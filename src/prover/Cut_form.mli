@@ -7,12 +7,14 @@ open Logtk
 
 type var = FOTerm.var
 type term = FOTerm.t
+type clause = Literals.t
+type form = clause list
 
 (** A formula of the form [forall vars. \bigand_i C_i].
     The [C_i] are clauses with free variables in [vars] *)
 type t = private {
   vars: FOTerm.VarSet.t;
-  cs: Literals.t list;
+  cs: form;
 }
 
 val make : Literals.t list -> t
@@ -36,4 +38,7 @@ val apply_subst : renaming:Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
 
 val are_variant : t -> t -> bool
 (** Are these two cut formulas alpha-equivalent? *)
+
+val normalize : t -> t
+(** Use rewriting to normalize the formula *)
 

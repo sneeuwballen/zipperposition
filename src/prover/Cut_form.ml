@@ -10,20 +10,26 @@ module T = FOTerm
 
 type var = FOTerm.var
 type term = FOTerm.t
+type clause = Literals.t
+type form = clause list
 
 type t = {
   vars: T.VarSet.t;
-  cs: Literals.t list;
+  cs: form;
 }
 
 let trivial = {cs=[]; vars=T.VarSet.empty}
+
 let make cs =
-  let vars =
-    Sequence.of_list cs
-    |> Sequence.flat_map Literals.Seq.vars
-    |> T.VarSet.of_seq
-  and cs = CCList.sort_uniq ~cmp:Literals.compare cs in
-  {cs; vars;}
+  if cs=[] then trivial
+  else (
+    let vars =
+      Sequence.of_list cs
+      |> Sequence.flat_map Literals.Seq.vars
+      |> T.VarSet.of_seq
+    and cs = CCList.sort_uniq ~cmp:Literals.compare cs in
+    {cs; vars;}
+  )
 
 let vars t = t.vars
 let cs t = t.cs
@@ -93,3 +99,5 @@ let variant ~subst (f1,sc1)(f2,sc2): Subst.t Sequence.t =
 
 let are_variant f1 f2: bool =
   not @@ Sequence.is_empty @@ variant ~subst:Subst.empty (f1,1)(f2,0)
+
+let normalize (f:t): t = cs f |> Test_prop.normalize_form |> make

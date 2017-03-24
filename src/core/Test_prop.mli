@@ -19,6 +19,9 @@ type res =
   | R_ok
   | R_fail of Subst.t (* counter-example *)
 
+val normalize_form : form -> form
+(** Use rewriting to normalize the formula *)
+
 val check_form : ?limit:int -> form -> res
 (** [check_form rules form] returns [R_ok] if the property seems to hold
     up to [depth], or [R_fail subst] if [subst] makes [form]

@@ -45,6 +45,13 @@ module Make_goal(E : Env_intf.S) : sig
   val ind_vars : t -> var list
   (** the inductive variables *)
 
+  val simplify : t -> t
+  (** Apply rewrite rules to the goal *)
+
+  val split : t -> t list
+  (** Split the goal into independent goals to be proved separately
+      (if there is a conjunction of clauses that share no variables) *)
+
   val pp : t CCFormat.printer
 
   type status =
@@ -86,10 +93,11 @@ end = struct
       | Test_prop.R_fail subst -> S_falsifiable subst
     end
 
-  let make cs: t =
-    let cut = Cut_form.make cs in
-    let test_res = lazy (test_ cs) in
-    {cut; test_res}
+  let of_form (f:Cut_form.t): t =
+    let test_res = lazy (Cut_form.cs f |> test_) in
+    {cut=f; test_res}
+
+  let make cs: t = of_form (Cut_form.make cs)
 
   let form t = t.cut
   let cs t = Cut_form.cs t.cut
@@ -98,6 +106,10 @@ end = struct
   let ind_vars t = Cut_form.ind_vars t.cut
 
   let pp out (f:t): unit = Cut_form.pp out f.cut
+
+  let simplify (g:t): t = form g |> Cut_form.normalize |> of_form
+
+  let split (g:t): t list = [g] (* TODO: see if clauses are disjoint *)
 
   module C = E.C
 
@@ -742,11 +754,6 @@ module Make
       (fun k->k (Util.pp_list C.pp) clauses
           (Util.pp_list Fmt.(pair ~sep:(return ":@ ") ID.pp Type.pp))
           generalize_on);
-    let goal =
-      generalize_clauses
-        (List.map C.lits clauses)
-        ~generalize_on
-    in
     let depth =
       Sequence.of_list generalize_on
       |> Sequence.map (fun (id,_) -> Ind_cst.ind_skolem_depth id)
@@ -763,17 +770,27 @@ module Make
         (fun lit -> not (BoolLit.sign lit && BBox.is_lemma lit))
     in
     if depth <= max_depth && no_pos_lemma_in_trail () then (
-      (* check if goal is worth the effort *)
-      if Goal.is_acceptable_goal goal then (
-        Util.debugf ~section 1
-          "(@[<2>@{<green>prove_by_induction@}@ :clauses (@[%a@])@ :goal %a@])"
-          (fun k->k (Util.pp_list C.pp) clauses Goal.pp goal);
-        let proof = ProofStep.mk_lemma in
-        (* new lemma has same penalty as the clauses *)
-        let penalty = List.fold_left (fun n c -> n+C.penalty c) 0 clauses in
-        let cut = A.introduce_cut ~penalty ~depth (Goal.form goal) proof in
-        A.add_lemma cut
-      );
+      let goal =
+        generalize_clauses
+          (List.map C.lits clauses)
+          ~generalize_on
+        |> Goal.simplify
+      in
+      let goals = Goal.split goal in
+      List.iter
+        (fun goal ->
+           (* check if goal is worth the effort *)
+           if Goal.is_acceptable_goal goal then (
+             Util.debugf ~section 1
+               "(@[<2>@{<green>prove_by_induction@}@ :clauses (@[%a@])@ :goal %a@])"
+               (fun k->k (Util.pp_list C.pp) clauses Goal.pp goal);
+             let proof = ProofStep.mk_lemma in
+             (* new lemma has same penalty as the clauses *)
+             let penalty = List.fold_left (fun n c -> n+C.penalty c) 0 clauses in
+             let cut = A.introduce_cut ~penalty ~depth (Goal.form goal) proof in
+             A.add_lemma cut
+           ))
+        goals
     );
     ()
 

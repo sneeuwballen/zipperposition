@@ -59,6 +59,45 @@ let pp_form out (f:form): unit =
     | _ -> Fmt.fprintf out "∧{@[%a@]}" (Util.pp_list ~sep:"," pp_c) f
   end
 
+let normalize_form (f:form): form =
+  let module RW = Rewrite in
+  let rec simplify c =
+    let lit_abs = CCArray.find_idx Literal.is_absurd c in
+    begin match lit_abs with
+      | None -> c
+      | Some (i,_) ->
+        let new_c = CCArray.except_idx c i |> Array.of_list in
+        simplify new_c
+    end
+  in
+  (* fixpoint of rewriting *)
+  let rec normalize (c:clause): clause Sequence.t =
+    let progress=ref false in
+    (* how to normalize a term/lit *)
+    let rw_term t =
+      let t', rules = RW.Term.normalize_term t in
+      if not (RW.Term.Set.is_empty rules) then progress := true;
+      t'
+    in
+    let rw_terms c = Literals.map rw_term c
+    and rw_clause c = match RW.Lit.normalize_clause c with
+      | None -> [c]
+      | Some cs ->
+        progress := true;
+        cs
+    in
+    let cs = c |> rw_terms |> rw_clause in
+    if !progress
+    then normalize_form cs (* normalize each result recursively *)
+    else (
+      (* done, just simplify *)
+      Sequence.of_list cs |> Sequence.map simplify
+    )
+  and normalize_form (f:form): clause Sequence.t =
+    Sequence.of_list f |> Sequence.flat_map normalize
+  in
+  normalize_form f |> Sequence.to_rev_list
+
 module Narrow : sig
   val default_limit: int
   val check_form: limit:int -> form -> res
@@ -86,32 +125,6 @@ end = struct
     Sequence.of_list f
     |> Sequence.flat_map Literals.Seq.vars
     |> T.VarSet.of_seq |> T.VarSet.to_list
-
-  let normalize_form (f:form): form =
-    (* fixpoint of rewriting *)
-    let rec normalize (c:clause): clause Sequence.t =
-      let progress=ref false in
-      (* how to normalize a term/lit *)
-      let rw_term t =
-        let t', rules = RW.Term.normalize_term t in
-        if not (RW.Term.Set.is_empty rules) then progress := true;
-        t'
-      in
-      let rw_terms c = Literals.map rw_term c
-      and rw_clause c = match RW.Lit.normalize_clause c with
-        | None -> [c]
-        | Some cs ->
-          progress := true;
-          cs
-      in
-      let cs = c |> rw_terms |> rw_clause in
-      if !progress
-      then normalize_form cs (* normalize each result recursively *)
-      else Sequence.of_list cs (* done *)
-    and normalize_form (f:form): clause Sequence.t =
-      Sequence.of_list f |> Sequence.flat_map normalize
-    in
-    normalize_form f |> Sequence.to_rev_list
 
   (* perform term narrowing in [f] *)
   let narrow_term (acc:subst_acc) (f:form): (subst_acc*form) Sequence.t =
