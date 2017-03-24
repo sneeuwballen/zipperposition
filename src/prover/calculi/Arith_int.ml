@@ -127,7 +127,7 @@ end
 let enable_arith_ = ref true
 let enable_ac_ = ref false
 let enable_semantic_tauto_ = ref true
-let enable_trivial_ineq_ = ref true
+let enable_trivial_ineq_ = ref false (* very costly *)
 let dot_unit_ = ref None
 let diff_to_lesseq_ = ref `Simplify
 
