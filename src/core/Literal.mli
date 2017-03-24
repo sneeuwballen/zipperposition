@@ -210,6 +210,15 @@ module View : sig
       removed from its monome, and its coefficient is returned. *)
 
   val unfocus_arith : Int_lit.Focus.t -> t
+
+  val get_rat : t -> Rat_lit.t option
+  (** Extract an arithmetic literal *)
+
+  val focus_rat : t -> Position.t -> Rat_lit.Focus.t option
+  (** Focus on a specific term in an arithmetic literal. The focused term is
+      removed from its monome, and its coefficient is returned. *)
+
+  val unfocus_rat : Rat_lit.Focus.t -> t
 end
 
 (** {2 Conversions} *)

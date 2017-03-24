@@ -237,6 +237,11 @@ module View = struct
       Lit.View.focus_arith lits.(idx) pos'
     | _ -> None
 
+  let get_rat lits pos = match pos with
+    | Position.Arg (idx, pos') when idx < Array.length lits ->
+      Lit.View.focus_rat lits.(idx) pos'
+    | _ -> None
+
   let _unwrap2 ~msg f x y = match f x y with
     | Some z -> z
     | None -> invalid_arg msg
@@ -246,6 +251,9 @@ module View = struct
 
   let get_arith_exn =
     _unwrap2 ~msg:"get_arith: improper position" get_arith
+
+  let get_rat_exn =
+    _unwrap2 ~msg:"get_rat: improper position" get_rat
 end
 
 let fold_lits ~eligible lits k =
@@ -330,6 +338,39 @@ let fold_arith_terms ~eligible ~which ~ord lits k =
        Int_lit.Focus.fold_terms ~pos a_lit
          (fun (foc_lit, pos) ->
             let t = Int_lit.Focus.term foc_lit in
+            if do_term t then k (t, foc_lit, pos))
+    )
+
+let fold_rat ~eligible lits k =
+  let rec aux i =
+    if i = Array.length lits then ()
+    else if not (eligible i lits.(i)) then aux (i+1)
+    else (
+      begin match Lit.View.get_rat lits.(i) with
+        | None -> ()
+        | Some x ->
+          let pos = Position.(arg i stop) in
+          k (x, pos)
+      end;
+      aux (i+1)
+    )
+  in aux 0
+
+let fold_rat_terms ~eligible ~which ~ord lits k =
+  let module M = Monome in let module MF = Monome.Focus in
+  fold_rat ~eligible lits
+    (fun (a_lit, pos) ->
+       (* do we use the given term? *)
+       let do_term =
+         match which with
+           | `All -> (fun _ -> true)
+           | `Max ->
+             let max_terms = Rat_lit.max_terms ~ord a_lit in
+             fun t -> CCList.mem ~eq:T.equal t max_terms
+       in
+       Rat_lit.Focus.fold_terms ~pos a_lit
+         (fun (foc_lit, pos) ->
+            let t = Rat_lit.Focus.term foc_lit in
             if do_term t then k (t, foc_lit, pos))
     )
 

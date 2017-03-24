@@ -133,6 +133,7 @@ Library "libzipperposition"
                     calculi/Rewriting,
                     calculi/EnumTypes,
                     calculi/Arith_int,
+                    calculi/Arith_rat,
                     calculi/Heuristics,
                     calculi/Ind_types,
                     calculi/Fool

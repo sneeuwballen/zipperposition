@@ -967,4 +967,14 @@ module View = struct
     | _ -> None
 
   let unfocus_arith x = Int (Int_lit.Focus.unfocus x)
+
+  let get_rat = function
+    | Rat o -> Some o
+    | _ -> None
+
+  let focus_rat lit pos = match lit with
+    | Rat o -> Rat_lit.Focus.get o pos
+    | _ -> None
+
+  let unfocus_rat x = Rat (Rat_lit.Focus.unfocus x)
 end
