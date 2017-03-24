@@ -71,7 +71,7 @@ Library "logtk"
                     Congruence, FeatureVector, FV_tree, UntypedAST, Ind_ty,
                     TypedSTerm, Statement, Flex_state, Compute_prec, 
                     Ordinal, Rewrite, Test_prop, Input_format,
-                    Multisets, Literal, Literals, Arith_lit, Monome,
+                    Multisets, Literal, Literals, Int_lit, Monome,
                     lib/Hashcons, lib/ParseLocation, lib/Multiset, lib/LazyList,
                     lib/Hash, lib/IArray, lib/AllocCache, lib/Multiset_intf,
                     lib/Signal, lib/UnionFind
@@ -132,7 +132,7 @@ Library "libzipperposition"
                     calculi/Superposition, calculi/Superposition_intf,
                     calculi/Rewriting,
                     calculi/EnumTypes,
-                    calculi/ArithInt,
+                    calculi/Arith_int,
                     calculi/Heuristics,
                     calculi/Ind_types,
                     calculi/Fool

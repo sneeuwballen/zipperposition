@@ -7,7 +7,7 @@ module T = FOTerm
 module S = Subst
 module PB = Position.Build
 module P = Position
-module AL = Arith_lit
+module AL = Int_lit
 
 type term = FOTerm.t
 
@@ -16,7 +16,7 @@ type t =
   | False
   | Equation of term * term * bool
   | Prop of term * bool
-  | Arith of Arith_lit.t
+  | Int of Int_lit.t
 
 let equal l1 l2 =
   match l1, l2 with
@@ -25,12 +25,12 @@ let equal l1 l2 =
     | Prop (p1, sign1), Prop(p2, sign2) -> sign1 = sign2 && T.equal p1 p2
     | True, True
     | False, False -> true
-    | Arith o1, Arith o2 -> Arith_lit.equal o1 o2
+    | Int o1, Int o2 -> Int_lit.equal o1 o2
     | Equation _, _
     | Prop _, _
     | True, _
     | False, _
-    | Arith _, _ -> false
+    | Int _, _ -> false
 
 let equal_com l1 l2 =
   match l1, l2 with
@@ -41,7 +41,7 @@ let equal_com l1 l2 =
     | Prop (p1, sign1), Prop(p2, sign2) -> sign1 = sign2 && T.equal p1 p2
     | True, True
     | False, False -> true
-    | Arith o1, Arith o2 -> Arith_lit.equal_com o1 o2
+    | Int o1, Int o2 -> Int_lit.equal_com o1 o2
     | _ -> equal l1 l2  (* regular comparison *)
 
 let compare l1 l2 =
@@ -50,7 +50,7 @@ let compare l1 l2 =
     | True -> 1
     | Equation _ -> 2
     | Prop _ -> 3
-    | Arith _ -> 5
+    | Int _ -> 5
   in
   match l1, l2 with
     | Equation (l1,r1,sign1), Equation (l2,r2,sign2) ->
@@ -64,19 +64,19 @@ let compare l1 l2 =
       if c <> 0 then c else Pervasives.compare sign1 sign2
     | True, True
     | False, False -> 0
-    | Arith o1, Arith o2 -> Arith_lit.compare o1 o2
+    | Int o1, Int o2 -> Int_lit.compare o1 o2
     | _, _ -> __to_int l1 - __to_int l2
 
 let fold f acc lit = match lit with
   | Equation (l, r, _) -> f (f acc l) r
   | Prop (p, _) -> f acc p
-  | Arith o -> Arith_lit.fold f acc o
+  | Int o -> Int_lit.fold f acc o
   | True
   | False -> acc
 
 let hash lit =
   match lit with
-    | Arith o -> Arith_lit.hash o
+    | Int o -> Int_lit.hash o
     | Prop (p, sign) -> Hash.combine3 20 (Hash.bool sign) (T.hash p)
     | Equation (l, r, sign) ->
       Hash.combine4 30 (Hash.bool sign) (T.hash l) (T.hash r)
@@ -91,7 +91,7 @@ let heuristic_weight weight = function
   | Equation (l, r, _) -> weight l + weight r
   | True
   | False -> 0
-  | Arith alit ->
+  | Int alit ->
     (* sum of weights of terms, without the (naked) variables *)
     AL.Seq.terms alit
     |> Sequence.filter (fun t -> not (T.is_var t))
@@ -104,12 +104,12 @@ let sign = function
   | Prop (_, sign)
   | Equation (_, _, sign) -> sign
   | False -> false
-  | Arith o -> Arith_lit.sign o
+  | Int o -> Int_lit.sign o
   | True -> true
 
 (* specific: for the term comparison *)
 let polarity = function
-  | Arith o -> Arith_lit.polarity o
+  | Int o -> Int_lit.polarity o
   | lit -> sign lit
 
 let is_pos = sign
@@ -119,7 +119,7 @@ let is_neg lit = not (is_pos lit)
 let is_eqn = function
   | Equation _
   | Prop _ -> true
-  | Arith _
+  | Int _
   | True
   | False -> false
 
@@ -130,24 +130,24 @@ let is_prop = function
   | Prop _
   | True
   | False -> true
-  | Arith _
+  | Int _
   | Equation _ -> false
 
 let is_arith = function
-  | Arith _ -> true
+  | Int _ -> true
   | _ -> false
 
 let _on_arith p lit = match lit with
-  | Arith o -> p o
+  | Int o -> p o
   | _ -> false
 
-let is_arith_eqn = _on_arith Arith_lit.is_eqn
-let is_arith_eq = _on_arith Arith_lit.is_eq
-let is_arith_neq = _on_arith Arith_lit.is_neq
-let is_arith_ineq = _on_arith Arith_lit.is_ineq
-let is_arith_less = _on_arith Arith_lit.is_less
-let is_arith_lesseq = _on_arith Arith_lit.is_lesseq
-let is_arith_divides = _on_arith Arith_lit.is_divides
+let is_arith_eqn = _on_arith Int_lit.is_eqn
+let is_arith_eq = _on_arith Int_lit.is_eq
+let is_arith_neq = _on_arith Int_lit.is_neq
+let is_arith_ineq = _on_arith Int_lit.is_ineq
+let is_arith_less = _on_arith Int_lit.is_less
+let is_arith_lesseq = _on_arith Int_lit.is_lesseq
+let is_arith_divides = _on_arith Int_lit.is_divides
 
 let ty_error_ a b =
   let msg =
@@ -193,20 +193,20 @@ let mk_tauto = True
 
 let mk_absurd = False
 
-let mk_arith x = Arith x
+let mk_arith x = Int x
 
-let mk_arith_op op m1 m2 = Arith (Arith_lit.make op m1 m2)
-let mk_arith_eq m1 m2 = mk_arith_op Arith_lit.Equal m1 m2
-let mk_arith_neq m1 m2 = mk_arith_op Arith_lit.Different m1 m2
-let mk_arith_less m1 m2 = mk_arith_op Arith_lit.Less m1 m2
-let mk_arith_lesseq m1 m2 = mk_arith_op Arith_lit.Lesseq m1 m2
+let mk_arith_op op m1 m2 = Int (Int_lit.make op m1 m2)
+let mk_arith_eq m1 m2 = mk_arith_op Int_lit.Equal m1 m2
+let mk_arith_neq m1 m2 = mk_arith_op Int_lit.Different m1 m2
+let mk_arith_less m1 m2 = mk_arith_op Int_lit.Less m1 m2
+let mk_arith_lesseq m1 m2 = mk_arith_op Int_lit.Lesseq m1 m2
 
 let mk_divides ?(sign=true) n ~power m =
-  let alit = Arith_lit.mk_divides ~sign n ~power m in
+  let alit = Int_lit.mk_divides ~sign n ~power m in
   (* simplify things like  not (5 | 10) ---> false *)
-  if Arith_lit.is_trivial alit then mk_tauto
-  else if Arith_lit.is_absurd alit then mk_absurd
-  else Arith alit
+  if Int_lit.is_trivial alit then mk_tauto
+  else if Int_lit.is_absurd alit then mk_absurd
+  else Int alit
 
 let mk_not_divides n ~power m = mk_divides ~sign:false n ~power m
 
@@ -214,7 +214,7 @@ module Seq = struct
   let terms lit k = match lit with
     | Equation(l, r, _) -> k l; k r
     | Prop(p, _) -> k p
-    | Arith o -> Arith_lit.Seq.terms o k
+    | Int o -> Int_lit.Seq.terms o k
     | True
     | False -> ()
 
@@ -259,8 +259,8 @@ let unif_lits op ~subst (lit1,sc1) (lit2,sc2) k =
     | False, False -> k subst
     | Equation (l1, r1, sign1), Equation (l2, r2, sign2) when sign1 = sign2 ->
       unif4 op.term ~subst l1 r1 sc1 l2 r2 sc2 k
-    | Arith o1, Arith o2 ->
-      Arith_lit.generic_unif op.monomes ~subst (o1,sc1) (o2,sc2) k
+    | Int o1, Int o2 ->
+      Int_lit.generic_unif op.monomes ~subst (o1,sc1) (o2,sc2) k
     | _, _ -> ()
 
 let variant ?(subst=S.empty) lit1 lit2 k =
@@ -330,9 +330,9 @@ let _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 k =
 
 let subsumes ?(subst=Subst.empty) (lit1,sc1) (lit2,sc2) k =
   match lit1, lit2 with
-    | Arith o1, Arith o2 ->
+    | Int o1, Int o2 ->
       (* use the more specific subsumption mechanism *)
-      Arith_lit.subsumes ~subst (o1,sc1) (o2,sc2) k
+      Int_lit.subsumes ~subst (o1,sc1) (o2,sc2) k
     | Equation (l1, r1, true), Equation (l2, r2, true) ->
       _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 k
     | _ -> matching ~subst ~pattern:(lit1,sc1) (lit2,sc2) k
@@ -355,7 +355,7 @@ let map f = function
   | Prop (p, sign) ->
     let p' = f p in
     mk_prop p' sign
-  | Arith o -> Arith (Arith_lit.map f o)
+  | Int o -> Int (Int_lit.map f o)
   | True -> True
   | False -> False
 
@@ -368,23 +368,23 @@ let apply_subst_ ~f_term ~f_arith_lit subst (lit,sc) =
     | Prop (p, sign) ->
       let p' = f_term subst (p,sc) in
       mk_prop p' sign
-    | Arith o -> Arith (f_arith_lit subst (o,sc))
+    | Int o -> Int (f_arith_lit subst (o,sc))
     | True
     | False -> lit
 
 let apply_subst ~renaming subst (lit,sc) =
   apply_subst_ subst (lit,sc)
     ~f_term:(S.FO.apply ~renaming)
-    ~f_arith_lit:(Arith_lit.apply_subst ~renaming)
+    ~f_arith_lit:(Int_lit.apply_subst ~renaming)
 
 let apply_subst_no_renaming subst (lit,sc) =
   apply_subst_ subst (lit,sc)
     ~f_term:S.FO.apply_no_renaming
-    ~f_arith_lit:Arith_lit.apply_subst_no_renaming
+    ~f_arith_lit:Int_lit.apply_subst_no_renaming
 
 let apply_subst_no_simp ~renaming subst (lit,sc) =
   match lit with
-    | Arith o -> Arith (Arith_lit.apply_subst_no_simp ~renaming subst (o,sc))
+    | Int o -> Int (Int_lit.apply_subst_no_simp ~renaming subst (o,sc))
     | Equation (l,r,sign) ->
       Equation (S.FO.apply ~renaming subst (l,sc),
         S.FO.apply ~renaming subst (r,sc), sign)
@@ -403,7 +403,7 @@ let negate lit = match lit with
   | Prop (p, sign) -> Prop (p, not sign)
   | True -> False
   | False -> True
-  | Arith o -> Arith (Arith_lit.negate o)
+  | Int o -> Int (Int_lit.negate o)
 
 let vars lit =
   Seq.vars lit |> T.VarSet.of_seq |> T.VarSet.to_list
@@ -411,14 +411,14 @@ let vars lit =
 let var_occurs v lit = match lit with
   | Prop (p,_) -> T.var_occurs ~var:v p
   | Equation (l,r,_) -> T.var_occurs ~var:v l || T.var_occurs ~var:v r
-  | Arith _ -> Sequence.exists (T.var_occurs ~var:v) (Seq.terms lit)
+  | Int _ -> Sequence.exists (T.var_occurs ~var:v) (Seq.terms lit)
   | True
   | False -> false
 
 let is_ground lit = match lit with
   | Equation (l,r,_) -> T.is_ground l && T.is_ground r
   | Prop (p, _) -> T.is_ground p
-  | Arith _ -> Sequence.for_all T.is_ground (Seq.terms lit)
+  | Int _ -> Sequence.for_all T.is_ground (Seq.terms lit)
   | True
   | False -> true
 
@@ -430,7 +430,7 @@ let to_multiset lit = match lit with
   | Equation (l, r, _) -> Multisets.MT.doubleton l r
   | True
   | False -> Multisets.MT.singleton T.true_
-  | Arith alit ->
+  | Int alit ->
     AL.Seq.to_multiset alit
     |> Multisets.MT.Seq.of_coeffs Multisets.MT.empty
 
@@ -439,7 +439,7 @@ let is_trivial lit = match lit with
   | False -> false
   | Equation (l, r, true) -> T.equal l r
   | Equation (_, _, false) -> false
-  | Arith o -> Arith_lit.is_trivial o
+  | Int o -> Int_lit.is_trivial o
   | Prop (_, _) -> false
 
 (* is it impossible for these terms to be equal? check if a cstor-only
@@ -464,7 +464,7 @@ let is_absurd lit = match lit with
   | Prop (p, false) when T.equal p T.true_ -> true
   | Prop (p, true) when T.equal p T.false_ -> true
   | False -> true
-  | Arith o -> Arith_lit.is_absurd o
+  | Int o -> Int_lit.is_absurd o
   | _ -> false
 
 let fold_terms ?(position=Position.stop) ?(vars=false) ?ty_args ~which ~ord ~subterms lit k =
@@ -495,8 +495,8 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ?ty_args ~which ~ord ~sub
     | Prop (p, _), _ ->
       (* p is the only term, and it's maximal *)
       at_term ~pos:P.(append position (left stop)) p
-    | Arith o, _ ->
-      Arith_lit.fold_terms ~pos:position ~vars ~which ~ord ~subterms o k
+    | Int o, _ ->
+      Int_lit.fold_terms ~pos:position ~vars ~which ~ord ~subterms o k
     | True, _
     | False, _ -> ()
 
@@ -513,7 +513,7 @@ let pp_debug ?(hooks=[]) out lit =
       Format.fprintf out "@[<1>%a@ = %a@]" T.pp l T.pp r
     | Equation (l, r, false) ->
       Format.fprintf out "@[<1>%a@ ≠ %a@]" T.pp l T.pp r
-    | Arith o -> Arith_lit.pp out o
+    | Int o -> Int_lit.pp out o
 
 let pp_tstp out lit =
   match lit with
@@ -525,7 +525,7 @@ let pp_tstp out lit =
       Format.fprintf out "@[<1>%a@ = %a@]" T.TPTP.pp l T.TPTP.pp r
     | Equation (l, r, false) ->
       Format.fprintf out "@[<1>%a@ != %a@]" T.TPTP.pp l T.TPTP.pp r
-    | Arith o -> Arith_lit.pp_tstp out o
+    | Int o -> Int_lit.pp_tstp out o
 
 type print_hook = CCFormat.t -> t -> bool
 let __hooks = ref []
@@ -552,7 +552,7 @@ module Comp = struct
     match lit with
       | Prop (p, _) -> [p]
       | Equation (l, r, _) -> _maxterms2 ~ord l r
-      | Arith a -> Arith_lit.max_terms ~ord a
+      | Int a -> Int_lit.max_terms ~ord a
       | True
       | False -> []
 
@@ -599,15 +599,15 @@ module Comp = struct
       | false, true -> Comparison.Gt
 
   let _cmp_by_kind l1 l2 =
-    let open Arith_lit in
+    let open Int_lit in
     let _to_int = function
       | False
       | True -> 0
-      | Arith (Binary (Equal, _, _)) -> 3
-      | Arith (Binary (Different, _, _)) -> 4
-      | Arith (Binary (Less, _, _)) -> 5
-      | Arith (Binary (Lesseq, _, _)) -> 6
-      | Arith (Divides _) -> 7
+      | Int (Binary (Equal, _, _)) -> 3
+      | Int (Binary (Different, _, _)) -> 4
+      | Int (Binary (Less, _, _)) -> 5
+      | Int (Binary (Lesseq, _, _)) -> 6
+      | Int (Divides _) -> 7
       | Equation _
       | Prop _ -> 8  (* eqn and prop are really the same thing *)
     in
@@ -637,7 +637,7 @@ module Comp = struct
       | Equation _, True
       | Equation _, False ->
         _cmp_by_term_multiset ~ord l1 l2
-      | Arith (AL.Binary(op1, x1, y1)), Arith (AL.Binary(op2, x2, y2)) ->
+      | Int (AL.Binary(op1, x1, y1)), Int (AL.Binary(op2, x2, y2)) ->
         assert (op1 = op2);
         let module MI = Monome.Int in
         let left = Multisets.MMT.doubleton (MI.to_multiset x1) (MI.to_multiset y1) in
@@ -645,7 +645,7 @@ module Comp = struct
         Multisets.MMT.compare_partial
           (Multisets.MT.compare_partial (Ordering.compare ord))
           left right
-      | Arith(AL.Divides d1), Arith(AL.Divides d2) ->
+      | Int(AL.Divides d1), Int(AL.Divides d2) ->
         assert (d1.AL.sign=d2.AL.sign);
         let c = Z.compare d1.AL.num d2.AL.num in
         if c <> 0 then C.of_total c  (* live in totally distinct Z/nZ *)
@@ -683,7 +683,7 @@ module Pos = struct
     in invalid_arg msg
 
   let split lit pos =
-    let module AL = Arith_lit in
+    let module AL = Int_lit in
     match lit, pos with
       | True, P.Stop ->
         {lit_pos=P.stop; term_pos=P.stop; term=T.true_; }
@@ -695,13 +695,13 @@ module Pos = struct
         {lit_pos=P.(right stop); term_pos=pos'; term=r; }
       | Prop (p,_), P.Left pos' ->
         {lit_pos=P.(left stop); term_pos=pos'; term=p; }
-      | Arith(AL.Divides d), P.Arg (i, pos') ->
+      | Int(AL.Divides d), P.Arg (i, pos') ->
         let term = try snd(Monome.nth d.AL.monome i) with _ -> _fail_lit lit pos in
         {lit_pos=P.(arg i stop); term_pos= pos'; term; }
-      | Arith(AL.Binary (_, m1, _)), P.Left (P.Arg (i, pos')) ->
+      | Int(AL.Binary (_, m1, _)), P.Left (P.Arg (i, pos')) ->
         let term = try snd(Monome.nth m1 i) with _ -> _fail_lit lit pos in
         {lit_pos=P.(left @@ arg i stop); term_pos=pos'; term; }
-      | Arith(AL.Binary(_, _, m2)), P.Right (P.Arg (i, pos')) ->
+      | Int(AL.Binary(_, _, m2)), P.Right (P.Arg (i, pos')) ->
         let term = try snd(Monome.nth m2 i) with _ -> _fail_lit lit pos in
         {lit_pos=P.(right @@ arg i stop); term_pos=pos'; term; }
       | _ -> _fail_lit lit pos
@@ -715,7 +715,7 @@ module Pos = struct
     T.Pos.at s.term s.term_pos
 
   let replace lit ~at ~by =
-    let module AL = Arith_lit in
+    let module AL = Int_lit in
     match lit, at with
       | Equation (l, r, sign), P.Left pos' ->
         mk_lit (T.Pos.replace l pos' ~by) r sign
@@ -725,18 +725,18 @@ module Pos = struct
         mk_prop (T.Pos.replace p pos' ~by) sign
       | True, _
       | False, _ -> lit  (* flexible, lit can be the result of a simplification *)
-      | Arith (AL.Binary (op, m1, m2)), P.Left (P.Arg(i,pos')) ->
+      | Int (AL.Binary (op, m1, m2)), P.Left (P.Arg(i,pos')) ->
         let _, t = Monome.nth m1 i in
         let m1' = Monome.set_term m1 i (T.Pos.replace t pos' ~by) in
-        Arith (AL.make op m1' m2)
-      | Arith (AL.Binary(op, m1, m2)), P.Right (P.Arg(i,pos')) ->
+        Int (AL.make op m1' m2)
+      | Int (AL.Binary(op, m1, m2)), P.Right (P.Arg(i,pos')) ->
         let _, t = Monome.nth m2 i in
         let m2' = Monome.set_term m2 i (T.Pos.replace t pos' ~by) in
-        Arith (AL.make op m1 m2')
-      | Arith (AL.Divides d), P.Arg (i, pos') ->
+        Int (AL.make op m1 m2')
+      | Int (AL.Divides d), P.Arg (i, pos') ->
         let _, t = Monome.nth d.AL.monome i in
         let m' = Monome.set_term d.AL.monome i (T.Pos.replace t pos' ~by) in
-        Arith (AL.mk_divides ~sign:d.AL.sign ~power:d.AL.power d.AL.num m')
+        Int (AL.mk_divides ~sign:d.AL.sign ~power:d.AL.power d.AL.num m')
       | _ -> _fail_lit lit at
 
   let root_term lit pos =
@@ -745,20 +745,20 @@ module Pos = struct
   let term_pos lit pos = snd (cut lit pos)
 
   let is_max_term ~ord lit pos =
-    let module AL = Arith_lit in
+    let module AL = Int_lit in
     match lit, pos with
       | Equation (l, r, _), P.Left _ ->
         Ordering.compare ord l r <> Comparison.Lt
       | Equation (l, r, _), P.Right _ ->
         Ordering.compare ord r l <> Comparison.Lt
       | Prop _, _ -> true
-      | Arith (AL.Binary(_, _m1, _m2)), _ ->
+      | Int (AL.Binary(_, _m1, _m2)), _ ->
         (* [t] dominates all atomic terms? *)
         let t = root_term lit pos in
         Sequence.for_all
           (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
           (Seq.terms lit)
-      | Arith (AL.Divides d), _ ->
+      | Int (AL.Divides d), _ ->
         let t = root_term lit pos in
         Sequence.for_all
           (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
@@ -774,42 +774,43 @@ module Conv = struct
 
   let arith_hook_from f =
     let open CCOpt in
-    let module SA = Builtin.Arith in
-    let module AL = Arith_lit in
-    let type_ok t = Type.equal Type.TPTP.int (T.ty t) in
+    let module BA = Builtin.Arith in
+    let module AL = Int_lit in
+    let type_ok t = Type.equal Type.int (T.ty t) in
     (* arithmetic conversion! *)
-    match f with
+    begin match f with
       | SLiteral.Eq (l, r) when type_ok l ->
         Monome.Int.of_term l >>= fun m1 ->
         Monome.Int.of_term r >>= fun m2 ->
-        return (Arith (AL.mk_eq m1 m2))
+        return (Int (AL.mk_eq m1 m2))
       | SLiteral.Neq (l, r) when type_ok l ->
         Monome.Int.of_term l >>= fun m1 ->
         Monome.Int.of_term r >>= fun m2 ->
-        return (Arith (AL.mk_neq m1 m2))
+        return (Int (AL.mk_neq m1 m2))
       | SLiteral.Atom (t, b) ->
         let post lit = if b then lit else negate lit in
         let res = match T.view t with
           | T.AppBuiltin (Builtin.Less, [_; l; r]) when type_ok l ->
             Monome.Int.of_term l >>= fun m1 ->
             Monome.Int.of_term r >>= fun m2 ->
-            return (Arith (AL.mk_less m1 m2))
+            return (Int (AL.mk_less m1 m2))
           | T.AppBuiltin (Builtin.Lesseq, [_; l; r]) when type_ok l ->
             Monome.Int.of_term l >>= fun m1 ->
             Monome.Int.of_term r >>= fun m2 ->
-            return (Arith (AL.mk_lesseq m1 m2))
+            return (Int (AL.mk_lesseq m1 m2))
           | T.AppBuiltin (Builtin.Greater, [_; l; r]) when type_ok l ->
             Monome.Int.of_term l >>= fun m1 ->
             Monome.Int.of_term r >>= fun m2 ->
-            return (Arith (AL.mk_less m2 m1))
+            return (Int (AL.mk_less m2 m1))
           | T.AppBuiltin (Builtin.Greatereq, [_; l; r]) when type_ok l ->
             Monome.Int.of_term l >>= fun m1 ->
             Monome.Int.of_term r >>= fun m2 ->
-            return (Arith (AL.mk_lesseq m2 m1))
+            return (Int (AL.mk_lesseq m2 m1))
           | _ -> None
         in
         CCOpt.map post res
       | _ -> None
+    end
 
   let rec try_hooks x hooks = match hooks with
     | [] -> None
@@ -840,7 +841,7 @@ module Conv = struct
           | Prop (p, sign) -> SLiteral.atom p sign
           | True -> SLiteral.true_
           | False -> SLiteral.false_
-          | Arith o -> Arith_lit.to_form o
+          | Int o -> Int_lit.to_form o
 end
 
 module View = struct
@@ -849,7 +850,7 @@ module View = struct
     | Prop (p, sign) -> Some (p, T.true_, sign)
     | True
     | False
-    | Arith _ -> None
+    | Int _ -> None
 
   let get_eqn lit position =
     match lit, position with
@@ -858,16 +859,16 @@ module View = struct
       | Prop (p, sign), P.Left _ -> Some (p, T.true_, sign)
       | True, _
       | False, _
-      | Arith _, _ -> None
+      | Int _, _ -> None
       | _ -> invalid_arg "get_eqn: wrong literal or position"
 
   let get_arith = function
-    | Arith o -> Some o
+    | Int o -> Some o
     | _ -> None
 
   let focus_arith lit pos = match lit with
-    | Arith o -> Arith_lit.Focus.get o pos
+    | Int o -> Int_lit.Focus.get o pos
     | _ -> None
 
-  let unfocus_arith x = Arith (Arith_lit.Focus.unfocus x)
+  let unfocus_arith x = Int (Int_lit.Focus.unfocus x)
 end

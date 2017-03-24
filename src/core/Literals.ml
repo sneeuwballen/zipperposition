@@ -290,7 +290,7 @@ let fold_eqn ?(both=true) ?sign ~ord ~eligible lits k =
           k (p, T.true_, sign, Position.(arg i @@ left @@ stop))
         | Lit.Prop _
         | Lit.Equation _
-        | Lit.Arith _
+        | Lit.Int _
         | Lit.True
         | Lit.False -> ()
       end;
@@ -323,12 +323,12 @@ let fold_arith_terms ~eligible ~which ~ord lits k =
          match which with
            | `All -> (fun _ -> true)
            | `Max ->
-             let max_terms = Arith_lit.max_terms ~ord a_lit in
+             let max_terms = Int_lit.max_terms ~ord a_lit in
              fun t -> CCList.mem ~eq:T.equal t max_terms
        in
-       Arith_lit.Focus.fold_terms ~pos a_lit
+       Int_lit.Focus.fold_terms ~pos a_lit
          (fun (foc_lit, pos) ->
-            let t = Arith_lit.Focus.term foc_lit in
+            let t = Int_lit.Focus.term foc_lit in
             if do_term t then k (t, foc_lit, pos))
     )
 

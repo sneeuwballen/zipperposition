@@ -11,7 +11,7 @@ module Lits = Literals
 module S = Subst
 module M = Monome
 module MF = Monome.Focus
-module AL = Arith_lit
+module AL = Int_lit
 module ALF = AL.Focus
 module Stmt = Statement
 
@@ -210,7 +210,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let update_simpl f c =
     let ord = Ctx.ord () in
     begin match C.lits c with
-      | [| Lit.Arith ((AL.Binary (AL.Equal, _, _)) as alit) |] ->
+      | [| Lit.Int ((AL.Binary (AL.Equal, _, _)) as alit) |] ->
         let pos = Position.(arg 0 stop) in
         _idx_unit_eq :=
           AL.fold_terms ~subterms:false ~vars:false ~pos ~which:`Max ~ord alit
@@ -220,7 +220,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                let with_pos = C.WithPos.( {term=t; pos; clause=c;} ) in
                f acc t with_pos)
             !_idx_unit_eq
-      | [| Lit.Arith ((AL.Binary (AL.Lesseq, _, _)) as alit) |] ->
+      | [| Lit.Int ((AL.Binary (AL.Lesseq, _, _)) as alit) |] ->
         let pos = Position.(arg 0 stop) in
         _idx_unit_ineq :=
           AL.fold_terms ~subterms:false ~vars:false ~pos ~which:`Max ~ord alit
@@ -230,7 +230,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                let with_pos = C.WithPos.( {term=t; pos; clause=c;} ) in
                f acc t with_pos)
             !_idx_unit_ineq
-      | [| Lit.Arith (AL.Divides d as alit) |] when d.AL.sign ->
+      | [| Lit.Int (AL.Divides d as alit) |] when d.AL.sign ->
         let pos = Position.(arg 0 stop) in
         _idx_unit_div :=
           AL.fold_terms ~subterms:false ~vars:false ~pos ~which:`Max ~ord alit
@@ -534,7 +534,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> Sequence.iter
       (fun (lit,i) ->
          match lit with
-           | Lit.Arith a_lit ->
+           | Lit.Int a_lit ->
              _demod_lit_nf ~add_lit ~add_premise ~i c a_lit
            | _ ->
              add_lit lit (* keep non-arith literals *)
@@ -568,7 +568,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let ord = Ctx.ord () in
     let res = C.ClauseSet.empty in
     let res = match C.lits c with
-      | [| Lit.Arith (AL.Binary (AL.Equal, _, _) as alit) |] ->
+      | [| Lit.Int (AL.Binary (AL.Equal, _, _) as alit) |] ->
         AL.fold_terms ~vars:false ~which:`Max ~subterms:false ~ord alit
         |> Sequence.fold
           (fun acc (t,pos) ->
@@ -587,9 +587,9 @@ module Make(E : Env.S) : S with module Env = E = struct
                   ) else acc)
                acc)
           C.ClauseSet.empty
-      | [| Lit.Arith (AL.Binary (AL.Lesseq, _m1, _m2)) |] ->
+      | [| Lit.Int (AL.Binary (AL.Lesseq, _m1, _m2)) |] ->
         res (* TODO *)
-      | [| Lit.Arith (AL.Divides d) |] when d.AL.sign ->
+      | [| Lit.Int (AL.Divides d) |] when d.AL.sign ->
         res (* TODO *)
       | _ -> res (* no demod *)
     in
@@ -1112,7 +1112,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     match lit with
       | _ when Lit.is_trivial lit || Lit.is_absurd lit ->
         None  (* something more efficient will take care of it *)
-      | Lit.Arith (AL.Binary (AL.Lesseq, _m1, _m2) as alit) ->
+      | Lit.Int (AL.Binary (AL.Lesseq, _m1, _m2) as alit) ->
         let ord = Ctx.ord () in
         let traces =
           _ineq_find_sufficient ~ord ~trace:[] c alit
@@ -1536,7 +1536,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* Simplification:  a < b  ----> a+1 ≤ b *)
   let canc_less_to_lesseq = function
-    | Lit.Arith (AL.Binary (AL.Less, m1, m2)) ->
+    | Lit.Int (AL.Binary (AL.Less, m1, m2)) ->
       Some (Lit.mk_arith_lesseq (M.succ m1) m2)
     | _ -> None
 
@@ -1599,7 +1599,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Sequence.iter
         (fun (lit,i) ->
            match lit with
-             | Lit.Arith (AL.Binary (AL.Different, m1, m2)) ->
+             | Lit.Int (AL.Binary (AL.Different, m1, m2)) ->
                assert (eligible i lit);
                Util.debugf ~section 5 "@[<2>lit @[%a [%d]@]@ in @[%a@]@]"
                  (fun k->k Lit.pp lit i C.pp c);
@@ -1835,7 +1835,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let of_lits lits x =
       Array.fold_left
         (fun acc lit -> match lit with
-           | Lit.Arith o when Lit.var_occurs x lit ->
+           | Lit.Int o when Lit.var_occurs x lit ->
              (* one of the literals [x] occurs in! classify it, but
                 remember that we need to {b negate} it first. *)
              begin match AL.Focus.focus_term (AL.negate o) (T.var x) with
