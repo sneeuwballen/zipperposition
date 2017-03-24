@@ -35,6 +35,9 @@ val mk_less : Q.t Monome.t -> Q.t Monome.t -> t
 val is_eq : t -> bool
 val is_less : t -> bool
 
+val to_term : t -> term
+(** Back to terms (for negation) *)
+
 val pp : t CCFormat.printer
 val pp_tstp : t CCFormat.printer
 val to_string : t -> string

@@ -373,6 +373,14 @@ let to_form m =
       SLiteral.atom t true
   end
 
+let to_term m: term =
+  let m1 = M.Rat.to_term m.left in
+  let m2 = M.Rat.to_term m.right in
+  begin match m.op with
+    | Equal -> T.app_builtin ~ty:Type.prop Builtin.Eq [m1; m2]
+    | Less -> T.app_builtin ~ty:Type.prop Builtin.Less [m1; m2]
+  end
+
 (** {2 Iterators} *)
 
 module Seq = struct

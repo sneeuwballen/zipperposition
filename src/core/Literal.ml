@@ -440,7 +440,7 @@ let negate lit = match lit with
   | True -> False
   | False -> True
   | Int o -> Int (Int_lit.negate o)
-  | Rat o -> Util.invalid_argf "cannot negate `%a`" Rat_lit.pp o
+  | Rat o -> mk_false (Rat_lit.to_term o)
 
 let vars lit =
   Seq.vars lit |> T.VarSet.of_seq |> T.VarSet.to_list

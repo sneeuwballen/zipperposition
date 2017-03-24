@@ -41,17 +41,12 @@ let prof_rat_ineq_factoring = Util.mk_profiler "rat.ineq_factoring"
 let prof_rat_reflexivity_resolution = Util.mk_profiler "rat.reflexivity_resolution"
 *)
 
-let section = Util.Section.make ~parent:Const.section "arith"
+let section = Util.Section.make ~parent:Const.section "rat-arith"
 
 let enable_rat_ = ref true
 let enable_ac_ = ref false
 let enable_semantic_tauto_ = ref true
-let enable_trivial_ineq_ = ref false (* very costly *)
 let dot_unit_ = ref None
-let diff_to_lesseq_ = ref `Simplify
-
-let case_switch_limit = ref 30
-let div_case_switch_limit = ref 100
 
 let flag_tauto = SClause.new_flag ()
 let flag_computed_tauto = SClause.new_flag ()
@@ -894,91 +889,41 @@ module Make(E : Env.S) : S with module Env = E = struct
       res
     )
 
-  exception VarElim of int * S.t
-
-  (* X != Y or C -----> C[X/Y] *)
-  let canc_eq_resolution c =
-    (* check whether [m] is only one variable with coeff 1 *)
-    let is_unary_var m =
-      match M.coeffs m with
-        | [c, t] ->
-          begin match T.view t with
-            | T.Var v when Z.(equal c one) && Z.(equal (M.const m) zero) ->
-              Some v
-            | _ -> None
-          end
-        | _ -> None
+  (* look for negated literals *)
+  let unnegate_lits c: C.t SimplM.t =
+    let type_ok t = Type.equal Type.rat (T.ty t) in
+    let open CCOpt.Infix in
+    let conv_lit i lit = match lit with
+      | Lit.Equation (l, r, false) when type_ok l ->
+        Monome.Rat.of_term l >>= fun m1 ->
+        Monome.Rat.of_term r >|= fun m2 ->
+        i, [Lit.mk_rat_less m1 m2; Lit.mk_rat_less m2 m1]
+      | Lit.Prop (f, false) ->
+        begin match T.view f with
+          | T.AppBuiltin (Builtin.Less, [l; r]) when type_ok l ->
+            Monome.Rat.of_term l >>= fun m1 ->
+            Monome.Rat.of_term r >|= fun m2 ->
+            (* ¬(l<r) --> l=r ∨ r<l *)
+            i, [Lit.mk_rat_eq m1 m2; Lit.mk_rat_less m2 m1]
+          | _ -> None
+        end
+      | _ -> None
     in
-    try
-      Lits.fold_arith ~eligible:C.Eligible.(filter Lit.is_arith_neq) (C.lits c)
-      |> Sequence.iter
-        (fun (lit,pos) ->
-           match lit with
-             | {AL.op=AL.Neq; left=m1; right=m2} ->
-               begin match is_unary_var m1, is_unary_var m2 with
-                 | Some v1, Some v2 ->
-                   let subst =
-                     S.FO.bind S.empty
-                       ((v1:Type.t HVar.t :> InnerTerm.t HVar.t),0)
-                       (T.var v2,0) in
-                   let i = Lits.Pos.idx pos in
-                   raise (VarElim (i, subst))
-                 | _ -> ()
-               end
-             | _ -> ()
-        );
-      SimplM.return_same c (* could not simplify *)
-    with VarElim (i, subst) ->
-      let lits' = CCArray.except_idx (C.lits c) i in
-      let renaming = Ctx.renaming_clear () in
-      let lits' = Lit.apply_subst_list ~renaming subst (lits',0) in
-      let proof =
-        ProofStep.mk_inference
-          ~rule:(ProofStep.mk_rule ~subst:[subst] "canc_eq_res")
-          [C.proof c] in
-      let c' = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
-      Util.debugf ~section 4
-        "@[<2>arith_eq_res:@ simplify @[%a@]@ into @[%a@]@]"
-        (fun k->k C.pp c C.pp c');
-      SimplM.return_new c'
-
-  exception DiffToLesseq of C.t
-
-  (* a != b ------> a+1 ≤ b | a ≥ b+1 *)
-  let canc_diff_to_lesseq c =
-    let ord = Ctx.ord () in
-    let eligible = C.Eligible.(filter Lit.is_arith_neq ** max c) in
-    try
-      Lits.fold_lits ~eligible (C.lits c)
-      |> Sequence.iter
-        (fun (lit,i) ->
-           match lit with
-             | Lit.Int (AL.Binary (AL.Different, m1, m2)) ->
-               assert (eligible i lit);
-               Util.debugf ~section 5 "@[<2>lit @[%a [%d]@]@ in @[%a@]@]"
-                 (fun k->k Lit.pp lit i C.pp c);
-               assert (Lits.is_max ~ord (C.lits c) i);
-               let lits = CCArray.except_idx (C.lits c) i in
-               let new_lits =
-                 [ Lit.mk_arith_lesseq (M.succ m1) m2
-                 ; Lit.mk_arith_lesseq (M.succ m2) m1
-                 ]
-               in
-               let proof =
-                 ProofStep.mk_inference
-                   ~rule:(ProofStep.mk_rule "arith_diff_to_lesseq") [C.proof c] in
-               let c' =
-                 C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-                   (new_lits @ lits) proof
-               in
-               Util.debugf ~section 5 "@[<2>diff2less:@ @[%a@]@ into @[%a@]@]"
-                 (fun k->k C.pp c C.pp c');
-               raise (DiffToLesseq c')
-             | _ -> assert false
-        );
-      SimplM.return_same c
-    with DiffToLesseq c ->
-      SimplM.return_new c
+    begin match CCArray.findi conv_lit (C.lits c) with
+      | None -> SimplM.return_same c
+      | Some (i, new_lits) ->
+        let lits =
+          new_lits @ CCArray.except_idx (C.lits c) i
+        and proof =
+          ProofStep.mk_simp ~rule:(ProofStep.mk_rule "unnegate_lit") [C.proof c]
+        in
+        let c' =
+          C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof
+        in
+        Util.debugf ~section 5 "(@[unnegate@ :from %a@ :to %a@])"
+          (fun k->k C.pp c C.pp c');
+        SimplM.return_new c'
+    end
 
   (* replace arith subterms with fresh variable + constraint *)
   let purify c = SimplM.return c
@@ -1217,8 +1162,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_backward_simplify canc_backward_demodulation;
     Env.add_is_trivial is_tautology;
     Env.add_simplify purify;
-    Env.add_simplify canc_neq_to_less;
-    Env.add_simplify canc_eq_resolution;
+    Env.add_simplify unnegate_lits;
     Env.add_multi_simpl_rule eliminate_unshielded;
     Ctx.Lit.add_from_hook Lit.Conv.rat_hook_from;
     (* completeness? I don't think so *)
