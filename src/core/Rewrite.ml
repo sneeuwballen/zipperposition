@@ -515,7 +515,7 @@ module Lit = struct
                  | _ -> fail()
                end
            | Literal.True | Literal.False
-           | Literal.Equation _ | Literal.Int _ -> fail()
+           | Literal.Equation _ | Literal.Int _ | Literal.Rat _ -> fail()
         end)
     in
     compute_pos_gen prules

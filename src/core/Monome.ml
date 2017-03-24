@@ -27,8 +27,8 @@ type 'a num = {
   to_string : 'a -> string;
 }
 
-let z = {
-  ty = Type.TPTP.int;
+let z : Z.t num = {
+  ty = Type.int;
   equal = Z.equal;
   sign = Z.sign;
   abs = Z.abs;
@@ -44,8 +44,31 @@ let z = {
   mult = Z.mul;
   uminus = (fun x -> Z.mul x Z.minus_one);
   minus = Z.sub;
-  to_term = (fun n -> T.builtin ~ty:Type.TPTP.int (Builtin.mk_int n));
+  to_term = (fun n -> T.builtin ~ty:Type.int (Builtin.mk_int n));
   to_string = Z.to_string;
+}
+
+let q : Q.t num = {
+  ty = Type.rat;
+  equal = Q.equal;
+  sign = Q.sign;
+  abs = Q.abs;
+  cmp = Q.compare;
+  raise_to_lcm = (fun a b ->
+    assert (Q.sign a <> 0);
+    assert (Q.sign b <> 0);
+    let gcd = Q.max a b in
+    Q.div b gcd, Q.div a gcd);
+  hash = (fun q-> CCHash.string (Q.to_string q));
+  zero = Q.zero;
+  one = Q.one;
+  add = Q.add;
+  sub = Q.sub;
+  mult = Q.mul;
+  uminus = (fun x -> Q.mul x Q.minus_one);
+  minus = Q.sub;
+  to_term = (fun n -> T.builtin ~ty:Type.rat (Builtin.mk_rat n));
+  to_string = Q.to_string;
 }
 
 type 'a t = {
@@ -1158,4 +1181,112 @@ module Int = struct
     let neq_zero ?fresh_var m =
       lt_zero ?fresh_var m
   end
+end
+
+module Rat = struct
+  let num = q
+  type t = Q.t monome
+
+  let const = mk_const ~num
+  let singleton = singleton ~num
+  let of_list = of_list ~num
+
+  let of_term_exn t =
+    let rec of_term t : t = match T.view t with
+      | T.AppBuiltin (Builtin.Sum, [_; t1; t2]) ->
+        let m1 = of_term t1 in
+        let m2 = of_term t2 in
+        sum m1 m2
+      | T.AppBuiltin (Builtin.Difference, [_;t1; t2]) ->
+        let m1 = of_term t1 in
+        let m2 = of_term t2 in
+        difference m1 m2
+      | T.AppBuiltin (Builtin.Uminus, [_;t']) ->
+        let m = of_term t' in
+        uminus m
+      | T.AppBuiltin (Builtin.Product, [_;t1; t2]) ->
+        begin match T.view t1, T.view t2 with
+          | T.AppBuiltin (Builtin.Rat n, []), _ ->
+            let m = of_term t2 in
+            product m n
+          | _, T.AppBuiltin (Builtin.Rat n, []) ->
+            let m = of_term t1 in
+            product m n
+          | _ -> raise NotLinear
+        end
+      | T.AppBuiltin (Builtin.Succ, [_;t']) ->
+        let m = of_term t' in
+        succ m
+      | T.AppBuiltin (Builtin.Prec, [_;t']) ->
+        let m = of_term t' in
+        pred m
+      | T.AppBuiltin (Builtin.Rat n, []) -> const n
+      | T.AppBuiltin (b, _) when Builtin.is_arith b ->
+        raise NotLinear
+      | T.AppBuiltin _
+      | T.Var _
+      | T.Const _
+      | T.App _
+      | T.DB _ -> singleton num.one t
+    in
+    of_term t
+
+  let of_term t =
+    try Some (of_term_exn t)
+    with NotLinear -> None
+
+  let mk_const n = T.builtin ~ty:num.ty (Builtin.mk_rat n)
+
+  (* a.t *)
+  let mk_product a t =
+    if num.equal a num.one then t
+    else
+      T.app_builtin Builtin.Product ~ty:num.ty
+        [T.of_ty num.ty; mk_const a; t]
+
+  (* a.t + b *)
+  let mk_sum a t b =
+    if num.equal a num.zero then b
+    else
+      T.app_builtin Builtin.Sum ~ty:num.ty [T.of_ty num.ty; mk_product a t; b]
+
+  (* a.1 + b *)
+  let mk_sum_const a b =
+    if num.equal a num.zero then b
+    else
+      T.app_builtin Builtin.Sum ~ty:num.ty [T.of_ty num.ty; mk_const a; b]
+
+  let to_term e =
+    let t = match e.terms with
+      | [] -> mk_const e.const
+      | (c, t)::rest ->
+        (* remove one coeff to make the basic sum *)
+        let sum = mk_product c t in
+        (* add coeff*term for the remaining terms *)
+        let sum = List.fold_left
+            (fun sum (coeff, _t') ->
+               assert (num.sign coeff <> 0);
+               mk_sum coeff t sum
+            ) sum rest
+        in
+        (* add the constant (if needed) *)
+        mk_sum_const e.const sum
+    in
+    t
+
+  let normalize m =
+    let cst, changed, terms =
+      List.fold_left
+        (fun (cst, changed, acc) (c,t) ->
+           match T.view t with
+             | T.AppBuiltin (Builtin.Rat n, []) ->
+               Q.add cst (Q.mul n c), true, acc
+             | _ -> cst, changed, (c,t)::acc
+        ) (m.const, false, []) m.terms
+    in
+    if changed
+    then
+      let terms = List.rev terms in  (* sort again *)
+      {m with const=cst; terms; }
+    else m
 end

@@ -487,9 +487,9 @@ module Arith = struct
       | _ -> pp_rec buf t
     in
     match Classic.view t with
-      | Classic.Var v when Type.equal (ty t) Type.TPTP.int ->
+      | Classic.Var v when Type.equal (ty t) Type.int ->
         Format.fprintf out "I%d" (HVar.id v); true
-      | Classic.Var v when Type.equal (ty t) Type.TPTP.rat ->
+      | Classic.Var v when Type.equal (ty t) Type.rat ->
         Format.fprintf out "Q%d" (HVar.id v); true
       | Classic.AppBuiltin (Builtin.Less, [_; a; b]) ->
         Format.fprintf out "%a < %a" pp_surrounded a pp_surrounded b; true
@@ -514,6 +514,8 @@ module Arith = struct
       | Classic.AppBuiltin (Builtin.Remainder_e, [_;a;b]) ->
         Format.fprintf out "%a mod %a" pp_surrounded a pp_surrounded b; true;
       | _ -> false  (* default *)
+
+  let () = add_hook pp_hook
 end
 
 let debugf out t =

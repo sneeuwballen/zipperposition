@@ -17,6 +17,7 @@ type t =
   | Equation of term * term * bool
   | Prop of term * bool
   | Int of Int_lit.t
+  | Rat of Rat_lit.t
 
 let equal l1 l2 =
   match l1, l2 with
@@ -26,11 +27,14 @@ let equal l1 l2 =
     | True, True
     | False, False -> true
     | Int o1, Int o2 -> Int_lit.equal o1 o2
+    | Rat o1, Rat o2 -> Rat_lit.equal o1 o2
     | Equation _, _
     | Prop _, _
     | True, _
     | False, _
-    | Int _, _ -> false
+    | Int _, _
+    | Rat _, _
+      -> false
 
 let equal_com l1 l2 =
   match l1, l2 with
@@ -51,6 +55,7 @@ let compare l1 l2 =
     | Equation _ -> 2
     | Prop _ -> 3
     | Int _ -> 5
+    | Rat _ -> 6
   in
   match l1, l2 with
     | Equation (l1,r1,sign1), Equation (l2,r2,sign2) ->
@@ -65,18 +70,21 @@ let compare l1 l2 =
     | True, True
     | False, False -> 0
     | Int o1, Int o2 -> Int_lit.compare o1 o2
+    | Rat o1, Rat o2 -> Rat_lit.compare o1 o2
     | _, _ -> __to_int l1 - __to_int l2
 
 let fold f acc lit = match lit with
   | Equation (l, r, _) -> f (f acc l) r
   | Prop (p, _) -> f acc p
   | Int o -> Int_lit.fold f acc o
+  | Rat o -> Rat_lit.fold f acc o
   | True
   | False -> acc
 
 let hash lit =
   match lit with
     | Int o -> Int_lit.hash o
+    | Rat o -> Rat_lit.hash o
     | Prop (p, sign) -> Hash.combine3 20 (Hash.bool sign) (T.hash p)
     | Equation (l, r, sign) ->
       Hash.combine4 30 (Hash.bool sign) (T.hash l) (T.hash r)
@@ -96,6 +104,10 @@ let heuristic_weight weight = function
     AL.Seq.terms alit
     |> Sequence.filter (fun t -> not (T.is_var t))
     |> Sequence.fold (fun acc t -> acc + weight t) 0
+  | Rat alit ->
+    Rat_lit.Seq.terms alit
+    |> Sequence.filter (fun t -> not (T.is_var t))
+    |> Sequence.fold (fun acc t -> acc + weight t) 0
 
 let depth lit =
   fold (fun acc t -> max acc (T.depth t)) 0 lit
@@ -105,6 +117,7 @@ let sign = function
   | Equation (_, _, sign) -> sign
   | False -> false
   | Int o -> Int_lit.sign o
+  | Rat _ -> true
   | True -> true
 
 (* specific: for the term comparison *)
@@ -120,6 +133,7 @@ let is_eqn = function
   | Equation _
   | Prop _ -> true
   | Int _
+  | Rat _
   | True
   | False -> false
 
@@ -131,6 +145,7 @@ let is_prop = function
   | True
   | False -> true
   | Int _
+  | Rat _
   | Equation _ -> false
 
 let is_arith = function
@@ -148,6 +163,15 @@ let is_arith_ineq = _on_arith Int_lit.is_ineq
 let is_arith_less = _on_arith Int_lit.is_less
 let is_arith_lesseq = _on_arith Int_lit.is_lesseq
 let is_arith_divides = _on_arith Int_lit.is_divides
+
+let _on_rat p lit = match lit with
+  | Rat o -> p o
+  | _ -> false
+
+let is_rat = function Rat _ -> true | _ -> false
+let is_rat_eq = _on_rat Rat_lit.is_eq
+let is_rat_less = _on_rat Rat_lit.is_less
+
 
 let ty_error_ a b =
   let msg =
@@ -208,6 +232,12 @@ let mk_divides ?(sign=true) n ~power m =
   else if Int_lit.is_absurd alit then mk_absurd
   else Int alit
 
+let mk_rat x = Rat x
+
+let mk_rat_op op m1 m2 = Rat (Rat_lit.make op m1 m2)
+let mk_rat_eq m1 m2 = mk_rat_op Rat_lit.Equal m1 m2
+let mk_rat_less m1 m2 = mk_rat_op Rat_lit.Less m1 m2
+
 let mk_not_divides n ~power m = mk_divides ~sign:false n ~power m
 
 module Seq = struct
@@ -215,6 +245,7 @@ module Seq = struct
     | Equation(l, r, _) -> k l; k r
     | Prop(p, _) -> k p
     | Int o -> Int_lit.Seq.terms o k
+    | Rat o -> Rat_lit.Seq.terms o k
     | True
     | False -> ()
 
@@ -356,10 +387,11 @@ let map f = function
     let p' = f p in
     mk_prop p' sign
   | Int o -> Int (Int_lit.map f o)
+  | Rat o -> Rat (Rat_lit.map f o)
   | True -> True
   | False -> False
 
-let apply_subst_ ~f_term ~f_arith_lit subst (lit,sc) =
+let apply_subst_ ~f_term ~f_arith_lit ~f_rat subst (lit,sc) =
   match lit with
     | Equation (l,r,sign) ->
       let new_l = f_term subst (l,sc)
@@ -369,6 +401,7 @@ let apply_subst_ ~f_term ~f_arith_lit subst (lit,sc) =
       let p' = f_term subst (p,sc) in
       mk_prop p' sign
     | Int o -> Int (f_arith_lit subst (o,sc))
+    | Rat o -> Rat (f_rat subst (o,sc))
     | True
     | False -> lit
 
@@ -376,15 +409,18 @@ let apply_subst ~renaming subst (lit,sc) =
   apply_subst_ subst (lit,sc)
     ~f_term:(S.FO.apply ~renaming)
     ~f_arith_lit:(Int_lit.apply_subst ~renaming)
+    ~f_rat:(Rat_lit.apply_subst ~renaming)
 
 let apply_subst_no_renaming subst (lit,sc) =
   apply_subst_ subst (lit,sc)
     ~f_term:S.FO.apply_no_renaming
     ~f_arith_lit:Int_lit.apply_subst_no_renaming
+    ~f_rat:Rat_lit.apply_subst_no_renaming
 
 let apply_subst_no_simp ~renaming subst (lit,sc) =
   match lit with
     | Int o -> Int (Int_lit.apply_subst_no_simp ~renaming subst (o,sc))
+    | Rat o -> Rat (Rat_lit.apply_subst_no_simp ~renaming subst (o,sc))
     | Equation (l,r,sign) ->
       Equation (S.FO.apply ~renaming subst (l,sc),
         S.FO.apply ~renaming subst (r,sc), sign)
@@ -404,6 +440,7 @@ let negate lit = match lit with
   | True -> False
   | False -> True
   | Int o -> Int (Int_lit.negate o)
+  | Rat o -> Util.invalid_argf "cannot negate `%a`" Rat_lit.pp o
 
 let vars lit =
   Seq.vars lit |> T.VarSet.of_seq |> T.VarSet.to_list
@@ -411,14 +448,16 @@ let vars lit =
 let var_occurs v lit = match lit with
   | Prop (p,_) -> T.var_occurs ~var:v p
   | Equation (l,r,_) -> T.var_occurs ~var:v l || T.var_occurs ~var:v r
-  | Int _ -> Sequence.exists (T.var_occurs ~var:v) (Seq.terms lit)
+  | Int _
+  | Rat _ -> Sequence.exists (T.var_occurs ~var:v) (Seq.terms lit)
   | True
   | False -> false
 
 let is_ground lit = match lit with
   | Equation (l,r,_) -> T.is_ground l && T.is_ground r
   | Prop (p, _) -> T.is_ground p
-  | Int _ -> Sequence.for_all T.is_ground (Seq.terms lit)
+  | Int _
+  | Rat _ -> Sequence.for_all T.is_ground (Seq.terms lit)
   | True
   | False -> true
 
@@ -433,6 +472,9 @@ let to_multiset lit = match lit with
   | Int alit ->
     AL.Seq.to_multiset alit
     |> Multisets.MT.Seq.of_coeffs Multisets.MT.empty
+  | Rat o ->
+    Rat_lit.Seq.to_multiset o |> Sequence.map fst
+    |> Multisets.MT.Seq.of_seq Multisets.MT.empty
 
 let is_trivial lit = match lit with
   | True -> true
@@ -440,6 +482,7 @@ let is_trivial lit = match lit with
   | Equation (l, r, true) -> T.equal l r
   | Equation (_, _, false) -> false
   | Int o -> Int_lit.is_trivial o
+  | Rat o -> Rat_lit.is_trivial o
   | Prop (_, _) -> false
 
 (* is it impossible for these terms to be equal? check if a cstor-only
@@ -465,7 +508,8 @@ let is_absurd lit = match lit with
   | Prop (p, true) when T.equal p T.false_ -> true
   | False -> true
   | Int o -> Int_lit.is_absurd o
-  | _ -> false
+  | Rat o -> Rat_lit.is_absurd o
+  | Equation _ | Prop _ | True -> false
 
 let fold_terms ?(position=Position.stop) ?(vars=false) ?ty_args ~which ~ord ~subterms lit k =
   (* function to call at terms *)
@@ -476,7 +520,7 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ?ty_args ~which ~ord ~sub
     then () (* ignore *)
     else k (t, pos)
   in
-  match lit, which with
+  begin match lit, which with
     | Equation (l, r, _), `All ->
       (* visit both sides of the equation *)
       at_term ~pos:P.(append position (left stop)) l;
@@ -497,8 +541,11 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ?ty_args ~which ~ord ~sub
       at_term ~pos:P.(append position (left stop)) p
     | Int o, _ ->
       Int_lit.fold_terms ~pos:position ~vars ~which ~ord ~subterms o k
+    | Rat o, _ ->
+      Rat_lit.fold_terms ~pos:position ~vars ~which ~ord ~subterms o k
     | True, _
     | False, _ -> ()
+  end
 
 (** {2 IO} *)
 
@@ -514,6 +561,7 @@ let pp_debug ?(hooks=[]) out lit =
     | Equation (l, r, false) ->
       Format.fprintf out "@[<1>%a@ ≠ %a@]" T.pp l T.pp r
     | Int o -> Int_lit.pp out o
+    | Rat o -> Rat_lit.pp out o
 
 let pp_tstp out lit =
   match lit with
@@ -526,6 +574,7 @@ let pp_tstp out lit =
     | Equation (l, r, false) ->
       Format.fprintf out "@[<1>%a@ != %a@]" T.TPTP.pp l T.TPTP.pp r
     | Int o -> Int_lit.pp_tstp out o
+    | Rat o -> Rat_lit.pp_tstp out o
 
 type print_hook = CCFormat.t -> t -> bool
 let __hooks = ref []
@@ -553,6 +602,7 @@ module Comp = struct
       | Prop (p, _) -> [p]
       | Equation (l, r, _) -> _maxterms2 ~ord l r
       | Int a -> Int_lit.max_terms ~ord a
+      | Rat a -> Rat_lit.max_terms ~ord a
       | True
       | False -> []
 
@@ -608,8 +658,10 @@ module Comp = struct
       | Int (Binary (Less, _, _)) -> 5
       | Int (Binary (Lesseq, _, _)) -> 6
       | Int (Divides _) -> 7
+      | Rat {Rat_lit.op=Rat_lit.Equal; _} -> 8
+      | Rat {Rat_lit.op=Rat_lit.Less; _} -> 9
       | Equation _
-      | Prop _ -> 8  (* eqn and prop are really the same thing *)
+      | Prop _ -> 10  (* eqn and prop are really the same thing *)
     in
     C.of_total (Pervasives.compare (_to_int l1) (_to_int l2))
 
@@ -763,6 +815,11 @@ module Pos = struct
         Sequence.for_all
           (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
           (Monome.Seq.terms d.AL.monome)
+      | Rat _, _ ->
+        let t = root_term lit pos in
+        Sequence.for_all
+          (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
+          (Seq.terms lit)
       | True, _
       | False, _ -> true  (* why not. *)
       | Equation _, _ -> _fail_lit lit pos
@@ -772,7 +829,7 @@ module Conv = struct
   type hook_from = term SLiteral.t -> t option
   type hook_to = t -> term SLiteral.t option
 
-  let arith_hook_from f =
+  let int_hook_from f =
     let open CCOpt in
     let module BA = Builtin.Arith in
     let module AL = Int_lit in
@@ -812,6 +869,40 @@ module Conv = struct
       | _ -> None
     end
 
+  let rat_hook_from f =
+    let open CCOpt in
+    let module BA = Builtin.Arith in
+    let module AL = Rat_lit in
+    let type_ok t = Type.equal Type.rat (T.ty t) in
+    (* arithmetic conversion! *)
+    begin match f with
+      | SLiteral.Eq (l, r) when type_ok l ->
+        Monome.Rat.of_term l >>= fun m1 ->
+        Monome.Rat.of_term r >>= fun m2 ->
+        return (Rat (AL.mk_eq m1 m2))
+      | SLiteral.Neq (l, _) when type_ok l ->
+        Util.errorf ~where:"cnf" "should have encoded `%a`" (SLiteral.pp T.pp) f
+      | SLiteral.Atom (t, b) ->
+        let post lit = if b then lit else negate lit in
+        let res = match T.view t with
+          | T.AppBuiltin (Builtin.Less, [_; l; r]) when type_ok l ->
+            Monome.Rat.of_term l >>= fun m1 ->
+            Monome.Rat.of_term r >>= fun m2 ->
+            return (Rat (AL.mk_less m1 m2))
+          | T.AppBuiltin (Builtin.Greater, [_; l; r]) when type_ok l ->
+            Monome.Rat.of_term l >>= fun m1 ->
+            Monome.Rat.of_term r >>= fun m2 ->
+            return (Rat (AL.mk_less m2 m1))
+          | T.AppBuiltin (Builtin.Lesseq, [_; l; _]) when type_ok l ->
+            Util.errorf ~where:"cnf" "should have encoded `%a`" (SLiteral.pp T.pp) f
+          | T.AppBuiltin (Builtin.Greatereq, [_; l; _]) when type_ok l ->
+            Util.errorf ~where:"cnf" "should have encoded `%a`" (SLiteral.pp T.pp) f
+          | _ -> None
+        in
+        CCOpt.map post res
+      | _ -> None
+    end
+
   let rec try_hooks x hooks = match hooks with
     | [] -> None
     | h::hooks' ->
@@ -832,16 +923,19 @@ module Conv = struct
         end
 
   let to_form ?(hooks=[]) lit =
-    match try_hooks lit hooks with
+    begin match try_hooks lit hooks with
       | Some f -> f
       | None ->
-        match lit with
+        begin match lit with
           | Equation (l, r, true) -> SLiteral.eq l r
           | Equation (l, r, false) -> SLiteral.neq l r
           | Prop (p, sign) -> SLiteral.atom p sign
           | True -> SLiteral.true_
           | False -> SLiteral.false_
           | Int o -> Int_lit.to_form o
+          | Rat o -> Rat_lit.to_form o
+        end
+    end
 end
 
 module View = struct
@@ -850,6 +944,7 @@ module View = struct
     | Prop (p, sign) -> Some (p, T.true_, sign)
     | True
     | False
+    | Rat _
     | Int _ -> None
 
   let get_eqn lit position =
@@ -859,7 +954,8 @@ module View = struct
       | Prop (p, sign), P.Left _ -> Some (p, T.true_, sign)
       | True, _
       | False, _
-      | Int _, _ -> None
+      | Int _, _
+      | Rat _, _ -> None
       | _ -> invalid_arg "get_eqn: wrong literal or position"
 
   let get_arith = function

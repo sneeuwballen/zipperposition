@@ -291,6 +291,7 @@ let fold_eqn ?(both=true) ?sign ~ord ~eligible lits k =
         | Lit.Prop _
         | Lit.Equation _
         | Lit.Int _
+        | Lit.Rat _
         | Lit.True
         | Lit.False -> ()
       end;

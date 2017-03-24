@@ -12,6 +12,7 @@ type t = private
   | Equation of term * term * bool
   | Prop of term * bool
   | Int of Int_lit.t
+  | Rat of Rat_lit.t
 
 val equal_com : t -> t -> bool     (** commutative equality of lits *)
 val compare : t -> t -> int     (** lexicographic comparison of literals *)
@@ -40,6 +41,10 @@ val is_arith_less : t -> bool
 val is_arith_lesseq : t -> bool
 val is_arith_divides : t -> bool
 
+val is_rat : t -> bool
+val is_rat_eq : t -> bool
+val is_rat_less : t -> bool
+
 (** build literals. If sides so not have the same sort,
     a SortError will be raised. An ordering must be provided *)
 val mk_eq : term -> term -> t
@@ -60,6 +65,11 @@ val mk_arith_lesseq : Z.t Monome.t -> Z.t Monome.t -> t
 
 val mk_divides : ?sign:bool -> Z.t -> power:int -> Z.t Monome.t -> t
 val mk_not_divides : Z.t -> power:int -> Z.t Monome.t -> t
+
+val mk_rat : Rat_lit.t -> t
+val mk_rat_op : Rat_lit.op -> Q.t Monome.t -> Q.t Monome.t -> t
+val mk_rat_eq : Q.t Monome.t -> Q.t Monome.t -> t
+val mk_rat_less : Q.t Monome.t -> Q.t Monome.t -> t
 
 val matching : ?subst:Subst.t -> pattern:t Scoped.t -> t Scoped.t ->
   Subst.t Sequence.t
@@ -207,7 +217,8 @@ module Conv : sig
   type hook_from = term SLiteral.t -> t option
   type hook_to = t -> term SLiteral.t option
 
-  val arith_hook_from : hook_from
+  val int_hook_from : hook_from
+  val rat_hook_from : hook_from
 
   val of_form : ?hooks:hook_from list -> term SLiteral.t -> t
   (** Conversion from a formula. By default no ordering or arith theory

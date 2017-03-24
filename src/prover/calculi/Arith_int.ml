@@ -2058,8 +2058,6 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let register () =
     Util.debug ~section 2 "arith: setup env";
-    (* enable arith printing of terms *)
-    T.add_hook T.Arith.pp_hook;
     (* add inference rules *)
     Env.add_binary_inf "canc_sup_active" canc_sup_active;
     Env.add_binary_inf "canc_sup_passive" canc_sup_passive;
@@ -2086,7 +2084,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_redundant is_redundant_by_ineq;
     Env.add_simplify purify;
     Env.add_multi_simpl_rule eliminate_unshielded;
-    Ctx.Lit.add_from_hook Lit.Conv.arith_hook_from;
+    Ctx.Lit.add_from_hook Lit.Conv.int_hook_from;
     (* completeness? I don't think so *)
     Ctx.lost_completeness ();
     (* enable AC-property of sum *)
