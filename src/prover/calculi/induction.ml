@@ -950,7 +950,7 @@ let extension =
 let () =
   Params.add_opts
     [ "--induction", Options.switch_set true enabled_, " enable induction"
-    ; "--no-induction", Options.switch_set false enabled_, " enable induction"
+    ; "--no-induction", Options.switch_set false enabled_, " disable induction"
     ; "--induction-depth", Arg.Set_int depth_, " maximum depth of nested induction"
     ; "--ind-test-limit",
       Arg.Set_int test_limit,

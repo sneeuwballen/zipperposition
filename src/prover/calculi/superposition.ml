@@ -633,14 +633,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let ord = Ctx.ord () in
     (* clauses used to rewrite *)
     let clauses = ref [] in
-    (* literals that are eligible for resolution *)
-    let eligible_res = lazy (C.eligible_res_no_subst c) in
+    (* literals that are eligible for paramodulation. *)
+    let eligible_param = lazy (C.eligible_param (c,0) S.empty) in
     (* demodulate literals *)
     let demod_lit i lit =
       (* strictly maximal terms might be blocked *)
       let strictly_max = lazy (
         begin match lit with
-          | Lit.Equation (t1,t2,true) -> 
+          | Lit.Equation (t1,t2,true) ->
             begin match O.compare ord t1 t2 with
               | Comp.Gt -> [t1] | Comp.Lt -> [t2] | _ -> []
             end
@@ -649,9 +649,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         end
       ) in
       (* shall we restrict a subterm? only for max terms in positive
-          equations that are eligible for resolution *)
+          equations that are eligible for paramodulation.
+
+         NOTE: E's paper mentions that restrictions should occur for
+         literals eligible for {b resolution}, not paramodulation, but
+         it seems it might be a typo
+      *)
       let restrict_term t = lazy (
-        if Lit.is_pos lit && BV.get (Lazy.force eligible_res) i
+        if Lit.is_pos lit && BV.get (Lazy.force eligible_param) i
         then
           (* restrict max terms in positive literals eligible for resolution *)
           CCList.mem ~eq:T.equal t (Lazy.force strictly_max)
