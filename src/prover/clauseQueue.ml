@@ -17,6 +17,7 @@ let profiles_ =
   let open ClauseQueue_intf in
   [ "default", P_default
   ; "bfs", P_bfs
+  ; "almost-bfs", P_almost_bfs
   ; "explore", P_explore
   ; "ground", P_ground
   ; "goal", P_goal
@@ -219,6 +220,11 @@ module Make(C : Clause_intf.S) = struct
     let weight = age in
     make ~ratio:1 ~weight "bfs"
 
+  let almost_bfs : t =
+    let open WeightFun in
+    let weight = combine [ default, 3; penalty, 2; ] in
+    make ~ratio:1 ~weight "almost_bfs"
+
   let explore : t =
     let open WeightFun in
     let weight =
@@ -250,6 +256,7 @@ module Make(C : Clause_intf.S) = struct
     match p with
       | P_default -> default
       | P_bfs -> bfs
+      | P_almost_bfs -> almost_bfs
       | P_explore -> explore
       | P_ground -> ground
       | P_goal -> goal_oriented

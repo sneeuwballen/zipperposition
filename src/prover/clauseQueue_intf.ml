@@ -4,6 +4,7 @@
 type profile =
   | P_default
   | P_bfs
+  | P_almost_bfs
   | P_explore
   | P_ground
   | P_goal
