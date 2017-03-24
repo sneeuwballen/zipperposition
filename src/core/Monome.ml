@@ -14,6 +14,7 @@ type 'a num = {
   sign : 'a -> int;
   abs : 'a -> 'a;
   cmp : 'a -> 'a -> int;
+  raise_to_lcm: 'a -> 'a -> 'a * 'a; (* factors to reach lcm *)
   hash : 'a Hash.t;
   zero : 'a;
   one : 'a;
@@ -32,6 +33,9 @@ let z = {
   sign = Z.sign;
   abs = Z.abs;
   cmp = Z.compare;
+  raise_to_lcm = (fun a b ->
+    let gcd = Z.gcd a b in
+    Z.divexact b gcd, Z.divexact a gcd);
   hash = Z.hash;
   zero = Z.zero;
   one = Z.one;
@@ -405,8 +409,9 @@ module Focus = struct
 
   (* scale focused monomes to have the same coefficient *)
   let scale m1 m2 =
-    let gcd = Z.gcd m1.coeff m2.coeff in
-    product m1 (Z.divexact m2.coeff gcd), product m2 (Z.divexact m1.coeff gcd)
+    let num = m1.rest.num in
+    let n1, n2 = num.raise_to_lcm m1.coeff m2.coeff in
+    product m1 n1, product m2 n2
 
   let pp out t =
     let num = t.rest.num in

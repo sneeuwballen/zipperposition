@@ -172,7 +172,7 @@ module Focus : sig
   val map : ?term:(term->term) -> ?coeff:('a -> 'a) ->
     ?rest:('a monome -> 'a monome) -> 'a t -> 'a t
 
-  val scale : Z.t t -> Z.t t -> Z.t t * Z.t t
+  val scale : 'a t -> 'a t -> 'a t * 'a t
   (** Scale to the same coefficient *)
 
   val is_max : ord:Ordering.t -> _ t -> bool
