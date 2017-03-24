@@ -44,6 +44,7 @@ let load_extensions =
   Extensions.register EnumTypes.extension;
   Extensions.register Induction.extension;
   Extensions.register Rewriting.extension;
+  Extensions.register Arith_int.extension;
   Extensions.register Ind_types.extension;
   Extensions.register Fool.extension;
   let l = Extensions.extensions () in

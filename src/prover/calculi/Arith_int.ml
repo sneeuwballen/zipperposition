@@ -2138,8 +2138,6 @@ let extension =
                          env_actions=[env_action];
   }
 
-let () = Extensions.register extension
-
 let () =
   Params.add_opts
     [ "--arith-no-semantic-tauto"
