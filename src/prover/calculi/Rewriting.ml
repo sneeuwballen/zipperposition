@@ -63,7 +63,9 @@ module Make(E : Env_intf.S) = struct
               let proof =
                 ProofStep.mk_inference [C.proof c]
                   ~rule:(ProofStep.mk_rule "narrow") in
-              let c' = C.create ~trail:(C.trail c) (new_lit :: lits') proof in
+              let c' =
+                C.create ~trail:(C.trail c) ~penalty:(C.penalty c) (new_lit :: lits') proof
+              in
               Util.debugf ~section 3
                 "@[<2>term narrowing:@ from `@[%a@]`@ to `@[%a@]`@ \
                  using rule `%a`@ and subst @[%a@]@]"
@@ -87,7 +89,7 @@ module Make(E : Env_intf.S) = struct
         let proof = ProofStep.mk_simp ~rule:(ProofStep.mk_rule "rw_clause") [C.proof c] in
         let clauses =
           List.map
-            (fun c' -> C.create_a ~trail:(C.trail c) c' proof)
+            (fun c' -> C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) c' proof)
             clauses
         in
         Util.debugf ~section 2
@@ -119,7 +121,7 @@ module Make(E : Env_intf.S) = struct
                        (Literal.apply_subst_list ~renaming subst (lits',0)) @
                          (Literal.apply_subst_list ~renaming subst (c',1))
                      in
-                     C.create ~trail:(C.trail c) new_lits proof)
+                     C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof)
                   (RW.Lit.Rule.rhs rule)
               in
               Util.debugf ~section 3

@@ -89,7 +89,7 @@ module Make(Env : Env_intf.S) = struct
     else (
       let proof =
         ProofStep.mk_inference ~rule:(ProofStep.mk_rule "acyclicity") [C.proof c] in
-      let c' = C.create_a ~trail:(C.trail c) lits' proof in
+      let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
       Util.incr_stat stat_acyclicity;
       Util.debugf ~section 3
         "@[<2>acyclicity:@ simplify `@[%a@]`@ into `@[%a@]`@]" (fun k->k C.pp c C.pp c');
@@ -136,7 +136,7 @@ module Make(Env : Env_intf.S) = struct
            in
            let new_c =
              C.create
-               ~trail:(C.trail c)
+               ~trail:(C.trail c) ~penalty:(C.penalty c)
                new_lits proof
            in
            Util.incr_stat stat_acyclicity;
@@ -185,7 +185,8 @@ module Make(Env : Env_intf.S) = struct
         let clauses =
           List.map
             (fun lit ->
-               C.create ~trail:(C.trail c) (lit :: other_lits) proof)
+               C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+                 (lit :: other_lits) proof)
             new_lits
         in
         Util.incr_stat stat_injectivity;
@@ -215,7 +216,10 @@ module Make(Env : Env_intf.S) = struct
         in
         let rule = ProofStep.mk_rule ~comment:["(ind_types)"] "injectivity_destruct-" in
         let proof = ProofStep.mk_inference ~rule [C.proof c] in
-        let c' = C.create ~trail:(C.trail c) (new_lits @ lits) proof in
+        let c' =
+          C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+            (new_lits @ lits) proof
+        in
         Util.incr_stat stat_injectivity;
         Util.debugf ~section 3 "@[<hv2>injectivity:@ simplify @[%a@]@ into @[%a@]@]"
           (fun k->k C.pp c C.pp c');
@@ -306,7 +310,8 @@ module Make(Env : Env_intf.S) = struct
       let lits = List.map (Literal.mk_eq t) rhs_l in
       (* XXX: could derive this from the [data] that defines [ity]… *)
       let proof = ProofStep.mk_trivial in
-      let new_c = C.create ~trail:Trail.empty lits proof in
+      let penalty = 5 in (* do not use too lightly! *)
+      let new_c = C.create ~trail:Trail.empty ~penalty lits proof in
       Util.incr_stat stat_exhaustiveness;
       Util.debugf ~section 3
         "(@[<2>exhaustiveness axiom@ :for `@[%a:%a@]`@ :clause %a@])"

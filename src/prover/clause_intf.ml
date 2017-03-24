@@ -72,24 +72,33 @@ module type S = sig
   (** {2 Constructors} *)
 
   val create :
+    penalty:int ->
     trail:Trail.t ->
     Literal.t list ->
     proof_step ->
     t
   (** Build a new clause from the given literals.
       @param trail boolean trail
+      @param penalty heuristic penalty due to history of the clause
+        (the higher, the less likely the clause is to be picked soon)
       also takes a list of literals and a proof builder *)
 
   val create_a :
+    penalty:int ->
     trail:Trail.t ->
     Literal.t array ->
     proof_step ->
     t
   (** Build a new clause from the given literals. *)
 
-  val of_sclause : SClause.t -> proof_step -> t
+  val of_sclause :
+    ?penalty:int ->
+    SClause.t ->
+    proof_step ->
+    t
 
   val of_forms :
+    ?penalty:int ->
     trail:Trail.t ->
     FOTerm.t SLiteral.t list ->
     proof_step ->
@@ -97,6 +106,7 @@ module type S = sig
   (** Directly from list of formulas *)
 
   val of_forms_axiom :
+    ?penalty:int ->
     file:string -> name:string ->
     FOTerm.t SLiteral.t list -> t
   (** Construction from formulas as axiom (initial clause) *)
@@ -120,9 +130,6 @@ module type S = sig
 
   val length : t -> int
   (** Number of literals *)
-
-  val apply_subst : renaming:Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
-  (** apply the substitution to the clause *)
 
   val maxlits : t Scoped.t -> Subst.t -> CCBV.t
   (** List of maximal literals *)
@@ -157,6 +164,8 @@ module type S = sig
 
   val selected_lits : t -> (Literal.t * int) list
   (** get the list of selected literals *)
+
+  val penalty : t -> int
 
   val is_unit_clause : t -> bool
   (** is the clause a unit clause? *)

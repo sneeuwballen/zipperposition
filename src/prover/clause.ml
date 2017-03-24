@@ -34,6 +34,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   type t = {
     sclause : sclause;
+    penalty: int; (** heuristic penalty *)
     mutable selected : BV.t Lazy.t; (** bitvector for selected lits*)
     mutable proof : proof_step; (** Proof of the clause *)
     mutable eligible_res: BV.t option; (* eligible for resolution? *)
@@ -69,6 +70,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let has_trail c = not (Trail.is_empty c.sclause.trail)
   let trail_subsumes c1 c2 = Trail.subsumes c1.sclause.trail c2.sclause.trail
   let is_active c ~v = Trail.is_active c.sclause.trail ~v
+  let penalty c = c.penalty
 
   let trail_l = function
     | [] -> Trail.empty
@@ -91,10 +93,11 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let distance_to_goal c = ProofStep.distance_to_goal c.proof
 
   (* private function for building clauses *)
-  let create_inner ~selected sclause proof =
+  let create_inner ~penalty ~selected sclause proof =
     (* create the structure *)
     let c = {
       sclause;
+      penalty;
       selected;
       proof;
       eligible_res=None;
@@ -103,25 +106,25 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     Util.incr_stat stat_clause_create;
     c
 
-  let of_sclause c proof =
+  let of_sclause ?(penalty=0) c proof =
     let selected = lazy (Ctx.select c.lits) in
-    create_inner ~selected c proof
+    create_inner ~penalty ~selected c proof
 
-  let create_a ~trail lits proof =
+  let create_a ~penalty ~trail lits proof =
     let selected = lazy (Ctx.select lits) in
-    create_inner ~selected (SClause.make ~trail lits) proof
+    create_inner ~penalty ~selected (SClause.make ~trail lits) proof
 
-  let create ~trail lits proof =
-    create_a ~trail (Array.of_list lits) proof
+  let create ~penalty ~trail lits proof =
+    create_a ~penalty ~trail (Array.of_list lits) proof
 
-  let of_forms ~trail forms proof =
+  let of_forms ?(penalty=0) ~trail forms proof =
     let lits = List.map Ctx.Lit.of_form forms |> Array.of_list in
-    create_a ~trail lits proof
+    create_a ~penalty ~trail lits proof
 
-  let of_forms_axiom ~file ~name forms =
+  let of_forms_axiom ?(penalty=0) ~file ~name forms =
     let lits = List.map Ctx.Lit.of_form forms in
     let proof = ProofStep.mk_assert' ~file ~name () in
-    create ~trail:Trail.empty lits proof
+    create ~penalty ~trail:Trail.empty lits proof
 
   let rule_neg_ = ProofStep.mk_rule ~comment:["negate goal to find a refutation"] "neg_goal"
   let rule_cnf_ = ProofStep.mk_rule "cnf"
@@ -177,7 +180,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       (* convert literals *)
       let lits = List.map Ctx.Lit.of_form lits in
       let proof = proof_of_stmt (Stmt.src st) in
-      let c = create ~trail:Trail.empty lits proof in
+      let c = create ~trail:Trail.empty ~penalty:0 lits proof in
       c
     in
     match Stmt.view st with
@@ -193,7 +196,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let update_trail f c =
     let sclause = SClause.update_trail f c.sclause in
-    create_inner ~selected:c.selected sclause c.proof
+    create_inner ~selected:c.selected ~penalty:c.penalty sclause c.proof
 
   let proof_step c = c.proof
 
@@ -201,19 +204,12 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let update_proof c f =
     let new_proof = f c.proof in
-    create_a ~trail:c.sclause.trail c.sclause.lits new_proof
+    create_a ~trail:c.sclause.trail ~penalty:c.penalty c.sclause.lits new_proof
 
   let is_empty c =
     Lits.is_absurd c.sclause.lits && Trail.is_empty c.sclause.trail
 
   let length c = SClause.length c.sclause
-
-  (** Apply substitution to the clause. Note that using the same renaming for all
-      literals is important. *)
-  let apply_subst ~renaming subst (c,sc) =
-    let lits = Literals.apply_subst ~renaming subst (c.sclause.lits,sc) in
-    let new_c = create_a ~trail:c.sclause.trail lits c.proof in
-    new_c
 
   let _apply_subst_no_simpl subst (lits,sc) =
     if Subst.is_empty subst

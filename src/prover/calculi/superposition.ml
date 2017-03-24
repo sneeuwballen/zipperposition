@@ -216,8 +216,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let passive_lit' = Lit.apply_subst ~renaming subst (info.passive_lit, sc_p) in
       let new_trail = C.trail_l [info.active; info.passive] in
       if Env.is_trivial_trail new_trail then raise (ExitSuperposition "trivial trail");
+      let s' = S.FO.apply ~renaming info.subst (info.s, sc_a) in
       if (
-        O.compare ord (S.FO.apply ~renaming info.subst (info.s, sc_a)) t' = Comp.Lt ||
+        O.compare ord s' t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
         not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx) ||
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
@@ -240,8 +241,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ProofStep.mk_rule ~subst:[subst] name
       in
       let proof =
-        ProofStep.mk_inference ~rule [C.proof info.active; C.proof info.passive] in
-      let new_clause = C.create ~trail:new_trail new_lits proof in
+        ProofStep.mk_inference ~rule [C.proof info.active; C.proof info.passive]
+      and penalty =
+        C.penalty info.active
+        + C.penalty info.passive
+        + (if T.is_var s' then 2 else 0) (* superposition from var = bad *)
+      in
+      let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
       Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       new_clause :: acc
     with ExitSuperposition reason ->
@@ -291,8 +297,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       let new_trail = C.trail_l [info.active; info.passive] in
       if Env.is_trivial_trail new_trail then raise (ExitSuperposition "trivial trail");
+      let s' = S.FO.apply ~renaming info.subst (info.s, sc_a) in
       if (
-        O.compare ord (S.FO.apply ~renaming info.subst (info.s, sc_a)) t' = Comp.Lt ||
+        O.compare ord s' t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
         not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx) ||
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
@@ -314,8 +321,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ProofStep.mk_rule ~subst:[subst] name
       in
       let proof =
-        ProofStep.mk_inference ~rule [C.proof info.active; C.proof info.passive] in
-      let new_clause = C.create ~trail:new_trail new_lits proof in
+        ProofStep.mk_inference ~rule [C.proof info.active; C.proof info.passive]
+      and penalty =
+        C.penalty info.active
+        + C.penalty info.passive
+        + (if T.is_var s' then 2 else 0) (* superposition from var = bad *)
+      in
+      let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
       Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       new_clause :: acc
     with ExitSuperposition reason ->
@@ -420,7 +432,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                let proof = ProofStep.mk_inference ~rule [C.proof clause] in
                let new_lits = CCArray.except_idx (C.lits clause) pos in
                let new_lits = Lit.apply_subst_list ~renaming subst (new_lits,0) in
-               let new_clause = C.create ~trail:(C.trail clause) new_lits proof in
+               let trail = C.trail clause and penalty = C.penalty clause in
+               let new_clause = C.create ~trail ~penalty new_lits proof in
                Util.debugf ~section 3 "@[<hv2>equality resolution on@ @[%a@]@ yields @[%a@]@]"
                  (fun k->k C.pp clause C.pp new_clause);
                new_clause::acc
@@ -473,7 +486,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           (S.FO.apply ~renaming subst (v, info.scope))
       in
       let new_lits = lit' :: new_lits in
-      let new_clause = C.create ~trail:(C.trail info.clause) new_lits proof in
+      let new_clause =
+        C.create ~trail:(C.trail info.clause) ~penalty:(C.penalty info.clause)
+          new_lits proof
+      in
       Util.debugf ~section 3 "@[<hv2>equality factoring on@ @[%a@]@ yields @[%a@]@]"
         (fun k->k C.pp info.clause C.pp new_clause);
       new_clause :: acc
@@ -680,7 +696,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           ~rule:(ProofStep.mk_rule "demod")
           (C.proof c :: List.map C.proof !clauses) in
       let trail = C.trail c in (* we know that demodulating rules have smaller trail *)
-      let new_c = C.create_a ~trail lits proof in
+      let new_c = C.create_a ~trail ~penalty:(C.penalty c) lits proof in
       Util.debugf ~section 3 "@[<hv2>demodulate@ @[%a@]@ into @[%a@]@ using @[%a@]@]"
         (fun k->k C.pp c C.pp new_c (Util.pp_list C.pp) !clauses);
       (* return simplified clause *)
@@ -834,7 +850,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       ) else (
         let proof =
           ProofStep.mk_simp ~rule:(ProofStep.mk_rule "simplify") [C.proof c] in
-        let new_clause = C.create ~trail:(C.trail c) new_lits proof in
+        let new_clause =
+          C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof
+        in
         Util.debugf ~section 3
           "@[<>@[%a@]@ @[<2>basic_simplifies into@ @[%a@]@]@ with @[%a@]@]"
           (fun k->k C.pp c C.pp new_clause S.pp !subst);
@@ -930,8 +948,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let proof =
         ProofStep.mk_simp ~rule:(ProofStep.mk_rule "simplify_reflect+")
           (C.proof c::premises) in
-      let trail = C.trail c in
-      let new_c = C.create ~trail lits proof in
+      let trail = C.trail c and penalty = C.penalty c in
+      let new_c = C.create ~trail ~penalty lits proof in
       Util.debugf ~section 3 "@[@[%a@]@ pos_simplify_reflect into @[%a@]@]"
         (fun k->k C.pp c C.pp new_c);
       Util.exit_prof prof_pos_simplify_reflect;
@@ -984,7 +1002,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ProofStep.mk_simp
           ~rule:(ProofStep.mk_rule "simplify_reflect-")
           (C.proof c :: premises) in
-      let new_c = C.create ~trail:(C.trail c) lits proof in
+      let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
       Util.debugf ~section 3 "@[@[%a@]@ neg_simplify_reflect into @[%a@]@]"
         (fun k->k C.pp c C.pp new_c);
       Util.exit_prof prof_neg_simplify_reflect;
@@ -1265,7 +1283,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             ProofStep.mk_inference
               ~rule:(ProofStep.mk_rule "clc")
               [C.proof c; C.proof c'] in
-          let new_c = C.create ~trail:(C.trail c) new_lits proof in
+          let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
           Util.debugf ~section 3
             "@[<2>contextual literal cutting@ in @[%a@]@ using @[%a@]@ gives @[%a@]@]"
             (fun k->k C.pp c C.pp c' C.pp new_c);
@@ -1337,7 +1355,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           ProofStep.mk_simp
             ~rule:(ProofStep.mk_rule ~subst:[subst] "condensation")
             [C.proof c] in
-        let c' = C.create_a ~trail:(C.trail c) new_lits proof in
+        let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
         Util.debugf ~section 3
           "@[<2>condensation@ of @[%a@] (with @[%a@])@ gives @[%a@]@]"
           (fun k->k C.pp c S.pp subst C.pp c');

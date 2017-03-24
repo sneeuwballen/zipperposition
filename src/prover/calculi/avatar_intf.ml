@@ -55,6 +55,7 @@ module type S = sig
   (** print the current list of lemmas, and their status *)
 
   val introduce_cut :
+    ?penalty:int ->
     ?depth:int ->
     Cut_form.t ->
     ProofStep.t ->

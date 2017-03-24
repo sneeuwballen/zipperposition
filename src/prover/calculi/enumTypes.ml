@@ -330,8 +330,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                       ProofStep.mk_inference [C.proof c]
                         ~rule:(ProofStep.mk_rule ~subst:[subst] "enum_type_case_switch")
                     in
-                    let trail = C.trail c in
-                    let c' = C.create_a ~trail lits' proof in
+                    let trail = C.trail c and penalty = C.penalty c in
+                    let c' = C.create_a ~trail ~penalty lits' proof in
                     Util.debugf ~section 3
                       "@[<2>deduce @[%a@]@ from @[%a@]@ @[(enum_type switch on %a)@]@]"
                       (fun k->k C.pp c' C.pp c Type.pp decl.decl_ty);
@@ -377,7 +377,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             ~rule:(ProofStep.mk_rule "axiom_enum_types") [step]
       in
       let trail = Trail.empty in
-      let c' = C.create ~trail lits proof in
+      (* start with initial penalty *)
+      let penalty = 4 in
+      let c' = C.create ~trail ~penalty lits proof in
       Util.debugf ~section 3 "@[<2>instantiate axiom of enum type `%a` \
                               on @[%a@]:@ clause @[%a@]@]"
         (fun k->k pp_id_or_builtin decl.decl_ty_id ID.pp s C.pp c');

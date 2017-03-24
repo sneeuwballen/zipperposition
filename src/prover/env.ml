@@ -380,7 +380,7 @@ module Make(X : sig
       C.mark_redundant c;
       let rule = ProofStep.mk_rule ~comment:(StrSet.to_list !applied_rules) "rw" in
       let proof = ProofStep.mk_simp ~rule [C.proof c] in
-      let c' = C.create_a ~trail:(C.trail c) lits' proof in
+      let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
       assert (not (C.equal c c'));
       Util.debugf ~section 3 "@[term rewritten clause `@[%a@]`@ into `@[%a@]`"
         (fun k->k C.pp c C.pp c');
@@ -410,7 +410,7 @@ module Make(X : sig
       C.mark_redundant c;
       let rule = ProofStep.mk_rule ~comment:(StrSet.to_list !applied_rules) "rw_lit" in
       let proof = ProofStep.mk_simp ~rule [C.proof c]  in
-      let c' = C.create_a ~trail:(C.trail c) lits proof in
+      let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
       assert (not (C.equal c c'));
       Util.debugf ~section 3 "@[lit rewritten `@[%a@]`@ into `@[%a@]`@]"
         (fun k->k C.pp c C.pp c');

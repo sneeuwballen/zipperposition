@@ -141,7 +141,9 @@ end = struct
       (* fully simplify each goal's clause, check if absurd or trivial *)
       List.iter
         (fun lits ->
-           let c = C.create_a ~trail:Trail.empty lits ProofStep.mk_trivial in
+           let c =
+             C.create_a ~trail:Trail.empty ~penalty:0 lits ProofStep.mk_trivial
+           in
            let cs, _ = E.all_simplify c in
            begin match CCList.find_pred C.is_empty cs with
              | Some c_empty -> raise (Yield_false c_empty)
@@ -452,7 +454,7 @@ module Make
                            BoolLit.neg cut_blit;
                          ] |> Trail.of_list
                        in
-                       C.create_a lits proof ~trail))
+                       C.create_a lits proof ~trail ~penalty:0))
              |> Sequence.to_list
            in
            (* clauses [CNF[¬goal[case]) <- b_lit(case), ¬cut.blit] with
@@ -482,7 +484,7 @@ module Make
                         b_lit_case;
                       ] |> Trail.of_list
                     in
-                    C.create_a lits proof ~trail)
+                    C.create_a lits proof ~trail ~penalty:0)
              end
            in
            (* all new clauses *)
@@ -767,7 +769,9 @@ module Make
           "(@[<2>@{<green>prove_by_induction@}@ :clauses (@[%a@])@ :goal %a@])"
           (fun k->k (Util.pp_list C.pp) clauses Goal.pp goal);
         let proof = ProofStep.mk_lemma in
-        let cut = A.introduce_cut ~depth (Goal.form goal) proof in
+        (* new lemma has same penalty as the clauses *)
+        let penalty = List.fold_left (fun n c -> n+C.penalty c) 0 clauses in
+        let cut = A.introduce_cut ~penalty ~depth (Goal.form goal) proof in
         A.add_lemma cut
       );
     );

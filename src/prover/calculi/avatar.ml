@@ -105,7 +105,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
                  |> Trail.filter BBox.must_be_kept
                  |> Trail.add bool_name
                in
-               let c = C.create_a ~trail lits proof in
+               let c = C.create_a ~trail ~penalty:(C.penalty c) lits proof in
                c, bool_name)
             !components
         in
@@ -228,7 +228,9 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         let proof =
           ProofStep.mk_simp ~rule:(ProofStep.mk_rule "simpl_trail")
             (C.proof c :: proof_removed) in
-        let c' = C.create_a ~trail:new_trail (C.lits c) proof in
+        let c' =
+          C.create_a ~trail:new_trail ~penalty:(C.penalty c)(C.lits c) proof
+        in
         Util.debugf ~section 3
           "@[<2>clause @[%a@]@ trail-simplifies into @[%a@]@]"
           (fun k->k C.pp c C.pp c');
@@ -297,13 +299,13 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
 
   (* generic mechanism for adding clause(s)
      and make a lemma out of them, including Skolemization, etc. *)
-  let introduce_cut ?(depth=0) (f:Cut_form.t) proof : cut_res =
+  let introduce_cut ?(penalty=0) ?(depth=0) (f:Cut_form.t) proof : cut_res =
     let box = BBox.inject_lemma f in
     (* positive clauses *)
     let c_pos =
       List.map
         (fun lits ->
-           C.create_a ~trail:(Trail.singleton box) lits proof)
+           C.create_a ~trail:(Trail.singleton box) ~penalty lits proof)
         (Cut_form.cs f)
     in
     { cut_form=f; cut_pos=c_pos; cut_lit=box;
@@ -406,7 +408,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       | Sat_solver.Unsat proof ->
         Util.debug ~section 1 "SAT-solver reports \"UNSAT\"";
         let proof = ProofStep.step proof in
-        let c = C.create ~trail:Trail.empty [] proof in
+        let c = C.create ~trail:Trail.empty ~penalty:0 [] proof in
         [c]
     in
     Signal.send after_check_sat ();

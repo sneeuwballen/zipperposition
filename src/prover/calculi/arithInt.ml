@@ -337,7 +337,8 @@ module Make(E : Env.S) : S with module Env = E = struct
               "canc_sup")
           [C.proof info.active; C.proof info.passive] in
       let trail = C.trail_l [info.active;info.passive] in
-      let new_c = C.create ~trail all_lits proof in
+      let penalty = C.penalty info.active + C.penalty info.passive in
+      let new_c = C.create ~penalty ~trail all_lits proof in
       Util.debugf ~section 5 "@[<2>... gives@ @[%a@]@]" (fun k->k C.pp new_c);
       Util.incr_stat stat_arith_sup;
       new_c :: acc
@@ -547,7 +548,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             ~rule:(ProofStep.mk_rule "canc_demod")
             (C.proof c :: List.map C.proof !clauses) in
         let trail = C.trail c in
-        let new_c = C.create ~trail (List.rev !lits) proof in
+        let new_c = C.create ~penalty:(C.penalty c) ~trail (List.rev !lits) proof in
         Util.incr_stat stat_arith_demod;
         Util.debugf ~section 5 "@[<2>arith demodulation@ of @[%a@]@ with [@[%a@]]@ gives @[%a@]@]"
           (fun k->k C.pp c (Util.pp_list C.pp) !clauses C.pp new_c);
@@ -631,7 +632,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                           ~rule:(ProofStep.mk_rule ~subst:[subst] "cancellation")
                           [C.proof c] in
                       let trail = C.trail c in
-                      let new_c = C.create ~trail all_lits proof in
+                      let penalty = C.penalty c in
+                      let new_c = C.create ~trail ~penalty all_lits proof in
                       Util.debugf ~section 3
                         "@[<2>cancellation@ of @[%a@]@ (with %a)@ into @[%a@]@]"
                         (fun k->k C.pp c Subst.pp subst C.pp new_c);
@@ -661,8 +663,9 @@ module Make(E : Env.S) : S with module Env = E = struct
                         ProofStep.mk_inference
                           ~rule:(ProofStep.mk_rule ~subst:[subst] "cancellation")
                           [C.proof c] in
-                      let trail = C.trail c in
-                      let new_c = C.create ~trail all_lits proof in
+                      let trail = C.trail c
+                      and penalty = C.penalty c in
+                      let new_c = C.create ~trail ~penalty all_lits proof in
                       Util.debugf ~section 3
                         "@[<2>cancellation@ of @[%a@]@ (with %a)@ into @[%a@]@]"
                         (fun k->k C.pp c Subst.pp subst C.pp new_c);
@@ -736,7 +739,9 @@ module Make(E : Env.S) : S with module Env = E = struct
                                  ~subst:[subst]
                                  "arith_eq_factoring")
                              [C.proof c] in
-                         let new_c = C.create ~trail:(C.trail c) all_lits proof in
+                         let penalty = C.penalty c
+                         and trail = C.trail c in
+                         let new_c = C.create ~trail ~penalty all_lits proof in
                          Util.debugf ~section 5
                            "@[<2>arith_eq_factoring:@ @[%a@]@ gives @[%a@]@]"
                            (fun k->k C.pp c C.pp new_c);
@@ -822,7 +827,15 @@ module Make(E : Env.S) : S with module Env = E = struct
                            ; CCFormat.sprintf "right(%a)" T.pp (MF.term mf_1)])
               [C.proof info.left; C.proof info.right] in
           let trail = C.trail_l [info.left; info.right] in
-          let new_c = C.create ~trail all_lits proof in
+          (* penalty for some chaining *)
+          let penalty =
+            C.penalty info.left
+            + C.penalty info.right
+            + 3 (* nested chainings are dangerous *)
+            + (if MF.term mf_1 |> T.is_var then 10 else 0)
+            + (if MF.term mf_2 |> T.is_var then 10 else 0)
+          in
+          let new_c = C.create ~penalty ~trail all_lits proof in
           Util.debugf ~section 5 "@[<2>ineq chaining@ of @[%a@]@ and @[%a@]@ gives @[%a@]@]"
             (fun k->k C.pp info.left C.pp info.right C.pp new_c);
           Util.incr_stat stat_arith_ineq_chaining;
@@ -849,7 +862,9 @@ module Make(E : Env.S) : S with module Env = E = struct
                 ~rule:(ProofStep.mk_rule ~subst:[subst] "canc_case_switch")
                 [C.proof info.left; C.proof info.right] in
             let trail = C.trail_l [info.left; info.right] in
-            let new_c = C.create ~trail all_lits proof in
+            (* small penalty for case switch *)
+            let penalty = C.penalty info.left + C.penalty info.right + 3 in
+            let new_c = C.create ~trail ~penalty all_lits proof in
             Util.debugf ~section 5 "@[<2>case switch@ of @[%a@]@ and @[%a@]@ gives @[%a@]@]"
               (fun k->k C.pp info.left C.pp info.right C.pp new_c);
             Util.incr_stat stat_arith_case_switch;
@@ -964,7 +979,9 @@ module Make(E : Env.S) : S with module Env = E = struct
               ProofStep.mk_inference
                 ~rule:(ProofStep.mk_rule ~subst:[subst] "canc_ineq_factoring")
                 [C.proof c] in
-            let new_c = C.create ~trail:(C.trail c) lits proof in
+            let trail = C.trail c
+            and penalty = C.penalty c in
+            let new_c = C.create ~trail ~penalty lits proof in
             Util.debugf ~section 5 "@[<2>ineq factoring@ of @[%a@]@ gives @[%a@]@"
               (fun k->k C.pp c C.pp new_c);
             Util.incr_stat stat_arith_ineq_factoring;
@@ -1169,7 +1186,14 @@ module Make(E : Env.S) : S with module Env = E = struct
           ProofStep.mk_inference ~rule:(ProofStep.mk_rule "div_chaining")
             [C.proof c1; C.proof c2] in
         let trail = C.trail_l [c1; c2] in
-        let new_c = C.create ~trail all_lits proof in
+        (* penalize chaining into variables *)
+        let penalty =
+          C.penalty c1
+          + C.penalty c2
+          + (if MF.term mf1' |> T.is_var then 10 else 0)
+          + (if MF.term mf2' |> T.is_var then 10 else 0)
+        in
+        let new_c = C.create ~trail ~penalty all_lits proof in
         Util.debugf ~section 5 "@[<4>... gives@ @[%a@]@]" (fun k->k C.pp new_c);
         Util.incr_stat stat_arith_div_chaining;
         new_c :: acc
@@ -1261,7 +1285,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       let proof =
         ProofStep.mk_inference ~rule:(ProofStep.mk_rule "div_case_switch")
           [C.proof c] in
-      let new_c = C.create ~trail:(C.trail c) all_lits proof in
+      let new_c =
+        C.create ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof
+      in
       Util.debugf ~section 5 "@[<2>div_case_switch@ of @[%a@]@ into @[%a@]@]"
         (fun k->k C.pp c C.pp new_c);
       [new_c]
@@ -1323,7 +1349,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           ProofStep.mk_inference
             ~rule:(ProofStep.mk_rule "div_prime_decomposition")
             [C.proof c] in
-        let new_c = C.create ~trail:(C.trail c) all_lits proof in
+        let new_c =
+          C.create ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof
+        in
         Util.debugf ~section 5
           "@[<2>prime_decomposition- of@ @[%a@]@ into @[%a@]@]"
           (fun k->k C.pp c C.pp new_c);
@@ -1336,7 +1364,9 @@ module Make(E : Env.S) : S with module Env = E = struct
                let proof =
                  ProofStep.mk_inference [C.proof c]
                    ~rule:(ProofStep.mk_rule "div_prime_decomposition")  in
-               let new_c = C.create_a ~trail:(C.trail c) all_lits proof in
+               let new_c =
+                 C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof
+               in
                new_c)
             lits
         in
@@ -1405,7 +1435,9 @@ module Make(E : Env.S) : S with module Env = E = struct
                     ProofStep.mk_inference
                       ~rule:(ProofStep.mk_rule "divisibility")
                       [C.proof c] in
-                  let new_c = C.create ~trail:(C.trail c) all_lits proof in
+                  let new_c =
+                    C.create ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof
+                  in
                   Util.debugf ~section 5 "@[<4>... gives@ @[%a@]@]" (fun k->k C.pp new_c);
                   Util.incr_stat stat_arith_divisibility;
                   new_c :: acc
@@ -1550,7 +1582,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         ProofStep.mk_inference
           ~rule:(ProofStep.mk_rule ~subst:[subst] "canc_eq_res")
           [C.proof c] in
-      let c' = C.create ~trail:(C.trail c) lits' proof in
+      let c' = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
       Util.debugf ~section 4
         "@[<2>arith_eq_res:@ simplify @[%a@]@ into @[%a@]@]"
         (fun k->k C.pp c C.pp c');
@@ -1581,7 +1613,10 @@ module Make(E : Env.S) : S with module Env = E = struct
                let proof =
                  ProofStep.mk_inference
                    ~rule:(ProofStep.mk_rule "arith_diff_to_lesseq") [C.proof c] in
-               let c' = C.create ~trail:(C.trail c) (new_lits @ lits) proof in
+               let c' =
+                 C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+                   (new_lits @ lits) proof
+               in
                Util.debugf ~section 5 "@[<2>diff2less:@ @[%a@]@ into @[%a@]@]"
                  (fun k->k C.pp c C.pp c');
                raise (DiffToLesseq c')
@@ -1681,7 +1716,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             let all_lits = !new_lits @ (Array.to_list lits') in
             let proof =
               ProofStep.mk_inference ~rule:(ProofStep.mk_rule "purify") [C.proof c] in
-            let new_c = C.create ~trail:(C.trail c) all_lits proof in
+            let new_c =
+              C.create ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof
+            in
             Util.debugf ~section 5 "@[<2>purify@ @[%a@]@ into @[%a@]@]"
               (fun k->k C.pp c C.pp new_c);
             Util.incr_stat stat_arith_purify;
@@ -1947,10 +1984,11 @@ module Make(E : Env.S) : S with module Env = E = struct
             in
             let rule = ProofStep.mk_rule rule_name ~comment: [ which] in
             let proof = ProofStep.mk_inference ~rule [C.proof c] in
-            let new_c = C.create ~trail:(C.trail c) lits proof in
+            let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
             Util.debugf ~section 5
               "@[<2>elimination of %s×%a@ by %a (which:%s)@ in @[%a@]:@ gives @[%a@]@]"
-              (fun k->k (Z.to_string view.NVE.lcm) HVar.pp x M.pp by which C.pp c C.pp new_c);
+              (fun k->k (Z.to_string view.NVE.lcm)
+                  HVar.pp x M.pp by which C.pp c C.pp new_c);
             acc := new_c :: !acc
           in
           (* choose which form to use *)

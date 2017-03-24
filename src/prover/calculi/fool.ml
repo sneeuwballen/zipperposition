@@ -36,7 +36,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       ProofStep.mk_inference [C.proof c]
         ~rule:(ProofStep.mk_rule "fool_param")
     in
-    let new_c = C.create ~trail:(C.trail c) (new_lit :: lits) proof in
+    let new_c =
+      C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+        (new_lit :: lits) proof
+    in
     Util.debugf ~section 5 "... deduce `@[%a@]`" (fun k->k C.pp new_c);
     new_c
 

@@ -25,6 +25,9 @@ module type S = sig
     val age : t
     (** Returns the age of the clause (or 0 for the empty clause) *)
 
+    val penalty : t
+    (** Returns the penalty of the clause *)
+
     val favor_all_neg : t
     (** Favor clauses with only negative ground lits *)
 

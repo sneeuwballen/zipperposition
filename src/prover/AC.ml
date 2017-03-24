@@ -61,7 +61,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* build clause l=r *)
     let mk_clause l r =
       let proof = ProofStep.mk_trivial in
-      let c = C.create ~trail:Trail.empty [ Lit.mk_eq l r ] proof in
+      let penalty = 0 in
+      let c = C.create ~trail:Trail.empty ~penalty [ Lit.mk_eq l r ] proof in
       C.set_flag flag_axiom c true;
       C.set_flag SClause.flag_persistent c true;
       c
@@ -171,7 +172,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           ProofStep.mk_simp premises
             ~rule:(ProofStep.mk_rule "AC.normalize")
         in
-        let new_c = C.create ~trail:(C.trail c) lits proof in
+        let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
         Util.exit_prof prof_simplify;
         Util.incr_stat stat_ac_simplify;
         Util.debugf ~section 3 "@[<2>@[%a@]@ AC-simplify into @[%a@]@]"
