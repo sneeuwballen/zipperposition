@@ -880,8 +880,6 @@ module Conv = struct
         Monome.Rat.of_term l >>= fun m1 ->
         Monome.Rat.of_term r >>= fun m2 ->
         return (Rat (AL.mk_eq m1 m2))
-      | SLiteral.Neq (l, _) when type_ok l ->
-        Util.errorf ~where:"cnf" "should have encoded `%a`" (SLiteral.pp T.pp) f
       | SLiteral.Atom (t, b) ->
         let post lit = if b then lit else negate lit in
         let res = match T.view t with
@@ -893,8 +891,6 @@ module Conv = struct
             Monome.Rat.of_term l >>= fun m1 ->
             Monome.Rat.of_term r >>= fun m2 ->
             return (Rat (AL.mk_less m2 m1))
-          | T.AppBuiltin (Builtin.Lesseq, [_; l; _]) when type_ok l ->
-            Util.errorf ~where:"cnf" "should have encoded `%a`" (SLiteral.pp T.pp) f
           | T.AppBuiltin (Builtin.Greatereq, [_; l; _]) when type_ok l ->
             Util.errorf ~where:"cnf" "should have encoded `%a`" (SLiteral.pp T.pp) f
           | _ -> None

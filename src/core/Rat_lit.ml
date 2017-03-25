@@ -85,12 +85,11 @@ let to_string = CCFormat.to_string pp_tstp
 
 (** {2 Operators} *)
 
-let map f m =
-  { m with left=M.map f m.left; right=M.map f m.right }
+let map f m = make m.op (M.map f m.left)(M.map f m.right)
 
 let fold f acc m =
-    let acc = Sequence.fold f acc (Monome.Seq.terms m.left) in
-    Sequence.fold f acc (Monome.Seq.terms m.right)
+  let acc = Sequence.fold f acc (Monome.Seq.terms m.left) in
+  Sequence.fold f acc (Monome.Seq.terms m.right)
 
 type 'a unif = subst:Subst.t -> 'a Scoped.t -> 'a Scoped.t -> Subst.t Sequence.t
 

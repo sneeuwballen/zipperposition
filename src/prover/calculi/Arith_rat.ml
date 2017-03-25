@@ -890,7 +890,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
 
   (* look for negated literals *)
-  let unnegate_lits c: C.t SimplM.t =
+  let convert_lit c: C.t SimplM.t =
     let type_ok t = Type.equal Type.rat (T.ty t) in
     let open CCOpt.Infix in
     let conv_lit i lit = match lit with
@@ -898,13 +898,23 @@ module Make(E : Env.S) : S with module Env = E = struct
         Monome.Rat.of_term l >>= fun m1 ->
         Monome.Rat.of_term r >|= fun m2 ->
         i, [Lit.mk_rat_less m1 m2; Lit.mk_rat_less m2 m1]
-      | Lit.Prop (f, false) ->
-        begin match T.view f with
-          | T.AppBuiltin (Builtin.Less, [l; r]) when type_ok l ->
+      | Lit.Prop (f,sign) ->
+        begin match T.view f, sign with
+          | T.AppBuiltin (Builtin.Less, [_; l; r]), false when type_ok l ->
             Monome.Rat.of_term l >>= fun m1 ->
             Monome.Rat.of_term r >|= fun m2 ->
             (* ¬(l<r) --> l=r ∨ r<l *)
             i, [Lit.mk_rat_eq m1 m2; Lit.mk_rat_less m2 m1]
+          | T.AppBuiltin (Builtin.Lesseq, [_; l; r]), true when type_ok l ->
+            Monome.Rat.of_term l >>= fun m1 ->
+            Monome.Rat.of_term r >|= fun m2 ->
+            (* l≤r --> l=r ∨ l<r *)
+            i, [Lit.mk_rat_eq m1 m2; Lit.mk_rat_less m1 m2]
+          | T.AppBuiltin (Builtin.Lesseq, [_; l; r]), false when type_ok l ->
+            Monome.Rat.of_term l >>= fun m1 ->
+            Monome.Rat.of_term r >|= fun m2 ->
+            (* ¬(l≤r) --> r<l *)
+            i, [Lit.mk_rat_less m2 m1]
           | _ -> None
         end
       | _ -> None
@@ -915,12 +925,12 @@ module Make(E : Env.S) : S with module Env = E = struct
         let lits =
           new_lits @ CCArray.except_idx (C.lits c) i
         and proof =
-          ProofStep.mk_simp ~rule:(ProofStep.mk_rule "unnegate_lit") [C.proof c]
+          ProofStep.mk_simp ~rule:(ProofStep.mk_rule "convert_lit") [C.proof c]
         in
         let c' =
           C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof
         in
-        Util.debugf ~section 5 "(@[unnegate@ :from %a@ :to %a@])"
+        Util.debugf ~section 5 "(@[convert@ :from %a@ :to %a@])"
           (fun k->k C.pp c C.pp c');
         SimplM.return_new c'
     end
@@ -1162,7 +1172,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_backward_simplify canc_backward_demodulation;
     Env.add_is_trivial is_tautology;
     Env.add_simplify purify;
-    Env.add_simplify unnegate_lits;
+    Env.add_simplify convert_lit;
     Env.add_multi_simpl_rule eliminate_unshielded;
     Ctx.Lit.add_from_hook Lit.Conv.rat_hook_from;
     (* completeness? I don't think so *)
@@ -1195,7 +1205,7 @@ let extension =
     )
   and post_typing_action stmts state =
     let module PT = TypedSTerm in
-    let has_int =
+    let has_rat =
       CCVector.to_seq stmts
       |> Sequence.flat_map Stmt.Seq.to_seq
       |> Sequence.flat_map
@@ -1206,11 +1216,11 @@ let extension =
           | `Term t -> PT.Seq.subterms t |> Sequence.filter_map PT.ty)
       |> Sequence.exists (PT.Ty.equal PT.Ty.rat)
     in
-    let should_reg = !enable_rat_ && has_int in
+    let should_reg = !enable_rat_ && has_rat in
     Util.debugf ~section 2 "decision to register rat-arith: %B" (fun k->k should_reg);
     state
     |> Flex_state.add k_should_register should_reg
-    |> Flex_state.add k_has_rat has_int
+    |> Flex_state.add k_has_rat has_rat
   in
   { Extensions.default with
       Extensions.
