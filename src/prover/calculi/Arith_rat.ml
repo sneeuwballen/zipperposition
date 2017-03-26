@@ -905,6 +905,10 @@ module Make(E : Env.S) : S with module Env = E = struct
             Monome.Rat.of_term r >|= fun m2 ->
             (* ¬(l<r) --> l=r ∨ r<l *)
             i, [Lit.mk_rat_eq m1 m2; Lit.mk_rat_less m2 m1]
+          | T.AppBuiltin (Builtin.Less, [_; l; r]), true when type_ok l ->
+            Monome.Rat.of_term l >>= fun m1 ->
+            Monome.Rat.of_term r >|= fun m2 ->
+            i, [Lit.mk_rat_less m1 m2]
           | T.AppBuiltin (Builtin.Lesseq, [_; l; r]), true when type_ok l ->
             Monome.Rat.of_term l >>= fun m1 ->
             Monome.Rat.of_term r >|= fun m2 ->
@@ -915,6 +919,15 @@ module Make(E : Env.S) : S with module Env = E = struct
             Monome.Rat.of_term r >|= fun m2 ->
             (* ¬(l≤r) --> r<l *)
             i, [Lit.mk_rat_less m2 m1]
+          | T.AppBuiltin (Builtin.Eq, [_; l; r]), true when type_ok l ->
+            Monome.Rat.of_term l >>= fun m1 ->
+            Monome.Rat.of_term r >|= fun m2 ->
+            i, [Lit.mk_rat_eq m1 m2]
+          | T.AppBuiltin (Builtin.Eq, [_; l; r]), false when type_ok l ->
+            Monome.Rat.of_term l >>= fun m1 ->
+            Monome.Rat.of_term r >|= fun m2 ->
+            (* ¬(l=r) --> l<r ∨ r<l *)
+            i, [Lit.mk_rat_less m1 m2; Lit.mk_rat_less m2 m1]
           | _ -> None
         end
       | _ -> None
