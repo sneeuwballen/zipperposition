@@ -37,7 +37,7 @@ let compare lits1 lits2 = CCArray.compare Lit.compare lits1 lits2
 let hash lits = Hash.array Lit.hash lits
 
 let variant ?(subst=S.empty) (a1,sc1) (a2,sc2) =
-  Unif.unif_array_com subst (a1,sc1) (a2,sc2)
+  Unif.unif_array_com ~size:`Same subst (a1,sc1) (a2,sc2)
     ~op:(fun subst x y -> Lit.variant ~subst x y)
 
 let are_variant a1 a2 =
