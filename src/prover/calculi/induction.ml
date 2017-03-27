@@ -22,6 +22,7 @@ let stats_lemmas = Util.mk_stat "induction.inductive_lemmas"
 let stats_trivial_lemmas = Util.mk_stat "induction.trivial_lemmas"
 let stats_absurd_lemmas = Util.mk_stat "induction.absurd_lemmas"
 let stats_inductions = Util.mk_stat "induction.inductions"
+let stats_split_goal = Util.mk_stat "induction.split_goals"
 
 let k_enable : bool Flex_state.key = Flex_state.create_key()
 let k_ind_depth : int Flex_state.key = Flex_state.create_key()
@@ -78,6 +79,8 @@ end = struct
     cut: Cut_form.t;
     test_res: status lazy_t;
   }
+  type clause = Literals.t
+  type form = clause list
 
   let trivial: t =
     {cut=Cut_form.trivial; test_res=Lazy.from_val S_trivial}
@@ -100,7 +103,7 @@ end = struct
   let make cs: t = of_form (Cut_form.make cs)
 
   let form t = t.cut
-  let cs t = Cut_form.cs t.cut
+  let cs t : form = Cut_form.cs t.cut
   let vars t = Cut_form.vars t.cut
   let test (t:t): status = Lazy.force t.test_res
   let ind_vars t = Cut_form.ind_vars t.cut
@@ -109,7 +112,50 @@ end = struct
 
   let simplify (g:t): t = form g |> Cut_form.normalize |> of_form
 
-  let split (g:t): t list = [g] (* TODO: see if clauses are disjoint *)
+  (* union-find for sets of clauses *)
+  module UF_clauses =
+    UnionFind.Make(struct
+      type key = T.var
+      type value = clause list
+      let equal = HVar.equal Type.equal
+      let hash = HVar.hash
+      let zero = []
+      let merge = List.rev_append
+    end)
+
+  let split (g:t): t list =
+    let uf =
+      vars g |> T.VarSet.to_list |> UF_clauses.create
+    and ground_ = ref [] in
+    List.iter
+      (fun c ->
+         let vars = Literals.vars c in
+         List.iter
+           (fun v -> UF_clauses.add uf v [c])
+           vars;
+         begin match vars with
+           | [] ->
+             (* ground clause is all by itself *)
+             ground_ := [c] :: !ground_;
+           | v::other_vars ->
+             (* merge together these variables *)
+             List.iter
+               (fun v' -> UF_clauses.union uf v v')
+               other_vars;
+         end)
+      (cs g);
+    let all_clusters =
+      (UF_clauses.to_seq uf |> Sequence.map snd |> Sequence.to_rev_list)
+      @ !ground_
+    in
+    let new_goals = List.rev_map make all_clusters in
+    if List.length new_goals > 1 then (
+      Util.incr_stat stats_split_goal;
+      Util.debugf ~section 3
+        "(@[<2>split_goal@ :goal %a@ :new_goals (@[<hv>%a@])@])"
+        (fun k->k pp g (Util.pp_list pp) new_goals);
+    );
+    new_goals
 
   module C = E.C
 
