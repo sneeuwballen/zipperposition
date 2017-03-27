@@ -8,6 +8,7 @@ open Logtk_arbitrary
 
 module T = FOTerm
 module S = Subst
+module Q = QCheck
 
 let (==>) = QCheck.(==>)
 
@@ -36,6 +37,29 @@ let check_variant =
   in
   QCheck.Test.make ~long_factor:20 ~name gen prop
 
+let check_variant2 =
+  let gen = ArTerm.default in
+  let name = "unif_term_variant_sound" in
+  let prop (t0,t1) =
+    try
+      let subst = Unif.FO.variant (t0,0)(t1,1) in
+      (* check they are really variants *)
+      let renaming = Subst.Renaming.create() in
+      let t0' = Subst.FO.apply ~renaming subst (t0,0) in
+      let t1' = Subst.FO.apply ~renaming subst (t1,1) in
+      T.equal t0' t1'
+    with Unif.Fail -> QCheck.assume_fail ()
+  in
+  QCheck.Test.make ~long_factor:20 ~name (Q.pair gen gen) prop
+
+let check_variant_sym =
+  let gen = ArTerm.default in
+  let name = "unif_term_variant_sym" in
+  let prop (t0,t1) =
+    Unif.FO.are_variant t0 t1 = Unif.FO.are_variant t1 t0
+  in
+  QCheck.Test.make ~long_factor:20 ~name (Q.pair gen gen) prop
+
 let check_matching =
   let gen = QCheck.pair ArTerm.default ArTerm.default in
   let name = "unif_matching_gives_matcher" in
@@ -54,5 +78,7 @@ let check_matching =
 let props =
   [ check_unify_gives_unifier
   ; check_variant
+  ; check_variant2
+  ; check_variant_sym
   ; check_matching
   ]
