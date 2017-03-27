@@ -622,19 +622,19 @@ module TPTP = struct
       | TyDecl (id,ty) -> pp_decl out (id,ty)
       | Assert f ->
         let role = "axiom" in
-        fpf out "@[<2>tff(%s, %s,@ (@[%a@])@]." name role ppf f
+        fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@]." name role ppf f
       | Lemma l ->
         let role = "lemma" in
-        fpf out "@[<2>tff(%s, %s,@ (@[%a@])@]." name role
+        fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@]." name role
           (Util.pp_list ~sep:" & " ppf) l
       | Goal f ->
         let role = "conjecture" in
-        fpf out "@[<2>tff(%s, %s,@ (@[%a@])@]." name role ppf f
+        fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@]." name role ppf f
       | NegatedGoal (_,l) ->
         let role = "negated_conjecture" in
         List.iter
           (fun f ->
-             fpf out "@[<2>tff(%s, %s,@ (@[%a@])@]." name role ppf f)
+             fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@]." name role ppf f)
           l
       | Def l ->
         (* declare *)
