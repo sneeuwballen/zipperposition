@@ -66,6 +66,10 @@ module type S = sig
   (** Add the given cut to the list of lemmas. Modifies the global list
       of lemmas. *)
 
+  val add_imply : cut_res list -> cut_res -> ProofStep.t -> unit
+  (** [add_imply l res] means that the conjunction of lemmas in [l]
+      implies that the lemma [res] is proven *)
+
   val on_input_lemma : cut_res Signal.t
   (** Triggered every time a cut is introduced  for an input lemma
       (i.e. every time a statement of the form `lemma F` is translated) *)

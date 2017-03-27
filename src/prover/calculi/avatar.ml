@@ -333,6 +333,16 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         (fun k->k Cut_form.pp c.cut_form);
     )
 
+  let add_imply (l:cut_res list) (res:cut_res) (p:ProofStep.t): unit =
+    let c = res.cut_lit :: List.map (fun cut -> BLit.neg cut.cut_lit) l in
+      Util.debugf ~section 3
+        "(@[<2>add_imply@ :premises (@[<hv>%a@])@ :concl %a@ :proof %a@])"
+        (fun k->k (Util.pp_list pp_cut_res) l pp_cut_res res
+            ProofPrint.pp_normal_step p);
+    Solver.add_clause ~proof:p c;
+    ()
+
+
   let lemma_seq : cut_res Sequence.t =
     fun yield -> Lemma_tbl.iter (fun _ c -> yield c) all_lemmas_
 
