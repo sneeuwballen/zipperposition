@@ -19,6 +19,8 @@ type t =
   | Int of Int_lit.t
   | Rat of Rat_lit.t
 
+type lit = t
+
 let equal l1 l2 =
   match l1, l2 with
     | Equation (l1,r1,sign1), Equation (l2,r2,sign2) ->
@@ -119,6 +121,8 @@ let sign = function
   | Int o -> Int_lit.sign o
   | Rat _ -> true
   | True -> true
+
+module Set = CCSet.Make(struct type t = lit let compare = compare end)
 
 (* specific: for the term comparison *)
 let polarity = function

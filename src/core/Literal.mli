@@ -108,6 +108,8 @@ val is_ground : t -> bool
 val symbols : t -> ID.Set.t
 val root_terms : t -> term list (** all the terms immediatly under the lit *)
 
+module Set : CCSet.S with type elt = t
+
 (** {2 Basic semantic checks} *)
 
 val is_trivial : t -> bool
