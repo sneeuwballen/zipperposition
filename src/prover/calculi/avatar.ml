@@ -43,14 +43,12 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
   module UF =
     UnionFind.Make(struct
       type key = T.var
-      type value = Lit.t list
+      type value = Lit.Set.t
       let equal = HVar.equal Type.equal
       let hash = HVar.hash
-      let zero = []
-      let merge = List.rev_append
+      let zero = Lit.Set.empty
+      let merge = Lit.Set.union
     end)
-
-  module LitSet = Sequence.Set.Make(Lit)
 
   let infer_split_ c =
     let lits = C.lits c in
@@ -62,7 +60,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       |> T.VarSet.to_list
       |> UF.create
     (* set of ground literals (each one is its own component) *)
-    and cluster_ground = ref LitSet.empty in
+    and cluster_ground = ref Lit.Set.empty in
 
     (* literals belong to either their own ground component, or to every
         sets in [uf_vars] associated to their variables *)
@@ -71,22 +69,22 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
          let v_opt = Lit.Seq.vars lit |> Sequence.head in
          match v_opt with
            | None -> (* ground, lit has its own component *)
-             cluster_ground := LitSet.add lit !cluster_ground
+             cluster_ground := Lit.Set.add lit !cluster_ground
            | Some v ->
              (* merge other variables of the literal with [v] *)
              Lit.Seq.vars lit
              |> Sequence.iter
                (fun v' ->
-                  UF.add uf_vars v' [lit];  (* lit is in the equiv class of [v'] *)
+                  UF.add uf_vars v' (Lit.Set.singleton lit);  (* lit is in the equiv class of [v'] *)
                   UF.union uf_vars v v');
       ) lits;
 
     (* now gather all the components as a literal list list *)
     let components = ref [] in
-    LitSet.iter (fun lit -> components := [lit] :: !components) !cluster_ground;
-    UF.iter uf_vars (fun _ comp -> components := comp :: !components);
+    Lit.Set.iter (fun lit -> components := [lit] :: !components) !cluster_ground;
+    UF.iter uf_vars (fun _ comp -> components := Lit.Set.to_list comp :: !components);
 
-    match !components with
+    begin match !components with
       | [] -> assert (Array.length lits=0); None
       | [_] -> None
       | _::_ ->
@@ -123,6 +121,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
           (fun k->k BBox.pp_bclause bool_clause);
         (* return the clauses *)
         Some clauses
+    end
 
   (* Avatar splitting *)
   let split c =
