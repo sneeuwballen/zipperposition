@@ -124,6 +124,15 @@ let save_ lit =
       ICaseTbl.add _case_set p (payload, lit)
   end
 
+let check_variant lits lits' =
+  let subst = Lits.variant (lits,0)(lits',1) |> Sequence.head_exn in
+  let renaming = Subst.Renaming.create() in
+  let lits_g = Lits.apply_subst ~renaming subst (lits,0) in
+  let lits'_g = Lits.apply_subst ~renaming subst (lits',1) in
+  Array.sort Literal.compare lits_g;
+  Array.sort Literal.compare lits'_g;
+  Literals.equal lits_g lits'_g
+
 (* clause -> boolean lit *)
 let inject_lits_ lits  =
   (* special case: one negative literal. *)
@@ -139,6 +148,9 @@ let inject_lits_ lits  =
       (function
         | lits', Clause_component _, blit
           when Lits.are_variant lits lits' ->
+          (* FIXME: comment once bug solved *)
+          assert (Lit.sign blit);
+          assert (check_variant lits lits');
           Some blit
         | _ -> None)
   in

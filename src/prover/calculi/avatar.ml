@@ -67,7 +67,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     Array.iter
       (fun lit ->
          let v_opt = Lit.Seq.vars lit |> Sequence.head in
-         match v_opt with
+         begin match v_opt with
            | None -> (* ground, lit has its own component *)
              cluster_ground := Lit.Set.add lit !cluster_ground
            | Some v ->
@@ -75,9 +75,11 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
              Lit.Seq.vars lit
              |> Sequence.iter
                (fun v' ->
-                  UF.add uf_vars v' (Lit.Set.singleton lit);  (* lit is in the equiv class of [v'] *)
+                  (* lit is in the equiv class of [v'] *)
+                  UF.add uf_vars v' (Lit.Set.singleton lit);
                   UF.union uf_vars v v');
-      ) lits;
+         end)
+      lits;
 
     (* now gather all the components as a literal list list *)
     let components = ref [] in
@@ -91,18 +93,21 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         (* do a simplification! *)
         Util.incr_stat stat_splits;
         let proof =
-          ProofStep.mk_esa ~rule:(ProofStep.mk_rule "split") [C.proof c] in
+          ProofStep.mk_esa ~rule:(ProofStep.mk_rule "split") [C.proof c]
+        in
+        (* elements of the trail to keep *)
+        let keep_trail =
+          C.trail c |> Trail.filter BBox.must_be_kept
+        in
         let clauses_and_names =
           List.map
             (fun lits ->
                let lits = Array.of_list lits in
                let bool_name = BBox.inject_lits lits in
-               (* new trail: keep some literals of [C.trail c], add the new one *)
-               let trail =
-                 C.trail c
-                 |> Trail.filter BBox.must_be_kept
-                 |> Trail.add bool_name
-               in
+               Util.debugf ~section 5 "(@[<2>inject_lits@ :lits %a@ :blit %a@])"
+                 (fun k->k Literals.pp lits BBox.pp bool_name);
+               (* new trail: add the new one *)
+               let trail = Trail.add bool_name keep_trail in
                let c = C.create_a ~trail ~penalty:(C.penalty c) lits proof in
                c, bool_name)
             !components
@@ -114,7 +119,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         let bool_guard =
           C.trail c
           |> Trail.to_list
-          |> List.map Trail.Lit.neg in
+          |> List.map Trail.Lit.neg
+        in
         let bool_clause = List.append bool_clause bool_guard in
         Sat.add_clause ~proof bool_clause;
         Util.debugf ~section 4 "@[constraint clause is @[%a@]@]"
