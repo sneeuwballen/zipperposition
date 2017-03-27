@@ -59,12 +59,12 @@ let unif_array_com ?(size=`Same) subst ~op (a1,sc1) (a2,sc2) k =
   (* match a1.(i...) with a2\bv *)
   let rec iter2 subst bv i =
     if i = Array.length a1
-    then k subst
+    then k subst (* success *)
     else iter3 subst bv i 0
-  (* find a matching literal for a1.(i), within a2.(j...) *)
+  (* find a matching literal for a1.(i), within a2.(j...)\bv *)
   and iter3 subst bv i j =
     if j = Array.length a2
-    then ()  (* stop *)
+    then () (* fail *)
     else (
       if not (BV.get bv j) then (
         (* try to match i-th literal of a1 with j-th literal of a2 *)
@@ -169,7 +169,7 @@ module Inner = struct
             if occurs_check ~depth:0 subst (v1,sc1) (t2,sc2)
             then fail () (* occur check or t2 is open *)
             else S.bind subst (v1,sc1) (t2,sc2)
-          | T.Var v1, T.Var _, O_variant ->
+          | T.Var v1, T.Var _, O_variant when sc1<>sc2 ->
             S.bind subst (v1,sc1) (t2,sc2)
           | _, T.Var v2, O_unify ->
             if occurs_check ~depth:0 subst (v2,sc2) (t1,sc1)
