@@ -18,11 +18,11 @@ type var = T.var
 
 let section = Util.Section.make ~parent:Const.section "induction"
 
-let stats_lemmas = Util.mk_stat "induction.inductive_lemmas"
-let stats_trivial_lemmas = Util.mk_stat "induction.trivial_lemmas"
-let stats_absurd_lemmas = Util.mk_stat "induction.absurd_lemmas"
-let stats_inductions = Util.mk_stat "induction.inductions"
-let stats_split_goal = Util.mk_stat "induction.split_goals"
+let stat_lemmas = Util.mk_stat "induction.inductive_lemmas"
+let stat_trivial_lemmas = Util.mk_stat "induction.trivial_lemmas"
+let stat_absurd_lemmas = Util.mk_stat "induction.absurd_lemmas"
+let stat_inductions = Util.mk_stat "induction.inductions"
+let stat_split_goal = Util.mk_stat "induction.split_goals"
 
 let k_enable : bool Flex_state.key = Flex_state.create_key()
 let k_ind_depth : int Flex_state.key = Flex_state.create_key()
@@ -150,7 +150,7 @@ end = struct
     in
     let new_goals = List.rev_map make all_clusters in
     if List.length new_goals > 1 then (
-      Util.incr_stat stats_split_goal;
+      Util.incr_stat stat_split_goal;
       Util.debugf ~section 3
         "(@[<2>split_goal@ :goal %a@ :new_goals (@[<hv>%a@])@])"
         (fun k->k pp g (Util.pp_list pp) new_goals);
@@ -163,14 +163,14 @@ end = struct
     begin match test g with
       | S_ok -> true
       | S_trivial ->
-        Util.incr_stat stats_trivial_lemmas;
+        Util.incr_stat stat_trivial_lemmas;
         Util.debugf ~section 2 "(@[<2>lemma_trivial@ @[%a@]@@])" (fun k->k pp g);
         false
       | S_falsifiable subst ->
         Util.debugf ~section 2
           "(@[<2>lemma_absurd@ @[%a@]@ :subst %a@])"
           (fun k->k pp g Subst.pp subst);
-        Util.incr_stat stats_absurd_lemmas;
+        Util.incr_stat stat_absurd_lemmas;
         false
     end
 
@@ -212,14 +212,14 @@ end = struct
       Util.debugf ~section 2
         "@[<2>lemma @[%a@]@ apparently not absurd (trivial:%B)@]"
         (fun k->k pp g !trivial);
-      if !trivial then Util.incr_stat stats_trivial_lemmas;
+      if !trivial then Util.incr_stat stat_trivial_lemmas;
       not !trivial
     with Yield_false c ->
       assert (C.is_empty c);
       Util.debugf ~section 2
         "@[<2>lemma @[%a@] absurd:@ leads to empty clause `%a`@]"
         (fun k->k pp g C.pp c);
-      Util.incr_stat stats_absurd_lemmas;
+      Util.incr_stat stat_absurd_lemmas;
       false
 
   (* some checks that [g] should be considered as a goal *)
@@ -572,7 +572,7 @@ module Make
     Util.debugf ~section 2 "@[<2>add boolean constraints@ @[<hv>%a@]@ :proof %a@]"
       (fun k->k (Util.pp_list BBox.pp_bclause) b_clauses
           ProofPrint.pp_normal_step proof);
-    Util.incr_stat stats_inductions;
+    Util.incr_stat stat_inductions;
     (* return the clauses *)
     clauses
 
@@ -936,7 +936,7 @@ module Make
   let on_lemma cut =
     let l = prove_lemma cut in
     if l<>[] then (
-      Util.incr_stat stats_lemmas;
+      Util.incr_stat stat_lemmas;
       new_clauses_from_lemmas_ := List.rev_append l !new_clauses_from_lemmas_;
     )
 
