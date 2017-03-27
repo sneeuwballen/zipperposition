@@ -217,7 +217,7 @@ module Ctx = struct
     | `Infer -> `Generalize
 
   (* generate fresh type var. *)
-  let fresh_ty_meta_var ctx ?(dest=default_dest ctx) : T.meta_var =
+  let fresh_ty_meta_var ctx ?(dest=default_dest ctx) () : T.meta_var =
     let v = Var.gensym ~ty:T.tType () in
     let r = ref None in
     let meta = v, r, dest in
@@ -228,12 +228,12 @@ module Ctx = struct
   let rec fresh_ty_meta_vars ?dest ctx n =
     if n = 0
     then []
-    else fresh_ty_meta_var ?dest ctx :: fresh_ty_meta_vars ?dest ctx (n-1)
+    else fresh_ty_meta_var ?dest ctx () :: fresh_ty_meta_vars ?dest ctx (n-1)
 
   (* Fresh function type with [arity] arguments. Type meta-vars should
      not be generalized but bound to default. *)
   let fresh_fun_ty ?(dest=`BindDefault) ~arity ctx =
-    let ret = fresh_ty_meta_var ~dest ctx in
+    let ret = fresh_ty_meta_var ctx ~dest () in
     let new_vars = fresh_ty_meta_vars ~dest ctx arity in
     let ty = T.Ty.fun_ (List.map (fun v->T.Ty.meta v) new_vars) (T.Ty.meta ret) in
     ty
@@ -273,7 +273,7 @@ module Ctx = struct
   let get_var_ ctx v =
     let mk_fresh v =
       let dest = default_dest ctx in
-      let ty_v = fresh_ty_meta_var ~dest ctx in
+      let ty_v = fresh_ty_meta_var ~dest ctx () in
       let v' = Var.of_string ~ty:(T.Ty.meta ty_v) v in
       ctx.local_vars <- v' :: ctx.local_vars;
       v'
@@ -315,7 +315,7 @@ let with_typed_vars_ ?loc ~infer_ty ctx vars ~f =
     | [] -> f (List.rev acc)
     | (v,o) :: l' ->
       let ty = match o with
-        | None -> T.Ty.meta (Ctx.fresh_ty_meta_var ~dest:`Generalize ctx)
+        | None -> T.Ty.meta (Ctx.fresh_ty_meta_var ~dest:`Generalize ctx ())
         | Some ty -> infer_ty ?loc ctx ty
       in
       let v = match v with
@@ -405,7 +405,7 @@ let add_implicit_params ty_fun l =
 
 let mk_metas ctx n =
   CCList.init n
-    (fun _ -> T.Ty.meta (Ctx.fresh_ty_meta_var ~dest:`Generalize ctx))
+    (fun _ -> T.Ty.meta (Ctx.fresh_ty_meta_var ~dest:`Generalize ctx ()))
 
 (* apply type to the relevant number of metas; return the resulting type *)
 let apply_ty_to_metas ?loc ctx (ty:T.Ty.t): T.Ty.t list * T.Ty.t =
@@ -491,7 +491,7 @@ let rec infer_rec ctx t =
       let l = infer_match ?loc ctx ~ty_matched:ty_u t data l in
       T.match_ ?loc u l
     | PT.List [] ->
-      let v = Ctx.fresh_ty_meta_var ~dest:`Generalize ctx in
+      let v = Ctx.fresh_ty_meta_var ~dest:`Generalize ctx () in
       let ty = T.Ty.multiset (T.Ty.meta v) in
       T.multiset ?loc ~ty []
     | PT.List (t::l) ->
@@ -520,7 +520,7 @@ let rec infer_rec ctx t =
       T.record ~ty ?loc l ~rest
     | PT.AppBuiltin (Builtin.Wildcard, []) ->
       (* make a new TYPE variable *)
-      let v = Ctx.fresh_ty_meta_var ~dest:`Generalize ctx in
+      let v = Ctx.fresh_ty_meta_var ~dest:`Generalize ctx () in
       T.Ty.meta v
     | PT.AppBuiltin (Builtin.Arrow, ret :: args) ->
       let ret = infer_ty_exn ctx ret in
