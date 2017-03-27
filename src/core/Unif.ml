@@ -78,7 +78,7 @@ let unif_array_com ?(size=`Same) subst ~op (a1,sc1) (a2,sc2) k =
   in
   let size_ok = match size with
     | `Same -> Array.length a1 = Array.length a2
-    | `Smaller -> Array.length a1 = Array.length a2
+    | `Smaller -> Array.length a1 <= Array.length a2
   in
   if size_ok then (
     let bv = BV.create ~size:(Array.length a1) false in
