@@ -15,8 +15,8 @@
 #directory "_build/tests/";;
 
 print_endline "load base lib....";;
-#load "libzipperposition.cma";;
-open Libzipperposition;;
+#load "logtk.cma";;
+open Logtk;;
 module ST = InnerTerm;;
 module T = FOTerm;;
 module PT = STerm;;
@@ -36,8 +36,9 @@ let (~<) = ID.make;;
 
 (* optional part: parser *)
 print_endline "load parser lib...";;
-#load "libzipperposition_parsers.cma";;
-open Libzipperposition_parsers;;
+#require "tip_parser";;
+#load "logtk_parsers.cma";;
+open Logtk_parsers;;
 #install_printer UntypedAST.pp_statement;;
 let pterm s =
     let t = Parse_zf.parse_term Lex_zf.token (Lexing.from_string s) in
@@ -49,8 +50,8 @@ let pterm s =
 
 (* optional part: arbitrary *)
 #require "qcheck";;
-#load "libzipperposition_arbitrary.cma";;
-open Libzipperposition_arbitrary;;
+#load "logtk_arbitrary.cma";;
+open Logtk_arbitrary;;
 open QCheck;;
 
 print_endline "load prover lib...";;
