@@ -21,6 +21,10 @@ val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> Subst.t Sequence.t
 val are_variant : t -> t -> bool
 (** Simple interface on top of {!variant} with distinc scopes *)
 
+val matching : ?subst:Subst.t -> pattern:t Scoped.t -> t Scoped.t -> Subst.t Sequence.t
+
+val matches : t -> t -> bool
+
 val weight : t -> int
 val depth : t -> int
 val vars : t -> Type.t HVar.t list

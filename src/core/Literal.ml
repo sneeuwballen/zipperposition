@@ -306,7 +306,8 @@ let variant ?(subst=S.empty) lit1 lit2 k =
       monomes=(fun ~subst m1 m2 k -> Monome.variant ~subst m1 m2 k)
     })
   in
-  unif_lits op ~subst lit1 lit2 k
+  unif_lits op ~subst lit1 lit2
+    (fun subst -> if Subst.is_renaming subst then k subst)
 
 let are_variant lit1 lit2 =
   not (Sequence.is_empty (variant (Scoped.make lit1 0) (Scoped.make lit2 1)))

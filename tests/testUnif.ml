@@ -79,8 +79,9 @@ let check_variant_bidir_match =
   let gen = ArTerm.default in
   let name = "unif_term_variant_bidir_match" in
   let prop (t0,t1) =
-    Unif.FO.are_variant t0 t1 =
-    ( Unif.FO.matches ~pattern:t0 t1 && Unif.FO.matches ~pattern:t1 t0 )
+    if Unif.FO.are_variant t0 t1
+    then Unif.FO.matches ~pattern:t0 t1 && Unif.FO.matches ~pattern:t1 t0
+    else QCheck.assume_fail()
   in
   QCheck.Test.make ~long_factor:20 ~name (Q.pair gen gen) prop
 
@@ -88,8 +89,9 @@ let check_lits_variant_bidir_match =
   let gen = ArLiteral.clause in
   let name = "unif_lits_variant_bidir_match" in
   let prop (lits0,lits1) =
-    Literals.are_variant lits0 lits1 =
-    ( Literals.matches lits0 lits1 && Literals.matches lits1 lits0 )
+    if Literals.are_variant lits0 lits1
+    then Literals.matches lits0 lits1 && Literals.matches lits1 lits0
+    else QCheck.assume_fail()
   in
   QCheck.Test.make ~long_factor:20 ~count:5_000 ~name (Q.pair gen gen) prop
 

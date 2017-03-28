@@ -39,9 +39,17 @@ let hash lits = Hash.array Lit.hash lits
 let variant ?(subst=S.empty) (a1,sc1) (a2,sc2) =
   Unif.unif_array_com ~size:`Same subst (a1,sc1) (a2,sc2)
     ~op:(fun subst x y -> Lit.variant ~subst x y)
+  |> Sequence.filter Subst.is_renaming
 
 let are_variant a1 a2 =
   not (Sequence.is_empty (variant (Scoped.make a1 0) (Scoped.make a2 1)))
+
+let matching ?(subst=S.empty) ~pattern:(a1,sc1) (a2,sc2) =
+  Unif.unif_array_com ~size:`Same subst (a1,sc1) (a2,sc2)
+    ~op:(fun subst x y -> Lit.matching ~subst ~pattern:x y)
+
+let matches a1 a2 =
+  not (Sequence.is_empty (matching ~pattern:(Scoped.make a1 0) (Scoped.make a2 1)))
 
 let weight lits =
   Array.fold_left (fun w lit -> w + Lit.weight lit) 0 lits

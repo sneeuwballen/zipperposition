@@ -237,7 +237,8 @@ module Inner = struct
     else matching ?subst ~pattern t
 
   let variant ?(subst=Subst.empty) a b =
-    unif_rec ~op:O_variant subst a b
+    let subst = unif_rec ~op:O_variant subst a b in
+    if Subst.is_renaming subst then subst else raise Fail
 
   let equal ~subst a b =
     try
