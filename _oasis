@@ -110,7 +110,7 @@ Library "logtk_arbitrary"
   Pack:             true
   FindlibName:      arbitrary
   FindlibParent:    logtk
-  Modules:          ArTerm, ArForm, ArType, ArID
+  Modules:          ArTerm, ArForm, ArType, ArID, ArLiteral
   BuildDepends:     logtk, qcheck
   Build$:           flag(qcheck)
   Install$:         flag(qcheck)

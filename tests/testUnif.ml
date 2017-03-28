@@ -75,10 +75,32 @@ let check_matching =
   in
   QCheck.Test.make ~long_factor:20 ~count:1000 ~name gen prop
 
+let check_variant_bidir_match =
+  let gen = ArTerm.default in
+  let name = "unif_term_variant_bidir_match" in
+  let prop (t0,t1) =
+    Unif.FO.are_variant t0 t1 =
+    ( Unif.FO.matches ~pattern:t0 t1 && Unif.FO.matches ~pattern:t1 t0 )
+  in
+  QCheck.Test.make ~long_factor:20 ~name (Q.pair gen gen) prop
+
+let check_lits_variant_bidir_match =
+  let gen = ArLiteral.clause in
+  let name = "unif_lits_variant_bidir_match" in
+  let prop (lits0,lits1) =
+    Literals.are_variant lits0 lits1 =
+    ( Literals.matches lits0 lits1 && Literals.matches lits1 lits0 )
+  in
+  QCheck.Test.make ~long_factor:20 ~count:5_000 ~name (Q.pair gen gen) prop
+
+(* TODO: generate random Literals.t, then check [variant a b <=> (matches a b && matches b a)] *)
+
 let props =
-  [ check_unify_gives_unifier
-  ; check_variant
-  ; check_variant2
-  ; check_variant_sym
-  ; check_matching
+  [ check_unify_gives_unifier;
+    check_variant;
+    check_variant2;
+    check_variant_sym;
+    check_variant_bidir_match;
+    check_lits_variant_bidir_match;
+    check_matching;
   ]
