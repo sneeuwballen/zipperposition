@@ -576,44 +576,77 @@ module Make
     (* return the clauses *)
     clauses
 
+  type defined_path =
+    | P_root
+    | P_active
+    | P_inactive
+
+  let defined_path_add (p:defined_path)(pos:Defined_pos.t): defined_path =
+    begin match p, pos with
+      | (P_root | P_active), Defined_pos.P_active -> P_active
+      | (P_root | P_active),
+        (Defined_pos.P_accumulator | Defined_pos.P_invariant) -> P_inactive
+      | P_inactive, _ -> P_inactive
+    end
+
+  let subterms_with_pos
+      (f:Cut_form.t)
+    : (defined_path * Position.t * term) Sequence.t =
+    (* true if [x] occurs in active positions somewhere in [t] *)
+    let rec aux (dp:defined_path) (p:Position.t) (t:term) : _ Sequence.t = fun k ->
+      k (dp,p,t);
+      begin match T_view.view t with
+        | T_view.T_app_defined (_, c, l) ->
+          let d_pos = RW.Defined_cst.defined_positions c in
+          assert (IArray.length d_pos >= List.length l);
+          (* only look under active positions *)
+          List.iteri
+            (fun i u ->
+               let d = IArray.get d_pos i in
+               aux
+                 (defined_path_add dp d)
+                 Position.(append p @@ arg i @@ stop)
+                 u k)
+            l
+        | T_view.T_var _ -> ()
+        | T_view.T_app (_,l)
+        | T_view.T_app_unin (_,l) (* approx, we assume all positions are active *)
+        | T_view.T_builtin (_,l)
+        | T_view.T_app_cstor (_,l) ->
+          let dp = defined_path_add dp Defined_pos.P_active in
+          List.iteri
+            (fun i u -> aux dp Position.(append p @@ arg i @@ stop) u k)
+            l
+      end
+    in
+    Cut_form.Seq.terms_with_pos ~subterms:false f
+    |> Sequence.flat_map
+      (fun (t, pos) -> aux P_root pos t)
+
   (* does the variable occur in an active position in [f],
      or under some uninterpreted position? *)
   let var_occurs_under_active_pos (f:Cut_form.t)(x:T.var): bool =
-    let open T_view in
     let is_x (t:term): bool = match T.view t with
       | T.Var y -> HVar.equal Type.equal x y
       | _ -> false
     in
-    (* true if [x] occurs in active positions somewhere in [t] *)
-    let rec check_sub(t:term): bool = match T_view.view t with
-      | T_app_defined (_, c, l) ->
-        let pos = RW.Defined_cst.defined_positions c in
-        assert (IArray.length pos >= List.length l);
-        (* only look under active positions *)
-        begin
-          Sequence.of_list l
-          |> Sequence.zip_i |> Sequence.zip
-          |> Sequence.exists
-            (fun (i,u) ->
-               IArray.get pos i = Defined_pos.P_active &&
-               ( is_x u || check_sub u ))
-        end
-      | T_var _ -> false
-      | T_app (f,l) -> check_sub f || List.exists check_eq_or_sub l
-      | T_app_cstor (_,l) -> List.exists check_sub l
-      | T_builtin (_,l)
-      | T_app_unin (_,l) -> List.exists check_eq_or_sub l (* approx *)
-    (* true if [t=x] or if [x] occurs in active positions somewhere in [t] *)
-    and check_eq_or_sub (t:term): bool =
-      is_x t || check_sub t
+    subterms_with_pos f
+    |> Sequence.exists
+      (function
+        | P_active, _, t -> is_x t
+        | _ -> false)
+
+  (* does the variable occur in a position that is invariant? *)
+  let var_occurs_under_invariant_pos (f:Cut_form.t)(x:T.var): bool =
+    let is_x (t:term): bool = match T.view t with
+      | T.Var y -> HVar.equal Type.equal x y
+      | _ -> false
     in
-    begin
-      Cut_form.cs f
-      |> Sequence.of_list
-      |> Sequence.flat_map Sequence.of_array
-      |> Sequence.flat_map Literal.Seq.terms
-      |> Sequence.exists check_sub
-    end
+    subterms_with_pos f
+    |> Sequence.exists
+      (function
+        | P_inactive, _, t -> is_x t
+        | _ -> false)
 
   (* variable appears only naked, i.e. directly under [=] *)
   let var_always_naked (f:Cut_form.t)(x:T.var): bool =
