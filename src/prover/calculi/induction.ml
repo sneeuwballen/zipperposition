@@ -581,13 +581,14 @@ module Make
 
   type defined_path =
     | P_root
+    | P_under_cstor
     | P_active
     | P_inactive
 
   let defined_path_add (p:defined_path)(pos:Defined_pos.t): defined_path =
     begin match p, pos with
-      | (P_root | P_active), Defined_pos.P_active -> P_active
-      | (P_root | P_active),
+      | (P_root | P_under_cstor | P_active), Defined_pos.P_active -> P_active
+      | (P_root | P_under_cstor | P_active),
         (Defined_pos.P_accumulator | Defined_pos.P_invariant) -> P_inactive
       | P_inactive, _ -> P_inactive
     end
@@ -614,9 +615,15 @@ module Make
         | T_view.T_var _ -> ()
         | T_view.T_app (_,l)
         | T_view.T_app_unin (_,l) (* approx, we assume all positions are active *)
-        | T_view.T_builtin (_,l)
-        | T_view.T_app_cstor (_,l) ->
+        | T_view.T_builtin (_,l) ->
           let dp = defined_path_add dp Defined_pos.P_active in
+          List.iteri
+            (fun i u -> aux dp Position.(append p @@ arg i @@ stop) u k)
+            l
+        | T_view.T_app_cstor (_,l) ->
+          let dp = match dp with
+            | P_inactive -> P_inactive | _ -> P_under_cstor
+          in
           List.iteri
             (fun i u -> aux dp Position.(append p @@ arg i @@ stop) u k)
             l
