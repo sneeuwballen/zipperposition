@@ -23,6 +23,9 @@ let stat_trivial_lemmas = Util.mk_stat "induction.trivial_lemmas"
 let stat_absurd_lemmas = Util.mk_stat "induction.absurd_lemmas"
 let stat_inductions = Util.mk_stat "induction.inductions"
 let stat_split_goal = Util.mk_stat "induction.split_goals"
+let stat_generalize = Util.mk_stat "induction.generalize"
+let stat_generalize_vars_active_pos = Util.mk_stat "induction.generalize_vars_active_pos"
+let stat_generalize_terms_active_pos = Util.mk_stat "induction.generalize_terms_active_pos"
 
 let k_enable : bool Flex_state.key = Flex_state.create_key()
 let k_ind_depth : int Flex_state.key = Flex_state.create_key()
@@ -672,6 +675,42 @@ module Make
     |> Sequence.flat_map Literal.Seq.terms
     |> Sequence.flat_map T_view.active_subterms
 
+  module Generalize : sig
+    type form = Cut_form.t
+    type t = form -> form list option
+
+    val vars_at_active_pos : t
+
+    val terms_at_active_pos : t
+
+    val all : t
+  end = struct
+    type form = Cut_form.t
+    type t = form -> form list option
+
+    let vars_at_active_pos (f:form): form list option =
+      let vars =
+        Cut_form.vars f
+        |> T.VarSet.to_list
+        |> List.filter
+          (fun v ->
+             var_occurs_under_active_pos f v &&
+             var_occurs_under_invariant_pos f v)
+      in
+      None (* TODO *)
+
+    let terms_at_active_pos (f:form): form list option =
+      None (* TODO *)
+
+    let all f =
+      let (<++>) o (f,x) = match o with
+        | None -> f x
+        | Some x -> Some x
+      in
+      vars_at_active_pos f
+      <++> (terms_at_active_pos, f)
+  end
+
   (* should we do induction on [x] in [c]? *)
   let should_do_ind_on_var (f:Cut_form.t) (x:T.var): bool =
     not (E.flex_get k_limit_to_active) ||
@@ -748,10 +787,16 @@ module Make
           res);
     res
 
-  (* main inductive proof of lemmas that have inductive variables *)
-  let prove_lemma (cut:A.cut_res): C.t list =
+  (* TODO: [prove_lemma g] should return sth like:
+     - [Direct_proof of C.t list] if we attempt induction(s)
+     - [Generalize of lemma list] if we generalize [g] (and split resulting lemmas).
+      In this case we must notify Avatar that [g1,…,gn |- g] where [g1,…,gn]
+       are the new lemmas, so it can add the corresponding boolean clauses.
+  *)
+
+  (* proof by direct induction *)
+  let prove_lemma_by_ind (cut:A.cut_res): C.t list =
     let g = A.cut_form cut in
-    Util.debugf ~section 5 "(@[<hv>prove_lemma@ %a@])" (fun k->k Cut_form.pp g);
     begin match Cut_form.ind_vars g with
       | [] -> []
       | ivars ->
@@ -773,6 +818,33 @@ module Make
            and do a case distinction on the [top] constant of this
            coverset. *)
         CCList.flat_map (ind_on_vars cut) clusters
+    end
+
+  (* prove any lemma that has inductive variables. First we try
+     to generalize it, otherwise we prove it by induction *)
+  let prove_lemma (cut:A.cut_res): C.t list =
+    let g = A.cut_form cut in
+    Util.debugf ~section 5 "(@[<hv>prove_lemma@ %a@])" (fun k->k Cut_form.pp g);
+    begin match Generalize.all g with
+      | None ->
+        prove_lemma_by_ind cut
+      | Some new_goals ->
+        let new_cuts =
+          List.map
+            (fun g -> A.introduce_cut ~depth:(A.cut_depth cut) g ProofStep.mk_lemma)
+            new_goals
+        in
+        (* assert that the new goals imply the old one *)
+        let proof =
+          ProofStep.mk_inference ~rule:(ProofStep.mk_rule "lemma.generalize")
+            (List.map
+               (fun c -> ProofStep.mk_bc (A.cut_proof c) [A.cut_lit c])
+               new_cuts)
+        in
+        A.add_imply new_cuts cut proof;
+        (* now prove the lemmas in Avatar *)
+        List.iter A.add_lemma new_cuts;
+        []
     end
 
   (* replace the constants by fresh variables in the given clauses,
