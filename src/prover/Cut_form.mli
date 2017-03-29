@@ -42,3 +42,33 @@ val are_variant : t -> t -> bool
 val normalize : t -> t
 (** Use rewriting to normalize the formula *)
 
+module Pos : sig
+  val at : t -> Position.t -> term
+  (** Return the subterm at the given position, or
+      @raise Invalid_argument if the position is not valid *)
+
+  val lit_at : t -> Position.t -> Literal.t * Position.t
+  (** Lookup which literal the position is about, return it
+      and the rest of the position.
+      @raise Invalid_argument if the position is not valid *)
+
+  val clause_at : t -> Position.t -> clause * Position.t
+  (** Lookup which clause the position is about, return it
+      and the rest of the position.
+      @raise Invalid_argument if the position is not valid *)
+
+  val replace : t -> at:Position.t -> by:term -> t
+  (** In-place modification of the array, in which the subterm at given
+      position is replaced by the [by] term.
+      @raise Invalid_argument if the position is not valid *)
+
+  val replace_many : t -> term Position.Map.t -> t
+  (** In-place modification of the array, in which the subterm at given
+      position is replaced by the [by] term.
+      @raise Invalid_argument if the position is not valid *)
+end
+
+module Seq : sig
+  val terms : t -> term Sequence.t
+  val terms_with_pos : ?subterms:bool -> t -> term Position.With.t Sequence.t
+end

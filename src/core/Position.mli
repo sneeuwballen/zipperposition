@@ -37,6 +37,8 @@ val hash : t -> int
 
 include Interfaces.PRINT with type t := t
 
+module Map : CCMap.S with type key = t
+
 (** {2 Position builder} *)
 
 module Build : sig

@@ -65,6 +65,11 @@ let rec pp out pos = match pos with
 
 let to_string = CCFormat.to_string pp
 
+module Map = CCMap.Make(struct
+    type t = position
+    let compare = compare
+  end)
+
 (** {2 Position builder}
 
     We use an adaptation of difference lists for this tasks *)

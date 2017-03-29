@@ -101,3 +101,60 @@ let are_variant f1 f2: bool =
   not @@ Sequence.is_empty @@ variant ~subst:Subst.empty (f1,1)(f2,0)
 
 let normalize (f:t): t = cs f |> Test_prop.normalize_form |> make
+
+module Pos = struct
+  module P = Position
+
+  let bad_pos f p = Util.invalid_argf "invalid pos `%a`@ in %a" P.pp p pp f
+
+  let clause_at f p = match p with
+    | P.Stop -> bad_pos f p
+    | P.Arg (n,p') ->
+      let cs = cs f in
+      if n<0 || n>= List.length cs then bad_pos f p;
+      List.nth cs n, p'
+    | _ -> bad_pos f p
+
+  let lit_at f p =
+    let c, p = clause_at f p in
+    Literals.Pos.lit_at c p
+
+  let at f p: term =
+    let lit, p = lit_at f p in
+    Literal.Pos.at lit p
+
+  let replace_many f m: t =
+    let l = cs f in
+    P.Map.fold
+      (fun p by l ->
+         let c, p_c = clause_at f p in
+         let n = match p with P.Arg (n,_) -> n | _ -> assert false in
+         let c' = Array.copy c in
+         Literals.Pos.replace c' ~at:p_c ~by;
+         CCList.set_at_idx n c' l)
+      m l
+    |> make
+
+  let replace f ~at ~by = replace_many f (P.Map.singleton at by)
+end
+
+module Seq = struct
+  let terms f =
+    cs f
+    |> Sequence.of_list
+    |> Sequence.flat_map Literals.Seq.terms
+
+  let terms_with_pos ?(subterms=true) f =
+    cs f
+    |> Sequence.of_list
+    |> Sequence.zip_i |> Sequence.zip
+    |> Sequence.flat_map
+      (fun (i,c) ->
+         Sequence.of_array_i c
+         |> Sequence.map (fun (j,lit) -> i, j, lit))
+    |> Sequence.flat_map
+      (fun (i,j,lit) ->
+         let position = Position.(arg i @@ arg j @@ stop) in
+         Literal.fold_terms lit
+           ~position ~ord:Ordering.none ~which:`All ~vars:true ~subterms)
+end
