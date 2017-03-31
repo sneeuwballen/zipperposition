@@ -15,6 +15,8 @@ module type S = Induction_intf.S
 
 type term = T.t
 type var = T.var
+type clause = Literals.t
+type form = clause list
 
 let section = Util.Section.make ~parent:Const.section "induction"
 
@@ -40,7 +42,8 @@ module Make_goal(E : Env_intf.S) : sig
   val trivial : t
   (** trivial goal *)
 
-  val make : Literals.t list -> t
+  val of_form : form -> t
+  val of_cut_form : Cut_form.t -> t
 
   val form : t -> Cut_form.t
   val cs : t -> Literals.t list
@@ -82,8 +85,6 @@ end = struct
     cut: Cut_form.t;
     test_res: status lazy_t;
   }
-  type clause = Literals.t
-  type form = clause list
 
   let trivial: t =
     {cut=Cut_form.trivial; test_res=Lazy.from_val S_trivial}
@@ -99,11 +100,11 @@ end = struct
       | Test_prop.R_fail subst -> S_falsifiable subst
     end
 
-  let of_form (f:Cut_form.t): t =
+  let of_cut_form (f:Cut_form.t): t =
     let test_res = lazy (Cut_form.cs f |> test_) in
     {cut=f; test_res}
 
-  let make cs: t = of_form (Cut_form.make cs)
+  let of_form cs: t = of_cut_form (Cut_form.make cs)
 
   let form t = t.cut
   let cs t : form = Cut_form.cs t.cut
@@ -113,7 +114,7 @@ end = struct
 
   let pp out (f:t): unit = Cut_form.pp out f.cut
 
-  let simplify (g:t): t = form g |> Cut_form.normalize |> of_form
+  let simplify (g:t): t = form g |> Cut_form.normalize |> of_cut_form
 
   (* union-find for sets of clauses *)
   module UF_clauses =
@@ -151,7 +152,7 @@ end = struct
       (UF_clauses.to_seq uf |> Sequence.map snd |> Sequence.to_rev_list)
       @ !ground_
     in
-    let new_goals = List.rev_map make all_clusters in
+    let new_goals = List.rev_map of_form all_clusters in
     if List.length new_goals > 1 then (
       Util.incr_stat stat_split_goal;
       Util.debugf ~section 3
@@ -633,29 +634,29 @@ module Make
     |> Sequence.flat_map
       (fun (t, pos) -> aux P_root pos t)
 
+  let term_is_var x t: bool = match T.view t with
+    | T.Var y -> HVar.equal Type.equal x y
+    | _ -> false
+
+  (* active occurrences of [x] in [f] *)
+  let var_active_pos_seq (f:Cut_form.t)(x:T.var): _ Sequence.t =
+    subterms_with_pos f
+    |> Sequence.filter
+      (function
+        | P_active, _, t -> term_is_var x t
+        | _ -> false)
+
   (* does the variable occur in an active position in [f],
      or under some uninterpreted position? *)
   let var_occurs_under_active_pos (f:Cut_form.t)(x:T.var): bool =
-    let is_x (t:term): bool = match T.view t with
-      | T.Var y -> HVar.equal Type.equal x y
-      | _ -> false
-    in
-    subterms_with_pos f
-    |> Sequence.exists
-      (function
-        | P_active, _, t -> is_x t
-        | _ -> false)
+    not (Sequence.is_empty @@ var_active_pos_seq f x)
 
   (* does the variable occur in a position that is invariant? *)
   let var_occurs_under_invariant_pos (f:Cut_form.t)(x:T.var): bool =
-    let is_x (t:term): bool = match T.view t with
-      | T.Var y -> HVar.equal Type.equal x y
-      | _ -> false
-    in
     subterms_with_pos f
     |> Sequence.exists
       (function
-        | P_inactive, _, t -> is_x t
+        | P_inactive, _, t -> term_is_var x t
         | _ -> false)
 
   (* variable appears only naked, i.e. directly under [=] *)
@@ -695,18 +696,60 @@ module Make
     type form = Cut_form.t
     type t = form -> form list option
 
+    (* generalize on variables that occur both (several times) in active
+       positions, and which also occur in passive position.
+       The idea is that induction on the variable would work in active
+       positions, but applying induction hypothesis would fail because
+       of the occurrences in passive positions.
+       This should generalize [forall x. x + (x + x) = (x + x) + x]
+       into [forall x y. y + (x + x) = (y + x) + x]
+    *)
     let vars_at_active_pos (f:form): form list option =
       let vars =
         Cut_form.vars f
         |> T.VarSet.to_list
         |> List.filter
           (fun v ->
-             var_occurs_under_active_pos f v &&
+             (Sequence.length @@ var_active_pos_seq f v >= 2) &&
              var_occurs_under_invariant_pos f v)
       in
-      None (* TODO *)
+      begin match vars with
+        | [] -> None
+        | _ ->
+          (* build a map to replace active occurrences of these variables by
+             fresh variables *)
+          let m =
+            let offset =
+              Cut_form.vars f
+              |> T.VarSet.to_seq
+              |> Sequence.map HVar.id
+              |> Sequence.max |> CCOpt.get_or ~default:0 |> succ
+            in
+            CCList.foldi
+              (fun m i v ->
+                 let v' = HVar.make ~ty:(HVar.ty v) (i+offset) in
+                 subterms_with_pos f
+                 |> Sequence.filter_map
+                   (function
+                     | P_active, pos, t when term_is_var v t -> Some (pos, T.var v')
+                     | _ -> None)
+                 |> Position.Map.add_seq m)
+              Position.Map.empty vars
+          in
+          Format.printf "map: (@[%a@])@." (Position.Map.pp Position.pp T.pp) m;
+          let f' = Cut_form.Pos.replace_many f m in
+          Util.debugf ~section 4
+            "(@[<2>candidate_generalize@ :of %a@ :gen_to %a@ :by vars_active_pos@])"
+            (fun k->k Cut_form.pp f Cut_form.pp f');
+          if Goal.is_acceptable_goal @@ Goal.of_cut_form f'
+          then (
+            Util.incr_stat stat_generalize_vars_active_pos;
+            Some [f']
+          )
+          else None
+      end
 
-    let terms_at_active_pos (f:form): form list option =
+    let terms_at_active_pos (_f:form): form list option =
       None (* TODO *)
 
     let all f =
@@ -831,7 +874,7 @@ module Make
      to generalize it, otherwise we prove it by induction *)
   let prove_lemma (cut:A.cut_res): C.t list =
     let g = A.cut_form cut in
-    Util.debugf ~section 5 "(@[<hv>prove_lemma@ %a@])" (fun k->k Cut_form.pp g);
+    Util.debugf ~section 4 "(@[<hv>prove_lemma@ %a@])" (fun k->k Cut_form.pp g);
     begin match Generalize.all g with
       | None ->
         prove_lemma_by_ind cut
@@ -841,6 +884,9 @@ module Make
             (fun g -> A.introduce_cut ~depth:(A.cut_depth cut) g ProofStep.mk_lemma)
             new_goals
         in
+        Util.debugf ~section 4 "(@[<2>generalize@ :lemma %a@ :into (@[<hv>%a@])@])"
+          (fun k->k Cut_form.pp g (Util.pp_list Cut_form.pp) new_goals);
+        Util.incr_stat stat_generalize;
         (* assert that the new goals imply the old one *)
         let proof =
           ProofStep.mk_inference ~rule:(ProofStep.mk_rule "lemma.generalize")
@@ -895,7 +941,7 @@ module Make
                   |> CCList.return)
              |> Array.to_list)
         |> List.map Array.of_list
-        |> Goal.make
+        |> Goal.of_form
       end
     )
 
