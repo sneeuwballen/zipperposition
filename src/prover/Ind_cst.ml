@@ -74,6 +74,8 @@ let id_is_cst id = match id_as_cst id with Some _ -> true | _ -> false
 
 let is_sub c = c.cst_is_sub
 
+let id_is_sub id = id_as_cst id |> CCOpt.map_or ~default:false is_sub
+
 (** {6 Creation of Coverset and Cst} *)
 
 let n_ = ref 0

@@ -38,6 +38,8 @@ val make : ?depth:int -> is_sub:bool -> Type.t -> t
 val is_sub : t -> bool
 (** Is the constant a sub-constant (i.e. a subterm of a case in a coverset)? *)
 
+val id_is_sub : ID.t -> bool
+
 val equal : t -> t -> bool
 val compare : t -> t -> int
 val hash : t -> int

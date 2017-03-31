@@ -747,6 +747,8 @@ module Make
           (function
             | P_active, pos, t ->
               begin match T_view.view t with
+                | T_view.T_app_unin (id,[]) when Ind_cst.id_is_sub id ->
+                  None (* probably there because there are induction hyp. on it *)
                 | T_view.T_app_unin _
                 | T_view.T_app_defined _ -> Some (pos,t)
                 | _ -> None
