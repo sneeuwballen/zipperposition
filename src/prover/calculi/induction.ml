@@ -635,13 +635,16 @@ module Make
   let var_occurs_under_active_pos (f:Cut_form.t)(x:T.var): bool =
     not (Sequence.is_empty @@ var_active_pos_seq f x)
 
-  (* does the variable occur in a position that is invariant? *)
-  let var_occurs_under_invariant_pos (f:Cut_form.t)(x:T.var): bool =
+  let var_invariant_pos_seq f x: _ Sequence.t =
     subterms_with_pos f
-    |> Sequence.exists
+    |> Sequence.filter
       (function
         | P_inactive, _, t -> term_is_var x t
         | _ -> false)
+
+  (* does the variable occur in a position that is invariant? *)
+  let var_occurs_under_invariant_pos (f:Cut_form.t)(x:T.var): bool =
+    not (Sequence.is_empty @@ var_invariant_pos_seq f x)
 
   (* variable appears only naked, i.e. directly under [=] *)
   let var_always_naked (f:Cut_form.t)(x:T.var): bool =
@@ -683,7 +686,7 @@ module Make
     type t = form -> generalization list
 
     (* generalize on variables that occur both (several times) in active
-       positions, and which also occur in passive position.
+       positions, and which also occur (several times) in passive position.
        The idea is that induction on the variable would work in active
        positions, but applying induction hypothesis would fail because
        of the occurrences in passive positions.
@@ -697,7 +700,7 @@ module Make
         |> List.filter
           (fun v ->
              (Sequence.length @@ var_active_pos_seq f v >= 2) &&
-             var_occurs_under_invariant_pos f v)
+             (Sequence.length @@ var_invariant_pos_seq f v >= 2))
       in
       begin match vars with
         | [] -> []
@@ -723,9 +726,10 @@ module Make
               Position.Map.empty vars
           in
           let f' = Cut_form.Pos.replace_many f m in
-          Util.debugf ~section 4
-            "(@[<2>candidate_generalize@ :of %a@ :gen_to %a@ :by vars_active_pos@])"
-            (fun k->k Cut_form.pp f Cut_form.pp f');
+          Util.debugf ~section 5
+            "(@[<2>candidate_generalize@ :of %a@ :gen_to %a@ \
+             :by vars_active_pos :on (@[%a@])@])"
+            (fun k->k Cut_form.pp f Cut_form.pp f' (Util.pp_list HVar.pp) vars);
           if Goal.is_acceptable_goal @@ Goal.of_cut_form f'
           then (
             Util.incr_stat stat_generalize_vars_active_pos;
@@ -920,7 +924,8 @@ module Make
                  (fun g -> A.introduce_cut ~depth:(A.cut_depth cut) g ProofStep.mk_lemma)
                  new_goals
              in
-             Util.debugf ~section 4 "(@[<2>generalize@ :lemma %a@ :into (@[<hv>%a@])@])"
+             Util.debugf ~section 4
+               "(@[<2>@{<Yellow>generalize@}@ :lemma %a@ :into (@[<hv>%a@])@])"
                (fun k->k Cut_form.pp g (Util.pp_list Cut_form.pp) new_goals);
              Util.incr_stat stat_generalize;
              (* assert that the new goals imply the old one *)
