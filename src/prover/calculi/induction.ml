@@ -734,8 +734,62 @@ module Make
           else []
       end
 
-    let terms_at_active_pos (_f:form): form list option =
-      None (* TODO *)
+    (* generalize non-variable subterms occurring several times
+       at active positions *)
+    let terms_at_active_pos (f:form): generalization list =
+      let relevant_subterms =
+        subterms_with_pos f
+        |> Sequence.filter_map
+          (function
+            | P_active, pos, t ->
+              begin match T_view.view t with
+                | T_view.T_app_unin _
+                | T_view.T_app_defined _ -> Some (pos,t)
+                | _ -> None
+              end
+            | _ -> None)
+      in
+      let subterms =
+        relevant_subterms |> Sequence.map snd
+        |> Sequence.group_by ~hash:T.hash ~eq:T.equal
+        |> Sequence.filter_map
+          (function
+            | t :: _ :: _ -> Some t (* at least 2 *)
+            | _ -> None)
+        |> Sequence.to_rev_list
+      in
+      begin
+        subterms
+        |> CCList.filter_map
+          (fun t ->
+             (* introduce variable for [t] *)
+             let v =
+               Cut_form.vars f
+               |> T.VarSet.to_seq
+               |> Sequence.map HVar.id
+               |> Sequence.max |> CCOpt.get_or ~default:0 |> succ
+               |> HVar.make ~ty:(T.ty t)
+             in
+             let m =
+               relevant_subterms
+               |> Sequence.filter_map
+                 (function
+                   | pos, u when T.equal t u -> Some (pos, T.var v)
+                   | _ -> None)
+               |> Position.Map.of_seq
+             in
+             let f' = Cut_form.Pos.replace_many f m in
+             Util.debugf ~section 4
+               "(@[<2>candidate_generalize@ :of %a@ :gen_to %a@ \
+                :by terms_active_pos@ :on %a@])"
+               (fun k->k Cut_form.pp f Cut_form.pp f' T.pp t);
+             if Goal.is_acceptable_goal @@ Goal.of_cut_form f'
+             then (
+               Util.incr_stat stat_generalize_vars_active_pos;
+               Some [f']
+             )
+             else None)
+      end
 
     let all f =
       let (<++>) o (f,x) = match o with
