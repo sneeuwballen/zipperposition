@@ -791,7 +791,7 @@ module Make
                (fun k->k Cut_form.pp f Cut_form.pp f' T.pp t);
              if Goal.is_acceptable_goal @@ Goal.of_cut_form f'
              then (
-               Util.incr_stat stat_generalize_vars_active_pos;
+               Util.incr_stat stat_generalize_terms_active_pos;
                Some [f']
              )
              else None)
