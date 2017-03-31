@@ -2,11 +2,10 @@
 
 ## Now
 
+- aggressive generalization based on positions (and purification of inactive/acc pos?)
+
 - bring back a tiny amount of smallcheck to instnatiate variables
   and realize that `forall l1 l2:list.  l1=l2` is absurd
-
-- simple generalization of a variable with ≥ 2 occurrences in active pos,
-  and ≥ 1 passive occurrences
 
 - heuristic:
   * [ ] per-inference penalty `int` field in clause. The higher, the
@@ -157,13 +156,13 @@
   * [x] might be a bug in candidate lemmas regarding α-equiv checking
         (see on `nat2.zf`, should have only one lemma?)
   * [x] do induction on *simplified* formula (e.g. for HO functions)
-  * [ ] **fix**: notion of active position should also work for
+  * [x] notion of active position should also work for
         defined propositions (look into clause rules)
-        + [ ] factor the computation of positions out of `rewrite_term`
+        + [x] factor the computation of positions out of `rewrite_term`
             and abstract it so it takes a list of LHS
-        + [ ] move this into `Statement`? propositions defined by clause rules
+        + [x] move this into `Statement`? propositions defined by clause rules
             with `atom t` as LHS should be as "defined" as term RW rules
-        + [ ] small check truly needs to use clause rules, too
+        + [x] small check truly needs to use clause rules, too
   * [ ] check if two variables are interchangeable (i.e. `{X→Y,Y→X}`
       gives same form). In this case don't do induction on the second one.
   * [x] do induction on multiple variables, **iff** they occur in active
@@ -230,6 +229,17 @@
       + multi-variable induction requires `<|` to work on tuples or multisets
         on both sides…
       + `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot examples/ind/nat21.zf`
+
+- lemma guessing in induction:
+  * [x] simple generalization of a variable with ≥ 2 occurrences in active pos,
+        and ≥ 1 passive occurrences
+  * [x] generalization of subterms that are not variables nor constructors,
+        occurring at least twice in active positions.
+  * [ ] track variable dependencies for generalized subterms, to avoid
+        losing the (often crucial) relation between them
+        and other terms containing the same variables.
+        → need to also prove `t = t'` for every generalized term `t`
+          and other term `t'` that shared ≥1 var with `t`
 
 - theory of datatypes
   * [ ] inference for acyclicity (not just simplification):
@@ -416,12 +426,6 @@
   * `./zipperposition.native --stats --print-lemmas -o none --dot /tmp/truc.dot -t 30 tptp/Problems/MGT/MGT011-1.p --debug 2 --select SelectDiffNegLit`
     (works with SelectDiffNegLitNS, must be a slightly too restrictive inf rule)
 
-- `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot examples/ind/list10_easy.zf`
-  should be easy to solve, but terrible pref (in part because of demod/rpo6?)
-  → profile
-  → check if because of incompleteness (run for a long time)
-  → use hierarchic KBO instead, see if it works better
-
 - `./zipperposition.native -p -o none -t 30 --dot /tmp/truc.dot examples/GEG024=1.p --debug 1`
   seems like heuristics are bad here (`--clause-queue bfs` works fine),
   need to penalize some deep series of arith inferences **NO**
@@ -435,7 +439,6 @@
 
   with speculative paramodulation/generalization
   `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot examples/ind/nat15_def.zf`
-  `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot examples/ind/nat22.zf`
 
 ## In Hold
 
