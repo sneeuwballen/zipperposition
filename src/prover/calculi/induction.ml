@@ -837,13 +837,6 @@ module Make
           res);
     res
 
-  (* TODO: [prove_lemma g] should return sth like:
-     - [Direct_proof of C.t list] if we attempt induction(s)
-     - [Generalize of lemma list] if we generalize [g] (and split resulting lemmas).
-      In this case we must notify Avatar that [g1,…,gn |- g] where [g1,…,gn]
-       are the new lemmas, so it can add the corresponding boolean clauses.
-  *)
-
   (* proof by direct induction *)
   let prove_lemma_by_ind (cut:A.cut_res): C.t list =
     let g = A.cut_form cut in
@@ -888,12 +881,7 @@ module Make
           (fun k->k Cut_form.pp g (Util.pp_list Cut_form.pp) new_goals);
         Util.incr_stat stat_generalize;
         (* assert that the new goals imply the old one *)
-        let proof =
-          ProofStep.mk_inference ~rule:(ProofStep.mk_rule "lemma.generalize")
-            (List.map
-               (fun c -> ProofStep.mk_bc (A.cut_proof c) [A.cut_lit c])
-               new_cuts)
-        in
+        let proof = ProofStep.mk_trivial in
         A.add_imply new_cuts cut proof;
         (* now prove the lemmas in Avatar *)
         List.iter A.add_lemma new_cuts;
