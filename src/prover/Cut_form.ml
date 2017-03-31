@@ -127,8 +127,8 @@ module Pos = struct
     let l = cs f in
     P.Map.fold
       (fun p by l ->
-         let c, p_c = clause_at f p in
-         let n = match p with P.Arg (n,_) -> n | _ -> assert false in
+         let n, p_c = match p with P.Arg (n,p') -> n,p' | _ -> assert false in
+         let c = List.nth l n in
          let c' = Array.copy c in
          Literals.Pos.replace c' ~at:p_c ~by;
          CCList.set_at_idx n c' l)
