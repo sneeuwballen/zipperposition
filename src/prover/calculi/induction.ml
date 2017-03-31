@@ -367,22 +367,6 @@ module Make
 
   let has_pos_lit_ c = CCArray.exists Literal.is_pos (C.lits c)
 
-  (* TODO: readapt? *)
-  let generalizable_subterms c: term list =
-    let count = T.Tbl.create 16 in
-    C.Seq.terms c
-    |> Sequence.flat_map T.Seq.subterms
-    |> Sequence.filter
-      (fun t -> Ind_ty.is_inductive_type (T.ty t) && not (T.is_const t))
-    |> Sequence.iter
-      (fun t ->
-         let n = try T.Tbl.find count t with Not_found -> 0 in
-         T.Tbl.replace count t (n+1));
-    (* terms that occur more than once *)
-    T.Tbl.to_seq count
-    |> Sequence.filter_map (fun (t,n) -> if n>1 then Some t else None)
-    |> Sequence.to_rev_list
-
   (* fresh var generator *)
   let fresh_var_gen_ (): Type.t -> T.t =
     let r = ref 0 in
@@ -685,7 +669,8 @@ module Make
 
   module Generalize : sig
     type form = Cut_form.t
-    type t = form -> form list option
+    type generalization = form list
+    type t = form -> generalization list
 
     val vars_at_active_pos : t
 
@@ -694,7 +679,8 @@ module Make
     val all : t
   end = struct
     type form = Cut_form.t
-    type t = form -> form list option
+    type generalization = form list
+    type t = form -> generalization list
 
     (* generalize on variables that occur both (several times) in active
        positions, and which also occur in passive position.
@@ -704,7 +690,7 @@ module Make
        This should generalize [forall x. x + (x + x) = (x + x) + x]
        into [forall x y. y + (x + x) = (y + x) + x]
     *)
-    let vars_at_active_pos (f:form): form list option =
+    let vars_at_active_pos (f:form): generalization list =
       let vars =
         Cut_form.vars f
         |> T.VarSet.to_list
@@ -714,7 +700,7 @@ module Make
              var_occurs_under_invariant_pos f v)
       in
       begin match vars with
-        | [] -> None
+        | [] -> []
         | _ ->
           (* build a map to replace active occurrences of these variables by
              fresh variables *)
@@ -736,7 +722,6 @@ module Make
                  |> Position.Map.add_seq m)
               Position.Map.empty vars
           in
-          Format.printf "map: (@[%a@])@." (Position.Map.pp Position.pp T.pp) m;
           let f' = Cut_form.Pos.replace_many f m in
           Util.debugf ~section 4
             "(@[<2>candidate_generalize@ :of %a@ :gen_to %a@ :by vars_active_pos@])"
@@ -744,9 +729,9 @@ module Make
           if Goal.is_acceptable_goal @@ Goal.of_cut_form f'
           then (
             Util.incr_stat stat_generalize_vars_active_pos;
-            Some [f']
+            [[f']]
           )
-          else None
+          else []
       end
 
     let terms_at_active_pos (_f:form): form list option =
@@ -754,8 +739,8 @@ module Make
 
     let all f =
       let (<++>) o (f,x) = match o with
-        | None -> f x
-        | Some x -> Some x
+        | [] -> f x
+        | l -> l
       in
       vars_at_active_pos f
       <++> (terms_at_active_pos, f)
@@ -869,22 +854,27 @@ module Make
     let g = A.cut_form cut in
     Util.debugf ~section 4 "(@[<hv>prove_lemma@ %a@])" (fun k->k Cut_form.pp g);
     begin match Generalize.all g with
-      | None ->
+      | [] ->
         prove_lemma_by_ind cut
-      | Some new_goals ->
-        let new_cuts =
-          List.map
-            (fun g -> A.introduce_cut ~depth:(A.cut_depth cut) g ProofStep.mk_lemma)
-            new_goals
-        in
-        Util.debugf ~section 4 "(@[<2>generalize@ :lemma %a@ :into (@[<hv>%a@])@])"
-          (fun k->k Cut_form.pp g (Util.pp_list Cut_form.pp) new_goals);
-        Util.incr_stat stat_generalize;
-        (* assert that the new goals imply the old one *)
-        let proof = ProofStep.mk_trivial in
-        A.add_imply new_cuts cut proof;
-        (* now prove the lemmas in Avatar *)
-        List.iter A.add_lemma new_cuts;
+      | new_goals_l ->
+        (* try each generalization in turn *)
+        List.iter
+          (fun new_goals ->
+             assert (new_goals <> []);
+             let new_cuts =
+               List.map
+                 (fun g -> A.introduce_cut ~depth:(A.cut_depth cut) g ProofStep.mk_lemma)
+                 new_goals
+             in
+             Util.debugf ~section 4 "(@[<2>generalize@ :lemma %a@ :into (@[<hv>%a@])@])"
+               (fun k->k Cut_form.pp g (Util.pp_list Cut_form.pp) new_goals);
+             Util.incr_stat stat_generalize;
+             (* assert that the new goals imply the old one *)
+             let proof = ProofStep.mk_trivial in
+             A.add_imply new_cuts cut proof;
+             (* now prove the lemmas in Avatar *)
+             List.iter A.add_lemma new_cuts)
+          new_goals_l;
         []
     end
 
