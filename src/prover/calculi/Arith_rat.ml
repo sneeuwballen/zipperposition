@@ -223,9 +223,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* build clause *)
       let proof =
         ProofStep.mk_inference
-          ~rule:(ProofStep.mk_rule
-              ~comment:(CCFormat.sprintf "lhs(%a)" MF.pp mf_a)
-              "canc_sup")
+          ~rule:(ProofStep.mk_rule "canc_sup")
+          ~comment:(CCFormat.sprintf "lhs(%a)" MF.pp mf_a)
           [C.proof info.active; C.proof info.passive] in
       let trail = C.trail_l [info.active;info.passive] in
       let penalty = C.penalty info.active + C.penalty info.passive in
@@ -571,9 +570,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                          let all_lits = new_lits @ other_lits in
                          let proof =
                            ProofStep.mk_inference
-                             ~rule:(ProofStep.mk_rule
-                                 ~comment:(CCFormat.sprintf "idx(%d,%d)" idx1 idx2)
-                                 "arith_eq_factoring")
+                             ~rule:(ProofStep.mk_rule "arith_eq_factoring")
+                             ~comment:(CCFormat.sprintf "idx(%d,%d)" idx1 idx2)
                              [C.proof c] in
                          let penalty = C.penalty c
                          and trail = C.trail c in
@@ -656,9 +654,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           let all_lits = new_lit :: lits_l @ lits_r in
           let proof =
             ProofStep.mk_inference
-              ~rule:(ProofStep.mk_rule "canc_ineq_chaining"
-                  ~comment:(CCFormat.sprintf "(@[idx(%d,%d)@ left(%a)@ right(%a)@])"
-                      idx_l idx_r T.pp (MF.term mf_2) T.pp (MF.term mf_1)))
+              ~rule:(ProofStep.mk_rule "canc_ineq_chaining")
+              ~comment:(CCFormat.sprintf "(@[idx(%d,%d)@ left(%a)@ right(%a)@])"
+                  idx_l idx_r T.pp (MF.term mf_2) T.pp (MF.term mf_1))
               [C.proof info.left; C.proof info.right] in
           let trail = C.trail_l [info.left; info.right] in
           (* penalty for some chaining *)

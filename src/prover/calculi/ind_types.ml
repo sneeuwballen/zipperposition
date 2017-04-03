@@ -179,7 +179,7 @@ module Make(Env : Env_intf.S) = struct
             (fun (t1,t2) ->
                if T.equal t1 t2 then None else Some (Literal.mk_eq t1 t2))
         in
-        let rule = ProofStep.mk_rule ~comment:"induction" "injectivity_destruct+" in
+        let rule = ProofStep.mk_rule "injectivity_destruct+" in
         let proof = ProofStep.mk_inference ~rule [C.proof c] in
         (* make one clause per [new_lits] *)
         let clauses =
@@ -214,7 +214,7 @@ module Make(Env : Env_intf.S) = struct
                let ty = T.ty t1 in
                if Type.is_tType ty then None else Some (Literal.mk_neq t1 t2))
         in
-        let rule = ProofStep.mk_rule ~comment:"(ind_types)" "injectivity_destruct-" in
+        let rule = ProofStep.mk_rule "injectivity_destruct-" in
         let proof = ProofStep.mk_inference ~rule [C.proof c] in
         let c' =
           C.create ~trail:(C.trail c) ~penalty:(C.penalty c)

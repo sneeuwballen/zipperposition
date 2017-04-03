@@ -7,6 +7,8 @@ open Logtk
 
 module Loc = ParseLocation
 module Stmt = Statement
+module T = TypedSTerm
+module F = T.Form
 
 type form = TypedSTerm.t
 type bool_lit = BBox.Lit.t
@@ -16,21 +18,17 @@ let section = Util.Section.make ~parent:Const.section "proof"
 
 type statement_src = Statement.source
 
-type rule = {
-  rule_name: string;
-  rule_info: string option;
-}
+type rule = string
+let rule_name r = r
 
-let mk_rule ?comment name = { rule_name=name; rule_info=comment; }
-
-let mk_rulef ?comment fmt =
-  CCFormat.ksprintf ~f:(mk_rule ?comment) fmt
+let mk_rule name = name
+let mk_rulef fmt = CCFormat.ksprintf ~f:mk_rule fmt
 
 (** Classification of proof steps *)
 type kind =
-  | Inference of rule
-  | Simplification of rule
-  | Esa of rule
+  | Inference of rule * string option
+  | Simplification of rule * string option
+  | Esa of rule * string option
   | Assert of statement_src
   | Goal of statement_src
   | Lemma
@@ -51,6 +49,8 @@ type t = {
   parents: of_ list;
 }
 
+(* FIXME: should be either a real step; or a [subst, scoped of_]
+   for cases with instantiation *)
 (** Proof Step with its conclusion *)
 and of_ = {
   step: t;
@@ -105,8 +105,6 @@ let equal_proof a b =
 
 let hash_proof a = hash a.step
 
-let rule_name r = r.rule_name
-
 module PTbl = CCHashtbl.Make(struct
     type t = of_
     let equal = equal_proof
@@ -122,6 +120,10 @@ let get_id_ () =
   let n = !id_ in
   incr id_;
   n
+
+(* TODO: if subst not empty, record the instantiation *)
+(* TODO: use this in every inference step that has a substitution *)
+let instantiate (s:Subst.t) (o,sc_o): of_ = o
 
 let mk_trivial = {id=get_id_(); parents=[]; kind=Trivial; dist_to_goal=None; }
 let mk_lemma = {id=get_id_(); parents=[]; kind=Lemma; dist_to_goal=Some 0; }
@@ -159,14 +161,14 @@ let mk_goal' ?loc ~file ~name () =
   let src = Stmt.Src.from_file ?loc ~name file Stmt.R_goal in
   mk_goal src
 
-let mk_inference ~rule parents =
-  mk_step_ (Inference rule) parents
+let mk_inference ?comment ~rule parents =
+  mk_step_ (Inference (rule,comment)) parents
 
-let mk_simp ~rule parents =
-  mk_step_ (Simplification rule) parents
+let mk_simp ?comment ~rule parents =
+  mk_step_ (Simplification (rule,comment)) parents
 
-let mk_esa ~rule parents =
-  mk_step_ (Esa rule) parents
+let mk_esa ?comment ~rule parents =
+  mk_step_ (Esa (rule,comment)) parents
 
 let mk_f step res = {step; result=Form res; }
 
@@ -204,9 +206,21 @@ let rule p = match p.kind with
   | Assert _
   | Data _
   | Goal _-> None
-  | Esa rule
-  | Simplification rule
-  | Inference rule -> Some rule
+  | Esa (rule,_)
+  | Simplification (rule,_)
+  | Inference (rule,_)
+    -> Some rule
+
+let comment p = match p.kind with
+  | Trivial
+  | Lemma
+  | Assert _
+  | Data _
+  | Goal _-> None
+  | Esa (_,c)
+  | Simplification (_,c)
+  | Inference (_,c)
+    -> Some c
 
 let is_assert p = match p.kind with Assert _ -> true | _ -> false
 let is_goal p = match p.kind with Goal _ | Lemma -> true | _ -> false
@@ -217,14 +231,11 @@ let distance_to_goal p = p.dist_to_goal
 
 (** {2 IO} *)
 
-let pp_rule ~info out r =
-  let pp_info out = function
-    | None -> ()
-    | Some s -> Format.fprintf out " %s" s
-  in
-  if info
-  then Format.fprintf out "@[%s%a@]" r.rule_name pp_info r.rule_info
-  else Format.fprintf out "'%s'" r.rule_name
+let pp_comment out = function
+  | None -> ()
+  | Some s -> Format.fprintf out " %s" s
+
+let pp_rule out r = Format.fprintf out "'%s'" r
 
 let rec pp_src_tstp out src = match Stmt.Src.view src with
   | Stmt.Internal _
@@ -255,12 +266,12 @@ let pp_kind_tstp out k =
     | Goal src -> pp_src_tstp out src
     | Lemma -> Format.fprintf out "lemma"
     | Data _ -> Util.error ~where:"ProofStep" "cannot print `Data` step in TPTP"
-    | Inference rule ->
-      Format.fprintf out "inference(%a, [status(thm)])" (pp_rule ~info:false) rule
-    | Simplification rule ->
-      Format.fprintf out "inference(%a, [status(thm)])" (pp_rule ~info:false) rule
-    | Esa rule ->
-      Format.fprintf out "inference(%a, [status(esa)])" (pp_rule ~info:false) rule
+    | Inference (rule,_) ->
+      Format.fprintf out "inference(%a, [status(thm)])" pp_rule rule
+    | Simplification (rule,_) ->
+      Format.fprintf out "inference(%a, [status(thm)])" pp_rule rule
+    | Esa (rule,_) ->
+      Format.fprintf out "inference(%a, [status(esa)])" pp_rule rule
     | Trivial ->
       Format.fprintf out "trivial([status(thm)])"
 
@@ -289,11 +300,46 @@ let pp_kind out k =
     | Goal src -> Format.fprintf out "goal %a" pp_src src
     | Lemma -> Format.fprintf out "lemma"
     | Data (src, _) -> Format.fprintf out "data %a" pp_src src
-    | Inference rule ->
-      Format.fprintf out "inf %a" (pp_rule ~info:true) rule
-    | Simplification rule ->
-      Format.fprintf out "simp %a" (pp_rule ~info:true) rule
-    | Esa rule ->
-      Format.fprintf out "esa %a" (pp_rule ~info:true) rule
+    | Inference (rule,c) ->
+      Format.fprintf out "inf %a%a" pp_rule rule pp_comment c
+    | Simplification (rule,c) ->
+      Format.fprintf out "simp %a%a" pp_rule rule pp_comment c
+    | Esa (rule,c) ->
+      Format.fprintf out "esa %a%a" pp_rule rule pp_comment c
     | Trivial -> CCFormat.string out "trivial"
 
+
+(** {2 Conversion} *)
+
+
+let res_to_form (r:result): form = match r with
+  | Form f -> f
+  | Clause c ->
+    (* TODO: trail *)
+    let ctx = FOTerm.Conv.create() in
+    Literals.to_form (SClause.lits c)
+    |> List.map
+      (fun lit ->
+         lit
+         |> SLiteral.map ~f:(FOTerm.Conv.to_simple_term ctx)
+         |> SLiteral.to_form)
+    |> F.or_
+    |> F.close_forall
+  | BoolClause _ -> assert false (* TODO *)
+  | Stmt _ -> assert false (* TODO *)
+
+(* FIXME: write this properly, including instantiation steps *)
+let to_llproof (p:of_): LLProof.t =
+  let tbl = PTbl.create 32 in
+  let rec conv p: LLProof.t =
+    match PTbl.get tbl p with
+      | Some r -> r
+      | None ->
+        let res = res_to_form (result p) in
+        let parents = List.map conv (parents @@ step p) in
+        let name = "<noname>" in (* TODO: rule_name, if needed *)
+        let step = LLProof.no_check res name parents in
+        PTbl.add tbl p step;
+        step
+  in
+  conv p

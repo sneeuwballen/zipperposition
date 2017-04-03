@@ -19,18 +19,15 @@ type rule
 
 val rule_name : rule -> string
 
-val mk_rule : ?comment:string -> string -> rule
+val mk_rule : string -> rule
 
-val mk_rulef:
-  ?comment:string ->
-  ('a, Format.formatter, unit, rule) format4 -> 'a
-
+val mk_rulef: ('a, Format.formatter, unit, rule) format4 -> 'a
 
 (** Classification of proof steps *)
 type kind =
-  | Inference of rule
-  | Simplification of rule
-  | Esa of rule
+  | Inference of rule * string option
+  | Simplification of rule * string option
+  | Esa of rule * string option
   | Assert of statement_src
   | Goal of statement_src
   | Lemma
@@ -47,10 +44,7 @@ type result =
 type t
 
 (** Proof Step with its conclusion *)
-and of_ = {
-  step: t;
-  result : result
-}
+and of_
 
 type proof = of_
 
@@ -87,11 +81,13 @@ val mk_assert' : ?loc:Loc.t -> file:string -> name:string -> unit -> t
 
 val mk_goal' : ?loc:Loc.t -> file:string -> name:string -> unit -> t
 
-val mk_inference : rule:rule -> of_ list -> t
+val instantiate : Subst.t -> of_ Scoped.t -> of_
 
-val mk_simp : rule:rule -> of_ list -> t
+val mk_inference : ?comment:string -> rule:rule -> of_ list -> t
 
-val mk_esa : rule:rule -> of_ list -> t
+val mk_simp : ?comment:string -> rule:rule -> of_ list -> t
+
+val mk_esa : ?comment:string -> rule:rule -> of_ list -> t
 
 val mk_f : t -> form -> of_
 
@@ -134,9 +130,13 @@ val distance_to_goal : t -> int option
     if [d] is the distance, in the proof graph, to the closest
     conjecture ancestor of [p] *)
 
+(** {2 Proof Conversion} *)
+
+val to_llproof : of_ -> LLProof.t
+
 (** {2 IO} *)
 
-val pp_rule : info:bool -> rule CCFormat.printer
+val pp_rule : rule CCFormat.printer
 
 val pp_src : statement_src CCFormat.printer
 val pp_src_tstp : statement_src CCFormat.printer

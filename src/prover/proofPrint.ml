@@ -123,18 +123,18 @@ let pp_kind_tstp out (k,parents) =
   let pp_step status out (rule,parents) =
     match parents with
       | [] ->
-        Format.fprintf out "inference(%a, [status(%s)])" (P.pp_rule ~info:false) rule status
+        Format.fprintf out "inference(%a, [status(%s)])" P.pp_rule rule status
       | _::_ ->
         Format.fprintf out "inference(%a, [status(%s)], [%a])"
-          (P.pp_rule ~info:false) rule status pp_parents parents
+          P.pp_rule rule status pp_parents parents
   in
   match k with
     | P.Assert src
     | P.Goal src -> ProofStep.pp_src_tstp out src
     | P.Data _ -> assert false
-    | P.Inference rule
-    | P.Simplification rule -> pp_step "thm" out (rule,parents)
-    | P.Esa rule -> pp_step "esa" out (rule,parents)
+    | P.Inference (rule,_)
+    | P.Simplification (rule,_) -> pp_step "thm" out (rule,parents)
+    | P.Esa (rule,_) -> pp_step "esa" out (rule,parents)
     | P.Lemma -> Format.fprintf out "lemma"
     | P.Trivial -> assert(parents=[]); Format.fprintf out "trivial([status(thm)])"
 

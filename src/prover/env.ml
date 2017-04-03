@@ -301,7 +301,7 @@ module Make(X : sig
       if after_inf
       then
         (* after inference step: stop recursion and check *)
-        match p.result with
+        match P.result p with
           | Clause c' -> SClause.is_backward_simplified c'
           | BoolClause _
           | Stmt _
@@ -380,8 +380,10 @@ module Make(X : sig
     else (
       C.mark_redundant c;
       (* FIXME: put the rules as parameters *)
-      let rule = ProofStep.mk_rule ~comment:(StrSet.to_list !applied_rules |> String.concat ",") "rw" in
-      let proof = ProofStep.mk_simp ~rule [C.proof c] in
+      let rule = ProofStep.mk_rule "rw" in
+      let proof = ProofStep.mk_simp [C.proof c]
+          ~comment:(StrSet.to_list !applied_rules |> String.concat ",") ~rule
+      in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
       assert (not (C.equal c c'));
       Util.debugf ~section 3 "@[term rewritten clause `@[%a@]`@ into `@[%a@]`"
@@ -411,8 +413,10 @@ module Make(X : sig
       (* simplifications occurred! *)
       C.mark_redundant c;
       (* FIXME: put the rules as parameters *)
-      let rule = ProofStep.mk_rule ~comment:(StrSet.to_list !applied_rules |> String.concat ",") "rw_lit" in
-      let proof = ProofStep.mk_simp ~rule [C.proof c]  in
+      let rule = ProofStep.mk_rule "rw_lit" in
+      let proof = ProofStep.mk_simp [C.proof c]
+          ~rule ~comment:(StrSet.to_list !applied_rules |> String.concat ",")
+      in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
       assert (not (C.equal c c'));
       Util.debugf ~section 3 "@[lit rewritten `@[%a@]`@ into `@[%a@]`@]"
