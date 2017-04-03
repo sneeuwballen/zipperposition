@@ -10,11 +10,6 @@ type term = FOTerm.t
 type lit = Literal.t
 type form = Literals.t list
 
-(* TODO: replace lit = Literal.t, form = Literals.t list
-   (use corresponding functions for trivial/absurd/subst) *)
-
-(* TODO: check_form should take a Lit_rewrite.set *)
-
 type res =
   | R_ok
   | R_fail of Subst.t (* counter-example *)
