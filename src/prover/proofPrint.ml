@@ -26,6 +26,10 @@ let is_proof_of_false p =
       Literals.is_absurd (C.lits c) && Trail.is_empty (C.trail c)
     | _ -> false
 
+let is_pure_bool p = match p.result with
+  | BoolClause _ -> true
+  | _ -> false
+
 let get_name ~namespace p =
   try
     Tbl.find namespace p
@@ -199,6 +203,7 @@ let pp_dot_seq ~name out seq =
       let attrs = [`Label label; `Style "filled"] in
       let shape = `Shape "box" in
       if is_proof_of_false p then [`Color "red"; `Label "[]"; `Shape "box"; `Style "filled"]
+      else if is_pure_bool p then `Color "cyan3" :: shape :: attrs
       else if has_absurd_lits p then `Color "orange" :: shape :: attrs
       else if is_assert p.step then `Color "yellow" :: shape :: attrs
       else if is_goal p.step then `Color "green" :: shape :: attrs
