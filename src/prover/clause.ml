@@ -126,7 +126,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let proof = ProofStep.mk_assert' ~file ~name () in
     create ~penalty ~trail:Trail.empty lits proof
 
-  let rule_neg_ = ProofStep.mk_rule ~comment:["negate goal to find a refutation"] "neg_goal"
+  let rule_neg_ = ProofStep.mk_rule "neg_goal"
   let rule_cnf_ = ProofStep.mk_rule "cnf"
   let rule_renaming_ = ProofStep.mk_rule "renaming"
   let rule_preprocess_ msg = ProofStep.mk_rulef "preprocess(%s)" msg

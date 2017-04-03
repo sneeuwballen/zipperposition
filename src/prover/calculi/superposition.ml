@@ -238,7 +238,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       let rule =
         let name = if Lit.sign passive_lit' then "sup+" else "sup-" in
-        ProofStep.mk_rule ~subst:[subst] name
+        ProofStep.mk_rule name
       in
       let proof =
         ProofStep.mk_inference ~rule [C.proof info.active; C.proof info.passive]
@@ -318,7 +318,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let new_lits = lits_a @ lits_p in
       let rule =
         let name = if Lit.sign passive_lit' then "s_sup+" else "s_sup-" in
-        ProofStep.mk_rule ~subst:[subst] name
+        ProofStep.mk_rule name
       in
       let proof =
         ProofStep.mk_inference ~rule [C.proof info.active; C.proof info.passive]
@@ -428,7 +428,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
              then (
                Util.incr_stat stat_equality_resolution_call;
                let renaming = Ctx.renaming_clear () in
-               let rule = ProofStep.mk_rule ~subst:[subst] "eq_res" in
+               let rule = ProofStep.mk_rule "eq_res" in
                let proof = ProofStep.mk_inference ~rule [C.proof clause] in
                let new_lits = CCArray.except_idx (C.lits clause) pos in
                let new_lits = Lit.apply_subst_list ~renaming subst (new_lits,0) in
@@ -475,7 +475,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Util.incr_stat stat_equality_factoring_call;
       let proof =
         ProofStep.mk_inference
-          ~rule:(ProofStep.mk_rule ~subst:[subst] "eq_fact")
+          ~rule:(ProofStep.mk_rule "eq_fact")
           [C.proof info.clause]
       (* new_lits: literals of the new clause. remove active literal
          and replace it by a t!=v one, and apply subst *)
@@ -1353,7 +1353,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (* clause is simplified *)
         let proof =
           ProofStep.mk_simp
-            ~rule:(ProofStep.mk_rule ~subst:[subst] "condensation")
+            ~rule:(ProofStep.mk_rule "condensation")
             [C.proof c] in
         let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
         Util.debugf ~section 3

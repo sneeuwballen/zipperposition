@@ -15,28 +15,16 @@ val section : Util.Section.t
 
 type statement_src = Statement.source
 
-type rule_info =
-  | I_subst of Subst.t
-  | I_pos of Position.t
-  | I_comment of string
+type rule
 
-type rule = {
-  rule_name: string;
-  rule_info: rule_info list;
-}
+val rule_name : rule -> string
 
-val mk_rule :
-  ?subst:Subst.t list ->
-  ?pos:Position.t list ->
-  ?comment:string list ->
-  string ->
-  rule
+val mk_rule : ?comment:string -> string -> rule
 
 val mk_rulef:
-  ?subst:Subst.t list ->
-  ?pos:Position.t list ->
-  ?comment:string list ->
+  ?comment:string ->
   ('a, Format.formatter, unit, rule) format4 -> 'a
+
 
 (** Classification of proof steps *)
 type kind =
@@ -56,12 +44,7 @@ type result =
   | Stmt of Statement.input_t
 
 (** A proof step, without the conclusion *)
-type t = private {
-  id: int; (* unique ID *)
-  kind: kind;
-  dist_to_goal: int option; (* distance to goal *)
-  parents: of_ list;
-}
+type t
 
 (** Proof Step with its conclusion *)
 and of_ = {

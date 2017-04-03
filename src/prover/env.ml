@@ -8,6 +8,7 @@ open Logtk
 module T = FOTerm
 module Lit = Literal
 module Lits = Literals
+module P = ProofStep
 
 let section = Util.Section.make ~parent:Const.section "env"
 
@@ -290,7 +291,7 @@ module Make(X : sig
   let orphan_criterion c =
     let open ProofStep in
     (* is the current step [p] an inference step? *)
-    let is_inf p = match p.step.kind with
+    let is_inf p = match P.kind @@ P.step p with
       | Inference _ -> true
       | _ -> false
     in
@@ -308,10 +309,10 @@ module Make(X : sig
       else
         List.exists
           (fun p' -> aux ~after_inf:(is_inf p) p')
-          p.step.parents
+          (P.parents @@ P.step p)
     in
     let p = C.proof c in
-    let res = List.exists (aux ~after_inf:(is_inf p)) p.step.parents in
+    let res = List.exists (aux ~after_inf:(is_inf p)) (P.parents @@ P.step p) in
     if res then (
       Util.incr_stat stat_orphan_criterion;
       Util.debugf ~section 3
@@ -378,7 +379,8 @@ module Make(X : sig
     then SimplM.return_same c (* no simplification *)
     else (
       C.mark_redundant c;
-      let rule = ProofStep.mk_rule ~comment:(StrSet.to_list !applied_rules) "rw" in
+      (* FIXME: put the rules as parameters *)
+      let rule = ProofStep.mk_rule ~comment:(StrSet.to_list !applied_rules |> String.concat ",") "rw" in
       let proof = ProofStep.mk_simp ~rule [C.proof c] in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
       assert (not (C.equal c c'));
@@ -408,7 +410,8 @@ module Make(X : sig
     else (
       (* simplifications occurred! *)
       C.mark_redundant c;
-      let rule = ProofStep.mk_rule ~comment:(StrSet.to_list !applied_rules) "rw_lit" in
+      (* FIXME: put the rules as parameters *)
+      let rule = ProofStep.mk_rule ~comment:(StrSet.to_list !applied_rules |> String.concat ",") "rw_lit" in
       let proof = ProofStep.mk_simp ~rule [C.proof c]  in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
       assert (not (C.equal c c'));

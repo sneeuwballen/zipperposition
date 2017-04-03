@@ -24,6 +24,7 @@ and step =
   | Goal
   | Assert
   | Negated_goal of t
+  | Trivial
   | Instantiate of subst * t
   | Esa of name * t list
   | Inference of name * t list
@@ -33,6 +34,7 @@ let pp_step out (s:step): unit = match s with
   | Goal -> Fmt.string out "goal"
   | Assert -> Fmt.string out "assert"
   | Negated_goal _ -> Fmt.string out "negated_goal"
+  | Trivial -> Fmt.string out "trivial"
   | Instantiate (subst, _) ->
     Fmt.fprintf out "(@[instantiate %a@])" (Var.Subst.pp T.pp) subst
   | Esa (n,_) -> Fmt.fprintf out "(esa %s)" n
@@ -40,7 +42,7 @@ let pp_step out (s:step): unit = match s with
   | No_check (n,_) -> Fmt.fprintf out "(no_check %s)" n
 
 let premises (p:t): t list = match p.step with
-  | Goal | Assert -> []
+  | Goal | Assert | Trivial -> []
   | Negated_goal p2
   | Instantiate (_,p2) -> [p2]
   | Esa (_,l)
@@ -83,6 +85,7 @@ let mk_ : form -> step -> t =
 let goal f = mk_ f Goal
 let negated_goal f p = mk_ f (Negated_goal p)
 let assert_ f = mk_ f Assert
+let trivial f = mk_ f Trivial
 let instantiate f subst p = mk_ f (Instantiate (subst,p))
 let esa f name ps = mk_ f (Esa (name,ps))
 let inference f name ps = mk_ f (Inference (name,ps))

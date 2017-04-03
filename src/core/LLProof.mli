@@ -19,6 +19,7 @@ and step =
   | Goal
   | Assert
   | Negated_goal of t
+  | Trivial
   | Instantiate of subst * t
   | Esa of name * t list
   | Inference of name * t list
@@ -41,6 +42,7 @@ val hash : t -> int
 val goal : form -> t
 val negated_goal : form -> t -> t
 val assert_ : form -> t
+val trivial : form -> t
 val instantiate : form -> subst -> t -> t
 val esa : form -> name -> t list -> t
 val inference : form -> name -> t list -> t

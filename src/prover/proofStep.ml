@@ -16,31 +16,15 @@ let section = Util.Section.make ~parent:Const.section "proof"
 
 type statement_src = Statement.source
 
-type rule_info =
-  | I_subst of Subst.t
-  | I_pos of Position.t
-  | I_comment of string
-
 type rule = {
   rule_name: string;
-  rule_info: rule_info list;
+  rule_info: string option;
 }
 
-let mk_rule ?(subst=[]) ?(pos=[]) ?(comment=[]) name =
-  let rec map_append f l1 l2 = match l1 with
-    | [] -> l2
-    | x :: l1' -> map_append f l1' (f x :: l2)
-  in
-  { rule_name=name;
-    rule_info=
-      []
-      |> map_append (fun x->I_subst x) subst
-      |> map_append (fun x->I_pos x) pos
-      |> map_append (fun x->I_comment x) comment;
-  }
+let mk_rule ?comment name = { rule_name=name; rule_info=comment; }
 
-let mk_rulef ?subst ?pos ?comment fmt =
-  CCFormat.ksprintf ~f:(mk_rule ?subst ?pos ?comment) fmt
+let mk_rulef ?comment fmt =
+  CCFormat.ksprintf ~f:(mk_rule ?comment) fmt
 
 (** Classification of proof steps *)
 type kind =
@@ -120,6 +104,8 @@ let equal_proof a b =
   equal a.step b.step && equal_result a.result b.result
 
 let hash_proof a = hash a.step
+
+let rule_name r = r.rule_name
 
 module PTbl = CCHashtbl.Make(struct
     type t = of_
@@ -233,13 +219,11 @@ let distance_to_goal p = p.dist_to_goal
 
 let pp_rule ~info out r =
   let pp_info out = function
-    | I_subst s -> Format.fprintf out " with @[%a@]" Subst.pp s
-    | I_pos p -> Format.fprintf out " at @[%a@]" Position.pp p
-    | I_comment s -> Format.fprintf out " %s" s
+    | None -> ()
+    | Some s -> Format.fprintf out " %s" s
   in
-  let pp_list pp = Util.pp_list ~sep:"" pp in
   if info
-  then Format.fprintf out "@[%s%a@]" r.rule_name (pp_list pp_info) r.rule_info
+  then Format.fprintf out "@[%s%a@]" r.rule_name pp_info r.rule_info
   else Format.fprintf out "'%s'" r.rule_name
 
 let rec pp_src_tstp out src = match Stmt.Src.view src with

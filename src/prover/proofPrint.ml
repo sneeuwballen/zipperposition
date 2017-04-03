@@ -4,30 +4,30 @@
 (** {1 Manipulate proofs} *)
 
 open Logtk
-open ProofStep
 
 module C = SClause
+module P = ProofStep
 
 (* proof hashtable *)
-module Tbl = PTbl
+module Tbl = P.PTbl
 
 let section = ProofStep.section
 
 type t = ProofStep.of_
 
-let has_absurd_lits p = match p.result with
-  | Clause c -> Literals.is_absurd (C.lits c)
+let has_absurd_lits p = match P.result p with
+  | P.Clause c -> Literals.is_absurd (C.lits c)
   | _ -> false
 
 let is_proof_of_false p =
-  match p.result with
-    | Form f when TypedSTerm.equal f TypedSTerm.Form.false_ -> true
-    | Clause c ->
+  match P.result p with
+    | P.Form f when TypedSTerm.equal f TypedSTerm.Form.false_ -> true
+    | P.Clause c ->
       Literals.is_absurd (C.lits c) && Trail.is_empty (C.trail c)
     | _ -> false
 
-let is_pure_bool p = match p.result with
-  | BoolClause _ -> true
+let is_pure_bool p = match P.result p with
+  | P.BoolClause _ -> true
   | _ -> false
 
 let get_name ~namespace p =
@@ -44,26 +44,26 @@ let get_name ~namespace p =
 let as_graph =
   CCGraph.make
     (fun p ->
-       match rule p.step with
+       match P.rule (P.step p) with
          | None -> Sequence.empty
          | Some rule ->
-           let parents = Sequence.of_list p.step.parents in
+           let parents = Sequence.of_list (P.parents @@ P.step p) in
            Sequence.map (fun p' -> rule, p') parents)
 
 (** {2 IO} *)
 
 let pp_result out = function
-  | Form f -> TypedSTerm.pp out f
-  | Clause c ->
+  | P.Form f -> TypedSTerm.pp out f
+  | P.Clause c ->
     Format.fprintf out "%a/%d" C.pp c (C.id c)
-  | BoolClause lits -> BBox.pp_bclause out lits
-  | Stmt stmt -> Statement.pp_input out stmt
+  | P.BoolClause lits -> BBox.pp_bclause out lits
+  | P.Stmt stmt -> Statement.pp_input out stmt
 
-let pp_result_of out proof = pp_result out proof.result
+let pp_result_of out proof = pp_result out @@ P.result proof
 
 let pp_notrec out p =
   Format.fprintf out "@[%a by %a@]"
-    pp_result_of p pp_kind p.step.kind
+    pp_result_of p P.pp_kind (P.kind @@ P.step p)
 
 let traverse ?(traversed=Tbl.create 16) proof k =
   let current, next = ref [proof], ref [] in
@@ -76,7 +76,8 @@ let traverse ?(traversed=Tbl.create 16) proof k =
       else (
         Tbl.add traversed proof ();
         (* traverse premises first *)
-        List.iter (fun proof' -> next := proof' :: !next) proof.step.parents;
+        List.iter (fun proof' -> next := proof' :: !next)
+          (P.parents @@ P.step proof);
         (* yield proof *)
         k proof;
       )
@@ -86,21 +87,21 @@ let traverse ?(traversed=Tbl.create 16) proof k =
     next := [];
   done
 
-let pp_normal_step out step = match step.kind with
-  | Assert _
-  | Goal _ ->
-    Format.fprintf out "@[<hv2>%a@]@," pp_kind step.kind
-  | Data _ ->
-    Format.fprintf out "@[<hv2>data %a@]@," pp_kind step.kind
-  | Lemma -> Format.fprintf out "lemma"
-  | Trivial -> Format.fprintf out "trivial"
-  | Inference _
-  | Simplification _
-  | Esa _ ->
+let pp_normal_step out step = match P.kind step with
+  | P.Assert _
+  | P.Goal _ ->
+    Format.fprintf out "@[<hv2>%a@]@," P.pp_kind (P.kind step)
+  | P.Data _ ->
+    Format.fprintf out "@[<hv2>data %a@]@," P.pp_kind (P.kind step)
+  | P.Lemma -> Format.fprintf out "lemma"
+  | P.Trivial -> Format.fprintf out "trivial"
+  | P.Inference _
+  | P.Simplification _
+  | P.Esa _ ->
     Format.fprintf out "@[<hv2>%a@ with @[<hv>%a@]@]@,"
-      pp_kind step.kind
+      P.pp_kind (P.kind step)
       (Util.pp_list pp_result)
-      (List.map (fun p->p.result) step.parents)
+      (List.map P.result @@ P.parents step)
 
 let pp_normal out proof =
   let sep = "by" in
@@ -109,7 +110,7 @@ let pp_normal out proof =
   traverse proof
     (fun p ->
        Format.fprintf out "@[<hv2>%t @[%a@] %s@ %a@]@,"
-         pp_bullet pp_result p.result sep pp_normal_step p.step
+         pp_bullet pp_result (P.result p) sep pp_normal_step (P.step p)
     );
   Format.fprintf out "@]"
 
@@ -122,20 +123,20 @@ let pp_kind_tstp out (k,parents) =
   let pp_step status out (rule,parents) =
     match parents with
       | [] ->
-        Format.fprintf out "inference(%a, [status(%s)])" (pp_rule ~info:false) rule status
+        Format.fprintf out "inference(%a, [status(%s)])" (P.pp_rule ~info:false) rule status
       | _::_ ->
         Format.fprintf out "inference(%a, [status(%s)], [%a])"
-          (pp_rule ~info:false) rule status pp_parents parents
+          (P.pp_rule ~info:false) rule status pp_parents parents
   in
   match k with
-    | Assert src
-    | Goal src -> ProofStep.pp_src_tstp out src
-    | Data _ -> assert false
-    | Inference rule
-    | Simplification rule -> pp_step "thm" out (rule,parents)
-    | Esa rule -> pp_step "esa" out (rule,parents)
-    | Lemma -> Format.fprintf out "lemma"
-    | Trivial -> assert(parents=[]); Format.fprintf out "trivial([status(thm)])"
+    | P.Assert src
+    | P.Goal src -> ProofStep.pp_src_tstp out src
+    | P.Data _ -> assert false
+    | P.Inference rule
+    | P.Simplification rule -> pp_step "thm" out (rule,parents)
+    | P.Esa rule -> pp_step "esa" out (rule,parents)
+    | P.Lemma -> Format.fprintf out "lemma"
+    | P.Trivial -> assert(parents=[]); Format.fprintf out "trivial([status(thm)])"
 
 let pp_tstp out proof =
   let namespace = Tbl.create 5 in
@@ -144,21 +145,22 @@ let pp_tstp out proof =
     (fun p ->
        let name = get_name ~namespace p in
        let parents =
-         List.map (fun p -> `Name (get_name ~namespace p)) p.step.parents
+         List.map (fun p -> `Name (get_name ~namespace p))
+           (P.parents @@ P.step p)
        in
        let role = "plain" in (* TODO *)
-       begin match p.result with
-         | Form f ->
+       begin match P.result p with
+         | P.Form f ->
            Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]).@]@,"
-             name role TypedSTerm.TPTP.pp f pp_kind_tstp (p.step.kind,parents)
-         | BoolClause c ->
+             name role TypedSTerm.TPTP.pp f pp_kind_tstp (P.kind @@ P.step p,parents)
+         | P.BoolClause c ->
            let tr = Trail.of_list c in
            Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]).@]@,"
-             name role SClause.pp_trail_tstp tr pp_kind_tstp (p.step.kind,parents)
-         | Clause c ->
+             name role SClause.pp_trail_tstp tr pp_kind_tstp (P.kind @@ P.step p,parents)
+         | P.Clause c ->
            Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]).@]@,"
-             name role C.pp_tstp c pp_kind_tstp (p.step.kind,parents)
-         | Stmt stmt ->
+             name role C.pp_tstp c pp_kind_tstp (P.kind @@ P.step p,parents)
+         | P.Stmt stmt ->
            let module T = TypedSTerm in
            Statement.pp T.TPTP.pp T.TPTP.pp T.TPTP.pp out stmt
        end);
@@ -205,13 +207,13 @@ let pp_dot_seq ~name out seq =
       if is_proof_of_false p then [`Color "red"; `Label "[]"; `Shape "box"; `Style "filled"]
       else if is_pure_bool p then `Color "cyan3" :: shape :: attrs
       else if has_absurd_lits p then `Color "orange" :: shape :: attrs
-      else if is_assert p.step then `Color "yellow" :: shape :: attrs
-      else if is_goal p.step then `Color "green" :: shape :: attrs
-      else if is_trivial p.step then `Color "cyan" :: shape :: attrs
+      else if P.is_assert @@ P.step p then `Color "yellow" :: shape :: attrs
+      else if P.is_goal @@ P.step p then `Color "green" :: shape :: attrs
+      else if P.is_trivial @@ P.step p then `Color "cyan" :: shape :: attrs
       else shape :: attrs
     )
     ~attrs_e:(fun r ->
-      [`Label r.rule_name; `Other ("dir", "back")])
+      [`Label (P.rule_name r); `Other ("dir", "back")])
     out
     seq;
   Format.pp_print_newline out ();

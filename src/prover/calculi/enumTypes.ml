@@ -328,7 +328,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     let lits' = Lits.apply_subst ~renaming subst (C.lits c,s_c) in
                     let proof =
                       ProofStep.mk_inference [C.proof c]
-                        ~rule:(ProofStep.mk_rule ~subst:[subst] "enum_type_case_switch")
+                        ~rule:(ProofStep.mk_rule "enum_type_case_switch")
                     in
                     let trail = C.trail c and penalty = C.penalty c in
                     let c' = C.create_a ~trail ~penalty lits' proof in

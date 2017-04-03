@@ -224,7 +224,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let proof =
         ProofStep.mk_inference
           ~rule:(ProofStep.mk_rule
-              ~comment:[Subst.to_string subst; CCFormat.sprintf "lhs(%a)" MF.pp mf_a]
+              ~comment:(CCFormat.sprintf "lhs(%a)" MF.pp mf_a)
               "canc_sup")
           [C.proof info.active; C.proof info.passive] in
       let trail = C.trail_l [info.active;info.passive] in
@@ -495,7 +495,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   let all_lits = new_lit :: lits' in
                   let proof =
                     ProofStep.mk_inference
-                      ~rule:(ProofStep.mk_rule ~subst:[subst] "cancellation")
+                      ~rule:(ProofStep.mk_rule "cancellation")
                       [C.proof c] in
                   let trail = C.trail c in
                   let penalty = C.penalty c in
@@ -572,8 +572,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                          let proof =
                            ProofStep.mk_inference
                              ~rule:(ProofStep.mk_rule
-                                 ~comment:[CCFormat.sprintf "idx(%d,%d)" idx1 idx2]
-                                 ~subst:[subst]
+                                 ~comment:(CCFormat.sprintf "idx(%d,%d)" idx1 idx2)
                                  "arith_eq_factoring")
                              [C.proof c] in
                          let penalty = C.penalty c
@@ -658,10 +657,8 @@ module Make(E : Env.S) : S with module Env = E = struct
           let proof =
             ProofStep.mk_inference
               ~rule:(ProofStep.mk_rule "canc_ineq_chaining"
-                  ~subst:[subst]
-                  ~comment:[ CCFormat.sprintf "idx(%d,%d)" idx_l idx_r
-                           ; CCFormat.sprintf "left(%a)" T.pp (MF.term mf_2)
-                           ; CCFormat.sprintf "right(%a)" T.pp (MF.term mf_1)])
+                  ~comment:(CCFormat.sprintf "(@[idx(%d,%d)@ left(%a)@ right(%a)@])"
+                      idx_l idx_r T.pp (MF.term mf_2) T.pp (MF.term mf_1)))
               [C.proof info.left; C.proof info.right] in
           let trail = C.trail_l [info.left; info.right] in
           (* penalty for some chaining *)
@@ -784,7 +781,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             (* build clauses *)
             let proof =
               ProofStep.mk_inference
-                ~rule:(ProofStep.mk_rule ~subst:[subst] "canc_ineq_factoring")
+                ~rule:(ProofStep.mk_rule "canc_ineq_factoring")
                 [C.proof c] in
             let trail = C.trail c
             and penalty = C.penalty c in
