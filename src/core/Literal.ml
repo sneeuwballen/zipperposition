@@ -775,11 +775,11 @@ module Pos = struct
     let module AL = Int_lit in
     match lit, at with
       | Equation (l, r, sign), P.Left pos' ->
-        mk_lit (T.Pos.replace l pos' ~by) r sign
+        Equation (T.Pos.replace l pos' ~by, r, sign)
       | Equation (l, r, sign), P.Right pos' ->
-        mk_lit l (T.Pos.replace r pos' ~by) sign
+        Equation (l, T.Pos.replace r pos' ~by, sign)
       | Prop (p, sign), P.Left pos' ->
-        mk_prop (T.Pos.replace p pos' ~by) sign
+        Prop (T.Pos.replace p pos' ~by, sign)
       | True, _
       | False, _ -> lit  (* flexible, lit can be the result of a simplification *)
       | Int (AL.Binary (op, m1, m2)), P.Left (P.Arg(i,pos')) ->

@@ -31,13 +31,24 @@ val rev : t -> t
 val append : t -> t -> t
 (** Append two positions *)
 
+val is_prefix : t -> t -> bool
+(** [is_prefix a b] is true iff [a] is a prefix of [b] *)
+
+val is_strict_prefix : t -> t -> bool
+(** [is_prefix a b] is true iff [a] is a prefix of [b] and [a != b] *)
+
 val compare : t -> t -> int
 val equal : t -> t -> bool
 val hash : t -> int
 
 include Interfaces.PRINT with type t := t
 
-module Map : CCMap.S with type key = t
+module Map : sig
+  include CCMap.S with type key = t
+
+  val prune_subsumed : 'a t -> 'a t
+  (** Remove the keys that are below other keys in the map *)
+end
 
 (** {2 Position builder} *)
 

@@ -65,10 +65,37 @@ let rec pp out pos = match pos with
 
 let to_string = CCFormat.to_string pp
 
-module Map = CCMap.Make(struct
+let rec is_prefix p1 p2 : bool = match p1, p2 with
+  | Stop, _ -> true
+  | Left l1, Left l2
+  | Right l1, Right l2
+  | Head l1, Head l2
+  | Body l1, Body l2
+  | Type l1, Type l2
+    ->
+    is_prefix l1 l2
+  | Arg (i1,l1), Arg (i2,l2) -> i1=i2 && is_prefix l1 l2
+  | Left _, _
+  | Right _, _
+  | Head _, _
+  | Body _, _
+  | Arg _, _
+  | Type _, _
+    -> false
+
+let is_strict_prefix p1 p2 = not (equal p1 p2) && is_prefix p1 p2
+
+module Map = struct
+  include CCMap.Make(struct
     type t = position
     let compare = compare
   end)
+
+  let prune_subsumed (m:_ t): _ t =
+    filter
+      (fun k _ -> not (exists (fun k' _ -> is_strict_prefix k' k) m))
+      m
+end
 
 (** {2 Position builder}
 
