@@ -31,6 +31,8 @@ val length : t -> int
 
 val update_trail : (Trail.t -> Trail.t) -> t -> t
 
+val to_s_form : t -> TypedSTerm.Form.t
+
 (** {2 Flags} *)
 
 val flag_lemma : flag (** clause is a lemma *)

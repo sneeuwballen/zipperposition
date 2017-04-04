@@ -332,6 +332,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let to_forms c = Lits.Conv.to_forms c.sclause.lits
   let to_sclause c = c.sclause
 
+  let to_s_form c = SClause.to_s_form c.sclause
+
   module Seq = struct
     let lits c = Sequence.of_array c.sclause.lits
     let terms c = lits c |> Sequence.flat_map Lit.Seq.terms

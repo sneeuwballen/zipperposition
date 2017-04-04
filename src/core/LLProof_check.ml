@@ -22,6 +22,7 @@ type stats = {
 }
 
 let section = Util.Section.make "llproof_check"
+let prof_check = Util.mk_profiler "llproof_check.step"
 
 let pp_res out = function
   | R_ok -> Fmt.fprintf out "@{<green>ok@}"
@@ -31,7 +32,9 @@ let pp_stats out (s:stats) =
   Fmt.fprintf out "(@[:ok %d@ :fail %d@ :nocheck %d@])"
     s.n_ok s.n_fail s.n_nocheck
 
-let check_step (_p:proof): res option = None (* TODO: tableau prover, etc. *)
+let check_step_ (_p:proof): res option = None (* TODO: tableau prover, etc. *)
+
+let check_step p = Util.with_prof prof_check check_step_ p
 
 let check
     ?(before_check=fun _ -> ())
@@ -44,10 +47,10 @@ let check
   let rec check (p:proof): unit =
     if not (P.Tbl.mem tbl p) then (
       before_check p;
-      Util.debugf ~section 3 "(@[start check_proof@ %a@])" (fun k->k P.pp p);
+      Util.debugf ~section 3 "(@[@{<yellow>start_check_proof@}@ %a@])" (fun k->k P.pp p);
       let res = check_step p in
       P.Tbl.add tbl p res;
-      Util.debugf ~section 3 "(@[check_proof_res@ :of %a@ :res %a@])"
+      Util.debugf ~section 3 "(@[done_check_proof@ :of %a@ :res %a@])"
         (fun k->k P.pp p (Fmt.Dump.option pp_res) res);
       on_check p res;
       begin match res with

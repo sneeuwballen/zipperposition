@@ -398,6 +398,22 @@ let print file env result =
   print_szs_result ~file env result >>= fun () ->
   print_dots env result
 
+let check res =
+  Phases.start_phase Phases.Check_proof >>= fun () ->
+  Phases.get_key Params.key >>= fun params ->
+  let errcode = match res with
+    | Saturate.Unsat p when params.Params.param_check ->
+      (* check proof! *)
+      Util.debug ~section 1 "start checking proof…";
+      let p' = ProofStep.to_llproof p in
+      let res, stats = LLProof_check.check p' in
+      Util.debugf ~section 1 "(@[proof_check@ :res %a@ :stats %a@])"
+        (fun k->k LLProof_check.pp_res res LLProof_check.pp_stats stats);
+      if res = LLProof_check.R_fail then 1 else 0
+    | _ -> 0
+  in
+  Phases.return_phase errcode
+
 let setup_gc =
   Phases.start_phase Phases.Setup_gc >>= fun () ->
   Util.debug ~section 2 "setup GC";
@@ -425,7 +441,8 @@ let setup_signal =
 let process_files_and_print files =
   let f file =
     process_file file >>= fun (Phases.Env_result (env, res)) ->
-    print file env res
+    print file env res >>= fun () ->
+    check res
   in
   let phases = List.map f files in
   Phases.run_parallel phases

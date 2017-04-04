@@ -15,6 +15,11 @@ type subst = (term, ty) Var.Subst.t
 
 type name = string
 
+type check_info =
+  | C_check of form list (* additional inputs *)
+  | C_no_check
+  | C_other
+
 type t = {
   id: int; (* unique ID *)
   concl: form;
@@ -26,9 +31,8 @@ and step =
   | Negated_goal of t
   | Trivial
   | Instantiate of subst * t
-  | Esa of name * t list
-  | Inference of name * t list
-  | No_check of name * t list
+  | Esa of name * t list * check_info
+  | Inference of name * t list * check_info
 
 let pp_step out (s:step): unit = match s with
   | Goal -> Fmt.string out "goal"
@@ -37,21 +41,29 @@ let pp_step out (s:step): unit = match s with
   | Trivial -> Fmt.string out "trivial"
   | Instantiate (subst, _) ->
     Fmt.fprintf out "(@[instantiate %a@])" (Var.Subst.pp T.pp) subst
-  | Esa (n,_) -> Fmt.fprintf out "(esa %s)" n
-  | Inference (n,_) -> Fmt.fprintf out "(inf %s)" n
-  | No_check (n,_) -> Fmt.fprintf out "(no_check %s)" n
+  | Esa (n,_,_) -> Fmt.fprintf out "(esa %s)" n
+  | Inference (n,_,_) -> Fmt.fprintf out "(inf %s)" n
 
 let premises (p:t): t list = match p.step with
   | Goal | Assert | Trivial -> []
   | Negated_goal p2
   | Instantiate (_,p2) -> [p2]
-  | Esa (_,l)
-  | Inference (_,l)
-  | No_check (_,l) -> l
+  | Esa (_,l,_)
+  | Inference (_,l,_) -> l
+
+let check_info (p:t): check_info = match p.step with
+  | Goal | Assert | Trivial | Negated_goal _ -> C_other
+  | Instantiate (_,_) -> C_check []
+  | Esa (_,_,c)
+  | Inference (_,_,c) -> c
 
 let equal a b = a.id = b.id
 let compare a b = CCInt.compare a.id b.id
 let hash a = Hash.int a.id
+
+let concl p = p.concl
+let step p = p.step
+let id p = p.id
 
 module Tbl = CCHashtbl.Make(struct
     type t_ = t
@@ -61,10 +73,13 @@ module Tbl = CCHashtbl.Make(struct
   end)
 
 let pp_id out (p:t): unit = Fmt.int out p.id
+let pp_res out (p:t) = TypedSTerm.pp out (concl p)
 
 let pp out (p:t): unit =
-  Fmt.fprintf out "(@[<2>%a@ :from [@[%a@]]@])@,"
-    pp_step p.step (Util.pp_list pp_id) (premises p)
+  Fmt.fprintf out "(@[<hv2>%a@ :res `%a`@ :from [@[%a@]]@])"
+    pp_step (step p)
+    pp_res p
+    (Util.pp_list pp_res) (premises p)
 
 let pp_dag out (p:t): unit =
   let seen = Tbl.create 32 in
@@ -72,6 +87,7 @@ let pp_dag out (p:t): unit =
     if not @@ Tbl.mem seen p then (
       Tbl.add seen p ();
       pp out p;
+      Fmt.fprintf out "@,";
       List.iter (pp out) (premises p);
     )
   in
@@ -87,7 +103,12 @@ let negated_goal f p = mk_ f (Negated_goal p)
 let assert_ f = mk_ f Assert
 let trivial f = mk_ f Trivial
 let instantiate f subst p = mk_ f (Instantiate (subst,p))
-let esa f name ps = mk_ f (Esa (name,ps))
-let inference f name ps = mk_ f (Inference (name,ps))
-let no_check f name ps = mk_ f (No_check (name,ps))
+
+let conv_check_ = function
+  | `No_check -> C_no_check
+  | `Check -> C_check []
+  | `Check_with l -> C_check l
+
+let esa c f name ps = mk_ f (Esa (name,ps,conv_check_ c))
+let inference c f name ps = mk_ f (Inference (name,ps,conv_check_ c))
 

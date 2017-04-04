@@ -97,6 +97,12 @@ module Conv : sig
 
   val to_forms : ?hooks:Literal.Conv.hook_to list -> t -> term SLiteral.t list
   (** To list of formulas *)
+
+  val to_s_form :
+    ?ctx:FOTerm.Conv.ctx ->
+    ?hooks:Literal.Conv.hook_to list ->
+    t ->
+    TypedSTerm.Form.t
 end
 
 module View : sig

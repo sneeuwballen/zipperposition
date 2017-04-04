@@ -42,6 +42,9 @@ val are_variant : t -> t -> bool
 val normalize : t -> t
 (** Use rewriting to normalize the formula *)
 
+val to_s_form : t -> TypedSTerm.Form.t
+(** Convert to input formula *)
+
 module Pos : sig
   val at : t -> Position.t -> term
   (** Return the subterm at the given position, or

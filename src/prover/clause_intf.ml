@@ -181,6 +181,8 @@ module type S = sig
   val to_forms : t -> FOTerm.t SLiteral.t list
   (** Easy iteration on an abstract view of literals *)
 
+  val to_s_form : t -> TypedSTerm.Form.t
+
   (** {2 Iterators} *)
 
   module Seq : sig

@@ -323,6 +323,9 @@ let prop = builtin ~ty:tType Builtin.Prop
 
 let fresh_var ?loc ~ty () = var ?loc (Var.gensym ~ty ())
 
+let box_opaque t: t =
+  make_ ~ty:(ty_exn t) (AppBuiltin (Builtin.Box_opaque, [t]))
+
 (** {2 Utils} *)
 
 let is_var = function | {term=Var _; _} -> true | _ -> false
@@ -691,6 +694,8 @@ module Form = struct
   let xor ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Xor [a;b]
   let ite = ite
   let imply ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Imply [a;b]
+
+  let box_opaque = box_opaque
 
   let rec flatten_ (k:[<`And|`Or]) acc l = match l with
     | [] -> acc

@@ -237,6 +237,8 @@ module Conv : sig
       @raise Invalid_argument if the formula is not atomic. *)
 
   val to_form : ?hooks:hook_to list -> t -> term SLiteral.t
+
+  val to_s_form : ?ctx:FOTerm.Conv.ctx -> ?hooks:hook_to list -> t -> TypedSTerm.Form.t
 end
 
 (** {2 IO} *)

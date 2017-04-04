@@ -57,6 +57,7 @@ type t =
   | Lesseq
   | Greater
   | Greatereq
+  | Box_opaque (** hint not to open this formula *)
 
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t

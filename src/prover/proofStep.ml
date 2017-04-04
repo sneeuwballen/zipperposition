@@ -314,32 +314,40 @@ let pp_kind out k =
 
 let res_to_form (r:result): form = match r with
   | Form f -> f
-  | Clause c ->
-    (* TODO: trail *)
-    let ctx = FOTerm.Conv.create() in
-    Literals.to_form (SClause.lits c)
-    |> List.map
-      (fun lit ->
-         lit
-         |> SLiteral.map ~f:(FOTerm.Conv.to_simple_term ctx)
-         |> SLiteral.to_form)
-    |> F.or_
-    |> F.close_forall
-  | BoolClause _ -> assert false (* TODO *)
-  | Stmt _ -> assert false (* TODO *)
+  | Clause c -> SClause.to_s_form c |> F.close_forall
+  | BoolClause c ->
+    List.map BBox.to_s_form c |> F.or_
+  | Stmt st ->
+    (* assimilate the statement to its formulas *)
+    Stmt.Seq.forms st |> Sequence.to_list |> F.and_
 
 (* FIXME: write this properly, including instantiation steps *)
 let to_llproof (p:of_): LLProof.t =
   let tbl = PTbl.create 32 in
   let rec conv p: LLProof.t =
-    match PTbl.get tbl p with
+    begin match PTbl.get tbl p with
       | Some r -> r
       | None ->
-        let res = res_to_form (result p) in
-        let parents = List.map conv (parents @@ step p) in
-        let name = "<noname>" in (* TODO: rule_name, if needed *)
-        let step = LLProof.no_check res name parents in
-        PTbl.add tbl p step;
-        step
+        let res = conv_step p in
+        PTbl.add tbl p res;
+        res
+    end
+  and conv_step p =
+    let res = res_to_form (result p) in
+    let parents = List.map conv (parents @@ step p) in
+    begin match kind @@ step p with
+      | Inference (name,_)
+      | Simplification (name,_) ->
+        (* TODO: check, perhaps with side conditions *)
+        LLProof.inference `No_check res name parents
+      | Esa (name,_) ->
+        (* TODO: check, perhaps with side conditions *)
+        LLProof.esa `No_check res name parents
+      |Trivial -> LLProof.trivial res
+      | Assert _ -> LLProof.assert_ res
+      | Goal _ -> LLProof.assert_ res
+      | Lemma -> LLProof.trivial res
+      | Data (_,_) -> assert false (* TODO *)
+    end
   in
   conv p

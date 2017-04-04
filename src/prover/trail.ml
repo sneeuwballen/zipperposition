@@ -66,3 +66,11 @@ let labels (t:t) =
   to_seq t
   |> Sequence.map BBox.Lit.to_int
   |> Util.Int_set.of_seq
+
+let to_s_form (t:t) =
+  let module F = TypedSTerm.Form in
+  begin match to_list t |> List.map BBox.to_s_form with
+    | [] -> F.true_
+    | [f] -> f
+    | l -> F.and_ l
+  end

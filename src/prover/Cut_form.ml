@@ -102,6 +102,13 @@ let are_variant f1 f2: bool =
 
 let normalize (f:t): t = cs f |> Test_prop.normalize_form |> make
 
+let to_s_form (f:t) =
+  let module F = TypedSTerm.Form in
+  (* convert all clauses with the same variable bindings *)
+  let ctx = FOTerm.Conv.create() in
+  let l = List.map (Literals.Conv.to_s_form ~ctx) (cs f) in
+  F.and_ l |> F.close_forall
+
 module Pos = struct
   module P = Position
 

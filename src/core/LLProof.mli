@@ -10,6 +10,11 @@ type subst = (term, ty) Var.Subst.t
 
 type name = string
 
+type check_info =
+  | C_check of form list (* additional inputs *)
+  | C_no_check
+  | C_other
+
 type t = {
   id: int; (* unique ID *)
   concl: form;
@@ -21,13 +26,17 @@ and step =
   | Negated_goal of t
   | Trivial
   | Instantiate of subst * t
-  | Esa of name * t list
-  | Inference of name * t list
-  | No_check of name * t list (* NOTE: avoid if possible *)
+  | Esa of name * t list * check_info
+  | Inference of name * t list * check_info
 
 val premises : t -> t list
 
+val check_info : t -> check_info
+
 val pp_step : step CCFormat.printer
+
+val pp_id : t CCFormat.printer
+val pp_res : t CCFormat.printer
 
 val pp : t CCFormat.printer
 (** Print only this step *)
@@ -44,8 +53,7 @@ val negated_goal : form -> t -> t
 val assert_ : form -> t
 val trivial : form -> t
 val instantiate : form -> subst -> t -> t
-val esa : form -> name -> t list -> t
-val inference : form -> name -> t list -> t
-val no_check : form -> name -> t list -> t
+val esa : [`No_check | `Check | `Check_with of form list] -> form -> name -> t list -> t
+val inference : [`No_check | `Check | `Check_with of form list] -> form -> name -> t list -> t
 
 module Tbl : CCHashtbl.S with type key = t
