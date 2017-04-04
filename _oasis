@@ -68,7 +68,8 @@ Library "logtk"
                     TypeInference, Options, Comparison, Precedence, Builtin,
                     Ordering, Skolem, Cnf, ID, IDOrBuiltin, SLiteral,
                     Index, Index_intf, Dtree, Fingerprint, NPDtree, Binder,
-                    Congruence, FeatureVector, FV_tree, UntypedAST, Ind_ty,
+                    Congruence, Congruence_intf,
+                    FeatureVector, FV_tree, UntypedAST, Ind_ty,
                     TypedSTerm, Statement, Flex_state, Compute_prec, 
                     Ordinal, Rewrite, Test_prop, Input_format,
                     LLProof, LLProof_check,
@@ -121,7 +122,7 @@ Library "libzipperposition"
   Pack:             true
   FindlibName:      libzipperposition
   Modules:          ClauseQueue, Clause, SClause, Const, Extensions,
-                    Ctx, ProofStep, ProofPrint, ProofState,
+                    Ctx, Proof, ProofState,
                     Saturate, Selection, AC, AC_intf, SimplM,
                     Params, Env, Signals, Classify_cst,
                     Ctx_intf, Clause_intf, Env_intf, ProofState_intf,
