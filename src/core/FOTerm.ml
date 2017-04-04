@@ -560,6 +560,8 @@ module Conv = struct
   type ctx = Type.Conv.ctx
   let create = Type.Conv.create
 
+  let var_to_simple_var = Type.Conv.var_to_simple_var
+
   let of_simple_term_exn ctx t =
     let rec aux t = match PT.view t with
       | PT.Var v -> var (Type.Conv.var_of_simple_term ctx v)

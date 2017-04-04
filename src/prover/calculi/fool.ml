@@ -33,8 +33,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
     let new_lit = Literal.mk_eq sub (if sign then T.false_ else T.true_) in
     let proof =
-      ProofStep.mk_inference [C.proof c]
-        ~rule:(ProofStep.mk_rule "fool_param")
+      Proof.Step.inference [C.proof_parent c]
+        ~rule:(Proof.Rule.mk"fool_param")
     in
     let new_c =
       C.create ~trail:(C.trail c) ~penalty:(C.penalty c)

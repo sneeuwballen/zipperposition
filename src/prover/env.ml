@@ -8,7 +8,7 @@ open Logtk
 module T = FOTerm
 module Lit = Literal
 module Lits = Literals
-module P = ProofStep
+module P = Proof
 
 let section = Util.Section.make ~parent:Const.section "env"
 
@@ -289,10 +289,9 @@ module Make(X : sig
   (* is [c] the result (after simplification) of an inference in which
      at least one premise has been backward simplified? *)
   let orphan_criterion c =
-    let open ProofStep in
     (* is the current step [p] an inference step? *)
-    let is_inf p = match P.kind @@ P.step p with
-      | Inference _ -> true
+    let is_inf p = match P.Step.kind @@ P.S.step p with
+      | P.Inference _ -> true
       | _ -> false
     in
     (* recursively traversal of the proof of [c].
@@ -301,18 +300,21 @@ module Make(X : sig
       if after_inf
       then
         (* after inference step: stop recursion and check *)
-        match P.result p with
-          | Clause c' -> SClause.is_backward_simplified c'
-          | BoolClause _
-          | Stmt _
-          | Form _ -> false
+        match P.S.result p with
+          | P.Clause c' -> SClause.is_backward_simplified c'
+          | P.BoolClause _
+          | P.Stmt _
+          | P.Form _ -> false
       else
         List.exists
-          (fun p' -> aux ~after_inf:(is_inf p) p')
-          (P.parents @@ P.step p)
+          (fun p' -> aux ~after_inf:(is_inf p) @@ P.Parent.proof p')
+          (P.Step.parents @@ P.S.step p)
     in
     let p = C.proof c in
-    let res = List.exists (aux ~after_inf:(is_inf p)) (P.parents @@ P.step p) in
+    let res =
+      List.exists (fun p' -> aux ~after_inf:(is_inf p) @@ P.Parent.proof p')
+        (P.Step.parents @@ P.S.step p)
+    in
     if res then (
       Util.incr_stat stat_orphan_criterion;
       Util.debugf ~section 3
@@ -380,8 +382,8 @@ module Make(X : sig
     else (
       C.mark_redundant c;
       (* FIXME: put the rules as parameters *)
-      let rule = ProofStep.mk_rule "rw" in
-      let proof = ProofStep.mk_simp [C.proof c]
+      let rule = Proof.Rule.mk "rw" in
+      let proof = Proof.Step.simp [C.proof_parent c]
           ~comment:(StrSet.to_list !applied_rules |> String.concat ",") ~rule
       in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
@@ -413,8 +415,8 @@ module Make(X : sig
       (* simplifications occurred! *)
       C.mark_redundant c;
       (* FIXME: put the rules as parameters *)
-      let rule = ProofStep.mk_rule "rw_lit" in
-      let proof = ProofStep.mk_simp [C.proof c]
+      let rule = Proof.Rule.mk "rw_lit" in
+      let proof = Proof.Step.simp [C.proof_parent c]
           ~rule ~comment:(StrSet.to_list !applied_rules |> String.concat ",")
       in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in

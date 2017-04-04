@@ -220,15 +220,47 @@ module Src = struct
     | R_goal -> CCFormat.string out "goal"
     | R_def -> CCFormat.string out "def"
 
-  (*
-  let rec pp out t =
-    match t with
-      | From_file x -> pp_from_file out x
-      | Neg t -> Format.fprintf out "@[<2>neg(%a)@]" pp t
-      | CNF t -> Format.fprintf out "@[<2>cnf(%a)@]" pp t
+  let rec pp_tstp out src = match view src with
+    | Internal _
+    | Input _ -> ()
+    | From_file (src,_) ->
+      let file = src.file in
+      begin match src.name with
+        | None -> Format.fprintf out "file('%s')" file
+        | Some name -> Format.fprintf out "file('%s', '%s')" file name
+      end
+    | Neg (_,src') ->
+      Format.fprintf out "inference(@['negate_goal',@ [status(thm)],@ [%a]@])"
+        pp_tstp src'
+    | CNF (_,src') ->
+      Format.fprintf out "inference(@['clausify',@ [status(esa)],@ [%a]@])"
+        pp_tstp src'
+    | Preprocess ((_,src'),msg) ->
+      Format.fprintf out
+        "inference(@['%s',@ [status(esa)],@ [%a]@])" msg pp_tstp src'
+    | Renaming ((_,src'), id, form) ->
+      Format.fprintf out
+        "inference(@['renaming',@ [status(esa)],@ [%a],@ on(@[%a<=>%a@])@])"
+        pp_tstp src' ID.pp id TypedSTerm.TPTP.pp form
 
-  let to_string = CCFormat.to_string pp
-     *)
+  let rec pp out src = match view src with
+    | Internal _
+    | Input _ -> ()
+    | From_file (src,_) ->
+      let file = src.file in
+      begin match src.name with
+        | None -> Format.fprintf out "'%s'" file
+        | Some name -> Format.fprintf out "'%s' in '%s'" name file
+      end
+    | Neg (_,src') ->
+      Format.fprintf out "(@[neg@ %a@])" pp src'
+    | CNF (_,src') ->
+      Format.fprintf out "(@[CNF@ %a@])" pp src'
+    | Renaming ((_,src'), id, form) ->
+      Format.fprintf out "(@[renaming@ [%a]@ :name %a@ :on @[%a@]@])"
+        pp src' ID.pp id TypedSTerm.pp form
+    | Preprocess ((_,src'),msg) ->
+      Format.fprintf out "(@[preprocess@ [%a]@ :msg %S@])" pp src' msg
 end
 
 (** {2 Defined Constants} *)

@@ -9,7 +9,7 @@ val check_timeout : float option -> bool
 
 (** The SZS status of a state *)
 type szs_status =
-  | Unsat of ProofStep.of_
+  | Unsat of Proof.S.t
   | Sat
   | Unknown
   | Error of string

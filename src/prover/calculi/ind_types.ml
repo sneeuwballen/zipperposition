@@ -88,7 +88,7 @@ module Make(Env : Env_intf.S) = struct
     then SimplM.return_same c
     else (
       let proof =
-        ProofStep.mk_inference ~rule:(ProofStep.mk_rule "acyclicity") [C.proof c] in
+        Proof.Step.inference ~rule:(Proof.Rule.mk "acyclicity") [C.proof_parent c] in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
       Util.incr_stat stat_acyclicity;
       Util.debugf ~section 3
@@ -131,8 +131,8 @@ module Make(Env : Env_intf.S) = struct
            let renaming = Env.Ctx.renaming_clear () in
            let new_lits = Literal.apply_subst_list ~renaming subst (new_lits,0) in
            let proof =
-             ProofStep.mk_inference [C.proof c]
-               ~rule:(ProofStep.mk_rule "acyclicity")
+             Proof.Step.inference [C.proof_parent_subst (c,0) subst]
+               ~rule:(Proof.Rule.mk "acyclicity")
            in
            let new_c =
              C.create
@@ -179,8 +179,8 @@ module Make(Env : Env_intf.S) = struct
             (fun (t1,t2) ->
                if T.equal t1 t2 then None else Some (Literal.mk_eq t1 t2))
         in
-        let rule = ProofStep.mk_rule "injectivity_destruct+" in
-        let proof = ProofStep.mk_inference ~rule [C.proof c] in
+        let rule = Proof.Rule.mk "injectivity_destruct+" in
+        let proof = Proof.Step.inference ~rule [C.proof_parent c] in
         (* make one clause per [new_lits] *)
         let clauses =
           List.map
@@ -214,8 +214,8 @@ module Make(Env : Env_intf.S) = struct
                let ty = T.ty t1 in
                if Type.is_tType ty then None else Some (Literal.mk_neq t1 t2))
         in
-        let rule = ProofStep.mk_rule "injectivity_destruct-" in
-        let proof = ProofStep.mk_inference ~rule [C.proof c] in
+        let rule = Proof.Rule.mk "injectivity_destruct-" in
+        let proof = Proof.Step.inference ~rule [C.proof_parent c] in
         let c' =
           C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
             (new_lits @ lits) proof
@@ -309,7 +309,7 @@ module Make(Env : Env_intf.S) = struct
       in
       let lits = List.map (Literal.mk_eq t) rhs_l in
       (* XXX: could derive this from the [data] that defines [ity]… *)
-      let proof = ProofStep.mk_trivial in
+      let proof = Proof.Step.trivial in
       let penalty = 5 in (* do not use too lightly! *)
       let new_c = C.create ~trail:Trail.empty ~penalty lits proof in
       Util.incr_stat stat_exhaustiveness;

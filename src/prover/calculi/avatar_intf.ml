@@ -31,7 +31,7 @@ module type S = sig
     cut_pos: E.C.t list; (** clauses true if lemma is true *)
     cut_lit: BLit.t; (** lit that is true if lemma is true *)
     cut_depth: int; (** if the lemma is used to prove another lemma *)
-    cut_proof: ProofStep.t; (** where does the lemma come from? *)
+    cut_proof: Proof.Step.t; (** where does the lemma come from? *)
   }
   (** This represents a cut on a formula, where we obtain a list
       of clauses [cut_pos] representing the formula itself with the
@@ -46,7 +46,7 @@ module type S = sig
   val cut_pos : cut_res -> E.C.t list
   val cut_lit : cut_res -> BLit.t
   val cut_depth : cut_res -> int
-  val cut_proof : cut_res -> ProofStep.t
+  val cut_proof : cut_res -> Proof.Step.t
 
   val pp_cut_res : cut_res CCFormat.printer
   val cut_res_clauses: cut_res -> E.C.t Sequence.t
@@ -58,7 +58,7 @@ module type S = sig
     ?penalty:int ->
     ?depth:int ->
     Cut_form.t ->
-    ProofStep.t ->
+    Proof.Step.t ->
     cut_res
   (** Introduce a cut on the given clause(s). Pure. *)
 
@@ -66,7 +66,7 @@ module type S = sig
   (** Add the given cut to the list of lemmas. Modifies the global list
       of lemmas. *)
 
-  val add_imply : cut_res list -> cut_res -> ProofStep.t -> unit
+  val add_imply : cut_res list -> cut_res -> Proof.Step.t -> unit
   (** [add_imply l res] means that the conjunction of lemmas in [l]
       implies that the lemma [res] is proven *)
 

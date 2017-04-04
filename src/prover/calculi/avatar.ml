@@ -95,7 +95,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         (* do a simplification! *)
         Util.incr_stat stat_splits;
         let proof =
-          ProofStep.mk_esa ~rule:(ProofStep.mk_rule "split") [C.proof c]
+          Proof.Step.esa ~rule:(Proof.Rule.mk "split")
+            [Proof.Parent.from @@ C.proof c]
         in
         (* elements of the trail to keep *)
         let keep_trail =
@@ -233,10 +234,12 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         (* use SAT resolution proofs for tracking why the trail
            has been simplified, so that the other branches that have been
            closed can appear in the proof *)
-        let proof_removed = List.map Sat.get_proof_of_lit removed_trail in
+        let proof_removed =
+          List.map (CCFun.compose Sat.get_proof_of_lit Proof.Parent.from) removed_trail
+        in
         let proof =
-          ProofStep.mk_simp ~rule:(ProofStep.mk_rule "simpl_trail")
-            (C.proof c :: proof_removed) in
+          Proof.Step.simp ~rule:(Proof.Rule.mk "simpl_trail")
+            (Proof.Parent.from (C.proof c) :: proof_removed) in
         let c' =
           C.create_a ~trail:new_trail ~penalty:(C.penalty c)(C.lits c) proof
         in
@@ -303,7 +306,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     cut_pos: E.C.t list; (** clauses true if lemma is true *)
     cut_lit: BLit.t; (** lit that is true if lemma is true *)
     cut_depth: int; (** if the lemma is used to prove another lemma *)
-    cut_proof: ProofStep.t; (** where does the lemma come from? *)
+    cut_proof: Proof.Step.t; (** where does the lemma come from? *)
   }
 
   let cut_form c = c.cut_form
@@ -357,12 +360,11 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         (fun k->k Cut_form.pp c.cut_form);
     )
 
-  let add_imply (l:cut_res list) (res:cut_res) (p:ProofStep.t): unit =
+  let add_imply (l:cut_res list) (res:cut_res) (p:Proof.Step.t): unit =
     let c = res.cut_lit :: List.map (fun cut -> BLit.neg cut.cut_lit) l in
       Util.debugf ~section 3
         "(@[<2>add_imply@ :premises (@[<hv>%a@])@ :concl %a@ :proof %a@])"
-        (fun k->k (Util.pp_list pp_cut_res) l pp_cut_res res
-            ProofPrint.pp_normal_step p);
+        (fun k->k (Util.pp_list pp_cut_res) l pp_cut_res res Proof.Step.pp p);
     Solver.add_clause ~proof:p c;
     ()
 
@@ -371,17 +373,17 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     fun yield -> Lemma_tbl.iter (fun _ c -> yield c) all_lemmas_
 
   (* is this literal involved in the proof? *)
-  let rec in_proof_of_ (p:ProofStep.of_) (lit:BLit.t): bool =
+  let rec in_proof_of_ (p:Proof.t) (lit:BLit.t): bool =
     let eq_abs l1 l2 = BLit.equal (BLit.abs l1) (BLit.abs l2) in
-    let in_proof_ (p:ProofStep.t) (lit:BLit.t): bool =
-      List.exists (fun parent -> in_proof_of_ parent lit) (ProofStep.parents p)
+    let in_proof_ (p:Proof.Step.t) (lit:BLit.t): bool =
+      List.exists (fun parent -> in_proof_of_ (Proof.Parent.proof parent) lit) (Proof.Step.parents p)
     in
-    begin match ProofStep.result p with
-      | ProofStep.Stmt _
-      | ProofStep.Form _
-      | ProofStep.Clause _ -> in_proof_ (ProofStep.step p) lit
-      | ProofStep.BoolClause l ->
-        List.exists (eq_abs lit) l || in_proof_ (ProofStep.step p) lit
+    begin match Proof.S.result p with
+      | Proof.Stmt _
+      | Proof.Form _
+      | Proof.Clause _ -> in_proof_ (Proof.S.step p) lit
+      | Proof.BoolClause l ->
+        List.exists (eq_abs lit) l || in_proof_ (Proof.S.step p) lit
     end
 
   let print_lemmas out () =
@@ -407,7 +409,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
 
   let convert_lemma st = match Statement.view st with
     | Statement.Lemma l ->
-      let proof_st = ProofStep.mk_goal (Statement.src st) in
+      let proof_st = Proof.Step.goal (Statement.src st) in
       let f =
         l
         |> List.map (List.map Ctx.Lit.of_form)
@@ -416,8 +418,11 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       in
       let proof =
         Cut_form.cs f
-        |> List.map (fun c -> ProofStep.mk_c proof_st (SClause.make ~trail:Trail.empty c))
-        |> ProofStep.mk_inference ~rule:(ProofStep.mk_rule "lemma")
+        |> List.map
+          (fun c ->
+             Proof.Parent.from @@ Proof.S.mk_c proof_st @@
+             SClause.make ~trail:Trail.empty c)
+        |> Proof.Step.inference ~rule:(Proof.Rule.mk "lemma")
       in
       let cut = introduce_cut f proof in
       let all_clauses = cut_res_clauses cut |> Sequence.to_rev_list in
@@ -440,7 +445,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         []
       | Sat_solver.Unsat proof ->
         Util.debug ~section 1 "SAT-solver reports \"UNSAT\"";
-        let proof = ProofStep.step proof in
+        let proof = Proof.S.step proof in
         let c = C.create ~trail:Trail.empty ~penalty:0 [] proof in
         [c]
     in

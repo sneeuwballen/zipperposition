@@ -16,7 +16,8 @@ let stat_clause_create = Util.mk_stat "clause.create"
 
 module type S = Clause_intf.S
 
-type proof_step = Clause_intf.proof_step
+type proof_step = Proof.Step.t
+type proof = Proof.S.t
 
 (** {2 Type def} *)
 module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
@@ -88,9 +89,9 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   (** {2 Utils} *)
 
-  let is_goal c = ProofStep.is_goal c.proof
+  let is_goal c = Proof.Step.is_goal c.proof
 
-  let distance_to_goal c = ProofStep.distance_to_goal c.proof
+  let distance_to_goal c = Proof.Step.distance_to_goal c.proof
 
   (* private function for building clauses *)
   let create_inner ~penalty ~selected sclause proof =
@@ -123,13 +124,13 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let of_forms_axiom ?(penalty=0) ~file ~name forms =
     let lits = List.map Ctx.Lit.of_form forms in
-    let proof = ProofStep.mk_assert' ~file ~name () in
+    let proof = Proof.Step.assert' ~file ~name () in
     create ~penalty ~trail:Trail.empty lits proof
 
-  let rule_neg_ = ProofStep.mk_rule "neg_goal"
-  let rule_cnf_ = ProofStep.mk_rule "cnf"
-  let rule_renaming_ = ProofStep.mk_rule "renaming"
-  let rule_preprocess_ msg = ProofStep.mk_rulef "preprocess(%s)" msg
+  let rule_neg_ = Proof.Rule.mk "neg_goal"
+  let rule_cnf_ = Proof.Rule.mk "cnf"
+  let rule_renaming_ = Proof.Rule.mk "renaming"
+  let rule_preprocess_ msg = Proof.Rule.mkf "preprocess(%s)" msg
 
   module Src_tbl = CCHashtbl.Make(struct
       type t = Stmt.source
@@ -138,41 +139,41 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     end)
 
   (* used to share the same SClause.t in the proof *)
-  let input_proof_tbl_ : ProofStep.t Src_tbl.t = Src_tbl.create 32
+  let input_proof_tbl_ : Proof.Step.t Src_tbl.t = Src_tbl.create 32
 
   let rec proof_of_stmt src =
     try Src_tbl.find input_proof_tbl_ src
     with Not_found ->
       let p = match Stmt.Src.view src with
-        | Stmt.Input (_, Stmt.R_goal) -> ProofStep.mk_goal src
-        | Stmt.Input (_, _) -> ProofStep.mk_assert src
-        | Stmt.From_file (_, Stmt.R_goal) -> ProofStep.mk_goal src
-        | Stmt.From_file (_, _) -> ProofStep.mk_assert src
-        | Stmt.Internal _ -> ProofStep.mk_trivial
-        | Stmt.Neg srcd -> ProofStep.mk_esa ~rule:rule_neg_ [proof_of_sourced srcd]
-        | Stmt.CNF srcd -> ProofStep.mk_esa ~rule:rule_cnf_ [proof_of_sourced srcd]
+        | Stmt.Input (_, Stmt.R_goal) -> Proof.Step.goal src
+        | Stmt.Input (_, _) -> Proof.Step.assert_ src
+        | Stmt.From_file (_, Stmt.R_goal) -> Proof.Step.goal src
+        | Stmt.From_file (_, _) -> Proof.Step.assert_ src
+        | Stmt.Internal _ -> Proof.Step.trivial
+        | Stmt.Neg srcd -> Proof.Step.esa ~rule:rule_neg_ [proof_of_sourced srcd]
+        | Stmt.CNF srcd -> Proof.Step.esa ~rule:rule_cnf_ [proof_of_sourced srcd]
         | Stmt.Preprocess (srcd,msg) ->
-          ProofStep.mk_esa ~rule:(rule_preprocess_ msg) [proof_of_sourced srcd]
+          Proof.Step.esa ~rule:(rule_preprocess_ msg) [proof_of_sourced srcd]
         | Stmt.Renaming (srcd,id,form) ->
-          ProofStep.mk_esa ~rule:rule_renaming_
+          Proof.Step.esa ~rule:rule_renaming_
             [proof_of_sourced srcd;
-             ProofStep.mk_f_by_def id
+             Proof.Parent.from @@ Proof.S.mk_f_by_def id @@
                TypedSTerm.(Form.eq (const id ~ty:Ty.prop) form)]
       in
       Src_tbl.add input_proof_tbl_ src p;
       p
 
-  and proof_of_sourced (res, src) =
+  and proof_of_sourced (res, src): Proof.Parent.t =
     let p = proof_of_stmt src in
     begin match res with
       | Stmt.Sourced_input f ->
-        ProofStep.mk_f p f
+        Proof.Parent.from (Proof.S.mk_f p f)
       | Stmt.Sourced_clause c ->
         let lits = List.map Ctx.Lit.of_form c |> Array.of_list in
         let c = SClause.make ~trail:Trail.empty lits in
-        ProofStep.mk_c p c
+        Proof.Parent.from (Proof.S.mk_c p c)
       | Stmt.Sourced_statement stmt ->
-        ProofStep.mk_stmt p stmt
+        Proof.Parent.from (Proof.S.mk_stmt p stmt)
     end
 
   let of_statement st =
@@ -200,7 +201,9 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let proof_step c = c.proof
 
-  let proof c = ProofStep.mk_c c.proof c.sclause
+  let proof c = Proof.S.mk_c c.proof c.sclause
+  let proof_parent c = Proof.Parent.from (proof c)
+  let proof_parent_subst (c,sc) subst = Proof.Parent.from_subst (proof c,sc) subst
 
   let update_proof c f =
     let new_proof = f c.proof in

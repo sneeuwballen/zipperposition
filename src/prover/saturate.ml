@@ -38,7 +38,7 @@ let print_progress i ~steps =
 
       (** The SZS status of a state *)
 type szs_status =
-  | Unsat of ProofStep.of_
+  | Unsat of Proof.S.t
   | Sat
   | Unknown
   | Error of string

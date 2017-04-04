@@ -141,7 +141,7 @@ module Make(Dummy : sig end)
     let norm l =
       let l', b = norm l in
       l', if b then FI.Negated else FI.Same_sign
-    type proof = ProofStep.t
+    type proof = Proof.Step.t
     let print = Lit.pp
   end
 
@@ -161,13 +161,13 @@ module Make(Dummy : sig end)
 
   (* (clause * proof * proof) -> 'a *)
   module ResTbl = CCHashtbl.Make(struct
-      type t = sat_clause * ProofStep.of_ * ProofStep.of_
+      type t = sat_clause * Proof.t * Proof.t
       let equal (c,a1,a2)(c',b1,b2) =
         CCList.equal Lit.equal c c' &&
-        ProofStep.equal_proof a1 b1 && ProofStep.equal_proof a2 b2
+        Proof.S.equal a1 b1 && Proof.S.equal a2 b2
       let hash (c,a,b) =
         Hashtbl.hash
-          [List.length c; ProofStep.hash_proof a; ProofStep.hash_proof b]
+          [List.length c; Proof.S.hash a; Proof.S.hash b]
     end)
 
   let tbl_res = ResTbl.create 16
@@ -182,7 +182,7 @@ module Make(Dummy : sig end)
     begin match CCHashtbl.get tag_to_proof_ tag with
       | Some step ->
         let c = bool_clause_of_sat c in
-        ProofStep.mk_bc step c
+        Proof.S.mk_bc step c
       | None -> errorf "no proof for tag %d" tag
     end
 
@@ -201,11 +201,11 @@ module Make(Dummy : sig end)
           begin match ResTbl.get tbl_res (c,q1,q2) with
             | Some s -> s
             | None ->
-              let parents = [q1; q2] in
+              let parents = [Proof.Parent.from q1; Proof.Parent.from q2] in
               let step =
-                ProofStep.mk_inference parents
-                  ~rule:(ProofStep.mk_rule "sat_resolution")  in
-              let s = ProofStep.mk_bc step c in
+                Proof.Step.inference parents
+                  ~rule:(Proof.Rule.mk "sat_resolution") in
+              let s = Proof.S.mk_bc step c in
               ResTbl.add tbl_res (c,q1,q2) s;
               ResTbl.add tbl_res (c,q2,q1) s;
               s
@@ -225,15 +225,15 @@ module Make(Dummy : sig end)
            | { step = S.Proof.Resolution (_,_,_); _ } ->
              acc (* ignore, intermediate node *)
            | { conclusion=c; step = _ } ->
-             proof_of_leaf c :: acc)
+             Proof.Parent.from (proof_of_leaf c) :: acc)
         [] p
     in
     let {conclusion=c;_} = S.Proof.expand p in
     let c = bool_clause_of_sat c in
     let step =
-      ProofStep.mk_inference leaves
-        ~rule:(ProofStep.mk_rule "sat_resolution*")  in
-    ProofStep.mk_bc step c
+      Proof.Step.inference leaves
+        ~rule:(Proof.Rule.mk "sat_resolution*")  in
+    Proof.S.mk_bc step c
 
   let conv_proof_ p =
     if !sat_compact_
@@ -273,7 +273,7 @@ module Make(Dummy : sig end)
     while not (Queue.is_empty queue_) do
       let c, proof, tag = Queue.pop queue_ in
       Util.debugf ~section 4 "@[<hv2>assume@ @[%a@]@ proof: %a@]"
-        (fun k->k pp_form (c,tag) ProofPrint.pp_normal_step proof);
+        (fun k->k pp_form (c,tag) Proof.Step.pp proof);
       S.assume ~tag c
     done;
     (* solve *)

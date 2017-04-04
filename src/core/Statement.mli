@@ -218,6 +218,9 @@ module Src : sig
   (* include Interfaces.PRINT with type t := t *)
 
   val pp_role : role CCFormat.printer
+
+  val pp : t CCFormat.printer
+  val pp_tstp : t CCFormat.printer
 end
 
 (** {2 Iterators} *)

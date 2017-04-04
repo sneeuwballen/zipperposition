@@ -281,7 +281,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     }
   end
 
-  let rule_canc = ProofStep.mk_rule "canc_sup"
+  let rule_canc = Proof.Rule.mk "canc_sup"
 
   (* do cancellative superposition *)
   let _do_canc info acc =
@@ -333,10 +333,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       let all_lits = new_lit :: lits_a @ lits_p in
       (* build clause *)
       let proof =
-        ProofStep.mk_inference
+        Proof.Step.inference
           ~rule:rule_canc
           ~comment:(CCFormat.sprintf "lhs(%a)" MF.pp mf_a)
-          [C.proof info.active; C.proof info.passive] in
+          [C.proof_parent_subst (info.active,s_a) subst;
+           C.proof_parent_subst (info.passive,s_p) subst] in
       let trail = C.trail_l [info.active;info.passive] in
       let penalty = C.penalty info.active + C.penalty info.passive in
       let new_c = C.create ~penalty ~trail all_lits proof in
@@ -510,13 +511,15 @@ module Make(E : Env.S) : S with module Env = E = struct
         add_lit (Lit.mk_arith a_lit)
       with SimplifyInto (a_lit',c',subst) ->
         (* lit ----> lit' *)
-        add_premise c';
+        add_premise c' subst;
         (* recurse until the literal isn't reducible *)
         Util.debugf ~section 4
           "@[<2>rewrite arith lit (@[%a@])@ into (@[%a@])@ using clause @[%a@]@ and subst @[%a@]@]"
           (fun k->k AL.pp a_lit AL.pp a_lit' C.pp c' S.pp subst);
         _demod_lit_nf ~add_premise ~add_lit ~i c a_lit'
     end
+
+  let eq_c_subst (c1,s1)(c2,s2) = C.equal c1 c2 && Subst.equal s1 s2
 
   (* demodulation (simplification) *)
   let _demodulation c =
@@ -526,9 +529,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     let add_lit l = lits := l :: !lits in
     let clauses = ref [] in  (* simplifying clauses *)
     (* add a rewriting clause *)
-    let add_premise c' =
+    let add_premise c' subst =
       did_simplify := true;
-      clauses := c' :: !clauses
+      clauses := (c',subst) :: !clauses
     in
     (* simplify each and every literal *)
     Lits.fold_lits ~eligible:C.Eligible.always (C.lits c)
@@ -543,16 +546,22 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* build result clause (if it was simplified) *)
     let res =
       if !did_simplify then (
-        clauses := CCList.uniq ~eq:C.equal !clauses;
+        clauses := CCList.uniq ~eq:eq_c_subst !clauses;
         let proof =
-          ProofStep.mk_inference
-            ~rule:(ProofStep.mk_rule "canc_demod")
-            (C.proof c :: List.map C.proof !clauses) in
+          Proof.Step.inference
+            ~rule:(Proof.Rule.mk "canc_demod")
+            (C.proof_parent c ::
+               List.map (fun (c,subst) -> C.proof_parent_subst (c,1) subst) !clauses)
+        in
         let trail = C.trail c in
         let new_c = C.create ~penalty:(C.penalty c) ~trail (List.rev !lits) proof in
         Util.incr_stat stat_arith_demod;
         Util.debugf ~section 5 "@[<2>arith demodulation@ of @[%a@]@ with [@[%a@]]@ gives @[%a@]@]"
-          (fun k->k C.pp c (Util.pp_list C.pp) !clauses C.pp new_c);
+          (fun k->
+             let pp_c_s out (c,s) =
+               Format.fprintf out "(@[%a@ :subst %a@])" C.pp c Subst.pp s
+             in
+             k C.pp c (Util.pp_list pp_c_s) !clauses C.pp new_c);
         SimplM.return_new new_c
       ) else
         SimplM.return_same c
@@ -629,9 +638,9 @@ module Make(E : Env.S) : S with module Env = E = struct
                       let new_lit = Lit.mk_arith_op op (MF.rest mf1') (MF.rest mf2') in
                       let all_lits = new_lit :: lits' in
                       let proof =
-                        ProofStep.mk_inference
-                          ~rule:(ProofStep.mk_rule "cancellation")
-                          [C.proof c] in
+                        Proof.Step.inference
+                          ~rule:(Proof.Rule.mk "cancellation")
+                          [C.proof_parent_subst (c,0) subst] in
                       let trail = C.trail c in
                       let penalty = C.penalty c in
                       let new_c = C.create ~trail ~penalty all_lits proof in
@@ -661,9 +670,9 @@ module Make(E : Env.S) : S with module Env = E = struct
                       in
                       let all_lits = new_lit :: lits' in
                       let proof =
-                        ProofStep.mk_inference
-                          ~rule:(ProofStep.mk_rule "cancellation")
-                          [C.proof c] in
+                        Proof.Step.inference
+                          ~rule:(Proof.Rule.mk "cancellation")
+                          [C.proof_parent_subst (c,0) subst] in
                       let trail = C.trail c
                       and penalty = C.penalty c in
                       let new_c = C.create ~trail ~penalty all_lits proof in
@@ -679,7 +688,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.exit_prof prof_arith_cancellation;
     res
 
-  let rule_canc_eq_fact = ProofStep.mk_rule "arith_eq_factoring"
+  let rule_canc_eq_fact = Proof.Rule.mk "arith_eq_factoring"
 
   let canc_equality_factoring c =
     Util.enter_prof prof_arith_eq_factoring;
@@ -736,10 +745,10 @@ module Make(E : Env.S) : S with module Env = E = struct
                          (* apply subst and build clause *)
                          let all_lits = new_lit :: other_lits in
                          let proof =
-                           ProofStep.mk_inference
+                           Proof.Step.inference
                              ~rule:rule_canc_eq_fact
                              ~comment:(CCFormat.sprintf "idx(%d,%d)" idx1 idx2)
-                             [C.proof c] in
+                             [C.proof_parent_subst (c,0) subst] in
                          let penalty = C.penalty c
                          and trail = C.trail c in
                          let new_c = C.create ~trail ~penalty all_lits proof in
@@ -820,11 +829,12 @@ module Make(E : Env.S) : S with module Env = E = struct
           let lits_r = Lit.apply_subst_list ~renaming subst (lits_r,s_r) in
           let all_lits = new_lit :: lits_l @ lits_r in
           let proof =
-            ProofStep.mk_inference
-              ~rule:(ProofStep.mk_rule "canc_ineq_chaining")
+            Proof.Step.inference
+              ~rule:(Proof.Rule.mk "canc_ineq_chaining")
               ~comment:(CCFormat.sprintf "(@[idx(%d,%d)@ left(%a)@ right(%a)@])"
                   idx_l idx_r T.pp (MF.term mf_2) T.pp (MF.term mf_1))
-              [C.proof info.left; C.proof info.right] in
+              [C.proof_parent_subst (info.left,s_l) subst;
+               C.proof_parent_subst (info.right,s_r) subst] in
           let trail = C.trail_l [info.left; info.right] in
           (* penalty for some chaining *)
           let penalty =
@@ -857,9 +867,10 @@ module Make(E : Env.S) : S with module Env = E = struct
             in
             let all_lits = List.rev_append new_lits (lits_l @ lits_r) in
             let proof =
-              ProofStep.mk_inference
-                ~rule:(ProofStep.mk_rule "canc_case_switch")
-                [C.proof info.left; C.proof info.right] in
+              Proof.Step.inference
+                ~rule:(Proof.Rule.mk "canc_case_switch")
+                [C.proof_parent_subst (info.left,s_l) subst;
+                 C.proof_parent_subst (info.right,s_r) subst] in
             let trail = C.trail_l [info.left; info.right] in
             (* small penalty for case switch *)
             let penalty = C.penalty info.left + C.penalty info.right + 3 in
@@ -975,9 +986,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             let lits = new_lit :: other_lits in
             (* build clauses *)
             let proof =
-              ProofStep.mk_inference
-                ~rule:(ProofStep.mk_rule "canc_ineq_factoring")
-                [C.proof c] in
+              Proof.Step.inference
+                ~rule:(Proof.Rule.mk "canc_ineq_factoring")
+                [C.proof_parent_subst (c,0) subst] in
             let trail = C.trail c
             and penalty = C.penalty c in
             let new_c = C.create ~trail ~penalty lits proof in
@@ -1182,8 +1193,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         and lits2 = Lit.apply_subst_list ~renaming subst (lits2,sc2) in
         let all_lits = new_lit :: lits1 @ lits2 in
         let proof =
-          ProofStep.mk_inference ~rule:(ProofStep.mk_rule "div_chaining")
-            [C.proof c1; C.proof c2] in
+          Proof.Step.inference ~rule:(Proof.Rule.mk "div_chaining")
+            [C.proof_parent_subst (c1,sc1) subst;
+             C.proof_parent_subst (c2,sc2) subst] in
         let trail = C.trail_l [c1; c2] in
         (* penalize chaining into variables *)
         let penalty =
@@ -1282,8 +1294,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       let lits' = CCArray.except_idx (C.lits c) i in
       let all_lits = List.rev_append lits lits' in
       let proof =
-        ProofStep.mk_inference ~rule:(ProofStep.mk_rule "div_case_switch")
-          [C.proof c] in
+        Proof.Step.inference ~rule:(Proof.Rule.mk "div_case_switch")
+          [C.proof_parent c] in
       let new_c =
         C.create ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof
       in
@@ -1345,9 +1357,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         let lits' = CCArray.except_idx (C.lits c) i in
         let all_lits = List.rev_append lits lits' in
         let proof =
-          ProofStep.mk_inference
-            ~rule:(ProofStep.mk_rule "div_prime_decomposition")
-            [C.proof c] in
+          Proof.Step.inference
+            ~rule:(Proof.Rule.mk "div_prime_decomposition")
+            [C.proof_parent c] in
         let new_c =
           C.create ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof
         in
@@ -1361,8 +1373,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                let all_lits = Array.copy (C.lits c) in
                all_lits.(i) <- lit;
                let proof =
-                 ProofStep.mk_inference [C.proof c]
-                   ~rule:(ProofStep.mk_rule "div_prime_decomposition")  in
+                 Proof.Step.inference [C.proof_parent c]
+                   ~rule:(Proof.Rule.mk "div_prime_decomposition")  in
                let new_c =
                  C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof
                in
@@ -1431,9 +1443,9 @@ module Make(E : Env.S) : S with module Env = E = struct
                   let lits' = Lit.apply_subst_list ~renaming subst (lits',0) in
                   let all_lits = new_lit :: lits' in
                   let proof =
-                    ProofStep.mk_inference
-                      ~rule:(ProofStep.mk_rule "divisibility")
-                      [C.proof c] in
+                    Proof.Step.inference
+                      ~rule:(Proof.Rule.mk "divisibility")
+                      [C.proof_parent_subst (c,0) subst] in
                   let new_c =
                     C.create ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof
                   in
@@ -1578,9 +1590,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       let renaming = Ctx.renaming_clear () in
       let lits' = Lit.apply_subst_list ~renaming subst (lits',0) in
       let proof =
-        ProofStep.mk_inference
-          ~rule:(ProofStep.mk_rule "canc_eq_res")
-          [C.proof c] in
+        Proof.Step.inference
+          ~rule:(Proof.Rule.mk "canc_eq_res")
+          [C.proof_parent_subst (c,0) subst] in
       let c' = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
       Util.debugf ~section 4
         "@[<2>arith_eq_res:@ simplify @[%a@]@ into @[%a@]@]"
@@ -1610,8 +1622,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                  ]
                in
                let proof =
-                 ProofStep.mk_inference
-                   ~rule:(ProofStep.mk_rule "arith_diff_to_lesseq") [C.proof c] in
+                 Proof.Step.inference [C.proof_parent c] 
+                   ~rule:(Proof.Rule.mk "arith_diff_to_lesseq") in
                let c' =
                  C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
                    (new_lits @ lits) proof
@@ -1714,7 +1726,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           | _::_ ->
             let all_lits = !new_lits @ (Array.to_list lits') in
             let proof =
-              ProofStep.mk_inference ~rule:(ProofStep.mk_rule "purify") [C.proof c] in
+              Proof.Step.inference ~rule:(Proof.Rule.mk "purify") [C.proof_parent c] in
             let new_c =
               C.create ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof
             in
@@ -1977,12 +1989,13 @@ module Make(E : Env.S) : S with module Env = E = struct
           (* prepare to build clauses *)
           let acc = ref [] in
           let add_clause ~by ~which lits =
-            let rule_name =
-              CCFormat.sprintf "var_elim(%s×%a → %a)" (Z.to_string view.NVE.lcm)
-                HVar.pp x M.pp by
+            let comment =
+              CCFormat.sprintf "var_elim(%s×%a → %a, which:%s)"
+                (Z.to_string view.NVE.lcm)
+                HVar.pp x M.pp by which
             in
-            let rule = ProofStep.mk_rule rule_name in
-            let proof = ProofStep.mk_inference ~comment:which ~rule [C.proof c] in
+            let rule = Proof.Rule.mk "var_elim" in
+            let proof = Proof.Step.inference ~comment ~rule [C.proof_parent c] in
             let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
             Util.debugf ~section 5
               "@[<2>elimination of %s×%a@ by %a (which:%s)@ in @[%a@]:@ gives @[%a@]@]"

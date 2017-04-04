@@ -204,7 +204,7 @@ end = struct
       List.iter
         (fun lits ->
            let c =
-             C.create_a ~trail:Trail.empty ~penalty:0 lits ProofStep.mk_trivial
+             C.create_a ~trail:Trail.empty ~penalty:0 lits Proof.Step.trivial
            in
            let cs, _ = E.all_simplify c in
            begin match CCList.find_pred C.is_empty cs with
@@ -426,8 +426,8 @@ module Make
     let cut_blit = A.cut_lit cut in
     (* proof step *)
     let proof =
-      ProofStep.mk_inference (List.map C.proof (A.cut_pos cut))
-        ~rule:(ProofStep.mk_rulef "induction(@[<h>%a@])" (Util.pp_list HVar.pp) vars)
+      Proof.Step.inference (List.map C.proof_parent (A.cut_pos cut))
+        ~rule:(Proof.Rule.mkf "induction(@[<h>%a@])" (Util.pp_list HVar.pp) vars)
     in
     let c_sets =
       List.map
@@ -558,8 +558,7 @@ module Make
     in
     A.Solver.add_clauses ~proof b_clauses;
     Util.debugf ~section 2 "@[<2>add boolean constraints@ @[<hv>%a@]@ :proof %a@]"
-      (fun k->k (Util.pp_list BBox.pp_bclause) b_clauses
-          ProofPrint.pp_normal_step proof);
+      (fun k->k (Util.pp_list BBox.pp_bclause) b_clauses Proof.Step.pp proof);
     Util.incr_stat stat_inductions;
     (* return the clauses *)
     clauses
@@ -923,7 +922,7 @@ module Make
              assert (new_goals <> []);
              let new_cuts =
                List.map
-                 (fun g -> A.introduce_cut ~depth:(A.cut_depth cut) g ProofStep.mk_lemma)
+                 (fun g -> A.introduce_cut ~depth:(A.cut_depth cut) g Proof.Step.lemma)
                  new_goals
              in
              Util.debugf ~section 4
@@ -931,7 +930,7 @@ module Make
                (fun k->k Cut_form.pp g (Util.pp_list Cut_form.pp) new_goals);
              Util.incr_stat stat_generalize;
              (* assert that the new goals imply the old one *)
-             let proof = ProofStep.mk_trivial in
+             let proof = Proof.Step.trivial in
              A.add_imply new_cuts cut proof;
              (* now prove the lemmas in Avatar *)
              List.iter A.add_lemma new_cuts)
@@ -1027,7 +1026,7 @@ module Make
              Util.debugf ~section 1
                "(@[<2>@{<green>prove_by_induction@}@ :clauses (@[%a@])@ :goal %a@])"
                (fun k->k (Util.pp_list C.pp) clauses Goal.pp goal);
-             let proof = ProofStep.mk_lemma in
+             let proof = Proof.Step.lemma in
              (* new lemma has same penalty as the clauses *)
              let penalty = List.fold_left (fun n c -> n+C.penalty c) 0 clauses in
              let cut = A.introduce_cut ~penalty ~depth (Goal.form goal) proof in
