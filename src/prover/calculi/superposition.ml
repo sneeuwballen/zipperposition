@@ -1130,11 +1130,37 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     | None -> false
     | Some _ -> true
 
+  (* anti-unification of the two terms with at most one disagreement point *)
+  let anti_unify (t:T.t)(u:T.t): (T.t * T.t) option =
+    let pair = ref None in
+    let rec aux t u = match T.view t, T.view u with
+      | _ when T.equal t u -> () (* trivial *)
+      | T.App (f, ts), T.App (g, us) when List.length ts = List.length us ->
+        aux f g;
+        List.iter2 aux ts us
+      | _ ->
+        begin match !pair with
+          | None -> pair := Some (t,u)
+          | Some _ -> raise Exit (* 2 distinct pairs, too bad *)
+        end
+    in
+    assert (not (T.equal t u));
+    try
+      aux t u;
+      !pair
+    with Exit -> None
+
   let eq_subsumes_with (a,sc_a) (b,sc_b) =
     (* subsume a literal using a = b *)
     let rec equate_lit_with a b lit = match lit with
-      | Lit.Equation (u, v, true) -> equate_root a b u v
+      | Lit.Equation (u, v, true) when not (T.equal u v) -> equate_terms a b u v
       | _ -> None
+    (* make u=v using a=b once *)
+    and equate_terms a b u v =
+      begin match anti_unify u v with
+        | None -> None
+        | Some (u', v') -> equate_root a b u' v'
+      end
     (* check whether a\sigma = u and b\sigma = v, for some sigma;
        or the commutation thereof *)
     and equate_root a b u v: Subst.t option =
