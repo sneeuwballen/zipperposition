@@ -41,7 +41,7 @@ and select = ref "SelectComplex"
 and unary_depth = ref 1
 and def_as_rewrite = ref true
 and files = CCVector.create ()
-and check = ref true
+and check = ref false
 
 (** parse_args returns parameters *)
 let parse_args () =
