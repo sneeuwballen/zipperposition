@@ -15,20 +15,21 @@ type check_info =
   | C_no_check
   | C_other
 
-type t = {
-  id: int; (* unique ID *)
-  concl: form;
-  step: step;
-}
-and step =
+type t
+
+type step =
   | Goal
   | Assert
   | Negated_goal of t
   | Trivial
+  | By_def of ID.t
   | Instantiate of subst * t
   | Esa of name * t list * check_info
   | Inference of name * t list * check_info
 
+val id : t -> int
+val concl : t -> form
+val step : t -> step
 val premises : t -> t list
 
 val check_info : t -> check_info
@@ -52,6 +53,7 @@ val goal : form -> t
 val negated_goal : form -> t -> t
 val assert_ : form -> t
 val trivial : form -> t
+val by_def : ID.t -> form -> t
 val instantiate : form -> subst -> t -> t
 val esa : [`No_check | `Check | `Check_with of form list] -> form -> name -> t list -> t
 val inference : [`No_check | `Check | `Check_with of form list] -> form -> name -> t list -> t

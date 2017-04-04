@@ -156,7 +156,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
         | Stmt.Renaming (srcd,id,form) ->
           ProofStep.mk_esa ~rule:rule_renaming_
             [proof_of_sourced srcd;
-             ProofStep.mk_f_trivial
+             ProofStep.mk_f_by_def id
                TypedSTerm.(Form.eq (const id ~ty:Ty.prop) form)]
       in
       Src_tbl.add input_proof_tbl_ src p;

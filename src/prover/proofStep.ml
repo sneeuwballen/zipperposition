@@ -34,6 +34,7 @@ type kind =
   | Lemma
   | Data of statement_src * Type.t Statement.data
   | Trivial (** trivial, or trivial within theories *)
+  | By_def of ID.t
 
 type result =
   | Form of form
@@ -126,6 +127,7 @@ let get_id_ () =
 let instantiate (s:Subst.t) (o,sc_o): of_ = o
 
 let mk_trivial = {id=get_id_(); parents=[]; kind=Trivial; dist_to_goal=None; }
+let mk_by_def id = {id=get_id_(); parents=[]; kind=By_def id; dist_to_goal=None }
 let mk_lemma = {id=get_id_(); parents=[]; kind=Lemma; dist_to_goal=Some 0; }
 
 let combine_dist o p = match o, p.step.dist_to_goal with
@@ -173,6 +175,7 @@ let mk_esa ?comment ~rule parents =
 let mk_f step res = {step; result=Form res; }
 
 let mk_f_trivial = mk_f mk_trivial
+let mk_f_by_def id f = mk_f (mk_by_def id) f
 
 let mk_f_inference ~rule f parents =
   let step = mk_inference ~rule parents in
@@ -200,11 +203,16 @@ let is_trivial = function
   | {kind=Trivial; _} -> true
   | _ -> false
 
+let is_by_def = function
+  | {kind=By_def _; _} -> true
+  | _ -> false
+
 let rule p = match p.kind with
   | Trivial
   | Lemma
   | Assert _
   | Data _
+  | By_def _
   | Goal _-> None
   | Esa (rule,_)
   | Simplification (rule,_)
@@ -215,6 +223,7 @@ let comment p = match p.kind with
   | Trivial
   | Lemma
   | Assert _
+  | By_def _
   | Data _
   | Goal _-> None
   | Esa (_,c)
@@ -274,6 +283,7 @@ let pp_kind_tstp out k =
       Format.fprintf out "inference(%a, [status(esa)])" pp_rule rule
     | Trivial ->
       Format.fprintf out "trivial([status(thm)])"
+    | By_def _ -> Format.fprintf out "by_def([status(thm)])"
 
 let rec pp_src out src = match Stmt.Src.view src with
   | Stmt.Internal _
@@ -307,6 +317,7 @@ let pp_kind out k =
     | Esa (rule,c) ->
       Format.fprintf out "esa %a%a" pp_rule rule pp_comment c
     | Trivial -> CCFormat.string out "trivial"
+    | By_def id -> Format.fprintf out "by_def(%a)" ID.pp id
 
 
 (** {2 Conversion} *)
@@ -343,7 +354,8 @@ let to_llproof (p:of_): LLProof.t =
       | Esa (name,_) ->
         (* TODO: check, perhaps with side conditions *)
         LLProof.esa `No_check res name parents
-      |Trivial -> LLProof.trivial res
+      | Trivial -> LLProof.trivial res
+      | By_def id -> LLProof.by_def id res
       | Assert _ -> LLProof.assert_ res
       | Goal _ -> LLProof.assert_ res
       | Lemma -> LLProof.trivial res

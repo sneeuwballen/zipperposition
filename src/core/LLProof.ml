@@ -30,29 +30,35 @@ and step =
   | Assert
   | Negated_goal of t
   | Trivial
+  | By_def of ID.t
   | Instantiate of subst * t
   | Esa of name * t list * check_info
   | Inference of name * t list * check_info
+
+let concl p = p.concl
+let step p = p.step
+let id p = p.id
 
 let pp_step out (s:step): unit = match s with
   | Goal -> Fmt.string out "goal"
   | Assert -> Fmt.string out "assert"
   | Negated_goal _ -> Fmt.string out "negated_goal"
   | Trivial -> Fmt.string out "trivial"
+  | By_def id -> Fmt.fprintf out "(by_def :of %a)" ID.pp id
   | Instantiate (subst, _) ->
     Fmt.fprintf out "(@[instantiate %a@])" (Var.Subst.pp T.pp) subst
   | Esa (n,_,_) -> Fmt.fprintf out "(esa %s)" n
   | Inference (n,_,_) -> Fmt.fprintf out "(inf %s)" n
 
 let premises (p:t): t list = match p.step with
-  | Goal | Assert | Trivial -> []
+  | Goal | Assert | Trivial | By_def _ -> []
   | Negated_goal p2
   | Instantiate (_,p2) -> [p2]
   | Esa (_,l,_)
   | Inference (_,l,_) -> l
 
 let check_info (p:t): check_info = match p.step with
-  | Goal | Assert | Trivial | Negated_goal _ -> C_other
+  | Goal | Assert | Trivial | Negated_goal _ | By_def _ -> C_other
   | Instantiate (_,_) -> C_check []
   | Esa (_,_,c)
   | Inference (_,_,c) -> c
@@ -60,10 +66,6 @@ let check_info (p:t): check_info = match p.step with
 let equal a b = a.id = b.id
 let compare a b = CCInt.compare a.id b.id
 let hash a = Hash.int a.id
-
-let concl p = p.concl
-let step p = p.step
-let id p = p.id
 
 module Tbl = CCHashtbl.Make(struct
     type t_ = t
@@ -102,6 +104,7 @@ let goal f = mk_ f Goal
 let negated_goal f p = mk_ f (Negated_goal p)
 let assert_ f = mk_ f Assert
 let trivial f = mk_ f Trivial
+let by_def id f = mk_ f (By_def id)
 let instantiate f subst p = mk_ f (Instantiate (subst,p))
 
 let conv_check_ = function

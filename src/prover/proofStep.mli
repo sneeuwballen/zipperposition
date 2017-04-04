@@ -33,6 +33,7 @@ type kind =
   | Lemma
   | Data of statement_src * Type.t Statement.data
   | Trivial (** trivial, or trivial within theories *)
+  | By_def of ID.t
 
 type result =
   | Form of form
@@ -69,6 +70,8 @@ module PTbl : CCHashtbl.S with type key = of_
 
 val mk_trivial : t
 
+val mk_by_def : ID.t -> t
+
 val mk_data : statement_src -> Type.t Statement.data -> t
 
 val mk_assert : statement_src -> t
@@ -92,6 +95,7 @@ val mk_esa : ?comment:string -> rule:rule -> of_ list -> t
 val mk_f : t -> form -> of_
 
 val mk_f_trivial : form -> of_
+val mk_f_by_def : ID.t -> form -> of_
 
 val mk_f_inference : rule:rule -> form -> of_ list -> of_
 
@@ -109,6 +113,7 @@ val adapt_f : of_ -> form -> of_
 val adapt_c : of_ -> SClause.t -> of_
 
 val is_trivial : t -> bool
+val is_by_def : t -> bool
 
 val is_assert : t -> bool
 (** Proof: the statement was asserted in some file *)

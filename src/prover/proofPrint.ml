@@ -95,6 +95,7 @@ let pp_normal_step out step = match P.kind step with
     Format.fprintf out "@[<hv2>data %a@]@," P.pp_kind (P.kind step)
   | P.Lemma -> Format.fprintf out "lemma"
   | P.Trivial -> Format.fprintf out "trivial"
+  | P.By_def id -> Format.fprintf out "by_def %a" ID.pp id
   | P.Inference _
   | P.Simplification _
   | P.Esa _ ->
@@ -137,6 +138,7 @@ let pp_kind_tstp out (k,parents) =
     | P.Esa (rule,_) -> pp_step "esa" out (rule,parents)
     | P.Lemma -> Format.fprintf out "lemma"
     | P.Trivial -> assert(parents=[]); Format.fprintf out "trivial([status(thm)])"
+    | P.By_def _ -> Format.fprintf out "by_def([status(thm)])"
 
 let pp_tstp out proof =
   let namespace = Tbl.create 5 in
@@ -210,6 +212,7 @@ let pp_dot_seq ~name out seq =
       else if P.is_assert @@ P.step p then `Color "yellow" :: shape :: attrs
       else if P.is_goal @@ P.step p then `Color "green" :: shape :: attrs
       else if P.is_trivial @@ P.step p then `Color "cyan" :: shape :: attrs
+      else if P.is_by_def @@ P.step p then `Color "navajowhite" :: shape :: attrs
       else shape :: attrs
     )
     ~attrs_e:(fun r ->
