@@ -35,6 +35,45 @@ let pp_stats out (s:stats) =
   Fmt.fprintf out "(@[<hv>:ok %d@ :fail %d@ :nocheck %d@])"
     s.n_ok s.n_fail s.n_nocheck
 
+(** {2 Congruence Closure} *)
+
+module CC = Congruence.Make(struct
+    include T
+
+    let subterms t = match T.view t with
+      | T.App (f, l) -> f :: l
+      | T.AppBuiltin (_,l) -> l
+      | T.Ite (a,b,c) -> [a;b;c]
+      | T.Const _ | T.Var _
+        -> []
+      | T.Match _
+      | T.Bind _
+      | T.Let _
+      | T.Multiset _
+      | T.Record _
+      | T.Meta _
+        -> assert false (* TODO *)
+
+    let update_subterms t l = match T.view t, l with
+      | T.App (_, l1), f :: l1' when List.length l1 = List.length l1' ->
+        T.app ~ty:(T.ty_exn t) f l1'
+      | T.AppBuiltin (b, l1), l1' when List.length l1 = List.length l1' ->
+        T.app_builtin ~ty:(T.ty_exn t) b l1'
+      | (T.Const _ | T.Var _), [] -> t
+      | T.Ite (_,_,_), [a;b;c] -> T.ite a b c
+      | T.App _, _
+      | T.AppBuiltin _, _
+      | T.Const _, _
+      | T.Var _, _
+      | T.Ite _, _
+      | T.Match _, _
+      | T.Bind _, _
+      | T.Let _, _
+      | T.Multiset _, _
+      | T.Record _, _
+      | T.Meta _, _ -> assert false
+  end)
+
 (** {2 Tableau Prover} *)
 
 (** A simple tableau prover for discharging every proof obligation.
@@ -46,7 +85,20 @@ module Tab : sig
   val prove : form list -> form list -> res
   (** [prove a b] returns [R_ok] if [a => b] is a tautology. *)
 end = struct
-  let prove a b = assert false (* TODO *)
+  type branch = {
+    expansed: form list;
+    open_ : form list;
+  }
+
+  (** main state *)
+  type t = {
+    mutable branches: branch list;
+    cc: CC.t;
+  }
+
+  let prove _a _b =
+    let _t = {branches=[]; cc=CC.create(); } in
+    assert false (* TODO *)
 end
 
 (** {2 Checking Proofs} *)
