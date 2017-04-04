@@ -16,6 +16,7 @@ let section = Util.Section.make ~parent:Const.section "avatar"
 
 let prof_splits = Util.mk_profiler "avatar.split"
 let prof_check = Util.mk_profiler "avatar.check"
+let prof_simp_trail = Util.mk_profiler "avatar.simp_trail"
 
 let stat_splits = Util.mk_stat "avatar.splits"
 let stat_trail_trivial = Util.mk_stat "avatar.trivial_trail"
@@ -30,6 +31,7 @@ module type S = Avatar_intf.S
 let k_avatar : (module S) Flex_state.key = Flex_state.create_key ()
 let k_show_lemmas : bool Flex_state.key = Flex_state.create_key()
 let k_simplify_trail : bool Flex_state.key = Flex_state.create_key()
+let k_back_simplify_trail : bool Flex_state.key = Flex_state.create_key()
 
 module Make(E : Env.S)(Sat : Sat_solver.S)
 = struct
@@ -189,7 +191,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
   exception Trail_is_trivial
 
   (* return [new_trail], [is_trivial] *)
-  let simplify_opt (trail:Trail.t): trail_status =
+  let simplify_opt_ (trail:Trail.t): trail_status =
     let n_simpl = ref 0 in
     try
       let trail, removed =
@@ -215,6 +217,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       ) else Tr_same
     with Trail_is_trivial ->
       Tr_trivial
+
+  let simplify_opt trail = Util.with_prof prof_simp_trail simplify_opt_ trail
 
   (* simplify the trail of [c] using boolean literals that have been proven *)
   let simplify_trail_ c =
@@ -248,12 +252,25 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     then simplify_trail_ c
     else SimplM.return_same c
 
+  let new_proved_lits : unit -> bool =
+    let num_proved_last_ = ref 0 in
+    fun () ->
+      let set = Sat.all_proved () in
+      let n = BLit.Set.cardinal set in
+      assert (n >= !num_proved_last_);
+      let yes = n > !num_proved_last_ in
+      num_proved_last_ := n;
+      yes
+
+
   (* subset of active clauses that have a trivial trail or simplifiable
      trail *)
   let backward_simplify_trails (_:C.t): C.ClauseSet.t =
-    if Sat.last_result () = Sat_solver.Sat then (
+    if Sat.last_result () = Sat_solver.Sat && new_proved_lits () then (
       E.ProofState.ActiveSet.clauses ()
-      |> C.ClauseSet.filter
+      |> C.ClauseSet.to_seq
+      |> Sequence.filter (fun c -> not (Trail.is_empty @@ C.trail c))
+      |> Sequence.filter
         (fun c ->
            let ok = match simplify_opt (C.trail c) with
              | Tr_trivial | Tr_simplify_into _ -> true
@@ -265,6 +282,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
                "(@[<2>backward_simplify_trail@ %a@])" (fun k->k C.pp c);
            );
            ok)
+      |> C.ClauseSet.of_seq
     ) else C.ClauseSet.empty
 
   let skolem_count_ = ref 0
@@ -442,8 +460,10 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     E.add_clause_conversion convert_lemma;
     E.add_is_trivial_trail trail_is_trivial;
     if E.flex_get k_simplify_trail then (
-      E.add_backward_simplify backward_simplify_trails;
       E.add_simplify simplify_trail;
+      if E.flex_get k_back_simplify_trail then (
+        E.add_backward_simplify backward_simplify_trails;
+      );
     );
     if E.flex_get k_show_lemmas then (
       Signal.once Signals.on_exit (fun _ -> show_lemmas ());
@@ -458,6 +478,7 @@ let get_env (module E : Env.S) : (module S) = E.flex_get k_avatar
 let enabled_ = ref false
 let show_lemmas_ = ref false
 let simplify_trail_ = ref true
+let back_simplify_trail_ = ref true
 
 let extension =
   let action env =
@@ -469,6 +490,7 @@ let extension =
     E.flex_add k_avatar (module A : S);
     E.flex_add k_show_lemmas !show_lemmas_;
     E.flex_add k_simplify_trail !simplify_trail_;
+    E.flex_add k_back_simplify_trail !back_simplify_trail_;
     Util.debug 1 "enable Avatar";
     A.register ~split:!enabled_ ()
   in
@@ -481,4 +503,6 @@ let () =
     ; "--print-lemmas", Arg.Set show_lemmas_, " show status of Avatar lemmas"
     ; "--avatar-simp-trail", Arg.Set simplify_trail_, " simplify boolean trails in Avatar"
     ; "--no-avatar-simp-trail", Arg.Clear simplify_trail_, " do not simplify boolean trails in Avatar"
+    ; "--avatar-backward-simp-trail", Arg.Set back_simplify_trail_, " backward-simplify boolean trails in Avatar"
+    ; "--no-avatar-backward-simp-trail", Arg.Clear back_simplify_trail_, " do not backward-simplify boolean trails in Avatar"
     ]

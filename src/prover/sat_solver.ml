@@ -73,6 +73,7 @@ module Make(Dummy : sig end)
 
   let clause_tbl_ : (int * proof_step) ClauseTbl.t = ClauseTbl.create 32
   let tag_to_proof_ : (int, proof_step) Hashtbl.t = Hashtbl.create 32
+  let lit_tbl_ : unit Lit.Tbl.t = Lit.Tbl.create 32
 
   (* add clause, if not added already *)
   let add_clause_ ~proof c =
@@ -83,6 +84,7 @@ module Make(Dummy : sig end)
       let tag = fresh_tag_() in
       ClauseTbl.add clause_tbl_ c (tag,proof);
       Hashtbl.add tag_to_proof_ tag proof;
+      List.iter (fun lit -> Lit.Tbl.replace lit_tbl_ (Lit.abs lit) ()) c;
       Queue.push ([c], proof, tag) queue_
     )
 
@@ -111,6 +113,7 @@ module Make(Dummy : sig end)
   let eval_ = ref eval_fail_
   let eval_level_ = ref eval_fail_
   let proof_ : proof option ref = ref None
+  let proved_lits_ : Lit.Set.t lazy_t ref = ref (lazy Lit.Set.empty)
 
   let pp_ = ref Lit.pp
 
@@ -125,6 +128,7 @@ module Make(Dummy : sig end)
   let last_result () = !result_
   let valuation l = !eval_ l
   let valuation_level l = !eval_level_ l
+  let all_proved () = Lazy.force !proved_lits_
 
   let get_proof () = match !proof_ with
     | None -> assert false
@@ -249,6 +253,15 @@ module Make(Dummy : sig end)
     else if S.true_at_level0 (Lit.neg lit) then Some false
     else None
 
+  let get_proved_lits (): Lit.Set.t =
+    Lit.Tbl.to_seq lit_tbl_
+    |> Sequence.filter_map
+      (fun (lit,_) -> match proved_at_0 lit with
+         | Some true -> Some lit
+         | Some false -> Some (Lit.neg lit)
+         | None -> None)
+    |> Lit.Set.of_seq
+
   (* call [S.solve()] in any case, and enforce invariant about eval/unsat_core *)
   let check_unconditional_ () =
     (* reset functions, so they will fail if called in the wrong state *)
@@ -268,6 +281,7 @@ module Make(Dummy : sig end)
       | S.Sat s ->
         eval_ := s.SI.eval;
         eval_level_ := s.SI.eval_level;
+        proved_lits_ := lazy (get_proved_lits ());
         result_ := Sat;
       | S.Unsat us ->
         let p = us.SI.get_proof ()  |> conv_proof_ in

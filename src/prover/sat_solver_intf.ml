@@ -49,6 +49,9 @@ module type S = sig
       return its value (which does not depend on the model).
       Otherwise return [None] *)
 
+  val all_proved: unit -> Lit.Set.t
+  (** Set of (signed) proved literals *)
+
   val set_printer : Lit.t CCFormat.printer -> unit
   (** How to print literals? *)
 
