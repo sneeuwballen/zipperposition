@@ -401,8 +401,9 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       Format.fprintf out "@[<hv>@{<Green>*@} %s %a@]"
         status Cut_form.pp c.cut_form
     in
-    Format.fprintf out "@[<v2>lemmas: {@ %a@,@]}"
-      (Util.pp_seq ~sep:"" pp_lemma) lemma_seq;
+    let l = lemma_seq |> Sequence.to_rev_list in
+    Format.fprintf out "@[<v2>lemmas (%d): {@ %a@,@]}"
+      (List.length l) (Util.pp_list ~sep:"" pp_lemma) l;
     ()
 
   let show_lemmas () = Format.printf "%a@." print_lemmas ()
