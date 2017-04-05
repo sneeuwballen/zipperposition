@@ -456,10 +456,11 @@ module S = struct
     String.iter
       (fun c ->
          begin match c with
-           | '|' | '\\' | '{' | '}' | '<' | '>' | '"' -> Buffer.add_char b '\\';
-           | _ -> ()
-         end;
-         Buffer.add_char b c)
+           | '|' | '\\' | '{' | '}' | '<' | '>' | '"' ->
+             Buffer.add_char b '\\'; Buffer.add_char b c
+           | '\n' -> Buffer.add_string b "\\l"; (* left justify *)
+           | _ -> Buffer.add_char b c
+         end)
       s;
     Buffer.contents b
 
