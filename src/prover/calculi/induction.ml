@@ -698,6 +698,7 @@ module Make
         |> T.VarSet.to_list
         |> List.filter
           (fun v ->
+             not (Type.is_tType (HVar.ty v)) &&
              (Sequence.length @@ var_active_pos_seq f v >= 2) &&
              (Sequence.length @@ var_invariant_pos_seq f v >= 2))
       in
@@ -748,6 +749,8 @@ module Make
               begin match T_view.view t with
                 | T_view.T_app_unin (id,[]) when Ind_cst.id_is_sub id ->
                   None (* probably there because there are induction hyp. on it *)
+                | _ when Type.is_tType (T.ty t |> Type.returns) ->
+                  None (* do not generalize on type or type constructors *)
                 | T_view.T_app_unin _
                 | T_view.T_app_defined _ -> Some (pos,t)
                 | _ -> None

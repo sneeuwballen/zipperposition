@@ -211,6 +211,10 @@ let rec open_poly_fun ty = match view ty with
     let args, ret = open_fun ty in
     0, args, ret
 
+let returns ty =
+  let _, _, ret = open_poly_fun ty in
+  ret
+
 exception ApplyError of string
 
 let () = Printexc.register_printer
