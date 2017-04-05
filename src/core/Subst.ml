@@ -209,10 +209,8 @@ let apply subst ~renaming t =
                 (* variable not bound by [subst], rename it
                     (after specializing its type if needed) *)
                 let v = HVar.cast v ~ty:ty' in
-                let v' = Renaming.rename renaming (v,sc_t) in
-                if T.equal ty ty' && HVar.equal T.equal v v'
-                then t
-                else T.var v'
+                let v = Renaming.rename renaming (v,sc_t) in
+                T.var v
             end
           | T.Bind (s, varty, sub_t) ->
             let varty' = aux (varty,sc_t) in
