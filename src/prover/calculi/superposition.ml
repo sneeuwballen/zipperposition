@@ -639,7 +639,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               let t' =
                 if T.equal hd hd' && T.same_l l l'
                 then t
-                else T.app hd' l' in
+                else T.app hd' l'
+              in
               (* rewrite term at root *)
               reduce_at_root ~restrict t'
             | T.App _
