@@ -443,6 +443,20 @@ let pp out t = pp_depth ~hooks:!__hooks 0 out t
 
 let to_string = CCFormat.to_string pp
 
+(** {2 Form} *)
+
+module Form = struct
+  let pp_hook _depth pp_rec out t =
+    match Classic.view t with
+      | Classic.AppBuiltin (Builtin.Not, [a]) ->
+        Format.fprintf out "(@[<1>¬@ %a@])" pp_rec a; true
+      | _ -> false  (* default *)
+
+  let () = add_hook pp_hook
+
+  let not_ t: t = app_builtin ~ty:Type.prop Builtin.not_ [t]
+end
+
 (** {2 Arith} *)
 
 module Arith = struct

@@ -249,6 +249,12 @@ val default_hooks : unit -> print_hook list
 val debugf : Format.formatter -> t -> unit
 (** debugf printing, with sorts *)
 
+(** {2 Formulas} *)
+
+module Form : sig
+  val not_ : t -> t
+end
+
 (** {2 Arith} *)
 
 module Arith : sig
