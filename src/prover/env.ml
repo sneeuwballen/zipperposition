@@ -24,7 +24,7 @@ let prof_all_simplify = Util.mk_profiler "env.all_simplify"
 let prof_is_redundant = Util.mk_profiler "env.is_redundant"
 let prof_subsumed_by = Util.mk_profiler "env.subsumed_by"
 
-let orphan_criterion_ = ref true
+let orphan_criterion_ = ref false
 
 (** {2 Signature} *)
 module type S = Env_intf.S
@@ -787,8 +787,12 @@ module Make(X : sig
 end
 
 let () =
+  let set_or () =
+    Util.warn "caution: orphan criterion seems to be incomplete";
+    orphan_criterion_ := true
+  in
   Params.add_opts
-    [ "--orphan-criterion", Arg.Set orphan_criterion_, " enable orphan criterion"
+    [ "--orphan-criterion", Arg.Unit set_or, " enable orphan criterion"
     ; "--no-orphan-criterion", Arg.Clear orphan_criterion_, " disable orphan criterion"
     ]
 
