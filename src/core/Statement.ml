@@ -284,35 +284,22 @@ let conv_term_rule (r:_ term_rule): Rewrite.Term.rule =
   let _, id, ty, args, rhs = r in
   Rewrite.Term.Rule.make id ty args rhs
 
-let conv_lit_rule (r:_ form_rule): Rewrite.Lit.rule =
+(* returns either a term or a lit rule (depending on whether RHS is atomic) *)
+let conv_lit_rule (r:_ form_rule): Rewrite.rule =
   let _, lhs, rhs = r in
   let lhs = Literal.Conv.of_form lhs in
   let rhs = List.map (List.map Literal.Conv.of_form) rhs in
-  Rewrite.Lit.Rule.make lhs rhs
+  Rewrite.Rule.make_lit lhs rhs
 
-let as_term_rules (l:_ def_rule list): Rewrite.Term.rule list option =
+(* convert rules *)
+let conv_rules (l:_ def_rule list): definition =
   assert (l <> []);
-  if List.for_all (function Def_term _ -> true | _ -> false) l
-  then (
+  List.map
+    (function
+      | Def_term r -> Rewrite.Rule.of_term (conv_term_rule r)
+      | Def_form r -> conv_lit_rule r)
     l
-    |> List.map
-      (function
-        | Def_term r -> conv_term_rule r
-        | Def_form _ -> assert false)
-    |> CCOpt.return
-  ) else None
-
-let as_clause_rules (l:_ def_rule list): Rewrite.Lit.rule list option =
-  assert (l <> []);
-  if List.for_all (function Def_form _ -> true | _ -> false) l
-  then (
-    l
-    |> List.map
-      (function
-        | Def_form r -> conv_lit_rule r
-        | Def_term _ -> assert false)
-    |> CCOpt.return
-  ) else None
+  |> Rewrite.Rule_set.of_list
 
 let terms_of_rule (d:_ def_rule): _ Sequence.t = match d with
   | Def_term (_, _, _, args, rhs) ->
@@ -351,11 +338,7 @@ let scan_stmt_for_defined_cst (st:(clause,FOTerm.t,Type.t) t): unit = match view
              |> Sequence.map level_of_rule
              |> max_exn
            and def =
-             let open CCOpt.Infix in
-             ((as_term_rules def_rules >|= fun l -> `Term l)
-              <+>
-                (as_clause_rules def_rules >|= fun l -> `Form l))
-             |> CCOpt.get_lazy (fun _ -> assert false)
+             conv_rules def_rules
            in
            def_id, lev, def)
     in
@@ -367,25 +350,28 @@ let scan_stmt_for_defined_cst (st:(clause,FOTerm.t,Type.t) t): unit = match view
     in
     List.iter
       (fun (id,_,def) ->
-         let _ = match def with
-           | `Term l -> Rewrite.Defined_cst.declare_term ~level id l
-           | `Form def -> Rewrite.Defined_cst.declare_lit ~level id def
-         in
+         let _ = Rewrite.Defined_cst.declare ~level id def in
          ())
       ids_and_levels
   | RewriteTerm rule ->
     (* declare the rule, possibly making its head defined *)
     let r = conv_term_rule rule in
     let id = Rewrite.Term.Rule.head_id r in
-    Rewrite.Defined_cst.declare_or_add_term id r
+    Rewrite.Defined_cst.declare_or_add id (Rewrite.T_rule r)
   | RewriteForm r ->
     let r = conv_lit_rule r in
-    begin match Rewrite.Lit.Rule.head_id r with
-      | Some id ->
-        Rewrite.Defined_cst.declare_or_add_lit id r
-      | None ->
-        assert (Rewrite.Lit.Rule.is_equational r);
-        Rewrite.Defined_cst.add_eq_rule r
+    begin match r with
+      | Rewrite.T_rule tr ->
+        let id = Rewrite.Term.Rule.head_id tr in
+        Rewrite.Defined_cst.declare_or_add id r
+      | Rewrite.L_rule lr ->
+        begin match Rewrite.Lit.Rule.head_id lr with
+          | Some id ->
+            Rewrite.Defined_cst.declare_or_add id r
+          | None ->
+            assert (Rewrite.Lit.Rule.is_equational lr);
+            Rewrite.Defined_cst.add_eq_rule lr
+        end
     end
   | _ -> ()
 

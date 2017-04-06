@@ -78,21 +78,6 @@ module Lit : sig
     val pp : t CCFormat.printer
   end
 
-  (** {6 Set of Rewrite Rules} *)
-  module Set : sig
-    type t
-
-    val empty : t
-
-    val is_empty : t -> bool
-
-    val to_seq : t -> rule Sequence.t
-
-    val pp : t CCFormat.printer
-  end
-
-  type rule_set = Set.t
-
   val normalize_clause : Literals.t -> Literals.t list option
   (** normalize literals of the clause w.r.t. rules, or return [None]
       if no rule applies *)
@@ -108,9 +93,24 @@ end
 
 (** {2 Rules in General} *)
 
-type rule_set =
-  | T_rules of Term.rule_set
-  | L_rules of Lit.rule_set
+type rule =
+  | T_rule of Term.rule
+  | L_rule of Lit.rule
+
+module Rule : sig
+  type t = rule
+  val of_term : Term.Rule.t -> t
+  val of_lit : Lit.Rule.t -> t
+  val pp : t CCFormat.printer
+
+  val make_lit : Literal.t -> Literal.t list list -> t
+  (** Make a literal rule, unless the right-hand side is an atomic term too,
+      in which case we make a term rule *)
+end
+
+module Rule_set : CCSet.S with type elt = rule
+
+type rule_set = Rule_set.t
 
 (** {2 Defined Constant}
     A constant that is defined by at least one rewrite rule *)
@@ -121,6 +121,8 @@ module Defined_cst : sig
   val ty : t -> Type.t
 
   val rules : t -> rule_set
+
+  val rules_seq : t -> rule Sequence.t
 
   val rules_term_seq : t -> Term.rule Sequence.t
 
@@ -137,16 +139,8 @@ module Defined_cst : sig
         or if the list of rules is empty
   *)
 
-  val declare_term : ?level:int -> ID.t -> Term.rule list -> t
-
-  val declare_lit : ?level:int -> ID.t -> Lit.rule list -> t
-
-  val declare_or_add_term : ID.t -> Term.rule -> unit
-  (** [declare_or_add_term id rule] defines [id] if it's not already a
-      defined constant, and add [rule] to it *)
-
-  val declare_or_add_lit : ID.t -> Lit.rule -> unit
-  (** [declare_or_add_lit id rule] defines [id] if it's not already a
+  val declare_or_add : ID.t -> rule -> unit
+  (** [declare_or_add id rule] defines [id] if it's not already a
       defined constant, and add [rule] to it *)
 
   val add_term_rule : t -> Term.rule -> unit

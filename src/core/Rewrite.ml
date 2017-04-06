@@ -41,9 +41,21 @@ module LR_set = CCSet.Make(struct type t = lit_rule let compare = compare_lr end
 type defined_position = Defined_pos.t
 type defined_positions = defined_position IArray.t
 
-type rule_set =
-  | T_rules of TR_set.t
-  | L_rules of LR_set.t
+type rule =
+  | T_rule of term_rule
+  | L_rule of lit_rule
+
+let compare_rule r1 r2 =
+  let to_int = function T_rule _ -> 0 | L_rule _ -> 1 in
+  match r1, r2 with
+  | T_rule r1, T_rule r2 -> compare_tr r1 r2
+  | L_rule r1, L_rule r2 -> compare_lr r1 r2
+  | T_rule _, _
+  | L_rule _, _ -> CCInt.compare (to_int r1) (to_int r2)
+
+module Rule_set = CCSet.Make(struct type t = rule let compare = compare_rule end)
+
+type rule_set = Rule_set.t
 
 type defined_cst = {
   defined_id: ID.t;
@@ -57,7 +69,7 @@ type defined_cst = {
 }
 
 let pp_term_rule out r =
-  Fmt.fprintf out "@[<2>@[%a@] -->@ @[%a@]@]" T.pp r.term_lhs T.pp r.term_lhs
+  Fmt.fprintf out "@[<2>@[%a@] -->@ @[%a@]@]" T.pp r.term_lhs T.pp r.term_rhs
 
 let pp_term_rules out (s:term_rule Sequence.t): unit =
   Fmt.(within "{" "}" @@ hvbox @@ Util.pp_seq pp_term_rule) out s
@@ -70,9 +82,12 @@ let pp_lit_rule out r =
 let pp_lit_rules out (s:lit_rule Sequence.t): unit =
   Format.fprintf out "{@[<hv>%a@]}" (Util.pp_seq pp_lit_rule) s
 
-let pp_rule_set out (rs: rule_set): unit = match rs with
-  | T_rules l -> pp_term_rules out (TR_set.to_seq l)
-  | L_rules l -> pp_lit_rules out (LR_set.to_seq l)
+let pp_rule out = function
+  | T_rule r -> Format.fprintf out "(@[(term) %a@])" pp_term_rule r
+  | L_rule l -> Format.fprintf out "(@[(lit) %a@])" pp_lit_rule l
+
+let pp_rule_set out (rs: rule_set): unit =
+  Fmt.(within "{" "}" @@ hvbox @@ Util.pp_seq pp_rule) out (Rule_set.to_seq rs)
 
 (** Annotation on IDs that are defined. *)
 exception Payload_defined_cst of defined_cst
@@ -87,14 +102,17 @@ module Cst_ = struct
   type t = defined_cst
 
   let rules t = t.defined_rules
+  let rules_seq t = Rule_set.to_seq (rules t)
 
-  let rules_term_seq t : term_rule Sequence.t = match t.defined_rules with
-    | T_rules r -> TR_set.to_seq r
-    | L_rules _ -> Sequence.empty
+  let rules_term_seq t : term_rule Sequence.t =
+    rules_seq t
+    |> Sequence.filter_map
+      (function T_rule t -> Some t | _ -> None)
 
-  let rules_lit_seq t : lit_rule Sequence.t = match t.defined_rules with
-    | T_rules _ -> Sequence.empty
-    | L_rules r -> LR_set.to_seq r
+  let rules_lit_seq t : lit_rule Sequence.t =
+    rules_seq t
+    |> Sequence.filter_map
+      (function L_rule t -> Some t | _ -> None)
 
   let defined_positions t = Lazy.force t.defined_positions
   let ty t = t.defined_ty
@@ -324,27 +342,6 @@ module Term = struct
       | T.DB _
       | T.AppBuiltin _ -> Sequence.empty
     end
-
-  (* compute role of positions *)
-  let compute_positions (s:rule_set): defined_positions =
-    let prules: pseudo_rule list =
-      Set.to_list s
-      |> List.rev_map
-        (fun r ->
-           let id = Rule.head_id r in
-           let args = Rule.args r in
-           let rhs =
-             Rule.rhs r
-             |> T.Seq.subterms
-             |> Sequence.filter_map
-               (fun sub -> match T.Classic.view sub with
-                  | T.Classic.App (id', args') when ID.equal id' id ->
-                    Some args'
-                  | _ -> None)
-           in
-           id, args, rhs)
-    in
-    compute_pos_gen prules
 end
 
 module Lit = struct
@@ -385,10 +382,8 @@ module Lit = struct
     let pp out s = pp_lit_rules out (to_seq s)
   end
 
-  type rule_set = Set.t
-
   (* rules on equality *)
-  let eq_rules_ : rule_set ref = ref Set.empty
+  let eq_rules_ : Set.t ref = ref Set.empty
 
   let add_eq_rule (r:Rule.t): unit = match Rule.lhs r with
     | Literal.Equation (t,_,_) ->
@@ -481,10 +476,23 @@ module Lit = struct
       (fun r ->
          Literal.unify ~subst (r.lit_lhs,sc_r) (lit,sc_lit)
          |> Sequence.map (fun subst -> r, subst))
+end
 
-  (* compute role of positions *)
-  let compute_positions (s:rule_set): defined_positions =
-    assert (not (LR_set.is_empty s));
+let pseudo_rule_of_rule (r:rule): pseudo_rule = match r with
+  | T_rule r ->
+    let id = Term.Rule.head_id r in
+    let args = Term.Rule.args r in
+    let rhs =
+      Term.Rule.rhs r
+      |> T.Seq.subterms
+      |> Sequence.filter_map
+        (fun sub -> match T.Classic.view sub with
+           | T.Classic.App (id', args') when ID.equal id' id ->
+             Some args'
+           | _ -> None)
+    in
+    id, args, rhs
+  | L_rule r ->
     let view_atom id (t:term) = match T.Classic.view t with
       | T.Classic.App (id', args') when ID.equal id' id -> Some args'
       | _ -> None
@@ -493,32 +501,57 @@ module Lit = struct
       | Literal.Prop (t, _) -> view_atom id t
       | _ -> None
     in
-    let prules: pseudo_rule list =
-      Set.to_list s
-      |> List.rev_map
-        (fun r ->
-           let fail() =
-             Util.invalid_argf "cannot compute position for rule %a" Rule.pp r
-           in
-           begin match Rule.lhs r with
-             | Literal.Prop (t, _) ->
-               begin match T.Classic.view t with
-                 | T.Classic.App (id, args) ->
-                   (* occurrences of literals with same [id] on RHS *)
-                   let rhs =
-                     Rule.rhs r
-                     |> Sequence.of_list
-                     |> Sequence.flat_map Sequence.of_list
-                     |> Sequence.filter_map (view_lit id)
-                   in
-                   id, args, rhs
-                 | _ -> fail()
-               end
-           | Literal.True | Literal.False
-           | Literal.Equation _ | Literal.Int _ | Literal.Rat _ -> fail()
-        end)
+    let fail() =
+      Util.invalid_argf "cannot compute position for rule %a" Lit.Rule.pp r
     in
-    compute_pos_gen prules
+    begin match Lit.Rule.lhs r with
+      | Literal.Prop (t, _) ->
+        begin match T.Classic.view t with
+          | T.Classic.App (id, args) ->
+            (* occurrences of literals with same [id] on RHS *)
+            let rhs =
+              Lit.Rule.rhs r
+              |> Sequence.of_list
+              |> Sequence.flat_map Sequence.of_list
+              |> Sequence.filter_map (view_lit id)
+            in
+            id, args, rhs
+          | _ -> fail()
+        end
+      | Literal.True | Literal.False
+      | Literal.Equation _ | Literal.Int _ | Literal.Rat _ -> fail()
+    end
+
+
+module Rule = struct
+  type t = rule
+  let of_term t = T_rule t
+  let of_lit t = L_rule t
+  let pp = pp_rule
+
+  let make_lit lit_lhs lit_rhs = match lit_lhs, lit_rhs with
+    | Literal.Prop (t, true), [[ lit0 ]] ->
+      let lhs = match T.Classic.view t with
+        | T.Classic.App (id, args) ->
+          let ty_id = match T.view t with
+            | T.Const _ -> T.ty t
+            | T.App (f, _) -> T.ty f
+            | _ -> assert false
+          in
+          Some (id, ty_id, args)
+        | _ -> None
+      and rhs = match lit0 with
+        | Literal.Prop (u, true) -> Some u
+        | Literal.True -> Some T.true_
+        | Literal.False -> Some T.false_
+        | _ -> None
+      in
+      begin match lhs, rhs with
+        | Some (id,ty_id,args), Some rhs ->
+          T_rule (Term.Rule.make id ty_id args rhs)
+        | _ -> L_rule (Lit.Rule.make lit_lhs lit_rhs)
+      end
+    | _ -> L_rule (Lit.Rule.make lit_lhs lit_rhs)
 end
 
 module Defined_cst = struct
@@ -532,13 +565,18 @@ module Defined_cst = struct
         Term.Rule.pp r ID.pp id
     )
 
-  let compute_pos (s:rule_set) = match s with
-    | T_rules s -> Term.compute_positions s
-    | L_rules s -> Lit.compute_positions s
+  let compute_pos (s:rule_set) =
+    Rule_set.to_seq s
+    |> Sequence.map pseudo_rule_of_rule
+    |> Sequence.to_rev_list
+    |> compute_pos_gen
 
-  let check_rules id rules = match rules with
-    | T_rules s -> TR_set.iter (check_id_tr id) s
-    | L_rules _ -> () (* TODO *)
+  let check_rules id rules =
+    Rule_set.iter
+      (function
+        | T_rule r -> check_id_tr id r
+        | _ -> ())
+      rules
 
   (* main builder *)
   let make_ level id ty rules: t =
@@ -555,47 +593,33 @@ module Defined_cst = struct
     Util.debugf ~section 2
       "@[<2>declare %a@ as defined constant@ :rules %a@]"
       (fun k->k ID.pp id pp_rule_set rules);
-    let ty = match rules with
-      | T_rules s ->
-        if TR_set.is_empty s then (
-          Util.invalid_argf
-            "cannot declare %a as defined constant with empty set of rules"
-            ID.pp id;
-        );
-        (* type of one of the rules *)
-        TR_set.choose s |> Term.Rule.ty
-      | L_rules _ -> Type.prop
+    let ty =
+      if Rule_set.is_empty rules then (
+        Util.invalid_argf
+          "cannot declare %a as defined constant with empty set of rules"
+          ID.pp id;
+      );
+      begin match Rule_set.choose rules with
+        | T_rule s -> Term.Rule.ty s
+        | L_rule _ -> Type.prop
+      end
     in
     let dcst = make_ level id ty rules in
     ID.set_payload id (Payload_defined_cst dcst);
     dcst
 
-  let declare_term ?level id rules =
-    declare ?level id (T_rules (TR_set.of_list rules))
-
-  let declare_lit ?level id rules =
-    declare ?level id (L_rules (LR_set.of_list rules))
-
-  let add_term_rule (dcst:t) (r:term_rule): unit =
-    check_id_tr dcst.defined_id r;
-    let rules = match rules dcst with
-      | T_rules s -> T_rules (TR_set.add r s)
-      | L_rules _ ->
-        Util.invalid_argf "add_term_rule to defined lit `%a`" ID.pp dcst.defined_id
-    in
+  let add_rule (dcst:t) (r:rule): unit =
+    begin match r with
+      | T_rule r -> check_id_tr dcst.defined_id r;
+      | L_rule _ -> ()
+    end;
+    let rules = Rule_set.add r (rules dcst) in
     dcst.defined_rules <- rules;
     dcst.defined_positions <- lazy (compute_pos rules); (* update positions *)
     ()
 
-  let add_lit_rule (dcst:t) (r:lit_rule): unit =
-    let rules = match rules dcst with
-      | L_rules s -> L_rules (LR_set.add r s)
-      | T_rules _ ->
-        Util.invalid_argf "add_term_rule to defined lit `%a`" ID.pp dcst.defined_id
-    in
-    dcst.defined_rules <- rules;
-    dcst.defined_positions <- lazy (compute_pos rules); (* update positions *)
-    ()
+  let add_term_rule (dcst:t) (r:term_rule): unit = add_rule dcst (T_rule r)
+  let add_lit_rule (dcst:t) (r:lit_rule): unit = add_rule dcst (L_rule r)
 
   let add_term_rule_l dcst = List.iter (add_term_rule dcst)
   let add_lit_rule_l dcst = List.iter (add_lit_rule dcst)
@@ -603,20 +627,12 @@ module Defined_cst = struct
   let add_eq_rule = Lit.add_eq_rule
   let add_eq_rule_l = List.iter add_eq_rule
 
-  let declare_or_add_term id rule: unit = match as_defined_cst id with
+  let declare_or_add id (rule:rule): unit = match as_defined_cst id with
     | Some c ->
       Util.debugf ~section 2
-        "@[<2>add rule@ :to %a@ :rule %a@]" (fun k->k ID.pp id Term.Rule.pp rule);
-      add_term_rule c rule
+        "@[<2>add rule@ :to %a@ :rule %a@]" (fun k->k ID.pp id pp_rule rule);
+      add_rule c rule
     | None ->
-      ignore (declare_term ?level:None id [rule])
-
-  let declare_or_add_lit id rule: unit = match as_defined_cst id with
-    | Some c ->
-      Util.debugf ~section 2
-        "@[<2>add rule@ :to %a@ :rule %a@]" (fun k->k ID.pp id Lit.Rule.pp rule);
-      add_lit_rule c rule
-    | None ->
-      ignore (declare_lit ?level:None id [rule])
+      ignore (declare ?level:None id (Rule_set.singleton rule))
 end
 
