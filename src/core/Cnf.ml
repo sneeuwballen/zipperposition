@@ -15,7 +15,7 @@ let prof_to_cnf = Util.mk_profiler "cnf.distribute"
 let prof_miniscope = Util.mk_profiler "cnf.miniscope"
 let prof_skolemize = Util.mk_profiler "cnf.skolemize"
 
-let section = Util.Section.make ~parent:Util.Section.zip "cnf"
+let section = Util.Section.make "cnf"
 
 type term = T.t
 type type_ = T.t
@@ -296,6 +296,19 @@ module Flatten = struct
               (T.const def.Skolem.td_id ~ty:def.Skolem.td_ty)
               (List.map T.var closure @ [u])
         end
+      | T.AppBuiltin (Builtin.Greater, [ty;a;b]) when T.equal T.Ty.rat (T.ty_exn a) ->
+        aux pos vars (T.app_builtin ~ty:T.Ty.prop Builtin.Less [ty;b;a])
+      | T.AppBuiltin (Builtin.Greatereq, [ty;a;b]) when T.equal T.Ty.rat (T.ty_exn a) ->
+        aux pos vars (T.app_builtin ~ty:T.Ty.prop Builtin.Lesseq [ty;b;a])
+      | T.AppBuiltin (Builtin.Neq, [a;b]) when T.equal T.Ty.rat (T.ty_exn a) ->
+        (* rat: a!=b -> a<b ∨ a>b *)
+        aux Pos_toplevel vars a >>= fun a ->
+        aux Pos_toplevel vars b >|= fun b ->
+        let f = T.Form.or_
+          [ T.app_builtin ~ty:T.Ty.prop Builtin.Less [a; b];
+            T.app_builtin ~ty:T.Ty.prop Builtin.Less [b; a];
+          ]
+        in aux_maybe_define pos f
       | T.AppBuiltin (Builtin.Eq, [a;b]) ->
         (F.eq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
         >|= aux_maybe_define pos

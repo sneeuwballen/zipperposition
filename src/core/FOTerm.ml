@@ -443,6 +443,20 @@ let pp out t = pp_depth ~hooks:!__hooks 0 out t
 
 let to_string = CCFormat.to_string pp
 
+(** {2 Form} *)
+
+module Form = struct
+  let pp_hook _depth pp_rec out t =
+    match Classic.view t with
+      | Classic.AppBuiltin (Builtin.Not, [a]) ->
+        Format.fprintf out "(@[<1>¬@ %a@])" pp_rec a; true
+      | _ -> false  (* default *)
+
+  let () = add_hook pp_hook
+
+  let not_ t: t = app_builtin ~ty:Type.prop Builtin.not_ [t]
+end
+
 (** {2 Arith} *)
 
 module Arith = struct
@@ -487,9 +501,9 @@ module Arith = struct
       | _ -> pp_rec buf t
     in
     match Classic.view t with
-      | Classic.Var v when Type.equal (ty t) Type.TPTP.int ->
+      | Classic.Var v when Type.equal (ty t) Type.int ->
         Format.fprintf out "I%d" (HVar.id v); true
-      | Classic.Var v when Type.equal (ty t) Type.TPTP.rat ->
+      | Classic.Var v when Type.equal (ty t) Type.rat ->
         Format.fprintf out "Q%d" (HVar.id v); true
       | Classic.AppBuiltin (Builtin.Less, [_; a; b]) ->
         Format.fprintf out "%a < %a" pp_surrounded a pp_surrounded b; true
@@ -514,6 +528,8 @@ module Arith = struct
       | Classic.AppBuiltin (Builtin.Remainder_e, [_;a;b]) ->
         Format.fprintf out "%a mod %a" pp_surrounded a pp_surrounded b; true;
       | _ -> false  (* default *)
+
+  let () = add_hook pp_hook
 end
 
 let debugf out t =
@@ -557,6 +573,8 @@ module Conv = struct
 
   type ctx = Type.Conv.ctx
   let create = Type.Conv.create
+
+  let var_to_simple_var = Type.Conv.var_to_simple_var
 
   let of_simple_term_exn ctx t =
     let rec aux t = match PT.view t with

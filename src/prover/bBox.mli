@@ -7,7 +7,9 @@
     properties into boolean literals, and maintains a bijection between
     encapsulated values and boolean literals *)
 
-val section : Logtk.Util.Section.t
+open Logtk
+
+val section : Util.Section.t
 
 type inductive_case = Cover_set.case
 
@@ -57,6 +59,8 @@ val must_be_kept : t -> bool
 
 val is_lemma : t -> bool
 (** returns [true] if the bool literal represents a lemma *)
+
+val to_s_form : t -> TypedSTerm.Form.t
 
 (** {2 Printers}
     Those printers print the content (injection) of a boolean literal, if any *)

@@ -158,6 +158,7 @@ let of_list ?(init=empty) l = match l with
     List.fold_left (fun subst (v,t) -> bind subst v t) init l
 
 let equal (s1:t) s2 : bool = M.equal (Scoped.equal T.equal) s1 s2
+let compare s1 s2 = M.compare (Scoped.compare T.compare) s1 s2
 
 let hash (s:t): int =
   CCHash.(seq (pair (Scoped.hash HVar.hash) (Scoped.hash T.hash))) (M.to_seq s)
@@ -208,10 +209,8 @@ let apply subst ~renaming t =
                 (* variable not bound by [subst], rename it
                     (after specializing its type if needed) *)
                 let v = HVar.cast v ~ty:ty' in
-                let v' = Renaming.rename renaming (v,sc_t) in
-                if T.equal ty ty' && HVar.equal T.equal v v'
-                then t
-                else T.var v'
+                let v = Renaming.rename renaming (v,sc_t) in
+                T.var v
             end
           | T.Bind (s, varty, sub_t) ->
             let varty' = aux (varty,sc_t) in

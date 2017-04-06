@@ -17,9 +17,8 @@ let classify id = match ID.payload id with
   | Ind_ty.Payload_ind_cstor (c,t) -> Cstor (c,t)
   | Ind_ty.Payload_ind_type x -> Ty x
   | Ind_ty.Payload_ind_projector id -> Projector id
-  | Rewrite_term.Payload_defined_cst c ->
-    DefinedCst (Rewrite_term.Defined_cst.level c)
-  | Statement.Payload_defined_form (l,_) -> DefinedCst l
+  | Rewrite.Payload_defined_cst c ->
+    DefinedCst (Rewrite.Defined_cst.level c)
   | _ -> Other
 
 let pp_res out = function

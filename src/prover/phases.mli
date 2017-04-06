@@ -19,6 +19,8 @@ type env_with_clauses =
 type env_with_result =
     Env_result : 'c Env.packed * Saturate.szs_status -> env_with_result
 
+type errcode = int
+
 type ('ret, 'before, 'after) phase =
   | Init : (unit, _, [`Init]) phase (* global setup *)
   | Setup_gc : (unit, [`Init], [`Init]) phase
@@ -30,7 +32,7 @@ type ('ret, 'before, 'after) phase =
   | Start_file :
       (filename, [`LoadExtensions], [`Start_file]) phase (* file to process *)
   | Parse_file :
-      (Parsing_utils.input * UntypedAST.statement Sequence.t,
+      (Input_format.t * UntypedAST.statement Sequence.t,
        [`Start_file], [`Parse_file]) phase (* parse some file *)
   | Typing :
       (TypeInference.typed_statement CCVector.ro_vector, [`Parse_file], [`Typing]) phase
@@ -56,6 +58,7 @@ type ('ret, 'before, 'after) phase =
   | Print_stats : (unit, [`Saturate], [`Print_stats]) phase
   | Print_result : (unit, [`Print_stats], [`Print_result]) phase
   | Print_dot : (unit, [`Print_result], [`Print_dot]) phase
+  | Check_proof : (errcode, [`Print_dot], [`Check_proof]) phase
   | Exit : (unit, _, [`Exit]) phase
 
 type any_phase = Any_phase : (_, _, _) phase -> any_phase
@@ -112,11 +115,12 @@ val map : ('a, 'p1, 'p2) t -> f:('a -> 'b) -> ('b, 'p1, 'p2) t
 
 val fold_l : f:('a -> 'b -> ('a, 'p, 'p) t) -> x:'a -> 'b list -> ('a, 'p, 'p) t
 
-val run_parallel : (unit, 'p1, 'p2) t list -> (unit, 'p1, 'p2) t
+val run_parallel : (errcode, 'p1, 'p2) t list -> (errcode, 'p1, 'p2) t
 (** [run_sequentiel l] runs each action of the list in succession,
     restarting every time with the initial state (once an action
     has finished, its state is discarded). Only the very last state
-    is kept. *)
+    is kept.
+    If any errcode is non-zero, then the evaluation stops with this errcode *)
 
 module Infix : sig
   val (>>=) : ('a, 'p1, 'p2) t -> ('a -> ('b, 'p2, 'p3) t) -> ('b, 'p1, 'p3) t

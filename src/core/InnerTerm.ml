@@ -363,9 +363,7 @@ module DB = struct
             begin match DBEnv.find env i with
               | None -> bvar ~ty i
               | Some t' ->
-                (* TODO: we should shift [t'], and make sure shifting is
-                   efficient when [t'] is closed (e.g. storing in each
-                   term the number of binders it needs to be closed) *)
+                assert (equal (ty_exn t') ty);
                 assert (closed t');
                 t'
             end

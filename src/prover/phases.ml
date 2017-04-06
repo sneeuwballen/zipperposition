@@ -17,6 +17,8 @@ type env_with_clauses =
 type env_with_result =
     Env_result : 'c Env.packed * Saturate.szs_status -> env_with_result
 
+type errcode = int
+
 type ('ret, 'before, 'after) phase =
   | Init : (unit, _, [`Init]) phase (* global setup *)
   | Setup_gc : (unit, [`Init], [`Init]) phase
@@ -28,7 +30,7 @@ type ('ret, 'before, 'after) phase =
   | Start_file :
       (filename, [`LoadExtensions], [`Start_file]) phase (* file to process *)
   | Parse_file :
-      (Parsing_utils.input * UntypedAST.statement Sequence.t,
+      (Input_format.t * UntypedAST.statement Sequence.t,
        [`Start_file], [`Parse_file]) phase (* parse some file *)
   | Typing :
       (TypeInference.typed_statement CCVector.ro_vector, [`Parse_file], [`Typing]) phase
@@ -54,6 +56,7 @@ type ('ret, 'before, 'after) phase =
   | Print_stats : (unit, [`Saturate], [`Print_stats]) phase
   | Print_result : (unit, [`Print_stats], [`Print_result]) phase
   | Print_dot : (unit, [`Print_result], [`Print_dot]) phase
+  | Check_proof : (int, [`Print_dot], [`Check_proof]) phase
   | Exit : (unit, _, [`Exit]) phase
 
 type any_phase = Any_phase : (_, _, _) phase -> any_phase
@@ -91,6 +94,7 @@ let string_of_phase : type a b c. (a,b,c) phase -> string
     | Print_result -> "print_result"
     | Print_stats -> "print_stats"
     | Print_dot -> "print_dot"
+    | Check_proof -> "check_proof"
     | Exit -> "exit"
 
 let string_of_any_phase (Any_phase p) = string_of_phase p
@@ -176,14 +180,17 @@ let set_key k v st =
 
 let run_parallel l =
   let rec aux = function
-    | [] -> return ()
+    | [] -> return 0
     | [a] -> a
     | a :: tail ->
       get >>= fun old_st ->
-      a >>= fun () ->
-      (* restore old state *)
-      set old_st >>= fun () ->
-      aux tail
+      a >>= fun n ->
+      if n<>0 then return n
+      else (
+        (* restore old state *)
+        set old_st >>= fun () ->
+        aux tail
+      )
   in
   aux l
 

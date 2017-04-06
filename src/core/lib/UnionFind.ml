@@ -76,12 +76,13 @@ module Make(P : PAIR) = struct
     (* if key is its own representative, done; otherwise recurse toward key's root *)
     if P.equal key node.n_repr
     then node
-    else begin
+    else (
       (* path compression *)
       let node' = find_root t node.n_repr in
+      assert (node != node');
       node.n_repr <- node'.n_repr;
       node'
-    end
+    )
 
   let find t key = (find_root t key).n_repr
 
@@ -91,12 +92,11 @@ module Make(P : PAIR) = struct
   (** Merge two representatives *)
   let union t k1 k2 =
     let n1, n2 = find_root t k1, find_root t k2 in
-    if not (P.equal n1.n_repr n2.n_repr)
-    then begin
+    if not (P.equal n1.n_repr n2.n_repr) then (
       (* k2 points to k1, and k1 points to the new value *)
       n1.n_value <- P.merge n1.n_value n2.n_value;
       n2.n_repr <- n1.n_repr;
-    end
+    )
 
   (** Add the given value to the key (monoid) *)
   let add t key value =

@@ -38,6 +38,8 @@ val make : ?depth:int -> is_sub:bool -> Type.t -> t
 val is_sub : t -> bool
 (** Is the constant a sub-constant (i.e. a subterm of a case in a coverset)? *)
 
+val id_is_sub : ID.t -> bool
+
 val equal : t -> t -> bool
 val compare : t -> t -> int
 val hash : t -> int
@@ -65,6 +67,7 @@ module Cst_set : CCSet.S with type elt = t
 type ind_skolem = ID.t * Type.t
 
 val ind_skolem_compare : ind_skolem -> ind_skolem -> int
+val ind_skolem_equal : ind_skolem -> ind_skolem -> bool
 
 val id_is_ind_skolem : ID.t -> Type.t -> bool
 (** [id_is_potential_cst id ty] returns [true] if [id:ty] is

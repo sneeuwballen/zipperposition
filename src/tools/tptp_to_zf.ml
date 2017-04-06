@@ -21,9 +21,12 @@ let declare_term out () =
   pp_stmt out st
 
 let process file =
+  let input = Input_format.I_tptp in
   Util_tptp.parse_file ~recursive:true file
   >|= Sequence.map Util_tptp.to_ast
   >>= TypeInference.infer_statements ?ctx:None
+    ~on_var:(Input_format.on_var input)
+    ~on_undef:(Input_format.on_undef_id input)
   >|= fun stmts ->
   (* declare "term" then proceed *)
   Format.printf "@[<v>%a@,%a@]@." declare_term () pp_stmts stmts;

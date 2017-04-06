@@ -3,8 +3,6 @@
 
 (** {1 Arithmetic Literal} *)
 
-open Logtk
-
 type term = FOTerm.t
 
 (** {2 Type Decls} *)

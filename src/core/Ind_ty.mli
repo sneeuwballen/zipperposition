@@ -21,6 +21,8 @@ type t = private {
   ty_constructors : constructor list;
   (* constructors, all returning [pattern] and containing
      no other type variables than [ty_vars] *)
+  ty_is_rec: bool lazy_t;
+  (* true iff the type is (mutually) recursive *)
 }
 
 val pp : t CCFormat.printer
@@ -48,11 +50,15 @@ val as_inductive_type : Type.t -> (t * Type.t list) option
 (** [as_inductive_ty (list int)] will return [list, [int]] as an
     inductive type applied to some arguments *)
 
+val as_inductive_type_exn : Type.t -> t * Type.t list
+
 val is_inductive_type : Type.t -> bool
 (** [is_inductive_type ty] holds iff [ty] is an instance of some
     registered type (registered with {!declare_ty}). *)
 
 val is_inductive_simple_type : TypedSTerm.t -> bool
+
+val is_recursive : t -> bool
 
 (** {6 Constructors} *)
 
@@ -70,16 +76,6 @@ val as_constructor_exn : ID.t -> constructor * t
 val contains_inductive_types : FOTerm.t -> bool
 (** [true] iff the term contains at least one subterm with
     an inductive type *)
-
-(** {6 Scan Declarations} *)
-
-val scan_stmt : (_, _, Type.t) Statement.t -> unit
-(** [scan_stmt stmt] examines [stmt], and, if the statement is a
-    declaration of inductive types or constants,
-    it declares them using {!declare_ty} or {!declare_inductive_constant}. *)
-
-val scan_simple_stmt : (_, _, TypedSTerm.t) Statement.t -> unit
-(** Same as {!scan_stmt} but on earlier statements *)
 
 (**/**)
 

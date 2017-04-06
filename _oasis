@@ -63,14 +63,17 @@ Library "logtk"
   Path:             src/core/
   Pack:             true
   Modules:          InnerTerm, FOTerm, Type, Util, STerm, Interfaces,
-                    DBEnv, Position, Var, HVar,
+                    DBEnv, Position, Var, HVar, Defined_pos,
                     Subst, Unif, Signature, Scoped, Unif_intf,
                     TypeInference, Options, Comparison, Precedence, Builtin,
                     Ordering, Skolem, Cnf, ID, IDOrBuiltin, SLiteral,
                     Index, Index_intf, Dtree, Fingerprint, NPDtree, Binder,
-                    Congruence, FeatureVector, FV_tree, UntypedAST, Ind_ty,
+                    Congruence, Congruence_intf,
+                    FeatureVector, FV_tree, UntypedAST, Ind_ty,
                     TypedSTerm, Statement, Flex_state, Compute_prec, 
-                    Ordinal, Rewrite_term, Test_prop,
+                    Ordinal, Rewrite, Test_prop, Input_format,
+                    LLProof, LLProof_check,
+                    Multisets, Literal, Literals, Int_lit, Rat_lit, Monome,
                     lib/Hashcons, lib/ParseLocation, lib/Multiset, lib/LazyList,
                     lib/Hash, lib/IArray, lib/AllocCache, lib/Multiset_intf,
                     lib/Signal, lib/UnionFind
@@ -109,7 +112,7 @@ Library "logtk_arbitrary"
   Pack:             true
   FindlibName:      arbitrary
   FindlibParent:    logtk
-  Modules:          ArTerm, ArForm, ArType, ArID
+  Modules:          ArTerm, ArForm, ArType, ArID, ArLiteral
   BuildDepends:     logtk, qcheck
   Build$:           flag(qcheck)
   Install$:         flag(qcheck)
@@ -119,20 +122,20 @@ Library "libzipperposition"
   Pack:             true
   FindlibName:      libzipperposition
   Modules:          ClauseQueue, Clause, SClause, Const, Extensions,
-                    Literal, Literals, Ctx, ProofStep, ProofPrint, ProofState,
+                    Ctx, Proof, ProofState,
                     Saturate, Selection, AC, AC_intf, SimplM,
-                    Params, Env, Monome, ArithLit, Signals, Multisets,
+                    Params, Env, Signals, Classify_cst,
                     Ctx_intf, Clause_intf, Env_intf, ProofState_intf,
                     BBox, ClauseContext, ClauseQueue_intf,
                     Bool_lit, Bool_lit_intf, Sat_solver, Sat_solver_intf,
                     Trail, Ind_cst, Cover_set, Cut_form, Phases, Phases_impl,
-                    Classify_cst, Rewrite_lit,
                     calculi/Avatar, calculi/Avatar_intf,
                     calculi/Induction, calculi/Induction_intf,
                     calculi/Superposition, calculi/Superposition_intf,
                     calculi/Rewriting,
                     calculi/EnumTypes,
-                    calculi/ArithInt,
+                    calculi/Arith_int,
+                    calculi/Arith_rat,
                     calculi/Heuristics,
                     calculi/Ind_types,
                     calculi/Fool

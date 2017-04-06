@@ -16,6 +16,7 @@ let section = Util.Section.make ~parent:Const.section "avatar"
 
 let prof_splits = Util.mk_profiler "avatar.split"
 let prof_check = Util.mk_profiler "avatar.check"
+let prof_simp_trail = Util.mk_profiler "avatar.simp_trail"
 
 let stat_splits = Util.mk_stat "avatar.splits"
 let stat_trail_trivial = Util.mk_stat "avatar.trivial_trail"
@@ -30,6 +31,7 @@ module type S = Avatar_intf.S
 let k_avatar : (module S) Flex_state.key = Flex_state.create_key ()
 let k_show_lemmas : bool Flex_state.key = Flex_state.create_key()
 let k_simplify_trail : bool Flex_state.key = Flex_state.create_key()
+let k_back_simplify_trail : bool Flex_state.key = Flex_state.create_key()
 
 module Make(E : Env.S)(Sat : Sat_solver.S)
 = struct
@@ -43,14 +45,12 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
   module UF =
     UnionFind.Make(struct
       type key = T.var
-      type value = Lit.t list
+      type value = Lit.Set.t
       let equal = HVar.equal Type.equal
       let hash = HVar.hash
-      let zero = []
-      let merge = List.rev_append
+      let zero = Lit.Set.empty
+      let merge = Lit.Set.union
     end)
-
-  module LitSet = Sequence.Set.Make(Lit)
 
   let infer_split_ c =
     let lits = C.lits c in
@@ -62,50 +62,56 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       |> T.VarSet.to_list
       |> UF.create
     (* set of ground literals (each one is its own component) *)
-    and cluster_ground = ref LitSet.empty in
+    and cluster_ground = ref Lit.Set.empty in
 
     (* literals belong to either their own ground component, or to every
         sets in [uf_vars] associated to their variables *)
     Array.iter
       (fun lit ->
          let v_opt = Lit.Seq.vars lit |> Sequence.head in
-         match v_opt with
+         begin match v_opt with
            | None -> (* ground, lit has its own component *)
-             cluster_ground := LitSet.add lit !cluster_ground
+             cluster_ground := Lit.Set.add lit !cluster_ground
            | Some v ->
              (* merge other variables of the literal with [v] *)
              Lit.Seq.vars lit
              |> Sequence.iter
                (fun v' ->
-                  UF.add uf_vars v' [lit];  (* lit is in the equiv class of [v'] *)
+                  (* lit is in the equiv class of [v'] *)
+                  UF.add uf_vars v' (Lit.Set.singleton lit);
                   UF.union uf_vars v v');
-      ) lits;
+         end)
+      lits;
 
     (* now gather all the components as a literal list list *)
     let components = ref [] in
-    LitSet.iter (fun lit -> components := [lit] :: !components) !cluster_ground;
-    UF.iter uf_vars (fun _ comp -> components := comp :: !components);
+    Lit.Set.iter (fun lit -> components := [lit] :: !components) !cluster_ground;
+    UF.iter uf_vars (fun _ comp -> components := Lit.Set.to_list comp :: !components);
 
-    match !components with
+    begin match !components with
       | [] -> assert (Array.length lits=0); None
       | [_] -> None
       | _::_ ->
         (* do a simplification! *)
         Util.incr_stat stat_splits;
         let proof =
-          ProofStep.mk_esa ~rule:(ProofStep.mk_rule "split") [C.proof c] in
+          Proof.Step.esa ~rule:(Proof.Rule.mk "split")
+            [Proof.Parent.from @@ C.proof c]
+        in
+        (* elements of the trail to keep *)
+        let keep_trail =
+          C.trail c |> Trail.filter BBox.must_be_kept
+        in
         let clauses_and_names =
           List.map
             (fun lits ->
                let lits = Array.of_list lits in
                let bool_name = BBox.inject_lits lits in
-               (* new trail: keep some literals of [C.trail c], add the new one *)
-               let trail =
-                 C.trail c
-                 |> Trail.filter BBox.must_be_kept
-                 |> Trail.add bool_name
-               in
-               let c = C.create_a ~trail lits proof in
+               Util.debugf ~section 5 "(@[<2>inject_lits@ :lits %a@ :blit %a@])"
+                 (fun k->k Literals.pp lits BBox.pp bool_name);
+               (* new trail: add the new one *)
+               let trail = Trail.add bool_name keep_trail in
+               let c = C.create_a ~trail ~penalty:(C.penalty c) lits proof in
                c, bool_name)
             !components
         in
@@ -116,13 +122,15 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         let bool_guard =
           C.trail c
           |> Trail.to_list
-          |> List.map Trail.Lit.neg in
+          |> List.map Trail.Lit.neg
+        in
         let bool_clause = List.append bool_clause bool_guard in
         Sat.add_clause ~proof bool_clause;
         Util.debugf ~section 4 "@[constraint clause is @[%a@]@]"
           (fun k->k BBox.pp_bclause bool_clause);
         (* return the clauses *)
         Some clauses
+    end
 
   (* Avatar splitting *)
   let split c =
@@ -184,7 +192,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
   exception Trail_is_trivial
 
   (* return [new_trail], [is_trivial] *)
-  let simplify_opt (trail:Trail.t): trail_status =
+  let simplify_opt_ (trail:Trail.t): trail_status =
     let n_simpl = ref 0 in
     try
       let trail, removed =
@@ -211,6 +219,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     with Trail_is_trivial ->
       Tr_trivial
 
+  let simplify_opt trail = Util.with_prof prof_simp_trail simplify_opt_ trail
+
   (* simplify the trail of [c] using boolean literals that have been proven *)
   let simplify_trail_ c =
     let trail = C.trail c in
@@ -224,11 +234,15 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         (* use SAT resolution proofs for tracking why the trail
            has been simplified, so that the other branches that have been
            closed can appear in the proof *)
-        let proof_removed = List.map Sat.get_proof_of_lit removed_trail in
+        let proof_removed =
+          List.map (CCFun.compose Sat.get_proof_of_lit Proof.Parent.from) removed_trail
+        in
         let proof =
-          ProofStep.mk_simp ~rule:(ProofStep.mk_rule "simpl_trail")
-            (C.proof c :: proof_removed) in
-        let c' = C.create_a ~trail:new_trail (C.lits c) proof in
+          Proof.Step.simp ~rule:(Proof.Rule.mk "simpl_trail")
+            (Proof.Parent.from (C.proof c) :: proof_removed) in
+        let c' =
+          C.create_a ~trail:new_trail ~penalty:(C.penalty c)(C.lits c) proof
+        in
         Util.debugf ~section 3
           "@[<2>clause @[%a@]@ trail-simplifies into @[%a@]@]"
           (fun k->k C.pp c C.pp c');
@@ -241,12 +255,25 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     then simplify_trail_ c
     else SimplM.return_same c
 
+  let new_proved_lits : unit -> bool =
+    let num_proved_last_ = ref 0 in
+    fun () ->
+      let set = Sat.all_proved () in
+      let n = BLit.Set.cardinal set in
+      assert (n >= !num_proved_last_);
+      let yes = n > !num_proved_last_ in
+      num_proved_last_ := n;
+      yes
+
+
   (* subset of active clauses that have a trivial trail or simplifiable
      trail *)
   let backward_simplify_trails (_:C.t): C.ClauseSet.t =
-    if Sat.last_result () = Sat_solver.Sat then (
+    if Sat.last_result () = Sat_solver.Sat && new_proved_lits () then (
       E.ProofState.ActiveSet.clauses ()
-      |> C.ClauseSet.filter
+      |> C.ClauseSet.to_seq
+      |> Sequence.filter (fun c -> not (Trail.is_empty @@ C.trail c))
+      |> Sequence.filter
         (fun c ->
            let ok = match simplify_opt (C.trail c) with
              | Tr_trivial | Tr_simplify_into _ -> true
@@ -258,6 +285,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
                "(@[<2>backward_simplify_trail@ %a@])" (fun k->k C.pp c);
            );
            ok)
+      |> C.ClauseSet.of_seq
     ) else C.ClauseSet.empty
 
   let skolem_count_ = ref 0
@@ -278,7 +306,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     cut_pos: E.C.t list; (** clauses true if lemma is true *)
     cut_lit: BLit.t; (** lit that is true if lemma is true *)
     cut_depth: int; (** if the lemma is used to prove another lemma *)
-    cut_proof: ProofStep.t; (** where does the lemma come from? *)
+    cut_proof: Proof.Step.t; (** where does the lemma come from? *)
   }
 
   let cut_form c = c.cut_form
@@ -297,13 +325,13 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
 
   (* generic mechanism for adding clause(s)
      and make a lemma out of them, including Skolemization, etc. *)
-  let introduce_cut ?(depth=0) (f:Cut_form.t) proof : cut_res =
+  let introduce_cut ?(penalty=0) ?(depth=0) (f:Cut_form.t) proof : cut_res =
     let box = BBox.inject_lemma f in
     (* positive clauses *)
     let c_pos =
       List.map
         (fun lits ->
-           C.create_a ~trail:(Trail.singleton box) lits proof)
+           C.create_a ~trail:(Trail.singleton box) ~penalty lits proof)
         (Cut_form.cs f)
     in
     { cut_form=f; cut_pos=c_pos; cut_lit=box;
@@ -332,21 +360,30 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         (fun k->k Cut_form.pp c.cut_form);
     )
 
+  let add_imply (l:cut_res list) (res:cut_res) (p:Proof.Step.t): unit =
+    let c = res.cut_lit :: List.map (fun cut -> BLit.neg cut.cut_lit) l in
+      Util.debugf ~section 3
+        "(@[<2>add_imply@ :premises (@[<hv>%a@])@ :concl %a@ :proof %a@])"
+        (fun k->k (Util.pp_list pp_cut_res) l pp_cut_res res Proof.Step.pp p);
+    Solver.add_clause ~proof:p c;
+    ()
+
+
   let lemma_seq : cut_res Sequence.t =
     fun yield -> Lemma_tbl.iter (fun _ c -> yield c) all_lemmas_
 
   (* is this literal involved in the proof? *)
-  let rec in_proof_of_ (p:ProofStep.of_) (lit:BLit.t): bool =
+  let rec in_proof_of_ (p:Proof.t) (lit:BLit.t): bool =
     let eq_abs l1 l2 = BLit.equal (BLit.abs l1) (BLit.abs l2) in
-    let in_proof_ (p:ProofStep.t) (lit:BLit.t): bool =
-      List.exists (fun parent -> in_proof_of_ parent lit) (ProofStep.parents p)
+    let in_proof_ (p:Proof.Step.t) (lit:BLit.t): bool =
+      List.exists (fun parent -> in_proof_of_ (Proof.Parent.proof parent) lit) (Proof.Step.parents p)
     in
-    begin match ProofStep.result p with
-      | ProofStep.Stmt _
-      | ProofStep.Form _
-      | ProofStep.Clause _ -> in_proof_ (ProofStep.step p) lit
-      | ProofStep.BoolClause l ->
-        List.exists (eq_abs lit) l || in_proof_ (ProofStep.step p) lit
+    begin match Proof.S.result p with
+      | Proof.Stmt _
+      | Proof.Form _
+      | Proof.Clause _ -> in_proof_ (Proof.S.step p) lit
+      | Proof.BoolClause l ->
+        List.exists (eq_abs lit) l || in_proof_ (Proof.S.step p) lit
     end
 
   let print_lemmas out () =
@@ -364,15 +401,16 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       Format.fprintf out "@[<hv>@{<Green>*@} %s %a@]"
         status Cut_form.pp c.cut_form
     in
-    Format.fprintf out "@[<v2>lemmas: {@ %a@,@]}"
-      (Util.pp_seq ~sep:"" pp_lemma) lemma_seq;
+    let l = lemma_seq |> Sequence.to_rev_list in
+    Format.fprintf out "@[<v2>lemmas (%d): {@ %a@,@]}"
+      (List.length l) (Util.pp_list ~sep:"" pp_lemma) l;
     ()
 
   let show_lemmas () = Format.printf "%a@." print_lemmas ()
 
   let convert_lemma st = match Statement.view st with
     | Statement.Lemma l ->
-      let proof_st = ProofStep.mk_goal (Statement.src st) in
+      let proof_st = Proof.Step.goal (Statement.src st) in
       let f =
         l
         |> List.map (List.map Ctx.Lit.of_form)
@@ -381,8 +419,11 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       in
       let proof =
         Cut_form.cs f
-        |> List.map (fun c -> ProofStep.mk_c proof_st (SClause.make ~trail:Trail.empty c))
-        |> ProofStep.mk_inference ~rule:(ProofStep.mk_rule "lemma")
+        |> List.map
+          (fun c ->
+             Proof.Parent.from @@ Proof.S.mk_c proof_st @@
+             SClause.make ~trail:Trail.empty c)
+        |> Proof.Step.inference ~rule:(Proof.Rule.mk "lemma")
       in
       let cut = introduce_cut f proof in
       let all_clauses = cut_res_clauses cut |> Sequence.to_rev_list in
@@ -405,8 +446,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         []
       | Sat_solver.Unsat proof ->
         Util.debug ~section 1 "SAT-solver reports \"UNSAT\"";
-        let proof = ProofStep.step proof in
-        let c = C.create ~trail:Trail.empty [] proof in
+        let proof = Proof.S.step proof in
+        let c = C.create ~trail:Trail.empty ~penalty:0 [] proof in
         [c]
     in
     Signal.send after_check_sat ();
@@ -425,8 +466,10 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     E.add_clause_conversion convert_lemma;
     E.add_is_trivial_trail trail_is_trivial;
     if E.flex_get k_simplify_trail then (
-      E.add_backward_simplify backward_simplify_trails;
       E.add_simplify simplify_trail;
+      if E.flex_get k_back_simplify_trail then (
+        E.add_backward_simplify backward_simplify_trails;
+      );
     );
     if E.flex_get k_show_lemmas then (
       Signal.once Signals.on_exit (fun _ -> show_lemmas ());
@@ -438,9 +481,10 @@ end
 
 let get_env (module E : Env.S) : (module S) = E.flex_get k_avatar
 
-let enabled_ = ref false
+let enabled_ = ref true
 let show_lemmas_ = ref false
 let simplify_trail_ = ref true
+let back_simplify_trail_ = ref true
 
 let extension =
   let action env =
@@ -452,6 +496,7 @@ let extension =
     E.flex_add k_avatar (module A : S);
     E.flex_add k_show_lemmas !show_lemmas_;
     E.flex_add k_simplify_trail !simplify_trail_;
+    E.flex_add k_back_simplify_trail !back_simplify_trail_;
     Util.debug 1 "enable Avatar";
     A.register ~split:!enabled_ ()
   in
@@ -464,4 +509,6 @@ let () =
     ; "--print-lemmas", Arg.Set show_lemmas_, " show status of Avatar lemmas"
     ; "--avatar-simp-trail", Arg.Set simplify_trail_, " simplify boolean trails in Avatar"
     ; "--no-avatar-simp-trail", Arg.Clear simplify_trail_, " do not simplify boolean trails in Avatar"
+    ; "--avatar-backward-simp-trail", Arg.Set back_simplify_trail_, " backward-simplify boolean trails in Avatar"
+    ; "--no-avatar-backward-simp-trail", Arg.Clear back_simplify_trail_, " do not backward-simplify boolean trails in Avatar"
     ]

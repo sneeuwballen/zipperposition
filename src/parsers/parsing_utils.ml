@@ -14,36 +14,28 @@ let parse_tip file =
   Util_tip.parse_file file
   >|= Util_tip.convert_seq
 
-type input =
-  | I_tptp
-  | I_zf
-  | I_tip
-
-let guess_input (file:string): input =
+let guess_input (file:string): Input_format.t =
   if CCString.suffix ~suf:".p" file
-  then I_tptp
+  then Input_format.I_tptp
   else if CCString.suffix ~suf:".smt2" file
-  then I_tip
+  then Input_format.I_tip
   else if CCString.suffix ~suf:".zf" file
-  then I_zf
+  then Input_format.I_zf
   else (
-    Util.warnf "unable to guess syntax for `%s`, use native syntax" file;
-    I_zf
+    let res = Input_format.default in
+    Util.warnf "unable to guess syntax for `%s`, use default syntax (%a)"
+      file Input_format.pp res;
+    res
   )
 
 (** Parse file using the input format chosen by the user *)
-let input_of_file (file:string): input = match !Options.input with
-  | Options.I_tptp -> I_tptp
-  | Options.I_zf -> I_zf
-  | Options.I_tip -> I_tip
+let input_of_file (file:string): Input_format.t = match !Options.input with
+  | Options.I_tptp -> Input_format.I_tptp
+  | Options.I_zf -> Input_format.I_zf
+  | Options.I_tip -> Input_format.I_tip
   | Options.I_guess -> guess_input file
 
-let parse_file (i:input) (file:string) = match i with
-  | I_tptp -> parse_tptp file
-  | I_zf -> Util_zf.parse_file file
-  | I_tip -> parse_tip file
-
-let on_undef_id (i:input) = match i with
-  | I_tptp -> `Guess
-  | I_tip -> `Fail
-  | I_zf -> `Warn
+let parse_file (i:Input_format.t) (file:string) = match i with
+  | Input_format.I_tptp -> parse_tptp file
+  | Input_format.I_zf -> Util_zf.parse_file file
+  | Input_format.I_tip -> parse_tip file

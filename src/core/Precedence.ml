@@ -7,7 +7,7 @@ type symbol_status =
   | Multiset
   | Lexicographic
 
-let section = Util.Section.(make ~parent:zip "precedence")
+let section = Util.Section.(make "precedence")
 
 (** {2 Weight of Symbols} *)
 module Weight = struct

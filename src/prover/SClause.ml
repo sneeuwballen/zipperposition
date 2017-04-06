@@ -32,6 +32,13 @@ let is_empty c = length c = 0 && Trail.is_empty c.trail
 
 let update_trail f c = make ~trail:(f c.trail) c.lits
 
+let to_s_form ?(ctx=FOTerm.Conv.create()) c =
+  let module F = TypedSTerm.Form in
+  let concl = Literals.Conv.to_s_form ~ctx (lits c) |> F.close_forall in
+  if Trail.is_empty (trail c)
+  then concl
+  else F.imply (Trail.to_s_form (trail c)) concl
+
 (** {2 Flags} *)
 
 let new_flag =

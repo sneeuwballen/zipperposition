@@ -1,8 +1,8 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-type proof_step = ProofStep.t
-type proof = ProofStep.of_
+type proof_step = Proof.Step.t
+type proof = Proof.t
 
 type result =
   | Sat
@@ -48,6 +48,9 @@ module type S = sig
   (** If the literal has been propagated at decision level 0,
       return its value (which does not depend on the model).
       Otherwise return [None] *)
+
+  val all_proved: unit -> Lit.Set.t
+  (** Set of (signed) proved literals *)
 
   val set_printer : Lit.t CCFormat.printer -> unit
   (** How to print literals? *)

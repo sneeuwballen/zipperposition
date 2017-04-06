@@ -63,6 +63,7 @@ module Ctx : sig
   val create :
     ?def_as_rewrite:bool ->
     ?default:type_ ->
+    ?on_var:[`Default | `Infer] ->
     ?on_undef:[`Warn | `Fail | `Guess] ->
     unit ->
     t
@@ -70,7 +71,9 @@ module Ctx : sig
       @param default which types are inferred by default (if not provided
         then {!type_erm} will be used)
       @param def_as_rewrite if true, definitions will be treated like rewrite rules
-      @param on_undef behavior when an undefined identifier is met *)
+      @param on_undef behavior when an undefined identifier is met
+      @param on_var behavior when a variable without type annotation is met
+  *)
 
   val copy : t -> t
   (** Copy of the context *)
@@ -158,6 +161,7 @@ val infer_statement_exn :
 
 val infer_statements_exn :
   ?def_as_rewrite:bool ->
+  ?on_var:[`Infer | `Default] ->
   ?on_undef:[`Warn | `Fail | `Guess] ->
   ?ctx:Ctx.t ->
   UntypedAST.statement Sequence.t ->
@@ -167,6 +171,7 @@ val infer_statements_exn :
 
 val infer_statements :
   ?def_as_rewrite:bool ->
+  ?on_var:[`Infer | `Default] ->
   ?on_undef:[`Warn | `Fail | `Guess] ->
   ?ctx:Ctx.t ->
   UntypedAST.statement Sequence.t ->

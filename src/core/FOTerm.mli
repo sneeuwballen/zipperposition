@@ -249,6 +249,12 @@ val default_hooks : unit -> print_hook list
 val debugf : Format.formatter -> t -> unit
 (** debugf printing, with sorts *)
 
+(** {2 Formulas} *)
+
+module Form : sig
+  val not_ : t -> t
+end
+
 (** {2 Arith} *)
 
 module Arith : sig
@@ -292,7 +298,7 @@ module TPTP : sig
 end
 
 module Conv : sig
-  type ctx
+  type ctx = Type.Conv.ctx
   val create : unit -> ctx
   val of_simple_term : ctx -> TypedSTerm.t -> t option
   val of_simple_term_exn : ctx -> TypedSTerm.t -> t (** @raise Type.Conv.Error on failure *)
@@ -301,4 +307,5 @@ module Conv : sig
     ctx ->
     t ->
     TypedSTerm.t
+  val var_to_simple_var : ?prefix:string -> ctx -> var -> TypedSTerm.t Var.t
 end

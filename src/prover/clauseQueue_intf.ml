@@ -4,6 +4,7 @@
 type profile =
   | P_default
   | P_bfs
+  | P_almost_bfs
   | P_explore
   | P_ground
   | P_goal
@@ -22,8 +23,8 @@ module type S = sig
     val default : t
     (** Use {!Literal.heuristic_weight} *)
 
-    val age : t
-    (** Returns the age of the clause (or 0 for the empty clause) *)
+    val penalty : t
+    (** Returns the penalty of the clause *)
 
     val favor_all_neg : t
     (** Favor clauses with only negative ground lits *)
@@ -54,6 +55,9 @@ module type S = sig
   val add_seq : t -> C.t Sequence.t -> unit
   (** Add clauses to the queue *)
 
+  val length : t -> int
+  (** Number of elements *)
+
   val is_empty : t -> bool
   (** check whether the queue is empty *)
 
@@ -72,20 +76,23 @@ module type S = sig
         from a priority queue that uses [weight] to sort clauses
       @param name the name of this clause queue *)
 
-  val bfs : t
-  (** Strong orientation toward FIFO *)
+  val bfs : unit -> t
+  (** FIFO *)
 
-  val explore : t
+  val almost_bfs : unit -> t
+  (** Half FIFO, half default *)
+
+  val explore : unit -> t
   (** Use heuristics for selecting "small" clauses *)
 
-  val ground : t
+  val ground : unit -> t
   (** Favor positive unit clauses and ground clauses *)
 
-  val goal_oriented : t
+  val goal_oriented : unit -> t
   (** custom weight function that favors clauses that are "close" to
       initial conjectures. It is fair.  *)
 
-  val default : t
+  val default : unit -> t
   (** Obtain the default queue *)
 
   val of_profile : profile -> t

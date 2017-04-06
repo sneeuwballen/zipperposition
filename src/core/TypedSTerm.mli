@@ -42,6 +42,7 @@ val view : t -> view
 val loc : t -> location option
 val ty : t -> t option
 val ty_exn : t -> t
+val head : t -> ID.t option
 val head_exn : t -> ID.t (** @raise Not_found if not an application/const *)
 
 val deref : t -> t
@@ -86,6 +87,9 @@ val map_ty : t -> f:(t -> t) -> t
 
 val fresh_var : ?loc:location -> ty:t -> unit -> t
 (** fresh free variable with the given type. *)
+
+val box_opaque : t -> t
+(** Put a box around this *)
 
 (** {2 Specific Views} *)
 
@@ -195,6 +199,8 @@ module Form : sig
 
   val unfold_forall : t -> t Var.t list * t
   val close_forall : ?loc:location -> t -> t
+
+  val box_opaque : t -> t
 end
 
 (** {2 Utils} *)

@@ -57,7 +57,7 @@ module type S = sig
     | AlreadyDeclared of decl
 
   val declare_ty :
-    proof:ProofStep.of_ ->
+    proof:Proof.t ->
     ty_id:ID.t ->
     ty_vars:Type.t HVar.t list ->
     var:Type.t HVar.t ->
@@ -107,7 +107,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     decl_cases : term list; (* ... t1 | t2 | ... | tn *)
     decl_proof :
       [ `Data of Statement.source * Type.t Statement.data
-      | `Clause of ProofStep.of_
+      | `Clause of Proof.t
       ]; (* justification for the enumeration axiom *)
     mutable decl_symbols : ID.Set.t; (* set of declared symbols for t1,...,tn *)
   }
@@ -327,11 +327,11 @@ module Make(E : Env.S) : S with module Env = E = struct
                     let renaming = Ctx.renaming_clear () in
                     let lits' = Lits.apply_subst ~renaming subst (C.lits c,s_c) in
                     let proof =
-                      ProofStep.mk_inference [C.proof c]
-                        ~rule:(ProofStep.mk_rule ~subst:[subst] "enum_type_case_switch")
+                      Proof.Step.inference [Proof.Parent.from @@ C.proof c]
+                        ~rule:(Proof.Rule.mk"enum_type_case_switch")
                     in
-                    let trail = C.trail c in
-                    let c' = C.create_a ~trail lits' proof in
+                    let trail = C.trail c and penalty = C.penalty c in
+                    let c' = C.create_a ~trail ~penalty lits' proof in
                     Util.debugf ~section 3
                       "@[<2>deduce @[%a@]@ from @[%a@]@ @[(enum_type switch on %a)@]@]"
                       (fun k->k C.pp c' C.pp c Type.pp decl.decl_ty);
@@ -371,13 +371,16 @@ module Make(E : Env.S) : S with module Env = E = struct
           decl.decl_cases
       in
       let proof = match decl.decl_proof with
-        | `Data (src,d) -> ProofStep.mk_data src d
+        | `Data (src,d) -> Proof.Step.data src d
         | `Clause step ->
-          ProofStep.mk_inference
-            ~rule:(ProofStep.mk_rule "axiom_enum_types") [step]
+          Proof.Step.inference
+            ~rule:(Proof.Rule.mk "axiom_enum_types")
+            [Proof.Parent.from_subst (step,0) subst]
       in
       let trail = Trail.empty in
-      let c' = C.create ~trail lits proof in
+      (* start with initial penalty *)
+      let penalty = 4 in
+      let c' = C.create ~trail ~penalty lits proof in
       Util.debugf ~section 3 "@[<2>instantiate axiom of enum type `%a` \
                               on @[%a@]:@ clause @[%a@]@]"
         (fun k->k pp_id_or_builtin decl.decl_ty_id ID.pp s C.pp c');
@@ -506,7 +509,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let src = Stmt.src stmt in
     match Stmt.view stmt with
       | Stmt.Assert c ->
-        let proof = ProofStep.mk_assert src in
+        let proof = Proof.Step.assert_ src in
         let c = C.of_forms ~trail:Trail.empty c proof in
         _detect_and_declare c
       | Stmt.Data l ->

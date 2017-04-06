@@ -44,6 +44,8 @@ let load_extensions =
   Extensions.register EnumTypes.extension;
   Extensions.register Induction.extension;
   Extensions.register Rewriting.extension;
+  Extensions.register Arith_int.extension;
+  Extensions.register Arith_rat.extension;
   Extensions.register Ind_types.extension;
   Extensions.register Fool.extension;
   let l = Extensions.extensions () in
@@ -79,7 +81,8 @@ let typing (input,stmts) =
   Phases.get_key Params.key >>= fun params ->
   let def_as_rewrite = params.Params.param_def_as_rewrite in
   TypeInference.infer_statements
-    ~on_undef:(Parsing_utils.on_undef_id input)
+    ~on_var:(Input_format.on_var input)
+    ~on_undef:(Input_format.on_undef_id input)
     ~def_as_rewrite ?ctx:None stmts
   >>?= fun stmts ->
   do_extensions ~field:(fun e -> e.Extensions.post_typing_actions)
@@ -283,13 +286,13 @@ let print_dots (type c)
                else None)
         else Sequence.singleton proof
       in
-      ProofPrint.pp_dot_seq_file ~name dot_f proof
+      Proof.S.pp_dot_seq_file ~name dot_f proof
     | Some dot_f, (Saturate.Sat | Saturate.Unknown) when Env.params.param_dot_sat ->
       (* print saturated set *)
       let name = "sat_set" in
       let seq = Sequence.append (Env.get_active ()) (Env.get_passive ()) in
       let seq = Sequence.map Env.C.proof seq in
-      ProofPrint.pp_dot_seq_file ~name dot_f seq
+      Proof.S.pp_dot_seq_file ~name dot_f seq
     | _ -> ()
   end;
   Phases.return_phase ()
@@ -329,7 +332,7 @@ let print_szs_result (type c) ~file
       (* print status then proof *)
       Format.printf "%% SZS status %s for '%s'@." (unsat_to_str ()) file;
       Format.printf "%% SZS output start Refutation@.";
-      Format.printf "%a@." (ProofPrint.pp !Options.output) proof;
+      Format.printf "%a@." (Proof.S.pp !Options.output) proof;
       Format.printf "%% SZS output end Refutation@.";
   end;
   Phases.return_phase ()
@@ -364,7 +367,7 @@ let process_file file =
   parse_file file >>= fun stmts ->
   typing stmts >>= fun decls ->
   (* declare inductive types and constants *)
-  CCVector.iter Ind_ty.scan_simple_stmt decls;
+  CCVector.iter Statement.scan_simple_stmt_for_ind_ty decls;
   let has_goal = has_goal_decls_ decls in
   Util.debugf ~section 1 "parsed %d declarations (%s goal(s))"
     (fun k->k (CCVector.length decls) (if has_goal then "some" else "no"));
@@ -395,6 +398,22 @@ let print file env result =
   print_szs_result ~file env result >>= fun () ->
   print_dots env result
 
+let check res =
+  Phases.start_phase Phases.Check_proof >>= fun () ->
+  Phases.get_key Params.key >>= fun params ->
+  let errcode = match res with
+    | Saturate.Unsat p when params.Params.param_check ->
+      (* check proof! *)
+      Util.debug ~section 1 "start checking proof…";
+      let p' = Proof.S.to_llproof p in
+      let res, stats = LLProof_check.check p' in
+      Util.debugf ~section 1 "(@[proof_check@ :res %a@ :stats %a@])"
+        (fun k->k LLProof_check.pp_res res LLProof_check.pp_stats stats);
+      if res = LLProof_check.R_fail then 1 else 0
+    | _ -> 0
+  in
+  Phases.return_phase errcode
+
 let setup_gc =
   Phases.start_phase Phases.Setup_gc >>= fun () ->
   Util.debug ~section 2 "setup GC";
@@ -422,7 +441,8 @@ let setup_signal =
 let process_files_and_print files =
   let f file =
     process_file file >>= fun (Phases.Env_result (env, res)) ->
-    print file env res
+    print file env res >>= fun () ->
+    check res
   in
   let phases = List.map f files in
   Phases.run_parallel phases

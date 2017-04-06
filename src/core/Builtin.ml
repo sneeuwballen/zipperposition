@@ -53,6 +53,7 @@ type t =
   | Lesseq
   | Greater
   | Greatereq
+  | Box_opaque (** hint not to open this formula *)
 
 type t_ = t
 
@@ -106,6 +107,7 @@ let to_int_ = function
   | ForallConst -> 47
   | ExistsConst -> 48
   | Grounding -> 50
+  | Box_opaque -> 60
 
 let compare a b = match a, b with
   | Int i, Int j -> Z.compare i j
@@ -185,6 +187,7 @@ let to_string s = match s with
   | Lesseq -> "≤"
   | Greater -> ">"
   | Greatereq -> "≥"
+  | Box_opaque -> "<box>"
 
 let pp out s = Format.pp_print_string out (to_string s)
 
@@ -320,6 +323,7 @@ module TPTP = struct
     | Lesseq -> "$lesseq"
     | Greater -> "$greater"
     | Greatereq -> "$greatereq"
+    | Box_opaque -> "$$box"
 
   let pp out b = CCFormat.string out (to_string b)
 
@@ -641,6 +645,7 @@ module ZF = struct
     | Lesseq -> "<="
     | Greater -> ">"
     | Greatereq -> ">="
+    | Box_opaque -> "<box>"
 
   let pp out b = CCFormat.string out (to_string b)
 end

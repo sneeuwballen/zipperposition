@@ -187,6 +187,11 @@ val open_fun : t -> t list * t
     [open_fun (a -> (b -> (c -> d)))] returns [[a;b;c], d].
     @return the return type and the list of all its arguments *)
 
+val returns : t -> t
+(** returned type (going through foralls and arrows).
+    [returns a] is like [let _, _, ret = open_poly_fun a in ret]
+    {b NOTE} caution, not always closed *)
+
 exception ApplyError of string
 (** Error raised when {!apply} fails *)
 

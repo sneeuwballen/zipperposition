@@ -124,6 +124,9 @@ let save_ lit =
       ICaseTbl.add _case_set p (payload, lit)
   end
 
+let _check_variant lits lits' =
+  Lits.matches lits lits' && Lits.matches lits' lits
+
 (* clause -> boolean lit *)
 let inject_lits_ lits  =
   (* special case: one negative literal. *)
@@ -139,6 +142,8 @@ let inject_lits_ lits  =
       (function
         | lits', Clause_component _, blit
           when Lits.are_variant lits lits' ->
+          assert (Lit.sign blit);
+          (* assert (_check_variant lits lits'); *)
           Some blit
         | _ -> None)
   in
@@ -215,6 +220,24 @@ let as_lemma lit = match Lit.payload (Lit.abs lit) with
 
 (* boolean lit -> payload *)
 let payload = Lit.payload
+let sign = Lit.sign
+
+let to_s_form (lit:t) =
+  let module T = FOTerm in
+  let module F = TypedSTerm.Form in
+  let f = match payload lit with
+    | Fresh -> assert false (* TODO? *)
+    | Clause_component lits ->
+      F.box_opaque (Literals.Conv.to_s_form lits |> F.close_forall)
+    | Lemma f -> Cut_form.to_s_form f |> F.box_opaque
+    | Case l ->
+      let ctx = T.Conv.create () in
+      l
+      |> List.map
+        (fun t -> Cover_set.Case.to_lit t |> Literal.Conv.to_s_form ~ctx)
+      |> F.and_
+  in
+  if sign lit then f else F.not_ f
 
 let pp out i =
   if not (Lit.sign i) then CCFormat.string out "¬";

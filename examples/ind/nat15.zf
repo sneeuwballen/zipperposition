@@ -1,9 +1,10 @@
 # expect: unsat
 include "nat.zf".
-val odd : nat -> prop.
-val even : nat -> prop.
-assert odd (s z).
-assert forall (N:nat). ((even N) => (odd (s N))).
-assert even z.
-assert forall (N:nat). ((odd N) => (even (s N))).
-goal forall (N:nat). (even (plus N N)).
+
+def odd : nat -> prop where
+  forall N. odd (s N) = even N
+and even : nat -> prop where
+  even z = true;
+  forall (N:nat). even (s N) = odd N.
+
+goal forall (N:nat). even (plus N N).

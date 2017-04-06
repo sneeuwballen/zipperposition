@@ -115,14 +115,6 @@ module Make(A : ARGS) : S = struct
       Pr.to_list c |> List.map (fun a -> a.M.St.lit)
     in
     let rec aux p : proof * bool_clause = match Pr.expand p with
-      | { Pr.conclusion=c; step=Pr.Assumption|Pr.Hypothesis } ->
-        begin match M.get_tag c with
-          | None -> assert false
-          | Some tag ->
-            let c = bool_clause_of_sat c in
-            let proof = Proof_tbl.proof_of_tag tag in
-            proof, c
-        end
       | { Pr.step = Pr.Lemma lemma; conclusion=c } ->
         let c = bool_clause_of_sat c in
         lemma, c
@@ -138,6 +130,7 @@ module Make(A : ARGS) : S = struct
             Bool_clause_tbl.add tbl c proof;
             proof, c
         end
+      | _ -> assert false (* TODO *)
     in
     Pr.check p;
     let proof, c = aux p in

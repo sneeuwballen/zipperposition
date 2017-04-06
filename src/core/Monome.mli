@@ -9,8 +9,6 @@
     are "f(X)" and "a", with coefficients "1" and "3".
 *)
 
-open Logtk
-
 type term = FOTerm.t
 
 type 'a t
@@ -174,7 +172,7 @@ module Focus : sig
   val map : ?term:(term->term) -> ?coeff:('a -> 'a) ->
     ?rest:('a monome -> 'a monome) -> 'a t -> 'a t
 
-  val scale : Z.t t -> Z.t t -> Z.t t * Z.t t
+  val scale : 'a t -> 'a t -> 'a t * 'a t
   (** Scale to the same coefficient *)
 
   val is_max : ord:Ordering.t -> _ t -> bool
@@ -387,6 +385,29 @@ module Int : sig
     (** Find some solutions that negate the equation. For now it
         just takes solutions to [m < 0].  *)
   end
+end
+
+module Rat : sig
+  type t = Q.t monome
+
+  val const : Q.t -> t (** Empty monomial, from constant (decides type) *)
+  val singleton : Q.t -> term -> t  (** One term. *)
+  val of_list : Q.t -> (Q.t * term) list -> t
+
+  val of_term : term -> t option
+
+  val of_term_exn : term -> t
+  (** try to get a monome from a term.
+      @raise NotLinear if the term is not a proper monome. *)
+
+  val to_term : t -> term
+  (** convert back to a term *)
+
+  val normalize : t -> t
+  (** Normalize the monome, which means that if some terms are
+      rational or integer constants, they are moved to the constant part
+      (e.g after apply X->3/4 in 2.X+1, one gets 2×3/4 +1. Normalization
+      reduces this to 5/2). *)
 end
 
 (** {2 For fields (Q,R)} *)

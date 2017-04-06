@@ -3,8 +3,6 @@
 
 (** {1 Array of literals} *)
 
-open Logtk
-
 type term = FOTerm.t
 
 type t = Literal.t array
@@ -22,6 +20,10 @@ val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> Subst.t Sequence.t
 
 val are_variant : t -> t -> bool
 (** Simple interface on top of {!variant} with distinc scopes *)
+
+val matching : ?subst:Subst.t -> pattern:t Scoped.t -> t Scoped.t -> Subst.t Sequence.t
+
+val matches : t -> t -> bool
 
 val weight : t -> int
 val depth : t -> int
@@ -95,6 +97,12 @@ module Conv : sig
 
   val to_forms : ?hooks:Literal.Conv.hook_to list -> t -> term SLiteral.t list
   (** To list of formulas *)
+
+  val to_s_form :
+    ?ctx:FOTerm.Conv.ctx ->
+    ?hooks:Literal.Conv.hook_to list ->
+    t ->
+    TypedSTerm.Form.t
 end
 
 module View : sig
@@ -103,13 +111,16 @@ module View : sig
       is the Literal.t at the given position.
       @raise Invalid_argument if the position is not valid in the *)
 
-  val get_arith : t -> Position.t -> ArithLit.Focus.t option
+  val get_arith : t -> Position.t -> Int_lit.Focus.t option
+
+  val get_rat : t -> Position.t -> Rat_lit.Focus.t option
 
   (** The following functions will raise [Invalid_argument] if the
       position is not valid or if the literal isn't what's asked for *)
 
   val get_eqn_exn : t -> Position.t -> (term * term * bool)
-  val get_arith_exn : t -> Position.t -> ArithLit.Focus.t
+  val get_arith_exn : t -> Position.t -> Int_lit.Focus.t
+  val get_rat_exn : t -> Position.t -> Rat_lit.Focus.t
 end
 
 val fold_lits : eligible:(int -> Literal.t -> bool) ->
@@ -131,12 +142,23 @@ val fold_eqn : ?both:bool -> ?sign:bool -> ord:Ordering.t ->
 
 val fold_arith :
   eligible:(int -> Literal.t -> bool) ->
-  t -> ArithLit.t Position.With.t Sequence.t
+  t -> Int_lit.t Position.With.t Sequence.t
 (** Fold over eligible arithmetic literals *)
 
 val fold_arith_terms : eligible:(int -> Literal.t -> bool) ->
   which:[<`Max|`All] -> ord:Ordering.t ->
-  t -> (term * ArithLit.Focus.t * Position.t) Sequence.t
+  t -> (term * Int_lit.Focus.t * Position.t) Sequence.t
+(** Fold on terms under arithmetic literals, with the focus on
+    the current term *)
+
+val fold_rat :
+  eligible:(int -> Literal.t -> bool) ->
+  t -> Rat_lit.t Position.With.t Sequence.t
+(** Fold over eligible arithmetic literals *)
+
+val fold_rat_terms : eligible:(int -> Literal.t -> bool) ->
+  which:[<`Max|`All] -> ord:Ordering.t ->
+  t -> (term * Rat_lit.Focus.t * Position.t) Sequence.t
 (** Fold on terms under arithmetic literals, with the focus on
     the current term *)
 

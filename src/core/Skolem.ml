@@ -11,7 +11,7 @@ type type_ = TypedSTerm.t
 type term = TypedSTerm.t
 type form = TypedSTerm.t
 
-let section = Util.Section.(make ~parent:zip "skolem")
+let section = Util.Section.(make "skolem")
 
 type kind = K_normal | K_ind (* inductive *)
 

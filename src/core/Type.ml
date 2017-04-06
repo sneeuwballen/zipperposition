@@ -211,6 +211,10 @@ let rec open_poly_fun ty = match view ty with
     let args, ret = open_fun ty in
     0, args, ret
 
+let returns ty =
+  let _, _, ret = open_poly_fun ty in
+  ret
+
 exception ApplyError of string
 
 let () = Printexc.register_printer
@@ -240,8 +244,8 @@ let apply ty0 args0 =
     | _, [] ->
       T.DB.eval env (arrow_ exp_args ty_ret)
     | [], _ ->
-      err_applyf_ "@[<2>Type.apply:@ unexpected arguments @[%a@]@]"
-        (CCFormat.list T.pp) args
+      err_applyf_ "@[<2>Type.apply:@ unexpected arguments [@[%a@]]@]"
+        (Util.pp_list T.pp) args
     | exp :: exp_args', a :: args' ->
       (* expected type: [exp];  [a]: actual value, whose type must match [exp] *)
       let exp' = T.DB.eval env exp in

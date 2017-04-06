@@ -147,15 +147,7 @@ val map :
 
 (** {2 Defined Constants} *)
 
-type form_rewrite = lit * clause list
-(** Basic rewrite rule for literals *)
-
-type form_definition = form_rewrite list
-(** Definition for a literal *)
-
-type definition =
-  | D_term of Rewrite_term.defined_cst
-  | D_form of form_definition
+type definition = Rewrite.rule_set
 
 val as_defined_cst: ID.t -> (int * definition) option
 (** [as_defined_cst id] returns [Some level] if [id] is a constant
@@ -165,15 +157,23 @@ val as_defined_cst_level : ID.t -> int option
 
 val is_defined_cst: ID.t -> bool
 
-val declare_defined_form : ID.t -> level:int -> form_definition -> unit
+val declare_defined_cst : ID.t -> level:int -> definition -> unit
 (** [declare_defined_cst id ~level] states that [id] is a defined
     constant of given [level]. It means that it is defined based only
     on constants of strictly lower levels *)
 
-val declare_defined_cst_term : ID.t -> level:int -> Rewrite_term.rule list -> unit
-
 val scan_stmt_for_defined_cst : (clause, FOTerm.t, Type.t) t -> unit
 (** Try and declare defined constants in the given statement *)
+
+(** {2 Inductive Types} *)
+
+val scan_stmt_for_ind_ty : (_, _, Type.t) t -> unit
+(** [scan_stmt_for_ind_ty stmt] examines [stmt], and, if the statement is a
+    declaration of inductive types or constants,
+    it declares them using {!declare_ty} or {!declare_inductive_constant}. *)
+
+val scan_simple_stmt_for_ind_ty : (_, _, TypedSTerm.t) t -> unit
+(** Same as {!scan_stmt} but on earlier statements *)
 
 (** {2 Sourced Statements} *)
 
@@ -218,14 +218,10 @@ module Src : sig
   (* include Interfaces.PRINT with type t := t *)
 
   val pp_role : role CCFormat.printer
+
+  val pp : t CCFormat.printer
+  val pp_tstp : t CCFormat.printer
 end
-
-(**/**)
-
-exception Payload_defined_form of int * form_definition ref
-(** Annotation on propositional IDs that are defined (int: stratification level) *)
-
-(**/**)
 
 (** {2 Iterators} *)
 

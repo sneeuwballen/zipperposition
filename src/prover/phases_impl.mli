@@ -30,8 +30,12 @@ val print :
   (unit, [`Saturate], [`Print_dot]) Phases.t
 (** Printing of results *)
 
+val check :
+  Saturate.szs_status ->
+  (Phases.errcode, [`Print_dot], [`Check_proof]) Phases.t
+
 val process_files_and_print :
   Phases.filename list ->
-  (unit, [`LoadExtensions], [`Print_dot]) Phases.t
+  (Phases.errcode, [`LoadExtensions], [`Check_proof]) Phases.t
 (** Process each file in the list successively, printing the results. *)
 

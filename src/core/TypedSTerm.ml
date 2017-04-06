@@ -10,11 +10,12 @@ module Loc = ParseLocation
 
 type location = ParseLocation.t
 
-let section = Util.Section.(make ~parent:zip "typedSTerm")
+let section = Util.Section.make "typedSTerm"
 
 type t = {
   term : view;
   ty : t option;
+  mutable hash: int; (* computed lazily *)
   loc : location option;
 }
 and term = t
@@ -70,6 +71,8 @@ let rec head_exn t = match view t with
   | Record (_,_)
   | Meta _ -> raise Not_found
 
+let head t = try Some (head_exn t) with Not_found -> None
+
 let to_int_ = function
   | Var _ -> 0
   | Const _ -> 3
@@ -83,7 +86,35 @@ let to_int_ = function
   | Match _ -> 11
   | Let _ -> 12
 
-let rec compare t1 t2 = match view t1, view t2 with
+let rec hash t =
+  if t.hash <> -1 then t.hash
+  else (
+    let h = hash_rec_ t in
+    assert (h <> -1);
+    t.hash <- h;
+    h
+  )
+and hash_rec_ t = match t.term with
+  | Var s -> Hash.combine2 1 (Var.hash s)
+  | Const s -> Hash.combine2 2 (ID.hash s)
+  | App (s, l) -> Hash.combine3 3 (hash s) (Hash.list hash l)
+  | Multiset l -> Hash.combine2 4 (Hash.list hash l)
+  | AppBuiltin (b,l) -> Hash.combine3 5 (Builtin.hash b) (Hash.list hash l)
+  | Bind (s,v,t') -> Hash.combine4 6 (Binder.hash s) (Var.hash v) (hash t')
+  | Record (l, rest) ->
+    Hash.combine3 7
+      (Hash.opt hash rest)
+      (Hash.list (Hash.pair Hash.string hash) l)
+  | Ite (a,b,c) -> Hash.combine4 8 (hash a) (hash b) (hash c)
+  | Let (_, u) -> Hash.combine2 9 (hash u)
+  | Match (u, _) -> Hash.combine2 10 (hash u)
+  | Meta (id,_,_) -> Var.hash id
+
+let rec compare t1 t2 =
+  let h1 = hash t1 in
+  let h2 = hash t2 in
+  if h1<>h2 then CCInt.compare h1 h2 (* compare by hash, first *)
+  else match view t1, view t2 with
   | Var s1, Var s2 -> Var.compare s1 s2
   | Const s1, Const s2 -> ID.compare s1 s2
   | App (s1,l1), App (s2, l2) ->
@@ -139,22 +170,6 @@ and cmp_field x y = CCOrd.pair String.compare compare x y
 and cmp_fields x y = CCOrd.list cmp_field x y
 
 let equal t1 t2 = compare t1 t2 = 0
-
-let rec hash t = match t.term with
-  | Var s -> Hash.combine2 1 (Var.hash s)
-  | Const s -> Hash.combine2 2 (ID.hash s)
-  | App (s, l) -> Hash.combine3 3 (hash s) (Hash.list hash l)
-  | Multiset l -> Hash.combine2 4 (Hash.list hash l)
-  | AppBuiltin (b,l) -> Hash.combine3 5 (Builtin.hash b) (Hash.list hash l)
-  | Bind (s,v,t') -> Hash.combine4 6 (Binder.hash s) (Var.hash v) (hash t')
-  | Record (l, rest) ->
-    Hash.combine3 7
-      (Hash.opt hash rest)
-      (Hash.list (Hash.pair Hash.string hash) l)
-  | Ite (a,b,c) -> Hash.combine4 8 (hash a) (hash b) (hash c)
-  | Let (_, u) -> Hash.combine2 9 (hash u)
-  | Match (u, _) -> Hash.combine2 10 (hash u)
-  | Meta (id,_,_) -> Var.hash id
 
 
 let rec unfold_binder b f = match f.term with
@@ -242,7 +257,7 @@ let () = Printexc.register_printer
       | IllFormedTerm msg -> Some ("ill formed term: " ^ msg)
       | _ -> None)
 
-let make_ ?loc ~ty view = {term=view; loc; ty=Some ty; }
+let make_ ?loc ~ty view = {term=view; loc; ty=Some ty; hash= -1;}
 
 let var ?loc v = make_ ?loc ~ty:v.Var.ty (Var v)
 let var_of_string ?loc ~ty n = var ?loc (Var.of_string ~ty n)
@@ -316,10 +331,13 @@ let map_ty t ~f =
 
 let of_string ?loc ~ty s = const ?loc ~ty (ID.make s)
 
-let tType = {ty=None; loc=None; term=AppBuiltin (Builtin.TType,[]); }
+let tType = {ty=None; loc=None; term=AppBuiltin (Builtin.TType,[]); hash= -1; }
 let prop = builtin ~ty:tType Builtin.Prop
 
 let fresh_var ?loc ~ty () = var ?loc (Var.gensym ~ty ())
+
+let box_opaque t: t =
+  make_ ~ty:(ty_exn t) (AppBuiltin (Builtin.Box_opaque, [t]))
 
 (** {2 Utils} *)
 
@@ -690,6 +708,8 @@ module Form = struct
   let ite = ite
   let imply ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Imply [a;b]
 
+  let box_opaque = box_opaque
+
   let rec flatten_ (k:[<`And|`Or]) acc l = match l with
     | [] -> acc
     | t::l' ->
@@ -708,7 +728,7 @@ module Form = struct
     | l -> app_builtin ?loc ~ty:Ty.prop Builtin.And (flatten_ `And [] l)
 
   let or_ ?loc = function
-    | [] -> true_
+    | [] -> false_
     | [t] -> t
     | l -> app_builtin ?loc ~ty:Ty.prop Builtin.Or (flatten_ `Or [] l)
 

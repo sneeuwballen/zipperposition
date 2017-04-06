@@ -98,6 +98,8 @@ val is_renaming : t -> bool
 
 val equal : t -> t -> bool
 
+val compare : t -> t -> int
+
 val hash : t -> int
 
 include Interfaces.PRINT with type t := t

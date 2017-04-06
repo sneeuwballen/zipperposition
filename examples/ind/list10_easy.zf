@@ -4,9 +4,8 @@ include "list.zf".
 
 # not trivial! proof of `a+b=b+a` is not so easy
 
-val sum : list -> nat.
-assert (sum nil) = z.
-assert
+def sum : list -> nat where
+  (sum nil) = z;
   forall (N:nat). (forall (L:list). ((sum (cons N L)) = (plus N (sum L)))).
 
 lemma forall X. plus X z = X.

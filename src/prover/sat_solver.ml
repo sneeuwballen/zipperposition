@@ -26,7 +26,7 @@ let wrong_state_ msg = raise (WrongState msg)
 let errorf msg = Util.errorf ~where:"sat_solver" msg
 
 let sat_dump_file_ = ref ""
-let sat_compact_ = ref true
+let sat_compact_ = ref false
 
 module type S = Sat_solver_intf.S
 
@@ -73,6 +73,7 @@ module Make(Dummy : sig end)
 
   let clause_tbl_ : (int * proof_step) ClauseTbl.t = ClauseTbl.create 32
   let tag_to_proof_ : (int, proof_step) Hashtbl.t = Hashtbl.create 32
+  let lit_tbl_ : unit Lit.Tbl.t = Lit.Tbl.create 32
 
   (* add clause, if not added already *)
   let add_clause_ ~proof c =
@@ -83,6 +84,7 @@ module Make(Dummy : sig end)
       let tag = fresh_tag_() in
       ClauseTbl.add clause_tbl_ c (tag,proof);
       Hashtbl.add tag_to_proof_ tag proof;
+      List.iter (fun lit -> Lit.Tbl.replace lit_tbl_ (Lit.abs lit) ()) c;
       Queue.push ([c], proof, tag) queue_
     )
 
@@ -111,6 +113,7 @@ module Make(Dummy : sig end)
   let eval_ = ref eval_fail_
   let eval_level_ = ref eval_fail_
   let proof_ : proof option ref = ref None
+  let proved_lits_ : Lit.Set.t lazy_t ref = ref (lazy Lit.Set.empty)
 
   let pp_ = ref Lit.pp
 
@@ -125,6 +128,7 @@ module Make(Dummy : sig end)
   let last_result () = !result_
   let valuation l = !eval_ l
   let valuation_level l = !eval_level_ l
+  let all_proved () = Lazy.force !proved_lits_
 
   let get_proof () = match !proof_ with
     | None -> assert false
@@ -137,7 +141,7 @@ module Make(Dummy : sig end)
     let norm l =
       let l', b = norm l in
       l', if b then FI.Negated else FI.Same_sign
-    type proof = ProofStep.t
+    type proof = Proof.Step.t
     let print = Lit.pp
   end
 
@@ -157,13 +161,13 @@ module Make(Dummy : sig end)
 
   (* (clause * proof * proof) -> 'a *)
   module ResTbl = CCHashtbl.Make(struct
-      type t = sat_clause * ProofStep.of_ * ProofStep.of_
+      type t = sat_clause * Proof.t * Proof.t
       let equal (c,a1,a2)(c',b1,b2) =
         CCList.equal Lit.equal c c' &&
-        ProofStep.equal_proof a1 b1 && ProofStep.equal_proof a2 b2
+        Proof.S.equal a1 b1 && Proof.S.equal a2 b2
       let hash (c,a,b) =
         Hashtbl.hash
-          [List.length c; ProofStep.hash_proof a; ProofStep.hash_proof b]
+          [List.length c; Proof.S.hash a; Proof.S.hash b]
     end)
 
   let tbl_res = ResTbl.create 16
@@ -178,7 +182,7 @@ module Make(Dummy : sig end)
     begin match CCHashtbl.get tag_to_proof_ tag with
       | Some step ->
         let c = bool_clause_of_sat c in
-        ProofStep.mk_bc step c
+        Proof.S.mk_bc step c
       | None -> errorf "no proof for tag %d" tag
     end
 
@@ -197,11 +201,11 @@ module Make(Dummy : sig end)
           begin match ResTbl.get tbl_res (c,q1,q2) with
             | Some s -> s
             | None ->
-              let parents = [q1; q2] in
+              let parents = [Proof.Parent.from q1; Proof.Parent.from q2] in
               let step =
-                ProofStep.mk_inference parents
-                  ~rule:(ProofStep.mk_rule "sat_resolution")  in
-              let s = ProofStep.mk_bc step c in
+                Proof.Step.inference parents
+                  ~rule:(Proof.Rule.mk "sat_resolution") in
+              let s = Proof.S.mk_bc step c in
               ResTbl.add tbl_res (c,q1,q2) s;
               ResTbl.add tbl_res (c,q2,q1) s;
               s
@@ -221,15 +225,15 @@ module Make(Dummy : sig end)
            | { step = S.Proof.Resolution (_,_,_); _ } ->
              acc (* ignore, intermediate node *)
            | { conclusion=c; step = _ } ->
-             proof_of_leaf c :: acc)
+             Proof.Parent.from (proof_of_leaf c) :: acc)
         [] p
     in
     let {conclusion=c;_} = S.Proof.expand p in
     let c = bool_clause_of_sat c in
     let step =
-      ProofStep.mk_inference leaves
-        ~rule:(ProofStep.mk_rule "sat_resolution*")  in
-    ProofStep.mk_bc step c
+      Proof.Step.inference leaves
+        ~rule:(Proof.Rule.mk "sat_resolution*")  in
+    Proof.S.mk_bc step c
 
   let conv_proof_ p =
     if !sat_compact_
@@ -249,6 +253,15 @@ module Make(Dummy : sig end)
     else if S.true_at_level0 (Lit.neg lit) then Some false
     else None
 
+  let get_proved_lits (): Lit.Set.t =
+    Lit.Tbl.to_seq lit_tbl_
+    |> Sequence.filter_map
+      (fun (lit,_) -> match proved_at_0 lit with
+         | Some true -> Some lit
+         | Some false -> Some (Lit.neg lit)
+         | None -> None)
+    |> Lit.Set.of_seq
+
   (* call [S.solve()] in any case, and enforce invariant about eval/unsat_core *)
   let check_unconditional_ () =
     (* reset functions, so they will fail if called in the wrong state *)
@@ -260,7 +273,7 @@ module Make(Dummy : sig end)
     while not (Queue.is_empty queue_) do
       let c, proof, tag = Queue.pop queue_ in
       Util.debugf ~section 4 "@[<hv2>assume@ @[%a@]@ proof: %a@]"
-        (fun k->k pp_form (c,tag) ProofPrint.pp_normal_step proof);
+        (fun k->k pp_form (c,tag) Proof.Step.pp proof);
       S.assume ~tag c
     done;
     (* solve *)
@@ -268,6 +281,7 @@ module Make(Dummy : sig end)
       | S.Sat s ->
         eval_ := s.SI.eval;
         eval_level_ := s.SI.eval_level;
+        proved_lits_ := lazy (get_proved_lits ());
         result_ := Sat;
       | S.Unsat us ->
         let p = us.SI.get_proof ()  |> conv_proof_ in

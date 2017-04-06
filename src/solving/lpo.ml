@@ -7,7 +7,7 @@ open Logtk
 
 module SI = Msat.Solver_intf
 
-let section = Util.Section.(make ~parent:zip "solving")
+let section = Util.Section.(make ~parent:(make "solving") "lpo")
 
 (** {6 Constraints} *)
 

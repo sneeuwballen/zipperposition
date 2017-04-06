@@ -3,8 +3,6 @@
 
 (** {1 Array of literals} *)
 
-open Logtk
-
 module BV = CCBV
 module T = FOTerm
 module S = Subst
@@ -34,24 +32,24 @@ let equal_com lits1 lits2 =
   then false
   else check 0
 
-let compare lits1 lits2 =
-  let rec check i =
-    if i = Array.length lits1 then 0 else
-      let cmp = compare lits1.(i) lits2.(i) in
-      if cmp = 0 then check (i+1) else cmp
-  in
-  if Array.length lits1 <> Array.length lits2
-  then Array.length lits1 - Array.length lits2
-  else check 0
+let compare lits1 lits2 = CCArray.compare Lit.compare lits1 lits2
 
 let hash lits = Hash.array Lit.hash lits
 
 let variant ?(subst=S.empty) (a1,sc1) (a2,sc2) =
-  Unif.unif_array_com subst (a1,sc1) (a2,sc2)
+  Unif.unif_array_com ~size:`Same subst (a1,sc1) (a2,sc2)
     ~op:(fun subst x y -> Lit.variant ~subst x y)
+  |> Sequence.filter Subst.is_renaming
 
 let are_variant a1 a2 =
   not (Sequence.is_empty (variant (Scoped.make a1 0) (Scoped.make a2 1)))
+
+let matching ?(subst=S.empty) ~pattern:(a1,sc1) (a2,sc2) =
+  Unif.unif_array_com ~size:`Same subst (a1,sc1) (a2,sc2)
+    ~op:(fun subst x y -> Lit.matching ~subst ~pattern:x y)
+
+let matches a1 a2 =
+  not (Sequence.is_empty (matching ~pattern:(Scoped.make a1 0) (Scoped.make a2 1)))
 
 let weight lits =
   Array.fold_left (fun w lit -> w + Lit.weight lit) 0 lits
@@ -147,7 +145,31 @@ let is_max ~ord lits =
     MLI.is_max (_compare_lit_with_idx ~ord) (lit,i) m
 
 let is_trivial lits =
-  CCArray.exists Lit.is_trivial lits
+  (* check if a pair of lits is trivial *)
+  let rec check_multi lits i =
+    if i = Array.length lits then false
+    else
+      let triv = match lits.(i) with
+        | Lit.Prop (p, sign) ->
+          CCArray.exists
+            (function
+              | Lit.Prop (p', sign') when sign = not sign' ->
+                T.equal p p'  (* p  \/  ~p *)
+              | _ -> false)
+            lits
+        | Lit.Equation (l, r, true) when T.equal l r -> true
+        | Lit.Equation (l, r, sign) ->
+          CCArray.exists
+            (function
+              | Lit.Equation (l', r', sign') when sign = not sign' ->
+                (T.equal l l' && T.equal r r') || (T.equal l r' && T.equal l' r)
+              | _ -> false)
+            lits
+        | lit -> Lit.is_trivial lit
+      in
+      triv || check_multi lits (i+1)
+  in
+  CCArray.exists Lit.is_trivial lits || check_multi lits 0
 
 let is_absurd lits =
   CCArray.for_all Lit.is_absurd lits
@@ -210,6 +232,11 @@ module Conv = struct
 
   let to_forms ?hooks lits =
     Array.to_list (Array.map (Lit.Conv.to_form ?hooks) lits)
+
+  let to_s_form ?(ctx=T.Conv.create()) ?hooks lits =
+    Array.to_list lits
+    |> List.map (Literal.Conv.to_s_form ~ctx)
+    |> TypedSTerm.Form.or_
 end
 
 module View = struct
@@ -223,6 +250,11 @@ module View = struct
       Lit.View.focus_arith lits.(idx) pos'
     | _ -> None
 
+  let get_rat lits pos = match pos with
+    | Position.Arg (idx, pos') when idx < Array.length lits ->
+      Lit.View.focus_rat lits.(idx) pos'
+    | _ -> None
+
   let _unwrap2 ~msg f x y = match f x y with
     | Some z -> z
     | None -> invalid_arg msg
@@ -232,6 +264,9 @@ module View = struct
 
   let get_arith_exn =
     _unwrap2 ~msg:"get_arith: improper position" get_arith
+
+  let get_rat_exn =
+    _unwrap2 ~msg:"get_rat: improper position" get_rat
 end
 
 let fold_lits ~eligible lits k =
@@ -276,7 +311,8 @@ let fold_eqn ?(both=true) ?sign ~ord ~eligible lits k =
           k (p, T.true_, sign, Position.(arg i @@ left @@ stop))
         | Lit.Prop _
         | Lit.Equation _
-        | Lit.Arith _
+        | Lit.Int _
+        | Lit.Rat _
         | Lit.True
         | Lit.False -> ()
       end;
@@ -309,12 +345,45 @@ let fold_arith_terms ~eligible ~which ~ord lits k =
          match which with
            | `All -> (fun _ -> true)
            | `Max ->
-             let max_terms = ArithLit.max_terms ~ord a_lit in
+             let max_terms = Int_lit.max_terms ~ord a_lit in
              fun t -> CCList.mem ~eq:T.equal t max_terms
        in
-       ArithLit.Focus.fold_terms ~pos a_lit
+       Int_lit.Focus.fold_terms ~pos a_lit
          (fun (foc_lit, pos) ->
-            let t = ArithLit.Focus.term foc_lit in
+            let t = Int_lit.Focus.term foc_lit in
+            if do_term t then k (t, foc_lit, pos))
+    )
+
+let fold_rat ~eligible lits k =
+  let rec aux i =
+    if i = Array.length lits then ()
+    else if not (eligible i lits.(i)) then aux (i+1)
+    else (
+      begin match Lit.View.get_rat lits.(i) with
+        | None -> ()
+        | Some x ->
+          let pos = Position.(arg i stop) in
+          k (x, pos)
+      end;
+      aux (i+1)
+    )
+  in aux 0
+
+let fold_rat_terms ~eligible ~which ~ord lits k =
+  let module M = Monome in let module MF = Monome.Focus in
+  fold_rat ~eligible lits
+    (fun (a_lit, pos) ->
+       (* do we use the given term? *)
+       let do_term =
+         match which with
+           | `All -> (fun _ -> true)
+           | `Max ->
+             let max_terms = Rat_lit.max_terms ~ord a_lit in
+             fun t -> CCList.mem ~eq:T.equal t max_terms
+       in
+       Rat_lit.Focus.fold_terms ~pos a_lit
+         (fun (foc_lit, pos) ->
+            let t = Rat_lit.Focus.term foc_lit in
             if do_term t then k (t, foc_lit, pos))
     )
 

@@ -15,7 +15,7 @@ module Subst = Var.Subst
 module Fmt = CCFormat
 
 let prof_infer = Util.mk_profiler "TypeInference.infer"
-let section = Util.Section.(make ~parent:zip "ty_infer")
+let section = Util.Section.(make "ty-infer")
 
 type 'a or_error = ('a, string) CCResult.t
 
@@ -31,6 +31,15 @@ let () = Printexc.register_printer
       | Error msg ->
         Some (CCFormat.sprintf "@[@{<Red>type inference error@}:@ %s@]" msg)
       | _ -> None)
+
+let error_on_incomplete_match_ = ref false
+let () =
+  Options.add_opts
+    [ "--require-exhaustive-matches", Arg.Set error_on_incomplete_match_,
+        " fail if pattern matches are not exhaustive";
+      "--no-require-exhautive-matches", Arg.Clear error_on_incomplete_match_,
+        " accept non-exhaustive pattern matches";
+    ]
 
 (* error-raising function *)
 let error_ ?loc msg =
@@ -116,6 +125,8 @@ module Ctx = struct
     (* map names to variables or IDs *)
     def_as_rewrite: bool;
     (* if true, definitions are rewrite rules *)
+    on_var: [`Default | `Infer];
+    (* what to do for variables without type annotation *)
     on_undef: [`Warn | `Fail | `Guess];
     (* what to do when we meet an undefined symbol *)
     mutable new_metas: T.meta_var list;
@@ -129,10 +140,11 @@ module Ctx = struct
     (* list of symbols whose type has been inferred recently *)
   }
 
-  let create ?(def_as_rewrite=true) ?(default=T.Ty.term) ?(on_undef=`Guess) () =
+  let create ?(def_as_rewrite=true) ?(default=T.Ty.term) ?(on_var=`Infer) ?(on_undef=`Guess) () =
     let ctx = {
       default;
       def_as_rewrite;
+      on_var;
       on_undef;
       env = Hashtbl.create 32;
       datatypes = ID.Tbl.create 32;
@@ -200,8 +212,12 @@ module Ctx = struct
     );
     Hashtbl.add ctx.env name (`ID (s,ty))
 
+  let default_dest ctx = match ctx.on_var with
+    | `Default -> `BindDefault
+    | `Infer -> `Generalize
+
   (* generate fresh type var. *)
-  let fresh_ty_meta_var ?(dest=`BindDefault) ctx : T.meta_var =
+  let fresh_ty_meta_var ctx ?(dest=default_dest ctx) () : T.meta_var =
     let v = Var.gensym ~ty:T.tType () in
     let r = ref None in
     let meta = v, r, dest in
@@ -212,12 +228,12 @@ module Ctx = struct
   let rec fresh_ty_meta_vars ?dest ctx n =
     if n = 0
     then []
-    else fresh_ty_meta_var ?dest ctx :: fresh_ty_meta_vars ?dest ctx (n-1)
+    else fresh_ty_meta_var ?dest ctx () :: fresh_ty_meta_vars ?dest ctx (n-1)
 
   (* Fresh function type with [arity] arguments. Type meta-vars should
      not be generalized but bound to default. *)
   let fresh_fun_ty ?(dest=`BindDefault) ~arity ctx =
-    let ret = fresh_ty_meta_var ~dest ctx in
+    let ret = fresh_ty_meta_var ctx ~dest () in
     let new_vars = fresh_ty_meta_vars ~dest ctx arity in
     let ty = T.Ty.fun_ (List.map (fun v->T.Ty.meta v) new_vars) (T.Ty.meta ret) in
     ty
@@ -256,7 +272,8 @@ module Ctx = struct
   (* in ZF, variables might be constant, there is no syntactic difference *)
   let get_var_ ctx v =
     let mk_fresh v =
-      let ty_v = fresh_ty_meta_var ~dest:`Generalize ctx in
+      let dest = default_dest ctx in
+      let ty_v = fresh_ty_meta_var ~dest ctx () in
       let v' = Var.of_string ~ty:(T.Ty.meta ty_v) v in
       ctx.local_vars <- v' :: ctx.local_vars;
       v'
@@ -298,7 +315,7 @@ let with_typed_vars_ ?loc ~infer_ty ctx vars ~f =
     | [] -> f (List.rev acc)
     | (v,o) :: l' ->
       let ty = match o with
-        | None -> T.Ty.meta (Ctx.fresh_ty_meta_var ~dest:`Generalize ctx)
+        | None -> T.Ty.meta (Ctx.fresh_ty_meta_var ~dest:`Generalize ctx ())
         | Some ty -> infer_ty ?loc ctx ty
       in
       let v = match v with
@@ -388,7 +405,7 @@ let add_implicit_params ty_fun l =
 
 let mk_metas ctx n =
   CCList.init n
-    (fun _ -> T.Ty.meta (Ctx.fresh_ty_meta_var ~dest:`Generalize ctx))
+    (fun _ -> T.Ty.meta (Ctx.fresh_ty_meta_var ~dest:`Generalize ctx ()))
 
 (* apply type to the relevant number of metas; return the resulting type *)
 let apply_ty_to_metas ?loc ctx (ty:T.Ty.t): T.Ty.t list * T.Ty.t =
@@ -471,10 +488,10 @@ let rec infer_rec ctx t =
         with Not_found ->
           error_ ?loc "type `@[%a@]` is not a known datatype" T.pp ty_u
       in
-      let l = infer_match ?loc ctx ~ty_matched:ty_u data l in
+      let l = infer_match ?loc ctx ~ty_matched:ty_u t data l in
       T.match_ ?loc u l
     | PT.List [] ->
-      let v = Ctx.fresh_ty_meta_var ~dest:`Generalize ctx in
+      let v = Ctx.fresh_ty_meta_var ~dest:`Generalize ctx () in
       let ty = T.Ty.multiset (T.Ty.meta v) in
       T.multiset ?loc ~ty []
     | PT.List (t::l) ->
@@ -503,7 +520,7 @@ let rec infer_rec ctx t =
       T.record ~ty ?loc l ~rest
     | PT.AppBuiltin (Builtin.Wildcard, []) ->
       (* make a new TYPE variable *)
-      let v = Ctx.fresh_ty_meta_var ~dest:`Generalize ctx in
+      let v = Ctx.fresh_ty_meta_var ~dest:`Generalize ctx () in
       T.Ty.meta v
     | PT.AppBuiltin (Builtin.Arrow, ret :: args) ->
       let ret = infer_ty_exn ctx ret in
@@ -610,7 +627,7 @@ and infer_app ?loc ctx id ty_id l =
 
 (* replace a match with possibly a "default" case into a completely
    defined match *)
-and infer_match ?loc ctx ~ty_matched data (l:PT.match_branch list)
+and infer_match ?loc ctx ~ty_matched t data (l:PT.match_branch list)
   : (T.match_cstor * type_ Var.t list * T.t) list =
   let ty_ret = ref None in
   (* check consistency of types in every branch *)
@@ -687,7 +704,14 @@ and infer_match ?loc ctx ~ty_matched data (l:PT.match_branch list)
   begin match missing with
     | [] -> l
     | _::_ ->
-      error_ ?loc "missing cases in match: (@[%a@])" (Util.pp_list ID.pp) missing
+      if !error_on_incomplete_match_ then (
+        error_ ?loc "missing cases in match: (@[%a@])@ :in `%a`"
+          (Util.pp_list ID.pp) missing PT.pp t
+      ) else (
+        Util.warnf "%a@,missing cases in match: (@[%a@])@ :in `%a`"
+          Loc.pp_opt loc (Util.pp_list ID.pp) missing PT.pp t;
+        l
+      )
   end
 
 (* infer a term, and force its type to [prop] *)
@@ -871,6 +895,16 @@ let infer_defs ?loc ctx (l:A.def list): (_,_,_) Stmt.def list =
                   Stmt.Def_term (vars,id,ty,args,rhs)
                 | `Prop (vars,lhs,rhs) ->
                   assert (T.Ty.is_prop (T.ty_exn rhs));
+                  let ok = match lhs with
+                    | SLiteral.Atom (t,_) ->
+                      T.head t |> CCOpt.map_or (ID.equal id) ~default:false
+                    | _ -> false
+                  in
+                  if not ok then (
+                    error_ ?loc
+                      "rule `%a`@ must have `%a` as head symbol"
+                      T.pp r ID.pp id
+                  );
                   Stmt.Def_form (vars,lhs,[rhs])
               end)
            rules
@@ -980,9 +1014,9 @@ let infer_statement_exn ctx st =
   in
   st, aux
 
-let infer_statements_exn ?def_as_rewrite ?on_undef ?ctx seq =
+let infer_statements_exn ?def_as_rewrite ?on_var ?on_undef ?ctx seq =
   let ctx = match ctx with
-    | None -> Ctx.create ?def_as_rewrite ?on_undef ()
+    | None -> Ctx.create ?def_as_rewrite ?on_var ?on_undef ()
     | Some c -> c
   in
   let res = CCVector.create () in
@@ -995,7 +1029,7 @@ let infer_statements_exn ?def_as_rewrite ?on_undef ?ctx seq =
     seq;
   CCVector.freeze res
 
-let infer_statements ?def_as_rewrite ?on_undef ?ctx seq =
-  try Err.return (infer_statements_exn ?def_as_rewrite ?on_undef ?ctx seq)
+let infer_statements ?def_as_rewrite ?on_var ?on_undef ?ctx seq =
+  try Err.return (infer_statements_exn ?def_as_rewrite ?on_var ?on_undef ?ctx seq)
   with e -> Err.of_exn_trace e
 

@@ -3,8 +3,6 @@
 
 (** {1 Equational literals} *)
 
-open Logtk
-
 type term = FOTerm.t
 
 (** a literal, that is, a signed atomic formula *)
@@ -13,7 +11,8 @@ type t = private
   | False
   | Equation of term * term * bool
   | Prop of term * bool
-  | Arith of ArithLit.t
+  | Int of Int_lit.t
+  | Rat of Rat_lit.t
 
 val equal_com : t -> t -> bool     (** commutative equality of lits *)
 val compare : t -> t -> int     (** lexicographic comparison of literals *)
@@ -42,6 +41,10 @@ val is_arith_less : t -> bool
 val is_arith_lesseq : t -> bool
 val is_arith_divides : t -> bool
 
+val is_rat : t -> bool
+val is_rat_eq : t -> bool
+val is_rat_less : t -> bool
+
 (** build literals. If sides so not have the same sort,
     a SortError will be raised. An ordering must be provided *)
 val mk_eq : term -> term -> t
@@ -53,8 +56,8 @@ val mk_false : term -> t    (* false proposition *)
 val mk_tauto : t (* tautological literal *)
 val mk_absurd : t (* absurd literal, like ~ true *)
 
-val mk_arith : ArithLit.t -> t
-val mk_arith_op : ArithLit.op -> Z.t Monome.t -> Z.t Monome.t -> t
+val mk_arith : Int_lit.t -> t
+val mk_arith_op : Int_lit.op -> Z.t Monome.t -> Z.t Monome.t -> t
 val mk_arith_eq : Z.t Monome.t -> Z.t Monome.t -> t
 val mk_arith_neq : Z.t Monome.t -> Z.t Monome.t -> t
 val mk_arith_less : Z.t Monome.t -> Z.t Monome.t -> t
@@ -62,6 +65,11 @@ val mk_arith_lesseq : Z.t Monome.t -> Z.t Monome.t -> t
 
 val mk_divides : ?sign:bool -> Z.t -> power:int -> Z.t Monome.t -> t
 val mk_not_divides : Z.t -> power:int -> Z.t Monome.t -> t
+
+val mk_rat : Rat_lit.t -> t
+val mk_rat_op : Rat_lit.op -> Q.t Monome.t -> Q.t Monome.t -> t
+val mk_rat_eq : Q.t Monome.t -> Q.t Monome.t -> t
+val mk_rat_less : Q.t Monome.t -> Q.t Monome.t -> t
 
 val matching : ?subst:Subst.t -> pattern:t Scoped.t -> t Scoped.t ->
   Subst.t Sequence.t
@@ -99,6 +107,8 @@ val var_occurs : Type.t HVar.t -> t -> bool
 val is_ground : t -> bool
 val symbols : t -> ID.Set.t
 val root_terms : t -> term list (** all the terms immediatly under the lit *)
+
+module Set : CCSet.S with type elt = t
 
 (** {2 Basic semantic checks} *)
 
@@ -194,14 +204,23 @@ module View : sig
       @return None for other literals
       @raise Invalid_argument if the position doesn't match the literal. *)
 
-  val get_arith : t -> ArithLit.t option
+  val get_arith : t -> Int_lit.t option
   (** Extract an arithmetic literal *)
 
-  val focus_arith : t -> Position.t -> ArithLit.Focus.t option
+  val focus_arith : t -> Position.t -> Int_lit.Focus.t option
   (** Focus on a specific term in an arithmetic literal. The focused term is
       removed from its monome, and its coefficient is returned. *)
 
-  val unfocus_arith : ArithLit.Focus.t -> t
+  val unfocus_arith : Int_lit.Focus.t -> t
+
+  val get_rat : t -> Rat_lit.t option
+  (** Extract an arithmetic literal *)
+
+  val focus_rat : t -> Position.t -> Rat_lit.Focus.t option
+  (** Focus on a specific term in an arithmetic literal. The focused term is
+      removed from its monome, and its coefficient is returned. *)
+
+  val unfocus_rat : Rat_lit.Focus.t -> t
 end
 
 (** {2 Conversions} *)
@@ -209,7 +228,8 @@ module Conv : sig
   type hook_from = term SLiteral.t -> t option
   type hook_to = t -> term SLiteral.t option
 
-  val arith_hook_from : hook_from
+  val int_hook_from : hook_from
+  val rat_hook_from : hook_from
 
   val of_form : ?hooks:hook_from list -> term SLiteral.t -> t
   (** Conversion from a formula. By default no ordering or arith theory
@@ -217,6 +237,8 @@ module Conv : sig
       @raise Invalid_argument if the formula is not atomic. *)
 
   val to_form : ?hooks:hook_to list -> t -> term SLiteral.t
+
+  val to_s_form : ?ctx:FOTerm.Conv.ctx -> ?hooks:hook_to list -> t -> TypedSTerm.Form.t
 end
 
 (** {2 IO} *)

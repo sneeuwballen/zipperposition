@@ -14,15 +14,17 @@ let phases =
   Phases_impl.setup_signal >>= fun () ->
   Phases_impl.parse_cli >>= fun (files, _params) ->
   Phases_impl.load_extensions >>= fun _ ->
-  Phases_impl.process_files_and_print files >>= fun () ->
-  Phases.exit
+  Phases_impl.process_files_and_print files >>= fun errcode ->
+  Phases.exit >|= fun () ->
+  errcode
 
 let () =
   match Phases.run phases with
     | CCResult.Error msg ->
       print_endline msg;
       exit 1
-    | CCResult.Ok (_, ()) -> ()
+    | CCResult.Ok (_, 0) -> ()
+    | CCResult.Ok (_, errcode) -> exit errcode (* failure *)
 
 let _ =
   at_exit

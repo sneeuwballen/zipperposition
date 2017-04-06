@@ -21,6 +21,7 @@ exception Error of string
 
 let error msg = raise (Error msg)
 let errorf msg = CCFormat.ksprintf msg ~f:error
+let section = Util.Section.base
 
 (** {2 Printing/Parsing} *)
 
@@ -32,7 +33,7 @@ let find_file name dir =
   (* search in [dir], and its parents recursively *)
   let rec search dir =
     let cur_name = Filename.concat dir name in
-    Util.debugf 2 "search `%s`@ as `%s`" (fun k->k name cur_name);
+    Util.debugf 2 ~section "search `%s`@ as `%s`" (fun k->k name cur_name);
     if Sys.file_exists cur_name
     then Some cur_name
     else

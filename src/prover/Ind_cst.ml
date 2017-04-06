@@ -74,6 +74,8 @@ let id_is_cst id = match id_as_cst id with Some _ -> true | _ -> false
 
 let is_sub c = c.cst_is_sub
 
+let id_is_sub id = id_as_cst id |> CCOpt.map_or ~default:false is_sub
+
 (** {6 Creation of Coverset and Cst} *)
 
 let n_ = ref 0
@@ -128,6 +130,7 @@ let dominates (c1:t)(c2:t): bool =
 type ind_skolem = ID.t * Type.t
 
 let ind_skolem_compare = CCOrd.pair ID.compare Type.compare
+let ind_skolem_equal a b = ind_skolem_compare a b = 0
 
 let id_is_ind_skolem (id:ID.t) (ty:Type.t): bool =
   let n_tyvars, ty_args, ty_ret = Type.open_poly_fun ty in
@@ -135,7 +138,7 @@ let id_is_ind_skolem (id:ID.t) (ty:Type.t): bool =
   && ty_args=[] (* constant *)
   && Ind_ty.is_inductive_type ty_ret
   && Type.is_ground ty
-  && (id_is_cst id || (not (Ind_ty.is_constructor id) && Skolem.is_skolem id))
+  && (id_is_cst id || (not (Ind_ty.is_constructor id) && not (Rewrite.is_defined_cst id)))
 
 let ind_skolem_depth (id:ID.t): int = match id_as_cst id with
   | None -> 0

@@ -220,86 +220,86 @@ module Src = struct
     | R_goal -> CCFormat.string out "goal"
     | R_def -> CCFormat.string out "def"
 
-  (*
-  let rec pp out t =
-    match t with
-      | From_file x -> pp_from_file out x
-      | Neg t -> Format.fprintf out "@[<2>neg(%a)@]" pp t
-      | CNF t -> Format.fprintf out "@[<2>cnf(%a)@]" pp t
+  let rec pp_tstp out src = match view src with
+    | Internal _
+    | Input _ -> ()
+    | From_file (src,_) ->
+      let file = src.file in
+      begin match src.name with
+        | None -> Format.fprintf out "file('%s')" file
+        | Some name -> Format.fprintf out "file('%s', '%s')" file name
+      end
+    | Neg (_,src') ->
+      Format.fprintf out "inference(@['negate_goal',@ [status(thm)],@ [%a]@])"
+        pp_tstp src'
+    | CNF (_,src') ->
+      Format.fprintf out "inference(@['clausify',@ [status(esa)],@ [%a]@])"
+        pp_tstp src'
+    | Preprocess ((_,src'),msg) ->
+      Format.fprintf out
+        "inference(@['%s',@ [status(esa)],@ [%a]@])" msg pp_tstp src'
+    | Renaming ((_,src'), id, form) ->
+      Format.fprintf out
+        "inference(@['renaming',@ [status(esa)],@ [%a],@ on(@[%a<=>%a@])@])"
+        pp_tstp src' ID.pp id TypedSTerm.TPTP.pp form
 
-  let to_string = CCFormat.to_string pp
-     *)
+  let rec pp out src = match view src with
+    | Internal _
+    | Input _ -> ()
+    | From_file (src,_) ->
+      let file = src.file in
+      begin match src.name with
+        | None -> Format.fprintf out "'%s'" file
+        | Some name -> Format.fprintf out "'%s' in '%s'" name file
+      end
+    | Neg (_,src') ->
+      Format.fprintf out "(@[neg@ %a@])" pp src'
+    | CNF (_,src') ->
+      Format.fprintf out "(@[CNF@ %a@])" pp src'
+    | Renaming ((_,src'), id, form) ->
+      Format.fprintf out "(@[renaming@ [%a]@ :name %a@ :on @[%a@]@])"
+        pp src' ID.pp id TypedSTerm.pp form
+    | Preprocess ((_,src'),msg) ->
+      Format.fprintf out "(@[preprocess@ [%a]@ :msg %S@])" pp src' msg
 end
 
 (** {2 Defined Constants} *)
 
-type form_rewrite = lit * clause list
-(** Basic rewrite rule for literals *)
-
-type form_definition = form_rewrite list
-(** Definition for a literal *)
-
-type definition =
-  | D_term of Rewrite_term.defined_cst
-  | D_form of form_rewrite list
-
-exception Payload_defined_form of int * form_definition ref
+type definition = Rewrite.rule_set
 
 let as_defined_cst id = match ID.payload id with
-  | Payload_defined_form (l,d) -> Some (l, D_form !d)
-  | Rewrite_term.Payload_defined_cst c ->
-    Some (Rewrite_term.Defined_cst.level c, D_term c)
+  | Rewrite.Payload_defined_cst c ->
+    Some (Rewrite.Defined_cst.level c, Rewrite.Defined_cst.rules c)
   | _ -> None
 
 let as_defined_cst_level id = CCOpt.map fst @@ as_defined_cst id
 
 let is_defined_cst id = as_defined_cst id <> None
 
-let declare_defined_form id ~level def =
-  (* declare that [id] is a defined constant of level [l+1] *)
-  Util.debugf ~section:Util.Section.zip 1
-    "@[<2>declare %a@ as defined constant of level %d@]"
-    (fun k->k ID.pp id level);
-  ID.set_payload id (Payload_defined_form (level, ref def));
+let declare_defined_cst id ~level (rules:definition) : unit =
+  let _ = Rewrite.Defined_cst.declare ~level id rules in
   ()
 
-let declare_defined_form_or_add id (r:form_rewrite): unit =
-  begin match ID.payload id with
-    | Payload_defined_form (_,l) -> l := r :: !l
-    | _ -> declare_defined_form ~level:0 id [r]
-  end
-
-let declare_defined_cst_term id ~level rules: unit =
-  let _ = Rewrite_term.declare_defined_cst ~level id rules in
-  ()
-
-let conv_term_rule (r:_ term_rule): Rewrite_term.rule =
+let conv_term_rule (r:_ term_rule): Rewrite.Term.rule =
   let _, id, ty, args, rhs = r in
-  Rewrite_term.Rule.make id ty args rhs
+  Rewrite.Term.Rule.make id ty args rhs
 
-let as_term_rules (l:_ def_rule list): Rewrite_term.rule list option =
-  assert (l <> []);
-  if List.for_all (function Def_term _ -> true | _ -> false) l
-  then (
-    l
-    |> List.map
-      (function
-        | Def_term r -> conv_term_rule r
-        | Def_form _ -> assert false)
-    |> CCOpt.return
-  ) else None
+(* returns either a term or a lit rule (depending on whether RHS is atomic) *)
+let conv_lit_rule (r:_ form_rule): Rewrite.rule =
+  let _, lhs, rhs = r in
+  let lhs = Literal.Conv.of_form lhs in
+  let rhs = List.map (List.map Literal.Conv.of_form) rhs in
+  Rewrite.Rule.make_lit lhs rhs
 
-let as_clause_rules (l:_ def_rule list): form_definition option =
+(* convert rules *)
+let conv_rules (l:_ def_rule list): definition =
   assert (l <> []);
-  if List.for_all (function Def_form _ -> true | _ -> false) l
-  then (
+  List.map
+    (function
+      | Def_term r -> Rewrite.Rule.of_term (conv_term_rule r)
+      | Def_form r -> conv_lit_rule r)
     l
-    |> List.map
-      (function
-        | Def_form (_,lit,rhs) -> lit, rhs
-        | Def_term _ -> assert false)
-    |> CCOpt.return
-  ) else None
+  |> Rewrite.Rule_set.of_list
 
 let terms_of_rule (d:_ def_rule): _ Sequence.t = match d with
   | Def_term (_, _, _, args, rhs) ->
@@ -325,21 +325,22 @@ let scan_stmt_for_defined_cst (st:(clause,FOTerm.t,Type.t) t): unit = match view
   | Def l ->
     (* define all IDs at the same level (the max of those computed) *)
     let ids_and_levels =
-      List.map
+      l
+      |> List.filter
+        (fun {def_ty=ty; def_rewrite=b; _} ->
+           (* definitions require [b=true] or the LHS be a constant *)
+           let _, args, _ = Type.open_poly_fun ty in
+           b || CCList.is_empty args)
+      |> List.map
         (fun {def_id; def_rules; _} ->
            let lev =
              Sequence.of_list def_rules
              |> Sequence.map level_of_rule
              |> max_exn
            and def =
-             let open CCOpt.Infix in
-             ((as_term_rules def_rules >|= fun l -> `Term l)
-              <+>
-                (as_clause_rules def_rules >|= fun l -> `Form l))
-             |> CCOpt.get_lazy (fun _ -> assert false)
+             conv_rules def_rules
            in
            def_id, lev, def)
-        l
     in
     let level =
       Sequence.of_list ids_and_levels
@@ -348,26 +349,62 @@ let scan_stmt_for_defined_cst (st:(clause,FOTerm.t,Type.t) t): unit = match view
       |> succ
     in
     List.iter
-      (fun (id,_,def) -> match def with
-         | `Term l -> declare_defined_cst_term ~level id l
-         | `Form def -> declare_defined_form ~level id def)
+      (fun (id,_,def) ->
+         let _ = Rewrite.Defined_cst.declare ~level id def in
+         ())
       ids_and_levels
   | RewriteTerm rule ->
     (* declare the rule, possibly making its head defined *)
     let r = conv_term_rule rule in
-    let id = Rewrite_term.Rule.head_id r in
-    Rewrite_term.declare_cst_or_add id r
-  | RewriteForm (_,lhs,rhs) ->
-    let r = lhs, rhs in
-    (* is this rule associated to an ID? *)
-    let lhs, _ = r in
-    let head_id = match lhs with
-      | SLiteral.Atom (t,_) -> FOTerm.head t
-      | _ -> None
-    in
-    CCOpt.iter
-      (fun id -> declare_defined_form_or_add id r)
-      head_id
+    let id = Rewrite.Term.Rule.head_id r in
+    Rewrite.Defined_cst.declare_or_add id (Rewrite.T_rule r)
+  | RewriteForm r ->
+    let r = conv_lit_rule r in
+    begin match r with
+      | Rewrite.T_rule tr ->
+        let id = Rewrite.Term.Rule.head_id tr in
+        Rewrite.Defined_cst.declare_or_add id r
+      | Rewrite.L_rule lr ->
+        begin match Rewrite.Lit.Rule.head_id lr with
+          | Some id ->
+            Rewrite.Defined_cst.declare_or_add id r
+          | None ->
+            assert (Rewrite.Lit.Rule.is_equational lr);
+            Rewrite.Defined_cst.add_eq_rule lr
+        end
+    end
+  | _ -> ()
+
+(** {2 Inductive Types} *)
+
+let scan_stmt_for_ind_ty st = match view st with
+  | Data l ->
+    List.iter
+      (fun d ->
+         let ty_vars =
+           List.mapi (fun i v -> HVar.make ~ty:(Var.ty v) i) d.data_args
+         and cstors =
+           List.map (fun (c,ty) -> {Ind_ty.cstor_name=c; cstor_ty=ty;}) d.data_cstors
+         in
+         let _ = Ind_ty.declare_ty d.data_id ~ty_vars cstors in
+         ())
+      l
+  | _ -> ()
+
+let scan_simple_stmt_for_ind_ty st = match view st with
+  | Data l ->
+    let conv = Type.Conv.create() in
+    let conv_ty = Type.Conv.of_simple_term_exn conv in
+    List.iter
+      (fun d ->
+         let ty_vars =
+           List.mapi (fun i v -> HVar.make ~ty:(Var.ty v |> conv_ty) i) d.data_args
+         and cstors =
+           List.map (fun (c,ty) -> {Ind_ty.cstor_name=c; cstor_ty=conv_ty ty;}) d.data_cstors
+         in
+         let _ = Ind_ty.declare_ty d.data_id ~ty_vars cstors in
+         ())
+      l
   | _ -> ()
 
 (** {2 Iterators} *)
@@ -603,19 +640,19 @@ module TPTP = struct
       | TyDecl (id,ty) -> pp_decl out (id,ty)
       | Assert f ->
         let role = "axiom" in
-        fpf out "@[<2>tff(%s, %s,@ (@[%a@])@]." name role ppf f
+        fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@]." name role ppf f
       | Lemma l ->
         let role = "lemma" in
-        fpf out "@[<2>tff(%s, %s,@ (@[%a@])@]." name role
+        fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@]." name role
           (Util.pp_list ~sep:" & " ppf) l
       | Goal f ->
         let role = "conjecture" in
-        fpf out "@[<2>tff(%s, %s,@ (@[%a@])@]." name role ppf f
+        fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@]." name role ppf f
       | NegatedGoal (_,l) ->
         let role = "negated_conjecture" in
         List.iter
           (fun f ->
-             fpf out "@[<2>tff(%s, %s,@ (@[%a@])@]." name role ppf f)
+             fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@]." name role ppf f)
           l
       | Def l ->
         (* declare *)

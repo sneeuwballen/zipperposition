@@ -8,6 +8,7 @@ open Logtk
 module T = FOTerm
 module Lit = Literal
 module Lits = Literals
+module P = Proof
 
 let section = Util.Section.make ~parent:Const.section "env"
 
@@ -23,7 +24,7 @@ let prof_all_simplify = Util.mk_profiler "env.all_simplify"
 let prof_is_redundant = Util.mk_profiler "env.is_redundant"
 let prof_subsumed_by = Util.mk_profiler "env.subsumed_by"
 
-let orphan_criterion_ = ref true
+let orphan_criterion_ = ref false
 
 (** {2 Signature} *)
 module type S = Env_intf.S
@@ -287,37 +288,42 @@ module Make(X : sig
 
   (* is [c] the result (after simplification) of an inference in which
      at least one premise has been backward simplified? *)
-  let orphan_criterion c =
-    let open ProofStep in
+  let orphan_criterion_real c =
     (* is the current step [p] an inference step? *)
-    let is_inf p = match p.step.kind with
-      | Inference _ -> true
+    let is_inf p = match P.Step.kind @@ P.S.step p with
+      | P.Inference _ -> true
       | _ -> false
     in
-    (* recursively traversal of the proof of [c].
+    (* recursive traversal of the proof of [c].
        @param after_inf true if we just crossed an inference step *)
     let rec aux ~after_inf p =
       if after_inf
       then
         (* after inference step: stop recursion and check *)
-        match p.result with
-          | Clause c' -> SClause.is_backward_simplified c'
-          | BoolClause _
-          | Stmt _
-          | Form _ -> false
+        match P.S.result p with
+          | P.Clause c' -> SClause.is_backward_simplified c'
+          | P.BoolClause _
+          | P.Stmt _
+          | P.Form _ -> false
       else
         List.exists
-          (fun p' -> aux ~after_inf:(is_inf p) p')
-          p.step.parents
+          (fun p' -> aux ~after_inf:(is_inf p) @@ P.Parent.proof p')
+          (P.Step.parents @@ P.S.step p)
     in
     let p = C.proof c in
-    let res = List.exists (aux ~after_inf:(is_inf p)) p.step.parents in
+    let res =
+      List.exists (fun p' -> aux ~after_inf:(is_inf p) @@ P.Parent.proof p')
+        (P.Step.parents @@ P.S.step p)
+    in
     if res then (
       Util.incr_stat stat_orphan_criterion;
       Util.debugf ~section 3
         "@[<2>`@[%a@]` is redundant by orphan criterion@]" (fun k->k C.pp c);
     );
     res
+
+  let orphan_criterion c =
+    if !orphan_criterion_ then orphan_criterion_real c else false
 
   let is_trivial_trail trail = match !_is_trivial_trail with
     | [] -> false
@@ -378,9 +384,12 @@ module Make(X : sig
     then SimplM.return_same c (* no simplification *)
     else (
       C.mark_redundant c;
-      let rule = ProofStep.mk_rule ~comment:(StrSet.to_list !applied_rules) "rw" in
-      let proof = ProofStep.mk_simp ~rule [C.proof c] in
-      let c' = C.create_a ~trail:(C.trail c) lits' proof in
+      (* FIXME: put the rules as parameters *)
+      let rule = Proof.Rule.mk "rw" in
+      let proof = Proof.Step.simp [C.proof_parent c]
+          ~comment:(StrSet.to_list !applied_rules |> String.concat ",") ~rule
+      in
+      let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
       assert (not (C.equal c c'));
       Util.debugf ~section 3 "@[term rewritten clause `@[%a@]`@ into `@[%a@]`"
         (fun k->k C.pp c C.pp c');
@@ -408,9 +417,12 @@ module Make(X : sig
     else (
       (* simplifications occurred! *)
       C.mark_redundant c;
-      let rule = ProofStep.mk_rule ~comment:(StrSet.to_list !applied_rules) "rw_lit" in
-      let proof = ProofStep.mk_simp ~rule [C.proof c]  in
-      let c' = C.create_a ~trail:(C.trail c) lits proof in
+      (* FIXME: put the rules as parameters *)
+      let rule = Proof.Rule.mk "rw_lit" in
+      let proof = Proof.Step.simp [C.proof_parent c]
+          ~rule ~comment:(StrSet.to_list !applied_rules |> String.concat ",")
+      in
+      let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
       assert (not (C.equal c c'));
       Util.debugf ~section 3 "@[lit rewritten `@[%a@]`@ into `@[%a@]`@]"
         (fun k->k C.pp c C.pp c');
@@ -775,8 +787,12 @@ module Make(X : sig
 end
 
 let () =
+  let set_or () =
+    Util.warn "caution: orphan criterion seems to be incomplete";
+    orphan_criterion_ := true
+  in
   Params.add_opts
-    [ "--orphan-criterion", Arg.Set orphan_criterion_, " enable orphan criterion"
+    [ "--orphan-criterion", Arg.Unit set_or, " enable orphan criterion"
     ; "--no-orphan-criterion", Arg.Clear orphan_criterion_, " disable orphan criterion"
     ]
 
