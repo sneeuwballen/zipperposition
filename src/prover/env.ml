@@ -288,13 +288,13 @@ module Make(X : sig
 
   (* is [c] the result (after simplification) of an inference in which
      at least one premise has been backward simplified? *)
-  let orphan_criterion c =
+  let orphan_criterion_real c =
     (* is the current step [p] an inference step? *)
     let is_inf p = match P.Step.kind @@ P.S.step p with
       | P.Inference _ -> true
       | _ -> false
     in
-    (* recursively traversal of the proof of [c].
+    (* recursive traversal of the proof of [c].
        @param after_inf true if we just crossed an inference step *)
     let rec aux ~after_inf p =
       if after_inf
@@ -321,6 +321,9 @@ module Make(X : sig
         "@[<2>`@[%a@]` is redundant by orphan criterion@]" (fun k->k C.pp c);
     );
     res
+
+  let orphan_criterion c =
+    if !orphan_criterion_ then orphan_criterion_real c else false
 
   let is_trivial_trail trail = match !_is_trivial_trail with
     | [] -> false
