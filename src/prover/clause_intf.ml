@@ -45,6 +45,9 @@ module type S = sig
   val distance_to_goal : t -> int option
   (** See {!Proof.distance_to_goal}, applied to the clause's proof *)
 
+  val comes_from_goal : t -> bool
+  (** [true] iff the clause is (indirectly) deduced from a goal or lemma *)
+
   (** {2 Boolean Abstraction} *)
 
   val pp_trail : Trail.t CCFormat.printer

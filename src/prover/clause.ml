@@ -92,6 +92,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let is_goal c = Proof.Step.is_goal c.proof
 
   let distance_to_goal c = Proof.Step.distance_to_goal c.proof
+  let comes_from_goal c = CCOpt.is_some @@ distance_to_goal c
 
   (* private function for building clauses *)
   let create_inner ~penalty ~selected sclause proof =
