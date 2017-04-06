@@ -98,11 +98,6 @@ module Make(C : Clause_intf.S) = struct
     let favor_horn c =
       if Lits.is_horn (C.lits c) then 0 else penalty_coeff_
 
-    (* logarithmic function of age *)
-    let age c =
-      if C.is_empty c then 0
-      else max 1 (C.id c+1 |> float |> log |> ceil |> int_of_float)
-
     let goal_threshold_ = 15
 
     let favor_goal c =
@@ -143,8 +138,12 @@ module Make(C : Clause_intf.S) = struct
         (i1 = i2 && C.compare c1 c2 <= 0)
     end)
 
-  (** A priority queue of clauses, purely functional *)
-  type t = {
+  (** A priority queue of clauses + FIFO queue *)
+  type t =
+    | FIFO of C.t Queue.t
+    | Mixed of mixed
+
+  and mixed = {
     mutable heap : H.t;
     mutable queue: C.t Queue.t;
     tbl: unit C.Tbl.t;
@@ -160,7 +159,8 @@ module Make(C : Clause_intf.S) = struct
       by a weight function *)
   let make ~ratio ~weight name =
     if ratio <= 0 then invalid_arg "ClauseQueue.make: ratio must be >0";
-    { weight;
+    Mixed {
+      weight;
       name;
       ratio;
       time_before_fifo=ratio;
@@ -169,21 +169,27 @@ module Make(C : Clause_intf.S) = struct
       tbl=C.Tbl.create 256;
     }
 
-  let is_empty (q:t) = C.Tbl.length q.tbl = 0
+  let is_empty_mixed q = C.Tbl.length q.tbl = 0
 
-  let add q c =
-    if not (C.Tbl.mem q.tbl c) then (
-      C.Tbl.add q.tbl c ();
-      let w = q.weight c in
-      let heap = H.insert (w, c) q.heap in
-      q.heap <- heap;
-      Queue.push c q.queue;
-    )
+  let is_empty (q:t) = match q with
+    | FIFO q -> Queue.is_empty q
+    | Mixed q -> is_empty_mixed q
+
+  let add q c = match q with
+    | FIFO q -> Queue.push c q
+    | Mixed q ->
+      if not (C.Tbl.mem q.tbl c) then (
+        C.Tbl.add q.tbl c ();
+        let w = q.weight c in
+        let heap = H.insert (w, c) q.heap in
+        q.heap <- heap;
+        Queue.push c q.queue;
+      )
 
   let add_seq q hcs = Sequence.iter (add q) hcs
 
-  let rec take_first q =
-    if is_empty q then raise Not_found;
+  let rec take_first_mixed q =
+    if is_empty_mixed q then raise Not_found;
     (* find next clause *)
     let c =
       if q.time_before_fifo = 0
@@ -201,52 +207,56 @@ module Make(C : Clause_intf.S) = struct
     if C.Tbl.mem q.tbl c then (
       C.Tbl.remove q.tbl c;
       c
-    ) else take_first q (* spurious *)
+    ) else take_first_mixed q (* spurious *)
 
-  let name q = q.name
+  let take_first = function
+    | FIFO q ->
+      if Queue.is_empty q then raise Not_found else Queue.pop q
+    | Mixed q -> take_first_mixed q
+
+  let name q = match q with
+    | FIFO _ -> "bfs"
+    | Mixed q -> q.name
 
   (** {6 Combination of queues} *)
 
-  let goal_oriented : t =
+  let goal_oriented () : t =
     let open WeightFun in
     let weight =
-      combine [age, 1; default, 4; favor_small_num_vars, 2;
+      combine [default, 4; favor_small_num_vars, 2;
                favor_goal, 1; favor_all_neg, 1; penalty, 1; ] in
     let name = "goal_oriented" in
     make ~ratio:6 ~weight name
 
-  let bfs : t =
-    let open WeightFun in
-    let weight = age in
-    make ~ratio:1 ~weight "bfs"
+  let bfs () : t = FIFO (Queue.create ())
 
-  let almost_bfs : t =
+  let almost_bfs () : t =
     let open WeightFun in
     let weight = combine [ default, 3; penalty, 2; ] in
     make ~ratio:1 ~weight "almost_bfs"
 
-  let explore : t =
+  let explore () : t =
     let open WeightFun in
     let weight =
       combine
-        [age, 1; default, 4; favor_small_num_vars, 1;
+        [default, 4; favor_small_num_vars, 1;
          favor_all_neg, 1; penalty, 1; ]
     in
     make ~ratio:6 ~weight "explore"
 
-  let ground : t =
+  let ground () : t =
     let open WeightFun in
     let weight =
-      combine [age, 1; favor_pos_unit, 1; favor_ground, 2;
+      combine [favor_pos_unit, 1; favor_ground, 2;
                favor_small_num_vars, 10; penalty, 1 ]
     in
     make ~ratio:6 ~weight "ground"
 
-  let default : t =
+  let default () : t =
     let open WeightFun in
     let weight =
       combine
-        [ age, 4; default, 3; favor_all_neg, 1; favor_small_num_vars, 2
+        [ default, 3; favor_all_neg, 1; favor_small_num_vars, 2
         ; favor_goal, 1; favor_pos_unit, 1; penalty, 1; ]
     in
     make ~ratio:6 ~weight "default"
@@ -254,12 +264,12 @@ module Make(C : Clause_intf.S) = struct
   let of_profile p =
     let open ClauseQueue_intf in
     match p with
-      | P_default -> default
-      | P_bfs -> bfs
-      | P_almost_bfs -> almost_bfs
-      | P_explore -> explore
-      | P_ground -> ground
-      | P_goal -> goal_oriented
+      | P_default -> default ()
+      | P_bfs -> bfs ()
+      | P_almost_bfs -> almost_bfs ()
+      | P_explore -> explore ()
+      | P_ground -> ground ()
+      | P_goal -> goal_oriented ()
 
   let pp out q = CCFormat.fprintf out "queue %s" (name q)
   let to_string = CCFormat.to_string pp
