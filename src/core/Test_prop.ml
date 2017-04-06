@@ -85,8 +85,10 @@ let normalize_form (f:form): form =
       | Some cs ->
         progress := true;
         cs
+    and rm_trivial =
+      List.filter (fun c -> not (Literals.is_trivial c))
     in
-    let cs = c |> rw_terms |> rw_clause in
+    let cs = c |> rw_terms |> rw_clause |> rm_trivial in
     if !progress
     then normalize_form cs (* normalize each result recursively *)
     else (
