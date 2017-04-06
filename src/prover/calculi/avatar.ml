@@ -481,7 +481,7 @@ end
 
 let get_env (module E : Env.S) : (module S) = E.flex_get k_avatar
 
-let enabled_ = ref false
+let enabled_ = ref true
 let show_lemmas_ = ref false
 let simplify_trail_ = ref true
 let back_simplify_trail_ = ref true
