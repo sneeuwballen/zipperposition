@@ -202,7 +202,7 @@ module Step = struct
     | Assert _
     | By_def _
     | Data _
-    | Goal _-> None
+    | Goal _ -> None
     | Esa (_,c,_)
     | Simplification (_,c,_)
     | Inference (_,c,_)
@@ -227,17 +227,21 @@ module Step = struct
     | None, None -> None
     | (Some _ as res), None
     | None, (Some _ as res) -> res
-    | Some x, Some y -> Some (max x y)
+    | Some x, Some y -> Some (min x y)
 
   let step_ kind parents =
-    (* distance to goal *)
-    let dist_to_goal = match parents with
-      | [] -> None
-      | [p] -> CCOpt.map succ (Parent.proof p).step.dist_to_goal
-      | [p1;p2] ->
-        CCOpt.map succ (combine_dist (Parent.proof p1).step.dist_to_goal p2)
-      | p::l ->
-        CCOpt.map succ (List.fold_left combine_dist (Parent.proof p).step.dist_to_goal l)
+    (* distance to goal (0 if a goal itself) *)
+    let dist_to_goal = match kind with
+      | Goal _ | Lemma -> Some 0
+      | _ ->
+        begin match parents with
+          | [] -> None
+          | [p] -> CCOpt.map succ (Parent.proof p).step.dist_to_goal
+          | [p1;p2] ->
+            CCOpt.map succ (combine_dist (Parent.proof p1).step.dist_to_goal p2)
+          | p::l ->
+            CCOpt.map succ (List.fold_left combine_dist (Parent.proof p).step.dist_to_goal l)
+        end
     in
     { id=get_id_(); kind; parents; dist_to_goal; }
 
