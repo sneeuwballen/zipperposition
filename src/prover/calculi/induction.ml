@@ -199,8 +199,9 @@ end = struct
   let check_not_absurd_or_trivial_ (g:t): bool =
     Util.debugf ~section 2 "@[<2>@{<green>assess goal@}@ :goal %a@ :max-steps %d@]"
       (fun k->k pp g max_steps_);
-    let q : C.t Queue.t = Queue.create() in (* clauses waiting *)
-    let push_c c = Queue.push c q in
+    let module CQ = E.ProofState.CQueue in
+    let q = CQ.almost_bfs () in (* clauses waiting *)
+    let push_c c = CQ.add q c in
     let n : int ref = ref 0 in (* number of steps *)
     let trivial = ref true in
     try
@@ -217,9 +218,9 @@ end = struct
            ))
         (cs g);
       (* do a few steps of saturation *)
-      while not (Queue.is_empty q) && !n < max_steps_ do
+      while not (CQ.is_empty q) && !n < max_steps_ do
         incr n;
-        let c = Queue.pop q in
+        let c = CQ.take_first q in
         let c, _ = E.simplify c in
         assert (C.trail c |> Trail.is_empty);
         (* check for empty clause *)
@@ -230,7 +231,7 @@ end = struct
           trivial := false; (* at least one clause does not simplify to [true] *)
           (* now make inferences with [c] and push non-trivial clauses to [q],
              if needed *)
-          if !n + Queue.length q < max_steps_ then (
+          if !n + 2 < max_steps_ then (
             let new_c =
               Sequence.append
                 (E.do_binary_inferences c)
@@ -1208,7 +1209,7 @@ let enabled_ = ref true
 let depth_ = ref !Ind_cst.max_depth_
 let limit_to_active = ref true
 let coverset_depth = ref 1
-let goal_assess_limit = ref 10
+let goal_assess_limit = ref 8
 
 (* if induction is enabled AND there are some inductive types,
    then perform some setup after typing, including setting the key
