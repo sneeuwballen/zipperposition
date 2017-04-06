@@ -175,6 +175,10 @@ module Make(C : Clause_intf.S) = struct
     | FIFO q -> Queue.is_empty q
     | Mixed q -> is_empty_mixed q
 
+  let length q = match q with
+    | FIFO q -> Queue.length q
+    | Mixed q -> C.Tbl.length q.tbl
+
   let add q c = match q with
     | FIFO q -> Queue.push c q
     | Mixed q ->

@@ -55,6 +55,9 @@ module type S = sig
   val add_seq : t -> C.t Sequence.t -> unit
   (** Add clauses to the queue *)
 
+  val length : t -> int
+  (** Number of elements *)
+
   val is_empty : t -> bool
   (** check whether the queue is empty *)
 
@@ -74,7 +77,10 @@ module type S = sig
       @param name the name of this clause queue *)
 
   val bfs : unit -> t
-  (** Strong orientation toward FIFO *)
+  (** FIFO *)
+
+  val almost_bfs : unit -> t
+  (** Half FIFO, half default *)
 
   val explore : unit -> t
   (** Use heuristics for selecting "small" clauses *)
