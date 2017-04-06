@@ -38,7 +38,8 @@ module Make(Env : Env_intf.S) = struct
   let walk_cstor_args (t:term): term Sequence.t =
     let rec aux t = match as_cstor_app t with
       | Some (_, l) ->
-        Sequence.of_list l |> Sequence.flat_map aux
+        Sequence.of_list l
+        |> Sequence.flat_map (fun u -> Sequence.cons u (aux u))
       | None -> Sequence.empty
     in
     aux t
