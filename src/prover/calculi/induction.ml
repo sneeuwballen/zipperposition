@@ -29,11 +29,13 @@ let stat_generalize = Util.mk_stat "induction.generalize"
 let stat_generalize_vars_active_pos = Util.mk_stat "induction.generalize_vars_active_pos"
 let stat_generalize_terms_active_pos = Util.mk_stat "induction.generalize_terms_active_pos"
 
+let prof_check_goal = Util.mk_profiler "induction.check_goal"
+
 let k_enable : bool Flex_state.key = Flex_state.create_key()
 let k_ind_depth : int Flex_state.key = Flex_state.create_key()
-let k_test_limit : int Flex_state.key = Flex_state.create_key()
 let k_limit_to_active : bool Flex_state.key = Flex_state.create_key()
 let k_coverset_depth : int Flex_state.key = Flex_state.create_key()
+let k_goal_assess_limit : int Flex_state.key = Flex_state.create_key()
 
 (** {2 Formula to be Proved Inductively *)
 module Make_goal(E : Env_intf.S) : sig
@@ -180,51 +182,92 @@ end = struct
 
   exception Yield_false of C.t
 
-  (* TODO: re-establish this, but only do it if smallcheck failed
-      (also, do the 20 steps of resolution only in last resort)
+  (* do only a few steps of inferences for checking if a candidate lemma
+     is trivial/absurd *)
+  let max_steps_ = E.flex_get k_goal_assess_limit
 
-      → if goal passes tests, can we use the demod/sup steps to infer active
-         positions? (e.g. looking at which variables were substituted with
-         cstor terms) *)
+  (* TODO: if goal passes tests, can we use the demod/sup steps to infer active
+     positions? (e.g. looking at which variables were substituted with
+     cstor terms) *)
 
-  (* check that [lemma] is not obviously absurd or trivial, by using
-     the corresponding inference rules from env [E].
-
-     We do not try to refute it with a few superposition steps because
-     in cases it would work (lemma is wrong, attempted nonetheless,
-     and refutable in a few steps), the lemma will be disproved and
-     simplified away by saturation anyway.
-  *)
-  let check_not_absurd_or_trivial (g:t): bool =
-    Util.debugf ~section 2 "@[<2>@{<green>assess goal@}@ %a@]"
-      (fun k->k pp g);
+  (* check that [lemma] is not obviously absurd or trivial, by making a few steps of
+     superposition inferences between [lemma] and the Active Set.
+     The strategy here is set of support: no inference between clauses of [lemma]
+     and no inferences among active clauses, just between active clauses and
+     those derived from [lemma]. Inferences with trails are dropped because
+     the lemma should be inconditionally true. *)
+  let check_not_absurd_or_trivial_ (g:t): bool =
+    Util.debugf ~section 2 "@[<2>@{<green>assess goal@}@ :goal %a@ :max-steps %d@]"
+      (fun k->k pp g max_steps_);
+    let q : C.t Queue.t = Queue.create() in (* clauses waiting *)
+    let push_c c = Queue.push c q in
+    let n : int ref = ref 0 in (* number of steps *)
     let trivial = ref true in
     try
-      (* fully simplify each goal's clause, check if absurd or trivial *)
+      (* add goal's clauses to the local saturation set *)
       List.iter
         (fun lits ->
-           let c =
-             C.create_a ~trail:Trail.empty ~penalty:0 lits Proof.Step.trivial
-           in
-           let cs, _ = E.all_simplify c in
-           begin match CCList.find_pred C.is_empty cs with
-             | Some c_empty -> raise (Yield_false c_empty)
-             | None ->
-               if not (List.for_all E.is_trivial cs) then trivial := false
-           end)
+           let c = C.create_a ~trail:Trail.empty ~penalty:0 lits Proof.Step.trivial in
+           let c, _ = E.simplify c in
+           if E.is_trivial c then ()
+           else if C.is_empty c then raise (Yield_false c)
+           else (
+             trivial := false;
+             push_c c
+           ))
         (cs g);
+      (* do a few steps of saturation *)
+      while not (Queue.is_empty q) && !n < max_steps_ do
+        incr n;
+        let c = Queue.pop q in
+        let c, _ = E.simplify c in
+        assert (C.trail c |> Trail.is_empty);
+        (* check for empty clause *)
+        if C.comes_from_goal c then () (* ignore, a valid lemma might contradict goal *)
+        else if C.is_empty c then raise (Yield_false c)
+        else if E.is_trivial c then ()
+        else (
+          trivial := false; (* at least one clause does not simplify to [true] *)
+          (* now make inferences with [c] and push non-trivial clauses to [q],
+             if needed *)
+          if !n + Queue.length q < max_steps_ then (
+            let new_c =
+              Sequence.append
+                (E.do_binary_inferences c)
+                (E.do_unary_inferences c)
+            in
+            new_c
+            |> Sequence.filter_map
+              (fun new_c ->
+                 let new_c, _ = E.simplify new_c in
+                 (* discard trivial/conditional clauses, or clauses coming
+                    from goals (as they might be true lemmas but contradict
+                    the negated goal, which makes them even more useful);
+                    also scan for empty clauses *)
+                 if C.comes_from_goal new_c then None
+                 else if not (Trail.is_empty (C.trail new_c)) then None
+                 else if E.is_trivial new_c then None
+                 else if C.is_empty new_c then raise (Yield_false new_c)
+                 else Some new_c)
+            |> Sequence.iter push_c
+          )
+        )
+      done;
       Util.debugf ~section 2
-        "@[<2>lemma @[%a@]@ apparently not absurd (trivial:%B)@]"
-        (fun k->k pp g !trivial);
+        "@[<2>lemma @[%a@]@ apparently not absurd (after %d steps; trivial:%B)@]"
+        (fun k->k pp g !n !trivial);
       if !trivial then Util.incr_stat stat_trivial_lemmas;
       not !trivial
     with Yield_false c ->
       assert (C.is_empty c);
       Util.debugf ~section 2
-        "@[<2>lemma @[%a@] absurd:@ leads to empty clause `%a`@]"
-        (fun k->k pp g C.pp c);
+        "@[<2>lemma @[%a@] absurd:@ leads to empty clause %a (after %d steps)@]"
+        (fun k->k pp g C.pp c !n);
       Util.incr_stat stat_absurd_lemmas;
       false
+
+  let check_not_absurd_or_trivial g =
+    Util.with_prof prof_check_goal check_not_absurd_or_trivial_ g
 
   (* some checks that [g] should be considered as a goal *)
   let is_acceptable_goal (g:t) : bool =
@@ -1163,9 +1206,9 @@ end
 
 let enabled_ = ref true
 let depth_ = ref !Ind_cst.max_depth_
-let test_limit = ref Test_prop.default_limit
 let limit_to_active = ref true
 let coverset_depth = ref 1
+let goal_assess_limit = ref 10
 
 (* if induction is enabled AND there are some inductive types,
    then perform some setup after typing, including setting the key
@@ -1185,9 +1228,9 @@ let post_typing_hook stmts state =
     state
     |> Flex_state.add k_enable true
     |> Flex_state.add k_ind_depth !depth_
-    |> Flex_state.add k_test_limit !test_limit
     |> Flex_state.add k_limit_to_active !limit_to_active
     |> Flex_state.add k_coverset_depth !coverset_depth
+    |> Flex_state.add k_goal_assess_limit !goal_assess_limit
     |> Flex_state.add Ctx.Key.lost_completeness true
   ) else Flex_state.add k_enable false state
 
@@ -1218,10 +1261,8 @@ let () =
     [ "--induction", Options.switch_set true enabled_, " enable induction"
     ; "--no-induction", Options.switch_set false enabled_, " disable induction"
     ; "--induction-depth", Arg.Set_int depth_, " maximum depth of nested induction"
-    ; "--ind-test-limit",
-      Arg.Set_int test_limit,
-      " set limit for property testing in induction"
     ; "--ind-only-active-pos", Arg.Set limit_to_active, " limit induction to active positions"
     ; "--no-ind-only-active-pos", Arg.Clear limit_to_active, " limit induction to active positions"
     ; "--ind-coverset-depth", Arg.Set_int coverset_depth, " coverset depth in induction"
+    ; "--ind-goal-assess", Arg.Set_int goal_assess_limit, " number of steps for assessing potential lemmas"
     ]
