@@ -1,9 +1,9 @@
+# expect: unsat
 
 include "list.zf".
 
-val sum : list -> nat.
-assert (sum nil) = z.
-assert
+def sum : list -> nat where
+  (sum nil) = z;
   forall (N:nat). (forall (L:list). ((sum (cons N L)) = (plus N (sum L)))).
 
 goal forall (L:list). ((sum (rev L)) = (sum L)).

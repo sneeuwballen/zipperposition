@@ -3,15 +3,15 @@
 
 (** {1 Parse Rewrite Rules} *)
 
-open Libzipperposition
-open Libzipperposition_parsers
+open Logtk
+open Logtk_parsers
 
 module PT = STerm
 module T = TypedSTerm
-module E = CCError
+module E = CCResult
 module Loc = ParseLocation
 
-type 'a or_error = [`Error of string | `Ok of 'a]
+type 'a or_error = ('a, string) CCResult.t
 
 type statement =
   | Rule of PT.t * PT.t
@@ -28,23 +28,23 @@ let parse_file filename ic =
     let terms = Parse_ho.parse_decls Lex_ho.token lexbuf in
     (* keep the facts of the form  a --> b *)
     let rules = CCList.filter_map
-      (function
-        | Ast_ho.Clause (t, []) ->
+        (function
+          | Ast_ho.Clause (t, []) ->
             begin match PT.view t with
-            | PT.App ({PT.term=PT.Const "-->";_}, [_;l;r]) ->
+              | PT.App ({PT.term=PT.Const "-->";_}, [_;l;r]) ->
                 Util.debugf 5 "parsed rule %a --> %a" (fun k->k PT.pp l PT.pp r);
                 Some (Rule (l, r))
-            | _ -> None
+              | _ -> None
             end
-        | Ast_ho.Type (s, ty) -> Some (Type (s,ty))
-        | _ -> None)
-      terms
+          | Ast_ho.Type (s, ty) -> Some (Type (s,ty))
+          | _ -> None)
+        terms
     in
     E.return rules
   with
-  | Parse_ho.Error ->
-    let msg = CCFormat.sprintf "parse error at %a" Loc.pp (Loc.of_lexbuf lexbuf) in
-    E.fail msg
+    | Parse_ho.Error ->
+      let msg = CCFormat.sprintf "parse error at %a" Loc.pp (Loc.of_lexbuf lexbuf) in
+      E.fail msg
 
 (* list of pairs of terms --> list of pairs of FOTerms *)
 let rules_of_pairs pairs =
@@ -52,20 +52,20 @@ let rules_of_pairs pairs =
     let ctx = TypeInference.Ctx.create () in
     (* infer types *)
     let rules = CCList.filter_map
-      (function
-        | Rule (l,r) ->
-          let l' = TypeInference.infer_exn ctx l in
-          let r' = TypeInference.infer_exn ctx r in
-          TypeInference.unify (T.ty_exn l') (T.ty_exn r');
-          TypeInference.Ctx.exit_scope ctx;
-          Some (l', r')
-        | Type (s, ty) ->
-          (* declare the type *)
-          begin match TypeInference.infer_ty ctx ty with
-          | `Error _ -> ()
-          | `Ok ty -> TypeInference.Ctx.declare ctx (ID.make s) ty
-          end; None
-      ) pairs
+        (function
+          | Rule (l,r) ->
+            let l' = TypeInference.infer_exn ctx l in
+            let r' = TypeInference.infer_exn ctx r in
+            TypeInference.unify (T.ty_exn l') (T.ty_exn r');
+            TypeInference.Ctx.exit_scope ctx;
+            Some (l', r')
+          | Type (s, ty) ->
+            (* declare the type *)
+            begin match TypeInference.infer_ty ctx ty with
+              | E.Error _ -> ()
+              | E.Ok ty -> TypeInference.Ctx.declare ctx (ID.make s) ty
+            end; None
+        ) pairs
     in
     TypeInference.Ctx.exit_scope ctx;
     (* extract typed rules and signature *)

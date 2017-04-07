@@ -1,0 +1,10 @@
+# expect: unsat
+
+include "fsm.zf".
+
+# there are two timestamps t1, t1+t2, where state = S2
+
+goal exists t1 t2.
+  t2 != Now &&
+  at_state t1 = S2 &&
+  at_state (add_time t2 t1) = S2.

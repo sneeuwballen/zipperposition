@@ -1,16 +1,16 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {6 Simple Proof checker for TSTP} *)
 
-open Libzipperposition
-open Libzipperposition_parsers
+open Logtk
+open Logtk_parsers
 
 module A = Ast_tptp
 module T = STerm
 module TT = Trace_tstp
 module StepTbl = TT.StepTbl
-module E = CCError
+module E = CCResult
 
 (* result of checking the step: success or failure, with name of prover.
    The step may be unchecked. *)
@@ -59,8 +59,8 @@ module CheckedTrace = struct
     let l = get ~checked step in
     StepTbl.replace checked.steps step (res :: l);
     match res with
-    | Failed _ -> checked.failures <- (step, res) :: checked.failures
-    | _ -> ()
+      | Failed _ -> checked.failures <- (step, res) :: checked.failures
+      | _ -> ()
 end
 
 (* can we avoid checking this proof step? *)
@@ -69,8 +69,8 @@ let _do_not_check proof = match proof with
   | TT.Theory _ -> true
   | TT.InferClause (_, lazy step)
   | TT.InferForm (_, lazy step) ->
-      step.TT.esa ||
-      match step.TT.parents with
+    step.TT.esa ||
+    match step.TT.parents with
       | [| a |] when TT.is_axiom a -> true  (* axiom *)
       | _ -> false
 
@@ -91,23 +91,23 @@ let mk_proof_obligation proof =
     try
       let goal, step = match proof with
         | TT.InferForm (f, lazy step) ->
-            let f = T.close_all Binder.Forall f in
-            A.FOF(step.TT.id, A.R_conjecture, f, []), step
+          let f = T.close_all Binder.Forall f in
+          A.FOF(step.TT.id, A.R_conjecture, f, []), step
         | TT.InferClause (c, lazy step) ->
-            let c = List.map slit_to_form c in
-            let c = T.close_all Binder.Forall (T.or_ c) in
-            A.FOF(step.TT.id, A.R_conjecture, c, []), step
+          let c = List.map slit_to_form c in
+          let c = T.close_all Binder.Forall (T.or_ c) in
+          A.FOF(step.TT.id, A.R_conjecture, c, []), step
         | _ -> assert false
       in
       let premises = CCList.filter_map
           (fun parent -> match parent with
              | TT.InferClause (c, lazy step') ->
-                 let c = List.map slit_to_form c in
-                 let c = T.close_all Binder.Forall (T.or_ c) in
-                 Some (A.FOF(step'.TT.id, A.R_axiom, c, []))
+               let c = List.map slit_to_form c in
+               let c = T.close_all Binder.Forall (T.or_ c) in
+               Some (A.FOF(step'.TT.id, A.R_axiom, c, []))
              | TT.InferForm(f, lazy step') ->
-                 let f = T.close_all Binder.Forall f in
-                 Some (A.FOF(step'.TT.id, A.R_axiom, f, []))
+               let f = T.close_all Binder.Forall f in
+               Some (A.FOF(step'.TT.id, A.R_axiom, f, []))
              | TT.Axiom _
              | TT.Theory _ -> None)
           (Array.to_list step.TT.parents)
@@ -121,8 +121,8 @@ let check_step ~timeout ~prover step =
   (* input to feed to the prover *)
   let obligation = mk_proof_obligation step in
   match obligation with
-  | None -> E.return Unchecked  (* nothing to check, no obligation! *)
-  | Some decls ->
+    | None -> E.return Unchecked  (* nothing to check, no obligation! *)
+    | Some decls ->
       E.(
         CallProver.call ~timeout ~prover decls
         >>= fun res ->
@@ -131,8 +131,8 @@ let check_step ~timeout ~prover step =
         let res = match res with
           | CallProver.Unsat -> Succeeded p_name
           | CallProver.Error e ->
-              Util.debugf 1 "error trying to check %a: %s" (fun k->k TT.pp1 step e);
-              Failed p_name
+            Util.debugf 1 "error trying to check %a: %s" (fun k->k TT.pp1 step e);
+            Failed p_name
           | CallProver.Unknown
           | CallProver.Sat -> Failed p_name
         in
@@ -162,9 +162,9 @@ let check_all ~progress ~provers ~timeout ~checked =
            (fun prover ->
               (* check step with prover *)
               match  check_step ~timeout ~prover step with
-              | `Ok res ->
+                | E.Ok res ->
                   CheckedTrace.add ~checked step res
-              | `Error msg ->
+                | E.Error msg ->
                   failwith msg)
            provers);
     (* clean line of progress *)
@@ -197,7 +197,7 @@ let all_paths_correct ~valid ~checked =
       begin match proof with
         | TT.InferClause (_, lazy step)
         | TT.InferForm (_, lazy step) ->
-            Array.iter check_proof step.TT.parents
+          Array.iter check_proof step.TT.parents
         | TT.Axiom _
         | TT.Theory _ -> ()
       end;
@@ -265,7 +265,7 @@ let main file =
     List.iter
       (fun (proof, res) -> match res with
          | Failed prover ->
-             Util.debugf 1 "trying to prove %a with %s failed" (fun k->k TT.pp1 proof prover)
+           Util.debugf 1 "trying to prove %a with %s failed" (fun k->k TT.pp1 proof prover)
          | _ -> assert false)
       (CheckedTrace.failures ~checked);
     (* check the global structure of the validated steps *)
@@ -280,7 +280,7 @@ let () =
   CCFormat.set_color_default true;
   parse_args ();
   match main !file with
-  | `Ok () -> ()
-  | `Error msg ->
+    | E.Ok () -> ()
+    | E.Error msg ->
       print_endline msg;
       exit 1

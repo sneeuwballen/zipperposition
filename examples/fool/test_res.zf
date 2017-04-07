@@ -1,0 +1,7 @@
+
+# expect: unsat
+
+val p : prop -> prop.
+
+goal exists (x:prop) y. forall z. x=z || y=z.
+

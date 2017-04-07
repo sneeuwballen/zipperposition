@@ -1,0 +1,13 @@
+# expect: SAT
+val term : type.
+val q : term -> prop.
+val p : term -> prop.
+assert (forall (X:term). (p X)) => (forall (X:term). (q X)).
+val s : term -> prop.
+val r : term -> prop.
+assert
+  (forall (X:term). ((r X) || (q X))) => (exists (X:term). ((s X) && (q X))).
+val g : term -> prop.
+val f : term -> prop.
+assert (exists (X:term). (s X)) => (forall (X:term). ((f X) => (g X))).
+goal forall (X:term). (((f X) && (p X)) => (g X)).

@@ -4,9 +4,8 @@
 (** {1 Inductive Types} *)
 
 module T = FOTerm
-module Stmt = Statement
 
-let section = Util.Section.(make ~parent:zip "ind")
+let section = Util.Section.make "ind_ty"
 
 type constructor = {
   cstor_name: ID.t;
@@ -21,9 +20,13 @@ type t = {
   ty_vars: Type.t HVar.t list; (* list of variables *)
   ty_pattern: Type.t; (* equal to  [id ty_vars] *)
   ty_constructors : constructor list;
-    (* constructors, all returning [pattern] and containing
-       no other type variables than [ty_vars] *)
+  (* constructors, all returning [pattern] and containing
+     no other type variables than [ty_vars] *)
+  ty_is_rec: bool lazy_t;
+  (* true iff the type is (mutually) recursive *)
 }
+
+let equal a b = ID.equal a.ty_id b.ty_id
 
 type id_or_tybuiltin =
   | I of ID.t
@@ -38,60 +41,105 @@ exception NotAnInductiveType of ID.t
 let () =
   let spf = CCFormat.sprintf in
   Printexc.register_printer
-  (function
-    | InvalidDecl msg ->
+    (function
+      | InvalidDecl msg ->
         Some (spf "@[<2>invalid declaration:@ %s@]" msg)
-    | NotAnInductiveType id ->
+      | NotAnInductiveType id ->
         Some (spf "%a is not an inductive type" ID.pp id)
-    | NotAnInductiveConstructor id ->
+      | NotAnInductiveConstructor id ->
         Some (spf "%a is not an inductive constructor" ID.pp id)
-    | _ -> None)
+      | _ -> None)
 
 exception Payload_ind_type of t
 exception Payload_ind_cstor of constructor * t
-exception Payload_ind_constant
 exception Payload_ind_projector of ID.t
 
 let invalid_decl_ msg = raise (InvalidDecl msg)
 let invalid_declf_ fmt = CCFormat.ksprintf fmt ~f:invalid_decl_
 
+let pp out ty =
+  let ppvars out =
+    function [] -> () | l -> Format.fprintf out " %a" (Util.pp_list HVar.pp) l
+  in
+  Format.fprintf out "@[%a%a@]" ID.pp ty.ty_id ppvars ty.ty_vars
+
 let type_hd ty =
   let _, _, ret = Type.open_poly_fun ty in
   match Type.view ret with
-  | Type.Builtin b -> Some (B b)
-  | Type.App (s, _) -> Some (I s)
-  | _ -> None
+    | Type.Builtin b -> Some (B b)
+    | Type.App (s, _) -> Some (I s)
+    | _ -> None
 
 let type_hd_exn ty = match type_hd ty with
   | Some res -> res
   | None ->
-      invalid_declf_ "expected function type,@ got `@[%a@]`" Type.pp ty
+    invalid_declf_ "expected function type,@ got `@[%a@]`" Type.pp ty
 
-let as_inductive_ty id =
-  CCList.find
-    (function
-      | Payload_ind_type ty -> Some ty
-      | _ -> None)
-    (ID.payload id)
+let as_inductive_ty id = match ID.payload id with
+  | Payload_ind_type ty -> Some ty
+  | _ -> None
 
 let as_inductive_ty_exn id =
   match as_inductive_ty id with
-  | Some ty -> ty
-  | None -> invalid_declf_ "%a is not an inductive type" ID.pp id
+    | Some ty -> ty
+    | None -> invalid_declf_ "%a is not an inductive type" ID.pp id
 
 let is_inductive_ty id =
   match as_inductive_ty id with Some _ -> true | None -> false
 
 let is_inductive_type ty =
   match type_hd ty with
-  | Some (I id) -> is_inductive_ty id
-  | Some (B _)
-  | None -> false
+    | Some (I id) -> is_inductive_ty id
+    | Some (B _)
+    | None -> false
 
-let as_inductive_type ty =
-  match type_hd ty with
-  | Some (B _) | None -> None
-  | Some (I id) -> as_inductive_ty id
+let is_inductive_simple_type ty =
+  try is_inductive_ty (TypedSTerm.head_exn ty)
+  with Not_found -> false
+
+let as_inductive_type ty = match Type.view ty with
+  | Type.App (id, l) ->
+    begin match as_inductive_ty id with
+      | None -> None
+      | Some ity -> Some (ity, l)
+    end
+  | Type.Fun _ | Type.Forall _ | Type.Builtin _ | Type.DB _ | Type.Var _
+    -> None
+
+let as_inductive_type_exn ty = as_inductive_type ty |> CCOpt.get_exn
+
+let is_recursive (t:t) =
+  let new_ = Lazy.is_val t.ty_is_rec in
+  let res = Lazy.force t.ty_is_rec in
+  if new_ then (
+    Util.debugf ~section 3 "(@[is_recursive@ :ty %a@ :res %B@])"
+      (fun k->k pp t res);
+  );
+  res
+
+(* is [top] recursive? *)
+let is_rec_ (top:t): bool =
+  let rec find_in_ity (seen:t list) (ity:t): bool =
+    if CCList.mem ~eq:equal ity seen then false (* loop *)
+    else (
+      let seen = ity :: seen in
+      List.exists
+        (fun cstor -> find_in_ty_args seen cstor.cstor_ty)
+        ity.ty_constructors
+    )
+  and find_in_ty_args seen ty = match Type.view ty with
+    | Type.Forall ty' -> find_in_ty_args seen ty'
+    | Type.Fun (args,_) -> List.exists (find_in_ty seen) args
+    | Type.App _ | Type.Builtin _ | Type.Var _ | Type.DB _ -> false
+  and find_in_ty (seen:t list) (ty:Type.t) = match Type.view ty with
+    | Type.Forall ty' -> find_in_ty seen ty'
+    | Type.App (id,l) ->
+      ID.equal id top.ty_id || List.exists (find_in_ty seen) l
+    | Type.Fun (args,ret) ->
+      find_in_ty seen ret || List.exists (find_in_ty seen) args
+    | Type.Builtin _ | Type.Var _ | Type.DB _ -> false
+  in
+  find_in_ity [] top
 
 (* declare that the given type is inductive *)
 let declare_ty id ~ty_vars constructors =
@@ -99,34 +147,31 @@ let declare_ty id ~ty_vars constructors =
   if constructors = []
   then invalid_declf_ "Ind_types.declare_ty %a: no constructors provided" ID.pp id;
   (* check that [ty] is not declared already *)
-  List.iter
-    (function
-      | Payload_ind_type _ -> invalid_declf_ "inductive type %a already declared" ID.pp id;
-      | _ -> ())
-    (ID.payload id);
-  let ity = {
+  begin match ID.payload id with
+    | Payload_ind_type _ -> invalid_declf_ "inductive type %a already declared" ID.pp id;
+    | _ -> ()
+  end;
+  let rec ity = {
     ty_id=id;
     ty_vars;
     ty_pattern=Type.app id (List.map Type.var ty_vars);
     ty_constructors=constructors;
+    ty_is_rec=lazy (is_rec_ ity);
   } in
   (* map the constructors to [ity] too *)
   List.iter
     (fun c ->
-      ID.add_payload c.cstor_name (Payload_ind_cstor (c, ity)))
+       ID.set_payload c.cstor_name (Payload_ind_cstor (c, ity)))
     constructors;
   (* map [id] to [ity] *)
-  ID.add_payload id (Payload_ind_type ity);
+  ID.set_payload id (Payload_ind_type ity);
   ity
 
 (** {6 Constructors} *)
 
-let as_constructor id =
-  CCList.find
-    (function
-      | Payload_ind_cstor (cstor,ity) -> Some (cstor,ity)
-      | _ -> None)
-    (ID.payload id)
+let as_constructor id = match ID.payload id with
+  | Payload_ind_cstor (cstor,ity) -> Some (cstor,ity)
+  | _ -> None
 
 let as_constructor_exn id = match as_constructor id with
   | None -> raise (NotAnInductiveConstructor id)
@@ -138,40 +183,3 @@ let is_constructor s =
 let contains_inductive_types t =
   T.Seq.subterms t
   |> Sequence.exists (fun t -> is_inductive_type (T.ty t))
-
-(** {6 Constants with Inductive Type} *)
-
-let is_inductive_constant id =
-  List.exists
-    (function Payload_ind_constant -> true | _ -> false)
-    (ID.payload id)
-
-let declare_inductive_constant id =
-  if not (is_inductive_constant id)
-  then (
-    Util.debugf ~section 3 "declare inductive constant %a" (fun k->k ID.pp id);
-    ID.add_payload id Payload_ind_constant
-  )
-
-let scan_for_constant id ty =
-  let n_tyvars, args, ret = Type.open_poly_fun ty in
-  if n_tyvars=0 && args=[] && is_inductive_type ret && not (Stmt.is_defined_cst id)
-  then declare_inductive_constant id
-
-(** {6 Scan Declarations} *)
-
-let scan_stmt st = match Stmt.view st with
-  | Stmt.Data l ->
-      List.iter
-        (fun d ->
-          let ty_vars =
-            List.mapi (fun i v -> HVar.make ~ty:(Var.ty v) i) d.Stmt.data_args
-          and cstors =
-            List.map (fun (c,ty) -> {cstor_name=c; cstor_ty=ty;}) d.Stmt.data_cstors
-          in
-          let _ = declare_ty d.Stmt.data_id ~ty_vars cstors in
-          ())
-        l
-  | Stmt.TyDecl (id, ty)
-  | Stmt.Def (id,ty,_) -> scan_for_constant id ty
-  | _ -> ()

@@ -3,7 +3,7 @@
 
 (** {1 Selection functions} *)
 
-open Libzipperposition
+open Logtk
 
 (** See "E: a brainiac theorem prover". A selection function
     returns a bitvector of selected literals. *)

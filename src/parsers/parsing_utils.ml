@@ -3,18 +3,39 @@
 
 (** {1 Utils for Parsing} *)
 
-open Libzipperposition
-open CCError.Infix
+open Logtk
+open CCResult.Infix
 
 let parse_tptp file =
   Util_tptp.parse_file ~recursive:true file
   >|= Sequence.map Util_tptp.to_ast
 
+let parse_tip file =
+  Util_tip.parse_file file
+  >|= Util_tip.convert_seq
+
+let guess_input (file:string): Input_format.t =
+  if CCString.suffix ~suf:".p" file
+  then Input_format.I_tptp
+  else if CCString.suffix ~suf:".smt2" file
+  then Input_format.I_tip
+  else if CCString.suffix ~suf:".zf" file
+  then Input_format.I_zf
+  else (
+    let res = Input_format.default in
+    Util.warnf "unable to guess syntax for `%s`, use default syntax (%a)"
+      file Input_format.pp res;
+    res
+  )
+
 (** Parse file using the input format chosen by the user *)
-let parse file = match !Options.input with
-  | Options.I_tptp -> parse_tptp file
-  | Options.I_zf -> Util_zf.parse_file file
-  | Options.I_guess ->
-      if CCString.suffix ~suf:".p" file
-      then parse_tptp file
-      else Util_zf.parse_file file
+let input_of_file (file:string): Input_format.t = match !Options.input with
+  | Options.I_tptp -> Input_format.I_tptp
+  | Options.I_zf -> Input_format.I_zf
+  | Options.I_tip -> Input_format.I_tip
+  | Options.I_guess -> guess_input file
+
+let parse_file (i:Input_format.t) (file:string) = match i with
+  | Input_format.I_tptp -> parse_tptp file
+  | Input_format.I_zf -> Util_zf.parse_file file
+  | Input_format.I_tip -> parse_tip file

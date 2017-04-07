@@ -3,14 +3,14 @@
 
 (** {1 AC redundancy} *)
 
-open Libzipperposition
+open Logtk
 
 module T = FOTerm
 module Lit = Literal
 
 open AC_intf
 
-let section = Util.Section.(make ~parent:zip) "AC"
+let section = Util.Section.make "AC"
 
 let prof_simplify = Util.mk_profiler "AC.simplify"
 
@@ -60,8 +60,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let f x y = T.app_full (T.const ~ty s) ty_vars_t [x;y] in
     (* build clause l=r *)
     let mk_clause l r =
-      let proof = ProofStep.mk_trivial in
-      let c = C.create ~trail:Trail.empty [ Lit.mk_eq l r ] proof in
+      let proof = Proof.Step.trivial in
+      let penalty = 0 in
+      let c = C.create ~trail:Trail.empty ~penalty [ Lit.mk_eq l r ] proof in
       C.set_flag flag_axiom c true;
       C.set_flag SClause.flag_persistent c true;
       c
@@ -77,7 +78,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let proof = match proof with
       | Some p -> p
       | None -> (* new axioms *)
-          List.map C.proof (axioms s ty)
+        List.map C.proof (axioms s ty)
     in
     if not (ID.Tbl.mem tbl s)
     then (
@@ -125,8 +126,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     &&
     (
       match lit with
-      | Lit.Equation (l, r, true) -> has_ac_ids_ l r && A.equal l r
-      | _ -> false
+        | Lit.Equation (l, r, true) -> has_ac_ids_ l r && A.equal l r
+        | _ -> false
     )
 
   let is_trivial c =
@@ -165,13 +166,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (* gather axioms that were used, removing duplicates *)
         let ac_proof =
           CCList.flat_map find_proof symbols
-          |> CCList.sort_uniq ~cmp:ProofStep.compare_by_result in
-        let premises = C.proof c :: ac_proof in
+          |> CCList.sort_uniq ~cmp:Proof.S.compare_by_result in
+        let premises = List.map Proof.Parent.from (C.proof c :: ac_proof) in
         let proof =
-          ProofStep.mk_simp premises
-          ~rule:(ProofStep.mk_rule "AC.normalize")
+          Proof.Step.simp premises
+            ~rule:(Proof.Rule.mk "AC.normalize")
         in
-        let new_c = C.create ~trail:(C.trail c) lits proof in
+        let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
         Util.exit_prof prof_simplify;
         Util.incr_stat stat_ac_simplify;
         Util.debugf ~section 3 "@[<2>@[%a@]@ AC-simplify into @[%a@]@]"
@@ -223,13 +224,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (Statement.attrs st)
     in
     if has_ac_attr then match St.view st with
-      | St.TyDecl (id, ty)
-      | St.Def (id, ty, _) ->
-        add id ty
+      | St.TyDecl (id, ty) -> add id ty
+      | St.Def l ->
+        List.iter (fun {Statement.def_id; def_ty; _} -> add def_id def_ty) l
       | St.Data _
-      | St.RewriteTerm (_,_,_,_)
-      | St.RewriteForm (_,_)
+      | St.RewriteTerm _
+      | St.RewriteForm _
       | St.Assert _
+      | St.Lemma _
       | St.Goal _
       | St.NegatedGoal _ ->
         Util.error ~where:"AC"
@@ -249,6 +251,6 @@ let extension =
     AC.setup ()
   in
   { Extensions.default with Extensions.
-    name="ac";
-    env_actions=[action];
+                         name="ac";
+                         env_actions=[action];
   }

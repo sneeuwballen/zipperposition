@@ -3,6 +3,8 @@
 
 (** {1 Simple Clause} *)
 
+open Logtk
+
 type flag
 
 type t = private {
@@ -28,6 +30,8 @@ val is_empty : t -> bool
 val length : t -> int
 
 val update_trail : (Trail.t -> Trail.t) -> t -> t
+
+val to_s_form : ?ctx:FOTerm.Conv.ctx -> t -> TypedSTerm.Form.t
 
 (** {2 Flags} *)
 

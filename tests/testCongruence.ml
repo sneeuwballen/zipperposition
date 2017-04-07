@@ -1,8 +1,8 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-open Libzipperposition
-open Libzipperposition_arbitrary
+open Logtk
+open Logtk_arbitrary
 
 module T = FOTerm
 module CC = Congruence.FO
@@ -30,7 +30,7 @@ let check_term_eq_itself =
     CC.is_eq cc t t
   in
   let name = "congruence_term_eq_to_itself" in
-  QCheck.Test.make ~name gen prop
+  QCheck.Test.make ~long_factor:20 ~name gen prop
 
 (* if we build a congruence closure with classes, in each class,
     all elements are equal *)
@@ -45,7 +45,7 @@ let check_classes_are_eq =
       classes
   in
   let name = "congruence_class_members_are_eq" in
-  QCheck.Test.make ~name gen prop
+  QCheck.Test.make ~long_factor:20 ~name gen prop
 
 let props =
   [ check_term_eq_itself

@@ -1,0 +1,16 @@
+# expect: UNSAT
+val term : type.
+val r : term -> term -> prop.
+val a : term.
+val p : term -> prop.
+goal
+  (forall (X:term).
+     ((((p X) => (exists (Y:term). ((r X Y) && (p Y)))) && (p a))
+      => (exists (Z:term). (exists (W:term). ((r W Z) && (p Z) && (r X W))))))
+  <=> (forall (X:term).
+         (((exists (Z:term). (exists (W:term). ((r W Z) && (p Z) && (r X W)))) || 
+           (~ (p a)) || 
+           (~ (exists (Y:term). ((r X Y) && (p Y))))) && 
+          ((exists (Z:term). (exists (W:term). ((r W Z) && (p Z) && (r X W)))) || 
+           (~ (p a)) || 
+           (p X)))).

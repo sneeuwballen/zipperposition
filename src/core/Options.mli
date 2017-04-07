@@ -1,5 +1,5 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Global CLI options}
 
@@ -14,6 +14,7 @@ val stats : bool ref
 type input_format =
   | I_tptp
   | I_zf
+  | I_tip
   | I_guess (* based on the file extension *)
 
 val input_format_of_string : string -> input_format
@@ -36,8 +37,8 @@ val switch_opt : 'a -> ('a -> unit) -> Arg.spec
 (** [switch_opt b f] is an option that, when parsed, will call [f b]. Useful
     for
     {[ [ ("--foo", switch_opt true set_foo, " enable foo"
-       ; ("--no-foo", switch_opt false set_foo, " disable foo"]
-     ]} *)
+         ; ("--no-foo", switch_opt false set_foo, " disable foo"]
+    ]} *)
 
 val switch_set : 'a -> 'a ref -> Arg.spec
 (** [switch_set x r] is the option that, enabled, calls [r := x] *)

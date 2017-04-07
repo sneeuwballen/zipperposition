@@ -1,3 +1,6 @@
+
+# expect: unsat
+
 val term : type.
 data list := nil | cons term list.
 val append : list -> list -> list.

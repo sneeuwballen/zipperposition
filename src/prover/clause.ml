@@ -3,27 +3,25 @@
 
 (** {1 Clauses} *)
 
-open Libzipperposition
+open Logtk
 
-module Hash = CCHash
 module BV = CCBV
 module T = FOTerm
-module S = Substs
+module S = Subst
 module Lit = Literal
 module Lits = Literals
+module Stmt = Statement
 
 let stat_clause_create = Util.mk_stat "clause.create"
-let prof_clause_create = Util.mk_profiler "clause_create"
 
 module type S = Clause_intf.S
 
-type proof_step = Clause_intf.proof_step
-type proof = Clause_intf.proof
+type proof_step = Proof.Step.t
+type proof = Proof.S.t
 
 (** {2 Type def} *)
 module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   module Ctx = Ctx
-  module BLit = BBox
 
   type flag = SClause.flag
 
@@ -37,8 +35,10 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   type t = {
     sclause : sclause;
+    penalty: int; (** heuristic penalty *)
     mutable selected : BV.t Lazy.t; (** bitvector for selected lits*)
     mutable proof : proof_step; (** Proof of the clause *)
+    mutable eligible_res: BV.t option; (* eligible for resolution? *)
   }
 
   type clause = t
@@ -60,7 +60,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let compare c1 c2 = SClause.compare c1.sclause c2.sclause
 
   let hash c = SClause.hash c.sclause
-  let hash_fun c h = CCHash.int_ (hash c) h
 
   let id c = SClause.id c.sclause
 
@@ -72,6 +71,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let has_trail c = not (Trail.is_empty c.sclause.trail)
   let trail_subsumes c1 c2 = Trail.subsumes c1.sclause.trail c2.sclause.trail
   let is_active c ~v = Trail.is_active c.sclause.trail ~v
+  let penalty c = c.penalty
 
   let trail_l = function
     | [] -> Trail.empty
@@ -81,7 +81,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let lits c = c.sclause.lits
 
-  module CHashtbl = CCHashtbl.Make(struct
+  module Tbl = CCHashtbl.Make(struct
       type t = clause
       let hash = hash
       let equal = equal
@@ -89,90 +89,134 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   (** {2 Utils} *)
 
-  let is_goal c = ProofStep.is_goal c.proof
+  let is_goal c = Proof.Step.is_goal c.proof
 
-  let distance_to_goal c = ProofStep.distance_to_goal c.proof
+  let distance_to_goal c = Proof.Step.distance_to_goal c.proof
+  let comes_from_goal c = CCOpt.is_some @@ distance_to_goal c
 
   (* private function for building clauses *)
-  let create_inner ~selected sclause proof =
-    Util.enter_prof prof_clause_create;
+  let create_inner ~penalty ~selected sclause proof =
     (* create the structure *)
     let c = {
       sclause;
+      penalty;
       selected;
       proof;
+      eligible_res=None;
     } in
     (* return clause *)
     Util.incr_stat stat_clause_create;
-    Util.exit_prof prof_clause_create;
     c
 
-  let of_sclause c proof =
+  let of_sclause ?(penalty=0) c proof =
     let selected = lazy (Ctx.select c.lits) in
-    create_inner ~selected c proof
+    create_inner ~penalty ~selected c proof
 
-  let create_a ~trail lits proof =
+  let create_a ~penalty ~trail lits proof =
     let selected = lazy (Ctx.select lits) in
-    create_inner ~selected (SClause.make ~trail lits) proof
+    create_inner ~penalty ~selected (SClause.make ~trail lits) proof
 
-  let create ~trail lits proof =
-    create_a ~trail (Array.of_list lits) proof
+  let create ~penalty ~trail lits proof =
+    create_a ~penalty ~trail (Array.of_list lits) proof
 
-  let of_forms ~trail forms proof =
+  let of_forms ?(penalty=0) ~trail forms proof =
     let lits = List.map Ctx.Lit.of_form forms |> Array.of_list in
-    create_a ~trail lits proof
+    create_a ~penalty ~trail lits proof
 
-  let of_forms_axiom ~file ~name forms =
+  let of_forms_axiom ?(penalty=0) ~file ~name forms =
     let lits = List.map Ctx.Lit.of_form forms in
-    let proof = ProofStep.mk_assert' ~file ~name () in
-    create ~trail:Trail.empty lits proof
+    let proof = Proof.Step.assert' ~file ~name () in
+    create ~penalty ~trail:Trail.empty lits proof
+
+  let rule_neg_ = Proof.Rule.mk "neg_goal"
+  let rule_cnf_ = Proof.Rule.mk "cnf"
+  let rule_renaming_ = Proof.Rule.mk "renaming"
+  let rule_preprocess_ msg = Proof.Rule.mkf "preprocess(%s)" msg
+
+  module Src_tbl = CCHashtbl.Make(struct
+      type t = Stmt.source
+      let equal = Stmt.Src.equal
+      let hash = Stmt.Src.hash
+    end)
+
+  (* used to share the same SClause.t in the proof *)
+  let input_proof_tbl_ : Proof.Step.t Src_tbl.t = Src_tbl.create 32
+
+  let rec proof_of_stmt src =
+    try Src_tbl.find input_proof_tbl_ src
+    with Not_found ->
+      let p = match Stmt.Src.view src with
+        | Stmt.Input (_, Stmt.R_goal) -> Proof.Step.goal src
+        | Stmt.Input (_, _) -> Proof.Step.assert_ src
+        | Stmt.From_file (_, Stmt.R_goal) -> Proof.Step.goal src
+        | Stmt.From_file (_, _) -> Proof.Step.assert_ src
+        | Stmt.Internal _ -> Proof.Step.trivial
+        | Stmt.Neg srcd -> Proof.Step.esa ~rule:rule_neg_ [proof_of_sourced srcd]
+        | Stmt.CNF srcd -> Proof.Step.esa ~rule:rule_cnf_ [proof_of_sourced srcd]
+        | Stmt.Preprocess (srcd,msg) ->
+          Proof.Step.esa ~rule:(rule_preprocess_ msg) [proof_of_sourced srcd]
+        | Stmt.Renaming (srcd,id,form) ->
+          Proof.Step.esa ~rule:rule_renaming_
+            [proof_of_sourced srcd;
+             Proof.Parent.from @@ Proof.S.mk_f_by_def id @@
+               TypedSTerm.(Form.eq (const id ~ty:Ty.prop) form)]
+      in
+      Src_tbl.add input_proof_tbl_ src p;
+      p
+
+  and proof_of_sourced (res, src): Proof.Parent.t =
+    let p = proof_of_stmt src in
+    begin match res with
+      | Stmt.Sourced_input f ->
+        Proof.Parent.from (Proof.S.mk_f p f)
+      | Stmt.Sourced_clause c ->
+        let lits = List.map Ctx.Lit.of_form c |> Array.of_list in
+        let c = SClause.make ~trail:Trail.empty lits in
+        Proof.Parent.from (Proof.S.mk_c p c)
+      | Stmt.Sourced_statement stmt ->
+        Proof.Parent.from (Proof.S.mk_stmt p stmt)
+    end
 
   let of_statement st =
-    let of_lits ~is_goal lits =
+    let of_lits lits =
       (* convert literals *)
       let lits = List.map Ctx.Lit.of_form lits in
-      let src = Statement.src st in
-      let proof = if is_goal then ProofStep.mk_goal src else ProofStep.mk_assert src in
-      let c = create ~trail:Trail.empty lits proof in
+      let proof = proof_of_stmt (Stmt.src st) in
+      let c = create ~trail:Trail.empty ~penalty:0 lits proof in
       c
     in
-    match Statement.view st with
-    | Statement.Data _
-    | Statement.TyDecl _ -> []
-    | Statement.Def _
-    | Statement.RewriteForm _
-    | Statement.RewriteTerm _ -> [] (* dealt with by rewriting *)
-    | Statement.Assert lits -> [of_lits ~is_goal:false lits]
-    | Statement.Goal lits -> [of_lits ~is_goal:true lits]
-    | Statement.Lemma l
-    | Statement.NegatedGoal l -> List.map (of_lits ~is_goal:true) l
+    match Stmt.view st with
+      | Stmt.Data _
+      | Stmt.TyDecl _ -> []
+      | Stmt.Def _
+      | Stmt.RewriteForm _
+      | Stmt.RewriteTerm _ -> [] (* dealt with by rewriting *)
+      | Stmt.Assert lits -> [of_lits lits]
+      | Stmt.Goal lits -> [of_lits lits]
+      | Stmt.Lemma l
+      | Stmt.NegatedGoal (_,l) -> List.map of_lits l
 
   let update_trail f c =
     let sclause = SClause.update_trail f c.sclause in
-    create_inner ~selected:c.selected sclause c.proof
+    create_inner ~selected:c.selected ~penalty:c.penalty sclause c.proof
 
   let proof_step c = c.proof
 
-  let proof c = ProofStep.mk_c c.proof c.sclause
+  let proof c = Proof.S.mk_c c.proof c.sclause
+  let proof_parent c = Proof.Parent.from (proof c)
+  let proof_parent_subst (c,sc) subst = Proof.Parent.from_subst (proof c,sc) subst
 
   let update_proof c f =
     let new_proof = f c.proof in
-    create_a ~trail:c.sclause.trail c.sclause.lits new_proof
+    create_a ~trail:c.sclause.trail ~penalty:c.penalty c.sclause.lits new_proof
 
   let is_empty c =
     Lits.is_absurd c.sclause.lits && Trail.is_empty c.sclause.trail
 
   let length c = SClause.length c.sclause
 
-  (** Apply substitution to the clause. Note that using the same renaming for all
-      literals is important. *)
-  let apply_subst ~renaming subst (c,sc) =
-    let lits = Literals.apply_subst ~renaming subst (c.sclause.lits,sc) in
-    let new_c = create_a ~trail:c.sclause.trail lits c.proof in
-    new_c
-
   let _apply_subst_no_simpl subst (lits,sc) =
-    if Substs.is_empty subst
+    if Subst.is_empty subst
     then lits (* id *)
     else
       let renaming = S.Renaming.create () in
@@ -227,6 +271,15 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       bv
     )
 
+  let eligible_res_no_subst c =
+    begin match c.eligible_res with
+      | Some r -> r
+      | None ->
+        let bv = eligible_res (c,0) Subst.empty in
+        c.eligible_res <- Some bv;
+        bv
+    end
+
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for paramodulation. *)
   let eligible_param (c,sc) subst =
@@ -236,7 +289,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       (* maximal ones *)
       let bv = Lits.maxlits ~ord lits' in
       (* only keep literals that are positive equations *)
-      BV.filter bv (fun i -> Lit.is_eq lits'.(i));
+      BV.filter bv (fun i -> Lit.is_pos lits'.(i));
       bv
     ) else
       BV.empty () (* no eligible literal when some are selected *)
@@ -265,15 +318,15 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let is_oriented_rule c =
     let ord = Ctx.ord () in
     match c.sclause.lits with
-    | [| Lit.Equation (l, r, true) |] ->
+      | [| Lit.Equation (l, r, true) |] ->
         begin match Ordering.compare ord l r with
           | Comparison.Gt
           | Comparison.Lt -> true
           | Comparison.Eq
           | Comparison.Incomparable -> false
         end
-    | [| Lit.Prop (_, true) |] -> true
-    | _ -> false
+      | [| Lit.Prop (_, true) |] -> true
+      | _ -> false
 
   let symbols ?(init=ID.Set.empty) seq =
     Sequence.fold
@@ -282,6 +335,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let to_forms c = Lits.Conv.to_forms c.sclause.lits
   let to_sclause c = c.sclause
+
+  let to_s_form c = SClause.to_s_form c.sclause
 
   module Seq = struct
     let lits c = Sequence.of_array c.sclause.lits
@@ -387,13 +442,13 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
             Lit.pp lit (pp_selected selected) i (pp_maxlit max) i
         in
         Format.fprintf out "[@[%a@]]"
-          (CCFormat.arrayi ~start:"" ~stop:"" ~sep:" ∨ " pp_lit)
-          lits
+          (Util.pp_seq ~sep:" ∨ " pp_lit)
+          (Sequence.of_array_i lits)
       )
     in
-    Format.fprintf out "@[%a@[<2>%a%a@]@]"
+    Format.fprintf out "@[%a@[<2>%a%a@]@]/%d"
       SClause.pp_vars c.sclause pp_lits c.sclause.lits
-      SClause.pp_trail c.sclause.trail;
+      SClause.pp_trail c.sclause.trail c.sclause.id;
     ()
 
   let pp_tstp out c = SClause.pp_tstp out c.sclause
@@ -404,11 +459,11 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let pp_set out set =
     Format.fprintf out "{@[<hv>%a@]}"
-      (CCFormat.seq ~start:"" ~stop:"" ~sep:"," pp)
+      (Util.pp_seq ~sep:"," pp)
       (ClauseSet.to_seq set)
 
   let pp_set_tstp out set =
     Format.fprintf out "@[<v>%a@]"
-      (CCFormat.seq ~start:"" ~stop:"" ~sep:"," pp_tstp)
+      (Util.pp_seq ~sep:"," pp_tstp)
       (ClauseSet.to_seq set)
 end

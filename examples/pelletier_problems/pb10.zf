@@ -1,0 +1,9 @@
+# expect: UNSAT
+val term : type.
+val r : prop.
+val q : prop.
+assert q => r.
+val p : prop.
+assert r => (q && p).
+assert p => (r || q).
+goal p <=> q.

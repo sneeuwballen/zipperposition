@@ -1,0 +1,13 @@
+# expect: UNSAT
+val term : type.
+val i : term -> term -> term.
+val t : term -> prop.
+assert forall (X:term). (forall (Y:term). (t (i X (i Y X)))).
+assert
+  forall (X:term).
+    (forall (Y:term).
+       (forall (Z:term). (t (i (i X (i Y Z)) (i (i X Y) (i X Z)))))).
+val n : term -> term.
+assert forall (X:term). (forall (Y:term). (t (i (i (n X) (n Y)) (i Y X)))).
+assert forall (X:term). (forall (Y:term). (((t X) && (t (i X Y))) => (t Y))).
+goal forall (X:term). (t (i X (n (n X)))).

@@ -8,24 +8,19 @@
 
     The point is to relate different applications of the same context. *)
 
-open Libzipperposition
+open Logtk
 
 type term = FOTerm.t
-type subst = Substs.t
+type subst = Subst.t
 
 (** A context is represented as a regular array of literals, containing
     at least one specific variable [x], paired with this variable [x].
     Applying the context is a mere substitution *)
-type t = private {
-  lits : Literals.t;
-  var : FOTerm.var;
-  mutable hash: int;
-}
+type t
 
 val compare : t -> t -> int
 val equal : t -> t -> bool
 val hash : t -> int
-val hash_fun : t CCHash.hash_fun
 
 val make : Literals.t -> var:FOTerm.var -> t
 (** Make a context from a var and literals containing this var.
@@ -40,6 +35,9 @@ val extract : Literals.t -> term -> t option
 val extract_exn : Literals.t -> term -> t
 (** Unsafe version of {!extract}.
     @raise Invalid_argument if the term is not to be found within the lits *)
+
+val trivial : Literals.t -> term -> t
+(** Trivial context, that contains 0 holes. *)
 
 val apply : t -> term -> Literals.t
 (** [apply c t] fills the hole of [c] with the given term [t]. [t] and [c]

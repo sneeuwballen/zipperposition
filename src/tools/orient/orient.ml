@@ -3,11 +3,11 @@
 
 (** {1 Tool to orient a serie of rewriting rules} *)
 
-open Libzipperposition
-open Libzipperposition_solving
+open Logtk
+open Logtk_solving
 
 module PT = STerm
-module E = CCError
+module E = CCResult
 module T = TypedSTerm
 module Loc = ParseLocation
 
@@ -42,21 +42,21 @@ let print_signature signature =
 let parse_files_into_rules files =
   let open E.Infix in
   E.fold_l
-     (fun rules file ->
-        begin match file with
-          | "stdin" -> E.return stdin
-          | _ ->
-              begin try E.return (open_in file)
-                with Sys_error msg ->
-                  let msg = Printf.sprintf "could not open file %s: %s" file msg in
-                  E.fail msg
-              end
-        end >>=
-        RewriteRules.parse_file file >>=
-        RewriteRules.rules_of_pairs >|= fun rules' ->
-        List.rev_append rules' rules)
-     []
-     files
+    (fun rules file ->
+       begin match file with
+         | "stdin" -> E.return stdin
+         | _ ->
+           begin try E.return (open_in file)
+             with Sys_error msg ->
+               let msg = Printf.sprintf "could not open file %s: %s" file msg in
+               E.fail msg
+           end
+       end >>=
+       RewriteRules.parse_file file >>=
+       RewriteRules.rules_of_pairs >|= fun rules' ->
+       List.rev_append rules' rules)
+    []
+    files
 
 let parse_args () =
   let help_msg = "orient: finds orderings for rewriting rules" in
@@ -84,15 +84,15 @@ let () =
       | _ when n = 0 -> []
       | lazy LazyList.Nil -> []
       | lazy (LazyList.Cons (s,tl)) ->
-          let tl = get_solutions tl (n-1) in
-          s::tl
+        let tl = get_solutions tl (n-1) in
+        s::tl
     in
     get_solutions solutions !num_solutions
   in
   match res with
-  | `Error msg ->
+    | E.Error msg ->
       print_endline msg
-  | `Ok [] ->
+    | E.Ok [] ->
       print_endline "no solution for this set of rules"
-  | `Ok solutions ->
+    | E.Ok solutions ->
       List.iter print_solution solutions

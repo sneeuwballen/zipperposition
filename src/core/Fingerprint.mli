@@ -22,7 +22,7 @@ module Make(X : Set.OrderedType) : sig
   val default_fp : fingerprint_fun
 
   val empty_with : fingerprint_fun -> t
-    (** Empty index, using the given fingerprint function *)
+  (** Empty index, using the given fingerprint function *)
 
   val get_fingerprint : t -> fingerprint_fun
 end

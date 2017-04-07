@@ -1,0 +1,10 @@
+# expect: SAT
+val term : type.
+val g : term -> term.
+val a : term.
+val f : term -> prop.
+goal
+  ((forall (X:term). ((f X) => (f (g X)))) && (f a))
+  <=> (forall (X:term).
+         (((f (g (g X))) || (~ (f a)) || (~ (f (g X)))) && 
+          ((f (g (g X))) || (~ (f a)) || (f X)))).

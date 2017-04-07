@@ -3,7 +3,7 @@
 
 (** {1 Arbitrary Basic Terms} *)
 
-open Libzipperposition
+open Logtk
 
 type 'a arbitrary = 'a QCheck.arbitrary
 type 'a gen = 'a QCheck.Gen.t
@@ -15,7 +15,7 @@ val atom : form arbitrary
 (** Atomic formula *)
 
 val clause_g : form list gen
-    
+
 val clause : form list arbitrary
 (** clause *)
 

@@ -3,10 +3,10 @@
 
 (** {1 Inference and simplification rules for Algebraic types} *)
 
-open Libzipperposition
+open Logtk
 
 module T = FOTerm
-module S = Substs
+module S = Subst
 module Lit = Literal
 module Lits = Literals
 module Stmt = Statement
@@ -28,8 +28,8 @@ let flag_enumeration_clause = SClause.new_flag ()
 exception Error of string
 
 let () = Printexc.register_printer
-  (function Error s -> Some ("error in enum_types: " ^s)
-  | _ -> None)
+    (function Error s -> Some ("error in enum_types: " ^s)
+            | _ -> None)
 
 let error_ s = raise (Error s)
 let errorf_ msg = CCFormat.ksprintf msg ~f:error_
@@ -57,7 +57,7 @@ module type S = sig
     | AlreadyDeclared of decl
 
   val declare_ty :
-    proof:ProofStep.of_ ->
+    proof:Proof.t ->
     ty_id:ID.t ->
     ty_vars:Type.t HVar.t list ->
     var:Type.t HVar.t ->
@@ -82,17 +82,14 @@ module type S = sig
   (** Register rules in the environment *)
 end
 
-let _enable = ref true
+let _enable = ref false
 let _instantiate_shielded = ref false
 let _accept_unary_types = ref true
 let _instantiate_projector_axiom = ref false
 
-let is_projector_ id ~of_ =
-  List.exists
-    (function
-      | Ind_ty.Payload_ind_projector of' -> ID.equal of_ of'
-      | _ -> false)
-    (ID.payload id)
+let is_projector_ id ~of_ = match ID.payload id with
+  | Ind_ty.Payload_ind_projector of' -> ID.equal of_ of'
+  | _ -> false
 
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
@@ -101,7 +98,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module Ctx = Env.Ctx
 
   (* one particular enum type. The return type has the shape [id(vars)],
-    such as [list(a)] or [map(a,b)] *)
+     such as [list(a)] or [map(a,b)] *)
   type decl = {
     decl_ty_id : id_or_ty_builtin;
     decl_ty_vars : Type.t HVar.t list;
@@ -109,8 +106,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     decl_var : Type.t HVar.t; (* x = ... *)
     decl_cases : term list; (* ... t1 | t2 | ... | tn *)
     decl_proof :
-      [ `Data of StatementSrc.t * Type.t Statement.data
-      | `Clause of ProofStep.of_
+      [ `Data of Statement.source * Type.t Statement.data
+      | `Clause of Proof.t
       ]; (* justification for the enumeration axiom *)
     mutable decl_symbols : ID.Set.t; (* set of declared symbols for t1,...,tn *)
   }
@@ -140,14 +137,14 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> Sequence.of_list
     |> Sequence.flat_map T.Seq.vars
     |> Sequence.filter (fun v -> not (Type.equal Type.tType (HVar.ty v)))
-    |> Sequence.for_all (HVar.equal var)
+    |> Sequence.for_all (HVar.equal Type.equal var)
 
   (* check that all vars in [l] are pairwise distinct *)
   let rec check_all_distinct_ acc l = match l with
     | [] -> true
     | v :: l' ->
-        not (CCList.Set.mem ~eq:HVar.equal v acc)
-        && check_all_distinct_ (v :: acc) l'
+      not (CCList.mem ~eq:(HVar.equal Type.equal) v acc)
+      && check_all_distinct_ (v :: acc) l'
 
   type declare_result =
     | New of decl
@@ -155,9 +152,9 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let declare_ ~proof ~ty_id:id ~ty_vars ~var cases =
     if not (check_all_distinct_ [] ty_vars)
-      then errorf_ "invalid declaration %a: duplicate type variable" pp_id_or_builtin id;
+    then errorf_ "invalid declaration %a: duplicate type variable" pp_id_or_builtin id;
     if not (check_uniq_var_is_ ~var cases)
-      then errorf_ "invalid declaration %a: %a is not the only variable in @[%a@]"
+    then errorf_ "invalid declaration %a: %a is not the only variable in @[%a@]"
         pp_id_or_builtin id (Util.pp_list T.pp) cases HVar.pp var;
     try
       let decl = find_decl_ id in
@@ -209,7 +206,7 @@ module Make(E : Env.S) : S with module Env = E = struct
      with only constants as cases (in other words, a monomorphic finite type) *)
   let detect_decl_ c =
     let eq_var_ ~var t = match T.view t with
-      | T.Var v' -> HVar.equal var v'
+      | T.Var v' -> HVar.equal Type.equal var v'
       | _ -> false
     and get_var_ t = match T.view t with
       | T.Var v -> v
@@ -222,27 +219,27 @@ module Make(E : Env.S) : S with module Env = E = struct
        [var = t] for some constant [t] *)
     let rec _check_all_vars ~ty ~var acc lits = match lits with
       | [] ->
-          (* now also check that no case has free variables other than [var],
-              and that there are at least 2 cases *)
-          if check_uniq_var_is_ ~var acc
-          && (!_accept_unary_types || List.length acc >= 2)
-          then Some (var, acc)
-          else None
+        (* now also check that no case has free variables other than [var],
+            and that there are at least 2 cases *)
+        if check_uniq_var_is_ ~var acc
+        && (!_accept_unary_types || List.length acc >= 2)
+        then Some (var, acc)
+        else None
       | Lit.Equation (l, r, true) :: lits' when eq_var_ ~var l && is_const r ->
-          _check_all_vars ~ty ~var (r::acc) lits'
+        _check_all_vars ~ty ~var (r::acc) lits'
       | Lit.Equation (l, r, true) :: lits' when eq_var_ ~var r && is_const l ->
-          _check_all_vars ~ty ~var (l::acc) lits'
+        _check_all_vars ~ty ~var (l::acc) lits'
       | _ -> None
     in
     let lits = C.lits c in
     if CCArray.exists (fun l -> not (Lit.is_eq l)) lits then None
     else match Array.to_list lits with
       | Lit.Equation (l,r,true) :: lits when T.is_var l && is_simple_ty (T.ty l) && is_const r ->
-          let var = get_var_ l in
-          _check_all_vars ~ty:(T.ty l) ~var [r] lits
+        let var = get_var_ l in
+        _check_all_vars ~ty:(T.ty l) ~var [r] lits
       | Lit.Equation (l,r,true) :: lits when T.is_var r && is_simple_ty (T.ty r) && is_const l ->
-          let var = get_var_ r in
-          _check_all_vars ~ty:(T.ty r) ~var [l] lits
+        let var = get_var_ r in
+        _check_all_vars ~ty:(T.ty r) ~var [l] lits
       | _ -> None
 
   let detect_declaration c = Util.with_prof prof_detect detect_decl_ c
@@ -259,7 +256,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Sequence.of_array lits
     |> Sequence.flat_map Lit.Seq.terms
     |> Sequence.flat_map T.Seq.subterms_depth
-    |> Sequence.fmap
+    |> Sequence.filter_map
       (fun (v,depth) -> if depth>0 && T.is_var v then Some v else None)
     |> T.Seq.add_set T.Set.empty
 
@@ -276,9 +273,9 @@ module Make(E : Env.S) : S with module Env = E = struct
   let bind_vars_ (d,sc_decl) (args,sc_args) =
     List.fold_left2
       (fun subst v arg ->
-        let v = (v : Type.t HVar.t :> InnerTerm.t HVar.t) in
-        Substs.Ty.bind subst (v,sc_decl) (arg,sc_args))
-      Substs.empty d.decl_ty_vars args
+         let v = (v : Type.t HVar.t :> InnerTerm.t HVar.t) in
+         Subst.Ty.bind subst (v,sc_decl) (arg,sc_args))
+      Subst.empty d.decl_ty_vars args
 
   (* given a type [ty], find whether it's an enum type, and if it is the
      case return [Some (decl, subst)] *)
@@ -294,12 +291,16 @@ module Make(E : Env.S) : S with module Env = E = struct
       with Not_found -> None
     in
     match Type.view ty with
-    | Type.Builtin b -> find_aux (B b) []
-    | Type.App (id, l) -> find_aux (I id) l
-    | _ -> None
+      | Type.Builtin b -> find_aux (B b) []
+      | Type.App (id, l) -> find_aux (I id) l
+      | _ -> None
 
   (* TODO: maybe relax the restriction that is must not be naked, but only
      up to a given depth (if CLI arg?) *)
+
+  (* TODO: only instantiate naked variables that are in positive equations;
+     those in negative equations may come from purification and must be
+     found be E-unification *)
 
   (* instantiate variables that belong to an enum case *)
   let instantiate_vars_ c =
@@ -313,8 +314,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     CCList.find_map
       (fun v ->
          match find_ty_ s_decl (T.ty v) s_c with
-         | None -> None
-         | Some (decl, subst) ->
+           | None -> None
+           | Some (decl, subst) ->
              (* we found an enum type declaration for [v], replace it
                 with each case for the enum type *)
              Util.incr_stat stat_simplify;
@@ -326,11 +327,11 @@ module Make(E : Env.S) : S with module Env = E = struct
                     let renaming = Ctx.renaming_clear () in
                     let lits' = Lits.apply_subst ~renaming subst (C.lits c,s_c) in
                     let proof =
-                      ProofStep.mk_inference [C.proof c]
-                        ~rule:(ProofStep.mk_rule ~subst:[subst] "enum_type_case_switch")
+                      Proof.Step.inference [Proof.Parent.from @@ C.proof c]
+                        ~rule:(Proof.Rule.mk"enum_type_case_switch")
                     in
-                    let trail = C.trail c in
-                    let c' = C.create_a ~trail lits' proof in
+                    let trail = C.trail c and penalty = C.penalty c in
+                    let c' = C.create_a ~trail ~penalty lits' proof in
                     Util.debugf ~section 3
                       "@[<2>deduce @[%a@]@ from @[%a@]@ @[(enum_type switch on %a)@]@]"
                       (fun k->k C.pp c' C.pp c Type.pp decl.decl_ty);
@@ -364,19 +365,22 @@ module Make(E : Env.S) : S with module Env = E = struct
       let lits =
         List.map
           (fun case ->
-            Lit.mk_eq
-              (S.FO.apply ~renaming subst (t,1))
-              (S.FO.apply ~renaming subst (case,0)))
+             Lit.mk_eq
+               (S.FO.apply ~renaming subst (t,1))
+               (S.FO.apply ~renaming subst (case,0)))
           decl.decl_cases
       in
       let proof = match decl.decl_proof with
-        | `Data (src,d) -> ProofStep.mk_data src d
+        | `Data (src,d) -> Proof.Step.data src d
         | `Clause step ->
-            ProofStep.mk_inference
-              ~rule:(ProofStep.mk_rule "axiom_enum_types") [step]
+          Proof.Step.inference
+            ~rule:(Proof.Rule.mk "axiom_enum_types")
+            [Proof.Parent.from_subst (step,0) subst]
       in
       let trail = Trail.empty in
-      let c' = C.create ~trail lits proof in
+      (* start with initial penalty *)
+      let penalty = 4 in
+      let c' = C.create ~trail ~penalty lits proof in
       Util.debugf ~section 3 "@[<2>instantiate axiom of enum type `%a` \
                               on @[%a@]:@ clause @[%a@]@]"
         (fun k->k pp_id_or_builtin decl.decl_ty_id ID.pp s C.pp c');
@@ -406,14 +410,14 @@ module Make(E : Env.S) : S with module Env = E = struct
   let check_decl_ ~ty s decl =
     let _, ty_ret = Type.open_fun ty in
     match Type.view ty_ret, decl.decl_ty_id with
-    | Type.Builtin b, B b' when b=b' ->
+      | Type.Builtin b, B b' when b=b' ->
         instantiate_axiom ~ty_s:ty s [] decl
-    | Type.App (c, args), I i
-      when ID.equal c i
-      && not (is_projector_ s ~of_:i)
-      && List.length args = List.length decl.decl_ty_vars->
+      | Type.App (c, args), I i
+        when ID.equal c i
+          && not (is_projector_ s ~of_:i)
+          && List.length args = List.length decl.decl_ty_vars->
         instantiate_axiom ~ty_s:ty s args decl
-    | _ -> None
+      | _ -> None
 
   (* add axioms for new symbol [s] with type [ty], if needed *)
   let _on_new_symbol s ~ty =
@@ -426,9 +430,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     let clauses =
       let _, ty_ret = Type.open_fun ty in
       match Type.view ty_ret with
-      | Type.Builtin b -> aux (B b)
-      | Type.App (id, _) -> aux (I id)
-      | _ -> []
+        | Type.Builtin b -> aux (B b)
+        | Type.App (id, _) -> aux (I id)
+        | _ -> []
     in
     (* set of support *)
     PS.ActiveSet.add (Sequence.of_list clauses)
@@ -438,8 +442,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       Signature.fold (Ctx.signature ()) []
         (fun acc s ty ->
            match check_decl_ s ~ty decl with
-           | None -> acc
-           | Some c -> c::acc)
+             | None -> acc
+             | Some c -> c::acc)
     in
     PS.PassiveSet.add (Sequence.of_list clauses)
 
@@ -453,10 +457,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     match detect_declaration c with
       | None -> ()
       | Some (var,cases) ->
-          let ty_id = CCOpt.get_exn (as_simple_ty (HVar.ty var)) in
-          let is_new = declare_ ~ty_id ~ty_vars:[] ~var ~proof:(`Clause (C.proof c)) cases in
-          (* clause becomes redundant if it's a new declaration *)
-          match is_new with
+        let ty_id = CCOpt.get_exn (as_simple_ty (HVar.ty var)) in
+        let is_new = declare_ ~ty_id ~ty_vars:[] ~var ~proof:(`Clause (C.proof c)) cases in
+        (* clause becomes redundant if it's a new declaration *)
+        match is_new with
           | New _ -> C.set_flag flag_enumeration_clause c true
           | AlreadyDeclared _ -> ()
 
@@ -480,10 +484,9 @@ module Make(E : Env.S) : S with module Env = E = struct
            let projs_of_v =
              List.mapi
                (fun n ty_arg ->
-                  let name = CCFormat.sprintf "proj_%a_%d" ID.pp c_id n in
-                  let proj = ID.make name in
+                  let proj = ID.makef "proj_%a_%d" ID.pp c_id n in
                   (* remember that proj is a projector for the enum type *)
-                  ID.add_payload proj (Ind_ty.Payload_ind_projector d.Stmt.data_id);
+                  ID.set_payload proj (Ind_ty.Payload_ind_projector d.Stmt.data_id);
                   let ty_proj = Type.(forall_n num_ty_vars ([ty_ret] ==> ty_arg)) in
                   (* declare projector *)
                   Ctx.declare proj ty_proj;
@@ -505,19 +508,19 @@ module Make(E : Env.S) : S with module Env = E = struct
   let _detect_stmt stmt =
     let src = Stmt.src stmt in
     match Stmt.view stmt with
-    | Stmt.Assert c ->
-        let proof = ProofStep.mk_assert src in
+      | Stmt.Assert c ->
+        let proof = Proof.Step.assert_ src in
         let c = C.of_forms ~trail:Trail.empty c proof in
         _detect_and_declare c
-    | Stmt.Data l ->
+      | Stmt.Data l ->
         List.iter (_declare_inductive ~src) l
-    | Stmt.TyDecl _
-    | Stmt.Def _
-    | Stmt.RewriteTerm _
-    | Stmt.RewriteForm _
-    | Stmt.Lemma _
-    | Stmt.NegatedGoal _
-    | Stmt.Goal _ -> ()
+      | Stmt.TyDecl _
+      | Stmt.Def _
+      | Stmt.RewriteTerm _
+      | Stmt.RewriteForm _
+      | Stmt.Lemma _
+      | Stmt.NegatedGoal _
+      | Stmt.Goal _ -> ()
 
   let setup () =
     if !_enable then (
@@ -549,35 +552,35 @@ let extension =
     ET.setup ()
   in
   { Extensions.default with Extensions.
-    name = "enum_types";
-    env_actions=[register];
+                         name = "enum_types";
+                         env_actions=[register];
   }
 
 let () =
   Extensions.register extension;
   Params.add_opts
     [ "--enum-types"
-      , Options.switch_set true _enable
-      , " enable inferences for enumerated/inductive types"
+    , Options.switch_set true _enable
+    , " enable inferences for enumerated/inductive types"
     ; "--no-enum-types"
-      , Options.switch_set false _enable
-      , " disable inferences for enumerated/inductive types"
+    , Options.switch_set false _enable
+    , " disable inferences for enumerated/inductive types"
     ; "--projector-axioms"
-      , Options.switch_set true _instantiate_projector_axiom
-      , " enable exhaustiveness axioms for inductive types (with projectors)"
+    , Options.switch_set true _instantiate_projector_axiom
+    , " enable exhaustiveness axioms for inductive types (with projectors)"
     ; "--no-projector-axioms"
-      , Options.switch_set false _instantiate_projector_axiom
-      , " disable exhaustiveness axioms for inductive types (with projectors)"
+    , Options.switch_set false _instantiate_projector_axiom
+    , " disable exhaustiveness axioms for inductive types (with projectors)"
     ; "--enum-shielded"
-      , Options.switch_set true _instantiate_shielded
-      , " enable/disable instantiation of shielded variables of enum type"
+    , Options.switch_set true _instantiate_shielded
+    , " enable/disable instantiation of shielded variables of enum type"
     ; "--no-enum-shielded"
-      , Options.switch_set false _instantiate_shielded
-      , " enable/disable instantiation of shielded variables of enum type"
+    , Options.switch_set false _instantiate_shielded
+    , " enable/disable instantiation of shielded variables of enum type"
     ; "--enum-unary"
-      , Options.switch_set true _accept_unary_types
-      , " enable support for unary enum types (one case)"
+    , Options.switch_set true _accept_unary_types
+    , " enable support for unary enum types (one case)"
     ; "--no-enum-unary"
-      , Options.switch_set false _accept_unary_types
-      , " disable support for unary enum types (one case)"
+    , Options.switch_set false _accept_unary_types
+    , " disable support for unary enum types (one case)"
     ]

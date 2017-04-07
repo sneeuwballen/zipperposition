@@ -1,0 +1,9 @@
+
+# expect: unsat
+
+val not_ : prop -> prop.
+
+assert forall (x:prop). not_ x <=> (x=false).
+
+goal not_ false.
+

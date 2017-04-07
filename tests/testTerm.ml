@@ -3,8 +3,8 @@
 
 (** Test terms *)
 
-open Libzipperposition
-open Libzipperposition_arbitrary
+open Logtk
+open Logtk_arbitrary
 
 module T = FOTerm
 module H = Helpers
@@ -66,10 +66,22 @@ let check_ground_novar =
 let check_min_max_vars =
   let gen = ArTerm.default in
   let prop t =
-    let vars = T.vars (Sequence.singleton t) in
+    let vars = T.vars t in
     T.VarSet.is_empty vars || (T.min_var vars <= T.max_var vars)
   in
   QCheck.Test.make ~count:1000 ~name:"term_min_max_var" gen prop
+
+let check_hash_mod_alpha =
+  let gen = QCheck.pair ArTerm.default ArTerm.default in
+  let prop (t1,t2) =
+    if not (T.equal t1 t2) && Unif.FO.are_variant t1 t2
+    then
+      T.hash_mod_alpha t1 = T.hash_mod_alpha t2
+    else QCheck.assume_fail ()
+  in
+  QCheck.Test.make gen prop
+    ~count:10_000 ~long_factor:20
+    ~name:"variant_have_same_hash_mod_alpha"
 
 (* TODO: write a term arbitrary instance for DB terms (lambda terms?)
    and check that a shifted/unshifted closed term remains closed *)
@@ -78,5 +90,6 @@ let props =
   [ check_size_subterm
   ; check_replace_id
   ; check_ground_novar
+  ; check_hash_mod_alpha
   ; check_min_max_vars
   ]

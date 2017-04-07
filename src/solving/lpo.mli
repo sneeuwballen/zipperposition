@@ -3,7 +3,7 @@
 
 (** {1 Constraint Solving for LPO} *)
 
-open Libzipperposition
+open Logtk
 
 (** {6 Constraints} *)
 

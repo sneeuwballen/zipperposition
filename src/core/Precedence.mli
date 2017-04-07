@@ -7,10 +7,35 @@ type symbol_status =
   | Multiset
   | Lexicographic
 
+(** {2 Weight of Symbols} *)
+module Weight : sig
+  type t
+
+  val int : int -> t
+  val zero : t
+  val one : t
+  val omega : t
+  val omega_plus : int -> t
+
+  val sign : t -> int
+
+  val add : t -> t -> t
+  val diff : t -> t -> t
+
+  module Infix : sig
+    val ( + ) : t -> t -> t
+    val ( - ) : t -> t -> t
+  end
+  include module type of Infix
+
+  include Interfaces.ORD with type t := t
+  include Interfaces.PRINT with type t := t
+end
+
 (** {2 Constraints} *)
 module Constr : sig
   type 'a t = private ID.t -> ID.t -> int
-  constraint 'a = [< `partial | `total]
+    constraint 'a = [< `partial | `total]
   (** A partial order on symbols, used to make the precedence more
       precise.
       ['a] encodes the kind of ordering: partial or total
@@ -74,8 +99,8 @@ val mem : t -> ID.t -> bool
 val status : t -> ID.t -> symbol_status
 (** Status of the symbol *)
 
-val weight : t -> ID.t -> int
-(** Weight of a symbol (for KBO). Strictly positive int. *)
+val weight : t -> ID.t -> Weight.t
+(** Weight of a symbol (for KBO). *)
 
 val add_list : t -> ID.t list -> unit
 (** Update the precedence with the given symbols *)
@@ -94,7 +119,7 @@ val pp_snapshot : ID.t list CCFormat.printer
 val pp_debugf : t CCFormat.printer
 include Interfaces.PRINT with type t := t
 
-type weight_fun = ID.t -> int
+type weight_fun = ID.t -> Weight.t
 
 val weight_modarity : arity:(ID.t -> int) -> weight_fun
 

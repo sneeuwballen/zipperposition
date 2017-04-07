@@ -1,20 +1,33 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Simple Typed Terms}.
 
-These terms are scoped, and possibly typed. Type inference should be
-performed on them. *)
+    These terms are scoped, and possibly typed. Type inference should be
+    performed on them. *)
 
 type location = ParseLocation.t
 
 type t
 type term = t
+type ty = t
+
+(** a constructor of given type, applied to a list of type argumentss *)
+type match_cstor = {
+  cstor_id: ID.t;
+  cstor_ty: ty;
+  cstor_args: ty list;
+}
+
+type match_branch = match_cstor  * t Var.t list * t
 
 type view = private
   | Var of t Var.t (** variable *)
   | Const of ID.t (** constant *)
   | App of t * t list (** apply term *)
+  | Ite of t * t * t
+  | Match of t * match_branch list
+  | Let of (t Var.t * t) list * t
   | Bind of Binder.t * t Var.t * t (** bind variable in term *)
   | AppBuiltin of Builtin.t * t list
   | Multiset of t list
@@ -29,7 +42,8 @@ val view : t -> view
 val loc : t -> location option
 val ty : t -> t option
 val ty_exn : t -> t
-val head_exn : t -> ID.t
+val head : t -> ID.t option
+val head_exn : t -> ID.t (** @raise Not_found if not an application/const *)
 
 val deref : t -> t
 (** While [t] is a bound [Meta] variable, follow its link *)
@@ -48,6 +62,10 @@ val var : ?loc:location -> t Var.t -> t
 val var_of_string : ?loc:location -> ty:t -> string -> t
 val app : ?loc:location -> ty:t -> t -> t list -> t
 val const : ?loc:location -> ty:t -> ID.t -> t
+val const_of_cstor : ?loc:location -> match_cstor -> t
+val ite : ?loc:location -> t -> t -> t -> t
+val match_ : ?loc:location -> t -> match_branch list -> t
+val let_ : ?loc:location -> (t Var.t * t) list -> t -> t
 val app_builtin : ?loc:location -> ty:t -> Builtin.t -> t list -> t
 val builtin : ?loc:location -> ty:t -> Builtin.t -> t
 val bind : ?loc:location -> ty:t -> Binder.t -> t Var.t -> t -> t
@@ -70,6 +88,9 @@ val map_ty : t -> f:(t -> t) -> t
 val fresh_var : ?loc:location -> ty:t -> unit -> t
 (** fresh free variable with the given type. *)
 
+val box_opaque : t -> t
+(** Put a box around this *)
+
 (** {2 Specific Views} *)
 
 module Ty : sig
@@ -78,16 +99,19 @@ module Ty : sig
   type builtin = Prop | TType | Term | Int | Rat
 
   type view =
-    | Builtin of builtin
-    | Var of t Var.t
-    | App of ID.t * t list
-    | Fun of t list * t
-    | Forall of t Var.t * t
-    | Multiset of t
-    | Record of (string * t) list * t Var.t option
-    | Meta of meta_var
+    | Ty_builtin of builtin
+    | Ty_var of t Var.t
+    | Ty_app of ID.t * t list
+    | Ty_fun of t list * t
+    | Ty_forall of t Var.t * t
+    | Ty_multiset of t
+    | Ty_record of (string * t) list * t Var.t option
+    | Ty_meta of meta_var
 
   val view : t -> view
+
+  include Interfaces.HASH with type t := t
+  include Interfaces.ORD with type t := t
 
   val tType : t
   val var : ?loc:location -> t Var.t -> t
@@ -112,8 +136,15 @@ module Ty : sig
 
   val close_forall : t -> t
 
+  val unfold : t -> t Var.t list * t list * t
+  (** [unfold [forall a b. x y z -> ret]] returns the triples
+      [[a,b], [x,y,z], ret] *)
+
   val arity : t -> int * int
   (** [arity ty] returns [(n,m)] where [ty = forall x1..xn (a1 ... am -> ret)] *)
+
+  val mangle : t -> string
+  (** String usable as an identifier, without whitespace *)
 
   val is_tType : t -> bool
   val is_prop : t -> bool
@@ -121,6 +152,9 @@ module Ty : sig
   val returns_tType : t -> bool
   val returns_prop : t -> bool
 end
+
+val sort_ty_vars_first : t Var.t list -> t Var.t list
+(** sort the given list of variables by putting type variables first *)
 
 module Form : sig
   type t = term
@@ -154,13 +188,19 @@ module Form : sig
   val and_ : ?loc:location -> t list -> t
   val or_ : ?loc:location -> t list -> t
   val not_ : ?loc:location -> t -> t
+  val ite : ?loc:location -> t -> t -> t -> t
   val forall : ?loc:location -> t Var.t -> t -> t
   val exists : ?loc:location -> t Var.t -> t -> t
 
   val forall_l : ?loc:location -> t Var.t list -> t -> t
   val exists_l : ?loc:location -> t Var.t list -> t -> t
 
+  val unfold_binder : Binder.t -> t -> t Var.t list * t
+
+  val unfold_forall : t -> t Var.t list * t
   val close_forall : ?loc:location -> t -> t
+
+  val box_opaque : t -> t
 end
 
 (** {2 Utils} *)
@@ -192,11 +232,14 @@ val var_occurs : var:t Var.t -> t -> bool
 
 val vars : t -> t Var.t list
 val free_vars : t -> t Var.t list
+val free_vars_l : t list -> t Var.t list
 
 val close_all : ty:t -> Binder.t -> t -> t
 (** Bind all free vars with the symbol *)
 
 include Interfaces.PRINT with type t := t
+
+val pp_inner : t CCFormat.printer
 
 module Set : Sequence.Set.S with type elt = term
 module Map : Sequence.Map.S with type key = term
@@ -226,9 +269,11 @@ module Subst : sig
   val find_exn : t -> term Var.t -> term
   (** @raise Not_found if the variable is not present *)
 
-  val eval : t -> term -> term
+  val rename_var : t -> term Var.t -> t * term Var.t
 
-  val eval_head : t -> term -> term
+  val merge : t -> t -> t
+
+  val eval : t -> term -> term
 
   include Interfaces.PRINT with type t := t
 end
@@ -275,9 +320,6 @@ val apply_unify :
     be interpreted as types, the other ones as terms (whose types are unified
     against expected types). *)
 
-val deref_rec : t -> t
-(** Follow meta-variables links in all subterms *)
-
 val app_infer :
   ?st:UStack.t -> ?subst:Subst.t ->
   t -> t list -> t
@@ -296,5 +338,6 @@ end
 
 module ZF : sig
   include Interfaces.PRINT with type t := t
+  val pp_inner : t CCFormat.printer
 end
 

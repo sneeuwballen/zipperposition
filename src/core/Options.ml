@@ -1,5 +1,5 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Global CLI options}
 
@@ -13,13 +13,15 @@ let stats = ref false
 type input_format =
   | I_tptp
   | I_zf
+  | I_tip
   | I_guess
 
 let input_format_of_string s =
-  match s |> String.trim |> String.lowercase with
-  | "tptp" | "tstp" -> I_tptp
-  | "zf" -> I_zf
-  | s -> failwith ("unknown input format " ^ s)
+  match s |> String.trim |> CCString.lowercase_ascii with
+    | "tptp" | "tstp" -> I_tptp
+    | "zf" -> I_zf
+    | "tip" -> I_tip
+    | s -> failwith ("unknown input format " ^ s)
 
 type print_format =
   | Print_none
@@ -28,12 +30,12 @@ type print_format =
   | Print_zf
 
 let print_format_of_string s =
-  match s |> String.trim |> String.lowercase with
-  | "none" -> Print_none
-  | "tptp" | "tstp" -> Print_tptp
-  | "default" | "normal" -> Print_normal
-  | "zf" -> Print_zf
-  | _ -> failwith ("unknown print format " ^ s)
+  match s |> String.trim |> CCString.lowercase_ascii with
+    | "none" -> Print_none
+    | "tptp" | "tstp" -> Print_tptp
+    | "default" | "normal" -> Print_normal
+    | "zf" -> Print_zf
+    | _ -> failwith ("unknown print format " ^ s)
 
 let input = ref I_guess
 let output = ref Print_normal
@@ -69,7 +71,9 @@ let make () =
     [ "--debug", Arg.Int Util.set_debug, " debug level (int)"
     ; "--profile", Arg.Set Util.enable_profiling, " enable profiling"
     ; "--print-types", Arg.Unit _print_types , " print type annotations everywhere"
-    ; "--print-hashconsing-id", Arg.Set InnerTerm.print_hashconsing_ids, " print each term's unique hashconsing ID"
+    ; "--print-hashconsing-id",
+      Arg.Set InnerTerm.print_hashconsing_ids,
+      " print each term's unique hashconsing ID"
     ; "--backtrace", switch_opt true Printexc.record_backtrace, " enable backtraces"
     ; "--no-backtrace", switch_opt false Printexc.record_backtrace, " disable backtraces"
     ; "--color", switch_opt true CCFormat.set_color_default, " enable colors"
@@ -81,5 +85,6 @@ let make () =
     ; "-i", Arg.String set_in, " alias for --input"
     ; "--output" , Arg.String set_out , " choose printing format (zf, tptp, default, none)"
     ; "-o", Arg.String set_out, " alias for --output"
+    ; "--break", Arg.Set Util.break_on_debug, " wait for user input after each debug message"
     ]
-  (List.rev_append !other_opts (mk_debug_opts ()))
+    (List.rev_append !other_opts (mk_debug_opts ()))

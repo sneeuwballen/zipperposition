@@ -1,3 +1,6 @@
+
+# expect: sat
+
 val set : type -> type.
 val mem : pi a. a -> set a -> prop.
 val pow : pi a. set a -> set (set a).

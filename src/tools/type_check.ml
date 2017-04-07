@@ -1,14 +1,14 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 TPTP Syntax and types checking} *)
 
-open Libzipperposition
-open Libzipperposition_parsers
+open Logtk
+open Logtk_parsers
 
 module PT = STerm
 module T = TypedSTerm
-module Err = CCError
+module Err = CCResult
 module A = Ast_tptp
 
 open Err.Infix
@@ -18,33 +18,50 @@ let print_line () =
   ()
 
 let cat_input = ref false  (* print input declarations? *)
+let dump = ref false
 let pp_base = ref false
 
 let options = Arg.align (
     [ "--cat", Arg.Set cat_input, " print (annotated) declarations"
+    ; "--dump", Arg.Set dump, " print annotated declarations and nothing else"
     ] @ Options.make ()
   )
 
 (* check the given file *)
 let check file =
-  print_line ();
-  Format.printf "checking file `%s`...@." file;
-  Parsing_utils.parse file
-  >>= TypeInference.infer_statements ?ctx:None
+  if !dump then  (
+    Format.printf "# file `%s`@." file;
+  ) else (
+    print_line ();
+    Format.printf "checking file `%s`...@." file;
+  );
+  let input = Parsing_utils.input_of_file file in
+  Parsing_utils.parse_file input file
+  >>= TypeInference.infer_statements
+    ~on_var:(Input_format.on_var input)
+    ~on_undef:(Input_format.on_undef_id input)
+    ?ctx:None
   >|= fun decls ->
   let sigma =
     CCVector.to_seq decls
     |> Sequence.flat_map Statement.Seq.ty_decls
     |> ID.Map.of_seq
   in
-  Format.printf "@[<hv2>signature:@ @[<v>%a@]@]@."
-    (ID.Map.print ~start:"" ~stop:"" ~sep:"" ~arrow:" : " ID.pp T.pp) sigma;
+  if not !dump then (
+    Format.printf "@[<hv2>signature:@ @[<v>%a@]@]@."
+      (ID.Map.pp ~sep:"" ~arrow:" : " ID.pp T.pp) sigma;
+  );
   (* print formulas *)
-  if !cat_input then
+  if !dump then (
+    let pp_stmt = Statement.pp T.ZF.pp T.ZF.pp T.ZF.pp in
+    CCFormat.set_color_default false;
+    Format.printf "@[<v>%a@]@." (CCVector.pp ~sep:"" pp_stmt) decls;
+  ) else if !cat_input then (
     let pp_stmt = Statement.pp T.pp T.pp T.pp in
     Format.printf "@[<v2>statements:@ %a@]@."
-      (CCVector.print ~start:"" ~stop:"" ~sep:"" pp_stmt)
+      (CCVector.pp ~sep:"" pp_stmt)
       decls;
+  );
   ()
 
 let main () =
@@ -60,10 +77,12 @@ let main () =
       () !files;
   in
   match res with
-  | `Ok () ->
-      print_line ();
-      Format.printf "@{<Green>success!@}@."
-  | `Error msg ->
+    | Err.Ok () ->
+      if not !dump then (
+        print_line ();
+        Format.printf "@{<Green>success!@}@."
+      )
+    | Err.Error msg ->
       print_endline msg
 
 let _ =

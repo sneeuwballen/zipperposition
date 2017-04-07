@@ -1,0 +1,9 @@
+# expect: unsat
+
+data unit := Unit.
+
+val a : unit.
+val b : unit.
+
+goal a=b.
+

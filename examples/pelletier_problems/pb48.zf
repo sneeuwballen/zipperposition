@@ -1,0 +1,9 @@
+# expect: UNSAT
+val term : type.
+val d : term.
+val c : term.
+val b : term.
+val a : term.
+assert (c = d) || (a = b).
+assert (b = d) || (a = c).
+goal (b = c) || (a = d).

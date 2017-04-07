@@ -1,5 +1,5 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Feature Vector indexing} *)
 
@@ -52,18 +52,18 @@ module Make(C : Index.CLAUSE) = struct
       | T.DB _ -> 0
       | T.AppBuiltin (_, l)
       | T.App (_, l) ->
-          let depth' = depth + 1 in
-          List.fold_left (fun acc t' -> acc + _depth_term depth' t') depth l
+        let depth' = depth + 1 in
+        List.fold_left (fun acc t' -> acc + _depth_term depth' t') depth l
 
     (* sum of depths at which symbols occur. Eg f(a, g(b)) will yield 4 (f
        is at depth 0) *)
     let sum_of_depths =
       { name = "sum_of_depths";
         f = (fun lits ->
-            Sequence.fold
-              (fun acc lit ->
-                 SLiteral.fold (fun acc t -> acc + _depth_term 0 t) acc lit
-              ) 0 lits);
+          Sequence.fold
+            (fun acc lit ->
+               SLiteral.fold (fun acc t -> acc + _depth_term 0 t) acc lit
+            ) 0 lits);
       }
 
     let _select_sign ~sign lits =
@@ -89,14 +89,14 @@ module Make(C : Index.CLAUSE) = struct
     let max_depth_term symb t =
       let symbs_depths =
         T.Seq.subterms_depth t
-        |> Sequence.fmap
+        |> Sequence.filter_map
           (fun (t,depth) -> match T.Classic.view t with
              | T.Classic.App (s, _) when ID.equal s symb -> Some depth
              | _ -> None)
       in
       match Sequence.max symbs_depths with
-      | None -> 0
-      | Some m -> m
+        | None -> 0
+        | Some m -> m
 
     let _max_depth_lits ~sign symb lits =
       Sequence.fold
@@ -153,11 +153,11 @@ module Make(C : Index.CLAUSE) = struct
     (* function to go to the given leaf, building it if needed *)
     let rec goto trie t rebuild =
       match trie, t with
-      | (TrieLeaf set) as leaf, [] -> (* found leaf *)
+        | (TrieLeaf set) as leaf, [] -> (* found leaf *)
           (match k set with
-           | new_leaf when leaf == new_leaf -> root  (* no change, return same tree *)
-           | new_leaf -> rebuild new_leaf)           (* replace by new leaf *)
-      | TrieNode m, c::t' ->
+            | new_leaf when leaf == new_leaf -> root  (* no change, return same tree *)
+            | new_leaf -> rebuild new_leaf)           (* replace by new leaf *)
+        | TrieNode m, c::t' ->
           (try  (* insert in subtrie *)
              let subtrie = IntMap.find c m in
              let rebuild' subtrie = match subtrie with
@@ -174,8 +174,8 @@ module Make(C : Index.CLAUSE) = struct
                | _ -> rebuild (TrieNode (IntMap.add c subtrie m))
              in
              goto subtrie t' rebuild')
-      | TrieNode _, [] -> assert false (* ill-formed term *)
-      | TrieLeaf _, _ -> assert false  (* wrong arity *)
+        | TrieNode _, [] -> assert false (* ill-formed term *)
+        | TrieLeaf _, _ -> assert false  (* wrong arity *)
     in
     goto trie t (fun t -> t)
 
@@ -220,13 +220,13 @@ module Make(C : Index.CLAUSE) = struct
            if Type.equal ty Type.TPTP.o
            then features := [1 + arity, Feature.count_symb_plus s;
                              1 + arity, Feature.count_symb_minus s]
-                            @ !features
+               @ !features
            else
              features := [0, Feature.max_depth_plus s;
                           0, Feature.max_depth_minus s;
                           1 + arity, Feature.count_symb_plus s;
                           1 + arity, Feature.count_symb_minus s]
-                         @ !features);
+               @ !features);
     (* only take a limited number of features *)
     let features = List.sort (fun (s1,_) (s2,_) -> s2 - s1) !features in
     let features = CCList.take max_features features in
@@ -260,61 +260,61 @@ module Make(C : Index.CLAUSE) = struct
   let remove_seq idx seq = Sequence.fold remove idx seq
 
   (* clauses that subsume (potentially) the given clause *)
-  let retrieve_subsuming idx lits f =
+  let retrieve_subsuming idx lits _ f =
     (* feature vector of [c] *)
     let fv = compute_fv idx.features lits in
     let rec fold_lower fv node = match fv, node with
       | [], TrieLeaf set -> CSet.iter f set
       | i::fv', TrieNode map ->
-          IntMap.iter
-            (fun j subnode -> if j <= i
-              then fold_lower fv' subnode  (* go in the branch *)
-              else ())
-            map
+        IntMap.iter
+          (fun j subnode -> if j <= i
+            then fold_lower fv' subnode  (* go in the branch *)
+            else ())
+          map
       | _ -> failwith "number of features in feature vector changed"
     in
     fold_lower fv idx.trie
 
   (** clauses that are subsumed (potentially) by the given clause *)
-  let retrieve_subsumed idx lits f =
+  let retrieve_subsumed idx lits _ f =
     (* feature vector of the hc *)
     let fv = compute_fv idx.features lits in
     let rec fold_higher fv node = match fv, node with
       | [], TrieLeaf set -> CSet.iter f set
       | i::fv', TrieNode map ->
-          IntMap.iter
-            (fun j subnode -> if j >= i
-              then fold_higher fv' subnode  (* go in the branch *)
-              else ())
-            map
+        IntMap.iter
+          (fun j subnode -> if j >= i
+            then fold_higher fv' subnode  (* go in the branch *)
+            else ())
+          map
       | _ -> failwith "number of features in feature vector changed"
     in
     fold_higher fv idx.trie
 
   (** clauses that are potentially alpha-equivalent to the given clause*)
-  let retrieve_alpha_equiv idx lits f =
+  let retrieve_alpha_equiv idx lits _ f =
     (* feature vector of the hc *)
     let fv = compute_fv idx.features lits in
     let rec fold_higher fv node = match fv, node with
       | [], TrieLeaf set -> CSet.iter f set
       | i::fv', TrieNode map ->
-          IntMap.iter
-            (fun j subnode -> if j = i
-              then fold_higher fv' subnode  (* go in the branch *)
-              else ())
-            map
+        IntMap.iter
+          (fun j subnode -> if j = i
+            then fold_higher fv' subnode  (* go in the branch *)
+            else ())
+          map
       | _ -> failwith "number of features in feature vector changed"
     in
     fold_higher fv idx.trie
 
   let retrieve_subsuming_c idx c f =
-    retrieve_subsuming idx (C.to_lits c) f
+    retrieve_subsuming idx (C.to_lits c) (C.labels c) f
 
   let retrieve_subsumed_c idx c f =
-    retrieve_subsumed idx (C.to_lits c) f
+    retrieve_subsumed idx (C.to_lits c) (C.labels c) f
 
   let retrieve_alpha_equiv_c idx c f =
-    retrieve_alpha_equiv idx (C.to_lits c) f
+    retrieve_alpha_equiv idx (C.to_lits c) (C.labels c) f
 
   let iter idx f =
     let rec iter = function

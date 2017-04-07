@@ -1,3 +1,4 @@
+# expect: unsat
 # NOTE: requires --induction-depth 1, and a change to the definition of mem
 
 include "nat.zf".

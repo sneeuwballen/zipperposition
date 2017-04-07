@@ -1,0 +1,7 @@
+# expect: UNSAT
+val term : type.
+val a : term.
+val f : term -> term -> prop.
+goal
+  (forall (X:term). ((forall (Y:term). (f X Y)) || (f a X)))
+  => (exists (X:term). (forall (Y:term). (f X Y))).

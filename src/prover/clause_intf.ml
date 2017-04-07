@@ -1,10 +1,10 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-open Libzipperposition
+open Logtk
 
-type proof_step = ProofStep.t
-type proof = ProofStep.of_
+type proof_step = Proof.Step.t
+type proof = Proof.S.t
 
 module type S = sig
   module Ctx : Ctx.S
@@ -36,7 +36,7 @@ module type S = sig
   val is_ground : t -> bool
   val weight : t -> int
 
-  module CHashtbl : CCHashtbl.S with type key = t
+  module Tbl : CCHashtbl.S with type key = t
 
   val is_goal : t -> bool
   (** Looking at the clause's proof, return [true] iff the clause is an
@@ -44,6 +44,9 @@ module type S = sig
 
   val distance_to_goal : t -> int option
   (** See {!Proof.distance_to_goal}, applied to the clause's proof *)
+
+  val comes_from_goal : t -> bool
+  (** [true] iff the clause is (indirectly) deduced from a goal or lemma *)
 
   (** {2 Boolean Abstraction} *)
 
@@ -72,24 +75,33 @@ module type S = sig
   (** {2 Constructors} *)
 
   val create :
+    penalty:int ->
     trail:Trail.t ->
     Literal.t list ->
     proof_step ->
     t
   (** Build a new clause from the given literals.
       @param trail boolean trail
+      @param penalty heuristic penalty due to history of the clause
+        (the higher, the less likely the clause is to be picked soon)
       also takes a list of literals and a proof builder *)
 
   val create_a :
+    penalty:int ->
     trail:Trail.t ->
     Literal.t array ->
     proof_step ->
     t
   (** Build a new clause from the given literals. *)
 
-  val of_sclause : SClause.t -> proof_step -> t
+  val of_sclause :
+    ?penalty:int ->
+    SClause.t ->
+    proof_step ->
+    t
 
   val of_forms :
+    ?penalty:int ->
     trail:Trail.t ->
     FOTerm.t SLiteral.t list ->
     proof_step ->
@@ -97,6 +109,7 @@ module type S = sig
   (** Directly from list of formulas *)
 
   val of_forms_axiom :
+    ?penalty:int ->
     file:string -> name:string ->
     FOTerm.t SLiteral.t list -> t
   (** Construction from formulas as axiom (initial clause) *)
@@ -110,6 +123,9 @@ module type S = sig
   val proof : t -> proof
   (** Obtain the pair [conclusion, step] *)
 
+  val proof_parent : t -> Proof.Parent.t
+  val proof_parent_subst : t Scoped.t -> Subst.t -> Proof.Parent.t
+
   val update_proof : t -> (proof_step -> proof_step) -> t
   (** [update_proof c f] creates a new clause that is
       similar to [c] in all aspects, but with
@@ -121,29 +137,29 @@ module type S = sig
   val length : t -> int
   (** Number of literals *)
 
-  val apply_subst : renaming:Substs.Renaming.t -> Substs.t -> t Scoped.t -> t
-  (** apply the substitution to the clause *)
-
-  val maxlits : t Scoped.t -> Substs.t -> CCBV.t
+  val maxlits : t Scoped.t -> Subst.t -> CCBV.t
   (** List of maximal literals *)
 
-  val is_maxlit : t Scoped.t -> Substs.t -> idx:int -> bool
+  val is_maxlit : t Scoped.t -> Subst.t -> idx:int -> bool
   (** Is the i-th literal maximal in subst(clause)? Equivalent to
       Bitvector.get (maxlits ~ord c subst) i *)
 
-  val eligible_res : t Scoped.t -> Substs.t -> CCBV.t
+  val eligible_res : t Scoped.t -> Subst.t -> CCBV.t
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for resolution. THe literal has to be either maximal
       among selected literals of the same sign, if some literal is selected,
       or maximal if none is selected. *)
 
-  val eligible_param : t Scoped.t -> Substs.t -> CCBV.t
+  val eligible_res_no_subst : t -> CCBV.t
+  (** More efficient version of {!eligible_res} with [Subst.empty] *)
+
+  val eligible_param : t Scoped.t -> Subst.t -> CCBV.t
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for paramodulation. That means the literal
       is positive, no literal is selecteed, and the literal
       is maximal among literals of [subst(clause)]. *)
 
-  val is_eligible_param : t Scoped.t -> Substs.t -> idx:int -> bool
+  val is_eligible_param : t Scoped.t -> Subst.t -> idx:int -> bool
   (** Check whether the [idx]-th literal is eligible for paramodulation *)
 
   val has_selected_lits : t -> bool
@@ -154,6 +170,8 @@ module type S = sig
 
   val selected_lits : t -> (Literal.t * int) list
   (** get the list of selected literals *)
+
+  val penalty : t -> int
 
   val is_unit_clause : t -> bool
   (** is the clause a unit clause? *)
@@ -168,6 +186,8 @@ module type S = sig
 
   val to_forms : t -> FOTerm.t SLiteral.t list
   (** Easy iteration on an abstract view of literals *)
+
+  val to_s_form : t -> TypedSTerm.Form.t
 
   (** {2 Iterators} *)
 

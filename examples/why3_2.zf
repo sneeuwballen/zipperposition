@@ -1,3 +1,4 @@
+# expect: unsat
 # ZF translation of why3_2.p
 
 data bool := True | False.
@@ -15,9 +16,6 @@ val match_color: pi a. color -> a -> a -> a.
 
 rewrite forall a x y. match_color a Red x y = x.
 rewrite forall a x y. match_color a Black x y = y.
-
-# TODO: builtin arithmetic in zf
-val int : type.
 
 data tree :=
   | Leaf

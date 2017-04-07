@@ -1,0 +1,13 @@
+
+# expect: unsat
+
+include "nat.zf".
+include "list.zf".
+
+# TODO: find the right lemmas
+
+lemma forall A B C. leq A B => leq (plus C A) (plus C B).
+lemma forall X L1 L2. count X (append L1 L2) = plus (count X L1) (count X L2).
+lemma forall L1 L2. length (append L1 L2) = plus (length L1) (length L2).
+
+goal forall (X:nat). forall (L:list). leq (count X L) (length L).

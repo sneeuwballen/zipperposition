@@ -3,7 +3,7 @@
 
 (** {1 Heuristics} *)
 
-open Libzipperposition
+open Logtk
 
 val enable_depth_limit : int -> unit
 (** Set a maximal depth for terms. Any clause with a term deeper than

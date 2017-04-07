@@ -10,7 +10,7 @@ let home = "$(datadir)/"
 
 let version = "$(pkg_version)"
 
-let section = Libzipperposition.Util.Section.(make ~parent:zip "prover")
+let section = Logtk.Util.Section.(make "zip")
 
 (* vim:filetype=ocaml:
 *)

@@ -1,0 +1,13 @@
+# expect: unsat
+include "nat.zf".
+
+# use definitions
+
+def odd : nat -> prop where
+  odd (s z);
+  forall (N:nat). odd (s N) = even N
+and  even : nat -> prop where
+  even z;
+  forall (N:nat). even (s N) = odd N.
+
+goal forall (N:nat). even (plus N N).

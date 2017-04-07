@@ -3,8 +3,8 @@
 
 (** {1 Implementation of Phases} *)
 
-open Libzipperposition
-open Libzipperposition_parsers
+open Logtk
+open Logtk_parsers
 open Params
 
 open Phases.Infix
@@ -12,7 +12,6 @@ open Phases.Infix
 module T = FOTerm
 module O = Ordering
 module Lit = Literal
-module S = Substs
 
 let section = Const.section
 
@@ -45,7 +44,10 @@ let load_extensions =
   Extensions.register EnumTypes.extension;
   Extensions.register Induction.extension;
   Extensions.register Rewriting.extension;
+  Extensions.register Arith_int.extension;
+  Extensions.register Arith_rat.extension;
   Extensions.register Ind_types.extension;
+  Extensions.register Fool.extension;
   let l = Extensions.extensions () in
   Phases.return_phase l
 
@@ -53,10 +55,10 @@ let load_extensions =
    the current state given some parameter [x]. *)
 let do_extensions ~x ~field =
   Extensions.extensions ()
-    |> Phases.fold_l ~x:()
-      ~f:(fun () e ->
-        Phases.fold_l (field e) ~x:()
-          ~f:(fun () f -> Phases.update ~f:(f x)))
+  |> Phases.fold_l ~x:()
+    ~f:(fun () e ->
+      Phases.fold_l (field e) ~x:()
+        ~f:(fun () f -> Phases.update ~f:(f x)))
 
 let start_file file =
   Phases.start_phase Phases.Start_file >>= fun () ->
@@ -68,14 +70,21 @@ let start_file file =
 
 let parse_file file =
   Phases.start_phase Phases.Parse_file >>= fun () ->
-  Parsing_utils.parse file >>?= fun parsed ->
+  let input = Parsing_utils.input_of_file file in
+  Parsing_utils.parse_file input file >>?= fun parsed ->
   do_extensions ~field:(fun e -> e.Extensions.post_parse_actions)
     ~x:parsed >>= fun () ->
-  Phases.return_phase parsed
+  Phases.return_phase (input,parsed)
 
-let typing stmts =
+let typing (input,stmts) =
   Phases.start_phase Phases.Typing >>= fun () ->
-  TypeInference.infer_statements ?ctx:None stmts >>?= fun stmts ->
+  Phases.get_key Params.key >>= fun params ->
+  let def_as_rewrite = params.Params.param_def_as_rewrite in
+  TypeInference.infer_statements
+    ~on_var:(Input_format.on_var input)
+    ~on_undef:(Input_format.on_undef_id input)
+    ~def_as_rewrite ?ctx:None stmts
+  >>?= fun stmts ->
   do_extensions ~field:(fun e -> e.Extensions.post_typing_actions)
     ~x:stmts >>= fun () ->
   Phases.return_phase stmts
@@ -87,7 +96,7 @@ let cnf ~file decls =
     decls
     |> CCVector.to_seq
     |> Sequence.map (Statement.add_src ~file)
-    |> Cnf.cnf_of_seq ~neg_src:StatementSrc.neg ~cnf_src:StatementSrc.cnf
+    |> Cnf.cnf_of_seq
     |> CCVector.to_seq
     |> Cnf.convert
   in
@@ -108,10 +117,11 @@ let compute_prec stmts =
 
     (* add constraint about inductive constructors, etc. *)
     |> Compute_prec.add_constr 10 Classify_cst.prec_constr
+    |> Compute_prec.set_weight_rule (fun _ -> Classify_cst.weight_fun)
 
     (* use "invfreq", with low priority *)
     |> Compute_prec.add_constr_rule 90
-       (fun seq ->
+      (fun seq ->
          seq
          |> Sequence.flat_map Statement.Seq.terms
          |> Sequence.flat_map FOTerm.Seq.symbols
@@ -124,6 +134,7 @@ let compute_ord_select precedence =
   Phases.start_phase Phases.Compute_ord_select >>= fun () ->
   Phases.get_key Params.key >>= fun params ->
   let ord = Ordering.by_name params.param_ord precedence in
+  Util.debugf ~section 2 "@[<2>ordering %s@]" (fun k->k (Ordering.name ord));
   let select = Selection.selection_from_string ~ord params.param_select in
   do_extensions ~field:(fun e->e.Extensions.ord_select_actions)
     ~x:(ord,select) >>= fun () ->
@@ -158,8 +169,8 @@ let make_env ~ctx:(module Ctx : Ctx_intf.S) ~params stmts =
   let env1 = (module MyEnv : Env.S) in
   (* use extensions to customize env *)
   Extensions.extensions ()
-    |> List.iter
-      (fun e -> List.iter (fun f -> f env1) e.Extensions.env_actions);
+  |> List.iter
+    (fun e -> List.iter (fun f -> f env1) e.Extensions.env_actions);
   (* convert statements to clauses *)
   let clauses = MyEnv.convert_input_statements stmts in
   let env2 = (module MyEnv : Env.S with type C.t = MyEnv.C.t) in
@@ -200,8 +211,8 @@ let print_stats (type c) (module Env : Env.S with type C.t = c) =
 
 (* pre-saturation *)
 let presaturate_clauses (type c)
-(module Env : Env.S with type C.t = c)
-(clauses : c CCVector.ro_vector) =
+    (module Env : Env.S with type C.t = c)
+    (clauses : c CCVector.ro_vector) =
   Phases.start_phase Phases.Pre_saturate >>= fun () ->
   let module Sat = Saturate.Make(Env) in
   let num_clauses = CCVector.length clauses in
@@ -217,7 +228,7 @@ let presaturate_clauses (type c)
     Env.remove_active clauses;
     Env.remove_passive clauses;
     Util.debugf ~section 2 "@[<2>%d clauses pre-saturated into:@ @[<hv>%a@]@]"
-      (fun k->k num_clauses (CCFormat.seq ~sep:" " Env.C.pp) clauses);
+      (fun k->k num_clauses (Util.pp_seq ~sep:" " Env.C.pp) clauses);
     Phases.return_phase (result, clauses)
   )
   else Phases.return_phase (Saturate.Unknown, CCVector.to_seq clauses)
@@ -248,40 +259,40 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
     | Saturate.Unsat _ -> result, 0  (* already found unsat during presaturation *)
     | _ -> Sat.given_clause ~generating:true ?steps ?timeout ()
   in
-  Format.printf "%% done %d iterations@." num;
+  Format.printf "%% done %d iterations in %.1fs@." num (Util.total_time_s());
   Util.debugf ~section 1 "@[<2>final precedence:@ @[%a@]@]"
     (fun k->k Precedence.pp (Env.precedence ()));
   Phases.return_phase result
 
 (* Print some content of the state, based on environment variables *)
 let print_dots (type c)
-(module Env : Env_intf.S with type C.t = c)
-(result : Saturate.szs_status) =
+    (module Env : Env_intf.S with type C.t = c)
+    (result : Saturate.szs_status) =
   Phases.start_phase Phases.Print_dot >>= fun () ->
   Signal.send Signals.on_dot_output ();
   (* see if we need to print proof state *)
   begin match Env.params.param_dot_file, result with
     | Some dot_f, Saturate.Unsat proof ->
-        let name = "unsat_graph" in
-        (* print proof of false *)
-        let proof =
-          if Env.params.param_dot_all_roots
-          then
-            Env.(Sequence.append (get_active()) (get_passive()))
-            |> Sequence.filter_map
-              (fun c ->
-                if Literals.is_absurd (Env.C.lits c)
-                then Some (Env.C.proof c)
-                else None)
-          else Sequence.singleton proof
-        in
-        ProofPrint.pp_dot_seq_file ~name dot_f proof
+      let name = "unsat_graph" in
+      (* print proof of false *)
+      let proof =
+        if Env.params.param_dot_all_roots
+        then
+          Env.(Sequence.append (get_active()) (get_passive()))
+          |> Sequence.filter_map
+            (fun c ->
+               if Literals.is_absurd (Env.C.lits c)
+               then Some (Env.C.proof c)
+               else None)
+        else Sequence.singleton proof
+      in
+      Proof.S.pp_dot_seq_file ~name dot_f proof
     | Some dot_f, (Saturate.Sat | Saturate.Unknown) when Env.params.param_dot_sat ->
-        (* print saturated set *)
-        let name = "sat_set" in
-        let seq = Sequence.append (Env.get_active ()) (Env.get_passive ()) in
-        let seq = Sequence.map Env.C.proof seq in
-        ProofPrint.pp_dot_seq_file ~name dot_f seq
+      (* print saturated set *)
+      let name = "sat_set" in
+      let seq = Sequence.append (Env.get_active ()) (Env.get_passive ()) in
+      let seq = Sequence.map Env.C.proof seq in
+      Proof.S.pp_dot_seq_file ~name dot_f seq
     | _ -> ()
   end;
   Phases.return_phase ()
@@ -293,49 +304,50 @@ let unsat_to_str () =
   if !has_goal_ then "Theorem" else "Unsatisfiable"
 
 let print_szs_result (type c) ~file
-(module Env : Env_intf.S with type C.t = c)
-(result : Saturate.szs_status) =
+    (module Env : Env_intf.S with type C.t = c)
+    (result : Saturate.szs_status) =
   Phases.start_phase Phases.Print_result >>= fun () ->
   begin match result with
-  | Saturate.Unknown
-  | Saturate.Timeout ->
+    | Saturate.Unknown
+    | Saturate.Timeout ->
       Format.printf "%% SZS status ResourceOut for '%s'@." file
-  | Saturate.Error s ->
+    | Saturate.Error s ->
       Format.printf "%% SZS status InternalError for '%s'@." file;
       Util.debugf ~section 1 "error is:@ %s" (fun k->k s);
-  | Saturate.Sat when Env.Ctx.is_completeness_preserved () ->
+    | Saturate.Sat when Env.Ctx.is_completeness_preserved () ->
       Format.printf "%% SZS status %s for '%s'@." (sat_to_str ()) file
-  | Saturate.Sat ->
+    | Saturate.Sat ->
       Format.printf "%% SZS status GaveUp for '%s'@." file;
       begin match !Options.output with
         | Options.Print_none -> ()
         | Options.Print_zf -> failwith "not implemented: printing in ZF" (* TODO *)
         | Options.Print_tptp ->
-            Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
-              (fun k->k (CCFormat.seq ~sep:" " Env.C.pp_tstp_full) (Env.get_active ()))
+          Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
+            (fun k->k (Util.pp_seq ~sep:" " Env.C.pp_tstp_full) (Env.get_active ()))
         | Options.Print_normal ->
-            Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
-              (fun k->k (CCFormat.seq ~sep:" " Env.C.pp) (Env.get_active ()))
+          Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
+            (fun k->k (Util.pp_seq ~sep:" " Env.C.pp) (Env.get_active ()))
       end
-  | Saturate.Unsat proof ->
+    | Saturate.Unsat proof ->
       (* print status then proof *)
       Format.printf "%% SZS status %s for '%s'@." (unsat_to_str ()) file;
       Format.printf "%% SZS output start Refutation@.";
-      Format.printf "%a@." (ProofPrint.pp !Options.output) proof;
+      Format.printf "%a@." (Proof.S.pp !Options.output) proof;
       Format.printf "%% SZS output end Refutation@.";
   end;
   Phases.return_phase ()
 
 (* print weight of [s] within precedence [prec] *)
-let _pp_weight prec out s =
-  Format.fprintf out "w(%a)=%d" ID.pp s (Precedence.weight prec s)
+let pp_weight prec out s =
+  Format.fprintf out "w(%a)=%a"
+    ID.pp s Precedence.Weight.pp (Precedence.weight prec s)
 
 (* does the sequence of declarations contain at least one conjecture? *)
 let has_goal_decls_ decls =
   CCVector.exists
     (fun st -> match Statement.view st with
-      | Statement.Goal _ -> true
-      | _ -> false)
+       | Statement.Goal _ -> true
+       | _ -> false)
     decls
 
 (* parse CLI options and list of files to deal with *)
@@ -354,15 +366,17 @@ let process_file file =
   start_file file >>= fun () ->
   parse_file file >>= fun stmts ->
   typing stmts >>= fun decls ->
+  (* declare inductive types and constants *)
+  CCVector.iter Statement.scan_simple_stmt_for_ind_ty decls;
   let has_goal = has_goal_decls_ decls in
   Util.debugf ~section 1 "parsed %d declarations (%s goal(s))"
     (fun k->k (CCVector.length decls) (if has_goal then "some" else "no"));
   cnf ~file decls >>= fun stmts ->
-  (* declare inductive types and constants *)
-  CCVector.iter Ind_ty.scan_stmt stmts;
   (* compute signature, precedence, ordering *)
   let signature = Statement.signature (CCVector.to_seq stmts) in
-  Util.debugf ~section 2 "@[<2>signature:@ @[<hv>%a@]@]" (fun k->k Signature.pp signature);
+  Util.debugf ~section 1 "@[<2>signature:@ @[<hv>%a@]@]" (fun k->k Signature.pp signature);
+  Util.debugf ~section 2 "(@[classification:@ %a@])"
+    (fun k->k Classify_cst.pp_signature signature);
   compute_prec (CCVector.to_seq stmts) >>= fun precedence ->
   Util.debugf ~section 1 "@[<2>precedence:@ @[%a@]@]" (fun k->k Precedence.pp precedence);
   compute_ord_select precedence >>= fun (ord, select) ->
@@ -379,10 +393,26 @@ let process_file file =
   Phases.return (Phases.Env_result (env, result))
 
 let print file env result =
-  print_szs_result ~file env result >>= fun () ->
   (* print some statistics *)
   print_stats env >>= fun () ->
+  print_szs_result ~file env result >>= fun () ->
   print_dots env result
+
+let check res =
+  Phases.start_phase Phases.Check_proof >>= fun () ->
+  Phases.get_key Params.key >>= fun params ->
+  let errcode = match res with
+    | Saturate.Unsat p when params.Params.param_check ->
+      (* check proof! *)
+      Util.debug ~section 1 "start checking proof…";
+      let p' = Proof.S.to_llproof p in
+      let res, stats = LLProof_check.check p' in
+      Util.debugf ~section 1 "(@[proof_check@ :res %a@ :stats %a@])"
+        (fun k->k LLProof_check.pp_res res LLProof_check.pp_stats stats);
+      if res = LLProof_check.R_fail then 1 else 0
+    | _ -> 0
+  in
+  Phases.return_phase errcode
 
 let setup_gc =
   Phases.start_phase Phases.Setup_gc >>= fun () ->
@@ -399,19 +429,20 @@ let setup_signal =
   (* signal handler. Re-raise, bugs shouldn't keep hidden *)
   Signal.set_exn_handler
     (fun e ->
-      let stack = Printexc.get_backtrace () in
-      let msg = Printexc.to_string e in
-      output_string stderr ("exception raised in signal: " ^ msg ^ "\n");
-      output_string stderr stack;
-      flush stderr;
-      raise e);
+       let stack = Printexc.get_backtrace () in
+       let msg = Printexc.to_string e in
+       output_string stderr ("exception raised in signal: " ^ msg ^ "\n");
+       output_string stderr stack;
+       flush stderr;
+       raise e);
   Phases.return_phase ()
 
 (* process several files, printing the result *)
 let process_files_and_print files =
   let f file =
     process_file file >>= fun (Phases.Env_result (env, res)) ->
-    print file env res
+    print file env res >>= fun () ->
+    check res
   in
   let phases = List.map f files in
   Phases.run_parallel phases

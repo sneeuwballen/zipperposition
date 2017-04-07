@@ -3,9 +3,9 @@
 
 (** {1 Parse Rewrite Rules} *)
 
-open Libzipperposition
+open Logtk
 
-type 'a or_error = [`Error of string | `Ok of 'a]
+type 'a or_error = ('a, string) CCResult.t
 
 type statement =
   | Rule of STerm.t * STerm.t
@@ -21,7 +21,7 @@ val rules_of_pairs :
   statement list ->
   rule list or_error
 (** Infer types and signature from a list of statements.
-   @return typed rules and the new signature *)
+    @return typed rules and the new signature *)
 
 val signature : rule Sequence.t -> TypedSTerm.t ID.Map.t
 (** Compute signature *)

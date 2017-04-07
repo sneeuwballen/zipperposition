@@ -1,5 +1,5 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Scoped Terms}
 
@@ -38,7 +38,11 @@ val ty_exn : t -> t
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 
+val hash_mod_alpha : t -> int
+(** Hash invariant w.r.t variable renaming *)
+
 val same_l : t list -> t list -> bool
+(** Physical equality on lists of terms, roughly the same as {!List.forall2 (==)} *)
 
 (** {3 Constructors}
 
@@ -71,6 +75,19 @@ val is_bind : t -> bool
 val is_app : t -> bool
 
 val hashcons_stats : unit -> int*int*int*int*int*int
+
+(** {3 Payload} *)
+
+exception No_payload
+
+val payload : t -> exn
+
+val set_payload : t -> exn -> unit
+(** Set payload.
+    @raise Invalid_argument if there is already a payload *)
+
+val set_payload_erase : t -> exn -> unit
+(** Set payload, ignoring the previous payload. *)
 
 (** {3 Containers} *)
 
@@ -148,6 +165,9 @@ end
 val replace : t -> old:t -> by:t -> t
 (** [replace t ~old ~by] syntactically replaces all occurrences of [old]
     in [t] by the term [by]. *)
+
+val replace_m : t -> t Map.t -> t
+(** Simultaneous replacement of every [a->b] in the map *)
 
 (** {3 Variables} *)
 

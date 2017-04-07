@@ -44,16 +44,16 @@ val eq : t -> t -> bool
 val hash : t -> int
 
 val combine : t -> t -> t
-  (** Position that spans the two given positions. The file is assumed to be
-      the same in both case, and is chosen from one of the two positions. *)
+(** Position that spans the two given positions. The file is assumed to be
+    the same in both case, and is chosen from one of the two positions. *)
 
 val combine_list : t list -> t
-  (** N-ary version of {!combine}.
-      @raise Invalid_argument if the list is empty *)
+(** N-ary version of {!combine}.
+    @raise Invalid_argument if the list is empty *)
 
 val smaller : t -> t -> bool
-  (** [smaller p1 p2] is true if [p1] is included in [p2], ie
-      [p1] is a sub-location of [p2] (interval inclusion) *)
+(** [smaller p1 p2] is true if [p1] is included in [p2], ie
+    [p1] is a sub-location of [p2] (interval inclusion) *)
 
 include Interfaces.PRINT with type t := t
 
@@ -62,7 +62,7 @@ val pp_opt : t option CCFormat.printer
 (** {2 Lexbuf} *)
 
 val set_file : Lexing.lexbuf -> string -> unit
-  (** Change the file name used for positions in this lexbuf *)
+(** Change the file name used for positions in this lexbuf *)
 
 val of_lexbuf : Lexing.lexbuf -> t
-  (** Recover a position from a lexbuf *)
+(** Recover a position from a lexbuf *)

@@ -4,10 +4,10 @@
 (** Selection functions. Note for splitting: SelectComplex already selects
     in priority "big" negative literals, ie literals that are not split symbols. *)
 
-open Libzipperposition
+open Logtk
 
 module T = FOTerm
-module S = Substs.FO
+module S = Subst.FO
 module Lit = Literal
 module Lits = Literals
 module BV = CCBV
@@ -72,9 +72,9 @@ let select_diff_neg_lit ~strict ~ord:_ lits =
     else
       let weightdiff, ok = match lits.(i) with
         | Lit.Equation(l,r,false) ->
-            abs (T.size l - T.size r), true
+          abs (T.size l - T.size r), true
         | Lit.Prop (p, false) ->
-            T.size p - 1, true
+          T.size p - 1, true
         | _ -> 0, false
       in
       let best_idx, best_diff =
@@ -85,16 +85,18 @@ let select_diff_neg_lit ~strict ~ord:_ lits =
       find_lit best_diff best_idx lits (i+1)
   in
   (* search such a lit among the clause's lits *)
-  if _pure_superposition lits
-  then match find_lit (-1) (-1) lits 0 with
-    | -1 -> BV.empty ()
-    | n when strict -> BV.of_list [n]
-    | n ->
+  if _pure_superposition lits then (
+    let res = match find_lit (-1) (-1) lits 0 with
+      | -1 -> BV.empty ()
+      | n when strict -> BV.of_list [n]
+      | n ->
         let bv = select_positives lits in
         BV.set bv n;
-        assert (_validate_select lits bv);
         bv
-  else BV.empty ()
+    in
+    assert (_validate_select lits res);
+    res
+  ) else BV.empty ()
 
 let select_complex ~strict ~ord lits =
   (* find the ground negative literal with highest diff in size *)
@@ -102,9 +104,9 @@ let select_complex ~strict ~ord lits =
     if i = Array.length lits then best_i else
       let weightdiff, ok = match lits.(i) with
         | Lit.Equation(l,r,false) when Lit.is_ground lits.(i) ->
-            abs (T.size l - T.size r), true
+          abs (T.size l - T.size r), true
         | Lit.Prop (p, false) when Lit.is_ground lits.(i) ->
-            T.size p - 1, true
+          T.size p - 1, true
         | _ -> 0, false
       in
       let best_i, best_diff =
@@ -176,6 +178,6 @@ let () =
   let set_select s = Params.select := s in
   Params.add_opts
     [ "--select",
-        Arg.Symbol (available_selections (), set_select),
-        " set literal selection function"
+      Arg.Symbol (available_selections (), set_select),
+      " set literal selection function"
     ]

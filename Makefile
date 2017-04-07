@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 46f8bd9984975bd4727bed22d0876cd2)
+# DO NOT EDIT (digest: 0ea630b0d23ed49c1bf5c457a3a51866)
 
 SETUP = ./setup.exe
 
@@ -38,7 +38,7 @@ configure: $(SETUP)
 	$(SETUP) -configure $(CONFIGUREFLAGS)
 
 setup.exe: setup.ml
-	ocamlfind ocamlopt -o $@ $< || ocamlfind ocamlc -o $@ $< || true
+	ocamlfind ocamlopt -o $@ setup.ml || ocamlfind ocamlc -o $@ setup.ml || true
 	$(RM) setup.cmi setup.cmo setup.cmx setup.o
 
 .PHONY: build doc test all install uninstall reinstall clean distclean configure
@@ -48,6 +48,8 @@ setup.exe: setup.ml
 rst_doc:
 	@echo "build Sphinx documentation (into _build/doc)"
 	sphinx-build doc _build/doc
+	mkdir -p gh-pages/rst/
+	cp -r _build/doc/*.html _build/doc/*.js _build/doc/_static gh-pages/rst
 
 open_doc: rst_doc
 	firefox _build/doc/contents.html
@@ -57,8 +59,8 @@ push_doc: doc rst_doc
 	rsync -tavu _build/doc/* cedeela.fr:~/simon/root/software/logtk/rst/
 
 test-all: build
-	./run_tests.native
-	./tests/quick/all.sh
+	./run_tests.native --verbose
+	# ./tests/quick/all.sh # FIXME?
 
 INTERFACE_FILES = $(shell find src -name '*.mli')
 IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
@@ -75,6 +77,40 @@ tags:
 dot:
 	for i in *.dot; do dot -Tsvg "$$i" > "$$( basename $$i .dot )".svg; done
 
+TEST_FILES = tests/ examples/
+
+frogtest:
+	frogtest run -c ./tests/conf.toml $(TEST_FILES)
+
+frogtest-zipper:
+	frogtest run -p zipperposition -c ./tests/conf.toml $(TEST_FILES)
+
+frogtest-hornet:
+	frogtest run -p hornet -c ./tests/conf.toml $(TEST_FILES)
+
+tip-benchmarks:
+	git submodule update --init tip-benchmarks
+
+frogtest-tip: tip-benchmarks
+	@[ -d tip-benchmarks ] || (echo "missing tip-benchmarks/" && exit 1)
+	frogtest run --meta=`git rev-parse HEAD` -c ./data/tip.toml
+
+# restricted version of frogtest-tip
+frogtest-tip-isaplanner: tip-benchmarks
+	@[ -d tip-benchmarks ] || (echo "missing tip-benchmarks/" && exit 1)
+	frogtest run --meta=`git rev-parse HEAD` -c ./data/tip.toml \
+	  tip-benchmarks/benchmarks/isaplanner/
+
+BENCH_DIR="bench-$(shell date -Iminutes)"
+frogtest-tptp:
+	@echo "start benchmarks in ${BENCH_DIR}"
+	mkdir -p ${BENCH_DIR}
+	cp zipperposition.native hornet.native ${BENCH_DIR}/
+	ln -s ../tptp/ ${BENCH_DIR}/tptp
+	cp data/bench.toml ${BENCH_DIR}/conf.toml
+	cd ${BENCH_DIR} && frogtest run --meta=`git rev-parse HEAD` \
+	  -c conf.toml
+
 TARBALL=zipperposition.tar.gz
 
 package: clean
@@ -89,6 +125,16 @@ watch:
 		echo "============ at `date` ==========" ; \
 		make $(WATCH); \
 	done
+
+ocp-indent:
+	@which ocp-indent > /dev/null || { \
+	  	echo 'ocp-indent not found; please run `opam install ocp-indent`'; \
+		exit 1 ; \
+	  }
+
+reindent: ocp-indent
+	@find src '(' -name '*.ml' -or -name '*.mli' ')' -print0 | xargs -0 echo "reindenting: "
+	@find src '(' -name '*.ml' -or -name '*.mli' ')' -print0 | xargs -0 ocp-indent -i
 
 gallery.svg:
 	for i in gallery/*.dot ; do dot -Tsvg "$$i" > "gallery/`basename $${i} .dot`.svg" ; done

@@ -56,6 +56,9 @@ module Set : CCSet.S with type elt = t
 module Map : CCMap.S with type key = t
 module Tbl : CCHashtbl.S with type key = t
 
+val hash_mod_alpha : t -> int
+(** Hash invariant w.r.t variable renaming *)
+
 val same_l : t list -> t list -> bool
 (** [same_l l1 l2] returns [true] if terms of [l1] and [l2] are pairwise
     equal, [false] otherwise.
@@ -94,10 +97,18 @@ val app_full : t -> Type.t list -> t list -> t
 val true_ : t
 val false_ : t
 
+val grounding : Type.t -> t
+(** [grounding ty] is a unique constant of type [ty] *)
+
 val is_var : t -> bool
 val is_bvar : t -> bool
 val is_app : t -> bool
 val is_const : t -> bool
+
+val as_const : t -> ID.t option
+val as_const_exn : t -> ID.t
+val as_var : t -> var option
+val as_var_exn : t -> var
 
 val of_term_unsafe : InnerTerm.t -> t
 (** {b NOTE}: this can break the invariants and make {!view} fail. Only
@@ -130,7 +141,7 @@ val monomorphic : t -> bool (** true if the term contains no type var *)
 val max_var : VarSet.t -> int (** find the maximum variable *)
 val min_var : VarSet.t -> int (** minimum variable *)
 val add_vars : unit VarTbl.t -> t -> unit (** add variables of the term to the set *)
-val vars : t Sequence.t -> VarSet.t (** compute variables of the terms *)
+val vars : t -> VarSet.t (** compute variables of the terms *)
 val vars_prefix_order : t -> var list (** variables in prefix traversal order *)
 val depth : t -> int (** depth of the term *)
 val head : t -> ID.t option (** head ID.t *)
@@ -164,6 +175,10 @@ val replace : t -> old:t -> by:t -> t
 (** [replace t ~old ~by] syntactically replaces all occurrences of [old]
     in [t] by the term [by]. *)
 
+val replace_m : t -> t Map.t -> t
+(** [replace t m] syntactically replaces all occurrences of bindings of
+    the map in [t], starting from the root *)
+
 (** {2 High-level operations} *)
 
 val symbols : ?init:ID.Set.t -> t -> ID.Set.t
@@ -178,7 +193,7 @@ val contains_symbol : ID.t -> t -> bool
 
 val all_positions :
   ?vars:bool -> ?ty_args:bool -> ?pos:Position.t ->
-  t -> (t * Position.t) Sequence.t
+  t -> t Position.With.t Sequence.t
 (** Iterate on all sub-terms with their position.
     @param vars specifies whether variables are folded on (default false).
     @param ty_args specifies whether type arguments are folded on (default true).
@@ -234,6 +249,12 @@ val default_hooks : unit -> print_hook list
 val debugf : Format.formatter -> t -> unit
 (** debugf printing, with sorts *)
 
+(** {2 Formulas} *)
+
+module Form : sig
+  val not_ : t -> t
+end
+
 (** {2 Arith} *)
 
 module Arith : sig
@@ -277,11 +298,14 @@ module TPTP : sig
 end
 
 module Conv : sig
-  type ctx
+  type ctx = Type.Conv.ctx
   val create : unit -> ctx
   val of_simple_term : ctx -> TypedSTerm.t -> t option
-  val of_simple_term_exn : ctx -> TypedSTerm.t -> t
+  val of_simple_term_exn : ctx -> TypedSTerm.t -> t (** @raise Type.Conv.Error on failure *)
   val to_simple_term :
     ?env:TypedSTerm.t Var.t DBEnv.t ->
-    t -> TypedSTerm.t
+    ctx ->
+    t ->
+    TypedSTerm.t
+  val var_to_simple_var : ?prefix:string -> ctx -> var -> TypedSTerm.t Var.t
 end

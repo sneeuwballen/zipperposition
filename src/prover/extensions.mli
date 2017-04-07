@@ -1,11 +1,11 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-open Libzipperposition
+open Logtk
 
 (** {1 Dynamic extensions} *)
 
-type 'a or_error = [ `Ok of 'a | `Error of string ]
+type 'a or_error = ('a, string) CCResult.t
 
 (** {2 Type Definitions} *)
 

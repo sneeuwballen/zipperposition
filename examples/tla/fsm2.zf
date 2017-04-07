@@ -1,0 +1,11 @@
+# expect: unsat
+
+include "fsm.zf".
+
+
+# S2 is reachable from 2 distinct states
+
+goal exists t1 t2.
+  t1 != t2 &&
+  at_state t1 = S2 &&
+  at_state t2 = S2.

@@ -1,8 +1,8 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-type proof_step = ProofStep.t
-type proof = ProofStep.of_
+type proof_step = Proof.Step.t
+type proof = Proof.t
 
 type result =
   | Sat
@@ -26,8 +26,9 @@ module type S = sig
 
   val add_clause_seq : proof:proof_step -> Lit.t list Sequence.t -> unit
 
-  val check : unit -> result
-  (** Is the current problem satisfiable? *)
+  val check : full:bool -> unit -> result
+  (** Is the current problem satisfiable?
+      @param full if true, check unconditionally *)
 
   val last_result : unit -> result
   (** Last computed result. This does not compute a new result *)
@@ -48,6 +49,9 @@ module type S = sig
       return its value (which does not depend on the model).
       Otherwise return [None] *)
 
+  val all_proved: unit -> Lit.Set.t
+  (** Set of (signed) proved literals *)
+
   val set_printer : Lit.t CCFormat.printer -> unit
   (** How to print literals? *)
 
@@ -57,25 +61,13 @@ module type S = sig
       nodes are clauses deduced by the SAT solver.
       @raise WrongState if the last result isn't [Unsat] *)
 
+  val get_proof_opt : unit -> proof option
+  (** Obtain the proof, if any *)
+
   val get_proof_of_lit : Lit.t -> proof
   (** [get_proof_of_lit lit] returns the proof of [lit], assuming it has been
       proved true at level 0 (see {!valuation_level})
       @raise Invalid_argument if the literal is not at level 0 *)
 
   val setup: unit -> unit
-
-  (** {6 Incrementality}
-      We manage a stack for backtracking to older states *)
-
-  (* TODO fix this *)
-
-  type save_level
-
-  val root_save_level : save_level
-
-  val save : unit -> save_level
-  (** Save current state on the stack *)
-
-  val restore : save_level -> unit
-  (** Restore to a level below in the stack *)
 end

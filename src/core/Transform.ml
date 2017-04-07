@@ -10,9 +10,9 @@ type term = FOTerm.t
 type form = Formula.FO.t
 
 type t =
-| RwTerm of Rewriting.TRS.t
-| RwForm of Rewriting.FormRW.t
-| Tr of string * (F.t -> F.t list)
+  | RwTerm of Rewriting.TRS.t
+  | RwForm of Rewriting.FormRW.t
+  | Tr of string * (F.t -> F.t list)
   (** the function can return a conjunction of formulas. The
       string is a short name/description of the transformation *)
 
@@ -60,8 +60,8 @@ let rec apply tr f = match tr with
   | Tr (_, transform) ->
     let f' = transform f in
     match f' with
-    | [f''] when F.equal f f'' -> f'
-    | _ -> CCList.flat_map (apply tr) f'
+      | [f''] when F.equal f f'' -> f'
+      | _ -> CCList.flat_map (apply tr) f'
 
 let pp out tr = match tr with
   | RwTerm _ -> CCFormat.string out "TRS"
@@ -98,10 +98,10 @@ module type DAG = sig
   type t
 
   val create : (string * transformation) list -> t
-    (** Create a DAG that implements the given list of transformations *)
+  (** Create a DAG that implements the given list of transformations *)
 
   val transform : t -> Form.t list -> Form.t list
-    (** Transform a set of formulas recursively *)
+  (** Transform a set of formulas recursively *)
 end
 
 module MakeDAG(Form : FORM) = struct
@@ -148,40 +148,40 @@ module MakeDAG(Form : FORM) = struct
       | (rule,tr)::tr_list' ->
         let f = Form.to_form node.form in
         begin match apply tr f with
-        | [f'] when F.equal f f' ->
-          (* transformation failed *)
-          try_trans tr_list' node
-        | forms ->
-          (* build list of new formulas, from [form], and update the DAG *)
-          let parents = [node.form] in
-          let forms = List.map (fun f -> Form.of_form ~rule ~parents f) forms in
-          let nodes = List.map (_get_node dag) forms in
-          List.iter (fun n' -> _add_edge dag node n') nodes;
-          Some nodes
+          | [f'] when F.equal f f' ->
+            (* transformation failed *)
+            try_trans tr_list' node
+          | forms ->
+            (* build list of new formulas, from [form], and update the DAG *)
+            let parents = [node.form] in
+            let forms = List.map (fun f -> Form.of_form ~rule ~parents f) forms in
+            let nodes = List.map (_get_node dag) forms in
+            List.iter (fun n' -> _add_edge dag node n') nodes;
+            Some nodes
         end
     in
     while not (Queue.is_empty q); do
       let node = Queue.pop q in
       if node.explored
-        then match node.children with
+      then match node.children with
         | [] ->  (* already explored leaf *)
           F.Tbl.replace leaves (Form.to_form node.form) node.form
         | _::_ -> (* just explore children *)
           List.iter (fun n' -> Queue.push n' q) node.children
-        else begin match try_trans dag.trans node with
-          | None -> F.Tbl.replace leaves (Form.to_form node.form) node.form
-          | Some nodes ->
-            List.iter (fun n' -> Queue.push n' q) nodes;
-            node.explored <- true
-        end
+      else begin match try_trans dag.trans node with
+        | None -> F.Tbl.replace leaves (Form.to_form node.form) node.form
+        | Some nodes ->
+          List.iter (fun n' -> Queue.push n' q) nodes;
+          node.explored <- true
+      end
     done;
     F.Tbl.fold (fun _ form acc -> form :: acc) leaves []
 end
 
 module FormDag = MakeDAG(struct
-  type t = F.t
+    type t = F.t
 
-  let of_form ~rule:_ ~parents:_ f = f
+    let of_form ~rule:_ ~parents:_ f = f
 
-  let to_form f = f
-end)
+    let to_form f = f
+  end)

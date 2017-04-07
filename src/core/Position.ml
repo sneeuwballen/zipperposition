@@ -1,5 +1,5 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Positions in terms, clauses...} *)
 
@@ -24,7 +24,7 @@ let arg i pos = Arg (i, pos)
 let body pos = Body pos
 
 let compare = Pervasives.compare
-let eq p1 p2 = compare p1 p2 = 0
+let equal p1 p2 = compare p1 p2 = 0
 let hash p = Hashtbl.hash p
 
 let rev pos =
@@ -65,6 +65,38 @@ let rec pp out pos = match pos with
 
 let to_string = CCFormat.to_string pp
 
+let rec is_prefix p1 p2 : bool = match p1, p2 with
+  | Stop, _ -> true
+  | Left l1, Left l2
+  | Right l1, Right l2
+  | Head l1, Head l2
+  | Body l1, Body l2
+  | Type l1, Type l2
+    ->
+    is_prefix l1 l2
+  | Arg (i1,l1), Arg (i2,l2) -> i1=i2 && is_prefix l1 l2
+  | Left _, _
+  | Right _, _
+  | Head _, _
+  | Body _, _
+  | Arg _, _
+  | Type _, _
+    -> false
+
+let is_strict_prefix p1 p2 = not (equal p1 p2) && is_prefix p1 p2
+
+module Map = struct
+  include CCMap.Make(struct
+    type t = position
+    let compare = compare
+  end)
+
+  let prune_subsumed (m:_ t): _ t =
+    filter
+      (fun k _ -> not (exists (fun k' _ -> is_strict_prefix k' k) m))
+      m
+end
+
 (** {2 Position builder}
 
     We use an adaptation of difference lists for this tasks *)
@@ -81,12 +113,14 @@ module Build = struct
   let of_pos p = P (p, E)
 
   (* how to apply a difference list to a tail list *)
-  let rec __apply tail b = match b with
+  let rec apply_rec tail b = match b with
     | E -> tail
-    | P (pos0,b') -> __apply (append pos0 tail) b'
-    | N (f, b') -> __apply (f tail) b'
+    | P (pos0,b') -> apply_rec (append pos0 tail) b'
+    | N (f, b') -> apply_rec (f tail) b'
 
-  let to_pos b = __apply stop b
+  let apply_flip b pos = apply_rec pos b
+
+  let to_pos b = apply_rec stop b
 
   let suffix b pos =
     (* given a suffix, first append pos to it, then apply b *)
@@ -95,7 +129,9 @@ module Build = struct
   let prefix pos b =
     (* tricky: this doesn't follow the recursive structure. Hence we
         need to first apply b totally, then pre-prend pos *)
-    N ((fun pos1 -> append pos (__apply pos1 b)), E)
+    N ((fun pos1 -> append pos (apply_rec pos1 b)), E)
+
+  let append p1 p2 = N(apply_flip p2, p1)
 
   let left b = N (left, b)
   let right b = N (right, b)
@@ -106,4 +142,33 @@ module Build = struct
 
   let pp out t = pp out (to_pos t)
   let to_string t = to_string (to_pos t)
+end
+
+(** {2 Pairing of value with Pos} *)
+
+module With = struct
+  type 'a t = 'a * position
+
+  let get = fst
+  let pos = snd
+
+  let make x p : _ t = x, p
+  let of_pair p = p
+
+  let map_pos f (x,pos) = x, f pos
+
+  let map f (x,pos) = f x, pos
+
+  module Infix = struct
+    let (>|=) x f = map f x
+  end
+  include Infix
+
+  let equal f t1 t2 = f (get t1) (get t2) && equal (pos t1) (pos t2)
+  let compare f t1 t2 =
+    let c = f (get t1) (get t2) in
+    if c=0 then compare (pos t1) (pos t2) else c
+  let hash f t = Hash.combine3 41 (f (get t)) (hash (pos t))
+  let pp f out t =
+    CCFormat.fprintf out "(@[:pos %a :in %a@])" pp (pos t) f (get t)
 end

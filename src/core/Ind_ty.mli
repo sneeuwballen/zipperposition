@@ -19,9 +19,13 @@ type t = private {
   ty_vars: Type.t HVar.t list; (* list of variables *)
   ty_pattern: Type.t; (* equal to  [id ty_vars] *)
   ty_constructors : constructor list;
-    (* constructors, all returning [pattern] and containing
-       no other type variables than [ty_vars] *)
+  (* constructors, all returning [pattern] and containing
+     no other type variables than [ty_vars] *)
+  ty_is_rec: bool lazy_t;
+  (* true iff the type is (mutually) recursive *)
 }
+
+val pp : t CCFormat.printer
 
 exception InvalidDecl of string
 
@@ -42,11 +46,19 @@ val as_inductive_ty_exn : ID.t -> t
 
 val is_inductive_ty : ID.t -> bool
 
-val as_inductive_type : Type.t -> t option
+val as_inductive_type : Type.t -> (t * Type.t list) option
+(** [as_inductive_ty (list int)] will return [list, [int]] as an
+    inductive type applied to some arguments *)
+
+val as_inductive_type_exn : Type.t -> t * Type.t list
 
 val is_inductive_type : Type.t -> bool
 (** [is_inductive_type ty] holds iff [ty] is an instance of some
     registered type (registered with {!declare_ty}). *)
+
+val is_inductive_simple_type : TypedSTerm.t -> bool
+
+val is_recursive : t -> bool
 
 (** {6 Constructors} *)
 
@@ -65,32 +77,12 @@ val contains_inductive_types : FOTerm.t -> bool
 (** [true] iff the term contains at least one subterm with
     an inductive type *)
 
-(** {6 Constants with Inductive Type} *)
-
-val is_inductive_constant : ID.t -> bool
-(** An ID whose type is inductive; nothing more *)
-
-val declare_inductive_constant : ID.t -> unit
-(** Make the ID satisfy {!is_inductive_constant} *)
-
-val scan_for_constant : ID.t -> Type.t -> unit
-(** Check whether [id : ty] has an inductive type; if yes, then
-    call {!declare_inductive_constant} *)
-
-(** {6 Scan Declarations} *)
-
-val scan_stmt : (_, _, Type.t, _) Statement.t -> unit
-(** [scan_stmt stmt] examines [stmt], and, if the statement is a
-    declaration of inductive types or constants,
-    it declares them using {!declare_ty} or {!declare_inductive_constant}. *)
-
 (**/**)
 
 (** Exceptions used to store information in IDs *)
 
 exception Payload_ind_type of t
 exception Payload_ind_cstor of constructor * t
-exception Payload_ind_constant
 exception Payload_ind_projector of ID.t
 
 (**/**)

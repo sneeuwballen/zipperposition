@@ -1,0 +1,7 @@
+# expect: UNSAT
+val term : type.
+val f : term -> prop.
+val p : prop.
+assert exists (X:term). (p => (f X)).
+assert exists (X:term). ((f X) => p).
+goal exists (X:term). (p <=> (f X)).

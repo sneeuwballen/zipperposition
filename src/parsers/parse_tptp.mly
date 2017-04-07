@@ -4,7 +4,7 @@
 (** {1 TPTP Parser} *)
 
 %{
-  open Libzipperposition
+  open Logtk
 
   module L = ParseLocation
   module PT = STerm
@@ -78,11 +78,11 @@
 %nonassoc NOTVLINE
 %nonassoc NOTAND
 
-%start <Libzipperposition.STerm.t> parse_term
-%start <Libzipperposition.STerm.t> parse_formula
-%start <Libzipperposition.STerm.t Ast_tptp.declaration> parse_declaration
-%start <Libzipperposition.STerm.t Ast_tptp.declaration list> parse_declarations
-%start <Libzipperposition.STerm.t list list> parse_answer_tuple
+%start <Logtk.STerm.t> parse_term
+%start <Logtk.STerm.t> parse_formula
+%start <Logtk.STerm.t Ast_tptp.declaration> parse_declaration
+%start <Logtk.STerm.t Ast_tptp.declaration list> parse_declarations
+%start <Logtk.STerm.t list list> parse_answer_tuple
 
 %%
 

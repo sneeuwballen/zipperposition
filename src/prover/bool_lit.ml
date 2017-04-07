@@ -3,6 +3,8 @@
 
 (** {1 Boolean Literal} *)
 
+open Logtk
+
 module type S = Bool_lit_intf.S
 
 module type PAYLOAD = sig
@@ -10,8 +12,10 @@ module type PAYLOAD = sig
   val dummy : t
 end
 
+let stat_num_lit = Util.mk_stat "msat.num_lits"
+
 module Make(Payload : PAYLOAD)
-: S with type payload = Payload.t
+  : S with type payload = Payload.t
 = struct
   type t = {
     id: int; (* sign = sign of literal *)
@@ -26,6 +30,7 @@ module Make(Payload : PAYLOAD)
   let fresh_id =
     let n = ref 1 in
     fun () ->
+      Util.incr_stat stat_num_lit;
       let id = !n in
       incr n;
       id
@@ -39,14 +44,13 @@ module Make(Payload : PAYLOAD)
         payload;
         neg;
       } and neg = {
-        id= -id;
-        payload;
-        neg=pos;
-      } in
+          id= -id;
+          payload;
+          neg=pos;
+        } in
       pos
 
-  let hash i = i.id land max_int
-  let hash_fun i = CCHash.int (hash i)
+  let hash i = Hash.int i.id
   let equal i j = i.id = j.id
   let compare i j = CCInt.compare i.id j.id
   let neg i = i.neg
@@ -62,7 +66,10 @@ module Make(Payload : PAYLOAD)
   module AsKey = struct
     type t = lit
     let compare = compare
+    let hash = hash
+    let equal = equal
   end
 
   module Set = CCSet.Make(AsKey)
+  module Tbl = CCHashtbl.Make(AsKey)
 end

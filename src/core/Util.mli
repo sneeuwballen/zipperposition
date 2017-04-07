@@ -1,5 +1,5 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Some helpers} *)
 
@@ -40,7 +40,7 @@ module Section : sig
   (** all registered sections *)
 
   val root : t (** Default section, with no parent *)
-  val zip : t (** Section for all Libzipperposition-related things *)
+  val base : t (** Section for basic logtk things *)
 
   val make : ?parent:t -> ?inheriting:t list -> string -> t
   (** [make ?parent ?inheriting name] makes a new section with the given name.
@@ -53,6 +53,9 @@ end
 
 val set_debug : int -> unit (** Set debug level of [Section.root] *)
 val get_debug : unit -> int (** Current debug level for [Section.root] *)
+
+val break_on_debug : bool ref
+(** Shall we wait for user input after each debug message? *)
 
 val debugf : ?section:Section.t ->
   int ->
@@ -117,6 +120,8 @@ module Exn : sig
   (** printer for backtraces, if enabled (print nothing otherwise) *)
 
   val fmt_backtrace : Format.formatter -> unit -> unit
+
+  val string_of_backtrace : unit -> string
 end
 
 (** {2 profiling facilities} *)
@@ -163,13 +168,28 @@ val pp_pair :
 val pp_list : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
 (** Print a list without begin/end separators *)
 
+val pp_seq : ?sep:string -> 'a CCFormat.printer -> 'a Sequence.t CCFormat.printer
+
+val pp_list0 : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
+(** Print a list with a whitespace in front if it's non empty, or
+    does nothing if the list is empty
+    Default separator is " " *)
+
 val ord_option : 'a CCOrd.t -> 'a option CCOrd.t
 
 val map_product : f:('a -> 'b list list) -> 'a list -> 'b list list
 
+val seq_map_l : f:('a -> 'b list) -> 'a list -> 'b list Sequence.t
+
+val invalid_argf: ('a, Format.formatter, unit, 'b) format4 -> 'a
+val failwithf : ('a, Format.formatter, unit, 'b) format4 -> 'a
+
+module Int_map : CCMap.S with type key = int
+module Int_set : CCSet.S with type elt = int
+
 (** {2 File utils} *)
 
-type 'a or_error = [`Error of string | `Ok of 'a]
+type 'a or_error = ('a, string) CCResult.t
 
 val popen : cmd:string -> input:string -> string or_error
 (** Run the given command [cmd] with the given [input], wait for it

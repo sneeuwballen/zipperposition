@@ -27,7 +27,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Parser for HO} *)
 
 {
-  open Libzipperposition
+  open Logtk
   open Parse_ho
 }
 
@@ -104,8 +104,8 @@ rule token = parse
 
 
 {
-  module E = CCError
-  type 'a or_error = [`Ok of 'a | `Error of string ]
+  module E = CCResult
+  type 'a or_error = ('a, string) CCResult.t
 
   let decl_of_string s : Ast_ho.t or_error =
     try

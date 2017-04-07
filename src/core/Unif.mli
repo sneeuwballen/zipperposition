@@ -1,9 +1,9 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Unification and Matching} *)
 
-type subst = Substs.t
+type subst = Subst.t
 type 'a sequence = ('a -> unit) -> unit
 
 exception Fail
@@ -11,6 +11,33 @@ exception Fail
 
 val occurs_check : depth:int -> subst ->
   InnerTerm.t HVar.t Scoped.t -> InnerTerm.t Scoped.t -> bool
+
+(** Generic unification over two arrays (of the same size, or the first
+    one must be smaller or equal) *)
+val unif_array_com :
+  ?size:[`Same | `Smaller] ->
+  'subst ->
+  op:('subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Sequence.t) ->
+  'a array Scoped.t ->
+  'a array Scoped.t ->
+  'subst Sequence.t
+
+(** Generic unification over two lists (of the same size) *)
+val unif_list :
+  'subst ->
+  op:('subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Sequence.t) ->
+  'a list Scoped.t ->
+  'a list Scoped.t ->
+  'subst Sequence.t
+
+(** Generic unification over two lists (of the same size or smaller) *)
+val unif_list_com :
+  ?size:[`Same | `Smaller] ->
+  'subst ->
+  op:('subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Sequence.t) ->
+  'a list Scoped.t ->
+  'a list Scoped.t ->
+  'subst Sequence.t
 
 (** {2 Signatures} *)
 

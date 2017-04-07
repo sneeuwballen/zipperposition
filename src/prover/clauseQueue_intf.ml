@@ -4,13 +4,14 @@
 type profile =
   | P_default
   | P_bfs
+  | P_almost_bfs
   | P_explore
   | P_ground
   | P_goal
 
 (** {1 A priority queue of clauses, purely functional} *)
 module type S = sig
-  module C : Clause.S
+  module C : Clause_intf.S
 
   (** {6 Weight functions} *)
   module WeightFun : sig
@@ -22,8 +23,8 @@ module type S = sig
     val default : t
     (** Use {!Literal.heuristic_weight} *)
 
-    val age : t
-    (** Returns the age of the clause (or 0 for the empty clause) *)
+    val penalty : t
+    (** Returns the penalty of the clause *)
 
     val favor_all_neg : t
     (** Favor clauses with only negative ground lits *)
@@ -48,16 +49,19 @@ module type S = sig
   type t
   (** A priority queue. *)
 
-  val add : t -> C.t -> t
+  val add : t -> C.t -> unit
   (** Add a clause to the Queue *)
 
-  val adds : t -> C.t Sequence.t -> t
+  val add_seq : t -> C.t Sequence.t -> unit
   (** Add clauses to the queue *)
+
+  val length : t -> int
+  (** Number of elements *)
 
   val is_empty : t -> bool
   (** check whether the queue is empty *)
 
-  val take_first : t -> (t * C.t)
+  val take_first : t -> C.t
   (** Take first element of the queue, or raise Not_found *)
 
   val name : t -> string
@@ -65,26 +69,30 @@ module type S = sig
 
   (** {6 Available Queues} *)
 
-  val make : weight:(C.t -> int) -> string -> t
-  (** Bring your own implementation of queue. The [weight] function
-      should be fair, i.e. for any clause [c], the weight of [c] should
-      eventually be the smallest one in the queue (e.g., using the age
-      of clauses in the weight somewhere should be enough) *)
+  val make : ratio:int -> weight:(C.t -> int) -> string -> t
+  (** Bring your own implementation of queue.
+      @param ratio pick-given ratio. One in [ratio] calls to {!take_first},
+        the returned clause comes from a FIFO; the other times it comes
+        from a priority queue that uses [weight] to sort clauses
+      @param name the name of this clause queue *)
 
-  val bfs : t
-  (** Strong orientation toward FIFO *)
+  val bfs : unit -> t
+  (** FIFO *)
 
-  val explore : t
+  val almost_bfs : unit -> t
+  (** Half FIFO, half default *)
+
+  val explore : unit -> t
   (** Use heuristics for selecting "small" clauses *)
 
-  val ground : t
+  val ground : unit -> t
   (** Favor positive unit clauses and ground clauses *)
 
-  val goal_oriented : t
+  val goal_oriented : unit -> t
   (** custom weight function that favors clauses that are "close" to
       initial conjectures. It is fair.  *)
 
-  val default : t
+  val default : unit -> t
   (** Obtain the default queue *)
 
   val of_profile : profile -> t

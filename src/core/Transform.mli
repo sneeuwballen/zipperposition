@@ -10,9 +10,9 @@ type form = Formula.FO.t
     Transformations include definition expansion and term rewriting *)
 
 type t =
-| RwTerm of Rewriting.TRS.t
-| RwForm of Rewriting.FormRW.t
-| Tr of string * (form -> form list)
+  | RwTerm of Rewriting.TRS.t
+  | RwForm of Rewriting.FormRW.t
+  | Tr of string * (form -> form list)
   (** the function can return a conjunction of formulas. The
       string is a short name/description of the transformation *)
 
@@ -31,16 +31,16 @@ val of_form_rules : (term * form) list -> t
 val of_form_rules_seq : (term * form) Sequence.t -> t
 
 val of_term_tr : string -> (term -> term) -> t
-  (** Lift a term transformation to the formula level *)
+(** Lift a term transformation to the formula level *)
 
 val open_and : t
-  (** transformation that opens outermost "and" connectives *)
+(** transformation that opens outermost "and" connectives *)
 
 val remove_trivial : t
-  (** Tranformation that removes trivial formulas *)
+(** Tranformation that removes trivial formulas *)
 
 val apply : t -> form -> form list
-  (** Apply the transformations to a formula *)
+(** Apply the transformations to a formula *)
 
 include Interfaces.PRINT with type t := t
 
@@ -72,10 +72,10 @@ module type DAG = sig
   type t
 
   val create : (string * transformation) list -> t
-    (** Create a DAG that implements the given list of transformations *)
+  (** Create a DAG that implements the given list of transformations *)
 
   val transform : t -> Form.t list -> Form.t list
-    (** Transform a set of formulas recursively *)
+  (** Transform a set of formulas recursively *)
 end
 
 (** Build a DAG *)

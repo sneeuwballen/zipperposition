@@ -1,3 +1,4 @@
+# expect: sat
 include "nat.zf".
 val p : nat -> prop.
 assert forall (N:nat). ((p N) => (p (s (s N)))).

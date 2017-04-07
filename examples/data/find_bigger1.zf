@@ -1,3 +1,4 @@
+# expect: unsat
 
 # find an integer whose factorial is bigger than some bound
 

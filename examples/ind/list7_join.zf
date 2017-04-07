@@ -1,3 +1,4 @@
+# expect: unsat
 # correlate "rev" and "rev_append"
 
 include "list.zf".

@@ -1,5 +1,5 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Type Inference}
 
@@ -28,7 +28,7 @@
     to deal with errors (including monadic operators).
 *)
 
-type 'a or_error = [`Error of string | `Ok of 'a]
+type 'a or_error = ('a, string) CCResult.t
 
 type type_ = TypedSTerm.t
 type untyped = STerm.t (** untyped term *)
@@ -60,10 +60,20 @@ end
 module Ctx : sig
   type t
 
-  val create : ?default:type_ -> unit -> t
+  val create :
+    ?def_as_rewrite:bool ->
+    ?default:type_ ->
+    ?on_var:[`Default | `Infer] ->
+    ?on_undef:[`Warn | `Fail | `Guess] ->
+    unit ->
+    t
   (** New context with a signature and default types.
       @param default which types are inferred by default (if not provided
-        then {!type_erm} will be used) *)
+        then {!type_erm} will be used)
+      @param def_as_rewrite if true, definitions will be treated like rewrite rules
+      @param on_undef behavior when an undefined identifier is met
+      @param on_var behavior when a variable without type annotation is met
+  *)
 
   val copy : t -> t
   (** Copy of the context *)
@@ -139,7 +149,7 @@ val constrain_term_type : ?loc:loc -> Ctx.t -> untyped -> type_ -> unit or_error
 
 (** {2 Statements} *)
 
-type typed_statement = (typed, typed, type_, UntypedAST.attrs) Statement.t
+type typed_statement = (typed, typed, type_) Statement.t
 
 val infer_statement_exn :
   Ctx.t ->
@@ -150,12 +160,19 @@ val infer_statement_exn :
     that were inferred implicitely. *)
 
 val infer_statements_exn :
+  ?def_as_rewrite:bool ->
+  ?on_var:[`Infer | `Default] ->
+  ?on_undef:[`Warn | `Fail | `Guess] ->
   ?ctx:Ctx.t ->
   UntypedAST.statement Sequence.t ->
   typed_statement CCVector.ro_vector
-(** Infer all statements *)
+(** Infer all statements
+    @param def_as_rewrite if true, definitions becomes rewrite rules *)
 
 val infer_statements :
+  ?def_as_rewrite:bool ->
+  ?on_var:[`Infer | `Default] ->
+  ?on_undef:[`Warn | `Fail | `Guess] ->
   ?ctx:Ctx.t ->
   UntypedAST.statement Sequence.t ->
   typed_statement CCVector.ro_vector or_error

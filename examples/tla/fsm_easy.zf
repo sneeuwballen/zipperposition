@@ -1,0 +1,24 @@
+# expect: unsat
+
+# Simple state machine with 2 states
+
+include "time.zf".
+
+data state :=
+  | S1
+  | S2.
+
+val step : state -> state.
+rewrite step S1 = S2.
+rewrite step S2 = S1.
+
+# current state
+val at_state : time -> state.
+
+# initial state is S1
+assert at_state Now = S1.
+
+# transition function
+assert forall t s. at_state t = s => at_state (Later t) = step s.
+
+

@@ -1,11 +1,9 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Signature} *)
 
-(* TODO: remove useless stuff... *)
-
-type t = private Type.t ID.Map.t
+type t = Type.t ID.Map.t
 (** A signature maps symbols to types *)
 
 val empty : t
@@ -46,9 +44,6 @@ val is_ground : t -> bool
 val merge : t -> t -> t
 (** Merge two signatures together.
     @raise Type.Error if they share some symbols with distinct types *)
-
-val filter : t -> (ID.t -> Type.t -> bool) -> t
-(** Only keep part of the signature *)
 
 val diff : t -> t -> t
 (** [diff s1 s2] contains the symbols of [s1] that do not appear

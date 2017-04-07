@@ -1,0 +1,12 @@
+# expect: sat
+
+# axioms
+
+data time :=
+  | Now
+  | Later time.
+
+# addition
+val add_time : time -> time -> time.
+rewrite forall t. add_time Now t = t.
+rewrite forall t1 t2. add_time (Later t1) t2 = Later (add_time t1 t2).

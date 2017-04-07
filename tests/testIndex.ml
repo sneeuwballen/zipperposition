@@ -3,8 +3,8 @@
 
 (** {1 Test indexing structures} *)
 
-open Libzipperposition
-open Libzipperposition_arbitrary
+open Logtk
+open Logtk_arbitrary
 
 module T = FOTerm
 
@@ -41,6 +41,8 @@ let arb i j =
   let shrink = QCheck.Shrink.(list ~shrink:(pair shrink_t int)) in
   QCheck.make ~shrink ~print:pp (gen i j)
 
+let long_factor = 10
+
 (* test unit index *)
 module TestUnit(I : UnitIndex) = struct
   (* check that the size of index is correct *)
@@ -70,7 +72,7 @@ module TestUnit(I : UnitIndex) = struct
       l
     in
     let name = CCFormat.sprintf "index(%s)_gen_retrieved_member" I.name in
-    QCheck.Test.make ~name (arb 30 100) prop
+    QCheck.Test.make ~long_factor ~name (arb 30 100) prop
 
   (* check that the retrieved terms match the query *)
   let check_gen_retrieved_match =
@@ -86,7 +88,7 @@ module TestUnit(I : UnitIndex) = struct
         l
     in
     let name = CCFormat.sprintf "index(%s)_gen_retrieved_match" I.name in
-    QCheck.Test.make ~name (arb 50 150) prop
+    QCheck.Test.make ~long_factor ~name (arb 50 150) prop
 
   (* check that all matching terms are retrieved *)
   let check_all_matching_are_retrieved =
@@ -107,7 +109,7 @@ module TestUnit(I : UnitIndex) = struct
         l
     in
     let name = CCFormat.sprintf "index(%s)_all_matching_are_retrieved" I.name in
-    QCheck.Test.make ~name (arb 50 150) prop
+    QCheck.Test.make ~long_factor ~name (arb 50 150) prop
 
   (* check the matching of generalization *)
   let props =
@@ -203,39 +205,40 @@ module TestTerm(I : TermIndex) = struct
           l)
       l
 
-  let _limit = 0
+  let _count = 100
+  let _limit = _count + 100
 
   let check_retrieved_unify =
     let prop = _check_all_retrieved_satisfy I.retrieve_unifiables Unif.FO.unification in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_unify" I.name in
-    QCheck.Test.make ~name ~max_gen:_limit (arb 10 150) prop
+    QCheck.Test.make ~name ~count:_count ~max_gen:_limit (arb 10 150) prop
 
   let check_retrieved_specializations =
     let prop = _check_all_retrieved_satisfy I.retrieve_specializations
       (fun t1 t2 -> Unif.FO.matching ~pattern:t1 t2) in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_specializations" I.name in
-    QCheck.Test.make ~name ~max_gen:_limit (arb 10 150) prop
+    QCheck.Test.make ~name ~count:_count ~max_gen:_limit (arb 10 150) prop
 
   let check_retrieved_generalizations =
     let prop = _check_all_retrieved_satisfy I.retrieve_generalizations _match_flip in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_generalizations" I.name in
-    QCheck.Test.make ~name ~max_gen:_limit (arb 10 150) prop
+    QCheck.Test.make ~name ~count:_count ~max_gen:_limit (arb 10 150) prop
 
   let check_retrieve_all_unify =
     let prop = _check_all_satisfying_are_retrieved I.retrieve_unifiables Unif.FO.unification in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_unify" I.name in
-    QCheck.Test.make ~name ~max_gen:_limit (arb 10 150) prop
+    QCheck.Test.make ~name ~count:_count ~max_gen:_limit (arb 10 150) prop
 
   let check_retrieve_all_specializations =
     let prop = _check_all_satisfying_are_retrieved I.retrieve_specializations
       (fun t1 t2 -> Unif.FO.matching ~pattern:t1 t2) in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_specializations" I.name in
-    QCheck.Test.make ~name ~max_gen:_limit (arb 10 150) prop
+    QCheck.Test.make ~name ~count:_count ~max_gen:_limit (arb 10 150) prop
 
   let check_retrieve_all_generalizations =
     let prop = _check_all_satisfying_are_retrieved I.retrieve_generalizations _match_flip in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_generalizations" I.name in
-    QCheck.Test.make ~name ~max_gen:_limit (arb 10 150) prop
+    QCheck.Test.make ~name ~count:_count ~max_gen:_limit (arb 10 150) prop
 
   (* check the matching of generalization *)
   let props =

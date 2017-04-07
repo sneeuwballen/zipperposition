@@ -1,0 +1,9 @@
+# expect: unsat
+
+# transitivity of geq
+# x>=y, y>=z -> x>=y
+
+include "nat.zf".
+
+goal forall x y z. (leq x y && leq y z => leq x z).
+

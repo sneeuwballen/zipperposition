@@ -1,0 +1,10 @@
+val i : type.
+val a : i.
+
+val f : i -> i. # a function
+val p : i -> i -> prop. # a binary predicate
+
+assert forall x y. p x y => p y x.
+assert p a (f a).
+
+goal exists (x:i). p (f x) x.

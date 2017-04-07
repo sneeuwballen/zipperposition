@@ -1,16 +1,17 @@
 
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Scoped Value}
 
-  A scoped value is a pair of the value and an (integer) scope.
-  The value contains variables, but a value in a scope A
-  share no variables with the same value in any scope B ≠ A.
+    A scoped value is a pair of the value and an (integer) scope.
+    The value contains variables, but a value in a scope A
+    share no variables with the same value in any scope B ≠ A.
 
 *)
 
-type +'a t = 'a * int
+type scope = int
+type +'a t = 'a * scope
 
 val make : 'a -> int -> 'a t
 
@@ -24,8 +25,7 @@ val same_scope : _ t -> _ t -> bool
 
 val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
 val compare : 'a CCOrd.t -> 'a t CCOrd.t
-val hash_fun : 'a CCHash.hash_fun -> 'a t CCHash.hash_fun
-val hash : 'a CCHash.hash_fun -> 'a t -> int
+val hash : 'a Hash.t -> 'a t -> int
 
 val map : ('a -> 'b) -> 'a t -> 'b t
 

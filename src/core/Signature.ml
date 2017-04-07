@@ -1,5 +1,5 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Signature} *)
 
@@ -24,14 +24,14 @@ let find_exn signature s =
 exception AlreadyDeclared of ID.t * Type.t * Type.t
 
 let () = Printexc.register_printer
-  (function
-    | AlreadyDeclared (id, old, new_) ->
+    (function
+      | AlreadyDeclared (id, old, new_) ->
         Some (
           CCFormat.sprintf
-          "@[<2>symbol %a@ is already declared with type @[%a@],@ \
-          which is not compatible with @[%a@]@]"
-          ID.pp id  Type.pp old Type.pp new_ )
-    | _ -> None)
+            "@[<2>symbol %a@ is already declared with type @[%a@],@ \
+             which is not compatible with @[%a@]@]"
+            ID.pp id  Type.pp old Type.pp new_ )
+      | _ -> None)
 
 let declare signature id ty =
   try
@@ -42,14 +42,14 @@ let declare signature id ty =
     then raise (Invalid_argument "Signature.declare: non-closed type");
     ID.Map.add id ty signature
 
-let cardinal signature = ID.Map.cardinal signature
+let cardinal = ID.Map.cardinal
 
 let arity signature s =
   let ty = find_exn signature s in
   match Type.arity ty with
-  | Type.NoArity ->
+    | Type.NoArity ->
       failwith (CCFormat.sprintf "symbol %a has ill-formed type %a" ID.pp s Type.pp ty)
-  | Type.Arity (a,b) -> a, b
+    | Type.Arity (a,b) -> a, b
 
 let is_ground signature =
   ID.Map.for_all (fun _ ty -> Type.is_ground ty) signature
@@ -59,14 +59,12 @@ let merge s1 s2 =
     (fun s t1 t2 -> match t1, t2 with
        | None, None -> assert false
        | Some ty1, Some ty2 ->
-           if Type.equal ty1 ty2
-           then Some ty1
-           else raise (AlreadyDeclared (s, ty1, ty2))
+         if Type.equal ty1 ty2
+         then Some ty1
+         else raise (AlreadyDeclared (s, ty1, ty2))
        | Some s1, None -> Some s1
        | None, Some s2 -> Some s2)
     s1 s2
-
-let filter s p = ID.Map.filter p s
 
 let diff s1 s2 =
   ID.Map.merge
@@ -127,7 +125,7 @@ let pp out s =
     Format.fprintf out "@[<hov2>%a:@ %a@]" ID.pp s Type.pp ty
   in
   Format.fprintf out "{@[<hv>";
-  CCFormat.seq ~start:"" ~stop:"" ~sep:", " pp_pair out (Seq.to_seq s);
+  Util.pp_seq ~sep:", " pp_pair out (Seq.to_seq s);
   Format.fprintf out "@]}";
   ()
 

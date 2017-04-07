@@ -4,7 +4,7 @@
 (** {1 Parser for Zipperposition Formulas} *)
 
 %{
-  open Libzipperposition
+  open Logtk
 
   module L = ParseLocation
   module A = UntypedAST
@@ -32,8 +32,10 @@
 %token WILDCARD
 %token COMMA
 %token DOT
+%token SEMI_COLON
 %token COLON
 %token EQDEF
+%token WHERE
 %token AND
 
 %token LOGIC_TRUE
@@ -48,6 +50,23 @@
 %token LOGIC_NEQ
 %token LOGIC_EQUIV
 
+%token ARITH_PLUS
+%token ARITH_MINUS
+%token ARITH_PRODUCT
+%token ARITH_LT
+%token ARITH_LEQ
+%token ARITH_GT
+%token ARITH_GEQ
+
+%token IF
+%token THEN
+%token ELSE
+
+%token MATCH
+%token WITH
+%token END
+
+%token INT
 %token PROP
 %token TYPE
 
@@ -70,11 +89,12 @@
 %token <string> LOWER_WORD
 %token <string> UPPER_WORD
 %token <string> QUOTED
+%token <string> INTEGER
 
-%start <Libzipperposition.UntypedAST.statement> parse_statement
-%start <Libzipperposition.UntypedAST.statement list> parse_statement_list
-%start <Libzipperposition.UntypedAST.term> parse_term
-%start <Libzipperposition.UntypedAST.ty> parse_ty
+%start <Logtk.UntypedAST.statement> parse_statement
+%start <Logtk.UntypedAST.statement list> parse_statement_list
+%start <Logtk.UntypedAST.term> parse_term
+%start <Logtk.UntypedAST.ty> parse_ty
 
 
 %%
@@ -89,15 +109,28 @@ raw_var:
   | w=LOWER_WORD { w }
   | w=UPPER_WORD { w }
 
-typed_var:
-  | v=raw_var { T.V v, None }
-  | WILDCARD { T.Wildcard, None }
-  | LEFT_PAREN v=raw_var COLON t=term RIGHT_PAREN { T.V v, Some t }
+var_or_wildcard:
+  | v=raw_var { T.V v }
+  | WILDCARD { T.Wildcard }
 
-typed_ty_var:
-  | v=raw_var { T.V v, None }
-  | v=raw_var COLON TYPE { T.V v, Some T.tType  }
-  | LEFT_PAREN v=raw_var COLON TYPE RIGHT_PAREN { T.V v, Some T.tType }
+typed_var_block:
+  | v=raw_var { [T.V v, None] }
+  | WILDCARD { [T.Wildcard, None] }
+  | LEFT_PAREN v=raw_var+ COLON t=term RIGHT_PAREN
+    { List.map (fun v -> T.V v, Some t) v }
+
+typed_var_list:
+  | l=typed_var_block { l }
+  | l=typed_var_block l2=typed_var_list { l @ l2 }
+
+typed_ty_var_block:
+  | v=raw_var { [T.V v, None] }
+  | v=raw_var COLON TYPE { [T.V v, Some T.tType] }
+  | LEFT_PAREN v=raw_var+ COLON TYPE RIGHT_PAREN { List.map (fun v -> T.V v, Some T.tType) v }
+
+typed_ty_var_list:
+  | l=typed_ty_var_block { l }
+  | l=typed_ty_var_block l2=typed_ty_var_list { l @ l2 }
 
 var:
   | WILDCARD { T.wildcard }
@@ -110,13 +143,24 @@ var:
 const:
   | TYPE { T.tType }
   | PROP { T.prop }
+  | INT { T.ty_int }
   | LOGIC_TRUE { T.true_ }
   | LOGIC_FALSE { T.false_ }
+
+match_branch:
+  | VERTICAL_BAR c=raw_var vars=var_or_wildcard* ARROW rhs=term
+    { T.Match_case (c,vars,rhs) }
 
 atomic_term:
   | v=var { v }
   | t=const { t }
+  | i=INTEGER { T.int_ (Z.of_string i) }
   | LEFT_PAREN t=term RIGHT_PAREN { t }
+  | MATCH t=term WITH l=match_branch+ END
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.match_ ~loc t l
+    }
 
 apply_term:
   | t=atomic_term { t }
@@ -125,20 +169,62 @@ apply_term:
       let loc = L.mk_pos $startpos $endpos in
       T.app ~loc t u
     }
-  | LOGIC_NOT t=apply_term
+  | ARITH_MINUS t=apply_term
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.app_builtin ~loc Builtin.Uminus [t]
+    }
+
+mult_term:
+  | t=apply_term { t }
+  | a=apply_term ARITH_PRODUCT b=mult_term
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.app_builtin ~loc Builtin.Product [a;b]
+    }
+
+%inline PLUS_OP:
+  | ARITH_PLUS { Builtin.Sum }
+  | ARITH_MINUS { Builtin.Difference }
+
+plus_term:
+  | t=mult_term { t }
+  | a=mult_term o=PLUS_OP b=plus_term
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.app_builtin ~loc o [a;b]
+    }
+
+%inline ARITH_OP:
+  | ARITH_LT { Builtin.Less }
+  | ARITH_LEQ { Builtin.Lesseq }
+  | ARITH_GT { Builtin.Greater }
+  | ARITH_GEQ { Builtin.Greatereq }
+
+arith_op_term:
+  | t=plus_term { t }
+  | a=plus_term o=ARITH_OP b=plus_term
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.app_builtin ~loc o [a;b]
+    }
+
+not_term:
+  | t=arith_op_term { t }
+  | LOGIC_NOT t=arith_op_term
     {
       let loc = L.mk_pos $startpos $endpos in
       T.not_ ~loc t
     }
 
 eq_term:
-  | t=apply_term { t }
-  | t=apply_term LOGIC_EQ u=apply_term
+  | t=not_term { t }
+  | t=not_term LOGIC_EQ u=not_term
     {
       let loc = L.mk_pos $startpos $endpos in
       T.eq ~loc t u
     }
-  | t=apply_term LOGIC_NEQ u=apply_term
+  | t=not_term LOGIC_NEQ u=not_term
     {
       let loc = L.mk_pos $startpos $endpos in
       T.neq ~loc t u
@@ -172,12 +258,12 @@ or_term:
 
 term:
   | t=or_term { t }
-  | LOGIC_FORALL vars=typed_var+ DOT t=term
+  | LOGIC_FORALL vars=typed_var_list DOT t=term
     {
       let loc = L.mk_pos $startpos $endpos in
       T.forall ~loc vars t
     }
-  | LOGIC_EXISTS vars=typed_var+ DOT t=term
+  | LOGIC_EXISTS vars=typed_var_list DOT t=term
     {
       let loc = L.mk_pos $startpos $endpos in
       T.exists ~loc vars t
@@ -187,10 +273,15 @@ term:
       let loc = L.mk_pos $startpos $endpos in
       T.fun_ty ~loc [t] u
     }
-  | PI vars=typed_ty_var+ DOT t=term
+  | PI vars=typed_ty_var_list DOT t=term
     {
       let loc = L.mk_pos $startpos $endpos in
       T.forall_ty ~loc vars t
+    }
+  | IF a=term THEN b=term ELSE c=term
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.ite ~loc a b c
     }
   | error
     {
@@ -222,6 +313,12 @@ attrs:
     { l }
   | { [] }
 
+def:
+ | v=raw_var COLON ty=term EQDEF t=term
+   { A.mk_def v ty [T.eq (T.var v) t] }
+ | v=raw_var COLON ty=term WHERE rules=separated_nonempty_list(SEMI_COLON,term)
+   { A.mk_def v ty rules }
+
 statement:
   | INCLUDE s=QUOTED DOT
     {
@@ -234,10 +331,10 @@ statement:
       let loc = L.mk_pos $startpos $endpos in
       A.decl ~attrs:a ~loc v t
     }
-  | DEF a=attrs v=raw_var COLON t=term EQDEF u=term DOT
+  | DEF a=attrs l=separated_nonempty_list(AND,def) DOT
     {
       let loc = L.mk_pos $startpos $endpos in
-      A.def ~attrs:a ~loc v t u
+      A.def ~attrs:a ~loc l
     }
   | REWRITE a=attrs t=term DOT
     {

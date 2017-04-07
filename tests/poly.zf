@@ -1,0 +1,29 @@
+# some tests for polymorphism, just check it types
+
+# expect: SAT
+
+data nat := Z | S nat.
+data pair a b := Pair a b.
+
+data list a :=
+  | nil
+  | cons a (list a).
+
+def swap : pi (a b : type). pair a b -> pair b a where
+  forall x y. swap (Pair x y) = Pair y x.
+
+def fst : pi (a b : type). pair a b -> a where
+  forall x y. fst (Pair x y) = x.
+def snd : pi (a b : type). pair a b -> b where
+  forall x y. snd (Pair x y) = y.
+
+def length : pi a. list a -> nat where
+  length nil = Z;
+  forall x l. length (cons x l) = S (length l).
+
+def split : pi (a:type) (b:type). list (pair a b) -> pair (list a) (list b) where
+  split nil = Pair nil nil;
+  forall x y l.
+    split (cons (Pair x y) l) =
+      Pair (cons x (fst (split l))) (cons y (snd (split l))).
+

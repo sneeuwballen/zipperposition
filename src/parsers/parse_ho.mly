@@ -28,7 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 A parser with a nice curried syntax. *)
 
 %{
-  open Libzipperposition
+  open Logtk
 
   module L = ParseLocation
   module A = Ast_ho
@@ -85,7 +85,7 @@ A parser with a nice curried syntax. *)
 
 %start <Ast_ho.t> parse_decl
 %start <Ast_ho.t list> parse_decls
-%start <Libzipperposition.STerm.t> parse_term
+%start <Logtk.STerm.t> parse_term
 
 %%
 

@@ -3,7 +3,7 @@
 
 (** {1 Priority Queue of clauses} *)
 
-open Libzipperposition
+open Logtk
 
 module O = Ordering
 module Lit = Literal
@@ -17,13 +17,14 @@ let profiles_ =
   let open ClauseQueue_intf in
   [ "default", P_default
   ; "bfs", P_bfs
+  ; "almost-bfs", P_almost_bfs
   ; "explore", P_explore
   ; "ground", P_ground
   ; "goal", P_goal
   ]
 
 let profile_of_string s =
-  let s = s |> String.trim |> String.lowercase in
+  let s = s |> String.trim |> CCString.lowercase_ascii in
   try List.assoc s profiles_
   with Not_found -> invalid_arg ("unknown queue profile: " ^ s)
 
@@ -33,13 +34,14 @@ let set_profile p = _profile := p
 let parse_profile s = _profile := (profile_of_string s)
 
 let () =
+  let o = Arg.Symbol (List.map fst profiles_, parse_profile) in
   Params.add_opts
-    [ "--clause-queue"
-      , Arg.Symbol (List.map fst profiles_, parse_profile)
-      , " choose which set of clause queues to use (for selecting next active clause)"
+    [ "--clause-queue", o,
+      " choose which set of clause queues to use (for selecting next active clause)";
+      "-cq", o, " alias to --clause-queue"
     ]
 
-module Make(C : Clause.S) = struct
+module Make(C : Clause_intf.S) = struct
   module C = C
 
   (* weight of a term [t], using the precedence's weight *)
@@ -61,24 +63,12 @@ module Make(C : Clause.S) = struct
         |> Sequence.map FOTerm.ty
         |> Sequence.map Type.depth
         |> Sequence.max ?lt:None
-        |> CCOpt.maybe CCFun.id 0
+        |> CCOpt.map_or CCFun.id ~default:0
       in
-      let trail = C.trail c in
       let w_lits = weight_lits_ (C.lits c) in
-      let w_trail =
-        let module B = BBox in
-        Trail.fold
-          (fun acc t -> match B.payload (B.Lit.abs t) with
-             | B.Fresh -> acc
-             | B.Lemma _ -> acc
-             | B.Clause_component lits -> acc + weight_lits_ lits
-             | B.Case p ->
-               (* penalize deep inductions exponentially *)
-               acc + CCInt.pow 2 (4 * Ind_cst.path_length p)
-          )
-          0 trail
-      in
-      w_lits * Array.length (C.lits c) + w_trail * (Trail.length trail) + _depth_ty
+      w_lits * Array.length (C.lits c) + _depth_ty
+
+    let penalty = C.penalty
 
     let penalty_coeff_ = 20
 
@@ -89,12 +79,24 @@ module Make(C : Clause.S) = struct
       in
       if is_unit_pos c then 0 else penalty_coeff_
 
+    (* favorize small number of variables in a clause *)
+    let favor_small_num_vars c =
+      (* number of distinct term variables *)
+      let n_vars =
+        Literals.vars (C.lits c)
+        |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))
+        |> List.length
+      in
+      let n =
+        if n_vars < 4 then 0
+        else if n_vars < 6 then 1
+        else if n_vars < 8 then 3
+        else n_vars
+      in
+      n * penalty_coeff_
+
     let favor_horn c =
       if Lits.is_horn (C.lits c) then 0 else penalty_coeff_
-
-    let age c =
-      if C.is_empty c then 0
-      else C.id c
 
     let goal_threshold_ = 15
 
@@ -129,94 +131,149 @@ module Make(C : Clause.S) = struct
   end
 
   module H = CCHeap.Make(struct
+      (* heap ordered by [weight, real age(id)] *)
       type t = (int * C.t)
-      let leq (i1, c1) (i2, c2) = i1 <= i2 || (i1 = i2 && C.compare c1 c2 <= 0)
+      let leq (i1, c1) (i2, c2) =
+        i1 < i2 ||
+        (i1 = i2 && C.compare c1 c2 <= 0)
     end)
 
-  (** A priority queue of clauses, purely functional *)
-  type t = {
-    heap : H.t;
-    functions : functions;
-  }
-  and functions = {
-    weight : C.t -> int;
-    name : string;
+  (** A priority queue of clauses + FIFO queue *)
+  type t =
+    | FIFO of C.t Queue.t
+    | Mixed of mixed
+
+  and mixed = {
+    mutable heap : H.t;
+    mutable queue: C.t Queue.t;
+    tbl: unit C.Tbl.t;
+    mutable time_before_fifo: int;
+    (* cycles from 0 to ratio, changed at every [take_first].
+       when 0, pick in fifo; other pick from heap and decrease *)
+    ratio: int;
+    weight: C.t -> int;
+    name: string;
   }
 
   (** generic clause queue based on some ordering on clauses, given
       by a weight function *)
-  let make ~weight name =
-    let functions = {
+  let make ~ratio ~weight name =
+    if ratio <= 0 then invalid_arg "ClauseQueue.make: ratio must be >0";
+    Mixed {
       weight;
       name;
-    } in
-    { heap = H.empty; functions; }
+      ratio;
+      time_before_fifo=ratio;
+      heap = H.empty;
+      queue=Queue.create();
+      tbl=C.Tbl.create 256;
+    }
 
-  let is_empty q =
-    H.is_empty q.heap
+  let is_empty_mixed q = C.Tbl.length q.tbl = 0
 
-  let add q c =
-    let w = q.functions.weight c in
-    let heap = H.insert (w, c) q.heap in
-    { q with heap; }
+  let is_empty (q:t) = match q with
+    | FIFO q -> Queue.is_empty q
+    | Mixed q -> is_empty_mixed q
 
-  let adds q hcs =
-    let heap =
-      Sequence.fold
-        (fun heap c ->
-           let w = q.functions.weight c in
-           H.insert (w,c) heap)
-        q.heap hcs in
-    { q with heap; }
+  let length q = match q with
+    | FIFO q -> Queue.length q
+    | Mixed q -> C.Tbl.length q.tbl
 
-  let take_first q =
-    if is_empty q then raise Not_found;
-    let new_h, (_, c) = H.take_exn q.heap in
-    let q' = { q with heap=new_h; } in
-    q', c
+  let add q c = match q with
+    | FIFO q -> Queue.push c q
+    | Mixed q ->
+      if not (C.Tbl.mem q.tbl c) then (
+        C.Tbl.add q.tbl c ();
+        let w = q.weight c in
+        let heap = H.insert (w, c) q.heap in
+        q.heap <- heap;
+        Queue.push c q.queue;
+      )
 
-  let name q = q.functions.name
+  let add_seq q hcs = Sequence.iter (add q) hcs
+
+  let rec take_first_mixed q =
+    if is_empty_mixed q then raise Not_found;
+    (* find next clause *)
+    let c =
+      if q.time_before_fifo = 0
+      then (
+        q.time_before_fifo <- q.ratio;
+        Queue.pop q.queue
+      ) else (
+        assert (q.time_before_fifo > 0);
+        q.time_before_fifo <- q.time_before_fifo - 1;
+        let new_h, (_, c) = H.take_exn q.heap in
+        q.heap <- new_h;
+        c
+      )
+    in
+    if C.Tbl.mem q.tbl c then (
+      C.Tbl.remove q.tbl c;
+      c
+    ) else take_first_mixed q (* spurious *)
+
+  let take_first = function
+    | FIFO q ->
+      if Queue.is_empty q then raise Not_found else Queue.pop q
+    | Mixed q -> take_first_mixed q
+
+  let name q = match q with
+    | FIFO _ -> "bfs"
+    | Mixed q -> q.name
 
   (** {6 Combination of queues} *)
 
-  let goal_oriented =
+  let goal_oriented () : t =
     let open WeightFun in
-    let weight = combine [age, 1; default, 4; favor_goal, 1; favor_all_neg, 1] in
+    let weight =
+      combine [default, 4; favor_small_num_vars, 2;
+               favor_goal, 1; favor_all_neg, 1; penalty, 1; ] in
     let name = "goal_oriented" in
-    make ~weight name
+    make ~ratio:6 ~weight name
 
-  let bfs =
+  let bfs () : t = FIFO (Queue.create ())
+
+  let almost_bfs () : t =
     let open WeightFun in
-    let weight = combine [age, 5; default, 1] in
-    make ~weight "bfs"
+    let weight = combine [ default, 3; penalty, 2; ] in
+    make ~ratio:1 ~weight "almost_bfs"
 
-  let explore =
-    let open WeightFun in
-    let weight = combine [age, 1; default, 4; favor_all_neg, 1] in
-    make ~weight "explore"
-
-  let ground =
-    let open WeightFun in
-    let weight = combine [age, 1; favor_pos_unit, 1; favor_ground, 2] in
-    make ~weight "ground"
-
-  let default =
+  let explore () : t =
     let open WeightFun in
     let weight =
       combine
-      [ age, 4; default, 3; favor_all_neg, 1
-      ; favor_goal, 1; favor_pos_unit, 1]
+        [default, 4; favor_small_num_vars, 1;
+         favor_all_neg, 1; penalty, 1; ]
     in
-    make ~weight "default"
+    make ~ratio:6 ~weight "explore"
+
+  let ground () : t =
+    let open WeightFun in
+    let weight =
+      combine [favor_pos_unit, 1; favor_ground, 2;
+               favor_small_num_vars, 10; penalty, 1 ]
+    in
+    make ~ratio:6 ~weight "ground"
+
+  let default () : t =
+    let open WeightFun in
+    let weight =
+      combine
+        [ default, 3; favor_all_neg, 1; favor_small_num_vars, 2
+        ; favor_goal, 1; favor_pos_unit, 1; penalty, 1; ]
+    in
+    make ~ratio:6 ~weight "default"
 
   let of_profile p =
     let open ClauseQueue_intf in
     match p with
-    | P_default -> default
-    | P_bfs -> bfs
-    | P_explore -> explore
-    | P_ground -> ground
-    | P_goal -> goal_oriented
+      | P_default -> default ()
+      | P_bfs -> bfs ()
+      | P_almost_bfs -> almost_bfs ()
+      | P_explore -> explore ()
+      | P_ground -> ground ()
+      | P_goal -> goal_oriented ()
 
   let pp out q = CCFormat.fprintf out "queue %s" (name q)
   let to_string = CCFormat.to_string pp

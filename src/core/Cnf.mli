@@ -1,5 +1,5 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Reduction to CNF and simplifications} *)
 
@@ -51,14 +51,16 @@ val clause_to_fo :
   clause ->
   FOTerm.t SLiteral.t list
 
-type 'a f_statement = (term, term, type_, 'a) Statement.t
+type f_statement = (term, term, type_) Statement.t
 (** A statement before CNF *)
 
-type 'a c_statement = (clause, term, type_, 'a) Statement.t
+type c_statement = (clause, term, type_) Statement.t
 (** A statement after CNF *)
 
-val pp_f_statement : _ f_statement CCFormat.printer
-val pp_c_statement : _ c_statement CCFormat.printer
+val pp_f_statement : f_statement CCFormat.printer
+val pp_c_statement : c_statement CCFormat.printer
+val pp_fo_c_statement : (FOTerm.t SLiteral.t list, FOTerm.t, Type.t) Statement.t CCFormat.printer
+
 
 val is_clause : form -> bool
 val is_cnf : form -> bool
@@ -68,10 +70,8 @@ val is_cnf : form -> bool
 val cnf_of :
   ?opts:options list ->
   ?ctx:Skolem.ctx ->
-  ?neg_src:('a -> 'a) ->
-  ?cnf_src:('a -> 'a) ->
-  'a f_statement ->
-  'a c_statement CCVector.ro_vector
+  f_statement ->
+  c_statement CCVector.ro_vector
 (** Transform the clause into proper CNF; returns a list of statements,
     including type declarations for new Skolem symbols or formulas proxys.
     Options are used to tune the behavior. *)
@@ -79,20 +79,18 @@ val cnf_of :
 val cnf_of_seq :
   ?opts:options list ->
   ?ctx:Skolem.ctx ->
-  ?neg_src:('a -> 'a) ->
-  ?cnf_src:('a -> 'a) ->
-  'a f_statement Sequence.t ->
-  'a c_statement CCVector.ro_vector
+  f_statement Sequence.t ->
+  c_statement CCVector.ro_vector
 
 val type_declarations :
-  _ c_statement Sequence.t ->
+  c_statement Sequence.t ->
   type_ ID.Map.t
 (** Compute the types declared in the statement sequence *)
 
 (** {2 Conversions} *)
 
 val convert :
-  StatementSrc.t c_statement Sequence.t ->
+  c_statement Sequence.t ->
   Statement.clause_t CCVector.ro_vector
 (** Converts statements based on {!TypedSTerm} into statements
     based on {!FOTerm} and {!Type} *)

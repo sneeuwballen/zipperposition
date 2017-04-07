@@ -1,7 +1,7 @@
 
 (** {1 Simple Clause} *)
 
-open Libzipperposition
+open Logtk
 
 type flag = int
 
@@ -31,6 +31,13 @@ let length c = Array.length c.lits
 let is_empty c = length c = 0 && Trail.is_empty c.trail
 
 let update_trail f c = make ~trail:(f c.trail) c.lits
+
+let to_s_form ?(ctx=FOTerm.Conv.create()) c =
+  let module F = TypedSTerm.Form in
+  let concl = Literals.Conv.to_s_form ~ctx (lits c) |> F.close_forall in
+  if Trail.is_empty (trail c)
+  then concl
+  else F.imply (Trail.to_s_form (trail c)) concl
 
 (** {2 Flags} *)
 
@@ -67,7 +74,7 @@ let pp_trail out trail =
   if not (Trail.is_empty trail)
   then
     Format.fprintf out "@ @<2>← @[<hv>%a@]"
-      (CCFormat.seq ~start:"" ~stop:"" ~sep:" ⊓ " BBox.pp)
+      (Util.pp_seq ~sep:" ⊓ " BBox.pp)
       (Trail.to_seq trail)
 
 let pp_vars out c =
@@ -103,13 +110,12 @@ and pp_trail_tstp out trail =
   (* print a single boolean box *)
   let pp_box_unsigned out b = match BBox.payload b with
     | BBox.Case p ->
-      let lits = Ind_cst.lits_of_path p in
-      pp_lits_tstp out lits
+      let lits = List.map Cover_set.Case.to_lit p |> Array.of_list in
+      Literals.pp_tstp out lits
     | BBox.Clause_component lits ->
       CCFormat.within "(" ")" pp_closed_lits_tstp out lits
-    | BBox.Lemma lits ->
-      CCFormat.within "(" ")"
-        (Util.pp_list ~sep:" & " pp_closed_lits_tstp) out lits
+    | BBox.Lemma f ->
+      CCFormat.within "(" ")" Cut_form.pp_tstp out f
     | BBox.Fresh -> failwith "cannot print <fresh> boolean box"
   in
   let pp_box out b =
@@ -117,7 +123,7 @@ and pp_trail_tstp out trail =
     else Format.fprintf out "@[~@ %a@]" pp_box_unsigned b
   in
   Format.fprintf out "@[<hv>%a@]"
-    (CCFormat.seq ~start:"" ~stop:"" ~sep:" & " pp_box)
+    (Util.pp_seq ~sep:" & " pp_box)
     (Trail.to_seq trail)
 
 let pp_tstp out c =

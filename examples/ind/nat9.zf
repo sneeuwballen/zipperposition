@@ -1,2 +1,3 @@
+# expect: unsat
 include "nat.zf".
 goal forall (X:nat). (forall (Y:nat). ((minus (plus X Y) X) = Y)).

@@ -8,14 +8,13 @@
 
     The point is to relate different applications of the same context. *)
 
-open Libzipperposition
+open Logtk
 
 module T = FOTerm
-module Subst = Substs
 module Lits = Literals
 
 type term = T.t
-type subst = Substs.t
+type subst = Subst.t
 
 (** A context is represented as a regular array of literals, containing
     at least one specific variable [x], paired with this variable [x].
@@ -27,7 +26,7 @@ type t = {
 }
 type ctx=t
 
-let equal c1 c2 = HVar.equal c1.var c2.var && Lits.equal c1.lits c2.lits
+let equal c1 c2 = HVar.equal Type.equal c1.var c2.var && Lits.equal c1.lits c2.lits
 
 let raw_lits t = t.lits
 
@@ -35,38 +34,31 @@ let raw_lits t = t.lits
    if same type, instantiate with some specific "diamond" of that type
    and check for alpha-equiv *)
 let compare c1 c2 =
-  CCOrd.(HVar.compare c1.var c2.var <?> (Lits.compare, c1.lits, c2.lits))
+  CCOrd.(HVar.compare Type.compare c1.var c2.var <?> (Lits.compare, c1.lits, c2.lits))
 
-let real_hash_fun c h =
-  h |> Literals.hash_fun c.lits |> HVar.hash_fun c.var
+let hash_real c = Hash.combine3 42 (Literals.hash c.lits) (HVar.hash c.var)
 
 let hash c =
   if c.hash = ~-1 then (
-    let h = CCHash.apply real_hash_fun c in
+    let h = hash_real c in
     assert (h >= 0);
     c.hash <- h
   );
   c.hash
 
-let hash_fun c h = CCHash.int (hash c) h
-
-let hash = CCHash.apply hash_fun
+let make_ lits var =
+  {lits; var; hash= ~-1}
 
 let make lits ~var =
   assert (Lits.Seq.terms lits
-          |> Sequence.exists (T.var_occurs ~var)
-         );
-  {lits; var; hash= ~-1}
+          |> Sequence.exists (T.var_occurs ~var));
+  make_ lits var
 
 let extract lits t =
   if Lits.Seq.terms lits |> Sequence.exists (T.subterm ~sub:t)
   then
-    (* create fresh var to replace [t] *)
-    let i = Lits.Seq.terms lits
-            |> Sequence.flat_map T.Seq.vars
-            |> T.Seq.max_var
-    in
-    let var = HVar.make ~ty:(T.ty t) (i+1) in
+    (* create fresh var to replace [t], negative to avoid collisions later *)
+    let var = HVar.make_unsafe ~ty:(T.ty t) ~-2 in
     let var_t = T.var var in
     (* replace [t] with [var] *)
     let lits =
@@ -74,12 +66,18 @@ let extract lits t =
         (Literal.map (fun root_t -> T.replace root_t ~old:t ~by:var_t))
         lits
     in
-    Some {lits; var; hash= ~-1}
+    Some (make_ lits var)
   else None
 
 let extract_exn lits t = match extract lits t with
   | None -> invalid_arg "ClauseContext.extract_exn"
   | Some c -> c
+
+let trivial lits t =
+  (* create fresh var to replace [t], negative to avoid collisions later *)
+  let var = HVar.make_unsafe ~ty:(T.ty t) ~-2 in
+  assert (not (Literals.Seq.terms lits |> Sequence.exists (T.subterm ~sub:t)));
+  make_ lits var
 
 let _apply_subst subst (lits, sc) =
   let renaming = Subst.Renaming.create () in

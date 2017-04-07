@@ -1,5 +1,5 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Feature Vector indexing} *)
 
@@ -11,9 +11,9 @@ type lits = Index_intf.lits
 (* TODO: mutable version? *)
 
 (* TODO:
-  keep a pool of all possible features (with functions to register new symbols),
-  and maintain an histogram of possible values for each feature.
-  Then, regularly, replace the [n] currently used features by the [n] top useful
+   keep a pool of all possible features (with functions to register new symbols),
+   and maintain an histogram of possible values for each feature.
+   Then, regularly, replace the [n] currently used features by the [n] top useful
     features. See paper.
 *)
 
@@ -47,13 +47,6 @@ module Make(C : Index.CLAUSE) : sig
   (** {2 Index} *)
 
   include Index.SUBSUMPTION_IDX with module C = C
-
-  val retrieve_alpha_equiv : t -> lits -> C.t Sequence.t
-  (** Retrieve clauses that are potentially alpha-equivalent to the given clause
-      @since 0.6 *)
-
-  val retrieve_alpha_equiv_c : t -> C.t -> C.t Sequence.t
-  (** @since 0.6 *)
 
   val empty_with : Feature.t list -> t
 

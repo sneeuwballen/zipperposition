@@ -3,6 +3,8 @@
 
 (** {1 Global environment for an instance of the prover} *)
 
+open Logtk
+
 (** {2 Signature} *)
 module type S = Env_intf.S
 
@@ -14,5 +16,5 @@ module Make(X : sig
     val params : Params.t
     val flex_state : Flex_state.t
   end) : sig
-    include S with module Ctx = X.Ctx
-  end
+  include S with module Ctx = X.Ctx
+end

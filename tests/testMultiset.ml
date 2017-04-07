@@ -1,6 +1,6 @@
 
-open Libzipperposition
-open OUnit2
+open Logtk
+open OUnit
 module Q = QCheck
 
 module M = Multiset.Make(struct
@@ -53,7 +53,9 @@ let compare_and_partial =
   let prop (m1,m2) =
     _sign (compare' m1 m2) = _sign (M.compare m1 m2)
   in
-  QCheck.Test.make ~name:"multiset_compare_and_compare_partial" ~count:1000 gen prop
+  QCheck.Test.make
+    ~name:"multiset_compare_and_compare_partial" ~long_factor:3 ~count:1000
+    gen prop
 
 let max_is_max =
   let pp = CCFormat.to_string (M.pp CCFormat.int) in
@@ -64,7 +66,9 @@ let max_is_max =
     let l = M.max f m |> M.to_list |> List.map fst in
     List.for_all (fun x -> M.is_max f x m) l
   in
-  Q.Test.make ~name:"multiset_max_l_is_max" ~count:1000 gen prop
+  Q.Test.make
+    ~name:"multiset_max_l_is_max" ~long_factor:3 ~count:1000
+    gen prop
 
 let suite =
   "test_multiset" >:::

@@ -1,9 +1,9 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Trace of a TSTP prover} *)
 
-open Libzipperposition
+open Logtk
 
 type id = Ast_tptp.name
 
@@ -68,7 +68,7 @@ val size : t -> int
 
 (** {3 IO} *)
 
-type 'a or_error = [`Error of string | `Ok of 'a]
+type 'a or_error = ('a, string) CCResult.t
 
 val of_decls : form Ast_tptp.t Sequence.t -> t or_error
 (** Try to extract a proof from a list of TSTP statements. *)

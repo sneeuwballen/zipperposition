@@ -50,8 +50,13 @@ val is_tType : t -> bool
 val is_var : t -> bool
 val is_bvar : t -> bool
 val is_app : t -> bool
+val is_const : t -> bool
 val is_fun : t -> bool
 val is_forall : t -> bool
+val is_prop : t -> bool
+
+val hash_mod_alpha : t -> int
+(** Hash invariant w.r.t variable renaming *)
 
 (** {2 Constructors} *)
 
@@ -96,6 +101,22 @@ val of_term_unsafe : InnerTerm.t -> t
 
 val of_terms_unsafe : InnerTerm.t list -> t list
 val cast_var_unsafe : InnerTerm.t HVar.t -> t HVar.t
+
+(** {2 Definition} *)
+
+type def =
+  | Def_unin of int (* number of type variables *)
+  | Def_data of int * ty list (* data type with number of variables and cstors *)
+
+val def : ID.t -> def option
+(** Access the definition of a type *)
+
+val def_exn : ID.t -> def
+(** Unsafe version of {!def}
+    @raise Not_found if not a proper constant *)
+
+val set_def : ID.t -> def -> unit
+(** Set definition of an ID *)
 
 (** {2 Containers} *)
 
@@ -166,6 +187,11 @@ val open_fun : t -> t list * t
     [open_fun (a -> (b -> (c -> d)))] returns [[a;b;c], d].
     @return the return type and the list of all its arguments *)
 
+val returns : t -> t
+(** returned type (going through foralls and arrows).
+    [returns a] is like [let _, _, ret = open_poly_fun a in ret]
+    {b NOTE} caution, not always closed *)
+
 exception ApplyError of string
 (** Error raised when {!apply} fails *)
 
@@ -190,6 +216,9 @@ include Interfaces.PRINT_DE_BRUIJN with type term := t and type t := t
 include Interfaces.PRINT with type t := t
 val pp_surrounded : t CCFormat.printer
 val pp_typed_var : t HVar.t CCFormat.printer
+
+val mangle : t -> string
+val pp_mangle : t CCFormat.printer
 
 (** {2 TPTP} specific printer and types *)
 
@@ -228,14 +257,18 @@ module Conv : sig
   val fresh_ty_var : ctx -> t HVar.t
   (** Fresh type variable *)
 
-  exception Error
+  val var_to_simple_var : ?prefix:string -> ctx -> t HVar.t -> TypedSTerm.t Var.t
+
+  exception Error of TypedSTerm.t
 
   val of_simple_term_exn : ctx -> TypedSTerm.t -> t
   (** @raise Invalid_argument if conversion is impossible *)
 
   val to_simple_term :
     ?env:TypedSTerm.t Var.t DBEnv.t ->
-    t -> TypedSTerm.t
-  (** convert a type to a prolog term.
-      @param env the current environement for De Bruijn indices *)
+    ctx ->
+    t ->
+    TypedSTerm.t
+    (** convert a type to a prolog term.
+        @param env the current environement for De Bruijn indices *)
 end

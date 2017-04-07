@@ -26,11 +26,17 @@ type attr =
 
 type attrs = attr list
 
+type def = {
+  def_id: string;
+  def_ty: ty;
+  def_rules: term list;
+}
+
 (** Statement *)
 type statement_view =
   | Include of string
   | Decl of string * ty
-  | Def of string * ty * term
+  | Def of def list
   | Rewrite of term
   | Data of data list
   | Assert of form
@@ -45,9 +51,11 @@ type statement = {
 
 val default_attrs : attrs
 
+val mk_def : string -> ty -> term list -> def
+
 val include_ : ?loc:Loc.t -> ?attrs:attrs -> string -> statement
 val decl : ?loc:Loc.t -> ?attrs:attrs -> string -> ty -> statement
-val def : ?loc:Loc.t -> ?attrs:attrs -> string -> ty -> term -> statement
+val def : ?loc:Loc.t -> ?attrs:attrs -> def list -> statement
 val data : ?loc:Loc.t -> ?attrs:attrs -> data list -> statement
 val rewrite : ?loc:Loc.t -> ?attrs:attrs -> term -> statement
 val assert_ : ?loc:Loc.t -> ?attrs:attrs -> term -> statement

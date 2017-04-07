@@ -3,13 +3,13 @@
 
 (** {1 S-like Terms}.
 
-Those terms are not hashconsed, nor do they use De Bruijn indices. Their
-simplicity make them good for heavy AST transformations, output of parsing,
-etc.
+    Those terms are not hashconsed, nor do they use De Bruijn indices. Their
+    simplicity make them good for heavy AST transformations, output of parsing,
+    etc.
 
-Terms are only compared, hashsed, etc. by their "term" component (the algebraic
-variant). Additional fields (location...) are ignored for almost every
-operation.
+    Terms are only compared, hashsed, etc. by their "term" component (the algebraic
+    variant). Additional fields (location...) are ignored for almost every
+    operation.
 *)
 
 type location = ParseLocation.t
@@ -23,11 +23,18 @@ type t = private {
   loc : location option;
 }
 
+and match_branch =
+  | Match_case of string * var list * t
+  | Match_default of t
+
 and view =
   | Var of var (** variable *)
   | Const of string (** constant *)
   | AppBuiltin of Builtin.t * t list
   | App of t * t list (** apply term *)
+  | Ite of t * t * t
+  | Match of t * match_branch list
+  | Let of (var * t) list * t
   | Bind of Binder.t * typed_var list * t (** bind n variables *)
   | List of t list (** special constructor for lists *)
   | Record of (string * t) list * var option (** extensible record *)
@@ -46,10 +53,14 @@ val var : ?loc:location -> string -> t
 val v_wild : t (** wildcard *)
 val mk_var : ?loc:location -> var -> t
 val app : ?loc:location -> t -> t list -> t
+val app_const : ?loc:location -> string -> t list -> t
 val builtin : ?loc:location -> Builtin.t -> t
 val app_builtin : ?loc:location -> Builtin.t -> t list -> t
 val const : ?loc:location -> string -> t
 val bind : ?loc:location -> Binder.t -> typed_var list -> t -> t
+val ite : ?loc:location -> t -> t -> t -> t
+val match_ : ?loc:location -> t -> match_branch list -> t
+val let_ : ?loc:location -> (var * t) list -> t -> t
 val list_ : ?loc:location -> t list -> t
 val nil : t
 val record : ?loc:location -> (string*t) list -> rest:var option -> t
@@ -86,6 +97,9 @@ val ty_rat : t
 val fun_ty : ?loc:location -> t list -> t -> t
 val forall_ty : ?loc:location -> typed_var list -> t -> t
 
+val ty_unfold : t -> t list * t
+val unfold_bind: Binder.t -> t -> typed_var list * t
+
 module Set : CCSet.S with type elt = term
 module Map : CCMap.S with type key = term
 module Tbl : CCHashtbl.S with type key = term
@@ -97,7 +111,7 @@ module Seq : sig
   val free_vars : t -> string Sequence.t
   val subterms : t -> t Sequence.t
   val subterms_with_bound : t -> (t * StringSet.t) Sequence.t
-    (** subterm and variables bound at this subterm *)
+  (** subterm and variables bound at this subterm *)
 
   val symbols : t -> string Sequence.t
 end
@@ -105,9 +119,15 @@ end
 val ground : t -> bool
 val close_all : Binder.t -> t -> t  (** Bind all free vars with the symbol *)
 val subterm : strict:bool -> t -> sub:t -> bool
-  (** is [sub] a (strict?) subterm of the other arg? *)
+(** is [sub] a (strict?) subterm of the other arg? *)
+
+(** {2 Print} *)
 
 include Interfaces.PRINT with type t := t
+val pp_typed_var : typed_var CCFormat.printer
+val pp_var : var CCFormat.printer
+
+(** {2 Formats} *)
 
 module TPTP : sig
   include Interfaces.PRINT with type t := t
@@ -115,4 +135,19 @@ end
 
 module ZF : sig
   include Interfaces.PRINT with type t := t
+  val pp_inner : t CCFormat.printer
 end
+
+(** {2 Subst} *)
+
+module StrMap : CCMap.S with type key = string
+
+type subst = t StrMap.t
+
+val empty_subst : subst
+
+val merge_subst : subst -> subst -> subst
+(** [merge a b] merges [a] into [b], but favors [b] in case
+    of conflict *)
+
+val apply_subst : subst -> term -> term

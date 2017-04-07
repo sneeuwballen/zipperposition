@@ -1,6 +1,6 @@
 opam-version: "1.2"
 name: "zipperposition"
-version: "1.0"
+version: "1.1"
 maintainer: "simon.cruanes@inria.fr"
 author: "Simon Cruanes"
 homepage: "https://github.com/c-cube/zipperposition"
@@ -9,33 +9,35 @@ build: [
         "--bindir" "%{bin}%"
         "--disable-tests"
         "--disable-docs"
-        "--%{menhir:enable}%-parsers"
+        "--%{menhir+tip-parser:enable}%-parsers"
+        "--disable-hornet-prover"
+        "--enable-zipperposition-prover"
         "--disable-solving"
         "--disable-qcheck"
         "--disable-tools"
-        "--enable-meta"
     ]
     [make]
 ]
 install: [make "install"]
 remove: [
+    ["ocamlfind" "remove" "logtk"]
     ["ocamlfind" "remove" "libzipperposition"]
-    ["rm" "%{bin}%/zipperposition"]
+    ["rm" "-f" "%{bin}%/zipperposition"]
+    ["rm" "-f" "%{bin}%/hornet"]
 ]
 depends: [
   "ocamlfind" { build }
   "base-bytes"
   "base-unix"
   "zarith"
-  "containers" { > "0.16" }
+  "containers" { >= "1.0" }
   "sequence" { >= "0.4" }
-  "gen"
   "oclock"
-  "oasis"
-  "msat" { >= "0.3" < "0.4" }
+  "msat" { >= "0.5" }
+  "menhir" {build}
+  "tip-parser"
 ]
 depopts: [
-  "menhir" {build}
   "qcheck" {test}
 ]
 available: [

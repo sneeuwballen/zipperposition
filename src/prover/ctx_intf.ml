@@ -1,7 +1,7 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-open Libzipperposition
+open Logtk
 
 module type S = sig
   val ord : unit -> Ordering.t
@@ -17,7 +17,7 @@ module type S = sig
   val signature : unit -> Signature.t
   (** Current signature *)
 
-  val renaming : Substs.Renaming.t
+  val renaming : Subst.Renaming.t
 
   (** {2 Utils} *)
 
@@ -26,7 +26,7 @@ module type S = sig
 
   val select : Selection.t
 
-  val renaming_clear : unit  -> Substs.Renaming.t
+  val renaming_clear : unit  -> Subst.Renaming.t
   (** Obtain the global renaming. The renaming is cleared before
       it is returned. *)
 

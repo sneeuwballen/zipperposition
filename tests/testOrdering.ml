@@ -3,11 +3,11 @@
 
 (** test orderings *)
 
-open Libzipperposition
-open Libzipperposition_arbitrary
+open Logtk
+open Logtk_arbitrary
 
 module T = FOTerm
-module S = Substs.FO
+module S = Subst.FO
 module O = Ordering
 
 (* [more_specific cm1 cm2] is true if [cmp2] is compatible with, and possibly
@@ -23,7 +23,7 @@ let more_specific cmp1 cmp2 = Comparison.(match cmp1, cmp2 with
 
 let check_ordering_inv_by_subst ord =
   let name = CCFormat.sprintf "ordering_%s_inv_by_subst" (O.name ord) in
-  let pp = QCheck.Print.triple T.to_string T.to_string Substs.to_string in
+  let pp = QCheck.Print.triple T.to_string T.to_string Subst.to_string in
   (* generate pairs of terms, and grounding substitutions *)
   let gen = QCheck.Gen.(
     (pair ArTerm.default_g ArTerm.default_g)
@@ -37,12 +37,12 @@ let check_ordering_inv_by_subst ord =
       (fun v subst ->
         let v = (v : Type.t HVar.t :> InnerTerm.t HVar.t) in
         S.bind subst (v,1) (ArTerm.ground_g st,0))
-      vars Substs.empty in
+      vars Subst.empty in
     triple (return t1) (return t2) subst)
   in
   let size (t1, t2, s) =
     T.size t1 + T.size t2 +
-      (Substs.fold (fun n _ (t,_) -> n + T.size (T.of_term_unsafe t)) 0 s)
+      (Subst.fold (fun n _ (t,_) -> n + T.size (T.of_term_unsafe t)) 0 s)
   in
   let gen = QCheck.make ~print:pp ~small:size gen in
   (* do type inference on the fly
@@ -65,7 +65,51 @@ let check_ordering_inv_by_subst ord =
   in
   QCheck.Test.make ~count:1000 ~name gen prop
 
+let check_ordering_trans ord =
+  let name = CCFormat.sprintf "ordering_%s_transitive" (O.name ord) in
+  let arb = QCheck.triple ArTerm.default ArTerm.default ArTerm.default in
+  let ord = ref ord in
+  let prop (t1, t2, t3) =
+    (* declare symbols *)
+    Sequence.of_list [t1;t2;t3]
+      |> Sequence.flat_map T.Seq.symbols
+      |> ID.Set.of_seq |> ID.Set.to_seq
+      |> O.add_seq !ord;
+    (* check that instantiating variables preserves ordering *)
+    let o12 = O.compare !ord t1 t2 in
+    let o23 = O.compare !ord t2 t3 in
+    if o12 = Comparison.Lt && o23 = Comparison.Lt
+    then 
+      let o13 = O.compare !ord t1 t3 in
+      o13 = Comparison.Lt
+    else QCheck.assume_fail ()
+  in
+  QCheck.Test.make ~count:1000 ~name arb prop
+
+let check_ordering_subterm ord =
+  let name = CCFormat.sprintf "ordering_%s_subterm_property" (O.name ord) in
+  let arb = ArTerm.default in
+  let ord = ref ord in
+  let prop t =
+    (* declare symbols *)
+    Sequence.of_list [t]
+      |> Sequence.flat_map T.Seq.symbols
+      |> ID.Set.of_seq |> ID.Set.to_seq
+      |> O.add_seq !ord;
+    T.Seq.subterms_depth t
+    |> Sequence.filter_map (fun (t,i) -> if i>0 then Some t else None)
+    |> Sequence.for_all
+      (fun sub -> O.compare !ord t sub = Comparison.Gt)
+  in
+  QCheck.Test.make ~count:1000 ~name arb prop
+
 let props =
-  [ check_ordering_inv_by_subst (O.kbo (Precedence.default []))
-  ; check_ordering_inv_by_subst (O.rpo6 (Precedence.default []))
-  ]
+  CCList.flat_map
+    (fun o ->
+       [ check_ordering_inv_by_subst o;
+         check_ordering_trans o;
+         check_ordering_subterm o;
+       ])
+    [ O.kbo (Precedence.default []);
+      O.rpo6 (Precedence.default []);
+    ]
