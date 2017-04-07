@@ -1112,10 +1112,13 @@ module Make
                replaced by variables. But first, simplify these clauses
                because otherwise the inductive subgoals
                (which are simplified) will not match
-               the inductive hypothesis. *)
+               the inductive hypothesis.
+
+               NOTE: do not use {!all_simplify} as it interacts badly
+               with avatar splitting. *)
             let clauses =
               C.of_statement st
-              |> CCList.flat_map (fun c -> fst (E.all_simplify c))
+              |> List.map (fun c -> fst (E.simplify c))
             in
             prove_by_ind clauses ~generalize_on:consts;
             (* "skip" in any case, because the proof is done in a cut anyway *)
