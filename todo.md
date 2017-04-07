@@ -2,10 +2,18 @@
 
 ## Now
 
-- aggressive generalization based on positions (and purification of inactive/acc pos?)
+- induction:
+  find good ways of limiting the number of sub-inductions, and quick
 
-- bring back a tiny amount of smallcheck to instnatiate variables
-  and realize that `forall l1 l2:list.  l1=l2` is absurd
+- test prop:
+  * [x] bring back few steps of saturation
+  * [ ] how to test_prop on sth with skolem symbols
+      (e.g. to eliminate `rev x=filter p x`)?
+  * [ ] bring back a tiny amount of smallcheck to instantiate variables
+    and realize that `forall l1 l2:list.  l1=l2` is absurd?
+
+- PROOF CHECKER (with intermediate internal format which separates
+  instantiation and basic "ground" reasoning, perhaps)
 
 - heuristic:
   * [ ] per-inference penalty `int` field in clause. The higher, the
@@ -180,6 +188,9 @@
         → might be sufficient for many cases where we used to use nested ind.
   * [ ] functional induction:
     + based on assumption that recursive functions terminate
+      → ask for [wf] attribute?
+      → maybe prove termination myself?
+      → require that such functions are total! (not just warning)
     + build functional induction scheme(s) based on recursive def, might
         prove very useful for some problems.
     + applies for goals of the form `P[f(x…)]` with only variables in
@@ -242,7 +253,7 @@
           and other term `t'` that shared ≥1 var with `t`
 
 - theory of datatypes
-  * [ ] inference for acyclicity (not just simplification):
+  * [x] inference for acyclicity (not just simplification):
         given `C ∨ s = t`, look for σ such that `sσ = tσ` is absurd by acyclicity.
         Then infer `Cσ` from that.
         E.g. `s (f x) = s (s (f a))` would give `σ={x→a}`
@@ -310,7 +321,10 @@
   * [ ] parse THF-0 and try on TPTP
       → some inductive problems contain higher-order
   * [ ] use S,K,I to λ-lift instead of introducing new symbol?
-  * [ ] consider whether B,C combinators help make smaller unifiers
+  * optimize unification (shorter unifiers):
+    + [ ] consider whether B,C combinators help make smaller unifiers
+    + [ ] look at paper on combinators `ho/efficient_combinators_czajka_2016.pdf`
+          for richer language of combinators (to find shorter unifiers)
   * [ ] introduce one `fold` combinator per datatype, use these for
         HO-unification when arguments are of a datatype
         → need some hack for mutually recursive datatypes (perhaps take
@@ -341,7 +355,7 @@
   * [ ] use quickspec to generate lemmas on Isaplanner problems
   * [ ] run benchmarks (without induction, with induction, with quickspec lemmas)
 
-- lemma by generalization (if `t` occurs on both sides of ineq?)
+- [x] lemma by generalization (if `t` occurs on both sides of ineq?)
   * see what isaplanner does
   * use "Aubin" paper (generalize exactly the subterms at reductive position),
     but this requires to have tighter control over rules/definitions first
@@ -422,16 +436,9 @@
 
 ## To Fix
 
-- incompleteness:
-  * `./zipperposition.native --stats --print-lemmas -o none --dot /tmp/truc.dot -t 30 tptp/Problems/MGT/MGT011-1.p --debug 2 --select SelectDiffNegLit`
-    (works with SelectDiffNegLitNS, must be a slightly too restrictive inf rule)
-
-- `./zipperposition.native -p -o none -t 30 --dot /tmp/truc.dot examples/GEG024=1.p --debug 1`
-  seems like heuristics are bad here (`--clause-queue bfs` works fine),
-  need to penalize some deep series of arith inferences **NO**
-
-  → also need to find good way of indexing these for subsumption
+- also need to find good way of indexing arith lits for subsumption
   (e.g. feature vectors with lower/upper bounds?)
+  → tough, subsumption on these is hard
 
 - `./zipperposition.native -p -o none -t 30 --dot /tmp/truc.dot tip-benchmarks/isaplanner/prop_66.smt2`
   better lemmas in induction
