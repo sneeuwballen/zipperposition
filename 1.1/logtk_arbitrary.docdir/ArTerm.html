@@ -1,0 +1,59 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="Start" href="index.html">
+<link rel="next" href="ArForm.html">
+<link rel="Up" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="ArTerm" rel="Chapter" href="ArTerm.html">
+<link title="ArForm" rel="Chapter" href="ArForm.html">
+<link title="ArType" rel="Chapter" href="ArType.html">
+<link title="ArID" rel="Chapter" href="ArID.html">
+<link title="ArLiteral" rel="Chapter" href="ArLiteral.html"><link title="S Terms" rel="Section" href="#2_STerms">
+<title>ArTerm</title>
+</head>
+<body>
+<div class="navbar">&nbsp;<a class="up" href="index.html" title="Index">Up</a>
+&nbsp;<a class="post" href="ArForm.html" title="ArForm">Next</a>
+</div>
+<h1>Module <a href="type_ArTerm.html">ArTerm</a></h1>
+
+<pre><span class="keyword">module</span> ArTerm: <code class="code">sig</code> <a href="ArTerm.html">..</a> <code class="code">end</code></pre><div class="info module top">
+<h1 id="1_ArbitraryTypedTermsandFormulas">Arbitrary Typed Terms and Formulas</h1><br>
+</div>
+<hr width="100%">
+
+<pre><span id="TYPEarbitrary"><span class="keyword">type</span> <code class="type">'a</code> arbitrary</span> = <code class="type">'a QCheck.arbitrary</code> </pre>
+
+
+<pre><span id="TYPEgen"><span class="keyword">type</span> <code class="type">'a</code> gen</span> = <code class="type">'a QCheck.Gen.t</code> </pre>
+
+
+<pre><span id="VALshrink"><span class="keyword">val</span> shrink</span> : <code class="type">Logtk.FOTerm.t QCheck.Shrink.t</code></pre>
+<pre><span id="VALdefault_g"><span class="keyword">val</span> default_g</span> : <code class="type">Logtk.FOTerm.t <a href="ArTerm.html#TYPEgen">gen</a></code></pre>
+<pre><span id="VALdefault_fuel"><span class="keyword">val</span> default_fuel</span> : <code class="type">int -> Logtk.FOTerm.t <a href="ArTerm.html#TYPEgen">gen</a></code></pre>
+<pre><span id="VALdefault"><span class="keyword">val</span> default</span> : <code class="type">Logtk.FOTerm.t <a href="ArTerm.html#TYPEarbitrary">arbitrary</a></code></pre><div class="info ">
+Default polymorphic term<br>
+</div>
+
+<pre><span id="VALground_g"><span class="keyword">val</span> ground_g</span> : <code class="type">Logtk.FOTerm.t <a href="ArTerm.html#TYPEgen">gen</a></code></pre>
+<pre><span id="VALground"><span class="keyword">val</span> ground</span> : <code class="type">Logtk.FOTerm.t <a href="ArTerm.html#TYPEarbitrary">arbitrary</a></code></pre><div class="info ">
+Default ground monomorphic term<br>
+</div>
+
+<pre><span id="VALpred"><span class="keyword">val</span> pred</span> : <code class="type">Logtk.FOTerm.t <a href="ArTerm.html#TYPEarbitrary">arbitrary</a></code></pre><div class="info ">
+predicates (type "o")<br>
+</div>
+
+<pre><span id="VALpos"><span class="keyword">val</span> pos</span> : <code class="type">Logtk.FOTerm.t -> Logtk.Position.t <a href="ArTerm.html#TYPEgen">gen</a></code></pre><div class="info ">
+Random valid position in the term<br>
+</div>
+<br>
+<h2 id="2_STerms">S Terms</h2><br>
+
+<pre><span class="keyword">module</span> <a href="ArTerm.PT.html">PT</a>: <code class="code">sig</code> <a href="ArTerm.PT.html">..</a> <code class="code">end</code></pre></body></html>

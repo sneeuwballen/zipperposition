@@ -1,0 +1,285 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Lex_ho.html">
+<link rel="next" href="Trace_tstp.html">
+<link rel="Up" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Parse_tptp" rel="Chapter" href="Parse_tptp.html">
+<link title="Lex_tptp" rel="Chapter" href="Lex_tptp.html">
+<link title="Ast_tptp" rel="Chapter" href="Ast_tptp.html">
+<link title="Util_tptp" rel="Chapter" href="Util_tptp.html">
+<link title="Ast_ho" rel="Chapter" href="Ast_ho.html">
+<link title="Lex_ho" rel="Chapter" href="Lex_ho.html">
+<link title="Parse_ho" rel="Chapter" href="Parse_ho.html">
+<link title="Trace_tstp" rel="Chapter" href="Trace_tstp.html">
+<link title="Parse_zf" rel="Chapter" href="Parse_zf.html">
+<link title="Lex_zf" rel="Chapter" href="Lex_zf.html">
+<link title="Util_zf" rel="Chapter" href="Util_zf.html">
+<link title="Util_tip" rel="Chapter" href="Util_tip.html">
+<link title="Parsing_utils" rel="Chapter" href="Parsing_utils.html">
+<link title="CallProver" rel="Chapter" href="CallProver.html"><title>Parse_ho</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Lex_ho.html" title="Lex_ho">Previous</a>
+&nbsp;<a class="up" href="index.html" title="Index">Up</a>
+&nbsp;<a class="post" href="Trace_tstp.html" title="Trace_tstp">Next</a>
+</div>
+<h1>Module <a href="type_Parse_ho.html">Parse_ho</a></h1>
+
+<pre><span class="keyword">module</span> Parse_ho: <code class="code">sig</code> <a href="Parse_ho.html">..</a> <code class="code">end</code></pre><hr width="100%">
+
+<pre><code><span id="TYPEtoken"><span class="keyword">type</span> <code class="type"></code>token</span> = </code></pre><table class="typetable">
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.XOR"><span class="constructor">XOR</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.WILDCARD"><span class="constructor">WILDCARD</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.VAL"><span class="constructor">VAL</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.UPPER_WORD"><span class="constructor">UPPER_WORD</span></span> <span class="keyword">of</span> <code class="type">string</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.RIGHT_PAREN"><span class="constructor">RIGHT_PAREN</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.RIGHT_BRACKET"><span class="constructor">RIGHT_BRACKET</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.RIGHT_BRACE"><span class="constructor">RIGHT_BRACE</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.RIGHT_ARROW"><span class="constructor">RIGHT_ARROW</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.PIPE"><span class="constructor">PIPE</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.OR"><span class="constructor">OR</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.OPERATOR"><span class="constructor">OPERATOR</span></span> <span class="keyword">of</span> <code class="type">string</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.NOT"><span class="constructor">NOT</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.NEQ"><span class="constructor">NEQ</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.LOWER_WORD"><span class="constructor">LOWER_WORD</span></span> <span class="keyword">of</span> <code class="type">string</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.LEFT_PAREN"><span class="constructor">LEFT_PAREN</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.LEFT_BRACKET"><span class="constructor">LEFT_BRACKET</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.LEFT_BRACE"><span class="constructor">LEFT_BRACE</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.LEFT_ARROW"><span class="constructor">LEFT_ARROW</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.LAMBDA"><span class="constructor">LAMBDA</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.INTERROGATION_WORD"><span class="constructor">INTERROGATION_WORD</span></span> <span class="keyword">of</span> <code class="type">string</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.INTEGER"><span class="constructor">INTEGER</span></span> <span class="keyword">of</span> <code class="type">string</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.IMPLY"><span class="constructor">IMPLY</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.FORALL_TY"><span class="constructor">FORALL_TY</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.FORALL"><span class="constructor">FORALL</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.EXISTS"><span class="constructor">EXISTS</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.EQUIV"><span class="constructor">EQUIV</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.EQ"><span class="constructor">EQ</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.EOI"><span class="constructor">EOI</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.DOT"><span class="constructor">DOT</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.DOLLAR_WORD"><span class="constructor">DOLLAR_WORD</span></span> <span class="keyword">of</span> <code class="type">string</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.DOLLAR_DOLLAR_WORD"><span class="constructor">DOLLAR_DOLLAR_WORD</span></span> <span class="keyword">of</span> <code class="type">string</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.COMMA"><span class="constructor">COMMA</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.COLUMN"><span class="constructor">COLUMN</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTtoken.AND"><span class="constructor">AND</span></span></code></td>
+
+</tr></table>
+
+
+
+<pre><span id="EXCEPTIONError"><span class="keyword">exception</span> Error</span></pre>
+
+<pre><span id="VALparse_term"><span class="keyword">val</span> parse_term</span> : <code class="type">(Lexing.lexbuf -> <a href="Parse_ho.html#TYPEtoken">token</a>) -> Lexing.lexbuf -> Logtk.STerm.t</code></pre>
+<pre><span id="VALparse_decls"><span class="keyword">val</span> parse_decls</span> : <code class="type">(Lexing.lexbuf -> <a href="Parse_ho.html#TYPEtoken">token</a>) -> Lexing.lexbuf -> <a href="Ast_ho.html#TYPEt">Ast_ho.t</a> list</code></pre>
+<pre><span id="VALparse_decl"><span class="keyword">val</span> parse_decl</span> : <code class="type">(Lexing.lexbuf -> <a href="Parse_ho.html#TYPEtoken">token</a>) -> Lexing.lexbuf -> <a href="Ast_ho.html#TYPEt">Ast_ho.t</a></code></pre></body></html>

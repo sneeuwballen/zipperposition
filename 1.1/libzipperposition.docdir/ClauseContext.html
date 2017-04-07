@@ -1,0 +1,140 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="Start" href="index.html">
+<link rel="previous" href="BBox.html">
+<link rel="next" href="ClauseQueue_intf.html">
+<link rel="Up" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="ClauseQueue" rel="Chapter" href="ClauseQueue.html">
+<link title="Clause" rel="Chapter" href="Clause.html">
+<link title="SClause" rel="Chapter" href="SClause.html">
+<link title="Const" rel="Chapter" href="Const.html">
+<link title="Extensions" rel="Chapter" href="Extensions.html">
+<link title="Ctx" rel="Chapter" href="Ctx.html">
+<link title="Proof" rel="Chapter" href="Proof.html">
+<link title="ProofState" rel="Chapter" href="ProofState.html">
+<link title="Saturate" rel="Chapter" href="Saturate.html">
+<link title="Selection" rel="Chapter" href="Selection.html">
+<link title="AC" rel="Chapter" href="AC.html">
+<link title="AC_intf" rel="Chapter" href="AC_intf.html">
+<link title="SimplM" rel="Chapter" href="SimplM.html">
+<link title="Params" rel="Chapter" href="Params.html">
+<link title="Env" rel="Chapter" href="Env.html">
+<link title="Signals" rel="Chapter" href="Signals.html">
+<link title="Classify_cst" rel="Chapter" href="Classify_cst.html">
+<link title="Ctx_intf" rel="Chapter" href="Ctx_intf.html">
+<link title="Clause_intf" rel="Chapter" href="Clause_intf.html">
+<link title="Env_intf" rel="Chapter" href="Env_intf.html">
+<link title="ProofState_intf" rel="Chapter" href="ProofState_intf.html">
+<link title="BBox" rel="Chapter" href="BBox.html">
+<link title="ClauseContext" rel="Chapter" href="ClauseContext.html">
+<link title="ClauseQueue_intf" rel="Chapter" href="ClauseQueue_intf.html">
+<link title="Bool_lit" rel="Chapter" href="Bool_lit.html">
+<link title="Bool_lit_intf" rel="Chapter" href="Bool_lit_intf.html">
+<link title="Sat_solver" rel="Chapter" href="Sat_solver.html">
+<link title="Sat_solver_intf" rel="Chapter" href="Sat_solver_intf.html">
+<link title="Trail" rel="Chapter" href="Trail.html">
+<link title="Ind_cst" rel="Chapter" href="Ind_cst.html">
+<link title="Cover_set" rel="Chapter" href="Cover_set.html">
+<link title="Cut_form" rel="Chapter" href="Cut_form.html">
+<link title="Phases" rel="Chapter" href="Phases.html">
+<link title="Phases_impl" rel="Chapter" href="Phases_impl.html">
+<link title="Avatar" rel="Chapter" href="Avatar.html">
+<link title="Avatar_intf" rel="Chapter" href="Avatar_intf.html">
+<link title="Induction" rel="Chapter" href="Induction.html">
+<link title="Induction_intf" rel="Chapter" href="Induction_intf.html">
+<link title="Superposition" rel="Chapter" href="Superposition.html">
+<link title="Superposition_intf" rel="Chapter" href="Superposition_intf.html">
+<link title="Rewriting" rel="Chapter" href="Rewriting.html">
+<link title="EnumTypes" rel="Chapter" href="EnumTypes.html">
+<link title="Arith_int" rel="Chapter" href="Arith_int.html">
+<link title="Arith_rat" rel="Chapter" href="Arith_rat.html">
+<link title="Heuristics" rel="Chapter" href="Heuristics.html">
+<link title="Ind_types" rel="Chapter" href="Ind_types.html">
+<link title="Fool" rel="Chapter" href="Fool.html"><link title="Sets of contexts" rel="Section" href="#2_Setsofcontexts">
+<title>ClauseContext</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="BBox.html" title="BBox">Previous</a>
+&nbsp;<a class="up" href="index.html" title="Index">Up</a>
+&nbsp;<a class="post" href="ClauseQueue_intf.html" title="ClauseQueue_intf">Next</a>
+</div>
+<h1>Module <a href="type_ClauseContext.html">ClauseContext</a></h1>
+
+<pre><span class="keyword">module</span> ClauseContext: <code class="code">sig</code> <a href="ClauseContext.html">..</a> <code class="code">end</code></pre><div class="info module top">
+<h1 id="1_Clausecontext">Clause context</h1>
+<p>
+
+    A clause with a "hole" in it. Filling the whole with a term <code class="code">t</code> is called
+    "applying the context to <code class="code">t</code>".
+<p>
+
+    The point is to relate different applications of the same context.<br>
+</div>
+<hr width="100%">
+
+<pre><span id="TYPEterm"><span class="keyword">type</span> <code class="type"></code>term</span> = <code class="type">Logtk.FOTerm.t</code> </pre>
+
+
+<pre><span id="TYPEsubst"><span class="keyword">type</span> <code class="type"></code>subst</span> = <code class="type">Logtk.Subst.t</code> </pre>
+
+
+<pre><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> </pre>
+<div class="info ">
+A context is represented as a regular array of literals, containing
+    at least one specific variable <code class="code">x</code>, paired with this variable <code class="code">x</code>.
+    Applying the context is a mere substitution<br>
+</div>
+
+
+<pre><span id="VALcompare"><span class="keyword">val</span> compare</span> : <code class="type"><a href="ClauseContext.html#TYPEt">t</a> -> <a href="ClauseContext.html#TYPEt">t</a> -> int</code></pre>
+<pre><span id="VALequal"><span class="keyword">val</span> equal</span> : <code class="type"><a href="ClauseContext.html#TYPEt">t</a> -> <a href="ClauseContext.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALhash"><span class="keyword">val</span> hash</span> : <code class="type"><a href="ClauseContext.html#TYPEt">t</a> -> int</code></pre>
+<pre><span id="VALmake"><span class="keyword">val</span> make</span> : <code class="type">Logtk.Literals.t -> var:Logtk.FOTerm.var -> <a href="ClauseContext.html#TYPEt">t</a></code></pre><div class="info ">
+Make a context from a var and literals containing this var.<br>
+<b>Raises</b> <code>Assert_failure</code> if the variable isn't present in any literal<br>
+</div>
+
+<pre><span id="VALextract"><span class="keyword">val</span> extract</span> : <code class="type">Logtk.Literals.t -> <a href="ClauseContext.html#TYPEterm">term</a> -> <a href="ClauseContext.html#TYPEt">t</a> option</code></pre><div class="info ">
+<code class="code">extract lits t</code> returns <code class="code">None</code> if <code class="code">t</code> doesn't occur in <code class="code">lits</code>. Otherwise,
+    it creates a fresh var <code class="code">x</code>, replaces <code class="code">t</code> with <code class="code">x</code> within <code class="code">lits</code>, and
+    returns the corresponding context.
+    Basically, if <code class="code">extract lits t = Some c</code> then <code class="code">apply c t = lits</code><br>
+</div>
+
+<pre><span id="VALextract_exn"><span class="keyword">val</span> extract_exn</span> : <code class="type">Logtk.Literals.t -> <a href="ClauseContext.html#TYPEterm">term</a> -> <a href="ClauseContext.html#TYPEt">t</a></code></pre><div class="info ">
+Unsafe version of <a href="ClauseContext.html#VALextract"><code class="code">ClauseContext.extract</code></a>.<br>
+<b>Raises</b> <code>Invalid_argument</code> if the term is not to be found within the lits<br>
+</div>
+
+<pre><span id="VALtrivial"><span class="keyword">val</span> trivial</span> : <code class="type">Logtk.Literals.t -> <a href="ClauseContext.html#TYPEterm">term</a> -> <a href="ClauseContext.html#TYPEt">t</a></code></pre><div class="info ">
+Trivial context, that contains 0 holes.<br>
+</div>
+
+<pre><span id="VALapply"><span class="keyword">val</span> apply</span> : <code class="type"><a href="ClauseContext.html#TYPEt">t</a> -> <a href="ClauseContext.html#TYPEterm">term</a> -> Logtk.Literals.t</code></pre><div class="info ">
+<code class="code">apply c t</code> fills the hole of <code class="code">c</code> with the given term <code class="code">t</code>. <code class="code">t</code> and <code class="code">c</code>
+    share no free variables.<br>
+</div>
+
+<pre><span id="VALapply_same_scope"><span class="keyword">val</span> apply_same_scope</span> : <code class="type"><a href="ClauseContext.html#TYPEt">t</a> -> <a href="ClauseContext.html#TYPEterm">term</a> -> Logtk.Literals.t</code></pre><div class="info ">
+Same as <a href="ClauseContext.html#VALapply"><code class="code">ClauseContext.apply</code></a>, but now variables from the context and variables
+    from the term live in the same scope<br>
+</div>
+
+<pre><span id="VALraw_lits"><span class="keyword">val</span> raw_lits</span> : <code class="type"><a href="ClauseContext.html#TYPEt">t</a> -> Logtk.Literals.t</code></pre><div class="info ">
+give access to the underlying literals. Careful not to depend
+    on the variable's actual name.<br>
+</div>
+
+<pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="ClauseContext.html#TYPEt">t</a> CCFormat.printer</code></pre><br>
+<h2 id="2_Setsofcontexts">Sets of contexts</h2><br>
+
+<pre><span class="keyword">module</span> <a href="ClauseContext.Set.html">Set</a>: <code class="type">CCSet.S</code><code class="type">  with type elt = t</code></pre></body></html>

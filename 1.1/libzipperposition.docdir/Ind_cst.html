@@ -1,0 +1,161 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Trail.html">
+<link rel="next" href="Cover_set.html">
+<link rel="Up" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="ClauseQueue" rel="Chapter" href="ClauseQueue.html">
+<link title="Clause" rel="Chapter" href="Clause.html">
+<link title="SClause" rel="Chapter" href="SClause.html">
+<link title="Const" rel="Chapter" href="Const.html">
+<link title="Extensions" rel="Chapter" href="Extensions.html">
+<link title="Ctx" rel="Chapter" href="Ctx.html">
+<link title="Proof" rel="Chapter" href="Proof.html">
+<link title="ProofState" rel="Chapter" href="ProofState.html">
+<link title="Saturate" rel="Chapter" href="Saturate.html">
+<link title="Selection" rel="Chapter" href="Selection.html">
+<link title="AC" rel="Chapter" href="AC.html">
+<link title="AC_intf" rel="Chapter" href="AC_intf.html">
+<link title="SimplM" rel="Chapter" href="SimplM.html">
+<link title="Params" rel="Chapter" href="Params.html">
+<link title="Env" rel="Chapter" href="Env.html">
+<link title="Signals" rel="Chapter" href="Signals.html">
+<link title="Classify_cst" rel="Chapter" href="Classify_cst.html">
+<link title="Ctx_intf" rel="Chapter" href="Ctx_intf.html">
+<link title="Clause_intf" rel="Chapter" href="Clause_intf.html">
+<link title="Env_intf" rel="Chapter" href="Env_intf.html">
+<link title="ProofState_intf" rel="Chapter" href="ProofState_intf.html">
+<link title="BBox" rel="Chapter" href="BBox.html">
+<link title="ClauseContext" rel="Chapter" href="ClauseContext.html">
+<link title="ClauseQueue_intf" rel="Chapter" href="ClauseQueue_intf.html">
+<link title="Bool_lit" rel="Chapter" href="Bool_lit.html">
+<link title="Bool_lit_intf" rel="Chapter" href="Bool_lit_intf.html">
+<link title="Sat_solver" rel="Chapter" href="Sat_solver.html">
+<link title="Sat_solver_intf" rel="Chapter" href="Sat_solver_intf.html">
+<link title="Trail" rel="Chapter" href="Trail.html">
+<link title="Ind_cst" rel="Chapter" href="Ind_cst.html">
+<link title="Cover_set" rel="Chapter" href="Cover_set.html">
+<link title="Cut_form" rel="Chapter" href="Cut_form.html">
+<link title="Phases" rel="Chapter" href="Phases.html">
+<link title="Phases_impl" rel="Chapter" href="Phases_impl.html">
+<link title="Avatar" rel="Chapter" href="Avatar.html">
+<link title="Avatar_intf" rel="Chapter" href="Avatar_intf.html">
+<link title="Induction" rel="Chapter" href="Induction.html">
+<link title="Induction_intf" rel="Chapter" href="Induction_intf.html">
+<link title="Superposition" rel="Chapter" href="Superposition.html">
+<link title="Superposition_intf" rel="Chapter" href="Superposition_intf.html">
+<link title="Rewriting" rel="Chapter" href="Rewriting.html">
+<link title="EnumTypes" rel="Chapter" href="EnumTypes.html">
+<link title="Arith_int" rel="Chapter" href="Arith_int.html">
+<link title="Arith_rat" rel="Chapter" href="Arith_rat.html">
+<link title="Heuristics" rel="Chapter" href="Heuristics.html">
+<link title="Ind_types" rel="Chapter" href="Ind_types.html">
+<link title="Fool" rel="Chapter" href="Fool.html"><link title="Inductive Skolems" rel="Section" href="#2_InductiveSkolems">
+<title>Ind_cst</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Trail.html" title="Trail">Previous</a>
+&nbsp;<a class="up" href="index.html" title="Index">Up</a>
+&nbsp;<a class="post" href="Cover_set.html" title="Cover_set">Next</a>
+</div>
+<h1>Module <a href="type_Ind_cst.html">Ind_cst</a></h1>
+
+<pre><span class="keyword">module</span> Ind_cst: <code class="code">sig</code> <a href="Ind_cst.html">..</a> <code class="code">end</code></pre><div class="info module top">
+<h1 id="1_InductiveConstantsandCases">Inductive Constants and Cases</h1>
+<p>
+
+    Skolem constants of an inductive type, coversets, etc. required for
+    inductive reasoning.<br>
+</div>
+<hr width="100%">
+
+<pre><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> </pre>
+<div class="info ">
+A ground term of an inductive type. It must correspond to a
+    term built with the corresponding <a href="Ind_cst.html#TYPEt"><code class="code">Ind_cst.t</code></a> only.
+    For instance, a constant of type <code class="code">nat</code> should be equal to
+    <code class="code">s^n(0)</code> in any model.<br>
+</div>
+
+
+<pre><span id="EXCEPTIONInvalidDecl"><span class="keyword">exception</span> InvalidDecl</span> <span class="keyword">of</span> <code class="type">string</code></pre>
+
+<pre><span id="EXCEPTIONNotAnInductiveConstant"><span class="keyword">exception</span> NotAnInductiveConstant</span> <span class="keyword">of</span> <code class="type">Logtk.ID.t</code></pre>
+
+<pre><span id="VALid_as_cst"><span class="keyword">val</span> id_as_cst</span> : <code class="type">Logtk.ID.t -> <a href="Ind_cst.html#TYPEt">t</a> option</code></pre>
+<pre><span id="VALid_as_cst_exn"><span class="keyword">val</span> id_as_cst_exn</span> : <code class="type">Logtk.ID.t -> <a href="Ind_cst.html#TYPEt">t</a></code></pre><div class="info ">
+Unsafe version of <code class="code">as_cst</code><br>
+<b>Raises</b> <code>NotAnInductiveConstant</code> if it fails<br>
+</div>
+
+<pre><span id="VALid_is_cst"><span class="keyword">val</span> id_is_cst</span> : <code class="type">Logtk.ID.t -> bool</code></pre><div class="info ">
+Check whether the given constant is an inductive constant<br>
+</div>
+
+<pre><span id="VALon_new_cst"><span class="keyword">val</span> on_new_cst</span> : <code class="type"><a href="Ind_cst.html#TYPEt">t</a> Logtk.Signal.t</code></pre><div class="info ">
+Triggered with new inductive constants<br>
+</div>
+
+<pre><span id="VALmake_skolem"><span class="keyword">val</span> make_skolem</span> : <code class="type">Logtk.Type.t -> Logtk.ID.t</code></pre>
+<pre><span id="VALmake"><span class="keyword">val</span> make</span> : <code class="type">?depth:int -> is_sub:bool -> Logtk.Type.t -> <a href="Ind_cst.html#TYPEt">t</a></code></pre><div class="info ">
+Make a new constant of the given type<br>
+</div>
+
+<pre><span id="VALis_sub"><span class="keyword">val</span> is_sub</span> : <code class="type"><a href="Ind_cst.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+Is the constant a sub-constant (i.e. a subterm of a case in a coverset)?<br>
+</div>
+
+<pre><span id="VALid_is_sub"><span class="keyword">val</span> id_is_sub</span> : <code class="type">Logtk.ID.t -> bool</code></pre>
+<pre><span id="VALequal"><span class="keyword">val</span> equal</span> : <code class="type"><a href="Ind_cst.html#TYPEt">t</a> -> <a href="Ind_cst.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALcompare"><span class="keyword">val</span> compare</span> : <code class="type"><a href="Ind_cst.html#TYPEt">t</a> -> <a href="Ind_cst.html#TYPEt">t</a> -> int</code></pre>
+<pre><span id="VALhash"><span class="keyword">val</span> hash</span> : <code class="type"><a href="Ind_cst.html#TYPEt">t</a> -> int</code></pre>
+<pre><span id="VALid"><span class="keyword">val</span> id</span> : <code class="type"><a href="Ind_cst.html#TYPEt">t</a> -> Logtk.ID.t</code></pre>
+<pre><span id="VALto_term"><span class="keyword">val</span> to_term</span> : <code class="type"><a href="Ind_cst.html#TYPEt">t</a> -> Logtk.FOTerm.t</code></pre>
+<pre><span id="VALty"><span class="keyword">val</span> ty</span> : <code class="type"><a href="Ind_cst.html#TYPEt">t</a> -> Logtk.Type.t</code></pre>
+<pre><span id="VALsame_type"><span class="keyword">val</span> same_type</span> : <code class="type"><a href="Ind_cst.html#TYPEt">t</a> -> <a href="Ind_cst.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+Do these two inductive constants have the same type?<br>
+</div>
+
+<pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Ind_cst.html#TYPEt">t</a> CCFormat.printer</code></pre>
+<pre><span id="VALdepth"><span class="keyword">val</span> depth</span> : <code class="type"><a href="Ind_cst.html#TYPEt">t</a> -> int</code></pre>
+<pre><span id="VALdominates"><span class="keyword">val</span> dominates</span> : <code class="type"><a href="Ind_cst.html#TYPEt">t</a> -> <a href="Ind_cst.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+<code class="code">dominates c1 c2</code> if <code class="code">depth c1 &lt; depth c2</code>. This way, in coversets,
+    the top constant dominates all sub-constants<br>
+</div>
+
+<pre><span class="keyword">module</span> <a href="Ind_cst.Cst_set.html">Cst_set</a>: <code class="type">CCSet.S</code><code class="type">  with type elt = t</code></pre><div class="info">
+Set of constants
+</div>
+<br>
+<h2 id="2_InductiveSkolems">Inductive Skolems</h2><br>
+
+<pre><span id="TYPEind_skolem"><span class="keyword">type</span> <code class="type"></code>ind_skolem</span> = <code class="type">Logtk.ID.t * Logtk.Type.t</code> </pre>
+
+
+<pre><span id="VALind_skolem_compare"><span class="keyword">val</span> ind_skolem_compare</span> : <code class="type"><a href="Ind_cst.html#TYPEind_skolem">ind_skolem</a> -> <a href="Ind_cst.html#TYPEind_skolem">ind_skolem</a> -> int</code></pre>
+<pre><span id="VALind_skolem_equal"><span class="keyword">val</span> ind_skolem_equal</span> : <code class="type"><a href="Ind_cst.html#TYPEind_skolem">ind_skolem</a> -> <a href="Ind_cst.html#TYPEind_skolem">ind_skolem</a> -> bool</code></pre>
+<pre><span id="VALid_is_ind_skolem"><span class="keyword">val</span> id_is_ind_skolem</span> : <code class="type">Logtk.ID.t -> Logtk.Type.t -> bool</code></pre><div class="info ">
+<code class="code">id_is_potential_cst id ty</code> returns <code class="code">true</code> if <code class="code">id:ty</code> is
+    a skolem constant of an inductive type, or
+    if it is already an inductive constant.<br>
+</div>
+
+<pre><span id="VALfind_ind_skolems"><span class="keyword">val</span> find_ind_skolems</span> : <code class="type">Logtk.FOTerm.t -> <a href="Ind_cst.html#TYPEind_skolem">ind_skolem</a> Sequence.t</code></pre><div class="info ">
+<code class="code">find_ind_skolem term</code> searches subterms of <code class="code">term</code> for constants
+    that are of an inductive type and that are skolems or
+    (already) inductive constants.<br>
+</div>
+
+<pre><span id="VALind_skolem_depth"><span class="keyword">val</span> ind_skolem_depth</span> : <code class="type">Logtk.ID.t -> int</code></pre><div class="info ">
+depth of the skolem (0 if not an inductive constant)<br>
+</div>
+</body></html>
