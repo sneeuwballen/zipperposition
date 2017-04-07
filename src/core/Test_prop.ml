@@ -71,11 +71,15 @@ let normalize_form (f:form): form =
     end
   in
   (* fixpoint of rewriting *)
-  let rec normalize (c:clause): clause Sequence.t =
+  let rec normalize_up_to fuel (c:clause): clause Sequence.t =
+    assert (fuel>=0);
+    if fuel=0 then Sequence.return c
+    else normalize_step (fuel-1) c
+  and normalize_step fuel c =
     let progress=ref false in
-    (* how to normalize a term/lit *)
+    (* how to normalize a term/lit (with restricted resources) *)
     let rw_term t =
-      let t', rules = RW.Term.normalize_term t in
+      let t', rules = RW.Term.normalize_term ~max_steps:10 t in
       if not (RW.Term.Set.is_empty rules) then progress := true;
       t'
     in
@@ -90,15 +94,15 @@ let normalize_form (f:form): form =
     in
     let cs = c |> rw_terms |> rw_clause |> rm_trivial in
     if !progress
-    then normalize_form cs (* normalize each result recursively *)
+    then normalize_form fuel cs (* normalize each result recursively *)
     else (
       (* done, just simplify *)
       Sequence.of_list cs |> Sequence.map simplify
     )
-  and normalize_form (f:form): clause Sequence.t =
-    Sequence.of_list f |> Sequence.flat_map normalize
+  and normalize_form fuel (f:form): clause Sequence.t =
+    Sequence.of_list f |> Sequence.flat_map (normalize_up_to fuel)
   in
-  normalize_form f |> Sequence.to_rev_list
+  normalize_form 3 f |> Sequence.to_rev_list
 
 module Narrow : sig
   val default_limit: int
