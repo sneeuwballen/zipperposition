@@ -244,12 +244,15 @@ module Term = struct
 
      Use the FOTerm.DB case extensively... *)
 
-  let normalize_term_ (t:term): term * rule_set =
+  let normalize_term_ max_steps (t:term): term * rule_set =
+    assert (max_steps >= 0);
     let set = ref TR_set.empty in
+    let fuel = ref max_steps in
     (* compute normal form of subterm. Tail-recursive.
        @param k the continuation
        @return [t'] where [t'] is the normal form of [t] *)
     let rec reduce t k = match T.view t with
+      | _ when !fuel = 0 -> k t
       | T.Const id ->
         (* pick a constant rule *)
         begin match rules_of_id id |> Sequence.head with
@@ -258,6 +261,7 @@ module Term = struct
             assert (T.equal t r.term_lhs);
             set := TR_set.add r !set;
             Util.incr_stat stat_term_rw;
+            decr fuel;
             Util.debugf ~section 5
               "@[<2>rewrite `@[%a@]`@ using `@[%a@]`@]"
               (fun k->k T.pp t Rule.pp r);
@@ -295,6 +299,7 @@ module Term = struct
                        (fun k->k T.pp t' Rule.pp r Subst.pp subst);
                      set := TR_set.add r !set;
                      Util.incr_stat stat_term_rw;
+                     decr fuel;
                      (* NOTE: not efficient, will traverse [t'] fully *)
                      let t' = Subst.FO.apply_no_renaming subst (r.term_rhs,1) in
                      reduce t' k
@@ -319,10 +324,10 @@ module Term = struct
     in
     reduce t (fun t->t, !set)
 
-  let normalize_term (t:term): term * rule_set =
-    Util.with_prof prof_term_rw normalize_term_ t
+  let normalize_term ?(max_steps=max_int) (t:term): term * rule_set =
+    Util.with_prof prof_term_rw (normalize_term_ max_steps) t
 
-  let normalize_term_fst t = fst (normalize_term t)
+  let normalize_term_fst ?max_steps t = fst (normalize_term ?max_steps t)
 
   let narrow_term ?(subst=Subst.empty) ~scope_rules:sc_r (t,sc_t): _ Sequence.t =
     begin match T.view t with
