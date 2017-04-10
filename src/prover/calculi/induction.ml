@@ -39,6 +39,7 @@ let k_ind_depth : int Flex_state.key = Flex_state.create_key()
 let k_limit_to_active : bool Flex_state.key = Flex_state.create_key()
 let k_coverset_depth : int Flex_state.key = Flex_state.create_key()
 let k_goal_assess_limit : int Flex_state.key = Flex_state.create_key()
+let k_ind_on_subcst : bool Flex_state.key = Flex_state.create_key()
 
 (** {2 Formula to be Proved Inductively *)
 module Make_goal(E : Env_intf.S) : sig
@@ -466,7 +467,9 @@ module Make
       @return a list of ways to generalize the given clause *)
   let scan_clause (c:C.t) : Ind_cst.ind_skolem list list =
     let l1 =
-      C.lits c |> Lits.Seq.terms |> scan_terms ~mode:`All
+      if E.flex_get k_ind_on_subcst
+      then C.lits c |> Lits.Seq.terms |> scan_terms ~mode:`All
+      else []
     and l2 =
       C.lits c |> Lits.Seq.terms |> scan_terms ~mode:`No_sub_cst
     in
@@ -1255,6 +1258,7 @@ let depth_ = ref !Ind_cst.max_depth_
 let limit_to_active = ref true
 let coverset_depth = ref 1
 let goal_assess_limit = ref 8
+let ind_sub_cst = ref true
 
 (* if induction is enabled AND there are some inductive types,
    then perform some setup after typing, including setting the key
@@ -1277,6 +1281,7 @@ let post_typing_hook stmts state =
     |> Flex_state.add k_limit_to_active !limit_to_active
     |> Flex_state.add k_coverset_depth !coverset_depth
     |> Flex_state.add k_goal_assess_limit !goal_assess_limit
+    |> Flex_state.add k_ind_on_subcst !ind_sub_cst
     |> Flex_state.add Ctx.Key.lost_completeness true
   ) else Flex_state.add k_enable false state
 
@@ -1311,4 +1316,6 @@ let () =
     ; "--no-ind-only-active-pos", Arg.Clear limit_to_active, " limit induction to active positions"
     ; "--ind-coverset-depth", Arg.Set_int coverset_depth, " coverset depth in induction"
     ; "--ind-goal-assess", Arg.Set_int goal_assess_limit, " number of steps for assessing potential lemmas"
+    ; "--ind-sub-cst", Arg.Set ind_sub_cst, " do induction on sub-constants"
+    ; "--no-ind-sub-cst", Arg.Clear ind_sub_cst, " do not do induction on sub-constants"
     ]
