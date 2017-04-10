@@ -17,6 +17,7 @@ type t = {
   vars: T.VarSet.t;
   cs: form;
 }
+type cut_form = t
 
 let trivial = {cs=[]; vars=T.VarSet.empty}
 
@@ -164,4 +165,43 @@ module Seq = struct
          let position = Position.(arg i @@ arg j @@ stop) in
          Literal.fold_terms lit
            ~position ~ord:Ordering.none ~which:`All ~vars:true ~subterms)
+end
+
+module FV_tbl(X : Map.OrderedType) = struct
+  type value = X.t
+
+  (* approximation here, we represent it as a clause, losing the
+         boolean structure. monotonicity w.r.t features should still apply *)
+  let to_lits (f:cut_form) =
+    cs f
+    |> Sequence.of_list
+    |> Sequence.flat_map_l Literals.to_form
+
+  (* index for lemmas, to ensure α-equivalent lemmas have the same lit *)
+  module FV = FV_tree.Make(struct
+      type t = cut_form * X.t
+      let compare (l1,v1)(l2,v2) =
+        let open CCOrd.Infix in
+        compare l1 l2 <?> (X.compare, v1, v2)
+
+      let to_lits (l,_) = to_lits l
+      let labels _ = Util.Int_set.empty
+    end)
+
+  type t = {
+    mutable fv: FV.t;
+  }
+
+  let create () = {fv=FV.empty ()}
+
+  let add t k v = t.fv <- FV.add t.fv (k,v)
+
+  let get t k =
+    FV.retrieve_alpha_equiv t.fv (to_lits k) Util.Int_set.empty
+    |> Sequence.find_map
+      (fun (k',v) -> if are_variant k k' then Some v else None)
+
+  let mem t k = get t k |> CCOpt.is_some
+
+  let to_seq t = FV.iter t.fv
 end

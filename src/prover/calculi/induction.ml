@@ -23,6 +23,7 @@ let section = Util.Section.make ~parent:Const.section "induction"
 let stat_lemmas = Util.mk_stat "induction.inductive_lemmas"
 let stat_trivial_lemmas = Util.mk_stat "induction.trivial_lemmas"
 let stat_absurd_lemmas = Util.mk_stat "induction.absurd_lemmas"
+let stat_goal_duplicate = Util.mk_stat "induction.duplicate_goal"
 let stat_inductions = Util.mk_stat "induction.inductions"
 let stat_split_goal = Util.mk_stat "induction.split_goals"
 let stat_generalize = Util.mk_stat "induction.generalize"
@@ -75,6 +76,12 @@ module Make_goal(E : Env_intf.S) : sig
   (** More thorough testing *)
 
   val is_acceptable_goal : t -> bool
+
+  val add_lemma : Cut_form.t -> unit
+  (** Signal that this cut formula is an active lemma *)
+
+  val has_been_tried : t -> bool
+  (** Is the goal already converted into a lemma? *)
 end = struct
   type status =
     | S_trivial
@@ -274,6 +281,17 @@ end = struct
   let is_acceptable_goal (g:t) : bool =
     test_goal_is_ok g &&
     check_not_absurd_or_trivial g
+
+  module FV = Cut_form.FV_tbl(struct
+      type t = unit
+      let compare ()()=0
+    end)
+
+  let add_lemma, has_been_tried =
+    let tbl = FV.create () in
+    let add f = FV.add tbl f ()
+    and mem (g:t) = FV.mem tbl (form g) in
+    add, mem
 end
 
 module T_view : sig
@@ -1068,8 +1086,14 @@ module Make
       let goals = Goal.split goal in
       List.iter
         (fun goal ->
-           (* check if goal is worth the effort *)
-           if Goal.is_acceptable_goal goal then (
+           (* check if goal is worth the effort and if it's new *)
+           if Goal.has_been_tried goal then (
+             Util.debugf ~section 1
+               "(@[<2>goal_already_active@ %a@])"
+               (fun k->k Goal.pp goal);
+             Util.incr_stat stat_goal_duplicate;
+             ()
+           ) else if Goal.is_acceptable_goal goal then (
              Util.debugf ~section 1
                "(@[<2>@{<green>prove_by_induction@}@ :clauses (@[%a@])@ :goal %a@])"
                (fun k->k (Util.pp_list C.pp) clauses Goal.pp goal);
@@ -1203,7 +1227,11 @@ module Make
     if E.flex_get Avatar.k_simplify_trail then (
       Env.add_is_trivial_trail trail_is_trivial_lemmas;
     );
-    Signal.on_every A.on_lemma on_lemma;
+    (* be notified of lemmas *)
+    Signal.on_every A.on_lemma
+      (fun cut ->
+         Goal.add_lemma cut.A.cut_form;
+         on_lemma cut);
     Env.add_generate "ind.lemmas" inf_new_lemmas;
     ()
 end

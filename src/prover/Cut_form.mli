@@ -16,6 +16,7 @@ type t = private {
   vars: FOTerm.VarSet.t;
   cs: form;
 }
+type cut_form = t
 
 val make : Literals.t list -> t
 val trivial : t
@@ -74,4 +75,20 @@ end
 module Seq : sig
   val terms : t -> term Sequence.t
   val terms_with_pos : ?subterms:bool -> t -> term Position.With.t Sequence.t
+end
+
+(** {2 Structure for Sets of cut forms, indexed modulo α-eq} *)
+module FV_tbl(X : Map.OrderedType) : sig
+  type value = X.t
+  type t
+
+  val create : unit -> t
+
+  val add : t -> cut_form -> value -> unit
+
+  val mem : t -> cut_form -> bool
+
+  val get : t -> cut_form -> value option
+
+  val to_seq : t -> (cut_form * X.t) Sequence.t
 end
