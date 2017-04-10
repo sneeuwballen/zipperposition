@@ -307,6 +307,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     cut_lit: BLit.t; (** lit that is true if lemma is true *)
     cut_depth: int; (** if the lemma is used to prove another lemma *)
     cut_proof: Proof.Step.t; (** where does the lemma come from? *)
+    cut_reason: unit CCFormat.printer option; (** Informal reason why the lemma was added *)
   }
 
   let cut_form c = c.cut_form
@@ -317,15 +318,17 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
 
   let pp_cut_res out (c:cut_res): unit =
     let pp_depth out d = if d>0  then Format.fprintf out "@ :depth %d" d in
-    Format.fprintf out "(@[<hv>cut@ :form @[%a@]@ :lit @[%a@]%a)"
+    let pp_reason out r = Format.fprintf out "@ :reason @[%a@]" r () in
+    Format.fprintf out "(@[<4>@[<hv>cut@ :form @[%a@]@ :lit @[%a@]%a]%a@])"
       (Util.pp_list E.C.pp) c.cut_pos
       BLit.pp c.cut_lit pp_depth c.cut_depth
+      (Fmt.some pp_reason) c.cut_reason
 
   let cut_res_clauses c = Sequence.of_list c.cut_pos
 
   (* generic mechanism for adding clause(s)
      and make a lemma out of them, including Skolemization, etc. *)
-  let introduce_cut ?(penalty=0) ?(depth=0) (f:Cut_form.t) proof : cut_res =
+  let introduce_cut ?reason ?(penalty=0) ?(depth=0) (f:Cut_form.t) proof : cut_res =
     let box = BBox.inject_lemma f in
     (* positive clauses *)
     let c_pos =
@@ -335,7 +338,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         (Cut_form.cs f)
     in
     { cut_form=f; cut_pos=c_pos; cut_lit=box;
-      cut_depth=depth; cut_proof=proof; }
+      cut_depth=depth; cut_proof=proof; cut_reason=reason; }
 
   let on_input_lemma : cut_res Signal.t = Signal.create ()
   let on_lemma : cut_res Signal.t = Signal.create()
@@ -390,7 +393,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     let in_core = match Sat.get_proof_opt () with
       | None -> (fun _ -> false)
       | Some p -> in_proof_of_ p
-    in
+    and pp_reason out r = Format.fprintf out "@ :reason @[%a@]" r () in
     let pp_lemma out c =
       let status = match Sat.proved_at_0 c.cut_lit with
         | None -> "unknown"
@@ -398,8 +401,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         | Some true -> "proved"
         | Some false -> "refuted"
       in
-      Format.fprintf out "@[<hv>@{<Green>*@} %s %a@]"
-        status Cut_form.pp c.cut_form
+      Format.fprintf out "@[<4>@[<hv>@{<Green>*@} %s %a@]%a@]"
+        status Cut_form.pp c.cut_form (Fmt.some pp_reason) c.cut_reason
     in
     let l = lemma_seq |> Sequence.to_rev_list in
     Format.fprintf out "@[<v2>lemmas (%d): {@ %a@,@]}"
@@ -425,7 +428,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
              SClause.make ~trail:Trail.empty c)
         |> Proof.Step.inference ~rule:(Proof.Rule.mk "lemma")
       in
-      let cut = introduce_cut f proof in
+      let cut = introduce_cut ~reason:Fmt.(return "in-input") f proof in
       let all_clauses = cut_res_clauses cut |> Sequence.to_rev_list in
       add_lemma cut;
       Signal.send on_input_lemma cut;

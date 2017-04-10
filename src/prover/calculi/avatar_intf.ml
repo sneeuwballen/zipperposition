@@ -32,6 +32,7 @@ module type S = sig
     cut_lit: BLit.t; (** lit that is true if lemma is true *)
     cut_depth: int; (** if the lemma is used to prove another lemma *)
     cut_proof: Proof.Step.t; (** where does the lemma come from? *)
+    cut_reason: unit CCFormat.printer option; (** Informal reason why the lemma was added *)
   }
   (** This represents a cut on a formula, where we obtain a list
       of clauses [cut_pos] representing the formula itself with the
@@ -55,12 +56,14 @@ module type S = sig
   (** print the current list of lemmas, and their status *)
 
   val introduce_cut :
+    ?reason:unit CCFormat.printer ->
     ?penalty:int ->
     ?depth:int ->
     Cut_form.t ->
     Proof.Step.t ->
     cut_res
-  (** Introduce a cut on the given clause(s). Pure. *)
+  (** Introduce a cut on the given clause(s). Pure.
+      @param reason some comment on why the lemma was added *)
 
   val add_lemma : cut_res -> unit
   (** Add the given cut to the list of lemmas. Modifies the global list

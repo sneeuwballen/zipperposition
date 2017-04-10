@@ -29,6 +29,8 @@ let stat_split_goal = Util.mk_stat "induction.split_goals"
 let stat_generalize = Util.mk_stat "induction.generalize"
 let stat_generalize_vars_active_pos = Util.mk_stat "induction.generalize_vars_active_pos"
 let stat_generalize_terms_active_pos = Util.mk_stat "induction.generalize_terms_active_pos"
+let stat_assess_goal = Util.mk_stat "induction.assess_goal_calls"
+let stat_assess_goal_ok = Util.mk_stat "induction.assess_goal_ok"
 
 let prof_check_goal = Util.mk_profiler "induction.check_goal"
 
@@ -279,8 +281,13 @@ end = struct
 
   (* some checks that [g] should be considered as a goal *)
   let is_acceptable_goal (g:t) : bool =
-    test_goal_is_ok g &&
-    check_not_absurd_or_trivial g
+    Util.incr_stat stat_assess_goal;
+    let res =
+      test_goal_is_ok g &&
+      check_not_absurd_or_trivial g
+    in
+    if res then Util.incr_stat stat_assess_goal_ok;
+    res
 
   module FV = Cut_form.FV_tbl(struct
       type t = unit
@@ -987,7 +994,10 @@ module Make
              assert (new_goals <> []);
              let new_cuts =
                List.map
-                 (fun g -> A.introduce_cut ~depth:(A.cut_depth cut) g Proof.Step.lemma)
+                 (fun g ->
+                    A.introduce_cut ~depth:(A.cut_depth cut) g Proof.Step.lemma
+                      ~reason:Fmt.(fun out ()->
+                          fprintf out "generalizing %a" Cut_form.pp g))
                  new_goals
              in
              Util.debugf ~section 4
@@ -1055,12 +1065,11 @@ module Make
       @param generalize_on the set of (skolem) constants that are replaced
        by free variables in the negation of [clauses] *)
   let prove_by_ind (clauses:C.t list) ~generalize_on : unit =
+    let pp_csts = Util.pp_list Fmt.(pair ~sep:(return ":@ ") ID.pp Type.pp) in
     Util.debugf ~section 5
       "(@[<2>consider_proving_by_induction@ \
        :clauses [@[%a@]]@ :generalize_on (@[%a@])@]"
-      (fun k->k (Util.pp_list C.pp) clauses
-          (Util.pp_list Fmt.(pair ~sep:(return ":@ ") ID.pp Type.pp))
-          generalize_on);
+      (fun k->k (Util.pp_list C.pp) clauses pp_csts generalize_on);
     let depth =
       Sequence.of_list generalize_on
       |> Sequence.map (fun (id,_) -> Ind_cst.ind_skolem_depth id)
@@ -1100,7 +1109,12 @@ module Make
              let proof = Proof.Step.lemma in
              (* new lemma has same penalty as the clauses *)
              let penalty = List.fold_left (fun n c -> n+C.penalty c) 0 clauses in
-             let cut = A.introduce_cut ~penalty ~depth (Goal.form goal) proof in
+             let cut =
+               A.introduce_cut ~penalty ~depth (Goal.form goal) proof
+                 ~reason:Fmt.(fun out () -> fprintf out
+                     "(@[prove_ind@ :clauses (@[%a@])@ :on (@[%a@])@])"
+                     (Util.pp_list C.pp) clauses pp_csts generalize_on)
+             in
              A.add_lemma cut
            ))
         goals
