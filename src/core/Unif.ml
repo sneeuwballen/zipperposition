@@ -347,4 +347,25 @@ module FO = struct
 
   let are_variant =
     (are_variant :> term -> term -> bool)
+
+  (* anti-unification of the two terms with at most one disagreement point *)
+  let anti_unify (t:term)(u:term): (term * term) list option =
+    let module T = FOTerm in
+    let pairs = ref [] in
+    let rec aux t u = match T.view t, T.view u with
+      | _ when T.equal t u -> () (* trivial *)
+      | _ when not (Type.equal (T.ty t) (T.ty u)) ->
+        raise Exit (* irreconciliable *)
+      | _ when Type.equal (Type.returns (T.ty t)) Type.tType ->
+        raise Exit (* distinct types *)
+      | T.App (f, ts), T.App (g, us) when T.equal f g &&
+                                          List.length ts = List.length us ->
+        List.iter2 aux ts us
+      | _ -> pairs := (t, u) :: !pairs;
+    in
+    assert (not (T.equal t u));
+    try
+      aux t u;
+      Some !pairs
+    with Exit -> None
 end

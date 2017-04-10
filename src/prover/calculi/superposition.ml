@@ -1133,23 +1133,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   (* anti-unification of the two terms with at most one disagreement point *)
   let anti_unify (t:T.t)(u:T.t): (T.t * T.t) option =
-    let pair = ref None in
-    let rec aux t u = match T.view t, T.view u with
-      | _ when T.equal t u -> () (* trivial *)
-      | T.App (f, ts), T.App (g, us) when List.length ts = List.length us ->
-        aux f g;
-        List.iter2 aux ts us
-      | _ ->
-        begin match !pair with
-          | None -> pair := Some (t,u)
-          | Some _ -> raise Exit (* 2 distinct pairs, too bad *)
-        end
-    in
-    assert (not (T.equal t u));
-    try
-      aux t u;
-      !pair
-    with Exit -> None
+    match Unif.FO.anti_unify t u with
+      | Some [pair] -> Some pair
+      | _ -> None
 
   let eq_subsumes_with (a,sc_a) (b,sc_b) =
     (* subsume a literal using a = b *)
