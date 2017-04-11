@@ -1,5 +1,5 @@
 
-provers = [ "zipperposition" ]
+provers = [ "zipperposition", "cvc4", "cvc4-gen" ]
 
 [test]
 
@@ -7,7 +7,7 @@ default_expect = "unsat"
 
 timeout = 30 # in s
 memory = 2000 # in MB
-provers = [ "zipperposition" ]
+#provers = [ "zipperposition" ]
 problems = ".*.smt2"
 dir = [ "tip-benchmarks/benchmarks/" ]
 
@@ -19,3 +19,17 @@ unsat = "SZS status (Theorem|Unsatisfiable)"
 sat = "SZS status (CounterSatisfiable|Satisfiable)"
 timeout = "SZS Status ResourceOut"
 version = "git:."
+
+[cvc4]
+
+binary = "cvc4"
+cmd = "tip --smtlib $file | cvc4 --lang smt2 --quant-ind --tlimit=`expr 1000 '*' $timeout`"
+unsat = "^unsat"
+sat = "^sat"
+
+[cvc4-gen]
+
+binary = "cvc4"
+cmd = "tip --smtlib $file | cvc4 --lang smt2 --quant-ind --conjecture-gen --tlimit=`expr 1000 '*' $timeout`"
+unsat = "^unsat"
+sat = "^sat"
