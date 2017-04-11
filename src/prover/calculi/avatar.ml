@@ -396,8 +396,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     and pp_reason out r = Format.fprintf out "@ :reason @[%a@]" r () in
     let pp_lemma out c =
       let status = match Sat.proved_at_0 c.cut_lit with
+        | _ when in_core c.cut_lit -> "in_proof"
         | None -> "unknown"
-        | Some _ when in_core c.cut_lit -> "in_proof"
         | Some true -> "proved"
         | Some false -> "refuted"
       in
