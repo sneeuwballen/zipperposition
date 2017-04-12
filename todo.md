@@ -15,6 +15,11 @@
 - PROOF CHECKER (with intermediate internal format which separates
   instantiation and basic "ground" reasoning, perhaps)
 
+- continue rat arith (fix pb 340, ordering, then var elim)
+
+- bring back a tiny amount of smallcheck to instnatiate variables
+  and realize that `forall l1 l2:list.  l1=l2` is absurd
+
 - heuristic:
   * [ ] per-inference penalty `int` field in clause. The higher, the
         worst. Each inference adds its own penalty, with
