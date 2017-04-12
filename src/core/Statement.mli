@@ -265,6 +265,10 @@ val to_string :
 val pp_clause : clause_t CCFormat.printer
 val pp_input : input_t CCFormat.printer
 
+module ZF : sig
+  include Interfaces.PRINT3 with type ('a, 'b, 'c) t := ('a, 'b, 'c) t
+end
+
 module TPTP : sig
   include Interfaces.PRINT3 with type ('a, 'b, 'c) t := ('a, 'b, 'c) t
 end

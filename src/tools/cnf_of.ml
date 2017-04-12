@@ -51,8 +51,8 @@ let print_res decls = match !Options.output with
       decls
   | Options.Print_zf ->
     let ppst out st =
-      Statement.pp
-        (Util.pp_list ~sep:" || " (SLiteral.ZF.pp T.ZF.pp)) T.ZF.pp T.ZF.pp
+      Statement.ZF.pp
+        (Util.pp_list ~sep:" || " (SLiteral.ZF.pp T.ZF.pp_inner)) T.ZF.pp_inner T.ZF.pp_inner
         out st
     in
     Format.printf "@[<v>%a@]@."
@@ -102,7 +102,10 @@ let main () =
   (if !files = [] then files := ["stdin"]);
   files := List.rev !files;
   List.iter process !files;
-  Format.printf "%% @{<Green>success!@}@.";
+  begin match !Options.output with
+    | Options.Print_normal -> Format.printf "%% @{<Green>success!@}@.";
+    | _ -> ()
+  end;
   ()
 
 let _ =

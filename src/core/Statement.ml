@@ -568,10 +568,10 @@ let pp ppf ppt ppty out st = match st.view with
     fpf out "@[<2>def%a %a@]."
       pp_attrs st.attrs (Util.pp_list ~sep:" and " (pp_def ppf ppt ppty)) l
   | RewriteTerm (_, id, _, args, rhs) ->
-    fpf out "@[<2>rewrite%a @[%a %a@]@ = @[%a@]@]" pp_attrs st.attrs
+    fpf out "@[<2>rewrite%a @[%a %a@]@ = @[%a@]@]." pp_attrs st.attrs
       ID.pp id (Util.pp_list ~sep:" " ppt) args ppt rhs
   | RewriteForm (_, lhs, rhs) ->
-    fpf out "@[<2>rewrite%a @[%a@]@ <=> @[%a@]@]" pp_attrs st.attrs
+    fpf out "@[<2>rewrite%a @[%a@]@ <=> @[%a@]@]." pp_attrs st.attrs
       (SLiteral.pp ppt) lhs (Util.pp_list ~sep:" && " ppf) rhs
   | Data l ->
     let pp_cstor out (id,ty) =
@@ -580,7 +580,7 @@ let pp ppf ppt ppty out st = match st.view with
       fpf out "@[<hv2>@[%a : %a@] :=@ %a@]"
         ID.pp d.data_id ppty d.data_ty (Util.pp_list ~sep:"" pp_cstor) d.data_cstors
     in
-    fpf out "@[<hv2>data%a@ %a@]" pp_attrs st.attrs (Util.pp_list ~sep:" and " pp_data) l
+    fpf out "@[<hv2>data%a@ %a@]." pp_attrs st.attrs (Util.pp_list ~sep:" and " pp_data) l
   | Assert f ->
     fpf out "@[<2>assert%a@ @[%a@]@]." pp_attrs st.attrs ppf f
   | Lemma l ->
@@ -601,6 +601,49 @@ let pp_clause =
   pp (Util.pp_list ~sep:" ∨ " (SLiteral.pp FOTerm.pp)) FOTerm.pp Type.pp
 
 let pp_input = pp TypedSTerm.pp TypedSTerm.pp TypedSTerm.pp
+
+module ZF = struct
+  let pp ppf ppt ppty out st =
+    let pp_var out v= Format.fprintf out "(%a:%a)" Var.pp v ppty (Var.ty v) in
+    let pp_vars out = function
+      | [] -> ()
+      | vars -> Format.fprintf out "forall %a.@ " (Util.pp_list ~sep:" " pp_var) vars
+    in
+    match st.view with
+    | TyDecl (id,ty) ->
+      fpf out "@[<2>val%a %a :@ @[%a@]@]." pp_attrs st.attrs ID.pp id ppty ty
+    | Def l ->
+      fpf out "@[<2>def%a %a@]."
+        pp_attrs st.attrs (Util.pp_list ~sep:" and " (pp_def ppf ppt ppty)) l
+    | RewriteTerm (vars, id, _, args, rhs) ->
+      fpf out "@[<2>rewrite%a @[<2>%a@[%a %a@]@ = @[%a@]@]@]." pp_attrs st.attrs
+        pp_vars vars ID.pp id (Util.pp_list ~sep:" " ppt) args ppt rhs
+    | RewriteForm (vars, lhs, rhs) ->
+      fpf out "@[<2>rewrite%a @[<2>%a@[%a@]@ <=> @[%a@]@]@]." pp_attrs st.attrs
+        pp_vars vars (SLiteral.ZF.pp ppt) lhs (Util.pp_list ~sep:" && " ppf)
+        rhs
+    | Data l ->
+      let pp_cstor out (id,ty) =
+        fpf out "@[<2>| %a :@ @[%a@]@]" ID.pp id ppty ty in
+      let pp_data out d =
+        fpf out "@[<hv2>@[%a : %a@] :=@ %a@]"
+          ID.pp d.data_id ppty d.data_ty (Util.pp_list ~sep:"" pp_cstor) d.data_cstors
+      in
+      fpf out "@[<hv2>data%a@ %a@]." pp_attrs st.attrs (Util.pp_list ~sep:" and " pp_data) l
+    | Assert f ->
+      fpf out "@[<2>assert%a@ @[%a@]@]." pp_attrs st.attrs ppf f
+    | Lemma l ->
+      fpf out "@[<2>lemma%a@ @[%a@]@]."
+        pp_attrs st.attrs (Util.pp_list ~sep:" && " ppf) l
+    | Goal f ->
+      fpf out "@[<2>goal%a@ @[%a@]@]." pp_attrs st.attrs ppf f
+    | NegatedGoal (_, l) ->
+      fpf out "@[<hv2>goal%a@ ~(@[<hv>%a@])."
+        pp_attrs st.attrs
+        (Util.pp_list ~sep:", " (CCFormat.hovbox ppf)) l
+
+  let to_string ppf ppt ppty = CCFormat.to_string (pp ppf ppt ppty)
+end
 
 module TPTP = struct
   let pp ppf ppt ppty out st =

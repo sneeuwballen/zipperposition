@@ -143,9 +143,11 @@ let app ?loc s l = match s.term, l with
   | _, _::_ -> make_ ?loc (App(s,l))
 let const ?loc s = make_ ?loc (Const s)
 let app_const ?loc s l = app (const ?loc s) l
-let bind ?loc s v l = match v with
-  | [] -> l
-  | _::_ -> make_ ?loc (Bind(s,v,l))
+let bind ?loc s v l = match v, l with
+  | [], _ -> l
+  | _::_, {term=Bind(s',v',l'); _} when s=s' ->
+    make_ ?loc (Bind (s, v@v', l')) (* flatten *)
+  | _::_, _ -> make_ ?loc (Bind(s,v,l))
 let ite ?loc a b c = make_ ?loc (Ite (a,b,c))
 let match_ ?loc t l = make_ ?loc (Match (t, l))
 let let_ ?loc l u = match l with
