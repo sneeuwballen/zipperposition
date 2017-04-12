@@ -90,6 +90,7 @@ module Make(Dummy : sig end)
     )
 
   let add_clause ~proof (c:clause) =
+    let c = CCList.sort_uniq ~cmp:Lit.compare c in (* no duplicates *)
     dump_l [c];
     add_clause_ ~proof c
 
