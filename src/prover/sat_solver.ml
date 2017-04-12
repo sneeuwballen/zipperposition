@@ -26,6 +26,7 @@ let wrong_state_ msg = raise (WrongState msg)
 let errorf msg = Util.errorf ~where:"sat_solver" msg
 
 let sat_dump_file_ = ref ""
+let sat_log_file = ref ""
 let sat_compact_ = ref false
 
 module type S = Sat_solver_intf.S
@@ -151,6 +152,15 @@ module Make(Dummy : sig end)
       (SatForm)
       (Msat.Solver.DummyTheory(SatForm))
       (struct end)
+
+  let () =
+    if !sat_log_file <> "" then (
+      let oc = open_out !sat_log_file in
+      let fmt = Format.formatter_of_out_channel oc in
+      Msat.Log.set_debug_out fmt;
+      Msat.Log.set_debug 9999;
+      at_exit (fun () -> Format.pp_print_flush fmt (); close_out_noerr oc);
+    )
 
   exception UndecidedLit = S.UndecidedLit
 
@@ -329,6 +339,7 @@ let set_compact b = sat_compact_ := b
 let () =
   Params.add_opts
     [ "--sat-dump", Arg.Set_string sat_dump_file_, " output SAT problem(s) into <file>"
+    ; "--sat-log", Arg.Set_string sat_log_file, " output SAT logs into <file>"
     ; "--compact-sat", Arg.Set sat_compact_, " compact SAT proofs"
     ; "--no-compact-sat", Arg.Clear sat_compact_, " do not compact SAT proofs"
     ]
