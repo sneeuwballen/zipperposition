@@ -197,10 +197,10 @@ module Flatten = struct
       | T.AppBuiltin (Builtin.False, []) -> return F.false_
       | T.Var v ->
         (* look [v] up in subst *)
-        get_subst >|= fun subst ->
+        get_subst >>= fun subst ->
         begin match T.Subst.find subst v with
-          | None -> t
-          | Some t' -> t'
+          | None -> return t
+          | Some t' -> aux pos vars t'
         end
       | T.Const _ -> return t
       | T.App (f,l) ->
@@ -236,10 +236,9 @@ module Flatten = struct
               (List.map T.var closure @ [a])
         end
       | T.Let (l,u) ->
-        (* first, process let-bound terms;
-           then add all bindings to context and proceed into [u] *)
-        map_m (fun (v,t) -> aux Pos_inner vars t
-          >|= fun t' -> v, t') l >>= fun l ->
+        (* add let-bound terms to substitution without processing them.
+           They will be processed differently at every place the
+           variables are used *)
         let subst =
           List.fold_left (fun s (v,t) -> T.Subst.add s v t) T.Subst.empty l
         in
