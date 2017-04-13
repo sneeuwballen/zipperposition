@@ -995,12 +995,13 @@ module Make
         List.iter
           (fun new_goals ->
              assert (new_goals <> []);
+             let g0 = g in
              let new_cuts =
                List.map
                  (fun g ->
                     A.introduce_cut ~depth:(A.cut_depth cut) g Proof.Step.lemma
                       ~reason:Fmt.(fun out ()->
-                          fprintf out "generalizing %a" Cut_form.pp g))
+                          fprintf out "generalizing %a" Cut_form.pp g0))
                  new_goals
              in
              Util.debugf ~section 4
