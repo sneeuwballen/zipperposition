@@ -231,7 +231,9 @@ module Make(Env : Env_intf.S) = struct
           -> false
       end
 
-  let exhaustiveness (c:C.t): C.t list =
+  (* how to build exhaustiveness axiom for a term [t] *)
+  let make_exhaustiveness_axiom (t:term): C.t =
+    assert (T.is_ground t);
     let mk_sub_skolem (t:term) (ty:Type.t): ID.t =
       if Ind_ty.is_inductive_type ty then (
         (* declare a constant, with a depth that (if any)
@@ -245,49 +247,48 @@ module Make(Env : Env_intf.S) = struct
         Ind_cst.make ~is_sub:false ?depth ty |> Ind_cst.id
       ) else Ind_cst.make_skolem ty
     in
-    (* how to build exhaustiveness axiom for a term [t] *)
-    let make_axiom (t:term): C.t =
-      assert (T.is_ground t);
-      let ity, ty_params = match Ind_ty.as_inductive_type (T.ty t) with
-        | Some t -> t
-        | None -> assert false
-      in
-      assert (List.for_all Type.is_ground ty_params);
-      let rhs_l =
-        ity.Ind_ty.ty_constructors
-        |> List.map
-          (fun { Ind_ty.cstor_name; cstor_ty } ->
-             let n_args, _, _ = Type.open_poly_fun cstor_ty in
-             assert (n_args = List.length ty_params);
-             let cstor_ty_args, ret =
-               Type.apply cstor_ty ty_params |> Type.open_fun
-             in
-             assert (Type.equal ret (T.ty t));
-             (* build new constants to pass to the cstor *)
-             let args =
-               List.map
-                 (fun ty ->
-                    let c = mk_sub_skolem t ty in
-                    Env.Ctx.declare c ty;
-                    T.const ~ty c)
-                 cstor_ty_args
-             in
-             T.app_full
-               (T.const ~ty:cstor_ty cstor_name)
-               ty_params
-               args)
-      in
-      let lits = List.map (Literal.mk_eq t) rhs_l in
-      (* XXX: could derive this from the [data] that defines [ity]… *)
-      let proof = Proof.Step.trivial in
-      let penalty = 5 in (* do not use too lightly! *)
-      let new_c = C.create ~trail:Trail.empty ~penalty lits proof in
-      Util.incr_stat stat_exhaustiveness;
-      Util.debugf ~section 3
-        "(@[<2>exhaustiveness axiom@ :for `@[%a:%a@]`@ :clause %a@])"
-        (fun k->k T.pp t Type.pp (T.ty t) C.pp new_c);
-      new_c
+    assert (T.is_ground t);
+    let ity, ty_params = match Ind_ty.as_inductive_type (T.ty t) with
+      | Some t -> t
+      | None -> assert false
     in
+    assert (List.for_all Type.is_ground ty_params);
+    let rhs_l =
+      ity.Ind_ty.ty_constructors
+      |> List.map
+        (fun { Ind_ty.cstor_name; cstor_ty } ->
+           let n_args, _, _ = Type.open_poly_fun cstor_ty in
+           assert (n_args = List.length ty_params);
+           let cstor_ty_args, ret =
+             Type.apply cstor_ty ty_params |> Type.open_fun
+           in
+           assert (Type.equal ret (T.ty t));
+           (* build new constants to pass to the cstor *)
+           let args =
+             List.map
+               (fun ty ->
+                  let c = mk_sub_skolem t ty in
+                  Env.Ctx.declare c ty;
+                  T.const ~ty c)
+               cstor_ty_args
+           in
+           T.app_full
+             (T.const ~ty:cstor_ty cstor_name)
+             ty_params
+             args)
+    in
+    let lits = List.map (Literal.mk_eq t) rhs_l in
+    (* XXX: could derive this from the [data] that defines [ity]… *)
+    let proof = Proof.Step.trivial in
+    let penalty = 5 in (* do not use too lightly! *)
+    let new_c = C.create ~trail:Trail.empty ~penalty lits proof in
+    Util.incr_stat stat_exhaustiveness;
+    Util.debugf ~section 3
+      "(@[<2>exhaustiveness axiom@ :for `@[%a:%a@]`@ :clause %a@])"
+      (fun k->k T.pp t Type.pp (T.ty t) C.pp new_c);
+    new_c
+
+  let exhaustiveness_ground_terms (c:C.t): C.t list =
     (* find terms to instantiate exhaustiveness for, and do it *)
     begin
       let eligible = C.Eligible.(res c ** neg) in
@@ -318,8 +319,71 @@ module Make(Env : Env_intf.S) = struct
       |> List.rev_map
         (fun t ->
            T.Tbl.add exhaustiveness_tbl_ t ();
-           let ax = make_axiom t in
+           let ax = make_exhaustiveness_axiom t in
            ax)
+    end
+
+  (* simplification that replaces a variable of a non-recursive inductive
+     type, by a set of constructors with new variables inside *)
+  let exhaustiveness_vars (c:C.t): C.t list option =
+    let v_opt =
+      C.Seq.vars c
+      |> Sequence.find_map
+        (fun v ->
+           let ty = HVar.ty v in
+           begin match Ind_ty.as_inductive_type ty with
+             | Some (ity,ty_params) when not (Ind_ty.is_recursive ity) ->
+               Some (v,ity,ty_params)
+             | _ -> None
+           end)
+    in
+    begin match v_opt with
+      | None -> None
+      | Some (v,ity,ty_params) ->
+        (* list of cstor-headed terms to substitute for [v] *)
+        let offset = C.Seq.vars c |> T.Seq.max_var |> succ in
+        let terms =
+          ity.Ind_ty.ty_constructors
+          |> List.map
+            (fun { Ind_ty.cstor_name; cstor_ty } ->
+               let n_args, _, _ = Type.open_poly_fun cstor_ty in
+               assert (n_args = List.length ty_params);
+               let cstor_ty_args, ret =
+                 Type.apply cstor_ty ty_params |> Type.open_fun
+               in
+               assert (Type.equal ret (HVar.ty v));
+               (* build fresh variables to pass to the cstor *)
+               let args =
+                 List.mapi
+                   (fun i ty ->
+                      let v' = HVar.make ~ty (i+offset) in
+                      T.var v')
+                   cstor_ty_args
+               in
+               T.app_full
+                 (T.const ~ty:cstor_ty cstor_name)
+                 ty_params
+                 args)
+        in
+        let clauses =
+          terms
+          |> List.map
+            (fun t ->
+               let subst = Subst.FO.of_list' [(v,0), (t,1)] in
+               let proof =
+                 Proof.Step.simp ~rule:(Proof.Rule.mk "exhaustiveness_var")
+                   [C.proof_parent_subst (c,0) subst]
+               in
+               let renaming = Env.Ctx.renaming_clear () in
+               let lits = Literals.apply_subst ~renaming subst (C.lits c,0) in
+               let new_c = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
+               new_c)
+        in
+        Util.incr_stat stat_exhaustiveness;
+        Util.debugf ~section 3
+          "(@[<2>exhaustiveness_var@ :simplified `@[%a@]`@ :into (@[%a@])@])"
+          (fun k->k C.pp c (Util.pp_list C.pp) clauses);
+        Some clauses
     end
 
   let setup() =
@@ -329,7 +393,8 @@ module Make(Env : Env_intf.S) = struct
     Env.add_multi_simpl_rule injectivity_destruct_pos;
     Env.add_lit_rule "ind_types.disjointness" disjointness;
     Env.add_unary_inf "ind_types.acyclicity" acyclicity_inf;
-    Env.add_unary_inf "ind_types.exhaustiveness" exhaustiveness;
+    Env.add_unary_inf "ind_types.exhaustiveness_ground" exhaustiveness_ground_terms;
+    Env.add_multi_simpl_rule exhaustiveness_vars;
     ()
 end
 
