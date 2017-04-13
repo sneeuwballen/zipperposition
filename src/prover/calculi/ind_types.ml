@@ -197,37 +197,6 @@ module Make(Env : Env_intf.S) = struct
       | Some _
       | None -> None
 
-  (* if c is  f(t1,...,tn) != f(t1',...,tn') or d, with f inductive cstor, then
-      replace c with    t1 != t1' or ... or tn != tn' or d *)
-  let injectivity_destruct_neg c =
-    let eligible = C.Eligible.(filter Literal.is_neq) in
-    match find_cstor_pair ~sign:false ~eligible c with
-      | Some (idx,s1,l1,s2,l2) when ID.equal s1 s2 ->
-        (* same constructor: simplify *)
-        let lits = CCArray.except_idx (C.lits c) idx in
-        assert (List.length l1 = List.length l2);
-        (* add [ti != ti'] for arguments that are not actually types;
-           types should ALWAYS be equal anyway *)
-        let new_lits =
-          List.combine l1 l2
-          |> CCList.filter_map
-            (fun (t1,t2) ->
-               let ty = T.ty t1 in
-               if Type.is_tType ty then None else Some (Literal.mk_neq t1 t2))
-        in
-        let rule = Proof.Rule.mk "injectivity_destruct-" in
-        let proof = Proof.Step.inference ~rule [C.proof_parent c] in
-        let c' =
-          C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-            (new_lits @ lits) proof
-        in
-        Util.incr_stat stat_injectivity;
-        Util.debugf ~section 3 "@[<hv2>injectivity:@ simplify @[%a@]@ into @[%a@]@]"
-          (fun k->k C.pp c C.pp c');
-        SimplM.return_new c'
-      | Some _
-      | None -> SimplM.return_same c
-
   (* rule on literals that are trivial or absurd depending on toplevel
      constructor *)
   let disjointness lit = match lit with
@@ -357,7 +326,6 @@ module Make(Env : Env_intf.S) = struct
     Util.debug ~section 2 "setup inductive types calculus";
     Env.add_is_trivial acyclicity_trivial;
     Env.add_simplify acyclicity_simplify;
-    Env.add_simplify injectivity_destruct_neg;
     Env.add_multi_simpl_rule injectivity_destruct_pos;
     Env.add_lit_rule "ind_types.disjointness" disjointness;
     Env.add_unary_inf "ind_types.acyclicity" acyclicity_inf;
