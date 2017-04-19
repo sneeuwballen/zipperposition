@@ -1,4 +1,6 @@
 
+; expect: unsat
+
 (declare-datatypes (a)
   ((list (nil) (cons (head a) (tail (list a))))))
 
