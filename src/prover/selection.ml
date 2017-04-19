@@ -46,22 +46,25 @@ let select_positives lits =
   then Lits.pos lits
   else BV.empty ()
 
+let bv_first bv = BV.iter_true bv |> Sequence.head
+
 let select_max_goal ~strict ~ord lits =
   if _pure_superposition lits
   then
     let bv = Lits.maxlits ~ord lits in
     BV.filter bv (fun i -> Lit.is_neg lits.(i));
-    try
+    begin match bv_first bv with
+    | Some i ->
       (* keep only first satisfying lit *)
-      let i = BV.first bv in
       BV.clear bv;
       BV.set bv i;
       if not strict
       then BV.union_into ~into:bv (select_positives lits);
       assert (_validate_select lits bv);
       bv
-    with Not_found ->
+    | None ->
       BV.empty ()  (* empty one *)
+    end
   else BV.empty ()
 
 let select_diff_neg_lit ~strict ~ord:_ lits =
