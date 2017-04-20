@@ -19,7 +19,7 @@ let section = Const.section
 let setup_alarm timeout =
   let handler _ =
     Format.printf "%% SZS Status ResourceOut@.";
-    Unix.kill (Unix.getpid ()) Sys.sigterm
+    exit 0
   in
   ignore (Sys.signal Sys.sigalrm (Sys.Signal_handle handler));
   Unix.alarm (max 1 (int_of_float timeout))
