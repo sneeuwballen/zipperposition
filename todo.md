@@ -2,6 +2,14 @@
 
 ## Now
 
+- flags to disable generalizations
+  * then compare impact on benchmarks
+
+- translation between cstor-style and destructor-style?
+  e.g. `x+y = if x=0 then y else (pred x) + (s y)`
+
+- generalize a bit notion of ind_cst (to ground terms made of skolems)
+
 - induction:
   find good ways of limiting the number of sub-inductions, and quick
 
@@ -16,18 +24,6 @@
   instantiation and basic "ground" reasoning, perhaps)
 
 - continue rat arith (fix pb 340, ordering, then var elim)
-
-- bring back a tiny amount of smallcheck to instnatiate variables
-  and realize that `forall l1 l2:list.  l1=l2` is absurd
-
-- heuristic:
-  * [ ] per-inference penalty `int` field in clause. The higher, the
-        worst. Each inference adds its own penalty, with
-        a high penalty for sup/chaining from variable (explosion);
-        replaces `age` in all queues but the `bfs` one
-        → assess on GEG problems
-        → also handicap risky inductions (these where all vars are generalized?)
-        → also handicap very prolific arith rules
 
 - CLI option to hide types when printing terms (useful with lot of polymorphism)
 
@@ -245,6 +241,22 @@
       + multi-variable induction requires `<|` to work on tuples or multisets
         on both sides…
       + `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot examples/ind/nat21.zf`
+  * FIX
+    `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot tip-benchmarks/benchmarks/tip2015/list_return_1.smt2`
+    (problem is, we should *generalize* `sk_f sk_x` before doing induction,
+     or consider that a pure skolem term is an inductive constant,
+     or consider that a skolem function returning an inductive type is an
+     inductive constant)
+  * FIX
+    `./zipperposition.native -p --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot tip-benchmarks/benchmarks/tip2015/list_elem.smt2`
+    need to be able to pattern-match on boolean (also in TIP-parser)
+  * FIX
+    `./zipperposition.native -p --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot tip-benchmarks/benchmarks/tip2015/tree_SwapAB.smt2`
+    stack overflow because (CNF of neg of) lemma is too big?
+  * FIX
+    `./zipperposition.native -p --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot tip-benchmarks/benchmarks/tip2015/int_add_inv_right.smt2`
+    need to prove lemmas by regular neg+CNF if they don't trigger inductive proof
+    → then, by elimination, we get another sub-proof that is inductive
 
 - lemma guessing in induction:
   * [x] simple generalization of a variable with ≥ 2 occurrences in active pos,
@@ -256,6 +268,12 @@
         and other terms containing the same variables.
         → need to also prove `t = t'` for every generalized term `t`
           and other term `t'` that shared ≥1 var with `t`
+  * [ ] purification of composite terms occurring in passive position
+  * [ ] anti-unification in sub-goal solving
+      (e.g. `append a t1 != append a t2`, where `a` is a skolem
+       → try to prove `t1!=t2` instead,
+      if append is found to be left-injective by testing or lemma)
+  * [ ] paramodulation of sub-goal with inductive hypothesis (try on `list7.zf`)?
 
 - theory of datatypes
   * [x] inference for acyclicity (not just simplification):
@@ -402,6 +420,15 @@
         → will be useful after purification (approximation leads to too
           many inferences, some of which yield non-inductively true constraints,
           so we need to check constraints before solving them by induction)
+
+- heuristic:
+  * [x] per-inference penalty `int` field in clause. The higher, the
+        worst. Each inference adds its own penalty, with
+        a high penalty for sup/chaining from variable (explosion);
+        replaces `age` in all queues but the `bfs` one
+        → assess on GEG problems
+        → also handicap risky inductions (these where all vars are generalized?)
+        → also handicap very prolific arith rules
 
 - [x] replace smallcheck by narrowing with a steps limit, not depth limit
 
