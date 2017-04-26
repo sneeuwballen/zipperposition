@@ -1,5 +1,12 @@
 
-provers = [ "zipperposition", "cvc4", "cvc4-gen" ]
+provers = [
+  "zipperposition",
+  "zipperposition-v",
+  "zipperposition-t",
+  "zipperposition-vt",
+  "cvc4",
+  "cvc4-gen"
+  ]
 
 [test]
 
@@ -15,6 +22,33 @@ dir = [ "tip-benchmarks/benchmarks/" ]
 
 binary = "./zipperposition.native"
 cmd = "./zipperposition.native $file --timeout $timeout --mem-limit $memory --output none"
+unsat = "SZS status (Theorem|Unsatisfiable)"
+sat = "SZS status (CounterSatisfiable|Satisfiable)"
+timeout = "SZS Status ResourceOut"
+version = "git:."
+
+[zipperposition-v]
+
+binary = "./zipperposition.native"
+cmd = "./zipperposition.native $file --timeout $timeout --mem-limit $memory --output none --no-ind-gen-var"
+unsat = "SZS status (Theorem|Unsatisfiable)"
+sat = "SZS status (CounterSatisfiable|Satisfiable)"
+timeout = "SZS Status ResourceOut"
+version = "git:."
+
+[zipperposition-t]
+
+binary = "./zipperposition.native"
+cmd = "./zipperposition.native $file --timeout $timeout --mem-limit $memory --output none  --no-ind-gen-term"
+unsat = "SZS status (Theorem|Unsatisfiable)"
+sat = "SZS status (CounterSatisfiable|Satisfiable)"
+timeout = "SZS Status ResourceOut"
+version = "git:."
+
+[zipperposition-vt]
+
+binary = "./zipperposition.native"
+cmd = "./zipperposition.native $file --timeout $timeout --mem-limit $memory --output none --no-ind-gen-var --no-ind-gen-term"
 unsat = "SZS status (Theorem|Unsatisfiable)"
 sat = "SZS status (CounterSatisfiable|Satisfiable)"
 timeout = "SZS Status ResourceOut"
