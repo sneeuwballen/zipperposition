@@ -55,6 +55,12 @@ val smaller : t -> t -> bool
 (** [smaller p1 p2] is true if [p1] is included in [p2], ie
     [p1] is a sub-location of [p2] (interval inclusion) *)
 
+module Infix : sig
+  val (<+>) : t option -> t option -> t option
+  (** Combine two optional locations. Left has priority *)
+end
+include module type of Infix
+
 include Interfaces.PRINT with type t := t
 
 val pp_opt : t option CCFormat.printer

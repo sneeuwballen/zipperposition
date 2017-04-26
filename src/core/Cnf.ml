@@ -240,7 +240,11 @@ module Flatten = struct
            They will be processed differently at every place the
            variables are used *)
         let subst =
-          List.fold_left (fun s (v,t) -> T.Subst.add s v t) T.Subst.empty l
+          List.fold_left
+            (fun s (v,t) ->
+               let t = T.Subst.eval s t in
+               T.Subst.add s v t)
+            T.Subst.empty l
         in
         add_subst subst >>= fun () ->
         aux pos vars u

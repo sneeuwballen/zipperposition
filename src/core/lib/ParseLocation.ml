@@ -86,6 +86,10 @@ let smaller p1 p2 =
   (p1.stop_line < p2.stop_line
    ||  (p1.stop_line = p2.stop_line && p1.stop_column <= p2.stop_column))
 
+module Infix = struct
+  let (<+>) = CCOpt.(<+>)
+end
+include Infix
 
 let pp out pos =
   if pos.start_line = pos.stop_line
