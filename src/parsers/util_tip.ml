@@ -104,6 +104,8 @@ let rec conv_term (t:A.term): T.t =
         | "<=", [a;b] -> T.app_builtin BA.lesseq [a;b]
         | ">", [a;b] -> T.app_builtin BA.greater [a;b]
         | "<", [a;b] -> T.app_builtin BA.less [a;b]
+        | "mod", [a;b] -> T.app_builtin BA.remainder_e [a;b]
+        | "div", [a;b] -> T.app_builtin BA.quotient_e [a;b]
         | _ -> T.app_const f l
       end
     | A.HO_app (a,b) ->
