@@ -40,6 +40,8 @@ let k_limit_to_active : bool Flex_state.key = Flex_state.create_key()
 let k_coverset_depth : int Flex_state.key = Flex_state.create_key()
 let k_goal_assess_limit : int Flex_state.key = Flex_state.create_key()
 let k_ind_on_subcst : bool Flex_state.key = Flex_state.create_key()
+let k_generalize_var : bool Flex_state.key = Flex_state.create_key()
+let k_generalize_term : bool Flex_state.key = Flex_state.create_key()
 
 (** {2 Formula to be Proved Inductively *)
 module Make_goal(E : Env_intf.S) : sig
@@ -746,6 +748,9 @@ module Make
     type generalization = form list
     type t = form -> generalization list
 
+    val id : t
+    (** Do nothing *)
+
     val vars_at_active_pos : t
 
     val terms_at_active_pos : t
@@ -755,6 +760,8 @@ module Make
     type form = Cut_form.t
     type generalization = form list
     type t = form -> generalization list
+
+    let id _ = []
 
     (* generalize on variables that occur both (several times) in active
        positions, and which also occur (several times) in passive position.
@@ -871,13 +878,14 @@ module Make
              else None)
       end
 
-    let all f =
-      let (<++>) o (f,x) = match o with
+    let all =
+      let g1 = if Env.flex_get k_generalize_var then vars_at_active_pos else id
+      and g2 = if Env.flex_get k_generalize_term then terms_at_active_pos else id
+      and (<++>) o (f,x) = match o with
         | [] -> f x
         | l -> l
       in
-      vars_at_active_pos f
-      <++> (terms_at_active_pos, f)
+      fun f -> g1 f <++> (g2, f)
   end
 
   (* should we do induction on [x] in [c]? *)
@@ -1260,6 +1268,8 @@ let limit_to_active = ref true
 let coverset_depth = ref 1
 let goal_assess_limit = ref 8
 let ind_sub_cst = ref true
+let gen_var = ref true
+let gen_term = ref true
 
 (* if induction is enabled AND there are some inductive types,
    then perform some setup after typing, including setting the key
@@ -1283,6 +1293,8 @@ let post_typing_hook stmts state =
     |> Flex_state.add k_coverset_depth !coverset_depth
     |> Flex_state.add k_goal_assess_limit !goal_assess_limit
     |> Flex_state.add k_ind_on_subcst !ind_sub_cst
+    |> Flex_state.add k_generalize_var !gen_var
+    |> Flex_state.add k_generalize_term !gen_term
     |> Flex_state.add Ctx.Key.lost_completeness true
   ) else Flex_state.add k_enable false state
 
@@ -1319,4 +1331,8 @@ let () =
     ; "--ind-goal-assess", Arg.Set_int goal_assess_limit, " number of steps for assessing potential lemmas"
     ; "--ind-sub-cst", Arg.Set ind_sub_cst, " do induction on sub-constants"
     ; "--no-ind-sub-cst", Arg.Clear ind_sub_cst, " do not do induction on sub-constants"
+    ; "--ind-gen-var", Arg.Set gen_var, " generalize on variables"
+    ; "--ind-gen-term", Arg.Set gen_term, " generalize on terms"
+    ; "--no-ind-gen-var", Arg.Clear gen_var, " do not generalize on variables"
+    ; "--no-ind-gen-term", Arg.Clear gen_term, " do not generalize on terms"
     ]
