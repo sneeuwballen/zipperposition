@@ -14,7 +14,9 @@ type form = T.t
 type data = {
   data_name: string;
   data_vars: string list;
-  data_cstors: (string * ty list) list;
+  data_cstors: (string * (string option * ty) list) list;
+  (* list of constructor. Each constructor is paired with a list of
+     arguments, that is, an optional projector + the type *)
 }
 
 (** Attributes *)
@@ -93,8 +95,9 @@ let pp_statement out st =
     | Rewrite t ->
       fpf out "@[<2>rewrite%a @[%a@]@]." pp_attrs attrs T.pp t
     | Data l ->
+      let pp_arg out (_,ty) = T.pp out ty in
       let pp_cstor out (id,args) =
-        fpf out "@[<2>| @[%s@ %a@]@]" id (Util.pp_list ~sep:" " T.pp) args in
+        fpf out "@[<2>| @[%s@ %a@]@]" id (Util.pp_list ~sep:" " pp_arg) args in
       let pp_data out d =
         fpf out "@[%s %a@] :=@ @[<v>%a@]"
           d.data_name

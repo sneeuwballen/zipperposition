@@ -16,7 +16,9 @@ type form = T.t
 type data = {
   data_name: string;
   data_vars: string list;
-  data_cstors: (string * ty list) list;
+  data_cstors: (string * (string option * ty) list) list;
+  (* list of constructor. Each constructor is paired with a list of
+     arguments, that is, an optional projector + the type *)
 }
 
 (** Attributes *)

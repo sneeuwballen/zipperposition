@@ -18,7 +18,7 @@ let classify id = match ID.payload id with
   | Ind_ty.Payload_ind_type x -> Ty x
   | Skolem.Attr_skolem Skolem.K_ind -> Inductive_cst None
   | Ind_cst.Payload_cst c -> Inductive_cst (Some c)
-  | Ind_ty.Payload_ind_projector id -> Projector id
+  | Ind_ty.Payload_ind_projector p -> Projector (Ind_ty.projector_id p)
   | Rewrite.Payload_defined_cst cst ->
     DefinedCst (Rewrite.Defined_cst.level cst, Rewrite.Defined_cst.rules cst)
   | _ -> Other

@@ -290,7 +290,7 @@ term:
     }
 
 constructor:
-  | v=raw_var l=atomic_term* { v, l }
+  | v=raw_var l=atomic_term* { v, List.map (fun ty -> None, ty) l }
 
 constructors:
   | VERTICAL_BAR? l=separated_nonempty_list(VERTICAL_BAR, constructor) { l }

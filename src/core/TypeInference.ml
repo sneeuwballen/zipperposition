@@ -134,7 +134,7 @@ module Ctx = struct
        or bound to [default], if they are not bound *)
     mutable local_vars: T.t Var.t list;
     (* free variables in the local scope *)
-    mutable datatypes: (ID.t * type_) list ID.Tbl.t;
+    mutable datatypes: (ID.t * type_ * (type_ * (ID.t * type_)) list) list ID.Tbl.t;
     (* datatype ID -> list of cstors *)
     mutable new_types: (ID.t * type_) list;
     (* list of symbols whose type has been inferred recently *)
@@ -654,7 +654,7 @@ and infer_match ?loc ctx ~ty_matched t data (l:PT.match_branch list)
              check_ty (T.ty_exn rhs);
              (* now cover every missing case *)
              CCList.filter_map
-               (fun (c_id,c_ty) ->
+               (fun (c_id,c_ty,_) ->
                   if List.exists (ID.equal c_id) !seen
                   then None
                   else (
@@ -676,7 +676,7 @@ and infer_match ?loc ctx ~ty_matched t data (l:PT.match_branch list)
              if List.exists (ID.equal c_id) !seen then (
                error_ ?loc "duplicate branch for constructor `%a`" ID.pp c_id
              );
-             if List.for_all (fun (cstor,_) -> not (ID.equal c_id cstor)) data then (
+             if List.for_all (fun (cstor,_,_) -> not (ID.equal c_id cstor)) data then (
                error_ ?loc "symbol `%a` not a suitable constructor" ID.pp c_id
              );
              seen := c_id :: !seen;
@@ -704,7 +704,7 @@ and infer_match ?loc ctx ~ty_matched t data (l:PT.match_branch list)
   in
   let missing =
     CCList.filter_map
-      (fun (id,_) ->
+      (fun (id,_,_) ->
          if List.exists (fun (c,_,_) -> ID.equal id c.T.cstor_id) l
          then None else Some id)
       data
@@ -984,13 +984,30 @@ let infer_statement_exn ctx st =
                      (fun (name, args) ->
                         let c_id = ID.make name in
                         (* type of c: forall ty_vars. ty_args -> ty_ret *)
-                        let ty_args = List.map (infer_ty_exn ctx) args in
+                        let args =
+                          List.mapi
+                            (fun i (p,ty) ->
+                               let ty = infer_ty_exn ctx ty in
+                               (* type of projector *)
+                               let p_ty =
+                                 T.Ty.forall_l ty_vars (T.Ty.fun_ [ty_ret] ty)
+                               and p_id = match p with
+                                 | Some p -> ID.make p
+                                 | None ->
+                                   (* create projector *)
+                                   ID.makef "proj_%a_%d" ID.pp c_id i
+                               in
+                               Ctx.declare ctx p_id p_ty;
+                               ty, (p_id, p_ty))
+                            args
+                        in
+                        let ty_args = List.map fst args in
                         let ty_c =
                           T.Ty.forall_l ty_vars (T.Ty.fun_ ty_args ty_ret)
                         in
                         Ctx.declare ctx c_id ty_c;
                         (* TODO: check absence of other type variables in ty_c *)
-                        c_id, ty_c)
+                        c_id, ty_c, args)
                      d.A.data_cstors
                  in
                  ID.Tbl.add ctx.Ctx.datatypes data_ty cstors;

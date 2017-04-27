@@ -12,9 +12,11 @@ type 'ty data = {
   (** type parameters *)
   data_ty: 'ty;
   (** type of Id, that is,   [type -> type -> ... -> type] *)
-  data_cstors: (ID.t * 'ty) list;
-  (** Each constructor is [id, ty]. [ty] must be of the form
-      [ty1 -> ty2 -> ... -> id args] *)
+  data_cstors: (ID.t * 'ty * ('ty * (ID.t * 'ty)) list) list;
+  (** Each constructor is [id, ty, args].
+      [ty] must be of the form [ty1 -> ty2 -> ... -> id args].
+      [args] has the form [(ty1, p1), (ty2,p2), …] where each [p]
+      is a projector. *)
 }
 
 type attr =
@@ -128,7 +130,10 @@ let map_data ~ty:fty d =
   { d with
       data_args = List.map (Var.update_ty ~f:fty) d.data_args;
       data_ty = fty d.data_ty;
-      data_cstors = List.map (fun (id,ty) -> id, fty ty) d.data_cstors;
+      data_cstors =
+        List.map (fun (id,ty,args) ->
+          id, fty ty, List.map (fun (ty,(p_id,p_ty)) -> fty ty,(p_id, fty p_ty)) args)
+          d.data_cstors;
   }
 
 let map_def ~form:fform ~term:fterm ~ty:fty d =
@@ -373,6 +378,8 @@ let scan_stmt_for_defined_cst (st:(clause,FOTerm.t,Type.t) t): unit = match view
             Rewrite.Defined_cst.add_eq_rule lr
         end
     end
+  | Data _ -> ()
+    (* TODO: define projectors using Rewrite  *)
   | _ -> ()
 
 (** {2 Inductive Types} *)
@@ -384,7 +391,9 @@ let scan_stmt_for_ind_ty st = match view st with
          let ty_vars =
            List.mapi (fun i v -> HVar.make ~ty:(Var.ty v) i) d.data_args
          and cstors =
-           List.map (fun (c,ty) -> {Ind_ty.cstor_name=c; cstor_ty=ty;}) d.data_cstors
+           List.map
+             (fun (c,ty,args) -> Ind_ty.mk_constructor c ty args)
+             d.data_cstors
          in
          let _ = Ind_ty.declare_ty d.data_id ~ty_vars cstors in
          ())
@@ -400,7 +409,14 @@ let scan_simple_stmt_for_ind_ty st = match view st with
          let ty_vars =
            List.mapi (fun i v -> HVar.make ~ty:(Var.ty v |> conv_ty) i) d.data_args
          and cstors =
-           List.map (fun (c,ty) -> {Ind_ty.cstor_name=c; cstor_ty=conv_ty ty;}) d.data_cstors
+           List.map
+             (fun (c,ty,args) ->
+                let args =
+                  List.map
+                    (fun (ty,(p_id,p_ty)) -> conv_ty ty, (p_id, conv_ty p_ty))
+                    args in
+                Ind_ty.mk_constructor c (conv_ty ty) args)
+             d.data_cstors
          in
          let _ = Ind_ty.declare_ty d.data_id ~ty_vars cstors in
          ())
@@ -442,10 +458,14 @@ module Seq = struct
         SLiteral.iter ~f:(fun t -> k (`Term t)) lhs;
         List.iter (fun f -> k (`Form f)) rhs
       | Data l ->
+        let decl_cstor (id,ty,args) =
+          decl id ty;
+          List.iter (fun (_,(p_id,p_ty)) -> decl p_id p_ty) args;
+        in
         List.iter
           (fun d ->
              decl d.data_id d.data_ty;
-             List.iter (CCFun.uncurry decl) d.data_cstors)
+             List.iter decl_cstor d.data_cstors)
           l
       | Lemma l -> List.iter (fun f -> k (`Form f)) l
       | Assert f
@@ -459,10 +479,14 @@ module Seq = struct
         l
     | TyDecl (id, ty) -> k (id,ty)
     | Data l ->
+      let decl_cstor (id,ty,args) =
+        k(id,ty);
+        List.iter (fun (_,p) -> k p) args;
+      in
       List.iter
         (fun d ->
            k (d.data_id, d.data_ty);
-           List.iter k d.data_cstors)
+           List.iter decl_cstor d.data_cstors)
         l
     | RewriteTerm _
     | RewriteForm _
@@ -574,7 +598,7 @@ let pp ppf ppt ppty out st = match st.view with
     fpf out "@[<2>rewrite%a @[%a@]@ <=> @[%a@]@]." pp_attrs st.attrs
       (SLiteral.pp ppt) lhs (Util.pp_list ~sep:" && " ppf) rhs
   | Data l ->
-    let pp_cstor out (id,ty) =
+    let pp_cstor out (id,ty,_) =
       fpf out "@[<2>| %a :@ @[%a@]@]" ID.pp id ppty ty in
     let pp_data out d =
       fpf out "@[<hv2>@[%a : %a@] :=@ %a@]"
@@ -623,7 +647,7 @@ module ZF = struct
         pp_vars vars (SLiteral.ZF.pp ppt) lhs (Util.pp_list ~sep:" && " ppf)
         rhs
     | Data l ->
-      let pp_cstor out (id,ty) =
+      let pp_cstor out (id,ty,_) =
         fpf out "@[<2>| %a :@ @[%a@]@]" ID.pp id ppty ty in
       let pp_data out d =
         fpf out "@[<hv2>@[%a : %a@] :=@ %a@]"

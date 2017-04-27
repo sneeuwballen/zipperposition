@@ -16,7 +16,7 @@ type res =
 let classify id = match ID.payload id with
   | Ind_ty.Payload_ind_cstor (c,t) -> Cstor (c,t)
   | Ind_ty.Payload_ind_type x -> Ty x
-  | Ind_ty.Payload_ind_projector id -> Projector id
+  | Ind_ty.Payload_ind_projector p -> Projector (Ind_ty.projector_id p)
   | Rewrite.Payload_defined_cst c ->
     DefinedCst (Rewrite.Defined_cst.level c)
   | _ -> Other

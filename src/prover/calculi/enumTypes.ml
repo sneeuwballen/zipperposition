@@ -87,9 +87,9 @@ let _instantiate_shielded = ref false
 let _accept_unary_types = ref true
 let _instantiate_projector_axiom = ref false
 
-let is_projector_ id ~of_ = match ID.payload id with
-  | Ind_ty.Payload_ind_projector of' -> ID.equal of_ of'
-  | _ -> false
+let is_projector_ id ~of_ = match Ind_ty.as_projector id with
+  | Some p -> ID.equal (Ind_ty.projector_id p) of_
+  | None -> false
 
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
@@ -477,21 +477,15 @@ module Make(E : Env.S) : S with module Env = E = struct
     let v_t = T.var v in
     let cases =
       List.map
-        (fun (c_id, c_ty) ->
+        (fun (c_id, c_ty, c_args) ->
            (* declare projector functions for this constructor *)
-           let num_ty_vars, ty_args, ty_ret = Type.open_poly_fun c_ty in
+           let num_ty_vars, _, ty_ret = Type.open_poly_fun c_ty in
            assert (num_ty_vars = List.length ty_vars);
            let projs_of_v =
              List.mapi
-               (fun n ty_arg ->
-                  let proj = ID.makef "proj_%a_%d" ID.pp c_id n in
-                  (* remember that proj is a projector for the enum type *)
-                  ID.set_payload proj (Ind_ty.Payload_ind_projector d.Stmt.data_id);
-                  let ty_proj = Type.(forall_n num_ty_vars ([ty_ret] ==> ty_arg)) in
-                  (* declare projector *)
-                  Ctx.declare proj ty_proj;
+               (fun n (ty_arg,(proj, ty_proj)) ->
                   T.app (T.const ~ty:ty_proj proj) (ty_vars_t @ [v_t]))
-               ty_args
+               c_args
            in
            (* [c (proj1 v) (proj2 v) ... (proj_n v)] *)
            T.app (T.const ~ty:c_ty c_id) (ty_vars_t @ projs_of_v)

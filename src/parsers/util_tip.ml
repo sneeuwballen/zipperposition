@@ -214,7 +214,9 @@ let convert (st:A.statement): UA.statement list =
              let cstors =
                List.map
                  (fun c ->
-                    let args = c.A.cstor_args |> List.map snd |> List.map conv_ty in
+                    let args =
+                      c.A.cstor_args
+                      |> List.map (CCPair.map CCOpt.return conv_ty) in
                     c.A.cstor_name, args)
                  cstors
              in

@@ -17,9 +17,11 @@ type 'ty data = {
   (** type parameters *)
   data_ty: 'ty;
   (** type of Id, that is,   [type -> type -> ... -> type] *)
-  data_cstors: (ID.t * 'ty) list;
-  (** Each constructor is [id, ty]. [ty] must be of the form
-      [ty1 -> ty2 -> ... -> id args] *)
+  data_cstors: (ID.t * 'ty * ('ty * (ID.t * 'ty)) list) list;
+  (** Each constructor is [id, ty, args].
+      [ty] must be of the form [ty1 -> ty2 -> ... -> id args].
+      [args] has the form [(ty1, p1), (ty2,p2), …] where each [p]
+      is a projector. *)
 }
 
 type attr =
@@ -110,7 +112,8 @@ val view : ('f, 't, 'ty) t -> ('f, 't, 'ty) view
 val attrs : (_, _, _) t -> attrs
 val src : (_, _, _) t -> source
 
-val mk_data : ID.t -> args:'ty Var.t list -> 'ty -> (ID.t * 'ty) list -> 'ty data
+val mk_data : ID.t -> args:'ty Var.t list -> 'ty ->
+  (ID.t * 'ty * ('ty * (ID.t * 'ty)) list) list -> 'ty data
 val mk_def : ?rewrite:bool -> ID.t -> 'ty -> ('f,'t,'ty) def_rule list -> ('f,'t,'ty) def
 
 val ty_decl : ?attrs:attrs -> src:source -> ID.t -> 'ty -> (_, _, 'ty) t
