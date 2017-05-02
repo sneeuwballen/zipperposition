@@ -223,6 +223,9 @@ let contains_inductive_types t =
 (** {6 Projectors} *)
 
 let projector_id p = p.p_id
+let projector_ty p = p.p_ty
+let projector_idx p = p.p_index
+let projector_cstor p = Lazy.force p.p_cstor
 
 let as_projector id =
   ID.payload_find id

@@ -91,6 +91,9 @@ val contains_inductive_types : FOTerm.t -> bool
 (** {6 Projectors} *)
 
 val projector_id: projector -> ID.t
+val projector_ty: projector -> Type.t
+val projector_idx: projector -> int
+val projector_cstor: projector -> constructor
 
 val as_projector : ID.t -> projector option
 

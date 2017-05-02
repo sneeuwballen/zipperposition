@@ -144,6 +144,9 @@ module Defined_cst : sig
   (** [declare_or_add id rule] defines [id] if it's not already a
       defined constant, and add [rule] to it *)
 
+  val declare_proj : Ind_ty.projector -> unit
+  (** Declare an inductive projector *)
+
   val add_term_rule : t -> Term.rule -> unit
   val add_term_rule_l : t -> Term.rule list -> unit
   val add_lit_rule : t -> Lit.rule -> unit

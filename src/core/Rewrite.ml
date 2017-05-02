@@ -641,5 +641,42 @@ module Defined_cst = struct
       add_rule c rule
     | None ->
       ignore (declare ?level:None id (Rule_set.singleton rule))
+
+  (* make a single rule [proj (C … x_i …) --> x_i] *)
+  let mk_rule_proj_ (p:Ind_ty.projector): rule =
+    let i = Ind_ty.projector_idx p in
+    let id = Ind_ty.projector_id p in
+    let cstor = Ind_ty.projector_cstor p in
+    let ty_proj = Ind_ty.projector_ty p in
+    (* build the variable arguments *)
+    let ty_cstor = cstor.Ind_ty.cstor_ty in
+    let n_ty_vars, _, _ = Type.open_poly_fun ty_cstor in
+    let ty_vars = CCList.init n_ty_vars (fun i -> HVar.make ~ty:Type.tType i) in
+    let _, ty_args, _ =
+      Type.apply ty_cstor (List.map Type.var ty_vars)
+      |> Type.open_poly_fun
+    in
+    let vars = List.mapi (fun i ty -> HVar.make (i+n_ty_vars) ~ty) ty_args in
+    (* the term [cstor … x_i …] *)
+    let t =
+      T.app_full
+        (T.const ~ty:ty_cstor cstor.Ind_ty.cstor_name)
+        (List.map Type.var ty_vars)
+        (List.map T.var vars)
+    in
+    let rhs = T.var (List.nth vars i) in
+    T_rule (Term.Rule.make id ty_proj (List.map T.var ty_vars @ [t]) rhs)
+
+  let declare_proj (p:Ind_ty.projector): unit =
+    let p_id = Ind_ty.projector_id p in
+    begin match as_defined_cst p_id with
+      | Some _ ->
+        Util.invalid_argf "cannot declare proj %a, already defined" ID.pp p_id
+      | None ->
+        let rule = mk_rule_proj_ p in
+        Util.debugf ~section 3 "(@[declare-proj %a@ :rule %a@])"
+          (fun k->k ID.pp p_id Rule.pp rule);
+        ignore (declare ?level:None p_id (Rule_set.singleton rule))
+    end
 end
 

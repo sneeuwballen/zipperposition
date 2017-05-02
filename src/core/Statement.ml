@@ -380,11 +380,18 @@ let scan_stmt_for_defined_cst (st:(clause,FOTerm.t,Type.t) t): unit = match view
             Rewrite.Defined_cst.add_eq_rule lr
         end
     end
-  | Data _ -> ()
-    (* TODO: define projectors using Rewrite  *)
   | _ -> ()
 
 (** {2 Inductive Types} *)
+
+let decl_projs ity: unit =
+  (* now declare projectors *)
+  List.iter
+    (fun cstor ->
+       List.iter
+         (fun (_, proj) -> Rewrite.Defined_cst.declare_proj proj)
+         cstor.Ind_ty.cstor_args)
+    ity.Ind_ty.ty_constructors
 
 let scan_stmt_for_ind_ty st = match view st with
   | Data l ->
@@ -397,7 +404,8 @@ let scan_stmt_for_ind_ty st = match view st with
              (fun (c,ty,args) -> Ind_ty.mk_constructor c ty args)
              d.data_cstors
          in
-         let _ = Ind_ty.declare_ty d.data_id ~ty_vars cstors in
+         let ity = Ind_ty.declare_ty d.data_id ~ty_vars cstors in
+         decl_projs ity;
          ())
       l
   | _ -> ()
@@ -420,7 +428,8 @@ let scan_simple_stmt_for_ind_ty st = match view st with
                 Ind_ty.mk_constructor c (conv_ty ty) args)
              d.data_cstors
          in
-         let _ = Ind_ty.declare_ty d.data_id ~ty_vars cstors in
+         let ity = Ind_ty.declare_ty d.data_id ~ty_vars cstors in
+         decl_projs ity;
          ())
       l
   | _ -> ()
