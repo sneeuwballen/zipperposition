@@ -572,11 +572,17 @@ module Defined_cst = struct
         Term.Rule.pp r ID.pp id
     )
 
-  let compute_pos (s:rule_set) =
-    Rule_set.to_seq s
-    |> Sequence.map pseudo_rule_of_rule
-    |> Sequence.to_rev_list
-    |> compute_pos_gen
+  let compute_pos id (s:rule_set) =
+    let pos =
+      Rule_set.to_seq s
+      |> Sequence.map pseudo_rule_of_rule
+      |> Sequence.to_rev_list
+      |> compute_pos_gen
+    in
+    Util.debugf ~section 3
+      "(@[<2>defined_pos %a@ :pos (@[<hv>%a@])@])"
+      (fun k->k ID.pp id (Util.pp_seq Defined_pos.pp) (IArray.to_seq pos));
+    pos
 
   let check_rules id rules =
     Rule_set.iter
@@ -592,7 +598,7 @@ module Defined_cst = struct
       defined_level=level;
       defined_ty=ty;
       defined_rules=rules;
-      defined_positions=lazy (compute_pos rules);
+      defined_positions=lazy (compute_pos id rules);
     }
 
   let declare ?level id (rules:rule_set): t =
@@ -622,7 +628,8 @@ module Defined_cst = struct
     end;
     let rules = Rule_set.add r (rules dcst) in
     dcst.defined_rules <- rules;
-    dcst.defined_positions <- lazy (compute_pos rules); (* update positions *)
+    dcst.defined_positions <-
+      lazy (compute_pos dcst.defined_id rules); (* update positions *)
     ()
 
   let add_term_rule (dcst:t) (r:term_rule): unit = add_rule dcst (T_rule r)
