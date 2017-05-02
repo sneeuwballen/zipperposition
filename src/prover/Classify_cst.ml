@@ -13,15 +13,29 @@ type res =
   | DefinedCst of int * Statement.definition
   | Other
 
-let classify id = match ID.payload id with
-  | Ind_ty.Payload_ind_cstor (c,t) -> Cstor (c,t)
-  | Ind_ty.Payload_ind_type x -> Ty x
-  | Skolem.Attr_skolem Skolem.K_ind -> Inductive_cst None
-  | Ind_cst.Payload_cst c -> Inductive_cst (Some c)
-  | Ind_ty.Payload_ind_projector p -> Projector (Ind_ty.projector_id p)
-  | Rewrite.Payload_defined_cst cst ->
-    DefinedCst (Rewrite.Defined_cst.level cst, Rewrite.Defined_cst.rules cst)
-  | _ -> Other
+let classify id =
+  let rec aux = function
+    | [] -> Other
+    | p :: tail ->
+      begin match p id with
+        | None -> aux tail
+        | Some x -> x
+      end
+  in
+  let (|>>) p f id = match p id with | None -> None | Some x -> Some (f x) in
+  aux
+    [ (Ind_ty.as_constructor |>> fun (c,t) -> Cstor (c,t));
+      (Ind_ty.as_inductive_ty |>> fun x -> Ty x);
+      (fun id ->
+         let open CCOpt.Infix in
+         Skolem.as_skolem id >>= function
+         | Skolem.K_ind -> Some (Inductive_cst None)
+         | _ -> None);
+      (Ind_cst.id_as_cst |>> fun c -> Inductive_cst (Some c));
+      (Ind_ty.as_projector |>> fun p -> Projector (Ind_ty.projector_id p));
+      (Rewrite.as_defined_cst |>> fun cst ->
+       DefinedCst (Rewrite.Defined_cst.level cst, Rewrite.Defined_cst.rules cst));
+    ]
 
 let id_is_cstor id = match classify id with Cstor _ -> true | _ -> false
 let id_is_projector id = match classify id with Projector _ -> true | _ -> false

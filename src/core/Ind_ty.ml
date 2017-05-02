@@ -85,9 +85,11 @@ let type_hd_exn ty = match type_hd ty with
   | None ->
     invalid_declf_ "expected function type,@ got `@[%a@]`" Type.pp ty
 
-let as_inductive_ty id = match ID.payload id with
-  | Payload_ind_type ty -> Some ty
-  | _ -> None
+let as_inductive_ty id =
+  ID.payload_find id
+    ~f:(function
+      | Payload_ind_type ty -> Some ty
+      | _ -> None)
 
 let as_inductive_ty_exn id =
   match as_inductive_ty id with
@@ -158,9 +160,9 @@ let declare_ty id ~ty_vars constructors =
     invalid_declf_ "Ind_types.declare_ty %a: no constructors provided" ID.pp id;
   );
   (* check that [ty] is not declared already *)
-  begin match ID.payload id with
-    | Payload_ind_type _ -> invalid_declf_ "inductive type %a already declared" ID.pp id;
-    | _ -> ()
+  begin match as_inductive_ty id with
+    | Some _ -> invalid_declf_ "inductive type %a already declared" ID.pp id;
+    | None -> ()
   end;
   let rec ity = {
     ty_id=id;
@@ -201,9 +203,11 @@ let mk_constructor id ty args =
   ) in
   Lazy.force c
 
-let as_constructor id = match ID.payload id with
-  | Payload_ind_cstor (cstor,ity) -> Some (cstor,ity)
-  | _ -> None
+let as_constructor id =
+  ID.payload_find id
+    ~f:(function
+      | Payload_ind_cstor (cstor,ity) -> Some (cstor,ity)
+      | _ -> None)
 
 let as_constructor_exn id = match as_constructor id with
   | None -> raise (NotAnInductiveConstructor id)
@@ -220,6 +224,8 @@ let contains_inductive_types t =
 
 let projector_id p = p.p_id
 
-let as_projector id = match ID.payload id with
-  | Payload_ind_projector p -> Some p
-  | _ -> None
+let as_projector id =
+  ID.payload_find id
+    ~f:(function
+      | Payload_ind_projector p -> Some p
+      | _ -> None)

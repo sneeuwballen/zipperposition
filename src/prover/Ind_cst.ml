@@ -62,9 +62,11 @@ let pp out c = ID.pp out c.cst_id
 
 let on_new_cst = Signal.create()
 
-let id_as_cst id = match ID.payload id with
-  | Payload_cst c -> Some c
-  | _ -> None
+let id_as_cst id =
+  ID.payload_find id
+    ~f:(function
+      | Payload_cst c -> Some c
+      | _ -> None)
 
 let id_as_cst_exn id = match id_as_cst id with
   | None -> raise (NotAnInductiveConstant id)

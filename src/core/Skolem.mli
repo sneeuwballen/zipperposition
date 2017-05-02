@@ -121,4 +121,6 @@ exception Attr_skolem of kind
 val is_skolem : ID.t -> bool
 (** [is_skolem id] returns [true] iff [id] is a Skolem symbol *)
 
+val as_skolem : ID.t -> kind option
+
 

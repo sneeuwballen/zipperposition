@@ -92,9 +92,11 @@ let pp_rule_set out (rs: rule_set): unit =
 (** Annotation on IDs that are defined. *)
 exception Payload_defined_cst of defined_cst
 
-let as_defined_cst id = match ID.payload id with
-  | Payload_defined_cst c -> Some c
-  | _ -> None
+let as_defined_cst id =
+  ID.payload_find id
+    ~f:(function
+      | Payload_defined_cst c -> Some c
+      | _ -> None)
 
 let is_defined_cst id = CCOpt.is_some (as_defined_cst id)
 

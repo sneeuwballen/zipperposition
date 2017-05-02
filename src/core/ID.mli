@@ -12,7 +12,7 @@
 type t = private {
   id: int;
   name: string;
-  mutable payload: exn; (** Use [exn] as an open type for user-defined payload *)
+  mutable payload: exn list; (** Use [exn] as an open type for user-defined payload *)
 }
 
 val make : string -> t
@@ -25,18 +25,16 @@ val copy : t -> t
 
 val id : t -> int
 val name : t -> string
-val payload : t -> exn
+val payload : t -> exn list
 
-exception No_payload
+val payload_find: f:(exn -> 'a option) -> t -> 'a option
+
+val payload_pred: f:(exn -> bool) -> t -> bool
 
 val set_payload : ?can_erase:(exn -> bool) -> t -> exn -> unit
 (** Set given exception as payload.
-    @param can_erase if provided, checks whether the current value
-      can be safely erased.
-    @raise Invalid_argument if there already is a payload. *)
-
-val set_payload_erase : t -> exn -> unit
-(** Set given exception as payload. Erases any previous value. *)
+    @param can_erase if provided, checks whether an existing value
+      is to be replaced instead of adding a new entry *)
 
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t

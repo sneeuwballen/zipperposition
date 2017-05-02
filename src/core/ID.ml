@@ -6,18 +6,16 @@
 type t = {
   id: int;
   name: string;
-  mutable payload: exn; (** Use [exn] as an open type for user-defined payload *)
+  mutable payload: exn list; (** Use [exn] as an open type for user-defined payload *)
 }
 type t_ = t
-
-exception No_payload
 
 let make =
   let n = ref 0 in
   fun name ->
     let id = !n in
     incr n;
-    {id; name; payload=No_payload; }
+    {id; name; payload=[]; }
 
 let makef fmt = CCFormat.ksprintf ~f:make fmt
 
@@ -27,12 +25,39 @@ let id t = t.id
 let name t = t.name
 let payload t = t.payload
 
-let set_payload_erase t e = t.payload <- e
+let set_payload ?(can_erase=fun _->false) t e =
+  let rec aux = function
+    | [] -> [e]
+    | e' :: tail when can_erase e' -> e :: tail
+    | e' :: tail -> e' :: aux tail
+  in
+  t.payload <- aux t.payload
 
-let set_payload ?(can_erase=fun _->false) t e = match t.payload with
-  | No_payload -> t.payload <- e
-  | old_e when can_erase old_e -> t.payload <- e
-  | old_e -> invalid_arg ("ID.set_payload: collision with "^ Printexc.to_string old_e)
+let payload_find ~f:p t =
+  begin match t.payload with
+    | [] -> None
+    | e1 :: tail ->
+      match p e1, tail with
+        | Some _ as res, _ -> res
+        | None, [] -> None
+        | None, e2 :: tail2 ->
+          match p e2, tail2 with
+            | Some _ as res, _ -> res
+            | None, [] -> None
+            | None, e3 :: tail3 ->
+              match p e3 with
+                | Some _ as res -> res
+                | None -> CCList.find_map p tail3
+  end
+
+let payload_pred ~f:p t =
+  begin match t.payload with
+    | [] -> false
+    | e :: _ when p e -> true
+    | _ :: e :: _ when p e -> true
+    | _ :: _ :: e :: _ when p e -> true
+    | l -> List.exists p l
+  end
 
 let hash t = t.id
 let equal i1 i2 = i1.id = i2.id

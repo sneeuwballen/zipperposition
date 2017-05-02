@@ -272,10 +272,12 @@ end
 
 type definition = Rewrite.rule_set
 
-let as_defined_cst id = match ID.payload id with
-  | Rewrite.Payload_defined_cst c ->
-    Some (Rewrite.Defined_cst.level c, Rewrite.Defined_cst.rules c)
-  | _ -> None
+let as_defined_cst id =
+  ID.payload_find id
+    ~f:(function
+      | Rewrite.Payload_defined_cst c ->
+        Some (Rewrite.Defined_cst.level c, Rewrite.Defined_cst.rules c)
+      | _ -> None)
 
 let as_defined_cst_level id = CCOpt.map fst @@ as_defined_cst id
 

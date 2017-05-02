@@ -121,9 +121,11 @@ type def =
 exception Payload_def of def
 
 
-let def id = match ID.payload id with
-  | Payload_def d -> Some d
-  | _ -> None
+let def id =
+  ID.payload_find id
+    ~f:(function 
+      | Payload_def d -> Some d
+      | _ -> None)
 
 let def_exn id = match def id with
   | Some d -> d

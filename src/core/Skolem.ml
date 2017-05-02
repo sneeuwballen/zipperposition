@@ -243,6 +243,14 @@ let pop_new_definitions ~ctx =
   ctx.sc_new_defs <- [];
   l
 
-let is_skolem id = match ID.payload id with
-  | Attr_skolem _ -> true
-  | _ -> false
+let is_skolem id =
+  ID.payload_pred id
+    ~f:(function
+      | Attr_skolem _ -> true
+      | _ -> false)
+
+let as_skolem id =
+  ID.payload_find id
+    ~f:(function
+      | Attr_skolem a -> Some a
+      | _ -> None)
