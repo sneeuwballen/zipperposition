@@ -108,7 +108,7 @@ module Narrow : sig
   val default_limit: int
   val check_form: limit:int -> form -> res
 end = struct
-  let default_limit = 50
+  let default_limit = 10
 
   (* pseudo-substitution that is accumulated *)
   type subst_acc = T.t T.VarMap.t
