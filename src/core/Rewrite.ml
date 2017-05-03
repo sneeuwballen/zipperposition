@@ -685,5 +685,46 @@ module Defined_cst = struct
           (fun k->k ID.pp p_id Rule.pp rule);
         ignore (declare ?level:None p_id (Rule_set.singleton rule))
     end
+
+  (* make a single rule [C (proj_1 x)…(proj_n x) --> x] *)
+  let mk_rule_cstor_ (c:Ind_ty.constructor): rule =
+    let c_id = c.Ind_ty.cstor_name in
+    let projs = List.map snd c.Ind_ty.cstor_args in
+    assert (projs <> []);
+    (* make type variables *)
+    let c_ty = c.Ind_ty.cstor_ty in
+    let n_ty_vars, _, _ = Type.open_poly_fun c_ty in
+    let ty_vars = CCList.init n_ty_vars (fun i -> HVar.make ~ty:Type.tType i) in
+    (* build LHS *)
+    let _, _, ty_x =
+      Type.apply c_ty (List.map Type.var ty_vars)
+      |> Type.open_poly_fun
+    in
+    let x = HVar.make ~ty:ty_x 0 in
+    let args =
+      List.map
+        (fun proj ->
+           T.app_full
+             (T.const ~ty:(Ind_ty.projector_ty proj) (Ind_ty.projector_id proj))
+             (List.map Type.var ty_vars)
+             [T.var x])
+        projs
+    in
+    let rhs = T.var x in
+    T_rule (Term.Rule.make c_id c_ty (List.map T.var ty_vars @ args) rhs)
+
+  let declare_cstor (c:Ind_ty.constructor): unit =
+    let c_id = c.Ind_ty.cstor_name in
+    if not (CCList.is_empty c.Ind_ty.cstor_args) then (
+      begin match as_defined_cst c_id with
+        | Some _ ->
+          Util.invalid_argf "cannot declare cstor %a, already defined" ID.pp c_id
+        | None ->
+          let rule = mk_rule_cstor_ c in
+          Util.debugf ~section 3 "(@[declare-cstor %a@ :rule %a@])"
+            (fun k->k ID.pp c_id Rule.pp rule);
+          ignore (declare ?level:None c_id (Rule_set.singleton rule))
+      end
+    )
 end
 

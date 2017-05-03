@@ -147,6 +147,9 @@ module Defined_cst : sig
   val declare_proj : Ind_ty.projector -> unit
   (** Declare an inductive projector *)
 
+  val declare_cstor : Ind_ty.constructor -> unit
+  (** Add a rewrite rule [cstor (proj1 x)…(projn x) --> x] *)
+
   val add_term_rule : t -> Term.rule -> unit
   val add_term_rule_l : t -> Term.rule list -> unit
   val add_lit_rule : t -> Lit.rule -> unit
