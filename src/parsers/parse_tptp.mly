@@ -175,12 +175,12 @@ formula:
   | f=app_formula { f }
 
 app_formula:
-  | f=unitary_formula AT t=unitary_formula
+  | f=unitary_formula AT t=unary_formula
     {
       let loc = L.mk_pos $startpos $endpos in
       PT.app ~loc f [t]
     }
-  | f=app_formula AT t=unitary_formula
+  | f=app_formula AT t=unary_formula
     {
       let loc = L.mk_pos $startpos $endpos in
       PT.app ~loc f [t]
@@ -195,7 +195,7 @@ unitary_atomic_formula:
   | LEFT_PAREN f=formula RIGHT_PAREN { f }
 
 quantified_formula:
-  | q=quantifier LEFT_BRACKET vars=typed_vars RIGHT_BRACKET COLUMN f=unitary_infix_formula
+  | q=quantifier LEFT_BRACKET vars=typed_vars RIGHT_BRACKET COLUMN f=unary_formula
     {
       let loc = L.mk_pos $startpos $endpos in
       q ?loc:(Some loc) vars f
