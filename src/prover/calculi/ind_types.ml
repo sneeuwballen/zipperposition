@@ -256,7 +256,7 @@ module Make(Env : Env_intf.S) = struct
       let rhs_l =
         ity.Ind_ty.ty_constructors
         |> List.map
-          (fun { Ind_ty.cstor_name; cstor_ty } ->
+          (fun { Ind_ty.cstor_name; cstor_ty; _ } ->
              let n_args, _, _ = Type.open_poly_fun cstor_ty in
              assert (n_args = List.length ty_params);
              let cstor_ty_args, ret =
