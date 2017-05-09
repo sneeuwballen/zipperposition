@@ -25,7 +25,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module C = Env.C
 
   (* replace [sub] by [true/false] in [c], obtaining a new clause *)
-  let fool_param ~sub sign c =
+  let fool_param_sign ~sub sign c =
     let lits =
       C.lits c
       |> Literals.map (T.replace ~old:sub ~by:(if sign then T.true_ else T.false_))
@@ -70,7 +70,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     begin
       T.Set.to_seq sub_terms
       |> Sequence.flat_map_l
-        (fun sub -> [fool_param ~sub true c; fool_param ~sub false c])
+        (fun sub -> [fool_param_sign ~sub true c; fool_param_sign ~sub false c])
       |> Sequence.to_rev_list
     end
 
