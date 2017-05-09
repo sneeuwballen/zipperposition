@@ -101,6 +101,9 @@ frogtest-tip-isaplanner: tip-benchmarks
 	frogtest run --meta=`git rev-parse HEAD` -c ./data/tip.toml \
 	  tip-benchmarks/benchmarks/isaplanner/
 
+frogtest-thf:
+	frogtest run -c data/bench.toml --profile=thf
+
 BENCH_DIR="bench-$(shell date -Iminutes)"
 frogtest-tptp:
 	@echo "start benchmarks in ${BENCH_DIR}"
