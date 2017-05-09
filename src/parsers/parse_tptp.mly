@@ -28,6 +28,7 @@
 %token FOF
 %token CNF
 %token TFF
+%token THF
 %token INCLUDE
 
 %token NOT
@@ -39,6 +40,9 @@
 %token TYPE_TY  /* tType */
 %token WILDCARD  /* $_ */
 
+%token AT /* @ */
+%token LAMBDA /* ^ */
+
 %token AND
 %token NOTAND
 %token VLINE
@@ -47,7 +51,6 @@
 %token LEFT_IMPLY
 %token EQUIV
 %token XOR
-%token GENTZEN_ARROW
 %token EQUAL
 %token NOT_EQUAL
 
@@ -91,7 +94,7 @@
 /* top-level */
 
 parse_term: t=term EOI { t }
-parse_formula: f=fof_formula EOI { f }
+parse_formula: f=formula EOI { f }
 parse_declaration: d=declaration EOI { d }
 parse_declarations: l=declarations EOI { l }
 parse_answer_tuple: t=answer_tuples EOI { t }
@@ -102,11 +105,13 @@ declarations:
   | l=declaration* { l }
 
 declaration:
-  | FOF LEFT_PAREN name=name COMMA role=role COMMA f=fof_formula info=annotations RIGHT_PAREN DOT
+  | FOF LEFT_PAREN name=name COMMA role=role COMMA f=formula info=annotations RIGHT_PAREN DOT
     { A.FOF (name, role, f, info) }
-  | TFF LEFT_PAREN name=name COMMA role=role COMMA f=fof_formula info=annotations RIGHT_PAREN DOT
+  | TFF LEFT_PAREN name=name COMMA role=role COMMA f=formula info=annotations RIGHT_PAREN DOT
     { A.TFF (name, role, f, info) }
-  | TFF LEFT_PAREN name=name COMMA role COMMA tydecl=type_decl info=annotations RIGHT_PAREN DOT
+  | THF LEFT_PAREN name=name COMMA role=role COMMA f=formula info=annotations RIGHT_PAREN DOT
+    { A.THF (name, role, f, info) }
+  | declaration_ty_header LEFT_PAREN name=name COMMA role COMMA tydecl=type_decl info=annotations RIGHT_PAREN DOT
     { let s, ty = tydecl in
       match ty.PT.term with
       | PT.AppBuiltin (Builtin.TType, [])
@@ -128,6 +133,9 @@ declaration:
       let loc = L.mk_pos $startpos $endpos in
       UntypedAST.error loc "expected declaration"
     }
+
+%inline
+declaration_ty_header: TFF {} | THF {}
 
 role: w=LOWER_WORD { Ast_tptp.role_of_string w }
 
@@ -154,83 +162,80 @@ disjunction:
 
 literal:
   | f=atomic_formula { f }
-  | NOT f=atomic_formula
+  | NOT f=unitary_formula
     {
       let loc = L.mk_pos $startpos $endpos in
       PT.not_ ~loc f
     }
 
-fof_formula:
-  | fof_logic_formula { $1 }
-  | fof_sequent { $1 }
+/* actually, any formula or term */
+formula:
+  | f=binary_formula { f }
+  | f=unary_formula { f }
+  | f=app_formula { f }
 
-fof_sequent:
-  | l=fof_tuple GENTZEN_ARROW r=fof_tuple
-    { (* TODO accurate locs for subterms *)
-      let loc = L.mk_pos $startpos $endpos in
-      PT.imply ~loc (PT.and_ ~loc l) (PT.or_ ~loc r)
-    }
-  | LEFT_PAREN seq=fof_sequent RIGHT_PAREN { seq }
-
-fof_tuple:
-  LEFT_BRACKET l=separated_list(COMMA, fof_logic_formula) RIGHT_BRACKET { l }
-
-fof_logic_formula:
-  | f=fof_unitary_formula { f }
-  | f=fof_binary_formula { f }
-
-fof_unitary_formula:
-  | fof_quantified_formula { $1 }
-  | fof_unary_formula { $1 }
-  | atomic_formula { $1 }
-  | LEFT_PAREN f=fof_logic_formula RIGHT_PAREN { f }
-
-fof_quantified_formula:
-  | q=fol_quantifier LEFT_BRACKET vars=typed_vars RIGHT_BRACKET COLUMN f=fof_unitary_formula
+app_formula:
+  | f=unitary_formula AT t=unitary_formula
     {
       let loc = L.mk_pos $startpos $endpos in
-      q ~loc vars f
+      PT.app ~loc f [t]
+    }
+  | f=app_formula AT t=unitary_formula
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      PT.app ~loc f [t]
     }
 
-fof_unary_formula:
-  | o=unary_connective f=fof_unitary_formula
+unitary_formula:
+  | f=quantified_formula { f }
+  | f=unitary_atomic_formula { f }
+
+unitary_atomic_formula:
+  | f=atomic_formula { f }
+  | LEFT_PAREN f=formula RIGHT_PAREN { f }
+
+quantified_formula:
+  | q=quantifier LEFT_BRACKET vars=typed_vars RIGHT_BRACKET COLUMN f=unitary_infix_formula
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      q ?loc:(Some loc) vars f
+    }
+
+unitary_infix_formula:
+  | f=unitary_formula { f }
+  | l=unitary_atomic_formula op=infix_connective r=unitary_formula { op l r }
+
+unary_formula:
+  | f=unitary_infix_formula { f }
+  | o=unary_connective f=unitary_infix_formula
     {
      let loc = L.mk_pos $startpos $endpos in
-     o ~loc f
+     o ?loc:(Some loc) f
     }
 
-fof_binary_formula:
-  | f=fof_nonassoc_binary_formula { f }
-  | f=fof_assoc_binary_formula { f }
+binary_formula:
+  | f=nonassoc_binary_formula { f }
+  | f=assoc_binary_formula { f }
 
-fof_nonassoc_binary_formula:
-  | l=fof_unitary_formula o=binary_connective r=fof_unitary_formula
+nonassoc_binary_formula:
+  | l=unary_formula o=binary_connective r=unary_formula
     {
       let loc = L.mk_pos $startpos $endpos in
       o ?loc:(Some loc) l r
     }
 
-fof_assoc_binary_formula:
-  | f=fof_and_formula { f }
-  | f=fof_or_formula { f }
+assoc_binary_formula:
+  | f=and_formula { f }
+  | f=or_formula { f }
 
-fof_or_formula:
-  | l=fof_unitary_formula
-    VLINE
-    r=separated_nonempty_list(VLINE,fof_unitary_formula)
-    {
-      let loc = L.mk_pos $startpos $endpos in
-      PT.or_ ~loc (l :: r)
-    }
+assoc_binary_formula_aux(OP):
+  | l=unary_formula
+    OP
+    r=separated_nonempty_list(OP,unary_formula)
+    { l :: r }
 
-fof_and_formula:
-  | l=fof_unitary_formula
-    AND
-    r=separated_nonempty_list(AND,fof_unitary_formula)
-    {
-      let loc = L.mk_pos $startpos $endpos in
-      PT.and_ ~loc (l :: r)
-    }
+and_formula: l=assoc_binary_formula_aux(AND) { PT.and_ l }
+or_formula: l=assoc_binary_formula_aux(VLINE) { PT.or_ l }
 
 %inline binary_connective:
   | EQUIV { PT.equiv }
@@ -239,17 +244,17 @@ fof_and_formula:
   | XOR { PT.xor }
   | NOTVLINE { fun ?loc x y -> PT.not_ ?loc (PT.or_ ?loc [x; y]) }
   | NOTAND { fun ?loc x y -> PT.not_ ?loc (PT.and_ ?loc [x; y]) }
-%inline fol_quantifier:
+%inline quantifier:
   | FORALL { PT.forall }
   | EXISTS { PT.exists }
+  | LAMBDA { PT.lambda }
 %inline unary_connective:
   | NOT { PT.not_ }
 
 atomic_formula:
   | TRUE { PT.true_ }
   | FALSE { PT.false_ }
-  | l=term o=infix_connective r=term { o l r }
-  | t=function_term
+  | t=term
     {
       let loc = L.mk_pos $startpos $endpos in
       PT.at_loc ~loc t
@@ -262,27 +267,33 @@ atomic_formula:
 /* Terms */
 
 term:
-  | function_term { $1 }
-  | variable { $1 }
+  | t=function_term { t }
+  | t=variable { t }
   /* | conditional_term { $1 }  for TFF */
   /* | let_term { $1 } */
 
 function_term:
-  | plain_term { $1 }
-  | defined_term { $1 }
-  | system_term { $1 }
+  | t=plain_term { t }
+  | t=defined_term { t }
+  | t=system_term { t }
 
 plain_term:
+  | t=atomic_term { t }
+  | f=functor_ LEFT_PAREN args=term_arguments RIGHT_PAREN
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      PT.app ~loc f args
+    }
+
+atomic_term:
   | s=atomic_word
     {
       let loc = L.mk_pos $startpos $endpos in
       PT.const ~loc s
     }
-  | f=functor_ LEFT_PAREN args=arguments RIGHT_PAREN
-    {
-      let loc = L.mk_pos $startpos $endpos in
-      PT.app ~loc f args
-    }
+
+term_arguments:
+  | l=separated_nonempty_list(COMMA, formula) { l }
 
 functor_:
   | f=atomic_word { PT.const f }
@@ -318,12 +329,12 @@ defined_plain_term:
           UntypedAST.errorf loc "unknown builtin `%s`" s
       | Some b -> PT.builtin ~loc b
     }
-  | f=defined_functor LEFT_PAREN args=arguments RIGHT_PAREN
+  | f=defined_functor LEFT_PAREN args=term_arguments RIGHT_PAREN
     {
       let loc = L.mk_pos $startpos $endpos in
       PT.app ~loc f args
     }
-  | s=DOLLAR_WORD LEFT_PAREN args=arguments RIGHT_PAREN
+  | s=DOLLAR_WORD LEFT_PAREN args=term_arguments RIGHT_PAREN
     {
       let loc = L.mk_pos $startpos $endpos in
       match Builtin.TPTP.of_string s with
@@ -336,7 +347,7 @@ defined_functor: s=atomic_defined_word { s }
 
 system_term:
   | c=system_constant { c }
-  | f=system_functor LEFT_PAREN args=arguments RIGHT_PAREN
+  | f=system_functor LEFT_PAREN args=term_arguments RIGHT_PAREN
     {
       let loc = L.mk_pos $startpos $endpos in
       PT.app ~loc f args
@@ -395,8 +406,6 @@ type_const:
   | WILDCARD { PT.wildcard }
   | w=LOWER_WORD { PT.const w }
 
-arguments: separated_nonempty_list(COMMA, term) { $1 }
-
 variable:
   | x=UPPER_WORD
     {
@@ -405,7 +414,7 @@ variable:
     }
 
 atomic_word:
-  | s=SINGLE_QUOTED { remove_quotes s }
+  | s=SINGLE_QUOTED { s }
   | s=LOWER_WORD { s }
 
 atomic_defined_word:
@@ -439,13 +448,13 @@ annotations:
   | COMMA l=separated_list(COMMA, general_term) { l }
 
 general_term:
-  | general_data { $1 }
+  | g=general_data { g }
   | l=general_data COLUMN r=general_term { Ast_tptp.GColumn (l, r) }
-  | general_list { $1 }
+  | g=general_list { g }
 
 general_data:
   | w=atomic_word { Ast_tptp.GString w }
-  | general_function { $1 }
+  | g=general_function { g }
   | i=INTEGER { Ast_tptp.GInt (int_of_string i) }
   | v=UPPER_WORD { Ast_tptp.GVar v }
   | w=DISTINCT_OBJECT { Ast_tptp.GString w }
