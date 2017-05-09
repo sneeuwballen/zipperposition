@@ -1,0 +1,10 @@
+
+# expect: unsat
+
+val i:type.
+
+# not (f true), f false... so f=not should work
+goal
+  exists (f: prop ->prop).
+  (~ (f true) && f (forall (x:prop). x)).
+
