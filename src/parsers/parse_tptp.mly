@@ -154,15 +154,19 @@ type_decl:
   | s=atomic_word COLUMN ty=tff_quantified_type { s, ty }
 
 cnf_formula:
-  | LEFT_PAREN c=disjunction RIGHT_PAREN { c }
+  | LEFT_PAREN c=cnf_formula RIGHT_PAREN { c }
   | c=disjunction { c }
 
 disjunction:
   | l=separated_nonempty_list(VLINE, literal) { l }
 
-literal:
+literal_atom:
   | f=atomic_formula { f }
-  | NOT f=unitary_formula
+  | l=atomic_formula op=infix_connective r=atomic_formula { op l r }
+
+literal:
+  | f=literal_atom { f }
+  | NOT f=literal_atom
     {
       let loc = L.mk_pos $startpos $endpos in
       PT.not_ ~loc f
