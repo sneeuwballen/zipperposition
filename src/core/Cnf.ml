@@ -907,59 +907,60 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
     then f
     else introduce_defs ~is_pos:(not is_goal) ~ctx stmt f
   in
-  let res = seq
-            |> Sequence.flat_map
-              (fun stmt ->
-                 let old_counter = Skolem.counter ctx in
-                 let src () =
-                   if Skolem.counter ctx > old_counter
-                   then Stmt.Src.preprocess_input stmt "rename"
-                   else stmt.Stmt.src
-                 in
-                 let new_st = match stmt.Stmt.view with
-                   | Stmt.Data _
-                   | Stmt.RewriteTerm _
-                   | Stmt.TyDecl _ -> stmt
-                   | Stmt.Def l ->
-                     let l =
-                       List.map
-                         (fun d ->
-                            if T.Ty.returns_prop d.Stmt.def_ty
-                            then
-                              let rules =
-                                List.map
-                                  (function
-                                    | Stmt.Def_term _ -> assert false
-                                    | Stmt.Def_form (vars,lhs,rhs) ->
-                                      let rhs = List.map (process_form stmt ~is_goal:false) rhs in
-                                      Stmt.Def_form (vars,lhs,rhs))
-                                  d.Stmt.def_rules
-                              in
-                              { d with Stmt.def_rules=rules }
-                            else d)
-                         l
-                     in
-                     Stmt.def ~src:(src ()) l
-                   | Stmt.RewriteForm (vars, lhs, rhs) ->
-                     let rhs = List.map (process_form stmt ~is_goal:false) rhs in
-                     Stmt.rewrite_form ~src:(src ()) (vars, lhs, rhs)
-                   | Stmt.Assert f ->
-                     let f = process_form stmt ~is_goal:false f in
-                     Stmt.assert_ ~src:(src ()) f
-                   | Stmt.Lemma l ->
-                     let l = List.map (process_form stmt ~is_goal:true) l in
-                     Stmt.lemma ~src:(src ()) l
-                   | Stmt.Goal f ->
-                     let f = process_form stmt ~is_goal:true f in
-                     Stmt.goal ~src:(src()) f
-                   | Stmt.NegatedGoal _ -> assert false
-                 in
-                 begin match new_defs ~ctx stmt with
-                   | [] -> Sequence.return new_st
-                   | l -> Sequence.of_list (List.rev (new_st :: l))
-                 end
-              )
-            |> CCVector.of_seq ?init:None
+  let res =
+    seq
+    |> Sequence.flat_map
+      (fun stmt ->
+         let old_counter = Skolem.counter ctx in
+         let src () =
+           if Skolem.counter ctx > old_counter
+           then Stmt.Src.preprocess_input stmt "rename"
+           else stmt.Stmt.src
+         in
+         let new_st = match stmt.Stmt.view with
+           | Stmt.Data _
+           | Stmt.RewriteTerm _
+           | Stmt.TyDecl _ -> stmt
+           | Stmt.Def l ->
+             let l =
+               List.map
+                 (fun d ->
+                    if T.Ty.returns_prop d.Stmt.def_ty
+                    then
+                      let rules =
+                        List.map
+                          (function
+                            | Stmt.Def_term _ -> assert false
+                            | Stmt.Def_form (vars,lhs,rhs) ->
+                              let rhs = List.map (process_form stmt ~is_goal:false) rhs in
+                              Stmt.Def_form (vars,lhs,rhs))
+                          d.Stmt.def_rules
+                      in
+                      { d with Stmt.def_rules=rules }
+                    else d)
+                 l
+             in
+             Stmt.def ~src:(src ()) l
+           | Stmt.RewriteForm (vars, lhs, rhs) ->
+             let rhs = List.map (process_form stmt ~is_goal:false) rhs in
+             Stmt.rewrite_form ~src:(src ()) (vars, lhs, rhs)
+           | Stmt.Assert f ->
+             let f = process_form stmt ~is_goal:false f in
+             Stmt.assert_ ~src:(src ()) f
+           | Stmt.Lemma l ->
+             let l = List.map (process_form stmt ~is_goal:true) l in
+             Stmt.lemma ~src:(src ()) l
+           | Stmt.Goal f ->
+             let f = process_form stmt ~is_goal:true f in
+             Stmt.goal ~src:(src()) f
+           | Stmt.NegatedGoal _ -> assert false
+         in
+         begin match new_defs ~ctx stmt with
+           | [] -> Sequence.return new_st
+           | l -> Sequence.of_list (List.rev (new_st :: l))
+         end
+      )
+    |> CCVector.of_seq ?init:None
   in
   Util.exit_prof prof_simplify_rename;
   res
