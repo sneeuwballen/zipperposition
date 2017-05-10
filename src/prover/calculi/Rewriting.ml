@@ -150,6 +150,11 @@ module Make(E : Env_intf.S) = struct
       let t = RW.Term.Rule.lhs r in
       T.all_positions ~vars:false ~pos:P.stop ~ty_args:false t
       |> Sequence.filter (fun (_,p) -> not (P.equal p P.stop)) (* not root *)
+      |> Sequence.filter
+        (fun (t,_) -> match T.Classic.view t with
+           | T.Classic.App (id,_) -> not (Ind_ty.is_constructor id)
+           | T.Classic.Var _ | T.Classic.DB _
+           | T.Classic.AppBuiltin (_,_) | T.Classic.NonFO -> false)
       |> Sequence.filter_map
         (fun (t,p) ->
            try
@@ -177,7 +182,7 @@ module Make(E : Env_intf.S) = struct
         | RW.L_rule r -> find_lit r)
 
   (* do narrowing with [s=t], a literal in [c], and add results to [acc] *)
-  let ctx_narrow_with s t s_pos c acc : C.t list =
+  let ctx_narrow_with ~ord s t s_pos c acc : C.t list =
     let sc_a = 1 and sc_p = 0 in
     (* do narrowing inside this rule? *)
     let do_narrowing rule rule_pos subst =
@@ -185,10 +190,10 @@ module Make(E : Env_intf.S) = struct
         | RW.T_rule r -> [ [| RW.Term.Rule.as_lit r |] ]
         | RW.L_rule r -> RW.Lit.Rule.as_clauses r
       in
-      begin
-        let renaming = E.Ctx.renaming_clear() in
-        let s' = Subst.FO.apply ~renaming subst (s,sc_a) in
-        let t' = Subst.FO.apply ~renaming subst (t,sc_a) in
+      let renaming = E.Ctx.renaming_clear() in
+      let s' = Subst.FO.apply ~renaming subst (s,sc_a) in
+      let t' = Subst.FO.apply ~renaming subst (t,sc_a) in
+      if Ordering.compare ord s' t' <> Comparison.Lt then (
         Util.incr_stat stat_ctx_narrowing;
         rule_clauses
         |> List.map
@@ -222,7 +227,7 @@ module Make(E : Env_intf.S) = struct
                (fun k->k RW.Rule.pp rule C.pp c P.pp rule_pos Subst.pp subst C.pp new_c);
              new_c)
         |> CCOpt.return
-      end
+      ) else None
     in
     ctx_narrow_find (s,sc_a) sc_p
     |> Sequence.fold
@@ -236,16 +241,16 @@ module Make(E : Env_intf.S) = struct
     (* no literal can be eligible for paramodulation if some are selected.
        This checks if inferences with i-th literal are needed? *)
     let eligible = C.Eligible.param c in
+    let ord = E.Ctx.ord() in
     (* do the inferences where clause is active; for this,
        we try to rewrite conditionally other clauses using
        non-minimal sides of every positive literal *)
     let new_clauses =
-      Literals.fold_eqn ~sign:true ~ord:(E.Ctx.ord ())
-        ~both:true ~eligible (C.lits c)
+      Literals.fold_eqn ~sign:true ~ord ~both:true ~eligible (C.lits c)
       |> Sequence.fold
         (fun acc (s, t, _, s_pos) ->
            (* rewrite clauses using s *)
-           ctx_narrow_with s t s_pos c acc)
+           ctx_narrow_with ~ord s t s_pos c acc)
         []
     in
     new_clauses
