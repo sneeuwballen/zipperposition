@@ -48,6 +48,7 @@ let load_extensions =
   Extensions.register Arith_rat.extension;
   Extensions.register Ind_types.extension;
   Extensions.register Fool.extension;
+  Extensions.register Higher_order.extension;
   let l = Extensions.extensions () in
   Phases.return_phase l
 
