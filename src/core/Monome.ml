@@ -3,9 +3,9 @@
 
 (** {1 Polynomes of order 1, over several variables}. *)
 
-module T = FOTerm
+module T = Term
 
-type term = FOTerm.t
+type term = Term.t
 
 (** Typeclass num *)
 type 'a num = {
@@ -879,7 +879,7 @@ module Int = struct
   (** {2 Find Solutions} *)
 
   module Solve = struct
-    type solution = (FOTerm.t * t) list
+    type solution = (Term.t * t) list
     (** List of constraints (term = monome). It means that
         if all those constraints are satisfied, then a solution
         to the given problem has been found *)

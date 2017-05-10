@@ -4,11 +4,11 @@
 (** {1 Array of literals} *)
 
 module BV = CCBV
-module T = FOTerm
+module T = Term
 module S = Subst
 module Lit = Literal
 
-type term = FOTerm.t
+type term = Term.t
 
 type t = Literal.t array
 

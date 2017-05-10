@@ -47,7 +47,7 @@ module type S = sig
   type is_trivial_rule = C.t -> bool
   (** Rule that checks whether the clause is trivial (a tautology) *)
 
-  type term_rewrite_rule = FOTerm.t -> FOTerm.t option
+  type term_rewrite_rule = Term.t -> Term.t option
   (** Rewrite rule on terms *)
 
   type lit_rewrite_rule = Literal.t -> Literal.t option
@@ -214,7 +214,7 @@ module type S = sig
   val simplify : simplify_rule
   (** Simplify the clause. *)
 
-  val simplify_term : FOTerm.t -> FOTerm.t SimplM.t
+  val simplify_term : Term.t -> Term.t SimplM.t
   (** Simplify the term *)
 
   val backward_simplify : C.t -> C.ClauseSet.t * C.t Sequence.t

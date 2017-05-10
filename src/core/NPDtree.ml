@@ -3,7 +3,7 @@
 
 (** {1 Non-Perfect Discrimination Tree} *)
 
-module T = FOTerm
+module T = Term
 module S = Subst
 module TC = T.Classic
 

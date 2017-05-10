@@ -6,7 +6,7 @@
 open Logtk
 open Logtk_arbitrary
 
-module T = FOTerm
+module T = Term
 module S = Subst.FO
 module O = Ordering
 

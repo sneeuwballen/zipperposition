@@ -3,7 +3,7 @@
 
 (** {1 Array of literals} *)
 
-type term = FOTerm.t
+type term = Term.t
 
 type t = Literal.t array
 (** Array of literals *)
@@ -99,7 +99,7 @@ module Conv : sig
   (** To list of formulas *)
 
   val to_s_form :
-    ?ctx:FOTerm.Conv.ctx ->
+    ?ctx:Term.Conv.ctx ->
     ?hooks:Literal.Conv.hook_to list ->
     t ->
     TypedSTerm.Form.t

@@ -62,7 +62,7 @@ Flag "demo"
 Library "logtk"
   Path:             src/core/
   Pack:             true
-  Modules:          InnerTerm, FOTerm, Type, Util, STerm, Interfaces,
+  Modules:          InnerTerm, Term, Type, Util, STerm, Interfaces,
                     DBEnv, Position, Var, HVar, Defined_pos,
                     Subst, Unif, Signature, Scoped, Unif_intf,
                     TypeInference, Options, Comparison, Precedence, Builtin,

@@ -6,7 +6,7 @@
 
 open Logtk
 
-module T = FOTerm
+module T = Term
 module S = Subst.FO
 module Lit = Literal
 module Lits = Literals

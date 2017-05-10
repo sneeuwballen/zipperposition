@@ -4,7 +4,7 @@
 open Logtk
 open OUnit
 
-module T = FOTerm
+module T = Term
 module S = Subst
 
 let ty = Type.TPTP.i

@@ -278,7 +278,7 @@ module Make(T : TERM) = struct
 end
 
 module FO = Make(struct
-    module T = FOTerm
+    module T = Term
 
     type t = T.t
     let equal = T.equal

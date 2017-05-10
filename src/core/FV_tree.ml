@@ -6,7 +6,7 @@
 (** Feature Vector indexing (see Schulz 2004) for efficient forward
     and backward subsumption *)
 
-module T = FOTerm
+module T = Term
 module Fmt = CCFormat
 
 type labels = Index_intf.labels

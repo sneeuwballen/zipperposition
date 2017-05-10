@@ -3,7 +3,7 @@
 
 (** {1 Inductive Types} *)
 
-module T = FOTerm
+module T = Term
 
 let section = Util.Section.make "ind_ty"
 

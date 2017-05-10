@@ -3,7 +3,7 @@
 
 (** {1 Rewriting} *)
 
-type term = FOTerm.t
+type term = Term.t
 
 type defined_cst
 (** Payload of a defined function symbol or type *)
@@ -19,7 +19,7 @@ module Term : sig
 
     val lhs : t -> term
     val rhs : t -> term
-    val vars : t -> FOTerm.VarSet.t
+    val vars : t -> Term.VarSet.t
     val vars_l : t -> Type.t HVar.t list
     val head_id : t -> ID.t
     val args : t -> term list

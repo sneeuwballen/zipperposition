@@ -6,7 +6,7 @@
 open Logtk
 open Logtk_arbitrary
 
-module T = FOTerm
+module T = Term
 
 (* a simple instance of equation *)
 module E : Index.EQUATION with type rhs = int and type t = T.t * int = struct

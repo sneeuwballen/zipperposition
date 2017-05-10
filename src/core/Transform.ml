@@ -3,10 +3,10 @@
 
 (** {1 Transformations on Fs and Terms} *)
 
-module T = FOTerm
+module T = Term
 module F = Formula.FO
 
-type term = FOTerm.t
+type term = Term.t
 type form = Formula.FO.t
 
 type t =

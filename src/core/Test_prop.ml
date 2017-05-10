@@ -2,7 +2,7 @@
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 module TI = InnerTerm
-module T = FOTerm
+module T = Term
 module Fmt = CCFormat
 
 module RW = Rewrite

@@ -212,7 +212,7 @@ let payload = Lit.payload
 let sign = Lit.sign
 
 let to_s_form (lit:t) =
-  let module T = FOTerm in
+  let module T = Term in
   let module F = TypedSTerm.Form in
   let f = match payload lit with
     | Fresh -> assert false (* TODO? *)

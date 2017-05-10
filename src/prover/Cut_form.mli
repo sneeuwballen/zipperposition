@@ -5,15 +5,15 @@
 
 open Logtk
 
-type var = FOTerm.var
-type term = FOTerm.t
+type var = Term.var
+type term = Term.t
 type clause = Literals.t
 type form = clause list
 
 (** A formula of the form [forall vars. \bigand_i C_i].
     The [C_i] are clauses with free variables in [vars] *)
 type t = private {
-  vars: FOTerm.VarSet.t;
+  vars: Term.VarSet.t;
   cs: form;
 }
 type cut_form = t
@@ -26,7 +26,7 @@ include Interfaces.ORD with type t := t
 include Interfaces.PRINT with type t := t
 val pp_tstp : t CCFormat.printer
 
-val vars : t -> FOTerm.VarSet.t
+val vars : t -> Term.VarSet.t
 val cs : t -> Literals.t list
 
 val ind_vars : t -> var list

@@ -27,7 +27,7 @@ module type S = sig
   val symbols : unit -> ID.Set.t
   (** set of AC symbols *)
 
-  val symbols_of_terms : FOTerm.t Sequence.t -> ID.Set.t
+  val symbols_of_terms : Term.t Sequence.t -> ID.Set.t
   (** set of AC symbols occurring in the given term *)
 
   val proofs : unit -> Proof.t list
@@ -41,7 +41,7 @@ module type S = sig
       be complete for the given symbol. The [ctx] is required for type inference
       and building clauses . *)
 
-  val scan_statement : (_, FOTerm.t, Type.t) Statement.t -> unit
+  val scan_statement : (_, Term.t, Type.t) Statement.t -> unit
   (** Check whether the statement contains an "AC" attribute, do the proper
       declaration in this case *)
 

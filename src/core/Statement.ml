@@ -61,7 +61,7 @@ type from_file = {
   loc: ParseLocation.t option;
 }
 
-type lit = FOTerm.t SLiteral.t
+type lit = Term.t SLiteral.t
 type formula = TypedSTerm.t
 type clause = lit list
 
@@ -99,7 +99,7 @@ and result =
 and sourced_t = result * source
 
 and input_t = (TypedSTerm.t, TypedSTerm.t, TypedSTerm.t) t
-and clause_t = (clause, FOTerm.t, Type.t) t
+and clause_t = (clause, Term.t, Type.t) t
 
 let compare a b = CCInt.compare a.id b.id
 let view t = t.view
@@ -317,7 +317,7 @@ let terms_of_rule (d:_ def_rule): _ Sequence.t = match d with
 
 let level_of_rule (d:_ def_rule): int =
   terms_of_rule d
-  |> Sequence.flat_map FOTerm.Seq.symbols
+  |> Sequence.flat_map Term.Seq.symbols
   |> Sequence.filter_map as_defined_cst_level
   |> Sequence.max
   |> CCOpt.get_or ~default:0
@@ -327,7 +327,7 @@ let max_exn seq =
   |> Sequence.max
   |> CCOpt.get_lazy (fun () -> assert false)
 
-let scan_stmt_for_defined_cst (st:(clause,FOTerm.t,Type.t) t): unit = match view st with
+let scan_stmt_for_defined_cst (st:(clause,Term.t,Type.t) t): unit = match view st with
   | Def [] -> assert false
   | Def l ->
     (* define all IDs at the same level (the max of those computed) *)
@@ -535,8 +535,8 @@ module Seq = struct
         | `Form f ->
           Sequence.of_list f
           |> Sequence.flat_map SLiteral.to_seq
-          |> Sequence.flat_map FOTerm.Seq.symbols
-        | `Term t -> FOTerm.Seq.symbols t
+          |> Sequence.flat_map Term.Seq.symbols
+        | `Term t -> Term.Seq.symbols t
         | `Ty ty -> Type.Seq.symbols ty)
 end
 
@@ -639,7 +639,7 @@ let pp ppf ppt ppty out st = match st.view with
 let to_string ppf ppt ppty = CCFormat.to_string (pp ppf ppt ppty)
 
 let pp_clause =
-  pp (Util.pp_list ~sep:" ∨ " (SLiteral.pp FOTerm.pp)) FOTerm.pp Type.pp
+  pp (Util.pp_list ~sep:" ∨ " (SLiteral.pp Term.pp)) Term.pp Type.pp
 
 let pp_input = pp TypedSTerm.pp TypedSTerm.pp TypedSTerm.pp
 

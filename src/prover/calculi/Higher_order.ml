@@ -5,9 +5,9 @@
 
 open Logtk
 
-module T = FOTerm
+module T = Term
 
-type term = FOTerm.t
+type term = Term.t
 let section = Util.Section.make ~parent:Const.section "ho"
 
 module type S = sig

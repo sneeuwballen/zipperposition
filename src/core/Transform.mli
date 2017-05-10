@@ -3,7 +3,7 @@
 
 (** {6 Transformations on Formulas and Terms} *)
 
-type term = FOTerm.t
+type term = Term.t
 type form = Formula.FO.t
 
 (** Provides some transformations on formulas, and sets of formulas.

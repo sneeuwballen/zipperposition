@@ -5,7 +5,7 @@
 
     Those terms are not designed to be used directly, but rather to provide
     a generic backend (implementing De Bruijn indices, subterms, substitutions,
-    etc.) for other more specific representations like Type, FOTerm, ...
+    etc.) for other more specific representations like Type, Term, ...
 *)
 
 type t

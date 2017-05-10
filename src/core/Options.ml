@@ -43,7 +43,7 @@ let set_in s = input := input_format_of_string s
 let set_out s = output := print_format_of_string s
 
 let _print_types () =
-  FOTerm.print_all_types := true;
+  Term.print_all_types := true;
   ()
 
 let switch_opt b f = Arg.Unit (fun () -> f b)

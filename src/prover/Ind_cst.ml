@@ -6,7 +6,7 @@
 
 open Logtk
 
-module T = FOTerm
+module T = Term
 
 (* TODO: should probably be 3 *)
 let max_depth_ = ref 4
@@ -40,7 +40,7 @@ exception Payload_cst of t
 
 (** {6 Inductive Constants} *)
 
-let to_term c = FOTerm.const ~ty:c.cst_ty c.cst_id
+let to_term c = Term.const ~ty:c.cst_ty c.cst_id
 let id c = c.cst_id
 let ty c = c.cst_ty
 

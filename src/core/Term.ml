@@ -284,7 +284,7 @@ let depth t = Seq.subterms_depth t |> Sequence.map snd |> Sequence.fold max 0
 let rec head_exn t = match T.view t with
   | T.Const s -> s
   | T.App (hd,_) -> head_exn hd
-  | _ -> invalid_arg "FOTerm.head"
+  | _ -> invalid_arg "Term.head"
 
 let head t =
   try Some (head_exn t)

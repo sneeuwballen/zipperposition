@@ -32,7 +32,7 @@ let is_empty c = length c = 0 && Trail.is_empty c.trail
 
 let update_trail f c = make ~trail:(f c.trail) c.lits
 
-let to_s_form ?(ctx=FOTerm.Conv.create()) c =
+let to_s_form ?(ctx=Term.Conv.create()) c =
   let module F = TypedSTerm.Form in
   let concl = Literals.Conv.to_s_form ~ctx (lits c) |> F.close_forall in
   if Trail.is_empty (trail c)
@@ -67,8 +67,8 @@ let is_backward_simplified c = get_flag flag_backward_simplified c
 (* list of free variables *)
 let vars_ lits =
   Literals.Seq.vars lits
-  |> FOTerm.VarSet.of_seq
-  |> FOTerm.VarSet.to_list
+  |> Term.VarSet.of_seq
+  |> Term.VarSet.to_list
 
 let pp_trail out trail =
   if not (Trail.is_empty trail)

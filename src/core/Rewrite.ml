@@ -3,7 +3,7 @@
 
 (** {1 Rewriting on Terms} *)
 
-module T = FOTerm
+module T = Term
 module Fmt = CCFormat
 
 let section = Util.Section.make "rewrite"
@@ -12,7 +12,7 @@ let prof_term_rw = Util.mk_profiler "rw.term"
 let stat_lit_rw = Util.mk_stat "rw.steps_lit"
 let prof_lit_rw = Util.mk_profiler "rw.lit"
 
-type term = FOTerm.t
+type term = Term.t
 
 type term_rule = {
   term_head: ID.t; (* head symbol of LHS *)
@@ -246,7 +246,7 @@ module Term = struct
      decision tree (similar to pattern-matching compilation) on head symbols
      + equality contraints for non-linear rules.
 
-     Use the FOTerm.DB case extensively... *)
+     Use the Term.DB case extensively... *)
 
   let normalize_term_ max_steps (t:term): term * rule_set =
     assert (max_steps >= 0);

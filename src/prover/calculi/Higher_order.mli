@@ -5,7 +5,7 @@
 
 open Logtk
 
-type term = FOTerm.t
+type term = Term.t
 
 module type S = sig
   module Env : Env.S

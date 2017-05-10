@@ -6,7 +6,7 @@
 (** Test universal properties that use defined functions,
     within some "reasonable" bound (e.g. smallcheck/quickcheck) *)
 
-type term = FOTerm.t
+type term = Term.t
 type lit = Literal.t
 type form = Literals.t list
 

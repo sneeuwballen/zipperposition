@@ -47,9 +47,9 @@ type clause = lit list
 (** Basic clause representation, as list of literals *)
 
 val clause_to_fo :
-  ?ctx:FOTerm.Conv.ctx ->
+  ?ctx:Term.Conv.ctx ->
   clause ->
-  FOTerm.t SLiteral.t list
+  Term.t SLiteral.t list
 
 type f_statement = (term, term, type_) Statement.t
 (** A statement before CNF *)
@@ -59,7 +59,7 @@ type c_statement = (clause, term, type_) Statement.t
 
 val pp_f_statement : f_statement CCFormat.printer
 val pp_c_statement : c_statement CCFormat.printer
-val pp_fo_c_statement : (FOTerm.t SLiteral.t list, FOTerm.t, Type.t) Statement.t CCFormat.printer
+val pp_fo_c_statement : (Term.t SLiteral.t list, Term.t, Type.t) Statement.t CCFormat.printer
 
 
 val is_clause : form -> bool
@@ -93,4 +93,4 @@ val convert :
   c_statement Sequence.t ->
   Statement.clause_t CCVector.ro_vector
 (** Converts statements based on {!TypedSTerm} into statements
-    based on {!FOTerm} and {!Type} *)
+    based on {!Term} and {!Type} *)

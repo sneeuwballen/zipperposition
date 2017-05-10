@@ -5,7 +5,7 @@
 
 open Logtk
 
-module T = FOTerm
+module T = Term
 module RW = Rewrite
 module P = Position
 

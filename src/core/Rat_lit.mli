@@ -3,7 +3,7 @@
 
 (** {1 Arithmetic Literal} *)
 
-type term = FOTerm.t
+type term = Term.t
 
 (** {2 Type Decls} *)
 
@@ -88,14 +88,14 @@ val fold_terms : ?pos:Position.t -> ?vars:bool -> ?ty_args:bool ->
 val max_terms : ord:Ordering.t -> t -> term list
 (** Maximal terms of the literal *)
 
-val to_form : t -> FOTerm.t SLiteral.t
+val to_form : t -> Term.t SLiteral.t
 (** Conversion into a simple literal *)
 
 (** {2 Iterators} *)
 
 module Seq : sig
   val terms : t -> term Sequence.t
-  val vars : t -> FOTerm.var Sequence.t
+  val vars : t -> Term.var Sequence.t
   val to_multiset : t -> (term * Q.t) Sequence.t
 end
 

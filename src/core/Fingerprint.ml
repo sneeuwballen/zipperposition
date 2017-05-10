@@ -4,7 +4,7 @@
 
 (** {1 Fingerprint term indexing} *)
 
-module T = FOTerm
+module T = Term
 module I = Index
 module S = Subst
 

@@ -3,7 +3,7 @@
 
 (** {1 Equational literals} *)
 
-type term = FOTerm.t
+type term = Term.t
 
 (** a literal, that is, a signed atomic formula *)
 type t = private
@@ -238,7 +238,7 @@ module Conv : sig
 
   val to_form : ?hooks:hook_to list -> t -> term SLiteral.t
 
-  val to_s_form : ?ctx:FOTerm.Conv.ctx -> ?hooks:hook_to list -> t -> TypedSTerm.Form.t
+  val to_s_form : ?ctx:Term.Conv.ctx -> ?hooks:hook_to list -> t -> TypedSTerm.Form.t
 end
 
 (** {2 IO} *)

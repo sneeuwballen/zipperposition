@@ -84,7 +84,7 @@ val as_constructor_exn : ID.t -> constructor * t
 (** Unsafe version of {!as_constructor}
     @raise NotAnInductiveConstructor if it fails *)
 
-val contains_inductive_types : FOTerm.t -> bool
+val contains_inductive_types : Term.t -> bool
 (** [true] iff the term contains at least one subterm with
     an inductive type *)
 

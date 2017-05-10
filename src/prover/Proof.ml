@@ -164,7 +164,7 @@ module Result = struct
     | BoolClause lits -> BBox.pp_bclause out lits
     | Stmt stmt -> Statement.pp_input out stmt
 
-  let to_s_form ?(ctx=FOTerm.Conv.create()) (r:t): form = match r with
+  let to_s_form ?(ctx=Term.Conv.create()) (r:t): form = match r with
     | Form f -> f
     | Clause c -> SClause.to_s_form ~ctx c |> F.close_forall
     | BoolClause c ->
@@ -521,7 +521,7 @@ module S = struct
           Tbl.add tbl p res;
           res
       end
-    and conv_step ?(ctx=FOTerm.Conv.create()) p =
+    and conv_step ?(ctx=Term.Conv.create()) p =
       let res = Result.to_s_form ~ctx (result p) in
       let parents =
         List.map (conv_parent ~ctx) (Step.parents @@ step p)
@@ -561,10 +561,10 @@ module S = struct
                if sc=sc_p then (
                  let v' =
                    HVar.cast v ~ty:(Type.of_term_unsafe (HVar.ty v))
-                   |> FOTerm.Conv.var_to_simple_var ctx
+                   |> Term.Conv.var_to_simple_var ctx
                  and t' =
-                   FOTerm.of_term_unsafe t
-                   |> FOTerm.Conv.to_simple_term ctx in
+                   Term.of_term_unsafe t
+                   |> Term.Conv.to_simple_term ctx in
                  Some (v',t')
                ) else None)
           |> Var.Subst.of_seq

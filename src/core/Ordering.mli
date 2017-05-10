@@ -7,7 +7,7 @@
 
 (** {2 Type definitions} *)
 
-type term = FOTerm.t
+type term = Term.t
 
 type t
 (** Partial ordering on terms *)

@@ -3,10 +3,10 @@
 
 (** {1 Generic term indexing} *)
 
-type term = FOTerm.t
+type term = Term.t
 type subst = Subst.t
 
-module T = FOTerm
+module T = Term
 
 (** {2 Leaf} *)
 

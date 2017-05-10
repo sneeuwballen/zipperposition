@@ -6,7 +6,7 @@
 open Logtk
 
 module QA = QCheck
-module T = FOTerm
+module T = Term
 module Sym = Symbol
 module HOT = HOTerm
 
@@ -110,19 +110,19 @@ let shrink t = T.Seq.subterms t |> Sequence.drop 1
 
 let mk_ gen = QA.make ~print:T.to_string ~shrink gen
 
-let ctx = FOTerm.Conv.create()
+let ctx = Term.Conv.create()
 
-let default_g = QCheck.Gen.map (FOTerm.Conv.of_simple_term_exn ctx) PT.default_g
+let default_g = QCheck.Gen.map (Term.Conv.of_simple_term_exn ctx) PT.default_g
 let default = mk_ default_g
 
 let default_fuel f =
-  QA.Gen.map (FOTerm.Conv.of_simple_term_exn ctx) (PT.default_fuel f)
+  QA.Gen.map (Term.Conv.of_simple_term_exn ctx) (PT.default_fuel f)
 
-let ground_g = QCheck.Gen.map (FOTerm.Conv.of_simple_term_exn ctx) PT.ground_g
+let ground_g = QCheck.Gen.map (Term.Conv.of_simple_term_exn ctx) PT.ground_g
 let ground = mk_ ground_g
 
 let pred =
-  QA.map (FOTerm.Conv.of_simple_term_exn ctx) PT.pred
+  QA.map (Term.Conv.of_simple_term_exn ctx) PT.pred
 
 let pos t =
   let module PB = Position.Build in

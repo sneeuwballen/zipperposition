@@ -4,7 +4,7 @@
 open Logtk
 
 module Lits = Literals
-module T = FOTerm
+module T = Term
 
 type term = T.t
 

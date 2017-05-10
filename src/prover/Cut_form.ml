@@ -6,10 +6,10 @@
 open Logtk
 
 module Fmt = CCFormat
-module T = FOTerm
+module T = Term
 
-type var = FOTerm.var
-type term = FOTerm.t
+type var = Term.var
+type term = Term.t
 type clause = Literals.t
 type form = clause list
 
@@ -106,7 +106,7 @@ let normalize (f:t): t = cs f |> Test_prop.normalize_form |> make
 let to_s_form (f:t) =
   let module F = TypedSTerm.Form in
   (* convert all clauses with the same variable bindings *)
-  let ctx = FOTerm.Conv.create() in
+  let ctx = Term.Conv.create() in
   let l = List.map (Literals.Conv.to_s_form ~ctx) (cs f) in
   F.and_ l |> F.close_forall
 

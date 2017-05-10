@@ -3,7 +3,7 @@
 
 (** {1 Generic term indexing} *)
 
-type term = FOTerm.t
+type term = Term.t
 type subst = Subst.t
 
 (** {2 Leaf} *)
@@ -14,7 +14,7 @@ module type LEAF = Index_intf.LEAF
 
 module MakeLeaf(X : Set.OrderedType) : LEAF with type elt = X.t
 
-(** {2 FOTerm index} *)
+(** {2 Term index} *)
 
 module type TERM_IDX = Index_intf.TERM_IDX
 
@@ -31,8 +31,8 @@ module type SUBSUMPTION_IDX = Index_intf.SUBSUMPTION_IDX
 module type EQUATION = Index_intf.EQUATION
 
 module BasicEquation : EQUATION
-  with type t = FOTerm.t * FOTerm.t
-   and type rhs = FOTerm.t
+  with type t = Term.t * Term.t
+   and type rhs = Term.t
 
 module type UNIT_IDX = Index_intf.UNIT_IDX
 

@@ -5,7 +5,7 @@
 
 open Logtk
 
-module T = FOTerm
+module T = Term
 module Lit = Literal
 module Lits = Literals
 module P = Proof
@@ -81,7 +81,7 @@ module Make(X : sig
   type is_trivial_rule = C.t -> bool
   (** Rule that checks whether the clause is trivial (a tautology) *)
 
-  type term_rewrite_rule = FOTerm.t -> FOTerm.t option
+  type term_rewrite_rule = Term.t -> Term.t option
   (** Rewrite rule on terms *)
 
   type lit_rewrite_rule = Literal.t -> Literal.t option

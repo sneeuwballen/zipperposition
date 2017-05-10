@@ -291,26 +291,26 @@ module Ty : SPECIALIZED with type term = Type.t = struct
 end
 
 module FO = struct
-  type term = FOTerm.t
+  type term = Term.t
   type t = subst
 
   let deref subst t =
     let t, sc = deref subst (t : term Scoped.t :> T.t Scoped.t) in
-    FOTerm.of_term_unsafe t, sc
+    Term.of_term_unsafe t, sc
 
   let get_var subst v =
     let o = get_var subst v in
-    CCOpt.map (Scoped.map FOTerm.of_term_unsafe) o
+    CCOpt.map (Scoped.map Term.of_term_unsafe) o
 
   let find_exn subst v =
     let t = find_exn subst v in
-    Scoped.map FOTerm.of_term_unsafe t
+    Scoped.map Term.of_term_unsafe t
 
   let apply subst ~renaming t =
-    FOTerm.of_term_unsafe (apply subst ~renaming (t : term Scoped.t :> T.t Scoped.t))
+    Term.of_term_unsafe (apply subst ~renaming (t : term Scoped.t :> T.t Scoped.t))
 
   let apply_no_renaming subst t =
-    FOTerm.of_term_unsafe (apply_no_renaming  subst (t : term Scoped.t :> T.t Scoped.t))
+    Term.of_term_unsafe (apply_no_renaming  subst (t : term Scoped.t :> T.t Scoped.t))
 
   let bind = (bind :> t -> var Scoped.t -> term Scoped.t -> t)
   let of_list = (of_list :> ?init:t -> (var Scoped.t * term Scoped.t) list -> t)

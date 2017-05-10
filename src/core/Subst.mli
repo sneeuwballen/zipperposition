@@ -157,7 +157,7 @@ end
 module Ty : SPECIALIZED with type term = Type.t
 
 module FO : sig
-  include SPECIALIZED with type term = FOTerm.t
+  include SPECIALIZED with type term = Term.t
   val bind' : t -> Type.t HVar.t Scoped.t -> term Scoped.t -> t
   val of_list' : ?init:t -> (Type.t HVar.t Scoped.t * term Scoped.t) list -> t
 end

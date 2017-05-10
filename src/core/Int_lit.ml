@@ -1,9 +1,9 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-type term = FOTerm.t
+type term = Term.t
 
-module T = FOTerm
+module T = Term
 module S = Subst
 module P = Position
 module M = Monome

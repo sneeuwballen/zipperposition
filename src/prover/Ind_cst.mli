@@ -45,7 +45,7 @@ val compare : t -> t -> int
 val hash : t -> int
 
 val id : t -> ID.t
-val to_term : t -> FOTerm.t
+val to_term : t -> Term.t
 val ty : t -> Type.t
 
 val same_type : t -> t -> bool
@@ -74,7 +74,7 @@ val id_is_ind_skolem : ID.t -> Type.t -> bool
     a skolem constant of an inductive type, or
     if it is already an inductive constant. *)
 
-val find_ind_skolems : FOTerm.t -> ind_skolem Sequence.t
+val find_ind_skolems : Term.t -> ind_skolem Sequence.t
 (** [find_ind_skolem term] searches subterms of [term] for constants
     that are of an inductive type and that are skolems or
     (already) inductive constants. *)

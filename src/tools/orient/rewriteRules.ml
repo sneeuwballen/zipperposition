@@ -46,7 +46,7 @@ let parse_file filename ic =
       let msg = CCFormat.sprintf "parse error at %a" Loc.pp (Loc.of_lexbuf lexbuf) in
       E.fail msg
 
-(* list of pairs of terms --> list of pairs of FOTerms *)
+(* list of pairs of terms --> list of pairs of Terms *)
 let rules_of_pairs pairs =
   try
     let ctx = TypeInference.Ctx.create () in

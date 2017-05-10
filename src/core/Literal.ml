@@ -3,13 +3,13 @@
 
 (** {1 Equational literals} *)
 
-module T = FOTerm
+module T = Term
 module S = Subst
 module PB = Position.Build
 module P = Position
 module AL = Int_lit
 
-type term = FOTerm.t
+type term = Term.t
 
 type t =
   | True

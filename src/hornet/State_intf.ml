@@ -3,7 +3,7 @@
 
 open Logtk
 
-type term = FOTerm.t
+type term = Term.t
 type ty = Type.t
 type statement = (Clause.t, term, ty) Statement.t
 type proof = Hornet_types.proof

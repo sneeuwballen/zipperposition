@@ -66,7 +66,7 @@ type from_file = {
   loc: ParseLocation.t option;
 }
 
-type lit = FOTerm.t SLiteral.t
+type lit = Term.t SLiteral.t
 type formula = TypedSTerm.t
 type clause = lit list
 
@@ -104,7 +104,7 @@ and result =
 and sourced_t = result * source
 
 and input_t = (TypedSTerm.t, TypedSTerm.t, TypedSTerm.t) t
-and clause_t = (clause, FOTerm.t, Type.t) t
+and clause_t = (clause, Term.t, Type.t) t
 
 val compare : (_, _, _) t -> (_, _, _) t -> int
 
@@ -165,7 +165,7 @@ val declare_defined_cst : ID.t -> level:int -> definition -> unit
     constant of given [level]. It means that it is defined based only
     on constants of strictly lower levels *)
 
-val scan_stmt_for_defined_cst : (clause, FOTerm.t, Type.t) t -> unit
+val scan_stmt_for_defined_cst : (clause, Term.t, Type.t) t -> unit
 (** Try and declare defined constants in the given statement *)
 
 (** {2 Inductive Types} *)
@@ -233,9 +233,9 @@ module Seq : sig
     [`Term of 't | `Form of 'f | `Ty of 'ty | `ID of ID.t] Sequence.t
   val ty_decls : (_, _, 'ty) t -> (ID.t * 'ty) Sequence.t
   val forms : ('f, _, _) t -> 'f Sequence.t
-  val lits : (clause, _, _) t -> FOTerm.t SLiteral.t Sequence.t
-  val terms : (clause, FOTerm.t, _) t -> FOTerm.t Sequence.t
-  val symbols : (clause, FOTerm.t, Type.t) t -> ID.t Sequence.t
+  val lits : (clause, _, _) t -> Term.t SLiteral.t Sequence.t
+  val terms : (clause, Term.t, _) t -> Term.t Sequence.t
+  val symbols : (clause, Term.t, Type.t) t -> ID.t Sequence.t
 end
 
 (** {2 IO} *)

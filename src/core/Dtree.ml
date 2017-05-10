@@ -4,7 +4,7 @@
 (** {1 Perfect Discrimination Tree} *)
 
 module ST = InnerTerm
-module T = FOTerm
+module T = Term
 module S = Subst
 
 let prof_dtree_retrieve = Util.mk_profiler "dtree_retrieve"

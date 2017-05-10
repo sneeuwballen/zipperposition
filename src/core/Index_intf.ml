@@ -1,7 +1,7 @@
 
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
-type term = FOTerm.t
+type term = Term.t
 type subst = Subst.t
 
 module type LEAF = sig

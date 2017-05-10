@@ -4,7 +4,7 @@
 open Logtk
 
 module BV = CCBV
-module T = FOTerm
+module T = Term
 module O = Ordering
 module S = Subst
 module Lit = Literal

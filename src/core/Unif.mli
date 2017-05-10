@@ -52,7 +52,7 @@ module Inner : S with type term = InnerTerm.t and type ty = InnerTerm.t
 
 module Ty : S with type term = Type.t and type ty = Type.t
 module FO : sig
-  include S with type term = FOTerm.t and type ty = Type.t
+  include S with type term = Term.t and type ty = Type.t
 
   val anti_unify : term -> term -> (term * term) list option
   (** anti-unification of the two terms, returning disagreement pairs *)

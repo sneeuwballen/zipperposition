@@ -9,7 +9,7 @@
     are "f(X)" and "a", with coefficients "1" and "3".
 *)
 
-type term = FOTerm.t
+type term = Term.t
 
 type 'a t
 (** A monome over terms, with coefficient of type 'a *)
@@ -41,7 +41,7 @@ val map_num : ('a -> 'a) -> 'a t -> 'a t
 
 module Seq : sig
   val terms : _ t -> term Sequence.t
-  val vars : _ t -> FOTerm.var Sequence.t
+  val vars : _ t -> Term.var Sequence.t
   val coeffs : 'a t -> ('a * term) Sequence.t
   val coeffs_swap : 'a t -> (term * 'a) Sequence.t
 end
@@ -62,7 +62,7 @@ val size : _ t -> int
 val terms : _ t -> term list
 (** List of terms that occur in the monome with non-nul coefficients *)
 
-val var_occurs : var:FOTerm.var ->  _ t -> bool
+val var_occurs : var:Term.var ->  _ t -> bool
 (** Does the variable occur in the monome? *)
 
 val sum : 'a t -> 'a t -> 'a t

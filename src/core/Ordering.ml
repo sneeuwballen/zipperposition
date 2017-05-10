@@ -4,7 +4,7 @@
 (** {1 Term Orderings} *)
 
 module Prec = Precedence
-module MT = Multiset.Make(FOTerm)
+module MT = Multiset.Make(Term)
 module IOB = IDOrBuiltin
 module W = Precedence.Weight
 
@@ -13,8 +13,8 @@ open Comparison
 let prof_rpo6 = Util.mk_profiler "compare_rpo6"
 let prof_kbo = Util.mk_profiler "compare_kbo"
 
-module T = FOTerm
-module TC = FOTerm.Classic
+module T = Term
+module TC = Term.Classic
 
 let mk_cache n =
   let hash (a,b) = Hash.combine3 42 (T.hash a) (T.hash b) in

@@ -313,7 +313,7 @@ end
 module FO = struct
   open Inner
   type ty = Type.t
-  type term = FOTerm.t
+  type term = Term.t
 
   let bind =
     (bind :> subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst)
@@ -350,7 +350,7 @@ module FO = struct
 
   (* anti-unification of the two terms with at most one disagreement point *)
   let anti_unify (t:term)(u:term): (term * term) list option =
-    let module T = FOTerm in
+    let module T = Term in
     let pairs = ref [] in
     let rec aux t u = match T.view t, T.view u with
       | _ when T.equal t u -> () (* trivial *)
