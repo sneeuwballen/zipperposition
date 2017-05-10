@@ -574,7 +574,7 @@ let pp_attrs out = function
   | [] -> ()
   | l -> fpf out "@ [@[%a@]]" (Util.pp_list ~sep:"," pp_attr) l
 
-let pp_typedvar ppty out v = fpf out "(%a:%a)" Var.pp v ppty (Var.ty v)
+let pp_typedvar ppty out v = fpf out "(@[%a:%a@])" Var.pp v ppty (Var.ty v)
 let pp_typedvar_l ppty = Util.pp_list ~sep:" " (pp_typedvar ppty)
 
 let pp_def_rule ppf ppt ppty out d =
