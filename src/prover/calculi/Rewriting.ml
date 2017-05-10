@@ -19,6 +19,11 @@ let prof_narrowing_term = Util.mk_profiler "narrow.term"
 let prof_narrowing_lit = Util.mk_profiler "narrow.lit"
 let prof_ctx_narrowing = Util.mk_profiler "narrow.ctx_narrow"
 
+module Key = struct
+  let has_rw = Flex_state.create_key()
+  let ctx_narrow = Flex_state.create_key()
+end
+
 module Make(E : Env_intf.S) = struct
   module Env = E
   module C = E.C
@@ -248,20 +253,20 @@ module Make(E : Env_intf.S) = struct
   let contextual_narrowing c =
     Util.with_prof prof_ctx_narrowing contextual_narrowing_ c
 
-  let setup ~has_rw () =
+  let setup ?(ctx_narrow=true) ~has_rw () =
     Util.debug ~section 1 "register Rewriting to Env...";
     E.add_rewrite_rule "rewrite_defs" simpl_term;
     E.add_binary_inf "narrow_term_defs" narrow_term_passive;
-    E.add_binary_inf "ctx_narrow" contextual_narrowing;
+    if ctx_narrow then (
+      E.add_binary_inf "ctx_narrow" contextual_narrowing;
+    );
     if has_rw then  E.Ctx.lost_completeness ();
     E.add_multi_simpl_rule simpl_clause;
     E.add_unary_inf "narrow_lit_defs" narrow_lits;
     ()
 end
 
-module Key = struct
-  let has_rw = Flex_state.create_key()
-end
+let ctx_narrow_ = ref true
 
 let post_cnf stmts st =
   CCVector.iter Statement.scan_stmt_for_defined_cst stmts;
@@ -282,7 +287,8 @@ let post_cnf stmts st =
 let normalize_simpl (module E : Env_intf.S) =
   let module M = Make(E) in
   let has_rw = E.flex_get Key.has_rw in
-  M.setup ~has_rw ()
+  E.flex_add Key.ctx_narrow !ctx_narrow_;
+  M.setup ~has_rw ~ctx_narrow:!ctx_narrow_ ()
 
 let extension =
   let open Extensions in
@@ -292,3 +298,7 @@ let extension =
       env_actions=[normalize_simpl];
   }
 
+let () = Options.add_opts
+    [ "--rw-ctx-narrow", Arg.Set ctx_narrow_, " enable contextual narrowing";
+      "--no-rw-ctx-narrow", Arg.Clear ctx_narrow_, " disable contextual narrowing";
+    ]
