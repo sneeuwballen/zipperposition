@@ -513,20 +513,19 @@ module Seq = struct
     | NegatedGoal _
     | Assert _ -> ()
 
-  let forms st k = match view st with
-    | Def _
-    | RewriteTerm _
-    | Data _
-    | TyDecl _ -> ()
-    | Goal c -> k c
-    | RewriteForm (_,_, _) -> ()
-    | Lemma l
-    | NegatedGoal (_, l) -> List.iter k l
-    | Assert c -> k c
+  let forms st =
+    to_seq st
+    |> Sequence.filter_map (function `Form f -> Some f | _ -> None)
 
   let lits st = forms st |> Sequence.flat_map Sequence.of_list
 
-  let terms st = lits st |> Sequence.flat_map SLiteral.to_seq
+  let terms st =
+    to_seq st
+    |> Sequence.flat_map
+      (function
+        | `Form f -> Sequence.of_list f |> Sequence.flat_map SLiteral.to_seq
+        | `Term t -> Sequence.return t
+        | _ -> Sequence.empty)
 
   let symbols st =
     to_seq st

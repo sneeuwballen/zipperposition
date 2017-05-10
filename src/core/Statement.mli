@@ -234,7 +234,7 @@ module Seq : sig
   val ty_decls : (_, _, 'ty) t -> (ID.t * 'ty) Sequence.t
   val forms : ('f, _, _) t -> 'f Sequence.t
   val lits : (clause, _, _) t -> FOTerm.t SLiteral.t Sequence.t
-  val terms : (clause, _, _) t -> FOTerm.t Sequence.t
+  val terms : (clause, FOTerm.t, _) t -> FOTerm.t Sequence.t
   val symbols : (clause, FOTerm.t, Type.t) t -> ID.t Sequence.t
 end
 
