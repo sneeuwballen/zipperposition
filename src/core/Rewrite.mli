@@ -24,6 +24,8 @@ module Term : sig
     val head_id : t -> ID.t
     val args : t -> term list
 
+    val as_lit : t -> Literal.t
+
     val make_const : ID.t -> Type.t -> term -> t
     (** [make_const id ty rhs] is the same as [T.const id ty --> rhs] *)
 
@@ -74,6 +76,7 @@ module Lit : sig
     val rhs : t -> Literal.t list list
     val make : Literal.t -> Literal.t list list -> t
     val is_equational : t -> bool
+    val as_clauses : t -> Literals.t list
     val head_id : t -> ID.t option
     val compare : t -> t -> int
     val pp : t CCFormat.printer
@@ -166,6 +169,9 @@ end
 val as_defined_cst : ID.t -> defined_cst option
 
 val is_defined_cst : ID.t -> bool
+
+val all_cst : Defined_cst.t Sequence.t
+val all_rules : Rule.t Sequence.t
 
 (**/**)
 exception Payload_defined_cst of defined_cst

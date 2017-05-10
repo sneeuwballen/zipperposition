@@ -189,6 +189,8 @@ module Term = struct
     let args r = r.term_args
     let ty r = T.ty r.term_rhs
 
+    let as_lit (r:t): Literal.t = Literal.mk_eq (lhs r)(rhs r)
+
     let vars r = T.vars (lhs r)
     let vars_l r = vars r |> T.VarSet.to_list
 
@@ -361,6 +363,12 @@ module Lit = struct
 
     let lhs c = c.lit_lhs
     let rhs c = c.lit_rhs
+
+    (* conversion into regular clauses *)
+    let as_clauses (c:t): Literals.t list =
+      List.map
+        (fun rhs_c -> Array.of_list (Literal.negate (lhs c) :: rhs_c))
+        (rhs c)
 
     let head_id c = match lhs c with
       | Literal.Prop (t, _) ->
@@ -561,6 +569,8 @@ module Rule = struct
     | _ -> L_rule (Lit.Rule.make lit_lhs lit_rhs)
 end
 
+let allcst_ : Cst_.t list ref = ref []
+
 module Defined_cst = struct
   include Cst_
 
@@ -619,6 +629,7 @@ module Defined_cst = struct
     in
     let dcst = make_ level id ty rules in
     ID.set_payload id (Payload_defined_cst dcst);
+    CCList.Ref.push allcst_ dcst;
     dcst
 
   let add_rule (dcst:t) (r:rule): unit =
@@ -728,3 +739,8 @@ module Defined_cst = struct
     )
 end
 
+let all_cst k = List.iter k !allcst_
+
+let all_rules =
+  all_cst
+  |> Sequence.flat_map Defined_cst.rules_seq

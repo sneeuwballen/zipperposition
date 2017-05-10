@@ -7,14 +7,17 @@ open Logtk
 
 module T = FOTerm
 module RW = Rewrite
+module P = Position
 
 let section = RW.section
 
 let stat_narrowing_lit = Util.mk_stat "narrow.lit_steps"
 let stat_narrowing_term = Util.mk_stat "narrow.term_steps"
+let stat_ctx_narrowing = Util.mk_stat "narrow.ctx_narrow_steps"
 
 let prof_narrowing_term = Util.mk_profiler "narrow.term"
 let prof_narrowing_lit = Util.mk_profiler "narrow.lit"
+let prof_ctx_narrowing = Util.mk_profiler "narrow.ctx_narrow"
 
 module Make(E : Env_intf.S) = struct
   module Env = E
@@ -77,8 +80,6 @@ module Make(E : Env_intf.S) = struct
 
   let narrow_term_passive = Util.with_prof prof_narrowing_term narrow_term_passive_
 
-  (* TODO: contextual extended narrowing *)
-
   (* XXX: for now, we only do one step, and let Env.multi_simplify
      manage the fixpoint *)
   let simpl_clause c =
@@ -138,10 +139,120 @@ module Make(E : Env_intf.S) = struct
   let narrow_lits lits =
     Util.with_prof prof_narrowing_lit narrow_lits_ lits
 
+  (* find positions in rules' LHS *)
+  let ctx_narrow_find (s,sc_a) sc_p : (RW.Rule.t * Position.t * Subst.t) Sequence.t =
+    let find_term (r:RW.Term.rule) =
+      let t = RW.Term.Rule.lhs r in
+      T.all_positions ~vars:false ~pos:P.stop ~ty_args:false t
+      |> Sequence.filter (fun (_,p) -> not (P.equal p P.stop)) (* not root *)
+      |> Sequence.filter_map
+        (fun (t,p) ->
+           try
+             let subst = Unif.FO.unification (s,sc_a) (t,sc_p) in
+             Some (RW.T_rule r, p, subst)
+           with Unif.Fail -> None)
+    and find_lit (r:RW.Lit.rule) =
+      let lit = RW.Lit.Rule.lhs r in
+      Literal.fold_terms lit
+        ~position:P.stop ~vars:false ~ty_args:false
+        ~which:`All ~ord:(E.Ctx.ord()) ~subterms:true
+      |> Sequence.filter_map
+        (fun (t,p) -> match p with
+           | P.Left P.Stop -> None (* not root *)
+           | _ ->
+             try
+               let subst = Unif.FO.unification (s,sc_a) (t,sc_p) in
+               Some (RW.L_rule r, p, subst)
+             with Unif.Fail -> None)
+    in
+    Rewrite.all_rules
+    |> Sequence.flat_map
+      (function
+        | RW.T_rule r -> find_term r
+        | RW.L_rule r -> find_lit r)
+
+  (* do narrowing with [s=t], a literal in [c], and add results to [acc] *)
+  let ctx_narrow_with s t s_pos c acc : C.t list =
+    let sc_a = 1 and sc_p = 0 in
+    (* do narrowing inside this rule? *)
+    let do_narrowing rule rule_pos subst =
+      let rule_clauses =match rule with
+        | RW.T_rule r -> [ [| RW.Term.Rule.as_lit r |] ]
+        | RW.L_rule r -> RW.Lit.Rule.as_clauses r
+      in
+      begin
+        let renaming = E.Ctx.renaming_clear() in
+        let s' = Subst.FO.apply ~renaming subst (s,sc_a) in
+        let t' = Subst.FO.apply ~renaming subst (t,sc_a) in
+        Util.incr_stat stat_ctx_narrowing;
+        rule_clauses
+        |> List.map
+          (fun rule_clause ->
+             (* instantiate rule and replace [s'] by [t'] now *)
+             let new_lits =
+               Literals.apply_subst ~renaming subst (rule_clause,sc_p)
+               |> Literals.map (T.replace ~old:s' ~by:t')
+               |> Array.to_list
+             in
+             (* also instantiate context literals in [c] *)
+             let idx_active = match s_pos with
+               | P.Arg (n,_) -> n | _ -> assert false
+             in
+             let ctx =
+               Literal.apply_subst_list ~renaming subst
+                 (CCArray.except_idx (C.lits c) idx_active, sc_a)
+             in
+             (* build new clause *)
+             let proof =
+               Proof.Step.inference
+                 ~rule:(Proof.Rule.mk "contextual_narrowing")
+                 [C.proof_parent_subst (c,sc_a) subst]
+             in
+             let new_c =
+               C.create (new_lits @ ctx) proof
+                 ~trail:(C.trail c) ~penalty:(C.penalty c)
+             in
+             Util.debugf ~section 4
+               "(@[<2>ctx_narrow@ :rule %a@ :clause %a@ :pos %a@ :subst %a@ :yield %a@])"
+               (fun k->k RW.Rule.pp rule C.pp c P.pp rule_pos Subst.pp subst C.pp new_c);
+             new_c)
+        |> CCOpt.return
+      end
+    in
+    ctx_narrow_find (s,sc_a) sc_p
+    |> Sequence.fold
+      (fun acc (rule,rule_pos,subst) ->
+         match do_narrowing rule rule_pos subst with
+           | None -> acc
+           | Some cs -> cs @ acc)
+      acc
+
+  let contextual_narrowing_ c : C.t list =
+    (* no literal can be eligible for paramodulation if some are selected.
+       This checks if inferences with i-th literal are needed? *)
+    let eligible = C.Eligible.param c in
+    (* do the inferences where clause is active; for this,
+       we try to rewrite conditionally other clauses using
+       non-minimal sides of every positive literal *)
+    let new_clauses =
+      Literals.fold_eqn ~sign:true ~ord:(E.Ctx.ord ())
+        ~both:true ~eligible (C.lits c)
+      |> Sequence.fold
+        (fun acc (s, t, _, s_pos) ->
+           (* rewrite clauses using s *)
+           ctx_narrow_with s t s_pos c acc)
+        []
+    in
+    new_clauses
+
+  let contextual_narrowing c =
+    Util.with_prof prof_ctx_narrowing contextual_narrowing_ c
+
   let setup ~has_rw () =
     Util.debug ~section 1 "register Rewriting to Env...";
     E.add_rewrite_rule "rewrite_defs" simpl_term;
     E.add_binary_inf "narrow_term_defs" narrow_term_passive;
+    E.add_binary_inf "ctx_narrow" contextual_narrowing;
     if has_rw then  E.Ctx.lost_completeness ();
     E.add_multi_simpl_rule simpl_clause;
     E.add_unary_inf "narrow_lit_defs" narrow_lits;
