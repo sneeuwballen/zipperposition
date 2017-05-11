@@ -958,6 +958,42 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
     then f
     else introduce_defs ~is_pos:(not is_goal) ~ctx stmt f
   in
+  (* turn [p = rhs], partially applied (type […→…])
+     into the def [p vars=rhs vars] *)
+  let process_term_def stmt d (vars,id,ty_id,args,rhs) =
+    let ty_vars, ty_args, ty_ret = T.Ty.unfold (T.ty_exn rhs) in
+    if ty_vars<>[] then (
+      errorf_
+        "cannot deal with polymorphic definition@ `%a`"
+        (Stmt.pp_def_rule T.pp T.pp T.pp) d;
+    );
+    if ty_args=[] then Stmt.Def_term(vars,id,ty_id,args,rhs)
+    else (
+      let new_vars =
+        List.mapi (fun i ty -> Var.makef ~ty "x_%d" i) ty_args
+      in
+      let vars = vars @ new_vars in
+      let rhs =
+        T.app ~ty:ty_ret rhs (List.map T.var new_vars)
+      in
+      if T.Ty.is_prop ty_ret then (
+        let lhs =
+          T.app ~ty:ty_ret (T.const ~ty:ty_id id)
+            (args @ List.map T.var new_vars)
+          |> SLiteral.atom_true
+        and rhs =
+          [process_form stmt ~is_goal:false rhs ]
+        in
+        Stmt.Def_form (vars,lhs,rhs))
+      else (
+        let vars = vars @ new_vars in
+        let args = args @ List.map T.var new_vars in
+        Stmt.Def_term (vars,id,ty_id,args,rhs)
+      )
+    )
+  and process_form_def stmt rhs =
+    List.map (process_form stmt ~is_goal:false) rhs
+  in
   let res =
     seq
     |> Sequence.flat_map
@@ -970,31 +1006,43 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
          in
          let new_st = match stmt.Stmt.view with
            | Stmt.Data _
-           | Stmt.RewriteTerm _
            | Stmt.TyDecl _ -> stmt
            | Stmt.Def l ->
              let l =
                List.map
                  (fun d ->
-                    if T.Ty.returns_prop d.Stmt.def_ty
-                    then
-                      let rules =
-                        List.map
-                          (function
-                            | Stmt.Def_term _ -> assert false
-                            | Stmt.Def_form (vars,lhs,rhs) ->
-                              let rhs = List.map (process_form stmt ~is_goal:false) rhs in
-                              Stmt.Def_form (vars,lhs,rhs))
-                          d.Stmt.def_rules
-                      in
-                      { d with Stmt.def_rules=rules }
-                    else d)
+                    Util.debugf ~section 5 "(@[simplify-def@ `@[%a@]`@])"
+                      (fun k->k (Stmt.pp_def T.pp T.pp T.pp) d);
+                    let rules =
+                      List.map
+                        (function
+                          | Stmt.Def_term (vars,id,ty_id,args,rhs) as def ->
+                            process_term_def stmt def (vars,id,ty_id,args,rhs)
+                          | Stmt.Def_form (vars,lhs,rhs) ->
+                            let rhs = process_form_def stmt rhs in
+                            Stmt.Def_form (vars,lhs,rhs))
+                        d.Stmt.def_rules
+                    in
+                    { d with Stmt.def_rules=rules })
                  l
              in
              Stmt.def ~src:(src ()) l
            | Stmt.RewriteForm (vars, lhs, rhs) ->
-             let rhs = List.map (process_form stmt ~is_goal:false) rhs in
+             let rhs = process_form_def stmt rhs in
              Stmt.rewrite_form ~src:(src ()) (vars, lhs, rhs)
+           | Stmt.RewriteTerm (vars,id,ty_id,args,rhs) ->
+             (* due to partial application, this might become a formula rewrite rule *)
+             let res =
+               process_term_def stmt
+                 (Stmt.Def_term(vars,id,ty_id,args,rhs))
+                 (vars,id,ty_id,args,rhs)
+             in
+             begin match res with
+               | Stmt.Def_term (vars,id,ty_id,args,rhs) ->
+                 Stmt.rewrite_term ~src:(src()) (vars,id,ty_id,args,rhs)
+               | Stmt.Def_form (vars,lhs,rhs) ->
+                 Stmt.rewrite_form ~src:(src()) (vars,lhs,rhs)
+             end
            | Stmt.Assert f ->
              let f = process_form stmt ~is_goal:false f in
              Stmt.assert_ ~src:(src ()) f
