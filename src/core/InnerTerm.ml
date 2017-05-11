@@ -180,6 +180,7 @@ let is_bvar t = match view t with | DB _ -> true | _ -> false
 let is_const t = match view t with | Const _ -> true | _ -> false
 let is_bind t = match view t with | Bind _ -> true | _ -> false
 let is_app t = match view t with | App _ -> true | _ -> false
+let is_tType t = match view t with AppBuiltin (Builtin.TType, _) -> true | _ -> false
 
 (** {3 Payload} *)
 
@@ -620,6 +621,8 @@ let needs_args (t:t): bool = match view t with
   | Bind (Binder.ForallTy, _, _) -> true
   | _ -> false
 
+let show_type_arguments = ref false
+
 let pp_depth ?(hooks=[]) depth out t =
   let rec _pp depth out t =
     if List.exists (fun h -> h depth (_pp depth) out t) hooks
@@ -651,10 +654,17 @@ let pp_depth ?(hooks=[]) depth out t =
     | AppBuiltin (b, []) -> Builtin.pp out b
     | AppBuiltin (b, l) ->
       Format.fprintf out "@[%a(%a)@]" Builtin.pp b (Util.pp_list (_pp depth)) l
-    | App (f, []) -> _pp depth out f
     | App (f, l) ->
-      Format.fprintf out "@[<1>%a@ %a@]"
-        (_pp_surrounded depth) f (Util.pp_list ~sep:" " (_pp_surrounded depth)) l
+      let l =
+        if !show_type_arguments then l
+        else List.filter (fun t -> not (is_tType @@ ty_exn t)) l
+      in
+      begin match l with
+        | [] -> _pp depth out f
+        | _ ->
+          Format.fprintf out "@[<1>%a@ %a@]"
+            (_pp_surrounded depth) f (Util.pp_list ~sep:" " (_pp_surrounded depth)) l
+      end
   and _pp_surrounded depth out t = match view t with
     | Bind _
     | AppBuiltin (_,_::_)

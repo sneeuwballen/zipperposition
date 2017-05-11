@@ -196,6 +196,9 @@ val head : t -> ID.t option
 val print_hashconsing_ids : bool ref
 (** if enabled, every term will be printed with its unique ID *)
 
+val show_type_arguments : bool ref
+(** Parameter for printing/hiding type arguments in terms *)
+
 include Interfaces.PRINT with type t := t
 include Interfaces.PRINT_DE_BRUIJN with type t := t
                                     and type term := t
