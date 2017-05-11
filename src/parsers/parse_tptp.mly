@@ -392,7 +392,7 @@ tff_atom_type:
   | w=type_const LEFT_PAREN l=separated_nonempty_list(COMMA, tff_type) RIGHT_PAREN
     { PT.app w l }
   | TYPE_TY { PT.tType }
-  | LEFT_PAREN ty=tff_type RIGHT_PAREN { ty }
+  | LEFT_PAREN ty=tff_toplevel_type RIGHT_PAREN { ty }
 
 tff_ty_star_list:
   | ty=tff_atom_type
