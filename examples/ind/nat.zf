@@ -5,21 +5,21 @@ data nat :=
   | z
   | s nat.
 
-def plus : nat -> nat -> nat where
+def[infix "+"] plus : nat -> nat -> nat where
   forall (X:nat). ((plus z X) = X);
   forall (X:nat). (forall (Y:nat). ((plus (s X) Y) = (s (plus X Y)))).
 
-def minus : nat -> nat -> nat where
+def[infix "-"] minus : nat -> nat -> nat where
   forall (X:nat). ((minus X z) = X);
   forall X. minus z X = z;
   forall (X:nat). (forall (Y:nat). ((minus (s X) (s Y)) = (minus X Y))).
 
-def less : nat -> nat -> prop where
+def[infix "<"] less : nat -> nat -> prop where
   forall (X:nat). (less z (s X));
   forall X. ~ (less (s X) z);
   forall (X:nat). (forall (Y:nat). ((less (s X) (s Y)) <=> (less X Y))).
 
-def leq : nat -> nat -> prop where
+def[infix "≤"] leq : nat -> nat -> prop where
   forall (X:nat). (leq z X);
   forall X. ~ (leq (s X) z);
   forall (X:nat). (forall (Y:nat). ((leq (s X) (s Y)) <=> (leq X Y))).

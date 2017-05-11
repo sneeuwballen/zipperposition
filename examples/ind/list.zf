@@ -19,7 +19,7 @@ def length : list -> nat where
   (length nil) = z;
   forall (X:nat). (forall (L:list). ((length (cons X L)) = (s (length L)))).
 
-def append : list -> list -> list where
+def[infix "++"] append : list -> list -> list where
   forall (L:list). ((append nil L) = L);
   forall (X:nat).
     (forall (L:list).

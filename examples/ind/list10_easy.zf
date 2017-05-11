@@ -4,7 +4,7 @@ include "list.zf".
 
 # not trivial! proof of `a+b=b+a` is not so easy
 
-def sum : list -> nat where
+def[prefix "Σ"] sum : list -> nat where
   (sum nil) = z;
   forall (N:nat). (forall (L:list). ((sum (cons N L)) = (plus N (sum L)))).
 
