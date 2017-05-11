@@ -479,11 +479,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       List.map
         (fun (c_id, c_ty, c_args) ->
            (* declare projector functions for this constructor *)
-           let num_ty_vars, _, ty_ret = Type.open_poly_fun c_ty in
+           let num_ty_vars, _, _ty_ret = Type.open_poly_fun c_ty in
            assert (num_ty_vars = List.length ty_vars);
            let projs_of_v =
-             List.mapi
-               (fun n (ty_arg,(proj, ty_proj)) ->
+             List.map
+               (fun (_ty_arg,(proj, ty_proj)) ->
                   T.app (T.const ~ty:ty_proj proj) (ty_vars_t @ [v_t]))
                c_args
            in

@@ -10,6 +10,9 @@ module T = Term
 module S = Subst.FO
 module O = Ordering
 
+let count = 1_000
+let long_factor = 10
+
 (* [more_specific cm1 cm2] is true if [cmp2] is compatible with, and possibly
     more accurate, than [cmp1]. For instance, Incomparable/Gt is ok, but
     not Lt/Eq *)
@@ -63,7 +66,7 @@ let check_ordering_inv_by_subst ord =
     let o2 = O.compare !ord t1' t2' in
     more_specific o1 o2
   in
-  QCheck.Test.make ~count:3_000 ~long_factor:10 ~name gen prop
+  QCheck.Test.make ~count ~long_factor ~name gen prop
 
 let check_ordering_trans ord =
   let name = CCFormat.sprintf "ordering_%s_transitive" (O.name ord) in
@@ -84,7 +87,7 @@ let check_ordering_trans ord =
       o13 = Comparison.Lt
     else QCheck.assume_fail ()
   in
-  QCheck.Test.make ~count:3_000 ~long_factor:10 ~name arb prop
+  QCheck.Test.make ~count ~long_factor ~name arb prop
 
 let check_ordering_swap_args ord =
   let name = CCFormat.sprintf "ordering_%s_swap_args" (O.name ord) in
@@ -108,7 +111,7 @@ let check_ordering_swap_args ord =
       | _ -> false
     end
   in
-  QCheck.Test.make ~count:3_000 ~long_factor:10 ~name arb prop
+  QCheck.Test.make ~count ~long_factor ~name arb prop
 
 let check_ordering_subterm ord =
   let name = CCFormat.sprintf "ordering_%s_subterm_property" (O.name ord) in
@@ -125,7 +128,7 @@ let check_ordering_subterm ord =
     |> Sequence.for_all
       (fun sub -> O.compare !ord t sub = Comparison.Gt)
   in
-  QCheck.Test.make ~count:3_000 ~long_factor:10 ~name arb prop
+  QCheck.Test.make ~count ~long_factor ~name arb prop
 
 let props =
   CCList.flat_map
