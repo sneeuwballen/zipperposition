@@ -35,6 +35,8 @@ val false_ : _ t
 val eq : 'a -> 'a -> 'a t
 val neq : 'a -> 'a -> 'a t
 val atom : 'a -> bool -> 'a t
+val atom_true : 'a -> 'a t
+val atom_false : 'a -> 'a t
 
 val is_true : _ t -> bool
 val is_false : _ t -> bool

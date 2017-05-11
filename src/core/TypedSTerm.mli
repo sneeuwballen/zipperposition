@@ -146,6 +146,9 @@ module Ty : sig
   val mangle : t -> string
   (** String usable as an identifier, without whitespace *)
 
+  val needs_args : t -> bool
+  (** [needs_args ty] means that [arity ty <> (0,0)] *)
+
   val is_tType : t -> bool
   val is_prop : t -> bool
   val returns : t -> t

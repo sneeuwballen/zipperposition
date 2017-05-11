@@ -340,7 +340,7 @@ and pp_l depth out l = match l with
   | [ty] -> pp_rec depth out ty
   | ty :: l' ->
     Format.fprintf out "@[<2>%a →@ @[<hv>%a@]@]"
-      (pp_rec depth) ty (pp_l depth) l'
+      (pp_inner depth) ty (pp_l depth) l'
 
 let pp_depth ?hooks:_ depth out t = pp_rec depth out t
 

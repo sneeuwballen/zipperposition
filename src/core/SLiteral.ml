@@ -74,6 +74,8 @@ let false_ = False
 let eq a b = Eq (a,b)
 let neq a b = Neq (a,b)
 let atom a b = Atom (a,b)
+let atom_true a = atom a true
+let atom_false a = atom a false
 
 let is_true = function True -> true | _ -> false
 let is_false = function False -> true | _ -> false

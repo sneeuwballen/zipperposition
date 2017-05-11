@@ -237,6 +237,7 @@ and pp_field out (name,t) =
 and pp_fields out f = Util.pp_list ~sep:", " pp_field out f
 and pp_infix_ b out l = match l with
   | [] -> assert false
+  | [t] when b=Builtin.Arrow -> pp out t
   | [t] -> pp_inner out t
   | t :: l' ->
     Format.fprintf out "@[%a@]@ %a %a"
@@ -614,6 +615,8 @@ module Ty = struct
     let buf = Buffer.create 32 in
     aux buf ty;
     Buffer.contents buf
+
+  let needs_args ty = arity ty <> (0,0)
 
   let is_tType t = match view t with | Ty_builtin TType -> true | _ -> false
   let is_prop t = match view t with Ty_builtin Prop -> true | _ -> false
