@@ -220,7 +220,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let module St = Statement in
     let has_ac_attr =
       List.exists
-        (function St.A_AC -> true)
+        (function St.A_AC -> true | _ -> false)
         (Statement.attrs st)
     in
     if has_ac_attr then match St.view st with

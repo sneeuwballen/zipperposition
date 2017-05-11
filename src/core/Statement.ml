@@ -21,6 +21,8 @@ type 'ty data = {
 
 type attr =
   | A_AC
+  | A_infix of string
+  | A_prefix of string
 
 type attrs = attr list
 
@@ -558,7 +560,11 @@ let add_src ~file st = match st.src.src_view with
     let module A = UntypedAST in
     let attrs =
       CCList.filter_map
-        (function A.A_AC -> Some A_AC | A.A_name _ -> None)
+        (function
+          | A.A_AC -> Some A_AC
+          | A.A_infix s -> Some (A_infix s)
+          | A.A_prefix s -> Some (A_prefix s)
+          | A.A_name _ -> None)
         attrs
     and name =
       CCList.find_map
@@ -579,6 +585,8 @@ let fpf = Format.fprintf
 
 let pp_attr out = function
   | A_AC -> fpf out "AC"
+  | A_infix s -> fpf out "infix %S" s
+  | A_prefix s -> fpf out "prefix %S" s
 
 let pp_attrs out = function
   | [] -> ()

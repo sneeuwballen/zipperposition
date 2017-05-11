@@ -659,8 +659,15 @@ let pp_depth ?(hooks=[]) depth out t =
         if !show_type_arguments then l
         else List.filter (fun t -> not (is_tType @@ ty_exn t)) l
       in
-      begin match l with
-        | [] -> _pp depth out f
+      let as_infix = match view f with Const id -> ID.as_infix id | _ -> None in
+      let as_prefix = match view f with Const id -> ID.as_prefix id | _ -> None in
+      begin match as_infix, as_prefix, l with
+        | _, _, [] -> _pp depth out f
+        | Some s, _, [a;b] ->
+          Format.fprintf out "@[<1>%a@ %s@ %a@]"
+            (_pp_surrounded depth) a s (_pp_surrounded depth) b
+        | _, Some s, [a] ->
+          Format.fprintf out "@[<1>%s@ %a@]" s (_pp_surrounded depth) a
         | _ ->
           Format.fprintf out "@[<1>%a@ %a@]"
             (_pp_surrounded depth) f (Util.pp_list ~sep:" " (_pp_surrounded depth)) l

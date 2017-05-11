@@ -26,6 +26,8 @@ type 'ty data = {
 
 type attr =
   | A_AC
+  | A_infix of string
+  | A_prefix of string
 
 type attrs = attr list
 

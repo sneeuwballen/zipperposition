@@ -92,3 +92,13 @@ end
 module Map = CCMap.Make(O_)
 module Set = CCSet.Make(O_)
 module Tbl = CCHashtbl.Make(O_)
+
+exception Attr_infix of string
+
+exception Attr_prefix of string
+
+let as_infix = payload_find ~f:(function Attr_infix s->Some s | _ -> None)
+let is_infix id = as_infix id |> CCOpt.is_some
+let as_prefix = payload_find ~f:(function Attr_prefix s->Some s | _ -> None)
+let is_prefix id = as_prefix id |> CCOpt.is_some
+

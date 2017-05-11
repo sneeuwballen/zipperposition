@@ -85,6 +85,8 @@
 
 %token AC
 %token NAME
+%token INFIX
+%token PREFIX
 
 %token <string> LOWER_WORD
 %token <string> UPPER_WORD
@@ -307,6 +309,8 @@ mutual_types:
 attr:
   | AC { A.A_AC }
   | NAME COLON n=raw_var { A.A_name n }
+  | INFIX s=QUOTED { A.A_infix (unquote s) }
+  | PREFIX s=QUOTED { A.A_prefix (unquote s) }
 
 attrs:
   | LEFT_BRACKET l=separated_nonempty_list(COMMA, attr) RIGHT_BRACKET

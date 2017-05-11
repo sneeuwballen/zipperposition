@@ -920,6 +920,15 @@ let infer_defs ?loc ctx (l:A.def list): (_,_,_) Stmt.def list =
        Stmt.mk_def ~rewrite:ctx.Ctx.def_as_rewrite id ty rules)
     decls
 
+(* see whether attributes contain some hints of notation for this ID *)
+let set_notation id attrs: unit =
+  List.iter
+    (function
+      | A.A_infix s -> ID.set_payload id (ID.Attr_infix s)
+      | A.A_prefix s -> ID.set_payload id (ID.Attr_prefix s)
+      | _ -> ())
+    attrs
+
 let infer_statement_exn ctx st =
   Util.debugf ~section 3 "@[<2>infer types for @{<yellow>statement@}@ `@[%a@]`@]"
     (fun k->k A.pp_statement st);
@@ -935,9 +944,13 @@ let infer_statement_exn ctx st =
       let id = ID.make s in
       let ty = infer_ty_exn ctx ty in
       Ctx.declare ctx id ty;
+      set_notation id st.A.attrs;
       Stmt.ty_decl ~src:(mk_src Stmt.R_decl) id ty
     | A.Def l ->
       let l = infer_defs ?loc ctx l in
+      List.iter
+        (fun d -> set_notation d.Stmt.def_id st.A.attrs)
+        l;
       Stmt.def ~src:(mk_src Stmt.R_def) l
     | A.Rewrite t ->
       let t =  infer_prop_ ctx t in

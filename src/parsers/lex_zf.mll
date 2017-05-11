@@ -89,6 +89,8 @@ rule token = parse
   | "<=>" { LOGIC_EQUIV }
   | "AC" { AC }
   | "name" { NAME }
+  | "infix" { INFIX }
+  | "prefix" { PREFIX }
   | "include" { INCLUDE }
   | lower_word { LOWER_WORD(Lexing.lexeme lexbuf) }
   | upper_word { UPPER_WORD(Lexing.lexeme lexbuf) }

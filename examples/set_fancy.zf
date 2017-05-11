@@ -1,0 +1,30 @@
+# expect: unsat
+
+# test for fancy infix/prefix symbols, with set theory
+
+val i : type.
+val set : type -> type.
+
+val a : i.
+val b : i.
+
+val[infix "∈"] mem : pi a. a -> set a -> prop.
+val[infix "∪"] union : pi a. set a -> set a -> set a.
+val[infix "⊆"] subeq : pi a. set a -> set a -> prop.
+val[prefix "ℙ"] power : pi a. set a -> set (set a).
+
+rewrite
+  forall a (x:a) A B.
+    mem x (union A B) <=> (mem x A || mem x B).
+
+rewrite
+  forall a A B.
+    subeq A B <=> (forall (x:a). mem x A => mem x B).
+
+rewrite
+  forall a (x:set a) A.
+    mem x (power A) <=> subeq x A.
+
+goal forall (A:set i) B.
+  subeq (power A) (power (union A B)).
+
