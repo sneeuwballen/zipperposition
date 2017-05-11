@@ -341,7 +341,7 @@ module Flatten = struct
         (aux Pos_toplevel vars body >|= F.exists var) >|= aux_maybe_define pos
       | T.Bind (Binder.Lambda, _, _) ->
         (* lambda-lifting *)
-        let fun_vars, body = T.open_binder Binder.Lambda t in
+        let fun_vars, body = T.unfold_fun t in
         assert (fun_vars <> []);
         (* give a name to [body vars] *)
         let closure = T.free_vars t |> ty_vars_first in

@@ -344,6 +344,7 @@ let box_opaque t: t =
 let is_var = function | {term=Var _; _} -> true | _ -> false
 let is_meta t = match view t with Meta _ -> true | _ -> false
 let is_const = function {term=Const _; _} -> true | _ -> false
+let is_fun = function {term=Bind (Binder.Lambda, _, _); _} -> true | _ -> false
 
 module Set = Sequence.Set.Make(struct type t = term let compare = compare end)
 module Map = Sequence.Map.Make(struct type t = term let compare = compare end)
@@ -470,15 +471,11 @@ let free_vars_l l =
 
 let closed t = Seq.free_vars t |> Sequence.is_empty
 
-let rec open_binder b t = match view t with
-  | Bind (b', v, t') when Binder.equal b b' ->
-    let vars, body = open_binder b t' in
-    v :: vars, body
-  | _ -> [], t
-
 let close_all ~ty s t =
   let vars = free_vars t in
   bind_list ~ty s vars t
+
+let unfold_fun = unfold_binder Binder.Lambda
 
 (** {2 Specific Views} *)
 
@@ -781,7 +778,7 @@ module Subst = struct
   type t = (term, term) Var.Subst.t
 
   let empty = Var.Subst.empty
-
+  let is_empty = Var.Subst.is_empty
   let mem = Var.Subst.mem
 
   let pp = Var.Subst.pp _pp_term
@@ -802,73 +799,75 @@ module Subst = struct
 
   let merge a b = Var.Subst.merge a b
 
-  let rec eval subst t = match view t with
+  let rec eval_ subst t = match view t with
     | Var v ->
       begin try
           let t' = Var.Subst.find_exn subst v in
           assert (t != t');
-          eval subst t'
+          eval_ subst t'
         with Not_found ->
-          var ?loc:t.loc (Var.update_ty v ~f:(eval subst))
+          var ?loc:t.loc (Var.update_ty v ~f:(eval_ subst))
       end
     | Const _ -> t
     | App (f, l) ->
-      let ty = eval subst (ty_exn t) in
-      app ?loc:t.loc ~ty (eval subst f) (eval_list subst l)
+      let ty = eval_ subst (ty_exn t) in
+      app ?loc:t.loc ~ty (eval_ subst f) (eval_list subst l)
     | Bind (s, v, body) ->
-      let ty = eval subst (ty_exn t) in
+      let ty = eval_ subst (ty_exn t) in
       (* bind [v] to a fresh name to avoid collision *)
       let subst, v' = rename_var subst v in
-      bind ?loc:t.loc ~ty s v' (eval subst body)
+      bind ?loc:t.loc ~ty s v' (eval_ subst body)
     | AppBuiltin (Builtin.TType,_) -> t
     | AppBuiltin (b,l) ->
-      let ty = eval subst (ty_exn t) in
+      let ty = eval_ subst (ty_exn t) in
       app_builtin ?loc:t.loc ~ty b (eval_list subst l)
     | Record (l, rest) ->
-      let ty = eval subst (ty_exn t) in
+      let ty = eval_ subst (ty_exn t) in
       record_flatten ?loc:t.loc ~ty
-        (List.map (CCPair.map2 (eval subst)) l)
-        ~rest:(CCOpt.map (eval subst) rest)
+        (List.map (CCPair.map2 (eval_ subst)) l)
+        ~rest:(CCOpt.map (eval_ subst) rest)
     | Ite (a,b,c) ->
-      let a = eval subst a in
-      let b = eval subst b in
-      let c = eval subst c in
+      let a = eval_ subst a in
+      let b = eval_ subst b in
+      let c = eval_ subst c in
       ite ?loc:t.loc a b c
     | Let (l, u) ->
       let subst', l =
         CCList.fold_map
           (fun subst' (v,t) ->
-             let t = eval subst t in
+             let t = eval_ subst t in
              let subst', v = rename_var subst' v in
              subst', (v,t))
           subst l
       in
-      let u = eval subst' u in
+      let u = eval_ subst' u in
       let_ ?loc:t.loc l u
     | Match (u, l) ->
-      let u = eval subst u in
+      let u = eval_ subst u in
       let l =
         List.map
           (fun (c, vars, rhs) ->
              let subst, vars = CCList.fold_map rename_var subst vars in
-             c, vars, eval subst rhs)
+             c, vars, eval_ subst rhs)
           l
       in
       match_ ?loc:t.loc u l
     | Multiset l ->
-      let ty = eval subst (ty_exn t) in
+      let ty = eval_ subst (ty_exn t) in
       multiset ?loc:t.loc ~ty (eval_list subst l)
     | Meta (v,r,k) ->
-      let v = Var.update_ty v ~f:(eval subst) in
+      let v = Var.update_ty v ~f:(eval_ subst) in
       meta ?loc:t.loc (v, r, k)
   and eval_list subst l =
-    List.map (eval subst) l
+    List.map (eval_ subst) l
 
   (* rename variable and evaluate its type *)
   and rename_var subst v =
-    let v' = Var.copy v |> Var.update_ty ~f:(eval subst) in
+    let v' = Var.copy v |> Var.update_ty ~f:(eval_ subst) in
     let subst = add subst v (var v') in
     subst, v'
+
+  let eval subst t = if is_empty subst then t else eval_ subst t
 end
 
 (** {2 Substitutions, Unification} *)

@@ -208,6 +208,7 @@ end
 val is_var : t -> bool
 val is_meta : t -> bool
 val is_const : t -> bool
+val is_fun : t -> bool
 
 val is_ground : t -> bool
 (** [true] iff there is no free variable *)
@@ -224,8 +225,10 @@ val closed : t -> bool
 (** [closed t] is [true] iff all bound variables of [t] occur under a
     binder (i.e. they are actually bound in [t]) *)
 
-val open_binder : Binder.t -> t -> t Var.t list * t
-(** [open_binder b (b v1 (b v2... (b vn t)))] returns [[v1,...,vn], t] *)
+val unfold_binder : Binder.t -> t -> t Var.t list * t
+(** [unfold_binder b (b v1 (b v2... (b vn t)))] returns [[v1,...,vn], t] *)
+
+val unfold_fun : t -> t Var.t list * t
 
 val var_occurs : var:t Var.t -> t -> bool
 (** [var_occurs ~var t] is [true] iff [var] occurs in [t] *)
