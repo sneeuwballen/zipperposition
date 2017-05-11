@@ -2,7 +2,7 @@
 # expect: unsat
 
 val term : type.
-val[AC] f : term -> term -> term.
+val[infix "·", AC] f : term -> term -> term.
 val d : term.
 val c : term.
 val b : term.
