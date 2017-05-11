@@ -211,7 +211,7 @@ unitary_infix_formula:
 
 unary_formula:
   | f=unitary_infix_formula { f }
-  | o=unary_connective f=unitary_infix_formula
+  | o=unary_connective f=unary_formula
     {
      let loc = L.mk_pos $startpos $endpos in
      o ?loc:(Some loc) f
