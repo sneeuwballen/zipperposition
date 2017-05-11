@@ -32,7 +32,7 @@ let print_solution solution =
 
 let print_signature signature =
   Format.printf "@[<2>signature: @[%a@]@]@."
-    (CCFormat.seq ~sep:" "
+    (Util.pp_seq ~sep:" "
        (fun out (a,b) -> Format.fprintf out "@[%a :@ %a@]" ID.pp a T.pp b))
     (ID.Map.to_seq signature)
 

@@ -85,4 +85,4 @@ let print_rule out (l,r) =
 
 let print_rules oc rules =
   Format.fprintf oc "rules: @[%a@]@."
-    (CCFormat.list ~sep:" " print_rule) rules
+    (Util.pp_list ~sep:" " print_rule) rules
