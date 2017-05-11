@@ -1,7 +1,7 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 First-order terms}
+(** {1 Lambda-free Terms}
 
     Those terms provide a first-order presentation of higher-order terms (without
     functions), in the sense that they make currying possible (as well as applying
@@ -9,7 +9,9 @@
 
     This is as if terms had an `apply` symbol everywhere, but more lightweight.
 
-    Types and terms are mixed because it makes application much easier.
+    Types and terms are mixed because it makes application much easier
+    (applying to a type and to a term are the same thing).
+    It might also make dependent typing possible some day.
 *)
 
 (** {2 Term} *)
