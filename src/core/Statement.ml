@@ -63,6 +63,7 @@ type from_file = {
 
 type lit = Term.t SLiteral.t
 type formula = TypedSTerm.t
+type input_def = (TypedSTerm.t,TypedSTerm.t,TypedSTerm.t) def
 type clause = lit list
 
 type role =
@@ -89,7 +90,8 @@ and source_view =
   | Neg of sourced_t
   | CNF of sourced_t
   | Renaming of sourced_t * ID.t * formula (* renamed this formula *)
-  | Preprocess of sourced_t * string
+  | Define of ID.t
+  | Preprocess of sourced_t * sourced_t list * string (* stmt, definitions, info *)
 
 and result =
   | Sourced_input of TypedSTerm.t
@@ -198,7 +200,8 @@ module Src = struct
   let neg x : t = mk_ (Neg x)
   let cnf x : t = mk_ (CNF x)
   let renaming x id f : t = mk_ (Renaming (x, id, f))
-  let preprocess x str : t = mk_ (Preprocess (x,str))
+  let define id : t = mk_ (Define id)
+  let preprocess x l str : t = mk_ (Preprocess (x,l,str))
 
   let neg_input f src = neg (Sourced_input f, src)
   let neg_clause c src = neg (Sourced_clause c, src)
@@ -208,8 +211,8 @@ module Src = struct
 
   let renaming_input input id f =
     renaming (Sourced_statement input, input.src) id f
-  let preprocess_input input str =
-    preprocess (Sourced_statement input, input.src) str
+  let preprocess_input input l str =
+    preprocess (Sourced_statement input, input.src) l str
 
   let pp_from_file out x =
     let pp_name out = function
@@ -227,7 +230,8 @@ module Src = struct
 
   let rec pp_tstp out src = match view src with
     | Internal _
-    | Input _ -> ()
+    | Input _
+    | Define _ -> ()
     | From_file (src,_) ->
       let file = src.file in
       begin match src.name with
@@ -240,9 +244,10 @@ module Src = struct
     | CNF (_,src') ->
       Format.fprintf out "inference(@['clausify',@ [status(esa)],@ [%a]@])"
         pp_tstp src'
-    | Preprocess ((_,src'),msg) ->
+    | Preprocess ((_,src'),_,msg) ->
       Format.fprintf out
-        "inference(@['%s',@ [status(esa)],@ [%a]@])" msg pp_tstp src'
+        "inference(@['%s',@ [status(esa)],@ [%a]@])"
+        msg pp_tstp src'
     | Renaming ((_,src'), id, form) ->
       Format.fprintf out
         "inference(@['renaming',@ [status(esa)],@ [%a],@ on(@[%a<=>%a@])@])"
@@ -264,8 +269,11 @@ module Src = struct
     | Renaming ((_,src'), id, form) ->
       Format.fprintf out "(@[renaming@ [%a]@ :name %a@ :on @[%a@]@])"
         pp src' ID.pp id TypedSTerm.pp form
-    | Preprocess ((_,src'),msg) ->
-      Format.fprintf out "(@[preprocess@ [%a]@ :msg %S@])" pp src' msg
+    | Define id ->
+      Format.fprintf out "(@[define %a@])" ID.pp id
+    | Preprocess ((_,src'),_,msg) ->
+      Format.fprintf out "(@[preprocess@ [%a]@ :msg %S@])"
+        pp src' msg
 end
 
 (** {2 Defined Constants} *)
@@ -563,6 +571,8 @@ let add_src ~file st = match st.src.src_view with
     }
   | _ -> st
 
+let as_sourced st = Sourced_statement st, src st
+
 (** {2 IO} *)
 
 let fpf = Format.fprintf
@@ -601,6 +611,8 @@ let pp_def ppf ppt ppty out d =
   fpf out "@[<2>@[%a : %a@]@ where@ @[<hv>%a@]@]"
     ID.pp d.def_id ppty d.def_ty
     (Util.pp_list ~sep:";" (pp_def_rule ppf ppt ppty)) d.def_rules
+
+let pp_input_def = pp_def TypedSTerm.pp TypedSTerm.pp TypedSTerm.pp
 
 let pp ppf ppt ppty out st = match st.view with
   | TyDecl (id,ty) ->

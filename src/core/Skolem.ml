@@ -46,6 +46,7 @@ type term_definition = {
   td_id: ID.t;
   td_ty: type_;
   td_rules: (form, term, type_) Statement.def_rule list;
+  td_as_def: (form,term,type_) Statement.def;
 }
 
 type definition =
@@ -229,19 +230,47 @@ let define_term ~ctx rules : term_definition =
            Stmt.Def_term (all_vars, id, ty, args, rhs))
       rules
   in
+  let td_as_def = Stmt.mk_def ~rewrite:true id ty rules in
   let def = {
     td_id=id;
     td_ty=ty;
     td_rules=rules;
+    td_as_def;
   } in
   ctx.sc_new_defs <- Def_term def :: ctx.sc_new_defs;
   Util.debugf ~section 4 "@[<2>define_term@ %a@]" (fun k->k pp_term_definition def);
   def
 
+let new_definitions ~ctx = ctx.sc_new_defs
+
 let pop_new_definitions ~ctx =
   let l = ctx.sc_new_defs in
   ctx.sc_new_defs <- [];
   l
+
+let def_as_stmt (d:definition): Stmt.input_t =
+  let module F = T.Form in
+  begin match d with
+    | Def_form d ->
+      (* introduce the required definition, with polarity as needed *)
+      let f' = match d.polarity with
+        | `Pos -> F.imply d.proxy d.form
+        | `Neg -> F.imply d.form d.proxy
+        | `Both -> F.equiv d.proxy d.form
+      in
+      let src = d.src in
+      Stmt.assert_ ~src f'
+    | Def_term d ->
+      let id = d.td_id in
+      let ty = d.td_ty in
+      let rules = d.td_rules in
+      let src = Stmt.Src.define id in
+      Stmt.def ~src [Stmt.mk_def ~rewrite:true id ty rules]
+  end
+
+let def_as_sourced_stmt d : Stmt.sourced_t =
+  let stmt = def_as_stmt d in
+  Stmt.as_sourced stmt
 
 let is_skolem id =
   ID.payload_pred id

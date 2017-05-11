@@ -87,6 +87,7 @@ type term_definition = private {
   td_id: ID.t;
   td_ty: type_;
   td_rules: (form, term, type_) Statement.def_rule list;
+  td_as_def: (form,term,type_) Statement.def;
 }
 
 val define_term :
@@ -103,7 +104,9 @@ type definition =
 
 val pp_definition : definition CCFormat.printer
 
-(* TODO: return list of sum type [form_def | term_def] *)
+val new_definitions : ctx:ctx -> definition list
+(** Return the new definitions, without side effects *)
+
 val pop_new_definitions : ctx:ctx -> definition list
 (** List of new definitions, that were introduced since the last
     call to {!new_definitions}. The list can be obtained only once,
@@ -111,6 +114,12 @@ val pop_new_definitions : ctx:ctx -> definition list
 
     Will call {!remove_def} so there is no risk of re-using a definition
     with a new polarity. *)
+
+val def_as_stmt : definition -> Statement.input_t
+(** Project the definition into a statement *)
+
+val def_as_sourced_stmt : definition -> Statement.sourced_t
+(** Project the definition into a statement *)
 
 (** {2 Attribute} *)
 

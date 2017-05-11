@@ -68,6 +68,7 @@ type from_file = {
 
 type lit = Term.t SLiteral.t
 type formula = TypedSTerm.t
+type input_def = (TypedSTerm.t,TypedSTerm.t,TypedSTerm.t) def
 type clause = lit list
 
 type role =
@@ -94,7 +95,8 @@ and source_view =
   | Neg of sourced_t
   | CNF of sourced_t
   | Renaming of sourced_t * ID.t * formula (* renamed this formula *)
-  | Preprocess of sourced_t * string
+  | Define of ID.t
+  | Preprocess of sourced_t * sourced_t list * string (* stmt, definitions, info *)
 
 and result =
   | Sourced_input of TypedSTerm.t
@@ -131,6 +133,9 @@ val signature : ?init:Signature.t -> (_, _, Type.t) t Sequence.t -> Signature.t
 (** Compute signature when the types are using {!Type} *)
 
 val add_src : file:string -> ('f, 't, 'ty) t -> ('f, 't, 'ty) t
+
+val as_sourced : input_t -> sourced_t
+(** Just wrap the statement with its source *)
 
 val map_data : ty:('ty1 -> 'ty2) -> 'ty1 data -> 'ty2 data
 
@@ -205,8 +210,9 @@ module Src : sig
 
   val neg : sourced_t -> t
   val cnf : sourced_t -> t
-  val preprocess : sourced_t -> string -> t
+  val preprocess : sourced_t -> sourced_t list -> string -> t
   val renaming : sourced_t -> ID.t -> formula -> t
+  val define : ID.t -> t
 
   val neg_input : TypedSTerm.t -> source -> t
   val neg_clause : clause -> source -> t
@@ -214,7 +220,7 @@ module Src : sig
   val cnf_input : TypedSTerm.t -> source -> t
   val cnf_clause : clause -> source -> t
 
-  val preprocess_input : input_t -> string -> t
+  val preprocess_input : input_t -> sourced_t list -> string -> t
   val renaming_input : input_t -> ID.t -> formula -> t
 
   val pp_from_file : from_file CCFormat.printer

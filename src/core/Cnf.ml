@@ -831,26 +831,15 @@ type options =
   | PostNNF of (form -> form)  (** any processing that keeps negation at leaves *)
   | PostSkolem of (form -> form) (** must not introduce variables nor negations *)
 
-let new_defs ~ctx stmt : (_,_,_) Stmt.t list =
-  let defs = Skolem.pop_new_definitions ~ctx in
-  List.map
-    (function
-      | Skolem.Def_form d ->
-        (* introduce the required definition, with polarity as needed *)
-        let f' = match d.Skolem.polarity with
-          | `Pos -> F.imply d.Skolem.proxy d.Skolem.form
-          | `Neg -> F.imply d.Skolem.form d.Skolem.proxy
-          | `Both -> F.equiv d.Skolem.proxy d.Skolem.form
-        in
-        Stmt.assert_ ~src:d.Skolem.src f'
-      | Skolem.Def_term d ->
-        let id = d.Skolem.td_id in
-        let ty = d.Skolem.td_ty in
-        let rules = d.Skolem.td_rules in
-        Stmt.def ~src:(Stmt.Src.preprocess_input stmt (Fmt.sprintf "def_%a" ID.pp id))
-          [Stmt.mk_def ~rewrite:true id ty rules]
-    )
-    defs
+(* return new sources, without modifying anything *)
+let new_src ~ctx : Stmt.sourced_t list =
+  Skolem.new_definitions ~ctx
+  |> List.map Skolem.def_as_sourced_stmt
+
+(* pop and return new statements *)
+let pop_new_defs ~ctx : (_,_,_) Stmt.t list =
+  Skolem.pop_new_definitions ~ctx
+  |> List.map Skolem.def_as_stmt
 
 let pp_stmt out st = Stmt.pp T.pp T.pp_inner T.pp_inner out st
 
@@ -901,9 +890,9 @@ let flatten ~ctx seq : _ Sequence.t =
   |> Sequence.flat_map_l
     (fun stmt ->
        let n = Skolem.counter ctx in
-       let src () =
+       let src() =
          if Skolem.counter ctx > n
-         then Stmt.Src.preprocess_input stmt "flatten"
+         then Stmt.Src.preprocess_input stmt (new_src ~ctx) "flatten"
          else stmt.Stmt.src
        in
        let attrs = stmt.Stmt.attrs in
@@ -940,7 +929,7 @@ let flatten ~ctx seq : _ Sequence.t =
        in
        Util.debugf ~section 5 "@[<2>flatten `@[%a@]`@ into `@[%a@]`@]"
          (fun k->k pp_stmt stmt (Util.pp_list pp_stmt) new_sts);
-       begin match new_defs ~ctx stmt with
+       begin match pop_new_defs ~ctx with
          | [] -> new_sts
          | l -> List.rev (List.rev_append new_sts l)
        end)
@@ -1001,7 +990,7 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
          let old_counter = Skolem.counter ctx in
          let src () =
            if Skolem.counter ctx > old_counter
-           then Stmt.Src.preprocess_input stmt "rename"
+           then Stmt.Src.preprocess_input stmt (new_src ~ctx) "rename"
            else stmt.Stmt.src
          in
          let new_st = match stmt.Stmt.view with
@@ -1054,7 +1043,7 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
              Stmt.goal ~src:(src()) f
            | Stmt.NegatedGoal _ -> assert false
          in
-         begin match new_defs ~ctx stmt with
+         begin match pop_new_defs ~ctx with
            | [] -> Sequence.return new_st
            | l -> Sequence.of_list (List.rev (new_st :: l))
          end
