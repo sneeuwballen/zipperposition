@@ -218,9 +218,10 @@ module Make(E : Env_intf.S) = struct
                  ~rule:(Proof.Rule.mk "contextual_narrowing")
                  [C.proof_parent_subst (c,sc_a) subst]
              in
+             (* add some penalty on every inference *)
+             let penalty = Array.length (C.lits c) + C.penalty c in
              let new_c =
-               C.create (new_lits @ ctx) proof
-                 ~trail:(C.trail c) ~penalty:(C.penalty c)
+               C.create (new_lits @ ctx) proof ~trail:(C.trail c) ~penalty
              in
              Util.debugf ~section 4
                "(@[<2>ctx_narrow@ :rule %a@ :clause %a@ :pos %a@ :subst %a@ :yield %a@])"
