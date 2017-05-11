@@ -186,6 +186,8 @@ let rec expected_ty_vars ty = match view ty with
   | Forall ty' -> 1 + expected_ty_vars ty'
   | _ -> 0
 
+let needs_args ty = expected_ty_vars ty>0 || expected_args ty<>[]
+
 let order ty: int =
   let rec aux ty = match view ty with
     | Forall ty -> aux ty
@@ -364,6 +366,7 @@ let pp_typed_var out v = match view (HVar.ty v) with
   | Builtin Term -> HVar.pp out v
   | Builtin Int -> Format.fprintf out "I%d" (HVar.id v)
   | Builtin Rat -> Format.fprintf out "Q%d" (HVar.id v)
+  | Forall _ | Fun _ -> Format.fprintf out "(@[F%d:%a@])" (HVar.id v) pp (HVar.ty v)
   | _ -> Format.fprintf out "(@[%a:%a@])" HVar.pp v pp (HVar.ty v)
 
 let mangle (ty:t): string =

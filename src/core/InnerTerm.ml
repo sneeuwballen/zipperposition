@@ -615,6 +615,11 @@ type print_hook = int -> (CCFormat.t -> t -> unit) -> CCFormat.t -> t -> bool
 let _hooks = ref []
 let add_default_hook h = _hooks := h :: !_hooks
 
+let needs_args (t:t): bool = match view t with
+  | AppBuiltin (Builtin.Arrow, _) -> true
+  | Bind (Binder.ForallTy, _, _) -> true
+  | _ -> false
+
 let pp_depth ?(hooks=[]) depth out t =
   let rec _pp depth out t =
     if List.exists (fun h -> h depth (_pp depth) out t) hooks
@@ -627,6 +632,7 @@ let pp_depth ?(hooks=[]) depth out t =
       let ty = HVar.ty v in
       begin match view ty with
         | AppBuiltin (Builtin.TType, []) -> Format.fprintf out "A%d" (HVar.id v)
+        | _ when needs_args ty -> Format.fprintf out "F%d" (HVar.id v)
         | _ -> HVar.pp out v
       end
     | DB i -> Format.fprintf out "Y%d" (depth-i-1)

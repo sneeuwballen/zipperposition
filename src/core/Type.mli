@@ -166,6 +166,9 @@ val expected_args : t -> t list
 val expected_ty_vars : t -> int
 (** Number of type parameters expected. 0 for monomorphic types. *)
 
+val needs_args : t -> bool
+(** [needs_args ty] iff [expected_ty_vars ty>0 || expected_args ty<>[]] *)
+
 val order : t -> int
 (** Number of left-nested function types (1 for constant and variables).
     [order (a->b) = 1]
