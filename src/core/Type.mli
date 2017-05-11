@@ -166,6 +166,12 @@ val expected_args : t -> t list
 val expected_ty_vars : t -> int
 (** Number of type parameters expected. 0 for monomorphic types. *)
 
+val order : t -> int
+(** Number of left-nested function types (1 for constant and variables).
+    [order (a->b) = 1]
+    [order ((a->b)->c) = 2]
+    [order (((a->b)->c)->d) = 2] *)
+
 val is_ground : t -> bool
 (** Is the type ground? (means that no {!Var} not {!BVar} occurs in it) *)
 

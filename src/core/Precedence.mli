@@ -43,6 +43,10 @@ module Constr : sig
         equivalence classes, within which all symbols are equal, but
         symbols of distinct equivalence classes are always ordered. *)
 
+  (* TODO: sth based on order of the type. Higher-order functions should
+     be bigger than first-order functions, so that ghd() works fine
+     with types in KBO *)
+
   val arity : (ID.t -> int) -> [`partial] t
   (** decreasing arity constraint (big arity => high in precedence) *)
 

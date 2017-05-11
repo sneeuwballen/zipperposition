@@ -112,6 +112,10 @@ val as_const_exn : t -> ID.t
 val as_var : t -> var option
 val as_var_exn : t -> var
 
+val as_app : t -> t * t list
+(** [as_app t] decomposes [t] into a head (non-application) and arguments,
+    such as [(let f,l = as_app t in app f l) = t] *)
+
 val of_term_unsafe : InnerTerm.t -> t
 (** {b NOTE}: this can break the invariants and make {!view} fail. Only
     apply with caution. *)

@@ -123,7 +123,7 @@ exception Payload_def of def
 
 let def id =
   ID.payload_find id
-    ~f:(function 
+    ~f:(function
       | Payload_def d -> Some d
       | _ -> None)
 
@@ -185,6 +185,16 @@ let rec expected_args ty = match view ty with
 let rec expected_ty_vars ty = match view ty with
   | Forall ty' -> 1 + expected_ty_vars ty'
   | _ -> 0
+
+let order ty: int =
+  let rec aux ty = match view ty with
+    | Forall ty -> aux ty
+    | Fun (l, ret) ->
+      List.fold_left (fun o arg -> max o (1 + aux arg)) (aux ret) l
+    | App (_, l) -> List.fold_left (fun o arg -> max o (aux arg)) 0 l
+    | Var _ | DB _ | Builtin _ -> 0
+  in
+  max 1 (aux ty)  (* never less than 1 *)
 
 let is_ground = T.is_ground
 

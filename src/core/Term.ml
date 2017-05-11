@@ -173,6 +173,10 @@ let as_var_exn t = match T.view t with
 
 let as_var t = try Some (as_var_exn t) with Invalid_argument _ -> None
 
+let as_app t = match view t with
+  | App (f,l) -> f, l
+  | _ -> t, []
+
 module Seq = struct
   let vars t k =
     let rec aux t =
