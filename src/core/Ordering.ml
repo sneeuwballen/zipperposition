@@ -141,6 +141,11 @@ module KBO : ORD = struct
     | IOB.B _ -> W.int 1
     | IOB.I s -> Prec.weight prec s
 
+  (* TODO: ghc() that maps (in theory) variables to sets of symbols
+     their instances can have as head (for a symbol [f] it's just [{f}] itself).
+     Then [x > y] if [forall f∈ghc(x),y∈ghd(y), f>g] in precedence.
+  *)
+
   (** the KBO ordering itself. The implementation is borrowed from
       the kbo_5 version of "things to know when implementing KBO".
       It should be linear time. *)
@@ -149,8 +154,8 @@ module KBO : ORD = struct
     (** variable balance, weight balance, t contains variable y. pos
         stands for positive (is t the left term) *)
     let rec balance_weight (wb:W.t) t y pos: W.t * bool =
-      match TC.view t with
-        | TC.Var x ->
+      match T.view t with
+        | T.Var x ->
           let x = HVar.id x in
           if pos then (
             add_pos_var balance x;
@@ -159,22 +164,25 @@ module KBO : ORD = struct
             add_neg_var balance x;
             W.(wb - one), x = y
           )
-        | TC.DB _ ->
+        | T.DB _ ->
           let w = if pos then W.(wb + one) else W.(wb - one) in
           w, false
-        | TC.App (s, l) ->
+        | T.Const s ->
           let open W.Infix in
-          let wb' = if pos
+          let wb' =
+            if pos
             then wb + weight prec (IOB.I s)
-            else wb - weight prec (IOB.I s) in
-          balance_weight_rec wb' l y pos false
-        | TC.AppBuiltin (b,l) ->
+            else wb - weight prec (IOB.I s)
+          in wb', false
+        | T.App (f, l) ->
+          let wb', res = balance_weight wb f y pos in
+          balance_weight_rec wb' l y pos res
+        | T.AppBuiltin (b,l) ->
           let open W.Infix in
           let wb' = if pos
             then wb + weight prec (IOB.B b)
             else wb - weight prec (IOB.B b) in
           balance_weight_rec wb' l y pos false
-        | TC.NonFO -> assert false
     (** list version of the previous one, threaded with the check result *)
     and balance_weight_rec wb terms y pos res = match terms with
       | [] -> (wb, res)
