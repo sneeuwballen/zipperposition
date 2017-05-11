@@ -350,7 +350,7 @@ module Flatten = struct
       | T.AppBuiltin (Builtin.Eq, [a;b]) when T.is_fun a || T.is_fun b ->
         (* turn [f = λx. t] into [∀x. f x=t] *)
         let vars_forall, a, b = complete_eq a b in
-        let t' = F.forall_l vars_forall (F.eq a b) in
+        let t' = F.forall_l vars_forall (F.eq_or_equiv a b) in
         Util.debugf ~section 5 "(@[<2>rewrite-eq@ `%a`@ :into `%a`@])"
           (fun k->k T.pp t T.pp t');
         assert (vars_forall<>[]);
@@ -361,7 +361,7 @@ module Flatten = struct
       | T.AppBuiltin (Builtin.Neq, [a;b]) when T.is_fun a || T.is_fun b ->
         (* turn [f ≠ λx. t] into [∃x. f x≠t] *)
         let vars_exist, a, b = complete_eq a b in
-        let t' = F.exists_l vars_exist (F.neq a b) in
+        let t' = F.exists_l vars_exist (F.neq_or_xor a b) in
         Util.debugf ~section 5 "(@[<2>rewrite-eq@ `%a`@ :into `%a`@])"
           (fun k->k T.pp t T.pp t');
         assert (vars_exist<>[]);

@@ -195,6 +195,9 @@ module Form : sig
   val forall : ?loc:location -> t Var.t -> t -> t
   val exists : ?loc:location -> t Var.t -> t -> t
 
+  val eq_or_equiv : t -> t -> t
+  val neq_or_xor : t -> t -> t
+
   val forall_l : ?loc:location -> t Var.t list -> t -> t
   val exists_l : ?loc:location -> t Var.t list -> t -> t
 

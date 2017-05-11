@@ -708,6 +708,16 @@ module Form = struct
   let ite = ite
   let imply ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Imply [a;b]
 
+  let eq_or_equiv t u =
+    if Ty.is_prop (ty_exn t)
+    then equiv t u
+    else eq t u
+
+  let neq_or_xor t u =
+    if Ty.is_prop (ty_exn t)
+    then xor t u
+    else neq t u
+
   let box_opaque = box_opaque
 
   let rec flatten_ (k:[<`And|`Or]) acc l = match l with
