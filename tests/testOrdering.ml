@@ -63,7 +63,7 @@ let check_ordering_inv_by_subst ord =
     let o2 = O.compare !ord t1' t2' in
     more_specific o1 o2
   in
-  QCheck.Test.make ~count:1000 ~name gen prop
+  QCheck.Test.make ~count:3_000 ~long_factor:10 ~name gen prop
 
 let check_ordering_trans ord =
   let name = CCFormat.sprintf "ordering_%s_transitive" (O.name ord) in
@@ -84,7 +84,31 @@ let check_ordering_trans ord =
       o13 = Comparison.Lt
     else QCheck.assume_fail ()
   in
-  QCheck.Test.make ~count:1000 ~name arb prop
+  QCheck.Test.make ~count:3_000 ~long_factor:10 ~name arb prop
+
+let check_ordering_swap_args ord =
+  let name = CCFormat.sprintf "ordering_%s_swap_args" (O.name ord) in
+  let arb = QCheck.pair ArTerm.default ArTerm.default in
+  let ord = ref ord in
+  let prop (t1, t2) =
+    (* declare symbols *)
+    Sequence.of_list [t1;t2]
+      |> Sequence.flat_map T.Seq.symbols
+      |> ID.Set.of_seq |> ID.Set.to_seq
+      |> O.add_seq !ord;
+    (* check that instantiating variables preserves ordering *)
+    let o12 = O.compare !ord t1 t2 in
+    let o21 = O.compare !ord t2 t1 in
+    let open Comparison in
+    begin match o12, o21 with
+      | Lt, Gt
+      | Gt, Lt
+      | Eq, Eq
+      | Incomparable, Incomparable -> true
+      | _ -> false
+    end
+  in
+  QCheck.Test.make ~count:3_000 ~long_factor:10 ~name arb prop
 
 let check_ordering_subterm ord =
   let name = CCFormat.sprintf "ordering_%s_subterm_property" (O.name ord) in
@@ -101,13 +125,14 @@ let check_ordering_subterm ord =
     |> Sequence.for_all
       (fun sub -> O.compare !ord t sub = Comparison.Gt)
   in
-  QCheck.Test.make ~count:1000 ~name arb prop
+  QCheck.Test.make ~count:3_000 ~long_factor:10 ~name arb prop
 
 let props =
   CCList.flat_map
     (fun o ->
        [ check_ordering_inv_by_subst o;
          check_ordering_trans o;
+         check_ordering_swap_args o;
          check_ordering_subterm o;
        ])
     [ O.kbo (Precedence.default []);
