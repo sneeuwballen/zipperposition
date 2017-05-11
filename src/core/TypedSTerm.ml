@@ -73,6 +73,8 @@ let rec head_exn t = match view t with
 
 let head t = try Some (head_exn t) with Not_found -> None
 
+let is_tType t = match view t with AppBuiltin (Builtin.TType,_) -> true | _ -> false
+
 let to_int_ = function
   | Var _ -> 0
   | Const _ -> 3
@@ -183,8 +185,22 @@ let rec pp out t = match view t with
   | Const s -> ID.pp out s
   | App (_, []) -> assert false
   | App (f, l) ->
-    Format.fprintf out "@[<2>%a@ %a@]"
-      pp_inner f (Util.pp_list ~sep:" " pp_inner) l
+    let l =
+      if !InnerTerm.show_type_arguments then l
+      else List.filter (fun t -> not (ty_exn t |> is_tType)) l
+    in
+    let as_infix = match view f with Const id -> ID.as_infix id | _ -> None in
+    let as_prefix = match view f with Const id -> ID.as_prefix id | _ -> None in
+    begin match as_infix, as_prefix, l with
+      | _, _, [] -> pp out f
+      | Some s, _, [a;b] ->
+        Format.fprintf out "@[<1>%a@ %s@ %a@]" pp_inner a s pp_inner b
+      | _, Some s, [a] ->
+        Format.fprintf out "@[<1>%s@ %a@]" s pp_inner a
+      | _ ->
+        Format.fprintf out "@[<2>%a@ %a@]"
+          pp_inner f (Util.pp_list ~sep:" " pp_inner) l
+    end
   | Bind (s, _, _) ->
     let vars, body = unfold_binder s t in
     let pp_bound_var out v =
@@ -618,7 +634,7 @@ module Ty = struct
 
   let needs_args ty = arity ty <> (0,0)
 
-  let is_tType t = match view t with | Ty_builtin TType -> true | _ -> false
+  let is_tType = is_tType
   let is_prop t = match view t with Ty_builtin Prop -> true | _ -> false
 
   let rec returns t = match view t with

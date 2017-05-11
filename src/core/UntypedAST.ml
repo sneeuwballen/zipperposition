@@ -69,8 +69,8 @@ let goal ?loc ?attrs t = make_ ?attrs ?loc (Goal t)
 let pp_attr out = function
   | A_name n -> Format.fprintf out "name:%s" n
   | A_AC -> CCFormat.string out "AC"
-  | A_infix s -> Format.fprintf out "infix %S" s
-  | A_prefix s -> Format.fprintf out "prefix %S" s
+  | A_infix s -> Format.fprintf out "infix \"%s\"" s
+  | A_prefix s -> Format.fprintf out "prefix \"%s\"" s
 
 let pp_attrs out = function
   | [] -> ()

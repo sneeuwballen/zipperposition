@@ -585,8 +585,8 @@ let fpf = Format.fprintf
 
 let pp_attr out = function
   | A_AC -> fpf out "AC"
-  | A_infix s -> fpf out "infix %S" s
-  | A_prefix s -> fpf out "prefix %S" s
+  | A_infix s -> fpf out "infix \"%s\"" s
+  | A_prefix s -> fpf out "prefix \"%s\"" s
 
 let pp_attrs out = function
   | [] -> ()
