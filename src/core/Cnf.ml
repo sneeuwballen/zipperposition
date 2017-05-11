@@ -215,7 +215,7 @@ module Flatten = struct
       let n = List.length vars' in
       List.map T.var (CCList.drop n vars),
       Var.Subst.of_list
-        (List.combine (CCList.take n vars) (List.map T.var vars'))
+        (List.combine vars' (CCList.take n vars |> List.map T.var))
     in
     let args_t, subst_t = mk_args_subst vars_t in
     let args_u, subst_u = mk_args_subst vars_u in
