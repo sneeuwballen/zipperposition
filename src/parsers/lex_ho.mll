@@ -125,7 +125,7 @@ rule token = parse
   let term_of_string s : STerm.t option =
     try
       Some (Parse_ho.parse_term token (Lexing.from_string s))
-    with Parse_ho.Error | Error _ -> None
+    with Parse_ho.Error -> None
 
   let pterm (s:string): TypedSTerm.t option =
     CCOpt.(

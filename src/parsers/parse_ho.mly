@@ -129,10 +129,10 @@ type_:
       let loc = L.mk_pos $startpos $endpos in
       Term.fun_ty ~loc [l] r
     }
-  | FORALL_TY v=typed_var ty=type_
+  | FORALL_TY v=var_raw ty=type_
     {
       let loc = L.mk_pos $startpos $endpos in
-      Term.forall_ty ~loc [v] ty
+      Term.forall_ty ~loc [v,Some Term.tType] ty
     }
   | t=app_type {t}
 
@@ -186,11 +186,6 @@ unary_term:
       Term.var ~loc w
     }
   | v=var { v }
-  | WILDCARD
-    {
-      let loc = L.mk_pos $startpos $endpos in
-      Term.wildcard
-    }
   | w=LOWER_WORD
   | w=DOLLAR_WORD
   | w=DOLLAR_DOLLAR_WORD
@@ -302,7 +297,7 @@ var:
 
 typed_var:
   | v=var_raw { v, None }
-  | v=var_raw COLUMN ty=app_type { v, Some ty }
+  | LEFT_PAREN v=var_raw COLUMN ty=app_type RIGHT_PAREN { v, Some ty }
 
 typed_vars:
   | v=separated_nonempty_list(COMMA,typed_var) { v }
