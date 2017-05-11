@@ -188,6 +188,41 @@ module Flatten = struct
   let pp_rules =
     Fmt.(Util.pp_list Dump.(pair (list T.pp_inner |> hovbox) T.pp) |> hovbox)
 
+  (* [t=u], but one of them is a lambda/function type. Add/create new variables
+     [vars] and turn this into [t vars = u vars], modulo beta.
+     @return [vars, t vars, u vars] *)
+  let complete_eq t u =
+    let ty_vars, ty_args, ty_ret = T.Ty.unfold (T.ty_exn t) in
+    assert (List.length ty_vars + List.length ty_args > 0);
+    (* unfold t and u *)
+    let vars_t, t = T.unfold_fun t in
+    let vars_u, u = T.unfold_fun u in
+    (* variable names, for re-use *)
+    let names =
+      if List.length vars_t > List.length vars_u
+      then List.map Var.name vars_t
+      else List.map Var.name vars_u
+    in
+    (* make variables for full application *)
+    let vars =
+      List.mapi
+        (fun i ty ->
+           let name = try List.nth names i with _ -> Printf.sprintf "x_%d" i in
+           Var.of_string ~ty name)
+        ty_args
+    in
+    let mk_args_subst vars' =
+      let n = List.length vars' in
+      List.map T.var (CCList.drop n vars),
+      Var.Subst.of_list
+        (List.combine (CCList.take n vars) (List.map T.var vars'))
+    in
+    let args_t, subst_t = mk_args_subst vars_t in
+    let args_u, subst_u = mk_args_subst vars_u in
+    let t = T.app ~ty:ty_ret (T.Subst.eval subst_t t) args_t in
+    let u = T.app ~ty:ty_ret (T.Subst.eval subst_u u) args_u in
+    ty_vars @ vars, t, u
+
   (* conversion of terms can yield several possible terms, by
      eliminating if and match
      @param vars the variables that can be replaced in the context *)
@@ -312,9 +347,25 @@ module Flatten = struct
             T.app_builtin ~ty:T.Ty.prop Builtin.Less [b; a];
           ]
         in aux_maybe_define pos f
+      | T.AppBuiltin (Builtin.Eq, [a;b]) when T.is_fun a || T.is_fun b ->
+        (* turn [f = λx. t] into [∀x. f x=t] *)
+        let vars_forall, a, b = complete_eq a b in
+        let t' = F.forall_l vars_forall (F.eq a b) in
+        Util.debugf ~section 5 "(@[<2>rewrite-eq@ `%a`@ :into `%a`@])"
+          (fun k->k T.pp t T.pp t');
+        assert (vars_forall<>[]);
+        aux pos vars t'
       | T.AppBuiltin (Builtin.Eq, [a;b]) ->
         (F.eq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
         >|= aux_maybe_define pos
+      | T.AppBuiltin (Builtin.Neq, [a;b]) when T.is_fun a || T.is_fun b ->
+        (* turn [f ≠ λx. t] into [∃x. f x≠t] *)
+        let vars_exist, a, b = complete_eq a b in
+        let t' = F.exists_l vars_exist (F.neq a b) in
+        Util.debugf ~section 5 "(@[<2>rewrite-eq@ `%a`@ :into `%a`@])"
+          (fun k->k T.pp t T.pp t');
+        assert (vars_exist<>[]);
+        aux pos vars t'
       | T.AppBuiltin (Builtin.Neq, [a;b]) ->
         (F.neq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
         >|= aux_maybe_define pos
