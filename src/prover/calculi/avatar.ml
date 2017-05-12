@@ -338,7 +338,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     in
     (* positive clauses *)
     let proof_pos =
-      Proof.Step.inference ~rule:(Proof.Rule.mk "cut") [cut_proof_parent]
+      Proof.Step.simp ~rule:(Proof.Rule.mk "cut") [cut_proof_parent]
     in
     let c_pos =
       List.map
@@ -377,7 +377,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       let g = cut_form c in
       (* proof step *)
       let proof =
-        Proof.Step.inference [cut_proof_parent c] ~rule:(Proof.Rule.mk "cut")
+        Proof.Step.simp [cut_proof_parent c] ~rule:(Proof.Rule.mk "cut")
       in
       let vars = Cut_form.vars g |> T.VarSet.to_list in
       Util.debugf ~section 2
@@ -509,7 +509,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
           (fun c ->
              Proof.Parent.from @@ Proof.S.mk_c proof_st @@
              SClause.make ~trail:Trail.empty c)
-        |> Proof.Step.inference ~rule:(Proof.Rule.mk "lemma")
+        |> Proof.Step.simp ~rule:(Proof.Rule.mk "lemma")
       in
       let cut = introduce_cut ~reason:Fmt.(return "in-input") f proof in
       let all_clauses = cut_res_clauses cut |> Sequence.to_rev_list in
