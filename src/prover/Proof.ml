@@ -234,14 +234,15 @@ module Step = struct
     let dist_to_goal = match kind with
       | Goal _ | Lemma -> Some 0
       | _ ->
-        begin match parents with
+        let d = match parents with
           | [] -> None
-          | [p] -> CCOpt.map succ (Parent.proof p).step.dist_to_goal
-          | [p1;p2] ->
-            CCOpt.map succ (combine_dist (Parent.proof p1).step.dist_to_goal p2)
-          | p::l ->
-            CCOpt.map succ (List.fold_left combine_dist (Parent.proof p).step.dist_to_goal l)
-        end
+          | [p] -> (Parent.proof p).step.dist_to_goal
+          | [p1;p2] -> combine_dist (Parent.proof p1).step.dist_to_goal p2
+          | p::l -> List.fold_left combine_dist (Parent.proof p).step.dist_to_goal l
+        in
+        match kind with
+          | Inference _ -> CCOpt.map succ d
+          | _ -> d
     in
     { id=get_id_(); kind; parents; dist_to_goal; }
 
