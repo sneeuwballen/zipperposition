@@ -1,0 +1,52 @@
+
+# expect: sat
+
+# separation logic
+
+val o : type.
+val list : type.
+
+val heap : o -> prop.
+
+val[infix "*", AC] sep : o -> o -> o.
+#val[infix "*"] sep : i -> i -> i.
+
+val[infix "-R->"] lseg : list -> list -> o. # list reachability
+
+val[infix "-->"] next : list -> list -> o.
+
+val nil : list.
+
+val emp : o.
+
+# if `sep` is not annotated with "AC"
+#assert forall X Y Sigma. sep X (sep Y Sigma) = sep Y (sep X Sigma).
+
+assert forall X Y Sigma. sep (lseg X X) Sigma = Sigma.
+
+assert forall Y Sigma. ~ heap (sep (next nil Y) Sigma).
+
+assert forall Y Sigma. heap (sep (lseg nil Y) Sigma) => Y=nil.
+
+assert forall X Y Z Sigma. ~ heap (sep (next X Y) (sep (next X Z) Sigma)).
+
+assert forall X Y Z Sigma. heap (sep (next X Y) (sep (lseg X Z) Sigma)) => X=Z.
+
+assert forall X Y Z Sigma.
+  heap (sep (lseg X Y) (sep (lseg X Z) Sigma)) => (X=Y || X=Z).
+
+assert forall X Y Z Sigma.
+  heap (sep (next X Y) (sep (lseg Y Z) Sigma)) =>
+  (X=Y || heap (sep (lseg X Z) Sigma)).
+
+assert forall X Y Z Sigma.
+  heap (sep (lseg X Y) (sep (lseg Y nil) Sigma)) =>
+  heap (sep (lseg X nil) Sigma).
+
+assert forall X Y Z W Sigma.
+  heap (sep (lseg X Y) (sep (lseg Y Z) (sep (next Z W) Sigma))) =>
+  heap (sep (lseg X Z) (sep (next Z W) Sigma)).
+
+assert forall X Y Z W Sigma.
+  heap (sep (lseg X Y) (sep (lseg Y Z) (sep (lseg Z W) Sigma))) =>
+  (Z=W || heap (sep (lseg X Z) (sep (lseg Z W) Sigma))).
