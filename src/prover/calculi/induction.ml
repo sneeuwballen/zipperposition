@@ -831,8 +831,9 @@ module Make
                   None (* probably there because there are induction hyp. on it *)
                 | _ when Type.is_tType (T.ty t |> Type.returns) ->
                   None (* do not generalize on type or type constructors *)
-                | T_view.T_app_unin _
-                | T_view.T_app_defined _ -> Some (pos,t)
+                | (T_view.T_app_unin _ | T_view.T_app_defined _)
+                  when T.is_ground t ->
+                  Some (pos,t)
                 | _ -> None
               end
             | _ -> None)
