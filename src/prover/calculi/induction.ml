@@ -500,7 +500,8 @@ module Make
     let cut_blit = A.cut_lit cut in
     (* proof step *)
     let proof =
-      Proof.Step.inference (List.map C.proof_parent (A.cut_pos cut))
+      let proof_parent = A.cut_proof_parent cut in
+      Proof.Step.inference [proof_parent]
         ~rule:(Proof.Rule.mkf "induction(@[<h>%a@])" (Util.pp_list HVar.pp) vars)
     in
     let c_sets =
@@ -992,7 +993,7 @@ module Make
 
   (* prove any lemma that has inductive variables. First we try
      to generalize it, otherwise we prove it by induction *)
-  let prove_lemma (cut:A.cut_res): C.t list =
+  let inductions_on_lemma (cut:A.cut_res): C.t list =
     let g = A.cut_form cut in
     Util.debugf ~section 4 "(@[<hv>prove_lemma@ %a@])" (fun k->k Cut_form.pp g);
     begin match Generalize.all g with
@@ -1226,21 +1227,13 @@ module Make
          );
          res)
 
-  let new_clauses_from_lemmas_ : C.t list ref = ref []
-
   (* look whether, to prove the lemma, we need induction *)
-  let on_lemma cut =
-    let l = prove_lemma cut in
+  let prove_lemma_by_ind cut =
+    let l = inductions_on_lemma cut in
     if l<>[] then (
       Util.incr_stat stat_lemmas;
-      new_clauses_from_lemmas_ := List.rev_append l !new_clauses_from_lemmas_;
-    )
-
-  (* return the list of new lemmas *)
-  let inf_new_lemmas ~full:_ () =
-    let l = !new_clauses_from_lemmas_ in
-    new_clauses_from_lemmas_ := [];
-    l
+      E.CR_return l
+    ) else E.CR_skip
 
   let register () =
     Util.debug ~section 2 "register induction";
@@ -1253,12 +1246,8 @@ module Make
     if E.flex_get Avatar.k_simplify_trail then (
       Env.add_is_trivial_trail trail_is_trivial_lemmas;
     );
-    (* be notified of lemmas *)
-    Signal.on_every A.on_lemma
-      (fun cut ->
-         Goal.add_lemma cut.A.cut_form;
-         on_lemma cut);
-    Env.add_generate "ind.lemmas" inf_new_lemmas;
+    (* try to prove lemmas by induction *)
+    A.add_prove_lemma prove_lemma_by_ind;
     ()
 end
 

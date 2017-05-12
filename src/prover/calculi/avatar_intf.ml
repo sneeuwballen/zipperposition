@@ -32,6 +32,7 @@ module type S = sig
     cut_lit: BLit.t; (** lit that is true if lemma is true *)
     cut_depth: int; (** if the lemma is used to prove another lemma *)
     cut_proof: Proof.Step.t; (** where does the lemma come from? *)
+    cut_proof_parent: Proof.Parent.t; (** how to justify sth from the lemma *)
     cut_reason: unit CCFormat.printer option; (** Informal reason why the lemma was added *)
   }
   (** This represents a cut on a formula, where we obtain a list
@@ -48,6 +49,7 @@ module type S = sig
   val cut_lit : cut_res -> BLit.t
   val cut_depth : cut_res -> int
   val cut_proof : cut_res -> Proof.Step.t
+  val cut_proof_parent : cut_res -> Proof.Parent.t
 
   val pp_cut_res : cut_res CCFormat.printer
   val cut_res_clauses: cut_res -> E.C.t Sequence.t
@@ -65,9 +67,14 @@ module type S = sig
   (** Introduce a cut on the given clause(s). Pure.
       @param reason some comment on why the lemma was added *)
 
+  val add_prove_lemma : (cut_res -> E.C.t list E.conversion_result) -> unit
+  (** Add a mean of proving lemmas *)
+
   val add_lemma : cut_res -> unit
   (** Add the given cut to the list of lemmas. Modifies the global list
-      of lemmas. *)
+      of lemmas.
+      It will call the functions added by {!add_prove_lemma} to try and
+      prove this one. *)
 
   val add_imply : cut_res list -> cut_res -> Proof.Step.t -> unit
   (** [add_imply l res] means that the conjunction of lemmas in [l]
