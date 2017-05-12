@@ -424,7 +424,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
           | E.CR_add cs -> aux (List.rev_append cs acc) tail
         end
     in
-    let cs = aux [] !prove_lemma_handlers_ in
+    (* add proof clauses to the positive clauses *)
+    let cs = aux (cut_pos c) !prove_lemma_handlers_ in
     Util.debugf ~section 3
       "(@[prove_lemma@ :lemma %a@ :clauses (@[<hv>%a@])@])"
       (fun k->k Cut_form.pp (cut_form c) (Util.pp_list C.pp) cs);
@@ -435,8 +436,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       Util.debugf ~section 2 "(@[<2>add_lemma@ :on `[@[<hv>%a@]]`@ :lit %a@])"
         (fun k->k Cut_form.pp c.cut_form BBox.pp c.cut_lit);
       Lemma_tbl.add all_lemmas_ c.cut_lit c;
-      (* actually add the clauses to passive set *)
-      E.ProofState.PassiveSet.add (cut_res_clauses c);
+      (* start a subproof for the lemma *)
       prove_lemma c;
       Signal.send on_lemma c;
     ) else (
