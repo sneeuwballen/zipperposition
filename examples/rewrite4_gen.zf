@@ -1,0 +1,48 @@
+# expect: unsat
+
+# exercize rewriting
+
+# iterated rewrite4
+
+val set : type -> type.
+
+val empty : pi a. set a.
+val[infix "∈"] mem : pi a. a -> set a -> prop.
+val[AC,infix "∪"] union : pi a. set a -> set a -> set a.
+val[infix "⊆"] subeq : pi a. set a -> set a -> prop.
+
+rewrite
+  forall a (x:a). ~ mem x empty.
+
+rewrite
+  forall a s1 s2 x.
+    mem a x (union a s1 s2) <=> mem a x s1 || mem a x s2.
+
+rewrite
+  forall a s1 s2.
+    subeq a s1 s2 <=> (forall x. mem a x s1 => mem a x s2).
+
+# extensionality
+rewrite
+  forall a (s1 s2 : set a).
+  s1 = s2 <=> (subeq s1 s2 && subeq s2 s1).
+
+# union of a list of sets
+
+data list a := nil | cons a (list a).
+
+def union_left : pi a. list (set a) -> set a where
+  forall a. union_left a nil = empty;
+  forall a s tail. union_left (cons s tail) = union s (union_left tail).
+
+def union_right : pi a. list (set a) -> set a where
+  forall a. union_right a nil = empty;
+  forall a s tail. union_right (cons s tail) = union (union_right tail) s.
+
+# TODO
+#lemma forall a (s1 s2 s3:set a). union s1 (union s2 s3) = union (union s1 s2) s3.
+#lemma forall a (s1 s2:set a). union s1 s2 = union s2 s1.
+
+goal forall a (l:list (set a)). union_left l = union_right l.
+
+# [ P empty && (forall x S S'. x ∈ S ∧ S = S' ∪ {x} ∧ x∉S' ∧ P(S') => P(S)) ] => forall S. P S.

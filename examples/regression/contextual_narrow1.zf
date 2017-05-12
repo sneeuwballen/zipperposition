@@ -1,0 +1,184 @@
+
+# expect: unsat
+
+# file `bset/foo.zf`
+val tup : (type -> type -> type).
+val set : (type -> type).
+val mem : (pi a. (a -> (set a) -> prop)).
+val pair : (pi a b. (a -> b -> (tup a b))).
+val power : (pi a. (set a -> set (set a))).
+val subset : (pi a. ((set a) -> (set a) -> prop)).
+val times : (pi a b. ((set a) -> (set b) -> (set (tup a b)))).
+val union : (pi a. ((set a) -> (set a) -> (set a))).
+val inter : (pi a. ((set a) -> (set a) -> (set a))).
+val diff : (pi a. ((set a) -> (set a) -> (set a))).
+val empty : (pi a. (set a)).
+val plmngt : (pi a b. ((set a) -> (set b) -> (set (set (tup a b))))).
+val mnmngt : (pi a b. ((set a) -> (set b) -> (set (set (tup a b))))).
+val relation : (pi a b. ((set a) -> (set b) -> (set (set (tup a b))))).
+val dom : (pi a b. (set (tup a b) -> set a)).
+val ran : (pi a b. (set (tup a b) -> set b)).
+val inverse : (pi a b. (set (tup a b) -> set (tup b a))).
+val semicolon :
+  (pi a b c. ((set (tup a b)) -> (set (tup b c)) -> (set (tup a c)))).
+val image : (pi a b. ((set (tup a b)) -> (set a) -> (set b))).
+val id : (pi a. (set a -> set (tup a a))).
+val domain_restriction :
+  (pi a b. ((set a) -> (set (tup a b)) -> (set (tup a b)))).
+val range_restriction :
+  (pi a b. ((set (tup a b)) -> (set b) -> (set (tup a b)))).
+val domain_substraction :
+  (pi a b. ((set a) -> (set (tup a b)) -> (set (tup a b)))).
+val range_substraction :
+  (pi a b. ((set (tup a b)) -> (set b) -> (set (tup a b)))).
+val lspl : (pi a b. ((set (tup a b)) -> (set (tup a b)) -> (set (tup a b)))).
+val direct_product :
+  (pi a b c. ((set (tup a b)) -> (set (tup a c)) -> (set (tup a (tup b c))))).
+val parallel_product :
+  (pi a b c d.
+     ((set (tup a b)) -> (set (tup c d)) -> (set (tup (tup a c) (tup b d))))).
+val singleton : (pi a. (a -> set a)).
+val plmngtgt : (pi a b. ((set a) -> (set b) -> (set (set (tup a b))))).
+val gtmngtgt : (pi a b. ((set a) -> (set b) -> (set (set (tup a b))))).
+val gtmngt : (pi a b. ((set a) -> (set b) -> (set (set (tup a b))))).
+val mnmngtgt : (pi a b. ((set a) -> (set b) -> (set (set (tup a b))))).
+val gtplgt : (pi a b. ((set a) -> (set b) -> (set (set (tup a b))))).
+val prj1 : (pi a b. (tup (set a) (set b) -> set (tup (tup a b) a))).
+val prj2 : (pi a b. (tup (set a) (set b) -> set (tup (tup a b) b))).
+val fst : (pi a b. (tup a b -> a)).
+val snd : (pi a b. (tup a b -> b)).
+rewrite forall (b:type) (a:type) (y:b) (x:a). fst a b (pair a b x y) = x.
+rewrite forall (b:type) (a:type) (y:b) (x:a). snd a b (pair a b x y) = y.
+rewrite forall (b:type) (a:type) (P:(tup a b)).
+          pair a b (fst a b P) (snd a b P) = P.
+rewrite forall (b:type) (a:type) (T:(set b)) (S:(set a)) (y:b) (x:a).
+          (mem (tup a b) (pair a b x y) (times a b S T))
+          <=> ((mem b y T) && (mem a x S)).
+rewrite forall (b:type) (a:type) (S2:(set b)) (S1:(set a)) (z:(tup a b)).
+          (mem (tup a b) z (times a b S1 S2))
+          <=> ((mem b (snd a b z) S2) && (mem a (fst a b z) S1)).
+rewrite forall (a:type) (T:(set a)) (S:(set a)). (mem (set a) S (power a T))
+          <=> (forall (x:a). ((mem a x S) => (mem a x T))).
+rewrite forall (a:type) (T:(set a)) (S:(set a)). (subset a S T)
+          <=> (mem (set a) S (power a T)).
+rewrite forall (a:type) (T:(set a)) (S:(set a)). S = T
+          <=> (forall (x:a). ((mem a x S) <=> (mem a x T))).
+#rewrite forall (b:type) (a:type) (y:(tup a b)) (x:(tup a b)). x = y
+#          <=> (((snd a b x) = (snd a b y)) && ((fst a b x) = (fst a b y))).
+rewrite forall (a:type) (T:(set a)) (S:(set a)) (x:a).
+          (mem a x (union a S T)) <=> ((mem a x T) || (mem a x S)).
+rewrite forall (a:type) (T:(set a)) (S:(set a)) (x:a).
+          (mem a x (inter a S T)) <=> ((mem a x T) && (mem a x S)).
+rewrite forall (a:type) (T:(set a)) (S:(set a)) (x:a). (mem a x (diff a S T))
+          <=> ((~ (mem a x T)) && (mem a x S)).
+rewrite forall (b:type) (a:type) (y1:b) (y:b) (x1:a) (x:a).
+          (pair a b x y) = (pair a b x1 y1) <=> ((y = y1) && (x = x1)).
+rewrite forall (a:type) (x:a). (mem a x (empty a)) <=> false.
+rewrite forall (b:type) (a:type) (F:(set (tup a b))) (T:(set b)) (S:(
+          set a)). (mem (set (tup a b)) F (plmngt a b S T))
+          <=> (forall (X:a) (Y1:b) (Y2:b).
+                 (((mem (tup a b) (pair a b X Y2) F) && 
+                   (mem (tup a b) (pair a b X Y1) F))
+                  => (Y1 = Y2))).
+rewrite forall (b:type) (a:type) (X:(set (tup a b))) (T:(set b)) (S:(
+          set a)). (mem (set (tup a b)) X (mnmngt a b S T))
+          <=> (((dom a b X) = S) && (mem (set (tup a b)) X (plmngt a b S T))).
+rewrite forall (b:type) (a:type) (x:b) (P:(set (tup a b))).
+          (mem b x (ran a b P))
+          <=> (exists (A1:a). (mem (tup a b) (pair a b A1 x) P)).
+rewrite forall (b:type) (a:type) (x:a) (P:(set (tup a b))).
+          (mem a x (dom a b P))
+          <=> (exists (b1:b). (mem (tup a b) (pair a b x b1) P)).
+rewrite forall (b:type) (a:type) (T:(tup b a)) (P:(set (tup a b))).
+          (mem (tup b a) T (inverse a b P))
+          <=> (mem (tup a b) (pair a b (snd b a T) (fst b a T)) P).
+rewrite forall (b:type) (a:type) (R:(set (tup a b))) (V:(set b)) (U:(
+          set a)). (mem (set (tup a b)) R (relation a b U V))
+          <=> (forall (T:(tup a b)).
+                 ((mem (tup a b) T R)
+                  => ((mem b (snd a b T) V) && (mem a (fst a b T) U)))).
+rewrite forall (c:type) (b:type) (a:type) (T:(tup a c)) (Q:(set (tup b c))) 
+          (P:(set (tup a b))). (mem (tup a c) T (semicolon a b c P Q))
+          <=> (exists (b1:b).
+                 ((mem (tup b c) (pair b c b1 (snd a c T)) Q) && 
+                  (mem (tup a b) (pair a b (fst a c T) b1) P))).
+rewrite forall (b:type) (a:type) (x:b) (W:(set a)) (P:(set (tup a b))).
+          (mem b x (image a b P W))
+          <=> (exists (a1:a).
+                 ((mem (tup a b) (pair a b a1 x) P) && (mem a a1 W))).
+rewrite forall (a:type) (z:(tup a a)) (U:(set a)). (mem (tup a a) z (id a U))
+          <=> (((fst a a z) = (snd a a z)) && (mem a (fst a a z) U)).
+rewrite forall (b:type) (a:type) (T:(tup a b)) (S:(set a)) 
+          (P:(set (tup a b))). (mem (tup a b) T (domain_restriction a b S P))
+          <=> ((mem a (fst a b T) S) && 
+               (mem (tup a b) (pair a b (fst a b T) (snd a b T)) P)).
+rewrite forall (b:type) (a:type) (V:(tup a b)) (T:(set b)) 
+          (P:(set (tup a b))). (mem (tup a b) V (range_restriction a b P T))
+          <=> ((mem b (snd a b V) T) && 
+               (mem (tup a b) (pair a b (fst a b V) (snd a b V)) P)).
+rewrite forall (b:type) (a:type) (T:(tup a b)) (S:(set a)) 
+          (P:(set (tup a b))).
+          (mem (tup a b) T (domain_substraction a b S P))
+          <=> ((~ (mem a (fst a b T) S)) && (mem (tup a b) T P)).
+rewrite forall (b:type) (a:type) (V:(tup a b)) (T:(set b)) 
+          (P:(set (tup a b))). (mem (tup a b) V (range_substraction a b P T))
+          <=> ((~ (mem b (snd a b V) T)) && (mem (tup a b) V P)).
+rewrite forall (b:type) (a:type) (T:(tup a b)) (Q:(set (tup a b))) 
+          (P:(set (tup a b))). (mem (tup a b) T (lspl a b Q P))
+          <=> ((mem (tup a b) T P) || 
+               ((~ (mem a (fst a b T) (dom a b P))) && (mem (tup a b) T Q))).
+rewrite forall (c:type) (b:type) (a:type) (V:(tup a (tup b c))) 
+          (G:(set (tup a c))) (F:(set (tup a b))).
+          (mem (tup a (tup b c)) V (direct_product a b c F G))
+          <=> ((mem (tup a c) 
+                  (pair a c (fst a (tup b c) V) (snd b c (snd a (tup b c) V))) 
+                  G) && 
+               (mem (tup a b) 
+                  (pair a b (fst a (tup b c) V) (fst b c (snd a (tup b c) V))) 
+                  F)).
+rewrite forall (d:type) (c:type) (b:type) (a:type) 
+          (T:(tup (tup a c) (tup b d))) (w:d) (z:b) (y:c) (x:a) 
+          (K:(set (tup c d))) (H:(set (tup a b))).
+          (mem (tup (tup a c) (tup b d)) T (parallel_product a b c d H K))
+          <=> ((mem (tup c d) 
+                  (pair c d (snd a c (fst (tup a c) (tup b d) T)) 
+                     (snd b d (snd (tup a c) (tup b d) T))) 
+                  K) && 
+               (mem (tup a b) 
+                  (pair a b (fst a c (fst (tup a c) (tup b d) T)) 
+                     (fst b d (snd (tup a c) (tup b d) T))) 
+                  H)).
+rewrite forall (a:type) (Y:a) (X:a). (mem a X (singleton a Y)) <=> (X = Y).
+rewrite forall (b:type) (a:type) (X:(set (tup a b))) (T:(set b)) (S:(
+          set a)). (mem (set (tup a b)) X (plmngtgt a b S T))
+          <=> (((ran a b X) = T) && (mem (set (tup a b)) X (plmngt a b S T))).
+rewrite forall (b:type) (a:type) (X:(set (tup a b))) (T:(set b)) (S:(
+          set a)). (mem (set (tup a b)) X (gtmngtgt a b S T))
+          <=> ((mem (set (tup a b)) X (mnmngtgt a b S T)) && 
+               (mem (set (tup a b)) X (gtmngt a b S T))).
+rewrite forall (b:type) (a:type) (X:(set (tup a b))) (T:(set b)) (S:(
+          set a)). (mem (set (tup a b)) X (gtmngt a b S T))
+          <=> ((mem (set (tup a b)) X (mnmngt a b S T)) && 
+               (mem (set (tup a b)) X (gtplgt a b S T))).
+rewrite forall (b:type) (a:type) (X:(set (tup a b))) (T:(set b)) (S:(
+          set a)). (mem (set (tup a b)) X (mnmngtgt a b S T))
+          <=> ((mem (set (tup a b)) X (mnmngt a b S T)) && 
+               (mem (set (tup a b)) X (plmngtgt a b S T))).
+rewrite forall (b:type) (a:type) (X:(set (tup a b))) (T:(set b)) (S:(
+          set a)). (mem (set (tup a b)) X (gtplgt a b S T))
+          <=> ((mem (set (tup b a)) (inverse a b X) (plmngt b a T S)) && 
+               (mem (set (tup a b)) X (plmngt a b S T))).
+rewrite forall (b:type) (a:type) (V:(tup (tup a b) a)) (T:(set b)) 
+          (S:(set a)).
+          (mem (tup (tup a b) a) V (prj1 a b (pair (set a) (set b) S T)))
+          <=> (((snd (tup a b) a V) = (fst a b (fst (tup a b) a V))) && 
+               (mem (tup (tup a b) a) V (times (tup a b) a (times a b S T) S))).
+rewrite forall (b:type) (a:type) (V:(tup (tup a b) b)) (z:b) (y:b) (x:a) 
+          (T:(set b)) (S:(set a)).
+          (mem (tup (tup a b) b) V (prj2 a b (pair (set a) (set b) S T)))
+          <=> (((snd (tup a b) b V) = (snd a b (fst (tup a b) b V))) && 
+               (mem (tup (tup a b) b) V (times (tup a b) b (times a b S T) T))).
+goal
+  (forall a b (p:(set (tup a b))) (y:(tup a b)) (x:a).
+     (((x = (fst a b y)) && (mem (tup a b) y p))
+      => (mem (tup a b) (pair a b x (snd a b y)) p))).

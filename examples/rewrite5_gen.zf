@@ -1,0 +1,91 @@
+# expect: unsat
+
+# exercize rewriting
+
+# ITERATED rewrite5
+
+val set : type -> type.
+
+val empty : pi a. set a.
+val[infix "∈"] mem : pi a. a -> set a -> prop.
+val[infix "∩"] inter : pi a. set a -> set a -> set a.
+val[infix "∪"] union : pi a. set a -> set a -> set a.
+val[infix "⊆"] subeq : pi a. set a -> set a -> prop.
+
+rewrite
+  forall a (x:a). ~ mem x empty.
+
+rewrite
+  forall a s1 s2 x.
+    mem a x (union a s1 s2) <=> mem a x s1 || mem a x s2.
+
+rewrite
+  forall a s1 s2 x.
+    mem a x (inter a s1 s2) <=> mem a x s1 && mem a x s2.
+
+rewrite
+  forall a s1 s2.
+    subeq a s1 s2 <=> (forall x. mem a x s1 => mem a x s2).
+
+# extensionality
+rewrite
+  forall a (s1 s2 : set a).
+  s1 = s2 <=> (subeq s1 s2 && subeq s2 s1).
+
+# union of n sets
+
+data list a := nil | cons a (list a).
+
+def union_l : pi a. list (set a) -> set a where
+  forall a. union_l a nil = empty;
+  forall a s tail. union_l (cons s tail) = union s (union_l tail).
+
+data nat := zero | succ nat.
+
+def length : pi a. list a -> nat where
+  forall a. length (nil a) = zero;
+  forall a x tail. length (cons a x tail) = succ (length tail).
+
+def list_mem : pi a. a -> list a -> prop where
+  forall a (x:a). ~ list_mem x nil;
+  forall a (x y:a) tail. list_mem x (cons y tail) <=> x=y || list_mem x tail.
+
+def all_distinct : pi a. list a -> prop where
+  forall a. all_distinct a nil;
+  forall a (x:a) tail.
+    all_distinct (cons x tail) <=> all_distinct tail && ~ list_mem x tail.
+
+def all_intersect_with : pi a. set a -> list (set a) -> prop where
+  forall a (s:set a). all_intersect_with s nil;
+  forall a (s s1:set a) tail.
+    all_intersect_with s (cons s1 tail) <=>
+      inter s s1 != empty && all_intersect_with s tail.
+
+def card_at_least_n : pi a. set a -> nat -> prop where
+  forall a (s:set a). card_at_least_n s zero;
+  forall a (s:set a) n.
+    card_at_least_n s (succ n) <=>
+      (exists (x:a) (s2 : set a).
+        mem x s && ~ mem x s2 && subeq s2 s && card_at_least_n s2 n).
+
+# does the set intersect with anything in the list?
+def intersect_any_l : pi a. set a -> list (set a) -> prop where
+  forall a s. ~ intersect_any_l a s nil;
+  forall a (s1 s2:set a) tail.
+    intersect_any_l s1 (cons s2 tail) <=> s1=s2 || intersect_any_l s1 tail.
+
+def all_disjoint_l : pi a. list (set a) -> prop where
+  forall a. all_disjoint_l a nil;
+  forall a (s1 : set a) tail.
+    all_disjoint_l (cons s1 tail) <=>
+      all_disjoint_l tail &&
+      ~ intersect_any_l s1 tail.
+
+goal
+  forall a (middle:set a) (l:list (set a)).
+    all_disjoint_l l &&
+    all_intersect_with middle l =>
+    card_at_least_n middle (length l).
+
+
+
