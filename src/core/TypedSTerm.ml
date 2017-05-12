@@ -186,7 +186,7 @@ let rec pp out t = match view t with
   | App (_, []) -> assert false
   | App (f, l) ->
     let l =
-      if !InnerTerm.show_type_arguments then l
+      if !InnerTerm.show_type_arguments || is_tType (ty_exn t) then l
       else List.filter (fun t -> not (ty_exn t |> is_tType)) l
     in
     let as_infix = match view f with Const id -> ID.as_infix id | _ -> None in
