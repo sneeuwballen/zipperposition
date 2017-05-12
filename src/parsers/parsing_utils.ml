@@ -15,7 +15,7 @@ let parse_tip file =
   >|= Util_tip.convert_seq
 
 let guess_input (file:string): Input_format.t =
-  if CCString.suffix ~suf:".p" file
+  if CCString.suffix ~suf:".p" file || CCString.suffix ~suf:".tptp" file
   then Input_format.I_tptp
   else if CCString.suffix ~suf:".smt2" file
   then Input_format.I_tip
