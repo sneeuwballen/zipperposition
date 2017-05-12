@@ -1,0 +1,73 @@
+%------------------------------------------------------------------------------
+tff(ty_n_t__Set__Oset_It__Product____Type__Oprod_It__fun_It__List__Olist_It__String__Ochar_J_Mt__Int__Oint_J_Mt__fun_It__List__Olist_It__String__Ochar_J_Mt__Int__Oint_J_J_J,type,(
+    set_Pr568847189ar_int: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__fun_It__List__Olist_It__String__Ochar_J_Mt__Int__Oint_J_Mt__fun_It__List__Olist_It__String__Ochar_J_Mt__Int__Oint_J_J,type,(
+    produc1034581749ar_int: $tType )).
+
+tff(ty_n_t__fun_It__List__Olist_It__String__Ochar_J_Mt__Int__Oint_J,type,(
+    fun_list_char_int: $tType )).
+
+tff(ty_n_t__HOL__Obool,type,(
+    bool: $tType )).
+
+tff(ty_n_t__Com__Ocom,type,(
+    com: $tType )).
+
+tff(sy_c_Denotational_OD,type,(
+    d: com > set_Pr568847189ar_int )).
+
+tff(sy_c_Product__Type_OPair_001t__fun_It__List__Olist_It__String__Ochar_J_Mt__Int__Oint_J_001t__fun_It__List__Olist_It__String__Ochar_J_Mt__Int__Oint_J,type,(
+    produc950425133ar_int: ( fun_list_char_int * fun_list_char_int ) > produc1034581749ar_int )).
+
+tff(sy_c_ex11__04_OmyD,type,(
+    ex11_myD: com > set_Pr568847189ar_int )).
+
+tff(sy_c_fFalse,type,(
+    fFalse: bool )).
+
+tff(sy_c_fTrue,type,(
+    fTrue: bool )).
+
+tff(sy_c_member_001t__Product____Type__Oprod_It__fun_It__List__Olist_It__String__Ochar_J_Mt__Int__Oint_J_Mt__fun_It__List__Olist_It__String__Ochar_J_Mt__Int__Oint_J_J,type,(
+    member762801822ar_int: ( produc1034581749ar_int * set_Pr568847189ar_int ) > $o )).
+
+tff(sy_c_pp,type,(
+    pp: bool > $o )).
+
+tff(sy_v_c1____,type,(
+    c1: com )).
+
+tff(sy_v_c2____,type,(
+    c2: com )).
+
+tff(sy_v_sa____,type,(
+    sa: fun_list_char_int )).
+
+tff(sy_v_ta____,type,(
+    ta: fun_list_char_int )).
+
+tff(sy_v_u____,type,(
+    u: fun_list_char_int )).
+
+tff(fact_0__092_060open_062_Is_M_Au_J_A_092_060in_062_AD_Ac1_092_060close_062,axiom,(
+    member762801822ar_int(produc950425133ar_int(sa,u),d(c1)) )).
+
+tff(fact_1_calculation,axiom,
+    ( member762801822ar_int(produc950425133ar_int(sa,u),ex11_myD(c1))
+    & member762801822ar_int(produc950425133ar_int(u,ta),ex11_myD(c2)) )).
+
+tff(fact_2_Seq_OIH_I2_J,axiom,(
+    ! [S: fun_list_char_int,T: fun_list_char_int] : 
+      ( member762801822ar_int(produc950425133ar_int(S,T),ex11_myD(c2))
+     => member762801822ar_int(produc950425133ar_int(S,T),d(c2)) ) )).
+
+tff(help_pp_2_1_U,axiom,(
+    pp(fTrue) )).
+
+tff(help_pp_1_1_U,axiom,(
+    ~ pp(fFalse) )).
+
+tff(conj_1,conjecture,(
+    member762801822ar_int(produc950425133ar_int(u,ta),d(c2)) )).
+%------------------------------------------------------------------------------

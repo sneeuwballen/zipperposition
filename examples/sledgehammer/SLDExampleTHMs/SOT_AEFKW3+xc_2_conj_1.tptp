@@ -1,0 +1,697 @@
+%------------------------------------------------------------------------------
+tff(ty_n_t__Congruence__Opartial____object__Opartial____object____ext_Itf__c_Mt__Congruence__Oeq____object__Oeq____object____ext_Itf__c_Mt__Order__Ogorder__Ogorder____ext_Itf__c_Mtf__d_J_J_J,type,(
+    partia171196342xt_c_d: $tType )).
+
+tff(ty_n_t__Congruence__Opartial____object__Opartial____object____ext_Itf__a_Mt__Congruence__Oeq____object__Oeq____object____ext_Itf__a_Mt__Order__Ogorder__Ogorder____ext_Itf__a_Mtf__b_J_J_J,type,(
+    partia1200667062xt_a_b: $tType )).
+
+tff(ty_n_t__fun_It__Set__Oset_It__fun_Itf__c_Mtf__a_J_J_Mt__fun_It__fun_Itf__c_Mtf__a_J_Mt__Set__Oset_It__fun_Itf__c_Mtf__a_J_J_J_J,type,(
+    fun_se1768287145un_c_a: $tType )).
+
+tff(ty_n_t__fun_It__Set__Oset_It__fun_Itf__c_Mtf__c_J_J_Mt__fun_Itf__c_Mt__Set__Oset_It__fun_Itf__c_Mtf__c_J_J_J_J,type,(
+    fun_se1549625516un_c_c: $tType )).
+
+tff(ty_n_t__fun_It__Set__Oset_It__fun_Itf__c_Mtf__a_J_J_Mt__fun_Itf__c_Mt__Set__Oset_It__fun_Itf__c_Mtf__a_J_J_J_J,type,(
+    fun_se11005228un_c_a: $tType )).
+
+tff(ty_n_t__fun_It__Set__Oset_It__fun_Itf__c_Mtf__a_J_J_Mt__fun_Itf__a_Mt__Set__Oset_It__fun_Itf__c_Mtf__a_J_J_J_J,type,(
+    fun_se1583989546un_c_a: $tType )).
+
+tff(ty_n_t__fun_It__Set__Oset_Itf__c_J_Mt__fun_It__fun_Itf__c_Mtf__a_J_Mt__Set__Oset_Itf__c_J_J_J,type,(
+    fun_se1717247643_set_c: $tType )).
+
+tff(ty_n_t__fun_It__Set__Oset_Itf__a_J_Mt__fun_It__fun_Itf__c_Mtf__a_J_Mt__Set__Oset_Itf__a_J_J_J,type,(
+    fun_se968876827_set_a: $tType )).
+
+tff(ty_n_t__Galois____Connection__Ogalcon__Ogalcon____ext_Itf__a_Mtf__c_Mtf__b_Mtf__d_Mtf__e_J,type,(
+    galois1257299863_b_d_e: $tType )).
+
+tff(ty_n_t__fun_It__fun_Itf__c_Mtf__a_J_Mt__Set__Oset_It__fun_Itf__c_Mtf__a_J_J_J,type,(
+    fun_fu1631951285un_c_a: $tType )).
+
+tff(ty_n_t__Set__Oset_It__fun_It__fun_Itf__c_Mtf__a_J_Mt__fun_Itf__c_Mtf__a_J_J_J,type,(
+    set_fu845739061un_c_a: $tType )).
+
+tff(ty_n_t__fun_It__Set__Oset_Itf__c_J_Mt__fun_Itf__c_Mt__Set__Oset_Itf__c_J_J_J,type,(
+    fun_se1273576342_set_c: $tType )).
+
+tff(ty_n_t__fun_It__Set__Oset_Itf__c_J_Mt__fun_Itf__a_Mt__Set__Oset_Itf__c_J_J_J,type,(
+    fun_se192351768_set_c: $tType )).
+
+tff(ty_n_t__fun_It__Set__Oset_Itf__a_J_Mt__fun_Itf__c_Mt__Set__Oset_Itf__a_J_J_J,type,(
+    fun_se2102736018_set_a: $tType )).
+
+tff(ty_n_t__fun_It__Set__Oset_Itf__a_J_Mt__fun_Itf__a_Mt__Set__Oset_Itf__a_J_J_J,type,(
+    fun_se1021511444_set_a: $tType )).
+
+tff(ty_n_t__fun_It__fun_Itf__c_Mtf__a_J_Mt__fun_Itf__c_Mtf__a_J_J,type,(
+    fun_fun_c_a_fun_c_a: $tType )).
+
+tff(ty_n_t__fun_Itf__c_Mt__Set__Oset_It__fun_Itf__c_Mtf__c_J_J_J,type,(
+    fun_c_set_fun_c_c: $tType )).
+
+tff(ty_n_t__fun_Itf__c_Mt__Set__Oset_It__fun_Itf__c_Mtf__a_J_J_J,type,(
+    fun_c_set_fun_c_a: $tType )).
+
+tff(ty_n_t__fun_Itf__a_Mt__Set__Oset_It__fun_Itf__c_Mtf__a_J_J_J,type,(
+    fun_a_set_fun_c_a: $tType )).
+
+tff(ty_n_t__fun_It__fun_Itf__c_Mtf__a_J_Mt__Set__Oset_Itf__c_J_J,type,(
+    fun_fun_c_a_set_c: $tType )).
+
+tff(ty_n_t__fun_It__fun_Itf__c_Mtf__a_J_Mt__Set__Oset_Itf__a_J_J,type,(
+    fun_fun_c_a_set_a: $tType )).
+
+tff(ty_n_t__Set__Oset_It__fun_Itf__c_Mt__fun_Itf__c_Mtf__c_J_J_J,type,(
+    set_fun_c_fun_c_c: $tType )).
+
+tff(ty_n_t__Set__Oset_It__fun_Itf__c_Mt__fun_Itf__c_Mtf__a_J_J_J,type,(
+    set_fun_c_fun_c_a: $tType )).
+
+tff(ty_n_t__Set__Oset_It__fun_Itf__a_Mt__fun_Itf__c_Mtf__a_J_J_J,type,(
+    set_fun_a_fun_c_a: $tType )).
+
+tff(ty_n_t__Set__Oset_It__fun_It__fun_Itf__c_Mtf__a_J_Mtf__c_J_J,type,(
+    set_fun_fun_c_a_c: $tType )).
+
+tff(ty_n_t__Set__Oset_It__fun_It__fun_Itf__c_Mtf__a_J_Mtf__a_J_J,type,(
+    set_fun_fun_c_a_a: $tType )).
+
+tff(ty_n_t__fun_Itf__c_Mt__fun_Itf__c_Mtf__c_J_J,type,(
+    fun_c_fun_c_c: $tType )).
+
+tff(ty_n_t__fun_Itf__c_Mt__fun_Itf__c_Mtf__a_J_J,type,(
+    fun_c_fun_c_a: $tType )).
+
+tff(ty_n_t__fun_Itf__a_Mt__fun_Itf__c_Mtf__a_J_J,type,(
+    fun_a_fun_c_a: $tType )).
+
+tff(ty_n_t__fun_It__fun_Itf__c_Mtf__a_J_Mtf__c_J,type,(
+    fun_fun_c_a_c: $tType )).
+
+tff(ty_n_t__fun_It__fun_Itf__c_Mtf__a_J_Mtf__a_J,type,(
+    fun_fun_c_a_a: $tType )).
+
+tff(ty_n_t__fun_Itf__c_Mt__Set__Oset_Itf__c_J_J,type,(
+    fun_c_set_c: $tType )).
+
+tff(ty_n_t__fun_Itf__c_Mt__Set__Oset_Itf__a_J_J,type,(
+    fun_c_set_a: $tType )).
+
+tff(ty_n_t__fun_Itf__a_Mt__Set__Oset_Itf__c_J_J,type,(
+    fun_a_set_c: $tType )).
+
+tff(ty_n_t__fun_Itf__a_Mt__Set__Oset_Itf__a_J_J,type,(
+    fun_a_set_a: $tType )).
+
+tff(ty_n_t__Set__Oset_It__fun_Itf__c_Mtf__c_J_J,type,(
+    set_fun_c_c: $tType )).
+
+tff(ty_n_t__Set__Oset_It__fun_Itf__c_Mtf__a_J_J,type,(
+    set_fun_c_a: $tType )).
+
+tff(ty_n_t__Set__Oset_It__fun_Itf__a_Mtf__c_J_J,type,(
+    set_fun_a_c: $tType )).
+
+tff(ty_n_t__Set__Oset_It__fun_Itf__a_Mtf__a_J_J,type,(
+    set_fun_a_a: $tType )).
+
+tff(ty_n_t__fun_Itf__c_Mtf__c_J,type,(
+    fun_c_c: $tType )).
+
+tff(ty_n_t__fun_Itf__c_Mtf__a_J,type,(
+    fun_c_a: $tType )).
+
+tff(ty_n_t__fun_Itf__a_Mtf__c_J,type,(
+    fun_a_c: $tType )).
+
+tff(ty_n_t__fun_Itf__a_Mtf__a_J,type,(
+    fun_a_a: $tType )).
+
+tff(ty_n_t__Set__Oset_Itf__c_J,type,(
+    set_c: $tType )).
+
+tff(ty_n_t__Set__Oset_Itf__a_J,type,(
+    set_a: $tType )).
+
+tff(ty_n_t__HOL__Obool,type,(
+    bool: $tType )).
+
+tff(ty_n_tf__c,type,(
+    c: $tType )).
+
+tff(ty_n_tf__a,type,(
+    a: $tType )).
+
+tff(sy_c_ATP_058Lamm__a____,type,(
+    aTP_Lamm_a: fun_se1273576342_set_c )).
+
+tff(sy_c_ATP_058Lamm__aa____,type,(
+    aTP_Lamm_aa: fun_se2102736018_set_a )).
+
+tff(sy_c_ATP_058Lamm__ab____,type,(
+    aTP_Lamm_ab: fun_se11005228un_c_a )).
+
+tff(sy_c_ATP_058Lamm__ac____,type,(
+    aTP_Lamm_ac: fun_se1717247643_set_c )).
+
+tff(sy_c_ATP_058Lamm__ad____,type,(
+    aTP_Lamm_ad: fun_se1768287145un_c_a )).
+
+tff(sy_c_ATP_058Lamm__ae____,type,(
+    aTP_Lamm_ae: fun_se192351768_set_c )).
+
+tff(sy_c_ATP_058Lamm__af____,type,(
+    aTP_Lamm_af: fun_se1021511444_set_a )).
+
+tff(sy_c_ATP_058Lamm__ag____,type,(
+    aTP_Lamm_ag: fun_se1549625516un_c_c )).
+
+tff(sy_c_ATP_058Lamm__ah____,type,(
+    aTP_Lamm_ah: fun_se968876827_set_a )).
+
+tff(sy_c_ATP_058Lamm__ai____,type,(
+    aTP_Lamm_ai: fun_se1583989546un_c_a )).
+
+tff(sy_c_ATP_058Lamm__aj____,type,(
+    aTP_Lamm_aj: fun_c_set_a )).
+
+tff(sy_c_COMBK_001t__Set__Oset_It__fun_Itf__c_Mtf__a_J_J_001t__fun_Itf__c_Mtf__a_J,type,(
+    cOMBK_122860872un_c_a: fun_se1768287145un_c_a )).
+
+tff(sy_c_COMBK_001t__Set__Oset_It__fun_Itf__c_Mtf__a_J_J_001tf__a,type,(
+    cOMBK_set_fun_c_a_a: fun_se1583989546un_c_a )).
+
+tff(sy_c_COMBK_001t__Set__Oset_It__fun_Itf__c_Mtf__a_J_J_001tf__c,type,(
+    cOMBK_set_fun_c_a_c: fun_se11005228un_c_a )).
+
+tff(sy_c_COMBK_001t__Set__Oset_It__fun_Itf__c_Mtf__c_J_J_001tf__c,type,(
+    cOMBK_set_fun_c_c_c: fun_se1549625516un_c_c )).
+
+tff(sy_c_COMBK_001t__Set__Oset_Itf__a_J_001t__fun_Itf__c_Mtf__a_J,type,(
+    cOMBK_set_a_fun_c_a: fun_se968876827_set_a )).
+
+tff(sy_c_COMBK_001t__Set__Oset_Itf__a_J_001tf__a,type,(
+    cOMBK_set_a_a: fun_se1021511444_set_a )).
+
+tff(sy_c_COMBK_001t__Set__Oset_Itf__a_J_001tf__c,type,(
+    cOMBK_set_a_c: fun_se2102736018_set_a )).
+
+tff(sy_c_COMBK_001t__Set__Oset_Itf__c_J_001t__fun_Itf__c_Mtf__a_J,type,(
+    cOMBK_set_c_fun_c_a: fun_se1717247643_set_c )).
+
+tff(sy_c_COMBK_001t__Set__Oset_Itf__c_J_001tf__a,type,(
+    cOMBK_set_c_a: fun_se192351768_set_c )).
+
+tff(sy_c_COMBK_001t__Set__Oset_Itf__c_J_001tf__c,type,(
+    cOMBK_set_c_c: fun_se1273576342_set_c )).
+
+tff(sy_c_Congruence_Opartial__object_Ocarrier_001tf__a_001t__Congruence__Oeq____object__Oeq____object____ext_Itf__a_Mt__Order__Ogorder__Ogorder____ext_Itf__a_Mtf__b_J_J,type,(
+    partia1648700841xt_a_b: partia1200667062xt_a_b > set_a )).
+
+tff(sy_c_Congruence_Opartial__object_Ocarrier_001tf__c_001t__Congruence__Oeq____object__Oeq____object____ext_Itf__c_Mt__Order__Ogorder__Ogorder____ext_Itf__c_Mtf__d_J_J,type,(
+    partia887345833xt_c_d: partia171196342xt_c_d > set_c )).
+
+tff(sy_c_FuncSet_OPi_001t__fun_Itf__c_Mtf__a_J_001t__fun_Itf__c_Mtf__a_J,type,(
+    pi_fun_c_a_fun_c_a: ( set_fun_c_a * fun_fu1631951285un_c_a ) > set_fu845739061un_c_a )).
+
+tff(sy_c_FuncSet_OPi_001t__fun_Itf__c_Mtf__a_J_001tf__a,type,(
+    pi_fun_c_a_a: ( set_fun_c_a * fun_fun_c_a_set_a ) > set_fun_fun_c_a_a )).
+
+tff(sy_c_FuncSet_OPi_001t__fun_Itf__c_Mtf__a_J_001tf__c,type,(
+    pi_fun_c_a_c: ( set_fun_c_a * fun_fun_c_a_set_c ) > set_fun_fun_c_a_c )).
+
+tff(sy_c_FuncSet_OPi_001tf__a_001t__fun_Itf__c_Mtf__a_J,type,(
+    pi_a_fun_c_a: ( set_a * fun_a_set_fun_c_a ) > set_fun_a_fun_c_a )).
+
+tff(sy_c_FuncSet_OPi_001tf__a_001tf__a,type,(
+    pi_a_a: ( set_a * fun_a_set_a ) > set_fun_a_a )).
+
+tff(sy_c_FuncSet_OPi_001tf__a_001tf__c,type,(
+    pi_a_c: ( set_a * fun_a_set_c ) > set_fun_a_c )).
+
+tff(sy_c_FuncSet_OPi_001tf__c_001t__fun_Itf__c_Mtf__a_J,type,(
+    pi_c_fun_c_a: ( set_c * fun_c_set_fun_c_a ) > set_fun_c_fun_c_a )).
+
+tff(sy_c_FuncSet_OPi_001tf__c_001t__fun_Itf__c_Mtf__c_J,type,(
+    pi_c_fun_c_c: ( set_c * fun_c_set_fun_c_c ) > set_fun_c_fun_c_c )).
+
+tff(sy_c_FuncSet_OPi_001tf__c_001tf__a,type,(
+    pi_c_a: ( set_c * fun_c_set_a ) > set_fun_c_a )).
+
+tff(sy_c_FuncSet_OPi_001tf__c_001tf__c,type,(
+    pi_c_c: ( set_c * fun_c_set_c ) > set_fun_c_c )).
+
+tff(sy_c_Galois__Connection_Ogalcon_Olower_001tf__a_001tf__c_001tf__b_001tf__d_001tf__e,type,(
+    galois1339486701_b_d_e: galois1257299863_b_d_e > fun_a_c )).
+
+tff(sy_c_Galois__Connection_Ogalcon_OorderA_001tf__a_001tf__c_001tf__b_001tf__d_001tf__e,type,(
+    galois233116665_b_d_e: galois1257299863_b_d_e > partia1200667062xt_a_b )).
+
+tff(sy_c_Galois__Connection_Ogalcon_OorderB_001tf__a_001tf__c_001tf__b_001tf__d_001tf__e,type,(
+    galois1502363448_b_d_e: galois1257299863_b_d_e > partia171196342xt_c_d )).
+
+tff(sy_c_Galois__Connection_Ogalcon_Oupper_001tf__a_001tf__c_001tf__b_001tf__d_001tf__e,type,(
+    galois1295839724_b_d_e: galois1257299863_b_d_e > fun_c_a )).
+
+tff(sy_c_Galois__Connection_Ogalois__connection_001tf__a_001tf__c_001tf__b_001tf__d_001tf__e,type,(
+    galois1996426151_b_d_e: galois1257299863_b_d_e > $o )).
+
+tff(sy_c_Order_OLower_001tf__a_001tf__b,type,(
+    lower_a_b: ( partia1200667062xt_a_b * set_a ) > set_a )).
+
+tff(sy_c_Order_OLower_001tf__c_001tf__d,type,(
+    lower_c_d: ( partia171196342xt_c_d * set_c ) > set_c )).
+
+tff(sy_c_Order_OUpper_001tf__a_001tf__b,type,(
+    upper_a_b: ( partia1200667062xt_a_b * set_a ) > set_a )).
+
+tff(sy_c_Order_OUpper_001tf__c_001tf__d,type,(
+    upper_c_d: ( partia171196342xt_c_d * set_c ) > set_c )).
+
+tff(sy_c_Order_Ogorder_Ole_001tf__a_001tf__b,type,(
+    le_a_b: ( partia1200667062xt_a_b * a * a ) > $o )).
+
+tff(sy_c_Order_Ogorder_Ole_001tf__c_001tf__d,type,(
+    le_c_d: ( partia171196342xt_c_d * c * c ) > $o )).
+
+tff(sy_c_Order_Oisotone_001tf__a_001tf__b_001tf__a_001tf__b,type,(
+    isotone_a_b_a_b: ( partia1200667062xt_a_b * partia1200667062xt_a_b * fun_a_a ) > $o )).
+
+tff(sy_c_Order_Oisotone_001tf__a_001tf__b_001tf__c_001tf__d,type,(
+    isotone_a_b_c_d: ( partia1200667062xt_a_b * partia171196342xt_c_d * fun_a_c ) > $o )).
+
+tff(sy_c_Order_Oisotone_001tf__c_001tf__d_001tf__a_001tf__b,type,(
+    isotone_c_d_a_b: ( partia171196342xt_c_d * partia1200667062xt_a_b * fun_c_a ) > $o )).
+
+tff(sy_c_Order_Oisotone_001tf__c_001tf__d_001tf__c_001tf__d,type,(
+    isotone_c_d_c_d: ( partia171196342xt_c_d * partia171196342xt_c_d * fun_c_c ) > $o )).
+
+tff(sy_c_Order_Opartial__order_001tf__a_001tf__b,type,(
+    partial_order_a_b: partia1200667062xt_a_b > $o )).
+
+tff(sy_c_Order_Opartial__order_001tf__c_001tf__d,type,(
+    partial_order_c_d: partia171196342xt_c_d > $o )).
+
+tff(sy_c_Order_Oweak__partial__order_001tf__a_001tf__b,type,(
+    weak_p1556482856er_a_b: partia1200667062xt_a_b > $o )).
+
+tff(sy_c_Order_Oweak__partial__order_001tf__c_001tf__d,type,(
+    weak_p1064538024er_c_d: partia171196342xt_c_d > $o )).
+
+tff(sy_c_Orderings_Obot__class_Obot_001t__Set__Oset_Itf__a_J,type,(
+    bot_bot_set_a: set_a )).
+
+tff(sy_c_Orderings_Obot__class_Obot_001t__Set__Oset_Itf__c_J,type,(
+    bot_bot_set_c: set_c )).
+
+tff(sy_c_aa_001t__Set__Oset_It__fun_Itf__c_Mtf__a_J_J_001t__fun_It__fun_Itf__c_Mtf__a_J_Mt__Set__Oset_It__fun_Itf__c_Mtf__a_J_J_J,type,(
+    aa_set275871594un_c_a: ( fun_se1768287145un_c_a * set_fun_c_a ) > fun_fu1631951285un_c_a )).
+
+tff(sy_c_aa_001t__Set__Oset_It__fun_Itf__c_Mtf__a_J_J_001t__fun_Itf__a_Mt__Set__Oset_It__fun_Itf__c_Mtf__a_J_J_J,type,(
+    aa_set1117367187un_c_a: ( fun_se1583989546un_c_a * set_fun_c_a ) > fun_a_set_fun_c_a )).
+
+tff(sy_c_aa_001t__Set__Oset_It__fun_Itf__c_Mtf__a_J_J_001t__fun_Itf__c_Mt__Set__Oset_It__fun_Itf__c_Mtf__a_J_J_J,type,(
+    aa_set754005653un_c_a: ( fun_se11005228un_c_a * set_fun_c_a ) > fun_c_set_fun_c_a )).
+
+tff(sy_c_aa_001t__Set__Oset_It__fun_Itf__c_Mtf__c_J_J_001t__fun_Itf__c_Mt__Set__Oset_It__fun_Itf__c_Mtf__c_J_J_J,type,(
+    aa_set248058645un_c_c: ( fun_se1549625516un_c_c * set_fun_c_c ) > fun_c_set_fun_c_c )).
+
+tff(sy_c_aa_001t__Set__Oset_Itf__a_J_001t__fun_It__fun_Itf__c_Mtf__a_J_Mt__Set__Oset_Itf__a_J_J,type,(
+    aa_set140948_set_a: ( fun_se968876827_set_a * set_a ) > fun_fun_c_a_set_a )).
+
+tff(sy_c_aa_001t__Set__Oset_Itf__a_J_001t__fun_Itf__a_Mt__Set__Oset_Itf__a_J_J,type,(
+    aa_set_a_fun_a_set_a: ( fun_se1021511444_set_a * set_a ) > fun_a_set_a )).
+
+tff(sy_c_aa_001t__Set__Oset_Itf__a_J_001t__fun_Itf__c_Mt__Set__Oset_Itf__a_J_J,type,(
+    aa_set_a_fun_c_set_a: ( fun_se2102736018_set_a * set_a ) > fun_c_set_a )).
+
+tff(sy_c_aa_001t__Set__Oset_Itf__c_J_001t__fun_It__fun_Itf__c_Mtf__a_J_Mt__Set__Oset_Itf__c_J_J,type,(
+    aa_set136332052_set_c: ( fun_se1717247643_set_c * set_c ) > fun_fun_c_a_set_c )).
+
+tff(sy_c_aa_001t__Set__Oset_Itf__c_J_001t__fun_Itf__a_Mt__Set__Oset_Itf__c_J_J,type,(
+    aa_set_c_fun_a_set_c: ( fun_se192351768_set_c * set_c ) > fun_a_set_c )).
+
+tff(sy_c_aa_001t__Set__Oset_Itf__c_J_001t__fun_Itf__c_Mt__Set__Oset_Itf__c_J_J,type,(
+    aa_set_c_fun_c_set_c: ( fun_se1273576342_set_c * set_c ) > fun_c_set_c )).
+
+tff(sy_c_aa_001t__fun_Itf__c_Mtf__a_J_001t__Set__Oset_It__fun_Itf__c_Mtf__a_J_J,type,(
+    aa_fun1900338294un_c_a: ( fun_fu1631951285un_c_a * fun_c_a ) > set_fun_c_a )).
+
+tff(sy_c_aa_001t__fun_Itf__c_Mtf__a_J_001t__Set__Oset_Itf__a_J,type,(
+    aa_fun_c_a_set_a: ( fun_fun_c_a_set_a * fun_c_a ) > set_a )).
+
+tff(sy_c_aa_001t__fun_Itf__c_Mtf__a_J_001t__Set__Oset_Itf__c_J,type,(
+    aa_fun_c_a_set_c: ( fun_fun_c_a_set_c * fun_c_a ) > set_c )).
+
+tff(sy_c_aa_001t__fun_Itf__c_Mtf__a_J_001t__fun_Itf__c_Mtf__a_J,type,(
+    aa_fun_c_a_fun_c_a: ( fun_fun_c_a_fun_c_a * fun_c_a ) > fun_c_a )).
+
+tff(sy_c_aa_001t__fun_Itf__c_Mtf__a_J_001tf__a,type,(
+    aa_fun_c_a_a: ( fun_fun_c_a_a * fun_c_a ) > a )).
+
+tff(sy_c_aa_001t__fun_Itf__c_Mtf__a_J_001tf__c,type,(
+    aa_fun_c_a_c: ( fun_fun_c_a_c * fun_c_a ) > c )).
+
+tff(sy_c_aa_001tf__a_001t__Set__Oset_It__fun_Itf__c_Mtf__a_J_J,type,(
+    aa_a_set_fun_c_a: ( fun_a_set_fun_c_a * a ) > set_fun_c_a )).
+
+tff(sy_c_aa_001tf__a_001t__Set__Oset_Itf__a_J,type,(
+    aa_a_set_a: ( fun_a_set_a * a ) > set_a )).
+
+tff(sy_c_aa_001tf__a_001t__Set__Oset_Itf__c_J,type,(
+    aa_a_set_c: ( fun_a_set_c * a ) > set_c )).
+
+tff(sy_c_aa_001tf__a_001t__fun_Itf__c_Mtf__a_J,type,(
+    aa_a_fun_c_a: ( fun_a_fun_c_a * a ) > fun_c_a )).
+
+tff(sy_c_aa_001tf__a_001tf__a,type,(
+    aa_a_a: ( fun_a_a * a ) > a )).
+
+tff(sy_c_aa_001tf__a_001tf__c,type,(
+    aa_a_c: ( fun_a_c * a ) > c )).
+
+tff(sy_c_aa_001tf__c_001t__Set__Oset_It__fun_Itf__c_Mtf__a_J_J,type,(
+    aa_c_set_fun_c_a: ( fun_c_set_fun_c_a * c ) > set_fun_c_a )).
+
+tff(sy_c_aa_001tf__c_001t__Set__Oset_It__fun_Itf__c_Mtf__c_J_J,type,(
+    aa_c_set_fun_c_c: ( fun_c_set_fun_c_c * c ) > set_fun_c_c )).
+
+tff(sy_c_aa_001tf__c_001t__Set__Oset_Itf__a_J,type,(
+    aa_c_set_a: ( fun_c_set_a * c ) > set_a )).
+
+tff(sy_c_aa_001tf__c_001t__Set__Oset_Itf__c_J,type,(
+    aa_c_set_c: ( fun_c_set_c * c ) > set_c )).
+
+tff(sy_c_aa_001tf__c_001t__fun_Itf__c_Mtf__a_J,type,(
+    aa_c_fun_c_a: ( fun_c_fun_c_a * c ) > fun_c_a )).
+
+tff(sy_c_aa_001tf__c_001t__fun_Itf__c_Mtf__c_J,type,(
+    aa_c_fun_c_c: ( fun_c_fun_c_c * c ) > fun_c_c )).
+
+tff(sy_c_aa_001tf__c_001tf__a,type,(
+    aa_c_a: ( fun_c_a * c ) > a )).
+
+tff(sy_c_aa_001tf__c_001tf__c,type,(
+    aa_c_c: ( fun_c_c * c ) > c )).
+
+tff(sy_c_fFalse,type,(
+    fFalse: bool )).
+
+tff(sy_c_fTrue,type,(
+    fTrue: bool )).
+
+tff(sy_c_member_001t__fun_It__fun_Itf__c_Mtf__a_J_Mt__fun_Itf__c_Mtf__a_J_J,type,(
+    member1570581654un_c_a: ( fun_fun_c_a_fun_c_a * set_fu845739061un_c_a ) > $o )).
+
+tff(sy_c_member_001t__fun_It__fun_Itf__c_Mtf__a_J_Mtf__a_J,type,(
+    member_fun_fun_c_a_a: ( fun_fun_c_a_a * set_fun_fun_c_a_a ) > $o )).
+
+tff(sy_c_member_001t__fun_It__fun_Itf__c_Mtf__a_J_Mtf__c_J,type,(
+    member_fun_fun_c_a_c: ( fun_fun_c_a_c * set_fun_fun_c_a_c ) > $o )).
+
+tff(sy_c_member_001t__fun_Itf__a_Mt__fun_Itf__c_Mtf__a_J_J,type,(
+    member_fun_a_fun_c_a: ( fun_a_fun_c_a * set_fun_a_fun_c_a ) > $o )).
+
+tff(sy_c_member_001t__fun_Itf__a_Mtf__a_J,type,(
+    member_fun_a_a: ( fun_a_a * set_fun_a_a ) > $o )).
+
+tff(sy_c_member_001t__fun_Itf__a_Mtf__c_J,type,(
+    member_fun_a_c: ( fun_a_c * set_fun_a_c ) > $o )).
+
+tff(sy_c_member_001t__fun_Itf__c_Mt__fun_Itf__c_Mtf__a_J_J,type,(
+    member_fun_c_fun_c_a: ( fun_c_fun_c_a * set_fun_c_fun_c_a ) > $o )).
+
+tff(sy_c_member_001t__fun_Itf__c_Mt__fun_Itf__c_Mtf__c_J_J,type,(
+    member_fun_c_fun_c_c: ( fun_c_fun_c_c * set_fun_c_fun_c_c ) > $o )).
+
+tff(sy_c_member_001t__fun_Itf__c_Mtf__a_J,type,(
+    member_fun_c_a: ( fun_c_a * set_fun_c_a ) > $o )).
+
+tff(sy_c_member_001t__fun_Itf__c_Mtf__c_J,type,(
+    member_fun_c_c: ( fun_c_c * set_fun_c_c ) > $o )).
+
+tff(sy_c_member_001tf__a,type,(
+    member_a: ( a * set_a ) > $o )).
+
+tff(sy_c_member_001tf__c,type,(
+    member_c: ( c * set_c ) > $o )).
+
+tff(sy_c_pp,type,(
+    pp: bool > $o )).
+
+tff(sy_v_G,type,(
+    g: galois1257299863_b_d_e )).
+
+tff(sy_v_y,type,(
+    y: c )).
+
+tff(fact_0__092_060open_062_092_060pi_062_092_060_094sup_062_K_A_I_092_060pi_062_092_060_094sub_062_K_Ay_J_A_092_060in_062_Acarrier_A_092_060Y_062_092_060close_062,axiom,(
+    member_c(aa_a_c(galois1339486701_b_d_e(g),aa_c_a(galois1295839724_b_d_e(g),y)),partia887345833xt_c_d(galois1502363448_b_d_e(g))) )).
+
+tff(fact_1_galois__connection__axioms,axiom,(
+    galois1996426151_b_d_e(g) )).
+
+tff(fact_2_funcset__pred,axiom,(
+    ! [F: fun_c_c,A: set_c,B: set_c] : 
+      ( member_fun_c_c(F,pi_c_c(A,aa_set_c_fun_c_set_c(aTP_Lamm_a,B)))
+    <=> ! [X: c] : 
+          ( member_c(X,A)
+         => member_c(aa_c_c(F,X),B) ) ) )).
+
+tff(fact_3_funcset__pred,axiom,(
+    ! [F: fun_c_a,A: set_c,B: set_a] : 
+      ( member_fun_c_a(F,pi_c_a(A,aa_set_a_fun_c_set_a(aTP_Lamm_aa,B)))
+    <=> ! [X: c] : 
+          ( member_c(X,A)
+         => member_a(aa_c_a(F,X),B) ) ) )).
+
+tff(fact_4_funcset__pred,axiom,(
+    ! [F: fun_c_fun_c_a,A: set_c,B: set_fun_c_a] : 
+      ( member_fun_c_fun_c_a(F,pi_c_fun_c_a(A,aa_set754005653un_c_a(aTP_Lamm_ab,B)))
+    <=> ! [X: c] : 
+          ( member_c(X,A)
+         => member_fun_c_a(aa_c_fun_c_a(F,X),B) ) ) )).
+
+tff(fact_5_funcset__pred,axiom,(
+    ! [F: fun_fun_c_a_c,A: set_fun_c_a,B: set_c] : 
+      ( member_fun_fun_c_a_c(F,pi_fun_c_a_c(A,aa_set136332052_set_c(aTP_Lamm_ac,B)))
+    <=> ! [X: fun_c_a] : 
+          ( member_fun_c_a(X,A)
+         => member_c(aa_fun_c_a_c(F,X),B) ) ) )).
+
+tff(fact_6_funcset__pred,axiom,(
+    ! [F: fun_fun_c_a_fun_c_a,A: set_fun_c_a,B: set_fun_c_a] : 
+      ( member1570581654un_c_a(F,pi_fun_c_a_fun_c_a(A,aa_set275871594un_c_a(aTP_Lamm_ad,B)))
+    <=> ! [X: fun_c_a] : 
+          ( member_fun_c_a(X,A)
+         => member_fun_c_a(aa_fun_c_a_fun_c_a(F,X),B) ) ) )).
+
+tff(fact_7_funcset__pred,axiom,(
+    ! [F: fun_a_c,A: set_a,B: set_c] : 
+      ( member_fun_a_c(F,pi_a_c(A,aa_set_c_fun_a_set_c(aTP_Lamm_ae,B)))
+    <=> ! [X: a] : 
+          ( member_a(X,A)
+         => member_c(aa_a_c(F,X),B) ) ) )).
+
+tff(fact_8_funcset__pred,axiom,(
+    ! [F: fun_a_a,A: set_a,B: set_a] : 
+      ( member_fun_a_a(F,pi_a_a(A,aa_set_a_fun_a_set_a(aTP_Lamm_af,B)))
+    <=> ! [X: a] : 
+          ( member_a(X,A)
+         => member_a(aa_a_a(F,X),B) ) ) )).
+
+tff(fact_9_funcset__pred,axiom,(
+    ! [F: fun_c_fun_c_c,A: set_c,B: set_fun_c_c] : 
+      ( member_fun_c_fun_c_c(F,pi_c_fun_c_c(A,aa_set248058645un_c_c(aTP_Lamm_ag,B)))
+    <=> ! [X: c] : 
+          ( member_c(X,A)
+         => member_fun_c_c(aa_c_fun_c_c(F,X),B) ) ) )).
+
+tff(fact_10_funcset__pred,axiom,(
+    ! [F: fun_fun_c_a_a,A: set_fun_c_a,B: set_a] : 
+      ( member_fun_fun_c_a_a(F,pi_fun_c_a_a(A,aa_set140948_set_a(aTP_Lamm_ah,B)))
+    <=> ! [X: fun_c_a] : 
+          ( member_fun_c_a(X,A)
+         => member_a(aa_fun_c_a_a(F,X),B) ) ) )).
+
+tff(fact_11_funcset__pred,axiom,(
+    ! [F: fun_a_fun_c_a,A: set_a,B: set_fun_c_a] : 
+      ( member_fun_a_fun_c_a(F,pi_a_fun_c_a(A,aa_set1117367187un_c_a(aTP_Lamm_ai,B)))
+    <=> ! [X: a] : 
+          ( member_a(X,A)
+         => member_fun_c_a(aa_a_fun_c_a(F,X),B) ) ) )).
+
+tff(fact_12_deflation,axiom,(
+    ! [Y: c] : 
+      ( member_c(Y,partia887345833xt_c_d(galois1502363448_b_d_e(g)))
+     => le_c_d(galois1502363448_b_d_e(g),aa_a_c(galois1339486701_b_d_e(g),aa_c_a(galois1295839724_b_d_e(g),Y)),Y) ) )).
+
+tff(fact_13_a1,axiom,(
+    member_c(y,partia887345833xt_c_d(galois1502363448_b_d_e(g))) )).
+
+tff(fact_14_upper__closure,axiom,(
+    member_fun_c_a(galois1295839724_b_d_e(g),pi_c_a(partia887345833xt_c_d(galois1502363448_b_d_e(g)),aTP_Lamm_aj)) )).
+
+tff(fact_15_upper__iso,axiom,(
+    isotone_c_d_a_b(galois1502363448_b_d_e(g),galois233116665_b_d_e(g),galois1295839724_b_d_e(g)) )).
+
+tff(fact_16_partial__order_Ole__antisym,axiom,(
+    ! [L: partia171196342xt_c_d,X2: c,Y: c] : 
+      ( partial_order_c_d(L)
+     => ( le_c_d(L,X2,Y)
+       => ( le_c_d(L,Y,X2)
+         => ( member_c(X2,partia887345833xt_c_d(L))
+           => ( member_c(Y,partia887345833xt_c_d(L))
+             => X2 = Y ) ) ) ) ) )).
+
+tff(fact_17_partial__order_Ole__antisym,axiom,(
+    ! [L: partia1200667062xt_a_b,X2: a,Y: a] : 
+      ( partial_order_a_b(L)
+     => ( le_a_b(L,X2,Y)
+       => ( le_a_b(L,Y,X2)
+         => ( member_a(X2,partia1648700841xt_a_b(L))
+           => ( member_a(Y,partia1648700841xt_a_b(L))
+             => X2 = Y ) ) ) ) ) )).
+
+tff(fact_18_galois__connection_Oinflation,axiom,(
+    ! [G: galois1257299863_b_d_e,X2: a] : 
+      ( galois1996426151_b_d_e(G)
+     => ( member_a(X2,partia1648700841xt_a_b(galois233116665_b_d_e(G)))
+       => le_a_b(galois233116665_b_d_e(G),X2,aa_c_a(galois1295839724_b_d_e(G),aa_a_c(galois1339486701_b_d_e(G),X2))) ) ) )).
+
+tff(fact_19_is__order__A,axiom,(
+    partial_order_a_b(galois233116665_b_d_e(g)) )).
+
+tff(fact_20_isotone__def,axiom,(
+    ! [A: partia171196342xt_c_d,B: partia171196342xt_c_d,F: fun_c_c] : 
+      ( isotone_c_d_c_d(A,B,F)
+    <=> ( weak_p1064538024er_c_d(A)
+        & weak_p1064538024er_c_d(B)
+        & ! [X: c] : 
+            ( member_c(X,partia887345833xt_c_d(A))
+           => ! [Xa: c] : 
+                ( member_c(Xa,partia887345833xt_c_d(A))
+               => ( le_c_d(A,X,Xa)
+                 => le_c_d(B,aa_c_c(F,X),aa_c_c(F,Xa)) ) ) ) ) ) )).
+
+tff(fact_21_isotone__def,axiom,(
+    ! [A: partia171196342xt_c_d,B: partia1200667062xt_a_b,F: fun_c_a] : 
+      ( isotone_c_d_a_b(A,B,F)
+    <=> ( weak_p1064538024er_c_d(A)
+        & weak_p1556482856er_a_b(B)
+        & ! [X: c] : 
+            ( member_c(X,partia887345833xt_c_d(A))
+           => ! [Xa: c] : 
+                ( member_c(Xa,partia887345833xt_c_d(A))
+               => ( le_c_d(A,X,Xa)
+                 => le_a_b(B,aa_c_a(F,X),aa_c_a(F,Xa)) ) ) ) ) ) )).
+
+tff(fact_22_isotone__def,axiom,(
+    ! [A: partia1200667062xt_a_b,B: partia171196342xt_c_d,F: fun_a_c] : 
+      ( isotone_a_b_c_d(A,B,F)
+    <=> ( weak_p1556482856er_a_b(A)
+        & weak_p1064538024er_c_d(B)
+        & ! [X: a] : 
+            ( member_a(X,partia1648700841xt_a_b(A))
+           => ! [Xa: a] : 
+                ( member_a(Xa,partia1648700841xt_a_b(A))
+               => ( le_a_b(A,X,Xa)
+                 => le_c_d(B,aa_a_c(F,X),aa_a_c(F,Xa)) ) ) ) ) ) )).
+
+tff(fact_23_isotone__def,axiom,(
+    ! [A: partia1200667062xt_a_b,B: partia1200667062xt_a_b,F: fun_a_a] : 
+      ( isotone_a_b_a_b(A,B,F)
+    <=> ( weak_p1556482856er_a_b(A)
+        & weak_p1556482856er_a_b(B)
+        & ! [X: a] : 
+            ( member_a(X,partia1648700841xt_a_b(A))
+           => ! [Xa: a] : 
+                ( member_a(Xa,partia1648700841xt_a_b(A))
+               => ( le_a_b(A,X,Xa)
+                 => le_a_b(B,aa_a_a(F,X),aa_a_a(F,Xa)) ) ) ) ) ) )).
+
+tff(fact_24_Lower__empty,axiom,(
+    ! [L: partia171196342xt_c_d] : lower_c_d(L,bot_bot_set_c) = partia887345833xt_c_d(L) )).
+
+tff(fact_25_Lower__empty,axiom,(
+    ! [L: partia1200667062xt_a_b] : lower_a_b(L,bot_bot_set_a) = partia1648700841xt_a_b(L) )).
+
+tff(fact_26_Upper__empty,axiom,(
+    ! [L: partia171196342xt_c_d] : upper_c_d(L,bot_bot_set_c) = partia887345833xt_c_d(L) )).
+
+tff(fact_27_Upper__empty,axiom,(
+    ! [L: partia1200667062xt_a_b] : upper_a_b(L,bot_bot_set_a) = partia1648700841xt_a_b(L) )).
+
+tff(fact_28_ATP_Olambda__1,axiom,(
+    aTP_Lamm_aj = aa_set_a_fun_c_set_a(cOMBK_set_a_c,partia1648700841xt_a_b(galois233116665_b_d_e(g))) )).
+
+tff(fact_29_ATP_Olambda__2,axiom,(
+    aTP_Lamm_ag = cOMBK_set_fun_c_c_c )).
+
+tff(fact_30_ATP_Olambda__3,axiom,(
+    aTP_Lamm_ad = cOMBK_122860872un_c_a )).
+
+tff(fact_31_ATP_Olambda__4,axiom,(
+    aTP_Lamm_ab = cOMBK_set_fun_c_a_c )).
+
+tff(fact_32_ATP_Olambda__5,axiom,(
+    aTP_Lamm_ai = cOMBK_set_fun_c_a_a )).
+
+tff(fact_33_ATP_Olambda__6,axiom,(
+    aTP_Lamm_ac = cOMBK_set_c_fun_c_a )).
+
+tff(fact_34_ATP_Olambda__7,axiom,(
+    aTP_Lamm_a = cOMBK_set_c_c )).
+
+tff(fact_35_ATP_Olambda__8,axiom,(
+    aTP_Lamm_ae = cOMBK_set_c_a )).
+
+tff(fact_36_ATP_Olambda__9,axiom,(
+    aTP_Lamm_ah = cOMBK_set_a_fun_c_a )).
+
+tff(fact_37_ATP_Olambda__10,axiom,(
+    aTP_Lamm_aa = cOMBK_set_a_c )).
+
+tff(fact_38_ATP_Olambda__11,axiom,(
+    aTP_Lamm_af = cOMBK_set_a_a )).
+
+tff(help_pp_2_1_U,axiom,(
+    pp(fTrue) )).
+
+tff(help_pp_1_1_U,axiom,(
+    ~ pp(fFalse) )).
+
+tff(help_COMBK_1_1_COMBK_001t__Set__Oset_Itf__a_J_001tf__a_U,axiom,(
+    ! [P: set_a,Q: a] : aa_a_set_a(aa_set_a_fun_a_set_a(cOMBK_set_a_a,P),Q) = P )).
+
+tff(help_COMBK_1_1_COMBK_001t__Set__Oset_Itf__a_J_001tf__c_U,axiom,(
+    ! [P: set_a,Q: c] : aa_c_set_a(aa_set_a_fun_c_set_a(cOMBK_set_a_c,P),Q) = P )).
+
+tff(help_COMBK_1_1_COMBK_001t__Set__Oset_Itf__c_J_001tf__a_U,axiom,(
+    ! [P: set_c,Q: a] : aa_a_set_c(aa_set_c_fun_a_set_c(cOMBK_set_c_a,P),Q) = P )).
+
+tff(help_COMBK_1_1_COMBK_001t__Set__Oset_Itf__c_J_001tf__c_U,axiom,(
+    ! [P: set_c,Q: c] : aa_c_set_c(aa_set_c_fun_c_set_c(cOMBK_set_c_c,P),Q) = P )).
+
+tff(help_COMBK_1_1_COMBK_001t__Set__Oset_It__fun_Itf__c_Mtf__a_J_J_001tf__a_U,axiom,(
+    ! [P: set_fun_c_a,Q: a] : aa_a_set_fun_c_a(aa_set1117367187un_c_a(cOMBK_set_fun_c_a_a,P),Q) = P )).
+
+tff(help_COMBK_1_1_COMBK_001t__Set__Oset_It__fun_Itf__c_Mtf__a_J_J_001tf__c_U,axiom,(
+    ! [P: set_fun_c_a,Q: c] : aa_c_set_fun_c_a(aa_set754005653un_c_a(cOMBK_set_fun_c_a_c,P),Q) = P )).
+
+tff(help_COMBK_1_1_COMBK_001t__Set__Oset_It__fun_Itf__c_Mtf__c_J_J_001tf__c_U,axiom,(
+    ! [P: set_fun_c_c,Q: c] : aa_c_set_fun_c_c(aa_set248058645un_c_c(cOMBK_set_fun_c_c_c,P),Q) = P )).
+
+tff(help_COMBK_1_1_COMBK_001t__Set__Oset_Itf__a_J_001t__fun_Itf__c_Mtf__a_J_U,axiom,(
+    ! [P: set_a,Q: fun_c_a] : aa_fun_c_a_set_a(aa_set140948_set_a(cOMBK_set_a_fun_c_a,P),Q) = P )).
+
+tff(help_COMBK_1_1_COMBK_001t__Set__Oset_Itf__c_J_001t__fun_Itf__c_Mtf__a_J_U,axiom,(
+    ! [P: set_c,Q: fun_c_a] : aa_fun_c_a_set_c(aa_set136332052_set_c(cOMBK_set_c_fun_c_a,P),Q) = P )).
+
+tff(help_COMBK_1_1_COMBK_001t__Set__Oset_It__fun_Itf__c_Mtf__a_J_J_001t__fun_Itf__c_Mtf__a_J_U,axiom,(
+    ! [P: set_fun_c_a,Q: fun_c_a] : aa_fun1900338294un_c_a(aa_set275871594un_c_a(cOMBK_122860872un_c_a,P),Q) = P )).
+
+tff(conj_1,conjecture,(
+    aa_c_a(galois1295839724_b_d_e(g),aa_a_c(galois1339486701_b_d_e(g),aa_c_a(galois1295839724_b_d_e(g),y))) = aa_c_a(galois1295839724_b_d_e(g),y) )).
+%------------------------------------------------------------------------------

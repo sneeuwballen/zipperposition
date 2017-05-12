@@ -1,0 +1,4042 @@
+%------------------------------------------------------------------------------
+tff(ty_n_t__fun_It__Product____Type__Oprod_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_Mt__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_J_Mt__HOL__Obool_J,type,(
+    fun_Pr1810807859e_bool: $tType )).
+
+tff(ty_n_t__fun_It__Product____Type__Oprod_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J_Mt__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J_J_Mt__HOL__Obool_J,type,(
+    fun_Pr339688819k_bool: $tType )).
+
+tff(ty_n_t__fun_It__Product____Type__Oprod_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Otype_J_Mt__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Otype_J_J_Mt__HOL__Obool_J,type,(
+    fun_Pr552721779e_bool: $tType )).
+
+tff(ty_n_t__fun_It__Product____Type__Oprod_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_Mt__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_J_Mt__HOL__Obool_J,type,(
+    fun_Pr1229086387k_bool: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_Mt__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_J_J,type,(
+    set_Pr2081054535e_type: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J_Mt__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J_J_J,type,(
+    set_Pr28651015e_mark: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Otype_J_Mt__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Otype_J_J_J,type,(
+    set_Pr1193971207k_type: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_Mt__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_J_J,type,(
+    set_Pr1289051335k_mark: $tType )).
+
+tff(ty_n_t__fun_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_Mt__fun_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_Mt__HOL__Obool_J_J,type,(
+    fun_Pr935122093e_bool: $tType )).
+
+tff(ty_n_t__fun_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J_Mt__fun_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J_Mt__HOL__Obool_J_J,type,(
+    fun_Pr1010118637k_bool: $tType )).
+
+tff(ty_n_t__fun_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_Mt__fun_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_Mt__HOL__Obool_J_J,type,(
+    fun_Pr761080621k_bool: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_Mt__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_J,type,(
+    produc1703900263e_type: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J_Mt__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J_J,type,(
+    produc820355879e_mark: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Otype_J_Mt__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Otype_J_J,type,(
+    produc1930101543k_type: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_Mt__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_J,type,(
+    produc1046557159k_mark: $tType )).
+
+tff(ty_n_t__fun_It__GenericConformance__Otype_Mt__Set__Oset_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_J_J,type,(
+    fun_ty238017314e_type: $tType )).
+
+tff(ty_n_t__fun_It__GenericConformance__Otype_Mt__Set__Oset_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_J_J,type,(
+    fun_ty85451272k_mark: $tType )).
+
+tff(ty_n_t__fun_It__GenericConformance__Omark_Mt__Set__Oset_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_J_J,type,(
+    fun_ma1475628821k_mark: $tType )).
+
+tff(ty_n_t__fun_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_Mt__HOL__Obool_J,type,(
+    fun_Pr1877371689e_bool: $tType )).
+
+tff(ty_n_t__fun_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J_Mt__HOL__Obool_J,type,(
+    fun_Pr1038595638k_bool: $tType )).
+
+tff(ty_n_t__fun_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_Mt__HOL__Obool_J,type,(
+    fun_Pr1257344963k_bool: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_J,type,(
+    set_Pr1267735761e_type: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J_J,type,(
+    set_Pr99672324e_mark: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_J,type,(
+    set_Pr183678647k_mark: $tType )).
+
+tff(ty_n_t__fun_It__GenericConformance__Otype_Mt__fun_It__GenericConformance__Otype_Mt__HOL__Obool_J_J,type,(
+    fun_ty518885433e_bool: $tType )).
+
+tff(ty_n_t__fun_It__GenericConformance__Omark_Mt__fun_It__GenericConformance__Omark_Mt__HOL__Obool_J_J,type,(
+    fun_ma1060395731k_bool: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J,type,(
+    produc1292315505e_type: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J,type,(
+    produc866752804e_mark: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Otype_J,type,(
+    produc2098948772k_type: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J,type,(
+    produc1673386071k_mark: $tType )).
+
+tff(ty_n_t__List__Olist_It__fun_It__GenericConformance__Otype_Mt__Nat__Onat_J_J,type,(
+    list_fun_type_nat: $tType )).
+
+tff(ty_n_t__List__Olist_It__fun_It__GenericConformance__Omark_Mt__Nat__Onat_J_J,type,(
+    list_fun_mark_nat: $tType )).
+
+tff(ty_n_t__fun_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J,type,(
+    fun_type_type: $tType )).
+
+tff(ty_n_t__fun_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J,type,(
+    fun_type_mark: $tType )).
+
+tff(ty_n_t__fun_It__GenericConformance__Omark_Mt__GenericConformance__Otype_J,type,(
+    fun_mark_type: $tType )).
+
+tff(ty_n_t__fun_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J,type,(
+    fun_mark_mark: $tType )).
+
+tff(ty_n_t__fun_It__HOL__Obool_Mt__fun_It__HOL__Obool_Mt__HOL__Obool_J_J,type,(
+    fun_bo1373903021l_bool: $tType )).
+
+tff(ty_n_t__fun_It__Nat__Onat_Mt__fun_It__Nat__Onat_Mt__HOL__Obool_J_J,type,(
+    fun_nat_fun_nat_bool: $tType )).
+
+tff(ty_n_t__fun_It__Int__Oint_Mt__fun_It__Int__Oint_Mt__HOL__Obool_J_J,type,(
+    fun_int_fun_int_bool: $tType )).
+
+tff(ty_n_t__fun_It__GenericConformance__Otype_Mt__HOL__Obool_J,type,(
+    fun_type_bool: $tType )).
+
+tff(ty_n_t__fun_It__GenericConformance__Omark_Mt__HOL__Obool_J,type,(
+    fun_mark_bool: $tType )).
+
+tff(ty_n_t__fun_It__GenericConformance__Otype_Mt__Nat__Onat_J,type,(
+    fun_type_nat: $tType )).
+
+tff(ty_n_t__fun_It__GenericConformance__Otype_Mt__Int__Oint_J,type,(
+    fun_type_int: $tType )).
+
+tff(ty_n_t__fun_It__GenericConformance__Omark_Mt__Nat__Onat_J,type,(
+    fun_mark_nat: $tType )).
+
+tff(ty_n_t__fun_It__GenericConformance__Omark_Mt__Int__Oint_J,type,(
+    fun_mark_int: $tType )).
+
+tff(ty_n_t__List__Olist_It__GenericConformance__Otype_J,type,(
+    list_type: $tType )).
+
+tff(ty_n_t__Set__Oset_It__GenericConformance__Otype_J,type,(
+    set_type: $tType )).
+
+tff(ty_n_t__Set__Oset_It__GenericConformance__Omark_J,type,(
+    set_mark: $tType )).
+
+tff(ty_n_t__fun_It__HOL__Obool_Mt__HOL__Obool_J,type,(
+    fun_bool_bool: $tType )).
+
+tff(ty_n_t__fun_It__Nat__Onat_Mt__HOL__Obool_J,type,(
+    fun_nat_bool: $tType )).
+
+tff(ty_n_t__fun_It__Int__Oint_Mt__HOL__Obool_J,type,(
+    fun_int_bool: $tType )).
+
+tff(ty_n_t__fun_It__HOL__Obool_Mt__Nat__Onat_J,type,(
+    fun_bool_nat: $tType )).
+
+tff(ty_n_t__fun_It__HOL__Obool_Mt__Int__Oint_J,type,(
+    fun_bool_int: $tType )).
+
+tff(ty_n_t__fun_It__Nat__Onat_Mt__Nat__Onat_J,type,(
+    fun_nat_nat: $tType )).
+
+tff(ty_n_t__fun_It__Nat__Onat_Mt__Int__Oint_J,type,(
+    fun_nat_int: $tType )).
+
+tff(ty_n_t__fun_It__Int__Oint_Mt__Nat__Onat_J,type,(
+    fun_int_nat: $tType )).
+
+tff(ty_n_t__fun_It__Int__Oint_Mt__Int__Oint_J,type,(
+    fun_int_int: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Nat__Onat_J,type,(
+    set_nat: $tType )).
+
+tff(ty_n_t__GenericConformance__Otype,type,(
+    type: $tType )).
+
+tff(ty_n_t__GenericConformance__Omark,type,(
+    mark: $tType )).
+
+tff(ty_n_t__HOL__Obool,type,(
+    bool: $tType )).
+
+tff(ty_n_t__Num__Onum,type,(
+    num: $tType )).
+
+tff(ty_n_t__Nat__Onat,type,(
+    nat: $tType )).
+
+tff(ty_n_t__Int__Oint,type,(
+    int: $tType )).
+
+tff(sy_c_ATP_058Lamm__a____,type,(
+    aTP_Lamm_a: set_Pr183678647k_mark > fun_Pr1257344963k_bool )).
+
+tff(sy_c_ATP_058Lamm__aa____,type,(
+    aTP_Lamm_aa: set_Pr2081054535e_type > fun_Pr1810807859e_bool )).
+
+tff(sy_c_ATP_058Lamm__ab____,type,(
+    aTP_Lamm_ab: set_Pr28651015e_mark > fun_Pr339688819k_bool )).
+
+tff(sy_c_ATP_058Lamm__ac____,type,(
+    aTP_Lamm_ac: set_Pr1193971207k_type > fun_Pr552721779e_bool )).
+
+tff(sy_c_ATP_058Lamm__ad____,type,(
+    aTP_Lamm_ad: set_Pr1289051335k_mark > fun_Pr1229086387k_bool )).
+
+tff(sy_c_ATP_058Lamm__ae____,type,(
+    aTP_Lamm_ae: set_type > fun_type_bool )).
+
+tff(sy_c_BNF__Cardinal__Order__Relation_OrelChain_001t__GenericConformance__Omark_001t__HOL__Obool,type,(
+    bNF_Ca2125776118k_bool: ( set_Pr183678647k_mark * fun_mark_bool ) > $o )).
+
+tff(sy_c_BNF__Cardinal__Order__Relation_OrelChain_001t__GenericConformance__Omark_001t__Int__Oint,type,(
+    bNF_Ca243559821rk_int: ( set_Pr183678647k_mark * fun_mark_int ) > $o )).
+
+tff(sy_c_BNF__Cardinal__Order__Relation_OrelChain_001t__GenericConformance__Omark_001t__Nat__Onat,type,(
+    bNF_Ca1753769777rk_nat: ( set_Pr183678647k_mark * fun_mark_nat ) > $o )).
+
+tff(sy_c_BNF__Cardinal__Order__Relation_OrelChain_001t__GenericConformance__Otype_001t__HOL__Obool,type,(
+    bNF_Ca378635113e_bool: ( set_Pr1267735761e_type * fun_type_bool ) > $o )).
+
+tff(sy_c_BNF__Cardinal__Order__Relation_OrelChain_001t__GenericConformance__Otype_001t__Int__Oint,type,(
+    bNF_Ca2127684186pe_int: ( set_Pr1267735761e_type * fun_type_int ) > $o )).
+
+tff(sy_c_BNF__Cardinal__Order__Relation_OrelChain_001t__GenericConformance__Otype_001t__Nat__Onat,type,(
+    bNF_Ca1490410494pe_nat: ( set_Pr1267735761e_type * fun_type_nat ) > $o )).
+
+tff(sy_c_Divides_Odiv__class_Omod_001t__Nat__Onat,type,(
+    div_mod_nat: nat > fun_nat_nat )).
+
+tff(sy_c_Finite__Set_Ofinite_001t__GenericConformance__Otype,type,(
+    finite_finite_type: set_type > $o )).
+
+tff(sy_c_GenericConformance_Oconforms,type,(
+    conforms: fun_ty518885433e_bool )).
+
+tff(sy_c_GenericConformance_Oconforms__rel,type,(
+    conforms_rel: fun_Pr935122093e_bool )).
+
+tff(sy_c_GenericConformance_Ogeneric__conforms,type,(
+    generic_conforms: fun_ma1060395731k_bool )).
+
+tff(sy_c_GenericConformance_Ogeneric__conforms__rel,type,(
+    generic_conforms_rel: fun_Pr761080621k_bool )).
+
+tff(sy_c_GenericConformance_Ogeneric__self__initializing,type,(
+    generi1333131366lizing: fun_mark_bool )).
+
+tff(sy_c_GenericConformance_Ois__attached,type,(
+    is_attached: fun_type_bool )).
+
+tff(sy_c_GenericConformance_Ois__attached__rel,type,(
+    is_attached_rel: fun_ty518885433e_bool )).
+
+tff(sy_c_GenericConformance_Omark_OAttachedMark,type,(
+    attachedMark: mark )).
+
+tff(sy_c_GenericConformance_Omark_ODetachableMark,type,(
+    detachableMark: mark )).
+
+tff(sy_c_GenericConformance_Omark_OEmptyMark,type,(
+    emptyMark: mark )).
+
+tff(sy_c_GenericConformance_Omark_Osize__mark,type,(
+    size_mark: fun_mark_nat )).
+
+tff(sy_c_GenericConformance_Oself__initializing,type,(
+    self_initializing: fun_type_bool )).
+
+tff(sy_c_GenericConformance_Oself__initializing__rel,type,(
+    self_i7492726ng_rel: fun_ty518885433e_bool )).
+
+tff(sy_c_GenericConformance_Otype_OAttachedReference,type,(
+    attachedReference: type )).
+
+tff(sy_c_GenericConformance_Otype_ODetachableReference,type,(
+    detachableReference: type )).
+
+tff(sy_c_GenericConformance_Otype_OExpanded,type,(
+    expanded: type )).
+
+tff(sy_c_GenericConformance_Otype_Osize__type,type,(
+    size_type: fun_type_nat )).
+
+tff(sy_c_GenericConformance_Ounmark,type,(
+    unmark: type > fun_mark_type )).
+
+tff(sy_c_GenericConformance_Ounmark__rel,type,(
+    unmark_rel: fun_Pr1010118637k_bool )).
+
+tff(sy_c_Groups_Ominus__class_Ominus_001t__Set__Oset_It__GenericConformance__Otype_J,type,(
+    minus_minus_set_type: ( set_type * set_type ) > set_type )).
+
+tff(sy_c_Groups_Oone__class_Oone_001t__Nat__Onat,type,(
+    one_one_nat: nat )).
+
+tff(sy_c_Groups_Oplus__class_Oplus_001t__Int__Oint,type,(
+    plus_plus_int: int > fun_int_int )).
+
+tff(sy_c_Groups_Oplus__class_Oplus_001t__Nat__Onat,type,(
+    plus_plus_nat: nat > fun_nat_nat )).
+
+tff(sy_c_Groups_Ozero__class_Ozero_001t__Int__Oint,type,(
+    zero_zero_int: int )).
+
+tff(sy_c_Groups_Ozero__class_Ozero_001t__Nat__Onat,type,(
+    zero_zero_nat: nat )).
+
+tff(sy_c_Lattices_Oinf__class_Oinf_001t__Set__Oset_It__GenericConformance__Otype_J,type,(
+    inf_inf_set_type: ( set_type * set_type ) > set_type )).
+
+tff(sy_c_Lattices_Osup__class_Osup_001t__HOL__Obool,type,(
+    sup_sup_bool: fun_bo1373903021l_bool )).
+
+tff(sy_c_Lattices_Osup__class_Osup_001t__Int__Oint,type,(
+    sup_sup_int: int > fun_int_int )).
+
+tff(sy_c_Lattices_Osup__class_Osup_001t__Nat__Onat,type,(
+    sup_sup_nat: nat > fun_nat_nat )).
+
+tff(sy_c_Lattices_Osup__class_Osup_001t__Set__Oset_It__GenericConformance__Otype_J,type,(
+    sup_sup_set_type: ( set_type * set_type ) > set_type )).
+
+tff(sy_c_Lifting_ORespects_001t__GenericConformance__Otype,type,(
+    respects_type: fun_ty518885433e_bool > set_type )).
+
+tff(sy_c_List_Ocan__select_001t__GenericConformance__Otype,type,(
+    can_select_type: ( fun_type_bool * set_type ) > $o )).
+
+tff(sy_c_List_Ocoset_001t__GenericConformance__Otype,type,(
+    coset_type: list_type > set_type )).
+
+tff(sy_c_List_OdropWhile_001t__GenericConformance__Otype,type,(
+    dropWhile_type: ( fun_type_bool * list_type ) > list_type )).
+
+tff(sy_c_List_Oinsert_001t__GenericConformance__Otype,type,(
+    insert_type: ( type * list_type ) > list_type )).
+
+tff(sy_c_List_Olast_001t__GenericConformance__Otype,type,(
+    last_type: list_type > type )).
+
+tff(sy_c_List_Olist_OCons_001t__GenericConformance__Otype,type,(
+    cons_type: ( type * list_type ) > list_type )).
+
+tff(sy_c_List_Olist_ONil_001t__GenericConformance__Otype,type,(
+    nil_type: list_type )).
+
+tff(sy_c_List_Olist_ONil_001t__fun_It__GenericConformance__Omark_Mt__Nat__Onat_J,type,(
+    nil_fun_mark_nat: list_fun_mark_nat )).
+
+tff(sy_c_List_Olist_ONil_001t__fun_It__GenericConformance__Otype_Mt__Nat__Onat_J,type,(
+    nil_fun_type_nat: list_fun_type_nat )).
+
+tff(sy_c_List_Olist_Ohd_001t__GenericConformance__Otype,type,(
+    hd_type: list_type > type )).
+
+tff(sy_c_List_Olist_Oset_001t__GenericConformance__Otype,type,(
+    set_type2: list_type > set_type )).
+
+tff(sy_c_List_Olist__ex1_001t__GenericConformance__Otype,type,(
+    list_ex1_type: ( fun_type_bool * list_type ) > $o )).
+
+tff(sy_c_List_Omeasures_001t__GenericConformance__Omark,type,(
+    measures_mark: list_fun_mark_nat > set_Pr183678647k_mark )).
+
+tff(sy_c_List_Omeasures_001t__GenericConformance__Otype,type,(
+    measures_type: list_fun_type_nat > set_Pr1267735761e_type )).
+
+tff(sy_c_List_Omember_001t__GenericConformance__Otype,type,(
+    member_type: list_type > fun_type_bool )).
+
+tff(sy_c_List_Osublist_001t__GenericConformance__Otype,type,(
+    sublist_type: ( list_type * set_nat ) > list_type )).
+
+tff(sy_c_Nat_OSuc,type,(
+    suc: fun_nat_nat )).
+
+tff(sy_c_Nat_Osemiring__1__class_Oof__nat_001t__Int__Oint,type,(
+    semiri2019852685at_int: fun_nat_int )).
+
+tff(sy_c_Nat_Osize__class_Osize_001t__GenericConformance__Omark,type,(
+    size_size_mark: fun_mark_nat )).
+
+tff(sy_c_Nat_Osize__class_Osize_001t__GenericConformance__Otype,type,(
+    size_size_type: fun_type_nat )).
+
+tff(sy_c_Num_Onumeral__class_Onumeral_001t__Nat__Onat,type,(
+    numeral_numeral_nat: num > nat )).
+
+tff(sy_c_Orderings_Obot__class_Obot_001t__HOL__Obool,type,(
+    bot_bot_bool: bool )).
+
+tff(sy_c_Orderings_Obot__class_Obot_001t__Nat__Onat,type,(
+    bot_bot_nat: nat )).
+
+tff(sy_c_Orderings_Obot__class_Obot_001t__Set__Oset_It__GenericConformance__Omark_J,type,(
+    bot_bot_set_mark: set_mark )).
+
+tff(sy_c_Orderings_Obot__class_Obot_001t__Set__Oset_It__GenericConformance__Otype_J,type,(
+    bot_bot_set_type: set_type )).
+
+tff(sy_c_Orderings_Obot__class_Obot_001t__Set__Oset_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_J,type,(
+    bot_bo691196707k_mark: set_Pr183678647k_mark )).
+
+tff(sy_c_Orderings_Obot__class_Obot_001t__Set__Oset_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_J,type,(
+    bot_bo1775253821e_type: set_Pr1267735761e_type )).
+
+tff(sy_c_Orderings_Oord__class_Oless_001t__HOL__Obool,type,(
+    ord_less_bool: fun_bo1373903021l_bool )).
+
+tff(sy_c_Orderings_Oord__class_Oless_001t__Int__Oint,type,(
+    ord_less_int: fun_int_fun_int_bool )).
+
+tff(sy_c_Orderings_Oord__class_Oless_001t__Nat__Onat,type,(
+    ord_less_nat: fun_nat_fun_nat_bool )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__HOL__Obool,type,(
+    ord_less_eq_bool: fun_bo1373903021l_bool )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Int__Oint,type,(
+    ord_less_eq_int: fun_int_fun_int_bool )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Nat__Onat,type,(
+    ord_less_eq_nat: fun_nat_fun_nat_bool )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Set__Oset_It__GenericConformance__Omark_J,type,(
+    ord_less_eq_set_mark: ( set_mark * set_mark ) > $o )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Set__Oset_It__GenericConformance__Otype_J,type,(
+    ord_less_eq_set_type: ( set_type * set_type ) > $o )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Set__Oset_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_J,type,(
+    ord_le47136343k_mark: ( set_Pr183678647k_mark * set_Pr183678647k_mark ) > $o )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Set__Oset_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J_J,type,(
+    ord_le2110613668e_mark: ( set_Pr99672324e_mark * set_Pr99672324e_mark ) > $o )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Set__Oset_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_J,type,(
+    ord_le1131193457e_type: ( set_Pr1267735761e_type * set_Pr1267735761e_type ) > $o )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__fun_It__GenericConformance__Otype_Mt__HOL__Obool_J,type,(
+    ord_le627149320e_bool: ( fun_type_bool * fun_type_bool ) > $o )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__fun_It__GenericConformance__Otype_Mt__fun_It__GenericConformance__Otype_Mt__HOL__Obool_J_J,type,(
+    ord_le1653811161e_bool: ( fun_ty518885433e_bool * fun_ty518885433e_bool ) > $o )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__fun_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_Mt__HOL__Obool_J,type,(
+    ord_le415117347k_bool: ( fun_Pr1257344963k_bool * fun_Pr1257344963k_bool ) > $o )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__fun_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_Mt__fun_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_Mt__HOL__Obool_J_J,type,(
+    ord_le922735309k_bool: ( fun_Pr761080621k_bool * fun_Pr761080621k_bool ) > $o )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__fun_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J_Mt__HOL__Obool_J,type,(
+    ord_le196368022k_bool: ( fun_Pr1038595638k_bool * fun_Pr1038595638k_bool ) > $o )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__fun_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J_Mt__fun_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J_Mt__HOL__Obool_J_J,type,(
+    ord_le1171773325k_bool: ( fun_Pr1010118637k_bool * fun_Pr1010118637k_bool ) > $o )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__fun_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_Mt__HOL__Obool_J,type,(
+    ord_le1035144073e_bool: ( fun_Pr1877371689e_bool * fun_Pr1877371689e_bool ) > $o )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__fun_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_Mt__fun_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_Mt__HOL__Obool_J_J,type,(
+    ord_le1096776781e_bool: ( fun_Pr935122093e_bool * fun_Pr935122093e_bool ) > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Oantimono_001t__HOL__Obool_001t__HOL__Obool,type,(
+    order_721039474l_bool: fun_bool_bool > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Oantimono_001t__HOL__Obool_001t__Int__Oint,type,(
+    order_1723884305ol_int: fun_bool_int > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Oantimono_001t__HOL__Obool_001t__Nat__Onat,type,(
+    order_1086610613ol_nat: fun_bool_nat > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Oantimono_001t__Int__Oint_001t__HOL__Obool,type,(
+    order_1556698295t_bool: fun_int_bool > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Oantimono_001t__Int__Oint_001t__Int__Oint,type,(
+    order_34266508nt_int: fun_int_int > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Oantimono_001t__Int__Oint_001t__Nat__Onat,type,(
+    order_1544476464nt_nat: fun_int_nat > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Oantimono_001t__Nat__Onat_001t__HOL__Obool,type,(
+    order_203183123t_bool: fun_nat_bool > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Oantimono_001t__Nat__Onat_001t__Int__Oint,type,(
+    order_120997680at_int: fun_nat_int > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Oantimono_001t__Nat__Onat_001t__Nat__Onat,type,(
+    order_1631207636at_nat: fun_nat_nat > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001t__HOL__Obool_001t__HOL__Obool,type,(
+    order_mono_bool_bool: fun_bool_bool > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001t__HOL__Obool_001t__Int__Oint,type,(
+    order_mono_bool_int: fun_bool_int > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001t__HOL__Obool_001t__Nat__Onat,type,(
+    order_mono_bool_nat: fun_bool_nat > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001t__Int__Oint_001t__HOL__Obool,type,(
+    order_mono_int_bool: fun_int_bool > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001t__Int__Oint_001t__Int__Oint,type,(
+    order_mono_int_int: fun_int_int > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001t__Int__Oint_001t__Nat__Onat,type,(
+    order_mono_int_nat: fun_int_nat > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001t__Nat__Onat_001t__HOL__Obool,type,(
+    order_mono_nat_bool: fun_nat_bool > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001t__Nat__Onat_001t__Int__Oint,type,(
+    order_mono_nat_int: fun_nat_int > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001t__Nat__Onat_001t__Nat__Onat,type,(
+    order_mono_nat_nat: fun_nat_nat > $o )).
+
+tff(sy_c_Product__Type_OPair_001t__GenericConformance__Omark_001t__GenericConformance__Omark,type,(
+    produc2130394895k_mark: ( mark * mark ) > produc1673386071k_mark )).
+
+tff(sy_c_Product__Type_OPair_001t__GenericConformance__Omark_001t__GenericConformance__Otype,type,(
+    produc1350199260k_type: ( mark * type ) > produc2098948772k_type )).
+
+tff(sy_c_Product__Type_OPair_001t__GenericConformance__Otype_001t__GenericConformance__Omark,type,(
+    produc1323761628e_mark: ( type * mark ) > produc866752804e_mark )).
+
+tff(sy_c_Product__Type_OPair_001t__GenericConformance__Otype_001t__GenericConformance__Otype,type,(
+    produc543565993e_type: ( type * type ) > produc1292315505e_type )).
+
+tff(sy_c_Product__Type_OPair_001t__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_001t__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J,type,(
+    produc507800407k_mark: ( produc1673386071k_mark * produc1673386071k_mark ) > produc1046557159k_mark )).
+
+tff(sy_c_Product__Type_OPair_001t__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Otype_J_001t__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Otype_J,type,(
+    produc648844055k_type: ( produc2098948772k_type * produc2098948772k_type ) > produc1930101543k_type )).
+
+tff(sy_c_Product__Type_OPair_001t__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J_001t__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J,type,(
+    produc1706455831e_mark: ( produc866752804e_mark * produc866752804e_mark ) > produc820355879e_mark )).
+
+tff(sy_c_Product__Type_OPair_001t__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_001t__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J,type,(
+    produc1847499479e_type: ( produc1292315505e_type * produc1292315505e_type ) > produc1703900263e_type )).
+
+tff(sy_c_Product__Type_Ocurry_001t__GenericConformance__Omark_001t__GenericConformance__Omark_001t__HOL__Obool,type,(
+    produc49613332k_bool: fun_Pr1257344963k_bool > fun_ma1060395731k_bool )).
+
+tff(sy_c_Product__Type_Ocurry_001t__GenericConformance__Otype_001t__GenericConformance__Omark_001t__HOL__Obool,type,(
+    produc1978347655k_bool: ( fun_Pr1038595638k_bool * type ) > fun_mark_bool )).
+
+tff(sy_c_Product__Type_Ocurry_001t__GenericConformance__Otype_001t__GenericConformance__Otype_001t__HOL__Obool,type,(
+    produc231206650e_bool: fun_Pr1877371689e_bool > fun_ty518885433e_bool )).
+
+tff(sy_c_Product__Type_Oprod_Ofst_001t__GenericConformance__Omark_001t__GenericConformance__Omark,type,(
+    produc725330683k_mark: produc1673386071k_mark > mark )).
+
+tff(sy_c_Product__Type_Oprod_Ofst_001t__GenericConformance__Otype_001t__GenericConformance__Omark,type,(
+    produc2066181064e_mark: produc866752804e_mark > type )).
+
+tff(sy_c_Product__Type_Oprod_Ofst_001t__GenericConformance__Otype_001t__GenericConformance__Otype,type,(
+    produc1285985429e_type: produc1292315505e_type > type )).
+
+tff(sy_c_Product__Type_Oprod_Osnd_001t__GenericConformance__Omark_001t__GenericConformance__Omark,type,(
+    produc2132103997k_mark: produc1673386071k_mark > mark )).
+
+tff(sy_c_Product__Type_Oprod_Osnd_001t__GenericConformance__Otype_001t__GenericConformance__Omark,type,(
+    produc1325470730e_mark: produc866752804e_mark > mark )).
+
+tff(sy_c_Product__Type_Oprod_Osnd_001t__GenericConformance__Otype_001t__GenericConformance__Otype,type,(
+    produc545275095e_type: produc1292315505e_type > type )).
+
+tff(sy_c_Quotient_OBex1__rel_001t__GenericConformance__Otype,type,(
+    bex1_rel_type: ( fun_ty518885433e_bool * fun_type_bool ) > $o )).
+
+tff(sy_c_Relation_OField_001t__GenericConformance__Omark,type,(
+    field_mark: set_Pr183678647k_mark > set_mark )).
+
+tff(sy_c_Relation_OField_001t__GenericConformance__Otype,type,(
+    field_type: set_Pr1267735761e_type > set_type )).
+
+tff(sy_c_Relation_Oinv__image_001t__GenericConformance__Omark_001t__GenericConformance__Omark,type,(
+    inv_image_mark_mark: ( set_Pr183678647k_mark * fun_mark_mark ) > set_Pr183678647k_mark )).
+
+tff(sy_c_Relation_Oinv__image_001t__GenericConformance__Omark_001t__GenericConformance__Otype,type,(
+    inv_image_mark_type: ( set_Pr183678647k_mark * fun_type_mark ) > set_Pr1267735761e_type )).
+
+tff(sy_c_Relation_Oinv__image_001t__GenericConformance__Otype_001t__GenericConformance__Omark,type,(
+    inv_image_type_mark: ( set_Pr1267735761e_type * fun_mark_type ) > set_Pr183678647k_mark )).
+
+tff(sy_c_Relation_Oinv__image_001t__GenericConformance__Otype_001t__GenericConformance__Otype,type,(
+    inv_image_type_type: ( set_Pr1267735761e_type * fun_type_type ) > set_Pr1267735761e_type )).
+
+tff(sy_c_Rings_Odvd__class_Odvd_001t__Nat__Onat,type,(
+    dvd_dvd_nat: fun_nat_fun_nat_bool )).
+
+tff(sy_c_Set_OCollect_001t__GenericConformance__Otype,type,(
+    collect_type: fun_type_bool > set_type )).
+
+tff(sy_c_Set_OCollect_001t__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J,type,(
+    collec966944322k_mark: fun_Pr1257344963k_bool > set_Pr183678647k_mark )).
+
+tff(sy_c_Set_OCollect_001t__Product____Type__Oprod_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_Mt__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_J,type,(
+    collec1436875602k_mark: fun_Pr1229086387k_bool > set_Pr1289051335k_mark )).
+
+tff(sy_c_Set_OCollect_001t__Product____Type__Oprod_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Otype_J_Mt__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Otype_J_J,type,(
+    collec172936338k_type: fun_Pr552721779e_bool > set_Pr1193971207k_type )).
+
+tff(sy_c_Set_OCollect_001t__Product____Type__Oprod_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J_Mt__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J_J,type,(
+    collec1210674322e_mark: fun_Pr339688819k_bool > set_Pr28651015e_mark )).
+
+tff(sy_c_Set_OCollect_001t__Product____Type__Oprod_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_Mt__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_J,type,(
+    collec2094218706e_type: fun_Pr1810807859e_bool > set_Pr2081054535e_type )).
+
+tff(sy_c_Set_Oinsert_001t__GenericConformance__Otype,type,(
+    insert_type2: ( type * set_type ) > set_type )).
+
+tff(sy_c_Wellfounded_Oaccp_001t__GenericConformance__Otype,type,(
+    accp_type: fun_ty518885433e_bool > fun_type_bool )).
+
+tff(sy_c_Wellfounded_Oaccp_001t__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J,type,(
+    accp_P522654688k_mark: fun_Pr761080621k_bool > fun_Pr1257344963k_bool )).
+
+tff(sy_c_Wellfounded_Oaccp_001t__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J,type,(
+    accp_P1863505069e_mark: fun_Pr1010118637k_bool > fun_Pr1038595638k_bool )).
+
+tff(sy_c_Wellfounded_Oaccp_001t__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J,type,(
+    accp_P141584122e_type: fun_Pr935122093e_bool > fun_Pr1877371689e_bool )).
+
+tff(sy_c_Wellfounded_Olex__prod_001t__GenericConformance__Omark_001t__GenericConformance__Omark,type,(
+    lex_prod_mark_mark: ( set_Pr183678647k_mark * set_Pr183678647k_mark ) > set_Pr1289051335k_mark )).
+
+tff(sy_c_Wellfounded_Olex__prod_001t__GenericConformance__Omark_001t__GenericConformance__Otype,type,(
+    lex_prod_mark_type: ( set_Pr183678647k_mark * set_Pr1267735761e_type ) > set_Pr1193971207k_type )).
+
+tff(sy_c_Wellfounded_Olex__prod_001t__GenericConformance__Otype_001t__GenericConformance__Omark,type,(
+    lex_prod_type_mark: ( set_Pr1267735761e_type * set_Pr183678647k_mark ) > set_Pr28651015e_mark )).
+
+tff(sy_c_Wellfounded_Olex__prod_001t__GenericConformance__Otype_001t__GenericConformance__Otype,type,(
+    lex_prod_type_type: ( set_Pr1267735761e_type * set_Pr1267735761e_type ) > set_Pr2081054535e_type )).
+
+tff(sy_c_Wellfounded_Owf_001t__GenericConformance__Omark,type,(
+    wf_mark: set_Pr183678647k_mark > $o )).
+
+tff(sy_c_Wellfounded_Owf_001t__GenericConformance__Otype,type,(
+    wf_type: set_Pr1267735761e_type > $o )).
+
+tff(sy_c_Wfrec_Osame__fst_001t__GenericConformance__Omark_001t__GenericConformance__Omark,type,(
+    same_fst_mark_mark: ( fun_mark_bool * fun_ma1475628821k_mark ) > set_Pr1289051335k_mark )).
+
+tff(sy_c_Wfrec_Osame__fst_001t__GenericConformance__Otype_001t__GenericConformance__Omark,type,(
+    same_fst_type_mark: ( fun_type_bool * fun_ty85451272k_mark ) > set_Pr28651015e_mark )).
+
+tff(sy_c_Wfrec_Osame__fst_001t__GenericConformance__Otype_001t__GenericConformance__Otype,type,(
+    same_fst_type_type: ( fun_type_bool * fun_ty238017314e_type ) > set_Pr2081054535e_type )).
+
+tff(sy_c_aa_001t__GenericConformance__Omark_001t__GenericConformance__Omark,type,(
+    aa_mark_mark: ( fun_mark_mark * mark ) > mark )).
+
+tff(sy_c_aa_001t__GenericConformance__Omark_001t__GenericConformance__Otype,type,(
+    aa_mark_type: ( fun_mark_type * mark ) > type )).
+
+tff(sy_c_aa_001t__GenericConformance__Omark_001t__HOL__Obool,type,(
+    aa_mark_bool: ( fun_mark_bool * mark ) > bool )).
+
+tff(sy_c_aa_001t__GenericConformance__Omark_001t__Int__Oint,type,(
+    aa_mark_int: ( fun_mark_int * mark ) > int )).
+
+tff(sy_c_aa_001t__GenericConformance__Omark_001t__Nat__Onat,type,(
+    aa_mark_nat: ( fun_mark_nat * mark ) > nat )).
+
+tff(sy_c_aa_001t__GenericConformance__Omark_001t__Set__Oset_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_J,type,(
+    aa_mar1226857214k_mark: ( fun_ma1475628821k_mark * mark ) > set_Pr183678647k_mark )).
+
+tff(sy_c_aa_001t__GenericConformance__Omark_001t__fun_It__GenericConformance__Omark_Mt__HOL__Obool_J,type,(
+    aa_mar776331196k_bool: ( fun_ma1060395731k_bool * mark ) > fun_mark_bool )).
+
+tff(sy_c_aa_001t__GenericConformance__Otype_001t__GenericConformance__Omark,type,(
+    aa_type_mark: ( fun_type_mark * type ) > mark )).
+
+tff(sy_c_aa_001t__GenericConformance__Otype_001t__GenericConformance__Otype,type,(
+    aa_type_type: ( fun_type_type * type ) > type )).
+
+tff(sy_c_aa_001t__GenericConformance__Otype_001t__HOL__Obool,type,(
+    aa_type_bool: ( fun_type_bool * type ) > bool )).
+
+tff(sy_c_aa_001t__GenericConformance__Otype_001t__Int__Oint,type,(
+    aa_type_int: ( fun_type_int * type ) > int )).
+
+tff(sy_c_aa_001t__GenericConformance__Otype_001t__Nat__Onat,type,(
+    aa_type_nat: ( fun_type_nat * type ) > nat )).
+
+tff(sy_c_aa_001t__GenericConformance__Otype_001t__Set__Oset_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_J,type,(
+    aa_typ1984163313k_mark: ( fun_ty85451272k_mark * type ) > set_Pr183678647k_mark )).
+
+tff(sy_c_aa_001t__GenericConformance__Otype_001t__Set__Oset_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_J,type,(
+    aa_typ920736779e_type: ( fun_ty238017314e_type * type ) > set_Pr1267735761e_type )).
+
+tff(sy_c_aa_001t__GenericConformance__Otype_001t__fun_It__GenericConformance__Otype_Mt__HOL__Obool_J,type,(
+    aa_typ1943871138e_bool: ( fun_ty518885433e_bool * type ) > fun_type_bool )).
+
+tff(sy_c_aa_001t__HOL__Obool_001t__HOL__Obool,type,(
+    aa_bool_bool: ( fun_bool_bool * bool ) > bool )).
+
+tff(sy_c_aa_001t__HOL__Obool_001t__Int__Oint,type,(
+    aa_bool_int: ( fun_bool_int * bool ) > int )).
+
+tff(sy_c_aa_001t__HOL__Obool_001t__Nat__Onat,type,(
+    aa_bool_nat: ( fun_bool_nat * bool ) > nat )).
+
+tff(sy_c_aa_001t__HOL__Obool_001t__fun_It__HOL__Obool_Mt__HOL__Obool_J,type,(
+    aa_boo1142376798l_bool: ( fun_bo1373903021l_bool * bool ) > fun_bool_bool )).
+
+tff(sy_c_aa_001t__Int__Oint_001t__HOL__Obool,type,(
+    aa_int_bool: ( fun_int_bool * int ) > bool )).
+
+tff(sy_c_aa_001t__Int__Oint_001t__Int__Oint,type,(
+    aa_int_int: ( fun_int_int * int ) > int )).
+
+tff(sy_c_aa_001t__Int__Oint_001t__Nat__Onat,type,(
+    aa_int_nat: ( fun_int_nat * int ) > nat )).
+
+tff(sy_c_aa_001t__Int__Oint_001t__fun_It__Int__Oint_Mt__HOL__Obool_J,type,(
+    aa_int_fun_int_bool: ( fun_int_fun_int_bool * int ) > fun_int_bool )).
+
+tff(sy_c_aa_001t__Nat__Onat_001t__HOL__Obool,type,(
+    aa_nat_bool: ( fun_nat_bool * nat ) > bool )).
+
+tff(sy_c_aa_001t__Nat__Onat_001t__Int__Oint,type,(
+    aa_nat_int: ( fun_nat_int * nat ) > int )).
+
+tff(sy_c_aa_001t__Nat__Onat_001t__Nat__Onat,type,(
+    aa_nat_nat: ( fun_nat_nat * nat ) > nat )).
+
+tff(sy_c_aa_001t__Nat__Onat_001t__fun_It__Nat__Onat_Mt__HOL__Obool_J,type,(
+    aa_nat_fun_nat_bool: ( fun_nat_fun_nat_bool * nat ) > fun_nat_bool )).
+
+tff(sy_c_aa_001t__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_001t__HOL__Obool,type,(
+    aa_Pro2119018940k_bool: ( fun_Pr1257344963k_bool * produc1673386071k_mark ) > bool )).
+
+tff(sy_c_aa_001t__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_001t__fun_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_Mt__HOL__Obool_J,type,(
+    aa_Pro853436894k_bool: ( fun_Pr761080621k_bool * produc1673386071k_mark ) > fun_Pr1257344963k_bool )).
+
+tff(sy_c_aa_001t__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J_001t__HOL__Obool,type,(
+    aa_Pro1900269615k_bool: ( fun_Pr1038595638k_bool * produc866752804e_mark ) > bool )).
+
+tff(sy_c_aa_001t__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J_001t__fun_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J_Mt__HOL__Obool_J,type,(
+    aa_Pro1841854494k_bool: ( fun_Pr1010118637k_bool * produc866752804e_mark ) > fun_Pr1038595638k_bool )).
+
+tff(sy_c_aa_001t__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_001t__HOL__Obool,type,(
+    aa_Pro591562018e_bool: ( fun_Pr1877371689e_bool * produc1292315505e_type ) > bool )).
+
+tff(sy_c_aa_001t__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_001t__fun_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_Mt__HOL__Obool_J,type,(
+    aa_Pro1841391198e_bool: ( fun_Pr935122093e_bool * produc1292315505e_type ) > fun_Pr1877371689e_bool )).
+
+tff(sy_c_aa_001t__Product____Type__Oprod_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_Mt__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_J_001t__HOL__Obool,type,(
+    aa_Pro533236908k_bool: ( fun_Pr1229086387k_bool * produc1046557159k_mark ) > bool )).
+
+tff(sy_c_aa_001t__Product____Type__Oprod_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Otype_J_Mt__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Otype_J_J_001t__HOL__Obool,type,(
+    aa_Pro2004355948e_bool: ( fun_Pr552721779e_bool * produc1930101543k_type ) > bool )).
+
+tff(sy_c_aa_001t__Product____Type__Oprod_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J_Mt__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J_J_001t__HOL__Obool,type,(
+    aa_Pro1791322988k_bool: ( fun_Pr339688819k_bool * produc820355879e_mark ) > bool )).
+
+tff(sy_c_aa_001t__Product____Type__Oprod_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_Mt__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_J_001t__HOL__Obool,type,(
+    aa_Pro1114958380e_bool: ( fun_Pr1810807859e_bool * produc1703900263e_type ) > bool )).
+
+tff(sy_c_fFalse,type,(
+    fFalse: bool )).
+
+tff(sy_c_fTrue,type,(
+    fTrue: bool )).
+
+tff(sy_c_member_001t__GenericConformance__Omark,type,(
+    member_mark: ( mark * set_mark ) > $o )).
+
+tff(sy_c_member_001t__GenericConformance__Otype,type,(
+    member_type2: ( type * set_type ) > $o )).
+
+tff(sy_c_member_001t__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J,type,(
+    member2017138432k_mark: ( produc1673386071k_mark * set_Pr183678647k_mark ) > $o )).
+
+tff(sy_c_member_001t__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J,type,(
+    member1210505165e_mark: ( produc866752804e_mark * set_Pr99672324e_mark ) > $o )).
+
+tff(sy_c_member_001t__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J,type,(
+    member1636067866e_type: ( produc1292315505e_type * set_Pr1267735761e_type ) > $o )).
+
+tff(sy_c_member_001t__Product____Type__Oprod_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_Mt__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Omark_J_J,type,(
+    member497084176k_mark: ( produc1046557159k_mark * set_Pr1289051335k_mark ) > $o )).
+
+tff(sy_c_member_001t__Product____Type__Oprod_It__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Otype_J_Mt__Product____Type__Oprod_It__GenericConformance__Omark_Mt__GenericConformance__Otype_J_J,type,(
+    member1380628560k_type: ( produc1930101543k_type * set_Pr1193971207k_type ) > $o )).
+
+tff(sy_c_member_001t__Product____Type__Oprod_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J_Mt__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Omark_J_J,type,(
+    member270882896e_mark: ( produc820355879e_mark * set_Pr28651015e_mark ) > $o )).
+
+tff(sy_c_member_001t__Product____Type__Oprod_It__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_Mt__Product____Type__Oprod_It__GenericConformance__Otype_Mt__GenericConformance__Otype_J_J,type,(
+    member1154427280e_type: ( produc1703900263e_type * set_Pr2081054535e_type ) > $o )).
+
+tff(sy_c_pp,type,(
+    pp: bool > $o )).
+
+tff(sy_v_C,type,(
+    c: type )).
+
+tff(sy_v_Tm,type,(
+    tm: mark )).
+
+tff(fact_0_unmark_Osimps_I7_J,axiom,(
+    aa_mark_type(unmark(detachableReference),detachableMark) = detachableReference )).
+
+tff(fact_1_self__initializing_Osimps_I1_J,axiom,(
+    ~ pp(aa_type_bool(self_initializing,attachedReference)) )).
+
+tff(fact_2_unmark_Osimps_I2_J,axiom,(
+    aa_mark_type(unmark(attachedReference),detachableMark) = detachableReference )).
+
+tff(fact_3_unmark_Osimps_I1_J,axiom,(
+    ! [Uu: mark] : aa_mark_type(unmark(expanded),Uu) = expanded )).
+
+tff(fact_4_unmark_Osimps_I3_J,axiom,(
+    aa_mark_type(unmark(attachedReference),emptyMark) = attachedReference )).
+
+tff(fact_5_conforms_Oelims_I2_J,axiom,(
+    ! [X: type,Xa: type] : 
+      ( pp(aa_type_bool(aa_typ1943871138e_bool(conforms,X),Xa))
+     => ( ( X = expanded
+         => ! [Uu2: type] : 
+              Xa != Uu2 )
+       => ( ( X = attachedReference
+           => Xa != attachedReference )
+         => ( ( X = attachedReference
+             => Xa != detachableReference )
+           => ~ ( X = detachableReference
+               => Xa != detachableReference ) ) ) ) ) )).
+
+tff(fact_6_unmark_Osimps_I4_J,axiom,(
+    aa_mark_type(unmark(attachedReference),attachedMark) = attachedReference )).
+
+tff(fact_7_type_Odistinct_I5_J,axiom,(
+    attachedReference != detachableReference )).
+
+tff(fact_8_type_Odistinct_I3_J,axiom,(
+    expanded != detachableReference )).
+
+tff(fact_9_unmark_Oelims,axiom,(
+    ! [X: type,Xa: mark,Y: type] : 
+      ( aa_mark_type(unmark(X),Xa) = Y
+     => ( ( X = expanded
+         => Y != expanded )
+       => ( ( X = attachedReference
+           => ( Xa = detachableMark
+             => Y != detachableReference ) )
+         => ( ( X = attachedReference
+             => ( Xa = emptyMark
+               => Y != attachedReference ) )
+           => ( ( X = attachedReference
+               => ( Xa = attachedMark
+                 => Y != attachedReference ) )
+             => ( ( X = detachableReference
+                 => ( Xa = attachedMark
+                   => Y != attachedReference ) )
+               => ( ( X = detachableReference
+                   => ( Xa = emptyMark
+                     => Y != detachableReference ) )
+                 => ~ ( X = detachableReference
+                     => ( Xa = detachableMark
+                       => Y != detachableReference ) ) ) ) ) ) ) ) ) )).
+
+tff(fact_10_self__initializing_Oelims_I3_J,axiom,(
+    ! [X: type] : 
+      ( ~ pp(aa_type_bool(self_initializing,X))
+     => X = attachedReference ) )).
+
+tff(fact_11_type_Odistinct_I1_J,axiom,(
+    expanded != attachedReference )).
+
+tff(fact_12_conforms_Oelims_I3_J,axiom,(
+    ! [X: type,Xa: type] : 
+      ( ~ pp(aa_type_bool(aa_typ1943871138e_bool(conforms,X),Xa))
+     => ( ( X = attachedReference
+         => Xa != expanded )
+       => ( ( X = detachableReference
+           => Xa != expanded )
+         => ~ ( X = detachableReference
+             => Xa != attachedReference ) ) ) ) )).
+
+tff(fact_13_conforms_Osimps_I4_J,axiom,(
+    pp(aa_type_bool(aa_typ1943871138e_bool(conforms,detachableReference),detachableReference)) )).
+
+tff(fact_14_is__attached_Osimps_I1_J,axiom,(
+    ~ pp(aa_type_bool(is_attached,detachableReference)) )).
+
+tff(fact_15_conforms_Osimps_I3_J,axiom,(
+    pp(aa_type_bool(aa_typ1943871138e_bool(conforms,attachedReference),detachableReference)) )).
+
+tff(fact_16_unmark_Osimps_I5_J,axiom,(
+    aa_mark_type(unmark(detachableReference),attachedMark) = attachedReference )).
+
+tff(fact_17_conforms_Oelims_I1_J,axiom,(
+    ! [X: type,Xa: type,Y: bool] : 
+      ( ( pp(aa_type_bool(aa_typ1943871138e_bool(conforms,X),Xa))
+      <=> pp(Y) )
+     => ( ( X = expanded
+         => ~ pp(Y) )
+       => ( ( X = attachedReference
+           => ( Xa = attachedReference
+             => ~ pp(Y) ) )
+         => ( ( X = attachedReference
+             => ( Xa = detachableReference
+               => ~ pp(Y) ) )
+           => ( ( X = detachableReference
+               => ( Xa = detachableReference
+                 => ~ pp(Y) ) )
+             => ( ( X = attachedReference
+                 => ( Xa = expanded
+                   => pp(Y) ) )
+               => ( ( X = detachableReference
+                   => ( Xa = expanded
+                     => pp(Y) ) )
+                 => ~ ( X = detachableReference
+                     => ( Xa = attachedReference
+                       => pp(Y) ) ) ) ) ) ) ) ) ) )).
+
+tff(fact_18_self__initializing_Oelims_I2_J,axiom,(
+    ! [X: type] : 
+      ( pp(aa_type_bool(self_initializing,X))
+     => ( X != expanded
+       => X = detachableReference ) ) )).
+
+tff(fact_19_conforms_Osimps_I7_J,axiom,(
+    ~ pp(aa_type_bool(aa_typ1943871138e_bool(conforms,detachableReference),attachedReference)) )).
+
+tff(fact_20_conforms_Osimps_I6_J,axiom,(
+    ~ pp(aa_type_bool(aa_typ1943871138e_bool(conforms,detachableReference),expanded)) )).
+
+tff(fact_21_conforms_Osimps_I5_J,axiom,(
+    ~ pp(aa_type_bool(aa_typ1943871138e_bool(conforms,attachedReference),expanded)) )).
+
+tff(fact_22_le__boolI_H,axiom,(
+    ! [P: bool,Q: bool] : 
+      ( ( pp(P)
+       => pp(Q) )
+     => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,P),Q)) ) )).
+
+tff(fact_23_generic__conforms__is__correct,axiom,(
+    ! [A_S: mark,A_T: mark,T: type] : 
+      ( pp(aa_mark_bool(aa_mar776331196k_bool(generic_conforms,A_S),A_T))
+     => pp(aa_type_bool(aa_typ1943871138e_bool(conforms,aa_mark_type(unmark(T),A_S)),aa_mark_type(unmark(T),A_T))) ) )).
+
+tff(fact_24_self__initializing_Osimps_I2_J,axiom,(
+    pp(aa_type_bool(self_initializing,expanded)) )).
+
+tff(fact_25_conforms_Osimps_I2_J,axiom,(
+    pp(aa_type_bool(aa_typ1943871138e_bool(conforms,attachedReference),attachedReference)) )).
+
+tff(fact_26_mark_Oexhaust,axiom,(
+    ! [Y: mark] : 
+      ( Y != emptyMark
+     => ( Y != attachedMark
+       => Y = detachableMark ) ) )).
+
+tff(fact_27_unmark_Osimps_I6_J,axiom,(
+    aa_mark_type(unmark(detachableReference),emptyMark) = detachableReference )).
+
+tff(fact_28_conforms_Osimps_I1_J,axiom,(
+    ! [Uu: type] : pp(aa_type_bool(aa_typ1943871138e_bool(conforms,expanded),Uu)) )).
+
+tff(fact_29_generic__self__initializing__def,axiom,(
+    ! [M: mark] : 
+      ( pp(aa_mark_bool(generi1333131366lizing,M))
+    <=> M = detachableMark ) )).
+
+tff(fact_30_is__attached_Ocases,axiom,(
+    ! [X: type] : 
+      ( X != detachableReference
+     => ( X != expanded
+       => X = attachedReference ) ) )).
+
+tff(fact_31_generic__self__initializing__is__correct,axiom,(
+    ! [A: mark,T: type] : 
+      ( pp(aa_mark_bool(generi1333131366lizing,A))
+     => pp(aa_type_bool(self_initializing,aa_mark_type(unmark(T),A))) ) )).
+
+tff(fact_32_generic__is__attached,axiom,(
+    ! [C: type,Tm: mark] : 
+      ( ! [A2: type] : 
+          ( pp(aa_type_bool(aa_typ1943871138e_bool(conforms,A2),C))
+         => pp(aa_type_bool(is_attached,aa_mark_type(unmark(A2),Tm))) )
+     => ( Tm = attachedMark
+        | C != detachableReference ) ) )).
+
+tff(fact_33_self__initializing_Osimps_I3_J,axiom,(
+    pp(aa_type_bool(self_initializing,detachableReference)) )).
+
+tff(fact_34_is__attached_Oelims_I2_J,axiom,(
+    ! [X: type] : 
+      ( pp(aa_type_bool(is_attached,X))
+     => ( X != expanded
+       => X = attachedReference ) ) )).
+
+tff(fact_35_self__initializing_Oelims_I1_J,axiom,(
+    ! [X: type,Y: bool] : 
+      ( ( pp(aa_type_bool(self_initializing,X))
+      <=> pp(Y) )
+     => ( ( X = attachedReference
+         => pp(Y) )
+       => ( ( X = expanded
+           => ~ pp(Y) )
+         => ~ ( X = detachableReference
+             => ~ pp(Y) ) ) ) ) )).
+
+tff(fact_36_type_Oexhaust,axiom,(
+    ! [Y: type] : 
+      ( Y != expanded
+     => ( Y != attachedReference
+       => Y = detachableReference ) ) )).
+
+tff(fact_37_generic__conforms_Oelims_I3_J,axiom,(
+    ! [X: mark,Xa: mark] : 
+      ( ~ pp(aa_mark_bool(aa_mar776331196k_bool(generic_conforms,X),Xa))
+     => ( ( X = detachableMark
+         => Xa != emptyMark )
+       => ( ( X = emptyMark
+           => Xa != attachedMark )
+         => ~ ( X = detachableMark
+             => Xa != attachedMark ) ) ) ) )).
+
+tff(fact_38_self__initializing_Ocases,axiom,(
+    ! [X: type] : 
+      ( X != attachedReference
+     => ( X != expanded
+       => X = detachableReference ) ) )).
+
+tff(fact_39_is__attached_Oelims_I1_J,axiom,(
+    ! [X: type,Y: bool] : 
+      ( ( pp(aa_type_bool(is_attached,X))
+      <=> pp(Y) )
+     => ( ( X = detachableReference
+         => pp(Y) )
+       => ( ( X = expanded
+           => ~ pp(Y) )
+         => ~ ( X = attachedReference
+             => ~ pp(Y) ) ) ) ) )).
+
+tff(fact_40_le__boolI,axiom,(
+    ! [P: bool,Q: bool] : 
+      ( ( pp(P)
+       => pp(Q) )
+     => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,P),Q)) ) )).
+
+tff(fact_41_mark_Odistinct_I3_J,axiom,(
+    emptyMark != detachableMark )).
+
+tff(fact_42_conforms_Ocases,axiom,(
+    ! [X: produc1292315505e_type] : 
+      ( ! [Uu2: type] : 
+          X != produc543565993e_type(expanded,Uu2)
+     => ( X != produc543565993e_type(attachedReference,attachedReference)
+       => ( X != produc543565993e_type(attachedReference,detachableReference)
+         => ( X != produc543565993e_type(detachableReference,detachableReference)
+           => ( X != produc543565993e_type(attachedReference,expanded)
+             => ( X != produc543565993e_type(detachableReference,expanded)
+               => X = produc543565993e_type(detachableReference,attachedReference) ) ) ) ) ) ) )).
+
+tff(fact_43_is__attached_Osimps_I3_J,axiom,(
+    pp(aa_type_bool(is_attached,attachedReference)) )).
+
+tff(fact_44_self__initializing_Opelims_I1_J,axiom,(
+    ! [X: type,Y: bool] : 
+      ( ( pp(aa_type_bool(self_initializing,X))
+      <=> pp(Y) )
+     => ( pp(aa_type_bool(accp_type(self_i7492726ng_rel),X))
+       => ( ( X = attachedReference
+           => ( ~ pp(Y)
+             => ~ pp(aa_type_bool(accp_type(self_i7492726ng_rel),attachedReference)) ) )
+         => ( ( X = expanded
+             => ( pp(Y)
+               => ~ pp(aa_type_bool(accp_type(self_i7492726ng_rel),expanded)) ) )
+           => ~ ( X = detachableReference
+               => ( pp(Y)
+                 => ~ pp(aa_type_bool(accp_type(self_i7492726ng_rel),detachableReference)) ) ) ) ) ) ) )).
+
+tff(fact_45_generic__is__attached__n,axiom,(
+    ! [Cs: list_type,Tm: mark] : 
+      ( ! [C2: type] : 
+          ( member_type2(C2,set_type2(Cs))
+         => ! [A2: type] : 
+              ( pp(aa_type_bool(aa_typ1943871138e_bool(conforms,A2),C2))
+             => pp(aa_type_bool(is_attached,aa_mark_type(unmark(A2),Tm))) ) )
+     => ( Tm = attachedMark
+        | ! [X2: type] : 
+            ( member_type2(X2,set_type2(Cs))
+           => X2 != detachableReference ) ) ) )).
+
+tff(fact_46_mark_Odistinct_I5_J,axiom,(
+    attachedMark != detachableMark )).
+
+tff(fact_47_self__initializing_Opelims_I3_J,axiom,(
+    ! [X: type] : 
+      ( ~ pp(aa_type_bool(self_initializing,X))
+     => ( pp(aa_type_bool(accp_type(self_i7492726ng_rel),X))
+       => ~ ( X = attachedReference
+           => ~ pp(aa_type_bool(accp_type(self_i7492726ng_rel),attachedReference)) ) ) ) )).
+
+tff(fact_48_le__bool__def,axiom,(
+    ! [P: bool,Q: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,P),Q))
+    <=> ( pp(P)
+       => pp(Q) ) ) )).
+
+tff(fact_49_generic__self__initializing__is__maximal,axiom,(
+    ! [F: fun_mark_bool,A: mark] : 
+      ( ! [T2: type,A2: mark] : 
+          ( pp(aa_mark_bool(F,A2))
+         => pp(aa_type_bool(self_initializing,aa_mark_type(unmark(T2),A2))) )
+     => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_mark_bool(F,A)),aa_mark_bool(generi1333131366lizing,A))) ) )).
+
+tff(fact_50_unmark_Opelims,axiom,(
+    ! [X: type,Xa: mark,Y: type] : 
+      ( aa_mark_type(unmark(X),Xa) = Y
+     => ( pp(aa_Pro1900269615k_bool(accp_P1863505069e_mark(unmark_rel),produc1323761628e_mark(X,Xa)))
+       => ( ( X = expanded
+           => ( Y = expanded
+             => ~ pp(aa_Pro1900269615k_bool(accp_P1863505069e_mark(unmark_rel),produc1323761628e_mark(expanded,Xa))) ) )
+         => ( ( X = attachedReference
+             => ( Xa = detachableMark
+               => ( Y = detachableReference
+                 => ~ pp(aa_Pro1900269615k_bool(accp_P1863505069e_mark(unmark_rel),produc1323761628e_mark(attachedReference,detachableMark))) ) ) )
+           => ( ( X = attachedReference
+               => ( Xa = emptyMark
+                 => ( Y = attachedReference
+                   => ~ pp(aa_Pro1900269615k_bool(accp_P1863505069e_mark(unmark_rel),produc1323761628e_mark(attachedReference,emptyMark))) ) ) )
+             => ( ( X = attachedReference
+                 => ( Xa = attachedMark
+                   => ( Y = attachedReference
+                     => ~ pp(aa_Pro1900269615k_bool(accp_P1863505069e_mark(unmark_rel),produc1323761628e_mark(attachedReference,attachedMark))) ) ) )
+               => ( ( X = detachableReference
+                   => ( Xa = attachedMark
+                     => ( Y = attachedReference
+                       => ~ pp(aa_Pro1900269615k_bool(accp_P1863505069e_mark(unmark_rel),produc1323761628e_mark(detachableReference,attachedMark))) ) ) )
+                 => ( ( X = detachableReference
+                     => ( Xa = emptyMark
+                       => ( Y = detachableReference
+                         => ~ pp(aa_Pro1900269615k_bool(accp_P1863505069e_mark(unmark_rel),produc1323761628e_mark(detachableReference,emptyMark))) ) ) )
+                   => ~ ( X = detachableReference
+                       => ( Xa = detachableMark
+                         => ( Y = detachableReference
+                           => ~ pp(aa_Pro1900269615k_bool(accp_P1863505069e_mark(unmark_rel),produc1323761628e_mark(detachableReference,detachableMark))) ) ) ) ) ) ) ) ) ) ) ) )).
+
+tff(fact_51_generic__conforms__is__maximal,axiom,(
+    ! [F: fun_ma1060395731k_bool,A_S: mark,A_T: mark] : 
+      ( ! [T2: type,A_T2: mark,A_S2: mark] : 
+          ( pp(aa_mark_bool(aa_mar776331196k_bool(F,A_S2),A_T2))
+         => ( pp(aa_type_bool(is_attached,aa_mark_type(unmark(T2),A_T2)))
+           => ( ~ pp(aa_type_bool(self_initializing,aa_mark_type(unmark(T2),A_T2)))
+             => ( pp(aa_type_bool(is_attached,aa_mark_type(unmark(T2),A_S2)))
+                & ~ pp(aa_type_bool(self_initializing,aa_mark_type(unmark(T2),A_S2))) ) ) ) )
+     => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_mark_bool(aa_mar776331196k_bool(F,A_S),A_T)),aa_mark_bool(aa_mar776331196k_bool(generic_conforms,A_S),A_T))) ) )).
+
+tff(fact_52_generic__conforms_Osimps_I7_J,axiom,(
+    ~ pp(aa_mark_bool(aa_mar776331196k_bool(generic_conforms,detachableMark),attachedMark)) )).
+
+tff(fact_53_eq__refl,axiom,(
+    ! [X: fun_Pr935122093e_bool,Y: fun_Pr935122093e_bool] : 
+      ( X = Y
+     => ord_le1096776781e_bool(X,Y) ) )).
+
+tff(fact_54_eq__refl,axiom,(
+    ! [X: fun_Pr1038595638k_bool,Y: fun_Pr1038595638k_bool] : 
+      ( X = Y
+     => ord_le196368022k_bool(X,Y) ) )).
+
+tff(fact_55_eq__refl,axiom,(
+    ! [X: fun_Pr1010118637k_bool,Y: fun_Pr1010118637k_bool] : 
+      ( X = Y
+     => ord_le1171773325k_bool(X,Y) ) )).
+
+tff(fact_56_eq__refl,axiom,(
+    ! [X: fun_Pr1257344963k_bool,Y: fun_Pr1257344963k_bool] : 
+      ( X = Y
+     => ord_le415117347k_bool(X,Y) ) )).
+
+tff(fact_57_eq__refl,axiom,(
+    ! [X: fun_Pr761080621k_bool,Y: fun_Pr761080621k_bool] : 
+      ( X = Y
+     => ord_le922735309k_bool(X,Y) ) )).
+
+tff(fact_58_eq__refl,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( ( pp(X)
+      <=> pp(Y) )
+     => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y)) ) )).
+
+tff(fact_59_eq__refl,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( X = Y
+     => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y)) ) )).
+
+tff(fact_60_eq__refl,axiom,(
+    ! [X: int,Y: int] : 
+      ( X = Y
+     => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X),Y)) ) )).
+
+tff(fact_61_generic__conforms_Osimps_I3_J,axiom,(
+    pp(aa_mark_bool(aa_mar776331196k_bool(generic_conforms,attachedMark),attachedMark)) )).
+
+tff(fact_62_self__initializing_Opelims_I2_J,axiom,(
+    ! [X: type] : 
+      ( pp(aa_type_bool(self_initializing,X))
+     => ( pp(aa_type_bool(accp_type(self_i7492726ng_rel),X))
+       => ( ( X = expanded
+           => ~ pp(aa_type_bool(accp_type(self_i7492726ng_rel),expanded)) )
+         => ~ ( X = detachableReference
+             => ~ pp(aa_type_bool(accp_type(self_i7492726ng_rel),detachableReference)) ) ) ) ) )).
+
+tff(fact_63_is__attached_Oelims_I3_J,axiom,(
+    ! [X: type] : 
+      ( ~ pp(aa_type_bool(is_attached,X))
+     => X = detachableReference ) )).
+
+tff(fact_64_generic__conforms_Oelims_I2_J,axiom,(
+    ! [X: mark,Xa: mark] : 
+      ( pp(aa_mark_bool(aa_mar776331196k_bool(generic_conforms,X),Xa))
+     => ( Xa != detachableMark
+       => ( ( X = attachedMark
+           => Xa != emptyMark )
+         => ( ( X = attachedMark
+             => Xa != attachedMark )
+           => ~ ( X = emptyMark
+               => Xa != emptyMark ) ) ) ) ) )).
+
+tff(fact_65_prod_Oinject,axiom,(
+    ! [X1: produc1673386071k_mark,X22: produc1673386071k_mark,Y1: produc1673386071k_mark,Y2: produc1673386071k_mark] : 
+      ( produc507800407k_mark(X1,X22) = produc507800407k_mark(Y1,Y2)
+    <=> ( X1 = Y1
+        & X22 = Y2 ) ) )).
+
+tff(fact_66_prod_Oinject,axiom,(
+    ! [X1: produc866752804e_mark,X22: produc866752804e_mark,Y1: produc866752804e_mark,Y2: produc866752804e_mark] : 
+      ( produc1706455831e_mark(X1,X22) = produc1706455831e_mark(Y1,Y2)
+    <=> ( X1 = Y1
+        & X22 = Y2 ) ) )).
+
+tff(fact_67_prod_Oinject,axiom,(
+    ! [X1: produc1292315505e_type,X22: produc1292315505e_type,Y1: produc1292315505e_type,Y2: produc1292315505e_type] : 
+      ( produc1847499479e_type(X1,X22) = produc1847499479e_type(Y1,Y2)
+    <=> ( X1 = Y1
+        & X22 = Y2 ) ) )).
+
+tff(fact_68_prod_Oinject,axiom,(
+    ! [X1: produc2098948772k_type,X22: produc2098948772k_type,Y1: produc2098948772k_type,Y2: produc2098948772k_type] : 
+      ( produc648844055k_type(X1,X22) = produc648844055k_type(Y1,Y2)
+    <=> ( X1 = Y1
+        & X22 = Y2 ) ) )).
+
+tff(fact_69_prod_Oinject,axiom,(
+    ! [X1: mark,X22: type,Y1: mark,Y2: type] : 
+      ( produc1350199260k_type(X1,X22) = produc1350199260k_type(Y1,Y2)
+    <=> ( X1 = Y1
+        & X22 = Y2 ) ) )).
+
+tff(fact_70_prod_Oinject,axiom,(
+    ! [X1: type,X22: type,Y1: type,Y2: type] : 
+      ( produc543565993e_type(X1,X22) = produc543565993e_type(Y1,Y2)
+    <=> ( X1 = Y1
+        & X22 = Y2 ) ) )).
+
+tff(fact_71_prod_Oinject,axiom,(
+    ! [X1: type,X22: mark,Y1: type,Y2: mark] : 
+      ( produc1323761628e_mark(X1,X22) = produc1323761628e_mark(Y1,Y2)
+    <=> ( X1 = Y1
+        & X22 = Y2 ) ) )).
+
+tff(fact_72_prod_Oinject,axiom,(
+    ! [X1: mark,X22: mark,Y1: mark,Y2: mark] : 
+      ( produc2130394895k_mark(X1,X22) = produc2130394895k_mark(Y1,Y2)
+    <=> ( X1 = Y1
+        & X22 = Y2 ) ) )).
+
+tff(fact_73_generic__conforms_Osimps_I1_J,axiom,(
+    ! [Uu: mark] : pp(aa_mark_bool(aa_mar776331196k_bool(generic_conforms,Uu),detachableMark)) )).
+
+tff(fact_74_is__attached_Opelims_I1_J,axiom,(
+    ! [X: type,Y: bool] : 
+      ( ( pp(aa_type_bool(is_attached,X))
+      <=> pp(Y) )
+     => ( pp(aa_type_bool(accp_type(is_attached_rel),X))
+       => ( ( X = detachableReference
+           => ( ~ pp(Y)
+             => ~ pp(aa_type_bool(accp_type(is_attached_rel),detachableReference)) ) )
+         => ( ( X = expanded
+             => ( pp(Y)
+               => ~ pp(aa_type_bool(accp_type(is_attached_rel),expanded)) ) )
+           => ~ ( X = attachedReference
+               => ( pp(Y)
+                 => ~ pp(aa_type_bool(accp_type(is_attached_rel),attachedReference)) ) ) ) ) ) ) )).
+
+tff(fact_75_is__attached_Osimps_I2_J,axiom,(
+    pp(aa_type_bool(is_attached,expanded)) )).
+
+tff(fact_76_wf__empty,axiom,(
+    wf_mark(bot_bo691196707k_mark) )).
+
+tff(fact_77_wf__empty,axiom,(
+    wf_type(bot_bo1775253821e_type) )).
+
+tff(fact_78_is__attached_Opelims_I2_J,axiom,(
+    ! [X: type] : 
+      ( pp(aa_type_bool(is_attached,X))
+     => ( pp(aa_type_bool(accp_type(is_attached_rel),X))
+       => ( ( X = expanded
+           => ~ pp(aa_type_bool(accp_type(is_attached_rel),expanded)) )
+         => ~ ( X = attachedReference
+             => ~ pp(aa_type_bool(accp_type(is_attached_rel),attachedReference)) ) ) ) ) )).
+
+tff(fact_79_unmark_Ocases,axiom,(
+    ! [X: produc866752804e_mark] : 
+      ( ! [Uu2: mark] : 
+          X != produc1323761628e_mark(expanded,Uu2)
+     => ( X != produc1323761628e_mark(attachedReference,detachableMark)
+       => ( X != produc1323761628e_mark(attachedReference,emptyMark)
+         => ( X != produc1323761628e_mark(attachedReference,attachedMark)
+           => ( X != produc1323761628e_mark(detachableReference,attachedMark)
+             => ( X != produc1323761628e_mark(detachableReference,emptyMark)
+               => X = produc1323761628e_mark(detachableReference,detachableMark) ) ) ) ) ) ) )).
+
+tff(fact_80_conforms_Opelims_I3_J,axiom,(
+    ! [X: type,Xa: type] : 
+      ( ~ pp(aa_type_bool(aa_typ1943871138e_bool(conforms,X),Xa))
+     => ( pp(aa_Pro591562018e_bool(accp_P141584122e_type(conforms_rel),produc543565993e_type(X,Xa)))
+       => ( ( X = attachedReference
+           => ( Xa = expanded
+             => ~ pp(aa_Pro591562018e_bool(accp_P141584122e_type(conforms_rel),produc543565993e_type(attachedReference,expanded))) ) )
+         => ( ( X = detachableReference
+             => ( Xa = expanded
+               => ~ pp(aa_Pro591562018e_bool(accp_P141584122e_type(conforms_rel),produc543565993e_type(detachableReference,expanded))) ) )
+           => ~ ( X = detachableReference
+               => ( Xa = attachedReference
+                 => ~ pp(aa_Pro591562018e_bool(accp_P141584122e_type(conforms_rel),produc543565993e_type(detachableReference,attachedReference))) ) ) ) ) ) ) )).
+
+tff(fact_81_le__boolE,axiom,(
+    ! [P: bool,Q: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,P),Q))
+     => ( pp(P)
+       => pp(Q) ) ) )).
+
+tff(fact_82_generic__conforms_Oelims_I1_J,axiom,(
+    ! [X: mark,Xa: mark,Y: bool] : 
+      ( ( pp(aa_mark_bool(aa_mar776331196k_bool(generic_conforms,X),Xa))
+      <=> pp(Y) )
+     => ( ( Xa = detachableMark
+         => ~ pp(Y) )
+       => ( ( X = attachedMark
+           => ( Xa = emptyMark
+             => ~ pp(Y) ) )
+         => ( ( X = attachedMark
+             => ( Xa = attachedMark
+               => ~ pp(Y) ) )
+           => ( ( X = emptyMark
+               => ( Xa = emptyMark
+                 => ~ pp(Y) ) )
+             => ( ( X = detachableMark
+                 => ( Xa = emptyMark
+                   => pp(Y) ) )
+               => ( ( X = emptyMark
+                   => ( Xa = attachedMark
+                     => pp(Y) ) )
+                 => ~ ( X = detachableMark
+                     => ( Xa = attachedMark
+                       => pp(Y) ) ) ) ) ) ) ) ) ) )).
+
+tff(fact_83_conforms_Opelims_I2_J,axiom,(
+    ! [X: type,Xa: type] : 
+      ( pp(aa_type_bool(aa_typ1943871138e_bool(conforms,X),Xa))
+     => ( pp(aa_Pro591562018e_bool(accp_P141584122e_type(conforms_rel),produc543565993e_type(X,Xa)))
+       => ( ( X = expanded
+           => ~ pp(aa_Pro591562018e_bool(accp_P141584122e_type(conforms_rel),produc543565993e_type(expanded,Xa))) )
+         => ( ( X = attachedReference
+             => ( Xa = attachedReference
+               => ~ pp(aa_Pro591562018e_bool(accp_P141584122e_type(conforms_rel),produc543565993e_type(attachedReference,attachedReference))) ) )
+           => ( ( X = attachedReference
+               => ( Xa = detachableReference
+                 => ~ pp(aa_Pro591562018e_bool(accp_P141584122e_type(conforms_rel),produc543565993e_type(attachedReference,detachableReference))) ) )
+             => ~ ( X = detachableReference
+                 => ( Xa = detachableReference
+                   => ~ pp(aa_Pro591562018e_bool(accp_P141584122e_type(conforms_rel),produc543565993e_type(detachableReference,detachableReference))) ) ) ) ) ) ) ) )).
+
+tff(fact_84_conforms_Opelims_I1_J,axiom,(
+    ! [X: type,Xa: type,Y: bool] : 
+      ( ( pp(aa_type_bool(aa_typ1943871138e_bool(conforms,X),Xa))
+      <=> pp(Y) )
+     => ( pp(aa_Pro591562018e_bool(accp_P141584122e_type(conforms_rel),produc543565993e_type(X,Xa)))
+       => ( ( X = expanded
+           => ( pp(Y)
+             => ~ pp(aa_Pro591562018e_bool(accp_P141584122e_type(conforms_rel),produc543565993e_type(expanded,Xa))) ) )
+         => ( ( X = attachedReference
+             => ( Xa = attachedReference
+               => ( pp(Y)
+                 => ~ pp(aa_Pro591562018e_bool(accp_P141584122e_type(conforms_rel),produc543565993e_type(attachedReference,attachedReference))) ) ) )
+           => ( ( X = attachedReference
+               => ( Xa = detachableReference
+                 => ( pp(Y)
+                   => ~ pp(aa_Pro591562018e_bool(accp_P141584122e_type(conforms_rel),produc543565993e_type(attachedReference,detachableReference))) ) ) )
+             => ( ( X = detachableReference
+                 => ( Xa = detachableReference
+                   => ( pp(Y)
+                     => ~ pp(aa_Pro591562018e_bool(accp_P141584122e_type(conforms_rel),produc543565993e_type(detachableReference,detachableReference))) ) ) )
+               => ( ( X = attachedReference
+                   => ( Xa = expanded
+                     => ( ~ pp(Y)
+                       => ~ pp(aa_Pro591562018e_bool(accp_P141584122e_type(conforms_rel),produc543565993e_type(attachedReference,expanded))) ) ) )
+                 => ( ( X = detachableReference
+                     => ( Xa = expanded
+                       => ( ~ pp(Y)
+                         => ~ pp(aa_Pro591562018e_bool(accp_P141584122e_type(conforms_rel),produc543565993e_type(detachableReference,expanded))) ) ) )
+                   => ~ ( X = detachableReference
+                       => ( Xa = attachedReference
+                         => ( ~ pp(Y)
+                           => ~ pp(aa_Pro591562018e_bool(accp_P141584122e_type(conforms_rel),produc543565993e_type(detachableReference,attachedReference))) ) ) ) ) ) ) ) ) ) ) ) )).
+
+tff(fact_85_old_Oprod_Oexhaust,axiom,(
+    ! [Y: produc1046557159k_mark] : 
+      ~ ( ! [A3: produc1673386071k_mark,B: produc1673386071k_mark] : 
+            Y != produc507800407k_mark(A3,B) ) )).
+
+tff(fact_86_old_Oprod_Oexhaust,axiom,(
+    ! [Y: produc820355879e_mark] : 
+      ~ ( ! [A3: produc866752804e_mark,B: produc866752804e_mark] : 
+            Y != produc1706455831e_mark(A3,B) ) )).
+
+tff(fact_87_old_Oprod_Oexhaust,axiom,(
+    ! [Y: produc1703900263e_type] : 
+      ~ ( ! [A3: produc1292315505e_type,B: produc1292315505e_type] : 
+            Y != produc1847499479e_type(A3,B) ) )).
+
+tff(fact_88_old_Oprod_Oexhaust,axiom,(
+    ! [Y: produc1930101543k_type] : 
+      ~ ( ! [A3: produc2098948772k_type,B: produc2098948772k_type] : 
+            Y != produc648844055k_type(A3,B) ) )).
+
+tff(fact_89_old_Oprod_Oexhaust,axiom,(
+    ! [Y: produc2098948772k_type] : 
+      ~ ( ! [A3: mark,B: type] : 
+            Y != produc1350199260k_type(A3,B) ) )).
+
+tff(fact_90_old_Oprod_Oexhaust,axiom,(
+    ! [Y: produc1292315505e_type] : 
+      ~ ( ! [A3: type,B: type] : 
+            Y != produc543565993e_type(A3,B) ) )).
+
+tff(fact_91_old_Oprod_Oexhaust,axiom,(
+    ! [Y: produc866752804e_mark] : 
+      ~ ( ! [A3: type,B: mark] : 
+            Y != produc1323761628e_mark(A3,B) ) )).
+
+tff(fact_92_old_Oprod_Oexhaust,axiom,(
+    ! [Y: produc1673386071k_mark] : 
+      ~ ( ! [A3: mark,B: mark] : 
+            Y != produc2130394895k_mark(A3,B) ) )).
+
+tff(fact_93_antisym__conv,axiom,(
+    ! [Y: fun_Pr935122093e_bool,X: fun_Pr935122093e_bool] : 
+      ( ord_le1096776781e_bool(Y,X)
+     => ( ord_le1096776781e_bool(X,Y)
+      <=> X = Y ) ) )).
+
+tff(fact_94_antisym__conv,axiom,(
+    ! [Y: fun_Pr1038595638k_bool,X: fun_Pr1038595638k_bool] : 
+      ( ord_le196368022k_bool(Y,X)
+     => ( ord_le196368022k_bool(X,Y)
+      <=> X = Y ) ) )).
+
+tff(fact_95_antisym__conv,axiom,(
+    ! [Y: fun_Pr1010118637k_bool,X: fun_Pr1010118637k_bool] : 
+      ( ord_le1171773325k_bool(Y,X)
+     => ( ord_le1171773325k_bool(X,Y)
+      <=> X = Y ) ) )).
+
+tff(fact_96_antisym__conv,axiom,(
+    ! [Y: fun_Pr1257344963k_bool,X: fun_Pr1257344963k_bool] : 
+      ( ord_le415117347k_bool(Y,X)
+     => ( ord_le415117347k_bool(X,Y)
+      <=> X = Y ) ) )).
+
+tff(fact_97_antisym__conv,axiom,(
+    ! [Y: fun_Pr761080621k_bool,X: fun_Pr761080621k_bool] : 
+      ( ord_le922735309k_bool(Y,X)
+     => ( ord_le922735309k_bool(X,Y)
+      <=> X = Y ) ) )).
+
+tff(fact_98_antisym__conv,axiom,(
+    ! [Y: bool,X: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),X))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+      <=> ( pp(X)
+        <=> pp(Y) ) ) ) )).
+
+tff(fact_99_antisym__conv,axiom,(
+    ! [Y: nat,X: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),X))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+      <=> X = Y ) ) )).
+
+tff(fact_100_antisym__conv,axiom,(
+    ! [Y: int,X: int] : 
+      ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,Y),X))
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X),Y))
+      <=> X = Y ) ) )).
+
+tff(fact_101_type_Odistinct_I4_J,axiom,(
+    detachableReference != expanded )).
+
+tff(fact_102_linear,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+      | pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),X)) ) )).
+
+tff(fact_103_linear,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+      | pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),X)) ) )).
+
+tff(fact_104_linear,axiom,(
+    ! [X: int,Y: int] : 
+      ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X),Y))
+      | pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,Y),X)) ) )).
+
+tff(fact_105_is__attached_Opelims_I3_J,axiom,(
+    ! [X: type] : 
+      ( ~ pp(aa_type_bool(is_attached,X))
+     => ( pp(aa_type_bool(accp_type(is_attached_rel),X))
+       => ~ ( X = detachableReference
+           => ~ pp(aa_type_bool(accp_type(is_attached_rel),detachableReference)) ) ) ) )).
+
+tff(fact_106_mem__Collect__eq,axiom,(
+    ! [A4: produc1673386071k_mark,P: fun_Pr1257344963k_bool] : 
+      ( member2017138432k_mark(A4,collec966944322k_mark(P))
+    <=> pp(aa_Pro2119018940k_bool(P,A4)) ) )).
+
+tff(fact_107_mem__Collect__eq,axiom,(
+    ! [A4: produc1703900263e_type,P: fun_Pr1810807859e_bool] : 
+      ( member1154427280e_type(A4,collec2094218706e_type(P))
+    <=> pp(aa_Pro1114958380e_bool(P,A4)) ) )).
+
+tff(fact_108_mem__Collect__eq,axiom,(
+    ! [A4: produc820355879e_mark,P: fun_Pr339688819k_bool] : 
+      ( member270882896e_mark(A4,collec1210674322e_mark(P))
+    <=> pp(aa_Pro1791322988k_bool(P,A4)) ) )).
+
+tff(fact_109_mem__Collect__eq,axiom,(
+    ! [A4: produc1930101543k_type,P: fun_Pr552721779e_bool] : 
+      ( member1380628560k_type(A4,collec172936338k_type(P))
+    <=> pp(aa_Pro2004355948e_bool(P,A4)) ) )).
+
+tff(fact_110_mem__Collect__eq,axiom,(
+    ! [A4: produc1046557159k_mark,P: fun_Pr1229086387k_bool] : 
+      ( member497084176k_mark(A4,collec1436875602k_mark(P))
+    <=> pp(aa_Pro533236908k_bool(P,A4)) ) )).
+
+tff(fact_111_mem__Collect__eq,axiom,(
+    ! [A4: type,P: fun_type_bool] : 
+      ( member_type2(A4,collect_type(P))
+    <=> pp(aa_type_bool(P,A4)) ) )).
+
+tff(fact_112_generic__conforms_Ocases,axiom,(
+    ! [X: produc1673386071k_mark] : 
+      ( ! [Uu2: mark] : 
+          X != produc2130394895k_mark(Uu2,detachableMark)
+     => ( X != produc2130394895k_mark(attachedMark,emptyMark)
+       => ( X != produc2130394895k_mark(attachedMark,attachedMark)
+         => ( X != produc2130394895k_mark(emptyMark,emptyMark)
+           => ( X != produc2130394895k_mark(detachableMark,emptyMark)
+             => ( X != produc2130394895k_mark(emptyMark,attachedMark)
+               => X = produc2130394895k_mark(detachableMark,attachedMark) ) ) ) ) ) ) )).
+
+tff(fact_113_le__funI,axiom,(
+    ! [F: fun_Pr935122093e_bool,G: fun_Pr935122093e_bool] : 
+      ( ! [X3: produc1292315505e_type] : ord_le1035144073e_bool(aa_Pro1841391198e_bool(F,X3),aa_Pro1841391198e_bool(G,X3))
+     => ord_le1096776781e_bool(F,G) ) )).
+
+tff(fact_114_le__funI,axiom,(
+    ! [F: fun_Pr1038595638k_bool,G: fun_Pr1038595638k_bool] : 
+      ( ! [X3: produc866752804e_mark] : pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_Pro1900269615k_bool(F,X3)),aa_Pro1900269615k_bool(G,X3)))
+     => ord_le196368022k_bool(F,G) ) )).
+
+tff(fact_115_le__funI,axiom,(
+    ! [F: fun_Pr1257344963k_bool,G: fun_Pr1257344963k_bool] : 
+      ( ! [X3: produc1673386071k_mark] : pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_Pro2119018940k_bool(F,X3)),aa_Pro2119018940k_bool(G,X3)))
+     => ord_le415117347k_bool(F,G) ) )).
+
+tff(fact_116_le__funI,axiom,(
+    ! [F: fun_Pr1010118637k_bool,G: fun_Pr1010118637k_bool] : 
+      ( ! [X3: produc866752804e_mark] : ord_le196368022k_bool(aa_Pro1841854494k_bool(F,X3),aa_Pro1841854494k_bool(G,X3))
+     => ord_le1171773325k_bool(F,G) ) )).
+
+tff(fact_117_le__funI,axiom,(
+    ! [F: fun_Pr761080621k_bool,G: fun_Pr761080621k_bool] : 
+      ( ! [X3: produc1673386071k_mark] : ord_le415117347k_bool(aa_Pro853436894k_bool(F,X3),aa_Pro853436894k_bool(G,X3))
+     => ord_le922735309k_bool(F,G) ) )).
+
+tff(fact_118_le__boolD,axiom,(
+    ! [P: bool,Q: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,P),Q))
+     => ( pp(P)
+       => pp(Q) ) ) )).
+
+tff(fact_119_type_Osimps_I6_J,axiom,(
+    detachableReference != attachedReference )).
+
+tff(fact_120_Collect__cong,axiom,(
+    ! [P: fun_type_bool,Q: fun_type_bool] : 
+      ( ! [X3: type] : 
+          ( pp(aa_type_bool(P,X3))
+        <=> pp(aa_type_bool(Q,X3)) )
+     => collect_type(P) = collect_type(Q) ) )).
+
+tff(fact_121_order__refl,axiom,(
+    ! [X: fun_Pr935122093e_bool] : ord_le1096776781e_bool(X,X) )).
+
+tff(fact_122_order__refl,axiom,(
+    ! [X: fun_Pr1038595638k_bool] : ord_le196368022k_bool(X,X) )).
+
+tff(fact_123_order__refl,axiom,(
+    ! [X: fun_Pr1010118637k_bool] : ord_le1171773325k_bool(X,X) )).
+
+tff(fact_124_order__refl,axiom,(
+    ! [X: fun_Pr1257344963k_bool] : ord_le415117347k_bool(X,X) )).
+
+tff(fact_125_order__refl,axiom,(
+    ! [X: fun_Pr761080621k_bool] : ord_le922735309k_bool(X,X) )).
+
+tff(fact_126_order__refl,axiom,(
+    ! [X: bool] : pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),X)) )).
+
+tff(fact_127_order__refl,axiom,(
+    ! [X: nat] : pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),X)) )).
+
+tff(fact_128_order__refl,axiom,(
+    ! [X: int] : pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X),X)) )).
+
+tff(fact_129_mark_Odistinct_I1_J,axiom,(
+    emptyMark != attachedMark )).
+
+tff(fact_130_le__funD,axiom,(
+    ! [F: fun_Pr935122093e_bool,G: fun_Pr935122093e_bool,X: produc1292315505e_type] : 
+      ( ord_le1096776781e_bool(F,G)
+     => ord_le1035144073e_bool(aa_Pro1841391198e_bool(F,X),aa_Pro1841391198e_bool(G,X)) ) )).
+
+tff(fact_131_le__funD,axiom,(
+    ! [F: fun_Pr1038595638k_bool,G: fun_Pr1038595638k_bool,X: produc866752804e_mark] : 
+      ( ord_le196368022k_bool(F,G)
+     => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_Pro1900269615k_bool(F,X)),aa_Pro1900269615k_bool(G,X))) ) )).
+
+tff(fact_132_le__funD,axiom,(
+    ! [F: fun_Pr1010118637k_bool,G: fun_Pr1010118637k_bool,X: produc866752804e_mark] : 
+      ( ord_le1171773325k_bool(F,G)
+     => ord_le196368022k_bool(aa_Pro1841854494k_bool(F,X),aa_Pro1841854494k_bool(G,X)) ) )).
+
+tff(fact_133_le__funD,axiom,(
+    ! [F: fun_Pr1257344963k_bool,G: fun_Pr1257344963k_bool,X: produc1673386071k_mark] : 
+      ( ord_le415117347k_bool(F,G)
+     => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_Pro2119018940k_bool(F,X)),aa_Pro2119018940k_bool(G,X))) ) )).
+
+tff(fact_134_le__funD,axiom,(
+    ! [F: fun_Pr761080621k_bool,G: fun_Pr761080621k_bool,X: produc1673386071k_mark] : 
+      ( ord_le922735309k_bool(F,G)
+     => ord_le415117347k_bool(aa_Pro853436894k_bool(F,X),aa_Pro853436894k_bool(G,X)) ) )).
+
+tff(fact_135_Collect__mem__eq,axiom,(
+    ! [A: set_Pr183678647k_mark] : collec966944322k_mark(aTP_Lamm_a(A)) = A )).
+
+tff(fact_136_Collect__mem__eq,axiom,(
+    ! [A: set_Pr2081054535e_type] : collec2094218706e_type(aTP_Lamm_aa(A)) = A )).
+
+tff(fact_137_Collect__mem__eq,axiom,(
+    ! [A: set_Pr28651015e_mark] : collec1210674322e_mark(aTP_Lamm_ab(A)) = A )).
+
+tff(fact_138_Collect__mem__eq,axiom,(
+    ! [A: set_Pr1193971207k_type] : collec172936338k_type(aTP_Lamm_ac(A)) = A )).
+
+tff(fact_139_Collect__mem__eq,axiom,(
+    ! [A: set_Pr1289051335k_mark] : collec1436875602k_mark(aTP_Lamm_ad(A)) = A )).
+
+tff(fact_140_Collect__mem__eq,axiom,(
+    ! [A: set_type] : collect_type(aTP_Lamm_ae(A)) = A )).
+
+tff(fact_141_generic__conforms_Osimps_I5_J,axiom,(
+    ~ pp(aa_mark_bool(aa_mar776331196k_bool(generic_conforms,detachableMark),emptyMark)) )).
+
+tff(fact_142_generic__conforms_Osimps_I4_J,axiom,(
+    pp(aa_mark_bool(aa_mar776331196k_bool(generic_conforms,emptyMark),emptyMark)) )).
+
+tff(fact_143_accp__induct__rule,axiom,(
+    ! [R: fun_ty518885433e_bool,A4: type,P: fun_type_bool] : 
+      ( pp(aa_type_bool(accp_type(R),A4))
+     => ( ! [X3: type] : 
+            ( pp(aa_type_bool(accp_type(R),X3))
+           => ( ! [Y3: type] : 
+                  ( pp(aa_type_bool(aa_typ1943871138e_bool(R,Y3),X3))
+                 => pp(aa_type_bool(P,Y3)) )
+             => pp(aa_type_bool(P,X3)) ) )
+       => pp(aa_type_bool(P,A4)) ) ) )).
+
+tff(fact_144_accp__induct__rule,axiom,(
+    ! [R: fun_Pr1010118637k_bool,A4: produc866752804e_mark,P: fun_Pr1038595638k_bool] : 
+      ( pp(aa_Pro1900269615k_bool(accp_P1863505069e_mark(R),A4))
+     => ( ! [X3: produc866752804e_mark] : 
+            ( pp(aa_Pro1900269615k_bool(accp_P1863505069e_mark(R),X3))
+           => ( ! [Y3: produc866752804e_mark] : 
+                  ( pp(aa_Pro1900269615k_bool(aa_Pro1841854494k_bool(R,Y3),X3))
+                 => pp(aa_Pro1900269615k_bool(P,Y3)) )
+             => pp(aa_Pro1900269615k_bool(P,X3)) ) )
+       => pp(aa_Pro1900269615k_bool(P,A4)) ) ) )).
+
+tff(fact_145_accp__induct__rule,axiom,(
+    ! [R: fun_Pr935122093e_bool,A4: produc1292315505e_type,P: fun_Pr1877371689e_bool] : 
+      ( pp(aa_Pro591562018e_bool(accp_P141584122e_type(R),A4))
+     => ( ! [X3: produc1292315505e_type] : 
+            ( pp(aa_Pro591562018e_bool(accp_P141584122e_type(R),X3))
+           => ( ! [Y3: produc1292315505e_type] : 
+                  ( pp(aa_Pro591562018e_bool(aa_Pro1841391198e_bool(R,Y3),X3))
+                 => pp(aa_Pro591562018e_bool(P,Y3)) )
+             => pp(aa_Pro591562018e_bool(P,X3)) ) )
+       => pp(aa_Pro591562018e_bool(P,A4)) ) ) )).
+
+tff(fact_146_accp__induct__rule,axiom,(
+    ! [R: fun_Pr761080621k_bool,A4: produc1673386071k_mark,P: fun_Pr1257344963k_bool] : 
+      ( pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(R),A4))
+     => ( ! [X3: produc1673386071k_mark] : 
+            ( pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(R),X3))
+           => ( ! [Y3: produc1673386071k_mark] : 
+                  ( pp(aa_Pro2119018940k_bool(aa_Pro853436894k_bool(R,Y3),X3))
+                 => pp(aa_Pro2119018940k_bool(P,Y3)) )
+             => pp(aa_Pro2119018940k_bool(P,X3)) ) )
+       => pp(aa_Pro2119018940k_bool(P,A4)) ) ) )).
+
+tff(fact_147_generic__conforms_Osimps_I2_J,axiom,(
+    pp(aa_mark_bool(aa_mar776331196k_bool(generic_conforms,attachedMark),emptyMark)) )).
+
+tff(fact_148_generic__conforms_Osimps_I6_J,axiom,(
+    ~ pp(aa_mark_bool(aa_mar776331196k_bool(generic_conforms,emptyMark),attachedMark)) )).
+
+tff(fact_149_surj__pair,axiom,(
+    ! [P2: produc1046557159k_mark] : 
+    ? [X3: produc1673386071k_mark,Y4: produc1673386071k_mark] : P2 = produc507800407k_mark(X3,Y4) )).
+
+tff(fact_150_surj__pair,axiom,(
+    ! [P2: produc820355879e_mark] : 
+    ? [X3: produc866752804e_mark,Y4: produc866752804e_mark] : P2 = produc1706455831e_mark(X3,Y4) )).
+
+tff(fact_151_surj__pair,axiom,(
+    ! [P2: produc1703900263e_type] : 
+    ? [X3: produc1292315505e_type,Y4: produc1292315505e_type] : P2 = produc1847499479e_type(X3,Y4) )).
+
+tff(fact_152_surj__pair,axiom,(
+    ! [P2: produc1930101543k_type] : 
+    ? [X3: produc2098948772k_type,Y4: produc2098948772k_type] : P2 = produc648844055k_type(X3,Y4) )).
+
+tff(fact_153_surj__pair,axiom,(
+    ! [P2: produc2098948772k_type] : 
+    ? [X3: mark,Y4: type] : P2 = produc1350199260k_type(X3,Y4) )).
+
+tff(fact_154_surj__pair,axiom,(
+    ! [P2: produc1292315505e_type] : 
+    ? [X3: type,Y4: type] : P2 = produc543565993e_type(X3,Y4) )).
+
+tff(fact_155_surj__pair,axiom,(
+    ! [P2: produc866752804e_mark] : 
+    ? [X3: type,Y4: mark] : P2 = produc1323761628e_mark(X3,Y4) )).
+
+tff(fact_156_surj__pair,axiom,(
+    ! [P2: produc1673386071k_mark] : 
+    ? [X3: mark,Y4: mark] : P2 = produc2130394895k_mark(X3,Y4) )).
+
+tff(fact_157_Pair__inject,axiom,(
+    ! [A4: produc866752804e_mark,B2: produc866752804e_mark,A5: produc866752804e_mark,B3: produc866752804e_mark] : 
+      ( produc1706455831e_mark(A4,B2) = produc1706455831e_mark(A5,B3)
+     => ~ ( A4 = A5
+         => B2 != B3 ) ) )).
+
+tff(fact_158_Pair__inject,axiom,(
+    ! [A4: produc1292315505e_type,B2: produc1292315505e_type,A5: produc1292315505e_type,B3: produc1292315505e_type] : 
+      ( produc1847499479e_type(A4,B2) = produc1847499479e_type(A5,B3)
+     => ~ ( A4 = A5
+         => B2 != B3 ) ) )).
+
+tff(fact_159_Pair__inject,axiom,(
+    ! [A4: produc2098948772k_type,B2: produc2098948772k_type,A5: produc2098948772k_type,B3: produc2098948772k_type] : 
+      ( produc648844055k_type(A4,B2) = produc648844055k_type(A5,B3)
+     => ~ ( A4 = A5
+         => B2 != B3 ) ) )).
+
+tff(fact_160_Pair__inject,axiom,(
+    ! [A4: mark,B2: type,A5: mark,B3: type] : 
+      ( produc1350199260k_type(A4,B2) = produc1350199260k_type(A5,B3)
+     => ~ ( A4 = A5
+         => B2 != B3 ) ) )).
+
+tff(fact_161_Pair__inject,axiom,(
+    ! [A4: type,B2: type,A5: type,B3: type] : 
+      ( produc543565993e_type(A4,B2) = produc543565993e_type(A5,B3)
+     => ~ ( A4 = A5
+         => B2 != B3 ) ) )).
+
+tff(fact_162_Pair__inject,axiom,(
+    ! [A4: type,B2: mark,A5: type,B3: mark] : 
+      ( produc1323761628e_mark(A4,B2) = produc1323761628e_mark(A5,B3)
+     => ~ ( A4 = A5
+         => B2 != B3 ) ) )).
+
+tff(fact_163_Pair__inject,axiom,(
+    ! [A4: mark,B2: mark,A5: mark,B3: mark] : 
+      ( produc2130394895k_mark(A4,B2) = produc2130394895k_mark(A5,B3)
+     => ~ ( A4 = A5
+         => B2 != B3 ) ) )).
+
+tff(fact_164_old_Oprod_Oinject,axiom,(
+    ! [A4: type,B2: type,A5: type,B3: type] : 
+      ( produc543565993e_type(A4,B2) = produc543565993e_type(A5,B3)
+    <=> ( A4 = A5
+        & B2 = B3 ) ) )).
+
+tff(fact_165_old_Oprod_Oinject,axiom,(
+    ! [A4: type,B2: mark,A5: type,B3: mark] : 
+      ( produc1323761628e_mark(A4,B2) = produc1323761628e_mark(A5,B3)
+    <=> ( A4 = A5
+        & B2 = B3 ) ) )).
+
+tff(fact_166_old_Oprod_Oinject,axiom,(
+    ! [A4: mark,B2: mark,A5: mark,B3: mark] : 
+      ( produc2130394895k_mark(A4,B2) = produc2130394895k_mark(A5,B3)
+    <=> ( A4 = A5
+        & B2 = B3 ) ) )).
+
+tff(fact_167_generic__conforms_Opelims_I3_J,axiom,(
+    ! [X: mark,Xa: mark] : 
+      ( ~ pp(aa_mark_bool(aa_mar776331196k_bool(generic_conforms,X),Xa))
+     => ( pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(generic_conforms_rel),produc2130394895k_mark(X,Xa)))
+       => ( ( X = detachableMark
+           => ( Xa = emptyMark
+             => ~ pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(generic_conforms_rel),produc2130394895k_mark(detachableMark,emptyMark))) ) )
+         => ( ( X = emptyMark
+             => ( Xa = attachedMark
+               => ~ pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(generic_conforms_rel),produc2130394895k_mark(emptyMark,attachedMark))) ) )
+           => ~ ( X = detachableMark
+               => ( Xa = attachedMark
+                 => ~ pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(generic_conforms_rel),produc2130394895k_mark(detachableMark,attachedMark))) ) ) ) ) ) ) )).
+
+tff(fact_168_generic__conforms_Opelims_I2_J,axiom,(
+    ! [X: mark,Xa: mark] : 
+      ( pp(aa_mark_bool(aa_mar776331196k_bool(generic_conforms,X),Xa))
+     => ( pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(generic_conforms_rel),produc2130394895k_mark(X,Xa)))
+       => ( ( Xa = detachableMark
+           => ~ pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(generic_conforms_rel),produc2130394895k_mark(X,detachableMark))) )
+         => ( ( X = attachedMark
+             => ( Xa = emptyMark
+               => ~ pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(generic_conforms_rel),produc2130394895k_mark(attachedMark,emptyMark))) ) )
+           => ( ( X = attachedMark
+               => ( Xa = attachedMark
+                 => ~ pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(generic_conforms_rel),produc2130394895k_mark(attachedMark,attachedMark))) ) )
+             => ~ ( X = emptyMark
+                 => ( Xa = emptyMark
+                   => ~ pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(generic_conforms_rel),produc2130394895k_mark(emptyMark,emptyMark))) ) ) ) ) ) ) ) )).
+
+tff(fact_169_generic__conforms_Opelims_I1_J,axiom,(
+    ! [X: mark,Xa: mark,Y: bool] : 
+      ( ( pp(aa_mark_bool(aa_mar776331196k_bool(generic_conforms,X),Xa))
+      <=> pp(Y) )
+     => ( pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(generic_conforms_rel),produc2130394895k_mark(X,Xa)))
+       => ( ( Xa = detachableMark
+           => ( pp(Y)
+             => ~ pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(generic_conforms_rel),produc2130394895k_mark(X,detachableMark))) ) )
+         => ( ( X = attachedMark
+             => ( Xa = emptyMark
+               => ( pp(Y)
+                 => ~ pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(generic_conforms_rel),produc2130394895k_mark(attachedMark,emptyMark))) ) ) )
+           => ( ( X = attachedMark
+               => ( Xa = attachedMark
+                 => ( pp(Y)
+                   => ~ pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(generic_conforms_rel),produc2130394895k_mark(attachedMark,attachedMark))) ) ) )
+             => ( ( X = emptyMark
+                 => ( Xa = emptyMark
+                   => ( pp(Y)
+                     => ~ pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(generic_conforms_rel),produc2130394895k_mark(emptyMark,emptyMark))) ) ) )
+               => ( ( X = detachableMark
+                   => ( Xa = emptyMark
+                     => ( ~ pp(Y)
+                       => ~ pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(generic_conforms_rel),produc2130394895k_mark(detachableMark,emptyMark))) ) ) )
+                 => ( ( X = emptyMark
+                     => ( Xa = attachedMark
+                       => ( ~ pp(Y)
+                         => ~ pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(generic_conforms_rel),produc2130394895k_mark(emptyMark,attachedMark))) ) ) )
+                   => ~ ( X = detachableMark
+                       => ( Xa = attachedMark
+                         => ( ~ pp(Y)
+                           => ~ pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(generic_conforms_rel),produc2130394895k_mark(detachableMark,attachedMark))) ) ) ) ) ) ) ) ) ) ) ) )).
+
+tff(fact_170_type_Osimps_I2_J,axiom,(
+    attachedReference != expanded )).
+
+tff(fact_171_type_Osize_I5_J,axiom,(
+    aa_type_nat(size_size_type,attachedReference) = zero_zero_nat )).
+
+tff(fact_172_prod__cases,axiom,(
+    ! [P: fun_Pr1877371689e_bool,P2: produc1292315505e_type] : 
+      ( ! [A3: type,B: type] : pp(aa_Pro591562018e_bool(P,produc543565993e_type(A3,B)))
+     => pp(aa_Pro591562018e_bool(P,P2)) ) )).
+
+tff(fact_173_prod__cases,axiom,(
+    ! [P: fun_Pr1038595638k_bool,P2: produc866752804e_mark] : 
+      ( ! [A3: type,B: mark] : pp(aa_Pro1900269615k_bool(P,produc1323761628e_mark(A3,B)))
+     => pp(aa_Pro1900269615k_bool(P,P2)) ) )).
+
+tff(fact_174_prod__cases,axiom,(
+    ! [P: fun_Pr1257344963k_bool,P2: produc1673386071k_mark] : 
+      ( ! [A3: mark,B: mark] : pp(aa_Pro2119018940k_bool(P,produc2130394895k_mark(A3,B)))
+     => pp(aa_Pro2119018940k_bool(P,P2)) ) )).
+
+tff(fact_175_type_Osize__gen_I2_J,axiom,(
+    aa_type_nat(size_type,attachedReference) = zero_zero_nat )).
+
+tff(fact_176_order__trans,axiom,(
+    ! [X: bool,Y: bool,Z: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),Z))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Z)) ) ) )).
+
+tff(fact_177_order__trans,axiom,(
+    ! [X: nat,Y: nat,Z: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),Z))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Z)) ) ) )).
+
+tff(fact_178_order__trans,axiom,(
+    ! [X: int,Y: int,Z: int] : 
+      ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X),Y))
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,Y),Z))
+       => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X),Z)) ) ) )).
+
+tff(fact_179_set__mp,axiom,(
+    ! [A: set_type,B4: set_type,X: type] : 
+      ( ord_less_eq_set_type(A,B4)
+     => ( member_type2(X,A)
+       => member_type2(X,B4) ) ) )).
+
+tff(fact_180_mark_Osimps_I4_J,axiom,(
+    detachableMark != emptyMark )).
+
+tff(fact_181_contra__subsetD,axiom,(
+    ! [A: set_type,B4: set_type,C3: type] : 
+      ( ord_less_eq_set_type(A,B4)
+     => ( ~ member_type2(C3,B4)
+       => ~ member_type2(C3,A) ) ) )).
+
+tff(fact_182_mark_Osimps_I6_J,axiom,(
+    detachableMark != attachedMark )).
+
+tff(fact_183_type_Osize_I4_J,axiom,(
+    aa_type_nat(size_size_type,expanded) = zero_zero_nat )).
+
+tff(fact_184_type_Osize__gen_I1_J,axiom,(
+    aa_type_nat(size_type,expanded) = zero_zero_nat )).
+
+tff(fact_185_subsetI,axiom,(
+    ! [A: set_type,B4: set_type] : 
+      ( ! [X3: type] : 
+          ( member_type2(X3,A)
+         => member_type2(X3,B4) )
+     => ord_less_eq_set_type(A,B4) ) )).
+
+tff(fact_186_not__accp__down,axiom,(
+    ! [R2: fun_ty518885433e_bool,X: type] : 
+      ( ~ pp(aa_type_bool(accp_type(R2),X))
+     => ~ ( ! [Z2: type] : 
+              ( pp(aa_type_bool(aa_typ1943871138e_bool(R2,Z2),X))
+             => pp(aa_type_bool(accp_type(R2),Z2)) ) ) ) )).
+
+tff(fact_187_not__accp__down,axiom,(
+    ! [R2: fun_Pr1010118637k_bool,X: produc866752804e_mark] : 
+      ( ~ pp(aa_Pro1900269615k_bool(accp_P1863505069e_mark(R2),X))
+     => ~ ( ! [Z2: produc866752804e_mark] : 
+              ( pp(aa_Pro1900269615k_bool(aa_Pro1841854494k_bool(R2,Z2),X))
+             => pp(aa_Pro1900269615k_bool(accp_P1863505069e_mark(R2),Z2)) ) ) ) )).
+
+tff(fact_188_not__accp__down,axiom,(
+    ! [R2: fun_Pr935122093e_bool,X: produc1292315505e_type] : 
+      ( ~ pp(aa_Pro591562018e_bool(accp_P141584122e_type(R2),X))
+     => ~ ( ! [Z2: produc1292315505e_type] : 
+              ( pp(aa_Pro591562018e_bool(aa_Pro1841391198e_bool(R2,Z2),X))
+             => pp(aa_Pro591562018e_bool(accp_P141584122e_type(R2),Z2)) ) ) ) )).
+
+tff(fact_189_not__accp__down,axiom,(
+    ! [R2: fun_Pr761080621k_bool,X: produc1673386071k_mark] : 
+      ( ~ pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(R2),X))
+     => ~ ( ! [Z2: produc1673386071k_mark] : 
+              ( pp(aa_Pro2119018940k_bool(aa_Pro853436894k_bool(R2,Z2),X))
+             => pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(R2),Z2)) ) ) ) )).
+
+tff(fact_190_mark_Osimps_I2_J,axiom,(
+    attachedMark != emptyMark )).
+
+tff(fact_191_mark_Osize_I6_J,axiom,(
+    aa_mark_nat(size_size_mark,detachableMark) = zero_zero_nat )).
+
+tff(fact_192_accp__induct,axiom,(
+    ! [R: fun_ty518885433e_bool,A4: type,P: fun_type_bool] : 
+      ( pp(aa_type_bool(accp_type(R),A4))
+     => ( ! [X3: type] : 
+            ( pp(aa_type_bool(accp_type(R),X3))
+           => ( ! [Y3: type] : 
+                  ( pp(aa_type_bool(aa_typ1943871138e_bool(R,Y3),X3))
+                 => pp(aa_type_bool(P,Y3)) )
+             => pp(aa_type_bool(P,X3)) ) )
+       => pp(aa_type_bool(P,A4)) ) ) )).
+
+tff(fact_193_accp__induct,axiom,(
+    ! [R: fun_Pr1010118637k_bool,A4: produc866752804e_mark,P: fun_Pr1038595638k_bool] : 
+      ( pp(aa_Pro1900269615k_bool(accp_P1863505069e_mark(R),A4))
+     => ( ! [X3: produc866752804e_mark] : 
+            ( pp(aa_Pro1900269615k_bool(accp_P1863505069e_mark(R),X3))
+           => ( ! [Y3: produc866752804e_mark] : 
+                  ( pp(aa_Pro1900269615k_bool(aa_Pro1841854494k_bool(R,Y3),X3))
+                 => pp(aa_Pro1900269615k_bool(P,Y3)) )
+             => pp(aa_Pro1900269615k_bool(P,X3)) ) )
+       => pp(aa_Pro1900269615k_bool(P,A4)) ) ) )).
+
+tff(fact_194_accp__induct,axiom,(
+    ! [R: fun_Pr935122093e_bool,A4: produc1292315505e_type,P: fun_Pr1877371689e_bool] : 
+      ( pp(aa_Pro591562018e_bool(accp_P141584122e_type(R),A4))
+     => ( ! [X3: produc1292315505e_type] : 
+            ( pp(aa_Pro591562018e_bool(accp_P141584122e_type(R),X3))
+           => ( ! [Y3: produc1292315505e_type] : 
+                  ( pp(aa_Pro591562018e_bool(aa_Pro1841391198e_bool(R,Y3),X3))
+                 => pp(aa_Pro591562018e_bool(P,Y3)) )
+             => pp(aa_Pro591562018e_bool(P,X3)) ) )
+       => pp(aa_Pro591562018e_bool(P,A4)) ) ) )).
+
+tff(fact_195_accp__induct,axiom,(
+    ! [R: fun_Pr761080621k_bool,A4: produc1673386071k_mark,P: fun_Pr1257344963k_bool] : 
+      ( pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(R),A4))
+     => ( ! [X3: produc1673386071k_mark] : 
+            ( pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(R),X3))
+           => ( ! [Y3: produc1673386071k_mark] : 
+                  ( pp(aa_Pro2119018940k_bool(aa_Pro853436894k_bool(R,Y3),X3))
+                 => pp(aa_Pro2119018940k_bool(P,Y3)) )
+             => pp(aa_Pro2119018940k_bool(P,X3)) ) )
+       => pp(aa_Pro2119018940k_bool(P,A4)) ) ) )).
+
+tff(fact_196_accp_Ointros,axiom,(
+    ! [R: fun_ty518885433e_bool,X: type] : 
+      ( ! [Y4: type] : 
+          ( pp(aa_type_bool(aa_typ1943871138e_bool(R,Y4),X))
+         => pp(aa_type_bool(accp_type(R),Y4)) )
+     => pp(aa_type_bool(accp_type(R),X)) ) )).
+
+tff(fact_197_accp_Ointros,axiom,(
+    ! [R: fun_Pr1010118637k_bool,X: produc866752804e_mark] : 
+      ( ! [Y4: produc866752804e_mark] : 
+          ( pp(aa_Pro1900269615k_bool(aa_Pro1841854494k_bool(R,Y4),X))
+         => pp(aa_Pro1900269615k_bool(accp_P1863505069e_mark(R),Y4)) )
+     => pp(aa_Pro1900269615k_bool(accp_P1863505069e_mark(R),X)) ) )).
+
+tff(fact_198_accp_Ointros,axiom,(
+    ! [R: fun_Pr935122093e_bool,X: produc1292315505e_type] : 
+      ( ! [Y4: produc1292315505e_type] : 
+          ( pp(aa_Pro591562018e_bool(aa_Pro1841391198e_bool(R,Y4),X))
+         => pp(aa_Pro591562018e_bool(accp_P141584122e_type(R),Y4)) )
+     => pp(aa_Pro591562018e_bool(accp_P141584122e_type(R),X)) ) )).
+
+tff(fact_199_accp_Ointros,axiom,(
+    ! [R: fun_Pr761080621k_bool,X: produc1673386071k_mark] : 
+      ( ! [Y4: produc1673386071k_mark] : 
+          ( pp(aa_Pro2119018940k_bool(aa_Pro853436894k_bool(R,Y4),X))
+         => pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(R),Y4)) )
+     => pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(R),X)) ) )).
+
+tff(fact_200_accp_Ocases,axiom,(
+    ! [R: fun_ty518885433e_bool,A4: type] : 
+      ( pp(aa_type_bool(accp_type(R),A4))
+     => ! [Y3: type] : 
+          ( pp(aa_type_bool(aa_typ1943871138e_bool(R,Y3),A4))
+         => pp(aa_type_bool(accp_type(R),Y3)) ) ) )).
+
+tff(fact_201_accp_Ocases,axiom,(
+    ! [R: fun_Pr1010118637k_bool,A4: produc866752804e_mark] : 
+      ( pp(aa_Pro1900269615k_bool(accp_P1863505069e_mark(R),A4))
+     => ! [Y3: produc866752804e_mark] : 
+          ( pp(aa_Pro1900269615k_bool(aa_Pro1841854494k_bool(R,Y3),A4))
+         => pp(aa_Pro1900269615k_bool(accp_P1863505069e_mark(R),Y3)) ) ) )).
+
+tff(fact_202_accp_Ocases,axiom,(
+    ! [R: fun_Pr935122093e_bool,A4: produc1292315505e_type] : 
+      ( pp(aa_Pro591562018e_bool(accp_P141584122e_type(R),A4))
+     => ! [Y3: produc1292315505e_type] : 
+          ( pp(aa_Pro591562018e_bool(aa_Pro1841391198e_bool(R,Y3),A4))
+         => pp(aa_Pro591562018e_bool(accp_P141584122e_type(R),Y3)) ) ) )).
+
+tff(fact_203_accp_Ocases,axiom,(
+    ! [R: fun_Pr761080621k_bool,A4: produc1673386071k_mark] : 
+      ( pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(R),A4))
+     => ! [Y3: produc1673386071k_mark] : 
+          ( pp(aa_Pro2119018940k_bool(aa_Pro853436894k_bool(R,Y3),A4))
+         => pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(R),Y3)) ) ) )).
+
+tff(fact_204_accp_Osimps,axiom,(
+    ! [R: fun_ty518885433e_bool,A4: type] : 
+      ( pp(aa_type_bool(accp_type(R),A4))
+    <=> ? [X4: type] : 
+          ( A4 = X4
+          & ! [Xa2: type] : 
+              ( pp(aa_type_bool(aa_typ1943871138e_bool(R,Xa2),X4))
+             => pp(aa_type_bool(accp_type(R),Xa2)) ) ) ) )).
+
+tff(fact_205_accp_Osimps,axiom,(
+    ! [R: fun_Pr1010118637k_bool,A4: produc866752804e_mark] : 
+      ( pp(aa_Pro1900269615k_bool(accp_P1863505069e_mark(R),A4))
+    <=> ? [X4: produc866752804e_mark] : 
+          ( A4 = X4
+          & ! [Xa2: produc866752804e_mark] : 
+              ( pp(aa_Pro1900269615k_bool(aa_Pro1841854494k_bool(R,Xa2),X4))
+             => pp(aa_Pro1900269615k_bool(accp_P1863505069e_mark(R),Xa2)) ) ) ) )).
+
+tff(fact_206_accp_Osimps,axiom,(
+    ! [R: fun_Pr935122093e_bool,A4: produc1292315505e_type] : 
+      ( pp(aa_Pro591562018e_bool(accp_P141584122e_type(R),A4))
+    <=> ? [X4: produc1292315505e_type] : 
+          ( A4 = X4
+          & ! [Xa2: produc1292315505e_type] : 
+              ( pp(aa_Pro591562018e_bool(aa_Pro1841391198e_bool(R,Xa2),X4))
+             => pp(aa_Pro591562018e_bool(accp_P141584122e_type(R),Xa2)) ) ) ) )).
+
+tff(fact_207_accp_Osimps,axiom,(
+    ! [R: fun_Pr761080621k_bool,A4: produc1673386071k_mark] : 
+      ( pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(R),A4))
+    <=> ? [X4: produc1673386071k_mark] : 
+          ( A4 = X4
+          & ! [Xa2: produc1673386071k_mark] : 
+              ( pp(aa_Pro2119018940k_bool(aa_Pro853436894k_bool(R,Xa2),X4))
+             => pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(R),Xa2)) ) ) ) )).
+
+tff(fact_208_mark_Osize__gen_I3_J,axiom,(
+    aa_mark_nat(size_mark,detachableMark) = zero_zero_nat )).
+
+tff(fact_209_accp__downward,axiom,(
+    ! [R: fun_ty518885433e_bool,B2: type,A4: type] : 
+      ( pp(aa_type_bool(accp_type(R),B2))
+     => ( pp(aa_type_bool(aa_typ1943871138e_bool(R,A4),B2))
+       => pp(aa_type_bool(accp_type(R),A4)) ) ) )).
+
+tff(fact_210_accp__downward,axiom,(
+    ! [R: fun_Pr1010118637k_bool,B2: produc866752804e_mark,A4: produc866752804e_mark] : 
+      ( pp(aa_Pro1900269615k_bool(accp_P1863505069e_mark(R),B2))
+     => ( pp(aa_Pro1900269615k_bool(aa_Pro1841854494k_bool(R,A4),B2))
+       => pp(aa_Pro1900269615k_bool(accp_P1863505069e_mark(R),A4)) ) ) )).
+
+tff(fact_211_accp__downward,axiom,(
+    ! [R: fun_Pr935122093e_bool,B2: produc1292315505e_type,A4: produc1292315505e_type] : 
+      ( pp(aa_Pro591562018e_bool(accp_P141584122e_type(R),B2))
+     => ( pp(aa_Pro591562018e_bool(aa_Pro1841391198e_bool(R,A4),B2))
+       => pp(aa_Pro591562018e_bool(accp_P141584122e_type(R),A4)) ) ) )).
+
+tff(fact_212_accp__downward,axiom,(
+    ! [R: fun_Pr761080621k_bool,B2: produc1673386071k_mark,A4: produc1673386071k_mark] : 
+      ( pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(R),B2))
+     => ( pp(aa_Pro2119018940k_bool(aa_Pro853436894k_bool(R,A4),B2))
+       => pp(aa_Pro2119018940k_bool(accp_P522654688k_mark(R),A4)) ) ) )).
+
+tff(fact_213_subsetCE,axiom,(
+    ! [A: set_type,B4: set_type,C3: type] : 
+      ( ord_less_eq_set_type(A,B4)
+     => ( member_type2(C3,A)
+       => member_type2(C3,B4) ) ) )).
+
+tff(fact_214_monoI,axiom,(
+    ! [F: fun_bool_bool] : 
+      ( ! [X3: bool,Y4: bool] : 
+          ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y4))
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,X3)),aa_bool_bool(F,Y4))) )
+     => order_mono_bool_bool(F) ) )).
+
+tff(fact_215_monoI,axiom,(
+    ! [F: fun_bool_nat] : 
+      ( ! [X3: bool,Y4: bool] : 
+          ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y4))
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,X3)),aa_bool_nat(F,Y4))) )
+     => order_mono_bool_nat(F) ) )).
+
+tff(fact_216_monoI,axiom,(
+    ! [F: fun_bool_int] : 
+      ( ! [X3: bool,Y4: bool] : 
+          ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y4))
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_bool_int(F,X3)),aa_bool_int(F,Y4))) )
+     => order_mono_bool_int(F) ) )).
+
+tff(fact_217_monoI,axiom,(
+    ! [F: fun_nat_bool] : 
+      ( ! [X3: nat,Y4: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y4))
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,X3)),aa_nat_bool(F,Y4))) )
+     => order_mono_nat_bool(F) ) )).
+
+tff(fact_218_monoI,axiom,(
+    ! [F: fun_nat_nat] : 
+      ( ! [X3: nat,Y4: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y4))
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,X3)),aa_nat_nat(F,Y4))) )
+     => order_mono_nat_nat(F) ) )).
+
+tff(fact_219_monoI,axiom,(
+    ! [F: fun_nat_int] : 
+      ( ! [X3: nat,Y4: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y4))
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_nat_int(F,X3)),aa_nat_int(F,Y4))) )
+     => order_mono_nat_int(F) ) )).
+
+tff(fact_220_monoI,axiom,(
+    ! [F: fun_int_bool] : 
+      ( ! [X3: int,Y4: int] : 
+          ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X3),Y4))
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_int_bool(F,X3)),aa_int_bool(F,Y4))) )
+     => order_mono_int_bool(F) ) )).
+
+tff(fact_221_monoI,axiom,(
+    ! [F: fun_int_nat] : 
+      ( ! [X3: int,Y4: int] : 
+          ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X3),Y4))
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_int_nat(F,X3)),aa_int_nat(F,Y4))) )
+     => order_mono_int_nat(F) ) )).
+
+tff(fact_222_monoI,axiom,(
+    ! [F: fun_int_int] : 
+      ( ! [X3: int,Y4: int] : 
+          ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X3),Y4))
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_int_int(F,X3)),aa_int_int(F,Y4))) )
+     => order_mono_int_int(F) ) )).
+
+tff(fact_223_type_Osize__gen_I3_J,axiom,(
+    aa_type_nat(size_type,detachableReference) = zero_zero_nat )).
+
+tff(fact_224_type_Osize_I6_J,axiom,(
+    aa_type_nat(size_size_type,detachableReference) = zero_zero_nat )).
+
+tff(fact_225_dual__order_Otrans,axiom,(
+    ! [B2: bool,A4: bool,C3: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B2),A4))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,C3),B2))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,C3),A4)) ) ) )).
+
+tff(fact_226_dual__order_Otrans,axiom,(
+    ! [B2: nat,A4: nat,C3: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B2),A4))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,C3),B2))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,C3),A4)) ) ) )).
+
+tff(fact_227_dual__order_Otrans,axiom,(
+    ! [B2: int,A4: int,C3: int] : 
+      ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,B2),A4))
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,C3),B2))
+       => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,C3),A4)) ) ) )).
+
+tff(fact_228_list_Osimps_I15_J,axiom,(
+    ! [X21: type,X222: list_type] : set_type2(cons_type(X21,X222)) = insert_type2(X21,set_type2(X222)) )).
+
+tff(fact_229_order_Otrans,axiom,(
+    ! [A4: bool,B2: bool,C3: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),B2))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B2),C3))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),C3)) ) ) )).
+
+tff(fact_230_order_Otrans,axiom,(
+    ! [A4: nat,B2: nat,C3: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),B2))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B2),C3))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),C3)) ) ) )).
+
+tff(fact_231_order_Otrans,axiom,(
+    ! [A4: int,B2: int,C3: int] : 
+      ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,A4),B2))
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,B2),C3))
+       => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,A4),C3)) ) ) )).
+
+tff(fact_232_mark_Osize__gen_I1_J,axiom,(
+    aa_mark_nat(size_mark,emptyMark) = zero_zero_nat )).
+
+tff(fact_233_mark_Osize_I4_J,axiom,(
+    aa_mark_nat(size_size_mark,emptyMark) = zero_zero_nat )).
+
+tff(fact_234_mark_Osize__gen_I2_J,axiom,(
+    aa_mark_nat(size_mark,attachedMark) = zero_zero_nat )).
+
+tff(fact_235_mark_Osize_I5_J,axiom,(
+    aa_mark_nat(size_size_mark,attachedMark) = zero_zero_nat )).
+
+tff(fact_236_eq__iff,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( ( pp(X)
+      <=> pp(Y) )
+    <=> ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+        & pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),X)) ) ) )).
+
+tff(fact_237_eq__iff,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( X = Y
+    <=> ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+        & pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),X)) ) ) )).
+
+tff(fact_238_eq__iff,axiom,(
+    ! [X: int,Y: int] : 
+      ( X = Y
+    <=> ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X),Y))
+        & pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,Y),X)) ) ) )).
+
+tff(fact_239_list_Oset__cases,axiom,(
+    ! [E: type,A4: list_type] : 
+      ( member_type2(E,set_type2(A4))
+     => ( ! [Z22: list_type] : 
+            A4 != cons_type(E,Z22)
+       => ~ ( ! [Z1: type,Z22: list_type] : 
+                ( A4 = cons_type(Z1,Z22)
+               => ~ member_type2(E,set_type2(Z22)) ) ) ) ) )).
+
+tff(fact_240_ord__eq__le__trans,axiom,(
+    ! [A4: bool,B2: bool,C3: bool] : 
+      ( ( pp(A4)
+      <=> pp(B2) )
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B2),C3))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),C3)) ) ) )).
+
+tff(fact_241_ord__eq__le__trans,axiom,(
+    ! [A4: nat,B2: nat,C3: nat] : 
+      ( A4 = B2
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B2),C3))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),C3)) ) ) )).
+
+tff(fact_242_ord__eq__le__trans,axiom,(
+    ! [A4: int,B2: int,C3: int] : 
+      ( A4 = B2
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,B2),C3))
+       => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,A4),C3)) ) ) )).
+
+tff(fact_243_set__ConsD,axiom,(
+    ! [Y: type,X: type,Xs: list_type] : 
+      ( member_type2(Y,set_type2(cons_type(X,Xs)))
+     => ( Y = X
+        | member_type2(Y,set_type2(Xs)) ) ) )).
+
+tff(fact_244_dual__order_Orefl,axiom,(
+    ! [A4: bool] : pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),A4)) )).
+
+tff(fact_245_dual__order_Orefl,axiom,(
+    ! [A4: nat] : pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),A4)) )).
+
+tff(fact_246_dual__order_Orefl,axiom,(
+    ! [A4: int] : pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,A4),A4)) )).
+
+tff(fact_247_antisym,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),X))
+       => ( pp(X)
+        <=> pp(Y) ) ) ) )).
+
+tff(fact_248_antisym,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),X))
+       => X = Y ) ) )).
+
+tff(fact_249_antisym,axiom,(
+    ! [X: int,Y: int] : 
+      ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X),Y))
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,Y),X))
+       => X = Y ) ) )).
+
+tff(fact_250_le__cases,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+     => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),X)) ) )).
+
+tff(fact_251_le__cases,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+     => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),X)) ) )).
+
+tff(fact_252_le__cases,axiom,(
+    ! [X: int,Y: int] : 
+      ( ~ pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X),Y))
+     => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,Y),X)) ) )).
+
+tff(fact_253_set__empty,axiom,(
+    ! [Xs: list_type] : 
+      ( set_type2(Xs) = bot_bot_set_type
+    <=> Xs = nil_type ) )).
+
+tff(fact_254_subset__iff,axiom,(
+    ! [A: set_type,B4: set_type] : 
+      ( ord_less_eq_set_type(A,B4)
+    <=> ! [T3: type] : 
+          ( member_type2(T3,A)
+         => member_type2(T3,B4) ) ) )).
+
+tff(fact_255_rev__subsetD,axiom,(
+    ! [C3: type,A: set_type,B4: set_type] : 
+      ( member_type2(C3,A)
+     => ( ord_less_eq_set_type(A,B4)
+       => member_type2(C3,B4) ) ) )).
+
+tff(fact_256_set__rev__mp,axiom,(
+    ! [X: type,A: set_type,B4: set_type] : 
+      ( member_type2(X,A)
+     => ( ord_less_eq_set_type(A,B4)
+       => member_type2(X,B4) ) ) )).
+
+tff(fact_257_ord__le__eq__trans,axiom,(
+    ! [A4: bool,B2: bool,C3: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),B2))
+     => ( ( pp(B2)
+        <=> pp(C3) )
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),C3)) ) ) )).
+
+tff(fact_258_ord__le__eq__trans,axiom,(
+    ! [A4: nat,B2: nat,C3: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),B2))
+     => ( B2 = C3
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),C3)) ) ) )).
+
+tff(fact_259_ord__le__eq__trans,axiom,(
+    ! [A4: int,B2: int,C3: int] : 
+      ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,A4),B2))
+     => ( B2 = C3
+       => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,A4),C3)) ) ) )).
+
+tff(fact_260_set__empty2,axiom,(
+    ! [Xs: list_type] : 
+      ( bot_bot_set_type = set_type2(Xs)
+    <=> Xs = nil_type ) )).
+
+tff(fact_261_relChain__def,axiom,(
+    ! [R: set_Pr1267735761e_type,As: fun_type_bool] : 
+      ( bNF_Ca378635113e_bool(R,As)
+    <=> ! [I: type,J: type] : 
+          ( member1636067866e_type(produc543565993e_type(I,J),R)
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_type_bool(As,I)),aa_type_bool(As,J))) ) ) )).
+
+tff(fact_262_relChain__def,axiom,(
+    ! [R: set_Pr183678647k_mark,As: fun_mark_bool] : 
+      ( bNF_Ca2125776118k_bool(R,As)
+    <=> ! [I: mark,J: mark] : 
+          ( member2017138432k_mark(produc2130394895k_mark(I,J),R)
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_mark_bool(As,I)),aa_mark_bool(As,J))) ) ) )).
+
+tff(fact_263_relChain__def,axiom,(
+    ! [R: set_Pr1267735761e_type,As: fun_type_nat] : 
+      ( bNF_Ca1490410494pe_nat(R,As)
+    <=> ! [I: type,J: type] : 
+          ( member1636067866e_type(produc543565993e_type(I,J),R)
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_type_nat(As,I)),aa_type_nat(As,J))) ) ) )).
+
+tff(fact_264_relChain__def,axiom,(
+    ! [R: set_Pr183678647k_mark,As: fun_mark_nat] : 
+      ( bNF_Ca1753769777rk_nat(R,As)
+    <=> ! [I: mark,J: mark] : 
+          ( member2017138432k_mark(produc2130394895k_mark(I,J),R)
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_mark_nat(As,I)),aa_mark_nat(As,J))) ) ) )).
+
+tff(fact_265_relChain__def,axiom,(
+    ! [R: set_Pr1267735761e_type,As: fun_type_int] : 
+      ( bNF_Ca2127684186pe_int(R,As)
+    <=> ! [I: type,J: type] : 
+          ( member1636067866e_type(produc543565993e_type(I,J),R)
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_type_int(As,I)),aa_type_int(As,J))) ) ) )).
+
+tff(fact_266_relChain__def,axiom,(
+    ! [R: set_Pr183678647k_mark,As: fun_mark_int] : 
+      ( bNF_Ca243559821rk_int(R,As)
+    <=> ! [I: mark,J: mark] : 
+          ( member2017138432k_mark(produc2130394895k_mark(I,J),R)
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_mark_int(As,I)),aa_mark_int(As,J))) ) ) )).
+
+tff(fact_267_sup_OorderE,axiom,(
+    ! [B2: bool,A4: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B2),A4))
+     => ( pp(A4)
+      <=> pp(aa_bool_bool(aa_boo1142376798l_bool(sup_sup_bool,A4),B2)) ) ) )).
+
+tff(fact_268_sup_OorderE,axiom,(
+    ! [B2: nat,A4: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B2),A4))
+     => A4 = aa_nat_nat(sup_sup_nat(A4),B2) ) )).
+
+tff(fact_269_sup_OorderE,axiom,(
+    ! [B2: int,A4: int] : 
+      ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,B2),A4))
+     => A4 = aa_int_int(sup_sup_int(A4),B2) ) )).
+
+tff(fact_270_not__less,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Y))
+    <=> pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),X)) ) )).
+
+tff(fact_271_not__less,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Y))
+    <=> pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),X)) ) )).
+
+tff(fact_272_not__less,axiom,(
+    ! [X: int,Y: int] : 
+      ( ~ pp(aa_int_bool(aa_int_fun_int_bool(ord_less_int,X),Y))
+    <=> pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,Y),X)) ) )).
+
+tff(fact_273_same__fstI,axiom,(
+    ! [P: fun_type_bool,X: type,Y5: type,Y: type,R2: fun_ty238017314e_type] : 
+      ( pp(aa_type_bool(P,X))
+     => ( member1636067866e_type(produc543565993e_type(Y5,Y),aa_typ920736779e_type(R2,X))
+       => member1154427280e_type(produc1847499479e_type(produc543565993e_type(X,Y5),produc543565993e_type(X,Y)),same_fst_type_type(P,R2)) ) ) )).
+
+tff(fact_274_same__fstI,axiom,(
+    ! [P: fun_type_bool,X: type,Y5: mark,Y: mark,R2: fun_ty85451272k_mark] : 
+      ( pp(aa_type_bool(P,X))
+     => ( member2017138432k_mark(produc2130394895k_mark(Y5,Y),aa_typ1984163313k_mark(R2,X))
+       => member270882896e_mark(produc1706455831e_mark(produc1323761628e_mark(X,Y5),produc1323761628e_mark(X,Y)),same_fst_type_mark(P,R2)) ) ) )).
+
+tff(fact_275_same__fstI,axiom,(
+    ! [P: fun_mark_bool,X: mark,Y5: mark,Y: mark,R2: fun_ma1475628821k_mark] : 
+      ( pp(aa_mark_bool(P,X))
+     => ( member2017138432k_mark(produc2130394895k_mark(Y5,Y),aa_mar1226857214k_mark(R2,X))
+       => member497084176k_mark(produc507800407k_mark(produc2130394895k_mark(X,Y5),produc2130394895k_mark(X,Y)),same_fst_mark_mark(P,R2)) ) ) )).
+
+tff(fact_276_order__subst1,axiom,(
+    ! [A4: bool,F: fun_bool_bool,B2: bool,C3: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),aa_bool_bool(F,B2)))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B2),C3))
+       => ( ! [X3: bool,Y4: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y4))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,X3)),aa_bool_bool(F,Y4))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),aa_bool_bool(F,C3))) ) ) ) )).
+
+tff(fact_277_order__subst1,axiom,(
+    ! [A4: bool,F: fun_nat_bool,B2: nat,C3: nat] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),aa_nat_bool(F,B2)))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B2),C3))
+       => ( ! [X3: nat,Y4: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y4))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,X3)),aa_nat_bool(F,Y4))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),aa_nat_bool(F,C3))) ) ) ) )).
+
+tff(fact_278_order__subst1,axiom,(
+    ! [A4: bool,F: fun_int_bool,B2: int,C3: int] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),aa_int_bool(F,B2)))
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,B2),C3))
+       => ( ! [X3: int,Y4: int] : 
+              ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X3),Y4))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_int_bool(F,X3)),aa_int_bool(F,Y4))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),aa_int_bool(F,C3))) ) ) ) )).
+
+tff(fact_279_order__subst1,axiom,(
+    ! [A4: nat,F: fun_bool_nat,B2: bool,C3: bool] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),aa_bool_nat(F,B2)))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B2),C3))
+       => ( ! [X3: bool,Y4: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y4))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,X3)),aa_bool_nat(F,Y4))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),aa_bool_nat(F,C3))) ) ) ) )).
+
+tff(fact_280_order__subst1,axiom,(
+    ! [A4: nat,F: fun_nat_nat,B2: nat,C3: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),aa_nat_nat(F,B2)))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B2),C3))
+       => ( ! [X3: nat,Y4: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y4))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,X3)),aa_nat_nat(F,Y4))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),aa_nat_nat(F,C3))) ) ) ) )).
+
+tff(fact_281_order__subst1,axiom,(
+    ! [A4: nat,F: fun_int_nat,B2: int,C3: int] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),aa_int_nat(F,B2)))
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,B2),C3))
+       => ( ! [X3: int,Y4: int] : 
+              ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X3),Y4))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_int_nat(F,X3)),aa_int_nat(F,Y4))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),aa_int_nat(F,C3))) ) ) ) )).
+
+tff(fact_282_order__subst1,axiom,(
+    ! [A4: int,F: fun_bool_int,B2: bool,C3: bool] : 
+      ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,A4),aa_bool_int(F,B2)))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B2),C3))
+       => ( ! [X3: bool,Y4: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y4))
+             => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_bool_int(F,X3)),aa_bool_int(F,Y4))) )
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,A4),aa_bool_int(F,C3))) ) ) ) )).
+
+tff(fact_283_order__subst1,axiom,(
+    ! [A4: int,F: fun_nat_int,B2: nat,C3: nat] : 
+      ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,A4),aa_nat_int(F,B2)))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B2),C3))
+       => ( ! [X3: nat,Y4: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y4))
+             => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_nat_int(F,X3)),aa_nat_int(F,Y4))) )
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,A4),aa_nat_int(F,C3))) ) ) ) )).
+
+tff(fact_284_order__subst1,axiom,(
+    ! [A4: int,F: fun_int_int,B2: int,C3: int] : 
+      ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,A4),aa_int_int(F,B2)))
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,B2),C3))
+       => ( ! [X3: int,Y4: int] : 
+              ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X3),Y4))
+             => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_int_int(F,X3)),aa_int_int(F,Y4))) )
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,A4),aa_int_int(F,C3))) ) ) ) )).
+
+tff(fact_285_in__set__member,axiom,(
+    ! [X: type,Xs: list_type] : 
+      ( member_type2(X,set_type2(Xs))
+    <=> pp(aa_type_bool(member_type(Xs),X)) ) )).
+
+tff(fact_286_order__subst2,axiom,(
+    ! [A4: bool,B2: bool,F: fun_bool_bool,C3: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),B2))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,B2)),C3))
+       => ( ! [X3: bool,Y4: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y4))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,X3)),aa_bool_bool(F,Y4))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,A4)),C3)) ) ) ) )).
+
+tff(fact_287_order__subst2,axiom,(
+    ! [A4: bool,B2: bool,F: fun_bool_nat,C3: nat] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),B2))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,B2)),C3))
+       => ( ! [X3: bool,Y4: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y4))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,X3)),aa_bool_nat(F,Y4))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,A4)),C3)) ) ) ) )).
+
+tff(fact_288_order__subst2,axiom,(
+    ! [A4: bool,B2: bool,F: fun_bool_int,C3: int] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),B2))
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_bool_int(F,B2)),C3))
+       => ( ! [X3: bool,Y4: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y4))
+             => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_bool_int(F,X3)),aa_bool_int(F,Y4))) )
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_bool_int(F,A4)),C3)) ) ) ) )).
+
+tff(fact_289_order__subst2,axiom,(
+    ! [A4: nat,B2: nat,F: fun_nat_bool,C3: bool] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),B2))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,B2)),C3))
+       => ( ! [X3: nat,Y4: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y4))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,X3)),aa_nat_bool(F,Y4))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,A4)),C3)) ) ) ) )).
+
+tff(fact_290_order__subst2,axiom,(
+    ! [A4: nat,B2: nat,F: fun_nat_nat,C3: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),B2))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,B2)),C3))
+       => ( ! [X3: nat,Y4: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y4))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,X3)),aa_nat_nat(F,Y4))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,A4)),C3)) ) ) ) )).
+
+tff(fact_291_order__subst2,axiom,(
+    ! [A4: nat,B2: nat,F: fun_nat_int,C3: int] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),B2))
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_nat_int(F,B2)),C3))
+       => ( ! [X3: nat,Y4: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y4))
+             => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_nat_int(F,X3)),aa_nat_int(F,Y4))) )
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_nat_int(F,A4)),C3)) ) ) ) )).
+
+tff(fact_292_order__subst2,axiom,(
+    ! [A4: int,B2: int,F: fun_int_bool,C3: bool] : 
+      ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,A4),B2))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_int_bool(F,B2)),C3))
+       => ( ! [X3: int,Y4: int] : 
+              ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X3),Y4))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_int_bool(F,X3)),aa_int_bool(F,Y4))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_int_bool(F,A4)),C3)) ) ) ) )).
+
+tff(fact_293_order__subst2,axiom,(
+    ! [A4: int,B2: int,F: fun_int_nat,C3: nat] : 
+      ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,A4),B2))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_int_nat(F,B2)),C3))
+       => ( ! [X3: int,Y4: int] : 
+              ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X3),Y4))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_int_nat(F,X3)),aa_int_nat(F,Y4))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_int_nat(F,A4)),C3)) ) ) ) )).
+
+tff(fact_294_order__subst2,axiom,(
+    ! [A4: int,B2: int,F: fun_int_int,C3: int] : 
+      ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,A4),B2))
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_int_int(F,B2)),C3))
+       => ( ! [X3: int,Y4: int] : 
+              ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X3),Y4))
+             => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_int_int(F,X3)),aa_int_int(F,Y4))) )
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_int_int(F,A4)),C3)) ) ) ) )).
+
+tff(fact_295_subset__eq,axiom,(
+    ! [A: set_type,B4: set_type] : 
+      ( ord_less_eq_set_type(A,B4)
+    <=> ! [X4: type] : 
+          ( member_type2(X4,A)
+         => member_type2(X4,B4) ) ) )).
+
+tff(fact_296_List_Ofinite__set,axiom,(
+    ! [Xs: list_type] : finite_finite_type(set_type2(Xs)) )).
+
+tff(fact_297_ord__eq__le__subst,axiom,(
+    ! [A4: bool,F: fun_bool_bool,B2: bool,C3: bool] : 
+      ( ( pp(A4)
+      <=> pp(aa_bool_bool(F,B2)) )
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B2),C3))
+       => ( ! [X3: bool,Y4: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y4))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,X3)),aa_bool_bool(F,Y4))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),aa_bool_bool(F,C3))) ) ) ) )).
+
+tff(fact_298_ord__eq__le__subst,axiom,(
+    ! [A4: nat,F: fun_bool_nat,B2: bool,C3: bool] : 
+      ( A4 = aa_bool_nat(F,B2)
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B2),C3))
+       => ( ! [X3: bool,Y4: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y4))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,X3)),aa_bool_nat(F,Y4))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),aa_bool_nat(F,C3))) ) ) ) )).
+
+tff(fact_299_ord__eq__le__subst,axiom,(
+    ! [A4: int,F: fun_bool_int,B2: bool,C3: bool] : 
+      ( A4 = aa_bool_int(F,B2)
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B2),C3))
+       => ( ! [X3: bool,Y4: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y4))
+             => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_bool_int(F,X3)),aa_bool_int(F,Y4))) )
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,A4),aa_bool_int(F,C3))) ) ) ) )).
+
+tff(fact_300_ord__eq__le__subst,axiom,(
+    ! [A4: bool,F: fun_nat_bool,B2: nat,C3: nat] : 
+      ( ( pp(A4)
+      <=> pp(aa_nat_bool(F,B2)) )
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B2),C3))
+       => ( ! [X3: nat,Y4: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y4))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,X3)),aa_nat_bool(F,Y4))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),aa_nat_bool(F,C3))) ) ) ) )).
+
+tff(fact_301_ord__eq__le__subst,axiom,(
+    ! [A4: nat,F: fun_nat_nat,B2: nat,C3: nat] : 
+      ( A4 = aa_nat_nat(F,B2)
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B2),C3))
+       => ( ! [X3: nat,Y4: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y4))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,X3)),aa_nat_nat(F,Y4))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),aa_nat_nat(F,C3))) ) ) ) )).
+
+tff(fact_302_ord__eq__le__subst,axiom,(
+    ! [A4: int,F: fun_nat_int,B2: nat,C3: nat] : 
+      ( A4 = aa_nat_int(F,B2)
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B2),C3))
+       => ( ! [X3: nat,Y4: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y4))
+             => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_nat_int(F,X3)),aa_nat_int(F,Y4))) )
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,A4),aa_nat_int(F,C3))) ) ) ) )).
+
+tff(fact_303_ord__eq__le__subst,axiom,(
+    ! [A4: bool,F: fun_int_bool,B2: int,C3: int] : 
+      ( ( pp(A4)
+      <=> pp(aa_int_bool(F,B2)) )
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,B2),C3))
+       => ( ! [X3: int,Y4: int] : 
+              ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X3),Y4))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_int_bool(F,X3)),aa_int_bool(F,Y4))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),aa_int_bool(F,C3))) ) ) ) )).
+
+tff(fact_304_ord__eq__le__subst,axiom,(
+    ! [A4: nat,F: fun_int_nat,B2: int,C3: int] : 
+      ( A4 = aa_int_nat(F,B2)
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,B2),C3))
+       => ( ! [X3: int,Y4: int] : 
+              ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X3),Y4))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_int_nat(F,X3)),aa_int_nat(F,Y4))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),aa_int_nat(F,C3))) ) ) ) )).
+
+tff(fact_305_ord__eq__le__subst,axiom,(
+    ! [A4: int,F: fun_int_int,B2: int,C3: int] : 
+      ( A4 = aa_int_int(F,B2)
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,B2),C3))
+       => ( ! [X3: int,Y4: int] : 
+              ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X3),Y4))
+             => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_int_int(F,X3)),aa_int_int(F,Y4))) )
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,A4),aa_int_int(F,C3))) ) ) ) )).
+
+tff(fact_306_ord__le__eq__subst,axiom,(
+    ! [A4: bool,B2: bool,F: fun_bool_bool,C3: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),B2))
+     => ( ( pp(aa_bool_bool(F,B2))
+        <=> pp(C3) )
+       => ( ! [X3: bool,Y4: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y4))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,X3)),aa_bool_bool(F,Y4))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,A4)),C3)) ) ) ) )).
+
+tff(fact_307_ord__le__eq__subst,axiom,(
+    ! [A4: bool,B2: bool,F: fun_bool_nat,C3: nat] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),B2))
+     => ( aa_bool_nat(F,B2) = C3
+       => ( ! [X3: bool,Y4: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y4))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,X3)),aa_bool_nat(F,Y4))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,A4)),C3)) ) ) ) )).
+
+tff(fact_308_ord__le__eq__subst,axiom,(
+    ! [A4: bool,B2: bool,F: fun_bool_int,C3: int] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),B2))
+     => ( aa_bool_int(F,B2) = C3
+       => ( ! [X3: bool,Y4: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y4))
+             => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_bool_int(F,X3)),aa_bool_int(F,Y4))) )
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_bool_int(F,A4)),C3)) ) ) ) )).
+
+tff(fact_309_ord__le__eq__subst,axiom,(
+    ! [A4: nat,B2: nat,F: fun_nat_bool,C3: bool] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),B2))
+     => ( ( pp(aa_nat_bool(F,B2))
+        <=> pp(C3) )
+       => ( ! [X3: nat,Y4: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y4))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,X3)),aa_nat_bool(F,Y4))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,A4)),C3)) ) ) ) )).
+
+tff(fact_310_ord__le__eq__subst,axiom,(
+    ! [A4: nat,B2: nat,F: fun_nat_nat,C3: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),B2))
+     => ( aa_nat_nat(F,B2) = C3
+       => ( ! [X3: nat,Y4: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y4))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,X3)),aa_nat_nat(F,Y4))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,A4)),C3)) ) ) ) )).
+
+tff(fact_311_ord__le__eq__subst,axiom,(
+    ! [A4: nat,B2: nat,F: fun_nat_int,C3: int] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),B2))
+     => ( aa_nat_int(F,B2) = C3
+       => ( ! [X3: nat,Y4: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y4))
+             => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_nat_int(F,X3)),aa_nat_int(F,Y4))) )
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_nat_int(F,A4)),C3)) ) ) ) )).
+
+tff(fact_312_ord__le__eq__subst,axiom,(
+    ! [A4: int,B2: int,F: fun_int_bool,C3: bool] : 
+      ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,A4),B2))
+     => ( ( pp(aa_int_bool(F,B2))
+        <=> pp(C3) )
+       => ( ! [X3: int,Y4: int] : 
+              ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X3),Y4))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_int_bool(F,X3)),aa_int_bool(F,Y4))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_int_bool(F,A4)),C3)) ) ) ) )).
+
+tff(fact_313_ord__le__eq__subst,axiom,(
+    ! [A4: int,B2: int,F: fun_int_nat,C3: nat] : 
+      ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,A4),B2))
+     => ( aa_int_nat(F,B2) = C3
+       => ( ! [X3: int,Y4: int] : 
+              ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X3),Y4))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_int_nat(F,X3)),aa_int_nat(F,Y4))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_int_nat(F,A4)),C3)) ) ) ) )).
+
+tff(fact_314_ord__le__eq__subst,axiom,(
+    ! [A4: int,B2: int,F: fun_int_int,C3: int] : 
+      ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,A4),B2))
+     => ( aa_int_int(F,B2) = C3
+       => ( ! [X3: int,Y4: int] : 
+              ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X3),Y4))
+             => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_int_int(F,X3)),aa_int_int(F,Y4))) )
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_int_int(F,A4)),C3)) ) ) ) )).
+
+tff(fact_315_empty__set,axiom,(
+    bot_bot_set_type = set_type2(nil_type) )).
+
+tff(fact_316_list_Oset__intros_I1_J,axiom,(
+    ! [A1: type,A22: list_type] : member_type2(A1,set_type2(cons_type(A1,A22))) )).
+
+tff(fact_317_le__cases3,axiom,(
+    ! [X: bool,Y: bool,Z: bool] : 
+      ( ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+       => ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),Z)) )
+     => ( ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),X))
+         => ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Z)) )
+       => ( ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Z))
+           => ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Z),Y)) )
+         => ( ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Z),Y))
+             => ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),X)) )
+           => ( ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),Z))
+               => ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Z),X)) )
+             => ~ ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Z),X))
+                 => ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y)) ) ) ) ) ) ) )).
+
+tff(fact_318_le__cases3,axiom,(
+    ! [X: nat,Y: nat,Z: nat] : 
+      ( ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+       => ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),Z)) )
+     => ( ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),X))
+         => ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Z)) )
+       => ( ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Z))
+           => ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Z),Y)) )
+         => ( ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Z),Y))
+             => ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),X)) )
+           => ( ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),Z))
+               => ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Z),X)) )
+             => ~ ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Z),X))
+                 => ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y)) ) ) ) ) ) ) )).
+
+tff(fact_319_le__cases3,axiom,(
+    ! [X: int,Y: int,Z: int] : 
+      ( ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X),Y))
+       => ~ pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,Y),Z)) )
+     => ( ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,Y),X))
+         => ~ pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X),Z)) )
+       => ( ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X),Z))
+           => ~ pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,Z),Y)) )
+         => ( ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,Z),Y))
+             => ~ pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,Y),X)) )
+           => ( ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,Y),Z))
+               => ~ pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,Z),X)) )
+             => ~ ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,Z),X))
+                 => ~ pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X),Y)) ) ) ) ) ) ) )).
+
+tff(fact_320_order__class_Oorder_Oantisym,axiom,(
+    ! [A4: bool,B2: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),B2))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B2),A4))
+       => ( pp(A4)
+        <=> pp(B2) ) ) ) )).
+
+tff(fact_321_order__class_Oorder_Oantisym,axiom,(
+    ! [A4: nat,B2: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),B2))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B2),A4))
+       => A4 = B2 ) ) )).
+
+tff(fact_322_order__class_Oorder_Oantisym,axiom,(
+    ! [A4: int,B2: int] : 
+      ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,A4),B2))
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,B2),A4))
+       => A4 = B2 ) ) )).
+
+tff(fact_323_eq__imp__le,axiom,(
+    ! [M: nat,N: nat] : 
+      ( M = N
+     => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,M),N)) ) )).
+
+tff(fact_324_list_Oset__intros_I2_J,axiom,(
+    ! [X: type,A22: list_type,A1: type] : 
+      ( member_type2(X,set_type2(A22))
+     => member_type2(X,set_type2(cons_type(A1,A22))) ) )).
+
+tff(fact_325_linorder__wlog,axiom,(
+    ! [P: fun_bo1373903021l_bool,A4: bool,B2: bool] : 
+      ( ! [A3: bool,B: bool] : 
+          ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A3),B))
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(P,A3),B)) )
+     => ( ! [A3: bool,B: bool] : 
+            ( pp(aa_bool_bool(aa_boo1142376798l_bool(P,B),A3))
+           => pp(aa_bool_bool(aa_boo1142376798l_bool(P,A3),B)) )
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(P,A4),B2)) ) ) )).
+
+tff(fact_326_linorder__wlog,axiom,(
+    ! [P: fun_nat_fun_nat_bool,A4: nat,B2: nat] : 
+      ( ! [A3: nat,B: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A3),B))
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(P,A3),B)) )
+     => ( ! [A3: nat,B: nat] : 
+            ( pp(aa_nat_bool(aa_nat_fun_nat_bool(P,B),A3))
+           => pp(aa_nat_bool(aa_nat_fun_nat_bool(P,A3),B)) )
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(P,A4),B2)) ) ) )).
+
+tff(fact_327_linorder__wlog,axiom,(
+    ! [P: fun_int_fun_int_bool,A4: int,B2: int] : 
+      ( ! [A3: int,B: int] : 
+          ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,A3),B))
+         => pp(aa_int_bool(aa_int_fun_int_bool(P,A3),B)) )
+     => ( ! [A3: int,B: int] : 
+            ( pp(aa_int_bool(aa_int_fun_int_bool(P,B),A3))
+           => pp(aa_int_bool(aa_int_fun_int_bool(P,A3),B)) )
+       => pp(aa_int_bool(aa_int_fun_int_bool(P,A4),B2)) ) ) )).
+
+tff(fact_328_dual__order_Oantisym,axiom,(
+    ! [B2: bool,A4: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B2),A4))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),B2))
+       => ( pp(A4)
+        <=> pp(B2) ) ) ) )).
+
+tff(fact_329_dual__order_Oantisym,axiom,(
+    ! [B2: nat,A4: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B2),A4))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),B2))
+       => A4 = B2 ) ) )).
+
+tff(fact_330_dual__order_Oantisym,axiom,(
+    ! [B2: int,A4: int] : 
+      ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,B2),A4))
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,A4),B2))
+       => A4 = B2 ) ) )).
+
+tff(fact_331_accp__subset,axiom,(
+    ! [R1: fun_ty518885433e_bool,R22: fun_ty518885433e_bool] : 
+      ( ord_le1653811161e_bool(R1,R22)
+     => ord_le627149320e_bool(accp_type(R22),accp_type(R1)) ) )).
+
+tff(fact_332_accp__subset,axiom,(
+    ! [R1: fun_Pr1010118637k_bool,R22: fun_Pr1010118637k_bool] : 
+      ( ord_le1171773325k_bool(R1,R22)
+     => ord_le196368022k_bool(accp_P1863505069e_mark(R22),accp_P1863505069e_mark(R1)) ) )).
+
+tff(fact_333_accp__subset,axiom,(
+    ! [R1: fun_Pr935122093e_bool,R22: fun_Pr935122093e_bool] : 
+      ( ord_le1096776781e_bool(R1,R22)
+     => ord_le1035144073e_bool(accp_P141584122e_type(R22),accp_P141584122e_type(R1)) ) )).
+
+tff(fact_334_accp__subset,axiom,(
+    ! [R1: fun_Pr761080621k_bool,R22: fun_Pr761080621k_bool] : 
+      ( ord_le922735309k_bool(R1,R22)
+     => ord_le415117347k_bool(accp_P522654688k_mark(R22),accp_P522654688k_mark(R1)) ) )).
+
+tff(fact_335_less__le__trans,axiom,(
+    ! [X: bool,Y: bool,Z: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Y))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),Z))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Z)) ) ) )).
+
+tff(fact_336_less__le__trans,axiom,(
+    ! [X: nat,Y: nat,Z: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Y))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),Z))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Z)) ) ) )).
+
+tff(fact_337_less__le__trans,axiom,(
+    ! [X: int,Y: int,Z: int] : 
+      ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_int,X),Y))
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,Y),Z))
+       => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_int,X),Z)) ) ) )).
+
+tff(fact_338_accp__subset__induct,axiom,(
+    ! [D: fun_type_bool,R2: fun_ty518885433e_bool,X: type,P: fun_type_bool] : 
+      ( ord_le627149320e_bool(D,accp_type(R2))
+     => ( ! [X3: type,Z2: type] : 
+            ( pp(aa_type_bool(D,X3))
+           => ( pp(aa_type_bool(aa_typ1943871138e_bool(R2,Z2),X3))
+             => pp(aa_type_bool(D,Z2)) ) )
+       => ( pp(aa_type_bool(D,X))
+         => ( ! [X3: type] : 
+                ( pp(aa_type_bool(D,X3))
+               => ( ! [Z3: type] : 
+                      ( pp(aa_type_bool(aa_typ1943871138e_bool(R2,Z3),X3))
+                     => pp(aa_type_bool(P,Z3)) )
+                 => pp(aa_type_bool(P,X3)) ) )
+           => pp(aa_type_bool(P,X)) ) ) ) ) )).
+
+tff(fact_339_accp__subset__induct,axiom,(
+    ! [D: fun_Pr1038595638k_bool,R2: fun_Pr1010118637k_bool,X: produc866752804e_mark,P: fun_Pr1038595638k_bool] : 
+      ( ord_le196368022k_bool(D,accp_P1863505069e_mark(R2))
+     => ( ! [X3: produc866752804e_mark,Z2: produc866752804e_mark] : 
+            ( pp(aa_Pro1900269615k_bool(D,X3))
+           => ( pp(aa_Pro1900269615k_bool(aa_Pro1841854494k_bool(R2,Z2),X3))
+             => pp(aa_Pro1900269615k_bool(D,Z2)) ) )
+       => ( pp(aa_Pro1900269615k_bool(D,X))
+         => ( ! [X3: produc866752804e_mark] : 
+                ( pp(aa_Pro1900269615k_bool(D,X3))
+               => ( ! [Z3: produc866752804e_mark] : 
+                      ( pp(aa_Pro1900269615k_bool(aa_Pro1841854494k_bool(R2,Z3),X3))
+                     => pp(aa_Pro1900269615k_bool(P,Z3)) )
+                 => pp(aa_Pro1900269615k_bool(P,X3)) ) )
+           => pp(aa_Pro1900269615k_bool(P,X)) ) ) ) ) )).
+
+tff(fact_340_accp__subset__induct,axiom,(
+    ! [D: fun_Pr1877371689e_bool,R2: fun_Pr935122093e_bool,X: produc1292315505e_type,P: fun_Pr1877371689e_bool] : 
+      ( ord_le1035144073e_bool(D,accp_P141584122e_type(R2))
+     => ( ! [X3: produc1292315505e_type,Z2: produc1292315505e_type] : 
+            ( pp(aa_Pro591562018e_bool(D,X3))
+           => ( pp(aa_Pro591562018e_bool(aa_Pro1841391198e_bool(R2,Z2),X3))
+             => pp(aa_Pro591562018e_bool(D,Z2)) ) )
+       => ( pp(aa_Pro591562018e_bool(D,X))
+         => ( ! [X3: produc1292315505e_type] : 
+                ( pp(aa_Pro591562018e_bool(D,X3))
+               => ( ! [Z3: produc1292315505e_type] : 
+                      ( pp(aa_Pro591562018e_bool(aa_Pro1841391198e_bool(R2,Z3),X3))
+                     => pp(aa_Pro591562018e_bool(P,Z3)) )
+                 => pp(aa_Pro591562018e_bool(P,X3)) ) )
+           => pp(aa_Pro591562018e_bool(P,X)) ) ) ) ) )).
+
+tff(fact_341_accp__subset__induct,axiom,(
+    ! [D: fun_Pr1257344963k_bool,R2: fun_Pr761080621k_bool,X: produc1673386071k_mark,P: fun_Pr1257344963k_bool] : 
+      ( ord_le415117347k_bool(D,accp_P522654688k_mark(R2))
+     => ( ! [X3: produc1673386071k_mark,Z2: produc1673386071k_mark] : 
+            ( pp(aa_Pro2119018940k_bool(D,X3))
+           => ( pp(aa_Pro2119018940k_bool(aa_Pro853436894k_bool(R2,Z2),X3))
+             => pp(aa_Pro2119018940k_bool(D,Z2)) ) )
+       => ( pp(aa_Pro2119018940k_bool(D,X))
+         => ( ! [X3: produc1673386071k_mark] : 
+                ( pp(aa_Pro2119018940k_bool(D,X3))
+               => ( ! [Z3: produc1673386071k_mark] : 
+                      ( pp(aa_Pro2119018940k_bool(aa_Pro853436894k_bool(R2,Z3),X3))
+                     => pp(aa_Pro2119018940k_bool(P,Z3)) )
+                 => pp(aa_Pro2119018940k_bool(P,X3)) ) )
+           => pp(aa_Pro2119018940k_bool(P,X)) ) ) ) ) )).
+
+tff(fact_342_prod_Osel_I1_J,axiom,(
+    ! [X1: type,X22: type] : produc1285985429e_type(produc543565993e_type(X1,X22)) = X1 )).
+
+tff(fact_343_prod_Osel_I1_J,axiom,(
+    ! [X1: type,X22: mark] : produc2066181064e_mark(produc1323761628e_mark(X1,X22)) = X1 )).
+
+tff(fact_344_prod_Osel_I1_J,axiom,(
+    ! [X1: mark,X22: mark] : produc725330683k_mark(produc2130394895k_mark(X1,X22)) = X1 )).
+
+tff(fact_345_list_Oset__sel_I1_J,axiom,(
+    ! [A4: list_type] : 
+      ( A4 != nil_type
+     => member_type2(hd_type(A4),set_type2(A4)) ) )).
+
+tff(fact_346_empty__iff,axiom,(
+    ! [C3: type] : 
+      ~ member_type2(C3,bot_bot_set_type) )).
+
+tff(fact_347_prod_Osel_I2_J,axiom,(
+    ! [X1: type,X22: type] : produc545275095e_type(produc543565993e_type(X1,X22)) = X22 )).
+
+tff(fact_348_prod_Osel_I2_J,axiom,(
+    ! [X1: type,X22: mark] : produc1325470730e_mark(produc1323761628e_mark(X1,X22)) = X22 )).
+
+tff(fact_349_prod_Osel_I2_J,axiom,(
+    ! [X1: mark,X22: mark] : produc2132103997k_mark(produc2130394895k_mark(X1,X22)) = X22 )).
+
+tff(fact_350_add_Oright__neutral,axiom,(
+    ! [A4: int] : aa_int_int(plus_plus_int(A4),zero_zero_int) = A4 )).
+
+tff(fact_351_add_Oright__neutral,axiom,(
+    ! [A4: nat] : aa_nat_nat(plus_plus_nat(A4),zero_zero_nat) = A4 )).
+
+tff(fact_352_add__Suc__right,axiom,(
+    ! [M: nat,N: nat] : aa_nat_nat(plus_plus_nat(M),aa_nat_nat(suc,N)) = aa_nat_nat(suc,aa_nat_nat(plus_plus_nat(M),N)) )).
+
+tff(fact_353_insert__iff,axiom,(
+    ! [A4: type,B2: type,A: set_type] : 
+      ( member_type2(A4,insert_type2(B2,A))
+    <=> ( A4 = B2
+        | member_type2(A4,A) ) ) )).
+
+tff(fact_354_in__lex__prod,axiom,(
+    ! [A4: mark,B2: type,A5: mark,B3: type,R: set_Pr183678647k_mark,S: set_Pr1267735761e_type] : 
+      ( member1380628560k_type(produc648844055k_type(produc1350199260k_type(A4,B2),produc1350199260k_type(A5,B3)),lex_prod_mark_type(R,S))
+    <=> ( member2017138432k_mark(produc2130394895k_mark(A4,A5),R)
+        | ( A4 = A5
+          & member1636067866e_type(produc543565993e_type(B2,B3),S) ) ) ) )).
+
+tff(fact_355_in__lex__prod,axiom,(
+    ! [A4: type,B2: type,A5: type,B3: type,R: set_Pr1267735761e_type,S: set_Pr1267735761e_type] : 
+      ( member1154427280e_type(produc1847499479e_type(produc543565993e_type(A4,B2),produc543565993e_type(A5,B3)),lex_prod_type_type(R,S))
+    <=> ( member1636067866e_type(produc543565993e_type(A4,A5),R)
+        | ( A4 = A5
+          & member1636067866e_type(produc543565993e_type(B2,B3),S) ) ) ) )).
+
+tff(fact_356_in__lex__prod,axiom,(
+    ! [A4: type,B2: mark,A5: type,B3: mark,R: set_Pr1267735761e_type,S: set_Pr183678647k_mark] : 
+      ( member270882896e_mark(produc1706455831e_mark(produc1323761628e_mark(A4,B2),produc1323761628e_mark(A5,B3)),lex_prod_type_mark(R,S))
+    <=> ( member1636067866e_type(produc543565993e_type(A4,A5),R)
+        | ( A4 = A5
+          & member2017138432k_mark(produc2130394895k_mark(B2,B3),S) ) ) ) )).
+
+tff(fact_357_in__lex__prod,axiom,(
+    ! [A4: mark,B2: mark,A5: mark,B3: mark,R: set_Pr183678647k_mark,S: set_Pr183678647k_mark] : 
+      ( member497084176k_mark(produc507800407k_mark(produc2130394895k_mark(A4,B2),produc2130394895k_mark(A5,B3)),lex_prod_mark_mark(R,S))
+    <=> ( member2017138432k_mark(produc2130394895k_mark(A4,A5),R)
+        | ( A4 = A5
+          & member2017138432k_mark(produc2130394895k_mark(B2,B3),S) ) ) ) )).
+
+tff(fact_358_subset__code_I1_J,axiom,(
+    ! [Xs: list_type,B4: set_type] : 
+      ( ord_less_eq_set_type(set_type2(Xs),B4)
+    <=> ! [X4: type] : 
+          ( member_type2(X4,set_type2(Xs))
+         => member_type2(X4,B4) ) ) )).
+
+tff(fact_359_eq__fst__iff,axiom,(
+    ! [A4: type,P2: produc1292315505e_type] : 
+      ( A4 = produc1285985429e_type(P2)
+    <=> ? [B5: type] : P2 = produc543565993e_type(A4,B5) ) )).
+
+tff(fact_360_eq__fst__iff,axiom,(
+    ! [A4: type,P2: produc866752804e_mark] : 
+      ( A4 = produc2066181064e_mark(P2)
+    <=> ? [B5: mark] : P2 = produc1323761628e_mark(A4,B5) ) )).
+
+tff(fact_361_eq__fst__iff,axiom,(
+    ! [A4: mark,P2: produc1673386071k_mark] : 
+      ( A4 = produc725330683k_mark(P2)
+    <=> ? [B5: mark] : P2 = produc2130394895k_mark(A4,B5) ) )).
+
+tff(fact_362_ssubst__Pair__rhs,axiom,(
+    ! [R: type,S: type,R2: set_Pr1267735761e_type,S2: type] : 
+      ( member1636067866e_type(produc543565993e_type(R,S),R2)
+     => ( S2 = S
+       => member1636067866e_type(produc543565993e_type(R,S2),R2) ) ) )).
+
+tff(fact_363_ssubst__Pair__rhs,axiom,(
+    ! [R: type,S: mark,R2: set_Pr99672324e_mark,S2: mark] : 
+      ( member1210505165e_mark(produc1323761628e_mark(R,S),R2)
+     => ( S2 = S
+       => member1210505165e_mark(produc1323761628e_mark(R,S2),R2) ) ) )).
+
+tff(fact_364_ssubst__Pair__rhs,axiom,(
+    ! [R: mark,S: mark,R2: set_Pr183678647k_mark,S2: mark] : 
+      ( member2017138432k_mark(produc2130394895k_mark(R,S),R2)
+     => ( S2 = S
+       => member2017138432k_mark(produc2130394895k_mark(R,S2),R2) ) ) )).
+
+tff(fact_365_equals0D,axiom,(
+    ! [A: set_type,A4: type] : 
+      ( A = bot_bot_set_type
+     => ~ member_type2(A4,A) ) )).
+
+tff(fact_366_subset__code_I2_J,axiom,(
+    ! [A: set_type,Ys: list_type] : 
+      ( ord_less_eq_set_type(A,coset_type(Ys))
+    <=> ! [X4: type] : 
+          ( member_type2(X4,set_type2(Ys))
+         => ~ member_type2(X4,A) ) ) )).
+
+tff(fact_367_prod_Ocollapse,axiom,(
+    ! [Prod: produc1292315505e_type] : produc543565993e_type(produc1285985429e_type(Prod),produc545275095e_type(Prod)) = Prod )).
+
+tff(fact_368_prod_Ocollapse,axiom,(
+    ! [Prod: produc866752804e_mark] : produc1323761628e_mark(produc2066181064e_mark(Prod),produc1325470730e_mark(Prod)) = Prod )).
+
+tff(fact_369_prod_Ocollapse,axiom,(
+    ! [Prod: produc1673386071k_mark] : produc2130394895k_mark(produc725330683k_mark(Prod),produc2132103997k_mark(Prod)) = Prod )).
+
+tff(fact_370_in__mono,axiom,(
+    ! [A: set_type,B4: set_type,X: type] : 
+      ( ord_less_eq_set_type(A,B4)
+     => ( member_type2(X,A)
+       => member_type2(X,B4) ) ) )).
+
+tff(fact_371_subsetD,axiom,(
+    ! [A: set_type,B4: set_type,C3: type] : 
+      ( ord_less_eq_set_type(A,B4)
+     => ( member_type2(C3,A)
+       => member_type2(C3,B4) ) ) )).
+
+tff(fact_372_monoD,axiom,(
+    ! [F: fun_bool_bool,X: bool,Y: bool] : 
+      ( order_mono_bool_bool(F)
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,X)),aa_bool_bool(F,Y))) ) ) )).
+
+tff(fact_373_monoD,axiom,(
+    ! [F: fun_bool_nat,X: bool,Y: bool] : 
+      ( order_mono_bool_nat(F)
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,X)),aa_bool_nat(F,Y))) ) ) )).
+
+tff(fact_374_monoD,axiom,(
+    ! [F: fun_bool_int,X: bool,Y: bool] : 
+      ( order_mono_bool_int(F)
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+       => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_bool_int(F,X)),aa_bool_int(F,Y))) ) ) )).
+
+tff(fact_375_monoD,axiom,(
+    ! [F: fun_nat_bool,X: nat,Y: nat] : 
+      ( order_mono_nat_bool(F)
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,X)),aa_nat_bool(F,Y))) ) ) )).
+
+tff(fact_376_monoD,axiom,(
+    ! [F: fun_nat_nat,X: nat,Y: nat] : 
+      ( order_mono_nat_nat(F)
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,X)),aa_nat_nat(F,Y))) ) ) )).
+
+tff(fact_377_monoD,axiom,(
+    ! [F: fun_nat_int,X: nat,Y: nat] : 
+      ( order_mono_nat_int(F)
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+       => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_nat_int(F,X)),aa_nat_int(F,Y))) ) ) )).
+
+tff(fact_378_monoD,axiom,(
+    ! [F: fun_int_bool,X: int,Y: int] : 
+      ( order_mono_int_bool(F)
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X),Y))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_int_bool(F,X)),aa_int_bool(F,Y))) ) ) )).
+
+tff(fact_379_monoD,axiom,(
+    ! [F: fun_int_nat,X: int,Y: int] : 
+      ( order_mono_int_nat(F)
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X),Y))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_int_nat(F,X)),aa_int_nat(F,Y))) ) ) )).
+
+tff(fact_380_monoD,axiom,(
+    ! [F: fun_int_int,X: int,Y: int] : 
+      ( order_mono_int_int(F)
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X),Y))
+       => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_int_int(F,X)),aa_int_int(F,Y))) ) ) )).
+
+tff(fact_381_mono__def,axiom,(
+    ! [F: fun_bool_bool] : 
+      ( order_mono_bool_bool(F)
+    <=> ! [X4: bool,Y6: bool] : 
+          ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X4),Y6))
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,X4)),aa_bool_bool(F,Y6))) ) ) )).
+
+tff(fact_382_mono__def,axiom,(
+    ! [F: fun_bool_nat] : 
+      ( order_mono_bool_nat(F)
+    <=> ! [X4: bool,Y6: bool] : 
+          ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X4),Y6))
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,X4)),aa_bool_nat(F,Y6))) ) ) )).
+
+tff(fact_383_mono__def,axiom,(
+    ! [F: fun_bool_int] : 
+      ( order_mono_bool_int(F)
+    <=> ! [X4: bool,Y6: bool] : 
+          ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X4),Y6))
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_bool_int(F,X4)),aa_bool_int(F,Y6))) ) ) )).
+
+tff(fact_384_mono__def,axiom,(
+    ! [F: fun_nat_bool] : 
+      ( order_mono_nat_bool(F)
+    <=> ! [X4: nat,Y6: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X4),Y6))
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,X4)),aa_nat_bool(F,Y6))) ) ) )).
+
+tff(fact_385_mono__def,axiom,(
+    ! [F: fun_nat_nat] : 
+      ( order_mono_nat_nat(F)
+    <=> ! [X4: nat,Y6: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X4),Y6))
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,X4)),aa_nat_nat(F,Y6))) ) ) )).
+
+tff(fact_386_mono__def,axiom,(
+    ! [F: fun_nat_int] : 
+      ( order_mono_nat_int(F)
+    <=> ! [X4: nat,Y6: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X4),Y6))
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_nat_int(F,X4)),aa_nat_int(F,Y6))) ) ) )).
+
+tff(fact_387_mono__def,axiom,(
+    ! [F: fun_int_bool] : 
+      ( order_mono_int_bool(F)
+    <=> ! [X4: int,Y6: int] : 
+          ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X4),Y6))
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_int_bool(F,X4)),aa_int_bool(F,Y6))) ) ) )).
+
+tff(fact_388_mono__def,axiom,(
+    ! [F: fun_int_nat] : 
+      ( order_mono_int_nat(F)
+    <=> ! [X4: int,Y6: int] : 
+          ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X4),Y6))
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_int_nat(F,X4)),aa_int_nat(F,Y6))) ) ) )).
+
+tff(fact_389_mono__def,axiom,(
+    ! [F: fun_int_int] : 
+      ( order_mono_int_int(F)
+    <=> ! [X4: int,Y6: int] : 
+          ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X4),Y6))
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_int_int(F,X4)),aa_int_int(F,Y6))) ) ) )).
+
+tff(fact_390_subset__code_I3_J,axiom,(
+    ~ ord_less_eq_set_type(coset_type(nil_type),set_type2(nil_type)) )).
+
+tff(fact_391_ball__reg__right,axiom,(
+    ! [R2: set_type,P: fun_type_bool,Q: fun_type_bool] : 
+      ( ! [X3: type] : 
+          ( member_type2(X3,R2)
+         => ( pp(aa_type_bool(P,X3))
+           => pp(aa_type_bool(Q,X3)) ) )
+     => ( ! [X_1: type] : pp(aa_type_bool(P,X_1))
+       => ! [X2: type] : 
+            ( member_type2(X2,R2)
+           => pp(aa_type_bool(Q,X2)) ) ) ) )).
+
+tff(fact_392_subrelI,axiom,(
+    ! [R: set_Pr1267735761e_type,S: set_Pr1267735761e_type] : 
+      ( ! [X3: type,Y4: type] : 
+          ( member1636067866e_type(produc543565993e_type(X3,Y4),R)
+         => member1636067866e_type(produc543565993e_type(X3,Y4),S) )
+     => ord_le1131193457e_type(R,S) ) )).
+
+tff(fact_393_subrelI,axiom,(
+    ! [R: set_Pr99672324e_mark,S: set_Pr99672324e_mark] : 
+      ( ! [X3: type,Y4: mark] : 
+          ( member1210505165e_mark(produc1323761628e_mark(X3,Y4),R)
+         => member1210505165e_mark(produc1323761628e_mark(X3,Y4),S) )
+     => ord_le2110613668e_mark(R,S) ) )).
+
+tff(fact_394_subrelI,axiom,(
+    ! [R: set_Pr183678647k_mark,S: set_Pr183678647k_mark] : 
+      ( ! [X3: mark,Y4: mark] : 
+          ( member2017138432k_mark(produc2130394895k_mark(X3,Y4),R)
+         => member2017138432k_mark(produc2130394895k_mark(X3,Y4),S) )
+     => ord_le47136343k_mark(R,S) ) )).
+
+tff(fact_395_not__le,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+    <=> pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Y),X)) ) )).
+
+tff(fact_396_not__le,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+    <=> pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Y),X)) ) )).
+
+tff(fact_397_not__le,axiom,(
+    ! [X: int,Y: int] : 
+      ( ~ pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X),Y))
+    <=> pp(aa_int_bool(aa_int_fun_int_bool(ord_less_int,Y),X)) ) )).
+
+tff(fact_398_ball__reg,axiom,(
+    ! [R2: set_type,P: fun_type_bool,Q: fun_type_bool] : 
+      ( ! [X3: type] : 
+          ( member_type2(X3,R2)
+         => ( pp(aa_type_bool(P,X3))
+           => pp(aa_type_bool(Q,X3)) ) )
+     => ( ! [X3: type] : 
+            ( member_type2(X3,R2)
+           => pp(aa_type_bool(P,X3)) )
+       => ! [X2: type] : 
+            ( member_type2(X2,R2)
+           => pp(aa_type_bool(Q,X2)) ) ) ) )).
+
+tff(fact_399_antimono__def,axiom,(
+    ! [F: fun_bool_bool] : 
+      ( order_721039474l_bool(F)
+    <=> ! [X4: bool,Y6: bool] : 
+          ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X4),Y6))
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,Y6)),aa_bool_bool(F,X4))) ) ) )).
+
+tff(fact_400_antimono__def,axiom,(
+    ! [F: fun_bool_nat] : 
+      ( order_1086610613ol_nat(F)
+    <=> ! [X4: bool,Y6: bool] : 
+          ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X4),Y6))
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,Y6)),aa_bool_nat(F,X4))) ) ) )).
+
+tff(fact_401_antimono__def,axiom,(
+    ! [F: fun_bool_int] : 
+      ( order_1723884305ol_int(F)
+    <=> ! [X4: bool,Y6: bool] : 
+          ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X4),Y6))
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_bool_int(F,Y6)),aa_bool_int(F,X4))) ) ) )).
+
+tff(fact_402_antimono__def,axiom,(
+    ! [F: fun_nat_bool] : 
+      ( order_203183123t_bool(F)
+    <=> ! [X4: nat,Y6: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X4),Y6))
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,Y6)),aa_nat_bool(F,X4))) ) ) )).
+
+tff(fact_403_antimono__def,axiom,(
+    ! [F: fun_nat_nat] : 
+      ( order_1631207636at_nat(F)
+    <=> ! [X4: nat,Y6: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X4),Y6))
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,Y6)),aa_nat_nat(F,X4))) ) ) )).
+
+tff(fact_404_antimono__def,axiom,(
+    ! [F: fun_nat_int] : 
+      ( order_120997680at_int(F)
+    <=> ! [X4: nat,Y6: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X4),Y6))
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_nat_int(F,Y6)),aa_nat_int(F,X4))) ) ) )).
+
+tff(fact_405_antimono__def,axiom,(
+    ! [F: fun_int_bool] : 
+      ( order_1556698295t_bool(F)
+    <=> ! [X4: int,Y6: int] : 
+          ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X4),Y6))
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_int_bool(F,Y6)),aa_int_bool(F,X4))) ) ) )).
+
+tff(fact_406_antimono__def,axiom,(
+    ! [F: fun_int_nat] : 
+      ( order_1544476464nt_nat(F)
+    <=> ! [X4: int,Y6: int] : 
+          ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X4),Y6))
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_int_nat(F,Y6)),aa_int_nat(F,X4))) ) ) )).
+
+tff(fact_407_antimono__def,axiom,(
+    ! [F: fun_int_int] : 
+      ( order_34266508nt_int(F)
+    <=> ! [X4: int,Y6: int] : 
+          ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X4),Y6))
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_int_int(F,Y6)),aa_int_int(F,X4))) ) ) )).
+
+tff(fact_408_antimonoI,axiom,(
+    ! [F: fun_bool_bool] : 
+      ( ! [X3: bool,Y4: bool] : 
+          ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y4))
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,Y4)),aa_bool_bool(F,X3))) )
+     => order_721039474l_bool(F) ) )).
+
+tff(fact_409_antimonoI,axiom,(
+    ! [F: fun_bool_nat] : 
+      ( ! [X3: bool,Y4: bool] : 
+          ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y4))
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,Y4)),aa_bool_nat(F,X3))) )
+     => order_1086610613ol_nat(F) ) )).
+
+tff(fact_410_antimonoI,axiom,(
+    ! [F: fun_bool_int] : 
+      ( ! [X3: bool,Y4: bool] : 
+          ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y4))
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_bool_int(F,Y4)),aa_bool_int(F,X3))) )
+     => order_1723884305ol_int(F) ) )).
+
+tff(fact_411_antimonoI,axiom,(
+    ! [F: fun_nat_bool] : 
+      ( ! [X3: nat,Y4: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y4))
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,Y4)),aa_nat_bool(F,X3))) )
+     => order_203183123t_bool(F) ) )).
+
+tff(fact_412_antimonoI,axiom,(
+    ! [F: fun_nat_nat] : 
+      ( ! [X3: nat,Y4: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y4))
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,Y4)),aa_nat_nat(F,X3))) )
+     => order_1631207636at_nat(F) ) )).
+
+tff(fact_413_antimonoI,axiom,(
+    ! [F: fun_nat_int] : 
+      ( ! [X3: nat,Y4: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y4))
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_nat_int(F,Y4)),aa_nat_int(F,X3))) )
+     => order_120997680at_int(F) ) )).
+
+tff(fact_414_antimonoI,axiom,(
+    ! [F: fun_int_bool] : 
+      ( ! [X3: int,Y4: int] : 
+          ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X3),Y4))
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_int_bool(F,Y4)),aa_int_bool(F,X3))) )
+     => order_1556698295t_bool(F) ) )).
+
+tff(fact_415_antimonoI,axiom,(
+    ! [F: fun_int_nat] : 
+      ( ! [X3: int,Y4: int] : 
+          ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X3),Y4))
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_int_nat(F,Y4)),aa_int_nat(F,X3))) )
+     => order_1544476464nt_nat(F) ) )).
+
+tff(fact_416_antimonoI,axiom,(
+    ! [F: fun_int_int] : 
+      ( ! [X3: int,Y4: int] : 
+          ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X3),Y4))
+         => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_int_int(F,Y4)),aa_int_int(F,X3))) )
+     => order_34266508nt_int(F) ) )).
+
+tff(fact_417_Suc__le__mono,axiom,(
+    ! [N: nat,M: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(suc,N)),aa_nat_nat(suc,M)))
+    <=> pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,N),M)) ) )).
+
+tff(fact_418_antimonoE,axiom,(
+    ! [F: fun_bool_bool,X: bool,Y: bool] : 
+      ( order_721039474l_bool(F)
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,Y)),aa_bool_bool(F,X))) ) ) )).
+
+tff(fact_419_antimonoE,axiom,(
+    ! [F: fun_bool_nat,X: bool,Y: bool] : 
+      ( order_1086610613ol_nat(F)
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,Y)),aa_bool_nat(F,X))) ) ) )).
+
+tff(fact_420_antimonoE,axiom,(
+    ! [F: fun_bool_int,X: bool,Y: bool] : 
+      ( order_1723884305ol_int(F)
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+       => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_bool_int(F,Y)),aa_bool_int(F,X))) ) ) )).
+
+tff(fact_421_antimonoE,axiom,(
+    ! [F: fun_nat_bool,X: nat,Y: nat] : 
+      ( order_203183123t_bool(F)
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,Y)),aa_nat_bool(F,X))) ) ) )).
+
+tff(fact_422_antimonoE,axiom,(
+    ! [F: fun_nat_nat,X: nat,Y: nat] : 
+      ( order_1631207636at_nat(F)
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,Y)),aa_nat_nat(F,X))) ) ) )).
+
+tff(fact_423_antimonoE,axiom,(
+    ! [F: fun_nat_int,X: nat,Y: nat] : 
+      ( order_120997680at_int(F)
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+       => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_nat_int(F,Y)),aa_nat_int(F,X))) ) ) )).
+
+tff(fact_424_antimonoE,axiom,(
+    ! [F: fun_int_bool,X: int,Y: int] : 
+      ( order_1556698295t_bool(F)
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X),Y))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_int_bool(F,Y)),aa_int_bool(F,X))) ) ) )).
+
+tff(fact_425_antimonoE,axiom,(
+    ! [F: fun_int_nat,X: int,Y: int] : 
+      ( order_1544476464nt_nat(F)
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X),Y))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_int_nat(F,Y)),aa_int_nat(F,X))) ) ) )).
+
+tff(fact_426_antimonoE,axiom,(
+    ! [F: fun_int_int,X: int,Y: int] : 
+      ( order_34266508nt_int(F)
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X),Y))
+       => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_int_int(F,Y)),aa_int_int(F,X))) ) ) )).
+
+tff(fact_427_antimonoD,axiom,(
+    ! [F: fun_bool_bool,X: bool,Y: bool] : 
+      ( order_721039474l_bool(F)
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,Y)),aa_bool_bool(F,X))) ) ) )).
+
+tff(fact_428_antimonoD,axiom,(
+    ! [F: fun_bool_nat,X: bool,Y: bool] : 
+      ( order_1086610613ol_nat(F)
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,Y)),aa_bool_nat(F,X))) ) ) )).
+
+tff(fact_429_antimonoD,axiom,(
+    ! [F: fun_bool_int,X: bool,Y: bool] : 
+      ( order_1723884305ol_int(F)
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+       => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_bool_int(F,Y)),aa_bool_int(F,X))) ) ) )).
+
+tff(fact_430_antimonoD,axiom,(
+    ! [F: fun_nat_bool,X: nat,Y: nat] : 
+      ( order_203183123t_bool(F)
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,Y)),aa_nat_bool(F,X))) ) ) )).
+
+tff(fact_431_antimonoD,axiom,(
+    ! [F: fun_nat_nat,X: nat,Y: nat] : 
+      ( order_1631207636at_nat(F)
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,Y)),aa_nat_nat(F,X))) ) ) )).
+
+tff(fact_432_antimonoD,axiom,(
+    ! [F: fun_nat_int,X: nat,Y: nat] : 
+      ( order_120997680at_int(F)
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+       => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_nat_int(F,Y)),aa_nat_int(F,X))) ) ) )).
+
+tff(fact_433_antimonoD,axiom,(
+    ! [F: fun_int_bool,X: int,Y: int] : 
+      ( order_1556698295t_bool(F)
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X),Y))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_int_bool(F,Y)),aa_int_bool(F,X))) ) ) )).
+
+tff(fact_434_antimonoD,axiom,(
+    ! [F: fun_int_nat,X: int,Y: int] : 
+      ( order_1544476464nt_nat(F)
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X),Y))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_int_nat(F,Y)),aa_int_nat(F,X))) ) ) )).
+
+tff(fact_435_antimonoD,axiom,(
+    ! [F: fun_int_int,X: int,Y: int] : 
+      ( order_34266508nt_int(F)
+     => ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X),Y))
+       => pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,aa_int_int(F,Y)),aa_int_int(F,X))) ) ) )).
+
+tff(fact_436_set__sublist__subset,axiom,(
+    ! [Xs: list_type,I2: set_nat] : ord_less_eq_set_type(set_type2(sublist_type(Xs,I2)),set_type2(Xs)) )).
+
+tff(fact_437_curryI,axiom,(
+    ! [F: fun_Pr1877371689e_bool,A4: type,B2: type] : 
+      ( pp(aa_Pro591562018e_bool(F,produc543565993e_type(A4,B2)))
+     => pp(aa_type_bool(aa_typ1943871138e_bool(produc231206650e_bool(F),A4),B2)) ) )).
+
+tff(fact_438_curryI,axiom,(
+    ! [F: fun_Pr1038595638k_bool,A4: type,B2: mark] : 
+      ( pp(aa_Pro1900269615k_bool(F,produc1323761628e_mark(A4,B2)))
+     => pp(aa_mark_bool(produc1978347655k_bool(F,A4),B2)) ) )).
+
+tff(fact_439_curryI,axiom,(
+    ! [F: fun_Pr1257344963k_bool,A4: mark,B2: mark] : 
+      ( pp(aa_Pro2119018940k_bool(F,produc2130394895k_mark(A4,B2)))
+     => pp(aa_mark_bool(aa_mar776331196k_bool(produc49613332k_bool(F),A4),B2)) ) )).
+
+tff(fact_440_le0,axiom,(
+    ! [N: nat] : pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,zero_zero_nat),N)) )).
+
+tff(fact_441_in__set__sublistD,axiom,(
+    ! [X: type,Xs: list_type,I2: set_nat] : 
+      ( member_type2(X,set_type2(sublist_type(Xs,I2)))
+     => member_type2(X,set_type2(Xs)) ) )).
+
+tff(fact_442_notin__set__sublistI,axiom,(
+    ! [X: type,Xs: list_type,I2: set_nat] : 
+      ( ~ member_type2(X,set_type2(Xs))
+     => ~ member_type2(X,set_type2(sublist_type(Xs,I2))) ) )).
+
+tff(fact_443_le__0__eq,axiom,(
+    ! [N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,N),zero_zero_nat))
+    <=> N = zero_zero_nat ) )).
+
+tff(fact_444_bspec,axiom,(
+    ! [A: set_type,P: fun_type_bool,X: type] : 
+      ( ! [X3: type] : 
+          ( member_type2(X3,A)
+         => pp(aa_type_bool(P,X3)) )
+     => ( member_type2(X,A)
+       => pp(aa_type_bool(P,X)) ) ) )).
+
+tff(fact_445_One__nat__def,axiom,(
+    one_one_nat = aa_nat_nat(suc,zero_zero_nat) )).
+
+tff(fact_446_curryD,axiom,(
+    ! [F: fun_Pr1877371689e_bool,A4: type,B2: type] : 
+      ( pp(aa_type_bool(aa_typ1943871138e_bool(produc231206650e_bool(F),A4),B2))
+     => pp(aa_Pro591562018e_bool(F,produc543565993e_type(A4,B2))) ) )).
+
+tff(fact_447_curryD,axiom,(
+    ! [F: fun_Pr1038595638k_bool,A4: type,B2: mark] : 
+      ( pp(aa_mark_bool(produc1978347655k_bool(F,A4),B2))
+     => pp(aa_Pro1900269615k_bool(F,produc1323761628e_mark(A4,B2))) ) )).
+
+tff(fact_448_curryD,axiom,(
+    ! [F: fun_Pr1257344963k_bool,A4: mark,B2: mark] : 
+      ( pp(aa_mark_bool(aa_mar776331196k_bool(produc49613332k_bool(F),A4),B2))
+     => pp(aa_Pro2119018940k_bool(F,produc2130394895k_mark(A4,B2))) ) )).
+
+tff(fact_449_curryE,axiom,(
+    ! [F: fun_Pr1877371689e_bool,A4: type,B2: type] : 
+      ( pp(aa_type_bool(aa_typ1943871138e_bool(produc231206650e_bool(F),A4),B2))
+     => pp(aa_Pro591562018e_bool(F,produc543565993e_type(A4,B2))) ) )).
+
+tff(fact_450_curryE,axiom,(
+    ! [F: fun_Pr1038595638k_bool,A4: type,B2: mark] : 
+      ( pp(aa_mark_bool(produc1978347655k_bool(F,A4),B2))
+     => pp(aa_Pro1900269615k_bool(F,produc1323761628e_mark(A4,B2))) ) )).
+
+tff(fact_451_curryE,axiom,(
+    ! [F: fun_Pr1257344963k_bool,A4: mark,B2: mark] : 
+      ( pp(aa_mark_bool(aa_mar776331196k_bool(produc49613332k_bool(F),A4),B2))
+     => pp(aa_Pro2119018940k_bool(F,produc2130394895k_mark(A4,B2))) ) )).
+
+tff(fact_452_nat_Osimps_I3_J,axiom,(
+    ! [X22: nat] : 
+      aa_nat_nat(suc,X22) != zero_zero_nat )).
+
+tff(fact_453_in__measures_I1_J,axiom,(
+    ! [X: type,Y: type] : 
+      ~ member1636067866e_type(produc543565993e_type(X,Y),measures_type(nil_fun_type_nat)) )).
+
+tff(fact_454_in__measures_I1_J,axiom,(
+    ! [X: mark,Y: mark] : 
+      ~ member2017138432k_mark(produc2130394895k_mark(X,Y),measures_mark(nil_fun_mark_nat)) )).
+
+tff(fact_455_less__le__not__le,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Y))
+    <=> ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+        & ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),X)) ) ) )).
+
+tff(fact_456_less__le__not__le,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Y))
+    <=> ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+        & ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),X)) ) ) )).
+
+tff(fact_457_less__le__not__le,axiom,(
+    ! [X: int,Y: int] : 
+      ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_int,X),Y))
+    <=> ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,X),Y))
+        & ~ pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,Y),X)) ) ) )).
+
+tff(fact_458_in__inv__image,axiom,(
+    ! [X: type,Y: type,R: set_Pr1267735761e_type,F: fun_type_type] : 
+      ( member1636067866e_type(produc543565993e_type(X,Y),inv_image_type_type(R,F))
+    <=> member1636067866e_type(produc543565993e_type(aa_type_type(F,X),aa_type_type(F,Y)),R) ) )).
+
+tff(fact_459_in__inv__image,axiom,(
+    ! [X: type,Y: type,R: set_Pr183678647k_mark,F: fun_type_mark] : 
+      ( member1636067866e_type(produc543565993e_type(X,Y),inv_image_mark_type(R,F))
+    <=> member2017138432k_mark(produc2130394895k_mark(aa_type_mark(F,X),aa_type_mark(F,Y)),R) ) )).
+
+tff(fact_460_in__inv__image,axiom,(
+    ! [X: mark,Y: mark,R: set_Pr1267735761e_type,F: fun_mark_type] : 
+      ( member2017138432k_mark(produc2130394895k_mark(X,Y),inv_image_type_mark(R,F))
+    <=> member1636067866e_type(produc543565993e_type(aa_mark_type(F,X),aa_mark_type(F,Y)),R) ) )).
+
+tff(fact_461_in__inv__image,axiom,(
+    ! [X: mark,Y: mark,R: set_Pr183678647k_mark,F: fun_mark_mark] : 
+      ( member2017138432k_mark(produc2130394895k_mark(X,Y),inv_image_mark_mark(R,F))
+    <=> member2017138432k_mark(produc2130394895k_mark(aa_mark_mark(F,X),aa_mark_mark(F,Y)),R) ) )).
+
+tff(fact_462_dropWhile__eq__Nil__conv,axiom,(
+    ! [P: fun_type_bool,Xs: list_type] : 
+      ( dropWhile_type(P,Xs) = nil_type
+    <=> ! [X4: type] : 
+          ( member_type2(X4,set_type2(Xs))
+         => pp(aa_type_bool(P,X4)) ) ) )).
+
+tff(fact_463_list_Oset_I1_J,axiom,(
+    set_type2(nil_type) = bot_bot_set_type )).
+
+tff(fact_464_bot_Oextremum__uniqueI,axiom,(
+    ! [A4: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),bot_bot_bool))
+     => ( pp(A4)
+      <=> pp(bot_bot_bool) ) ) )).
+
+tff(fact_465_bot_Oextremum__uniqueI,axiom,(
+    ! [A4: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),bot_bot_nat))
+     => A4 = bot_bot_nat ) )).
+
+tff(fact_466_bot_Oextremum__unique,axiom,(
+    ! [A4: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A4),bot_bot_bool))
+    <=> ( pp(A4)
+      <=> pp(bot_bot_bool) ) ) )).
+
+tff(fact_467_bot_Oextremum__unique,axiom,(
+    ! [A4: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A4),bot_bot_nat))
+    <=> A4 = bot_bot_nat ) )).
+
+tff(fact_468_bot_Oextremum,axiom,(
+    ! [A4: bool] : pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,bot_bot_bool),A4)) )).
+
+tff(fact_469_bot_Oextremum,axiom,(
+    ! [A4: nat] : pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,bot_bot_nat),A4)) )).
+
+tff(fact_470_subset__emptyI,axiom,(
+    ! [A: set_type] : 
+      ( ! [X3: type] : 
+          ~ member_type2(X3,A)
+     => ord_less_eq_set_type(A,bot_bot_set_type) ) )).
+
+tff(fact_471_set__dropWhileD,axiom,(
+    ! [X: type,P: fun_type_bool,Xs: list_type] : 
+      ( member_type2(X,set_type2(dropWhile_type(P,Xs)))
+     => member_type2(X,set_type2(Xs)) ) )).
+
+tff(fact_472_UnCI,axiom,(
+    ! [C3: type,B4: set_type,A: set_type] : 
+      ( ( ~ member_type2(C3,B4)
+       => member_type2(C3,A) )
+     => member_type2(C3,sup_sup_set_type(A,B4)) ) )).
+
+tff(fact_473_dropWhile__cong,axiom,(
+    ! [L: list_type,K: list_type,P: fun_type_bool,Q: fun_type_bool] : 
+      ( L = K
+     => ( ! [X3: type] : 
+            ( member_type2(X3,set_type2(L))
+           => ( pp(aa_type_bool(P,X3))
+            <=> pp(aa_type_bool(Q,X3)) ) )
+       => dropWhile_type(P,L) = dropWhile_type(Q,K) ) ) )).
+
+tff(fact_474_list__ex1__iff,axiom,(
+    ! [P: fun_type_bool,Xs: list_type] : 
+      ( list_ex1_type(P,Xs)
+    <=> ? [X4: type] : 
+          ( member_type2(X4,set_type2(Xs))
+          & pp(aa_type_bool(P,X4))
+          & ! [Y6: type] : 
+              ( ( member_type2(Y6,set_type2(Xs))
+                & pp(aa_type_bool(P,Y6)) )
+             => Y6 = X4 ) ) ) )).
+
+tff(fact_475_le__trans,axiom,(
+    ! [I3: nat,J2: nat,K: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,I3),J2))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,J2),K))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,I3),K)) ) ) )).
+
+tff(fact_476_can__select__set__list__ex1,axiom,(
+    ! [P: fun_type_bool,A: list_type] : 
+      ( can_select_type(P,set_type2(A))
+    <=> list_ex1_type(P,A) ) )).
+
+tff(fact_477_UnE,axiom,(
+    ! [C3: type,A: set_type,B4: set_type] : 
+      ( member_type2(C3,sup_sup_set_type(A,B4))
+     => ( ~ member_type2(C3,A)
+       => member_type2(C3,B4) ) ) )).
+
+tff(fact_478_dropWhile__last,axiom,(
+    ! [X: type,Xs: list_type,P: fun_type_bool] : 
+      ( member_type2(X,set_type2(Xs))
+     => ( ~ pp(aa_type_bool(P,X))
+       => last_type(dropWhile_type(P,Xs)) = last_type(Xs) ) ) )).
+
+tff(fact_479_in__set__insert,axiom,(
+    ! [X: type,Xs: list_type] : 
+      ( member_type2(X,set_type2(Xs))
+     => insert_type(X,Xs) = Xs ) )).
+
+tff(fact_480_Un__iff,axiom,(
+    ! [C3: type,A: set_type,B4: set_type] : 
+      ( member_type2(C3,sup_sup_set_type(A,B4))
+    <=> ( member_type2(C3,A)
+        | member_type2(C3,B4) ) ) )).
+
+tff(fact_481_le__refl,axiom,(
+    ! [N: nat] : pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,N),N)) )).
+
+tff(fact_482_can__select__def,axiom,(
+    ! [P: fun_type_bool,A: set_type] : 
+      ( can_select_type(P,A)
+    <=> ? [X4: type] : 
+          ( member_type2(X4,A)
+          & pp(aa_type_bool(P,X4))
+          & ! [Y6: type] : 
+              ( ( member_type2(Y6,A)
+                & pp(aa_type_bool(P,Y6)) )
+             => Y6 = X4 ) ) ) )).
+
+tff(fact_483_IntI,axiom,(
+    ! [C3: type,A: set_type,B4: set_type] : 
+      ( member_type2(C3,A)
+     => ( member_type2(C3,B4)
+       => member_type2(C3,inf_inf_set_type(A,B4)) ) ) )).
+
+tff(fact_484_last__in__set,axiom,(
+    ! [As2: list_type] : 
+      ( As2 != nil_type
+     => member_type2(last_type(As2),set_type2(As2)) ) )).
+
+tff(fact_485_le__antisym,axiom,(
+    ! [M: nat,N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,M),N))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,N),M))
+       => M = N ) ) )).
+
+tff(fact_486_dvd__eq__mod__eq__0__numeral,axiom,(
+    ! [X: num,Y: num] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(dvd_dvd_nat,numeral_numeral_nat(X)),numeral_numeral_nat(Y)))
+    <=> aa_nat_nat(div_mod_nat(numeral_numeral_nat(Y)),numeral_numeral_nat(X)) = zero_zero_nat ) )).
+
+tff(fact_487_zle__iff__zadd,axiom,(
+    ! [W: int,Z: int] : 
+      ( pp(aa_int_bool(aa_int_fun_int_bool(ord_less_eq_int,W),Z))
+    <=> ? [N2: nat] : Z = aa_int_int(plus_plus_int(W),aa_nat_int(semiri2019852685at_int,N2)) ) )).
+
+tff(fact_488_bex1__bexeq__reg,axiom,(
+    ! [R2: fun_ty518885433e_bool,P: fun_type_bool] : 
+      ( ? [X2: type] : 
+          ( member_type2(X2,respects_type(R2))
+          & pp(aa_type_bool(P,X2))
+          & ! [Y4: type] : 
+              ( ( member_type2(Y4,respects_type(R2))
+                & pp(aa_type_bool(P,Y4)) )
+             => Y4 = X2 ) )
+     => bex1_rel_type(R2,P) ) )).
+
+tff(fact_489_not__in__set__insert,axiom,(
+    ! [X: type,Xs: list_type] : 
+      ( ~ member_type2(X,set_type2(Xs))
+     => insert_type(X,Xs) = cons_type(X,Xs) ) )).
+
+tff(fact_490_List_Oset__insert,axiom,(
+    ! [X: type,Xs: list_type] : set_type2(insert_type(X,Xs)) = insert_type2(X,set_type2(Xs)) )).
+
+tff(fact_491_wf__eq__minimal2,axiom,(
+    ! [R: set_Pr1267735761e_type] : 
+      ( wf_type(R)
+    <=> ! [A6: set_type] : 
+          ( ( ord_less_eq_set_type(A6,field_type(R))
+            & A6 != bot_bot_set_type )
+         => ? [X4: type] : 
+              ( member_type2(X4,A6)
+              & ! [Xa2: type] : 
+                  ( member_type2(Xa2,A6)
+                 => ~ member1636067866e_type(produc543565993e_type(Xa2,X4),R) ) ) ) ) )).
+
+tff(fact_492_wf__eq__minimal2,axiom,(
+    ! [R: set_Pr183678647k_mark] : 
+      ( wf_mark(R)
+    <=> ! [A6: set_mark] : 
+          ( ( ord_less_eq_set_mark(A6,field_mark(R))
+            & A6 != bot_bot_set_mark )
+         => ? [X4: mark] : 
+              ( member_mark(X4,A6)
+              & ! [Xa2: mark] : 
+                  ( member_mark(Xa2,A6)
+                 => ~ member2017138432k_mark(produc2130394895k_mark(Xa2,X4),R) ) ) ) ) )).
+
+tff(fact_493_DiffE,axiom,(
+    ! [C3: type,A: set_type,B4: set_type] : 
+      ( member_type2(C3,minus_minus_set_type(A,B4))
+     => ~ ( member_type2(C3,A)
+         => member_type2(C3,B4) ) ) )).
+
+tff(fact_494_insert__subset,axiom,(
+    ! [X: type,A: set_type,B4: set_type] : 
+      ( ord_less_eq_set_type(insert_type2(X,A),B4)
+    <=> ( member_type2(X,B4)
+        & ord_less_eq_set_type(A,B4) ) ) )).
+
+tff(fact_495_ATP_Olambda__1,axiom,(
+    ! [Uu: set_type,Uua: type] : 
+      ( pp(aa_type_bool(aTP_Lamm_ae(Uu),Uua))
+    <=> member_type2(Uua,Uu) ) )).
+
+tff(fact_496_ATP_Olambda__2,axiom,(
+    ! [Uu: set_Pr183678647k_mark,Uua: produc1673386071k_mark] : 
+      ( pp(aa_Pro2119018940k_bool(aTP_Lamm_a(Uu),Uua))
+    <=> member2017138432k_mark(Uua,Uu) ) )).
+
+tff(fact_497_ATP_Olambda__3,axiom,(
+    ! [Uu: set_Pr2081054535e_type,Uua: produc1703900263e_type] : 
+      ( pp(aa_Pro1114958380e_bool(aTP_Lamm_aa(Uu),Uua))
+    <=> member1154427280e_type(Uua,Uu) ) )).
+
+tff(fact_498_ATP_Olambda__4,axiom,(
+    ! [Uu: set_Pr28651015e_mark,Uua: produc820355879e_mark] : 
+      ( pp(aa_Pro1791322988k_bool(aTP_Lamm_ab(Uu),Uua))
+    <=> member270882896e_mark(Uua,Uu) ) )).
+
+tff(fact_499_ATP_Olambda__5,axiom,(
+    ! [Uu: set_Pr1193971207k_type,Uua: produc1930101543k_type] : 
+      ( pp(aa_Pro2004355948e_bool(aTP_Lamm_ac(Uu),Uua))
+    <=> member1380628560k_type(Uua,Uu) ) )).
+
+tff(fact_500_ATP_Olambda__6,axiom,(
+    ! [Uu: set_Pr1289051335k_mark,Uua: produc1046557159k_mark] : 
+      ( pp(aa_Pro533236908k_bool(aTP_Lamm_ad(Uu),Uua))
+    <=> member497084176k_mark(Uua,Uu) ) )).
+
+tff(help_pp_2_1_U,axiom,(
+    pp(fTrue) )).
+
+tff(help_pp_1_1_U,axiom,(
+    ~ pp(fFalse) )).
+
+tff(conj_9,conjecture,
+    ( ! [A6: type] : 
+        ( pp(aa_type_bool(aa_typ1943871138e_bool(conforms,A6),c))
+       => pp(aa_type_bool(self_initializing,aa_mark_type(unmark(A6),tm))) )
+  <=> ( tm = detachableMark
+      | c = expanded ) )).
+%------------------------------------------------------------------------------
