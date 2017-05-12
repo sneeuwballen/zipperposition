@@ -39,9 +39,9 @@ def union_right : pi a. list (set a) -> set a where
   forall a. union_right a nil = empty;
   forall a s tail. union_right (cons s tail) = union (union_right tail) s.
 
-# TODO
-#lemma forall a (s1 s2 s3:set a). union s1 (union s2 s3) = union (union s1 s2) s3.
-#lemma forall a (s1 s2:set a). union s1 s2 = union s2 s1.
+# NOTE: useless, but funny
+lemma forall a (s1 s2 s3:set a). union s1 (union s2 s3) = union (union s1 s2) s3.
+lemma forall a (s1 s2:set a). union s1 s2 = union s2 s1.
 
 goal forall a (l:list (set a)). union_left l = union_right l.
 
