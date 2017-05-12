@@ -2,7 +2,10 @@
 
 ## Now
 
-- flag for not printing type arguments
+- lemmas: if lemma not proven inductively, prove it directly
+
+- in TPTP, detect *some* definitions (`definition, foo = bar`)
+  with flag to disable it
 
 ## Misc
 
@@ -131,6 +134,21 @@
 ## Zipperposition
 
 ### Induction
+
+* custom induction schema, with a toplevel command
+  + structural induction on datatypes:
+    `inductive (n:nat) := { (zero, {}), (succ(n'), {n'}) }`
+  + induction on sets
+    `inductive (S:set a) := { (S=empty, {}), (∃x S'. (S = S' ∪ {x} ∧ x∉S'), {S'}) }`
+    corresponding to axioms:
+    `forall S. S = empty xor ∃x S'. (S = S' ∪ {x} ∧ x∉S')`
+    `[ P empty && (forall x S S'. x ∈ S ∧ S = S' ∪ {x} ∧ x∉S' ∧ P(S') => P(S)) ] => ∀S. P S.`
+    NOTE: need to restrict its application, not needed for most use cases
+    and will only slow things down
+    → only when goal involves recursive function on sets?
+
+  + inductive relations? if `R` transitive:
+    `inductive (R(x,y)) := { (x=y, {}), (x ≠ y, {∃z. R(x,y) ∧ R(y,z)}) }`
 
 * discussion
   + it all becomes sound (assuming hidden induction principle): each cut
