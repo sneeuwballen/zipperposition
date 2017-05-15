@@ -183,6 +183,7 @@ module Combinators = struct
       ]
   end
 
+  let none : t = of_rules "none" (CCFun.const [])
   let ski : t = of_rules "ski" Rules_.ski
   let skibc : t = of_rules "skibc" Rules_.skibc
   let turner : t = of_rules "turner" Rules_.turner
