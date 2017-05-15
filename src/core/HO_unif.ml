@@ -170,7 +170,10 @@ let unif_step ((c:Combinators.t),sc_combs) ((t,u),sc_pair): _ list =
                (fun i ->
                   let t_prefix = T.app f (CCList.take (n_ty_args+i) args) in
                   try
-                    Some (Unif.FO.unification (t_prefix,sc_pair) (lhs,sc_combs),p)
+                    let subst =
+                      Unif.FO.unification (t_prefix,sc_pair) (lhs,sc_combs)
+                    in
+                    Some (subst,p)
                   with Unif.Fail -> None)
            end)
     ) else Sequence.empty
@@ -187,7 +190,7 @@ let unif_step ((c:Combinators.t),sc_combs) ((t,u),sc_pair): _ list =
            let pp_subst out s = Subst.pp out (fst s) in
            Util.add_stat stat_unif_steps (List.length substs);
            Util.debugf ~section 4
-             "(@[ho_unif@ `@[<hv>%a =@ %a@]`@ :substs (@[<hv>%a@])@])"
+             "(@[ho_unif.step@ `@[<hv>%a =@ %a@]`@ :substs (@[<hv>%a@])@])"
              (fun k->k T.pp t T.pp u (Util.pp_list pp_subst) substs);
          );
       )
