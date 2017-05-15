@@ -10,6 +10,8 @@ module T = Term
 type term = Term.t
 let section = Util.Section.make ~parent:Const.section "fool"
 
+let stat_fool_param = Util.mk_stat "fool.param_step"
+
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C
@@ -72,11 +74,39 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Sequence.flat_map_l
         (fun sub -> [fool_param_sign ~sub true c; fool_param_sign ~sub false c])
       |> Sequence.to_rev_list
+      |> CCFun.tap
+        (fun l ->
+           if l<>[] then (
+             Util.add_stat stat_fool_param (List.length l);
+             Util.debugf ~section 4
+               "(@[<2>fool_param@ :clause %a@ :yields (@[<hv>%a@])@])"
+               (fun k->k C.pp c (Util.pp_list C.pp) l);
+           ))
     end
+
+  (* rewrite [a ≠_o b] into [a || b && (¬ a || ¬b)], i.e. exclusive or *)
+  let rw_bool_eqns : E.multi_simpl_rule = fun c ->
+    C.lits c
+    |> CCArray.findi
+      (fun i lit -> match lit with
+        | Literal.Equation (a, b, false) when Type.is_prop (T.ty a) ->
+          let lits = CCArray.except_idx (C.lits c) i in
+          let mk_c lits =
+            let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "fool_simp")
+                [Proof.Parent.from @@ C.proof c]
+            in
+            C.create lits proof
+              ~penalty:(C.penalty c) ~trail:(C.trail c)
+          in
+          let c_pos = Literal.mk_true a :: Literal.mk_true b :: lits |> mk_c in
+          let c_neg = Literal.mk_false a :: Literal.mk_false b :: lits |> mk_c in
+          Some [c_pos; c_neg]
+        | _ -> None)
 
   let setup () =
     Util.debug ~section 1 "setup fool rules";
     Env.add_unary_inf "fool_param" fool_param;
+    Env.add_multi_simpl_rule rw_bool_eqns;
     ()
 end
 
