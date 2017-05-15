@@ -28,6 +28,7 @@ let errorf msg = Util.errorf ~where:"sat_solver" msg
 let sat_dump_file_ = ref ""
 let sat_log_file = ref ""
 let sat_compact_ = ref false
+let sat_pp_model_ = ref false
 
 module type S = Sat_solver_intf.S
 
@@ -273,6 +274,17 @@ module Make(Dummy : sig end)
          | None -> None)
     |> Lit.Set.of_seq
 
+  let pp_model_ (): unit = match last_result() with
+    | Sat ->
+      let m =
+        Lit.Tbl.keys lit_tbl_
+        |> Sequence.map (fun l -> l, valuation l)
+        |> Sequence.to_rev_list
+      in
+      let pp_pair out (l,b) = Format.fprintf out "(@[%B %a@])" b BBox.pp l in
+      Format.printf "(@[<hv2>bool_model@ %a@])@." (Util.pp_list ~sep:" " pp_pair) m
+    | Unsat _ -> ()
+
   (* call [S.solve()] in any case, and enforce invariant about eval/unsat_core *)
   let check_unconditional_ () =
     (* reset functions, so they will fail if called in the wrong state *)
@@ -321,8 +333,7 @@ module Make(Dummy : sig end)
   let set_printer pp = pp_ := pp
 
   let setup () =
-    if !sat_dump_file_ <> ""
-    then (
+    if !sat_dump_file_ <> "" then (
       Util.debugf ~section 1 "dump SAT clauses to `%s`" (fun k->k !sat_dump_file_);
       try
         let oc = open_out !sat_dump_file_ in
@@ -332,6 +343,7 @@ module Make(Dummy : sig end)
         Util.warnf "@[<2>could not open `%s`:@ %s@]"
           !sat_dump_file_ (Printexc.to_string e);
     );
+    if !sat_pp_model_ then at_exit pp_model_;
     ()
 end
 
@@ -343,4 +355,5 @@ let () =
     ; "--sat-log", Arg.Set_string sat_log_file, " output SAT logs into <file>"
     ; "--compact-sat", Arg.Set sat_compact_, " compact SAT proofs"
     ; "--no-compact-sat", Arg.Clear sat_compact_, " do not compact SAT proofs"
+    ; "--pp-sat-model", Arg.Set sat_pp_model_, " print SAT model on exit"
     ]
