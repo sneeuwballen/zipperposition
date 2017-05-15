@@ -220,7 +220,7 @@ module Make(Env : Env_intf.S) = struct
   (* all ground terms for which we already applied the exhaustiveness inf *)
   let exhaustiveness_tbl_ : unit T.Tbl.t = T.Tbl.create 128
 
-  (* purely made of cstors and skolems *)
+  (* purely made of cstors and skolems and undefined constants *)
   let rec pure_value (t:term): bool = match as_cstor_app t with
     | Some (_, l) -> List.for_all pure_value l
     | None ->
@@ -288,6 +288,20 @@ module Make(Env : Env_intf.S) = struct
         (fun k->k T.pp t Type.pp (T.ty t) C.pp new_c);
       new_c
     in
+    (* find candidate subterms that are candidate for exhaustiveness *)
+    let find_terms (t:term): term Sequence.t =
+      T.Seq.subterms t
+      |> Sequence.filter
+        (fun t ->
+           T.is_ground t &&
+           begin match Ind_ty.as_inductive_type (T.ty t) with
+             | None -> false
+             | Some (ity,_) ->
+               (* only for non-recursive types *)
+               not (Ind_ty.is_recursive ity) &&
+               pure_value t
+           end)
+    in
     (* find terms to instantiate exhaustiveness for, and do it *)
     begin
       let eligible = C.Eligible.(res c ** neg) in
@@ -295,26 +309,14 @@ module Make(Env : Env_intf.S) = struct
       |> Sequence.of_array_i
       |> Sequence.filter_map
         (fun (i,lit) -> if eligible i lit then Some lit else None)
-      |> Sequence.flat_map_l
-        (function
-          | Literal.Equation (l, r, false)
-            when Ind_ty.is_inductive_type (T.ty l) ->
-            (* [l != r] with some specific criteria.
-               We always do it for ground terms of
-               non-recursive inductive types.
-            *)
-            if Ind_ty.is_recursive
-                (Ind_ty.as_inductive_type_exn (T.ty l) |> fst)
-            then [] (* induction *)
-            else List.filter (fun t -> T.is_ground t && pure_value t) [l;r]
-          | _ -> [])
+      |> Sequence.flat_map Literal.Seq.terms
+      |> Sequence.flat_map find_terms
       (* remove cstor-headed terms *)
       |> Sequence.filter
         (fun t ->
            not (is_cstor_app t) &&
            not (T.Tbl.mem exhaustiveness_tbl_ t))
-      |> T.Set.of_seq
-      |> T.Set.to_list
+      |> T.Set.of_seq |> T.Set.to_list
       |> List.rev_map
         (fun t ->
            T.Tbl.add exhaustiveness_tbl_ t ();
