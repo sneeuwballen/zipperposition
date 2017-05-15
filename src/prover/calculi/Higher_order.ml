@@ -102,12 +102,20 @@ end
 let k_some_ho : bool Flex_state.key = Flex_state.create_key()
 
 let st_contains_ho (st:(_,_,_) Statement.t): bool =
-  Statement.Seq.terms st
-  |> Sequence.flat_map T.Seq.vars
-  |> Sequence.exists
-    (fun v ->
-       let n_ty_vars, args, _ = Type.open_poly_fun (HVar.ty v) in
-       n_ty_vars > 0 || args<>[])
+  (* is there a HO variable? *)
+  let has_ho_var () =
+    Statement.Seq.terms st
+    |> Sequence.flat_map T.Seq.vars
+    |> Sequence.exists
+      (fun v ->
+         let n_ty_vars, args, _ = Type.open_poly_fun (HVar.ty v) in
+         n_ty_vars > 0 || args<>[])
+  (* is there a HO symbol? *)
+  and has_ho_sym () =
+    Statement.Seq.ty_decls st
+    |> Sequence.exists (fun (_,ty) -> Type.order ty > 1)
+  in
+  has_ho_sym () || has_ho_var ()
 
 let extension =
   let register env =
