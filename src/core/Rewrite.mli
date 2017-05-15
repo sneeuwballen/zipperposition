@@ -23,6 +23,7 @@ module Term : sig
     val vars_l : t -> Type.t HVar.t list
     val head_id : t -> ID.t
     val args : t -> term list
+    val arity : t -> int
 
     val as_lit : t -> Literal.t
 

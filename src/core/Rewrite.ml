@@ -20,6 +20,7 @@ type term = Term.t
 type term_rule = {
   term_head: ID.t; (* head symbol of LHS *)
   term_args: term list; (* arguments *)
+  term_arity: int; (* [length args] *)
   term_lhs: term; (* [lhs = head args] *)
   term_rhs: term;
 }
@@ -190,6 +191,7 @@ module Term = struct
     let rhs r = r.term_rhs
     let head_id r = r.term_head
     let args r = r.term_args
+    let arity r = r.term_arity
     let ty r = T.ty r.term_rhs
 
     let as_lit (r:t): Literal.t = Literal.mk_eq (lhs r)(rhs r)
@@ -198,7 +200,8 @@ module Term = struct
     let vars_l r = vars r |> T.VarSet.to_list
 
     let make_ head args term_lhs term_rhs =
-      { term_head=head; term_args=args; term_lhs; term_rhs }
+      { term_head=head; term_args=args; term_arity=List.length args;
+        term_lhs; term_rhs }
 
     (* constant rule [id := rhs] *)
     let make_const id ty rhs =
@@ -283,6 +286,7 @@ module Term = struct
         reduce_l l
           (fun l' ->
              let t' = if T.same_l l l' then t else T.app f l' in
+             let n_l = List.length l' in
              begin match T.view f with
                | T.Const id ->
                  let find_rule =
@@ -290,25 +294,39 @@ module Term = struct
                    |> Sequence.find_map
                      (fun r ->
                         try
+                          let n_r = Rule.arity r in
+                          let t', l_rest =
+                            if n_l=n_r then t', []
+                            else if n_r < n_l then (
+                              let l1, l2 = CCList.take_drop n_r l' in
+                              T.app f l1, l2
+                            ) else (
+                              raise Exit;
+                            )
+                          in
                           let subst' =
                             Unif.FO.matching ~pattern:(r.term_lhs,1) (t',0)
                           in
-                          Some (r, subst')
-                        with Unif.Fail -> None)
+                          Some (r, subst', l_rest)
+                        with Unif.Fail | Exit -> None)
                  in
                  begin match find_rule with
                    | None -> k t'
-                   | Some (r, subst) ->
+                   | Some (r, subst,l_rest) ->
                      (* rewrite [t = r.lhs\sigma] into [rhs] (and normalize [rhs],
                         which contain variables bound by [subst]) *)
                      Util.debugf ~section 5
-                       "@[<2>rewrite `@[%a@]`@ using `@[%a@]`@ with `@[%a@]`@]"
-                       (fun k->k T.pp t' Rule.pp r Subst.pp subst);
+                       "(@[<2>rewrite `@[%a@]`@ :using `@[%a@]`@ \
+                        :with `@[%a@]`@ :rest [@[%a@]]@])"
+                       (fun k->k T.pp t' Rule.pp r Subst.pp subst
+                           (Util.pp_list ~sep:"," T.pp) l_rest);
                      set := TR_set.add r !set;
                      Util.incr_stat stat_term_rw;
                      decr fuel;
                      (* NOTE: not efficient, will traverse [t'] fully *)
                      let t' = Subst.FO.apply_no_renaming subst (r.term_rhs,1) in
+                     (* add leftover arguments *)
+                     let t' = T.app t' l_rest in
                      reduce t' k
                  end
                | _ -> k t'
