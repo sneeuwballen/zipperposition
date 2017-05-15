@@ -456,6 +456,7 @@ module Conv = struct
       | PT.Const id -> const id
       | PT.AppBuiltin (Builtin.Arrow, ret::args) ->
         let ret = aux depth v2db ret in
+        assert (not (is_fun ret || is_forall ret));
         let args = List.map (aux depth v2db) args in
         arrow args ret
       | PT.AppBuiltin (Builtin.Term,[]) -> term

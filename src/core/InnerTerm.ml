@@ -159,9 +159,15 @@ let builtin ~ty b =
   let my_t = make_ ~ty:(HasType ty) (AppBuiltin (b,[])) in
   H.hashcons my_t
 
-let app_builtin ~ty b l =
-  let my_t = make_ ~ty:(HasType ty) (AppBuiltin (b,l)) in
-  H.hashcons my_t
+let rec app_builtin ~ty b l = match b, l with
+  | Builtin.Arrow, [] -> assert false
+  | Builtin.Arrow, [ret] -> ret
+  | Builtin.Arrow, ({term=AppBuiltin(Builtin.Arrow, ret::l1); _} :: l2) ->
+    (* flatten *)
+    app_builtin ~ty Builtin.Arrow (ret :: l2 @ l1)
+  | _ ->
+    let my_t = make_ ~ty:(HasType ty) (AppBuiltin (b,l)) in
+    H.hashcons my_t
 
 let tType =
   let my_t = make_ ~ty:NoType (AppBuiltin(Builtin.TType, [])) in
