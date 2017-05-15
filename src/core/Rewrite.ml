@@ -12,6 +12,9 @@ let prof_term_rw = Util.mk_profiler "rw.term"
 let stat_lit_rw = Util.mk_stat "rw.steps_lit"
 let prof_lit_rw = Util.mk_profiler "rw.lit"
 
+(* do we rewrite literals of the form [t = u]? *)
+let allow_pos_eqn_rewrite_ = ref false
+
 type term = Term.t
 
 type term_rule = {
@@ -401,9 +404,13 @@ module Lit = struct
   let eq_rules_ : Set.t ref = ref Set.empty
 
   let add_eq_rule (r:Rule.t): unit = match Rule.lhs r with
-    | Literal.Equation (t,_,_) ->
+    | Literal.Equation (t,_,sign) ->
       let ty = T.ty t in
-      if Type.is_const ty || Type.is_app ty then (
+      if sign && not !allow_pos_eqn_rewrite_ then (
+        (* ignore positive rules *)
+        Util.debugf ~section 2 "@[<2>ignore positive equational rewrite `%a`@]"
+          (fun k->k Rule.pp r);
+      ) else if Type.is_const ty || Type.is_app ty then (
         eq_rules_ := Set.add r !eq_rules_;
       ) else (
         Util.invalid_argf
@@ -744,3 +751,9 @@ let all_cst k = List.iter k !allcst_
 let all_rules =
   all_cst
   |> Sequence.flat_map Defined_cst.rules_seq
+
+let () =
+  Options.add_opts
+    [ "--rw-pos-eqn", Arg.Set allow_pos_eqn_rewrite_, " do rewriting on positive equations";
+      "--no-rw-pos-eqn", Arg.Clear allow_pos_eqn_rewrite_, " no rewriting on positive equations";
+    ]
