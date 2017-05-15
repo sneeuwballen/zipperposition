@@ -106,6 +106,7 @@ val is_var : t -> bool
 val is_bvar : t -> bool
 val is_app : t -> bool
 val is_const : t -> bool
+val is_type : t -> bool (** Does it have type [tType]? *)
 
 val as_const : t -> ID.t option
 val as_const_exn : t -> ID.t

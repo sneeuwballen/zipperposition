@@ -258,8 +258,14 @@ let apply ty0 args0 =
     | _, [] ->
       T.DB.eval env (arrow_ exp_args ty_ret)
     | [], _ ->
-      err_applyf_ "@[<2>Type.apply:@ unexpected arguments [@[%a@]]@]"
-        (Util.pp_list T.pp) args
+      begin match T.view (T.DB.eval env ty_ret) with
+        | T.AppBuiltin (Builtin.Arrow, (ty_ret'::exp_args')) ->
+          (* [ty_ret = exp_args' -> ty_ret'], continue applying *)
+          aux_l ty_ret' exp_args' args env
+        | _ ->
+          err_applyf_ "@[<2>Type.apply:@ unexpected arguments [@[%a@]]@]"
+            (Util.pp_list T.pp) args
+      end
     | exp :: exp_args', a :: args' ->
       (* expected type: [exp];  [a]: actual value, whose type must match [exp] *)
       let exp' = T.DB.eval env exp in
