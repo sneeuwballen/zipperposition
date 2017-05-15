@@ -511,10 +511,12 @@ module Ty = struct
     | Ty_record of (string * t) list * t Var.t option
     | Ty_meta of meta_var
 
-  let view (t:t) : view = match view t with
+  let t_view_ = view
+
+  let rec view (t:t) : view = match t_view_ t with
     | Var v -> Ty_var v
     | App (f, l) ->
-      begin match view f with
+      begin match t_view_ f with
         | Const id -> Ty_app (id,l)
         | _ -> assert false
       end
@@ -522,10 +524,11 @@ module Ty = struct
     | Bind (Binder.ForallTy, v, t) -> Ty_forall (v,t)
     | Record (l,None) -> Ty_record (l, None)
     | Record (l, Some r) ->
-      begin match view r with
+      begin match t_view_ r with
         | Var r -> Ty_record (l, Some r)
         | _ -> assert false
       end
+    | Meta (_,{contents=Some ty'},_) -> view ty'
     | Meta (v,o,k) -> Ty_meta (v,o,k)
     | AppBuiltin (Builtin.Prop, []) -> Ty_builtin Prop
     | AppBuiltin (Builtin.TType, []) -> Ty_builtin TType
@@ -1216,7 +1219,7 @@ let unify ?(allow_open=false) ?loc ?(st=UStack.create()) ?(subst=Subst.empty) t1
   in
   unif_rec subst t1 t2
 
-let apply_unify ?allow_open ?loc ?st ?(subst=Subst.empty) ty l =
+let apply_unify ?gen_fresh_meta ?allow_open ?loc ?st ?(subst=Subst.empty) ty l =
   Util.debugf ~section 5 "@[<>apply `%a`@ to [@[%a@]]@]"
     (fun k->k pp ty (Util.pp_list pp) l);
   let rec aux subst ty l = match Ty.view ty, l with
@@ -1228,7 +1231,19 @@ let apply_unify ?allow_open ?loc ?st ?(subst=Subst.empty) ty l =
       aux (Subst.add subst v a) ty' l'
     | Ty.Ty_fun (exp, ret), _ ->
       aux_l subst exp ret l
-    | (Ty.Ty_meta _ | Ty.Ty_var _ | Ty.Ty_app _ | Ty.Ty_builtin _
+    | Ty.Ty_meta _, _ ->
+      begin match gen_fresh_meta with
+        | None ->
+          fail_uniff_ ?loc [] "cannot apply type `@[%a@]`@ to `@[%a@]`"
+            pp ty (Util.pp_list pp) l
+        | Some g ->
+          (* unify meta with [tyof(l) -> fresh_var()] *)
+          let ret = g() |> Ty.meta in
+          unify ?allow_open ?loc ?st ~subst ty
+            (Ty.fun_ (List.map ty_exn l) ret);
+          ret
+      end
+    | (Ty.Ty_var _ | Ty.Ty_app _ | Ty.Ty_builtin _
       | Ty.Ty_multiset _ | Ty.Ty_record _), _ ->
       fail_uniff_ ?loc [] "cannot apply type `@[%a@]`@ to `@[%a@]`"
         pp ty (Util.pp_list pp) l

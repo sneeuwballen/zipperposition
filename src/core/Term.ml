@@ -177,6 +177,9 @@ let as_app t = match view t with
   | App (f,l) -> f, l
   | _ -> t, []
 
+let head_term t = fst (as_app t)
+let args t = snd (as_app t)
+
 module Seq = struct
   let vars t k =
     let rec aux t =

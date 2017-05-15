@@ -116,6 +116,12 @@ val as_app : t -> t * t list
 (** [as_app t] decomposes [t] into a head (non-application) and arguments,
     such as [(let f,l = as_app t in app f l) = t] *)
 
+val head_term : t -> t
+(** [head_term t = fst (as_app t)] *)
+
+val args : t -> t list
+(** [args t = snd (as_app t)] *)
+
 val of_term_unsafe : InnerTerm.t -> t
 (** {b NOTE}: this can break the invariants and make {!view} fail. Only
     apply with caution. *)

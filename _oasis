@@ -64,7 +64,7 @@ Library "logtk"
   Pack:             true
   Modules:          InnerTerm, Term, Type, Util, STerm, Interfaces,
                     DBEnv, Position, Var, HVar, Defined_pos,
-                    Subst, Unif, Signature, Scoped, Unif_intf,
+                    Subst, Unif, Signature, Scoped, Unif_intf, HO_unif,
                     TypeInference, Options, Comparison, Precedence, Builtin,
                     Ordering, Skolem, Cnf, ID, IDOrBuiltin, SLiteral,
                     Index, Index_intf, Dtree, Fingerprint, NPDtree, Binder,

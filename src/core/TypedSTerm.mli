@@ -322,6 +322,7 @@ val unify :
     @raise UnifyFailure if unification fails. *)
 
 val apply_unify :
+  ?gen_fresh_meta:(unit -> meta_var) ->
   ?allow_open:bool -> ?loc:location -> ?st:UStack.t -> ?subst:Subst.t ->
   t -> t list -> t
 (** [apply_unify f_ty args] compute the type of a function of type [f_ty],

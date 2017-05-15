@@ -334,6 +334,11 @@ let with_typed_var_ ?loc ~infer_ty ctx v ~f =
       | [v] -> f v
       | _ -> assert false)
 
+let apply_unify ~allow_open ?loc ctx ty l =
+  T.apply_unify ty l
+    ?loc ~allow_open
+    ~gen_fresh_meta:(Ctx.fresh_ty_meta_var ctx ~dest:`Generalize)
+
 (* convert a prolog term into a type *)
 let rec infer_ty_ ?loc ctx ty =
   let rec aux ty = match PT.view ty with
@@ -376,13 +381,15 @@ let rec infer_ty_ ?loc ctx ty =
           List.iter (fun v -> unify T.tType (Var.ty v)) vars';
           let body' = aux body in
           T.Ty.forall_l vars' body')
+    | PT.AppBuiltin (Builtin.Wildcard,[]) ->
+      Ctx.fresh_ty_meta_var ctx ~dest:`Generalize () |> T.meta
     | _ ->
       error_ ?loc "@[<2>`@[%a@]`@ is not a valid type@]" PT.pp ty
   and aux_app id ty l =
     unify ?loc (T.Ty.returns ty) T.Ty.tType;
     let l = List.map aux l in
     (* ensure that the type is well-typed (!) *)
-    let ty_res = T.apply_unify ?loc ~allow_open:false ty l in
+    let ty_res = apply_unify ctx ~allow_open:false ?loc ty l in
     unify ?loc ty_res T.Ty.tType;
     T.Ty.app id l
   in
@@ -417,7 +424,7 @@ let mk_metas ctx n =
 let apply_ty_to_metas ?loc ctx (ty:T.Ty.t): T.Ty.t list * T.Ty.t =
   let ty_vars, _, _ = T.Ty.unfold ty in
   let metas = mk_metas ctx (List.length ty_vars) in
-  let ty = T.apply_unify ~allow_open:true ?loc ty metas in
+  let ty = apply_unify ctx ~allow_open:true ?loc ty metas in
   metas, ty
 
 (* infer a type for [t], possibly updating [ctx]. Also returns a
@@ -432,14 +439,14 @@ let rec infer_rec ?loc ctx t =
         | `ID (id, ty_id) ->
           (* implicit parameters, e.g. for [nil] *)
           let l = add_implicit_params ty_id [] |> List.map (infer_rec ?loc ctx) in
-          let ty = T.apply_unify ?loc ~allow_open:true ty_id l in
+          let ty = apply_unify ctx ?loc ~allow_open:true ty_id l in
           T.app ?loc ~ty (T.const ?loc ~ty:ty_id id) l
       end
     | PT.Const s ->
       let id, ty_id = Ctx.get_id_ ?loc ~arity:0 ctx s in
       (* implicit parameters, e.g. for [nil] *)
       let l = add_implicit_params ty_id [] |> List.map (infer_rec ?loc ctx) in
-      let ty = T.apply_unify ?loc ~allow_open:true ty_id l in
+      let ty = apply_unify ctx ?loc ~allow_open:true ty_id l in
       T.app ?loc ~ty (T.const ?loc ~ty:ty_id id) l
     | PT.App ({PT.term=PT.Var v; _}, l) ->
       begin match Ctx.get_var_ ?loc ctx v with
@@ -451,7 +458,7 @@ let rec infer_rec ?loc ctx t =
           Util.debugf ~section 5 "@[<2>apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]"
             (fun k->k Var.pp v T.pp (Var.ty v) (Util.pp_list T.pp) l
                 (Util.pp_list T.pp) (List.map T.ty_exn l));
-          let ty = T.apply_unify ?loc ~allow_open:true (Var.ty v) l in
+          let ty = apply_unify ctx ?loc ~allow_open:true (Var.ty v) l in
           T.app ?loc ~ty (T.var ?loc v) l
       end
     | PT.App ({PT.term=PT.Const s; _}, l) ->
@@ -464,7 +471,7 @@ let rec infer_rec ?loc ctx t =
       Util.debugf ~section 5 "@[<2>apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]"
         (fun k->k T.pp f T.pp (T.ty_exn f) (Util.pp_list T.pp) l
             (Util.pp_list T.pp) (List.map T.ty_exn l));
-      let ty = T.apply_unify ?loc ~allow_open:true (T.ty_exn f) l in
+      let ty = apply_unify ctx ?loc ~allow_open:true (T.ty_exn f) l in
       T.app ?loc ~ty f l
     | PT.Ite (a,b,c) ->
       let a = infer_prop_ ?loc ctx a in
@@ -615,7 +622,7 @@ let rec infer_rec ?loc ctx t =
               metas @ l
             ) else l
           in
-          let ty = T.apply_unify ~allow_open:true ?loc ty_b l in
+          let ty = apply_unify ctx ~allow_open:true ?loc ty_b l in
           T.app_builtin ?loc ~ty b l
       end
   in
@@ -630,7 +637,7 @@ and infer_app ?loc ctx id ty_id l =
   Util.debugf ~section 5 "@[<2>apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]"
     (fun k->k ID.pp id T.pp ty_id (Util.pp_list T.pp) l
         (Util.pp_list T.pp) (List.map T.ty_exn l));
-  let ty = T.apply_unify ?loc ~allow_open:true ty_id l in
+  let ty = apply_unify ctx ?loc ~allow_open:true ty_id l in
   T.app ?loc ~ty (T.const ?loc ~ty:ty_id id) l
 
 (* replace a match with possibly a "default" case into a completely

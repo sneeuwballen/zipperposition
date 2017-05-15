@@ -469,6 +469,7 @@ module Conv = struct
         let t' = aux (depth+1) v2db t' in
         forall t'
       | PT.Record _ -> failwith "cannot convert record-type into type"
+      | PT.Meta (_,{contents=Some ty'},_) -> aux depth v2db ty'
       | PT.Bind _
       | PT.AppBuiltin _
       | PT.Meta _
