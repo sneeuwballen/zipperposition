@@ -104,49 +104,88 @@ module Combinators = struct
     let a = "a"
     let b = "b"
     let c = "c"
+    let d = "d"
     let x = "x"
     let y = "y"
     let z = "z"
+    let k = "k"
     let pi l ty = PT.forall_ty  (List.map (fun v->PT.V v, Some PT.tType) l) ty
-    let var x = PT.var x
+    let v x = PT.var x
     let app f l = PT.app f l
+    let ($) f t = app f [t]
     let (@->) a b = PT.fun_ty [a] b
 
     (* rewrite rules for SKI *)
     let ski () : pre_rule list =
       (* now define *)
-      let ty_i = pi [a] @@ var a @-> var a in
-      let ty_k = pi [a;b] @@ var a @-> var b @-> var a in
+      let ty_i = pi [a] @@ v a @-> v a in
+      let ty_k = pi [a;b] @@ v a @-> v b @-> v a in
       let ty_s =
         pi [a;b;c] @@
-        (var a @-> var b @-> var c) @->
-          (var a @-> var b) @->
-          var a @-> var c
+        (v a @-> v b @-> v c) @->
+          (v a @-> v b) @->
+          v a @-> v c
       in
-      [ ("I»", 0, ty_i, [x], var x);
-        ("K»", 0, ty_k, [x;y], var x);
+      [ ("I»", 0, ty_i, [x], v x);
+        ("K»", 0, ty_k, [x;y], v x);
         ("S»", 1, ty_s, [x;y;z],
-         app (var x) [var z; app (var y) [var z]]);
+         v x $ v z $ (v y $ v z));
       ]
 
-    (* Schönfinkel's combinators *)
+    (* Schönfinkel's combinators:
+       [B x y z = x (y z)]
+       [C x y z = x z y]
+    *)
     let skibc () : pre_rule list =
       let ty_b = pi [a;b;c] @@
-        (var b @-> var c) @->
-          (var a @-> var b) @->
-          var a @-> var c
+        (v b @-> v c) @-> (v a @-> v b) @-> v a @-> v c
       and ty_c = pi [a;b;c] @@
-        (var a @-> var b @-> var c) @->
-          var b @-> var a @-> var c
+        (v a @-> v b @-> v c) @->
+          v b @-> v a @-> v c
       in
       ski () @ [
-        ("B»", 1, ty_b, [x;y;z], app (var x) [app (var y) [var z]]);
-        ("C»", 1, ty_c, [x;y;z], app (var x) [var z; var y]);
+        ("B»", 1, ty_b, [x;y;z], v x $ (v y $ v z));
+        ("C»", 1, ty_c, [x;y;z], v x $ v z $ v y);
+      ]
+
+    (* Turner's combinators
+       [S' k x y z = k (x z) (y z)]
+       [B' k x y z = k x (y z)]
+       [C' k x y z = k (x z) y]
+    *)
+    let turner () : pre_rule list =
+      (* ('a -> 'b -> 'c) -> ('d -> 'a) -> ('d -> 'b) -> 'd -> 'c *)
+      let ty_s' = pi [a;b;c;d] @@
+        (v a @-> v b @-> v c) @->
+          (v d @-> v a) @->
+          (v d @-> v b) @->
+          v d @->
+          v c
+      (* ('a -> 'b -> 'c) -> 'a -> ('d -> 'b) -> 'd -> 'c *)
+      and ty_b' = pi [a;b;c;d] @@
+        (v a @-> v b @-> v c) @->
+          v a @->
+          (v d @-> v b) @->
+          v d @->
+          v c
+      (* ('a -> 'b -> 'c) -> ('d -> 'a) -> 'b -> 'd -> 'c *)
+      and ty_c' = pi [a;b;c;d] @@
+        (v a @-> v b @-> v c) @->
+          (v d @-> v a) @->
+          v b @->
+          v d @->
+          v c
+      in
+      skibc () @ [
+        ("S'»", 1, ty_s', [k;x;y;z], v k $ (v x $ v z) $ (v y $ v z));
+        ("B'»", 1, ty_b', [k;x;y;z], v k $ v x $ (v y $ v z));
+        ("C'»", 1, ty_c', [k;x;y;z], v k $ (v x $ v z) $ v y);
       ]
   end
 
   let ski : t = of_rules "ski" Rules_.ski
   let skibc : t = of_rules "skibc" Rules_.skibc
+  let turner : t = of_rules "turner" Rules_.turner
 
   let default = skibc
 
