@@ -924,6 +924,20 @@ module Make
              ))
           vars;
     end;
+    (* group variables naked in same (dis)equations *)
+    begin
+      Cut_form.cs f
+      |> Sequence.of_list
+      |> Sequence.flat_map Sequence.of_array
+      |> Sequence.iter
+        (function
+          | Literal.Equation (l,r,_) ->
+            begin match T.view l, T.view r with
+              | T.Var x, T.Var y -> UF_vars.union uf x y
+              | _ -> ()
+            end
+          | _ -> ())
+    end;
     (* other variables grouped by occurring at active pos in same subterm *)
     begin
       active_subterms_form f
