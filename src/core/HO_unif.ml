@@ -122,9 +122,9 @@ module Combinators = struct
           (var a @-> var b) @->
           var a @-> var c
       in
-      [ ("I", 0, ty_i, [x], PT.var x);
-        ("K", 0, ty_k, [x;y], PT.var x);
-        ("S", 1, ty_s, [x;y;z],
+      [ ("I»", 0, ty_i, [x], PT.var x);
+        ("K»", 0, ty_k, [x;y], PT.var x);
+        ("S»", 1, ty_s, [x;y;z],
          PT.app (PT.var x) [PT.var z; PT.app (PT.var y) [PT.var z]]);
       ]
   end
