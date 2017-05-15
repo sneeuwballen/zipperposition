@@ -465,6 +465,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       List.exists (fun parent -> in_proof_of_ (Proof.Parent.proof parent) lit) (Proof.Step.parents p)
     in
     begin match Proof.S.result p with
+      | Proof.C_stmt _
       | Proof.Stmt _
       | Proof.Form _
       | Proof.Clause _ -> in_proof_ (Proof.S.step p) lit

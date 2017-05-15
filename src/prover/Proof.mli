@@ -37,6 +37,7 @@ type result =
   | Clause of SClause.t
   | BoolClause of bool_lit list
   | Stmt of Statement.input_t
+  | C_stmt of Statement.clause_t
 
 (** A proof step, without the conclusion *)
 type step
@@ -242,5 +243,8 @@ module S : sig
 
   val pp_dot_seq_file : ?name:string -> string -> t Sequence.t -> unit
   (** same as {!pp_dot_seq} but into a file *)
+
+  val step_of_src : Statement.Src.t -> Step.t
+  val parent_of_sourced : Statement.sourced_t -> Parent.t
 end
 

@@ -104,6 +104,7 @@ and result =
   | Sourced_input of TypedSTerm.t
   | Sourced_clause of clause
   | Sourced_statement of input_t
+  | Sourced_clause_stmt of clause_t
 
 and sourced_t = result * source
 
@@ -138,6 +139,8 @@ val add_src : file:string -> ('f, 't, 'ty) t -> ('f, 't, 'ty) t
 
 val as_sourced : input_t -> sourced_t
 (** Just wrap the statement with its source *)
+
+val as_sourced_clause : clause_t -> sourced_t
 
 val map_data : ty:('ty1 -> 'ty2) -> 'ty1 data -> 'ty2 data
 

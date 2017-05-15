@@ -303,6 +303,7 @@ module Make(X : sig
         match P.S.result p with
           | P.Clause c' -> SClause.is_backward_simplified c'
           | P.BoolClause _
+          | P.C_stmt _
           | P.Stmt _
           | P.Form _ -> false
       else

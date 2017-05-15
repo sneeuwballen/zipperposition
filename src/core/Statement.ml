@@ -99,6 +99,7 @@ and result =
   | Sourced_input of TypedSTerm.t
   | Sourced_clause of clause
   | Sourced_statement of input_t
+  | Sourced_clause_stmt of clause_t
 
 and sourced_t = result * source
 
@@ -578,6 +579,8 @@ let add_src ~file st = match st.src.src_view with
   | _ -> st
 
 let as_sourced st = Sourced_statement st, src st
+
+let as_sourced_clause st = Sourced_clause_stmt st, src st
 
 (** {2 IO} *)
 

@@ -39,6 +39,7 @@ type result =
   | Clause of SClause.t
   | BoolClause of bool_lit list
   | Stmt of Statement.input_t
+  | C_stmt of Statement.clause_t
 
 (** A proof step, without the conclusion *)
 type step = {
@@ -134,16 +135,19 @@ module Result = struct
     | Form _ -> 1
     | BoolClause _ -> 2
     | Stmt _ -> 3
+    | C_stmt _ -> 4
 
   let compare a b = match a, b with
     | Clause c1, Clause c2 -> SClause.compare c1 c2
     | Form f1, Form f2 -> TypedSTerm.compare f1 f2
     | BoolClause l1, BoolClause l2 -> CCOrd.list BBox.Lit.compare l1 l2
     | Stmt s1, Stmt s2 -> Statement.compare s1 s2
+    | C_stmt s1, C_stmt s2 -> Statement.compare s1 s2
     | Clause _, _
     | Form _, _
     | BoolClause _, _
     | Stmt _, _
+    | C_stmt _, _
       -> CCInt.compare (res_to_int_ a) (res_to_int_ b)
 
   let equal a b = match a, b with
@@ -151,10 +155,12 @@ module Result = struct
     | Form f1, Form f2 -> TypedSTerm.equal f1 f2
     | BoolClause l1, BoolClause l2 -> CCList.equal BBox.Lit.equal l1 l2
     | Stmt s1, Stmt s2 -> Statement.compare s1 s2 = 0
+    | C_stmt s1, C_stmt s2 -> Statement.compare s1 s2 = 0
     | Clause _, _
     | Form _, _
     | BoolClause _, _
     | Stmt _, _
+    | C_stmt _, _
       -> false
 
   let pp out = function
@@ -163,6 +169,9 @@ module Result = struct
       Format.fprintf out "%a/%d" SClause.pp c (SClause.id c)
     | BoolClause lits -> BBox.pp_bclause out lits
     | Stmt stmt -> Statement.pp_input out stmt
+    | C_stmt st -> Statement.pp_clause out st
+
+  let c_to_sform ctx c = SClause.to_s_form ~ctx c |> F.close_forall
 
   let to_s_form ?(ctx=Term.Conv.create()) (r:t): form = match r with
     | Form f -> f
@@ -172,6 +181,18 @@ module Result = struct
     | Stmt st ->
       (* assimilate the statement to its formulas *)
       Stmt.Seq.forms st |> Sequence.to_list |> F.and_
+    | C_stmt st ->
+      (* assimilate the statement to its formulas *)
+      Stmt.Seq.forms st
+      |> Sequence.map
+        (fun c ->
+           c
+           |> List.map
+             (fun lit ->
+                SLiteral.map lit ~f:(Term.Conv.to_simple_term ctx)
+                |> SLiteral.to_form)
+           |> F.or_ |> F.close_forall)
+      |> Sequence.to_list |> F.and_
 end
 
 module Step = struct
@@ -347,6 +368,7 @@ module S = struct
   let mk_c step c = {step; result=Clause c; }
   let mk_bc step c = {step; result=BoolClause c; }
   let mk_stmt step stmt = {step; result=Stmt stmt; }
+  let mk_c_stmt step stmt = {step; result=C_stmt stmt }
 
   let adapt_c p c =
     { p with result=Clause c; }
@@ -442,7 +464,11 @@ module S = struct
                Kind.pp_tstp (Step.kind @@ step p,parents)
            | Stmt stmt ->
              let module T = TypedSTerm in
-             Statement.pp T.TPTP.pp T.TPTP.pp T.TPTP.pp out stmt
+             Statement.TPTP.pp T.TPTP.pp T.TPTP.pp T.TPTP.pp out stmt
+           | C_stmt stmt ->
+             let pp_t = Term.TPTP.pp in
+             let pp_c = Util.pp_list ~sep:"|" (SLiteral.TPTP.pp pp_t) in
+             Statement.TPTP.pp pp_c pp_t Type.TPTP.pp out stmt
          end);
     Format.fprintf out "@]";
     ()
@@ -573,4 +599,58 @@ module S = struct
         LLProof.instantiate res_subst subst p'
     in
     conv p
+
+  module Src_tbl = CCHashtbl.Make(struct
+      type t = Stmt.source
+      let equal = Stmt.Src.equal
+      let hash = Stmt.Src.hash
+    end)
+
+  (* used to share the same SClause.t in the proof *)
+  let input_proof_tbl_ : Step.t Src_tbl.t = Src_tbl.create 32
+
+  let rule_neg_ = Rule.mk "neg_goal"
+  let rule_cnf_ = Rule.mk "cnf"
+  let rule_renaming_ = Rule.mk "renaming"
+  let rule_define_ = Rule.mk "define"
+  let rule_preprocess_ msg = Rule.mkf "preprocess(%s)" msg
+
+  let rec step_of_src src: step =
+    try Src_tbl.find input_proof_tbl_ src
+    with Not_found ->
+      let p = match Stmt.Src.view src with
+        | Stmt.Input (_, Stmt.R_goal) -> Step.goal src
+        | Stmt.Input (_, _) -> Step.assert_ src
+        | Stmt.From_file (_, Stmt.R_goal) -> Step.goal src
+        | Stmt.From_file (_, _) -> Step.assert_ src
+        | Stmt.Internal _ -> Step.trivial
+        | Stmt.Neg srcd -> Step.esa ~rule:rule_neg_ [parent_of_sourced srcd]
+        | Stmt.CNF srcd -> Step.esa ~rule:rule_cnf_ [parent_of_sourced srcd]
+        | Stmt.Preprocess (srcd,l,msg) ->
+          Step.esa ~rule:(rule_preprocess_ msg)
+            (parent_of_sourced srcd :: List.map parent_of_sourced l)
+        | Stmt.Renaming (srcd,id,form) ->
+          Step.esa ~rule:rule_renaming_
+            [parent_of_sourced srcd;
+             Parent.from @@ mk_f_by_def id @@
+               TypedSTerm.(Form.eq (const id ~ty:Ty.prop) form)]
+        | Stmt.Define id -> Step.by_def id
+      in
+      Src_tbl.add input_proof_tbl_ src p;
+      p
+
+  and parent_of_sourced (res, src) : Parent.t =
+    let p = step_of_src src in
+    begin match res with
+      | Stmt.Sourced_input f ->
+        Parent.from (mk_f p f)
+      | Stmt.Sourced_clause c ->
+        let lits = List.map Literal.Conv.of_form c |> Array.of_list in
+        let c = SClause.make ~trail:Trail.empty lits in
+        Parent.from (mk_c p c)
+      | Stmt.Sourced_statement stmt ->
+        Parent.from (mk_stmt p stmt)
+      | Stmt.Sourced_clause_stmt stmt ->
+        Parent.from (mk_c_stmt p stmt)
+    end
 end
