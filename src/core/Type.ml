@@ -347,18 +347,13 @@ let rec pp_rec depth out t = match view t with
     Format.fprintf out "@[<2>%a %a@]"
       ID.pp p (Util.pp_list ~sep:" " (pp_rec depth)) args
   | Fun (args, ret) ->
-    Format.fprintf out "@[%a →@ %a@]" (pp_l depth) args (pp_rec depth) ret
+    Format.fprintf out "@[%a →@ %a@]"
+      (Util.pp_list ~sep:"→" (pp_inner depth)) args (pp_rec depth) ret
   | Forall ty' ->
     Format.fprintf out "@[Π T%i.@ %a@]" depth (pp_inner (depth+1)) ty'
 and pp_inner depth out t = match view t with
   | Fun _ -> Format.fprintf out "(@[%a@])" (pp_rec depth) t
   | _ -> pp_rec depth out t
-and pp_l depth out l = match l with
-  | [] -> assert false
-  | [ty] -> pp_rec depth out ty
-  | ty :: l' ->
-    Format.fprintf out "@[<2>%a →@ @[<hv>%a@]@]"
-      (pp_inner depth) ty (pp_l depth) l'
 
 let pp_depth ?hooks:_ depth out t = pp_rec depth out t
 
