@@ -139,7 +139,7 @@ let equal p1 p2 =
 
 let snapshot p = p.snapshot
 
-let compare p s1 s2 =
+let compare_by_tbl p s1 s2 =
   let lazy tbl = p.tbl in
   let i1 = ID.Tbl.get_or ~default:~-1 tbl s1 in
   let i2 = ID.Tbl.get_or ~default:~-1 tbl s2 in
@@ -151,6 +151,12 @@ let compare p s1 s2 =
     c
   )
   else c
+
+let compare p s1 s2 = match ID.as_parameter s1, ID.as_parameter s2 with
+  | None, None -> compare_by_tbl p s1 s2
+  | Some _, None -> -1
+  | None, Some _ -> 1
+  | Some i, Some j -> CCOrd.int i j
 
 let mem p s =
   let lazy tbl = p.tbl in

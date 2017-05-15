@@ -97,8 +97,12 @@ exception Attr_infix of string
 
 exception Attr_prefix of string
 
+exception Attr_parameter of int
+
 let as_infix = payload_find ~f:(function Attr_infix s->Some s | _ -> None)
 let is_infix id = as_infix id |> CCOpt.is_some
 let as_prefix = payload_find ~f:(function Attr_prefix s->Some s | _ -> None)
 let is_prefix id = as_prefix id |> CCOpt.is_some
+let as_parameter id = payload_find id ~f:(function Attr_parameter i -> Some i | _ -> None)
+let is_parameter id = as_parameter id |> CCOpt.is_some
 

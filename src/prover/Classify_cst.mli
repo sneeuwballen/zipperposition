@@ -19,6 +19,7 @@ type res =
     (** projector of some constructor (id: type) *)
   | DefinedCst of int * Statement.definition
     (** (recursive) definition of given stratification level + definition *)
+  | Parameter of int
   | Other
 
 val classify : ID.t -> res

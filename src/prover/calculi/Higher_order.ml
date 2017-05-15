@@ -11,9 +11,10 @@ module T = Term
 type term = Term.t
 let section = Util.Section.make ~parent:Const.section "ho"
 
-let stat_ho_eq_res = Util.mk_stat "ho.eq_res.steps"
+let stat_eq_res = Util.mk_stat "ho.eq_res.steps"
+let stat_ext_neg = Util.mk_stat "ho.extensionality-.steps"
 
-let prof_ho_eq_res = Util.mk_profiler "ho.eq_res"
+let prof_eq_res = Util.mk_profiler "ho.eq_res"
 
 module type S = sig
   module Env : Env.S
@@ -36,7 +37,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     | _ -> false
 
   (* HO unif rule, applies to literals [F t != u] *)
-  let ho_eq_res_ (c:C.t) : C.t list =
+  let eq_res_ (c:C.t) : C.t list =
     (* try HO unif with [l != r] *)
     let mk_ l r l_pos =
       let pos = Literals.Pos.idx l_pos in
@@ -44,7 +45,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         HO_unif.unif_step (Ctx.combinators (), 1) ((l,r),0)
         |> List.rev_map
           (fun (subst,subst_penalty) ->
-             Util.incr_stat stat_ho_eq_res;
+             Util.incr_stat stat_eq_res;
              let renaming = Ctx.renaming_clear () in
              let rule = Proof.Rule.mk "ho_eq_res" in
              let proof = Proof.Step.inference ~rule
@@ -71,7 +72,33 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
     new_clauses
 
-  let ho_eq_res c = Util.with_prof prof_ho_eq_res ho_eq_res_ c
+  let eq_res c = Util.with_prof prof_eq_res eq_res_ c
+
+  let mk_parameter =
+    let n = ref 0 in
+    fun ty ->
+      let id = ID.makef "%%c_%d" (CCRef.incr_then_get n) in
+      T.const id ~ty
+
+  (* negative extensionality rule:
+     [f != g] where [f : a -> b] becomes [f k != g k] for a fresh parameter [k] *)
+  let ext_neg (lit:Literal.t): Literal.t option = match lit with
+    | Literal.Equation (f, g, false)
+      when Type.is_fun (T.ty f) && not (T.is_var f) && not (T.is_var g) ->
+      let n_ty_params, ty_args, _ = Type.open_poly_fun (T.ty f) in
+      assert (n_ty_params=0);
+      let params = List.map mk_parameter ty_args in
+      let new_lit =
+        Literal.mk_neq
+          (T.app f params)
+          (T.app g params)
+      in
+      Util.incr_stat stat_ext_neg;
+      Util.debugf ~section 4
+        "(@[ho_ext_neg@ :old `%a`@ :new `%a`@])"
+        (fun k->k Literal.pp lit Literal.pp new_lit);
+      Some new_lit
+    | _ -> None
 
   (* TODO: predicate elimination *)
 
@@ -95,7 +122,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.debug ~section 1 "setup HO rules";
     Env.Ctx.lost_completeness();
     declare_combinators ();
-    Env.add_unary_inf "ho_eq_res" ho_eq_res;
+    Env.add_unary_inf "ho_eq_res" eq_res;
+    Env.add_lit_rule "ho_ext_neg" ext_neg;
     ()
 end
 

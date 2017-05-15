@@ -11,6 +11,7 @@ type res =
   | Inductive_cst of Ind_cst.t option
   | Projector of ID.t (** projector of some constructor (id: type) *)
   | DefinedCst of int * Statement.definition
+  | Parameter of int
   | Other
 
 let classify id =
@@ -26,6 +27,7 @@ let classify id =
   aux
     [ (Ind_ty.as_constructor |>> fun (c,t) -> Cstor (c,t));
       (Ind_ty.as_inductive_ty |>> fun x -> Ty x);
+      (ID.as_parameter |>> fun x->Parameter x);
       (fun id ->
          let open CCOpt.Infix in
          Skolem.as_skolem id >>= function
@@ -47,6 +49,7 @@ let pp_res out = function
   | Inductive_cst _ -> Format.fprintf out "ind_cst"
   | Projector id -> Format.fprintf out "projector_%a" ID.pp id
   | DefinedCst (lev,_) -> Format.fprintf out "defined (level %d)" lev
+  | Parameter i -> Format.fprintf out "parameter %d" i
   | Other -> CCFormat.string out "other"
 
 let pp_signature out sigma =
@@ -64,9 +67,10 @@ let prec_constr_ a b =
     | Ty _ -> 0
     | Projector _ -> 1
     | Cstor _ -> 2
-    | Inductive_cst _ -> 3
-    | Other -> 4
-    | DefinedCst _ -> 5 (* defined: biggest *)
+    | Parameter _ -> 3
+    | Inductive_cst _ -> 4
+    | Other -> 5
+    | DefinedCst _ -> 6 (* defined: biggest *)
   in
   let c_a = classify a in
   let c_b = classify b in
@@ -75,6 +79,7 @@ let prec_constr_ a b =
     | Cstor _, Cstor _
     | Projector _, Projector _
     | Other, Other -> 0
+    | Parameter i, Parameter j -> CCOrd.int i j (* by mere index *)
     | Inductive_cst c1, Inductive_cst c2 ->
       (* Inductive_cst cases should be compared by "sub-case" order (i.e. `x
          sub-cst-of y` means `x < y`); this is a stable ordering. *)
@@ -87,6 +92,7 @@ let prec_constr_ a b =
     | Ty _, _
     | Cstor _, _
     | Inductive_cst _, _
+    | Parameter _, _
     | Projector _, _
     | DefinedCst _, _
     | Other, _ -> CCInt.compare (to_int_ c_a) (to_int_ c_b)
@@ -98,6 +104,7 @@ let weight_fun (id:ID.t): Precedence.Weight.t =
   begin match classify id with
     | Ty _ -> W.int 1
     | Projector _ -> W.int 1
+    | Parameter _ -> W.int 1
     | Cstor _ -> W.int 1
     | Inductive_cst _ -> W.int 2
     | Other -> W.omega_plus 4

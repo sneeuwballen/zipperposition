@@ -63,9 +63,16 @@ exception Attr_infix of string
 exception Attr_prefix of string
 (** Prefix name for pretty-printing *)
 
+exception Attr_parameter of int
+(** Parameter, used for HO unif *)
+
 val as_infix : t -> string option
 val is_infix : t -> bool
 
 val as_prefix : t -> string option
 val is_prefix : t -> bool
+
+val as_parameter : t -> int option
+val is_parameter : t -> bool
+
 
