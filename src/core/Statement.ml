@@ -238,7 +238,7 @@ module Src = struct
       let file = src.file in
       begin match src.name with
         | None -> Format.fprintf out "file('%s')" file
-        | Some name -> Format.fprintf out "file('%s', '%s')" file name
+        | Some name -> Format.fprintf out "file(@['%s',@ '%s'@])" file name
       end
     | Neg (_,src') ->
       Format.fprintf out "inference(@['negate_goal',@ [status(thm)],@ [%a]@])"

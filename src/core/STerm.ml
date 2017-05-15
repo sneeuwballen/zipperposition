@@ -407,26 +407,26 @@ module TPTP = struct
     | AppBuiltin (Builtin.Or, l) ->
       Util.pp_list ~sep:" | " pp_surrounded out l
     | AppBuiltin (Builtin.Not, [a]) ->
-      Format.fprintf out "~%a" pp_surrounded a
+      Format.fprintf out "@[<1>~@,@[%a@]@]" pp_surrounded a
     | AppBuiltin (Builtin.Imply, [a;b]) ->
-      Format.fprintf out "%a => %a" pp_surrounded a pp_surrounded b
+      Format.fprintf out "@[%a =>@ %a@]" pp_surrounded a pp_surrounded b
     | AppBuiltin (Builtin.Xor, [a;b]) ->
-      Format.fprintf out "%a <~> %a" pp_surrounded a pp_surrounded b
+      Format.fprintf out "@[%a <~>@ %a@]" pp_surrounded a pp_surrounded b
     | AppBuiltin (Builtin.Equiv, [a;b]) ->
-      Format.fprintf out "%a <=> %a" pp_surrounded a pp_surrounded b
+      Format.fprintf out "@[%a <=>@ %a@]" pp_surrounded a pp_surrounded b
     | AppBuiltin (Builtin.Eq, ([_;a;b] | [a;b])) ->
-      Format.fprintf out "%a = %a" pp_surrounded a pp_surrounded b
+      Format.fprintf out "@[%a =@ %a@]" pp_surrounded a pp_surrounded b
     | AppBuiltin (Builtin.Neq, ([_;a;b] | [a;b])) ->
-      Format.fprintf out "%a != %a" pp_surrounded a pp_surrounded b
+      Format.fprintf out "@[%a !=@ %a@]" pp_surrounded a pp_surrounded b
     | AppBuiltin (Builtin.Arrow, [ret;a]) ->
-      Format.fprintf out "%a > %a" pp a pp ret
+      Format.fprintf out "@[<2>%a >@ %a@]" pp a pp ret
     | AppBuiltin (Builtin.Arrow, ret::l) ->
-      Format.fprintf out "(%a) > %a" (Util.pp_list~sep:" * " pp) l pp_surrounded ret
+      Format.fprintf out "@[<2>(@[<hv>%a@]) >@ %a@]" (Util.pp_list~sep:" * " pp) l pp_surrounded ret
     | AppBuiltin (s, []) -> Builtin.TPTP.pp out s
     | AppBuiltin (s, l) ->
-      Format.fprintf out "%a(%a)" Builtin.TPTP.pp s (Util.pp_list ~sep:", " pp_surrounded) l
+      Format.fprintf out "@[%a(@[%a@])@]" Builtin.TPTP.pp s (Util.pp_list ~sep:", " pp_surrounded) l
     | App (s, l) ->
-      Format.fprintf out "@[<2>%a(%a)@]"
+      Format.fprintf out "@[%a(@[%a@])@]"
         pp s (Util.pp_list ~sep:"," pp) l
     | Bind (s, vars, t') ->
       Format.fprintf out "@[<2>%a[@[%a@]]:@ %a@]"

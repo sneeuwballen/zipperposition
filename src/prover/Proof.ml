@@ -108,9 +108,9 @@ module Kind = struct
     let pp_parents = Util.pp_list _pp_parent in
     let pp_step status out (rule,parents) = match parents with
       | [] ->
-        Format.fprintf out "inference(%a, [status(%s)])" Rule.pp rule status
+        Format.fprintf out "inference(@[%a,@ [status(%s)]@])" Rule.pp rule status
       | _::_ ->
-        Format.fprintf out "inference(%a, [status(%s)], [%a])"
+        Format.fprintf out "inference(@[%a,@ [status(%s)],@ [@[%a@]]@])"
           Rule.pp rule status pp_parents parents
     in
     begin match k with
