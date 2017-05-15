@@ -140,11 +140,19 @@ module Combinators = struct
   let list_names () = List.map name !all_
 end
 
+(* number of ty and non-ty arguments *)
+let term_arity args =
+  args
+  |> CCList.take_drop_while (fun t -> T.is_type t)
+  |> CCPair.map List.length List.length
+
 let unif_step ((c:Combinators.t),sc_combs) ((t,u),sc_pair): _ list =
   assert (Type.equal (T.ty t) (T.ty u));
   let try_heads (t:term): _ Sequence.t =
     let f, args = T.as_app t in
-    if T.is_var f then (
+    let n_ty_args, n_l = term_arity args in
+    assert (T.equal t @@ T.app f args);
+    if T.is_var f && n_l > 0 then (
       (* try to unify LHS of rules with prefixes of [f args] *)
       Combinators.rules c
       |> Sequence.of_list
@@ -152,19 +160,15 @@ let unif_step ((c:Combinators.t),sc_combs) ((t,u),sc_pair): _ list =
         (fun (r,p) ->
            let lhs = RW.Term.Rule.lhs r in
            (* number of term arguments *)
-           let n_args =
-             RW.Term.Rule.args r
-             |> List.filter (fun t -> not (Type.is_tType @@ T.ty t))
-             |> List.length
-           in
+           let n_args = RW.Term.Rule.args r |> term_arity |> snd in
            assert (n_args >= 1);
            (* unify [lhs] with [f args_1…args_{m}] where [1 ≤ m ≤ len(args)]
               (i.e. non empty prefixes of args) *)
            begin
-             Sequence.int_range ~start:1 ~stop:(min n_args (List.length args))
+             Sequence.int_range ~start:1 ~stop:(min n_args n_l)
              |> Sequence.filter_map
                (fun i ->
-                  let t_prefix = T.app f (CCList.take i args) in
+                  let t_prefix = T.app f (CCList.take (n_ty_args+i) args) in
                   try
                     Some (Unif.FO.unification (t_prefix,sc_pair) (lhs,sc_combs),p)
                   with Unif.Fail -> None)
