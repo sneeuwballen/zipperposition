@@ -121,6 +121,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   let setup () =
     Util.debug ~section 1 "setup HO rules";
     Env.Ctx.lost_completeness();
+    (* force rules *)
+    let () = ignore (HO_unif.Combinators.rules @@ Ctx.combinators ()) in
     declare_combinators ();
     Env.add_unary_inf "ho_eq_res" eq_res;
     Env.add_lit_rule "ho_ext_neg" ext_neg;

@@ -40,9 +40,6 @@ module Make(X : PARAMETERS) = struct
   let signature () = !_signature
   let combinators () = X.combinators
 
-  (* force rules *)
-  let () = ignore (HO_unif.Combinators.rules X.combinators)
-
   let on_new_symbol = Signal.create()
   let on_signature_update = Signal.create()
 
