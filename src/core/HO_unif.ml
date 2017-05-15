@@ -54,14 +54,15 @@ module Combinators = struct
   type pre_rule = string * int * PT.t * string list * PT.t
 
   (* build from a list of pairs of terms (interpreted as [lhs->rhs]) *)
-  let of_rules name (l:pre_rule list) : t =
+  let of_rules name (gen_rules:unit -> pre_rule list) : t =
     let rules_and_decls = lazy (
       let ctx =
         TypeInference.Ctx.create ~on_var:`Infer ()
       in
       let conv = T.Conv.create () in
       (* do type inference and conversions for each rule *)
-      List.map
+      gen_rules ()
+      |> List.map
         (fun (name,penalty,ty,args,rhs) ->
            let id = ID.make name in
            (* perform conversion… *)
@@ -86,7 +87,6 @@ module Combinators = struct
            let ty_id = Type.Conv.of_simple_term_exn conv @@ ty_id in
            let _, args = T.as_app lhs in
            (RW.Term.Rule.make id ty_id args rhs, penalty), (id, ty_id))
-        l
       |> List.split
     ) in
     let rules = lazy (
@@ -109,10 +109,11 @@ module Combinators = struct
     let z = "z"
     let pi l ty = PT.forall_ty  (List.map (fun v->PT.V v, Some PT.tType) l) ty
     let var x = PT.var x
+    let app f l = PT.app f l
     let (@->) a b = PT.fun_ty [a] b
 
     (* rewrite rules for SKI *)
-    let ski : pre_rule list =
+    let ski () : pre_rule list =
       (* now define *)
       let ty_i = pi [a] @@ var a @-> var a in
       let ty_k = pi [a;b] @@ var a @-> var b @-> var a in
@@ -122,16 +123,32 @@ module Combinators = struct
           (var a @-> var b) @->
           var a @-> var c
       in
-      [ ("I»", 0, ty_i, [x], PT.var x);
-        ("K»", 0, ty_k, [x;y], PT.var x);
+      [ ("I»", 0, ty_i, [x], var x);
+        ("K»", 0, ty_k, [x;y], var x);
         ("S»", 1, ty_s, [x;y;z],
-         PT.app (PT.var x) [PT.var z; PT.app (PT.var y) [PT.var z]]);
+         app (var x) [var z; app (var y) [var z]]);
+      ]
+
+    (* Schönfinkel's combinators *)
+    let skibc () : pre_rule list =
+      let ty_b = pi [a;b;c] @@
+        (var b @-> var c) @->
+          (var a @-> var b) @->
+          var a @-> var c
+      and ty_c = pi [a;b;c] @@
+        (var a @-> var b @-> var c) @->
+          var b @-> var a @-> var c
+      in
+      ski () @ [
+        ("B»", 1, ty_b, [x;y;z], app (var x) [app (var y) [var z]]);
+        ("C»", 1, ty_c, [x;y;z], app (var x) [var z; var y]);
       ]
   end
 
   let ski : t = of_rules "ski" Rules_.ski
+  let skibc : t = of_rules "skibc" Rules_.skibc
 
-  let default = ski
+  let default = skibc
 
   let by_name s = match CCList.find_pred (fun c -> name c=s) !all_ with
     | Some c -> c
