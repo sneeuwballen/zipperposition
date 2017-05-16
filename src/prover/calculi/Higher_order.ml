@@ -8,7 +8,6 @@ open Logtk
 module BV = CCBV
 module T = Term
 
-type term = Term.t
 let section = Util.Section.make ~parent:Const.section "ho"
 
 let stat_eq_res = Util.mk_stat "ho.eq_res.steps"

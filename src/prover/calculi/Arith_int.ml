@@ -19,7 +19,6 @@ let stat_arith_sup = Util.mk_stat "arith.superposition"
 let stat_arith_cancellation = Util.mk_stat "arith.arith_cancellation"
 let stat_arith_eq_factoring = Util.mk_stat "arith.eq_factoring"
 let stat_arith_ineq_chaining = Util.mk_stat "arith.ineq_chaining"
-let stat_arith_purify = Util.mk_stat "arith.purify"
 let stat_arith_case_switch = Util.mk_stat "arith.case_switch"
 let stat_arith_semantic_tautology = Util.mk_stat "arith.semantic_tauto"
 let stat_arith_ineq_factoring = Util.mk_stat "arith.ineq_factoring"
@@ -36,7 +35,6 @@ let prof_arith_sup = Util.mk_profiler "arith.superposition"
 let prof_arith_cancellation = Util.mk_profiler "arith.arith_cancellation"
 let prof_arith_eq_factoring = Util.mk_profiler "arith.eq_factoring"
 let prof_arith_ineq_chaining = Util.mk_profiler "arith.ineq_chaining"
-let prof_arith_purify = Util.mk_profiler "arith.purify"
 let prof_arith_demod = Util.mk_profiler "arith.demod"
 let prof_arith_backward_demod = Util.mk_profiler "arith.backward_demod"
 let prof_arith_semantic_tautology = Util.mk_profiler "arith.semantic_tauto"
@@ -111,10 +109,6 @@ module type S = sig
   val is_tautology : C.t -> bool
   (** is the clause a tautology w.r.t linear expressions? *)
 
-  val purify : Env.simplify_rule
-  (** Purify clauses by replacing arithmetic expressions occurring
-      under terms by variables, and adding constraints *)
-
   val eliminate_unshielded : Env.multi_simpl_rule
   (** Eliminate unshielded variables using an adaptation of
       Cooper's algorithm *)
@@ -136,9 +130,6 @@ let div_case_switch_limit = ref 100
 
 let flag_tauto = SClause.new_flag ()
 let flag_computed_tauto = SClause.new_flag ()
-
-(* flag to be used to know when a clause cannot be purified *)
-let flag_no_purify = SClause.new_flag ()
 
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
@@ -1644,124 +1635,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       | `New -> [c]
       | `Same -> []
 
-  (* replace arith subterms with fresh variable + constraint *)
-  let purify c =
-    let module TC = T.Classic in
-    Util.enter_prof prof_arith_purify;
-    (* set of new literals *)
-    let new_lits = ref [] in
-    let cache = T.Tbl.create 16 in  (* cache for term->var *)
-    let _add_lit lit = new_lits := lit :: !new_lits in
-    (* index of the next fresh variable *)
-    let varidx =
-      ref ((Lits.Seq.terms (C.lits c)
-            |> Sequence.flat_map T.Seq.vars
-            |> T.Seq.max_var) + 1) in
-    (* replace term by a fresh var + constraint *)
-    let replace t ~by =
-      (* [v]: fresh var that will replace [t] *)
-      let v =
-        try T.Tbl.find cache t
-        with Not_found ->
-          let ty = T.ty t in
-          let v = T.var_of_int ~ty !varidx in
-          T.Tbl.replace cache t v;
-          incr varidx;
-          v
-      in
-      let lit = Lit.mk_arith_neq (M.Int.singleton Z.one v) by in
-      _add_lit lit;
-      v (* return variable instead of literal *)
-    (* should we purify the term t with head symbol [s] ?
-       yes if it's an arith expression or if it a int-sorted
-       function/constant under some other function *)
-    and should_purify ~root s t =
-      Builtin.is_arith s
-      ||
-      ( not root && Type.equal (T.ty t) Type.TPTP.int)
-    in
-    let purify_sub t =
-      Util.debugf ~section 5 "@[<2>need to purify term@ @[%a@]@]" (fun k->k T.pp t);
-      (* purify the term and add a constraint *)
-      begin match M.Int.of_term t with
-        | None ->
-          Util.debugf ~section 5
-            "@[<2>could not purify@ @[%a@]@ (non linear; cache)@]" (fun k->k T.pp t);
-          C.set_flag flag_no_purify c true;
-          t  (* non linear, abort. *)
-        | Some m -> replace t ~by:m
-      end
-    in
-    (* purify a term (adding constraints to the list).  *)
-    let rec purify_term ~root t = match TC.view t with
-      | TC.AppBuiltin (b, []) when Builtin.is_numeric b -> t   (* keep constants *)
-      | TC.NonFO
-      | TC.DB _
-      | TC.Var _ -> t
-      | TC.AppBuiltin (Builtin.Int _, []) -> t  (* don't purify numbers *)
-      | TC.AppBuiltin (b, _l) when should_purify ~root b t -> purify_sub t
-      | TC.App _ when (not root && Type.equal (T.ty t) Type.TPTP.int) ->
-        purify_sub t (* uninterpreted int subterm *)
-      | TC.AppBuiltin _
-      | TC.App _ ->
-        (* not an arith term. *)
-        begin match T.view t with
-          | T.App (hd, l) ->
-            T.app hd (List.map (purify_term ~root:false) l)
-          | T.AppBuiltin (b, l) ->
-            T.app_builtin ~ty:(T.ty t) b (List.map (purify_term ~root:false) l)
-          | T.DB _
-          | T.Var _ -> assert false
-          | T.Const _ -> t
-        end
-    in
-    (* replace! *)
-    let res =
-      if C.get_flag flag_no_purify c
-      then SimplM.return_same c
-      else
-        let lits' = Lits.map (purify_term ~root:true) (C.lits c) in
-        match !new_lits with
-          | [] -> SimplM.return_same c (* no change *)
-          | _::_ ->
-            let all_lits = !new_lits @ (Array.to_list lits') in
-            let proof =
-              Proof.Step.inference ~rule:(Proof.Rule.mk "purify") [C.proof_parent c] in
-            let new_c =
-              C.create ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof
-            in
-            Util.debugf ~section 5 "@[<2>purify@ @[%a@]@ into @[%a@]@]"
-              (fun k->k C.pp c C.pp new_c);
-            Util.incr_stat stat_arith_purify;
-            SimplM.return_new new_c
-    in
-    Util.exit_prof prof_arith_purify;
-    res
-
   (** {6 Variable Elimination Procedure} *)
 
-  let is_shielded lits ~var =
-    let rec shielded_by_term ~root t = match T.view t with
-      | T.Var v' when HVar.equal Type.equal v' var -> not root
-      | T.Var _
-      | T.DB _
-      | T.Const _ -> false
-      | T.AppBuiltin (_, l)
-      | T.App (_, l) ->
-        (* ignore arith terms, they are shielding as well. We should
-           only eliminate variables that occur directly under proper arith
-           literals *)
-        List.exists (shielded_by_term ~root:false) l
-    in
-    (* is there a term, directly under a literal, that shields the variable? *)
-    lits
-    |> Lits.Seq.terms
-    |> Sequence.exists (shielded_by_term ~root:true)
-
   let naked_vars lits =
-    Lits.vars lits
+    Purify.unshielded_vars lits
     |> List.filter (fun var -> Type.equal (HVar.ty var) Type.int)
-    |> List.filter (fun var -> not (is_shielded lits ~var))
 
   (** Description of a clause, focused around the elimination
       of some variable x *)
@@ -2094,7 +1972,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_backward_simplify canc_backward_demodulation;
     Env.add_is_trivial is_tautology;
     Env.add_redundant is_redundant_by_ineq;
-    Env.add_simplify purify;
     Env.add_multi_simpl_rule eliminate_unshielded;
     (* completeness? I don't think so *)
     Ctx.lost_completeness ();

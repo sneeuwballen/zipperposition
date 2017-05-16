@@ -76,10 +76,6 @@ module type S = sig
   val is_tautology : C.t -> bool
   (** is the clause a tautology w.r.t linear expressions? *)
 
-  val purify : Env.simplify_rule
-  (** Purify clauses by replacing arithmetic expressions occurring
-      under terms by variables, and adding constraints *)
-
   val eliminate_unshielded : Env.multi_simpl_rule
   (** Eliminate unshielded variables using an adaptation of
       Cooper's algorithm *)
