@@ -1622,7 +1622,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                  ]
                in
                let proof =
-                 Proof.Step.inference [C.proof_parent c] 
+                 Proof.Step.inference [C.proof_parent c]
                    ~rule:(Proof.Rule.mk "arith_diff_to_lesseq") in
                let c' =
                  C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
