@@ -136,7 +136,7 @@ let compute_ord_select precedence =
   Phases.get_key Params.key >>= fun params ->
   let ord = Ordering.by_name params.param_ord precedence in
   Util.debugf ~section 2 "@[<2>ordering %s@]" (fun k->k (Ordering.name ord));
-  let select = Selection.selection_from_string ~ord params.param_select in
+  let select = Selection.from_string ~ord params.param_select in
   do_extensions ~field:(fun e->e.Extensions.ord_select_actions)
     ~x:(ord,select) >>= fun () ->
   Util.debugf ~section 2 "@[<2>selection function:@ %s@]" (fun k->k params.param_select);

@@ -12,175 +12,217 @@ module Lit = Literal
 module Lits = Literals
 module BV = CCBV
 
+let section = Util.Section.make "select"
+
 type t = Literal.t array -> BV.t
 
-let no_select _ = BV.empty ()
+module Classify : sig
+  type shielded = [`Shielded | `Unshielded]
+  type sign = bool
+
+  type class_ =
+    | C_normal of sign (* any "normal" kind of literal *)
+    | C_arith_constraint of shielded (* arith negative equality, seen as constraint *)
+    | C_ho_constraint of shielded (* F args != t *)
+    | C_purify_constraint of shielded (* X != t, X of purifiable type *)
+
+  type t = class_ array
+
+  val pp_class : class_ CCFormat.printer
+  val pp : t CCFormat.printer
+
+  val classify : Literals.t -> t
+  (** [classify lits] gives a classification of the literals in this array,
+      relative to other literals *)
+end = struct
+  type shielded = [`Shielded | `Unshielded]
+  type sign = bool
+
+  type class_ =
+    | C_normal of sign (* any "normal" kind of literal *)
+    | C_arith_constraint of shielded (* arith negative equality, seen as constraint *)
+    | C_ho_constraint of shielded (* F args != t *)
+    | C_purify_constraint of shielded (* X != t, X of purifiable type *)
+
+  type t = class_ array
+
+  (* combine the "shielded" status *)
+  let (+++) a b = match a, b with
+    | `Unshielded, _
+    | _, `Unshielded -> `Unshielded
+    | `Shielded, `Shielded -> `Shielded
+
+  let pp_shield out = function
+    | `Shielded -> CCFormat.string out "shielded"
+    | `Unshielded -> CCFormat.string out "unshielded"
+
+  let pp_class out = function
+    | C_normal s -> Format.fprintf out "normal :sign %B" s
+    | C_arith_constraint s -> Format.fprintf out "arith_constr %a" pp_shield s
+    | C_ho_constraint s -> Format.fprintf out "ho_constr %a" pp_shield s
+    | C_purify_constraint s -> Format.fprintf out "purify_constr %a" pp_shield s
+
+  let pp out a =
+    let pp_i out (i,cl) = Format.fprintf out "(%d: %a)" i pp_class cl in
+    Format.fprintf out "(@[<hv>%a@])"
+      (Util.pp_seq ~sep:" " pp_i) (Sequence.of_array_i a)
+
+  let classify (lits:Literals.t): t =
+    let shield_status v =
+      if Purify.is_shielded v lits then `Shielded else `Unshielded
+    in
+    lits |> Array.map
+      (fun lit -> match lit with
+         | Literal.Equation (t, u, false) ->
+           let hd_t, args_t = T.as_app t in
+           let hd_u, args_u = T.as_app u in
+           begin match T.view hd_t, T.view hd_u with
+             | T.Var v1, T.Var v2 when args_t <> [] && args_u <> [] ->
+               C_ho_constraint (shield_status v1 +++ shield_status v2)
+             | T.Var v, _ when args_t <> [] ->
+               (* HO unif constraint *)
+               C_ho_constraint (shield_status v)
+             | _, T.Var v when args_u <> [] ->
+               C_ho_constraint (shield_status v)
+             | T.Var v, _ when Type.is_fun (T.ty t) ->
+               C_purify_constraint (shield_status v)
+             | _, T.Var v when Type.is_fun (T.ty u) ->
+               C_purify_constraint (shield_status v)
+             | _ -> C_normal (Lit.sign lit)
+           end
+         | Literal.Int (Int_lit.Binary (Int_lit.Different, m1, m2)) ->
+           let vars =
+             Sequence.append (Monome.Seq.terms m1) (Monome.Seq.terms m2)
+             |> Sequence.filter_map T.as_var
+             |> Sequence.to_rev_list
+           in
+           begin match vars with
+             | [] -> C_normal (Lit.sign lit) (* no vars *)
+             | _::_ ->
+               let st =
+                 List.fold_left (fun acc v -> acc +++ shield_status v) `Shielded vars
+               in
+               C_arith_constraint st
+           end
+         | _ -> C_normal (Lit.sign lit))
+end
 
 (* does the clause belong to pure superposition, without other theories? *)
-let _pure_superposition lits =
+let pure_logic_ lits =
   CCArray.for_all
     (function
       | Lit.Prop _
       | Lit.Equation _
       | Lit.True
       | Lit.False -> true
-      | _ -> false)
+      | Lit.Int _ | Lit.Rat _ -> false)
     lits
 
 (* checks that [bv] is an acceptable selection for [lits]. In case
    some literal is selected, at least one negative literal must be selected. *)
-let _validate_select lits bv =
-  BV.is_empty bv
-  ||
-  try
-    Array.iteri
-      (fun i lit ->
-         if Lit.is_neg lit && BV.get bv i then raise Exit
-      ) lits;
-    false
-  with Exit -> true
+let validate_fun_ lits bv =
+  if BV.is_empty bv then true
+  else (
+    Sequence.of_array_i lits
+    |> Sequence.exists (fun (i,lit) -> Lit.is_neg lit && BV.get bv i)
+  )
 
-(** Select all positives literals *)
-let select_positives lits =
-  if _pure_superposition lits
-  then Lits.pos lits
-  else BV.empty ()
+type parametrized = strict:bool -> ord:Ordering.t -> t
 
-let bv_first bv = BV.iter_true bv |> Sequence.head
+(* no need for classification here *)
+let no_select _ = BV.empty ()
 
-let select_max_goal ~strict ~ord lits =
-  if _pure_superposition lits
-  then
-    let bv = Lits.maxlits ~ord lits in
-    BV.filter bv (fun i -> Lit.is_neg lits.(i));
-    begin match bv_first bv with
-    | Some i ->
-      (* keep only first satisfying lit *)
-      BV.clear bv;
-      BV.set bv i;
-      if not strict
-      then BV.union_into ~into:bv (select_positives lits);
-      assert (_validate_select lits bv);
+(* is it a good idea to select this kind of literal? *)
+let can_select_cl_ (k:Classify.class_): bool = match k with
+  | Classify.C_normal false
+  | Classify.C_arith_constraint `Unshielded
+  | Classify.C_ho_constraint `Unshielded -> true
+  | _ -> false
+
+(* build a selection function in general, given the more specialized
+   one there *)
+let mk_ ~(f:Classify.t -> Lits.t -> BV.t) (lits:Lits.t) : BV.t =
+  if Array.length lits <= 1 then BV.empty ()
+  else (
+    let cl = Classify.classify lits in
+    (* should we select anything? *)
+    let should_select = Array.exists can_select_cl_ cl in
+    if should_select then (
+      let bv = f cl lits in
+      Util.debugf ~section 5
+        "(@[select@ :lits %a@ :res %a@ :classify %a@])"
+        (fun k->k Lits.pp lits BV.print bv Classify.pp cl);
+      assert (validate_fun_ lits bv);
       bv
-    | None ->
-      BV.empty ()  (* empty one *)
-    end
-  else BV.empty ()
+    ) else (
+      Util.debugf ~section 5 "(@[should-not-select@ %a@])" (fun k->k Lits.pp lits);
+      BV.empty ()
+    )
+  )
 
-let select_diff_neg_lit ~strict ~ord:_ lits =
-  (* find a negative literal with maximal difference between
-     the weights of the sides of the equation *)
-  let rec find_lit best_diff best_idx lits i =
-    if i = Array.length lits then best_idx
-    else
-      let weightdiff, ok = match lits.(i) with
-        | Lit.Equation(l,r,false) ->
-          abs (T.size l - T.size r), true
-        | Lit.Prop (p, false) ->
-          T.size p - 1, true
-        | _ -> 0, false
-      in
-      let best_idx, best_diff =
-        if ok && weightdiff > best_diff
-        then i, weightdiff  (* prefer this lit *)
-        else best_idx, best_diff
-      in
-      find_lit best_diff best_idx lits (i+1)
-  in
-  (* search such a lit among the clause's lits *)
-  if _pure_superposition lits then (
-    let res = match find_lit (-1) (-1) lits 0 with
-      | -1 -> BV.empty ()
-      | n when strict -> BV.of_list [n]
-      | n ->
-        let bv = select_positives lits in
-        BV.set bv n;
+(* Select all positives literals. Only present for building
+   non-strict selection functions *)
+let select_positive_ lits =
+  if pure_logic_ lits then Lits.pos lits else BV.empty ()
+
+let bv_first_ bv = BV.iter_true bv |> Sequence.head
+
+let max_goal ~strict ~ord lits =
+  mk_ lits ~f:(fun cl lits ->
+    let bv = Lits.maxlits ~ord lits in
+    (* only retain negative normal lits, or constraints
+         that are unshielded *)
+    BV.filter bv (fun i -> can_select_cl_ cl.(i));
+    begin match bv_first_ bv with
+      | Some i ->
+        (* keep only first satisfying lit *)
+        BV.clear bv;
+        BV.set bv i;
+        if not strict then (
+          BV.union_into ~into:bv (select_positive_ lits);
+        );
         bv
-    in
-    assert (_validate_select lits res);
-    res
-  ) else BV.empty ()
+      | None ->
+        BV.empty ()  (* empty one *)
+    end)
 
-let select_complex ~strict ~ord lits =
-  (* find the ground negative literal with highest diff in size *)
-  let rec find_neg_ground best_diff best_i lits i =
-    if i = Array.length lits then best_i else
-      let weightdiff, ok = match lits.(i) with
-        | Lit.Equation(l,r,false) when Lit.is_ground lits.(i) ->
-          abs (T.size l - T.size r), true
-        | Lit.Prop (p, false) when Lit.is_ground lits.(i) ->
-          T.size p - 1, true
-        | _ -> 0, false
-      in
-      let best_i, best_diff =
-        if ok && weightdiff > best_diff
-        then i, weightdiff  (* prefer this lit *)
-        else best_i, best_diff
-      in
-      find_neg_ground best_diff best_i lits (i+1)
-  in
-  (* try to find ground negative lit with bigger weight difference, else delegate *)
-  if _pure_superposition lits
-  then
-    let i = find_neg_ground (-1) (-1) lits 0 in
-    if i >= 0
-    then if strict
-      then BV.of_list [i]
-      else (
-        let bv = select_positives lits in
-        let _ = BV.set bv i in
-        assert (_validate_select lits bv);
-        bv
-      )
-    else
-      select_diff_neg_lit ~strict ~ord lits (* delegate to select_diff_neg_lit *)
-  else BV.empty ()
-
-let select_complex_except_RR_horn ~strict ~ord lits =
-  if not (_pure_superposition lits) || Lits.is_RR_horn_clause lits
-  then BV.empty ()  (* do not select (conditional rewrite rule) *)
-  else select_complex ~strict ~ord lits  (* like select_complex *)
+let except_RR_horn (p:parametrized) ~strict ~ord lits =
+  if Lits.is_RR_horn_clause lits
+  then BV.empty () (* do not select (conditional rewrite rule) *)
+  else p ~strict ~ord lits  (* delegate *)
 
 (** {2 Global selection Functions} *)
 
-let default_selection ~ord =
-  select_complex ~strict:true ~ord
+let default ~ord = max_goal ~strict:true ~ord
 
-let tbl_ = Hashtbl.create 17
-(** table of name -> functions *)
+let l =
+  let basics =
+    [ "NoSelection", (fun ~ord:_ c -> no_select c);
+      "default", default
+    ]
+  and by_ord =
+    CCList.flat_map
+      (fun (name,p) ->
+         [ name, (fun ~ord -> p ~strict:true ~ord);
+           name ^ "NS", (fun ~ord -> p ~strict:false ~ord);
+         ])
+      [ "MaxGoal", max_goal;
+        "MaxGoalExceptRRHorn", except_RR_horn max_goal;
+      ]
+  in
+  basics @ by_ord
 
-let () =
-  Hashtbl.add tbl_ "NoSelection" (fun ~ord:_ c -> no_select c);
-  Hashtbl.add tbl_ "MaxGoal" (select_max_goal ~strict:true);
-  Hashtbl.add tbl_ "MaxGoalNS" (select_max_goal ~strict:false);
-  Hashtbl.add tbl_ "SelectDiffNegLit" (select_diff_neg_lit ~strict:true);
-  Hashtbl.add tbl_ "SelectDiffNegLitNS" (select_diff_neg_lit ~strict:false);
-  Hashtbl.add tbl_ "SelectComplex" (select_complex ~strict:true);
-  Hashtbl.add tbl_ "SelectComplexNS" (select_complex ~strict:false);
-  Hashtbl.add tbl_ "SelectComplexExceptRRHorn" (select_complex_except_RR_horn ~strict:true);
-  Hashtbl.add tbl_ "SelectComplexExceptRRHornNS" (select_complex_except_RR_horn ~strict:false);
-  ()
-
-(** selection function from string (may fail) *)
-let selection_from_string ~ord s =
-  try
-    let select = Hashtbl.find tbl_ s in
-    select ~ord
+let from_string ~ord s =
+  try (List.assoc s l) ~ord
   with Not_found ->
     failwith ("no such selection function: "^s)
 
-(** available names for selection functions *)
-let available_selections () = CCHashtbl.keys_list tbl_
-
-let register name f =
-  if Hashtbl.mem tbl_ name
-  then failwith ("selection function " ^ name ^ " already defined");
-  Hashtbl.add tbl_ name f
+let all () = List.map fst l
 
 let () =
   let set_select s = Params.select := s in
   Params.add_opts
     [ "--select",
-      Arg.Symbol (available_selections (), set_select),
+      Arg.Symbol (all(), set_select),
       " set literal selection function"
     ]
