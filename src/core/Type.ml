@@ -345,20 +345,23 @@ let rec pp_rec depth out t = match view t with
   | App (p, []) -> ID.pp out p
   | App (p, args) ->
     Format.fprintf out "@[<2>%a %a@]"
-      ID.pp p (Util.pp_list ~sep:" " (pp_rec depth)) args
+      ID.pp p (Util.pp_list ~sep:" " (pp_inner_app depth)) args
   | Fun (args, ret) ->
     Format.fprintf out "@[%a →@ %a@]"
-      (Util.pp_list ~sep:"→" (pp_inner depth)) args (pp_rec depth) ret
+      (Util.pp_list ~sep:"→" (pp_inner_fun depth)) args (pp_rec depth) ret
   | Forall ty' ->
-    Format.fprintf out "@[Π T%i.@ %a@]" depth (pp_inner (depth+1)) ty'
-and pp_inner depth out t = match view t with
+    Format.fprintf out "@[Π T%i.@ %a@]" depth (pp_inner_fun (depth+1)) ty'
+and pp_inner_fun depth out t = match view t with
   | Fun _ -> Format.fprintf out "(@[%a@])" (pp_rec depth) t
+  | _ -> pp_rec depth out t
+and pp_inner_app depth out t = match view t with
+  | Fun _ | App (_,_::_) -> Format.fprintf out "(@[%a@])" (pp_rec depth) t
   | _ -> pp_rec depth out t
 
 let pp_depth ?hooks:_ depth out t = pp_rec depth out t
 
 let pp out t = pp_rec 0 out t
-let pp_surrounded out t = (pp_inner 0) out t
+let pp_surrounded out t = (pp_inner_app 0) out t
 
 let to_string = CCFormat.to_string pp
 

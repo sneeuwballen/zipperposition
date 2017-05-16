@@ -976,7 +976,7 @@ module Make
     Util.debugf ~section 3
       "(@[<hv2>induction_clusters@ :in %a@ :clusters (@[<hv>%a@])@])"
       (fun k->k Cut_form.pp f
-          (Util.pp_list Fmt.(within "(" ")" @@ hvbox @@ Util.pp_list HVar.pp))
+          (Util.pp_list Fmt.(within "{" "}" @@ hvbox @@ Util.pp_list HVar.pp))
           res);
     res
 
