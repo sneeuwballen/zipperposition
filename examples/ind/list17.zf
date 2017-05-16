@@ -1,0 +1,9 @@
+# expect: unsat
+
+# len (rev x) = len x
+
+include "list.zf".
+
+goal forall x. length x = length (rev x).
+
+

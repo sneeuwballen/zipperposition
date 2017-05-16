@@ -1,0 +1,15 @@
+
+# expect: unsat
+
+val i : type.
+
+val f : i -> i -> i.
+val g : i -> i.
+val a : i.
+val b : i.
+
+goal exists F.
+  F a = f a (g a) &&
+  F b = f b (g b).
+
+

@@ -1,4 +1,6 @@
-# expect: UNSAT
+# expect: sat
+# bad retranscription?
+
 val term : type.
 val f : term -> term -> prop.
 assert

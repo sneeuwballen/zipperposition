@@ -1,0 +1,15 @@
+# expect: unsat
+
+# len (rev x) = len x
+
+include "nat.zf".
+include "list.zf".
+
+# NOTE: why isn't this sufficient?
+#lemma forall x l. length (cons x l) = s (length l).
+
+lemma forall l1 l2. length (append l1 l2) = plus (length l2) (length l1).
+
+goal forall x. length x = length (rev x).
+
+

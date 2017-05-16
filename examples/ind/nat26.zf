@@ -1,0 +1,19 @@
+
+# expect: unsat
+
+# ack(m,n) > 0
+
+include "nat.zf".
+
+def ack : nat -> nat -> nat where
+  forall m. ack z m = s m;
+  forall n m. ack (s n) m =
+    match m with
+    | z -> ack n (s z)
+    | s m2 -> ack n (ack (s n) m2)
+    end.
+
+goal forall x y. less z (ack x y).
+
+
+
