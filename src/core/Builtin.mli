@@ -30,8 +30,10 @@ type t =
   | Grounding (** used for inst-gen *)
   | TyInt
   | TyRat
+  | TyReal
   | Int of Z.t
   | Rat of Q.t
+  | Real of string (* for now… *)
   | Floor
   | Ceiling
   | Truncate

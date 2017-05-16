@@ -183,6 +183,7 @@ let lambda ?loc vars f = bind ?loc Binder.lambda vars f
 let int_ i = builtin (Builtin.Int i)
 let of_int i = int_ (Z.of_int i)
 let rat n = builtin (Builtin.Rat n)
+let real r = builtin (Builtin.Real r)
 
 let fun_ty ?loc l ret = match l with
   | [] -> ret
@@ -193,6 +194,7 @@ let term = builtin Builtin.Term
 let prop = builtin Builtin.Prop
 let ty_int = builtin Builtin.TyInt
 let ty_rat = builtin Builtin.TyRat
+let ty_real = builtin Builtin.TyReal
 let forall_ty ?loc vars t = bind ?loc Binder.forall_ty vars t
 
 let ty_unfold =

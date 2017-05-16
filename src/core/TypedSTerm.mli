@@ -129,6 +129,7 @@ module Ty : sig
   val prop : t
   val int : t
   val rat : t
+  val real : t
   val term : t
 
   val (==>) : t list -> t -> t

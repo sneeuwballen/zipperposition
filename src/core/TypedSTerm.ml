@@ -575,6 +575,7 @@ module Ty = struct
   let prop = builtin ~ty:tType Builtin.Prop
   let int = builtin ~ty:tType Builtin.TyInt
   let rat = builtin ~ty:tType Builtin.TyRat
+  let real = builtin ~ty:tType Builtin.TyReal
   let term = builtin ~ty:tType Builtin.Term
 
   let (==>) args ret = fun_ args ret

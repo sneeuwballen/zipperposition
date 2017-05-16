@@ -344,6 +344,7 @@ let rec infer_ty_ ?loc ctx ty =
   let rec aux ty = match PT.view ty with
     | PT.AppBuiltin (Builtin.TyInt, []) -> T.Ty.int
     | PT.AppBuiltin (Builtin.TyRat, []) -> T.Ty.rat
+    | PT.AppBuiltin (Builtin.TyReal, []) -> T.Ty.real
     | PT.AppBuiltin (Builtin.Term, []) -> T.Ty.term
     | PT.AppBuiltin (Builtin.Prop, []) -> T.Ty.prop
     | PT.AppBuiltin (Builtin.TType, []) -> T.Ty.tType
@@ -596,6 +597,7 @@ let rec infer_rec ?loc ctx t =
           T.Ty.forall_l ?loc vars' t')
     | PT.AppBuiltin (Builtin.Int _ as b, []) -> T.builtin ~ty:T.Ty.int b
     | PT.AppBuiltin (Builtin.Rat _ as b, []) -> T.builtin ~ty:T.Ty.rat b
+    | PT.AppBuiltin (Builtin.Real _ as b, []) -> T.builtin ~ty:T.Ty.real b
     | PT.AppBuiltin (Builtin.TyInt, []) -> T.Ty.int
     | PT.AppBuiltin (Builtin.TyRat, []) -> T.Ty.rat
     | PT.AppBuiltin (Builtin.Term, []) -> T.Ty.term

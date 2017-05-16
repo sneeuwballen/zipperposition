@@ -26,8 +26,10 @@ type t =
   | Grounding (** used for inst-gen *)
   | TyInt
   | TyRat
+  | TyReal
   | Int of Z.t
   | Rat of Q.t
+  | Real of string
   | Floor
   | Ceiling
   | Truncate
@@ -108,6 +110,8 @@ let to_int_ = function
   | ExistsConst -> 48
   | Grounding -> 50
   | Box_opaque -> 60
+  | TyReal -> 70
+  | Real _ -> 71
 
 let compare a b = match a, b with
   | Int i, Int j -> Z.compare i j
@@ -140,6 +144,7 @@ let is_arith = function
 let to_string s = match s with
   | Int n -> Z.to_string n
   | Rat n -> Q.to_string n
+  | Real r -> r
   | Not -> "¬"
   | And -> "∧"
   | Or -> "∨"
@@ -162,6 +167,7 @@ let to_string s = match s with
   | Grounding -> "★"
   | TyInt -> "int"
   | TyRat -> "rat"
+  | TyReal -> "real"
   | Floor -> "floor"
   | Ceiling -> "ceiling"
   | Truncate -> "truncate"
@@ -296,8 +302,10 @@ module TPTP = struct
     | Grounding -> "$$ground"
     | TyInt -> "$int"
     | TyRat -> "$rat"
+    | TyReal -> "$real"
     | Int x -> Z.to_string x
     | Rat x -> Q.to_string x
+    | Real r -> r
     | Floor -> "$floor"
     | Ceiling -> "$ceiling"
     | Truncate -> "$truncate"
@@ -617,8 +625,10 @@ module ZF = struct
     | Grounding -> "$$grounding"
     | TyInt -> "int"
     | TyRat -> "rat"
+    | TyReal -> "real"
     | Int x -> Z.to_string x
     | Rat x -> Q.to_string x
+    | Real x -> x
     (* FIXME: update *)
     | Floor -> "$floor"
     | Ceiling -> "$ceiling"

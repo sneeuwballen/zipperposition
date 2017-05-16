@@ -309,10 +309,7 @@ defined_term:
 defined_atom:
   | n=INTEGER { PT.int_ (Z.of_string n) }
   | n=RATIONAL { PT.rat (Q.of_string n) }
-  | REAL {
-      let loc = L.mk_pos $startpos $endpos in
-      UntypedAST.error loc "expected `defined_atom`"
-    }
+  | n=REAL { PT.real n }
   | s=DISTINCT_OBJECT
     {
       let loc = L.mk_pos $startpos $endpos in
@@ -432,6 +429,7 @@ defined_ty:
       | "$tType" -> PT.tType
       | "$int" -> PT.ty_int
       | "$rat" -> PT.ty_rat
+      | "$real" -> PT.ty_real
       | _ ->
           let loc = L.mk_pos $startpos $endpos in
           UntypedAST.errorf loc "expected defined_type, not `%s`" w
