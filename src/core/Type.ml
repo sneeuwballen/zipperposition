@@ -377,7 +377,7 @@ let mangle (ty:t): string =
   let add_id buf id =
     let s =
       ID.name id
-      |> CCString.filter (function '#' -> false | _ -> true)
+      |> CCString.filter (function '#' | '_' -> false | _ -> true)
     in
     Buffer.add_string buf s
   in

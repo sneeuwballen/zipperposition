@@ -36,7 +36,7 @@ let pp_context out = function
 let purify (lits:Literals.t) =
   (* set of new literals *)
   let new_lits = ref [] in
-  let cache_ = T.Tbl.create 16 in  (* cache for term->var *)
+  let cache_ = T.Tbl.create 8 in  (* cache for term->var *)
   let add_lit_ lit = new_lits := lit :: !new_lits in
   (* index of the next fresh variable *)
   let varidx =
