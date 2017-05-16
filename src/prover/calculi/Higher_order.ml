@@ -77,7 +77,9 @@ module Make(E : Env.S) : S with module Env = E = struct
   let mk_parameter =
     let n = ref 0 in
     fun ty ->
-      let id = ID.makef "k#%d" (CCRef.incr_then_get n) in
+      let i = CCRef.incr_then_get n in
+      let id = ID.makef "k#%d" i in
+      ID.set_payload id (ID.Attr_parameter i);
       T.const id ~ty
 
   (* negative extensionality rule:
