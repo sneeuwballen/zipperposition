@@ -415,6 +415,20 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.exit_prof prof_infer_passive;
     new_clauses
 
+  (* can we unify [t] and [u] for equality resolution? Only if they
+     are not variables shielded elsewhere *)
+  let can_eq_res lits t u =
+    let var_ok v =
+      not (Purify.type_is_purifiable @@ HVar.ty v) ||
+      not (Purify.is_shielded v lits)
+    in
+    begin match T.view t, T.view u with
+      | T.Var v1, T.Var v2 -> var_ok v1 || var_ok v2
+      | T.Var v, _
+      | _, T.Var v -> var_ok v
+      | _ -> true
+    end
+
   let infer_equality_resolution clause =
     Util.enter_prof prof_infer_equality_resolution;
     let eligible = C.Eligible.always in
@@ -422,9 +436,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let new_clauses =
       Lits.fold_eqn ~sign:false ~ord:(Ctx.ord ())
         ~both:false ~eligible (C.lits clause)
-      |> Sequence.fold
-        (fun acc (l, r, sign, l_pos) ->
+      |> Sequence.filter
+        (fun (l, r, sign, _) ->
            assert (not sign);
+           can_eq_res (C.lits clause) l r)
+      |> Sequence.filter_map
+        (fun (l, r, _, l_pos) ->
            let pos = Lits.Pos.idx l_pos in
            try
              let subst = Unif.FO.unification (l, 0) (r, 0) in
@@ -442,12 +459,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                let new_clause = C.create ~trail ~penalty new_lits proof in
                Util.debugf ~section 3 "@[<hv2>equality resolution on@ @[%a@]@ yields @[%a@]@]"
                  (fun k->k C.pp clause C.pp new_clause);
-               new_clause::acc
-             ) else
-               acc
+               Some new_clause
+             ) else None
            with Unif.Fail ->
-             acc  (* l and r not unifiable, try next *)
-        ) []
+             (* l and r not unifiable, try next *)
+             None)
+      |> Sequence.to_rev_list
     in
     Util.exit_prof prof_infer_equality_resolution;
     new_clauses
@@ -817,15 +834,20 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       Array.iteri
         (fun i lit ->
+           let can_destr_eq_var v =
+             not (var_in_subst_ !subst v 0) &&
+             ( not (Purify.type_is_purifiable @@ HVar.ty v) ||
+               not (Purify.is_shielded v (C.lits c)))
+           in
            if BV.get bv i then match lit with
              | Lit.Equation (l, r, false) ->
                begin match T.view l, T.view r with
-                 | T.Var v, _ when not (var_in_subst_ !subst v 0) ->
+                 | T.Var v, _ when can_destr_eq_var v ->
                    (* eligible for destructive Equality Resolution, try to update
                        [subst]. Careful: in the case [X!=a | X!=b | C] we must
                        bind X only to [a] or [b], not unify [a] with [b]. *)
                    try_unif i l 0 r 0
-                 | _, T.Var v when not (var_in_subst_ !subst v 0) ->
+                 | _, T.Var v when can_destr_eq_var v ->
                    try_unif i r 0 l 0
                  | _ -> ()
                end
