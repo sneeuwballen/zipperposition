@@ -12,6 +12,7 @@ let section = Util.Section.make ~parent:Const.section "ho"
 
 let stat_eq_res = Util.mk_stat "ho.eq_res.steps"
 let stat_ext_neg = Util.mk_stat "ho.extensionality-.steps"
+let stat_complete_eq = Util.mk_stat "ho.complete_eq.steps"
 
 let prof_eq_res = Util.mk_profiler "ho.eq_res"
 
@@ -76,7 +77,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let mk_parameter =
     let n = ref 0 in
     fun ty ->
-      let id = ID.makef "%%c_%d" (CCRef.incr_then_get n) in
+      let id = ID.makef "k#%d" (CCRef.incr_then_get n) in
       T.const id ~ty
 
   (* negative extensionality rule:
@@ -99,9 +100,45 @@ module Make(E : Env.S) : S with module Env = E = struct
       Some new_lit
     | _ -> None
 
-  (* TODO: predicate elimination *)
+  (* complete [f = g] into [f x1…xn = g x1…xn] *)
+  let complete_eq_args (c:C.t) : C.t list =
+    let var_offset = C.Seq.vars c |> Type.Seq.max_var |> succ in
+    let new_c =
+      C.lits c
+      |> Sequence.of_array |> Sequence.zip_i |> Sequence.zip
+      |> Sequence.filter_map
+        (fun (lit_idx,lit) -> match lit with
+          | Literal.Equation (t, u, true) when Type.is_fun (T.ty t) ->
+            let n_ty_args, ty_args, _ = Type.open_poly_fun (T.ty t) in
+            assert (n_ty_args = 0);
+            let vars =
+              List.mapi
+                (fun i ty -> HVar.make ~ty (i+var_offset) |> T.var)
+                ty_args
+            in
+            let new_lit = Literal.mk_eq (T.app t vars) (T.app u vars) in
+            let new_lits = new_lit :: CCArray.except_idx (C.lits c) lit_idx in
+            let proof =
+              Proof.Step.inference [C.proof_parent c]
+                ~rule:(Proof.Rule.mk "ho_complete_eq")
+            in
+            let new_c =
+              C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
+            in
+            Some new_c
+          | _ -> None)
+      |> Sequence.to_rev_list
+    in
+    if new_c<>[] then (
+      Util.add_stat stat_complete_eq (List.length new_c);
+      Util.debugf ~section 4
+        "(@[complete-eq@ :clause %a@ :yields (@[<hv>%a@])@])"
+        (fun k->k C.pp c (Util.pp_list ~sep:" " C.pp) new_c);
+    );
+    new_c
 
-  (* TODO: purification *)
+
+  (* TODO: predicate elimination *)
 
   (* ensure that combinators are defined functions *)
   let declare_combinators() =
@@ -124,6 +161,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let () = ignore (HO_unif.Combinators.rules @@ Ctx.combinators ()) in
     declare_combinators ();
     Env.add_unary_inf "ho_eq_res" eq_res;
+    Env.add_unary_inf "ho_complete_eq" complete_eq_args;
     Env.add_lit_rule "ho_ext_neg" ext_neg;
     ()
 end
