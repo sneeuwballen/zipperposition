@@ -98,11 +98,9 @@ let is_divides = function
   | Divides _ -> true
   | Binary _ -> false
 
-let _normalize = Monome.Int.normalize
-
 (* main constructor *)
 let make op m1 m2 =
-  let m1, m2 = _normalize m1, _normalize m2 in
+  let m1, m2 = M.normalize m1, M.normalize m2 in
   let m = M.difference m1 m2 in
   (* build from a single monome *)
   let _make_split op m =
@@ -158,7 +156,7 @@ let _normalize_in_div n ~power m =
   M.map_num norm_coeff m
 
 let mk_divides ?(sign=true) n ~power m =
-  let m = _normalize m in
+  let m = Monome.normalize m in
   let m = _normalize_in_div n ~power m in
   (* factorize m by some k; if k is n^p, then make the literal
      n^{power-p} | m/k *)

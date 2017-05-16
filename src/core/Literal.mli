@@ -228,9 +228,6 @@ module Conv : sig
   type hook_from = term SLiteral.t -> t option
   type hook_to = t -> term SLiteral.t option
 
-  val int_hook_from : hook_from
-  val rat_hook_from : hook_from
-
   val of_form : ?hooks:hook_from list -> term SLiteral.t -> t
   (** Conversion from a formula. By default no ordering or arith theory
       is considered.

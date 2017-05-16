@@ -185,6 +185,10 @@ let ty_error_ a b =
   in
   raise (Type.ApplyError msg)
 
+let has_num_ty t =
+  Type.equal Type.int (T.ty t) ||
+  Type.equal Type.rat (T.ty t)
+
 (* primary constructor for equations and predicates *)
 let rec mk_lit a b sign =
   if not (Type.equal (T.ty a) (T.ty b)) then ty_error_ a b;
@@ -197,21 +201,86 @@ let rec mk_lit a b sign =
     | _, T.AppBuiltin (Builtin.False, []) -> Prop (a, not sign)
     | T.AppBuiltin (Builtin.Not, [a']), _ -> mk_lit a' b (not sign)
     | _, T.AppBuiltin (Builtin.Not, [b']) -> mk_lit a b' (not sign)
+    | _ when has_num_ty a ->
+      begin match mk_num_eq a b sign with
+        | None -> Equation (a,b,sign)
+        | Some lit -> lit
+      end
     | _ -> Equation (a, b, sign)
 
-let mk_eq a b = mk_lit a b true
+and mk_num_eq t u sign =
+  let open CCOpt in
+  if Type.equal Type.int (T.ty t) then (
+    let module AL = Int_lit in
+    Monome.Int.of_term t >>= fun m1 ->
+    Monome.Int.of_term u >>= fun m2 ->
+    return (Int (if sign then AL.mk_eq m1 m2 else AL.mk_neq m1 m2))
+  ) else if Type.equal Type.rat (T.ty t) then (
+    let module AL = Rat_lit in
+    if sign then (
+      Monome.Rat.of_term t >>= fun m1 ->
+      Monome.Rat.of_term u >>= fun m2 ->
+      return (Rat (AL.mk_eq m1 m2))
+    ) else None (* no "neq" literal for rationals *)
+  ) else assert false
 
-let mk_neq a b = mk_lit a b false
-
-let rec mk_prop p sign = match T.view p with
+and mk_prop p sign = match T.view p with
   | T.AppBuiltin (Builtin.True, []) -> if sign then True else False
   | T.AppBuiltin (Builtin.False, []) -> if sign then False else True
   | T.AppBuiltin (Builtin.Not, [p']) -> mk_prop p' (not sign)
   | T.AppBuiltin (Builtin.Eq, [a;b]) -> mk_lit a b sign
   | T.AppBuiltin (Builtin.Neq, [a;b]) -> mk_lit a b (not sign)
+  | T.AppBuiltin
+      ((Builtin.Less | Builtin.Lesseq | Builtin.Greater | Builtin.Greatereq) as b,
+       [_; t; u]) when has_num_ty t ->
+    (* arith conversion *)
+    begin match mk_num_prop b t u sign with
+      | None -> Prop (p, sign)
+      | Some lit -> lit
+    end
   | _ ->
     if not (Type.equal (T.ty p) Type.prop) then ty_error_ p T.true_;
     Prop (p, sign)
+
+(* [sign (builtin t u)] *)
+and mk_num_prop builtin t u sign: t option =
+  let open CCOpt in
+  if Type.equal Type.int (T.ty t) then (
+    let module AL = Int_lit in
+    Monome.Int.of_term t >>= fun m1 ->
+    Monome.Int.of_term u >|= fun m2 ->
+    let mk_pred t u = match builtin, sign with
+      | Builtin.Less, true
+      | Builtin.Greatereq, false -> AL.mk_less t u
+      | Builtin.Lesseq, true
+      | Builtin.Greater, false -> AL.mk_lesseq t u
+      | Builtin.Greater, true
+      | Builtin.Lesseq, false -> AL.mk_less u t
+      | Builtin.Greatereq, true
+      | Builtin.Less, false -> AL.mk_lesseq u t
+      | _ -> assert false
+    in
+    Int (mk_pred m1 m2)
+  ) else if Type.equal Type.rat (T.ty t) then (
+    let module AL = Rat_lit in
+    Monome.Rat.of_term t >>= fun t ->
+    Monome.Rat.of_term u >>= fun u ->
+    begin match builtin, sign with
+      | Builtin.Less, true
+      | Builtin.Greatereq, false -> Some (Rat (AL.mk_less t u))
+      | Builtin.Greater, true
+      | Builtin.Lesseq, false -> Some (Rat (AL.mk_less u t))
+      | Builtin.Lesseq, true
+      | Builtin.Greater, false
+      | Builtin.Greatereq, true
+      | Builtin.Less, false -> None (* cannot encode this, would yield 2 lits *)
+      | _ -> assert false
+    end
+  ) else assert false
+
+let mk_eq a b = mk_lit a b true
+
+let mk_neq a b = mk_lit a b false
 
 let mk_true p = mk_prop p true
 
@@ -565,8 +634,8 @@ let pp_debug ?(hooks=[]) out lit =
       Format.fprintf out "@[<1>%a@ = %a@]" T.pp l T.pp r
     | Equation (l, r, false) ->
       Format.fprintf out "@[<1>%a@ ≠ %a@]" T.pp l T.pp r
-    | Int o -> Int_lit.pp out o
-    | Rat o -> Rat_lit.pp out o
+    | Int o -> CCFormat.within "(" ")" Int_lit.pp out o
+    | Rat o -> CCFormat.within "(" ")" Rat_lit.pp out o
 
 let pp_tstp out lit =
   match lit with
@@ -833,76 +902,6 @@ end
 module Conv = struct
   type hook_from = term SLiteral.t -> t option
   type hook_to = t -> term SLiteral.t option
-
-  let int_hook_from f =
-    let open CCOpt in
-    let module BA = Builtin.Arith in
-    let module AL = Int_lit in
-    let type_ok t = Type.equal Type.int (T.ty t) in
-    (* arithmetic conversion! *)
-    begin match f with
-      | SLiteral.Eq (l, r) when type_ok l ->
-        Monome.Int.of_term l >>= fun m1 ->
-        Monome.Int.of_term r >>= fun m2 ->
-        return (Int (AL.mk_eq m1 m2))
-      | SLiteral.Neq (l, r) when type_ok l ->
-        Monome.Int.of_term l >>= fun m1 ->
-        Monome.Int.of_term r >>= fun m2 ->
-        return (Int (AL.mk_neq m1 m2))
-      | SLiteral.Atom (t, b) ->
-        let post lit = if b then lit else negate lit in
-        let res = match T.view t with
-          | T.AppBuiltin (Builtin.Less, [_; l; r]) when type_ok l ->
-            Monome.Int.of_term l >>= fun m1 ->
-            Monome.Int.of_term r >>= fun m2 ->
-            return (Int (AL.mk_less m1 m2))
-          | T.AppBuiltin (Builtin.Lesseq, [_; l; r]) when type_ok l ->
-            Monome.Int.of_term l >>= fun m1 ->
-            Monome.Int.of_term r >>= fun m2 ->
-            return (Int (AL.mk_lesseq m1 m2))
-          | T.AppBuiltin (Builtin.Greater, [_; l; r]) when type_ok l ->
-            Monome.Int.of_term l >>= fun m1 ->
-            Monome.Int.of_term r >>= fun m2 ->
-            return (Int (AL.mk_less m2 m1))
-          | T.AppBuiltin (Builtin.Greatereq, [_; l; r]) when type_ok l ->
-            Monome.Int.of_term l >>= fun m1 ->
-            Monome.Int.of_term r >>= fun m2 ->
-            return (Int (AL.mk_lesseq m2 m1))
-          | _ -> None
-        in
-        CCOpt.map post res
-      | _ -> None
-    end
-
-  let rat_hook_from f =
-    let open CCOpt in
-    let module BA = Builtin.Arith in
-    let module AL = Rat_lit in
-    let type_ok t = Type.equal Type.rat (T.ty t) in
-    (* arithmetic conversion! *)
-    begin match f with
-      | SLiteral.Eq (l, r) when type_ok l ->
-        Monome.Rat.of_term l >>= fun m1 ->
-        Monome.Rat.of_term r >>= fun m2 ->
-        return (Rat (AL.mk_eq m1 m2))
-      | SLiteral.Atom (t, b) ->
-        let post lit = if b then lit else negate lit in
-        let res = match T.view t with
-          | T.AppBuiltin (Builtin.Less, [_; l; r]) when type_ok l ->
-            Monome.Rat.of_term l >>= fun m1 ->
-            Monome.Rat.of_term r >>= fun m2 ->
-            return (Rat (AL.mk_less m1 m2))
-          | T.AppBuiltin (Builtin.Greater, [_; l; r]) when type_ok l ->
-            Monome.Rat.of_term l >>= fun m1 ->
-            Monome.Rat.of_term r >>= fun m2 ->
-            return (Rat (AL.mk_less m2 m1))
-          | T.AppBuiltin (Builtin.Greatereq, [_; l; _]) when type_ok l ->
-            Util.errorf ~where:"cnf" "should have encoded `%a`" (SLiteral.pp T.pp) f
-          | _ -> None
-        in
-        CCOpt.map post res
-      | _ -> None
-    end
 
   let rec try_hooks x hooks = match hooks with
     | [] -> None

@@ -56,11 +56,9 @@ let hash lit =
 let is_eq t = t.op = Equal
 let is_less t = t.op = Less
 
-let _normalize = Monome.Rat.normalize
-
 (* main constructor *)
 let make op m1 m2 =
-  let m1, m2 = _normalize m1, _normalize m2 in
+  let m1, m2 = Monome.normalize m1, Monome.normalize m2 in
   let m = M.difference m1 m2 in
   (* build from a single monome *)
   let m1, m2 = M.split m in

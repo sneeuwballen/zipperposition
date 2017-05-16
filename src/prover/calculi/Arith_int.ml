@@ -2096,7 +2096,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_redundant is_redundant_by_ineq;
     Env.add_simplify purify;
     Env.add_multi_simpl_rule eliminate_unshielded;
-    Ctx.Lit.add_from_hook Lit.Conv.int_hook_from;
     (* completeness? I don't think so *)
     Ctx.lost_completeness ();
     (* enable AC-property of sum *)

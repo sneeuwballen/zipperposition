@@ -8,8 +8,6 @@
     "scaled" literals, i.e. literals that are multiplied by numeric coefficients so
     as to bring the unified terms to the same coefficient. *)
 
-open Logtk
-
 val case_switch_limit : int ref
 (** Positive integer: maximum width of an inequality case switch. Default: 30 *)
 

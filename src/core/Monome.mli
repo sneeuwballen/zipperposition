@@ -89,6 +89,12 @@ val dominates : strict:bool -> 'a t -> 'a t -> bool
     then [m1 = m2].
     @argument strict if true, use "greater than", else "greater or equal". *)
 
+val normalize : 'a t -> 'a t
+(** Normalize the monome, which means that if some terms are
+    rational or integer constants, they are moved to the constant part
+    (e.g after apply X->3/4 in 2.X+1, one gets 2×3/4 +1. Normalization
+    reduces this to 5/2). *)
+
 val split : 'a t -> 'a t * 'a t
 (** [split m] splits into a monome with positive coefficients, and one
     with negative coefficients.
@@ -263,12 +269,6 @@ module Int : sig
   val to_term : t -> term
   (** convert back to a term *)
 
-  val normalize : t -> t
-  (** Normalize the monome, which means that if some terms are
-      integer constants, they are moved to the constant part
-      (e.g after apply X->3 in 2.X+1, one gets 2.3 +1. Normalization
-      reduces this to 7). *)
-
   val has_instances : t -> bool
   (** For real or rational, always true. For integers, returns true
       iff g divides [m.constant], where g is the
@@ -402,12 +402,6 @@ module Rat : sig
 
   val to_term : t -> term
   (** convert back to a term *)
-
-  val normalize : t -> t
-  (** Normalize the monome, which means that if some terms are
-      rational or integer constants, they are moved to the constant part
-      (e.g after apply X->3/4 in 2.X+1, one gets 2×3/4 +1. Normalization
-      reduces this to 5/2). *)
 end
 
 (** {2 For fields (Q,R)} *)

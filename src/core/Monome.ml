@@ -25,6 +25,8 @@ type 'a num = {
   minus : 'a -> 'a -> 'a;
   to_term : 'a -> term;
   to_string : 'a -> string;
+  of_int: Z.t -> 'a;
+  of_rat: Q.t -> 'a option;
 }
 
 let z : Z.t num = {
@@ -46,6 +48,8 @@ let z : Z.t num = {
   minus = Z.sub;
   to_term = (fun n -> T.builtin ~ty:Type.int (Builtin.mk_int n));
   to_string = Z.to_string;
+  of_int=(fun x->x);
+  of_rat=(fun _ -> None);
 }
 
 let q : Q.t num = {
@@ -69,6 +73,8 @@ let q : Q.t num = {
   minus = Q.sub;
   to_term = (fun n -> T.builtin ~ty:Type.rat (Builtin.mk_rat n));
   to_string = Q.to_string;
+  of_int = Q.of_bigint;
+  of_rat = (fun x->Some x);
 }
 
 type 'a t = {
@@ -667,6 +673,63 @@ let unify ?(subst=Subst.empty) (m1,sc1)(m2,sc2) k =
 
 exception NotLinear
 
+(* convert term to monome, or raise NotLinear *)
+let of_term_exn (type a)(num:a num) t =
+  let of_rat_exn q = match num.of_rat q with
+    | None -> raise NotLinear
+    | Some n -> n
+  in
+  let rec of_term t = match T.view t with
+    | T.AppBuiltin (Builtin.Sum, [_; t1; t2]) ->
+      let m1 = of_term t1 in
+      let m2 = of_term t2 in
+      sum m1 m2
+    | T.AppBuiltin (Builtin.Difference, [_;t1; t2]) ->
+      let m1 = of_term t1 in
+      let m2 = of_term t2 in
+      difference m1 m2
+    | T.AppBuiltin (Builtin.Uminus, [_;t']) ->
+      let m = of_term t' in
+      uminus m
+    | T.AppBuiltin (Builtin.Product, [_;t1; t2]) ->
+      begin match T.view t1, T.view t2 with
+        | T.AppBuiltin (Builtin.Int n, []), _ ->
+          product (of_term t2) (num.of_int n)
+        | T.AppBuiltin (Builtin.Rat n, []), _ ->
+          product (of_term t2) (of_rat_exn n)
+        | _, T.AppBuiltin (Builtin.Int n, []) ->
+          product (of_term t1) (num.of_int n)
+        | _, T.AppBuiltin (Builtin.Rat n, []) ->
+          product (of_term t1) (of_rat_exn n)
+        | _ -> raise NotLinear
+      end
+    | T.AppBuiltin (Builtin.Succ, [_;t']) -> succ (of_term t')
+    | T.AppBuiltin (Builtin.Prec, [_;t']) -> pred (of_term t')
+    | T.AppBuiltin (Builtin.Int n, []) -> mk_const ~num (num.of_int n)
+    | T.AppBuiltin (Builtin.Rat n, []) -> mk_const ~num (of_rat_exn n)
+    | T.AppBuiltin (b, _) when Builtin.is_arith b ->
+      raise NotLinear
+    | T.AppBuiltin _
+    | T.Var _
+    | T.Const _
+    | T.App _
+    | T.DB _ -> singleton ~num num.one t
+  in
+  of_term t
+
+(* to normalize, convert every coefficient to a monome and sum everything
+   together *)
+let normalize (type a) (m:a t): a t =
+  let acc = mk_const ~num:m.num m.const in
+  List.fold_left
+    (fun acc (c,t) ->
+       (* flatten this term into a full monome *)
+       let m =
+         try of_term_exn m.num t with NotLinear -> assert false
+       in
+       sum acc (product m c))
+    acc m.terms
+
 module Int = struct
   let num = z
   type t = Z.t monome
@@ -675,45 +738,7 @@ module Int = struct
   let singleton = singleton ~num
   let of_list = of_list ~num
 
-  let of_term_exn t =
-    let rec of_term t : t = match T.view t with
-      | T.AppBuiltin (Builtin.Sum, [_; t1; t2]) ->
-        let m1 = of_term t1 in
-        let m2 = of_term t2 in
-        sum m1 m2
-      | T.AppBuiltin (Builtin.Difference, [_;t1; t2]) ->
-        let m1 = of_term t1 in
-        let m2 = of_term t2 in
-        difference m1 m2
-      | T.AppBuiltin (Builtin.Uminus, [_;t']) ->
-        let m = of_term t' in
-        uminus m
-      | T.AppBuiltin (Builtin.Product, [_;t1; t2]) ->
-        begin match T.view t1, T.view t2 with
-          | T.AppBuiltin (Builtin.Int n, []), _ ->
-            let m = of_term t2 in
-            product m n
-          | _, T.AppBuiltin (Builtin.Int n, []) ->
-            let m = of_term t1 in
-            product m n
-          | _ -> raise NotLinear
-        end
-      | T.AppBuiltin (Builtin.Succ, [_;t']) ->
-        let m = of_term t' in
-        succ m
-      | T.AppBuiltin (Builtin.Prec, [_;t']) ->
-        let m = of_term t' in
-        pred m
-      | T.AppBuiltin (Builtin.Int n, []) -> const n
-      | T.AppBuiltin (b, _) when Builtin.is_arith b ->
-        raise NotLinear
-      | T.AppBuiltin _
-      | T.Var _
-      | T.Const _
-      | T.App _
-      | T.DB _ -> singleton num.one t
-    in
-    of_term t
+  let of_term_exn t = of_term_exn num t
 
   let of_term t =
     try Some (of_term_exn t)
@@ -756,22 +781,6 @@ module Int = struct
         mk_sum_const e.const sum
     in
     t
-
-  let normalize m =
-    let cst, changed, terms =
-      List.fold_left
-        (fun (cst, changed, acc) (c,t) ->
-           match T.view t with
-             | T.AppBuiltin (Builtin.Int n, []) ->
-               Z.add cst (Z.mul n c), true, acc
-             | _ -> cst, changed, (c,t)::acc
-        ) (m.const, false, []) m.terms
-    in
-    if changed
-    then
-      let terms = List.rev terms in  (* sort again *)
-      {m with const=cst; terms; }
-    else m
 
   let normalize_wrt_zero m =
     if is_const m
@@ -1191,45 +1200,7 @@ module Rat = struct
   let singleton = singleton ~num
   let of_list = of_list ~num
 
-  let of_term_exn t =
-    let rec of_term t : t = match T.view t with
-      | T.AppBuiltin (Builtin.Sum, [_; t1; t2]) ->
-        let m1 = of_term t1 in
-        let m2 = of_term t2 in
-        sum m1 m2
-      | T.AppBuiltin (Builtin.Difference, [_;t1; t2]) ->
-        let m1 = of_term t1 in
-        let m2 = of_term t2 in
-        difference m1 m2
-      | T.AppBuiltin (Builtin.Uminus, [_;t']) ->
-        let m = of_term t' in
-        uminus m
-      | T.AppBuiltin (Builtin.Product, [_;t1; t2]) ->
-        begin match T.view t1, T.view t2 with
-          | T.AppBuiltin (Builtin.Rat n, []), _ ->
-            let m = of_term t2 in
-            product m n
-          | _, T.AppBuiltin (Builtin.Rat n, []) ->
-            let m = of_term t1 in
-            product m n
-          | _ -> raise NotLinear
-        end
-      | T.AppBuiltin (Builtin.Succ, [_;t']) ->
-        let m = of_term t' in
-        succ m
-      | T.AppBuiltin (Builtin.Prec, [_;t']) ->
-        let m = of_term t' in
-        pred m
-      | T.AppBuiltin (Builtin.Rat n, []) -> const n
-      | T.AppBuiltin (b, _) when Builtin.is_arith b ->
-        raise NotLinear
-      | T.AppBuiltin _
-      | T.Var _
-      | T.Const _
-      | T.App _
-      | T.DB _ -> singleton num.one t
-    in
-    of_term t
+  let of_term_exn t = of_term_exn num t
 
   let of_term t =
     try Some (of_term_exn t)
@@ -1273,20 +1244,4 @@ module Rat = struct
         mk_sum_const e.const sum
     in
     t
-
-  let normalize m =
-    let cst, changed, terms =
-      List.fold_left
-        (fun (cst, changed, acc) (c,t) ->
-           match T.view t with
-             | T.AppBuiltin (Builtin.Rat n, []) ->
-               Q.add cst (Q.mul n c), true, acc
-             | _ -> cst, changed, (c,t)::acc
-        ) (m.const, false, []) m.terms
-    in
-    if changed
-    then
-      let terms = List.rev terms in  (* sort again *)
-      {m with const=cst; terms; }
-    else m
 end
