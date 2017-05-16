@@ -84,29 +84,55 @@ module Make(E : Env.S) : S with module Env = E = struct
            ))
     end
 
-  (* rewrite [a ≠_o b] into [a || b && (¬ a || ¬b)], i.e. exclusive or *)
-  let rw_bool_eqns : E.multi_simpl_rule = fun c ->
+  (* rewrite some boolean literals:
+     - [a ≠_o b --> a || b && (¬ a || ¬b)], i.e. exclusive or
+     - [(∧ a b) --> a ∧ b]
+     - [(∨ a b) --> a ∨ b]
+  *)
+  let rw_bool_lits : E.multi_simpl_rule = fun c ->
+    let is_bool_val t = T.equal t T.true_ || T.equal t T.false_ in
+    (* how to build a new clause *)
+    let mk_c lits =
+      let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "fool_simp")
+          [Proof.Parent.from @@ C.proof c]
+      in
+      C.create lits proof
+        ~penalty:(C.penalty c) ~trail:(C.trail c)
+    in
     C.lits c
     |> CCArray.findi
       (fun i lit -> match lit with
-        | Literal.Equation (a, b, false) when Type.is_prop (T.ty a) ->
-          let lits = CCArray.except_idx (C.lits c) i in
-          let mk_c lits =
-            let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "fool_simp")
-                [Proof.Parent.from @@ C.proof c]
-            in
-            C.create lits proof
-              ~penalty:(C.penalty c) ~trail:(C.trail c)
-          in
-          let c_pos = Literal.mk_true a :: Literal.mk_true b :: lits |> mk_c in
-          let c_neg = Literal.mk_false a :: Literal.mk_false b :: lits |> mk_c in
-          Some [c_pos; c_neg]
-        | _ -> None)
+         | Literal.Equation (a, b, false)
+           when Type.is_prop (T.ty a) &&
+                not (is_bool_val a) &&
+                not (is_bool_val b) ->
+           let lits = CCArray.except_idx (C.lits c) i in
+           let c_pos = Literal.mk_true a :: Literal.mk_true b :: lits |> mk_c in
+           let c_neg = Literal.mk_false a :: Literal.mk_false b :: lits |> mk_c in
+           Some [c_pos; c_neg]
+         | Literal.Prop (t, sign) ->
+           (* see if there is some CNF to do here *)
+           begin match T.view t, sign with
+             | T.AppBuiltin (Builtin.And, l), true
+             | T.AppBuiltin (Builtin.Or, l), false ->
+               let lits = CCArray.except_idx (C.lits c) i in
+               l
+               |> List.map (fun t -> Literal.mk_prop t sign :: lits |> mk_c)
+               |> CCOpt.return
+             | T.AppBuiltin (Builtin.Or, l), true
+             | T.AppBuiltin (Builtin.And, l), false ->
+               let lits = CCArray.except_idx (C.lits c) i in
+               (List.map (fun t -> Literal.mk_prop t sign) l @ lits)
+               |> mk_c |> CCList.return |> CCOpt.return
+
+             | _ -> None
+           end
+         | _ -> None)
 
   let setup () =
     Util.debug ~section 1 "setup fool rules";
     Env.add_unary_inf "fool_param" fool_param;
-    Env.add_multi_simpl_rule rw_bool_eqns;
+    Env.add_multi_simpl_rule rw_bool_lits;
     ()
 end
 
