@@ -504,18 +504,6 @@ module Make
       Proof.Step.inference [proof_parent]
         ~rule:(Proof.Rule.mkf "induction(@[<h>%a@])" (Util.pp_list HVar.pp) vars)
     in
-    let c_sets =
-      List.map
-        (fun v ->
-           let ty = HVar.ty v in
-           v, Cover_set.make ~cover_set_depth ~depth ty)
-        vars
-    in
-    List.iter (fun (_,set) -> decl_cst_of_set set) c_sets;
-    Util.debugf ~section 2
-      "(@[<hv2>ind_on_vars (@[%a@])@ :form %a@ :cover_sets (@[<hv>%a@])@])"
-      (fun k->k (Util.pp_list HVar.pp) vars Cut_form.pp g
-          (Util.pp_list (Fmt.Dump.pair HVar.pp Cover_set.pp)) c_sets);
     (* other variables -> become skolems *)
     let subst_skolems: Subst.t =
       Cut_form.vars g
@@ -529,6 +517,20 @@ module Make
            (v,0), (T.const ~ty:ty_v id,1))
       |> Subst.FO.of_list' ?init:None
     in
+    (* make cover-sets for the variables, for the {b skolemized} type *)
+    let c_sets =
+      List.map
+        (fun v ->
+           let ty = Subst.Ty.apply_no_renaming subst_skolems (HVar.ty v,0) in
+           v, Cover_set.make ~cover_set_depth ~depth ty)
+        vars
+    in
+    List.iter (fun (_,set) -> decl_cst_of_set set) c_sets;
+    Util.debugf ~section 2
+      "(@[<hv2>ind_on_vars (@[%a@])@ :form %a@ :cover_sets (@[<hv>%a@])@ :subst_skolem %a@])"
+      (fun k->k (Util.pp_list HVar.pp) vars Cut_form.pp g
+          (Util.pp_list (Fmt.Dump.pair HVar.pp Cover_set.pp)) c_sets
+          Subst.pp subst_skolems);
     (* set of boolean literal. We will add their exclusive disjonction to
        the SAT solver. *)
     let b_lits = ref [] in
@@ -981,7 +983,7 @@ module Make
     res
 
   (* proof by direct induction *)
-  let prove_lemma_by_ind (cut:A.cut_res): C.t list =
+  let prove_cut_by_ind (cut:A.cut_res): C.t list =
     let g = A.cut_form cut in
     begin match Cut_form.ind_vars g with
       | [] -> []
@@ -1010,10 +1012,10 @@ module Make
      to generalize it, otherwise we prove it by induction *)
   let inductions_on_lemma (cut:A.cut_res): C.t list =
     let g = A.cut_form cut in
-    Util.debugf ~section 4 "(@[<hv>prove_lemma@ %a@])" (fun k->k Cut_form.pp g);
+    Util.debugf ~section 4 "(@[<hv>prove_lemma_by_induction@ %a@])" (fun k->k Cut_form.pp g);
     begin match Generalize.all g with
       | [] ->
-        prove_lemma_by_ind cut
+        prove_cut_by_ind cut
       | new_goals_l ->
         (* try each generalization in turn *)
         List.iter
@@ -1059,6 +1061,7 @@ module Make
       let pairs =
         List.mapi
           (fun i (id,ty) ->
+             assert (not (Type.is_tType @@ ty));
              T.const ~ty id, T.var (HVar.make ~ty (i+offset)))
           generalize_on
         |> T.Map.of_list
