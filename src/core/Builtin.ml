@@ -129,9 +129,9 @@ module Map = Sequence.Map.Make(struct type t = t_ let compare = compare end)
 module Set = Sequence.Set.Make(struct type t = t_ let compare = compare end)
 module Tbl = Hashtbl.Make(struct type t = t_ let equal = equal let hash = hash end)
 
-let is_int = function | Int _ -> true | _ -> false
-let is_rat = function | Rat _ -> true | _ -> false
-let is_numeric = function | Int _ | Rat _ | _ -> false
+let is_int = function Int _ -> true | _ -> false
+let is_rat = function Rat _ -> true | _ -> false
+let is_numeric = function Int _ | Rat _ -> true | _ -> false
 let is_not_numeric x = not (is_numeric x)
 
 let is_arith = function
