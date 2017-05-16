@@ -381,7 +381,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       in
       let vars = Cut_form.vars g |> T.VarSet.to_list in
       Util.debugf ~section 2
-        "(@[<hv2>prove_lemma@ :form %a@ :vars %a@])"
+        "(@[<hv2>prove_lemma@ :form %a@ :vars (@[%a@])@])"
         (fun k->k Cut_form.pp g (Util.pp_list HVar.pp) vars);
       (* map variables to skolems *)
       let subst : Subst.t =
@@ -391,7 +391,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
              let ty_v = HVar.ty v in
              let id = Ind_cst.make_skolem ty_v in
              Ctx.declare id ty_v;
-             (v,0), (T.const ~ty:ty_v id,1))
+             (v,0), (T.const ~ty:ty_v id,0))
         |> Subst.FO.of_list' ?init:None
       in
       (* for each clause, apply [subst] to it and negate its
