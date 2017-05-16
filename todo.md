@@ -2,15 +2,20 @@
 
 ## Now
 
-- lemmas: if lemma not proven inductively, prove it directly
+## Misc
+
+- use ocamlify for loading prelude files from `data/`?
 
 - in TPTP, detect *some* definitions (`definition, foo = bar`)
   with flag to disable it
 
-## Misc
 
 - induction:
-  find good ways of limiting the number of sub-inductions, and quick
+  * [ ] disable `gen-term` by default (too dangerous?)
+        OR: refine notion of passive position (if definition patterns are deep),
+          or totally disable it for arguments that are not inductive?
+        see: `/zipperposition.native -p --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot examples/rewrite4_gen.zf`
+  * [ ] find good ways of limiting the number of sub-inductions, and quick
 
 - test prop:
   * [x] bring back few steps of saturation
@@ -389,27 +394,29 @@
 * [x] use Jasmin's KBO for higher-order terms
     + [ ] use the `ghd` function to increase precision
 * [ ] fix RPO for partially applied terms
-* [ ] introduce builtin symbols S, K, and I with their definition
+* [x] introduce builtin symbols S, K, and I with their definition
 * [x] fix syntactic unification and indexing for higher-order terms
     (must consider them as right-parenthesed, be careful)
-* [ ] purification
-* [ ] stream of pseudo-skolems `{c_1,c_2,…}` ordered by `i<j ⇒ c_i<c_j` as a
+* [ ] HO purification (or rather, common framework for purification)
+* [x] stream of pseudo-skolems `{c_1,c_2,…}` ordered by `i<j ⇒ c_i<c_j` as a
       block in precedence
-* [ ] on `f ≠ g` with functional types, where `{f,g} ∉ vars`,
+* [x] on `f ≠ g` with functional types, where `{f,g} ∉ vars`,
       add `f c_i ≠ g c_i` for fresh pseudo-skolem `c_i`
-* [ ] fool: rule `C ∨ p ≠ₒ q` => `{C ∨ p ∨ q, C ∨ ¬p ∨ ¬q}`
-* [ ] HO unification based on that (purify sub-terms of functional type,
+      (do not do that for `F ≠ t` because it will refl-eq-destruct
+       once `F` is not guarded anymore)
+* [x] fool: rule `C ∨ p ≠ₒ q` => `{C ∨ p ∨ q, C ∨ ¬p ∨ ¬q}`
+* [x] HO unification based on that (purify sub-terms of functional type,
     and deal with `a ≠ b` of functional types by successive steps
     of HO unification (structural rules = simplifications,
     choice points = inferences)
+* [x] on `f = g`, infer `f x = g x`
 * [ ] special rule instead of primitive enumeration: when predicate variable
-    `P` occurs unguarded in a clause (only lits `P(t)` and `¬ P(u)`)
-    perform variable elimination based on `P(x) = ite(x=t,⊥,⊤)`
-    with side-conditions `t≠u` (meaning replace by lits `t=u`)
-  + need some special combinators to actually *write* the substitution
-    (e.g. a `if` combinator, a `eq` pseudo-fun with corresponding subst)
+    `P` occurs unguarded in a clause (only lits `P(t_i)` and `¬ P(u_j)`)
+    perform variable elimination based on `P(x) = ∨_j x=u_j`
+    with side-conditions `t_i≠u_j` (meaning replace by lits `t_i=u_j`)
   + conversion of λ-term to combinators on-the-fly for `P`
 * [ ] use S,K,I to λ-lift instead of introducing new symbol?
+* [ ] debug: print terms with λ-expansion for clarity?
 * optimize unification (shorter unifiers):
   + [ ] consider whether B,C combinators help make smaller unifiers
   + [ ] look at paper on combinators `ho/efficient_combinators_czajka_2016.pdf`
