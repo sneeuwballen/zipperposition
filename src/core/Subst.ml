@@ -309,6 +309,9 @@ module FO = struct
   let apply subst ~renaming t =
     Term.of_term_unsafe (apply subst ~renaming (t : term Scoped.t :> T.t Scoped.t))
 
+  let apply_l subst ~renaming (l,sc) =
+    List.map (fun t -> apply subst ~renaming (t,sc)) l
+
   let apply_no_renaming subst t =
     Term.of_term_unsafe (apply_no_renaming  subst (t : term Scoped.t :> T.t Scoped.t))
 

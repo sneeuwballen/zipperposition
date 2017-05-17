@@ -224,6 +224,87 @@ module Make(E : Env.S) : S with module Env = E = struct
     );
     new_c
 
+  (* try to eliminate a predicate variable *)
+  let elim_pred_variable (c:C.t) : C.t SimplM.t =
+    (* find unshielded predicate vars *)
+    let find_vars(): _ HVar.t Sequence.t =
+      Purify.unshielded_vars (C.lits c)
+      |> Sequence.of_list
+      |> Sequence.filter
+        (fun v -> Type.is_prop @@ Type.returns @@ HVar.ty v)
+    (* find all constraints on [v], also returns the remaining literals.
+       returns None if some constraints contains [v] itself. *)
+    and gather_lits v : (Literal.t list * (T.t list * bool) list) option =
+      try
+        Array.fold_left
+          (fun (others,set) lit ->
+             begin match lit with
+               | Literal.Prop (t, sign) ->
+                 let f, args = T.as_app t in
+                 begin match T.view f with
+                   | T.Var q when HVar.equal Type.equal v q ->
+                     (* found an occurrence *)
+                     if List.exists (T.var_occurs ~var:v) args then (
+                       raise Exit; (* [P … t[v] …] is out of scope *)
+                     );
+                     others, (args, sign) :: set
+                   | _ -> lit :: others, set
+                 end
+               | _ -> lit :: others, set
+             end)
+          ([], [])
+          (C.lits c)
+        |> CCOpt.return
+      with Exit -> None
+    in
+    (* try to eliminate [v], if it doesn't occur in its own arguments *)
+    let try_elim_var v: _ option =
+      (* gather constraints on [v] *)
+      begin match gather_lits v with
+      | None -> None
+      | Some (other_lits, constr_l) ->
+        (* gather positive/negative args *)
+        let pos_args, neg_args =
+          CCList.partition_map
+            (fun (args,sign) -> if sign then `Left args else `Right args)
+            constr_l
+        in
+        (* build new clause *)
+        let subst = Subst.empty in (* FIXME *)
+        let renaming = Ctx.renaming_clear () in
+        let new_lits =
+          let l1 = Literal.apply_subst_list ~renaming subst (other_lits,0) in
+          let l2 =
+            CCList.product
+              (fun args_pos args_neg ->
+                 let args_pos = Subst.FO.apply_l ~renaming subst (args_pos,0) in
+                 let args_neg = Subst.FO.apply_l ~renaming subst (args_neg,0) in
+                 List.map2 Literal.mk_eq args_pos args_neg)
+              pos_args
+              neg_args
+            |> List.flatten
+          in
+          l1 @ l2
+        in
+        let proof =
+          Proof.Step.inference ~rule:(Proof.Rule.mk "ho_elim_pred")
+            [ C.proof_parent_subst (c,0) subst ]
+        in
+        let new_c =
+          C.create new_lits proof
+            ~penalty:(C.penalty c) ~trail:(C.trail c)
+        in
+        Some new_c
+      end
+    in
+    begin
+      find_vars()
+      |> Sequence.filter_map try_elim_var
+      |> Sequence.head
+      |> (function
+        | Some c -> SimplM.return_new c
+        | None -> SimplM.return_same c)
+    end
 
   (* TODO: predicate elimination *)
 
@@ -250,6 +331,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_unary_inf "ho_eq_res" eq_res;
     Env.add_unary_inf "ho_eq_res_syn" eq_res_syntactic;
     Env.add_unary_inf "ho_complete_eq" complete_eq_args;
+    Env.add_simplify elim_pred_variable;
     Env.add_lit_rule "ho_ext_neg" ext_neg;
     ()
 end

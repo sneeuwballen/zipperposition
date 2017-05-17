@@ -159,5 +159,6 @@ module Ty : SPECIALIZED with type term = Type.t
 module FO : sig
   include SPECIALIZED with type term = Term.t
   val bind' : t -> Type.t HVar.t Scoped.t -> term Scoped.t -> t
+  val apply_l : t -> renaming:Renaming.t -> term list Scoped.t -> term list
   val of_list' : ?init:t -> (Type.t HVar.t Scoped.t * term Scoped.t) list -> t
 end
