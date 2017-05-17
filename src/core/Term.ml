@@ -302,6 +302,7 @@ let head t =
 let ty_vars t = Seq.ty_vars t |> Type.VarSet.of_seq
 
 let of_term_unsafe t = t
+let of_term_unsafe_l l = l
 
 let of_ty t = (t : Type.t :> T.t)
 

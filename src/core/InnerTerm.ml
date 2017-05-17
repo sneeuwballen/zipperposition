@@ -629,7 +629,7 @@ let needs_args (t:t): bool = match view t with
 
 let show_type_arguments = ref false
 
-let pp_depth ?(hooks=[]) depth out t =
+let rec pp_depth ?(hooks=[]) depth out t =
   let rec _pp depth out t =
     if List.exists (fun h -> h depth (_pp depth) out t) hooks
     then () (* hook took control *)
@@ -637,13 +637,7 @@ let pp_depth ?(hooks=[]) depth out t =
     then Format.fprintf out "%a@{<Black>/%d@}" (_pp_root depth) t t.id
     else _pp_root depth out t
   and _pp_root depth out t = match view t with
-    | Var v ->
-      let ty = HVar.ty v in
-      begin match view ty with
-        | AppBuiltin (Builtin.TType, []) -> Format.fprintf out "A%d" (HVar.id v)
-        | _ when needs_args ty -> Format.fprintf out "F%d" (HVar.id v)
-        | _ -> HVar.pp out v
-      end
+    | Var v -> pp_var out v
     | DB i -> Format.fprintf out "Y%d" (depth-i-1)
     | Const s -> ID.pp out s
     | Bind (b, varty, t') ->
@@ -685,6 +679,15 @@ let pp_depth ?(hooks=[]) depth out t =
     | _ -> _pp depth out t
   in
   _pp depth out t
+and pp_var out v =
+  let ty = HVar.ty v in
+  begin match view ty with
+    | AppBuiltin (Builtin.TType, []) -> Format.fprintf out "A%d" (HVar.id v)
+    | AppBuiltin (Builtin.Int _, []) -> Format.fprintf out "I%d" (HVar.id v)
+    | AppBuiltin (Builtin.Rat _, []) -> Format.fprintf out "Q%d" (HVar.id v)
+    | _ when needs_args ty -> Format.fprintf out "F%d" (HVar.id v)
+    | _ -> HVar.pp out v
+  end
 
 let pp out t = pp_depth ~hooks:!_hooks 0 out t
 let to_string t = CCFormat.to_string pp t

@@ -86,7 +86,7 @@ let () = Printexc.register_printer
       | InconsistentBinding (v, t1, t2) ->
         let msg = CCFormat.sprintf
             "@[<2>inconsistent binding@ for %a: %a@ and %a@]"
-            (Scoped.pp HVar.pp) v (Scoped.pp T.pp) t1 (Scoped.pp T.pp) t2
+            (Scoped.pp T.pp_var) v (Scoped.pp T.pp) t1 (Scoped.pp T.pp) t2
         in
         Some msg
       | _ -> None)
@@ -166,7 +166,7 @@ let hash (s:t): int =
 let pp out subst =
   let pp_binding out (v,t) =
     Format.fprintf out "@[<2>@[%a@] →@ @[%a@]@]"
-      (Scoped.pp HVar.pp) v (Scoped.pp T.pp) t
+      (Scoped.pp T.pp_var) v (Scoped.pp T.pp) t
   in
   Format.fprintf out "{@[<hv>%a@]}"
     (Util.pp_seq ~sep:", " pp_binding)

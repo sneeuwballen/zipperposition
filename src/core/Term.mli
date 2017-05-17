@@ -127,6 +127,8 @@ val of_term_unsafe : InnerTerm.t -> t
 (** {b NOTE}: this can break the invariants and make {!view} fail. Only
     apply with caution. *)
 
+val of_term_unsafe_l : InnerTerm.t list -> t list
+
 val of_ty : Type.t -> t
 (** Upcast from type *)
 
