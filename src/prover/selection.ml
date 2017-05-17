@@ -106,6 +106,13 @@ end = struct
                K_constr (C_purify, shield_status v)
              | _ -> K_normal (Lit.sign lit)
            end
+         | Literal.Prop (t, sign) ->
+           let hd_t, args_t = T.as_app t in
+           begin match T.view hd_t, args_t with
+             | T.Var v, [] -> K_constr (C_purify, shield_status v)
+             | T.Var v, _::_ -> K_constr (C_ho, shield_status v)
+             | _ -> K_normal sign
+           end
          | Literal.Int (Int_lit.Binary (Int_lit.Different, m1, m2)) ->
            let vars =
              Sequence.append (Monome.Seq.terms m1) (Monome.Seq.terms m2)
@@ -123,15 +130,6 @@ end = struct
          | _ -> K_normal (Lit.sign lit))
 end
 
-(* checks that [bv] is an acceptable selection for [lits]. In case
-   some literal is selected, at least one negative literal must be selected. *)
-let validate_fun_ lits bv =
-  if BV.is_empty bv then true
-  else (
-    Sequence.of_array_i lits
-    |> Sequence.exists (fun (i,lit) -> Lit.is_neg lit && BV.get bv i)
-  )
-
 type parametrized = strict:bool -> ord:Ordering.t -> t
 
 (* no need for classification here *)
@@ -142,6 +140,16 @@ let can_select_cl_ (k:Classify.class_): bool = match k with
   | Classify.K_normal false
   | Classify.K_constr (_, `Unshielded) -> true
   | _ -> false
+
+(* checks that [bv] is an acceptable selection for [lits]. In case
+   some literal is selected, at least one negative literal must be selected. *)
+let validate_fun_ cl lits bv =
+  if BV.is_empty bv then true
+  else (
+    Sequence.of_array_i lits
+    |> Sequence.exists
+      (fun (i,_) -> can_select_cl_ cl.(i) && BV.get bv i)
+  )
 
 (* select one unshielded {HO,purify} constraint, if any *)
 let find_max_constr_ cl =
@@ -171,7 +179,7 @@ let mk_ ~(f: Classify.t -> Lits.t -> BV.t) (lits:Lits.t) : BV.t =
       Util.debugf ~section 5
         "(@[select@ :lits %a@ :res %a@ :classify %a@])"
         (fun k->k Lits.pp lits BV.print bv Classify.pp cl);
-      assert (validate_fun_ lits bv);
+      assert (validate_fun_ cl lits bv);
       bv
     ) else (
       Util.debugf ~section 5 "(@[should-not-select@ %a@])" (fun k->k Lits.pp lits);
