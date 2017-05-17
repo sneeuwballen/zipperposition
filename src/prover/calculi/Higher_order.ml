@@ -35,20 +35,30 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let lit_is_unshielded_ho_unif (c:C.t) (lit:Literal.t): bool = match lit with
     | Literal.Equation (t, u, false) ->
-      let lits = C.lits c in
       begin match T.as_var (T.head_term t), T.as_var (T.head_term u) with
-        | Some v, _ when not (Purify.is_shielded v lits) -> true
-        | _, Some v when not (Purify.is_shielded v lits) -> true
+        | Some v, _ when not (Purify.is_shielded v (C.lits c)) -> true
+        | _, Some v when not (Purify.is_shielded v (C.lits c)) -> true
         | _ -> false
+      end
+    | Literal.Prop (t, _) ->
+      (* boolean unification constraint *)
+      let hd, args = T.as_app t in
+      begin match T.as_var hd with
+        | Some v ->
+          args <> [] &&
+          not (Purify.is_shielded v (C.lits c))
+        | None -> false
       end
     | _ -> false
 
-  (* HO unif rule, applies to literals [F t != u] *)
+  (* HO unif rule, applies to literals [F t != u] or [P t] or [¬ P t] *)
   let eq_res_ (c:C.t) : C.t list =
     (* try HO unif with [l != r] *)
     let try_unif_ l r l_pos =
       let pos = Literals.Pos.idx l_pos in
       if BV.get (C.eligible_res_no_subst c) pos then (
+        Util.debugf ~section 5 "(@[try_ho_eq_res@ :lit %a@ :idx %d@])"
+          (fun k->k Literal.pp (C.lits c).(pos) pos);
         HO_unif.unif_step (Ctx.combinators (), 1) ((l,r),0)
         |> List.rev_map
           (fun (subst,subst_penalty) ->
@@ -70,12 +80,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* try negative HO unif lits that are also eligible for resolution *)
     let eligible = C.Eligible.(filter (lit_is_unshielded_ho_unif c) ** res c) in
     let new_clauses =
-      Literals.fold_eqn ~sign:false ~ord:(Ctx.ord ())
-        ~both:false ~eligible (C.lits c)
+      Literals.fold_eqn (C.lits c) ~ord:(Ctx.ord ()) ~both:false ~eligible
       |> Sequence.flat_map_l
         (fun (l, r, sign, l_pos) ->
-           assert (not sign);
-           try_unif_ l r l_pos)
+           if not sign || Type.is_prop (T.ty l)
+           then try_unif_ l r l_pos
+           else [])
       |> Sequence.to_rev_list
     in
     new_clauses
