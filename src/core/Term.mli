@@ -251,6 +251,8 @@ include Interfaces.PRINT with type t := t
 include Interfaces.PRINT_DE_BRUIJN with type t := t
                                     and type term := t
 
+val pp_var : Type.t HVar.t CCFormat.printer
+
 val add_hook : print_hook -> unit
 (** Hook used by default for printing *)
 

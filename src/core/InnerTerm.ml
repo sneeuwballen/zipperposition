@@ -685,6 +685,7 @@ and pp_var out v =
     | AppBuiltin (Builtin.TType, []) -> Format.fprintf out "A%d" (HVar.id v)
     | AppBuiltin (Builtin.Int _, []) -> Format.fprintf out "I%d" (HVar.id v)
     | AppBuiltin (Builtin.Rat _, []) -> Format.fprintf out "Q%d" (HVar.id v)
+    | AppBuiltin (Builtin.Prop, []) -> Format.fprintf out "P%d" (HVar.id v)
     | _ when needs_args ty -> Format.fprintf out "F%d" (HVar.id v)
     | _ -> HVar.pp out v
   end

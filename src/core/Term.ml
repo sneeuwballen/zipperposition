@@ -445,6 +445,8 @@ type print_hook = int -> (CCFormat.t -> t -> unit) -> CCFormat.t -> t -> bool
 (* lightweight printing *)
 let pp_depth = T.pp_depth
 
+let pp_var out (v:Type.t HVar.t) = T.pp_var out (v :> T.t HVar.t)
+
 let __hooks = ref []
 let add_hook h = __hooks := h :: !__hooks
 let default_hooks () = !__hooks
