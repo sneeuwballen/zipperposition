@@ -31,15 +31,20 @@ module Make(E : Env.S) : S with module Env = E = struct
   module C = Env.C
   module Ctx = Env.Ctx
 
-  let lit_is_ho_unif (lit:Literal.t): bool = match lit with
+  let lit_is_unshielded_ho_unif (c:C.t) (lit:Literal.t): bool = match lit with
     | Literal.Equation (t, u, false) ->
-      T.is_var (T.head_term t) || T.is_var (T.head_term u)
+      let lits = C.lits c in
+      begin match T.as_var (T.head_term t), T.as_var (T.head_term u) with
+        | Some v, _ when not (Purify.is_shielded v lits) -> true
+        | _, Some v when not (Purify.is_shielded v lits) -> true
+        | _ -> false
+      end
     | _ -> false
 
   (* HO unif rule, applies to literals [F t != u] *)
   let eq_res_ (c:C.t) : C.t list =
     (* try HO unif with [l != r] *)
-    let mk_ l r l_pos =
+    let try_unif_ l r l_pos =
       let pos = Literals.Pos.idx l_pos in
       if BV.get (C.eligible_res_no_subst c) pos then (
         HO_unif.unif_step (Ctx.combinators (), 1) ((l,r),0)
@@ -60,14 +65,15 @@ module Make(E : Env.S) : S with module Env = E = struct
              new_c)
       ) else []
     in
-    let eligible = C.Eligible.filter lit_is_ho_unif in
+    (* try negative HO unif lits that are also eligible for resolution *)
+    let eligible = C.Eligible.(filter (lit_is_unshielded_ho_unif c) ** res c) in
     let new_clauses =
       Literals.fold_eqn ~sign:false ~ord:(Ctx.ord ())
         ~both:false ~eligible (C.lits c)
       |> Sequence.flat_map_l
         (fun (l, r, sign, l_pos) ->
            assert (not sign);
-           mk_ l r l_pos)
+           try_unif_ l r l_pos)
       |> Sequence.to_rev_list
     in
     new_clauses
