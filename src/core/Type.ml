@@ -229,6 +229,9 @@ let returns ty =
   let _, _, ret = open_poly_fun ty in
   ret
 
+let returns_prop ty = is_prop (returns ty)
+let returns_tType ty = is_tType (returns ty)
+
 exception ApplyError of string
 
 let () = Printexc.register_printer

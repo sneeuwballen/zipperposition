@@ -201,6 +201,9 @@ val returns : t -> t
     [returns a] is like [let _, _, ret = open_poly_fun a in ret]
     {b NOTE} caution, not always closed *)
 
+val returns_prop : t -> bool
+val returns_tType : t -> bool
+
 exception ApplyError of string
 (** Error raised when {!apply} fails *)
 
