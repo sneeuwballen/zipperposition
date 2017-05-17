@@ -4,6 +4,7 @@
 (** {1 Unification and Matching} *)
 
 type subst = Subst.t
+type term = InnerTerm.t
 type 'a sequence = ('a -> unit) -> unit
 
 exception Fail
@@ -39,6 +40,11 @@ val unif_list_com :
   'a list Scoped.t ->
   'subst Sequence.t
 
+val pair_lists : term -> term list -> term -> term list -> term list * term list
+(** in HO, we have [f1 l1] and [f2 l2], where application is left-associative.
+    we need to unify from the right (the outermost application is on
+    the right) so this returns pairs to unify (including heads). *)
+
 (** {2 Signatures} *)
 
 module type S = Unif_intf.S
@@ -56,4 +62,6 @@ module FO : sig
 
   val anti_unify : term -> term -> (term * term) list option
   (** anti-unification of the two terms, returning disagreement pairs *)
+
+  val pair_lists : term -> term list -> term -> term list -> term list * term list
 end

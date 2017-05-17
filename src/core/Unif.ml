@@ -9,6 +9,7 @@ module S = Subst
 exception Fail
 
 type subst = S.t
+type term = InnerTerm.t
 type 'a sequence = ('a -> unit) -> unit
 
 let prof_unify = Util.mk_profiler "unify"
@@ -98,7 +99,7 @@ let rec unif_list subst ~op (l1,sc1) (l2,sc2) k = match l1, l2 with
 (* in HO, we have [f1 l1] and [f2 l2], where application is left-associative.
    we need to unify from the right (the outermost application is on
    the right) so this returns pairs to unify. *)
-let pair_lists_ f1 l1 f2 l2 =
+let pair_lists f1 l1 f2 l2 =
   let len1 = List.length l1 and len2 = List.length l2 in
   if len1 = len2 then f1::l1, f2::l2
   else if len1 < len2
@@ -191,7 +192,7 @@ module Inner = struct
             else fail()
           | _ ->
             (* currying: unify "from the right" *)
-            let l1, l2 = pair_lists_ f1 l1 f2 l2 in
+            let l1, l2 = pair_lists f1 l1 f2 l2 in
             unif_list ~op subst l1 sc1 l2 sc2
         end
       | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Builtin.equal s1 s2 ->
@@ -368,4 +369,11 @@ module FO = struct
       aux t u;
       Some !pairs
     with Exit -> None
+
+  let pair_lists_ =
+    (pair_lists :> term -> term list -> term -> term list -> InnerTerm.t list * InnerTerm.t list)
+
+  let pair_lists f1 l1 f2 l2 =
+    let l1, l2 = pair_lists_ f1 l1 f2 l2 in
+    Term.of_term_unsafe_l l1, Term.of_term_unsafe_l l2
 end
