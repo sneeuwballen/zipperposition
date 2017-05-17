@@ -11,6 +11,7 @@ type term = Term.t
 let section = Util.Section.make ~parent:Const.section "fool"
 
 let stat_fool_param = Util.mk_stat "fool.param_step"
+let stat_elim_var = Util.mk_stat "fool.elim_var"
 
 module type S = sig
   module Env : Env.S
@@ -25,6 +26,7 @@ end
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
   module C = Env.C
+  module Ctx = Env.Ctx
 
   (* replace [sub] by [true/false] in [c], obtaining a new clause *)
   let fool_param_sign ~sub sign c =
@@ -84,6 +86,44 @@ module Make(E : Env.S) : S with module Env = E = struct
            ))
     end
 
+  (* eliminate [P ∨ C] into [C[P := ⊥]] (and same for [¬P]) *)
+  let fool_elim_var (c:C.t) : C.t list =
+    C.lits c
+    |> Sequence.of_array_i
+    |> Sequence.filter_map
+      (fun (idx,lit) -> match lit with
+         | Literal.Prop (t, sign) ->
+           begin match T.as_var t with
+             | Some v when not (Purify.is_shielded v (C.lits c)) -> 
+               (* found unshielded var, replace it with [not sign] *)
+               let t = if sign then T.false_ else T.true_ in
+               let subst =
+                 Subst.FO.of_list' [(v,0), (t,0)]
+               in
+               let new_lits = CCArray.except_idx (C.lits c) idx in
+               let renaming = Ctx.renaming_clear() in
+               let new_lits =
+                 Literal.apply_subst_list ~renaming subst (new_lits,0)
+               in
+               let proof =
+                 Proof.Step.inference ~rule:(Proof.Rule.mk "fool.elim_var")
+                   [ C.proof_parent_subst (c,0) subst ]
+               in
+               let new_c =
+                 C.create new_lits proof
+                   ~penalty:(C.penalty c) ~trail:(C.trail c)
+               in
+
+               Util.incr_stat stat_elim_var;
+               Util.debugf ~section 3
+                 "(@[elim_pred_var@ :var %a :into %B@ :clause %a@ :yield %a@])"
+                 (fun k->k T.pp_var v (not sign) C.pp c C.pp new_c);
+               Some new_c
+             | _ -> None
+           end
+         | _ -> None)
+    |> Sequence.to_rev_list
+
   (* rewrite some boolean literals:
      - [a ≠_o b --> a || b && (¬ a || ¬b)], i.e. exclusive or
      - [(∧ a b) --> a ∧ b]
@@ -133,6 +173,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.debug ~section 1 "setup fool rules";
     Env.add_unary_inf "fool_param" fool_param;
     Env.add_multi_simpl_rule rw_bool_lits;
+    Env.add_unary_inf "fool_elim_var" fool_elim_var;
     ()
 end
 
