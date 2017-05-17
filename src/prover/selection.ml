@@ -20,11 +20,17 @@ module Classify : sig
   type shielded = [`Shielded | `Unshielded]
   type sign = bool
 
+  type constraint_ =
+    | C_arith (* arith negative equality, seen as constraint *)
+    | C_ho (* F args != t *)
+    | C_purify (* X != t, X of purifiable type *)
+
   type class_ =
-    | C_normal of sign (* any "normal" kind of literal *)
-    | C_arith_constraint of shielded (* arith negative equality, seen as constraint *)
-    | C_ho_constraint of shielded (* F args != t *)
-    | C_purify_constraint of shielded (* X != t, X of purifiable type *)
+    | K_normal of sign (* any "normal" kind of literal *)
+    | K_constr of constraint_ * shielded (* constraint *)
+
+  val is_unshielded_constr : class_ -> bool
+  (** Constraint on unshielded variable? *)
 
   type t = class_ array
 
@@ -38,11 +44,14 @@ end = struct
   type shielded = [`Shielded | `Unshielded]
   type sign = bool
 
+  type constraint_ =
+    | C_arith (* arith negative equality, seen as constraint *)
+    | C_ho (* F args != t *)
+    | C_purify (* X != t, X of purifiable type *)
+
   type class_ =
-    | C_normal of sign (* any "normal" kind of literal *)
-    | C_arith_constraint of shielded (* arith negative equality, seen as constraint *)
-    | C_ho_constraint of shielded (* F args != t *)
-    | C_purify_constraint of shielded (* X != t, X of purifiable type *)
+    | K_normal of sign (* any "normal" kind of literal *)
+    | K_constr of constraint_ * shielded (* constraint *)
 
   type t = class_ array
 
@@ -52,15 +61,22 @@ end = struct
     | _, `Unshielded -> `Unshielded
     | `Shielded, `Shielded -> `Shielded
 
+  let is_unshielded_constr = function
+    | K_constr (_, `Unshielded) -> true
+    | K_normal _ | K_constr _ -> false
+
   let pp_shield out = function
     | `Shielded -> CCFormat.string out "shielded"
     | `Unshielded -> CCFormat.string out "unshielded"
 
+  let pp_constr out = function
+    | C_arith -> CCFormat.string out "arith_constr"
+    | C_ho -> CCFormat.string out "ho_constr"
+    | C_purify -> CCFormat.string out "purify_constr"
+
   let pp_class out = function
-    | C_normal s -> Format.fprintf out "normal :sign %B" s
-    | C_arith_constraint s -> Format.fprintf out "arith_constr %a" pp_shield s
-    | C_ho_constraint s -> Format.fprintf out "ho_constr %a" pp_shield s
-    | C_purify_constraint s -> Format.fprintf out "purify_constr %a" pp_shield s
+    | K_normal s -> Format.fprintf out "normal :sign %B" s
+    | K_constr (c,s) -> Format.fprintf out "%a %a" pp_constr c pp_shield s
 
   let pp out a =
     let pp_i out (i,cl) = Format.fprintf out "(%d: %a)" i pp_class cl in
@@ -78,17 +94,17 @@ end = struct
            let hd_u, args_u = T.as_app u in
            begin match T.view hd_t, T.view hd_u with
              | T.Var v1, T.Var v2 when args_t <> [] && args_u <> [] ->
-               C_ho_constraint (shield_status v1 +++ shield_status v2)
+               K_constr (C_ho, shield_status v1 +++ shield_status v2)
              | T.Var v, _ when args_t <> [] ->
                (* HO unif constraint *)
-               C_ho_constraint (shield_status v)
+               K_constr (C_ho, shield_status v)
              | _, T.Var v when args_u <> [] ->
-               C_ho_constraint (shield_status v)
+               K_constr (C_ho, shield_status v)
              | T.Var v, _ when Type.is_fun (T.ty t) ->
-               C_purify_constraint (shield_status v)
+               K_constr (C_purify, shield_status v)
              | _, T.Var v when Type.is_fun (T.ty u) ->
-               C_purify_constraint (shield_status v)
-             | _ -> C_normal (Lit.sign lit)
+               K_constr (C_purify, shield_status v)
+             | _ -> K_normal (Lit.sign lit)
            end
          | Literal.Int (Int_lit.Binary (Int_lit.Different, m1, m2)) ->
            let vars =
@@ -97,14 +113,14 @@ end = struct
              |> Sequence.to_rev_list
            in
            begin match vars with
-             | [] -> C_normal (Lit.sign lit) (* no vars *)
+             | [] -> K_normal (Lit.sign lit) (* no vars *)
              | _::_ ->
                let st =
                  List.fold_left (fun acc v -> acc +++ shield_status v) `Shielded vars
                in
-               C_arith_constraint st
+               K_constr (C_arith, st)
            end
-         | _ -> C_normal (Lit.sign lit))
+         | _ -> K_normal (Lit.sign lit))
 end
 
 (* does the clause belong to pure superposition, without other theories? *)
@@ -134,21 +150,35 @@ let no_select _ = BV.empty ()
 
 (* is it a good idea to select this kind of literal? *)
 let can_select_cl_ (k:Classify.class_): bool = match k with
-  | Classify.C_normal false
-  | Classify.C_arith_constraint `Unshielded
-  | Classify.C_ho_constraint `Unshielded -> true
+  | Classify.K_normal false
+  | Classify.K_constr (_, `Unshielded) -> true
   | _ -> false
+
+(* select one unshielded {HO,purify} constraint, if any *)
+let find_max_constr_ cl =
+  cl |> CCArray.findi
+    (fun i k -> match k with
+       | Classify.K_constr
+           ((Classify.C_ho | Classify.C_purify), `Unshielded) ->
+         let bv = BV.create ~size:(Array.length cl) false in
+         BV.set bv i;
+         Some bv
+       | _ -> None)
 
 (* build a selection function in general, given the more specialized
    one there *)
-let mk_ ~(f:Classify.t -> Lits.t -> BV.t) (lits:Lits.t) : BV.t =
+let mk_ ~(f: Classify.t -> Lits.t -> BV.t) (lits:Lits.t) : BV.t =
   if Array.length lits <= 1 then BV.empty ()
   else (
     let cl = Classify.classify lits in
     (* should we select anything? *)
     let should_select = Array.exists can_select_cl_ cl in
     if should_select then (
-      let bv = f cl lits in
+      (* select a literal (first try an unshielded constr, else call [f]) *)
+      let bv = match find_max_constr_ cl with
+        | Some bv ->  bv
+        | None -> f cl lits
+      in
       Util.debugf ~section 5
         "(@[select@ :lits %a@ :res %a@ :classify %a@])"
         (fun k->k Lits.pp lits BV.print bv Classify.pp cl);
@@ -160,18 +190,13 @@ let mk_ ~(f:Classify.t -> Lits.t -> BV.t) (lits:Lits.t) : BV.t =
     )
   )
 
-(* Select all positives literals. Only present for building
-   non-strict selection functions *)
-let select_positive_ lits =
-  if pure_logic_ lits then Lits.pos lits else BV.empty ()
-
 let bv_first_ bv = BV.iter_true bv |> Sequence.head
 
 let max_goal ~strict ~ord lits =
   mk_ lits ~f:(fun cl lits ->
     let bv = Lits.maxlits ~ord lits in
     (* only retain negative normal lits, or constraints
-         that are unshielded *)
+       that are unshielded *)
     BV.filter bv (fun i -> can_select_cl_ cl.(i));
     begin match bv_first_ bv with
       | Some i ->
@@ -179,7 +204,7 @@ let max_goal ~strict ~ord lits =
         BV.clear bv;
         BV.set bv i;
         if not strict then (
-          BV.union_into ~into:bv (select_positive_ lits);
+          BV.union_into ~into:bv (Lits.pos lits);
         );
         bv
       | None ->
