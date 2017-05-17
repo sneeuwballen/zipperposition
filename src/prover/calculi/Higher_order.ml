@@ -11,10 +11,12 @@ module T = Term
 let section = Util.Section.make ~parent:Const.section "ho"
 
 let stat_eq_res = Util.mk_stat "ho.eq_res.steps"
+let stat_eq_res_syntactic = Util.mk_stat "ho.eq_res_syntactic.steps"
 let stat_ext_neg = Util.mk_stat "ho.extensionality-.steps"
 let stat_complete_eq = Util.mk_stat "ho.complete_eq.steps"
 
 let prof_eq_res = Util.mk_profiler "ho.eq_res"
+let prof_eq_res_syn = Util.mk_profiler "ho.eq_res_syntactic"
 
 module type S = sig
   module Env : Env.S
@@ -79,6 +81,83 @@ module Make(E : Env.S) : S with module Env = E = struct
     new_clauses
 
   let eq_res c = Util.with_prof prof_eq_res eq_res_ c
+
+  (* flex-rigid (dis)equation? *)
+  let is_flex_rigid t u =
+    (T.is_var @@ T.head_term t) <> (T.is_var @@ T.head_term u)
+
+  (* incremental synctactic elimination rules for HO unif:
+     [F t1 t2 != g u1 u2] becomes [t1 != u1 | t2 != u2]
+     (inference rule, no penalty) *)
+  let eq_res_syntactic_ (c:C.t) : C.t list =
+    (* try HO unif with [l != r], only in flex/rigid case *)
+    let try_unif_ idx l r l_pos =
+      let pos = Literals.Pos.idx l_pos in
+      if is_flex_rigid l r &&
+         BV.get (C.eligible_res_no_subst c) pos then (
+        (* decompose into syntactic problem *)
+        let f1, l1 = T.as_app l in
+        let f2, l2 = T.as_app r in
+        assert (T.is_var f1 <> T.is_var f2);
+        let l1, l2 = Unif.FO.pair_lists f1 l1 f2 l2 in
+        begin match l1, l2 with
+          | [], _ | _, [] -> assert false
+          | hd1 :: tail1, hd2 :: tail2 ->
+            assert (List.length tail1 = List.length tail2);
+            (* unify heads, delay the other sub-problems, but unify their types *)
+            try
+              let subst = Unif.FO.unification (hd1,0)(hd2,0) in
+              let subst =
+                List.fold_left2
+                  (fun subst t u ->
+                     Unif.Ty.unification ~subst (T.ty t,0)(T.ty u,0))
+                  subst tail1 tail2
+              in
+              Util.incr_stat stat_eq_res_syntactic;
+              let renaming = Ctx.renaming_clear () in
+              let rule = Proof.Rule.mk "ho_eq_res_syn" in
+              let proof = Proof.Step.inference ~rule
+                  [C.proof_parent_subst (c,0) subst] in
+              (* remove the literal, but add [combine tail1 tail2] as new constraints *)
+              let new_lits =
+                List.rev_append
+                  (List.map2
+                     (fun t u ->
+                        Literal.mk_neq
+                          (Subst.FO.apply ~renaming subst (t,0))
+                          (Subst.FO.apply ~renaming subst (u,0)))
+                     tail1 tail2)
+                  (Literal.apply_subst_list ~renaming subst
+                     (CCArray.except_idx (C.lits c) idx,0))
+              in
+              let new_lits =
+                Literal.apply_subst_list ~renaming subst (new_lits,0)
+              in
+              let trail = C.trail c and penalty = C.penalty c in
+              let new_c = C.create ~trail ~penalty new_lits proof in
+              Util.debugf ~section 3
+                "(@[<hv2>ho_eq_res_syn@ :on @[%a@]@ :yields @[%a@]@ :subst %a@])"
+                (fun k->k C.pp c C.pp new_c Subst.pp subst);
+              Some new_c
+            with Unif.Fail -> None
+        end
+      ) else None
+    in
+    (* try negative HO unif lits that are also eligible for resolution *)
+    let eligible = C.Eligible.(filter (lit_is_unshielded_ho_unif c) ** res c) in
+    let new_clauses =
+      Literals.fold_eqn ~sign:false ~ord:(Ctx.ord ())
+        ~both:false ~eligible (C.lits c)
+      |> Sequence.zip_i |> Sequence.zip
+      |> Sequence.filter_map
+        (fun (i,(l, r, sign, l_pos)) ->
+           assert (not sign);
+           try_unif_ i l r l_pos)
+      |> Sequence.to_rev_list
+    in
+    new_clauses
+
+  let eq_res_syntactic c = Util.with_prof prof_eq_res_syn eq_res_syntactic_ c
 
   let mk_parameter =
     let n = ref 0 in
@@ -169,6 +248,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let () = ignore (HO_unif.Combinators.rules @@ Ctx.combinators ()) in
     declare_combinators ();
     Env.add_unary_inf "ho_eq_res" eq_res;
+    Env.add_unary_inf "ho_eq_res_syn" eq_res_syntactic;
     Env.add_unary_inf "ho_complete_eq" complete_eq_args;
     Env.add_lit_rule "ho_ext_neg" ext_neg;
     ()
