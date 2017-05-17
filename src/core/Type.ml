@@ -368,11 +368,13 @@ let pp_surrounded out t = (pp_inner_app 0) out t
 
 let to_string = CCFormat.to_string pp
 
+(* keep synchro with {!InnerTerm.pp_var} *)
 let pp_typed_var out v = match view (HVar.ty v) with
   | Builtin TType -> Format.fprintf out "A%d" (HVar.id v)
   | Builtin Term -> HVar.pp out v
   | Builtin Int -> Format.fprintf out "I%d" (HVar.id v)
   | Builtin Rat -> Format.fprintf out "Q%d" (HVar.id v)
+  | Builtin Prop -> Format.fprintf out "P%d" (HVar.id v)
   | Forall _ | Fun _ -> Format.fprintf out "(@[F%d:%a@])" (HVar.id v) pp (HVar.ty v)
   | _ -> Format.fprintf out "(@[%a:%a@])" HVar.pp v pp (HVar.ty v)
 

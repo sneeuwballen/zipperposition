@@ -1872,7 +1872,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                 (Z.to_string view.NVE.lcm)
                 HVar.pp x M.pp by which
             in
-            let rule = Proof.Rule.mk "var_elim" in
+            let rule = Proof.Rule.mkf "var_elim(%a)" T.pp_var x in
             let proof = Proof.Step.inference ~comment ~rule [C.proof_parent c] in
             let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
             Util.debugf ~section 5
