@@ -99,6 +99,8 @@ let bind
 
 let remove subst v = M.remove v subst
 
+let restrict_scope subst sc = M.filter (fun (_,sc_v) _ -> sc=sc_v) subst
+
 let append s1 s2 =
   M.merge
     (fun v b1 b2 -> match b1, b2 with
@@ -163,14 +165,14 @@ let compare s1 s2 = M.compare (Scoped.compare T.compare) s1 s2
 let hash (s:t): int =
   CCHash.(seq (pair (Scoped.hash HVar.hash) (Scoped.hash T.hash))) (M.to_seq s)
 
-let pp out subst =
+let pp_bindings out subst =
   let pp_binding out (v,t) =
-    Format.fprintf out "@[<2>@[%a@] →@ @[%a@]@]"
+    Format.fprintf out "@[<2>@[%a@] @<1>→@ @[%a@]@]"
       (Scoped.pp T.pp_var) v (Scoped.pp T.pp) t
   in
-  Format.fprintf out "{@[<hv>%a@]}"
-    (Util.pp_seq ~sep:", " pp_binding)
-    (to_seq subst)
+  Util.pp_seq ~sep:", " pp_binding out (to_seq subst)
+
+let pp out subst = Format.fprintf out "{@[<hv>%a@]}" pp_bindings subst
 
 let to_string = CCFormat.to_string pp
 

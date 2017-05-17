@@ -69,7 +69,7 @@ module Make(E : Env_intf.S) = struct
               (* make new clause *)
               Util.incr_stat stat_narrowing_term;
               let proof =
-                Proof.Step.inference [C.proof_parent c]
+                Proof.Step.inference [C.proof_parent_subst (c,0) subst]
                   ~rule:(Proof.Rule.mk "narrow") in
               let c' =
                 C.create ~trail:(C.trail c) ~penalty:(C.penalty c) (new_lit :: lits') proof
@@ -116,7 +116,7 @@ module Make(E : Env_intf.S) = struct
          |> Sequence.fold
            (fun acc (rule,subst) ->
               let proof =
-                Proof.Step.inference [C.proof_parent c]
+                Proof.Step.inference [C.proof_parent_subst (c,0) subst]
                   ~rule:(Proof.Rule.mk "narrow_clause") in
               let lits' = CCArray.except_idx lits i in
               (* create new clauses that correspond to replacing [lit]

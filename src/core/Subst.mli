@@ -76,6 +76,9 @@ val append : t -> t -> t
 val remove : t -> var Scoped.t -> t
 (** Remove the given binding. No other variable should depend on it... *)
 
+val restrict_scope : t -> Scoped.scope -> t
+(** Only keep bindings from this scope *)
+
 (** {2 Set operations} *)
 
 val domain : t -> (var Scoped.t) Sequence.t
@@ -103,6 +106,9 @@ val compare : t -> t -> int
 val hash : t -> int
 
 include Interfaces.PRINT with type t := t
+
+val pp_bindings : t CCFormat.printer
+(** Only print the bindings, no box *)
 
 val fold : ('a -> var Scoped.t -> term Scoped.t -> 'a) -> 'a -> t -> 'a
 val iter : (var Scoped.t -> term Scoped.t -> unit) -> t -> unit

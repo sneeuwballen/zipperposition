@@ -159,6 +159,7 @@ module Parent : sig
   val from : proof -> t
   val from_subst : proof Scoped.t -> Subst.t -> t
   val proof : t -> proof
+  val subst : t -> Subst.t
 end
 
 (** {2 Proof} *)
@@ -213,7 +214,7 @@ module S : sig
 
   (** {6 Conversion to a graph of proofs} *)
 
-  val as_graph : (t, rule) CCGraph.t
+  val as_graph : (t, rule * Subst.t) CCGraph.t
   (** Get a graph of the proof *)
 
   val traverse :

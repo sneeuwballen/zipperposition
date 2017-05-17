@@ -73,11 +73,21 @@ module Parent = struct
   type t = parent
 
   let from p: t = P_of p
-  let from_subst (p,sc_p) subst: t = P_subst (p,sc_p,subst)
+
+  (* restrict subst to [sc_p] *)
+  let from_subst (p,sc_p) subst: t =
+    let subst = Subst.restrict_scope subst sc_p in
+    if Subst.is_empty subst
+    then P_of p
+    else P_subst (p,sc_p,subst)
 
   let proof = function
     | P_of p -> p
     | P_subst (p,_,_) -> p
+
+  let subst = function
+    | P_of _ -> Subst.empty
+    | P_subst (_,_,s) -> s
 end
 
 module Kind = struct
@@ -392,8 +402,11 @@ module S = struct
       (fun p -> match Step.rule (step p) with
          | None -> Sequence.empty
          | Some rule ->
-           let parents = Sequence.of_list (Step.parents @@ step p) in
-           Sequence.map (fun p' -> rule, Parent.proof p') parents)
+           step p
+           |> Step.parents
+           |> Sequence.of_list
+           |> Sequence.map
+             (fun p' -> (rule,Parent.subst p'), Parent.proof p'))
 
   (** {2 IO} *)
 
@@ -518,8 +531,12 @@ module S = struct
         else if Step.is_by_def @@ step p then `Color "navajowhite" :: shape :: attrs
         else shape :: attrs
       )
-      ~attrs_e:(fun r ->
-        [`Label (Rule.name r); `Other ("dir", "back")])
+      ~attrs_e:(fun (r,s) ->
+        let label =
+          if Subst.is_empty s then Rule.name r
+          else _to_str_escape "@[<v>%s@,{@[<v>%a@]}@]" (Rule.name r) Subst.pp_bindings s
+        in
+        [`Label label; `Other ("dir", "back")])
       out
       seq;
     Format.pp_print_newline out ();
