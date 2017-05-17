@@ -123,17 +123,6 @@ end = struct
          | _ -> K_normal (Lit.sign lit))
 end
 
-(* does the clause belong to pure superposition, without other theories? *)
-let pure_logic_ lits =
-  CCArray.for_all
-    (function
-      | Lit.Prop _
-      | Lit.Equation _
-      | Lit.True
-      | Lit.False -> true
-      | Lit.Int _ | Lit.Rat _ -> false)
-    lits
-
 (* checks that [bv] is an acceptable selection for [lits]. In case
    some literal is selected, at least one negative literal must be selected. *)
 let validate_fun_ lits bv =
