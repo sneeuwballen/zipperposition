@@ -271,16 +271,43 @@ module Make(E : Env.S) : S with module Env = E = struct
     let try_elim_var v: _ option =
       (* gather constraints on [v] *)
       begin match gather_lits v with
-      | None -> None
-      | Some (other_lits, constr_l) ->
-        (* gather positive/negative args *)
-        let pos_args, neg_args =
-          CCList.partition_map
-            (fun (args,sign) -> if sign then `Left args else `Right args)
-            constr_l
-        in
+        | None -> None
+        | Some (other_lits, constr_l) ->
+          (* gather positive/negative args *)
+          let pos_args, neg_args =
+            CCList.partition_map
+              (fun (args,sign) -> if sign then `Left args else `Right args)
+              constr_l
+          in
+          (* build substitution used for this inference *)
+          let subst =
+            let some_tup = match pos_args, neg_args with
+              | tup :: _, _ | _, tup :: _ -> tup
+              | [], [] -> assert false
+            in
+            let offset = C.Seq.vars c |> T.Seq.max_var |> succ in
+            let vars =
+              List.mapi (fun i t -> HVar.make ~ty:(T.ty t) (i+offset)) some_tup
+            in
+            let vars_t = List.map T.var vars in
+            let body =
+              neg_args
+              |> List.map
+                (fun tup ->
+                   assert (List.length tup = List.length vars);
+                   List.map2 T.Form.eq vars_t tup |> T.Form.and_l)
+              |> T.Form.or_l
+            in
+            Util.debugf ~section 5
+              "(@[elim-pred-with@ (@[@<1>λ @[%a@].@ %a@])@])"
+              (fun k->k (Util.pp_list Type.pp_typed_var) vars T.pp body);
+            let t =
+              HO_unif.Combinators.conv_lambda
+                (Ctx.combinators()) vars body
+            in
+            Subst.FO.of_list [((v:>InnerTerm.t HVar.t),0), (t,0)]
+          in
         (* build new clause *)
-        let subst = Subst.empty in (* FIXME: use prop combinators *)
         let renaming = Ctx.renaming_clear () in
         let new_lits =
           let l1 = Literal.apply_subst_list ~renaming subst (other_lits,0) in
