@@ -27,8 +27,20 @@ module Combinators : sig
   val name : t -> string
   val decls : t -> (ID.t * Type.t) list
 
+  val conv_lambda : t -> Type.t HVar.t list -> term -> term
+  (** Convert toplevel lambda into combinators.
+      [conv_lambda vars t] converts [λvars. t] into combinators *)
+
   val ski : t
-  (** basic set *)
+  (** basic set + predicate combinators *)
+
+  val ski_if : t
+  (** Same as {!ski} + an "if then else" combinator *)
+
+  val skibc : t
+  (** Schönfickel's combinators *)
+
+  val skibc_if : t
 
   val default : t
 
