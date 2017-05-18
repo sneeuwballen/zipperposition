@@ -72,6 +72,7 @@ rule token = parse
   | "with" { WITH }
   | "end" { END }
   | "data" { DATA }
+  | "fun" { FUN }
   | "&&" { LOGIC_AND }
   | "||" { LOGIC_OR }
   | "|" { VERTICAL_BAR }

@@ -65,6 +65,7 @@
 %token MATCH
 %token WITH
 %token END
+%token FUN
 
 %token INT
 %token PROP
@@ -269,6 +270,11 @@ term:
     {
       let loc = L.mk_pos $startpos $endpos in
       T.exists ~loc vars t
+    }
+  | FUN vars=typed_var_list DOT t=term
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.lambda ~loc vars t
     }
   | t=apply_term ARROW u=term
     {
