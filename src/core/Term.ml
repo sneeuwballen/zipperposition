@@ -466,7 +466,34 @@ module Form = struct
 
   let () = add_hook pp_hook
 
-  let not_ t: t = app_builtin ~ty:Type.prop Builtin.not_ [t]
+  let not_ t: t =
+    assert (Type.is_prop (ty t));
+    app_builtin ~ty:Type.prop Builtin.not_ [t]
+
+  let eq a b =
+    assert (Type.equal (ty a)(ty b));
+    app_builtin ~ty:Type.prop Builtin.eq [of_ty (ty a); a; b]
+
+  let neq a b =
+    assert (Type.equal (ty a)(ty b));
+    app_builtin ~ty:Type.prop Builtin.neq [of_ty (ty a); a; b]
+
+  let and_ a b =
+    assert (Type.is_prop (ty a) && Type.is_prop (ty b));
+    app_builtin ~ty:Type.prop Builtin.and_ [a; b]
+
+  let or_ a b =
+    assert (Type.is_prop (ty a) && Type.is_prop (ty b));
+    app_builtin ~ty:Type.prop Builtin.or_ [a; b]
+
+  let and_l = function
+    | [] -> true_
+    | [t] -> t
+    | a :: tail -> List.fold_left and_ a tail
+  let or_l = function
+    | [] -> false_
+    | [t] -> t
+    | a :: tail -> List.fold_left or_ a tail
 end
 
 (** {2 Arith} *)

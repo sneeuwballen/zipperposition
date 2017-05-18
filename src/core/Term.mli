@@ -270,6 +270,12 @@ val debugf : Format.formatter -> t -> unit
 
 module Form : sig
   val not_ : t -> t
+  val eq : t -> t -> t
+  val neq : t -> t -> t
+  val and_ : t -> t -> t
+  val or_ : t -> t -> t
+  val and_l : t list -> t
+  val or_l : t list -> t
 end
 
 (** {2 Arith} *)
