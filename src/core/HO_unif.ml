@@ -269,6 +269,15 @@ module Combinators = struct
       |> CCOpt.get_lazy
         (fun () -> Util.failwithf "cannot find combinator `%s`" name)
 
+    let ty_return1_exn ty = match Type.view ty with
+      | Type.Fun ([_], ret) -> ret
+      | Type.Fun (_::args, ret) -> Type.arrow args ret
+      | _ -> Util.invalid_argf "expected `@[%a@]`@ to be a function type" Type.pp ty
+
+    let ty_return2_exn ty = match Type.view ty with
+      | Type.Fun (_::_::args, ret) -> Type.arrow args ret
+      | _ -> Util.invalid_argf "expected `@[%a@]`@ to be a function type" Type.pp ty
+
     (* conversion for SKI *)
     let abf decls : conv_fun =
       let _I = find_comb Rules._I decls in
@@ -283,18 +292,39 @@ module Combinators = struct
         | _ -> T.app _not [t]
       in
       let mk_and a b = T.app _and [a;b] in
-      let mk_eq a b = T.app _eq [a;b] in
+      let mk_eq a b = T.app_full _eq [T.ty a] [a;b] in
       let mk_or a b = mk_not (mk_and (mk_not a) (mk_not b)) in
+      let mk_i x = T.app_full _I [HVar.ty x] [] in
+      let mk_k x t =
+        Format.printf "@[K %a `%a`@]@." T.pp_var x T.pp t;
+        T.app_full _K [T.ty t; HVar.ty x] [t] in
+      let mk_s x t u =
+        Format.printf "@[S %a t=`%a` u=`%a`@]@."
+          T.pp_var x T.pp t T.pp u;
+        let ty_b = T.ty u |> ty_return1_exn in
+        let ty_c = T.ty t |> ty_return2_exn in
+        Format.printf "@[S %a t=`%a` u=`%a` ty_b=%a ty_c=%a@]@."
+          T.pp_var x T.pp t T.pp u Type.pp ty_b Type.pp ty_c;
+        T.app_full _S [HVar.ty x; ty_b; ty_c] [t; u]
+      in
       let rec aux x t = match T.view t with
-        | T.Var y when HVar.equal Type.equal x y -> T.app _I [t]
-        | _ when not (T.var_occurs ~var:x t) -> T.app _K [t]
+        | T.Var y when HVar.equal Type.equal x y -> mk_i x
+        | _ when not (T.var_occurs ~var:x t) -> mk_k x t
         | T.DB _ | T.Var _ | T.Const _ -> assert false (* see above *)
         | T.App (_, []) -> assert false
         | T.App (f, l) ->
-          List.fold_left
-            (fun f arg -> Term.app _S [f; aux x arg])
-            (aux x f)
-            l
+          (* remove type arguments *)
+          let ty_args, l =
+            Util.take_drop_while (fun t -> Type.is_tType @@ T.ty t) l
+          in
+          let f = T.app f ty_args in
+          if l=[] then f
+          else (
+            List.fold_left
+              (fun f arg -> mk_s x f (aux x arg))
+              (aux x f)
+              l
+          )
         | T.AppBuiltin (Builtin.And, [a;b]) -> aux x (mk_and a b)
         | T.AppBuiltin (Builtin.Or, [a;b]) -> aux x (mk_or a b)
         | T.AppBuiltin (Builtin.Not, [a]) -> aux x (mk_not a)
