@@ -53,7 +53,7 @@ let prof_infer_passive = Util.mk_profiler "sup.infer_passive"
 let prof_infer_equality_resolution = Util.mk_profiler "sup.infer_equality_resolution"
 let prof_infer_equality_factoring = Util.mk_profiler "sup.infer_equality_factoring"
 
-let _enable_semantic_tauto = ref false
+let _use_semantic_tauto = ref true
 let _use_simultaneous_sup = ref true
 let _dot_sup_into = ref None
 let _dot_sup_from = ref None
@@ -778,20 +778,19 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     if is_tauto then Util.debugf ~section 3 "@[@[%a@]@ is a tautology@]" (fun k->k C.pp c);
     is_tauto
 
-  (** semantic tautology deletion, using a congruence closure algorithm
-      to see if negative literals imply some positive literal *)
-  let is_semantic_tautology c =
-    Util.enter_prof prof_semantic_tautology;
+  (* semantic tautology deletion, using a congruence closure algorithm
+     to see if negative literals imply some positive literal *)
+  let is_semantic_tautology_real (c:C.t) : bool =
     (* create the congruence closure of all negative equations of [c] *)
-    let cc = Congruence.FO.create ~size:7 () in
+    let cc = Congruence.FO.create ~size:8 () in
     Array.iter
       (function
         | Lit.Equation (l, r, false) ->
           Congruence.FO.mk_eq cc l r
         | Lit.Prop (p, false) ->
           Congruence.FO.mk_eq cc p T.true_
-        | _ -> ()
-      ) (C.lits c);
+        | _ -> ())
+      (C.lits c);
     let res = CCArray.exists
         (function
           | Lit.Equation (l, r, true) ->
@@ -799,15 +798,24 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             Congruence.FO.is_eq cc l r
           | Lit.Prop (p, true) ->
             Congruence.FO.is_eq cc p T.true_
-          | _ -> false
-        ) (C.lits c);
+          | _ -> false)
+        (C.lits c)
     in
     if res then (
       Util.incr_stat stat_semantic_tautology;
       Util.debugf ~section 2 "@[@[%a@]@ is a semantic tautology@]" (fun k->k C.pp c);
     );
-    Util.exit_prof prof_semantic_tautology;
     res
+
+  let is_semantic_tautology_ c =
+    if Array.length (C.lits c) >= 2 &&
+       CCArray.exists Lit.is_neg (C.lits c) &&
+       CCArray.exists Lit.is_pos (C.lits c)
+    then is_semantic_tautology_real c
+    else false
+
+  let is_semantic_tautology c =
+    Util.with_prof prof_semantic_tautology is_semantic_tautology_ c
 
   let var_in_subst_ subst v sc =
     S.mem subst ((v:T.var:>InnerTerm.t HVar.t),sc)
@@ -1470,7 +1478,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Env.add_backward_simplify backward_simplify;
     Env.add_redundant redundant;
     Env.add_backward_redundant backward_redundant;
-    if !_enable_semantic_tauto
+    if !_use_semantic_tauto
     then Env.add_is_trivial is_semantic_tautology;
     Env.add_is_trivial is_trivial;
     Env.add_lit_rule "distinct_symbol" handle_distinct_constants;
@@ -1502,8 +1510,11 @@ let extension =
 let () =
   Params.add_opts
     [ "--semantic-tauto"
-    , Arg.Set _enable_semantic_tauto
+    , Arg.Set _use_semantic_tauto
     , " enable semantic tautology check"
+    ; "--no-semantic-tauto"
+    , Arg.Clear _use_semantic_tauto
+    , " disable semantic tautology check"
     ; "--dot-sup-into"
     , Arg.String (fun s -> _dot_sup_into := Some s)
     , " print superposition-into index into file"
