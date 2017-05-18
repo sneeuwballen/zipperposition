@@ -359,6 +359,8 @@ let ord_option c o1 o2 = match o1, o2 with
   | Some _, None -> 1
   | Some x1, Some x2 -> c x1 x2
 
+let take_drop_while f l = CCList.take_while f l, CCList.drop_while f l
+
 (* cartesian product of lists of lists *)
 let map_product ~f l =
   let product a b =

@@ -177,6 +177,9 @@ val pp_list0 : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
 
 val ord_option : 'a CCOrd.t -> 'a option CCOrd.t
 
+(* TODO: use containers' at some point *)
+val take_drop_while : ('a -> bool) -> 'a list -> 'a list * 'a list
+
 val map_product : f:('a -> 'b list list) -> 'a list -> 'b list list
 
 val seq_map_l : f:('a -> 'b list) -> 'a list -> 'b list Sequence.t
