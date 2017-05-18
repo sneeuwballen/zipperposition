@@ -234,8 +234,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     );
     new_c
 
-  (* try to eliminate a predicate variable *)
-  let elim_pred_variable (c:C.t) : C.t SimplM.t =
+  (* try to eliminate a predicate variable in one fell swoop *)
+  let elim_pred_variable (c:C.t) : C.t list =
     (* find unshielded predicate vars *)
     let find_vars(): _ HVar.t Sequence.t =
       Purify.unshielded_vars (C.lits c)
@@ -280,7 +280,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             constr_l
         in
         (* build new clause *)
-        let subst = Subst.empty in (* FIXME *)
+        let subst = Subst.empty in (* FIXME: use prop combinators *)
         let renaming = Ctx.renaming_clear () in
         let new_lits =
           let l1 = Literal.apply_subst_list ~renaming subst (other_lits,0) in
@@ -304,19 +304,17 @@ module Make(E : Env.S) : S with module Env = E = struct
           C.create new_lits proof
             ~penalty:(C.penalty c) ~trail:(C.trail c)
         in
+        Util.debugf ~section 3
+          "(@[<2>elim_pred_var %a@ :clause %a@ :yields %a@])"
+          (fun k->k T.pp_var v C.pp c C.pp new_c);
         Some new_c
       end
     in
     begin
       find_vars()
       |> Sequence.filter_map try_elim_var
-      |> Sequence.head
-      |> (function
-        | Some c -> SimplM.return_new c
-        | None -> SimplM.return_same c)
+      |> Sequence.to_rev_list
     end
-
-  (* TODO: predicate elimination *)
 
   (* ensure that combinators are defined functions *)
   let declare_combinators() =
@@ -341,7 +339,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_unary_inf "ho_eq_res" eq_res;
     Env.add_unary_inf "ho_eq_res_syn" eq_res_syntactic;
     Env.add_unary_inf "ho_complete_eq" complete_eq_args;
-    Env.add_simplify elim_pred_variable;
+    Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
     Env.add_lit_rule "ho_ext_neg" ext_neg;
     ()
 end
