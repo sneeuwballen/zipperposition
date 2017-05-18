@@ -673,6 +673,10 @@ let rec pp_depth ?(hooks=[]) depth out t =
             (_pp_surrounded depth) f (Util.pp_list ~sep:" " (_pp_surrounded depth)) l
       end
   and _pp_surrounded depth out t = match view t with
+    | App (_, l)
+      when not !show_type_arguments
+        && List.for_all (fun t -> is_tType (ty_exn t)) l ->
+      _pp depth out t
     | Bind _
     | AppBuiltin (_,_::_)
     | App (_,_::_) -> Format.fprintf out "(@[%a@])" (_pp depth) t
