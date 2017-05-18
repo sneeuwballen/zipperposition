@@ -169,7 +169,7 @@ let mk_ ~(f: Classify.t -> Lits.t -> BV.t) (lits:Lits.t) : BV.t =
   else (
     let cl = Classify.classify lits in
     (* should we select anything? *)
-    let should_select = Array.exists can_select_cl_ cl in
+    let should_select = CCArray.exists can_select_cl_ cl in
     if should_select then (
       (* select a literal (first try an unshielded constr, else call [f]) *)
       let bv = match find_max_constr_ cl with
