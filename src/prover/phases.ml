@@ -19,6 +19,8 @@ type env_with_result =
 
 type errcode = int
 
+type prelude = UntypedAST.statement Sequence.t
+
 type ('ret, 'before, 'after) phase =
   | Init : (unit, _, [`Init]) phase (* global setup *)
   | Setup_gc : (unit, [`Init], [`Init]) phase
@@ -27,8 +29,9 @@ type ('ret, 'before, 'after) phase =
       (filename list * Params.t, [`Init], [`Parse_cli]) phase
   (* parse CLI options: get a list of files to process, and parameters *)
   | LoadExtensions : (Extensions.t list, [`Parse_cli], [`LoadExtensions]) phase
+  | Parse_prelude : (prelude, [`LoadExtensions], [`Parse_prelude]) phase
   | Start_file :
-      (filename, [`LoadExtensions], [`Start_file]) phase (* file to process *)
+      (filename, [`Parse_prelude], [`Start_file]) phase (* file to process *)
   | Parse_file :
       (Input_format.t * UntypedAST.statement Sequence.t,
        [`Start_file], [`Parse_file]) phase (* parse some file *)
@@ -81,6 +84,7 @@ let string_of_phase : type a b c. (a,b,c) phase -> string
     | Setup_signal -> "setup_signal"
     | Parse_CLI  -> "parse_cli"
     | LoadExtensions -> "load_extensions"
+    | Parse_prelude -> "parse_prelude"
     | Start_file -> "start_file"
     | Parse_file -> "parse_file"
     | Typing -> "typing"

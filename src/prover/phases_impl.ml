@@ -69,6 +69,26 @@ let start_file file =
     ~x:file >>= fun () ->
   Phases.return_phase ()
 
+let parse_prelude (params:Params.t) =
+  Phases.start_phase Phases.Parse_prelude >>= fun () ->
+  let prelude_files = params.Params.param_prelude in
+  let res =
+    if CCVector.is_empty prelude_files
+    then CCResult.return Sequence.empty
+    else (
+      CCVector.to_list prelude_files
+      |> CCResult.map_l
+        (fun file ->
+           Util.debugf ~section 1 "@[@{<Yellow>### parse prelude file@ `%s` ###@}@]"
+             (fun k->k file);
+           let fmt = Parsing_utils.guess_input file in
+           Parsing_utils.parse_file fmt file)
+      |> CCResult.map Sequence.of_list
+      |> CCResult.map Sequence.flatten
+    )
+  in
+  Phases.return_phase_err res
+
 let parse_file file =
   Phases.start_phase Phases.Parse_file >>= fun () ->
   let input = Parsing_utils.input_of_file file in
@@ -77,14 +97,15 @@ let parse_file file =
     ~x:parsed >>= fun () ->
   Phases.return_phase (input,parsed)
 
-let typing (input,stmts) =
+let typing prelude (input,stmts) =
   Phases.start_phase Phases.Typing >>= fun () ->
   Phases.get_key Params.key >>= fun params ->
   let def_as_rewrite = params.Params.param_def_as_rewrite in
   TypeInference.infer_statements
     ~on_var:(Input_format.on_var input)
     ~on_undef:(Input_format.on_undef_id input)
-    ~def_as_rewrite ?ctx:None stmts
+    ~def_as_rewrite ?ctx:None
+    (Sequence.append prelude stmts)
   >>?= fun stmts ->
   do_extensions ~field:(fun e -> e.Extensions.post_typing_actions)
     ~x:stmts >>= fun () ->
@@ -252,6 +273,7 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
     then None
     else (
       Util.debugf ~section 1 "run for %.2f s" (fun k->k Env.params.param_timeout);
+      (* FIXME: only do that for zipperposition, not the library? *)
       ignore (setup_alarm Env.params.param_timeout);
       Some (Util.total_time_s () +. Env.params.param_timeout -. 0.25)
     )
@@ -364,10 +386,10 @@ let parse_cli =
   Phases.return_phase (files, params)
 
 (* Process the given file (try to solve it) *)
-let process_file file =
+let process_file (prelude:Phases.prelude) file =
   start_file file >>= fun () ->
   parse_file file >>= fun stmts ->
-  typing stmts >>= fun decls ->
+  typing prelude stmts >>= fun decls ->
   (* declare inductive types and constants *)
   CCVector.iter Statement.scan_simple_stmt_for_ind_ty decls;
   let has_goal = has_goal_decls_ decls in
@@ -442,9 +464,10 @@ let setup_signal =
   Phases.return_phase ()
 
 (* process several files, printing the result *)
-let process_files_and_print files =
+let process_files_and_print (params:Params.t) files =
+  parse_prelude params >>= fun prelude ->
   let f file =
-    process_file file >>= fun (Phases.Env_result (env, res)) ->
+    process_file prelude file >>= fun (Phases.Env_result (env, res)) ->
     print file env res >>= fun () ->
     check res
   in
