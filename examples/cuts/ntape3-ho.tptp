@@ -1,0 +1,48 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en-US" xml:lang="en-US">
+<head>
+  <title>Past-isserie</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+  <link rel="stylesheet" type="text/css" href="/static/design.css" />
+</head>
+<body><pre>% type declarations
+% constant type declarations
+thf(1, type, c1: $i ).
+thf(2, type, plus: $i &gt; ($i &gt; $i) ).
+thf(3, type, s7: ($i &gt; $o) &gt; $i ).
+thf(4, type, f: $i &gt; $i ).
+thf(5, type, s8: ($i &gt; $o) &gt; ($i &gt; ($i &gt; $i)) ).
+thf(6, type, c0: $i ).
+thf(7, type, lt: $i &gt; ($i &gt; $o) ).
+thf(8, type, q1: $i &gt; ($i &gt; $o) ).
+% sequents
+
+% formula: ¬(∀n_1 ∀n_0 0 + n_1 &lt; n_0 + 1 + n_1 ∧
+%     ∀n_0 ∀n_1 0 + n_0 &lt; n_1 + 1 + n_0 ∧
+%     ∀n_0 ∀n_1 (f(n_0 + n_1 + 1) = 0 ∨ f(n_0 + n_1 + 1) = 1) ∧
+%     ∀n_0 ∀n_1 n_0 + 1 + n_1 = n_1 + (n_0 + 1) ∧
+%     ∀n_1 ∀n_0 n_1 + 1 + n_0 = n_0 + (n_1 + 1) ∧
+%     ∀&#39;\\alpha&#39;
+%       ∀&#39;\\sigma&#39;
+%       ∀&#39;\\alpha_0&#39;
+%       ∀n_2
+%       (¬f(&#39;\\alpha&#39;) = &#39;\\sigma&#39; ∨
+%         ¬s_8(&#39;q_{1}&#39;(&#39;\\sigma&#39;): i&gt;o, &#39;\\sigma&#39;, s_7(&#39;q_{1}&#39;(&#39;\\sigma&#39;))) &lt;
+%             &#39;\\alpha_0&#39; ∨
+%         ¬f(&#39;\\alpha_0&#39;) = &#39;\\sigma&#39; ∨
+%         n_2 &lt; n_2 + 1) ∧
+%     ∀&#39;\\alpha&#39;
+%       ∀&#39;\\sigma&#39;
+%       ∀&#39;\\alpha_0&#39;
+%       (¬f(&#39;\\alpha&#39;) = &#39;\\sigma&#39; ∨
+%         ¬s_7(&#39;q_{1}&#39;(&#39;\\sigma&#39;)) &lt; s_7(&#39;q_{1}&#39;(&#39;\\sigma&#39;)) + 1 ∨
+%         ¬s_8(&#39;q_{1}&#39;(&#39;\\sigma&#39;), &#39;\\sigma&#39;, s_7(&#39;q_{1}&#39;(&#39;\\sigma&#39;))) &lt;
+%             &#39;\\alpha_0&#39; ∨
+%         ¬f(&#39;\\alpha_0&#39;) = &#39;\\sigma&#39;) ∧
+%     ∀n_1 ∀n_0 n_1 + (n_0 + 1) = n_1 + n_0 + 1 ∧
+%     ∀n_0 ∀n_1 n_0 + (n_1 + 1) = n_0 + n_1 + 1 ∧
+%     ∀n_1 ∀n_0 n_1 + n_0 = n_0 + n_1 ∧
+%     ∀n_1 0 + n_1 = n_1 ∧
+%     ∀n_0 0 + n_0 = n_0) 
+thf(9, conjecture, ( ~(((((((((((((![N1 : $i] : ((![N0 : $i] : (((lt @ ((plus @ c0) @ N1)) @ ((plus @ ((plus @ N0) @ c1)) @ N1)))))) &amp; (![N0 : $i] : ((![N1 : $i] : (((lt @ ((plus @ c0) @ N0)) @ ((plus @ ((plus @ N1) @ c1)) @ N0))))))) &amp; (![N0 : $i] : ((![N1 : $i] : ((((f @ ((plus @ ((plus @ N0) @ N1)) @ c1)) = c0) | ((f @ ((plus @ ((plus @ N0) @ N1)) @ c1)) = c1))))))) &amp; (![N0 : $i] : ((![N1 : $i] : ((((plus @ ((plus @ N0) @ c1)) @ N1) = ((plus @ N1) @ ((plus @ N0) @ c1)))))))) &amp; (![N1 : $i] : ((![N0 : $i] : ((((plus @ ((plus @ N1) @ c1)) @ N0) = ((plus @ N0) @ ((plus @ N1) @ c1)))))))) &amp; (![Alpha : $i] : ((![Sigma : $i] : ((![Alpha0 : $i] : ((![N2 : $i] : (((( ~(((f @ Alpha) = Sigma)) |  ~(((lt @ (((s8 @ (q1 @ Sigma)) @ Sigma) @ (s7 @ (q1 @ Sigma)))) @ Alpha0))) |  ~(((f @ Alpha0) = Sigma))) | ((lt @ N2) @ ((plus @ N2) @ c1)))))))))))) &amp; (![Alpha : $i] : ((![Sigma : $i] : ((![Alpha0 : $i] : (((( ~(((f @ Alpha) = Sigma)) |  ~(((lt @ (s7 @ (q1 @ Sigma))) @ ((plus @ (s7 @ (q1 @ Sigma))) @ c1)))) |  ~(((lt @ (((s8 @ (q1 @ Sigma)) @ Sigma) @ (s7 @ (q1 @ Sigma)))) @ Alpha0))) |  ~(((f @ Alpha0) = Sigma)))))))))) &amp; (![N1 : $i] : ((![N0 : $i] : ((((plus @ N1) @ ((plus @ N0) @ c1)) = ((plus @ ((plus @ N1) @ N0)) @ c1))))))) &amp; (![N0 : $i] : ((![N1 : $i] : ((((plus @ N0) @ ((plus @ N1) @ c1)) = ((plus @ ((plus @ N0) @ N1)) @ c1))))))) &amp; (![N1 : $i] : ((![N0 : $i] : ((((plus @ N1) @ N0) = ((plus @ N0) @ N1))))))) &amp; (![N1 : $i] : ((((plus @ c0) @ N1) = N1)))) &amp; (![N0 : $i] : ((((plus @ c0) @ N0) = N0)))))) ).</pre></body></html>

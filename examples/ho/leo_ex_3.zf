@@ -1,0 +1,11 @@
+
+# expect: unsat
+
+# example 3 from "extensional higher order resolution"
+
+val a : prop.
+val b : prop.
+
+goal forall P. ((P a && P b) => P (a && b)).
+
+

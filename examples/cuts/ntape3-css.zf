@@ -1,0 +1,33 @@
+# expect: unsat
+val term : type.
+val zero : term.
+val plus : term -> term -> term.
+assert forall (N_1:term). ((plus zero N_1) = N_1).
+assert forall (N_1:term) (N_0:term). ((plus N_1 N_0) = (plus N_0 N_1)).
+val one : term.
+assert
+  forall (N_1:term) (N_0:term).
+    ((plus N_1 (plus N_0 one)) = (plus (plus N_1 N_0) one)).
+val s_8 : term -> term -> term -> term.
+val q_1 : term -> term.
+val s_7 : term -> term.
+val less : term -> term -> prop.
+val f : term -> term.
+assert
+  forall (X:term) (X_0:term) (X_1:term).
+    (((f X_1) != X_0) || 
+     (~ (less (s_8 (q_1 X_0) X_0 (s_7 (q_1 X_0))) X_1)) || 
+     (~ (less (s_7 (q_1 X_0)) (plus (s_7 (q_1 X_0)) one))) || 
+     ((f X) != X_0)).
+assert
+  forall (X:term) (X_0:term) (X_1:term) (N_2:term).
+    ((less N_2 (plus N_2 one)) || 
+     ((f X_1) != X_0) || 
+     (~ (less (s_8 (q_1 X_0) X_0 (s_7 (q_1 X_0))) X_1)) || 
+     ((f X) != X_0)).
+assert
+  forall (N_0:term) (N_1:term).
+    (((f (plus (plus N_0 N_1) one)) = one) || 
+     ((f (plus (plus N_0 N_1) one)) = zero)).
+assert
+  forall (N_1:term) (N_0:term). (less (plus zero N_1) (plus (plus N_0 one) N_1)).

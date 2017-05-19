@@ -1,0 +1,8 @@
+# expect: unsat
+
+# find set complement
+
+val a : type.
+
+goal forall (P: a -> prop). exists (Q:a -> prop). forall x. (P x <=> ~ Q x).
+
