@@ -21,8 +21,8 @@ let pp out (i:t) = match i with
 (** What to do when we have an undefined ID in the corresponding format? *)
 let on_undef_id (i:t) = match i with
   | I_tptp -> `Guess
-  | I_tip -> `Fail
-  | I_zf -> `Warn
+  | I_tip
+  | I_zf -> `Fail
 
 (** what to do when we have a variable without a type declaration? *)
 let on_var (i:t) = match i with
