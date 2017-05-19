@@ -40,15 +40,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         | _, Some v when not (Purify.is_shielded v (C.lits c)) -> true
         | _ -> false
       end
-    | Literal.Prop (t, _) ->
-      (* boolean unification constraint *)
-      let hd, args = T.as_app t in
-      begin match T.as_var hd with
-        | Some v ->
-          args <> [] &&
-          not (Purify.is_shielded v (C.lits c))
-        | None -> false
-      end
     | _ -> false
 
   (* HO unif rule, applies to literals [F t != u] or [P t] or [¬ P t] *)
