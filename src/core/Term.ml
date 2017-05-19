@@ -468,7 +468,9 @@ module Form = struct
 
   let not_ t: t =
     assert (Type.is_prop (ty t));
-    app_builtin ~ty:Type.prop Builtin.not_ [t]
+    match view t with
+      | AppBuiltin (Builtin.Not, [u]) -> u
+      | _ -> app_builtin ~ty:Type.prop Builtin.not_ [t]
 
   let eq a b =
     assert (Type.equal (ty a)(ty b));
