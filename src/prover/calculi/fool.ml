@@ -130,7 +130,9 @@ module Make(E : Env.S) : S with module Env = E = struct
      - [(∨ a b) --> a ∨ b]
   *)
   let rw_bool_lits : E.multi_simpl_rule = fun c ->
-    let is_bool_val t = T.equal t T.true_ || T.equal t T.false_ || T.is_var t in
+    let is_bool_val t =
+      T.equal t T.true_ || T.equal t T.false_ || T.is_var t || T.is_ho_app t
+    in
     (* how to build a new clause *)
     let mk_c lits =
       let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "fool_simp")
