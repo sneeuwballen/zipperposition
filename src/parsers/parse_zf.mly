@@ -84,11 +84,6 @@
 %token PI
 %token VERTICAL_BAR
 
-%token AC
-%token NAME
-%token INFIX
-%token PREFIX
-
 %token <string> LOWER_WORD
 %token <string> UPPER_WORD
 %token <string> QUOTED
@@ -314,7 +309,6 @@ mutual_types:
 
 attr:
   | a=atomic_attr { a }
-  | s=raw_var { A.A_app (s, []) }
   | s=raw_var l=atomic_attr+ { A.A_app (s, l) }
 
 atomic_attr:
