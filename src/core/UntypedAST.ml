@@ -19,12 +19,10 @@ type data = {
      arguments, that is, an optional projector + the type *)
 }
 
-(** Attributes *)
+(** Attributes (general terms) *)
 type attr =
-  | A_name of string
-  | A_AC
-  | A_infix of string
-  | A_prefix of string
+  | A_app of string * attr list
+  | A_quoted of string
 
 type attrs = attr list
 
@@ -53,6 +51,15 @@ type statement = {
 
 let default_attrs = []
 
+let attr_const s = A_app (s, [])
+let attr_app s l = A_app (s, l)
+let attr_quoted s = A_quoted s
+
+let attr_name n = attr_app "name" [attr_const n]
+let attr_ac = attr_const "ac"
+let attr_prefix s = attr_app "prefix" [attr_quoted s]
+let attr_infix s = attr_app "infix" [attr_quoted s]
+
 let make_ ?loc ?(attrs=default_attrs) stmt = {loc; stmt; attrs; }
 
 let mk_def def_id def_ty def_rules = {def_id; def_ty; def_rules}
@@ -66,11 +73,11 @@ let assert_ ?loc ?attrs t = make_ ?attrs ?loc (Assert t)
 let lemma ?loc ?attrs t = make_ ?attrs ?loc (Lemma t)
 let goal ?loc ?attrs t = make_ ?attrs ?loc (Goal t)
 
-let pp_attr out = function
-  | A_name n -> Format.fprintf out "name:%s" n
-  | A_AC -> CCFormat.string out "AC"
-  | A_infix s -> Format.fprintf out "infix \"%s\"" s
-  | A_prefix s -> Format.fprintf out "prefix \"%s\"" s
+let rec pp_attr out = function
+  | A_app (s,[]) -> CCFormat.string out s
+  | A_app (s,l) ->
+    Format.fprintf out "(@[%s@ %a@])" s (Util.pp_list ~sep:" " pp_attr) l
+  | A_quoted s -> Format.fprintf out "\"%s\"" s
 
 let pp_attrs out = function
   | [] -> ()
@@ -78,7 +85,7 @@ let pp_attrs out = function
 
 let name_of_attrs =
   CCList.find_map
-    (function A_name n -> Some n | _ -> None)
+    (function A_app ("name", [A_quoted n]) -> Some n | _ -> None)
 let name st = name_of_attrs st.attrs
 
 let pp_statement out st =

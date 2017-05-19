@@ -179,10 +179,21 @@ let has_includes decls =
 
 module UA = UntypedAST
 
+let attr_of_info = function
+  | A.GString "ac"
+  | A.GString "AC"
+  | A.GNode ("ac", [])
+  | A.GNode ("AC", []) -> [UA.attr_ac]
+  | A.GNode ("infix", [A.GString n]) -> [UA.attr_infix n]
+  | A.GNode ("prefix", [A.GString n]) -> [UA.attr_prefix n]
+  | g ->
+    Util.warnf "unknown attribute `%a`, ignore" A.pp_general g;
+    []
+
 let to_ast st =
   let conv_form name role f =
     let name = A.string_of_name name in
-    let attrs = [UA.A_name name] in
+    let attrs = [UA.attr_name name] in
     match role with
       | A.R_question 
       | A.R_conjecture -> UA.goal ~attrs f
@@ -197,13 +208,24 @@ let to_ast st =
       | A.R_finite _
       | A.R_type 
       | A.R_unknown  -> UA.assert_ ~attrs f
+  and conv_decl name s ty info =
+    let name = A.string_of_name name in
+    let attr_name = UA.attr_name name in
+    let attrs' =
+      CCList.flat_map
+        (function
+          | A.GNode ("attrs", l) -> CCList.flat_map attr_of_info l
+          | _ -> [])
+        info
+    in
+    UA.decl s ty ~attrs:(attr_name :: attrs')
   in
-  match st with
+  begin match st with
     | A.Include _
     | A.IncludeOnly _ -> error "cannot convert `Include` to UntypedAST"
-    | A.TypeDecl (_,s,ty,_)
-    | A.NewType (_,s,ty,_) ->
-      UA.decl s ty
+    | A.TypeDecl (name,s,ty,info)
+    | A.NewType (name,s,ty,info) ->
+      conv_decl name s ty info
     | A.TFF (name,role,f,_)
     | A.THF (name,role,f,_)
     | A.FOF (name,role,f,_) ->
@@ -211,6 +233,7 @@ let to_ast st =
     | A.CNF (name,role,f,_) ->
       let f = PT.or_ f in
       conv_form name role f
+  end
 
 (* default function for giving a name to the declaration of a symbol *)
 let name_sym_ sy =

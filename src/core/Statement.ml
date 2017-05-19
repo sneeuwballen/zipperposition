@@ -562,14 +562,16 @@ let add_src ~file st = match st.src.src_view with
     let attrs =
       CCList.filter_map
         (function
-          | A.A_AC -> Some A_AC
-          | A.A_infix s -> Some (A_infix s)
-          | A.A_prefix s -> Some (A_prefix s)
-          | A.A_name _ -> None)
+          | A.A_app (("ac" | "AC"), []) -> Some A_AC
+          | A.A_app ("infix", [A.A_quoted s]) -> Some (A_infix s)
+          | A.A_app ("prefix", [A.A_quoted s]) -> Some (A_prefix s)
+          | _ -> None)
         attrs
     and name =
       CCList.find_map
-        (function A.A_name n-> Some n | _ -> None)
+        (function
+          | A.A_app ("name", [(A.A_quoted s | A.A_app (s,[]))]) -> Some s
+          | _ -> None)
         attrs
     in
     { st with

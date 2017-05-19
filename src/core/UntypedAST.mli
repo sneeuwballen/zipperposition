@@ -21,12 +21,10 @@ type data = {
      arguments, that is, an optional projector + the type *)
 }
 
-(** Attributes *)
+(** Attributes (general terms) *)
 type attr =
-  | A_name of string
-  | A_AC
-  | A_infix of string
-  | A_prefix of string
+  | A_app of string * attr list
+  | A_quoted of string
 
 type attrs = attr list
 
@@ -68,6 +66,15 @@ val goal : ?loc:Loc.t -> ?attrs:attrs -> term -> statement
 
 val name_of_attrs : attrs -> string option
 val name : statement -> string option
+
+val attr_const : string -> attr
+val attr_quoted : string -> attr
+val attr_app : string -> attr list -> attr
+
+val attr_name : string -> attr
+val attr_ac : attr
+val attr_prefix : string -> attr
+val attr_infix : string -> attr
 
 val pp_attr : attr CCFormat.printer
 val pp_attrs : attrs CCFormat.printer

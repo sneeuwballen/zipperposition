@@ -88,10 +88,6 @@ rule token = parse
   | "exists" { LOGIC_EXISTS }
   | "=>" { LOGIC_IMPLY }
   | "<=>" { LOGIC_EQUIV }
-  | "AC" { AC }
-  | "name" { NAME }
-  | "infix" { INFIX }
-  | "prefix" { PREFIX }
   | "include" { INCLUDE }
   | lower_word { LOWER_WORD(Lexing.lexeme lexbuf) }
   | upper_word { UPPER_WORD(Lexing.lexeme lexbuf) }

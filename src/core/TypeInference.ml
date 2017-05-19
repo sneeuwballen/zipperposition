@@ -933,8 +933,8 @@ let infer_defs ?loc ctx (l:A.def list): (_,_,_) Stmt.def list =
 let set_notation id attrs: unit =
   List.iter
     (function
-      | A.A_infix s -> ID.set_payload id (ID.Attr_infix s)
-      | A.A_prefix s -> ID.set_payload id (ID.Attr_prefix s)
+      | A.A_app ("infix", [A.A_quoted s]) -> ID.set_payload id (ID.Attr_infix s)
+      | A.A_app ("prefix", [A.A_quoted s]) -> ID.set_payload id (ID.Attr_prefix s)
       | _ -> ())
     attrs
 

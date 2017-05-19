@@ -313,10 +313,14 @@ mutual_types:
   | l=separated_nonempty_list(AND, type_def) { l }
 
 attr:
-  | AC { A.A_AC }
-  | NAME COLON n=raw_var { A.A_name n }
-  | INFIX s=QUOTED { A.A_infix (unquote s) }
-  | PREFIX s=QUOTED { A.A_prefix (unquote s) }
+  | a=atomic_attr { a }
+  | s=raw_var { A.A_app (s, []) }
+  | s=raw_var l=atomic_attr+ { A.A_app (s, l) }
+
+atomic_attr:
+  | s=raw_var { A.A_app (s, []) }
+  | s=QUOTED { A.A_quoted (unquote s) }
+  | LEFT_PAREN a=attr RIGHT_PAREN { a }
 
 attrs:
   | LEFT_BRACKET l=separated_nonempty_list(COMMA, attr) RIGHT_BRACKET
