@@ -265,7 +265,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     let try_elim_var v: _ option =
       (* gather constraints on [v] *)
       begin match gather_lits v with
-        | None -> None
+        | None
+        | Some (_, []) -> None
         | Some (other_lits, constr_l) ->
           (* gather positive/negative args *)
           let pos_args, neg_args =
@@ -337,41 +338,15 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Sequence.to_rev_list
     end
 
-  (* try to convert a literal into a term *)
-  let lit_to_term (lit:Literal.t): T.t option = match lit with
-    | Literal.Prop (t, true) -> Some t
-    | Literal.Prop (t, false) -> Some (T.Form.not_ t)
-    | Literal.True -> Some T.true_
-    | Literal.False -> Some T.false_
-    | Literal.Equation (t, u, sign) ->
-      Some (if sign then T.Form.eq t u else T.Form.neq t u)
-    | Literal.Int _
-    | Literal.Rat _ -> None
-
-  let as_ho_lit (lit:Literal.t) : _ option = match lit with
-    | Literal.Prop (t, sign) ->
-      let hd_t, args_t = T.as_app t in
-      begin match T.view hd_t, args_t with
-        | T.Var v, _::_ -> Some (v, hd_t, args_t, sign)
-        | _ -> None
-      end
-    | _ -> None
-
-  let is_ho_lit lit = CCOpt.is_some (as_ho_lit lit)
-
-  let is_ho_pred t =
-    let hd, args = T.as_app t in
-    T.is_var hd && args<> []
-
   (* smart [t ≠ₒ u] that turns [(¬ F a) ≠ t] into [F a ≠ ¬t] *)
   let mk_prop_unif_constraint t u : Literal.t =
     assert (Type.is_prop @@ T.ty t);
     begin match T.view t, T.view u with
       | T.AppBuiltin (Builtin.Not, [t']), _
-        when is_ho_pred t' && not (is_ho_pred u) ->
+        when Term.is_ho_pred t' && not (Term.is_ho_pred u) ->
         Literal.mk_neq t' (T.Form.not_ u)
       | _, T.AppBuiltin (Builtin.Not, [u'])
-        when is_ho_pred u' && not (is_ho_pred t) ->
+        when Term.is_ho_pred u' && not (Term.is_ho_pred t) ->
         Literal.mk_neq (T.Form.not_ t) u'
       | _ -> Literal.mk_neq t u
     end
@@ -385,9 +360,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Sequence.diagonal
       |> Sequence.filter_map
         (fun ((i1,lit1),(i2,lit2)) ->
-           let is_ho_lit1 = is_ho_lit lit1 in
-           let is_ho_lit2 = is_ho_lit lit2 in
-           begin match lit_to_term lit1, lit_to_term lit2 with
+           let is_ho_lit1 = Literal.is_ho_predicate lit1 in
+           let is_ho_lit2 = Literal.is_ho_predicate lit2 in
+           begin match Literal.to_ho_term lit1, Literal.to_ho_term lit2 with
              | Some t1, Some t2 when is_ho_lit1 || is_ho_lit2  ->
                (* we shall do factoring! *)
                let constr = mk_prop_unif_constraint t1 t2 in
