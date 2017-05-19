@@ -14,6 +14,7 @@ let stat_eq_res = Util.mk_stat "ho.eq_res.steps"
 let stat_eq_res_syntactic = Util.mk_stat "ho.eq_res_syntactic.steps"
 let stat_ext_neg = Util.mk_stat "ho.extensionality-.steps"
 let stat_complete_eq = Util.mk_stat "ho.complete_eq.steps"
+let stat_factor = Util.mk_stat "ho.factor.steps"
 
 let prof_eq_res = Util.mk_profiler "ho.eq_res"
 let prof_eq_res_syn = Util.mk_profiler "ho.eq_res_syntactic"
@@ -86,6 +87,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* flex-rigid (dis)equation? *)
   let is_flex_rigid t u =
     (T.is_var @@ T.head_term t) <> (T.is_var @@ T.head_term u)
+
+  (* TODO: make eq_res_syntactic optional, investigate whether it's useful *)
 
   (* incremental synctactic elimination rules for HO unif:
      [F t1 t2 != g u1 u2] becomes [t1 != u1 | t2 != u2]
@@ -164,7 +167,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let n = ref 0 in
     fun ty ->
       let i = CCRef.incr_then_get n in
-      let id = ID.makef "k#%d" i in
+      let id = ID.makef "#k%d" i in
       ID.set_payload id (ID.Attr_parameter i);
       T.const id ~ty
 
@@ -334,6 +337,89 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Sequence.to_rev_list
     end
 
+  (* try to convert a literal into a term *)
+  let lit_to_term (lit:Literal.t): T.t option = match lit with
+    | Literal.Prop (t, true) -> Some t
+    | Literal.Prop (t, false) -> Some (T.Form.not_ t)
+    | Literal.True -> Some T.true_
+    | Literal.False -> Some T.false_
+    | Literal.Equation (t, u, sign) ->
+      Some (if sign then T.Form.eq t u else T.Form.neq t u)
+    | Literal.Int _
+    | Literal.Rat _ -> None
+
+  let as_ho_lit (lit:Literal.t) : _ option = match lit with
+    | Literal.Prop (t, sign) ->
+      let hd_t, args_t = T.as_app t in
+      begin match T.view hd_t, args_t with
+        | T.Var v, _::_ -> Some (v, hd_t, args_t, sign)
+        | _ -> None
+      end
+    | _ -> None
+
+  let is_ho_lit lit = CCOpt.is_some (as_ho_lit lit)
+
+  let is_ho_pred t =
+    let hd, args = T.as_app t in
+    T.is_var hd && args<> []
+
+  (* smart [t ≠ₒ u] that turns [(¬ F a) ≠ t] into [F a ≠ ¬t] *)
+  let mk_prop_unif_constraint t u : Literal.t =
+    assert (Type.is_prop @@ T.ty t);
+    begin match T.view t, T.view u with
+      | T.AppBuiltin (Builtin.Not, [t']), _
+        when is_ho_pred t' && not (is_ho_pred u) ->
+        Literal.mk_neq t' (T.Form.not_ u)
+      | _, T.AppBuiltin (Builtin.Not, [u'])
+        when is_ho_pred u' && not (is_ho_pred t) ->
+        Literal.mk_neq (T.Form.not_ t) u'
+      | _ -> Literal.mk_neq t u
+    end
+
+  (* factor together literals.
+     [C ∨ l ∨ l'] becomes  [C ∨ l ∨ l≠l'] where at least one of [l,l'] is HO *)
+  let factor_rule (c:C.t): C.t list =
+    let res =
+      C.lits c
+      |> Sequence.of_array_i
+      |> Sequence.diagonal
+      |> Sequence.filter_map
+        (fun ((i1,lit1),(i2,lit2)) ->
+           let is_ho_lit1 = is_ho_lit lit1 in
+           let is_ho_lit2 = is_ho_lit lit2 in
+           begin match lit_to_term lit1, lit_to_term lit2 with
+             | Some t1, Some t2 when is_ho_lit1 || is_ho_lit2  ->
+               (* we shall do factoring! *)
+               let constr = mk_prop_unif_constraint t1 t2 in
+               (* now, which literal do we remove? if one of them
+                  is first-order, then keep it (will restrict unifications) *)
+               let remove_idx =
+                 if is_ho_lit1 && not is_ho_lit2 then i1 else i2
+               in
+               Some (remove_idx, constr)
+             | _ -> None
+           end)
+      |> Sequence.map
+        (fun (remove_idx,constr) ->
+           let new_lits = Array.copy (C.lits c) in
+           new_lits.(remove_idx) <- constr;
+           let proof =
+             Proof.Step.inference ~rule:(Proof.Rule.mk "ho.factor")
+               [C.proof_parent c]
+           in
+           let new_c =
+             C.create_a new_lits proof
+               ~penalty:(C.penalty c+1) ~trail:(C.trail c)
+           in
+           Util.incr_stat stat_factor;
+           Util.debugf ~section 4
+             "(@[<hv2>ho_factor@ :clause %a@ :idx %d :yields %a@])"
+             (fun k->k C.pp c remove_idx C.pp new_c);
+           new_c)
+      |> Sequence.to_rev_list
+    in
+    res
+
   (* ensure that combinators are defined functions *)
   let declare_combinators() =
     let module RW = Rewrite in
@@ -358,6 +444,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_unary_inf "ho_eq_res_syn" eq_res_syntactic;
     Env.add_unary_inf "ho_complete_eq" complete_eq_args;
     Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
+    Env.add_unary_inf "ho_factor" factor_rule;
     Env.add_lit_rule "ho_ext_neg" ext_neg;
     ()
 end
