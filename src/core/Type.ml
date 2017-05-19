@@ -351,7 +351,7 @@ let rec pp_rec depth out t = match view t with
       ID.pp p (Util.pp_list ~sep:" " (pp_inner_app depth)) args
   | Fun (args, ret) ->
     Format.fprintf out "@[%a →@ %a@]"
-      (Util.pp_list ~sep:"→" (pp_inner_fun depth)) args (pp_rec depth) ret
+      (Util.pp_list ~sep:" → " (pp_inner_fun depth)) args (pp_rec depth) ret
   | Forall ty' ->
     Format.fprintf out "@[Π T%i.@ %a@]" depth (pp_inner_fun (depth+1)) ty'
 and pp_inner_fun depth out t = match view t with
