@@ -477,6 +477,11 @@ let var_occurs ~var t =
   Seq.vars t
   |> Sequence.mem ~eq:Var.equal var
 
+let as_id_app t = match view t with
+  | Const id -> Some (id, ty_exn t, [])
+  | App ({term=Const id; ty=Some ty; _}, l) -> Some (id, ty, l)
+  | _ -> None
+
 let vars t = Seq.vars t |> Var.Set.of_seq |> Var.Set.to_list
 
 let free_vars t = Seq.free_vars t |> Var.Set.of_seq |> Var.Set.to_list

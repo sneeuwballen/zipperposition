@@ -140,8 +140,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       | Stmt.Data _
       | Stmt.TyDecl _ -> []
       | Stmt.Def _
-      | Stmt.RewriteForm _
-      | Stmt.RewriteTerm _ -> [] (* dealt with by rewriting *)
+      | Stmt.Rewrite _ -> [] (* dealt with by rewriting *)
       | Stmt.Assert lits -> [of_lits lits]
       | Stmt.Goal lits -> [of_lits lits]
       | Stmt.Lemma l

@@ -281,8 +281,7 @@ let post_cnf stmts st =
     CCVector.to_seq stmts
     |> Sequence.exists
       (fun st -> match Statement.view st with
-         | Statement.RewriteForm _
-         | Statement.RewriteTerm _
+         | Statement.Rewrite _
          | Statement.Def _ -> true
          | _ -> false)
   in

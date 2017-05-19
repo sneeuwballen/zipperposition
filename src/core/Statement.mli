@@ -54,8 +54,7 @@ type ('f, 't, 'ty) view =
   | TyDecl of ID.t * 'ty (** id: ty *)
   | Data of 'ty data list
   | Def of ('f, 't, 'ty) def list
-  | RewriteTerm of ('t, 'ty) term_rule
-  | RewriteForm of ('f, 't, 'ty) form_rule
+  | Rewrite of ('f,'t,'ty) def_rule
   | Assert of 'f (** assert form *)
   | Lemma of 'f list (** lemma to prove and use, using Avatar cut *)
   | Goal of 'f (** goal to prove *)
@@ -123,6 +122,7 @@ val mk_def : ?rewrite:bool -> ID.t -> 'ty -> ('f,'t,'ty) def_rule list -> ('f,'t
 
 val ty_decl : ?attrs:attrs -> src:source -> ID.t -> 'ty -> (_, _, 'ty) t
 val def : ?attrs:attrs -> src:source -> ('f,'t,'ty) def list -> ('f, 't, 'ty) t
+val rewrite : ?attrs:attrs -> src:source -> ('f,'t,'ty) def_rule -> ('f,'t,'ty) t
 val rewrite_term : ?attrs:attrs -> src:source -> ('t, 'ty) term_rule -> (_, 't, 'ty) t
 val rewrite_form : ?attrs:attrs -> src:source -> ('f, 't, 'ty) form_rule -> ('f, 't, 'ty) t
 val data : ?attrs:attrs -> src:source -> 'ty data list -> (_, _, 'ty) t

@@ -45,6 +45,7 @@ let clause_to_fo ?(ctx=Term.Conv.create()) c =
   List.map (SLiteral.map ~f:(Term.Conv.of_simple_term_exn ctx)) c
 
 let as_lit = SLiteral.of_form
+let as_lit_opt t = try Some (as_lit t) with _ -> None
 
 (* check whether the formula is already in CNF *)
 let as_clause f = match F.view f with
@@ -899,11 +900,15 @@ let flatten ~ctx seq : _ Sequence.t =
        let new_sts = match stmt.Stmt.view with
          | Stmt.Data _
          | Stmt.TyDecl _ -> [stmt]
-         | Stmt.RewriteTerm ((vars,id,ty,_,_) as r) ->
+         | Stmt.Rewrite (Stmt.Def_term ((vars,id,ty,_,_) as r)) ->
            flat_term_rule stmt r
            |> List.map
              (fun (args,rhs) ->
                 Stmt.rewrite_term ~attrs ~src:(src ()) (vars,id,ty,args,rhs))
+         | Stmt.Rewrite (Stmt.Def_form ((vars, _, _) as r)) ->
+           flat_form_rule stmt r
+           |> List.map
+             (fun (lhs,rhs) -> Stmt.rewrite_form ~src:(src ()) (vars,lhs,rhs))
          | Stmt.Def l ->
            let l =
              List.map
@@ -913,10 +918,6 @@ let flatten ~ctx seq : _ Sequence.t =
                l
            in
            [Stmt.def ~src:(src ()) l]
-         | Stmt.RewriteForm ((vars, _, _) as r) ->
-           flat_form_rule stmt r
-           |> List.map
-             (fun (lhs,rhs) -> Stmt.rewrite_form ~src:(src ()) (vars,lhs,rhs))
          | Stmt.Assert f ->
            flatten_axiom stmt f
            |> List.map (fun f -> Stmt.assert_ ~src:(src ()) f)
@@ -1016,10 +1017,10 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
                  l
              in
              Stmt.def ~src:(src ()) l
-           | Stmt.RewriteForm (vars, lhs, rhs) ->
+           | Stmt.Rewrite (Stmt.Def_form (vars, lhs, rhs)) ->
              let rhs = process_form_def stmt rhs in
              Stmt.rewrite_form ~src:(src ()) (vars, lhs, rhs)
-           | Stmt.RewriteTerm (vars,id,ty_id,args,rhs) ->
+           | Stmt.Rewrite (Stmt.Def_term (vars,id,ty_id,args,rhs)) ->
              (* due to partial application, this might become a formula rewrite rule *)
              let res =
                process_term_def stmt
@@ -1118,6 +1119,30 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
   let conv_form f =
     snd (conv_form_sk f)
   in
+  (* polarized rewriting: make two rewrite rules, one positive,
+     one negative.
+     positive:   lhs <=> cnf(rhs)
+     negative: ¬ lhs <=> cnf(¬ rhs) *)
+  let conv_form_rw_default vars lhs rhs =
+    let c_pos = CCList.flat_map conv_form rhs in
+    let c_neg = conv_form (F.not_ (F.and_ rhs)) in
+    [ Stmt.Def_form (vars,lhs,c_pos);
+      Stmt.Def_form (vars,SLiteral.negate lhs,c_neg);
+    ]
+  in
+  (* convert formula rule into either formula or term rule *)
+  let conv_form_rw vars lhs rhs = match lhs, rhs with
+    | SLiteral.Atom(lhs_t,true), [rhs_t] ->
+      begin match T.as_id_app lhs_t, as_lit_opt rhs_t with
+        | Some (id, ty_id, args), Some lit when SLiteral.is_pos lit ->
+          (* convert to term rule *)
+          let rhs = SLiteral.to_form lit in
+          [ Stmt.Def_term (vars,id,ty_id,args,rhs)]
+        | _ ->
+          conv_form_rw_default vars lhs rhs
+      end
+    | _ -> conv_form_rw_default vars lhs rhs
+  in
   CCVector.iter
     (fun st ->
        let attrs = Stmt.attrs st in
@@ -1133,27 +1158,20 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
                       (function
                         | Stmt.Def_term _ as d -> [d]
                         | Stmt.Def_form (vars,lhs,rhs) ->
-                          let c_pos = CCList.flat_map conv_form rhs in
-                          let c_neg = conv_form (F.not_ (F.and_ rhs)) in
-                          [ Stmt.Def_form (vars,lhs,c_pos);
-                            Stmt.Def_form (vars,SLiteral.negate lhs,c_neg);
-                          ])
+                          conv_form_rw vars lhs rhs)
                   in
                   { d with Stmt.def_rules = rules  })
                l
            in
            CCVector.push res (Stmt.def ~attrs ~src l);
-         | Stmt.RewriteTerm (vars,id,ty,args,rhs) ->
+         | Stmt.Rewrite (Stmt.Def_term (vars,id,ty,args,rhs)) ->
            CCVector.push res (Stmt.rewrite_term ~src (vars,id,ty,args,rhs))
-         | Stmt.RewriteForm (vars,lhs,rhs) ->
-           (* polarized rewriting: make two rewrite rules, one positive,
-              one negative.
-              positive:   lhs <=> cnf(rhs)
-              negative: ¬ lhs <=> cnf(¬ rhs) *)
-           let c_pos = CCList.flat_map conv_form rhs in
-           CCVector.push res (Stmt.rewrite_form ~attrs ~src (vars,lhs,c_pos));
-           let c_neg = conv_form (F.not_ (F.and_ rhs)) in
-           CCVector.push res (Stmt.rewrite_form ~attrs ~src (vars,SLiteral.negate lhs,c_neg));
+         | Stmt.Rewrite (Stmt.Def_form (vars,lhs,rhs)) ->
+           let st_l =
+             conv_form_rw vars lhs rhs
+             |> List.map (Stmt.rewrite ~attrs ~src)
+           in
+           CCVector.append_list res st_l;
          | Stmt.Data l ->
            CCVector.push res (Stmt.data ~attrs ~src l)
          | Stmt.TyDecl (id,ty) ->
@@ -1245,11 +1263,11 @@ let convert seq =
             l
         in
         Stmt.def ~attrs ~src l
-      | Stmt.RewriteTerm (vars, id, ty, args, rhs) ->
+      | Stmt.Rewrite (Stmt.Def_term (vars, id, ty, args, rhs)) ->
         let vars = List.map (Var.update_ty ~f:conv_ty) vars in
         Stmt.rewrite_term ~attrs ~src
           (vars, id, conv_ty ty,  List.map conv_t args, conv_t rhs)
-      | Stmt.RewriteForm (vars,lhs,rhs) ->
+      | Stmt.Rewrite (Stmt.Def_form (vars,lhs,rhs)) ->
         let vars = List.map (Var.update_ty ~f:conv_ty) vars in
         Stmt.rewrite_form ~attrs ~src
           (vars,

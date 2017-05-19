@@ -240,6 +240,8 @@ val unfold_fun : t -> t Var.t list * t
 val var_occurs : var:t Var.t -> t -> bool
 (** [var_occurs ~var t] is [true] iff [var] occurs in [t] *)
 
+val as_id_app : t -> (ID.t * Ty.t * t list) option
+
 val vars : t -> t Var.t list
 val free_vars : t -> t Var.t list
 val free_vars_l : t list -> t Var.t list

@@ -573,37 +573,7 @@ module Rule = struct
     T.Seq.symbols t
     |> Sequence.exists ID.is_skolem
 
-  let make_lit lit_lhs lit_rhs = match lit_lhs, lit_rhs with
-    | Literal.Prop (t, true), [[ lit0 ]] ->
-      let lhs = match T.Classic.view t with
-        | T.Classic.App (id, args) ->
-          let ty_id = match T.view t with
-            | T.Const _ -> T.ty t
-            | T.App (f, _) -> T.ty f
-            | _ -> assert false
-          in
-          Some (id, ty_id, args)
-        | _ -> None
-      and rhs = match lit0 with
-        | Literal.Prop (u, true)
-          when T.VarSet.subset (T.vars u) (T.vars t) &&
-               not (contains_skolems u)->
-          (* restrictions:
-             - vars(u)⊆vars(t)
-             - u contains no skolems (because that is tied to [t=u] being
-               used in positive polarity)
-          *)
-          Some u
-        | Literal.True -> Some T.true_
-        | Literal.False -> Some T.false_
-        | _ -> None
-      in
-      begin match lhs, rhs with
-        | Some (id,ty_id,args), Some rhs ->
-          T_rule (Term.Rule.make id ty_id args rhs)
-        | _ -> L_rule (Lit.Rule.make lit_lhs lit_rhs)
-      end
-    | _ -> L_rule (Lit.Rule.make lit_lhs lit_rhs)
+  let make_lit lit_lhs lit_rhs = L_rule (Lit.Rule.make lit_lhs lit_rhs)
 end
 
 let allcst_ : Cst_.t list ref = ref []
