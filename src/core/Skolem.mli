@@ -123,13 +123,3 @@ val def_as_sourced_stmt : definition -> Statement.sourced_t
 
 (** {2 Attribute} *)
 
-type kind = K_normal | K_ind (* inductive *)
-
-exception Attr_skolem of kind
-
-val is_skolem : ID.t -> bool
-(** [is_skolem id] returns [true] iff [id] is a Skolem symbol *)
-
-val as_skolem : ID.t -> kind option
-
-

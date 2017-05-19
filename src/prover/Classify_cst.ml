@@ -30,8 +30,8 @@ let classify id =
       (ID.as_parameter |>> fun x->Parameter x);
       (fun id ->
          let open CCOpt.Infix in
-         Skolem.as_skolem id >>= function
-         | Skolem.K_ind -> Some (Inductive_cst None)
+         ID.as_skolem id >>= function
+         | ID.K_ind -> Some (Inductive_cst None)
          | _ -> None);
       (Ind_cst.id_as_cst |>> fun c -> Inductive_cst (Some c));
       (Ind_ty.as_projector |>> fun p -> Projector (Ind_ty.projector_id p));

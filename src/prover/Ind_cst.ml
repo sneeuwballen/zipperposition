@@ -86,7 +86,7 @@ let make_skolem ty : ID.t =
   let c = ID.makef "#%s_%d" (Type.mangle ty) !n_ in
   incr n_;
   if Ind_ty.is_inductive_type ty then (
-    ID.set_payload c (Skolem.Attr_skolem Skolem.K_ind);
+    ID.set_payload c (ID.Attr_skolem ID.K_ind);
   );
   c
 
@@ -113,7 +113,7 @@ let declare ~depth ~is_sub id ty =
   in
   ID.set_payload id (Payload_cst cst)
     ~can_erase:(function
-      | Skolem.Attr_skolem Skolem.K_ind ->
+      | ID.Attr_skolem ID.K_ind ->
         true (* special case: promotion from skolem to inductive const *)
       | _ -> false);
   (* return *)

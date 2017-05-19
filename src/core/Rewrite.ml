@@ -569,6 +569,10 @@ module Rule = struct
   let of_lit t = L_rule t
   let pp = pp_rule
 
+  let contains_skolems (t:term): bool =
+    T.Seq.symbols t
+    |> Sequence.exists ID.is_skolem
+
   let make_lit lit_lhs lit_rhs = match lit_lhs, lit_rhs with
     | Literal.Prop (t, true), [[ lit0 ]] ->
       let lhs = match T.Classic.view t with
@@ -581,7 +585,15 @@ module Rule = struct
           Some (id, ty_id, args)
         | _ -> None
       and rhs = match lit0 with
-        | Literal.Prop (u, true) -> Some u
+        | Literal.Prop (u, true)
+          when T.VarSet.subset (T.vars u) (T.vars t) &&
+               not (contains_skolems u)->
+          (* restrictions:
+             - vars(u)⊆vars(t)
+             - u contains no skolems (because that is tied to [t=u] being
+               used in positive polarity)
+          *)
+          Some u
         | Literal.True -> Some T.true_
         | Literal.False -> Some T.false_
         | _ -> None

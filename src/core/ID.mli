@@ -66,6 +66,10 @@ exception Attr_prefix of string
 exception Attr_parameter of int
 (** Parameter, used for HO unif *)
 
+type skolem_kind = K_normal | K_ind (* inductive *)
+
+exception Attr_skolem of skolem_kind
+
 val as_infix : t -> string option
 val is_infix : t -> bool
 
@@ -75,4 +79,8 @@ val is_prefix : t -> bool
 val as_parameter : t -> int option
 val is_parameter : t -> bool
 
+val is_skolem : t -> bool
+(** [is_skolem id] returns [true] iff [id] is a Skolem symbol *)
+
+val as_skolem : t -> skolem_kind option
 
