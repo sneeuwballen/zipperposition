@@ -107,6 +107,8 @@ let typing prelude (input,stmts) =
     ~def_as_rewrite ?ctx:None
     (Sequence.append prelude stmts)
   >>?= fun stmts ->
+  Util.debugf ~section 3 "@[<hv2>@{<green>typed statements@}@ %a@]"
+    (fun k->k (Util.pp_seq Statement.pp_input) (CCVector.to_seq stmts));
   do_extensions ~field:(fun e -> e.Extensions.post_typing_actions)
     ~x:stmts >>= fun () ->
   Phases.return_phase stmts
