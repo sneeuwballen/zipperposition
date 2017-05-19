@@ -914,13 +914,16 @@ module Make
      the same subterm *)
   let find_var_clusters (f:Cut_form.t) (vars:T.var list): T.var list list =
     let uf = UF_vars.create [] in
-    List.iter (fun v -> UF_vars.add uf v [v]) vars;
+    (* add all variables of [f] *)
+    T.VarSet.iter (fun v -> UF_vars.add uf v [v]) (Cut_form.vars f);
     (* naked variables together *)
     begin match CCList.find_pred (var_always_naked f) vars with
       | None -> ()
       | Some v ->
+        assert (UF_vars.mem uf v);
         List.iter
           (fun v' ->
+             assert (UF_vars.mem uf v');
              if not (HVar.equal Type.equal v v') && var_always_naked f v' then (
                UF_vars.union uf v v';
              ))
