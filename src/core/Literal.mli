@@ -108,6 +108,15 @@ val is_ground : t -> bool
 val symbols : t -> ID.Set.t
 val root_terms : t -> term list (** all the terms immediatly under the lit *)
 
+val to_ho_term : t -> term option
+(** Conversion to higher-order term using {!Term.Form} *)
+
+val as_ho_predicate : t -> (Term.var * term * term list * bool) option
+(** View on literals [F t1…tn] and [¬ (F t1…tn)] *)
+
+val is_ho_predicate : t -> bool
+(** Does {!as_ho_predicate} return Some? *)
+
 module Set : CCSet.S with type elt = t
 
 (** {2 Basic semantic checks} *)

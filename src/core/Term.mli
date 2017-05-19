@@ -173,6 +173,12 @@ val weight : ?var:int -> ?sym:(ID.t -> int) -> t -> int
 val ty_vars : t -> Type.VarSet.t
 (** Set of free type variables *)
 
+val is_ho_app : t -> bool
+(** [is_ho_pred (F t1…tn)] is true, when [F] is a variable (of any function type) *)
+
+val is_ho_pred : t -> bool
+(** [is_ho_pred (F t1…tn)] is true, when [F] is a predicate variable *)
+
 (** {2 Subterms and Positions} *)
 
 module Pos : sig

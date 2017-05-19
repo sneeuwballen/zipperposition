@@ -623,6 +623,32 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ?ty_args ~which ~ord ~sub
     | False, _ -> ()
   end
 
+(* try to convert a literal into a term *)
+let to_ho_term (lit:t): T.t option = match lit with
+  | Prop (t, true) -> Some t
+  | Prop (t, false) -> Some (T.Form.not_ t)
+  | True -> Some T.true_
+  | False -> Some T.false_
+  | Equation (t, u, sign) ->
+    Some (if sign then T.Form.eq t u else T.Form.neq t u)
+  | Int _
+  | Rat _ -> None
+
+let as_ho_predicate (lit:t) : _ option = match lit with
+  | Prop (t, sign) ->
+    let hd_t, args_t = T.as_app t in
+    begin match T.view hd_t, args_t with
+      | T.Var v, _::_ -> Some (v, hd_t, args_t, sign)
+      | _ -> None
+    end
+  | _ -> None
+
+let is_ho_predicate lit = CCOpt.is_some (as_ho_predicate lit)
+
+let is_ho_unif lit = match lit with
+  | Equation (t, u, false) -> Term.is_ho_app t || Term.is_ho_app u
+  | _ -> false
+
 (** {2 IO} *)
 
 let pp_debug ?(hooks=[]) out lit =
@@ -741,6 +767,13 @@ module Comp = struct
     in
     C.of_total (Pervasives.compare (_to_int l1) (_to_int l2))
 
+  (* make HO unif constraints smaller *)
+  let _cmp_by_constraint l1 l2 = match is_ho_unif l1, is_ho_unif l2 with
+    | true, true
+    | false, false -> C.Eq
+    | true, false -> C.Lt
+    | false, true -> C.Gt
+
   (* by multiset of terms *)
   let _cmp_by_term_multiset ~ord l1 l2 =
     let m1 = to_multiset l1 and m2 = to_multiset l2 in
@@ -788,6 +821,7 @@ module Comp = struct
 
   let compare ~ord l1 l2 =
     let f = Comparison.(
+        _cmp_by_constraint @>>
         _cmp_by_maxterms ~ord @>>
         _cmp_by_polarity @>>
         _cmp_by_kind @>>
