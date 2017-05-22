@@ -296,15 +296,10 @@ module Combinators = struct
       let mk_or a b = mk_not (mk_and (mk_not a) (mk_not b)) in
       let mk_i x = T.app_full _I [HVar.ty x] [] in
       let mk_k x t =
-        Format.printf "@[K %a `%a`@]@." T.pp_var x T.pp t;
         T.app_full _K [T.ty t; HVar.ty x] [t] in
       let mk_s x t u =
-        Format.printf "@[S %a t=`%a` u=`%a`@]@."
-          T.pp_var x T.pp t T.pp u;
         let ty_b = T.ty u |> ty_return1_exn in
         let ty_c = T.ty t |> ty_return2_exn in
-        Format.printf "@[S %a t=`%a` u=`%a` ty_b=%a ty_c=%a@]@."
-          T.pp_var x T.pp t T.pp u Type.pp ty_b Type.pp ty_c;
         T.app_full _S [HVar.ty x; ty_b; ty_c] [t; u]
       in
       let rec aux x t = match T.view t with
