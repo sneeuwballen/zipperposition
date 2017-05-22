@@ -47,6 +47,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.debugf ~section 5 "... deduce `@[%a@]`" (fun k->k C.pp new_c);
     new_c
 
+  (* TODO: do not perform this under a connective (¬, ∧) or boolean combinator *)
   let fool_param c : C.t list =
     let sub_terms =
       C.Seq.terms c

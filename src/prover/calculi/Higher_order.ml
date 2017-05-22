@@ -34,11 +34,12 @@ module Make(E : Env.S) : S with module Env = E = struct
   module C = Env.C
   module Ctx = Env.Ctx
 
-  let lit_is_unshielded_ho_unif (c:C.t) (lit:Literal.t): bool = match lit with
+  let lit_is_unshielded_ho_unif (c:C.t)(i:int)(lit:Literal.t): bool = match lit with
     | Literal.Equation (t, u, false) ->
+      let other_lits = lazy (CCArray.except_idx (C.lits c) i |> Array.of_list) in
       begin match T.as_var (T.head_term t), T.as_var (T.head_term u) with
-        | Some v, _ when not (Purify.is_shielded v (C.lits c)) -> true
-        | _, Some v when not (Purify.is_shielded v (C.lits c)) -> true
+        | Some v, _ when not (Purify.is_shielded v (Lazy.force other_lits)) -> true
+        | _, Some v when not (Purify.is_shielded v (Lazy.force other_lits)) -> true
         | _ -> false
       end
     | _ -> false
@@ -70,7 +71,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       ) else []
     in
     (* try negative HO unif lits that are also eligible for resolution *)
-    let eligible = C.Eligible.(filter (lit_is_unshielded_ho_unif c) ** res c) in
+    let eligible = C.Eligible.(lit_is_unshielded_ho_unif c ** res c) in
     let new_clauses =
       Literals.fold_eqn (C.lits c) ~ord:(Ctx.ord ()) ~both:false ~eligible
       |> Sequence.flat_map_l
@@ -148,7 +149,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       ) else None
     in
     (* try negative HO unif lits that are also eligible for resolution *)
-    let eligible = C.Eligible.(filter (lit_is_unshielded_ho_unif c) ** res c) in
+    let eligible = C.Eligible.(lit_is_unshielded_ho_unif c ** res c) in
     let new_clauses =
       Literals.fold_eqn ~sign:false ~ord:(Ctx.ord ())
         ~both:false ~eligible (C.lits c)
