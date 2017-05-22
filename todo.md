@@ -9,7 +9,6 @@
 - in TPTP, detect *some* definitions (`definition, foo = bar`)
   with flag to disable it
 
-
 - induction:
   * [ ] disable `gen-term` by default (too dangerous?)
         OR: refine notion of passive position (if definition patterns are deep),
@@ -31,10 +30,9 @@
 
 - CLI option to hide types when printing terms (useful with lot of polymorphism)
 
-- heavy penalty on the number of variables per clause (quadratic
-  function n_vars → weight)
-
-- same penalty in hornet
+- penalty on high num of vars in hornet
+  * heuristics in hornet (pick given ratio)
+  * remove trivial non-horn clauses in hornet
 
 - subsumption on unit horn clauses!
 - maybe subsumption on other horn clauses, too
@@ -540,7 +538,7 @@
   → tough, subsumption on these is hard
 
 - `./zipperposition.native -p -o none -t 30 --dot /tmp/truc.dot tip-benchmarks/isaplanner/prop_66.smt2`
-  better lemmas in induction
+  better lemmas in induction (also do induction on normalized clauses)
   `./zipperposition.native -p -o none -t 30 --dot /tmp/truc.dot tip-benchmarks/isaplanner/prop_85.smt2`
 
   with speculative paramodulation/generalization
