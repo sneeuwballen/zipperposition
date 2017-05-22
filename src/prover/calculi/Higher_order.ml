@@ -176,7 +176,10 @@ module Make(E : Env.S) : S with module Env = E = struct
      [f != g] where [f : a -> b] becomes [f k != g k] for a fresh parameter [k] *)
   let ext_neg (lit:Literal.t): Literal.t option = match lit with
     | Literal.Equation (f, g, false)
-      when Type.is_fun (T.ty f) && not (T.is_var f) && not (T.is_var g) ->
+      when Type.is_fun (T.ty f) &&
+           not (T.is_var f) &&
+           not (T.is_var g) &&
+           not (T.equal f g) ->
       let n_ty_params, ty_args, _ = Type.open_poly_fun (T.ty f) in
       assert (n_ty_params=0);
       let params = List.map mk_parameter ty_args in
