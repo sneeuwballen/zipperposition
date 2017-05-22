@@ -182,9 +182,14 @@ let as_app t = match view t with
 let head_term t = fst (as_app t)
 let args t = snd (as_app t)
 
-let is_ho_app t =
+let as_ho_app t =
   let hd, args = as_app t in
-  is_var hd && args<> []
+  begin match as_var hd with
+    | Some v when args<> [] -> Some (v, args)
+    | _ -> None
+  end
+
+let is_ho_app t = CCOpt.is_some (as_ho_app t)
 
 let is_ho_pred t = is_ho_app t && Type.is_prop (ty t)
 
