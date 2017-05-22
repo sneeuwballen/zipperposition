@@ -976,6 +976,13 @@ module Make
     let res =
       UF_vars.to_seq uf
       |> Sequence.map snd
+      |> Sequence.filter_map
+        (fun vars ->
+           (* eliminate non-inductive variables *)
+           let vars =
+             List.filter (fun v -> Ind_ty.is_inductive_type @@ HVar.ty v) vars
+           in
+           if vars=[] then None else Some vars)
       |> Sequence.to_rev_list
     in
     Util.debugf ~section 3
