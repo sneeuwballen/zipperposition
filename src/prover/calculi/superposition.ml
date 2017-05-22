@@ -650,6 +650,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               in
               (* rewrite term at root *)
               reduce_at_root ~restrict t'
+            | T.Fun (ty_arg, u) ->
+              let u' = normal_form ~restrict:lazy_false subst u scope in
+              if T.equal u u' then t else T.fun_ ty_arg u
             | T.App _
             | T.AppBuiltin _ -> assert false
           end

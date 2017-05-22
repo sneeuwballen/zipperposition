@@ -499,13 +499,9 @@ let is_shielded var (lits:t) : bool =
     | T.AppBuiltin (_, l) ->
       List.exists (shielded_by_term ~root:false) l
     | T.App (f, l) ->
-      begin match T.view f with
-        | T.Var v' when HVar.equal Type.equal var v' -> not root
-        | T.Var _
-        | T.Const _ ->
-          List.exists (shielded_by_term ~root:false) l
-        | T.DB _ | T.AppBuiltin _ | T.App _ -> assert false
-      end
+      shielded_by_term ~root f ||
+      List.exists (shielded_by_term ~root:false) l
+    | T.Fun (_, bod) -> shielded_by_term ~root:false bod
   in
   (* is there a term, directly under a literal, that shields the variable? *)
   begin

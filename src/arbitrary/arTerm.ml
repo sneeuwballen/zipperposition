@@ -141,6 +141,8 @@ and shrink_sub t =
          shrink_sub sub >|= fun sub' ->
          let l' = CCList.set_at_idx i sub' l in
          T.app f l')
+    | T.Fun (ty_arg, bod) ->
+      shrink bod >|= T.fun_ ty_arg
     | _ -> empty
 
 let mk_ gen = QA.make ~print:T.to_string ~shrink gen
@@ -172,5 +174,7 @@ let pos t =
       | T.AppBuiltin (_, l)
       | T.App (_, l) ->
         oneof (stop :: List.mapi (fun i t' -> recurse t' (PB.arg i pb)) l) st
+      | T.Fun (_,bod) ->
+        oneof [stop; recurse bod (PB.body pb)] st
   in
   recurse t PB.empty

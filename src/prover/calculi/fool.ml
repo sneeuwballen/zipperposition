@@ -64,6 +64,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              | T.AppBuiltin ((Builtin.True | Builtin.False), _) -> false
              | T.AppBuiltin (_, _) -> true
              | T.Var _ | T.DB _ -> false
+             | T.Fun _ -> assert false (* by typing *)
            end)
       |> T.Set.of_seq
     in

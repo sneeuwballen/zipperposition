@@ -28,6 +28,7 @@ let open_term ~stack t = match T.view t with
   | T.Var _
   | T.DB _
   | T.AppBuiltin _
+  | T.Fun _
   | T.Const _ ->
     Some {cur_term=t; stack=[]::stack;}
   | _ when not (Unif.Ty.type_is_unifiable (T.ty t)) ->

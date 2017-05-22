@@ -311,6 +311,7 @@ module T_view : sig
     | T_app_cstor of ID.t * 'a list
     | T_app_unin of ID.t * 'a list
     | T_app of 'a * 'a list
+    | T_fun of Type.t * 'a
     | T_builtin of Builtin.t * 'a list
 
   val view : term -> term t
@@ -326,6 +327,7 @@ end = struct
     | T_app_cstor of ID.t * 'a list
     | T_app_unin of ID.t * 'a list
     | T_app of 'a * 'a list
+    | T_fun of Type.t * 'a
     | T_builtin of Builtin.t * 'a list
 
   let view (t:term): term t = match T.view t with
@@ -338,6 +340,7 @@ end = struct
         | None -> T_app_unin (id, [])
       end
     | T.Const id -> T_app_unin (id, [])
+    | T.Fun (arg,bod) -> T_fun (arg,bod)
     | T.App (f, l) ->
       begin match T.view f with
         | T.Const id when Ind_ty.is_constructor id -> T_app_cstor (id, l)
@@ -363,6 +366,7 @@ end = struct
             (fun i sub ->
                if IArray.get pos i = Defined_pos.P_active then aux sub)
             l
+        | T_fun (_,_) -> () (* no induction under λ, we follow WHNF semantics *)
         | T_var _ -> ()
         | T_app (f,l) ->
           aux f;
@@ -684,6 +688,9 @@ module Make
           List.iteri
             (fun i u -> aux dp Position.(append p @@ arg i @@ stop) u k)
             l
+        | T_view.T_fun (_,u) ->
+          let dp = defined_path_add dp Defined_pos.P_invariant in
+          aux dp Position.(append p @@ body stop) u k
         | T_view.T_app_cstor (_,l) ->
           let dp = match dp with
             | P_inactive -> P_inactive | _ -> P_under_cstor

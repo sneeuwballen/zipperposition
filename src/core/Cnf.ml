@@ -402,27 +402,9 @@ module Flatten = struct
         (* lambda-lifting *)
         let fun_vars, body = T.unfold_fun t in
         assert (fun_vars <> []);
-        (* give a name to [body vars] *)
-        let closure = T.free_vars t |> ty_vars_first in
-        let all_vars = closure @ fun_vars in
-        let cases =
-          (* flatten body, but it can only specify cases for its closure *)
-          aux Pos_toplevel all_vars body >>= fun body' ->
-          get_subst >|= fun subst ->
-          Util.debugf ~section 5 "@[<2>subst {@[%a@]}@ closure %a@ body `@[%a@]`@]@."
-            (fun k->k T.Subst.pp subst Fmt.(Dump.(list Var.pp_full)|>hovbox) closure T.pp body');
-          apply_subst_vars_ subst all_vars, T.Subst.eval subst body'
-        in
-        let rules = to_list' cases in
-        Util.debugf ~section 5 "@[<2>define_lambda `@[%a@]`@ rules: [@[%a@]]@]@."
-          (fun k->k T.pp t pp_rules rules);
-        let def = Skolem.define_term ~ctx rules ~pattern:(mk_pat "fun") in
-        let res =
-          T.app ~ty:(T.ty_exn t)
-            (T.const def.Skolem.td_id ~ty:def.Skolem.td_ty)
-            (List.map T.var closure)
-        in
-        return res
+        (* flatten body (but [fun_vars] are protected) *)
+        aux Pos_inner vars body >|= fun body ->
+        T.fun_l fun_vars body
       | T.Bind (Binder.ForallTy,_,_)
       | T.Multiset _
       | T.Record _

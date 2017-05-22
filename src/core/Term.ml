@@ -23,6 +23,7 @@ type view =
   | Var of var (** Term variable *)
   | Const of ID.t (** Typed constant *)
   | App of t * t list (** Application to a list of terms (cannot be left-nested) *)
+  | Fun of Type.t * t (** Lambda abstraction *)
 
 let view t = match T.view t with
   | T.AppBuiltin (b,l) -> AppBuiltin (b,l)
@@ -31,6 +32,7 @@ let view t = match T.view t with
   | T.App (_, []) -> assert false
   | T.App (f, l) -> App (f, l)
   | T.Const s -> Const s
+  | T.Bind (Binder.Lambda, ty, t') -> Fun (Type.of_term_unsafe ty, t')
   | _ -> assert false
 
 (** {2 Comparison, equality, containers} *)
@@ -41,8 +43,8 @@ let subterm ~sub t =
     match T.view t with
       | T.Var _ | T.DB _ | T.Const _ -> false
       | T.App (f, l) -> check f || List.exists check l
+      | T.Bind (_, _, t') -> check t'
       | T.AppBuiltin (_,l) -> List.exists check l
-      | _ -> false
   in
   check t
 
@@ -83,7 +85,8 @@ module Classic = struct
         | T.Const id -> App (id, l)
         | _ -> NonFO
       end
-    | _ -> assert false
+    | T.Bind (Binder.Lambda, _, _) -> NonFO
+    | T.Bind (_,_,_) -> assert false
 end
 
 (** {2 Containers} *)
@@ -140,6 +143,22 @@ let app_full f tyargs l =
   let l = (tyargs : Type.t list :> T.t list) @ l in
   app f l
 
+let fun_ (ty_arg:Type.t) body =
+  let ty = Type.arrow [ty_arg] (ty body) in
+  T.bind ~ty:(ty :> T.t) ~varty:(ty_arg:>T.t) Binder.Lambda body
+
+let fun_l args body = List.fold_right fun_ args body
+
+let fun_of_fvars vars body =
+  if vars=[] then body
+  else (
+    List.fold_right
+      (fun v body ->
+         let body = T.DB.from_var body ~var:(var v) in
+         fun_ (HVar.ty v) body)
+      vars body
+  )
+
 let true_ = builtin ~ty:Type.prop Builtin.True
 let false_ = builtin ~ty:Type.prop Builtin.False
 
@@ -180,6 +199,14 @@ let as_app t = match view t with
   | App (f,l) -> f, l
   | _ -> t, []
 
+let rec as_fun t = match view t with
+  | Fun (ty_arg, bod) ->
+    let args, ret = as_fun bod in
+    ty_arg :: args, ret
+  | _ -> [], t
+
+let is_closed t = T.DB.closed t
+
 let head_term t = fst (as_app t)
 let args t = snd (as_app t)
 
@@ -209,6 +236,7 @@ module Seq = struct
       | Var v -> k v
       | Const _
       | DB _ -> ()
+      | Fun (_,u) -> aux_term u
       | App (f, l) ->
         aux f;
         List.iter aux l
@@ -224,6 +252,7 @@ module Seq = struct
         | Const _
         | Var _
         | DB _ -> ()
+        | Fun (_, u) -> aux u
         | App (f, l) -> aux f; List.iter aux l
     in
     aux t
@@ -235,6 +264,7 @@ module Seq = struct
         | Const _
         | DB _
         | Var _ -> ()
+        | Fun (_,u) -> recurse (depth+1) u
         | AppBuiltin (_, l) -> List.iter (recurse (depth+1)) l
         | App (_, l) ->
           let depth' = depth + 1 in
@@ -248,6 +278,7 @@ module Seq = struct
       | Const s -> k s
       | Var _
       | DB _ -> ()
+      | Fun (_,u) -> aux u
       | App (f, l) -> aux f; List.iter aux l
     in
     aux t
@@ -278,6 +309,7 @@ let rec size t = match view t with
   | DB _ -> 1
   | AppBuiltin (_,l)
   | App (_, l) -> List.fold_left (fun s t' -> s + size t') 1 l
+  | Fun (_,u) -> 1 + size u
   | Const _ -> 1
 
 let weight ?(var=1) ?(sym=fun _ -> 1) t =
@@ -286,6 +318,7 @@ let weight ?(var=1) ?(sym=fun _ -> 1) t =
     | DB _ -> var
     | AppBuiltin (_,l)
     | App (_, l) -> List.fold_left (fun s t' -> s + weight t') 1 l
+    | Fun (_, u) -> 1 + weight u
     | Const s -> sym s
   in weight t
 
@@ -358,6 +391,7 @@ let all_positions ?(vars=false) ?(ty_args=true) ?(pos=Position.stop) t f =
     | Const _ ->
       if ty_args || not (Type.is_tType (ty t))
       then f (PW.make t (PB.to_pos pb))
+    | Fun (_, u) -> aux (PB.body pb) u
     | AppBuiltin (_,tl)
     | App (_, tl) ->
       if ty_args || not (Type.is_tType (ty t)) then (
@@ -590,6 +624,10 @@ module Arith = struct
   let () = add_hook pp_hook
 end
 
+module DB = struct
+  let is_closed = T.DB.closed
+end
+
 let debugf = pp
 
 (** {2 TPTP} *)
@@ -616,11 +654,23 @@ module TPTP = struct
       | App (f, l) ->
         Format.fprintf out "@[<hov2>%a(@,%a)@]" pp_rec f
           (Util.pp_list ~sep:", " pp_rec) l
+      | Fun _ ->
+        let ty_args, bod = as_fun t in
+        let vars = List.mapi (fun i ty -> i+ !depth, ty) ty_args in
+        let pp_db out (i,ty) =
+          Format.fprintf out "Y%d : %a" i Type.TPTP.pp ty
+        in
+        let old_d = !depth in
+        depth := !depth + List.length ty_args;
+        Format.fprintf out "(@[<hv2>^[@[%a@]]:@ %a@])"
+          (Util.pp_list ~sep:"," pp_db) vars pp_rec bod;
+        depth := old_d;
       | Var i ->
         Format.fprintf out "X%d" (HVar.id i);
         (* print type of term *)
-        if !print_all_types && not (Type.equal (ty t) Type.TPTP.i)
-        then Format.fprintf out ":%a" (Type.TPTP.pp_depth !depth) (ty t)
+        if !print_all_types && not (Type.equal (ty t) Type.TPTP.i) then (
+          Format.fprintf out ":%a" (Type.TPTP.pp_depth !depth) (ty t);
+        )
     in
     pp_rec out t
 
@@ -644,8 +694,16 @@ module Conv = struct
   let var_to_simple_var = Type.Conv.var_to_simple_var
 
   let of_simple_term_exn ctx t =
+    let tbl = PT.Var_tbl.create 8 in
+    let depth = ref 0 in
     let rec aux t = match PT.view t with
-      | PT.Var v -> var (Type.Conv.var_of_simple_term ctx v)
+      | PT.Var v ->
+        (* is the variable bound? *)
+        begin match PT.Var_tbl.get tbl v with
+          | Some (i,ty) -> bvar ~ty (!depth - i - 1)
+          | None ->
+            var (Type.Conv.var_of_simple_term ctx v)
+        end
       | PT.AppBuiltin (Builtin.Wildcard, []) ->
         (* fresh type variable *)
         var (Type.Conv.fresh_ty_var ctx)
@@ -669,6 +727,14 @@ module Conv = struct
         let ty = Type.Conv.of_simple_term_exn ctx (PT.ty_exn t) in
         let l = List.map aux l in
         app_builtin ~ty b l
+      | PT.Bind (Binder.Lambda, v, body) ->
+        let ty_arg = Type.Conv.of_simple_term_exn ctx (Var.ty v) in
+        PT.Var_tbl.add tbl v (!depth,ty_arg);
+        incr depth;
+        let body = aux body in
+        decr depth;
+        PT.Var_tbl.remove tbl v;
+        fun_ ty_arg body
       | PT.Bind _
       | PT.Meta _
       | PT.Record _
@@ -685,21 +751,26 @@ module Conv = struct
 
   let to_simple_term ?(env=DBEnv.empty) ctx t =
     let module ST = TypedSTerm in
-    let rec to_simple_term t =
+    let n = ref 0 in
+    let rec to_simple_term env t =
       match view t with
         | Var i -> ST.var (aux_var i)
         | DB i -> ST.var (DBEnv.find_exn env i)
         | Const id -> ST.const ~ty:(aux_ty (ty t)) id
         | App (f,l) ->
           ST.app ~ty:(aux_ty (ty t))
-            (to_simple_term f) (List.map to_simple_term l)
+            (to_simple_term env f) (List.map (to_simple_term env) l)
         | AppBuiltin (b,l) ->
           ST.app_builtin ~ty:(aux_ty (ty t))
-            b (List.map to_simple_term l)
+            b (List.map (to_simple_term env) l)
+        | Fun (ty_arg, body) ->
+          let v = Var.makef ~ty:(aux_ty ty_arg) "v_%d" (CCRef.incr_then_get n) in
+          let body = to_simple_term (DBEnv.push env v) body in
+          ST.bind Binder.Lambda ~ty:(aux_ty (ty t)) v body
     and aux_var v =
       Type.Conv.var_to_simple_var ~prefix:"X" ctx v
     and aux_ty ty =
       Type.Conv.to_simple_term ~env ctx ty
     in
-    to_simple_term t
+    to_simple_term env t
 end

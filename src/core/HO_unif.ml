@@ -320,6 +320,7 @@ module Combinators = struct
               (aux x f)
               l
           )
+        | T.Fun _ -> assert false (* FIXME: remove this! *)
         | T.AppBuiltin (Builtin.And, [a;b]) -> aux x (mk_and a b)
         | T.AppBuiltin (Builtin.Or, [a;b]) -> aux x (mk_or a b)
         | T.AppBuiltin (Builtin.Not, [a]) -> aux x (mk_not a)

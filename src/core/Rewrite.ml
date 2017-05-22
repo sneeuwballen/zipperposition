@@ -331,6 +331,14 @@ module Term = struct
                  end
                | _ -> k t'
              end)
+      | T.Fun (arg, body) ->
+        (* term rewrite rules, because [vars(rhs)⊆vars(lhs)], map
+           closed terms to closed terms, so we can safely rewrite under λ *)
+        reduce body
+          (fun body' ->
+             let t =
+               if T.equal body body then t else (T.fun_ arg body')
+             in k t)
       | T.Var _
       | T.DB _ -> k t
       | T.AppBuiltin (_,[]) -> k t
@@ -368,6 +376,7 @@ module Term = struct
                  with Unif.Fail -> None)
           | _ -> Sequence.empty
         end
+      | T.Fun _
       | T.Var _
       | T.DB _
       | T.AppBuiltin _ -> Sequence.empty
