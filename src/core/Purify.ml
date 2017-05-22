@@ -15,6 +15,8 @@ let type_is_purifiable (ty:Type.t): bool = match Type.view ty with
   | Type.Builtin (Type.Int | Type.Rat) -> true
   | _ -> false
 
+let var_is_purifiable v: bool = type_is_purifiable (HVar.ty v)
+
 let is_value (t:term): bool = match T.view t with
   | T.AppBuiltin (b, []) when Builtin.is_numeric b ->
     true (* do not purify numeric constants *)
@@ -57,11 +59,14 @@ let purify (lits:Literals.t) =
       let lit = Literal.mk_neq v t in
       add_lit_ lit;
       v
-  (* should we purify the term t? Yes if it's not a value *)
-  and should_purify ~ctx t =
+  (* should we purify the term t? Yes if it's not a value,
+     and if it's not a HO term in a HO constraint *)
+  and should_purify ~in_constr ~ctx t =
+    let ty_t = T.ty t in
     ctx = C_under_uninterpreted &&
-    type_is_purifiable (T.ty t) &&
-    not (is_value t)
+    type_is_purifiable ty_t &&
+    not (is_value t) &&
+    (not in_constr || not (Type.needs_args ty_t))
   in
   let purify_sub ~ctx t =
     Util.debugf ~section 5
@@ -69,21 +74,23 @@ let purify (lits:Literals.t) =
       (fun k->k T.pp t pp_context ctx);
     extract_into_var t
   in
-  (* purify a term (adding constraints to the list).  *)
-  let rec purify_term ~ctx t = match T.view t with
+  (* purify a term (adding constraints to the list).
+     @param in_constr if true, we are in a HO constraint, do not purify HO stuff
+  *)
+  let rec purify_term ~in_constr ~ctx t = match T.view t with
     | T.DB _
     | T.Var _ -> t
     | T.Const _ | T.AppBuiltin (_, []) ->
-      if should_purify ~ctx t
+      if should_purify ~in_constr ~ctx t
       then purify_sub ~ctx t
       else t
     | T.AppBuiltin (b, l) ->
       let t =
         let ctx_args = C_under_builtin in
         T.app_builtin ~ty:(T.ty t) b
-          (List.map (purify_term ~ctx:ctx_args) l)
+          (List.map (purify_term ~in_constr ~ctx:ctx_args) l)
       in
-      if should_purify ~ctx t
+      if should_purify ~in_constr ~ctx t
       then purify_sub ~ctx t
       else t
     | T.App (f, l) ->
@@ -93,15 +100,25 @@ let purify (lits:Literals.t) =
           | _ -> C_under_uninterpreted
         in
         T.app
-          (purify_term ~ctx:C_root f)
-          (List.map (purify_term ~ctx:ctx_args) l)
+          (purify_term ~in_constr ~ctx:C_root f)
+          (List.map (purify_term ~in_constr ~ctx:ctx_args) l)
       in
-      if should_purify ~ctx t
+      if should_purify ~in_constr ~ctx t
       then purify_sub ~ctx t
       else t
   in
+  let purify_lit lit = match lit with
+    | Literal.Equation (t, u, false) ->
+      let is_ho_t = T.is_ho_app t in
+      let is_ho_u = T.is_ho_app u in
+      Literal.mk_neq
+        (purify_term ~in_constr:is_ho_t ~ctx:C_root t)
+        (purify_term ~in_constr:is_ho_u ~ctx:C_root u)
+    | _ ->
+      Literal.map (purify_term ~in_constr:false ~ctx:C_root) lit
+  in
   (* try to purify *)
-  let lits' = Literals.map (purify_term ~ctx:C_root) lits in
+  let lits' = Array.map purify_lit lits in
   begin match !new_lits with
     | [] -> None
     | _::_ ->
