@@ -18,7 +18,7 @@ let type_is_purifiable (ty:Type.t): bool = match Type.view ty with
 let is_value (t:term): bool = match T.view t with
   | T.AppBuiltin (b, []) when Builtin.is_numeric b ->
     true (* do not purify numeric constants *)
-  | T.DB _ | T.Var _ -> true
+  | T.Fun _ | T.DB _ | T.Var _ -> true
   | T.AppBuiltin _ | T.Const _ | T.App _ ->
     not (type_is_purifiable @@ T.ty t)
 
@@ -61,7 +61,8 @@ let purify (lits:Literals.t) =
   and should_purify ~ctx t =
     ctx = C_under_uninterpreted &&
     type_is_purifiable (T.ty t) &&
-    not (is_value t)
+    not (is_value t) &&
+    T.is_closed t
   in
   let purify_sub ~ctx t =
     Util.debugf ~section 5
@@ -99,6 +100,9 @@ let purify (lits:Literals.t) =
       if should_purify ~ctx t
       then purify_sub ~ctx t
       else t
+    | T.Fun (ty_arg, u)  ->
+      let u = purify_term ~ctx:C_under_purifiable u in
+      T.fun_ ty_arg u
   in
   (* try to purify *)
   let lits' = Literals.map (purify_term ~ctx:C_root) lits in
@@ -116,11 +120,13 @@ let is_shielded var (lits:Literals.t) : bool =
     | T.Var _
     | T.DB _
     | T.Const _ -> false
+    | T.Fun (_,u) -> shielded_by_term ~root:false u
     | T.AppBuiltin (_, l) ->
       List.exists (shielded_by_term ~root:false) l
     | T.App (f, l) ->
       begin match T.view f with
         | T.Var v' when HVar.equal Type.equal var v' -> not root
+        | T.Fun (_, u) -> shielded_by_term ~root:false u
         | T.Var _
         | T.Const _ ->
           List.exists (shielded_by_term ~root:false) l

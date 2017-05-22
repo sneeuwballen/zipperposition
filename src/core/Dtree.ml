@@ -77,6 +77,7 @@ let open_term ~stack t =
     match T.view t with
       | T.Var _
       | T.DB _
+      | T.Fun _
       | T.AppBuiltin _
       | T.Const _ ->
         {cur_char; cur_term=t; stack=[]::stack;}

@@ -33,7 +33,10 @@ type 'a t_view =
   | T_app of ID.t * 'a list (* other application *)
   | T_fun_app of 'a * 'a list
   | T_builtin of Builtin.t * 'a list
+  | T_fun of Type.t * 'a
   | T_var of var
+
+(* TODO: β reduction *)
 
 let t_view (t:term): term t_view = match T.view t with
   | T.AppBuiltin (Builtin.Int n, []) -> T_Z n
@@ -44,6 +47,7 @@ let t_view (t:term): term t_view = match T.view t with
   | T.Var v -> T_var v
   | T.Const id when Ind_ty.is_constructor id -> T_cstor (id, [])
   | T.Const id -> T_app (id, [])
+  | T.Fun (arg,bod) -> T_fun (arg,bod)
   | T.App (f, l) ->
     begin match T.view f with
       | T.Const id when Ind_ty.is_constructor id -> T_cstor (id, l)

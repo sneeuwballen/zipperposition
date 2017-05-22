@@ -77,6 +77,8 @@ val record_flatten : ?loc:location -> ty:t -> (string*t) list -> rest:t option -
 (** Build a record with possibly a row variable.
     @raise IllFormedTerm if the [rest] is not either a record or a variable. *)
 
+val fun_l : ?loc:location -> t Var.t list -> t -> t
+
 val of_string : ?loc:location -> ty:t -> string -> t
 (** Make a constant from this string *)
 
@@ -289,6 +291,11 @@ module Subst : sig
 
   include Interfaces.PRINT with type t := t
 end
+
+
+(** {2 Table of Variables} *)
+
+module Var_tbl : CCHashtbl.S with type key = t Var.t
 
 (** {2 Unification} *)
 

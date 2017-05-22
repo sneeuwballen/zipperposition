@@ -29,6 +29,7 @@ type view = private
   | Var of var (** Term variable *)
   | Const of ID.t (** Typed constant *)
   | App of t * t list (** Application to a list of terms (cannot be left-nested) *)
+  | Fun of Type.t * t (** Lambda abstraction *)
 
 val view : t -> view
 
@@ -99,6 +100,9 @@ val app_full : t -> Type.t list -> t list -> t
 val true_ : t
 val false_ : t
 
+val fun_: Type.t -> t -> t
+val fun_l : Type.t list -> t -> t
+
 val grounding : Type.t -> t
 (** [grounding ty] is a unique constant of type [ty] *)
 
@@ -116,6 +120,12 @@ val as_var_exn : t -> var
 val as_app : t -> t * t list
 (** [as_app t] decomposes [t] into a head (non-application) and arguments,
     such as [(let f,l = as_app t in app f l) = t] *)
+
+val as_fun : t -> Type.t list * t
+(** Open functions *)
+
+val is_closed : t -> bool
+(** De-bruijn closed? *)
 
 val head_term : t -> t
 (** [head_term t = fst (as_app t)] *)
