@@ -1081,19 +1081,33 @@ module Make
         (fun k->k (Util.pp_list ~sep:"∧" Lits.pp) cs
             (T.Map.pp T.pp T.pp) pairs);
       (* replace skolems by the new variables, then negate the formula
-         and re-CNF the negation *)
+         and re-CNF the negation.
+         Purification constraints are kept as hypotheses in each resulting clause. *)
       begin
         cs
         |> Util.map_product
           ~f:(fun lits ->
-             lits
-             |> Array.map
-               (fun lit ->
-                  lit
-                  |> Literal.map (fun t -> T.replace_m t pairs)
-                  |> Literal.negate
-                  |> CCList.return)
-             |> Array.to_list)
+            let lits_l =
+              Array.to_list lits
+              |> List.map (Literal.map (fun t -> T.replace_m t pairs))
+            in
+            (* separate the guard (purification constraints) from other literals *)
+            let guard, other_lits =
+              List.partition
+                (function
+                  | Literal.Equation (t, u, false) ->
+                    begin match T.as_var t, T.as_var u with
+                      | Some v1, Some v2 ->
+                        Purify.is_shielded v1 lits || Purify.is_shielded v2 lits
+                      | (Some v, None | None, Some v) -> Purify.is_shielded v lits
+                      | None, None -> false
+                    end
+                  | _ -> false)
+                lits_l
+            in
+            List.map
+              (fun other_lit -> Literal.negate other_lit :: guard)
+              other_lits)
         |> List.map Array.of_list
         |> Goal.of_form
       end
