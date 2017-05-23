@@ -1592,6 +1592,16 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   exception DiffToLesseq of C.t
 
+  let is_singleton_unshielded_var lits (m:_ M.t) : bool =
+    Z.sign (M.const m) = 0 &&
+    begin match M.coeffs m with
+      | [c,t] ->
+        Z.equal Z.one c &&
+        T.is_var t &&
+        (not @@ Purify.is_shielded (T.as_var_exn t) lits)
+      | _ -> false
+    end
+
   (* a != b ------> a+1 ≤ b | a ≥ b+1 *)
   let canc_diff_to_lesseq c =
     let ord = Ctx.ord () in
@@ -1601,7 +1611,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Sequence.iter
         (fun (lit,i) ->
            match lit with
-             | Lit.Int (AL.Binary (AL.Different, m1, m2)) ->
+             | Lit.Int (AL.Binary (AL.Different, m1, m2))
+               when not (is_singleton_unshielded_var (C.lits c) m1) &&
+                    not (is_singleton_unshielded_var (C.lits c) m2) ->
                assert (eligible i lit);
                Util.debugf ~section 5 "@[<2>lit @[%a [%d]@]@ in @[%a@]@]"
                  (fun k->k Lit.pp lit i C.pp c);
@@ -1622,6 +1634,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                Util.debugf ~section 5 "@[<2>diff2less:@ @[%a@]@ into @[%a@]@]"
                  (fun k->k C.pp c C.pp c');
                raise (DiffToLesseq c')
+             | Lit.Int (AL.Binary (AL.Different, _, _)) -> ()
              | _ -> assert false
         );
       SimplM.return_same c
