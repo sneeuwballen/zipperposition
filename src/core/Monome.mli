@@ -394,6 +394,9 @@ module Rat : sig
   val singleton : Q.t -> term -> t  (** One term. *)
   val of_list : Q.t -> (Q.t * term) list -> t
 
+  val divide : t -> Q.t -> t
+  (** Divide by non-zero constant *)
+
   val of_term : term -> t option
 
   val of_term_exn : term -> t

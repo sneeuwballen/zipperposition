@@ -314,17 +314,15 @@ let apply_subst_no_simp ~renaming subst (lit,sc) =
      right=M.apply_subst ~renaming subst (lit.right, sc);
   }
 
-let is_trivial m = match m.op with
-  | Equal -> M.equal m.left m.right
-  | Less -> M.dominates ~strict:true m.left m.right
+let is_trivial lit = match lit.op with
+  | Equal -> M.equal lit.left lit.right
+  | Less -> M.dominates ~strict:true lit.right lit.left
 
-let is_absurd m = match m.op with
+let is_absurd lit = match lit.op with
   | Equal ->
-    let m = M.difference m.left m.right in
+    let m = M.difference lit.left lit.right in
     M.is_const m && M.sign m <> 0
-  | Less ->
-    let m = M.difference m.left m.right in
-    M.is_const m && M.sign m >= 0
+  | Less -> M.dominates ~strict:false lit.left lit.right
 
 let fold_terms ?(pos=P.stop) ?(vars=false) ?ty_args ~which ~ord ~subterms lit k =
   (* function to call at terms *)

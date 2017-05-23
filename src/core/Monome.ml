@@ -1209,6 +1209,8 @@ module Rat = struct
 
   let mk_const n = T.builtin ~ty:num.ty (Builtin.mk_rat n)
 
+  let divide m q: t = product m (Q.inv q)
+
   (* a.t *)
   let mk_product a t =
     if num.equal a num.one then t
