@@ -13,8 +13,6 @@ module Lits = Literals
 module BV = CCBV
 module Classify = Classify_literals
 
-let section = Util.Section.make "select"
-
 type t = Classify_literals.t -> Literal.t array -> CCBV.t
 
 type parametrized = strict:bool -> ord:Ordering.t -> t
@@ -62,13 +60,13 @@ let mk_ ~(f:Lits.t -> BV.t)(cl:Classify.t) (lits:Lits.t) : BV.t =
         | Some bv ->  bv
         | None -> f lits
       in
-      Util.debugf ~section 5
+      (*Util.debugf ~section 5
         "(@[select@ :lits %a@ :res %a@ :classify %a@])"
-        (fun k->k Lits.pp lits BV.print bv Classify.pp cl);
+        (fun k->k Lits.pp lits BV.print bv Classify.pp cl);*)
       assert (validate_fun_ cl lits bv);
       bv
     ) else (
-      Util.debugf ~section 5 "(@[should-not-select@ %a@])" (fun k->k Lits.pp lits);
+      (*Util.debugf ~section 5 "(@[should-not-select@ %a@])" (fun k->k Lits.pp lits);*)
       BV.empty ()
     )
   )
