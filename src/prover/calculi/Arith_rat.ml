@@ -981,19 +981,25 @@ module Make(E : Env.S) : S with module Env = E = struct
         | Atom of Literal.t
         | And of form list
         | Or of form list
+        | True
+        | False
 
       let atom l = Atom l
-      let or_ = function [] -> assert false | [t] -> t | l -> Or l
-      let and_ = function [] -> assert false | [t] -> t | l -> And l
+      let or_ = function [] -> False | [t] -> t | l -> Or l
+      let and_ = function [] -> True | [t] -> t | l -> And l
 
       let rec cnf (f:form): Lit.t list list = match f with
         | Atom lit -> [[lit]]
+        | True -> [[Lit.mk_tauto]]
+        | False -> [[Lit.mk_absurd]]
         | And [] | Or [] -> assert false
         | And [f] | Or [f] -> cnf f
         | And l -> CCList.flat_map cnf l
         | Or l -> Util.map_product ~f:cnf l
 
       let rec pp out (f:form): unit = match f with
+        | True -> CCFormat.string out "⊤"
+        | False -> CCFormat.string out "⊥"
         | Atom lit -> Lit.pp out lit
         | Or l -> Format.fprintf out "(@[<hv>or@ %a@])" (Util.pp_list ~sep:" " pp) l
         | And l -> Format.fprintf out "(@[<hv>and@ %a@])" (Util.pp_list ~sep:" " pp) l
