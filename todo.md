@@ -2,11 +2,22 @@
 
 ## Now
 
+- move classification of lits from `Selection` to `Literals`
+  (use it for eligibility, too? → C.Eligible.is_no_ho_constraint)
+
+- update purify's definition of `shielded` so it totally ignores constraints?
+  or at least that it only looks under uninterpreted symbols
+  and totally ignores HO unif constraints
+
+- update FOOL so it doesn't act in HO constraints
+
 ## Misc
 
-- use ocamlify for loading prelude files from `data/`?
+- [ ] use ocamlify for loading prelude files from `data/`? With special
+    handling in `--prelude` for extensionless files (e.g. `--prelude set`)
+  * [ ] option to print a given prelude file (`--print-prelude set`)
 
-- in TPTP, detect *some* definitions (`definition, foo = bar`)
+- [ ] in TPTP, detect *some* definitions (`definition, foo = bar`)
   with flag to disable it
 
 - induction:
@@ -23,12 +34,22 @@
   * [ ] bring back a tiny amount of smallcheck to instantiate variables
     and realize that `forall l1 l2:list.  l1=l2` is absurd?
 
-- PROOF CHECKER (with intermediate internal format which separates
+- [ ] rewrite meta-prover directly with `Term.t`(?) or something similar,
+    using custom bottom-up solver (much simpler than calling datalog…?)
+    or functorized datalog.
+  * [ ] use it to detect instances of AC
+  * [ ] rewrite system for group theory? also, ring theory?
+
+- [ ]
+  **PROOF CHECKER** (with intermediate internal format which separates
   instantiation and basic "ground" reasoning, perhaps)
 
-- continue rat arith (fix pb 340, ordering, then var elim)
+- [ ] continue rat arith (fix pb 340, ordering, then var elim)
 
-- CLI option to hide types when printing terms (useful with lot of polymorphism)
+- [x] CLI option to hide types when printing terms (useful with lot of polymorphism)
+
+- [] heavy penalty on the number of variables per clause (quadratic
+  function n_vars → weight)
 
 - penalty on high num of vars in hornet
   * heuristics in hornet (pick given ratio)
@@ -37,7 +58,7 @@
 - subsumption on unit horn clauses!
 - maybe subsumption on other horn clauses, too
 
-- put rewrite rules (and their source) in proofs
+- [ ] put rewrite rules (and their source) in proofs
 
 ## Hornet
 
@@ -280,6 +301,9 @@
   `./zipperposition.native -p --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot tip-benchmarks/benchmarks/tip2015/list_nat_PairUnpair.smt2`
   problem is the destructor argument (need to define it automatically, with
   exactly one rewrite rule?)
+* FIX:
+  `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot examples/ind/tree4.zf`
+  does not pass anymore for some reason?
 * translation between cstor-style and destructor-style?
   e.g. `x+y = if x=0 then y else (pred x) + (s y)`
 
@@ -413,6 +437,9 @@
     perform variable elimination based on `P(x) = ∨_j x=u_j`
     with side-conditions `t_i≠u_j` (meaning replace by lits `t_i=u_j`)
   + conversion of λ-term to combinators on-the-fly for `P`
+* [x] literal selection function:
+  + do not select constraints with shielded vars
+  + maybe *do* select prioritarily constraints with unshielded vars (to eliminate them)
 * [ ] use S,K,I to λ-lift instead of introducing new symbol?
 * [ ] debug: print terms with λ-expansion for clarity?
 * optimize unification (shorter unifiers):
@@ -531,11 +558,24 @@
   → `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot examples/ind/nat21.zf --steps 1000`
     same, look at `small_check.fails`
 
+- `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot examples/ind/isaplanner_prop_12.smt2`
+  HO purification gets in the way.
+  Perhaps generalize `F ≠ f ∨ t[F]≠u[F]` into `F ≠ f ∨ t[F]=u[F]`
+    instead of splitting? (keep all unif constraints as hypotheses)
+  OR: before generalizing, perform destr-eq-res unconditionally?
+
 ## To Fix
+
+- Arith:
+  `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot tptp/Problems/SWW/SWW616=2.p --no-avatar -p`
+  performance drop with avatar…
 
 - also need to find good way of indexing arith lits for subsumption
   (e.g. feature vectors with lower/upper bounds?)
   → tough, subsumption on these is hard
+
+- induction: this should be faster, ideally (too many garbage lemmas)
+  `./zipperposition.native -p --dot-sat --stats -o none -t 30 --dot /tmp/truc.dot examples/ind/list10_easy.zf --print-lemmas`
 
 - `./zipperposition.native -p -o none -t 30 --dot /tmp/truc.dot tip-benchmarks/isaplanner/prop_66.smt2`
   better lemmas in induction (also do induction on normalized clauses)
