@@ -25,11 +25,13 @@ let is_value (t:term): bool = match T.view t with
 type context =
   | C_root
   | C_under_uninterpreted
+  | C_under_builtin
   | C_under_purifiable
 
 let pp_context out = function
   | C_root -> Fmt.string out "root"
   | C_under_uninterpreted -> Fmt.string out "under-uninterpreted"
+  | C_under_builtin -> Fmt.string out "under-builtin"
   | C_under_purifiable -> Fmt.string out "under-purifiable"
 
 (* replace arith subterms with fresh variable + constraint *)
@@ -77,11 +79,7 @@ let purify (lits:Literals.t) =
       else t
     | T.AppBuiltin (b, l) ->
       let t =
-        let ctx_args =
-          if type_is_purifiable (T.ty t)
-          then C_under_purifiable
-          else C_under_uninterpreted
-        in
+        let ctx_args = C_under_builtin in
         T.app_builtin ~ty:(T.ty t) b
           (List.map (purify_term ~ctx:ctx_args) l)
       in
