@@ -763,7 +763,7 @@ module Comp = struct
       | Rat {Rat_lit.op=Rat_lit.Equal; _} -> 8
       | Rat {Rat_lit.op=Rat_lit.Less; _} -> 9
       | Equation _
-      | Prop _ -> 10  (* eqn and prop are really the same thing *)
+      | Prop _ -> 30  (* eqn and prop are really the same thing *)
     in
     C.of_total (Pervasives.compare (_to_int l1) (_to_int l2))
 
@@ -816,7 +816,14 @@ module Comp = struct
           C.Incomparable
           (* TODO: Bezout-normalize, then actually compare Monomes. *)
         else C.Incomparable
+      | Rat {Rat_lit.op=o1;left=l1;right=r1}, Rat {Rat_lit.op=o2;left=l2;right=r2} ->
+        assert (o1=o2);
+        let module M = Monome.Rat in
+        let m1 = Multisets.MT.union (M.to_multiset l1) (M.to_multiset r1) in
+        let m2 = Multisets.MT.union (M.to_multiset l2) (M.to_multiset r2) in
+        Multisets.MT.compare_partial (Ordering.compare ord) m1 m2
       | _, _ ->
+        Util.debugf 5 "(@[bad_compare %a %a@])" (fun k->k pp l1 pp l2);
         assert false
 
   let compare ~ord l1 l2 =

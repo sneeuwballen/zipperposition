@@ -402,6 +402,9 @@ module Rat : sig
 
   val to_term : t -> term
   (** convert back to a term *)
+
+  val to_multiset : t -> Multisets.MT.t
+  (** Multiset of terms *)
 end
 
 (** {2 For fields (Q,R)} *)

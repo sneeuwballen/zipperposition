@@ -1245,4 +1245,7 @@ module Rat = struct
         mk_sum_const e.const sum
     in
     t
+
+  let to_multiset m =
+    Seq.terms m |> Multisets.MT.Seq.of_seq Multisets.MT.empty
 end
