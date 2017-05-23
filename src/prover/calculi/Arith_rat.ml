@@ -946,92 +946,166 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (** {6 Variable Elimination Procedure} *)
 
-  let naked_vars lits =
+  let unshielded_vars lits =
     Purify.unshielded_vars lits
-    |> List.filter (fun var -> Type.equal (HVar.ty var) Type.int)
+    |> List.filter (fun var -> Type.equal (HVar.ty var) Type.rat)
 
   let _negate_lits = List.map Lit.negate
 
-  let eliminate_unshielded _ = None
-    (* FIXME: new elimination
-    let module NVE = NakedVarElim in
-    let nvars = naked_vars (C.lits c) in
-    match nvars with
+  module Elim_var = struct
+    type t = {
+      var: T.var;
+      lower: Q.t M.t list; (* monomes smaller than x *)
+      upper: Q.t M.t list; (* monomes bigger than x *)
+      eq: Q.t M.t list; (* monomes equal to x *)
+      side_lits: Literal.t list; (* other literals *)
+      initial_lits: Literals.t;
+    }
+
+    let pp out (e:t) =
+      let pp_m = CCFormat.within "`" "`" M.pp in
+      let pp_m_l out l =
+        Format.fprintf out "(@[<hv>%a@])" (Util.pp_list ~sep:" " pp_m) l
+      in
+      Format.fprintf out
+        "(@[<v>:var %a@ :lower %a@ :upper %a@ :eq %a@ :side (@[%a@])@])"
+        T.pp_var e.var
+        pp_m_l e.lower
+        pp_m_l e.upper
+        pp_m_l e.eq
+        (Util.pp_list ~sep:" " Literal.pp) e.side_lits
+
+    (* quick and dirty CNF *)
+    module Form = struct
+      type form =
+        | Atom of Literal.t
+        | And of form list
+        | Or of form list
+
+      let atom l = Atom l
+      let or_ = function [] -> assert false | [t] -> t | l -> Or l
+      let and_ = function [] -> assert false | [t] -> t | l -> And l
+
+      let rec cnf (f:form): Lit.t list list = match f with
+        | Atom lit -> [[lit]]
+        | And [] | Or [] -> assert false
+        | And [f] | Or [f] -> cnf f
+        | And l -> CCList.flat_map cnf l
+        | Or l -> Util.map_product ~f:cnf l
+
+      let rec pp out (f:form): unit = match f with
+        | Atom lit -> Lit.pp out lit
+        | Or l -> Format.fprintf out "(@[<hv>or@ %a@])" (Util.pp_list ~sep:" " pp) l
+        | And l -> Format.fprintf out "(@[<hv>and@ %a@])" (Util.pp_list ~sep:" " pp) l
+    end
+
+    (* variable elimination. First, build formula; then perform CNF. *)
+    let to_clauses (e:t): Literal.t list list =
+      (* let i range over e.eq
+             j range over e.lower
+             k range over e.upper.
+         produce:
+         [∨_j ∨_k (m_j < m_k ∨ ∨_i (m_i = m_j ∧ m_i = m_k))]
+      *)
+      let form_l =
+        let open CCList.Infix in
+        e.lower >>= fun m_j ->
+        e.upper >>= fun m_k ->
+        let f_diseq = Form.atom (Lit.mk_rat_less m_j m_k) in
+        let f_eq =
+          e.eq >|= fun m_i ->
+          Form.and_
+            [ Form.atom (Lit.mk_rat_eq m_i m_j);
+              Form.atom (Lit.mk_rat_eq m_i m_k);
+            ]
+        in
+        CCList.return (Form.or_ (f_diseq :: f_eq))
+      in
+      let form = Form.or_ form_l in
+      Util.debugf ~section 5
+        "(@[<2>elim_var_non_cnf :var %a@ :clause %a@ :state %a@ :form %a@])"
+        (fun k->k T.pp_var e.var Lits.pp e.initial_lits pp e Form.pp form);
+      begin
+        Form.cnf form
+        |> List.rev_map (fun lits -> List.rev_append e.side_lits lits)
+      end
+
+    exception Make_err
+
+    (* builder *)
+    let make_exn (lits:Literals.t) (x:T.var): t =
+      assert (not (Purify.is_shielded x lits));
+      (* gather literals *)
+      let lower = ref [] in
+      let upper = ref [] in
+      let eq = ref [] in
+      let side = ref [] in
+      let push_l = CCList.Ref.push in
+      let t_x = T.var x in
+      Array.iter
+        (fun lit -> match lit with
+           | Lit.Rat {Rat_lit.op; left=m1; right=m2} ->
+             begin match M.find m1 t_x, M.find m2 t_x with
+               | None, None -> push_l side lit
+               | Some _, Some _ -> raise Make_err (* cancellations are possible *)
+               | Some c1, None ->
+                 let m = M.Rat.divide (M.difference m2 (M.remove m1 t_x)) c1 in
+                 begin match op with
+                   | Rat_lit.Equal -> push_l eq m
+                   | Rat_lit.Less -> push_l upper m
+                 end
+               | None, Some c2 ->
+                 let m = M.Rat.divide (M.difference m1 (M.remove m2 t_x)) c2 in
+                 begin match op with
+                   | Rat_lit.Equal -> push_l eq m
+                   | Rat_lit.Less -> push_l lower m
+                 end
+             end
+           | Lit.Equation (t, u, true) when T.equal t t_x ->
+             push_l eq (M.Rat.singleton Q.one u)
+           | Lit.Equation (t, u, true) when T.equal u t_x ->
+             push_l eq (M.Rat.singleton Q.one t)
+           | Lit.Equation (t, _, false) when T.equal t t_x -> raise Make_err
+           | Lit.Equation (_, u, false) when T.equal u t_x -> raise Make_err
+           | _ ->
+             assert (not (Lit.var_occurs x lit)); (* shielding *)
+             push_l side lit)
+        lits;
+      { var=x; lower= !lower; upper= !upper; eq= !eq;
+        side_lits= !side; initial_lits=lits; }
+
+    let make lits x : t option =
+      try Some (make_exn lits x)
+      with Make_err -> None
+  end
+
+  let eliminate_unshielded (c:C.t): C.t list option =
+    let module E = Elim_var in
+    let nvars = unshielded_vars (C.lits c) in
+    begin match nvars with
       | [] -> None
-      | x::_ ->
-        (* eliminate v *)
-        Util.debugf ~section 3
-          "@[<2>eliminate naked variable %a@ from @[%a@]@]" (fun k->k HVar.pp x C.pp c);
-        (* split C into C' (not containing v) and 6 kinds of literals *)
-        let view = NVE.of_lits (C.lits c) x in
-        let delta, view = NVE.scale view in
-        if not (Z.fits_int delta) then None
-        else begin
-          let delta = Z.to_int delta in
-          let a_set = NVE.a_set view
-          and b_set = NVE.b_set view in
-          (* prepare to build clauses *)
-          let acc = ref [] in
-          let add_clause ~by ~which lits =
-            let rule_name =
-              CCFormat.sprintf "var_elim(%s×%a → %a)" (Z.to_string view.NVE.lcm)
-                HVar.pp x M.pp by
+      | x :: _ ->
+        begin match E.make (C.lits c) x with
+          | None -> None
+          | Some e ->
+            let clauses = E.to_clauses e in
+            let proof =
+              Proof.Step.simp [C.proof_parent c]
+                ~rule:(Proof.Rule.mkf "elim_var(%a)" T.pp_var x)
             in
-            let rule = ProofStep.mk_rule rule_name ~comment: [ which] in
-            let proof = ProofStep.mk_inference ~rule [C.proof c] in
-            let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
-            Util.debugf ~section 5
-              "@[<2>elimination of %s×%a@ by %a (which:%s)@ in @[%a@]:@ gives @[%a@]@]"
-              (fun k->k (Z.to_string view.NVE.lcm)
-                  HVar.pp x M.pp by which C.pp c C.pp new_c);
-            acc := new_c :: !acc
-          in
-          (* choose which form to use *)
-          if List.length a_set > List.length b_set
-          then begin
-            (* use B *)
-            Util.debug ~section 5 "use the B elimination algorithm";
-            (* first, the -infty part *)
-            for i = 1 to delta do
-              let x' = M.Int.const (Z.of_int i) in
-              let lits = view.NVE.rest @
-                  _negate_lits (NVE.eval_minus_infty view x') in
-              add_clause ~by:x' ~which:"-∝" lits
-            done;
-            (* then the enumeration *)
-            for i = 1 to delta do
-              List.iter
-                (fun x' ->
-                   (* evaluate at x'+i *)
-                   let x'' = M.add_const x' Z.(of_int i) in
-                   let lits = view.NVE.rest @ _negate_lits (NVE.eval_at view x'') in
-                   add_clause ~by:x'' ~which:"middle" lits
-                ) b_set
-            done;
-          end else begin
-            (* use A *)
-            Util.debug ~section 5 "use the A elimination algorithm";
-            (* first, the +infty part *)
-            for i = 1 to delta do
-              let x' = M.Int.const Z.(neg (of_int i)) in
-              let lits = view.NVE.rest @
-                  _negate_lits (NVE.eval_plus_infty view x') in
-              add_clause ~by:x' ~which:"+∝" lits
-            done;
-            (* then the enumeration *)
-            for i = 1 to delta do
-              List.iter
-                (fun x' ->
-                   (* evaluate at x'-i *)
-                   let x'' = M.add_const x' Z.(neg (of_int i)) in
-                   let lits = view.NVE.rest @ _negate_lits (NVE.eval_at view x'') in
-                   add_clause ~by:x'' ~which:"middle" lits
-                ) a_set
-            done;
-          end;
-          Some !acc
+            let new_c =
+              List.map
+                (fun lits ->
+                   C.create lits proof
+                     ~penalty:(C.penalty c) ~trail:(C.trail c))
+                clauses
+            in
+            Util.debugf ~section 4
+              "(@[<2>elim_var :var %a@ :clause %a@ :yields (@[<hv>%a@])@]@)"
+              (fun k->k T.pp_var x C.pp c (Util.pp_list C.pp) new_c);
+            Some new_c
         end
-    *)
+    end
 
   (** {2 Setup} *)
 
