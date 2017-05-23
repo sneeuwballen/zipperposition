@@ -283,17 +283,17 @@ let negate = function
 
 let pp out = function
   | Binary (op, l, r) ->
-    Format.fprintf out "%a %s %a"
+    Format.fprintf out "@[%a %s@ %a@]"
       M.pp l
       (match op with Equal -> "=" | Different -> "≠"
                    | Less -> "<" | Lesseq -> "≤")
       M.pp r
   | Divides d when d.sign ->
     let nk = Z.pow d.num d.power in
-    Format.fprintf out "%s div %a" (Z.to_string nk) M.pp d.monome
+    Format.fprintf out "@[<2>%s div@ %a@]" (Z.to_string nk) M.pp d.monome
   | Divides d ->
     let nk = Z.pow d.num d.power in
-    Format.fprintf out "¬(%s div %a)" (Z.to_string nk) M.pp d.monome
+    Format.fprintf out "@<1>¬(%s div %a)" (Z.to_string nk) M.pp d.monome
 
 let pp_tstp out = function
   | Binary (Equal, l, r) ->
