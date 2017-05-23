@@ -334,8 +334,7 @@ module Make(E : Env.S) : S with module Env = E = struct
          || not(Lit.equal (C.lits c).(i) (C.lits c').(0))
          || not(ALF.is_max ~ord passive_lit && C.is_maxlit (c,0) S.empty ~idx:i)
     )
-    && (C.trail_subsumes c' c)
-    then (
+    && (C.trail_subsumes c' c) then (
       (* we know all variables of [active_lit] are bound, no need
          for a renaming *)
       let active_lit = ALF.apply_subst_no_renaming subst (active_lit,s_a) in
@@ -343,8 +342,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       match active_lit, passive_lit with
         | ALF.Left (AL.Equal, mf1, m1), _
         | ALF.Right (AL.Equal, m1, mf1), _ ->
-          let new_lit = ALF.replace passive_lit
-              (M.difference m1 (MF.rest mf1)) in
+          let new_lit =
+            ALF.replace passive_lit (M.difference m1 (MF.rest mf1))
+          in
           raise (SimplifyInto (new_lit, c',subst))
         | _ -> ()
     ) else ()
@@ -376,10 +376,11 @@ module Make(E : Env.S) : S with module Env = E = struct
         add_lit (Lit.mk_rat a_lit)
       with SimplifyInto (a_lit',c',subst) ->
         (* lit ----> lit' *)
-        add_premise c';
+        add_premise c' subst;
         (* recurse until the literal isn't reducible *)
         Util.debugf ~section 4
-          "@[<2>rewrite arith lit (@[%a@])@ into (@[%a@])@ using clause @[%a@]@ and subst @[%a@]@]"
+          "(@[<hv2>rewrite_rat_arith@ :lit `%a`@ :into `%a`@ \
+           :using @[%a@]@ :subst @[%a@]@])"
           (fun k->k AL.pp a_lit AL.pp a_lit' C.pp c' S.pp subst);
         _demod_lit_nf ~add_premise ~add_lit ~i c a_lit'
     end
@@ -616,12 +617,6 @@ module Make(E : Env.S) : S with module Env = E = struct
   end
 
   (* range from low to low+len *)
-  let _range low len =
-    let rec make acc i len =
-      if Z.sign len < 0 then acc
-      else make (i::acc) (Z.succ i) (Z.pred len)
-    in make [] low len
-
   (* cancellative chaining *)
   let _do_chaining info acc =
     let open ChainingInfo in
@@ -849,9 +844,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module Simp = Simplex.MakeHelp(T)
 
   (* tautology check: take the linear system that is the negation
-     of all a≠b and a≤b, and check its (rational) satisfiability. If
-     it's unsat in Q, it's unsat in Z, and its negation (a subset of c)
-     is tautological *)
+     of all a≠b and a≤b, and check its satisfiability *)
   let _is_tautology c =
     Util.enter_prof prof_rat_semantic_tautology;
     (* convert a monome into a rational monome + Q constant *)
