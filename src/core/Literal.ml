@@ -294,7 +294,11 @@ let mk_absurd = False
 
 let mk_arith x = Int x
 
-let mk_arith_op op m1 m2 = Int (Int_lit.make op m1 m2)
+let mk_arith_op op m1 m2 =
+  let alit = Int_lit.make op m1 m2 in
+  if Int_lit.is_trivial alit then mk_tauto
+  else if Int_lit.is_absurd alit then mk_absurd
+  else Int alit
 let mk_arith_eq m1 m2 = mk_arith_op Int_lit.Equal m1 m2
 let mk_arith_neq m1 m2 = mk_arith_op Int_lit.Different m1 m2
 let mk_arith_less m1 m2 = mk_arith_op Int_lit.Less m1 m2
