@@ -405,7 +405,7 @@ tff_ty_var:
 
 type_const:
   | WILDCARD { PT.wildcard }
-  | w=LOWER_WORD { PT.const w }
+  | w=atomic_word { PT.const w }
 
 variable:
   | x=UPPER_WORD
