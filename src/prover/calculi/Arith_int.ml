@@ -1617,6 +1617,8 @@ module Make(E : Env.S) : S with module Env = E = struct
              | Lit.Int (AL.Binary (AL.Different, m1, m2))
                when not (is_singleton_unshielded_var (C.lits c) m1) &&
                     not (is_singleton_unshielded_var (C.lits c) m2) ->
+               (* translate [m1 ≠ m2] into [m1 < m2 ∨ m1 > m2],
+                  do not do it on a variable that is going to be eliminated. *)
                assert (eligible i lit);
                Util.debugf ~section 5 "@[<2>lit @[%a [%d]@]@ in @[%a@]@]"
                  (fun k->k Lit.pp lit i C.pp c);
