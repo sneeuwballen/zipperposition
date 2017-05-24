@@ -21,6 +21,7 @@ let stat_arith_eq_factoring = Util.mk_stat "arith.eq_factoring"
 let stat_arith_ineq_chaining = Util.mk_stat "arith.ineq_chaining"
 let stat_arith_case_switch = Util.mk_stat "arith.case_switch"
 let stat_arith_semantic_tautology = Util.mk_stat "arith.semantic_tauto"
+let stat_arith_semantic_tautology_steps = Util.mk_stat "arith.semantic_tauto.steps"
 let stat_arith_ineq_factoring = Util.mk_stat "arith.ineq_factoring"
 let stat_arith_div_chaining = Util.mk_stat "arith.div_chaining"
 let stat_arith_divisibility = Util.mk_stat "arith.divisibility"
@@ -1529,9 +1530,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       let res = _has_arith c && _is_tautology c in
       C.set_flag flag_tauto c res;
       C.set_flag flag_computed_tauto c true;
-      if res then
+      if res then (
+        Util.incr_stat stat_arith_semantic_tautology_steps;
         Util.debugf ~section 4
           "@[<2>clause@ @[%a@]@ is an arith tautology@]" (fun k->k C.pp c);
+      );
       Util.incr_stat stat_arith_semantic_tautology;
       res
     )
