@@ -52,7 +52,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       let merge = Lit.Set.union
     end)
 
-  let infer_split_ c =
+  let simplify_split_ (c:C.t): C.t list option =
     let lits = C.lits c in
     (* maps each variable to a list of literals. Sets can be merged whenever
        two variables occur in the same literal.  *)
@@ -135,9 +135,10 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
   (* Avatar splitting *)
   let split c =
     Util.enter_prof prof_splits;
-    let res = if Array.length (C.lits c) <= 1
+    let res =
+      if Array.length (C.lits c) <= 1 || Literals.is_trivial (C.lits c)
       then None
-      else infer_split_ c
+      else simplify_split_ c
     in
     Util.exit_prof prof_splits;
     res
