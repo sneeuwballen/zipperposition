@@ -235,7 +235,7 @@ module Conv = struct
 
   let to_s_form ?(ctx=T.Conv.create()) ?hooks lits =
     Array.to_list lits
-    |> List.map (Literal.Conv.to_s_form ~ctx)
+    |> List.map (Literal.Conv.to_s_form ?hooks ~ctx)
     |> TypedSTerm.Form.or_
 end
 
