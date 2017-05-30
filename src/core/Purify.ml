@@ -96,7 +96,7 @@ let purify (lits:Literals.t) =
     | T.App (f, l) ->
       let t =
         let ctx_args = match T.view f with
-          | T.Var _ -> C_root
+          | T.Var _ -> C_under_purifiable
           | _ -> C_under_uninterpreted
         in
         T.app
