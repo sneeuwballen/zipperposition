@@ -140,6 +140,11 @@ val fold_eqn : ?both:bool -> ?sign:bool -> ord:Ordering.t ->
     if [sign = true], then only positive equations are visited; if it's
       [false], only negative ones; if it's not defined, both. *)
 
+val fold_ho_constraint :
+  eligible:(int -> Literal.t -> bool) ->
+  t ->
+  (term * term * Position.t) Sequence.t
+
 val fold_arith :
   eligible:(int -> Literal.t -> bool) ->
   t -> Int_lit.t Position.With.t Sequence.t

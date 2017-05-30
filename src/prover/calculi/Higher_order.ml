@@ -35,7 +35,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module Ctx = Env.Ctx
 
   let lit_is_unshielded_ho_unif (c:C.t)(i:int)(lit:Literal.t): bool = match lit with
-    | Literal.Equation (t, u, false) ->
+    | Literal.HO_constraint (t, u) ->
       let other_lits = lazy (CCArray.except_idx (C.lits c) i |> Array.of_list) in
       begin match T.as_var (T.head_term t), T.as_var (T.head_term u) with
         | Some v, _ when not (Purify.is_shielded v (Lazy.force other_lits)) -> true
@@ -47,8 +47,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* HO unif rule, applies to literals [F t != u] or [P t] or [¬ P t] *)
   let eq_res_ (c:C.t) : C.t list =
     (* try HO unif with [l != r] *)
-    let try_unif_ l r l_pos =
-      let pos = Literals.Pos.idx l_pos in
+    let try_unif_ l r pos =
+      let pos = Literals.Pos.idx pos in
       if BV.get (C.eligible_res_no_subst c) pos then (
         Util.debugf ~section 5 "(@[try_ho_eq_res@ :lit %a@ :idx %d@])"
           (fun k->k Literal.pp (C.lits c).(pos) pos);
@@ -73,12 +73,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* try negative HO unif lits that are also eligible for resolution *)
     let eligible = C.Eligible.(lit_is_unshielded_ho_unif c ** res c) in
     let new_clauses =
-      Literals.fold_eqn (C.lits c) ~ord:(Ctx.ord ()) ~both:false ~eligible
+      Literals.fold_ho_constraint (C.lits c) ~eligible
       |> Sequence.flat_map_l
-        (fun (l, r, sign, l_pos) ->
-           if not sign || Type.is_prop (T.ty l)
-           then try_unif_ l r l_pos
-           else [])
+        (fun (l, r, pos) -> try_unif_ l r pos)
       |> Sequence.to_rev_list
     in
     new_clauses

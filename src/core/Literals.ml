@@ -322,6 +322,16 @@ let fold_eqn ?(both=true) ?sign ~ord ~eligible lits k =
   in
   aux 0
 
+let fold_ho_constraint ~eligible lits k =
+  CCArray.iteri
+    (fun i lit ->
+       if not (eligible i lit) then ()
+       else match lit  with
+        | Lit.HO_constraint (l,r) ->
+          k (l, r, Position.(arg i @@ stop))
+        | _ -> ())
+    lits
+
 let fold_arith ~eligible lits k =
   let rec aux i =
     if i = Array.length lits then ()
