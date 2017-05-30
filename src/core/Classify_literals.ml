@@ -48,33 +48,24 @@ let pp out a =
     (Util.pp_seq ~sep:" " pp_i) (Sequence.of_array_i a)
 
 let classify (lits:Literals.t): t =
-  let shield_status v =
+  let shield_status_var v =
     if Purify.is_shielded v lits then `Shielded else `Unshielded
+  in
+  let shield_status_term t =
+    (if T.is_var t then shield_status_var (T.as_var_exn t) else `Unshielded)
   in
   lits |> Array.map
     (fun lit -> match lit with
-       | Literal.Equation (t, u, false) ->
-         let hd_t, args_t = T.as_app t in
-         let hd_u, args_u = T.as_app u in
-         begin match T.view hd_t, T.view hd_u with
-           | T.Var v1, T.Var v2 when args_t <> [] && args_u <> [] ->
-             K_constr (C_ho, shield_status v1 +++ shield_status v2)
-           | T.Var v, _ when args_t <> [] ->
-             (* HO unif constraint *)
-             K_constr (C_ho, shield_status v)
-           | _, T.Var v when args_u <> [] ->
-             K_constr (C_ho, shield_status v)
-           | T.Var v, _ when Type.is_fun (T.ty t) ->
-             K_constr (C_purify, shield_status v)
-           | _, T.Var v when Type.is_fun (T.ty u) ->
-             K_constr (C_purify, shield_status v)
-           | _ -> K_normal (Literal.sign lit)
-         end
+       | Literal.HO_constraint (t, u) ->
+         K_constr (C_ho, shield_status_term t +++ shield_status_term u)
+       | Literal.Equation (t, u, false)
+         when (T.is_var t || T.is_var u) && Purify.type_is_purifiable (T.ty t) ->
+         K_constr (C_purify, shield_status_term t +++ shield_status_term u)
        | Literal.Prop (t, sign) ->
          let hd_t, args_t = T.as_app t in
          begin match T.view hd_t, args_t with
-           | T.Var v, [] -> K_constr (C_purify, shield_status v)
-           | T.Var v, _::_ -> K_constr (C_ho, shield_status v)
+           | T.Var v, [] -> K_constr (C_purify, shield_status_var v)
+           | T.Var v, _::_ -> K_constr (C_ho, shield_status_var v)
            | _ -> K_normal sign
          end
        | Literal.Int (Int_lit.Binary (Int_lit.Different, m1, m2)) ->
@@ -87,7 +78,7 @@ let classify (lits:Literals.t): t =
            | [] -> K_normal (Literal.sign lit) (* no vars *)
            | _::_ ->
              let st =
-               List.fold_left (fun acc v -> acc +++ shield_status v) `Shielded vars
+               List.fold_left (fun acc v -> acc +++ shield_status_var v) `Shielded vars
              in
              K_constr (C_arith, st)
          end
