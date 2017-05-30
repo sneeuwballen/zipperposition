@@ -56,7 +56,11 @@ let purify (lits:Literals.t) =
       (* [v]: fresh var that will replace [t] *)
       let ty = T.ty t in
       let v = T.var_of_int ~ty (CCRef.get_then_incr varidx) in
-      let lit = Literal.mk_neq v t in
+      let lit =
+        if T.is_ho_at_root t
+        then Literal.mk_ho_constraint v t
+        else Literal.mk_neq v t
+      in
       add_lit_ lit;
       v
   (* should we purify the term t? Yes if it's not a value,
