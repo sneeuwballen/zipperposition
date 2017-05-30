@@ -10,14 +10,14 @@ module T = Term
 
 let section = Util.Section.make ~parent:Const.section "ho"
 
-let stat_eq_res = Util.mk_stat "ho.eq_res.steps"
-let stat_eq_res_syntactic = Util.mk_stat "ho.eq_res_syntactic.steps"
+let stat_unif = Util.mk_stat "ho.unif.steps"
+let stat_unif_syntastic = Util.mk_stat "ho.unif_syntactic.steps"
 let stat_ext_neg = Util.mk_stat "ho.extensionality-.steps"
 let stat_complete_eq = Util.mk_stat "ho.complete_eq.steps"
 let stat_factor = Util.mk_stat "ho.factor.steps"
 
-let prof_eq_res = Util.mk_profiler "ho.eq_res"
-let prof_eq_res_syn = Util.mk_profiler "ho.eq_res_syntactic"
+let prof_unif = Util.mk_profiler "ho.unif"
+let prof_unif_syn = Util.mk_profiler "ho.unif_syntactic"
 
 module type S = sig
   module Env : Env.S
@@ -45,17 +45,17 @@ module Make(E : Env.S) : S with module Env = E = struct
     | _ -> false
 
   (* HO unif rule, applies to literals [F t != u] or [P t] or [¬ P t] *)
-  let eq_res_ (c:C.t) : C.t list =
+  let ho_unif_ (c:C.t) : C.t list =
     (* try HO unif with [l != r] *)
     let try_unif_ l r pos =
       let pos = Literals.Pos.idx pos in
       if BV.get (C.eligible_res_no_subst c) pos then (
-        Util.debugf ~section 5 "(@[try_ho_eq_res@ :lit %a@ :idx %d@])"
+        Util.debugf ~section 5 "(@[try_ho_unif@ :lit %a@ :idx %d@])"
           (fun k->k Literal.pp (C.lits c).(pos) pos);
         HO_unif.unif_step (Ctx.combinators (), 1) ((l,r),0)
         |> List.rev_map
           (fun (subst,subst_penalty) ->
-             Util.incr_stat stat_eq_res;
+             Util.incr_stat stat_unif;
              let renaming = Ctx.renaming_clear () in
              let rule = Proof.Rule.mk "ho_eq_res" in
              let proof = Proof.Step.inference ~rule
@@ -65,7 +65,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              let penalty = C.penalty c + subst_penalty in
              let new_c = C.create_a ~trail ~penalty new_lits proof in
              Util.debugf ~section 3
-               "(@[<hv2>ho_eq_res@ :on @[%a@]@ :yields @[%a@]@])"
+               "(@[<hv2>ho_unif@ :on @[%a@]@ :yields @[%a@]@])"
                (fun k->k C.pp c C.pp new_c);
              new_c)
       ) else []
@@ -80,21 +80,19 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
     new_clauses
 
-  let eq_res c = Util.with_prof prof_eq_res eq_res_ c
+  let ho_unif c = Util.with_prof prof_unif ho_unif_ c
 
   (* flex-rigid (dis)equation? *)
   let is_flex_rigid t u =
     (T.is_var @@ T.head_term t) <> (T.is_var @@ T.head_term u)
 
-  (* TODO: make eq_res_syntactic optional, investigate whether it's useful *)
-
   (* incremental synctactic elimination rules for HO unif:
-     [F t1 t2 != g u1 u2] becomes [t1 != u1 | t2 != u2]
-     (inference rule, no penalty) *)
-  let eq_res_syntactic_ (c:C.t) : C.t list =
+     [F t1 t2 != g u1 u2] becomes [t1 != u1 | t2 != u2].
+     This is a simplification rule *)
+  let unif_syntactic_ (c:C.t) : C.t SimplM.t =
     (* try HO unif with [l != r], only in flex/rigid case *)
-    let try_unif_ idx l r l_pos =
-      let pos = Literals.Pos.idx l_pos in
+    let try_unif_ idx l r pos =
+      let pos = Literals.Pos.idx pos in
       if is_flex_rigid l r &&
          BV.get (C.eligible_res_no_subst c) pos then (
         (* decompose into syntactic problem *)
@@ -115,9 +113,9 @@ module Make(E : Env.S) : S with module Env = E = struct
                      Unif.Ty.unification ~subst (T.ty t,0)(T.ty u,0))
                   subst tail1 tail2
               in
-              Util.incr_stat stat_eq_res_syntactic;
+              Util.incr_stat stat_unif_syntastic;
               let renaming = Ctx.renaming_clear () in
-              let rule = Proof.Rule.mk "ho_eq_res_syn" in
+              let rule = Proof.Rule.mk "ho_unif_syn" in
               let proof = Proof.Step.inference ~rule
                   [C.proof_parent_subst (c,0) subst] in
               (* remove the literal, but add [combine tail1 tail2] as new constraints *)
@@ -147,19 +145,14 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
     (* try negative HO unif lits that are also eligible for resolution *)
     let eligible = C.Eligible.(lit_is_unshielded_ho_unif c ** res c) in
-    let new_clauses =
-      Literals.fold_eqn ~sign:false ~ord:(Ctx.ord ())
-        ~both:false ~eligible (C.lits c)
-      |> Sequence.zip_i |> Sequence.zip
-      |> Sequence.filter_map
-        (fun (i,(l, r, sign, l_pos)) ->
-           assert (not sign);
-           try_unif_ i l r l_pos)
-      |> Sequence.to_rev_list
-    in
-    new_clauses
+    begin
+      Literals.fold_ho_constraint  ~eligible (C.lits c)
+      |> Sequence.find_mapi
+        (fun i (l, r, pos) -> try_unif_ i l r pos)
+      |> SimplM.return_opt ~old:c
+    end
 
-  let eq_res_syntactic c = Util.with_prof prof_eq_res_syn eq_res_syntactic_ c
+  let unif_syntactic c = Util.with_prof prof_unif_syn unif_syntactic_ c
 
   let mk_parameter =
     let n = ref 0 in
@@ -416,8 +409,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* force rules *)
     let () = ignore (HO_unif.Combinators.rules @@ Ctx.combinators ()) in
     declare_combinators ();
-    Env.add_unary_inf "ho_eq_res" eq_res;
-    Env.add_unary_inf "ho_eq_res_syn" eq_res_syntactic;
+    Env.add_unary_inf "ho_unif" ho_unif;
+    Env.add_simplify unif_syntactic;
     Env.add_unary_inf "ho_complete_eq" complete_eq_args;
     Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
     Env.add_unary_inf "ho_factor" factor_rule;
