@@ -2,14 +2,29 @@
 
 ## Now
 
-- move classification of lits from `Selection` to `Literals`
-  (use it for eligibility, too? → C.Eligible.is_no_ho_constraint)
+- add special "ho constraint" literals
+  * automatically used for purification of HO subterms
+  * purification can occur in them for arithmetic terms, not FOOL nor HO
+  * smaller than anything else(?)
+  * always selected if they are not of the form `x =?= t` with `x` shielded,
+    or flex/flex
+    → in short, do flex/rigid prioritarily, but delay flex/flex or shielded
+    variable purification
+  * HO unification proceeds on these literals (perhaps by batch with
+    a max number of steps), including syntactic steps → yields DNF.
+    Put relatively high limit of steps?
+  * no superposition/rewriting in them
+
+- HO equality resolution (in addition to HO factoring and resolution)?
+  **OR**: purify all HO terms into HO constraints, i.e. `F a ≠ G b` actually
+  becomes `X₁ ≠ X₂ ∨ X₁ =?= F a ∨ X₂ =?= G b`, then normal FO eq-res,
+  then `F a =?= G b` solved by HO unif
+
+- update FOOL so it doesn't act in HO constraints
 
 - update purify's definition of `shielded` so it totally ignores constraints?
   or at least that it only looks under uninterpreted symbols
   and totally ignores HO unif constraints
-
-- update FOOL so it doesn't act in HO constraints
 
 ## Misc
 
@@ -347,12 +362,14 @@
       E.g. `s (f x) = s (s (f a))` would give `σ={x→a}`
       (do anti-unification with cstors only, then try to unify
        cstor-prefixed subterms on one side with the root on the other side)
+* [ ] remove some specialized rules  (positive injectivity) and instead,
+      generate rewrite rules during preprocessing
 * [ ] hierarchic superposition for datatypes (with defined functions being part
     of the background)
-  + [ ] need corresponding TKBO with 2 levels
+  + [x] need corresponding TKBO with 2 levels
         (just replace KBO with it anyway, and build weight fun
         from constant classification)
-  + [ ] with TKBO implemented, removed the code that forces rpo6 to be
+  + [x] with TKBO implemented, removed the code that forces rpo6 to be
         used when induction is enabled, as well as constraint disabling
   + narrowing with defined symbols would ± correspond to E-unification on pure
     background literals
