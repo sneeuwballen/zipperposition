@@ -173,6 +173,8 @@ val weight : ?var:int -> ?sym:(ID.t -> int) -> t -> int
 val ty_vars : t -> Type.VarSet.t
 (** Set of free type variables *)
 
+val is_ho_var : t -> bool
+
 val is_ho_app : t -> bool
 (** [is_ho_app (F t1…tn)] is true, when [F] is a variable (of any function type) *)
 
@@ -181,6 +183,10 @@ val as_ho_app : t -> (Type.t HVar.t * t list) option
 
 val is_ho_pred : t -> bool
 (** [is_ho_pred (F t1…tn)] is true, when [F] is a predicate variable *)
+
+val is_ho_at_root : t -> bool
+(** [is_ho_at_root t] returns [true] if the term [t] is a higher-order variable,
+    possibly applied (i.e. [is_ho_var t || is_ho_app t]) *)
 
 (** {2 Subterms and Positions} *)
 

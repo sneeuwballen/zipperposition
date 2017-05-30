@@ -182,6 +182,10 @@ let as_app t = match view t with
 let head_term t = fst (as_app t)
 let args t = snd (as_app t)
 
+let is_ho_var t = match view t with
+  | Var v -> Type.needs_args (HVar.ty v)
+  | _ -> false
+
 let as_ho_app t =
   let hd, args = as_app t in
   begin match as_var hd with
@@ -192,6 +196,8 @@ let as_ho_app t =
 let is_ho_app t = CCOpt.is_some (as_ho_app t)
 
 let is_ho_pred t = is_ho_app t && Type.is_prop (ty t)
+
+let is_ho_at_root t = is_ho_var t || is_ho_app t
 
 module Seq = struct
   let vars t k =
