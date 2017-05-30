@@ -387,6 +387,7 @@ module Lit = struct
 
     (* conversion into regular clauses *)
     let as_clauses (c:t): Literals.t list =
+      assert (not (Literal.is_constraint @@ lhs c));
       List.map
         (fun rhs_c -> Array.of_list (Literal.negate (lhs c) :: rhs_c))
         (rhs c)
@@ -558,7 +559,7 @@ let pseudo_rule_of_rule (r:rule): pseudo_rule = match r with
             id, args, rhs
           | _ -> fail()
         end
-      | Literal.True | Literal.False
+      | Literal.True | Literal.False | Literal.HO_constraint _
       | Literal.Equation _ | Literal.Int _ | Literal.Rat _ -> fail()
     end
 

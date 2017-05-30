@@ -13,6 +13,7 @@ type t = private
   | Prop of term * bool
   | Int of Int_lit.t
   | Rat of Rat_lit.t
+  | HO_constraint of term * term (** t1 =≠= t2 *)
 
 val equal_com : t -> t -> bool     (** commutative equality of lits *)
 val compare : t -> t -> int     (** lexicographic comparison of literals *)
@@ -71,6 +72,8 @@ val mk_rat_op : Rat_lit.op -> Q.t Monome.t -> Q.t Monome.t -> t
 val mk_rat_eq : Q.t Monome.t -> Q.t Monome.t -> t
 val mk_rat_less : Q.t Monome.t -> Q.t Monome.t -> t
 
+val mk_ho_constraint : term -> term -> t
+
 val matching : ?subst:Subst.t -> pattern:t Scoped.t -> t Scoped.t ->
   Subst.t Sequence.t
 (** checks whether subst(lit_a) matches lit_b. Returns alternative
@@ -99,7 +102,16 @@ val apply_subst_no_simp : renaming:Subst.Renaming.t ->
 val apply_subst_list : renaming:Subst.Renaming.t ->
   Subst.t -> t list Scoped.t -> t list
 
-val negate : t -> t   (** negate literal *)
+exception Lit_is_constraint
+
+val negate : t -> t
+(** negate literal *)
+
+val is_constraint : t -> bool
+(** Is the literal a constraint? *)
+
+val is_ho_constraint : t -> bool
+
 val map : (term -> term) -> t -> t (** functor *)
 val fold : ('a -> term -> 'a) -> 'a -> t -> 'a  (** basic fold *)
 val vars : t -> Type.t HVar.t list (** gather variables *)

@@ -848,12 +848,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                not (Purify.is_shielded v (C.lits c)))
            in
            if BV.get bv i then match lit with
+             | Lit.HO_constraint (l, r)
              | Lit.Equation (l, r, false) ->
                begin match T.view l, T.view r with
                  | T.Var v, _ when can_destr_eq_var v ->
                    (* eligible for destructive Equality Resolution, try to update
                        [subst]. Careful: in the case [X!=a | X!=b | C] we must
-                       bind X only to [a] or [b], not unify [a] with [b]. *)
+                       bind X only to [a] or [b], not unify [a] with [b].
+
+                      NOTE: this also works for HO constraints for unshielded vars *)
                    try_unif i l 0 r 0
                  | _, T.Var v when can_destr_eq_var v ->
                    try_unif i r 0 l 0
@@ -1279,8 +1282,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
    * contextual literal cutting
    * ---------------------------------------------------------------------- *)
 
-  exception RemoveLit of int * C.t * Subst.t
-
   (* Performs successive contextual literal cuttings *)
   let rec contextual_literal_cutting_rec c =
     let open SimplM.Infix in
@@ -1293,39 +1294,36 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let try_eq_subsumption = CCArray.exists Lit.is_eqn (C.lits c) in
       (* try to remove one literal from the literal array *)
       let remove_one_lit lits =
-        try
-          for i = 0 to Array.length lits - 1 do
-            (* negate literal *)
-            lits.(i) <- Lit.negate lits.(i);
-            (* test for subsumption *)
-            SubsumIdx.retrieve_subsuming !_idx_fv
-              (Lits.Seq.to_form lits) (C.trail c |> Trail.labels)
-            |> Sequence.filter (fun c' -> C.trail_subsumes c' c)
-            |> Sequence.iter
-              (fun c' ->
-                 let subst = match
-                     if try_eq_subsumption
-                     then eq_subsumes_with (C.lits c',1) (lits,0)
-                     else None
-                   with
-                     | Some _ as s -> s
-                     | None -> subsumes_with (C.lits c',1) (lits,0)
-                 in
-                 begin match subst with
-                   | None -> ()
-                   | Some subst ->
-                     (* some clause subsumes the literals with i-th literal flipped *)
-                   lits.(i) <- Lit.negate lits.(i);
-                   raise (RemoveLit (i, c', subst))
-                 end
-              );
-            (* restore literal *)
-            lits.(i) <- Lit.negate lits.(i);
-          done;
-          None (* no change *)
-        with (RemoveLit (i, c',subst)) ->
-          (* remove the literal and recurse *)
-          Some (CCArray.except_idx lits i, i, c', subst)
+        Sequence.of_array lits
+        |> Sequence.filter (fun lit -> not (Lit.is_constraint lit))
+        |> Sequence.find_mapi
+          (fun i old_lit ->
+             (* negate literal *)
+             lits.(i) <- Lit.negate old_lit;
+             (* test for subsumption *)
+             SubsumIdx.retrieve_subsuming !_idx_fv
+               (Lits.Seq.to_form lits) (C.trail c |> Trail.labels)
+             |> Sequence.filter (fun c' -> C.trail_subsumes c' c)
+             |> Sequence.find_map
+               (fun c' ->
+                  let subst =
+                    match
+                      if try_eq_subsumption
+                      then eq_subsumes_with (C.lits c',1) (lits,0)
+                      else None
+                    with
+                      | Some _ as s -> s
+                      | None -> subsumes_with (C.lits c',1) (lits,0)
+                  in
+                  subst
+                  |> CCOpt.map
+                    (fun subst ->
+                       (* remove the literal and recurse *)
+                       CCArray.except_idx lits i, i, c', subst))
+             |> CCFun.tap
+               (fun _ ->
+                  (* restore literal *)
+                  lits.(i) <- old_lit))
       in
       begin match remove_one_lit (Array.copy (C.lits c)) with
         | None ->

@@ -731,6 +731,7 @@ module Make
       |> Sequence.flat_map Sequence.of_array
       |> Sequence.for_all
         (function
+          | Literal.HO_constraint (l,r)
           | Literal.Equation (l,r,_) ->
             let check_t t = T.is_var t || not (T.var_occurs ~var:x t) in
             check_t l && check_t r
@@ -1091,19 +1092,9 @@ module Make
               Array.to_list lits
               |> List.map (Literal.map (fun t -> T.replace_m t pairs))
             in
-            (* separate the guard (purification constraints) from other literals *)
+            (* separate the guard (constraints) from other literals *)
             let guard, other_lits =
-              List.partition
-                (function
-                  | Literal.Equation (t, u, false) ->
-                    begin match T.as_var t, T.as_var u with
-                      | Some v1, Some v2 ->
-                        Purify.is_shielded v1 lits || Purify.is_shielded v2 lits
-                      | (Some v, None | None, Some v) -> Purify.is_shielded v lits
-                      | None, None -> false
-                    end
-                  | _ -> false)
-                lits_l
+              List.partition Literal.is_constraint lits_l
             in
             List.map
               (fun other_lit -> Literal.negate other_lit :: guard)

@@ -311,6 +311,7 @@ let fold_eqn ?(both=true) ?sign ~ord ~eligible lits k =
           k (p, T.true_, sign, Position.(arg i @@ left @@ stop))
         | Lit.Prop _
         | Lit.Equation _
+        | Lit.HO_constraint _ (* no paramod inside it *)
         | Lit.Int _
         | Lit.Rat _
         | Lit.True

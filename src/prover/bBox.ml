@@ -123,7 +123,10 @@ let _check_variant lits lits' =
 let inject_lits_ lits  =
   (* special case: one negative literal. *)
   let lits, sign = match lits with
-    | [| lit0 |] when Literal.is_ground lit0 && Literal.is_neg lit0 ->
+    | [| lit0 |]
+      when Literal.is_ground lit0 &&
+           Literal.is_neg lit0 &&
+           not (Literal.is_constraint lit0) ->
       [| Literal.negate lits.(0) |], false
     | _ -> lits, true
   in

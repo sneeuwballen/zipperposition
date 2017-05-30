@@ -18,6 +18,7 @@ type t =
   | Prop of term * bool
   | Int of Int_lit.t
   | Rat of Rat_lit.t
+  | HO_constraint of term * term (** t1 =≠= t2 *)
 
 type lit = t
 
@@ -30,12 +31,16 @@ let equal l1 l2 =
     | False, False -> true
     | Int o1, Int o2 -> Int_lit.equal o1 o2
     | Rat o1, Rat o2 -> Rat_lit.equal o1 o2
+    | HO_constraint (l1,r1), HO_constraint (l2,r2) ->
+      (T.equal l1 l2 && T.equal r1 r2) ||
+      (T.equal l1 r2 && T.equal r1 l2)
     | Equation _, _
     | Prop _, _
     | True, _
     | False, _
     | Int _, _
     | Rat _, _
+    | HO_constraint _, _
       -> false
 
 let equal_com l1 l2 =
@@ -58,6 +63,7 @@ let compare l1 l2 =
     | Prop _ -> 3
     | Int _ -> 5
     | Rat _ -> 6
+    | HO_constraint _ -> 7
   in
   match l1, l2 with
     | Equation (l1,r1,sign1), Equation (l2,r2,sign2) ->
@@ -73,9 +79,14 @@ let compare l1 l2 =
     | False, False -> 0
     | Int o1, Int o2 -> Int_lit.compare o1 o2
     | Rat o1, Rat o2 -> Rat_lit.compare o1 o2
+    | HO_constraint (l1,r1), HO_constraint (l2,r2) ->
+      let c = T.compare l1 l2 in
+      if c <> 0 then c else
+        T.compare r1 r2
     | _, _ -> __to_int l1 - __to_int l2
 
 let fold f acc lit = match lit with
+  | HO_constraint (l, r)
   | Equation (l, r, _) -> f (f acc l) r
   | Prop (p, _) -> f acc p
   | Int o -> Int_lit.fold f acc o
@@ -92,6 +103,7 @@ let hash lit =
       Hash.combine4 30 (Hash.bool sign) (T.hash l) (T.hash r)
     | True -> 40
     | False -> 50
+    | HO_constraint (l,r) -> Hash.combine3 60 (T.hash l) (T.hash r)
 
 let weight lit =
   fold (fun acc t -> acc + T.size t) 0 lit
@@ -110,6 +122,7 @@ let heuristic_weight weight = function
     Rat_lit.Seq.terms alit
     |> Sequence.filter (fun t -> not (T.is_var t))
     |> Sequence.fold (fun acc t -> acc + weight t) 0
+  | HO_constraint (l,r) -> weight l + weight r
 
 let depth lit =
   fold (fun acc t -> max acc (T.depth t)) 0 lit
@@ -121,6 +134,7 @@ let sign = function
   | Int o -> Int_lit.sign o
   | Rat _ -> true
   | True -> true
+  | HO_constraint _ -> false
 
 module Set = CCSet.Make(struct type t = lit let compare = compare end)
 
@@ -140,6 +154,7 @@ let is_eqn = function
   | Rat _
   | True
   | False -> false
+  | HO_constraint _ -> false (* dealt with differently *)
 
 let is_eq lit = is_eqn lit && is_pos lit
 let is_neq lit = is_eqn lit && is_neg lit
@@ -151,6 +166,7 @@ let is_prop = function
   | Int _
   | Rat _
   | Equation _ -> false
+  | HO_constraint _ -> false
 
 let is_arith = function
   | Int _ -> true
@@ -319,8 +335,14 @@ let mk_rat_less m1 m2 = mk_rat_op Rat_lit.Less m1 m2
 
 let mk_not_divides n ~power m = mk_divides ~sign:false n ~power m
 
+let mk_ho_constraint l r =
+  if T.is_ho_app l || T.is_ho_var l || T.is_ho_app r || T.is_ho_var r
+  then HO_constraint (l, r)
+  else mk_neq l r
+
 module Seq = struct
   let terms lit k = match lit with
+    | HO_constraint (l,r)
     | Equation(l, r, _) -> k l; k r
     | Prop(p, _) -> k p
     | Int o -> Int_lit.Seq.terms o k
@@ -470,6 +492,7 @@ let map f = function
   | Rat o -> Rat (Rat_lit.map f o)
   | True -> True
   | False -> False
+  | HO_constraint (l,r) -> mk_ho_constraint (f l) (f r)
 
 let apply_subst_ ~f_term ~f_arith_lit ~f_rat subst (lit,sc) =
   match lit with
@@ -484,6 +507,10 @@ let apply_subst_ ~f_term ~f_arith_lit ~f_rat subst (lit,sc) =
     | Rat o -> Rat (f_rat subst (o,sc))
     | True
     | False -> lit
+    | HO_constraint (l, r) ->
+      let new_l = f_term subst (l,sc)
+      and new_r = f_term subst (r,sc) in
+      mk_ho_constraint new_l new_r
 
 let apply_subst ~renaming subst (lit,sc) =
   apply_subst_ subst (lit,sc)
@@ -508,11 +535,25 @@ let apply_subst_no_simp ~renaming subst (lit,sc) =
       Prop (S.FO.apply ~renaming subst (p,sc), sign)
     | True
     | False -> lit
+    | HO_constraint (l, r) ->
+      HO_constraint (S.FO.apply ~renaming subst (l,sc),
+        S.FO.apply ~renaming subst (r,sc))
 
 let apply_subst_list ~renaming subst (lits,sc) =
   List.map
     (fun lit -> apply_subst ~renaming subst (lit,sc))
     lits
+
+exception Lit_is_constraint
+
+let is_ho_constraint = function
+  | HO_constraint _ -> true
+  | _ -> false
+
+let is_constraint = function
+  | HO_constraint _ -> true
+  | Equation (l, r, false) -> T.is_var l || T.is_var r
+  | _ -> false
 
 let negate lit = match lit with
   | Equation (l,r,sign) -> Equation (l,r,not sign)
@@ -521,12 +562,14 @@ let negate lit = match lit with
   | False -> True
   | Int o -> Int (Int_lit.negate o)
   | Rat o -> mk_false (Rat_lit.to_term o)
+  | HO_constraint (l,r) -> mk_eq l r
 
 let vars lit =
   Seq.vars lit |> T.VarSet.of_seq |> T.VarSet.to_list
 
 let var_occurs v lit = match lit with
   | Prop (p,_) -> T.var_occurs ~var:v p
+  | HO_constraint (l,r)
   | Equation (l,r,_) -> T.var_occurs ~var:v l || T.var_occurs ~var:v r
   | Int _
   | Rat _ -> Sequence.exists (T.var_occurs ~var:v) (Seq.terms lit)
@@ -534,6 +577,7 @@ let var_occurs v lit = match lit with
   | False -> false
 
 let is_ground lit = match lit with
+  | HO_constraint (l,r)
   | Equation (l,r,_) -> T.is_ground l && T.is_ground r
   | Prop (p, _) -> T.is_ground p
   | Int _
@@ -555,6 +599,7 @@ let to_multiset lit = match lit with
   | Rat o ->
     Rat_lit.Seq.to_multiset o |> Sequence.map fst
     |> Multisets.MT.Seq.of_seq Multisets.MT.empty
+  | HO_constraint (l,r) -> Multisets.MT.doubleton l r
 
 let is_trivial lit = match lit with
   | True -> true
@@ -564,6 +609,7 @@ let is_trivial lit = match lit with
   | Int o -> Int_lit.is_trivial o
   | Rat o -> Rat_lit.is_trivial o
   | Prop (_, _) -> false
+  | HO_constraint _ -> false  (* never trivial *)
 
 (* is it impossible for these terms to be equal? check if a cstor-only
      path leads to distinct constructors/constants *)
@@ -589,6 +635,7 @@ let is_absurd lit = match lit with
   | False -> true
   | Int o -> Int_lit.is_absurd o
   | Rat o -> Rat_lit.is_absurd o
+  | HO_constraint (l,r) -> T.equal l r
   | Equation _ | Prop _ | True -> false
 
 let fold_terms ?(position=Position.stop) ?(vars=false) ?ty_args ~which ~ord ~subterms lit k =
@@ -601,7 +648,8 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ?ty_args ~which ~ord ~sub
     else k (t, pos)
   in
   begin match lit, which with
-    | Equation (l, r, _), `All ->
+    | Equation (l, r, _), `All
+    | HO_constraint (l, r), _ ->
       (* visit both sides of the equation *)
       at_term ~pos:P.(append position (left stop)) l;
       at_term ~pos:P.(append position (right stop)) r;
@@ -637,6 +685,7 @@ let to_ho_term (lit:t): T.t option = match lit with
     Some (if sign then T.Form.eq t u else T.Form.neq t u)
   | Int _
   | Rat _ -> None
+  | HO_constraint (l, r) -> Some (T.Form.neq l r)
 
 let as_ho_predicate (lit:t) : _ option = match lit with
   | Prop (t, sign) ->
@@ -668,6 +717,8 @@ let pp_debug ?(hooks=[]) out lit =
       Format.fprintf out "@[<1>%a@ ≠ %a@]" T.pp l T.pp r
     | Int o -> CCFormat.within "(" ")" Int_lit.pp out o
     | Rat o -> CCFormat.within "(" ")" Rat_lit.pp out o
+    | HO_constraint (l, r) ->
+      Format.fprintf out "@[<1>%a@ =≠= %a@]" T.pp l T.pp r
 
 let pp_tstp out lit =
   match lit with
@@ -677,7 +728,8 @@ let pp_tstp out lit =
     | False -> CCFormat.string out "$false"
     | Equation (l, r, true) ->
       Format.fprintf out "@[<1>%a@ = %a@]" T.TPTP.pp l T.TPTP.pp r
-    | Equation (l, r, false) ->
+    | Equation (l, r, false)
+    | HO_constraint (l, r) ->
       Format.fprintf out "@[<1>%a@ != %a@]" T.TPTP.pp l T.TPTP.pp r
     | Int o -> Int_lit.pp_tstp out o
     | Rat o -> Rat_lit.pp_tstp out o
@@ -711,6 +763,7 @@ module Comp = struct
       | Rat a -> Rat_lit.max_terms ~ord a
       | True
       | False -> []
+      | HO_constraint _ -> [] (* ignore terms *)
 
   (* general comparison is a bit complicated.
      - First we compare literals l1 and l2
@@ -759,13 +812,14 @@ module Comp = struct
     let _to_int = function
       | False
       | True -> 0
-      | Int (Binary (Equal, _, _)) -> 3
-      | Int (Binary (Different, _, _)) -> 4
-      | Int (Binary (Less, _, _)) -> 5
-      | Int (Binary (Lesseq, _, _)) -> 6
-      | Int (Divides _) -> 7
-      | Rat {Rat_lit.op=Rat_lit.Equal; _} -> 8
-      | Rat {Rat_lit.op=Rat_lit.Less; _} -> 9
+      | HO_constraint _ -> 2 (* lower than other lits *)
+      | Int (Binary (Equal, _, _)) -> 13
+      | Int (Binary (Different, _, _)) -> 14
+      | Int (Binary (Less, _, _)) -> 15
+      | Int (Binary (Lesseq, _, _)) -> 16
+      | Int (Divides _) -> 17
+      | Rat {Rat_lit.op=Rat_lit.Equal; _} -> 20
+      | Rat {Rat_lit.op=Rat_lit.Less; _} -> 21
       | Equation _
       | Prop _ -> 30  (* eqn and prop are really the same thing *)
     in
@@ -920,8 +974,10 @@ module Pos = struct
   let is_max_term ~ord lit pos =
     let module AL = Int_lit in
     match lit, pos with
+      | HO_constraint (l, r), P.Left _
       | Equation (l, r, _), P.Left _ ->
         Ordering.compare ord l r <> Comparison.Lt
+      | HO_constraint (l, r), P.Right _
       | Equation (l, r, _), P.Right _ ->
         Ordering.compare ord r l <> Comparison.Lt
       | Prop _, _ -> true
@@ -943,6 +999,7 @@ module Pos = struct
           (Seq.terms lit)
       | True, _
       | False, _ -> true  (* why not. *)
+      | HO_constraint _, _
       | Equation _, _ -> _fail_lit lit pos
 end
 
@@ -975,6 +1032,7 @@ module Conv = struct
       | None ->
         begin match lit with
           | Equation (l, r, true) -> SLiteral.eq l r
+          | HO_constraint (l, r)
           | Equation (l, r, false) -> SLiteral.neq l r
           | Prop (p, sign) -> SLiteral.atom p sign
           | True -> SLiteral.true_
@@ -998,6 +1056,7 @@ module View = struct
     | False
     | Rat _
     | Int _ -> None
+    | HO_constraint _ -> None
 
   let get_eqn lit position =
     match lit, position with
