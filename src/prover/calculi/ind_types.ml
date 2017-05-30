@@ -231,6 +231,9 @@ module Make(Env : Env_intf.S) = struct
           -> false
       end
 
+  (* NOTE: this is similar to
+     "hierarchic superposition with weak abstraction"'s rule that
+     introduces background constants to equate to foreground terms *)
   let exhaustiveness (c:C.t): C.t list =
     let mk_sub_skolem (t:term) (ty:Type.t): ID.t =
       if Ind_ty.is_inductive_type ty then (
