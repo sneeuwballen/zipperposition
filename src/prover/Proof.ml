@@ -51,7 +51,7 @@ type step = {
 
 and parent =
   | P_of of proof
-  | P_subst of proof * Scoped.scope * Subst.t
+  | P_subst of parent * Scoped.scope * Subst.t
 
 (** Proof Step with its conclusion *)
 and proof = {
@@ -79,15 +79,19 @@ module Parent = struct
     let subst = Subst.restrict_scope subst sc_p in
     if Subst.is_empty subst
     then P_of p
+    else P_subst (P_of p,sc_p,subst)
+
+  let add_subst (p,sc_p) subst: t =
+    if Subst.is_empty subst then p
     else P_subst (p,sc_p,subst)
 
-  let proof = function
+  let rec proof = function
     | P_of p -> p
-    | P_subst (p,_,_) -> p
+    | P_subst (p,_,_) -> proof p
 
-  let subst = function
-    | P_of _ -> Subst.empty
-    | P_subst (_,_,s) -> s
+  let rec subst = function
+    | P_of _ -> []
+    | P_subst (p,_,s) -> s :: subst p
 end
 
 module Kind = struct
@@ -532,9 +536,13 @@ module S = struct
         else shape :: attrs
       )
       ~attrs_e:(fun (r,s) ->
+        let pp_subst out s =
+          Format.fprintf out "{@[<v>%a@]}" Subst.pp_bindings s
+        in
         let label =
-          if Subst.is_empty s then Rule.name r
-          else _to_str_escape "@[<v>%s@,{@[<v>%a@]}@]" (Rule.name r) Subst.pp_bindings s
+          if s=[] then Rule.name r
+          else _to_str_escape "@[<v>%s@,%a@]"
+              (Rule.name r) (Util.pp_list ~sep:"" pp_subst) s
         in
         [`Label label; `Other ("dir", "back")])
       out
@@ -584,9 +592,9 @@ module S = struct
     and conv_parent ~ctx (p:Parent.t): LLProof.t = match p with
       | P_of p -> conv p
       | P_subst (p,sc_p,subst) ->
-        let p' = conv p in
+        let p' = conv_parent ~ctx p in
         (* build instance of result *)
-        let res_subst = match result p with
+        let res_subst = match result @@ Parent.proof p with
           | Clause c ->
             let trail = SClause.trail c in
             let lits' =
