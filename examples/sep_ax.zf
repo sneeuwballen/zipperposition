@@ -4,18 +4,18 @@
 # separation logic
 
 val o : type.
-val list : type.
+val ptr : type.
 
 val heap : o -> prop.
 
 val[infix "*", AC] sep : o -> o -> o.
 #val[infix "*"] sep : i -> i -> i.
 
-val[infix "-R->"] lseg : list -> list -> o. # list reachability
+val[infix "-R->"] lseg : ptr -> ptr -> o. # reachability
 
-val[infix "-->"] next : list -> list -> o.
+val[infix "-->"] next : ptr -> ptr -> o.
 
-val nil : list.
+val nil : ptr.
 
 val emp : o.
 

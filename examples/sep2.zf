@@ -6,8 +6,8 @@
 
 include "sep_ax.zf".
 
-val x1:list.
-val x2:list.
+val x1:ptr.
+val x2:ptr.
 
 assert x1 != nil.
 

@@ -6,10 +6,10 @@
 
 include "sep_ax.zf".
 
-val x1:list.
-val x2:list.
-val x3:list.
-val x4:list.
+val x1:ptr.
+val x2:ptr.
+val x3:ptr.
+val x4:ptr.
 
 assert x1 != nil.
 assert x2 != nil.

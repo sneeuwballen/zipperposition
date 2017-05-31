@@ -20,7 +20,6 @@ rewrite
   forall a (s1 s2 : set a).
   s1 = s2 <=> (subeq s1 s2 && subeq s2 s1).
 
-
 goal
   forall a (S1 S2 S3 S4 S5 S6 : set a).
     (union S1 (union S2 (union S3 (union S4 (union S5 S6))))) =
