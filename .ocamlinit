@@ -18,7 +18,7 @@ print_endline "load base lib....";;
 #load "logtk.cma";;
 open Logtk;;
 module ST = InnerTerm;;
-module T = FOTerm;;
+module T = Term;;
 module PT = STerm;;
 let (~<) = ID.make;;
 #install_printer ID.pp;;
@@ -51,8 +51,6 @@ let pterm s =
 (* optional part: arbitrary *)
 #require "qcheck";;
 #load "logtk_arbitrary.cma";;
-open Logtk_arbitrary;;
-open QCheck;;
 
 print_endline "load prover lib...";;
 #load "libzipperposition_prover.cma";;
@@ -67,6 +65,6 @@ module MF = Monome.Focus;;
 #install_printer Signature.pp;;
 #install_printer Type.pp;;
 #install_printer Monome.pp;;
-let pterm s = Parse_tptp.parse_term Lex_tptp.token (Lexing.from_string s);;
-let pform s = Parse_tptp.parse_formula Lex_tptp.token (Lexing.from_string s);;
+let pterm_tptp s = Parse_tptp.parse_term Lex_tptp.token (Lexing.from_string s);;
+let pform_tptp s = Parse_tptp.parse_formula Lex_tptp.token (Lexing.from_string s);;
 Printf.printf "finished loading\n";;
