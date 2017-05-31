@@ -66,11 +66,15 @@ let purify (lits:Literals.t) =
   (* should we purify the term t? Yes if it's not a value,
      and if it's not a HO term in a HO constraint *)
   and should_purify ~in_constr ~ctx t =
-    let ty_t = T.ty t in
-    ctx = C_under_uninterpreted &&
-    type_is_purifiable ty_t &&
-    not (is_value t) &&
-    (not in_constr || not (Type.needs_args ty_t))
+    if T.is_ho_at_root t then (
+      (* purify HO terms not occurring in constraints *)
+      not in_constr && ctx <> C_under_purifiable
+    ) else (
+      let ty_t = T.ty t in
+      ctx = C_under_uninterpreted &&
+      type_is_purifiable ty_t &&
+      not (is_value t)
+    )
   in
   let purify_sub ~ctx t =
     Util.debugf ~section 5
@@ -112,12 +116,10 @@ let purify (lits:Literals.t) =
       else t
   in
   let purify_lit lit = match lit with
-    | Literal.Equation (t, u, false) ->
-      let is_ho_t = T.is_ho_app t in
-      let is_ho_u = T.is_ho_app u in
-      Literal.mk_neq
-        (purify_term ~in_constr:is_ho_t ~ctx:C_root t)
-        (purify_term ~in_constr:is_ho_u ~ctx:C_root u)
+    | Literal.HO_constraint (t, u) ->
+      Literal.mk_ho_constraint
+        (purify_term ~in_constr:true ~ctx:C_root t)
+        (purify_term ~in_constr:true ~ctx:C_root u)
     | _ ->
       Literal.map (purify_term ~in_constr:false ~ctx:C_root) lit
   in

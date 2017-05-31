@@ -335,10 +335,7 @@ let mk_rat_less m1 m2 = mk_rat_op Rat_lit.Less m1 m2
 
 let mk_not_divides n ~power m = mk_divides ~sign:false n ~power m
 
-let mk_ho_constraint l r =
-  if T.is_ho_app l || T.is_ho_var l || T.is_ho_app r || T.is_ho_var r
-  then HO_constraint (l, r)
-  else mk_neq l r
+let mk_ho_constraint l r = HO_constraint (l, r)
 
 module Seq = struct
   let terms lit k = match lit with
@@ -880,6 +877,11 @@ module Comp = struct
         let m1 = Multisets.MT.union (M.to_multiset l1) (M.to_multiset r1) in
         let m2 = Multisets.MT.union (M.to_multiset l2) (M.to_multiset r2) in
         Multisets.MT.compare_partial (Ordering.compare ord) m1 m2
+      | HO_constraint (l1,r1), HO_constraint (l2,r2) ->
+        if (T.equal l1 l2 && T.equal r1 r2) ||
+           (T.equal l1 r2 && T.equal r1 l2)
+        then C.Eq
+        else C.Incomparable
       | _, _ ->
         Util.debugf 5 "(@[bad_compare %a %a@])" (fun k->k pp l1 pp l2);
         assert false

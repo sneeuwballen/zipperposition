@@ -7,6 +7,7 @@ open Logtk
 
 module BV = CCBV
 module T = Term
+module RW = Rewrite
 
 let section = Util.Section.make ~parent:Const.section "ho"
 
@@ -44,10 +45,123 @@ module Make(E : Env.S) : S with module Env = E = struct
       end
     | _ -> false
 
+  (* flex-rigid (dis)equation? *)
+  let is_flex_rigid t u =
+    (T.is_var @@ T.head_term t) <> (T.is_var @@ T.head_term u)
+
+  (* rigid/rigid constraint? *)
+  let is_rigid_rigid t u =
+    not (T.is_var (T.head_term t)) && not (T.is_var (T.head_term u))
+
+  (* flex/flexconstraint? *)
+  let is_flex_flex t u =
+    T.is_var (T.head_term t) && T.is_var (T.head_term u)
+
+  (* maximum number of consecutive steps in HO unif *)
+  let max_unif_depth = 10
+
+  type ho_constraint = T.t * T.t
+
+  (* one possible solution for HO unif *)
+  type unif_sol = {
+    unif_lits: Literal.t list;
+    unif_flex_rigid: ho_constraint list;
+    unif_flex_flex: ho_constraint list;
+    unif_rigid_rigid: ho_constraint list;
+    unif_proof: Proof.Parent.t;
+    unif_penalty: int;
+    unif_depth: int; (* how many steps were done so far? *)
+  }
+
+  (* builder for {!unif_sol} *)
+  let mk_unif ~lits ~cstr ~proof ~penalty ~depth : unif_sol =
+    let unif_rigid_rigid, others =
+      List.partition (CCFun.uncurry is_rigid_rigid) cstr in
+    let unif_flex_rigid, others =
+      List.partition (CCFun.uncurry is_flex_rigid) others in
+    assert (List.for_all (CCFun.uncurry is_flex_flex) others);
+    { unif_lits=lits;
+      unif_rigid_rigid; unif_flex_rigid; unif_flex_flex=others;
+      unif_proof=proof; unif_penalty=penalty; unif_depth=depth;
+    }
+
+  let unif_cstr (u:unif_sol): ho_constraint list =
+    u.unif_flex_flex
+    |> List.rev_append u.unif_flex_rigid
+    |> List.rev_append u.unif_rigid_rigid
+
+  (* TODO: use this for batch unification *)
+
+  let ho_unif_lits
+      (c:C.t)
+      (lits:Literals.t)
+      (cstr:ho_constraint list)
+    : unif_sol list =
+    (* queue of problems to process *)
+    let q : unif_sol Queue.t = Queue.create() in
+    let pb0 =
+      mk_unif
+        ~lits:(Array.to_list lits) ~cstr
+        ~proof:(C.proof_parent c) ~penalty:(C.penalty c) ~depth:0
+    in
+    Queue.push pb0 q;
+    (* final solutions *)
+    let sols : unif_sol list ref = ref [] in
+    while not (Queue.is_empty q) do
+      let pb = Queue.pop q in
+      if pb.unif_depth >= max_unif_depth then CCList.Ref.push sols pb
+      else begin match pb.unif_rigid_rigid, pb.unif_flex_rigid with
+        | [], [] -> CCList.Ref.push sols pb
+        | (t,u)::tail, _ ->
+          (* do syntactic unif *)
+          assert (Type.equal (T.ty t) (T.ty u));
+          let hd_t, args_t = T.as_app t in
+          let hd_u, args_u = T.as_app u in
+          assert (not (T.is_var hd_t) && not (T.is_var hd_u));
+          if T.equal hd_t hd_u then (
+            assert (List.length args_t = List.length args_u);
+            (* unify arguments pairwise. no depth increase needed *)
+            let pb' =
+              mk_unif
+                ~lits:pb.unif_lits
+                ~cstr:(List.combine args_t args_u @
+                   unif_cstr {pb with unif_rigid_rigid=tail})
+                ~proof:pb.unif_proof ~penalty:pb.unif_penalty
+                ~depth:pb.unif_depth
+            in
+            Queue.push pb' q
+          )
+        | [], (t,u)::tail ->
+          (* try to solve [t=u] *)
+          assert (not (is_rigid_rigid t u));
+          HO_unif.unif_step (Ctx.combinators (), 1) ((t,u),0)
+          |> List.iter
+            (fun (subst,subst_penalty) ->
+               let renaming = Ctx.renaming_clear () in
+               let proof = Proof.Parent.add_subst (pb.unif_proof,0) subst in
+               let t =
+                 Subst.FO.apply ~renaming subst (t,0) |> RW.Term.normalize_term_fst
+               and u =
+                 Subst.FO.apply ~renaming subst (u,0) |> RW.Term.normalize_term_fst
+               in
+               let lits =
+                 Literal.apply_subst_list ~renaming subst (pb.unif_lits,0)
+               and cstr =
+                 (t,u) :: unif_cstr {pb with unif_flex_rigid=tail}
+               in
+               let penalty = pb.unif_penalty + subst_penalty in
+               let depth = pb.unif_depth + 1 in
+               let pb' = mk_unif ~lits ~cstr ~penalty ~proof ~depth in
+               Queue.push pb' q)
+      end
+    done;
+    Util.add_stat stat_unif (List.length !sols);
+    !sols
+
   (* HO unif rule, applies to literals [F t != u] or [P t] or [¬ P t] *)
   let ho_unif_ (c:C.t) : C.t list =
-    (* try HO unif with [l != r] *)
-    let try_unif_ l r pos =
+    (* try doing HO unif using combinators for [l != r] *)
+    let try_unif_combinator_ l r pos =
       let pos = Literals.Pos.idx pos in
       if BV.get (C.eligible_res_no_subst c) pos then (
         Util.debugf ~section 5 "(@[try_ho_unif@ :lit %a@ :idx %d@])"
@@ -57,7 +171,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           (fun (subst,subst_penalty) ->
              Util.incr_stat stat_unif;
              let renaming = Ctx.renaming_clear () in
-             let rule = Proof.Rule.mk "ho_eq_res" in
+             let rule = Proof.Rule.mk "ho_unif" in
              let proof = Proof.Step.inference ~rule
                  [C.proof_parent_subst (c,0) subst] in
              let new_lits = Literals.apply_subst ~renaming subst (C.lits c,0) in
@@ -75,84 +189,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     let new_clauses =
       Literals.fold_ho_constraint (C.lits c) ~eligible
       |> Sequence.flat_map_l
-        (fun (l, r, pos) -> try_unif_ l r pos)
+        (fun (l, r, pos) -> try_unif_combinator_ l r pos)
       |> Sequence.to_rev_list
     in
     new_clauses
 
   let ho_unif c = Util.with_prof prof_unif ho_unif_ c
-
-  (* flex-rigid (dis)equation? *)
-  let is_flex_rigid t u =
-    (T.is_var @@ T.head_term t) <> (T.is_var @@ T.head_term u)
-
-  (* incremental synctactic elimination rules for HO unif:
-     [F t1 t2 != g u1 u2] becomes [t1 != u1 | t2 != u2].
-     This is a simplification rule *)
-  let unif_syntactic_ (c:C.t) : C.t SimplM.t =
-    (* try HO unif with [l != r], only in flex/rigid case *)
-    let try_unif_ idx l r pos =
-      let pos = Literals.Pos.idx pos in
-      if is_flex_rigid l r &&
-         BV.get (C.eligible_res_no_subst c) pos then (
-        (* decompose into syntactic problem *)
-        let f1, l1 = T.as_app l in
-        let f2, l2 = T.as_app r in
-        assert (T.is_var f1 <> T.is_var f2);
-        let l1, l2 = Unif.FO.pair_lists f1 l1 f2 l2 in
-        begin match l1, l2 with
-          | [], _ | _, [] -> assert false
-          | hd1 :: tail1, hd2 :: tail2 ->
-            assert (List.length tail1 = List.length tail2);
-            (* unify heads, delay the other sub-problems, but unify their types *)
-            try
-              let subst = Unif.FO.unification (hd1,0)(hd2,0) in
-              let subst =
-                List.fold_left2
-                  (fun subst t u ->
-                     Unif.Ty.unification ~subst (T.ty t,0)(T.ty u,0))
-                  subst tail1 tail2
-              in
-              Util.incr_stat stat_unif_syntastic;
-              let renaming = Ctx.renaming_clear () in
-              let rule = Proof.Rule.mk "ho_unif_syn" in
-              let proof = Proof.Step.inference ~rule
-                  [C.proof_parent_subst (c,0) subst] in
-              (* remove the literal, but add [combine tail1 tail2] as new constraints *)
-              let new_lits =
-                List.rev_append
-                  (List.map2
-                     (fun t u ->
-                        Literal.mk_neq
-                          (Subst.FO.apply ~renaming subst (t,0))
-                          (Subst.FO.apply ~renaming subst (u,0)))
-                     tail1 tail2)
-                  (Literal.apply_subst_list ~renaming subst
-                     (CCArray.except_idx (C.lits c) idx,0))
-              in
-              let new_lits =
-                Literal.apply_subst_list ~renaming subst (new_lits,0)
-              in
-              let trail = C.trail c and penalty = C.penalty c in
-              let new_c = C.create ~trail ~penalty new_lits proof in
-              Util.debugf ~section 3
-                "(@[<hv2>ho_eq_res_syn@ :on @[%a@]@ :yields @[%a@]@ :subst %a@])"
-                (fun k->k C.pp c C.pp new_c Subst.pp subst);
-              Some new_c
-            with Unif.Fail -> None
-        end
-      ) else None
-    in
-    (* try negative HO unif lits that are also eligible for resolution *)
-    let eligible = C.Eligible.(lit_is_unshielded_ho_unif c ** res c) in
-    begin
-      Literals.fold_ho_constraint  ~eligible (C.lits c)
-      |> Sequence.find_mapi
-        (fun i (l, r, pos) -> try_unif_ i l r pos)
-      |> SimplM.return_opt ~old:c
-    end
-
-  let unif_syntactic c = Util.with_prof prof_unif_syn unif_syntactic_ c
 
   let mk_parameter =
     let n = ref 0 in
@@ -338,11 +380,11 @@ module Make(E : Env.S) : S with module Env = E = struct
     begin match T.view t, T.view u with
       | T.AppBuiltin (Builtin.Not, [t']), _
         when Term.is_ho_pred t' && not (Term.is_ho_pred u) ->
-        Literal.mk_neq t' (T.Form.not_ u)
+        Literal.mk_ho_constraint t' (T.Form.not_ u)
       | _, T.AppBuiltin (Builtin.Not, [u'])
         when Term.is_ho_pred u' && not (Term.is_ho_pred t) ->
-        Literal.mk_neq (T.Form.not_ t) u'
-      | _ -> Literal.mk_neq t u
+        Literal.mk_ho_constraint (T.Form.not_ t) u'
+      | _ -> Literal.mk_ho_constraint t u
     end
 
   (* factor together literals.
@@ -410,7 +452,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     let () = ignore (HO_unif.Combinators.rules @@ Ctx.combinators ()) in
     declare_combinators ();
     Env.add_unary_inf "ho_unif" ho_unif;
-    Env.add_simplify unif_syntactic;
     Env.add_unary_inf "ho_complete_eq" complete_eq_args;
     Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
     Env.add_unary_inf "ho_factor" factor_rule;

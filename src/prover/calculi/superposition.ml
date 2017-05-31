@@ -431,18 +431,19 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let infer_equality_resolution clause =
     Util.enter_prof prof_infer_equality_resolution;
-    let eligible = C.Eligible.always in
     (* iterate on those literals *)
     let new_clauses =
-      Lits.fold_eqn ~sign:false ~ord:(Ctx.ord ())
-        ~both:false ~eligible (C.lits clause)
-      |> Sequence.filter
-        (fun (l, r, sign, _) ->
-           assert (not sign);
-           can_eq_res (C.lits clause) l r)
+      Sequence.of_array_i (C.lits clause)
       |> Sequence.filter_map
-        (fun (l, r, _, l_pos) ->
-           let pos = Lits.Pos.idx l_pos in
+        (fun (i,lit) -> match lit with
+          | Lit.Equation (t, u, false)
+          | Lit.HO_constraint (t, u) ->
+            if can_eq_res (C.lits clause) t u
+            then Some (t, u, i)
+            else None
+          | _ -> None)
+      |> Sequence.filter_map
+        (fun (l, r, pos) ->
            try
              let subst = Unif.FO.unification (l, 0) (r, 0) in
              if BV.get (C.eligible_res_no_subst clause) pos
@@ -848,7 +849,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                not (Purify.is_shielded v (C.lits c)))
            in
            if BV.get bv i then match lit with
-             | Lit.HO_constraint (l, r)
              | Lit.Equation (l, r, false) ->
                begin match T.view l, T.view r with
                  | T.Var v, _ when can_destr_eq_var v ->
