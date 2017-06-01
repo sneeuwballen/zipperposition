@@ -335,7 +335,12 @@ let mk_rat_less m1 m2 = mk_rat_op Rat_lit.Less m1 m2
 
 let mk_not_divides n ~power m = mk_divides ~sign:false n ~power m
 
-let mk_ho_constraint l r = HO_constraint (l, r)
+let mk_ho_constraint l r =
+  if T.equal l r then mk_absurd
+  else if (T.equal l T.true_ && T.equal r T.false_) ||
+          (T.equal l T.false_ && T.equal r T.true_)
+  then mk_tauto
+  else HO_constraint (l, r)
 
 module Seq = struct
   let terms lit k = match lit with
