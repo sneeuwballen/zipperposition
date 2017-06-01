@@ -165,6 +165,11 @@ let rec app_builtin ~ty b l = match b, l with
   | Builtin.Arrow, ({term=AppBuiltin(Builtin.Arrow, ret::l1); _} :: l2) ->
     (* flatten *)
     app_builtin ~ty Builtin.Arrow (ret :: l2 @ l1)
+  | Builtin.Not, [{term=AppBuiltin(Builtin.Not,[t]); _}] -> t
+  | Builtin.Not, [{term=AppBuiltin(Builtin.True,[]); _}] ->
+    app_builtin ~ty Builtin.False []
+  | Builtin.Not, [{term=AppBuiltin(Builtin.False,[]); _}] ->
+    app_builtin ~ty Builtin.True []
   | _ ->
     let my_t = make_ ~ty:(HasType ty) (AppBuiltin (b,l)) in
     H.hashcons my_t
