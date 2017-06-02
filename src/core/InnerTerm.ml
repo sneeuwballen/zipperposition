@@ -632,6 +632,11 @@ let rec head t = match view t with
   | DB _ | Var _ | Bind (_, _, _) | AppBuiltin (_, _) -> None
   | App (h, _) -> head h
 
+let type_is_unifiable (ty:t): bool = match view ty with
+  | AppBuiltin ((Builtin.Arrow | Builtin.TyInt | Builtin.TyRat), _)
+  | Bind (Binder.ForallTy, _, _) -> false
+  | _ -> true
+
 (** {3 IO} *)
 
 let print_hashconsing_ids = ref false

@@ -34,12 +34,13 @@ module Make(E : Env.S) : S with module Env = E = struct
   module C = Env.C
   module Ctx = Env.Ctx
 
-  let lit_is_unshielded_ho_unif (c:C.t)(i:int)(lit:Literal.t): bool = match lit with
+  (* TODO: do blind enumeration for fully applied HO variables instead *)
+
+  let lit_is_ho_unif (i:int)(lit:Literal.t): bool = match lit with
     | Literal.Equation (t, u, false) ->
-      let other_lits = lazy (CCArray.except_idx (C.lits c) i |> Array.of_list) in
       begin match T.as_var (T.head_term t), T.as_var (T.head_term u) with
-        | Some v, _ when not (Purify.is_shielded v (Lazy.force other_lits)) -> true
-        | _, Some v when not (Purify.is_shielded v (Lazy.force other_lits)) -> true
+        | Some _, _ -> true
+        | _, Some _ -> true
         | _ -> false
       end
     | _ -> false
@@ -71,7 +72,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       ) else []
     in
     (* try negative HO unif lits that are also eligible for resolution *)
-    let eligible = C.Eligible.(lit_is_unshielded_ho_unif c ** res c) in
+    let eligible = C.Eligible.(lit_is_ho_unif ** res c) in
     let new_clauses =
       Literals.fold_eqn (C.lits c) ~ord:(Ctx.ord ()) ~both:false ~eligible
       |> Sequence.flat_map_l
@@ -111,15 +112,17 @@ module Make(E : Env.S) : S with module Env = E = struct
             assert (List.length tail1 = List.length tail2);
             (* unify heads, delay the other sub-problems, but unify their types *)
             try
-              let subst = Unif.FO.unification (hd1,0)(hd2,0) in
+              let subst = Unif.FO.unify_full (hd1,0)(hd2,0) in
               let subst =
                 List.fold_left2
                   (fun subst t u ->
-                     Unif.Ty.unification ~subst (T.ty t,0)(T.ty u,0))
+                     Unif.Ty.unify_full ~subst (T.ty t,0)(T.ty u,0))
                   subst tail1 tail2
               in
               Util.incr_stat stat_eq_res_syntactic;
               let renaming = Ctx.renaming_clear () in
+              let c_guard = Literal.of_unif_subst ~renaming subst
+              and subst = Unif_subst.subst subst in
               let rule = Proof.Rule.mk "ho_eq_res_syn" in
               let proof = Proof.Step.inference ~rule
                   [C.proof_parent_subst (c,0) subst] in
@@ -139,7 +142,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                 Literal.apply_subst_list ~renaming subst (new_lits,0)
               in
               let trail = C.trail c and penalty = C.penalty c in
-              let new_c = C.create ~trail ~penalty new_lits proof in
+              let new_c = C.create ~trail ~penalty (c_guard @ new_lits) proof in
               Util.debugf ~section 3
                 "(@[<hv2>ho_eq_res_syn@ :on @[%a@]@ :yields @[%a@]@ :subst %a@])"
                 (fun k->k C.pp c C.pp new_c Subst.pp subst);
@@ -149,7 +152,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       ) else None
     in
     (* try negative HO unif lits that are also eligible for resolution *)
-    let eligible = C.Eligible.(lit_is_unshielded_ho_unif c ** res c) in
+    let eligible = C.Eligible.(lit_is_ho_unif ** res c) in
     let new_clauses =
       Literals.fold_eqn ~sign:false ~ord:(Ctx.ord ())
         ~both:false ~eligible (C.lits c)
@@ -236,8 +239,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   let elim_pred_variable (c:C.t) : C.t list =
     (* find unshielded predicate vars *)
     let find_vars(): _ HVar.t Sequence.t =
-      Purify.unshielded_vars (C.lits c)
-      |> Sequence.of_list
+      C.Seq.vars c
+      |> T.VarSet.of_seq |> T.VarSet.to_seq
       |> Sequence.filter
         (fun v -> Type.is_prop @@ Type.returns @@ HVar.ty v)
     (* find all constraints on [v], also returns the remaining literals.

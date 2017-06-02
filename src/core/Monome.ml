@@ -3,6 +3,7 @@
 
 (** {1 Polynomes of order 1, over several variables}. *)
 
+module US = Unif_subst
 module T = Term
 
 type term = Term.t
@@ -509,14 +510,16 @@ module Focus = struct
         let mf' = { coeff=c; term=t; rest=of_list ~num const rest;} in
         if num.sign c <> 0 then k (mf', subst)
       | (c', t') :: l' ->
-        if Unif.FO.equal ~subst (Scoped.make t scope) (Scoped.make t' scope)
-        then
+        if Unif.FO.equal ~subst:(US.subst subst)
+            (Scoped.make t scope) (Scoped.make t' scope)
+        then (
           (* we do not have a choice, [t = t'] is true *)
           _iter_self ~num ~subst (num.add c c') t l' rest const scope k
-        else (
-          begin try
+        ) else (
+          begin
+            try
               (* maybe we can merge [t] and [t'] *)
-              let subst' = Unif.FO.unification ~subst
+              let subst' = Unif.FO.unify_full ~subst
                   (Scoped.make t scope) (Scoped.make t' scope)
               in
               (* move back [rest] into the main list, some terms might be equal
@@ -528,11 +531,11 @@ module Focus = struct
           _iter_self ~num ~subst c t l' ((c',t')::rest) const scope k
         )
 
-  let unify_self ?(subst=Subst.empty) (mf,sc) k =
+  let unify_self ?(subst=US.empty) (mf,sc) k =
     let num = mf.rest.num in
     _iter_self ~num ~subst mf.coeff mf.term mf.rest.terms [] mf.rest.const sc k
 
-  let unify_self_monome ?(subst=Subst.empty) (m,sc) k =
+  let unify_self_monome ?(subst=US.empty) (m,sc) k: unit =
     let num = m.num in
     let rec choose_first subst l rest = match l with
       | [] -> ()
@@ -543,8 +546,9 @@ module Focus = struct
       | [] -> ()
       | (c',t')::l' ->
         (* see whether we can unify t and t' *)
-        begin try
-            let subst = Unif.FO.unification ~subst (t,sc) (t',sc) in
+        begin
+          try
+            let subst = Unif.FO.unify_full ~subst (t,sc) (t',sc) in
             (* extend the unifier *)
             _iter_self ~num ~subst (num.add c c') t (l'@rest) [] m.const sc k
           with Unif.Fail -> ()
@@ -554,11 +558,11 @@ module Focus = struct
     in
     choose_first subst m.terms []
 
-  let unify_ff ?(subst=Subst.empty) (mf1,sc1) (mf2,sc2) k =
+  let unify_ff ?(subst=US.empty) (mf1,sc1) (mf2,sc2) k =
     assert(mf1.rest.num == mf2.rest.num);
     let num = mf1.rest.num in
     try
-      let subst = Unif.FO.unification ~subst (mf1.term,sc1) (mf2.term,sc2) in
+      let subst = Unif.FO.unify_full ~subst (mf1.term,sc1) (mf2.term,sc2) in
       _iter_self ~num ~subst mf1.coeff mf1.term mf1.rest.terms
         [] mf1.rest.const sc1
         (fun (mf1, subst) ->
@@ -567,7 +571,7 @@ module Focus = struct
              (fun (mf2, subst) -> k (mf1, mf2, subst)))
     with Unif.Fail -> ()
 
-  let unify_mm ?(subst=Subst.empty) (m1,sc1) (m2,sc2) k =
+  let unify_mm ?(subst=US.empty) (m1,sc1) (m2,sc2) k =
     assert(m1.num==m2.num);
     let num = m1.num in
     (* unify a term of [m1] with a term of [m2] *)
@@ -580,9 +584,9 @@ module Focus = struct
         assert (num.sign c1 <> 0 && num.sign c2 <> 0);
         begin
           try
-            let subst = Unif.FO.unification ~subst (t1,sc1) (t2,sc2) in
+            let subst = Unif.FO.unify_full ~subst (t1,sc1) (t2,sc2) in
             Util.debugf 5 "@[<2>unify_mm :@ @[%a = %a@]@ with @[%a@]@]"
-              (fun k->k T.pp t1 T.pp t2 Subst.pp subst);
+              (fun k->k T.pp t1 T.pp t2 US.pp subst);
             _iter_self ~num ~subst c1 t1 (l1'@rest1) [] m1.const sc1
               (fun (mf1, subst) ->
                  _iter_self ~num ~subst c2 t2 (l2'@rest2) [] m2.const sc2
@@ -655,14 +659,14 @@ let matching ?(subst=Subst.empty) (m1,sc1)(m2,sc2) k =
   if m1.num.cmp m1.const m2.const <> 0 then ()
   else start subst m1.terms m2.terms
 
-let unify ?(subst=Subst.empty) (m1,sc1)(m2,sc2) k =
+let unify ?(subst=Unif_subst.empty) (m1,sc1)(m2,sc2) k =
   assert (m1.num == m2.num);
   let rec traverse_lists subst (c1,t1) l1' rest2 l2 = match l2 with
     | [] -> ()
     | (c2,t2)::l2' ->
       begin
         try
-          let subst = Unif.FO.matching ~subst ~pattern:(t1,sc1) (t2,sc2) in
+          let subst = Unif.FO.unify_full ~subst (t1,sc1) (t2,sc2) in
           match m1.num.cmp c1 c2 with
             | 0 -> start subst l1' (rest2 @ l2')  (* t1 removed *)
             | n when n<0 ->

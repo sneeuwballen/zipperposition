@@ -43,7 +43,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     sclause : sclause;
     penalty: int; (** heuristic penalty *)
     mutable selected : BV.t Lazy.t; (** bitvector for selected lits*)
-    classify_lits: Classify_literals.t; (** classification of lits *)
     mutable proof : proof_step; (** Proof of the clause *)
     mutable eligible_res: BV.t option; (* eligible for resolution? *)
   }
@@ -79,7 +78,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let trail_subsumes c1 c2 = Trail.subsumes c1.sclause.trail c2.sclause.trail
   let is_active c ~v = Trail.is_active c.sclause.trail ~v
   let penalty c = c.penalty
-  let classify_lits c = c.classify_lits
 
   let trail_l = function
     | [] -> Trail.empty
@@ -103,13 +101,12 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let comes_from_goal c = CCOpt.is_some @@ distance_to_goal c
 
   (* private function for building clauses *)
-  let create_inner ~penalty ~selected ~cl sclause proof =
+  let create_inner ~penalty ~selected sclause proof =
     (* create the structure *)
     let c = {
       sclause;
       penalty;
       selected;
-      classify_lits=cl;
       proof;
       eligible_res=None;
     } in
@@ -118,14 +115,12 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     c
 
   let of_sclause ?(penalty=0) c proof =
-    let cl = Classify_literals.classify c.lits in
-    let selected = lazy (Ctx.select cl c.lits) in
-    create_inner ~penalty ~selected ~cl c proof
+    let selected = lazy (Ctx.select c.lits) in
+    create_inner ~penalty ~selected c proof
 
   let create_a ~penalty ~trail lits proof =
-    let cl = Classify_literals.classify lits in
-    let selected = lazy (Ctx.select cl lits) in
-    create_inner ~penalty ~selected ~cl (SClause.make ~trail lits) proof
+    let selected = lazy (Ctx.select lits) in
+    create_inner ~penalty ~selected (SClause.make ~trail lits) proof
 
   let create ~penalty ~trail lits proof =
     create_a ~penalty ~trail (Array.of_list lits) proof
@@ -159,8 +154,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let update_trail f c =
     let sclause = SClause.update_trail f c.sclause in
-    create_inner sclause c.proof
-      ~selected:c.selected ~penalty:c.penalty ~cl:c.classify_lits
+    create_inner sclause c.proof ~selected:c.selected ~penalty:c.penalty
 
   let proof_step c = c.proof
 

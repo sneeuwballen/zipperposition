@@ -71,8 +71,7 @@ let open_term ~stack t =
     (* opaque. Do not enter the term. *)
     let cur_char = Subterm t in
     {cur_char; cur_term=t; stack=[]::stack}
-  )
-  else (
+  ) else (
     let cur_char = term_to_char t in
     match T.view t with
       | T.Var _

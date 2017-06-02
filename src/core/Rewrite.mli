@@ -58,12 +58,13 @@ module Term : sig
      whenever [f] is a defined constant with one rule which matches [l] *)
 
   val narrow_term :
-    ?subst:Subst.t ->
+    ?subst:Unif_subst.t ->
     scope_rules:Scoped.scope ->
     term Scoped.t ->
-    (rule * Subst.t) Sequence.t
+    (rule * Unif_subst.t) Sequence.t
     (** [narrow_term ~scope_rule t] finds the set of rules [(l --> r)]
-        in IDs and substitutions [sigma] such that [sigma(l) = sigma(t)] *)
+        in IDs and substitutions [sigma] such that [sigma(l) = sigma(t)]
+        @param scope_rules used for rules (LEFT) *)
 end
 
 (** {2 Rewriting on Literals and Clauses} *)
@@ -88,12 +89,13 @@ module Lit : sig
       if no rule applies *)
 
   val narrow_lit :
-    ?subst:Subst.t ->
+    ?subst:Unif_subst.t ->
     scope_rules:Scoped.scope ->
     Literal.t Scoped.t ->
-    (rule * Subst.t) Sequence.t
+    (rule * Unif_subst.t) Sequence.t
   (** [narrow_term rules lit] finds the set of rules [(l --> clauses) in rules]
-      and substitutions [sigma] such that [sigma(l) = sigma(tit)] *)
+      and substitutions [sigma] such that [sigma(l) = sigma(lit)]
+      @param scope_rules used for rules (LEFT) *)
 end
 
 (** {2 Rules in General} *)

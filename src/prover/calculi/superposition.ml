@@ -10,6 +10,7 @@ module S = Subst
 module Lit = Literal
 module Lits = Literals
 module Comp = Comparison
+module US = Unif_subst
 
 let section = Util.Section.make ~parent:Const.section "sup"
 
@@ -172,7 +173,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       passive_lit : Lit.t;
       scope_passive : int;
       u_p : T.t; (* rewritten subterm *)
-      subst : S.t;
+      subst : US.t;
     }
   end
 
@@ -191,14 +192,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       "@[<2>sup@ @[%a[%d] s=%a t=%a@]@ @[%a[%d] passive_lit=%a p=%a@]@ with subst=@[%a@]@]"
       (fun k->k C.pp info.active sc_a T.pp info.s T.pp info.t
           C.pp info.passive sc_p Lit.pp info.passive_lit
-          Position.pp info.passive_pos S.pp info.subst);
+          Position.pp info.passive_pos US.pp info.subst);
     assert (InnerTerm.DB.closed (info.s:>InnerTerm.t));
     assert (InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
     let active_idx = Lits.Pos.idx info.active_pos in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
     try
       let renaming = S.Renaming.create () in
-      let subst = info.subst in
+      let us = info.subst in
+      let subst = US.subst us in
       let t' = S.FO.apply ~renaming subst (info.t, sc_a) in
       begin match info.passive_lit, info.passive_pos with
         | Lit.Prop (_, true), P.Arg(_, P.Left P.Stop) ->
@@ -217,7 +219,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let passive_lit' = Lit.apply_subst_no_simp ~renaming subst (info.passive_lit, sc_p) in
       let new_trail = C.trail_l [info.active; info.passive] in
       if Env.is_trivial_trail new_trail then raise (ExitSuperposition "trivial trail");
-      let s' = S.FO.apply ~renaming info.subst (info.s, sc_a) in
+      let s' = S.FO.apply ~renaming subst (info.s, sc_a) in
       if (
         O.compare ord s' t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
@@ -231,9 +233,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let new_passive_lit =
         Lit.Pos.replace passive_lit'
           ~at:passive_lit_pos ~by:t' in
+      let c_guard = Literal.of_unif_subst ~renaming us in
       (* apply substitution to other literals *)
       let new_lits =
         new_passive_lit ::
+          c_guard @
           Lit.apply_subst_list ~renaming subst (lits_a, sc_a) @
           Lit.apply_subst_list ~renaming subst (lits_p, sc_p)
       in
@@ -272,7 +276,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
        @[<2>passive@ %a[%d]@ passive_lit=@[%a@]@ p=@[%a@]@]@ with subst=@[%a@]@]"
       (fun k->k C.pp info.active sc_a T.pp info.s T.pp info.t
           C.pp info.passive sc_p Lit.pp info.passive_lit
-          Position.pp info.passive_pos S.pp info.subst);
+          Position.pp info.passive_pos US.pp info.subst);
     assert (InnerTerm.DB.closed (info.s:>InnerTerm.t));
     assert (InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
     assert (not(T.is_var info.u_p));
@@ -280,7 +284,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
     try
       let renaming = S.Renaming.create () in
-      let subst = info.subst in
+      let us = info.subst in
+      let subst = US.subst us in
       let t' = S.FO.apply ~renaming subst (info.t, sc_a) in
       begin match info.passive_lit, info.passive_pos with
         | Lit.Prop (_, true), P.Arg(_, P.Left P.Stop) ->
@@ -300,7 +305,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       let new_trail = C.trail_l [info.active; info.passive] in
       if Env.is_trivial_trail new_trail then raise (ExitSuperposition "trivial trail");
-      let s' = S.FO.apply ~renaming info.subst (info.s, sc_a) in
+      let s' = S.FO.apply ~renaming subst (info.s, sc_a) in
       if (
         O.compare ord s' t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
@@ -317,8 +322,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let lits_p = Lit.apply_subst_list ~renaming subst (lits_p, sc_p) in
       (* assert (T.equal (Lits.Pos.at (Array.of_list lits_p) info.passive_pos) u'); *)
       let lits_p = List.map (Lit.map (fun t-> T.replace t ~old:u' ~by:t')) lits_p in
+      let c_guard = Literal.of_unif_subst ~renaming us in
       (* build clause *)
-      let new_lits = lits_a @ lits_p in
+      let new_lits = c_guard @ lits_a @ lits_p in
       let rule =
         let name = if Lit.sign passive_lit' then "s_sup+" else "s_sup-" in
         Proof.Rule.mk name
@@ -343,7 +349,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let do_superposition info acc=
     let open SupInfo in
     assert (Type.equal (T.ty info.s) (T.ty info.t));
-    assert (Unif.Ty.equal ~subst:info.subst
+    assert (Unif.Ty.equal ~subst:(US.subst info.subst)
         (T.ty info.s, info.scope_active) (T.ty info.u_p, info.scope_passive));
     if !_use_simultaneous_sup
     then do_simultaneous_superposition info acc
@@ -415,20 +421,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.exit_prof prof_infer_passive;
     new_clauses
 
-  (* can we unify [t] and [u] for equality resolution? Only if they
-     are not variables shielded elsewhere *)
-  let can_eq_res lits t u =
-    let var_ok v =
-      not (Purify.type_is_purifiable @@ HVar.ty v) ||
-      not (Purify.is_shielded v lits)
-    in
-    begin match T.view t, T.view u with
-      | T.Var v1, T.Var v2 -> var_ok v1 || var_ok v2
-      | T.Var v, _
-      | _, T.Var v -> var_ok v
-      | _ -> true
-    end
-
   let infer_equality_resolution clause =
     Util.enter_prof prof_infer_equality_resolution;
     let eligible = C.Eligible.always in
@@ -436,27 +428,25 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let new_clauses =
       Lits.fold_eqn ~sign:false ~ord:(Ctx.ord ())
         ~both:false ~eligible (C.lits clause)
-      |> Sequence.filter
-        (fun (l, r, sign, _) ->
-           assert (not sign);
-           can_eq_res (C.lits clause) l r)
       |> Sequence.filter_map
         (fun (l, r, _, l_pos) ->
            let pos = Lits.Pos.idx l_pos in
            try
-             let subst = Unif.FO.unification (l, 0) (r, 0) in
+             let us = Unif.FO.unify_full (l, 0) (r, 0) in
              if BV.get (C.eligible_res_no_subst clause) pos
              (* subst(lit) is maximal, we can do the inference *)
              then (
                Util.incr_stat stat_equality_resolution_call;
                let renaming = Ctx.renaming_clear () in
+               let subst = US.subst us in
                let rule = Proof.Rule.mk "eq_res" in
                let proof = Proof.Step.inference ~rule
                    [C.proof_parent_subst (clause,0) subst] in
                let new_lits = CCArray.except_idx (C.lits clause) pos in
                let new_lits = Lit.apply_subst_list ~renaming subst (new_lits,0) in
+               let c_guard = Literal.of_unif_subst ~renaming us in
                let trail = C.trail clause and penalty = C.penalty clause in
-               let new_clause = C.create ~trail ~penalty new_lits proof in
+               let new_clause = C.create ~trail ~penalty (c_guard@new_lits) proof in
                Util.debugf ~section 3 "@[<hv2>equality resolution on@ @[%a@]@ yields @[%a@]@]"
                  (fun k->k C.pp clause C.pp new_clause);
                Some new_clause
@@ -477,7 +467,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       t : T.t;
       u : T.t;
       v : T.t;
-      subst : S.t;
+      subst : US.t;
       scope : int;
     }
   end
@@ -487,9 +477,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let open EqFactInfo in
     let ord = Ctx.ord () in
     let s = info.s and t = info.t and v = info.v in
-    let subst = info.subst in
+    let us = info.subst in
     (* check whether subst(lit) is maximal, and not (subst(s) < subst(t)) *)
     let renaming = S.Renaming.create () in
+    let subst = US.subst us in
     if O.compare ord (S.FO.apply ~renaming subst (s, info.scope))
         (S.FO.apply ~renaming subst (t, info.scope)) <> Comp.Lt
        &&
@@ -504,11 +495,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
          and replace it by a t!=v one, and apply subst *)
       and new_lits = CCArray.except_idx (C.lits info.clause) info.active_idx in
       let new_lits = Lit.apply_subst_list ~renaming subst (new_lits,info.scope) in
+      let c_guard = Literal.of_unif_subst ~renaming us in
       let lit' = Lit.mk_neq
           (S.FO.apply ~renaming subst (t, info.scope))
           (S.FO.apply ~renaming subst (v, info.scope))
       in
-      let new_lits = lit' :: new_lits in
+      let new_lits = lit' :: c_guard @ new_lits in
       let new_clause =
         C.create ~trail:(C.trail info.clause) ~penalty:(C.penalty info.clause)
           new_lits proof
@@ -532,19 +524,19 @@ module Make(Env : Env.S) : S with module Env = Env = struct
              | Lit.Prop (p, true) ->
                (* positive proposition *)
                begin try
-                   let subst = Unif.FO.unification (s,0) (p,0) in
+                   let subst = Unif.FO.unify_full (s,0) (p,0) in
                    k (p, T.true_, subst)
                  with Unif.Fail -> ()
                end
              | Lit.Equation (u, v, true) ->
                (* positive equation *)
                begin try
-                   let subst = Unif.FO.unification (s,0) (u,0) in
+                   let subst = Unif.FO.unify_full (s,0) (u,0) in
                    k (u, v, subst)
                  with Unif.Fail -> ()
                end;
                begin try
-                   let subst = Unif.FO.unification (s,0) (v,0) in
+                   let subst = Unif.FO.unify_full (s,0) (v,0) in
                    k (v, u, subst)
                  with Unif.Fail -> ()
                end;
@@ -815,8 +807,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let is_semantic_tautology c =
     Util.with_prof prof_semantic_tautology is_semantic_tautology_ c
 
-  let var_in_subst_ subst v sc =
-    S.mem subst ((v:T.var:>InnerTerm.t HVar.t),sc)
+  let var_in_subst_ us v sc =
+    S.mem (US.subst us) ((v:T.var:>InnerTerm.t HVar.t),sc)
 
   let basic_simplify c =
     if C.get_flag flag_simplified c
@@ -825,25 +817,31 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Util.enter_prof prof_basic_simplify;
       Util.incr_stat stat_basic_simplify_calls;
       let lits = C.lits c in
+      let has_changed = ref false in
       (* bv: literals to keep *)
       let bv = BV.create ~size:(Array.length lits) true in
       (* eliminate absurd lits *)
-      Array.iteri (fun i lit -> if Lit.is_absurd lit then BV.reset bv i) lits;
+      Array.iteri
+        (fun i lit ->
+           if Lit.is_absurd lit then (
+             has_changed := true;
+             BV.reset bv i
+           ))
+        lits;
       (* eliminate inequations x != t *)
-      let subst = ref S.empty in
+      let us = ref US.empty in
       let try_unif i t1 sc1 t2 sc2 =
         try
-          let subst' = Unif.FO.unification ~subst:!subst (t1,sc1) (t2,sc2) in
+          let subst' = Unif.FO.unify_full ~subst:!us (t1,sc1) (t2,sc2) in
+          has_changed := true;
           BV.reset bv i;
-          subst := subst';
+          us := subst';
         with Unif.Fail -> ()
       in
       Array.iteri
         (fun i lit ->
            let can_destr_eq_var v =
-             not (var_in_subst_ !subst v 0) &&
-             ( not (Purify.type_is_purifiable @@ HVar.ty v) ||
-               not (Purify.is_shielded v (C.lits c)))
+             not (var_in_subst_ !us v 0)
            in
            if BV.get bv i then match lit with
              | Lit.HO_constraint (l, r)
@@ -864,13 +862,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                begin match T.view l, T.view r with
                  | ( T.AppBuiltin (Builtin.True, []), T.Var x
                    | T.Var x, T.AppBuiltin (Builtin.True, []))
-                   when not (var_in_subst_ !subst x 0) ->
+                   when not (var_in_subst_ !us x 0) ->
                    (* [C or x=true ---> C[x:=false]] *)
                    begin
                      try
-                       let subst' = Unif.FO.bind !subst (x,0) (T.false_,0) in
+                       let subst' = US.FO.bind !us (x,0) (T.false_,0) in
+                       has_changed := true;
                        BV.reset bv i;
-                       subst := subst';
+                       us := subst';
                      with Unif.Fail -> ()
                    end
 
@@ -880,28 +879,32 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         lits;
       let new_lits = BV.select bv lits in
       let new_lits =
-        if S.is_empty !subst then new_lits
-        else
+        if US.is_empty !us then new_lits
+        else (
+          assert !has_changed;
           let renaming = Ctx.renaming_clear () in
-          Lit.apply_subst_list ~renaming !subst (new_lits,0)
+          let subst = US.subst !us in
+          let c_guard = Literal.of_unif_subst ~renaming !us in
+          c_guard @ Lit.apply_subst_list ~renaming subst (new_lits,0)
+        )
       in
       let new_lits = CCList.uniq ~eq:Lit.equal_com new_lits in
-      if List.length new_lits = Array.length lits
-      then (
+      if not !has_changed && List.length new_lits = Array.length lits then (
         Util.exit_prof prof_basic_simplify;
         C.set_flag flag_simplified c true;
         SimplM.return_same c  (* no simplification *)
       ) else (
         let parent =
-          if Subst.is_empty !subst then C.proof_parent c
-          else C.proof_parent_subst (c,0) !subst
-        in let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "simplify") [parent] in
+          if Subst.is_empty (US.subst !us) then C.proof_parent c
+          else C.proof_parent_subst (c,0) (US.subst !us)
+        in
+        let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "simplify") [parent] in
         let new_clause =
           C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof
         in
         Util.debugf ~section 3
           "@[<>@[%a@]@ @[<2>basic_simplifies into@ @[%a@]@]@ with @[%a@]@]"
-          (fun k->k C.pp c C.pp new_clause S.pp !subst);
+          (fun k->k C.pp c C.pp new_clause US.pp !us);
         Util.incr_stat stat_basic_simplify;
         Util.exit_prof prof_basic_simplify;
         SimplM.return_new new_clause

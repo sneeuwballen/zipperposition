@@ -379,7 +379,7 @@ let unif_step ((c:Combinators.t),sc_combs) ((t,u),sc_pair): _ list =
                   let t_prefix = T.app f (CCList.take (n_ty_args+i) args) in
                   try
                     let subst =
-                      Unif.FO.unification (t_prefix,sc_pair) (lhs,sc_combs)
+                      Unif.FO.unify_syn (t_prefix,sc_pair) (lhs,sc_combs)
                     in
                     Some (subst,p)
                   with Unif.Fail -> None)

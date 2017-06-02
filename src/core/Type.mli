@@ -226,6 +226,10 @@ val apply_unsafe : t -> InnerTerm.t list -> t
     @raise ApplyError if types do not match
     @raise Assert_failure if the arguments are not proper types *)
 
+val is_unifiable : t -> bool
+(** Are terms of this type syntactically unifiable?
+    See {!InnerTerm.type_is_unifiable} *)
+
 (** {2 IO} *)
 
 include Interfaces.PRINT_DE_BRUIJN with type term := t and type t := t

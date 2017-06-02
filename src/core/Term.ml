@@ -75,6 +75,7 @@ module Classic = struct
   let view t : view = match T.view t with
     | T.Var v -> Var (Type.cast_var_unsafe v)
     | T.DB i -> DB i
+    | _ when not (Type.is_unifiable @@ ty t) -> NonFO
     | T.Const s -> App (s,[])
     | T.AppBuiltin (b,l) -> AppBuiltin (b,l)
     | T.App (f, l) ->

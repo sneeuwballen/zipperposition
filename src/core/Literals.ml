@@ -76,6 +76,9 @@ let apply_subst ~renaming subst (lits,sc) =
     (fun lit -> Lit.apply_subst ~renaming subst (lit,sc))
     lits
 
+let of_unif_subst ~renaming s =
+  Literal.of_unif_subst ~renaming s |> Array.of_list
+
 let map f lits =
   Array.map (fun lit -> Lit.map f lit) lits
 
@@ -481,3 +484,36 @@ let is_pos_eq lits =
     | [| Lit.Prop(p,true) |] -> Some (p, T.true_)
     | [| Lit.True |] -> Some (T.true_, T.true_)
     | _ -> None
+
+(** {2 Shielded Variables} *)
+
+let is_shielded var (lits:t) : bool =
+  let rec shielded_by_term ~root t = match T.view t with
+    | T.Var v' when HVar.equal Type.equal v' var -> not root
+    | T.Var _
+    | T.DB _
+    | T.Const _ -> false
+    | T.AppBuiltin (_, l) ->
+      List.exists (shielded_by_term ~root:false) l
+    | T.App (f, l) ->
+      begin match T.view f with
+        | T.Var v' when HVar.equal Type.equal var v' -> not root
+        | T.Var _
+        | T.Const _ ->
+          List.exists (shielded_by_term ~root:false) l
+        | T.DB _ | T.AppBuiltin _ | T.App _ -> assert false
+      end
+  in
+  (* is there a term, directly under a literal, that shields the variable? *)
+  begin
+    lits
+    |> Seq.terms
+    |> Sequence.exists (shielded_by_term ~root:true)
+  end
+
+let unshielded_vars ?(filter=fun _->true) lits: _ list =
+  vars lits
+  |> List.filter
+    (fun var ->
+       filter var &&
+       not (is_shielded var lits))

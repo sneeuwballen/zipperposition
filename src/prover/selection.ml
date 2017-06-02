@@ -11,59 +11,37 @@ module S = Subst.FO
 module Lit = Literal
 module Lits = Literals
 module BV = CCBV
-module Classify = Classify_literals
 
-type t = Classify_literals.t -> Literal.t array -> CCBV.t
+type t = Literal.t array -> CCBV.t
 
 type parametrized = strict:bool -> ord:Ordering.t -> t
 
 (* no need for classification here *)
-let no_select _ _ : BV.t = BV.empty ()
+let no_select _ : BV.t = BV.empty ()
 
 (* is it a good idea to select this kind of literal? *)
-let can_select_cl_ (k:Classify.class_): bool = match k with
-  | Classify.K_normal false
-  | Classify.K_constr (_, `Unshielded) -> true
-  | _ -> false
+let can_select_lit (lit:Lit.t) : bool = Lit.is_neg lit
 
 (* checks that [bv] is an acceptable selection for [lits]. In case
    some literal is selected, at least one negative literal must be selected. *)
-let validate_fun_ cl lits bv =
+let validate_fun_ lits bv =
   if BV.is_empty bv then true
   else (
     Sequence.of_array_i lits
     |> Sequence.exists
-      (fun (i,_) -> can_select_cl_ cl.(i) && BV.get bv i)
+      (fun (i,_) -> can_select_lit lits.(i) && BV.get bv i)
   )
-
-(* select one unshielded {HO,purify} constraint, if any *)
-let find_max_constr_ cl =
-  cl |> CCArray.findi
-    (fun i k -> match k with
-       | Classify.K_constr
-           ((Classify.C_ho | Classify.C_purify), `Unshielded) ->
-         let bv = BV.create ~size:(Array.length cl) false in
-         BV.set bv i;
-         Some bv
-       | _ -> None)
 
 (* build a selection function in general, given the more specialized
    one there *)
-let mk_ ~(f:Lits.t -> BV.t)(cl:Classify.t) (lits:Lits.t) : BV.t =
+let mk_ ~(f:Lits.t -> BV.t) (lits:Lits.t) : BV.t =
   if Array.length lits <= 1 then BV.empty ()
   else (
     (* should we select anything? *)
-    let should_select = CCArray.exists can_select_cl_ cl in
+    let should_select = CCArray.exists can_select_lit lits in
     if should_select then (
-      (* select a literal (first try an unshielded constr, else call [f]) *)
-      let bv = match find_max_constr_ cl with
-        | Some bv ->  bv
-        | None -> f lits
-      in
-      (*Util.debugf ~section 5
-        "(@[select@ :lits %a@ :res %a@ :classify %a@])"
-        (fun k->k Lits.pp lits BV.print bv Classify.pp cl);*)
-      assert (validate_fun_ cl lits bv);
+      let bv = f lits in
+      assert (validate_fun_ lits bv);
       bv
     ) else (
       (*Util.debugf ~section 5 "(@[should-not-select@ %a@])" (fun k->k Lits.pp lits);*)
@@ -73,12 +51,12 @@ let mk_ ~(f:Lits.t -> BV.t)(cl:Classify.t) (lits:Lits.t) : BV.t =
 
 let bv_first_ bv = BV.iter_true bv |> Sequence.head
 
-let max_goal ~strict ~ord cl lits =
-  mk_ cl lits ~f:(fun lits ->
+let max_goal ~strict ~ord lits =
+  mk_ lits ~f:(fun lits ->
     let bv = Lits.maxlits ~ord lits in
     (* only retain negative normal lits, or constraints
        that are unshielded *)
-    BV.filter bv (fun i -> can_select_cl_ cl.(i));
+    BV.filter bv (fun i -> can_select_lit lits.(i));
     begin match bv_first_ bv with
       | Some i ->
         (* keep only first satisfying lit *)
@@ -92,10 +70,10 @@ let max_goal ~strict ~ord cl lits =
         BV.empty ()  (* empty one *)
     end)
 
-let except_RR_horn (p:parametrized) ~strict ~ord cl lits =
+let except_RR_horn (p:parametrized) ~strict ~ord lits =
   if Lits.is_RR_horn_clause lits
   then BV.empty () (* do not select (conditional rewrite rule) *)
-  else p ~strict ~ord cl lits  (* delegate *)
+  else p ~strict ~ord lits  (* delegate *)
 
 (** {2 Global selection Functions} *)
 

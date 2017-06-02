@@ -29,7 +29,7 @@ let test_rename _ =
   let t1 = f x (g y) in
   let t2 = f x (g a) in
   let t3 = g (g x) in
-  let subst = Unif.FO.unification (t1,1) (t2,0) in
+  let subst = Unif.FO.unify_syn (t1,1) (t2,0) in
   let renaming = S.Renaming.create () in
   let t1' = S.FO.apply ~renaming subst (t1,1) in
   let t2' = S.FO.apply ~renaming subst (t2,0) in
@@ -61,7 +61,7 @@ let test_unify _ =
   let t2 =
     let ty = Type.(app list_ [int]) in
     f ty (nil Type.TPTP.int) (g ty y) in
-  let subst = Unif.FO.unification (t1,0) (t2,1) in
+  let subst = Unif.FO.unify_syn (t1,0) (t2,1) in
   let renaming = S.Renaming.create () in
   let t1' = S.FO.apply subst ~renaming (t1,0) in
   let t2' = S.FO.apply subst ~renaming (t2,1) in

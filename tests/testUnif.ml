@@ -17,7 +17,7 @@ let check_unify_gives_unifier =
   let name = "unify_gives_unifier" in
   let prop (t1, t2) =
     try
-      let subst = Unif.FO.unification (t1,0) (t2,1) in
+      let subst = Unif.FO.unify_syn (t1,0) (t2,1) in
       let renaming = S.Renaming.create () in
       let t1' = S.FO.apply ~renaming subst (t1,0) in
       let t2' = S.FO.apply ~renaming subst (t2,1) in

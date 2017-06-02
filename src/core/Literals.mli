@@ -36,6 +36,8 @@ val to_form : t -> term SLiteral.t list
 val apply_subst : renaming:Subst.Renaming.t ->
   Subst.t -> t Scoped.t -> t
 
+val of_unif_subst : renaming:Subst.Renaming.t -> Unif_subst.t -> t
+
 val map : (term -> term) -> t -> t
 
 val pos : t -> CCBV.t
@@ -191,3 +193,11 @@ val is_horn : t -> bool
 
 val is_pos_eq : t -> (term * term) option
 (** Recognize whether the clause is a positive unit equality. *)
+
+(** {2 Shielded Variables} *)
+
+val is_shielded : Term.var -> t -> bool
+(** Is this variable shielded in this clause? *)
+
+val unshielded_vars : ?filter:(Term.var -> bool) -> t -> Term.var list
+(** Set of variables occurring unshielded *)

@@ -70,9 +70,10 @@ val fold : ('a -> term -> 'a) -> 'a -> t -> 'a
 
 val map : (term -> term) -> t -> t (** functor *)
 
-type 'a unif = subst:Subst.t -> 'a Scoped.t -> 'a Scoped.t -> Subst.t Sequence.t
+type ('subst,'a) unif =
+  subst:'subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Sequence.t
 
-val generic_unif: Z.t Monome.t unif -> t unif
+val generic_unif: ('subst,Z.t Monome.t) unif -> ('subst,t) unif
 (** Generic unification/matching/variant, given such an operation on monomes *)
 
 val apply_subst : renaming:Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
@@ -91,7 +92,7 @@ val matching : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
 val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
   Subst.t Sequence.t
 
-val unify : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> Subst.t Sequence.t
+val unify : ?subst:Unif_subst.t -> t Scoped.t -> t Scoped.t -> Unif_subst.t Sequence.t
 
 val subsumes : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> Subst.t Sequence.t
 (** Find substitutions such that [subst(lit_a)] implies [lit_b]. This is
@@ -194,8 +195,8 @@ module Focus : sig
   val apply_subst_no_renaming : Subst.t -> t Scoped.t -> t
   (** Apply a substitution with renaming (careful with collisions!) *)
 
-  val unify : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
-    (t * t * Subst.t) Sequence.t
+  val unify : ?subst:Unif_subst.t -> t Scoped.t -> t Scoped.t ->
+    (t * t * Unif_subst.t) Sequence.t
   (** Unify the two focused terms, and possibly other terms of their
       respective focused monomes; yield the new literals accounting for
       the unification along with the unifier *)

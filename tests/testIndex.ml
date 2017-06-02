@@ -209,7 +209,7 @@ module TestTerm(I : TermIndex) = struct
   let _limit = _count + 100
 
   let check_retrieved_unify =
-    let prop = _check_all_retrieved_satisfy I.retrieve_unifiables Unif.FO.unification in
+    let prop = _check_all_retrieved_satisfy I.retrieve_unifiables Unif.FO.unify_syn in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_unify" I.name in
     QCheck.Test.make ~name ~count:_count ~max_gen:_limit (arb 10 150) prop
 
@@ -225,7 +225,7 @@ module TestTerm(I : TermIndex) = struct
     QCheck.Test.make ~name ~count:_count ~max_gen:_limit (arb 10 150) prop
 
   let check_retrieve_all_unify =
-    let prop = _check_all_satisfying_are_retrieved I.retrieve_unifiables Unif.FO.unification in
+    let prop = _check_all_satisfying_are_retrieved I.retrieve_unifiables Unif.FO.unify_syn in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_unify" I.name in
     QCheck.Test.make ~name ~count:_count ~max_gen:_limit (arb 10 150) prop
 

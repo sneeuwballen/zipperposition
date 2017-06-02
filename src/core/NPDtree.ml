@@ -30,6 +30,8 @@ let open_term ~stack t = match T.view t with
   | T.AppBuiltin _
   | T.Const _ ->
     Some {cur_term=t; stack=[]::stack;}
+  | _ when not (Unif.Ty.type_is_unifiable (T.ty t)) ->
+    Some {cur_term=t; stack=[]::stack;} (* opaque constant *)
   | T.App (_, l) ->
     Some {cur_term=t; stack=l::stack;}
 
@@ -318,7 +320,7 @@ module MakeTerm(X : Set.OrderedType) = struct
     in
     skip trie 1 k
 
-  let retrieve_unifiables ?(subst=S.empty) dt t k =
+  let retrieve_unifiables ?(subst=Unif_subst.empty) dt t k =
     Util.enter_prof prof_npdtree_term_unify;
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie iter = match iter with

@@ -126,8 +126,8 @@ val variant : ?subst:Subst.t -> 'a t Scoped.t -> 'a t Scoped.t -> Subst.t Sequen
 
 val matching : ?subst:Subst.t -> 'a t Scoped.t -> 'a t Scoped.t -> Subst.t Sequence.t
 
-val unify : ?subst:Subst.t -> 'a t Scoped.t -> 'a t Scoped.t ->
-  Subst.t Sequence.t
+val unify : ?subst:Unif_subst.t -> 'a t Scoped.t -> 'a t Scoped.t ->
+  Unif_subst.t Sequence.t
 
 val is_ground : _ t -> bool
 (** Are there no variables in the monome? *)
@@ -213,30 +213,30 @@ module Focus : sig
 
       Again, arith constants are not unifiable with unshielded variables. *)
 
-  val unify_ff : ?subst:Subst.t ->
+  val unify_ff : ?subst:Unif_subst.t ->
     'a t Scoped.t -> 'a t Scoped.t ->
-    ('a t * 'a t * Subst.t) Sequence.t
+    ('a t * 'a t * Unif_subst.t) Sequence.t
   (** Unify two focused monomes. All returned unifiers are unifiers
       of the focused terms, but maybe also of other unfocused terms;
       Focused monomes are modified by unification because several terms
       might merge with the focused term, so the new ones are
       returned with the unifier itself *)
 
-  val unify_mm : ?subst:Subst.t ->
+  val unify_mm : ?subst:Unif_subst.t ->
     'a monome Scoped.t -> 'a monome Scoped.t ->
-    ('a t * 'a t * Subst.t) Sequence.t
+    ('a t * 'a t * Unif_subst.t) Sequence.t
   (** Unify parts of two monomes [m1] and [m2]. For each such unifier we
       return the versions of [m1] and [m2] where the unified terms
       are focused. *)
 
-  val unify_self : ?subst:Subst.t ->
-    'a t Scoped.t -> ('a t * Subst.t) Sequence.t
+  val unify_self : ?subst:Unif_subst.t ->
+    'a t Scoped.t -> ('a t * Unif_subst.t) Sequence.t
   (** Extend the substitution to other terms within the focused monome,
       if possible. For instance it might return
       [2f(x)+a, {x=y}] for the monome [f(x)+f(y)+a] where [f(x)] is focused. *)
 
-  val unify_self_monome : ?subst:Subst.t ->
-    'a monome Scoped.t -> ('a t * Subst.t) Sequence.t
+  val unify_self_monome : ?subst:Unif_subst.t ->
+    'a monome Scoped.t -> ('a t * Unif_subst.t) Sequence.t
   (** Unify at least two terms of the monome together *)
 
   (* TODO

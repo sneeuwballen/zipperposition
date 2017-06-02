@@ -93,7 +93,8 @@ let fold f acc m =
   let acc = Sequence.fold f acc (Monome.Seq.terms m.left) in
   Sequence.fold f acc (Monome.Seq.terms m.right)
 
-type 'a unif = subst:Subst.t -> 'a Scoped.t -> 'a Scoped.t -> Subst.t Sequence.t
+type ('subst,'a) unif =
+  subst:'subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Sequence.t
 
 (* match {x1,y1} in scope 1, with {x2,y2} with scope2 *)
 let unif4 op ~subst x1 y1 sc1 x2 y2 sc2 k =
@@ -119,7 +120,7 @@ let generic_unif m_unif ~subst (lit1,sc1) (lit2,sc2) k =
     | Less, Equal -> ()
   end
 
-let unify ?(subst=Subst.empty) lit1 lit2 =
+let unify ?(subst=Unif_subst.empty) lit1 lit2 =
   generic_unif (fun ~subst -> M.unify ~subst) ~subst lit1 lit2
 
 let matching ?(subst=Subst.empty) lit1 lit2 =
@@ -495,7 +496,7 @@ module Focus = struct
       ~f_m:(fun m -> M.apply_subst_no_renaming subst (m,sc))
       lit
 
-  let unify ?(subst=Subst.empty) (lit1,sc1) (lit2,sc2) k =
+  let unify ?(subst=Unif_subst.empty) (lit1,sc1) (lit2,sc2) k =
     let _set_mf lit mf = match lit with
       | Left (op, _, m) -> Left (op, mf, m)
       | Right (op, m, _) -> Right (op, m, mf)
