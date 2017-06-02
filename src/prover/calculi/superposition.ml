@@ -1294,10 +1294,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let try_eq_subsumption = CCArray.exists Lit.is_eqn (C.lits c) in
       (* try to remove one literal from the literal array *)
       let remove_one_lit lits =
-        Sequence.of_array lits
-        |> Sequence.filter (fun lit -> not (Lit.is_constraint lit))
-        |> Sequence.find_mapi
-          (fun i old_lit ->
+        Sequence.of_array_i lits
+        |> Sequence.filter (fun (_,lit) -> not (Lit.is_constraint lit))
+        |> Sequence.find_map
+          (fun (i,old_lit) ->
              (* negate literal *)
              lits.(i) <- Lit.negate old_lit;
              (* test for subsumption *)
