@@ -354,7 +354,7 @@ module Term = struct
 
   let normalize_term_fst ?max_steps t = fst (normalize_term ?max_steps t)
 
-  let narrow_term ?(subst=Subst.empty) ~scope_rules:sc_r (t,sc_t): _ Sequence.t =
+  let narrow_term ?(subst=Unif_subst.empty) ~scope_rules:sc_r (t,sc_t): _ Sequence.t =
     begin match T.view t with
       | T.Const _ -> Sequence.empty (* already normal form *)
       | T.App (f, _) ->
@@ -364,7 +364,7 @@ module Term = struct
             rules_of_id id
             |> Sequence.filter_map
               (fun r ->
-                 try Some (r, Unif.FO.unification ~subst (r.term_lhs,sc_r) (t,sc_t))
+                 try Some (r, Unif.FO.unify_full ~subst (r.term_lhs,sc_r) (t,sc_t))
                  with Unif.Fail -> None)
           | _ -> Sequence.empty
         end
@@ -511,7 +511,7 @@ module Lit = struct
   let normalize_clause lits =
     Util.with_prof prof_lit_rw normalize_clause_ lits
 
-  let narrow_lit ?(subst=Subst.empty) ~scope_rules:sc_r (lit,sc_lit) =
+  let narrow_lit ?(subst=Unif_subst.empty) ~scope_rules:sc_r (lit,sc_lit) =
     rules_of_lit lit
     |> Sequence.flat_map
       (fun r ->

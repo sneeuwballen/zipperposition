@@ -52,9 +52,11 @@ module Make(E : Env_intf.S) = struct
       (fun (u_p, passive_pos) ->
          RW.Term.narrow_term ~scope_rules:sc_rule (u_p,sc_c)
          |> Sequence.map
-           (fun (rule,subst) ->
+           (fun (rule,us) ->
               let i, _ = Literals.Pos.cut passive_pos in
               let renaming = C.Ctx.renaming_clear() in
+              let subst = Unif_subst.subst us in
+              let c_guard = Literal.of_unif_subst ~renaming us in
               (* side literals *)
               let lits_passive = C.lits c in
               let lits_passive =
@@ -76,12 +78,13 @@ module Make(E : Env_intf.S) = struct
                 Proof.Step.inference [C.proof_parent_subst (c,0) subst]
                   ~rule:(Proof.Rule.mk "narrow") in
               let c' =
-                C.create ~trail:(C.trail c) ~penalty:(C.penalty c) (new_lit :: lits') proof
+                C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+                  (new_lit :: c_guard @ lits') proof
               in
               Util.debugf ~section 3
                 "@[<2>term narrowing:@ from `@[%a@]`@ to `@[%a@]`@ \
                  using rule `%a`@ and subst @[%a@]@]"
-                (fun k->k C.pp c C.pp c' RW.Term.Rule.pp rule Subst.pp subst);
+                (fun k->k C.pp c C.pp c' RW.Term.Rule.pp rule Unif_subst.pp us);
               c'
            )
       )
@@ -118,7 +121,10 @@ module Make(E : Env_intf.S) = struct
       (fun acc (lit,i) ->
          RW.Lit.narrow_lit ~scope_rules:1 (lit,0)
          |> Sequence.fold
-           (fun acc (rule,subst) ->
+           (fun acc (rule,us) ->
+              let subst = Unif_subst.subst us in
+              let renaming = E.Ctx.renaming_clear () in
+              let c_guard = Literal.of_unif_subst ~renaming us in
               let proof =
                 Proof.Step.inference [C.proof_parent_subst (c,0) subst]
                   ~rule:(Proof.Rule.mk "narrow_clause") in
@@ -128,17 +134,17 @@ module Make(E : Env_intf.S) = struct
               let clauses =
                 List.map
                   (fun c' ->
-                     let renaming = E.Ctx.renaming_clear () in
                      let new_lits =
-                       (Literal.apply_subst_list ~renaming subst (lits',0)) @
-                         (Literal.apply_subst_list ~renaming subst (c',1))
+                       c_guard
+                       @ Literal.apply_subst_list ~renaming subst (lits',0)
+                       @ Literal.apply_subst_list ~renaming subst (c',1)
                      in
                      C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof)
                   (RW.Lit.Rule.rhs rule)
               in
               Util.debugf ~section 3
                 "@[<2>narrowing of `@[%a@]`@ using `@[%a@]`@ with @[%a@]@ yields @[%a@]@]"
-                (fun k->k C.pp c RW.Lit.Rule.pp rule Subst.pp subst
+                (fun k->k C.pp c RW.Lit.Rule.pp rule Unif_subst.pp us
                     CCFormat.(list (hovbox C.pp)) clauses);
               Util.incr_stat stat_narrowing_lit;
               List.rev_append clauses acc)
@@ -149,7 +155,7 @@ module Make(E : Env_intf.S) = struct
     Util.with_prof prof_narrowing_lit narrow_lits_ lits
 
   (* find positions in rules' LHS *)
-  let ctx_narrow_find (s,sc_a) sc_p : (RW.Rule.t * Position.t * Subst.t) Sequence.t =
+  let ctx_narrow_find (s,sc_a) sc_p : (RW.Rule.t * Position.t * Unif_subst.t) Sequence.t =
     let find_term (r:RW.Term.rule) =
       let t = RW.Term.Rule.lhs r in
       T.all_positions ~vars:false ~pos:P.stop ~ty_args:false t
@@ -162,7 +168,7 @@ module Make(E : Env_intf.S) = struct
       |> Sequence.filter_map
         (fun (t,p) ->
            try
-             let subst = Unif.FO.unification (s,sc_a) (t,sc_p) in
+             let subst = Unif.FO.unify_full (s,sc_a) (t,sc_p) in
              Some (RW.T_rule r, p, subst)
            with Unif.Fail -> None)
     and find_lit (r:RW.Lit.rule) =
@@ -175,7 +181,7 @@ module Make(E : Env_intf.S) = struct
            | P.Left P.Stop -> None (* not root *)
            | _ ->
              try
-               let subst = Unif.FO.unification (s,sc_a) (t,sc_p) in
+               let subst = Unif.FO.unify_full (s,sc_a) (t,sc_p) in
                Some (RW.L_rule r, p, subst)
              with Unif.Fail -> None)
     in
@@ -189,12 +195,14 @@ module Make(E : Env_intf.S) = struct
   let ctx_narrow_with ~ord s t s_pos c acc : C.t list =
     let sc_a = 1 and sc_p = 0 in
     (* do narrowing inside this rule? *)
-    let do_narrowing rule rule_pos subst =
+    let do_narrowing rule rule_pos (us:Unif_subst.t) =
       let rule_clauses =match rule with
         | RW.T_rule r -> [ [| RW.Term.Rule.as_lit r |] ]
         | RW.L_rule r -> RW.Lit.Rule.as_clauses r
       in
       let renaming = E.Ctx.renaming_clear() in
+      let subst = Unif_subst.subst us in
+      let c_guard = Literal.of_unif_subst ~renaming us in
       let s' = Subst.FO.apply ~renaming subst (s,sc_a) in
       let t' = Subst.FO.apply ~renaming subst (t,sc_a) in
       if Ordering.compare ord s' t' <> Comparison.Lt then (
@@ -225,7 +233,8 @@ module Make(E : Env_intf.S) = struct
              (* add some penalty on every inference *)
              let penalty = Array.length (C.lits c) + C.penalty c in
              let new_c =
-               C.create (new_lits @ ctx) proof ~trail:(C.trail c) ~penalty
+               C.create (c_guard @ new_lits @ ctx) proof
+                 ~trail:(C.trail c) ~penalty
              in
              Util.debugf ~section 4
                "(@[<2>ctx_narrow@ :rule %a@ :clause %a@ :pos %a@ :subst %a@ :yield %a@])"

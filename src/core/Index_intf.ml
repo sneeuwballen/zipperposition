@@ -17,8 +17,8 @@ module type LEAF = sig
   val size : t -> int
 
   val fold_unify :
-    ?subst:subst -> t Scoped.t -> term Scoped.t ->
-    (term * elt * subst) Sequence.t
+    ?subst:Unif_subst.t -> t Scoped.t -> term Scoped.t ->
+    (term * elt * Unif_subst.t) Sequence.t
 
   val fold_match :
     ?subst:subst ->
@@ -59,9 +59,9 @@ module type TERM_IDX = sig
 
   val fold : t -> ('a -> term -> elt -> 'a) -> 'a -> 'a
 
-  val retrieve_unifiables : ?subst:subst ->
+  val retrieve_unifiables : ?subst:Unif_subst.t ->
     t Scoped.t -> term Scoped.t ->
-    (term * elt * subst) Sequence.t
+    (term * elt * Unif_subst.t) Sequence.t
 
   val retrieve_generalizations : ?subst:subst ->
     t Scoped.t -> term Scoped.t ->

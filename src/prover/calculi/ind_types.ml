@@ -103,12 +103,12 @@ module Make(Env : Env_intf.S) = struct
       walk_cstor_args t
       |> Sequence.filter_map
         (fun t' ->
-           try Some (Unif.FO.unification (t',0) (sub,0))
+           try Some (Unif.FO.unify_full (t',0) (sub,0))
            with Unif.Fail -> None)
     in
     (* try to kill a [t=u] if there is [sigma] s.t. acyclicity applies
        to [t\sigma = u\sigma] *)
-    let kill_lit lit: Subst.t Sequence.t =
+    let kill_lit lit: Unif_subst.t Sequence.t =
       begin match lit with
         | Literal.Equation (l, r, true) ->
           begin match as_cstor_app l, as_cstor_app r with
@@ -126,11 +126,15 @@ module Make(Env : Env_intf.S) = struct
         (fun (i, lit) ->
            kill_lit lit |> Sequence.map (fun subst -> i, subst))
       |> Sequence.map
-        (fun (i,subst) ->
+        (fun (i,us) ->
+           let subst = Unif_subst.subst us in
            (* delete i-th literal and build new clause *)
            let new_lits = CCArray.except_idx (C.lits c) i in
            let renaming = Env.Ctx.renaming_clear () in
-           let new_lits = Literal.apply_subst_list ~renaming subst (new_lits,0) in
+           let c_guard = Literal.of_unif_subst ~renaming us in
+           let new_lits =
+             c_guard @ Literal.apply_subst_list ~renaming subst (new_lits,0)
+           in
            let proof =
              Proof.Step.inference [C.proof_parent_subst (c,0) subst]
                ~rule:(Proof.Rule.mk "acyclicity")

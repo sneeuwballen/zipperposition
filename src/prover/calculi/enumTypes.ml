@@ -319,19 +319,25 @@ module Make(E : Env.S) : S with module Env = E = struct
              (* we found an enum type declaration for [v], replace it
                 with each case for the enum type *)
              Util.incr_stat stat_simplify;
+             let subst = Unif_subst.of_subst subst in
              let l =
                List.map
                  (fun case ->
                     (* replace [v] with [case] now *)
-                    let subst = Unif.FO.unification ~subst (v,s_c) (case,s_decl) in
+                    let subst = Unif.FO.unify_full ~subst (v,s_c) (case,s_decl) in
                     let renaming = Ctx.renaming_clear () in
+                    let c_guard = Literals.of_unif_subst ~renaming subst
+                    and subst = Unif_subst.subst subst in
                     let lits' = Lits.apply_subst ~renaming subst (C.lits c,s_c) in
                     let proof =
                       Proof.Step.inference [Proof.Parent.from @@ C.proof c]
                         ~rule:(Proof.Rule.mk"enum_type_case_switch")
                     in
                     let trail = C.trail c and penalty = C.penalty c in
-                    let c' = C.create_a ~trail ~penalty lits' proof in
+                    let c' =
+                      C.create_a ~trail ~penalty
+                        (CCArray.append c_guard lits') proof
+                    in
                     Util.debugf ~section 3
                       "@[<2>deduce @[%a@]@ from @[%a@]@ @[(enum_type switch on %a)@]@]"
                       (fun k->k C.pp c' C.pp c Type.pp decl.decl_ty);
@@ -359,9 +365,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       let t = T.app (T.const ~ty:ty_s s) vars in
       Util.debugf ~section 5 "@[<2>instantiate enum type `%a`@ on `@[%a@]`@]"
         (fun k->k pp_id_or_builtin decl.decl_ty_id T.pp t);
-      let subst = bind_vars_ (decl,0) (poly_args,1) in
-      let subst = Unif.FO.unification ~subst (T.var decl.decl_var,0) (t,1) in
+      let us = bind_vars_ (decl,0) (poly_args,1) |> Unif_subst.of_subst in
+      let us = Unif.FO.unify_full ~subst:us (T.var decl.decl_var,0) (t,1) in
       let renaming = Ctx.renaming_clear () in
+      let subst = Unif_subst.subst us
+      and c_guard = Literal.of_unif_subst ~renaming us in
       let lits =
         List.map
           (fun case ->
@@ -380,7 +388,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let trail = Trail.empty in
       (* start with initial penalty *)
       let penalty = 4 in
-      let c' = C.create ~trail ~penalty lits proof in
+      let c' = C.create ~trail ~penalty (c_guard@lits) proof in
       Util.debugf ~section 3 "@[<2>instantiate axiom of enum type `%a` \
                               on @[%a@]:@ clause @[%a@]@]"
         (fun k->k pp_id_or_builtin decl.decl_ty_id ID.pp s C.pp c');

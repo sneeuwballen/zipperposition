@@ -3,8 +3,10 @@
 
 (** {1 Unification and Matching} *)
 
+type unif_subst = Unif_subst.t
 type subst = Subst.t
 type term = InnerTerm.t
+type ty = InnerTerm.t
 type 'a sequence = ('a -> unit) -> unit
 
 exception Fail
@@ -50,6 +52,9 @@ val pair_lists_left : term list -> term -> term list -> term -> term list * term
     we need to unify from the left,
     so this returns pairs to unify (including return types). *)
 
+val type_is_unifiable : ty -> bool
+(** Can we (syntactically) unify terms of this type? *)
+
 (** {2 Signatures} *)
 
 module type S = Unif_intf.S
@@ -61,7 +66,13 @@ module Inner : S with type term = InnerTerm.t and type ty = InnerTerm.t
 
 (** {2 Specializations} *)
 
-module Ty : S with type term = Type.t and type ty = Type.t
+module Ty : sig
+  include S with type term = Type.t and type ty = Type.t
+
+  val type_is_unifiable : term -> bool
+  (** Can we (syntactically) unify terms of this type? *)
+end
+
 module FO : sig
   include S with type term = Term.t and type ty = Type.t
 

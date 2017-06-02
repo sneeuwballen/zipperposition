@@ -25,6 +25,7 @@ type fingerprint_fun = T.t -> feature list
 let rec gfpf pos t = match pos, T.Classic.view t with
   | [], T.Classic.Var _ -> A
   | [], T.Classic.DB _ -> B
+  | [], _ when not (Unif.Ty.type_is_unifiable @@ T.ty t) -> B
   | [], T.Classic.App (s, _) -> S s
   | i::pos', T.Classic.App (_, l) ->
     begin try gfpf pos' (List.nth l i)  (* recurse in subterm *)
@@ -259,7 +260,7 @@ module Make(X : Set.OrderedType) = struct
       Util.exit_prof prof_traverse;
       raise e
 
-  let retrieve_unifiables ?(subst=S.empty) (idx,sc_idx) t k =
+  let retrieve_unifiables ?(subst=Unif_subst.empty) (idx,sc_idx) t k =
     let features = idx.fp (fst t) in
     let compatible = compatible_features_unif in
     traverse ~compatible idx features

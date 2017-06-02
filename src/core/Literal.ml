@@ -8,6 +8,7 @@ module S = Subst
 module PB = Position.Build
 module P = Position
 module AL = Int_lit
+module US = Unif_subst
 
 type term = Term.t
 
@@ -365,11 +366,11 @@ let symbols lit = Seq.symbols lit |> ID.Set.of_seq
 
 (** Unification-like operation on components of a literal. *)
 module UnifOp = struct
-  type op = {
-    term : subst:Subst.t -> term Scoped.t -> term Scoped.t ->
-      Subst.t Sequence.t;
-    monomes : subst:Subst.t -> Z.t Monome.t Scoped.t -> Z.t Monome.t
-        Scoped.t -> Subst.t Sequence.t;
+  type 'subst op = {
+    term : subst:'subst -> term Scoped.t -> term Scoped.t ->
+      'subst Sequence.t;
+    monomes : 'a. subst:'subst -> 'a Monome.t Scoped.t -> 'a Monome.t
+        Scoped.t -> 'subst Sequence.t;
   }
 end
 
@@ -393,6 +394,8 @@ let unif_lits op ~subst (lit1,sc1) (lit2,sc2) k =
       unif4 op.term ~subst l1 r1 sc1 l2 r2 sc2 k
     | Int o1, Int o2 ->
       Int_lit.generic_unif op.monomes ~subst (o1,sc1) (o2,sc2) k
+    | Rat o1, Rat o2 ->
+      Rat_lit.generic_unif op.monomes ~subst (o1,sc1) (o2,sc2) k
     | _, _ -> ()
 
 let variant ?(subst=S.empty) lit1 lit2 k =
@@ -470,10 +473,10 @@ let subsumes ?(subst=Subst.empty) (lit1,sc1) (lit2,sc2) k =
       _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 k
     | _ -> matching ~subst ~pattern:(lit1,sc1) (lit2,sc2) k
 
-let unify ?(subst=Subst.empty) lit1 lit2 k =
+let unify ?(subst=US.empty) lit1 lit2 k =
   let op = UnifOp.({
       term=(fun ~subst t1 t2 k ->
-        try k (Unif.FO.unification ~subst t1 t2)
+        try k (Unif.FO.unify_full ~subst t1 t2)
         with Unif.Fail -> ());
       monomes=(fun ~subst m1 m2 k -> Monome.unify ~subst m1 m2 k)
     })
@@ -701,6 +704,15 @@ let is_ho_predicate lit = CCOpt.is_some (as_ho_predicate lit)
 let is_ho_unif lit = match lit with
   | Equation (t, u, false) -> Term.is_ho_app t || Term.is_ho_app u
   | _ -> false
+
+let of_unif_subst ~renaming (s:Unif_subst.t) : t list =
+  Unif_subst.constr_l_subst ~renaming s
+  |> List.map
+    (fun (t,u) ->
+       (* upcast *)
+       let t = T.of_term_unsafe t in
+       let u = T.of_term_unsafe u in
+       mk_neq t u)
 
 (** {2 IO} *)
 

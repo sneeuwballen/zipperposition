@@ -95,8 +95,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       (fun (idx,lit) -> match lit with
          | Literal.Prop (t, sign) ->
            begin match T.as_var t with
-             | Some v when not (Purify.is_shielded v (C.lits c)) -> 
-               (* found unshielded var, replace it with [not sign] *)
+             | Some v -> 
+               (* found var, replace it with [not sign] *)
                let t = if sign then T.false_ else T.true_ in
                let subst =
                  Subst.FO.of_list' [(v,0), (t,0)]

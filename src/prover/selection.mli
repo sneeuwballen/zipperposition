@@ -13,7 +13,7 @@ open Logtk
     if [strict=false] then all positive literals are also selected.
 *)
 
-type t = Classify_literals.t -> Literal.t array -> CCBV.t
+type t = Literal.t array -> CCBV.t
 
 type parametrized = strict:bool -> ord:Ordering.t -> t
 

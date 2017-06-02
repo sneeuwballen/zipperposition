@@ -171,9 +171,6 @@ module type S = sig
   val selected_lits : t -> (Literal.t * int) list
   (** get the list of selected literals *)
 
-  val classify_lits : t -> Classify_literals.t
-  (** Classification of the literals *)
-
   val penalty : t -> int
 
   val is_unit_clause : t -> bool
