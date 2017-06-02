@@ -552,7 +552,6 @@ let is_ho_constraint = function
 
 let is_constraint = function
   | HO_constraint _ -> true
-  | Equation (l, r, false) -> T.is_var l || T.is_var r
   | _ -> false
 
 let negate lit = match lit with
