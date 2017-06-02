@@ -2,6 +2,16 @@
 
 ## Now
 
+- unification under constraints
+  * propose `unif_constraint: term -> term -> subst * (term*term) list`
+  * provide `is_syntactic_unifiable: term -> bool`
+    (returns false on int,rat,HO terms)
+  * change `fold_terms` so it doesn't recurse under non-syntactic unifiable terms
+  * modify term indexing so it puts all non-syntactic unifiable terms in a box
+  * use `unif_constraint` in all inference rules, adding constraints
+    as new literals
+  * disable purification → evaluate perf impact on arith
+
 - add special "ho constraint" literals
   * automatically used for purification of HO subterms
   * purification can occur in them for arithmetic terms, not FOOL nor HO
