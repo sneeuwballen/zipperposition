@@ -1112,6 +1112,10 @@ module Make
        by free variables in the negation of [clauses] *)
   let prove_by_ind (clauses:C.t list) ~generalize_on : unit =
     let pp_csts = Util.pp_list Fmt.(pair ~sep:(return ":@ ") ID.pp Type.pp) in
+    (* remove trivial clauses *)
+    let clauses =
+      List.filter (fun c -> not @@ Literals.is_trivial @@ C.lits c) clauses
+    in
     Util.debugf ~section 5
       "(@[<2>consider_proving_by_induction@ \
        :clauses [@[%a@]]@ :generalize_on (@[%a@])@]"
