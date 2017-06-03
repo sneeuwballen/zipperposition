@@ -1,0 +1,92 @@
+data list a := nil | cons a (list a).
+
+val default_value : pi a. a.
+
+def head : pi a. list a -> a where
+  head nil = default_value;
+  forall hd tl. head (cons hd tl) = hd.
+
+def tail : pi a. list a -> list a where
+  tail nil = nil;
+  forall hd tl. tail (cons hd tl) = tl.
+
+def length : pi a. list a -> int where
+  length nil = 0;
+  forall hd tl. length (cons hd tl) = 1 + length tl.
+
+def[infix "++"] append : pi a. list a -> list a -> list a where
+  forall l. append nil l = l;
+  forall hd tl l. append (cons hd tl) l = cons hd (append tl l).
+
+def reverse : pi a. list a -> list a where
+  reverse nil = nil;
+  forall hd tl. reverse (cons hd tl) = append (reverse tl) (cons hd nil).
+
+def nth : pi a. int -> list a -> a where
+  forall n. nth n nil = default_value;
+  forall n hd tl. nth n (cons hd tl) = (if n = 0 then hd else nth (n - 1) tl).
+
+def[infix "∈"] mem : pi a. a -> list a -> prop where
+  forall x. mem x nil = false;
+  forall x hd tl. mem x (cons hd tl) = (x = hd || mem x tl).
+
+def distinct : pi a. list a -> prop where
+  distinct nil = true;
+  forall hd tl. distinct (cons hd tl) = (~mem hd tl && distinct tl).
+
+def take : pi a. int -> list a -> list a where
+  forall n. take n nil = nil;
+  forall n hd tl. take n (cons hd tl) =
+     (if n = 0 then nil else cons hd (take (n - 1) tl)).
+
+def drop : pi a. int -> list a -> list a where
+  forall n. drop n nil = nil;
+  forall n hd tl. drop n (cons hd tl) =
+     (if n = 0 then cons hd tl else drop (n - 1) tl).
+
+def remove : pi a. a -> list a -> list a where
+  forall x. remove x nil = nil;
+  forall x hd tl. remove x (cons hd tl) =
+          (if hd = x then tl else cons hd (remove x tl)).
+
+def remove_nth : pi a. int -> list a -> list a where
+  forall n. remove_nth n nil = nil;
+  forall n hd tl. remove_nth n (cons hd tl) =
+           (if n = 0 then tl else cons hd (remove_nth (n - 1) tl)).
+
+def index_of : pi a. a -> list a -> int where
+  forall x. index_of x nil = 0;
+  forall x hd tl. index_of x (cons hd tl) =
+       (if hd = x then 0 else 1 + index_of x tl).
+
+def foreach : pi a. list a -> (a -> prop) -> prop where
+   forall p. foreach nil p = true;
+   forall hd tl p. foreach (cons hd tl) p = (p hd && foreach tl p).
+
+def map : pi a b. (a -> b) -> list a -> list b where
+   forall f. map f nil = nil;
+   forall f hd tl. map f (cons hd tl) = cons (f hd) (map f tl).
+
+# In the source file, a forall function behaving like the foreach
+# relation is defined It makes sense in VeriFast because relations and
+# functions to prop are not identified (predicates can occupy some
+# place on the heap).
+
+# "forsome" is called "exists" in VeriFast but this is a keyword in zf.
+def forsome : pi a. list a -> (a -> prop) -> prop where
+   forall p. forsome nil p = false;
+   forall hd tl p. forsome (cons hd tl) p = (p hd || forsome tl p).
+
+def update : pi a. int -> a -> list a -> list a where
+   forall i y. update i y nil = nil;
+   forall i y hd tl. update i y (cons hd tl) =
+      (if i = 0 then cons y tl else cons hd (update (i - 1) y tl)).
+
+def all_eq : pi a. list a -> a -> prop where
+   forall x. all_eq nil x = true;
+   forall hd tl x. all_eq (cons hd tl) x = (hd = x && all_eq tl x).
+
+def count : pi a. list a -> (a -> prop) -> int where
+   forall p. count nil p = 0;
+   forall hd tl p. count (cons hd tl) p = count tl p + (if p hd then 1 else 0).
+
