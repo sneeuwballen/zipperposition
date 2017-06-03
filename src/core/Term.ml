@@ -400,7 +400,7 @@ module AC(A : AC_SPEC) = struct
       | T.Const _
       | T.Var _
       | T.DB _ -> t
-      | T.App (f, l) when A.is_ac (head_exn f) ->
+      | T.App (f, l) when T.is_const f && A.is_ac (head_exn f) ->
         let l = flatten (head_exn f) l in
         let tyargs, l = split_args_ ~ty:(ty f) l in
         let l = List.map normalize l in
@@ -414,7 +414,7 @@ module AC(A : AC_SPEC) = struct
               x l'
           | [] -> assert false
         end
-      | T.App (f, l) when A.is_comm (head_exn f) ->
+      | T.App (f, l) when T.is_const f && A.is_comm (head_exn f) ->
         let tyargs, l = split_args_ ~ty:(ty f) l in
         begin match l with
           | [a;b] ->
