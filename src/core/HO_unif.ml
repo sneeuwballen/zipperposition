@@ -352,7 +352,6 @@ end
 let term_arity args =
   args
   |> Util.take_drop_while (fun t -> T.is_type t)
-
   |> CCPair.map List.length List.length
 
 let unif_step ((c:Combinators.t),sc_combs) ((t,u),sc_pair): _ list =
