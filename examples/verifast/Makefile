@@ -11,18 +11,18 @@ all: easy hard
 %_hard_pb.zf: goals.org
 	@echo 'include "list.zf".' > $@
 	@echo -n 'goal ' >> $@
-	@grep "$* " goals.org | cut -d '|' -f 3 | sed "s/OR/||/g" >> $@
+	@grep " $* " goals.org | cut -d '|' -f 3 | sed "s/OR/||/g" >> $@
 
 # Prove lemma foo from the definitions and the previous lemmas
 %_easy_pb.zf: goals.org
 	@echo 'include "list.zf".' > $@
 	@sed "/$* /q" goals.org | sed '$$d' | cut -d '|' -f 3 | sed "s/OR/||/g" | sed 's/^/assert /' >> $@
 	@echo -n 'goal ' >> $@
-	@grep "$* " goals.org | cut -d '|' -f 3 | sed "s/OR/||/g" >> $@
+	@grep " $* " goals.org | cut -d '|' -f 3 | sed "s/OR/||/g" >> $@
 
 # Call zipperposition and store its output in the target file foo_{easy|hard}_pb.zipper_proof
 # Additionnally, foo_{easy|hard}_pb.time contains the time
-# and foo_{easy|hard}_pb.time contains the status
+# and foo_{easy|hard}_pb.status contains the status
 # Echo the status
 %.zipper_proof: %.zf
 	@echo -n "$*: "
