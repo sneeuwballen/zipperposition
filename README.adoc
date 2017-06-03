@@ -373,6 +373,15 @@ axioms:
 val[AC] f : foo -> foo -> foo.
 ----
 
+Axioms in _Set of Support_::
++
+Some axioms (introduced using `assert [sos] <formula>.`) will be considered
+as part of the so-called "set of support" strategy.
+No saturation among SOS axioms is done. They are only used for inferences
+(and simplifications) with non-SOS axioms and goals.
+Typically this is useful for introducing general lemmas while preventing them
+from interacting in ways not related to the current goal.
+
 === Graphical Display of Proofs
 
 A handy way of displaying the proof is to use http://graphviz.org/[graphviz]:

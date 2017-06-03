@@ -28,6 +28,7 @@ type attr =
   | A_AC
   | A_infix of string
   | A_prefix of string
+  | A_sos (** set of support *)
 
 type attrs = attr list
 
@@ -134,6 +135,8 @@ val neg_goal :
 
 val signature : ?init:Signature.t -> (_, _, Type.t) t Sequence.t -> Signature.t
 (** Compute signature when the types are using {!Type} *)
+
+val conv_attrs : UntypedAST.attrs -> attrs
 
 val add_src : file:string -> ('f, 't, 'ty) t -> ('f, 't, 'ty) t
 

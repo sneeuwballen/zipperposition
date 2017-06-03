@@ -23,6 +23,7 @@ type attr =
   | A_AC
   | A_infix of string
   | A_prefix of string
+  | A_sos (** set of support *)
 
 type attrs = attr list
 
@@ -565,17 +566,20 @@ let signature ?(init=Signature.empty) seq =
   |> Sequence.flat_map Seq.ty_decls
   |> Sequence.fold (fun sigma (id,ty) -> Signature.declare sigma id ty) init
 
+let conv_attrs =
+  let module A = UntypedAST in
+  CCList.filter_map
+    (function
+      | A.A_app (("ac" | "AC"), []) -> Some A_AC
+      | A.A_app (("sos" | "SOS"), []) -> Some A_sos
+      | A.A_app ("infix", [A.A_quoted s]) -> Some (A_infix s)
+      | A.A_app ("prefix", [A.A_quoted s]) -> Some (A_prefix s)
+      | _ -> None)
+
 let add_src ~file st = match st.src.src_view with
   | Input (attrs,r) ->
     let module A = UntypedAST in
-    let attrs =
-      CCList.filter_map
-        (function
-          | A.A_app (("ac" | "AC"), []) -> Some A_AC
-          | A.A_app ("infix", [A.A_quoted s]) -> Some (A_infix s)
-          | A.A_app ("prefix", [A.A_quoted s]) -> Some (A_prefix s)
-          | _ -> None)
-        attrs
+    let attrs = conv_attrs attrs
     and name =
       CCList.find_map
         (function
@@ -601,6 +605,7 @@ let pp_attr out = function
   | A_AC -> fpf out "AC"
   | A_infix s -> fpf out "infix \"%s\"" s
   | A_prefix s -> fpf out "prefix \"%s\"" s
+  | A_sos -> fpf out "sos"
 
 let pp_attrs out = function
   | [] -> ()

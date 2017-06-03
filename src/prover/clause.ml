@@ -19,6 +19,12 @@ module type S = Clause_intf.S
 type proof_step = Proof.Step.t
 type proof = Proof.S.t
 
+(** Bundle of clause sets *)
+type 'c sets = {
+  c_set: 'c CCVector.ro_vector; (** main set of clauses *)
+  c_sos: 'c CCVector.ro_vector; (** set of support *)
+}
+
 (** {2 Type def} *)
 module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   module Ctx = Ctx

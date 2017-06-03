@@ -197,9 +197,9 @@ let make_env ~ctx:(module Ctx : Ctx_intf.S) ~params stmts =
   |> List.iter
     (fun e -> List.iter (fun f -> f env1) e.Extensions.env_actions);
   (* convert statements to clauses *)
-  let clauses = MyEnv.convert_input_statements stmts in
+  let c_sets = MyEnv.convert_input_statements stmts in
   let env2 = (module MyEnv : Env.S with type C.t = MyEnv.C.t) in
-  Phases.return_phase (Phases.Env_clauses (env2, clauses))
+  Phases.return_phase (Phases.Env_clauses (env2, c_sets))
 
 (* FIXME: move this into Env! *)
 let has_goal_ = ref false
@@ -237,34 +237,36 @@ let print_stats (type c) (module Env : Env.S with type C.t = c) =
 (* pre-saturation *)
 let presaturate_clauses (type c)
     (module Env : Env.S with type C.t = c)
-    (clauses : c CCVector.ro_vector) =
+    (c_sets : c Clause.sets) =
   Phases.start_phase Phases.Pre_saturate >>= fun () ->
   let module Sat = Saturate.Make(Env) in
-  let num_clauses = CCVector.length clauses in
+  let num_clauses = CCVector.length c_sets.Clause.c_set in
   if Env.params.param_presaturate
   then (
     Util.debug ~section 1 "presaturate initial clauses";
-    Env.add_passive (CCVector.to_seq clauses);
+    Env.add_passive (CCVector.to_seq c_sets.Clause.c_set);
     let result, num = Sat.presaturate () in
     Util.debugf ~section 1 "initial presaturation in %d steps" (fun k->k num);
     (* pre-saturated set of clauses *)
-    let clauses = Env.get_active () in
+    let c_set = Env.get_active() |> CCVector.of_seq |> CCVector.freeze in
+    let clauses = {c_sets with Clause.c_set; } in
     (* remove clauses from [env] *)
-    Env.remove_active clauses;
-    Env.remove_passive clauses;
+    Env.remove_active (CCVector.to_seq c_set);
+    Env.remove_passive (CCVector.to_seq c_set);
     Util.debugf ~section 2 "@[<2>%d clauses pre-saturated into:@ @[<hv>%a@]@]"
-      (fun k->k num_clauses (Util.pp_seq ~sep:" " Env.C.pp) clauses);
+      (fun k->k num_clauses (Util.pp_seq ~sep:" " Env.C.pp) (CCVector.to_seq c_set));
     Phases.return_phase (result, clauses)
   )
-  else Phases.return_phase (Saturate.Unknown, CCVector.to_seq clauses)
+  else Phases.return_phase (Saturate.Unknown, c_sets)
 
 (* try to refute the set of clauses contained in the [env]. Parameters are
    used to influence how saturation is done, for how long it runs, etc. *)
 let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result =
   Phases.start_phase Phases.Saturate >>= fun () ->
   let module Sat = Saturate.Make(Env) in
-  (* add clauses to passive set of [env] *)
-  Env.add_passive clauses;
+  (* add clauses to passive set of [env], and SOS to active set *)
+  Env.add_active (CCVector.to_seq clauses.Clause.c_sos);
+  Env.add_passive (CCVector.to_seq clauses.Clause.c_set);
   let steps = if Env.params.param_steps < 0
     then None
     else (

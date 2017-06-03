@@ -755,9 +755,17 @@ module Make(X : sig
     | Statement.Lemma _ -> true
     | _ -> false
 
-  let convert_input_statements stmts =
+  let has_sos_attr st =
+    CCList.exists
+      (function Statement.A_sos -> true | _ -> false)
+      (Statement.attrs st)
+
+  let convert_input_statements stmts : C.t Clause.sets =
     Util.debug ~section 2 "trigger on_input_statement";
     CCVector.iter (Signal.send on_input_statement) stmts;
+    (* sets of clauses *)
+    let c_set = CCVector.create() in
+    let c_sos = CCVector.create() in
     (* convert clauses, applying hooks when possible *)
     let rec conv_clause_ rules st = match rules with
       | [] when is_lemma_ st ->
@@ -771,12 +779,23 @@ module Make(X : sig
           | CR_add l -> List.rev_append l (conv_clause_ rules' st)
         end
     in
-    let clauses =
-      CCVector.flat_map_list (conv_clause_ !_clause_conversion_rules) stmts in
-    Util.debugf ~section 1 "@[<2>clauses:@ @[<v>%a@]@]"
-      (fun k->k (Util.pp_seq ~sep:" " C.pp)
-          (CCVector.to_seq clauses));
-    clauses
+    CCVector.iter
+      (fun st ->
+         let cs = conv_clause_ !_clause_conversion_rules st in
+         begin match Statement.view st with
+           | Statement.Assert _ when has_sos_attr st ->
+             CCVector.append_list c_sos cs
+           | _ -> CCVector.append_list c_set cs
+         end)
+      stmts;
+    Util.debugf ~section 1
+      "@[<v>@[<2>clauses:@ @[<v>%a@]@]@ @[<2>sos:@ @[<v>%a@]@]@]"
+      (fun k->k
+          (Util.pp_seq ~sep:" " C.pp) (CCVector.to_seq c_set)
+          (Util.pp_seq ~sep:" " C.pp) (CCVector.to_seq c_sos));
+    let c_set = CCVector.freeze c_set in
+    let c_sos = CCVector.freeze c_sos in
+    { Clause.c_set; c_sos; }
 
   (** {2 Misc} *)
 

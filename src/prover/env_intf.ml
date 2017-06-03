@@ -165,7 +165,7 @@ module type S = sig
   (** Triggered on every input statement *)
 
   val convert_input_statements :
-    Statement.clause_t CCVector.ro_vector -> C.t CCVector.ro_vector
+    Statement.clause_t CCVector.ro_vector -> C.t Clause.sets
   (** Convert raw input statements into clauses, triggering
       {! on_input_statement} *)
 
