@@ -943,6 +943,7 @@ let infer_statement_exn ctx st =
     (fun k->k A.pp_statement st);
   (* auxiliary statements *)
   let mk_src r = Stmt.Src.from_input st.A.attrs r in
+  let attrs = Stmt.conv_attrs st.A.attrs in
   let loc = st.A.loc in
   let st = match st.A.stmt with
     | A.Include _ ->
@@ -1042,7 +1043,7 @@ let infer_statement_exn ctx st =
       Stmt.data ~src:(mk_src Stmt.R_def) l'
     | A.Assert t ->
       let t = infer_prop_exn ctx t in
-      Stmt.assert_ ~src:(mk_src Stmt.R_assert) t
+      Stmt.assert_ ~attrs ~src:(mk_src Stmt.R_assert) t
     | A.Lemma t ->
       let t = infer_prop_exn ctx t in
       Stmt.lemma ~src:(mk_src Stmt.R_assert) [t]

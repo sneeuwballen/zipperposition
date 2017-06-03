@@ -920,7 +920,7 @@ let flatten ~ctx seq : _ Sequence.t =
          | Stmt.Rewrite (Stmt.Def_form ((vars, _, _) as r)) ->
            flat_form_rule stmt r
            |> List.map
-             (fun (lhs,rhs) -> Stmt.rewrite_form ~src:(src ()) (vars,lhs,rhs))
+             (fun (lhs,rhs) -> Stmt.rewrite_form ~attrs ~src:(src ()) (vars,lhs,rhs))
          | Stmt.Def l ->
            let l =
              List.map
@@ -929,15 +929,15 @@ let flatten ~ctx seq : _ Sequence.t =
                   { d with Stmt.def_rules=rules })
                l
            in
-           [Stmt.def ~src:(src ()) l]
+           [Stmt.def ~attrs ~src:(src ()) l]
          | Stmt.Assert f ->
            flatten_axiom stmt f
-           |> List.map (fun f -> Stmt.assert_ ~src:(src ()) f)
+           |> List.map (fun f -> Stmt.assert_ ~attrs ~src:(src ()) f)
          | Stmt.Lemma l ->
            List.map
-             (fun f -> Stmt.lemma ~src:(src ()) [F.and_ (flatten_axiom stmt f)]) l
+             (fun f -> Stmt.lemma ~attrs ~src:(src ()) [F.and_ (flatten_axiom stmt f)]) l
          | Stmt.Goal f ->
-           [Stmt.goal ~src:(src ()) (F.and_ (flatten_axiom stmt f))]
+           [Stmt.goal ~attrs ~src:(src ()) (F.and_ (flatten_axiom stmt f))]
          | Stmt.NegatedGoal _ -> assert false
        in
        Util.debugf ~section 5 "@[<2>flatten `@[%a@]`@ into `@[%a@]`@]"
@@ -1006,6 +1006,7 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
            then Stmt.Src.preprocess_input stmt (new_src ~ctx) "rename"
            else stmt.Stmt.src
          in
+         let attrs = Stmt.attrs stmt in
          let new_st = match stmt.Stmt.view with
            | Stmt.Data _
            | Stmt.TyDecl _ -> stmt
@@ -1028,10 +1029,10 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
                     { d with Stmt.def_rules=rules })
                  l
              in
-             Stmt.def ~src:(src ()) l
+             Stmt.def ~attrs ~src:(src ()) l
            | Stmt.Rewrite (Stmt.Def_form (vars, lhs, rhs)) ->
              let rhs = process_form_def stmt rhs in
-             Stmt.rewrite_form ~src:(src ()) (vars, lhs, rhs)
+             Stmt.rewrite_form ~attrs ~src:(src ()) (vars, lhs, rhs)
            | Stmt.Rewrite (Stmt.Def_term (vars,id,ty_id,args,rhs)) ->
              (* due to partial application, this might become a formula rewrite rule *)
              let res =
@@ -1047,13 +1048,13 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
              end
            | Stmt.Assert f ->
              let f = process_form stmt ~is_goal:false f in
-             Stmt.assert_ ~src:(src ()) f
+             Stmt.assert_ ~attrs ~src:(src ()) f
            | Stmt.Lemma l ->
              let l = List.map (process_form stmt ~is_goal:true) l in
-             Stmt.lemma ~src:(src ()) l
+             Stmt.lemma ~attrs ~src:(src ()) l
            | Stmt.Goal f ->
              let f = process_form stmt ~is_goal:true f in
-             Stmt.goal ~src:(src()) f
+             Stmt.goal ~attrs ~src:(src()) f
            | Stmt.NegatedGoal _ -> assert false
          in
          begin match pop_new_defs ~ctx with
