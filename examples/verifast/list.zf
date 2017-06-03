@@ -1,6 +1,9 @@
-data list a := nil | cons a (list a).
 
 val default_value : pi a. a.
+
+# Definitions from list.gh
+
+data list a := nil | cons a (list a).
 
 def head : pi a. list a -> a where
   head nil = default_value;
@@ -89,4 +92,44 @@ def all_eq : pi a. list a -> a -> prop where
 def count : pi a. list a -> (a -> prop) -> int where
    forall p. count nil p = 0;
    forall hd tl p. count (cons hd tl) p = count tl p + (if p hd then 1 else 0).
+
+# Definitions from listex.gh
+
+def max : int -> list int -> int where
+   forall x. max x nil = x;
+   forall x hd tl. max x (cons hd tl) = (if x < hd then max hd tl else max x tl).
+
+def fold_left : pi a b. a -> (a -> b -> a) -> list b -> a where
+   forall acc f. fold_left acc f nil = acc;
+   forall acc f hd tl. fold_left acc f (cons hd tl) = fold_left (f acc hd) f tl.
+
+def remove_all : pi a. list a -> list a -> list a where
+   forall l. remove_all nil l = l;
+   forall hd tl l. remove_all (cons hd tl) l = remove hd (remove_all tl l).
+
+def filter : pi a. (a -> prop) -> list a -> list a where
+   forall f. filter f nil = nil;
+   forall f hd tl. filter f (cons hd tl) =
+      (if f hd then cons hd (filter f tl) else filter f tl).
+
+def contains : pi a. list a -> a -> prop where
+  forall l x. contains l x = mem x l.
+
+# Source file uses partial applications of contains that seem not
+# supported by Zipperpostion. We eta-expand instead.
+
+def[infix "⊆"] subset : pi a. list a -> list a -> prop where
+  forall l1 l2. subset l1 l2 = foreach l1 (fun x. contains l2 x).
+
+def[infix "∩"] intersection : pi a. list a -> list a -> list a where
+  forall l1 l2. intersection l1 l2 = filter (fun x. contains l1 x) l2.
+
+def foreachp : pi a. list a -> (a -> prop) -> prop where
+  forall l p. foreachp l p =
+    (if l = nil then
+       true
+     else
+       (l = cons (head l) (tail l) &&
+        p (head l) &&
+        foreachp (tail l) p)).
 

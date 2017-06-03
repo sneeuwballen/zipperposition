@@ -2,7 +2,8 @@ SHELL=/bin/bash
 
 GOALS=$(shell cut goals.org -d '|' -f 2)
 PROVER=zipperposition
-PROVER_OPT=-o none -t 2
+TIMEOUT=2
+PROVER_OPT=-o none -t $(TIMEOUT)
 
 all: easy hard
 
@@ -25,7 +26,7 @@ all: easy hard
 # Echo the status
 %.zipper_proof: %.zf
 	@echo -n "$*: "
-	@( time $(PROVER) $(PROVER_OPT) $< > $@ ) |& cat > $*.time
+	@( time timeout $(TIMEOUT) $(PROVER) $(PROVER_OPT) $< > $@ ) |& cat > $*.time
 	@cat $@ | grep -i status | cut -d ' ' -f 4 | tee $*.status
 	@echo
 
