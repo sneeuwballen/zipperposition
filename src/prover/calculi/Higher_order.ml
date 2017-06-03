@@ -403,14 +403,16 @@ module Make(E : Env.S) : S with module Env = E = struct
   let declare_combinators() =
     let module RW = Rewrite in
     let c = Ctx.combinators () in
-    List.iter
-      (fun (id,ty) -> Ctx.declare id ty)
-      (HO_unif.Combinators.decls c);
+    (* define combinators *)
     List.iter
       (fun (r,_) ->
          let id = RW.Term.Rule.head_id r in
          RW.Defined_cst.declare_or_add id (Rewrite.T_rule r))
       (HO_unif.Combinators.rules c);
+    (* now that combinators are defined, we can declare them *)
+    List.iter
+      (fun (id,ty) -> Ctx.declare id ty)
+      (HO_unif.Combinators.decls c);
     ()
 
   let setup () =
