@@ -1,0 +1,35 @@
+| length_nonnegative   | forall a (l : list a). length l >= 0.                                                                                                         |
+| append_nil           | forall a (l : list a). append l nil = l.                                                                                                      |
+| append_assoc         | forall a (l1 l2 l3 : list a). append (append l1 l2) l3 = append l1 (append l2 l3).                                                            |
+| length_append        | forall a (l1 l2 : list a). length (append l1 l2) = length l1 + length l2.                                                                     |
+| nth_append           | forall a (l1 l2 : list a) i. 0 <= i && i < length(l1) => nth i l1 = nth i (append l1 l2).                                                     |
+| nth_append_r         | forall a (l1 l2 : list a) i. 0 <= i && i < length(l2) => nth i l2 = nth (length l1 + i) (append l1 l2).                                       |
+| reverse_append       | forall a (l1 l2 : list a). reverse (append l1 l2) = append (reverse l2) (reverse l1).                                                         |
+| reverse_reverse      | forall a (l : list a). reverse (reverse l) = l.                                                                                               |
+| mem_nth              | forall a n (l : list a). (0 <= n && n < length l) => (mem (nth n l) l = true).                                                                |
+| mem_append           | forall a (x : a) (l1 l2 : list a). mem x (append l1 l2) = (mem x l1 OR mem x l2).                                                             |
+| take_0               | forall a (l : list a). take 0 l = nil.                                                                                                        |
+| take_length          | forall a (l : list a). take (length l) l = l.                                                                                                 |
+| length_take          | forall a n (l : list a). 0 <= n && n <= length l => length (take n l) = n.                                                                    |
+| nth_take             | forall a i n (l : list a). 0 <= i && i < n && n <= length l => nth i (take n l) = nth i l.                                                    |
+| drop_0               | forall a (l : list a). drop 0 l = l.                                                                                                          |
+| drop_n_plus_one      | forall a n (l : list a). 0 <= n && n < length l => drop n l = cons (nth n l) (drop (n + 1) l).                                                |
+| drop_length          | forall a (l : list a). drop (length l) l = nil.                                                                                               |
+| length_drop          | forall a n (l : list a). 0 <= n && n <= length l => length (drop n l) = length l - n.                                                         |
+| drop_n_take_n        | forall a n (l : list a). drop n (take n l) = nil.                                                                                             |
+| length_remove        | forall a (x : a) (l : list a). length (remove x l) = (if mem x l then length l - 1 else length l).                                            |
+| drop_take_remove_nth | forall a (l : list a) n. 0 <= n && n < length l => append (take n l) (tail (drop n l)) = remove_nth n l.                                      |
+| append_take_drop_n   | forall a (l : list a) n. 0 <= n && n < length l => append (take n l) (drop n l) = l.                                                          |
+| mem_index_of         | forall a (x : a) (l : list a). mem x l = true => (0 <= index_of x l && index_of x l < length l).                                              |
+| foreach_remove       | forall a (x : a) (l : list a) p. foreach l p && mem x l = true => foreach (remove x l) p && p x.                                              |
+| foreach_unremove     | forall a (x : a) (l : list a) p. foreach (remove x l) p && mem x l = true && p x => foreach l p.                                              |
+| foreach_append       | forall a (l1 l2 : list a) p. foreach l1 p && foreach l2 p => foreach (append l1 l2) p.                                                        |
+| nth_update           | forall a i j (y : a) (l : list a). 0 <= i && i < length l && 0 <= j && j < length l => nth i (update j y l) = (if i = j then y else nth i l). |
+| length_update        | forall a i (y : a) (l : list a). length (update i y l) = length l.                                                                             |
+| all_eq_nth           | forall a (l : list a) (x : a) i. all_eq l x && 0 <= i && i < length l => nth i l = x.                                                         |
+| count_nonnegative    | forall a (l : list a) p. 0 <= count l p.                                                                                                      |
+| count_remove         | forall a (l : list a) p (x : a). mem x l = true => count (remove x l) p = count l p - (if p x then 1 else 0).                                 |
+| count_zero_mem       | forall a (l : list a) p (x : a). count l p = 0 && mem x l = true => ~ p x.                                                                    |
+| count_non_zero       | forall a (l : list a) p. count l p != 0 => (exists result. mem result l && p result).                                                   |
+| count_append         | forall a (l1 l2 : list a) p. count (append l1 l2) p = count l1 p + count l2 p.                                                                |
+
