@@ -12,6 +12,7 @@ type res =
   | Projector of ID.t (** projector of some constructor (id: type) *)
   | DefinedCst of int * Statement.definition
   | Parameter of int
+  | Skolem
   | Other
 
 let classify id =
@@ -28,12 +29,12 @@ let classify id =
     [ (Ind_ty.as_constructor |>> fun (c,t) -> Cstor (c,t));
       (Ind_ty.as_inductive_ty |>> fun x -> Ty x);
       (ID.as_parameter |>> fun x->Parameter x);
+      (Ind_cst.id_as_cst |>> fun c -> Inductive_cst (Some c));
       (fun id ->
          let open CCOpt.Infix in
          ID.as_skolem id >>= function
          | ID.K_ind -> Some (Inductive_cst None)
-         | _ -> None);
-      (Ind_cst.id_as_cst |>> fun c -> Inductive_cst (Some c));
+         | ID.K_normal -> Some Skolem);
       (Ind_ty.as_projector |>> fun p -> Projector (Ind_ty.projector_id p));
       (Rewrite.as_defined_cst |>> fun cst ->
        DefinedCst (Rewrite.Defined_cst.level cst, Rewrite.Defined_cst.rules cst));
@@ -50,6 +51,7 @@ let pp_res out = function
   | Projector id -> Format.fprintf out "projector_%a" ID.pp id
   | DefinedCst (lev,_) -> Format.fprintf out "defined (level %d)" lev
   | Parameter i -> Format.fprintf out "parameter %d" i
+  | Skolem -> CCFormat.string out "skolem"
   | Other -> CCFormat.string out "other"
 
 let pp_signature out sigma =
@@ -69,8 +71,9 @@ let prec_constr_ a b =
     | Cstor _ -> 2
     | Parameter _ -> 3
     | Inductive_cst _ -> 4
-    | Other -> 5
-    | DefinedCst _ -> 6 (* defined: biggest *)
+    | Skolem
+    | Other -> 10 (* skolem and other constants, at the same level *)
+    | DefinedCst _ -> 20 (* defined: biggest *)
   in
   let c_a = classify a in
   let c_b = classify b in
@@ -78,6 +81,7 @@ let prec_constr_ a b =
     | Ty _, Ty _
     | Cstor _, Cstor _
     | Projector _, Projector _
+    | Skolem, Skolem
     | Other, Other -> 0
     | Parameter i, Parameter j -> CCOrd.int i j (* by mere index *)
     | Inductive_cst c1, Inductive_cst c2 ->
@@ -95,7 +99,9 @@ let prec_constr_ a b =
     | Parameter _, _
     | Projector _, _
     | DefinedCst _, _
-    | Other, _ -> CCInt.compare (to_int_ c_a) (to_int_ c_b)
+    | Skolem, _
+    | Other, _
+      -> CCInt.compare (to_int_ c_a) (to_int_ c_b)
 
 let prec_constr = Precedence.Constr.make prec_constr_
 
@@ -107,6 +113,7 @@ let weight_fun (id:ID.t): Precedence.Weight.t =
     | Parameter _ -> W.int 1
     | Cstor _ -> W.int 1
     | Inductive_cst _ -> W.int 2
+    | Skolem
     | Other -> W.omega_plus 4
     | DefinedCst _ -> W.omega_plus 5 (* defined: biggest *)
   end

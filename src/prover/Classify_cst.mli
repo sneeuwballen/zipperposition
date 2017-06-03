@@ -20,6 +20,7 @@ type res =
   | DefinedCst of int * Statement.definition
     (** (recursive) definition of given stratification level + definition *)
   | Parameter of int
+  | Skolem
   | Other
 
 val classify : ID.t -> res

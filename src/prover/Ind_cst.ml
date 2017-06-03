@@ -85,9 +85,9 @@ let n_ = ref 0
 let make_skolem ty : ID.t =
   let c = ID.makef "#%s_%d" (Type.mangle ty) !n_ in
   incr n_;
-  if Ind_ty.is_inductive_type ty then (
-    ID.set_payload c (ID.Attr_skolem ID.K_ind);
-  );
+  (* declare as a skolem *)
+  let k = if Ind_ty.is_inductive_type ty then ID.K_ind else ID.K_normal in
+  ID.set_payload c (ID.Attr_skolem k);
   c
 
 (* declare new constant *)
