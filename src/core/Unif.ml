@@ -350,9 +350,10 @@ module FO = struct
     (are_variant :> term -> term -> bool)
 
   (* anti-unification of the two terms with at most one disagreement point *)
-  let anti_unify (t:term)(u:term): (term * term) list option =
+  let anti_unify ?(cut=max_int) (t:term)(u:term): (term * term) list option =
     let module T = Term in
     let pairs = ref [] in
+    let len = ref 0 in
     let rec aux t u = match T.view t, T.view u with
       | _ when T.equal t u -> () (* trivial *)
       | _ when not (Type.equal (T.ty t) (T.ty u)) ->
@@ -362,7 +363,11 @@ module FO = struct
       | T.App (f, ts), T.App (g, us) when T.equal f g &&
                                           List.length ts = List.length us ->
         List.iter2 aux ts us
-      | _ -> pairs := (t, u) :: !pairs;
+      | _ ->
+        incr len;
+        if !len <= cut then (
+          pairs := (t, u) :: !pairs;
+        ) else raise Exit (* went above cut *)
     in
     assert (not (T.equal t u));
     try

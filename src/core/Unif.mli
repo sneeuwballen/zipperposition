@@ -60,8 +60,10 @@ module Ty : S with type term = Type.t and type ty = Type.t
 module FO : sig
   include S with type term = Term.t and type ty = Type.t
 
-  val anti_unify : term -> term -> (term * term) list option
-  (** anti-unification of the two terms, returning disagreement pairs *)
+  val anti_unify : ?cut:int -> term -> term -> (term * term) list option
+  (** anti-unification of the two terms, returning disagreement pairs
+      @param cut if [cut=n], then the returned list will have length
+      at most [n] (if it's too long then [None] is returned) *)
 
   val pair_lists : term -> term list -> term -> term list -> term list * term list
 end

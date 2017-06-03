@@ -1166,7 +1166,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   (* anti-unification of the two terms with at most one disagreement point *)
   let anti_unify (t:T.t)(u:T.t): (T.t * T.t) option =
-    match Unif.FO.anti_unify t u with
+    match Unif.FO.anti_unify ~cut:1 t u with
       | Some [pair] -> Some pair
       | _ -> None
 
