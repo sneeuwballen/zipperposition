@@ -214,6 +214,10 @@ module Pos : sig
       can the whole literal becomes smaller? *)
 end
 
+val replace : t -> old:term -> by:term -> t
+(** [replace lit ~old ~by] syntactically replaces all occurrences of [old]
+    in [lit] by the term [by]. *)
+
 (** {2 Specific views} *)
 module View : sig
   val as_eqn : t -> (term * term * bool) option

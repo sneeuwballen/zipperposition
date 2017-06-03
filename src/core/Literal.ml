@@ -1002,6 +1002,8 @@ module Pos = struct
       | Equation _, _ -> _fail_lit lit pos
 end
 
+let replace lit ~old ~by = map (T.replace ~old ~by) lit
+
 module Conv = struct
   type hook_from = term SLiteral.t -> t option
   type hook_to = t -> term SLiteral.t option
