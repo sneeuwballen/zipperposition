@@ -77,7 +77,7 @@ let incr_counter ctx = ctx.sc_counter <- ctx.sc_counter + 1
 let fresh_id ~ctx prefix =
   let n = CCHashtbl.get_or ~default:0 ctx.sc_gensym prefix in
   Hashtbl.replace ctx.sc_gensym prefix (n+1);
-  let name = if n=0 then prefix else prefix ^ string_of_int n in
+  let name = prefix ^ string_of_int n in
   ID.make name
 
 let fresh_skolem_prefix ~ctx ~ty prefix =
@@ -181,7 +181,7 @@ let define_form ~ctx ~add_rules ~polarity ~src form =
 let pp_rules =
   Fmt.(Util.pp_list Dump.(pair (list T.pp_inner |> hovbox) T.pp) |> hovbox)
 
-let define_term ~ctx rules : term_definition =
+let define_term ?(pattern="fun_") ~ctx rules : term_definition =
   Util.debugf ~section 5
     "(@[<hv2>define_term@ :rules (@[<hv>%a@])@])" (fun k->k pp_rules rules);
   incr_counter ctx;
@@ -207,8 +207,9 @@ let define_term ~ctx rules : term_definition =
     rules;
   let ty = T.Ty.forall_l ty_vars (T.Ty.fun_ ty_args ty_ret) in
   let is_prop = T.Ty.is_prop ty_ret in
-  (* NOTE: not a skolem, just a mere constant undeclared so far *)
-  let id = fresh_id ~ctx "fun_" in
+  (* NOTE: not a skolem, just a mere constant undeclared so far. Will be
+     a defined constant later on. *)
+  let id = fresh_id ~ctx pattern in
   (* convert rules *)
   let rules =
     List.map

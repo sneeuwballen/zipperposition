@@ -91,12 +91,15 @@ type term_definition = private {
 }
 
 val define_term :
+  ?pattern:string ->
   ctx:ctx ->
   (term list * term) list ->
   term_definition
 (** [define_term l] introduces a new function symbol [f] that is
     defined by:
-    - for each [args, rhs] in [l], [f args = rhs] *)
+    - for each [args, rhs] in [l], [f args = rhs]
+    @param pattern used to name the new function in an informative way
+*)
 
 type definition =
   | Def_form of form_definition

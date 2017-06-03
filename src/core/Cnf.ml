@@ -226,8 +226,15 @@ module Flatten = struct
 
   (* conversion of terms can yield several possible terms, by
      eliminating if and match
-     @param vars the variables that can be replaced in the context *)
-  let flatten_rec (ctx:Skolem.ctx) stmt (pos:position) (vars:type_ Var.t list)(t:term): T.t t =
+     @param vars the variables that can be replaced in the context
+     @param of_ the ID being defined, if any
+  *)
+  let flatten_rec ?of_ (ctx:Skolem.ctx) stmt (pos:position) (vars:type_ Var.t list)(t:term): T.t t =
+    (* how to name intermediate subterms? *)
+    let mk_pat what = match of_ with
+      | None -> what ^  "_"
+      | Some id -> Fmt.sprintf "%s_%s_" (ID.name id) what
+    in
     let rec aux pos vars t = match T.view t with
       | T.AppBuiltin (Builtin.True, []) -> return F.true_
       | T.AppBuiltin (Builtin.False, []) -> return F.false_
@@ -265,7 +272,7 @@ module Flatten = struct
               apply_subst_vars_ subst closure @ [F.false_], T.Subst.eval subst c
             in
             let rules = to_list' (cases_true <+> cases_false) in
-            let def = Skolem.define_term ~ctx rules in
+            let def = Skolem.define_term ~ctx rules ~pattern:(mk_pat "ite") in
             aux Pos_toplevel vars a >|= fun a ->
             T.app ~ty:(T.ty_exn b)
               (T.const def.Skolem.td_id ~ty:def.Skolem.td_ty)
@@ -328,7 +335,7 @@ module Flatten = struct
             let rules = to_list' cases in
             Util.debugf ~section 5 "(@[define_match@ :term %a@ :rules %a@])"
               (fun k->k T.pp t pp_rules rules);
-            let def = Skolem.define_term ~ctx rules in
+            let def = Skolem.define_term ~ctx rules ~pattern:(mk_pat "match") in
             (* now apply definition to [u] *)
             aux Pos_inner vars u >|= fun u ->
             T.app ~ty:(T.ty_exn t)
@@ -409,7 +416,7 @@ module Flatten = struct
         let rules = to_list' cases in
         Util.debugf ~section 5 "@[<2>define_lambda `@[%a@]`@ rules: [@[%a@]]@]@."
           (fun k->k T.pp t pp_rules rules);
-        let def = Skolem.define_term ~ctx rules in
+        let def = Skolem.define_term ~ctx rules ~pattern:(mk_pat "fun") in
         let res =
           T.app ~ty:(T.ty_exn t)
             (T.const def.Skolem.td_id ~ty:def.Skolem.td_ty)
@@ -437,7 +444,8 @@ module Flatten = struct
       (fun k->k T.pp t (Util.pp_list Var.pp_fullc) vars);
     aux pos vars t
 
-  let flatten_rec_l ctx stmt pos vars l = map_m (flatten_rec ctx stmt pos vars) l
+  let flatten_rec_l ?of_ ctx stmt pos vars l =
+    map_m (flatten_rec ?of_ ctx stmt pos vars) l
 end
 
 (* miniscoping (push quantifiers as deep as possible in the formula) *)
@@ -850,10 +858,10 @@ let flatten ~ctx seq : _ Sequence.t =
   let open Flatten in
   let flat_term_rule stmt (r:_ Stmt.term_rule) : _ list =
     begin
-      let vars, _, _, args, rhs = r in
-      flatten_rec_l ctx stmt Pos_inner vars args >>= fun args ->
-      flatten_rec_l ctx stmt Pos_toplevel vars args >>= fun args ->
-      flatten_rec ctx stmt Pos_toplevel vars rhs >>= fun rhs ->
+      let vars, id, _, args, rhs = r in
+      flatten_rec_l ~of_:id ctx stmt Pos_inner vars args >>= fun args ->
+      flatten_rec_l ~of_:id ctx stmt Pos_toplevel vars args >>= fun args ->
+      flatten_rec ~of_:id ctx stmt Pos_toplevel vars rhs >>= fun rhs ->
       get_subst >|= fun subst ->
       let args = List.map (T.Subst.eval subst) args in
       let rhs = T.Subst.eval subst rhs in
@@ -862,8 +870,12 @@ let flatten ~ctx seq : _ Sequence.t =
   and flat_form_rule stmt (r:_ Stmt.form_rule) : _ list =
     begin
       let vars, lhs, rhs = r in
-      map_sliteral (flatten_rec ctx stmt Pos_inner vars) lhs >>= fun lhs ->
-      flatten_rec_l ctx stmt Pos_toplevel vars rhs >>= fun rhs ->
+      let of_ = match lhs with
+        | SLiteral.Atom (t,_) -> T.head t
+        | _ -> None
+      in
+      map_sliteral (flatten_rec ?of_ ctx stmt Pos_inner vars) lhs >>= fun lhs ->
+      flatten_rec_l ?of_ ctx stmt Pos_toplevel vars rhs >>= fun rhs ->
       get_subst >|= fun subst ->
       let lhs = SLiteral.map ~f:(T.Subst.eval subst) lhs in
       let rhs = List.map (T.Subst.eval subst) rhs in
