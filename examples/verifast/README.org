@@ -1,5 +1,5 @@
-These inductive problems have been manually translated from the file
-[[https://github.com/verifast/verifast/blob/master/bin/list.gh][list.gh]] from Verifast standard library.
+These inductive problems have been manually translated from the files
+[[https://github.com/verifast/verifast/blob/master/bin/list.gh][list.gh]] and [[https://github.com/verifast/verifast/blob/master/bin/listex.gh][listex.gh]] from Verifast standard library.
 
 Usage: $ make | grep -v make
 
