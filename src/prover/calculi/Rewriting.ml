@@ -53,19 +53,23 @@ module Make(E : Env_intf.S) = struct
          RW.Term.narrow_term ~scope_rules:sc_rule (u_p,sc_c)
          |> Sequence.map
            (fun (rule,subst) ->
-              let i, lit_pos = Literals.Pos.cut passive_pos in
+              let i, _ = Literals.Pos.cut passive_pos in
               let renaming = C.Ctx.renaming_clear() in
               (* side literals *)
               let lits_passive = C.lits c in
               let lits_passive =
                 Literals.apply_subst ~renaming subst (lits_passive,sc_c) in
               let lits' = CCArray.except_idx lits_passive i in
-              (* literal in which narrowing took place *)
+              (* substitute in rule *)
               let rhs =
-                Subst.FO.apply ~renaming subst (RW.Term.Rule.rhs rule, sc_rule) in
+                Subst.FO.apply ~renaming subst (RW.Term.Rule.rhs rule, sc_rule)
+              and lhs =
+                Subst.FO.apply ~renaming subst (RW.Term.Rule.lhs rule, sc_rule)
+              in
+              (* literal in which narrowing took place: replace lhs by rhs *)
               let new_lit =
-                Literal.Pos.replace lits_passive.(i) ~at:lit_pos
-                  ~by:rhs in
+                Literal.replace lits_passive.(i) ~old:lhs ~by:rhs
+              in
               (* make new clause *)
               Util.incr_stat stat_narrowing_term;
               let proof =
