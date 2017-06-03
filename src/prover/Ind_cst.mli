@@ -83,7 +83,6 @@ val ind_skolem_depth : ID.t -> int
 (** depth of the skolem (0 if not an inductive constant) *)
 
 (**/**)
-val max_depth_: int ref
 
 exception Payload_cst of t
 (**/**)

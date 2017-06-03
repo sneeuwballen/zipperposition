@@ -1110,7 +1110,7 @@ module Make
 
       @param generalize_on the set of (skolem) constants that are replaced
        by free variables in the negation of [clauses] *)
-  let prove_by_ind (clauses:C.t list) ~generalize_on : unit =
+  let prove_by_ind (clauses:C.t list) ~ignore_depth ~generalize_on : unit =
     let pp_csts = Util.pp_list Fmt.(pair ~sep:(return ":@ ") ID.pp Type.pp) in
     (* remove trivial clauses *)
     let clauses =
@@ -1135,7 +1135,7 @@ module Make
       |> Sequence.for_all
         (fun lit -> not (BoolLit.sign lit && BBox.is_lemma lit))
     in
-    if depth <= max_depth && no_pos_lemma_in_trail () then (
+    if (ignore_depth || depth < max_depth) && no_pos_lemma_in_trail () then (
       let goal =
         generalize_clauses
           (List.map C.lits clauses)
@@ -1176,7 +1176,7 @@ module Make
     List.iter
       (fun consts ->
          assert (consts<>[]);
-         prove_by_ind [c] ~generalize_on:consts)
+         prove_by_ind [c] ~ignore_depth:false ~generalize_on:consts)
       (scan_clause c);
     []
 
@@ -1208,7 +1208,7 @@ module Make
               C.of_statement st
               |> List.map (fun c -> fst (E.simplify c))
             in
-            prove_by_ind clauses ~generalize_on:consts;
+            prove_by_ind clauses ~ignore_depth:true ~generalize_on:consts;
             (* "skip" in any case, because the proof is done in a cut anyway *)
             E.CR_skip
         end
@@ -1276,7 +1276,6 @@ module Make
     Util.debug ~section 2 "register induction";
     let d = Env.flex_get k_ind_depth in
     Util.debugf ~section 2 "maximum induction depth: %d" (fun k->k d);
-    Ind_cst.max_depth_ := d;
     Env.add_unary_inf "induction.ind" inf_prove_by_ind;
     Env.add_clause_conversion convert_statement;
     Env.add_is_trivial_trail trail_is_trivial_cases;
@@ -1289,7 +1288,7 @@ module Make
 end
 
 let enabled_ = ref true
-let depth_ = ref !Ind_cst.max_depth_
+let depth_ = ref 4 (* NOTE: should be 3? *)
 let limit_to_active = ref true
 let coverset_depth = ref 1
 let goal_assess_limit = ref 8

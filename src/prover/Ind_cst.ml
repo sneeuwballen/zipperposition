@@ -8,9 +8,6 @@ open Logtk
 
 module T = Term
 
-(* TODO: should probably be 3 *)
-let max_depth_ = ref 4
-
 exception InvalidDecl of string
 exception NotAnInductiveConstant of ID.t
 
