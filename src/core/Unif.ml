@@ -155,6 +155,19 @@ module Inner = struct
     else if S.mem subst v then fail()
     else S.bind subst v t
 
+  let has_atomic_ty (t:T.t): bool = match T.ty t with
+    | T.NoType -> false
+    | T.HasType ty ->
+      begin match T.view ty with
+        | T.AppBuiltin (Builtin.Arrow, _)
+        | T.Bind (Binder.ForallTy, _, _) -> false
+        | _ -> true
+      end
+
+  let has_non_unifiable_ty (t:T.t): bool = match T.ty t with
+    | T.NoType -> false
+    | T.HasType ty -> not (type_is_unifiable ty)
+
   let rec unif_rec ~op subst t1s t2s : unif_subst =
     let t1,sc1 = US.deref subst t1s
     and t2,sc2 = US.deref subst t2s in
@@ -209,8 +222,13 @@ module Inner = struct
       | T.App (f1, l1), T.App (f2, l2) ->
         begin match T.view f1, T.view f2 with
           | T.Const id1, T.Const id2 ->
-            if ID.equal id1 id2 && List.length l1 = List.length l2
+            if ID.equal id1 id2 &&
+               List.length l1 = List.length l2 &&
+               (op <> O_unify || has_atomic_ty t1)
             then unif_list ~op subst l1 sc1 l2 sc2
+            else if op=O_unify && has_non_unifiable_ty t1
+            (* TODO: notion of value, here, to fail fast in some cases *)
+            then US.add_constr (Unif_constr.make (t1,sc1) (t2,sc2)) subst
             else fail()
           | T.Var _, _
           | _, T.Var _ ->
@@ -224,11 +242,7 @@ module Inner = struct
         (* unify [a -> b] and [a' -> b'], virtually *)
         let l1, l2 = pair_lists_left args1 ret1 args2 ret2 in
         unif_list ~op subst l1 sc1 l2 sc2
-      | _ when op=O_unify &&
-               begin match T.ty t1 with
-                 | T.NoType -> false
-                 | T.HasType ty -> not (type_is_unifiable ty)
-               end ->
+      | _ when op=O_unify && has_non_unifiable_ty t1 ->
         (* push pair as a constraint, because of typing. *)
         US.add_constr (Unif_constr.make (t1,sc1) (t2,sc2)) subst
       | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Builtin.equal s1 s2 ->
