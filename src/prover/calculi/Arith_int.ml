@@ -15,39 +15,40 @@ module AL = Int_lit
 module ALF = AL.Focus
 module Stmt = Statement
 
-let stat_arith_sup = Util.mk_stat "arith.superposition"
-let stat_arith_cancellation = Util.mk_stat "arith.arith_cancellation"
-let stat_arith_eq_factoring = Util.mk_stat "arith.eq_factoring"
-let stat_arith_ineq_chaining = Util.mk_stat "arith.ineq_chaining"
-let stat_arith_case_switch = Util.mk_stat "arith.case_switch"
-let stat_arith_semantic_tautology = Util.mk_stat "arith.semantic_tauto"
-let stat_arith_semantic_tautology_steps = Util.mk_stat "arith.semantic_tauto.steps"
-let stat_arith_ineq_factoring = Util.mk_stat "arith.ineq_factoring"
-let stat_arith_div_chaining = Util.mk_stat "arith.div_chaining"
-let stat_arith_divisibility = Util.mk_stat "arith.divisibility"
-let stat_arith_demod = Util.mk_stat "arith.demod"
-let stat_arith_backward_demod = Util.mk_stat "arith.backward_demod"
-let stat_arith_trivial_ineq = Util.mk_stat "arith.redundant_by_ineq"
+let stat_arith_sup = Util.mk_stat "int.superposition"
+let stat_arith_cancellation = Util.mk_stat "int.arith_cancellation"
+let stat_arith_eq_factoring = Util.mk_stat "int.eq_factoring"
+let stat_arith_ineq_chaining = Util.mk_stat "int.ineq_chaining"
+let stat_arith_case_switch = Util.mk_stat "int.case_switch"
+let stat_arith_semantic_tautology = Util.mk_stat "int.semantic_tauto"
+let stat_arith_semantic_tautology_steps = Util.mk_stat "int.semantic_tauto.steps"
+let stat_arith_ineq_factoring = Util.mk_stat "int.ineq_factoring"
+let stat_arith_div_chaining = Util.mk_stat "int.div_chaining"
+let stat_arith_divisibility = Util.mk_stat "int.divisibility"
+let stat_arith_demod = Util.mk_stat "int.demod"
+let stat_arith_backward_demod = Util.mk_stat "int.backward_demod"
+let stat_arith_trivial_ineq = Util.mk_stat "int.redundant_by_ineq.calls"
+let stat_arith_trivial_ineq_steps = Util.mk_stat "int.redundant_by_ineq.steps"
 (*
-let stat_arith_reflexivity_resolution = Util.mk_stat "arith.reflexivity_resolution"
+let stat_arith_reflexivity_resolution = Util.mk_stat "int.reflexivity_resolution"
 *)
 
-let prof_arith_sup = Util.mk_profiler "arith.superposition"
-let prof_arith_cancellation = Util.mk_profiler "arith.arith_cancellation"
-let prof_arith_eq_factoring = Util.mk_profiler "arith.eq_factoring"
-let prof_arith_ineq_chaining = Util.mk_profiler "arith.ineq_chaining"
-let prof_arith_demod = Util.mk_profiler "arith.demod"
-let prof_arith_backward_demod = Util.mk_profiler "arith.backward_demod"
-let prof_arith_semantic_tautology = Util.mk_profiler "arith.semantic_tauto"
-let prof_arith_ineq_factoring = Util.mk_profiler "arith.ineq_factoring"
-let prof_arith_div_chaining = Util.mk_profiler "arith.div_chaining"
-let prof_arith_divisibility = Util.mk_profiler "arith.divisibility"
-let prof_arith_trivial_ineq = Util.mk_profiler "arith.redundant_by_ineq"
+let prof_arith_sup = Util.mk_profiler "int.superposition"
+let prof_arith_cancellation = Util.mk_profiler "int.arith_cancellation"
+let prof_arith_eq_factoring = Util.mk_profiler "int.eq_factoring"
+let prof_arith_ineq_chaining = Util.mk_profiler "int.ineq_chaining"
+let prof_arith_demod = Util.mk_profiler "int.demod"
+let prof_arith_backward_demod = Util.mk_profiler "int.backward_demod"
+let prof_arith_semantic_tautology = Util.mk_profiler "int.semantic_tauto"
+let prof_arith_ineq_factoring = Util.mk_profiler "int.ineq_factoring"
+let prof_arith_div_chaining = Util.mk_profiler "int.div_chaining"
+let prof_arith_divisibility = Util.mk_profiler "int.divisibility"
+let prof_arith_trivial_ineq = Util.mk_profiler "int.redundant_by_ineq"
 (*
-let prof_arith_reflexivity_resolution = Util.mk_profiler "arith.reflexivity_resolution"
+let prof_arith_reflexivity_resolution = Util.mk_profiler "int.reflexivity_resolution"
 *)
 
-let section = Util.Section.make ~parent:Const.section "arith"
+let section = Util.Section.make ~parent:Const.section "int-arith"
 
 module type S = sig
   module Env : Env.S
@@ -1111,6 +1112,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* is a literal redundant w.r.t the current set of unit clauses *)
   let _ineq_is_redundant_by_unit c lit =
+    Util.incr_stat stat_arith_trivial_ineq;
     match lit with
       | _ when Lit.is_trivial lit || Lit.is_absurd lit ->
         None  (* something more efficient will take care of it *)
@@ -1140,7 +1142,7 @@ module Make(E : Env.S) : S with module Env = E = struct
            | Some trace ->
              Util.debugf ~section 3 "@[<2>clause @[%a@]@ trivial by inequations @[%a@]@]"
                (fun k->k C.pp c (CCFormat.list C.pp) trace);
-             Util.incr_stat stat_arith_trivial_ineq;
+             Util.incr_stat stat_arith_trivial_ineq_steps;
              true)
         (C.lits c)
     in
@@ -2046,28 +2048,31 @@ let extension =
 
 let () =
   Params.add_opts
-    [ "--arith-no-semantic-tauto"
+    [ "--no-int-semantic-tauto"
     , Arg.Clear enable_semantic_tauto_
-    , " disable arithmetic semantic tautology check"
-    ; "--arith-no-trivial-ineq"
+    , " disable integer arithmetic semantic tautology check"
+    ; "--int-trivial-ineq"
+    , Arg.Set enable_trivial_ineq_
+    , " enable integer inequality triviality checking by rewriting"
+    ; "--no-int-trivial-ineq"
     , Arg.Clear enable_trivial_ineq_
-    , " disable inequality triviality checking by rewriting"
-    ; "--arith"
+    , " disable integer inequality triviality checking by rewriting"
+    ; "--int-arith"
     , Arg.Set enable_arith_
     , " enable axiomatic integer arithmetic"
-    ; "--no-arith"
+    ; "--no-int-arith"
     , Arg.Clear enable_arith_
     , " disable axiomatic integer arithmetic"
-    ; "--arith-ac"
+    ; "--int-ac"
     , Arg.Set enable_ac_
-    , " enable AC axioms for arithmetic (sum)"
-    ; "--dot-arith-unit"
+    , " enable AC axioms for integer arithmetic (sum)"
+    ; "--dot-int-unit"
     , Arg.String (fun s -> dot_unit_ := Some s)
-    , " print arith-unit index into file"
-    ; "--arith-inf-diff-to-lesseq"
+    , " print arith-int-unit index into file"
+    ; "--int-inf-diff-to-lesseq"
     , Arg.Unit (fun () -> diff_to_lesseq_ := `Inf)
     , " ≠ → ≤ as inference"
-    ; "--arith-simp-diff-to-lesseq"
+    ; "--int-simp-diff-to-lesseq"
     , Arg.Unit (fun () -> diff_to_lesseq_ := `Simplify)
     , " ≠ → ≤ as simplification"
     ];

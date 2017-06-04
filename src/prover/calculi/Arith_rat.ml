@@ -1206,18 +1206,18 @@ let () =
     [ "--rat-no-semantic-tauto"
     , Arg.Clear enable_semantic_tauto_
     , " disable rational arithmetic semantic tautology check"
-    ; "--rat"
+    ; "--rat-arith"
     , Arg.Set enable_rat_
     , " enable axiomatic rational arithmetic"
     ; "--no-arith"
     , Arg.Clear enable_rat_
     , " disable axiomatic rational arithmetic"
-    ; "--arith-ac"
+    ; "--rat-ac"
     , Arg.Set enable_ac_
     , " enable AC axioms for rational arithmetic (sum)"
-    ; "--dot-arith-unit"
+    ; "--dot-rat-unit"
     , Arg.String (fun s -> dot_unit_ := Some s)
-    , " print arith-unit index into file"
+    , " print arith-rat-unit index into file"
     ];
   ()
 
