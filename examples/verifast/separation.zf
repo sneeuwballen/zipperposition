@@ -1,0 +1,38 @@
+# An encoding of separation logic
+
+val heap : type -> type.
+val loc : type.
+
+val emp : pi a. heap a.
+val pointsto : pi a. loc -> a -> heap a.
+val[AC] heap_merge : pi a. heap a -> heap a -> heap a.
+
+rewrite forall a h. heap_merge h (emp a) = h.
+rewrite forall a h. heap_merge (emp a) h = h.
+
+# assoc h l v means that h contains at least once pointsto l v
+def assoc : pi a. heap a -> loc -> a -> prop where
+  forall a l v. ~ assoc (emp a) l v;
+  forall a l1 l2 (v1 v2 : a).
+    assoc (pointsto l1 v1) l2 v2 <=> l1 = l2 && v1 = v2;
+  forall a h1 h2 l (v : a).
+    assoc (heap_merge h1 h2) l v <=> (assoc h1 l v || assoc h2 l v).
+
+def disjoint : pi a. heap a -> heap a -> prop where
+  forall a (h1 h2 : heap a).
+    disjoint h1 h2 <=> (forall l v. ~(assoc h1 l v && assoc h2 l v)).
+
+# Probably useless but does not hurt
+rewrite forall a h. disjoint h (emp a).
+rewrite forall a h. disjoint (emp a) h.
+
+def functional_heap : pi a. heap a -> prop where
+  forall a (h : heap a).
+    functional_heap h <=>
+      (forall l v1 v2. assoc h l v1 && assoc h l v2 => v1 = v2).
+
+rewrite forall a. functional_heap (emp a).
+
+rewrite forall a (h1 h2 : heap a).
+   functional_heap (heap_merge h1 h2) =>
+     functional_heap h1 && functional_heap h2.
