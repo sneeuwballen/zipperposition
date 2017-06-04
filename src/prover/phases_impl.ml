@@ -265,6 +265,9 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
   Phases.start_phase Phases.Saturate >>= fun () ->
   let module Sat = Saturate.Make(Env) in
   (* add clauses to passive set of [env], and SOS to active set *)
+  if not (CCVector.is_empty clauses.Clause.c_sos) then (
+    Env.Ctx.lost_completeness();
+  );
   Env.add_active (CCVector.to_seq clauses.Clause.c_sos);
   Env.add_passive (CCVector.to_seq clauses.Clause.c_set);
   let steps = if Env.params.param_steps < 0
