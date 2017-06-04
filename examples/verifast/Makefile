@@ -3,7 +3,7 @@ SHELL=/bin/bash
 GOALS=$(shell cut goals.org -d '|' -f 2)
 PROVER=zipperposition
 TIMEOUT=2
-PROVER_OPT=-o none -t $(TIMEOUT)
+PROVER_OPT=-t $(TIMEOUT) --induction-depth 0
 
 all: easy hard
 
