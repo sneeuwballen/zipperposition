@@ -1036,6 +1036,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       For instance, 0 ≤ f(x)  makes  0 ≤ f(a) + f(b) redundant, but subsumption
       is not able to detect it. *)
 
+  (* allow traces of depth at most 3 *)
+  let max_ineq_trivial_steps = 3
+
   (* rewrite a literal [l] into a smaller literal [l'], such that [l'] and
      the current set of unit clauses imply [l]; then compute the
      transitive closure of this relation. If we obtain a trivial
@@ -1043,10 +1046,15 @@ module Make(E : Env.S) : S with module Env = E = struct
      We use continuations to deal with the multiple choices. *)
   let rec _ineq_find_sufficient ~ord ~trace c lit k = match lit with
     | _ when AL.is_trivial lit -> k (trace,lit)
+    | _ when List.length trace >= max_ineq_trivial_steps ->
+      () (* need another step, but it would exceed the limit *)
     | AL.Binary _ when Sequence.exists T.is_var (AL.Seq.terms lit) ->
       ()  (* no way we rewrite this into a tautology *)
     | AL.Binary (AL.Lesseq, _, _) ->
       Util.incr_stat stat_arith_trivial_ineq;
+      Util.debugf ~section 5
+        "(@[try_ineq_find_sufficient@ :lit `%a`@ :trace (@[%a@])@])"
+        (fun k->k AL.pp lit (Util.pp_list C.pp) trace);
       AL.fold_terms ~vars:false ~which:`Max ~ord ~subterms:false lit
       |> Sequence.iter
         (fun (t,pos) ->
@@ -1122,15 +1130,14 @@ module Make(E : Env.S) : S with module Env = E = struct
         let ord = Ctx.ord () in
         let traces =
           _ineq_find_sufficient ~ord ~trace:[] c alit
-          |> Sequence.take 1  (* one is enough *)
-          |> Sequence.to_list
+          |> Sequence.head  (* one is enough *)
         in
         begin match traces with
-          | [trace, _lit'] ->
+          | Some (trace, _lit') ->
             assert (AL.is_trivial _lit');
             let trace = CCList.uniq ~eq:C.equal trace in
             Some trace
-          | _ -> None
+          | None -> None
         end
       | _ -> None
 
