@@ -599,7 +599,7 @@ module Make
                  ~f:(fun lits ->
                    let lits = Array.map (fun l -> [Literal.negate l]) lits in
                    Array.to_list lits)
-               |> List.map
+               |> CCList.map
                  (fun l ->
                     let lits = Array.of_list l in
                     let trail =
