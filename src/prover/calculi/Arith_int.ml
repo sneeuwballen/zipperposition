@@ -216,13 +216,15 @@ module Make(E : Env.S) : S with module Env = E = struct
       | [| Lit.Int ((AL.Binary (AL.Lesseq, _, _)) as alit) |] ->
         let pos = Position.(arg 0 stop) in
         _idx_unit_ineq :=
-          AL.fold_terms ~subterms:false ~vars:false ~pos ~which:`Max ~ord alit
+          if !enable_trivial_ineq_
+          then AL.fold_terms ~subterms:false ~vars:false ~pos ~which:`Max ~ord alit
           |> Sequence.fold
             (fun acc (t,pos) ->
                assert (not (T.is_var t));
                let with_pos = C.WithPos.( {term=t; pos; clause=c;} ) in
                f acc t with_pos)
             !_idx_unit_ineq
+          else !_idx_unit_ineq
       | [| Lit.Int (AL.Divides d as alit) |] when d.AL.sign ->
         let pos = Position.(arg 0 stop) in
         _idx_unit_div :=
@@ -1044,6 +1046,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     | AL.Binary _ when Sequence.exists T.is_var (AL.Seq.terms lit) ->
       ()  (* no way we rewrite this into a tautology *)
     | AL.Binary (AL.Lesseq, _, _) ->
+      Util.incr_stat stat_arith_trivial_ineq;
       AL.fold_terms ~vars:false ~which:`Max ~ord ~subterms:false lit
       |> Sequence.iter
         (fun (t,pos) ->
@@ -1112,7 +1115,6 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* is a literal redundant w.r.t the current set of unit clauses *)
   let _ineq_is_redundant_by_unit c lit =
-    Util.incr_stat stat_arith_trivial_ineq;
     match lit with
       | _ when Lit.is_trivial lit || Lit.is_absurd lit ->
         None  (* something more efficient will take care of it *)
@@ -1140,7 +1142,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun lit -> match _ineq_is_redundant_by_unit c lit with
            | None -> false
            | Some trace ->
-             Util.debugf ~section 3 "@[<2>clause @[%a@]@ trivial by inequations @[%a@]@]"
+             Util.debugf ~section 3
+               "@[<2>clause @[%a@]@ trivial by inequations @[%a@]@]"
                (fun k->k C.pp c (CCFormat.list C.pp) trace);
              Util.incr_stat stat_arith_trivial_ineq_steps;
              true)
