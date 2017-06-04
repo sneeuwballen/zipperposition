@@ -828,7 +828,7 @@ let rec as_def ?loc bound t =
       |> T.sort_ty_vars_first
     in
     `Term (vars, id, ty, args, rhs)
-  and yield_prop lhs rhs =
+  and yield_prop lhs rhs pol =
     let vars =
       SLiteral.to_seq lhs
       |> Sequence.flat_map T.Seq.free_vars
@@ -836,17 +836,18 @@ let rec as_def ?loc bound t =
       |> Var.Set.to_list
       |> T.sort_ty_vars_first
     in
-    `Prop (vars, lhs, rhs)
+    `Prop (vars, lhs, rhs, pol)
   in
   begin match T.view t with
     | T.Bind (Binder.Forall, v, t) ->
       as_def ?loc (Var.Set.add bound v) t
-    | T.AppBuiltin (Builtin.Equiv, [lhs;rhs]) ->
+    | T.AppBuiltin ((Builtin.Equiv | Builtin.Imply) as op, [lhs;rhs]) ->
       (* check that LHS is a literal, and  that all free variables
          of RHS occur in LHS (bound variables are ok though) *)
       check_vars_eqn ?loc bound lhs rhs;
       let lhs = SLiteral.of_form lhs in
-      yield_prop lhs rhs
+      let pol = if op=Builtin.Equiv then `Equiv else `Imply in
+      yield_prop lhs rhs pol
     | T.AppBuiltin (Builtin.Eq, [lhs;rhs]) ->
       check_vars_eqn ?loc bound lhs rhs;
       begin match T.view lhs with
@@ -866,12 +867,12 @@ let rec as_def ?loc bound t =
       let rhs = T.Form.false_ in
       check_vars_eqn ?loc bound lhs rhs;
       let lhs = SLiteral.of_form lhs in
-      yield_prop lhs rhs
+      yield_prop lhs rhs `Equiv
     | _ when T.Ty.is_prop (T.ty_exn t) ->
       let rhs = T.Form.true_ in
       check_vars_eqn ?loc bound t rhs;
       let lhs = SLiteral.of_form t in
-      yield_prop lhs rhs
+      yield_prop lhs rhs `Equiv
     | _ -> fail()
   end
 
@@ -910,7 +911,7 @@ let infer_defs ?loc ctx (l:A.def list): (_,_,_) Stmt.def list =
                       T.pp r ID.pp id ID.pp id' ID.pp id ID.pp id;
                   );
                   Stmt.Def_term (vars,id,ty,args,rhs)
-                | `Prop (vars,lhs,rhs) ->
+                | `Prop (vars,lhs,rhs,pol) ->
                   assert (T.Ty.is_prop (T.ty_exn rhs));
                   let ok = match lhs with
                     | SLiteral.Atom (t,_) ->
@@ -922,7 +923,7 @@ let infer_defs ?loc ctx (l:A.def list): (_,_,_) Stmt.def list =
                       "rule `%a`@ must have `%a` as head symbol"
                       T.pp r ID.pp id
                   );
-                  Stmt.Def_form (vars,lhs,[rhs])
+                  Stmt.Def_form (vars,lhs,[rhs],pol)
               end)
            rules
        in
@@ -971,9 +972,9 @@ let infer_statement_exn ctx st =
               "in definition of %a,@ equality between types is forbidden" ID.pp id;
           );
           Stmt.rewrite_term ~src:(mk_src Stmt.R_assert) (vars,id,ty,args,rhs)
-        | `Prop (vars,lhs,rhs) ->
+        | `Prop (vars,lhs,rhs,pol) ->
           assert (T.Ty.is_prop (T.ty_exn rhs));
-          Stmt.rewrite_form ~src:(mk_src Stmt.R_assert) (vars,lhs,[rhs])
+          Stmt.rewrite_form ~src:(mk_src Stmt.R_assert) (vars,lhs,[rhs],pol)
       end
     | A.Data l ->
       (* declare the inductive types *)

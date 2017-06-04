@@ -32,8 +32,12 @@ type 'ty skolem = ID.t * 'ty
 type ('t, 'ty) term_rule = 'ty Var.t list * ID.t * 'ty * 't list * 't
 (** [forall vars, id args = rhs] *)
 
-type ('f, 't, 'ty) form_rule = 'ty Var.t list * 't SLiteral.t * 'f list
-(** [forall vars, lhs <=> bigand rhs] *)
+(** polarity for rewrite rules *)
+type polarity = [`Equiv | `Imply]
+
+type ('f, 't, 'ty) form_rule = 'ty Var.t list * 't SLiteral.t * 'f list * polarity
+(** [forall vars, lhs op bigand rhs] where [op] depends on
+    [polarity] (in [{=>, <=>, <=}]) *)
 
 type ('f, 't, 'ty) def_rule =
   | Def_term of ('t, 'ty) term_rule
@@ -151,9 +155,9 @@ let map_def ~form:fform ~term:fterm ~ty:fty d =
             | Def_term (vars,id,ty,args,rhs) ->
               let vars = List.map (Var.update_ty ~f:fty) vars in
               Def_term (vars, id, fty ty, List.map fterm args, fterm rhs)
-            | Def_form (vars,lhs,rhs) ->
+            | Def_form (vars,lhs,rhs,pol) ->
               let vars = List.map (Var.update_ty ~f:fty) vars in
-              Def_form (vars, SLiteral.map ~f:fterm lhs, List.map fform rhs))
+              Def_form (vars, SLiteral.map ~f:fterm lhs, List.map fform rhs, pol))
           d.def_rules;
   }
 
@@ -167,9 +171,9 @@ let map ~form ~term ~ty st =
         | Def_term (vars, id, ty, args, rhs) ->
           let vars = List.map (Var.update_ty ~f:fty) vars in
           Def_term (vars, id, fty ty, List.map term args, term rhs)
-        | Def_form (vars,lhs,rhs) ->
+        | Def_form (vars,lhs,rhs,pol) ->
           let vars = List.map (Var.update_ty ~f:fty) vars in
-          Def_form (vars, SLiteral.map ~f:term lhs, List.map form rhs)
+          Def_form (vars, SLiteral.map ~f:term lhs, List.map form rhs, pol)
       in
       Rewrite d
     | Data l ->
@@ -309,7 +313,7 @@ let conv_term_rule (r:_ term_rule): Rewrite.Term.rule =
 
 (* returns either a term or a lit rule (depending on whether RHS is atomic) *)
 let conv_lit_rule (r:_ form_rule): Rewrite.rule =
-  let _, lhs, rhs = r in
+  let _, lhs, rhs, _ = r in
   let lhs = Literal.Conv.of_form lhs in
   let rhs = List.map (List.map Literal.Conv.of_form) rhs in
   Rewrite.Rule.make_lit lhs rhs
@@ -327,7 +331,7 @@ let conv_rules (l:_ def_rule list): definition =
 let terms_of_rule (d:_ def_rule): _ Sequence.t = match d with
   | Def_term (_, _, _, args, rhs) ->
     Sequence.of_list (rhs::args)
-  | Def_form (_, lhs, rhs) ->
+  | Def_form (_, lhs, rhs, _) ->
     Sequence.cons lhs (Sequence.of_list rhs |> Sequence.flat_map Sequence.of_list)
     |> Sequence.flat_map SLiteral.to_seq
 
@@ -471,7 +475,7 @@ module Seq = struct
       k (`Ty ty);
       List.iter (fun v->k (`Ty (Var.ty v))) vars;
       List.iter (fun t->k (`Term t)) (rhs::args);
-    | Def_form (vars, lhs, rhs) ->
+    | Def_form (vars, lhs, rhs, _) ->
       List.iter (fun v->k (`Ty (Var.ty v))) vars;
       SLiteral.to_seq lhs |> Sequence.map mk_term |> Sequence.iter k;
       Sequence.of_list rhs |> Sequence.map mk_form |> Sequence.iter k
@@ -493,7 +497,7 @@ module Seq = struct
             k (`Ty ty);
             List.iter (fun t -> k (`Term t)) args;
             k (`Term rhs)
-          | Def_form (_,lhs,rhs) ->
+          | Def_form (_,lhs,rhs,_) ->
             SLiteral.iter ~f:(fun t -> k (`Term t)) lhs;
             List.iter (fun f -> k (`Form f)) rhs
         end
@@ -627,10 +631,12 @@ let pp_def_rule ppf ppt ppty out d =
     | Def_term (vars,id,_,args,rhs) ->
       fpf out "@[<2>%a@[<2>%a%a@] =@ %a@]"
         pp_vars vars ID.pp id pp_args args ppt rhs
-    | Def_form (vars,lhs,rhs) ->
-      fpf out "@[<2>%a%a =@ (@[<hv>%a@])@]"
+    | Def_form (vars,lhs,rhs,pol) ->
+      let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
+      fpf out "@[<2>%a%a %s@ (@[<hv>%a@])@]"
         pp_vars vars
         (SLiteral.pp ppt) lhs
+        op
         (Util.pp_list ~sep:" && " ppf) rhs
   end
 
@@ -652,9 +658,10 @@ let pp ppf ppt ppty out st = match st.view with
       | Def_term (_, id, _, args, rhs) ->
         fpf out "@[<2>rewrite%a @[%a %a@]@ = @[%a@]@]." pp_attrs st.attrs
           ID.pp id (Util.pp_list ~sep:" " ppt) args ppt rhs
-      | Def_form (_, lhs, rhs) ->
-        fpf out "@[<2>rewrite%a @[%a@]@ <=> @[%a@]@]." pp_attrs st.attrs
-          (SLiteral.pp ppt) lhs (Util.pp_list ~sep:" && " ppf) rhs
+      | Def_form (_, lhs, rhs, pol) ->
+        let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
+        fpf out "@[<2>rewrite%a @[%a@]@ %s @[%a@]@]." pp_attrs st.attrs
+          (SLiteral.pp ppt) lhs op (Util.pp_list ~sep:" && " ppf) rhs
     end
   | Data l ->
     let pp_cstor out (id,ty,_) =
@@ -703,10 +710,11 @@ module ZF = struct
           | Def_term (vars, id, _, args, rhs) ->
             fpf out "@[<2>rewrite%a @[<2>%a@[%a %a@]@ = @[%a@]@]@]." pp_attrs st.attrs
               pp_vars vars ID.pp id (Util.pp_list ~sep:" " ppt) args ppt rhs
-          | Def_form (vars, lhs, rhs) ->
-            fpf out "@[<2>rewrite%a @[<2>%a@[%a@]@ <=> @[%a@]@]@]." pp_attrs st.attrs
-              pp_vars vars (SLiteral.ZF.pp ppt) lhs (Util.pp_list ~sep:" && " ppf)
-              rhs
+          | Def_form (vars, lhs, rhs, pol) ->
+            let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
+            fpf out "@[<2>rewrite%a @[<2>%a@[%a@]@ %s @[%a@]@]@]." pp_attrs st.attrs
+              pp_vars vars (SLiteral.ZF.pp ppt) lhs op
+              (Util.pp_list ~sep:" && " ppf) rhs
         end
       | Data l ->
         let pp_cstor out (id,ty,_) =
@@ -756,8 +764,10 @@ module TPTP = struct
       let pp_rule out = function
         | Def_term (vars,id,_,args,rhs) ->
           fpf out "%a(@[%a%a@] =@ %a)" pp_quant_vars vars ID.pp id pp_args args ppt rhs
-        | Def_form (vars,lhs,rhs) ->
-          fpf out "%a(@[%a@] <=>@ (@[<hv>%a@]))" pp_quant_vars vars (SLiteral.pp ppt) lhs
+        | Def_form (vars,lhs,rhs,pol) ->
+          let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
+          fpf out "%a(@[%a@] %s@ (@[<hv>%a@]))"
+            pp_quant_vars vars (SLiteral.pp ppt) lhs op
             (Util.pp_list ~sep:" & " ppf) rhs
       in
       let pp_top_rule out r =
@@ -795,9 +805,11 @@ module TPTP = struct
           | Def_term (_, id, _, args, rhs) ->
             fpf out "@[<2>tff(%s, axiom,@ %a(%a) =@ @[%a@])@]."
               name ID.pp id (Util.pp_list ~sep:", " ppt) args ppt rhs
-          | Def_form (_, lhs, rhs) ->
-            fpf out "@[<2>tff(%s, axiom,@ %a <=>@ (@[%a@]))@]."
-              name (SLiteral.TPTP.pp ppt) lhs (Util.pp_list ~sep:" & " ppf) rhs
+          | Def_form (_, lhs, rhs, pol) ->
+            let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
+            fpf out "@[<2>tff(%s, axiom,@ %a %s@ (@[%a@]))@]."
+              name (SLiteral.TPTP.pp ppt) lhs op
+              (Util.pp_list ~sep:" & " ppf) rhs
         end
       | Data _ -> failwith "cannot print `data` to TPTP"
 

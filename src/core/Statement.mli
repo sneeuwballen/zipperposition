@@ -37,8 +37,12 @@ type 'ty skolem = ID.t * 'ty
 type ('t, 'ty) term_rule = 'ty Var.t list * ID.t * 'ty * 't list * 't
 (** [forall vars, id args = rhs] *)
 
-type ('f, 't, 'ty) form_rule = 'ty Var.t list * 't SLiteral.t * 'f list
-(** [forall vars, lhs <=> bigand rhs] *)
+(** polarity for rewrite rules *)
+type polarity = [`Equiv | `Imply]
+
+type ('f, 't, 'ty) form_rule = 'ty Var.t list * 't SLiteral.t * 'f list * polarity
+(** [forall vars, lhs op bigand rhs] where [op] depends on
+    [polarity] (in [{=>, <=>, <=}]) *)
 
 type ('f, 't, 'ty) def_rule =
   | Def_term of ('t, 'ty) term_rule

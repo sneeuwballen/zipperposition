@@ -311,6 +311,15 @@ goal forall a (s1:set a) s2 s3.
    (union s1 (union s2 s3))
    (union (union s1 s2) s3).
 ----
++
+there are several variations on literal rewrite rules:
++
+- `rewrite forall x. p x` (short for `p x <=> true`) 
+- `rewrite forall x. ~ p x` (short for `p x <=> false`) 
+- `rewrite forall x. p x => q x`
+  (one way rule, will rewrite `p x` but not `~ p x`; also called _polarized rewriting_)
+- `rewrite forall x. ~ p x => q x`
+  (negative polarized rule)
 
 recursive definitions::
 +

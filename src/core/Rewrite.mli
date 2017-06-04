@@ -109,8 +109,7 @@ module Rule : sig
   val pp : t CCFormat.printer
 
   val make_lit : Literal.t -> Literal.t list list -> t
-  (** Make a literal rule, unless the right-hand side is an atomic term too,
-      in which case we make a term rule *)
+  (** Make a literal rule *)
 end
 
 module Rule_set : CCSet.S with type elt = rule

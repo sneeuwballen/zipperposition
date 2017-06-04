@@ -222,7 +222,7 @@ let define_term ?(pattern="fun_") ~ctx rules : term_definition =
          if is_prop
          then
            let atom = T.app ~ty:ty_ret (T.const ~ty id) args in
-           Stmt.Def_form (all_vars, SLiteral.atom atom true, [rhs])
+           Stmt.Def_form (all_vars, SLiteral.atom atom true, [rhs], `Equiv)
          else
            Stmt.Def_term (all_vars, id, ty, args, rhs))
       rules
