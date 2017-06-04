@@ -3,7 +3,7 @@ SHELL=/bin/bash
 GOALS=$(shell cut goals.org -d '|' -f 2)
 PROVER=zipperposition
 TIMEOUT=2
-PROVER_OPT=-o none -t $(TIMEOUT)
+PROVER_OPT=-t $(TIMEOUT) --induction-depth 0
 
 all: easy hard
 
@@ -16,7 +16,7 @@ all: easy hard
 # Prove lemma foo from the definitions and the previous lemmas
 %_easy_pb.zf: goals.org
 	@echo 'include "list.zf".' > $@
-	@sed "/$* /q" goals.org | sed '$$d' | cut -d '|' -f 3 | sed "s/OR/||/g" | sed 's/^/assert /' >> $@
+	@sed "/$* /q" goals.org | sed '$$d' | cut -d '|' -f 3 | sed "s/OR/||/g" | sed 's/^/assert[sos] /' >> $@
 	@echo -n 'goal ' >> $@
 	@grep " $* " goals.org | cut -d '|' -f 3 | sed "s/OR/||/g" >> $@
 

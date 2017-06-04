@@ -1,3 +1,4 @@
+include "separation.zf".
 
 val default_value : pi a. a.
 
@@ -62,23 +63,29 @@ def index_of : pi a. a -> list a -> int where
   forall x hd tl. index_of x (cons hd tl) =
        (if hd = x then 0 else 1 + index_of x tl).
 
-def foreach : pi a. list a -> (a -> prop) -> prop where
-   forall p. foreach nil p = true;
-   forall hd tl p. foreach (cons hd tl) p = (p hd && foreach tl p).
+def foreach : pi a b. list a -> (a -> heap b -> prop) -> heap b -> prop where
+   forall a b p (h : heap b). foreach (nil a) p h = true;
+   forall a b (hd : a) tl p (h : heap b).
+      foreach (cons hd tl) p h =
+        (exists h1 h2.
+          h = heap_merge h1 h2 &&
+          disjoint h1 h2 &&
+          p hd h1 &&
+          foreach tl p h2).
 
 def map : pi a b. (a -> b) -> list a -> list b where
    forall f. map f nil = nil;
    forall f hd tl. map f (cons hd tl) = cons (f hd) (map f tl).
 
-# In the source file, a forall function behaving like the foreach
-# relation is defined It makes sense in VeriFast because relations and
-# functions to prop are not identified (predicates can occupy some
-# place on the heap).
+# "list_forall" and "list_exists" are called "forall" and "exists" respectively in VeriFast but these are keywords in zf.
 
-# "forsome" is called "exists" in VeriFast but this is a keyword in zf.
-def forsome : pi a. list a -> (a -> prop) -> prop where
-   forall p. forsome nil p = false;
-   forall hd tl p. forsome (cons hd tl) p = (p hd || forsome tl p).
+def list_forall : pi a. list a -> (a -> prop) -> prop where
+   forall p. list_forall nil p = true;
+   forall hd tl p. list_forall (cons hd tl) p = (p hd && list_forall tl p).
+
+def list_exists : pi a. list a -> (a -> prop) -> prop where
+   forall p. list_exists nil p = false;
+   forall hd tl p. list_exists (cons hd tl) p = (p hd || list_exists tl p).
 
 def update : pi a. int -> a -> list a -> list a where
    forall i y. update i y nil = nil;
@@ -119,17 +126,20 @@ def contains : pi a. list a -> a -> prop where
 # supported by Zipperpostion. We eta-expand instead.
 
 def[infix "⊆"] subset : pi a. list a -> list a -> prop where
-  forall l1 l2. subset l1 l2 = foreach l1 (fun x. contains l2 x).
+  forall l1 l2. subset l1 l2 = list_forall l1 (fun x. contains l2 x).
 
 def[infix "∩"] intersection : pi a. list a -> list a -> list a where
   forall l1 l2. intersection l1 l2 = filter (fun x. contains l1 x) l2.
 
-def foreachp : pi a. list a -> (a -> prop) -> prop where
-  forall l p. foreachp l p =
-    (if l = nil then
-       true
-     else
-       (l = cons (head l) (tail l) &&
-        p (head l) &&
-        foreachp (tail l) p)).
+def foreachp : pi a b. list a -> (a -> heap b -> prop) -> heap b -> prop where
+  forall a b (l : list a) (p : a -> heap b -> prop) h.
+     foreachp l p h =
+       (if l = nil then
+          h = emp
+        else
+          (exists h1 h2.
+            h = heap_merge h1 h2 &&
+            disjoint h1 h2 &&
+            p (head l) h1 &&
+            foreachp (tail l) p h2)).
 
