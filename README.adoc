@@ -391,6 +391,15 @@ No saturation among SOS axioms is done. They are only used for inferences
 Typically this is useful for introducing general lemmas while preventing them
 from interacting in ways not related to the current goal.
 
+Named Axioms::
++
+An axiom can be given a name, as in TPTP, to retrieve it easily in proofs.
+The syntax is:
++
+----
+assert[name "foo"] bar.
+----
+
 === Graphical Display of Proofs
 
 A handy way of displaying the proof is to use http://graphviz.org/[graphviz]:
