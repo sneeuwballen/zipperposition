@@ -1088,14 +1088,16 @@ module Make
         cs
         |> Util.map_product
           ~f:(fun lits ->
-            let lits_l =
-              Array.to_list lits
-              |> List.map (Literal.map (fun t -> T.replace_m t pairs))
-            in
+            let lits_l = Array.to_list lits in
             (* separate the guard (constraints) from other literals *)
             let guard, other_lits =
               List.partition Literal.is_constraint lits_l
             in
+            let replace_lits =
+              List.map (Literal.map (fun t -> T.replace_m t pairs))
+            in
+            let guard = replace_lits guard in
+            let other_lits = replace_lits other_lits in
             List.map
               (fun other_lit -> Literal.negate other_lit :: guard)
               other_lits)
