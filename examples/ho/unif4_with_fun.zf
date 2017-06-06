@@ -1,0 +1,31 @@
+
+# expect: unsat
+
+# NOTE: very similar to unif4, but we add the solution explicitely. However,
+# it seems to hurt the prover for now (2017-05-22)
+
+val i : type.
+
+val map : (i -> i) -> i.
+
+val f : i -> i.
+val g : i -> i.
+
+val a : i.
+val b : i.
+
+assert f = g.
+
+val f1: i->i.
+val f2: i->i.
+
+assert f1 != f2.
+
+goal exists (F:(i->i)->i->i).
+  map (F f) = map (F g) &&
+  F f a = f (f a) &&
+  F f b = f (f b) &&
+  (F = (fun f x. f (f x))) && # FIXME: this kills the prover, by getting it stuck… HO unif should deal with it
+  F f1 != F f2. # not identity
+
+
