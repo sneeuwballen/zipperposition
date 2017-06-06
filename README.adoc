@@ -46,11 +46,12 @@ This project is licensed under the BSD2 license. See the `LICENSE` file.
 
 == Build
 
+[[via-opam]]
 === Via opam
 
 The recommended way to install Zipperposition is through http://opam.ocaml.org/[opam].
-You need to have GMP (with headers) installed (it's not handled by opam).  Once
-you have installed GMP and opam, type:
+You need to have GMP (with headers) installed (it's not handled by opam).
+Once you have installed GMP and opam, type:
 
 ----
 $ opam install zipperposition
@@ -68,6 +69,10 @@ If you want to try the development (unstable) version, which has more
 dependencies (in particular Oasis for the build), try:
 
     $ opam pin add zipperposition -k git https://github.com/c-cube/zipperposition.git#dev
+
+NOTE: do *not* install `logtk`. It now ships with zipperposition itself.
+NOTE: if installation fails, you might want to try to `opam update` and
+  `opam upgrade`: it might be because some of the dependencies are too old.
 
 === Manually
 
@@ -103,6 +108,10 @@ random term generators with
 $ ./configure --enable-qcheck --enable-tests
 $ make tests
 ----
+
+NOTE: in case of build errors, it might be because of outdated dependencies
+(see <<via-opam>> for more details), or stale build files.
+Try `rm _build setup.data -rf` to try to build from scratch.
 
 == Use
 

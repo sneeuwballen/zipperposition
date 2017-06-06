@@ -42,6 +42,9 @@ depopts: [
 available: [
     ocaml-version >= "4.02.1"
 ]
+conflicts: [
+  "logtk"
+]
 tags: [ "logic" "unification" "term" "superposition" "prover" ]
 bug-reports: "https://github.com/c-cube/zipperposition/issues"
 dev-repo: "https://github.com/c-cube/zipperposition.git"
