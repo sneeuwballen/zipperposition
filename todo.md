@@ -2,17 +2,31 @@
 
 ## Now
 
-- unification under constraints
-  * propose `unif_constraint: term -> term -> subst * (term*term) list`
-  * provide `is_syntactic_unifiable: term -> bool`
-    (returns false on int,rat,HO terms)
-  * change `fold_terms` so it doesn't recurse under non-syntactic unifiable terms
-  * modify term indexing so it puts all non-syntactic unifiable terms in a box
-  * use `unif_constraint` in all inference rules, adding constraints
-    as new literals
-  * disable purification → evaluate perf impact on arith
+- investigate useless arith inferences in
+  `./zipperposition.native --stats --dot-sat -o none -t 30 --dot /tmp/truc.dot examples/verifast/foreach_remove_easy_pb.zf --induction-depth 0 --debug 1 | less`
 
-- add special "ho constraint" literals
+- FIX:
+  `./zipperposition.native --stats --dot-sat -o none -t 30 --dot /tmp/truc.dot examples/verifast/take_length_easy_pb.zf --induction-depth 0 --debug 1 --print-lemmas --int-trivial-ineq --debug 5 | less`
+
+- unification under constraints
+  * [x] propose `unif_constraint: term -> term -> subst * (term*term) list`
+  * [x] provide `is_syntactic_unifiable: term -> bool`
+    (returns false on int,rat,HO terms)
+  * [x] change `fold_terms` so it doesn't recurse under non-syntactic unifiable terms
+  * [x] modify term indexing so it puts all non-syntactic unifiable terms in a box
+  * [x] use `unif_constraint` in all inference rules, adding constraints
+    as new literals
+  * [x] disable purification
+  * [ ] → evaluate perf impact on arith
+  * [ ] restore notion of "value" and fail constraints between distinct values
+      (e.g. `0` and `1`)
+  * [ ] two variations (optional arg) to avoid unifying `t` and `u:int` at
+      root (useful for monome unif), or allow it (for subterms)
+
+- HO enumeration for fully applied function or predicate variables.
+  should complement syntactic unif with constraints for HO.
+
+- ~~add special "ho constraint" literals~~
   * automatically used for purification of HO subterms
   * purification can occur in them for arithmetic terms, not FOOL nor HO
   * smaller than anything else(?)
@@ -478,6 +492,11 @@
       → need some hack for mutually recursive datatypes (perhaps take
         all arguments in each case, so we can properly write recursive
         definitions)
+
+### Arith
+
+- simplification rule similar to `trivial_ineq` but for removing literals? E.g. to
+  simplify `len a+len b < 0` from `len x ≥ 0`
 
 ### Misc
 
