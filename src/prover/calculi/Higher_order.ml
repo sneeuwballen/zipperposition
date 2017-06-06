@@ -14,6 +14,8 @@ let stat_refine = Util.mk_stat "ho.refine.steps"
 let stat_ext_neg = Util.mk_stat "ho.extensionality-.steps"
 let stat_complete_eq = Util.mk_stat "ho.complete_eq.steps"
 
+let prof_refine = Util.mk_profiler "ho.refine"
+
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C
@@ -211,9 +213,58 @@ module Make(E : Env.S) : S with module Env = E = struct
      using combinators.
      This enumeration eventually leads to terms being syntactically
      (λfHO)-unifiable in first-order inference rules *)
-  let refine (c:C.t): C.t list =
+  let refine_ (c:C.t): C.t list =
+    (*let eligible = C.Eligible.(max c) in*)
     let eligible = C.Eligible.(param c ++ res c) in
-    assert false
+    (* set of terms to refine (only those occurring in "interesting" lits) *)
+    let terms =
+      Literals.fold_lits ~eligible (C.lits c)
+      |> Sequence.map fst
+      |> Sequence.flat_map Literal.Seq.terms
+      |> Sequence.flat_map T.Seq.subterms
+      |> Sequence.filter
+        (fun t ->
+           let hd, args = T.as_app t in
+           T.is_var hd &&
+           begin match Type.arity (T.ty hd) with
+             | Type.Arity (0, n) when n>0 ->
+               n = List.length args
+             | _ -> false
+           end)
+      |> T.Set.of_seq (* unique *)
+    in
+    if not (T.Set.is_empty terms) then (
+      Util.debugf ~section 5 "(@[<hv2>ho.refine@ :clause %a@ :terms {@[%a@]}@])"
+        (fun k->k C.pp c (Util.pp_seq T.pp) (T.Set.to_seq terms));
+    );
+    let sc_combs = 1 in
+    let sc_c = 0 in
+    begin
+      terms
+      |> T.Set.to_seq
+      |> Sequence.flat_map_l
+        (fun t ->
+           HO_combinators.refine_step (Ctx.combinators (),sc_combs) (t,sc_c))
+      |> Sequence.map
+        (fun (subst,penalty) ->
+           let renaming = Ctx.renaming_clear() in
+           let lits = Literals.apply_subst ~renaming subst (C.lits c,sc_c) in
+           let proof =
+             Proof.Step.inference ~rule:(Proof.Rule.mk "ho.refine")
+               [C.proof_parent_subst (c,sc_c) subst]
+           in
+           let new_c =
+             C.create_a lits proof
+               ~penalty:(C.penalty c + penalty) ~trail:(C.trail c)
+           in
+           Util.debugf ~section 5
+             "(@[<hv2>ho.refine@ :from %a@ :subst %a@ :yields %a@])"
+             (fun k->k C.pp c Subst.pp subst C.pp new_c);
+           new_c)
+      |> Sequence.to_rev_list
+    end
+
+  let refine c = Util.with_prof prof_refine refine_ c
 
   (* ensure that combinators are defined functions *)
   let declare_combinators() =
