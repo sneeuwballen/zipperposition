@@ -398,9 +398,14 @@ let to_string = CCFormat.to_string pp
 (** {2 TPTP} *)
 
 module TPTP = struct
+  let pp_id out s =
+    if CCString.exists (function '#' | '$' -> true | _ -> false) s
+    then CCFormat.fprintf out "'%s'" s
+    else CCFormat.string out s
+
   let rec pp out t = match t.term with
     | Var v -> pp_var out v
-    | Const s -> CCFormat.string out s
+    | Const s -> pp_id out s
     | List l ->
       Format.fprintf out "[@[<hv>%a@]]"
         (Util.pp_list ~sep:"," pp) l;
@@ -450,7 +455,7 @@ module TPTP = struct
     | _ -> pp out t
   and pp_var out = function
     | Wildcard -> CCFormat.string out "$_"
-    | V s -> CCFormat.string out s
+    | V s -> CCFormat.string out (CCString.capitalize_ascii s)
 
   let to_string = CCFormat.to_string pp
 end

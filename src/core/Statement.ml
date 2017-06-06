@@ -746,7 +746,7 @@ module TPTP = struct
       | _ -> "no_name"
     in
     let pp_decl out (id,ty) =
-      fpf out "@[<2>tff(%s, type,@ %a :@ @[%a@])@]." name ID.pp id ppty ty
+      fpf out "@[<2>tff(%s, type,@ %a :@ @[%a@])@].@," name ID.pp id ppty ty
     and pp_quant_vars out = function
       | [] -> ()
       | l ->
@@ -779,19 +779,19 @@ module TPTP = struct
       | TyDecl (id,ty) -> pp_decl out (id,ty)
       | Assert f ->
         let role = "axiom" in
-        fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@]." name role ppf f
+        fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@].@," name role ppf f
       | Lemma l ->
         let role = "lemma" in
-        fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@]." name role
+        fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@].@," name role
           (Util.pp_list ~sep:" & " ppf) l
       | Goal f ->
         let role = "conjecture" in
-        fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@]." name role ppf f
+        fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@].@," name role ppf f
       | NegatedGoal (_,l) ->
         let role = "negated_conjecture" in
         List.iter
           (fun f ->
-             fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@]." name role ppf f)
+             fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@].@," name role ppf f)
           l
       | Def l ->
         (* declare *)
@@ -803,11 +803,11 @@ module TPTP = struct
       | Rewrite d ->
         begin match d with
           | Def_term (_, id, _, args, rhs) ->
-            fpf out "@[<2>tff(%s, axiom,@ %a(%a) =@ @[%a@])@]."
+            fpf out "@[<2>tff(%s, axiom,@ %a(%a) =@ @[%a@])@].@,"
               name ID.pp id (Util.pp_list ~sep:", " ppt) args ppt rhs
           | Def_form (_, lhs, rhs, pol) ->
             let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
-            fpf out "@[<2>tff(%s, axiom,@ %a %s@ (@[%a@]))@]."
+            fpf out "@[<2>tff(%s, axiom,@ %a %s@ (@[%a@]))@].@,"
               name (SLiteral.TPTP.pp ppt) lhs op
               (Util.pp_list ~sep:" & " ppf) rhs
         end

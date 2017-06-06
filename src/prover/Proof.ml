@@ -523,7 +523,7 @@ module S = struct
       ~name
       ~graph:as_graph
       ~attrs_v:(fun p ->
-        let label = _to_str_escape "@[<2>%a@]" pp_result_of p in
+        let label = _to_str_escape "@[<2>%a@]@." pp_result_of p in
         let attrs = [`Label label; `Style "filled"] in
         let shape = `Shape "box" in
         if is_proof_of_false p then [`Color "red"; `Label "[]"; `Shape "box"; `Style "filled"]
