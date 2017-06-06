@@ -171,7 +171,7 @@ module Inner = struct
       | T.NoType, _
       | _, T.NoType -> fail()
       | T.HasType ty1, T.HasType ty2 ->
-        unif_rec ~op ~root subst (ty1,sc1) (ty2,sc2)
+        unif_rec ~op ~root:true subst (ty1,sc1) (ty2,sc2)
     in
     unif_term ~op ~root subst t1 sc1 t2 sc2
 
@@ -220,10 +220,11 @@ module Inner = struct
         begin match T.view f1, T.view f2 with
           | T.Const id1, T.Const id2 ->
             if ID.equal id1 id2 &&
-               List.length l1 = List.length l2 &&
-               (op <> O_unify || has_unifiable_ty t1)
-            then unif_list ~op subst l1 sc1 l2 sc2
-            else if op=O_unify && not root && has_non_unifiable_ty t1
+               List.length l1 = List.length l2
+            then (
+              (* just unify subterms pairwise *)
+              unif_list ~op subst l1 sc1 l2 sc2
+            ) else if op=O_unify && not root && has_non_unifiable_ty t1
             (* TODO: notion of value, here, to fail fast in some cases *)
             then US.add_constr (Unif_constr.make (t1,sc1) (t2,sc2)) subst
             else fail()
