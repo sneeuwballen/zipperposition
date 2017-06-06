@@ -35,7 +35,7 @@ and steps = ref ~-1
 and version = ref false
 and timeout = ref 0.
 and presaturate = ref false
-and combinators = ref HO_unif.Combinators.(name default)
+and combinators = ref HO_combinators.(name default)
 and dot_file = ref None
 and dot_sat = ref false
 and dot_all_roots = ref false
@@ -74,7 +74,7 @@ let parse_args () =
     ; "--prelude", Arg.String (CCVector.push prelude), " parse prelude file"
     ; "--no-check", Arg.Clear check, " do not check proof"
     ; "--ho-combinators",
-      Arg.Symbol (HO_unif.Combinators.list_names(), (:=) combinators),
+      Arg.Symbol (HO_combinators.list_names(), (:=) combinators),
       " set of combinators for HO unif";
     ] @ Options.make ()
   ) |> List.sort (fun (s1,_,_)(s2,_,_) -> String.compare s1 s2)

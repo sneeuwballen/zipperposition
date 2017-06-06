@@ -413,7 +413,7 @@ let process_file (prelude:Phases.prelude) file =
   compute_ord_select precedence >>= fun (ord, select) ->
   (* HO *)
   Phases.get_key Params.key >>= fun params ->
-  let combinators = HO_unif.Combinators.by_name params.Params.param_combinators in
+  let combinators = HO_combinators.by_name params.Params.param_combinators in
   (* build the context and env *)
   make_ctx ~signature ~ord ~select ~combinators >>= fun ctx ->
   make_env ~params ~ctx stmts >>= fun (Phases.Env_clauses (env,clauses)) ->

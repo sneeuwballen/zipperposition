@@ -19,7 +19,7 @@ module type PARAMETERS = sig
   val signature : Signature.t
   val ord : Ordering.t
   val select : Selection.t
-  val combinators : HO_unif.Combinators.t
+  val combinators : HO_combinators.t
 end
 
 module Key = struct

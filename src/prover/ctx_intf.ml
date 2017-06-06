@@ -19,7 +19,7 @@ module type S = sig
 
   val renaming : Subst.Renaming.t
 
-  val combinators : unit -> HO_unif.Combinators.t
+  val combinators : unit -> HO_combinators.t
 
   (** {2 Utils} *)
 
