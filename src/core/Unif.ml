@@ -96,10 +96,7 @@ let rec unif_list subst ~op (l1,sc1) (l2,sc2) k = match l1, l2 with
     op subst (x1,sc1) (x2,sc2)
       (fun subst -> unif_list subst ~op (tail1,sc1)(tail2,sc2) k)
 
-(* in HO, we have [f1 l1] and [f2 l2], where application is left-associative.
-   we need to unify from the right (the outermost application is on
-   the right) so this returns pairs to unify. *)
-let pair_lists f1 l1 f2 l2 =
+let pair_lists_right f1 l1 f2 l2 : _ list * _ list =
   let len1 = List.length l1 and len2 = List.length l2 in
   if len1 = len2 then f1::l1, f2::l2
   else if len1 < len2
@@ -112,6 +109,20 @@ let pair_lists f1 l1 f2 l2 =
   else
     let l1_1, l1_2 = CCList.take_drop (len1 - len2) l1 in
     (T.app ~ty:(T.ty_exn f2) f1 l1_1) :: l1_2, f2 :: l2
+
+let pair_lists_left l1 ret1 l2 ret2 : _ list * _ list =
+  let len1 = List.length l1 and len2 = List.length l2 in
+  if len1 = len2 then ret1::l1, ret2::l2
+  else if len1 < len2
+  then (
+    let l2_1, l2_2 = CCList.take_drop len1 l2 in
+    let ret2' = T.arrow l2_2 ret2 in
+    ret1 :: l1, ret2' :: l2_1
+  ) else (
+    let l1_1, l1_2 = CCList.take_drop len2 l1 in
+    let ret1' = T.arrow l1_2 ret1 in
+    ret1' :: l1_1, ret2 :: l2
+  )
 
 type protected =
   | P_vars of T.VarSet.t (* blocked variables *)
@@ -192,9 +203,14 @@ module Inner = struct
             else fail()
           | _ ->
             (* currying: unify "from the right" *)
-            let l1, l2 = pair_lists f1 l1 f2 l2 in
+            let l1, l2 = pair_lists_right f1 l1 f2 l2 in
             unif_list ~op subst l1 sc1 l2 sc2
         end
+      | T.AppBuiltin (Builtin.Arrow, ret1::args1),
+        T.AppBuiltin (Builtin.Arrow, ret2::args2) ->
+        (* unify [a -> b] and [a' -> b'], virtually *)
+        let l1, l2 = pair_lists_left args1 ret1 args2 ret2 in
+        unif_list ~op subst l1 sc1 l2 sc2
       | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Builtin.equal s1 s2 ->
         unif_list ~op subst l1 sc1 l2 sc2
       | _, _ -> raise Fail
@@ -376,7 +392,7 @@ module FO = struct
     with Exit -> None
 
   let pair_lists_ =
-    (pair_lists :> term -> term list -> term -> term list -> InnerTerm.t list * InnerTerm.t list)
+    (pair_lists_right :> term -> term list -> term -> term list -> InnerTerm.t list * InnerTerm.t list)
 
   let pair_lists f1 l1 f2 l2 =
     let l1, l2 = pair_lists_ f1 l1 f2 l2 in

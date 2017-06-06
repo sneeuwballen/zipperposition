@@ -81,14 +81,7 @@ let var v = T.var v
 
 let var_of_int i = T.var (HVar.make ~ty:tType i)
 
-let arrow_ l r = T.app_builtin ~ty:T.tType Builtin.arrow (r :: l)
-
-let arrow l r = match l, view r with
-  | [], _ -> r
-  | _::_, Fun (l', ret) ->
-    assert (not (is_fun ret));
-    arrow_ (l @ l') ret
-  | _ -> arrow_ l r
+let arrow = T.arrow
 
 let app s l =
   let ty_s = arrow (List.map (fun _ -> T.tType) l) T.tType in
@@ -259,7 +252,7 @@ let apply ty0 args0 =
   and aux_l ty_ret exp_args args env = match exp_args, args with
     | [], [] -> T.DB.eval env ty_ret
     | _, [] ->
-      T.DB.eval env (arrow_ exp_args ty_ret)
+      T.DB.eval env (arrow exp_args ty_ret)
     | [], _ ->
       begin match T.view (T.DB.eval env ty_ret) with
         | T.AppBuiltin (Builtin.Arrow, (ty_ret'::exp_args')) ->

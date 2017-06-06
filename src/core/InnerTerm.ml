@@ -178,6 +178,8 @@ let tType =
   let my_t = make_ ~ty:NoType (AppBuiltin(Builtin.TType, [])) in
   H.hashcons my_t
 
+let arrow l r = app_builtin ~ty:tType Builtin.arrow (r :: l)
+
 let cast ~ty old = match old.term with
   | Var v -> var (HVar.cast v ~ty)
   | DB i -> bvar ~ty i

@@ -65,6 +65,9 @@ val tType : t
 (** The root of the type system. It doesn't have a type.
     It has kind [Kind.Type] *)
 
+val arrow : t list -> t -> t
+(** Smart constructor for arrow types *)
+
 val cast : ty:t -> t -> t
 (** Change the type *)
 

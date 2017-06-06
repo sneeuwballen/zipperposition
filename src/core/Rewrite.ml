@@ -312,7 +312,7 @@ module Term = struct
                  in
                  begin match find_rule with
                    | None -> k t'
-                   | Some (r, subst,l_rest) ->
+                   | Some (r, subst, l_rest) ->
                      (* rewrite [t = r.lhs\sigma] into [rhs] (and normalize [rhs],
                         which contain variables bound by [subst]) *)
                      Util.debugf ~section 5

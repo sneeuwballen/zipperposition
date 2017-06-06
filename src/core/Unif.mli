@@ -40,10 +40,15 @@ val unif_list_com :
   'a list Scoped.t ->
   'subst Sequence.t
 
-val pair_lists : term -> term list -> term -> term list -> term list * term list
+val pair_lists_right : term -> term list -> term -> term list -> term list * term list
 (** in HO, we have [f1 l1] and [f2 l2], where application is left-associative.
     we need to unify from the right (the outermost application is on
     the right) so this returns pairs to unify (including heads). *)
+
+val pair_lists_left : term list -> term -> term list -> term -> term list * term list
+(** in HO, we have [l1 -> ret1] and [l2 -> ret2], where [->] is right-associative.
+    we need to unify from the left,
+    so this returns pairs to unify (including return types). *)
 
 (** {2 Signatures} *)
 
