@@ -60,10 +60,13 @@ module Make(E : Env.S) = struct
 
   let has_too_many_vars c =
     let lits = C.lits c in
-    (* number of distinct term variables *)
+    (* number of distinct first-order term variables *)
     let n_vars =
       Literals.vars lits
-      |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))
+      |> List.filter
+        (fun v ->
+           let ty = HVar.ty v in
+           not (Type.is_tType ty) && not (Type.is_fun ty))
       |> List.length
     in
     if n_vars > !max_vars then (

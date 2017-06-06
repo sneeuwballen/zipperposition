@@ -81,10 +81,13 @@ module Make(C : Clause_intf.S) = struct
 
     (* favorize small number of variables in a clause *)
     let favor_small_num_vars c =
-      (* number of distinct term variables *)
+      (* number of distinct first-order variables *)
       let n_vars =
         Literals.vars (C.lits c)
-        |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))
+        |> List.filter
+          (fun v ->
+             let ty = HVar.ty v in
+             not (Type.is_tType ty) && not (Type.is_fun ty))
         |> List.length
       in
       let n =
