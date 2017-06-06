@@ -245,33 +245,33 @@ module KBO : ORD = struct
         | TC.DB i, TC.DB j ->
           (wb, if i = j then Eq else Incomparable)
         | TC.NonFO, _
-        | _, TC.NonFO when Type.is_fun (T.ty t1) || Type.is_fun (T.ty t2) ->
+        | _, TC.NonFO ->
           (* compare partial applications *)
           let hd1, l1 = T.as_app t1 in
           let hd2, l2 = T.as_app t2 in
-          let wb, cmp_hd = tckbo wb hd1 hd2 in
-          (* how to update the [wb] for [l1,l2] *)
-          let update_wb() =
-            let wb, _ = balance_weight_rec wb l1 0 ~pos:true false in
-            let wb, _ = balance_weight_rec wb l2 0 ~pos:false false in
-            wb
-          in
-          begin match cmp_hd with
-            | Eq -> tckbolex wb l1 l2
-            | Lt ->
-              update_wb(), if balance.pos_counter = 0 then Lt else Incomparable
-            | Gt ->
-              update_wb(), if balance.neg_counter = 0 then Gt else Incomparable
-            | Incomparable ->
-              update_wb(), Incomparable
-          end
-        | TC.NonFO, _
-        | _, TC.NonFO ->
-          assert (not (Type.is_fun @@ T.ty t1) && not (Type.is_fun @@ T.ty t2));
-          let c = if T.equal t1 t2 then Eq else Incomparable in
-          let wb, _ = balance_weight wb t1 0 ~pos:true in
-          let wb, _ = balance_weight wb t2 0 ~pos:false in
-          wb, c
+          if CCList.is_empty l1 && CCList.is_empty l2 then (
+            let c = if T.equal t1 t2 then Eq else Incomparable in
+            let wb, _ = balance_weight wb t1 0 ~pos:true in
+            let wb, _ = balance_weight wb t2 0 ~pos:false in
+            wb, c
+          ) else (
+            let wb, cmp_hd = tckbo wb hd1 hd2 in
+            (* how to update the [wb] for [l1,l2] *)
+            let update_wb() =
+              let wb, _ = balance_weight_rec wb l1 0 ~pos:true false in
+              let wb, _ = balance_weight_rec wb l2 0 ~pos:false false in
+              wb
+            in
+            begin match cmp_hd with
+              | Eq -> tckbolex wb l1 l2
+              | Lt ->
+                update_wb(), if balance.pos_counter = 0 then Lt else Incomparable
+              | Gt ->
+                update_wb(), if balance.neg_counter = 0 then Gt else Incomparable
+              | Incomparable ->
+                update_wb(), Incomparable
+            end
+          )
         (* node and something else *)
         | (TC.App (_, _) | TC.AppBuiltin _), TC.DB _ ->
           let wb', _ = balance_weight wb t1 0 ~pos:true in
