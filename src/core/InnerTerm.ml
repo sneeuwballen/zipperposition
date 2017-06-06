@@ -626,6 +626,7 @@ type print_hook = int -> (CCFormat.t -> t -> unit) -> CCFormat.t -> t -> bool
 
 let _hooks = ref []
 let add_default_hook h = _hooks := h :: !_hooks
+let default_hooks() = !_hooks
 
 let needs_args (t:t): bool = match view t with
   | AppBuiltin (Builtin.Arrow, _) -> true
@@ -648,9 +649,9 @@ let rec pp_depth ?(hooks=[]) depth out t =
     | Bind (b, varty, t') ->
       Format.fprintf out "@[<1>%a@ Y%d:@[%a@].@ %a@]" Binder.pp b depth
         (_pp depth) varty (_pp_surrounded (depth+1)) t'
-    | AppBuiltin (b, [a]) when Builtin.is_prefix b ->
+    | AppBuiltin (b, ([_;a] | [a])) when Builtin.is_prefix b ->
       Format.fprintf out "@[<1>%a %a@]" Builtin.pp b (_pp depth) a
-    | AppBuiltin (b, [t1;t2]) when Builtin.is_infix b ->
+    | AppBuiltin (b, ([_;t1;t2] | [t1;t2])) when Builtin.is_infix b ->
       Format.fprintf out "(@[<1>%a@ %a@ %a@])" (_pp depth) t1 Builtin.pp b (_pp depth) t2
     | AppBuiltin (Builtin.Arrow, ret::args) ->
       Format.fprintf out "@[%a@ → %a@]"

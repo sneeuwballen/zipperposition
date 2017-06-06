@@ -208,6 +208,8 @@ val pp_var : t HVar.t CCFormat.printer
 val add_default_hook : print_hook -> unit
 (** Add a print hook that will be used from now on *)
 
+val default_hooks: unit -> print_hook list
+
 val debugf : t CCFormat.printer
 
 (* TODO: path-selection operation (for handling general-data in TPTP), see

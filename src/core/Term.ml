@@ -464,11 +464,10 @@ let pp_depth = T.pp_depth
 
 let pp_var out (v:Type.t HVar.t) = T.pp_var out (v :> T.t HVar.t)
 
-let __hooks = ref []
-let add_hook h = __hooks := h :: !__hooks
-let default_hooks () = !__hooks
+let add_hook = T.add_default_hook
+let default_hooks = T.default_hooks
 
-let pp out t = pp_depth ~hooks:!__hooks 0 out t
+let pp out t = pp_depth 0 out t
 
 let to_string = CCFormat.to_string pp
 
@@ -590,8 +589,7 @@ module Arith = struct
   let () = add_hook pp_hook
 end
 
-let debugf out t =
-  pp_depth ~hooks:(Arith.pp_hook :: !__hooks) 0 out t
+let debugf = pp
 
 (** {2 TPTP} *)
 
