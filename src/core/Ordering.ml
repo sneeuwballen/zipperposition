@@ -245,7 +245,8 @@ module KBO : ORD = struct
         | TC.DB i, TC.DB j ->
           (wb, if i = j then Eq else Incomparable)
         | TC.NonFO, _
-        | _, TC.NonFO ->
+        | _, TC.NonFO when Type.is_fun (T.ty t1) || Type.is_fun (T.ty t2) ->
+          (* compare partial applications *)
           let hd1, l1 = T.as_app t1 in
           let hd2, l2 = T.as_app t2 in
           let wb, cmp_hd = tckbo wb hd1 hd2 in
@@ -264,6 +265,13 @@ module KBO : ORD = struct
             | Incomparable ->
               update_wb(), Incomparable
           end
+        | TC.NonFO, _
+        | _, TC.NonFO ->
+          assert (not (Type.is_fun @@ T.ty t1) && not (Type.is_fun @@ T.ty t2));
+          let c = if T.equal t1 t2 then Eq else Incomparable in
+          let wb, _ = balance_weight wb t1 0 ~pos:true in
+          let wb, _ = balance_weight wb t2 0 ~pos:false in
+          wb, c
         (* node and something else *)
         | (TC.App (_, _) | TC.AppBuiltin _), TC.DB _ ->
           let wb', _ = balance_weight wb t1 0 ~pos:true in
