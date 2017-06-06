@@ -134,8 +134,12 @@ let of_rules
 module Rules = struct
   let a = "a"
   let b = "b"
+  let a2 = "a2"
+  let b2 = "b2"
   let c = "c"
   let d = "d"
+  let f = "f"
+  let g = "g"
   let x = "x"
   let y = "y"
   let z = "z"
@@ -156,6 +160,7 @@ module Rules = struct
   let _I = mk_name "I"
   let _S = mk_name "S"
   let _B = mk_name "B"
+  let _B2 = mk_name "B2"
   let _C = mk_name "C"
 
   let pre_ name p ty args rhs : pre_rule =
@@ -219,6 +224,23 @@ module Rules = struct
     ski () @ [
       pre_ _B 1 ty_b [x;y;z] @@ (v x $ (v y $ v z));
       pre_ _C 1 ty_c [x;y;z] @@ (v x $ v z $ v y);
+    ]
+
+  (* SKIBC + B2
+     [B2 k f g x y = k (f x) (g y)]
+  *)
+  let skibc2 () : pre_rule list =
+    let ty_b2 = pi [a;b;a2;b2;c;d] @@
+      (v b @-> v b2 @-> v c) @->
+        (v a @-> v b) @->
+        (v a2 @-> v b2) @->
+        v a @->
+        v a2 @->
+        v c
+    in
+    skibc () @ [
+      pre_ _B2 4 ty_b2 [k;f;g;x;y] @@
+      (v k $ (v f $ v x) $ (v g $ v y));
     ]
 
   (* Turner's combinators
@@ -335,6 +357,7 @@ end
 let ski : t = of_rules "ski" Rules.(ski ++ preds) Conv.abf
 let ski_if : t = of_rules "ski_if" Rules.(ski ++ preds ++ if_) Conv.abf
 let skibc : t = of_rules "skibc" Rules.(skibc ++ preds) Conv.abf
+let skibc2 : t = of_rules "skibc2" Rules.(skibc2 ++ preds) Conv.abf
 let skibc_if : t = of_rules "skibc_if" Rules.(skibc ++ preds ++ if_) Conv.abf
 let turner : t = of_rules "turner" Rules.(turner ++ preds) Conv.abf
 
