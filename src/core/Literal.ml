@@ -668,9 +668,9 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ?ty_args ~which ~ord ~sub
       (* p is the only term, and it's maximal *)
       at_term ~pos:P.(append position (left stop)) p
     | Int o, _ ->
-      Int_lit.fold_terms ~pos:position ~vars ~which ~ord ~subterms o k
+      Int_lit.fold_terms ~pos:position ?ty_args ~vars ~which ~ord ~subterms o k
     | Rat o, _ ->
-      Rat_lit.fold_terms ~pos:position ~vars ~which ~ord ~subterms o k
+      Rat_lit.fold_terms ~pos:position ?ty_args ~vars ~which ~ord ~subterms o k
     | True, _
     | False, _ -> ()
   end
