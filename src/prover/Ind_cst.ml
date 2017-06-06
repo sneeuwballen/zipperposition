@@ -136,6 +136,7 @@ let id_is_ind_skolem (id:ID.t) (ty:Type.t): bool =
   n_tyvars=0
   && ty_args=[] (* constant *)
   && Ind_ty.is_inductive_type ty_ret
+  && Ind_ty.is_recursive (Ind_ty.as_inductive_type_exn ty_ret |> fst)
   && Type.is_ground ty
   && (id_is_cst id || (not (Ind_ty.is_constructor id) && not (Rewrite.is_defined_cst id)))
 
