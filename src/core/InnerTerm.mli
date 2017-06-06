@@ -194,6 +194,9 @@ val depth : t -> int
 val head : t -> ID.t option
 (** Head symbol, or None if the term is a (bound) variable *)
 
+val type_is_unifiable : t -> bool
+(** Can we (syntactically) unify terms of this type? *)
+
 (** {2 IO} *)
 
 val print_hashconsing_ids : bool ref

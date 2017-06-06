@@ -280,6 +280,8 @@ let apply1 ty a = apply ty [a]
 
 let apply_unsafe = apply
 
+let is_unifiable = T.type_is_unifiable
+
 type print_hook = int -> (CCFormat.t -> t-> unit) -> CCFormat.t -> t-> bool
 
 module TPTP = struct

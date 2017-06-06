@@ -137,11 +137,6 @@ type op =
   | O_variant
   | O_equal
 
-let type_is_unifiable (ty:ty): bool = match T.view ty with
-  | T.AppBuiltin ((Builtin.Arrow | Builtin.TyInt | Builtin.TyRat), _)
-  | T.Bind (Binder.ForallTy, _, _) -> false
-  | _ -> true
-
 (** {2 Unary Unification} *)
 
 module Inner = struct
@@ -155,20 +150,19 @@ module Inner = struct
     else if S.mem subst v then fail()
     else S.bind subst v t
 
-  let has_atomic_ty (t:T.t): bool = match T.ty t with
+  let has_unifiable_ty (t:T.t): bool = match T.ty t with
     | T.NoType -> false
-    | T.HasType ty ->
-      begin match T.view ty with
-        | T.AppBuiltin (Builtin.Arrow, _)
-        | T.Bind (Binder.ForallTy, _, _) -> false
-        | _ -> true
-      end
+    | T.HasType ty -> T.type_is_unifiable ty
 
   let has_non_unifiable_ty (t:T.t): bool = match T.ty t with
     | T.NoType -> false
-    | T.HasType ty -> not (type_is_unifiable ty)
+    | T.HasType ty -> not (T.type_is_unifiable ty)
 
-  let rec unif_rec ~op subst t1s t2s : unif_subst =
+  (* @param op which operation to perform (unification,matching,alpha-eq)
+     @param root if we are at the root of the original problem. This is
+     useful for constraints (only allowed in subterms, where [root=false])
+  *)
+  let rec unif_rec ~op ~root subst t1s t2s : unif_subst =
     let t1,sc1 = US.deref subst t1s
     and t2,sc2 = US.deref subst t2s in
     (* first, unify types *)
@@ -177,10 +171,11 @@ module Inner = struct
       | T.NoType, _
       | _, T.NoType -> fail()
       | T.HasType ty1, T.HasType ty2 ->
-        unif_rec ~op subst (ty1,sc1) (ty2,sc2)
+        unif_rec ~op ~root subst (ty1,sc1) (ty2,sc2)
     in
-    unif_term ~op subst t1 sc1 t2 sc2
-  and unif_term ~op subst t1 sc1 t2 sc2 : unif_subst =
+    unif_term ~op ~root subst t1 sc1 t2 sc2
+
+  and unif_term ~op ~root subst t1 sc1 t2 sc2 : unif_subst =
     let view1 = T.view t1 and view2 = T.view t2 in
     match view1, view2 with
       | _ when sc1=sc2 && T.equal t1 t2 ->
@@ -212,21 +207,23 @@ module Inner = struct
         end
       | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Binder.equal s1 s2 ->
         (* FIXME: should carry a "depth" parameter for closedness checks? *)
-        let subst = unif_rec ~op subst (varty1,sc1) (varty2,sc2) in
-        unif_rec ~op subst (t1',sc1) (t2',sc2)
+        let subst = unif_rec ~op ~root:true subst (varty1,sc1) (varty2,sc2) in
+        unif_rec ~op ~root:false subst (t1',sc1) (t2',sc2)
       | T.DB i, T.DB j -> if i = j then subst else raise Fail
       | T.Const f, T.Const g ->
         if ID.equal f g
         then subst
+        else if op=O_unify && not root && has_non_unifiable_ty t1
+        then US.add_constr (Unif_constr.make (t1,sc1)(t2,sc2)) subst
         else raise Fail
       | T.App (f1, l1), T.App (f2, l2) ->
         begin match T.view f1, T.view f2 with
           | T.Const id1, T.Const id2 ->
             if ID.equal id1 id2 &&
                List.length l1 = List.length l2 &&
-               (op <> O_unify || has_atomic_ty t1)
+               (op <> O_unify || has_unifiable_ty t1)
             then unif_list ~op subst l1 sc1 l2 sc2
-            else if op=O_unify && has_non_unifiable_ty t1
+            else if op=O_unify && not root && has_non_unifiable_ty t1
             (* TODO: notion of value, here, to fail fast in some cases *)
             then US.add_constr (Unif_constr.make (t1,sc1) (t2,sc2)) subst
             else fail()
@@ -242,7 +239,7 @@ module Inner = struct
         (* unify [a -> b] and [a' -> b'], virtually *)
         let l1, l2 = pair_lists_left args1 ret1 args2 ret2 in
         unif_list ~op subst l1 sc1 l2 sc2
-      | _ when op=O_unify && has_non_unifiable_ty t1 ->
+      | _ when op=O_unify && not root && has_non_unifiable_ty t1 ->
         (* push pair as a constraint, because of typing. *)
         US.add_constr (Unif_constr.make (t1,sc1) (t2,sc2)) subst
       | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Builtin.equal s1 s2 ->
@@ -255,12 +252,12 @@ module Inner = struct
     | _, []
     | [], _ -> fail ()
     | t1::l1', t2::l2' ->
-      let subst = unif_rec ~op subst (t1,sc1) (t2,sc2) in
+      let subst = unif_rec ~op ~root:false subst (t1,sc1) (t2,sc2) in
       unif_list ~op subst l1' sc1 l2' sc2
 
   let unify_full ?(subst=US.empty) a b =
     Util.with_prof prof_unify
-      (fun () -> unif_rec ~op:O_unify subst a b) ()
+      (fun () -> unif_rec ~root:true ~op:O_unify subst a b) ()
 
   let unify_syn ?(subst=Subst.empty) a b =
     let subst = US.of_subst subst in
@@ -276,7 +273,7 @@ module Inner = struct
       (fun () ->
          let subst = US.of_subst subst in
          let subst =
-           unif_rec ~op:(O_match_protect (P_scope scope)) subst pattern b
+           unif_rec ~root:true ~op:(O_match_protect (P_scope scope)) subst pattern b
          in
          assert (not @@ US.has_constr subst);
          US.subst subst)
@@ -292,7 +289,7 @@ module Inner = struct
       (fun () ->
          let subst = US.of_subst subst in
          let subst =
-           unif_rec ~op:(O_match_protect (P_vars blocked)) subst
+           unif_rec ~op:(O_match_protect (P_vars blocked)) ~root:true subst
              (Scoped.make pattern scope) (Scoped.make b scope)
          in
          assert (not @@ US.has_constr subst);
@@ -307,7 +304,7 @@ module Inner = struct
 
   let variant ?(subst=Subst.empty) a b =
     let subst = US.of_subst subst in
-    let subst = unif_rec ~op:O_variant subst a b in
+    let subst = unif_rec ~op:O_variant ~root:true subst a b in
     assert (not @@ US.has_constr subst);
     let subst = US.subst subst in
     if Subst.is_renaming subst then subst else raise Fail
@@ -315,7 +312,7 @@ module Inner = struct
   let equal ~subst a b =
     let subst = US.of_subst subst in
     try
-      let subst = unif_rec ~op:O_equal subst a b in
+      let subst = unif_rec ~op:O_equal ~root:true subst a b in
       assert (not @@ US.has_constr subst);
       true
     with Fail -> false
@@ -396,7 +393,7 @@ module Ty = struct
   let are_variant =
     (are_variant :> term -> term -> bool)
 
-  let type_is_unifiable = (type_is_unifiable :> term -> bool)
+  let type_is_unifiable = (T.type_is_unifiable :> term -> bool)
 end
 
 module FO = struct

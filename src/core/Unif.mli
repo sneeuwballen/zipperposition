@@ -52,9 +52,6 @@ val pair_lists_left : term list -> term -> term list -> term -> term list * term
     we need to unify from the left,
     so this returns pairs to unify (including return types). *)
 
-val type_is_unifiable : ty -> bool
-(** Can we (syntactically) unify terms of this type? *)
-
 (** {2 Signatures} *)
 
 module type S = Unif_intf.S
