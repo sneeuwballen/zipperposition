@@ -164,7 +164,7 @@ module Rules = struct
     }
 
   (* predicate combinators.
-     [N f x = ¬ f x]
+     [N x = ¬ x]
      [Eq x y = x=y]
      [And x y = x∧y]
   *)
