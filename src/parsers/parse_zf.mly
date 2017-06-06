@@ -292,8 +292,12 @@ term:
       UntypedAST.error loc "expected term"
     }
 
+constructor_arg:
+  | ty=atomic_term { None, ty }
+  | LEFT_PAREN id=raw_var COLON ty=atomic_term RIGHT_PAREN { Some id, ty }
+
 constructor:
-  | v=raw_var l=atomic_term* { v, List.map (fun ty -> None, ty) l }
+  | v=raw_var l=constructor_arg* { v, l }
 
 constructors:
   | VERTICAL_BAR? l=separated_nonempty_list(VERTICAL_BAR, constructor) { l }
