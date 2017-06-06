@@ -46,7 +46,7 @@ module Make(E : Env_intf.S) = struct
     let eligible = C.Eligible.(res c) in
     let sc_rule = 1 in
     let sc_c = 0 in
-    Literals.fold_terms ~vars:false ~subterms:true ~ord:(C.Ctx.ord())
+    Literals.fold_terms ~vars:false ~subterms:true ~ty_args:false ~ord:(C.Ctx.ord())
       ~which:`All ~eligible (C.lits c)
     |> Sequence.flat_map
       (fun (u_p, passive_pos) ->
