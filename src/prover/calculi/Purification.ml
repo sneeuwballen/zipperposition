@@ -48,7 +48,7 @@ module Make(E : Env.S) = struct
   let setup () =
     Util.debug ~section 1 "setup purification";
     (* force rules *)
-    Env.add_simplify purify;
+    Env.add_unary_simplify purify;
     ()
 end
 

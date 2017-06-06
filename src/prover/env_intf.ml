@@ -113,8 +113,11 @@ module type S = sig
   val add_backward_redundant : backward_redundant_rule -> unit
   (** Add rule that finds redundant clauses within active set *)
 
-  val add_simplify : simplify_rule -> unit
+  val add_basic_simplify : simplify_rule -> unit
   (** Add basic simplification rule *)
+
+  val add_unary_simplify : simplify_rule -> unit
+  (** Add unary simplification rule (not dependent on proof state)  *)
 
   val add_multi_simpl_rule : multi_simpl_rule -> unit
   (** Add a multi-clause simplification rule *)
@@ -211,7 +214,10 @@ module type S = sig
   val is_passive : C.t -> bool
   (** Is the clause a passive clause? *)
 
-  val simplify : simplify_rule
+  val basic_simplify : simplify_rule
+  (** Basic (and fast) simplifications *)
+
+  val unary_simplify : simplify_rule
   (** Simplify the clause. *)
 
   val simplify_term : Term.t -> Term.t SimplM.t

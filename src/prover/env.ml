@@ -105,6 +105,7 @@ module Make(X : sig
   let _rewrite_rules : (string * term_rewrite_rule) list ref = ref []
   let _lit_rules : (string * lit_rewrite_rule) list ref = ref []
   let _basic_simplify : simplify_rule list ref = ref []
+  let _unary_simplify : simplify_rule list ref = ref []
   let _rw_simplify = ref []
   let _active_simplify = ref []
   let _backward_simplify = ref []
@@ -187,8 +188,11 @@ module Make(X : sig
   let add_backward_redundant r =
     _backward_redundant := r :: !_backward_redundant
 
-  let add_simplify r =
+  let add_basic_simplify r =
     _basic_simplify := r :: !_basic_simplify
+
+  let add_unary_simplify r =
+    _unary_simplify := r :: !_unary_simplify
 
   let add_is_trivial_trail r =
     _is_trivial_trail := r :: !_is_trivial_trail
@@ -444,11 +448,21 @@ module Make(X : sig
         new_c >>= fix_simpl ~f
       )
 
-  (* All basic simplification of the clause itself *)
   let basic_simplify c =
+    let open SimplM.Infix in
+    begin match !_basic_simplify with
+      | [] -> SimplM.return_same c
+      | [f] -> f c
+      | [f;g] -> f c >>= g
+      | l -> SimplM.app_list l c
+    end
+
+  (* All basic simplification of the clause itself *)
+  let unary_simplify c =
     let open SimplM.Infix in
     fix_simpl c
       ~f:(fun c ->
+        basic_simplify c >>= fun c ->
         (* first, rewrite terms *)
         rewrite c >>= fun c ->
         (* rewrite literals (if needed) *)
@@ -458,7 +472,7 @@ module Make(X : sig
         end
         >>= fun c ->
         (* apply simplifications *)
-        begin match !_basic_simplify with
+        begin match !_unary_simplify with
           | [] -> SimplM.return_same c
           | [f] -> f c
           | [f;g] -> f c >>= g
@@ -501,7 +515,7 @@ module Make(X : sig
           (* simplify with unit clauses, then all active clauses *)
           rewrite >>=
           rw_simplify >>=
-          basic_simplify >>=
+          unary_simplify >>=
           active_simplify >|= fun c ->
           if not (Lits.equal_com (C.lits c) (C.lits old_c))
           then
@@ -544,7 +558,7 @@ module Make(X : sig
     while not (Queue.is_empty q) do
       let c = Queue.pop q in
       if not (C.ClauseSet.mem c !set) then (
-        let c, st = basic_simplify c in
+        let c, st = unary_simplify c in
         if st = `New then did_something := true;
         match try_next c !_multi_simpl_rule with
           | None ->
@@ -587,7 +601,7 @@ module Make(X : sig
           (* simplify with unit clauses, then all active clauses *)
           rewrite >>=
           rw_simplify >>=
-          basic_simplify >|= fun c ->
+          unary_simplify >|= fun c ->
           if not (Lits.equal_com (C.lits c) (C.lits old_c)) then (
             Util.debugf ~section 2 "@[clause `@[%a@]`@ simplified into `@[%a@]`@]"
               (fun k->k C.pp old_c C.pp c);
@@ -629,7 +643,7 @@ module Make(X : sig
                let redundant, clauses =
                  CCList.fold_map
                    (fun red c ->
-                      let c', is_new = basic_simplify c in
+                      let c', is_new = unary_simplify c in
                       (red || is_new=`New), c')
                    false clauses
                in
@@ -652,7 +666,7 @@ module Make(X : sig
   (** Simplify the clause w.r.t to the active set *)
   let forward_simplify c =
     let open SimplM.Infix in
-    rewrite c >>= rw_simplify >>= basic_simplify
+    rewrite c >>= rw_simplify >>= unary_simplify
 
   (** generate all clauses from inferences *)
   let generate given =
@@ -665,7 +679,7 @@ module Make(X : sig
     Queue.push (given, 0) unary_queue;
     while not (Queue.is_empty unary_queue) do
       let c, depth = Queue.pop unary_queue in
-      let c, _ = basic_simplify c in (* simplify a bit the clause *)
+      let c, _ = unary_simplify c in (* simplify a bit the clause *)
       if not (is_trivial c) then (
         (* add the clause to set of inferred clauses, if it's not the original clause *)
         if depth > 0 then unary_clauses := c :: !unary_clauses;

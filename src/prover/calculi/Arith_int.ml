@@ -1994,11 +1994,11 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_lit_rule "less_to_lesseq" canc_less_to_lesseq;
     (* transformation ≠ to ≤ *)
     begin match !diff_to_lesseq_ with
-      | `Simplify -> Env.add_simplify canc_diff_to_lesseq
+      | `Simplify -> Env.add_unary_simplify canc_diff_to_lesseq
       | `Inf -> Env.add_unary_inf "canc_diff_imply_lesseq" canc_diff_imply_lesseq
     end;
-    Env.add_simplify canc_eq_resolution;
-    Env.add_simplify canc_demodulation;
+    Env.add_basic_simplify canc_eq_resolution;
+    Env.add_unary_simplify canc_demodulation;
     Env.add_backward_simplify canc_backward_demodulation;
     Env.add_is_trivial is_tautology;
     Env.add_redundant is_redundant_by_ineq;

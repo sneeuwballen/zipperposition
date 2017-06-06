@@ -185,7 +185,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let install_rules_ () =
     Env.add_is_trivial is_trivial;
-    Env.add_simplify simplify;
+    Env.add_basic_simplify simplify;
     ()
 
   let add ~proof s ty =

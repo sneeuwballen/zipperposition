@@ -221,7 +221,7 @@ end = struct
       List.iter
         (fun lits ->
            let c = C.create_a ~trail:Trail.empty ~penalty:0 lits Proof.Step.trivial in
-           let c, _ = E.simplify c in
+           let c, _ = E.unary_simplify c in
            if E.is_trivial c then ()
            else if C.is_empty c then raise (Yield_false c)
            else (
@@ -233,7 +233,7 @@ end = struct
       while not (CQ.is_empty q) && !n < max_steps_ do
         incr n;
         let c = CQ.take_first q in
-        let c, _ = E.simplify c in
+        let c, _ = E.unary_simplify c in
         assert (C.trail c |> Trail.is_empty);
         (* check for empty clause *)
         if C.comes_from_goal c then () (* ignore, a valid lemma might contradict goal *)
@@ -252,7 +252,7 @@ end = struct
             new_c
             |> Sequence.filter_map
               (fun new_c ->
-                 let new_c, _ = E.simplify new_c in
+                 let new_c, _ = E.unary_simplify new_c in
                  (* discard trivial/conditional clauses, or clauses coming
                     from goals (as they might be true lemmas but contradict
                     the negated goal, which makes them even more useful);
@@ -1208,7 +1208,7 @@ module Make
                with avatar splitting. *)
             let clauses =
               C.of_statement st
-              |> List.map (fun c -> fst (E.simplify c))
+              |> List.map (fun c -> fst (E.basic_simplify c))
             in
             prove_by_ind clauses ~ignore_depth:true ~generalize_on:consts;
             (* "skip" in any case, because the proof is done in a cut anyway *)

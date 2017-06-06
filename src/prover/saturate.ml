@@ -78,7 +78,7 @@ module Make(E : Env.S) = struct
           Env.do_generate ~full:true ()
           |> Sequence.filter_map
             (fun c ->
-               let c, _ = Env.simplify c in
+               let c, _ = Env.unary_simplify c in
                if Env.is_trivial c || Env.is_active c || Env.is_passive c
                then None
                else Some c)

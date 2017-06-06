@@ -1471,7 +1471,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Env.add_unary_inf "equality_factoring" infer_equality_factoring;
     Env.add_unary_inf "equality_resolution" infer_equality_resolution;
     Env.add_rw_simplify rw_simplify;
-    Env.add_simplify basic_simplify;
+    Env.add_basic_simplify basic_simplify;
     Env.add_active_simplify active_simplify;
     Env.add_backward_simplify backward_simplify;
     Env.add_redundant redundant;

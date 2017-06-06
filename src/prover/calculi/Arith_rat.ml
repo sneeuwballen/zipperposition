@@ -1142,10 +1142,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_binary_inf "rat_ineq_chaining" canc_ineq_chaining;
     Env.add_unary_inf "rat_ineq_factoring" canc_ineq_factoring;
     Env.add_multi_simpl_rule eliminate_unshielded;
-    Env.add_simplify canc_demodulation;
+    Env.add_unary_simplify canc_demodulation;
     Env.add_backward_simplify canc_backward_demodulation;
     Env.add_is_trivial is_tautology;
-    Env.add_simplify convert_lit;
+    Env.add_unary_simplify convert_lit;
     Env.add_multi_simpl_rule eliminate_unshielded;
     (* completeness? I don't think so *)
     Ctx.lost_completeness ();

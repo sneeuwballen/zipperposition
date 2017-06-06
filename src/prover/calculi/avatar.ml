@@ -555,7 +555,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     E.add_clause_conversion convert_lemma;
     E.add_is_trivial_trail trail_is_trivial;
     if E.flex_get k_simplify_trail then (
-      E.add_simplify simplify_trail;
+      E.add_unary_simplify simplify_trail;
       if E.flex_get k_back_simplify_trail then (
         E.add_backward_simplify backward_simplify_trails;
       );
