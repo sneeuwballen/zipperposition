@@ -482,6 +482,8 @@ module Make(E : Env.S) : S with module Env = E = struct
            Util.debugf ~section 5 "@[<2>try cancellation@ in @[%a@]@]" (fun k->k AL.pp a_lit);
            (* try to unify terms in [m1] and [m2] *)
            MF.unify_mm (m1,0) (m2,0)
+           |> Sequence.filter
+             (fun (mf1,mf2,_) -> Q.equal (MF.coeff mf1) (MF.coeff mf2))
            |> Sequence.fold
              (fun acc (mf1, mf2, subst) ->
                 let renaming = Ctx.renaming_clear () in

@@ -616,6 +616,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                Util.debugf ~section 5 "@[<2>try cancellation@ in @[%a@]@]" (fun k->k AL.pp a_lit);
                (* try to unify terms in [m1] and [m2] *)
                MF.unify_mm (m1,0) (m2,0)
+               |> Sequence.filter
+                 (fun (mf1,mf2,_) -> Z.equal (MF.coeff mf1) (MF.coeff mf2))
                |> Sequence.fold
                  (fun acc (mf1, mf2, subst) ->
                     let renaming = Ctx.renaming_clear () in
@@ -623,8 +625,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                     let mf2' = MF.apply_subst ~renaming subst (mf2,0) in
                     let is_max_lit = C.is_maxlit (c,0) subst ~idx in
                     Util.debugf ~section 5
-                      "@[<4>... candidate:@ @[%a@] (max lit ? %B)@]"
-                      (fun k->k S.pp subst is_max_lit);
+                      "@[<4>... candidate:@ @[%a@] (max lit ? %B)@ :mf1 %a@ :mf2 %a@]"
+                      (fun k->k S.pp subst is_max_lit MF.pp mf1' MF.pp mf2');
                     if is_max_lit && MF.is_max ~ord mf1' && MF.is_max ~ord mf2'
                     then (
                       (* do the inference *)
@@ -957,6 +959,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              so we deduce that if  m1-mf1.rest ≤ m2 - mf2.rest
              then the first literal implies the second, so we only
              keep the second one *)
+          assert (Z.equal (MF.coeff mf1) (MF.coeff mf2));
           if (C.is_maxlit (c,0) subst ~idx:i || C.is_maxlit (c,0) subst ~idx:j)
           && (ALF.is_max ~ord lit1 || ALF.is_max ~ord lit2)
           then (
