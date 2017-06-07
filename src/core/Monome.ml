@@ -510,6 +510,8 @@ module Focus = struct
               let subst' = Unif.FO.unification ~subst
                   (Scoped.make t scope) (Scoped.make t' scope)
               in
+              (* move back [rest] into the main list, some terms might be equal
+                 to [t] now *)
               _iter_self ~num ~subst:subst' (num.add c c') t (l'@ rest) [] const scope k
             with Unif.Fail -> ()
           end;
@@ -572,9 +574,9 @@ module Focus = struct
             let subst = Unif.FO.unification ~subst (t1,sc1) (t2,sc2) in
             Util.debugf 5 "@[<2>unify_mm :@ @[%a = %a@]@ with @[%a@]@]"
               (fun k->k T.pp t1 T.pp t2 Subst.pp subst);
-            _iter_self ~num ~subst c1 t1 l1' [] m1.const sc1
+            _iter_self ~num ~subst c1 t1 (l1'@rest1) [] m1.const sc1
               (fun (mf1, subst) ->
-                 _iter_self ~num ~subst c2 t2 l2' [] m2.const sc2
+                 _iter_self ~num ~subst c2 t2 (l2'@rest2) [] m2.const sc2
                    (fun (mf2, subst) -> k (mf1, mf2, subst))
               )
           with Unif.Fail -> ()
