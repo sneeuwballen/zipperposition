@@ -542,6 +542,8 @@ module Ty = struct
     | AppBuiltin (Builtin.Term, []) -> Ty_builtin Term
     | AppBuiltin (Builtin.Arrow, ret::args) -> Ty_fun (args, ret)
     | AppBuiltin (Builtin.Multiset, [t]) -> Ty_multiset t
+    | AppBuiltin (Builtin.TyReal, []) ->
+      failwith "cannot handle values of type `real`"
     | Let _
     | Ite _
     | Match _
