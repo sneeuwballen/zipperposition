@@ -478,12 +478,10 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun acc (a_lit,pos) ->
            let idx = Lits.Pos.idx pos in
            (* cancellation depends on what the literal looks like *)
-           let {AL.op; left=m1; right=m2} = a_lit in
+           let {AL.left=m1; right=m2; _} = a_lit in
            Util.debugf ~section 5 "@[<2>try cancellation@ in @[%a@]@]" (fun k->k AL.pp a_lit);
            (* try to unify terms in [m1] and [m2] *)
            MF.unify_mm (m1,0) (m2,0)
-           |> Sequence.filter
-             (fun (mf1,mf2,_) -> Q.equal (MF.coeff mf1) (MF.coeff mf2))
            |> Sequence.fold
              (fun acc (mf1, mf2, subst) ->
                 let renaming = Ctx.renaming_clear () in
@@ -498,7 +496,10 @@ module Make(E : Env.S) : S with module Env = E = struct
                   (* do the inference *)
                   let lits' = CCArray.except_idx (C.lits c) idx in
                   let lits' = Lit.apply_subst_list ~renaming subst (lits',0) in
-                  let new_lit = Lit.mk_rat_op op (MF.rest mf1') (MF.rest mf2') in
+                      (* just substitute in a_lit *)
+                      let new_lit =
+                        AL.apply_subst ~renaming subst (a_lit,0) |> Lit.mk_rat
+                      in
                   let all_lits = new_lit :: lits' in
                   let proof =
                     Proof.Step.inference
