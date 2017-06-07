@@ -240,6 +240,12 @@ module Inner = struct
         (* unify [a -> b] and [a' -> b'], virtually *)
         let l1, l2 = pair_lists_left args1 ret1 args2 ret2 in
         unif_list ~op subst l1 sc1 l2 sc2
+      | T.AppBuiltin (Builtin.Int n1,[]),
+        T.AppBuiltin (Builtin.Int n2,[]) ->
+        if Z.equal n1 n2 then subst else raise Fail (* int equality *)
+      | T.AppBuiltin (Builtin.Rat n1,[]),
+        T.AppBuiltin (Builtin.Rat n2,[]) ->
+        if Q.equal n1 n2 then subst else raise Fail (* rational equality *)
       | _ when op=O_unify && not root && has_non_unifiable_ty t1 ->
         (* push pair as a constraint, because of typing. *)
         US.add_constr (Unif_constr.make (t1,sc1) (t2,sc2)) subst
