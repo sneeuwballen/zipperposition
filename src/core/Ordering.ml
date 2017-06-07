@@ -5,7 +5,7 @@
 
 module Prec = Precedence
 module MT = Multiset.Make(Term)
-module IOB = IDOrBuiltin
+module IOB = ID_or_builtin
 module W = Precedence.Weight
 
 open Comparison

@@ -11,3 +11,4 @@ include Interfaces.EQ with type t := t
 include Interfaces.ORD with type t := t
 include Interfaces.PRINT with type t := t
 
+module Map : CCMap.S with type key = t

@@ -21,3 +21,11 @@ let pp out = function
 
 let to_string = CCFormat.to_string pp
 
+
+module As_key = struct
+  type t_ = t
+  type t = t_
+  let compare = compare
+end
+
+module Map = CCMap.Make(As_key)

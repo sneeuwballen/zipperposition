@@ -66,7 +66,7 @@ Library "logtk"
                     DBEnv, Position, Var, HVar, Defined_pos,
                     Subst, Unif, Signature, Scoped, Unif_intf, HO_unif,
                     TypeInference, Options, Comparison, Precedence, Builtin,
-                    Ordering, Skolem, Cnf, ID, IDOrBuiltin, SLiteral,
+                    Ordering, Skolem, Cnf, ID, ID_or_builtin, SLiteral,
                     Index, Index_intf, Dtree, Fingerprint, NPDtree, Binder,
                     Congruence, Congruence_intf, Classify_literals, Purify,
                     FeatureVector, FV_tree, UntypedAST, Ind_ty,

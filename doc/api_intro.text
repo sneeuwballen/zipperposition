@@ -24,7 +24,7 @@ Hashcons
 HVar
 IArray
 ID
-IDOrBuiltin
+ID_or_builtin
 Index
 Ind_ty
 InnerTerm
