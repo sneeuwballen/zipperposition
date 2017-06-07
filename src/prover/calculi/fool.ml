@@ -95,7 +95,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       (fun (idx,lit) -> match lit with
          | Literal.Prop (t, sign) ->
            begin match T.as_var t with
-             | Some v -> 
+             | Some v ->
                (* found var, replace it with [not sign] *)
                let t = if sign then T.false_ else T.true_ in
                let subst =
