@@ -30,7 +30,7 @@ depends: [
   "zarith"
   "containers" { >= "1.0" }
   "sequence" { >= "0.4" }
-  "oclock"
+  "mtime"
   "oasis" { build }
   "msat" { >= "0.5" }
   "menhir" {build}

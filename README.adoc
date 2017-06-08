@@ -81,7 +81,7 @@ following https://github.com/c-cube/zipperposition/releases[github page for rele
 
 Look in the file `opam` to see which dependencies you need to install.
 They include `menhir`, `zarith`, `containers`,
-`oclock`, https://github.com/Gbury/mSAT[msat] and `sequence`, but
+`mtime`, https://github.com/Gbury/mSAT[msat] and `sequence`, but
 maybe also other libraries. Consider using opam directly if possible.
 
 ----
