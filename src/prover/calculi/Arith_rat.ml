@@ -220,7 +220,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       let proof =
         Proof.Step.inference
           ~rule:rule_canc
-          ~comment:(CCFormat.sprintf "lhs(%a)" MF.pp mf_a)
           [C.proof_parent_subst (info.active,s_a) subst;
            C.proof_parent_subst (info.passive,s_p) subst] in
       let trail = C.trail_l [info.active;info.passive] in
@@ -582,7 +581,6 @@ module Make(E : Env.S) : S with module Env = E = struct
                          let proof =
                            Proof.Step.inference
                              ~rule:rule_canc_eq_fact
-                             ~comment:(CCFormat.sprintf "idx(%d,%d)" idx1 idx2)
                              [C.proof_parent_subst (c,0) subst] in
                          let penalty = C.penalty c
                          and trail = C.trail c in
@@ -660,8 +658,6 @@ module Make(E : Env.S) : S with module Env = E = struct
           let proof =
             Proof.Step.inference
               ~rule:(Proof.Rule.mk "canc_ineq_chaining")
-              ~comment:(CCFormat.sprintf "(@[idx(%d,%d)@ left(%a)@ right(%a)@])"
-                  idx_l idx_r T.pp (MF.term mf_2) T.pp (MF.term mf_1))
               [C.proof_parent_subst (info.left,s_l) subst;
                C.proof_parent_subst (info.right,s_r) subst] in
           let trail = C.trail_l [info.left; info.right] in

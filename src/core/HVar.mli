@@ -27,7 +27,9 @@ val max : 'a t -> 'a t -> 'a t
 val min : 'a t -> 'a t -> 'a t
 
 val pp : _ t CCFormat.printer
+val pp_tstp : _ t CCFormat.printer
 val to_string : _ t -> string
+val to_string_tstp : _ t -> string
 
 (**/**)
 val make_unsafe : ty:'a -> int -> 'a t

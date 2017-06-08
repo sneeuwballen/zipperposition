@@ -391,9 +391,7 @@ module Make(X : sig
       C.mark_redundant c;
       (* FIXME: put the rules as parameters *)
       let rule = Proof.Rule.mk "rw" in
-      let proof = Proof.Step.simp [C.proof_parent c]
-          ~comment:(StrSet.to_list !applied_rules |> String.concat ",") ~rule
-      in
+      let proof = Proof.Step.simp [C.proof_parent c] ~rule in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
       assert (not (C.equal c c'));
       Util.debugf ~section 3 "@[term rewritten clause `@[%a@]`@ into `@[%a@]`"
@@ -424,9 +422,7 @@ module Make(X : sig
       C.mark_redundant c;
       (* FIXME: put the rules as parameters *)
       let rule = Proof.Rule.mk "rw_lit" in
-      let proof = Proof.Step.simp [C.proof_parent c]
-          ~rule ~comment:(StrSet.to_list !applied_rules |> String.concat ",")
-      in
+      let proof = Proof.Step.simp [C.proof_parent c] ~rule in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
       assert (not (C.equal c c'));
       Util.debugf ~section 3 "@[lit rewritten `@[%a@]`@ into `@[%a@]`@]"

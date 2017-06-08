@@ -25,6 +25,7 @@ type data = {
 type attr =
   | A_app of string * attr list
   | A_quoted of string
+  | A_list of attr list
 
 type attrs = attr list
 
@@ -78,6 +79,17 @@ val attr_infix : string -> attr
 
 val pp_attr : attr CCFormat.printer
 val pp_attrs : attrs CCFormat.printer
+
+val pp_attr_tstp : attr CCFormat.printer
+(** Print as a TPTP general_term *)
+
+module A : sig
+  type t = attr
+  val str : string -> t
+  val app : string -> t list -> t
+  val quoted : string -> t
+  val list : t list -> t
+end
 
 val pp_statement : statement CCFormat.printer
 

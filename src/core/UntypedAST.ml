@@ -23,6 +23,7 @@ type data = {
 type attr =
   | A_app of string * attr list
   | A_quoted of string
+  | A_list of attr list
 
 type attrs = attr list
 
@@ -78,10 +79,28 @@ let rec pp_attr out = function
   | A_app (s,l) ->
     Format.fprintf out "(@[%s@ %a@])" s (Util.pp_list ~sep:" " pp_attr) l
   | A_quoted s -> Format.fprintf out "\"%s\"" s
+  | A_list l ->
+    Format.fprintf out "[@[<hv>%a@]]" (Util.pp_list ~sep:"," pp_attr) l
 
 let pp_attrs out = function
   | [] -> ()
   | l -> Format.fprintf out "@ [@[%a@]]" (Util.pp_list ~sep:", " pp_attr) l
+
+let rec pp_attr_tstp out = function
+  | A_app (s,[]) -> Format.fprintf out "%s()" s
+  | A_app (s,l) ->
+    Format.fprintf out "%s(@[%a@])" s (Util.pp_list ~sep:"," pp_attr_tstp) l
+  | A_quoted s -> Format.fprintf out "'%s'" s
+  | A_list l ->
+    Format.fprintf out "[@[<hv>%a@]]" (Util.pp_list ~sep:"," pp_attr_tstp) l
+
+module A = struct
+  type t = attr
+  let str s = A_app (s,[])
+  let app s l = A_app (s,l)
+  let quoted s = A_quoted s
+  let list l = A_list l
+end
 
 let name_of_attrs =
   CCList.find_map

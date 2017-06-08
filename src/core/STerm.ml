@@ -455,7 +455,7 @@ module TPTP = struct
     | _ -> pp out t
   and pp_var out = function
     | Wildcard -> CCFormat.string out "$_"
-    | V s -> CCFormat.string out (CCString.capitalize_ascii s)
+    | V s -> Util.pp_var_tstp out s
 
   let to_string = CCFormat.to_string pp
 end

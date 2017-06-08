@@ -501,8 +501,11 @@ module Make
     (* proof step *)
     let proof =
       let proof_parent = A.cut_proof_parent cut in
-      Proof.Step.inference [proof_parent]
-        ~rule:(Proof.Rule.mkf "induction(@[<h>%a@])" (Util.pp_list HVar.pp) vars)
+      let infos = UntypedAST.A.(
+          [app "induction"
+             (List.map (fun v -> quoted (HVar.to_string_tstp v)) vars)])
+      in
+      Proof.Step.inference [proof_parent] ~infos ~rule:(Proof.Rule.mk "induction")
     in
     (* other variables -> become skolems *)
     let subst_skolems: Subst.t =

@@ -22,9 +22,9 @@ type check = [`No_check | `Check | `Check_with of form list]
 
 (** Classification of proof steps *)
 type kind =
-  | Inference of rule * string option * check
-  | Simplification of rule * string option * check
-  | Esa of rule * string option * check
+  | Inference of rule * check
+  | Simplification of rule * check
+  | Esa of rule * check
   | Assert of statement_src
   | Goal of statement_src
   | Lemma
@@ -48,6 +48,10 @@ type proof
 type t = proof
 
 type parent
+
+type info = UntypedAST.attr
+
+type infos = info list
 
 (** {2 Rule} *)
 
@@ -100,6 +104,7 @@ module Step : sig
 
   val kind : t -> kind
   val parents : t -> parent list
+  val infos : t -> infos
   val compare : t -> t -> int
   val hash : t -> int
   val equal : t -> t -> bool
@@ -121,11 +126,11 @@ module Step : sig
 
   val goal' : ?loc:Loc.t -> file:string -> name:string -> unit -> t
 
-  val inference : ?check:check -> ?comment:string -> rule:rule -> parent list -> t
+  val inference : ?infos:infos -> ?check:check -> rule:rule -> parent list -> t
 
-  val simp : ?check:check -> ?comment:string -> rule:rule -> parent list -> t
+  val simp : ?infos:infos -> ?check:check -> rule:rule -> parent list -> t
 
-  val esa : ?check:check -> ?comment:string -> rule:rule -> parent list -> t
+  val esa : ?infos:infos -> ?check:check -> rule:rule -> parent list -> t
 
   val is_trivial : t -> bool
   val is_by_def : t -> bool
@@ -215,7 +220,7 @@ module S : sig
 
   (** {6 Conversion to a graph of proofs} *)
 
-  val as_graph : (t, rule * Subst.t list) CCGraph.t
+  val as_graph : (t, rule * Subst.t list * infos) CCGraph.t
   (** Get a graph of the proof *)
 
   val traverse :

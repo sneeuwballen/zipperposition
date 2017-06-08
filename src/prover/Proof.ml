@@ -22,11 +22,15 @@ type rule = string
 
 type check = [`No_check | `Check | `Check_with of form list]
 
+type info = UntypedAST.attr
+
+type infos = info list
+
 (** Classification of proof steps *)
 type kind =
-  | Inference of rule * string option * check
-  | Simplification of rule * string option * check
-  | Esa of rule * string option * check
+  | Inference of rule * check
+  | Simplification of rule * check
+  | Esa of rule * check
   | Assert of statement_src
   | Goal of statement_src
   | Lemma
@@ -47,6 +51,7 @@ type step = {
   kind: kind;
   dist_to_goal: int option; (* distance to goal *)
   parents: parent list;
+  infos: UntypedAST.attr list; (* additional info *)
 }
 
 and parent =
@@ -101,21 +106,17 @@ module Kind = struct
     | `Name i -> Format.fprintf out "%d" i
     | `Theory s -> Format.fprintf out "theory(%s)" s
 
-  let pp_comment out = function
-    | None -> ()
-    | Some s -> Format.fprintf out " %s" s
-
   let pp out k = match k with
     | Assert src -> Stmt.Src.pp out src
     | Goal src -> Format.fprintf out "goal %a" Stmt.Src.pp src
     | Lemma -> Format.fprintf out "lemma"
     | Data (src, _) -> Format.fprintf out "data %a" Stmt.Src.pp src
-    | Inference (rule,c,_) ->
-      Format.fprintf out "inf %a%a" Rule.pp rule pp_comment c
-    | Simplification (rule,c,_) ->
-      Format.fprintf out "simp %a%a" Rule.pp rule pp_comment c
-    | Esa (rule,c,_) ->
-      Format.fprintf out "esa %a%a" Rule.pp rule pp_comment c
+    | Inference (rule,_) ->
+      Format.fprintf out "inf %a" Rule.pp rule
+    | Simplification (rule,_) ->
+      Format.fprintf out "simp %a" Rule.pp rule
+    | Esa (rule,_) ->
+      Format.fprintf out "esa %a" Rule.pp rule
     | Trivial -> CCFormat.string out "trivial"
     | By_def id -> Format.fprintf out "by_def(%a)" ID.pp id
 
@@ -132,9 +133,9 @@ module Kind = struct
       | Assert src
       | Goal src -> Stmt.Src.pp_tstp out src
       | Data _ -> Util.error ~where:"ProofStep" "cannot print `Data` step in TPTP"
-      | Inference (rule,_,_)
-      | Simplification (rule,_,_) -> pp_step "thm" out (rule,parents)
-      | Esa (rule,_,_) -> pp_step "esa" out (rule,parents)
+      | Inference (rule,_)
+      | Simplification (rule,_) -> pp_step "thm" out (rule,parents)
+      | Esa (rule,_) -> pp_step "esa" out (rule,parents)
       | Lemma -> Format.fprintf out "lemma"
       | Trivial -> assert(parents=[]); Format.fprintf out "trivial([status(thm)])"
       | By_def _ -> Format.fprintf out "by_def([status(thm)])"
@@ -218,6 +219,7 @@ module Step = struct
 
   let kind p = p.kind
   let parents p = p.parents
+  let infos p = p.infos
 
   let rule p = match p.kind with
     | Trivial
@@ -226,22 +228,10 @@ module Step = struct
     | Data _
     | By_def _
     | Goal _-> None
-    | Esa (rule,_,_)
-    | Simplification (rule,_,_)
-    | Inference (rule,_,_)
+    | Esa (rule,_)
+    | Simplification (rule,_)
+    | Inference (rule,_)
       -> Some rule
-
-  let comment p = match p.kind with
-    | Trivial
-    | Lemma
-    | Assert _
-    | By_def _
-    | Data _
-    | Goal _ -> None
-    | Esa (_,c,_)
-    | Simplification (_,c,_)
-    | Inference (_,c,_)
-      -> Some c
 
   let is_assert p = match p.kind with Assert _ -> true | _ -> false
   let is_goal p = match p.kind with Goal _ | Lemma -> true | _ -> false
@@ -254,9 +244,9 @@ module Step = struct
     let n = ref 0 in
     fun () -> CCRef.incr_then_get n
 
-  let trivial = {id=get_id_(); parents=[]; kind=Trivial; dist_to_goal=None; }
-  let by_def id = {id=get_id_(); parents=[]; kind=By_def id; dist_to_goal=None }
-  let lemma = {id=get_id_(); parents=[]; kind=Lemma; dist_to_goal=Some 0; }
+  let trivial = {id=get_id_(); parents=[]; kind=Trivial; dist_to_goal=None; infos=[]; }
+  let by_def id = {id=get_id_(); parents=[]; kind=By_def id; dist_to_goal=None; infos=[]; }
+  let lemma = {id=get_id_(); parents=[]; kind=Lemma; dist_to_goal=Some 0; infos=[]; }
 
   let combine_dist o p = match o, (Parent.proof p).step.dist_to_goal with
     | None, None -> None
@@ -264,7 +254,7 @@ module Step = struct
     | None, (Some _ as res) -> res
     | Some x, Some y -> Some (min x y)
 
-  let step_ kind parents =
+  let step_ ?(infos=[]) kind parents =
     (* distance to goal (0 if a goal itself) *)
     let dist_to_goal = match kind with
       | Goal _ | Lemma -> Some 0
@@ -279,7 +269,7 @@ module Step = struct
           | Inference _ -> CCOpt.map succ d
           | _ -> d
     in
-    { id=get_id_(); kind; parents; dist_to_goal; }
+    { id=get_id_(); kind; parents; dist_to_goal; infos; }
 
   let data src data =
     step_ (Data (src,data)) []
@@ -298,31 +288,37 @@ module Step = struct
 
   let default_check : check = `Check
 
-  let inference ?(check=default_check) ?comment ~rule parents =
-    step_ (Inference (rule,comment,check)) parents
+  let inference ?infos ?(check=default_check) ~rule parents =
+    step_ ?infos (Inference (rule,check)) parents
 
-  let simp ?(check=default_check) ?comment ~rule parents =
-    step_ (Simplification (rule,comment,check)) parents
+  let simp ?infos ?(check=default_check) ~rule parents =
+    step_ ?infos (Simplification (rule,check)) parents
 
-  let esa ?(check=default_check) ?comment ~rule parents =
-    step_ (Esa (rule,comment,check)) parents
+  let esa ?infos ?(check=default_check) ~rule parents =
+    step_ ?infos (Esa (rule,check)) parents
+
+  let pp_infos out = function
+    | [] -> ()
+    | l ->
+      Format.fprintf out "@ %a" (Util.pp_list ~sep:" " UntypedAST.pp_attr) l
 
   let pp out step = match kind step with
     | Assert _
     | Goal _ ->
-      Format.fprintf out "@[<hv2>%a@]@," Kind.pp (kind step)
+      Format.fprintf out "@[<hv2>%a@]%a@," Kind.pp (kind step) pp_infos step.infos
     | Data _ ->
-      Format.fprintf out "@[<hv2>data %a@]@," Kind.pp (kind step)
-    | Lemma -> Format.fprintf out "lemma"
-    | Trivial -> Format.fprintf out "trivial"
-    | By_def id -> Format.fprintf out "by_def %a" ID.pp id
+      Format.fprintf out "@[<hv2>data %a@]%a@," Kind.pp (kind step) pp_infos step.infos
+    | Lemma -> Format.fprintf out "@[<2>lemma%a@]" pp_infos step.infos
+    | Trivial -> Format.fprintf out "@[<2>trivial%a@]" pp_infos step.infos
+    | By_def id -> Format.fprintf out "@[<2>by_def %a%a@]" ID.pp id pp_infos step.infos
     | Inference _
     | Simplification _
     | Esa _ ->
-      Format.fprintf out "@[<hv2>%a@ with @[<hv>%a@]@]@,"
+      Format.fprintf out "@[<hv2>%a@ with @[<hv>%a@]%a@]@,"
         Kind.pp (kind step)
         (Util.pp_list Result.pp)
         (List.map (fun p -> (Parent.proof p).result) @@ parents step)
+        pp_infos step.infos
 end
 
 module S = struct
@@ -403,14 +399,16 @@ module S = struct
   (** Get a graph of the proof *)
   let as_graph =
     CCGraph.make
-      (fun p -> match Step.rule (step p) with
+      (fun p ->
+         let st = step p in
+         match Step.rule st with
          | None -> Sequence.empty
          | Some rule ->
-           step p
+           st
            |> Step.parents
            |> Sequence.of_list
            |> Sequence.map
-             (fun p' -> (rule,Parent.subst p'), Parent.proof p'))
+             (fun p' -> (rule,Parent.subst p',Step.infos st), Parent.proof p'))
 
   (** {2 IO} *)
 
@@ -483,19 +481,26 @@ module S = struct
              (Step.parents @@ step p)
          in
          let role = "plain" in (* TODO *)
+         let pp_infos out = function
+           | [] -> ()
+           | l ->
+             Format.fprintf out ",@ %a"
+               (Util.pp_list ~sep:", " UntypedAST.pp_attr_tstp) l
+         in
+         let infos = p.step |> Step.infos in
          begin match result p with
            | Form f ->
-             Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]).@]@,"
+             Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]%a).@]@,"
                name role TypedSTerm.TPTP.pp f
-               Kind.pp_tstp (Step.kind @@ step p,parents)
+               Kind.pp_tstp (Step.kind @@ step p,parents) pp_infos infos
            | BoolClause c ->
-             Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]).@]@,"
+             Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]%a).@]@,"
                name role (Util.pp_list ~sep:" | " BBox.pp_tstp) c
-               Kind.pp_tstp (Step.kind @@ step p,parents)
+               Kind.pp_tstp (Step.kind @@ step p,parents) pp_infos infos
            | Clause c ->
-             Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]).@]@,"
+             Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]%a).@]@,"
                name role SClause.pp_tstp c
-               Kind.pp_tstp (Step.kind @@ step p,parents)
+               Kind.pp_tstp (Step.kind @@ step p,parents) pp_infos infos
            | Stmt stmt ->
              let module T = TypedSTerm in
              Statement.TPTP.pp T.TPTP.pp T.TPTP.pp T.TPTP.pp out stmt
@@ -552,14 +557,14 @@ module S = struct
         else if Step.is_by_def @@ step p then `Color "navajowhite" :: shape :: attrs
         else shape :: attrs
       )
-      ~attrs_e:(fun (r,s) ->
+      ~attrs_e:(fun (r,s,infos) ->
         let pp_subst out s =
-          Format.fprintf out "{@[<v>%a@]}" Subst.pp_bindings s
+          Format.fprintf out "@,{@[<v>%a@]}" Subst.pp_bindings s
         in
         let label =
-          if s=[] then Rule.name r
-          else _to_str_escape "@[<v>%s@,%a@]"
-              (Rule.name r) (Util.pp_list ~sep:"" pp_subst) s
+          if s=[] && infos=[] then Rule.name r
+          else _to_str_escape "@[<v>%s%a%a@]"
+              (Rule.name r) (Util.pp_list ~sep:"" pp_subst) s Step.pp_infos infos
         in
         [`Label label; `Other ("dir", "back")])
       out
@@ -596,9 +601,9 @@ module S = struct
         List.map (conv_parent ~ctx) (Step.parents @@ step p)
       in
       begin match Step.kind @@ step p with
-        | Inference (name,_,c)
-        | Simplification (name,_,c) -> LLProof.inference c res name parents
-        | Esa (name,_,c) -> LLProof.esa c res name parents
+        | Inference (name,c)
+        | Simplification (name,c) -> LLProof.inference c res name parents
+        | Esa (name,c) -> LLProof.esa c res name parents
         | Trivial -> LLProof.trivial res
         | By_def id -> LLProof.by_def id res
         | Assert _ -> LLProof.assert_ res

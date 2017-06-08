@@ -356,6 +356,8 @@ let pp_list0 ?(sep=" ") pp_x out = function
 let tstp_needs_escaping s =
   CCString.exists (function '#' | '$' | '+' | '-' -> true | _ -> false) s
 
+let pp_var_tstp out s = CCFormat.string out (CCString.capitalize_ascii s)
+
 let ord_option c o1 o2 = match o1, o2 with
   | None, None -> 0
   | None, Some _ -> -1

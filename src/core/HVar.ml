@@ -29,7 +29,9 @@ let max a b = if a.id < b.id then b else a
 let min a b = if a.id < b.id then a else b
 
 let pp out v = Format.fprintf out "X%d" v.id
+let pp_tstp = pp
 let to_string v = CCFormat.to_string pp v
+let to_string_tstp = to_string
 
 let make_unsafe ~ty id = {ty; id; }
 
