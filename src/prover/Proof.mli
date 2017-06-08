@@ -220,6 +220,7 @@ module S : sig
 
   val traverse :
     ?traversed:unit Tbl.t ->
+    order:[`BFS | `DFS] ->
     t ->
     t Sequence.t
 

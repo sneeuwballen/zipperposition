@@ -446,7 +446,7 @@ module TPTP = struct
     | Record _ -> failwith "cannot print records in TPTP"
   and pp_typed_var out (v,o) = match o with
     | None -> pp_var out v
-    | Some {term=AppBuiltin ((Builtin.TType | Builtin.Term),[]); _} ->
+    | Some {term=AppBuiltin (Builtin.Term,[]); _} ->
       pp_var out v (* implicit type *)
     | Some ty -> Format.fprintf out "%a:%a" pp_var v pp_surrounded ty
   and pp_surrounded out t = match t.term with

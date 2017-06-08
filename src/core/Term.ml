@@ -606,7 +606,7 @@ module TPTP = struct
       | AppBuiltin (b,[]) -> Builtin.TPTP.pp out b
       | AppBuiltin (b,l) ->
         Format.fprintf out "(@[<hov2>%a@ %a@])" Builtin.TPTP.pp b (Util.pp_list pp_rec) l
-      | Const s -> ID.pp out s
+      | Const s -> ID.pp_tstp out s
       | App (f, l) ->
         Format.fprintf out "@[<hov2>%a(@,%a)@]" pp_rec f
           (Util.pp_list ~sep:", " pp_rec) l

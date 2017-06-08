@@ -420,13 +420,12 @@ module S = struct
     Format.fprintf out "@[%a by %a@]"
       pp_result_of p Kind.pp (Step.kind @@ step p)
 
-  let traverse ?(traversed=Tbl.create 16) proof k =
+  let traverse_bfs ~traversed proof k =
+    (* layered BFS *)
     let current, next = ref [proof], ref [] in
     while !current <> [] do
       (* exhaust the current layer of proofs to explore *)
-      while !current <> [] do
-        let proof = List.hd !current in
-        current := List.tl !current;
+      List.iter (fun proof ->
         if Tbl.mem traversed proof then ()
         else (
           Tbl.add traversed proof ();
@@ -435,29 +434,48 @@ module S = struct
             (fun proof' -> next := Parent.proof proof' :: !next)
             (Step.parents @@ step proof);
           (* yield proof *)
-          k proof;
-        )
-      done;
+          k proof
+        ))
+        !current;
       (* explore next layer *)
       current := !next;
       next := [];
     done
 
+  let traverse_dfs ~traversed proof k =
+    let rec aux proof =
+      if Tbl.mem traversed proof then ()
+      else (
+        Tbl.add traversed proof ();
+        (* traverse premises first *)
+        List.iter
+          (fun p' -> aux (Parent.proof p'))
+          (Step.parents @@ step proof);
+          (* yield proof *)
+        k proof
+      )
+    in
+    aux proof
+
+  let traverse ?(traversed=Tbl.create 16) ~order proof k =
+    match order with
+      | `BFS -> traverse_bfs ~traversed proof k
+      | `DFS -> traverse_dfs ~traversed proof k
+
   let pp_normal out proof =
     let sep = "by" in
     Format.fprintf out "@[<v>";
     let pp_bullet out = Format.fprintf out "@<1>@{<Green>*@}" in
-    traverse proof
+    traverse ~order:`DFS proof
       (fun p ->
          Format.fprintf out "@[<hv2>%t @[%a@] %s@ %a@]@,"
-           pp_bullet Result.pp (result p) sep Step.pp (step p)
-      );
+           pp_bullet Result.pp (result p) sep Step.pp (step p));
     Format.fprintf out "@]"
 
   let pp_tstp out proof =
     let namespace = Tbl.create 5 in
     Format.fprintf out "@[<v>";
-    traverse proof
+    traverse ~order:`DFS proof
       (fun p ->
          let name = get_name ~namespace p in
          let parents =

@@ -356,8 +356,8 @@ let to_string m = CCFormat.to_string pp m
 let pp_tstp out e =
   let rec pp_pair out (s, t) =
     if e.num.cmp s e.num.one = 0
-    then T.pp out t
-    else Format.fprintf out "$product(%s, %a)" (e.num.to_string s) T.pp t
+    then T.TPTP.pp out t
+    else Format.fprintf out "$product(%s, %a)" (e.num.to_string s) T.TPTP.pp t
   and pp_list buf l = match l with
     | [] -> ()
     | [s, t] -> pp_pair buf (s, t)

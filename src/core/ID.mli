@@ -49,6 +49,8 @@ val pp_fullc : t CCFormat.printer
 (** Prints the ID with its internal number colored in gray (better for
     readability). Only use for debugging. *)
 
+val pp_tstp : t CCFormat.printer
+
 val gensym : unit -> t
 (** Generate a new ID with a new, unique name *)
 
