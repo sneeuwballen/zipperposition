@@ -399,7 +399,7 @@ let to_string = CCFormat.to_string pp
 
 module TPTP = struct
   let pp_id out s =
-    if CCString.exists (function '#' | '$' -> true | _ -> false) s
+    if Util.tstp_needs_escaping s
     then CCFormat.fprintf out "'%s'" s
     else CCFormat.string out s
 

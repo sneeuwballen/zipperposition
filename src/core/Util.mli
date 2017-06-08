@@ -175,6 +175,9 @@ val pp_list0 : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
     does nothing if the list is empty
     Default separator is " " *)
 
+val tstp_needs_escaping: string -> bool
+(** Is this name a proper TSTP identifier, or does it need ' ' around it? *)
+
 val ord_option : 'a CCOrd.t -> 'a option CCOrd.t
 
 (* TODO: use containers' at some point *)

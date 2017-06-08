@@ -310,9 +310,9 @@ module TPTP = struct
     | Builtin Rat -> CCFormat.string out "$rat"
     | Var v -> Format.fprintf out "X%d" (HVar.id v)
     | DB i -> Format.fprintf out "Tb%d" (depth-i-1)
-    | App (p, []) -> ID.pp out p
+    | App (p, []) -> ID.pp_tstp out p
     | App (p, args) ->
-      Format.fprintf out "@[<2>%a(%a)@]" ID.pp p
+      Format.fprintf out "@[<2>%a(%a)@]" ID.pp_tstp p
         (Util.pp_list (pp_tstp_rec depth)) args
     | Fun (args, ret) ->
       Format.fprintf out "%a > %a" (pp_l depth) args (pp_tstp_rec depth) ret

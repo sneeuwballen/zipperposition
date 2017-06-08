@@ -70,7 +70,7 @@ let pp_full out id = Format.fprintf out "%s/%d" id.name id.id
 let pp_fullc out id = Format.fprintf out "%s/@{<Black>%d@}" id.name id.id
 
 let pp_tstp out id =
-  if CCString.exists (function '#' | '$' -> true | _ -> false) id.name
+  if Util.tstp_needs_escaping id.name
   then CCFormat.fprintf out "'%s'" id.name
   else CCFormat.string out id.name
 
