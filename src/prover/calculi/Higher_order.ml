@@ -34,13 +34,24 @@ module Make(E : Env.S) : S with module Env = E = struct
   module C = Env.C
   module Ctx = Env.Ctx
 
+  (* @param vars the free variables the parameter must depend upon
+     @param ty_ret the return type *)
   let mk_parameter =
     let n = ref 0 in
-    fun ty ->
+    fun vars ty_ret ->
       let i = CCRef.incr_then_get n in
       let id = ID.makef "#k%d" i in
       ID.set_payload id (ID.Attr_parameter i);
-      T.const id ~ty
+      let ty_vars, vars =
+        List.partition (fun v -> Type.is_tType (HVar.ty v)) vars
+      in
+      let ty =
+        Type.forall_fvars ty_vars
+          (Type.arrow (List.map HVar.ty vars) ty_ret)
+      in
+      T.app_full (T.const id ~ty)
+        (List.map Type.var ty_vars)
+        (List.map T.var vars)
 
   (* negative extensionality rule:
      [f != g] where [f : a -> b] becomes [f k != g k] for a fresh parameter [k] *)
@@ -52,7 +63,9 @@ module Make(E : Env.S) : S with module Env = E = struct
            not (T.equal f g) ->
       let n_ty_params, ty_args, _ = Type.open_poly_fun (T.ty f) in
       assert (n_ty_params=0);
-      let params = List.map mk_parameter ty_args in
+      (* parametrize the skolem by free variables *)
+      let vars = Literal.vars lit in
+      let params = List.map (mk_parameter vars) ty_args in
       let new_lit =
         Literal.mk_neq
           (T.app f params)
