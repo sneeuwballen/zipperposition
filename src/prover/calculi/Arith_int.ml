@@ -612,7 +612,7 @@ module Make(E : Env.S) : S with module Env = E = struct
            let idx = Lits.Pos.idx pos in
            (* cancellation depends on what the literal looks like *)
            match a_lit with
-             | AL.Binary (op, m1, m2) ->
+             | AL.Binary (_op, m1, m2) ->
                Util.debugf ~section 5 "@[<2>try cancellation@ in @[%a@]@]" (fun k->k AL.pp a_lit);
                (* try to unify terms in [m1] and [m2] *)
                MF.unify_mm (m1,0) (m2,0)
@@ -1478,9 +1478,20 @@ module Make(E : Env.S) : S with module Env = E = struct
             begin match Monome.Int.of_term l', T.view r', opp with
               | Some m,
                 T.AppBuiltin (Builtin.Int n,[]),
-                T.AppBuiltin (Builtin.Int opp', []) ->
-                (* remainder(l1, n) = opp ----> n | l1-opp *)
-                let lit = Lit.mk_divides ~sign n ~power:1 (M.add_const m Z.(~- opp')) in
+                T.AppBuiltin (Builtin.Int opp', [])
+                when Z.sign opp' >= 0 && Z.compare opp' n < 0 ->
+                (* remainder(l1, n) = opp ----> n | l1-opp,
+                   assuming 0<=opp<n *)
+                let m = M.add_const m Z.(rem (~- opp') n) in
+                let lit = Lit.mk_divides ~sign n ~power:1 m in
+                Some lit
+              | Some _,
+                T.AppBuiltin (Builtin.Int n,[]),
+                T.AppBuiltin (Builtin.Int opp', [])
+                when Z.sign opp' < 0 || Z.compare opp' n >= 0 ->
+                (* remainder(l1, n) = opp --> false
+                   assuming opp ∉ [0.. n-1] *)
+                let lit = if sign then Lit.mk_absurd else Lit.mk_tauto in
                 Some lit
               | _ -> None
             end
