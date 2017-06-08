@@ -240,6 +240,21 @@ let pp out i =
 let pp_bclause out lits =
   Format.fprintf out "@[<hv>%a@]" (Util.pp_list ~sep:" ⊔ " pp) lits
 
+(* print a single boolean box *)
+let pp_tstp out b =
+  let pp_box_unsigned out b = match payload b with
+    | Case p ->
+      let lits = List.map Cover_set.Case.to_lit p |> Array.of_list in
+      Literals.pp_tstp out lits
+    | Clause_component lits ->
+      CCFormat.within "(" ")" Literals.pp_tstp_closed out lits
+    | Lemma f ->
+      CCFormat.within "(" ")" Cut_form.pp_tstp out f
+    | Fresh -> failwith "cannot print <fresh> boolean box"
+  in
+  if Lit.sign b then pp_box_unsigned out b
+  else Format.fprintf out "@[~@ %a@]" pp_box_unsigned b
+
 let () =
   Options.add_opts
     [ "--pp-bbox-id", Arg.Set pp_bbox_id, " print boolean literals' IDs";

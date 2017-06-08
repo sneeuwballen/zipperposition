@@ -176,6 +176,7 @@ val symbols : ?init:ID.Set.t -> t -> ID.Set.t
 val pp : t CCFormat.printer
 val pp_vars : t CCFormat.printer
 val pp_tstp : t CCFormat.printer
+val pp_tstp_closed : t CCFormat.printer
 val to_string : t -> string
 
 (** {2 Special kinds of literal arrays} *)

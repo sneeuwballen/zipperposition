@@ -433,11 +433,22 @@ let pp_vars out lits =
   in
   Format.fprintf out "@[<2>%a%a@]" pp_vars vars_ pp lits
 
-let pp_tstp out lits =
-  if Array.length lits = 0 then CCFormat.string out "$false"
-  else
-    Format.fprintf out "@[%a@]"
+let pp_tstp out lits = match lits with
+  | [| |] -> CCFormat.string out "$false"
+  | [| l |] -> Literal.pp_tstp out l
+  | _ ->
+    Format.fprintf out "(@[%a@])"
       CCFormat.(array ~sep:(return "@ | ") Lit.pp_tstp) lits
+
+(* print quantified literals *)
+let pp_tstp_closed out lits =
+  let pp_vars out = function
+    | [] -> ()
+    | l ->
+      Format.fprintf out "![@[%a@]]:@ "
+        (Util.pp_list ~sep:", " Type.TPTP.pp_typed_var) l
+  in
+  Format.fprintf out "@[<2>%a%a@]" pp_vars (vars lits) pp_tstp lits
 
 let to_string a = CCFormat.to_string pp a
 

@@ -471,9 +471,8 @@ module S = struct
                name role TypedSTerm.TPTP.pp f
                Kind.pp_tstp (Step.kind @@ step p,parents)
            | BoolClause c ->
-             let tr = Trail.of_list c in
              Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]).@]@,"
-               name role SClause.pp_trail_tstp tr
+               name role (Util.pp_list ~sep:" | " BBox.pp_tstp) c
                Kind.pp_tstp (Step.kind @@ step p,parents)
            | Clause c ->
              Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]).@]@,"
