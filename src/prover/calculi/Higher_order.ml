@@ -14,7 +14,8 @@ let stat_eq_res = Util.mk_stat "ho.eq_res.steps"
 let stat_eq_res_syntactic = Util.mk_stat "ho.eq_res_syntactic.steps"
 let stat_ext_neg = Util.mk_stat "ho.extensionality-.steps"
 let stat_complete_eq = Util.mk_stat "ho.complete_eq.steps"
-let stat_factor = Util.mk_stat "ho.factor.steps"
+let stat_beta = Util.mk_stat "ho.beta_reduce.steps"
+let stat_prim_enum = Util.mk_stat "ho.prim_enum.steps"
 
 let prof_eq_res = Util.mk_profiler "ho.eq_res"
 let prof_eq_res_syn = Util.mk_profiler "ho.eq_res_syntactic"
@@ -227,23 +228,79 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Sequence.to_rev_list
     end
 
-  (* TODO: rule for primitive enumeration of predicates
+  (* rule for primitive enumeration of predicates [P t1…tn]
      (using ¬ and ∧ and =) *)
+  let prim_enum (c:C.t) : C.t list =
+    (*let eligible = C.Eligible.(max c) in*)
+    let eligible = C.Eligible.(param c ++ res c) in
+    (* set of variables to refine (only those occurring in "interesting" lits) *)
+    let vars =
+      Literals.fold_lits ~eligible (C.lits c)
+      |> Sequence.map fst
+      |> Sequence.flat_map Literal.Seq.terms
+      |> Sequence.flat_map T.Seq.subterms
+      |> Sequence.filter (fun t -> Type.is_prop (T.ty t))
+      |> Sequence.filter_map
+        (fun t ->
+           let hd = T.head_term t in
+           begin match T.as_var hd, Type.arity (T.ty hd) with
+             | Some v, Type.Arity (0, n)
+               when n>0 &&
+                    Type.returns_prop (T.ty hd) &&
+                    not (Literals.is_shielded v (C.lits c)) ->
+               Some v
+             | _ -> None
+           end)
+      |> T.VarSet.of_seq (* unique *)
+    in
+    if not (T.VarSet.is_empty vars) then (
+      Util.debugf ~section 5 "(@[<hv2>ho.refine@ :clause %a@ :terms {@[%a@]}@])"
+        (fun k->k C.pp c (Util.pp_seq T.pp_var) (T.VarSet.to_seq vars));
+    );
+    let sc_c = 0 in
+    let sc_new_vars = 1 in
+    begin
+      vars
+      |> T.VarSet.to_seq
+      |> Sequence.flat_map_l
+        (fun v -> HO_unif.enum_prop (v,sc_c) ~scope_new_vars:sc_new_vars)
+      |> Sequence.map
+        (fun (subst,penalty) ->
+           let renaming = Ctx.renaming_clear() in
+           let lits = Literals.apply_subst ~renaming subst (C.lits c,sc_c) in
+           let proof =
+             Proof.Step.inference ~rule:(Proof.Rule.mk "ho.refine")
+               [C.proof_parent_subst (c,sc_c) subst]
+           in
+           let new_c =
+             C.create_a lits proof
+               ~penalty:(C.penalty c + penalty) ~trail:(C.trail c)
+           in
+           Util.debugf ~section 3
+             "(@[<hv2>ho.refine@ :from %a@ :subst %a@ :yields %a@])"
+             (fun k->k C.pp c Subst.pp subst C.pp new_c);
+           Util.incr_stat stat_prim_enum;
+           new_c)
+      |> Sequence.to_rev_list
+    end
 
   (* rule for β-reduction *)
   let beta_reduce t =
+    assert (T.DB.is_closed t);
     let t' = Lambda.snf t in
     if (T.equal t t') then None
     else (
       Util.debugf ~section 4 "(@[beta_reduce `%a`@ :into `%a`@])"
         (fun k->k T.pp t T.pp t');
+      Util.incr_stat stat_beta;
+      assert (T.DB.is_closed t');
       Some t'
     )
-
 
   let setup () =
     Util.debug ~section 1 "setup HO rules";
     Env.Ctx.lost_completeness();
+    Env.add_unary_inf "ho_prim_enum" prim_enum;
     Env.add_unary_inf "ho_complete_eq" complete_eq_args;
     Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
     Env.add_lit_rule "ho_ext_neg" ext_neg;
