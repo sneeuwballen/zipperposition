@@ -84,6 +84,10 @@ val mk_rat_less : Q.t Monome.t -> Q.t Monome.t -> t
 
 val mk_ho_constraint : term -> term -> t
 
+val mk_constraint : term -> term -> t
+(** [mk_constraint t u] makes a disequation or a HO constraint depending
+    on how [t] and [u] look. *)
+
 val matching : ?subst:Subst.t -> pattern:t Scoped.t -> t Scoped.t ->
   Subst.t Sequence.t
 (** checks whether subst(lit_a) matches lit_b. Returns alternative
