@@ -312,7 +312,7 @@ module DB = struct
     recurse ~depth:0 acc t
 
   (* shift the non-captured De Bruijn indexes in the term by n *)
-  let shift n t =
+  let shift_real n t =
     assert (n >= 0);
     _fold_map ()
       ~on_bvar:(
@@ -323,6 +323,8 @@ module DB = struct
       )
       ~on_binder:(fun ~ty:_ ~depth:_ () _ _ -> ())
       t
+
+  let shift n t = if n=0 then t else shift_real n t
 
   let unshift n t =
     _fold_map ()
@@ -378,8 +380,8 @@ module DB = struct
               | None -> bvar ~ty i
               | Some t' ->
                 assert (equal (ty_exn t') ty);
-                assert (closed t');
-                t'
+                (* shift open variables by [i] *)
+                shift i t'
             end
           | Const s -> const ~ty s
           | Bind (s, varty, t') ->
@@ -655,6 +657,7 @@ let rec pp_depth ?(hooks=[]) depth out t =
       Format.fprintf out "@[<1>%a %a@]" Builtin.pp b (_pp depth) a
     | AppBuiltin (b, ([_;t1;t2] | [t1;t2])) when Builtin.is_infix b ->
       Format.fprintf out "(@[<1>%a@ %a@ %a@])" (_pp depth) t1 Builtin.pp b (_pp depth) t2
+    | AppBuiltin (Builtin.Arrow, ([] | [_])) -> assert false
     | AppBuiltin (Builtin.Arrow, ret::args) ->
       Format.fprintf out "@[%a@ → %a@]"
         (Util.pp_list ~sep:" → " (_pp_surrounded depth)) args
