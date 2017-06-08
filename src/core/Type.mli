@@ -88,6 +88,10 @@ val forall : t -> t
 val forall_n : int -> t -> t
 (** Quantify over [n] type variable. Careful with the De Bruijn indices! *)
 
+val forall_fvars : t HVar.t list -> t -> t
+(** [forall_fvars vars body] makes the De Bruijn conversion before quantifying
+    on [vars] *)
+
 val bvar : int -> t
 (** bound variable *)
 

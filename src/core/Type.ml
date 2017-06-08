@@ -99,6 +99,17 @@ let rec forall_n n ty =
   if n=0 then ty
   else forall (forall_n (n-1) ty)
 
+let forall_fvars vars ty =
+  if vars=[] then ty
+  else (
+    List.fold_right
+      (fun v ty ->
+         assert (is_tType (HVar.ty v));
+         let body = T.DB.from_var ty ~var:(var v) in
+         forall body)
+      vars ty
+  )
+
 let (==>) = arrow
 
 let of_term_unsafe t = t
