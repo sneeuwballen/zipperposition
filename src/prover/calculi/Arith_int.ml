@@ -857,13 +857,14 @@ module Make(E : Env.S) : S with module Env = E = struct
           if M.is_const diff && Z.leq (M.const diff) Z.(of_int !case_switch_limit)
           then (
             (* re-use lits_l and lits_r, but build an enumeration *)
-            let new_lits = List.map
+            let new_lits =
+              List.map
                 (fun i ->
                    (* mf_2 = m2 + i *)
-                   Lit.mk_arith_eq (MF.to_monome mf_2) (M.add_const m2 i)
-                ) (_range Z.zero (M.const diff))
+                   Lit.mk_arith_eq (MF.to_monome mf_2) (M.add_const m2 i))
+                (_range Z.zero (M.const diff))
             in
-            let all_lits = List.rev_append new_lits (lits_l @ lits_r) in
+            let all_lits = CCList.flatten [new_lits; c_guard; lits_l; lits_r] in
             let proof =
               Proof.Step.inference
                 ~rule:(Proof.Rule.mk "canc_case_switch")
