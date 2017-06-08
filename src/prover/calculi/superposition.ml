@@ -621,9 +621,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                Util.debugf ~section 5
                  "@[<hv2>demod:@ @[<hv>t=%a[0],@ l=%a[1],@ r=%a[1]@],@ subst=@[%a@]@]"
                  (fun k->k T.pp t T.pp l T.pp r S.pp subst);
-               (* sanity check *)
+               (* sanity checks *)
+               assert (Type.equal (T.ty l) (T.ty r));
                assert (
-                 Type.equal (T.ty l) (T.ty r) &&
+                 T.equal r T.true_ || (* e.g. [p(λx.a)] not compable with true *)
                  O.compare ord
                    (S.FO.apply_no_renaming subst (l,1))
                    (S.FO.apply_no_renaming subst (r,1)) = Comp.Gt);
