@@ -167,6 +167,10 @@ module Make(E : Env.S) : S with module Env = E = struct
                let lits = CCArray.except_idx (C.lits c) i in
                (List.map (fun t -> Literal.mk_prop t sign) l @ lits)
                |> mk_c |> CCList.return |> CCOpt.return
+             | T.AppBuiltin (Builtin.Eq, [_;t;u]), _ ->
+               let lits = CCArray.except_idx (C.lits c) i in
+               let lit = Literal.mk_lit t u sign in
+               Some [mk_c (lit::lits)]
              | _ -> None
            end
          | _ -> None)
