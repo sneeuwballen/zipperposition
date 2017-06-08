@@ -5,6 +5,7 @@
 
 open Logtk
 open Logtk_arbitrary
+open OUnit
 
 module T = Term
 module H = Helpers
@@ -19,6 +20,69 @@ let g_ = ID.make "g"
 let h_ = ID.make "h"
 
 let ty = Type.term
+let f x y = T.app (T.const ~ty:Type.([ty;ty] ==> ty) f_) [x; y]
+let g_fun = T.const ~ty:Type.([ty] ==> ty) g_
+let g x = T.app g_fun [x]
+let h x y z = T.app (T.const ~ty:Type.([ty;ty;ty] ==> ty) h_) [x;y;z]
+let a = T.const ~ty (ID.make "a")
+let b = T.const ~ty (ID.make "b")
+let x = T.var_of_int ~ty 0
+let y = T.var_of_int ~ty 1
+
+let test_db_shift () =
+  let t = T.fun_ ty (f (T.bvar ~ty 0) (g (T.bvar ~ty 1))) in
+  let t' = T.of_term_unsafe (InnerTerm.DB.shift 1 (t:T.t:>InnerTerm.t)) in
+  let t1 = T.fun_ ty (f (T.bvar ~ty 0) (g (T.bvar ~ty 2))) in
+  assert_equal ~cmp:T.equal ~printer:T.to_string t1 t';
+  ()
+
+let test_db_unshift () =
+  let t = T.fun_ ty (f (T.bvar ~ty 0) (g (T.bvar ~ty 2))) in
+  let t' = T.of_term_unsafe (InnerTerm.DB.unshift 1 (t:T.t:>InnerTerm.t)) in
+  let t1 = T.fun_ ty (f (T.bvar ~ty 0) (g (T.bvar ~ty 1))) in
+  assert_equal ~cmp:T.equal ~printer:T.to_string t1 t';
+  ()
+
+let test_whnf1 () =
+  (* eta expansion of [g] *)
+  let g_eta = T.fun_ ty (g (T.bvar ~ty 0)) in
+  let redex =
+    let ty2 = Type.([ty] ==> ty) in
+    T.app
+      (T.fun_ ty2
+         (f
+           (T.app (T.bvar ~ty:ty2 0) [a])
+           (T.app (T.bvar ~ty:ty2 0) [b])))
+      [g_eta]
+  in
+  let t' = Lambda.whnf redex in
+  (* WHNF: does not reduce in subterms *)
+  let t1 = f (T.app g_eta [a]) (T.app g_eta [b]) in
+  assert_equal ~cmp:T.equal ~printer:T.to_string t1 t';
+  ()
+
+let test_whnf2 () =
+  let redex =
+    let ty2 = Type.([ty] ==> ty) in
+    T.app
+      (T.fun_ ty2
+         (f
+           (T.app (T.bvar ~ty:ty2 0) [a])
+           (T.app (T.bvar ~ty:ty2 0) [b])))
+      [g_fun]
+  in
+  let t' = Lambda.whnf redex in
+  let t1 = f (g a) (g b) in
+  assert_equal ~cmp:T.equal ~printer:T.to_string t1 t';
+  ()
+
+let suite =
+  "test_term" >:::
+    [ "test_db_shift" >:: test_db_shift
+    ; "test_db_unshift" >:: test_db_unshift
+    ; "test_whnf1" >:: test_whnf1
+    ; "test_whnf2" >:: test_whnf2
+    ]
 
 (** Properties *)
 

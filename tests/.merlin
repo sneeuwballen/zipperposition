@@ -1,4 +1,6 @@
 REC
+S tests/
+B _build/tests/
 PKG oUnit
 PKG qcheck
 PKG benchmark

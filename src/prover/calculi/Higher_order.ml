@@ -227,21 +227,19 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Sequence.to_rev_list
     end
 
-  (* smart [t ≠ₒ u] that turns [(¬ F a) ≠ t] into [F a ≠ ¬t] *)
-  let mk_prop_unif_constraint t u : Literal.t =
-    assert (Type.is_prop @@ T.ty t);
-    begin match T.view t, T.view u with
-      | T.AppBuiltin (Builtin.Not, [t']), _
-        when Term.is_ho_pred t' && not (Term.is_ho_pred u) ->
-        Literal.mk_neq t' (T.Form.not_ u)
-      | _, T.AppBuiltin (Builtin.Not, [u'])
-        when Term.is_ho_pred u' && not (Term.is_ho_pred t) ->
-        Literal.mk_neq (T.Form.not_ t) u'
-      | _ -> Literal.mk_neq t u
-    end
-
   (* TODO: rule for primitive enumeration of predicates
      (using ¬ and ∧ and =) *)
+
+  (* rule for β-reduction *)
+  let beta_reduce t =
+    let t' = Lambda.snf t in
+    if (T.equal t t') then None
+    else (
+      Util.debugf ~section 4 "(@[beta_reduce `%a`@ :into `%a`@])"
+        (fun k->k T.pp t T.pp t');
+      Some t'
+    )
+
 
   let setup () =
     Util.debug ~section 1 "setup HO rules";
@@ -249,6 +247,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_unary_inf "ho_complete_eq" complete_eq_args;
     Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
     Env.add_lit_rule "ho_ext_neg" ext_neg;
+    Env.add_rewrite_rule "beta_reduce" beta_reduce;
     ()
 end
 

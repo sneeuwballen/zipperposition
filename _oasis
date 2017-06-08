@@ -69,7 +69,7 @@ Library "logtk"
                     TypeInference, Options, Comparison, Precedence, Builtin,
                     Ordering, Skolem, Cnf, ID, ID_or_builtin, SLiteral,
                     Index, Index_intf, Dtree, Fingerprint, NPDtree, Binder,
-                    Congruence, Congruence_intf,
+                    Congruence, Congruence_intf, Lambda,
                     FeatureVector, FV_tree, UntypedAST, Ind_ty,
                     TypedSTerm, Statement, Flex_state, Compute_prec, 
                     Ordinal, Rewrite, Test_prop, Input_format,

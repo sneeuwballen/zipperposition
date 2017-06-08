@@ -20,6 +20,7 @@ let suite =
   "all_tests" >:::
     (  TestSubsts.suite
       :: TestMultiset.suite
+      :: TestTerm.suite
       :: []
     )
 
