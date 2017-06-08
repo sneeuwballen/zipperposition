@@ -303,6 +303,11 @@ let apply_subst ~renaming subst (m,sc) =
     (fun t -> Subst.FO.apply ~renaming subst (t,sc))
     m
 
+let apply_subst_no_simp ~renaming subst (m,sc) = {
+  m with
+    terms=List.map (fun (c,t) -> c, Subst.FO.apply ~renaming subst (t,sc)) m.terms;
+}
+
 let apply_subst_no_renaming subst (m,sc) =
   map
     (fun t -> Subst.FO.apply_no_renaming subst (t,sc))

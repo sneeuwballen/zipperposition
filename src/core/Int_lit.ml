@@ -641,11 +641,10 @@ let apply_subst_no_renaming subst (lit,sc) = match lit with
 let apply_subst_no_simp ~renaming subst (lit,sc) = match lit with
   | Binary (op, m1, m2) ->
     Binary (op,
-      (M.apply_subst ~renaming subst (m1,sc)),
-      (M.apply_subst ~renaming subst (m2,sc)) )
+      (M.apply_subst_no_simp ~renaming subst (m1,sc)),
+      (M.apply_subst_no_simp ~renaming subst (m2,sc)) )
   | Divides d ->
-    mk_divides ~sign:d.sign d.num ~power:d.power
-      (M.apply_subst ~renaming subst (d.monome,sc))
+    Divides {d with monome=M.apply_subst_no_simp ~renaming subst (d.monome,sc); }
 
 let is_trivial = function
   | Divides d when d.sign && (Z.equal d.num Z.one || d.power = 0) ->

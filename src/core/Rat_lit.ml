@@ -310,8 +310,8 @@ let apply_subst_no_renaming subst (lit,sc) =
 
 let apply_subst_no_simp ~renaming subst (lit,sc) =
   {lit with
-     left=M.apply_subst ~renaming subst (lit.left, sc);
-     right=M.apply_subst ~renaming subst (lit.right, sc);
+     left=M.apply_subst_no_simp ~renaming subst (lit.left, sc);
+     right=M.apply_subst_no_simp ~renaming subst (lit.right, sc);
   }
 
 let is_trivial lit = match lit.op with

@@ -103,7 +103,13 @@ val split : 'a t -> 'a t * 'a t
 
 val apply_subst : renaming:Subst.Renaming.t ->
   Subst.t -> 'a t Scoped.t -> 'a t
-(** Apply a substitution to the monome's terms *)
+(** Apply a substitution to the monome's terms.
+    This does not preserve positions in the monome. *)
+
+val apply_subst_no_simp : renaming:Subst.Renaming.t ->
+  Subst.t -> 'a t Scoped.t -> 'a t
+(** Apply a substitution to the monome's terms, without renormalizing.
+    This preserves positions. *)
 
 val apply_subst_no_renaming : Subst.t -> 'a t Scoped.t -> 'a t
 (** Apply a substitution but doesn't rename free variables. Careful
