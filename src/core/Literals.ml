@@ -488,8 +488,11 @@ let is_pos_eq lits =
 (** {2 Shielded Variables} *)
 
 let is_shielded var (lits:t) : bool =
+  let var_eq = HVar.equal Type.equal in
   let rec shielded_by_term ~root t = match T.view t with
-    | T.Var v' when HVar.equal Type.equal v' var -> not root
+    | T.Var v' when var_eq v' var -> not root
+    | _ when Type.Seq.vars (T.ty t) |> Sequence.exists (var_eq var) ->
+      true (* shielded by type *)
     | T.Var _
     | T.DB _
     | T.Const _ -> false
