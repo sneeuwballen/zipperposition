@@ -19,8 +19,6 @@ module type S = sig
 
   val renaming : Subst.Renaming.t
 
-  val combinators : unit -> HO_unif.Combinators.t
-
   (** {2 Utils} *)
 
   val compare : Term.t -> Term.t -> Comparison.t
