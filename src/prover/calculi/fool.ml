@@ -57,8 +57,8 @@ module Make(E : Env.S) : S with module Env = E = struct
            |> Sequence.filter_map (fun (t,d) -> if d>0  then Some t else None))
       |> Sequence.filter
         (fun t ->
-           Type.is_prop (T.ty t)
-           &&
+           Type.is_prop (T.ty t) &&
+           T.DB.is_closed t &&
            begin match T.view t with
              | T.Const _ | T.App _ -> true
              | T.AppBuiltin ((Builtin.True | Builtin.False), _) -> false

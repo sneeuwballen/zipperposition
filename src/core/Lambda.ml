@@ -62,7 +62,7 @@ let rec whnf_rec st =
     | T.Fun _, [] -> st
     | T.Fun (_, body), a :: args' ->
       (* beta-reduce *)
-      Util.debugf 5 "@[<2>beta-reduce:@ @[%a@ %a@]" (fun k->k T.pp st.head T.pp a);
+      Util.debugf 10 "@[<2>beta-reduce:@ @[%a@ %a@]" (fun k->k T.pp st.head T.pp a);
       let st' = { st with
                     env=DBEnv.push st.env a;
                     args=args';
