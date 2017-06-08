@@ -150,10 +150,74 @@ let check_hash_mod_alpha =
 (* TODO: write a term arbitrary instance for DB terms (lambda terms?)
    and check that a shifted/unshifted closed term remains closed *)
 
+let is_fun t = match T.view t with T.Fun _ -> true | _ -> false
+
+let num_lam t =
+  T.Seq.subterms t
+  |> Sequence.filter is_fun
+  |> Sequence.length
+
+let num_var_app t =
+  T.Seq.subterms t
+  |> Sequence.filter T.is_ho_app
+  |> Sequence.length
+
+(* NOTE: this enables stats *)
+let add_stat = ref false
+
+let gen_ho =
+  let a = {ArTerm.default_ho with QCheck.gen=ArTerm.default_ho_fuel 10} in
+  if !add_stat then (
+    a
+    |> QCheck.add_stat ("lambdas",num_lam)
+    |> QCheck.add_stat ("var_app",num_var_app)
+    |> QCheck.add_stat ("size", T.size)
+  ) else a
+
+let check_whnf =
+  let gen = gen_ho in
+  let prop t =
+    assert (T.DB.is_closed t);
+    let t' = Lambda.whnf t in
+    T.DB.is_closed t'
+  in
+  QCheck.Test.make gen prop
+    ~count:10_000 ~long_factor:10
+    ~name:"whnf_preserve_closed"
+
+let check_snf =
+  let gen = gen_ho in
+  let prop t =
+    assert (T.DB.is_closed t);
+    let t' = Lambda.snf t in
+    T.DB.is_closed t'
+  in
+  QCheck.Test.make gen prop
+    ~count:10_000 ~long_factor:10
+    ~name:"snf_preserve_closed"
+
+let check_snf_no_redex =
+  let gen = gen_ho in
+  let prop t =
+    assert (T.DB.is_closed t);
+    let t' = Lambda.snf t in
+    T.Seq.subterms t'
+    |> Sequence.for_all
+      (fun t -> match T.view t with
+         | T.App (f, _) -> not (is_fun f)
+         | _ -> true)
+  in
+  QCheck.Test.make gen prop
+    ~count:10_000 ~long_factor:10
+    ~name:"snf_no_remaining_redex"
+
 let props =
   [ check_size_subterm
   ; check_replace_id
   ; check_ground_novar
   ; check_hash_mod_alpha
   ; check_min_max_vars
+  ; check_whnf
+  ; check_snf
+  ; check_snf_no_redex
   ]
