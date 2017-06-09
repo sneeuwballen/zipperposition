@@ -61,6 +61,7 @@ val is_divides : t -> bool
 
 val pp : t CCFormat.printer
 val pp_tstp : t CCFormat.printer
+val pp_zf : t CCFormat.printer
 val to_string : t -> string
 
 (** {2 Operators} *)

@@ -707,3 +707,48 @@ and pp_var out v =
 
 let pp out t = pp_depth ~hooks:!_hooks 0 out t
 let to_string t = CCFormat.to_string pp t
+
+let rec pp_zf out t =
+  let rec pp_ depth out t = match view t with
+    | Var v -> pp_var_zf out v
+    | DB i -> Format.fprintf out "Y%d" (depth-i-1)
+    | Const s -> ID.pp_zf out s
+    | Bind (b, varty, t') ->
+      Format.fprintf out "@[<1>%a@ (Y%d:@[%a@]).@ %a@]" Binder.ZF.pp b depth
+        (pp_ depth) varty (_pp_surrounded (depth+1)) t'
+    | AppBuiltin (b, ([_;a] | [a])) when Builtin.is_prefix b ->
+      Format.fprintf out "@[<1>%a %a@]" Builtin.ZF.pp b (pp_ depth) a
+    | AppBuiltin (b, ([_;t1;t2] | [t1;t2])) when Builtin.is_infix b ->
+      Format.fprintf out "(@[<1>%a@ %a@ %a@])" (pp_ depth) t1 Builtin.ZF.pp b (pp_ depth) t2
+    | AppBuiltin (Builtin.Arrow, ([] | [_])) -> assert false
+    | AppBuiltin (Builtin.Arrow, ret::args) ->
+      Format.fprintf out "@[%a@ -> %a@]"
+        (Util.pp_list ~sep:" -> " (_pp_surrounded depth)) args
+        (_pp_surrounded depth) ret
+    | AppBuiltin (b, []) -> Builtin.ZF.pp out b
+    | AppBuiltin (b, l) ->
+      Format.fprintf out "@[%a(%a)@]" Builtin.ZF.pp b (Util.pp_list (pp_ depth)) l
+    | App (f, l) ->
+      begin match l with
+        | [] -> pp_ depth out f
+        | _::_ ->
+          Format.fprintf out "@[<1>%a@ %a@]"
+            (_pp_surrounded depth) f (Util.pp_list ~sep:" " (_pp_surrounded depth)) l
+      end
+  and _pp_surrounded depth out t = match view t with
+    | Bind _
+    | AppBuiltin (_,_::_)
+    | App (_,_::_) -> Format.fprintf out "(@[%a@])" (pp_ depth) t
+    | _ -> pp_ depth out t
+  in
+  pp_ 0 out t
+and pp_var_zf out v =
+  let ty = HVar.ty v in
+  begin match view ty with
+    | AppBuiltin (Builtin.TType, []) -> Format.fprintf out "A%d" (HVar.id v)
+    | AppBuiltin (Builtin.TyInt, []) -> Format.fprintf out "I%d" (HVar.id v)
+    | AppBuiltin (Builtin.TyRat, []) -> Format.fprintf out "Q%d" (HVar.id v)
+    | AppBuiltin (Builtin.Prop, []) -> Format.fprintf out "P%d" (HVar.id v)
+    | _ when needs_args ty -> Format.fprintf out "F%d" (HVar.id v)
+    | _ -> HVar.pp out v
+  end

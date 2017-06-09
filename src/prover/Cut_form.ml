@@ -67,6 +67,19 @@ let pp_tstp out (f:t): unit =
       (Util.pp_list Type.TPTP.pp_typed_var) (T.VarSet.to_list f.vars) pp_body ()
   )
 
+let pp_zf out (f:t): unit =
+  let pp_c = Fmt.within "(" ")" Literals.pp_zf in
+  let pp_body out () = match f.cs with
+    | [c] -> pp_c out c
+    | _ -> Fmt.fprintf out "(@[%a@])" (Util.pp_list ~sep:" && " pp_c) f.cs
+  in
+  if T.VarSet.is_empty f.vars then (
+    pp_body out ()
+  ) else (
+    Fmt.fprintf out "(@[<2>forall %a.@ (%a)@])"
+      (Util.pp_list Type.ZF.pp_typed_var) (T.VarSet.to_list f.vars) pp_body ()
+  )
+
 let ind_vars t =
   vars t
   |> T.VarSet.to_list

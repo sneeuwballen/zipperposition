@@ -25,6 +25,7 @@ include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 include Interfaces.PRINT with type t := t
 val pp_tstp : t CCFormat.printer
+val pp_zf : t CCFormat.printer
 
 val vars : t -> Term.VarSet.t
 val cs : t -> Literals.t list

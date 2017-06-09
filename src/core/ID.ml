@@ -74,6 +74,8 @@ let pp_tstp out id =
   then CCFormat.fprintf out "'%s'" id.name
   else CCFormat.string out id.name
 
+let pp_zf = pp_tstp
+
 let gensym =
   let r = ref 0 in
   let names = "abcdefghijklmopq" in

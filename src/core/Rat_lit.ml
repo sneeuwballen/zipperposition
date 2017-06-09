@@ -79,6 +79,10 @@ let pp_tstp out m = match m.op with
   | Less ->
     Format.fprintf out "$less(%a, %a)" M.pp_tstp m.left M.pp_tstp m.right
 
+let pp_zf out m = match m.op with
+  | Equal -> Format.fprintf out "%a = %a" M.pp_zf m.left M.pp_zf m.right
+  | Less -> Format.fprintf out "(%a < %a)" M.pp_zf m.left M.pp_zf m.right
+
 let to_string = CCFormat.to_string pp_tstp
 
 (** {2 Operators} *)

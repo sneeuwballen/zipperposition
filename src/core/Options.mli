@@ -28,10 +28,16 @@ type print_format =
 val print_format_of_string : string -> print_format
 (** @raise Failure if it could not parse *)
 
+val comment_of_format : print_format -> string
+(** Comment prefix for format *)
+
 val input : input_format ref
 
 val output : print_format ref
 (** Output format *)
+
+val comment : unit -> string
+(** Current comment format *)
 
 val switch_opt : 'a -> ('a -> unit) -> Arg.spec
 (** [switch_opt b f] is an option that, when parsed, will call [f b]. Useful

@@ -100,6 +100,7 @@ let pp_attrs out = function
   | l -> Format.fprintf out "@ [@[%a@]]" (Util.pp_list ~sep:", " pp_attr) l
 
 let pp_attr_zf = pp_attr
+let pp_attrs_zf = pp_attrs
 
 let rec pp_attr_tstp out = function
   | A_app (s,[]) -> Format.fprintf out "%s()" s

@@ -311,6 +311,22 @@ let pp_tstp out = function
     let nk = Z.pow d.num d.power in
     Format.fprintf out "$remainder_e(%a, %s) != 0" M.pp_tstp d.monome (Z.to_string nk)
 
+let pp_zf out = function
+  | Binary (Equal, l, r) ->
+    Format.fprintf out "%a = %a" M.pp_zf l M.pp_zf r
+  | Binary (Different, l, r) ->
+    Format.fprintf out "%a != %a" M.pp_zf l M.pp_zf r
+  | Binary (Less, l, r) ->
+    Format.fprintf out "(%a < %a)" M.pp_zf l M.pp_zf r
+  | Binary (Lesseq, l, r) ->
+    Format.fprintf out "(%a <= %a)" M.pp_zf l M.pp_zf r
+  | Divides d when d.sign ->
+    let nk = Z.pow d.num d.power in
+    Format.fprintf out "(%a mod %s) = 0" M.pp_zf d.monome (Z.to_string nk)
+  | Divides d ->
+    let nk = Z.pow d.num d.power in
+    Format.fprintf out "(%a mod %s) != 0" M.pp_zf d.monome (Z.to_string nk)
+
 let to_string = CCFormat.to_string pp_tstp
 
 (** {2 Operators} *)

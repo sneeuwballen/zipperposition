@@ -50,6 +50,7 @@ val pp_fullc : t CCFormat.printer
     readability). Only use for debugging. *)
 
 val pp_tstp : t CCFormat.printer
+val pp_zf : t CCFormat.printer
 
 val gensym : unit -> t
 (** Generate a new ID with a new, unique name *)

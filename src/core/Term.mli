@@ -330,9 +330,14 @@ end
 
 module TPTP : sig
   include Interfaces.PRINT with type t := t
-  include Interfaces.PRINT_DE_BRUIJN with type t := t
-                                      and type term := t
-                                      and type print_hook := print_hook
+  include Interfaces.PRINT_DE_BRUIJN
+    with type t := t
+     and type term := t
+     and type print_hook := print_hook
+end
+
+module ZF : sig
+  include Interfaces.PRINT with type t := t
 end
 
 module Conv : sig

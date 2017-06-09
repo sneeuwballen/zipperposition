@@ -734,6 +734,20 @@ let pp_tstp out lit =
     | Int o -> Int_lit.pp_tstp out o
     | Rat o -> Rat_lit.pp_tstp out o
 
+let pp_zf out lit =
+  match lit with
+    | Prop (p, true) -> T.ZF.pp out p
+    | Prop (p, false) -> Format.fprintf out "~ %a" T.ZF.pp p
+    | True -> CCFormat.string out "true"
+    | False -> CCFormat.string out "false"
+    | Equation (l, r, true) ->
+      Format.fprintf out "@[<1>%a@ = %a@]" T.ZF.pp l T.ZF.pp r
+    | Equation (l, r, false)
+    | HO_constraint (l, r) ->
+      Format.fprintf out "@[<1>%a@ != %a@]" T.ZF.pp l T.ZF.pp r
+    | Int o -> Int_lit.pp_zf out o
+    | Rat o -> Rat_lit.pp_zf out o
+
 type print_hook = CCFormat.t -> t -> bool
 let __hooks = ref []
 let add_default_hook h = __hooks := h :: !__hooks

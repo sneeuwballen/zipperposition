@@ -237,6 +237,7 @@ module S : sig
 
   val pp_tstp : t CCFormat.printer
   val pp_normal : t CCFormat.printer
+  val pp_zf : t CCFormat.printer
   val pp : Options.print_format -> t CCFormat.printer
   (** Prints the proof according to the given input switch *)
 

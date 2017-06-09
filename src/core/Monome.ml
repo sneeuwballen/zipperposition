@@ -336,20 +336,24 @@ let fold_max ~ord f acc m =
     (fun acc i (c, t) -> if T.Set.mem t max then f acc i c t else acc)
     acc m.terms
 
-let pp out e =
+let pp_ ~mult ~add ~pp_t out e =
   let pp_pair out (s, t) =
     if e.num.cmp s e.num.one = 0
-    then T.pp out t
-    else Format.fprintf out "%s×%a" (e.num.to_string s) T.pp t
+    then pp_t out t
+    else Format.fprintf out "%s %s %a" (e.num.to_string s) mult pp_t t
   in
   match e.terms with
     | [] -> CCFormat.string out (e.num.to_string e.const)
     | _::_ when e.num.sign e.const = 0 ->
-      Util.pp_list ~sep:" + " pp_pair out e.terms
+      Util.pp_list ~sep:add pp_pair out e.terms
     | _::_ ->
-      Format.fprintf out "%a + %s"
-        (Util.pp_list ~sep:" + " pp_pair) e.terms
+      Format.fprintf out "%a%s%s"
+        (Util.pp_list ~sep:add pp_pair) e.terms
+        add
         (e.num.to_string e.const)
+
+let pp out e = pp_ ~mult:"×" ~add:" + " ~pp_t:T.pp out e
+let pp_zf out e = pp_ ~mult:" * " ~add:" + " ~pp_t:T.ZF.pp out e
 
 let to_string m = CCFormat.to_string pp m
 

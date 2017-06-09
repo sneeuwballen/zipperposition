@@ -255,6 +255,20 @@ let pp_tstp out b =
   if Lit.sign b then pp_box_unsigned out b
   else Format.fprintf out "@[~@ %a@]" pp_box_unsigned b
 
+let pp_zf out i =
+  let pp_payload out = function
+    | Fresh -> CCFormat.string out "'dummy_sym'"
+    | Clause_component lits ->
+      Format.fprintf out "(@[<hv>%a@])" Lits.pp_zf lits
+    | Lemma f -> Cut_form.pp_zf out f
+    | Case c ->
+      Format.fprintf out "(@[<hv>%a@])"
+        (Util.pp_list ~sep:" && " Literal.pp_zf)
+        (List.map Cover_set.Case.to_lit c)
+  in
+  if not (Lit.sign i) then CCFormat.string out "~";
+  pp_payload out (payload i)
+
 let () =
   Options.add_opts
     [ "--pp-bbox-id", Arg.Set pp_bbox_id, " print boolean literals' IDs";

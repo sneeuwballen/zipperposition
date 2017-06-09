@@ -471,7 +471,7 @@ module S = struct
     Format.fprintf out "@]"
 
   let pp_tstp out proof =
-    let namespace = Tbl.create 5 in
+    let namespace = Tbl.create 8 in
     Format.fprintf out "@[<v>";
     traverse ~order:`DFS proof
       (fun p ->
@@ -512,12 +512,70 @@ module S = struct
     Format.fprintf out "@]";
     ()
 
+  let pp_zf out proof =
+    let module UA = UntypedAST.A in
+    let namespace = Tbl.create 8 in
+    Format.fprintf out "@[<v>";
+    traverse ~order:`DFS proof
+      (fun p ->
+         let name = get_name ~namespace p in
+         let parents =
+           List.map (fun p -> get_name ~namespace @@ Parent.proof p)
+             (Step.parents @@ step p)
+         in
+         let str_of_name s = CCFormat.sprintf "'%d'" s in
+         let mk_status r = UA.app "status" [UA.quoted r] in
+         let info_name =
+           UA.(app "step" [str (str_of_name name)])
+         and info_from =
+           if parents=[] then []
+           else (
+             let l = List.map str_of_name parents in
+             [UA.(app "from" [list (List.map str l)])]
+           )
+         and info_rule = match Step.rule (step p) with
+           | Some r -> [UA.(app "rule" [quoted r])]
+           | None -> []
+         and info_status = match Step.kind (step p) with
+           | Inference _ | Simplification _ -> [mk_status "inference"]
+           | Lemma -> [mk_status "lemma"]
+           | Esa _ -> [mk_status "equisatisfiable"]
+           | Goal src -> [mk_status "goal"; Statement.Src.to_attr src]
+           | Assert src -> [mk_status "assert"; Statement.Src.to_attr src]
+           | Trivial -> [mk_status "trivial"]
+           | Data _ | By_def _ -> []
+         in
+         let pp_infos = UntypedAST.pp_attrs_zf in
+         let infos =
+           info_name :: info_from @ info_rule @ info_status @ (Step.infos p.step)
+         in
+         begin match result p with
+           | Form f ->
+             Format.fprintf out "@[<2>assert%a@ %a@].@,"
+               pp_infos infos TypedSTerm.ZF.pp f
+           | BoolClause c ->
+             Format.fprintf out "@[<2>assert%a@ %a@].@,"
+               pp_infos infos (Util.pp_list ~sep:" || " BBox.pp_zf) c
+           | Clause c ->
+             Format.fprintf out "@[<2>assert%a@ %a@].@,"
+               pp_infos infos SClause.pp_zf c
+           | Stmt stmt ->
+             let module T = TypedSTerm in
+             Statement.ZF.pp T.ZF.pp T.ZF.pp T.ZF.pp out stmt
+           | C_stmt stmt ->
+             let pp_t = Term.ZF.pp in
+             let pp_c = Util.pp_list ~sep:" || " (SLiteral.ZF.pp pp_t) in
+             Statement.ZF.pp pp_c pp_t Type.ZF.pp out stmt
+         end);
+    Format.fprintf out "@]";
+    ()
+
   (** Prints the proof according to the given input switch *)
   let pp o out proof = match o with
     | Options.Print_none -> Util.debug ~section 1 "proof printing disabled"
     | Options.Print_tptp -> pp_tstp out proof
     | Options.Print_normal -> pp_normal out proof
-    | Options.Print_zf -> failwith "proof printing in ZF not implemented" (* TODO? *)
+    | Options.Print_zf -> pp_zf out proof
 
   let _pp_list_str = Util.pp_list CCFormat.string
 

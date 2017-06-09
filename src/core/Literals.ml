@@ -414,31 +414,29 @@ let symbols ?(init=ID.Set.empty) lits =
 
 (** {3 IO} *)
 
-let pp out lits =
-  if Array.length lits = 0 then CCFormat.string out "⊥"
-  else
-    let pp_lit = CCFormat.hovbox Lit.pp in
-    Format.fprintf out "[@[<hv>%a@]]"
-      CCFormat.(array ~sep:(return "@ ∨ ") pp_lit) lits
+let pp_gen ~false_ ~l ~r ~sep ~pp_lit out lits = match lits with
+  | [||] -> CCFormat.string out false_
+  | [| l |] -> pp_lit out l
+  | _ ->
+    Format.fprintf out "%s@[<hv>%a@]%s" l CCFormat.(array ~sep pp_lit) lits r
 
-let pp_vars out lits =
+let pp out lits =
+  let pp_lit = CCFormat.hovbox Lit.pp in
+  pp_gen ~l:"[" ~r:"]" ~false_:"⊥" ~sep:(CCFormat.return "@ ∨ ") ~pp_lit out lits
+
+let pp_vars_gen ~pp_var ~pp_lits out lits =
   let pp_vars out = function
     | [] -> ()
-    | l ->
-      Format.fprintf out "forall @[%a@].@ "
-        (Util.pp_list ~sep:" " Type.pp_typed_var) l
+    | l -> Format.fprintf out "forall @[%a@].@ " (Util.pp_list ~sep:" " pp_var) l
   in
-  let vars_ =
-    Seq.vars lits |> T.VarSet.of_seq |> T.VarSet.to_list
-  in
-  Format.fprintf out "@[<2>%a%a@]" pp_vars vars_ pp lits
+  let vars_ = Seq.vars lits |> T.VarSet.of_seq |> T.VarSet.to_list in
+  Format.fprintf out "@[<2>%a%a@]" pp_vars vars_ pp_lits lits
 
-let pp_tstp out lits = match lits with
-  | [| |] -> CCFormat.string out "$false"
-  | [| l |] -> Literal.pp_tstp out l
-  | _ ->
-    Format.fprintf out "(@[%a@])"
-      CCFormat.(array ~sep:(return "@ | ") Lit.pp_tstp) lits
+let pp_vars out lits = pp_vars_gen ~pp_var:Type.pp_typed_var ~pp_lits:pp out lits
+
+let pp_tstp out lits =
+  let pp_lit = CCFormat.hovbox Lit.pp_tstp in
+  pp_gen ~l:"(" ~r:")" ~false_:"$false" ~sep:(CCFormat.return "@ | ") ~pp_lit out lits
 
 (* print quantified literals *)
 let pp_tstp_closed out lits =
@@ -449,6 +447,13 @@ let pp_tstp_closed out lits =
         (Util.pp_list ~sep:", " Type.TPTP.pp_typed_var) l
   in
   Format.fprintf out "@[<2>%a%a@]" pp_vars (vars lits) pp_tstp lits
+
+let pp_zf out lits =
+  let pp_lit = CCFormat.hovbox Lit.pp_zf in
+  pp_gen ~l:"(" ~r:")" ~false_:"false" ~sep:(CCFormat.return "@ || ") ~pp_lit out lits
+
+let pp_zf_closed out lits =
+  pp_vars_gen ~pp_var:Type.ZF.pp_typed_var ~pp_lits:pp_zf out lits
 
 let to_string a = CCFormat.to_string pp a
 

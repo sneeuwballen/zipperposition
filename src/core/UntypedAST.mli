@@ -85,6 +85,8 @@ val pp_attr : attr CCFormat.printer
 val pp_attrs : attrs CCFormat.printer
 
 val pp_attr_zf : attr CCFormat.printer
+val pp_attrs_zf : attrs CCFormat.printer
+
 val pp_attr_tstp : attr CCFormat.printer
 (** Print as a TPTP general_term *)
 

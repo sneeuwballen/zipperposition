@@ -627,6 +627,11 @@ module TPTP = struct
   let to_string = CCFormat.to_string pp
 end
 
+module ZF = struct
+  let pp = T.pp_zf
+  let to_string = CCFormat.to_string pp
+end
+
 (** {2 Conversions} *)
 
 module Conv = struct

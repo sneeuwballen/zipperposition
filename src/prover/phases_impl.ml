@@ -208,21 +208,23 @@ let has_goal_ = ref false
 let print_stats (type c) (module Env : Env.S with type C.t = c) =
   Phases.start_phase Phases.Print_stats >>= fun () ->
   Signal.send Signals.on_print_stats ();
+  let comment = Options.comment() in
   let print_hashcons_stats what (sz, num, sum_length, small, median, big) =
     Format.printf
-      "@[<2>hashcons stats for %s: size %d, num %d, sum length %d, \
+      "@[<h>%shashcons stats for %s: size %d, num %d, sum length %d, \
        buckets: small %d, median %d, big %d@]@."
-      what sz num sum_length small median big
+      comment what sz num sum_length small median big
   and print_state_stats (num_active, num_passive, num_simpl) =
-    Format.printf "proof state stats:@.";
-    Format.printf "stat:  active clauses          %d@." num_active;
-    Format.printf "stat:  passive clauses         %d@." num_passive;
-    Format.printf "stat:  simplification clauses  %d@." num_simpl;
+    Format.printf "%sproof state stats:@." comment;
+    Format.printf "%sstat:  active clauses          %d@." comment num_active;
+    Format.printf "%sstat:  passive clauses         %d@." comment num_passive;
+    Format.printf "%sstat:  simplification clauses  %d@." comment num_simpl;
   and print_gc () =
     let stats = Gc.stat () in
     Format.printf
-      "GC: minor words %.0f; major_words: %.0f; max_heap: %d; \
-       minor collections %d; major collections %d@."
+      "@[<h>%sGC: minor words %.0f; major_words: %.0f; max_heap: %d; \
+       minor collections %d; major collections %d@]@."
+      comment
       stats.Gc.minor_words stats.Gc.major_words stats.Gc.top_heap_words
       stats.Gc.minor_collections stats.Gc.major_collections;
   in
@@ -230,7 +232,7 @@ let print_stats (type c) (module Env : Env.S with type C.t = c) =
     print_gc ();
     print_hashcons_stats "terms" (InnerTerm.hashcons_stats ());
     print_state_stats (Env.stats ());
-    Util.print_global_stats ();
+    Util.print_global_stats ~comment ();
   );
   Phases.return_phase ()
 
@@ -290,7 +292,8 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
     | Saturate.Unsat _ -> result, 0  (* already found unsat during presaturation *)
     | _ -> Sat.given_clause ~generating:true ?steps ?timeout ()
   in
-  Format.printf "%% done %d iterations in %.2fs@." num (Util.total_time_s());
+  let comment = Options.comment() in
+  Format.printf "%sdone %d iterations in %.2fs@." comment num (Util.total_time_s());
   Util.debugf ~section 1 "@[<2>final precedence:@ @[%a@]@]"
     (fun k->k Precedence.pp (Env.precedence ()));
   Phases.return_phase result
@@ -338,17 +341,18 @@ let print_szs_result (type c) ~file
     (module Env : Env_intf.S with type C.t = c)
     (result : Saturate.szs_status) =
   Phases.start_phase Phases.Print_result >>= fun () ->
+  let comment = Options.comment() in
   begin match result with
     | Saturate.Unknown
     | Saturate.Timeout ->
-      Format.printf "%% SZS status ResourceOut for '%s'@." file
+      Format.printf "%sSZS status ResourceOut for '%s'@." comment file
     | Saturate.Error s ->
-      Format.printf "%% SZS status InternalError for '%s'@." file;
+      Format.printf "%sSZS status InternalError for '%s'@." comment file;
       Util.debugf ~section 1 "error is:@ %s" (fun k->k s);
     | Saturate.Sat when Env.Ctx.is_completeness_preserved () ->
-      Format.printf "%% SZS status %s for '%s'@." (sat_to_str ()) file
+      Format.printf "%sSZS status %s for '%s'@." comment (sat_to_str ()) file
     | Saturate.Sat ->
-      Format.printf "%% SZS status GaveUp for '%s'@." file;
+      Format.printf "%sSZS status GaveUp for '%s'@." comment file;
       begin match !Options.output with
         | Options.Print_none -> ()
         | Options.Print_zf -> failwith "not implemented: printing in ZF" (* TODO *)
@@ -361,10 +365,10 @@ let print_szs_result (type c) ~file
       end
     | Saturate.Unsat proof ->
       (* print status then proof *)
-      Format.printf "%% SZS status %s for '%s'@." (unsat_to_str ()) file;
-      Format.printf "%% SZS output start Refutation@.";
+      Format.printf "%sSZS status %s for '%s'@." comment (unsat_to_str ()) file;
+      Format.printf "%sSZS output start Refutation@." comment;
       Format.printf "%a@." (Proof.S.pp !Options.output) proof;
-      Format.printf "%% SZS output end Refutation@.";
+      Format.printf "%sSZS output end Refutation@." comment;
   end;
   Phases.return_phase ()
 

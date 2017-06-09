@@ -37,10 +37,17 @@ let print_format_of_string s =
     | "zf" -> Print_zf
     | _ -> failwith ("unknown print format " ^ s)
 
+let comment_of_format = function
+  | Print_tptp -> "% "
+  | Print_normal
+  | Print_zf -> "# "
+  | Print_none -> ""
+
 let input = ref I_guess
 let output = ref Print_normal
 let set_in s = input := input_format_of_string s
 let set_out s = output := print_format_of_string s
+let comment() = comment_of_format !output
 
 let _print_types () =
   Term.print_all_types := true;

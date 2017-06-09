@@ -215,6 +215,8 @@ val default_hooks: unit -> print_hook list
 
 val debugf : t CCFormat.printer
 
+val pp_zf : t CCFormat.printer
+
 (* TODO: path-selection operation (for handling general-data in TPTP), see
         XSLT or CSS *)
 

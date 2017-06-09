@@ -141,6 +141,7 @@ val signature : ?init:Signature.t -> (_, _, Type.t) t Sequence.t -> Signature.t
 (** Compute signature when the types are using {!Type} *)
 
 val conv_attrs : UntypedAST.attrs -> attrs
+val attr_to_ua : attr -> UntypedAST.attr
 
 val add_src : file:string -> ('f, 't, 'ty) t -> ('f, 't, 'ty) t
 
@@ -242,6 +243,7 @@ module Src : sig
 
   val pp : t CCFormat.printer
   val pp_tstp : t CCFormat.printer
+  val to_attr : t -> UntypedAST.attr
 end
 
 (** {2 Iterators} *)

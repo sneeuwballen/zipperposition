@@ -68,8 +68,7 @@ let pp_trail out trail =
   if not (Trail.is_empty trail)
   then
     Format.fprintf out "@ @<2>← @[<hv>%a@]"
-      (Util.pp_seq ~sep:" ⊓ " BBox.pp)
-      (Trail.to_seq trail)
+      (Util.pp_seq ~sep:" ⊓ " BBox.pp) (Trail.to_seq trail)
 
 let pp_vars out c =
   let pp_vars out = function
@@ -85,8 +84,19 @@ let pp out c =
     pp_vars c Literals.pp c.lits pp_trail c.trail;
   ()
 
+let pp_trail_zf out trail =
+  Format.fprintf out "@[<hv>%a@]"
+    (Util.pp_seq ~sep:" && " BBox.pp_zf) (Trail.to_seq trail)
+
+let pp_zf out c =
+  if Trail.is_empty c.trail
+  then Literals.pp_zf_closed out c.lits
+  else
+    Format.fprintf out "@[<2>(%a)@ => (%a)@]"
+      pp_trail_zf c.trail Literals.pp_zf_closed c.lits
+
 (* print a trail in TPTP *)
-and pp_trail_tstp out trail =
+let pp_trail_tstp out trail =
   (* print a single boolean box *)
   let pp_box_unsigned out b = match BBox.payload b with
     | BBox.Case p ->

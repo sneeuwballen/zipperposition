@@ -253,6 +253,11 @@ module TPTP : sig
   val real : t    (** reals *)
 end
 
+module ZF : sig
+  include Interfaces.PRINT with type t := t
+  val pp_typed_var : t HVar.t CCFormat.printer
+end
+
 (** {2 Conversions} *)
 
 module Conv : sig

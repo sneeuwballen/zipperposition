@@ -138,7 +138,7 @@ val with_prof : profiler -> ('a -> 'b) -> 'a -> 'b
 type stat
 
 val mk_stat : string -> stat
-val print_global_stats : unit -> unit
+val print_global_stats : comment:string -> unit -> unit (** comment prefix *)
 val incr_stat : stat -> unit
 val add_stat : stat -> int -> unit
 

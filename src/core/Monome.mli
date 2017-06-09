@@ -256,6 +256,7 @@ val pp : _ t CCFormat.printer
 val to_string : _ t -> string
 
 val pp_tstp : _ t CCFormat.printer
+val pp_zf : _ t CCFormat.printer
 
 exception NotLinear
 

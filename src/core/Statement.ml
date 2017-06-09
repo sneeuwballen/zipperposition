@@ -286,6 +286,25 @@ module Src = struct
     | Preprocess ((_,src'),_,msg) ->
       Format.fprintf out "(@[preprocess@ [%a]@ :msg %S@])"
         pp src' msg
+
+  let rec to_attr src : UntypedAST.attr =
+    let open UntypedAST.A in
+    begin match view src with
+      | Input (_,_) -> str "input"
+      | Internal _ -> str "internal"
+      | From_file (f,r) ->
+        begin match f.name with
+          | None -> app "file" [quoted f.file]
+          | Some n -> app "file" [quoted f.file; app "name" [quoted n]]
+        end
+      | Neg (_,src') -> app "neg" [to_attr src']
+      | CNF (_,src') -> app "cnf" [to_attr src']
+      | Renaming ((_,src'),id,_) ->
+        app "renaming" [to_attr src'; quoted (ID.to_string id)]
+      | Define id -> app "define" [quoted (ID.to_string id)]
+      | Preprocess ((_,src'),_,msg) ->
+        app "preprocess" [to_attr src'; quoted msg]
+    end
 end
 
 (** {2 Defined Constants} *)
@@ -580,6 +599,14 @@ let conv_attrs =
       | A.A_app ("prefix", [A.A_quoted s]) -> Some (A_prefix s)
       | _ -> None)
 
+let attr_to_ua =
+  let open UntypedAST.A in
+  function
+    | A_AC -> str "AC"
+    | A_sos -> str "sos"
+    | A_prefix s -> app "prefix" [quoted s]
+    | A_infix s -> app "infix" [quoted s]
+
 let add_src ~file st = match st.src.src_view with
   | Input (attrs,r) ->
     let module A = UntypedAST in
@@ -605,15 +632,8 @@ let as_sourced_clause st = Sourced_clause_stmt st, src st
 
 let fpf = Format.fprintf
 
-let pp_attr out = function
-  | A_AC -> fpf out "AC"
-  | A_infix s -> fpf out "infix \"%s\"" s
-  | A_prefix s -> fpf out "prefix \"%s\"" s
-  | A_sos -> fpf out "sos"
-
-let pp_attrs out = function
-  | [] -> ()
-  | l -> fpf out "@ [@[%a@]]" (Util.pp_list ~sep:"," pp_attr) l
+let pp_attr out a = UntypedAST.pp_attr out (attr_to_ua a)
+let pp_attrs out l = UntypedAST.pp_attrs out (List.map attr_to_ua l)
 
 let pp_typedvar ppty out v = fpf out "(@[%a:%a@])" Var.pp v ppty (Var.ty v)
 let pp_typedvar_l ppty = Util.pp_list ~sep:" " (pp_typedvar ppty)
@@ -693,26 +713,31 @@ let pp_clause =
 let pp_input = pp TypedSTerm.pp TypedSTerm.pp TypedSTerm.pp
 
 module ZF = struct
+  module UA = UntypedAST.A
+
   let pp ppf ppt ppty out st =
     let pp_var out v= Format.fprintf out "(%a:%a)" Var.pp v ppty (Var.ty v) in
     let pp_vars out = function
       | [] -> ()
       | vars -> Format.fprintf out "forall %a.@ " (Util.pp_list ~sep:" " pp_var) vars
     in
+    let src = Src.to_attr st.src in
+    let attrs = src :: List.map attr_to_ua st.attrs in
+    let pp_attrs = UntypedAST.pp_attrs_zf in
     match st.view with
       | TyDecl (id,ty) ->
-        fpf out "@[<2>val%a %a :@ @[%a@]@]." pp_attrs st.attrs ID.pp id ppty ty
+        fpf out "@[<2>val%a %a :@ @[%a@]@]." pp_attrs attrs ID.pp id ppty ty
       | Def l ->
         fpf out "@[<2>def%a %a@]."
-          pp_attrs st.attrs (Util.pp_list ~sep:" and " (pp_def ppf ppt ppty)) l
+          pp_attrs attrs (Util.pp_list ~sep:" and " (pp_def ppf ppt ppty)) l
       | Rewrite d ->
         begin match d with
           | Def_term (vars, id, _, args, rhs) ->
-            fpf out "@[<2>rewrite%a @[<2>%a@[%a %a@]@ = @[%a@]@]@]." pp_attrs st.attrs
+            fpf out "@[<2>rewrite%a @[<2>%a@[%a %a@]@ = @[%a@]@]@]." pp_attrs attrs
               pp_vars vars ID.pp id (Util.pp_list ~sep:" " ppt) args ppt rhs
           | Def_form (vars, lhs, rhs, pol) ->
             let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
-            fpf out "@[<2>rewrite%a @[<2>%a@[%a@]@ %s @[%a@]@]@]." pp_attrs st.attrs
+            fpf out "@[<2>rewrite%a @[<2>%a@[%a@]@ %s @[%a@]@]@]." pp_attrs attrs
               pp_vars vars (SLiteral.ZF.pp ppt) lhs op
               (Util.pp_list ~sep:" && " ppf) rhs
         end
@@ -723,17 +748,17 @@ module ZF = struct
           fpf out "@[<hv2>@[%a : %a@] :=@ %a@]"
             ID.pp d.data_id ppty d.data_ty (Util.pp_list ~sep:"" pp_cstor) d.data_cstors
         in
-        fpf out "@[<hv2>data%a@ %a@]." pp_attrs st.attrs (Util.pp_list ~sep:" and " pp_data) l
+        fpf out "@[<hv2>data%a@ %a@]." pp_attrs attrs (Util.pp_list ~sep:" and " pp_data) l
       | Assert f ->
-        fpf out "@[<2>assert%a@ @[%a@]@]." pp_attrs st.attrs ppf f
+        fpf out "@[<2>assert%a@ @[%a@]@]." pp_attrs attrs ppf f
       | Lemma l ->
         fpf out "@[<2>lemma%a@ @[%a@]@]."
-          pp_attrs st.attrs (Util.pp_list ~sep:" && " ppf) l
+          pp_attrs attrs (Util.pp_list ~sep:" && " ppf) l
       | Goal f ->
-        fpf out "@[<2>goal%a@ @[%a@]@]." pp_attrs st.attrs ppf f
+        fpf out "@[<2>goal%a@ @[%a@]@]." pp_attrs attrs ppf f
       | NegatedGoal (_, l) ->
         fpf out "@[<hv2>goal%a@ ~(@[<hv>%a@])."
-          pp_attrs st.attrs
+          pp_attrs attrs
           (Util.pp_list ~sep:", " (CCFormat.hovbox ppf)) l
 
   let to_string ppf ppt ppty = CCFormat.to_string (pp ppf ppt ppty)

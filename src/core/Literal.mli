@@ -274,5 +274,6 @@ val add_default_hook : print_hook -> unit
 val pp_debug : ?hooks:print_hook list -> t CCFormat.printer
 
 val pp : t CCFormat.printer
+val pp_zf : t CCFormat.printer
 val pp_tstp : t CCFormat.printer
 val to_string : t -> string
