@@ -317,12 +317,16 @@ mutual_types:
 attr:
   | a=atomic_attr { a }
   | s=raw_var l=atomic_attr+ { A.A_app (s, l) }
+  | error {
+      let loc = L.mk_pos $startpos $endpos in
+      UntypedAST.error loc "expected attribute"
+    }
 
 atomic_attr:
   | s=raw_var { A.A_app (s, []) }
   | s=QUOTED { A.A_quoted (unquote s) }
   | LEFT_PAREN a=attr RIGHT_PAREN { a }
-  | LEFT_BRACKET l=separated_list(COMMA, attr) RIGHT_PAREN { A.A_list l }
+  | LEFT_BRACKET l=separated_list(COMMA, attr) RIGHT_BRACKET { A.A_list l }
 
 attrs:
   | LEFT_BRACKET l=separated_nonempty_list(COMMA, attr) RIGHT_BRACKET
