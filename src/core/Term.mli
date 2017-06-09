@@ -107,6 +107,10 @@ val fun_of_fvars : var list -> t -> t
 (** Build a function from a list of free vars + the body.
     This performs the De Bruijn transformation. *)
 
+val open_fun : offset:int -> t -> var list * t * int
+(** [open_fun ~offset (λxy. F)] returns [[v1,v2], F[v1/x,v2/y], offset+2]
+    where [v1] and [v2] are fresh variables starting from offset *)
+
 val grounding : Type.t -> t
 (** [grounding ty] is a unique constant of type [ty] *)
 
@@ -114,6 +118,7 @@ val is_var : t -> bool
 val is_bvar : t -> bool
 val is_app : t -> bool
 val is_const : t -> bool
+val is_fun : t -> bool
 val is_type : t -> bool (** Does it have type [tType]? *)
 
 val as_const : t -> ID.t option
@@ -133,6 +138,9 @@ val is_closed : t -> bool
 
 val head_term : t -> t
 (** [head_term t = fst (as_app t)] *)
+
+val head_term_mono : t -> t
+(** head term, but still with type arguments *)
 
 val args : t -> t list
 (** [args t = snd (as_app t)] *)

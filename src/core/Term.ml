@@ -159,6 +159,18 @@ let fun_of_fvars vars body =
       vars body
   )
 
+let open_fun ~offset t =
+  let rec aux offset env vars t = match view t with
+    | Fun (ty_var, body) ->
+      let v = HVar.make offset ~ty:ty_var in
+      let env = DBEnv.push env (var v) in
+      aux (offset+1) env (v::vars) body
+    | _ ->
+      let t' = T.DB.eval env t in
+      List.rev vars, t', offset
+  in
+  aux offset DBEnv.empty [] t
+
 let true_ = builtin ~ty:Type.prop Builtin.True
 let false_ = builtin ~ty:Type.prop Builtin.False
 
@@ -174,6 +186,10 @@ let is_bvar t = match T.view t with
 
 let is_const t = match T.view t with
   | T.Const _ -> true
+  | _ -> false
+
+let is_fun t = match T.view t with
+  | T.Bind (Binder.Lambda, _, _) -> true
   | _ -> false
 
 let is_app t = match T.view t with
@@ -209,6 +225,12 @@ let is_closed t = T.DB.closed t
 
 let head_term t = fst (as_app t)
 let args t = snd (as_app t)
+
+let head_term_mono t = match view t with
+  | App (f,l) ->
+    let l1 = CCList.take_while is_type l in
+    app f l1 (* re-apply to type parameters *)
+  | _ -> t
 
 let is_ho_var t = match view t with
   | Var v -> Type.needs_args (HVar.ty v)
