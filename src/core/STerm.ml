@@ -535,6 +535,7 @@ module ZF = struct
   and pp_surrounded out t = match t.term with
     | AppBuiltin (_, _::_)
     | App _
+    | Ite _
     | Bind _ -> Format.fprintf out "(@[%a@])" pp t
     | _ -> pp out t
   and pp_var out = function
