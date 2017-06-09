@@ -30,6 +30,9 @@ module type S = sig
   (** Register rules in the environment *)
 end
 
+let k_some_ho : bool Flex_state.key = Flex_state.create_key()
+let k_enabled : bool Flex_state.key = Flex_state.create_key()
+
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
   module C = Env.C
@@ -300,17 +303,21 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
 
   let setup () =
-    Util.debug ~section 1 "setup HO rules";
-    Env.Ctx.lost_completeness();
-    Env.add_unary_inf "ho_prim_enum" prim_enum;
-    Env.add_unary_inf "ho_complete_eq" complete_eq_args;
-    Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
-    Env.add_lit_rule "ho_ext_neg" ext_neg;
-    Env.add_rewrite_rule "beta_reduce" beta_reduce;
+    if not (Env.flex_get k_enabled) then (
+      Util.debug ~section 1 "HO rules disabled";
+    ) else (
+      Util.debug ~section 1 "setup HO rules";
+      Env.Ctx.lost_completeness();
+      Env.add_unary_inf "ho_prim_enum" prim_enum;
+      Env.add_unary_inf "ho_complete_eq" complete_eq_args;
+      Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
+      Env.add_lit_rule "ho_ext_neg" ext_neg;
+      Env.add_rewrite_rule "beta_reduce" beta_reduce;
+    );
     ()
 end
 
-let k_some_ho : bool Flex_state.key = Flex_state.create_key()
+let enabled_ = ref true
 
 let st_contains_ho (st:(_,_,_) Statement.t): bool =
   let is_non_atomic_ty ty =
@@ -354,7 +361,9 @@ let extension =
     if is_ho then (
       Util.debug ~section 2 "problem is HO"
     );
-    Flex_state.add k_some_ho is_ho state
+    state
+    |> Flex_state.add k_some_ho is_ho
+    |> Flex_state.add k_enabled !enabled_
   in
   { Extensions.default with
       Extensions.name = "ho";
@@ -362,4 +371,9 @@ let extension =
       env_actions=[register];
   }
 
-let () = Extensions.register extension
+let () =
+  Options.add_opts
+    [ "--ho", Arg.Set enabled_, " enable HO reasoning";
+      "--no-ho", Arg.Clear enabled_, " disable HO reasoning";
+    ];
+  Extensions.register extension;
