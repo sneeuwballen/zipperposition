@@ -244,8 +244,16 @@ module Inner = struct
           | T.Var _, _
           | _, T.Var _ ->
             (* currying: unify "from the right" *)
-            let l1, l2 = pair_lists_right f1 l1 f2 l2 in
-            unif_list ~op subst l1 sc1 l2 sc2
+            begin
+              try
+                let l1, l2 = pair_lists_right f1 l1 f2 l2 in
+                unif_list ~op subst l1 sc1 l2 sc2
+              with Fail ->
+                (* we might delay, for non-syntactic unif, even at the root *)
+                if op=O_unify
+                then US.add_constr (Unif_constr.make (t1,sc1)(t2,sc2)) subst
+                else fail()
+            end
           | _ -> fail()
         end
       | T.AppBuiltin (Builtin.Arrow, ret1::args1),
