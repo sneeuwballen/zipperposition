@@ -252,9 +252,7 @@ module Make(E : Env.S) : S with module Env = E = struct
            let hd = T.head_term t in
            begin match T.as_var hd, Type.arity (T.ty hd) with
              | Some v, Type.Arity (0, n)
-               when n>0 &&
-                    Type.returns_prop (T.ty hd) &&
-                    not (Literals.is_shielded v (C.lits c)) ->
+               when n>0 && Type.returns_prop (T.ty hd) ->
                Some v
              | _ -> None
            end)
