@@ -526,7 +526,7 @@ module S = struct
          let str_of_name s = CCFormat.sprintf "'%d'" s in
          let mk_status r = UA.app "status" [UA.quoted r] in
          let info_name =
-           UA.(app "step" [str (str_of_name name)])
+           UA.(app "name" [str (str_of_name name)])
          and info_from =
            if parents=[] then []
            else (
