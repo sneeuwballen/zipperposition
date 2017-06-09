@@ -177,6 +177,12 @@ module Inner = struct
 
   and unif_term ~op ~root subst t1 sc1 t2 sc2 : unif_subst =
     let view1 = T.view t1 and view2 = T.view t2 in
+    (* delay pair, assuming it's closed *)
+    let delay() =
+      if T.DB.closed t1 && T.DB.closed t2
+      then US.add_constr (Unif_constr.make (t1,sc1)(t2,sc2)) subst
+      else raise Fail
+    in
     match view1, view2 with
       | _ when sc1=sc2 && T.equal t1 t2 ->
         subst (* the terms are equal under any substitution *)
@@ -208,7 +214,11 @@ module Inner = struct
             else US.bind subst (v2,sc2) (t1,sc1)
           | _ -> fail ()  (* fail *)
         end
-      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Binder.equal s1 s2 ->
+      | T.Bind (Binder.Lambda, _, _), _
+      | _, T.Bind (Binder.Lambda, _, _) when op=O_unify ->
+        delay() (* delay unconditionally, to be dealt with by HO unif *)
+      | T.Bind (Binder.ForallTy, varty1, t1'),
+        T.Bind (Binder.ForallTy, varty2, t2') ->
         (* FIXME: should carry a "depth" parameter for closedness checks? *)
         let subst = unif_rec ~op ~root:true subst (varty1,sc1) (varty2,sc2) in
         unif_rec ~op ~root:false subst (t1',sc1) (t2',sc2)
@@ -229,7 +239,7 @@ module Inner = struct
               unif_list ~op subst l1 sc1 l2 sc2
             ) else if op=O_unify && not root && has_non_unifiable_ty t1
             (* TODO: notion of value, here, to fail fast in some cases *)
-            then US.add_constr (Unif_constr.make (t1,sc1) (t2,sc2)) subst
+            then delay()
             else fail()
           | T.Var _, _
           | _, T.Var _ ->
@@ -250,8 +260,7 @@ module Inner = struct
         T.AppBuiltin (Builtin.Rat n2,[]) ->
         if Q.equal n1 n2 then subst else raise Fail (* rational equality *)
       | _ when op=O_unify && not root && has_non_unifiable_ty t1 ->
-        (* push pair as a constraint, because of typing. *)
-        US.add_constr (Unif_constr.make (t1,sc1) (t2,sc2)) subst
+        delay() (* push pair as a constraint, because of typing. *)
       | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Builtin.equal s1 s2 ->
         unif_list ~op subst l1 sc1 l2 sc2
       | _, _ -> raise Fail
