@@ -68,9 +68,13 @@ val goal : ?loc:Loc.t -> ?attrs:attrs -> term -> statement
 val name_of_attrs : attrs -> string option
 val name : statement -> string option
 
-val attr_const : string -> attr
-val attr_quoted : string -> attr
-val attr_app : string -> attr list -> attr
+module A : sig
+  type t = attr
+  val str : string -> t
+  val app : string -> t list -> t
+  val quoted : string -> t
+  val list : t list -> t
+end
 
 val attr_name : string -> attr
 val attr_ac : attr
@@ -80,16 +84,9 @@ val attr_infix : string -> attr
 val pp_attr : attr CCFormat.printer
 val pp_attrs : attrs CCFormat.printer
 
+val pp_attr_zf : attr CCFormat.printer
 val pp_attr_tstp : attr CCFormat.printer
 (** Print as a TPTP general_term *)
-
-module A : sig
-  type t = attr
-  val str : string -> t
-  val app : string -> t list -> t
-  val quoted : string -> t
-  val list : t list -> t
-end
 
 val pp_statement : statement CCFormat.printer
 

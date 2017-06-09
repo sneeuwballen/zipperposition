@@ -319,6 +319,7 @@ atomic_attr:
   | s=raw_var { A.A_app (s, []) }
   | s=QUOTED { A.A_quoted (unquote s) }
   | LEFT_PAREN a=attr RIGHT_PAREN { a }
+  | LEFT_BRACKET l=separated_list(COMMA, attr) RIGHT_PAREN { A.A_list l }
 
 attrs:
   | LEFT_BRACKET l=separated_nonempty_list(COMMA, attr) RIGHT_BRACKET

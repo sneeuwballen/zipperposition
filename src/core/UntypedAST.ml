@@ -52,14 +52,22 @@ type statement = {
 
 let default_attrs = []
 
-let attr_const s = A_app (s, [])
-let attr_app s l = A_app (s, l)
-let attr_quoted s = A_quoted s
+module A = struct
+  type t = attr
+  let str s = A_app (s,[])
+  let app s l = A_app (s,l)
+  let quoted s = A_quoted s
+  let list l = A_list l
+end
 
-let attr_name n = attr_app "name" [attr_const n]
-let attr_ac = attr_const "ac"
-let attr_prefix s = attr_app "prefix" [attr_quoted s]
-let attr_infix s = attr_app "infix" [attr_quoted s]
+let name_of_attrs =
+  CCList.find_map
+    (function A_app ("name", [A_quoted n]) -> Some n | _ -> None)
+
+let attr_name n = A.app "name" [A.str n]
+let attr_ac = A.str "ac"
+let attr_prefix s = A.app "prefix" [A.quoted s]
+let attr_infix s = A.app "infix" [A.quoted s]
 
 let make_ ?loc ?(attrs=default_attrs) stmt = {loc; stmt; attrs; }
 
@@ -74,17 +82,24 @@ let assert_ ?loc ?attrs t = make_ ?attrs ?loc (Assert t)
 let lemma ?loc ?attrs t = make_ ?attrs ?loc (Lemma t)
 let goal ?loc ?attrs t = make_ ?attrs ?loc (Goal t)
 
-let rec pp_attr out = function
-  | A_app (s,[]) -> CCFormat.string out s
-  | A_app (s,l) ->
-    Format.fprintf out "(@[%s@ %a@])" s (Util.pp_list ~sep:" " pp_attr) l
-  | A_quoted s -> Format.fprintf out "\"%s\"" s
-  | A_list l ->
-    Format.fprintf out "[@[<hv>%a@]]" (Util.pp_list ~sep:"," pp_attr) l
+let pp_attr =
+  let rec pp_attr_gen ~inner out = function
+    | A_app (s,[]) -> CCFormat.string out s
+    | A_app (s,l) when not inner ->
+      Format.fprintf out "@[%s@ %a@]" s (Util.pp_list ~sep:" " pp_attr) l
+    | A_app (s,l) ->
+      Format.fprintf out "(@[%s@ %a@])" s (Util.pp_list ~sep:" " pp_attr) l
+    | A_quoted s -> Format.fprintf out "\"%s\"" s
+    | A_list l ->
+      Format.fprintf out "[@[<hv>%a@]]" (Util.pp_list ~sep:"," pp_attr) l
+  and pp_attr out = pp_attr_gen ~inner:true out in
+  pp_attr_gen ~inner:false
 
 let pp_attrs out = function
   | [] -> ()
   | l -> Format.fprintf out "@ [@[%a@]]" (Util.pp_list ~sep:", " pp_attr) l
+
+let pp_attr_zf = pp_attr
 
 let rec pp_attr_tstp out = function
   | A_app (s,[]) -> Format.fprintf out "%s()" s
@@ -94,17 +109,6 @@ let rec pp_attr_tstp out = function
   | A_list l ->
     Format.fprintf out "[@[<hv>%a@]]" (Util.pp_list ~sep:"," pp_attr_tstp) l
 
-module A = struct
-  type t = attr
-  let str s = A_app (s,[])
-  let app s l = A_app (s,l)
-  let quoted s = A_quoted s
-  let list l = A_list l
-end
-
-let name_of_attrs =
-  CCList.find_map
-    (function A_app ("name", [A_quoted n]) -> Some n | _ -> None)
 let name st = name_of_attrs st.attrs
 
 let pp_statement out st =
