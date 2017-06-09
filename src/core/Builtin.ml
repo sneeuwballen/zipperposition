@@ -375,6 +375,16 @@ module TPTP = struct
     | "$greatereq" -> Greatereq
     | _ -> raise NotABuiltin
 
+  let fixity = function
+    | And | Or ->
+      Infix_nary
+    | Imply | Equiv | Xor | Eq | Neq | HasType ->
+      Infix_binary
+    | _ -> Prefix
+
+  let is_prefix o = fixity o = Prefix
+  let is_infix o = match fixity o with Infix_nary | Infix_binary -> true | Prefix -> false
+
   let of_string b =
     try Some (of_string_exn b)
     with NotABuiltin -> None

@@ -165,6 +165,11 @@ module TPTP : sig
   val connectives : Set.t
   val is_connective : t -> bool
 
+  val fixity : t -> fixity
+
+  val is_infix : t -> bool
+  val is_prefix : t -> bool
+
   val of_string : string -> t option
   (** Parse a $word into a builtin *)
 

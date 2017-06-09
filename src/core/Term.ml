@@ -604,6 +604,11 @@ module TPTP = struct
         if !print_all_types && not (Type.equal (ty t) Type.TPTP.i)
         then Format.fprintf out ":%a" (Type.TPTP.pp_depth !depth) (ty t)
       | AppBuiltin (b,[]) -> Builtin.TPTP.pp out b
+      | AppBuiltin (b, ([t;u] | [_;t;u])) when Builtin.TPTP.is_infix b ->
+        Format.fprintf out "(@[%a %a@ %a@])" pp_rec t Builtin.TPTP.pp b pp_rec u
+      | AppBuiltin (b, l) when Builtin.TPTP.fixity b = Builtin.Infix_nary ->
+        Format.fprintf out "(@[%a@])"
+          (Util.pp_list ~sep:(Builtin.TPTP.to_string b) pp_rec) l
       | AppBuiltin (b,l) ->
         Format.fprintf out "(@[<hov2>%a@ %a@])" Builtin.TPTP.pp b (Util.pp_list pp_rec) l
       | Const s -> ID.pp_tstp out s
