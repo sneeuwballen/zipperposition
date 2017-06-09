@@ -16,6 +16,7 @@ let stat_ext_neg = Util.mk_stat "ho.extensionality-.steps"
 let stat_complete_eq = Util.mk_stat "ho.complete_eq.steps"
 let stat_beta = Util.mk_stat "ho.beta_reduce.steps"
 let stat_prim_enum = Util.mk_stat "ho.prim_enum.steps"
+let stat_elim_pred = Util.mk_stat "ho.elim_pred.steps"
 
 let prof_eq_res = Util.mk_profiler "ho.eq_res"
 let prof_eq_res_syn = Util.mk_profiler "ho.eq_res_syntactic"
@@ -194,6 +195,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             Util.debugf ~section 5
               "(@[elim-pred-with@ (@[@<1>λ @[%a@].@ %a@])@])"
               (fun k->k (Util.pp_list ~sep:" " Type.pp_typed_var) vars T.pp body);
+            Util.incr_stat stat_elim_pred;
             let t = T.fun_of_fvars vars body in
             Subst.FO.of_list [((v:>InnerTerm.t HVar.t),0), (t,0)]
           in
