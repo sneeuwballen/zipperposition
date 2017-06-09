@@ -680,8 +680,10 @@ let rec pp_depth ?(hooks=[]) depth out t =
     | AppBuiltin (b, l) ->
       Format.fprintf out "@[%a(%a)@]" Builtin.pp b (Util.pp_list (_pp depth)) l
     | App (f, l) ->
+      (* remove type arguments unless required,
+         or unless we are already printing a type *)
       let l =
-        if !show_type_arguments then l
+        if !show_type_arguments || is_tType (ty_exn t) then l
         else List.filter (fun t -> not (is_tType @@ ty_exn t)) l
       in
       let as_infix = match view f with Const id -> ID.as_infix id | _ -> None in
@@ -699,8 +701,9 @@ let rec pp_depth ?(hooks=[]) depth out t =
       end
   and _pp_surrounded depth out t = match view t with
     | App (_, l)
-      when not !show_type_arguments
-        && List.for_all (fun t -> is_tType (ty_exn t)) l ->
+      when not !show_type_arguments &&
+           not (is_tType (ty_exn t)) &&
+           List.for_all (fun t -> is_tType (ty_exn t)) l ->
       _pp depth out t
     | Bind _
     | AppBuiltin (_,_::_)
