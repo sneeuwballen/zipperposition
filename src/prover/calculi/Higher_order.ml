@@ -128,7 +128,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       C.Seq.vars c
       |> T.VarSet.of_seq |> T.VarSet.to_seq
       |> Sequence.filter
-        (fun v -> Type.is_prop @@ Type.returns @@ HVar.ty v)
+        (fun v ->
+           (Type.is_prop @@ Type.returns @@ HVar.ty v) &&
+           not (Literals.is_shielded v (C.lits c)))
     (* find all constraints on [v], also returns the remaining literals.
        returns None if some constraints contains [v] itself. *)
     and gather_lits v : (Literal.t list * (T.t list * bool) list) option =
@@ -188,7 +190,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             in
             Util.debugf ~section 5
               "(@[elim-pred-with@ (@[@<1>λ @[%a@].@ %a@])@])"
-              (fun k->k (Util.pp_list Type.pp_typed_var) vars T.pp body);
+              (fun k->k (Util.pp_list ~sep:" " Type.pp_typed_var) vars T.pp body);
             let t = T.fun_of_fvars vars body in
             Subst.FO.of_list [((v:>InnerTerm.t HVar.t),0), (t,0)]
           in
