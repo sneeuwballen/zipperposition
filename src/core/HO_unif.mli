@@ -8,11 +8,23 @@ type term = Term.t
 type penalty = int
 (** penalty on the search space *)
 
-val enum_prop : Term.var Scoped.t -> scope_new_vars:Scoped.scope -> (Subst.t * penalty) list
+val enum_prop :
+  Term.var Scoped.t ->
+  offset:int ->
+  (Subst.t * penalty) list
 (** Given a variable of type [τ1…τn -> prop], enumerate possible shapes
     for it
     @param v the variable to refine + its scope. Must return [prop].
-    @param scope_new_vars the scope for fresh variables (should be unused elsewhere)
+    @param offset to create fresh variables (should be unused elsewhere)
 *)
 
-(* TODO *)
+val unif_pairs :
+  ?fuel:int ->
+  (term * term) list Scoped.t ->
+  offset:int ->
+  ((term * term) list * Subst.t * penalty) list
+(** [unif_pairs pairs ~scope_new_vars] returns a list of (partial) solutions
+    to the HO unification problem [pairs].
+    Each solution is a list of remaining constraints, a substitution,
+    and some penalty to influence the search space *)
+

@@ -54,7 +54,8 @@ let rec whnf_rec st =
         | Some t' ->
           (* FIXME: equality modulo env? *)
           assert (Type.equal ty (T.ty t'));
-          assert (InnerTerm.DB.closed (t' : T.t :> InnerTerm.t));
+          let t' = T.DB.shift n t' in
+          (*assert (InnerTerm.DB.closed (t' : T.t :> InnerTerm.t));*)
           (* must be closed, because it's already evaluated *)
           whnf_rec (set_head st t')
       end
@@ -84,6 +85,7 @@ let rec snf_rec t =
       begin match T.view f with
         | T.Fun _ ->
           let t' = whnf_term t in
+          assert (not (T.equal t t'));
           snf_rec t'
         | _ ->
           let l' = List.map snf_rec l in

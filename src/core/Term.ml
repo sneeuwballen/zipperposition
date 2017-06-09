@@ -221,8 +221,6 @@ let rec as_fun t = match view t with
     ty_arg :: args, ret
   | _ -> [], t
 
-let is_closed t = T.DB.closed t
-
 let head_term t = fst (as_app t)
 let args t = snd (as_app t)
 
@@ -648,6 +646,7 @@ end
 
 module DB = struct
   let is_closed = T.DB.closed
+  let shift = T.DB.shift
 end
 
 let debugf = pp

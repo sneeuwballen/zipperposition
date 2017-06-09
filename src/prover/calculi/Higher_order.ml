@@ -17,9 +17,12 @@ let stat_complete_eq = Util.mk_stat "ho.complete_eq.steps"
 let stat_beta = Util.mk_stat "ho.beta_reduce.steps"
 let stat_prim_enum = Util.mk_stat "ho.prim_enum.steps"
 let stat_elim_pred = Util.mk_stat "ho.elim_pred.steps"
+let stat_ho_unif = Util.mk_stat "ho.unif.calls"
+let stat_ho_unif_steps = Util.mk_stat "ho.unif.steps"
 
 let prof_eq_res = Util.mk_profiler "ho.eq_res"
 let prof_eq_res_syn = Util.mk_profiler "ho.eq_res_syntactic"
+let prof_ho_unif = Util.mk_profiler "ho.unif"
 
 module type S = sig
   module Env : Env.S
@@ -263,12 +266,12 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun k->k C.pp c (Util.pp_seq T.pp_var) (T.VarSet.to_seq vars));
     );
     let sc_c = 0 in
-    let sc_new_vars = 1 in
+    let offset = C.Seq.vars c |> T.Seq.max_var |> succ in
     begin
       vars
       |> T.VarSet.to_seq
       |> Sequence.flat_map_l
-        (fun v -> HO_unif.enum_prop (v,sc_c) ~scope_new_vars:sc_new_vars)
+        (fun v -> HO_unif.enum_prop (v,sc_c) ~offset)
       |> Sequence.map
         (fun (subst,penalty) ->
            let renaming = Ctx.renaming_clear() in
@@ -288,6 +291,63 @@ module Make(E : Env.S) : S with module Env = E = struct
            new_c)
       |> Sequence.to_rev_list
     end
+
+  let pp_pairs_ out =
+    let open CCFormat in
+    Format.fprintf out "(@[<hv>%a@])"
+      (Util.pp_list ~sep:" " @@ hvbox @@ pair ~sep:(return " = ") T.pp T.pp)
+
+  (* perform HO unif on [pairs].
+     invariant: [C.lits c = pairs @ other_lits] *)
+  let ho_unif_real_ c pairs other_lits : C.t list =
+    Util.debugf ~section 5
+      "(@[ho_unif.try@ :pairs (@[<hv>%a@])@ :other_lits %a@])"
+      (fun k->k pp_pairs_ pairs (Util.pp_list~sep:" " Literal.pp) other_lits);
+    Util.incr_stat stat_ho_unif;
+    let offset = C.Seq.vars c |> T.Seq.max_var |> succ in
+    begin
+      HO_unif.unif_pairs ?fuel:None (pairs,0) ~offset
+      |> List.map
+        (fun (new_pairs, subst, penalty) ->
+           let renaming = Ctx.renaming_clear() in
+           let new_pairs = List.map (CCFun.uncurry Literal.mk_constraint) new_pairs in
+           let new_lits =
+             Literal.apply_subst_list ~renaming subst (other_lits @ new_pairs,0)
+           in
+           let proof =
+             Proof.Step.inference ~rule:(Proof.Rule.mk "ho_unif")
+               [C.proof_parent_subst (c,0) subst]
+           in
+           let new_c =
+             C.create new_lits proof
+               ~trail:(C.trail c) ~penalty:(C.penalty c + penalty)
+           in
+           Util.debugf ~section 5
+             "(@[ho_unif.step@ :pairs (@[%a@])@ :subst %a@ :yields %a@])"
+             (fun k->k pp_pairs_ pairs Subst.pp subst C.pp new_c);
+           Util.incr_stat stat_ho_unif_steps;
+           new_c
+        )
+    end
+
+  (* HO unification of constraints *)
+  let ho_unif (c:C.t) : C.t list =
+    if C.lits c |> CCArray.exists Literal.is_ho_constraint then (
+      (* separate constraints from the rest *)
+      let pairs, others =
+        C.lits c
+        |> Array.to_list
+        |> CCList.partition_map
+          (function
+            | Literal.HO_constraint (t,u) -> `Left (t,u)
+            | lit -> `Right lit)
+      in
+      assert (pairs <> []);
+      Util.enter_prof prof_ho_unif;
+      let r = ho_unif_real_ c pairs others in
+      Util.exit_prof prof_ho_unif;
+      r
+    ) else []
 
   (* rule for β-reduction *)
   let beta_reduce t =
@@ -312,6 +372,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Env.add_unary_inf "ho_complete_eq" complete_eq_args;
       Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
       Env.add_lit_rule "ho_ext_neg" ext_neg;
+      Env.add_unary_inf "ho_unif" ho_unif;
       Env.add_rewrite_rule "beta_reduce" beta_reduce;
     );
     ()

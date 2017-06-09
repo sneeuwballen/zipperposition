@@ -133,9 +133,6 @@ val as_app : t -> t * t list
 val as_fun : t -> Type.t list * t
 (** Open functions *)
 
-val is_closed : t -> bool
-(** De-bruijn closed? *)
-
 val head_term : t -> t
 (** [head_term t = fst (as_app t)] *)
 
@@ -351,6 +348,7 @@ end
 (** {2 De Bruijn} *)
 module DB : sig
   val is_closed : t -> bool
+  val shift : int -> t -> t
 end
 
 (** {2 TPTP} *)

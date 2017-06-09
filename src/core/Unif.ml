@@ -241,6 +241,8 @@ module Inner = struct
             (* TODO: notion of value, here, to fail fast in some cases *)
             then delay()
             else fail()
+          | T.Var _, _ | _, T.Var _ when op=O_unify ->
+            delay() (* delay for non-syntactic unif *)
           | T.Var _, _
           | _, T.Var _ ->
             (* currying: unify "from the right" *)

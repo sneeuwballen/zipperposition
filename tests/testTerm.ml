@@ -177,9 +177,11 @@ let gen_ho =
 let check_whnf =
   let gen = gen_ho in
   let prop t =
-    assert (T.DB.is_closed t);
-    let t' = Lambda.whnf t in
-    T.DB.is_closed t'
+    if not (T.DB.is_closed t) then QCheck.assume_fail()
+    else (
+      let t' = Lambda.whnf t in
+      T.DB.is_closed t'
+    )
   in
   QCheck.Test.make gen prop
     ~count:10_000 ~long_factor:10
@@ -188,9 +190,11 @@ let check_whnf =
 let check_snf =
   let gen = gen_ho in
   let prop t =
-    assert (T.DB.is_closed t);
-    let t' = Lambda.snf t in
-    T.DB.is_closed t'
+    if not (T.DB.is_closed t) then QCheck.assume_fail()
+    else(
+      let t' = Lambda.snf t in
+      T.DB.is_closed t'
+    )
   in
   QCheck.Test.make gen prop
     ~count:10_000 ~long_factor:10
@@ -199,13 +203,15 @@ let check_snf =
 let check_snf_no_redex =
   let gen = gen_ho in
   let prop t =
-    assert (T.DB.is_closed t);
-    let t' = Lambda.snf t in
-    T.Seq.subterms t'
-    |> Sequence.for_all
-      (fun t -> match T.view t with
-         | T.App (f, _) -> not (is_fun f)
-         | _ -> true)
+    if not (T.DB.is_closed t) then QCheck.assume_fail()
+    else (
+      let t' = Lambda.snf t in
+      T.Seq.subterms t'
+      |> Sequence.for_all
+        (fun t -> match T.view t with
+           | T.App (f, _) -> not (is_fun f)
+           | _ -> true)
+    )
   in
   QCheck.Test.make gen prop
     ~count:10_000 ~long_factor:10
