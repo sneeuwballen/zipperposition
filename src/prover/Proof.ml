@@ -484,7 +484,7 @@ module S = struct
          let pp_infos out = function
            | [] -> ()
            | l ->
-             Format.fprintf out ",@ %a"
+             Format.fprintf out ",@ [@[<hv>%a@]]"
                (Util.pp_list ~sep:", " UntypedAST.pp_attr_tstp) l
          in
          let infos = p.step |> Step.infos in
