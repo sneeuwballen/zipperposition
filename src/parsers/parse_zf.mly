@@ -11,8 +11,9 @@
   module T = A.T
 
   let unquote s =
-    assert (CCString.prefix ~pre:"\"" s);
-    assert (CCString.suffix ~suf:"\"" s);
+    assert (s <> "");
+    assert (s.[0] = '\'' || s.[0] = '"');
+    assert (s.[String.length s-1] = '\'' || s.[String.length s-1] = '"');
     let s = String.sub s 1 (String.length s-2) in
     CCString.flat_map
       (function
@@ -87,6 +88,7 @@
 %token <string> LOWER_WORD
 %token <string> UPPER_WORD
 %token <string> QUOTED
+%token <string> SINGLE_QUOTED
 %token <string> INTEGER
 
 %start <Logtk.UntypedAST.statement> parse_statement
@@ -106,6 +108,7 @@ parse_statement_list: l=list(statement) EOI { l }
 raw_var:
   | w=LOWER_WORD { w }
   | w=UPPER_WORD { w }
+  | w=SINGLE_QUOTED { unquote w }
 
 var_or_wildcard:
   | v=raw_var { T.V v }
