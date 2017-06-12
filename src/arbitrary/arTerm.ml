@@ -7,8 +7,6 @@ open Logtk
 
 module QA = QCheck
 module T = Term
-module Sym = Symbol
-module HOT = HOTerm
 
 type 'a arbitrary = 'a QCheck.arbitrary
 type 'a gen = 'a QCheck.Gen.t
