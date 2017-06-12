@@ -12,64 +12,54 @@ type term = Term.t
 
 type state = {
   head: T.t;  (* not an app *)
-  args: T.t list;
-  env: T.t DBEnv.t;
+  env: T.t DBEnv.t; (* env for the head *)
+  args: T.t list; (* arguments, with their own env *)
 }
 
-let st_of_term ~env t = match T.view t  with
-  | T.App (f, l) -> { head=f; args=l; env; }
-  | _ -> {head=t; args=[]; env; }
+(* evaluate term in environment *)
+let eval_in_env_ env t = T.DB.eval env t
 
-let eval_ env t =
-  let t =
-    InnerTerm.DB.eval
-      (env : T.t DBEnv.t :> InnerTerm.t DBEnv.t)
-      (t : T.t :> InnerTerm.t)
-  in
-  T.of_term_unsafe t
-
-let set_head st t = match T.view t with
+let normalize st = match T.view st.head with
   | T.App (f, l) ->
     (* the arguments in [l] might contain variables *)
-    let l = List.rev_map (eval_ st.env) l in
-    { st with head=f; args= List.rev_append l st.args; }
-  | _ -> {st with head=t; }
+    let l = List.rev_map (eval_in_env_ st.env) l in
+    { st with head=f; args=List.rev_append l st.args; }
+  | _ -> st
+
+let st_of_term ~env t = {head=t; args=[]; env;} |> normalize
 
 let term_of_st st =
-  let f = eval_ st.env st.head in
+  let f = eval_in_env_ st.env st.head in
   T.app f st.args
 
 (* recursive reduction in call by value. [env] contains the environment for
     De Bruijn indexes. *)
 let rec whnf_rec st =
-  let ty = T.ty st.head in
   begin match T.view st.head, st.args with
     | T.App _, _ -> assert false
     | T.Var _, _
     | T.Const _, _ -> st
-    | T.DB n, _ ->
-      (* look for the possible binding for [n] *)
-      begin match DBEnv.find st.env n with
-        | None -> st
-        | Some t' ->
-          (* FIXME: equality modulo env? *)
-          assert (Type.equal ty (T.ty t'));
-          let t' = T.DB.shift n t' in
-          (*assert (InnerTerm.DB.closed (t' : T.t :> InnerTerm.t));*)
-          (* must be closed, because it's already evaluated *)
-          whnf_rec (set_head st t')
-      end
+    | T.DB _, _ ->
+      let t' = eval_in_env_ st.env st.head in
+      if T.equal st.head t' then st
+      else (
+        (* evaluate [db n], then reduce again *)
+        { st with head=t'; env=DBEnv.empty; }
+        |> normalize
+        |> whnf_rec
+      )
     | T.AppBuiltin _, _
     | T.Fun _, [] -> st
     | T.Fun (_, body), a :: args' ->
       (* beta-reduce *)
-      Util.debugf 10 "@[<2>beta-reduce:@ @[%a@ %a@]" (fun k->k T.pp st.head T.pp a);
-      let st' = { st with
-                    env=DBEnv.push st.env a;
-                    args=args';
-                } in
-      (* use smart constructor, in case [body] is an application *)
-      let st' = set_head st' body in
+      Util.debugf 10 "(@[<2>beta-reduce@ @[%a@ %a@]@])"
+        (fun k->k T.pp st.head T.pp a);
+      let st' =
+        { head=body;
+          env=DBEnv.push st.env a;
+          args=args';
+        } |> normalize
+      in
       whnf_rec st'
   end
 
@@ -78,25 +68,29 @@ let whnf_term t =
   let st = whnf_rec st in
   term_of_st st
 
-let rec snf_rec t =
+let rec snf_rec ~env t =
   let ty = T.ty t in
   begin match T.view t with
     | T.App (f, l) ->
-      begin match T.view f with
+      let f' = snf_rec ~env f in
+      let l' = List.map (snf_rec ~env) l in
+      let t' = if T.equal f f' && T.same_l l l' then t else T.app f' l' in
+      begin match T.view f' with
         | T.Fun _ ->
-          let t' = whnf_term t in
+          let t' = whnf_term t' in
+          (* beta reduce *)
           assert (not (T.equal t t'));
-          snf_rec t'
-        | _ ->
-          let l' = List.map snf_rec l in
-          if T.same_l l l' then t else T.app f l'
+          assert (l<>[]);
+          snf_rec ~env t'
+        | _ -> t'
       end
     | T.AppBuiltin (b, l) ->
-      let l' = List.map snf_rec l in
+      let l' = List.map (snf_rec ~env) l in
       if T.same_l l l' then t else T.app_builtin ~ty b l'
     | T.Var _ | T.Const _ | T.DB _ -> t
     | T.Fun (ty_arg, body) ->
-      let body' = snf_rec body in
+      let env = DBEnv.push_none env in
+      let body' = snf_rec ~env body in
       if T.equal body body' then t else T.fun_ ty_arg body'
   end
 
@@ -117,6 +111,6 @@ let whnf_list t args =
 
 let snf t =
   Util.enter_prof prof_snf;
-  let t' = snf_rec t in
+  let t' = snf_rec ~env:DBEnv.empty t in
   Util.exit_prof prof_snf;
   t'
