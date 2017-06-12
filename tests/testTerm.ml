@@ -113,10 +113,11 @@ let check_replace_id =
   let gen = QCheck.make ~print:pp gen in
   let prop (t, pos) =
     let sub = T.Pos.at t pos in
-    InnerTerm.DB.closed (sub : T.t :> InnerTerm.t)
-    ==>
+    if T.DB.is_closed sub
+    then (
       let t' = T.Pos.replace t pos ~by:sub in
       T.equal t t'
+    ) else QCheck.assume_fail()
   in
   QCheck.Test.make ~name:"term_replace_same_subterm" gen prop
 
@@ -174,25 +175,53 @@ let gen_ho =
     |> QCheck.add_stat ("size", T.size)
   ) else a
 
-let check_whnf =
+let t_show t = CCFormat.sprintf "`@[%a@]`" T.pp t
+let t_show2 (t,u) = CCFormat.sprintf "(@[`@[%a@]`,@ ref: `@[%a@]`@])" T.pp t T.pp u
+
+let check_whnf_closed =
   let gen = gen_ho in
   let prop t =
-    if not (T.DB.is_closed t) then QCheck.assume_fail()
-    else (
-      let t' = Lambda.whnf t in
-      T.DB.is_closed t'
-    )
+    let t' = Lambda.whnf t in
+    not (T.DB.is_closed t) || T.DB.is_closed t'
   in
   QCheck.Test.make gen prop
     ~count:10_000 ~long_factor:10
     ~name:"whnf_preserve_closed"
 
-let check_snf =
-  let gen = gen_ho in
-  let prop t =
+let check_whnf_correct =
+  (* reference implementation *)
+  let rec whnf_naive (t:T.t): T.t = match T.view t with
+    | T.Var _ | T.DB _ | T.Const _ -> t
+    | T.AppBuiltin _ | T.Fun _ -> t
+    | T.App (f, l) ->
+      begin match T.view f, l with
+        | _, [] -> assert false
+        | T.Fun (_, bod), a :: tail -> 
+          (* evaluate β-redex, unshift *)
+          let bod = T.DB.eval (DBEnv.push DBEnv.empty a) bod |> T.DB.unshift 1 in
+          whnf_naive (T.app bod tail)
+        | _ -> t
+      end
+  in
+  let gen =
+    QCheck.map_keep_input ~print:t_show2
+      (fun t -> Lambda.whnf t, whnf_naive t)
+      gen_ho
+  in
+  let prop (t,(t1,t2)) =
+    if T.DB.is_closed t
+    then T.equal t1 t2
+    else QCheck.assume_fail()
+  in
+  QCheck.Test.make gen prop
+    ~count:10_000 ~long_factor:10
+    ~name:"whnf_correct"
+
+let check_snf_closed =
+  let gen = QCheck.map_keep_input ~print:t_show Lambda.snf gen_ho in
+  let prop (t,t') =
     if not (T.DB.is_closed t) then QCheck.assume_fail()
     else(
-      let t' = Lambda.snf t in
       T.DB.is_closed t'
     )
   in
@@ -201,11 +230,10 @@ let check_snf =
     ~name:"snf_preserve_closed"
 
 let check_snf_no_redex =
-  let gen = gen_ho in
-  let prop t =
+  let gen = QCheck.map_keep_input ~print:t_show Lambda.snf gen_ho in
+  let prop (t,t') =
     if not (T.DB.is_closed t) then QCheck.assume_fail()
     else (
-      let t' = Lambda.snf t in
       T.Seq.subterms t'
       |> Sequence.for_all
         (fun t -> match T.view t with
@@ -217,13 +245,65 @@ let check_snf_no_redex =
     ~count:10_000 ~long_factor:10
     ~name:"snf_no_remaining_redex"
 
+let check_snf_correct =
+  (* reference implementation *)
+  let rec snf_naive (t:T.t): T.t = match T.view t with
+    | T.Var _ | T.DB _ | T.Const _ -> t
+    | T.Fun (ty_var, bod) ->
+      let bod = snf_naive bod in
+      T.fun_ ty_var bod
+    | T.AppBuiltin (b,l) ->
+      T.app_builtin ~ty:(T.ty t) b (List.map snf_naive l) 
+    | T.App (f, l) ->
+      let f = snf_naive f in
+      let l = List.map snf_naive l in
+      begin match T.view f, l with
+        | _, [] -> assert false
+        | T.Fun (_, bod), a :: tail -> 
+          (* evaluate β-redex *)
+          let bod = T.DB.eval (DBEnv.push DBEnv.empty a) bod in
+          snf_naive (T.app bod tail)
+        | _ -> T.app f l
+      end
+  in
+  let gen =
+    QCheck.map_keep_input ~print:t_show2
+      (fun t -> Lambda.snf t, snf_naive t)
+      gen_ho
+  in
+  let prop (t,(t1,t2)) =
+    if T.DB.is_closed t
+    then T.equal t1 t2
+    else QCheck.assume_fail()
+  in
+  QCheck.Test.make gen prop
+    ~count:10_000 ~long_factor:10
+    ~name:"snf_correct"
+
+
+let check_snf_idempotent =
+  let gen =
+    QCheck.map_keep_input ~print:t_show2
+      (fun t -> let t' = Lambda.snf t in t', Lambda.snf t')
+      gen_ho
+  in
+  let prop (_,(t',t'')) =
+    T.equal t' t''
+  in
+  QCheck.Test.make gen prop
+    ~count:10_000 ~long_factor:10
+    ~name:"snf_idempotent"
+
 let props =
   [ check_size_subterm
   ; check_replace_id
   ; check_ground_novar
   ; check_hash_mod_alpha
   ; check_min_max_vars
-  ; check_whnf
-  ; check_snf
+  ; check_whnf_closed
+  ; check_whnf_correct
+  ; check_snf_closed
   ; check_snf_no_redex
+  ; check_snf_idempotent
+  ; check_snf_correct
   ]
