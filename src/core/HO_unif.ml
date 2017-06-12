@@ -57,10 +57,8 @@ let enum_prop ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) list =
     in
     List.map
       (fun (t,penalty) ->
-         assert (InnerTerm.DB.closed (t: T.t :> InnerTerm.t));
-         let subst =
-           Subst.FO.of_list [((v:>InnerTerm.t HVar.t),sc_v),(t,sc_v)]
-         in
+         assert (T.DB.is_closed t);
+         let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
          subst, penalty)
       [ l_not, 2;
         l_and, 4;
