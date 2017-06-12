@@ -288,7 +288,7 @@ module DB = struct
   (* maps the term to another term, calling [on_binder acc t]
      when it meets a binder, and [on_bvar acc t] when it meets a
      bound variable. *)
-  let _fold_map acc ~on_bvar ~on_binder t =
+  let _fold_map ?(depth=0) acc ~on_bvar ~on_binder t =
     let rec recurse ~depth acc t = match t.ty with
       | NoType ->
         assert (t == tType);
@@ -309,12 +309,12 @@ module DB = struct
           | AppBuiltin (s,l) ->
             app_builtin ~ty s (List.map (recurse ~depth acc) l)
     in
-    recurse ~depth:0 acc t
+    recurse ~depth acc t
 
   (* shift the non-captured De Bruijn indexes in the term by n *)
-  let shift_real n t =
+  let shift_real ?depth n t =
     assert (n >= 0);
-    _fold_map ()
+    _fold_map ?depth ()
       ~on_bvar:(
         fun ~depth () i ->
           if i >= depth
@@ -324,43 +324,53 @@ module DB = struct
       ~on_binder:(fun ~ty:_ ~depth:_ () _ _ -> ())
       t
 
-  let shift n t = if n=0 then t else shift_real n t
+  let shift ?(depth=0) n t = if depth=0 && n=0 then t else shift_real ~depth n t
 
-  let unshift n t =
-    _fold_map ()
+  let unshift_real ?depth n t =
+    _fold_map ?depth ()
       ~on_bvar:(
         fun ~depth () i ->
-          if i >= depth
-          then i - n  (* ushift *)
-          else i
+          if i >= depth+n then (
+            i - n  (* unshift *)
+          ) else i
       )
       ~on_binder:(fun ~ty:_ ~depth:_ () _ _ -> ())
       t
 
-  (* recurse and replace [sub]. *)
-  let rec _replace depth ~sub t =
+  let unshift ?(depth=0) n t =
+    assert (n>=0);
+    if depth=0 && n=0 then t else unshift_real ~depth n t
+
+  (* recurse and replace elements of l. *)
+  let rec _replace depth ~l t =
     match t.ty with
       | NoType ->
         assert (t == tType);
         t
       | HasType ty ->
-        let ty = _replace depth ty ~sub in
+        let ty = _replace depth ty ~l in
         match view t with
-          | _ when equal t sub ->
-            bvar ~ty depth  (* replace *)
+          | _ when List.memq t l ->
+            begin match CCList.find_idx (equal t) l with
+              | None -> assert false
+              | Some (i, _) ->
+                bvar ~ty (depth+List.length l-i-1) (* replace *)
+            end
           | Var v -> var (HVar.cast ~ty v)
           | DB i -> bvar ~ty i
           | Const s -> const ~ty s
           | Bind (s, varty, t') ->
-            let varty' = _replace depth ~sub varty in
-            let t' = _replace (depth+1) t' ~sub in
+            let varty' = _replace depth ~l varty in
+            let t' = _replace (depth+1) t' ~l in
             bind ~ty ~varty:varty' s t'
           | App (f, l) ->
-            app ~ty (_replace depth ~sub f) (List.map (_replace depth ~sub) l)
+            app ~ty (_replace depth ~l f) (List.map (_replace depth ~l) l)
           | AppBuiltin (s,l) ->
-            app_builtin ~ty s (List.map (_replace depth ~sub) l)
+            app_builtin ~ty s (List.map (_replace depth ~l) l)
 
-  let replace t ~sub = _replace 0 t ~sub
+  let replace_l t l = _replace 0 t ~l
+
+  let replace t ~sub = _replace 0 t ~l:[sub]
 
   let from_var t ~var =
     assert (is_var var);

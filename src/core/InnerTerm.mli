@@ -124,16 +124,19 @@ module DB : sig
   val contains : t -> int -> bool
   (** Does t contains the De Bruijn variable of index n? *)
 
-  val shift : int -> t -> t
+  val shift : ?depth:int -> int -> t -> t
   (** shift the non-captured De Bruijn indexes in the term by n *)
 
-  val unshift : int -> t -> t
+  val unshift : ?depth:int -> int -> t -> t
   (** [unshift n t] unshifts the term [t]'s bound variables by [n]. In
       other words it decrements indices of all free De Bruijn variables
       inside by [n]. Variables bound within [t] are left untouched. *)
 
   val replace : t -> sub:t -> t
-  (** [db_from_term t ~sub] replaces [sub] by a fresh De Bruijn index in [t]. *)
+  (** [replace t ~sub] replaces [sub] by a fresh De Bruijn index in [t]. *)
+
+  val replace_l : t -> t list -> t
+  (** N-ary version of {!replace} *)
 
   val from_var : t -> var:t -> t
   (** [db_from_var t ~var] replace [var] by a De Bruijn symbol in t.
@@ -142,12 +145,6 @@ module DB : sig
   val eval : env -> t -> t
   (** Evaluate the term in the given De Bruijn environment, by
       replacing De Bruijn indices by their value in the environment. *)
-
-  val apply_subst : t VarMap.t -> t -> t
-  (** Apply the given simple substitution to variables in [t]; if some
-      variable [v] is bound to [t'], then [t'] can be open and will be
-      shifted as required.
-      Traverses the whole term. *)
 end
 
 (** {3 Iterators} *)

@@ -147,14 +147,14 @@ let fun_ (ty_arg:Type.t) body =
   let ty = Type.arrow [ty_arg] (ty body) in
   T.bind ~ty:(ty :> T.t) ~varty:(ty_arg:>T.t) Binder.Lambda body
 
-let fun_l args body = List.fold_right fun_ args body
+let fun_l ty_args body = List.fold_right fun_ ty_args body
 
 let fun_of_fvars vars body =
   if vars=[] then body
   else (
+    let body = T.DB.replace_l body (List.map var vars) in
     List.fold_right
       (fun v body ->
-         let body = T.DB.from_var body ~var:(var v) in
          fun_ (HVar.ty v) body)
       vars body
   )
@@ -647,6 +647,8 @@ end
 module DB = struct
   let is_closed = T.DB.closed
   let shift = T.DB.shift
+  let eval = T.DB.eval
+  let unshift = T.DB.unshift
 end
 
 let debugf = pp

@@ -348,7 +348,9 @@ end
 (** {2 De Bruijn} *)
 module DB : sig
   val is_closed : t -> bool
-  val shift : int -> t -> t
+  val shift : ?depth:int -> int -> t -> t
+  val unshift : ?depth:int -> int -> t -> t
+  val eval : t DBEnv.t -> t -> t
 end
 
 (** {2 TPTP} *)
