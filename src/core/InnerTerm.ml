@@ -342,35 +342,40 @@ module DB = struct
     if depth=0 && n=0 then t else unshift_real ~depth n t
 
   (* recurse and replace elements of l. *)
-  let rec _replace depth ~l t =
+  let rec _replace depth ~to_replace t =
     match t.ty with
       | NoType ->
         assert (t == tType);
         t
       | HasType ty ->
-        let ty = _replace depth ty ~l in
+        let ty = _replace depth ty ~to_replace in
         match view t with
-          | _ when List.memq t l ->
-            begin match CCList.find_idx (equal t) l with
+          | _ when CCList.exists (equal t) to_replace ->
+            begin match CCList.find_idx (equal t) to_replace with
               | None -> assert false
               | Some (i, _) ->
-                bvar ~ty (depth+List.length l-i-1) (* replace *)
+                bvar ~ty (depth+List.length to_replace-i-1) (* replace *)
             end
           | Var v -> var (HVar.cast ~ty v)
-          | DB i -> bvar ~ty i
+          | DB i ->
+            if i<depth
+            then bvar ~ty i
+            else bvar ~ty (i + List.length to_replace) (* shift *)
           | Const s -> const ~ty s
           | Bind (s, varty, t') ->
-            let varty' = _replace depth ~l varty in
-            let t' = _replace (depth+1) t' ~l in
+            let varty' = _replace depth ~to_replace varty in
+            let t' = _replace (depth+1) t' ~to_replace in
             bind ~ty ~varty:varty' s t'
           | App (f, l) ->
-            app ~ty (_replace depth ~l f) (List.map (_replace depth ~l) l)
+            app ~ty
+              (_replace depth ~to_replace f)
+              (List.map (_replace depth ~to_replace) l)
           | AppBuiltin (s,l) ->
-            app_builtin ~ty s (List.map (_replace depth ~l) l)
+            app_builtin ~ty s (List.map (_replace depth ~to_replace) l)
 
-  let replace_l t l = _replace 0 t ~l
+  let replace_l t ~l = _replace 0 t ~to_replace:l
 
-  let replace t ~sub = _replace 0 t ~l:[sub]
+  let replace t ~sub = _replace 0 t ~to_replace:[sub]
 
   let from_var t ~var =
     assert (is_var var);

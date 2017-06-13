@@ -133,10 +133,12 @@ module DB : sig
       inside by [n]. Variables bound within [t] are left untouched. *)
 
   val replace : t -> sub:t -> t
-  (** [replace t ~sub] replaces [sub] by a fresh De Bruijn index in [t]. *)
+  (** [replace t ~sub] replaces [sub] by a fresh De Bruijn index in [t].
+      Shifts other De Bruijn indices by 1 *)
 
-  val replace_l : t -> t list -> t
-  (** N-ary version of {!replace} *)
+  val replace_l : t -> l:t list -> t
+  (** N-ary version of {!replace}
+      Shifts other De Bruijn indices by [length t] *)
 
   val from_var : t -> var:t -> t
   (** [db_from_var t ~var] replace [var] by a De Bruijn symbol in t.

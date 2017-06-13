@@ -105,7 +105,7 @@ val fun_l : Type.t list -> t -> t
 
 val fun_of_fvars : var list -> t -> t
 (** Build a function from a list of free vars + the body.
-    This performs the De Bruijn transformation. *)
+    This performs the De Bruijn transformation, and shifts the body. *)
 
 val open_fun : offset:int -> t -> var list * t * int
 (** [open_fun ~offset (λxy. F)] returns [[v1,v2], F[v1/x,v2/y], offset+2]

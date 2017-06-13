@@ -152,10 +152,9 @@ let fun_l ty_args body = List.fold_right fun_ ty_args body
 let fun_of_fvars vars body =
   if vars=[] then body
   else (
-    let body = T.DB.replace_l body (List.map var vars) in
+    let body = T.DB.replace_l body ~l:(List.map var vars) in
     List.fold_right
-      (fun v body ->
-         fun_ (HVar.ty v) body)
+      (fun v body -> fun_ (HVar.ty v) body)
       vars body
   )
 

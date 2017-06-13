@@ -280,7 +280,6 @@ let check_snf_correct =
     ~count:10_000 ~long_factor:10
     ~name:"snf_correct"
 
-
 let check_snf_idempotent =
   let gen =
     QCheck.map_keep_input ~print:t_show2
@@ -294,6 +293,20 @@ let check_snf_idempotent =
     ~count:10_000 ~long_factor:10
     ~name:"snf_idempotent"
 
+let check_fun_fvars =
+  let gen = gen_ho in
+  let prop t =
+    if T.DB.is_closed t then (
+      let vars = T.vars t |> T.VarSet.to_list in
+      let t' = T.fun_of_fvars vars t in
+      let t'_app = Lambda.whnf (T.app t' (List.map T.var vars)) in
+      T.equal t t'_app
+    ) else QCheck.assume_fail()
+  in
+  QCheck.Test.make gen prop
+    ~count:10_000 ~long_factor:10
+    ~name:"check_fun_fvars_correct"
+
 let props =
   [ check_size_subterm
   ; check_replace_id
@@ -306,4 +319,5 @@ let props =
   ; check_snf_no_redex
   ; check_snf_idempotent
   ; check_snf_correct
+  ; check_fun_fvars
   ]
