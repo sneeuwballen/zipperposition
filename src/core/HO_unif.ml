@@ -173,7 +173,7 @@ module U = struct
       offset ty_l
 
   (* unify [v args = t], where [t] is rigid *)
-  let unif_rigid ~sc ~subst ~offset v args t : (pair list * Subst.t * int) Sequence.t =
+  let unif_rigid ~sc ~subst ~offset v args t : _ Sequence.t =
     assert (args<>[]);
     (* eta-expand locally *)
     let n, ty_args, ty_ret = Type.open_poly_fun (T.ty t) in
@@ -219,7 +219,7 @@ module U = struct
                T.app (List.nth lhs_args i) f_vars_applied
              in
              let subst = Subst.FO.bind' subst (v,sc) (lambda,sc) in
-             Some ([lhs,rhs],subst,offset)
+             Some ([lhs,rhs],subst,offset,"proj")
            with Unif.Fail ->
              None)
     (* imitate: if [t=f u1…um],
@@ -233,7 +233,7 @@ module U = struct
         (* imitate constant *)
         let lambda = T.fun_of_fvars all_vars rhs in
         let subst = Subst.FO.bind' subst (v,sc) (lambda,sc) in
-        Sequence.return ([], subst, offset)
+        Sequence.return ([], subst, offset,"imitate_b")
       | T.Const _ when not (T.var_occurs ~var:v t) ->
         (* now make fresh variables as arguments of [id]. Each variable
            is parametrized by [all_vars] and returns the type of the k-th arg *)
@@ -259,7 +259,7 @@ module U = struct
           T.app t_mono f_vars_applied
         in
         let subst = Subst.FO.bind' subst (v,sc) (lambda,sc) in
-        Sequence.return ([lhs,rhs], subst, offset)
+        Sequence.return ([lhs,rhs], subst, offset,"imitate")
       | _ ->
         Sequence.empty
     in
@@ -306,10 +306,10 @@ module U = struct
             try
               let fail() = raise Unif.Fail in
               let consume_fuel() = st.fuel <- st.fuel - 1 in
-              let push_new ~penalty ~subst ~offset pairs : unit =
+              let push_new ~penalty ~subst ~offset rule pairs : unit =
                 let pb' = mk_pb ~penalty ~subst ~offset (pairs @ pairs_tl) in
-                Util.debugf ~section 5 "(@[ho_unif.push@ %a@])"
-                  (fun k->k pp_pb pb');
+                Util.debugf ~section 5 "(@[ho_unif.push@ :rule %s@ %a@])"
+                  (fun k->k rule pp_pb pb');
                 Queue.push pb' st.queue
               in
               (* unify types *)
@@ -321,24 +321,24 @@ module U = struct
               let hd2, l2 = T.as_app t2 in
               begin match T.view hd1, T.view hd2 with
                 | _ when T.equal t1 t2 ->
-                  push_new ~penalty ~offset ~subst [] (* trivial *)
+                  push_new "triv" ~penalty ~offset ~subst [] (* trivial *)
                 | T.Const id1, T.Const id2 ->
                   if ID.equal id1 id2 && List.length l1=List.length l2
                   then (
                     (* unify arguments pairwise *)
                     let new_pairs = List.combine l1 l2 in
-                    push_new ~penalty ~offset ~subst new_pairs
+                    push_new "rigid" ~penalty ~offset ~subst new_pairs
                   ) else fail()
                 | T.DB a, T.DB b ->
-                  if a=b then push_new ~penalty ~offset ~subst [] else fail()
+                  if a=b then push_new "db" ~penalty ~offset ~subst [] else fail()
                 | T.Var _, _ when l1=[] ->
                   (* just bind or fail (with occur-check) *)
                   let subst = Unif.FO.unify_syn ~subst (t1,0) (t2,0) in
-                  push_new ~penalty ~offset ~subst []
+                  push_new "bind" ~penalty ~offset ~subst []
                 | _, T.Var _ when l2=[] ->
                   (* just bind or fail (with occur-check) *)
                   let subst = Unif.FO.unify_syn ~subst (t1,0) (t2,0) in
-                  push_new ~penalty ~offset ~subst []
+                  push_new "bind" ~penalty ~offset ~subst []
                 | T.AppBuiltin (b1, l1'), T.AppBuiltin (b2,l2') ->
                   assert (l1=[]);
                   assert (l2=[]);
@@ -346,18 +346,18 @@ module U = struct
                   then (
                     (* unify arguments pairwise *)
                     let new_pairs = List.combine l1 l2 in
-                    push_new ~penalty ~offset ~subst new_pairs
+                    push_new "rigid" ~penalty ~offset ~subst new_pairs
                   ) else fail()
                 | T.Var v, T.Fun _ ->
                   (* eta-expand *)
                   assert (l2=[]); (* whnf *)
                   let pair, offset = unif_lambda ~offset v l1 hd2 in
-                  push_new ~penalty ~subst ~offset [pair]
+                  push_new "bind" ~penalty ~subst ~offset [pair]
                 | T.Fun _, T.Var v ->
                   (* eta-expand *)
                   assert (l1=[]); (* whnf *)
                   let pair, offset = unif_lambda ~offset v l2 hd1 in
-                  push_new ~penalty ~subst ~offset [pair]
+                  push_new "bind" ~penalty ~subst ~offset [pair]
                 | T.Fun _, T.Fun _ ->
                   (* eta-expand and unify bodies: to unify [λx.t = λx.u]
                      just unify [t=u] *)
@@ -369,21 +369,21 @@ module U = struct
                   let offset, vars = mk_fresh_vars offset ty_args in
                   let vars = List.map T.var vars in
                   let pair = T.app hd1 vars, T.app hd2 vars in
-                  push_new ~penalty ~subst ~offset [pair]
+                  push_new "eta" ~penalty ~subst ~offset [pair]
                 | T.Var v, _ ->
                   (* project/imitate *)
                   assert (l1<>[]);
                   consume_fuel();
                   unif_rigid ~sc ~subst ~offset v l1 t2
-                    (fun (pairs,subst,offset) ->
-                       push_new ~penalty ~subst ~offset pairs);
+                    (fun (pairs,subst,offset,rule) ->
+                       push_new rule ~penalty ~subst ~offset pairs);
                 | _, T.Var v ->
                   (* project/imitate *)
                   assert (l2<>[]);
                   consume_fuel();
                   unif_rigid ~sc ~subst ~offset v l2 t1
-                    (fun (pairs,subst,offset) ->
-                       push_new ~penalty ~subst ~offset pairs);
+                    (fun (pairs,subst,offset,rule) ->
+                       push_new rule ~penalty ~subst ~offset pairs);
                 | T.App _, _ | _, T.App _ -> assert false (* heads *)
                 | T.Const _, _
                 | T.Fun _, _
