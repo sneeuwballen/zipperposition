@@ -176,7 +176,8 @@ let gen_ho =
   ) else a
 
 let t_show t = CCFormat.sprintf "`@[%a@]`" T.pp t
-let t_show2 (t,u) = CCFormat.sprintf "(@[`@[%a@]`,@ ref: `@[%a@]`@])" T.pp t T.pp u
+let t_show2_p pp (t,u) = CCFormat.sprintf "(@[`@[%a@]`,@ ref: `@[%a@]`@])" pp t T.pp u
+let t_show2 = t_show2_p T.pp
 
 let check_whnf_closed =
   let gen = gen_ho in
@@ -294,13 +295,27 @@ let check_snf_idempotent =
     ~name:"snf_idempotent"
 
 let check_fun_fvars =
-  let gen = gen_ho in
-  let prop t =
+  let gen =
+    QCheck.map_keep_input
+      ~print:(t_show2_p CCFormat.Dump.(result (pair T.pp T.pp)))
+      (fun t ->
+         let vars = T.vars t |> T.VarSet.to_list in
+         (* check that [(fun x. t[x]) x ==_β t] *)
+         let t' =
+           try
+             let t' = T.app (T.fun_of_fvars vars t) (List.map T.var vars) in
+             CCResult.return (t', Lambda.snf t')
+           with e -> CCResult.of_exn_trace e
+         in
+         t', Lambda.snf t)
+      gen_ho
+  in
+  let prop (t,(t1_opt,t2)) =
     if T.DB.is_closed t then (
-      let vars = T.vars t |> T.VarSet.to_list in
-      let t' = T.fun_of_fvars vars t in
-      let t'_app = Lambda.whnf (T.app t' (List.map T.var vars)) in
-      T.equal t t'_app
+      begin match t1_opt with
+        | CCResult.Error _ -> false
+        | CCResult.Ok (_,t1) -> T.equal t1 t2
+      end
     ) else QCheck.assume_fail()
   in
   QCheck.Test.make gen prop
