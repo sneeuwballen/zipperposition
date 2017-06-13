@@ -175,9 +175,9 @@ let gen_ho =
     |> QCheck.add_stat ("size", T.size)
   ) else a
 
-let t_show t = CCFormat.sprintf "`@[%a@]`" T.pp t
-let t_show2_p pp (t,u) = CCFormat.sprintf "(@[`@[%a@]`,@ ref: `@[%a@]`@])" pp t T.pp u
-let t_show2 = t_show2_p T.pp
+let t_show t = CCFormat.sprintf "`@[%a@]`" T.ZF.pp t
+let t_show2_p pp (t,u) = CCFormat.sprintf "(@[`@[%a@]`,@ ref: `@[%a@]`@])" pp t T.ZF.pp u
+let t_show2 = t_show2_p T.ZF.pp
 
 let check_whnf_closed =
   let gen = gen_ho in
@@ -189,6 +189,18 @@ let check_whnf_closed =
     ~count:10_000 ~long_factor:10
     ~name:"whnf_preserve_closed"
 
+let check_whnf_non_redex_preserved =
+  let gen = gen_ho in
+  let prop t = match T.as_app t with
+    | f, _::_ when is_fun f -> QCheck.assume_fail()
+    | _ ->
+      let t' = Lambda.whnf t in
+      T.equal t t'
+  in
+  QCheck.Test.make gen prop
+    ~count:10_000 ~long_factor:10
+    ~name:"whnf_non_redex_is_preserved"
+
 let check_whnf_correct =
   (* reference implementation *)
   let rec whnf_naive (t:T.t): T.t = match T.view t with
@@ -197,7 +209,7 @@ let check_whnf_correct =
     | T.App (f, l) ->
       begin match T.view f, l with
         | _, [] -> assert false
-        | T.Fun (_, bod), a :: tail -> 
+        | T.Fun (_, bod), a :: tail ->
           (* evaluate β-redex, unshift *)
           let bod = T.DB.eval (DBEnv.push DBEnv.empty a) bod |> T.DB.unshift 1 in
           whnf_naive (T.app bod tail)
@@ -246,30 +258,49 @@ let check_snf_no_redex =
     ~count:10_000 ~long_factor:10
     ~name:"snf_no_remaining_redex"
 
-let check_snf_correct =
-  (* reference implementation *)
+(* reference implementation of SNF *)
+module SNF = struct
+  let eval_and_unshift ~by t =
+    let rec aux depth t = match T.view t with
+      | T.Var _ | T.Const _ -> t
+      | T.DB i when i = depth -> by
+      | T.DB i when i < depth -> t
+      | T.DB i -> T.bvar ~ty:(T.ty t) (i-1)
+      | T.App (f, l) ->
+        T.app (aux depth f) (List.map (aux depth) l)
+      | T.AppBuiltin (b, l) ->
+        T.app_builtin ~ty b (List.map (aux depth) l)
+      | T.Fun (tyarg, body) ->
+        T.fun_ tyarg (aux (depth+1) body)
+    in
+    aux 0 t
+
   let rec snf_naive (t:T.t): T.t = match T.view t with
     | T.Var _ | T.DB _ | T.Const _ -> t
     | T.Fun (ty_var, bod) ->
       let bod = snf_naive bod in
       T.fun_ ty_var bod
     | T.AppBuiltin (b,l) ->
-      T.app_builtin ~ty:(T.ty t) b (List.map snf_naive l) 
+      T.app_builtin ~ty:(T.ty t) b (List.map snf_naive l)
     | T.App (f, l) ->
       let f = snf_naive f in
       let l = List.map snf_naive l in
       begin match T.view f, l with
         | _, [] -> assert false
-        | T.Fun (_, bod), a :: tail -> 
-          (* evaluate β-redex *)
-          let bod = T.DB.eval (DBEnv.push DBEnv.empty a) bod in
+        | T.Fun (ty_var, bod), a :: tail ->
+          assert (Type.equal (T.ty a) ty_var);
+          (* evaluate β-redex: remove binder and replace DB0 by [a] *)
+          let bod = eval_and_unshift ~by:a bod in
           snf_naive (T.app bod tail)
         | _ -> T.app f l
       end
-  in
+
+end
+
+let check_snf_correct =
   let gen =
     QCheck.map_keep_input ~print:t_show2
-      (fun t -> Lambda.snf t, snf_naive t)
+      (fun t -> Lambda.snf t, SNF.snf_naive t)
       gen_ho
   in
   let prop (t,(t1,t2)) =
@@ -297,20 +328,28 @@ let check_snf_idempotent =
 let check_fun_fvars =
   let gen =
     QCheck.map_keep_input
-      ~print:(t_show2_p CCFormat.Dump.(result (pair T.pp T.pp)))
+      ~print:(t_show2_p CCFormat.Dump.(result (pair T.ZF.pp T.ZF.pp)))
       (fun t ->
-         let vars = T.vars t |> T.VarSet.to_list in
+         ignore (T.rebuild_rec t);
+         (* quantify on non-ty variables *)
+         let vars =
+           T.vars t
+           |> T.VarSet.filter (fun v -> not (Type.is_tType (HVar.ty v)))
+           |> T.VarSet.to_list
+         in
          (* check that [(fun x. t[x]) x ==_β t] *)
          let t' =
            try
              let t' = T.app (T.fun_of_fvars vars t) (List.map T.var vars) in
-             CCResult.return (t', Lambda.snf t')
+             ignore (T.rebuild_rec t');
+             CCResult.return (t', SNF.snf_naive t')
            with e -> CCResult.of_exn_trace e
          in
          t', Lambda.snf t)
       gen_ho
   in
   let prop (t,(t1_opt,t2)) =
+    ignore (T.rebuild_rec t);
     if T.DB.is_closed t then (
       begin match t1_opt with
         | CCResult.Error _ -> false
@@ -330,6 +369,7 @@ let props =
   ; check_min_max_vars
   ; check_whnf_closed
   ; check_whnf_correct
+  ; check_whnf_non_redex_preserved
   ; check_snf_closed
   ; check_snf_no_redex
   ; check_snf_idempotent
