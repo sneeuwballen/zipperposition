@@ -796,3 +796,13 @@ module Conv = struct
     in
     to_simple_term env t
 end
+
+let rec rebuild_rec t =
+  let ty = ty t in
+  match view t with
+    | Var v -> var (HVar.cast ~ty v)
+    | DB i -> bvar ~ty i
+    | Const id -> const ~ty id
+    | App (f, l) -> app (rebuild_rec f) (List.map rebuild_rec l)
+    | AppBuiltin (b,l) -> app_builtin ~ty b (List.map rebuild_rec l)
+    | Fun (ty,bod) -> fun_ ty bod

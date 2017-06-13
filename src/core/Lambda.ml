@@ -63,34 +63,28 @@ let rec whnf_rec st =
       whnf_rec st'
   end
 
-let whnf_term t =
-  let st = st_of_term ~env:DBEnv.empty t in
+let whnf_term ?(env=DBEnv.empty) t =
+  let st = st_of_term ~env t in
   let st = whnf_rec st in
   term_of_st st
 
-let rec snf_rec ~env t =
+let rec snf_rec t =
+  let t = whnf_term t in
   let ty = T.ty t in
   begin match T.view t with
     | T.App (f, l) ->
-      let f' = snf_rec ~env f in
-      let l' = List.map (snf_rec ~env) l in
-      let t' = if T.equal f f' && T.same_l l l' then t else T.app f' l' in
-      begin match T.view f' with
-        | T.Fun _ ->
-          let t' = whnf_term t' in
-          (* beta reduce *)
-          assert (not (T.equal t t'));
-          assert (l<>[]);
-          snf_rec ~env t'
-        | _ -> t'
-      end
+      let f' = snf_rec f in
+      if not (T.equal f f') then snf_rec (T.app f' l)
+      else (
+        let l' = List.map snf_rec l in
+        if T.equal f f' && T.same_l l l' then t else T.app f' l'
+      )
     | T.AppBuiltin (b, l) ->
-      let l' = List.map (snf_rec ~env) l in
+      let l' = List.map snf_rec l in
       if T.same_l l l' then t else T.app_builtin ~ty b l'
     | T.Var _ | T.Const _ | T.DB _ -> t
     | T.Fun (ty_arg, body) ->
-      let env = DBEnv.push_none env in
-      let body' = snf_rec ~env body in
+      let body' = snf_rec body in
       if T.equal body body' then t else T.fun_ ty_arg body'
   end
 
@@ -111,6 +105,6 @@ let whnf_list t args =
 
 let snf t =
   Util.enter_prof prof_snf;
-  let t' = snf_rec ~env:DBEnv.empty t in
+  let t' = snf_rec t in
   Util.exit_prof prof_snf;
   t'

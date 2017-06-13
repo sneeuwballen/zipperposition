@@ -353,7 +353,8 @@ module DB = struct
           | _ when CCList.exists (equal t) to_replace ->
             begin match CCList.find_idx (equal t) to_replace with
               | None -> assert false
-              | Some (i, _) ->
+              | Some (i, t') ->
+                assert (equal t t');
                 bvar ~ty (depth+List.length to_replace-i-1) (* replace *)
             end
           | Var v -> var (HVar.cast ~ty v)
