@@ -10,6 +10,7 @@ module W = Precedence.Weight
 
 open Comparison
 
+let prof_lfhorpo = Util.mk_profiler "compare_lfhorpo"
 let prof_rpo6 = Util.mk_profiler "compare_rpo6"
 let prof_kbo = Util.mk_profiler "compare_kbo"
 
@@ -331,12 +332,105 @@ module KBO : ORD = struct
     compare
 end
 
+(** Blanchette's lambda-free higher-order RPO *)
+module LFHORPO : ORD = struct
+  let name = "lfhorpo"
+  
+  (** recursive path ordering *)
+  let rec lfhorpo ~prec s t =
+    if T.equal s t then Eq else  (* equality test is cheap *)
+      match T.view s, T.view t with
+        | T.Var _, T.Var _ -> Incomparable
+        | _, T.Var var -> if T.var_occurs ~var s then Gt else Incomparable
+        | T.Var var, _ -> if T.var_occurs ~var t then Lt else Incomparable
+        | T.DB i, T.DB j ->
+          if i = j && Type.equal (T.ty s) (T.ty t) then Eq else Incomparable
+        | T.App (f,ss), T.App (g, ts) -> lfhorpo_composite ~prec s t f g ss ts  
+        | T.Const f, T.App (g, ts) ->    lfhorpo_composite ~prec s t s g [] ts    
+        | T.App (f,ss), T.Const g->      lfhorpo_composite ~prec s t f t ss []  
+        | T.Const f, T.Const g ->        lfhorpo_composite ~prec s t s t [] []  
+        (* TODO: AppBuiltin *)
+        | _ -> Incomparable
+  (* handle the composite cases *)
+  and lfhorpo_composite ~prec s t f g ss ts =
+    begin match T.view f, T.view g with
+      | T.Const fid, T.Const gid -> 
+        begin match prec_compare prec (IOB.I fid) (IOB.I gid) with
+          | 0 ->
+            cLMA ~prec s t ss ts  (* lexicographic subterm comparison *)
+            (* TODO: add multiset order *)            
+          | n when n > 0 -> cMA ~prec s ts
+          | n when n < 0 -> Comparison.opp (cMA ~prec t ss)
+          | _ -> assert false  (* match exhaustively *)
+        end
+      | T.Const fid, T.Var y ->
+        cAA ~prec s t ss ts
+      | T.Var x, T.Const g ->
+        cAA ~prec s t ss ts
+      | T.Var x, T.Var y ->
+        if x = y 
+        then cLMA ~prec s t ss ts  (* TODO: add multiset order *)  
+        else cAA ~prec s t ss ts
+      | _ -> Incomparable
+    end
+    
+  (** try to dominate all the terms in ts by s; but by subterm property
+      if some t' in ts is >= s then s < t=g(ts) *)
+  and cMA ~prec s ts = match ts with
+    | [] -> Gt
+    | t::ts' ->
+      (match lfhorpo ~prec s t with
+        | Gt -> cMA ~prec s ts'
+        | Eq | Lt -> Lt
+        | Incomparable -> Comparison.opp (alpha ~prec ts' s))
+  (** lexicographic comparison of s=f(ss), and t=f(ts) *)
+  and cLMA ~prec s t ss ts = match ss, ts with
+    | si::ss', ti::ts' ->
+      begin match lfhorpo ~prec si ti with
+        | Eq -> cLMA ~prec s t ss' ts'
+        | Gt -> cMA ~prec s ts' (* just need s to dominate the remaining elements *)
+        | Lt -> Comparison.opp (cMA ~prec t ss')
+        | Incomparable -> cAA ~prec s t ss' ts'
+      end
+    | [], [] -> Eq
+
+    (* below are rules for extending to HO terms, likely
+       incomplete and dangerous!
+       TODO: instead compare types, which MUST be distinct in
+       this case since the head symbol is the same *)
+    | [], _::_ -> Lt
+    | _::_, [] -> Gt
+  (** multiset comparison of subterms (not optimized) *)
+  and cMultiset ~prec ss ts =
+    MT.compare_partial_l (lfhorpo ~prec) ss ts
+  (** bidirectional comparison by subterm property (bidirectional alpha) *)
+  and cAA ~prec s t ss ts =
+    match alpha ~prec ss t with
+      | Gt -> Gt
+      | Incomparable -> Comparison.opp (alpha ~prec ts s)
+      | _ -> assert false
+  (** if some s in ss is >= t, then s > t by subterm property and transitivity *)
+  and alpha ~prec ss t = match ss with
+    | [] -> Incomparable
+    | s::ss' ->
+      (match lfhorpo ~prec s t with
+        | Eq | Gt -> Gt
+        | Incomparable | Lt -> alpha ~prec ss' t)
+
+  let compare_terms ~prec x y =
+    Util.enter_prof prof_lfhorpo;
+    let compare = lfhorpo ~prec x y in
+    Util.exit_prof prof_lfhorpo;
+    compare
+end
+
+
 (** hopefully more efficient (polynomial) implementation of LPO,
     following the paper "things to know when implementing LPO" by Löchner.
     We adapt here the implementation clpo6 with some multiset symbols (=) *)
 module RPO6 : ORD = struct
   let name = "rpo6"
-
+  
   (** recursive path ordering *)
   let rec rpo6 ~prec s t =
     if T.equal s t then Eq else  (* equality test is cheap *)
@@ -429,6 +523,13 @@ let kbo prec =
   in
   { cache; compare; name=KBO.name; prec; }
 
+let lfhorpo prec =
+  let cache = mk_cache 256 in
+  let compare prec a b = CCCache.with_cache cache
+      (fun (a, b) -> LFHORPO.compare_terms ~prec a b) (a,b)
+  in
+  { cache; compare; name=LFHORPO.name; prec; }
+  
 let rpo6 prec =
   let cache = mk_cache 256 in
   let compare prec a b = CCCache.with_cache cache
