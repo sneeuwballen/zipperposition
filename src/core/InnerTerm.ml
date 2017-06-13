@@ -639,6 +639,12 @@ let needs_args (t:t): bool = match view t with
 
 let show_type_arguments = ref false
 
+let rec open_bind b t = match view t with
+  | Bind (b', ty, t') when b=b' ->
+    let args, ret = open_bind b t' in
+    ty :: args, ret
+  | _ -> [], t
+
 let rec pp_depth ?(hooks=[]) depth out t =
   let rec _pp depth out t =
     if List.exists (fun h -> h depth (_pp depth) out t) hooks
@@ -650,9 +656,17 @@ let rec pp_depth ?(hooks=[]) depth out t =
     | Var v -> pp_var out v
     | DB i -> Format.fprintf out "Y%d" (depth-i-1)
     | Const s -> ID.pp out s
-    | Bind (b, varty, t') ->
-      Format.fprintf out "@[<1>%a@ Y%d:@[%a@].@ %a@]" Binder.pp b depth
-        (_pp depth) varty (_pp_surrounded (depth+1)) t'
+    | Bind (b, _, _) ->
+      (* unfold *)
+      let varty_l, t' = open_bind b t in
+      let pp_tyvar out (i,varty) =
+        Format.fprintf out "(@[Y%d:@[%a@])@]" (depth+i) (_pp depth) varty
+      in
+      Format.fprintf out "@[<1>%a@ @[%a@].@ %a@]"
+        Binder.pp b
+        (Util.pp_seq ~sep:" " pp_tyvar)
+        (Sequence.of_array_i (Array.of_list varty_l))
+        (_pp_surrounded (depth+List.length varty_l)) t'
     | AppBuiltin (b, ([_;a] | [a])) when Builtin.is_prefix b ->
       Format.fprintf out "@[<1>%a %a@]" Builtin.pp b (_pp depth) a
     | AppBuiltin (b, ([_;t1;t2] | [t1;t2])) when Builtin.is_infix b ->
