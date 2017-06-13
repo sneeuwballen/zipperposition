@@ -7,11 +7,11 @@ module Fmt = CCFormat
 
 (** {2 Time facilities} *)
 
-let start_ = Mtime_clock.elapsed_ns()
+let start_ = Oclock.gettime Oclock.monotonic
 
 let ns_to_s t = Int64.to_float t /. 1_000_000_000.
 
-let total_time_ns () = Int64.sub (Mtime_clock.elapsed_ns()) start_
+let total_time_ns () = Int64.sub (Oclock.gettime Oclock.monotonic) start_
 let total_time_s () = ns_to_s (total_time_ns ())
 let start_time () = start_
 
@@ -235,11 +235,11 @@ let mk_profiler name =
 
 let enter_prof profiler =
   if !enable_profiling
-  then profiler.prof_enter <- Mtime_clock.elapsed_ns()
+  then profiler.prof_enter <- Oclock.gettime Oclock.monotonic
 
 let exit_prof profiler =
   if !enable_profiling then (
-    let stop = Mtime_clock.elapsed_ns() in
+    let stop = Oclock.gettime Oclock.monotonic in
     let delta = Int64.sub stop profiler.prof_enter in
     profiler.prof_total <- Int64.add profiler.prof_total delta;
     profiler.prof_calls <- profiler.prof_calls + 1;

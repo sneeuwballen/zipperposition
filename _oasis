@@ -80,7 +80,7 @@ Library "logtk"
   CSources:         util_stubs.c, util_stubs.h
   CCOpt:            -Wextra -Wno-unused-parameter
   BuildDepends:     zarith, unix, sequence, containers,
-                    containers.data, bytes, mtime.clock.os
+                    containers.data, bytes, oclock
 
 Library "logtk_parsers"
   Path:             src/parsers
