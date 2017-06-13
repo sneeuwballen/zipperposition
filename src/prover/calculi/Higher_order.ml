@@ -241,11 +241,9 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* rule for primitive enumeration of predicates [P t1…tn]
      (using ¬ and ∧ and =) *)
   let prim_enum (c:C.t) : C.t list =
-    (*let eligible = C.Eligible.(max c) in*)
-    let eligible = C.Eligible.(param c ++ res c) in
     (* set of variables to refine (only those occurring in "interesting" lits) *)
     let vars =
-      Literals.fold_lits ~eligible (C.lits c)
+      Literals.fold_lits ~eligible:C.Eligible.always (C.lits c)
       |> Sequence.map fst
       |> Sequence.flat_map Literal.Seq.terms
       |> Sequence.flat_map T.Seq.subterms
