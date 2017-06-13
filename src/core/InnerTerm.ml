@@ -716,15 +716,15 @@ let rec pp_zf out t =
     | Bind (b, varty, t') ->
       Format.fprintf out "@[<1>%a@ (Y%d:@[%a@]).@ %a@]" Binder.ZF.pp b depth
         (pp_ depth) varty (_pp_surrounded (depth+1)) t'
-    | AppBuiltin (b, ([_;a] | [a])) when Builtin.is_prefix b ->
-      Format.fprintf out "@[<1>%a %a@]" Builtin.ZF.pp b (pp_ depth) a
-    | AppBuiltin (b, ([_;t1;t2] | [t1;t2])) when Builtin.is_infix b ->
-      Format.fprintf out "(@[<1>%a@ %a@ %a@])" (pp_ depth) t1 Builtin.ZF.pp b (pp_ depth) t2
     | AppBuiltin (Builtin.Arrow, ([] | [_])) -> assert false
     | AppBuiltin (Builtin.Arrow, ret::args) ->
       Format.fprintf out "@[%a@ -> %a@]"
         (Util.pp_list ~sep:" -> " (_pp_surrounded depth)) args
         (_pp_surrounded depth) ret
+    | AppBuiltin (b, ([_;a] | [a])) when Builtin.is_prefix b ->
+      Format.fprintf out "@[<1>%a %a@]" Builtin.ZF.pp b (pp_ depth) a
+    | AppBuiltin (b, ([_;t1;t2] | [t1;t2])) when Builtin.is_infix b ->
+      Format.fprintf out "(@[<1>%a@ %a@ %a@])" (pp_ depth) t1 Builtin.ZF.pp b (pp_ depth) t2
     | AppBuiltin (b, []) -> Builtin.ZF.pp out b
     | AppBuiltin (b, l) ->
       Format.fprintf out "@[%a(%a)@]" Builtin.ZF.pp b (Util.pp_list (pp_ depth)) l
