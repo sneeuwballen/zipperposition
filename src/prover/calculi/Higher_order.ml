@@ -340,7 +340,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         |> Array.to_list
         |> CCList.partition_map
           (function
-            | Literal.HO_constraint (t,u) -> `Left (t,u)
+            | Literal.Equation (t,u, false) as lit
+              when Literal.is_ho_constraint lit -> `Left (t,u)
             | lit -> `Right lit)
       in
       assert (pairs <> []);

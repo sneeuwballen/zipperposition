@@ -847,7 +847,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
              not (var_in_subst_ !us v 0)
            in
            if BV.get bv i then match lit with
-             | Lit.HO_constraint (l, r)
              | Lit.Equation (l, r, false) ->
                begin match T.view l, T.view r with
                  | T.Var v, _ when can_destr_eq_var v ->

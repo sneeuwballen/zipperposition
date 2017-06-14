@@ -568,7 +568,7 @@ let pseudo_rule_of_rule (r:rule): pseudo_rule = match r with
             id, args, rhs
           | _ -> fail()
         end
-      | Literal.True | Literal.False | Literal.HO_constraint _
+      | Literal.True | Literal.False
       | Literal.Equation _ | Literal.Int _ | Literal.Rat _ -> fail()
     end
 
