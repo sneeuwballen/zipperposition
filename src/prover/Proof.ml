@@ -621,7 +621,7 @@ module S = struct
         in
         let label =
           if s=[] && infos=[] then Rule.name r
-          else _to_str_escape "@[<v>%s%a%a@]"
+          else _to_str_escape "@[<v>%s%a%a@]@."
               (Rule.name r) (Util.pp_list ~sep:"" pp_subst) s Step.pp_infos infos
         in
         [`Label label; `Other ("dir", "back")])
