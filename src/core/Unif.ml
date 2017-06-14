@@ -179,7 +179,8 @@ module Inner = struct
     let view1 = T.view t1 and view2 = T.view t2 in
     (* delay pair, assuming it's closed *)
     let delay() =
-      if T.DB.closed t1 && T.DB.closed t2
+      if T.equal t1 t2 then subst (* trivial *)
+      else if T.DB.closed t1 && T.DB.closed t2
       then US.add_constr (Unif_constr.make (t1,sc1)(t2,sc2)) subst
       else raise Fail
     in

@@ -41,3 +41,7 @@ let compare c1 c2: int =
   <?> (CCOrd.int, c1.sc2, c2.sc2)
 
 let to_string = CCFormat.to_string pp
+
+module FO = struct
+  let make (t1,sc1) (t2,sc2) = make ((t1:Term.t:>T.t),sc1) ((t2:Term.t:>T.t),sc2)
+end
