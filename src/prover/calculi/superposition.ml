@@ -612,8 +612,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
              assert (C.is_unit_clause unit_clause);
              if (not (Lazy.force restrict) || not (S.is_renaming subst))
              && C.trail_subsumes unit_clause c
-             && (C.is_oriented_rule unit_clause ||
-                 O.compare ord
+             && (O.compare ord
                    (S.FO.apply_no_renaming subst (l,1))
                    (S.FO.apply_no_renaming subst (r,1)) = Comp.Gt)
              (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
@@ -623,9 +622,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                  (fun k->k T.pp t T.pp l T.pp r S.pp subst);
                (* sanity checks *)
                assert (Type.equal (T.ty l) (T.ty r));
-               assert (
-                 T.equal r T.true_ || (* e.g. [p(λx.a)] not compable with true *)
-                 O.compare ord
+               assert (O.compare ord
                    (S.FO.apply_no_renaming subst (l,1))
                    (S.FO.apply_no_renaming subst (r,1)) = Comp.Gt);
                clauses := (unit_clause,subst) :: !clauses;
