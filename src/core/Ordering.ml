@@ -361,43 +361,29 @@ module LFHORPO : ORD = struct
         | T.Var _, T.Var _ -> Incomparable
         | _, T.Var var -> if T.var_occurs ~var s then Gt else Incomparable
         | T.Var var, _ -> if T.var_occurs ~var t then Lt else Incomparable
-        | T.DB i, T.DB j -> Incomparable
-        | T.App (f,ss), T.App (g, ts) -> 
-          begin match T.view f, T.view g with
-            | T.Const fid, T.Const gid ->  lfhorpo_composite ~prec s t (IOB.I fid) (IOB.I gid) ss ts
-            | T.Const fid, T.Var y ->      lfhorpo_composite ~prec s t (IOB.I fid) (IOB.V y)   ss ts
-            | T.Var x, T.Const gid ->      lfhorpo_composite ~prec s t (IOB.V x)   (IOB.I gid) ss ts
-            | T.Var x, T.Var y ->          lfhorpo_composite ~prec s t (IOB.V x)   (IOB.V y)   ss ts
-            | _, _ -> Incomparable
-          end
-        | T.Const fid, T.App (g, ts) ->   
-          begin match T.view g with
-            | T.Const gid -> lfhorpo_composite ~prec s t (IOB.I fid) (IOB.I gid) [] ts
-            | T.Var y ->     lfhorpo_composite ~prec s t (IOB.I fid) (IOB.V y)   [] ts
+        | T.DB _, T.DB _ -> Incomparable
+        | _ -> 
+          begin match term_to_iob s, term_to_iob t with
+            | Some iob1, Some iob2 -> lfhorpo_composite ~prec s t iob1 iob2 (term_to_args s) (term_to_args t)
             | _ -> Incomparable
           end
-        | T.AppBuiltin (fid, ss), T.App (g, ts) ->   
-          begin match T.view g with
-            | T.Const gid -> lfhorpo_composite ~prec s t (IOB.B fid) (IOB.I gid) ss ts
-            | T.Var y ->     lfhorpo_composite ~prec s t (IOB.B fid) (IOB.V y)   ss ts
-            | _ -> Incomparable
-          end
-        | T.App (f,ss), T.Const gid ->      
-          begin match T.view f with
-            | T.Const fid -> lfhorpo_composite ~prec s t (IOB.I fid) (IOB.I gid) ss []
-            | T.Var x ->     lfhorpo_composite ~prec s t (IOB.V x)   (IOB.I gid) ss []
-            | _ -> Incomparable
-          end        
-        | T.App (f,ss), T.AppBuiltin (gid, ts) ->      
-          begin match T.view f with
-            | T.Const fid -> lfhorpo_composite ~prec s t (IOB.I fid) (IOB.B gid) ss ts
-            | T.Var x ->     lfhorpo_composite ~prec s t (IOB.V x)   (IOB.B gid) ss ts
-            | _ -> Incomparable
-          end
-        | T.AppBuiltin (fid, ss), T.Const gid  -> lfhorpo_composite ~prec s t (IOB.B fid) (IOB.I gid) ss []
-        | T.Const fid, T.AppBuiltin (gid, ts)  -> lfhorpo_composite ~prec s t (IOB.I fid) (IOB.B gid) [] ts
-        | T.Const fid, T.Const gid             -> lfhorpo_composite ~prec s t (IOB.I fid) (IOB.I gid) [] []
-        | _ -> Incomparable
+  and term_to_iob s = 
+    match T.view s with
+      | T.App (f,_) ->      
+        begin match T.view f with
+          | T.Const fid -> Some (IOB.I fid)
+          | T.Var x ->     Some (IOB.V x)
+          | _ -> None
+        end
+      | T.AppBuiltin (fid,_) -> Some (IOB.B fid)
+      | T.Const fid -> Some (IOB.I fid)
+      | T.Var x ->     Some (IOB.V x)
+      | _ -> None
+  and term_to_args s = 
+    match T.view s with
+      | T.App (_,ss) -> ss
+      | T.AppBuiltin (_,ss) -> ss
+      | _ -> []
   (* handle the composite cases *)
   and lfhorpo_composite ~prec s t f g ss ts =
     begin match prec_compare prec f g  with
