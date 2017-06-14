@@ -138,6 +138,7 @@ let props =
          check_ordering_swap_args o;
          check_ordering_subterm o;
        ])
-    [ O.kbo (Precedence.default []);
+    [ O.lfhorpo (Precedence.default []);
+      O.kbo (Precedence.default []);
       O.rpo6 (Precedence.default []);
     ]

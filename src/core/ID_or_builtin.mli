@@ -3,12 +3,13 @@
 
 (** {1 ID or Builtin} *)
 
+type var = Type.t HVar.t
+
 type t =
   | I of ID.t
   | B of Builtin.t
+  | V of var
 
-include Interfaces.EQ with type t := t
-include Interfaces.ORD with type t := t
 include Interfaces.PRINT with type t := t
 
 module Map : CCMap.S with type key = t

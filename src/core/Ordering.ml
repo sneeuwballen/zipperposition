@@ -68,16 +68,32 @@ end
 (** {2 Ordering implementations} *)
 
 (* compare the two symbols (ID or builtin) using the precedence *)
-let prec_compare prec a b = match a, b with
-  | IOB.I a, IOB.I b -> Prec.compare prec a b
-  | IOB.I _, IOB.B _ -> 1
-  | IOB.B _, IOB.I _ -> -1
-  | IOB.B a, IOB.B b -> Builtin.compare a b
+let prec_compare prec a b = match a,b with
+  | IOB.I a, IOB.I b -> 
+    begin match Prec.compare prec a b with
+      | 0 -> Eq     
+      | n when n > 0 -> Gt
+      | n when n < 0 -> Lt
+      | _ -> assert false  (* match exhaustively *)
+    end
+  | IOB.B a, IOB.B b -> 
+    begin match Builtin.compare a b  with
+      | 0 -> Eq     
+      | n when n > 0 -> Gt
+      | n when n < 0 -> Lt
+      | _ -> assert false  (* match exhaustively *)
+    end
+  | IOB.I _, IOB.B _ -> Gt (* id > builtin *)
+  | IOB.B _, IOB.I _ -> Lt
+  | IOB.V x, IOB.V y -> if x=y then Eq else Incomparable
+  | IOB.V _, _ -> Incomparable
+  | _, IOB.V _ -> Incomparable
 
 let prec_status prec = function
   | IOB.I s -> Prec.status prec s
   | IOB.B Builtin.Eq -> Prec.Multiset
   | IOB.B _ -> Prec.Lexicographic
+  | IOB.V _ -> Prec.Lexicographic (* TODO: Not a good default *)
 
 module KBO : ORD = struct
   let name = "kbo"
@@ -141,6 +157,7 @@ module KBO : ORD = struct
   let weight prec = function
     | IOB.B _ -> W.int 1
     | IOB.I s -> Prec.weight prec s
+    | IOB.V _ -> W.int 1  (* TODO: Maybe not a good value *)
 
   (* TODO: ghc() that maps (in theory) variables to sets of symbols
      their instances can have as head (for a symbol [f] it's just [{f}] itself).
@@ -293,17 +310,18 @@ module KBO : ORD = struct
       if W.sign wb'' > 0 then wb'', g_or_n
       else if W.sign wb'' < 0 then wb'', l_or_n
       else match prec_compare prec f g with
-        | n when n > 0 -> wb'', g_or_n
-        | n when n < 0 ->  wb'', l_or_n
-        | _ ->
+        | Gt -> wb'', g_or_n
+        | Lt ->  wb'', l_or_n
+        | Eq ->
           assert (List.length ss = List.length ts);
           if res = Eq then wb'', Eq
           else if res = Lt then wb'', l_or_n
           else if res = Gt then wb'', g_or_n
           else wb'', Incomparable
+        | Incomparable -> assert false (* no variables here *)
     (** recursive comparison *)
     and tckbo_rec wb f g ss ts =
-      if IOB.equal f g
+      if prec_compare prec f g = Eq
       then match prec_status prec f with
         | Prec.Multiset ->
           (* use multiset or lexicographic comparison *)
@@ -343,37 +361,53 @@ module LFHORPO : ORD = struct
         | T.Var _, T.Var _ -> Incomparable
         | _, T.Var var -> if T.var_occurs ~var s then Gt else Incomparable
         | T.Var var, _ -> if T.var_occurs ~var t then Lt else Incomparable
-        | T.DB i, T.DB j ->
-          if i = j && Type.equal (T.ty s) (T.ty t) then Eq else Incomparable
-        | T.App (f,ss), T.App (g, ts) -> lfhorpo_composite ~prec s t f g ss ts  
-        | T.Const f, T.App (g, ts) ->    lfhorpo_composite ~prec s t s g [] ts    
-        | T.App (f,ss), T.Const g->      lfhorpo_composite ~prec s t f t ss []  
-        | T.Const f, T.Const g ->        lfhorpo_composite ~prec s t s t [] []  
-        (* TODO: AppBuiltin *)
+        | T.DB i, T.DB j -> Incomparable
+        | T.App (f,ss), T.App (g, ts) -> 
+          begin match T.view f, T.view g with
+            | T.Const fid, T.Const gid ->  lfhorpo_composite ~prec s t (IOB.I fid) (IOB.I gid) ss ts
+            | T.Const fid, T.Var y ->      lfhorpo_composite ~prec s t (IOB.I fid) (IOB.V y)   ss ts
+            | T.Var x, T.Const gid ->      lfhorpo_composite ~prec s t (IOB.V x)   (IOB.I gid) ss ts
+            | T.Var x, T.Var y ->          lfhorpo_composite ~prec s t (IOB.V x)   (IOB.V y)   ss ts
+            | _, _ -> Incomparable
+          end
+        | T.Const fid, T.App (g, ts) ->   
+          begin match T.view g with
+            | T.Const gid -> lfhorpo_composite ~prec s t (IOB.I fid) (IOB.I gid) [] ts
+            | T.Var y ->     lfhorpo_composite ~prec s t (IOB.I fid) (IOB.V y)   [] ts
+            | _ -> Incomparable
+          end
+        | T.AppBuiltin (fid, ss), T.App (g, ts) ->   
+          begin match T.view g with
+            | T.Const gid -> lfhorpo_composite ~prec s t (IOB.B fid) (IOB.I gid) ss ts
+            | T.Var y ->     lfhorpo_composite ~prec s t (IOB.B fid) (IOB.V y)   ss ts
+            | _ -> Incomparable
+          end
+        | T.App (f,ss), T.Const gid ->      
+          begin match T.view f with
+            | T.Const fid -> lfhorpo_composite ~prec s t (IOB.I fid) (IOB.I gid) ss []
+            | T.Var x ->     lfhorpo_composite ~prec s t (IOB.V x)   (IOB.I gid) ss []
+            | _ -> Incomparable
+          end        
+        | T.App (f,ss), T.AppBuiltin (gid, ts) ->      
+          begin match T.view f with
+            | T.Const fid -> lfhorpo_composite ~prec s t (IOB.I fid) (IOB.B gid) ss ts
+            | T.Var x ->     lfhorpo_composite ~prec s t (IOB.V x)   (IOB.B gid) ss ts
+            | _ -> Incomparable
+          end
+        | T.AppBuiltin (fid, ss), T.Const gid  -> lfhorpo_composite ~prec s t (IOB.B fid) (IOB.I gid) ss []
+        | T.Const fid, T.AppBuiltin (gid, ts)  -> lfhorpo_composite ~prec s t (IOB.I fid) (IOB.B gid) [] ts
+        | T.Const fid, T.Const gid             -> lfhorpo_composite ~prec s t (IOB.I fid) (IOB.I gid) [] []
         | _ -> Incomparable
   (* handle the composite cases *)
   and lfhorpo_composite ~prec s t f g ss ts =
-    begin match T.view f, T.view g with
-      | T.Const fid, T.Const gid -> 
-        begin match prec_compare prec (IOB.I fid) (IOB.I gid) with
-          | 0 ->
-            cLMA ~prec s t ss ts  (* lexicographic subterm comparison *)
-            (* TODO: add multiset order *)            
-          | n when n > 0 -> cMA ~prec s ts
-          | n when n < 0 -> Comparison.opp (cMA ~prec t ss)
-          | _ -> assert false  (* match exhaustively *)
-        end
-      | T.Const fid, T.Var y ->
-        cAA ~prec s t ss ts
-      | T.Var x, T.Const g ->
-        cAA ~prec s t ss ts
-      | T.Var x, T.Var y ->
-        if x = y 
-        then cLMA ~prec s t ss ts  (* TODO: add multiset order *)  
-        else cAA ~prec s t ss ts
-      | _ -> Incomparable
+    begin match prec_compare prec f g  with
+      | Eq ->
+        cLMA ~prec s t ss ts  (* lexicographic subterm comparison *)
+        (* TODO: add multiset order *)            
+      | Gt -> cMA ~prec s ts
+      | Lt -> Comparison.opp (cMA ~prec t ss)
+      | Incomparable -> cAA ~prec s t ss ts
     end
-    
   (** try to dominate all the terms in ts by s; but by subterm property
       if some t' in ts is >= s then s < t=g(ts) *)
   and cMA ~prec s ts = match ts with
@@ -454,16 +488,16 @@ module RPO6 : ORD = struct
   (* handle the composite cases *)
   and rpo6_composite ~prec s t f g ss ts =
     match prec_compare prec f g with
-      | 0 ->
+      | Eq ->
         begin match prec_status prec f with
           | Precedence.Multiset ->
             cMultiset ~prec ss ts (* multiset subterm comparison *)
           | Precedence.Lexicographic ->
             cLMA ~prec s t ss ts  (* lexicographic subterm comparison *)
         end
-      | n when n > 0 -> cMA ~prec s ts
-      | n when n < 0 -> Comparison.opp (cMA ~prec t ss)
-      | _ -> assert false  (* match exhaustively *)
+      | Gt-> cMA ~prec s ts
+      | Lt -> Comparison.opp (cMA ~prec t ss)
+      | Incomparable -> assert false  (* No Variables here *)
   (** try to dominate all the terms in ts by s; but by subterm property
       if some t' in ts is >= s then s < t=g(ts) *)
   and cMA ~prec s ts = match ts with

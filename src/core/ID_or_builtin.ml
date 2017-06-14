@@ -3,21 +3,19 @@
 
 (** {1 ID or Builtin} *)
 
+open Comparison
+
+type var = Type.t HVar.t
+
 type t =
   | I of ID.t
   | B of Builtin.t
-
-let compare a b = match a,b with
-  | I a, I b -> ID.compare a b
-  | B a, B b -> Builtin.compare a b
-  | I _, B _ -> 1 (* id > builtin *)
-  | B _, I _ -> -1
-
-let equal a b = compare a b = 0
+  | V of var
 
 let pp out = function
   | I id -> ID.pp out id
   | B b -> Builtin.pp out b
+  | V x -> HVar.pp out x
 
 let to_string = CCFormat.to_string pp
 
