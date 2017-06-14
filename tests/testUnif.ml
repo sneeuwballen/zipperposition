@@ -95,6 +95,35 @@ let check_lits_variant_bidir_match =
   in
   QCheck.Test.make ~long_factor:20 ~count:5_000 ~name (Q.pair gen gen) prop
 
+let check_ho_unify_gives_unifiers =
+  let gen = QCheck.(pair gen_t gen_t) in
+  let name = "ho_unify_gives_unifiers" in
+  let prop (t1, t2) =
+    let offset =
+      Sequence.doubleton t1 t2
+      |> Sequence.flat_map T.Seq.vars
+      |> T.Seq.max_var |> succ
+    in
+    (* only keep proper solutions *)
+    let l =
+      HO_unif.unif_pairs ~fuel:20 ~offset ([t1,t2],0)
+      |> List.filter
+        (fun (pairs,us,_) -> pairs=[] && not (Unif_subst.has_constr us))
+    in
+    if l=[] then QCheck.assume_fail()
+    else (
+      List.for_all
+        (fun (_,us,_) ->
+           let subst = Unif_subst.subst us in
+           let renaming = Subst.Renaming.create() in
+           let u1 = Subst.FO.apply ~renaming subst (t1,0) |> Lambda.snf in
+           let u2 = Subst.FO.apply ~renaming subst (t2,0) |> Lambda.snf in
+           T.equal u1 u2)
+      l
+    )
+  in
+  QCheck.Test.make ~long_factor:20 ~count:5_000 ~name gen prop
+
 (* TODO: generate random Literals.t, then check [variant a b <=> (matches a b && matches b a)] *)
 
 let props =
@@ -105,4 +134,5 @@ let props =
     check_variant_bidir_match;
     check_lits_variant_bidir_match;
     check_matching;
+    check_ho_unify_gives_unifiers;
   ]

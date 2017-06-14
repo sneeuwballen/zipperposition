@@ -62,8 +62,8 @@ let enum_prop ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) list =
          let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
          subst, penalty)
       [ l_not, 2;
-        l_and, 4;
-        l_eq, 5;
+        l_and, 5;
+        l_eq, 10;
       ]
   )
 
@@ -124,6 +124,15 @@ module U = struct
     in
     CCOrd.int (classify_pair p1 |> hardness) (classify_pair p2 |> hardness)
 
+  let whnf_deref (subst:US.t) (t,sc) =
+    let t = match T.view t with
+      | T.Var _ -> US.FO.deref subst (t,sc) |> fst
+      | T.App (f, l) when T.is_var f ->
+        T.app (US.FO.deref subst (f,sc) |> fst) l
+      | _ -> t
+    in
+    Lambda.whnf t
+
   (* perform syntactic unification aggressively on rigid/rigid pairs *)
   let flatten_rigid_rigid sc subst pairs : pair list option =
     try
@@ -131,8 +140,8 @@ module U = struct
         | [] -> acc
         | (t, u) :: tail ->
           (* deref+normalize terms *)
-          let t = US.FO.deref subst (t,sc) |> fst |> Lambda.whnf in
-          let u = US.FO.deref subst (u,sc) |> fst |> Lambda.whnf in
+          let t = whnf_deref subst (t,sc) in
+          let u = whnf_deref subst (u,sc) in
           begin match T.Classic.view t, T.Classic.view u with
             | _ when T.equal t u -> aux acc tail (* drop trivial *)
             | T.Classic.App (id1, l1), T.Classic.App (id2, l2) ->
@@ -298,15 +307,6 @@ module U = struct
      and new pairs [(F1 a = t), (F2 b = u)]
   *)
 
-  let whnf_deref (subst:US.t) (t,sc) =
-    let t = match T.view t with
-      | T.Var _ -> US.FO.deref subst (t,sc) |> fst
-      | T.App (f, l) when T.is_var f ->
-        T.app (US.FO.deref subst (f,sc) |> fst) l
-      | _ -> t
-    in
-    Lambda.whnf t
-
   (* main unification loop *)
   let unif_loop (st:state): unit =
     let sc = st.sc in
@@ -331,10 +331,17 @@ module U = struct
               let fail() = raise Unif.Fail in
               let consume_fuel() = st.fuel <- st.fuel - 1 in
               let push_new ~penalty ~subst ~offset rule pairs : unit =
-                let pb' = mk_pb ~penalty ~subst ~offset (pairs @ pairs_tl) in
-                Util.debugf ~section 5 "(@[ho_unif.push@ :rule %s@ %a@])"
-                  (fun k->k rule pp_pb pb');
-                Queue.push pb' st.queue
+                let pb' =
+                  mk_pb ~penalty ~subst ~offset (pairs @ pairs_tl)
+                  |> normalize_pb sc
+                in
+                begin match pb' with
+                  | None ->  ()
+                  | Some pb' ->
+                    Util.debugf ~section 5 "(@[ho_unif.push@ :rule %s@ %a@])"
+                      (fun k->k rule pp_pb pb');
+                    Queue.push pb' st.queue
+                end
               in
               (* unify types *)
               let subst = Unif.Ty.unify_full ~subst (T.ty t1,sc) (T.ty t2,sc) in
