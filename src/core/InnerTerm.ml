@@ -667,15 +667,15 @@ let rec pp_depth ?(hooks=[]) depth out t =
         (Util.pp_seq ~sep:" " pp_tyvar)
         (Sequence.of_array_i (Array.of_list varty_l))
         (_pp_surrounded (depth+List.length varty_l)) t'
-    | AppBuiltin (b, ([_;a] | [a])) when Builtin.is_prefix b ->
-      Format.fprintf out "@[<1>%a %a@]" Builtin.pp b (_pp depth) a
-    | AppBuiltin (b, ([_;t1;t2] | [t1;t2])) when Builtin.is_infix b ->
-      Format.fprintf out "(@[<1>%a@ %a@ %a@])" (_pp depth) t1 Builtin.pp b (_pp depth) t2
     | AppBuiltin (Builtin.Arrow, ([] | [_])) -> assert false
     | AppBuiltin (Builtin.Arrow, ret::args) ->
       Format.fprintf out "@[%a@ → %a@]"
         (Util.pp_list ~sep:" → " (_pp_surrounded depth)) args
         (_pp_surrounded depth) ret
+    | AppBuiltin (b, ([_;a] | [a])) when Builtin.is_prefix b ->
+      Format.fprintf out "@[<1>%a %a@]" Builtin.pp b (_pp depth) a
+    | AppBuiltin (b, ([_;t1;t2] | [t1;t2])) when Builtin.is_infix b ->
+      Format.fprintf out "(@[<1>%a@ %a@ %a@])" (_pp depth) t1 Builtin.pp b (_pp depth) t2
     | AppBuiltin (b, []) -> Builtin.pp out b
     | AppBuiltin (b, l) ->
       Format.fprintf out "@[%a(%a)@]" Builtin.pp b (Util.pp_list (_pp depth)) l
