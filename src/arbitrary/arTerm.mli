@@ -17,6 +17,8 @@ val default_fuel : int -> Term.t gen
 val default : Term.t arbitrary
 (** Default polymorphic term *)
 
+val default_ho_g : Term.t gen
+
 val default_ho : Term.t arbitrary
 (** Default polymorphic term, with lambdas *)
 

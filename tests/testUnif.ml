@@ -12,8 +12,10 @@ module Q = QCheck
 
 let (==>) = QCheck.(==>)
 
+let gen_t = ArTerm.default_ho
+
 let check_unify_gives_unifier =
-  let gen = QCheck.(pair ArTerm.default ArTerm.default) in
+  let gen = QCheck.(pair gen_t gen_t) in
   let name = "unify_gives_unifier" in
   let prop (t1, t2) =
     try
@@ -22,13 +24,12 @@ let check_unify_gives_unifier =
       let t1' = S.FO.apply ~renaming subst (t1,0) in
       let t2' = S.FO.apply ~renaming subst (t2,1) in
       T.equal t1' t2'
-    with Unif.Fail ->
-      false ==> true
+    with Unif.Fail -> QCheck.assume_fail()
   in
   QCheck.Test.make ~long_factor:20 ~count:1000 ~name gen prop
 
 let check_variant =
-  let gen = ArTerm.default in
+  let gen = gen_t in
   let name = "unif_term_self_variant" in
   let prop t =
     let renaming = S.Renaming.create () in
@@ -38,7 +39,7 @@ let check_variant =
   QCheck.Test.make ~long_factor:20 ~name gen prop
 
 let check_variant2 =
-  let gen = ArTerm.default in
+  let gen = gen_t in
   let name = "unif_term_variant_sound" in
   let prop (t0,t1) =
     try
@@ -53,7 +54,7 @@ let check_variant2 =
   QCheck.Test.make ~long_factor:20 ~name (Q.pair gen gen) prop
 
 let check_variant_sym =
-  let gen = ArTerm.default in
+  let gen = gen_t in
   let name = "unif_term_variant_sym" in
   let prop (t0,t1) =
     Unif.FO.are_variant t0 t1 = Unif.FO.are_variant t1 t0
@@ -61,7 +62,7 @@ let check_variant_sym =
   QCheck.Test.make ~long_factor:20 ~name (Q.pair gen gen) prop
 
 let check_matching =
-  let gen = QCheck.pair ArTerm.default ArTerm.default in
+  let gen = QCheck.pair gen_t gen_t in
   let name = "unif_matching_gives_matcher" in
   let prop (t1, t2) =
     try
@@ -70,13 +71,12 @@ let check_matching =
       let t1' = S.FO.apply ~renaming subst (t1,0) in
       let t2' = S.FO.apply ~renaming subst (t2,1) in
       T.equal t1' t2' && Unif.FO.are_variant t2 t2'
-    with Unif.Fail ->
-      false ==> true
+    with Unif.Fail -> QCheck.assume_fail()
   in
   QCheck.Test.make ~long_factor:20 ~count:1000 ~name gen prop
 
 let check_variant_bidir_match =
-  let gen = ArTerm.default in
+  let gen = gen_t in
   let name = "unif_term_variant_bidir_match" in
   let prop (t0,t1) =
     if Unif.FO.are_variant t0 t1

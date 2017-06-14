@@ -86,11 +86,14 @@ let suite =
 
 (** Properties *)
 
+let ar_t = ArTerm.default_ho
+let gen_t = ArTerm.default_ho_g
+
 (* subterm is smaller than term *)
 let check_size_subterm =
   (* choose a subterm of t *)
   let gen = QCheck.Gen.(
-    ArTerm.default_g >>= fun t ->
+    gen_t >>= fun t ->
     ArTerm.pos t >>= fun pos ->
     return (t, T.Pos.at t pos))
   in
@@ -105,7 +108,7 @@ let check_size_subterm =
 (* replace subterm by itself yields same term *)
 let check_replace_id =
   let gen = QCheck.Gen.(
-    ArTerm.default_g >>= fun t ->
+    gen_t >>= fun t ->
     ArTerm.pos t >>= fun pos ->
     return (t, pos))
   in
@@ -122,14 +125,14 @@ let check_replace_id =
   QCheck.Test.make ~name:"term_replace_same_subterm" gen prop
 
 let check_ground_novar =
-  let gen = ArTerm.default in
+  let gen = ar_t in
   let prop t =
     not (T.is_ground t) || Sequence.is_empty (T.Seq.vars t)  (* ground => no vars *)
   in
   QCheck.Test.make ~count:1000 ~name:"term_ground_has_no_var" gen prop
 
 let check_min_max_vars =
-  let gen = ArTerm.default in
+  let gen = ar_t in
   let prop t =
     let vars = T.vars t in
     T.VarSet.is_empty vars || (T.min_var vars <= T.max_var vars)
@@ -137,7 +140,7 @@ let check_min_max_vars =
   QCheck.Test.make ~count:1000 ~name:"term_min_max_var" gen prop
 
 let check_hash_mod_alpha =
-  let gen = QCheck.pair ArTerm.default ArTerm.default in
+  let gen = QCheck.pair ar_t ar_t in
   let prop (t1,t2) =
     if not (T.equal t1 t2) && Unif.FO.are_variant t1 t2
     then
