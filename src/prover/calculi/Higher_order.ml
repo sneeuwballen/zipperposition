@@ -293,7 +293,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let pp_pairs_ out =
     let open CCFormat in
     Format.fprintf out "(@[<hv>%a@])"
-      (Util.pp_list ~sep:" " @@ hvbox @@ pair ~sep:(return " = ") T.pp T.pp)
+      (Util.pp_list ~sep:" " @@ hvbox @@ pair ~sep:(return " =?=@ ") T.pp T.pp)
 
   (* perform HO unif on [pairs].
      invariant: [C.lits c = pairs @ other_lits] *)
@@ -306,18 +306,21 @@ module Make(E : Env.S) : S with module Env = E = struct
     begin
       HO_unif.unif_pairs ?fuel:None (pairs,0) ~offset
       |> List.map
-        (fun (new_pairs, subst, penalty) ->
+        (fun (new_pairs, us, penalty) ->
            let renaming = Ctx.renaming_clear() in
+           let subst = Unif_subst.subst us in
+           let c_guard = Literal.of_unif_subst ~renaming us in
            let new_pairs = List.map (CCFun.uncurry Literal.mk_constraint) new_pairs in
            let new_lits =
              Literal.apply_subst_list ~renaming subst (other_lits @ new_pairs,0)
            in
+           let all_lits = c_guard @ new_lits in
            let proof =
              Proof.Step.inference ~rule:(Proof.Rule.mk "ho_unif")
                [C.proof_parent_subst (c,0) subst]
            in
            let new_c =
-             C.create new_lits proof
+             C.create all_lits proof
                ~trail:(C.trail c) ~penalty:(C.penalty c + penalty)
            in
            Util.debugf ~section 5

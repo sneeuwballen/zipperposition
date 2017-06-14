@@ -22,7 +22,7 @@ val unif_pairs :
   ?fuel:int ->
   (term * term) list Scoped.t ->
   offset:int ->
-  ((term * term) list * Subst.t * penalty) list
+  ((term * term) list * Unif_subst.t * penalty) list
 (** [unif_pairs pairs ~scope_new_vars] returns a list of (partial) solutions
     to the HO unification problem [pairs].
     Each solution is a list of remaining constraints, a substitution,
