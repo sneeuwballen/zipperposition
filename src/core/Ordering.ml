@@ -5,7 +5,6 @@
 
 module Prec = Precedence
 module MT = Multiset.Make(Term)
-module IOB = ID_or_builtin
 module W = Precedence.Weight
 
 open Comparison
@@ -69,31 +68,31 @@ end
 
 (* compare the two symbols (ID or builtin) using the precedence *)
 let prec_compare prec a b = match a,b with
-  | IOB.I a, IOB.I b -> 
+  | Head.I a, Head.I b ->
     begin match Prec.compare prec a b with
-      | 0 -> Eq     
+      | 0 -> Eq
       | n when n > 0 -> Gt
       | n when n < 0 -> Lt
       | _ -> assert false  (* match exhaustively *)
     end
-  | IOB.B a, IOB.B b -> 
+  | Head.B a, Head.B b ->
     begin match Builtin.compare a b  with
-      | 0 -> Eq     
+      | 0 -> Eq
       | n when n > 0 -> Gt
       | n when n < 0 -> Lt
       | _ -> assert false  (* match exhaustively *)
     end
-  | IOB.I _, IOB.B _ -> Gt (* id > builtin *)
-  | IOB.B _, IOB.I _ -> Lt
-  | IOB.V x, IOB.V y -> if x=y then Eq else Incomparable
-  | IOB.V _, _ -> Incomparable
-  | _, IOB.V _ -> Incomparable
+  | Head.I _, Head.B _ -> Gt (* id > builtin *)
+  | Head.B _, Head.I _ -> Lt
+  | Head.V x, Head.V y -> if x=y then Eq else Incomparable
+  | Head.V _, _ -> Incomparable
+  | _, Head.V _ -> Incomparable
 
 let prec_status prec = function
-  | IOB.I s -> Prec.status prec s
-  | IOB.B Builtin.Eq -> Prec.Multiset
-  | IOB.B _ -> Prec.Lexicographic
-  | IOB.V _ -> Prec.Lexicographic (* TODO: Not a good default *)
+  | Head.I s -> Prec.status prec s
+  | Head.B Builtin.Eq -> Prec.Multiset
+  | Head.B _ -> Prec.Lexicographic
+  | Head.V _ -> Prec.Lexicographic (* TODO: Not a good default *)
 
 module KBO : ORD = struct
   let name = "kbo"
@@ -155,9 +154,9 @@ module KBO : ORD = struct
     balance.balance.(idx) <- n - 1
 
   let weight prec = function
-    | IOB.B _ -> W.int 1
-    | IOB.I s -> Prec.weight prec s
-    | IOB.V _ -> W.int 1  (* TODO: Maybe not a good value *)
+    | Head.B _ -> W.int 1
+    | Head.I s -> Prec.weight prec s
+    | Head.V _ -> W.int 1  (* TODO: Maybe not a good value *)
 
   (* TODO: ghc() that maps (in theory) variables to sets of symbols
      their instances can have as head (for a symbol [f] it's just [{f}] itself).
@@ -193,8 +192,8 @@ module KBO : ORD = struct
           let open W.Infix in
           let wb' =
             if pos
-            then wb + weight prec (IOB.I s)
-            else wb - weight prec (IOB.I s)
+            then wb + weight prec (Head.I s)
+            else wb - weight prec (Head.I s)
           in wb', false
         | T.App (f, l) ->
           let wb', res = balance_weight wb f y ~pos in
@@ -202,8 +201,8 @@ module KBO : ORD = struct
         | T.AppBuiltin (b,l) ->
           let open W.Infix in
           let wb' = if pos
-            then wb + weight prec (IOB.B b)
-            else wb - weight prec (IOB.B b)
+            then wb + weight prec (Head.B b)
+            else wb - weight prec (Head.B b)
           in
           balance_weight_rec wb' l y ~pos false
     (** list version of the previous one, threaded with the check result *)
@@ -256,10 +255,10 @@ module KBO : ORD = struct
           let wb', contains = balance_weight wb t1 (HVar.id y) ~pos:true in
           (W.(wb' - one), if contains then Gt else Incomparable)
         (* node/node, De Bruijn/De Bruijn *)
-        | TC.App (f, ss), TC.App (g, ts) -> tckbo_composite wb (IOB.I f) (IOB.I g) ss ts
-        | TC.AppBuiltin (f, ss), TC.App (g, ts) -> tckbo_composite wb (IOB.B f) (IOB.I g) ss ts
-        | TC.App (f, ss), TC.AppBuiltin (g, ts) -> tckbo_composite wb (IOB.I f) (IOB.B g) ss ts
-        | TC.AppBuiltin (f, ss), TC.AppBuiltin (g, ts) -> tckbo_composite wb (IOB.B f) (IOB.B g) ss ts
+        | TC.App (f, ss), TC.App (g, ts) -> tckbo_composite wb (Head.I f) (Head.I g) ss ts
+        | TC.AppBuiltin (f, ss), TC.App (g, ts) -> tckbo_composite wb (Head.B f) (Head.I g) ss ts
+        | TC.App (f, ss), TC.AppBuiltin (g, ts) -> tckbo_composite wb (Head.I f) (Head.B g) ss ts
+        | TC.AppBuiltin (f, ss), TC.AppBuiltin (g, ts) -> tckbo_composite wb (Head.B f) (Head.B g) ss ts
         | TC.DB i, TC.DB j ->
           (wb, if i = j then Eq else Incomparable)
         | TC.NonFO, _
@@ -353,7 +352,7 @@ end
 (** Blanchette's lambda-free higher-order RPO *)
 module LFHORPO : ORD = struct
   let name = "lfhorpo"
-  
+
   (** recursive path ordering *)
   let rec lfhorpo ~prec s t =
     if T.equal s t then Eq else  (* equality test is cheap *)
@@ -362,24 +361,24 @@ module LFHORPO : ORD = struct
         | _, T.Var var -> if T.var_occurs ~var s then Gt else Incomparable
         | T.Var var, _ -> if T.var_occurs ~var t then Lt else Incomparable
         | T.DB _, T.DB _ -> Incomparable
-        | _ -> 
-          begin match term_to_iob s, term_to_iob t with
-            | Some iob1, Some iob2 -> lfhorpo_composite ~prec s t iob1 iob2 (term_to_args s) (term_to_args t)
+        | _ ->
+          begin match term_to_head s, term_to_head t with
+            | Some head1, Some head2 -> lfhorpo_composite ~prec s t head1 head2 (term_to_args s) (term_to_args t)
             | _ -> Incomparable
           end
-  and term_to_iob s = 
+  and term_to_head s =
     match T.view s with
-      | T.App (f,_) ->      
+      | T.App (f,_) ->
         begin match T.view f with
-          | T.Const fid -> Some (IOB.I fid)
-          | T.Var x ->     Some (IOB.V x)
+          | T.Const fid -> Some (Head.I fid)
+          | T.Var x ->     Some (Head.V x)
           | _ -> None
         end
-      | T.AppBuiltin (fid,_) -> Some (IOB.B fid)
-      | T.Const fid -> Some (IOB.I fid)
-      | T.Var x ->     Some (IOB.V x)
+      | T.AppBuiltin (fid,_) -> Some (Head.B fid)
+      | T.Const fid -> Some (Head.I fid)
+      | T.Var x ->     Some (Head.V x)
       | _ -> None
-  and term_to_args s = 
+  and term_to_args s =
     match T.view s with
       | T.App (_,ss) -> ss
       | T.AppBuiltin (_,ss) -> ss
@@ -389,7 +388,7 @@ module LFHORPO : ORD = struct
     begin match prec_compare prec f g  with
       | Eq ->
         cLMA ~prec s t ss ts  (* lexicographic subterm comparison *)
-        (* TODO: add multiset order *)            
+        (* TODO: add multiset order *)
       | Gt -> cMA ~prec s ts
       | Lt -> Comparison.opp (cMA ~prec t ss)
       | Incomparable -> cAA ~prec s t ss ts
@@ -450,7 +449,7 @@ end
     We adapt here the implementation clpo6 with some multiset symbols (=) *)
 module RPO6 : ORD = struct
   let name = "rpo6"
-  
+
   (** recursive path ordering *)
   let rec rpo6 ~prec s t =
     if T.equal s t then Eq else  (* equality test is cheap *)
@@ -462,10 +461,10 @@ module RPO6 : ORD = struct
         | TC.NonFO, _
         | _, TC.NonFO -> Comparison.Incomparable
         (* node/node, De Bruijn/De Bruijn *)
-        | TC.App (f, ss), TC.App (g, ts) -> rpo6_composite ~prec s t (IOB.I f) (IOB.I g) ss ts
-        | TC.AppBuiltin (f, ss), TC.App (g, ts) -> rpo6_composite ~prec s t (IOB.B f) (IOB.I g) ss ts
-        | TC.App (f, ss), TC.AppBuiltin (g, ts) -> rpo6_composite ~prec s t (IOB.I f) (IOB.B g) ss ts
-        | TC.AppBuiltin (f, ss), TC.AppBuiltin (g, ts) -> rpo6_composite ~prec s t (IOB.B f) (IOB.B g) ss ts
+        | TC.App (f, ss), TC.App (g, ts) -> rpo6_composite ~prec s t (Head.I f) (Head.I g) ss ts
+        | TC.AppBuiltin (f, ss), TC.App (g, ts) -> rpo6_composite ~prec s t (Head.B f) (Head.I g) ss ts
+        | TC.App (f, ss), TC.AppBuiltin (g, ts) -> rpo6_composite ~prec s t (Head.I f) (Head.B g) ss ts
+        | TC.AppBuiltin (f, ss), TC.AppBuiltin (g, ts) -> rpo6_composite ~prec s t (Head.B f) (Head.B g) ss ts
         | TC.DB i, TC.DB j ->
           if i = j && Type.equal (T.ty s) (T.ty t) then Eq else Incomparable
         (* node and something else *)
@@ -549,7 +548,7 @@ let lfhorpo prec =
       (fun (a, b) -> LFHORPO.compare_terms ~prec a b) (a,b)
   in
   { cache; compare; name=LFHORPO.name; prec; }
-  
+
 let rpo6 prec =
   let cache = mk_cache 256 in
   let compare prec a b = CCCache.with_cache cache

@@ -40,7 +40,7 @@ true: annot, bin_annot
 "src/core/Skolem.cmx": for-pack(Logtk)
 "src/core/Cnf.cmx": for-pack(Logtk)
 "src/core/ID.cmx": for-pack(Logtk)
-"src/core/IDOrBuiltin.cmx": for-pack(Logtk)
+"src/core/Head.cmx": for-pack(Logtk)
 "src/core/SLiteral.cmx": for-pack(Logtk)
 "src/core/Index.cmx": for-pack(Logtk)
 "src/core/Index_intf.cmx": for-pack(Logtk)

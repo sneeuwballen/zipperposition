@@ -1,9 +1,7 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 ID or Builtin} *)
-
-open Comparison
+(** {1 Head} *)
 
 type var = Type.t HVar.t
 
@@ -18,12 +16,3 @@ let pp out = function
   | V x -> HVar.pp out x
 
 let to_string = CCFormat.to_string pp
-
-
-module As_key = struct
-  type t_ = t
-  type t = t_
-  let compare = compare
-end
-
-module Map = CCMap.Make(As_key)
