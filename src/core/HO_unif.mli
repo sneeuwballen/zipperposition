@@ -28,3 +28,9 @@ val unif_pairs :
     Each solution is a list of remaining constraints, a substitution,
     and some penalty to influence the search space *)
 
+val default_fuel : int ref
+(** Default amount of fuel for {!unif_pairs} *)
+
+val enable_norm_subst : bool ref
+(** If true, substitutions obtained with {!unif_pairs}
+    are normalized and β-reduced *)

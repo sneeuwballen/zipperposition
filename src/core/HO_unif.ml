@@ -10,12 +10,20 @@ module US = Unif_subst
 let stat_unif_calls = Util.mk_stat "ho_unif.calls"
 let stat_unif_steps = Util.mk_stat "ho_unif.steps"
 
+let prof_norm_subst = Util.mk_profiler "ho_unif.norm_subst"
+
 let section = Util.Section.make "ho_unif"
 
 type term = Term.t
 
 type penalty = int
 (** penalty on the search space *)
+
+(* options *)
+
+let default_fuel = ref 40
+
+let enable_norm_subst = ref true
 
 (* number of ty and non-ty arguments *)
 let term_arity args =
@@ -67,8 +75,6 @@ let enum_prop ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) list =
       ]
   )
 
-let default_fuel = 40
-
 module U = struct
   type pair = term * term
 
@@ -83,10 +89,12 @@ module U = struct
     sc: Scoped.scope;
     mutable fuel: int;
     queue: pb Queue.t;
+    offset0: int; (* initial offset *)
     mutable sols: (US.t * penalty) list; (* totally solved *)
   }
 
-  let empty sc fuel = { sc; fuel; queue=Queue.create(); sols=[]; }
+  let empty sc fuel offset =
+    { sc; fuel; queue=Queue.create(); sols=[]; offset0=offset; }
 
   let add (st:state) pb : unit = Queue.push pb st.queue
 
@@ -444,22 +452,50 @@ module U = struct
       end
     done
 
+  (* normalize substitution *)
+  let norm_subst_ offset sc (us:US.t) () : US.t =
+    US.map_subst us
+      ~f:(fun subst ->
+        Subst.normalize subst
+        |> Subst.FO.filter
+          (fun (v,sc_v) _ ->
+             (* filter out intermediate fun variables *)
+             let is_fvar =
+               sc_v = sc && HVar.id v >= offset && not (Type.is_tType (HVar.ty v))
+             in
+             not is_fvar)
+        |> Subst.FO.map Lambda.snf
+      )
+
+  let norm_subst offset sc us =
+    if !enable_norm_subst
+    then Util.with_prof prof_norm_subst (norm_subst_ offset sc us) ()
+    else us
+
   (* extract the (partial) solutions *)
   let get_solutions (st:state): (pair list * _ * _) list =
     let sols1 =
       st.sols
-      |> List.rev_map (fun (subst,p) -> [], subst, p)
+      |> List.rev_map (fun (subst,p) -> [], norm_subst st.offset0 st.sc subst, p)
     and sols2 =
       st.queue
       |> Sequence.of_queue
-      |> Sequence.map (fun pb -> pb.pairs, pb.subst, pb.penalty)
+      |> Sequence.map
+        (fun pb -> pb.pairs, norm_subst st.offset0 st.sc pb.subst, pb.penalty)
       |> Sequence.to_rev_list
     in
   List.rev_append sols1 sols2
 end
 
-let unif_pairs ?(fuel=default_fuel) (pairs,sc) ~offset : _ list =
-  let st = U.empty sc fuel in
+let unif_pairs ?(fuel= !default_fuel) (pairs,sc) ~offset : _ list =
+  let st = U.empty sc fuel offset in
   U.add st (U.mk_pb ~offset ~penalty:0 ~subst:US.empty pairs);
   U.unif_loop st;
   U.get_solutions st
+
+let () =
+  Options.add_opts
+    [ "--ho-unif-fuel", Arg.Set_int default_fuel, " default amount of fuel for HO unification";
+      "--ho-unif-norm", Arg.Set enable_norm_subst, " normalize substitutions in HO unif";
+      "--no-ho-unif-norm", Arg.Clear enable_norm_subst, " do not normalize substitutions in HO unif";
+    ]
