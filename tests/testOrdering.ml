@@ -143,10 +143,32 @@ let check_ordering_subterm ord =
 let test_lfhorpo _ =
   let ord = O.lfhorpo (Precedence.default [a_; b_; c_; f_; g_; h_]) in
   let compare = O.compare ord in
+
+  (* x a < x b *)
   let a = Term.const ~ty a_ in
   let b = Term.const ~ty b_ in
   let x = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
-  assert_equal (compare (Term.app x [a]) (Term.app x [b])) Comparison.Lt
+  assert_equal (compare (Term.app x [a]) (Term.app x [b])) Comparison.Lt ;
+
+  (* f x y is incomparable with  x y *)
+  let f = Term.const ~ty:(Type.arrow [(Type.arrow [ty] ty); ty] ty) f_ in
+  let x = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
+  let y = Term.var (HVar.fresh ~ty ()) in
+  assert_equal (compare (Term.app f [x;y]) (Term.app x [y])) Comparison.Incomparable;
+
+  (* g x > f x x *)
+  let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
+  let g = Term.const ~ty:(Type.arrow [ty] ty) g_ in
+  let x = Term.var (HVar.fresh ~ty ()) in
+  assert_equal (compare (Term.app g [x]) (Term.app f [x; x])) Comparison.Gt;
+
+  (* f (x b) > x a *)
+  let f = Term.const ~ty:(Type.arrow [ty] ty) f_ in
+  let x = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty)  ()) in
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  assert_equal (compare (Term.app f [Term.app x [b]]) (Term.app x [a])) Comparison.Gt
+
 
 let suite =
   "test_ordering" >:::
