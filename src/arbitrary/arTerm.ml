@@ -55,6 +55,7 @@ module PT = struct
   let h x = PT.app ~ty:ty_term (_const ~ty:ty_fun1 "h") [x]
   let ite x y z = PT.app ~ty:ty_term (_const ~ty:ty_fun3 "ite") [x; y; z]
   let app1 v t = PT.app ~ty:ty_term v [t]
+  let app2 v t u = PT.app ~ty:ty_term v [t;u]
   let lam v t = PT.fun_l [v] t
 
   let ground_g =
@@ -81,11 +82,17 @@ module PT = struct
     let var_x= Var.of_string ~ty:ty_term "X" in
     let var_y = Var.of_string ~ty:ty_term "Y" in
     let var_z = Var.of_string ~ty:ty_term "Z" in
-    let var_f = PT.var (Var.of_string ~ty:(PT.Ty.fun_ [ty_term] ty_term) "F") in
-    let var_g = PT.var (Var.of_string ~ty:(PT.Ty.fun_ [ty_term] ty_term) "G") in
+    let var_f = Var.of_string ~ty:(PT.Ty.fun_ [ty_term] ty_term) "F" in
+    let var_g = Var.of_string ~ty:(PT.Ty.fun_ [ty_term] ty_term) "G" in
+    let var_f2 = Var.of_string ~ty:(PT.Ty.fun_ [ty_term;ty_term] ty_term) "F2" in
+    let var_g2 = Var.of_string ~ty:(PT.Ty.fun_ [ty_term;ty_term] ty_term) "G2" in
     let x = PT.var var_x in
     let y = PT.var var_y in
     let z = PT.var var_z in
+    let vf = PT.var var_f in
+    let vg = PT.var var_g in
+    let vf2 = PT.var var_f2 in
+    let vg2 = PT.var var_g2 in
     let open QA.Gen in
     let base = oneofl [a;b;c;d;e;x;y;z] in
     let gen =
@@ -103,11 +110,18 @@ module PT = struct
                1, map3 ite self self self;
              ] in
              let l =
-               if ho then
-                 [ 2, map2 app1 (oneofl [var_f;var_g]) self;
-                   2, map2 app1 (map2 lam (oneofl [var_x;var_y;var_z]) self) self;
+               if ho then (
+                 (* fun term -> x *)
+                 let g_fun_t gen = map2 lam (oneofl [var_x;var_y;var_z]) gen in
+                 let g_fun_f1 = map2 lam (oneofl [var_f;var_g]) self in
+                 let g_fun_f2 = map2 lam (oneofl [var_f2;var_g2]) self in
+                 [ 2, map2 app1 (oneofl [vf;vg]) self;
+                   2, map3 app2 (oneofl [vf2;vg2]) self self;
+                   1, map2 app1 (g_fun_t self) self;
+                   1, map2 app1 g_fun_f1 (g_fun_t self);
+                   1, map2 app1 g_fun_f2 (g_fun_t (g_fun_t self));
                  ] @ l
-               else l
+               ) else l
              in
              frequency l
            ))
@@ -147,7 +161,8 @@ let rec shrink t =
   let subterms_same_ty =
     T.Seq.subterms t
     |> Sequence.drop 1
-    |> Sequence.filter (fun t' -> Type.equal (T.ty t) (T.ty t'))
+    |> Sequence.filter
+      (fun t' -> Type.equal (T.ty t) (T.ty t') && T.DB.is_closed t')
   in
   QA.Iter.append subterms_same_ty (shrink_sub t)
 (* shrink immediate subterms *)
