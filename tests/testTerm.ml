@@ -170,7 +170,10 @@ let num_var_app t =
 let add_stat = ref false
 
 let gen_ho =
-  let a = {ArTerm.default_ho with QCheck.gen=ArTerm.default_ho_fuel 10} in
+  let a =
+    {ArTerm.default_ho with QCheck.gen=ArTerm.default_ho_fuel 8}
+    |> QCheck.set_print T.ZF.to_string
+  in
   if !add_stat then (
     a
     |> QCheck.add_stat ("lambdas",num_lam)
@@ -266,13 +269,13 @@ module SNF = struct
   let eval_and_unshift ~by t =
     let rec aux depth t = match T.view t with
       | T.Var _ | T.Const _ -> t
-      | T.DB i when i = depth -> by
+      | T.DB i when i = depth -> T.DB.shift depth by (* shift [by] *)
       | T.DB i when i < depth -> t
-      | T.DB i -> T.bvar ~ty:(T.ty t) (i-1)
+      | T.DB i -> T.bvar ~ty:(T.ty t) (i-1) (* unshift *)
       | T.App (f, l) ->
         T.app (aux depth f) (List.map (aux depth) l)
       | T.AppBuiltin (b, l) ->
-        T.app_builtin ~ty b (List.map (aux depth) l)
+        T.app_builtin ~ty:(T.ty t) b (List.map (aux depth) l)
       | T.Fun (tyarg, body) ->
         T.fun_ tyarg (aux (depth+1) body)
     in
@@ -301,66 +304,64 @@ module SNF = struct
 end
 
 let check_snf_correct =
-  let gen =
-    QCheck.map_keep_input ~print:t_show2
-      (fun t -> Lambda.snf t, SNF.snf_naive t)
-      gen_ho
-  in
-  let prop (t,(t1,t2)) =
+  let prop t =
+    let t1 = Lambda.snf t in
+    let t2 = SNF.snf_naive t in
     if T.DB.is_closed t
-    then T.equal t1 t2
-    else QCheck.assume_fail()
+    then (
+      if T.equal t1 t2 then true
+      else
+        QCheck.Test.fail_reportf
+          "@[t: `@[%a@]`@ snf: `@[%a@]`,@ ref: `@[%a@]@]@."
+          T.ZF.pp t T.ZF.pp t1 T.ZF.pp t2
+    ) else QCheck.assume_fail()
   in
-  QCheck.Test.make gen prop
+  QCheck.Test.make gen_ho prop
     ~count:10_000 ~long_factor:10
     ~name:"snf_correct"
 
 let check_snf_idempotent =
-  let gen =
-    QCheck.map_keep_input ~print:t_show2
-      (fun t -> let t' = Lambda.snf t in t', Lambda.snf t')
-      gen_ho
+  let prop t =
+    let t1 = Lambda.snf t in
+    let t2 = Lambda.snf t1 in
+    if T.equal t1 t2 then true
+    else (
+      QCheck.Test.fail_reportf
+        "@[t: `@[%a@]`@ snf: `@[%a@]`,@ snf2: `@[%a@]@]@."
+        T.ZF.pp t T.ZF.pp t1 T.ZF.pp t2
+    )
   in
-  let prop (_,(t',t'')) =
-    T.equal t' t''
-  in
-  QCheck.Test.make gen prop
+  QCheck.Test.make gen_ho prop
     ~count:10_000 ~long_factor:10
     ~name:"snf_idempotent"
 
 let check_fun_fvars =
-  let gen =
-    QCheck.map_keep_input
-      ~print:(t_show2_p CCFormat.Dump.(result (pair T.ZF.pp T.ZF.pp)))
-      (fun t ->
-         ignore (T.rebuild_rec t);
-         (* quantify on non-ty variables *)
-         let vars =
-           T.vars t
-           |> T.VarSet.filter (fun v -> not (Type.is_tType (HVar.ty v)))
-           |> T.VarSet.to_list
-         in
-         (* check that [(fun x. t[x]) x ==_β t] *)
-         let t' =
-           try
-             let t' = T.app (T.fun_of_fvars vars t) (List.map T.var vars) in
-             ignore (T.rebuild_rec t');
-             CCResult.return (t', SNF.snf_naive t')
-           with e -> CCResult.of_exn_trace e
-         in
-         t', Lambda.snf t)
-      gen_ho
-  in
-  let prop (t,(t1_opt,t2)) =
+  let prop t =
     ignore (T.rebuild_rec t);
     if T.DB.is_closed t then (
-      begin match t1_opt with
-        | CCResult.Error _ -> false
-        | CCResult.Ok (_,t1) -> T.equal t1 t2
-      end
+      (* quantify on non-ty variables *)
+      let vars =
+        T.vars t
+        |> T.VarSet.filter (fun v -> not (Type.is_tType (HVar.ty v)))
+        |> T.VarSet.to_list
+      in
+      (* check that [(fun x. t[x]) x ==_β t] *)
+      let t' = T.app (T.fun_of_fvars vars t) (List.map T.var vars) in
+      let t1 =
+        ignore (T.rebuild_rec t');
+        SNF.snf_naive t'
+      in
+      let t2 = Lambda.snf t in
+      ignore (T.rebuild_rec t);
+      if T.equal t1 t2 then true
+      else (
+        QCheck.Test.fail_reportf
+          "@[t: `@[%a@]`@ fun_var_app: `@[%a@]`,@ snf_naive: `@[%a@]`@ snf: `@[%a@]`@]@."
+          T.ZF.pp t T.ZF.pp t' T.ZF.pp t1 T.ZF.pp t2
+      )
     ) else QCheck.assume_fail()
   in
-  QCheck.Test.make gen prop
+  QCheck.Test.make gen_ho prop
     ~count:10_000 ~long_factor:10
     ~name:"check_fun_fvars_correct"
 
