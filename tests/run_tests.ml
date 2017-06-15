@@ -19,8 +19,9 @@ let props =
 let suite =
   "all_tests" >:::
     (  TestSubsts.suite
-      :: TestMultiset.suite
-      :: []
+       :: TestMultiset.suite
+       :: TestOrdering.suite
+       :: []
     )
 
 let () =

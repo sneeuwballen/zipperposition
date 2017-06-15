@@ -5,6 +5,7 @@
 
 open Logtk
 open Logtk_arbitrary
+open OUnit
 
 module T = Term
 module S = Subst.FO
@@ -12,6 +13,15 @@ module O = Ordering
 
 let count = 1_000
 let long_factor = 10
+
+let a_ = ID.make "a"
+let b_ = ID.make "b"
+let c_ = ID.make "c"
+let f_ = ID.make "f"
+let g_ = ID.make "g"
+let h_ = ID.make "h"
+
+let ty = Type.term
 
 (* [more_specific cm1 cm2] is true if [cmp2] is compatible with, and possibly
     more accurate, than [cmp1]. For instance, Incomparable/Gt is ok, but
@@ -82,7 +92,7 @@ let check_ordering_trans ord =
     let o12 = O.compare !ord t1 t2 in
     let o23 = O.compare !ord t2 t3 in
     if o12 = Comparison.Lt && o23 = Comparison.Lt
-    then 
+    then
       let o13 = O.compare !ord t1 t3 in
       o13 = Comparison.Lt
     else QCheck.assume_fail ()
@@ -129,6 +139,19 @@ let check_ordering_subterm ord =
       (fun sub -> O.compare !ord t sub = Comparison.Gt)
   in
   QCheck.Test.make ~count ~long_factor ~name arb prop
+
+let test_lfhorpo _ =
+  let ord = O.lfhorpo (Precedence.default [a_; b_; c_; f_; g_; h_]) in
+  let compare = O.compare ord in
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  let x = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
+  assert_equal (compare (Term.app x [a]) (Term.app x [b])) Comparison.Lt
+
+let suite =
+  "test_ordering" >:::
+  [ "lfhorpo" >:: test_lfhorpo
+  ]
 
 let props =
   CCList.flat_map
