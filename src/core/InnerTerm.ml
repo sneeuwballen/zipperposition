@@ -366,8 +366,8 @@ module DB = struct
     assert (is_var var);
     replace t ~sub:var
 
-  let rec _eval env t =
-    match t.ty with
+  let _eval env0 t =
+    let rec _eval env t = match t.ty with
       | NoType ->
         assert (t == tType);
         t
@@ -377,11 +377,19 @@ module DB = struct
           | Var v -> var (HVar.cast ~ty v)
           | DB i ->
             begin match DBEnv.find env i with
-              | None -> bvar ~ty i
+              | None ->
+                if i >= DBEnv.size env
+                then bvar ~ty (i - DBEnv.size env0) (* unshift *)
+                else bvar ~ty i
               | Some t' ->
                 assert (equal (ty_exn t') ty);
-                (* shift open variables by [i] *)
-                shift i t'
+                (* [t'] is defined in scope 0, but there are [i-1] binders
+                   between the scope where its open variables live, and
+                   the current scope.
+                   Therefore we must lift by [i-1].
+                   The depth is the number of binders between the original [env0]
+                   and current [env]. *)
+                shift (DBEnv.size env - DBEnv.size env0) t'
             end
           | Const s -> const ~ty s
           | Bind (s, varty, t') ->
@@ -392,6 +400,8 @@ module DB = struct
             app ~ty (_eval env f) (List.map (_eval env) l)
           | AppBuiltin (s,l) ->
             app_builtin ~ty s (List.map (_eval env) l)
+    in
+    _eval env0 t
 
   let eval env t =
     if DBEnv.is_empty env then t else _eval env t
