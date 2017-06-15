@@ -156,6 +156,10 @@ module U = struct
               if ID.equal id1 id2 && List.length l1 = List.length l2
               then aux acc (List.combine l1 l2 @ tail)
               else raise Exit (* failure *)
+            | T.Classic.AppBuiltin (b1,l1), T.Classic.AppBuiltin (b2,l2) ->
+              if Builtin.equal b1 b2 && List.length l1=List.length l2
+              then aux acc (List.combine l1 l2 @ tail)
+              else raise Exit
             | _ -> aux ((t,u) :: acc) tail
           end
       in
@@ -458,12 +462,17 @@ module U = struct
       ~f:(fun subst ->
         Subst.normalize subst
         |> Subst.FO.filter
-          (fun (v,sc_v) _ ->
-             (* filter out intermediate fun variables *)
-             let is_fvar =
-               sc_v = sc && HVar.id v >= offset && not (Type.is_tType (HVar.ty v))
+          (fun (v,sc_v) (t,sc_t) ->
+             (* filter out intermediate variables. They are the ones
+                that have an index >= offset,
+                and only point to other intermediate vars *)
+             let is_fvar (v,sc_v) =
+               sc_v = sc && HVar.id v >= offset &&
+               not (Type.is_tType (HVar.ty v))
              in
-             not is_fvar)
+             not (is_fvar (v,sc_v)) ||
+             (T.Seq.vars t
+              |> Sequence.exists (fun v' -> not (is_fvar (v',sc_t)))))
         |> Subst.FO.map Lambda.snf
       )
 
