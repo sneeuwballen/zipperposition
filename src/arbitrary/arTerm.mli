@@ -17,6 +17,13 @@ val default_fuel : int -> Term.t gen
 val default : Term.t arbitrary
 (** Default polymorphic term *)
 
+val default_appvars_g : Term.t gen
+
+val default_appvars : Term.t arbitrary
+(** Default polymorphic term, with applied variables *)
+
+val default_appvars_fuel : int -> Term.t gen
+
 val ground_g : Term.t gen
 
 val ground : Term.t arbitrary

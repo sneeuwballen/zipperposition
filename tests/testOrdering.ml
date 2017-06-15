@@ -34,12 +34,12 @@ let more_specific cmp1 cmp2 = Comparison.(match cmp1, cmp2 with
   | _, _ -> false
   )
 
-let check_ordering_inv_by_subst ord =
+let check_ordering_inv_by_subst ord arbitrary =
   let name = CCFormat.sprintf "ordering_%s_inv_by_subst" (O.name ord) in
   let pp = QCheck.Print.triple T.to_string T.to_string Subst.to_string in
   (* generate pairs of terms, and grounding substitutions *)
   let gen = QCheck.Gen.(
-    (pair ArTerm.default_g ArTerm.default_g)
+    (pair (QCheck.gen arbitrary) (QCheck.gen arbitrary))
     >>= fun (t1, t2) ->
     let vars = Sequence.of_list [t1; t2]
       |> Sequence.flat_map T.Seq.vars
@@ -78,9 +78,9 @@ let check_ordering_inv_by_subst ord =
   in
   QCheck.Test.make ~count ~long_factor ~name gen prop
 
-let check_ordering_trans ord =
+let check_ordering_trans ord arbitrary =
   let name = CCFormat.sprintf "ordering_%s_transitive" (O.name ord) in
-  let arb = QCheck.triple ArTerm.default ArTerm.default ArTerm.default in
+  let arb = QCheck.triple arbitrary arbitrary arbitrary in
   let ord = ref ord in
   let prop (t1, t2, t3) =
     (* declare symbols *)
@@ -99,9 +99,9 @@ let check_ordering_trans ord =
   in
   QCheck.Test.make ~count ~long_factor ~name arb prop
 
-let check_ordering_swap_args ord =
+let check_ordering_swap_args ord arbitrary =
   let name = CCFormat.sprintf "ordering_%s_swap_args" (O.name ord) in
-  let arb = QCheck.pair ArTerm.default ArTerm.default in
+  let arb = QCheck.pair arbitrary arbitrary in
   let ord = ref ord in
   let prop (t1, t2) =
     (* declare symbols *)
@@ -123,9 +123,9 @@ let check_ordering_swap_args ord =
   in
   QCheck.Test.make ~count ~long_factor ~name arb prop
 
-let check_ordering_subterm ord =
+let check_ordering_subterm ord arbitrary =
   let name = CCFormat.sprintf "ordering_%s_subterm_property" (O.name ord) in
-  let arb = ArTerm.default in
+  let arb = arbitrary in
   let ord = ref ord in
   let prop t =
     (* declare symbols *)
@@ -177,13 +177,13 @@ let suite =
 
 let props =
   CCList.flat_map
-    (fun o ->
-       [ check_ordering_inv_by_subst o;
-         check_ordering_trans o;
-         check_ordering_swap_args o;
-         check_ordering_subterm o;
+    (fun (o,a) ->
+       [ check_ordering_inv_by_subst o a;
+         check_ordering_trans o a;
+         check_ordering_swap_args o a;
+         check_ordering_subterm o a;
        ])
-    [ O.lfhorpo (Precedence.default []);
-      O.kbo (Precedence.default []);
-      O.rpo6 (Precedence.default []);
+    [ (O.lfhorpo (Precedence.default []), ArTerm.default_appvars);
+      (O.kbo (Precedence.default []), ArTerm.default);
+      (O.rpo6 (Precedence.default []), ArTerm.default)
     ]

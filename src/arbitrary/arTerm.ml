@@ -38,6 +38,7 @@ module PT = struct
   let g x = PT.app ~ty:ty_term (_const ~ty:ty_fun1 "g") [x]
   let h x = PT.app ~ty:ty_term (_const ~ty:ty_fun1 "h") [x]
   let ite x y z = PT.app ~ty:ty_term (_const ~ty:ty_fun3 "ite") [x; y; z]
+  let app1 v t = PT.app ~ty:ty_term v [t]
 
   let ground_g =
     let open QA.Gen in
@@ -59,10 +60,12 @@ module PT = struct
 
   let ground = mk_ ground_g
 
-  let default_fuel n =
+  let default_fuel_ ~appvars n =
     let x = PT.var (Var.of_string ~ty:ty_term "X") in
     let y = PT.var (Var.of_string ~ty:ty_term "Y") in
     let z = PT.var (Var.of_string ~ty:ty_term "Z") in
+    let var_f = PT.var (Var.of_string ~ty:(PT.Ty.fun_ [ty_term] ty_term) "F") in
+    let var_g = PT.var (Var.of_string ~ty:(PT.Ty.fun_ [ty_term] ty_term) "G") in
     let open QA.Gen in
     let base = oneofl [a;b;c;d;e;x;y;z] in
     let gen =
@@ -70,18 +73,32 @@ module PT = struct
         (fun self n ->
            let self = self (n-1) in
            if n<=0 then base
-           else frequency
-               [ 3, base
-               ; 1, map2 f self self
-               ; 1, map2 sum self self
-               ; 1, map g self
-               ; 1, map h self
-               ; 1, map3 ite self self self
-               ])
+           else (
+             let l = [
+               3, base;
+               1, map2 f self self;
+               1, map2 sum self self;
+               1, map g self;
+               1, map h self;
+               1, map3 ite self self self;
+             ] in
+             let l =
+               if appvars then
+                 [ 2, map2 app1 (oneofl [var_f;var_g]) self
+                 ] @ l
+               else l
+             in
+             frequency l
+           ))
     in
     QA.Gen.((1 -- n) >>= gen)
 
+
+  let default_fuel = default_fuel_ ~appvars:false
+  let default_appvars_fuel = default_fuel_ ~appvars:true
+
   let default_g = QA.Gen.(1 -- 4 >>= default_fuel)
+  let default_appvars_g = QA.Gen.(1 -- 4 >>= default_appvars_fuel)
   let default = mk_ default_g
 
   let ty_prop = PT.Ty.prop
@@ -113,10 +130,14 @@ let mk_ gen = QA.make ~print:T.to_string ~shrink gen
 let ctx = Term.Conv.create()
 
 let default_g = QCheck.Gen.map (Term.Conv.of_simple_term_exn ctx) PT.default_g
+let default_appvars_g = QCheck.Gen.map (Term.Conv.of_simple_term_exn ctx) PT.default_appvars_g
 let default = mk_ default_g
+let default_appvars = mk_ default_appvars_g
 
 let default_fuel f =
   QA.Gen.map (Term.Conv.of_simple_term_exn ctx) (PT.default_fuel f)
+let default_appvars_fuel f =
+  QA.Gen.map (Term.Conv.of_simple_term_exn ctx) (PT.default_appvars_fuel f)
 
 let ground_g = QCheck.Gen.map (Term.Conv.of_simple_term_exn ctx) PT.ground_g
 let ground = mk_ ground_g
