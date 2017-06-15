@@ -65,14 +65,21 @@ let psterm, pstmt, pstmt_l =
 
 (* prelude *)
 ignore (pstmt_l
-  "val i : type.
-   val a : i.
-   val b : i.
-   val c : i.
-   val f : i -> i -> i.
-   val g : i -> i.
-   val p : i -> prop.
-   val q : i -> prop.");;
+  "val term : type.
+   val a : term.
+   val b : term.
+   val c : term.
+   val d : term.
+   val e : term.
+   val f : term -> term -> term.
+   val g : term -> term.
+   val h : term -> term.
+   val ite : term -> term -> term -> term.
+   val p : term -> term -> prop.
+   val q : term -> prop.
+   val r : term -> prop.
+   val s : prop.
+   ");;
 
 (* parse Term.t *)
 let pterm =
