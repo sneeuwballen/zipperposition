@@ -98,6 +98,8 @@ let is_divides = function
   | Divides _ -> true
   | Binary _ -> false
 
+let make_no_simp op m1 m2 = Binary (op, m1, m2)
+
 (* main constructor *)
 let make op m1 m2 =
   let m1, m2 = M.normalize m1, M.normalize m2 in
@@ -105,7 +107,7 @@ let make op m1 m2 =
   (* build from a single monome *)
   let _make_split op m =
     let m1, m2 = M.split m in
-    Binary (op, m1, m2)
+    make_no_simp op m1 m2
   in
   match op with
     | Equal
@@ -657,9 +659,9 @@ let apply_subst_no_renaming subst (lit,sc) = match lit with
 
 let apply_subst_no_simp ~renaming subst (lit,sc) = match lit with
   | Binary (op, m1, m2) ->
-    Binary (op,
-      (M.apply_subst_no_simp ~renaming subst (m1,sc)),
-      (M.apply_subst_no_simp ~renaming subst (m2,sc)) )
+    make_no_simp op
+      (M.apply_subst_no_simp ~renaming subst (m1,sc))
+      (M.apply_subst_no_simp ~renaming subst (m2,sc))
   | Divides d ->
     Divides {d with monome=M.apply_subst_no_simp ~renaming subst (d.monome,sc); }
 

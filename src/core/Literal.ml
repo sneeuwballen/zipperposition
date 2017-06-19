@@ -981,11 +981,11 @@ module Pos = struct
       | Int (AL.Binary (op, m1, m2)), P.Left (P.Arg(i,pos')) ->
         let _, t = Monome.nth m1 i in
         let m1' = Monome.set_term m1 i (T.Pos.replace t pos' ~by) in
-        Int (AL.make op m1' m2)
+        Int (AL.make_no_simp op m1' m2)
       | Int (AL.Binary(op, m1, m2)), P.Right (P.Arg(i,pos')) ->
         let _, t = Monome.nth m2 i in
         let m2' = Monome.set_term m2 i (T.Pos.replace t pos' ~by) in
-        Int (AL.make op m1 m2')
+        Int (AL.make_no_simp op m1 m2')
       | Int (AL.Divides d), P.Arg (i, pos') ->
         let _, t = Monome.nth d.AL.monome i in
         let m' = Monome.set_term d.AL.monome i (T.Pos.replace t pos' ~by) in

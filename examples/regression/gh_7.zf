@@ -1,3 +1,5 @@
+# expect: unsat
+
 data list a :=
   | nil
   | cons a (list a).

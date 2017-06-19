@@ -36,6 +36,8 @@ include Interfaces.HASH with type t := t
 
 val make : op -> Z.t Monome.t -> Z.t Monome.t -> t
 
+val make_no_simp : op -> Z.t Monome.t -> Z.t Monome.t -> t
+
 val mk_eq : Z.t Monome.t -> Z.t Monome.t -> t
 val mk_neq : Z.t Monome.t -> Z.t Monome.t -> t
 val mk_less : Z.t Monome.t -> Z.t Monome.t -> t
