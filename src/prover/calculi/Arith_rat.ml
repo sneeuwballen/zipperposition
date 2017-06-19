@@ -24,6 +24,10 @@ let stat_rat_semantic_tautology = Util.mk_stat "rat.semantic_tauto"
 let stat_rat_ineq_factoring = Util.mk_stat "rat.ineq_factoring"
 let stat_rat_demod = Util.mk_stat "rat.demod"
 let stat_rat_backward_demod = Util.mk_stat "rat.backward_demod"
+let stat_rat_trivial_ineq = Util.mk_stat "rat.redundant_by_ineq.calls"
+let stat_rat_trivial_ineq_steps = Util.mk_stat "rat.redundant_by_ineq.steps"
+let stat_rat_demod_ineq = Util.mk_stat "rat.demod_ineq.calls"
+let stat_rat_demod_ineq_steps = Util.mk_stat "rat.demod_ineq.steps"
 (*
 let stat_rat_reflexivity_resolution = Util.mk_stat "rat.reflexivity_resolution"
 *)
@@ -36,6 +40,8 @@ let prof_rat_demod = Util.mk_profiler "rat.demod"
 let prof_rat_backward_demod = Util.mk_profiler "rat.backward_demod"
 let prof_rat_semantic_tautology = Util.mk_profiler "rat.semantic_tauto"
 let prof_rat_ineq_factoring = Util.mk_profiler "rat.ineq_factoring"
+let prof_rat_trivial_ineq = Util.mk_profiler "rat.redundant_by_ineq"
+let prof_rat_demod_ineq = Util.mk_profiler "rat.demod_ineq"
 (*
 let prof_rat_reflexivity_resolution = Util.mk_profiler "rat.reflexivity_resolution"
 *)
@@ -60,6 +66,9 @@ module type S = sig
   val register : unit -> unit
 end
 
+let enable_trivial_ineq_ = ref true
+let enable_demod_ineq_ = ref true
+
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
   module Ctx = Env.Ctx
@@ -73,6 +82,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* unit clauses *)
   let _idx_unit_eq = ref (PS.TermIndex.empty ())
+  let _idx_unit_ineq = ref (PS.TermIndex.empty ())
 
   (* apply [f] to some subterms of [c] *)
   let update f c =
@@ -128,6 +138,18 @@ module Make(E : Env.S) : S with module Env = E = struct
                let with_pos = C.WithPos.( {term=t; pos; clause=c;} ) in
                f acc t with_pos)
             !_idx_unit_eq
+      | [| Lit.Rat ({AL.op=AL.Less; _} as alit) |] ->
+        let pos = Position.(arg 0 stop) in
+        _idx_unit_ineq :=
+          if !enable_trivial_ineq_ || !enable_demod_ineq_
+          then AL.fold_terms ~subterms:false ~vars:false ~pos ~which:`Max ~ord alit
+          |> Sequence.fold
+            (fun acc (t,pos) ->
+               assert (not (T.is_var t));
+               let with_pos = C.WithPos.( {term=t; pos; clause=c;} ) in
+               f acc t with_pos)
+            !_idx_unit_ineq
+          else !_idx_unit_ineq
       | _ -> ()
     end;
     ()
@@ -847,6 +869,268 @@ module Make(E : Env.S) : S with module Env = E = struct
       For instance, 0 ≤ f(x)  makes  0 ≤ f(a) + f(b) redundant, but subsumption
       is not able to detect it. *)
 
+  (* allow traces of depth at most 3 *)
+  let max_ineq_trivial_steps = 3
+
+  (* rewrite a literal [l] into a smaller literal [l'], such that [l'] and
+     the current set of unit clauses imply [l]; then compute the
+     transitive closure of this relation. If we obtain a trivial
+     literal, then [l] is redundant (we keep a trace of literals used).
+     We use continuations to deal with the multiple choices. *)
+  let rec _ineq_find_sufficient ~ord ~trace c lit k = match lit with
+    | _ when AL.is_trivial lit -> k (trace,lit)
+    | _ when List.length trace >= max_ineq_trivial_steps ->
+      () (* need another step, but it would exceed the limit *)
+    | {AL.op=AL.Less; _} when Sequence.exists T.is_var (AL.Seq.terms lit) ->
+      ()  (* no way we rewrite this into a tautology *)
+    | {AL.op=AL.Less; _} ->
+      Util.incr_stat stat_rat_trivial_ineq;
+      Util.debugf ~section 5
+        "(@[try_ineq_find_sufficient@ :lit `%a`@ :trace (@[%a@])@])"
+        (fun k->k AL.pp lit (Util.pp_list C.pp) trace);
+      AL.fold_terms ~vars:false ~which:`Max ~ord ~subterms:false lit
+      |> Sequence.iter
+        (fun (t,pos) ->
+           let plit = ALF.get_exn lit pos in
+           let is_left = match pos with
+             | Position.Left _ -> true
+             | Position.Right _ -> false
+             | _ -> assert false
+           in
+           (* try to eliminate [t] in passive lit [plit]*)
+           PS.TermIndex.retrieve_generalizations (!_idx_unit_ineq,1) (t,0)
+           |> Sequence.iter
+             (fun (_t',with_pos,subst) ->
+                let active_clause = with_pos.C.WithPos.clause in
+                let active_pos = with_pos.C.WithPos.pos in
+                match Lits.View.get_rat (C.lits active_clause) active_pos with
+                  | None -> assert false
+                  | Some (ALF.Left (AL.Less, _, _) as alit') when is_left ->
+                    let alit' = ALF.apply_subst_no_renaming subst (alit',1) in
+                    if C.trail_subsumes active_clause c
+                    && ALF.is_strictly_max ~ord alit'
+                    then (
+                      (* scale *)
+                      let plit, _alit' = ALF.scale plit alit' in
+                      let mf1', m2' =
+                        match Lits.View.get_rat (C.lits active_clause) active_pos with
+                          | Some (ALF.Left (_, mf1', m2')) -> mf1', m2'
+                          | _ -> assert false
+                      in
+                      let mf1' = MF.apply_subst_no_renaming subst (mf1',1) in
+                      let m2' = M.apply_subst_no_renaming subst (m2',1) in
+                      (* from t+mf1 ≤ m2  and t+mf1' ≤ m2', we deduce
+                         that if m2'-mf1' ≤ m2-mf1  then [lit] is redundant.
+                         That is, the sufficient literal is
+                         mf1 + m2' ≤ m2 + mf1'  (we replace [t] with [m2'-mf1']) *)
+                      let new_plit =
+                        ALF.replace plit (M.difference m2' (MF.rest mf1')) in
+                      (* transitive closure *)
+                      let trace = active_clause::trace in
+                      _ineq_find_sufficient ~ord ~trace c new_plit k
+                    )
+                  | Some (ALF.Right (AL.Less, _, _) as alit') when not is_left ->
+                    (* symmetric case *)
+                    let alit' = ALF.apply_subst_no_renaming subst (alit',1) in
+                    if C.trail_subsumes active_clause c
+                    && ALF.is_strictly_max ~ord alit'
+                    then (
+                      (* scale *)
+                      let plit, _alit' = ALF.scale plit alit' in
+                      let m1', mf2' =
+                        match Lits.View.get_rat (C.lits active_clause) active_pos with
+                          | Some (ALF.Right (_, m1', mf2')) -> m1', mf2'
+                          | _ -> assert false
+                      in
+                      let mf2' = MF.apply_subst_no_renaming subst (mf2',1) in
+                      let m1' = M.apply_subst_no_renaming subst (m1',1) in
+                      let new_plit =
+                        ALF.replace plit (M.difference m1' (MF.rest mf2')) in
+                      (* transitive closure *)
+                      let trace = active_clause::trace in
+                      _ineq_find_sufficient ~ord ~trace c new_plit k
+                    )
+                  | Some _ ->
+                    ()   (* cannot make a sufficient literal *)
+             )
+        )
+    | _ -> ()
+
+  (* is a literal redundant w.r.t the current set of unit clauses *)
+  let _ineq_is_redundant_by_unit c lit =
+    match lit with
+      | _ when Lit.is_trivial lit || Lit.is_absurd lit ->
+        None  (* something more efficient will take care of it *)
+      | Lit.Rat ({AL.op=AL.Less; _} as alit) ->
+        let ord = Ctx.ord () in
+        let traces =
+          _ineq_find_sufficient ~ord ~trace:[] c alit
+          |> Sequence.head  (* one is enough *)
+        in
+        begin match traces with
+          | Some (trace, _lit') ->
+            assert (AL.is_trivial _lit');
+            let trace = CCList.uniq ~eq:C.equal trace in
+            Some trace
+          | None -> None
+        end
+      | _ -> None
+
+  let is_redundant_by_ineq c =
+    Util.enter_prof prof_rat_trivial_ineq;
+    let res =
+      CCArray.exists
+        (fun lit -> match _ineq_is_redundant_by_unit c lit with
+           | None -> false
+           | Some trace ->
+             Util.debugf ~section 3
+               "@[<2>clause @[%a@]@ trivial by inequations @[%a@]@]"
+               (fun k->k C.pp c (CCFormat.list C.pp) trace);
+             Util.incr_stat stat_rat_trivial_ineq_steps;
+             true)
+        (C.lits c)
+    in
+    Util.exit_prof prof_rat_trivial_ineq;
+    res
+
+  (* allow traces of depth at most 3 *)
+  let max_ineq_demod_steps = 3
+
+  (* rewrite a literal [l] into a smaller literal [l'], such that [l] and
+     the current set of unit clauses imply [l']; then compute the
+     transitive closure of this relation. If we obtain an absurd
+     literal, then [l] is absurd (we keep a trace of literals used).
+     We use continuations to deal with the multiple choices.
+
+     Each step looks like: from [l == (t <= u) && l' == (l <= t)]
+     we deduce [l <= u]. If at some point we deduce [⊥], we win.  *)
+  let rec ineq_find_necessary_ ~ord ~trace c lit k = match lit with
+    | _ when AL.is_absurd lit -> k (trace,lit)
+    | _ when List.length trace >= max_ineq_demod_steps ->
+      () (* need another step, but it would exceed the limit *)
+    | {AL.op=AL.Less; _} when Sequence.exists T.is_var (AL.Seq.terms lit) ->
+      ()  (* too costly (will match too many things) *)
+    | {AL.op=AL.Less; _} ->
+      Util.incr_stat stat_rat_demod_ineq;
+      Util.debugf ~section 5
+        "(@[try_ineq_find_necessary@ :lit `%a`@ :trace (@[%a@])@])"
+        (fun k->k AL.pp lit (Util.pp_list C.pp) trace);
+      AL.fold_terms ~vars:false ~which:`Max ~ord ~subterms:false lit
+      |> Sequence.iter
+        (fun (t,pos) ->
+           let plit = ALF.get_exn lit pos in
+           let is_left = match pos with
+             | Position.Left _ -> true
+             | Position.Right _ -> false
+             | _ -> assert false
+           in
+           (* try to eliminate [t] in passive lit [plit]*)
+           PS.TermIndex.retrieve_generalizations (!_idx_unit_ineq,1) (t,0)
+           |> Sequence.iter
+             (fun (_t',with_pos,subst) ->
+                let active_clause = with_pos.C.WithPos.clause in
+                let active_pos = with_pos.C.WithPos.pos in
+                match Lits.View.get_rat (C.lits active_clause) active_pos with
+                  | None -> assert false
+                  | Some (ALF.Left (AL.Less, _, _) as alit') when not is_left ->
+                    let alit' = ALF.apply_subst_no_renaming subst (alit',1) in
+                    if C.trail_subsumes active_clause c
+                    && ALF.is_strictly_max ~ord alit'
+                    then (
+                      (* scale *)
+                      let plit, _alit' = ALF.scale plit alit' in
+                      let mf1', m2' =
+                        match Lits.View.get_rat (C.lits active_clause) active_pos with
+                          | Some (ALF.Left (_, mf1', m2')) -> mf1', m2'
+                          | _ -> assert false
+                      in
+                      let mf1' = MF.apply_subst_no_renaming subst (mf1',1) in
+                      let m2' = M.apply_subst_no_renaming subst (m2',1) in
+                      (* from m1 ≤ t+mf2  and t+mf1' ≤ m2', we deduce
+                         m1 + mf1' ≤ mf2 + m2'. If this literal is absurd
+                         then so is [m1 ≤ t+mf2].
+                         We replace [t] with [m2'-mf1'] *)
+                      let new_plit =
+                        ALF.replace plit (M.difference m2' (MF.rest mf1')) in
+                      (* transitive closure *)
+                      let trace = active_clause::trace in
+                      ineq_find_necessary_ ~ord ~trace c new_plit k
+                    )
+                  | Some (ALF.Right (AL.Less, _, _) as alit') when is_left ->
+                    (* symmetric case *)
+                    let alit' = ALF.apply_subst_no_renaming subst (alit',1) in
+                    if C.trail_subsumes active_clause c
+                    && ALF.is_strictly_max ~ord alit'
+                    then (
+                      (* scale *)
+                      let plit, _alit' = ALF.scale plit alit' in
+                      let m1', mf2' =
+                        match Lits.View.get_rat (C.lits active_clause) active_pos with
+                          | Some (ALF.Right (_, m1', mf2')) -> m1', mf2'
+                          | _ -> assert false
+                      in
+                      let mf2' = MF.apply_subst_no_renaming subst (mf2',1) in
+                      let m1' = M.apply_subst_no_renaming subst (m1',1) in
+                      let new_plit =
+                        ALF.replace plit (M.difference m1' (MF.rest mf2')) in
+                      (* transitive closure *)
+                      let trace = active_clause::trace in
+                      ineq_find_necessary_ ~ord ~trace c new_plit k
+                    )
+                  | Some _ ->
+                    ()   (* cannot make a sufficient literal *)
+             )
+        )
+    | _ -> ()
+
+  (* is a literal absurd w.r.t the current set of unit clauses *)
+  let _ineq_is_absurd_by_unit c lit =
+    match lit with
+      | _ when Lit.is_trivial lit || Lit.is_absurd lit ->
+        None  (* something more efficient will take care of it *)
+      | Lit.Rat ({AL.op=AL.Less; _} as alit) ->
+        let ord = Ctx.ord () in
+        let traces =
+          ineq_find_necessary_ ~ord ~trace:[] c alit
+          |> Sequence.head  (* one is enough *)
+        in
+        begin match traces with
+          | Some (trace, _lit') ->
+            assert (AL.is_absurd _lit');
+            let trace = CCList.uniq ~eq:C.equal trace in
+            Some trace
+          | None -> None
+        end
+      | _ -> None
+
+  (* demodulate using inequalities *)
+  let demod_ineq c : C.t SimplM.t =
+    Util.enter_prof prof_rat_demod_ineq;
+    let res =
+      CCArray.findi
+        (fun i lit -> match _ineq_is_absurd_by_unit c lit with
+           | None -> None
+           | Some trace ->
+             Util.debugf ~section 3
+               "@[<2>clause @[%a@]@ rewritten by inequations @[%a@]@]"
+               (fun k->k C.pp c (CCFormat.list C.pp) trace);
+             Util.incr_stat stat_rat_demod_ineq_steps;
+             Some (i,trace))
+        (C.lits c)
+    in
+    let res = match res with
+      | None -> SimplM.return_same c
+      | Some (i,cs) ->
+        let lits = CCArray.except_idx (C.lits c) i in
+        let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "rat.demod_ineq")
+            (C.proof_parent c :: List.map C.proof_parent cs)
+        in
+        let c' = C.create lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
+        SimplM.return_new c'
+    in
+    Util.exit_prof prof_rat_demod_ineq;
+    res
+
   (** {3 Others} *)
 
   let _has_rat c = CCArray.exists Lit.is_rat (C.lits c)
@@ -1156,6 +1440,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_backward_simplify canc_backward_demodulation;
     Env.add_is_trivial is_tautology;
     Env.add_unary_simplify convert_lit;
+    if !enable_trivial_ineq_ then (
+      Env.add_redundant is_redundant_by_ineq;
+    );
+    if !enable_demod_ineq_ then (
+      Env.add_active_simplify demod_ineq;
+    );
     Env.add_multi_simpl_rule eliminate_unshielded;
     (* completeness? I don't think so *)
     Ctx.lost_completeness ();
