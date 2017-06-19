@@ -118,7 +118,17 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let selected = lazy (Ctx.select c.lits) in
     create_inner ~penalty ~selected c proof
 
+  let lit_is_false_ = function
+    | Literal.False -> true
+    | _ -> false
+
   let create_a ~penalty ~trail lits proof =
+    (* remove spurious "false" literals automatically *)
+    let lits =
+      if CCArray.exists lit_is_false_ lits
+      then CCArray.filter (fun lit -> not (lit_is_false_ lit)) lits
+      else lits
+    in
     let selected = lazy (Ctx.select lits) in
     create_inner ~penalty ~selected (SClause.make ~trail lits) proof
 
