@@ -7,12 +7,17 @@ module Fmt = CCFormat
 
 (** {2 Time facilities} *)
 
-let start_ = Oclock.gettime Oclock.monotonic
+type timestamp = float
 
-let ns_to_s t = Int64.to_float t /. 1_000_000_000.
+let timestamp_sub a b = a -. b
+let timestamp_add a b = a +. b
+let timestamp_cmp = CCFloat.compare
 
-let total_time_ns () = Int64.sub (Oclock.gettime Oclock.monotonic) start_
-let total_time_s () = ns_to_s (total_time_ns ())
+let get_time_mon_() : timestamp = Unix.gettimeofday()
+
+let start_ = get_time_mon_()
+
+let total_time_s () = timestamp_sub (get_time_mon_()) start_
 let start_time () = start_
 
 (** {2 Misc} *)
@@ -211,10 +216,10 @@ end
 (** A profiler (do not call recursively) *)
 type profiler = {
   prof_name : string;
-  mutable prof_total : int64; (* total time (ns) *)
+  mutable prof_total : timestamp; (* total time *)
   mutable prof_calls : int; (* number of calls *)
-  mutable prof_max : int64; (* max time in the profiled function (ns) *)
-  mutable prof_enter : int64; (* time at which we entered the profiler (ns) *)
+  mutable prof_max : timestamp; (* max time in the profiled function (ns) *)
+  mutable prof_enter : timestamp; (* time at which we entered the profiler (ns) *)
 }
 
 let enable_profiling = ref false
@@ -224,10 +229,10 @@ let profilers = ref []
 let mk_profiler name =
   let prof = {
     prof_name = name;
-    prof_enter = 0L;
-    prof_total = 0L;
+    prof_enter = 0.;
+    prof_total = 0.;
     prof_calls = 0;
-    prof_max = 0L;
+    prof_max = 0.;
   } in
   (* register profiler *)
   profilers := prof :: !profilers;
@@ -235,13 +240,13 @@ let mk_profiler name =
 
 let enter_prof profiler =
   if !enable_profiling
-  then profiler.prof_enter <- Oclock.gettime Oclock.monotonic
+  then profiler.prof_enter <- get_time_mon_ ()
 
 let exit_prof profiler =
   if !enable_profiling then (
-    let stop = Oclock.gettime Oclock.monotonic in
-    let delta = Int64.sub stop profiler.prof_enter in
-    profiler.prof_total <- Int64.add profiler.prof_total delta;
+    let stop = get_time_mon_ () in
+    let delta = timestamp_sub stop profiler.prof_enter in
+    profiler.prof_total <- timestamp_add profiler.prof_total delta;
     profiler.prof_calls <- profiler.prof_calls + 1;
     if delta > profiler.prof_max then profiler.prof_max <- delta;
   )
@@ -269,7 +274,7 @@ let show_profilers out () =
   (* sort profilers by decreasing total time *)
   let profilers =
     List.sort
-      (fun p1 p2 -> - (Int64.compare p1.prof_total p2.prof_total))
+      (fun p1 p2 -> - (timestamp_cmp p1.prof_total p2.prof_total))
       !profilers
   in
   let tot = total_time_s ()in
@@ -279,10 +284,10 @@ let show_profilers out () =
         Format.fprintf out "@[%-39s %10d %9.4f %9.2f %9.4f %9.4f@]@,"
           profiler.prof_name
           profiler.prof_calls
-          (ns_to_s profiler.prof_total)
-          (ns_to_s profiler.prof_total *. 100. /. tot)
-          (ns_to_s profiler.prof_max)
-          ((ns_to_s profiler.prof_total) /. (float_of_int profiler.prof_calls))
+          profiler.prof_total
+          (profiler.prof_total *. 100. /. tot)
+          profiler.prof_max
+          (profiler.prof_total /. (float_of_int profiler.prof_calls))
     )
     profilers;
   Format.fprintf out "@]";

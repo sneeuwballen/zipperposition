@@ -8,14 +8,6 @@
 val total_time_s : unit -> float
 (** time elapsed since start of program, in seconds *)
 
-val total_time_ns : unit -> int64
-
-val start_time : unit -> int64
-(** time at which the program started *)
-
-val ns_to_s : int64 -> float
-(** convert a nanosecond time to a time in seconds *)
-
 (** {2 Misc} *)
 
 (** Debug section *)
