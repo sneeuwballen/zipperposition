@@ -36,6 +36,7 @@ end
 
 let k_some_ho : bool Flex_state.key = Flex_state.create_key()
 let k_enabled : bool Flex_state.key = Flex_state.create_key()
+let k_enable_ho_unif : bool Flex_state.key = Flex_state.create_key()
 
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
@@ -376,17 +377,20 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) else (
       Util.debug ~section 1 "setup HO rules";
       Env.Ctx.lost_completeness();
-      Env.add_unary_inf "ho_prim_enum" prim_enum;
       Env.add_unary_inf "ho_complete_eq" complete_eq_args;
       Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
       Env.add_lit_rule "ho_ext_neg" ext_neg;
-      Env.add_unary_inf "ho_unif" ho_unif;
       Env.add_rewrite_rule "beta_reduce" beta_reduce;
+      if Env.flex_get k_enable_ho_unif then (
+        Env.add_unary_inf "ho_unif" ho_unif;
+        Env.add_unary_inf "ho_prim_enum" prim_enum;
+      );
     );
     ()
 end
 
 let enabled_ = ref true
+let enable_unif_ = ref true
 
 let st_contains_ho (st:(_,_,_) Statement.t): bool =
   let is_non_atomic_ty ty =
@@ -433,6 +437,7 @@ let extension =
     state
     |> Flex_state.add k_some_ho is_ho
     |> Flex_state.add k_enabled !enabled_
+    |> Flex_state.add k_enable_ho_unif (!enabled_ && !enable_unif_)
   in
   { Extensions.default with
       Extensions.name = "ho";
@@ -444,5 +449,7 @@ let () =
   Options.add_opts
     [ "--ho", Arg.Set enabled_, " enable HO reasoning";
       "--no-ho", Arg.Clear enabled_, " disable HO reasoning";
+      "--ho-unif", Arg.Set enable_unif_, " enable full HO unification";
+      "--no-ho-unif", Arg.Clear enable_unif_, " disable full HO unification";
     ];
   Extensions.register extension;
