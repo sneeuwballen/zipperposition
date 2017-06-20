@@ -69,7 +69,7 @@ module PT = struct
            else frequency
                [ 1, map2 f self self
                ; 1, map g self
-               ; 1, map  h self
+               ; 1, map h self
                ; 1, oneof [map2 sum self self; map3 ite self self self]
                ; 3, base
                ])
