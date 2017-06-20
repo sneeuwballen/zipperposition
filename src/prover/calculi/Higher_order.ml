@@ -198,33 +198,38 @@ module Make(E : Env.S) : S with module Env = E = struct
       Some new_lit
     | _ -> None
 
-  (* complete [f = g] into [f x1…xn = g x1…xn] *)
+  (* complete [f = g] into [f x1…xn = g x1…xn] for each [n ≥ 1] *)
   let complete_eq_args (c:C.t) : C.t list =
     let var_offset = C.Seq.vars c |> Type.Seq.max_var |> succ in
     let new_c =
       C.lits c
       |> Sequence.of_array |> Sequence.zip_i |> Sequence.zip
-      |> Sequence.filter_map
+      |> Sequence.flat_map_l
         (fun (lit_idx,lit) -> match lit with
           | Literal.Equation (t, u, true) when Type.is_fun (T.ty t) ->
             let n_ty_args, ty_args, _ = Type.open_poly_fun (T.ty t) in
             assert (n_ty_args = 0);
+            assert (ty_args <> []);
             let vars =
               List.mapi
                 (fun i ty -> HVar.make ~ty (i+var_offset) |> T.var)
                 ty_args
             in
-            let new_lit = Literal.mk_eq (T.app t vars) (T.app u vars) in
-            let new_lits = new_lit :: CCArray.except_idx (C.lits c) lit_idx in
-            let proof =
-              Proof.Step.inference [C.proof_parent c]
-                ~rule:(Proof.Rule.mk "ho_complete_eq")
-            in
-            let new_c =
-              C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
-            in
-            Some new_c
-          | _ -> None)
+            CCList.(1 -- List.length vars)
+            |> List.map
+              (fun prefix_len ->
+                 let vars_prefix = CCList.take prefix_len vars in
+                 let new_lit = Literal.mk_eq (T.app t vars_prefix) (T.app u vars_prefix) in
+                 let new_lits = new_lit :: CCArray.except_idx (C.lits c) lit_idx in
+                 let proof =
+                   Proof.Step.inference [C.proof_parent c]
+                     ~rule:(Proof.Rule.mk "ho_complete_eq")
+                 in
+                 let new_c =
+                   C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
+                 in
+                 new_c)
+          | _ -> [])
       |> Sequence.to_rev_list
     in
     if new_c<>[] then (
