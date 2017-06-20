@@ -310,11 +310,17 @@ module Make(E : Env.S) : S with module Env = E = struct
            let renaming = Ctx.renaming_clear() in
            let subst = Unif_subst.subst us in
            let c_guard = Literal.of_unif_subst ~renaming us in
-           let new_pairs = List.map (CCFun.uncurry Literal.mk_constraint) new_pairs in
-           let new_lits =
-             Literal.apply_subst_list ~renaming subst (other_lits @ new_pairs,0)
+           let new_pairs =
+             List.map
+               (fun (t,u) ->
+                  let t = Subst.FO.apply ~renaming subst (t,0) in
+                  let u = Subst.FO.apply ~renaming subst (u,0) in
+                  Literal.mk_constraint t u)
+               new_pairs
+           and other_lits =
+             Literal.apply_subst_list ~renaming subst (other_lits,0)
            in
-           let all_lits = c_guard @ new_lits in
+           let all_lits = c_guard @ new_pairs @ other_lits in
            let proof =
              Proof.Step.inference ~rule:(Proof.Rule.mk "ho_unif")
                [C.proof_parent_subst (c,0) subst]

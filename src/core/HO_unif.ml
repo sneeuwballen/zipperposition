@@ -343,6 +343,13 @@ module U = struct
               let fail() = raise Unif.Fail in
               let consume_fuel() = st.fuel <- st.fuel - 1 in
               let push_new ~penalty ~subst ~offset rule pairs : unit =
+                (* unify types of pairs *)
+                let subst =
+                  List.fold_left
+                    (fun subst (t,u) ->
+                       Unif.Ty.unify_full ~subst (T.ty t,sc) (T.ty u,sc))
+                    subst pairs
+                in
                 let pb' =
                   mk_pb ~penalty ~subst ~offset (pairs @ pairs_tl)
                   |> normalize_pb sc
