@@ -841,7 +841,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Array.iteri
         (fun i lit ->
            let can_destr_eq_var v =
-             not (var_in_subst_ !us v 0)
+             not (var_in_subst_ !us v 0) && not (Type.is_fun (HVar.ty v))
            in
            if BV.get bv i then match lit with
              | Lit.HO_constraint (l, r)
@@ -1527,4 +1527,3 @@ let () =
     , Arg.Bool (fun b -> _use_simultaneous_sup := b)
     , " enable/disable simultaneous superposition"
     ]
-
