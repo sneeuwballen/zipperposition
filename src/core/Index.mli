@@ -3,6 +3,9 @@
 
 (** {1 Generic term indexing} *)
 
+(** Interfaces for indexing terms (for unification, matching) and clauses
+    (for subsumption) *)
+
 type term = Term.t
 type subst = Subst.t
 

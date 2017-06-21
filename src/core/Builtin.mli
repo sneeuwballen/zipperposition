@@ -1,9 +1,13 @@
 
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
-(** {1 Builtin Objects}
+(** {1 Builtin Objects} *)
 
-    Covers numbers, connectives, and builtin types
+(** Most objects that have a special meaning in logic are represented
+    by a {b builtin}. A builtin is a value of type {!t}; it might
+    correspond to different names in different input syntaxes.
+
+    Builtins cover numbers, connectives, and builtin types, among others.
 
     @since NEXT_RELEASE *)
 

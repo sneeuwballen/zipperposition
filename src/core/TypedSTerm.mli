@@ -1,10 +1,16 @@
 
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
-(** {1 Simple Typed Terms}.
+(** {1 Simple Typed Terms}. *)
 
-    These terms are scoped, and possibly typed. Type inference should be
-    performed on them. *)
+(** Similar to {!STerm}, but this time the terms are properly 
+    scoped (using {!Var}) and typed.
+
+    These terms are suitable for many preprocessing transformations,
+    including {!CNF}.
+    
+    They can be obtained from {!STerm.t} using {!TypeInference}.
+*)
 
 type location = ParseLocation.t
 

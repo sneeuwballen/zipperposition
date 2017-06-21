@@ -1,13 +1,15 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Statement}
+(** {1 Statement} *)
 
-    The input problem is made of {b statements}. Each statement can declare
-    a type, assert a formula, or a conjecture, define a term, etc.
+(** The input problem is made of {b statements}. Each statement can declare
+    a type, assert a formula, or a conjecture, define a term, add
+    a rewrite rule, etc.
 
     Those statements do not necessarily reflect exactly statements in the input
-    language(s) (e.g., TPTP). *)
+    language(s) (e.g., TPTP).
+*)
 
 (** A datatype declaration *)
 type 'ty data = {

@@ -3,6 +3,13 @@
 
 (** {1 De Bruijn environments} *)
 
+(** An environment is used to map De Bruijn indices to objects (or nothing).
+
+    This is low level and should be used with a lot of care
+    (it's mostly used in {!InnerTerm.DB} and a lot of coffee or aspiring
+    at hand.
+*)
+
 type +'a t
 (** An environment that maps De Bruijn indices to values of
     type 'a. *)

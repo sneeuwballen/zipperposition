@@ -1,7 +1,20 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Rewriting} *)
+(** {1 Rewriting on Terms and Literals} *)
+
+(** Rewriting is a (relatively) efficient way of computing on terms
+    and literals using rules that come from the input.
+    Each rule is a pair [lhs, rhs] (left-hand side, right-hand side)
+    that means that objects matching [lhs] should be rewritten into [rhs].
+
+    For term rules, [lhs] and [rhs] are both terms (with [vars rhs ⊆ vars lhs]).
+
+    For literal rules, [lhs] is an atomic literal,
+    and [rhs] is a list of clauses.
+
+    This is used for {b Deduction Modulo} in the prover.
+*)
 
 type term = Term.t
 

@@ -1,9 +1,14 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Main AST before Typing}
+(** {1 Main AST before Typing} *)
 
-    This AST should be output by parsers. *)
+(** Parsers eventually output this AST, that uses simple terms ({!STerm})
+    for types, terms, and formulas.
+
+    Everything is possibly annotated with a parse location so that
+    error messages can be properly localized.
+*)
 
 module Loc = ParseLocation
 module T = STerm

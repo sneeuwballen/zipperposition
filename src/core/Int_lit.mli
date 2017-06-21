@@ -1,7 +1,15 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Arithmetic Literal} *)
+(** {1 Arithmetic Integer Literal} *)
+
+(** A literal for linear integer arithmetic.
+
+    Care has been taken to normalize such literals. Some things are
+    not stable by substitution (e.g. positions in int literals)
+    and therefore there are functions such as {!apply_subst_no_simp}
+    that preserve positions.
+*)
 
 type term = Term.t
 

@@ -1,11 +1,20 @@
 
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
-(** {1 Scoped Terms}
+(** {1 Inner Terms} *)
 
-    Those terms are not designed to be used directly, but rather to provide
+(** Those terms are not designed to be used directly, but rather to provide
     a generic backend (implementing De Bruijn indices, subterms, substitutions,
-    etc.) for other more specific representations like Type, Term, ...
+    etc.) for other more specific representations like {!Type.t} and {!Term.t}.
+
+    The point is that we only have to do substitution, hashconsing,
+    and De Bruijn indices manipulation in one place;
+    it also makes it easy to make terms
+    and types occur in one another (types as parameters to terms, etc.)
+
+    NOTE: this should be used with a lot of caution. Few checks are performed
+    (even typing checks) and it is easy to obtain non-closed terms
+    or ill-typed terms by manipulating this carelessly.
 *)
 
 type t

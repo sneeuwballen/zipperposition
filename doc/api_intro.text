@@ -1,5 +1,6 @@
 
-The documentation can be found {{:rst/contents.html} here}.
+This is the API documentation for Logtk (the library for terms, formulas,
+literals, unification, type inference, etc.), 
 
 {2 API Documentation for Logtk}
 
@@ -61,8 +62,6 @@ UntypedAST
 Util
 Var
 }
-
-A description of modules can be found {{:rst/modules.html} here}.
 
 {2 List of modules}
 

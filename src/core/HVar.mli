@@ -4,6 +4,10 @@
 (** {1 Hashconsed Variable}
 
     A variable for hashconsed terms, paired with a type.
+    Such a ['ty HVar.t] is really a pair [(int, 'ty)]: the integer
+    is used to be able to have several variables in the same clause,
+    the type is because in typed logic we must know the type of variables
+    before unifying/binding them.
 *)
 
 type +'a t = private {

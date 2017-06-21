@@ -3,6 +3,8 @@
 
 (** {1 Signature} *)
 
+(** A signature is a finite mapping from identifiers to types. *)
+
 type t = Type.t ID.Map.t
 (** A signature maps symbols to types *)
 

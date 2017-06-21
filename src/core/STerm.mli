@@ -1,14 +1,17 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 S-like Terms}.
+(** {1 Simple Terms}. *)
 
-    Those terms are not hashconsed, nor do they use De Bruijn indices. Their
-    simplicity make them good for heavy AST transformations, output of parsing,
-    etc.
+(** Simple terms, that are not hashconsed, nor typed.
+    
+    Those do not use De Bruijn indices for variable binding,
+    but simply names (scoping is done later).
+    Their simplicity make them good for heavy AST transformations, output of
+    parsing, etc.
 
     Terms are only compared, hashsed, etc. by their "term" component (the algebraic
-    variant). Additional fields (location...) are ignored for almost every
+    variant). Additional fields (location…) are ignored for almost every
     operation.
 *)
 

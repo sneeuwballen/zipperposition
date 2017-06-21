@@ -3,6 +3,17 @@
 
 (** {1 Array of literals} *)
 
+(** An array of literals is one of the major components of a clause.
+
+    It defines (implicitely) a scope for its variables; applying a substitution
+    should always be done with the same {!Subst.Renaming.t} for
+    all literals in the array.
+
+    This also provides printers, comparison, matching, positions,
+    simplifications, etc.
+    for such arrays of literals.
+*)
+
 type term = Term.t
 
 type t = Literal.t array

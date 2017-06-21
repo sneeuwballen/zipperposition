@@ -3,10 +3,10 @@
 
 (** {1 Unification Substitution} *)
 
-(** A tuple containing:
+(** A tuple for full-unification, containing:
 
     - the substitution itself
-    - delayed constraints
+    - delayed constraints (if any)
 *)
 
 type term = Subst.term

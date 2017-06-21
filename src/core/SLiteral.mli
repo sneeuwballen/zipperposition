@@ -2,9 +2,10 @@
 
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
-(** {1 Simple Literal}
+(** {1 Simple Literal} *)
 
-    Used for reduction to CNF, this is a basic representation of literals *)
+(** Simple literals, used typically in {!CNF} before being converted to
+    whatever representation the prover prefers. *)
 
 type form = TypedSTerm.t
 type term = TypedSTerm.t

@@ -1,7 +1,13 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Polynomes of order 1, over several variables}.
+(** {1 Polynomes of order 1, over several variables}. *)
+
+(** A monome is a linear expression on several "variables".
+
+    We parametrize modules over some class of number (typically,
+    Z or Q) that need to provide some operations. The ['a] parameter
+    is the type of numbers ([Z.t] or [Q.t] from the library Zarith).
 
     Variables, in this module, are non-arithmetic terms, i.e. non-interpreted
     functions and predicates, that occur immediately under an arithmetic

@@ -1,7 +1,10 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Arithmetic Literal} *)
+(** {1 Arithmetic Rational Literal} *)
+
+(** Atomic formulas for linear rational arithmetic.
+    Similar to {!Int_lit}. *)
 
 type term = Term.t
 

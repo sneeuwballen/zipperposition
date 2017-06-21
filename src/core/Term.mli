@@ -1,9 +1,9 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Lambda-free Terms}
+(** {1 Lambda-free Terms} *)
 
-    Those terms provide a first-order presentation of higher-order terms (without
+(** Those terms provide a first-order presentation of higher-order terms (without
     functions), in the sense that they make currying possible (as well as applying
     functions to other terms).
 

@@ -1,14 +1,14 @@
 
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
-(** {1 Simple Cache for Allocations}
+(** {1 Simple Cache for Allocating Arrays} *)
 
+(**
     Be very careful not to use-after-free or double-free.
 
     {b NOT THREAD SAFE}
 
     @since NEXT_RELEASE
-
 *)
 
 module Arr : sig

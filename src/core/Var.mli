@@ -1,9 +1,11 @@
 
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
-(** {1 Variable}
+(** {1 Variable} *)
 
-    A Variable is a pair of a unique Name, and a type.
+(** A Variable is a pair of a unique {!ID.t}, and a type.
+    
+    It is used in {!TypedSTerm.t} for manipulating free and bound variables.
 
     @since NEXT_RELEASE *)
 

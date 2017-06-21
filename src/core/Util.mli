@@ -3,6 +3,12 @@
 
 (** {1 Some helpers} *)
 
+(** Various helpers for the provers.
+
+    It provides counters for statistics, basic profilers, helper functions,
+    debugging functions…
+*)
+
 (** {2 Time facilities} *)
 
 val total_time_s : unit -> float

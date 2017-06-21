@@ -1,7 +1,39 @@
 
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
-(** {1 Reduction to CNF and simplifications} *)
+(** {1 Reduction to CNF and Simplifications} *)
+
+(** {!CNF} allows to transition from a free-form AST (with statements containing
+    formulas as {!TypedSTerm.t}) into an AST using clauses
+    and without some constructs such as "if/then/else" or "match" or "let".
+    The output is more suitable for a Superposition-like prover.
+
+    There also are conversion functions to go from clauses that use
+    {!TypedSTerm.t}, into clauses that use the {!Term.t} (hashconsed,
+    and usable in unification, indexing, etc.).
+
+    We follow chapter 6 "Computing small clause normal forms"
+    of the "handbook of automated reasoning" for the theoretical part.
+
+    A few notes:
+
+    In worst case, normal CNF transformation can lead to an exponential
+    number of clauses, which is prohibitive. To avoid that, we use
+    the Tseitin trick to {b name} some intermediate formulas
+    by introducing fresh symbols (herein named "proxies") and
+    defining them to be equivalent to the formula they define.
+
+    This is done only if we estimate that adding the proxy will
+    reduce the final number of clauses (See [Estimation] module).
+
+    Before doing CNF we remove all the high-level constructs
+    such as pattern-matching and "let" by introducing
+    new symbols and defining the subterm to eliminate using
+    this new symbol (See [Flatten] module).
+    It is important to capture variables properly in this
+    phase (as in closure conversion).
+*)
+
 
 type term = TypedSTerm.t
 type form = TypedSTerm.t
@@ -72,8 +104,8 @@ val cnf_of :
   ?ctx:Skolem.ctx ->
   f_statement ->
   c_statement CCVector.ro_vector
-(** Transform the clause into proper CNF; returns a list of statements,
-    including type declarations for new Skolem symbols or formulas proxys.
+(** Transform the statement into proper CNF; returns a list of statements,
+    including type declarations for new Skolem symbols or formulas proxies.
     Options are used to tune the behavior. *)
 
 val cnf_of_seq :

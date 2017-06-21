@@ -1,10 +1,12 @@
 
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
-(** {1 Substitutions}
+(** {1 Substitutions} *)
 
-    Substitutions map variables to terms/types. They work on free variables (within
-    a scope, so that the same variable can live within several scopes).
+(** Substitutions map (scoped) variables to terms/types.
+    
+    They work on free variables (within a scope, so that the same variable can
+    live within several scopes).
 
     The concept of scope is to allow the same free variable to be used in
     several contexts without being renamed. A scope is kind of a namespace,

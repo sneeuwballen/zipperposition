@@ -1,7 +1,17 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Equational literals} *)
+(** {1 Literals} *)
+
+(** Literals are the representation of atomic formulas in the clausal
+    world of resolution/superposition provers.
+
+    A literal is an atomic formula (equality or predicate), paired with a sign
+    that carries negation.
+
+    We also have special arithmetic literals that have the intuitive meaning,
+    see {!Int_lit} and {!Rat_lit} for more details.
+*)
 
 type term = Term.t
 

@@ -3,6 +3,14 @@
 
 (** {1 Term Orderings} *)
 
+(** Term orderings are well-founded orderings on terms, that
+    (usually) have some nice properties for Superposition, such as being
+    total on ground terms, stable by substitution,
+    and stable by context (monotonic).
+
+    We provide several classic orderings, such as RPO and KBO.
+*)
+
 (* TODO: compute orderings modulo a substitution *)
 
 (** {2 Type definitions} *)

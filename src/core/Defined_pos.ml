@@ -1,7 +1,7 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Defined position} *)
+(** {1 Defined positions for Defined Functions} *)
 
 module Fmt = CCFormat
 

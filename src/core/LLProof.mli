@@ -3,6 +3,14 @@
 
 (** {1 Low Level Proofs} *)
 
+(** Low level proofs, intended for mechanical proof checking.
+
+    Instantiations (substitutions) are explicit because that should make
+    the job of the checker easier.
+
+    NOTE: this is still uncooked, and will probably change.
+*)
+
 type term = TypedSTerm.t
 type ty = term
 type form = TypedSTerm.Form.t

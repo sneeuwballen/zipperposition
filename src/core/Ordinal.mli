@@ -8,6 +8,8 @@
 
     An ordinal is either 0 or a finite sum [Σ_i nᵢ . ω^bᵢ] where each [bᵢ]
     is itself an ordinal.
+
+    NOTE: experimental module; also performance might not be great.
 *)
 
 type t = private

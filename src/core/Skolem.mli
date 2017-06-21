@@ -3,6 +3,13 @@
 
 (** {1 Skolem symbols} *)
 
+(** A Skolem symbol is a witness for an existential property, used
+    in {!CNF}.
+
+    Typically, we transform [∃x. p(x)] into [p(sk_x)] where [sk_x]
+    is a fresh Skolem constant, "witnessing" the existential property.
+*)
+
 type type_ = TypedSTerm.t
 type term = TypedSTerm.t
 type form = TypedSTerm.t

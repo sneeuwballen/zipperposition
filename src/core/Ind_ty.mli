@@ -3,6 +3,10 @@
 
 (** {1 Inductive Types} *)
 
+(** An inductive datatype, defined by a list of constructors
+    (and associated projectors that are defined as partial functions).
+    Inductive types can be mutually recursive. *)
+
 val section : Util.Section.t
 
 (** Constructor for an inductive type *)

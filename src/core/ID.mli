@@ -1,13 +1,26 @@
 
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
-(** {1 Unique Identifiers}
+(** {1 Unique Identifiers} *)
 
-    An {!ID.t} is a unique identifier (an integer) with a human-readable name.
+(** An {!ID.t} is a unique identifier (an integer) with a human-readable name.
     We use those to give names to variables that are not hashconsed (the hashconsing
-    does not play nice with names)
+    does not play nice with names).
 
-    @since NEXT_RELEASE *)
+    An identifier is primarily determined by its [id] (a unique number for
+    this identifier), and contains a string name for readability.
+    Sometimes we display identifiers as "name/id".
+
+    Identifiers are {b generative}: you can easily create new ones
+    or copy them.
+
+    Identifiers can carry some {b payload} (values, of type {!exn} because
+    it's extensible). It is useful to remember easily some
+    information about the identifier (e.g. special sugar notation,
+    whether it's a skolem, etc.)
+
+    @since NEXT_RELEASE
+*)
 
 type t = private {
   id: int;

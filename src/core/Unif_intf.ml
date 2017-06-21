@@ -1,6 +1,8 @@
 
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
+(** {1 Interface for unification} *)
+
 type unif_subst = Unif_subst.t
 type subst = Subst.t
 

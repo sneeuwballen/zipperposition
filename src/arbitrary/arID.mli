@@ -1,7 +1,7 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Arbitrary generation of symbols} *)
+(** {1 Arbitrary generation of Identifiers} *)
 
 open Logtk
 

@@ -1,12 +1,12 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Utils for Parsing} *)
-
 open Logtk
 open CCResult.Infix
 
-let parse_tptp file =
+type 'a or_error = ('a, string) CCResult.t
+
+let parse_tptp file : _ or_error =
   Util_tptp.parse_file ~recursive:true file
   >|= Sequence.map Util_tptp.to_ast
 
