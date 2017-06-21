@@ -576,6 +576,7 @@ let subterm =
 let tbl_ =
   let h = Hashtbl.create 5 in
   Hashtbl.add h "rpo6" rpo6;
+  Hashtbl.add h "lfhorpo" lfhorpo;
   Hashtbl.add h "kbo" kbo;
   Hashtbl.add h "none" (fun _ -> none);
   Hashtbl.add h "subterm" (fun _ -> subterm);
