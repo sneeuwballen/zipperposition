@@ -1474,9 +1474,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Env.add_rw_simplify rw_simplify;
     Env.add_basic_simplify basic_simplify;
     Env.add_active_simplify active_simplify;
-    Env.add_backward_simplify backward_simplify;
+       Env.add_backward_simplify backward_simplify; 
     Env.add_redundant redundant;
-    Env.add_backward_redundant backward_redundant;
+      Env.add_backward_redundant backward_redundant;
     if !_use_semantic_tauto
     then Env.add_is_trivial is_semantic_tautology;
     Env.add_is_trivial is_trivial;

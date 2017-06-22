@@ -407,6 +407,118 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
     res
 
+  module TVar = struct
+    type t = Type.t HVar.t
+    let equal = HVar.equal Type.equal
+    let hash = HVar.hash
+    let compare = HVar.compare Type.compare
+  end
+  module VarTermMultiMap = CCMultiMap.Make (TVar) (Term)
+  module VTbl = CCHashtbl.Make(TVar)
+
+  let purify_applied_variable c =
+    (* set of new literals *)
+    let new_lits = ref [] in
+    let cache_replacement_ = T.Tbl.create 8 in  (* cache for term headed by variable -> replacement variable *)
+    let cache_untouched_ = VTbl.create 8 in  (* cache for variable -> untouched term *)
+    let add_lit_ lit = new_lits := lit :: !new_lits in
+    (* index of the next fresh variable *)
+    let varidx =
+      Literals.Seq.terms (C.lits c)
+      |> Sequence.flat_map T.Seq.vars
+      |> T.Seq.max_var |> succ
+      |> CCRef.create
+    in
+    let replacement_var t =
+      Util.debugf ~section 5
+        "(@[<2>must_purify@ :term `@[%a@]`@ ])"
+        (fun k->k T.pp t);
+      try T.Tbl.find cache_replacement_ t
+      with Not_found ->
+        let head, _ = T.as_app t in
+        let ty = T.ty head in
+        let v = T.var_of_int ~ty (CCRef.get_then_incr varidx) in
+        let lit = Literal.mk_neq v head in
+        add_lit_ lit;
+        T.Tbl.add cache_replacement_ t v;
+        v
+    in
+    (* Term should be purified if this is the first term we encounter with this variable as head
+       or it is equal to the first term encountered *)
+    let should_purify t v toplevel =
+      if toplevel && T.is_var t then (
+        Util.debugf ~section 5
+          "Will not purify because toplevel: %a"
+          (fun k->k T.pp t);
+        false
+      )
+      else (
+        try (
+          if t = VTbl.find cache_untouched_ v then (
+            Util.debugf ~section 5
+              "Leaving untouched: %a"
+              (fun k->k T.pp t);false
+          )
+          else (
+            Util.debugf ~section 5
+              "To purify: %a"
+              (fun k->k T.pp t);true
+          )
+        )
+        with Not_found ->
+          VTbl.add cache_untouched_ v t;
+          Util.debugf ~section 5
+            "Add untouched term: %a"
+            (fun k->k T.pp t);
+          false
+      )
+    in
+    (* purify a term (adding constraints to the list).
+    *)
+    let rec purify_term toplevel t =
+      let head, args = T.as_app t in
+      match T.as_var head with
+      | Some v ->
+        if should_purify t v toplevel then (
+          Util.debugf ~section 5
+            "Purifying: %a. Untouched is: %a"
+            (fun k->k T.pp t T.pp (VTbl.find cache_untouched_ v));
+          T.app
+            (replacement_var t)
+            (List.map (purify_term false) args)
+        )
+        else
+          T.app
+            head
+            (List.map (purify_term false) args)
+      | None ->
+        T.app
+          head
+          (List.map (purify_term false) args)
+    in
+    let purify_lit lit =
+      Literal.map (purify_term true) lit
+    in
+    (* try to purify *)
+
+    Util.debugf ~section 5
+      "Attempting purification %a"
+      (fun k->k C.pp c);
+    let lits' = Array.map purify_lit (C.lits c) in
+    begin match !new_lits with
+      | [] -> SimplM.return_same c
+      | _::_ ->
+        (* replace! *)
+        let all_lits = !new_lits @ (Array.to_list lits') in
+        let parent = C.proof_parent c in
+        let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "ho.purify_applied_variable") [parent] in
+        let new_clause = (C.create ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof) in
+        Util.debugf ~section 5
+          "Old: %a New: %a"
+          (fun k->k C.pp c C.pp new_clause);
+        SimplM.return_new new_clause
+    end
+
   (* ensure that combinators are defined functions *)
   let declare_combinators() =
     let module RW = Rewrite in
@@ -434,6 +546,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_unary_inf "ho_complete_eq" complete_eq_args;
     Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
     Env.add_unary_inf "ho_factor" factor_rule;
+    Env.add_unary_simplify purify_applied_variable;
     Env.add_lit_rule "ho_ext_neg" ext_neg;
     ()
 end
