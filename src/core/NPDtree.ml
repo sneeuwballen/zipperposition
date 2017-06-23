@@ -32,6 +32,8 @@ let open_term ~stack t = match T.view t with
     Some {cur_term=t; stack=[]::stack;}
   | _ when not (Unif.Ty.type_is_unifiable (T.ty t)) ->
     Some {cur_term=t; stack=[]::stack;} (* opaque constant *)
+  | T.App (f, _) when (T.is_var f) ->
+    Some {cur_term=t; stack=[]::stack;} (* higher-order term *)
   | T.App (_, l) ->
     Some {cur_term=t; stack=l::stack;}
 
