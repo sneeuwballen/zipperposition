@@ -179,6 +179,47 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   exception ExitSuperposition of string
 
+  (* check for hidden superposition at variables,
+     e.g. superposing g x = f x into h (x b) = a to give h (f b) = a *)
+  let is_hidden_sup_at_var info =
+    let open SupInfo in
+    let active_idx = Lits.Pos.idx info.active_pos in
+    begin match T.view info.u_p with
+      | T.App (head, args) ->
+        begin match T.as_var head with
+          | Some _ ->
+            (* rewritten term is variable-headed *)
+            begin match T.view info.s, T.view info.t  with
+              | T.App (f, ss), T.App (g, tt) ->
+                let s_args = Array.of_list ss in
+                let t_args = Array.of_list tt in
+                Array.length s_args >= List.length args
+                && Array.length t_args >= List.length args
+                (* Check whether the last argument(s) of s and t are equal *)
+                && Array.sub s_args (Array.length s_args - List.length args) (List.length args) =
+                   Array.sub t_args (Array.length t_args - List.length args) (List.length args)
+                (* Check whether they are all variables that occur nowhere else *)
+                && CCList.(Array.length s_args - List.length args --^ Array.length s_args)
+                   |> List.for_all (fun idx ->
+                       match T.as_var (Array.get s_args idx) with
+                       | Some v ->
+                         (* Check whether variable occurs in previous arguments: *)
+                         not (Array.exists (T.var_occurs ~var:v) (Array.sub s_args 0 idx))
+                         && not (Array.exists (T.var_occurs ~var:v) (Array.sub t_args 0 (Array.length t_args - List.length args))
+                         (* Check whether variable occurs in heads: *)
+                         && not (T.var_occurs ~var:v f)
+                         && not (T.var_occurs ~var:v g)
+                         (* Check whether variable occurs in other literals: *)
+                         && not (List.exists (Literal.var_occurs v) (CCArray.except_idx (C.lits info.active) active_idx)))
+                       | None -> false
+                     )
+              | _ -> false
+            end
+          | None -> false
+        end
+      | _ -> false
+    end
+
   (* Helper that does one or zero superposition inference, with all
      the given parameters. Clauses have a scope. *)
   let do_classic_superposition info acc =
@@ -227,6 +268,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
       ) then raise (ExitSuperposition "bad ordering conditions");
       (* ordering constraints are ok *)
+      (* Check for hidden superposition at variable *)
+      if is_hidden_sup_at_var info then raise (ExitSuperposition "hidden superposition at variable");
       let lits_a = CCArray.except_idx (C.lits info.active) active_idx in
       let lits_p = CCArray.except_idx (C.lits info.passive) passive_idx in
       (* replace s\sigma by t\sigma in u|_p\sigma *)
@@ -312,6 +355,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx) ||
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
       ) then raise (ExitSuperposition "bad ordering conditions");
+      (* Check for hidden superposition at variable *)
+      if is_hidden_sup_at_var info then raise (ExitSuperposition "hidden superposition at variable");
       (* ordering constraints are ok, build new active lits (excepted s=t) *)
       let lits_a = CCArray.except_idx (C.lits info.active) active_idx in
       let lits_a = Lit.apply_subst_list ~renaming subst (lits_a, sc_a) in
@@ -1474,7 +1519,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Env.add_rw_simplify rw_simplify;
     Env.add_basic_simplify basic_simplify;
     Env.add_active_simplify active_simplify;
-       Env.add_backward_simplify backward_simplify; 
+       Env.add_backward_simplify backward_simplify;
     Env.add_redundant redundant;
       Env.add_backward_redundant backward_redundant;
     if !_use_semantic_tauto
