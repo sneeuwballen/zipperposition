@@ -201,9 +201,11 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* complete [f = g] into [f x1…xn = g x1…xn] for each [n ≥ 1] *)
   let complete_eq_args (c:C.t) : C.t list =
     let var_offset = C.Seq.vars c |> Type.Seq.max_var |> succ in
+    let eligible = C.Eligible.param c in
     let new_c =
       C.lits c
       |> Sequence.of_array |> Sequence.zip_i |> Sequence.zip
+      |> Sequence.filter (fun (idx,lit) -> eligible idx lit)
       |> Sequence.flat_map_l
         (fun (lit_idx,lit) -> match lit with
           | Literal.Equation (t, u, true) when Type.is_fun (T.ty t) ->
@@ -239,6 +241,58 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun k->k C.pp c (Util.pp_list ~sep:" " C.pp) new_c);
     );
     new_c
+
+(* reverse complete_eq_args: f X = g X becomes f = g,
+   only if the variable occors nowhere else in the clause.
+   Removes variables in all literals at once,
+   but only one variable at a time for each literal.
+  *)
+  let positive_extensionality c =
+    let new_lits = C.lits c
+      |> Sequence.of_array |> Sequence.mapi
+        (fun lit_idx lit -> match lit with
+           | Literal.Equation (t, s, true)  ->
+             begin match T.view t , T.view s with
+               | T.App (f, tt), T.App (g, ss) ->
+               let lastt = List.hd (List.rev tt) in
+               let lasts = List.hd (List.rev ss) in
+               if lastt = lasts then
+                 match T.as_var lastt with
+                 | Some v ->
+                   if not (T.var_occurs ~var:v f)
+                   && not (T.var_occurs ~var:v g)
+                   && not (List.exists (T.var_occurs ~var:v) (List.tl (List.rev tt)))
+                   && not (List.exists (T.var_occurs ~var:v) (List.tl (List.rev ss)))
+                   && not (List.exists (Literal.var_occurs v) (CCArray.except_idx (C.lits c) lit_idx))
+                   then
+                     let butlast = (fun l -> List.rev (List.tl (List.rev l))) in
+                     Literal.mk_eq (T.app f (butlast tt)) (T.app g (butlast ss))
+                   else
+                     lit
+                 | None -> lit
+               else
+                 lit
+             | _ -> lit
+             end
+           | _ -> lit
+        )
+      |> Sequence.to_list
+    in
+    if new_lits<>Array.to_list (C.lits c) then (
+      let parent = C.proof_parent c in
+      let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "ho.positive_extensionality") [parent] in
+      let new_c = (C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof) in (
+        Util.debugf ~section 4
+          "(@[positive-extensionality@ :clause %a@ :yields %a"
+          (fun k->k C.pp c C.pp new_c);
+        [new_c]
+      )
+    )
+    else
+      []
+
+
+
 
   (* try to eliminate a predicate variable in one fell swoop *)
   let elim_pred_variable (c:C.t) : C.t list =
@@ -416,12 +470,17 @@ module Make(E : Env.S) : S with module Env = E = struct
   module VarTermMultiMap = CCMultiMap.Make (TVar) (Term)
   module VTbl = CCHashtbl.Make(TVar)
 
+(* Purify variables with different arguments.
+   g X = X a \/ X a = b becomes g X = Y a \/ Y a = b \/ X != Y.
+   Variables at the top level (= naked variables) are not affected. *)
   let purify_applied_variable c =
     (* set of new literals *)
     let new_lits = ref [] in
-    let cache_replacement_ = T.Tbl.create 8 in  (* cache for term headed by variable -> replacement variable *)
-    let cache_untouched_ = VTbl.create 8 in  (* cache for variable -> untouched term *)
     let add_lit_ lit = new_lits := lit :: !new_lits in
+    (* cache for term headed by variable -> replacement variable *)
+    let cache_replacement_ = T.Tbl.create 8 in
+    (* cache for variable -> untouched term (the first term we encounter with a certain variable as head) *)
+    let cache_untouched_ = VTbl.create 8 in
     (* index of the next fresh variable *)
     let varidx =
       Literals.Seq.terms (C.lits c)
@@ -429,10 +488,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> T.Seq.max_var |> succ
       |> CCRef.create
     in
+    (* variable used to purify a term *)
     let replacement_var t =
-      Util.debugf ~section 5
-        "(@[<2>must_purify@ :term `@[%a@]`@ ])"
-        (fun k->k T.pp t);
       try T.Tbl.find cache_replacement_ t
       with Not_found ->
         let head, _ = T.as_app t in
@@ -443,8 +500,10 @@ module Make(E : Env.S) : S with module Env = E = struct
         T.Tbl.add cache_replacement_ t v;
         v
     in
-    (* Term should be purified if this is the first term we encounter with this variable as head
-       or it is equal to the first term encountered *)
+    (* Term should not be purified if
+       - this is a naked variable at the top level or
+       - this is the first term we encounter with this variable as head or
+       - it is equal to the first term encountered with this variable as head *)
     let should_purify t v toplevel =
       if toplevel && T.is_var t then (
         Util.debugf ~section 5
@@ -473,13 +532,13 @@ module Make(E : Env.S) : S with module Env = E = struct
           false
       )
     in
-    (* purify a term (adding constraints to the list).
-    *)
+    (* purify a term *)
     let rec purify_term toplevel t =
       let head, args = T.as_app t in
       match T.as_var head with
       | Some v ->
         if should_purify t v toplevel then (
+          (* purify *)
           Util.debugf ~section 5
             "Purifying: %a. Untouched is: %a"
             (fun k->k T.pp t T.pp (VTbl.find cache_untouched_ v));
@@ -487,23 +546,20 @@ module Make(E : Env.S) : S with module Env = E = struct
             (replacement_var t)
             (List.map (purify_term false) args)
         )
-        else
+        else (* dont purify *)
           T.app
             head
             (List.map (purify_term false) args)
-      | None ->
+      | None -> (* dont purify *)
         T.app
           head
           (List.map (purify_term false) args)
     in
+    (* purify a literal *)
     let purify_lit lit =
       Literal.map (purify_term true) lit
     in
     (* try to purify *)
-
-    Util.debugf ~section 5
-      "Attempting purification %a"
-      (fun k->k C.pp c);
     let lits' = Array.map purify_lit (C.lits c) in
     begin match !new_lits with
       | [] -> SimplM.return_same c
@@ -514,7 +570,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "ho.purify_applied_variable") [parent] in
         let new_clause = (C.create ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof) in
         Util.debugf ~section 5
-          "Old: %a New: %a"
+          "Purified: Old: %a New: %a"
           (fun k->k C.pp c C.pp new_clause);
         SimplM.return_new new_clause
     end
@@ -546,6 +602,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_unary_inf "ho_complete_eq" complete_eq_args;
     Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
     Env.add_unary_inf "ho_factor" factor_rule;
+    Env.add_unary_inf "ho_positive_extensionality" positive_extensionality;
     Env.add_unary_simplify purify_applied_variable;
     Env.add_lit_rule "ho_ext_neg" ext_neg;
     ()
