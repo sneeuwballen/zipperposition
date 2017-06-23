@@ -24,7 +24,7 @@ type stats = {
   n_nocheck: int;
 }
 
-let section = Util.Section.make "llproof_check"
+let section = LLProof.section
 let prof_check = Util.mk_profiler "llproof_check.step"
 
 let pp_res out = function

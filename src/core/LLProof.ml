@@ -8,6 +8,8 @@ module F = T.Form
 module Ty = T.Ty
 module Fmt = CCFormat
 
+let section = Util.Section.make "llproof"
+
 type term = TypedSTerm.t
 type ty = term
 type form = TypedSTerm.Form.t

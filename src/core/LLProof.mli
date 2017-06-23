@@ -11,6 +11,8 @@
     NOTE: this is still uncooked, and will probably change.
 *)
 
+val section : Util.Section.t
+
 type term = TypedSTerm.t
 type ty = term
 type form = TypedSTerm.Form.t
