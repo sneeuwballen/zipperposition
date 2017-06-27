@@ -9,6 +9,8 @@ provers = [ "zipperposition", "hornet", "zipperposition-avatar" ]
 problems = ".*.zf"
 dir = [ "examples", "tests" ]
 
+default_expect = "unsat"
+
 [zipperposition]
 
 binary = "./zipperposition.native"
