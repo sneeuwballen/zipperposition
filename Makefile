@@ -78,41 +78,46 @@ dot:
 	for i in *.dot; do dot -Tsvg "$$i" > "$$( basename $$i .dot )".svg; done
 
 TEST_FILES = tests/ examples/
+TEST_TOOL = logitest
+TEST_OPTS ?= -j 2
 
-frogtest:
-	frogtest run -c ./tests/conf.toml $(TEST_FILES)
+check-test-tool:
+	@if ! ( which $(TEST_TOOL) > /dev/null ) ; then echo "install $(TEST_TOOL)"; exit 1; fi
 
-frogtest-zipper:
-	frogtest run -p zipperposition -c ./tests/conf.toml $(TEST_FILES)
+$(TEST_TOOL): check-test-tool
+	$(TEST_TOOL) run -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES)
 
-frogtest-hornet:
-	frogtest run -p hornet -c ./tests/conf.toml $(TEST_FILES)
+$(TEST_TOOL)-zipper: check-test-tool
+	$(TEST_TOOL) run -p zipperposition -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES)
+
+$(TEST_TOOL)-hornet: check-test-tool
+	$(TEST_TOOL) run -p hornet -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES)
 
 tip-benchmarks:
 	git submodule update --init tip-benchmarks
 
-frogtest-tip: tip-benchmarks
+$(TEST_TOOL)-tip: check-test-tool tip-benchmarks
 	@[ -d tip-benchmarks ] || (echo "missing tip-benchmarks/" && exit 1)
-	frogtest run --meta=`git rev-parse HEAD` -c ./data/tip.toml
+	$(TEST_TOOL) run --meta=`git rev-parse HEAD` -c ./data/tip.toml $(TEST_OPTS) 
 
-# restricted version of frogtest-tip
-frogtest-tip-isaplanner: tip-benchmarks
+# restricted version of $(TEST_TOOL)-tip
+$(TEST_TOOL)-tip-isaplanner: check-test-tool tip-benchmarks
 	@[ -d tip-benchmarks ] || (echo "missing tip-benchmarks/" && exit 1)
-	frogtest run --meta=`git rev-parse HEAD` -c ./data/tip.toml \
-	  tip-benchmarks/benchmarks/isaplanner/
+	$(TEST_TOOL) run --meta=`git rev-parse HEAD` -c ./data/tip.toml \
+	  $(TEST_OPTS) tip-benchmarks/benchmarks/isaplanner/
 
-frogtest-thf:
-	frogtest run -c data/bench.toml --profile=thf
+$(TEST_TOOL)-thf: check-test-tool
+	$(TEST_TOOL) run -c data/bench.toml --profile=thf $(TEST_OPTS)
 
 BENCH_DIR="bench-$(shell date -Iminutes)"
-frogtest-tptp:
+$(TEST_TOOL)-tptp:
 	@echo "start benchmarks in ${BENCH_DIR}"
 	mkdir -p ${BENCH_DIR}
 	cp zipperposition.native hornet.native ${BENCH_DIR}/
 	ln -s ../tptp/ ${BENCH_DIR}/tptp
 	cp data/bench.toml ${BENCH_DIR}/conf.toml
-	cd ${BENCH_DIR} && frogtest run --meta=`git rev-parse HEAD` \
-	  -c conf.toml
+	cd ${BENCH_DIR} && $(TEST_TOOL) run --meta=`git rev-parse HEAD` \
+	  -c conf.toml $(TEST_OPTS)
 
 TARBALL=zipperposition.tar.gz
 
