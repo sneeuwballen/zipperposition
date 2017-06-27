@@ -195,6 +195,8 @@ let is_bind t = match view t with | Bind _ -> true | _ -> false
 let is_app t = match view t with | App _ -> true | _ -> false
 let is_tType t = match view t with AppBuiltin (Builtin.TType, _) -> true | _ -> false
 
+let is_lambda t = match view t with Bind (Binder.Lambda, _, _) -> true | _ -> false
+
 (** {3 Payload} *)
 
 let payload t = t.payload
@@ -715,7 +717,7 @@ let rec head t = match view t with
   | App (h, _) -> head h
 
 let type_is_unifiable (ty:t): bool = match view ty with
-  | AppBuiltin ((Builtin.Arrow | Builtin.TyInt | Builtin.TyRat), _)
+  | AppBuiltin ((Builtin.TyInt | Builtin.TyRat), _)
   | Bind (Binder.ForallTy, _, _) -> false
   | _ -> true
 

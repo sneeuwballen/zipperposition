@@ -18,3 +18,12 @@ val whnf_list : term -> term list -> term
 
 val snf : term -> term
 (** Strong normal form, computing under lambdas and subterms *)
+
+(** Low level interface *)
+module Inner : sig
+  type term = InnerTerm.t
+
+  val whnf : term -> term
+
+  val snf : term -> term
+end

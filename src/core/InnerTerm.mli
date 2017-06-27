@@ -91,6 +91,8 @@ val is_const : t -> bool
 val is_bind : t -> bool
 val is_app : t -> bool
 
+val is_lambda : t -> bool
+
 val hashcons_stats : unit -> int*int*int*int*int*int
 
 (** {3 Payload} *)
