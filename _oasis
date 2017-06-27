@@ -258,15 +258,6 @@ Executable tptp_to_zf
   MainIs:           tptp_to_zf.ml
   BuildDepends:     logtk, logtk.parsers
 
-# Orienting rewrite rules with LPO
-Executable orient
-  Path:             src/tools/orient/
-  Build$:           flag(tools) && flag(parsers) && flag(solving)
-  Install$:         flag(tools) && flag(parsers) && flag(solving)
-  CompiledObject:   native
-  MainIs:           orient.ml
-  BuildDepends:     logtk, logtk.parsers, logtk.solving, msat
-
 # proof checking
 Executable proof_check_tstp
   Path:             src/tools/
