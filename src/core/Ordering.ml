@@ -387,8 +387,8 @@ module LFHORPO : ORD = struct
   and lfhorpo_composite ~prec s t f g ss ts =
     begin match prec_compare prec f g  with
       | Eq ->
-        cLMA ~prec s t ss ts  (* lexicographic subterm comparison *)
-        (* TODO: add multiset order *)
+        cLLMA ~prec s t ss ts  (* length-lexicographic subterm comparison *)
+          (* TODO: add other extensions *)
       | Gt -> cMA ~prec s ts
       | Lt -> Comparison.opp (cMA ~prec t ss)
       | Incomparable -> cAA ~prec s t ss ts
@@ -412,13 +412,16 @@ module LFHORPO : ORD = struct
         | Incomparable -> cAA ~prec s t ss' ts'
       end
     | [], [] -> Eq
-
-    (* below are rules for extending to HO terms, likely
-       incomplete and dangerous!
-       TODO: instead compare types, which MUST be distinct in
-       this case since the head symbol is the same *)
     | [], _::_ -> Lt
     | _::_, [] -> Gt
+  (** length-lexicographic comparison of s=f(ss), and t=f(ts) *)
+  and cLLMA ~prec s t ss ts =
+    if List.length ss = List.length ts then
+      cLMA ~prec s t ss ts
+    else if List.length ss > List.length ts then
+      cMA ~prec s ts
+    else
+      Comparison.opp (cMA ~prec t ss)
   (** multiset comparison of subterms (not optimized) *)
   and cMultiset ~prec ss ts =
     MT.compare_partial_l (lfhorpo ~prec) ss ts

@@ -167,7 +167,13 @@ let test_lfhorpo _ =
   let x = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty)  ()) in
   let a = Term.const ~ty a_ in
   let b = Term.const ~ty b_ in
-  assert_equal (compare (Term.app f [Term.app x [b]]) (Term.app x [a])) Comparison.Gt
+  assert_equal (compare (Term.app f [Term.app x [b]]) (Term.app x [a])) Comparison.Gt;
+
+(* f a a > f b  ( test for length-lexicographic extension ) *)
+  let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  assert_equal (compare (Term.app f [a;a]) (Term.app f [b])) Comparison.Gt
 
 
 let suite =
