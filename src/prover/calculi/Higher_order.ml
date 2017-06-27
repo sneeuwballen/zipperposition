@@ -38,6 +38,7 @@ let k_some_ho : bool Flex_state.key = Flex_state.create_key()
 let k_enabled : bool Flex_state.key = Flex_state.create_key()
 let k_enable_ho_unif : bool Flex_state.key = Flex_state.create_key()
 let k_enable_ho_prim : bool Flex_state.key = Flex_state.create_key()
+let k_ho_prim_max_penalty : int Flex_state.key = Flex_state.create_key()
 
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
@@ -272,9 +273,12 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Sequence.to_rev_list
     end
 
+  (* maximum penalty on clauses to perform Primitive Enum on *)
+  let max_penalty_prim_ = E.flex_get k_ho_prim_max_penalty
+
   (* rule for primitive enumeration of predicates [P t1…tn]
      (using ¬ and ∧ and =) *)
-  let prim_enum (c:C.t) : C.t list =
+  let prim_enum_ (c:C.t) : C.t list =
     (* set of variables to refine (only those occurring in "interesting" lits) *)
     let vars =
       Literals.fold_lits ~eligible:C.Eligible.always (C.lits c)
@@ -323,6 +327,11 @@ module Make(E : Env.S) : S with module Env = E = struct
            new_c)
       |> Sequence.to_rev_list
     end
+
+  let prim_enum c =
+    if C.penalty c < max_penalty_prim_
+    then prim_enum_ c
+    else []
 
   let pp_pairs_ out =
     let open CCFormat in
@@ -427,6 +436,7 @@ end
 let enabled_ = ref true
 let enable_unif_ = ref true
 let enable_prim_ = ref true
+let prim_max_penalty = ref 15 (* FUDGE *)
 
 let st_contains_ho (st:(_,_,_) Statement.t): bool =
   let is_non_atomic_ty ty =
@@ -475,6 +485,7 @@ let extension =
     |> Flex_state.add k_enabled !enabled_
     |> Flex_state.add k_enable_ho_unif (!enabled_ && !enable_unif_)
     |> Flex_state.add k_enable_ho_prim (!enabled_ && !enable_prim_)
+    |> Flex_state.add k_ho_prim_max_penalty !prim_max_penalty
   in
   { Extensions.default with
       Extensions.name = "ho";
@@ -490,5 +501,6 @@ let () =
       "--no-ho-unif", Arg.Clear enable_unif_, " disable full HO unification";
       "--ho-prim-enum", Arg.Set enable_unif_, " enable HO primitive enum";
       "--no-ho-prim-enum", Arg.Clear enable_unif_, " disable HO primitive enum";
+      "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
     ];
   Extensions.register extension;
