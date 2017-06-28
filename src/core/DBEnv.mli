@@ -74,6 +74,8 @@ val num_bindings : _ t -> int
 val map : ('a -> 'b) -> 'a t -> 'b t
 (** Map bound objects to other bound objects *)
 
+val filteri : (int -> 'a -> bool) -> 'a t -> 'a t
+
 val of_list : (int * 'a) list -> 'a t
 (** Map indices to objects *)
 

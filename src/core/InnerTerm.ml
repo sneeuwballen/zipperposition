@@ -663,14 +663,6 @@ let open_fun ty = match view ty with
   | AppBuiltin (Builtin.Arrow, ret :: args) -> args, ret
   | _ -> [], ty
 
-let rec open_poly_fun ty = match view ty with
-  | Bind (Binder.ForallTy, _, ty') ->
-    let i, args, ret = open_poly_fun ty' in
-    i+1, args, ret
-  | _ ->
-    let args, ret = open_fun ty in
-    0, args, ret
-
 let open_bind_fresh b t =
   let rec aux env vars t = match view t with
     | Bind (b', ty_var, body) when b=b' ->

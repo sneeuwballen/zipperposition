@@ -71,6 +71,17 @@ let map f db =
   in
   { db with stack; }
 
+let filteri f db =
+  let stack =
+    CCList.foldi
+      (fun acc i o -> match o with
+        | Some x when f i x -> Some x :: acc
+        | _ -> None :: acc)
+      [] db.stack
+    |> List.rev
+  in
+  { db with stack; }
+
 let of_list l =
   let max = List.fold_left (fun acc (b,_) -> max acc b) ~-1 l in
   let env = make (max+1) in
