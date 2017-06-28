@@ -79,7 +79,7 @@ dot:
 
 TEST_FILES = tests/ examples/
 TEST_TOOL = logitest
-TEST_OPTS ?= -j 2
+TEST_OPTS ?= -j 2 --junit test.xml
 
 check-test-tool:
 	@if ! ( which $(TEST_TOOL) > /dev/null ) ; then echo "install $(TEST_TOOL)"; exit 1; fi
@@ -91,6 +91,18 @@ $(TEST_TOOL)-zipper: check-test-tool
 	$(TEST_TOOL) run -p zipperposition -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES)
 
 $(TEST_TOOL)-hornet: check-test-tool
+
+check_$(TEST_TOOL):
+	@if not (which $(TEST_TOOL) > /dev/null) ; then echo "install $(TEST_TOOL)"; exit 1; fi
+
+$(TEST_TOOL): check_$(TEST_TOOL)
+	$(TEST_TOOL) run -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES)
+
+$(TEST_TOOL)-zipper:
+	$(TEST_TOOL) run -p zipperposition -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES)
+
+$(TEST_TOOL)-hornet:
+>>>>>>> use logitest for tests
 	$(TEST_TOOL) run -p hornet -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES)
 
 tip-benchmarks:
