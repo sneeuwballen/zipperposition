@@ -86,6 +86,7 @@ let suite =
 
 (** Properties *)
 
+let ar_fo = ArTerm.default
 let ar_t = ArTerm.default_ho
 let gen_t = ArTerm.default_ho_g
 
@@ -140,7 +141,7 @@ let check_min_max_vars =
   QCheck.Test.make ~count:1000 ~name:"term_min_max_var" gen prop
 
 let check_hash_mod_alpha =
-  let gen = QCheck.pair ar_t ar_t in
+  let gen = QCheck.pair ar_fo ar_fo in
   let prop (t1,t2) =
     if not (T.equal t1 t2) && Unif.FO.are_variant t1 t2
     then

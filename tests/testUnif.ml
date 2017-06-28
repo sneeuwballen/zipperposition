@@ -12,6 +12,7 @@ module Q = QCheck
 
 let (==>) = QCheck.(==>)
 
+let gen_fo = ArTerm.default
 let gen_t = ArTerm.default_ho
 
 let check_unify_gives_unifier =
@@ -21,15 +22,17 @@ let check_unify_gives_unifier =
     try
       let subst = Unif.FO.unify_syn (t1,0) (t2,1) in
       let renaming = S.Renaming.create () in
-      let t1' = S.FO.apply ~renaming subst (t1,0) in
-      let t2' = S.FO.apply ~renaming subst (t2,1) in
-      T.equal t1' t2'
+      let t1' = S.FO.apply ~renaming subst (t1,0) |> Lambda.snf in
+      let t2' = S.FO.apply ~renaming subst (t2,1) |> Lambda.snf in
+      if T.equal t1' t2' then true
+      else QCheck.Test.fail_reportf
+          "subst=%a,@ t1'=`%a`,@ t2'=`%a`" Subst.pp subst T.pp t1' T.pp t2'
     with Unif.Fail -> QCheck.assume_fail()
   in
-  QCheck.Test.make ~long_factor:20 ~count:1000 ~name gen prop
+  QCheck.Test.make ~long_factor:20 ~count:15_000 ~name gen prop
 
 let check_variant =
-  let gen = gen_t in
+  let gen = gen_fo in
   let name = "unif_term_self_variant" in
   let prop t =
     let renaming = S.Renaming.create () in
@@ -46,8 +49,8 @@ let check_variant2 =
       let subst = Unif.FO.variant (t0,0)(t1,1) in
       (* check they are really variants *)
       let renaming = Subst.Renaming.create() in
-      let t0' = Subst.FO.apply ~renaming subst (t0,0) in
-      let t1' = Subst.FO.apply ~renaming subst (t1,1) in
+      let t0' = Subst.FO.apply ~renaming subst (t0,0) |> Lambda.snf in
+      let t1' = Subst.FO.apply ~renaming subst (t1,1) |> Lambda.snf in
       T.equal t0' t1'
     with Unif.Fail -> QCheck.assume_fail ()
   in
@@ -68,9 +71,28 @@ let check_matching =
     try
       let subst = Unif.FO.matching ~pattern:(t1,0) (t2,1) in
       let renaming = S.Renaming.create () in
-      let t1' = S.FO.apply ~renaming subst (t1,0) in
-      let t2' = S.FO.apply ~renaming subst (t2,1) in
-      T.equal t1' t2' && Unif.FO.are_variant t2 t2'
+      let t1' = S.FO.apply ~renaming subst (t1,0) |> Lambda.snf in
+      let t2' = S.FO.apply ~renaming subst (t2,1) |> Lambda.snf in
+      if T.equal t1' t2'
+      then true
+      else QCheck.Test.fail_reportf "@[<v>subst=%a,@ t1'=`%a`,@ t2'=`%a`@]"
+          Subst.pp subst T.pp t1' T.pp t2'
+    with Unif.Fail -> QCheck.assume_fail()
+  in
+  QCheck.Test.make ~long_factor:20 ~count:1000 ~name gen prop
+
+let check_matching_variant =
+  let gen = QCheck.pair gen_t gen_fo in
+  let name = "unif_matching_preserves_rhs" in
+  let prop (t1, t2) =
+    try
+      let subst = Unif.FO.matching ~pattern:(t1,0) (t2,1) in
+      let renaming = S.Renaming.create () in
+      let t2' = S.FO.apply ~renaming subst (t2,1) |> Lambda.snf in
+      if Unif.FO.are_variant t2 t2'
+      then true
+      else QCheck.Test.fail_reportf "@[<v>subst=%a,@ t2'=`%a`@]"
+          Subst.pp subst T.pp t2'
     with Unif.Fail -> QCheck.assume_fail()
   in
   QCheck.Test.make ~long_factor:20 ~count:1000 ~name gen prop
@@ -122,7 +144,7 @@ let check_ho_unify_gives_unifiers =
       l
     )
   in
-  QCheck.Test.make ~long_factor:20 ~count:5_000 ~name gen prop
+  QCheck.Test.make ~long_factor:20 ~count:8_000 ~name gen prop
 
 (* TODO: generate random Literals.t, then check [variant a b <=> (matches a b && matches b a)] *)
 
@@ -134,5 +156,6 @@ let props =
     check_variant_bidir_match;
     check_lits_variant_bidir_match;
     check_matching;
+    check_matching_variant;
     check_ho_unify_gives_unifiers;
   ]
