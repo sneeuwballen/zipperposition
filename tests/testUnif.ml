@@ -31,6 +31,19 @@ let check_unify_gives_unifier =
   in
   QCheck.Test.make ~long_factor:20 ~count:15_000 ~name gen prop
 
+let check_unify_makes_eq  =
+  let gen = QCheck.(pair gen_t gen_t) in
+  let name = "unify_makes_eq" in
+  let prop (t1, t2) =
+    try
+      let subst = Unif.FO.unify_syn (t1,0) (t2,1) in
+      if Unif.FO.equal subst (t1,0) (t2,1) then true
+      else QCheck.Test.fail_reportf
+          "subst=%a,@ t1=`%a`,@ t2=`%a`" Subst.pp subst T.pp t1 T.pp t2
+    with Unif.Fail -> QCheck.assume_fail()
+  in
+  QCheck.Test.make ~long_factor:20 ~count:15_000 ~name gen prop
+
 let check_variant =
   let gen = gen_fo in
   let name = "unif_term_self_variant" in
@@ -150,6 +163,7 @@ let check_ho_unify_gives_unifiers =
 
 let props =
   [ check_unify_gives_unifier;
+    check_unify_makes_eq;
     check_variant;
     check_variant2;
     check_variant_sym;
