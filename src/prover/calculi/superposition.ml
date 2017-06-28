@@ -194,7 +194,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           C.pp info.passive sc_p Lit.pp info.passive_lit
           Position.pp info.passive_pos US.pp info.subst);
     assert (InnerTerm.DB.closed (info.s:>InnerTerm.t));
-    assert (InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
     let active_idx = Lits.Pos.idx info.active_pos in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
     try
@@ -278,7 +277,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           C.pp info.passive sc_p Lit.pp info.passive_lit
           Position.pp info.passive_pos US.pp info.subst);
     assert (InnerTerm.DB.closed (info.s:>InnerTerm.t));
-    assert (InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
     assert (not(T.is_var info.u_p));
     let active_idx = Lits.Pos.idx info.active_pos in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
