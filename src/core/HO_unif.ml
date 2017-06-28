@@ -185,7 +185,7 @@ module U = struct
      If [t = λy1…yn. body], then the new pair is [v args…y1…yn = body] *)
   let unif_lambda ~offset v args t : pair * int =
     assert (T.is_fun t);
-    let t_vars, t_body, offset = T.open_fun ~offset t in
+    let t_vars, t_body, offset = T.open_fun_offset ~offset t in
     assert (t_vars<>[]);
     assert (not (T.is_fun t_body));
     (* the new pair is [v args…t_vars = t_body] *)

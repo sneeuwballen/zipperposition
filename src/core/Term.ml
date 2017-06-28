@@ -144,21 +144,19 @@ let app_full f tyargs l =
   app f l
 
 let fun_ (ty_arg:Type.t) body =
-  let ty = Type.arrow [ty_arg] (ty body) in
-  T.bind ~ty:(ty :> T.t) ~varty:(ty_arg:>T.t) Binder.Lambda body
+  T.fun_ (ty_arg:>T.t) body
 
 let fun_l ty_args body = List.fold_right fun_ ty_args body
 
 let fun_of_fvars vars body =
-  if vars=[] then body
-  else (
-    let body = T.DB.replace_l body ~l:(List.map var vars) in
-    List.fold_right
-      (fun v body -> fun_ (HVar.ty v) body)
-      vars body
-  )
+  let vars = (vars : Type.t HVar.t list :> T.t HVar.t list) in
+  T.fun_of_fvars vars body
 
-let open_fun ~offset t =
+let open_fun t =
+  let tys, bod = T.open_bind Binder.Lambda t in
+  Type.of_terms_unsafe tys, bod
+
+let open_fun_offset ~offset t =
   let rec aux offset env vars t = match view t with
     | Fun (ty_var, body) ->
       let v = HVar.make offset ~ty:ty_var in
@@ -210,9 +208,7 @@ let as_var_exn t = match T.view t with
 
 let as_var t = try Some (as_var_exn t) with Invalid_argument _ -> None
 
-let as_app t = match view t with
-  | App (f,l) -> f, l
-  | _ -> t, []
+let as_app = T.as_app
 
 let rec as_fun t = match view t with
   | Fun (ty_arg, bod) ->

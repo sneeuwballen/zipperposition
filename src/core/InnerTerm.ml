@@ -594,22 +594,25 @@ module Pos = struct
     | _ -> fail_ t pos
 end
 
-let rec replace_m t m = match Map.get t m with
-  | Some u -> u
-  | None ->
-    begin match t.ty, view t with
-      | HasType ty, Bind (s, varty, t') ->
-        bind ~ty ~varty s (replace_m t' m)
-      | HasType ty, App (f, l) ->
-        let f' = replace_m f m in
-        let l' = List.map (fun t' -> replace_m t' m) l in
-        app ~ty f' l'
-      | HasType ty, AppBuiltin (s,l) ->
-        let l' = List.map (fun t' -> replace_m t' m) l in
-        app_builtin ~ty s l'
-      | NoType, _ -> t
-      | _, (Var _ | DB _ | Const _) -> t
-    end
+let replace_m t m =
+  let rec aux depth t = match Map.get t m with
+    | Some u -> DB.shift depth u
+    | None ->
+      begin match t.ty, view t with
+        | HasType ty, Bind (s, varty, t') ->
+          bind ~ty ~varty s (aux (depth+1) t')
+        | HasType ty, App (f, l) ->
+          let f' = aux depth f in
+          let l' = List.map (aux depth) l in
+          app ~ty f' l'
+        | HasType ty, AppBuiltin (s,l) ->
+          let l' = List.map (aux depth) l in
+          app_builtin ~ty s l'
+        | NoType, _ -> t
+        | _, (Var _ | DB _ | Const _) -> t
+      end
+  in
+  aux 0 t
 
 (* [replace t ~old ~by] syntactically replaces all occurrences of [old]
     in [t] by the term [by]. *)
@@ -624,6 +627,69 @@ let replace t ~old ~by =
 let close_vars ~ty s t =
   let vars = Seq.vars t |> VarSet.of_seq |> VarSet.elements in
   bind_vars ~ty s vars t
+
+(* make the function closing over all the arguments *)
+let mk_fun ~ty_l (t:t) : t =
+  if ty_l=[] then t
+  else (
+    (* close over environment *)
+    List.fold_right
+      (fun varty body ->
+         let ty = arrow [varty] (ty_exn body) in
+         bind ~ty ~varty Binder.Lambda body)
+      ty_l t
+  )
+
+let fun_ (ty_arg:t) body =
+  let ty = arrow [ty_arg] (ty_exn body) in
+  bind ~ty ~varty:ty_arg Binder.Lambda body
+
+let fun_of_fvars vars body =
+  if vars=[] then body
+  else (
+    let body = DB.replace_l body ~l:(List.map var vars) in
+    List.fold_right
+      (fun v body -> fun_ (HVar.ty v) body)
+      vars body
+  )
+
+let open_bind_fresh b t =
+  let rec aux env vars t = match view t with
+    | Bind (b', ty_var, body) when b=b' ->
+      let v = HVar.fresh ~ty:ty_var () in
+      let env = DBEnv.push env (var v) in
+      aux env (v::vars) body
+    | _ ->
+      let t' = DB.eval env t in
+      List.rev vars, t'
+  in
+  aux DBEnv.empty [] t
+
+let open_bind_fresh2 ?(eq_ty=equal) b t1 t2 =
+  let rec aux env vars t1 t2 = match view t1, view t2 with
+    | Bind (b1, ty_var1, body1), Bind (b2, ty_var2, body2)
+      when b1=b && b2=b && eq_ty ty_var1 ty_var2 ->
+      let v = HVar.fresh ~ty:ty_var1 () in
+      let env = DBEnv.push env (var v) in
+      aux env (v::vars) body1 body2
+    | _ ->
+      let t1 = DB.eval env t1 in
+      let t2 = DB.eval env t2 in
+      List.rev vars, t1, t2
+  in
+  aux DBEnv.empty [] t1 t2
+
+let open_fun ty = match view ty with
+  | AppBuiltin (Builtin.Arrow, ret :: args) -> args, ret
+  | _ -> [], ty
+
+let rec open_poly_fun ty = match view ty with
+  | Bind (Binder.ForallTy, _, ty') ->
+    let i, args, ret = open_poly_fun ty' in
+    i+1, args, ret
+  | _ ->
+    let args, ret = open_fun ty in
+    0, args, ret
 
 let is_ground t = Sequence.is_empty (Seq.vars t)
 
@@ -653,6 +719,22 @@ let type_is_unifiable (ty:t): bool = match view ty with
   | Bind (Binder.ForallTy, _, _) -> false
   | _ -> true
 
+let type_is_prop t = match view t with AppBuiltin (Builtin.Prop, _) -> true | _ -> false
+
+let is_a_type t = match ty t with
+  | HasType ty -> equal ty tType
+  | NoType -> assert false
+
+let as_app t = match view t with
+  | App (f,l) -> f, l
+  | _ -> t, []
+
+let as_var t = match view t with Var v -> Some v | _ -> None
+let as_var_exn t = match view t with Var v -> v | _ -> invalid_arg "as_var_exn"
+
+let as_bvar_exn t = match view t with DB i -> i | _ -> invalid_arg "as_bvar_exn"
+let is_bvar_i i t = match view t with DB j -> i=j | _ -> false
+
 (** {3 IO} *)
 
 let print_hashconsing_ids = ref false
@@ -675,6 +757,12 @@ let rec open_bind b t = match view t with
     let args, ret = open_bind b t' in
     ty :: args, ret
   | _ -> [], t
+
+let rec open_bind2 b t1 t2 = match view t1, view t2 with
+  | Bind (b1', ty1, t1'), Bind (b2', ty2, t2') when b=b1' && b=b2' ->
+    let args1, ret1, args2, ret2 = open_bind2 b t1' t2' in
+    ty1 :: args1, ret1, ty2 :: args2, ret2
+  | _ -> [], t1, [], t2
 
 let rec pp_depth ?(hooks=[]) depth out t =
   let rec _pp depth out t =
