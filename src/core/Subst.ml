@@ -200,11 +200,11 @@ let apply subst ~renaming t =
             (* the most interesting cases!
                switch depending on whether [t] is bound by [subst] or not *)
             begin try
-                let (t', _) as term'  = find_exn subst (v,sc_t) in
-                (* NOTE: we used to shift [t'], in case it contained free De
-                   Bruijn indices, but that shouldn't happen because only
-                   closed terms should appear in substitutions. *)
-                assert (T.DB.closed t');
+                let term'  = find_exn subst (v,sc_t) in
+                (* NOTE: if [t'] is not closed, we assume that it
+                   is always replaced in a context where variables
+                   are properly bound. Typically, that means only
+                   in rewriting. *)
                 (* also apply [subst] to [t'] *)
                 aux term'
               with Not_found ->

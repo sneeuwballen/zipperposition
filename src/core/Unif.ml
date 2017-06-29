@@ -144,8 +144,8 @@ module Inner = struct
   type term = T.t
 
   (* public "bind" function that performs occur check *)
-  let bind subst v t =
-    if occurs_check ~depth:0 subst v t
+  let bind ?(check=true) subst v t =
+    if check && occurs_check ~depth:0 subst v t
     then fail()
     else if S.mem subst v then fail()
     else S.bind subst v t
@@ -193,7 +193,10 @@ module Inner = struct
             fail() (* blocked variable *)
           | T.Var _, _, O_match_protect (P_scope sc) when sc1 = sc ->
             fail() (* variable belongs to the protected scope *)
-          | T.Var v1, _, (O_unify | O_match_protect _) ->
+          | T.Var v1, _, O_match_protect _ ->
+            (* no need for occur check when matching *)
+            US.bind subst (v1,sc1) (t2,sc2)
+          | T.Var v1, _, O_unify ->
             if occurs_check ~depth:0 (US.subst subst) (v1,sc1) (t2,sc2)
             then fail () (* occur check or t2 is open *)
             else US.bind subst (v1,sc1) (t2,sc2)
@@ -361,7 +364,7 @@ module Ty = struct
   type term = Type.t
 
   let bind =
-    (bind :> subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst)
+    (bind :> ?check:bool -> subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst)
 
   let unify_full =
     (unify_full :> ?subst:unif_subst -> term Scoped.t -> term Scoped.t -> unif_subst)
@@ -409,7 +412,7 @@ module FO = struct
   type term = Term.t
 
   let bind =
-    (bind :> subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst)
+    (bind :> ?check:bool -> subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst)
 
   let unify_full =
     (unify_full :> ?subst:unif_subst -> term Scoped.t -> term Scoped.t -> unif_subst)

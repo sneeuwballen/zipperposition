@@ -10,10 +10,11 @@ module type S = sig
   type ty
   type term
 
-  val bind : subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst
+  val bind : ?check:bool -> subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst
   (** [bind subst v t] binds [v] to [t], but fails if [v] occurs in [t]
       (performs an occur-check first)
-      @raise Fail if occurs-check fires *)
+      @param check if true, perform occur check
+      @raise Fail if occurs-check fires or if the variable is bound already *)
 
   val unify_syn : ?subst:subst ->
     term Scoped.t -> term Scoped.t -> subst
