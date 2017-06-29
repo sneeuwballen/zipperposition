@@ -44,6 +44,14 @@ let check_unify_makes_eq  =
   in
   QCheck.Test.make ~long_factor:20 ~count:15_000 ~name gen prop
 
+let check_equal =
+  let gen = gen_t in
+  let name = "unif_term_self_equal" in
+  let prop t =
+    Unif.FO.equal ~subst:Subst.empty (t,0) (t,0)
+  in
+  QCheck.Test.make ~long_factor:20 ~count:2_000 ~name gen prop
+
 let check_variant =
   let gen = gen_fo in
   let name = "unif_term_self_variant" in
@@ -52,7 +60,7 @@ let check_variant =
     let t' = S.FO.apply ~renaming S.empty (t,0) in
     Unif.FO.are_variant t t'
   in
-  QCheck.Test.make ~long_factor:20 ~name gen prop
+  QCheck.Test.make ~long_factor:20 ~count:2_000 ~name gen prop
 
 let check_variant2 =
   let gen = gen_t in
@@ -169,6 +177,7 @@ let check_ho_unify_gives_unifiers =
 let props =
   [ check_unify_gives_unifier;
     check_unify_makes_eq;
+    check_equal;
     check_variant;
     check_variant2;
     check_variant_sym;
