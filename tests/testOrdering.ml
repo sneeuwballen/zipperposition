@@ -169,16 +169,32 @@ let test_lfhorpo _ =
   let b = Term.const ~ty b_ in
   assert_equal (compare (Term.app f [Term.app x [b]]) (Term.app x [a])) Comparison.Gt;
 
-(* f a a > f b  ( test for length-lexicographic extension ) *)
+  (* f a a > f b  ( test for length-lexicographic extension ) *)
   let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
   let a = Term.const ~ty a_ in
   let b = Term.const ~ty b_ in
   assert_equal (compare (Term.app f [a;a]) (Term.app f [b])) Comparison.Gt
 
 
+let test_lfhokbo _ =
+  (* alphabetical precedence, h has weight 2, all other symbols weight 1*)
+  let weight id = (if id=h_ then Precedence.Weight.add Precedence.Weight.one Precedence.Weight.one else Precedence.Weight.one) in
+  let ord = O.lfhokbo (Precedence.create ~weight Precedence.Constr.alpha [a_; b_; c_; f_; g_; h_]) in
+  let compare = O.compare ord in
+
+  (* h (x y) > f y (x a) *)
+  let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
+  let h = Term.const ~ty:(Type.arrow [ty] ty) h_ in
+  let a = Term.const ~ty a_ in
+  let x = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
+  let y = Term.var (HVar.fresh ~ty ()) in
+  assert_equal (compare (Term.app h [Term.app x [y]]) (Term.app f [y; Term.app x [a]])) Comparison.Gt
+
+
 let suite =
   "test_ordering" >:::
-  [ "lfhorpo" >:: test_lfhorpo
+  [ "lfhorpo" >:: test_lfhorpo;
+    "lfhokbo" >:: test_lfhokbo
   ]
 
 let props =
@@ -190,6 +206,7 @@ let props =
          check_ordering_subterm o a;
        ])
     [ (O.lfhorpo (Precedence.default []), ArTerm.default_appvars);
+      (O.lfhokbo (Precedence.default []), ArTerm.default_appvars);
       (O.kbo (Precedence.default []), ArTerm.default);
       (O.rpo6 (Precedence.default []), ArTerm.default)
     ]

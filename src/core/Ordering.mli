@@ -49,6 +49,9 @@ include Interfaces.PRINT with type t := t
 val kbo : Precedence.t -> t
 (** Knuth-Bendix simplification ordering *)
 
+val lfhokbo : Precedence.t -> t
+(** Blanchette's lambda-free higher-order KPO *)
+
 val rpo6 : Precedence.t -> t
 (** Efficient implementation of RPO (recursive path ordering) *)
 
@@ -80,4 +83,3 @@ val register : string -> (Precedence.t -> t) -> unit
 (** Register a new ordering, which can depend on a precedence.
     The name must not be registered already.
     @raise Invalid_argument if the name is already used. *)
-
