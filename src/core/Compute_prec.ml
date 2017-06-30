@@ -9,6 +9,8 @@ let prof_mk_prec = Util.mk_profiler "mk_precedence"
 
 let section = Util.Section.(make ~parent:root) "compute_prec"
 
+let _alpha_precedence = ref false
+
 type 'a parametrized = Statement.clause_t Sequence.t -> 'a
 
 type t = {
@@ -59,6 +61,7 @@ let mk_precedence t seq =
   let weight = t.weight_rule seq in
   let constr = Precedence.Constr.compose_sort constrs in
   let constr = Precedence.Constr.compose constr t.last_constr in
+  let constr = (if !_alpha_precedence then Precedence.Constr.alpha else constr) in
   let p = Precedence.create ~weight constr symbols in
   (* multiset status *)
   List.iter
@@ -66,3 +69,10 @@ let mk_precedence t seq =
     t.status;
   Util.exit_prof prof_mk_prec;
   p
+
+let () =
+  Options.add_opts
+    [  "--alpha-precedence"
+    , Arg.Set _alpha_precedence
+    , " use pure alphabetical precedence"
+    ]
