@@ -415,165 +415,165 @@ module LFHOKBO : ORD = struct
     | Head.I s -> Prec.weight prec s
     | Head.V _ -> W.int 1  (* TODO: Maybe not a good value *)
 
-(** Blanchette's higher-order KBO *)
-let rec lfhokbo ~prec t1 t2 =
-  let balance = mk_balance t1 t2 in
-  (** variable balance, weight balance, t contains variable y. pos
-      stands for positive (is t the left term) *)
-  let rec balance_weight (wb:W.t) t y ~pos : W.t * bool =
-    match T.view t with
-    | T.Var x ->
-      let x = HVar.id x in
-      if pos then (
-        add_pos_var balance x;
-        W.(wb + one), x = y
-      ) else (
-        add_neg_var balance x;
-        W.(wb - one), x = y
-      )
-    | T.DB _ ->
-      let w = if pos then W.(wb + one) else W.(wb - one) in
-      w, false
-    | T.Const s ->
-      let open W.Infix in
-      let wb' =
-        if pos
-        then wb + weight prec (Head.I s)
-        else wb - weight prec (Head.I s)
-      in wb', false
-    | T.App (f, l) ->
-      let wb', res = balance_weight wb f y ~pos in
-      balance_weight_rec wb' l y ~pos res
-    | T.AppBuiltin (b,l) ->
-      let open W.Infix in
-      let wb' = if pos
-        then wb + weight prec (Head.B b)
-        else wb - weight prec (Head.B b)
-      in
-      balance_weight_rec wb' l y ~pos false
-  (** list version of the previous one, threaded with the check result *)
-  and balance_weight_rec wb terms y ~pos res = match terms with
-    | [] -> (wb, res)
-    | t::terms' ->
-      let wb', res' = balance_weight wb t y ~pos in
-      balance_weight_rec wb' terms' y ~pos (res || res')
-  (** lexicographic comparison *)
-  and tckbolex wb terms1 terms2 =
-    match terms1, terms2 with
-    | [], [] -> wb, Eq
-    | t1::terms1', t2::terms2' ->
-      begin match tckbo wb t1 t2 with
-        | (wb', Eq) -> tckbolex wb' terms1' terms2'
-        | (wb', res) -> (* just compute the weights and return result *)
-          let wb'', _ = balance_weight_rec wb' terms1' 0 ~pos:true false in
-          let wb''', _ = balance_weight_rec wb'' terms2' 0 ~pos:false false in
-          wb''', res
-      end
-    | [], _ ->
-      let wb, _ = balance_weight_rec wb terms2 0 ~pos:false false in
-      wb, Lt
-    | _, [] ->
-      let wb, _ = balance_weight_rec wb terms1 0 ~pos:true false in
-      wb, Gt
-  (** commutative comparison. Not linear, must call kbo to
-      avoid breaking the weight computing invariants *)
-  and tckbocommute wb ss ts =
-    (* multiset comparison *)
-    let res = MT.compare_partial_l (lfhokbo ~prec) ss ts in
-    (* also compute weights of subterms *)
-    let wb', _ = balance_weight_rec wb ss 0 ~pos:true false in
-    let wb'', _ = balance_weight_rec wb' ts 0 ~pos:false false in
-    wb'', res
-  (** tupled version of kbo (kbo_5 of the paper) *)
-  and tckbo (wb:W.t) t1 t2 =
-    match T.view t1, T.view t2 with
-    | _ when T.equal t1 t2 -> (wb, Eq) (* do not update weight or var balance *)
-    | T.Var x, T.Var y ->
-      add_pos_var balance (HVar.id x);
-      add_neg_var balance (HVar.id y);
-      (wb, Incomparable)
-    | T.Var x,  _ ->
-      add_pos_var balance (HVar.id x);
-      let wb', contains = balance_weight wb t2 (HVar.id x) ~pos:false in
-      (W.(wb' + one), if contains then Lt else Incomparable)
-    |  _, T.Var y ->
-      add_neg_var balance (HVar.id y);
-      let wb', contains = balance_weight wb t1 (HVar.id y) ~pos:true in
-      (W.(wb' - one), if contains then Gt else Incomparable)
-    | T.DB i, T.DB j ->
-      (wb, if i = j then Eq else Incomparable)
-    | _ -> begin match term_to_head t1, term_to_head t2 with
-        | Some f, Some g -> tckbo_composite wb f g (term_to_args t1) (term_to_args t2)
-      | _ -> (wb, Incomparable)
-      end
-  and term_to_head s =
-    match T.view s with
-    | T.App (f,_) ->
-      begin match T.view f with
-        | T.Const fid -> Some (Head.I fid)
-        | T.Var x ->     Some (Head.V x)
-        | _ -> None
-      end
-    | T.AppBuiltin (fid,_) -> Some (Head.B fid)
-    | T.Const fid -> Some (Head.I fid)
-    | T.Var x ->     Some (Head.V x)
-    | _ -> None
-  and term_to_args s =
-    match T.view s with
-    | T.App (_,ss) -> ss
-    | T.AppBuiltin (_,ss) -> ss
-    | _ -> []
-  (** tckbo, for composite terms (ie non variables). It takes a ID.t
-      and a list of subterms. *)
-  and tckbo_composite wb f g ss ts =
-    (* do the recursive computation of kbo *)
-    let wb', res = tckbo_rec wb f g ss ts in
-    let wb'' = W.(wb' + weight prec f - weight prec g) in
-    (* check variable condition *)
-    let g_or_n = if balance.neg_counter = 0 then Gt else Incomparable
-    and l_or_n = if balance.pos_counter = 0 then Lt else Incomparable in
-    (* lexicographic product of weight and precedence *)
-    if W.sign wb'' > 0 then wb'', g_or_n
-    else if W.sign wb'' < 0 then wb'', l_or_n
-    else match prec_compare prec f g with
-      | Gt -> wb'', g_or_n
-      | Lt ->  wb'', l_or_n
-      | Eq ->
-        assert (List.length ss = List.length ts);
-        if res = Eq then wb'', Eq
-        else if res = Lt then wb'', l_or_n
-        else if res = Gt then wb'', g_or_n
-        else wb'', Incomparable
-      | Incomparable -> wb'', Incomparable
-  (** recursive comparison *)
-  and tckbo_rec wb f g ss ts =
-    if prec_compare prec f g = Eq
-    then match prec_status prec f with
-      | Prec.Multiset ->
-        (* use multiset or lexicographic comparison *)
-        tckbocommute wb ss ts
-      | Prec.Lexicographic ->
-        tckbolex wb ss ts
-    else (
-      (* just compute variable and weight balances *)
+  (** Blanchette's higher-order KBO *)
+  let rec lfhokbo ~prec t1 t2 =
+    let balance = mk_balance t1 t2 in
+    (** variable balance, weight balance, t contains variable y. pos
+        stands for positive (is t the left term) *)
+    let rec balance_weight (wb:W.t) t y ~pos : W.t * bool =
+      match T.view t with
+      | T.Var x ->
+        let x = HVar.id x in
+        if pos then (
+          add_pos_var balance x;
+          W.(wb + one), x = y
+        ) else (
+          add_neg_var balance x;
+          W.(wb - one), x = y
+        )
+      | T.DB _ ->
+        let w = if pos then W.(wb + one) else W.(wb - one) in
+        w, false
+      | T.Const s ->
+        let open W.Infix in
+        let wb' =
+          if pos
+          then wb + weight prec (Head.I s)
+          else wb - weight prec (Head.I s)
+        in wb', false
+      | T.App (f, l) ->
+        let wb', res = balance_weight wb f y ~pos in
+        balance_weight_rec wb' l y ~pos res
+      | T.AppBuiltin (b,l) ->
+        let open W.Infix in
+        let wb' = if pos
+          then wb + weight prec (Head.B b)
+          else wb - weight prec (Head.B b)
+        in
+        balance_weight_rec wb' l y ~pos false
+    (** list version of the previous one, threaded with the check result *)
+    and balance_weight_rec wb terms y ~pos res = match terms with
+      | [] -> (wb, res)
+      | t::terms' ->
+        let wb', res' = balance_weight wb t y ~pos in
+        balance_weight_rec wb' terms' y ~pos (res || res')
+    (** lexicographic comparison *)
+    and tckbolex wb terms1 terms2 =
+      match terms1, terms2 with
+      | [], [] -> wb, Eq
+      | t1::terms1', t2::terms2' ->
+        begin match tckbo wb t1 t2 with
+          | (wb', Eq) -> tckbolex wb' terms1' terms2'
+          | (wb', res) -> (* just compute the weights and return result *)
+            let wb'', _ = balance_weight_rec wb' terms1' 0 ~pos:true false in
+            let wb''', _ = balance_weight_rec wb'' terms2' 0 ~pos:false false in
+            wb''', res
+        end
+      | [], _ ->
+        let wb, _ = balance_weight_rec wb terms2 0 ~pos:false false in
+        wb, Lt
+      | _, [] ->
+        let wb, _ = balance_weight_rec wb terms1 0 ~pos:true false in
+        wb, Gt
+    (** commutative comparison. Not linear, must call kbo to
+        avoid breaking the weight computing invariants *)
+    and tckbocommute wb ss ts =
+      (* multiset comparison *)
+      let res = MT.compare_partial_l (lfhokbo ~prec) ss ts in
+      (* also compute weights of subterms *)
       let wb', _ = balance_weight_rec wb ss 0 ~pos:true false in
       let wb'', _ = balance_weight_rec wb' ts 0 ~pos:false false in
-      wb'', Incomparable
-    )
-  in
-  try
-    let _, res = tckbo W.zero t1 t2 in
-    AllocCache.Arr.free alloc_cache balance.balance;
-    res
-  with e ->
-    AllocCache.Arr.free alloc_cache balance.balance;
-    raise e
+      wb'', res
+    (** tupled version of kbo (kbo_5 of the paper) *)
+    and tckbo (wb:W.t) t1 t2 =
+      match T.view t1, T.view t2 with
+      | _ when T.equal t1 t2 -> (wb, Eq) (* do not update weight or var balance *)
+      | T.Var x, T.Var y ->
+        add_pos_var balance (HVar.id x);
+        add_neg_var balance (HVar.id y);
+        (wb, Incomparable)
+      | T.Var x,  _ ->
+        add_pos_var balance (HVar.id x);
+        let wb', contains = balance_weight wb t2 (HVar.id x) ~pos:false in
+        (W.(wb' + one), if contains then Lt else Incomparable)
+      |  _, T.Var y ->
+        add_neg_var balance (HVar.id y);
+        let wb', contains = balance_weight wb t1 (HVar.id y) ~pos:true in
+        (W.(wb' - one), if contains then Gt else Incomparable)
+      | T.DB i, T.DB j ->
+        (wb, if i = j then Eq else Incomparable)
+      | _ -> begin match term_to_head t1, term_to_head t2 with
+          | Some f, Some g -> tckbo_composite wb f g (term_to_args t1) (term_to_args t2)
+        | _ -> (wb, Incomparable)
+        end
+    and term_to_head s =
+      match T.view s with
+      | T.App (f,_) ->
+        begin match T.view f with
+          | T.Const fid -> Some (Head.I fid)
+          | T.Var x ->     Some (Head.V x)
+          | _ -> None
+        end
+      | T.AppBuiltin (fid,_) -> Some (Head.B fid)
+      | T.Const fid -> Some (Head.I fid)
+      | T.Var x ->     Some (Head.V x)
+      | _ -> None
+    and term_to_args s =
+      match T.view s with
+      | T.App (_,ss) -> ss
+      | T.AppBuiltin (_,ss) -> ss
+      | _ -> []
+    (** tckbo, for composite terms (ie non variables). It takes a ID.t
+        and a list of subterms. *)
+    and tckbo_composite wb f g ss ts =
+      (* do the recursive computation of kbo *)
+      let wb', res = tckbo_rec wb f g ss ts in
+      let wb'' = W.(wb' + weight prec f - weight prec g) in
+      (* check variable condition *)
+      let g_or_n = if balance.neg_counter = 0 then Gt else Incomparable
+      and l_or_n = if balance.pos_counter = 0 then Lt else Incomparable in
+      (* lexicographic product of weight and precedence *)
+      if W.sign wb'' > 0 then wb'', g_or_n
+      else if W.sign wb'' < 0 then wb'', l_or_n
+      else match prec_compare prec f g with
+        | Gt -> wb'', g_or_n
+        | Lt ->  wb'', l_or_n
+        | Eq ->
+          assert (List.length ss = List.length ts);
+          if res = Eq then wb'', Eq
+          else if res = Lt then wb'', l_or_n
+          else if res = Gt then wb'', g_or_n
+          else wb'', Incomparable
+        | Incomparable -> wb'', Incomparable
+    (** recursive comparison *)
+    and tckbo_rec wb f g ss ts =
+      if prec_compare prec f g = Eq
+      then match prec_status prec f with
+        | Prec.Multiset ->
+          (* use multiset or lexicographic comparison *)
+          tckbocommute wb ss ts
+        | Prec.Lexicographic ->
+          tckbolex wb ss ts
+      else (
+        (* just compute variable and weight balances *)
+        let wb', _ = balance_weight_rec wb ss 0 ~pos:true false in
+        let wb'', _ = balance_weight_rec wb' ts 0 ~pos:false false in
+        wb'', Incomparable
+      )
+    in
+    try
+      let _, res = tckbo W.zero t1 t2 in
+      AllocCache.Arr.free alloc_cache balance.balance;
+      res
+    with e ->
+      AllocCache.Arr.free alloc_cache balance.balance;
+      raise e
 
-let compare_terms ~prec x y =
-  Util.enter_prof prof_lfhokbo;
-  let compare = lfhokbo ~prec x y in
-  Util.exit_prof prof_lfhokbo;
-  compare
+  let compare_terms ~prec x y =
+    Util.enter_prof prof_lfhokbo;
+    let compare = lfhokbo ~prec x y in
+    Util.exit_prof prof_lfhokbo;
+    compare
 end
 
 (** Blanchette's lambda-free higher-order RPO *)
