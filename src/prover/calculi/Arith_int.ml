@@ -618,7 +618,7 @@ module Make(E : Env.S) : S with module Env = E = struct
            let idx = Lits.Pos.idx pos in
            (* cancellation depends on what the literal looks like *)
            match a_lit with
-             | AL.Binary (_op, m1, m2) ->
+             | AL.Binary (op, m1, m2) ->
                Util.debugf ~section 5 "@[<2>try cancellation@ in @[%a@]@]" (fun k->k AL.pp a_lit);
                (* try to unify terms in [m1] and [m2] *)
                MF.unify_mm (m1,0) (m2,0)
@@ -637,10 +637,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                       (* do the inference *)
                       let lits' = CCArray.except_idx (C.lits c) idx in
                       let lits' = Lit.apply_subst_list ~renaming subst (lits',0) in
-                      (* just substitute in a_lit *)
-                      let new_lit =
-                        AL.apply_subst ~renaming subst (a_lit,0) |> Lit.mk_arith
-                      in
+                      let new_lit = Lit.mk_arith_op op (MF.rest mf1') (MF.rest mf2') in
                       let c_guard = Literal.of_unif_subst ~renaming us in
                       let all_lits = new_lit :: c_guard @ lits' in
                       let proof =
