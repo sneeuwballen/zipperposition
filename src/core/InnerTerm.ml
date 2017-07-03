@@ -400,7 +400,9 @@ module DB = struct
                 then bvar ~ty (i - DBEnv.size env0) (* unshift *)
                 else bvar ~ty i
               | Some t' ->
-                assert (equal (ty_exn t') ty);
+                (* type might not be exactly equal, e.g. might be equal
+                   up to unifier *)
+                (*assert (equal (ty_exn t') ty);*)
                 (* [t'] is defined in scope 0, but there are [i-1] binders
                    between the scope where its open variables live, and
                    the current scope.
