@@ -307,6 +307,7 @@ end
 module T_view : sig
   type 'a t =
     | T_var of T.var
+    | T_db of int
     | T_app_defined of ID.t * Rewrite.Defined_cst.t * 'a list
     | T_app_cstor of ID.t * 'a list
     | T_app_unin of ID.t * 'a list
@@ -323,6 +324,7 @@ module T_view : sig
 end = struct
   type 'a t =
     | T_var of T.var
+    | T_db of int
     | T_app_defined of ID.t * Rewrite.Defined_cst.t * 'a list
     | T_app_cstor of ID.t * 'a list
     | T_app_unin of ID.t * 'a list
@@ -352,7 +354,7 @@ end = struct
         | T.Const id -> T_app_unin (id, l)
         | _ -> T_app (f,l)
       end
-    | T.DB _ -> assert false
+    | T.DB i -> T_db i
 
   let active_subterms t yield: unit =
     let rec aux t =
@@ -367,7 +369,7 @@ end = struct
                if IArray.get pos i = Defined_pos.P_active then aux sub)
             l
         | T_fun (_,_) -> () (* no induction under λ, we follow WHNF semantics *)
-        | T_var _ -> ()
+        | T_var _ | T_db _ -> ()
         | T_app (f,l) ->
           aux f;
           List.iter aux l
@@ -680,7 +682,7 @@ module Make
                  Position.(append p @@ arg i @@ stop)
                  u k)
             l
-        | T_view.T_var _ -> ()
+        | T_view.T_var _ | T_view.T_db _ -> ()
         | T_view.T_app (_,l)
         | T_view.T_app_unin (_,l) (* approx, we assume all positions are active *)
         | T_view.T_builtin (_,l) ->
