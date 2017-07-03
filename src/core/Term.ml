@@ -482,7 +482,8 @@ module AC(A : AC_SPEC) = struct
       | T.AppBuiltin (b,l) ->
         let l = List.map normalize l in
         T.app_builtin ~ty:(T.ty_exn t) b l
-      | _ -> assert false
+      | T.Bind (b, varty, body) ->
+        T.bind ~ty:(T.ty_exn t) ~varty b (normalize body)
     in
     let t' = normalize t in
     Util.exit_prof prof_ac_normal_form;
