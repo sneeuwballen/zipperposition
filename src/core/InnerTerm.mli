@@ -199,9 +199,24 @@ val close_vars :  ty:t -> Binder.t -> t -> t
 
 val fun_: t -> t -> t
 
+val fun_l : t list -> t -> t
+
 val fun_of_fvars : t HVar.t list -> t -> t
 (** Build a function from a list of free vars + the body.
     This performs the De Bruijn transformation, and shifts the body. *)
+
+val open_fun : t -> t list * t
+(** [open_fun ty] "unrolls" function arrows from the left, so that
+    [open_fun (a -> (b -> (c -> d)))] returns [[a;b;c], d].
+    @return the return type and the list of all its arguments *)
+
+val open_poly_fun : t -> int * t list * t
+(** [open_poly_fun ty] "unrolls" polymorphic function arrows from the left, so that
+    [open_fun (forall a b. f a -> (g b -> (c -> d)))] returns [2; [f a;g b;c], d].
+    @return the return type, the number of type variables,
+      and the list of all its arguments *)
+
+val open_bind : Binder.t -> t -> t list * t
 
 val open_bind_fresh : Binder.t -> t -> t HVar.t list * t
 (** [open_bind_fresh λ (λxy. F)] returns [[v1,v2], F[v1/x,v2/y]]

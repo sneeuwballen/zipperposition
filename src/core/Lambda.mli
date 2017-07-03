@@ -19,6 +19,9 @@ val whnf_list : term -> term list -> term
 val snf : term -> term
 (** Strong normal form, computing under lambdas and subterms *)
 
+val eta_expand : term -> term
+(** Traverse the term, eta-expanding all symbols *)
+
 (** Low level interface *)
 module Inner : sig
   type term = InnerTerm.t
@@ -26,4 +29,6 @@ module Inner : sig
   val whnf : term -> term
 
   val snf : term -> term
+
+  val eta_expand : term -> term
 end

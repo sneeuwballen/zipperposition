@@ -648,6 +648,8 @@ let fun_ (ty_arg:t) body =
   let ty = arrow [ty_arg] (ty_exn body) in
   bind ~ty ~varty:ty_arg Binder.Lambda body
 
+let fun_l ty_args body = List.fold_right fun_ ty_args body
+
 let fun_of_fvars vars body =
   if vars=[] then body
   else (
@@ -656,6 +658,18 @@ let fun_of_fvars vars body =
       (fun v body -> fun_ (HVar.ty v) body)
       vars body
   )
+
+let open_fun ty = match view ty with
+  | AppBuiltin (Builtin.Arrow, ret :: args) -> args, ret
+  | _ -> [], ty
+
+let rec open_poly_fun ty = match view ty with
+  | Bind (Binder.ForallTy, _, ty') ->
+    let i, args, ret = open_poly_fun ty' in
+    i+1, args, ret
+  | _ ->
+    let args, ret = open_fun ty in
+    0, args, ret
 
 let open_bind_fresh b t =
   let rec aux env vars t = match view t with

@@ -15,6 +15,7 @@ let stat_eq_res_syntactic = Util.mk_stat "ho.eq_res_syntactic.steps"
 let stat_ext_neg = Util.mk_stat "ho.extensionality-.steps"
 let stat_complete_eq = Util.mk_stat "ho.complete_eq.steps"
 let stat_beta = Util.mk_stat "ho.beta_reduce.steps"
+let stat_eta_expand = Util.mk_stat "ho.eta_expand.steps"
 let stat_prim_enum = Util.mk_stat "ho.prim_enum.steps"
 let stat_elim_pred = Util.mk_stat "ho.elim_pred.steps"
 let stat_ho_unif = Util.mk_stat "ho.unif.calls"
@@ -138,20 +139,16 @@ module Make(E : Env.S) : S with module Env = E = struct
                 (fun i ty -> HVar.make ~ty (i+var_offset) |> T.var)
                 ty_args
             in
-            CCList.(1 -- List.length vars)
-            |> List.map
-              (fun prefix_len ->
-                 let vars_prefix = CCList.take prefix_len vars in
-                 let new_lit = Literal.mk_eq (T.app t vars_prefix) (T.app u vars_prefix) in
-                 let new_lits = new_lit :: CCArray.except_idx (C.lits c) lit_idx in
-                 let proof =
-                   Proof.Step.inference [C.proof_parent c]
-                     ~rule:(Proof.Rule.mk "ho_complete_eq")
-                 in
-                 let new_c =
-                   C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
-                 in
-                 new_c)
+            let new_lit = Literal.mk_eq (T.app t vars) (T.app u vars) in
+            let new_lits = new_lit :: CCArray.except_idx (C.lits c) lit_idx in
+            let proof =
+              Proof.Step.inference [C.proof_parent c]
+                ~rule:(Proof.Rule.mk "ho_complete_eq")
+            in
+            let new_c =
+              C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
+            in
+            [new_c]
           | _ -> [])
       |> Sequence.to_rev_list
     in
@@ -416,6 +413,19 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* TODO: eta reduction *)
   (* TODO: positive extensionality `m x = n x --> m = n` *)
 
+  (* rule for eta-expansion *)
+  let eta_expand t =
+    assert (T.DB.is_closed t);
+    let t' = Lambda.eta_expand t in
+    if (T.equal t t') then None
+    else (
+      Util.debugf ~section 4 "(@[eta_expand `%a`@ :into `%a`@])"
+        (fun k->k T.pp t T.pp t');
+      Util.incr_stat stat_eta_expand;
+      assert (T.DB.is_closed t');
+      Some t'
+    )
+
   let setup () =
     if not (Env.flex_get k_enabled) then (
       Util.debug ~section 1 "HO rules disabled";
@@ -426,6 +436,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
       Env.add_lit_rule "ho_ext_neg" ext_neg;
       Env.add_rewrite_rule "beta_reduce" beta_reduce;
+      Env.add_rewrite_rule "eta_expand" eta_expand;
       if Env.flex_get k_enable_ho_unif then (
         Env.add_unary_inf "ho_unif" ho_unif;
       );

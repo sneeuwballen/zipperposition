@@ -5,6 +5,7 @@
 
 let prof_whnf = Util.mk_profiler "term.whnf"
 let prof_snf = Util.mk_profiler "term.snf"
+let prof_eta_expand = Util.mk_profiler "term.eta_expand"
 
 module Inner = struct
   module T = InnerTerm
@@ -94,6 +95,49 @@ module Inner = struct
             if T.equal body body' then t else T.bind b ~ty ~varty body'
         end
 
+  let eta_expand_rec t =
+    let rec aux shift_by t = match T.ty t with
+      | T.NoType -> t
+      | T.HasType ty ->
+        let n, ty_args, ty_ret = T.open_poly_fun ty in
+        assert (n=0);
+        (* first, WHNF *)
+        let t = whnf_term t in
+        (* see how many arguments are missing, and what type *)
+        let args, body = T.open_bind Binder.Lambda t in
+        let n_args = List.length ty_args in
+        let n_missing = n_args - List.length args in
+        if n_missing>0 then (
+          Util.debugf 5 "@[in `%a`,@ missing %d args@])"
+            (fun k->k T.pp t n_missing);
+        );
+        let missing_args = CCList.take n_missing ty_args in
+        assert (n_missing >= 0);
+        (* now traverse body, shifting on the way by [n_missing + shift_by] *)
+        let body =
+          let ty = T.ty_exn body in
+          begin match T.view body with
+            | T.Const _ | T.Var _ -> body
+            | T.DB i -> T.bvar ~ty (i + n_missing + shift_by)
+            | T.App (f, l) ->
+              let l' = List.map (aux (shift_by+n_missing)) l in
+              if T.same_l l l' then body else T.app ~ty f l'
+            | T.AppBuiltin (b, l) ->
+              let l' = List.map (aux (shift_by+n_missing)) l in
+              if T.same_l l l' then body else T.app_builtin ~ty b l'
+            | T.Bind (b, varty, body') ->
+              assert (b <> Binder.Lambda);
+              T.bind ~ty ~varty b (aux (shift_by+1) body')
+          end
+        in
+        (* build the fully-abstracted term *)
+        let dbvars =
+          List.mapi (fun i ty_arg -> T.bvar (n_missing-i-1) ~ty:ty_arg) missing_args
+        in
+        T.fun_l ty_args (T.app ~ty:ty_ret body dbvars)
+    in
+    aux 0 t
+
   let whnf t = match T.view t with
     | T.App (f, _) when T.is_lambda f ->
       Util.enter_prof prof_whnf;
@@ -110,6 +154,8 @@ module Inner = struct
     let t' = snf_rec t in
     Util.exit_prof prof_snf;
     t'
+
+  let eta_expand t = Util.with_prof prof_eta_expand eta_expand_rec t
 end
 
 module T = Term
@@ -135,3 +181,7 @@ let whnf_list t args =
 
 let snf t =
   Inner.snf_rec (t:T.t :> IT.t) |> T.of_term_unsafe
+
+let eta_expand t =
+  Inner.eta_expand (t:T.t :> IT.t) |> T.of_term_unsafe
+  |> T.rebuild_rec (* NOTE: check types; remove later *)
