@@ -403,8 +403,12 @@ module Lit = struct
 
     let head_id c = match lhs c with
       | Literal.Prop (t, _) ->
-        begin match T.Classic.view t with
-          | T.Classic.App (id, _) -> Some id
+        begin match T.view t with
+          | T.Const id -> Some id
+          | T.App (f, _) ->
+              begin match T.view f with
+                | T.Const id -> Some id | _ -> assert false
+              end
           | _ -> assert false
         end
       | Literal.Equation _ -> None
