@@ -1,0 +1,12 @@
+
+# expect: unsat
+
+val set : type -> type.
+
+val collect: pi a. (a -> prop) -> set a.
+
+goal
+  forall a (P Q: a -> prop).
+    collect (fun x. P x || Q x) =
+    collect (fun x. Q x || P x).
+
