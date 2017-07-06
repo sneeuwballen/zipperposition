@@ -1804,8 +1804,10 @@ module Make(E : Env.S) : S with module Env = E = struct
                (* translate [m1 ≠ m2] into [m1 < m2 ∨ m1 > m2],
                   do not do it on a variable that is going to be eliminated. *)
                assert (eligible i lit);
-               Util.debugf ~section 5 "@[<2>lit @[%a [%d]@]@ in @[%a@]@]"
-                 (fun k->k Lit.pp lit i C.pp c);
+               (*Format.printf
+                 "@[<2>lit @[%a [%d]@]@ in @[%a@]@ :is-max %B@ :max_lits %a@]@."
+                 Lit.pp lit i C.pp c (Lits.is_max ~ord (C.lits c) i)
+                 CCBV.print (Lits.maxlits ~ord @@ C.lits c);*)
                assert (Lits.is_max ~ord (C.lits c) i);
                let lits = CCArray.except_idx (C.lits c) i in
                let new_lits =
