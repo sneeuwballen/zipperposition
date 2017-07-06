@@ -745,9 +745,17 @@ let rec pp_zf out t =
     | Var v -> pp_var_zf out v
     | DB i -> Format.fprintf out "Y%d" (depth-i-1)
     | Const s -> ID.pp_zf out s
-    | Bind (b, varty, t') ->
-      Format.fprintf out "@[<1>%a@ (Y%d:@[%a@]).@ %a@]" Binder.ZF.pp b depth
-        (pp_ depth) varty (_pp_surrounded (depth+1)) t'
+    | Bind (b, _, _) ->
+      (* unfold *)
+      let varty_l, t' = open_bind b t in
+      let pp_tyvar out (i,varty) =
+        Format.fprintf out "(@[Y%d:@[%a@])@]" (depth+i) (pp_ depth) varty
+      in
+      Format.fprintf out "@[<1>%a@ @[%a@].@ %a@]"
+        Binder.ZF.pp b
+        (Util.pp_seq ~sep:" " pp_tyvar)
+        (Sequence.of_array_i (Array.of_list varty_l))
+        (_pp_surrounded (depth+List.length varty_l)) t'
     | AppBuiltin (Builtin.Arrow, ([] | [_])) -> assert false
     | AppBuiltin (Builtin.Arrow, ret::args) ->
       Format.fprintf out "@[%a@ -> %a@]"

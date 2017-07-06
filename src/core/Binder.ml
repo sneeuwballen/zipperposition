@@ -39,6 +39,6 @@ module ZF = struct
     | Exists -> "exists"
     | Forall -> "forall"
     | ForallTy -> "pi"
-    | Lambda -> "fun "
+    | Lambda -> "fun"
   let pp out t = CCFormat.string out (to_string t)
 end
