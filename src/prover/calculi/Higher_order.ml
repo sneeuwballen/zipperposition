@@ -13,6 +13,7 @@ let section = Util.Section.make ~parent:Const.section "ho"
 let stat_eq_res = Util.mk_stat "ho.eq_res.steps"
 let stat_eq_res_syntactic = Util.mk_stat "ho.eq_res_syntactic.steps"
 let stat_ext_neg = Util.mk_stat "ho.extensionality-.steps"
+let stat_ext_pos = Util.mk_stat "ho.extensionality+.steps"
 let stat_complete_eq = Util.mk_stat "ho.complete_eq.steps"
 let stat_beta = Util.mk_stat "ho.beta_reduce.steps"
 let stat_eta_expand = Util.mk_stat "ho.eta_expand.steps"
@@ -123,6 +124,52 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun k->k Literal.pp lit Literal.pp new_lit);
       Some new_lit
     | _ -> None
+
+  (* positive extensionality `m x = n x --> m = n` *)
+  let ext_pos (c:C.t): C.t list =
+    begin match C.lits c with
+      | [| Literal.Equation (t1, t2, true) |] ->
+        let f1, l1 = T.as_app t1 in
+        let f2, l2 = T.as_app t2 in
+        begin match List.rev l1, List.rev l2 with
+          | last1 :: l1, last2 :: l2 ->
+            begin match T.view last1, T.view last2 with
+              | T.Var x, T.Var y
+                when HVar.equal Type.equal x y &&
+                     begin
+                       Sequence.of_list
+                         [Sequence.doubleton f1 f2;
+                          Sequence.of_list l1;
+                          Sequence.of_list l2]
+                       |> Sequence.flatten
+                       |> Sequence.flat_map T.Seq.vars
+                       |> Sequence.for_all
+                         (fun v' -> not (HVar.equal Type.equal v' x))
+                     end ->
+                (* it works! *)
+                let new_lit =
+                  Literal.mk_eq
+                    (T.app f1 (List.rev l1))
+                    (T.app f2 (List.rev l2))
+                in
+                let proof =
+                  Proof.Step.inference [C.proof_parent c]
+                    ~rule:(Proof.Rule.mk "ho_ext_pos")
+                in
+                let new_c =
+                  C.create [new_lit] proof ~penalty:(C.penalty c) ~trail:(C.trail c)
+                in
+                Util.incr_stat stat_ext_pos;
+                Util.debugf ~section 4
+                  "(@[ext_pos@ :clause %a@ :yields %a@])"
+                  (fun k->k C.pp c C.pp new_c);
+                [new_c]
+              | _ -> []
+            end
+          | _ -> []
+        end
+      | _ -> []
+    end
 
   (* complete [f = g] into [f x1…xn = g x1…xn] for each [n ≥ 1] *)
   let complete_eq_args (c:C.t) : C.t list =
@@ -412,8 +459,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       Some t'
     )
 
-  (* TODO: positive extensionality `m x = n x --> m = n` *)
-
   (* rule for eta-expansion *)
   let eta_expand t =
     assert (T.DB.is_closed t);
@@ -449,6 +494,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Env.add_unary_inf "ho_complete_eq" complete_eq_args;
       Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
       Env.add_lit_rule "ho_ext_neg" ext_neg;
+      Env.add_unary_inf "ho_ext_pos" ext_pos;
       Env.add_rewrite_rule "beta_reduce" beta_reduce;
       begin match Env.flex_get k_eta with
         | `Expand -> Env.add_rewrite_rule "eta_expand" eta_expand
