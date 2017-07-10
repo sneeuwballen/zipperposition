@@ -147,14 +147,19 @@ let check_ho_unify_gives_unifiers =
     in
     if l=[] then QCheck.assume_fail()
     else (
-      List.for_all
+      List.iter
         (fun (_,us,_) ->
            let subst = Unif_subst.subst us in
            let renaming = Subst.Renaming.create() in
            let u1 = Subst.FO.apply ~renaming subst (t1,0) |> Lambda.snf in
            let u2 = Subst.FO.apply ~renaming subst (t2,0) |> Lambda.snf in
-           T.equal u1 u2)
-      l
+           if not (T.equal u1 u2) then (
+             QCheck.Test.fail_reportf
+               "(@[<hv2>bad solution@ t1'=`%a`@ t2'=`%a`@ :subst %a@])"
+               T.pp u1 T.pp u2 Subst.pp subst
+           ))
+        l;
+      true
     )
   in
   QCheck.Test.make ~long_factor:20 ~count:8_000 ~name gen prop
