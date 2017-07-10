@@ -16,6 +16,7 @@ let stat_ext_neg = Util.mk_stat "ho.extensionality-.steps"
 let stat_complete_eq = Util.mk_stat "ho.complete_eq.steps"
 let stat_beta = Util.mk_stat "ho.beta_reduce.steps"
 let stat_eta_expand = Util.mk_stat "ho.eta_expand.steps"
+let stat_eta_reduce = Util.mk_stat "ho.eta_reduce.steps"
 let stat_prim_enum = Util.mk_stat "ho.prim_enum.steps"
 let stat_elim_pred = Util.mk_stat "ho.elim_pred.steps"
 let stat_ho_unif = Util.mk_stat "ho.unif.calls"
@@ -40,6 +41,7 @@ let k_enabled : bool Flex_state.key = Flex_state.create_key()
 let k_enable_ho_unif : bool Flex_state.key = Flex_state.create_key()
 let k_enable_ho_prim : bool Flex_state.key = Flex_state.create_key()
 let k_ho_prim_max_penalty : int Flex_state.key = Flex_state.create_key()
+let k_eta : [`Reduce | `Expand | `None] Flex_state.key = Flex_state.create_key()
 
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
@@ -410,7 +412,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       Some t'
     )
 
-  (* TODO: eta reduction *)
   (* TODO: positive extensionality `m x = n x --> m = n` *)
 
   (* rule for eta-expansion *)
@@ -426,6 +427,19 @@ module Make(E : Env.S) : S with module Env = E = struct
       Some t'
     )
 
+  (* rule for eta-expansion *)
+  let eta_reduce t =
+    assert (T.DB.is_closed t);
+    let t' = Lambda.eta_reduce t in
+    if (T.equal t t') then None
+    else (
+      Util.debugf ~section 4 "(@[eta_reduce `%a`@ :into `%a`@])"
+        (fun k->k T.pp t T.pp t');
+      Util.incr_stat stat_eta_reduce;
+      assert (T.DB.is_closed t');
+      Some t'
+    )
+
   let setup () =
     if not (Env.flex_get k_enabled) then (
       Util.debug ~section 1 "HO rules disabled";
@@ -436,7 +450,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
       Env.add_lit_rule "ho_ext_neg" ext_neg;
       Env.add_rewrite_rule "beta_reduce" beta_reduce;
-      Env.add_rewrite_rule "eta_expand" eta_expand;
+      begin match Env.flex_get k_eta with
+        | `Expand -> Env.add_rewrite_rule "eta_expand" eta_expand
+        | `Reduce -> Env.add_rewrite_rule "eta_reduce" eta_reduce
+        | `None -> ()
+      end;
       if Env.flex_get k_enable_ho_unif then (
         Env.add_unary_inf "ho_unif" ho_unif;
       );
@@ -451,6 +469,7 @@ let enabled_ = ref true
 let enable_unif_ = ref true
 let enable_prim_ = ref true
 let prim_max_penalty = ref 15 (* FUDGE *)
+let eta_ = ref `Reduce
 
 let st_contains_ho (st:(_,_,_) Statement.t): bool =
   let is_non_atomic_ty ty =
@@ -500,12 +519,18 @@ let extension =
     |> Flex_state.add k_enable_ho_unif (!enabled_ && !enable_unif_)
     |> Flex_state.add k_enable_ho_prim (!enabled_ && !enable_prim_)
     |> Flex_state.add k_ho_prim_max_penalty !prim_max_penalty
+    |> Flex_state.add k_eta !eta_
   in
   { Extensions.default with
       Extensions.name = "ho";
       post_cnf_actions=[check_ho];
       env_actions=[register];
   }
+
+let eta_opt =
+  let set_ n = eta_ := n in
+  let l = [ "reduce", `Reduce; "expand", `Expand; "none", `None] in
+  Arg.Symbol (List.map fst l, fun s -> set_ (List.assoc s l))
 
 let () =
   Options.add_opts
@@ -516,5 +541,6 @@ let () =
       "--ho-prim-enum", Arg.Set enable_unif_, " enable HO primitive enum";
       "--no-ho-prim-enum", Arg.Clear enable_unif_, " disable HO primitive enum";
       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
+      "--ho-eta", eta_opt, " eta-expansion/reduction";
     ];
   Extensions.register extension;

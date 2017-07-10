@@ -6,6 +6,7 @@
 let prof_whnf = Util.mk_profiler "term.whnf"
 let prof_snf = Util.mk_profiler "term.snf"
 let prof_eta_expand = Util.mk_profiler "term.eta_expand"
+let prof_eta_reduce = Util.mk_profiler "term.eta_reduce"
 
 module Inner = struct
   module T = InnerTerm
@@ -138,6 +139,32 @@ module Inner = struct
     in
     aux 0 t
 
+  (* do one step of eta-reduction *)
+  let eta_reduce_rec t =
+    let rec aux t =  match T.ty t with
+      | T.NoType -> t
+      | T.HasType ty ->
+        begin match T.view t with
+          | T.Var _ | T.DB _ | T.Const _ -> t
+          | T.Bind (Binder.Lambda, _, {T.term=T.App (f, [{T.term=T.DB 0; _}]); _})
+            when not (T.DB.contains f 0) ->
+            (* [fun x. f x --> f] *)
+            f
+          | T.Bind (b, varty, body) ->
+            T.bind ~ty ~varty b (aux body)
+          | T.App (_,[]) -> assert false
+          | T.App (f, l) ->
+            let f' = aux f in
+            let l' = List.map aux l in
+            if T.equal f f' && T.same_l l l'
+            then t
+            else T.app ~ty (aux f) (List.map aux l)
+          | T.AppBuiltin (b,l) ->
+            T.app_builtin ~ty b (List.map aux l)
+        end
+    in
+    aux t
+
   let whnf t = match T.view t with
     | T.App (f, _) when T.is_lambda f ->
       Util.enter_prof prof_whnf;
@@ -156,6 +183,8 @@ module Inner = struct
     t'
 
   let eta_expand t = Util.with_prof prof_eta_expand eta_expand_rec t
+
+  let eta_reduce t = Util.with_prof prof_eta_reduce eta_reduce_rec t
 end
 
 module T = Term
@@ -184,4 +213,8 @@ let snf t =
 
 let eta_expand t =
   Inner.eta_expand (t:T.t :> IT.t) |> T.of_term_unsafe
+  |> T.rebuild_rec (* NOTE: check types; remove later *)
+
+let eta_reduce t =
+  Inner.eta_reduce (t:T.t :> IT.t) |> T.of_term_unsafe
   |> T.rebuild_rec (* NOTE: check types; remove later *)

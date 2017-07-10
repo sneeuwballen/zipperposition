@@ -20,7 +20,12 @@ val snf : term -> term
 (** Strong normal form, computing under lambdas and subterms *)
 
 val eta_expand : term -> term
-(** Traverse the term, eta-expanding all symbols *)
+(** Traverse the term, eta-expanding all sub-terms.
+    A term [t : a -> b] becomes [fun (x:a). t x] *)
+
+val eta_reduce : term -> term
+(** Traverse the term, eta-reducing all sub-terms.
+    A term [fun x. t x] where [x ∉ vars(t)] becomes [t] *)
 
 (** Low level interface *)
 module Inner : sig
