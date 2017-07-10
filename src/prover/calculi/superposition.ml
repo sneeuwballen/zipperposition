@@ -59,6 +59,8 @@ let _use_simultaneous_sup = ref true
 let _dot_sup_into = ref None
 let _dot_sup_from = ref None
 let _dot_simpl = ref None
+let _dont_simplify = ref false
+let _no_sup_at_vars = ref false
 
 module Make(Env : Env.S) : S with module Env = Env = struct
   module Env = Env
@@ -88,11 +90,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let ord = Ctx.ord () in
     (* index subterms that can be rewritten by superposition *)
     _idx_sup_into :=
-      Lits.fold_terms ~vars:false ~ty_args:false ~ord ~which:`Max ~subterms:true
+      Lits.fold_terms ~vars:(not !_no_sup_at_vars) ~ty_args:false ~ord ~which:`Max ~subterms:true
         ~eligible:(C.Eligible.res c) (C.lits c)
+      |> Sequence.filter (fun (t, _) -> not (T.is_var t) || T.is_ho_var t)
+      (* TODO: could exclude more variables from the index:
+      they are not needed if they occur with the same args everywhere in the clause *)
       |> Sequence.fold
         (fun tree (t, pos) ->
-           assert (not(T.is_var t));
            let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
            f tree t with_pos)
         !_idx_sup_into;
@@ -180,7 +184,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   exception ExitSuperposition of string
 
   (* check for hidden superposition at variables,
-     e.g. superposing g x = f x into h (x b) = a to give h (f b) = a *)
+     e.g. superposing g x = f x into h (x b) = a to give h (f b) = a.
+     Returns a term only containing the concerned variable
+     and a term consisting of the part of info.t that unifies with the variable,
+     e.g. (x, f) in the example above. *)
   let is_hidden_sup_at_var info =
     let open SupInfo in
     let active_idx = Lits.Pos.idx info.active_pos in
@@ -193,32 +200,56 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               | T.App (f, ss), T.App (g, tt) ->
                 let s_args = Array.of_list ss in
                 let t_args = Array.of_list tt in
-                Array.length s_args >= List.length args
-                && Array.length t_args >= List.length args
-                (* Check whether the last argument(s) of s and t are equal *)
-                && Array.sub s_args (Array.length s_args - List.length args) (List.length args) =
-                   Array.sub t_args (Array.length t_args - List.length args) (List.length args)
-                (* Check whether they are all variables that occur nowhere else *)
-                && CCList.(Array.length s_args - List.length args --^ Array.length s_args)
-                   |> List.for_all (fun idx ->
-                       match T.as_var (Array.get s_args idx) with
-                       | Some v ->
-                         (* Check whether variable occurs in previous arguments: *)
-                         not (Array.exists (T.var_occurs ~var:v) (Array.sub s_args 0 idx))
-                         && not (Array.exists (T.var_occurs ~var:v) (Array.sub t_args 0 (Array.length t_args - List.length args))
-                         (* Check whether variable occurs in heads: *)
-                         && not (T.var_occurs ~var:v f)
-                         && not (T.var_occurs ~var:v g)
-                         (* Check whether variable occurs in other literals: *)
-                         && not (List.exists (Literal.var_occurs v) (CCArray.except_idx (C.lits info.active) active_idx)))
-                       | None -> false
-                     )
-              | _ -> false
+                if
+                  Array.length s_args >= List.length args
+                  && Array.length t_args >= List.length args
+                  (* Check whether the last argument(s) of s and t are equal *)
+                  && Array.sub s_args (Array.length s_args - List.length args) (List.length args) =
+                     Array.sub t_args (Array.length t_args - List.length args) (List.length args)
+                  (* Check whether they are all variables that occur nowhere else *)
+                  && CCList.(Array.length s_args - List.length args --^ Array.length s_args)
+                     |> List.for_all (fun idx ->
+                         match T.as_var (Array.get s_args idx) with
+                         | Some v ->
+                           (* Check whether variable occurs in previous arguments: *)
+                           not (Array.exists (T.var_occurs ~var:v) (Array.sub s_args 0 idx))
+                           && not (Array.exists (T.var_occurs ~var:v) (Array.sub t_args 0 (Array.length t_args - List.length args))
+                           (* Check whether variable occurs in heads: *)
+                           && not (T.var_occurs ~var:v f)
+                           && not (T.var_occurs ~var:v g)
+                           (* Check whether variable occurs in other literals: *)
+                           && not (List.exists (Literal.var_occurs v) (CCArray.except_idx (C.lits info.active) active_idx)))
+                         | None -> false
+                       )
+                then
+                  (* Calculate the part of t that unifies with the variable *)
+                  let t_prefix = T.app g (Array.to_list (Array.sub t_args 0 (Array.length t_args - List.length args))) in
+                  Some (head, t_prefix)
+                else
+                  None
+              | _ -> None
             end
-          | None -> false
+          | None -> None
         end
-      | _ -> false
+      | _ -> None
     end
+
+  (* Checks whether C\sigma is either <= or incomparable to C[var -> replacement]\sigma.
+  In that case we must allow superposition at variables to be complete.*)
+  let sup_at_var_condition info var replacement =
+    let open SupInfo in
+    let us = info.subst in
+    let subst = US.subst us in
+    let renaming = S.Renaming.create () in
+    let passive'_lits = CCArray.map (fun l -> Lit.apply_subst ~renaming subst (l, info.scope_passive)) (C.lits info.passive) in
+    let replacement' = S.FO.apply ~renaming subst (replacement, info.scope_active) in
+    let passive_t'_lits =
+      Sequence.of_array (C.lits info.passive)
+      |> Sequence.map (fun l -> Lit.replace l ~old:var ~by:replacement')
+      |> Sequence.map (fun l -> Lit.apply_subst ~renaming subst (l, info.scope_passive))
+      |> Sequence.to_array in
+    let ord = Ctx.ord () in
+    not (Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt)
 
   (* Helper that does one or zero superposition inference, with all
      the given parameters. Clauses have a scope. *)
@@ -236,6 +267,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           Position.pp info.passive_pos US.pp info.subst);
     assert (InnerTerm.DB.closed (info.s:>InnerTerm.t));
     assert (InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
+    assert (not(T.is_var info.u_p) || T.is_ho_var info.u_p);
     let active_idx = Lits.Pos.idx info.active_pos in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
     try
@@ -267,9 +299,17 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx) ||
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
       ) then raise (ExitSuperposition "bad ordering conditions");
+      (* Check for superposition at a variable *)
+      if !_no_sup_at_vars then
+        assert (not (T.is_var info.u_p))
+      else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then
+         raise (ExitSuperposition "superposition at variable");
+      (* Check for hidden superposition at a variable *)
+      match is_hidden_sup_at_var info with
+      | Some (var,replacement) when not (sup_at_var_condition info var replacement)
+        -> raise (ExitSuperposition "hidden superposition at variable")
+      | _ -> ();
       (* ordering constraints are ok *)
-      (* Check for hidden superposition at variable *)
-      if is_hidden_sup_at_var info then raise (ExitSuperposition "hidden superposition at variable");
       let lits_a = CCArray.except_idx (C.lits info.active) active_idx in
       let lits_p = CCArray.except_idx (C.lits info.passive) passive_idx in
       (* replace s\sigma by t\sigma in u|_p\sigma *)
@@ -322,7 +362,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           Position.pp info.passive_pos US.pp info.subst);
     assert (InnerTerm.DB.closed (info.s:>InnerTerm.t));
     assert (InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
-    assert (not(T.is_var info.u_p));
+    assert (not(T.is_var info.u_p) || T.is_ho_var info.u_p);
     let active_idx = Lits.Pos.idx info.active_pos in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
     try
@@ -355,8 +395,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx) ||
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
       ) then raise (ExitSuperposition "bad ordering conditions");
-      (* Check for hidden superposition at variable *)
-      if is_hidden_sup_at_var info then raise (ExitSuperposition "hidden superposition at variable");
+      (* Check for superposition at a variable *)
+      if !_no_sup_at_vars then
+        assert (not (T.is_var info.u_p))
+      else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then
+        raise (ExitSuperposition "superposition at variable");
+      (* Check for hidden superposition at a variable *)
+      match is_hidden_sup_at_var info with
+      | Some (var,replacement) when not (sup_at_var_condition info var replacement)
+        -> raise (ExitSuperposition "hidden superposition at variable")
+      | _ -> ();
       (* ordering constraints are ok, build new active lits (excepted s=t) *)
       let lits_a = CCArray.except_idx (C.lits info.active) active_idx in
       let lits_a = Lit.apply_subst_list ~renaming subst (lits_a, sc_a) in
@@ -439,12 +487,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* do the inferences in which clause is passive (rewritten),
        so we consider both negative and positive literals *)
     let new_clauses =
-      Lits.fold_terms ~vars:false ~subterms:true ~ord:(Ctx.ord ())
+      Lits.fold_terms ~vars:(not !_no_sup_at_vars) ~subterms:true ~ord:(Ctx.ord ())
         ~which:`Max ~eligible (C.lits clause)
+      |> Sequence.filter (fun (u_p, _) -> not (T.is_var u_p) || T.is_ho_var u_p)
+      (* TODO: could exclude more variables from the index:
+         they are not needed if they occur with the same args everywhere in the clause *)
       |> Sequence.fold
         (fun acc (u_p, passive_pos) ->
            let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
-           assert (not (T.is_var u_p));
            (* all terms that occur in an equation in the active_set
               and that are potentially unifiable with u_p (u at position p) *)
            I.retrieve_unifiables (!_idx_sup_from, 1) (u_p,0)
@@ -1516,12 +1566,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Env.add_binary_inf "superposition_active" infer_active;
     Env.add_unary_inf "equality_factoring" infer_equality_factoring;
     Env.add_unary_inf "equality_resolution" infer_equality_resolution;
-    Env.add_rw_simplify rw_simplify;
-    Env.add_basic_simplify basic_simplify;
-    Env.add_active_simplify active_simplify;
-       Env.add_backward_simplify backward_simplify;
+    if not (!_dont_simplify) then (
+      Env.add_rw_simplify rw_simplify;
+      Env.add_basic_simplify basic_simplify;
+      Env.add_active_simplify active_simplify;
+      Env.add_backward_simplify backward_simplify
+    );
     Env.add_redundant redundant;
-      Env.add_backward_redundant backward_redundant;
+    Env.add_backward_redundant backward_redundant;
     if !_use_semantic_tauto
     then Env.add_is_trivial is_semantic_tautology;
     Env.add_is_trivial is_trivial;
@@ -1571,4 +1623,10 @@ let () =
     ; "--simultaneous-sup"
     , Arg.Bool (fun b -> _use_simultaneous_sup := b)
     , " enable/disable simultaneous superposition"
+    ; "--dont-simplify"
+    , Arg.Set _dont_simplify
+    , " disable simplification rules"
+    ; "--no-sup-at-vars"
+    , Arg.Set _no_sup_at_vars
+    , " disable superposition at variables"
     ]

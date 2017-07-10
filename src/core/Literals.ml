@@ -34,6 +34,11 @@ let equal_com lits1 lits2 =
 
 let compare lits1 lits2 = CCArray.compare Lit.compare lits1 lits2
 
+let compare_multiset ~ord (l1:t) (l2:t) : Comparison.t =
+  let module M = Multiset.Make(Literal) in
+  M.compare_partial_l (Literal.Comp.compare ~ord)
+    (Array.to_list l1) (Array.to_list l2)
+
 let hash lits = Hash.array Lit.hash lits
 
 let variant ?(subst=S.empty) (a1,sc1) (a2,sc2) =
