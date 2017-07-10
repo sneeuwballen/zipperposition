@@ -62,6 +62,31 @@ module Make(E : Env.S) : S with module Env = E = struct
         (List.map Type.var ty_vars)
         (List.map T.var vars)
 
+  (* index for ext-neg, to ensure α-equivalent negative equations have the same skolems *)
+  module FV_ext_neg = FV_tree.Make(struct
+      type t = Literal.t * T.t list (* lit -> skolems *)
+      let compare = CCOrd.(pair Literal.compare (list T.compare))
+      let to_lits (l,_) = Sequence.return (Literal.Conv.to_form l)
+      let labels _ = Util.Int_set.empty
+  end)
+
+  let idx_ext_neg_ : FV_ext_neg.t ref = ref (FV_ext_neg.empty())
+
+  (* retrieve skolems for this literal, if any *)
+  let find_skolems_ (lit:Literal.t) : T.t list option =
+    FV_ext_neg.retrieve_alpha_equiv_c !idx_ext_neg_ (lit, [])
+    |> Sequence.find_map
+      (fun (lit',skolems) ->
+         let subst = Literal.variant (lit',0) (lit,1) |> Sequence.head in
+         begin match subst with
+           | Some subst ->
+             let skolems =
+               List.map (fun t -> Subst.FO.apply_no_renaming subst (t,0)) skolems
+             in
+             Some skolems
+           | None -> None
+         end)
+
   (* negative extensionality rule:
      [f != g] where [f : a -> b] becomes [f k != g k] for a fresh parameter [k] *)
   let ext_neg (lit:Literal.t): Literal.t option = match lit with
@@ -72,9 +97,16 @@ module Make(E : Env.S) : S with module Env = E = struct
            not (T.equal f g) ->
       let n_ty_params, ty_args, _ = Type.open_poly_fun (T.ty f) in
       assert (n_ty_params=0);
-      (* parametrize the skolem by free variables *)
-      let vars = Literal.vars lit in
-      let params = List.map (mk_parameter vars) ty_args in
+      let params = match find_skolems_ lit with
+        | Some l -> l
+        | None ->
+          (* create new skolems, parametrized by free variables *)
+          let vars = Literal.vars lit in
+          let l = List.map (mk_parameter vars) ty_args in
+          (* save list *)
+          idx_ext_neg_ := FV_ext_neg.add !idx_ext_neg_ (lit,l);
+          l
+      in
       let new_lit =
         Literal.mk_neq
           (T.app f params)
