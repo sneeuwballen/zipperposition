@@ -413,6 +413,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       Some t'
     )
 
+  (* TODO: eta reduction *)
+  (* TODO: positive extensionality `m x = n x --> m = n` *)
+
   let setup () =
     if not (Env.flex_get k_enabled) then (
       Util.debug ~section 1 "HO rules disabled";

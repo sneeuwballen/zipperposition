@@ -181,37 +181,72 @@ module U = struct
 
   (** {6 Main loop} *)
 
-  (* unify [v args] and [t], where [t] is a lambda-term.
-     If [t = λy1…yn. body], then the new pair is [v args…y1…yn = body] *)
-  let unif_lambda ~offset v args t : pair * int =
-    assert (T.is_fun t);
-    let t_vars, t_body, offset = T.open_fun_offset ~offset t in
-    assert (t_vars<>[]);
-    assert (not (T.is_fun t_body));
-    (* the new pair is [v args…t_vars = t_body] *)
-    let new_pair = T.app (T.var v) (args @ List.map T.var t_vars), t_body in
-    new_pair, offset
+  let mk_fresh_var offset ty = offset+1, HVar.make offset ~ty
 
-  let mk_fresh_vars offset ty_l =
-    CCList.fold_map
-      (fun offset ty -> offset+1, HVar.make offset ~ty)
-      offset ty_l
+  let mk_fresh_vars offset ty_l = CCList.fold_map mk_fresh_var offset ty_l
+
+  (* unify [v args] and [t], where [t] is a lambda-term.
+     If [t = λy1…yn. body], then the new pair is [v' args…y1…yn = body]
+     where [v = λy1…yn. v'. args…y1…yn] *)
+  let unif_lambda ~offset v args t : pair list * int =
+    assert (T.is_fun t);
+    let ty_t_args, t_body = T.open_fun t in
+    assert (ty_t_args<>[]);
+    assert (not (T.is_fun t_body));
+    (* allocate new variable *)
+    let offset, v' =
+      let ty_v' =
+        Type.arrow
+          (List.map T.ty args @ ty_t_args)
+          (T.ty t_body)
+      in
+      mk_fresh_var offset ty_v'
+    in
+    (* bind [v] to [λavars…y1…yn. v' avars…y1…yn] where [avars] are fresh
+       variables standing for [args] *)
+    let bind_v =
+      let all_args = ty_t_args @ List.map T.ty args in
+      let n = List.length all_args in
+      let rhs =
+        T.app (T.var v')
+          (List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) all_args)
+        |> T.fun_l all_args
+      in
+      T.var v, rhs
+    (* unify [v' args…t_vars = t_body] *)
+    and new_pair_body =
+      let n = List.length ty_t_args in
+      let lhs =
+        T.app (T.var v')
+          (List.map (T.DB.shift n) args @
+             List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) ty_t_args) in
+      lhs, t_body
+    in
+    let new_pairs = [ bind_v; new_pair_body ] in
+    new_pairs, offset
 
   (* unify [v args = t], where [t] is rigid *)
   let unif_rigid ~sc ~subst ~offset v args t : _ Sequence.t =
     assert (args<>[]);
     (* eta-expand locally *)
-    let n, ty_args, ty_ret = Type.open_poly_fun (T.ty t) in
-    assert (n=0);
-    let offset, vars_left = mk_fresh_vars offset (List.map T.ty args) in
-    let offset, vars_right = mk_fresh_vars offset ty_args in
-    let all_vars = vars_left @ vars_right in
-    let all_vars_t = List.map T.var all_vars in
-    let hd_t = T.head_term t in
-    (* now unify [v args…vars_right = t vars_right] *)
-    let rhs = T.app t (List.map T.var vars_right) in
-    let lhs_args = args @ List.map T.var vars_right in
+    let n_params, ty_args, ty_ret = Type.open_poly_fun (T.ty t) in
+    assert (n_params=0);
+    let n_ty_args = List.length ty_args in
     let all_ty_args = List.map T.ty args @ ty_args in
+    let hd_t = T.head_term t in
+    (* bound variables for [ty_args] *)
+    let vars_right =
+      List.mapi (fun i ty -> T.bvar ~ty (n_ty_args-i-1)) ty_args
+    (* bound variables that abstract over [args].
+       Careful about shifting them, they are inside the scope of [vars_right]. *)
+    and vars_left =
+      let n = n_ty_args + List.length args in
+      List.mapi (fun i arg -> T.bvar ~ty:(T.ty arg) (n-i-1)) args
+    in
+    let all_vars = vars_left @ vars_right in
+    (* now unify [v args…vars_right = t vars_right] *)
+    let rhs = T.app (T.DB.shift n_ty_args t) vars_right in
+    let lhs_args = List.map (T.DB.shift n_ty_args) args @ vars_right in
     (* projections: if [k]-th element of [args…vars] has type [τ1…τm → ty_ret],
        then we can try [v := λx1…xn. x_k (F1 x1…xn)…(Fm x1…xn)]
        where the [F] are fresh,
@@ -232,10 +267,10 @@ module U = struct
              (* [λall_vars. (F1 all_vars)…(Fm all_vars)] *)
              let lambda =
                let f_vars_applied =
-                 List.map (fun f_var -> T.app (T.var f_var) all_vars_t) f_vars
+                 List.map (fun f_var -> T.app (T.var f_var) all_vars) f_vars
                in
-               T.fun_of_fvars all_vars
-                 (T.app (List.nth all_vars_t i) f_vars_applied)
+               T.app (List.nth all_vars i) f_vars_applied
+               |> T.fun_l (List.map T.ty all_vars)
              (* [x_k (F1 args…vars_right)…(Fm args…vars_right] *)
              and lhs =
                let f_vars_applied =
@@ -262,9 +297,10 @@ module U = struct
         (* [λall_vars. b (F1 all_vars)…(Fm all_vars)] *)
         let lambda =
           let f_vars_applied =
-            List.map (fun f_var -> T.app (T.var f_var) all_vars_t) f_vars
+            List.map (fun f_var -> T.app (T.var f_var) all_vars) f_vars
           in
-          T.fun_of_fvars all_vars (T.app_builtin ~ty:(T.ty t) b f_vars_applied)
+          T.app_builtin ~ty:(T.ty t) b f_vars_applied
+          |> T.fun_l (List.map T.ty all_vars)
         (* [b (F1 args…vars_right)…(Fm args…vars_right)] *)
         and lhs =
           let f_vars_applied =
@@ -274,7 +310,7 @@ module U = struct
         in
         (* imitate constant *)
         let subst = US.FO.bind subst (v,sc) (lambda,sc) in
-        Sequence.return ([lhs, rhs], subst, offset,"imitate_b")
+        Sequence.return ([lhs, rhs],subst,offset,"imitate_b")
       | T.Const _ ->
         (* now make fresh variables as arguments of [id]. Each variable
            is parametrized by [all_vars] and returns the type of the k-th arg *)
@@ -289,9 +325,10 @@ module U = struct
         (* [λall_vars. f (F1 all_vars)…(Fm all_vars)] *)
         let lambda =
           let f_vars_applied =
-            List.map (fun f_var -> T.app (T.var f_var) all_vars_t) f_vars
+            List.map (fun f_var -> T.app (T.var f_var) all_vars) f_vars
           in
-          T.fun_of_fvars all_vars (T.app t_mono f_vars_applied)
+          T.app t_mono f_vars_applied
+          |> T.fun_l (List.map T.ty all_vars)
         (* [f (F1 args…vars_right)…(Fm args…vars_right)] *)
         and lhs =
           let f_vars_applied =
@@ -300,7 +337,7 @@ module U = struct
           T.app t_mono f_vars_applied
         in
         let subst = US.FO.bind subst (v,sc) (lambda,sc) in
-        Sequence.return ([lhs,rhs], subst, offset,"imitate")
+        Sequence.return ([lhs,rhs],subst,offset,"imitate")
       | _ ->
         Sequence.empty
     in
@@ -401,24 +438,24 @@ module U = struct
                 | T.Var v, T.Fun _ ->
                   (* eta-expand *)
                   assert (l2=[]); (* whnf *)
-                  let pair, offset = unif_lambda ~offset v l1 hd2 in
-                  push_new "bind" ~penalty ~subst ~offset [pair]
+                  let pairs, offset = unif_lambda ~offset v l1 hd2 in
+                  push_new "bind" ~penalty ~subst ~offset pairs
                 | T.Fun _, T.Var v ->
                   (* eta-expand *)
                   assert (l1=[]); (* whnf *)
-                  let pair, offset = unif_lambda ~offset v l2 hd1 in
-                  push_new "bind" ~penalty ~subst ~offset [pair]
+                  let pairs, offset = unif_lambda ~offset v l2 hd1 in
+                  push_new "bind" ~penalty ~subst ~offset pairs
                 | T.Fun _, T.Fun _ ->
                   (* eta-expand and unify bodies: to unify [λx.t = λx.u]
                      just unify [t=u] *)
                   assert (l1 = []);
                   assert (l2 = []);
-                  let n, ty_args, _ = Type.open_poly_fun (T.ty t1) in
-                  assert (n=0);
-                  (* apply to fresh variables *)
-                  let offset, vars = mk_fresh_vars offset ty_args in
-                  let vars = List.map T.var vars in
-                  let pair = T.app hd1 vars, T.app hd2 vars in
+                  let n_params, ty_args, _ = Type.open_poly_fun (T.ty t1) in
+                  assert (n_params=0);
+                  (* apply to DB indices *)
+                  let n = List.length ty_args in
+                  let args = List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) ty_args in
+                  let pair = T.app hd1 args, T.app hd2 args in
                   push_new "eta" ~penalty ~subst ~offset [pair]
                 | T.Var v, (T.Const _ | T.AppBuiltin _ | T.DB _) ->
                   (* project/imitate *)
@@ -434,7 +471,7 @@ module U = struct
                   unif_rigid ~sc ~subst ~offset v l2 t1
                     (fun (pairs,subst,offset,rule) ->
                        push_new rule ~penalty ~subst ~offset pairs);
-                | T.Var _, T.Var _ ->
+                | T.Var v1, T.Var v2 ->
                   (* flex/flex: all should be flex/flex *)
                   Util.debugf ~section 5
                     "(@[ho_unif.all_flex_flex@ %a@])"
