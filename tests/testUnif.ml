@@ -149,7 +149,7 @@ let check_ho_unify_gives_unifiers =
     in
     (* only keep proper solutions *)
     let l =
-      HO_unif.unif_pairs ~fuel:20 ~offset ([t1,t2],0)
+      HO_unif.unif_pairs ~fuel:20 ~offset ([[],t1,t2],0)
       |> List.filter
         (fun (pairs,us,_) -> pairs=[] && not (Unif_subst.has_constr us))
     in

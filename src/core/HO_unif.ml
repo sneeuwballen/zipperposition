@@ -19,9 +19,11 @@ type term = Term.t
 type penalty = int
 (** penalty on the search space *)
 
+type pair = Type.t list * term * term
+
 (* options *)
 
-let default_fuel = ref 40
+let default_fuel = ref 15
 
 let enable_norm_subst = ref true
 
@@ -75,9 +77,11 @@ let enum_prop ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) list =
       ]
   )
 
-module U = struct
-  type pair = term * term
+let pp_pair out ((env,t,u):pair) =
+  Format.fprintf out "(@[@[`%a` =?=@]@ `%a`@ :env [@[%a@]]@])"
+    T.pp t T.pp u (Util.pp_list ~sep:", " Type.pp) env
 
+module U = struct
   type pb = {
     pairs: pair list;
     subst: US.t;
@@ -98,9 +102,6 @@ module U = struct
 
   let add (st:state) pb : unit = Queue.push pb st.queue
 
-  let pp_pair out (t,u) =
-    Format.fprintf out "(@[@[%a =?=@]@ @[%a@]@])" T.pp t T.pp u
-
   let pp_pb out (pb:pb) =
     Format.fprintf out "(@[pb :subst %a@ :pairs (@[<hv>%a@])@])"
       US.pp pb.subst (Util.pp_list ~sep:" " pp_pair) pb.pairs
@@ -117,7 +118,7 @@ module U = struct
     | P_flex_rigid
     | P_flex_flex
 
-  let classify_pair (t,u) = match T.is_ho_app t, T.is_ho_app u with
+  let classify_pair (_,t,u) = match T.is_ho_app t, T.is_ho_app u with
     | false, false -> P_rigid_rigid
     | false, true
     | true, false -> P_flex_rigid
@@ -141,12 +142,14 @@ module U = struct
     in
     Lambda.whnf t
 
+  let mk_pairs env l1 l2 = List.map2 (fun t u -> env, t, u) l1 l2
+
   (* perform syntactic unification aggressively on rigid/rigid pairs *)
   let flatten_rigid_rigid sc subst pairs : pair list option =
     try
       let rec aux acc l = match l with
         | [] -> acc
-        | (t, u) :: tail ->
+        | (env,t, u) :: tail ->
           (* deref+normalize terms *)
           let t = whnf_deref subst (t,sc) in
           let u = whnf_deref subst (u,sc) in
@@ -154,13 +157,13 @@ module U = struct
             | _ when T.equal t u -> aux acc tail (* drop trivial *)
             | T.Classic.App (id1, l1), T.Classic.App (id2, l2) ->
               if ID.equal id1 id2 && List.length l1 = List.length l2
-              then aux acc (List.combine l1 l2 @ tail)
+              then aux acc (mk_pairs env l1 l2 @ tail)
               else raise Exit (* failure *)
             | T.Classic.AppBuiltin (b1,l1), T.Classic.AppBuiltin (b2,l2) ->
               if Builtin.equal b1 b2 && List.length l1=List.length l2
-              then aux acc (List.combine l1 l2 @ tail)
+              then aux acc (mk_pairs env l1 l2 @ tail)
               else raise Exit
-            | _ -> aux ((t,u) :: acc) tail
+            | _ -> aux ((env,t,u) :: acc) tail
           end
       in
       Some (aux [] pairs)
@@ -187,32 +190,28 @@ module U = struct
 
   (* unify [v args] and [t], where [t] is a lambda-term.
      If [t = λy1…yn. body], then the new pair is [v' args…y1…yn = body]
-     where [v = λy1…yn. v'. args…y1…yn] *)
-  let unif_lambda ~offset v args t : pair list * int =
+     where [v = λy1…yn. v' args…y1…yn] *)
+  let unif_lambda ~offset env v args t : pair list * int =
     assert (T.is_fun t);
     let ty_t_args, t_body = T.open_fun t in
     assert (ty_t_args<>[]);
     assert (not (T.is_fun t_body));
+    let all_args = List.map T.ty args @ ty_t_args in
     (* allocate new variable *)
     let offset, v' =
-      let ty_v' =
-        Type.arrow
-          (List.map T.ty args @ ty_t_args)
-          (T.ty t_body)
-      in
+      let ty_v' = Type.arrow all_args (T.ty t_body) in
       mk_fresh_var offset ty_v'
     in
     (* bind [v] to [λavars…y1…yn. v' avars…y1…yn] where [avars] are fresh
        variables standing for [args] *)
     let bind_v =
-      let all_args = ty_t_args @ List.map T.ty args in
       let n = List.length all_args in
       let rhs =
         T.app (T.var v')
           (List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) all_args)
         |> T.fun_l all_args
       in
-      T.var v, rhs
+      env, T.var v, rhs
     (* unify [v' args…t_vars = t_body] *)
     and new_pair_body =
       let n = List.length ty_t_args in
@@ -220,13 +219,19 @@ module U = struct
         T.app (T.var v')
           (List.map (T.DB.shift n) args @
              List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) ty_t_args) in
-      lhs, t_body
+      ty_t_args @ env, lhs, t_body
     in
     let new_pairs = [ bind_v; new_pair_body ] in
     new_pairs, offset
 
+  let delay_pair (p:pair) sc : Unif_constr.t =
+    let env, t1, t2 = p in
+    let t1 = T.fun_l env t1 in
+    let t2 = T.fun_l env t2 in
+    Unif_constr.FO.make (t1,sc)(t2,sc)
+
   (* unify [v args = t], where [t] is rigid *)
-  let unif_rigid ~sc ~subst ~offset v args t : _ Sequence.t =
+  let unif_rigid ~sc ~subst ~offset env v args t : (pair list * _ * _ * _) Sequence.t =
     assert (args<>[]);
     (* eta-expand locally *)
     let n_params, ty_args, ty_ret = Type.open_poly_fun (T.ty t) in
@@ -279,7 +284,7 @@ module U = struct
                T.app (List.nth lhs_args i) f_vars_applied
              in
              let subst = US.FO.bind subst (v,sc) (lambda,sc) in
-             Some ([lhs,rhs],subst,offset,"proj")
+             Some ([ty_args@env,lhs,rhs],subst,offset,"proj")
            with Unif.Fail ->
              None)
     (* imitate: if [t=f u1…um],
@@ -288,6 +293,7 @@ module U = struct
     and imitate = match T.view hd_t with
       | T.AppBuiltin (b,l) when vars_right=[] && T.args t=[] ->
         (* imitate builtin *)
+        let ty_params, l = CCList.take_drop_while T.is_type l in
         let ty_args_t = List.map T.ty l in
         let offset, f_vars =
           ty_args_t
@@ -306,11 +312,11 @@ module U = struct
           let f_vars_applied =
             List.map (fun f_var -> T.app (T.var f_var) lhs_args) f_vars
           in
-          T.app_builtin ~ty:(T.ty t) b f_vars_applied
+          T.app_builtin ~ty:(T.ty t) b (ty_params @ f_vars_applied)
         in
         (* imitate constant *)
         let subst = US.FO.bind subst (v,sc) (lambda,sc) in
-        Sequence.return ([lhs, rhs],subst,offset,"imitate_b")
+        Sequence.return ([ty_args@env, lhs, rhs],subst,offset,"imitate_b")
       | T.Const _ ->
         (* now make fresh variables as arguments of [id]. Each variable
            is parametrized by [all_vars] and returns the type of the k-th arg *)
@@ -337,7 +343,7 @@ module U = struct
           T.app t_mono f_vars_applied
         in
         let subst = US.FO.bind subst (v,sc) (lambda,sc) in
-        Sequence.return ([lhs,rhs],subst,offset,"imitate")
+        Sequence.return ([ty_args@env,lhs,rhs],subst,offset,"imitate")
       | _ ->
         Sequence.empty
     in
@@ -371,10 +377,10 @@ module U = struct
         | Some {pairs=[]; subst; penalty; _} ->
           (* total solution! *)
           add_sol subst penalty;
-        | Some ({penalty; offset; subst; pairs=(t1,t2) :: pairs_tl} as pb) ->
+        | Some ({penalty; offset; subst; pairs=(env,t1,t2) :: pairs_tl} as pb) ->
           (* try to unify the first pair *)
           Util.debugf ~section 5 "(@[ho_unif.try_pair %a@ :subst %a@])"
-            (fun k->k pp_pair (t1,t2) US.pp subst);
+            (fun k->k pp_pair (env,t1,t2) US.pp subst);
           begin
             try
               let fail() = raise Unif.Fail in
@@ -383,7 +389,7 @@ module U = struct
                 (* unify types of pairs *)
                 let subst =
                   List.fold_left
-                    (fun subst (t,u) ->
+                    (fun subst (_,t,u) ->
                        Unif.Ty.unify_full ~subst (T.ty t,sc) (T.ty u,sc))
                     subst pairs
                 in
@@ -413,7 +419,7 @@ module U = struct
                   if ID.equal id1 id2 && List.length l1=List.length l2
                   then (
                     (* unify arguments pairwise *)
-                    let new_pairs = List.combine l1 l2 in
+                    let new_pairs = mk_pairs env l1 l2 in
                     push_new "rigid" ~penalty ~offset ~subst new_pairs
                   ) else fail()
                 | T.DB a, T.DB b ->
@@ -432,18 +438,18 @@ module U = struct
                   if Builtin.equal b1 b2 && List.length l1'=List.length l2'
                   then (
                     (* unify arguments pairwise *)
-                    let new_pairs = List.combine l1 l2 in
+                    let new_pairs = mk_pairs env l1 l2 in
                     push_new "rigid" ~penalty ~offset ~subst new_pairs
                   ) else fail()
                 | T.Var v, T.Fun _ ->
                   (* eta-expand *)
                   assert (l2=[]); (* whnf *)
-                  let pairs, offset = unif_lambda ~offset v l1 hd2 in
+                  let pairs, offset = unif_lambda ~offset env v l1 hd2 in
                   push_new "bind" ~penalty ~subst ~offset pairs
                 | T.Fun _, T.Var v ->
                   (* eta-expand *)
                   assert (l1=[]); (* whnf *)
-                  let pairs, offset = unif_lambda ~offset v l2 hd1 in
+                  let pairs, offset = unif_lambda ~offset env v l2 hd1 in
                   push_new "bind" ~penalty ~subst ~offset pairs
                 | T.Fun _, T.Fun _ ->
                   (* eta-expand and unify bodies: to unify [λx.t = λx.u]
@@ -455,23 +461,23 @@ module U = struct
                   (* apply to DB indices *)
                   let n = List.length ty_args in
                   let args = List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) ty_args in
-                  let pair = T.app hd1 args, T.app hd2 args in
+                  let pair = ty_args @ env, T.app hd1 args, T.app hd2 args in
                   push_new "eta" ~penalty ~subst ~offset [pair]
                 | T.Var v, (T.Const _ | T.AppBuiltin _ | T.DB _) ->
                   (* project/imitate *)
                   assert (l1<>[]);
                   consume_fuel();
-                  unif_rigid ~sc ~subst ~offset v l1 t2
+                  unif_rigid ~sc ~subst ~offset env v l1 t2
                     (fun (pairs,subst,offset,rule) ->
                        push_new rule ~penalty ~subst ~offset pairs);
                 | (T.Const _ | T.AppBuiltin _ | T.DB _), T.Var v ->
                   (* project/imitate *)
                   assert (l2<>[]);
                   consume_fuel();
-                  unif_rigid ~sc ~subst ~offset v l2 t1
+                  unif_rigid ~sc ~subst ~offset env v l2 t1
                     (fun (pairs,subst,offset,rule) ->
                        push_new rule ~penalty ~subst ~offset pairs);
-                | T.Var v1, T.Var v2 ->
+                | T.Var _, T.Var _ ->
                   (* flex/flex: all should be flex/flex *)
                   Util.debugf ~section 5
                     "(@[ho_unif.all_flex_flex@ %a@])"
@@ -480,8 +486,7 @@ module U = struct
                   (* delay all flex/flex pairs *)
                   let subst =
                     List.fold_left
-                      (fun subst (t1,t2) ->
-                         US.add_constr (Unif_constr.FO.make (t1,sc)(t2,sc)) subst)
+                      (fun subst p -> US.add_constr (delay_pair p sc) subst)
                     pb.subst pb.pairs
                   in
                   add_sol subst pb.penalty

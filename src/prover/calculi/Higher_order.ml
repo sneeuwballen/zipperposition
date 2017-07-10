@@ -336,7 +336,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let pp_pairs_ out =
     let open CCFormat in
     Format.fprintf out "(@[<hv>%a@])"
-      (Util.pp_list ~sep:" " @@ hvbox @@ pair ~sep:(return " =?=@ ") T.pp T.pp)
+      (Util.pp_list ~sep:" " @@ hvbox @@ HO_unif.pp_pair)
 
   (* perform HO unif on [pairs].
      invariant: [C.lits c = pairs @ other_lits] *)
@@ -355,9 +355,9 @@ module Make(E : Env.S) : S with module Env = E = struct
            let c_guard = Literal.of_unif_subst ~renaming us in
            let new_pairs =
              List.map
-               (fun (t,u) ->
-                  let t = Subst.FO.apply ~renaming subst (t,0) in
-                  let u = Subst.FO.apply ~renaming subst (u,0) in
+               (fun (env,t,u) ->
+                  let t = Subst.FO.apply ~renaming subst (T.fun_l env t,0) in
+                  let u = Subst.FO.apply ~renaming subst (T.fun_l env u,0) in
                   Literal.mk_constraint t u)
                new_pairs
            and other_lits =
@@ -390,7 +390,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         |> CCList.partition_map
           (function
             | Literal.Equation (t,u, false) as lit
-              when Literal.is_ho_constraint lit -> `Left (t,u)
+              when Literal.is_ho_constraint lit -> `Left ([],t,u)
             | lit -> `Right lit)
       in
       assert (pairs <> []);

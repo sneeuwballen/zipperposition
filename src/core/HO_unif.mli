@@ -18,11 +18,16 @@ val enum_prop :
     @param offset to create fresh variables (should be unused elsewhere)
 *)
 
+type pair = Type.t list * term * term
+(** unification pair *)
+
+val pp_pair : pair CCFormat.printer
+
 val unif_pairs :
   ?fuel:int ->
-  (term * term) list Scoped.t ->
+  pair list Scoped.t ->
   offset:int ->
-  ((term * term) list * Unif_subst.t * penalty) list
+  (pair list * Unif_subst.t * penalty) list
 (** [unif_pairs pairs ~scope_new_vars] returns a list of (partial) solutions
     to the HO unification problem [pairs].
     Each solution is a list of remaining constraints, a substitution,
