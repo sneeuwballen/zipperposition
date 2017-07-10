@@ -49,6 +49,7 @@ module PT = struct
   let c = _const ~ty:ty_term "c"
   let d = _const ~ty:ty_term "d"
   let e = _const ~ty:ty_term "e"
+  let p_ho2 = _const ~ty:(PT.Ty.([ty_fun1; ty_fun1] ==>term)) "p_ho2"
   let f x y = PT.app ~ty:ty_term (_const ~ty:ty_fun2 "f") [x; y]
   let sum x y = PT.app ~ty:ty_term (_const ~ty:ty_fun2 "sum") [x; y]
   let g x = PT.app ~ty:ty_term (_const ~ty:ty_fun1 "g") [x]
@@ -120,6 +121,7 @@ module PT = struct
                    1, map2 app1 (g_fun_t self) self;
                    1, map2 app1 g_fun_f1 (g_fun_t self);
                    1, map2 app1 g_fun_f2 (g_fun_t (g_fun_t self));
+                   1, map3 app2 (return p_ho2) (g_fun_t self) (g_fun_t self);
                  ] @ l
                ) else l
              in
