@@ -18,7 +18,25 @@ module PT = struct
   let _const ~ty s = PT.const ~ty (ID.make s)
 
   (* strict subterms *)
-  let shrink t = TypedSTerm.Seq.subterms t |> Sequence.drop 1
+  let rec shrink t =
+    QA.Iter.append
+      (TypedSTerm.Seq.subterms t |> Sequence.drop 1)
+      (shrink_sub t)
+  (* shrink immediate subterms *)
+  and shrink_sub t =
+    let open QA.Iter in
+    match PT.view t with
+      | PT.App (f, l) ->
+        append
+          (shrink f >|= fun f' -> PT.app ~ty:(PT.ty_exn t) f' l)
+          (Sequence.(0 -- (List.length l-1)) >>= fun i ->
+           let sub = List.nth l i in
+           shrink_sub sub >|= fun sub' ->
+           let l' = CCList.set_at_idx i sub' l in
+           PT.app ~ty:(PT.ty_exn t) f l')
+      | PT.Bind (b, v, bod) ->
+        shrink bod >|= PT.bind ~ty:(PT.ty_exn t) b v
+      | _ -> empty
 
   let mk_ gen =
     QA.make ~print:TypedSTerm.to_string ~shrink gen
@@ -106,7 +124,26 @@ module PT = struct
   let pred = mk_ pred_g
 end
 
-let shrink t = T.Seq.subterms t |> Sequence.drop 1
+let rec shrink t =
+  let subterms_same_ty =
+    T.Seq.subterms t
+    |> Sequence.drop 1
+    |> Sequence.filter (fun t' -> Type.equal (T.ty t) (T.ty t'))
+  in
+  QA.Iter.append subterms_same_ty (shrink_sub t)
+(* shrink immediate subterms *)
+and shrink_sub t =
+  let open QA.Iter in
+  match T.view t with
+    | T.App (f, l) ->
+      append
+        (shrink f >|= fun f' -> T.app f' l)
+        (Sequence.(0 -- (List.length l-1)) >>= fun i ->
+         let sub = List.nth l i in
+         shrink_sub sub >|= fun sub' ->
+         let l' = CCList.set_at_idx i sub' l in
+         T.app f l')
+    | _ -> empty
 
 let mk_ gen = QA.make ~print:T.to_string ~shrink gen
 
