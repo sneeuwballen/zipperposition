@@ -9,6 +9,7 @@ type penalty = int
 (** penalty on the search space *)
 
 val enum_prop :
+  ?mode:[`Full | `Neg | `None] ->
   Term.var Scoped.t ->
   offset:int ->
   (Subst.t * penalty) list
@@ -16,6 +17,8 @@ val enum_prop :
     for it
     @param v the variable to refine + its scope. Must return [prop].
     @param offset to create fresh variables (should be unused elsewhere)
+    @param mode if [`Neg], only tries negation; [`None], do nothing;
+      otherwise do all connectives
 *)
 
 type pair = Type.t list * term * term

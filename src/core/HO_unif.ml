@@ -33,7 +33,7 @@ let term_arity args =
   |> Util.take_drop_while (fun t -> T.is_type t)
   |> CCPair.map List.length List.length
 
-let enum_prop ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) list =
+let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) list =
   let ty_v = HVar.ty v in
   let n, ty_args, ty_ret = Type.open_poly_fun ty_v in
   assert (Type.is_prop ty_ret);
@@ -42,35 +42,46 @@ let enum_prop ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) list =
     (* local variables to build the λ-term *)
     let vars = List.mapi (fun i ty -> HVar.make ~ty i) ty_args in
     (* projection with "¬": [λvars. ¬ (F vars)] *)
-    let l_not =
-      let f = HVar.make offset ~ty:ty_v in
-      T.fun_of_fvars vars
-        (T.Form.not_ (T.app (T.var f) (List.map T.var vars)))
+    let l_not = match mode with
+      | `None -> None
+      | `Neg | `Full ->
+        let f = HVar.make offset ~ty:ty_v in
+        T.fun_of_fvars vars
+          (T.Form.not_ (T.app (T.var f) (List.map T.var vars)))
+        |> CCOpt.return
     (* projection with "∧": [λvars. (F1 vars) ∧ (F2 vars)] *)
-    and l_and =
-      let f = HVar.make offset ~ty:ty_v in
-      let g = HVar.make (offset+1) ~ty:ty_v in
-      T.fun_of_fvars vars
-        (T.Form.and_
-           (T.app (T.var f) (List.map T.var vars))
-           (T.app (T.var g) (List.map T.var vars)))
+    and l_and = match mode with
+      | `Neg | `None -> None
+      | `Full ->
+        let f = HVar.make offset ~ty:ty_v in
+        let g = HVar.make (offset+1) ~ty:ty_v in
+        T.fun_of_fvars vars
+          (T.Form.and_
+             (T.app (T.var f) (List.map T.var vars))
+             (T.app (T.var g) (List.map T.var vars)))
+        |> CCOpt.return
     (* projection with "=": [λvars. (F1 vars) = (F2 vars)]
        where [F1 : Πa. ty_args -> a] *)
-    and l_eq =
-      let a = HVar.make offset ~ty:Type.tType in
-      let ty_fun = Type.arrow ty_args (Type.var a) in
-      let f = HVar.make (offset+1) ~ty:ty_fun in
-      let g = HVar.make (offset+2) ~ty:ty_fun in
-      T.fun_of_fvars vars
-        (T.Form.eq
-           (T.app (T.var f) (List.map T.var vars))
-           (T.app (T.var g) (List.map T.var vars)))
+    and l_eq = match mode with
+      | `Neg | `None -> None
+      | `Full ->
+        let a = HVar.make offset ~ty:Type.tType in
+        let ty_fun = Type.arrow ty_args (Type.var a) in
+        let f = HVar.make (offset+1) ~ty:ty_fun in
+        let g = HVar.make (offset+2) ~ty:ty_fun in
+        T.fun_of_fvars vars
+          (T.Form.eq
+             (T.app (T.var f) (List.map T.var vars))
+             (T.app (T.var g) (List.map T.var vars)))
+        |> CCOpt.return
     in
-    List.map
-      (fun (t,penalty) ->
-         assert (T.DB.is_closed t);
-         let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
-         subst, penalty)
+    CCList.filter_map
+      (fun (o,penalty) -> match o with
+        | None -> None
+        | Some t ->
+          assert (T.DB.is_closed t);
+          let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
+          Some (subst, penalty))
       [ l_not, 2;
         l_and, 5;
         l_eq, 10;

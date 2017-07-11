@@ -40,7 +40,7 @@ end
 let k_some_ho : bool Flex_state.key = Flex_state.create_key()
 let k_enabled : bool Flex_state.key = Flex_state.create_key()
 let k_enable_ho_unif : bool Flex_state.key = Flex_state.create_key()
-let k_enable_ho_prim : bool Flex_state.key = Flex_state.create_key()
+let k_ho_prim_mode : _ Flex_state.key = Flex_state.create_key()
 let k_ho_prim_max_penalty : int Flex_state.key = Flex_state.create_key()
 let k_eta : [`Reduce | `Expand | `None] Flex_state.key = Flex_state.create_key()
 
@@ -324,7 +324,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* rule for primitive enumeration of predicates [P t1…tn]
      (using ¬ and ∧ and =) *)
-  let prim_enum_ (c:C.t) : C.t list =
+  let prim_enum_ ~mode (c:C.t) : C.t list =
     (* set of variables to refine (only those occurring in "interesting" lits) *)
     let vars =
       Literals.fold_lits ~eligible:C.Eligible.always (C.lits c)
@@ -353,7 +353,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       vars
       |> T.VarSet.to_seq
       |> Sequence.flat_map_l
-        (fun v -> HO_unif.enum_prop (v,sc_c) ~offset)
+        (fun v -> HO_unif.enum_prop ~mode (v,sc_c) ~offset)
       |> Sequence.map
         (fun (subst,penalty) ->
            let renaming = Ctx.renaming_clear() in
@@ -374,9 +374,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Sequence.to_rev_list
     end
 
-  let prim_enum c =
+  let prim_enum ~mode c =
     if C.penalty c < max_penalty_prim_
-    then prim_enum_ c
+    then prim_enum_ ~mode c
     else []
 
   let pp_pairs_ out =
@@ -504,18 +504,29 @@ module Make(E : Env.S) : S with module Env = E = struct
       if Env.flex_get k_enable_ho_unif then (
         Env.add_unary_inf "ho_unif" ho_unif;
       );
-      if Env.flex_get k_enable_ho_prim then (
-        Env.add_unary_inf "ho_prim_enum" prim_enum;
-      )
+      begin match Env.flex_get k_ho_prim_mode with
+        | `None -> ()
+        | mode ->
+          Env.add_unary_inf "ho_prim_enum" (prim_enum ~mode);
+      end;
     );
     ()
 end
 
 let enabled_ = ref true
 let enable_unif_ = ref true
-let enable_prim_ = ref true
+let prim_mode_ = ref `Neg
 let prim_max_penalty = ref 15 (* FUDGE *)
 let eta_ = ref `Reduce
+
+let set_prim_mode_ =
+  let l = [
+    "neg", `Neg;
+    "full", `Full;
+    "none", `None;
+  ] in
+  let set_ s = prim_mode_ := List.assoc s l in
+  Arg.Symbol (List.map fst l, set_)
 
 let st_contains_ho (st:(_,_,_) Statement.t): bool =
   let is_non_atomic_ty ty =
@@ -563,7 +574,7 @@ let extension =
     |> Flex_state.add k_some_ho is_ho
     |> Flex_state.add k_enabled !enabled_
     |> Flex_state.add k_enable_ho_unif (!enabled_ && !enable_unif_)
-    |> Flex_state.add k_enable_ho_prim (!enabled_ && !enable_prim_)
+    |> Flex_state.add k_ho_prim_mode (if !enabled_ then !prim_mode_ else `None)
     |> Flex_state.add k_ho_prim_max_penalty !prim_max_penalty
     |> Flex_state.add k_eta !eta_
   in
@@ -584,8 +595,7 @@ let () =
       "--no-ho", Arg.Clear enabled_, " disable HO reasoning";
       "--ho-unif", Arg.Set enable_unif_, " enable full HO unification";
       "--no-ho-unif", Arg.Clear enable_unif_, " disable full HO unification";
-      "--ho-prim-enum", Arg.Set enable_prim_, " enable HO primitive enum";
-      "--no-ho-prim-enum", Arg.Clear enable_prim_, " disable HO primitive enum";
+      "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";
       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
       "--ho-eta", eta_opt, " eta-expansion/reduction";
     ];
