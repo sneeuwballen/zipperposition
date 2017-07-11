@@ -109,7 +109,7 @@ module Inner = struct
         let n_args = List.length ty_args in
         let n_missing = n_args - List.length args in
         if n_missing>0 then (
-          Util.debugf 5 "@[in `%a`,@ missing %d args@])"
+          Util.debugf 5 "(@[eta_expand_rec `%a`,@ missing %d args@])"
             (fun k->k T.pp t n_missing);
         );
         let missing_args = CCList.take n_missing ty_args in
@@ -149,7 +149,7 @@ module Inner = struct
           | T.Bind (Binder.Lambda, _, {T.term=T.App (f, [{T.term=T.DB 0; _}]); _})
             when not (T.DB.contains f 0) ->
             (* [fun x. f x --> f] *)
-            f
+            T.DB.unshift 1 f
           | T.Bind (b, varty, body) ->
             T.bind ~ty ~varty b (aux body)
           | T.App (_,[]) -> assert false
@@ -213,8 +213,12 @@ let snf t =
 
 let eta_expand t =
   Inner.eta_expand (t:T.t :> IT.t) |> T.of_term_unsafe
+  (*|> CCFun.tap (fun t' ->
+    if t != t' then Format.printf "@[eta_expand `%a`@ into `%a`@]@." T.pp t T.pp t')*)
   |> T.rebuild_rec (* NOTE: check types; remove later *)
 
 let eta_reduce t =
   Inner.eta_reduce (t:T.t :> IT.t) |> T.of_term_unsafe
+  (*|> CCFun.tap (fun t' ->
+    if t != t' then Format.printf "@[eta_reduce `%a`@ into `%a`@]@." T.pp t T.pp t')*)
   |> T.rebuild_rec (* NOTE: check types; remove later *)
