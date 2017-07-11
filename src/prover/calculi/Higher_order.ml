@@ -584,8 +584,8 @@ let () =
       "--no-ho", Arg.Clear enabled_, " disable HO reasoning";
       "--ho-unif", Arg.Set enable_unif_, " enable full HO unification";
       "--no-ho-unif", Arg.Clear enable_unif_, " disable full HO unification";
-      "--ho-prim-enum", Arg.Set enable_unif_, " enable HO primitive enum";
-      "--no-ho-prim-enum", Arg.Clear enable_unif_, " disable HO primitive enum";
+      "--ho-prim-enum", Arg.Set enable_prim_, " enable HO primitive enum";
+      "--no-ho-prim-enum", Arg.Clear enable_prim_, " disable HO primitive enum";
       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
       "--ho-eta", eta_opt, " eta-expansion/reduction";
     ];
