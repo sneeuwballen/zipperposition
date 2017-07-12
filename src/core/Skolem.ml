@@ -101,7 +101,7 @@ let collect_vars subst f =
     T.Seq.free_vars t
     |> Sequence.flat_map
       (fun v -> match Var.Subst.find subst v with
-         | None -> Sequence.return v
+         | None -> Sequence.return (Var.update_ty ~f:(T.Subst.eval subst) v)
          | Some t' -> vars_seq t')
   in
   let is_ty_var v = T.Ty.is_tType (Var.ty v) in
@@ -121,17 +121,18 @@ let skolem_form ~ctx subst var form =
   incr_counter ctx;
   let tyvars, vars = collect_vars subst form in
   Util.debugf ~section 5
-    "@[<2>creating skolem for@ `@[%a@]`@ with tyvars=@[%a@],@ vars=@[%a@],@ subst={@[%a@]}@]"
+    "@[<2>creating skolem for@ `@[%a@]`@ with tyvars=[@[%a@]],@ vars=[@[%a@]],@ subst={@[%a@]}@]"
     (fun k->k T.pp form (Util.pp_list Var.pp_full) tyvars
         (Util.pp_list Var.pp_full) vars (Var.Subst.pp T.pp) subst);
-  let vars_t = List.map (fun v->T.var v) vars in
   let tyvars_t = List.map (fun v->T.Ty.var v) tyvars in
+  let vars_t = List.map (fun v->T.var v |> T.Subst.eval subst) vars in
   (* type of the symbol: quantify over type vars, apply to vars' types *)
   let ty_var = T.Subst.eval subst (Var.ty var) in
   let ty = ty_forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) ty_var) in
   let prefix = "sk_" ^ Var.to_string var in
   let f = fresh_skolem_prefix ~ctx ~ty prefix in
-  T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t)
+  let skolem_t = T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t) in
+  T.Subst.eval subst skolem_t
 
 let pop_new_skolem_symbols ~ctx =
   let l = ctx.sc_new_ids in
