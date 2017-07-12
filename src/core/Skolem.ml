@@ -95,10 +95,17 @@ let fresh_skolem_prefix ~ctx ~ty prefix =
 
 let fresh_skolem ~ctx ~ty = fresh_skolem_prefix ~ctx ~ty ctx.sc_prefix
 
-let collect_vars ?(filter=fun _->true) f =
+let collect_vars subst f =
+  (* traverse [t] and return free variables, dereferencing on the fly *)
+  let rec vars_seq t =
+    T.Seq.free_vars t
+    |> Sequence.flat_map
+      (fun v -> match Var.Subst.find subst v with
+         | None -> Sequence.return v
+         | Some t' -> vars_seq t')
+  in
   let is_ty_var v = T.Ty.is_tType (Var.ty v) in
-  T.Seq.free_vars f
-  |> Sequence.filter filter
+  vars_seq f
   |> Var.Set.of_seq
   |> Var.Set.to_list
   |> List.partition is_ty_var
@@ -112,16 +119,7 @@ let ty_forall_l = List.fold_right ty_forall
 
 let skolem_form ~ctx subst var form =
   incr_counter ctx;
-  (* only free variables we are interested in, are those bound to actual
-     free variables (the universal variables), not the existential ones
-     (bound to Skolem symbols) *)
-  let filter v =
-    try match T.view (Var.Subst.find_exn subst v) with
-      | T.Var _ -> true
-      | _ -> false
-    with Not_found -> true
-  in
-  let tyvars, vars = collect_vars form ~filter in
+  let tyvars, vars = collect_vars subst form in
   Util.debugf ~section 5
     "@[<2>creating skolem for@ `@[%a@]`@ with tyvars=@[%a@],@ vars=@[%a@],@ subst={@[%a@]}@]"
     (fun k->k T.pp form (Util.pp_list Var.pp_full) tyvars
@@ -159,7 +157,7 @@ let pp_definition out = function
 
 let define_form ~ctx ~add_rules ~polarity ~src form =
   incr_counter ctx;
-  let tyvars, vars = collect_vars form in
+  let tyvars, vars = collect_vars Var.Subst.empty form in
   let vars_t = List.map (fun v->T.var v) vars in
   let tyvars_t = List.map (fun v->T.Ty.var v) tyvars in
   (* similar to {!skolem_form}, but always return [prop] *)
