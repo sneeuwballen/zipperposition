@@ -558,32 +558,32 @@ module Arith = struct
         Format.fprintf buf "(@[<hv>%a@])" pp_rec t
       | _ -> pp_rec buf t
     in
-    match Classic.view t with
-      | Classic.Var v when Type.equal (ty t) Type.int ->
+    match view t with
+      | Var v when Type.equal (ty t) Type.int ->
         Format.fprintf out "I%d" (HVar.id v); true
-      | Classic.Var v when Type.equal (ty t) Type.rat ->
+      | Var v when Type.equal (ty t) Type.rat ->
         Format.fprintf out "Q%d" (HVar.id v); true
-      | Classic.AppBuiltin (Builtin.Less, [_; a; b]) ->
+      | AppBuiltin (Builtin.Less, [_; a; b]) ->
         Format.fprintf out "%a < %a" pp_surrounded a pp_surrounded b; true
-      | Classic.AppBuiltin (Builtin.Lesseq, [_;a; b]) ->
+      | AppBuiltin (Builtin.Lesseq, [_;a; b]) ->
         Format.fprintf out "%a ≤ %a" pp_surrounded a pp_surrounded b; true
-      | Classic.AppBuiltin (Builtin.Greater, [_;a; b]) ->
+      | AppBuiltin (Builtin.Greater, [_;a; b]) ->
         Format.fprintf out "%a > %a" pp_surrounded a pp_surrounded b; true
-      | Classic.AppBuiltin (Builtin.Greatereq, [_;a; b]) ->
+      | AppBuiltin (Builtin.Greatereq, [_;a; b]) ->
         Format.fprintf out "%a ≥ %a" pp_surrounded a pp_surrounded b; true
-      | Classic.AppBuiltin (Builtin.Sum, [_;a; b]) ->
+      | AppBuiltin (Builtin.Sum, [_;a; b]) ->
         Format.fprintf out "%a + %a" pp_surrounded a pp_surrounded b; true
-      | Classic.AppBuiltin (Builtin.Difference, [_;a; b]) ->
+      | AppBuiltin (Builtin.Difference, [_;a; b]) ->
         Format.fprintf out "%a - %a" pp_surrounded a pp_surrounded b; true
-      | Classic.AppBuiltin (Builtin.Product, [_;a; b]) ->
+      | AppBuiltin (Builtin.Product, [_;a; b]) ->
         Format.fprintf out "%a × %a" pp_surrounded a pp_surrounded b; true
-      | Classic.AppBuiltin (Builtin.Quotient, [_;a; b]) ->
+      | AppBuiltin (Builtin.Quotient, [_;a; b]) ->
         Format.fprintf out "%a / %a" pp_surrounded a pp_surrounded b; true
-      | Classic.AppBuiltin (Builtin.Quotient_e, [_;a; b]) ->
+      | AppBuiltin (Builtin.Quotient_e, [_;a; b]) ->
         Format.fprintf out "%a // %a" pp_surrounded a pp_surrounded b; true
-      | Classic.AppBuiltin (Builtin.Uminus, [_;a]) ->
+      | AppBuiltin (Builtin.Uminus, [_;a]) ->
         Format.fprintf out "-%a" pp_surrounded a; true;
-      | Classic.AppBuiltin (Builtin.Remainder_e, [_;a;b]) ->
+      | AppBuiltin (Builtin.Remainder_e, [_;a;b]) ->
         Format.fprintf out "%a mod %a" pp_surrounded a pp_surrounded b; true;
       | _ -> false  (* default *)
 

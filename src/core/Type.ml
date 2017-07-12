@@ -259,7 +259,7 @@ let apply ty0 args0 =
     | _ ->
       err_applyf_
         "@[<2>Type.apply:@ expected quantified or function type,@ but got @[%a@]"
-        T.pp ty
+        T.pp_zf ty
   and aux_l ty_ret exp_args args env = match exp_args, args with
     | [], [] -> T.DB.eval env ty_ret
     | _, [] ->
@@ -271,7 +271,7 @@ let apply ty0 args0 =
           aux_l ty_ret' exp_args' args env
         | _ ->
           err_applyf_ "@[<2>Type.apply:@ unexpected arguments [@[%a@]]@]"
-            (Util.pp_list T.pp) args
+            (Util.pp_list T.pp_zf) args
       end
     | exp :: exp_args', a :: args' ->
       (* expected type: [exp];  [a]: actual value, whose type must match [exp] *)
@@ -282,8 +282,8 @@ let apply ty0 args0 =
         err_applyf_
           "@[<2>Type.apply:@ wrong argument type,@ expected `@[_ : %a@]`@ \
            but got `@[%a : %a@]`@ when applying `%a` to@ [@[%a@]]@ in env [%a]@]"
-          T.pp exp' T.pp a T.pp (T.ty_exn a) T.pp ty0 (Util.pp_list T.pp) args0
-          (DBEnv.pp T.pp) env
+          T.pp_zf exp' T.pp_zf a T.pp_zf (T.ty_exn a) T.pp_zf ty0 (Util.pp_list T.pp_zf) args0
+          (DBEnv.pp T.pp_zf) env
   in
   aux ty0 args0 DBEnv.empty
 
@@ -354,7 +354,7 @@ let pp_typed_var_gen ~pp_ty out v = match view (HVar.ty v) with
   | _ -> Format.fprintf out "(@[%a:%a@])" HVar.pp v pp_ty (HVar.ty v)
 
 module ZF = struct
-  let pp = T.pp
+  let pp = T.pp_zf
   let to_string = CCFormat.to_string pp
 
   let pp_typed_var out v = pp_typed_var_gen ~pp_ty:pp out v
