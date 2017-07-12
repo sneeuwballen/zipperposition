@@ -794,12 +794,21 @@ module Conv = struct
     to_simple_term env t
 end
 
-let rec rebuild_rec t =
-  let ty = ty t in
-  match view t with
-    | Var v -> var (HVar.cast ~ty v)
-    | DB i -> bvar ~ty i
-    | Const id -> const ~ty id
-    | App (f, l) -> app (rebuild_rec f) (List.map rebuild_rec l)
-    | AppBuiltin (b,l) -> app_builtin ~ty b (List.map rebuild_rec l)
-    | Fun (ty,bod) -> fun_ ty bod
+let rebuild_rec t =
+  let rec aux env t =
+    let ty = ty t in
+    begin match view t with
+      | Var v -> var (HVar.cast ~ty v)
+      | DB i ->
+        assert (if i >= 0 && i < List.length env then true
+          else (Format.printf "%d not in %a@." i (CCFormat.Dump.list Type.pp) env; false));
+        assert (if Type.equal ty (List.nth env i) then true
+          else (Format.printf "%a:%a or %a@." pp t Type.pp ty Type.pp (List.nth env i); false));
+        bvar ~ty i
+      | Const id -> const ~ty id
+      | App (f, l) -> app (aux env f) (List.map (aux env) l)
+      | AppBuiltin (b,l) -> app_builtin ~ty b (List.map (aux env) l)
+      | Fun (ty,bod) -> fun_ ty (aux (ty::env) bod)
+    end
+  in
+  aux [] t
