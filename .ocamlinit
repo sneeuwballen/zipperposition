@@ -79,6 +79,8 @@ ignore (pstmt_l
    val q : term -> prop.
    val r : term -> prop.
    val s : prop.
+   val f_ho2: (term -> term ) -> (term -> term) -> term.
+   val p_ho2: (term -> term ) -> (term -> term) -> prop.
    ");;
 
 (* parse Term.t *)
