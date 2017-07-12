@@ -647,9 +647,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           (* rewrite term at root *)
           reduce_at_root ~restrict t'
         | T.Fun (ty_arg, body) ->
-          let body' = S.FO.apply_no_renaming subst (body,scope) in
           (* reduce under lambdas *)
-          let body' = normal_form ~restrict:lazy_false subst body' scope in
+          let body' = normal_form ~restrict:lazy_false subst body scope in
           if T.equal body body' then t else T.fun_ ty_arg body'
         | T.Var _ | T.DB _ ->
           S.FO.apply_no_renaming subst (t,scope)
