@@ -48,6 +48,7 @@ let eq_char c1 c2 = compare_char c1 c2 = 0
 let term_to_char t : character * T.t list =
   match T.Classic.view t with
     | T.Classic.Var v -> Variable v, []
+    | _ when Type.is_fun (T.ty t) -> Subterm t, [] (* partial app *)
     | T.Classic.App (f, l) -> Symbol f, l
     | T.Classic.DB _
     | T.Classic.AppBuiltin _
