@@ -282,7 +282,7 @@ module DB = struct
   let contains t n =
     _to_seq ~depth:0 t
     |> Sequence.map2
-      (fun bvar _ -> bvar=n)
+      (fun bvar depth -> bvar=n+depth)
     |> Sequence.exists _id
 
   (* maps the term to another term, calling [on_binder acc t]
