@@ -265,6 +265,34 @@ let check_snf_no_redex =
     ~count:10_000 ~long_factor:10
     ~name:"snf_no_remaining_redex"
 
+let check_eta_reduce_preserves_ty =
+  let gen = gen_ho in
+  let prop t =
+    if not (T.DB.is_closed t) then QCheck.assume_fail()
+    else (
+      let t' = Lambda.eta_reduce t in
+      ignore (T.rebuild_rec t');
+      Type.equal (T.ty t) (T.ty t')
+    )
+  in
+  QCheck.Test.make gen prop
+    ~count:10_000 ~long_factor:10
+    ~name:"eta_reduce_preserves_ty"
+
+let check_eta_expand_preserves_ty =
+  let gen = gen_ho in
+  let prop t =
+    if not (T.DB.is_closed t) then QCheck.assume_fail()
+    else (
+      let t' = Lambda.eta_expand t in
+      ignore (T.rebuild_rec t');
+      Type.equal (T.ty t) (T.ty t')
+    )
+  in
+  QCheck.Test.make gen prop
+    ~count:10_000 ~long_factor:10
+    ~name:"eta_expand_preserves_ty"
+
 (* reference implementation of SNF *)
 module SNF = struct
   let eval_and_unshift ~by t =
@@ -380,4 +408,6 @@ let props =
   ; check_snf_idempotent
   ; check_snf_correct
   ; check_fun_fvars
+  ; check_eta_reduce_preserves_ty
+  ; check_eta_expand_preserves_ty
   ]
