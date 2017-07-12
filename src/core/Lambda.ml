@@ -97,7 +97,7 @@ module Inner = struct
         end
 
   let eta_expand_rec t =
-    let rec aux shift_by t = match T.ty t with
+    let rec aux t = match T.ty t with
       | T.NoType -> t
       | T.HasType ty ->
         let n, ty_args, ty_ret = T.open_poly_fun ty in
@@ -109,35 +109,36 @@ module Inner = struct
         let n_args = List.length ty_args in
         let n_missing = n_args - List.length args in
         if n_missing>0 then (
-          Util.debugf 5 "(@[eta_expand_rec `%a`,@ missing %d args@])"
-            (fun k->k T.pp t n_missing);
-        );
-        let missing_args = CCList.take n_missing ty_args in
-        assert (n_missing >= 0);
-        (* now traverse body, shifting on the way by [n_missing + shift_by] *)
-        let body =
+          Util.debugf 5 "(@[eta_expand_rec `%a`,@ missing %d args@ in %a@])"
+            (fun k->k T.pp t n_missing (CCFormat.Dump.list T.pp) ty_args);
+          (* missing args: suffix of length [n_missing] *)
+          let missing_args = CCList.drop (n_args-n_missing) ty_args in
+          (* shift body to accomodate for new binders *)
+          let body = T.DB.shift n_missing body in
+          (* build the fully-abstracted term *)
+          let dbvars =
+            List.mapi (fun i ty_arg -> T.bvar (n_missing-i-1) ~ty:ty_arg) missing_args
+          in
+          T.fun_l ty_args (T.app ~ty:ty_ret body dbvars)
+        ) else (
           let ty = T.ty_exn body in
-          begin match T.view body with
-            | T.Const _ | T.Var _ -> body
-            | T.DB i -> T.bvar ~ty (i + n_missing + shift_by)
+          (* traverse body *)
+          let body = match T.view body with
+            | T.Const _ | T.Var _ | T.DB _ -> body
             | T.App (f, l) ->
-              let l' = List.map (aux (shift_by+n_missing)) l in
+              let l' = List.map aux l in
               if T.same_l l l' then body else T.app ~ty f l'
             | T.AppBuiltin (b, l) ->
-              let l' = List.map (aux (shift_by+n_missing)) l in
+              let l' = List.map aux l in
               if T.same_l l l' then body else T.app_builtin ~ty b l'
             | T.Bind (b, varty, body') ->
               assert (b <> Binder.Lambda);
-              T.bind ~ty ~varty b (aux (shift_by+1) body')
-          end
-        in
-        (* build the fully-abstracted term *)
-        let dbvars =
-          List.mapi (fun i ty_arg -> T.bvar (n_missing-i-1) ~ty:ty_arg) missing_args
-        in
-        T.fun_l ty_args (T.app ~ty:ty_ret body dbvars)
+              T.bind ~ty ~varty b (aux body')
+          in
+          T.fun_l ty_args body
+        )
     in
-    aux 0 t
+    aux t
 
   (* do one step of eta-reduction *)
   let eta_reduce_rec t =
@@ -215,10 +216,8 @@ let eta_expand t =
   Inner.eta_expand (t:T.t :> IT.t) |> T.of_term_unsafe
   (*|> CCFun.tap (fun t' ->
     if t != t' then Format.printf "@[eta_expand `%a`@ into `%a`@]@." T.pp t T.pp t')*)
-  |> T.rebuild_rec (* NOTE: check types; remove later *)
 
 let eta_reduce t =
   Inner.eta_reduce (t:T.t :> IT.t) |> T.of_term_unsafe
   (*|> CCFun.tap (fun t' ->
     if t != t' then Format.printf "@[eta_reduce `%a`@ into `%a`@]@." T.pp t T.pp t')*)
-  |> T.rebuild_rec (* NOTE: check types; remove later *)
