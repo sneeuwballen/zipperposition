@@ -1,0 +1,1 @@
+Zipperposition is a superposition based theorem prover for typed first order logic with equality
