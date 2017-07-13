@@ -5,6 +5,6 @@ package:
 	zip -r $(ARCHIVE) bin/
 
 clean:
-	rm $(ARCHIVE)
+	rm $(ARCHIVE) || true
 
 .PHONY: package clean
