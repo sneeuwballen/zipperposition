@@ -64,11 +64,14 @@ val pp_polarity : polarity CCFormat.printer
 
 type form_definition = private {
   form: form;
+  proxy_id: ID.t; (* name *)
   (* the defined object *)
   proxy : term;
   (* atom/term standing for the defined object *)
-  add_rules: bool;
-  (* do we add the add rules
+  proxy_ty : type_;
+  (* type of [proxy_id] *)
+  rw_rules: bool;
+  (* do we add rewrite rules (instead of an axiom)?
      [proxy -> true if form]
      [proxy -> false if not form] (depending on polarity) *)
   polarity : polarity;
@@ -79,8 +82,9 @@ type form_definition = private {
 val pp_form_definition : form_definition CCFormat.printer
 
 val define_form :
+  ?pattern:string ->
   ctx:ctx ->
-  add_rules:bool ->
+  rw_rules:bool ->
   polarity:polarity ->
   src:(ID.t -> Statement.source) ->
   form ->
@@ -125,10 +129,10 @@ val pop_new_definitions : ctx:ctx -> definition list
     Will call {!remove_def} so there is no risk of re-using a definition
     with a new polarity. *)
 
-val def_as_stmt : definition -> Statement.input_t
-(** Project the definition into a statement *)
+val def_as_stmt : definition -> Statement.input_t list
+(** Project the definition into a list of statements *)
 
-val def_as_sourced_stmt : definition -> Statement.sourced_t
+val def_as_sourced_stmt : definition -> Statement.sourced_t list
 (** Project the definition into a statement *)
 
 (** {2 Attribute} *)

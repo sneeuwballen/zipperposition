@@ -26,10 +26,13 @@ let pp_polarity out = function
 
 type form_definition = {
   form: form;
+  proxy_id: ID.t; (* name *)
   (* the defined object *)
   proxy : term;
   (* atom/term standing for the defined object *)
-  add_rules: bool;
+  proxy_ty : type_;
+  (* type of [proxy_id] *)
+  rw_rules: bool;
   (* do we add the add rules
      [proxy -> true if form]
      [proxy -> false if not form] (depending on polarity) *)
@@ -144,8 +147,8 @@ let counter ctx = ctx.sc_counter
 (** {2 Definitions} *)
 
 let pp_form_definition out def =
-  Format.fprintf out "(@[<hv>def %a@ for: %a@ add_rules: %B@ polarity: %a@])"
-    T.pp def.proxy T.pp def.form def.add_rules pp_polarity def.polarity
+  Format.fprintf out "(@[<hv>def %a@ for: %a@ rw_rules: %B@ polarity: %a@])"
+    T.pp def.proxy T.pp def.form def.rw_rules pp_polarity def.polarity
 
 let pp_term_definition out def =
   let pp_rule out r = Stmt.pp_def_rule T.pp T.pp T.pp out r in
@@ -156,19 +159,22 @@ let pp_definition out = function
   | Def_form f -> pp_form_definition out f
   | Def_term t -> pp_term_definition out t
 
-let define_form ~ctx ~add_rules ~polarity ~src form =
+let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~src form =
   incr_counter ctx;
   let tyvars, vars = collect_vars Var.Subst.empty form in
   let vars_t = List.map (fun v->T.var v) vars in
   let tyvars_t = List.map (fun v->T.Ty.var v) tyvars in
   (* similar to {!skolem_form}, but always return [prop] *)
   let ty = ty_forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) T.Ty.prop) in
-  let f = fresh_skolem_prefix ~ctx ~ty "zip_tseitin" in
+  (* not a skolem (but a defined term). Will be defined, not declared. *)
+  let f = fresh_id ~start0:true ~ctx pattern in
   let proxy = T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t) in
   (* register the new definition *)
   let def = {
     form;
-    add_rules;
+    proxy_id=f;
+    proxy_ty=ty;
+    rw_rules;
     proxy;
     polarity;
     src=src f;
@@ -244,27 +250,42 @@ let pop_new_definitions ~ctx =
   ctx.sc_new_defs <- [];
   l
 
-let def_as_stmt (d:definition): Stmt.input_t =
+let def_as_stmt (d:definition): Stmt.input_t list =
   let module F = T.Form in
   begin match d with
+    | Def_form d when d.rw_rules ->
+      (* introduce the required definition as an axiom, with polarity as needed *)
+      let rule : _ Stmt.def_rule =
+        let vars = T.vars d.proxy in
+        let lhs, polarity, rhs = match d.polarity with
+          | `Neg -> SLiteral.atom_false d.proxy, `Imply, F.not_ d.form
+          | `Pos -> SLiteral.atom_true d.proxy, `Imply, d.form
+          | `Both -> SLiteral.atom_true d.proxy, `Equiv, d.form
+        in
+        Stmt.Def_form (vars, lhs, [rhs], polarity)
+      in
+      let src = d.src in
+      [Stmt.def ~src [Stmt.mk_def ~rewrite:true d.proxy_id d.proxy_ty [rule]]]
     | Def_form d ->
-      (* introduce the required definition, with polarity as needed *)
+      (* introduce the required axiom, with polarity as needed *)
       let f' = match d.polarity with
         | `Pos -> F.imply d.proxy d.form
         | `Neg -> F.imply d.form d.proxy
         | `Both -> F.equiv d.proxy d.form
       in
       let src = d.src in
-      Stmt.assert_ ~src f'
+      [ Stmt.ty_decl ~src d.proxy_id d.proxy_ty;
+        Stmt.assert_ ~src f'
+      ]
     | Def_term d ->
       let id = d.td_id in
       let ty = d.td_ty in
       let rules = d.td_rules in
       let src = Stmt.Src.define id in
-      Stmt.def ~src [Stmt.mk_def ~rewrite:true id ty rules]
+      [Stmt.def ~src [Stmt.mk_def ~rewrite:true id ty rules]]
   end
 
-let def_as_sourced_stmt d : Stmt.sourced_t =
+let def_as_sourced_stmt d : Stmt.sourced_t list =
   let stmt = def_as_stmt d in
-  Stmt.as_sourced stmt
+  List.map Stmt.as_sourced stmt
 

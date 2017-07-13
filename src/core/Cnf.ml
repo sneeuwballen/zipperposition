@@ -435,7 +435,8 @@ module Flatten = struct
         | Pos_inner ->
           let src id = Statement.Src.renaming_input stmt id f in
           let def =
-            Skolem.define_form ~ctx ~add_rules:true ~polarity:`Both ~src f
+            Skolem.define_form f ~ctx ~rw_rules:true ~polarity:`Both ~src
+              ~pattern:(mk_pat "form")
           in
           def.Skolem.proxy
       end
@@ -688,7 +689,7 @@ let introduce_defs ~ctx ~is_pos stmt f =
   (* rename formula *)
   and rename_form ~polarity f =
     let src id = Statement.Src.renaming_input stmt id f in
-    let def = Skolem.define_form ~ctx ~add_rules:false ~polarity ~src f in
+    let def = Skolem.define_form ~ctx ~rw_rules:false ~polarity ~src f in
     let p = def.Skolem.proxy in
     Util.debugf ~section 4
       "@[<2>introduce@ def. @[%a@]@ for subformula `@[%a@]`@ with pol %a@]"
@@ -843,12 +844,12 @@ type options =
 (* return new sources, without modifying anything *)
 let new_src ~ctx : Stmt.sourced_t list =
   Skolem.new_definitions ~ctx
-  |> List.map Skolem.def_as_sourced_stmt
+  |> CCList.flat_map Skolem.def_as_sourced_stmt
 
 (* pop and return new statements *)
 let pop_new_defs ~ctx : (_,_,_) Stmt.t list =
   Skolem.pop_new_definitions ~ctx
-  |> List.map Skolem.def_as_stmt
+  |> CCList.flat_map Skolem.def_as_stmt
 
 let pp_stmt out st = Stmt.pp T.pp T.pp_inner T.pp_inner out st
 
@@ -948,6 +949,11 @@ let flatten ~ctx seq : _ Sequence.t =
          | l -> List.rev (List.rev_append new_sts l)
        end)
 
+let is_rw stmt = match Stmt.view stmt with
+  | Stmt.Rewrite _
+  | Stmt.Def _ -> true
+  | _ -> false
+
 (* simplify formulas and rename them. May introduce new formulas *)
 let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
   Util.enter_prof prof_simplify_rename;
@@ -956,8 +962,8 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
     Util.debugf ~section 4 "@[<2>simplify and rename@ `@[%a@]`@]" (fun k->k T.pp f);
     (* preprocessing *)
     let f = List.fold_left (|>) f preprocess in
-    (* simplification *)
-    if disable_renaming || is_clause f
+    (* introduce definitions? *)
+    if disable_renaming || is_clause f || is_rw stmt
     then f
     else introduce_defs ~is_pos:(not is_goal) ~ctx stmt f
   in
