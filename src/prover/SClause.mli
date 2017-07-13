@@ -60,3 +60,5 @@ val pp_tstp_full : t CCFormat.printer  (** Print in a toplevel TPTP statement *)
 
 val pp_trail : Trail.t CCFormat.printer
 val pp_trail_tstp : Trail.t CCFormat.printer
+
+val pp_in : Output_format.t -> t CCFormat.printer

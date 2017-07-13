@@ -3,12 +3,12 @@
 
 (** {1 Simple Typed Terms}. *)
 
-(** Similar to {!STerm}, but this time the terms are properly 
+(** Similar to {!STerm}, but this time the terms are properly
     scoped (using {!Var}) and typed.
 
     These terms are suitable for many preprocessing transformations,
     including {!CNF}.
-    
+
     They can be obtained from {!STerm.t} using {!TypeInference}.
 *)
 
@@ -258,6 +258,8 @@ val close_all : ty:t -> Binder.t -> t -> t
 include Interfaces.PRINT with type t := t
 
 val pp_inner : t CCFormat.printer
+
+val pp_in : Output_format.t -> t CCFormat.printer
 
 module Set : Sequence.Set.S with type elt = term
 module Map : Sequence.Map.S with type key = term

@@ -393,6 +393,12 @@ let pp_surrounded out t = (pp_inner_app 0) out t
 
 let to_string = CCFormat.to_string pp
 
+let pp_in = function
+  | Output_format.O_zf -> ZF.pp
+  | Output_format.O_tptp -> TPTP.pp
+  | Output_format.O_normal -> pp
+  | Output_format.O_none -> CCFormat.silent
+
 (* keep synchro with {!InnerTerm.pp_var} *)
 let pp_typed_var out v = pp_typed_var_gen ~pp_ty:pp out v
 

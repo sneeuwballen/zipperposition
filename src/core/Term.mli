@@ -340,6 +340,8 @@ module ZF : sig
   include Interfaces.PRINT with type t := t
 end
 
+val pp_in : Output_format.t -> t CCFormat.printer
+
 module Conv : sig
   type ctx = Type.Conv.ctx
   val create : unit -> ctx

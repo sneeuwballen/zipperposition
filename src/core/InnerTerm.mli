@@ -229,6 +229,8 @@ val debugf : t CCFormat.printer
 
 val pp_zf : t CCFormat.printer
 
+val pp_in : Output_format.t -> t CCFormat.printer
+
 (* TODO: path-selection operation (for handling general-data in TPTP), see
         XSLT or CSS *)
 

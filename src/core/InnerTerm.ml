@@ -792,3 +792,9 @@ and pp_var_zf out v =
     | _ when needs_args ty -> Format.fprintf out "F%d" (HVar.id v)
     | _ -> HVar.pp out v
   end
+
+let pp_in = function
+  | Output_format.O_zf -> pp_zf
+  | Output_format.O_tptp -> assert false
+  | Output_format.O_normal -> pp
+  | Output_format.O_none -> CCFormat.silent

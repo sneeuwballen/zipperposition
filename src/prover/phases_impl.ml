@@ -354,12 +354,12 @@ let print_szs_result (type c) ~file
     | Saturate.Sat ->
       Format.printf "%sSZS status GaveUp for '%s'@." comment file;
       begin match !Options.output with
-        | Options.Print_none -> ()
-        | Options.Print_zf -> failwith "not implemented: printing in ZF" (* TODO *)
-        | Options.Print_tptp ->
+        | Options.O_none -> ()
+        | Options.O_zf -> failwith "not implemented: printing in ZF" (* TODO *)
+        | Options.O_tptp ->
           Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
             (fun k->k (Util.pp_seq ~sep:" " Env.C.pp_tstp_full) (Env.get_active ()))
-        | Options.Print_normal ->
+        | Options.O_normal ->
           Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
             (fun k->k (Util.pp_seq ~sep:" " Env.C.pp) (Env.get_active ()))
       end

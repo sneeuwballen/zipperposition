@@ -19,17 +19,14 @@ type input_format =
 
 val input_format_of_string : string -> input_format
 
-type print_format =
-  | Print_none
-  | Print_normal
-  | Print_tptp
-  | Print_zf
+type print_format = Output_format.t =
+  | O_none
+  | O_normal
+  | O_tptp
+  | O_zf
 
 val print_format_of_string : string -> print_format
 (** @raise Failure if it could not parse *)
-
-val comment_of_format : print_format -> string
-(** Comment prefix for format *)
 
 val input : input_format ref
 

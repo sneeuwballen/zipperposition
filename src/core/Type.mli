@@ -262,6 +262,8 @@ module ZF : sig
   val pp_typed_var : t HVar.t CCFormat.printer
 end
 
+val pp_in : Output_format.t -> t CCFormat.printer
+
 (** {2 Conversions} *)
 
 module Conv : sig

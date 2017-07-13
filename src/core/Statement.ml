@@ -836,3 +836,13 @@ module TPTP = struct
   let to_string ppf ppt ppty = CCFormat.to_string (pp ppf ppt ppty)
 end
 
+let pp_in pp_f pp_t pp_ty = function
+  | Output_format.O_zf -> ZF.pp pp_f pp_t pp_ty
+  | Output_format.O_tptp -> TPTP.pp pp_f pp_t pp_ty
+  | Output_format.O_normal -> pp pp_f pp_t pp_ty
+  | Output_format.O_none -> CCFormat.silent
+
+let pp_clause_in o =
+  pp_in (Util.pp_list ~sep:" ∨ " (SLiteral.pp Term.pp)) Term.pp Type.pp o
+
+let pp_input_in o = pp_in TypedSTerm.pp TypedSTerm.pp TypedSTerm.pp o

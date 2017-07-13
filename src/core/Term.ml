@@ -633,6 +633,12 @@ module ZF = struct
   let to_string = CCFormat.to_string pp
 end
 
+let pp_in = function
+  | Output_format.O_zf -> ZF.pp
+  | Output_format.O_tptp -> TPTP.pp
+  | Output_format.O_normal -> pp
+  | Output_format.O_none -> CCFormat.silent
+
 (** {2 Conversions} *)
 
 module Conv = struct

@@ -126,3 +126,10 @@ let pp_tstp out c =
 (* TODO: if all vars are [:term] and trail is empty, use CNF; else use TFF *)
 let pp_tstp_full out c =
   Format.fprintf out "@[<2>tff(%d, plain,@ %a).@]" c.id pp_tstp c
+
+let pp_in = function
+  | Output_format.O_zf -> pp_zf
+  | Output_format.O_tptp -> pp_tstp
+  | Output_format.O_normal -> pp
+  | Output_format.O_none -> CCFormat.silent
+

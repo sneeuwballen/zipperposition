@@ -72,7 +72,7 @@ Library "logtk"
                     Congruence, Congruence_intf,
                     FeatureVector, FV_tree, UntypedAST, Ind_ty,
                     TypedSTerm, Statement, Flex_state, Compute_prec, 
-                    Ordinal, Rewrite, Test_prop, Input_format,
+                    Ordinal, Rewrite, Test_prop, Input_format, Output_format,
                     LLProof, LLProof_check,
                     Multisets, Literal, Literals, Int_lit, Rat_lit, Monome,
                     lib/Hashcons, lib/ParseLocation, lib/Multiset, lib/LazyList,

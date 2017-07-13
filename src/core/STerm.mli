@@ -4,7 +4,7 @@
 (** {1 Simple Terms}. *)
 
 (** Simple terms, that are not hashconsed, nor typed.
-    
+
     Those do not use De Bruijn indices for variable binding,
     but simply names (scoping is done later).
     Their simplicity make them good for heavy AST transformations, output of
@@ -142,6 +142,8 @@ module ZF : sig
   include Interfaces.PRINT with type t := t
   val pp_inner : t CCFormat.printer
 end
+
+val pp_in : Output_format.t -> t CCFormat.printer
 
 (** {2 Subst} *)
 

@@ -572,10 +572,10 @@ module S = struct
 
   (** Prints the proof according to the given input switch *)
   let pp o out proof = match o with
-    | Options.Print_none -> Util.debug ~section 1 "proof printing disabled"
-    | Options.Print_tptp -> pp_tstp out proof
-    | Options.Print_normal -> pp_normal out proof
-    | Options.Print_zf -> pp_zf out proof
+    | Output_format.O_none -> Util.debug ~section 1 "proof printing disabled"
+    | Output_format.O_tptp -> pp_tstp out proof
+    | Output_format.O_normal -> pp_normal out proof
+    | Output_format.O_zf -> pp_zf out proof
 
   let _pp_list_str = Util.pp_list CCFormat.string
 
