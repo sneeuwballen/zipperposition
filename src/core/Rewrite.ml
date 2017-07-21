@@ -423,9 +423,9 @@ module Lit = struct
   let eq_rules_ : Set.t ref = ref Set.empty
 
   let add_eq_rule (r:Rule.t): unit = match Rule.lhs r with
-    | Literal.Equation (t,_,sign) ->
+    | Literal.Equation (t,u,sign) ->
       let ty = T.ty t in
-      if sign && not !allow_pos_eqn_rewrite_ then (
+      if sign && not !allow_pos_eqn_rewrite_ && T.is_var t && T.is_var u then (
         (* ignore positive rules *)
         Util.debugf ~section 2 "@[<2>ignore positive equational rewrite `%a`@]"
           (fun k->k Rule.pp r);
