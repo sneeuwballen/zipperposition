@@ -38,12 +38,26 @@ type kind =
   | Trivial (** trivial, or trivial within theories *)
   | By_def of ID.t
 
-type result =
-  | Form of form
-  | Clause of SClause.t
-  | BoolClause of bool_lit list
-  | Stmt of Statement.input_t
-  | C_stmt of Statement.clause_t
+type flavor =
+  [ `Pure_bool
+  | `Absurd_lits
+  | `Proof_of_false
+  | `Vanilla
+  ]
+
+(** Typeclass for the result of a proof step *)
+type 'a result_tc = {
+  res_id: int; (* unique ID of the class *)
+  res_of_exn: exn -> 'a option;
+  res_to_exn: 'a -> exn;
+  res_compare: 'a -> 'a -> int;
+  res_pp_in: Output_format.t -> 'a CCFormat.printer;
+  res_to_form: 'a -> TypedSTerm.Form.t;
+  res_flavor: 'a -> flavor;
+}
+
+(** existential type for result of an inference *)
+type result = Res : 'a result_tc * exn -> result
 
 (** A proof step, without the conclusion *)
 type step = {
@@ -144,48 +158,76 @@ end
 
 module Result = struct
   type t = result
+  type 'a tc = 'a result_tc
 
-  let res_to_int_ = function
-    | Clause _ -> 0
-    | Form _ -> 1
-    | BoolClause _ -> 2
-    | Stmt _ -> 3
-    | C_stmt _ -> 4
+  let res_to_int_ = function (Res ({res_id; _}, _)) -> res_id
+
+  type flavor =
+    [ `Pure_bool
+    | `Absurd_lits
+    | `Proof_of_false
+    | `Vanilla
+    ]
 
   let compare a b = match a, b with
-    | Clause c1, Clause c2 -> SClause.compare c1 c2
-    | Form f1, Form f2 -> TypedSTerm.compare f1 f2
-    | BoolClause l1, BoolClause l2 -> CCOrd.list BBox.Lit.compare l1 l2
-    | Stmt s1, Stmt s2 -> Statement.compare s1 s2
-    | C_stmt s1, C_stmt s2 -> Statement.compare s1 s2
-    | Clause _, _
-    | Form _, _
-    | BoolClause _, _
-    | Stmt _, _
-    | C_stmt _, _
-      -> CCInt.compare (res_to_int_ a) (res_to_int_ b)
+    | Res (r1,x1), Res (r2,x2) ->
+      if r1.res_id <> r2.res_id
+      then CCInt.compare r1.res_id r2.res_id
+      else match r1.res_of_exn x1, r1.res_of_exn x2 with
+        | Some y1, Some y2 -> r1.res_compare y1 y2
+        | _ -> assert false (* same ID?? *)
 
-  let equal a b = match a, b with
-    | Clause c1, Clause c2 -> SClause.equal c1 c2
-    | Form f1, Form f2 -> TypedSTerm.equal f1 f2
-    | BoolClause l1, BoolClause l2 -> CCList.equal BBox.Lit.equal l1 l2
-    | Stmt s1, Stmt s2 -> Statement.compare s1 s2 = 0
-    | C_stmt s1, C_stmt s2 -> Statement.compare s1 s2 = 0
-    | Clause _, _
-    | Form _, _
-    | BoolClause _, _
-    | Stmt _, _
-    | C_stmt _, _
-      -> false
+  let equal a b = compare a b = 0
 
-  let pp out = function
-    | Form f -> TypedSTerm.pp out f
-    | Clause c ->
-      Format.fprintf out "%a/%d" SClause.pp c (SClause.id c)
-    | BoolClause lits -> BBox.pp_bclause out lits
-    | Stmt stmt -> Statement.pp_input out stmt
-    | C_stmt st -> Statement.pp_clause out st
+  let pp_in o out (Res (r,x)) = match r.res_of_exn x with
+    | None -> assert false
+    | Some x -> r.res_pp_in o out x
 
+  let pp = pp_in Output_format.normal
+
+  let to_form (Res (r,x)) = match r.res_of_exn x with
+    | None -> assert false
+    | Some x -> r.res_to_form x
+
+  let flavor (Res (r,x)) = match r.res_of_exn x with
+    | None -> assert false
+    | Some x -> r.res_flavor x
+
+  let make_tc =
+    let n_ = ref 0 in
+    fun
+      ~of_exn ~to_exn ~compare ~pp_in
+      ~to_form ?(flavor=fun _ -> `Vanilla)
+      () : _ result_tc
+      ->
+        let id = CCRef.incr_then_get n_ in
+        { res_id=id;
+          res_of_exn=of_exn;
+          res_to_exn=to_exn;
+          res_compare=compare;
+          res_pp_in=pp_in;
+          res_to_form=to_form;
+          res_flavor=flavor;
+        }
+
+  let make tc x : t = Res (tc, tc.res_to_exn x)
+
+  exception E_form of form
+
+  let form_tc : form result_tc =
+    make_tc
+      ~of_exn:(function
+        | E_form f -> Some f | _ -> None)
+      ~to_exn:(fun f -> E_form f)
+      ~to_form:CCFun.id
+      ~compare:T.compare
+      ~flavor:(fun f -> if T.equal f F.false_ then `Proof_of_false else `Vanilla)
+      ~pp_in:T.pp_in
+      ()
+
+  let of_form = make form_tc
+
+  (* FIXME
   let c_to_sform ctx c = SClause.to_s_form ~ctx c |> F.close_forall
 
   let to_s_form ?(ctx=Term.Conv.create()) (r:t): form = match r with
@@ -208,6 +250,7 @@ module Result = struct
                 |> SLiteral.to_form)
            |> F.or_ |> F.close_forall)
       |> Sequence.to_list |> F.and_
+     *)
 end
 
 module Step = struct
@@ -344,21 +387,14 @@ module S = struct
       let hash = hash
     end)
 
-  let has_absurd_lits p = match result p with
-    | Clause c -> Literals.is_absurd (SClause.lits c)
-    | _ -> false
+  let has_absurd_lits p = Result.flavor (result p) = `Absurd_lits
 
-  let is_proof_of_false p = match result p with
-    | Form f when TypedSTerm.equal f TypedSTerm.Form.false_ -> true
-    | Clause c ->
-      Literals.is_absurd (SClause.lits c) && Trail.is_empty (SClause.trail c)
-    | _ -> false
+  let is_proof_of_false p = Result.flavor (result p) = `Proof_of_false
 
-  let is_pure_bool p = match result p with
-    | BoolClause _ -> true
-    | _ -> false
+  let is_pure_bool p = Result.flavor (result p) = `Pure_bool
 
-  let mk_f step res = {step; result=Form res; }
+  let mk step res = {step; result=res}
+  let mk_f step res = mk step (Result.of_form res)
 
   let mk_f_trivial = mk_f Step.trivial
   let mk_f_by_def id f = mk_f (Step.by_def id) f
@@ -375,6 +411,7 @@ module S = struct
     let step = Step.esa ?check ~rule parents in
     mk_f step f
 
+  (* FIXME
   let mk_c step c = {step; result=Clause c; }
   let mk_bc step c = {step; result=BoolClause c; }
   let mk_stmt step stmt = {step; result=Stmt stmt; }
@@ -382,9 +419,11 @@ module S = struct
 
   let adapt_c p c =
     { p with result=Clause c; }
+     *)
 
-  let adapt_f p f =
-    { p with result=Form f; }
+  let adapt p r = { p with result=r; }
+
+  let adapt_f p f = adapt p (Result.of_form f)
 
   let get_name ~namespace p =
     try
@@ -488,6 +527,13 @@ module S = struct
                (Util.pp_list ~sep:", " UntypedAST.pp_attr_tstp) l
          in
          let infos = p.step |> Step.infos in
+         Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]%a).@]@,"
+           name role (Result.pp_in Output_format.tptp) (result p)
+           Kind.pp_tstp (Step.kind @@ step p,parents) pp_infos infos);
+    Format.fprintf out "@]";
+    ()
+
+           (* FIXME
          begin match result p with
            | Form f ->
              Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]%a).@]@,"
@@ -509,8 +555,7 @@ module S = struct
              let pp_c = Util.pp_list ~sep:"|" (SLiteral.TPTP.pp pp_t) in
              Statement.TPTP.pp pp_c pp_t Type.TPTP.pp out stmt
          end);
-    Format.fprintf out "@]";
-    ()
+           *)
 
   let pp_zf out proof =
     let module UA = UntypedAST.A in
@@ -549,6 +594,12 @@ module S = struct
          let infos =
            info_name :: info_from @ info_rule @ info_status @ (Step.infos p.step)
          in
+         Format.fprintf out "@[<2>assert%a@ %a@].@,"
+           pp_infos infos (Result.pp_in Output_format.zf) (result p));
+    Format.fprintf out "@]";
+    ()
+
+  (* FIXME:
          begin match result p with
            | Form f ->
              Format.fprintf out "@[<2>assert%a@ %a@].@,"
@@ -567,8 +618,7 @@ module S = struct
              let pp_c = Util.pp_list ~sep:" || " (SLiteral.ZF.pp pp_t) in
              Statement.ZF.pp pp_c pp_t Type.ZF.pp out stmt
          end);
-    Format.fprintf out "@]";
-    ()
+     *)
 
   (** Prints the proof according to the given input switch *)
   let pp o out proof = match o with
@@ -654,7 +704,7 @@ module S = struct
           res
       end
     and conv_step ?(ctx=Term.Conv.create()) p =
-      let res = Result.to_s_form ~ctx (result p) in
+      let res = Result.to_form (result p) in
       let parents =
         List.map (conv_parent ~ctx) (Step.parents @@ step p)
       in

@@ -23,11 +23,13 @@ type term_rule = {
   term_arity: int; (* [length args] *)
   term_lhs: term; (* [lhs = head args] *)
   term_rhs: term;
+  term_meta: exn list;
 }
 
 type lit_rule = {
   lit_lhs: Literal.t;
   lit_rhs: Literal.t list list; (* list of clauses *)
+  lit_meta: exn list;
 }
 
 let compare_tr r1 r2 =
@@ -48,6 +50,10 @@ type defined_positions = defined_position IArray.t
 type rule =
   | T_rule of term_rule
   | L_rule of lit_rule
+
+let meta = function
+  | T_rule r -> r.term_meta
+  | L_rule r -> r.lit_meta
 
 let compare_rule r1 r2 =
   let to_int = function T_rule _ -> 0 | L_rule _ -> 1 in
@@ -193,18 +199,19 @@ module Term = struct
     let args r = r.term_args
     let arity r = r.term_arity
     let ty r = T.ty r.term_rhs
+    let meta r = r.term_meta
 
     let as_lit (r:t): Literal.t = Literal.mk_eq (lhs r)(rhs r)
 
     let vars r = T.vars (lhs r)
     let vars_l r = vars r |> T.VarSet.to_list
 
-    let make_ head args term_lhs term_rhs =
+    let make_ meta head args term_lhs term_rhs =
       { term_head=head; term_args=args; term_arity=List.length args;
-        term_lhs; term_rhs }
+        term_lhs; term_rhs; term_meta=meta; }
 
     (* constant rule [id := rhs] *)
-    let make_const id ty rhs =
+    let make_const ?(meta=[]) id ty rhs =
       let lhs = T.const ~ty id in
       assert (Type.equal (T.ty rhs) (T.ty lhs));
       if not (T.VarSet.is_empty @@ T.vars rhs) then (
@@ -212,10 +219,10 @@ module Term = struct
           "Rule.make_const %a %a:@ invalid rule, RHS contains variables"
           ID.pp id T.pp rhs
       );
-      make_ id [] lhs rhs
+      make_ meta id [] lhs rhs
 
     (* [id args := rhs] *)
-    let make id ty args rhs =
+    let make ?(meta=[]) id ty args rhs =
       let lhs = T.app (T.const ~ty id) args in
       assert (Type.equal (T.ty lhs) (T.ty rhs));
       if not (T.VarSet.subset (T.vars rhs) (T.vars lhs)) then (
@@ -223,7 +230,7 @@ module Term = struct
           "Rule.make_const %a %a:@ invalid rule, RHS contains variables"
           ID.pp id T.pp rhs
       );
-      make_ id args lhs rhs
+      make_ meta id args lhs rhs
 
     let pp out r = pp_term_rule out r
 
@@ -389,10 +396,11 @@ module Lit = struct
   module Rule = struct
     type t = lit_rule
 
-    let make lit_lhs lit_rhs = {lit_lhs; lit_rhs}
+    let make ?(meta=[]) lit_lhs lit_rhs = {lit_lhs; lit_rhs; lit_meta=meta;}
 
     let lhs c = c.lit_lhs
     let rhs c = c.lit_rhs
+    let meta c = c.lit_meta
 
     (* conversion into regular clauses *)
     let as_clauses (c:t): Literals.t list =

@@ -121,7 +121,7 @@ Library "libzipperposition"
   Pack:             true
   FindlibName:      libzipperposition
   Modules:          ClauseQueue, Clause, SClause, Const, Extensions,
-                    Ctx, Proof, ProofState,
+                    Ctx, Proof, ProofState, Bool_clause,
                     Saturate, Selection, AC, AC_intf, SimplM,
                     Params, Env, Signals, Classify_cst,
                     Ctx_intf, Clause_intf, Env_intf, ProofState_intf,

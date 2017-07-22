@@ -194,7 +194,7 @@ module Make(Dummy : sig end)
     begin match CCHashtbl.get tag_to_proof_ tag with
       | Some step ->
         let c = bool_clause_of_sat c in
-        Proof.S.mk_bc step c
+        Proof.S.mk step (Bool_clause.mk_proof_res c)
       | None -> errorf "no proof for tag %d" tag
     end
 
@@ -217,7 +217,7 @@ module Make(Dummy : sig end)
               let step =
                 Proof.Step.inference parents
                   ~rule:(Proof.Rule.mk "sat_resolution") in
-              let s = Proof.S.mk_bc step c in
+              let s = Proof.S.mk step (Bool_clause.mk_proof_res c) in
               ResTbl.add tbl_res (c,q1,q2) s;
               ResTbl.add tbl_res (c,q2,q1) s;
               s
@@ -245,7 +245,7 @@ module Make(Dummy : sig end)
     let step =
       Proof.Step.inference leaves
         ~rule:(Proof.Rule.mk "sat_resolution*")  in
-    Proof.S.mk_bc step c
+    Proof.S.mk step (Bool_clause.mk_proof_res c)
 
   let conv_proof_ p =
     if !sat_compact_

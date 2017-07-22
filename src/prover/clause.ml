@@ -168,7 +168,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let proof_step c = c.proof
 
-  let proof c = Proof.S.mk_c c.proof c.sclause
+  let proof c = Proof.S.mk c.proof (SClause.mk_proof_res c.sclause)
   let proof_parent c = Proof.Parent.from (proof c)
   let proof_parent_subst (c,sc) subst = Proof.Parent.from_subst (proof c,sc) subst
 

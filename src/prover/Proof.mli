@@ -32,12 +32,11 @@ type kind =
   | Trivial (** trivial, or trivial within theories *)
   | By_def of ID.t
 
-type result =
-  | Form of form
-  | Clause of SClause.t
-  | BoolClause of bool_lit list
-  | Stmt of Statement.input_t
-  | C_stmt of Statement.clause_t
+(** Typeclass for the result of a proof step *)
+type 'a result_tc
+
+(** result of an inference *)
+type result = Res : 'a result_tc * exn -> result
 
 (** A proof step, without the conclusion *)
 type step
@@ -86,9 +85,37 @@ end
 module Result : sig
   type t = result
 
+  type 'a tc = 'a result_tc
+
+  type flavor =
+    [ `Pure_bool
+    | `Absurd_lits
+    | `Proof_of_false
+    | `Vanilla
+    ]
+
+  val make_tc :
+    of_exn:(exn -> 'a option) ->
+    to_exn:('a -> exn) ->
+    compare:('a -> 'a -> int) ->
+    pp_in:(Output_format.t -> 'a CCFormat.printer) ->
+    to_form:('a -> form) ->
+    ?flavor:('a -> flavor) ->
+    unit ->
+    'a tc
+
+  val make : 'a tc -> 'a -> t
+
+  val form_tc : form tc
+
+  val of_form : form -> t
+
   include Interfaces.ORD with type t := t
   include Interfaces.EQ with type t := t
+  val pp_in : Output_format.t -> t CCFormat.printer
   val pp : t CCFormat.printer
+  val to_form : t -> form
+  val flavor : t -> flavor
 end
 
 (** {2 A proof step} *)
@@ -193,6 +220,10 @@ module S : sig
   (** {2 Constructors and utils}
       In all the following constructors, [theories] defaults to the empty list.
       Axiom constructors have default role "axiom" *)
+
+  val mk : step -> Result.t -> t
+  (** Main constructor *)
+
   val mk_f : step -> form -> t
 
   val mk_f_trivial : form -> t
@@ -204,14 +235,19 @@ module S : sig
 
   val mk_f_esa : ?check:check -> rule:rule -> form -> parent list -> t
 
+  (* FIXME
   val mk_c : step -> SClause.t -> t
 
   val mk_bc : step -> bool_lit list -> t
 
   val mk_stmt : step -> Statement.input_t -> t
 
-  val adapt_f : t -> form -> t
   val adapt_c : t -> SClause.t -> t
+     *)
+
+  val adapt : t -> Result.t -> t
+
+  val adapt_f : t -> form -> t
 
   val to_llproof : t -> LLProof.t
   (** Convert to low level t *)
@@ -238,7 +274,7 @@ module S : sig
   val pp_tstp : t CCFormat.printer
   val pp_normal : t CCFormat.printer
   val pp_zf : t CCFormat.printer
-  val pp : Options.print_format -> t CCFormat.printer
+  val pp_in : Options.print_format -> t CCFormat.printer
   (** Prints the proof according to the given input switch *)
 
   val pp_dot : name:string -> t CCFormat.printer

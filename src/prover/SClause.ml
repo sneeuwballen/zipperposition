@@ -133,3 +133,26 @@ let pp_in = function
   | Output_format.O_normal -> pp
   | Output_format.O_none -> CCFormat.silent
 
+(** {2 Proofs} *)
+
+exception E_proof of t
+
+let proof_tc =
+  Proof.Result.make_tc
+    ~of_exn:(function | E_proof c -> Some c | _ -> None)
+    ~to_exn:(fun c -> E_proof c)
+    ~compare:compare
+    ~flavor:(fun c ->
+      if Literals.is_absurd (lits c)
+      then if Trail.is_empty (trail c) then `Proof_of_false
+        else `Absurd_lits
+      else `Vanilla)
+    ~to_form:(fun c ->
+      let ctx=Term.Conv.create() in
+      to_s_form ~ctx c |> TypedSTerm.Form.close_forall)
+    ~pp_in
+    ()
+
+let mk_proof_res = Proof.Result.make proof_tc
+
+let adapt p c = Proof.S.adapt p (mk_proof_res c)

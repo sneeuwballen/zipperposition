@@ -292,7 +292,7 @@ module Src = struct
     begin match view src with
       | Input (_,_) -> str "input"
       | Internal _ -> str "internal"
-      | From_file (f,r) ->
+      | From_file (f,_) ->
         begin match f.name with
           | None -> app "file" [quoted f.file]
           | Some n -> app "file" [quoted f.file; app "name" [quoted n]]
