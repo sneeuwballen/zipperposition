@@ -21,6 +21,8 @@ let singleton x = { size=1; stack = [Some x]; }
 
 let push env x = {size=env.size+1; stack=(Some x) :: env.stack; }
 
+let push_l env l = List.fold_right (fun x e -> push e x) l env
+
 let push_none env =  {size=env.size+1; stack=None :: env.stack; }
 
 let rec push_none_multiple env n =
@@ -69,12 +71,28 @@ let map f db =
   in
   { db with stack; }
 
+let filteri f db =
+  let stack =
+    CCList.foldi
+      (fun acc i o -> match o with
+        | Some x when f i x -> Some x :: acc
+        | _ -> None :: acc)
+      [] db.stack
+    |> List.rev
+  in
+  { db with stack; }
+
 let of_list l =
   let max = List.fold_left (fun acc (b,_) -> max acc b) ~-1 l in
   let env = make (max+1) in
   List.fold_left
     (fun env (db, v) -> set env db v)
     env l
+
+let to_list e = e.stack
+
+let to_list_i e =
+  List.mapi (fun i x -> CCOpt.map (CCPair.make i) x) e.stack
 
 let pp pp_x out e =
   let pp_item out = function

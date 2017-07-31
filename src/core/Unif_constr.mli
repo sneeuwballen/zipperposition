@@ -37,6 +37,10 @@ val apply_subst_l :
   t list ->
   (term * term) list
 
+module FO : sig
+  val make : Term.t Scoped.t -> Term.t Scoped.t -> t
+end
+
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 include Interfaces.PRINT with type t := t

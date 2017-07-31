@@ -45,13 +45,14 @@ let compare_char c1 c2 =
 let eq_char c1 c2 = compare_char c1 c2 = 0
 
 (** first symbol of t, or variable *)
-let term_to_char t =
+let term_to_char t : character * T.t list =
   match T.Classic.view t with
-    | T.Classic.Var v -> Variable v
-    | T.Classic.App (f, _) -> Symbol f
+    | T.Classic.Var v -> Variable v, []
+    | _ when Type.is_fun (T.ty t) -> Subterm t, [] (* partial app *)
+    | T.Classic.App (f, l) -> Symbol f, l
     | T.Classic.DB _
     | T.Classic.AppBuiltin _
-    | T.Classic.NonFO -> Subterm t
+    | T.Classic.NonFO -> Subterm t, []
 
 let pp_char out = function
   | Variable v -> Type.pp_typed_var out v
@@ -68,15 +69,8 @@ let open_term ~stack t =
     let cur_char = Subterm t in
     {cur_char; cur_term=t; stack=[]::stack}
   ) else (
-    let cur_char = term_to_char t in
-    match T.view t with
-      | T.Var _
-      | T.DB _
-      | T.AppBuiltin _
-      | T.Const _ ->
-        {cur_char; cur_term=t; stack=[]::stack;}
-      | T.App (_, l) ->
-        {cur_char; cur_term=t; stack=l::stack;}
+    let cur_char, l = term_to_char t in
+    {cur_char; cur_term=t; stack=l::stack;}
   )
 
 let rec next_rec stack = match stack with

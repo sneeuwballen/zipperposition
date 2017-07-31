@@ -59,6 +59,7 @@ let _use_simultaneous_sup = ref true
 let _dot_sup_into = ref None
 let _dot_sup_from = ref None
 let _dot_simpl = ref None
+let _dot_demod_into = ref None
 
 module Make(Env : Env.S) : S with module Env = Env = struct
   module Env = Env
@@ -194,7 +195,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           C.pp info.passive sc_p Lit.pp info.passive_lit
           Position.pp info.passive_pos US.pp info.subst);
     assert (InnerTerm.DB.closed (info.s:>InnerTerm.t));
-    assert (InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
     let active_idx = Lits.Pos.idx info.active_pos in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
     try
@@ -278,7 +278,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           C.pp info.passive sc_p Lit.pp info.passive_lit
           Position.pp info.passive_pos US.pp info.subst);
     assert (InnerTerm.DB.closed (info.s:>InnerTerm.t));
-    assert (InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
     assert (not(T.is_var info.u_p));
     let active_idx = Lits.Pos.idx info.active_pos in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
@@ -633,27 +632,31 @@ module Make(Env : Env.S) : S with module Env = Env = struct
        variables are bound to terms in context 0 *)
     and normal_form ~restrict subst t scope =
       match T.view t with
+        | T.Const _ -> reduce_at_root ~restrict t
         | T.App (hd, l) ->
-          begin match T.view hd with
-            | T.DB _
-            | T.Var _ -> S.FO.apply_no_renaming subst (t, scope)
-            | T.Const _ ->
-              (* rewrite subterms in call by value *)
-              let l' =
-                List.map (fun t' -> normal_form ~restrict:lazy_false subst t' scope) l
-              in
-              let hd' = Subst.FO.apply_no_renaming subst (hd, scope) in
-              let t' =
-                if T.equal hd hd' && T.same_l l l'
-                then t
-                else T.app hd' l'
-              in
-              (* rewrite term at root *)
-              reduce_at_root ~restrict t'
-            | T.App _
-            | T.AppBuiltin _ -> assert false
-          end
-        | _ -> S.FO.apply_no_renaming subst (t,scope)
+          (* rewrite subterms in call by value *)
+          let l' =
+            List.map (fun t' -> normal_form ~restrict:lazy_false subst t' scope) l
+          in
+          let hd' = normal_form ~restrict:lazy_false subst hd scope in
+          let t' =
+            if T.equal hd hd' && T.same_l l l'
+            then t
+            else T.app hd' l'
+          in
+          (* rewrite term at root *)
+          reduce_at_root ~restrict t'
+        | T.Fun (ty_arg, body) ->
+          (* reduce under lambdas *)
+          let body' = normal_form ~restrict:lazy_false subst body scope in
+          if T.equal body body' then t else T.fun_ ty_arg body'
+        | T.Var _ | T.DB _ ->
+          S.FO.apply_no_renaming subst (t,scope)
+        | T.AppBuiltin (b, l) ->
+          let l' =
+            List.map (fun t' -> normal_form ~restrict:lazy_false subst t' scope) l
+          in
+          if T.same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l'
     in
     normal_form ~restrict S.empty t 0
 
@@ -844,7 +847,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
              not (var_in_subst_ !us v 0)
            in
            if BV.get bv i then match lit with
-             | Lit.HO_constraint (l, r)
              | Lit.Equation (l, r, false) ->
                begin match T.view l, T.view r with
                  | T.Var v, _ when can_destr_eq_var v ->
@@ -1449,6 +1451,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
          Signal.once Signals.on_dot_output
            (fun () -> _print_idx ~f:UnitIdx.to_dot file !_idx_simpl))
       !_dot_simpl;
+    CCOpt.iter
+      (fun file ->
+         Signal.once Signals.on_dot_output
+           (fun () -> _print_idx ~f:(TermIndex.to_dot pp_leaf) file !_idx_back_demod))
+      !_dot_demod_into;
     ()
 
   let register () =
@@ -1523,6 +1530,9 @@ let () =
     ; "--dot-demod"
     , Arg.String (fun s -> _dot_simpl := Some s)
     , " print forward rewriting index into file"
+    ; "--dot-demod-into"
+    , Arg.String (fun s -> _dot_demod_into := Some s)
+    , " print backward rewriting index into file"
     ; "--simultaneous-sup"
     , Arg.Bool (fun b -> _use_simultaneous_sup := b)
     , " enable/disable simultaneous superposition"

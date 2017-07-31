@@ -307,10 +307,12 @@ end
 module T_view : sig
   type 'a t =
     | T_var of T.var
+    | T_db of int
     | T_app_defined of ID.t * Rewrite.Defined_cst.t * 'a list
     | T_app_cstor of ID.t * 'a list
     | T_app_unin of ID.t * 'a list
     | T_app of 'a * 'a list
+    | T_fun of Type.t * 'a
     | T_builtin of Builtin.t * 'a list
 
   val view : term -> term t
@@ -322,10 +324,12 @@ module T_view : sig
 end = struct
   type 'a t =
     | T_var of T.var
+    | T_db of int
     | T_app_defined of ID.t * Rewrite.Defined_cst.t * 'a list
     | T_app_cstor of ID.t * 'a list
     | T_app_unin of ID.t * 'a list
     | T_app of 'a * 'a list
+    | T_fun of Type.t * 'a
     | T_builtin of Builtin.t * 'a list
 
   let view (t:term): term t = match T.view t with
@@ -338,6 +342,7 @@ end = struct
         | None -> T_app_unin (id, [])
       end
     | T.Const id -> T_app_unin (id, [])
+    | T.Fun (arg,bod) -> T_fun (arg,bod)
     | T.App (f, l) ->
       begin match T.view f with
         | T.Const id when Ind_ty.is_constructor id -> T_app_cstor (id, l)
@@ -349,7 +354,7 @@ end = struct
         | T.Const id -> T_app_unin (id, l)
         | _ -> T_app (f,l)
       end
-    | T.DB _ -> assert false
+    | T.DB i -> T_db i
 
   let active_subterms t yield: unit =
     let rec aux t =
@@ -363,7 +368,8 @@ end = struct
             (fun i sub ->
                if IArray.get pos i = Defined_pos.P_active then aux sub)
             l
-        | T_var _ -> ()
+        | T_fun (_,_) -> () (* no induction under λ, we follow WHNF semantics *)
+        | T_var _ | T_db _ -> ()
         | T_app (f,l) ->
           aux f;
           List.iter aux l
@@ -676,7 +682,7 @@ module Make
                  Position.(append p @@ arg i @@ stop)
                  u k)
             l
-        | T_view.T_var _ -> ()
+        | T_view.T_var _ | T_view.T_db _ -> ()
         | T_view.T_app (_,l)
         | T_view.T_app_unin (_,l) (* approx, we assume all positions are active *)
         | T_view.T_builtin (_,l) ->
@@ -684,6 +690,9 @@ module Make
           List.iteri
             (fun i u -> aux dp Position.(append p @@ arg i @@ stop) u k)
             l
+        | T_view.T_fun (_,u) ->
+          let dp = defined_path_add dp Defined_pos.P_invariant in
+          aux dp Position.(append p @@ body stop) u k
         | T_view.T_app_cstor (_,l) ->
           let dp = match dp with
             | P_inactive -> P_inactive | _ -> P_under_cstor
@@ -734,7 +743,6 @@ module Make
       |> Sequence.flat_map Sequence.of_array
       |> Sequence.for_all
         (function
-          | Literal.HO_constraint (l,r)
           | Literal.Equation (l,r,_) ->
             let check_t t = T.is_var t || not (T.var_occurs ~var:x t) in
             check_t l && check_t r

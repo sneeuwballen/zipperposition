@@ -727,6 +727,7 @@ let of_term_exn (type a)(num:a num) t =
     | T.AppBuiltin _
     | T.Var _
     | T.Const _
+    | T.Fun _
     | T.App _
     | T.DB _ -> singleton ~num num.one t
   in

@@ -43,5 +43,9 @@ val fresh : ty:'a -> unit -> 'a t
 (** Magic: create a variable with a negative index, mostly for
     unification purpose *)
 
+val is_fresh : _ t -> bool
+(** Magic: check if the variable is a fresh one (with negative index) *)
+
+
 (**/**)
 

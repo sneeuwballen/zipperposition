@@ -28,10 +28,11 @@ let open_term ~stack t = match T.view t with
   | T.Var _
   | T.DB _
   | T.AppBuiltin _
+  | T.Fun _
   | T.Const _ ->
     Some {cur_term=t; stack=[]::stack;}
-  | _ when not (Unif.Ty.type_is_unifiable (T.ty t)) ->
-    Some {cur_term=t; stack=[]::stack;} (* opaque constant *)
+  | _ when not (Unif.Ty.type_is_unifiable (T.ty t)) || Type.is_fun (T.ty t) ->
+    Some {cur_term=t; stack=[]::stack;} (* opaque constant/partial application *)
   | T.App (f, _) when (T.is_var f) ->
     Some {cur_term=t; stack=[]::stack;} (* higher-order term *)
   | T.App (_, l) ->

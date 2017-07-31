@@ -331,6 +331,14 @@ module Term = struct
                  end
                | _ -> k t'
              end)
+      | T.Fun (arg, body) ->
+        (* term rewrite rules, because [vars(rhs)⊆vars(lhs)], map
+           closed terms to closed terms, so we can safely rewrite under λ *)
+        reduce body
+          (fun body' ->
+             let t =
+               if T.equal body body then t else (T.fun_ arg body')
+             in k t)
       | T.Var _
       | T.DB _ -> k t
       | T.AppBuiltin (_,[]) -> k t
@@ -368,6 +376,7 @@ module Term = struct
                  with Unif.Fail -> None)
           | _ -> Sequence.empty
         end
+      | T.Fun _
       | T.Var _
       | T.DB _
       | T.AppBuiltin _ -> Sequence.empty
@@ -394,8 +403,12 @@ module Lit = struct
 
     let head_id c = match lhs c with
       | Literal.Prop (t, _) ->
-        begin match T.Classic.view t with
-          | T.Classic.App (id, _) -> Some id
+        begin match T.view t with
+          | T.Const id -> Some id
+          | T.App (f, _) ->
+              begin match T.view f with
+                | T.Const id -> Some id | _ -> assert false
+              end
           | _ -> assert false
         end
       | Literal.Equation _ -> None
@@ -559,7 +572,7 @@ let pseudo_rule_of_rule (r:rule): pseudo_rule = match r with
             id, args, rhs
           | _ -> fail()
         end
-      | Literal.True | Literal.False | Literal.HO_constraint _
+      | Literal.True | Literal.False
       | Literal.Equation _ | Literal.Int _ | Literal.Rat _ -> fail()
     end
 

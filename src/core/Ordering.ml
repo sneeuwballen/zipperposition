@@ -141,6 +141,8 @@ module KBO : ORD = struct
     | IOB.B _ -> W.int 1
     | IOB.I s -> Prec.weight prec s
 
+  exception Has_lambda
+
   (* TODO: ghc() that maps (in theory) variables to sets of symbols
      their instances can have as head (for a symbol [f] it's just [{f}] itself).
      Then [x > y] if [forall f∈ghc(x),y∈ghd(y), f>g] in precedence.
@@ -188,6 +190,7 @@ module KBO : ORD = struct
             else wb - weight prec (IOB.B b)
           in
           balance_weight_rec wb' l y ~pos false
+        | T.Fun _ -> raise Has_lambda
     (** list version of the previous one, threaded with the check result *)
     and balance_weight_rec wb terms y ~pos res = match terms with
       | [] -> (wb, res)
@@ -320,9 +323,15 @@ module KBO : ORD = struct
       let _, res = tckbo W.zero t1 t2 in
       AllocCache.Arr.free alloc_cache balance.balance;
       res
-    with e ->
-      AllocCache.Arr.free alloc_cache balance.balance;
-      raise e
+    with
+      | Has_lambda ->
+        (* lambda terms are not comparable, except trivial
+           case when they are syntactically equal *)
+        AllocCache.Arr.free alloc_cache balance.balance;
+        Incomparable
+      | e ->
+        AllocCache.Arr.free alloc_cache balance.balance;
+        raise e
 
   let compare_terms ~prec x y =
     Util.enter_prof prof_kbo;
