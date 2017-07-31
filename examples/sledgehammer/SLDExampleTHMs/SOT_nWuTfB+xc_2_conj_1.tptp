@@ -1,0 +1,358 @@
+%------------------------------------------------------------------------------
+tff(ty_n_t__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_Mt__HOL__Obool_J_J_Mt__HOL__Obool_J_J_Mt__HOL__Obool_J,type,(
+    produc8658552434191269231l_bool: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_Mt__HOL__Obool_J_J_Mt__HOL__Obool_J_J,type,(
+    set_Pr9072123976580072975l_bool: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_Mt__HOL__Obool_J_J_Mt__HOL__Obool_J,type,(
+    produc8228049284381021359l_bool: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_Mt__HOL__Obool_J_J_Mt__HOL__Obool_J,type,(
+    produc3287061045669795025l_bool: $tType )).
+
+tff(ty_n_t__fun_It__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_Mt__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J,type,(
+    fun_Ke5997370747584789277t_bool: $tType )).
+
+tff(ty_n_t__fun_It__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J_Mt__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J,type,(
+    fun_ma5760147746720835297t_bool: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_Mt__HOL__Obool_J_J,type,(
+    set_Pr2667750421572572623l_bool: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_Mt__HOL__Obool_J_J,type,(
+    set_Pr4606883265519078061l_bool: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_Mt__HOL__Obool_J,type,(
+    produc9076187568141355375l_bool: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_Mt__HOL__Obool_J,type,(
+    produc4887610232093912525l_bool: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J,type,(
+    set_Pr7067805752157284367t_bool: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J,type,(
+    set_Pr7608014282691475889t_bool: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J,type,(
+    produc3769786098300567727t_bool: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J,type,(
+    produc3355067900018205649t_bool: $tType )).
+
+tff(ty_n_t__Word__Oword_It__Numeral____Type__Obit0_It__Numeral____Type__Obit0_It__Numeral____Type__Obit0_It__Numeral____Type__Obit0_It__Numeral____Type__Obit0_It__Numeral____Type__Onum1_J_J_J_J_J_J,type,(
+    word_N3645301735248828278l_num1: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J,type,(
+    set_Pr4398085759894919119t_unit: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J_J_J,type,(
+    set_Pr8596666893696625069t_unit: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J,type,(
+    produc8409959463918966127t_unit: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__Product____Type__Ounit_Mt__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J_J,type,(
+    produc2719044200362628813t_unit: $tType )).
+
+tff(ty_n_t__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J,type,(
+    kernel4533684380273285781t_unit: $tType )).
+
+tff(ty_n_t__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J,type,(
+    machin3440150138251392115t_unit: $tType )).
+
+tff(ty_n_t__Product____Type__Ounit,type,(
+    product_unit: $tType )).
+
+tff(ty_n_t__HOL__Obool,type,(
+    bool: $tType )).
+
+tff(sy_c_ArchInterruptDecls__H_OARM__H_OinitInterruptController,type,(
+    archIn8795888726837670195roller: fun_Ke5997370747584789277t_bool )).
+
+tff(sy_c_ArchThreadDecls__H_OARM__H_OswitchToIdleThread,type,(
+    archTh6584867680763971124Thread: fun_Ke5997370747584789277t_bool )).
+
+tff(sy_c_Hardware__H_OARM__H_OclearExMonitor,type,(
+    hardwa1900559659162415690onitor: fun_ma5760147746720835297t_bool )).
+
+tff(sy_c_KernelStateData__H_OdoMachineOp_001t__Product____Type__Ounit,type,(
+    kernel1555587059373008229t_unit: fun_ma5760147746720835297t_bool > fun_Ke5997370747584789277t_bool )).
+
+tff(sy_c_MachineOps_OARM_OstoreWordVM,type,(
+    storeWordVM: ( word_N3645301735248828278l_num1 * word_N3645301735248828278l_num1 ) > fun_ma5760147746720835297t_bool )).
+
+tff(sy_c_NonDetMonad_Oreturn_001t__Product____Type__Ounit_001t__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J,type,(
+    return2437542426579446389t_unit: product_unit > fun_Ke5997370747584789277t_bool )).
+
+tff(sy_c_NonDetMonad_Oreturn_001t__Product____Type__Ounit_001t__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J,type,(
+    return2896169181713208403t_unit: product_unit > fun_ma5760147746720835297t_bool )).
+
+tff(sy_c_NonDetMonad_Oreturn_001t__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_001t__HOL__Obool,type,(
+    return424291804231358901t_bool: ( set_Pr4398085759894919119t_unit * bool ) > produc9076187568141355375l_bool )).
+
+tff(sy_c_NonDetMonad_Oreturn_001t__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J_J_J_001t__HOL__Obool,type,(
+    return1974553047308954711t_bool: ( set_Pr8596666893696625069t_unit * bool ) > produc4887610232093912525l_bool )).
+
+tff(sy_c_NonDetMonad_Oreturn_001t__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_001t__HOL__Obool,type,(
+    return3664348693809743733l_bool: ( set_Pr7067805752157284367t_bool * bool ) > produc8228049284381021359l_bool )).
+
+tff(sy_c_NonDetMonad_Oreturn_001t__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_001t__HOL__Obool,type,(
+    return2090302409207339859l_bool: ( set_Pr7608014282691475889t_bool * bool ) > produc3287061045669795025l_bool )).
+
+tff(sy_c_NonDetMonad_Oreturn_001t__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_Mt__HOL__Obool_J_J_001t__HOL__Obool,type,(
+    return5104861545655793589l_bool: ( set_Pr2667750421572572623l_bool * bool ) > produc8658552434191269231l_bool )).
+
+tff(sy_c_Product__Type_OPair_001t__Product____Type__Ounit_001t__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J,type,(
+    produc1916371932851615839t_unit: ( product_unit * kernel4533684380273285781t_unit ) > produc8409959463918966127t_unit )).
+
+tff(sy_c_Product__Type_OPair_001t__Product____Type__Ounit_001t__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J,type,(
+    produc6487924794790977853t_unit: ( product_unit * machin3440150138251392115t_unit ) > produc2719044200362628813t_unit )).
+
+tff(sy_c_Product__Type_OPair_001t__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_001t__HOL__Obool,type,(
+    produc392924531992785311t_bool: ( set_Pr4398085759894919119t_unit * bool ) > produc3769786098300567727t_bool )).
+
+tff(sy_c_Product__Type_OPair_001t__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J_J_J_001t__HOL__Obool,type,(
+    produc5146753889477624641t_bool: ( set_Pr8596666893696625069t_unit * bool ) > produc3355067900018205649t_bool )).
+
+tff(sy_c_Product__Type_OPair_001t__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_001t__HOL__Obool,type,(
+    produc4059363656607426911l_bool: ( set_Pr7067805752157284367t_bool * bool ) > produc9076187568141355375l_bool )).
+
+tff(sy_c_Product__Type_OPair_001t__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_001t__HOL__Obool,type,(
+    produc6987364975386393661l_bool: ( set_Pr7608014282691475889t_bool * bool ) > produc4887610232093912525l_bool )).
+
+tff(sy_c_Product__Type_OPair_001t__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_Mt__HOL__Obool_J_J_001t__HOL__Obool,type,(
+    produc7766033297945928607l_bool: ( set_Pr2667750421572572623l_bool * bool ) > produc8228049284381021359l_bool )).
+
+tff(sy_c_Product__Type_OUnity,type,(
+    product_Unity: product_unit )).
+
+tff(sy_c_Product__Type_Oprod_Ofst_001t__Product____Type__Ounit_001t__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J,type,(
+    produc4212711704767751243t_unit: produc8409959463918966127t_unit > product_unit )).
+
+tff(sy_c_Product__Type_Oprod_Ofst_001t__Product____Type__Ounit_001t__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J,type,(
+    produc994217053840764713t_unit: produc2719044200362628813t_unit > product_unit )).
+
+tff(sy_c_Product__Type_Oprod_Ofst_001t__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_001t__HOL__Obool,type,(
+    produc2802984947220597131t_bool: produc3769786098300567727t_bool > set_Pr4398085759894919119t_unit )).
+
+tff(sy_c_Product__Type_Oprod_Ofst_001t__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J_J_J_001t__HOL__Obool,type,(
+    produc2203424236675038509t_bool: produc3355067900018205649t_bool > set_Pr8596666893696625069t_unit )).
+
+tff(sy_c_Product__Type_Oprod_Ofst_001t__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_001t__HOL__Obool,type,(
+    produc6370825340939300171l_bool: produc9076187568141355375l_bool > set_Pr7067805752157284367t_bool )).
+
+tff(sy_c_Product__Type_Oprod_Ofst_001t__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_001t__HOL__Obool,type,(
+    produc5385880494881907241l_bool: produc4887610232093912525l_bool > set_Pr7608014282691475889t_bool )).
+
+tff(sy_c_Product__Type_Oprod_Ofst_001t__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_Mt__HOL__Obool_J_J_001t__HOL__Obool,type,(
+    produc2626432024508093323l_bool: produc8228049284381021359l_bool > set_Pr2667750421572572623l_bool )).
+
+tff(sy_c_Product__Type_Oprod_Ofst_001t__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_Mt__HOL__Obool_J_J_001t__HOL__Obool,type,(
+    produc2849729869285827629l_bool: produc3287061045669795025l_bool > set_Pr4606883265519078061l_bool )).
+
+tff(sy_c_Product__Type_Oprod_Ofst_001t__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_Mt__HOL__Obool_J_J_Mt__HOL__Obool_J_J_001t__HOL__Obool,type,(
+    produc2590602198058948427l_bool: produc8658552434191269231l_bool > set_Pr9072123976580072975l_bool )).
+
+tff(sy_c_Product__Type_Oprod_Osnd_001t__Product____Type__Ounit_001t__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J,type,(
+    produc5601291151675059341t_unit: produc8409959463918966127t_unit > kernel4533684380273285781t_unit )).
+
+tff(sy_c_Product__Type_Oprod_Osnd_001t__Product____Type__Ounit_001t__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J,type,(
+    produc9147838884691901035t_unit: produc2719044200362628813t_unit > machin3440150138251392115t_unit )).
+
+tff(sy_c_Product__Type_Oprod_Osnd_001t__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_001t__HOL__Obool,type,(
+    produc3286424021769171917t_bool: produc3769786098300567727t_bool > bool )).
+
+tff(sy_c_Product__Type_Oprod_Osnd_001t__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J_J_J_001t__HOL__Obool,type,(
+    produc8121059133322783343t_bool: produc3355067900018205649t_bool > bool )).
+
+tff(sy_c_Product__Type_Oprod_Osnd_001t__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_001t__HOL__Obool,type,(
+    produc8819206506285414797l_bool: produc9076187568141355375l_bool > bool )).
+
+tff(sy_c_Product__Type_Oprod_Osnd_001t__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_001t__HOL__Obool,type,(
+    produc6894316085293576555l_bool: produc4887610232093912525l_bool > bool )).
+
+tff(sy_c_Product__Type_Oprod_Osnd_001t__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_Mt__HOL__Obool_J_J_001t__HOL__Obool,type,(
+    produc1435252133416894925l_bool: produc8228049284381021359l_bool > bool )).
+
+tff(sy_c_aa_001t__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_001t__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J,type,(
+    aa_Ker8744799612042795798t_bool: ( fun_Ke5997370747584789277t_bool * kernel4533684380273285781t_unit ) > produc3769786098300567727t_bool )).
+
+tff(sy_c_aa_001t__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J_001t__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J,type,(
+    aa_mac1304493219877124570t_bool: ( fun_ma5760147746720835297t_bool * machin3440150138251392115t_unit ) > produc3355067900018205649t_bool )).
+
+tff(sy_c_fFalse,type,(
+    fFalse: bool )).
+
+tff(sy_c_fTrue,type,(
+    fTrue: bool )).
+
+tff(sy_c_member_001t__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J,type,(
+    member5538404105196913688t_unit: ( produc8409959463918966127t_unit * set_Pr4398085759894919119t_unit ) > bool )).
+
+tff(sy_c_member_001t__Product____Type__Oprod_It__Product____Type__Ounit_Mt__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J_J,type,(
+    member8863027862795309814t_unit: ( produc2719044200362628813t_unit * set_Pr8596666893696625069t_unit ) > bool )).
+
+tff(sy_c_member_001t__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J,type,(
+    member2721893754958620760t_bool: ( produc3769786098300567727t_bool * set_Pr7067805752157284367t_bool ) > bool )).
+
+tff(sy_c_member_001t__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J,type,(
+    member355562681683826938t_bool: ( produc3355067900018205649t_bool * set_Pr7608014282691475889t_bool ) > bool )).
+
+tff(sy_c_member_001t__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_Mt__HOL__Obool_J,type,(
+    member2823304795856235032l_bool: ( produc9076187568141355375l_bool * set_Pr2667750421572572623l_bool ) > bool )).
+
+tff(sy_c_member_001t__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__MachineTypes__Omachine____state__Omachine____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_Mt__HOL__Obool_J,type,(
+    member6577324166976084982l_bool: ( produc4887610232093912525l_bool * set_Pr4606883265519078061l_bool ) > bool )).
+
+tff(sy_c_member_001t__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Set__Oset_It__Product____Type__Oprod_It__Product____Type__Ounit_Mt__KernelStateData____H__Okernel____state__Okernel____state____ext_It__Product____Type__Ounit_J_J_J_Mt__HOL__Obool_J_J_Mt__HOL__Obool_J_J_Mt__HOL__Obool_J,type,(
+    member3330093400808156760l_bool: ( produc8228049284381021359l_bool * set_Pr9072123976580072975l_bool ) > bool )).
+
+tff(sy_c_pp,type,(
+    pp: bool > $o )).
+
+tff(sy_v_s____,type,(
+    s: kernel4533684380273285781t_unit )).
+
+tff(sy_v_t____,type,(
+    t: kernel4533684380273285781t_unit )).
+
+tff(fact_0_prod_Osel_I1_J,axiom,(
+    ! [X1: set_Pr2667750421572572623l_bool,X2: bool] : produc2626432024508093323l_bool(produc7766033297945928607l_bool(X1,X2)) = X1 )).
+
+tff(fact_1_prod_Osel_I1_J,axiom,(
+    ! [X1: set_Pr7608014282691475889t_bool,X2: bool] : produc5385880494881907241l_bool(produc6987364975386393661l_bool(X1,X2)) = X1 )).
+
+tff(fact_2_prod_Osel_I1_J,axiom,(
+    ! [X1: set_Pr8596666893696625069t_unit,X2: bool] : produc2203424236675038509t_bool(produc5146753889477624641t_bool(X1,X2)) = X1 )).
+
+tff(fact_3_prod_Osel_I1_J,axiom,(
+    ! [X1: set_Pr7067805752157284367t_bool,X2: bool] : produc6370825340939300171l_bool(produc4059363656607426911l_bool(X1,X2)) = X1 )).
+
+tff(fact_4_prod_Osel_I1_J,axiom,(
+    ! [X1: product_unit,X2: machin3440150138251392115t_unit] : produc994217053840764713t_unit(produc6487924794790977853t_unit(X1,X2)) = X1 )).
+
+tff(fact_5_prod_Osel_I1_J,axiom,(
+    ! [X1: product_unit,X2: kernel4533684380273285781t_unit] : produc4212711704767751243t_unit(produc1916371932851615839t_unit(X1,X2)) = X1 )).
+
+tff(fact_6_prod_Osel_I1_J,axiom,(
+    ! [X1: set_Pr4398085759894919119t_unit,X2: bool] : produc2802984947220597131t_bool(produc392924531992785311t_bool(X1,X2)) = X1 )).
+
+tff(fact_7_local_OinitInterruptController__def,axiom,(
+    archIn8795888726837670195roller = return2437542426579446389t_unit(product_Unity) )).
+
+tff(fact_8_local_OswitchToIdleThread__def,axiom,(
+    archTh6584867680763971124Thread = return2437542426579446389t_unit(product_Unity) )).
+
+tff(fact_9_in__returns_I1_J,axiom,(
+    ! [R: set_Pr7067805752157284367t_bool,S: bool] : pp(member2823304795856235032l_bool(produc4059363656607426911l_bool(R,S),produc2626432024508093323l_bool(return3664348693809743733l_bool(R,S)))) )).
+
+tff(fact_10_in__returns_I1_J,axiom,(
+    ! [R: set_Pr8596666893696625069t_unit,S: bool] : pp(member355562681683826938t_bool(produc5146753889477624641t_bool(R,S),produc5385880494881907241l_bool(return1974553047308954711t_bool(R,S)))) )).
+
+tff(fact_11_in__returns_I1_J,axiom,(
+    ! [R: set_Pr4398085759894919119t_unit,S: bool] : pp(member2721893754958620760t_bool(produc392924531992785311t_bool(R,S),produc6370825340939300171l_bool(return424291804231358901t_bool(R,S)))) )).
+
+tff(fact_12_in__returns_I1_J,axiom,(
+    ! [R: product_unit,S: machin3440150138251392115t_unit] : pp(member8863027862795309814t_unit(produc6487924794790977853t_unit(R,S),produc2203424236675038509t_bool(aa_mac1304493219877124570t_bool(return2896169181713208403t_unit(R),S)))) )).
+
+tff(fact_13_in__returns_I1_J,axiom,(
+    ! [R: product_unit,S: kernel4533684380273285781t_unit] : pp(member5538404105196913688t_unit(produc1916371932851615839t_unit(R,S),produc2802984947220597131t_bool(aa_Ker8744799612042795798t_bool(return2437542426579446389t_unit(R),S)))) )).
+
+tff(fact_14_storeWordVM__def,axiom,(
+    ! [W: word_N3645301735248828278l_num1,P: word_N3645301735248828278l_num1] : storeWordVM(W,P) = return2896169181713208403t_unit(product_Unity) )).
+
+tff(fact_15_old_Oprod_Oexhaust,axiom,(
+    ! [Y: produc9076187568141355375l_bool] : 
+      ~ ( ! [A: set_Pr7067805752157284367t_bool,B: bool] : 
+            Y != produc4059363656607426911l_bool(A,B) ) )).
+
+tff(fact_16_old_Oprod_Oexhaust,axiom,(
+    ! [Y: produc3355067900018205649t_bool] : 
+      ~ ( ! [A: set_Pr8596666893696625069t_unit,B: bool] : 
+            Y != produc5146753889477624641t_bool(A,B) ) )).
+
+tff(fact_17_old_Oprod_Oexhaust,axiom,(
+    ! [Y: produc3769786098300567727t_bool] : 
+      ~ ( ! [A: set_Pr4398085759894919119t_unit,B: bool] : 
+            Y != produc392924531992785311t_bool(A,B) ) )).
+
+tff(fact_18_old_Oprod_Oexhaust,axiom,(
+    ! [Y: produc2719044200362628813t_unit] : 
+      ~ ( ! [A: product_unit,B: machin3440150138251392115t_unit] : 
+            Y != produc6487924794790977853t_unit(A,B) ) )).
+
+tff(fact_19_old_Oprod_Oexhaust,axiom,(
+    ! [Y: produc8409959463918966127t_unit] : 
+      ~ ( ! [A: product_unit,B: kernel4533684380273285781t_unit] : 
+            Y != produc1916371932851615839t_unit(A,B) ) )).
+
+tff(fact_20_clearExMonitor__def,axiom,(
+    hardwa1900559659162415690onitor = return2896169181713208403t_unit(product_Unity) )).
+
+tff(fact_21_in__monad_H_I8_J,axiom,(
+    ! [R: produc8228049284381021359l_bool,V: set_Pr2667750421572572623l_bool,S: bool] : 
+      ( pp(member3330093400808156760l_bool(R,produc2590602198058948427l_bool(return5104861545655793589l_bool(V,S))))
+    <=> ( produc2626432024508093323l_bool(R) = V
+        & ( pp(produc1435252133416894925l_bool(R))
+        <=> pp(S) ) ) ) )).
+
+tff(fact_22_in__monad_H_I8_J,axiom,(
+    ! [R: produc4887610232093912525l_bool,V: set_Pr7608014282691475889t_bool,S: bool] : 
+      ( pp(member6577324166976084982l_bool(R,produc2849729869285827629l_bool(return2090302409207339859l_bool(V,S))))
+    <=> ( produc5385880494881907241l_bool(R) = V
+        & ( pp(produc6894316085293576555l_bool(R))
+        <=> pp(S) ) ) ) )).
+
+tff(fact_23_in__monad_H_I8_J,axiom,(
+    ! [R: produc3355067900018205649t_bool,V: set_Pr8596666893696625069t_unit,S: bool] : 
+      ( pp(member355562681683826938t_bool(R,produc5385880494881907241l_bool(return1974553047308954711t_bool(V,S))))
+    <=> ( produc2203424236675038509t_bool(R) = V
+        & ( pp(produc8121059133322783343t_bool(R))
+        <=> pp(S) ) ) ) )).
+
+tff(fact_24_in__monad_H_I8_J,axiom,(
+    ! [R: produc9076187568141355375l_bool,V: set_Pr7067805752157284367t_bool,S: bool] : 
+      ( pp(member2823304795856235032l_bool(R,produc2626432024508093323l_bool(return3664348693809743733l_bool(V,S))))
+    <=> ( produc6370825340939300171l_bool(R) = V
+        & ( pp(produc8819206506285414797l_bool(R))
+        <=> pp(S) ) ) ) )).
+
+tff(fact_25_in__monad_H_I8_J,axiom,(
+    ! [R: produc2719044200362628813t_unit,V: product_unit,S: machin3440150138251392115t_unit] : 
+      ( pp(member8863027862795309814t_unit(R,produc2203424236675038509t_bool(aa_mac1304493219877124570t_bool(return2896169181713208403t_unit(V),S))))
+    <=> ( produc994217053840764713t_unit(R) = V
+        & produc9147838884691901035t_unit(R) = S ) ) )).
+
+tff(fact_26_in__monad_H_I8_J,axiom,(
+    ! [R: produc3769786098300567727t_bool,V: set_Pr4398085759894919119t_unit,S: bool] : 
+      ( pp(member2721893754958620760t_bool(R,produc6370825340939300171l_bool(return424291804231358901t_bool(V,S))))
+    <=> ( produc2802984947220597131t_bool(R) = V
+        & ( pp(produc3286424021769171917t_bool(R))
+        <=> pp(S) ) ) ) )).
+
+tff(fact_27_in__monad_H_I8_J,axiom,(
+    ! [R: produc8409959463918966127t_unit,V: product_unit,S: kernel4533684380273285781t_unit] : 
+      ( pp(member5538404105196913688t_unit(R,produc2802984947220597131t_bool(aa_Ker8744799612042795798t_bool(return2437542426579446389t_unit(V),S))))
+    <=> ( produc4212711704767751243t_unit(R) = V
+        & produc5601291151675059341t_unit(R) = S ) ) )).
+
+tff(fact_28_submonad__doMachineOp_Oguarded__return,axiom,(
+    ! [X: product_unit,S: kernel4533684380273285781t_unit] : aa_Ker8744799612042795798t_bool(kernel1555587059373008229t_unit(return2896169181713208403t_unit(X)),S) = aa_Ker8744799612042795798t_bool(return2437542426579446389t_unit(X),S) )).
+
+tff(fact_29_old_Ounit_Oexhaust,axiom,(
+    ! [Y: product_unit] : Y = product_Unity )).
+
+tff(fact_30_dmo__storeWordVM_H,axiom,(
+    ! [X: word_N3645301735248828278l_num1,Y: word_N3645301735248828278l_num1] : kernel1555587059373008229t_unit(storeWordVM(X,Y)) = return2437542426579446389t_unit(product_Unity) )).
+
+tff(help_pp_2_1_U,axiom,(
+    pp(fTrue) )).
+
+tff(help_pp_1_1_U,axiom,(
+    ~ pp(fFalse) )).
+
+tff(conj_1,conjecture,(
+    t = s )).
+%------------------------------------------------------------------------------

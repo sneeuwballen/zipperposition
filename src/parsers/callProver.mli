@@ -1,7 +1,16 @@
 
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
-(** {1 Call external provers with TSTP} *)
+(** {1 Call external provers with TSTP (Old)} *)
+
+(** This module is intended to provide a uniform interface to invoke
+    some classic first-order provers (E, SPASS, …) on a problem
+    specified as a TPTP Ast.
+
+    The point is that this AST might be generated programmatically,
+    or manipulated from an existing TSTP proof (for checking purpose),
+    rather than being handled as text.
+*)
 
 open Logtk
 

@@ -1,0 +1,7 @@
+# expect: unsat
+
+data unit := Unit.
+
+goal forall (x y:unit). x=y.
+
+

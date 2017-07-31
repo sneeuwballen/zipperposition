@@ -3,6 +3,10 @@
 
 (** {2 Extensible Map for State}  *)
 
+(** This data structure maps keys to values of any type (although the
+    type is fixed for a given key). Useful for configuration.
+*)
+
 type t
 
 val empty : t

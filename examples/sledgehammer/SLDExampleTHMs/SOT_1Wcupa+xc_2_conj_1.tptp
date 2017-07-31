@@ -1,0 +1,95 @@
+%------------------------------------------------------------------------------
+tff(ty_n_t__fun_Itf__a_Mtf__a_J,type,(
+    fun_a_a: $tType )).
+
+tff(ty_n_t__HOL__Obool,type,(
+    bool: $tType )).
+
+tff(ty_n_t__Nat__Onat,type,(
+    nat: $tType )).
+
+tff(ty_n_tf__a,type,(
+    a: $tType )).
+
+tff(sy_c_Fun_Ocomp_001tf__a_001tf__a_001tf__a,type,(
+    comp_a_a_a: ( fun_a_a * fun_a_a ) > fun_a_a )).
+
+tff(sy_c_Groups_Oone__class_Oone_001t__Nat__Onat,type,(
+    one_one_nat: nat )).
+
+tff(sy_c_Groups_Ozero__class_Ozero_001t__Nat__Onat,type,(
+    zero_zero_nat: nat )).
+
+tff(sy_c_Nat_OSuc,type,(
+    suc: nat > nat )).
+
+tff(sy_c_Nat_Ocompow_001t__fun_Itf__a_Mtf__a_J,type,(
+    compow_fun_a_a: ( nat * fun_a_a ) > fun_a_a )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001tf__a,type,(
+    ord_less_eq_a: ( a * a ) > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001tf__a_001tf__a,type,(
+    order_mono_a_a: fun_a_a > $o )).
+
+tff(sy_c_aa_001tf__a_001tf__a,type,(
+    aa_a_a: ( fun_a_a * a ) > a )).
+
+tff(sy_c_ex11__6_Ocpo__class_Obot_001tf__a,type,(
+    ex11_cpo_bot_a: a )).
+
+tff(sy_c_fFalse,type,(
+    fFalse: bool )).
+
+tff(sy_c_fTrue,type,(
+    fTrue: bool )).
+
+tff(sy_c_pp,type,(
+    pp: bool > $o )).
+
+tff(sy_v_f,type,(
+    f: fun_a_a )).
+
+tff(sy_v_p,type,(
+    p: a )).
+
+tff(fact_0__092_060open_062_If_A_094_094_ASuc_A0_J_Acpo__class_Obot_A_092_060le_062_Ap_092_060close_062,axiom,(
+    ord_less_eq_a(aa_a_a(compow_fun_a_a(suc(zero_zero_nat),f),ex11_cpo_bot_a),p) )).
+
+tff(fact_1_a2,axiom,(
+    ord_less_eq_a(aa_a_a(f,p),p) )).
+
+tff(fact_2_a1,axiom,(
+    order_mono_a_a(f) )).
+
+tff(fact_3_mono__def,axiom,(
+    ! [F: fun_a_a] : 
+      ( order_mono_a_a(F)
+    <=> ! [X: a,Y: a] : 
+          ( ord_less_eq_a(X,Y)
+         => ord_less_eq_a(aa_a_a(F,X),aa_a_a(F,Y)) ) ) )).
+
+tff(fact_4_order_Otrans,axiom,(
+    ! [A: a,B: a,C: a] : 
+      ( ord_less_eq_a(A,B)
+     => ( ord_less_eq_a(B,C)
+       => ord_less_eq_a(A,C) ) ) )).
+
+tff(fact_5_funpow_Osimps_I2_J,axiom,(
+    ! [N: nat,F: fun_a_a] : compow_fun_a_a(suc(N),F) = comp_a_a_a(F,compow_fun_a_a(N,F)) )).
+
+tff(fact_6_comp__def,axiom,(
+    ! [F: fun_a_a,G: fun_a_a,X2: a] : aa_a_a(comp_a_a_a(F,G),X2) = aa_a_a(F,aa_a_a(G,X2)) )).
+
+tff(fact_7_One__nat__def,axiom,(
+    one_one_nat = suc(zero_zero_nat) )).
+
+tff(help_pp_2_1_U,axiom,(
+    pp(fTrue) )).
+
+tff(help_pp_1_1_U,axiom,(
+    ~ pp(fFalse) )).
+
+tff(conj_1,conjecture,(
+    ord_less_eq_a(aa_a_a(compow_fun_a_a(suc(suc(zero_zero_nat)),f),ex11_cpo_bot_a),p) )).
+%------------------------------------------------------------------------------

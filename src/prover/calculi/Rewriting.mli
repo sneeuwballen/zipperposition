@@ -6,7 +6,7 @@
     Deal with definitions as rewrite rules *)
 
 module Make(E : Env_intf.S) : sig
-  val setup : has_rw:bool -> unit -> unit
+  val setup : ?ctx_narrow:bool -> has_rw:bool -> unit -> unit
 end
 
 val extension : Extensions.t

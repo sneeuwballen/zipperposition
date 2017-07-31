@@ -1,14 +1,17 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 S-like Terms}.
+(** {1 Simple Terms}. *)
 
-    Those terms are not hashconsed, nor do they use De Bruijn indices. Their
-    simplicity make them good for heavy AST transformations, output of parsing,
-    etc.
+(** Simple terms, that are not hashconsed, nor typed.
+
+    Those do not use De Bruijn indices for variable binding,
+    but simply names (scoping is done later).
+    Their simplicity make them good for heavy AST transformations, output of
+    parsing, etc.
 
     Terms are only compared, hashsed, etc. by their "term" component (the algebraic
-    variant). Additional fields (location...) are ignored for almost every
+    variant). Additional fields (location…) are ignored for almost every
     operation.
 *)
 
@@ -88,12 +91,14 @@ val lambda : ?loc:location -> typed_var list -> t -> t
 val int_ : Z.t -> t
 val of_int : int -> t
 val rat : Q.t -> t
+val real : string -> t
 
 val tType : t
 val term : t
 val prop : t
 val ty_int : t
 val ty_rat : t
+val ty_real : t
 val fun_ty : ?loc:location -> t list -> t -> t
 val forall_ty : ?loc:location -> typed_var list -> t -> t
 
@@ -137,6 +142,8 @@ module ZF : sig
   include Interfaces.PRINT with type t := t
   val pp_inner : t CCFormat.printer
 end
+
+val pp_in : Output_format.t -> t CCFormat.printer
 
 (** {2 Subst} *)
 

@@ -5,17 +5,18 @@
 
 open Logtk
 
-type var = FOTerm.var
-type term = FOTerm.t
+type var = Term.var
+type term = Term.t
 type clause = Literals.t
 type form = clause list
 
 (** A formula of the form [forall vars. \bigand_i C_i].
     The [C_i] are clauses with free variables in [vars] *)
 type t = private {
-  vars: FOTerm.VarSet.t;
+  vars: Term.VarSet.t;
   cs: form;
 }
+type cut_form = t
 
 val make : Literals.t list -> t
 val trivial : t
@@ -24,8 +25,9 @@ include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 include Interfaces.PRINT with type t := t
 val pp_tstp : t CCFormat.printer
+val pp_zf : t CCFormat.printer
 
-val vars : t -> FOTerm.VarSet.t
+val vars : t -> Term.VarSet.t
 val cs : t -> Literals.t list
 
 val ind_vars : t -> var list
@@ -74,4 +76,20 @@ end
 module Seq : sig
   val terms : t -> term Sequence.t
   val terms_with_pos : ?subterms:bool -> t -> term Position.With.t Sequence.t
+end
+
+(** {2 Structure for Sets of cut forms, indexed modulo α-eq} *)
+module FV_tbl(X : Map.OrderedType) : sig
+  type value = X.t
+  type t
+
+  val create : unit -> t
+
+  val add : t -> cut_form -> value -> unit
+
+  val mem : t -> cut_form -> bool
+
+  val get : t -> cut_form -> value option
+
+  val to_seq : t -> (cut_form * X.t) Sequence.t
 end

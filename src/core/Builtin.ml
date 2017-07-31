@@ -26,8 +26,10 @@ type t =
   | Grounding (** used for inst-gen *)
   | TyInt
   | TyRat
+  | TyReal
   | Int of Z.t
   | Rat of Q.t
+  | Real of string
   | Floor
   | Ceiling
   | Truncate
@@ -108,6 +110,8 @@ let to_int_ = function
   | ExistsConst -> 48
   | Grounding -> 50
   | Box_opaque -> 60
+  | TyReal -> 70
+  | Real _ -> 71
 
 let compare a b = match a, b with
   | Int i, Int j -> Z.compare i j
@@ -125,9 +129,9 @@ module Map = Sequence.Map.Make(struct type t = t_ let compare = compare end)
 module Set = Sequence.Set.Make(struct type t = t_ let compare = compare end)
 module Tbl = Hashtbl.Make(struct type t = t_ let equal = equal let hash = hash end)
 
-let is_int = function | Int _ -> true | _ -> false
-let is_rat = function | Rat _ -> true | _ -> false
-let is_numeric = function | Int _ | Rat _ | _ -> false
+let is_int = function Int _ -> true | _ -> false
+let is_rat = function Rat _ -> true | _ -> false
+let is_numeric = function Int _ | Rat _ -> true | _ -> false
 let is_not_numeric x = not (is_numeric x)
 
 let is_arith = function
@@ -140,6 +144,7 @@ let is_arith = function
 let to_string s = match s with
   | Int n -> Z.to_string n
   | Rat n -> Q.to_string n
+  | Real r -> r
   | Not -> "¬"
   | And -> "∧"
   | Or -> "∨"
@@ -162,6 +167,7 @@ let to_string s = match s with
   | Grounding -> "★"
   | TyInt -> "int"
   | TyRat -> "rat"
+  | TyReal -> "real"
   | Floor -> "floor"
   | Ceiling -> "ceiling"
   | Truncate -> "truncate"
@@ -296,8 +302,10 @@ module TPTP = struct
     | Grounding -> "$$ground"
     | TyInt -> "$int"
     | TyRat -> "$rat"
+    | TyReal -> "$real"
     | Int x -> Z.to_string x
     | Rat x -> Q.to_string x
+    | Real r -> r
     | Floor -> "$floor"
     | Ceiling -> "$ceiling"
     | Truncate -> "$truncate"
@@ -366,6 +374,16 @@ module TPTP = struct
     | "$greater" -> Greater
     | "$greatereq" -> Greatereq
     | _ -> raise NotABuiltin
+
+  let fixity = function
+    | And | Or ->
+      Infix_nary
+    | Imply | Equiv | Xor | Eq | Neq | HasType ->
+      Infix_binary
+    | _ -> Prefix
+
+  let is_prefix o = fixity o = Prefix
+  let is_infix o = match fixity o with Infix_nary | Infix_binary -> true | Prefix -> false
 
   let of_string b =
     try Some (of_string_exn b)
@@ -617,8 +635,10 @@ module ZF = struct
     | Grounding -> "$$grounding"
     | TyInt -> "int"
     | TyRat -> "rat"
+    | TyReal -> "real"
     | Int x -> Z.to_string x
     | Rat x -> Q.to_string x
+    | Real x -> x
     (* FIXME: update *)
     | Floor -> "$floor"
     | Ceiling -> "$ceiling"

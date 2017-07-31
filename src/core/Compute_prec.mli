@@ -3,6 +3,10 @@
 
 (** {1 Compute Precedence} *)
 
+(** This module computes precedences that satisfy a list of
+    constraints.
+    See {!Precedence.Constr} for more details on constraints. *)
+
 type t
 
 val empty : t

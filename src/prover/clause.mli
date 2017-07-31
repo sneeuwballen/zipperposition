@@ -13,6 +13,12 @@ val stat_clause_create : Util.stat
 
 module type S = Clause_intf.S
 
+(** Bundle of clause sets *)
+type 'c sets = {
+  c_set: 'c CCVector.ro_vector; (** main set of clauses *)
+  c_sos: 'c CCVector.ro_vector; (** set of support *)
+}
+
 (** {2 Clauses that depend on a Context} *)
 
 module Make(Ctx : Ctx.S) : S with module Ctx = Ctx

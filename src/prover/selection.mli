@@ -6,36 +6,31 @@
 open Logtk
 
 (** See "E: a brainiac theorem prover". A selection function
-    returns a bitvector of selected literals. *)
+    returns a bitvector of selected literals.
+
+    The [strict] parameter, if true, means only one negative
+    literal is selected (at most);
+    if [strict=false] then all positive literals are also selected.
+*)
 
 type t = Literal.t array -> CCBV.t
 
+type parametrized = strict:bool -> ord:Ordering.t -> t
+
 val no_select : t
 
-val select_max_goal : strict:bool -> ord:Ordering.t -> t
+val max_goal : parametrized
 (** Select a maximal negative literal, if any, or nothing *)
 
-val select_diff_neg_lit : strict:bool -> ord:Ordering.t -> t
-(** arbitrary negative literal with maximal weight difference between sides *)
-
-val select_complex : strict:bool -> ord:Ordering.t -> t
-(** x!=y, or ground negative lit, or like select_diff_neg_lit *)
-
-val select_complex_except_RR_horn : strict:bool -> ord:Ordering.t -> t
-(** if clause is a restricted range horn clause, then select nothing;
-    otherwise, like select_complex *)
+val except_RR_horn : parametrized -> parametrized
 
 (** {2 Global selection Functions} *)
 
-val default_selection : ord:Ordering.t -> t
+val default : ord:Ordering.t -> t
 (** Default selection function *)
 
-val selection_from_string : ord:Ordering.t -> string -> t
+val from_string : ord:Ordering.t -> string -> t
 (** selection function from string (may fail) *)
 
-val available_selections : unit -> string list
+val all : unit -> string list
 (** available names for selection functions *)
-
-val register : string -> (ord:Ordering.t -> t) -> unit
-(** Register new selection function
-    @raise Failure if the name is already used *)

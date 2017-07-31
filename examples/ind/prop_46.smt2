@@ -1,0 +1,1 @@
+../../tip-benchmarks/benchmarks/isaplanner/prop_46.smt2

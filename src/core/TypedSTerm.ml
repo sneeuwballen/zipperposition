@@ -73,6 +73,8 @@ let rec head_exn t = match view t with
 
 let head t = try Some (head_exn t) with Not_found -> None
 
+let is_tType t = match view t with AppBuiltin (Builtin.TType,_) -> true | _ -> false
+
 let to_int_ = function
   | Var _ -> 0
   | Const _ -> 3
@@ -183,8 +185,22 @@ let rec pp out t = match view t with
   | Const s -> ID.pp out s
   | App (_, []) -> assert false
   | App (f, l) ->
-    Format.fprintf out "@[<2>%a@ %a@]"
-      pp_inner f (Util.pp_list ~sep:" " pp_inner) l
+    let l =
+      if !InnerTerm.show_type_arguments || is_tType (ty_exn t) then l
+      else List.filter (fun t -> not (ty_exn t |> is_tType)) l
+    in
+    let as_infix = match view f with Const id -> ID.as_infix id | _ -> None in
+    let as_prefix = match view f with Const id -> ID.as_prefix id | _ -> None in
+    begin match as_infix, as_prefix, l with
+      | _, _, [] -> pp out f
+      | Some s, _, [a;b] ->
+        Format.fprintf out "@[<1>%a@ %s@ %a@]" pp_inner a s pp_inner b
+      | _, Some s, [a] ->
+        Format.fprintf out "@[<1>%s@ %a@]" s pp_inner a
+      | _ ->
+        Format.fprintf out "@[<2>%a@ %a@]"
+          pp_inner f (Util.pp_list ~sep:" " pp_inner) l
+    end
   | Bind (s, _, _) ->
     let vars, body = unfold_binder s t in
     let pp_bound_var out v =
@@ -237,6 +253,7 @@ and pp_field out (name,t) =
 and pp_fields out f = Util.pp_list ~sep:", " pp_field out f
 and pp_infix_ b out l = match l with
   | [] -> assert false
+  | [t] when b=Builtin.Arrow -> pp out t
   | [t] -> pp_inner out t
   | t :: l' ->
     Format.fprintf out "@[%a@]@ %a %a"
@@ -344,6 +361,7 @@ let box_opaque t: t =
 let is_var = function | {term=Var _; _} -> true | _ -> false
 let is_meta t = match view t with Meta _ -> true | _ -> false
 let is_const = function {term=Const _; _} -> true | _ -> false
+let is_fun = function {term=Bind (Binder.Lambda, _, _); _} -> true | _ -> false
 
 module Set = Sequence.Set.Make(struct type t = term let compare = compare end)
 module Map = Sequence.Map.Make(struct type t = term let compare = compare end)
@@ -459,6 +477,11 @@ let var_occurs ~var t =
   Seq.vars t
   |> Sequence.mem ~eq:Var.equal var
 
+let as_id_app t = match view t with
+  | Const id -> Some (id, ty_exn t, [])
+  | App ({term=Const id; ty=Some ty; _}, l) -> Some (id, ty, l)
+  | _ -> None
+
 let vars t = Seq.vars t |> Var.Set.of_seq |> Var.Set.to_list
 
 let free_vars t = Seq.free_vars t |> Var.Set.of_seq |> Var.Set.to_list
@@ -470,15 +493,11 @@ let free_vars_l l =
 
 let closed t = Seq.free_vars t |> Sequence.is_empty
 
-let rec open_binder b t = match view t with
-  | Bind (b', v, t') when Binder.equal b b' ->
-    let vars, body = open_binder b t' in
-    v :: vars, body
-  | _ -> [], t
-
 let close_all ~ty s t =
   let vars = free_vars t in
   bind_list ~ty s vars t
+
+let unfold_fun = unfold_binder Binder.Lambda
 
 (** {2 Specific Views} *)
 
@@ -497,10 +516,12 @@ module Ty = struct
     | Ty_record of (string * t) list * t Var.t option
     | Ty_meta of meta_var
 
-  let view (t:t) : view = match view t with
+  let t_view_ = view
+
+  let rec view (t:t) : view = match t_view_ t with
     | Var v -> Ty_var v
     | App (f, l) ->
-      begin match view f with
+      begin match t_view_ f with
         | Const id -> Ty_app (id,l)
         | _ -> assert false
       end
@@ -508,10 +529,11 @@ module Ty = struct
     | Bind (Binder.ForallTy, v, t) -> Ty_forall (v,t)
     | Record (l,None) -> Ty_record (l, None)
     | Record (l, Some r) ->
-      begin match view r with
+      begin match t_view_ r with
         | Var r -> Ty_record (l, Some r)
         | _ -> assert false
       end
+    | Meta (_,{contents=Some ty'},_) -> view ty'
     | Meta (v,o,k) -> Ty_meta (v,o,k)
     | AppBuiltin (Builtin.Prop, []) -> Ty_builtin Prop
     | AppBuiltin (Builtin.TType, []) -> Ty_builtin TType
@@ -520,6 +542,8 @@ module Ty = struct
     | AppBuiltin (Builtin.Term, []) -> Ty_builtin Term
     | AppBuiltin (Builtin.Arrow, ret::args) -> Ty_fun (args, ret)
     | AppBuiltin (Builtin.Multiset, [t]) -> Ty_multiset t
+    | AppBuiltin (Builtin.TyReal, []) ->
+      failwith "cannot handle values of type `real`"
     | Let _
     | Ite _
     | Match _
@@ -558,6 +582,7 @@ module Ty = struct
   let prop = builtin ~ty:tType Builtin.Prop
   let int = builtin ~ty:tType Builtin.TyInt
   let rat = builtin ~ty:tType Builtin.TyRat
+  let real = builtin ~ty:tType Builtin.TyReal
   let term = builtin ~ty:tType Builtin.Term
 
   let (==>) args ret = fun_ args ret
@@ -618,7 +643,9 @@ module Ty = struct
     aux buf ty;
     Buffer.contents buf
 
-  let is_tType t = match view t with | Ty_builtin TType -> true | _ -> false
+  let needs_args ty = arity ty <> (0,0)
+
+  let is_tType = is_tType
   let is_prop t = match view t with Ty_builtin Prop -> true | _ -> false
 
   let rec returns t = match view t with
@@ -640,6 +667,10 @@ module Ty = struct
     | Ty_var _
     | Ty_forall (_,_) -> false
 end
+
+let fun_l ?loc vars body =
+  let ty = Ty.fun_ ?loc (List.map Var.ty vars) (ty_exn body) in
+  bind_list ?loc ~ty Binder.Lambda vars body
 
 let sort_ty_vars_first : t Var.t list -> t Var.t list =
   List.sort
@@ -707,6 +738,16 @@ module Form = struct
   let xor ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Xor [a;b]
   let ite = ite
   let imply ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Imply [a;b]
+
+  let eq_or_equiv t u =
+    if Ty.is_prop (ty_exn t)
+    then equiv t u
+    else eq t u
+
+  let neq_or_xor t u =
+    if Ty.is_prop (ty_exn t)
+    then xor t u
+    else neq t u
 
   let box_opaque = box_opaque
 
@@ -781,7 +822,7 @@ module Subst = struct
   type t = (term, term) Var.Subst.t
 
   let empty = Var.Subst.empty
-
+  let is_empty = Var.Subst.is_empty
   let mem = Var.Subst.mem
 
   let pp = Var.Subst.pp _pp_term
@@ -802,74 +843,85 @@ module Subst = struct
 
   let merge a b = Var.Subst.merge a b
 
-  let rec eval subst t = match view t with
+  let rec eval_ subst t = match view t with
     | Var v ->
       begin try
           let t' = Var.Subst.find_exn subst v in
           assert (t != t');
-          eval subst t'
+          eval_ subst t'
         with Not_found ->
-          var ?loc:t.loc (Var.update_ty v ~f:(eval subst))
+          var ?loc:t.loc (Var.update_ty v ~f:(eval_ subst))
       end
     | Const _ -> t
     | App (f, l) ->
-      let ty = eval subst (ty_exn t) in
-      app ?loc:t.loc ~ty (eval subst f) (eval_list subst l)
+      let ty = eval_ subst (ty_exn t) in
+      app ?loc:t.loc ~ty (eval_ subst f) (eval_list subst l)
     | Bind (s, v, body) ->
-      let ty = eval subst (ty_exn t) in
+      let ty = eval_ subst (ty_exn t) in
       (* bind [v] to a fresh name to avoid collision *)
       let subst, v' = rename_var subst v in
-      bind ?loc:t.loc ~ty s v' (eval subst body)
+      bind ?loc:t.loc ~ty s v' (eval_ subst body)
     | AppBuiltin (Builtin.TType,_) -> t
     | AppBuiltin (b,l) ->
-      let ty = eval subst (ty_exn t) in
+      let ty = eval_ subst (ty_exn t) in
       app_builtin ?loc:t.loc ~ty b (eval_list subst l)
     | Record (l, rest) ->
-      let ty = eval subst (ty_exn t) in
+      let ty = eval_ subst (ty_exn t) in
       record_flatten ?loc:t.loc ~ty
-        (List.map (CCPair.map2 (eval subst)) l)
-        ~rest:(CCOpt.map (eval subst) rest)
+        (List.map (CCPair.map2 (eval_ subst)) l)
+        ~rest:(CCOpt.map (eval_ subst) rest)
     | Ite (a,b,c) ->
-      let a = eval subst a in
-      let b = eval subst b in
-      let c = eval subst c in
+      let a = eval_ subst a in
+      let b = eval_ subst b in
+      let c = eval_ subst c in
       ite ?loc:t.loc a b c
     | Let (l, u) ->
       let subst', l =
         CCList.fold_map
           (fun subst' (v,t) ->
-             let t = eval subst t in
+             let t = eval_ subst t in
              let subst', v = rename_var subst' v in
              subst', (v,t))
           subst l
       in
-      let u = eval subst' u in
+      let u = eval_ subst' u in
       let_ ?loc:t.loc l u
     | Match (u, l) ->
-      let u = eval subst u in
+      let u = eval_ subst u in
       let l =
         List.map
           (fun (c, vars, rhs) ->
              let subst, vars = CCList.fold_map rename_var subst vars in
-             c, vars, eval subst rhs)
+             c, vars, eval_ subst rhs)
           l
       in
       match_ ?loc:t.loc u l
     | Multiset l ->
-      let ty = eval subst (ty_exn t) in
+      let ty = eval_ subst (ty_exn t) in
       multiset ?loc:t.loc ~ty (eval_list subst l)
     | Meta (v,r,k) ->
-      let v = Var.update_ty v ~f:(eval subst) in
+      let v = Var.update_ty v ~f:(eval_ subst) in
       meta ?loc:t.loc (v, r, k)
   and eval_list subst l =
-    List.map (eval subst) l
+    List.map (eval_ subst) l
 
   (* rename variable and evaluate its type *)
   and rename_var subst v =
-    let v' = Var.copy v |> Var.update_ty ~f:(eval subst) in
+    let v' = Var.copy v |> Var.update_ty ~f:(eval_ subst) in
     let subst = add subst v (var v') in
     subst, v'
+
+  let eval subst t = if is_empty subst then t else eval_ subst t
 end
+
+(** {2 Table of Variables} *)
+
+module Var_tbl = CCHashtbl.Make(struct
+    type t_ = t
+    type t = t_ Var.t
+    let equal = Var.equal
+    let hash = Var.hash
+  end)
 
 (** {2 Substitutions, Unification} *)
 
@@ -1188,7 +1240,7 @@ let unify ?(allow_open=false) ?loc ?(st=UStack.create()) ?(subst=Subst.empty) t1
   in
   unif_rec subst t1 t2
 
-let apply_unify ?allow_open ?loc ?st ?(subst=Subst.empty) ty l =
+let apply_unify ?gen_fresh_meta ?allow_open ?loc ?st ?(subst=Subst.empty) ty l =
   Util.debugf ~section 5 "@[<>apply `%a`@ to [@[%a@]]@]"
     (fun k->k pp ty (Util.pp_list pp) l);
   let rec aux subst ty l = match Ty.view ty, l with
@@ -1200,7 +1252,19 @@ let apply_unify ?allow_open ?loc ?st ?(subst=Subst.empty) ty l =
       aux (Subst.add subst v a) ty' l'
     | Ty.Ty_fun (exp, ret), _ ->
       aux_l subst exp ret l
-    | (Ty.Ty_meta _ | Ty.Ty_var _ | Ty.Ty_app _ | Ty.Ty_builtin _
+    | Ty.Ty_meta _, _ ->
+      begin match gen_fresh_meta with
+        | None ->
+          fail_uniff_ ?loc [] "cannot apply type `@[%a@]`@ to `@[%a@]`"
+            pp ty (Util.pp_list pp) l
+        | Some g ->
+          (* unify meta with [tyof(l) -> fresh_var()] *)
+          let ret = g() |> Ty.meta in
+          unify ?allow_open ?loc ?st ~subst ty
+            (Ty.fun_ (List.map ty_exn l) ret);
+          ret
+      end
+    | (Ty.Ty_var _ | Ty.Ty_app _ | Ty.Ty_builtin _
       | Ty.Ty_multiset _ | Ty.Ty_record _), _ ->
       fail_uniff_ ?loc [] "cannot apply type `@[%a@]`@ to `@[%a@]`"
         pp ty (Util.pp_list pp) l
@@ -1270,4 +1334,10 @@ module ZF = struct
   let pp_inner out t = STerm.ZF.pp_inner out (erase t)
   let to_string t = STerm.ZF.to_string (erase t)
 end
+
+let pp_in = function
+  | Output_format.O_zf -> ZF.pp
+  | Output_format.O_tptp -> TPTP.pp
+  | Output_format.O_normal -> pp
+  | Output_format.O_none -> CCFormat.silent
 

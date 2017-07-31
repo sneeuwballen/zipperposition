@@ -6,10 +6,10 @@
 open Logtk
 
 module Fmt = CCFormat
-module T = FOTerm
+module T = Term
 
-type var = FOTerm.var
-type term = FOTerm.t
+type var = Term.var
+type term = Term.t
 type clause = Literals.t
 type form = clause list
 
@@ -17,6 +17,7 @@ type t = {
   vars: T.VarSet.t;
   cs: form;
 }
+type cut_form = t
 
 let trivial = {cs=[]; vars=T.VarSet.empty}
 
@@ -66,6 +67,19 @@ let pp_tstp out (f:t): unit =
       (Util.pp_list Type.TPTP.pp_typed_var) (T.VarSet.to_list f.vars) pp_body ()
   )
 
+let pp_zf out (f:t): unit =
+  let pp_c = Fmt.within "(" ")" Literals.pp_zf in
+  let pp_body out () = match f.cs with
+    | [c] -> pp_c out c
+    | _ -> Fmt.fprintf out "(@[%a@])" (Util.pp_list ~sep:" && " pp_c) f.cs
+  in
+  if T.VarSet.is_empty f.vars then (
+    pp_body out ()
+  ) else (
+    Fmt.fprintf out "(@[<2>forall %a.@ (%a)@])"
+      (Util.pp_list Type.ZF.pp_typed_var) (T.VarSet.to_list f.vars) pp_body ()
+  )
+
 let ind_vars t =
   vars t
   |> T.VarSet.to_list
@@ -105,7 +119,7 @@ let normalize (f:t): t = cs f |> Test_prop.normalize_form |> make
 let to_s_form (f:t) =
   let module F = TypedSTerm.Form in
   (* convert all clauses with the same variable bindings *)
-  let ctx = FOTerm.Conv.create() in
+  let ctx = Term.Conv.create() in
   let l = List.map (Literals.Conv.to_s_form ~ctx) (cs f) in
   F.and_ l |> F.close_forall
 
@@ -164,4 +178,43 @@ module Seq = struct
          let position = Position.(arg i @@ arg j @@ stop) in
          Literal.fold_terms lit
            ~position ~ord:Ordering.none ~which:`All ~vars:true ~subterms)
+end
+
+module FV_tbl(X : Map.OrderedType) = struct
+  type value = X.t
+
+  (* approximation here, we represent it as a clause, losing the
+         boolean structure. monotonicity w.r.t features should still apply *)
+  let to_lits (f:cut_form) =
+    cs f
+    |> Sequence.of_list
+    |> Sequence.flat_map_l Literals.to_form
+
+  (* index for lemmas, to ensure α-equivalent lemmas have the same lit *)
+  module FV = FV_tree.Make(struct
+      type t = cut_form * X.t
+      let compare (l1,v1)(l2,v2) =
+        let open CCOrd.Infix in
+        compare l1 l2 <?> (X.compare, v1, v2)
+
+      let to_lits (l,_) = to_lits l
+      let labels _ = Util.Int_set.empty
+    end)
+
+  type t = {
+    mutable fv: FV.t;
+  }
+
+  let create () = {fv=FV.empty ()}
+
+  let add t k v = t.fv <- FV.add t.fv (k,v)
+
+  let get t k =
+    FV.retrieve_alpha_equiv t.fv (to_lits k) Util.Int_set.empty
+    |> Sequence.find_map
+      (fun (k',v) -> if are_variant k k' then Some v else None)
+
+  let mem t k = get t k |> CCOpt.is_some
+
+  let to_seq t = FV.iter t.fv
 end

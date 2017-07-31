@@ -1,0 +1,253 @@
+%------------------------------------------------------------------------------
+tff(ty_n_t__Sum____Type__Osum_It__Nat__Onat_Mt__List__Olist_It__Nat__Onat_J_J,type,(
+    sum_sum_nat_list_nat: $tType )).
+
+tff(ty_n_t__fun_It__Nat__Onat_Mt__HOL__Obool_J,type,(
+    fun_nat_bool: $tType )).
+
+tff(ty_n_t__List__Olist_It__String__Ochar_J,type,(
+    list_char: $tType )).
+
+tff(ty_n_t__List__Olist_It__Nat__Onat_J,type,(
+    list_nat: $tType )).
+
+tff(ty_n_t__String__Onibble,type,(
+    nibble: $tType )).
+
+tff(ty_n_t__String__Ochar,type,(
+    char: $tType )).
+
+tff(ty_n_t__HOL__Obool,type,(
+    bool: $tType )).
+
+tff(ty_n_t__Nat__Onat,type,(
+    nat: $tType )).
+
+tff(sy_c_Groups_Ominus__class_Ominus_001t__Nat__Onat,type,(
+    minus_minus_nat: ( nat * nat ) > nat )).
+
+tff(sy_c_Groups_Oone__class_Oone_001t__Nat__Onat,type,(
+    one_one_nat: nat )).
+
+tff(sy_c_Groups_Oplus__class_Oplus_001t__Nat__Onat,type,(
+    plus_plus_nat: ( nat * nat ) > nat )).
+
+tff(sy_c_Groups_Ozero__class_Ozero_001t__Nat__Onat,type,(
+    zero_zero_nat: nat )).
+
+tff(sy_c_List_Oinsert_001t__Nat__Onat,type,(
+    insert_nat: ( nat * list_nat ) > list_nat )).
+
+tff(sy_c_List_Oinsert_001t__String__Ochar,type,(
+    insert_char: ( char * list_char ) > list_char )).
+
+tff(sy_c_List_Olast_001t__Nat__Onat,type,(
+    last_nat: list_nat > nat )).
+
+tff(sy_c_List_Olist_OCons_001t__Nat__Onat,type,(
+    cons_nat: ( nat * list_nat ) > list_nat )).
+
+tff(sy_c_List_Olist_OCons_001t__String__Ochar,type,(
+    cons_char: ( char * list_char ) > list_char )).
+
+tff(sy_c_List_Olist_ONil_001t__Nat__Onat,type,(
+    nil_nat: list_nat )).
+
+tff(sy_c_List_Olist_ONil_001t__String__Ochar,type,(
+    nil_char: list_char )).
+
+tff(sy_c_List_Olist_Ohd_001t__Nat__Onat,type,(
+    hd_nat: list_nat > nat )).
+
+tff(sy_c_List_Olist_Ohd_001t__String__Ochar,type,(
+    hd_char: list_char > char )).
+
+tff(sy_c_List_Olist_Otl_001t__Nat__Onat,type,(
+    tl_nat: list_nat > list_nat )).
+
+tff(sy_c_List_Olist_Otl_001t__String__Ochar,type,(
+    tl_char: list_char > list_char )).
+
+tff(sy_c_List_Otake_001t__Nat__Onat,type,(
+    take_nat: ( nat * list_nat ) > list_nat )).
+
+tff(sy_c_List_Otake_001t__String__Ochar,type,(
+    take_char: ( nat * list_char ) > list_char )).
+
+tff(sy_c_Nat_OSuc,type,(
+    suc: nat > nat )).
+
+tff(sy_c_Nat_Osize__class_Osize_001t__List__Olist_It__Nat__Onat_J,type,(
+    size_size_list_nat: list_nat > nat )).
+
+tff(sy_c_Orderings_Oord__class_Oless_001t__Nat__Onat,type,(
+    ord_less_nat: nat > fun_nat_bool )).
+
+tff(sy_c_Sort_OcheckPerm,type,(
+    checkPerm: ( list_nat * list_nat ) > bool )).
+
+tff(sy_c_Sort_OsieveLower,type,(
+    sieveLower: list_nat > bool )).
+
+tff(sy_c_String_Ochar_OChar,type,(
+    char2: ( nibble * nibble ) > char )).
+
+tff(sy_c_String_Onibble_ONibble6,type,(
+    nibble6: nibble )).
+
+tff(sy_c_String_Onibble_ONibble7,type,(
+    nibble7: nibble )).
+
+tff(sy_c_String_Onibble_ONibble8,type,(
+    nibble8: nibble )).
+
+tff(sy_c_String_Onibble_ONibbleA,type,(
+    nibbleA: nibble )).
+
+tff(sy_c_Sum__Type_Osum_Oprojl_001t__Nat__Onat_001t__List__Olist_It__Nat__Onat_J,type,(
+    sum_pr974661023st_nat: sum_sum_nat_list_nat > nat )).
+
+tff(sy_c_Sum__Type_Osum_Oprojr_001t__Nat__Onat_001t__List__Olist_It__Nat__Onat_J,type,(
+    sum_pr272054949st_nat: sum_sum_nat_list_nat > list_nat )).
+
+tff(sy_c_aa_001t__Nat__Onat_001t__HOL__Obool,type,(
+    aa_nat_bool: ( fun_nat_bool * nat ) > bool )).
+
+tff(sy_c_fFalse,type,(
+    fFalse: bool )).
+
+tff(sy_c_fTrue,type,(
+    fTrue: bool )).
+
+tff(sy_c_pp,type,(
+    pp: bool > $o )).
+
+tff(sy_v_X,type,(
+    x: list_nat )).
+
+tff(sy_v_s,type,(
+    s: list_char > sum_sum_nat_list_nat )).
+
+tff(fact_0_take__0,axiom,(
+    ! [Xs: list_char] : take_char(zero_zero_nat,Xs) = nil_char )).
+
+tff(fact_1_take__0,axiom,(
+    ! [Xs: list_nat] : take_nat(zero_zero_nat,Xs) = nil_nat )).
+
+tff(fact_2_sieveLower_Osimps_I2_J,axiom,(
+    ! [X: nat] : pp(sieveLower(cons_nat(X,nil_nat))) )).
+
+tff(fact_3_sieveLower_Oelims_I3_J,axiom,(
+    ! [X: list_nat] : 
+      ( ~ pp(sieveLower(X))
+     => ( ! [X2: nat,Y: nat] : 
+            ( X = cons_nat(X2,cons_nat(Y,nil_nat))
+           => ~ pp(aa_nat_bool(ord_less_nat(Y),X2)) )
+       => ~ ( ! [X2: nat,V: nat,Vb: nat,Vc: list_nat] : 
+                ( X = cons_nat(X2,cons_nat(V,cons_nat(Vb,Vc)))
+               => ( ~ pp(aa_nat_bool(ord_less_nat(last_nat(cons_nat(X2,cons_nat(V,cons_nat(Vb,Vc))))),X2))
+                  & ( ~ pp(aa_nat_bool(ord_less_nat(last_nat(cons_nat(X2,cons_nat(V,cons_nat(Vb,Vc))))),X2))
+                   => pp(sieveLower(cons_nat(V,cons_nat(Vb,Vc)))) ) ) ) ) ) ) )).
+
+tff(fact_4_list_Osel_I3_J,axiom,(
+    ! [X21: char,X22: list_char] : tl_char(cons_char(X21,X22)) = X22 )).
+
+tff(fact_5_list_Osel_I3_J,axiom,(
+    ! [X21: nat,X22: list_nat] : tl_nat(cons_nat(X21,X22)) = X22 )).
+
+tff(fact_6_not__gr0,axiom,(
+    ! [N: nat] : 
+      ( ~ pp(aa_nat_bool(ord_less_nat(zero_zero_nat),N))
+    <=> N = zero_zero_nat ) )).
+
+tff(fact_7_list_Osel_I1_J,axiom,(
+    ! [X21: char,X22: list_char] : hd_char(cons_char(X21,X22)) = X21 )).
+
+tff(fact_8_list_Osel_I1_J,axiom,(
+    ! [X21: nat,X22: list_nat] : hd_nat(cons_nat(X21,X22)) = X21 )).
+
+tff(fact_9_diff__Suc__1,axiom,(
+    ! [N: nat] : minus_minus_nat(suc(N),one_one_nat) = N )).
+
+tff(fact_10_not__less__eq,axiom,(
+    ! [M: nat,N: nat] : 
+      ( ~ pp(aa_nat_bool(ord_less_nat(M),N))
+    <=> pp(aa_nat_bool(ord_less_nat(N),suc(M))) ) )).
+
+tff(fact_11_take__tl,axiom,(
+    ! [N: nat,Xs: list_char] : take_char(N,tl_char(Xs)) = tl_char(take_char(suc(N),Xs)) )).
+
+tff(fact_12_take__tl,axiom,(
+    ! [N: nat,Xs: list_nat] : take_nat(N,tl_nat(Xs)) = tl_nat(take_nat(suc(N),Xs)) )).
+
+tff(fact_13_One__nat__def,axiom,(
+    one_one_nat = suc(zero_zero_nat) )).
+
+tff(fact_14_list_OdiscI,axiom,(
+    ! [List: list_char,X21: char,X22: list_char] : 
+      ( List = cons_char(X21,X22)
+     => List != nil_char ) )).
+
+tff(fact_15_list_OdiscI,axiom,(
+    ! [List: list_nat,X21: nat,X22: list_nat] : 
+      ( List = cons_nat(X21,X22)
+     => List != nil_nat ) )).
+
+tff(fact_16_less__numeral__extra_I3_J,axiom,(
+    ~ pp(aa_nat_bool(ord_less_nat(zero_zero_nat),zero_zero_nat)) )).
+
+tff(fact_17_less__SucE,axiom,(
+    ! [M: nat,N: nat] : 
+      ( pp(aa_nat_bool(ord_less_nat(M),suc(N)))
+     => ( ~ pp(aa_nat_bool(ord_less_nat(M),N))
+       => M = N ) ) )).
+
+tff(fact_18_less__zeroE,axiom,(
+    ! [N: nat] : 
+      ~ pp(aa_nat_bool(ord_less_nat(N),zero_zero_nat)) )).
+
+tff(fact_19_gr0__conv__Suc,axiom,(
+    ! [N: nat] : 
+      ( pp(aa_nat_bool(ord_less_nat(zero_zero_nat),N))
+    <=> ? [M2: nat] : N = suc(M2) ) )).
+
+tff(fact_20_exists__least__lemma,axiom,(
+    ! [P: fun_nat_bool] : 
+      ( ~ pp(aa_nat_bool(P,zero_zero_nat))
+     => ( ? [X_1: nat] : pp(aa_nat_bool(P,X_1))
+       => ? [N2: nat] : 
+            ( ~ pp(aa_nat_bool(P,N2))
+            & pp(aa_nat_bool(P,suc(N2))) ) ) ) )).
+
+tff(fact_21_insert__Nil,axiom,(
+    ! [X: char] : insert_char(X,nil_char) = cons_char(X,nil_char) )).
+
+tff(fact_22_insert__Nil,axiom,(
+    ! [X: nat] : insert_nat(X,nil_nat) = cons_nat(X,nil_nat) )).
+
+tff(fact_23_add__diff__inverse__nat,axiom,(
+    ! [M: nat,N: nat] : 
+      ( ~ pp(aa_nat_bool(ord_less_nat(M),N))
+     => plus_plus_nat(N,minus_minus_nat(M,N)) = M ) )).
+
+tff(fact_24_add__eq__self__zero,axiom,(
+    ! [M: nat,N: nat] : 
+      ( plus_plus_nat(M,N) = M
+     => N = zero_zero_nat ) )).
+
+tff(fact_25_less__imp__add__positive,axiom,(
+    ! [I: nat,J: nat] : 
+      ( pp(aa_nat_bool(ord_less_nat(I),J))
+     => ? [K: nat] : 
+          ( pp(aa_nat_bool(ord_less_nat(zero_zero_nat),K))
+          & plus_plus_nat(I,K) = J ) ) )).
+
+tff(help_pp_2_1_U,axiom,(
+    pp(fTrue) )).
+
+tff(help_pp_1_1_U,axiom,(
+    ~ pp(fFalse) )).
+
+tff(conj_4,conjecture,(
+    pp(sieveLower(take_nat(suc(zero_zero_nat),sum_pr272054949st_nat(s(cons_char(char2(nibble7,nibble8),nil_char)))))) )).
+%------------------------------------------------------------------------------

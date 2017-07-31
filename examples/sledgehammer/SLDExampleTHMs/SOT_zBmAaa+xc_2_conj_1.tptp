@@ -1,0 +1,46 @@
+%------------------------------------------------------------------------------
+tff(ty_n_t__HOL__Obool,type,(
+    bool: $tType )).
+
+tff(ty_n_tf__a,type,(
+    a: $tType )).
+
+tff(sy_c_fFalse,type,(
+    fFalse: bool )).
+
+tff(sy_c_fTrue,type,(
+    fTrue: bool )).
+
+tff(sy_c_pp,type,(
+    pp: bool > $o )).
+
+tff(sy_v_less__eq,type,(
+    less_eq: ( a * a ) > $o )).
+
+tff(sy_v_x,type,(
+    x: a )).
+
+tff(sy_v_y,type,(
+    y: a )).
+
+tff(fact_0__092_060open_062y_A_092_060le_062_Ax_092_060close_062,axiom,(
+    less_eq(y,x) )).
+
+tff(fact_1_local_Oantisym,axiom,(
+    ! [X: a,Y: a] : 
+      ( less_eq(X,Y)
+     => ( less_eq(Y,X)
+       => X = Y ) ) )).
+
+tff(fact_2_assms_I3_J,axiom,(
+    less_eq(x,y) )).
+
+tff(help_pp_2_1_U,axiom,(
+    pp(fTrue) )).
+
+tff(help_pp_1_1_U,axiom,(
+    ~ pp(fFalse) )).
+
+tff(conj_1,conjecture,(
+    x = y )).
+%------------------------------------------------------------------------------

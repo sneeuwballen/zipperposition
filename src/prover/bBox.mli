@@ -67,4 +67,7 @@ val to_s_form : t -> TypedSTerm.Form.t
 
 val pp : t CCFormat.printer
 
+val pp_tstp: t CCFormat.printer
+val pp_zf : t CCFormat.printer
+
 val pp_bclause : t list CCFormat.printer

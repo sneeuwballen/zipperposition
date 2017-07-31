@@ -23,27 +23,28 @@ let input_format_of_string s =
     | "tip" -> I_tip
     | s -> failwith ("unknown input format " ^ s)
 
-type print_format =
-  | Print_none
-  | Print_normal
-  | Print_tptp
-  | Print_zf
+type print_format = Output_format.t =
+  | O_none
+  | O_normal
+  | O_tptp
+  | O_zf
 
 let print_format_of_string s =
   match s |> String.trim |> CCString.lowercase_ascii with
-    | "none" -> Print_none
-    | "tptp" | "tstp" -> Print_tptp
-    | "default" | "normal" -> Print_normal
-    | "zf" -> Print_zf
+    | "none" -> O_none
+    | "tptp" | "tstp" -> O_tptp
+    | "default" | "normal" -> O_normal
+    | "zf" -> O_zf
     | _ -> failwith ("unknown print format " ^ s)
 
 let input = ref I_guess
-let output = ref Print_normal
+let output = ref O_normal
 let set_in s = input := input_format_of_string s
 let set_out s = output := print_format_of_string s
+let comment() = Output_format.comment_prefix !output
 
 let _print_types () =
-  FOTerm.print_all_types := true;
+  Term.print_all_types := true;
   ()
 
 let switch_opt b f = Arg.Unit (fun () -> f b)
@@ -86,5 +87,7 @@ let make () =
     ; "--output" , Arg.String set_out , " choose printing format (zf, tptp, default, none)"
     ; "-o", Arg.String set_out, " alias for --output"
     ; "--break", Arg.Set Util.break_on_debug, " wait for user input after each debug message"
+    ; "--show-ty-args", Arg.Set InnerTerm.show_type_arguments, " show type arguments in terms"
+    ; "--hide-ty-args", Arg.Clear InnerTerm.show_type_arguments, " hide type arguments in terms"
     ]
     (List.rev_append !other_opts (mk_debug_opts ()))

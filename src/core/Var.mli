@@ -1,9 +1,11 @@
 
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
-(** {1 Variable}
+(** {1 Variable} *)
 
-    A Variable is a pair of a unique Name, and a type.
+(** A Variable is a pair of a unique {!ID.t}, and a type.
+    
+    It is used in {!TypedSTerm.t} for manipulating free and bound variables.
 
     @since NEXT_RELEASE *)
 
@@ -62,12 +64,14 @@ end
 module Subst : sig
   type (+'a, +'b) t
   val empty : (_,_) t
+  val is_empty : (_,_) t -> bool
   val singleton : 'a var -> 'b -> ('a,'b) t
   val add : ('a,'b) t -> 'a var -> 'b -> ('a,'b) t
   val mem : ('a,_) t -> 'a var -> bool
   val find : ('a,'b) t -> 'a var -> 'b option
   val find_exn : ('a,'b) t -> 'a var -> 'b
   val merge : ('a,'b) t -> ('a,'b) t -> ('a,'b) t
+  val of_list : ('a var * 'b) list -> ('a,'b) t
   val of_seq : ('a var * 'b) Sequence.t -> ('a,'b) t
   val to_list : ('a,'b) t -> ('a var * 'b) list
   val to_seq: ('a,'b) t -> ('a var * 'b) Sequence.t

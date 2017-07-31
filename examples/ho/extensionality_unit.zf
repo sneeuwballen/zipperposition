@@ -1,0 +1,19 @@
+
+# expect: unsat
+
+# some extensionality here
+
+val i : type.
+
+data unit := U.
+
+val f : unit -> i.
+val g : unit -> i.
+
+assert f = g.
+
+val map : i -> i.
+
+goal forall x y. map (f x) = map (g y).
+
+

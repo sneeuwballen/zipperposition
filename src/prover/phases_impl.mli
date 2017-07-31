@@ -17,8 +17,9 @@ val setup_gc : (unit, [`Init], [`Init]) Phases.t
 val setup_signal : (unit, [`Init], [`Init]) Phases.t
 
 val process_file :
+  Phases.prelude ->
   Phases.filename ->
-  (Phases.env_with_result, [`LoadExtensions], [`Saturate]) Phases.t
+  (Phases.env_with_result, [`Parse_prelude], [`Saturate]) Phases.t
 (** [process_file f] parses [f], does the preprocessing phases, including
     type inference, choice of precedence, ordering, etc. , saturates
     the set of clauses, and return the result *)
@@ -35,6 +36,7 @@ val check :
   (Phases.errcode, [`Print_dot], [`Check_proof]) Phases.t
 
 val process_files_and_print :
+  Params.t ->
   Phases.filename list ->
   (Phases.errcode, [`LoadExtensions], [`Check_proof]) Phases.t
 (** Process each file in the list successively, printing the results. *)

@@ -1,0 +1,21 @@
+
+# expect: unsat
+
+val i : type.
+
+val[infix "*"] prod : i -> i -> i.
+val[prefix "-"] inv : i -> i.
+
+assert forall x y z. prod (prod x y) z = prod x (prod y z).
+
+assert forall x. prod x (prod (inv x) x) = x.
+
+assert forall x. prod (inv x) (prod x (inv x)) = inv x.
+
+assert forall x y.
+  prod x (prod y x) = x && prod y (prod x y) = y => y = inv x.
+
+goal
+  forall a b.
+  prod a a = a && prod b b = b => prod a b = prod b a.
+

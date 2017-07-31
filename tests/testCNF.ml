@@ -20,8 +20,7 @@ let check_cnf_gives_clauses =
       (fun st -> match Statement.view st with
         | Statement.Data _
         | Statement.Def _
-        | Statement.RewriteTerm _
-        | Statement.RewriteForm _
+        | Statement.Rewrite _
         | Statement.TyDecl (_,_) -> []
         | Statement.Lemma l
         | Statement.NegatedGoal (_,l) -> l

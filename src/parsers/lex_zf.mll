@@ -20,6 +20,7 @@ let upper_word = upper_alpha alpha_numeric*
 let lower_word = lower_alpha alpha_numeric*
 
 let quoted = '"' ([^ '"'] | '\\' '"')* '"'
+let single_quoted = '\'' ([^ '\''] | '\\' '\'')* '\''
 
 let zero_numeric = '0'
 let non_zero_numeric = ['1' - '9']
@@ -72,6 +73,7 @@ rule token = parse
   | "with" { WITH }
   | "end" { END }
   | "data" { DATA }
+  | "fun" { FUN }
   | "&&" { LOGIC_AND }
   | "||" { LOGIC_OR }
   | "|" { VERTICAL_BAR }
@@ -87,13 +89,12 @@ rule token = parse
   | "exists" { LOGIC_EXISTS }
   | "=>" { LOGIC_IMPLY }
   | "<=>" { LOGIC_EQUIV }
-  | "AC" { AC }
-  | "name" { NAME }
   | "include" { INCLUDE }
   | lower_word { LOWER_WORD(Lexing.lexeme lexbuf) }
   | upper_word { UPPER_WORD(Lexing.lexeme lexbuf) }
   | integer { INTEGER(Lexing.lexeme lexbuf) }
   | quoted { QUOTED(Lexing.lexeme lexbuf) }
+  | single_quoted { SINGLE_QUOTED(Lexing.lexeme lexbuf) }
   | _ as c
     {
       let loc = UntypedAST.Loc.of_lexbuf lexbuf in

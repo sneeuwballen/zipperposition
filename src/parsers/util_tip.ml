@@ -104,6 +104,8 @@ let rec conv_term (t:A.term): T.t =
         | "<=", [a;b] -> T.app_builtin BA.lesseq [a;b]
         | ">", [a;b] -> T.app_builtin BA.greater [a;b]
         | "<", [a;b] -> T.app_builtin BA.less [a;b]
+        | "mod", [a;b] -> T.app_builtin BA.remainder_e [a;b]
+        | "div", [a;b] -> T.app_builtin BA.quotient_e [a;b]
         | _ -> T.app_const f l
       end
     | A.HO_app (a,b) ->
@@ -212,7 +214,9 @@ let convert (st:A.statement): UA.statement list =
              let cstors =
                List.map
                  (fun c ->
-                    let args = c.A.cstor_args |> List.map snd |> List.map conv_ty in
+                    let args =
+                      c.A.cstor_args
+                      |> List.map (CCPair.map CCOpt.return conv_ty) in
                     c.A.cstor_name, args)
                  cstors
              in

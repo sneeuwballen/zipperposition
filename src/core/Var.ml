@@ -60,11 +60,13 @@ end
 module Subst = struct
   type ('a,'b) t = ('a var * 'b) ID.Map.t
   let empty = ID.Map.empty
+  let is_empty = ID.Map.is_empty
   let add t v x = ID.Map.add v.id (v,x) t
   let singleton v x = add empty v x
   let mem t v = ID.Map.mem v.id t
   let find_exn t v = snd (ID.Map.find v.id t)
   let find t v = try Some (find_exn t v) with Not_found -> None
+  let of_list l = l |> List.map (fun (v,x)->v.id,(v,x)) |> ID.Map.of_list
   let of_seq s = s |> Sequence.map (fun (v,x)->v.id, (v,x)) |> ID.Map.of_seq
   let to_seq t = ID.Map.to_seq t |> Sequence.map snd
   let to_list t = ID.Map.fold (fun _ tup acc -> tup::acc) t []

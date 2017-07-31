@@ -6,7 +6,7 @@
 (** Feature Vector indexing (see Schulz 2004) for efficient forward
     and backward subsumption *)
 
-module T = FOTerm
+module T = Term
 
 type lits = Index_intf.lits
 
@@ -50,6 +50,7 @@ module Make(C : Index.CLAUSE) = struct
       | T.Var _
       | T.Const _
       | T.DB _ -> 0
+      | T.Fun (_,u) -> _depth_term (depth+1) u
       | T.AppBuiltin (_, l)
       | T.App (_, l) ->
         let depth' = depth + 1 in

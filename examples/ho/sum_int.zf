@@ -1,0 +1,8 @@
+
+# expect: unsat
+
+val sum : pi a. a -> (a -> int) -> int.
+
+goal
+  forall a (s : a) f g.
+    sum s (fun x. f x + g x) = sum s (fun x. g x + f x).

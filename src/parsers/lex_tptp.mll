@@ -63,12 +63,15 @@ rule token = parse
   | "fof" { FOF }
   | "cnf" { CNF }
   | "tff" { TFF }
+  | "thf" { THF }
   | "include" { INCLUDE }
   | vline { VLINE }
   | '&' { AND }
+  | '@' { AT }
   | "!>" { FORALL_TY }
   | '!' { FORALL }
   | '?' { EXISTS }
+  | '^' { LAMBDA }
   | "$true" { TRUE }
   | "$false" { FALSE }
   | "$tType" { TYPE_TY }
@@ -89,7 +92,6 @@ rule token = parse
   | ')' { RIGHT_PAREN }
   | '[' { LEFT_BRACKET }
   | ']' { RIGHT_BRACKET }
-  | "-->" { GENTZEN_ARROW }
   | '=' { EQUAL }
   | ',' { COMMA }
   | '.' { DOT }

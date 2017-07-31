@@ -2,7 +2,7 @@
 
 include "list.zf".
 
-def sum : list -> nat where
+def[prefix "Σ"] sum : list -> nat where
   (sum nil) = z;
   forall (N:nat). (forall (L:list). ((sum (cons N L)) = (plus N (sum L)))).
 

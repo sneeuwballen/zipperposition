@@ -5,7 +5,7 @@
 
 open Logtk
 
-type term = FOTerm.t
+type term = Term.t
 
 (** {2 Inference rules} *)
 

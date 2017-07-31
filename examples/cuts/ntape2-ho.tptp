@@ -1,0 +1,51 @@
+% type declarations
+% constant type declarations
+thf(1, type, s6: ($i > $o) > ($i > $i) ).
+thf(2, type, s17: ($i > $o) > ($i > $i) ).
+thf(3, type, c1: $i ).
+thf(4, type, plus: $i > ($i > $i) ).
+thf(5, type, f: $i > $i ).
+thf(6, type, s5: ($i > $o) > $i ).
+thf(7, type, q1: $i > $o ).
+thf(8, type, c0: $i ).
+thf(9, type, lt: $i > ($i > $o) ).
+thf(10, type, q2: $i > $o ).
+% sequents
+
+% formula: ¬(∀'\\alpha_2'
+%       ∀'\\alpha_3'
+%       (¬f('\\alpha_2') = 1 ∨
+%         ¬s_5('q_{2}':i>o) < s_5('q_{2}') + 1 ∨
+%         ¬s_17('q_{2}', s_5('q_{2}')) < '\\alpha_3' ∨
+%         ¬f('\\alpha_3') = 1) ∧
+%     ∀n_1 ∀n_0 0 + n_1 < n_0 + 1 + n_1 ∧
+%     ∀n_0 ∀n_1 0 + n_0 < n_1 + 1 + n_0 ∧
+%     ∀n_0 ∀n_1 (f(n_0 + n_1 + 1) = 0 ∨ f(n_0 + n_1 + 1) = 1) ∧
+%     ∀'\\alpha'
+%       ∀'\\alpha_0'
+%       (¬f('\\alpha') = 0 ∨
+%         ¬s_5('q_{1}') < s_5('q_{1}') + 1 ∨
+%         ¬s_6('q_{1}', s_5('q_{1}')) < '\\alpha_0' ∨
+%         ¬f('\\alpha_0') = 0) ∧
+%     ∀n_1 ∀n_0 n_1 + (n_0 + 1) = n_0 + 1 + n_1 ∧
+%     ∀'\\alpha_2'
+%       ∀'\\alpha_3'
+%       ∀n_5
+%       (¬f('\\alpha_2') = 1 ∨
+%         ¬s_17('q_{2}', s_5('q_{2}')) < '\\alpha_3' ∨
+%         ¬f('\\alpha_3') = 1 ∨
+%         n_5 < n_5 + 1) ∧
+%     ∀n_1 ∀n_0 n_1 + 1 + n_0 = n_0 + (n_1 + 1) ∧
+%     ∀n_1 ∀n_0 n_1 + (n_0 + 1) = n_1 + n_0 + 1 ∧
+%     ∀n_0 ∀n_1 n_0 + (n_1 + 1) = n_0 + n_1 + 1 ∧
+%     ∀n_1 ∀n_0 n_1 + n_0 = n_0 + n_1 ∧
+%     ∀n_1 0 + n_1 = n_1 ∧
+%     ∀n_0 0 + n_0 = n_0 ∧
+%     ∀'\\alpha'
+%       ∀'\\alpha_0'
+%       ∀n_2
+%       (¬f('\\alpha') = 0 ∨
+%         ¬s_6('q_{1}', s_5('q_{1}')) < '\\alpha_0' ∨
+%         ¬f('\\alpha_0') = 0 ∨
+%         n_2 < n_2 + 1)) 
+thf(11, conjecture, ( ~(((((((((((((((![Alpha2 : $i] : ((![Alpha3 : $i] : (((( ~(((f @ Alpha2) = c1)) |  ~(((lt @ (s5 @ q2)) @ ((plus @ (s5 @ q2)) @ c1)))) |  ~(((lt @ ((s17 @ q2) @ (s5 @ q2))) @ Alpha3))) |  ~(((f @ Alpha3) = c1))))))) & (![N1 : $i] : ((![N0 : $i] : (((lt @ ((plus @ c0) @ N1)) @ ((plus @ ((plus @ N0) @ c1)) @ N1))))))) & (![N0 : $i] : ((![N1 : $i] : (((lt @ ((plus @ c0) @ N0)) @ ((plus @ ((plus @ N1) @ c1)) @ N0))))))) & (![N0 : $i] : ((![N1 : $i] : ((((f @ ((plus @ ((plus @ N0) @ N1)) @ c1)) = c0) | ((f @ ((plus @ ((plus @ N0) @ N1)) @ c1)) = c1))))))) & (![Alpha : $i] : ((![Alpha0 : $i] : (((( ~(((f @ Alpha) = c0)) |  ~(((lt @ (s5 @ q1)) @ ((plus @ (s5 @ q1)) @ c1)))) |  ~(((lt @ ((s6 @ q1) @ (s5 @ q1))) @ Alpha0))) |  ~(((f @ Alpha0) = c0)))))))) & (![N1 : $i] : ((![N0 : $i] : ((((plus @ N1) @ ((plus @ N0) @ c1)) = ((plus @ ((plus @ N0) @ c1)) @ N1))))))) & (![Alpha2 : $i] : ((![Alpha3 : $i] : ((![N5 : $i] : (((( ~(((f @ Alpha2) = c1)) |  ~(((lt @ ((s17 @ q2) @ (s5 @ q2))) @ Alpha3))) |  ~(((f @ Alpha3) = c1))) | ((lt @ N5) @ ((plus @ N5) @ c1)))))))))) & (![N1 : $i] : ((![N0 : $i] : ((((plus @ ((plus @ N1) @ c1)) @ N0) = ((plus @ N0) @ ((plus @ N1) @ c1)))))))) & (![N1 : $i] : ((![N0 : $i] : ((((plus @ N1) @ ((plus @ N0) @ c1)) = ((plus @ ((plus @ N1) @ N0)) @ c1))))))) & (![N0 : $i] : ((![N1 : $i] : ((((plus @ N0) @ ((plus @ N1) @ c1)) = ((plus @ ((plus @ N0) @ N1)) @ c1))))))) & (![N1 : $i] : ((![N0 : $i] : ((((plus @ N1) @ N0) = ((plus @ N0) @ N1))))))) & (![N1 : $i] : ((((plus @ c0) @ N1) = N1)))) & (![N0 : $i] : ((((plus @ c0) @ N0) = N0)))) & (![Alpha : $i] : ((![Alpha0 : $i] : ((![N2 : $i] : (((( ~(((f @ Alpha) = c0)) |  ~(((lt @ ((s6 @ q1) @ (s5 @ q1))) @ Alpha0))) |  ~(((f @ Alpha0) = c0))) | ((lt @ N2) @ ((plus @ N2) @ c1)))))))))))) ).

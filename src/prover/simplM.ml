@@ -15,6 +15,10 @@ let is_same (_,st) = match st with `New -> false | `Same -> true
 
 let map f (x,st) = f x, st
 
+let return_opt ~old = function
+  | None -> return_same old
+  | Some x -> return_new x
+
 (* chaining simplifications *)
 let (>>=) (c,state) f =
   let c', state2 = f c in

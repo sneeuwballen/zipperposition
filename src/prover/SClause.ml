@@ -32,7 +32,7 @@ let is_empty c = length c = 0 && Trail.is_empty c.trail
 
 let update_trail f c = make ~trail:(f c.trail) c.lits
 
-let to_s_form ?(ctx=FOTerm.Conv.create()) c =
+let to_s_form ?(ctx=Term.Conv.create()) c =
   let module F = TypedSTerm.Form in
   let concl = Literals.Conv.to_s_form ~ctx (lits c) |> F.close_forall in
   if Trail.is_empty (trail c)
@@ -64,18 +64,11 @@ let is_backward_simplified c = get_flag flag_backward_simplified c
 
 (** {2 IO} *)
 
-(* list of free variables *)
-let vars_ lits =
-  Literals.Seq.vars lits
-  |> FOTerm.VarSet.of_seq
-  |> FOTerm.VarSet.to_list
-
 let pp_trail out trail =
   if not (Trail.is_empty trail)
   then
     Format.fprintf out "@ @<2>← @[<hv>%a@]"
-      (Util.pp_seq ~sep:" ⊓ " BBox.pp)
-      (Trail.to_seq trail)
+      (Util.pp_seq ~sep:" ⊓ " BBox.pp) (Trail.to_seq trail)
 
 let pp_vars out c =
   let pp_vars out = function
@@ -84,36 +77,33 @@ let pp_vars out c =
       Format.fprintf out "forall @[%a@].@ "
         (Util.pp_list ~sep:" " Type.pp_typed_var) l
   in
-  pp_vars out (vars_ c.lits)
+  pp_vars out (Literals.vars c.lits)
 
 let pp out c =
   Format.fprintf out "@[%a@[<2>%a%a@]@]"
     pp_vars c Literals.pp c.lits pp_trail c.trail;
   ()
 
-let rec pp_lits_tstp out lits = match lits with
-  | [| |] -> CCFormat.string out "$false"
-  | [| l |] -> Literal.pp_tstp out l
-  | _ -> Format.fprintf out "(%a)" Literals.pp_tstp lits
-(* print quantified literals *)
-and pp_closed_lits_tstp out lits =
-  let pp_vars out = function
-    | [] -> ()
-    | l ->
-      Format.fprintf out "![@[%a@]]:@ "
-        (Util.pp_list ~sep:", " Type.TPTP.pp_typed_var) l
-  in
-  Format.fprintf out "@[<2>%a%a@]" pp_vars (vars_ lits) pp_lits_tstp lits
+let pp_trail_zf out trail =
+  Format.fprintf out "@[<hv>%a@]"
+    (Util.pp_seq ~sep:" && " BBox.pp_zf) (Trail.to_seq trail)
+
+let pp_zf out c =
+  if Trail.is_empty c.trail
+  then Literals.pp_zf_closed out c.lits
+  else
+    Format.fprintf out "@[<2>(%a)@ => (%a)@]"
+      pp_trail_zf c.trail Literals.pp_zf_closed c.lits
 
 (* print a trail in TPTP *)
-and pp_trail_tstp out trail =
+let pp_trail_tstp out trail =
   (* print a single boolean box *)
   let pp_box_unsigned out b = match BBox.payload b with
     | BBox.Case p ->
       let lits = List.map Cover_set.Case.to_lit p |> Array.of_list in
       Literals.pp_tstp out lits
     | BBox.Clause_component lits ->
-      CCFormat.within "(" ")" pp_closed_lits_tstp out lits
+      CCFormat.within "(" ")" Literals.pp_tstp_closed out lits
     | BBox.Lemma f ->
       CCFormat.within "(" ")" Cut_form.pp_tstp out f
     | BBox.Fresh -> failwith "cannot print <fresh> boolean box"
@@ -128,11 +118,18 @@ and pp_trail_tstp out trail =
 
 let pp_tstp out c =
   if Trail.is_empty c.trail
-  then pp_closed_lits_tstp out c.lits
+  then Literals.pp_tstp_closed out c.lits
   else
     Format.fprintf out "@[<2>(@[%a@])@ <= (%a)@]"
-      pp_closed_lits_tstp c.lits pp_trail_tstp c.trail
+      Literals.pp_tstp_closed c.lits pp_trail_tstp c.trail
 
 (* TODO: if all vars are [:term] and trail is empty, use CNF; else use TFF *)
 let pp_tstp_full out c =
   Format.fprintf out "@[<2>tff(%d, plain,@ %a).@]" c.id pp_tstp c
+
+let pp_in = function
+  | Output_format.O_zf -> pp_zf
+  | Output_format.O_tptp -> pp_tstp
+  | Output_format.O_normal -> pp
+  | Output_format.O_none -> CCFormat.silent
+

@@ -81,14 +81,7 @@ let var v = T.var v
 
 let var_of_int i = T.var (HVar.make ~ty:tType i)
 
-let arrow_ l r = T.app_builtin ~ty:T.tType Builtin.arrow (r :: l)
-
-let arrow l r = match l, view r with
-  | [], _ -> r
-  | _::_, Fun (l', ret) ->
-    assert (not (is_fun ret));
-    arrow_ (l @ l') ret
-  | _ -> arrow_ l r
+let arrow = T.arrow
 
 let app s l =
   let ty_s = arrow (List.map (fun _ -> T.tType) l) T.tType in
@@ -106,6 +99,17 @@ let rec forall_n n ty =
   if n=0 then ty
   else forall (forall_n (n-1) ty)
 
+let forall_fvars vars ty =
+  if vars=[] then ty
+  else (
+    List.fold_right
+      (fun v ty ->
+         assert (is_tType (HVar.ty v));
+         let body = T.DB.from_var ty ~var:(var v) in
+         forall body)
+      vars ty
+  )
+
 let (==>) = arrow
 
 let of_term_unsafe t = t
@@ -121,9 +125,11 @@ type def =
 exception Payload_def of def
 
 
-let def id = match ID.payload id with
-  | Payload_def d -> Some d
-  | _ -> None
+let def id =
+  ID.payload_find id
+    ~f:(function
+      | Payload_def d -> Some d
+      | _ -> None)
 
 let def_exn id = match def id with
   | Some d -> d
@@ -184,6 +190,18 @@ let rec expected_ty_vars ty = match view ty with
   | Forall ty' -> 1 + expected_ty_vars ty'
   | _ -> 0
 
+let needs_args ty = expected_ty_vars ty>0 || expected_args ty<>[]
+
+let order ty: int =
+  let rec aux ty = match view ty with
+    | Forall ty -> aux ty
+    | Fun (l, ret) ->
+      List.fold_left (fun o arg -> max o (1 + aux arg)) (aux ret) l
+    | App (_, l) -> List.fold_left (fun o arg -> max o (aux arg)) 0 l
+    | Var _ | DB _ | Builtin _ -> 0
+  in
+  max 1 (aux ty)  (* never less than 1 *)
+
 let is_ground = T.is_ground
 
 let size = T.size
@@ -197,23 +215,15 @@ let rec depth ty = match view ty with
   | Fun (l,ret) -> 1 + max (depth ret) (depth_l l)
 and depth_l l = List.fold_left (fun d t -> max d (depth t)) 0 l
 
-let open_fun ty = match view ty with
-  | Fun (args, ret) ->
-    assert (not (is_fun ret));
-    args, ret
-  | _ -> [], ty
-
-let rec open_poly_fun ty = match view ty with
-  | Forall ty' ->
-    let i, args, ret = open_poly_fun ty' in
-    i+1, args, ret
-  | _ ->
-    let args, ret = open_fun ty in
-    0, args, ret
+let open_fun = T.open_fun
+let open_poly_fun = T.open_poly_fun
 
 let returns ty =
   let _, _, ret = open_poly_fun ty in
   ret
+
+let returns_prop ty = is_prop (returns ty)
+let returns_tType ty = is_tType (returns ty)
 
 exception ApplyError of string
 
@@ -238,14 +248,20 @@ let apply ty0 args0 =
     | _ ->
       err_applyf_
         "@[<2>Type.apply:@ expected quantified or function type,@ but got @[%a@]"
-        T.pp ty
+        T.pp_zf ty
   and aux_l ty_ret exp_args args env = match exp_args, args with
     | [], [] -> T.DB.eval env ty_ret
     | _, [] ->
-      T.DB.eval env (arrow_ exp_args ty_ret)
+      T.DB.eval env (arrow exp_args ty_ret)
     | [], _ ->
-      err_applyf_ "@[<2>Type.apply:@ unexpected arguments [@[%a@]]@]"
-        (Util.pp_list T.pp) args
+      begin match T.view (T.DB.eval env ty_ret) with
+        | T.AppBuiltin (Builtin.Arrow, (ty_ret'::exp_args')) ->
+          (* [ty_ret = exp_args' -> ty_ret'], continue applying *)
+          aux_l ty_ret' exp_args' args env
+        | _ ->
+          err_applyf_ "@[<2>Type.apply:@ unexpected arguments [@[%a@]]@]"
+            (Util.pp_list T.pp_zf) args
+      end
     | exp :: exp_args', a :: args' ->
       (* expected type: [exp];  [a]: actual value, whose type must match [exp] *)
       let exp' = T.DB.eval env exp in
@@ -255,8 +271,8 @@ let apply ty0 args0 =
         err_applyf_
           "@[<2>Type.apply:@ wrong argument type,@ expected `@[_ : %a@]`@ \
            but got `@[%a : %a@]`@ when applying `%a` to@ [@[%a@]]@ in env [%a]@]"
-          T.pp exp' T.pp a T.pp (T.ty_exn a) T.pp ty0 (Util.pp_list T.pp) args0
-          (DBEnv.pp T.pp) env
+          T.pp_zf exp' T.pp_zf a T.pp_zf (T.ty_exn a) T.pp_zf ty0 (Util.pp_list T.pp_zf) args0
+          (DBEnv.pp T.pp_zf) env
   in
   aux ty0 args0 DBEnv.empty
 
@@ -264,7 +280,12 @@ let apply1 ty a = apply ty [a]
 
 let apply_unsafe = apply
 
+let is_unifiable = T.type_is_unifiable
+
 type print_hook = int -> (CCFormat.t -> t-> unit) -> CCFormat.t -> t-> bool
+
+
+
 
 module TPTP = struct
   let i = term
@@ -283,9 +304,9 @@ module TPTP = struct
     | Builtin Rat -> CCFormat.string out "$rat"
     | Var v -> Format.fprintf out "X%d" (HVar.id v)
     | DB i -> Format.fprintf out "Tb%d" (depth-i-1)
-    | App (p, []) -> ID.pp out p
+    | App (p, []) -> ID.pp_tstp out p
     | App (p, args) ->
-      Format.fprintf out "@[<2>%a(%a)@]" ID.pp p
+      Format.fprintf out "@[<2>%a(%a)@]" ID.pp_tstp p
         (Util.pp_list (pp_tstp_rec depth)) args
     | Fun (args, ret) ->
       Format.fprintf out "%a > %a" (pp_l depth) args (pp_tstp_rec depth) ret
@@ -307,9 +328,25 @@ module TPTP = struct
 
   let pp_typed_var out v = match view (HVar.ty v) with
     | Builtin Term -> HVar.pp out v (* implicit *)
-    | _ -> Format.fprintf out "@[%a : %a@]" HVar.pp v pp (HVar.ty v)
+    | _ -> Format.fprintf out "@[%a : %a@]" HVar.pp_tstp v pp (HVar.ty v)
 
   let to_string = CCFormat.to_string pp
+end
+
+let pp_typed_var_gen ~pp_ty out v = match view (HVar.ty v) with
+  | Builtin TType -> Format.fprintf out "A%d" (HVar.id v)
+  | Builtin Term -> HVar.pp out v
+  | Builtin Int -> Format.fprintf out "I%d" (HVar.id v)
+  | Builtin Rat -> Format.fprintf out "Q%d" (HVar.id v)
+  | Builtin Prop -> Format.fprintf out "P%d" (HVar.id v)
+  | Forall _ | Fun _ -> Format.fprintf out "(@[F%d:%a@])" (HVar.id v) pp_ty (HVar.ty v)
+  | _ -> Format.fprintf out "(@[%a:%a@])" HVar.pp v pp_ty (HVar.ty v)
+
+module ZF = struct
+  let pp = T.pp_zf
+  let to_string = CCFormat.to_string pp
+
+  let pp_typed_var out v = pp_typed_var_gen ~pp_ty:pp out v
 end
 
 (** {2 IO} *)
@@ -325,40 +362,40 @@ let rec pp_rec depth out t = match view t with
   | App (p, []) -> ID.pp out p
   | App (p, args) ->
     Format.fprintf out "@[<2>%a %a@]"
-      ID.pp p (Util.pp_list ~sep:" " (pp_rec depth)) args
+      ID.pp p (Util.pp_list ~sep:" " (pp_inner_app depth)) args
   | Fun (args, ret) ->
-    Format.fprintf out "@[%a →@ %a@]" (pp_l depth) args (pp_rec depth) ret
+    Format.fprintf out "@[%a →@ %a@]"
+      (Util.pp_list ~sep:" → " (pp_inner_fun depth)) args (pp_rec depth) ret
   | Forall ty' ->
-    Format.fprintf out "@[Π T%i.@ %a@]" depth (pp_inner (depth+1)) ty'
-and pp_inner depth out t = match view t with
+    Format.fprintf out "@[Π T%i.@ %a@]" depth (pp_inner_fun (depth+1)) ty'
+and pp_inner_fun depth out t = match view t with
   | Fun _ -> Format.fprintf out "(@[%a@])" (pp_rec depth) t
   | _ -> pp_rec depth out t
-and pp_l depth out l = match l with
-  | [] -> assert false
-  | [ty] -> pp_rec depth out ty
-  | ty :: l' ->
-    Format.fprintf out "@[<2>%a →@ @[<hv>%a@]@]"
-      (pp_rec depth) ty (pp_l depth) l'
+and pp_inner_app depth out t = match view t with
+  | Fun _ | App (_,_::_) -> Format.fprintf out "(@[%a@])" (pp_rec depth) t
+  | _ -> pp_rec depth out t
 
 let pp_depth ?hooks:_ depth out t = pp_rec depth out t
 
 let pp out t = pp_rec 0 out t
-let pp_surrounded out t = (pp_inner 0) out t
+let pp_surrounded out t = (pp_inner_app 0) out t
 
 let to_string = CCFormat.to_string pp
 
-let pp_typed_var out v = match view (HVar.ty v) with
-  | Builtin TType -> Format.fprintf out "A%d" (HVar.id v)
-  | Builtin Term -> HVar.pp out v
-  | Builtin Int -> Format.fprintf out "I%d" (HVar.id v)
-  | Builtin Rat -> Format.fprintf out "Q%d" (HVar.id v)
-  | _ -> Format.fprintf out "(@[%a:%a@])" HVar.pp v pp (HVar.ty v)
+let pp_in = function
+  | Output_format.O_zf -> ZF.pp
+  | Output_format.O_tptp -> TPTP.pp
+  | Output_format.O_normal -> pp
+  | Output_format.O_none -> CCFormat.silent
+
+(* keep synchro with {!InnerTerm.pp_var} *)
+let pp_typed_var out v = pp_typed_var_gen ~pp_ty:pp out v
 
 let mangle (ty:t): string =
   let add_id buf id =
     let s =
       ID.name id
-      |> CCString.filter (function '#' -> false | _ -> true)
+      |> CCString.filter (function '#' | '_' -> false | _ -> true)
     in
     Buffer.add_string buf s
   in
@@ -435,6 +472,7 @@ module Conv = struct
       | PT.Const id -> const id
       | PT.AppBuiltin (Builtin.Arrow, ret::args) ->
         let ret = aux depth v2db ret in
+        assert (not (is_fun ret || is_forall ret));
         let args = List.map (aux depth v2db) args in
         arrow args ret
       | PT.AppBuiltin (Builtin.Term,[]) -> term
@@ -454,6 +492,8 @@ module Conv = struct
         let t' = aux (depth+1) v2db t' in
         forall t'
       | PT.Record _ -> failwith "cannot convert record-type into type"
+      | PT.Meta (_,{contents=Some ty'},_) -> aux depth v2db ty'
+      | PT.AppBuiltin (Builtin.TyReal,[]) -> failwith "cannot handle type `real`"
       | PT.Bind _
       | PT.AppBuiltin _
       | PT.Meta _

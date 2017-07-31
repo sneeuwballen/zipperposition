@@ -1,0 +1,10 @@
+
+# expect: unsat
+
+val unit : type.
+
+rewrite forall (x y: unit). x=y <=> true.
+
+goal exists (x:unit). forall y. x=y.
+
+

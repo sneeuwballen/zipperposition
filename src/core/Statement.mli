@@ -1,13 +1,15 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Statement}
+(** {1 Statement} *)
 
-    The input problem is made of {b statements}. Each statement can declare
-    a type, assert a formula, or a conjecture, define a term, etc.
+(** The input problem is made of {b statements}. Each statement can declare
+    a type, assert a formula, or a conjecture, define a term, add
+    a rewrite rule, etc.
 
     Those statements do not necessarily reflect exactly statements in the input
-    language(s) (e.g., TPTP). *)
+    language(s) (e.g., TPTP).
+*)
 
 (** A datatype declaration *)
 type 'ty data = {
@@ -17,13 +19,18 @@ type 'ty data = {
   (** type parameters *)
   data_ty: 'ty;
   (** type of Id, that is,   [type -> type -> ... -> type] *)
-  data_cstors: (ID.t * 'ty) list;
-  (** Each constructor is [id, ty]. [ty] must be of the form
-      [ty1 -> ty2 -> ... -> id args] *)
+  data_cstors: (ID.t * 'ty * ('ty * (ID.t * 'ty)) list) list;
+  (** Each constructor is [id, ty, args].
+      [ty] must be of the form [ty1 -> ty2 -> ... -> id args].
+      [args] has the form [(ty1, p1), (ty2,p2), …] where each [p]
+      is a projector. *)
 }
 
 type attr =
   | A_AC
+  | A_infix of string
+  | A_prefix of string
+  | A_sos (** set of support *)
 
 type attrs = attr list
 
@@ -32,8 +39,12 @@ type 'ty skolem = ID.t * 'ty
 type ('t, 'ty) term_rule = 'ty Var.t list * ID.t * 'ty * 't list * 't
 (** [forall vars, id args = rhs] *)
 
-type ('f, 't, 'ty) form_rule = 'ty Var.t list * 't SLiteral.t * 'f list
-(** [forall vars, lhs <=> bigand rhs] *)
+(** polarity for rewrite rules *)
+type polarity = [`Equiv | `Imply]
+
+type ('f, 't, 'ty) form_rule = 'ty Var.t list * 't SLiteral.t * 'f list * polarity
+(** [forall vars, lhs op bigand rhs] where [op] depends on
+    [polarity] (in [{=>, <=>, <=}]) *)
 
 type ('f, 't, 'ty) def_rule =
   | Def_term of ('t, 'ty) term_rule
@@ -50,8 +61,7 @@ type ('f, 't, 'ty) view =
   | TyDecl of ID.t * 'ty (** id: ty *)
   | Data of 'ty data list
   | Def of ('f, 't, 'ty) def list
-  | RewriteTerm of ('t, 'ty) term_rule
-  | RewriteForm of ('f, 't, 'ty) form_rule
+  | Rewrite of ('f,'t,'ty) def_rule
   | Assert of 'f (** assert form *)
   | Lemma of 'f list (** lemma to prove and use, using Avatar cut *)
   | Goal of 'f (** goal to prove *)
@@ -64,8 +74,9 @@ type from_file = {
   loc: ParseLocation.t option;
 }
 
-type lit = FOTerm.t SLiteral.t
+type lit = Term.t SLiteral.t
 type formula = TypedSTerm.t
+type input_def = (TypedSTerm.t,TypedSTerm.t,TypedSTerm.t) def
 type clause = lit list
 
 type role =
@@ -92,17 +103,19 @@ and source_view =
   | Neg of sourced_t
   | CNF of sourced_t
   | Renaming of sourced_t * ID.t * formula (* renamed this formula *)
-  | Preprocess of sourced_t * string
+  | Define of ID.t
+  | Preprocess of sourced_t * sourced_t list * string (* stmt, definitions, info *)
 
 and result =
   | Sourced_input of TypedSTerm.t
   | Sourced_clause of clause
   | Sourced_statement of input_t
+  | Sourced_clause_stmt of clause_t
 
 and sourced_t = result * source
 
 and input_t = (TypedSTerm.t, TypedSTerm.t, TypedSTerm.t) t
-and clause_t = (clause, FOTerm.t, Type.t) t
+and clause_t = (clause, Term.t, Type.t) t
 
 val compare : (_, _, _) t -> (_, _, _) t -> int
 
@@ -110,11 +123,13 @@ val view : ('f, 't, 'ty) t -> ('f, 't, 'ty) view
 val attrs : (_, _, _) t -> attrs
 val src : (_, _, _) t -> source
 
-val mk_data : ID.t -> args:'ty Var.t list -> 'ty -> (ID.t * 'ty) list -> 'ty data
+val mk_data : ID.t -> args:'ty Var.t list -> 'ty ->
+  (ID.t * 'ty * ('ty * (ID.t * 'ty)) list) list -> 'ty data
 val mk_def : ?rewrite:bool -> ID.t -> 'ty -> ('f,'t,'ty) def_rule list -> ('f,'t,'ty) def
 
 val ty_decl : ?attrs:attrs -> src:source -> ID.t -> 'ty -> (_, _, 'ty) t
 val def : ?attrs:attrs -> src:source -> ('f,'t,'ty) def list -> ('f, 't, 'ty) t
+val rewrite : ?attrs:attrs -> src:source -> ('f,'t,'ty) def_rule -> ('f,'t,'ty) t
 val rewrite_term : ?attrs:attrs -> src:source -> ('t, 'ty) term_rule -> (_, 't, 'ty) t
 val rewrite_form : ?attrs:attrs -> src:source -> ('f, 't, 'ty) form_rule -> ('f, 't, 'ty) t
 val data : ?attrs:attrs -> src:source -> 'ty data list -> (_, _, 'ty) t
@@ -127,7 +142,15 @@ val neg_goal :
 val signature : ?init:Signature.t -> (_, _, Type.t) t Sequence.t -> Signature.t
 (** Compute signature when the types are using {!Type} *)
 
+val conv_attrs : UntypedAST.attrs -> attrs
+val attr_to_ua : attr -> UntypedAST.attr
+
 val add_src : file:string -> ('f, 't, 'ty) t -> ('f, 't, 'ty) t
+
+val as_sourced : input_t -> sourced_t
+(** Just wrap the statement with its source *)
+
+val as_sourced_clause : clause_t -> sourced_t
 
 val map_data : ty:('ty1 -> 'ty2) -> 'ty1 data -> 'ty2 data
 
@@ -162,7 +185,7 @@ val declare_defined_cst : ID.t -> level:int -> definition -> unit
     constant of given [level]. It means that it is defined based only
     on constants of strictly lower levels *)
 
-val scan_stmt_for_defined_cst : (clause, FOTerm.t, Type.t) t -> unit
+val scan_stmt_for_defined_cst : (clause, Term.t, Type.t) t -> unit
 (** Try and declare defined constants in the given statement *)
 
 (** {2 Inductive Types} *)
@@ -202,8 +225,9 @@ module Src : sig
 
   val neg : sourced_t -> t
   val cnf : sourced_t -> t
-  val preprocess : sourced_t -> string -> t
+  val preprocess : sourced_t -> sourced_t list -> string -> t
   val renaming : sourced_t -> ID.t -> formula -> t
+  val define : ID.t -> t
 
   val neg_input : TypedSTerm.t -> source -> t
   val neg_clause : clause -> source -> t
@@ -211,7 +235,7 @@ module Src : sig
   val cnf_input : TypedSTerm.t -> source -> t
   val cnf_clause : clause -> source -> t
 
-  val preprocess_input : input_t -> string -> t
+  val preprocess_input : input_t -> sourced_t list -> string -> t
   val renaming_input : input_t -> ID.t -> formula -> t
 
   val pp_from_file : from_file CCFormat.printer
@@ -221,6 +245,7 @@ module Src : sig
 
   val pp : t CCFormat.printer
   val pp_tstp : t CCFormat.printer
+  val to_attr : t -> UntypedAST.attr
 end
 
 (** {2 Iterators} *)
@@ -230,9 +255,9 @@ module Seq : sig
     [`Term of 't | `Form of 'f | `Ty of 'ty | `ID of ID.t] Sequence.t
   val ty_decls : (_, _, 'ty) t -> (ID.t * 'ty) Sequence.t
   val forms : ('f, _, _) t -> 'f Sequence.t
-  val lits : (clause, _, _) t -> FOTerm.t SLiteral.t Sequence.t
-  val terms : (clause, _, _) t -> FOTerm.t Sequence.t
-  val symbols : (clause, FOTerm.t, Type.t) t -> ID.t Sequence.t
+  val lits : (clause, _, _) t -> Term.t SLiteral.t Sequence.t
+  val terms : (clause, Term.t, _) t -> Term.t Sequence.t
+  val symbols : (clause, Term.t, Type.t) t -> ID.t Sequence.t
 end
 
 (** {2 IO} *)
@@ -265,8 +290,14 @@ val to_string :
 val pp_clause : clause_t CCFormat.printer
 val pp_input : input_t CCFormat.printer
 
+module ZF : sig
+  include Interfaces.PRINT3 with type ('a, 'b, 'c) t := ('a, 'b, 'c) t
+end
+
 module TPTP : sig
   include Interfaces.PRINT3 with type ('a, 'b, 'c) t := ('a, 'b, 'c) t
 end
 
+val pp_clause_in : Output_format.t -> clause_t CCFormat.printer
+val pp_input_in : Output_format.t -> input_t CCFormat.printer
 

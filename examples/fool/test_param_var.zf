@@ -1,0 +1,12 @@
+
+# expect: unsat
+
+val a : prop.
+val b : prop.
+
+goal
+  ( (forall P. (a != P || P)) &&
+    (forall P. (b != P || ~ P)) &&
+    (a=b) )
+    => false.
+

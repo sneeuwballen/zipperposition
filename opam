@@ -30,7 +30,6 @@ depends: [
   "zarith"
   "containers" { >= "1.0" }
   "sequence" { >= "0.4" }
-  "oclock"
   "oasis" { build }
   "msat" { >= "0.5" }
   "menhir" {build}
@@ -40,7 +39,10 @@ depopts: [
   "qcheck" {test}
 ]
 available: [
-    ocaml-version >= "4.00.1"
+    ocaml-version >= "4.02.1"
+]
+conflicts: [
+  "logtk"
 ]
 tags: [ "logic" "unification" "term" "superposition" "prover" ]
 bug-reports: "https://github.com/c-cube/zipperposition/issues"

@@ -9,7 +9,7 @@ open Params
 
 open Phases.Infix
 
-module T = FOTerm
+module T = Term
 module O = Ordering
 module Lit = Literal
 
@@ -19,7 +19,7 @@ let section = Const.section
 let setup_alarm timeout =
   let handler _ =
     Format.printf "%% SZS Status ResourceOut@.";
-    Unix.kill (Unix.getpid ()) Sys.sigterm
+    exit 0
   in
   ignore (Sys.signal Sys.sigalrm (Sys.Signal_handle handler));
   Unix.alarm (max 1 (int_of_float timeout))
@@ -48,6 +48,7 @@ let load_extensions =
   Extensions.register Arith_rat.extension;
   Extensions.register Ind_types.extension;
   Extensions.register Fool.extension;
+  Extensions.register Higher_order.extension;
   let l = Extensions.extensions () in
   Phases.return_phase l
 
@@ -68,6 +69,26 @@ let start_file file =
     ~x:file >>= fun () ->
   Phases.return_phase ()
 
+let parse_prelude (params:Params.t) =
+  Phases.start_phase Phases.Parse_prelude >>= fun () ->
+  let prelude_files = params.Params.param_prelude in
+  let res =
+    if CCVector.is_empty prelude_files
+    then CCResult.return Sequence.empty
+    else (
+      CCVector.to_list prelude_files
+      |> CCResult.map_l
+        (fun file ->
+           Util.debugf ~section 1 "@[@{<Yellow>### parse prelude file@ `%s` ###@}@]"
+             (fun k->k file);
+           let fmt = Parsing_utils.guess_input file in
+           Parsing_utils.parse_file fmt file)
+      |> CCResult.map Sequence.of_list
+      |> CCResult.map Sequence.flatten
+    )
+  in
+  Phases.return_phase_err res
+
 let parse_file file =
   Phases.start_phase Phases.Parse_file >>= fun () ->
   let input = Parsing_utils.input_of_file file in
@@ -76,15 +97,18 @@ let parse_file file =
     ~x:parsed >>= fun () ->
   Phases.return_phase (input,parsed)
 
-let typing (input,stmts) =
+let typing prelude (input,stmts) =
   Phases.start_phase Phases.Typing >>= fun () ->
   Phases.get_key Params.key >>= fun params ->
   let def_as_rewrite = params.Params.param_def_as_rewrite in
   TypeInference.infer_statements
     ~on_var:(Input_format.on_var input)
     ~on_undef:(Input_format.on_undef_id input)
-    ~def_as_rewrite ?ctx:None stmts
+    ~def_as_rewrite ?ctx:None
+    (Sequence.append prelude stmts)
   >>?= fun stmts ->
+  Util.debugf ~section 3 "@[<hv2>@{<green>typed statements@}@ %a@]"
+    (fun k->k (Util.pp_seq Statement.pp_input) (CCVector.to_seq stmts));
   do_extensions ~field:(fun e -> e.Extensions.post_typing_actions)
     ~x:stmts >>= fun () ->
   Phases.return_phase stmts
@@ -124,7 +148,7 @@ let compute_prec stmts =
       (fun seq ->
          seq
          |> Sequence.flat_map Statement.Seq.terms
-         |> Sequence.flat_map FOTerm.Seq.symbols
+         |> Sequence.flat_map Term.Seq.symbols
          |> Precedence.Constr.invfreq)
   in
   let prec = Compute_prec.mk_precedence cp stmts in
@@ -135,13 +159,13 @@ let compute_ord_select precedence =
   Phases.get_key Params.key >>= fun params ->
   let ord = Ordering.by_name params.param_ord precedence in
   Util.debugf ~section 2 "@[<2>ordering %s@]" (fun k->k (Ordering.name ord));
-  let select = Selection.selection_from_string ~ord params.param_select in
+  let select = Selection.from_string ~ord params.param_select in
   do_extensions ~field:(fun e->e.Extensions.ord_select_actions)
     ~x:(ord,select) >>= fun () ->
   Util.debugf ~section 2 "@[<2>selection function:@ %s@]" (fun k->k params.param_select);
   Phases.return_phase (ord, select)
 
-let make_ctx ~signature ~ord ~select =
+let make_ctx ~signature ~ord ~select () =
   Phases.start_phase Phases.MakeCtx >>= fun () ->
   let module Res = struct
     let signature = signature
@@ -172,9 +196,9 @@ let make_env ~ctx:(module Ctx : Ctx_intf.S) ~params stmts =
   |> List.iter
     (fun e -> List.iter (fun f -> f env1) e.Extensions.env_actions);
   (* convert statements to clauses *)
-  let clauses = MyEnv.convert_input_statements stmts in
+  let c_sets = MyEnv.convert_input_statements stmts in
   let env2 = (module MyEnv : Env.S with type C.t = MyEnv.C.t) in
-  Phases.return_phase (Phases.Env_clauses (env2, clauses))
+  Phases.return_phase (Phases.Env_clauses (env2, c_sets))
 
 (* FIXME: move this into Env! *)
 let has_goal_ = ref false
@@ -183,21 +207,23 @@ let has_goal_ = ref false
 let print_stats (type c) (module Env : Env.S with type C.t = c) =
   Phases.start_phase Phases.Print_stats >>= fun () ->
   Signal.send Signals.on_print_stats ();
+  let comment = Options.comment() in
   let print_hashcons_stats what (sz, num, sum_length, small, median, big) =
     Format.printf
-      "@[<2>hashcons stats for %s: size %d, num %d, sum length %d, \
+      "@[<h>%shashcons stats for %s: size %d, num %d, sum length %d, \
        buckets: small %d, median %d, big %d@]@."
-      what sz num sum_length small median big
+      comment what sz num sum_length small median big
   and print_state_stats (num_active, num_passive, num_simpl) =
-    Format.printf "proof state stats:@.";
-    Format.printf "stat:  active clauses          %d@." num_active;
-    Format.printf "stat:  passive clauses         %d@." num_passive;
-    Format.printf "stat:  simplification clauses  %d@." num_simpl;
+    Format.printf "%sproof state stats:@." comment;
+    Format.printf "%sstat:  active clauses          %d@." comment num_active;
+    Format.printf "%sstat:  passive clauses         %d@." comment num_passive;
+    Format.printf "%sstat:  simplification clauses  %d@." comment num_simpl;
   and print_gc () =
     let stats = Gc.stat () in
     Format.printf
-      "GC: minor words %.0f; major_words: %.0f; max_heap: %d; \
-       minor collections %d; major collections %d@."
+      "@[<h>%sGC: minor words %.0f; major_words: %.0f; max_heap: %d; \
+       minor collections %d; major collections %d@]@."
+      comment
       stats.Gc.minor_words stats.Gc.major_words stats.Gc.top_heap_words
       stats.Gc.minor_collections stats.Gc.major_collections;
   in
@@ -205,41 +231,46 @@ let print_stats (type c) (module Env : Env.S with type C.t = c) =
     print_gc ();
     print_hashcons_stats "terms" (InnerTerm.hashcons_stats ());
     print_state_stats (Env.stats ());
-    Util.print_global_stats ();
+    Util.print_global_stats ~comment ();
   );
   Phases.return_phase ()
 
 (* pre-saturation *)
 let presaturate_clauses (type c)
     (module Env : Env.S with type C.t = c)
-    (clauses : c CCVector.ro_vector) =
+    (c_sets : c Clause.sets) =
   Phases.start_phase Phases.Pre_saturate >>= fun () ->
   let module Sat = Saturate.Make(Env) in
-  let num_clauses = CCVector.length clauses in
+  let num_clauses = CCVector.length c_sets.Clause.c_set in
   if Env.params.param_presaturate
   then (
     Util.debug ~section 1 "presaturate initial clauses";
-    Env.add_passive (CCVector.to_seq clauses);
+    Env.add_passive (CCVector.to_seq c_sets.Clause.c_set);
     let result, num = Sat.presaturate () in
     Util.debugf ~section 1 "initial presaturation in %d steps" (fun k->k num);
     (* pre-saturated set of clauses *)
-    let clauses = Env.get_active () in
+    let c_set = Env.get_active() |> CCVector.of_seq |> CCVector.freeze in
+    let clauses = {c_sets with Clause.c_set; } in
     (* remove clauses from [env] *)
-    Env.remove_active clauses;
-    Env.remove_passive clauses;
+    Env.remove_active (CCVector.to_seq c_set);
+    Env.remove_passive (CCVector.to_seq c_set);
     Util.debugf ~section 2 "@[<2>%d clauses pre-saturated into:@ @[<hv>%a@]@]"
-      (fun k->k num_clauses (Util.pp_seq ~sep:" " Env.C.pp) clauses);
+      (fun k->k num_clauses (Util.pp_seq ~sep:" " Env.C.pp) (CCVector.to_seq c_set));
     Phases.return_phase (result, clauses)
   )
-  else Phases.return_phase (Saturate.Unknown, CCVector.to_seq clauses)
+  else Phases.return_phase (Saturate.Unknown, c_sets)
 
 (* try to refute the set of clauses contained in the [env]. Parameters are
    used to influence how saturation is done, for how long it runs, etc. *)
 let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result =
   Phases.start_phase Phases.Saturate >>= fun () ->
   let module Sat = Saturate.Make(Env) in
-  (* add clauses to passive set of [env] *)
-  Env.add_passive clauses;
+  (* add clauses to passive set of [env], and SOS to active set *)
+  if not (CCVector.is_empty clauses.Clause.c_sos) then (
+    Env.Ctx.lost_completeness();
+  );
+  Env.add_active (CCVector.to_seq clauses.Clause.c_sos);
+  Env.add_passive (CCVector.to_seq clauses.Clause.c_set);
   let steps = if Env.params.param_steps < 0
     then None
     else (
@@ -250,6 +281,7 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
     then None
     else (
       Util.debugf ~section 1 "run for %.2f s" (fun k->k Env.params.param_timeout);
+      (* FIXME: only do that for zipperposition, not the library? *)
       ignore (setup_alarm Env.params.param_timeout);
       Some (Util.total_time_s () +. Env.params.param_timeout -. 0.25)
     )
@@ -259,7 +291,8 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
     | Saturate.Unsat _ -> result, 0  (* already found unsat during presaturation *)
     | _ -> Sat.given_clause ~generating:true ?steps ?timeout ()
   in
-  Format.printf "%% done %d iterations in %.1fs@." num (Util.total_time_s());
+  let comment = Options.comment() in
+  Format.printf "%sdone %d iterations in %.2fs@." comment num (Util.total_time_s());
   Util.debugf ~section 1 "@[<2>final precedence:@ @[%a@]@]"
     (fun k->k Precedence.pp (Env.precedence ()));
   Phases.return_phase result
@@ -307,33 +340,34 @@ let print_szs_result (type c) ~file
     (module Env : Env_intf.S with type C.t = c)
     (result : Saturate.szs_status) =
   Phases.start_phase Phases.Print_result >>= fun () ->
+  let comment = Options.comment() in
   begin match result with
     | Saturate.Unknown
     | Saturate.Timeout ->
-      Format.printf "%% SZS status ResourceOut for '%s'@." file
+      Format.printf "%sSZS status ResourceOut for '%s'@." comment file
     | Saturate.Error s ->
-      Format.printf "%% SZS status InternalError for '%s'@." file;
+      Format.printf "%sSZS status InternalError for '%s'@." comment file;
       Util.debugf ~section 1 "error is:@ %s" (fun k->k s);
     | Saturate.Sat when Env.Ctx.is_completeness_preserved () ->
-      Format.printf "%% SZS status %s for '%s'@." (sat_to_str ()) file
+      Format.printf "%sSZS status %s for '%s'@." comment (sat_to_str ()) file
     | Saturate.Sat ->
-      Format.printf "%% SZS status GaveUp for '%s'@." file;
+      Format.printf "%sSZS status GaveUp for '%s'@." comment file;
       begin match !Options.output with
-        | Options.Print_none -> ()
-        | Options.Print_zf -> failwith "not implemented: printing in ZF" (* TODO *)
-        | Options.Print_tptp ->
+        | Options.O_none -> ()
+        | Options.O_zf -> failwith "not implemented: printing in ZF" (* TODO *)
+        | Options.O_tptp ->
           Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
             (fun k->k (Util.pp_seq ~sep:" " Env.C.pp_tstp_full) (Env.get_active ()))
-        | Options.Print_normal ->
+        | Options.O_normal ->
           Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
             (fun k->k (Util.pp_seq ~sep:" " Env.C.pp) (Env.get_active ()))
       end
     | Saturate.Unsat proof ->
       (* print status then proof *)
-      Format.printf "%% SZS status %s for '%s'@." (unsat_to_str ()) file;
-      Format.printf "%% SZS output start Refutation@.";
+      Format.printf "%sSZS status %s for '%s'@." comment (unsat_to_str ()) file;
+      Format.printf "%sSZS output start Refutation@." comment;
       Format.printf "%a@." (Proof.S.pp !Options.output) proof;
-      Format.printf "%% SZS output end Refutation@.";
+      Format.printf "%sSZS output end Refutation@." comment;
   end;
   Phases.return_phase ()
 
@@ -362,10 +396,10 @@ let parse_cli =
   Phases.return_phase (files, params)
 
 (* Process the given file (try to solve it) *)
-let process_file file =
+let process_file (prelude:Phases.prelude) file =
   start_file file >>= fun () ->
   parse_file file >>= fun stmts ->
-  typing stmts >>= fun decls ->
+  typing prelude stmts >>= fun decls ->
   (* declare inductive types and constants *)
   CCVector.iter Statement.scan_simple_stmt_for_ind_ty decls;
   let has_goal = has_goal_decls_ decls in
@@ -380,9 +414,10 @@ let process_file file =
   compute_prec (CCVector.to_seq stmts) >>= fun precedence ->
   Util.debugf ~section 1 "@[<2>precedence:@ @[%a@]@]" (fun k->k Precedence.pp precedence);
   compute_ord_select precedence >>= fun (ord, select) ->
-  (* build the context and env *)
-  make_ctx ~signature ~ord ~select >>= fun ctx ->
+  (* HO *)
   Phases.get_key Params.key >>= fun params ->
+  (* build the context and env *)
+  make_ctx ~signature ~ord ~select () >>= fun ctx ->
   make_env ~params ~ctx stmts >>= fun (Phases.Env_clauses (env,clauses)) ->
   (* main workload *)
   has_goal_ := has_goal; (* FIXME: should be computed at Env initialization *)
@@ -438,9 +473,10 @@ let setup_signal =
   Phases.return_phase ()
 
 (* process several files, printing the result *)
-let process_files_and_print files =
+let process_files_and_print (params:Params.t) files =
+  parse_prelude params >>= fun prelude ->
   let f file =
-    process_file file >>= fun (Phases.Env_result (env, res)) ->
+    process_file prelude file >>= fun (Phases.Env_result (env, res)) ->
     print file env res >>= fun () ->
     check res
   in

@@ -5,7 +5,7 @@
 
 open Logtk
 
-module T = FOTerm
+module T = Term
 module C = Clause
 module HC = Horn_clause
 module P = Position
@@ -225,7 +225,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       let depth_ty (c:HC.t): int =
         all_terms c
         |> Sequence.flat_map T.Seq.subterms
-        |> Sequence.map FOTerm.ty
+        |> Sequence.map Term.ty
         |> Sequence.map Type.depth
         |> Sequence.max ?lt:None
         |> CCOpt.get_or ~default:0

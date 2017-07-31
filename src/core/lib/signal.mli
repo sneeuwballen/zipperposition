@@ -1,7 +1,13 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Basic signal} *)
+(** {1 Basic signal for multiple-callbacks Observer} *)
+
+(** A signal can be used to decouple the (unique) emitter of some event,
+    and (multiple) receivers for this event. The signal is typically
+    created by the emitter (in the same module), and exposed;
+    then, observers can register to the signal and be notified every
+    time an event (a value) is emitted through the signal. *)
 
 type 'a t
 (** Signal of type 'a *)

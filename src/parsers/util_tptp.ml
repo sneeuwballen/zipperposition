@@ -23,6 +23,8 @@ let error msg = raise (Error msg)
 let errorf msg = CCFormat.ksprintf msg ~f:error
 let section = Util.Section.base
 
+let stat_def_as_rw = Util.mk_stat "tptp.def_as_rewrite"
+
 (** {2 Printing/Parsing} *)
 
 type parse_cache = (string, unit) Hashtbl.t
@@ -179,31 +181,81 @@ let has_includes decls =
 
 module UA = UntypedAST
 
+(* do we turn "definition" statements into rewrite rules? *)
+let enable_def_as_rewrite = ref false
+
+let attr_of_info = function
+  | A.GString "ac"
+  | A.GString "AC"
+  | A.GNode ("ac", [])
+  | A.GNode ("AC", []) -> [UA.attr_ac]
+  | A.GNode ("infix", [A.GString n]) -> [UA.attr_infix n]
+  | A.GNode ("prefix", [A.GString n]) -> [UA.attr_prefix n]
+  | g ->
+    Util.warnf "unknown attribute `%a`, ignore" A.pp_general g;
+    []
+
+(* does this formula look like a proper definition? *)
+let rec looks_like_def f = match PT.view f with
+  | PT.Bind (Binder.Forall, _, f') -> looks_like_def f'
+  | PT.AppBuiltin ((Builtin.Equiv | Builtin.Eq), ([_;lhs;rhs] | [lhs;rhs])) ->
+    (* LHS is an atom/literal? *)
+    let as_atom t = match PT.view t with
+      | PT.Const id | PT.App ({PT.term=PT.Const id; _}, _) -> Some id
+      | _ -> None
+    in
+    (* check that [lhs] is atomic and its head does not occur in [rhs] *)
+    begin match as_atom lhs with
+      | None -> false
+      | Some id ->
+        PT.Seq.symbols rhs |> Sequence.for_all (fun id' -> id<>id')
+    end
+  | _ -> false
+
 let to_ast st =
   let conv_form name role f =
     let name = A.string_of_name name in
-    let attrs = [UA.A_name name] in
+    let attrs = [UA.attr_name name] in
     match role with
-      | A.R_question 
+      | A.R_question
       | A.R_conjecture -> UA.goal ~attrs f
       | A.R_negated_conjecture -> UA.goal ~attrs (PT.not_ f)
       | A.R_lemma -> UA.lemma ~attrs f
-      | A.R_axiom 
-      | A.R_hypothesis 
-      | A.R_definition 
-      | A.R_assumption 
-      | A.R_theorem 
-      | A.R_plain 
+      | A.R_definition
+        when !enable_def_as_rewrite &&
+             looks_like_def f ->
+        (* conversion into def *)
+        Util.debugf ~section 3 "(@[tptp.def_as_rewrite@ %a@])"
+          (fun k->k PT.pp f);
+        Util.incr_stat stat_def_as_rw;
+        UA.rewrite ~attrs f
+      | A.R_definition
+      | A.R_axiom
+      | A.R_hypothesis
+      | A.R_assumption
+      | A.R_theorem
+      | A.R_plain
       | A.R_finite _
-      | A.R_type 
+      | A.R_type
       | A.R_unknown  -> UA.assert_ ~attrs f
+  and conv_decl name s ty info =
+    let name = A.string_of_name name in
+    let attr_name = UA.attr_name name in
+    let attrs' =
+      CCList.flat_map
+        (function
+          | A.GNode ("attrs", l) -> CCList.flat_map attr_of_info l
+          | _ -> [])
+        info
+    in
+    UA.decl s ty ~attrs:(attr_name :: attrs')
   in
-  match st with
+  begin match st with
     | A.Include _
     | A.IncludeOnly _ -> error "cannot convert `Include` to UntypedAST"
-    | A.TypeDecl (_,s,ty,_)
-    | A.NewType (_,s,ty,_) ->
-      UA.decl s ty
+    | A.TypeDecl (name,s,ty,info)
+    | A.NewType (name,s,ty,info) ->
+      conv_decl name s ty info
     | A.TFF (name,role,f,_)
     | A.THF (name,role,f,_)
     | A.FOF (name,role,f,_) ->
@@ -211,6 +263,7 @@ let to_ast st =
     | A.CNF (name,role,f,_) ->
       let f = PT.or_ f in
       conv_form name role f
+  end
 
 (* default function for giving a name to the declaration of a symbol *)
 let name_sym_ sy =
@@ -234,4 +287,10 @@ let of_ast st =
     | UA.Goal f -> A.TFF (name, A.R_conjecture, f, [])
     | UA.Assert f -> A.TFF (name, A.R_axiom, f, [])
     | UA.Lemma f -> A.TFF (name, A.R_lemma, f, [])
+
+let () =
+  Options.add_opts
+    [ "--tptp-def-as-rewrite", Arg.Set enable_def_as_rewrite, " in TPTP, definitions as rewrite rules";
+      "--no-tptp-def-as-rewrite", Arg.Clear enable_def_as_rewrite, " disable definition->rewrite in TPTP";
+    ]
 

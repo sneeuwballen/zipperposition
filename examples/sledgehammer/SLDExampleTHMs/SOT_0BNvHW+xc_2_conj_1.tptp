@@ -1,0 +1,98 @@
+%------------------------------------------------------------------------------
+tff(ty_n_t__fun_It__Term__Oterm_Itf__fun_Mtf__var_J_Mt__Product____Type__Oprod_It__Set__Oset_It__Term__Oterm_Itf__fun_Mtf__var_J_J_Mt__Set__Oset_It__Term__Oterm_Itf__fun_Mtf__var_J_J_J_J,type,(
+    fun_te1561512737un_var: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Term__Oterm_Itf__fun_Mtf__var_J_J,type,(
+    set_term_fun_var: $tType )).
+
+tff(ty_n_t__Term__Oterm_Itf__fun_Mtf__var_J,type,(
+    term_fun_var: $tType )).
+
+tff(ty_n_t__fun_Itf__fun_Mt__HOL__Obool_J,type,(
+    fun_fun_bool: $tType )).
+
+tff(ty_n_t__fun_Itf__fun_Mt__Nat__Onat_J,type,(
+    fun_fun_nat: $tType )).
+
+tff(ty_n_t__HOL__Obool,type,(
+    bool: $tType )).
+
+tff(sy_c_IntruderDeduction_Ointruder__model_Ointruder__deduct_001tf__fun_001tf__var,type,(
+    intrud2019890410un_var: ( fun_fun_nat * fun_fun_bool * fun_te1561512737un_var * set_term_fun_var * term_fun_var ) > $o )).
+
+tff(sy_c_IntruderDeduction_Ointruder__model_Ointruder__synth_001tf__fun_001tf__var,type,(
+    intrud2138895141un_var: ( fun_fun_nat * fun_fun_bool * set_term_fun_var * term_fun_var ) > $o )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Set__Oset_It__Term__Oterm_Itf__fun_Mtf__var_J_J,type,(
+    ord_le137366481un_var: ( set_term_fun_var * set_term_fun_var ) > $o )).
+
+tff(sy_c_fFalse,type,(
+    fFalse: bool )).
+
+tff(sy_c_fTrue,type,(
+    fTrue: bool )).
+
+tff(sy_c_member_001t__Term__Oterm_Itf__fun_Mtf__var_J,type,(
+    member_term_fun_var: ( term_fun_var * set_term_fun_var ) > $o )).
+
+tff(sy_c_pp,type,(
+    pp: bool > $o )).
+
+tff(sy_v_Ana,type,(
+    ana: fun_te1561512737un_var )).
+
+tff(sy_v_M,type,(
+    m: set_term_fun_var )).
+
+tff(sy_v_M_H,type,(
+    m2: set_term_fun_var )).
+
+tff(sy_v_arity,type,(
+    arity: fun_fun_nat )).
+
+tff(sy_v_ppublic,type,(
+    ppublic: fun_fun_bool )).
+
+tff(fact_0__092_060open_062_092_060And_062t_O_AM_H_A_092_060turnstile_062_092_060_094sub_062c_At_A_092_060Longrightarrow_062_AM_H_A_092_060turnstile_062_At_092_060close_062,axiom,(
+    ! [T: term_fun_var] : 
+      ( intrud2138895141un_var(arity,ppublic,m2,T)
+     => intrud2019890410un_var(arity,ppublic,ana,m2,T) ) )).
+
+tff(fact_1__092_060open_062_092_060forall_062t_O_A_IM_A_092_060turnstile_062_At_J_A_061_A_IM_H_A_092_060turnstile_062_092_060_094sub_062c_At_J_092_060close_062,axiom,(
+    ! [T2: term_fun_var] : 
+      ( intrud2019890410un_var(arity,ppublic,ana,m,T2)
+    <=> intrud2138895141un_var(arity,ppublic,m2,T2) ) )).
+
+tff(fact_2__092_060open_062_092_060forall_062m_092_060in_062M_H_O_AM_A_092_060turnstile_062_Am_092_060close_062,axiom,(
+    ! [X: term_fun_var] : 
+      ( member_term_fun_var(X,m2)
+     => intrud2019890410un_var(arity,ppublic,ana,m,X) ) )).
+
+tff(fact_3_deduct__if__synth,axiom,(
+    ! [M: set_term_fun_var,T: term_fun_var] : 
+      ( intrud2138895141un_var(arity,ppublic,M,T)
+     => intrud2019890410un_var(arity,ppublic,ana,M,T) ) )).
+
+tff(fact_4_assms_I2_J,axiom,(
+    ord_le137366481un_var(m,m2) )).
+
+tff(fact_5_ideduct__antimono,axiom,(
+    ! [M2: set_term_fun_var,T: term_fun_var,M: set_term_fun_var] : 
+      ( intrud2019890410un_var(arity,ppublic,ana,M2,T)
+     => ( ord_le137366481un_var(M,M2)
+       => ( ! [T3: term_fun_var] : 
+              ( member_term_fun_var(T3,M2)
+             => intrud2019890410un_var(arity,ppublic,ana,M,T3) )
+         => intrud2019890410un_var(arity,ppublic,ana,M,T) ) ) ) )).
+
+tff(help_pp_2_1_U,axiom,(
+    pp(fTrue) )).
+
+tff(help_pp_1_1_U,axiom,(
+    ~ pp(fFalse) )).
+
+tff(conj_1,conjecture,(
+    ! [T4: term_fun_var] : 
+      ( intrud2019890410un_var(arity,ppublic,ana,m,T4)
+    <=> intrud2019890410un_var(arity,ppublic,ana,m2,T4) ) )).
+%------------------------------------------------------------------------------

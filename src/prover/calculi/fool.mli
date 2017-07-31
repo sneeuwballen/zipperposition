@@ -6,7 +6,7 @@
 
 open Logtk
 
-type term = FOTerm.t
+type term = Term.t
 
 (** Deal with boolean subterms as if prop was a specific case of datatype.
     The rules are:

@@ -1,0 +1,201 @@
+%------------------------------------------------------------------------------
+tff(ty_n_t__fun_It__Set__Oset_It__Product____Type__Oprod_It__fun_Itf__a_Mt__Int__Oint_J_Mt__fun_Itf__a_Mt__Int__Oint_J_J_J_Mt__Set__Oset_It__Product____Type__Oprod_It__fun_Itf__a_Mt__Int__Oint_J_Mt__fun_Itf__a_Mt__Int__Oint_J_J_J_J,type,(
+    fun_se1538741891_a_int: $tType )).
+
+tff(ty_n_t__fun_It__fun_It__fun_Itf__a_Mt__Int__Oint_J_Mt__fun_Itf__a_Mt__Int__Oint_J_J_Mt__fun_It__fun_Itf__a_Mt__Int__Oint_J_Mt__fun_It__fun_Itf__a_Mt__Int__Oint_J_Mt__HOL__Obool_J_J_J,type,(
+    fun_fu238901571t_bool: $tType )).
+
+tff(ty_n_t__Lenses__Olens__Olens____ext_It__fun_Itf__a_Mt__Int__Oint_J_Mt__fun_Itf__a_Mt__Int__Oint_J_Mt__Product____Type__Ounit_J,type,(
+    lens_e1730307661t_unit: $tType )).
+
+tff(ty_n_t__fun_It__Product____Type__Oprod_It__fun_Itf__a_Mt__Int__Oint_J_Mt__fun_Itf__a_Mt__Int__Oint_J_J_Mt__HOL__Obool_J,type,(
+    fun_Pr1497380403t_bool: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Product____Type__Oprod_It__fun_Itf__a_Mt__Int__Oint_J_Mt__fun_Itf__a_Mt__Int__Oint_J_J_J,type,(
+    set_Pr1537689415_a_int: $tType )).
+
+tff(ty_n_t__fun_It__fun_Itf__a_Mt__Int__Oint_J_Mt__fun_It__fun_Itf__a_Mt__Int__Oint_J_Mt__HOL__Obool_J_J,type,(
+    fun_fu1541401133t_bool: $tType )).
+
+tff(ty_n_t__fun_It__fun_Itf__a_Mt__Int__Oint_J_Mt__fun_Itf__a_Mt__Int__Oint_J_J,type,(
+    fun_fu1603287811_a_int: $tType )).
+
+tff(ty_n_t__fun_It__fun_Itf__a_Mt__Int__Oint_J_Mt__HOL__Obool_J,type,(
+    fun_fun_a_int_bool: $tType )).
+
+tff(ty_n_t__fun_It__HOL__Obool_Mt__HOL__Obool_J,type,(
+    fun_bool_bool: $tType )).
+
+tff(ty_n_t__fun_Itf__a_Mt__Int__Oint_J,type,(
+    fun_a_int: $tType )).
+
+tff(ty_n_t__HOL__Obool,type,(
+    bool: $tType )).
+
+tff(ty_n_t__Int__Oint,type,(
+    int: $tType )).
+
+tff(ty_n_tf__a,type,(
+    a: $tType )).
+
+tff(sy_c_ATP_058Lamm__a____,type,(
+    aTP_Lamm_a: fun_a_int )).
+
+tff(sy_c_ATP_058Lamm__aa____,type,(
+    aTP_Lamm_aa: fun_fu238901571t_bool )).
+
+tff(sy_c_COMBB_001t__fun_Itf__a_Mt__Int__Oint_J_001t__fun_It__fun_Itf__a_Mt__Int__Oint_J_Mt__HOL__Obool_J_001t__fun_Itf__a_Mt__Int__Oint_J,type,(
+    cOMBB_762446407_a_int: fun_fu1541401133t_bool > fun_fu238901571t_bool )).
+
+tff(sy_c_COMBK_001t__Int__Oint_001tf__a,type,(
+    cOMBK_int_a: int > fun_a_int )).
+
+tff(sy_c_Commands_ORelInv_001t__fun_Itf__a_Mt__Int__Oint_J,type,(
+    relInv_fun_a_int: set_Pr1537689415_a_int > fun_fu1603287811_a_int )).
+
+tff(sy_c_Commands_ORel_001t__fun_Itf__a_Mt__Int__Oint_J,type,(
+    rel_fun_a_int: fun_fu1603287811_a_int > set_Pr1537689415_a_int )).
+
+tff(sy_c_Commands_OW_001t__fun_Itf__a_Mt__Int__Oint_J,type,(
+    w_fun_a_int: ( fun_fun_a_int_bool * set_Pr1537689415_a_int ) > fun_se1538741891_a_int )).
+
+tff(sy_c_Expressions_Ouop_001t__HOL__Obool_001t__HOL__Obool_001t__fun_Itf__a_Mt__Int__Oint_J,type,(
+    uop_bo1145374805_a_int: ( fun_bool_bool * fun_fun_a_int_bool ) > fun_fun_a_int_bool )).
+
+tff(sy_c_Fun_Ocomp_001t__fun_Itf__a_Mt__Int__Oint_J_001t__fun_Itf__a_Mt__Int__Oint_J_001t__fun_Itf__a_Mt__Int__Oint_J,type,(
+    comp_f1053389402_a_int: ( fun_fu1603287811_a_int * fun_fu1603287811_a_int ) > fun_fu1603287811_a_int )).
+
+tff(sy_c_Fun_Oid_001t__fun_Itf__a_Mt__Int__Oint_J,type,(
+    id_fun_a_int: fun_fu1603287811_a_int )).
+
+tff(sy_c_Groups_Oone__class_Oone_001t__Int__Oint,type,(
+    one_one_int: int )).
+
+tff(sy_c_Inductive_Ocomplete__lattice__class_Olfp_001t__Set__Oset_It__Product____Type__Oprod_It__fun_Itf__a_Mt__Int__Oint_J_Mt__fun_Itf__a_Mt__Int__Oint_J_J_J,type,(
+    comple1421021952_a_int: fun_se1538741891_a_int > set_Pr1537689415_a_int )).
+
+tff(sy_c_Lenses_Olens_Olens__get_001t__fun_Itf__a_Mt__Int__Oint_J_001t__fun_Itf__a_Mt__Int__Oint_J_001t__Product____Type__Ounit,type,(
+    lens_g1730450234t_unit: lens_e1730307661t_unit > fun_fu1603287811_a_int )).
+
+tff(sy_c_Lenses_Olens_Olens__put_001t__fun_Itf__a_Mt__Int__Oint_J_001t__fun_Itf__a_Mt__Int__Oint_J_001t__Product____Type__Ounit,type,(
+    lens_p1105325441t_unit: ( lens_e1730307661t_unit * fun_a_int ) > fun_fu1603287811_a_int )).
+
+tff(sy_c_Lenses_Omwb__lens_001t__fun_Itf__a_Mt__Int__Oint_J_001t__fun_Itf__a_Mt__Int__Oint_J,type,(
+    mwb_le1045828734_a_int: lens_e1730307661t_unit > bool )).
+
+tff(sy_c_Product__Type_Oprod_Ocase__prod_001t__fun_Itf__a_Mt__Int__Oint_J_001t__fun_Itf__a_Mt__Int__Oint_J_001t__HOL__Obool,type,(
+    produc613749291t_bool: fun_fu1541401133t_bool > fun_Pr1497380403t_bool )).
+
+tff(sy_c_Set_OCollect_001t__Product____Type__Oprod_It__fun_Itf__a_Mt__Int__Oint_J_Mt__fun_Itf__a_Mt__Int__Oint_J_J,type,(
+    collec805372882_a_int: fun_Pr1497380403t_bool > set_Pr1537689415_a_int )).
+
+tff(sy_c_aa_001t__HOL__Obool_001t__HOL__Obool,type,(
+    aa_bool_bool: ( fun_bool_bool * bool ) > bool )).
+
+tff(sy_c_aa_001t__fun_It__fun_Itf__a_Mt__Int__Oint_J_Mt__fun_Itf__a_Mt__Int__Oint_J_J_001t__fun_It__fun_Itf__a_Mt__Int__Oint_J_Mt__fun_It__fun_Itf__a_Mt__Int__Oint_J_Mt__HOL__Obool_J_J,type,(
+    aa_fun63650860t_bool: ( fun_fu238901571t_bool * fun_fu1603287811_a_int ) > fun_fu1541401133t_bool )).
+
+tff(sy_c_aa_001t__fun_Itf__a_Mt__Int__Oint_J_001t__HOL__Obool,type,(
+    aa_fun_a_int_bool: ( fun_fun_a_int_bool * fun_a_int ) > bool )).
+
+tff(sy_c_aa_001t__fun_Itf__a_Mt__Int__Oint_J_001t__fun_It__fun_Itf__a_Mt__Int__Oint_J_Mt__HOL__Obool_J,type,(
+    aa_fun436393950t_bool: ( fun_fu1541401133t_bool * fun_a_int ) > fun_fun_a_int_bool )).
+
+tff(sy_c_aa_001t__fun_Itf__a_Mt__Int__Oint_J_001t__fun_Itf__a_Mt__Int__Oint_J,type,(
+    aa_fun107670524_a_int: ( fun_fu1603287811_a_int * fun_a_int ) > fun_a_int )).
+
+tff(sy_c_aa_001tf__a_001t__Int__Oint,type,(
+    aa_a_int: ( fun_a_int * a ) > int )).
+
+tff(sy_c_fFalse,type,(
+    fFalse: bool )).
+
+tff(sy_c_fNot,type,(
+    fNot: fun_bool_bool )).
+
+tff(sy_c_fTrue,type,(
+    fTrue: bool )).
+
+tff(sy_c_fequal_001t__fun_Itf__a_Mt__Int__Oint_J,type,(
+    fequal_fun_a_int: fun_fu1541401133t_bool )).
+
+tff(sy_c_pp,type,(
+    pp: bool > $o )).
+
+tff(sy_v_Xa,type,(
+    xa: lens_e1730307661t_unit )).
+
+tff(sy_v_Ya,type,(
+    ya: lens_e1730307661t_unit )).
+
+tff(fact_0_id__apply,axiom,(
+    ! [X: fun_a_int] : aa_fun107670524_a_int(id_fun_a_int,X) = X )).
+
+tff(fact_1_WHILE1,axiom,(
+    ! [B: fun_fun_a_int_bool,C: fun_fu1603287811_a_int,X2: fun_a_int] : 
+      ( ( pp(aa_fun_a_int_bool(B,X2))
+       => aa_fun107670524_a_int(relInv_fun_a_int(comple1421021952_a_int(w_fun_a_int(B,rel_fun_a_int(C)))),X2) = aa_fun107670524_a_int(comp_f1053389402_a_int(relInv_fun_a_int(comple1421021952_a_int(w_fun_a_int(B,rel_fun_a_int(C)))),C),X2) )
+      & ( ~ pp(aa_fun_a_int_bool(B,X2))
+       => aa_fun107670524_a_int(relInv_fun_a_int(comple1421021952_a_int(w_fun_a_int(B,rel_fun_a_int(C)))),X2) = aa_fun107670524_a_int(id_fun_a_int,X2) ) ) )).
+
+tff(fact_2_WHILE3,axiom,(
+    ! [B: fun_fun_a_int_bool,C: fun_fu1603287811_a_int] : relInv_fun_a_int(comple1421021952_a_int(w_fun_a_int(uop_bo1145374805_a_int(fNot,B),rel_fun_a_int(C)))) = id_fun_a_int )).
+
+tff(fact_3_COND5,axiom,(
+    ! [P: fun_fun_a_int_bool,C1: fun_fu1603287811_a_int,C2: fun_fu1603287811_a_int,X2: fun_a_int] : 
+      ( ( pp(aa_fun_a_int_bool(uop_bo1145374805_a_int(fNot,P),X2))
+       => ( pp(aa_fun_a_int_bool(P,X2))
+         => aa_fun107670524_a_int(C1,X2) = aa_fun107670524_a_int(C2,X2) ) )
+      & ( ~ pp(aa_fun_a_int_bool(uop_bo1145374805_a_int(fNot,P),X2))
+       => ( ~ pp(aa_fun_a_int_bool(P,X2))
+         => aa_fun107670524_a_int(C2,X2) = aa_fun107670524_a_int(C1,X2) ) ) ) )).
+
+tff(fact_4_comp__apply,axiom,(
+    ! [F: fun_fu1603287811_a_int,G: fun_fu1603287811_a_int,X: fun_a_int] : aa_fun107670524_a_int(comp_f1053389402_a_int(F,G),X) = aa_fun107670524_a_int(F,aa_fun107670524_a_int(G,X)) )).
+
+tff(fact_5_Commands_ORel__def,axiom,(
+    ! [F: fun_fu1603287811_a_int] : rel_fun_a_int(F) = collec805372882_a_int(produc613749291t_bool(aa_fun63650860t_bool(aTP_Lamm_aa,F))) )).
+
+tff(fact_6_ATP_Olambda__1,axiom,(
+    aTP_Lamm_aa = cOMBB_762446407_a_int(fequal_fun_a_int) )).
+
+tff(fact_7_ATP_Olambda__2,axiom,(
+    aTP_Lamm_a = cOMBK_int_a(one_one_int) )).
+
+tff(help_pp_2_1_U,axiom,(
+    pp(fTrue) )).
+
+tff(help_pp_1_1_U,axiom,(
+    ~ pp(fFalse) )).
+
+tff(help_fNot_2_1_U,axiom,(
+    ! [P: bool] : 
+      ( pp(P)
+      | pp(aa_bool_bool(fNot,P)) ) )).
+
+tff(help_fNot_1_1_U,axiom,(
+    ! [P: bool] : 
+      ( ~ pp(aa_bool_bool(fNot,P))
+      | ~ pp(P) ) )).
+
+tff(help_COMBK_1_1_COMBK_001t__Int__Oint_001tf__a_U,axiom,(
+    ! [P: int,Q: a] : aa_a_int(cOMBK_int_a(P),Q) = P )).
+
+tff(help_fequal_2_1_fequal_001t__fun_Itf__a_Mt__Int__Oint_J_T,axiom,(
+    ! [X: fun_a_int,Y: fun_a_int] : 
+      ( X != Y
+      | pp(aa_fun_a_int_bool(aa_fun436393950t_bool(fequal_fun_a_int,X),Y)) ) )).
+
+tff(help_fequal_1_1_fequal_001t__fun_Itf__a_Mt__Int__Oint_J_T,axiom,(
+    ! [X: fun_a_int,Y: fun_a_int] : 
+      ( ~ pp(aa_fun_a_int_bool(aa_fun436393950t_bool(fequal_fun_a_int,X),Y))
+      | X = Y ) )).
+
+tff(help_COMBB_1_1_COMBB_001t__fun_Itf__a_Mt__Int__Oint_J_001t__fun_It__fun_Itf__a_Mt__Int__Oint_J_Mt__HOL__Obool_J_001t__fun_Itf__a_Mt__Int__Oint_J_U,axiom,(
+    ! [P: fun_fu1541401133t_bool,Q: fun_fu1603287811_a_int,R: fun_a_int] : aa_fun436393950t_bool(aa_fun63650860t_bool(cOMBB_762446407_a_int(P),Q),R) = aa_fun436393950t_bool(P,aa_fun107670524_a_int(Q,R)) )).
+
+tff(conj_2,conjecture,(
+    ! [X3: fun_a_int] : 
+      ( aa_fun107670524_a_int(lens_g1730450234t_unit(xa),aTP_Lamm_a) = aa_fun107670524_a_int(lens_p1105325441t_unit(ya,aa_fun107670524_a_int(id_fun_a_int,X3)),aa_fun107670524_a_int(lens_g1730450234t_unit(xa),X3))
+     => aa_fun107670524_a_int(lens_g1730450234t_unit(ya),aTP_Lamm_a) = X3 ) )).
+%------------------------------------------------------------------------------

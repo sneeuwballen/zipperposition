@@ -77,7 +77,7 @@ let compute_prec stmts =
       (fun seq ->
          seq
          |> Sequence.flat_map Statement.Seq.terms
-         |> Sequence.flat_map FOTerm.Seq.symbols
+         |> Sequence.flat_map Term.Seq.symbols
          |> Precedence.Constr.invfreq)
   in
   let prec = Compute_prec.mk_precedence cp stmts in

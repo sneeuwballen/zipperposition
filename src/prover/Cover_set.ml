@@ -5,17 +5,17 @@
 
 open Logtk
 
-module T = FOTerm
+module T = Term
 module Fmt = CCFormat
 
 (** Use for reasoning by case during induction *)
 
 type cst = Ind_cst.t
-type term = FOTerm.t
+type term = Term.t
 
 type case = {
   case_top: cst; (* copy of the coverset's top constant *)
-  case_term : FOTerm.t; (* rhs *)
+  case_term : Term.t; (* rhs *)
   case_kind: [`Base | `Rec]; (* at least one sub-constant? *)
   case_sub: cst list; (* set of sub-constants *)
   case_skolems: (ID.t * Type.t) list; (* set of other skolems *)
@@ -35,7 +35,7 @@ module Case = struct
   let compare a b =
     CCOrd.Infix.(
       Ind_cst.compare a.case_top b.case_top
-      <?> (FOTerm.compare, a.case_term, b.case_term))
+      <?> (Term.compare, a.case_term, b.case_term))
   let hash a =
     Hash.combine2 (Ind_cst.hash a.case_top) (T.hash a.case_term)
 

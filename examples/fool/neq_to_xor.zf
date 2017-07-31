@@ -1,0 +1,10 @@
+# expect: unsat
+
+# FIXME: find a way to test this while avoiding trivial CNF…
+
+val a : prop.
+val b : prop.
+
+goal
+  ((a && b) || (~ a && ~ b)) =>
+  (a = b).

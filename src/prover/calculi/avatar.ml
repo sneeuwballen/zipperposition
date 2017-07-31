@@ -5,7 +5,7 @@
 
 open Logtk
 
-module T = FOTerm
+module T = Term
 module Lit = Literal
 module Fmt = CCFormat
 
@@ -52,7 +52,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       let merge = Lit.Set.union
     end)
 
-  let infer_split_ c =
+  let simplify_split_ (c:C.t): C.t list option =
     let lits = C.lits c in
     (* maps each variable to a list of literals. Sets can be merged whenever
        two variables occur in the same literal.  *)
@@ -135,9 +135,10 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
   (* Avatar splitting *)
   let split c =
     Util.enter_prof prof_splits;
-    let res = if Array.length (C.lits c) <= 1
+    let res =
+      if Array.length (C.lits c) <= 1 || Literals.is_trivial (C.lits c)
       then None
-      else infer_split_ c
+      else simplify_split_ c
     in
     Util.exit_prof prof_splits;
     res
@@ -295,8 +296,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     let id = ID.makef "_avatar_%d" !skolem_count_  in
     incr skolem_count_;
     ID.set_payload id
-      (Skolem.Attr_skolem
-         (if Ind_ty.is_inductive_type ty then Skolem.K_ind else Skolem.K_normal));
+      (ID.Attr_skolem
+         (if Ind_ty.is_inductive_type ty then ID.K_ind else ID.K_normal));
     Ctx.declare id ty;
     Ordering.add_list (Ctx.ord ()) [id];
     id
@@ -307,6 +308,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     cut_lit: BLit.t; (** lit that is true if lemma is true *)
     cut_depth: int; (** if the lemma is used to prove another lemma *)
     cut_proof: Proof.Step.t; (** where does the lemma come from? *)
+    cut_proof_parent: Proof.Parent.t; (** how to justify sth from the lemma *)
+    cut_reason: unit CCFormat.printer option; (** Informal reason why the lemma was added *)
   }
 
   let cut_form c = c.cut_form
@@ -314,28 +317,39 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
   let cut_lit c = c.cut_lit
   let cut_depth c = c.cut_depth
   let cut_proof c = c.cut_proof
+  let cut_proof_parent c = c.cut_proof_parent
 
   let pp_cut_res out (c:cut_res): unit =
     let pp_depth out d = if d>0  then Format.fprintf out "@ :depth %d" d in
-    Format.fprintf out "(@[<hv>cut@ :form @[%a@]@ :lit @[%a@]%a)"
+    let pp_reason out r = Format.fprintf out "@ :reason @[%a@]" r () in
+    Format.fprintf out "(@[<4>@[<hv>cut@ :form @[%a@]@ :lit @[%a@]%a]%a@])"
       (Util.pp_list E.C.pp) c.cut_pos
       BLit.pp c.cut_lit pp_depth c.cut_depth
+      (Fmt.some pp_reason) c.cut_reason
 
   let cut_res_clauses c = Sequence.of_list c.cut_pos
 
   (* generic mechanism for adding clause(s)
      and make a lemma out of them, including Skolemization, etc. *)
-  let introduce_cut ?(penalty=0) ?(depth=0) (f:Cut_form.t) proof : cut_res =
+  let introduce_cut ?reason ?(penalty=0) ?(depth=0) (f:Cut_form.t) proof : cut_res =
     let box = BBox.inject_lemma f in
+    let cut_proof_parent =
+      let form = Cut_form.to_s_form f in
+      Proof.Parent.from @@ Proof.S.mk_f proof form
+    in
     (* positive clauses *)
+    let proof_pos =
+      Proof.Step.simp ~rule:(Proof.Rule.mk "cut") [cut_proof_parent]
+    in
     let c_pos =
       List.map
         (fun lits ->
-           C.create_a ~trail:(Trail.singleton box) ~penalty lits proof)
+           C.create_a ~trail:(Trail.singleton box) ~penalty lits proof_pos)
         (Cut_form.cs f)
     in
     { cut_form=f; cut_pos=c_pos; cut_lit=box;
-      cut_depth=depth; cut_proof=proof; }
+      cut_depth=depth; cut_proof=proof; cut_reason=reason;
+      cut_proof_parent; }
 
   let on_input_lemma : cut_res Signal.t = Signal.create ()
   let on_lemma : cut_res Signal.t = Signal.create()
@@ -345,13 +359,86 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
   (* map from [cut.cut_lit] to [cut] *)
   let all_lemmas_ : cut_res Lemma_tbl.t = Lemma_tbl.create 64
 
+  let prove_lemma_handlers_ : (cut_res -> C.t list E.conversion_result) list ref = ref []
+
+  let add_prove_lemma x = CCList.Ref.push prove_lemma_handlers_ x
+
+  (* clauses recently pushed while trying to prove lemmas *)
+  let new_clauses_from_lemmas_ : C.t list ref = ref []
+
+  (* return the list of new lemmas *)
+  let inf_new_lemmas ~full:_ () =
+    let l = !new_clauses_from_lemmas_ in
+    new_clauses_from_lemmas_ := [];
+    l
+
+  (* try to prove a lemma, by trying handlers one by one, or just skolemizing *)
+  let prove_lemma (c:cut_res): unit =
+    let default () =
+      let g = cut_form c in
+      (* proof step *)
+      let proof =
+        Proof.Step.simp [cut_proof_parent c] ~rule:(Proof.Rule.mk "cut")
+      in
+      let vars = Cut_form.vars g |> T.VarSet.to_list in
+      Util.debugf ~section 2
+        "(@[<hv2>prove_lemma@ :form %a@ :vars (@[%a@])@])"
+        (fun k->k Cut_form.pp g (Util.pp_list HVar.pp) vars);
+      (* map variables to skolems *)
+      let subst : Subst.t =
+        vars
+        |> List.map
+          (fun v ->
+             let ty_v = HVar.ty v in
+             let id = Ind_cst.make_skolem ty_v in
+             Ctx.declare id ty_v;
+             (v,0), (T.const ~ty:ty_v id,0))
+        |> Subst.FO.of_list' ?init:None
+      in
+      (* for each clause, apply [subst] to it and negate its
+          literals, obtaining a DNF of [¬ And_i ctx_i[case]];
+          then turn DNF into CNF *)
+      let renaming = Ctx.renaming_clear () in
+      let clauses =
+        begin
+          Cut_form.apply_subst ~renaming subst (g,0)
+          |> Cut_form.cs
+          |> Util.map_product
+            ~f:(fun lits ->
+              let lits = Array.map (fun l -> [Literal.negate l]) lits in
+              Array.to_list lits)
+          |> CCList.map
+            (fun l ->
+               let lits = Array.of_list l in
+               let trail = Trail.singleton (BLit.neg @@ cut_lit c) in
+               C.create_a lits proof ~trail ~penalty:0)
+        end
+      in
+      clauses
+    in
+    let rec aux acc = function
+      | [] -> List.rev_append (default()) acc
+      | proof_handler :: tail ->
+        begin match proof_handler c with
+          | E.CR_skip -> aux acc tail
+          | E.CR_return cs -> List.rev_append cs acc
+          | E.CR_add cs -> aux (List.rev_append cs acc) tail
+        end
+    in
+    (* add proof clauses to the positive clauses *)
+    let cs = aux (cut_pos c) !prove_lemma_handlers_ in
+    Util.debugf ~section 3
+      "(@[prove_lemma@ :lemma %a@ :clauses (@[<hv>%a@])@])"
+      (fun k->k Cut_form.pp (cut_form c) (Util.pp_list C.pp) cs);
+    CCList.Ref.push_list new_clauses_from_lemmas_ cs
+
   let add_lemma (c:cut_res): unit =
     if not (Lemma_tbl.mem all_lemmas_ c.cut_lit) then (
       Util.debugf ~section 2 "(@[<2>add_lemma@ :on `[@[<hv>%a@]]`@ :lit %a@])"
         (fun k->k Cut_form.pp c.cut_form BBox.pp c.cut_lit);
       Lemma_tbl.add all_lemmas_ c.cut_lit c;
-      (* actually add the clauses to passive set *)
-      E.ProofState.PassiveSet.add (cut_res_clauses c);
+      (* start a subproof for the lemma *)
+      prove_lemma c;
       Signal.send on_lemma c;
     ) else (
       (* already existing lemma *)
@@ -379,6 +466,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       List.exists (fun parent -> in_proof_of_ (Proof.Parent.proof parent) lit) (Proof.Step.parents p)
     in
     begin match Proof.S.result p with
+      | Proof.C_stmt _
       | Proof.Stmt _
       | Proof.Form _
       | Proof.Clause _ -> in_proof_ (Proof.S.step p) lit
@@ -390,16 +478,16 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     let in_core = match Sat.get_proof_opt () with
       | None -> (fun _ -> false)
       | Some p -> in_proof_of_ p
-    in
+    and pp_reason out r = Format.fprintf out "@ :reason @[%a@]" r () in
     let pp_lemma out c =
       let status = match Sat.proved_at_0 c.cut_lit with
+        | _ when in_core c.cut_lit -> "in_proof"
         | None -> "unknown"
-        | Some _ when in_core c.cut_lit -> "in_proof"
         | Some true -> "proved"
         | Some false -> "refuted"
       in
-      Format.fprintf out "@[<hv>@{<Green>*@} %s %a@]"
-        status Cut_form.pp c.cut_form
+      Format.fprintf out "@[<4>@[<hv>@{<Green>*@} %s %a@]%a@]"
+        status Cut_form.pp c.cut_form (Fmt.some pp_reason) c.cut_reason
     in
     let l = lemma_seq |> Sequence.to_rev_list in
     Format.fprintf out "@[<v2>lemmas (%d): {@ %a@,@]}"
@@ -423,9 +511,9 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
           (fun c ->
              Proof.Parent.from @@ Proof.S.mk_c proof_st @@
              SClause.make ~trail:Trail.empty c)
-        |> Proof.Step.inference ~rule:(Proof.Rule.mk "lemma")
+        |> Proof.Step.simp ~rule:(Proof.Rule.mk "lemma")
       in
-      let cut = introduce_cut f proof in
+      let cut = introduce_cut ~reason:Fmt.(return "in-input") f proof in
       let all_clauses = cut_res_clauses cut |> Sequence.to_rev_list in
       add_lemma cut;
       Signal.send on_input_lemma cut;
@@ -463,10 +551,11 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     );
     E.add_unary_inf "avatar_check_empty" check_empty;
     E.add_generate "avatar_check_sat" check_satisfiability;
+    E.add_generate "avatar.lemmas" inf_new_lemmas;
     E.add_clause_conversion convert_lemma;
     E.add_is_trivial_trail trail_is_trivial;
     if E.flex_get k_simplify_trail then (
-      E.add_simplify simplify_trail;
+      E.add_unary_simplify simplify_trail;
       if E.flex_get k_back_simplify_trail then (
         E.add_backward_simplify backward_simplify_trails;
       );

@@ -353,7 +353,7 @@ and lexico_order ~eq ~orient_lpo l1 l2 =
     | Some c -> c
 
 module FO = struct
-  module T = FOTerm
+  module T = Term
   type term = T.t
   module TC = T.Classic
 

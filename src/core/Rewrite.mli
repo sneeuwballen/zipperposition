@@ -1,9 +1,22 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Rewriting} *)
+(** {1 Rewriting on Terms and Literals} *)
 
-type term = FOTerm.t
+(** Rewriting is a (relatively) efficient way of computing on terms
+    and literals using rules that come from the input.
+    Each rule is a pair [lhs, rhs] (left-hand side, right-hand side)
+    that means that objects matching [lhs] should be rewritten into [rhs].
+
+    For term rules, [lhs] and [rhs] are both terms (with [vars rhs ⊆ vars lhs]).
+
+    For literal rules, [lhs] is an atomic literal,
+    and [rhs] is a list of clauses.
+
+    This is used for {b Deduction Modulo} in the prover.
+*)
+
+type term = Term.t
 
 type defined_cst
 (** Payload of a defined function symbol or type *)
@@ -19,10 +32,13 @@ module Term : sig
 
     val lhs : t -> term
     val rhs : t -> term
-    val vars : t -> FOTerm.VarSet.t
+    val vars : t -> Term.VarSet.t
     val vars_l : t -> Type.t HVar.t list
     val head_id : t -> ID.t
     val args : t -> term list
+    val arity : t -> int
+
+    val as_lit : t -> Literal.t
 
     val make_const : ID.t -> Type.t -> term -> t
     (** [make_const id ty rhs] is the same as [T.const id ty --> rhs] *)
@@ -55,12 +71,13 @@ module Term : sig
      whenever [f] is a defined constant with one rule which matches [l] *)
 
   val narrow_term :
-    ?subst:Subst.t ->
+    ?subst:Unif_subst.t ->
     scope_rules:Scoped.scope ->
     term Scoped.t ->
-    (rule * Subst.t) Sequence.t
+    (rule * Unif_subst.t) Sequence.t
     (** [narrow_term ~scope_rule t] finds the set of rules [(l --> r)]
-        in IDs and substitutions [sigma] such that [sigma(l) = sigma(t)] *)
+        in IDs and substitutions [sigma] such that [sigma(l) = sigma(t)]
+        @param scope_rules used for rules (LEFT) *)
 end
 
 (** {2 Rewriting on Literals and Clauses} *)
@@ -74,6 +91,7 @@ module Lit : sig
     val rhs : t -> Literal.t list list
     val make : Literal.t -> Literal.t list list -> t
     val is_equational : t -> bool
+    val as_clauses : t -> Literals.t list
     val head_id : t -> ID.t option
     val compare : t -> t -> int
     val pp : t CCFormat.printer
@@ -84,12 +102,13 @@ module Lit : sig
       if no rule applies *)
 
   val narrow_lit :
-    ?subst:Subst.t ->
+    ?subst:Unif_subst.t ->
     scope_rules:Scoped.scope ->
     Literal.t Scoped.t ->
-    (rule * Subst.t) Sequence.t
+    (rule * Unif_subst.t) Sequence.t
   (** [narrow_term rules lit] finds the set of rules [(l --> clauses) in rules]
-      and substitutions [sigma] such that [sigma(l) = sigma(tit)] *)
+      and substitutions [sigma] such that [sigma(l) = sigma(lit)]
+      @param scope_rules used for rules (LEFT) *)
 end
 
 (** {2 Rules in General} *)
@@ -105,8 +124,7 @@ module Rule : sig
   val pp : t CCFormat.printer
 
   val make_lit : Literal.t -> Literal.t list list -> t
-  (** Make a literal rule, unless the right-hand side is an atomic term too,
-      in which case we make a term rule *)
+  (** Make a literal rule *)
 end
 
 module Rule_set : CCSet.S with type elt = rule
@@ -144,6 +162,12 @@ module Defined_cst : sig
   (** [declare_or_add id rule] defines [id] if it's not already a
       defined constant, and add [rule] to it *)
 
+  val declare_proj : Ind_ty.projector -> unit
+  (** Declare an inductive projector *)
+
+  val declare_cstor : Ind_ty.constructor -> unit
+  (** Add a rewrite rule [cstor (proj1 x)…(projn x) --> x] *)
+
   val add_term_rule : t -> Term.rule -> unit
   val add_term_rule_l : t -> Term.rule list -> unit
   val add_lit_rule : t -> Lit.rule -> unit
@@ -160,6 +184,9 @@ end
 val as_defined_cst : ID.t -> defined_cst option
 
 val is_defined_cst : ID.t -> bool
+
+val all_cst : Defined_cst.t Sequence.t
+val all_rules : Rule.t Sequence.t
 
 (**/**)
 exception Payload_defined_cst of defined_cst

@@ -8,7 +8,7 @@
 open Logtk
 
 type ty = Type.t
-type term = FOTerm.t
+type term = Term.t
 
 type t = Hornet_types.lit =
   | Bool of bool

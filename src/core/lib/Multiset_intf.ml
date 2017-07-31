@@ -112,7 +112,7 @@ module type S = sig
   val to_list : t -> (elt * Z.t) list
   (** List of elements with their coefficients *)
 
-  val eq : t -> t -> bool
+  val equal : t -> t -> bool
   (** Check equality of two multisets *)
 
   val cancel : t -> t -> t * t

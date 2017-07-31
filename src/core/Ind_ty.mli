@@ -3,12 +3,25 @@
 
 (** {1 Inductive Types} *)
 
+(** An inductive datatype, defined by a list of constructors
+    (and associated projectors that are defined as partial functions).
+    Inductive types can be mutually recursive. *)
+
 val section : Util.Section.t
 
 (** Constructor for an inductive type *)
-type constructor = {
+type constructor = private {
   cstor_name: ID.t;
   cstor_ty: Type.t;
+  cstor_args: (Type.t * projector) list;
+}
+
+(** A projector for a given constructor and argument position *)
+and projector = private {
+  p_id: ID.t;
+  p_ty: Type.t;
+  p_index: int; (* index of projected argument *)
+  p_cstor: constructor lazy_t;
 }
 
 (** {6 Inductive Types} *)
@@ -62,6 +75,8 @@ val is_recursive : t -> bool
 
 (** {6 Constructors} *)
 
+val mk_constructor : ID.t -> Type.t -> (Type.t * (ID.t * Type.t)) list -> constructor
+
 val is_constructor : ID.t -> bool
 (** true if the symbol is an inductive constructor (zero, successor...) *)
 
@@ -73,9 +88,19 @@ val as_constructor_exn : ID.t -> constructor * t
 (** Unsafe version of {!as_constructor}
     @raise NotAnInductiveConstructor if it fails *)
 
-val contains_inductive_types : FOTerm.t -> bool
+val contains_inductive_types : Term.t -> bool
 (** [true] iff the term contains at least one subterm with
     an inductive type *)
+
+(** {6 Projectors} *)
+
+val projector_id: projector -> ID.t
+val projector_ty: projector -> Type.t
+val projector_idx: projector -> int
+val projector_cstor: projector -> constructor
+
+val as_projector : ID.t -> projector option
+
 
 (**/**)
 
@@ -83,6 +108,6 @@ val contains_inductive_types : FOTerm.t -> bool
 
 exception Payload_ind_type of t
 exception Payload_ind_cstor of constructor * t
-exception Payload_ind_projector of ID.t
+exception Payload_ind_projector of projector
 
 (**/**)

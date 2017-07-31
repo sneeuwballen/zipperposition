@@ -1,0 +1,16 @@
+# expect: unsat
+
+data unit := Unit.
+data nat := Z | S nat.
+data list a := Nil | Cons a (list a).
+
+def same_len : pi a. list a -> list a -> prop where
+  same_len (Nil _) (Nil _);
+  forall x l. ~ same_len (Nil _) (Cons x l);
+  forall x l. ~ same_len (Cons x l) (Nil _);
+  forall x y l1 l2.
+    same_len (Cons x l1) (Cons x l2) = same_len l1 l2.
+
+goal forall (l1 l2 : list unit). (same_len l1 l2 => l1=l2).
+
+

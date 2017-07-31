@@ -11,8 +11,9 @@
   module T = A.T
 
   let unquote s =
-    assert (CCString.prefix ~pre:"\"" s);
-    assert (CCString.suffix ~suf:"\"" s);
+    assert (s <> "");
+    assert (s.[0] = '\'' || s.[0] = '"');
+    assert (s.[String.length s-1] = '\'' || s.[String.length s-1] = '"');
     let s = String.sub s 1 (String.length s-2) in
     CCString.flat_map
       (function
@@ -65,6 +66,7 @@
 %token MATCH
 %token WITH
 %token END
+%token FUN
 
 %token INT
 %token PROP
@@ -83,12 +85,10 @@
 %token PI
 %token VERTICAL_BAR
 
-%token AC
-%token NAME
-
 %token <string> LOWER_WORD
 %token <string> UPPER_WORD
 %token <string> QUOTED
+%token <string> SINGLE_QUOTED
 %token <string> INTEGER
 
 %start <Logtk.UntypedAST.statement> parse_statement
@@ -108,6 +108,7 @@ parse_statement_list: l=list(statement) EOI { l }
 raw_var:
   | w=LOWER_WORD { w }
   | w=UPPER_WORD { w }
+  | w=SINGLE_QUOTED { unquote w }
 
 var_or_wildcard:
   | v=raw_var { T.V v }
@@ -268,6 +269,11 @@ term:
       let loc = L.mk_pos $startpos $endpos in
       T.exists ~loc vars t
     }
+  | FUN vars=typed_var_list DOT t=term
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.lambda ~loc vars t
+    }
   | t=apply_term ARROW u=term
     {
       let loc = L.mk_pos $startpos $endpos in
@@ -289,8 +295,12 @@ term:
       UntypedAST.error loc "expected term"
     }
 
+constructor_arg:
+  | ty=atomic_term { None, ty }
+  | LEFT_PAREN id=raw_var COLON ty=atomic_term RIGHT_PAREN { Some id, ty }
+
 constructor:
-  | v=raw_var l=atomic_term* { v, l }
+  | v=raw_var l=constructor_arg* { v, l }
 
 constructors:
   | VERTICAL_BAR? l=separated_nonempty_list(VERTICAL_BAR, constructor) { l }
@@ -305,8 +315,18 @@ mutual_types:
   | l=separated_nonempty_list(AND, type_def) { l }
 
 attr:
-  | AC { A.A_AC }
-  | NAME COLON n=raw_var { A.A_name n }
+  | a=atomic_attr { a }
+  | s=raw_var l=atomic_attr+ { A.A_app (s, l) }
+  | error {
+      let loc = L.mk_pos $startpos $endpos in
+      UntypedAST.error loc "expected attribute"
+    }
+
+atomic_attr:
+  | s=raw_var { A.A_app (s, []) }
+  | s=QUOTED { A.A_quoted (unquote s) }
+  | LEFT_PAREN a=attr RIGHT_PAREN { a }
+  | LEFT_BRACKET l=separated_list(COMMA, attr) RIGHT_BRACKET { A.A_list l }
 
 attrs:
   | LEFT_BRACKET l=separated_nonempty_list(COMMA, attr) RIGHT_BRACKET

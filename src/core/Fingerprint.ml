@@ -4,14 +4,20 @@
 
 (** {1 Fingerprint term indexing} *)
 
-module T = FOTerm
+module T = Term
 module I = Index
 module S = Subst
 
 let prof_traverse = Util.mk_profiler "fingerprint.traverse"
 
-(* a feature *)
-type feature = A | B | N | S of ID.t
+(* a feature.
+   A = variable
+   B = below variable
+   NonFO = Builtin/nonFO (non-syntactically unifiable)
+   N = invalid position
+   S = symbol
+*)
+type feature = A | B | NonFO | N | S of ID.t
 
 (* a fingerprint function, it computes several features of a term *)
 type fingerprint_fun = T.t -> feature list
@@ -25,6 +31,9 @@ type fingerprint_fun = T.t -> feature list
 let rec gfpf pos t = match pos, T.Classic.view t with
   | [], T.Classic.Var _ -> A
   | [], T.Classic.DB _ -> B
+  | [], _
+    when not (Unif.Ty.type_is_unifiable @@ T.ty t) ||
+         Type.is_fun (T.ty t) -> NonFO
   | [], T.Classic.App (s, _) -> S s
   | i::pos', T.Classic.App (_, l) ->
     begin try gfpf pos' (List.nth l i)  (* recurse in subterm *)
@@ -33,7 +42,7 @@ let rec gfpf pos t = match pos, T.Classic.view t with
   | _::_, T.Classic.DB _ -> N
   | _::_, T.Classic.Var _ -> B  (* under variable *)
   | _, T.Classic.AppBuiltin _
-  | _, T.Classic.NonFO -> B (* don't filter! *)
+  | _, T.Classic.NonFO -> NonFO (* don't filter! *)
 
 (* TODO more efficient way to compute a vector of features: if the fingerprint
    is in BFS, compute features during only one traversal of the term? *)
@@ -66,11 +75,14 @@ let feat_to_int_ = function
   | B -> 1
   | S _ -> 2
   | N -> 3
+  | NonFO -> 4
 
 let cmp_feature f1 f2 = match f1, f2 with
   | A, A
   | B, B
-  | N, N -> 0
+  | N, N
+  | NonFO, NonFO
+    -> 0
   | S s1, S s2 -> ID.compare s1 s2
   | _ -> feat_to_int_ f1 - feat_to_int_ f2
 
@@ -78,6 +90,7 @@ let cmp_feature f1 f2 = match f1, f2 with
 let compatible_features_unif f1 f2 =
   match f1, f2 with
     | S s1, S s2 -> ID.equal s1 s2
+    | NonFO, _ | _, NonFO
     | B, _ | _, B -> true
     | A, N | N, A -> false
     | A, _ | _, A -> true
@@ -88,6 +101,7 @@ let compatible_features_unif f1 f2 =
 let compatible_features_match f1 f2 =
   match f1, f2 with
     | S s1, S s2 -> ID.equal s1 s2
+    | NonFO, _ | _, NonFO
     | B, _ -> true
     | N, N -> true
     | N, _ -> false
@@ -259,7 +273,7 @@ module Make(X : Set.OrderedType) = struct
       Util.exit_prof prof_traverse;
       raise e
 
-  let retrieve_unifiables ?(subst=S.empty) (idx,sc_idx) t k =
+  let retrieve_unifiables ?(subst=Unif_subst.empty) (idx,sc_idx) t k =
     let features = idx.fp (fst t) in
     let compatible = compatible_features_unif in
     traverse ~compatible idx features

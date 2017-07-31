@@ -6,11 +6,11 @@
 
 open Logtk
 
-module T = FOTerm
+module T = Term
 module Fmt = CCFormat
 module BV = CCBV
 
-type term = FOTerm.t
+type term = Term.t
 
 type constr = term * term
 

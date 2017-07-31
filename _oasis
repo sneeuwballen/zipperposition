@@ -62,16 +62,17 @@ Flag "demo"
 Library "logtk"
   Path:             src/core/
   Pack:             true
-  Modules:          InnerTerm, FOTerm, Type, Util, STerm, Interfaces,
+  Modules:          InnerTerm, Term, Type, Util, STerm, Interfaces,
                     DBEnv, Position, Var, HVar, Defined_pos,
-                    Subst, Unif, Signature, Scoped, Unif_intf,
+                    Subst, Signature, Scoped,
+                    Unif, Unif_intf, Unif_constr, Unif_subst, HO_unif,
                     TypeInference, Options, Comparison, Precedence, Builtin,
-                    Ordering, Skolem, Cnf, ID, IDOrBuiltin, SLiteral,
+                    Ordering, Skolem, Cnf, ID, ID_or_builtin, SLiteral,
                     Index, Index_intf, Dtree, Fingerprint, NPDtree, Binder,
-                    Congruence, Congruence_intf,
+                    Congruence, Congruence_intf, Lambda,
                     FeatureVector, FV_tree, UntypedAST, Ind_ty,
                     TypedSTerm, Statement, Flex_state, Compute_prec, 
-                    Ordinal, Rewrite, Test_prop, Input_format,
+                    Ordinal, Rewrite, Test_prop, Input_format, Output_format,
                     LLProof, LLProof_check,
                     Multisets, Literal, Literals, Int_lit, Rat_lit, Monome,
                     lib/Hashcons, lib/ParseLocation, lib/Multiset, lib/LazyList,
@@ -80,15 +81,13 @@ Library "logtk"
   CSources:         util_stubs.c, util_stubs.h
   CCOpt:            -Wextra -Wno-unused-parameter
   BuildDepends:     zarith, unix, sequence, containers,
-                    containers.data, bytes, oclock
+                    containers.data, bytes
 
 Library "logtk_parsers"
   Path:             src/parsers
   Pack:             true
   Modules:          Parse_tptp, Lex_tptp, Ast_tptp, Util_tptp,
-                    Ast_ho, Lex_ho, Parse_ho, Trace_tstp,
-                    Parse_zf, Lex_zf, Util_zf,
-                    Util_tip,
+                    Trace_tstp, Parse_zf, Lex_zf, Util_zf, Util_tip,
                     Parsing_utils, CallProver
   Build$:           flag(parsers)
   Install$:         flag(parsers)
@@ -138,7 +137,8 @@ Library "libzipperposition"
                     calculi/Arith_rat,
                     calculi/Heuristics,
                     calculi/Ind_types,
-                    calculi/Fool
+                    calculi/Fool,
+                    calculi/Higher_order
   InternalModules:  lib/Simplex
   Build$:           flag(parsers) && flag("zipperposition_prover")
   Install$:         flag(parsers) && flag("zipperposition_prover")
@@ -257,15 +257,6 @@ Executable tptp_to_zf
   CompiledObject:   native
   MainIs:           tptp_to_zf.ml
   BuildDepends:     logtk, logtk.parsers
-
-# Orienting rewrite rules with LPO
-Executable orient
-  Path:             src/tools/orient/
-  Build$:           flag(tools) && flag(parsers) && flag(solving)
-  Install$:         flag(tools) && flag(parsers) && flag(solving)
-  CompiledObject:   native
-  MainIs:           orient.ml
-  BuildDepends:     logtk, logtk.parsers, logtk.solving, msat
 
 # proof checking
 Executable proof_check_tstp

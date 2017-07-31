@@ -13,13 +13,23 @@ type res =
   | DefinedCst of int (** (recursive) definition of given stratification level *)
   | Other
 
-let classify id = match ID.payload id with
-  | Ind_ty.Payload_ind_cstor (c,t) -> Cstor (c,t)
-  | Ind_ty.Payload_ind_type x -> Ty x
-  | Ind_ty.Payload_ind_projector id -> Projector id
-  | Rewrite.Payload_defined_cst c ->
-    DefinedCst (Rewrite.Defined_cst.level c)
-  | _ -> Other
+let classify id =
+  let rec aux = function
+    | [] -> Other
+    | p :: tail ->
+      begin match p id with
+        | None -> aux tail
+        | Some x -> x
+      end
+  in
+  let (|>>) p f id = match p id with | None -> None | Some x -> Some (f x) in
+  aux
+    [ (Ind_ty.as_constructor |>> fun (c,t) -> Cstor (c,t));
+      (Ind_ty.as_inductive_ty |>> fun x -> Ty x);
+      (Ind_ty.as_projector |>> fun p -> Projector (Ind_ty.projector_id p));
+      (Rewrite.as_defined_cst |>> fun cst ->
+       DefinedCst (Rewrite.Defined_cst.level cst));
+    ]
 
 let pp_res out = function
   | Ty _ -> Format.fprintf out "ind_ty"

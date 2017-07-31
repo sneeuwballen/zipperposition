@@ -1,0 +1,22 @@
+
+# expect: unsat
+
+# separation logic
+# SWW417-1.p
+
+include "sep_ax.zf".
+
+val x1:ptr.
+val x2:ptr.
+
+assert x1 != nil.
+
+assert x1 != x2.
+
+assert heap (sep (lseg x2 nil) (sep (next x1 x2) emp)).
+
+goal heap (sep (lseg x1 nil) emp).
+
+
+# separation logic
+

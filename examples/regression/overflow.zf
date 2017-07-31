@@ -1,0 +1,8 @@
+
+# expect: error
+
+#goal forall (a b : type) (p : set (tup a b)) (y : (tup a b)).
+#   mem _ y p => mem _ (pair _ _ (fst _ _ y) (snd _ _ y)) p.
+
+goal forall (a b : type) (p : set (tup a b)) (y : (tup a b)) (x : a).
+   mem _ y p && x = fst _ _ y => mem _ (pair _ _ x (snd _ _ y)) p.

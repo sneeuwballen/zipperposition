@@ -1,0 +1,9 @@
+# expect: unsat
+
+include "nat.zf".
+include "list.zf".
+
+# NOTE: lemmas
+lemma forall L X. rev (append L (cons X nil)) = cons X (rev L).
+
+goal forall (L:list). rev (rev L) = L.

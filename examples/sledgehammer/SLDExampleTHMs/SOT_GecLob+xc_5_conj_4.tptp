@@ -1,0 +1,4040 @@
+%------------------------------------------------------------------------------
+tff(ty_n_t__fun_It__List__Olist_It__HOL__Obool_J_Mt__fun_It__List__Olist_It__HOL__Obool_J_Mt__HOL__Obool_J_J,type,(
+    fun_li1658310573l_bool: $tType )).
+
+tff(ty_n_t__fun_It__List__Olist_It__Nat__Onat_J_Mt__fun_It__List__Olist_It__Nat__Onat_J_Mt__HOL__Obool_J_J,type,(
+    fun_li772997769t_bool: $tType )).
+
+tff(ty_n_t__fun_It__fun_It__HOL__Obool_Mt__HOL__Obool_J_Mt__fun_It__HOL__Obool_Mt__HOL__Obool_J_J,type,(
+    fun_fu131099011l_bool: $tType )).
+
+tff(ty_n_t__fun_It__fun_It__Nat__Onat_Mt__HOL__Obool_J_Mt__fun_It__Nat__Onat_Mt__HOL__Obool_J_J,type,(
+    fun_fu2117062723t_bool: $tType )).
+
+tff(ty_n_t__fun_It__List__Olist_Itf__a_J_Mt__fun_It__List__Olist_Itf__a_J_Mt__HOL__Obool_J_J,type,(
+    fun_li1082611693a_bool: $tType )).
+
+tff(ty_n_t__fun_It__fun_Itf__a_Mt__HOL__Obool_J_Mt__fun_Itf__a_Mt__HOL__Obool_J_J,type,(
+    fun_fu1944254005a_bool: $tType )).
+
+tff(ty_n_t__fun_It__HOL__Obool_Mt__fun_It__HOL__Obool_Mt__HOL__Obool_J_J,type,(
+    fun_bo1373903021l_bool: $tType )).
+
+tff(ty_n_t__fun_It__Nat__Onat_Mt__fun_It__Nat__Onat_Mt__HOL__Obool_J_J,type,(
+    fun_nat_fun_nat_bool: $tType )).
+
+tff(ty_n_t__fun_It__List__Olist_It__HOL__Obool_J_Mt__HOL__Obool_J,type,(
+    fun_list_bool_bool: $tType )).
+
+tff(ty_n_t__fun_It__List__Olist_It__Nat__Onat_J_Mt__HOL__Obool_J,type,(
+    fun_list_nat_bool: $tType )).
+
+tff(ty_n_t__fun_It__List__Olist_Itf__a_J_Mt__HOL__Obool_J,type,(
+    fun_list_a_bool: $tType )).
+
+tff(ty_n_t__fun_Itf__a_Mt__fun_Itf__a_Mt__HOL__Obool_J_J,type,(
+    fun_a_fun_a_bool: $tType )).
+
+tff(ty_n_t__fun_It__HOL__Obool_Mt__HOL__Obool_J,type,(
+    fun_bool_bool: $tType )).
+
+tff(ty_n_t__fun_It__Nat__Onat_Mt__HOL__Obool_J,type,(
+    fun_nat_bool: $tType )).
+
+tff(ty_n_t__fun_It__HOL__Obool_Mt__Nat__Onat_J,type,(
+    fun_bool_nat: $tType )).
+
+tff(ty_n_t__fun_It__Nat__Onat_Mt__Nat__Onat_J,type,(
+    fun_nat_nat: $tType )).
+
+tff(ty_n_t__Option__Ooption_It__HOL__Obool_J,type,(
+    option_bool: $tType )).
+
+tff(ty_n_t__Option__Ooption_It__Nat__Onat_J,type,(
+    option_nat: $tType )).
+
+tff(ty_n_t__List__Olist_It__HOL__Obool_J,type,(
+    list_bool: $tType )).
+
+tff(ty_n_t__fun_Itf__a_Mt__HOL__Obool_J,type,(
+    fun_a_bool: $tType )).
+
+tff(ty_n_t__fun_It__HOL__Obool_Mtf__a_J,type,(
+    fun_bool_a: $tType )).
+
+tff(ty_n_t__List__Olist_It__Nat__Onat_J,type,(
+    list_nat: $tType )).
+
+tff(ty_n_t__fun_Itf__a_Mt__Nat__Onat_J,type,(
+    fun_a_nat: $tType )).
+
+tff(ty_n_t__fun_It__Nat__Onat_Mtf__a_J,type,(
+    fun_nat_a: $tType )).
+
+tff(ty_n_t__Set__Oset_It__HOL__Obool_J,type,(
+    set_bool: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Nat__Onat_J,type,(
+    set_nat: $tType )).
+
+tff(ty_n_t__Option__Ooption_Itf__a_J,type,(
+    option_a: $tType )).
+
+tff(ty_n_t__List__Olist_Itf__a_J,type,(
+    list_a: $tType )).
+
+tff(ty_n_t__fun_Itf__a_Mtf__a_J,type,(
+    fun_a_a: $tType )).
+
+tff(ty_n_t__Set__Oset_Itf__a_J,type,(
+    set_a: $tType )).
+
+tff(ty_n_t__HOL__Obool,type,(
+    bool: $tType )).
+
+tff(ty_n_t__Nat__Onat,type,(
+    nat: $tType )).
+
+tff(ty_n_tf__a,type,(
+    a: $tType )).
+
+tff(sy_c_ATP_058Lamm__a____,type,(
+    aTP_Lamm_a: fun_a_bool )).
+
+tff(sy_c_ATP_058Lamm__aa____,type,(
+    aTP_Lamm_aa: set_a > fun_a_bool )).
+
+tff(sy_c_ATP_058Lamm__ab____,type,(
+    aTP_Lamm_ab: fun_bo1373903021l_bool )).
+
+tff(sy_c_ATP_058Lamm__ac____,type,(
+    aTP_Lamm_ac: list_bool > fun_bo1373903021l_bool )).
+
+tff(sy_c_ATP_058Lamm__ad____,type,(
+    aTP_Lamm_ad: fun_nat_fun_nat_bool )).
+
+tff(sy_c_ATP_058Lamm__ae____,type,(
+    aTP_Lamm_ae: list_nat > fun_nat_fun_nat_bool )).
+
+tff(sy_c_ATP_058Lamm__af____,type,(
+    aTP_Lamm_af: fun_a_fun_a_bool )).
+
+tff(sy_c_ATP_058Lamm__ag____,type,(
+    aTP_Lamm_ag: list_a > fun_a_fun_a_bool )).
+
+tff(sy_c_ATP_058Lamm__ah____,type,(
+    aTP_Lamm_ah: fun_a_a )).
+
+tff(sy_c_ATP_058Lamm__ai____,type,(
+    aTP_Lamm_ai: fun_nat_nat )).
+
+tff(sy_c_ATP_058Lamm__aj____,type,(
+    aTP_Lamm_aj: fun_bool_bool )).
+
+tff(sy_c_ATP_058Lamm__ak____,type,(
+    aTP_Lamm_ak: list_a > fun_fu1944254005a_bool )).
+
+tff(sy_c_ATP_058Lamm__al____,type,(
+    aTP_Lamm_al: list_nat > fun_fu2117062723t_bool )).
+
+tff(sy_c_ATP_058Lamm__am____,type,(
+    aTP_Lamm_am: list_bool > fun_fu131099011l_bool )).
+
+tff(sy_c_COMBI_001t__Nat__Onat,type,(
+    cOMBI_nat: fun_nat_nat )).
+
+tff(sy_c_COMBI_001tf__a,type,(
+    cOMBI_a: fun_a_a )).
+
+tff(sy_c_Groups_Ominus__class_Ominus_001t__Nat__Onat,type,(
+    minus_minus_nat: nat > fun_nat_nat )).
+
+tff(sy_c_Groups_Oone__class_Oone_001t__Nat__Onat,type,(
+    one_one_nat: nat )).
+
+tff(sy_c_Groups_Oplus__class_Oplus_001t__Nat__Onat,type,(
+    plus_plus_nat: nat > fun_nat_nat )).
+
+tff(sy_c_Groups_Ozero__class_Ozero_001t__Nat__Onat,type,(
+    zero_zero_nat: nat )).
+
+tff(sy_c_HOL_Oinduct__conj,type,(
+    induct_conj: fun_bo1373903021l_bool )).
+
+tff(sy_c_HOL_Oinduct__false,type,(
+    induct_false: $o )).
+
+tff(sy_c_HOL_Oinduct__true,type,(
+    induct_true: $o )).
+
+tff(sy_c_Lattices_Osup__class_Osup_001t__Set__Oset_It__HOL__Obool_J,type,(
+    sup_sup_set_bool: ( set_bool * set_bool ) > set_bool )).
+
+tff(sy_c_Lattices_Osup__class_Osup_001t__Set__Oset_It__Nat__Onat_J,type,(
+    sup_sup_set_nat: ( set_nat * set_nat ) > set_nat )).
+
+tff(sy_c_Lattices_Osup__class_Osup_001t__Set__Oset_Itf__a_J,type,(
+    sup_sup_set_a: ( set_a * set_a ) > set_a )).
+
+tff(sy_c_Lattices__Big_Olinorder__class_OMin_001t__HOL__Obool,type,(
+    lattic1644070296n_bool: set_bool > bool )).
+
+tff(sy_c_Lattices__Big_Olinorder__class_OMin_001t__Nat__Onat,type,(
+    lattic10116623in_nat: set_nat > nat )).
+
+tff(sy_c_Lattices__Big_Olinorder__class_OMin_001tf__a,type,(
+    lattic1344055935_Min_a: set_a > a )).
+
+tff(sy_c_List_Oappend_001t__HOL__Obool,type,(
+    append_bool: ( list_bool * list_bool ) > list_bool )).
+
+tff(sy_c_List_Oappend_001t__Nat__Onat,type,(
+    append_nat: ( list_nat * list_nat ) > list_nat )).
+
+tff(sy_c_List_Oappend_001tf__a,type,(
+    append_a: ( list_a * list_a ) > list_a )).
+
+tff(sy_c_List_Odistinct_001t__HOL__Obool,type,(
+    distinct_bool: list_bool > $o )).
+
+tff(sy_c_List_Odistinct_001t__Nat__Onat,type,(
+    distinct_nat: list_nat > $o )).
+
+tff(sy_c_List_Odistinct_001tf__a,type,(
+    distinct_a: list_a > $o )).
+
+tff(sy_c_List_OdropWhile_001t__HOL__Obool,type,(
+    dropWhile_bool: ( fun_bool_bool * list_bool ) > list_bool )).
+
+tff(sy_c_List_OdropWhile_001t__Nat__Onat,type,(
+    dropWhile_nat: ( fun_nat_bool * list_nat ) > list_nat )).
+
+tff(sy_c_List_OdropWhile_001tf__a,type,(
+    dropWhile_a: ( fun_a_bool * list_a ) > list_a )).
+
+tff(sy_c_List_Ofind_001t__HOL__Obool,type,(
+    find_bool: ( fun_bool_bool * list_bool ) > option_bool )).
+
+tff(sy_c_List_Ofind_001t__Nat__Onat,type,(
+    find_nat: ( fun_nat_bool * list_nat ) > option_nat )).
+
+tff(sy_c_List_Ofind_001tf__a,type,(
+    find_a: ( fun_a_bool * list_a ) > option_a )).
+
+tff(sy_c_List_Oinsert_001t__HOL__Obool,type,(
+    insert_bool: ( bool * list_bool ) > list_bool )).
+
+tff(sy_c_List_Oinsert_001t__Nat__Onat,type,(
+    insert_nat: ( nat * list_nat ) > list_nat )).
+
+tff(sy_c_List_Oinsert_001tf__a,type,(
+    insert_a: ( a * list_a ) > list_a )).
+
+tff(sy_c_List_Olast_001t__HOL__Obool,type,(
+    last_bool: list_bool > bool )).
+
+tff(sy_c_List_Olast_001t__Nat__Onat,type,(
+    last_nat: list_nat > nat )).
+
+tff(sy_c_List_Olast_001tf__a,type,(
+    last_a: list_a > a )).
+
+tff(sy_c_List_Olinorder__class_Oinsort__insert__key_001t__HOL__Obool_001t__HOL__Obool,type,(
+    linord1175135810l_bool: ( fun_bool_bool * bool * list_bool ) > list_bool )).
+
+tff(sy_c_List_Olinorder__class_Oinsort__insert__key_001t__Nat__Onat_001t__Nat__Onat,type,(
+    linord1132273316at_nat: ( fun_nat_nat * nat * list_nat ) > list_nat )).
+
+tff(sy_c_List_Olinorder__class_Oinsort__insert__key_001tf__a_001tf__a,type,(
+    linord168462850ey_a_a: ( fun_a_a * a * list_a ) > list_a )).
+
+tff(sy_c_List_Olinorder__class_Oinsort__key_001t__HOL__Obool_001t__HOL__Obool,type,(
+    linord580562875l_bool: ( fun_bool_bool * bool * list_bool ) > list_bool )).
+
+tff(sy_c_List_Olinorder__class_Oinsort__key_001t__HOL__Obool_001t__Nat__Onat,type,(
+    linord2132966188ol_nat: ( fun_bool_nat * bool * list_bool ) > list_bool )).
+
+tff(sy_c_List_Olinorder__class_Oinsort__key_001t__HOL__Obool_001tf__a,type,(
+    linord244570786bool_a: ( fun_bool_a * bool * list_bool ) > list_bool )).
+
+tff(sy_c_List_Olinorder__class_Oinsort__key_001t__Nat__Onat_001t__HOL__Obool,type,(
+    linord1249538698t_bool: ( fun_nat_bool * nat * list_nat ) > list_nat )).
+
+tff(sy_c_List_Olinorder__class_Oinsort__key_001t__Nat__Onat_001t__Nat__Onat,type,(
+    linord1318720669at_nat: ( fun_nat_nat * nat * list_nat ) > list_nat )).
+
+tff(sy_c_List_Olinorder__class_Oinsort__key_001t__Nat__Onat_001tf__a,type,(
+    linord719518577_nat_a: ( fun_nat_a * nat * list_nat ) > list_nat )).
+
+tff(sy_c_List_Olinorder__class_Oinsort__key_001tf__a_001t__HOL__Obool,type,(
+    linord1882544788a_bool: ( fun_a_bool * a * list_a ) > list_a )).
+
+tff(sy_c_List_Olinorder__class_Oinsort__key_001tf__a_001t__Nat__Onat,type,(
+    linord343050771_a_nat: ( fun_a_nat * a * list_a ) > list_a )).
+
+tff(sy_c_List_Olinorder__class_Oinsort__key_001tf__a_001tf__a,type,(
+    linord999585659ey_a_a: ( fun_a_a * a * list_a ) > list_a )).
+
+tff(sy_c_List_Olinorder__class_Osort__key_001t__HOL__Obool_001t__HOL__Obool,type,(
+    linord1730061248l_bool: ( fun_bool_bool * list_bool ) > list_bool )).
+
+tff(sy_c_List_Olinorder__class_Osort__key_001t__Nat__Onat_001t__Nat__Onat,type,(
+    linord464714530at_nat: ( fun_nat_nat * list_nat ) > list_nat )).
+
+tff(sy_c_List_Olinorder__class_Osort__key_001tf__a_001tf__a,type,(
+    linord841154432ey_a_a: ( fun_a_a * list_a ) > list_a )).
+
+tff(sy_c_List_Olinorder__class_Osorted_001t__HOL__Obool,type,(
+    linorder_sorted_bool: list_bool > $o )).
+
+tff(sy_c_List_Olinorder__class_Osorted_001t__Nat__Onat,type,(
+    linorder_sorted_nat: list_nat > $o )).
+
+tff(sy_c_List_Olinorder__class_Osorted_001tf__a,type,(
+    linorder_sorted_a: list_a > $o )).
+
+tff(sy_c_List_Olist_OCons_001t__HOL__Obool,type,(
+    cons_bool: ( bool * list_bool ) > list_bool )).
+
+tff(sy_c_List_Olist_OCons_001t__Nat__Onat,type,(
+    cons_nat: ( nat * list_nat ) > list_nat )).
+
+tff(sy_c_List_Olist_OCons_001tf__a,type,(
+    cons_a: ( a * list_a ) > list_a )).
+
+tff(sy_c_List_Olist_ONil_001t__HOL__Obool,type,(
+    nil_bool: list_bool )).
+
+tff(sy_c_List_Olist_ONil_001t__Nat__Onat,type,(
+    nil_nat: list_nat )).
+
+tff(sy_c_List_Olist_ONil_001tf__a,type,(
+    nil_a: list_a )).
+
+tff(sy_c_List_Olist_Oset_001t__HOL__Obool,type,(
+    set_bool2: list_bool > set_bool )).
+
+tff(sy_c_List_Olist_Oset_001t__Nat__Onat,type,(
+    set_nat2: list_nat > set_nat )).
+
+tff(sy_c_List_Olist_Oset_001tf__a,type,(
+    set_a2: list_a > set_a )).
+
+tff(sy_c_List_Omember_001t__HOL__Obool,type,(
+    member_bool: list_bool > fun_bool_bool )).
+
+tff(sy_c_List_Omember_001t__Nat__Onat,type,(
+    member_nat: list_nat > fun_nat_bool )).
+
+tff(sy_c_List_Omember_001tf__a,type,(
+    member_a: list_a > fun_a_bool )).
+
+tff(sy_c_List_Onth_001t__HOL__Obool,type,(
+    nth_bool: list_bool > fun_nat_bool )).
+
+tff(sy_c_List_Onth_001t__Nat__Onat,type,(
+    nth_nat: list_nat > fun_nat_nat )).
+
+tff(sy_c_List_Onth_001tf__a,type,(
+    nth_a: list_a > fun_nat_a )).
+
+tff(sy_c_List_Oord__class_Olexordp_001t__HOL__Obool,type,(
+    ord_lexordp_bool: fun_li1658310573l_bool )).
+
+tff(sy_c_List_Oord__class_Olexordp_001t__Nat__Onat,type,(
+    ord_lexordp_nat: fun_li772997769t_bool )).
+
+tff(sy_c_List_Oord__class_Olexordp_001tf__a,type,(
+    ord_lexordp_a: fun_li1082611693a_bool )).
+
+tff(sy_c_List_Oord__class_Olexordp__eq_001t__HOL__Obool,type,(
+    ord_lexordp_eq_bool: fun_li1658310573l_bool )).
+
+tff(sy_c_List_Oord__class_Olexordp__eq_001t__Nat__Onat,type,(
+    ord_lexordp_eq_nat: fun_li772997769t_bool )).
+
+tff(sy_c_List_Oord__class_Olexordp__eq_001tf__a,type,(
+    ord_lexordp_eq_a: fun_li1082611693a_bool )).
+
+tff(sy_c_List_Oremove1_001t__HOL__Obool,type,(
+    remove1_bool: ( bool * list_bool ) > list_bool )).
+
+tff(sy_c_List_Oremove1_001t__Nat__Onat,type,(
+    remove1_nat: ( nat * list_nat ) > list_nat )).
+
+tff(sy_c_List_Oremove1_001tf__a,type,(
+    remove1_a: ( a * list_a ) > list_a )).
+
+tff(sy_c_List_OtakeWhile_001t__HOL__Obool,type,(
+    takeWhile_bool: ( fun_bool_bool * list_bool ) > list_bool )).
+
+tff(sy_c_List_OtakeWhile_001t__Nat__Onat,type,(
+    takeWhile_nat: ( fun_nat_bool * list_nat ) > list_nat )).
+
+tff(sy_c_List_OtakeWhile_001tf__a,type,(
+    takeWhile_a: ( fun_a_bool * list_a ) > list_a )).
+
+tff(sy_c_List__extra_Ois__sorted__list__of__set_001t__HOL__Obool,type,(
+    list_i193099606t_bool: ( set_bool * list_bool ) > $o )).
+
+tff(sy_c_List__extra_Ois__sorted__list__of__set_001t__Nat__Onat,type,(
+    list_i1095245009et_nat: ( set_nat * list_nat ) > $o )).
+
+tff(sy_c_List__extra_Ois__sorted__list__of__set_001tf__a,type,(
+    list_i2074056765_set_a: ( set_a * list_a ) > $o )).
+
+tff(sy_c_Nat_OSuc,type,(
+    suc: fun_nat_nat )).
+
+tff(sy_c_Nat_Osize__class_Osize_001t__List__Olist_It__HOL__Obool_J,type,(
+    size_size_list_bool: list_bool > nat )).
+
+tff(sy_c_Nat_Osize__class_Osize_001t__List__Olist_It__Nat__Onat_J,type,(
+    size_size_list_nat: list_nat > nat )).
+
+tff(sy_c_Nat_Osize__class_Osize_001t__List__Olist_Itf__a_J,type,(
+    size_size_list_a: list_a > nat )).
+
+tff(sy_c_Option_Ooption_OSome_001t__HOL__Obool,type,(
+    some_bool: bool > option_bool )).
+
+tff(sy_c_Option_Ooption_OSome_001t__Nat__Onat,type,(
+    some_nat: nat > option_nat )).
+
+tff(sy_c_Option_Ooption_OSome_001tf__a,type,(
+    some_a: a > option_a )).
+
+tff(sy_c_Orderings_Obot__class_Obot_001t__Set__Oset_It__HOL__Obool_J,type,(
+    bot_bot_set_bool: set_bool )).
+
+tff(sy_c_Orderings_Obot__class_Obot_001t__Set__Oset_It__Nat__Onat_J,type,(
+    bot_bot_set_nat: set_nat )).
+
+tff(sy_c_Orderings_Obot__class_Obot_001t__Set__Oset_Itf__a_J,type,(
+    bot_bot_set_a: set_a )).
+
+tff(sy_c_Orderings_Oord__class_Oless_001t__HOL__Obool,type,(
+    ord_less_bool: fun_bo1373903021l_bool )).
+
+tff(sy_c_Orderings_Oord__class_Oless_001t__Nat__Onat,type,(
+    ord_less_nat: fun_nat_fun_nat_bool )).
+
+tff(sy_c_Orderings_Oord__class_Oless_001tf__a,type,(
+    ord_less_a: fun_a_fun_a_bool )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__HOL__Obool,type,(
+    ord_less_eq_bool: fun_bo1373903021l_bool )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Nat__Onat,type,(
+    ord_less_eq_nat: fun_nat_fun_nat_bool )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Set__Oset_It__HOL__Obool_J,type,(
+    ord_less_eq_set_bool: ( set_bool * set_bool ) > $o )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Set__Oset_It__Nat__Onat_J,type,(
+    ord_less_eq_set_nat: ( set_nat * set_nat ) > $o )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Set__Oset_Itf__a_J,type,(
+    ord_less_eq_set_a: ( set_a * set_a ) > $o )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001tf__a,type,(
+    ord_less_eq_a: fun_a_fun_a_bool )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001t__HOL__Obool_001t__HOL__Obool,type,(
+    order_mono_bool_bool: fun_bool_bool > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001t__HOL__Obool_001t__Nat__Onat,type,(
+    order_mono_bool_nat: fun_bool_nat > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001t__HOL__Obool_001tf__a,type,(
+    order_mono_bool_a: fun_bool_a > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001t__Nat__Onat_001t__HOL__Obool,type,(
+    order_mono_nat_bool: fun_nat_bool > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001t__Nat__Onat_001t__Nat__Onat,type,(
+    order_mono_nat_nat: fun_nat_nat > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001t__Nat__Onat_001tf__a,type,(
+    order_mono_nat_a: fun_nat_a > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001tf__a_001t__HOL__Obool,type,(
+    order_mono_a_bool: fun_a_bool > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001tf__a_001t__Nat__Onat,type,(
+    order_mono_a_nat: fun_a_nat > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001tf__a_001tf__a,type,(
+    order_mono_a_a: fun_a_a > $o )).
+
+tff(sy_c_Set_OCollect_001t__HOL__Obool,type,(
+    collect_bool: fun_bool_bool > set_bool )).
+
+tff(sy_c_Set_OCollect_001t__Nat__Onat,type,(
+    collect_nat: fun_nat_bool > set_nat )).
+
+tff(sy_c_Set_OCollect_001tf__a,type,(
+    collect_a: fun_a_bool > set_a )).
+
+tff(sy_c_Set_Oinsert_001t__HOL__Obool,type,(
+    insert_bool2: ( bool * set_bool ) > set_bool )).
+
+tff(sy_c_Set_Oinsert_001t__Nat__Onat,type,(
+    insert_nat2: ( nat * set_nat ) > set_nat )).
+
+tff(sy_c_Set_Oinsert_001tf__a,type,(
+    insert_a2: ( a * set_a ) > set_a )).
+
+tff(sy_c_Set__Interval_Oord__class_OatLeastAtMost_001t__HOL__Obool,type,(
+    set_or842601420t_bool: ( bool * bool ) > set_bool )).
+
+tff(sy_c_Set__Interval_Oord__class_OatLeastAtMost_001t__Nat__Onat,type,(
+    set_or601162459st_nat: ( nat * nat ) > set_nat )).
+
+tff(sy_c_Set__Interval_Oord__class_OatLeastAtMost_001tf__a,type,(
+    set_or411607219Most_a: ( a * a ) > set_a )).
+
+tff(sy_c_Set__Interval_Oord__class_OatLeastLessThan_001t__HOL__Obool,type,(
+    set_or643061160n_bool: ( bool * bool ) > set_bool )).
+
+tff(sy_c_Set__Interval_Oord__class_OatLeastLessThan_001t__Nat__Onat,type,(
+    set_or562006527an_nat: ( nat * nat ) > set_nat )).
+
+tff(sy_c_Set__Interval_Oord__class_OatLeastLessThan_001tf__a,type,(
+    set_or850827919Than_a: ( a * a ) > set_a )).
+
+tff(sy_c_aa_001t__HOL__Obool_001t__HOL__Obool,type,(
+    aa_bool_bool: ( fun_bool_bool * bool ) > bool )).
+
+tff(sy_c_aa_001t__HOL__Obool_001t__Nat__Onat,type,(
+    aa_bool_nat: ( fun_bool_nat * bool ) > nat )).
+
+tff(sy_c_aa_001t__HOL__Obool_001t__fun_It__HOL__Obool_Mt__HOL__Obool_J,type,(
+    aa_boo1142376798l_bool: ( fun_bo1373903021l_bool * bool ) > fun_bool_bool )).
+
+tff(sy_c_aa_001t__HOL__Obool_001tf__a,type,(
+    aa_bool_a: ( fun_bool_a * bool ) > a )).
+
+tff(sy_c_aa_001t__List__Olist_It__HOL__Obool_J_001t__HOL__Obool,type,(
+    aa_list_bool_bool: ( fun_list_bool_bool * list_bool ) > bool )).
+
+tff(sy_c_aa_001t__List__Olist_It__HOL__Obool_J_001t__fun_It__List__Olist_It__HOL__Obool_J_Mt__HOL__Obool_J,type,(
+    aa_lis482927454l_bool: ( fun_li1658310573l_bool * list_bool ) > fun_list_bool_bool )).
+
+tff(sy_c_aa_001t__List__Olist_It__Nat__Onat_J_001t__HOL__Obool,type,(
+    aa_list_nat_bool: ( fun_list_nat_bool * list_nat ) > bool )).
+
+tff(sy_c_aa_001t__List__Olist_It__Nat__Onat_J_001t__fun_It__List__Olist_It__Nat__Onat_J_Mt__HOL__Obool_J,type,(
+    aa_lis1480171250t_bool: ( fun_li772997769t_bool * list_nat ) > fun_list_nat_bool )).
+
+tff(sy_c_aa_001t__List__Olist_Itf__a_J_001t__HOL__Obool,type,(
+    aa_list_a_bool: ( fun_list_a_bool * list_a ) > bool )).
+
+tff(sy_c_aa_001t__List__Olist_Itf__a_J_001t__fun_It__List__Olist_Itf__a_J_Mt__HOL__Obool_J,type,(
+    aa_lis1082568734a_bool: ( fun_li1082611693a_bool * list_a ) > fun_list_a_bool )).
+
+tff(sy_c_aa_001t__Nat__Onat_001t__HOL__Obool,type,(
+    aa_nat_bool: ( fun_nat_bool * nat ) > bool )).
+
+tff(sy_c_aa_001t__Nat__Onat_001t__Nat__Onat,type,(
+    aa_nat_nat: ( fun_nat_nat * nat ) > nat )).
+
+tff(sy_c_aa_001t__Nat__Onat_001t__fun_It__Nat__Onat_Mt__HOL__Obool_J,type,(
+    aa_nat_fun_nat_bool: ( fun_nat_fun_nat_bool * nat ) > fun_nat_bool )).
+
+tff(sy_c_aa_001t__Nat__Onat_001tf__a,type,(
+    aa_nat_a: ( fun_nat_a * nat ) > a )).
+
+tff(sy_c_aa_001t__fun_It__HOL__Obool_Mt__HOL__Obool_J_001t__fun_It__HOL__Obool_Mt__HOL__Obool_J,type,(
+    aa_fun943231556l_bool: ( fun_fu131099011l_bool * fun_bool_bool ) > fun_bool_bool )).
+
+tff(sy_c_aa_001t__fun_It__Nat__Onat_Mt__HOL__Obool_J_001t__fun_It__Nat__Onat_Mt__HOL__Obool_J,type,(
+    aa_fun1751493308t_bool: ( fun_fu2117062723t_bool * fun_nat_bool ) > fun_nat_bool )).
+
+tff(sy_c_aa_001t__fun_Itf__a_Mt__HOL__Obool_J_001t__fun_Itf__a_Mt__HOL__Obool_J,type,(
+    aa_fun476504950a_bool: ( fun_fu1944254005a_bool * fun_a_bool ) > fun_a_bool )).
+
+tff(sy_c_aa_001tf__a_001t__HOL__Obool,type,(
+    aa_a_bool: ( fun_a_bool * a ) > bool )).
+
+tff(sy_c_aa_001tf__a_001t__Nat__Onat,type,(
+    aa_a_nat: ( fun_a_nat * a ) > nat )).
+
+tff(sy_c_aa_001tf__a_001t__fun_Itf__a_Mt__HOL__Obool_J,type,(
+    aa_a_fun_a_bool: ( fun_a_fun_a_bool * a ) > fun_a_bool )).
+
+tff(sy_c_aa_001tf__a_001tf__a,type,(
+    aa_a_a: ( fun_a_a * a ) > a )).
+
+tff(sy_c_fFalse,type,(
+    fFalse: bool )).
+
+tff(sy_c_fTrue,type,(
+    fTrue: bool )).
+
+tff(sy_c_member_001t__HOL__Obool,type,(
+    member_bool2: ( bool * set_bool ) > $o )).
+
+tff(sy_c_member_001t__Nat__Onat,type,(
+    member_nat2: ( nat * set_nat ) > $o )).
+
+tff(sy_c_member_001tf__a,type,(
+    member_a2: ( a * set_a ) > $o )).
+
+tff(sy_c_pp,type,(
+    pp: bool > $o )).
+
+tff(sy_v_Ia____,type,(
+    ia: list_a )).
+
+tff(sy_v_a____,type,(
+    a2: a )).
+
+tff(sy_v_n,type,(
+    n: a )).
+
+tff(sy_v_xa____,type,(
+    xa: a )).
+
+tff(fact_0_Cons_Oprems_I3_J,axiom,(
+    pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,xa),n)) )).
+
+tff(fact_1_sorted__Cons,axiom,(
+    ! [X: a,Xs: list_a] : 
+      ( linorder_sorted_a(cons_a(X,Xs))
+    <=> ( linorder_sorted_a(Xs)
+        & ! [X2: a] : 
+            ( member_a2(X2,set_a2(Xs))
+           => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),X2)) ) ) ) )).
+
+tff(fact_2_sorted__Cons,axiom,(
+    ! [X: bool,Xs: list_bool] : 
+      ( linorder_sorted_bool(cons_bool(X,Xs))
+    <=> ( linorder_sorted_bool(Xs)
+        & ! [X2: bool] : 
+            ( member_bool2(X2,set_bool2(Xs))
+           => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),X2)) ) ) ) )).
+
+tff(fact_3_sorted__Cons,axiom,(
+    ! [X: nat,Xs: list_nat] : 
+      ( linorder_sorted_nat(cons_nat(X,Xs))
+    <=> ( linorder_sorted_nat(Xs)
+        & ! [X2: nat] : 
+            ( member_nat2(X2,set_nat2(Xs))
+           => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),X2)) ) ) ) )).
+
+tff(fact_4_Cons_Oprems_I1_J,axiom,(
+    linorder_sorted_a(cons_a(a2,ia)) )).
+
+tff(fact_5_order__trans,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),Y))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,Y),Z))
+       => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),Z)) ) ) )).
+
+tff(fact_6_order__trans,axiom,(
+    ! [X: bool,Y: bool,Z: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),Z))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Z)) ) ) )).
+
+tff(fact_7_order__trans,axiom,(
+    ! [X: nat,Y: nat,Z: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),Z))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Z)) ) ) )).
+
+tff(fact_8_Cons_Oprems_I2_J,axiom,(
+    member_a2(xa,set_a2(cons_a(a2,ia))) )).
+
+tff(fact_9_Cons_Ohyps,axiom,(
+    ! [X: a] : 
+      ( linorder_sorted_a(ia)
+     => ( member_a2(X,set_a2(ia))
+       => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),n))
+         => member_a2(X,set_a2(takeWhile_a(aTP_Lamm_a,ia))) ) ) ) )).
+
+tff(fact_10_set__takeWhileD,axiom,(
+    ! [X: nat,P: fun_nat_bool,Xs: list_nat] : 
+      ( member_nat2(X,set_nat2(takeWhile_nat(P,Xs)))
+     => ( member_nat2(X,set_nat2(Xs))
+        & pp(aa_nat_bool(P,X)) ) ) )).
+
+tff(fact_11_set__takeWhileD,axiom,(
+    ! [X: bool,P: fun_bool_bool,Xs: list_bool] : 
+      ( member_bool2(X,set_bool2(takeWhile_bool(P,Xs)))
+     => ( member_bool2(X,set_bool2(Xs))
+        & pp(aa_bool_bool(P,X)) ) ) )).
+
+tff(fact_12_set__takeWhileD,axiom,(
+    ! [X: a,P: fun_a_bool,Xs: list_a] : 
+      ( member_a2(X,set_a2(takeWhile_a(P,Xs)))
+     => ( member_a2(X,set_a2(Xs))
+        & pp(aa_a_bool(P,X)) ) ) )).
+
+tff(fact_13_dual__order_Otrans,axiom,(
+    ! [B: a,A: a,C: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,B),A))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,C),B))
+       => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,C),A)) ) ) )).
+
+tff(fact_14_dual__order_Otrans,axiom,(
+    ! [B: bool,A: bool,C: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B),A))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,C),B))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,C),A)) ) ) )).
+
+tff(fact_15_dual__order_Otrans,axiom,(
+    ! [B: nat,A: nat,C: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B),A))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,C),B))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,C),A)) ) ) )).
+
+tff(fact_16_list_Oinject,axiom,(
+    ! [X21: nat,X22: list_nat,Y21: nat,Y22: list_nat] : 
+      ( cons_nat(X21,X22) = cons_nat(Y21,Y22)
+    <=> ( X21 = Y21
+        & X22 = Y22 ) ) )).
+
+tff(fact_17_list_Oinject,axiom,(
+    ! [X21: bool,X22: list_bool,Y21: bool,Y22: list_bool] : 
+      ( cons_bool(X21,X22) = cons_bool(Y21,Y22)
+    <=> ( ( pp(X21)
+        <=> pp(Y21) )
+        & X22 = Y22 ) ) )).
+
+tff(fact_18_list_Oinject,axiom,(
+    ! [X21: a,X22: list_a,Y21: a,Y22: list_a] : 
+      ( cons_a(X21,X22) = cons_a(Y21,Y22)
+    <=> ( X21 = Y21
+        & X22 = Y22 ) ) )).
+
+tff(fact_19_not__less,axiom,(
+    ! [X: a,Y: a] : 
+      ( ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),Y))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,Y),X)) ) )).
+
+tff(fact_20_not__less,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Y))
+    <=> pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),X)) ) )).
+
+tff(fact_21_not__less,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Y))
+    <=> pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),X)) ) )).
+
+tff(fact_22_takeWhile__eq__all__conv,axiom,(
+    ! [P: fun_nat_bool,Xs: list_nat] : 
+      ( takeWhile_nat(P,Xs) = Xs
+    <=> ! [X2: nat] : 
+          ( member_nat2(X2,set_nat2(Xs))
+         => pp(aa_nat_bool(P,X2)) ) ) )).
+
+tff(fact_23_takeWhile__eq__all__conv,axiom,(
+    ! [P: fun_bool_bool,Xs: list_bool] : 
+      ( takeWhile_bool(P,Xs) = Xs
+    <=> ! [X2: bool] : 
+          ( member_bool2(X2,set_bool2(Xs))
+         => pp(aa_bool_bool(P,X2)) ) ) )).
+
+tff(fact_24_takeWhile__eq__all__conv,axiom,(
+    ! [P: fun_a_bool,Xs: list_a] : 
+      ( takeWhile_a(P,Xs) = Xs
+    <=> ! [X2: a] : 
+          ( member_a2(X2,set_a2(Xs))
+         => pp(aa_a_bool(P,X2)) ) ) )).
+
+tff(fact_25_less__irrefl,axiom,(
+    ! [X: a] : 
+      ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),X)) )).
+
+tff(fact_26_less__irrefl,axiom,(
+    ! [X: nat] : 
+      ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),X)) )).
+
+tff(fact_27_less__irrefl,axiom,(
+    ! [X: bool] : 
+      ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),X)) )).
+
+tff(fact_28_takeWhile__idem,axiom,(
+    ! [P: fun_a_bool,Xs: list_a] : takeWhile_a(P,takeWhile_a(P,Xs)) = takeWhile_a(P,Xs) )).
+
+tff(fact_29_sorted__takeWhile,axiom,(
+    ! [Xs: list_a,P: fun_a_bool] : 
+      ( linorder_sorted_a(Xs)
+     => linorder_sorted_a(takeWhile_a(P,Xs)) ) )).
+
+tff(fact_30_sorted__takeWhile,axiom,(
+    ! [Xs: list_nat,P: fun_nat_bool] : 
+      ( linorder_sorted_nat(Xs)
+     => linorder_sorted_nat(takeWhile_nat(P,Xs)) ) )).
+
+tff(fact_31_sorted__takeWhile,axiom,(
+    ! [Xs: list_bool,P: fun_bool_bool] : 
+      ( linorder_sorted_bool(Xs)
+     => linorder_sorted_bool(takeWhile_bool(P,Xs)) ) )).
+
+tff(fact_32_list_Osimps_I15_J,axiom,(
+    ! [X21: a,X22: list_a] : set_a2(cons_a(X21,X22)) = insert_a2(X21,set_a2(X22)) )).
+
+tff(fact_33_list_Osimps_I15_J,axiom,(
+    ! [X21: nat,X22: list_nat] : set_nat2(cons_nat(X21,X22)) = insert_nat2(X21,set_nat2(X22)) )).
+
+tff(fact_34_list_Osimps_I15_J,axiom,(
+    ! [X21: bool,X22: list_bool] : set_bool2(cons_bool(X21,X22)) = insert_bool2(X21,set_bool2(X22)) )).
+
+tff(fact_35_empty__iff,axiom,(
+    ! [C: a] : 
+      ~ member_a2(C,bot_bot_set_a) )).
+
+tff(fact_36_takeWhile__cong,axiom,(
+    ! [L: list_nat,K: list_nat,P: fun_nat_bool,Q: fun_nat_bool] : 
+      ( L = K
+     => ( ! [X3: nat] : 
+            ( member_nat2(X3,set_nat2(L))
+           => ( pp(aa_nat_bool(P,X3))
+            <=> pp(aa_nat_bool(Q,X3)) ) )
+       => takeWhile_nat(P,L) = takeWhile_nat(Q,K) ) ) )).
+
+tff(fact_37_takeWhile__cong,axiom,(
+    ! [L: list_bool,K: list_bool,P: fun_bool_bool,Q: fun_bool_bool] : 
+      ( L = K
+     => ( ! [X3: bool] : 
+            ( member_bool2(X3,set_bool2(L))
+           => ( pp(aa_bool_bool(P,X3))
+            <=> pp(aa_bool_bool(Q,X3)) ) )
+       => takeWhile_bool(P,L) = takeWhile_bool(Q,K) ) ) )).
+
+tff(fact_38_takeWhile__cong,axiom,(
+    ! [L: list_a,K: list_a,P: fun_a_bool,Q: fun_a_bool] : 
+      ( L = K
+     => ( ! [X3: a] : 
+            ( member_a2(X3,set_a2(L))
+           => ( pp(aa_a_bool(P,X3))
+            <=> pp(aa_a_bool(Q,X3)) ) )
+       => takeWhile_a(P,L) = takeWhile_a(Q,K) ) ) )).
+
+tff(fact_39_set__ConsD,axiom,(
+    ! [Y: a,X: a,Xs: list_a] : 
+      ( member_a2(Y,set_a2(cons_a(X,Xs)))
+     => ( Y = X
+        | member_a2(Y,set_a2(Xs)) ) ) )).
+
+tff(fact_40_set__ConsD,axiom,(
+    ! [Y: nat,X: nat,Xs: list_nat] : 
+      ( member_nat2(Y,set_nat2(cons_nat(X,Xs)))
+     => ( Y = X
+        | member_nat2(Y,set_nat2(Xs)) ) ) )).
+
+tff(fact_41_set__ConsD,axiom,(
+    ! [Y: bool,X: bool,Xs: list_bool] : 
+      ( member_bool2(Y,set_bool2(cons_bool(X,Xs)))
+     => ( ( pp(Y)
+        <=> pp(X) )
+        | member_bool2(Y,set_bool2(Xs)) ) ) )).
+
+tff(fact_42_insert__iff,axiom,(
+    ! [A: a,B: a,A2: set_a] : 
+      ( member_a2(A,insert_a2(B,A2))
+    <=> ( A = B
+        | member_a2(A,A2) ) ) )).
+
+tff(fact_43_mem__Collect__eq,axiom,(
+    ! [A: a,P: fun_a_bool] : 
+      ( member_a2(A,collect_a(P))
+    <=> pp(aa_a_bool(P,A)) ) )).
+
+tff(fact_44_order__refl,axiom,(
+    ! [X: bool] : pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),X)) )).
+
+tff(fact_45_order__refl,axiom,(
+    ! [X: nat] : pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),X)) )).
+
+tff(fact_46_order__refl,axiom,(
+    ! [X: a] : pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),X)) )).
+
+tff(fact_47_list_Oset__intros_I2_J,axiom,(
+    ! [X: a,A22: list_a,A1: a] : 
+      ( member_a2(X,set_a2(A22))
+     => member_a2(X,set_a2(cons_a(A1,A22))) ) )).
+
+tff(fact_48_list_Oset__intros_I2_J,axiom,(
+    ! [X: nat,A22: list_nat,A1: nat] : 
+      ( member_nat2(X,set_nat2(A22))
+     => member_nat2(X,set_nat2(cons_nat(A1,A22))) ) )).
+
+tff(fact_49_list_Oset__intros_I2_J,axiom,(
+    ! [X: bool,A22: list_bool,A1: bool] : 
+      ( member_bool2(X,set_bool2(A22))
+     => member_bool2(X,set_bool2(cons_bool(A1,A22))) ) )).
+
+tff(fact_50_list_Oset__intros_I1_J,axiom,(
+    ! [A1: a,A22: list_a] : member_a2(A1,set_a2(cons_a(A1,A22))) )).
+
+tff(fact_51_list_Oset__intros_I1_J,axiom,(
+    ! [A1: nat,A22: list_nat] : member_nat2(A1,set_nat2(cons_nat(A1,A22))) )).
+
+tff(fact_52_list_Oset__intros_I1_J,axiom,(
+    ! [A1: bool,A22: list_bool] : member_bool2(A1,set_bool2(cons_bool(A1,A22))) )).
+
+tff(fact_53_sorted_ONil,axiom,(
+    linorder_sorted_a(nil_a) )).
+
+tff(fact_54_sorted_ONil,axiom,(
+    linorder_sorted_nat(nil_nat) )).
+
+tff(fact_55_sorted_ONil,axiom,(
+    linorder_sorted_bool(nil_bool) )).
+
+tff(fact_56_list_Oset__cases,axiom,(
+    ! [E: a,A: list_a] : 
+      ( member_a2(E,set_a2(A))
+     => ( ! [Z2: list_a] : 
+            A != cons_a(E,Z2)
+       => ~ ( ! [Z1: a,Z2: list_a] : 
+                ( A = cons_a(Z1,Z2)
+               => ~ member_a2(E,set_a2(Z2)) ) ) ) ) )).
+
+tff(fact_57_list_Oset__cases,axiom,(
+    ! [E: nat,A: list_nat] : 
+      ( member_nat2(E,set_nat2(A))
+     => ( ! [Z2: list_nat] : 
+            A != cons_nat(E,Z2)
+       => ~ ( ! [Z1: nat,Z2: list_nat] : 
+                ( A = cons_nat(Z1,Z2)
+               => ~ member_nat2(E,set_nat2(Z2)) ) ) ) ) )).
+
+tff(fact_58_list_Oset__cases,axiom,(
+    ! [E: bool,A: list_bool] : 
+      ( member_bool2(E,set_bool2(A))
+     => ( ! [Z2: list_bool] : 
+            A != cons_bool(E,Z2)
+       => ~ ( ! [Z1: bool,Z2: list_bool] : 
+                ( A = cons_bool(Z1,Z2)
+               => ~ member_bool2(E,set_bool2(Z2)) ) ) ) ) )).
+
+tff(fact_59_le__less__trans,axiom,(
+    ! [X: bool,Y: bool,Z: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Y),Z))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Z)) ) ) )).
+
+tff(fact_60_le__less__trans,axiom,(
+    ! [X: nat,Y: nat,Z: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Y),Z))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Z)) ) ) )).
+
+tff(fact_61_le__less__trans,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),Y))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Y),Z))
+       => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),Z)) ) ) )).
+
+tff(fact_62_list_Oset_I1_J,axiom,(
+    set_a2(nil_a) = bot_bot_set_a )).
+
+tff(fact_63_list_Oset_I1_J,axiom,(
+    set_nat2(nil_nat) = bot_bot_set_nat )).
+
+tff(fact_64_list_Oset_I1_J,axiom,(
+    set_bool2(nil_bool) = bot_bot_set_bool )).
+
+tff(fact_65_sorted__many__eq,axiom,(
+    ! [X: bool,Y: bool,Zs: list_bool] : 
+      ( linorder_sorted_bool(cons_bool(X,cons_bool(Y,Zs)))
+    <=> ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+        & linorder_sorted_bool(cons_bool(Y,Zs)) ) ) )).
+
+tff(fact_66_sorted__many__eq,axiom,(
+    ! [X: nat,Y: nat,Zs: list_nat] : 
+      ( linorder_sorted_nat(cons_nat(X,cons_nat(Y,Zs)))
+    <=> ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+        & linorder_sorted_nat(cons_nat(Y,Zs)) ) ) )).
+
+tff(fact_67_sorted__many__eq,axiom,(
+    ! [X: a,Y: a,Zs: list_a] : 
+      ( linorder_sorted_a(cons_a(X,cons_a(Y,Zs)))
+    <=> ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),Y))
+        & linorder_sorted_a(cons_a(Y,Zs)) ) ) )).
+
+tff(fact_68_pinf_I1_J,axiom,(
+    ! [P: fun_a_bool,P2: fun_a_bool,Q: fun_a_bool,Q2: fun_a_bool] : 
+      ( ? [Z3: a] : 
+        ! [X3: a] : 
+          ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Z3),X3))
+         => ( pp(aa_a_bool(P,X3))
+          <=> pp(aa_a_bool(P2,X3)) ) )
+     => ( ? [Z3: a] : 
+          ! [X3: a] : 
+            ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Z3),X3))
+           => ( pp(aa_a_bool(Q,X3))
+            <=> pp(aa_a_bool(Q2,X3)) ) )
+       => ? [Z4: a] : 
+          ! [X4: a] : 
+            ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Z4),X4))
+           => ( ( pp(aa_a_bool(P,X4))
+                & pp(aa_a_bool(Q,X4)) )
+            <=> ( pp(aa_a_bool(P2,X4))
+                & pp(aa_a_bool(Q2,X4)) ) ) ) ) ) )).
+
+tff(fact_69_pinf_I1_J,axiom,(
+    ! [P: fun_nat_bool,P2: fun_nat_bool,Q: fun_nat_bool,Q2: fun_nat_bool] : 
+      ( ? [Z3: nat] : 
+        ! [X3: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Z3),X3))
+         => ( pp(aa_nat_bool(P,X3))
+          <=> pp(aa_nat_bool(P2,X3)) ) )
+     => ( ? [Z3: nat] : 
+          ! [X3: nat] : 
+            ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Z3),X3))
+           => ( pp(aa_nat_bool(Q,X3))
+            <=> pp(aa_nat_bool(Q2,X3)) ) )
+       => ? [Z4: nat] : 
+          ! [X4: nat] : 
+            ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Z4),X4))
+           => ( ( pp(aa_nat_bool(P,X4))
+                & pp(aa_nat_bool(Q,X4)) )
+            <=> ( pp(aa_nat_bool(P2,X4))
+                & pp(aa_nat_bool(Q2,X4)) ) ) ) ) ) )).
+
+tff(fact_70_pinf_I1_J,axiom,(
+    ! [P: fun_bool_bool,P2: fun_bool_bool,Q: fun_bool_bool,Q2: fun_bool_bool] : 
+      ( ? [Z3: bool] : 
+        ! [X3: bool] : 
+          ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Z3),X3))
+         => ( pp(aa_bool_bool(P,X3))
+          <=> pp(aa_bool_bool(P2,X3)) ) )
+     => ( ? [Z3: bool] : 
+          ! [X3: bool] : 
+            ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Z3),X3))
+           => ( pp(aa_bool_bool(Q,X3))
+            <=> pp(aa_bool_bool(Q2,X3)) ) )
+       => ? [Z4: bool] : 
+          ! [X4: bool] : 
+            ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Z4),X4))
+           => ( ( pp(aa_bool_bool(P,X4))
+                & pp(aa_bool_bool(Q,X4)) )
+            <=> ( pp(aa_bool_bool(P2,X4))
+                & pp(aa_bool_bool(Q2,X4)) ) ) ) ) ) )).
+
+tff(fact_71_pinf_I2_J,axiom,(
+    ! [P: fun_a_bool,P2: fun_a_bool,Q: fun_a_bool,Q2: fun_a_bool] : 
+      ( ? [Z3: a] : 
+        ! [X3: a] : 
+          ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Z3),X3))
+         => ( pp(aa_a_bool(P,X3))
+          <=> pp(aa_a_bool(P2,X3)) ) )
+     => ( ? [Z3: a] : 
+          ! [X3: a] : 
+            ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Z3),X3))
+           => ( pp(aa_a_bool(Q,X3))
+            <=> pp(aa_a_bool(Q2,X3)) ) )
+       => ? [Z4: a] : 
+          ! [X4: a] : 
+            ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Z4),X4))
+           => ( ( pp(aa_a_bool(P,X4))
+                | pp(aa_a_bool(Q,X4)) )
+            <=> ( pp(aa_a_bool(P2,X4))
+                | pp(aa_a_bool(Q2,X4)) ) ) ) ) ) )).
+
+tff(fact_72_pinf_I2_J,axiom,(
+    ! [P: fun_nat_bool,P2: fun_nat_bool,Q: fun_nat_bool,Q2: fun_nat_bool] : 
+      ( ? [Z3: nat] : 
+        ! [X3: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Z3),X3))
+         => ( pp(aa_nat_bool(P,X3))
+          <=> pp(aa_nat_bool(P2,X3)) ) )
+     => ( ? [Z3: nat] : 
+          ! [X3: nat] : 
+            ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Z3),X3))
+           => ( pp(aa_nat_bool(Q,X3))
+            <=> pp(aa_nat_bool(Q2,X3)) ) )
+       => ? [Z4: nat] : 
+          ! [X4: nat] : 
+            ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Z4),X4))
+           => ( ( pp(aa_nat_bool(P,X4))
+                | pp(aa_nat_bool(Q,X4)) )
+            <=> ( pp(aa_nat_bool(P2,X4))
+                | pp(aa_nat_bool(Q2,X4)) ) ) ) ) ) )).
+
+tff(fact_73_pinf_I2_J,axiom,(
+    ! [P: fun_bool_bool,P2: fun_bool_bool,Q: fun_bool_bool,Q2: fun_bool_bool] : 
+      ( ? [Z3: bool] : 
+        ! [X3: bool] : 
+          ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Z3),X3))
+         => ( pp(aa_bool_bool(P,X3))
+          <=> pp(aa_bool_bool(P2,X3)) ) )
+     => ( ? [Z3: bool] : 
+          ! [X3: bool] : 
+            ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Z3),X3))
+           => ( pp(aa_bool_bool(Q,X3))
+            <=> pp(aa_bool_bool(Q2,X3)) ) )
+       => ? [Z4: bool] : 
+          ! [X4: bool] : 
+            ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Z4),X4))
+           => ( ( pp(aa_bool_bool(P,X4))
+                | pp(aa_bool_bool(Q,X4)) )
+            <=> ( pp(aa_bool_bool(P2,X4))
+                | pp(aa_bool_bool(Q2,X4)) ) ) ) ) ) )).
+
+tff(fact_74_sorted_OCons,axiom,(
+    ! [Xs: list_bool,X: bool] : 
+      ( ! [X3: bool] : 
+          ( member_bool2(X3,set_bool2(Xs))
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),X3)) )
+     => ( linorder_sorted_bool(Xs)
+       => linorder_sorted_bool(cons_bool(X,Xs)) ) ) )).
+
+tff(fact_75_sorted_OCons,axiom,(
+    ! [Xs: list_nat,X: nat] : 
+      ( ! [X3: nat] : 
+          ( member_nat2(X3,set_nat2(Xs))
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),X3)) )
+     => ( linorder_sorted_nat(Xs)
+       => linorder_sorted_nat(cons_nat(X,Xs)) ) ) )).
+
+tff(fact_76_sorted_OCons,axiom,(
+    ! [Xs: list_a,X: a] : 
+      ( ! [X3: a] : 
+          ( member_a2(X3,set_a2(Xs))
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),X3)) )
+     => ( linorder_sorted_a(Xs)
+       => linorder_sorted_a(cons_a(X,Xs)) ) ) )).
+
+tff(fact_77_not__Cons__self2,axiom,(
+    ! [X: a,Xs: list_a] : 
+      cons_a(X,Xs) != Xs )).
+
+tff(fact_78_not__Cons__self2,axiom,(
+    ! [X: nat,Xs: list_nat] : 
+      cons_nat(X,Xs) != Xs )).
+
+tff(fact_79_not__Cons__self2,axiom,(
+    ! [X: bool,Xs: list_bool] : 
+      cons_bool(X,Xs) != Xs )).
+
+tff(fact_80_pinf_I3_J,axiom,(
+    ! [T: a] : 
+    ? [Z4: a] : 
+    ! [X4: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Z4),X4))
+     => X4 != T ) )).
+
+tff(fact_81_pinf_I3_J,axiom,(
+    ! [T: nat] : 
+    ? [Z4: nat] : 
+    ! [X4: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Z4),X4))
+     => X4 != T ) )).
+
+tff(fact_82_pinf_I3_J,axiom,(
+    ! [T: bool] : 
+    ? [Z4: bool] : 
+    ! [X4: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Z4),X4))
+     => ( pp(X4)
+      <=> ~ pp(T) ) ) )).
+
+tff(fact_83_not__less__iff__gr__or__eq,axiom,(
+    ! [X: a,Y: a] : 
+      ( ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),Y))
+    <=> ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Y),X))
+        | X = Y ) ) )).
+
+tff(fact_84_not__less__iff__gr__or__eq,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Y))
+    <=> ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Y),X))
+        | X = Y ) ) )).
+
+tff(fact_85_not__less__iff__gr__or__eq,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Y))
+    <=> ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Y),X))
+        | ( pp(X)
+        <=> pp(Y) ) ) ) )).
+
+tff(fact_86_pinf_I4_J,axiom,(
+    ! [T: a] : 
+    ? [Z4: a] : 
+    ! [X4: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Z4),X4))
+     => X4 != T ) )).
+
+tff(fact_87_pinf_I4_J,axiom,(
+    ! [T: nat] : 
+    ? [Z4: nat] : 
+    ! [X4: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Z4),X4))
+     => X4 != T ) )).
+
+tff(fact_88_pinf_I4_J,axiom,(
+    ! [T: bool] : 
+    ? [Z4: bool] : 
+    ! [X4: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Z4),X4))
+     => ( pp(X4)
+      <=> ~ pp(T) ) ) )).
+
+tff(fact_89_sorted__single,axiom,(
+    ! [X: a] : linorder_sorted_a(cons_a(X,nil_a)) )).
+
+tff(fact_90_sorted__single,axiom,(
+    ! [X: nat] : linorder_sorted_nat(cons_nat(X,nil_nat)) )).
+
+tff(fact_91_sorted__single,axiom,(
+    ! [X: bool] : linorder_sorted_bool(cons_bool(X,nil_bool)) )).
+
+tff(fact_92_pinf_I5_J,axiom,(
+    ! [T: a] : 
+    ? [Z4: a] : 
+    ! [X4: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Z4),X4))
+     => ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X4),T)) ) )).
+
+tff(fact_93_pinf_I5_J,axiom,(
+    ! [T: nat] : 
+    ? [Z4: nat] : 
+    ! [X4: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Z4),X4))
+     => ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X4),T)) ) )).
+
+tff(fact_94_pinf_I5_J,axiom,(
+    ! [T: bool] : 
+    ? [Z4: bool] : 
+    ! [X4: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Z4),X4))
+     => ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X4),T)) ) )).
+
+tff(fact_95_sorted_Osimps,axiom,(
+    ! [A: list_bool] : 
+      ( linorder_sorted_bool(A)
+    <=> ( A = nil_bool
+        | ? [Xs2: list_bool,X2: bool] : 
+            ( A = cons_bool(X2,Xs2)
+            & ! [Xa: bool] : 
+                ( member_bool2(Xa,set_bool2(Xs2))
+               => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X2),Xa)) )
+            & linorder_sorted_bool(Xs2) ) ) ) )).
+
+tff(fact_96_sorted_Osimps,axiom,(
+    ! [A: list_nat] : 
+      ( linorder_sorted_nat(A)
+    <=> ( A = nil_nat
+        | ? [Xs2: list_nat,X2: nat] : 
+            ( A = cons_nat(X2,Xs2)
+            & ! [Xa: nat] : 
+                ( member_nat2(Xa,set_nat2(Xs2))
+               => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X2),Xa)) )
+            & linorder_sorted_nat(Xs2) ) ) ) )).
+
+tff(fact_97_sorted_Osimps,axiom,(
+    ! [A: list_a] : 
+      ( linorder_sorted_a(A)
+    <=> ( A = nil_a
+        | ? [Xs2: list_a,X2: a] : 
+            ( A = cons_a(X2,Xs2)
+            & ! [Xa: a] : 
+                ( member_a2(Xa,set_a2(Xs2))
+               => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X2),Xa)) )
+            & linorder_sorted_a(Xs2) ) ) ) )).
+
+tff(fact_98_pinf_I7_J,axiom,(
+    ! [T: a] : 
+    ? [Z4: a] : 
+    ! [X4: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Z4),X4))
+     => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,T),X4)) ) )).
+
+tff(fact_99_pinf_I7_J,axiom,(
+    ! [T: nat] : 
+    ? [Z4: nat] : 
+    ! [X4: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Z4),X4))
+     => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,T),X4)) ) )).
+
+tff(fact_100_pinf_I7_J,axiom,(
+    ! [T: bool] : 
+    ? [Z4: bool] : 
+    ! [X4: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Z4),X4))
+     => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,T),X4)) ) )).
+
+tff(fact_101_sorted_Ocases,axiom,(
+    ! [A: list_bool] : 
+      ( linorder_sorted_bool(A)
+     => ( A != nil_bool
+       => ~ ( ! [Xs3: list_bool,X3: bool] : 
+                ( A = cons_bool(X3,Xs3)
+               => ( ! [Xa2: bool] : 
+                      ( member_bool2(Xa2,set_bool2(Xs3))
+                     => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Xa2)) )
+                 => ~ linorder_sorted_bool(Xs3) ) ) ) ) ) )).
+
+tff(fact_102_sorted_Ocases,axiom,(
+    ! [A: list_nat] : 
+      ( linorder_sorted_nat(A)
+     => ( A != nil_nat
+       => ~ ( ! [Xs3: list_nat,X3: nat] : 
+                ( A = cons_nat(X3,Xs3)
+               => ( ! [Xa2: nat] : 
+                      ( member_nat2(Xa2,set_nat2(Xs3))
+                     => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Xa2)) )
+                 => ~ linorder_sorted_nat(Xs3) ) ) ) ) ) )).
+
+tff(fact_103_sorted_Ocases,axiom,(
+    ! [A: list_a] : 
+      ( linorder_sorted_a(A)
+     => ( A != nil_a
+       => ~ ( ! [Xs3: list_a,X3: a] : 
+                ( A = cons_a(X3,Xs3)
+               => ( ! [Xa2: a] : 
+                      ( member_a2(Xa2,set_a2(Xs3))
+                     => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X3),Xa2)) )
+                 => ~ linorder_sorted_a(Xs3) ) ) ) ) ) )).
+
+tff(fact_104_minf_I1_J,axiom,(
+    ! [P: fun_a_bool,P2: fun_a_bool,Q: fun_a_bool,Q2: fun_a_bool] : 
+      ( ? [Z3: a] : 
+        ! [X3: a] : 
+          ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X3),Z3))
+         => ( pp(aa_a_bool(P,X3))
+          <=> pp(aa_a_bool(P2,X3)) ) )
+     => ( ? [Z3: a] : 
+          ! [X3: a] : 
+            ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X3),Z3))
+           => ( pp(aa_a_bool(Q,X3))
+            <=> pp(aa_a_bool(Q2,X3)) ) )
+       => ? [Z4: a] : 
+          ! [X4: a] : 
+            ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X4),Z4))
+           => ( ( pp(aa_a_bool(P,X4))
+                & pp(aa_a_bool(Q,X4)) )
+            <=> ( pp(aa_a_bool(P2,X4))
+                & pp(aa_a_bool(Q2,X4)) ) ) ) ) ) )).
+
+tff(fact_105_minf_I1_J,axiom,(
+    ! [P: fun_nat_bool,P2: fun_nat_bool,Q: fun_nat_bool,Q2: fun_nat_bool] : 
+      ( ? [Z3: nat] : 
+        ! [X3: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X3),Z3))
+         => ( pp(aa_nat_bool(P,X3))
+          <=> pp(aa_nat_bool(P2,X3)) ) )
+     => ( ? [Z3: nat] : 
+          ! [X3: nat] : 
+            ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X3),Z3))
+           => ( pp(aa_nat_bool(Q,X3))
+            <=> pp(aa_nat_bool(Q2,X3)) ) )
+       => ? [Z4: nat] : 
+          ! [X4: nat] : 
+            ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X4),Z4))
+           => ( ( pp(aa_nat_bool(P,X4))
+                & pp(aa_nat_bool(Q,X4)) )
+            <=> ( pp(aa_nat_bool(P2,X4))
+                & pp(aa_nat_bool(Q2,X4)) ) ) ) ) ) )).
+
+tff(fact_106_minf_I1_J,axiom,(
+    ! [P: fun_bool_bool,P2: fun_bool_bool,Q: fun_bool_bool,Q2: fun_bool_bool] : 
+      ( ? [Z3: bool] : 
+        ! [X3: bool] : 
+          ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X3),Z3))
+         => ( pp(aa_bool_bool(P,X3))
+          <=> pp(aa_bool_bool(P2,X3)) ) )
+     => ( ? [Z3: bool] : 
+          ! [X3: bool] : 
+            ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X3),Z3))
+           => ( pp(aa_bool_bool(Q,X3))
+            <=> pp(aa_bool_bool(Q2,X3)) ) )
+       => ? [Z4: bool] : 
+          ! [X4: bool] : 
+            ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X4),Z4))
+           => ( ( pp(aa_bool_bool(P,X4))
+                & pp(aa_bool_bool(Q,X4)) )
+            <=> ( pp(aa_bool_bool(P2,X4))
+                & pp(aa_bool_bool(Q2,X4)) ) ) ) ) ) )).
+
+tff(fact_107_subsetI,axiom,(
+    ! [A2: set_a,B2: set_a] : 
+      ( ! [X3: a] : 
+          ( member_a2(X3,A2)
+         => member_a2(X3,B2) )
+     => ord_less_eq_set_a(A2,B2) ) )).
+
+tff(fact_108_minf_I2_J,axiom,(
+    ! [P: fun_a_bool,P2: fun_a_bool,Q: fun_a_bool,Q2: fun_a_bool] : 
+      ( ? [Z3: a] : 
+        ! [X3: a] : 
+          ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X3),Z3))
+         => ( pp(aa_a_bool(P,X3))
+          <=> pp(aa_a_bool(P2,X3)) ) )
+     => ( ? [Z3: a] : 
+          ! [X3: a] : 
+            ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X3),Z3))
+           => ( pp(aa_a_bool(Q,X3))
+            <=> pp(aa_a_bool(Q2,X3)) ) )
+       => ? [Z4: a] : 
+          ! [X4: a] : 
+            ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X4),Z4))
+           => ( ( pp(aa_a_bool(P,X4))
+                | pp(aa_a_bool(Q,X4)) )
+            <=> ( pp(aa_a_bool(P2,X4))
+                | pp(aa_a_bool(Q2,X4)) ) ) ) ) ) )).
+
+tff(fact_109_minf_I2_J,axiom,(
+    ! [P: fun_nat_bool,P2: fun_nat_bool,Q: fun_nat_bool,Q2: fun_nat_bool] : 
+      ( ? [Z3: nat] : 
+        ! [X3: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X3),Z3))
+         => ( pp(aa_nat_bool(P,X3))
+          <=> pp(aa_nat_bool(P2,X3)) ) )
+     => ( ? [Z3: nat] : 
+          ! [X3: nat] : 
+            ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X3),Z3))
+           => ( pp(aa_nat_bool(Q,X3))
+            <=> pp(aa_nat_bool(Q2,X3)) ) )
+       => ? [Z4: nat] : 
+          ! [X4: nat] : 
+            ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X4),Z4))
+           => ( ( pp(aa_nat_bool(P,X4))
+                | pp(aa_nat_bool(Q,X4)) )
+            <=> ( pp(aa_nat_bool(P2,X4))
+                | pp(aa_nat_bool(Q2,X4)) ) ) ) ) ) )).
+
+tff(fact_110_minf_I2_J,axiom,(
+    ! [P: fun_bool_bool,P2: fun_bool_bool,Q: fun_bool_bool,Q2: fun_bool_bool] : 
+      ( ? [Z3: bool] : 
+        ! [X3: bool] : 
+          ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X3),Z3))
+         => ( pp(aa_bool_bool(P,X3))
+          <=> pp(aa_bool_bool(P2,X3)) ) )
+     => ( ? [Z3: bool] : 
+          ! [X3: bool] : 
+            ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X3),Z3))
+           => ( pp(aa_bool_bool(Q,X3))
+            <=> pp(aa_bool_bool(Q2,X3)) ) )
+       => ? [Z4: bool] : 
+          ! [X4: bool] : 
+            ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X4),Z4))
+           => ( ( pp(aa_bool_bool(P,X4))
+                | pp(aa_bool_bool(Q,X4)) )
+            <=> ( pp(aa_bool_bool(P2,X4))
+                | pp(aa_bool_bool(Q2,X4)) ) ) ) ) ) )).
+
+tff(fact_111_sorted__many,axiom,(
+    ! [X: bool,Y: bool,Zs: list_bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+     => ( linorder_sorted_bool(cons_bool(Y,Zs))
+       => linorder_sorted_bool(cons_bool(X,cons_bool(Y,Zs))) ) ) )).
+
+tff(fact_112_sorted__many,axiom,(
+    ! [X: nat,Y: nat,Zs: list_nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+     => ( linorder_sorted_nat(cons_nat(Y,Zs))
+       => linorder_sorted_nat(cons_nat(X,cons_nat(Y,Zs))) ) ) )).
+
+tff(fact_113_sorted__many,axiom,(
+    ! [X: a,Y: a,Zs: list_a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),Y))
+     => ( linorder_sorted_a(cons_a(Y,Zs))
+       => linorder_sorted_a(cons_a(X,cons_a(Y,Zs))) ) ) )).
+
+tff(fact_114_minf_I3_J,axiom,(
+    ! [T: a] : 
+    ? [Z4: a] : 
+    ! [X4: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X4),Z4))
+     => X4 != T ) )).
+
+tff(fact_115_minf_I3_J,axiom,(
+    ! [T: nat] : 
+    ? [Z4: nat] : 
+    ! [X4: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X4),Z4))
+     => X4 != T ) )).
+
+tff(fact_116_minf_I3_J,axiom,(
+    ! [T: bool] : 
+    ? [Z4: bool] : 
+    ! [X4: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X4),Z4))
+     => ( pp(X4)
+      <=> ~ pp(T) ) ) )).
+
+tff(fact_117_Collect__mem__eq,axiom,(
+    ! [A2: set_a] : collect_a(aTP_Lamm_aa(A2)) = A2 )).
+
+tff(fact_118_minf_I4_J,axiom,(
+    ! [T: a] : 
+    ? [Z4: a] : 
+    ! [X4: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X4),Z4))
+     => X4 != T ) )).
+
+tff(fact_119_minf_I4_J,axiom,(
+    ! [T: nat] : 
+    ? [Z4: nat] : 
+    ! [X4: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X4),Z4))
+     => X4 != T ) )).
+
+tff(fact_120_minf_I4_J,axiom,(
+    ! [T: bool] : 
+    ? [Z4: bool] : 
+    ! [X4: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X4),Z4))
+     => ( pp(X4)
+      <=> ~ pp(T) ) ) )).
+
+tff(fact_121_minf_I5_J,axiom,(
+    ! [T: a] : 
+    ? [Z4: a] : 
+    ! [X4: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X4),Z4))
+     => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X4),T)) ) )).
+
+tff(fact_122_minf_I5_J,axiom,(
+    ! [T: nat] : 
+    ? [Z4: nat] : 
+    ! [X4: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X4),Z4))
+     => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X4),T)) ) )).
+
+tff(fact_123_minf_I5_J,axiom,(
+    ! [T: bool] : 
+    ? [Z4: bool] : 
+    ! [X4: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X4),Z4))
+     => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X4),T)) ) )).
+
+tff(fact_124_minf_I7_J,axiom,(
+    ! [T: a] : 
+    ? [Z4: a] : 
+    ! [X4: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X4),Z4))
+     => ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,T),X4)) ) )).
+
+tff(fact_125_minf_I7_J,axiom,(
+    ! [T: nat] : 
+    ? [Z4: nat] : 
+    ! [X4: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X4),Z4))
+     => ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,T),X4)) ) )).
+
+tff(fact_126_minf_I7_J,axiom,(
+    ! [T: bool] : 
+    ? [Z4: bool] : 
+    ! [X4: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X4),Z4))
+     => ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,T),X4)) ) )).
+
+tff(fact_127_leD,axiom,(
+    ! [Y: bool,X: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),X))
+     => ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Y)) ) )).
+
+tff(fact_128_leD,axiom,(
+    ! [Y: nat,X: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),X))
+     => ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Y)) ) )).
+
+tff(fact_129_leD,axiom,(
+    ! [Y: a,X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,Y),X))
+     => ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),Y)) ) )).
+
+tff(fact_130_not__in__set__insert,axiom,(
+    ! [X: a,Xs: list_a] : 
+      ( ~ member_a2(X,set_a2(Xs))
+     => insert_a(X,Xs) = cons_a(X,Xs) ) )).
+
+tff(fact_131_not__in__set__insert,axiom,(
+    ! [X: nat,Xs: list_nat] : 
+      ( ~ member_nat2(X,set_nat2(Xs))
+     => insert_nat(X,Xs) = cons_nat(X,Xs) ) )).
+
+tff(fact_132_not__in__set__insert,axiom,(
+    ! [X: bool,Xs: list_bool] : 
+      ( ~ member_bool2(X,set_bool2(Xs))
+     => insert_bool(X,Xs) = cons_bool(X,Xs) ) )).
+
+tff(fact_133_List_Oinsert__def,axiom,(
+    ! [X: a,Xs: list_a] : 
+      ( ( member_a2(X,set_a2(Xs))
+       => insert_a(X,Xs) = Xs )
+      & ( ~ member_a2(X,set_a2(Xs))
+       => insert_a(X,Xs) = cons_a(X,Xs) ) ) )).
+
+tff(fact_134_List_Oinsert__def,axiom,(
+    ! [X: nat,Xs: list_nat] : 
+      ( ( member_nat2(X,set_nat2(Xs))
+       => insert_nat(X,Xs) = Xs )
+      & ( ~ member_nat2(X,set_nat2(Xs))
+       => insert_nat(X,Xs) = cons_nat(X,Xs) ) ) )).
+
+tff(fact_135_List_Oinsert__def,axiom,(
+    ! [X: bool,Xs: list_bool] : 
+      ( ( member_bool2(X,set_bool2(Xs))
+       => insert_bool(X,Xs) = Xs )
+      & ( ~ member_bool2(X,set_bool2(Xs))
+       => insert_bool(X,Xs) = cons_bool(X,Xs) ) ) )).
+
+tff(fact_136_subsetCE,axiom,(
+    ! [A2: set_a,B2: set_a,C: a] : 
+      ( ord_less_eq_set_a(A2,B2)
+     => ( member_a2(C,A2)
+       => member_a2(C,B2) ) ) )).
+
+tff(fact_137_antisym,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),X))
+       => ( pp(X)
+        <=> pp(Y) ) ) ) )).
+
+tff(fact_138_antisym,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),X))
+       => X = Y ) ) )).
+
+tff(fact_139_antisym,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),Y))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,Y),X))
+       => X = Y ) ) )).
+
+tff(fact_140_less__imp__le,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Y))
+     => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y)) ) )).
+
+tff(fact_141_less__imp__le,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Y))
+     => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y)) ) )).
+
+tff(fact_142_less__imp__le,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),Y))
+     => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),Y)) ) )).
+
+tff(fact_143_set__dropWhile__le,axiom,(
+    ! [Xs: list_bool,N: bool] : 
+      ( linorder_sorted_bool(Xs)
+     => set_bool2(dropWhile_bool(aa_boo1142376798l_bool(aTP_Lamm_ab,N),Xs)) = collect_bool(aa_boo1142376798l_bool(aTP_Lamm_ac(Xs),N)) ) )).
+
+tff(fact_144_set__dropWhile__le,axiom,(
+    ! [Xs: list_nat,N: nat] : 
+      ( linorder_sorted_nat(Xs)
+     => set_nat2(dropWhile_nat(aa_nat_fun_nat_bool(aTP_Lamm_ad,N),Xs)) = collect_nat(aa_nat_fun_nat_bool(aTP_Lamm_ae(Xs),N)) ) )).
+
+tff(fact_145_set__dropWhile__le,axiom,(
+    ! [Xs: list_a,N: a] : 
+      ( linorder_sorted_a(Xs)
+     => set_a2(dropWhile_a(aa_a_fun_a_bool(aTP_Lamm_af,N),Xs)) = collect_a(aa_a_fun_a_bool(aTP_Lamm_ag(Xs),N)) ) )).
+
+tff(fact_146_lexordp__eq__simps_I4_J,axiom,(
+    ! [X: a,Xs: list_a,Y: a,Ys: list_a] : 
+      ( pp(aa_list_a_bool(aa_lis1082568734a_bool(ord_lexordp_eq_a,cons_a(X,Xs)),cons_a(Y,Ys)))
+    <=> ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),Y))
+        | ( ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Y),X))
+          & pp(aa_list_a_bool(aa_lis1082568734a_bool(ord_lexordp_eq_a,Xs),Ys)) ) ) ) )).
+
+tff(fact_147_lexordp__eq__simps_I4_J,axiom,(
+    ! [X: nat,Xs: list_nat,Y: nat,Ys: list_nat] : 
+      ( pp(aa_list_nat_bool(aa_lis1480171250t_bool(ord_lexordp_eq_nat,cons_nat(X,Xs)),cons_nat(Y,Ys)))
+    <=> ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Y))
+        | ( ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Y),X))
+          & pp(aa_list_nat_bool(aa_lis1480171250t_bool(ord_lexordp_eq_nat,Xs),Ys)) ) ) ) )).
+
+tff(fact_148_lexordp__eq__simps_I4_J,axiom,(
+    ! [X: bool,Xs: list_bool,Y: bool,Ys: list_bool] : 
+      ( pp(aa_list_bool_bool(aa_lis482927454l_bool(ord_lexordp_eq_bool,cons_bool(X,Xs)),cons_bool(Y,Ys)))
+    <=> ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Y))
+        | ( ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Y),X))
+          & pp(aa_list_bool_bool(aa_lis482927454l_bool(ord_lexordp_eq_bool,Xs),Ys)) ) ) ) )).
+
+tff(fact_149_in__set__member,axiom,(
+    ! [X: a,Xs: list_a] : 
+      ( member_a2(X,set_a2(Xs))
+    <=> pp(aa_a_bool(member_a(Xs),X)) ) )).
+
+tff(fact_150_in__set__member,axiom,(
+    ! [X: nat,Xs: list_nat] : 
+      ( member_nat2(X,set_nat2(Xs))
+    <=> pp(aa_nat_bool(member_nat(Xs),X)) ) )).
+
+tff(fact_151_in__set__member,axiom,(
+    ! [X: bool,Xs: list_bool] : 
+      ( member_bool2(X,set_bool2(Xs))
+    <=> pp(aa_bool_bool(member_bool(Xs),X)) ) )).
+
+tff(fact_152_atLeastAtMost__iff,axiom,(
+    ! [I: bool,L: bool,U: bool] : 
+      ( member_bool2(I,set_or842601420t_bool(L,U))
+    <=> ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,L),I))
+        & pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,I),U)) ) ) )).
+
+tff(fact_153_atLeastAtMost__iff,axiom,(
+    ! [I: nat,L: nat,U: nat] : 
+      ( member_nat2(I,set_or601162459st_nat(L,U))
+    <=> ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,L),I))
+        & pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,I),U)) ) ) )).
+
+tff(fact_154_atLeastAtMost__iff,axiom,(
+    ! [I: a,L: a,U: a] : 
+      ( member_a2(I,set_or411607219Most_a(L,U))
+    <=> ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,L),I))
+        & pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,I),U)) ) ) )).
+
+tff(fact_155_add_Oright__neutral,axiom,(
+    ! [A: nat] : aa_nat_nat(plus_plus_nat(A),zero_zero_nat) = A )).
+
+tff(fact_156_add__Suc__right,axiom,(
+    ! [M: nat,N: nat] : aa_nat_nat(plus_plus_nat(M),aa_nat_nat(suc,N)) = aa_nat_nat(suc,aa_nat_nat(plus_plus_nat(M),N)) )).
+
+tff(fact_157_dropWhile__sorted__le__above,axiom,(
+    ! [Xs: list_bool,X: bool,N: bool] : 
+      ( linorder_sorted_bool(Xs)
+     => ( member_bool2(X,set_bool2(dropWhile_bool(aa_boo1142376798l_bool(aTP_Lamm_ab,N),Xs)))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,N),X)) ) ) )).
+
+tff(fact_158_dropWhile__sorted__le__above,axiom,(
+    ! [Xs: list_nat,X: nat,N: nat] : 
+      ( linorder_sorted_nat(Xs)
+     => ( member_nat2(X,set_nat2(dropWhile_nat(aa_nat_fun_nat_bool(aTP_Lamm_ad,N),Xs)))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,N),X)) ) ) )).
+
+tff(fact_159_dropWhile__sorted__le__above,axiom,(
+    ! [Xs: list_a,X: a,N: a] : 
+      ( linorder_sorted_a(Xs)
+     => ( member_a2(X,set_a2(dropWhile_a(aa_a_fun_a_bool(aTP_Lamm_af,N),Xs)))
+       => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,N),X)) ) ) )).
+
+tff(fact_160_One__nat__def,axiom,(
+    one_one_nat = aa_nat_nat(suc,zero_zero_nat) )).
+
+tff(fact_161_list_Osimps_I3_J,axiom,(
+    ! [X21: a,X22: list_a] : 
+      cons_a(X21,X22) != nil_a )).
+
+tff(fact_162_list_Osimps_I3_J,axiom,(
+    ! [X21: nat,X22: list_nat] : 
+      cons_nat(X21,X22) != nil_nat )).
+
+tff(fact_163_list_Osimps_I3_J,axiom,(
+    ! [X21: bool,X22: list_bool] : 
+      cons_bool(X21,X22) != nil_bool )).
+
+tff(fact_164_in__set__insert,axiom,(
+    ! [X: a,Xs: list_a] : 
+      ( member_a2(X,set_a2(Xs))
+     => insert_a(X,Xs) = Xs ) )).
+
+tff(fact_165_in__set__insert,axiom,(
+    ! [X: nat,Xs: list_nat] : 
+      ( member_nat2(X,set_nat2(Xs))
+     => insert_nat(X,Xs) = Xs ) )).
+
+tff(fact_166_in__set__insert,axiom,(
+    ! [X: bool,Xs: list_bool] : 
+      ( member_bool2(X,set_bool2(Xs))
+     => insert_bool(X,Xs) = Xs ) )).
+
+tff(fact_167_less__le__trans,axiom,(
+    ! [X: bool,Y: bool,Z: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Y))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),Z))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Z)) ) ) )).
+
+tff(fact_168_less__le__trans,axiom,(
+    ! [X: nat,Y: nat,Z: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Y))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),Z))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Z)) ) ) )).
+
+tff(fact_169_less__le__trans,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),Y))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,Y),Z))
+       => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),Z)) ) ) )).
+
+tff(fact_170_atLeastLessThan__iff,axiom,(
+    ! [I: bool,L: bool,U: bool] : 
+      ( member_bool2(I,set_or643061160n_bool(L,U))
+    <=> ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,L),I))
+        & pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,I),U)) ) ) )).
+
+tff(fact_171_atLeastLessThan__iff,axiom,(
+    ! [I: nat,L: nat,U: nat] : 
+      ( member_nat2(I,set_or562006527an_nat(L,U))
+    <=> ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,L),I))
+        & pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I),U)) ) ) )).
+
+tff(fact_172_atLeastLessThan__iff,axiom,(
+    ! [I: a,L: a,U: a] : 
+      ( member_a2(I,set_or850827919Than_a(L,U))
+    <=> ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,L),I))
+        & pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,I),U)) ) ) )).
+
+tff(fact_173_member__rec_I1_J,axiom,(
+    ! [X: a,Xs: list_a,Y: a] : 
+      ( pp(aa_a_bool(member_a(cons_a(X,Xs)),Y))
+    <=> ( X = Y
+        | pp(aa_a_bool(member_a(Xs),Y)) ) ) )).
+
+tff(fact_174_member__rec_I1_J,axiom,(
+    ! [X: nat,Xs: list_nat,Y: nat] : 
+      ( pp(aa_nat_bool(member_nat(cons_nat(X,Xs)),Y))
+    <=> ( X = Y
+        | pp(aa_nat_bool(member_nat(Xs),Y)) ) ) )).
+
+tff(fact_175_member__rec_I1_J,axiom,(
+    ! [X: bool,Xs: list_bool,Y: bool] : 
+      ( pp(aa_bool_bool(member_bool(cons_bool(X,Xs)),Y))
+    <=> ( ( pp(X)
+        <=> pp(Y) )
+        | pp(aa_bool_bool(member_bool(Xs),Y)) ) ) )).
+
+tff(fact_176_not__le,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+    <=> pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Y),X)) ) )).
+
+tff(fact_177_not__le,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+    <=> pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Y),X)) ) )).
+
+tff(fact_178_not__le,axiom,(
+    ! [X: a,Y: a] : 
+      ( ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),Y))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Y),X)) ) )).
+
+tff(fact_179_list_Osize_I4_J,axiom,(
+    ! [X21: a,X22: list_a] : size_size_list_a(cons_a(X21,X22)) = aa_nat_nat(plus_plus_nat(size_size_list_a(X22)),aa_nat_nat(suc,zero_zero_nat)) )).
+
+tff(fact_180_list_Osize_I4_J,axiom,(
+    ! [X21: nat,X22: list_nat] : size_size_list_nat(cons_nat(X21,X22)) = aa_nat_nat(plus_plus_nat(size_size_list_nat(X22)),aa_nat_nat(suc,zero_zero_nat)) )).
+
+tff(fact_181_list_Osize_I4_J,axiom,(
+    ! [X21: bool,X22: list_bool] : size_size_list_bool(cons_bool(X21,X22)) = aa_nat_nat(plus_plus_nat(size_size_list_bool(X22)),aa_nat_nat(suc,zero_zero_nat)) )).
+
+tff(fact_182_ord__eq__le__trans,axiom,(
+    ! [A: bool,B: bool,C: bool] : 
+      ( ( pp(A)
+      <=> pp(B) )
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B),C))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),C)) ) ) )).
+
+tff(fact_183_ord__eq__le__trans,axiom,(
+    ! [A: nat,B: nat,C: nat] : 
+      ( A = B
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B),C))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),C)) ) ) )).
+
+tff(fact_184_ord__eq__le__trans,axiom,(
+    ! [A: a,B: a,C: a] : 
+      ( A = B
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,B),C))
+       => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),C)) ) ) )).
+
+tff(fact_185_dual__order_Ostrict__implies__not__eq,axiom,(
+    ! [B: a,A: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,B),A))
+     => A != B ) )).
+
+tff(fact_186_dual__order_Ostrict__implies__not__eq,axiom,(
+    ! [B: nat,A: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,B),A))
+     => A != B ) )).
+
+tff(fact_187_dual__order_Ostrict__implies__not__eq,axiom,(
+    ! [B: bool,A: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,B),A))
+     => ~ ( pp(A)
+        <=> pp(B) ) ) )).
+
+tff(fact_188_monoI,axiom,(
+    ! [F: fun_bool_bool] : 
+      ( ! [X3: bool,Y2: bool] : 
+          ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y2))
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,X3)),aa_bool_bool(F,Y2))) )
+     => order_mono_bool_bool(F) ) )).
+
+tff(fact_189_monoI,axiom,(
+    ! [F: fun_bool_nat] : 
+      ( ! [X3: bool,Y2: bool] : 
+          ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y2))
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,X3)),aa_bool_nat(F,Y2))) )
+     => order_mono_bool_nat(F) ) )).
+
+tff(fact_190_monoI,axiom,(
+    ! [F: fun_bool_a] : 
+      ( ! [X3: bool,Y2: bool] : 
+          ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y2))
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_bool_a(F,X3)),aa_bool_a(F,Y2))) )
+     => order_mono_bool_a(F) ) )).
+
+tff(fact_191_monoI,axiom,(
+    ! [F: fun_nat_bool] : 
+      ( ! [X3: nat,Y2: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y2))
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,X3)),aa_nat_bool(F,Y2))) )
+     => order_mono_nat_bool(F) ) )).
+
+tff(fact_192_monoI,axiom,(
+    ! [F: fun_nat_nat] : 
+      ( ! [X3: nat,Y2: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y2))
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,X3)),aa_nat_nat(F,Y2))) )
+     => order_mono_nat_nat(F) ) )).
+
+tff(fact_193_monoI,axiom,(
+    ! [F: fun_nat_a] : 
+      ( ! [X3: nat,Y2: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y2))
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_nat_a(F,X3)),aa_nat_a(F,Y2))) )
+     => order_mono_nat_a(F) ) )).
+
+tff(fact_194_monoI,axiom,(
+    ! [F: fun_a_bool] : 
+      ( ! [X3: a,Y2: a] : 
+          ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X3),Y2))
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_a_bool(F,X3)),aa_a_bool(F,Y2))) )
+     => order_mono_a_bool(F) ) )).
+
+tff(fact_195_monoI,axiom,(
+    ! [F: fun_a_nat] : 
+      ( ! [X3: a,Y2: a] : 
+          ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X3),Y2))
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_a_nat(F,X3)),aa_a_nat(F,Y2))) )
+     => order_mono_a_nat(F) ) )).
+
+tff(fact_196_monoI,axiom,(
+    ! [F: fun_a_a] : 
+      ( ! [X3: a,Y2: a] : 
+          ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X3),Y2))
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_a_a(F,X3)),aa_a_a(F,Y2))) )
+     => order_mono_a_a(F) ) )).
+
+tff(fact_197_linear,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+      | pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),X)) ) )).
+
+tff(fact_198_linear,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+      | pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),X)) ) )).
+
+tff(fact_199_linear,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),Y))
+      | pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,Y),X)) ) )).
+
+tff(fact_200_eq__iff,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( ( pp(X)
+      <=> pp(Y) )
+    <=> ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+        & pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),X)) ) ) )).
+
+tff(fact_201_eq__iff,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( X = Y
+    <=> ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+        & pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),X)) ) ) )).
+
+tff(fact_202_eq__iff,axiom,(
+    ! [X: a,Y: a] : 
+      ( X = Y
+    <=> ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),Y))
+        & pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,Y),X)) ) ) )).
+
+tff(fact_203_bspec,axiom,(
+    ! [A2: set_a,P: fun_a_bool,X: a] : 
+      ( ! [X3: a] : 
+          ( member_a2(X3,A2)
+         => pp(aa_a_bool(P,X3)) )
+     => ( member_a2(X,A2)
+       => pp(aa_a_bool(P,X)) ) ) )).
+
+tff(fact_204_dual__order_Oantisym,axiom,(
+    ! [B: bool,A: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B),A))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),B))
+       => ( pp(A)
+        <=> pp(B) ) ) ) )).
+
+tff(fact_205_dual__order_Oantisym,axiom,(
+    ! [B: nat,A: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B),A))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),B))
+       => A = B ) ) )).
+
+tff(fact_206_dual__order_Oantisym,axiom,(
+    ! [B: a,A: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,B),A))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),B))
+       => A = B ) ) )).
+
+tff(fact_207_leI,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Y))
+     => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),X)) ) )).
+
+tff(fact_208_leI,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Y))
+     => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),X)) ) )).
+
+tff(fact_209_leI,axiom,(
+    ! [X: a,Y: a] : 
+      ( ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),Y))
+     => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,Y),X)) ) )).
+
+tff(fact_210_le__less,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+    <=> ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Y))
+        | ( pp(X)
+        <=> pp(Y) ) ) ) )).
+
+tff(fact_211_le__less,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+    <=> ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Y))
+        | X = Y ) ) )).
+
+tff(fact_212_le__less,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),Y))
+    <=> ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),Y))
+        | X = Y ) ) )).
+
+tff(fact_213_le__boolI_H,axiom,(
+    ! [P: bool,Q: bool] : 
+      ( ( pp(P)
+       => pp(Q) )
+     => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,P),Q)) ) )).
+
+tff(fact_214_antisym__conv2,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+     => ( ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Y))
+      <=> ( pp(X)
+        <=> pp(Y) ) ) ) )).
+
+tff(fact_215_antisym__conv2,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+     => ( ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Y))
+      <=> X = Y ) ) )).
+
+tff(fact_216_antisym__conv2,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),Y))
+     => ( ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),Y))
+      <=> X = Y ) ) )).
+
+tff(fact_217_linorder__wlog,axiom,(
+    ! [P: fun_bo1373903021l_bool,A: bool,B: bool] : 
+      ( ! [A3: bool,B3: bool] : 
+          ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A3),B3))
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(P,A3),B3)) )
+     => ( ! [A3: bool,B3: bool] : 
+            ( pp(aa_bool_bool(aa_boo1142376798l_bool(P,B3),A3))
+           => pp(aa_bool_bool(aa_boo1142376798l_bool(P,A3),B3)) )
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(P,A),B)) ) ) )).
+
+tff(fact_218_linorder__wlog,axiom,(
+    ! [P: fun_nat_fun_nat_bool,A: nat,B: nat] : 
+      ( ! [A3: nat,B3: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A3),B3))
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(P,A3),B3)) )
+     => ( ! [A3: nat,B3: nat] : 
+            ( pp(aa_nat_bool(aa_nat_fun_nat_bool(P,B3),A3))
+           => pp(aa_nat_bool(aa_nat_fun_nat_bool(P,A3),B3)) )
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(P,A),B)) ) ) )).
+
+tff(fact_219_linorder__wlog,axiom,(
+    ! [P: fun_a_fun_a_bool,A: a,B: a] : 
+      ( ! [A3: a,B3: a] : 
+          ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A3),B3))
+         => pp(aa_a_bool(aa_a_fun_a_bool(P,A3),B3)) )
+     => ( ! [A3: a,B3: a] : 
+            ( pp(aa_a_bool(aa_a_fun_a_bool(P,B3),A3))
+           => pp(aa_a_bool(aa_a_fun_a_bool(P,A3),B3)) )
+       => pp(aa_a_bool(aa_a_fun_a_bool(P,A),B)) ) ) )).
+
+tff(fact_220_dual__order_Orefl,axiom,(
+    ! [A: bool] : pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),A)) )).
+
+tff(fact_221_dual__order_Orefl,axiom,(
+    ! [A: nat] : pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),A)) )).
+
+tff(fact_222_dual__order_Orefl,axiom,(
+    ! [A: a] : pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),A)) )).
+
+tff(fact_223_cancel__comm__monoid__add__class_Odiff__zero,axiom,(
+    ! [A: nat] : aa_nat_nat(minus_minus_nat(A),zero_zero_nat) = A )).
+
+tff(fact_224_antisym__conv1,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Y))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+      <=> ( pp(X)
+        <=> pp(Y) ) ) ) )).
+
+tff(fact_225_antisym__conv1,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Y))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+      <=> X = Y ) ) )).
+
+tff(fact_226_antisym__conv1,axiom,(
+    ! [X: a,Y: a] : 
+      ( ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),Y))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),Y))
+      <=> X = Y ) ) )).
+
+tff(fact_227_length__pos__if__in__set,axiom,(
+    ! [X: a,Xs: list_a] : 
+      ( member_a2(X,set_a2(Xs))
+     => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,zero_zero_nat),size_size_list_a(Xs))) ) )).
+
+tff(fact_228_length__pos__if__in__set,axiom,(
+    ! [X: nat,Xs: list_nat] : 
+      ( member_nat2(X,set_nat2(Xs))
+     => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,zero_zero_nat),size_size_list_nat(Xs))) ) )).
+
+tff(fact_229_length__pos__if__in__set,axiom,(
+    ! [X: bool,Xs: list_bool] : 
+      ( member_bool2(X,set_bool2(Xs))
+     => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,zero_zero_nat),size_size_list_bool(Xs))) ) )).
+
+tff(fact_230_less__le,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Y))
+    <=> ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+        & ~ ( pp(X)
+          <=> pp(Y) ) ) ) )).
+
+tff(fact_231_less__le,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Y))
+    <=> ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+        & X != Y ) ) )).
+
+tff(fact_232_less__le,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),Y))
+    <=> ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),Y))
+        & X != Y ) ) )).
+
+tff(fact_233_nth__Cons__Suc,axiom,(
+    ! [X: a,Xs: list_a,N: nat] : aa_nat_a(nth_a(cons_a(X,Xs)),aa_nat_nat(suc,N)) = aa_nat_a(nth_a(Xs),N) )).
+
+tff(fact_234_nth__Cons__Suc,axiom,(
+    ! [X: nat,Xs: list_nat,N: nat] : aa_nat_nat(nth_nat(cons_nat(X,Xs)),aa_nat_nat(suc,N)) = aa_nat_nat(nth_nat(Xs),N) )).
+
+tff(fact_235_nth__Cons__Suc,axiom,(
+    ! [X: bool,Xs: list_bool,N: nat] : 
+      ( pp(aa_nat_bool(nth_bool(cons_bool(X,Xs)),aa_nat_nat(suc,N)))
+    <=> pp(aa_nat_bool(nth_bool(Xs),N)) ) )).
+
+tff(fact_236_le__neq__trans,axiom,(
+    ! [A: bool,B: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),B))
+     => ( ~ ( pp(A)
+          <=> pp(B) )
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,A),B)) ) ) )).
+
+tff(fact_237_le__neq__trans,axiom,(
+    ! [A: nat,B: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),B))
+     => ( A != B
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,A),B)) ) ) )).
+
+tff(fact_238_le__neq__trans,axiom,(
+    ! [A: a,B: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),B))
+     => ( A != B
+       => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,A),B)) ) ) )).
+
+tff(fact_239_le__boolD,axiom,(
+    ! [P: bool,Q: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,P),Q))
+     => ( pp(P)
+       => pp(Q) ) ) )).
+
+tff(fact_240_le__less__linear,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+      | pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Y),X)) ) )).
+
+tff(fact_241_le__less__linear,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+      | pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Y),X)) ) )).
+
+tff(fact_242_le__less__linear,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),Y))
+      | pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Y),X)) ) )).
+
+tff(fact_243_dual__order_Oorder__iff__strict,axiom,(
+    ! [B: bool,A: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B),A))
+    <=> ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,B),A))
+        | ( pp(A)
+        <=> pp(B) ) ) ) )).
+
+tff(fact_244_dual__order_Oorder__iff__strict,axiom,(
+    ! [B: nat,A: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B),A))
+    <=> ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,B),A))
+        | A = B ) ) )).
+
+tff(fact_245_dual__order_Oorder__iff__strict,axiom,(
+    ! [B: a,A: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,B),A))
+    <=> ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,B),A))
+        | A = B ) ) )).
+
+tff(fact_246_antisym__conv,axiom,(
+    ! [Y: bool,X: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),X))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+      <=> ( pp(X)
+        <=> pp(Y) ) ) ) )).
+
+tff(fact_247_antisym__conv,axiom,(
+    ! [Y: nat,X: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),X))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+      <=> X = Y ) ) )).
+
+tff(fact_248_antisym__conv,axiom,(
+    ! [Y: a,X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,Y),X))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),Y))
+      <=> X = Y ) ) )).
+
+tff(fact_249_dual__order_Ostrict__iff__order,axiom,(
+    ! [B: bool,A: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,B),A))
+    <=> ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B),A))
+        & ~ ( pp(A)
+          <=> pp(B) ) ) ) )).
+
+tff(fact_250_dual__order_Ostrict__iff__order,axiom,(
+    ! [B: nat,A: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,B),A))
+    <=> ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B),A))
+        & A != B ) ) )).
+
+tff(fact_251_dual__order_Ostrict__iff__order,axiom,(
+    ! [B: a,A: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,B),A))
+    <=> ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,B),A))
+        & A != B ) ) )).
+
+tff(fact_252_le__cases3,axiom,(
+    ! [X: bool,Y: bool,Z: bool] : 
+      ( ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+       => ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),Z)) )
+     => ( ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),X))
+         => ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Z)) )
+       => ( ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Z))
+           => ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Z),Y)) )
+         => ( ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Z),Y))
+             => ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),X)) )
+           => ( ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),Z))
+               => ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Z),X)) )
+             => ~ ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Z),X))
+                 => ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y)) ) ) ) ) ) ) )).
+
+tff(fact_253_le__cases3,axiom,(
+    ! [X: nat,Y: nat,Z: nat] : 
+      ( ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+       => ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),Z)) )
+     => ( ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),X))
+         => ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Z)) )
+       => ( ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Z))
+           => ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Z),Y)) )
+         => ( ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Z),Y))
+             => ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),X)) )
+           => ( ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),Z))
+               => ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Z),X)) )
+             => ~ ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Z),X))
+                 => ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y)) ) ) ) ) ) ) )).
+
+tff(fact_254_le__cases3,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),Y))
+       => ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,Y),Z)) )
+     => ( ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,Y),X))
+         => ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),Z)) )
+       => ( ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),Z))
+           => ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,Z),Y)) )
+         => ( ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,Z),Y))
+             => ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,Y),X)) )
+           => ( ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,Y),Z))
+               => ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,Z),X)) )
+             => ~ ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,Z),X))
+                 => ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),Y)) ) ) ) ) ) ) )).
+
+tff(fact_255_order_Onot__eq__order__implies__strict,axiom,(
+    ! [A: bool,B: bool] : 
+      ( ~ ( pp(A)
+        <=> pp(B) )
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),B))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,A),B)) ) ) )).
+
+tff(fact_256_order_Onot__eq__order__implies__strict,axiom,(
+    ! [A: nat,B: nat] : 
+      ( A != B
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),B))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,A),B)) ) ) )).
+
+tff(fact_257_order_Onot__eq__order__implies__strict,axiom,(
+    ! [A: a,B: a] : 
+      ( A != B
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),B))
+       => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,A),B)) ) ) )).
+
+tff(fact_258_order_Otrans,axiom,(
+    ! [A: bool,B: bool,C: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),B))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B),C))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),C)) ) ) )).
+
+tff(fact_259_order_Otrans,axiom,(
+    ! [A: nat,B: nat,C: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),B))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B),C))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),C)) ) ) )).
+
+tff(fact_260_order_Otrans,axiom,(
+    ! [A: a,B: a,C: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),B))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,B),C))
+       => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),C)) ) ) )).
+
+tff(fact_261_sorted__last,axiom,(
+    ! [X: bool,Xs: list_bool] : 
+      ( member_bool2(X,set_bool2(Xs))
+     => ( linorder_sorted_bool(Xs)
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),last_bool(Xs))) ) ) )).
+
+tff(fact_262_sorted__last,axiom,(
+    ! [X: nat,Xs: list_nat] : 
+      ( member_nat2(X,set_nat2(Xs))
+     => ( linorder_sorted_nat(Xs)
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),last_nat(Xs))) ) ) )).
+
+tff(fact_263_sorted__last,axiom,(
+    ! [X: a,Xs: list_a] : 
+      ( member_a2(X,set_a2(Xs))
+     => ( linorder_sorted_a(Xs)
+       => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),last_a(Xs))) ) ) )).
+
+tff(fact_264_less__le__not__le,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Y))
+    <=> ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+        & ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),X)) ) ) )).
+
+tff(fact_265_less__le__not__le,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Y))
+    <=> ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+        & ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),X)) ) ) )).
+
+tff(fact_266_less__le__not__le,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),Y))
+    <=> ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),Y))
+        & ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,Y),X)) ) ) )).
+
+tff(fact_267_le__cases,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+     => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),X)) ) )).
+
+tff(fact_268_le__cases,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+     => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),X)) ) )).
+
+tff(fact_269_le__cases,axiom,(
+    ! [X: a,Y: a] : 
+      ( ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),Y))
+     => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,Y),X)) ) )).
+
+tff(fact_270_is__sorted__list__of__set__def,axiom,(
+    ! [A2: set_a,Xs: list_a] : 
+      ( list_i2074056765_set_a(A2,Xs)
+    <=> ( ! [I2: nat] : 
+            ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I2),aa_nat_nat(minus_minus_nat(size_size_list_a(Xs)),one_one_nat)))
+           => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,aa_nat_a(nth_a(Xs),I2)),aa_nat_a(nth_a(Xs),aa_nat_nat(plus_plus_nat(I2),one_one_nat)))) )
+        & set_a2(Xs) = A2 ) ) )).
+
+tff(fact_271_is__sorted__list__of__set__def,axiom,(
+    ! [A2: set_nat,Xs: list_nat] : 
+      ( list_i1095245009et_nat(A2,Xs)
+    <=> ( ! [I2: nat] : 
+            ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I2),aa_nat_nat(minus_minus_nat(size_size_list_nat(Xs)),one_one_nat)))
+           => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,aa_nat_nat(nth_nat(Xs),I2)),aa_nat_nat(nth_nat(Xs),aa_nat_nat(plus_plus_nat(I2),one_one_nat)))) )
+        & set_nat2(Xs) = A2 ) ) )).
+
+tff(fact_272_is__sorted__list__of__set__def,axiom,(
+    ! [A2: set_bool,Xs: list_bool] : 
+      ( list_i193099606t_bool(A2,Xs)
+    <=> ( ! [I2: nat] : 
+            ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I2),aa_nat_nat(minus_minus_nat(size_size_list_bool(Xs)),one_one_nat)))
+           => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,aa_nat_bool(nth_bool(Xs),I2)),aa_nat_bool(nth_bool(Xs),aa_nat_nat(plus_plus_nat(I2),one_one_nat)))) )
+        & set_bool2(Xs) = A2 ) ) )).
+
+tff(fact_273_not__le__imp__less,axiom,(
+    ! [Y: bool,X: bool] : 
+      ( ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Y),X))
+     => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Y)) ) )).
+
+tff(fact_274_not__le__imp__less,axiom,(
+    ! [Y: nat,X: nat] : 
+      ( ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),X))
+     => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Y)) ) )).
+
+tff(fact_275_not__le__imp__less,axiom,(
+    ! [Y: a,X: a] : 
+      ( ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,Y),X))
+     => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),Y)) ) )).
+
+tff(fact_276_nth__Cons__0,axiom,(
+    ! [X: a,Xs: list_a] : aa_nat_a(nth_a(cons_a(X,Xs)),zero_zero_nat) = X )).
+
+tff(fact_277_nth__Cons__0,axiom,(
+    ! [X: nat,Xs: list_nat] : aa_nat_nat(nth_nat(cons_nat(X,Xs)),zero_zero_nat) = X )).
+
+tff(fact_278_nth__Cons__0,axiom,(
+    ! [X: bool,Xs: list_bool] : 
+      ( pp(aa_nat_bool(nth_bool(cons_bool(X,Xs)),zero_zero_nat))
+    <=> pp(X) ) )).
+
+tff(fact_279_less__trans,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),Y))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Y),Z))
+       => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),Z)) ) ) )).
+
+tff(fact_280_less__trans,axiom,(
+    ! [X: nat,Y: nat,Z: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Y))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Y),Z))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Z)) ) ) )).
+
+tff(fact_281_less__trans,axiom,(
+    ! [X: bool,Y: bool,Z: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Y))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Y),Z))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Z)) ) ) )).
+
+tff(fact_282_insort__remove1,axiom,(
+    ! [A: a,Xs: list_a] : 
+      ( member_a2(A,set_a2(Xs))
+     => ( linorder_sorted_a(Xs)
+       => linord999585659ey_a_a(aTP_Lamm_ah,A,remove1_a(A,Xs)) = Xs ) ) )).
+
+tff(fact_283_insort__remove1,axiom,(
+    ! [A: nat,Xs: list_nat] : 
+      ( member_nat2(A,set_nat2(Xs))
+     => ( linorder_sorted_nat(Xs)
+       => linord1318720669at_nat(aTP_Lamm_ai,A,remove1_nat(A,Xs)) = Xs ) ) )).
+
+tff(fact_284_insort__remove1,axiom,(
+    ! [A: bool,Xs: list_bool] : 
+      ( member_bool2(A,set_bool2(Xs))
+     => ( linorder_sorted_bool(Xs)
+       => linord580562875l_bool(aTP_Lamm_aj,A,remove1_bool(A,Xs)) = Xs ) ) )).
+
+tff(fact_285_insort__insert__triv,axiom,(
+    ! [X: a,Xs: list_a] : 
+      ( member_a2(X,set_a2(Xs))
+     => linord168462850ey_a_a(aTP_Lamm_ah,X,Xs) = Xs ) )).
+
+tff(fact_286_insort__insert__triv,axiom,(
+    ! [X: nat,Xs: list_nat] : 
+      ( member_nat2(X,set_nat2(Xs))
+     => linord1132273316at_nat(aTP_Lamm_ai,X,Xs) = Xs ) )).
+
+tff(fact_287_insort__insert__triv,axiom,(
+    ! [X: bool,Xs: list_bool] : 
+      ( member_bool2(X,set_bool2(Xs))
+     => linord1175135810l_bool(aTP_Lamm_aj,X,Xs) = Xs ) )).
+
+tff(fact_288_distinct_Osimps_I2_J,axiom,(
+    ! [X: a,Xs: list_a] : 
+      ( distinct_a(cons_a(X,Xs))
+    <=> ( ~ member_a2(X,set_a2(Xs))
+        & distinct_a(Xs) ) ) )).
+
+tff(fact_289_distinct_Osimps_I2_J,axiom,(
+    ! [X: nat,Xs: list_nat] : 
+      ( distinct_nat(cons_nat(X,Xs))
+    <=> ( ~ member_nat2(X,set_nat2(Xs))
+        & distinct_nat(Xs) ) ) )).
+
+tff(fact_290_distinct_Osimps_I2_J,axiom,(
+    ! [X: bool,Xs: list_bool] : 
+      ( distinct_bool(cons_bool(X,Xs))
+    <=> ( ~ member_bool2(X,set_bool2(Xs))
+        & distinct_bool(Xs) ) ) )).
+
+tff(fact_291_less__linear,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),Y))
+      | X = Y
+      | pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Y),X)) ) )).
+
+tff(fact_292_less__linear,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Y))
+      | X = Y
+      | pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Y),X)) ) )).
+
+tff(fact_293_less__linear,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Y))
+      | ( pp(X)
+      <=> pp(Y) )
+      | pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Y),X)) ) )).
+
+tff(fact_294_diff__Suc__Suc,axiom,(
+    ! [M: nat,N: nat] : aa_nat_nat(minus_minus_nat(aa_nat_nat(suc,M)),aa_nat_nat(suc,N)) = aa_nat_nat(minus_minus_nat(M),N) )).
+
+tff(fact_295_insort__insert__insort,axiom,(
+    ! [X: a,Xs: list_a] : 
+      ( ~ member_a2(X,set_a2(Xs))
+     => linord168462850ey_a_a(aTP_Lamm_ah,X,Xs) = linord999585659ey_a_a(aTP_Lamm_ah,X,Xs) ) )).
+
+tff(fact_296_insort__insert__insort,axiom,(
+    ! [X: nat,Xs: list_nat] : 
+      ( ~ member_nat2(X,set_nat2(Xs))
+     => linord1132273316at_nat(aTP_Lamm_ai,X,Xs) = linord1318720669at_nat(aTP_Lamm_ai,X,Xs) ) )).
+
+tff(fact_297_insort__insert__insort,axiom,(
+    ! [X: bool,Xs: list_bool] : 
+      ( ~ member_bool2(X,set_bool2(Xs))
+     => linord1175135810l_bool(aTP_Lamm_aj,X,Xs) = linord580562875l_bool(aTP_Lamm_aj,X,Xs) ) )).
+
+tff(fact_298_last__in__set,axiom,(
+    ! [As: list_a] : 
+      ( As != nil_a
+     => member_a2(last_a(As),set_a2(As)) ) )).
+
+tff(fact_299_last__in__set,axiom,(
+    ! [As: list_nat] : 
+      ( As != nil_nat
+     => member_nat2(last_nat(As),set_nat2(As)) ) )).
+
+tff(fact_300_last__in__set,axiom,(
+    ! [As: list_bool] : 
+      ( As != nil_bool
+     => member_bool2(last_bool(As),set_bool2(As)) ) )).
+
+tff(fact_301_list_Oexhaust,axiom,(
+    ! [Y: list_a] : 
+      ( Y != nil_a
+     => ~ ( ! [X212: a,X222: list_a] : 
+              Y != cons_a(X212,X222) ) ) )).
+
+tff(fact_302_list_Oexhaust,axiom,(
+    ! [Y: list_nat] : 
+      ( Y != nil_nat
+     => ~ ( ! [X212: nat,X222: list_nat] : 
+              Y != cons_nat(X212,X222) ) ) )).
+
+tff(fact_303_list_Oexhaust,axiom,(
+    ! [Y: list_bool] : 
+      ( Y != nil_bool
+     => ~ ( ! [X212: bool,X222: list_bool] : 
+              Y != cons_bool(X212,X222) ) ) )).
+
+tff(fact_304_order__class_Oorder_Oantisym,axiom,(
+    ! [A: bool,B: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),B))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B),A))
+       => ( pp(A)
+        <=> pp(B) ) ) ) )).
+
+tff(fact_305_order__class_Oorder_Oantisym,axiom,(
+    ! [A: nat,B: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),B))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B),A))
+       => A = B ) ) )).
+
+tff(fact_306_order__class_Oorder_Oantisym,axiom,(
+    ! [A: a,B: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),B))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,B),A))
+       => A = B ) ) )).
+
+tff(fact_307_insertCI,axiom,(
+    ! [A: a,B2: set_a,B: a] : 
+      ( ( ~ member_a2(A,B2)
+       => A = B )
+     => member_a2(A,insert_a2(B,B2)) ) )).
+
+tff(fact_308_ord__le__eq__trans,axiom,(
+    ! [A: bool,B: bool,C: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),B))
+     => ( ( pp(B)
+        <=> pp(C) )
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),C)) ) ) )).
+
+tff(fact_309_ord__le__eq__trans,axiom,(
+    ! [A: nat,B: nat,C: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),B))
+     => ( B = C
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),C)) ) ) )).
+
+tff(fact_310_ord__le__eq__trans,axiom,(
+    ! [A: a,B: a,C: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),B))
+     => ( B = C
+       => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),C)) ) ) )).
+
+tff(fact_311_minf_I8_J,axiom,(
+    ! [T: bool] : 
+    ? [Z4: bool] : 
+    ! [X4: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X4),Z4))
+     => ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,T),X4)) ) )).
+
+tff(fact_312_minf_I8_J,axiom,(
+    ! [T: nat] : 
+    ? [Z4: nat] : 
+    ! [X4: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X4),Z4))
+     => ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,T),X4)) ) )).
+
+tff(fact_313_minf_I8_J,axiom,(
+    ! [T: a] : 
+    ? [Z4: a] : 
+    ! [X4: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X4),Z4))
+     => ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,T),X4)) ) )).
+
+tff(fact_314_pinf_I8_J,axiom,(
+    ! [T: bool] : 
+    ? [Z4: bool] : 
+    ! [X4: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Z4),X4))
+     => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,T),X4)) ) )).
+
+tff(fact_315_pinf_I8_J,axiom,(
+    ! [T: nat] : 
+    ? [Z4: nat] : 
+    ! [X4: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Z4),X4))
+     => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,T),X4)) ) )).
+
+tff(fact_316_pinf_I8_J,axiom,(
+    ! [T: a] : 
+    ? [Z4: a] : 
+    ! [X4: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Z4),X4))
+     => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,T),X4)) ) )).
+
+tff(fact_317_minf_I6_J,axiom,(
+    ! [T: bool] : 
+    ? [Z4: bool] : 
+    ! [X4: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X4),Z4))
+     => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X4),T)) ) )).
+
+tff(fact_318_minf_I6_J,axiom,(
+    ! [T: nat] : 
+    ? [Z4: nat] : 
+    ! [X4: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X4),Z4))
+     => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X4),T)) ) )).
+
+tff(fact_319_minf_I6_J,axiom,(
+    ! [T: a] : 
+    ? [Z4: a] : 
+    ! [X4: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X4),Z4))
+     => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X4),T)) ) )).
+
+tff(fact_320_pinf_I6_J,axiom,(
+    ! [T: bool] : 
+    ? [Z4: bool] : 
+    ! [X4: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Z4),X4))
+     => ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X4),T)) ) )).
+
+tff(fact_321_pinf_I6_J,axiom,(
+    ! [T: nat] : 
+    ? [Z4: nat] : 
+    ! [X4: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Z4),X4))
+     => ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X4),T)) ) )).
+
+tff(fact_322_pinf_I6_J,axiom,(
+    ! [T: a] : 
+    ? [Z4: a] : 
+    ! [X4: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Z4),X4))
+     => ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X4),T)) ) )).
+
+tff(fact_323_neqE,axiom,(
+    ! [X: a,Y: a] : 
+      ( X != Y
+     => ( ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),Y))
+       => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Y),X)) ) ) )).
+
+tff(fact_324_neqE,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( X != Y
+     => ( ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Y))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Y),X)) ) ) )).
+
+tff(fact_325_neqE,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( ( pp(X)
+      <=> ~ pp(Y) )
+     => ( ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Y))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Y),X)) ) ) )).
+
+tff(fact_326_sorted__sort,axiom,(
+    ! [Xs: list_a] : linorder_sorted_a(linord841154432ey_a_a(aTP_Lamm_ah,Xs)) )).
+
+tff(fact_327_sorted__sort,axiom,(
+    ! [Xs: list_nat] : linorder_sorted_nat(linord464714530at_nat(aTP_Lamm_ai,Xs)) )).
+
+tff(fact_328_sorted__sort,axiom,(
+    ! [Xs: list_bool] : linorder_sorted_bool(linord1730061248l_bool(aTP_Lamm_aj,Xs)) )).
+
+tff(fact_329_neq__iff,axiom,(
+    ! [X: a,Y: a] : 
+      ( X != Y
+    <=> ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),Y))
+        | pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Y),X)) ) ) )).
+
+tff(fact_330_neq__iff,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( X != Y
+    <=> ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Y))
+        | pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Y),X)) ) ) )).
+
+tff(fact_331_neq__iff,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( ~ ( pp(X)
+        <=> pp(Y) )
+    <=> ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Y))
+        | pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Y),X)) ) ) )).
+
+tff(fact_332_insertE,axiom,(
+    ! [A: a,B: a,A2: set_a] : 
+      ( member_a2(A,insert_a2(B,A2))
+     => ( A != B
+       => member_a2(A,A2) ) ) )).
+
+tff(fact_333_sorted__sort__id,axiom,(
+    ! [Xs: list_a] : 
+      ( linorder_sorted_a(Xs)
+     => linord841154432ey_a_a(aTP_Lamm_ah,Xs) = Xs ) )).
+
+tff(fact_334_sorted__sort__id,axiom,(
+    ! [Xs: list_nat] : 
+      ( linorder_sorted_nat(Xs)
+     => linord464714530at_nat(aTP_Lamm_ai,Xs) = Xs ) )).
+
+tff(fact_335_sorted__sort__id,axiom,(
+    ! [Xs: list_bool] : 
+      ( linorder_sorted_bool(Xs)
+     => linord1730061248l_bool(aTP_Lamm_aj,Xs) = Xs ) )).
+
+tff(fact_336_ballE,axiom,(
+    ! [A2: set_a,P: fun_a_bool,X: a] : 
+      ( ! [X3: a] : 
+          ( member_a2(X3,A2)
+         => pp(aa_a_bool(P,X3)) )
+     => ( ~ pp(aa_a_bool(P,X))
+       => ~ member_a2(X,A2) ) ) )).
+
+tff(fact_337_sorted__append,axiom,(
+    ! [Xs: list_bool,Ys: list_bool] : 
+      ( linorder_sorted_bool(append_bool(Xs,Ys))
+    <=> ( linorder_sorted_bool(Xs)
+        & linorder_sorted_bool(Ys)
+        & ! [X2: bool] : 
+            ( member_bool2(X2,set_bool2(Xs))
+           => ! [Xa: bool] : 
+                ( member_bool2(Xa,set_bool2(Ys))
+               => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X2),Xa)) ) ) ) ) )).
+
+tff(fact_338_sorted__append,axiom,(
+    ! [Xs: list_nat,Ys: list_nat] : 
+      ( linorder_sorted_nat(append_nat(Xs,Ys))
+    <=> ( linorder_sorted_nat(Xs)
+        & linorder_sorted_nat(Ys)
+        & ! [X2: nat] : 
+            ( member_nat2(X2,set_nat2(Xs))
+           => ! [Xa: nat] : 
+                ( member_nat2(Xa,set_nat2(Ys))
+               => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X2),Xa)) ) ) ) ) )).
+
+tff(fact_339_sorted__append,axiom,(
+    ! [Xs: list_a,Ys: list_a] : 
+      ( linorder_sorted_a(append_a(Xs,Ys))
+    <=> ( linorder_sorted_a(Xs)
+        & linorder_sorted_a(Ys)
+        & ! [X2: a] : 
+            ( member_a2(X2,set_a2(Xs))
+           => ! [Xa: a] : 
+                ( member_a2(Xa,set_a2(Ys))
+               => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X2),Xa)) ) ) ) ) )).
+
+tff(fact_340_linorder__cases,axiom,(
+    ! [X: a,Y: a] : 
+      ( ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),Y))
+     => ( X != Y
+       => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Y),X)) ) ) )).
+
+tff(fact_341_linorder__cases,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Y))
+     => ( X != Y
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Y),X)) ) ) )).
+
+tff(fact_342_linorder__cases,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Y))
+     => ( ( pp(X)
+        <=> ~ pp(Y) )
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Y),X)) ) ) )).
+
+tff(fact_343_append__Cons,axiom,(
+    ! [X: a,Xs: list_a,Ys: list_a] : append_a(cons_a(X,Xs),Ys) = cons_a(X,append_a(Xs,Ys)) )).
+
+tff(fact_344_append__Cons,axiom,(
+    ! [X: nat,Xs: list_nat,Ys: list_nat] : append_nat(cons_nat(X,Xs),Ys) = cons_nat(X,append_nat(Xs,Ys)) )).
+
+tff(fact_345_append__Cons,axiom,(
+    ! [X: bool,Xs: list_bool,Ys: list_bool] : append_bool(cons_bool(X,Xs),Ys) = cons_bool(X,append_bool(Xs,Ys)) )).
+
+tff(fact_346_eq__refl,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( ( pp(X)
+      <=> pp(Y) )
+     => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y)) ) )).
+
+tff(fact_347_eq__refl,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( X = Y
+     => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y)) ) )).
+
+tff(fact_348_eq__refl,axiom,(
+    ! [X: a,Y: a] : 
+      ( X = Y
+     => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),Y)) ) )).
+
+tff(fact_349_antisym__conv3,axiom,(
+    ! [Y: a,X: a] : 
+      ( ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Y),X))
+     => ( ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),Y))
+      <=> X = Y ) ) )).
+
+tff(fact_350_antisym__conv3,axiom,(
+    ! [Y: nat,X: nat] : 
+      ( ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Y),X))
+     => ( ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Y))
+      <=> X = Y ) ) )).
+
+tff(fact_351_antisym__conv3,axiom,(
+    ! [Y: bool,X: bool] : 
+      ( ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Y),X))
+     => ( ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Y))
+      <=> ( pp(X)
+        <=> pp(Y) ) ) ) )).
+
+tff(fact_352_UnCI,axiom,(
+    ! [C: a,B2: set_a,A2: set_a] : 
+      ( ( ~ member_a2(C,B2)
+       => member_a2(C,A2) )
+     => member_a2(C,sup_sup_set_a(A2,B2)) ) )).
+
+tff(fact_353_UnE,axiom,(
+    ! [C: a,A2: set_a,B2: set_a] : 
+      ( member_a2(C,sup_sup_set_a(A2,B2))
+     => ( ~ member_a2(C,A2)
+       => member_a2(C,B2) ) ) )).
+
+tff(fact_354_ord__le__eq__subst,axiom,(
+    ! [A: bool,B: bool,F: fun_bool_bool,C: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),B))
+     => ( ( pp(aa_bool_bool(F,B))
+        <=> pp(C) )
+       => ( ! [X3: bool,Y2: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y2))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,X3)),aa_bool_bool(F,Y2))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,A)),C)) ) ) ) )).
+
+tff(fact_355_ord__le__eq__subst,axiom,(
+    ! [A: bool,B: bool,F: fun_bool_nat,C: nat] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),B))
+     => ( aa_bool_nat(F,B) = C
+       => ( ! [X3: bool,Y2: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y2))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,X3)),aa_bool_nat(F,Y2))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,A)),C)) ) ) ) )).
+
+tff(fact_356_ord__le__eq__subst,axiom,(
+    ! [A: bool,B: bool,F: fun_bool_a,C: a] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),B))
+     => ( aa_bool_a(F,B) = C
+       => ( ! [X3: bool,Y2: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y2))
+             => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_bool_a(F,X3)),aa_bool_a(F,Y2))) )
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_bool_a(F,A)),C)) ) ) ) )).
+
+tff(fact_357_ord__le__eq__subst,axiom,(
+    ! [A: nat,B: nat,F: fun_nat_bool,C: bool] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),B))
+     => ( ( pp(aa_nat_bool(F,B))
+        <=> pp(C) )
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y2))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,X3)),aa_nat_bool(F,Y2))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,A)),C)) ) ) ) )).
+
+tff(fact_358_ord__le__eq__subst,axiom,(
+    ! [A: nat,B: nat,F: fun_nat_nat,C: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),B))
+     => ( aa_nat_nat(F,B) = C
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y2))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,X3)),aa_nat_nat(F,Y2))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,A)),C)) ) ) ) )).
+
+tff(fact_359_ord__le__eq__subst,axiom,(
+    ! [A: nat,B: nat,F: fun_nat_a,C: a] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),B))
+     => ( aa_nat_a(F,B) = C
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y2))
+             => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_nat_a(F,X3)),aa_nat_a(F,Y2))) )
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_nat_a(F,A)),C)) ) ) ) )).
+
+tff(fact_360_ord__le__eq__subst,axiom,(
+    ! [A: a,B: a,F: fun_a_bool,C: bool] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),B))
+     => ( ( pp(aa_a_bool(F,B))
+        <=> pp(C) )
+       => ( ! [X3: a,Y2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X3),Y2))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_a_bool(F,X3)),aa_a_bool(F,Y2))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_a_bool(F,A)),C)) ) ) ) )).
+
+tff(fact_361_ord__le__eq__subst,axiom,(
+    ! [A: a,B: a,F: fun_a_nat,C: nat] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),B))
+     => ( aa_a_nat(F,B) = C
+       => ( ! [X3: a,Y2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X3),Y2))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_a_nat(F,X3)),aa_a_nat(F,Y2))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_a_nat(F,A)),C)) ) ) ) )).
+
+tff(fact_362_ord__le__eq__subst,axiom,(
+    ! [A: a,B: a,F: fun_a_a,C: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),B))
+     => ( aa_a_a(F,B) = C
+       => ( ! [X3: a,Y2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X3),Y2))
+             => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_a_a(F,X3)),aa_a_a(F,Y2))) )
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_a_a(F,A)),C)) ) ) ) )).
+
+tff(fact_363_ord__eq__le__subst,axiom,(
+    ! [A: bool,F: fun_bool_bool,B: bool,C: bool] : 
+      ( ( pp(A)
+      <=> pp(aa_bool_bool(F,B)) )
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B),C))
+       => ( ! [X3: bool,Y2: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y2))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,X3)),aa_bool_bool(F,Y2))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),aa_bool_bool(F,C))) ) ) ) )).
+
+tff(fact_364_ord__eq__le__subst,axiom,(
+    ! [A: nat,F: fun_bool_nat,B: bool,C: bool] : 
+      ( A = aa_bool_nat(F,B)
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B),C))
+       => ( ! [X3: bool,Y2: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y2))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,X3)),aa_bool_nat(F,Y2))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),aa_bool_nat(F,C))) ) ) ) )).
+
+tff(fact_365_ord__eq__le__subst,axiom,(
+    ! [A: a,F: fun_bool_a,B: bool,C: bool] : 
+      ( A = aa_bool_a(F,B)
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B),C))
+       => ( ! [X3: bool,Y2: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y2))
+             => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_bool_a(F,X3)),aa_bool_a(F,Y2))) )
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),aa_bool_a(F,C))) ) ) ) )).
+
+tff(fact_366_ord__eq__le__subst,axiom,(
+    ! [A: bool,F: fun_nat_bool,B: nat,C: nat] : 
+      ( ( pp(A)
+      <=> pp(aa_nat_bool(F,B)) )
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y2))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,X3)),aa_nat_bool(F,Y2))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),aa_nat_bool(F,C))) ) ) ) )).
+
+tff(fact_367_ord__eq__le__subst,axiom,(
+    ! [A: nat,F: fun_nat_nat,B: nat,C: nat] : 
+      ( A = aa_nat_nat(F,B)
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y2))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,X3)),aa_nat_nat(F,Y2))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),aa_nat_nat(F,C))) ) ) ) )).
+
+tff(fact_368_ord__eq__le__subst,axiom,(
+    ! [A: a,F: fun_nat_a,B: nat,C: nat] : 
+      ( A = aa_nat_a(F,B)
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y2))
+             => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_nat_a(F,X3)),aa_nat_a(F,Y2))) )
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),aa_nat_a(F,C))) ) ) ) )).
+
+tff(fact_369_ord__eq__le__subst,axiom,(
+    ! [A: bool,F: fun_a_bool,B: a,C: a] : 
+      ( ( pp(A)
+      <=> pp(aa_a_bool(F,B)) )
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,B),C))
+       => ( ! [X3: a,Y2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X3),Y2))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_a_bool(F,X3)),aa_a_bool(F,Y2))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),aa_a_bool(F,C))) ) ) ) )).
+
+tff(fact_370_ord__eq__le__subst,axiom,(
+    ! [A: nat,F: fun_a_nat,B: a,C: a] : 
+      ( A = aa_a_nat(F,B)
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,B),C))
+       => ( ! [X3: a,Y2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X3),Y2))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_a_nat(F,X3)),aa_a_nat(F,Y2))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),aa_a_nat(F,C))) ) ) ) )).
+
+tff(fact_371_ord__eq__le__subst,axiom,(
+    ! [A: a,F: fun_a_a,B: a,C: a] : 
+      ( A = aa_a_a(F,B)
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,B),C))
+       => ( ! [X3: a,Y2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X3),Y2))
+             => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_a_a(F,X3)),aa_a_a(F,Y2))) )
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),aa_a_a(F,C))) ) ) ) )).
+
+tff(fact_372_order__subst2,axiom,(
+    ! [A: bool,B: bool,F: fun_bool_bool,C: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),B))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,B)),C))
+       => ( ! [X3: bool,Y2: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y2))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,X3)),aa_bool_bool(F,Y2))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,A)),C)) ) ) ) )).
+
+tff(fact_373_order__subst2,axiom,(
+    ! [A: bool,B: bool,F: fun_bool_nat,C: nat] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),B))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,B)),C))
+       => ( ! [X3: bool,Y2: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y2))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,X3)),aa_bool_nat(F,Y2))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,A)),C)) ) ) ) )).
+
+tff(fact_374_order__subst2,axiom,(
+    ! [A: bool,B: bool,F: fun_bool_a,C: a] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),B))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_bool_a(F,B)),C))
+       => ( ! [X3: bool,Y2: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y2))
+             => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_bool_a(F,X3)),aa_bool_a(F,Y2))) )
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_bool_a(F,A)),C)) ) ) ) )).
+
+tff(fact_375_order__subst2,axiom,(
+    ! [A: nat,B: nat,F: fun_nat_bool,C: bool] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),B))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,B)),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y2))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,X3)),aa_nat_bool(F,Y2))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,A)),C)) ) ) ) )).
+
+tff(fact_376_order__subst2,axiom,(
+    ! [A: nat,B: nat,F: fun_nat_nat,C: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),B))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,B)),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y2))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,X3)),aa_nat_nat(F,Y2))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,A)),C)) ) ) ) )).
+
+tff(fact_377_order__subst2,axiom,(
+    ! [A: nat,B: nat,F: fun_nat_a,C: a] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),B))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_nat_a(F,B)),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y2))
+             => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_nat_a(F,X3)),aa_nat_a(F,Y2))) )
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_nat_a(F,A)),C)) ) ) ) )).
+
+tff(fact_378_order__subst2,axiom,(
+    ! [A: a,B: a,F: fun_a_bool,C: bool] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),B))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_a_bool(F,B)),C))
+       => ( ! [X3: a,Y2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X3),Y2))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_a_bool(F,X3)),aa_a_bool(F,Y2))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_a_bool(F,A)),C)) ) ) ) )).
+
+tff(fact_379_order__subst2,axiom,(
+    ! [A: a,B: a,F: fun_a_nat,C: nat] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),B))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_a_nat(F,B)),C))
+       => ( ! [X3: a,Y2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X3),Y2))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_a_nat(F,X3)),aa_a_nat(F,Y2))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_a_nat(F,A)),C)) ) ) ) )).
+
+tff(fact_380_order__subst2,axiom,(
+    ! [A: a,B: a,F: fun_a_a,C: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),B))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_a_a(F,B)),C))
+       => ( ! [X3: a,Y2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X3),Y2))
+             => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_a_a(F,X3)),aa_a_a(F,Y2))) )
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_a_a(F,A)),C)) ) ) ) )).
+
+tff(fact_381_subset__code_I1_J,axiom,(
+    ! [Xs: list_a,B2: set_a] : 
+      ( ord_less_eq_set_a(set_a2(Xs),B2)
+    <=> ! [X2: a] : 
+          ( member_a2(X2,set_a2(Xs))
+         => member_a2(X2,B2) ) ) )).
+
+tff(fact_382_subset__code_I1_J,axiom,(
+    ! [Xs: list_nat,B2: set_nat] : 
+      ( ord_less_eq_set_nat(set_nat2(Xs),B2)
+    <=> ! [X2: nat] : 
+          ( member_nat2(X2,set_nat2(Xs))
+         => member_nat2(X2,B2) ) ) )).
+
+tff(fact_383_subset__code_I1_J,axiom,(
+    ! [Xs: list_bool,B2: set_bool] : 
+      ( ord_less_eq_set_bool(set_bool2(Xs),B2)
+    <=> ! [X2: bool] : 
+          ( member_bool2(X2,set_bool2(Xs))
+         => member_bool2(X2,B2) ) ) )).
+
+tff(fact_384_order__subst1,axiom,(
+    ! [A: bool,F: fun_bool_bool,B: bool,C: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),aa_bool_bool(F,B)))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B),C))
+       => ( ! [X3: bool,Y2: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y2))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,X3)),aa_bool_bool(F,Y2))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),aa_bool_bool(F,C))) ) ) ) )).
+
+tff(fact_385_order__subst1,axiom,(
+    ! [A: bool,F: fun_nat_bool,B: nat,C: nat] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),aa_nat_bool(F,B)))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y2))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,X3)),aa_nat_bool(F,Y2))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),aa_nat_bool(F,C))) ) ) ) )).
+
+tff(fact_386_order__subst1,axiom,(
+    ! [A: bool,F: fun_a_bool,B: a,C: a] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),aa_a_bool(F,B)))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,B),C))
+       => ( ! [X3: a,Y2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X3),Y2))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_a_bool(F,X3)),aa_a_bool(F,Y2))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),aa_a_bool(F,C))) ) ) ) )).
+
+tff(fact_387_order__subst1,axiom,(
+    ! [A: nat,F: fun_bool_nat,B: bool,C: bool] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),aa_bool_nat(F,B)))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B),C))
+       => ( ! [X3: bool,Y2: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y2))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,X3)),aa_bool_nat(F,Y2))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),aa_bool_nat(F,C))) ) ) ) )).
+
+tff(fact_388_order__subst1,axiom,(
+    ! [A: nat,F: fun_nat_nat,B: nat,C: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),aa_nat_nat(F,B)))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y2))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,X3)),aa_nat_nat(F,Y2))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),aa_nat_nat(F,C))) ) ) ) )).
+
+tff(fact_389_order__subst1,axiom,(
+    ! [A: nat,F: fun_a_nat,B: a,C: a] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),aa_a_nat(F,B)))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,B),C))
+       => ( ! [X3: a,Y2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X3),Y2))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_a_nat(F,X3)),aa_a_nat(F,Y2))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),aa_a_nat(F,C))) ) ) ) )).
+
+tff(fact_390_order__subst1,axiom,(
+    ! [A: a,F: fun_bool_a,B: bool,C: bool] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),aa_bool_a(F,B)))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B),C))
+       => ( ! [X3: bool,Y2: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y2))
+             => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_bool_a(F,X3)),aa_bool_a(F,Y2))) )
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),aa_bool_a(F,C))) ) ) ) )).
+
+tff(fact_391_order__subst1,axiom,(
+    ! [A: a,F: fun_nat_a,B: nat,C: nat] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),aa_nat_a(F,B)))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y2))
+             => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_nat_a(F,X3)),aa_nat_a(F,Y2))) )
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),aa_nat_a(F,C))) ) ) ) )).
+
+tff(fact_392_order__subst1,axiom,(
+    ! [A: a,F: fun_a_a,B: a,C: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),aa_a_a(F,B)))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,B),C))
+       => ( ! [X3: a,Y2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X3),Y2))
+             => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_a_a(F,X3)),aa_a_a(F,Y2))) )
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),aa_a_a(F,C))) ) ) ) )).
+
+tff(fact_393_Un__iff,axiom,(
+    ! [C: a,A2: set_a,B2: set_a] : 
+      ( member_a2(C,sup_sup_set_a(A2,B2))
+    <=> ( member_a2(C,A2)
+        | member_a2(C,B2) ) ) )).
+
+tff(fact_394_sorted__distinct__set__unique,axiom,(
+    ! [Xs: list_a,Ys: list_a] : 
+      ( linorder_sorted_a(Xs)
+     => ( distinct_a(Xs)
+       => ( linorder_sorted_a(Ys)
+         => ( distinct_a(Ys)
+           => ( set_a2(Xs) = set_a2(Ys)
+             => Xs = Ys ) ) ) ) ) )).
+
+tff(fact_395_sorted__distinct__set__unique,axiom,(
+    ! [Xs: list_nat,Ys: list_nat] : 
+      ( linorder_sorted_nat(Xs)
+     => ( distinct_nat(Xs)
+       => ( linorder_sorted_nat(Ys)
+         => ( distinct_nat(Ys)
+           => ( set_nat2(Xs) = set_nat2(Ys)
+             => Xs = Ys ) ) ) ) ) )).
+
+tff(fact_396_sorted__distinct__set__unique,axiom,(
+    ! [Xs: list_bool,Ys: list_bool] : 
+      ( linorder_sorted_bool(Xs)
+     => ( distinct_bool(Xs)
+       => ( linorder_sorted_bool(Ys)
+         => ( distinct_bool(Ys)
+           => ( set_bool2(Xs) = set_bool2(Ys)
+             => Xs = Ys ) ) ) ) ) )).
+
+tff(fact_397_insort__is__Cons,axiom,(
+    ! [Xs: list_a,F: fun_a_bool,A: a] : 
+      ( ! [X3: a] : 
+          ( member_a2(X3,set_a2(Xs))
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_a_bool(F,A)),aa_a_bool(F,X3))) )
+     => linord1882544788a_bool(F,A,Xs) = cons_a(A,Xs) ) )).
+
+tff(fact_398_insort__is__Cons,axiom,(
+    ! [Xs: list_nat,F: fun_nat_bool,A: nat] : 
+      ( ! [X3: nat] : 
+          ( member_nat2(X3,set_nat2(Xs))
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,A)),aa_nat_bool(F,X3))) )
+     => linord1249538698t_bool(F,A,Xs) = cons_nat(A,Xs) ) )).
+
+tff(fact_399_insort__is__Cons,axiom,(
+    ! [Xs: list_bool,F: fun_bool_bool,A: bool] : 
+      ( ! [X3: bool] : 
+          ( member_bool2(X3,set_bool2(Xs))
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,A)),aa_bool_bool(F,X3))) )
+     => linord580562875l_bool(F,A,Xs) = cons_bool(A,Xs) ) )).
+
+tff(fact_400_insort__is__Cons,axiom,(
+    ! [Xs: list_a,F: fun_a_nat,A: a] : 
+      ( ! [X3: a] : 
+          ( member_a2(X3,set_a2(Xs))
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_a_nat(F,A)),aa_a_nat(F,X3))) )
+     => linord343050771_a_nat(F,A,Xs) = cons_a(A,Xs) ) )).
+
+tff(fact_401_insort__is__Cons,axiom,(
+    ! [Xs: list_nat,F: fun_nat_nat,A: nat] : 
+      ( ! [X3: nat] : 
+          ( member_nat2(X3,set_nat2(Xs))
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,A)),aa_nat_nat(F,X3))) )
+     => linord1318720669at_nat(F,A,Xs) = cons_nat(A,Xs) ) )).
+
+tff(fact_402_insort__is__Cons,axiom,(
+    ! [Xs: list_bool,F: fun_bool_nat,A: bool] : 
+      ( ! [X3: bool] : 
+          ( member_bool2(X3,set_bool2(Xs))
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,A)),aa_bool_nat(F,X3))) )
+     => linord2132966188ol_nat(F,A,Xs) = cons_bool(A,Xs) ) )).
+
+tff(fact_403_insort__is__Cons,axiom,(
+    ! [Xs: list_a,F: fun_a_a,A: a] : 
+      ( ! [X3: a] : 
+          ( member_a2(X3,set_a2(Xs))
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_a_a(F,A)),aa_a_a(F,X3))) )
+     => linord999585659ey_a_a(F,A,Xs) = cons_a(A,Xs) ) )).
+
+tff(fact_404_insort__is__Cons,axiom,(
+    ! [Xs: list_nat,F: fun_nat_a,A: nat] : 
+      ( ! [X3: nat] : 
+          ( member_nat2(X3,set_nat2(Xs))
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_nat_a(F,A)),aa_nat_a(F,X3))) )
+     => linord719518577_nat_a(F,A,Xs) = cons_nat(A,Xs) ) )).
+
+tff(fact_405_insort__is__Cons,axiom,(
+    ! [Xs: list_bool,F: fun_bool_a,A: bool] : 
+      ( ! [X3: bool] : 
+          ( member_bool2(X3,set_bool2(Xs))
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_bool_a(F,A)),aa_bool_a(F,X3))) )
+     => linord244570786bool_a(F,A,Xs) = cons_bool(A,Xs) ) )).
+
+tff(fact_406_set__append,axiom,(
+    ! [Xs: list_a,Ys: list_a] : set_a2(append_a(Xs,Ys)) = sup_sup_set_a(set_a2(Xs),set_a2(Ys)) )).
+
+tff(fact_407_set__append,axiom,(
+    ! [Xs: list_nat,Ys: list_nat] : set_nat2(append_nat(Xs,Ys)) = sup_sup_set_nat(set_nat2(Xs),set_nat2(Ys)) )).
+
+tff(fact_408_set__append,axiom,(
+    ! [Xs: list_bool,Ys: list_bool] : set_bool2(append_bool(Xs,Ys)) = sup_sup_set_bool(set_bool2(Xs),set_bool2(Ys)) )).
+
+tff(fact_409_Nat_Oadd__0__right,axiom,(
+    ! [M: nat] : aa_nat_nat(plus_plus_nat(M),zero_zero_nat) = M )).
+
+tff(fact_410_equalityCE,axiom,(
+    ! [A2: set_a,B2: set_a,C: a] : 
+      ( A2 = B2
+     => ( ( member_a2(C,A2)
+         => ~ member_a2(C,B2) )
+       => ~ ( ~ member_a2(C,A2)
+           => member_a2(C,B2) ) ) ) )).
+
+tff(fact_411_order__le__less__subst1,axiom,(
+    ! [A: bool,F: fun_a_bool,B: a,C: a] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),aa_a_bool(F,B)))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,B),C))
+       => ( ! [X3: a,Y2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X3),Y2))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,aa_a_bool(F,X3)),aa_a_bool(F,Y2))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,A),aa_a_bool(F,C))) ) ) ) )).
+
+tff(fact_412_order__le__less__subst1,axiom,(
+    ! [A: bool,F: fun_nat_bool,B: nat,C: nat] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),aa_nat_bool(F,B)))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,B),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X3),Y2))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,aa_nat_bool(F,X3)),aa_nat_bool(F,Y2))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,A),aa_nat_bool(F,C))) ) ) ) )).
+
+tff(fact_413_order__le__less__subst1,axiom,(
+    ! [A: bool,F: fun_bool_bool,B: bool,C: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),aa_bool_bool(F,B)))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,B),C))
+       => ( ! [X3: bool,Y2: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X3),Y2))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,aa_bool_bool(F,X3)),aa_bool_bool(F,Y2))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,A),aa_bool_bool(F,C))) ) ) ) )).
+
+tff(fact_414_order__le__less__subst1,axiom,(
+    ! [A: nat,F: fun_a_nat,B: a,C: a] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),aa_a_nat(F,B)))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,B),C))
+       => ( ! [X3: a,Y2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X3),Y2))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,aa_a_nat(F,X3)),aa_a_nat(F,Y2))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,A),aa_a_nat(F,C))) ) ) ) )).
+
+tff(fact_415_order__le__less__subst1,axiom,(
+    ! [A: nat,F: fun_nat_nat,B: nat,C: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),aa_nat_nat(F,B)))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,B),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X3),Y2))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,aa_nat_nat(F,X3)),aa_nat_nat(F,Y2))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,A),aa_nat_nat(F,C))) ) ) ) )).
+
+tff(fact_416_order__le__less__subst1,axiom,(
+    ! [A: nat,F: fun_bool_nat,B: bool,C: bool] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),aa_bool_nat(F,B)))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,B),C))
+       => ( ! [X3: bool,Y2: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X3),Y2))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,aa_bool_nat(F,X3)),aa_bool_nat(F,Y2))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,A),aa_bool_nat(F,C))) ) ) ) )).
+
+tff(fact_417_order__le__less__subst1,axiom,(
+    ! [A: a,F: fun_a_a,B: a,C: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),aa_a_a(F,B)))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,B),C))
+       => ( ! [X3: a,Y2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X3),Y2))
+             => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,aa_a_a(F,X3)),aa_a_a(F,Y2))) )
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,A),aa_a_a(F,C))) ) ) ) )).
+
+tff(fact_418_order__le__less__subst1,axiom,(
+    ! [A: a,F: fun_nat_a,B: nat,C: nat] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),aa_nat_a(F,B)))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,B),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X3),Y2))
+             => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,aa_nat_a(F,X3)),aa_nat_a(F,Y2))) )
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,A),aa_nat_a(F,C))) ) ) ) )).
+
+tff(fact_419_order__le__less__subst1,axiom,(
+    ! [A: a,F: fun_bool_a,B: bool,C: bool] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),aa_bool_a(F,B)))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,B),C))
+       => ( ! [X3: bool,Y2: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X3),Y2))
+             => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,aa_bool_a(F,X3)),aa_bool_a(F,Y2))) )
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,A),aa_bool_a(F,C))) ) ) ) )).
+
+tff(fact_420_order__le__less__subst2,axiom,(
+    ! [A: bool,B: bool,F: fun_bool_bool,C: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),B))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,aa_bool_bool(F,B)),C))
+       => ( ! [X3: bool,Y2: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y2))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,X3)),aa_bool_bool(F,Y2))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,aa_bool_bool(F,A)),C)) ) ) ) )).
+
+tff(fact_421_order__le__less__subst2,axiom,(
+    ! [A: bool,B: bool,F: fun_bool_nat,C: nat] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),B))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,aa_bool_nat(F,B)),C))
+       => ( ! [X3: bool,Y2: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y2))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,X3)),aa_bool_nat(F,Y2))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,aa_bool_nat(F,A)),C)) ) ) ) )).
+
+tff(fact_422_order__le__less__subst2,axiom,(
+    ! [A: bool,B: bool,F: fun_bool_a,C: a] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),B))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,aa_bool_a(F,B)),C))
+       => ( ! [X3: bool,Y2: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y2))
+             => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_bool_a(F,X3)),aa_bool_a(F,Y2))) )
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,aa_bool_a(F,A)),C)) ) ) ) )).
+
+tff(fact_423_order__le__less__subst2,axiom,(
+    ! [A: nat,B: nat,F: fun_nat_bool,C: bool] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),B))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,aa_nat_bool(F,B)),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y2))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,X3)),aa_nat_bool(F,Y2))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,aa_nat_bool(F,A)),C)) ) ) ) )).
+
+tff(fact_424_order__le__less__subst2,axiom,(
+    ! [A: nat,B: nat,F: fun_nat_nat,C: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),B))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,aa_nat_nat(F,B)),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y2))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,X3)),aa_nat_nat(F,Y2))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,aa_nat_nat(F,A)),C)) ) ) ) )).
+
+tff(fact_425_order__le__less__subst2,axiom,(
+    ! [A: nat,B: nat,F: fun_nat_a,C: a] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),B))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,aa_nat_a(F,B)),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y2))
+             => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_nat_a(F,X3)),aa_nat_a(F,Y2))) )
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,aa_nat_a(F,A)),C)) ) ) ) )).
+
+tff(fact_426_order__le__less__subst2,axiom,(
+    ! [A: a,B: a,F: fun_a_bool,C: bool] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),B))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,aa_a_bool(F,B)),C))
+       => ( ! [X3: a,Y2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X3),Y2))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_a_bool(F,X3)),aa_a_bool(F,Y2))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,aa_a_bool(F,A)),C)) ) ) ) )).
+
+tff(fact_427_order__le__less__subst2,axiom,(
+    ! [A: a,B: a,F: fun_a_nat,C: nat] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),B))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,aa_a_nat(F,B)),C))
+       => ( ! [X3: a,Y2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X3),Y2))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_a_nat(F,X3)),aa_a_nat(F,Y2))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,aa_a_nat(F,A)),C)) ) ) ) )).
+
+tff(fact_428_order__le__less__subst2,axiom,(
+    ! [A: a,B: a,F: fun_a_a,C: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),B))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,aa_a_a(F,B)),C))
+       => ( ! [X3: a,Y2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X3),Y2))
+             => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_a_a(F,X3)),aa_a_a(F,Y2))) )
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,aa_a_a(F,A)),C)) ) ) ) )).
+
+tff(fact_429_less__diff__conv,axiom,(
+    ! [I: nat,J: nat,K: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I),aa_nat_nat(minus_minus_nat(J),K)))
+    <=> pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,aa_nat_nat(plus_plus_nat(I),K)),J)) ) )).
+
+tff(fact_430_order__less__le__subst1,axiom,(
+    ! [A: bool,F: fun_bool_bool,B: bool,C: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,A),aa_bool_bool(F,B)))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B),C))
+       => ( ! [X3: bool,Y2: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y2))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,X3)),aa_bool_bool(F,Y2))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,A),aa_bool_bool(F,C))) ) ) ) )).
+
+tff(fact_431_order__less__le__subst1,axiom,(
+    ! [A: nat,F: fun_bool_nat,B: bool,C: bool] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,A),aa_bool_nat(F,B)))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B),C))
+       => ( ! [X3: bool,Y2: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y2))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,X3)),aa_bool_nat(F,Y2))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,A),aa_bool_nat(F,C))) ) ) ) )).
+
+tff(fact_432_order__less__le__subst1,axiom,(
+    ! [A: a,F: fun_bool_a,B: bool,C: bool] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,A),aa_bool_a(F,B)))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,B),C))
+       => ( ! [X3: bool,Y2: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X3),Y2))
+             => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_bool_a(F,X3)),aa_bool_a(F,Y2))) )
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,A),aa_bool_a(F,C))) ) ) ) )).
+
+tff(fact_433_order__less__le__subst1,axiom,(
+    ! [A: bool,F: fun_nat_bool,B: nat,C: nat] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,A),aa_nat_bool(F,B)))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y2))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,X3)),aa_nat_bool(F,Y2))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,A),aa_nat_bool(F,C))) ) ) ) )).
+
+tff(fact_434_order__less__le__subst1,axiom,(
+    ! [A: nat,F: fun_nat_nat,B: nat,C: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,A),aa_nat_nat(F,B)))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y2))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,X3)),aa_nat_nat(F,Y2))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,A),aa_nat_nat(F,C))) ) ) ) )).
+
+tff(fact_435_order__less__le__subst1,axiom,(
+    ! [A: a,F: fun_nat_a,B: nat,C: nat] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,A),aa_nat_a(F,B)))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,B),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y2))
+             => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_nat_a(F,X3)),aa_nat_a(F,Y2))) )
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,A),aa_nat_a(F,C))) ) ) ) )).
+
+tff(fact_436_order__less__le__subst1,axiom,(
+    ! [A: bool,F: fun_a_bool,B: a,C: a] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,A),aa_a_bool(F,B)))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,B),C))
+       => ( ! [X3: a,Y2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X3),Y2))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_a_bool(F,X3)),aa_a_bool(F,Y2))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,A),aa_a_bool(F,C))) ) ) ) )).
+
+tff(fact_437_order__less__le__subst1,axiom,(
+    ! [A: nat,F: fun_a_nat,B: a,C: a] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,A),aa_a_nat(F,B)))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,B),C))
+       => ( ! [X3: a,Y2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X3),Y2))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_a_nat(F,X3)),aa_a_nat(F,Y2))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,A),aa_a_nat(F,C))) ) ) ) )).
+
+tff(fact_438_order__less__le__subst1,axiom,(
+    ! [A: a,F: fun_a_a,B: a,C: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,A),aa_a_a(F,B)))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,B),C))
+       => ( ! [X3: a,Y2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X3),Y2))
+             => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_a_a(F,X3)),aa_a_a(F,Y2))) )
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,A),aa_a_a(F,C))) ) ) ) )).
+
+tff(fact_439_order__less__le__subst2,axiom,(
+    ! [A: a,B: a,F: fun_a_bool,C: bool] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,A),B))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_a_bool(F,B)),C))
+       => ( ! [X3: a,Y2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X3),Y2))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,aa_a_bool(F,X3)),aa_a_bool(F,Y2))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,aa_a_bool(F,A)),C)) ) ) ) )).
+
+tff(fact_440_order__less__le__subst2,axiom,(
+    ! [A: nat,B: nat,F: fun_nat_bool,C: bool] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,A),B))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_nat_bool(F,B)),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X3),Y2))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,aa_nat_bool(F,X3)),aa_nat_bool(F,Y2))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,aa_nat_bool(F,A)),C)) ) ) ) )).
+
+tff(fact_441_order__less__le__subst2,axiom,(
+    ! [A: bool,B: bool,F: fun_bool_bool,C: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,A),B))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,aa_bool_bool(F,B)),C))
+       => ( ! [X3: bool,Y2: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X3),Y2))
+             => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,aa_bool_bool(F,X3)),aa_bool_bool(F,Y2))) )
+         => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,aa_bool_bool(F,A)),C)) ) ) ) )).
+
+tff(fact_442_order__less__le__subst2,axiom,(
+    ! [A: a,B: a,F: fun_a_nat,C: nat] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,A),B))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_a_nat(F,B)),C))
+       => ( ! [X3: a,Y2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X3),Y2))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,aa_a_nat(F,X3)),aa_a_nat(F,Y2))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,aa_a_nat(F,A)),C)) ) ) ) )).
+
+tff(fact_443_order__less__le__subst2,axiom,(
+    ! [A: nat,B: nat,F: fun_nat_nat,C: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,A),B))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,B)),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X3),Y2))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,aa_nat_nat(F,X3)),aa_nat_nat(F,Y2))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,aa_nat_nat(F,A)),C)) ) ) ) )).
+
+tff(fact_444_order__less__le__subst2,axiom,(
+    ! [A: bool,B: bool,F: fun_bool_nat,C: nat] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,A),B))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,B)),C))
+       => ( ! [X3: bool,Y2: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X3),Y2))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,aa_bool_nat(F,X3)),aa_bool_nat(F,Y2))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,aa_bool_nat(F,A)),C)) ) ) ) )).
+
+tff(fact_445_order__less__le__subst2,axiom,(
+    ! [A: a,B: a,F: fun_a_a,C: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,A),B))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_a_a(F,B)),C))
+       => ( ! [X3: a,Y2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X3),Y2))
+             => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,aa_a_a(F,X3)),aa_a_a(F,Y2))) )
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,aa_a_a(F,A)),C)) ) ) ) )).
+
+tff(fact_446_order__less__le__subst2,axiom,(
+    ! [A: nat,B: nat,F: fun_nat_a,C: a] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,A),B))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_nat_a(F,B)),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X3),Y2))
+             => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,aa_nat_a(F,X3)),aa_nat_a(F,Y2))) )
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,aa_nat_a(F,A)),C)) ) ) ) )).
+
+tff(fact_447_order__less__le__subst2,axiom,(
+    ! [A: bool,B: bool,F: fun_bool_a,C: a] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,A),B))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,aa_bool_a(F,B)),C))
+       => ( ! [X3: bool,Y2: bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X3),Y2))
+             => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,aa_bool_a(F,X3)),aa_bool_a(F,Y2))) )
+         => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,aa_bool_a(F,A)),C)) ) ) ) )).
+
+tff(fact_448_is__sorted__list__of__set__alt__def,axiom,(
+    ! [A2: set_a,Xs: list_a] : 
+      ( list_i2074056765_set_a(A2,Xs)
+    <=> ( linorder_sorted_a(Xs)
+        & distinct_a(Xs)
+        & set_a2(Xs) = A2 ) ) )).
+
+tff(fact_449_is__sorted__list__of__set__alt__def,axiom,(
+    ! [A2: set_nat,Xs: list_nat] : 
+      ( list_i1095245009et_nat(A2,Xs)
+    <=> ( linorder_sorted_nat(Xs)
+        & distinct_nat(Xs)
+        & set_nat2(Xs) = A2 ) ) )).
+
+tff(fact_450_is__sorted__list__of__set__alt__def,axiom,(
+    ! [A2: set_bool,Xs: list_bool] : 
+      ( list_i193099606t_bool(A2,Xs)
+    <=> ( linorder_sorted_bool(Xs)
+        & distinct_bool(Xs)
+        & set_bool2(Xs) = A2 ) ) )).
+
+tff(fact_451_in__set__conv__decomp,axiom,(
+    ! [X: a,Xs: list_a] : 
+      ( member_a2(X,set_a2(Xs))
+    <=> ? [Ys2: list_a,Zs2: list_a] : Xs = append_a(Ys2,cons_a(X,Zs2)) ) )).
+
+tff(fact_452_in__set__conv__decomp,axiom,(
+    ! [X: nat,Xs: list_nat] : 
+      ( member_nat2(X,set_nat2(Xs))
+    <=> ? [Ys2: list_nat,Zs2: list_nat] : Xs = append_nat(Ys2,cons_nat(X,Zs2)) ) )).
+
+tff(fact_453_in__set__conv__decomp,axiom,(
+    ! [X: bool,Xs: list_bool] : 
+      ( member_bool2(X,set_bool2(Xs))
+    <=> ? [Ys2: list_bool,Zs2: list_bool] : Xs = append_bool(Ys2,cons_bool(X,Zs2)) ) )).
+
+tff(fact_454_Set_Oset__insert,axiom,(
+    ! [X: a,A2: set_a] : 
+      ( member_a2(X,A2)
+     => ~ ( ! [B4: set_a] : 
+              ( A2 = insert_a2(X,B4)
+             => member_a2(X,B4) ) ) ) )).
+
+tff(fact_455_insert__subset,axiom,(
+    ! [X: a,A2: set_a,B2: set_a] : 
+      ( ord_less_eq_set_a(insert_a2(X,A2),B2)
+    <=> ( member_a2(X,B2)
+        & ord_less_eq_set_a(A2,B2) ) ) )).
+
+tff(fact_456_gt__ex,axiom,(
+    ! [X: nat] : 
+    ? [X_1: nat] : pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),X_1)) )).
+
+tff(fact_457_lexordp__iff,axiom,(
+    ! [Xs: list_a,Ys: list_a] : 
+      ( pp(aa_list_a_bool(aa_lis1082568734a_bool(ord_lexordp_a,Xs),Ys))
+    <=> ( ? [X2: a,Vs: list_a] : Ys = append_a(Xs,cons_a(X2,Vs))
+        | ? [Us: list_a,A4: a,B5: a,Vs: list_a,Ws: list_a] : 
+            ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,A4),B5))
+            & Xs = append_a(Us,cons_a(A4,Vs))
+            & Ys = append_a(Us,cons_a(B5,Ws)) ) ) ) )).
+
+tff(fact_458_lexordp__iff,axiom,(
+    ! [Xs: list_nat,Ys: list_nat] : 
+      ( pp(aa_list_nat_bool(aa_lis1480171250t_bool(ord_lexordp_nat,Xs),Ys))
+    <=> ( ? [X2: nat,Vs: list_nat] : Ys = append_nat(Xs,cons_nat(X2,Vs))
+        | ? [Us: list_nat,A4: nat,B5: nat,Vs: list_nat,Ws: list_nat] : 
+            ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,A4),B5))
+            & Xs = append_nat(Us,cons_nat(A4,Vs))
+            & Ys = append_nat(Us,cons_nat(B5,Ws)) ) ) ) )).
+
+tff(fact_459_lexordp__iff,axiom,(
+    ! [Xs: list_bool,Ys: list_bool] : 
+      ( pp(aa_list_bool_bool(aa_lis482927454l_bool(ord_lexordp_bool,Xs),Ys))
+    <=> ( ? [X2: bool,Vs: list_bool] : Ys = append_bool(Xs,cons_bool(X2,Vs))
+        | ? [Us: list_bool,A4: bool,B5: bool,Vs: list_bool,Ws: list_bool] : 
+            ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,A4),B5))
+            & Xs = append_bool(Us,cons_bool(A4,Vs))
+            & Ys = append_bool(Us,cons_bool(B5,Ws)) ) ) ) )).
+
+tff(fact_460_sorted__is__sorted__list__of__set_I1_J,axiom,(
+    ! [A2: set_a,Xs: list_a] : 
+      ( list_i2074056765_set_a(A2,Xs)
+     => linorder_sorted_a(Xs) ) )).
+
+tff(fact_461_sorted__is__sorted__list__of__set_I1_J,axiom,(
+    ! [A2: set_nat,Xs: list_nat] : 
+      ( list_i1095245009et_nat(A2,Xs)
+     => linorder_sorted_nat(Xs) ) )).
+
+tff(fact_462_sorted__is__sorted__list__of__set_I1_J,axiom,(
+    ! [A2: set_bool,Xs: list_bool] : 
+      ( list_i193099606t_bool(A2,Xs)
+     => linorder_sorted_bool(Xs) ) )).
+
+tff(fact_463_sorted__find__Min,axiom,(
+    ! [Xs: list_a,P: fun_a_bool] : 
+      ( linorder_sorted_a(Xs)
+     => ( ? [X4: a] : 
+            ( member_a2(X4,set_a2(Xs))
+            & pp(aa_a_bool(P,X4)) )
+       => find_a(P,Xs) = some_a(lattic1344055935_Min_a(collect_a(aa_fun476504950a_bool(aTP_Lamm_ak(Xs),P)))) ) ) )).
+
+tff(fact_464_sorted__find__Min,axiom,(
+    ! [Xs: list_nat,P: fun_nat_bool] : 
+      ( linorder_sorted_nat(Xs)
+     => ( ? [X4: nat] : 
+            ( member_nat2(X4,set_nat2(Xs))
+            & pp(aa_nat_bool(P,X4)) )
+       => find_nat(P,Xs) = some_nat(lattic10116623in_nat(collect_nat(aa_fun1751493308t_bool(aTP_Lamm_al(Xs),P)))) ) ) )).
+
+tff(fact_465_sorted__find__Min,axiom,(
+    ! [Xs: list_bool,P: fun_bool_bool] : 
+      ( linorder_sorted_bool(Xs)
+     => ( ? [X4: bool] : 
+            ( member_bool2(X4,set_bool2(Xs))
+            & pp(aa_bool_bool(P,X4)) )
+       => find_bool(P,Xs) = some_bool(lattic1644070296n_bool(collect_bool(aa_fun943231556l_bool(aTP_Lamm_am(Xs),P)))) ) ) )).
+
+tff(fact_466_le__imp__less__or__eq,axiom,(
+    ! [X: bool,Y: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,X),Y))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X),Y))
+        | ( pp(X)
+        <=> pp(Y) ) ) ) )).
+
+tff(fact_467_le__imp__less__or__eq,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X),Y))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X),Y))
+        | X = Y ) ) )).
+
+tff(fact_468_le__imp__less__or__eq,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,X),Y))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X),Y))
+        | X = Y ) ) )).
+
+tff(fact_469_order_Oasym,axiom,(
+    ! [A: a,B: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,A),B))
+     => ~ pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,B),A)) ) )).
+
+tff(fact_470_order_Oasym,axiom,(
+    ! [A: nat,B: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,A),B))
+     => ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,B),A)) ) )).
+
+tff(fact_471_order_Oasym,axiom,(
+    ! [A: bool,B: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,A),B))
+     => ~ pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,B),A)) ) )).
+
+tff(fact_472_sorted__dropWhile,axiom,(
+    ! [Xs: list_a,P: fun_a_bool] : 
+      ( linorder_sorted_a(Xs)
+     => linorder_sorted_a(dropWhile_a(P,Xs)) ) )).
+
+tff(fact_473_sorted__dropWhile,axiom,(
+    ! [Xs: list_nat,P: fun_nat_bool] : 
+      ( linorder_sorted_nat(Xs)
+     => linorder_sorted_nat(dropWhile_nat(P,Xs)) ) )).
+
+tff(fact_474_sorted__dropWhile,axiom,(
+    ! [Xs: list_bool,P: fun_bool_bool] : 
+      ( linorder_sorted_bool(Xs)
+     => linorder_sorted_bool(dropWhile_bool(P,Xs)) ) )).
+
+tff(fact_475_sorted__insort,axiom,(
+    ! [X: a,Xs: list_a] : 
+      ( linorder_sorted_a(linord999585659ey_a_a(aTP_Lamm_ah,X,Xs))
+    <=> linorder_sorted_a(Xs) ) )).
+
+tff(fact_476_sorted__insort,axiom,(
+    ! [X: nat,Xs: list_nat] : 
+      ( linorder_sorted_nat(linord1318720669at_nat(aTP_Lamm_ai,X,Xs))
+    <=> linorder_sorted_nat(Xs) ) )).
+
+tff(fact_477_sorted__insort,axiom,(
+    ! [X: bool,Xs: list_bool] : 
+      ( linorder_sorted_bool(linord580562875l_bool(aTP_Lamm_aj,X,Xs))
+    <=> linorder_sorted_bool(Xs) ) )).
+
+tff(fact_478_lexordp__induct,axiom,(
+    ! [Xs: list_a,Ys: list_a,P: fun_li1082611693a_bool] : 
+      ( pp(aa_list_a_bool(aa_lis1082568734a_bool(ord_lexordp_a,Xs),Ys))
+     => ( ! [Y2: a,Ys3: list_a] : pp(aa_list_a_bool(aa_lis1082568734a_bool(P,nil_a),cons_a(Y2,Ys3)))
+       => ( ! [X3: a,Xs3: list_a,Y2: a,Ys3: list_a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,X3),Y2))
+             => pp(aa_list_a_bool(aa_lis1082568734a_bool(P,cons_a(X3,Xs3)),cons_a(Y2,Ys3))) )
+         => ( ! [X3: a,Xs3: list_a,Ys3: list_a] : 
+                ( pp(aa_list_a_bool(aa_lis1082568734a_bool(ord_lexordp_a,Xs3),Ys3))
+               => ( pp(aa_list_a_bool(aa_lis1082568734a_bool(P,Xs3),Ys3))
+                 => pp(aa_list_a_bool(aa_lis1082568734a_bool(P,cons_a(X3,Xs3)),cons_a(X3,Ys3))) ) )
+           => pp(aa_list_a_bool(aa_lis1082568734a_bool(P,Xs),Ys)) ) ) ) ) )).
+
+tff(fact_479_lexordp__induct,axiom,(
+    ! [Xs: list_nat,Ys: list_nat,P: fun_li772997769t_bool] : 
+      ( pp(aa_list_nat_bool(aa_lis1480171250t_bool(ord_lexordp_nat,Xs),Ys))
+     => ( ! [Y2: nat,Ys3: list_nat] : pp(aa_list_nat_bool(aa_lis1480171250t_bool(P,nil_nat),cons_nat(Y2,Ys3)))
+       => ( ! [X3: nat,Xs3: list_nat,Y2: nat,Ys3: list_nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X3),Y2))
+             => pp(aa_list_nat_bool(aa_lis1480171250t_bool(P,cons_nat(X3,Xs3)),cons_nat(Y2,Ys3))) )
+         => ( ! [X3: nat,Xs3: list_nat,Ys3: list_nat] : 
+                ( pp(aa_list_nat_bool(aa_lis1480171250t_bool(ord_lexordp_nat,Xs3),Ys3))
+               => ( pp(aa_list_nat_bool(aa_lis1480171250t_bool(P,Xs3),Ys3))
+                 => pp(aa_list_nat_bool(aa_lis1480171250t_bool(P,cons_nat(X3,Xs3)),cons_nat(X3,Ys3))) ) )
+           => pp(aa_list_nat_bool(aa_lis1480171250t_bool(P,Xs),Ys)) ) ) ) ) )).
+
+tff(fact_480_lexordp__induct,axiom,(
+    ! [Xs: list_bool,Ys: list_bool,P: fun_li1658310573l_bool] : 
+      ( pp(aa_list_bool_bool(aa_lis482927454l_bool(ord_lexordp_bool,Xs),Ys))
+     => ( ! [Y2: bool,Ys3: list_bool] : pp(aa_list_bool_bool(aa_lis482927454l_bool(P,nil_bool),cons_bool(Y2,Ys3)))
+       => ( ! [X3: bool,Xs3: list_bool,Y2: bool,Ys3: list_bool] : 
+              ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,X3),Y2))
+             => pp(aa_list_bool_bool(aa_lis482927454l_bool(P,cons_bool(X3,Xs3)),cons_bool(Y2,Ys3))) )
+         => ( ! [X3: bool,Xs3: list_bool,Ys3: list_bool] : 
+                ( pp(aa_list_bool_bool(aa_lis482927454l_bool(ord_lexordp_bool,Xs3),Ys3))
+               => ( pp(aa_list_bool_bool(aa_lis482927454l_bool(P,Xs3),Ys3))
+                 => pp(aa_list_bool_bool(aa_lis482927454l_bool(P,cons_bool(X3,Xs3)),cons_bool(X3,Ys3))) ) )
+           => pp(aa_list_bool_bool(aa_lis482927454l_bool(P,Xs),Ys)) ) ) ) ) )).
+
+tff(fact_481_order_Ostrict__trans1,axiom,(
+    ! [A: bool,B: bool,C: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,A),B))
+     => ( pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,B),C))
+       => pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,A),C)) ) ) )).
+
+tff(fact_482_order_Ostrict__trans1,axiom,(
+    ! [A: nat,B: nat,C: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),B))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,B),C))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,A),C)) ) ) )).
+
+tff(fact_483_order_Ostrict__trans1,axiom,(
+    ! [A: a,B: a,C: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,A),B))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,B),C))
+       => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,A),C)) ) ) )).
+
+tff(fact_484_order_Ostrict__trans2,axiom,(
+    ! [A: a,B: a,C: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,A),B))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,B),C))
+       => pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,A),C)) ) ) )).
+
+tff(fact_485_induct__trueI,axiom,(
+    induct_true )).
+
+tff(fact_486_Suc__less__eq,axiom,(
+    ! [M: nat,N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,aa_nat_nat(suc,M)),aa_nat_nat(suc,N)))
+    <=> pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,M),N)) ) )).
+
+tff(fact_487_induct__rulify__fallback_I5_J,axiom,(
+    induct_true )).
+
+tff(fact_488_induct__rulify__fallback_I6_J,axiom,(
+    ~ induct_false )).
+
+tff(fact_489_induct__rulify__fallback_I4_J,axiom,(
+    ! [A2: bool,B2: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(induct_conj,A2),B2))
+    <=> ( pp(A2)
+        & pp(B2) ) ) )).
+
+tff(fact_490_le0,axiom,(
+    ! [N: nat] : pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,zero_zero_nat),N)) )).
+
+tff(fact_491_Suc__le__mono,axiom,(
+    ! [N: nat,M: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(suc,N)),aa_nat_nat(suc,M)))
+    <=> pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,N),M)) ) )).
+
+tff(fact_492_not__less0,axiom,(
+    ! [N: nat] : 
+      ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,N),zero_zero_nat)) )).
+
+tff(fact_493_ATP_Olambda__1,axiom,(
+    ! [Uu: a] : 
+      ( pp(aa_a_bool(aTP_Lamm_a,Uu))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Uu),n)) ) )).
+
+tff(fact_494_ATP_Olambda__2,axiom,(
+    ! [Uu: bool,Uua: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(aTP_Lamm_ab,Uu),Uua))
+    <=> pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_eq_bool,Uua),Uu)) ) )).
+
+tff(fact_495_ATP_Olambda__3,axiom,(
+    ! [Uu: nat,Uua: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(aTP_Lamm_ad,Uu),Uua))
+    <=> pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Uua),Uu)) ) )).
+
+tff(fact_496_ATP_Olambda__4,axiom,(
+    ! [Uu: a,Uua: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(aTP_Lamm_af,Uu),Uua))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(ord_less_eq_a,Uua),Uu)) ) )).
+
+tff(fact_497_ATP_Olambda__5,axiom,(
+    ! [Uu: set_a,Uua: a] : 
+      ( pp(aa_a_bool(aTP_Lamm_aa(Uu),Uua))
+    <=> member_a2(Uua,Uu) ) )).
+
+tff(fact_498_ATP_Olambda__6,axiom,(
+    ! [Uu: list_bool,Uua: bool,Uub: bool] : 
+      ( pp(aa_bool_bool(aa_boo1142376798l_bool(aTP_Lamm_ac(Uu),Uua),Uub))
+    <=> ( member_bool2(Uub,set_bool2(Uu))
+        & pp(aa_bool_bool(aa_boo1142376798l_bool(ord_less_bool,Uua),Uub)) ) ) )).
+
+tff(fact_499_ATP_Olambda__7,axiom,(
+    ! [Uu: list_nat,Uua: nat,Uub: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(aTP_Lamm_ae(Uu),Uua),Uub))
+    <=> ( member_nat2(Uub,set_nat2(Uu))
+        & pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Uua),Uub)) ) ) )).
+
+tff(fact_500_ATP_Olambda__8,axiom,(
+    ! [Uu: list_a,Uua: a,Uub: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(aTP_Lamm_ag(Uu),Uua),Uub))
+    <=> ( member_a2(Uub,set_a2(Uu))
+        & pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,Uua),Uub)) ) ) )).
+
+tff(fact_501_ATP_Olambda__9,axiom,(
+    ! [Uu: list_bool,Uua: fun_bool_bool,Uub: bool] : 
+      ( pp(aa_bool_bool(aa_fun943231556l_bool(aTP_Lamm_am(Uu),Uua),Uub))
+    <=> ( member_bool2(Uub,set_bool2(Uu))
+        & pp(aa_bool_bool(Uua,Uub)) ) ) )).
+
+tff(fact_502_ATP_Olambda__10,axiom,(
+    ! [Uu: list_nat,Uua: fun_nat_bool,Uub: nat] : 
+      ( pp(aa_nat_bool(aa_fun1751493308t_bool(aTP_Lamm_al(Uu),Uua),Uub))
+    <=> ( member_nat2(Uub,set_nat2(Uu))
+        & pp(aa_nat_bool(Uua,Uub)) ) ) )).
+
+tff(fact_503_ATP_Olambda__11,axiom,(
+    ! [Uu: list_a,Uua: fun_a_bool,Uub: a] : 
+      ( pp(aa_a_bool(aa_fun476504950a_bool(aTP_Lamm_ak(Uu),Uua),Uub))
+    <=> ( member_a2(Uub,set_a2(Uu))
+        & pp(aa_a_bool(Uua,Uub)) ) ) )).
+
+tff(fact_504_ATP_Olambda__12,axiom,(
+    ! [Uu: bool] : 
+      ( pp(aa_bool_bool(aTP_Lamm_aj,Uu))
+    <=> pp(Uu) ) )).
+
+tff(fact_505_ATP_Olambda__13,axiom,(
+    aTP_Lamm_ai = cOMBI_nat )).
+
+tff(fact_506_ATP_Olambda__14,axiom,(
+    aTP_Lamm_ah = cOMBI_a )).
+
+tff(help_pp_2_1_U,axiom,(
+    pp(fTrue) )).
+
+tff(help_pp_1_1_U,axiom,(
+    ~ pp(fFalse) )).
+
+tff(help_COMBI_1_1_COMBI_001tf__a_U,axiom,(
+    ! [P: a] : aa_a_a(cOMBI_a,P) = P )).
+
+tff(help_COMBI_1_1_COMBI_001t__Nat__Onat_U,axiom,(
+    ! [P: nat] : aa_nat_nat(cOMBI_nat,P) = P )).
+
+tff(conj_4,conjecture,(
+    pp(aa_a_bool(aa_a_fun_a_bool(ord_less_a,a2),n)) )).
+%------------------------------------------------------------------------------

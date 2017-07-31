@@ -3,7 +3,7 @@
 
 (** {1 Compute Precedence} *)
 
-module T = FOTerm
+module T = Term
 
 let prof_mk_prec = Util.mk_profiler "mk_precedence"
 

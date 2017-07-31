@@ -1,5 +1,6 @@
 
-The documentation can be found {{:rst/contents.html} here}.
+This is the API documentation for Logtk (the library for terms, formulas,
+literals, unification, type inference, etc.), 
 
 {2 API Documentation for Logtk}
 
@@ -13,7 +14,7 @@ Compute_prec
 Congruence
 DBEnv
 Dtree
-FOTerm
+Term
 FeatureVector
 Fingerprint
 Flex_state
@@ -24,11 +25,12 @@ Hashcons
 HVar
 IArray
 ID
-IDOrBuiltin
+ID_or_builtin
 Index
 Ind_ty
 InnerTerm
 Interfaces
+Lambda
 LazyGraph
 LazyList
 Multiset
@@ -40,6 +42,7 @@ Ordinal
 ParseLocation
 Position
 Precedence
+Purify
 Rewrite_term
 STerm
 Scoped
@@ -60,8 +63,6 @@ UntypedAST
 Util
 Var
 }
-
-A description of modules can be found {{:rst/modules.html} here}.
 
 {2 List of modules}
 

@@ -3,10 +3,10 @@
 
 (** {1 Generic term indexing} *)
 
-type term = FOTerm.t
+type term = Term.t
 type subst = Subst.t
 
-module T = FOTerm
+module T = Term
 
 (** {2 Leaf} *)
 
@@ -52,11 +52,11 @@ module MakeLeaf(X : Set.OrderedType) : LEAF with type elt = X.t = struct
   let size leaf =
     T.Map.fold (fun _ set acc -> S.cardinal set + acc) leaf 0
 
-  let fold_unify ?(subst=Subst.empty) (leaf,sc_l) t k =
+  let fold_unify ?(subst=Unif_subst.empty) (leaf,sc_l) t k =
     T.Map.iter
       (fun t' set ->
          try
-           let subst = Unif.FO.unification ~subst (t',sc_l) t in
+           let subst = Unif.FO.unify_full ~subst (t',sc_l) t in
            S.iter (fun data -> k (t', data, subst)) set
          with Unif.Fail -> ())
       leaf

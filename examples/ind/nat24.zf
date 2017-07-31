@@ -1,0 +1,9 @@
+
+# expect: unsat
+
+# right-injectivity of +
+
+include "nat.zf".
+
+goal forall x y z. y != z => plus x y != plus x z.
+

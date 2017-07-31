@@ -75,19 +75,11 @@ module FV_components = FV_tree.Make(struct
   end)
 
 (* index for lemmas, to ensure α-equivalent lemmas have the same lit *)
-module FV_lemma = FV_tree.Make(struct
-    type t = Cut_form.t * payload * lit
-    let compare (l1,i1,j1)(l2,i2,j2) =
-      CCOrd.(Cut_form.compare l1 l2
-        <?> (compare_payload, i1, i2)
-        <?> (Lit.compare, j1, j2))
-    (* approximation here, we represent it as a clause. monotonicity
-       w.r.t features should still apply *)
-    let to_lits (l,_,_) =
-      Cut_form.cs l
-      |> Sequence.of_list
-      |> Sequence.flat_map_l Lits.to_form
-    let labels _ = Util.Int_set.empty
+module FV_lemma = Cut_form.FV_tbl(struct
+    type t = payload * lit
+    let compare (i1,j1)(i2,j2) =
+      let open CCOrd.Infix in
+      compare_payload i1 i2 <?> (Lit.compare, j1, j2)
   end)
 
 module ICaseTbl = CCHashtbl.Make(struct
@@ -97,7 +89,7 @@ module ICaseTbl = CCHashtbl.Make(struct
   end)
 
 let _clause_set = ref (FV_components.empty()) (* FO lits -> blit *)
-let _lemma_set = ref (FV_lemma.empty()) (* lemma -> blit *)
+let _lemma_set = FV_lemma.create () (* lemma -> blit *)
 let _case_set = ICaseTbl.create 16 (* cst=term-> blit *)
 
 (* should never be used *)
@@ -108,7 +100,7 @@ let _retrieve_alpha_equiv lits =
   FV_components.retrieve_alpha_equiv_c !_clause_set (lits,dummy_payload,dummy_t)
 
 let _retrieve_lemma (f:Cut_form.t) =
-  FV_lemma.retrieve_alpha_equiv_c !_lemma_set (f,dummy_payload,dummy_t)
+  FV_lemma.get _lemma_set f
 
 (* put [lit] inside mappings, for retrieval by definition *)
 let save_ lit =
@@ -119,7 +111,7 @@ let save_ lit =
       (* be able to retrieve by lits *)
       _clause_set := FV_components.add !_clause_set (lits, payload, lit)
     | Lemma f ->
-      _lemma_set := FV_lemma.add !_lemma_set (f, payload, lit)
+      FV_lemma.add _lemma_set f (payload, lit)
     | Case p ->
       ICaseTbl.add _case_set p (payload, lit)
   end
@@ -131,7 +123,10 @@ let _check_variant lits lits' =
 let inject_lits_ lits  =
   (* special case: one negative literal. *)
   let lits, sign = match lits with
-    | [| lit0 |] when Literal.is_ground lit0 && Literal.is_neg lit0 ->
+    | [| lit0 |]
+      when Literal.is_ground lit0 &&
+           Literal.is_neg lit0 &&
+           not (Literal.is_constraint lit0) ->
       [| Literal.negate lits.(0) |], false
     | _ -> lits, true
   in
@@ -162,13 +157,10 @@ let inject_lits lits =
   Util.with_prof prof_inject_lits inject_lits_ lits
 
 let inject_lemma_ (f:Cut_form.t): t =
-  let old_lit =
-    _retrieve_lemma f
-    |> Sequence.find_map
-      (function
-        | f', Lemma _, blit when Cut_form.are_variant f f' ->
-          Some blit
-        | _ -> None)
+  let old_lit = match _retrieve_lemma f with
+    | None -> None
+    | Some (Lemma _, blit) -> Some blit
+    | Some _ -> assert false
   in
   begin match old_lit with
     | Some lit -> lit
@@ -223,7 +215,7 @@ let payload = Lit.payload
 let sign = Lit.sign
 
 let to_s_form (lit:t) =
-  let module T = FOTerm in
+  let module T = Term in
   let module F = TypedSTerm.Form in
   let f = match payload lit with
     | Fresh -> assert false (* TODO? *)
@@ -247,6 +239,35 @@ let pp out i =
 
 let pp_bclause out lits =
   Format.fprintf out "@[<hv>%a@]" (Util.pp_list ~sep:" ⊔ " pp) lits
+
+(* print a single boolean box *)
+let pp_tstp out b =
+  let pp_box_unsigned out b = match payload b with
+    | Case p ->
+      let lits = List.map Cover_set.Case.to_lit p |> Array.of_list in
+      Literals.pp_tstp out lits
+    | Clause_component lits ->
+      CCFormat.within "(" ")" Literals.pp_tstp_closed out lits
+    | Lemma f ->
+      CCFormat.within "(" ")" Cut_form.pp_tstp out f
+    | Fresh -> failwith "cannot print <fresh> boolean box"
+  in
+  if Lit.sign b then pp_box_unsigned out b
+  else Format.fprintf out "@[~@ %a@]" pp_box_unsigned b
+
+let pp_zf out i =
+  let pp_payload out = function
+    | Fresh -> CCFormat.string out "'dummy_sym'"
+    | Clause_component lits ->
+      Format.fprintf out "(@[<hv>%a@])" Lits.pp_zf lits
+    | Lemma f -> Cut_form.pp_zf out f
+    | Case c ->
+      Format.fprintf out "(@[<hv>%a@])"
+        (Util.pp_list ~sep:" && " Literal.pp_zf)
+        (List.map Cover_set.Case.to_lit c)
+  in
+  if not (Lit.sign i) then CCFormat.string out "~";
+  pp_payload out (payload i)
 
 let () =
   Options.add_opts

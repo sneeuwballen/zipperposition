@@ -45,7 +45,7 @@ module Make(C : Clause_intf.S) = struct
   module C = C
 
   (* weight of a term [t], using the precedence's weight *)
-  let term_weight t = FOTerm.size t
+  let term_weight t = Term.size t
 
   (** {6 Weight functions} *)
   module WeightFun = struct
@@ -60,7 +60,7 @@ module Make(C : Clause_intf.S) = struct
       (* maximum depth of types. Avoids reasoning on list (list (list .... (list int))) *)
       let _depth_ty =
         Lits.Seq.terms (C.lits c)
-        |> Sequence.map FOTerm.ty
+        |> Sequence.map Term.ty
         |> Sequence.map Type.depth
         |> Sequence.max ?lt:None
         |> CCOpt.map_or CCFun.id ~default:0
