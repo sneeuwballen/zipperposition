@@ -603,7 +603,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
     Env.add_unary_inf "ho_factor" factor_rule;
     Env.add_unary_inf "ho_positive_extensionality" positive_extensionality;
-    (* FIXME Env.add_unary_simplify purify_applied_variable; *)
+    Env.add_unary_simplify purify_applied_variable;
     Env.add_lit_rule "ho_ext_neg" ext_neg;
     ()
 end

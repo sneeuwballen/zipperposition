@@ -11,4 +11,3 @@ type t =
   | V of var
 
 include Interfaces.PRINT with type t := t
-

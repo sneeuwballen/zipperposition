@@ -27,6 +27,10 @@ val compare : t -> term -> term -> Comparison.t
 
 val precedence : t -> Precedence.t
 (** Current precedence *)
+module Weight_polynomial : Polynomial.S
+
+val weight : Precedence.t -> term -> Weight_polynomial.t option
+(** Current precedence *)
 
 val add_list : t -> ID.t list -> unit
 (** Update precedence with symbols *)
@@ -51,6 +55,9 @@ val kbo : Precedence.t -> t
 
 val lfhokbo : Precedence.t -> t
 (** Blanchette's lambda-free higher-order KPO *)
+
+val lfhokbo_arg_coeff : Precedence.t -> t
+(** Blanchette's lambda-free higher-order KPO with argument coefficients *)
 
 val rpo6 : Precedence.t -> t
 (** Efficient implementation of RPO (recursive path ordering) *)

@@ -21,6 +21,7 @@ module Weight : sig
 
   val add : t -> t -> t
   val diff : t -> t -> t
+  val mult : int -> t -> t
 
   module Infix : sig
     val ( + ) : t -> t -> t
@@ -106,6 +107,9 @@ val status : t -> ID.t -> symbol_status
 val weight : t -> ID.t -> Weight.t
 (** Weight of a symbol (for KBO). *)
 
+val arg_coeff : t -> ID.t -> int -> int
+(** Nth argument coefficient of a symbol (for KBO with argument coefficients). *)
+
 val add_list : t -> ID.t list -> unit
 (** Update the precedence with the given symbols *)
 
@@ -124,6 +128,7 @@ val pp_debugf : t CCFormat.printer
 include Interfaces.PRINT with type t := t
 
 type weight_fun = ID.t -> Weight.t
+type arg_coeff_fun = ID.t -> int list
 
 val weight_modarity : arity:(ID.t -> int) -> weight_fun
 
@@ -135,7 +140,7 @@ val set_weight : t -> weight_fun -> unit
 
 (** {2 Creation of a precedence from constraints} *)
 
-val create : ?weight:weight_fun -> [`total] Constr.t -> ID.t list -> t
+val create : ?weight:weight_fun -> ?arg_coeff:arg_coeff_fun -> [`total] Constr.t -> ID.t list -> t
 (** make a precedence from the given constraints. Constraints near
     the head of the list are {b more important} than constraints close
     to the tail. Only the very first constraint is assured to be totally

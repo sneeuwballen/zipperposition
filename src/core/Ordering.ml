@@ -11,6 +11,7 @@ open Comparison
 
 let prof_lfhorpo = Util.mk_profiler "compare_lfhorpo"
 let prof_lfhokbo = Util.mk_profiler "compare_lfhokbo"
+let prof_lfhokbo_arg_coeff = Util.mk_profiler "compare_lfhokbo_arg_coeff"
 let prof_rpo6 = Util.mk_profiler "compare_rpo6"
 let prof_kbo = Util.mk_profiler "compare_kbo"
 
@@ -576,6 +577,151 @@ module LFHOKBO : ORD = struct
     compare
 end
 
+module Weight_indet = struct
+  type var = Type.t HVar.t
+
+  type t =
+    | Weight of var
+    | Arg_coeff of var * int;;
+
+  let compare x y = match (x, y) with
+      Weight x', Weight y' -> HVar.compare Type.compare x' y'
+    | Arg_coeff (x', i), Arg_coeff (y', j) ->
+      let c = HVar.compare Type.compare x' y' in
+      if c <> 0 then c else abs(i-j)
+    | Weight _, Arg_coeff (_, _) -> 1
+    | Arg_coeff (_, _), Weight _ -> -1
+
+  let pp out (a:t): unit =
+    begin match a with
+      Weight x-> Format.fprintf out "w_%a" HVar.pp x
+    | Arg_coeff (x, i) -> Format.fprintf out "k_%a_%d" HVar.pp x i
+  end
+  let to_string = CCFormat.to_string pp
+end
+
+(* TODO: Reuse this everywhere *)
+let term_to_head s =
+  match T.view s with
+  | T.App (f,_) ->
+    begin match T.view f with
+      | T.Const fid -> Some (Head.I fid)
+      | T.Var x ->     Some (Head.V x)
+      | _ -> None
+    end
+  | T.AppBuiltin (fid,_) -> Some (Head.B fid)
+  | T.Const fid -> Some (Head.I fid)
+  | T.Var x ->     Some (Head.V x)
+  | _ -> None
+
+let term_to_args s =
+  match T.view s with
+  | T.App (_,ss) -> ss
+  | T.AppBuiltin (_,ss) -> ss
+  | _ -> []
+
+
+module WI = Weight_indet
+module Weight_polynomial = Polynomial.Make(W)(WI)
+module WP = Weight_polynomial
+
+let rec weight prec t =
+  (* Returns a function that is applied to the weight of argument i of a term
+     headed by t before adding the weights of all arguments *)
+  let arg_coeff_multiplier t i =
+    begin match T.view t with
+      | T.Const fid -> Some (WP.mult_const (Prec.arg_coeff prec fid i))
+      | T.Var x ->     Some (WP.mult_indet (WI.Arg_coeff (x, i)))
+      | _ -> None
+    end
+  in
+  (* recursively calculates weights of args, applies coeff_multipliers, and
+     adds all those weights plus the head_weight.*)
+  let app_weight head_weight coeff_multipliers args =
+    args
+    |> List.mapi (fun i s ->
+        begin match weight prec s, coeff_multipliers i with
+          | Some w, Some c -> Some (c w)
+          | _ -> None
+        end )
+    |> List.fold_left
+      (fun w1 w2 ->
+         begin match (w1, w2) with
+           | Some w1', Some w2' -> Some (WP.add w1' w2')
+           | _, _ -> None
+         end )
+      head_weight
+  in
+  begin match T.view t with
+    | T.App (f,args) -> app_weight (weight prec f) (arg_coeff_multiplier f) args
+    | T.AppBuiltin (_,args) -> app_weight (Some (WP.const (W.one))) (fun _ -> Some (fun x -> x)) args
+    | T.Const fid -> Some (WP.const (Prec.weight prec fid))
+    | T.Var x ->     Some (WP.indet (WI.Weight x))
+    | _ -> None
+  end
+
+module LFHOKBO_arg_coeff : ORD = struct
+  let name = "lfhokbo_arg_coeff"
+
+  let rec lfhokbo_arg_coeff ~prec t s =
+    (* length-lexicographic comparison *)
+    let rec lfhokbo_lex ts ss = match ts, ss with
+      | [], [] -> Eq
+      | _ :: _, [] -> Gt
+      | [] , _ :: _ -> Lt
+      | t0 :: t_rest , s0 :: s_rest ->
+        begin match lfhokbo_arg_coeff ~prec t0 s0 with
+        | Gt -> Gt
+        | Lt -> Lt
+        | Eq -> lfhokbo_lex t_rest s_rest
+        | Incomparable -> Incomparable
+        end
+    in
+    (* compare t = g tt and s = f ss (assuming they have the same weight) *)
+    let lfhokbo_composite g f ts ss =
+      match prec_compare prec g f with
+      | Incomparable -> (* try rule C2 *)
+        let hd_ts_s = lfhokbo_arg_coeff ~prec (List.hd ts) s in
+        let hd_ss_t = lfhokbo_arg_coeff ~prec (List.hd ss) t in
+        if List.length ts = 1 && (hd_ts_s = Gt || hd_ts_s = Eq) then Gt else
+        if List.length ss = 1 && (hd_ss_t = Gt || hd_ss_t = Eq) then Lt else
+        Incomparable
+      | Gt -> Gt (* by rule C3 *)
+      | Lt -> Lt (* by rule C3 inversed *)
+      | Eq -> (* try rule C4 *)
+        begin match prec_status prec g with
+          | Prec.Lexicographic -> lfhokbo_lex ts ss
+          | _ -> assert false
+        end
+    in
+    (* compare t and s assuming they have the same weight *)
+    let lfhokbo_same_weight t s =
+      match T.view t, T.view s with
+      | _ -> begin match term_to_head t, term_to_head s with
+          | Some g, Some f -> lfhokbo_composite g f (term_to_args t) (term_to_args s)
+          | _ -> Incomparable
+        end
+    in
+    (
+      if t = s then Eq else
+        match weight prec t, weight prec s with
+        | Some wt, Some ws ->
+          if WP.compare wt ws > 0 then Gt (* by rule C1 *)
+          else if WP.compare wt ws < 0 then Lt (* by rule C1 *)
+          else if wt = ws then lfhokbo_same_weight t s (* try rules C2 - C4 *)
+          else Incomparable (* Our approximation of comparing polynomials cannot
+                               determine the greater polynomial *)
+        | _ -> Incomparable
+    )
+
+  let compare_terms ~prec x y =
+    Util.enter_prof prof_lfhokbo;
+    let compare = lfhokbo_arg_coeff ~prec x y in
+    Util.exit_prof prof_lfhokbo;
+    compare
+end
+
+
 (** Blanchette's lambda-free higher-order RPO *)
 module LFHORPO : ORD = struct
   let name = "lfhorpo"
@@ -779,6 +925,13 @@ let lfhokbo prec =
       (fun (a, b) -> LFHOKBO.compare_terms ~prec a b) (a,b)
   in
   { cache; compare; name=LFHOKBO.name; prec; }
+
+let lfhokbo_arg_coeff prec =
+  let cache = mk_cache 256 in
+  let compare prec a b = CCCache.with_cache cache
+      (fun (a, b) -> LFHOKBO_arg_coeff.compare_terms ~prec a b) (a,b)
+  in
+  { cache; compare; name=LFHOKBO_arg_coeff.name; prec; }
 
 let lfhorpo prec =
   let cache = mk_cache 256 in
