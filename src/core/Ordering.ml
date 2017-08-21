@@ -969,6 +969,7 @@ let tbl_ =
   Hashtbl.add h "rpo6" rpo6;
   Hashtbl.add h "lfhorpo" lfhorpo;
   Hashtbl.add h "lfhokbo" lfhokbo;
+  Hashtbl.add h "lfhokbo_arg_coeff" lfhokbo_arg_coeff;
   Hashtbl.add h "kbo" kbo;
   Hashtbl.add h "none" (fun _ -> none);
   Hashtbl.add h "subterm" (fun _ -> subterm);

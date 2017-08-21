@@ -10,6 +10,7 @@ let prof_mk_prec = Util.mk_profiler "mk_precedence"
 let section = Util.Section.(make ~parent:root) "compute_prec"
 
 let _alpha_precedence = ref false
+let _custom_weights = ref ""
 
 type 'a parametrized = Statement.clause_t Sequence.t -> 'a
 
@@ -23,6 +24,8 @@ type t = {
 
 (* uniform weight *)
 let _default_weight _ = Precedence.weight_constant
+
+let _default_arg_coeff _ = []
 
 let empty =
   { constrs = [];
@@ -42,6 +45,29 @@ let set_weight_rule r t = { t with weight_rule = r }
 
 let add_status l t = { t with status = List.rev_append l t.status }
 
+(* Add weights specified by the user using the cli option *)
+let _add_custom_weights weights arg_coeff=
+  let input_list = String.split_on_char ',' !_custom_weights in
+  if input_list = [""] then weights, arg_coeff
+  else List.fold_left (fun (weights, arg_coeff) input ->
+      try
+        let i = String.index input '=' in
+        let name = String.sub input 0 i in
+        let values =
+          String.sub input (i+1) (String.length input - i - 1)
+          |> String.split_on_char ':'
+          |> List.map int_of_string
+        in
+        (fun constant ->
+           if ID.name constant = name then Precedence.Weight.int (List.hd values)
+           else weights constant),
+        (fun constant ->
+           if ID.name constant = name then List.tl values
+           else arg_coeff constant)
+      with
+      | Failure _ | Not_found -> failwith "Syntax error in custom weights"
+    ) (weights, arg_coeff) input_list
+
 let mk_precedence t seq =
   Util.enter_prof prof_mk_prec;
   (* set of symbols *)
@@ -59,10 +85,11 @@ let mk_precedence t seq =
   Util.debugf ~section 2 "@[<2>%d precedence constraint(s)@]"
     (fun k->k(List.length constrs));
   let weight = t.weight_rule seq in
+  let weight,arg_coeff = _add_custom_weights weight _default_arg_coeff in
   let constr = Precedence.Constr.compose_sort constrs in
   let constr = Precedence.Constr.compose constr t.last_constr in
   let constr = (if !_alpha_precedence then Precedence.Constr.alpha else constr) in
-  let p = Precedence.create ~weight constr symbols in
+  let p = Precedence.create ~weight ~arg_coeff constr symbols in
   (* multiset status *)
   List.iter
     (fun (s,status) -> Precedence.declare_status p s status)
@@ -75,4 +102,7 @@ let () =
     [  "--alpha-precedence"
     , Arg.Set _alpha_precedence
     , " use pure alphabetical precedence"
+    ;  "--weights"
+    , Arg.Set_string _custom_weights
+    , " set weights, e.g. f=2,g=3,h=1, or weights and argument coefficients, e.g. f=2:3:4,g=3:2"
     ]
