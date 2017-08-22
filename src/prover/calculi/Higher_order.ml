@@ -19,6 +19,8 @@ let stat_factor = Util.mk_stat "ho.factor.steps"
 let prof_eq_res = Util.mk_profiler "ho.eq_res"
 let prof_eq_res_syn = Util.mk_profiler "ho.eq_res_syntactic"
 
+let _purify_applied_vars = ref false
+
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C
@@ -603,7 +605,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
     Env.add_unary_inf "ho_factor" factor_rule;
     Env.add_unary_inf "ho_positive_extensionality" positive_extensionality;
-    Env.add_unary_simplify purify_applied_variable;
+    if !_purify_applied_vars then
+      Env.add_unary_simplify purify_applied_variable;
     Env.add_lit_rule "ho_ext_neg" ext_neg;
     ()
 end
@@ -661,3 +664,11 @@ let extension =
   }
 
 let () = Extensions.register extension
+
+
+let () =
+  Params.add_opts
+    [  "--purify"
+    , Arg.Set _purify_applied_vars
+    , " enable purification of applied variables"
+    ]
