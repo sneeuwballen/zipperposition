@@ -88,6 +88,10 @@ val forall : t -> t
 val forall_n : int -> t -> t
 (** Quantify over [n] type variable. Careful with the De Bruijn indices! *)
 
+val forall_fvars : t HVar.t list -> t -> t
+(** [forall_fvars vars body] makes the De Bruijn conversion before quantifying
+    on [vars] *)
+
 val bvar : int -> t
 (** bound variable *)
 
@@ -166,6 +170,15 @@ val expected_args : t -> t list
 val expected_ty_vars : t -> int
 (** Number of type parameters expected. 0 for monomorphic types. *)
 
+val needs_args : t -> bool
+(** [needs_args ty] iff [expected_ty_vars ty>0 || expected_args ty<>[]] *)
+
+val order : t -> int
+(** Number of left-nested function types (1 for constant and variables).
+    [order (a->b) = 1]
+    [order ((a->b)->c) = 2]
+    [order (((a->b)->c)->d) = 2] *)
+
 val is_ground : t -> bool
 (** Is the type ground? (means that no {!Var} not {!BVar} occurs in it) *)
 
@@ -192,6 +205,9 @@ val returns : t -> t
     [returns a] is like [let _, _, ret = open_poly_fun a in ret]
     {b NOTE} caution, not always closed *)
 
+val returns_prop : t -> bool
+val returns_tType : t -> bool
+
 exception ApplyError of string
 (** Error raised when {!apply} fails *)
 
@@ -209,6 +225,10 @@ val apply_unsafe : t -> InnerTerm.t list -> t
     types without more ado.
     @raise ApplyError if types do not match
     @raise Assert_failure if the arguments are not proper types *)
+
+val is_unifiable : t -> bool
+(** Are terms of this type syntactically unifiable?
+    See {!InnerTerm.type_is_unifiable} *)
 
 (** {2 IO} *)
 
@@ -236,6 +256,13 @@ module TPTP : sig
   val rat : t     (** rationals *)
   val real : t    (** reals *)
 end
+
+module ZF : sig
+  include Interfaces.PRINT with type t := t
+  val pp_typed_var : t HVar.t CCFormat.printer
+end
+
+val pp_in : Output_format.t -> t CCFormat.printer
 
 (** {2 Conversions} *)
 

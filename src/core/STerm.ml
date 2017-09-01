@@ -143,9 +143,11 @@ let app ?loc s l = match s.term, l with
   | _, _::_ -> make_ ?loc (App(s,l))
 let const ?loc s = make_ ?loc (Const s)
 let app_const ?loc s l = app (const ?loc s) l
-let bind ?loc s v l = match v with
-  | [] -> l
-  | _::_ -> make_ ?loc (Bind(s,v,l))
+let bind ?loc s v l = match v, l with
+  | [], _ -> l
+  | _::_, {term=Bind(s',v',l'); _} when s=s' ->
+    make_ ?loc (Bind (s, v@v', l')) (* flatten *)
+  | _::_, _ -> make_ ?loc (Bind(s,v,l))
 let ite ?loc a b c = make_ ?loc (Ite (a,b,c))
 let match_ ?loc t l = make_ ?loc (Match (t, l))
 let let_ ?loc l u = match l with
@@ -181,6 +183,7 @@ let lambda ?loc vars f = bind ?loc Binder.lambda vars f
 let int_ i = builtin (Builtin.Int i)
 let of_int i = int_ (Z.of_int i)
 let rat n = builtin (Builtin.Rat n)
+let real r = builtin (Builtin.Real r)
 
 let fun_ty ?loc l ret = match l with
   | [] -> ret
@@ -191,6 +194,7 @@ let term = builtin Builtin.Term
 let prop = builtin Builtin.Prop
 let ty_int = builtin Builtin.TyInt
 let ty_rat = builtin Builtin.TyRat
+let ty_real = builtin Builtin.TyReal
 let forall_ty ?loc vars t = bind ?loc Binder.forall_ty vars t
 
 let ty_unfold =
@@ -394,9 +398,14 @@ let to_string = CCFormat.to_string pp
 (** {2 TPTP} *)
 
 module TPTP = struct
+  let pp_id out s =
+    if Util.tstp_needs_escaping s
+    then CCFormat.fprintf out "'%s'" s
+    else CCFormat.string out s
+
   let rec pp out t = match t.term with
     | Var v -> pp_var out v
-    | Const s -> CCFormat.string out s
+    | Const s -> pp_id out s
     | List l ->
       Format.fprintf out "[@[<hv>%a@]]"
         (Util.pp_list ~sep:"," pp) l;
@@ -405,26 +414,26 @@ module TPTP = struct
     | AppBuiltin (Builtin.Or, l) ->
       Util.pp_list ~sep:" | " pp_surrounded out l
     | AppBuiltin (Builtin.Not, [a]) ->
-      Format.fprintf out "~%a" pp_surrounded a
+      Format.fprintf out "@[<1>~@,@[%a@]@]" pp_surrounded a
     | AppBuiltin (Builtin.Imply, [a;b]) ->
-      Format.fprintf out "%a => %a" pp_surrounded a pp_surrounded b
+      Format.fprintf out "@[%a =>@ %a@]" pp_surrounded a pp_surrounded b
     | AppBuiltin (Builtin.Xor, [a;b]) ->
-      Format.fprintf out "%a <~> %a" pp_surrounded a pp_surrounded b
+      Format.fprintf out "@[%a <~>@ %a@]" pp_surrounded a pp_surrounded b
     | AppBuiltin (Builtin.Equiv, [a;b]) ->
-      Format.fprintf out "%a <=> %a" pp_surrounded a pp_surrounded b
+      Format.fprintf out "@[%a <=>@ %a@]" pp_surrounded a pp_surrounded b
     | AppBuiltin (Builtin.Eq, ([_;a;b] | [a;b])) ->
-      Format.fprintf out "%a = %a" pp_surrounded a pp_surrounded b
+      Format.fprintf out "@[%a =@ %a@]" pp_surrounded a pp_surrounded b
     | AppBuiltin (Builtin.Neq, ([_;a;b] | [a;b])) ->
-      Format.fprintf out "%a != %a" pp_surrounded a pp_surrounded b
+      Format.fprintf out "@[%a !=@ %a@]" pp_surrounded a pp_surrounded b
     | AppBuiltin (Builtin.Arrow, [ret;a]) ->
-      Format.fprintf out "%a > %a" pp a pp ret
+      Format.fprintf out "@[<2>%a >@ %a@]" pp a pp ret
     | AppBuiltin (Builtin.Arrow, ret::l) ->
-      Format.fprintf out "(%a) > %a" (Util.pp_list~sep:" * " pp) l pp_surrounded ret
+      Format.fprintf out "@[<2>(@[<hv>%a@]) >@ %a@]" (Util.pp_list~sep:" * " pp) l pp_surrounded ret
     | AppBuiltin (s, []) -> Builtin.TPTP.pp out s
     | AppBuiltin (s, l) ->
-      Format.fprintf out "%a(%a)" Builtin.TPTP.pp s (Util.pp_list ~sep:", " pp_surrounded) l
+      Format.fprintf out "@[%a(@[%a@])@]" Builtin.TPTP.pp s (Util.pp_list ~sep:", " pp_surrounded) l
     | App (s, l) ->
-      Format.fprintf out "@[<2>%a(%a)@]"
+      Format.fprintf out "@[%a(@[%a@])@]"
         pp s (Util.pp_list ~sep:"," pp) l
     | Bind (s, vars, t') ->
       Format.fprintf out "@[<2>%a[@[%a@]]:@ %a@]"
@@ -437,7 +446,7 @@ module TPTP = struct
     | Record _ -> failwith "cannot print records in TPTP"
   and pp_typed_var out (v,o) = match o with
     | None -> pp_var out v
-    | Some {term=AppBuiltin ((Builtin.TType | Builtin.Term),[]); _} ->
+    | Some {term=AppBuiltin (Builtin.Term,[]); _} ->
       pp_var out v (* implicit type *)
     | Some ty -> Format.fprintf out "%a:%a" pp_var v pp_surrounded ty
   and pp_surrounded out t = match t.term with
@@ -446,7 +455,7 @@ module TPTP = struct
     | _ -> pp out t
   and pp_var out = function
     | Wildcard -> CCFormat.string out "$_"
-    | V s -> CCFormat.string out s
+    | V s -> Util.pp_var_tstp out s
 
   let to_string = CCFormat.to_string pp
 end
@@ -520,12 +529,11 @@ module ZF = struct
     | Record _ -> failwith "cannot print records in ZF"
   and pp_typed_var out (v,o) = match o with
     | None -> pp_var out v
-    | Some {term=AppBuiltin (Builtin.TType ,[]); _} ->
-      pp_var out v (* implicit type *)
     | Some ty -> Format.fprintf out "(@[%a:%a@])" pp_var v pp_surrounded ty
   and pp_surrounded out t = match t.term with
     | AppBuiltin (_, _::_)
     | App _
+    | Ite _
     | Bind _ -> Format.fprintf out "(@[%a@])" pp t
     | _ -> pp out t
   and pp_var out = function
@@ -535,6 +543,12 @@ module ZF = struct
   let pp_inner = pp_surrounded
   let to_string = CCFormat.to_string pp
 end
+
+let pp_in = function
+  | Output_format.O_zf -> ZF.pp
+  | Output_format.O_tptp -> TPTP.pp
+  | Output_format.O_normal -> pp
+  | Output_format.O_none -> CCFormat.silent
 
 (** {2 Subst} *)
 

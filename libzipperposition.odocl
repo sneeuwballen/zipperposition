@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 10f886358be053ab80a627a6abdfcde4)
+# DO NOT EDIT (digest: 25e94741e13e50b525ca49357a9ab941)
 src/prover/ClauseQueue
 src/prover/Clause
 src/prover/SClause
@@ -47,4 +47,5 @@ src/prover/calculi/Arith_rat
 src/prover/calculi/Heuristics
 src/prover/calculi/Ind_types
 src/prover/calculi/Fool
+src/prover/calculi/Higher_order
 # OASIS_STOP

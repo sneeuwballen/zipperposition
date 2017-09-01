@@ -4,11 +4,11 @@
 (** {1 Array of literals} *)
 
 module BV = CCBV
-module T = FOTerm
+module T = Term
 module S = Subst
 module Lit = Literal
 
-type term = FOTerm.t
+type term = Term.t
 
 type t = Literal.t array
 
@@ -76,6 +76,9 @@ let apply_subst ~renaming subst (lits,sc) =
     (fun lit -> Lit.apply_subst ~renaming subst (lit,sc))
     lits
 
+let of_unif_subst ~renaming s =
+  Literal.of_unif_subst ~renaming s |> Array.of_list
+
 let map f lits =
   Array.map (fun lit -> Lit.map f lit) lits
 
@@ -105,7 +108,11 @@ module MLI = Multiset.Make(struct
 let _compare_lit_with_idx ~ord (lit1,i1) (lit2,i2) =
   if i1=i2
   then Comparison.Eq (* ignore collisions *)
-  else Lit.Comp.compare ~ord lit1 lit2
+  else (
+    let c = Lit.Comp.compare ~ord lit1 lit2 in
+    (* two occurrences of one lit should be incomparable (and therefore maximal) *)
+    if c = Comparison.Eq then Comparison.Incomparable else c
+  )
 
 let _to_multiset_with_idx lits =
   CCArray.foldi
@@ -235,7 +242,7 @@ module Conv = struct
 
   let to_s_form ?(ctx=T.Conv.create()) ?hooks lits =
     Array.to_list lits
-    |> List.map (Literal.Conv.to_s_form ~ctx)
+    |> List.map (Literal.Conv.to_s_form ?hooks ~ctx)
     |> TypedSTerm.Form.or_
 end
 
@@ -409,30 +416,46 @@ let symbols ?(init=ID.Set.empty) lits =
 
 (** {3 IO} *)
 
-let pp out lits =
-  if Array.length lits = 0 then CCFormat.string out "⊥"
-  else
-    let pp_lit = CCFormat.hovbox Lit.pp in
-    Format.fprintf out "[@[<hv>%a@]]"
-      CCFormat.(array ~sep:(return "@ ∨ ") pp_lit) lits
+let pp_gen ~false_ ~l ~r ~sep ~pp_lit out lits = match lits with
+  | [||] -> CCFormat.string out false_
+  | [| l |] -> pp_lit out l
+  | _ ->
+    Format.fprintf out "%s@[<hv>%a@]%s" l CCFormat.(array ~sep pp_lit) lits r
 
-let pp_vars out lits =
+let pp out lits =
+  let pp_lit = CCFormat.hovbox Lit.pp in
+  pp_gen ~l:"[" ~r:"]" ~false_:"⊥" ~sep:(CCFormat.return "@ ∨ ") ~pp_lit out lits
+
+let pp_vars_gen ~pp_var ~pp_lits out lits =
+  let pp_vars out = function
+    | [] -> ()
+    | l -> Format.fprintf out "forall @[%a@].@ " (Util.pp_list ~sep:" " pp_var) l
+  in
+  let vars_ = Seq.vars lits |> T.VarSet.of_seq |> T.VarSet.to_list in
+  Format.fprintf out "@[<2>%a%a@]" pp_vars vars_ pp_lits lits
+
+let pp_vars out lits = pp_vars_gen ~pp_var:Type.pp_typed_var ~pp_lits:pp out lits
+
+let pp_tstp out lits =
+  let pp_lit = CCFormat.hovbox Lit.pp_tstp in
+  pp_gen ~l:"(" ~r:")" ~false_:"$false" ~sep:(CCFormat.return "@ | ") ~pp_lit out lits
+
+(* print quantified literals *)
+let pp_tstp_closed out lits =
   let pp_vars out = function
     | [] -> ()
     | l ->
-      Format.fprintf out "forall @[%a@].@ "
-        (Util.pp_list ~sep:" " Type.pp_typed_var) l
+      Format.fprintf out "![@[%a@]]:@ "
+        (Util.pp_list ~sep:", " Type.TPTP.pp_typed_var) l
   in
-  let vars_ =
-    Seq.vars lits |> T.VarSet.of_seq |> T.VarSet.to_list
-  in
-  Format.fprintf out "@[<2>%a%a@]" pp_vars vars_ pp lits
+  Format.fprintf out "@[<2>%a%a@]" pp_vars (vars lits) pp_tstp lits
 
-let pp_tstp out lits =
-  if Array.length lits = 0 then CCFormat.string out "$false"
-  else
-    Format.fprintf out "@[%a@]"
-      CCFormat.(array ~sep:(return "@ | ") Lit.pp_tstp) lits
+let pp_zf out lits =
+  let pp_lit = CCFormat.hovbox Lit.pp_zf in
+  pp_gen ~l:"(" ~r:")" ~false_:"false" ~sep:(CCFormat.return "@ || ") ~pp_lit out lits
+
+let pp_zf_closed out lits =
+  pp_vars_gen ~pp_var:Type.ZF.pp_typed_var ~pp_lits:pp_zf out lits
 
 let to_string a = CCFormat.to_string pp a
 
@@ -460,3 +483,35 @@ let is_pos_eq lits =
     | [| Lit.Prop(p,true) |] -> Some (p, T.true_)
     | [| Lit.True |] -> Some (T.true_, T.true_)
     | _ -> None
+
+(** {2 Shielded Variables} *)
+
+let is_shielded var (lits:t) : bool =
+  let var_eq = HVar.equal Type.equal in
+  let rec shielded_by_term ~root t = match T.view t with
+    | T.Var v' when var_eq v' var -> not root
+    | _ when Type.Seq.vars (T.ty t) |> Sequence.exists (var_eq var) ->
+      true (* shielded by type *)
+    | T.Var _
+    | T.DB _
+    | T.Const _ -> false
+    | T.AppBuiltin (_, l) ->
+      List.exists (shielded_by_term ~root:false) l
+    | T.App (f, l) ->
+      shielded_by_term ~root f ||
+      List.exists (shielded_by_term ~root:false) l
+    | T.Fun (_, bod) -> shielded_by_term ~root:false bod
+  in
+  (* is there a term, directly under a literal, that shields the variable? *)
+  begin
+    lits
+    |> Seq.terms
+    |> Sequence.exists (shielded_by_term ~root:true)
+  end
+
+let unshielded_vars ?(filter=fun _->true) lits: _ list =
+  vars lits
+  |> List.filter
+    (fun var ->
+       filter var &&
+       not (is_shielded var lits))

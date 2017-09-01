@@ -14,6 +14,9 @@ val return_new : 'a -> 'a t
 val return : 'a -> 'a t
 (** Alias to {!return_same} *)
 
+val return_opt : old:'a -> 'a option -> 'a t
+(** [return_opt ~old t] returns [return_new u] if [t=Some u], else returns [same old]. *)
+
 val get : 'a t -> 'a
 
 val is_new : _ t -> bool

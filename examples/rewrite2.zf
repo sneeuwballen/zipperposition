@@ -3,9 +3,9 @@
 
 val set : type -> type.
 
-val mem : pi a. a -> set a -> prop.
-val [AC] union : pi a. set a -> set a -> set a.
-val subeq : pi a. set a -> set a -> prop.
+val[infix "∈"] mem : pi a. a -> set a -> prop.
+val[AC, infix "∪"] union : pi a. set a -> set a -> set a.
+val[infix "⊆"] subeq : pi a. set a -> set a -> prop.
 
 #assert
 #  forall a s1 s2 s3.

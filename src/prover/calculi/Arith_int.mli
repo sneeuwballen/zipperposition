@@ -8,8 +8,6 @@
     "scaled" literals, i.e. literals that are multiplied by numeric coefficients so
     as to bring the unified terms to the same coefficient. *)
 
-open Logtk
-
 val case_switch_limit : int ref
 (** Positive integer: maximum width of an inequality case switch. Default: 30 *)
 
@@ -77,10 +75,6 @@ module type S = sig
 
   val is_tautology : C.t -> bool
   (** is the clause a tautology w.r.t linear expressions? *)
-
-  val purify : Env.simplify_rule
-  (** Purify clauses by replacing arithmetic expressions occurring
-      under terms by variables, and adding constraints *)
 
   val eliminate_unshielded : Env.multi_simpl_rule
   (** Eliminate unshielded variables using an adaptation of

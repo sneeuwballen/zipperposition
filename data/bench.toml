@@ -1,16 +1,25 @@
 
-provers = [ "zipperposition", "hornet", "read-tptp" ]
+provers = [ "zipperposition", "hornet", "read-tptp", "leo2", "satallax" ]
 
 [test]
 
 timeout = 30 # in s
 memory = 2000 # in MB
 provers = [ "zipperposition", "hornet" ]
-problems = ".*(\\+|-).*\.p"
+problems = ".*(\\+|-).*\\.p"
 dir = [ "tptp" ]
 
 expect = "program:read-tptp"
 default_expect = "unknown"
+
+[thf]
+
+timeout = 30 # in s
+memory = 2000 # in MB
+provers = [ "zipperposition", "leo2", "satallax" ]
+problems = ".*\\^.*.p"
+dir = [ "tptp" ]
+expect = "program:read-tptp"
 
 [zipperposition]
 
@@ -29,6 +38,18 @@ unsat = "UNSAT"
 sat = "^SAT"
 timeout = "SZS Status ResourceOut"
 version = "git:."
+
+[satallax]
+
+cmd = "~/bin/satallax -t $timeout $file"
+unsat = "SZS status (Theorem|Unsatisfiable)"
+sat = "SZS status CounterSatisfiable"
+
+[leo2]
+
+cmd = "leo -t $timeout $file"
+unsat = "SZS status (Theorem|Unsatisfiable)"
+sat = "SZS status CounterSatisfiable"
 
 [read-tptp]
 

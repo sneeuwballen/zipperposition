@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 module E = CCResult
-module T = FOTerm
+module T = Term
 module TS = TypedSTerm
 module F = TypedSTerm.Form
 module P = Logtk_parsers
@@ -40,7 +40,7 @@ module P = Logtk_parsers
 let _signature = ref Logtk.Signature.empty
 
 (** We do not have to do anything about terms, because they are already
-    defined in {! Logtk.FOTerm}. Terms are either variables or
+    defined in {! Logtk.Term}. Terms are either variables or
     applications of a constant (symbol) to a list of sub-terms.
 
     Examples (capitalized letter are variables):

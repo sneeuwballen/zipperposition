@@ -1,0 +1,21 @@
+
+# expect: unsat
+
+# some extensionality here
+
+val i : type.
+
+val f : i -> i -> i.
+val g : i -> i -> i.
+
+val a : i.
+val b : i.
+
+val map : (i -> i) -> i.
+
+assert a = b.
+assert f = g.
+
+goal map (f a) = map (g b).
+
+

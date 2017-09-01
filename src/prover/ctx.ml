@@ -5,7 +5,7 @@
 
 open Logtk
 
-module T = FOTerm
+module T = Term
 module S = Subst
 module Unif = Logtk.Unif
 

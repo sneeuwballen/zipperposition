@@ -1,0 +1,10 @@
+# expect: unsat
+
+# find set intersection
+
+val a : type.
+
+goal forall (A B: a -> prop).
+  exists (Q:a -> prop). forall x. ((A x && B x) <=> Q x).
+
+

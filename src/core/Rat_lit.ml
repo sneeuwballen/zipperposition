@@ -1,9 +1,9 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-type term = FOTerm.t
+type term = Term.t
 
-module T = FOTerm
+module T = Term
 module S = Subst
 module P = Position
 module M = Monome
@@ -56,11 +56,9 @@ let hash lit =
 let is_eq t = t.op = Equal
 let is_less t = t.op = Less
 
-let _normalize = Monome.Rat.normalize
-
 (* main constructor *)
 let make op m1 m2 =
-  let m1, m2 = _normalize m1, _normalize m2 in
+  let m1, m2 = Monome.normalize m1, Monome.normalize m2 in
   let m = M.difference m1 m2 in
   (* build from a single monome *)
   let m1, m2 = M.split m in
@@ -81,6 +79,10 @@ let pp_tstp out m = match m.op with
   | Less ->
     Format.fprintf out "$less(%a, %a)" M.pp_tstp m.left M.pp_tstp m.right
 
+let pp_zf out m = match m.op with
+  | Equal -> Format.fprintf out "%a = %a" M.pp_zf m.left M.pp_zf m.right
+  | Less -> Format.fprintf out "(%a < %a)" M.pp_zf m.left M.pp_zf m.right
+
 let to_string = CCFormat.to_string pp_tstp
 
 (** {2 Operators} *)
@@ -91,7 +93,8 @@ let fold f acc m =
   let acc = Sequence.fold f acc (Monome.Seq.terms m.left) in
   Sequence.fold f acc (Monome.Seq.terms m.right)
 
-type 'a unif = subst:Subst.t -> 'a Scoped.t -> 'a Scoped.t -> Subst.t Sequence.t
+type ('subst,'a) unif =
+  subst:'subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Sequence.t
 
 (* match {x1,y1} in scope 1, with {x2,y2} with scope2 *)
 let unif4 op ~subst x1 y1 sc1 x2 y2 sc2 k =
@@ -117,7 +120,7 @@ let generic_unif m_unif ~subst (lit1,sc1) (lit2,sc2) k =
     | Less, Equal -> ()
   end
 
-let unify ?(subst=Subst.empty) lit1 lit2 =
+let unify ?(subst=Unif_subst.empty) lit1 lit2 =
   generic_unif (fun ~subst -> M.unify ~subst) ~subst lit1 lit2
 
 let matching ?(subst=Subst.empty) lit1 lit2 =
@@ -312,21 +315,19 @@ let apply_subst_no_renaming subst (lit,sc) =
 
 let apply_subst_no_simp ~renaming subst (lit,sc) =
   {lit with
-     left=M.apply_subst ~renaming subst (lit.left, sc);
-     right=M.apply_subst ~renaming subst (lit.right, sc);
+     left=M.apply_subst_no_simp ~renaming subst (lit.left, sc);
+     right=M.apply_subst_no_simp ~renaming subst (lit.right, sc);
   }
 
-let is_trivial m = match m.op with
-  | Equal -> M.equal m.left m.right
-  | Less -> M.dominates ~strict:true m.left m.right
+let is_trivial lit = match lit.op with
+  | Equal -> M.equal lit.left lit.right
+  | Less -> M.dominates ~strict:true lit.right lit.left
 
-let is_absurd m = match m.op with
+let is_absurd lit = match lit.op with
   | Equal ->
-    let m = M.difference m.left m.right in
+    let m = M.difference lit.left lit.right in
     M.is_const m && M.sign m <> 0
-  | Less ->
-    let m = M.difference m.left m.right in
-    M.is_const m && M.sign m >= 0
+  | Less -> M.dominates ~strict:false lit.left lit.right
 
 let fold_terms ?(pos=P.stop) ?(vars=false) ?ty_args ~which ~ord ~subterms lit k =
   (* function to call at terms *)
@@ -495,7 +496,7 @@ module Focus = struct
       ~f_m:(fun m -> M.apply_subst_no_renaming subst (m,sc))
       lit
 
-  let unify ?(subst=Subst.empty) (lit1,sc1) (lit2,sc2) k =
+  let unify ?(subst=Unif_subst.empty) (lit1,sc1) (lit2,sc2) k =
     let _set_mf lit mf = match lit with
       | Left (op, _, m) -> Left (op, mf, m)
       | Right (op, m, _) -> Right (op, m, mf)

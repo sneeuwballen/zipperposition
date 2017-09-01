@@ -35,19 +35,27 @@ let _sign = function
   | n when n < 0 -> -1
   | _ -> 1
 
-let compare_and_partial =
-  let gen = Q.Gen.(
-    pair (list small_int) (list small_int) >>= fun (l1, l2) ->
-    return (M.of_list l1, M.of_list l2)
-  )
-  and pp =
-    let pp1 = CCFormat.to_string (M.pp CCFormat.int) in
-    Q.Print.pair pp1 pp1
+let gen1 =
+  let pp1 = CCFormat.to_string (M.pp CCFormat.int) in
+  let shrink_z z =
+    try Z.to_int z |> Q.Shrink.int |> Q.Iter.map Z.of_int
+    with _ -> Q.Iter.empty
   in
-  let gen = QCheck.make ~print:pp gen in
+  let shrink2 = Q.Shrink.pair Q.Shrink.nil shrink_z in
+  let shrink l =
+    M.to_list l
+    |> Q.Shrink.(list ~shrink:shrink2)
+    |> Q.Iter.map M.of_coeffs
+  in
+  Q.(small_list small_int
+     |> map M.of_list
+     |> set_print pp1
+     |> set_shrink shrink)
+
+let compare_and_partial =
   (* "naive" comparison function (using the general ordering on multisets) *)
   let compare' m1 m2 =
-    let f x y = Comparison.of_total (Pervasives.compare x y) in
+    let f x y = Comparison.of_total (CCInt.compare x y) in
     Comparison.to_total (M.compare_partial f m1 m2)
   in
   let prop (m1,m2) =
@@ -55,7 +63,72 @@ let compare_and_partial =
   in
   QCheck.Test.make
     ~name:"multiset_compare_and_compare_partial" ~long_factor:3 ~count:1000
-    gen prop
+    (Q.pair gen1 gen1) prop
+
+(* partial order for tests *)
+let partial_ord (x:int) y =
+  if x=y then Comparison.Eq
+  else if (x/5=y/5 && x mod 5 <> y mod 5) then Comparison.Incomparable
+  else CCInt.compare (x/5) (y/5) |> Comparison.of_total
+
+let compare_partial_sym =
+  let prop (m1,m2) =
+    let c1 = M.compare_partial partial_ord m1 m2 in
+    let c2 =  Comparison.opp (M.compare_partial partial_ord m2 m1) in
+    if c1=c2 
+    then true
+    else Q.Test.fail_reportf "comparison: %a vs %a" Comparison.pp c1 Comparison.pp c2
+  in
+  QCheck.Test.make
+    ~name:"multiset_compare_partial_sym" ~long_factor:3 ~count:13_000
+    Q.(pair gen1 gen1) prop
+
+let compare_partial_trans =
+  let prop (m1,m2,m3) =
+    let c1 = M.compare_partial partial_ord m1 m2 in
+    let c2 = M.compare_partial partial_ord m2 m3 in
+    let c3 = M.compare_partial partial_ord m1 m3 in
+    begin match c1,c2, c3 with
+      | Comparison.Incomparable, _, _
+      | _, Comparison.Incomparable, _
+      | _, _, Comparison.Incomparable
+      | Comparison.Lt, Comparison.Gt, _
+      | Comparison.Gt, Comparison.Lt, _ -> Q.assume_fail()  (* ignore *)
+      | Comparison.Eq, Comparison.Eq, Comparison.Eq -> true
+      | Comparison.Gt, Comparison.Gt, Comparison.Gt
+      | Comparison.Gt, Comparison.Eq, Comparison.Gt
+      | Comparison.Eq, Comparison.Gt, Comparison.Gt -> true
+      | Comparison.Lt, Comparison.Lt, Comparison.Lt
+      | Comparison.Lt, Comparison.Eq, Comparison.Lt
+      | Comparison.Eq, Comparison.Lt, Comparison.Lt -> true
+      | Comparison.Lt, _, Comparison.Eq
+      | Comparison.Gt, _, Comparison.Eq
+      | _, Comparison.Lt, Comparison.Eq
+      | _, Comparison.Gt, Comparison.Eq
+      | (Comparison.Eq | Comparison.Lt), Comparison.Lt, Comparison.Gt
+      | (Comparison.Eq | Comparison.Gt), Comparison.Gt, Comparison.Lt
+      | Comparison.Lt, Comparison.Eq, Comparison.Gt
+      | Comparison.Gt, Comparison.Eq, Comparison.Lt
+      | Comparison.Eq, Comparison.Eq, (Comparison.Lt | Comparison.Gt)
+        ->
+        Q.Test.fail_reportf
+          "comp %a %a %a" Comparison.pp c1 Comparison.pp c2 Comparison.pp c3
+    end
+  in
+  QCheck.Test.make
+    ~name:"multiset_compare_partial_trans" ~long_factor:3 ~count:13_000
+    (Q.triple gen1 gen1 gen1) prop
+
+let max_seq_correct =
+  let prop m =
+    let l1 = M.max_seq partial_ord m |> Sequence.zip |> Sequence.map fst |> Sequence.to_list in
+    let l2 = M.to_list m |> List.map fst |> List.filter (fun x -> M.is_max partial_ord x m) in
+    if l1=l2 then true
+    else Q.Test.fail_reportf "@[max_seq %a,@ max %a@]"
+        CCFormat.Dump.(list int) l1
+        CCFormat.Dump.(list int) l2
+  in
+  Q.Test.make ~name:"multiset_max_seq" ~long_factor:5 ~count:10_000 gen1 prop
 
 let max_is_max =
   let pp = CCFormat.to_string (M.pp CCFormat.int) in
@@ -78,6 +151,9 @@ let suite =
     ]
 
 let props =
-  [ compare_and_partial
-  ; max_is_max
+  [ compare_and_partial;
+    compare_partial_sym;
+    compare_partial_trans;
+    max_is_max;
+    max_seq_correct;
   ]

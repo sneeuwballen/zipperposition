@@ -21,7 +21,7 @@ module type S = sig
 
   (** {2 Utils} *)
 
-  val compare : FOTerm.t -> FOTerm.t -> Comparison.t
+  val compare : Term.t -> Term.t -> Comparison.t
   (** Compare two terms *)
 
   val select : Selection.t
@@ -61,10 +61,10 @@ module type S = sig
     val to_hooks : unit -> Literal.Conv.hook_to list
     val add_to_hook : Literal.Conv.hook_to -> unit
 
-    val of_form : FOTerm.t SLiteral.t -> Literal.t
+    val of_form : Term.t SLiteral.t -> Literal.t
     (** @raise Invalid_argument if the formula is not atomic *)
 
-    val to_form : Literal.t -> FOTerm.t SLiteral.t
+    val to_form : Literal.t -> Term.t SLiteral.t
   end
 end
 

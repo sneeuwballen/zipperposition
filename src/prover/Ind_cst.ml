@@ -6,10 +6,7 @@
 
 open Logtk
 
-module T = FOTerm
-
-(* TODO: should probably be 3 *)
-let max_depth_ = ref 4
+module T = Term
 
 exception InvalidDecl of string
 exception NotAnInductiveConstant of ID.t
@@ -40,7 +37,7 @@ exception Payload_cst of t
 
 (** {6 Inductive Constants} *)
 
-let to_term c = FOTerm.const ~ty:c.cst_ty c.cst_id
+let to_term c = Term.const ~ty:c.cst_ty c.cst_id
 let id c = c.cst_id
 let ty c = c.cst_ty
 
@@ -62,9 +59,11 @@ let pp out c = ID.pp out c.cst_id
 
 let on_new_cst = Signal.create()
 
-let id_as_cst id = match ID.payload id with
-  | Payload_cst c -> Some c
-  | _ -> None
+let id_as_cst id =
+  ID.payload_find id
+    ~f:(function
+      | Payload_cst c -> Some c
+      | _ -> None)
 
 let id_as_cst_exn id = match id_as_cst id with
   | None -> raise (NotAnInductiveConstant id)
@@ -83,9 +82,9 @@ let n_ = ref 0
 let make_skolem ty : ID.t =
   let c = ID.makef "#%s_%d" (Type.mangle ty) !n_ in
   incr n_;
-  if Ind_ty.is_inductive_type ty then (
-    ID.set_payload c (Skolem.Attr_skolem Skolem.K_ind);
-  );
+  (* declare as a skolem *)
+  let k = if Ind_ty.is_inductive_type ty then ID.K_ind else ID.K_normal in
+  ID.set_payload c (ID.Attr_skolem k);
   c
 
 (* declare new constant *)
@@ -111,7 +110,7 @@ let declare ~depth ~is_sub id ty =
   in
   ID.set_payload id (Payload_cst cst)
     ~can_erase:(function
-      | Skolem.Attr_skolem Skolem.K_ind ->
+      | ID.Attr_skolem ID.K_ind ->
         true (* special case: promotion from skolem to inductive const *)
       | _ -> false);
   (* return *)
@@ -137,6 +136,7 @@ let id_is_ind_skolem (id:ID.t) (ty:Type.t): bool =
   n_tyvars=0
   && ty_args=[] (* constant *)
   && Ind_ty.is_inductive_type ty_ret
+  && Ind_ty.is_recursive (Ind_ty.as_inductive_type_exn ty_ret |> fst)
   && Type.is_ground ty
   && (id_is_cst id || (not (Ind_ty.is_constructor id) && not (Rewrite.is_defined_cst id)))
 

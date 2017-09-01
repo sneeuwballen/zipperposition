@@ -1,7 +1,7 @@
 # OASIS_START
-# DO NOT EDIT (digest: 6f9a50126a8b2f64b04190a2ddcd18b0)
+# DO NOT EDIT (digest: 671ebc77337f1e59152ac020cd8325b5)
 InnerTerm
-FOTerm
+Term
 Type
 Util
 STerm
@@ -12,10 +12,13 @@ Var
 HVar
 Defined_pos
 Subst
-Unif
 Signature
 Scoped
+Unif
 Unif_intf
+Unif_constr
+Unif_subst
+HO_unif
 TypeInference
 Options
 Comparison
@@ -25,7 +28,7 @@ Ordering
 Skolem
 Cnf
 ID
-IDOrBuiltin
+ID_or_builtin
 SLiteral
 Index
 Index_intf
@@ -35,6 +38,7 @@ NPDtree
 Binder
 Congruence
 Congruence_intf
+Lambda
 FeatureVector
 FV_tree
 UntypedAST
@@ -47,6 +51,7 @@ Ordinal
 Rewrite
 Test_prop
 Input_format
+Output_format
 LLProof
 LLProof_check
 Multisets

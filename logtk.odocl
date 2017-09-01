@@ -1,7 +1,7 @@
 # OASIS_START
-# DO NOT EDIT (digest: 4a44539833a40de04d4a642d1b779ace)
+# DO NOT EDIT (digest: abfcd2d0f76d9d6d6f6bd817e9714488)
 src/core/InnerTerm
-src/core/FOTerm
+src/core/Term
 src/core/Type
 src/core/Util
 src/core/STerm
@@ -12,10 +12,13 @@ src/core/Var
 src/core/HVar
 src/core/Defined_pos
 src/core/Subst
-src/core/Unif
 src/core/Signature
 src/core/Scoped
+src/core/Unif
 src/core/Unif_intf
+src/core/Unif_constr
+src/core/Unif_subst
+src/core/HO_unif
 src/core/TypeInference
 src/core/Options
 src/core/Comparison
@@ -25,7 +28,7 @@ src/core/Ordering
 src/core/Skolem
 src/core/Cnf
 src/core/ID
-src/core/IDOrBuiltin
+src/core/ID_or_builtin
 src/core/SLiteral
 src/core/Index
 src/core/Index_intf
@@ -35,6 +38,7 @@ src/core/NPDtree
 src/core/Binder
 src/core/Congruence
 src/core/Congruence_intf
+src/core/Lambda
 src/core/FeatureVector
 src/core/FV_tree
 src/core/UntypedAST
@@ -47,6 +51,7 @@ src/core/Ordinal
 src/core/Rewrite
 src/core/Test_prop
 src/core/Input_format
+src/core/Output_format
 src/core/LLProof
 src/core/LLProof_check
 src/core/Multisets

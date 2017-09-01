@@ -9,7 +9,7 @@
 open Logtk
 
 type ty = Type.t
-type term = FOTerm.t
+type term = Term.t
 type var = ty HVar.t
 type formula = TypedSTerm.t
 type bool_unique_id = int

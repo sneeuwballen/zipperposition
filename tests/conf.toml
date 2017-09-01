@@ -1,5 +1,6 @@
 
 provers = [ "zipperposition", "hornet", "zipperposition-avatar" ]
+default_expect = "unsat"
 
 [test]
 
@@ -8,6 +9,8 @@ memory = 2000 # in MB
 provers = [ "zipperposition", "hornet", "zipperposition-avatar" ]
 problems = ".*.zf"
 dir = [ "examples", "tests" ]
+
+default_expect = "unsat"
 
 [zipperposition]
 

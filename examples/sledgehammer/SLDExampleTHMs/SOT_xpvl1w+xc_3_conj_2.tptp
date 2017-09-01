@@ -1,0 +1,97 @@
+%------------------------------------------------------------------------------
+tff(ty_n_t__Record__Otuple____isomorphism_It__Congruence__Opartial____object__Opartial____object____ext_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__Group__Omonoid__Omonoid____ext_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__Product____Type__Ounit_J_J_Mt__Set__Oset_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J_Mt__Group__Omonoid__Omonoid____ext_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__Product____Type__Ounit_J_J,type,(
+    tuple_1191239979t_unit: $tType )).
+
+tff(ty_n_t__Congruence__Opartial____object__Opartial____object____ext_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__Group__Omonoid__Omonoid____ext_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__Product____Type__Ounit_J_J,type,(
+    partia964409863t_unit: $tType )).
+
+tff(ty_n_t__fun_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__fun_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J_J,type,(
+    fun_fu2103114179Vertex: $tType )).
+
+tff(ty_n_t__Group__Omonoid__Omonoid____ext_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__Product____Type__Ounit_J,type,(
+    monoid1553863962t_unit: $tType )).
+
+tff(ty_n_t__Set__Oset_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J,type,(
+    set_fu1440825977Vertex: $tType )).
+
+tff(ty_n_t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J,type,(
+    fun_Vertex_Vertex: $tType )).
+
+tff(ty_n_t__Product____Type__Ounit,type,(
+    product_unit: $tType )).
+
+tff(ty_n_t__HOL__Obool,type,(
+    bool: $tType )).
+
+tff(sy_c_Congruence_Opartial__object_Ocarrier_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_001t__Group__Omonoid__Omonoid____ext_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__Product____Type__Ounit_J,type,(
+    partia1288304390t_unit: partia964409863t_unit > set_fu1440825977Vertex )).
+
+tff(sy_c_Congruence_Opartial__object_Opartial__object__ext_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_001t__Group__Omonoid__Omonoid____ext_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__Product____Type__Ounit_J,type,(
+    partia1560632785t_unit: ( set_fu1440825977Vertex * monoid1553863962t_unit ) > partia964409863t_unit )).
+
+tff(sy_c_Congruence_Opartial__object_Opartial__object__ext_Opartial__object__ext__Tuple__Iso_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_001t__Group__Omonoid__Omonoid____ext_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__Product____Type__Ounit_J,type,(
+    partia391176287t_unit: tuple_1191239979t_unit )).
+
+tff(sy_c_Finite__Set_Ofinite_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J,type,(
+    finite502879194Vertex: set_fu1440825977Vertex > $o )).
+
+tff(sy_c_Fun_Ocomp_001t__OrbitStabiliser__OVertex_001t__OrbitStabiliser__OVertex_001t__OrbitStabiliser__OVertex,type,(
+    comp_V592905037Vertex: fun_fu2103114179Vertex )).
+
+tff(sy_c_Fun_Oid_001t__OrbitStabiliser__OVertex,type,(
+    id_Vertex: fun_Vertex_Vertex )).
+
+tff(sy_c_Group_Omonoid_Omonoid__ext_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_001t__Product____Type__Ounit,type,(
+    monoid622349190t_unit: ( fun_fu2103114179Vertex * fun_Vertex_Vertex * product_unit ) > monoid1553863962t_unit )).
+
+tff(sy_c_OrbitStabiliser_Ocomplex__rotations,type,(
+    complex_rotations: set_fu1440825977Vertex )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Set__Oset_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J,type,(
+    ord_le579252953Vertex: ( set_fu1440825977Vertex * set_fu1440825977Vertex ) > $o )).
+
+tff(sy_c_Orderings_Otop__class_Otop_001t__Set__Oset_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J,type,(
+    top_to1244354857Vertex: set_fu1440825977Vertex )).
+
+tff(sy_c_Product__Type_OUnity,type,(
+    product_Unity: product_unit )).
+
+tff(sy_c_Record_Oiso__tuple__cons_001t__Congruence__Opartial____object__Opartial____object____ext_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__Group__Omonoid__Omonoid____ext_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__Product____Type__Ounit_J_J_001t__Set__Oset_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J_001t__Group__Omonoid__Omonoid____ext_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__Product____Type__Ounit_J,type,(
+    iso_tu2055307086t_unit: ( tuple_1191239979t_unit * set_fu1440825977Vertex * monoid1553863962t_unit ) > partia964409863t_unit )).
+
+tff(sy_c_fFalse,type,(
+    fFalse: bool )).
+
+tff(sy_c_fTrue,type,(
+    fTrue: bool )).
+
+tff(sy_c_pp,type,(
+    pp: bool > $o )).
+
+tff(fact_0__092_060open_062finite_AUNIV_092_060close_062,axiom,(
+    finite502879194Vertex(top_to1244354857Vertex) )).
+
+tff(fact_1__092_060open_062complex__rotations_A_092_060subseteq_062_AUNIV_092_060close_062,axiom,(
+    ord_le579252953Vertex(complex_rotations,top_to1244354857Vertex) )).
+
+tff(fact_2_partial__object__ext__def,axiom,(
+    ! [Carrier: set_fu1440825977Vertex,More: monoid1553863962t_unit] : partia1560632785t_unit(Carrier,More) = iso_tu2055307086t_unit(partia391176287t_unit,Carrier,More) )).
+
+tff(fact_3_infinite__super,axiom,(
+    ! [S: set_fu1440825977Vertex,T: set_fu1440825977Vertex] : 
+      ( ord_le579252953Vertex(S,T)
+     => ( ~ finite502879194Vertex(S)
+       => ~ finite502879194Vertex(T) ) ) )).
+
+tff(fact_4_partial__object_Oselect__convs_I1_J,axiom,(
+    ! [Carrier: set_fu1440825977Vertex,More: monoid1553863962t_unit] : partia1288304390t_unit(partia1560632785t_unit(Carrier,More)) = Carrier )).
+
+tff(help_pp_2_1_U,axiom,(
+    pp(fTrue) )).
+
+tff(help_pp_1_1_U,axiom,(
+    ~ pp(fFalse) )).
+
+tff(conj_2,conjecture,(
+    finite502879194Vertex(partia1288304390t_unit(partia1560632785t_unit(complex_rotations,monoid622349190t_unit(comp_V592905037Vertex,id_Vertex,product_Unity)))) )).
+%------------------------------------------------------------------------------

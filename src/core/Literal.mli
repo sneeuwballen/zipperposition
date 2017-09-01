@@ -1,9 +1,19 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Equational literals} *)
+(** {1 Literals} *)
 
-type term = FOTerm.t
+(** Literals are the representation of atomic formulas in the clausal
+    world of resolution/superposition provers.
+
+    A literal is an atomic formula (equality or predicate), paired with a sign
+    that carries negation.
+
+    We also have special arithmetic literals that have the intuitive meaning,
+    see {!Int_lit} and {!Rat_lit} for more details.
+*)
+
+type term = Term.t
 
 (** a literal, that is, a signed atomic formula *)
 type t = private
@@ -71,6 +81,10 @@ val mk_rat_op : Rat_lit.op -> Q.t Monome.t -> Q.t Monome.t -> t
 val mk_rat_eq : Q.t Monome.t -> Q.t Monome.t -> t
 val mk_rat_less : Q.t Monome.t -> Q.t Monome.t -> t
 
+val mk_constraint : term -> term -> t
+(** [mk_constraint t u] makes a disequation or a HO constraint depending
+    on how [t] and [u] look. *)
+
 val matching : ?subst:Subst.t -> pattern:t Scoped.t -> t Scoped.t ->
   Subst.t Sequence.t
 (** checks whether subst(lit_a) matches lit_b. Returns alternative
@@ -84,7 +98,7 @@ val subsumes : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
 val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
   Subst.t Sequence.t
 
-val unify : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> Subst.t Sequence.t
+val unify : ?subst:Unif_subst.t -> t Scoped.t -> t Scoped.t -> Unif_subst.t Sequence.t
 
 val are_variant : t -> t -> bool
 
@@ -99,7 +113,20 @@ val apply_subst_no_simp : renaming:Subst.Renaming.t ->
 val apply_subst_list : renaming:Subst.Renaming.t ->
   Subst.t -> t list Scoped.t -> t list
 
-val negate : t -> t   (** negate literal *)
+exception Lit_is_constraint
+
+val negate : t -> t
+(** negate literal *)
+
+val is_constraint : t -> bool
+(** Is the literal a constraint? *)
+
+val is_ho_constraint : t -> bool
+
+val of_unif_subst: renaming:Subst.Renaming.t -> Unif_subst.t -> t list
+(** Make a list of (negative) literals out of the unification constraints
+    contained in this substitution. *)
+
 val map : (term -> term) -> t -> t (** functor *)
 val fold : ('a -> term -> 'a) -> 'a -> t -> 'a  (** basic fold *)
 val vars : t -> Type.t HVar.t list (** gather variables *)
@@ -107,6 +134,15 @@ val var_occurs : Type.t HVar.t -> t -> bool
 val is_ground : t -> bool
 val symbols : t -> ID.Set.t
 val root_terms : t -> term list (** all the terms immediatly under the lit *)
+
+val to_ho_term : t -> term option
+(** Conversion to higher-order term using {!Term.Form} *)
+
+val as_ho_predicate : t -> (Term.var * term * term list * bool) option
+(** View on literals [F t1…tn] and [¬ (F t1…tn)] *)
+
+val is_ho_predicate : t -> bool
+(** Does {!as_ho_predicate} return Some? *)
 
 module Set : CCSet.S with type elt = t
 
@@ -193,6 +229,10 @@ module Pos : sig
       can the whole literal becomes smaller? *)
 end
 
+val replace : t -> old:term -> by:term -> t
+(** [replace lit ~old ~by] syntactically replaces all occurrences of [old]
+    in [lit] by the term [by]. *)
+
 (** {2 Specific views} *)
 module View : sig
   val as_eqn : t -> (term * term * bool) option
@@ -228,9 +268,6 @@ module Conv : sig
   type hook_from = term SLiteral.t -> t option
   type hook_to = t -> term SLiteral.t option
 
-  val int_hook_from : hook_from
-  val rat_hook_from : hook_from
-
   val of_form : ?hooks:hook_from list -> term SLiteral.t -> t
   (** Conversion from a formula. By default no ordering or arith theory
       is considered.
@@ -238,7 +275,7 @@ module Conv : sig
 
   val to_form : ?hooks:hook_to list -> t -> term SLiteral.t
 
-  val to_s_form : ?ctx:FOTerm.Conv.ctx -> ?hooks:hook_to list -> t -> TypedSTerm.Form.t
+  val to_s_form : ?ctx:Term.Conv.ctx -> ?hooks:hook_to list -> t -> TypedSTerm.Form.t
 end
 
 (** {2 IO} *)
@@ -252,5 +289,6 @@ val add_default_hook : print_hook -> unit
 val pp_debug : ?hooks:print_hook list -> t CCFormat.printer
 
 val pp : t CCFormat.printer
+val pp_zf : t CCFormat.printer
 val pp_tstp : t CCFormat.printer
 val to_string : t -> string

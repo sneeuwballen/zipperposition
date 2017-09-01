@@ -1,0 +1,27 @@
+# expect: unsat
+
+# exercize rewriting
+
+val set : type -> type.
+
+val[infix "∈"] mem : pi a. a -> set a -> prop.
+val[infix "∪"] union : pi a. set a -> set a -> set a.
+val[infix "⊆"] subeq : pi a. set a -> set a -> prop.
+
+rewrite
+  forall a s1 s2 x.
+    mem a x (union a s1 s2) <=> mem a x s1 || mem a x s2.
+
+rewrite
+  forall a s1 s2.
+    subeq a s1 s2 <=> (forall x. mem a x s1 => mem a x s2).
+
+rewrite
+  forall a (s1 s2 : set a).
+  s1 = s2 <=> (subeq s1 s2 && subeq s2 s1).
+
+goal
+  forall a (S1 S2 S3 S4 S5 S6 : set a).
+    (union S1 (union S2 (union S3 (union S4 (union S5 S6))))) =
+    (union S6 (union S5 (union S4 (union S3 (union S2 S1))))).
+

@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: be9ff218b5c7631e26eaeb33613ba90c)
+# DO NOT EDIT (digest: b6cb631b4bf68d20e1b6e41155b4d020)
 ClauseQueue
 Clause
 SClause
@@ -47,5 +47,6 @@ calculi/Arith_rat
 calculi/Heuristics
 calculi/Ind_types
 calculi/Fool
+calculi/Higher_order
 lib/Simplex
 # OASIS_STOP

@@ -10,7 +10,7 @@
 
 open Logtk
 
-type term = FOTerm.t
+type term = Term.t
 
 type t
 

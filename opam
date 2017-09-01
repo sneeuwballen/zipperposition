@@ -1,6 +1,6 @@
 opam-version: "1.2"
 name: "zipperposition"
-version: "1.1"
+version: "1.2"
 maintainer: "simon.cruanes@inria.fr"
 author: "Simon Cruanes"
 homepage: "https://github.com/c-cube/zipperposition"
@@ -42,6 +42,9 @@ depopts: [
 ]
 available: [
     ocaml-version >= "4.02.3"
+]
+conflicts: [
+  "logtk"
 ]
 tags: [ "logic" "unification" "term" "superposition" "prover" ]
 bug-reports: "https://github.com/c-cube/zipperposition/issues"

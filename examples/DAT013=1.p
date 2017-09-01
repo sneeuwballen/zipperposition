@@ -1,0 +1,1 @@
+/home/simon/workspace/tptp/tptp/Problems/DAT/DAT013=1.p

@@ -8,7 +8,7 @@
 open Logtk
 open Hornet_types
 
-type term = FOTerm.t
+type term = Term.t
 type ty = Type.t
 type statement = (Clause.t, term, ty) Statement.t
 

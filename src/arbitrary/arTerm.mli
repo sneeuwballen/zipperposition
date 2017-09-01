@@ -8,24 +8,31 @@ open Logtk
 type 'a arbitrary = 'a QCheck.arbitrary
 type 'a gen = 'a QCheck.Gen.t
 
-val shrink : FOTerm.t QCheck.Shrink.t
+val shrink : Term.t QCheck.Shrink.t
 
-val default_g : FOTerm.t gen
+val default_g : Term.t gen
 
-val default_fuel : int -> FOTerm.t gen
+val default_fuel : int -> Term.t gen
 
-val default : FOTerm.t arbitrary
+val default : Term.t arbitrary
 (** Default polymorphic term *)
 
-val ground_g : FOTerm.t gen
+val default_ho_g : Term.t gen
 
-val ground : FOTerm.t arbitrary
+val default_ho : Term.t arbitrary
+(** Default polymorphic term, with lambdas *)
+
+val default_ho_fuel : int -> Term.t gen
+
+val ground_g : Term.t gen
+
+val ground : Term.t arbitrary
 (** Default ground monomorphic term *)
 
-val pred : FOTerm.t arbitrary
+val pred : Term.t arbitrary
 (** predicates (type "o") *)
 
-val pos : FOTerm.t -> Position.t gen
+val pos : Term.t -> Position.t gen
 (** Random valid position in the term *)
 
 (** {2 S Terms} *)

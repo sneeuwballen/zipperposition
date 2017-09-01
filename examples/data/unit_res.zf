@@ -1,0 +1,13 @@
+
+# expect: unsat
+
+data unit := Unit.
+
+val a : unit.
+val b : unit.
+val p : unit -> prop.
+
+assert p a.
+assert ~ (p b).
+
+

@@ -1,9 +1,9 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-type term = FOTerm.t
+type term = Term.t
 
-module T = FOTerm
+module T = Term
 module S = Subst
 module P = Position
 module M = Monome
@@ -98,16 +98,16 @@ let is_divides = function
   | Divides _ -> true
   | Binary _ -> false
 
-let _normalize = Monome.Int.normalize
+let make_no_simp op m1 m2 = Binary (op, m1, m2)
 
 (* main constructor *)
 let make op m1 m2 =
-  let m1, m2 = _normalize m1, _normalize m2 in
+  let m1, m2 = M.normalize m1, M.normalize m2 in
   let m = M.difference m1 m2 in
   (* build from a single monome *)
   let _make_split op m =
     let m1, m2 = M.split m in
-    Binary (op, m1, m2)
+    make_no_simp op m1 m2
   in
   match op with
     | Equal
@@ -150,6 +150,105 @@ let mk_neq = make Different
 let mk_less = make Less
 let mk_lesseq = make Lesseq
 
+module U = struct
+  module ZTbl = Hashtbl.Make(Z)
+
+  type divisor = {
+    prime : Z.t;
+    power : int;
+  }
+
+  let two = Z.of_int 2
+
+  (* table from numbers to some of their divisor (if any) *)
+  let _table = lazy (
+    let t = ZTbl.create 256 in
+    ZTbl.add t two None;
+    t)
+
+  let _divisors n = ZTbl.find (Lazy.force _table) n
+
+  let _add_prime n =
+    ZTbl.replace (Lazy.force _table) n None
+
+  (* add to the table the fact that [d] is a divisor of [n] *)
+  let _add_divisor n d =
+    assert (not (ZTbl.mem (Lazy.force _table) n));
+    ZTbl.add (Lazy.force _table) n (Some d)
+
+  (* primality test, modifies _table *)
+  let _is_prime n0 =
+    let n = ref two in
+    let bound = Z.succ (Z.sqrt n0) in
+    let is_prime = ref true in
+    while !is_prime && Z.leq !n bound do
+      if Z.sign (Z.rem n0 !n) = 0
+      then begin
+        is_prime := false;
+        _add_divisor n0 !n;
+      end;
+      n := Z.succ !n;
+    done;
+    if !is_prime then _add_prime n0;
+    !is_prime
+
+  let is_prime n =
+    try
+      begin match _divisors n with
+        | None -> true
+        | Some _ -> false
+      end
+    with Not_found ->
+    match Z.probab_prime n 7 with
+      | 0 -> false
+      | 2 -> (_add_prime n; true)
+      | 1 ->
+        _is_prime n
+      | _ -> assert false
+
+  let rec _merge l1 l2 = match l1, l2 with
+    | [], _ -> l2
+    | _, [] -> l1
+    | p1::l1', p2::l2' ->
+      match Z.compare p1.prime p2.prime with
+        | 0 ->
+          {prime=p1.prime; power=p1.power+p2.power} :: _merge l1' l2'
+        | n when n < 0 ->
+          p1 :: _merge l1' l2
+        | _ -> p2 :: _merge l1 l2'
+
+  let rec _decompose n =
+    try
+      begin match _divisors n with
+        | None -> [{prime=n; power=1;}]
+        | Some q1 ->
+          let q2 = Z.divexact n q1 in
+          _merge (_decompose q1) (_decompose q2)
+      end
+    with Not_found ->
+      ignore (_is_prime n);
+      _decompose n
+
+  let prime_decomposition n =
+    if is_prime n
+    then [{prime=n; power=1;}]
+    else _decompose n
+
+  let primes_leq n0 k =
+    let n = ref two in
+    while Z.leq !n n0 do
+      if is_prime !n then k !n
+    done
+end
+
+(* reduce 8^1 to 2^3 *)
+let _normalize_n n power =
+  let divisors = U.prime_decomposition (Z.pow n power) in
+  match divisors with
+    | [] -> assert false
+    | [d] -> d.U.prime, d.U.power
+    | _::_::_ -> n, power
+
 (* normalize coefficients of [m] in Z/n^power Z *)
 let _normalize_in_div n ~power m =
   let nk = Z.pow n power in
@@ -158,7 +257,8 @@ let _normalize_in_div n ~power m =
   M.map_num norm_coeff m
 
 let mk_divides ?(sign=true) n ~power m =
-  let m = _normalize m in
+  let m = Monome.normalize m in
+  let n, power = _normalize_n n power in
   let m = _normalize_in_div n ~power m in
   (* factorize m by some k; if k is n^p, then make the literal
      n^{power-p} | m/k *)
@@ -185,17 +285,17 @@ let negate = function
 
 let pp out = function
   | Binary (op, l, r) ->
-    Format.fprintf out "%a %s %a"
+    Format.fprintf out "@[%a %s@ %a@]"
       M.pp l
       (match op with Equal -> "=" | Different -> "≠"
                    | Less -> "<" | Lesseq -> "≤")
       M.pp r
   | Divides d when d.sign ->
     let nk = Z.pow d.num d.power in
-    Format.fprintf out "%s div %a" (Z.to_string nk) M.pp d.monome
+    Format.fprintf out "@[<2>%s div@ %a@]" (Z.to_string nk) M.pp d.monome
   | Divides d ->
     let nk = Z.pow d.num d.power in
-    Format.fprintf out "¬(%s div %a)" (Z.to_string nk) M.pp d.monome
+    Format.fprintf out "@<1>¬(%s div %a)" (Z.to_string nk) M.pp d.monome
 
 let pp_tstp out = function
   | Binary (Equal, l, r) ->
@@ -213,6 +313,22 @@ let pp_tstp out = function
     let nk = Z.pow d.num d.power in
     Format.fprintf out "$remainder_e(%a, %s) != 0" M.pp_tstp d.monome (Z.to_string nk)
 
+let pp_zf out = function
+  | Binary (Equal, l, r) ->
+    Format.fprintf out "%a = %a" M.pp_zf l M.pp_zf r
+  | Binary (Different, l, r) ->
+    Format.fprintf out "%a != %a" M.pp_zf l M.pp_zf r
+  | Binary (Less, l, r) ->
+    Format.fprintf out "(%a < %a)" M.pp_zf l M.pp_zf r
+  | Binary (Lesseq, l, r) ->
+    Format.fprintf out "(%a <= %a)" M.pp_zf l M.pp_zf r
+  | Divides d when d.sign ->
+    let nk = Z.pow d.num d.power in
+    Format.fprintf out "(%a mod %s) = 0" M.pp_zf d.monome (Z.to_string nk)
+  | Divides d ->
+    let nk = Z.pow d.num d.power in
+    Format.fprintf out "(%a mod %s) != 0" M.pp_zf d.monome (Z.to_string nk)
+
 let to_string = CCFormat.to_string pp_tstp
 
 (** {2 Operators} *)
@@ -228,7 +344,8 @@ let fold f acc = function
   | Divides d ->
     Sequence.fold f acc (Monome.Seq.terms d.monome)
 
-type 'a unif = subst:Subst.t -> 'a Scoped.t -> 'a Scoped.t -> Subst.t Sequence.t
+type ('subst,'a) unif =
+  subst:'subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Sequence.t
 
 (* match {x1,y1} in scope 1, with {x2,y2} with scope2 *)
 let unif4 op ~subst x1 y1 sc1 x2 y2 sc2 k =
@@ -254,7 +371,7 @@ let generic_unif m_unif ~subst (lit1,sc1) (lit2,sc2) k =
     | Binary _, Divides _
     | Divides _, Binary _ -> ()
 
-let unify ?(subst=Subst.empty) lit1 lit2 =
+let unify ?(subst=Unif_subst.empty) lit1 lit2 =
   generic_unif (fun ~subst -> M.unify ~subst) ~subst lit1 lit2
 
 let matching ?(subst=Subst.empty) lit1 lit2 =
@@ -542,12 +659,11 @@ let apply_subst_no_renaming subst (lit,sc) = match lit with
 
 let apply_subst_no_simp ~renaming subst (lit,sc) = match lit with
   | Binary (op, m1, m2) ->
-    Binary (op,
-      (M.apply_subst ~renaming subst (m1,sc)),
-      (M.apply_subst ~renaming subst (m2,sc)) )
+    make_no_simp op
+      (M.apply_subst_no_simp ~renaming subst (m1,sc))
+      (M.apply_subst_no_simp ~renaming subst (m2,sc))
   | Divides d ->
-    mk_divides ~sign:d.sign d.num ~power:d.power
-      (M.apply_subst ~renaming subst (d.monome,sc))
+    Divides {d with monome=M.apply_subst_no_simp ~renaming subst (d.monome,sc); }
 
 let is_trivial = function
   | Divides d when d.sign && (Z.equal d.num Z.one || d.power = 0) ->
@@ -823,7 +939,7 @@ module Focus = struct
       ~f_m:(fun m -> M.apply_subst_no_renaming subst (m,sc))
       lit
 
-  let unify ?(subst=Subst.empty) (lit1,sc1) (lit2,sc2) k =
+  let unify ?(subst=Unif_subst.empty) (lit1,sc1) (lit2,sc2) k =
     let _set_mf lit mf = match lit with
       | Left (op, _, m) -> Left (op, mf, m)
       | Right (op, m, _) -> Right (op, m, mf)
@@ -891,93 +1007,4 @@ module Focus = struct
   let to_string = CCFormat.to_string pp
 end
 
-module Util = struct
-  module ZTbl = Hashtbl.Make(Z)
-
-  type divisor = {
-    prime : Z.t;
-    power : int;
-  }
-
-  let two = Z.of_int 2
-
-  (* table from numbers to some of their divisor (if any) *)
-  let _table = lazy (
-    let t = ZTbl.create 256 in
-    ZTbl.add t two None;
-    t)
-
-  let _divisors n = ZTbl.find (Lazy.force _table) n
-
-  let _add_prime n =
-    ZTbl.replace (Lazy.force _table) n None
-
-  (* add to the table the fact that [d] is a divisor of [n] *)
-  let _add_divisor n d =
-    assert (not (ZTbl.mem (Lazy.force _table) n));
-    ZTbl.add (Lazy.force _table) n (Some d)
-
-  (* primality test, modifies _table *)
-  let _is_prime n0 =
-    let n = ref two in
-    let bound = Z.succ (Z.sqrt n0) in
-    let is_prime = ref true in
-    while !is_prime && Z.leq !n bound do
-      if Z.sign (Z.rem n0 !n) = 0
-      then begin
-        is_prime := false;
-        _add_divisor n0 !n;
-      end;
-      n := Z.succ !n;
-    done;
-    if !is_prime then _add_prime n0;
-    !is_prime
-
-  let is_prime n =
-    try
-      begin match _divisors n with
-        | None -> true
-        | Some _ -> false
-      end
-    with Not_found ->
-    match Z.probab_prime n 7 with
-      | 0 -> false
-      | 2 -> (_add_prime n; true)
-      | 1 ->
-        _is_prime n
-      | _ -> assert false
-
-  let rec _merge l1 l2 = match l1, l2 with
-    | [], _ -> l2
-    | _, [] -> l1
-    | p1::l1', p2::l2' ->
-      match Z.compare p1.prime p2.prime with
-        | 0 ->
-          {prime=p1.prime; power=p1.power+p2.power} :: _merge l1' l2'
-        | n when n < 0 ->
-          p1 :: _merge l1' l2
-        | _ -> p2 :: _merge l1 l2'
-
-  let rec _decompose n =
-    try
-      begin match _divisors n with
-        | None -> [{prime=n; power=1;}]
-        | Some q1 ->
-          let q2 = Z.divexact n q1 in
-          _merge (_decompose q1) (_decompose q2)
-      end
-    with Not_found ->
-      ignore (_is_prime n);
-      _decompose n
-
-  let prime_decomposition n =
-    if is_prime n
-    then [{prime=n; power=1;}]
-    else _decompose n
-
-  let primes_leq n0 k =
-    let n = ref two in
-    while Z.leq !n n0 do
-      if is_prime !n then k !n
-    done
-end
+module Util = U

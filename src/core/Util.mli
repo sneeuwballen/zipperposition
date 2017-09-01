@@ -3,18 +3,16 @@
 
 (** {1 Some helpers} *)
 
+(** Various helpers for the provers.
+
+    It provides counters for statistics, basic profilers, helper functions,
+    debugging functions…
+*)
+
 (** {2 Time facilities} *)
 
 val total_time_s : unit -> float
 (** time elapsed since start of program, in seconds *)
-
-val total_time_ns : unit -> int64
-
-val start_time : unit -> int64
-(** time at which the program started *)
-
-val ns_to_s : int64 -> float
-(** convert a nanosecond time to a time in seconds *)
 
 (** {2 Misc} *)
 
@@ -138,7 +136,7 @@ val with_prof : profiler -> ('a -> 'b) -> 'a -> 'b
 type stat
 
 val mk_stat : string -> stat
-val print_global_stats : unit -> unit
+val print_global_stats : comment:string -> unit -> unit (** comment prefix *)
 val incr_stat : stat -> unit
 val add_stat : stat -> int -> unit
 
@@ -175,7 +173,15 @@ val pp_list0 : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
     does nothing if the list is empty
     Default separator is " " *)
 
+val tstp_needs_escaping: string -> bool
+(** Is this name a proper TSTP identifier, or does it need ' ' around it? *)
+
+val pp_var_tstp : string CCFormat.printer
+
 val ord_option : 'a CCOrd.t -> 'a option CCOrd.t
+
+(* TODO: use containers' at some point *)
+val take_drop_while : ('a -> bool) -> 'a list -> 'a list * 'a list
 
 val map_product : f:('a -> 'b list list) -> 'a list -> 'b list list
 

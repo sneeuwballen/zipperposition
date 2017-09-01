@@ -1,0 +1,3187 @@
+%------------------------------------------------------------------------------
+tff(ty_n_t__Congruence__Opartial____object__Opartial____object____ext_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__Group__Omonoid__Omonoid____ext_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__Product____Type__Ounit_J_J,type,(
+    partia964409863t_unit: $tType )).
+
+tff(ty_n_t__fun_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__fun_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J_J,type,(
+    fun_fu2103114179Vertex: $tType )).
+
+tff(ty_n_t__fun_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__Set__Oset_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J_J,type,(
+    fun_fu920109753Vertex: $tType )).
+
+tff(ty_n_t__fun_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J,type,(
+    fun_fu2028172291Vertex: $tType )).
+
+tff(ty_n_t__Group__Omonoid__Omonoid____ext_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__Product____Type__Ounit_J,type,(
+    monoid1553863962t_unit: $tType )).
+
+tff(ty_n_t__fun_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__Set__Oset_It__OrbitStabiliser__OVertex_J_J,type,(
+    fun_fu1557120166Vertex: $tType )).
+
+tff(ty_n_t__fun_It__OrbitStabiliser__OVertex_Mt__Set__Oset_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J_J,type,(
+    fun_Ve460580988Vertex: $tType )).
+
+tff(ty_n_t__fun_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__fun_It__Nat__Onat_Mt__Nat__Onat_J_J,type,(
+    fun_fu1696542301at_nat: $tType )).
+
+tff(ty_n_t__fun_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__Set__Oset_It__HOL__Obool_J_J,type,(
+    fun_fu2050241485t_bool: $tType )).
+
+tff(ty_n_t__fun_It__HOL__Obool_Mt__Set__Oset_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J_J,type,(
+    fun_bo1398644387Vertex: $tType )).
+
+tff(ty_n_t__fun_It__Set__Oset_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J_Mt__Nat__Onat_J,type,(
+    fun_se264260038ex_nat: $tType )).
+
+tff(ty_n_t__fun_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__OrbitStabiliser__OVertex_J,type,(
+    fun_fu1042269126Vertex: $tType )).
+
+tff(ty_n_t__fun_It__OrbitStabiliser__OVertex_Mt__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J,type,(
+    fun_Ve427828678Vertex: $tType )).
+
+tff(ty_n_t__fun_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__HOL__Obool_J,type,(
+    fun_fu1242025197x_bool: $tType )).
+
+tff(ty_n_t__fun_It__HOL__Obool_Mt__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J,type,(
+    fun_bo809367533Vertex: $tType )).
+
+tff(ty_n_t__fun_It__OrbitStabiliser__OVertex_Mt__Set__Oset_It__OrbitStabiliser__OVertex_J_J,type,(
+    fun_Ve1685860771Vertex: $tType )).
+
+tff(ty_n_t__Set__Oset_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J,type,(
+    set_fu1440825977Vertex: $tType )).
+
+tff(ty_n_t__fun_It__OrbitStabiliser__OVertex_Mt__fun_It__Nat__Onat_Mt__Nat__Onat_J_J,type,(
+    fun_Ve167659168at_nat: $tType )).
+
+tff(ty_n_t__fun_It__OrbitStabiliser__OVertex_Mt__Set__Oset_It__HOL__Obool_J_J,type,(
+    fun_Vertex_set_bool: $tType )).
+
+tff(ty_n_t__fun_It__HOL__Obool_Mt__Set__Oset_It__OrbitStabiliser__OVertex_J_J,type,(
+    fun_bool_set_Vertex: $tType )).
+
+tff(ty_n_t__fun_It__Set__Oset_It__OrbitStabiliser__OVertex_J_Mt__Nat__Onat_J,type,(
+    fun_set_Vertex_nat: $tType )).
+
+tff(ty_n_t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J,type,(
+    fun_Vertex_Vertex: $tType )).
+
+tff(ty_n_t__fun_It__HOL__Obool_Mt__fun_It__Nat__Onat_Mt__Nat__Onat_J_J,type,(
+    fun_bool_fun_nat_nat: $tType )).
+
+tff(ty_n_t__fun_It__HOL__Obool_Mt__Set__Oset_It__HOL__Obool_J_J,type,(
+    fun_bool_set_bool: $tType )).
+
+tff(ty_n_t__fun_It__Set__Oset_It__HOL__Obool_J_Mt__Nat__Onat_J,type,(
+    fun_set_bool_nat: $tType )).
+
+tff(ty_n_t__fun_It__OrbitStabiliser__OVertex_Mt__HOL__Obool_J,type,(
+    fun_Vertex_bool: $tType )).
+
+tff(ty_n_t__fun_It__HOL__Obool_Mt__OrbitStabiliser__OVertex_J,type,(
+    fun_bool_Vertex: $tType )).
+
+tff(ty_n_t__Set__Oset_It__OrbitStabiliser__OVertex_J,type,(
+    set_Vertex: $tType )).
+
+tff(ty_n_t__fun_It__HOL__Obool_Mt__HOL__Obool_J,type,(
+    fun_bool_bool: $tType )).
+
+tff(ty_n_t__fun_It__Nat__Onat_Mt__HOL__Obool_J,type,(
+    fun_nat_bool: $tType )).
+
+tff(ty_n_t__fun_It__Num__Onum_Mt__Num__Onum_J,type,(
+    fun_num_num: $tType )).
+
+tff(ty_n_t__fun_It__Num__Onum_Mt__Nat__Onat_J,type,(
+    fun_num_nat: $tType )).
+
+tff(ty_n_t__fun_It__Num__Onum_Mt__Int__Oint_J,type,(
+    fun_num_int: $tType )).
+
+tff(ty_n_t__fun_It__Nat__Onat_Mt__Num__Onum_J,type,(
+    fun_nat_num: $tType )).
+
+tff(ty_n_t__fun_It__Nat__Onat_Mt__Nat__Onat_J,type,(
+    fun_nat_nat: $tType )).
+
+tff(ty_n_t__fun_It__Nat__Onat_Mt__Int__Oint_J,type,(
+    fun_nat_int: $tType )).
+
+tff(ty_n_t__fun_It__Int__Oint_Mt__Num__Onum_J,type,(
+    fun_int_num: $tType )).
+
+tff(ty_n_t__fun_It__Int__Oint_Mt__Nat__Onat_J,type,(
+    fun_int_nat: $tType )).
+
+tff(ty_n_t__fun_It__Int__Oint_Mt__Int__Oint_J,type,(
+    fun_int_int: $tType )).
+
+tff(ty_n_t__Set__Oset_It__HOL__Obool_J,type,(
+    set_bool: $tType )).
+
+tff(ty_n_t__OrbitStabiliser__OVertex,type,(
+    vertex: $tType )).
+
+tff(ty_n_t__Product____Type__Ounit,type,(
+    product_unit: $tType )).
+
+tff(ty_n_t__String__Onibble,type,(
+    nibble: $tType )).
+
+tff(ty_n_t__HOL__Obool,type,(
+    bool: $tType )).
+
+tff(ty_n_t__Num__Onum,type,(
+    num: $tType )).
+
+tff(ty_n_t__Nat__Onat,type,(
+    nat: $tType )).
+
+tff(ty_n_t__Int__Oint,type,(
+    int: $tType )).
+
+tff(sy_c_ATP_058Lamm__a____,type,(
+    aTP_Lamm_a: fun_fu1696542301at_nat )).
+
+tff(sy_c_ATP_058Lamm__aa____,type,(
+    aTP_Lamm_aa: fun_bool_fun_nat_nat )).
+
+tff(sy_c_ATP_058Lamm__ab____,type,(
+    aTP_Lamm_ab: fun_Ve167659168at_nat )).
+
+tff(sy_c_ATP_058Lamm__ac____,type,(
+    aTP_Lamm_ac: set_fu1440825977Vertex > fun_fu1242025197x_bool )).
+
+tff(sy_c_ATP_058Lamm__ad____,type,(
+    aTP_Lamm_ad: set_bool > fun_bool_bool )).
+
+tff(sy_c_ATP_058Lamm__ae____,type,(
+    aTP_Lamm_ae: set_Vertex > fun_Vertex_bool )).
+
+tff(sy_c_COMBK_001t__fun_It__Nat__Onat_Mt__Nat__Onat_J_001t__HOL__Obool,type,(
+    cOMBK_11403434t_bool: fun_nat_nat > fun_bool_fun_nat_nat )).
+
+tff(sy_c_COMBK_001t__fun_It__Nat__Onat_Mt__Nat__Onat_J_001t__OrbitStabiliser__OVertex,type,(
+    cOMBK_1657219075Vertex: fun_nat_nat > fun_Ve167659168at_nat )).
+
+tff(sy_c_COMBK_001t__fun_It__Nat__Onat_Mt__Nat__Onat_J_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J,type,(
+    cOMBK_1275961328Vertex: fun_nat_nat > fun_fu1696542301at_nat )).
+
+tff(sy_c_Complete__Lattices_OSup__class_OSUPREMUM_001t__HOL__Obool_001t__Set__Oset_It__HOL__Obool_J,type,(
+    comple1373135616t_bool: ( set_bool * fun_bool_set_bool ) > set_bool )).
+
+tff(sy_c_Complete__Lattices_OSup__class_OSUPREMUM_001t__HOL__Obool_001t__Set__Oset_It__OrbitStabiliser__OVertex_J,type,(
+    comple1809131353Vertex: ( set_bool * fun_bool_set_Vertex ) > set_Vertex )).
+
+tff(sy_c_Complete__Lattices_OSup__class_OSUPREMUM_001t__HOL__Obool_001t__Set__Oset_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J,type,(
+    comple238680496Vertex: ( set_bool * fun_bo1398644387Vertex ) > set_fu1440825977Vertex )).
+
+tff(sy_c_Complete__Lattices_OSup__class_OSUPREMUM_001t__OrbitStabiliser__OVertex_001t__Set__Oset_It__HOL__Obool_J,type,(
+    comple1455330279t_bool: ( set_Vertex * fun_Vertex_set_bool ) > set_bool )).
+
+tff(sy_c_Complete__Lattices_OSup__class_OSUPREMUM_001t__OrbitStabiliser__OVertex_001t__Set__Oset_It__OrbitStabiliser__OVertex_J,type,(
+    comple1077936064Vertex: ( set_Vertex * fun_Ve1685860771Vertex ) > set_Vertex )).
+
+tff(sy_c_Complete__Lattices_OSup__class_OSUPREMUM_001t__OrbitStabiliser__OVertex_001t__Set__Oset_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J,type,(
+    comple45079945Vertex: ( set_Vertex * fun_Ve460580988Vertex ) > set_fu1440825977Vertex )).
+
+tff(sy_c_Complete__Lattices_OSup__class_OSUPREMUM_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_001t__Set__Oset_It__HOL__Obool_J,type,(
+    comple319316242t_bool: ( set_fu1440825977Vertex * fun_fu2050241485t_bool ) > set_bool )).
+
+tff(sy_c_Complete__Lattices_OSup__class_OSUPREMUM_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_001t__Set__Oset_It__OrbitStabiliser__OVertex_J,type,(
+    comple599148139Vertex: ( set_fu1440825977Vertex * fun_fu1557120166Vertex ) > set_Vertex )).
+
+tff(sy_c_Complete__Lattices_OSup__class_OSUPREMUM_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_001t__Set__Oset_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J,type,(
+    comple23865886Vertex: ( set_fu1440825977Vertex * fun_fu920109753Vertex ) > set_fu1440825977Vertex )).
+
+tff(sy_c_Congruence_Opartial__object_Ocarrier_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_001t__Group__Omonoid__Omonoid____ext_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__Product____Type__Ounit_J,type,(
+    partia1288304390t_unit: partia964409863t_unit > set_fu1440825977Vertex )).
+
+tff(sy_c_Congruence_Opartial__object_Opartial__object__ext_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_001t__Group__Omonoid__Omonoid____ext_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__Product____Type__Ounit_J,type,(
+    partia1560632785t_unit: ( set_fu1440825977Vertex * monoid1553863962t_unit ) > partia964409863t_unit )).
+
+tff(sy_c_Divides_Odiv__class_Omod_001t__Int__Oint,type,(
+    div_mod_int: int > fun_int_int )).
+
+tff(sy_c_Divides_Odiv__class_Omod_001t__Nat__Onat,type,(
+    div_mod_nat: nat > fun_nat_nat )).
+
+tff(sy_c_Finite__Set_Ocard_001t__HOL__Obool,type,(
+    finite_card_bool: fun_set_bool_nat )).
+
+tff(sy_c_Finite__Set_Ocard_001t__OrbitStabiliser__OVertex,type,(
+    finite_card_Vertex: fun_set_Vertex_nat )).
+
+tff(sy_c_Finite__Set_Ocard_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J,type,(
+    finite1117633179Vertex: fun_se264260038ex_nat )).
+
+tff(sy_c_Finite__Set_Ofinite_001t__HOL__Obool,type,(
+    finite_finite_bool: set_bool > $o )).
+
+tff(sy_c_Finite__Set_Ofinite_001t__OrbitStabiliser__OVertex,type,(
+    finite_finite_Vertex: set_Vertex > $o )).
+
+tff(sy_c_Finite__Set_Ofinite_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J,type,(
+    finite502879194Vertex: set_fu1440825977Vertex > $o )).
+
+tff(sy_c_Finite__Set_Ofolding_OF_001t__HOL__Obool_001t__Nat__Onat,type,(
+    finite_F_bool_nat: ( fun_bool_fun_nat_nat * nat ) > fun_set_bool_nat )).
+
+tff(sy_c_Finite__Set_Ofolding_OF_001t__OrbitStabiliser__OVertex_001t__Nat__Onat,type,(
+    finite_F_Vertex_nat: ( fun_Ve167659168at_nat * nat ) > fun_set_Vertex_nat )).
+
+tff(sy_c_Finite__Set_Ofolding_OF_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_001t__Nat__Onat,type,(
+    finite215660561ex_nat: ( fun_fu1696542301at_nat * nat ) > fun_se264260038ex_nat )).
+
+tff(sy_c_Fun_Ocomp_001t__OrbitStabiliser__OVertex_001t__OrbitStabiliser__OVertex_001t__OrbitStabiliser__OVertex,type,(
+    comp_V592905037Vertex: fun_fu2103114179Vertex )).
+
+tff(sy_c_Fun_Oid_001t__OrbitStabiliser__OVertex,type,(
+    id_Vertex: fun_Vertex_Vertex )).
+
+tff(sy_c_Fun_Oid_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J,type,(
+    id_fun_Vertex_Vertex: fun_fu2028172291Vertex )).
+
+tff(sy_c_Group_Omonoid_Omonoid__ext_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_001t__Product____Type__Ounit,type,(
+    monoid622349190t_unit: ( fun_fu2103114179Vertex * fun_Vertex_Vertex * product_unit ) > monoid1553863962t_unit )).
+
+tff(sy_c_Groups_Ominus__class_Ominus_001t__Nat__Onat,type,(
+    minus_minus_nat: nat > fun_nat_nat )).
+
+tff(sy_c_Groups_Ominus__class_Ominus_001t__Set__Oset_It__HOL__Obool_J,type,(
+    minus_minus_set_bool: ( set_bool * set_bool ) > set_bool )).
+
+tff(sy_c_Groups_Ominus__class_Ominus_001t__Set__Oset_It__OrbitStabiliser__OVertex_J,type,(
+    minus_400198071Vertex: ( set_Vertex * set_Vertex ) > set_Vertex )).
+
+tff(sy_c_Groups_Ominus__class_Ominus_001t__Set__Oset_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J,type,(
+    minus_155995090Vertex: ( set_fu1440825977Vertex * set_fu1440825977Vertex ) > set_fu1440825977Vertex )).
+
+tff(sy_c_Groups_Oone__class_Oone_001t__Int__Oint,type,(
+    one_one_int: int )).
+
+tff(sy_c_Groups_Oone__class_Oone_001t__Nat__Onat,type,(
+    one_one_nat: nat )).
+
+tff(sy_c_Groups_Oplus__class_Oplus_001t__Int__Oint,type,(
+    plus_plus_int: int > fun_int_int )).
+
+tff(sy_c_Groups_Oplus__class_Oplus_001t__Nat__Onat,type,(
+    plus_plus_nat: nat > fun_nat_nat )).
+
+tff(sy_c_Groups_Oplus__class_Oplus_001t__Num__Onum,type,(
+    plus_plus_num: num > fun_num_num )).
+
+tff(sy_c_Groups_Otimes__class_Otimes_001t__Int__Oint,type,(
+    times_times_int: int > fun_int_int )).
+
+tff(sy_c_Groups_Otimes__class_Otimes_001t__Nat__Onat,type,(
+    times_times_nat: nat > fun_nat_nat )).
+
+tff(sy_c_Groups_Ouminus__class_Ouminus_001t__Int__Oint,type,(
+    uminus_uminus_int: fun_int_int )).
+
+tff(sy_c_Groups_Ozero__class_Ozero_001t__Int__Oint,type,(
+    zero_zero_int: int )).
+
+tff(sy_c_Groups_Ozero__class_Ozero_001t__Nat__Onat,type,(
+    zero_zero_nat: nat )).
+
+tff(sy_c_Int_Onat,type,(
+    nat2: fun_int_nat )).
+
+tff(sy_c_Int_Oring__1__class_Oof__int_001t__Int__Oint,type,(
+    ring_1_of_int_int: fun_int_int )).
+
+tff(sy_c_Nat_OSuc,type,(
+    suc: fun_nat_nat )).
+
+tff(sy_c_Nat_Osemiring__1__class_Oof__nat_001t__Int__Oint,type,(
+    semiri2019852685at_int: fun_nat_int )).
+
+tff(sy_c_Nat_Osemiring__1__class_Oof__nat_001t__Nat__Onat,type,(
+    semiri1382578993at_nat: fun_nat_nat )).
+
+tff(sy_c_Nat_Osize__class_Osize_001t__Num__Onum,type,(
+    size_size_num: fun_num_nat )).
+
+tff(sy_c_Nat__Transfer_Ois__nat,type,(
+    nat_is_nat: int > $o )).
+
+tff(sy_c_Nat__Transfer_Otsub,type,(
+    nat_tsub: int > fun_int_int )).
+
+tff(sy_c_Num_OBitM,type,(
+    bitM: fun_num_num )).
+
+tff(sy_c_Num_Oneg__numeral__class_Odbl__dec_001t__Int__Oint,type,(
+    neg_nu493100289ec_int: fun_int_int )).
+
+tff(sy_c_Num_Oneg__numeral__class_Odbl__inc_001t__Int__Oint,type,(
+    neg_nu1877376189nc_int: fun_int_int )).
+
+tff(sy_c_Num_Onum_OBit0,type,(
+    bit0: fun_num_num )).
+
+tff(sy_c_Num_Onum_OBit1,type,(
+    bit1: fun_num_num )).
+
+tff(sy_c_Num_Onum_OOne,type,(
+    one: num )).
+
+tff(sy_c_Num_Onum_Osize__num,type,(
+    size_num: fun_num_nat )).
+
+tff(sy_c_Num_Onum__of__nat,type,(
+    num_of_nat: fun_nat_num )).
+
+tff(sy_c_Num_Onumeral__class_Onumeral_001t__Int__Oint,type,(
+    numeral_numeral_int: fun_num_int )).
+
+tff(sy_c_Num_Onumeral__class_Onumeral_001t__Nat__Onat,type,(
+    numeral_numeral_nat: fun_num_nat )).
+
+tff(sy_c_Num_Opred__numeral,type,(
+    pred_numeral: fun_num_nat )).
+
+tff(sy_c_OrbitStabiliser_OVertex_OA,type,(
+    a: vertex )).
+
+tff(sy_c_OrbitStabiliser_OVertex_OB,type,(
+    b: vertex )).
+
+tff(sy_c_OrbitStabiliser_OVertex_OC,type,(
+    c: vertex )).
+
+tff(sy_c_OrbitStabiliser_OVertex_OD,type,(
+    d: vertex )).
+
+tff(sy_c_OrbitStabiliser_OVertex_Ocase__Vertex_001t__OrbitStabiliser__OVertex,type,(
+    case_Vertex_Vertex: ( vertex * vertex * vertex ) > fun_Ve427828678Vertex )).
+
+tff(sy_c_OrbitStabiliser_Ocomplex__rotations,type,(
+    complex_rotations: set_fu1440825977Vertex )).
+
+tff(sy_c_OrbitStabiliser_Ocomplex__rotationsp,type,(
+    complex_rotationsp: fun_fu1242025197x_bool )).
+
+tff(sy_c_OrbitStabiliser_Oident__rotations,type,(
+    ident_rotations: set_fu1440825977Vertex )).
+
+tff(sy_c_OrbitStabiliser_Orotate__A,type,(
+    rotate_A: fun_Vertex_Vertex )).
+
+tff(sy_c_OrbitStabiliser_Orotate__B,type,(
+    rotate_B: fun_Vertex_Vertex )).
+
+tff(sy_c_OrbitStabiliser_Orotate__C,type,(
+    rotate_C: fun_Vertex_Vertex )).
+
+tff(sy_c_OrbitStabiliser_Orotate__D,type,(
+    rotate_D: fun_Vertex_Vertex )).
+
+tff(sy_c_OrbitStabiliser_Osimple__rotations,type,(
+    simple_rotations: set_fu1440825977Vertex )).
+
+tff(sy_c_OrbitStabiliser_Ostabiliser__A,type,(
+    stabiliser_A: set_fu1440825977Vertex )).
+
+tff(sy_c_OrbitStabiliser_Otetrahedral__group,type,(
+    tetrahedral_group: partia964409863t_unit )).
+
+tff(sy_c_OrbitStabiliser_Overtices,type,(
+    vertices: set_Vertex )).
+
+tff(sy_c_Orderings_Obot__class_Obot_001t__Nat__Onat,type,(
+    bot_bot_nat: nat )).
+
+tff(sy_c_Orderings_Obot__class_Obot_001t__Set__Oset_It__HOL__Obool_J,type,(
+    bot_bot_set_bool: set_bool )).
+
+tff(sy_c_Orderings_Obot__class_Obot_001t__Set__Oset_It__OrbitStabiliser__OVertex_J,type,(
+    bot_bot_set_Vertex: set_Vertex )).
+
+tff(sy_c_Orderings_Obot__class_Obot_001t__Set__Oset_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J,type,(
+    bot_bo692629261Vertex: set_fu1440825977Vertex )).
+
+tff(sy_c_Orderings_Obot__class_Obot_001t__fun_It__HOL__Obool_Mt__HOL__Obool_J,type,(
+    bot_bo1571181847l_bool: fun_bool_bool )).
+
+tff(sy_c_Orderings_Obot__class_Obot_001t__fun_It__OrbitStabiliser__OVertex_Mt__HOL__Obool_J,type,(
+    bot_bo167736830x_bool: fun_Vertex_bool )).
+
+tff(sy_c_Orderings_Obot__class_Obot_001t__fun_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__HOL__Obool_J,type,(
+    bot_bo2122034521x_bool: fun_fu1242025197x_bool )).
+
+tff(sy_c_Orderings_Oord__class_Oless_001t__Int__Oint,type,(
+    ord_less_int: ( int * int ) > $o )).
+
+tff(sy_c_Orderings_Oord__class_Oless_001t__Nat__Onat,type,(
+    ord_less_nat: nat > fun_nat_bool )).
+
+tff(sy_c_Orderings_Oord__class_Oless_001t__Num__Onum,type,(
+    ord_less_num: ( num * num ) > $o )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Int__Oint,type,(
+    ord_less_eq_int: ( int * int ) > $o )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Nat__Onat,type,(
+    ord_less_eq_nat: nat > fun_nat_bool )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Num__Onum,type,(
+    ord_less_eq_num: ( num * num ) > $o )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Set__Oset_It__HOL__Obool_J,type,(
+    ord_less_eq_set_bool: ( set_bool * set_bool ) > $o )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Set__Oset_It__OrbitStabiliser__OVertex_J,type,(
+    ord_le916282992Vertex: ( set_Vertex * set_Vertex ) > $o )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Set__Oset_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J,type,(
+    ord_le579252953Vertex: ( set_fu1440825977Vertex * set_fu1440825977Vertex ) > $o )).
+
+tff(sy_c_Orderings_Otop__class_Otop_001t__Set__Oset_It__HOL__Obool_J,type,(
+    top_top_set_bool: set_bool )).
+
+tff(sy_c_Power_Opower__class_Opower_001t__Int__Oint,type,(
+    power_power_int: int > fun_nat_int )).
+
+tff(sy_c_Power_Opower__class_Opower_001t__Nat__Onat,type,(
+    power_power_nat: nat > fun_nat_nat )).
+
+tff(sy_c_Product__Type_OUnity,type,(
+    product_Unity: product_unit )).
+
+tff(sy_c_Rings_Odivide__class_Odivide_001t__Nat__Onat,type,(
+    divide_divide_nat: nat > fun_nat_nat )).
+
+tff(sy_c_Rings_Odvd__class_Odvd_001t__Nat__Onat,type,(
+    dvd_dvd_nat: nat > fun_nat_bool )).
+
+tff(sy_c_Set_OCollect_001t__HOL__Obool,type,(
+    collect_bool: fun_bool_bool > set_bool )).
+
+tff(sy_c_Set_OCollect_001t__OrbitStabiliser__OVertex,type,(
+    collect_Vertex: fun_Vertex_bool > set_Vertex )).
+
+tff(sy_c_Set_OCollect_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J,type,(
+    collec1829582104Vertex: fun_fu1242025197x_bool > set_fu1440825977Vertex )).
+
+tff(sy_c_Set_Oimage_001t__HOL__Obool_001t__HOL__Obool,type,(
+    image_bool_bool: ( fun_bool_bool * set_bool ) > set_bool )).
+
+tff(sy_c_Set_Oimage_001t__HOL__Obool_001t__OrbitStabiliser__OVertex,type,(
+    image_bool_Vertex: ( fun_bool_Vertex * set_bool ) > set_Vertex )).
+
+tff(sy_c_Set_Oimage_001t__HOL__Obool_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J,type,(
+    image_557778581Vertex: ( fun_bo809367533Vertex * set_bool ) > set_fu1440825977Vertex )).
+
+tff(sy_c_Set_Oimage_001t__OrbitStabiliser__OVertex_001t__HOL__Obool,type,(
+    image_Vertex_bool: ( fun_Vertex_bool * set_Vertex ) > set_bool )).
+
+tff(sy_c_Set_Oimage_001t__OrbitStabiliser__OVertex_001t__OrbitStabiliser__OVertex,type,(
+    image_Vertex_Vertex: ( fun_Vertex_Vertex * set_Vertex ) > set_Vertex )).
+
+tff(sy_c_Set_Oimage_001t__OrbitStabiliser__OVertex_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J,type,(
+    image_222117870Vertex: ( fun_Ve427828678Vertex * set_Vertex ) > set_fu1440825977Vertex )).
+
+tff(sy_c_Set_Oimage_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_001t__HOL__Obool,type,(
+    image_1442158797x_bool: ( fun_fu1242025197x_bool * set_fu1440825977Vertex ) > set_bool )).
+
+tff(sy_c_Set_Oimage_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_001t__OrbitStabiliser__OVertex,type,(
+    image_692540838Vertex: ( fun_fu1042269126Vertex * set_fu1440825977Vertex ) > set_Vertex )).
+
+tff(sy_c_Set_Oimage_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J,type,(
+    image_687241101Vertex: ( fun_fu2028172291Vertex * set_fu1440825977Vertex ) > set_fu1440825977Vertex )).
+
+tff(sy_c_Set_Oinsert_001t__HOL__Obool,type,(
+    insert_bool: ( bool * set_bool ) > set_bool )).
+
+tff(sy_c_Set_Oinsert_001t__OrbitStabiliser__OVertex,type,(
+    insert_Vertex: ( vertex * set_Vertex ) > set_Vertex )).
+
+tff(sy_c_Set_Oinsert_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J,type,(
+    insert923351795Vertex: ( fun_Vertex_Vertex * set_fu1440825977Vertex ) > set_fu1440825977Vertex )).
+
+tff(sy_c_Set_Othe__elem_001t__HOL__Obool,type,(
+    the_elem_bool: set_bool > $o )).
+
+tff(sy_c_Set_Othe__elem_001t__OrbitStabiliser__OVertex,type,(
+    the_elem_Vertex: set_Vertex > vertex )).
+
+tff(sy_c_Set_Othe__elem_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J,type,(
+    the_el292141838Vertex: set_fu1440825977Vertex > fun_Vertex_Vertex )).
+
+tff(sy_c_String_Onat__of__nibble,type,(
+    nat_of_nibble: nibble > nat )).
+
+tff(sy_c_String_Onibble_ONibble3,type,(
+    nibble3: nibble )).
+
+tff(sy_c_String_Onibble_ONibble7,type,(
+    nibble7: nibble )).
+
+tff(sy_c_String_Onibble_ONibbleD,type,(
+    nibbleD: nibble )).
+
+tff(sy_c_String_Onibble_ONibbleF,type,(
+    nibbleF: nibble )).
+
+tff(sy_c_String_Onibble__of__nat,type,(
+    nibble_of_nat: nat > nibble )).
+
+tff(sy_c_aa_001t__HOL__Obool_001t__HOL__Obool,type,(
+    aa_bool_bool: ( fun_bool_bool * bool ) > bool )).
+
+tff(sy_c_aa_001t__HOL__Obool_001t__OrbitStabiliser__OVertex,type,(
+    aa_bool_Vertex: ( fun_bool_Vertex * bool ) > vertex )).
+
+tff(sy_c_aa_001t__HOL__Obool_001t__Set__Oset_It__HOL__Obool_J,type,(
+    aa_bool_set_bool: ( fun_bool_set_bool * bool ) > set_bool )).
+
+tff(sy_c_aa_001t__HOL__Obool_001t__Set__Oset_It__OrbitStabiliser__OVertex_J,type,(
+    aa_bool_set_Vertex: ( fun_bool_set_Vertex * bool ) > set_Vertex )).
+
+tff(sy_c_aa_001t__HOL__Obool_001t__Set__Oset_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J,type,(
+    aa_boo526153300Vertex: ( fun_bo1398644387Vertex * bool ) > set_fu1440825977Vertex )).
+
+tff(sy_c_aa_001t__HOL__Obool_001t__fun_It__Nat__Onat_Mt__Nat__Onat_J,type,(
+    aa_bool_fun_nat_nat: ( fun_bool_fun_nat_nat * bool ) > fun_nat_nat )).
+
+tff(sy_c_aa_001t__HOL__Obool_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J,type,(
+    aa_boo343327902Vertex: ( fun_bo809367533Vertex * bool ) > fun_Vertex_Vertex )).
+
+tff(sy_c_aa_001t__Int__Oint_001t__Int__Oint,type,(
+    aa_int_int: ( fun_int_int * int ) > int )).
+
+tff(sy_c_aa_001t__Int__Oint_001t__Nat__Onat,type,(
+    aa_int_nat: ( fun_int_nat * int ) > nat )).
+
+tff(sy_c_aa_001t__Int__Oint_001t__Num__Onum,type,(
+    aa_int_num: ( fun_int_num * int ) > num )).
+
+tff(sy_c_aa_001t__Nat__Onat_001t__HOL__Obool,type,(
+    aa_nat_bool: ( fun_nat_bool * nat ) > bool )).
+
+tff(sy_c_aa_001t__Nat__Onat_001t__Int__Oint,type,(
+    aa_nat_int: ( fun_nat_int * nat ) > int )).
+
+tff(sy_c_aa_001t__Nat__Onat_001t__Nat__Onat,type,(
+    aa_nat_nat: ( fun_nat_nat * nat ) > nat )).
+
+tff(sy_c_aa_001t__Nat__Onat_001t__Num__Onum,type,(
+    aa_nat_num: ( fun_nat_num * nat ) > num )).
+
+tff(sy_c_aa_001t__Num__Onum_001t__Int__Oint,type,(
+    aa_num_int: ( fun_num_int * num ) > int )).
+
+tff(sy_c_aa_001t__Num__Onum_001t__Nat__Onat,type,(
+    aa_num_nat: ( fun_num_nat * num ) > nat )).
+
+tff(sy_c_aa_001t__Num__Onum_001t__Num__Onum,type,(
+    aa_num_num: ( fun_num_num * num ) > num )).
+
+tff(sy_c_aa_001t__OrbitStabiliser__OVertex_001t__HOL__Obool,type,(
+    aa_Vertex_bool: ( fun_Vertex_bool * vertex ) > bool )).
+
+tff(sy_c_aa_001t__OrbitStabiliser__OVertex_001t__OrbitStabiliser__OVertex,type,(
+    aa_Vertex_Vertex: ( fun_Vertex_Vertex * vertex ) > vertex )).
+
+tff(sy_c_aa_001t__OrbitStabiliser__OVertex_001t__Set__Oset_It__HOL__Obool_J,type,(
+    aa_Vertex_set_bool: ( fun_Vertex_set_bool * vertex ) > set_bool )).
+
+tff(sy_c_aa_001t__OrbitStabiliser__OVertex_001t__Set__Oset_It__OrbitStabiliser__OVertex_J,type,(
+    aa_Vertex_set_Vertex: ( fun_Ve1685860771Vertex * vertex ) > set_Vertex )).
+
+tff(sy_c_aa_001t__OrbitStabiliser__OVertex_001t__Set__Oset_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J,type,(
+    aa_Ver1951063085Vertex: ( fun_Ve460580988Vertex * vertex ) > set_fu1440825977Vertex )).
+
+tff(sy_c_aa_001t__OrbitStabiliser__OVertex_001t__fun_It__Nat__Onat_Mt__Nat__Onat_J,type,(
+    aa_Ver1041477201at_nat: ( fun_Ve167659168at_nat * vertex ) > fun_nat_nat )).
+
+tff(sy_c_aa_001t__OrbitStabiliser__OVertex_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J,type,(
+    aa_Ver419499639Vertex: ( fun_Ve427828678Vertex * vertex ) > fun_Vertex_Vertex )).
+
+tff(sy_c_aa_001t__Set__Oset_It__HOL__Obool_J_001t__Nat__Onat,type,(
+    aa_set_bool_nat: ( fun_set_bool_nat * set_bool ) > nat )).
+
+tff(sy_c_aa_001t__Set__Oset_It__OrbitStabiliser__OVertex_J_001t__Nat__Onat,type,(
+    aa_set_Vertex_nat: ( fun_set_Vertex_nat * set_Vertex ) > nat )).
+
+tff(sy_c_aa_001t__Set__Oset_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J_001t__Nat__Onat,type,(
+    aa_set1594830599ex_nat: ( fun_se264260038ex_nat * set_fu1440825977Vertex ) > nat )).
+
+tff(sy_c_aa_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_001t__HOL__Obool,type,(
+    aa_fun1227708118x_bool: ( fun_fu1242025197x_bool * fun_Vertex_Vertex ) > bool )).
+
+tff(sy_c_aa_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_001t__OrbitStabiliser__OVertex,type,(
+    aa_fun889922607Vertex: ( fun_fu1042269126Vertex * fun_Vertex_Vertex ) > vertex )).
+
+tff(sy_c_aa_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_001t__Set__Oset_It__HOL__Obool_J,type,(
+    aa_fun606789046t_bool: ( fun_fu2050241485t_bool * fun_Vertex_Vertex ) > set_bool )).
+
+tff(sy_c_aa_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_001t__Set__Oset_It__OrbitStabiliser__OVertex_J,type,(
+    aa_fun357647631Vertex: ( fun_fu1557120166Vertex * fun_Vertex_Vertex ) > set_Vertex )).
+
+tff(sy_c_aa_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_001t__Set__Oset_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J,type,(
+    aa_fun228895354Vertex: ( fun_fu920109753Vertex * fun_Vertex_Vertex ) > set_fu1440825977Vertex )).
+
+tff(sy_c_aa_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_001t__fun_It__Nat__Onat_Mt__Nat__Onat_J,type,(
+    aa_fun603603486at_nat: ( fun_fu1696542301at_nat * fun_Vertex_Vertex ) > fun_nat_nat )).
+
+tff(sy_c_aa_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J,type,(
+    aa_fun1974636740Vertex: ( fun_fu2028172291Vertex * fun_Vertex_Vertex ) > fun_Vertex_Vertex )).
+
+tff(sy_c_aa_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_001t__fun_It__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_Mt__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_J,type,(
+    aa_fun1998781572Vertex: ( fun_fu2103114179Vertex * fun_Vertex_Vertex ) > fun_fu2028172291Vertex )).
+
+tff(sy_c_fFalse,type,(
+    fFalse: bool )).
+
+tff(sy_c_fTrue,type,(
+    fTrue: bool )).
+
+tff(sy_c_member_001t__HOL__Obool,type,(
+    member_bool: ( bool * set_bool ) > $o )).
+
+tff(sy_c_member_001t__OrbitStabiliser__OVertex,type,(
+    member_Vertex: ( vertex * set_Vertex ) > $o )).
+
+tff(sy_c_member_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J,type,(
+    member920616666Vertex: ( fun_Vertex_Vertex * set_fu1440825977Vertex ) > $o )).
+
+tff(sy_c_pp,type,(
+    pp: bool > $o )).
+
+tff(fact_0_stabiliser__A__def,axiom,(
+    stabiliser_A = insert923351795Vertex(id_Vertex,insert923351795Vertex(rotate_A,insert923351795Vertex(aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,rotate_A),rotate_A),bot_bo692629261Vertex))) )).
+
+tff(fact_1_ge,axiom,(
+    pp(aa_nat_bool(ord_less_eq_nat(zero_zero_nat),aa_set1594830599ex_nat(finite1117633179Vertex,stabiliser_A))) )).
+
+tff(fact_2_rotate__inverse__A,axiom,(
+    aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,rotate_A),rotate_A)),rotate_A) = id_Vertex )).
+
+tff(fact_3_simple__rotations__def,axiom,(
+    simple_rotations = insert923351795Vertex(id_Vertex,insert923351795Vertex(rotate_A,insert923351795Vertex(rotate_B,insert923351795Vertex(rotate_C,insert923351795Vertex(rotate_D,bot_bo692629261Vertex))))) )).
+
+tff(fact_4_card__empty,axiom,(
+    aa_set1594830599ex_nat(finite1117633179Vertex,bot_bo692629261Vertex) = zero_zero_nat )).
+
+tff(fact_5_card__empty,axiom,(
+    aa_set_Vertex_nat(finite_card_Vertex,bot_bot_set_Vertex) = zero_zero_nat )).
+
+tff(fact_6_card__empty,axiom,(
+    aa_set_bool_nat(finite_card_bool,bot_bot_set_bool) = zero_zero_nat )).
+
+tff(fact_7_rotate__inverse__id,axiom,(
+    aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,id_Vertex),id_Vertex)),id_Vertex) = id_Vertex )).
+
+tff(fact_8_card_Oinsert,axiom,(
+    ! [A: set_Vertex,X: vertex] : 
+      ( finite_finite_Vertex(A)
+     => ( ~ member_Vertex(X,A)
+       => aa_set_Vertex_nat(finite_card_Vertex,insert_Vertex(X,A)) = aa_nat_nat(suc,aa_set_Vertex_nat(finite_card_Vertex,A)) ) ) )).
+
+tff(fact_9_card_Oinsert,axiom,(
+    ! [A: set_bool,X: bool] : 
+      ( finite_finite_bool(A)
+     => ( ~ member_bool(X,A)
+       => aa_set_bool_nat(finite_card_bool,insert_bool(X,A)) = aa_nat_nat(suc,aa_set_bool_nat(finite_card_bool,A)) ) ) )).
+
+tff(fact_10_card_Oinsert,axiom,(
+    ! [A: set_fu1440825977Vertex,X: fun_Vertex_Vertex] : 
+      ( finite502879194Vertex(A)
+     => ( ~ member920616666Vertex(X,A)
+       => aa_set1594830599ex_nat(finite1117633179Vertex,insert923351795Vertex(X,A)) = aa_nat_nat(suc,aa_set1594830599ex_nat(finite1117633179Vertex,A)) ) ) )).
+
+tff(fact_11_id__apply,axiom,(
+    ! [X: vertex] : aa_Vertex_Vertex(id_Vertex,X) = X )).
+
+tff(fact_12_One__nat__def,axiom,(
+    one_one_nat = aa_nat_nat(suc,zero_zero_nat) )).
+
+tff(fact_13_empty__iff,axiom,(
+    ! [C: fun_Vertex_Vertex] : 
+      ~ member920616666Vertex(C,bot_bo692629261Vertex) )).
+
+tff(fact_14_empty__iff,axiom,(
+    ! [C: vertex] : 
+      ~ member_Vertex(C,bot_bot_set_Vertex) )).
+
+tff(fact_15_empty__iff,axiom,(
+    ! [C: bool] : 
+      ~ member_bool(C,bot_bot_set_bool) )).
+
+tff(fact_16_insertCI,axiom,(
+    ! [A2: fun_Vertex_Vertex,B: set_fu1440825977Vertex,B2: fun_Vertex_Vertex] : 
+      ( ( ~ member920616666Vertex(A2,B)
+       => A2 = B2 )
+     => member920616666Vertex(A2,insert923351795Vertex(B2,B)) ) )).
+
+tff(fact_17_insertCI,axiom,(
+    ! [A2: bool,B: set_bool,B2: bool] : 
+      ( ( ~ member_bool(A2,B)
+       => ( pp(A2)
+        <=> pp(B2) ) )
+     => member_bool(A2,insert_bool(B2,B)) ) )).
+
+tff(fact_18_insertCI,axiom,(
+    ! [A2: vertex,B: set_Vertex,B2: vertex] : 
+      ( ( ~ member_Vertex(A2,B)
+       => A2 = B2 )
+     => member_Vertex(A2,insert_Vertex(B2,B)) ) )).
+
+tff(fact_19_le0,axiom,(
+    ! [N: nat] : pp(aa_nat_bool(ord_less_eq_nat(zero_zero_nat),N)) )).
+
+tff(fact_20_order__refl,axiom,(
+    ! [X: nat] : pp(aa_nat_bool(ord_less_eq_nat(X),X)) )).
+
+tff(fact_21_order__refl,axiom,(
+    ! [X: num] : ord_less_eq_num(X,X) )).
+
+tff(fact_22_order__refl,axiom,(
+    ! [X: int] : ord_less_eq_int(X,X) )).
+
+tff(fact_23_semiring__norm_I86_J,axiom,(
+    ! [M: num] : 
+      aa_num_num(bit1,M) != one )).
+
+tff(fact_24_insert__iff,axiom,(
+    ! [A2: fun_Vertex_Vertex,B2: fun_Vertex_Vertex,A: set_fu1440825977Vertex] : 
+      ( member920616666Vertex(A2,insert923351795Vertex(B2,A))
+    <=> ( A2 = B2
+        | member920616666Vertex(A2,A) ) ) )).
+
+tff(fact_25_insert__iff,axiom,(
+    ! [A2: bool,B2: bool,A: set_bool] : 
+      ( member_bool(A2,insert_bool(B2,A))
+    <=> ( ( pp(A2)
+        <=> pp(B2) )
+        | member_bool(A2,A) ) ) )).
+
+tff(fact_26_insert__iff,axiom,(
+    ! [A2: vertex,B2: vertex,A: set_Vertex] : 
+      ( member_Vertex(A2,insert_Vertex(B2,A))
+    <=> ( A2 = B2
+        | member_Vertex(A2,A) ) ) )).
+
+tff(fact_27_semiring__norm_I84_J,axiom,(
+    ! [N: num] : 
+      one != aa_num_num(bit1,N) )).
+
+tff(fact_28_insert__subset,axiom,(
+    ! [X: fun_Vertex_Vertex,A: set_fu1440825977Vertex,B: set_fu1440825977Vertex] : 
+      ( ord_le579252953Vertex(insert923351795Vertex(X,A),B)
+    <=> ( member920616666Vertex(X,B)
+        & ord_le579252953Vertex(A,B) ) ) )).
+
+tff(fact_29_insert__subset,axiom,(
+    ! [X: bool,A: set_bool,B: set_bool] : 
+      ( ord_less_eq_set_bool(insert_bool(X,A),B)
+    <=> ( member_bool(X,B)
+        & ord_less_eq_set_bool(A,B) ) ) )).
+
+tff(fact_30_insert__subset,axiom,(
+    ! [X: vertex,A: set_Vertex,B: set_Vertex] : 
+      ( ord_le916282992Vertex(insert_Vertex(X,A),B)
+    <=> ( member_Vertex(X,B)
+        & ord_le916282992Vertex(A,B) ) ) )).
+
+tff(fact_31_comp__id,axiom,(
+    ! [F: fun_Vertex_Vertex] : aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,F),id_Vertex) = F )).
+
+tff(fact_32_id__comp,axiom,(
+    ! [G: fun_Vertex_Vertex] : aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,id_Vertex),G) = G )).
+
+tff(fact_33_vertices__def,axiom,(
+    vertices = insert_Vertex(a,insert_Vertex(b,insert_Vertex(c,insert_Vertex(d,bot_bot_set_Vertex)))) )).
+
+tff(fact_34_le__0__eq,axiom,(
+    ! [N: nat] : 
+      ( pp(aa_nat_bool(ord_less_eq_nat(N),zero_zero_nat))
+    <=> N = zero_zero_nat ) )).
+
+tff(fact_35_comp__apply,axiom,(
+    ! [F: fun_Vertex_Vertex,G: fun_Vertex_Vertex,X: vertex] : aa_Vertex_Vertex(aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,F),G),X) = aa_Vertex_Vertex(F,aa_Vertex_Vertex(G,X)) )).
+
+tff(fact_36_fun_Omap__id,axiom,(
+    ! [T: fun_Vertex_Vertex] : aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,id_Vertex),T) = T )).
+
+tff(fact_37_singletonI,axiom,(
+    ! [A2: fun_Vertex_Vertex] : member920616666Vertex(A2,insert923351795Vertex(A2,bot_bo692629261Vertex)) )).
+
+tff(fact_38_singletonI,axiom,(
+    ! [A2: vertex] : member_Vertex(A2,insert_Vertex(A2,bot_bot_set_Vertex)) )).
+
+tff(fact_39_singletonI,axiom,(
+    ! [A2: bool] : member_bool(A2,insert_bool(A2,bot_bot_set_bool)) )).
+
+tff(fact_40_rotate__A__def,axiom,(
+    rotate_A = aa_Ver419499639Vertex(case_Vertex_Vertex(a,c,d),b) )).
+
+tff(fact_41_subset__insertI,axiom,(
+    ! [B: set_fu1440825977Vertex,A2: fun_Vertex_Vertex] : ord_le579252953Vertex(B,insert923351795Vertex(A2,B)) )).
+
+tff(fact_42_subset__insertI,axiom,(
+    ! [B: set_Vertex,A2: vertex] : ord_le916282992Vertex(B,insert_Vertex(A2,B)) )).
+
+tff(fact_43_subset__insertI,axiom,(
+    ! [B: set_bool,A2: bool] : ord_less_eq_set_bool(B,insert_bool(A2,B)) )).
+
+tff(fact_44_zero__le__numeral,axiom,(
+    ! [N: num] : pp(aa_nat_bool(ord_less_eq_nat(zero_zero_nat),aa_num_nat(numeral_numeral_nat,N))) )).
+
+tff(fact_45_zero__le__numeral,axiom,(
+    ! [N: num] : ord_less_eq_int(zero_zero_int,aa_num_int(numeral_numeral_int,N)) )).
+
+tff(fact_46_card__insert__if,axiom,(
+    ! [A: set_fu1440825977Vertex,X: fun_Vertex_Vertex] : 
+      ( finite502879194Vertex(A)
+     => ( ( member920616666Vertex(X,A)
+         => aa_set1594830599ex_nat(finite1117633179Vertex,insert923351795Vertex(X,A)) = aa_set1594830599ex_nat(finite1117633179Vertex,A) )
+        & ( ~ member920616666Vertex(X,A)
+         => aa_set1594830599ex_nat(finite1117633179Vertex,insert923351795Vertex(X,A)) = aa_nat_nat(suc,aa_set1594830599ex_nat(finite1117633179Vertex,A)) ) ) ) )).
+
+tff(fact_47_card__insert__if,axiom,(
+    ! [A: set_bool,X: bool] : 
+      ( finite_finite_bool(A)
+     => ( ( member_bool(X,A)
+         => aa_set_bool_nat(finite_card_bool,insert_bool(X,A)) = aa_set_bool_nat(finite_card_bool,A) )
+        & ( ~ member_bool(X,A)
+         => aa_set_bool_nat(finite_card_bool,insert_bool(X,A)) = aa_nat_nat(suc,aa_set_bool_nat(finite_card_bool,A)) ) ) ) )).
+
+tff(fact_48_card__insert__if,axiom,(
+    ! [A: set_Vertex,X: vertex] : 
+      ( finite_finite_Vertex(A)
+     => ( ( member_Vertex(X,A)
+         => aa_set_Vertex_nat(finite_card_Vertex,insert_Vertex(X,A)) = aa_set_Vertex_nat(finite_card_Vertex,A) )
+        & ( ~ member_Vertex(X,A)
+         => aa_set_Vertex_nat(finite_card_Vertex,insert_Vertex(X,A)) = aa_nat_nat(suc,aa_set_Vertex_nat(finite_card_Vertex,A)) ) ) ) )).
+
+tff(fact_49_numeral__le__iff,axiom,(
+    ! [M: num,N: num] : 
+      ( pp(aa_nat_bool(ord_less_eq_nat(aa_num_nat(numeral_numeral_nat,M)),aa_num_nat(numeral_numeral_nat,N)))
+    <=> ord_less_eq_num(M,N) ) )).
+
+tff(fact_50_numeral__le__iff,axiom,(
+    ! [M: num,N: num] : 
+      ( ord_less_eq_int(aa_num_int(numeral_numeral_int,M),aa_num_int(numeral_numeral_int,N))
+    <=> ord_less_eq_num(M,N) ) )).
+
+tff(fact_51_empty__subsetI,axiom,(
+    ! [A: set_fu1440825977Vertex] : ord_le579252953Vertex(bot_bo692629261Vertex,A) )).
+
+tff(fact_52_empty__subsetI,axiom,(
+    ! [A: set_Vertex] : ord_le916282992Vertex(bot_bot_set_Vertex,A) )).
+
+tff(fact_53_empty__subsetI,axiom,(
+    ! [A: set_bool] : ord_less_eq_set_bool(bot_bot_set_bool,A) )).
+
+tff(fact_54_Vertex_Osimps_I13_J,axiom,(
+    ! [F1: vertex,F2: vertex,F3: vertex,F4: vertex] : aa_Vertex_Vertex(aa_Ver419499639Vertex(case_Vertex_Vertex(F1,F2,F3),F4),a) = F1 )).
+
+tff(fact_55_subset__empty,axiom,(
+    ! [A: set_fu1440825977Vertex] : 
+      ( ord_le579252953Vertex(A,bot_bo692629261Vertex)
+    <=> A = bot_bo692629261Vertex ) )).
+
+tff(fact_56_subset__empty,axiom,(
+    ! [A: set_Vertex] : 
+      ( ord_le916282992Vertex(A,bot_bot_set_Vertex)
+    <=> A = bot_bot_set_Vertex ) )).
+
+tff(fact_57_subset__empty,axiom,(
+    ! [A: set_bool] : 
+      ( ord_less_eq_set_bool(A,bot_bot_set_bool)
+    <=> A = bot_bot_set_bool ) )).
+
+tff(fact_58_finite_Ointros_I1_J,axiom,(
+    finite502879194Vertex(bot_bo692629261Vertex) )).
+
+tff(fact_59_finite_Ointros_I1_J,axiom,(
+    finite_finite_Vertex(bot_bot_set_Vertex) )).
+
+tff(fact_60_finite_Ointros_I1_J,axiom,(
+    finite_finite_bool(bot_bot_set_bool) )).
+
+tff(fact_61_mem__Collect__eq,axiom,(
+    ! [A2: fun_Vertex_Vertex,P: fun_fu1242025197x_bool] : 
+      ( member920616666Vertex(A2,collec1829582104Vertex(P))
+    <=> pp(aa_fun1227708118x_bool(P,A2)) ) )).
+
+tff(fact_62_mem__Collect__eq,axiom,(
+    ! [A2: bool,P: fun_bool_bool] : 
+      ( member_bool(A2,collect_bool(P))
+    <=> pp(aa_bool_bool(P,A2)) ) )).
+
+tff(fact_63_mem__Collect__eq,axiom,(
+    ! [A2: vertex,P: fun_Vertex_bool] : 
+      ( member_Vertex(A2,collect_Vertex(P))
+    <=> pp(aa_Vertex_bool(P,A2)) ) )).
+
+tff(fact_64_semiring__norm_I70_J,axiom,(
+    ! [M: num] : 
+      ~ ord_less_eq_num(aa_num_num(bit1,M),one) )).
+
+tff(fact_65_Collect__empty__eq,axiom,(
+    ! [P: fun_fu1242025197x_bool] : 
+      ( collec1829582104Vertex(P) = bot_bo692629261Vertex
+    <=> ! [X2: fun_Vertex_Vertex] : 
+          ~ pp(aa_fun1227708118x_bool(P,X2)) ) )).
+
+tff(fact_66_Collect__empty__eq,axiom,(
+    ! [P: fun_Vertex_bool] : 
+      ( collect_Vertex(P) = bot_bot_set_Vertex
+    <=> ! [X2: vertex] : 
+          ~ pp(aa_Vertex_bool(P,X2)) ) )).
+
+tff(fact_67_Collect__empty__eq,axiom,(
+    ! [P: fun_bool_bool] : 
+      ( collect_bool(P) = bot_bot_set_bool
+    <=> ! [X2: bool] : 
+          ~ pp(aa_bool_bool(P,X2)) ) )).
+
+tff(fact_68_subsetI,axiom,(
+    ! [A: set_fu1440825977Vertex,B: set_fu1440825977Vertex] : 
+      ( ! [X3: fun_Vertex_Vertex] : 
+          ( member920616666Vertex(X3,A)
+         => member920616666Vertex(X3,B) )
+     => ord_le579252953Vertex(A,B) ) )).
+
+tff(fact_69_subsetI,axiom,(
+    ! [A: set_bool,B: set_bool] : 
+      ( ! [X3: bool] : 
+          ( member_bool(X3,A)
+         => member_bool(X3,B) )
+     => ord_less_eq_set_bool(A,B) ) )).
+
+tff(fact_70_subsetI,axiom,(
+    ! [A: set_Vertex,B: set_Vertex] : 
+      ( ! [X3: vertex] : 
+          ( member_Vertex(X3,A)
+         => member_Vertex(X3,B) )
+     => ord_le916282992Vertex(A,B) ) )).
+
+tff(fact_71_finite__insert,axiom,(
+    ! [A2: fun_Vertex_Vertex,A: set_fu1440825977Vertex] : 
+      ( finite502879194Vertex(insert923351795Vertex(A2,A))
+    <=> finite502879194Vertex(A) ) )).
+
+tff(fact_72_finite__insert,axiom,(
+    ! [A2: bool,A: set_bool] : 
+      ( finite_finite_bool(insert_bool(A2,A))
+    <=> finite_finite_bool(A) ) )).
+
+tff(fact_73_finite__insert,axiom,(
+    ! [A2: vertex,A: set_Vertex] : 
+      ( finite_finite_Vertex(insert_Vertex(A2,A))
+    <=> finite_finite_Vertex(A) ) )).
+
+tff(fact_74_add__le__cancel__left,axiom,(
+    ! [C: nat,A2: nat,B2: nat] : 
+      ( pp(aa_nat_bool(ord_less_eq_nat(aa_nat_nat(plus_plus_nat(C),A2)),aa_nat_nat(plus_plus_nat(C),B2)))
+    <=> pp(aa_nat_bool(ord_less_eq_nat(A2),B2)) ) )).
+
+tff(fact_75_add__le__cancel__left,axiom,(
+    ! [C: int,A2: int,B2: int] : 
+      ( ord_less_eq_int(aa_int_int(plus_plus_int(C),A2),aa_int_int(plus_plus_int(C),B2))
+    <=> ord_less_eq_int(A2,B2) ) )).
+
+tff(fact_76_Suc3__eq__add__3,axiom,(
+    ! [N: nat] : aa_nat_nat(suc,aa_nat_nat(suc,aa_nat_nat(suc,N))) = aa_nat_nat(plus_plus_nat(aa_num_nat(numeral_numeral_nat,aa_num_num(bit1,one))),N) )).
+
+tff(fact_77_empty__Collect__eq,axiom,(
+    ! [P: fun_fu1242025197x_bool] : 
+      ( bot_bo692629261Vertex = collec1829582104Vertex(P)
+    <=> ! [X2: fun_Vertex_Vertex] : 
+          ~ pp(aa_fun1227708118x_bool(P,X2)) ) )).
+
+tff(fact_78_empty__Collect__eq,axiom,(
+    ! [P: fun_Vertex_bool] : 
+      ( bot_bot_set_Vertex = collect_Vertex(P)
+    <=> ! [X2: vertex] : 
+          ~ pp(aa_Vertex_bool(P,X2)) ) )).
+
+tff(fact_79_empty__Collect__eq,axiom,(
+    ! [P: fun_bool_bool] : 
+      ( bot_bot_set_bool = collect_bool(P)
+    <=> ! [X2: bool] : 
+          ~ pp(aa_bool_bool(P,X2)) ) )).
+
+tff(fact_80_all__not__in__conv,axiom,(
+    ! [A: set_fu1440825977Vertex] : 
+      ( ! [X2: fun_Vertex_Vertex] : 
+          ~ member920616666Vertex(X2,A)
+    <=> A = bot_bo692629261Vertex ) )).
+
+tff(fact_81_all__not__in__conv,axiom,(
+    ! [A: set_Vertex] : 
+      ( ! [X2: vertex] : 
+          ~ member_Vertex(X2,A)
+    <=> A = bot_bot_set_Vertex ) )).
+
+tff(fact_82_all__not__in__conv,axiom,(
+    ! [A: set_bool] : 
+      ( ! [X2: bool] : 
+          ~ member_bool(X2,A)
+    <=> A = bot_bot_set_bool ) )).
+
+tff(fact_83_insert__absorb,axiom,(
+    ! [A2: fun_Vertex_Vertex,A: set_fu1440825977Vertex] : 
+      ( member920616666Vertex(A2,A)
+     => insert923351795Vertex(A2,A) = A ) )).
+
+tff(fact_84_insert__absorb,axiom,(
+    ! [A2: bool,A: set_bool] : 
+      ( member_bool(A2,A)
+     => insert_bool(A2,A) = A ) )).
+
+tff(fact_85_insert__absorb,axiom,(
+    ! [A2: vertex,A: set_Vertex] : 
+      ( member_Vertex(A2,A)
+     => insert_Vertex(A2,A) = A ) )).
+
+tff(fact_86_id__def,axiom,(
+    ! [X4: vertex] : aa_Vertex_Vertex(id_Vertex,X4) = X4 )).
+
+tff(fact_87_equalityCE,axiom,(
+    ! [A: set_fu1440825977Vertex,B: set_fu1440825977Vertex,C: fun_Vertex_Vertex] : 
+      ( A = B
+     => ( ( member920616666Vertex(C,A)
+         => ~ member920616666Vertex(C,B) )
+       => ~ ( ~ member920616666Vertex(C,A)
+           => member920616666Vertex(C,B) ) ) ) )).
+
+tff(fact_88_equalityCE,axiom,(
+    ! [A: set_bool,B: set_bool,C: bool] : 
+      ( A = B
+     => ( ( member_bool(C,A)
+         => ~ member_bool(C,B) )
+       => ~ ( ~ member_bool(C,A)
+           => member_bool(C,B) ) ) ) )).
+
+tff(fact_89_equalityCE,axiom,(
+    ! [A: set_Vertex,B: set_Vertex,C: vertex] : 
+      ( A = B
+     => ( ( member_Vertex(C,A)
+         => ~ member_Vertex(C,B) )
+       => ~ ( ~ member_Vertex(C,A)
+           => member_Vertex(C,B) ) ) ) )).
+
+tff(fact_90_insert__absorb2,axiom,(
+    ! [X: fun_Vertex_Vertex,A: set_fu1440825977Vertex] : insert923351795Vertex(X,insert923351795Vertex(X,A)) = insert923351795Vertex(X,A) )).
+
+tff(fact_91_insert__absorb2,axiom,(
+    ! [X: vertex,A: set_Vertex] : insert_Vertex(X,insert_Vertex(X,A)) = insert_Vertex(X,A) )).
+
+tff(fact_92_insert__absorb2,axiom,(
+    ! [X: bool,A: set_bool] : insert_bool(X,insert_bool(X,A)) = insert_bool(X,A) )).
+
+tff(fact_93_complex__rotations_Ocomp,axiom,(
+    ! [R: fun_Vertex_Vertex,S: fun_Vertex_Vertex] : 
+      ( member920616666Vertex(R,complex_rotations)
+     => ( member920616666Vertex(S,complex_rotations)
+       => member920616666Vertex(aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,R),S),complex_rotations) ) ) )).
+
+tff(fact_94_add__Suc__right,axiom,(
+    ! [M: nat,N: nat] : aa_nat_nat(plus_plus_nat(M),aa_nat_nat(suc,N)) = aa_nat_nat(suc,aa_nat_nat(plus_plus_nat(M),N)) )).
+
+tff(fact_95_comp__def,axiom,(
+    ! [F: fun_Vertex_Vertex,G: fun_Vertex_Vertex,X4: vertex] : aa_Vertex_Vertex(aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,F),G),X4) = aa_Vertex_Vertex(F,aa_Vertex_Vertex(G,X4)) )).
+
+tff(fact_96_complex__rotations_Osimp,axiom,(
+    ! [R: fun_Vertex_Vertex] : 
+      ( member920616666Vertex(R,simple_rotations)
+     => member920616666Vertex(R,complex_rotations) ) )).
+
+tff(fact_97_add_Oright__neutral,axiom,(
+    ! [A2: nat] : aa_nat_nat(plus_plus_nat(A2),zero_zero_nat) = A2 )).
+
+tff(fact_98_add_Oright__neutral,axiom,(
+    ! [A2: int] : aa_int_int(plus_plus_int(A2),zero_zero_int) = A2 )).
+
+tff(fact_99_numeral__eq__iff,axiom,(
+    ! [M: num,N: num] : 
+      ( aa_num_nat(numeral_numeral_nat,M) = aa_num_nat(numeral_numeral_nat,N)
+    <=> M = N ) )).
+
+tff(fact_100_numeral__eq__iff,axiom,(
+    ! [M: num,N: num] : 
+      ( aa_num_int(numeral_numeral_int,M) = aa_num_int(numeral_numeral_int,N)
+    <=> M = N ) )).
+
+tff(fact_101_singleton__insert__inj__eq,axiom,(
+    ! [B2: fun_Vertex_Vertex,A2: fun_Vertex_Vertex,A: set_fu1440825977Vertex] : 
+      ( insert923351795Vertex(B2,bot_bo692629261Vertex) = insert923351795Vertex(A2,A)
+    <=> ( A2 = B2
+        & ord_le579252953Vertex(A,insert923351795Vertex(B2,bot_bo692629261Vertex)) ) ) )).
+
+tff(fact_102_singleton__insert__inj__eq,axiom,(
+    ! [B2: vertex,A2: vertex,A: set_Vertex] : 
+      ( insert_Vertex(B2,bot_bot_set_Vertex) = insert_Vertex(A2,A)
+    <=> ( A2 = B2
+        & ord_le916282992Vertex(A,insert_Vertex(B2,bot_bot_set_Vertex)) ) ) )).
+
+tff(fact_103_singleton__insert__inj__eq,axiom,(
+    ! [B2: bool,A2: bool,A: set_bool] : 
+      ( insert_bool(B2,bot_bot_set_bool) = insert_bool(A2,A)
+    <=> ( ( pp(A2)
+        <=> pp(B2) )
+        & ord_less_eq_set_bool(A,insert_bool(B2,bot_bot_set_bool)) ) ) )).
+
+tff(fact_104_insert__not__empty,axiom,(
+    ! [A2: fun_Vertex_Vertex,A: set_fu1440825977Vertex] : 
+      insert923351795Vertex(A2,A) != bot_bo692629261Vertex )).
+
+tff(fact_105_insert__not__empty,axiom,(
+    ! [A2: vertex,A: set_Vertex] : 
+      insert_Vertex(A2,A) != bot_bot_set_Vertex )).
+
+tff(fact_106_insert__not__empty,axiom,(
+    ! [A2: bool,A: set_bool] : 
+      insert_bool(A2,A) != bot_bot_set_bool )).
+
+tff(fact_107_semiring__norm_I90_J,axiom,(
+    ! [M: num,N: num] : 
+      ( aa_num_num(bit1,M) = aa_num_num(bit1,N)
+    <=> M = N ) )).
+
+tff(fact_108_num_Oinject_I2_J,axiom,(
+    ! [X32: num,Y3: num] : 
+      ( aa_num_num(bit1,X32) = aa_num_num(bit1,Y3)
+    <=> X32 = Y3 ) )).
+
+tff(fact_109_emptyE,axiom,(
+    ! [A2: fun_Vertex_Vertex] : 
+      ~ member920616666Vertex(A2,bot_bo692629261Vertex) )).
+
+tff(fact_110_emptyE,axiom,(
+    ! [A2: vertex] : 
+      ~ member_Vertex(A2,bot_bot_set_Vertex) )).
+
+tff(fact_111_emptyE,axiom,(
+    ! [A2: bool] : 
+      ~ member_bool(A2,bot_bot_set_bool) )).
+
+tff(fact_112_Nat__Transfer_Otransfer__nat__int__function__closures_I8_J,axiom,(
+    ord_less_eq_int(zero_zero_int,aa_num_int(numeral_numeral_int,aa_num_num(bit1,one))) )).
+
+tff(fact_113_insertE,axiom,(
+    ! [A2: fun_Vertex_Vertex,B2: fun_Vertex_Vertex,A: set_fu1440825977Vertex] : 
+      ( member920616666Vertex(A2,insert923351795Vertex(B2,A))
+     => ( A2 != B2
+       => member920616666Vertex(A2,A) ) ) )).
+
+tff(fact_114_insertE,axiom,(
+    ! [A2: bool,B2: bool,A: set_bool] : 
+      ( member_bool(A2,insert_bool(B2,A))
+     => ( ( pp(A2)
+        <=> ~ pp(B2) )
+       => member_bool(A2,A) ) ) )).
+
+tff(fact_115_insertE,axiom,(
+    ! [A2: vertex,B2: vertex,A: set_Vertex] : 
+      ( member_Vertex(A2,insert_Vertex(B2,A))
+     => ( A2 != B2
+       => member_Vertex(A2,A) ) ) )).
+
+tff(fact_116_semiring__norm_I68_J,axiom,(
+    ! [N: num] : ord_less_eq_num(one,N) )).
+
+tff(fact_117_singleton__insert__inj__eq_H,axiom,(
+    ! [A2: fun_Vertex_Vertex,A: set_fu1440825977Vertex,B2: fun_Vertex_Vertex] : 
+      ( insert923351795Vertex(A2,A) = insert923351795Vertex(B2,bot_bo692629261Vertex)
+    <=> ( A2 = B2
+        & ord_le579252953Vertex(A,insert923351795Vertex(B2,bot_bo692629261Vertex)) ) ) )).
+
+tff(fact_118_singleton__insert__inj__eq_H,axiom,(
+    ! [A2: vertex,A: set_Vertex,B2: vertex] : 
+      ( insert_Vertex(A2,A) = insert_Vertex(B2,bot_bot_set_Vertex)
+    <=> ( A2 = B2
+        & ord_le916282992Vertex(A,insert_Vertex(B2,bot_bot_set_Vertex)) ) ) )).
+
+tff(fact_119_singleton__insert__inj__eq_H,axiom,(
+    ! [A2: bool,A: set_bool,B2: bool] : 
+      ( insert_bool(A2,A) = insert_bool(B2,bot_bot_set_bool)
+    <=> ( ( pp(A2)
+        <=> pp(B2) )
+        & ord_less_eq_set_bool(A,insert_bool(B2,bot_bot_set_bool)) ) ) )).
+
+tff(fact_120_numeral__le__one__iff,axiom,(
+    ! [N: num] : 
+      ( pp(aa_nat_bool(ord_less_eq_nat(aa_num_nat(numeral_numeral_nat,N)),one_one_nat))
+    <=> ord_less_eq_num(N,one) ) )).
+
+tff(fact_121_numeral__le__one__iff,axiom,(
+    ! [N: num] : 
+      ( ord_less_eq_int(aa_num_int(numeral_numeral_int,N),one_one_int)
+    <=> ord_less_eq_num(N,one) ) )).
+
+tff(fact_122_semiring__norm_I73_J,axiom,(
+    ! [M: num,N: num] : 
+      ( ord_less_eq_num(aa_num_num(bit1,M),aa_num_num(bit1,N))
+    <=> ord_less_eq_num(M,N) ) )).
+
+tff(fact_123_numeral__3__eq__3,axiom,(
+    aa_num_nat(numeral_numeral_nat,aa_num_num(bit1,one)) = aa_nat_nat(suc,aa_nat_nat(suc,aa_nat_nat(suc,zero_zero_nat))) )).
+
+tff(fact_124_card__def,axiom,(
+    finite1117633179Vertex = finite215660561ex_nat(aTP_Lamm_a,zero_zero_nat) )).
+
+tff(fact_125_card__def,axiom,(
+    finite_card_bool = finite_F_bool_nat(aTP_Lamm_aa,zero_zero_nat) )).
+
+tff(fact_126_card__def,axiom,(
+    finite_card_Vertex = finite_F_Vertex_nat(aTP_Lamm_ab,zero_zero_nat) )).
+
+tff(fact_127_semiring__norm_I69_J,axiom,(
+    ! [M: num] : 
+      ~ ord_less_eq_num(aa_num_num(bit0,M),one) )).
+
+tff(fact_128_subsetCE,axiom,(
+    ! [A: set_fu1440825977Vertex,B: set_fu1440825977Vertex,C: fun_Vertex_Vertex] : 
+      ( ord_le579252953Vertex(A,B)
+     => ( member920616666Vertex(C,A)
+       => member920616666Vertex(C,B) ) ) )).
+
+tff(fact_129_subsetCE,axiom,(
+    ! [A: set_bool,B: set_bool,C: bool] : 
+      ( ord_less_eq_set_bool(A,B)
+     => ( member_bool(C,A)
+       => member_bool(C,B) ) ) )).
+
+tff(fact_130_subsetCE,axiom,(
+    ! [A: set_Vertex,B: set_Vertex,C: vertex] : 
+      ( ord_le916282992Vertex(A,B)
+     => ( member_Vertex(C,A)
+       => member_Vertex(C,B) ) ) )).
+
+tff(fact_131_singletonD,axiom,(
+    ! [B2: fun_Vertex_Vertex,A2: fun_Vertex_Vertex] : 
+      ( member920616666Vertex(B2,insert923351795Vertex(A2,bot_bo692629261Vertex))
+     => B2 = A2 ) )).
+
+tff(fact_132_singletonD,axiom,(
+    ! [B2: vertex,A2: vertex] : 
+      ( member_Vertex(B2,insert_Vertex(A2,bot_bot_set_Vertex))
+     => B2 = A2 ) )).
+
+tff(fact_133_singletonD,axiom,(
+    ! [B2: bool,A2: bool] : 
+      ( member_bool(B2,insert_bool(A2,bot_bot_set_bool))
+     => ( pp(B2)
+      <=> pp(A2) ) ) )).
+
+tff(fact_134_Suc__1,axiom,(
+    aa_nat_nat(suc,one_one_nat) = aa_num_nat(numeral_numeral_nat,aa_num_num(bit0,one)) )).
+
+tff(fact_135_tetrahedral__group__def,axiom,(
+    tetrahedral_group = partia1560632785t_unit(complex_rotations,monoid622349190t_unit(comp_V592905037Vertex,id_Vertex,product_Unity)) )).
+
+tff(fact_136_le__cases,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( ~ pp(aa_nat_bool(ord_less_eq_nat(X),Y))
+     => pp(aa_nat_bool(ord_less_eq_nat(Y),X)) ) )).
+
+tff(fact_137_le__cases,axiom,(
+    ! [X: num,Y: num] : 
+      ( ~ ord_less_eq_num(X,Y)
+     => ord_less_eq_num(Y,X) ) )).
+
+tff(fact_138_le__cases,axiom,(
+    ! [X: int,Y: int] : 
+      ( ~ ord_less_eq_int(X,Y)
+     => ord_less_eq_int(Y,X) ) )).
+
+tff(fact_139_eq__refl,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( X = Y
+     => pp(aa_nat_bool(ord_less_eq_nat(X),Y)) ) )).
+
+tff(fact_140_eq__refl,axiom,(
+    ! [X: num,Y: num] : 
+      ( X = Y
+     => ord_less_eq_num(X,Y) ) )).
+
+tff(fact_141_eq__refl,axiom,(
+    ! [X: int,Y: int] : 
+      ( X = Y
+     => ord_less_eq_int(X,Y) ) )).
+
+tff(fact_142_subset__singletonD,axiom,(
+    ! [A: set_fu1440825977Vertex,X: fun_Vertex_Vertex] : 
+      ( ord_le579252953Vertex(A,insert923351795Vertex(X,bot_bo692629261Vertex))
+     => ( A = bot_bo692629261Vertex
+        | A = insert923351795Vertex(X,bot_bo692629261Vertex) ) ) )).
+
+tff(fact_143_subset__singletonD,axiom,(
+    ! [A: set_Vertex,X: vertex] : 
+      ( ord_le916282992Vertex(A,insert_Vertex(X,bot_bot_set_Vertex))
+     => ( A = bot_bot_set_Vertex
+        | A = insert_Vertex(X,bot_bot_set_Vertex) ) ) )).
+
+tff(fact_144_subset__singletonD,axiom,(
+    ! [A: set_bool,X: bool] : 
+      ( ord_less_eq_set_bool(A,insert_bool(X,bot_bot_set_bool))
+     => ( A = bot_bot_set_bool
+        | A = insert_bool(X,bot_bot_set_bool) ) ) )).
+
+tff(fact_145_subset__insertI2,axiom,(
+    ! [A: set_fu1440825977Vertex,B: set_fu1440825977Vertex,B2: fun_Vertex_Vertex] : 
+      ( ord_le579252953Vertex(A,B)
+     => ord_le579252953Vertex(A,insert923351795Vertex(B2,B)) ) )).
+
+tff(fact_146_subset__insertI2,axiom,(
+    ! [A: set_Vertex,B: set_Vertex,B2: vertex] : 
+      ( ord_le916282992Vertex(A,B)
+     => ord_le916282992Vertex(A,insert_Vertex(B2,B)) ) )).
+
+tff(fact_147_subset__insertI2,axiom,(
+    ! [A: set_bool,B: set_bool,B2: bool] : 
+      ( ord_less_eq_set_bool(A,B)
+     => ord_less_eq_set_bool(A,insert_bool(B2,B)) ) )).
+
+tff(fact_148_Collect__mem__eq,axiom,(
+    ! [A: set_fu1440825977Vertex] : collec1829582104Vertex(aTP_Lamm_ac(A)) = A )).
+
+tff(fact_149_Collect__mem__eq,axiom,(
+    ! [A: set_bool] : collect_bool(aTP_Lamm_ad(A)) = A )).
+
+tff(fact_150_Collect__mem__eq,axiom,(
+    ! [A: set_Vertex] : collect_Vertex(aTP_Lamm_ae(A)) = A )).
+
+tff(fact_151_partial__object_Osimps_I1_J,axiom,(
+    ! [Carrier: set_fu1440825977Vertex,More: monoid1553863962t_unit] : partia1288304390t_unit(partia1560632785t_unit(Carrier,More)) = Carrier )).
+
+tff(fact_152_insertI1,axiom,(
+    ! [A2: fun_Vertex_Vertex,B: set_fu1440825977Vertex] : member920616666Vertex(A2,insert923351795Vertex(A2,B)) )).
+
+tff(fact_153_insertI1,axiom,(
+    ! [A2: bool,B: set_bool] : member_bool(A2,insert_bool(A2,B)) )).
+
+tff(fact_154_insertI1,axiom,(
+    ! [A2: vertex,B: set_Vertex] : member_Vertex(A2,insert_Vertex(A2,B)) )).
+
+tff(fact_155_insert__commute,axiom,(
+    ! [X: fun_Vertex_Vertex,Y: fun_Vertex_Vertex,A: set_fu1440825977Vertex] : insert923351795Vertex(X,insert923351795Vertex(Y,A)) = insert923351795Vertex(Y,insert923351795Vertex(X,A)) )).
+
+tff(fact_156_insert__commute,axiom,(
+    ! [X: vertex,Y: vertex,A: set_Vertex] : insert_Vertex(X,insert_Vertex(Y,A)) = insert_Vertex(Y,insert_Vertex(X,A)) )).
+
+tff(fact_157_insert__commute,axiom,(
+    ! [X: bool,Y: bool,A: set_bool] : insert_bool(X,insert_bool(Y,A)) = insert_bool(Y,insert_bool(X,A)) )).
+
+tff(fact_158_subset__insert,axiom,(
+    ! [X: fun_Vertex_Vertex,A: set_fu1440825977Vertex,B: set_fu1440825977Vertex] : 
+      ( ~ member920616666Vertex(X,A)
+     => ( ord_le579252953Vertex(A,insert923351795Vertex(X,B))
+      <=> ord_le579252953Vertex(A,B) ) ) )).
+
+tff(fact_159_subset__insert,axiom,(
+    ! [X: bool,A: set_bool,B: set_bool] : 
+      ( ~ member_bool(X,A)
+     => ( ord_less_eq_set_bool(A,insert_bool(X,B))
+      <=> ord_less_eq_set_bool(A,B) ) ) )).
+
+tff(fact_160_subset__insert,axiom,(
+    ! [X: vertex,A: set_Vertex,B: set_Vertex] : 
+      ( ~ member_Vertex(X,A)
+     => ( ord_le916282992Vertex(A,insert_Vertex(X,B))
+      <=> ord_le916282992Vertex(A,B) ) ) )).
+
+tff(fact_161_mk__disjoint__insert,axiom,(
+    ! [A2: fun_Vertex_Vertex,A: set_fu1440825977Vertex] : 
+      ( member920616666Vertex(A2,A)
+     => ? [B3: set_fu1440825977Vertex] : 
+          ( A = insert923351795Vertex(A2,B3)
+          & ~ member920616666Vertex(A2,B3) ) ) )).
+
+tff(fact_162_mk__disjoint__insert,axiom,(
+    ! [A2: bool,A: set_bool] : 
+      ( member_bool(A2,A)
+     => ? [B3: set_bool] : 
+          ( A = insert_bool(A2,B3)
+          & ~ member_bool(A2,B3) ) ) )).
+
+tff(fact_163_mk__disjoint__insert,axiom,(
+    ! [A2: vertex,A: set_Vertex] : 
+      ( member_Vertex(A2,A)
+     => ? [B3: set_Vertex] : 
+          ( A = insert_Vertex(A2,B3)
+          & ~ member_Vertex(A2,B3) ) ) )).
+
+tff(fact_164_pred__numeral__simps_I2_J,axiom,(
+    ! [K: num] : aa_num_nat(pred_numeral,aa_num_num(bit0,K)) = aa_num_nat(numeral_numeral_nat,aa_num_num(bitM,K)) )).
+
+tff(fact_165_insert__mono,axiom,(
+    ! [C2: set_fu1440825977Vertex,D: set_fu1440825977Vertex,A2: fun_Vertex_Vertex] : 
+      ( ord_le579252953Vertex(C2,D)
+     => ord_le579252953Vertex(insert923351795Vertex(A2,C2),insert923351795Vertex(A2,D)) ) )).
+
+tff(fact_166_insert__mono,axiom,(
+    ! [C2: set_Vertex,D: set_Vertex,A2: vertex] : 
+      ( ord_le916282992Vertex(C2,D)
+     => ord_le916282992Vertex(insert_Vertex(A2,C2),insert_Vertex(A2,D)) ) )).
+
+tff(fact_167_insert__mono,axiom,(
+    ! [C2: set_bool,D: set_bool,A2: bool] : 
+      ( ord_less_eq_set_bool(C2,D)
+     => ord_less_eq_set_bool(insert_bool(A2,C2),insert_bool(A2,D)) ) )).
+
+tff(fact_168_pred__numeral__simps_I3_J,axiom,(
+    ! [K: num] : aa_num_nat(pred_numeral,aa_num_num(bit1,K)) = aa_num_nat(numeral_numeral_nat,aa_num_num(bit0,K)) )).
+
+tff(fact_169_le__num__One__iff,axiom,(
+    ! [X: num] : 
+      ( ord_less_eq_num(X,one)
+    <=> X = one ) )).
+
+tff(fact_170_bot_Oextremum,axiom,(
+    ! [A2: set_fu1440825977Vertex] : ord_le579252953Vertex(bot_bo692629261Vertex,A2) )).
+
+tff(fact_171_bot_Oextremum,axiom,(
+    ! [A2: set_Vertex] : ord_le916282992Vertex(bot_bot_set_Vertex,A2) )).
+
+tff(fact_172_bot_Oextremum,axiom,(
+    ! [A2: set_bool] : ord_less_eq_set_bool(bot_bot_set_bool,A2) )).
+
+tff(fact_173_bot_Oextremum,axiom,(
+    ! [A2: nat] : pp(aa_nat_bool(ord_less_eq_nat(bot_bot_nat),A2)) )).
+
+tff(fact_174_Set_Oset__insert,axiom,(
+    ! [X: fun_Vertex_Vertex,A: set_fu1440825977Vertex] : 
+      ( member920616666Vertex(X,A)
+     => ~ ( ! [B3: set_fu1440825977Vertex] : 
+              ( A = insert923351795Vertex(X,B3)
+             => member920616666Vertex(X,B3) ) ) ) )).
+
+tff(fact_175_Set_Oset__insert,axiom,(
+    ! [X: bool,A: set_bool] : 
+      ( member_bool(X,A)
+     => ~ ( ! [B3: set_bool] : 
+              ( A = insert_bool(X,B3)
+             => member_bool(X,B3) ) ) ) )).
+
+tff(fact_176_Set_Oset__insert,axiom,(
+    ! [X: vertex,A: set_Vertex] : 
+      ( member_Vertex(X,A)
+     => ~ ( ! [B3: set_Vertex] : 
+              ( A = insert_Vertex(X,B3)
+             => member_Vertex(X,B3) ) ) ) )).
+
+tff(fact_177_le__trans,axiom,(
+    ! [I: nat,J: nat,K: nat] : 
+      ( pp(aa_nat_bool(ord_less_eq_nat(I),J))
+     => ( pp(aa_nat_bool(ord_less_eq_nat(J),K))
+       => pp(aa_nat_bool(ord_less_eq_nat(I),K)) ) ) )).
+
+tff(fact_178_Nat__Transfer_Otransfer__nat__int__function__closures_I5_J,axiom,(
+    ord_less_eq_int(zero_zero_int,zero_zero_int) )).
+
+tff(fact_179_le__SucI,axiom,(
+    ! [M: nat,N: nat] : 
+      ( pp(aa_nat_bool(ord_less_eq_nat(M),N))
+     => pp(aa_nat_bool(ord_less_eq_nat(M),aa_nat_nat(suc,N))) ) )).
+
+tff(fact_180_ex__in__conv,axiom,(
+    ! [A: set_fu1440825977Vertex] : 
+      ( ? [X2: fun_Vertex_Vertex] : member920616666Vertex(X2,A)
+    <=> A != bot_bo692629261Vertex ) )).
+
+tff(fact_181_ex__in__conv,axiom,(
+    ! [A: set_Vertex] : 
+      ( ? [X2: vertex] : member_Vertex(X2,A)
+    <=> A != bot_bot_set_Vertex ) )).
+
+tff(fact_182_ex__in__conv,axiom,(
+    ! [A: set_bool] : 
+      ( ? [X2: bool] : member_bool(X2,A)
+    <=> A != bot_bot_set_bool ) )).
+
+tff(fact_183_comp__assoc,axiom,(
+    ! [F: fun_Vertex_Vertex,G: fun_Vertex_Vertex,H: fun_Vertex_Vertex] : aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,F),G)),H) = aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,F),aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,G),H)) )).
+
+tff(fact_184_equals0I,axiom,(
+    ! [A: set_fu1440825977Vertex] : 
+      ( ! [Y2: fun_Vertex_Vertex] : 
+          ~ member920616666Vertex(Y2,A)
+     => A = bot_bo692629261Vertex ) )).
+
+tff(fact_185_equals0I,axiom,(
+    ! [A: set_Vertex] : 
+      ( ! [Y2: vertex] : 
+          ~ member_Vertex(Y2,A)
+     => A = bot_bot_set_Vertex ) )).
+
+tff(fact_186_equals0I,axiom,(
+    ! [A: set_bool] : 
+      ( ! [Y2: bool] : 
+          ~ member_bool(Y2,A)
+     => A = bot_bot_set_bool ) )).
+
+tff(fact_187_equals0D,axiom,(
+    ! [A: set_fu1440825977Vertex,A2: fun_Vertex_Vertex] : 
+      ( A = bot_bo692629261Vertex
+     => ~ member920616666Vertex(A2,A) ) )).
+
+tff(fact_188_equals0D,axiom,(
+    ! [A: set_Vertex,A2: vertex] : 
+      ( A = bot_bot_set_Vertex
+     => ~ member_Vertex(A2,A) ) )).
+
+tff(fact_189_equals0D,axiom,(
+    ! [A: set_bool,A2: bool] : 
+      ( A = bot_bot_set_bool
+     => ~ member_bool(A2,A) ) )).
+
+tff(fact_190_not__numeral__le__zero,axiom,(
+    ! [N: num] : 
+      ~ pp(aa_nat_bool(ord_less_eq_nat(aa_num_nat(numeral_numeral_nat,N)),zero_zero_nat)) )).
+
+tff(fact_191_not__numeral__le__zero,axiom,(
+    ! [N: num] : 
+      ~ ord_less_eq_int(aa_num_int(numeral_numeral_int,N),zero_zero_int) )).
+
+tff(fact_192_eval__nat__numeral_I3_J,axiom,(
+    ! [N: num] : aa_num_nat(numeral_numeral_nat,aa_num_num(bit1,N)) = aa_nat_nat(suc,aa_num_nat(numeral_numeral_nat,aa_num_num(bit0,N))) )).
+
+tff(fact_193_one__add__one,axiom,(
+    aa_nat_nat(plus_plus_nat(one_one_nat),one_one_nat) = aa_num_nat(numeral_numeral_nat,aa_num_num(bit0,one)) )).
+
+tff(fact_194_one__add__one,axiom,(
+    aa_int_int(plus_plus_int(one_one_int),one_one_int) = aa_num_int(numeral_numeral_int,aa_num_num(bit0,one)) )).
+
+tff(fact_195_doubleton__eq__iff,axiom,(
+    ! [A2: fun_Vertex_Vertex,B2: fun_Vertex_Vertex,C: fun_Vertex_Vertex,D2: fun_Vertex_Vertex] : 
+      ( insert923351795Vertex(A2,insert923351795Vertex(B2,bot_bo692629261Vertex)) = insert923351795Vertex(C,insert923351795Vertex(D2,bot_bo692629261Vertex))
+    <=> ( ( A2 = C
+          & B2 = D2 )
+        | ( A2 = D2
+          & B2 = C ) ) ) )).
+
+tff(fact_196_doubleton__eq__iff,axiom,(
+    ! [A2: vertex,B2: vertex,C: vertex,D2: vertex] : 
+      ( insert_Vertex(A2,insert_Vertex(B2,bot_bot_set_Vertex)) = insert_Vertex(C,insert_Vertex(D2,bot_bot_set_Vertex))
+    <=> ( ( A2 = C
+          & B2 = D2 )
+        | ( A2 = D2
+          & B2 = C ) ) ) )).
+
+tff(fact_197_doubleton__eq__iff,axiom,(
+    ! [A2: bool,B2: bool,C: bool,D2: bool] : 
+      ( insert_bool(A2,insert_bool(B2,bot_bot_set_bool)) = insert_bool(C,insert_bool(D2,bot_bot_set_bool))
+    <=> ( ( ( pp(A2)
+          <=> pp(C) )
+          & ( pp(B2)
+          <=> pp(D2) ) )
+        | ( ( pp(A2)
+          <=> pp(D2) )
+          & ( pp(B2)
+          <=> pp(C) ) ) ) ) )).
+
+tff(fact_198_Nat__Transfer_Otransfer__nat__int__function__closures_I7_J,axiom,(
+    ord_less_eq_int(zero_zero_int,aa_num_int(numeral_numeral_int,aa_num_num(bit0,one))) )).
+
+tff(fact_199_insert__eq__iff,axiom,(
+    ! [A2: fun_Vertex_Vertex,A: set_fu1440825977Vertex,B2: fun_Vertex_Vertex,B: set_fu1440825977Vertex] : 
+      ( ~ member920616666Vertex(A2,A)
+     => ( ~ member920616666Vertex(B2,B)
+       => ( insert923351795Vertex(A2,A) = insert923351795Vertex(B2,B)
+        <=> ( ( A2 = B2
+             => A = B )
+            & ( A2 != B2
+             => ? [C3: set_fu1440825977Vertex] : 
+                  ( A = insert923351795Vertex(B2,C3)
+                  & ~ member920616666Vertex(B2,C3)
+                  & B = insert923351795Vertex(A2,C3)
+                  & ~ member920616666Vertex(A2,C3) ) ) ) ) ) ) )).
+
+tff(fact_200_insert__eq__iff,axiom,(
+    ! [A2: bool,A: set_bool,B2: bool,B: set_bool] : 
+      ( ~ member_bool(A2,A)
+     => ( ~ member_bool(B2,B)
+       => ( insert_bool(A2,A) = insert_bool(B2,B)
+        <=> ( ( ( pp(A2)
+              <=> pp(B2) )
+             => A = B )
+            & ( ( pp(A2)
+              <=> ~ pp(B2) )
+             => ? [C3: set_bool] : 
+                  ( A = insert_bool(B2,C3)
+                  & ~ member_bool(B2,C3)
+                  & B = insert_bool(A2,C3)
+                  & ~ member_bool(A2,C3) ) ) ) ) ) ) )).
+
+tff(fact_201_insert__eq__iff,axiom,(
+    ! [A2: vertex,A: set_Vertex,B2: vertex,B: set_Vertex] : 
+      ( ~ member_Vertex(A2,A)
+     => ( ~ member_Vertex(B2,B)
+       => ( insert_Vertex(A2,A) = insert_Vertex(B2,B)
+        <=> ( ( A2 = B2
+             => A = B )
+            & ( A2 != B2
+             => ? [C3: set_Vertex] : 
+                  ( A = insert_Vertex(B2,C3)
+                  & ~ member_Vertex(B2,C3)
+                  & B = insert_Vertex(A2,C3)
+                  & ~ member_Vertex(A2,C3) ) ) ) ) ) ) )).
+
+tff(fact_202_le__antisym,axiom,(
+    ! [M: nat,N: nat] : 
+      ( pp(aa_nat_bool(ord_less_eq_nat(M),N))
+     => ( pp(aa_nat_bool(ord_less_eq_nat(N),M))
+       => M = N ) ) )).
+
+tff(fact_203_dbl__inc__simps_I3_J,axiom,(
+    aa_int_int(neg_nu1877376189nc_int,one_one_int) = aa_num_int(numeral_numeral_int,aa_num_num(bit1,one)) )).
+
+tff(fact_204_rotate__inverse__D,axiom,(
+    aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,rotate_D),rotate_D)),rotate_D) = id_Vertex )).
+
+tff(fact_205_rotate__inverse__C,axiom,(
+    aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,rotate_C),rotate_C)),rotate_C) = id_Vertex )).
+
+tff(fact_206_Vertex_Oexhaust,axiom,(
+    ! [Y: vertex] : 
+      ( Y != a
+     => ( Y != b
+       => ( Y != c
+         => Y = d ) ) ) )).
+
+tff(fact_207_insert__ident,axiom,(
+    ! [X: fun_Vertex_Vertex,A: set_fu1440825977Vertex,B: set_fu1440825977Vertex] : 
+      ( ~ member920616666Vertex(X,A)
+     => ( ~ member920616666Vertex(X,B)
+       => ( insert923351795Vertex(X,A) = insert923351795Vertex(X,B)
+        <=> A = B ) ) ) )).
+
+tff(fact_208_insert__ident,axiom,(
+    ! [X: bool,A: set_bool,B: set_bool] : 
+      ( ~ member_bool(X,A)
+     => ( ~ member_bool(X,B)
+       => ( insert_bool(X,A) = insert_bool(X,B)
+        <=> A = B ) ) ) )).
+
+tff(fact_209_insert__ident,axiom,(
+    ! [X: vertex,A: set_Vertex,B: set_Vertex] : 
+      ( ~ member_Vertex(X,A)
+     => ( ~ member_Vertex(X,B)
+       => ( insert_Vertex(X,A) = insert_Vertex(X,B)
+        <=> A = B ) ) ) )).
+
+tff(fact_210_rotate__inverse__B,axiom,(
+    aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,rotate_B),rotate_B)),rotate_B) = id_Vertex )).
+
+tff(fact_211_add_Ocommute,axiom,(
+    ! [A2: nat,B2: nat] : aa_nat_nat(plus_plus_nat(A2),B2) = aa_nat_nat(plus_plus_nat(B2),A2) )).
+
+tff(fact_212_add_Ocommute,axiom,(
+    ! [A2: int,B2: int] : aa_int_int(plus_plus_int(A2),B2) = aa_int_int(plus_plus_int(B2),A2) )).
+
+tff(fact_213_insertI2,axiom,(
+    ! [A2: fun_Vertex_Vertex,B: set_fu1440825977Vertex,B2: fun_Vertex_Vertex] : 
+      ( member920616666Vertex(A2,B)
+     => member920616666Vertex(A2,insert923351795Vertex(B2,B)) ) )).
+
+tff(fact_214_insertI2,axiom,(
+    ! [A2: bool,B: set_bool,B2: bool] : 
+      ( member_bool(A2,B)
+     => member_bool(A2,insert_bool(B2,B)) ) )).
+
+tff(fact_215_insertI2,axiom,(
+    ! [A2: vertex,B: set_Vertex,B2: vertex] : 
+      ( member_Vertex(A2,B)
+     => member_Vertex(A2,insert_Vertex(B2,B)) ) )).
+
+tff(fact_216_fun_Omap__id0,axiom,(
+    aa_fun1998781572Vertex(comp_V592905037Vertex,id_Vertex) = id_fun_Vertex_Vertex )).
+
+tff(fact_217_add_Oleft__commute,axiom,(
+    ! [B2: nat,A2: nat,C: nat] : aa_nat_nat(plus_plus_nat(B2),aa_nat_nat(plus_plus_nat(A2),C)) = aa_nat_nat(plus_plus_nat(A2),aa_nat_nat(plus_plus_nat(B2),C)) )).
+
+tff(fact_218_add_Oleft__commute,axiom,(
+    ! [B2: int,A2: int,C: int] : aa_int_int(plus_plus_int(B2),aa_int_int(plus_plus_int(A2),C)) = aa_int_int(plus_plus_int(A2),aa_int_int(plus_plus_int(B2),C)) )).
+
+tff(fact_219_semiring__1__class_Oof__nat__simps_I2_J,axiom,(
+    ! [M: nat] : aa_nat_nat(semiri1382578993at_nat,aa_nat_nat(suc,M)) = aa_nat_nat(plus_plus_nat(one_one_nat),aa_nat_nat(semiri1382578993at_nat,M)) )).
+
+tff(fact_220_semiring__1__class_Oof__nat__simps_I2_J,axiom,(
+    ! [M: nat] : aa_nat_int(semiri2019852685at_int,aa_nat_nat(suc,M)) = aa_int_int(plus_plus_int(one_one_int),aa_nat_int(semiri2019852685at_int,M)) )).
+
+tff(fact_221_add_Oleft__neutral,axiom,(
+    ! [A2: nat] : aa_nat_nat(plus_plus_nat(zero_zero_nat),A2) = A2 )).
+
+tff(fact_222_add_Oleft__neutral,axiom,(
+    ! [A2: int] : aa_int_int(plus_plus_int(zero_zero_int),A2) = A2 )).
+
+tff(fact_223_add__left__cancel,axiom,(
+    ! [A2: nat,B2: nat,C: nat] : 
+      ( aa_nat_nat(plus_plus_nat(A2),B2) = aa_nat_nat(plus_plus_nat(A2),C)
+    <=> B2 = C ) )).
+
+tff(fact_224_add__left__cancel,axiom,(
+    ! [A2: int,B2: int,C: int] : 
+      ( aa_int_int(plus_plus_int(A2),B2) = aa_int_int(plus_plus_int(A2),C)
+    <=> B2 = C ) )).
+
+tff(fact_225_Nat__Transfer_Otransfer__nat__int__function__closures_I6_J,axiom,(
+    ord_less_eq_int(zero_zero_int,one_one_int) )).
+
+tff(fact_226_card__insert,axiom,(
+    ! [A: set_fu1440825977Vertex,X: fun_Vertex_Vertex] : 
+      ( finite502879194Vertex(A)
+     => aa_set1594830599ex_nat(finite1117633179Vertex,insert923351795Vertex(X,A)) = aa_nat_nat(suc,aa_set1594830599ex_nat(finite1117633179Vertex,minus_155995090Vertex(A,insert923351795Vertex(X,bot_bo692629261Vertex)))) ) )).
+
+tff(fact_227_card__insert,axiom,(
+    ! [A: set_Vertex,X: vertex] : 
+      ( finite_finite_Vertex(A)
+     => aa_set_Vertex_nat(finite_card_Vertex,insert_Vertex(X,A)) = aa_nat_nat(suc,aa_set_Vertex_nat(finite_card_Vertex,minus_400198071Vertex(A,insert_Vertex(X,bot_bot_set_Vertex)))) ) )).
+
+tff(fact_228_card__insert,axiom,(
+    ! [A: set_bool,X: bool] : 
+      ( finite_finite_bool(A)
+     => aa_set_bool_nat(finite_card_bool,insert_bool(X,A)) = aa_nat_nat(suc,aa_set_bool_nat(finite_card_bool,minus_minus_set_bool(A,insert_bool(X,bot_bot_set_bool)))) ) )).
+
+tff(fact_229_numeral__Bit0,axiom,(
+    ! [N: num] : aa_num_nat(numeral_numeral_nat,aa_num_num(bit0,N)) = aa_nat_nat(plus_plus_nat(aa_num_nat(numeral_numeral_nat,N)),aa_num_nat(numeral_numeral_nat,N)) )).
+
+tff(fact_230_numeral__Bit0,axiom,(
+    ! [N: num] : aa_num_int(numeral_numeral_int,aa_num_num(bit0,N)) = aa_int_int(plus_plus_int(aa_num_int(numeral_numeral_int,N)),aa_num_int(numeral_numeral_int,N)) )).
+
+tff(fact_231_num_Odistinct_I3_J,axiom,(
+    ! [X32: num] : 
+      one != aa_num_num(bit1,X32) )).
+
+tff(fact_232_singleton__inject,axiom,(
+    ! [A2: fun_Vertex_Vertex,B2: fun_Vertex_Vertex] : 
+      ( insert923351795Vertex(A2,bot_bo692629261Vertex) = insert923351795Vertex(B2,bot_bo692629261Vertex)
+     => A2 = B2 ) )).
+
+tff(fact_233_singleton__inject,axiom,(
+    ! [A2: vertex,B2: vertex] : 
+      ( insert_Vertex(A2,bot_bot_set_Vertex) = insert_Vertex(B2,bot_bot_set_Vertex)
+     => A2 = B2 ) )).
+
+tff(fact_234_singleton__inject,axiom,(
+    ! [A2: bool,B2: bool] : 
+      ( insert_bool(A2,bot_bot_set_bool) = insert_bool(B2,bot_bot_set_bool)
+     => ( pp(A2)
+      <=> pp(B2) ) ) )).
+
+tff(fact_235_comp__eq__id__dest,axiom,(
+    ! [A2: fun_Vertex_Vertex,B2: fun_Vertex_Vertex,C: fun_Vertex_Vertex,V: vertex] : 
+      ( aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,A2),B2) = aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,id_Vertex),C)
+     => aa_Vertex_Vertex(A2,aa_Vertex_Vertex(B2,V)) = aa_Vertex_Vertex(C,V) ) )).
+
+tff(fact_236_zero__neq__numeral,axiom,(
+    ! [N: num] : 
+      zero_zero_nat != aa_num_nat(numeral_numeral_nat,N) )).
+
+tff(fact_237_zero__neq__numeral,axiom,(
+    ! [N: num] : 
+      zero_zero_int != aa_num_int(numeral_numeral_int,N) )).
+
+tff(fact_238_of__nat__numeral,axiom,(
+    ! [N: num] : aa_nat_nat(semiri1382578993at_nat,aa_num_nat(numeral_numeral_nat,N)) = aa_num_nat(numeral_numeral_nat,N) )).
+
+tff(fact_239_of__nat__numeral,axiom,(
+    ! [N: num] : aa_nat_int(semiri2019852685at_int,aa_num_nat(numeral_numeral_nat,N)) = aa_num_int(numeral_numeral_int,N) )).
+
+tff(fact_240_fun_Omap__comp,axiom,(
+    ! [G: fun_Vertex_Vertex,F: fun_Vertex_Vertex,V: fun_Vertex_Vertex] : aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,G),aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,F),V)) = aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,G),F)),V) )).
+
+tff(fact_241_neq0__conv,axiom,(
+    ! [N: nat] : 
+      ( N != zero_zero_nat
+    <=> pp(aa_nat_bool(ord_less_nat(zero_zero_nat),N)) ) )).
+
+tff(fact_242_comp__eq__dest__lhs,axiom,(
+    ! [A2: fun_Vertex_Vertex,B2: fun_Vertex_Vertex,C: fun_Vertex_Vertex,V: vertex] : 
+      ( aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,A2),B2) = C
+     => aa_Vertex_Vertex(A2,aa_Vertex_Vertex(B2,V)) = aa_Vertex_Vertex(C,V) ) )).
+
+tff(fact_243_singleton__iff,axiom,(
+    ! [B2: fun_Vertex_Vertex,A2: fun_Vertex_Vertex] : 
+      ( member920616666Vertex(B2,insert923351795Vertex(A2,bot_bo692629261Vertex))
+    <=> B2 = A2 ) )).
+
+tff(fact_244_singleton__iff,axiom,(
+    ! [B2: vertex,A2: vertex] : 
+      ( member_Vertex(B2,insert_Vertex(A2,bot_bot_set_Vertex))
+    <=> B2 = A2 ) )).
+
+tff(fact_245_singleton__iff,axiom,(
+    ! [B2: bool,A2: bool] : 
+      ( member_bool(B2,insert_bool(A2,bot_bot_set_bool))
+    <=> ( pp(B2)
+      <=> pp(A2) ) ) )).
+
+tff(fact_246_dbl__inc__simps_I5_J,axiom,(
+    ! [K: num] : aa_int_int(neg_nu1877376189nc_int,aa_num_int(numeral_numeral_int,K)) = aa_num_int(numeral_numeral_int,aa_num_num(bit1,K)) )).
+
+tff(fact_247_Vertex_Ocase_I4_J,axiom,(
+    ! [F1: vertex,F2: vertex,F3: vertex,F4: vertex] : aa_Vertex_Vertex(aa_Ver419499639Vertex(case_Vertex_Vertex(F1,F2,F3),F4),d) = F4 )).
+
+tff(fact_248_comp__eq__elim,axiom,(
+    ! [A2: fun_Vertex_Vertex,B2: fun_Vertex_Vertex,C: fun_Vertex_Vertex,D2: fun_Vertex_Vertex] : 
+      ( aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,A2),B2) = aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,C),D2)
+     => ! [V2: vertex] : aa_Vertex_Vertex(A2,aa_Vertex_Vertex(B2,V2)) = aa_Vertex_Vertex(C,aa_Vertex_Vertex(D2,V2)) ) )).
+
+tff(fact_249_set__mp,axiom,(
+    ! [A: set_fu1440825977Vertex,B: set_fu1440825977Vertex,X: fun_Vertex_Vertex] : 
+      ( ord_le579252953Vertex(A,B)
+     => ( member920616666Vertex(X,A)
+       => member920616666Vertex(X,B) ) ) )).
+
+tff(fact_250_set__mp,axiom,(
+    ! [A: set_bool,B: set_bool,X: bool] : 
+      ( ord_less_eq_set_bool(A,B)
+     => ( member_bool(X,A)
+       => member_bool(X,B) ) ) )).
+
+tff(fact_251_set__mp,axiom,(
+    ! [A: set_Vertex,B: set_Vertex,X: vertex] : 
+      ( ord_le916282992Vertex(A,B)
+     => ( member_Vertex(X,A)
+       => member_Vertex(X,B) ) ) )).
+
+tff(fact_252_not__le,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( ~ pp(aa_nat_bool(ord_less_eq_nat(X),Y))
+    <=> pp(aa_nat_bool(ord_less_nat(Y),X)) ) )).
+
+tff(fact_253_not__le,axiom,(
+    ! [X: num,Y: num] : 
+      ( ~ ord_less_eq_num(X,Y)
+    <=> ord_less_num(Y,X) ) )).
+
+tff(fact_254_not__le,axiom,(
+    ! [X: int,Y: int] : 
+      ( ~ ord_less_eq_int(X,Y)
+    <=> ord_less_int(Y,X) ) )).
+
+tff(fact_255_comp__eq__dest,axiom,(
+    ! [A2: fun_Vertex_Vertex,B2: fun_Vertex_Vertex,C: fun_Vertex_Vertex,D2: fun_Vertex_Vertex,V: vertex] : 
+      ( aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,A2),B2) = aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,C),D2)
+     => aa_Vertex_Vertex(A2,aa_Vertex_Vertex(B2,V)) = aa_Vertex_Vertex(C,aa_Vertex_Vertex(D2,V)) ) )).
+
+tff(fact_256_antisym,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( pp(aa_nat_bool(ord_less_eq_nat(X),Y))
+     => ( pp(aa_nat_bool(ord_less_eq_nat(Y),X))
+       => X = Y ) ) )).
+
+tff(fact_257_antisym,axiom,(
+    ! [X: num,Y: num] : 
+      ( ord_less_eq_num(X,Y)
+     => ( ord_less_eq_num(Y,X)
+       => X = Y ) ) )).
+
+tff(fact_258_antisym,axiom,(
+    ! [X: int,Y: int] : 
+      ( ord_less_eq_int(X,Y)
+     => ( ord_less_eq_int(Y,X)
+       => X = Y ) ) )).
+
+tff(fact_259_Vertex_Ocase_I3_J,axiom,(
+    ! [F1: vertex,F2: vertex,F3: vertex,F4: vertex] : aa_Vertex_Vertex(aa_Ver419499639Vertex(case_Vertex_Vertex(F1,F2,F3),F4),c) = F3 )).
+
+tff(fact_260_pointfree__idE,axiom,(
+    ! [F: fun_Vertex_Vertex,G: fun_Vertex_Vertex,X: vertex] : 
+      ( aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,F),G) = id_Vertex
+     => aa_Vertex_Vertex(F,aa_Vertex_Vertex(G,X)) = X ) )).
+
+tff(fact_261_Nat__Transfer_Otransfer__nat__int__function__closures_I3_J,axiom,(
+    ! [X: int,Y: int] : 
+      ( ord_less_eq_int(zero_zero_int,X)
+     => ( ord_less_eq_int(zero_zero_int,Y)
+       => ord_less_eq_int(zero_zero_int,aa_int_int(nat_tsub(X),Y)) ) ) )).
+
+tff(fact_262_Vertex_Ocase_I2_J,axiom,(
+    ! [F1: vertex,F2: vertex,F3: vertex,F4: vertex] : aa_Vertex_Vertex(aa_Ver419499639Vertex(case_Vertex_Vertex(F1,F2,F3),F4),b) = F2 )).
+
+tff(fact_263_less__eq__nat_Osimps_I1_J,axiom,(
+    ! [N: nat] : pp(aa_nat_bool(ord_less_eq_nat(zero_zero_nat),N)) )).
+
+tff(fact_264_ord__le__eq__trans,axiom,(
+    ! [A2: nat,B2: nat,C: nat] : 
+      ( pp(aa_nat_bool(ord_less_eq_nat(A2),B2))
+     => ( B2 = C
+       => pp(aa_nat_bool(ord_less_eq_nat(A2),C)) ) ) )).
+
+tff(fact_265_ord__le__eq__trans,axiom,(
+    ! [A2: num,B2: num,C: num] : 
+      ( ord_less_eq_num(A2,B2)
+     => ( B2 = C
+       => ord_less_eq_num(A2,C) ) ) )).
+
+tff(fact_266_ord__le__eq__trans,axiom,(
+    ! [A2: int,B2: int,C: int] : 
+      ( ord_less_eq_int(A2,B2)
+     => ( B2 = C
+       => ord_less_eq_int(A2,C) ) ) )).
+
+tff(fact_267_Vertex_Osimps_I6_J,axiom,(
+    d != a )).
+
+tff(fact_268_Vertex_Osimps_I8_J,axiom,(
+    c != b )).
+
+tff(fact_269_nat__le__linear,axiom,(
+    ! [M: nat,N: nat] : 
+      ( pp(aa_nat_bool(ord_less_eq_nat(M),N))
+      | pp(aa_nat_bool(ord_less_eq_nat(N),M)) ) )).
+
+tff(fact_270_less__irrefl,axiom,(
+    ! [X: nat] : 
+      ~ pp(aa_nat_bool(ord_less_nat(X),X)) )).
+
+tff(fact_271_less__irrefl,axiom,(
+    ! [X: num] : 
+      ~ ord_less_num(X,X) )).
+
+tff(fact_272_numeral__One,axiom,(
+    aa_num_nat(numeral_numeral_nat,one) = one_one_nat )).
+
+tff(fact_273_numeral__One,axiom,(
+    aa_num_int(numeral_numeral_int,one) = one_one_int )).
+
+tff(fact_274_Vertex_Osimps_I2_J,axiom,(
+    b != a )).
+
+tff(fact_275_Vertex_Osimps_I4_J,axiom,(
+    c != a )).
+
+tff(fact_276_eq__imp__le,axiom,(
+    ! [M: nat,N: nat] : 
+      ( M = N
+     => pp(aa_nat_bool(ord_less_eq_nat(M),N)) ) )).
+
+tff(fact_277_dbl__dec__simps_I4_J,axiom,(
+    aa_int_int(neg_nu493100289ec_int,aa_int_int(uminus_uminus_int,one_one_int)) = aa_int_int(uminus_uminus_int,aa_num_int(numeral_numeral_int,aa_num_num(bit1,one))) )).
+
+tff(fact_278_le__numeral__Suc,axiom,(
+    ! [K: num,N: nat] : 
+      ( pp(aa_nat_bool(ord_less_eq_nat(aa_num_nat(numeral_numeral_nat,K)),aa_nat_nat(suc,N)))
+    <=> pp(aa_nat_bool(ord_less_eq_nat(aa_num_nat(pred_numeral,K)),N)) ) )).
+
+tff(fact_279_in__mono,axiom,(
+    ! [A: set_fu1440825977Vertex,B: set_fu1440825977Vertex,X: fun_Vertex_Vertex] : 
+      ( ord_le579252953Vertex(A,B)
+     => ( member920616666Vertex(X,A)
+       => member920616666Vertex(X,B) ) ) )).
+
+tff(fact_280_in__mono,axiom,(
+    ! [A: set_bool,B: set_bool,X: bool] : 
+      ( ord_less_eq_set_bool(A,B)
+     => ( member_bool(X,A)
+       => member_bool(X,B) ) ) )).
+
+tff(fact_281_in__mono,axiom,(
+    ! [A: set_Vertex,B: set_Vertex,X: vertex] : 
+      ( ord_le916282992Vertex(A,B)
+     => ( member_Vertex(X,A)
+       => member_Vertex(X,B) ) ) )).
+
+tff(fact_282_le__refl,axiom,(
+    ! [N: nat] : pp(aa_nat_bool(ord_less_eq_nat(N),N)) )).
+
+tff(fact_283_le__numeral__extra_I3_J,axiom,(
+    pp(aa_nat_bool(ord_less_eq_nat(zero_zero_nat),zero_zero_nat)) )).
+
+tff(fact_284_le__numeral__extra_I3_J,axiom,(
+    ord_less_eq_int(zero_zero_int,zero_zero_int) )).
+
+tff(fact_285_Vertex_Osimps_I12_J,axiom,(
+    d != c )).
+
+tff(fact_286_simple__rotations__inverses,axiom,(
+    ! [X: fun_Vertex_Vertex] : 
+      ( member920616666Vertex(X,simple_rotations)
+     => ? [X3: fun_Vertex_Vertex] : 
+          ( member920616666Vertex(X3,complex_rotations)
+          & aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,X3),X) = id_Vertex ) ) )).
+
+tff(fact_287_mult_Oleft__neutral,axiom,(
+    ! [A2: int] : aa_int_int(times_times_int(one_one_int),A2) = A2 )).
+
+tff(fact_288_mult_Oleft__neutral,axiom,(
+    ! [A2: nat] : aa_nat_nat(times_times_nat(one_one_nat),A2) = A2 )).
+
+tff(fact_289_Vertex_Osimps_I10_J,axiom,(
+    d != b )).
+
+tff(fact_290_mult_Oright__neutral,axiom,(
+    ! [A2: int] : aa_int_int(times_times_int(A2),one_one_int) = A2 )).
+
+tff(fact_291_mult_Oright__neutral,axiom,(
+    ! [A2: nat] : aa_nat_nat(times_times_nat(A2),one_one_nat) = A2 )).
+
+tff(fact_292_add__2__eq__Suc,axiom,(
+    ! [N: nat] : aa_nat_nat(plus_plus_nat(aa_num_nat(numeral_numeral_nat,aa_num_num(bit0,one))),N) = aa_nat_nat(suc,aa_nat_nat(suc,N)) )).
+
+tff(fact_293_complex__rotations__inverses,axiom,(
+    ! [X: fun_Vertex_Vertex] : 
+      ( member920616666Vertex(X,complex_rotations)
+     => ? [X3: fun_Vertex_Vertex] : 
+          ( member920616666Vertex(X3,complex_rotations)
+          & aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,X3),X) = id_Vertex ) ) )).
+
+tff(fact_294_card__insert__le,axiom,(
+    ! [A: set_fu1440825977Vertex,X: fun_Vertex_Vertex] : 
+      ( finite502879194Vertex(A)
+     => pp(aa_nat_bool(ord_less_eq_nat(aa_set1594830599ex_nat(finite1117633179Vertex,A)),aa_set1594830599ex_nat(finite1117633179Vertex,insert923351795Vertex(X,A)))) ) )).
+
+tff(fact_295_card__insert__le,axiom,(
+    ! [A: set_bool,X: bool] : 
+      ( finite_finite_bool(A)
+     => pp(aa_nat_bool(ord_less_eq_nat(aa_set_bool_nat(finite_card_bool,A)),aa_set_bool_nat(finite_card_bool,insert_bool(X,A)))) ) )).
+
+tff(fact_296_card__insert__le,axiom,(
+    ! [A: set_Vertex,X: vertex] : 
+      ( finite_finite_Vertex(A)
+     => pp(aa_nat_bool(ord_less_eq_nat(aa_set_Vertex_nat(finite_card_Vertex,A)),aa_set_Vertex_nat(finite_card_Vertex,insert_Vertex(X,A)))) ) )).
+
+tff(fact_297_power_Osimps_I2_J,axiom,(
+    ! [A2: int,N: nat] : aa_nat_int(power_power_int(A2),aa_nat_nat(suc,N)) = aa_int_int(times_times_int(A2),aa_nat_int(power_power_int(A2),N)) )).
+
+tff(fact_298_power_Osimps_I2_J,axiom,(
+    ! [A2: nat,N: nat] : aa_nat_nat(power_power_nat(A2),aa_nat_nat(suc,N)) = aa_nat_nat(times_times_nat(A2),aa_nat_nat(power_power_nat(A2),N)) )).
+
+tff(fact_299_card__insert__le__m1,axiom,(
+    ! [N: nat,Y: set_fu1440825977Vertex,X: fun_Vertex_Vertex] : 
+      ( pp(aa_nat_bool(ord_less_nat(zero_zero_nat),N))
+     => ( pp(aa_nat_bool(ord_less_eq_nat(aa_set1594830599ex_nat(finite1117633179Vertex,Y)),aa_nat_nat(minus_minus_nat(N),one_one_nat)))
+       => pp(aa_nat_bool(ord_less_eq_nat(aa_set1594830599ex_nat(finite1117633179Vertex,insert923351795Vertex(X,Y))),N)) ) ) )).
+
+tff(fact_300_card__insert__le__m1,axiom,(
+    ! [N: nat,Y: set_bool,X: bool] : 
+      ( pp(aa_nat_bool(ord_less_nat(zero_zero_nat),N))
+     => ( pp(aa_nat_bool(ord_less_eq_nat(aa_set_bool_nat(finite_card_bool,Y)),aa_nat_nat(minus_minus_nat(N),one_one_nat)))
+       => pp(aa_nat_bool(ord_less_eq_nat(aa_set_bool_nat(finite_card_bool,insert_bool(X,Y))),N)) ) ) )).
+
+tff(fact_301_card__insert__le__m1,axiom,(
+    ! [N: nat,Y: set_Vertex,X: vertex] : 
+      ( pp(aa_nat_bool(ord_less_nat(zero_zero_nat),N))
+     => ( pp(aa_nat_bool(ord_less_eq_nat(aa_set_Vertex_nat(finite_card_Vertex,Y)),aa_nat_nat(minus_minus_nat(N),one_one_nat)))
+       => pp(aa_nat_bool(ord_less_eq_nat(aa_set_Vertex_nat(finite_card_Vertex,insert_Vertex(X,Y))),N)) ) ) )).
+
+tff(fact_302_order__trans,axiom,(
+    ! [X: nat,Y: nat,Z: nat] : 
+      ( pp(aa_nat_bool(ord_less_eq_nat(X),Y))
+     => ( pp(aa_nat_bool(ord_less_eq_nat(Y),Z))
+       => pp(aa_nat_bool(ord_less_eq_nat(X),Z)) ) ) )).
+
+tff(fact_303_order__trans,axiom,(
+    ! [X: num,Y: num,Z: num] : 
+      ( ord_less_eq_num(X,Y)
+     => ( ord_less_eq_num(Y,Z)
+       => ord_less_eq_num(X,Z) ) ) )).
+
+tff(fact_304_order__trans,axiom,(
+    ! [X: int,Y: int,Z: int] : 
+      ( ord_less_eq_int(X,Y)
+     => ( ord_less_eq_int(Y,Z)
+       => ord_less_eq_int(X,Z) ) ) )).
+
+tff(fact_305_bexI,axiom,(
+    ! [P: fun_fu1242025197x_bool,X: fun_Vertex_Vertex,A: set_fu1440825977Vertex] : 
+      ( pp(aa_fun1227708118x_bool(P,X))
+     => ( member920616666Vertex(X,A)
+       => ? [X3: fun_Vertex_Vertex] : 
+            ( member920616666Vertex(X3,A)
+            & pp(aa_fun1227708118x_bool(P,X3)) ) ) ) )).
+
+tff(fact_306_bexI,axiom,(
+    ! [P: fun_bool_bool,X: bool,A: set_bool] : 
+      ( pp(aa_bool_bool(P,X))
+     => ( member_bool(X,A)
+       => ? [X3: bool] : 
+            ( member_bool(X3,A)
+            & pp(aa_bool_bool(P,X3)) ) ) ) )).
+
+tff(fact_307_bexI,axiom,(
+    ! [P: fun_Vertex_bool,X: vertex,A: set_Vertex] : 
+      ( pp(aa_Vertex_bool(P,X))
+     => ( member_Vertex(X,A)
+       => ? [X3: vertex] : 
+            ( member_Vertex(X3,A)
+            & pp(aa_Vertex_bool(P,X3)) ) ) ) )).
+
+tff(fact_308_antisym__conv,axiom,(
+    ! [Y: nat,X: nat] : 
+      ( pp(aa_nat_bool(ord_less_eq_nat(Y),X))
+     => ( pp(aa_nat_bool(ord_less_eq_nat(X),Y))
+      <=> X = Y ) ) )).
+
+tff(fact_309_antisym__conv,axiom,(
+    ! [Y: num,X: num] : 
+      ( ord_less_eq_num(Y,X)
+     => ( ord_less_eq_num(X,Y)
+      <=> X = Y ) ) )).
+
+tff(fact_310_antisym__conv,axiom,(
+    ! [Y: int,X: int] : 
+      ( ord_less_eq_int(Y,X)
+     => ( ord_less_eq_int(X,Y)
+      <=> X = Y ) ) )).
+
+tff(fact_311_power_Osimps_I1_J,axiom,(
+    ! [A2: nat] : aa_nat_nat(power_power_nat(A2),zero_zero_nat) = one_one_nat )).
+
+tff(fact_312_power_Osimps_I1_J,axiom,(
+    ! [A2: int] : aa_nat_int(power_power_int(A2),zero_zero_nat) = one_one_int )).
+
+tff(fact_313_simple__rotations__inverses__helper,axiom,(
+    ident_rotations = simple_rotations )).
+
+tff(fact_314_card__1__singletonE,axiom,(
+    ! [A: set_fu1440825977Vertex] : 
+      ( aa_set1594830599ex_nat(finite1117633179Vertex,A) = one_one_nat
+     => ~ ( ! [X3: fun_Vertex_Vertex] : 
+              A != insert923351795Vertex(X3,bot_bo692629261Vertex) ) ) )).
+
+tff(fact_315_card__1__singletonE,axiom,(
+    ! [A: set_Vertex] : 
+      ( aa_set_Vertex_nat(finite_card_Vertex,A) = one_one_nat
+     => ~ ( ! [X3: vertex] : 
+              A != insert_Vertex(X3,bot_bot_set_Vertex) ) ) )).
+
+tff(fact_316_card__1__singletonE,axiom,(
+    ! [A: set_bool] : 
+      ( aa_set_bool_nat(finite_card_bool,A) = one_one_nat
+     => ~ ( ! [X3: bool] : 
+              A != insert_bool(X3,bot_bot_set_bool) ) ) )).
+
+tff(fact_317_UN__E,axiom,(
+    ! [B2: fun_Vertex_Vertex,A: set_fu1440825977Vertex,B: fun_fu920109753Vertex] : 
+      ( member920616666Vertex(B2,comple23865886Vertex(A,B))
+     => ~ ( ! [X3: fun_Vertex_Vertex] : 
+              ( member920616666Vertex(X3,A)
+             => ~ member920616666Vertex(B2,aa_fun228895354Vertex(B,X3)) ) ) ) )).
+
+tff(fact_318_UN__E,axiom,(
+    ! [B2: fun_Vertex_Vertex,A: set_bool,B: fun_bo1398644387Vertex] : 
+      ( member920616666Vertex(B2,comple238680496Vertex(A,B))
+     => ~ ( ! [X3: bool] : 
+              ( member_bool(X3,A)
+             => ~ member920616666Vertex(B2,aa_boo526153300Vertex(B,X3)) ) ) ) )).
+
+tff(fact_319_UN__E,axiom,(
+    ! [B2: fun_Vertex_Vertex,A: set_Vertex,B: fun_Ve460580988Vertex] : 
+      ( member920616666Vertex(B2,comple45079945Vertex(A,B))
+     => ~ ( ! [X3: vertex] : 
+              ( member_Vertex(X3,A)
+             => ~ member920616666Vertex(B2,aa_Ver1951063085Vertex(B,X3)) ) ) ) )).
+
+tff(fact_320_UN__E,axiom,(
+    ! [B2: bool,A: set_fu1440825977Vertex,B: fun_fu2050241485t_bool] : 
+      ( member_bool(B2,comple319316242t_bool(A,B))
+     => ~ ( ! [X3: fun_Vertex_Vertex] : 
+              ( member920616666Vertex(X3,A)
+             => ~ member_bool(B2,aa_fun606789046t_bool(B,X3)) ) ) ) )).
+
+tff(fact_321_UN__E,axiom,(
+    ! [B2: bool,A: set_bool,B: fun_bool_set_bool] : 
+      ( member_bool(B2,comple1373135616t_bool(A,B))
+     => ~ ( ! [X3: bool] : 
+              ( member_bool(X3,A)
+             => ~ member_bool(B2,aa_bool_set_bool(B,X3)) ) ) ) )).
+
+tff(fact_322_UN__E,axiom,(
+    ! [B2: bool,A: set_Vertex,B: fun_Vertex_set_bool] : 
+      ( member_bool(B2,comple1455330279t_bool(A,B))
+     => ~ ( ! [X3: vertex] : 
+              ( member_Vertex(X3,A)
+             => ~ member_bool(B2,aa_Vertex_set_bool(B,X3)) ) ) ) )).
+
+tff(fact_323_UN__E,axiom,(
+    ! [B2: vertex,A: set_fu1440825977Vertex,B: fun_fu1557120166Vertex] : 
+      ( member_Vertex(B2,comple599148139Vertex(A,B))
+     => ~ ( ! [X3: fun_Vertex_Vertex] : 
+              ( member920616666Vertex(X3,A)
+             => ~ member_Vertex(B2,aa_fun357647631Vertex(B,X3)) ) ) ) )).
+
+tff(fact_324_UN__E,axiom,(
+    ! [B2: vertex,A: set_bool,B: fun_bool_set_Vertex] : 
+      ( member_Vertex(B2,comple1809131353Vertex(A,B))
+     => ~ ( ! [X3: bool] : 
+              ( member_bool(X3,A)
+             => ~ member_Vertex(B2,aa_bool_set_Vertex(B,X3)) ) ) ) )).
+
+tff(fact_325_UN__E,axiom,(
+    ! [B2: vertex,A: set_Vertex,B: fun_Ve1685860771Vertex] : 
+      ( member_Vertex(B2,comple1077936064Vertex(A,B))
+     => ~ ( ! [X3: vertex] : 
+              ( member_Vertex(X3,A)
+             => ~ member_Vertex(B2,aa_Vertex_set_Vertex(B,X3)) ) ) ) )).
+
+tff(fact_326_bot_Oextremum__uniqueI,axiom,(
+    ! [A2: set_fu1440825977Vertex] : 
+      ( ord_le579252953Vertex(A2,bot_bo692629261Vertex)
+     => A2 = bot_bo692629261Vertex ) )).
+
+tff(fact_327_bot_Oextremum__uniqueI,axiom,(
+    ! [A2: set_Vertex] : 
+      ( ord_le916282992Vertex(A2,bot_bot_set_Vertex)
+     => A2 = bot_bot_set_Vertex ) )).
+
+tff(fact_328_bot_Oextremum__uniqueI,axiom,(
+    ! [A2: set_bool] : 
+      ( ord_less_eq_set_bool(A2,bot_bot_set_bool)
+     => A2 = bot_bot_set_bool ) )).
+
+tff(fact_329_bot_Oextremum__uniqueI,axiom,(
+    ! [A2: nat] : 
+      ( pp(aa_nat_bool(ord_less_eq_nat(A2),bot_bot_nat))
+     => A2 = bot_bot_nat ) )).
+
+tff(fact_330_not__less,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( ~ pp(aa_nat_bool(ord_less_nat(X),Y))
+    <=> pp(aa_nat_bool(ord_less_eq_nat(Y),X)) ) )).
+
+tff(fact_331_not__less,axiom,(
+    ! [X: num,Y: num] : 
+      ( ~ ord_less_num(X,Y)
+    <=> ord_less_eq_num(Y,X) ) )).
+
+tff(fact_332_not__less,axiom,(
+    ! [X: int,Y: int] : 
+      ( ~ ord_less_int(X,Y)
+    <=> ord_less_eq_int(Y,X) ) )).
+
+tff(fact_333_transfer__nat__int__numerals_I4_J,axiom,(
+    aa_num_nat(numeral_numeral_nat,aa_num_num(bit1,one)) = aa_int_nat(nat2,aa_num_int(numeral_numeral_int,aa_num_num(bit1,one))) )).
+
+tff(fact_334_bot_Oextremum__unique,axiom,(
+    ! [A2: set_fu1440825977Vertex] : 
+      ( ord_le579252953Vertex(A2,bot_bo692629261Vertex)
+    <=> A2 = bot_bo692629261Vertex ) )).
+
+tff(fact_335_bot_Oextremum__unique,axiom,(
+    ! [A2: set_Vertex] : 
+      ( ord_le916282992Vertex(A2,bot_bot_set_Vertex)
+    <=> A2 = bot_bot_set_Vertex ) )).
+
+tff(fact_336_bot_Oextremum__unique,axiom,(
+    ! [A2: set_bool] : 
+      ( ord_less_eq_set_bool(A2,bot_bot_set_bool)
+    <=> A2 = bot_bot_set_bool ) )).
+
+tff(fact_337_bot_Oextremum__unique,axiom,(
+    ! [A2: nat] : 
+      ( pp(aa_nat_bool(ord_less_eq_nat(A2),bot_bot_nat))
+    <=> A2 = bot_bot_nat ) )).
+
+tff(fact_338_ord__eq__le__trans,axiom,(
+    ! [A2: nat,B2: nat,C: nat] : 
+      ( A2 = B2
+     => ( pp(aa_nat_bool(ord_less_eq_nat(B2),C))
+       => pp(aa_nat_bool(ord_less_eq_nat(A2),C)) ) ) )).
+
+tff(fact_339_ord__eq__le__trans,axiom,(
+    ! [A2: num,B2: num,C: num] : 
+      ( A2 = B2
+     => ( ord_less_eq_num(B2,C)
+       => ord_less_eq_num(A2,C) ) ) )).
+
+tff(fact_340_ord__eq__le__trans,axiom,(
+    ! [A2: int,B2: int,C: int] : 
+      ( A2 = B2
+     => ( ord_less_eq_int(B2,C)
+       => ord_less_eq_int(A2,C) ) ) )).
+
+tff(fact_341_less__imp__le,axiom,(
+    ! [X: nat,Y: nat] : 
+      ( pp(aa_nat_bool(ord_less_nat(X),Y))
+     => pp(aa_nat_bool(ord_less_eq_nat(X),Y)) ) )).
+
+tff(fact_342_less__imp__le,axiom,(
+    ! [X: num,Y: num] : 
+      ( ord_less_num(X,Y)
+     => ord_less_eq_num(X,Y) ) )).
+
+tff(fact_343_less__imp__le,axiom,(
+    ! [X: int,Y: int] : 
+      ( ord_less_int(X,Y)
+     => ord_less_eq_int(X,Y) ) )).
+
+tff(fact_344_card_Oremove,axiom,(
+    ! [A: set_fu1440825977Vertex,X: fun_Vertex_Vertex] : 
+      ( finite502879194Vertex(A)
+     => ( member920616666Vertex(X,A)
+       => aa_set1594830599ex_nat(finite1117633179Vertex,A) = aa_nat_nat(suc,aa_set1594830599ex_nat(finite1117633179Vertex,minus_155995090Vertex(A,insert923351795Vertex(X,bot_bo692629261Vertex)))) ) ) )).
+
+tff(fact_345_card_Oremove,axiom,(
+    ! [A: set_Vertex,X: vertex] : 
+      ( finite_finite_Vertex(A)
+     => ( member_Vertex(X,A)
+       => aa_set_Vertex_nat(finite_card_Vertex,A) = aa_nat_nat(suc,aa_set_Vertex_nat(finite_card_Vertex,minus_400198071Vertex(A,insert_Vertex(X,bot_bot_set_Vertex)))) ) ) )).
+
+tff(fact_346_card_Oremove,axiom,(
+    ! [A: set_bool,X: bool] : 
+      ( finite_finite_bool(A)
+     => ( member_bool(X,A)
+       => aa_set_bool_nat(finite_card_bool,A) = aa_nat_nat(suc,aa_set_bool_nat(finite_card_bool,minus_minus_set_bool(A,insert_bool(X,bot_bot_set_bool)))) ) ) )).
+
+tff(fact_347_imageE,axiom,(
+    ! [B2: fun_Vertex_Vertex,F: fun_fu2028172291Vertex,A: set_fu1440825977Vertex] : 
+      ( member920616666Vertex(B2,image_687241101Vertex(F,A))
+     => ~ ( ! [X3: fun_Vertex_Vertex] : 
+              ( B2 = aa_fun1974636740Vertex(F,X3)
+             => ~ member920616666Vertex(X3,A) ) ) ) )).
+
+tff(fact_348_imageE,axiom,(
+    ! [B2: fun_Vertex_Vertex,F: fun_bo809367533Vertex,A: set_bool] : 
+      ( member920616666Vertex(B2,image_557778581Vertex(F,A))
+     => ~ ( ! [X3: bool] : 
+              ( B2 = aa_boo343327902Vertex(F,X3)
+             => ~ member_bool(X3,A) ) ) ) )).
+
+tff(fact_349_imageE,axiom,(
+    ! [B2: fun_Vertex_Vertex,F: fun_Ve427828678Vertex,A: set_Vertex] : 
+      ( member920616666Vertex(B2,image_222117870Vertex(F,A))
+     => ~ ( ! [X3: vertex] : 
+              ( B2 = aa_Ver419499639Vertex(F,X3)
+             => ~ member_Vertex(X3,A) ) ) ) )).
+
+tff(fact_350_imageE,axiom,(
+    ! [B2: bool,F: fun_fu1242025197x_bool,A: set_fu1440825977Vertex] : 
+      ( member_bool(B2,image_1442158797x_bool(F,A))
+     => ~ ( ! [X3: fun_Vertex_Vertex] : 
+              ( ( pp(B2)
+              <=> pp(aa_fun1227708118x_bool(F,X3)) )
+             => ~ member920616666Vertex(X3,A) ) ) ) )).
+
+tff(fact_351_imageE,axiom,(
+    ! [B2: bool,F: fun_bool_bool,A: set_bool] : 
+      ( member_bool(B2,image_bool_bool(F,A))
+     => ~ ( ! [X3: bool] : 
+              ( ( pp(B2)
+              <=> pp(aa_bool_bool(F,X3)) )
+             => ~ member_bool(X3,A) ) ) ) )).
+
+tff(fact_352_imageE,axiom,(
+    ! [B2: bool,F: fun_Vertex_bool,A: set_Vertex] : 
+      ( member_bool(B2,image_Vertex_bool(F,A))
+     => ~ ( ! [X3: vertex] : 
+              ( ( pp(B2)
+              <=> pp(aa_Vertex_bool(F,X3)) )
+             => ~ member_Vertex(X3,A) ) ) ) )).
+
+tff(fact_353_imageE,axiom,(
+    ! [B2: vertex,F: fun_fu1042269126Vertex,A: set_fu1440825977Vertex] : 
+      ( member_Vertex(B2,image_692540838Vertex(F,A))
+     => ~ ( ! [X3: fun_Vertex_Vertex] : 
+              ( B2 = aa_fun889922607Vertex(F,X3)
+             => ~ member920616666Vertex(X3,A) ) ) ) )).
+
+tff(fact_354_imageE,axiom,(
+    ! [B2: vertex,F: fun_bool_Vertex,A: set_bool] : 
+      ( member_Vertex(B2,image_bool_Vertex(F,A))
+     => ~ ( ! [X3: bool] : 
+              ( B2 = aa_bool_Vertex(F,X3)
+             => ~ member_bool(X3,A) ) ) ) )).
+
+tff(fact_355_imageE,axiom,(
+    ! [B2: vertex,F: fun_Vertex_Vertex,A: set_Vertex] : 
+      ( member_Vertex(B2,image_Vertex_Vertex(F,A))
+     => ~ ( ! [X3: vertex] : 
+              ( B2 = aa_Vertex_Vertex(F,X3)
+             => ~ member_Vertex(X3,A) ) ) ) )).
+
+tff(fact_356_of__int__1,axiom,(
+    aa_int_int(ring_1_of_int_int,one_one_int) = one_one_int )).
+
+tff(fact_357_less__le__trans,axiom,(
+    ! [X: nat,Y: nat,Z: nat] : 
+      ( pp(aa_nat_bool(ord_less_nat(X),Y))
+     => ( pp(aa_nat_bool(ord_less_eq_nat(Y),Z))
+       => pp(aa_nat_bool(ord_less_nat(X),Z)) ) ) )).
+
+tff(fact_358_less__le__trans,axiom,(
+    ! [X: num,Y: num,Z: num] : 
+      ( ord_less_num(X,Y)
+     => ( ord_less_eq_num(Y,Z)
+       => ord_less_num(X,Z) ) ) )).
+
+tff(fact_359_less__le__trans,axiom,(
+    ! [X: int,Y: int,Z: int] : 
+      ( ord_less_int(X,Y)
+     => ( ord_less_eq_int(Y,Z)
+       => ord_less_int(X,Z) ) ) )).
+
+tff(fact_360_Suc__mod__eq__add3__mod,axiom,(
+    ! [M: nat,N: nat] : aa_nat_nat(div_mod_nat(aa_nat_nat(suc,aa_nat_nat(suc,aa_nat_nat(suc,M)))),N) = aa_nat_nat(div_mod_nat(aa_nat_nat(plus_plus_nat(aa_num_nat(numeral_numeral_nat,aa_num_num(bit1,one))),M)),N) )).
+
+tff(fact_361_le__less__trans,axiom,(
+    ! [X: nat,Y: nat,Z: nat] : 
+      ( pp(aa_nat_bool(ord_less_eq_nat(X),Y))
+     => ( pp(aa_nat_bool(ord_less_nat(Y),Z))
+       => pp(aa_nat_bool(ord_less_nat(X),Z)) ) ) )).
+
+tff(fact_362_le__less__trans,axiom,(
+    ! [X: num,Y: num,Z: num] : 
+      ( ord_less_eq_num(X,Y)
+     => ( ord_less_num(Y,Z)
+       => ord_less_num(X,Z) ) ) )).
+
+tff(fact_363_le__less__trans,axiom,(
+    ! [X: int,Y: int,Z: int] : 
+      ( ord_less_eq_int(X,Y)
+     => ( ord_less_int(Y,Z)
+       => ord_less_int(X,Z) ) ) )).
+
+tff(fact_364_Nat__Transfer_Otransfer__nat__int__function__closures_I1_J,axiom,(
+    ! [X: int,Y: int] : 
+      ( ord_less_eq_int(zero_zero_int,X)
+     => ( ord_less_eq_int(zero_zero_int,Y)
+       => ord_less_eq_int(zero_zero_int,aa_int_int(plus_plus_int(X),Y)) ) ) )).
+
+tff(fact_365_one__le__numeral,axiom,(
+    ! [N: num] : pp(aa_nat_bool(ord_less_eq_nat(one_one_nat),aa_num_nat(numeral_numeral_nat,N))) )).
+
+tff(fact_366_one__le__numeral,axiom,(
+    ! [N: num] : ord_less_eq_int(one_one_int,aa_num_int(numeral_numeral_int,N)) )).
+
+tff(fact_367_add__mono__thms__linordered__semiring_I1_J,axiom,(
+    ! [I: nat,J: nat,K: nat,L: nat] : 
+      ( ( pp(aa_nat_bool(ord_less_eq_nat(I),J))
+        & pp(aa_nat_bool(ord_less_eq_nat(K),L)) )
+     => pp(aa_nat_bool(ord_less_eq_nat(aa_nat_nat(plus_plus_nat(I),K)),aa_nat_nat(plus_plus_nat(J),L))) ) )).
+
+tff(fact_368_add__mono__thms__linordered__semiring_I1_J,axiom,(
+    ! [I: int,J: int,K: int,L: int] : 
+      ( ( ord_less_eq_int(I,J)
+        & ord_less_eq_int(K,L) )
+     => ord_less_eq_int(aa_int_int(plus_plus_int(I),K),aa_int_int(plus_plus_int(J),L)) ) )).
+
+tff(fact_369_eval__nat__numeral_I1_J,axiom,(
+    aa_num_nat(numeral_numeral_nat,one) = aa_nat_nat(suc,zero_zero_nat) )).
+
+tff(fact_370_subsetD,axiom,(
+    ! [A: set_fu1440825977Vertex,B: set_fu1440825977Vertex,C: fun_Vertex_Vertex] : 
+      ( ord_le579252953Vertex(A,B)
+     => ( member920616666Vertex(C,A)
+       => member920616666Vertex(C,B) ) ) )).
+
+tff(fact_371_subsetD,axiom,(
+    ! [A: set_bool,B: set_bool,C: bool] : 
+      ( ord_less_eq_set_bool(A,B)
+     => ( member_bool(C,A)
+       => member_bool(C,B) ) ) )).
+
+tff(fact_372_subsetD,axiom,(
+    ! [A: set_Vertex,B: set_Vertex,C: vertex] : 
+      ( ord_le916282992Vertex(A,B)
+     => ( member_Vertex(C,A)
+       => member_Vertex(C,B) ) ) )).
+
+tff(fact_373_of__int__numeral,axiom,(
+    ! [K: num] : aa_int_int(ring_1_of_int_int,aa_num_int(numeral_numeral_int,K)) = aa_num_int(numeral_numeral_int,K) )).
+
+tff(fact_374_bexE,axiom,(
+    ! [A: set_fu1440825977Vertex,P: fun_fu1242025197x_bool] : 
+      ( ? [X4: fun_Vertex_Vertex] : 
+          ( member920616666Vertex(X4,A)
+          & pp(aa_fun1227708118x_bool(P,X4)) )
+     => ~ ( ! [X3: fun_Vertex_Vertex] : 
+              ( member920616666Vertex(X3,A)
+             => ~ pp(aa_fun1227708118x_bool(P,X3)) ) ) ) )).
+
+tff(fact_375_bexE,axiom,(
+    ! [A: set_bool,P: fun_bool_bool] : 
+      ( ? [X4: bool] : 
+          ( member_bool(X4,A)
+          & pp(aa_bool_bool(P,X4)) )
+     => ~ ( ! [X3: bool] : 
+              ( member_bool(X3,A)
+             => ~ pp(aa_bool_bool(P,X3)) ) ) ) )).
+
+tff(fact_376_bexE,axiom,(
+    ! [A: set_Vertex,P: fun_Vertex_bool] : 
+      ( ? [X4: vertex] : 
+          ( member_Vertex(X4,A)
+          & pp(aa_Vertex_bool(P,X4)) )
+     => ~ ( ! [X3: vertex] : 
+              ( member_Vertex(X3,A)
+             => ~ pp(aa_Vertex_bool(P,X3)) ) ) ) )).
+
+tff(fact_377_semiring__norm_I80_J,axiom,(
+    ! [M: num,N: num] : 
+      ( ord_less_num(aa_num_num(bit1,M),aa_num_num(bit1,N))
+    <=> ord_less_num(M,N) ) )).
+
+tff(fact_378_Suc__div__eq__add3__div,axiom,(
+    ! [M: nat,N: nat] : aa_nat_nat(divide_divide_nat(aa_nat_nat(suc,aa_nat_nat(suc,aa_nat_nat(suc,M)))),N) = aa_nat_nat(divide_divide_nat(aa_nat_nat(plus_plus_nat(aa_num_nat(numeral_numeral_nat,aa_num_num(bit1,one))),M)),N) )).
+
+tff(fact_379_subset__eq,axiom,(
+    ! [A: set_fu1440825977Vertex,B: set_fu1440825977Vertex] : 
+      ( ord_le579252953Vertex(A,B)
+    <=> ! [X2: fun_Vertex_Vertex] : 
+          ( member920616666Vertex(X2,A)
+         => member920616666Vertex(X2,B) ) ) )).
+
+tff(fact_380_subset__eq,axiom,(
+    ! [A: set_bool,B: set_bool] : 
+      ( ord_less_eq_set_bool(A,B)
+    <=> ! [X2: bool] : 
+          ( member_bool(X2,A)
+         => member_bool(X2,B) ) ) )).
+
+tff(fact_381_subset__eq,axiom,(
+    ! [A: set_Vertex,B: set_Vertex] : 
+      ( ord_le916282992Vertex(A,B)
+    <=> ! [X2: vertex] : 
+          ( member_Vertex(X2,A)
+         => member_Vertex(X2,B) ) ) )).
+
+tff(fact_382_Nat__Transfer_Otransfer__nat__int__function__closures_I2_J,axiom,(
+    ! [X: int,Y: int] : 
+      ( ord_less_eq_int(zero_zero_int,X)
+     => ( ord_less_eq_int(zero_zero_int,Y)
+       => ord_less_eq_int(zero_zero_int,aa_int_int(times_times_int(X),Y)) ) ) )).
+
+tff(fact_383_nibble__of__nat__simps_I4_J,axiom,(
+    nibble_of_nat(aa_num_nat(numeral_numeral_nat,aa_num_num(bit1,one))) = nibble3 )).
+
+tff(fact_384_set__rev__mp,axiom,(
+    ! [X: fun_Vertex_Vertex,A: set_fu1440825977Vertex,B: set_fu1440825977Vertex] : 
+      ( member920616666Vertex(X,A)
+     => ( ord_le579252953Vertex(A,B)
+       => member920616666Vertex(X,B) ) ) )).
+
+tff(fact_385_set__rev__mp,axiom,(
+    ! [X: bool,A: set_bool,B: set_bool] : 
+      ( member_bool(X,A)
+     => ( ord_less_eq_set_bool(A,B)
+       => member_bool(X,B) ) ) )).
+
+tff(fact_386_set__rev__mp,axiom,(
+    ! [X: vertex,A: set_Vertex,B: set_Vertex] : 
+      ( member_Vertex(X,A)
+     => ( ord_le916282992Vertex(A,B)
+       => member_Vertex(X,B) ) ) )).
+
+tff(fact_387_subset__iff,axiom,(
+    ! [A: set_fu1440825977Vertex,B: set_fu1440825977Vertex] : 
+      ( ord_le579252953Vertex(A,B)
+    <=> ! [T2: fun_Vertex_Vertex] : 
+          ( member920616666Vertex(T2,A)
+         => member920616666Vertex(T2,B) ) ) )).
+
+tff(fact_388_subset__iff,axiom,(
+    ! [A: set_bool,B: set_bool] : 
+      ( ord_less_eq_set_bool(A,B)
+    <=> ! [T2: bool] : 
+          ( member_bool(T2,A)
+         => member_bool(T2,B) ) ) )).
+
+tff(fact_389_subset__iff,axiom,(
+    ! [A: set_Vertex,B: set_Vertex] : 
+      ( ord_le916282992Vertex(A,B)
+    <=> ! [T2: vertex] : 
+          ( member_Vertex(T2,A)
+         => member_Vertex(T2,B) ) ) )).
+
+tff(fact_390_rev__subsetD,axiom,(
+    ! [C: fun_Vertex_Vertex,A: set_fu1440825977Vertex,B: set_fu1440825977Vertex] : 
+      ( member920616666Vertex(C,A)
+     => ( ord_le579252953Vertex(A,B)
+       => member920616666Vertex(C,B) ) ) )).
+
+tff(fact_391_rev__subsetD,axiom,(
+    ! [C: bool,A: set_bool,B: set_bool] : 
+      ( member_bool(C,A)
+     => ( ord_less_eq_set_bool(A,B)
+       => member_bool(C,B) ) ) )).
+
+tff(fact_392_rev__subsetD,axiom,(
+    ! [C: vertex,A: set_Vertex,B: set_Vertex] : 
+      ( member_Vertex(C,A)
+     => ( ord_le916282992Vertex(A,B)
+       => member_Vertex(C,B) ) ) )).
+
+tff(fact_393_the__elem__eq,axiom,(
+    ! [X: fun_Vertex_Vertex] : the_el292141838Vertex(insert923351795Vertex(X,bot_bo692629261Vertex)) = X )).
+
+tff(fact_394_the__elem__eq,axiom,(
+    ! [X: vertex] : the_elem_Vertex(insert_Vertex(X,bot_bot_set_Vertex)) = X )).
+
+tff(fact_395_the__elem__eq,axiom,(
+    ! [X: bool] : 
+      ( the_elem_bool(insert_bool(X,bot_bot_set_bool))
+    <=> pp(X) ) )).
+
+tff(fact_396_semiring__norm_I79_J,axiom,(
+    ! [M: num,N: num] : 
+      ( ord_less_num(aa_num_num(bit0,M),aa_num_num(bit1,N))
+    <=> ord_less_eq_num(M,N) ) )).
+
+tff(fact_397_semiring__1__class_Oof__nat__simps_I1_J,axiom,(
+    aa_nat_nat(semiri1382578993at_nat,zero_zero_nat) = zero_zero_nat )).
+
+tff(fact_398_semiring__1__class_Oof__nat__simps_I1_J,axiom,(
+    aa_nat_int(semiri2019852685at_int,zero_zero_nat) = zero_zero_int )).
+
+tff(fact_399_add__mono__thms__linordered__semiring_I3_J,axiom,(
+    ! [I: nat,J: nat,K: nat,L: nat] : 
+      ( ( pp(aa_nat_bool(ord_less_eq_nat(I),J))
+        & K = L )
+     => pp(aa_nat_bool(ord_less_eq_nat(aa_nat_nat(plus_plus_nat(I),K)),aa_nat_nat(plus_plus_nat(J),L))) ) )).
+
+tff(fact_400_add__mono__thms__linordered__semiring_I3_J,axiom,(
+    ! [I: int,J: int,K: int,L: int] : 
+      ( ( ord_less_eq_int(I,J)
+        & K = L )
+     => ord_less_eq_int(aa_int_int(plus_plus_int(I),K),aa_int_int(plus_plus_int(J),L)) ) )).
+
+tff(fact_401_transfer__int__nat__numerals_I4_J,axiom,(
+    aa_num_int(numeral_numeral_int,aa_num_num(bit1,one)) = aa_nat_int(semiri2019852685at_int,aa_num_nat(numeral_numeral_nat,aa_num_num(bit1,one))) )).
+
+tff(fact_402_nibble__of__nat__simps_I8_J,axiom,(
+    nibble_of_nat(aa_num_nat(numeral_numeral_nat,aa_num_num(bit1,aa_num_num(bit1,one)))) = nibble7 )).
+
+tff(fact_403_complex__rotations_Osimps,axiom,(
+    ! [A2: fun_Vertex_Vertex] : 
+      ( member920616666Vertex(A2,complex_rotations)
+    <=> ( ? [R2: fun_Vertex_Vertex] : 
+            ( A2 = R2
+            & member920616666Vertex(R2,simple_rotations) )
+        | ? [R2: fun_Vertex_Vertex,S2: fun_Vertex_Vertex] : 
+            ( A2 = aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,R2),S2)
+            & member920616666Vertex(R2,complex_rotations)
+            & member920616666Vertex(S2,complex_rotations) ) ) ) )).
+
+tff(fact_404_complex__rotationsp_Osimps,axiom,(
+    ! [A2: fun_Vertex_Vertex] : 
+      ( pp(aa_fun1227708118x_bool(complex_rotationsp,A2))
+    <=> ( ? [R2: fun_Vertex_Vertex] : 
+            ( A2 = R2
+            & member920616666Vertex(R2,simple_rotations) )
+        | ? [R2: fun_Vertex_Vertex,S2: fun_Vertex_Vertex] : 
+            ( A2 = aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,R2),S2)
+            & pp(aa_fun1227708118x_bool(complex_rotationsp,R2))
+            & pp(aa_fun1227708118x_bool(complex_rotationsp,S2)) ) ) ) )).
+
+tff(fact_405_nat__1,axiom,(
+    aa_int_nat(nat2,one_one_int) = aa_nat_nat(suc,zero_zero_nat) )).
+
+tff(fact_406_contra__subsetD,axiom,(
+    ! [A: set_fu1440825977Vertex,B: set_fu1440825977Vertex,C: fun_Vertex_Vertex] : 
+      ( ord_le579252953Vertex(A,B)
+     => ( ~ member920616666Vertex(C,B)
+       => ~ member920616666Vertex(C,A) ) ) )).
+
+tff(fact_407_contra__subsetD,axiom,(
+    ! [A: set_bool,B: set_bool,C: bool] : 
+      ( ord_less_eq_set_bool(A,B)
+     => ( ~ member_bool(C,B)
+       => ~ member_bool(C,A) ) ) )).
+
+tff(fact_408_contra__subsetD,axiom,(
+    ! [A: set_Vertex,B: set_Vertex,C: vertex] : 
+      ( ord_le916282992Vertex(A,B)
+     => ( ~ member_Vertex(C,B)
+       => ~ member_Vertex(C,A) ) ) )).
+
+tff(fact_409_is__nat__def,axiom,(
+    ! [X: int] : 
+      ( nat_is_nat(X)
+    <=> ord_less_eq_int(zero_zero_int,X) ) )).
+
+tff(fact_410_of__int__numeral__le__iff,axiom,(
+    ! [N: num,Z: int] : 
+      ( ord_less_eq_int(aa_num_int(numeral_numeral_int,N),aa_int_int(ring_1_of_int_int,Z))
+    <=> ord_less_eq_int(aa_num_int(numeral_numeral_int,N),Z) ) )).
+
+tff(fact_411_complex__rotations_Ocases,axiom,(
+    ! [A2: fun_Vertex_Vertex] : 
+      ( member920616666Vertex(A2,complex_rotations)
+     => ( ~ member920616666Vertex(A2,simple_rotations)
+       => ~ ( ! [R3: fun_Vertex_Vertex,S3: fun_Vertex_Vertex] : 
+                ( A2 = aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,R3),S3)
+               => ( member920616666Vertex(R3,complex_rotations)
+                 => ~ member920616666Vertex(S3,complex_rotations) ) ) ) ) ) )).
+
+tff(fact_412_nat__code_I2_J,axiom,(
+    aa_int_nat(nat2,zero_zero_int) = zero_zero_nat )).
+
+tff(fact_413_bot__set__def,axiom,(
+    bot_bo692629261Vertex = collec1829582104Vertex(bot_bo2122034521x_bool) )).
+
+tff(fact_414_bot__set__def,axiom,(
+    bot_bot_set_Vertex = collect_Vertex(bot_bo167736830x_bool) )).
+
+tff(fact_415_bot__set__def,axiom,(
+    bot_bot_set_bool = collect_bool(bot_bo1571181847l_bool) )).
+
+tff(fact_416_numerals_I1_J,axiom,(
+    aa_num_nat(numeral_numeral_nat,one) = one_one_nat )).
+
+tff(fact_417_nat__of__nibble_Osimps_I4_J,axiom,(
+    nat_of_nibble(nibble3) = aa_num_nat(numeral_numeral_nat,aa_num_num(bit1,one)) )).
+
+tff(fact_418_bot__nat__def,axiom,(
+    bot_bot_nat = zero_zero_nat )).
+
+tff(fact_419_complex__rotationsp_Ocases,axiom,(
+    ! [A2: fun_Vertex_Vertex] : 
+      ( pp(aa_fun1227708118x_bool(complex_rotationsp,A2))
+     => ( ~ member920616666Vertex(A2,simple_rotations)
+       => ~ ( ! [R3: fun_Vertex_Vertex,S3: fun_Vertex_Vertex] : 
+                ( A2 = aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,R3),S3)
+               => ( pp(aa_fun1227708118x_bool(complex_rotationsp,R3))
+                 => ~ pp(aa_fun1227708118x_bool(complex_rotationsp,S3)) ) ) ) ) ) )).
+
+tff(fact_420_of__int__le__iff,axiom,(
+    ! [W: int,Z: int] : 
+      ( ord_less_eq_int(aa_int_int(ring_1_of_int_int,W),aa_int_int(ring_1_of_int_int,Z))
+    <=> ord_less_eq_int(W,Z) ) )).
+
+tff(fact_421_nibble__of__nat__simps_I16_J,axiom,(
+    nibble_of_nat(aa_num_nat(numeral_numeral_nat,aa_num_num(bit1,aa_num_num(bit1,aa_num_num(bit1,one))))) = nibbleF )).
+
+tff(fact_422_power3__eq__cube,axiom,(
+    ! [A2: int] : aa_nat_int(power_power_int(A2),aa_num_nat(numeral_numeral_nat,aa_num_num(bit1,one))) = aa_int_int(times_times_int(aa_int_int(times_times_int(A2),A2)),A2) )).
+
+tff(fact_423_power3__eq__cube,axiom,(
+    ! [A2: nat] : aa_nat_nat(power_power_nat(A2),aa_num_nat(numeral_numeral_nat,aa_num_num(bit1,one))) = aa_nat_nat(times_times_nat(aa_nat_nat(times_times_nat(A2),A2)),A2) )).
+
+tff(fact_424_numeral__Bit1,axiom,(
+    ! [N: num] : aa_num_nat(numeral_numeral_nat,aa_num_num(bit1,N)) = aa_nat_nat(plus_plus_nat(aa_nat_nat(plus_plus_nat(aa_num_nat(numeral_numeral_nat,N)),aa_num_nat(numeral_numeral_nat,N))),one_one_nat) )).
+
+tff(fact_425_numeral__Bit1,axiom,(
+    ! [N: num] : aa_num_int(numeral_numeral_int,aa_num_num(bit1,N)) = aa_int_int(plus_plus_int(aa_int_int(plus_plus_int(aa_num_int(numeral_numeral_int,N)),aa_num_int(numeral_numeral_int,N))),one_one_int) )).
+
+tff(fact_426_of__int__le__numeral__iff,axiom,(
+    ! [Z: int,N: num] : 
+      ( ord_less_eq_int(aa_int_int(ring_1_of_int_int,Z),aa_num_int(numeral_numeral_int,N))
+    <=> ord_less_eq_int(Z,aa_num_int(numeral_numeral_int,N)) ) )).
+
+tff(fact_427_mod__Suc__eq__mod__add3,axiom,(
+    ! [M: nat,N: nat] : aa_nat_nat(div_mod_nat(M),aa_nat_nat(suc,aa_nat_nat(suc,aa_nat_nat(suc,N)))) = aa_nat_nat(div_mod_nat(M),aa_nat_nat(plus_plus_nat(aa_num_nat(numeral_numeral_nat,aa_num_num(bit1,one))),N)) )).
+
+tff(fact_428_order__subst1,axiom,(
+    ! [A2: nat,F: fun_nat_nat,B2: nat,C: nat] : 
+      ( pp(aa_nat_bool(ord_less_eq_nat(A2),aa_nat_nat(F,B2)))
+     => ( pp(aa_nat_bool(ord_less_eq_nat(B2),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(ord_less_eq_nat(X3),Y2))
+             => pp(aa_nat_bool(ord_less_eq_nat(aa_nat_nat(F,X3)),aa_nat_nat(F,Y2))) )
+         => pp(aa_nat_bool(ord_less_eq_nat(A2),aa_nat_nat(F,C))) ) ) ) )).
+
+tff(fact_429_order__subst1,axiom,(
+    ! [A2: nat,F: fun_num_nat,B2: num,C: num] : 
+      ( pp(aa_nat_bool(ord_less_eq_nat(A2),aa_num_nat(F,B2)))
+     => ( ord_less_eq_num(B2,C)
+       => ( ! [X3: num,Y2: num] : 
+              ( ord_less_eq_num(X3,Y2)
+             => pp(aa_nat_bool(ord_less_eq_nat(aa_num_nat(F,X3)),aa_num_nat(F,Y2))) )
+         => pp(aa_nat_bool(ord_less_eq_nat(A2),aa_num_nat(F,C))) ) ) ) )).
+
+tff(fact_430_order__subst1,axiom,(
+    ! [A2: nat,F: fun_int_nat,B2: int,C: int] : 
+      ( pp(aa_nat_bool(ord_less_eq_nat(A2),aa_int_nat(F,B2)))
+     => ( ord_less_eq_int(B2,C)
+       => ( ! [X3: int,Y2: int] : 
+              ( ord_less_eq_int(X3,Y2)
+             => pp(aa_nat_bool(ord_less_eq_nat(aa_int_nat(F,X3)),aa_int_nat(F,Y2))) )
+         => pp(aa_nat_bool(ord_less_eq_nat(A2),aa_int_nat(F,C))) ) ) ) )).
+
+tff(fact_431_order__subst1,axiom,(
+    ! [A2: num,F: fun_nat_num,B2: nat,C: nat] : 
+      ( ord_less_eq_num(A2,aa_nat_num(F,B2))
+     => ( pp(aa_nat_bool(ord_less_eq_nat(B2),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(ord_less_eq_nat(X3),Y2))
+             => ord_less_eq_num(aa_nat_num(F,X3),aa_nat_num(F,Y2)) )
+         => ord_less_eq_num(A2,aa_nat_num(F,C)) ) ) ) )).
+
+tff(fact_432_order__subst1,axiom,(
+    ! [A2: num,F: fun_num_num,B2: num,C: num] : 
+      ( ord_less_eq_num(A2,aa_num_num(F,B2))
+     => ( ord_less_eq_num(B2,C)
+       => ( ! [X3: num,Y2: num] : 
+              ( ord_less_eq_num(X3,Y2)
+             => ord_less_eq_num(aa_num_num(F,X3),aa_num_num(F,Y2)) )
+         => ord_less_eq_num(A2,aa_num_num(F,C)) ) ) ) )).
+
+tff(fact_433_order__subst1,axiom,(
+    ! [A2: num,F: fun_int_num,B2: int,C: int] : 
+      ( ord_less_eq_num(A2,aa_int_num(F,B2))
+     => ( ord_less_eq_int(B2,C)
+       => ( ! [X3: int,Y2: int] : 
+              ( ord_less_eq_int(X3,Y2)
+             => ord_less_eq_num(aa_int_num(F,X3),aa_int_num(F,Y2)) )
+         => ord_less_eq_num(A2,aa_int_num(F,C)) ) ) ) )).
+
+tff(fact_434_order__subst1,axiom,(
+    ! [A2: int,F: fun_nat_int,B2: nat,C: nat] : 
+      ( ord_less_eq_int(A2,aa_nat_int(F,B2))
+     => ( pp(aa_nat_bool(ord_less_eq_nat(B2),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(ord_less_eq_nat(X3),Y2))
+             => ord_less_eq_int(aa_nat_int(F,X3),aa_nat_int(F,Y2)) )
+         => ord_less_eq_int(A2,aa_nat_int(F,C)) ) ) ) )).
+
+tff(fact_435_order__subst1,axiom,(
+    ! [A2: int,F: fun_num_int,B2: num,C: num] : 
+      ( ord_less_eq_int(A2,aa_num_int(F,B2))
+     => ( ord_less_eq_num(B2,C)
+       => ( ! [X3: num,Y2: num] : 
+              ( ord_less_eq_num(X3,Y2)
+             => ord_less_eq_int(aa_num_int(F,X3),aa_num_int(F,Y2)) )
+         => ord_less_eq_int(A2,aa_num_int(F,C)) ) ) ) )).
+
+tff(fact_436_order__subst1,axiom,(
+    ! [A2: int,F: fun_int_int,B2: int,C: int] : 
+      ( ord_less_eq_int(A2,aa_int_int(F,B2))
+     => ( ord_less_eq_int(B2,C)
+       => ( ! [X3: int,Y2: int] : 
+              ( ord_less_eq_int(X3,Y2)
+             => ord_less_eq_int(aa_int_int(F,X3),aa_int_int(F,Y2)) )
+         => ord_less_eq_int(A2,aa_int_int(F,C)) ) ) ) )).
+
+tff(fact_437_nat_Osimps_I3_J,axiom,(
+    ! [X22: nat] : 
+      aa_nat_nat(suc,X22) != zero_zero_nat )).
+
+tff(fact_438_order__subst2,axiom,(
+    ! [A2: nat,B2: nat,F: fun_nat_nat,C: nat] : 
+      ( pp(aa_nat_bool(ord_less_eq_nat(A2),B2))
+     => ( pp(aa_nat_bool(ord_less_eq_nat(aa_nat_nat(F,B2)),C))
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(ord_less_eq_nat(X3),Y2))
+             => pp(aa_nat_bool(ord_less_eq_nat(aa_nat_nat(F,X3)),aa_nat_nat(F,Y2))) )
+         => pp(aa_nat_bool(ord_less_eq_nat(aa_nat_nat(F,A2)),C)) ) ) ) )).
+
+tff(fact_439_order__subst2,axiom,(
+    ! [A2: nat,B2: nat,F: fun_nat_num,C: num] : 
+      ( pp(aa_nat_bool(ord_less_eq_nat(A2),B2))
+     => ( ord_less_eq_num(aa_nat_num(F,B2),C)
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(ord_less_eq_nat(X3),Y2))
+             => ord_less_eq_num(aa_nat_num(F,X3),aa_nat_num(F,Y2)) )
+         => ord_less_eq_num(aa_nat_num(F,A2),C) ) ) ) )).
+
+tff(fact_440_order__subst2,axiom,(
+    ! [A2: nat,B2: nat,F: fun_nat_int,C: int] : 
+      ( pp(aa_nat_bool(ord_less_eq_nat(A2),B2))
+     => ( ord_less_eq_int(aa_nat_int(F,B2),C)
+       => ( ! [X3: nat,Y2: nat] : 
+              ( pp(aa_nat_bool(ord_less_eq_nat(X3),Y2))
+             => ord_less_eq_int(aa_nat_int(F,X3),aa_nat_int(F,Y2)) )
+         => ord_less_eq_int(aa_nat_int(F,A2),C) ) ) ) )).
+
+tff(fact_441_order__subst2,axiom,(
+    ! [A2: num,B2: num,F: fun_num_nat,C: nat] : 
+      ( ord_less_eq_num(A2,B2)
+     => ( pp(aa_nat_bool(ord_less_eq_nat(aa_num_nat(F,B2)),C))
+       => ( ! [X3: num,Y2: num] : 
+              ( ord_less_eq_num(X3,Y2)
+             => pp(aa_nat_bool(ord_less_eq_nat(aa_num_nat(F,X3)),aa_num_nat(F,Y2))) )
+         => pp(aa_nat_bool(ord_less_eq_nat(aa_num_nat(F,A2)),C)) ) ) ) )).
+
+tff(fact_442_order__subst2,axiom,(
+    ! [A2: num,B2: num,F: fun_num_num,C: num] : 
+      ( ord_less_eq_num(A2,B2)
+     => ( ord_less_eq_num(aa_num_num(F,B2),C)
+       => ( ! [X3: num,Y2: num] : 
+              ( ord_less_eq_num(X3,Y2)
+             => ord_less_eq_num(aa_num_num(F,X3),aa_num_num(F,Y2)) )
+         => ord_less_eq_num(aa_num_num(F,A2),C) ) ) ) )).
+
+tff(fact_443_order__subst2,axiom,(
+    ! [A2: num,B2: num,F: fun_num_int,C: int] : 
+      ( ord_less_eq_num(A2,B2)
+     => ( ord_less_eq_int(aa_num_int(F,B2),C)
+       => ( ! [X3: num,Y2: num] : 
+              ( ord_less_eq_num(X3,Y2)
+             => ord_less_eq_int(aa_num_int(F,X3),aa_num_int(F,Y2)) )
+         => ord_less_eq_int(aa_num_int(F,A2),C) ) ) ) )).
+
+tff(fact_444_order__subst2,axiom,(
+    ! [A2: int,B2: int,F: fun_int_nat,C: nat] : 
+      ( ord_less_eq_int(A2,B2)
+     => ( pp(aa_nat_bool(ord_less_eq_nat(aa_int_nat(F,B2)),C))
+       => ( ! [X3: int,Y2: int] : 
+              ( ord_less_eq_int(X3,Y2)
+             => pp(aa_nat_bool(ord_less_eq_nat(aa_int_nat(F,X3)),aa_int_nat(F,Y2))) )
+         => pp(aa_nat_bool(ord_less_eq_nat(aa_int_nat(F,A2)),C)) ) ) ) )).
+
+tff(fact_445_order__subst2,axiom,(
+    ! [A2: int,B2: int,F: fun_int_num,C: num] : 
+      ( ord_less_eq_int(A2,B2)
+     => ( ord_less_eq_num(aa_int_num(F,B2),C)
+       => ( ! [X3: int,Y2: int] : 
+              ( ord_less_eq_int(X3,Y2)
+             => ord_less_eq_num(aa_int_num(F,X3),aa_int_num(F,Y2)) )
+         => ord_less_eq_num(aa_int_num(F,A2),C) ) ) ) )).
+
+tff(fact_446_order__subst2,axiom,(
+    ! [A2: int,B2: int,F: fun_int_int,C: int] : 
+      ( ord_less_eq_int(A2,B2)
+     => ( ord_less_eq_int(aa_int_int(F,B2),C)
+       => ( ! [X3: int,Y2: int] : 
+              ( ord_less_eq_int(X3,Y2)
+             => ord_less_eq_int(aa_int_int(F,X3),aa_int_int(F,Y2)) )
+         => ord_less_eq_int(aa_int_int(F,A2),C) ) ) ) )).
+
+tff(fact_447_div__Suc__eq__div__add3,axiom,(
+    ! [M: nat,N: nat] : aa_nat_nat(divide_divide_nat(M),aa_nat_nat(suc,aa_nat_nat(suc,aa_nat_nat(suc,N)))) = aa_nat_nat(divide_divide_nat(M),aa_nat_nat(plus_plus_nat(aa_num_nat(numeral_numeral_nat,aa_num_num(bit1,one))),N)) )).
+
+tff(fact_448_ord__eq__le__subst,axiom,(
+    ! [A2: num,F: fun_int_num,B2: int,C: int] : 
+      ( A2 = aa_int_num(F,B2)
+     => ( ord_less_eq_int(B2,C)
+       => ( ! [X3: int,Y2: int] : 
+              ( ord_less_eq_int(X3,Y2)
+             => ord_less_eq_num(aa_int_num(F,X3),aa_int_num(F,Y2)) )
+         => ord_less_eq_num(A2,aa_int_num(F,C)) ) ) ) )).
+
+tff(fact_449_ord__eq__le__subst,axiom,(
+    ! [A2: int,F: fun_int_int,B2: int,C: int] : 
+      ( A2 = aa_int_int(F,B2)
+     => ( ord_less_eq_int(B2,C)
+       => ( ! [X3: int,Y2: int] : 
+              ( ord_less_eq_int(X3,Y2)
+             => ord_less_eq_int(aa_int_int(F,X3),aa_int_int(F,Y2)) )
+         => ord_less_eq_int(A2,aa_int_int(F,C)) ) ) ) )).
+
+tff(fact_450_nat__of__nibble_Osimps_I8_J,axiom,(
+    nat_of_nibble(nibble7) = aa_num_nat(numeral_numeral_nat,aa_num_num(bit1,aa_num_num(bit1,one))) )).
+
+tff(fact_451_eval__nat__numeral_I2_J,axiom,(
+    ! [N: num] : aa_num_nat(numeral_numeral_nat,aa_num_num(bit0,N)) = aa_nat_nat(suc,aa_num_nat(numeral_numeral_nat,aa_num_num(bitM,N))) )).
+
+tff(fact_452_num_Osize__gen_I1_J,axiom,(
+    aa_num_nat(size_num,one) = zero_zero_nat )).
+
+tff(fact_453_nibble__of__nat__simps_I14_J,axiom,(
+    nibble_of_nat(aa_num_nat(numeral_numeral_nat,aa_num_num(bit1,aa_num_num(bit0,aa_num_num(bit1,one))))) = nibbleD )).
+
+tff(fact_454_nat__of__nibble_Osimps_I16_J,axiom,(
+    nat_of_nibble(nibbleF) = aa_num_nat(numeral_numeral_nat,aa_num_num(bit1,aa_num_num(bit1,aa_num_num(bit1,one)))) )).
+
+tff(fact_455_not__gr0,axiom,(
+    ! [N: nat] : 
+      ( ~ pp(aa_nat_bool(ord_less_nat(zero_zero_nat),N))
+    <=> N = zero_zero_nat ) )).
+
+tff(fact_456_complex__rotationsp__complex__rotations__eq,axiom,(
+    ! [X4: fun_Vertex_Vertex] : 
+      ( pp(aa_fun1227708118x_bool(complex_rotationsp,X4))
+    <=> member920616666Vertex(X4,complex_rotations) ) )).
+
+tff(fact_457_complex__rotationsp_Ocomp,axiom,(
+    ! [R: fun_Vertex_Vertex,S: fun_Vertex_Vertex] : 
+      ( pp(aa_fun1227708118x_bool(complex_rotationsp,R))
+     => ( pp(aa_fun1227708118x_bool(complex_rotationsp,S))
+       => pp(aa_fun1227708118x_bool(complex_rotationsp,aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,R),S))) ) ) )).
+
+tff(fact_458_Suc__div__eq__add3__div__numeral,axiom,(
+    ! [M: nat,V: num] : aa_nat_nat(divide_divide_nat(aa_nat_nat(suc,aa_nat_nat(suc,aa_nat_nat(suc,M)))),aa_num_nat(numeral_numeral_nat,V)) = aa_nat_nat(divide_divide_nat(aa_nat_nat(plus_plus_nat(aa_num_nat(numeral_numeral_nat,aa_num_num(bit1,one))),M)),aa_num_nat(numeral_numeral_nat,V)) )).
+
+tff(fact_459_plus__nat_Osimps_I2_J,axiom,(
+    ! [M: nat,N: nat] : aa_nat_nat(plus_plus_nat(aa_nat_nat(suc,M)),N) = aa_nat_nat(suc,aa_nat_nat(plus_plus_nat(M),N)) )).
+
+tff(fact_460_Suc__mod__eq__add3__mod__numeral,axiom,(
+    ! [M: nat,V: num] : aa_nat_nat(div_mod_nat(aa_nat_nat(suc,aa_nat_nat(suc,aa_nat_nat(suc,M)))),aa_num_nat(numeral_numeral_nat,V)) = aa_nat_nat(div_mod_nat(aa_nat_nat(plus_plus_nat(aa_num_nat(numeral_numeral_nat,aa_num_num(bit1,one))),M)),aa_num_nat(numeral_numeral_nat,V)) )).
+
+tff(fact_461_complex__rotationsp_Osimp,axiom,(
+    ! [R: fun_Vertex_Vertex] : 
+      ( member920616666Vertex(R,simple_rotations)
+     => pp(aa_fun1227708118x_bool(complex_rotationsp,R)) ) )).
+
+tff(fact_462_Suc__eq__numeral,axiom,(
+    ! [N: nat,K: num] : 
+      ( aa_nat_nat(suc,N) = aa_num_nat(numeral_numeral_nat,K)
+    <=> N = aa_num_nat(pred_numeral,K) ) )).
+
+tff(fact_463_odd__mod__4__div__2,axiom,(
+    ! [N: nat] : 
+      ( aa_nat_nat(div_mod_nat(N),aa_num_nat(numeral_numeral_nat,aa_num_num(bit0,aa_num_num(bit0,one)))) = aa_num_nat(numeral_numeral_nat,aa_num_num(bit1,one))
+     => ~ pp(aa_nat_bool(dvd_dvd_nat(aa_num_nat(numeral_numeral_nat,aa_num_num(bit0,one))),aa_nat_nat(divide_divide_nat(aa_nat_nat(minus_minus_nat(N),one_one_nat)),aa_num_nat(numeral_numeral_nat,aa_num_num(bit0,one))))) ) )).
+
+tff(fact_464_Suc__le__mono,axiom,(
+    ! [N: nat,M: nat] : 
+      ( pp(aa_nat_bool(ord_less_eq_nat(aa_nat_nat(suc,N)),aa_nat_nat(suc,M)))
+    <=> pp(aa_nat_bool(ord_less_eq_nat(N),M)) ) )).
+
+tff(fact_465_nat__of__nibble_Osimps_I14_J,axiom,(
+    nat_of_nibble(nibbleD) = aa_num_nat(numeral_numeral_nat,aa_num_num(bit1,aa_num_num(bit0,aa_num_num(bit1,one)))) )).
+
+tff(fact_466_pos__zmod__mult__2,axiom,(
+    ! [A2: int,B2: int] : 
+      ( ord_less_eq_int(zero_zero_int,A2)
+     => aa_int_int(div_mod_int(aa_int_int(plus_plus_int(one_one_int),aa_int_int(times_times_int(aa_num_int(numeral_numeral_int,aa_num_num(bit0,one))),B2))),aa_int_int(times_times_int(aa_num_int(numeral_numeral_int,aa_num_num(bit0,one))),A2)) = aa_int_int(plus_plus_int(one_one_int),aa_int_int(times_times_int(aa_num_int(numeral_numeral_int,aa_num_num(bit0,one))),aa_int_int(div_mod_int(B2),A2))) ) )).
+
+tff(fact_467_Nat__Transfer_Otransfer__nat__int__function__closures_I9_J,axiom,(
+    ! [Z: nat] : ord_less_eq_int(zero_zero_int,aa_nat_int(semiri2019852685at_int,Z)) )).
+
+tff(fact_468_nat__numeral,axiom,(
+    ! [K: num] : aa_int_nat(nat2,aa_num_int(numeral_numeral_int,K)) = aa_num_nat(numeral_numeral_nat,K) )).
+
+tff(fact_469_less__eq__int__code_I1_J,axiom,(
+    ord_less_eq_int(zero_zero_int,zero_zero_int) )).
+
+tff(fact_470_Nat_Ole__iff__add,axiom,(
+    ! [M: nat,N: nat] : 
+      ( pp(aa_nat_bool(ord_less_eq_nat(M),N))
+    <=> ? [K2: nat] : N = aa_nat_nat(plus_plus_nat(M),K2) ) )).
+
+tff(fact_471_imp__le__cong,axiom,(
+    ! [X: int,X5: int,P: bool,P2: bool] : 
+      ( X = X5
+     => ( ( ord_less_eq_int(zero_zero_int,X5)
+         => ( pp(P)
+          <=> pp(P2) ) )
+       => ( ( ord_less_eq_int(zero_zero_int,X)
+           => pp(P) )
+        <=> ( ord_less_eq_int(zero_zero_int,X5)
+           => pp(P2) ) ) ) ) )).
+
+tff(fact_472_num_Oinject_I1_J,axiom,(
+    ! [X22: num,Y22: num] : 
+      ( aa_num_num(bit0,X22) = aa_num_num(bit0,Y22)
+    <=> X22 = Y22 ) )).
+
+tff(fact_473_mult__0,axiom,(
+    ! [N: nat] : aa_nat_nat(times_times_nat(zero_zero_nat),N) = zero_zero_nat )).
+
+tff(fact_474_zero__less__Suc,axiom,(
+    ! [N: nat] : pp(aa_nat_bool(ord_less_nat(zero_zero_nat),aa_nat_nat(suc,N))) )).
+
+tff(fact_475_conj__le__cong,axiom,(
+    ! [X: int,X5: int,P: bool,P2: bool] : 
+      ( X = X5
+     => ( ( ord_less_eq_int(zero_zero_int,X5)
+         => ( pp(P)
+          <=> pp(P2) ) )
+       => ( ( ord_less_eq_int(zero_zero_int,X)
+            & pp(P) )
+        <=> ( ord_less_eq_int(zero_zero_int,X5)
+            & pp(P2) ) ) ) ) )).
+
+tff(fact_476_pred__numeral__simps_I1_J,axiom,(
+    aa_num_nat(pred_numeral,one) = zero_zero_nat )).
+
+tff(fact_477_Nat__Transfer_Otransfer__int__nat__function__closures_I8_J,axiom,(
+    nat_is_nat(aa_num_int(numeral_numeral_int,aa_num_num(bit1,one))) )).
+
+tff(fact_478_semiring__norm_I77_J,axiom,(
+    ! [N: num] : ord_less_num(one,aa_num_num(bit1,N)) )).
+
+tff(fact_479_Nat__Transfer_Otransfer__nat__int__function__closures_I4_J,axiom,(
+    ! [X: int,N: nat] : 
+      ( ord_less_eq_int(zero_zero_int,X)
+     => ord_less_eq_int(zero_zero_int,aa_nat_int(power_power_int(X),N)) ) )).
+
+tff(fact_480_zmod__numeral__Bit1,axiom,(
+    ! [V: num,W: num] : aa_int_int(div_mod_int(aa_num_int(numeral_numeral_int,aa_num_num(bit1,V))),aa_num_int(numeral_numeral_int,aa_num_num(bit0,W))) = aa_int_int(plus_plus_int(aa_int_int(times_times_int(aa_num_int(numeral_numeral_int,aa_num_num(bit0,one))),aa_int_int(div_mod_int(aa_num_int(numeral_numeral_int,V)),aa_num_int(numeral_numeral_int,W)))),one_one_int) )).
+
+tff(fact_481_semiring__norm_I88_J,axiom,(
+    ! [M: num,N: num] : 
+      aa_num_num(bit0,M) != aa_num_num(bit1,N) )).
+
+tff(fact_482_semiring__norm_I89_J,axiom,(
+    ! [M: num,N: num] : 
+      aa_num_num(bit1,M) != aa_num_num(bit0,N) )).
+
+tff(fact_483_nat__induct,axiom,(
+    ! [P: fun_nat_bool,N: nat] : 
+      ( pp(aa_nat_bool(P,zero_zero_nat))
+     => ( ! [N2: nat] : 
+            ( pp(aa_nat_bool(P,N2))
+           => pp(aa_nat_bool(P,aa_nat_nat(suc,N2))) )
+       => pp(aa_nat_bool(P,N)) ) ) )).
+
+tff(fact_484_num__of__nat_Osimps_I1_J,axiom,(
+    aa_nat_num(num_of_nat,zero_zero_nat) = one )).
+
+tff(fact_485_UNIV__bool,axiom,(
+    top_top_set_bool = insert_bool(fFalse,insert_bool(fTrue,bot_bot_set_bool)) )).
+
+tff(fact_486_num_Osize_I4_J,axiom,(
+    aa_num_nat(size_size_num,one) = zero_zero_nat )).
+
+tff(fact_487_semiring__norm_I81_J,axiom,(
+    ! [M: num,N: num] : 
+      ( ord_less_num(aa_num_num(bit1,M),aa_num_num(bit0,N))
+    <=> ord_less_num(M,N) ) )).
+
+tff(fact_488_Suc__leI,axiom,(
+    ! [M: nat,N: nat] : 
+      ( pp(aa_nat_bool(ord_less_nat(M),N))
+     => pp(aa_nat_bool(ord_less_eq_nat(aa_nat_nat(suc,M)),N)) ) )).
+
+tff(fact_489_BitM__plus__one,axiom,(
+    ! [N: num] : aa_num_num(plus_plus_num(aa_num_num(bitM,N)),one) = aa_num_num(bit0,N) )).
+
+tff(fact_490_mult__0__right,axiom,(
+    ! [M: nat] : aa_nat_nat(times_times_nat(M),zero_zero_nat) = zero_zero_nat )).
+
+tff(fact_491_diff__le__self,axiom,(
+    ! [M: nat,N: nat] : pp(aa_nat_bool(ord_less_eq_nat(aa_nat_nat(minus_minus_nat(M),N)),M)) )).
+
+tff(fact_492_semiring__norm_I74_J,axiom,(
+    ! [M: num,N: num] : 
+      ( ord_less_eq_num(aa_num_num(bit1,M),aa_num_num(bit0,N))
+    <=> ord_less_num(M,N) ) )).
+
+tff(fact_493_semiring__norm_I72_J,axiom,(
+    ! [M: num,N: num] : 
+      ( ord_less_eq_num(aa_num_num(bit0,M),aa_num_num(bit1,N))
+    <=> ord_less_eq_num(M,N) ) )).
+
+tff(fact_494_ATP_Olambda__1,axiom,(
+    ! [Uu: set_Vertex,Uua: vertex] : 
+      ( pp(aa_Vertex_bool(aTP_Lamm_ae(Uu),Uua))
+    <=> member_Vertex(Uua,Uu) ) )).
+
+tff(fact_495_ATP_Olambda__2,axiom,(
+    ! [Uu: set_bool,Uua: bool] : 
+      ( pp(aa_bool_bool(aTP_Lamm_ad(Uu),Uua))
+    <=> member_bool(Uua,Uu) ) )).
+
+tff(fact_496_ATP_Olambda__3,axiom,(
+    ! [Uu: set_fu1440825977Vertex,Uua: fun_Vertex_Vertex] : 
+      ( pp(aa_fun1227708118x_bool(aTP_Lamm_ac(Uu),Uua))
+    <=> member920616666Vertex(Uua,Uu) ) )).
+
+tff(fact_497_ATP_Olambda__4,axiom,(
+    aTP_Lamm_ab = cOMBK_1657219075Vertex(suc) )).
+
+tff(fact_498_ATP_Olambda__5,axiom,(
+    aTP_Lamm_aa = cOMBK_11403434t_bool(suc) )).
+
+tff(fact_499_ATP_Olambda__6,axiom,(
+    aTP_Lamm_a = cOMBK_1275961328Vertex(suc) )).
+
+tff(help_fTrue_1_1_U,axiom,(
+    pp(fTrue) )).
+
+tff(help_fFalse_1_1_T,axiom,(
+    ! [P: bool] : 
+      ( P = fTrue
+      | P = fFalse ) )).
+
+tff(help_fFalse_1_1_U,axiom,(
+    ~ pp(fFalse) )).
+
+tff(help_COMBK_1_1_COMBK_001t__fun_It__Nat__Onat_Mt__Nat__Onat_J_001t__HOL__Obool_U,axiom,(
+    ! [P: fun_nat_nat,Q: bool] : aa_bool_fun_nat_nat(cOMBK_11403434t_bool(P),Q) = P )).
+
+tff(help_COMBK_1_1_COMBK_001t__fun_It__Nat__Onat_Mt__Nat__Onat_J_001t__OrbitStabiliser__OVertex_U,axiom,(
+    ! [P: fun_nat_nat,Q: vertex] : aa_Ver1041477201at_nat(cOMBK_1657219075Vertex(P),Q) = P )).
+
+tff(help_COMBK_1_1_COMBK_001t__fun_It__Nat__Onat_Mt__Nat__Onat_J_001t__fun_It__OrbitStabiliser__OVertex_Mt__OrbitStabiliser__OVertex_J_U,axiom,(
+    ! [P: fun_nat_nat,Q: fun_Vertex_Vertex] : aa_fun603603486at_nat(cOMBK_1275961328Vertex(P),Q) = P )).
+
+tff(conj_1,conjecture,(
+    pp(aa_nat_bool(ord_less_eq_nat(aa_num_nat(numeral_numeral_nat,aa_num_num(bit1,one))),aa_set1594830599ex_nat(finite1117633179Vertex,insert923351795Vertex(id_Vertex,insert923351795Vertex(rotate_A,insert923351795Vertex(aa_fun1974636740Vertex(aa_fun1998781572Vertex(comp_V592905037Vertex,rotate_A),rotate_A),bot_bo692629261Vertex)))))) )).
+%------------------------------------------------------------------------------

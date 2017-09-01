@@ -9,7 +9,7 @@ module BV = CCBV
 module Fmt = CCFormat
 module PW = Position.With
 module S = Subst
-module T = FOTerm
+module T = Term
 
 open Hornet_types
 

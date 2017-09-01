@@ -3,8 +3,11 @@
 
 (** {1 Check LLProof} *)
 
-(** A tiny Tableau-like prover that tries to re-prove each step in a
-    simple way. *)
+(** TODO: the checker itself.
+
+    GOAL: A tiny Tableau-like prover that tries to re-prove each step in a
+    simple way.
+*)
 
 type proof = LLProof.t
 

@@ -3,7 +3,18 @@
 
 (** {1 Array of literals} *)
 
-type term = FOTerm.t
+(** An array of literals is one of the major components of a clause.
+
+    It defines (implicitely) a scope for its variables; applying a substitution
+    should always be done with the same {!Subst.Renaming.t} for
+    all literals in the array.
+
+    This also provides printers, comparison, matching, positions,
+    simplifications, etc.
+    for such arrays of literals.
+*)
+
+type term = Term.t
 
 type t = Literal.t array
 (** Array of literals *)
@@ -35,6 +46,8 @@ val to_form : t -> term SLiteral.t list
 
 val apply_subst : renaming:Subst.Renaming.t ->
   Subst.t -> t Scoped.t -> t
+
+val of_unif_subst : renaming:Subst.Renaming.t -> Unif_subst.t -> t
 
 val map : (term -> term) -> t -> t
 
@@ -99,7 +112,7 @@ module Conv : sig
   (** To list of formulas *)
 
   val to_s_form :
-    ?ctx:FOTerm.Conv.ctx ->
+    ?ctx:Term.Conv.ctx ->
     ?hooks:Literal.Conv.hook_to list ->
     t ->
     TypedSTerm.Form.t
@@ -176,6 +189,9 @@ val symbols : ?init:ID.Set.t -> t -> ID.Set.t
 val pp : t CCFormat.printer
 val pp_vars : t CCFormat.printer
 val pp_tstp : t CCFormat.printer
+val pp_tstp_closed : t CCFormat.printer
+val pp_zf : t CCFormat.printer
+val pp_zf_closed : t CCFormat.printer
 val to_string : t -> string
 
 (** {2 Special kinds of literal arrays} *)
@@ -188,3 +204,11 @@ val is_horn : t -> bool
 
 val is_pos_eq : t -> (term * term) option
 (** Recognize whether the clause is a positive unit equality. *)
+
+(** {2 Shielded Variables} *)
+
+val is_shielded : Term.var -> t -> bool
+(** Is this variable shielded in this clause? *)
+
+val unshielded_vars : ?filter:(Term.var -> bool) -> t -> Term.var list
+(** Set of variables occurring unshielded *)

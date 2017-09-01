@@ -8,7 +8,7 @@
 open Logtk
 
 type cst = Ind_cst.t
-type term = FOTerm.t
+type term = Term.t
 
 type case
 

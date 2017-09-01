@@ -6,9 +6,13 @@
 (** Feature Vector indexing (see Schulz 2004) for efficient forward
     and backward subsumption on Horn Clauses.
 
+    This allows to retrieve clauses that (potentially) subsume
+    or are subsumed by a given query clause.
+
     This module is a modified version of {!FeatureVector},
     with full-signature features that encompass all symbols at the
-    same time. *)
+    same time.
+*)
 
 type labels = Index_intf.labels
 

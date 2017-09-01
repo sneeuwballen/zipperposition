@@ -12,12 +12,14 @@ type 'a or_error = ('a, string) CCResult.t
 (** {2 Phases} *)
 
 type env_with_clauses =
-    Env_clauses : 'c Env.packed * 'c CCVector.ro_vector -> env_with_clauses
+    Env_clauses : 'c Env.packed * 'c Clause.sets -> env_with_clauses
 
 type env_with_result =
     Env_result : 'c Env.packed * Saturate.szs_status -> env_with_result
 
 type errcode = int
+
+type prelude = UntypedAST.statement Sequence.t
 
 type ('ret, 'before, 'after) phase =
   | Init : (unit, _, [`Init]) phase (* global setup *)
@@ -27,8 +29,9 @@ type ('ret, 'before, 'after) phase =
       (filename list * Params.t, [`Init], [`Parse_cli]) phase
   (* parse CLI options: get a list of files to process, and parameters *)
   | LoadExtensions : (Extensions.t list, [`Parse_cli], [`LoadExtensions]) phase
+  | Parse_prelude : (prelude, [`LoadExtensions], [`Parse_prelude]) phase
   | Start_file :
-      (filename, [`LoadExtensions], [`Start_file]) phase (* file to process *)
+      (filename, [`Parse_prelude], [`Start_file]) phase (* file to process *)
   | Parse_file :
       (Input_format.t * UntypedAST.statement Sequence.t,
        [`Start_file], [`Parse_file]) phase (* parse some file *)
@@ -47,7 +50,7 @@ type ('ret, 'before, 'after) phase =
   | MakeEnv : (env_with_clauses, [`MakeCtx], [`MakeEnv]) phase
 
   | Pre_saturate :
-      ('c Env.packed * Saturate.szs_status * 'c CCVector.ro_vector,
+      ('c Env.packed * Saturate.szs_status * 'c Clause.sets,
        [`MakeEnv], [`Pre_saturate]) phase
 
   | Saturate :
@@ -81,6 +84,7 @@ let string_of_phase : type a b c. (a,b,c) phase -> string
     | Setup_signal -> "setup_signal"
     | Parse_CLI  -> "parse_cli"
     | LoadExtensions -> "load_extensions"
+    | Parse_prelude -> "parse_prelude"
     | Start_file -> "start_file"
     | Parse_file -> "parse_file"
     | Typing -> "typing"

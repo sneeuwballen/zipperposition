@@ -86,7 +86,7 @@ let () = Printexc.register_printer
       | InconsistentBinding (v, t1, t2) ->
         let msg = CCFormat.sprintf
             "@[<2>inconsistent binding@ for %a: %a@ and %a@]"
-            (Scoped.pp HVar.pp) v (Scoped.pp T.pp) t1 (Scoped.pp T.pp) t2
+            (Scoped.pp T.pp_var) v (Scoped.pp T.pp) t1 (Scoped.pp T.pp) t2
         in
         Some msg
       | _ -> None)
@@ -98,6 +98,8 @@ let bind
     M.add v t subst
 
 let remove subst v = M.remove v subst
+
+let restrict_scope subst sc = M.filter (fun (_,sc_v) _ -> sc=sc_v) subst
 
 let append s1 s2 =
   M.merge
@@ -145,6 +147,33 @@ let introduced subst k =
        T.Seq.vars t (fun v -> k (v,sc_t)))
     subst
 
+let normalize subst : t =
+  let rec aux sc t =
+    if T.equal t T.tType then t
+    else (
+      let ty = aux sc (T.ty_exn t) in
+      match T.view t with
+        | T.Var v ->
+          (* follow binding if it stays in the same domain *)
+          begin match find subst (v,sc) with
+            | Some (u, sc') when sc=sc' -> aux sc u
+            | _ -> T.var (HVar.cast ~ty v)
+          end
+        | T.DB i -> T.bvar ~ty i
+        | T.Const id -> T.const ~ty id
+        | T.App (f, l) -> T.app ~ty (aux sc f) (List.map (aux sc) l)
+        | T.AppBuiltin (b, l) -> T.app_builtin b ~ty (List.map (aux sc) l)
+        | T.Bind (b,varty,body) ->
+          let varty = aux sc varty in
+          T.bind b ~ty ~varty (aux sc body)
+    )
+  in
+  M.map (fun (t,sc) -> aux sc t, sc) subst
+
+let map f subst = M.map (fun (t,sc) -> f t, sc) subst
+
+let filter f subst = M.filter f subst
+
 let to_seq subst k = M.iter (fun v t -> k (v,t)) subst
 
 let to_list subst = M.fold (fun v t acc -> (v,t)::acc) subst []
@@ -163,14 +192,14 @@ let compare s1 s2 = M.compare (Scoped.compare T.compare) s1 s2
 let hash (s:t): int =
   CCHash.(seq (pair (Scoped.hash HVar.hash) (Scoped.hash T.hash))) (M.to_seq s)
 
-let pp out subst =
+let pp_bindings out subst =
   let pp_binding out (v,t) =
-    Format.fprintf out "@[<2>@[%a@] →@ @[%a@]@]"
-      (Scoped.pp HVar.pp) v (Scoped.pp T.pp) t
+    Format.fprintf out "@[<2>@[%a@] @<1>→@ @[%a@]@]"
+      (Scoped.pp T.pp_var) v (Scoped.pp T.pp) t
   in
-  Format.fprintf out "{@[<hv>%a@]}"
-    (Util.pp_seq ~sep:", " pp_binding)
-    (to_seq subst)
+  Util.pp_seq ~sep:", " pp_binding out (to_seq subst)
+
+let pp out subst = Format.fprintf out "{@[<hv>%a@]}" pp_bindings subst
 
 let to_string = CCFormat.to_string pp
 
@@ -198,11 +227,11 @@ let apply subst ~renaming t =
             (* the most interesting cases!
                switch depending on whether [t] is bound by [subst] or not *)
             begin try
-                let (t', _) as term'  = find_exn subst (v,sc_t) in
-                (* NOTE: we used to shift [t'], in case it contained free De
-                   Bruijn indices, but that shouldn't happen because only
-                   closed terms should appear in substitutions. *)
-                assert (T.DB.closed t');
+                let term'  = find_exn subst (v,sc_t) in
+                (* NOTE: if [t'] is not closed, we assume that it
+                   is always replaced in a context where variables
+                   are properly bound. Typically, that means only
+                   in rewriting. *)
                 (* also apply [subst] to [t'] *)
                 aux term'
               with Not_found ->
@@ -235,7 +264,9 @@ let apply subst ~renaming t =
   aux t
 
 let apply_no_renaming subst t =
-  apply subst ~renaming:Renaming.dummy t
+  if is_empty subst
+  then fst t
+  else apply subst ~renaming:Renaming.dummy t
 
 (** {2 Specializations} *)
 
@@ -291,30 +322,43 @@ module Ty : SPECIALIZED with type term = Type.t = struct
 end
 
 module FO = struct
-  type term = FOTerm.t
+  type term = Term.t
   type t = subst
 
   let deref subst t =
     let t, sc = deref subst (t : term Scoped.t :> T.t Scoped.t) in
-    FOTerm.of_term_unsafe t, sc
+    Term.of_term_unsafe t, sc
 
   let get_var subst v =
     let o = get_var subst v in
-    CCOpt.map (Scoped.map FOTerm.of_term_unsafe) o
+    CCOpt.map (Scoped.map Term.of_term_unsafe) o
 
   let find_exn subst v =
     let t = find_exn subst v in
-    Scoped.map FOTerm.of_term_unsafe t
+    Scoped.map Term.of_term_unsafe t
 
   let apply subst ~renaming t =
-    FOTerm.of_term_unsafe (apply subst ~renaming (t : term Scoped.t :> T.t Scoped.t))
+    Term.of_term_unsafe (apply subst ~renaming (t : term Scoped.t :> T.t Scoped.t))
+
+  let apply_l subst ~renaming (l,sc) =
+    List.map (fun t -> apply subst ~renaming (t,sc)) l
 
   let apply_no_renaming subst t =
-    FOTerm.of_term_unsafe (apply_no_renaming  subst (t : term Scoped.t :> T.t Scoped.t))
+    Term.of_term_unsafe (apply_no_renaming  subst (t : term Scoped.t :> T.t Scoped.t))
 
   let bind = (bind :> t -> var Scoped.t -> term Scoped.t -> t)
   let of_list = (of_list :> ?init:t -> (var Scoped.t * term Scoped.t) list -> t)
 
   let bind' = (bind :> t -> Type.t HVar.t Scoped.t -> term Scoped.t -> t)
   let of_list' = (of_list :> ?init:t -> (Type.t HVar.t Scoped.t * term Scoped.t) list -> t)
+
+  let map f s = map (fun t -> (f (Term.of_term_unsafe t) : term :> T.t)) s
+
+  let filter f s =
+    filter
+      (fun (v,sc_v) (t,sc_t) ->
+         f
+           (HVar.update_ty ~f:Type.of_term_unsafe v,sc_v)
+           (Term.of_term_unsafe t,sc_t))
+      s
 end

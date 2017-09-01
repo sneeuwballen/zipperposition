@@ -6,7 +6,7 @@
 open Logtk
 open Logtk_arbitrary
 
-module T = FOTerm
+module T = Term
 
 (* a simple instance of equation *)
 module E : Index.EQUATION with type rhs = int and type t = T.t * int = struct
@@ -25,9 +25,9 @@ end
 (* lists of unique terms *)
 let gen low high =
   QCheck.Gen.(
-    let t = (1 -- 7) >>= ArTerm.default_fuel in
+    let t = (1 -- 7) >>= ArTerm.default_ho_fuel in
     list_size (low -- high) t >>= fun l ->
-    let seq = T.Set.of_list l |> T.Set.to_seq in
+    let seq = List.map Lambda.snf l |> T.Set.of_list |> T.Set.to_seq in
     let seq = Sequence.mapi (fun i t -> t, i) seq in
     return (Sequence.to_list seq)
   )
@@ -209,7 +209,7 @@ module TestTerm(I : TermIndex) = struct
   let _limit = _count + 100
 
   let check_retrieved_unify =
-    let prop = _check_all_retrieved_satisfy I.retrieve_unifiables Unif.FO.unification in
+    let prop = _check_all_retrieved_satisfy I.retrieve_unifiables Unif.FO.unify_syn in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_unify" I.name in
     QCheck.Test.make ~name ~count:_count ~max_gen:_limit (arb 10 150) prop
 
@@ -225,7 +225,7 @@ module TestTerm(I : TermIndex) = struct
     QCheck.Test.make ~name ~count:_count ~max_gen:_limit (arb 10 150) prop
 
   let check_retrieve_all_unify =
-    let prop = _check_all_satisfying_are_retrieved I.retrieve_unifiables Unif.FO.unification in
+    let prop = _check_all_satisfying_are_retrieved I.retrieve_unifiables Unif.FO.unify_syn in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_unify" I.name in
     QCheck.Test.make ~name ~count:_count ~max_gen:_limit (arb 10 150) prop
 

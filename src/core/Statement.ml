@@ -12,13 +12,18 @@ type 'ty data = {
   (** type parameters *)
   data_ty: 'ty;
   (** type of Id, that is,   [type -> type -> ... -> type] *)
-  data_cstors: (ID.t * 'ty) list;
-  (** Each constructor is [id, ty]. [ty] must be of the form
-      [ty1 -> ty2 -> ... -> id args] *)
+  data_cstors: (ID.t * 'ty * ('ty * (ID.t * 'ty)) list) list;
+  (** Each constructor is [id, ty, args].
+      [ty] must be of the form [ty1 -> ty2 -> ... -> id args].
+      [args] has the form [(ty1, p1), (ty2,p2), …] where each [p]
+      is a projector. *)
 }
 
 type attr =
   | A_AC
+  | A_infix of string
+  | A_prefix of string
+  | A_sos (** set of support *)
 
 type attrs = attr list
 
@@ -27,8 +32,12 @@ type 'ty skolem = ID.t * 'ty
 type ('t, 'ty) term_rule = 'ty Var.t list * ID.t * 'ty * 't list * 't
 (** [forall vars, id args = rhs] *)
 
-type ('f, 't, 'ty) form_rule = 'ty Var.t list * 't SLiteral.t * 'f list
-(** [forall vars, lhs <=> bigand rhs] *)
+(** polarity for rewrite rules *)
+type polarity = [`Equiv | `Imply]
+
+type ('f, 't, 'ty) form_rule = 'ty Var.t list * 't SLiteral.t * 'f list * polarity
+(** [forall vars, lhs op bigand rhs] where [op] depends on
+    [polarity] (in [{=>, <=>, <=}]) *)
 
 type ('f, 't, 'ty) def_rule =
   | Def_term of ('t, 'ty) term_rule
@@ -45,8 +54,7 @@ type ('f, 't, 'ty) view =
   | TyDecl of ID.t * 'ty (** id: ty *)
   | Data of 'ty data list
   | Def of ('f, 't, 'ty) def list
-  | RewriteTerm of ('t, 'ty) term_rule
-  | RewriteForm of ('f, 't, 'ty) form_rule
+  | Rewrite of ('f, 't, 'ty) def_rule
   | Assert of 'f (** assert form *)
   | Lemma of 'f list (** lemma to prove and use, using Avatar cut *)
   | Goal of 'f (** goal to prove *)
@@ -59,8 +67,9 @@ type from_file = {
   loc: ParseLocation.t option;
 }
 
-type lit = FOTerm.t SLiteral.t
+type lit = Term.t SLiteral.t
 type formula = TypedSTerm.t
+type input_def = (TypedSTerm.t,TypedSTerm.t,TypedSTerm.t) def
 type clause = lit list
 
 type role =
@@ -87,17 +96,19 @@ and source_view =
   | Neg of sourced_t
   | CNF of sourced_t
   | Renaming of sourced_t * ID.t * formula (* renamed this formula *)
-  | Preprocess of sourced_t * string
+  | Define of ID.t
+  | Preprocess of sourced_t * sourced_t list * string (* stmt, definitions, info *)
 
 and result =
   | Sourced_input of TypedSTerm.t
   | Sourced_clause of clause
   | Sourced_statement of input_t
+  | Sourced_clause_stmt of clause_t
 
 and sourced_t = result * source
 
 and input_t = (TypedSTerm.t, TypedSTerm.t, TypedSTerm.t) t
-and clause_t = (clause, FOTerm.t, Type.t) t
+and clause_t = (clause, Term.t, Type.t) t
 
 let compare a b = CCInt.compare a.id b.id
 let view t = t.view
@@ -116,8 +127,9 @@ let mk_ ?(attrs=[]) ~src view: (_,_,_) t =
 
 let ty_decl ?attrs ~src id ty = mk_ ?attrs ~src (TyDecl (id,ty))
 let def ?attrs ~src l = mk_ ?attrs ~src (Def l)
-let rewrite_term ?attrs ~src r = mk_ ?attrs ~src (RewriteTerm r)
-let rewrite_form ?attrs ~src r = mk_ ?attrs ~src (RewriteForm r)
+let rewrite ?attrs ~src d = mk_ ?attrs ~src (Rewrite d)
+let rewrite_term ?attrs ~src r = rewrite ?attrs ~src (Def_term r)
+let rewrite_form ?attrs ~src r = rewrite ?attrs ~src (Def_form r)
 let data ?attrs ~src l = mk_ ?attrs ~src (Data l)
 let assert_ ?attrs ~src c = mk_ ?attrs ~src (Assert c)
 let lemma ?attrs ~src l = mk_ ?attrs ~src (Lemma l)
@@ -128,7 +140,10 @@ let map_data ~ty:fty d =
   { d with
       data_args = List.map (Var.update_ty ~f:fty) d.data_args;
       data_ty = fty d.data_ty;
-      data_cstors = List.map (fun (id,ty) -> id, fty ty) d.data_cstors;
+      data_cstors =
+        List.map (fun (id,ty,args) ->
+          id, fty ty, List.map (fun (ty,(p_id,p_ty)) -> fty ty,(p_id, fty p_ty)) args)
+          d.data_cstors;
   }
 
 let map_def ~form:fform ~term:fterm ~ty:fty d =
@@ -140,9 +155,9 @@ let map_def ~form:fform ~term:fterm ~ty:fty d =
             | Def_term (vars,id,ty,args,rhs) ->
               let vars = List.map (Var.update_ty ~f:fty) vars in
               Def_term (vars, id, fty ty, List.map fterm args, fterm rhs)
-            | Def_form (vars,lhs,rhs) ->
+            | Def_form (vars,lhs,rhs,pol) ->
               let vars = List.map (Var.update_ty ~f:fty) vars in
-              Def_form (vars, SLiteral.map ~f:fterm lhs, List.map fform rhs))
+              Def_form (vars, SLiteral.map ~f:fterm lhs, List.map fform rhs, pol))
           d.def_rules;
   }
 
@@ -151,12 +166,16 @@ let map ~form ~term ~ty st =
     | Def l ->
       let l = List.map (map_def ~form ~term ~ty) l in
       Def l
-    | RewriteTerm (vars, id, ty, args, rhs) ->
-      let vars = List.map (Var.update_ty ~f:fty) vars in
-      RewriteTerm (vars, id, fty ty, List.map term args, term rhs)
-    | RewriteForm (vars,lhs,rhs) ->
-      let vars = List.map (Var.update_ty ~f:fty) vars in
-      RewriteForm (vars, SLiteral.map ~f:term lhs, List.map form rhs)
+    | Rewrite d ->
+      let d = match d with
+        | Def_term (vars, id, ty, args, rhs) ->
+          let vars = List.map (Var.update_ty ~f:fty) vars in
+          Def_term (vars, id, fty ty, List.map term args, term rhs)
+        | Def_form (vars,lhs,rhs,pol) ->
+          let vars = List.map (Var.update_ty ~f:fty) vars in
+          Def_form (vars, SLiteral.map ~f:term lhs, List.map form rhs, pol)
+      in
+      Rewrite d
     | Data l ->
       let l = List.map (map_data ~ty:fty) l in
       Data l
@@ -193,7 +212,8 @@ module Src = struct
   let neg x : t = mk_ (Neg x)
   let cnf x : t = mk_ (CNF x)
   let renaming x id f : t = mk_ (Renaming (x, id, f))
-  let preprocess x str : t = mk_ (Preprocess (x,str))
+  let define id : t = mk_ (Define id)
+  let preprocess x l str : t = mk_ (Preprocess (x,l,str))
 
   let neg_input f src = neg (Sourced_input f, src)
   let neg_clause c src = neg (Sourced_clause c, src)
@@ -203,8 +223,8 @@ module Src = struct
 
   let renaming_input input id f =
     renaming (Sourced_statement input, input.src) id f
-  let preprocess_input input str =
-    preprocess (Sourced_statement input, input.src) str
+  let preprocess_input input l str =
+    preprocess (Sourced_statement input, input.src) l str
 
   let pp_from_file out x =
     let pp_name out = function
@@ -222,12 +242,13 @@ module Src = struct
 
   let rec pp_tstp out src = match view src with
     | Internal _
-    | Input _ -> ()
+    | Input _
+    | Define _ -> ()
     | From_file (src,_) ->
       let file = src.file in
       begin match src.name with
         | None -> Format.fprintf out "file('%s')" file
-        | Some name -> Format.fprintf out "file('%s', '%s')" file name
+        | Some name -> Format.fprintf out "file(@['%s',@ '%s'@])" file name
       end
     | Neg (_,src') ->
       Format.fprintf out "inference(@['negate_goal',@ [status(thm)],@ [%a]@])"
@@ -235,9 +256,10 @@ module Src = struct
     | CNF (_,src') ->
       Format.fprintf out "inference(@['clausify',@ [status(esa)],@ [%a]@])"
         pp_tstp src'
-    | Preprocess ((_,src'),msg) ->
+    | Preprocess ((_,src'),_,msg) ->
       Format.fprintf out
-        "inference(@['%s',@ [status(esa)],@ [%a]@])" msg pp_tstp src'
+        "inference(@['%s',@ [status(esa)],@ [%a]@])"
+        msg pp_tstp src'
     | Renaming ((_,src'), id, form) ->
       Format.fprintf out
         "inference(@['renaming',@ [status(esa)],@ [%a],@ on(@[%a<=>%a@])@])"
@@ -259,18 +281,42 @@ module Src = struct
     | Renaming ((_,src'), id, form) ->
       Format.fprintf out "(@[renaming@ [%a]@ :name %a@ :on @[%a@]@])"
         pp src' ID.pp id TypedSTerm.pp form
-    | Preprocess ((_,src'),msg) ->
-      Format.fprintf out "(@[preprocess@ [%a]@ :msg %S@])" pp src' msg
+    | Define id ->
+      Format.fprintf out "(@[define %a@])" ID.pp id
+    | Preprocess ((_,src'),_,msg) ->
+      Format.fprintf out "(@[preprocess@ [%a]@ :msg %S@])"
+        pp src' msg
+
+  let rec to_attr src : UntypedAST.attr =
+    let open UntypedAST.A in
+    begin match view src with
+      | Input (_,_) -> str "input"
+      | Internal _ -> str "internal"
+      | From_file (f,r) ->
+        begin match f.name with
+          | None -> app "file" [quoted f.file]
+          | Some n -> app "file" [quoted f.file; app "name" [quoted n]]
+        end
+      | Neg (_,src') -> app "neg" [to_attr src']
+      | CNF (_,src') -> app "cnf" [to_attr src']
+      | Renaming ((_,src'),id,_) ->
+        app "renaming" [to_attr src'; quoted (ID.to_string id)]
+      | Define id -> app "define" [quoted (ID.to_string id)]
+      | Preprocess ((_,src'),_,msg) ->
+        app "preprocess" [to_attr src'; quoted msg]
+    end
 end
 
 (** {2 Defined Constants} *)
 
 type definition = Rewrite.rule_set
 
-let as_defined_cst id = match ID.payload id with
-  | Rewrite.Payload_defined_cst c ->
-    Some (Rewrite.Defined_cst.level c, Rewrite.Defined_cst.rules c)
-  | _ -> None
+let as_defined_cst id =
+  ID.payload_find id
+    ~f:(function
+      | Rewrite.Payload_defined_cst c ->
+        Some (Rewrite.Defined_cst.level c, Rewrite.Defined_cst.rules c)
+      | _ -> None)
 
 let as_defined_cst_level id = CCOpt.map fst @@ as_defined_cst id
 
@@ -286,7 +332,7 @@ let conv_term_rule (r:_ term_rule): Rewrite.Term.rule =
 
 (* returns either a term or a lit rule (depending on whether RHS is atomic) *)
 let conv_lit_rule (r:_ form_rule): Rewrite.rule =
-  let _, lhs, rhs = r in
+  let _, lhs, rhs, _ = r in
   let lhs = Literal.Conv.of_form lhs in
   let rhs = List.map (List.map Literal.Conv.of_form) rhs in
   Rewrite.Rule.make_lit lhs rhs
@@ -304,23 +350,18 @@ let conv_rules (l:_ def_rule list): definition =
 let terms_of_rule (d:_ def_rule): _ Sequence.t = match d with
   | Def_term (_, _, _, args, rhs) ->
     Sequence.of_list (rhs::args)
-  | Def_form (_, lhs, rhs) ->
+  | Def_form (_, lhs, rhs, _) ->
     Sequence.cons lhs (Sequence.of_list rhs |> Sequence.flat_map Sequence.of_list)
     |> Sequence.flat_map SLiteral.to_seq
 
 let level_of_rule (d:_ def_rule): int =
   terms_of_rule d
-  |> Sequence.flat_map FOTerm.Seq.symbols
+  |> Sequence.flat_map Term.Seq.symbols
   |> Sequence.filter_map as_defined_cst_level
   |> Sequence.max
   |> CCOpt.get_or ~default:0
 
-let max_exn seq =
-  seq
-  |> Sequence.max
-  |> CCOpt.get_lazy (fun () -> assert false)
-
-let scan_stmt_for_defined_cst (st:(clause,FOTerm.t,Type.t) t): unit = match view st with
+let scan_stmt_for_defined_cst (st:(clause,Term.t,Type.t) t): unit = match view st with
   | Def [] -> assert false
   | Def l ->
     (* define all IDs at the same level (the max of those computed) *)
@@ -336,7 +377,8 @@ let scan_stmt_for_defined_cst (st:(clause,FOTerm.t,Type.t) t): unit = match view
            let lev =
              Sequence.of_list def_rules
              |> Sequence.map level_of_rule
-             |> max_exn
+             |> Sequence.max
+             |> CCOpt.get_or ~default:0
            and def =
              conv_rules def_rules
            in
@@ -345,37 +387,55 @@ let scan_stmt_for_defined_cst (st:(clause,FOTerm.t,Type.t) t): unit = match view
     let level =
       Sequence.of_list ids_and_levels
       |> Sequence.map (fun (_,l,_) -> l)
-      |> max_exn
-      |> succ
+      |> Sequence.max |> CCOpt.map_or ~default:0 succ
     in
     List.iter
       (fun (id,_,def) ->
          let _ = Rewrite.Defined_cst.declare ~level id def in
          ())
       ids_and_levels
-  | RewriteTerm rule ->
-    (* declare the rule, possibly making its head defined *)
-    let r = conv_term_rule rule in
-    let id = Rewrite.Term.Rule.head_id r in
-    Rewrite.Defined_cst.declare_or_add id (Rewrite.T_rule r)
-  | RewriteForm r ->
-    let r = conv_lit_rule r in
-    begin match r with
-      | Rewrite.T_rule tr ->
-        let id = Rewrite.Term.Rule.head_id tr in
-        Rewrite.Defined_cst.declare_or_add id r
-      | Rewrite.L_rule lr ->
-        begin match Rewrite.Lit.Rule.head_id lr with
-          | Some id ->
+  | Rewrite d ->
+    begin match d with
+      | Def_term rule ->
+        (* declare the rule, possibly making its head defined *)
+        let r = conv_term_rule rule in
+        let id = Rewrite.Term.Rule.head_id r in
+        Rewrite.Defined_cst.declare_or_add id (Rewrite.T_rule r)
+      | Def_form r ->
+        let r = conv_lit_rule r in
+        begin match r with
+          | Rewrite.T_rule tr ->
+            let id = Rewrite.Term.Rule.head_id tr in
             Rewrite.Defined_cst.declare_or_add id r
-          | None ->
-            assert (Rewrite.Lit.Rule.is_equational lr);
-            Rewrite.Defined_cst.add_eq_rule lr
+          | Rewrite.L_rule lr ->
+            begin match Rewrite.Lit.Rule.head_id lr with
+              | Some id ->
+                Rewrite.Defined_cst.declare_or_add id r
+              | None ->
+                assert (Rewrite.Lit.Rule.is_equational lr);
+                Rewrite.Defined_cst.add_eq_rule lr
+            end
         end
     end
   | _ -> ()
 
 (** {2 Inductive Types} *)
+
+(* add rewrite rules for functions associated
+   with this datatype (projectors, etc.) *)
+let decl_data_functions ity: unit =
+  let one_cstor = List.length ity.Ind_ty.ty_constructors = 1 in
+  List.iter
+    (fun cstor ->
+       (* projectors *)
+       List.iter
+         (fun (_, proj) -> Rewrite.Defined_cst.declare_proj proj)
+         cstor.Ind_ty.cstor_args;
+       (* if there is exactly one cstor, add [cstor (proj_1 x)…(proj_n x) --> x] *)
+       if one_cstor then (
+         Rewrite.Defined_cst.declare_cstor cstor
+       );)
+    ity.Ind_ty.ty_constructors
 
 let scan_stmt_for_ind_ty st = match view st with
   | Data l ->
@@ -384,9 +444,12 @@ let scan_stmt_for_ind_ty st = match view st with
          let ty_vars =
            List.mapi (fun i v -> HVar.make ~ty:(Var.ty v) i) d.data_args
          and cstors =
-           List.map (fun (c,ty) -> {Ind_ty.cstor_name=c; cstor_ty=ty;}) d.data_cstors
+           List.map
+             (fun (c,ty,args) -> Ind_ty.mk_constructor c ty args)
+             d.data_cstors
          in
-         let _ = Ind_ty.declare_ty d.data_id ~ty_vars cstors in
+         let ity = Ind_ty.declare_ty d.data_id ~ty_vars cstors in
+         decl_data_functions ity;
          ())
       l
   | _ -> ()
@@ -400,9 +463,17 @@ let scan_simple_stmt_for_ind_ty st = match view st with
          let ty_vars =
            List.mapi (fun i v -> HVar.make ~ty:(Var.ty v |> conv_ty) i) d.data_args
          and cstors =
-           List.map (fun (c,ty) -> {Ind_ty.cstor_name=c; cstor_ty=conv_ty ty;}) d.data_cstors
+           List.map
+             (fun (c,ty,args) ->
+                let args =
+                  List.map
+                    (fun (ty,(p_id,p_ty)) -> conv_ty ty, (p_id, conv_ty p_ty))
+                    args in
+                Ind_ty.mk_constructor c (conv_ty ty) args)
+             d.data_cstors
          in
-         let _ = Ind_ty.declare_ty d.data_id ~ty_vars cstors in
+         let ity = Ind_ty.declare_ty d.data_id ~ty_vars cstors in
+         decl_data_functions ity;
          ())
       l
   | _ -> ()
@@ -418,7 +489,7 @@ module Seq = struct
       k (`Ty ty);
       List.iter (fun v->k (`Ty (Var.ty v))) vars;
       List.iter (fun t->k (`Term t)) (rhs::args);
-    | Def_form (vars, lhs, rhs) ->
+    | Def_form (vars, lhs, rhs, _) ->
       List.iter (fun v->k (`Ty (Var.ty v))) vars;
       SLiteral.to_seq lhs |> Sequence.map mk_term |> Sequence.iter k;
       Sequence.of_list rhs |> Sequence.map mk_form |> Sequence.iter k
@@ -434,18 +505,25 @@ module Seq = struct
              Sequence.of_list def_rules
              |> Sequence.flat_map seq_of_rule |> Sequence.iter k)
           l
-      | RewriteTerm (_,_,ty,args,rhs) ->
-        k (`Ty ty);
-        List.iter (fun t -> k (`Term t)) args;
-        k (`Term rhs)
-      | RewriteForm (_,lhs,rhs) ->
-        SLiteral.iter ~f:(fun t -> k (`Term t)) lhs;
-        List.iter (fun f -> k (`Form f)) rhs
+      | Rewrite d ->
+        begin match d with
+          | Def_term (_,_,ty,args,rhs) ->
+            k (`Ty ty);
+            List.iter (fun t -> k (`Term t)) args;
+            k (`Term rhs)
+          | Def_form (_,lhs,rhs,_) ->
+            SLiteral.iter ~f:(fun t -> k (`Term t)) lhs;
+            List.iter (fun f -> k (`Form f)) rhs
+        end
       | Data l ->
+        let decl_cstor (id,ty,args) =
+          decl id ty;
+          List.iter (fun (_,(p_id,p_ty)) -> decl p_id p_ty) args;
+        in
         List.iter
           (fun d ->
              decl d.data_id d.data_ty;
-             List.iter (CCFun.uncurry decl) d.data_cstors)
+             List.iter decl_cstor d.data_cstors)
           l
       | Lemma l -> List.iter (fun f -> k (`Form f)) l
       | Assert f
@@ -459,32 +537,34 @@ module Seq = struct
         l
     | TyDecl (id, ty) -> k (id,ty)
     | Data l ->
+      let decl_cstor (id,ty,args) =
+        k(id,ty);
+        List.iter (fun (_,p) -> k p) args;
+      in
       List.iter
         (fun d ->
            k (d.data_id, d.data_ty);
-           List.iter k d.data_cstors)
+           List.iter decl_cstor d.data_cstors)
         l
-    | RewriteTerm _
-    | RewriteForm _
+    | Rewrite _
     | Lemma _
     | Goal _
     | NegatedGoal _
     | Assert _ -> ()
 
-  let forms st k = match view st with
-    | Def _
-    | RewriteTerm _
-    | Data _
-    | TyDecl _ -> ()
-    | Goal c -> k c
-    | RewriteForm (_,_, _) -> ()
-    | Lemma l
-    | NegatedGoal (_, l) -> List.iter k l
-    | Assert c -> k c
+  let forms st =
+    to_seq st
+    |> Sequence.filter_map (function `Form f -> Some f | _ -> None)
 
   let lits st = forms st |> Sequence.flat_map Sequence.of_list
 
-  let terms st = lits st |> Sequence.flat_map SLiteral.to_seq
+  let terms st =
+    to_seq st
+    |> Sequence.flat_map
+      (function
+        | `Form f -> Sequence.of_list f |> Sequence.flat_map SLiteral.to_seq
+        | `Term t -> Sequence.return t
+        | _ -> Sequence.empty)
 
   let symbols st =
     to_seq st
@@ -494,8 +574,8 @@ module Seq = struct
         | `Form f ->
           Sequence.of_list f
           |> Sequence.flat_map SLiteral.to_seq
-          |> Sequence.flat_map FOTerm.Seq.symbols
-        | `Term t -> FOTerm.Seq.symbols t
+          |> Sequence.flat_map Term.Seq.symbols
+        | `Term t -> Term.Seq.symbols t
         | `Ty ty -> Type.Seq.symbols ty)
 end
 
@@ -504,16 +584,33 @@ let signature ?(init=Signature.empty) seq =
   |> Sequence.flat_map Seq.ty_decls
   |> Sequence.fold (fun sigma (id,ty) -> Signature.declare sigma id ty) init
 
+let conv_attrs =
+  let module A = UntypedAST in
+  CCList.filter_map
+    (function
+      | A.A_app (("ac" | "AC"), []) -> Some A_AC
+      | A.A_app (("sos" | "SOS"), []) -> Some A_sos
+      | A.A_app ("infix", [A.A_quoted s]) -> Some (A_infix s)
+      | A.A_app ("prefix", [A.A_quoted s]) -> Some (A_prefix s)
+      | _ -> None)
+
+let attr_to_ua =
+  let open UntypedAST.A in
+  function
+    | A_AC -> str "AC"
+    | A_sos -> str "sos"
+    | A_prefix s -> app "prefix" [quoted s]
+    | A_infix s -> app "infix" [quoted s]
+
 let add_src ~file st = match st.src.src_view with
   | Input (attrs,r) ->
     let module A = UntypedAST in
-    let attrs =
-      CCList.filter_map
-        (function A.A_AC -> Some A_AC | A.A_name _ -> None)
-        attrs
+    let attrs = conv_attrs attrs
     and name =
       CCList.find_map
-        (function A.A_name n-> Some n | _ -> None)
+        (function
+          | A.A_app ("name", [(A.A_quoted s | A.A_app (s,[]))]) -> Some s
+          | _ -> None)
         attrs
     in
     { st with
@@ -522,18 +619,18 @@ let add_src ~file st = match st.src.src_view with
     }
   | _ -> st
 
+let as_sourced st = Sourced_statement st, src st
+
+let as_sourced_clause st = Sourced_clause_stmt st, src st
+
 (** {2 IO} *)
 
 let fpf = Format.fprintf
 
-let pp_attr out = function
-  | A_AC -> fpf out "AC"
+let pp_attr out a = UntypedAST.pp_attr out (attr_to_ua a)
+let pp_attrs out l = UntypedAST.pp_attrs out (List.map attr_to_ua l)
 
-let pp_attrs out = function
-  | [] -> ()
-  | l -> fpf out "@ [@[%a@]]" (Util.pp_list ~sep:"," pp_attr) l
-
-let pp_typedvar ppty out v = fpf out "(%a:%a)" Var.pp v ppty (Var.ty v)
+let pp_typedvar ppty out v = fpf out "(@[%a:%a@])" Var.pp v ppty (Var.ty v)
 let pp_typedvar_l ppty = Util.pp_list ~sep:" " (pp_typedvar ppty)
 
 let pp_def_rule ppf ppt ppty out d =
@@ -549,10 +646,12 @@ let pp_def_rule ppf ppt ppty out d =
     | Def_term (vars,id,_,args,rhs) ->
       fpf out "@[<2>%a@[<2>%a%a@] =@ %a@]"
         pp_vars vars ID.pp id pp_args args ppt rhs
-    | Def_form (vars,lhs,rhs) ->
-      fpf out "@[<2>%a%a =@ (@[<hv>%a@])@]"
+    | Def_form (vars,lhs,rhs,pol) ->
+      let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
+      fpf out "@[<2>%a%a %s@ (@[<hv>%a@])@]"
         pp_vars vars
         (SLiteral.pp ppt) lhs
+        op
         (Util.pp_list ~sep:" && " ppf) rhs
   end
 
@@ -561,26 +660,32 @@ let pp_def ppf ppt ppty out d =
     ID.pp d.def_id ppty d.def_ty
     (Util.pp_list ~sep:";" (pp_def_rule ppf ppt ppty)) d.def_rules
 
+let pp_input_def = pp_def TypedSTerm.pp TypedSTerm.pp TypedSTerm.pp
+
 let pp ppf ppt ppty out st = match st.view with
   | TyDecl (id,ty) ->
     fpf out "@[<2>val%a %a :@ @[%a@]@]." pp_attrs st.attrs ID.pp id ppty ty
   | Def l ->
     fpf out "@[<2>def%a %a@]."
       pp_attrs st.attrs (Util.pp_list ~sep:" and " (pp_def ppf ppt ppty)) l
-  | RewriteTerm (_, id, _, args, rhs) ->
-    fpf out "@[<2>rewrite%a @[%a %a@]@ = @[%a@]@]" pp_attrs st.attrs
-      ID.pp id (Util.pp_list ~sep:" " ppt) args ppt rhs
-  | RewriteForm (_, lhs, rhs) ->
-    fpf out "@[<2>rewrite%a @[%a@]@ <=> @[%a@]@]" pp_attrs st.attrs
-      (SLiteral.pp ppt) lhs (Util.pp_list ~sep:" && " ppf) rhs
+  | Rewrite d ->
+    begin match d with
+      | Def_term (_, id, _, args, rhs) ->
+        fpf out "@[<2>rewrite%a @[%a %a@]@ = @[%a@]@]." pp_attrs st.attrs
+          ID.pp id (Util.pp_list ~sep:" " ppt) args ppt rhs
+      | Def_form (_, lhs, rhs, pol) ->
+        let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
+        fpf out "@[<2>rewrite%a @[%a@]@ %s @[%a@]@]." pp_attrs st.attrs
+          (SLiteral.pp ppt) lhs op (Util.pp_list ~sep:" && " ppf) rhs
+    end
   | Data l ->
-    let pp_cstor out (id,ty) =
+    let pp_cstor out (id,ty,_) =
       fpf out "@[<2>| %a :@ @[%a@]@]" ID.pp id ppty ty in
     let pp_data out d =
       fpf out "@[<hv2>@[%a : %a@] :=@ %a@]"
         ID.pp d.data_id ppty d.data_ty (Util.pp_list ~sep:"" pp_cstor) d.data_cstors
     in
-    fpf out "@[<hv2>data%a@ %a@]" pp_attrs st.attrs (Util.pp_list ~sep:" and " pp_data) l
+    fpf out "@[<hv2>data%a@ %a@]." pp_attrs st.attrs (Util.pp_list ~sep:" and " pp_data) l
   | Assert f ->
     fpf out "@[<2>assert%a@ @[%a@]@]." pp_attrs st.attrs ppf f
   | Lemma l ->
@@ -598,9 +703,61 @@ let pp ppf ppt ppty out st = match st.view with
 let to_string ppf ppt ppty = CCFormat.to_string (pp ppf ppt ppty)
 
 let pp_clause =
-  pp (Util.pp_list ~sep:" ∨ " (SLiteral.pp FOTerm.pp)) FOTerm.pp Type.pp
+  pp (Util.pp_list ~sep:" ∨ " (SLiteral.pp Term.pp)) Term.pp Type.pp
 
 let pp_input = pp TypedSTerm.pp TypedSTerm.pp TypedSTerm.pp
+
+module ZF = struct
+  module UA = UntypedAST.A
+
+  let pp ppf ppt ppty out st =
+    let pp_var out v= Format.fprintf out "(%a:%a)" Var.pp v ppty (Var.ty v) in
+    let pp_vars out = function
+      | [] -> ()
+      | vars -> Format.fprintf out "forall %a.@ " (Util.pp_list ~sep:" " pp_var) vars
+    in
+    let src = Src.to_attr st.src in
+    let attrs = src :: List.map attr_to_ua st.attrs in
+    let pp_attrs = UntypedAST.pp_attrs_zf in
+    match st.view with
+      | TyDecl (id,ty) ->
+        fpf out "@[<2>val%a %a :@ @[%a@]@]." pp_attrs attrs ID.pp id ppty ty
+      | Def l ->
+        fpf out "@[<2>def%a %a@]."
+          pp_attrs attrs (Util.pp_list ~sep:" and " (pp_def ppf ppt ppty)) l
+      | Rewrite d ->
+        begin match d with
+          | Def_term (vars, id, _, args, rhs) ->
+            fpf out "@[<2>rewrite%a @[<2>%a@[%a %a@]@ = @[%a@]@]@]." pp_attrs attrs
+              pp_vars vars ID.pp id (Util.pp_list ~sep:" " ppt) args ppt rhs
+          | Def_form (vars, lhs, rhs, pol) ->
+            let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
+            fpf out "@[<2>rewrite%a @[<2>%a@[%a@]@ %s @[%a@]@]@]." pp_attrs attrs
+              pp_vars vars (SLiteral.ZF.pp ppt) lhs op
+              (Util.pp_list ~sep:" && " ppf) rhs
+        end
+      | Data l ->
+        let pp_cstor out (id,ty,_) =
+          fpf out "@[<2>| %a :@ @[%a@]@]" ID.pp id ppty ty in
+        let pp_data out d =
+          fpf out "@[<hv2>@[%a : %a@] :=@ %a@]"
+            ID.pp d.data_id ppty d.data_ty (Util.pp_list ~sep:"" pp_cstor) d.data_cstors
+        in
+        fpf out "@[<hv2>data%a@ %a@]." pp_attrs attrs (Util.pp_list ~sep:" and " pp_data) l
+      | Assert f ->
+        fpf out "@[<2>assert%a@ @[%a@]@]." pp_attrs attrs ppf f
+      | Lemma l ->
+        fpf out "@[<2>lemma%a@ @[%a@]@]."
+          pp_attrs attrs (Util.pp_list ~sep:" && " ppf) l
+      | Goal f ->
+        fpf out "@[<2>goal%a@ @[%a@]@]." pp_attrs attrs ppf f
+      | NegatedGoal (_, l) ->
+        fpf out "@[<hv2>goal%a@ ~(@[<hv>%a@])."
+          pp_attrs attrs
+          (Util.pp_list ~sep:", " (CCFormat.hovbox ppf)) l
+
+  let to_string ppf ppt ppty = CCFormat.to_string (pp ppf ppt ppty)
+end
 
 module TPTP = struct
   let pp ppf ppt ppty out st =
@@ -609,7 +766,7 @@ module TPTP = struct
       | _ -> "no_name"
     in
     let pp_decl out (id,ty) =
-      fpf out "@[<2>tff(%s, type,@ %a :@ @[%a@])@]." name ID.pp id ppty ty
+      fpf out "@[<2>tff(%s, type,@ %a :@ @[%a@])@].@," name ID.pp id ppty ty
     and pp_quant_vars out = function
       | [] -> ()
       | l ->
@@ -627,8 +784,10 @@ module TPTP = struct
       let pp_rule out = function
         | Def_term (vars,id,_,args,rhs) ->
           fpf out "%a(@[%a%a@] =@ %a)" pp_quant_vars vars ID.pp id pp_args args ppt rhs
-        | Def_form (vars,lhs,rhs) ->
-          fpf out "%a(@[%a@] <=>@ (@[<hv>%a@]))" pp_quant_vars vars (SLiteral.pp ppt) lhs
+        | Def_form (vars,lhs,rhs,pol) ->
+          let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
+          fpf out "%a(@[%a@] %s@ (@[<hv>%a@]))"
+            pp_quant_vars vars (SLiteral.pp ppt) lhs op
             (Util.pp_list ~sep:" & " ppf) rhs
       in
       let pp_top_rule out r =
@@ -640,19 +799,19 @@ module TPTP = struct
       | TyDecl (id,ty) -> pp_decl out (id,ty)
       | Assert f ->
         let role = "axiom" in
-        fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@]." name role ppf f
+        fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@].@," name role ppf f
       | Lemma l ->
         let role = "lemma" in
-        fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@]." name role
+        fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@].@," name role
           (Util.pp_list ~sep:" & " ppf) l
       | Goal f ->
         let role = "conjecture" in
-        fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@]." name role ppf f
+        fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@].@," name role ppf f
       | NegatedGoal (_,l) ->
         let role = "negated_conjecture" in
         List.iter
           (fun f ->
-             fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@]." name role ppf f)
+             fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@].@," name role ppf f)
           l
       | Def l ->
         (* declare *)
@@ -661,14 +820,29 @@ module TPTP = struct
           l;
         (* define *)
         List.iter (pp_def_axiom out) l
-      | RewriteTerm (_, id, _, args, rhs) ->
-        fpf out "@[<2>tff(%s, axiom,@ %a(%a) =@ @[%a@])@]."
-          name ID.pp id (Util.pp_list ~sep:", " ppt) args ppt rhs
-      | RewriteForm (_, lhs, rhs) ->
-        fpf out "@[<2>tff(%s, axiom,@ %a <=>@ (@[%a@]))@]."
-          name (SLiteral.TPTP.pp ppt) lhs (Util.pp_list ~sep:" & " ppf) rhs
+      | Rewrite d ->
+        begin match d with
+          | Def_term (_, id, _, args, rhs) ->
+            fpf out "@[<2>tff(%s, axiom,@ %a(%a) =@ @[%a@])@].@,"
+              name ID.pp id (Util.pp_list ~sep:", " ppt) args ppt rhs
+          | Def_form (_, lhs, rhs, pol) ->
+            let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
+            fpf out "@[<2>tff(%s, axiom,@ %a %s@ (@[%a@]))@].@,"
+              name (SLiteral.TPTP.pp ppt) lhs op
+              (Util.pp_list ~sep:" & " ppf) rhs
+        end
       | Data _ -> failwith "cannot print `data` to TPTP"
 
   let to_string ppf ppt ppty = CCFormat.to_string (pp ppf ppt ppty)
 end
 
+let pp_in pp_f pp_t pp_ty = function
+  | Output_format.O_zf -> ZF.pp pp_f pp_t pp_ty
+  | Output_format.O_tptp -> TPTP.pp pp_f pp_t pp_ty
+  | Output_format.O_normal -> pp pp_f pp_t pp_ty
+  | Output_format.O_none -> CCFormat.silent
+
+let pp_clause_in o =
+  pp_in (Util.pp_list ~sep:" ∨ " (SLiteral.pp Term.pp)) Term.pp Type.pp o
+
+let pp_input_in o = pp_in TypedSTerm.pp TypedSTerm.pp TypedSTerm.pp o

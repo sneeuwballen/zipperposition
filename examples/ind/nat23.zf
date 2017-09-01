@@ -1,0 +1,6 @@
+
+# expect: unsat
+
+include "nat.zf".
+
+goal forall x y. leq (minus x y) x.

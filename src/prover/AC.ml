@@ -5,7 +5,7 @@
 
 open Logtk
 
-module T = FOTerm
+module T = Term
 module Lit = Literal
 
 open AC_intf
@@ -31,14 +31,20 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   module Env = Env
   module C = Env.C
 
-  let tbl = ID.Tbl.create 3
-  let proofs = ID.Tbl.create 3
-  let on_add = Signal.create ()
+  type cell = {
+    spec: spec;
+    proof: Proof.step;
+    axioms: C.t list;
+  }
 
-  let axioms s ty =
+  let tbl : cell ID.Tbl.t = ID.Tbl.create 3
+  let on_add : spec Signal.t = Signal.create ()
+
+  let mk_axioms_ ~proof s ty: C.t list =
     let ty_args_n, ty_args, _ty_ret = Type.open_poly_fun ty in
-    if List.length ty_args <> 2
-    then Util.errorf ~where:"AC" "AC symbol `%a`must be of arity 2" ID.pp s;
+    if List.length ty_args <> 2 then (
+      Util.errorf ~where:"AC" "AC symbol `%a`must be of arity 2" ID.pp s;
+    );
     (* create type variables, for polymorphic AC symbols *)
     let ty_vars = CCList.init ty_args_n (fun i -> HVar.make ~ty:Type.tType i) in
     let ty_vars_t = List.map Type.var ty_vars in
@@ -49,9 +55,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* check consistency of types *)
     begin match ty_args with
       | [a; b] ->
-        if not (Type.equal a b && Type.equal a ty_ret)
-        then Util.errorf ~where:"AC"
+        if not (Type.equal a b && Type.equal a ty_ret) then (
+          Util.errorf ~where:"AC"
             "AC symbol `%a` argument types must be `@[%a@]`" ID.pp s Type.pp ty_ret;
+        );
       | _ -> assert false
     end;
     let x = T.var_of_int ~ty:ty_ret (ty_args_n + 1) in
@@ -60,7 +67,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let f x y = T.app_full (T.const ~ty s) ty_vars_t [x;y] in
     (* build clause l=r *)
     let mk_clause l r =
-      let proof = Proof.Step.trivial in
       let penalty = 0 in
       let c = C.create ~trail:Trail.empty ~penalty [ Lit.mk_eq l r ] proof in
       C.set_flag flag_axiom c true;
@@ -74,30 +80,23 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ; mk_clause (f x (f y z)) (f z (f y x))
     ]
 
-  let add_ ?proof ~ty s =
-    let proof = match proof with
-      | Some p -> p
-      | None -> (* new axioms *)
-        List.map C.proof (axioms s ty)
-    in
-    if not (ID.Tbl.mem tbl s)
-    then (
-      let instance = {ty; sym=s} in
-      ID.Tbl.replace tbl s instance;
-      ID.Tbl.replace proofs s proof;
-      Signal.send on_add instance
-    )
+  let add_ ~proof ~ty s =
+    try ID.Tbl.find tbl s
+    with Not_found ->
+      let spec = {ty; sym=s} in
+      let axioms = mk_axioms_ ~proof s ty in
+      let cell = {spec; proof; axioms; } in
+      ID.Tbl.add tbl s cell;
+      Signal.send on_add spec;
+      cell
 
   let is_ac s = ID.Tbl.mem tbl s
 
   let exists_ac () = ID.Tbl.length tbl > 0
 
-  let find_proof s = ID.Tbl.find proofs s
+  let find_proof s = (ID.Tbl.find tbl s).proof
 
-  let symbols () =
-    ID.Tbl.fold
-      (fun s _ set -> ID.Set.add s set)
-      tbl ID.Set.empty
+  let symbols () = ID.Tbl.keys tbl |> ID.Set.of_seq
 
   module A = T.AC(struct
       let is_ac = is_ac
@@ -105,11 +104,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     end)
 
   let symbols_of_terms seq = A.symbols seq
-
-  let proofs () =
-    ID.Tbl.fold
-      (fun _ proofs acc -> List.rev_append proofs acc)
-      proofs []
 
   (** {2 Rules} *)
 
@@ -162,12 +156,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       then (
         (* did some simplification *)
         let symbols = symbols_of_terms (C.Seq.terms c) in
-        let symbols = Sequence.to_list (ID.Set.to_seq symbols) in
+        let symbols = ID.Set.to_list symbols in
         (* gather axioms that were used, removing duplicates *)
-        let ac_proof =
-          CCList.flat_map find_proof symbols
-          |> CCList.sort_uniq ~cmp:Proof.S.compare_by_result in
-        let premises = List.map Proof.Parent.from (C.proof c :: ac_proof) in
+        let ac_axioms =
+          symbols
+          |> CCList.flat_map
+            (fun id ->
+               let ax = (ID.Tbl.find tbl id).axioms in
+               List.map C.proof_parent ax)
+        in
+        let premises = C.proof_parent c :: ac_axioms in
         let proof =
           Proof.Step.simp premises
             ~rule:(Proof.Rule.mk "AC.normalize")
@@ -187,31 +185,31 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let install_rules_ () =
     Env.add_is_trivial is_trivial;
-    Env.add_simplify simplify;
+    Env.add_basic_simplify simplify;
     ()
 
-  let add ?proof s ty =
-    Util.debugf ~section 1 "@[enable AC redundancy criterion@ for `@[%a : @[%a@]@]`@]"
-      (fun k->k ID.pp s Type.pp ty);
+  let add ~proof s ty =
+    Util.debugf ~section 1
+      "@[enable AC redundancy criterion@ for `@[%a : @[%a@]@]`@ :proof %a@]"
+      (fun k->k ID.pp s Type.pp ty Proof.Step.pp proof);
     (* is this the first case of AC symbols? If yes, then add inference rules *)
     let first = not (exists_ac ()) in
     if first then install_rules_ ();
     (* remember that the symbols is AC *)
-    add_ ?proof ~ty s;
+    let cell = add_ ~proof ~ty s in
     (* add clauses *)
-    let clauses = axioms s ty in
     Util.debugf ~section 3
       "@[<2>add AC axioms for `%a : @[%a@]`:@ @[<hv>%a@]@]"
-      (fun k->k ID.pp s Type.pp ty (Util.pp_list C.pp) clauses);
+      (fun k->k ID.pp s Type.pp ty (Util.pp_list C.pp) cell.axioms);
     (* add axioms to either passive, or active set *)
     if Env.ProofState.ActiveSet.clauses ()
        |> C.ClauseSet.for_all (C.get_flag flag_axiom)
     then (
       (* the only active clauses are other AC axioms, we miss no
          inference by adding the axioms to active set directly *)
-      Env.add_active (Sequence.of_list clauses)
+      Env.add_active (Sequence.of_list cell.axioms)
     ) else (
-      Env.add_passive (Sequence.of_list clauses);
+      Env.add_passive (Sequence.of_list cell.axioms);
     );
     ()
 
@@ -220,22 +218,28 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let module St = Statement in
     let has_ac_attr =
       List.exists
-        (function St.A_AC -> true)
+        (function St.A_AC -> true | _ -> false)
         (Statement.attrs st)
     in
-    if has_ac_attr then match St.view st with
-      | St.TyDecl (id, ty) -> add id ty
-      | St.Def l ->
-        List.iter (fun {Statement.def_id; def_ty; _} -> add def_id def_ty) l
-      | St.Data _
-      | St.RewriteTerm _
-      | St.RewriteForm _
-      | St.Assert _
-      | St.Lemma _
-      | St.Goal _
-      | St.NegatedGoal _ ->
-        Util.error ~where:"AC"
-          "attribute 'AC' only supported on def/decl statements"
+    if has_ac_attr then (
+      let proof =
+        Proof.Step.esa ~rule:(Proof.Rule.mk "ac")
+          [Proof.S.parent_of_sourced (St.as_sourced_clause st)]
+      in
+      begin match St.view st with
+        | St.TyDecl (id, ty) -> add ~proof id ty
+        | St.Def l ->
+          List.iter (fun {Statement.def_id; def_ty; _} -> add ~proof def_id def_ty) l
+        | St.Data _
+        | St.Rewrite _
+        | St.Assert _
+        | St.Lemma _
+        | St.Goal _
+        | St.NegatedGoal _ ->
+          Util.error ~where:"AC"
+            "attribute 'AC' only supported on def/decl statements"
+      end
+    )
 
   (* just look for AC axioms *)
   let setup () =

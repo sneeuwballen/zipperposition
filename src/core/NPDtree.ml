@@ -3,7 +3,7 @@
 
 (** {1 Non-Perfect Discrimination Tree} *)
 
-module T = FOTerm
+module T = Term
 module S = Subst
 module TC = T.Classic
 
@@ -28,8 +28,13 @@ let open_term ~stack t = match T.view t with
   | T.Var _
   | T.DB _
   | T.AppBuiltin _
+  | T.Fun _
   | T.Const _ ->
     Some {cur_term=t; stack=[]::stack;}
+  | _ when not (Unif.Ty.type_is_unifiable (T.ty t)) || Type.is_fun (T.ty t) ->
+    Some {cur_term=t; stack=[]::stack;} (* opaque constant/partial application *)
+  | T.App (f, _) when (T.is_var f) ->
+    Some {cur_term=t; stack=[]::stack;} (* higher-order term *)
   | T.App (_, l) ->
     Some {cur_term=t; stack=l::stack;}
 
@@ -318,7 +323,7 @@ module MakeTerm(X : Set.OrderedType) = struct
     in
     skip trie 1 k
 
-  let retrieve_unifiables ?(subst=S.empty) dt t k =
+  let retrieve_unifiables ?(subst=Unif_subst.empty) dt t k =
     Util.enter_prof prof_npdtree_term_unify;
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie iter = match iter with

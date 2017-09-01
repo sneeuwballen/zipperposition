@@ -1,12 +1,9 @@
 # OASIS_START
-# DO NOT EDIT (digest: 86ff253d35e52b6430c3a53fd70307a4)
+# DO NOT EDIT (digest: ca1d7b1e587e9ce9508bdb11ab4b8646)
 src/parsers/Parse_tptp
 src/parsers/Lex_tptp
 src/parsers/Ast_tptp
 src/parsers/Util_tptp
-src/parsers/Ast_ho
-src/parsers/Lex_ho
-src/parsers/Parse_ho
 src/parsers/Trace_tstp
 src/parsers/Parse_zf
 src/parsers/Lex_zf

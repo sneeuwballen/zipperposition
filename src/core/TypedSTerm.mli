@@ -1,10 +1,16 @@
 
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
-(** {1 Simple Typed Terms}.
+(** {1 Simple Typed Terms}. *)
 
-    These terms are scoped, and possibly typed. Type inference should be
-    performed on them. *)
+(** Similar to {!STerm}, but this time the terms are properly
+    scoped (using {!Var}) and typed.
+
+    These terms are suitable for many preprocessing transformations,
+    including {!CNF}.
+
+    They can be obtained from {!STerm.t} using {!TypeInference}.
+*)
 
 type location = ParseLocation.t
 
@@ -77,6 +83,8 @@ val record_flatten : ?loc:location -> ty:t -> (string*t) list -> rest:t option -
 (** Build a record with possibly a row variable.
     @raise IllFormedTerm if the [rest] is not either a record or a variable. *)
 
+val fun_l : ?loc:location -> t Var.t list -> t -> t
+
 val of_string : ?loc:location -> ty:t -> string -> t
 (** Make a constant from this string *)
 
@@ -129,6 +137,7 @@ module Ty : sig
   val prop : t
   val int : t
   val rat : t
+  val real : t
   val term : t
 
   val (==>) : t list -> t -> t
@@ -145,6 +154,9 @@ module Ty : sig
 
   val mangle : t -> string
   (** String usable as an identifier, without whitespace *)
+
+  val needs_args : t -> bool
+  (** [needs_args ty] means that [arity ty <> (0,0)] *)
 
   val is_tType : t -> bool
   val is_prop : t -> bool
@@ -192,6 +204,9 @@ module Form : sig
   val forall : ?loc:location -> t Var.t -> t -> t
   val exists : ?loc:location -> t Var.t -> t -> t
 
+  val eq_or_equiv : t -> t -> t
+  val neq_or_xor : t -> t -> t
+
   val forall_l : ?loc:location -> t Var.t list -> t -> t
   val exists_l : ?loc:location -> t Var.t list -> t -> t
 
@@ -208,6 +223,7 @@ end
 val is_var : t -> bool
 val is_meta : t -> bool
 val is_const : t -> bool
+val is_fun : t -> bool
 
 val is_ground : t -> bool
 (** [true] iff there is no free variable *)
@@ -224,11 +240,15 @@ val closed : t -> bool
 (** [closed t] is [true] iff all bound variables of [t] occur under a
     binder (i.e. they are actually bound in [t]) *)
 
-val open_binder : Binder.t -> t -> t Var.t list * t
-(** [open_binder b (b v1 (b v2... (b vn t)))] returns [[v1,...,vn], t] *)
+val unfold_binder : Binder.t -> t -> t Var.t list * t
+(** [unfold_binder b (b v1 (b v2... (b vn t)))] returns [[v1,...,vn], t] *)
+
+val unfold_fun : t -> t Var.t list * t
 
 val var_occurs : var:t Var.t -> t -> bool
 (** [var_occurs ~var t] is [true] iff [var] occurs in [t] *)
+
+val as_id_app : t -> (ID.t * Ty.t * t list) option
 
 val vars : t -> t Var.t list
 val free_vars : t -> t Var.t list
@@ -240,6 +260,8 @@ val close_all : ty:t -> Binder.t -> t -> t
 include Interfaces.PRINT with type t := t
 
 val pp_inner : t CCFormat.printer
+
+val pp_in : Output_format.t -> t CCFormat.printer
 
 module Set : Sequence.Set.S with type elt = term
 module Map : Sequence.Map.S with type key = term
@@ -278,6 +300,11 @@ module Subst : sig
   include Interfaces.PRINT with type t := t
 end
 
+
+(** {2 Table of Variables} *)
+
+module Var_tbl : CCHashtbl.S with type key = t Var.t
+
 (** {2 Unification} *)
 
 exception UnifyFailure of string * (term * term) list * location option
@@ -313,6 +340,7 @@ val unify :
     @raise UnifyFailure if unification fails. *)
 
 val apply_unify :
+  ?gen_fresh_meta:(unit -> meta_var) ->
   ?allow_open:bool -> ?loc:location -> ?st:UStack.t -> ?subst:Subst.t ->
   t -> t list -> t
 (** [apply_unify f_ty args] compute the type of a function of type [f_ty],

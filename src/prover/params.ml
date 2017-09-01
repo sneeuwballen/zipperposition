@@ -14,6 +14,7 @@ type t = {
   param_steps : int;
   param_version : bool;
   param_timeout : float;
+  param_prelude : (string, CCVector.ro) CCVector.t;
   param_files : (string, CCVector.ro) CCVector.t;
   param_select : string; (** name of the selection function *)
   param_dot_file : string option; (** file to print the final state in *)
@@ -37,9 +38,10 @@ and dot_file = ref None
 and dot_sat = ref false
 and dot_all_roots = ref false
 and expand_def = ref false
-and select = ref "SelectComplex"
+and select = ref "default"
 and unary_depth = ref 1
 and def_as_rewrite = ref true
+and prelude = CCVector.create()
 and files = CCVector.create ()
 and check = ref false
 
@@ -67,6 +69,7 @@ let parse_args () =
     ; "--def-as-rewrite", Arg.Set def_as_rewrite, " treat definitions as rewrite rules"
     ; "--def-as-assert", Arg.Clear def_as_rewrite, " treat definitions as axioms"
     ; "--check", Arg.Set check, " check proof"
+    ; "--prelude", Arg.String (CCVector.push prelude), " parse prelude file"
     ; "--no-check", Arg.Clear check, " do not check proof"
     ] @ Options.make ()
   ) |> List.sort (fun (s1,_,_)(s2,_,_) -> String.compare s1 s2)
@@ -77,10 +80,12 @@ let parse_args () =
     CCVector.push files "stdin";
     if !Options.input = Options.I_guess then Options.input := Options.I_zf;
   );
-  let files = CCVector.freeze files in (* from now on, immutable *)
+  (* freeze arrays of files, so that from now on they are immutable *)
+  let prelude = CCVector.freeze prelude in
+  let files = CCVector.freeze files in
   (* return parameter structure *)
   { param_ord= !ord; param_seed = !seed; param_steps = !steps;
-    param_version= !version; param_timeout = !timeout;
+    param_version= !version; param_timeout = !timeout; param_prelude= prelude;
     param_files = files; param_select = !select;
     param_stats= ! Options.stats; param_def_as_rewrite= !def_as_rewrite;
     param_presaturate = !presaturate; param_dot_all_roots= !dot_all_roots;

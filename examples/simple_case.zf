@@ -1,0 +1,14 @@
+
+# expect: unsat
+
+val term : type.
+val p : term -> prop.
+val a : term.
+val b : term.
+
+assert p a.
+assert p b.
+assert forall x. x = a || x = b.
+
+goal forall x. p x.
+

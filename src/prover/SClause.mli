@@ -31,7 +31,7 @@ val length : t -> int
 
 val update_trail : (Trail.t -> Trail.t) -> t -> t
 
-val to_s_form : ?ctx:FOTerm.Conv.ctx -> t -> TypedSTerm.Form.t
+val to_s_form : ?ctx:Term.Conv.ctx -> t -> TypedSTerm.Form.t
 
 (** {2 Flags} *)
 
@@ -54,8 +54,11 @@ val is_backward_simplified : t -> bool
 val pp_vars : t CCFormat.printer
 
 val pp : t CCFormat.printer
+val pp_zf : t CCFormat.printer
 val pp_tstp : t CCFormat.printer
 val pp_tstp_full : t CCFormat.printer  (** Print in a toplevel TPTP statement *)
 
 val pp_trail : Trail.t CCFormat.printer
 val pp_trail_tstp : Trail.t CCFormat.printer
+
+val pp_in : Output_format.t -> t CCFormat.printer

@@ -1,0 +1,17 @@
+
+# expect: unsat
+
+# variant of sum_int.zf without `int`
+
+val nat : type.
+
+val sum : pi a. a -> (a -> nat) -> nat.
+
+val [infix "+"] plus : nat -> nat -> nat.
+
+assert forall x y. plus x y = plus y x.
+
+goal
+  forall a (s : a) f g.
+    sum s (fun x. plus (f x) (g x)) = sum s (fun x. plus (g x) (f x)).
+

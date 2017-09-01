@@ -4,7 +4,7 @@
 open Logtk
 open Logtk_arbitrary
 
-module T = FOTerm
+module T = Term
 module CC = Congruence.FO
 
 (* build a congruence closure from a list of list of terms.

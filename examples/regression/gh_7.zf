@@ -1,0 +1,22 @@
+# expect: unsat
+
+data list a :=
+  | nil
+  | cons a (list a).
+
+def[infix "∈"] mem : pi a. a -> list a -> prop where
+  forall x. mem x nil = false;
+  forall x hd tl. mem x (cons hd tl) = (x = hd || mem x tl).
+
+def count : pi a. list a -> (a -> prop) -> int where
+   forall p. count nil p = 0;
+   forall hd tl p. count (cons hd tl) p = count tl p + (if p hd then 1 else 0).
+
+def remove : pi a. a -> list a -> list a where
+  forall x. remove x nil = nil;
+  forall x hd tl. remove x (cons hd tl) =
+          (if hd = x then tl else cons hd (remove x tl)).
+
+goal forall a (l : list a) p (x : a).
+  mem x l = true =>
+  count (remove x l) p = count l p - (if p x then 1 else 0).

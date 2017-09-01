@@ -1,7 +1,13 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Polynomes of order 1, over several variables}.
+(** {1 Polynomes of order 1, over several variables}. *)
+
+(** A monome is a linear expression on several "variables".
+
+    We parametrize modules over some class of number (typically,
+    Z or Q) that need to provide some operations. The ['a] parameter
+    is the type of numbers ([Z.t] or [Q.t] from the library Zarith).
 
     Variables, in this module, are non-arithmetic terms, i.e. non-interpreted
     functions and predicates, that occur immediately under an arithmetic
@@ -9,7 +15,7 @@
     are "f(X)" and "a", with coefficients "1" and "3".
 *)
 
-type term = FOTerm.t
+type term = Term.t
 
 type 'a t
 (** A monome over terms, with coefficient of type 'a *)
@@ -41,7 +47,7 @@ val map_num : ('a -> 'a) -> 'a t -> 'a t
 
 module Seq : sig
   val terms : _ t -> term Sequence.t
-  val vars : _ t -> FOTerm.var Sequence.t
+  val vars : _ t -> Term.var Sequence.t
   val coeffs : 'a t -> ('a * term) Sequence.t
   val coeffs_swap : 'a t -> (term * 'a) Sequence.t
 end
@@ -62,7 +68,7 @@ val size : _ t -> int
 val terms : _ t -> term list
 (** List of terms that occur in the monome with non-nul coefficients *)
 
-val var_occurs : var:FOTerm.var ->  _ t -> bool
+val var_occurs : var:Term.var ->  _ t -> bool
 (** Does the variable occur in the monome? *)
 
 val sum : 'a t -> 'a t -> 'a t
@@ -89,6 +95,12 @@ val dominates : strict:bool -> 'a t -> 'a t -> bool
     then [m1 = m2].
     @argument strict if true, use "greater than", else "greater or equal". *)
 
+val normalize : 'a t -> 'a t
+(** Normalize the monome, which means that if some terms are
+    rational or integer constants, they are moved to the constant part
+    (e.g after apply X->3/4 in 2.X+1, one gets 2×3/4 +1. Normalization
+    reduces this to 5/2). *)
+
 val split : 'a t -> 'a t * 'a t
 (** [split m] splits into a monome with positive coefficients, and one
     with negative coefficients.
@@ -97,7 +109,13 @@ val split : 'a t -> 'a t * 'a t
 
 val apply_subst : renaming:Subst.Renaming.t ->
   Subst.t -> 'a t Scoped.t -> 'a t
-(** Apply a substitution to the monome's terms *)
+(** Apply a substitution to the monome's terms.
+    This does not preserve positions in the monome. *)
+
+val apply_subst_no_simp : renaming:Subst.Renaming.t ->
+  Subst.t -> 'a t Scoped.t -> 'a t
+(** Apply a substitution to the monome's terms, without renormalizing.
+    This preserves positions. *)
 
 val apply_subst_no_renaming : Subst.t -> 'a t Scoped.t -> 'a t
 (** Apply a substitution but doesn't rename free variables. Careful
@@ -114,8 +132,8 @@ val variant : ?subst:Subst.t -> 'a t Scoped.t -> 'a t Scoped.t -> Subst.t Sequen
 
 val matching : ?subst:Subst.t -> 'a t Scoped.t -> 'a t Scoped.t -> Subst.t Sequence.t
 
-val unify : ?subst:Subst.t -> 'a t Scoped.t -> 'a t Scoped.t ->
-  Subst.t Sequence.t
+val unify : ?subst:Unif_subst.t -> 'a t Scoped.t -> 'a t Scoped.t ->
+  Unif_subst.t Sequence.t
 
 val is_ground : _ t -> bool
 (** Are there no variables in the monome? *)
@@ -201,30 +219,30 @@ module Focus : sig
 
       Again, arith constants are not unifiable with unshielded variables. *)
 
-  val unify_ff : ?subst:Subst.t ->
+  val unify_ff : ?subst:Unif_subst.t ->
     'a t Scoped.t -> 'a t Scoped.t ->
-    ('a t * 'a t * Subst.t) Sequence.t
+    ('a t * 'a t * Unif_subst.t) Sequence.t
   (** Unify two focused monomes. All returned unifiers are unifiers
       of the focused terms, but maybe also of other unfocused terms;
       Focused monomes are modified by unification because several terms
       might merge with the focused term, so the new ones are
       returned with the unifier itself *)
 
-  val unify_mm : ?subst:Subst.t ->
+  val unify_mm : ?subst:Unif_subst.t ->
     'a monome Scoped.t -> 'a monome Scoped.t ->
-    ('a t * 'a t * Subst.t) Sequence.t
+    ('a t * 'a t * Unif_subst.t) Sequence.t
   (** Unify parts of two monomes [m1] and [m2]. For each such unifier we
       return the versions of [m1] and [m2] where the unified terms
       are focused. *)
 
-  val unify_self : ?subst:Subst.t ->
-    'a t Scoped.t -> ('a t * Subst.t) Sequence.t
+  val unify_self : ?subst:Unif_subst.t ->
+    'a t Scoped.t -> ('a t * Unif_subst.t) Sequence.t
   (** Extend the substitution to other terms within the focused monome,
       if possible. For instance it might return
       [2f(x)+a, {x=y}] for the monome [f(x)+f(y)+a] where [f(x)] is focused. *)
 
-  val unify_self_monome : ?subst:Subst.t ->
-    'a monome Scoped.t -> ('a t * Subst.t) Sequence.t
+  val unify_self_monome : ?subst:Unif_subst.t ->
+    'a monome Scoped.t -> ('a t * Unif_subst.t) Sequence.t
   (** Unify at least two terms of the monome together *)
 
   (* TODO
@@ -244,6 +262,7 @@ val pp : _ t CCFormat.printer
 val to_string : _ t -> string
 
 val pp_tstp : _ t CCFormat.printer
+val pp_zf : _ t CCFormat.printer
 
 exception NotLinear
 
@@ -262,12 +281,6 @@ module Int : sig
 
   val to_term : t -> term
   (** convert back to a term *)
-
-  val normalize : t -> t
-  (** Normalize the monome, which means that if some terms are
-      integer constants, they are moved to the constant part
-      (e.g after apply X->3 in 2.X+1, one gets 2.3 +1. Normalization
-      reduces this to 7). *)
 
   val has_instances : t -> bool
   (** For real or rational, always true. For integers, returns true
@@ -394,6 +407,9 @@ module Rat : sig
   val singleton : Q.t -> term -> t  (** One term. *)
   val of_list : Q.t -> (Q.t * term) list -> t
 
+  val divide : t -> Q.t -> t
+  (** Divide by non-zero constant *)
+
   val of_term : term -> t option
 
   val of_term_exn : term -> t
@@ -403,11 +419,8 @@ module Rat : sig
   val to_term : t -> term
   (** convert back to a term *)
 
-  val normalize : t -> t
-  (** Normalize the monome, which means that if some terms are
-      rational or integer constants, they are moved to the constant part
-      (e.g after apply X->3/4 in 2.X+1, one gets 2×3/4 +1. Normalization
-      reduces this to 5/2). *)
+  val to_multiset : t -> Multisets.MT.t
+  (** Multiset of terms *)
 end
 
 (** {2 For fields (Q,R)} *)

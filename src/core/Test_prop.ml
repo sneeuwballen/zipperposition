@@ -2,7 +2,7 @@
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 module TI = InnerTerm
-module T = FOTerm
+module T = Term
 module Fmt = CCFormat
 
 module RW = Rewrite
@@ -33,7 +33,10 @@ type 'a t_view =
   | T_app of ID.t * 'a list (* other application *)
   | T_fun_app of 'a * 'a list
   | T_builtin of Builtin.t * 'a list
+  | T_fun of Type.t * 'a
   | T_var of var
+
+(* TODO: β reduction *)
 
 let t_view (t:term): term t_view = match T.view t with
   | T.AppBuiltin (Builtin.Int n, []) -> T_Z n
@@ -44,6 +47,7 @@ let t_view (t:term): term t_view = match T.view t with
   | T.Var v -> T_var v
   | T.Const id when Ind_ty.is_constructor id -> T_cstor (id, [])
   | T.Const id -> T_app (id, [])
+  | T.Fun (arg,bod) -> T_fun (arg,bod)
   | T.App (f, l) ->
     begin match T.view f with
       | T.Const id when Ind_ty.is_constructor id -> T_cstor (id, l)
@@ -108,7 +112,7 @@ module Narrow : sig
   val default_limit: int
   val check_form: limit:int -> form -> res
 end = struct
-  let default_limit = 50
+  let default_limit = 10
 
   (* pseudo-substitution that is accumulated *)
   type subst_acc = T.t T.VarMap.t
@@ -144,18 +148,24 @@ end = struct
       |> Sequence.flat_map
         (fun t -> RW.Term.narrow_term ~scope_rules:sc_rule (t,sc_c))
       |> Sequence.to_rev_list
-      |> CCList.sort_uniq ~cmp:(CCOrd.pair RW.Term.Rule.compare Subst.compare)
+      |> CCList.sort_uniq
+        ~cmp:CCOrd.(pair RW.Term.Rule.compare Unif_subst.compare)
     in
     (* now do one step for each *)
     begin
       Sequence.of_list subst_rule_l
       |> Sequence.map
-        (fun (rule,subst) ->
+        (fun (rule,us) ->
            let renaming = Subst.Renaming.create() in
+           let subst = Unif_subst.subst us in
+           let c_guard = Literals.of_unif_subst ~renaming us in
            (* evaluate new formula by substituting and evaluating *)
            let f' =
-             List.map
-               (fun lits -> Literals.apply_subst ~renaming subst (lits,sc_c)) f
+             f
+             |> List.map
+               (fun lits ->
+                  CCArray.append c_guard
+                    (Literals.apply_subst ~renaming subst (lits,sc_c)))
              |> normalize_form
            in
            (* make new formula *)
@@ -178,18 +188,24 @@ end = struct
       |> Sequence.flat_map
         (fun lit -> RW.Lit.narrow_lit ~scope_rules:sc_rule (lit,sc_c))
       |> Sequence.to_rev_list
-      |> CCList.sort_uniq ~cmp:(CCOrd.pair RW.Lit.Rule.compare Subst.compare)
+      |> CCList.sort_uniq
+        ~cmp:CCOrd.(pair RW.Lit.Rule.compare Unif_subst.compare)
     in
     (* now do one step for each *)
     begin
       Sequence.of_list subst_rule_l
       |> Sequence.map
-        (fun (rule,subst) ->
+        (fun (rule,us) ->
            let renaming = Subst.Renaming.create() in
+           let subst = Unif_subst.subst us in
+           let c_guard = Literals.of_unif_subst ~renaming us in
            (* evaluate new formula by substituting and evaluating *)
            let f' =
-             List.map
-               (fun lits -> Literals.apply_subst ~renaming subst (lits,sc_c)) f
+             f
+             |> List.map
+               (fun lits ->
+                  CCArray.append c_guard
+                    (Literals.apply_subst ~renaming subst (lits,sc_c)))
              |> normalize_form
            in
            (* make new formula *)

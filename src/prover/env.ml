@@ -5,14 +5,13 @@
 
 open Logtk
 
-module T = FOTerm
+module T = Term
 module Lit = Literal
 module Lits = Literals
 module P = Proof
 
 let section = Util.Section.make ~parent:Const.section "env"
 
-let stat_orphan_criterion = Util.mk_stat "env.orphan_criterion"
 let stat_inferred = Util.mk_stat "env.inferred clauses"
 
 let prof_generate = Util.mk_profiler "env.generate"
@@ -23,8 +22,6 @@ let prof_simplify = Util.mk_profiler "env.simplify"
 let prof_all_simplify = Util.mk_profiler "env.all_simplify"
 let prof_is_redundant = Util.mk_profiler "env.is_redundant"
 let prof_subsumed_by = Util.mk_profiler "env.subsumed_by"
-
-let orphan_criterion_ = ref false
 
 (** {2 Signature} *)
 module type S = Env_intf.S
@@ -81,7 +78,7 @@ module Make(X : sig
   type is_trivial_rule = C.t -> bool
   (** Rule that checks whether the clause is trivial (a tautology) *)
 
-  type term_rewrite_rule = FOTerm.t -> FOTerm.t option
+  type term_rewrite_rule = Term.t -> Term.t option
   (** Rewrite rule on terms *)
 
   type lit_rewrite_rule = Literal.t -> Literal.t option
@@ -105,6 +102,7 @@ module Make(X : sig
   let _rewrite_rules : (string * term_rewrite_rule) list ref = ref []
   let _lit_rules : (string * lit_rewrite_rule) list ref = ref []
   let _basic_simplify : simplify_rule list ref = ref []
+  let _unary_simplify : simplify_rule list ref = ref []
   let _rw_simplify = ref []
   let _active_simplify = ref []
   let _backward_simplify = ref []
@@ -187,8 +185,11 @@ module Make(X : sig
   let add_backward_redundant r =
     _backward_redundant := r :: !_backward_redundant
 
-  let add_simplify r =
+  let add_basic_simplify r =
     _basic_simplify := r :: !_basic_simplify
+
+  let add_unary_simplify r =
+    _unary_simplify := r :: !_unary_simplify
 
   let add_is_trivial_trail r =
     _is_trivial_trail := r :: !_is_trivial_trail
@@ -286,45 +287,6 @@ module Make(X : sig
     in
     Sequence.of_list clauses
 
-  (* is [c] the result (after simplification) of an inference in which
-     at least one premise has been backward simplified? *)
-  let orphan_criterion_real c =
-    (* is the current step [p] an inference step? *)
-    let is_inf p = match P.Step.kind @@ P.S.step p with
-      | P.Inference _ -> true
-      | _ -> false
-    in
-    (* recursive traversal of the proof of [c].
-       @param after_inf true if we just crossed an inference step *)
-    let rec aux ~after_inf p =
-      if after_inf
-      then
-        (* after inference step: stop recursion and check *)
-        match P.S.result p with
-          | P.Clause c' -> SClause.is_backward_simplified c'
-          | P.BoolClause _
-          | P.Stmt _
-          | P.Form _ -> false
-      else
-        List.exists
-          (fun p' -> aux ~after_inf:(is_inf p) @@ P.Parent.proof p')
-          (P.Step.parents @@ P.S.step p)
-    in
-    let p = C.proof c in
-    let res =
-      List.exists (fun p' -> aux ~after_inf:(is_inf p) @@ P.Parent.proof p')
-        (P.Step.parents @@ P.S.step p)
-    in
-    if res then (
-      Util.incr_stat stat_orphan_criterion;
-      Util.debugf ~section 3
-        "@[<2>`@[%a@]` is redundant by orphan criterion@]" (fun k->k C.pp c);
-    );
-    res
-
-  let orphan_criterion c =
-    if !orphan_criterion_ then orphan_criterion_real c else false
-
   let is_trivial_trail trail = match !_is_trivial_trail with
     | [] -> false
     | [f] -> f trail
@@ -337,7 +299,6 @@ module Make(X : sig
       let res =
         C.is_redundant c
         || is_trivial_trail (C.trail c)
-        || orphan_criterion c
         || begin match !_is_trivial with
           | [] -> false
           | [f] -> f c
@@ -386,9 +347,7 @@ module Make(X : sig
       C.mark_redundant c;
       (* FIXME: put the rules as parameters *)
       let rule = Proof.Rule.mk "rw" in
-      let proof = Proof.Step.simp [C.proof_parent c]
-          ~comment:(StrSet.to_list !applied_rules |> String.concat ",") ~rule
-      in
+      let proof = Proof.Step.simp [C.proof_parent c] ~rule in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
       assert (not (C.equal c c'));
       Util.debugf ~section 3 "@[term rewritten clause `@[%a@]`@ into `@[%a@]`"
@@ -419,9 +378,7 @@ module Make(X : sig
       C.mark_redundant c;
       (* FIXME: put the rules as parameters *)
       let rule = Proof.Rule.mk "rw_lit" in
-      let proof = Proof.Step.simp [C.proof_parent c]
-          ~rule ~comment:(StrSet.to_list !applied_rules |> String.concat ",")
-      in
+      let proof = Proof.Step.simp [C.proof_parent c] ~rule in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
       assert (not (C.equal c c'));
       Util.debugf ~section 3 "@[lit rewritten `@[%a@]`@ into `@[%a@]`@]"
@@ -443,11 +400,21 @@ module Make(X : sig
         new_c >>= fix_simpl ~f
       )
 
-  (* All basic simplification of the clause itself *)
   let basic_simplify c =
+    let open SimplM.Infix in
+    begin match !_basic_simplify with
+      | [] -> SimplM.return_same c
+      | [f] -> f c
+      | [f;g] -> f c >>= g
+      | l -> SimplM.app_list l c
+    end
+
+  (* All basic simplification of the clause itself *)
+  let unary_simplify c =
     let open SimplM.Infix in
     fix_simpl c
       ~f:(fun c ->
+        basic_simplify c >>= fun c ->
         (* first, rewrite terms *)
         rewrite c >>= fun c ->
         (* rewrite literals (if needed) *)
@@ -457,7 +424,7 @@ module Make(X : sig
         end
         >>= fun c ->
         (* apply simplifications *)
-        begin match !_basic_simplify with
+        begin match !_unary_simplify with
           | [] -> SimplM.return_same c
           | [f] -> f c
           | [f;g] -> f c >>= g
@@ -500,7 +467,7 @@ module Make(X : sig
           (* simplify with unit clauses, then all active clauses *)
           rewrite >>=
           rw_simplify >>=
-          basic_simplify >>=
+          unary_simplify >>=
           active_simplify >|= fun c ->
           if not (Lits.equal_com (C.lits c) (C.lits old_c))
           then
@@ -543,7 +510,7 @@ module Make(X : sig
     while not (Queue.is_empty q) do
       let c = Queue.pop q in
       if not (C.ClauseSet.mem c !set) then (
-        let c, st = basic_simplify c in
+        let c, st = unary_simplify c in
         if st = `New then did_something := true;
         match try_next c !_multi_simpl_rule with
           | None ->
@@ -586,7 +553,7 @@ module Make(X : sig
           (* simplify with unit clauses, then all active clauses *)
           rewrite >>=
           rw_simplify >>=
-          basic_simplify >|= fun c ->
+          unary_simplify >|= fun c ->
           if not (Lits.equal_com (C.lits c) (C.lits old_c)) then (
             Util.debugf ~section 2 "@[clause `@[%a@]`@ simplified into `@[%a@]`@]"
               (fun k->k C.pp old_c C.pp c);
@@ -628,7 +595,7 @@ module Make(X : sig
                let redundant, clauses =
                  CCList.fold_map
                    (fun red c ->
-                      let c', is_new = basic_simplify c in
+                      let c', is_new = unary_simplify c in
                       (red || is_new=`New), c')
                    false clauses
                in
@@ -651,7 +618,7 @@ module Make(X : sig
   (** Simplify the clause w.r.t to the active set *)
   let forward_simplify c =
     let open SimplM.Infix in
-    rewrite c >>= rw_simplify >>= basic_simplify
+    rewrite c >>= rw_simplify >>= unary_simplify
 
   (** generate all clauses from inferences *)
   let generate given =
@@ -664,7 +631,7 @@ module Make(X : sig
     Queue.push (given, 0) unary_queue;
     while not (Queue.is_empty unary_queue) do
       let c, depth = Queue.pop unary_queue in
-      let c, _ = basic_simplify c in (* simplify a bit the clause *)
+      let c, _ = unary_simplify c in (* simplify a bit the clause *)
       if not (is_trivial c) then (
         (* add the clause to set of inferred clauses, if it's not the original clause *)
         if depth > 0 then unary_clauses := c :: !unary_clauses;
@@ -754,9 +721,17 @@ module Make(X : sig
     | Statement.Lemma _ -> true
     | _ -> false
 
-  let convert_input_statements stmts =
+  let has_sos_attr st =
+    CCList.exists
+      (function Statement.A_sos -> true | _ -> false)
+      (Statement.attrs st)
+
+  let convert_input_statements stmts : C.t Clause.sets =
     Util.debug ~section 2 "trigger on_input_statement";
     CCVector.iter (Signal.send on_input_statement) stmts;
+    (* sets of clauses *)
+    let c_set = CCVector.create() in
+    let c_sos = CCVector.create() in
     (* convert clauses, applying hooks when possible *)
     let rec conv_clause_ rules st = match rules with
       | [] when is_lemma_ st ->
@@ -770,12 +745,23 @@ module Make(X : sig
           | CR_add l -> List.rev_append l (conv_clause_ rules' st)
         end
     in
-    let clauses =
-      CCVector.flat_map_list (conv_clause_ !_clause_conversion_rules) stmts in
-    Util.debugf ~section 1 "@[<2>clauses:@ @[<v>%a@]@]"
-      (fun k->k (Util.pp_seq ~sep:" " C.pp)
-          (CCVector.to_seq clauses));
-    clauses
+    CCVector.iter
+      (fun st ->
+         let cs = conv_clause_ !_clause_conversion_rules st in
+         begin match Statement.view st with
+           | Statement.Assert _ when has_sos_attr st ->
+             CCVector.append_list c_sos cs
+           | _ -> CCVector.append_list c_set cs
+         end)
+      stmts;
+    Util.debugf ~section 1
+      "@[<v>@[<2>clauses:@ @[<v>%a@]@]@ @[<2>sos:@ @[<v>%a@]@]@]"
+      (fun k->k
+          (Util.pp_seq ~sep:" " C.pp) (CCVector.to_seq c_set)
+          (Util.pp_seq ~sep:" " C.pp) (CCVector.to_seq c_sos));
+    let c_set = CCVector.freeze c_set in
+    let c_sos = CCVector.freeze c_sos in
+    { Clause.c_set; c_sos; }
 
   (** {2 Misc} *)
 
@@ -785,14 +771,4 @@ module Make(X : sig
   let flex_add k v = flex_state_ := Flex_state.add k v !flex_state_
   let flex_get k = Flex_state.get_exn k !flex_state_
 end
-
-let () =
-  let set_or () =
-    Util.warn "caution: orphan criterion seems to be incomplete";
-    orphan_criterion_ := true
-  in
-  Params.add_opts
-    [ "--orphan-criterion", Arg.Unit set_or, " enable orphan criterion"
-    ; "--no-orphan-criterion", Arg.Clear orphan_criterion_, " disable orphan criterion"
-    ]
 

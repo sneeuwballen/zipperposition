@@ -1,9 +1,13 @@
 
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
-(** {1 Builtin Objects}
+(** {1 Builtin Objects} *)
 
-    Covers numbers, connectives, and builtin types
+(** Most objects that have a special meaning in logic are represented
+    by a {b builtin}. A builtin is a value of type {!t}; it might
+    correspond to different names in different input syntaxes.
+
+    Builtins cover numbers, connectives, and builtin types, among others.
 
   @since 1.0 *)
 
@@ -30,8 +34,10 @@ type t =
   | Grounding (** used for inst-gen *)
   | TyInt
   | TyRat
+  | TyReal
   | Int of Z.t
   | Rat of Q.t
+  | Real of string (* for now… *)
   | Floor
   | Ceiling
   | Truncate
@@ -162,6 +168,11 @@ module Tbl : Hashtbl.S with type key = t
 module TPTP : sig
   val connectives : Set.t
   val is_connective : t -> bool
+
+  val fixity : t -> fixity
+
+  val is_infix : t -> bool
+  val is_prefix : t -> bool
 
   val of_string : string -> t option
   (** Parse a $word into a builtin *)

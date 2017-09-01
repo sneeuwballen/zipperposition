@@ -3,9 +3,10 @@
 
 (** {1 Polynomes of order 1, over several variables}. *)
 
-module T = FOTerm
+module US = Unif_subst
+module T = Term
 
-type term = FOTerm.t
+type term = Term.t
 
 (** Typeclass num *)
 type 'a num = {
@@ -25,6 +26,8 @@ type 'a num = {
   minus : 'a -> 'a -> 'a;
   to_term : 'a -> term;
   to_string : 'a -> string;
+  of_int: Z.t -> 'a;
+  of_rat: Q.t -> 'a option;
 }
 
 let z : Z.t num = {
@@ -46,6 +49,8 @@ let z : Z.t num = {
   minus = Z.sub;
   to_term = (fun n -> T.builtin ~ty:Type.int (Builtin.mk_int n));
   to_string = Z.to_string;
+  of_int=(fun x->x);
+  of_rat=(fun _ -> None);
 }
 
 let q : Q.t num = {
@@ -69,6 +74,8 @@ let q : Q.t num = {
   minus = Q.sub;
   to_term = (fun n -> T.builtin ~ty:Type.rat (Builtin.mk_rat n));
   to_string = Q.to_string;
+  of_int = Q.of_bigint;
+  of_rat = (fun x->Some x);
 }
 
 type 'a t = {
@@ -297,6 +304,11 @@ let apply_subst ~renaming subst (m,sc) =
     (fun t -> Subst.FO.apply ~renaming subst (t,sc))
     m
 
+let apply_subst_no_simp ~renaming subst (m,sc) = {
+  m with
+    terms=List.map (fun (c,t) -> c, Subst.FO.apply ~renaming subst (t,sc)) m.terms;
+}
+
 let apply_subst_no_renaming subst (m,sc) =
   map
     (fun t -> Subst.FO.apply_no_renaming subst (t,sc))
@@ -325,28 +337,32 @@ let fold_max ~ord f acc m =
     (fun acc i (c, t) -> if T.Set.mem t max then f acc i c t else acc)
     acc m.terms
 
-let pp out e =
+let pp_ ~mult ~add ~pp_t out e =
   let pp_pair out (s, t) =
     if e.num.cmp s e.num.one = 0
-    then T.pp out t
-    else Format.fprintf out "%s×%a" (e.num.to_string s) T.pp t
+    then pp_t out t
+    else Format.fprintf out "%s %s %a" (e.num.to_string s) mult pp_t t
   in
   match e.terms with
     | [] -> CCFormat.string out (e.num.to_string e.const)
     | _::_ when e.num.sign e.const = 0 ->
-      Util.pp_list ~sep:" + " pp_pair out e.terms
+      Util.pp_list ~sep:add pp_pair out e.terms
     | _::_ ->
-      Format.fprintf out "%a + %s"
-        (Util.pp_list ~sep:" + " pp_pair) e.terms
+      Format.fprintf out "%a%s%s"
+        (Util.pp_list ~sep:add pp_pair) e.terms
+        add
         (e.num.to_string e.const)
+
+let pp out e = pp_ ~mult:"×" ~add:" + " ~pp_t:T.pp out e
+let pp_zf out e = pp_ ~mult:" * " ~add:" + " ~pp_t:T.ZF.pp out e
 
 let to_string m = CCFormat.to_string pp m
 
 let pp_tstp out e =
   let rec pp_pair out (s, t) =
     if e.num.cmp s e.num.one = 0
-    then T.pp out t
-    else Format.fprintf out "$product(%s, %a)" (e.num.to_string s) T.pp t
+    then T.TPTP.pp out t
+    else Format.fprintf out "$product(%s, %a)" (e.num.to_string s) T.TPTP.pp t
   and pp_list buf l = match l with
     | [] -> ()
     | [s, t] -> pp_pair buf (s, t)
@@ -494,16 +510,20 @@ module Focus = struct
         let mf' = { coeff=c; term=t; rest=of_list ~num const rest;} in
         if num.sign c <> 0 then k (mf', subst)
       | (c', t') :: l' ->
-        if Unif.FO.equal ~subst (Scoped.make t scope) (Scoped.make t' scope)
-        then
+        if Unif.FO.equal ~subst:(US.subst subst)
+            (Scoped.make t scope) (Scoped.make t' scope)
+        then (
           (* we do not have a choice, [t = t'] is true *)
           _iter_self ~num ~subst (num.add c c') t l' rest const scope k
-        else (
-          begin try
+        ) else (
+          begin
+            try
               (* maybe we can merge [t] and [t'] *)
-              let subst' = Unif.FO.unification ~subst
+              let subst' = Unif.FO.unify_full ~subst
                   (Scoped.make t scope) (Scoped.make t' scope)
               in
+              (* move back [rest] into the main list, some terms might be equal
+                 to [t] now *)
               _iter_self ~num ~subst:subst' (num.add c c') t (l'@ rest) [] const scope k
             with Unif.Fail -> ()
           end;
@@ -511,11 +531,11 @@ module Focus = struct
           _iter_self ~num ~subst c t l' ((c',t')::rest) const scope k
         )
 
-  let unify_self ?(subst=Subst.empty) (mf,sc) k =
+  let unify_self ?(subst=US.empty) (mf,sc) k =
     let num = mf.rest.num in
     _iter_self ~num ~subst mf.coeff mf.term mf.rest.terms [] mf.rest.const sc k
 
-  let unify_self_monome ?(subst=Subst.empty) (m,sc) k =
+  let unify_self_monome ?(subst=US.empty) (m,sc) k: unit =
     let num = m.num in
     let rec choose_first subst l rest = match l with
       | [] -> ()
@@ -526,8 +546,9 @@ module Focus = struct
       | [] -> ()
       | (c',t')::l' ->
         (* see whether we can unify t and t' *)
-        begin try
-            let subst = Unif.FO.unification ~subst (t,sc) (t',sc) in
+        begin
+          try
+            let subst = Unif.FO.unify_full ~subst (t,sc) (t',sc) in
             (* extend the unifier *)
             _iter_self ~num ~subst (num.add c c') t (l'@rest) [] m.const sc k
           with Unif.Fail -> ()
@@ -537,11 +558,11 @@ module Focus = struct
     in
     choose_first subst m.terms []
 
-  let unify_ff ?(subst=Subst.empty) (mf1,sc1) (mf2,sc2) k =
+  let unify_ff ?(subst=US.empty) (mf1,sc1) (mf2,sc2) k =
     assert(mf1.rest.num == mf2.rest.num);
     let num = mf1.rest.num in
     try
-      let subst = Unif.FO.unification ~subst (mf1.term,sc1) (mf2.term,sc2) in
+      let subst = Unif.FO.unify_full ~subst (mf1.term,sc1) (mf2.term,sc2) in
       _iter_self ~num ~subst mf1.coeff mf1.term mf1.rest.terms
         [] mf1.rest.const sc1
         (fun (mf1, subst) ->
@@ -550,7 +571,7 @@ module Focus = struct
              (fun (mf2, subst) -> k (mf1, mf2, subst)))
     with Unif.Fail -> ()
 
-  let unify_mm ?(subst=Subst.empty) (m1,sc1) (m2,sc2) k =
+  let unify_mm ?(subst=US.empty) (m1,sc1) (m2,sc2) k =
     assert(m1.num==m2.num);
     let num = m1.num in
     (* unify a term of [m1] with a term of [m2] *)
@@ -563,12 +584,12 @@ module Focus = struct
         assert (num.sign c1 <> 0 && num.sign c2 <> 0);
         begin
           try
-            let subst = Unif.FO.unification ~subst (t1,sc1) (t2,sc2) in
+            let subst = Unif.FO.unify_full ~subst (t1,sc1) (t2,sc2) in
             Util.debugf 5 "@[<2>unify_mm :@ @[%a = %a@]@ with @[%a@]@]"
-              (fun k->k T.pp t1 T.pp t2 Subst.pp subst);
-            _iter_self ~num ~subst c1 t1 l1' [] m1.const sc1
+              (fun k->k T.pp t1 T.pp t2 US.pp subst);
+            _iter_self ~num ~subst c1 t1 (l1'@rest1) [] m1.const sc1
               (fun (mf1, subst) ->
-                 _iter_self ~num ~subst c2 t2 l2' [] m2.const sc2
+                 _iter_self ~num ~subst c2 t2 (l2'@rest2) [] m2.const sc2
                    (fun (mf2, subst) -> k (mf1, mf2, subst))
               )
           with Unif.Fail -> ()
@@ -638,14 +659,14 @@ let matching ?(subst=Subst.empty) (m1,sc1)(m2,sc2) k =
   if m1.num.cmp m1.const m2.const <> 0 then ()
   else start subst m1.terms m2.terms
 
-let unify ?(subst=Subst.empty) (m1,sc1)(m2,sc2) k =
+let unify ?(subst=Unif_subst.empty) (m1,sc1)(m2,sc2) k =
   assert (m1.num == m2.num);
   let rec traverse_lists subst (c1,t1) l1' rest2 l2 = match l2 with
     | [] -> ()
     | (c2,t2)::l2' ->
       begin
         try
-          let subst = Unif.FO.matching ~subst ~pattern:(t1,sc1) (t2,sc2) in
+          let subst = Unif.FO.unify_full ~subst (t1,sc1) (t2,sc2) in
           match m1.num.cmp c1 c2 with
             | 0 -> start subst l1' (rest2 @ l2')  (* t1 removed *)
             | n when n<0 ->
@@ -667,6 +688,65 @@ let unify ?(subst=Subst.empty) (m1,sc1)(m2,sc2) k =
 
 exception NotLinear
 
+(* convert term to monome, or raise NotLinear *)
+let of_term_exn (type a)(num:a num) t =
+  let of_rat_exn q = match num.of_rat q with
+    | None -> raise NotLinear
+    | Some n -> n
+  in
+  let rec of_term t = match T.view t with
+    | T.AppBuiltin (Builtin.Sum, [_; t1; t2]) ->
+      let m1 = of_term t1 in
+      let m2 = of_term t2 in
+      sum m1 m2
+    | T.AppBuiltin (Builtin.Difference, [_;t1; t2]) ->
+      let m1 = of_term t1 in
+      let m2 = of_term t2 in
+      difference m1 m2
+    | T.AppBuiltin (Builtin.Uminus, [_;t']) ->
+      let m = of_term t' in
+      uminus m
+    | T.AppBuiltin (Builtin.Product, [_;t1; t2]) ->
+      begin match T.view t1, T.view t2 with
+        | T.AppBuiltin (Builtin.Int n, []), _ ->
+          product (of_term t2) (num.of_int n)
+        | T.AppBuiltin (Builtin.Rat n, []), _ ->
+          product (of_term t2) (of_rat_exn n)
+        | _, T.AppBuiltin (Builtin.Int n, []) ->
+          product (of_term t1) (num.of_int n)
+        | _, T.AppBuiltin (Builtin.Rat n, []) ->
+          product (of_term t1) (of_rat_exn n)
+        | _ -> raise NotLinear
+      end
+    | T.AppBuiltin (Builtin.Succ, [_;t']) -> succ (of_term t')
+    | T.AppBuiltin (Builtin.Prec, [_;t']) -> pred (of_term t')
+    | T.AppBuiltin (Builtin.Int n, []) -> mk_const ~num (num.of_int n)
+    | T.AppBuiltin (Builtin.Rat n, []) -> mk_const ~num (of_rat_exn n)
+    | T.AppBuiltin (b, _) when Builtin.is_arith b ->
+      raise NotLinear
+    | T.AppBuiltin _
+    | T.Var _
+    | T.Const _
+    | T.Fun _
+    | T.App _
+    | T.DB _ -> singleton ~num num.one t
+  in
+  of_term t
+
+(* to normalize, convert every coefficient to a monome and sum everything
+   together *)
+let normalize (type a) (m:a t): a t =
+  let acc = mk_const ~num:m.num m.const in
+  List.fold_left
+    (fun acc (c,t) ->
+       (* flatten this term into a full monome *)
+         try
+           let m = of_term_exn m.num t in
+           sum acc (product m c)
+         with NotLinear ->
+           add acc c t)
+    acc m.terms
+
 module Int = struct
   let num = z
   type t = Z.t monome
@@ -675,45 +755,7 @@ module Int = struct
   let singleton = singleton ~num
   let of_list = of_list ~num
 
-  let of_term_exn t =
-    let rec of_term t : t = match T.view t with
-      | T.AppBuiltin (Builtin.Sum, [_; t1; t2]) ->
-        let m1 = of_term t1 in
-        let m2 = of_term t2 in
-        sum m1 m2
-      | T.AppBuiltin (Builtin.Difference, [_;t1; t2]) ->
-        let m1 = of_term t1 in
-        let m2 = of_term t2 in
-        difference m1 m2
-      | T.AppBuiltin (Builtin.Uminus, [_;t']) ->
-        let m = of_term t' in
-        uminus m
-      | T.AppBuiltin (Builtin.Product, [_;t1; t2]) ->
-        begin match T.view t1, T.view t2 with
-          | T.AppBuiltin (Builtin.Int n, []), _ ->
-            let m = of_term t2 in
-            product m n
-          | _, T.AppBuiltin (Builtin.Int n, []) ->
-            let m = of_term t1 in
-            product m n
-          | _ -> raise NotLinear
-        end
-      | T.AppBuiltin (Builtin.Succ, [_;t']) ->
-        let m = of_term t' in
-        succ m
-      | T.AppBuiltin (Builtin.Prec, [_;t']) ->
-        let m = of_term t' in
-        pred m
-      | T.AppBuiltin (Builtin.Int n, []) -> const n
-      | T.AppBuiltin (b, _) when Builtin.is_arith b ->
-        raise NotLinear
-      | T.AppBuiltin _
-      | T.Var _
-      | T.Const _
-      | T.App _
-      | T.DB _ -> singleton num.one t
-    in
-    of_term t
+  let of_term_exn t = of_term_exn num t
 
   let of_term t =
     try Some (of_term_exn t)
@@ -756,22 +798,6 @@ module Int = struct
         mk_sum_const e.const sum
     in
     t
-
-  let normalize m =
-    let cst, changed, terms =
-      List.fold_left
-        (fun (cst, changed, acc) (c,t) ->
-           match T.view t with
-             | T.AppBuiltin (Builtin.Int n, []) ->
-               Z.add cst (Z.mul n c), true, acc
-             | _ -> cst, changed, (c,t)::acc
-        ) (m.const, false, []) m.terms
-    in
-    if changed
-    then
-      let terms = List.rev terms in  (* sort again *)
-      {m with const=cst; terms; }
-    else m
 
   let normalize_wrt_zero m =
     if is_const m
@@ -879,7 +905,7 @@ module Int = struct
   (** {2 Find Solutions} *)
 
   module Solve = struct
-    type solution = (FOTerm.t * t) list
+    type solution = (Term.t * t) list
     (** List of constraints (term = monome). It means that
         if all those constraints are satisfied, then a solution
         to the given problem has been found *)
@@ -1191,51 +1217,15 @@ module Rat = struct
   let singleton = singleton ~num
   let of_list = of_list ~num
 
-  let of_term_exn t =
-    let rec of_term t : t = match T.view t with
-      | T.AppBuiltin (Builtin.Sum, [_; t1; t2]) ->
-        let m1 = of_term t1 in
-        let m2 = of_term t2 in
-        sum m1 m2
-      | T.AppBuiltin (Builtin.Difference, [_;t1; t2]) ->
-        let m1 = of_term t1 in
-        let m2 = of_term t2 in
-        difference m1 m2
-      | T.AppBuiltin (Builtin.Uminus, [_;t']) ->
-        let m = of_term t' in
-        uminus m
-      | T.AppBuiltin (Builtin.Product, [_;t1; t2]) ->
-        begin match T.view t1, T.view t2 with
-          | T.AppBuiltin (Builtin.Rat n, []), _ ->
-            let m = of_term t2 in
-            product m n
-          | _, T.AppBuiltin (Builtin.Rat n, []) ->
-            let m = of_term t1 in
-            product m n
-          | _ -> raise NotLinear
-        end
-      | T.AppBuiltin (Builtin.Succ, [_;t']) ->
-        let m = of_term t' in
-        succ m
-      | T.AppBuiltin (Builtin.Prec, [_;t']) ->
-        let m = of_term t' in
-        pred m
-      | T.AppBuiltin (Builtin.Rat n, []) -> const n
-      | T.AppBuiltin (b, _) when Builtin.is_arith b ->
-        raise NotLinear
-      | T.AppBuiltin _
-      | T.Var _
-      | T.Const _
-      | T.App _
-      | T.DB _ -> singleton num.one t
-    in
-    of_term t
+  let of_term_exn t = of_term_exn num t
 
   let of_term t =
     try Some (of_term_exn t)
     with NotLinear -> None
 
   let mk_const n = T.builtin ~ty:num.ty (Builtin.mk_rat n)
+
+  let divide m q: t = product m (Q.inv q)
 
   (* a.t *)
   let mk_product a t =
@@ -1274,19 +1264,6 @@ module Rat = struct
     in
     t
 
-  let normalize m =
-    let cst, changed, terms =
-      List.fold_left
-        (fun (cst, changed, acc) (c,t) ->
-           match T.view t with
-             | T.AppBuiltin (Builtin.Rat n, []) ->
-               Q.add cst (Q.mul n c), true, acc
-             | _ -> cst, changed, (c,t)::acc
-        ) (m.const, false, []) m.terms
-    in
-    if changed
-    then
-      let terms = List.rev terms in  (* sort again *)
-      {m with const=cst; terms; }
-    else m
+  let to_multiset m =
+    Seq.terms m |> Multisets.MT.Seq.of_seq Multisets.MT.empty
 end

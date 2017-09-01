@@ -10,7 +10,7 @@
 
 open Logtk
 
-type term = FOTerm.t
+type term = Term.t
 type subst = Subst.t
 
 (** A context is represented as a regular array of literals, containing
@@ -22,7 +22,7 @@ val compare : t -> t -> int
 val equal : t -> t -> bool
 val hash : t -> int
 
-val make : Literals.t -> var:FOTerm.var -> t
+val make : Literals.t -> var:Term.var -> t
 (** Make a context from a var and literals containing this var.
     @raise Assert_failure if the variable isn't present in any literal *)
 

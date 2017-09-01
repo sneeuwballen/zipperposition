@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 open Logtk_arbitrary
 
-module T = FOTerm
+module T = Term
 
 let _const ~ty s =
   T.const ~ty (Symbol.of_string s)

@@ -3,6 +3,11 @@
 
 (** {1 Simple and Lightweight Congruence and order} *)
 
+(** Congruence Closure provides an efficient, lightweight procedure for deciding
+    equality on ground terms (i.e. ignoring variables).
+    Here we have a simple implementation that is mostly used to
+    check if clauses are tautologies w.r.t. equality *)
+
 module type S = Congruence_intf.S
 
 (** {2 Functor} *)
@@ -28,4 +33,4 @@ module Make(T : TERM) : S with type term = T.t
 
 (** {2 Common implementations} *)
 
-module FO : S with type term = FOTerm.t
+module FO : S with type term = Term.t

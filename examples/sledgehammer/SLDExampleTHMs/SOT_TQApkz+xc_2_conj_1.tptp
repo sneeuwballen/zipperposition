@@ -1,0 +1,55 @@
+%------------------------------------------------------------------------------
+tff(ty_n_t__List__Olist_It__String__Ochar_J,type,(
+    list_char: $tType )).
+
+tff(ty_n_t__AExp__Oaexp,type,(
+    aexp: $tType )).
+
+tff(ty_n_t__HOL__Obool,type,(
+    bool: $tType )).
+
+tff(ty_n_t__Nat__Onat,type,(
+    nat: $tType )).
+
+tff(ty_n_t__Com__Ocom,type,(
+    com: $tType )).
+
+tff(sy_c_Com_Ocom_OAssign,type,(
+    assign: ( list_char * aexp ) > com )).
+
+tff(sy_c_Com_Ocom_OSKIP,type,(
+    skip: com )).
+
+tff(sy_c_Sec__Typing_Osec__type,type,(
+    sec_sec_type: ( nat * com ) > $o )).
+
+tff(sy_c_fFalse,type,(
+    fFalse: bool )).
+
+tff(sy_c_fTrue,type,(
+    fTrue: bool )).
+
+tff(sy_c_pp,type,(
+    pp: bool > $o )).
+
+tff(sy_v_a,type,(
+    a: aexp )).
+
+tff(sy_v_la,type,(
+    la: nat )).
+
+tff(sy_v_x,type,(
+    x: list_char )).
+
+tff(fact_0_sec__type_OSkip,axiom,(
+    ! [L: nat] : sec_sec_type(L,skip) )).
+
+tff(help_pp_2_1_U,axiom,(
+    pp(fTrue) )).
+
+tff(help_pp_1_1_U,axiom,(
+    ~ pp(fFalse) )).
+
+tff(conj_1,conjecture,(
+    sec_sec_type(la,skip) )).
+%------------------------------------------------------------------------------

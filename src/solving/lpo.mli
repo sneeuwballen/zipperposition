@@ -64,7 +64,7 @@ val solve_multiple : Constraint.t list -> Solution.t LazyList.t
 (** {6 Search for a LPO ordering} *)
 
 module FO : sig
-  type term = FOTerm.t
+  type term = Term.t
 
   val orient_lpo : term -> term -> Constraint.t
   (** [orient a b] generates a constraint that is sufficient for [a]

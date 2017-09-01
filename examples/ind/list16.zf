@@ -1,0 +1,11 @@
+
+# expect: unsat
+
+# P(len(x)) => P(len(rev x))
+
+include "list.zf".
+
+val p : nat -> prop.
+
+goal forall x.  p (length x) => p (length (rev x)).
+

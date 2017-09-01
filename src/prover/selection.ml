@@ -6,178 +6,107 @@
 
 open Logtk
 
-module T = FOTerm
+module T = Term
 module S = Subst.FO
 module Lit = Literal
 module Lits = Literals
 module BV = CCBV
 
-type t = Literal.t array -> BV.t
+type t = Literal.t array -> CCBV.t
 
-let no_select _ = BV.empty ()
+type parametrized = strict:bool -> ord:Ordering.t -> t
 
-(* does the clause belong to pure superposition, without other theories? *)
-let _pure_superposition lits =
-  CCArray.for_all
-    (function
-      | Lit.Prop _
-      | Lit.Equation _
-      | Lit.True
-      | Lit.False -> true
-      | _ -> false)
-    lits
+(* no need for classification here *)
+let no_select _ : BV.t = BV.empty ()
+
+(* is it a good idea to select this kind of literal? *)
+let can_select_lit (lit:Lit.t) : bool = Lit.is_neg lit
 
 (* checks that [bv] is an acceptable selection for [lits]. In case
    some literal is selected, at least one negative literal must be selected. *)
-let _validate_select lits bv =
-  BV.is_empty bv
-  ||
-  try
-    Array.iteri
-      (fun i lit ->
-         if Lit.is_neg lit && BV.get bv i then raise Exit
-      ) lits;
-    false
-  with Exit -> true
+let validate_fun_ lits bv =
+  if BV.is_empty bv then true
+  else (
+    Sequence.of_array_i lits
+    |> Sequence.exists
+      (fun (i,_) -> can_select_lit lits.(i) && BV.get bv i)
+  )
 
-(** Select all positives literals *)
-let select_positives lits =
-  if _pure_superposition lits
-  then Lits.pos lits
-  else BV.empty ()
-
-let select_max_goal ~strict ~ord lits =
-  if _pure_superposition lits
-  then
-    let bv = Lits.maxlits ~ord lits in
-    BV.filter bv (fun i -> Lit.is_neg lits.(i));
-    try
-      (* keep only first satisfying lit *)
-      let i = BV.first bv in
-      BV.clear bv;
-      BV.set bv i;
-      if not strict
-      then BV.union_into ~into:bv (select_positives lits);
-      assert (_validate_select lits bv);
+(* build a selection function in general, given the more specialized
+   one there *)
+let mk_ ~(f:Lits.t -> BV.t) (lits:Lits.t) : BV.t =
+  if Array.length lits <= 1 then BV.empty ()
+  else (
+    (* should we select anything? *)
+    let should_select = CCArray.exists can_select_lit lits in
+    if should_select then (
+      let bv = f lits in
+      assert (validate_fun_ lits bv);
       bv
-    with Not_found ->
-      BV.empty ()  (* empty one *)
-  else BV.empty ()
+    ) else (
+      (*Util.debugf ~section 5 "(@[should-not-select@ %a@])" (fun k->k Lits.pp lits);*)
+      BV.empty ()
+    )
+  )
 
-let select_diff_neg_lit ~strict ~ord:_ lits =
-  (* find a negative literal with maximal difference between
-     the weights of the sides of the equation *)
-  let rec find_lit best_diff best_idx lits i =
-    if i = Array.length lits then best_idx
-    else
-      let weightdiff, ok = match lits.(i) with
-        | Lit.Equation(l,r,false) ->
-          abs (T.size l - T.size r), true
-        | Lit.Prop (p, false) ->
-          T.size p - 1, true
-        | _ -> 0, false
-      in
-      let best_idx, best_diff =
-        if ok && weightdiff > best_diff
-        then i, weightdiff  (* prefer this lit *)
-        else best_idx, best_diff
-      in
-      find_lit best_diff best_idx lits (i+1)
-  in
-  (* search such a lit among the clause's lits *)
-  if _pure_superposition lits then (
-    let res = match find_lit (-1) (-1) lits 0 with
-      | -1 -> BV.empty ()
-      | n when strict -> BV.of_list [n]
-      | n ->
-        let bv = select_positives lits in
-        BV.set bv n;
+let bv_first_ bv = BV.iter_true bv |> Sequence.head
+
+let max_goal ~strict ~ord lits =
+  mk_ lits ~f:(fun lits ->
+    let bv = Lits.maxlits ~ord lits in
+    (* only retain negative normal lits, or constraints
+       that are unshielded *)
+    BV.filter bv (fun i -> can_select_lit lits.(i));
+    begin match bv_first_ bv with
+      | Some i ->
+        (* keep only first satisfying lit *)
+        BV.clear bv;
+        BV.set bv i;
+        if not strict then (
+          BV.union_into ~into:bv (Lits.pos lits);
+        );
         bv
-    in
-    assert (_validate_select lits res);
-    res
-  ) else BV.empty ()
+      | None ->
+        BV.empty ()  (* empty one *)
+    end)
 
-let select_complex ~strict ~ord lits =
-  (* find the ground negative literal with highest diff in size *)
-  let rec find_neg_ground best_diff best_i lits i =
-    if i = Array.length lits then best_i else
-      let weightdiff, ok = match lits.(i) with
-        | Lit.Equation(l,r,false) when Lit.is_ground lits.(i) ->
-          abs (T.size l - T.size r), true
-        | Lit.Prop (p, false) when Lit.is_ground lits.(i) ->
-          T.size p - 1, true
-        | _ -> 0, false
-      in
-      let best_i, best_diff =
-        if ok && weightdiff > best_diff
-        then i, weightdiff  (* prefer this lit *)
-        else best_i, best_diff
-      in
-      find_neg_ground best_diff best_i lits (i+1)
-  in
-  (* try to find ground negative lit with bigger weight difference, else delegate *)
-  if _pure_superposition lits
-  then
-    let i = find_neg_ground (-1) (-1) lits 0 in
-    if i >= 0
-    then if strict
-      then BV.of_list [i]
-      else (
-        let bv = select_positives lits in
-        let _ = BV.set bv i in
-        assert (_validate_select lits bv);
-        bv
-      )
-    else
-      select_diff_neg_lit ~strict ~ord lits (* delegate to select_diff_neg_lit *)
-  else BV.empty ()
-
-let select_complex_except_RR_horn ~strict ~ord lits =
-  if not (_pure_superposition lits) || Lits.is_RR_horn_clause lits
-  then BV.empty ()  (* do not select (conditional rewrite rule) *)
-  else select_complex ~strict ~ord lits  (* like select_complex *)
+let except_RR_horn (p:parametrized) ~strict ~ord lits =
+  if Lits.is_RR_horn_clause lits
+  then BV.empty () (* do not select (conditional rewrite rule) *)
+  else p ~strict ~ord lits  (* delegate *)
 
 (** {2 Global selection Functions} *)
 
-let default_selection ~ord =
-  select_complex ~strict:true ~ord
+let default ~ord = max_goal ~strict:true ~ord
 
-let tbl_ = Hashtbl.create 17
-(** table of name -> functions *)
+let l =
+  let basics =
+    [ "NoSelection", (fun ~ord:_ -> no_select);
+      "default", default
+    ]
+  and by_ord =
+    CCList.flat_map
+      (fun (name,p) ->
+         [ name, (fun ~ord -> p ~strict:true ~ord);
+           name ^ "NS", (fun ~ord -> p ~strict:false ~ord);
+         ])
+      [ "MaxGoal", max_goal;
+        "MaxGoalExceptRRHorn", except_RR_horn max_goal;
+      ]
+  in
+  basics @ by_ord
 
-let () =
-  Hashtbl.add tbl_ "NoSelection" (fun ~ord:_ c -> no_select c);
-  Hashtbl.add tbl_ "MaxGoal" (select_max_goal ~strict:true);
-  Hashtbl.add tbl_ "MaxGoalNS" (select_max_goal ~strict:false);
-  Hashtbl.add tbl_ "SelectDiffNegLit" (select_diff_neg_lit ~strict:true);
-  Hashtbl.add tbl_ "SelectDiffNegLitNS" (select_diff_neg_lit ~strict:false);
-  Hashtbl.add tbl_ "SelectComplex" (select_complex ~strict:true);
-  Hashtbl.add tbl_ "SelectComplexNS" (select_complex ~strict:false);
-  Hashtbl.add tbl_ "SelectComplexExceptRRHorn" (select_complex_except_RR_horn ~strict:true);
-  Hashtbl.add tbl_ "SelectComplexExceptRRHornNS" (select_complex_except_RR_horn ~strict:false);
-  ()
-
-(** selection function from string (may fail) *)
-let selection_from_string ~ord s =
-  try
-    let select = Hashtbl.find tbl_ s in
-    select ~ord
+let from_string ~ord s =
+  try (List.assoc s l) ~ord
   with Not_found ->
     failwith ("no such selection function: "^s)
 
-(** available names for selection functions *)
-let available_selections () = CCHashtbl.keys_list tbl_
-
-let register name f =
-  if Hashtbl.mem tbl_ name
-  then failwith ("selection function " ^ name ^ " already defined");
-  Hashtbl.add tbl_ name f
+let all () = List.map fst l
 
 let () =
   let set_select s = Params.select := s in
   Params.add_opts
     [ "--select",
-      Arg.Symbol (available_selections (), set_select),
+      Arg.Symbol (all(), set_select),
       " set literal selection function"
     ]

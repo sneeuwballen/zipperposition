@@ -103,7 +103,7 @@ module type S = sig
   val of_forms :
     ?penalty:int ->
     trail:Trail.t ->
-    FOTerm.t SLiteral.t list ->
+    Term.t SLiteral.t list ->
     proof_step ->
     t
   (** Directly from list of formulas *)
@@ -111,7 +111,7 @@ module type S = sig
   val of_forms_axiom :
     ?penalty:int ->
     file:string -> name:string ->
-    FOTerm.t SLiteral.t list -> t
+    Term.t SLiteral.t list -> t
   (** Construction from formulas as axiom (initial clause) *)
 
   val of_statement : Statement.clause_t -> t list
@@ -184,7 +184,7 @@ module type S = sig
 
   val to_sclause : t -> SClause.t
 
-  val to_forms : t -> FOTerm.t SLiteral.t list
+  val to_forms : t -> Term.t SLiteral.t list
   (** Easy iteration on an abstract view of literals *)
 
   val to_s_form : t -> TypedSTerm.Form.t
@@ -193,7 +193,7 @@ module type S = sig
 
   module Seq : sig
     val lits : t -> Literal.t Sequence.t
-    val terms : t -> FOTerm.t Sequence.t
+    val terms : t -> Term.t Sequence.t
     val vars : t -> Type.t HVar.t Sequence.t
   end
 
@@ -250,7 +250,7 @@ module type S = sig
   (** {2 Position} *)
 
   module Pos : sig
-    val at : t -> Position.t -> FOTerm.t
+    val at : t -> Position.t -> Term.t
   end
 
   (** {2 Clauses with more data} *)
@@ -260,7 +260,7 @@ module type S = sig
     type t = {
       clause : clause;
       pos : Position.t;
-      term : FOTerm.t;
+      term : Term.t;
     }
 
     val compare : t -> t -> int

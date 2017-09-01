@@ -77,7 +77,7 @@ val is_horn : t -> bool
 
 val of_slit_l :
   stmt:Statement.clause_t ->
-  FOTerm.t SLiteral.t list ->
+  Term.t SLiteral.t list ->
   t
 (** Conversion from some clause in the given statement *)
 

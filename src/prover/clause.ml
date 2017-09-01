@@ -6,7 +6,7 @@
 open Logtk
 
 module BV = CCBV
-module T = FOTerm
+module T = Term
 module S = Subst
 module Lit = Literal
 module Lits = Literals
@@ -18,6 +18,12 @@ module type S = Clause_intf.S
 
 type proof_step = Proof.Step.t
 type proof = Proof.S.t
+
+(** Bundle of clause sets *)
+type 'c sets = {
+  c_set: 'c CCVector.ro_vector; (** main set of clauses *)
+  c_sos: 'c CCVector.ro_vector; (** set of support *)
+}
 
 (** {2 Type def} *)
 module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
@@ -112,7 +118,17 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let selected = lazy (Ctx.select c.lits) in
     create_inner ~penalty ~selected c proof
 
+  let lit_is_false_ = function
+    | Literal.False -> true
+    | _ -> false
+
   let create_a ~penalty ~trail lits proof =
+    (* remove spurious "false" literals automatically *)
+    let lits =
+      if CCArray.exists lit_is_false_ lits
+      then CCArray.filter (fun lit -> not (lit_is_false_ lit)) lits
+      else lits
+    in
     let selected = lazy (Ctx.select lits) in
     create_inner ~penalty ~selected (SClause.make ~trail lits) proof
 
@@ -128,60 +144,11 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let proof = Proof.Step.assert' ~file ~name () in
     create ~penalty ~trail:Trail.empty lits proof
 
-  let rule_neg_ = Proof.Rule.mk "neg_goal"
-  let rule_cnf_ = Proof.Rule.mk "cnf"
-  let rule_renaming_ = Proof.Rule.mk "renaming"
-  let rule_preprocess_ msg = Proof.Rule.mkf "preprocess(%s)" msg
-
-  module Src_tbl = CCHashtbl.Make(struct
-      type t = Stmt.source
-      let equal = Stmt.Src.equal
-      let hash = Stmt.Src.hash
-    end)
-
-  (* used to share the same SClause.t in the proof *)
-  let input_proof_tbl_ : Proof.Step.t Src_tbl.t = Src_tbl.create 32
-
-  let rec proof_of_stmt src =
-    try Src_tbl.find input_proof_tbl_ src
-    with Not_found ->
-      let p = match Stmt.Src.view src with
-        | Stmt.Input (_, Stmt.R_goal) -> Proof.Step.goal src
-        | Stmt.Input (_, _) -> Proof.Step.assert_ src
-        | Stmt.From_file (_, Stmt.R_goal) -> Proof.Step.goal src
-        | Stmt.From_file (_, _) -> Proof.Step.assert_ src
-        | Stmt.Internal _ -> Proof.Step.trivial
-        | Stmt.Neg srcd -> Proof.Step.esa ~rule:rule_neg_ [proof_of_sourced srcd]
-        | Stmt.CNF srcd -> Proof.Step.esa ~rule:rule_cnf_ [proof_of_sourced srcd]
-        | Stmt.Preprocess (srcd,msg) ->
-          Proof.Step.esa ~rule:(rule_preprocess_ msg) [proof_of_sourced srcd]
-        | Stmt.Renaming (srcd,id,form) ->
-          Proof.Step.esa ~rule:rule_renaming_
-            [proof_of_sourced srcd;
-             Proof.Parent.from @@ Proof.S.mk_f_by_def id @@
-               TypedSTerm.(Form.eq (const id ~ty:Ty.prop) form)]
-      in
-      Src_tbl.add input_proof_tbl_ src p;
-      p
-
-  and proof_of_sourced (res, src): Proof.Parent.t =
-    let p = proof_of_stmt src in
-    begin match res with
-      | Stmt.Sourced_input f ->
-        Proof.Parent.from (Proof.S.mk_f p f)
-      | Stmt.Sourced_clause c ->
-        let lits = List.map Ctx.Lit.of_form c |> Array.of_list in
-        let c = SClause.make ~trail:Trail.empty lits in
-        Proof.Parent.from (Proof.S.mk_c p c)
-      | Stmt.Sourced_statement stmt ->
-        Proof.Parent.from (Proof.S.mk_stmt p stmt)
-    end
-
   let of_statement st =
     let of_lits lits =
       (* convert literals *)
       let lits = List.map Ctx.Lit.of_form lits in
-      let proof = proof_of_stmt (Stmt.src st) in
+      let proof = Proof.S.step_of_src (Stmt.src st) in
       let c = create ~trail:Trail.empty ~penalty:0 lits proof in
       c
     in
@@ -189,8 +156,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       | Stmt.Data _
       | Stmt.TyDecl _ -> []
       | Stmt.Def _
-      | Stmt.RewriteForm _
-      | Stmt.RewriteTerm _ -> [] (* dealt with by rewriting *)
+      | Stmt.Rewrite _ -> [] (* dealt with by rewriting *)
       | Stmt.Assert lits -> [of_lits lits]
       | Stmt.Goal lits -> [of_lits lits]
       | Stmt.Lemma l
@@ -198,7 +164,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let update_trail f c =
     let sclause = SClause.update_trail f c.sclause in
-    create_inner ~selected:c.selected ~penalty:c.penalty sclause c.proof
+    create_inner sclause c.proof ~selected:c.selected ~penalty:c.penalty
 
   let proof_step c = c.proof
 

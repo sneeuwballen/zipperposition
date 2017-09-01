@@ -1,0 +1,15 @@
+
+# expect: unsat
+
+# example 4 from "extensional higher order resolution"
+
+val i : type.
+
+val m : i -> i.
+val n : i -> i.
+
+goal
+  (forall P x. P (m x) => P (n x)) =>
+  (forall Q. Q (fun x. m x) => Q (fun y. n y)).
+
+

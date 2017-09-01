@@ -1,12 +1,12 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Utils for Parsing} *)
-
 open Logtk
 open CCResult.Infix
 
-let parse_tptp file =
+type 'a or_error = ('a, string) CCResult.t
+
+let parse_tptp file : _ or_error =
   Util_tptp.parse_file ~recursive:true file
   >|= Sequence.map Util_tptp.to_ast
 
@@ -15,7 +15,7 @@ let parse_tip file =
   >|= Util_tip.convert_seq
 
 let guess_input (file:string): Input_format.t =
-  if CCString.suffix ~suf:".p" file
+  if CCString.suffix ~suf:".p" file || CCString.suffix ~suf:".tptp" file
   then Input_format.I_tptp
   else if CCString.suffix ~suf:".smt2" file
   then Input_format.I_tip

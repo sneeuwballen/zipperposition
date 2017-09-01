@@ -4,7 +4,11 @@
 (** {1 Feature Vector indexing} *)
 
 (** Feature Vector indexing (see Schulz 2004) for efficient forward
-    and backward subsumption *)
+    and backward subsumption.
+
+    This allows to retrieve clauses that (potentially) subsume
+    or are subsumed by a given query clause.
+*)
 
 type lits = Index_intf.lits
 

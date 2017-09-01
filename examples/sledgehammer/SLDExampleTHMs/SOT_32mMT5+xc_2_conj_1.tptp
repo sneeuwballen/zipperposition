@@ -1,0 +1,2163 @@
+%------------------------------------------------------------------------------
+tff(ty_n_t__fun_Itf__a_Mt__fun_Itf__a_Mt__HOL__Obool_J_J,type,(
+    fun_a_fun_a_bool: $tType )).
+
+tff(ty_n_t__fun_Itf__a_Mt__fun_Itf__a_Mtf__a_J_J,type,(
+    fun_a_fun_a_a: $tType )).
+
+tff(ty_n_t__fun_Itf__a_Mt__Set__Oset_Itf__a_J_J,type,(
+    fun_a_set_a: $tType )).
+
+tff(ty_n_t__fun_Itf__a_Mt__HOL__Obool_J,type,(
+    fun_a_bool: $tType )).
+
+tff(ty_n_t__fun_Itf__a_Mtf__a_J,type,(
+    fun_a_a: $tType )).
+
+tff(ty_n_t__Set__Oset_Itf__a_J,type,(
+    set_a: $tType )).
+
+tff(ty_n_t__HOL__Obool,type,(
+    bool: $tType )).
+
+tff(ty_n_tf__a,type,(
+    a: $tType )).
+
+tff(sy_c_ATP_058Lamm__a____,type,(
+    aTP_Lamm_a: set_a > fun_a_bool )).
+
+tff(sy_c_Dioid_Otimes_Oopp__mult_001tf__a,type,(
+    opp_mult_a: fun_a_fun_a_a > fun_a_fun_a_a )).
+
+tff(sy_c_Finite__Set_Ocomp__fun__idem_001tf__a_001tf__a,type,(
+    finite40241356em_a_a: fun_a_fun_a_a > $o )).
+
+tff(sy_c_Groups_Oabel__semigroup_001tf__a,type,(
+    abel_semigroup_a: fun_a_fun_a_a > $o )).
+
+tff(sy_c_Groups_Oabel__semigroup__axioms_001tf__a,type,(
+    abel_s2117090225ioms_a: fun_a_fun_a_a > $o )).
+
+tff(sy_c_Groups_Ocomm__monoid_001tf__a,type,(
+    comm_monoid_a: fun_a_fun_a_a > fun_a_bool )).
+
+tff(sy_c_Groups_Ocomm__monoid__axioms_001tf__a,type,(
+    comm_monoid_axioms_a: fun_a_fun_a_a > fun_a_bool )).
+
+tff(sy_c_Groups_Omonoid_001tf__a,type,(
+    monoid_a: fun_a_fun_a_a > fun_a_bool )).
+
+tff(sy_c_Groups_Osemigroup_001tf__a,type,(
+    semigroup_a: fun_a_fun_a_a > $o )).
+
+tff(sy_c_Lattices_Oinf__class_Oinf_001t__Set__Oset_Itf__a_J,type,(
+    inf_inf_set_a: ( set_a * set_a ) > set_a )).
+
+tff(sy_c_Lattices_Osemilattice_001tf__a,type,(
+    semilattice_a: fun_a_fun_a_a > $o )).
+
+tff(sy_c_Lattices_Osemilattice__axioms_001tf__a,type,(
+    semilattice_axioms_a: fun_a_fun_a_a > $o )).
+
+tff(sy_c_Lattices_Osemilattice__neutr_001tf__a,type,(
+    semilattice_neutr_a: fun_a_fun_a_a > fun_a_bool )).
+
+tff(sy_c_Lattices_Osemilattice__neutr__order_001tf__a,type,(
+    semila577284780rder_a: ( fun_a_fun_a_a * a * fun_a_fun_a_bool * fun_a_fun_a_bool ) > $o )).
+
+tff(sy_c_Lattices_Osemilattice__order_001tf__a,type,(
+    semilattice_order_a: ( fun_a_fun_a_a * fun_a_fun_a_bool * fun_a_fun_a_bool ) > $o )).
+
+tff(sy_c_Lattices_Osemilattice__order__axioms_001tf__a,type,(
+    semila1396341003ioms_a: ( fun_a_fun_a_a * fun_a_fun_a_bool * fun_a_fun_a_bool ) > $o )).
+
+tff(sy_c_Lattices__Big_Osemilattice__set_001tf__a,type,(
+    lattic1885654924_set_a: fun_a_fun_a_a > $o )).
+
+tff(sy_c_More__Boolean__Algebra_Oboolean__algebra_Ois__conjugation_001tf__a,type,(
+    more_B123986365tion_a: ( fun_a_fun_a_a * a * fun_a_a * fun_a_a ) > $o )).
+
+tff(sy_c_Orderings_Obot__class_Obot_001t__Set__Oset_Itf__a_J,type,(
+    bot_bot_set_a: set_a )).
+
+tff(sy_c_Orderings_Oord_OLeast_001tf__a,type,(
+    least_a: ( fun_a_fun_a_bool * fun_a_bool ) > a )).
+
+tff(sy_c_Orderings_Oord_Omax_001tf__a,type,(
+    max_a: fun_a_fun_a_bool > fun_a_fun_a_a )).
+
+tff(sy_c_Orderings_Oord_Omin_001tf__a,type,(
+    min_a: fun_a_fun_a_bool > fun_a_fun_a_a )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Set__Oset_Itf__a_J,type,(
+    ord_less_eq_set_a: ( set_a * set_a ) > $o )).
+
+tff(sy_c_Orderings_Oorder_Oantimono_001tf__a_001t__Set__Oset_Itf__a_J,type,(
+    antimono_a_set_a: ( fun_a_fun_a_bool * fun_a_set_a ) > $o )).
+
+tff(sy_c_Orderings_Oorder_Omono_001tf__a_001t__Set__Oset_Itf__a_J,type,(
+    mono_a_set_a: ( fun_a_fun_a_bool * fun_a_set_a ) > $o )).
+
+tff(sy_c_Orderings_Otop__class_Otop_001t__Set__Oset_Itf__a_J,type,(
+    top_top_set_a: set_a )).
+
+tff(sy_c_Relation__Algebra__Functions_Orelation__algebra_Odom_001tf__a,type,(
+    relati1626140988_dom_a: ( fun_a_a * fun_a_fun_a_a * a * fun_a_fun_a_a ) > fun_a_fun_a_a )).
+
+tff(sy_c_Relation__Algebra__Functions_Orelation__algebra_Ois__bij_001tf__a,type,(
+    relati1283760645_bij_a: ( fun_a_fun_a_bool * fun_a_fun_a_a * fun_a_a ) > fun_a_fun_a_bool )).
+
+tff(sy_c_Relation__Algebra__Functions_Orelation__algebra_Ois__inj_001tf__a,type,(
+    relati692168899_inj_a: ( fun_a_fun_a_bool * fun_a_fun_a_a * fun_a_a ) > fun_a_fun_a_bool )).
+
+tff(sy_c_Relation__Algebra__Functions_Orelation__algebra_Ois__map_001tf__a,type,(
+    relati1341526444_map_a: ( fun_a_fun_a_bool * fun_a_fun_a_a * fun_a_a ) > fun_a_fun_a_bool )).
+
+tff(sy_c_Relation__Algebra__Functions_Orelation__algebra_Ois__p__fun_001tf__a,type,(
+    relati1280118755_fun_a: ( fun_a_fun_a_bool * fun_a_fun_a_a * fun_a_a ) > fun_a_fun_a_bool )).
+
+tff(sy_c_Relation__Algebra__Functions_Orelation__algebra_Ois__point_001tf__a,type,(
+    relati761776312oint_a: ( fun_a_fun_a_bool * a * a * fun_a_fun_a_a * fun_a_a ) > fun_a_fun_a_bool )).
+
+tff(sy_c_Relation__Algebra__Functions_Orelation__algebra_Ois__rectangle_001tf__a,type,(
+    relati1879477145ngle_a: ( fun_a_fun_a_bool * a * fun_a_fun_a_a ) > fun_a_bool )).
+
+tff(sy_c_Relation__Algebra__Functions_Orelation__algebra_Ois__sur_001tf__a,type,(
+    relati87626936_sur_a: ( fun_a_fun_a_bool * fun_a_fun_a_a * fun_a_a ) > fun_a_fun_a_bool )).
+
+tff(sy_c_Relation__Algebra__Functions_Orelation__algebra_Ois__total_001tf__a,type,(
+    relati1193222756otal_a: ( fun_a_fun_a_bool * fun_a_fun_a_a * fun_a_a ) > fun_a_fun_a_bool )).
+
+tff(sy_c_Relation__Algebra__Tests_Orelation__algebra_Ois__test_001tf__a,type,(
+    relati197917286test_a: fun_a_fun_a_bool > fun_a_fun_a_bool )).
+
+tff(sy_c_Relation__Algebra__Tests_Orelation__algebra_Otc_001tf__a,type,(
+    relati1726020595n_tc_a: ( fun_a_a * fun_a_fun_a_a ) > fun_a_fun_a_a )).
+
+tff(sy_c_Relation__Algebra__Vectors_Orelation__algebra_Ois__vector_001tf__a,type,(
+    relati1593128644ctor_a: ( a * fun_a_fun_a_a ) > fun_a_bool )).
+
+tff(sy_c_Set_OCollect_001tf__a,type,(
+    collect_a: fun_a_bool > set_a )).
+
+tff(sy_c_Set_Oinsert_001tf__a,type,(
+    insert_a: ( a * set_a ) > set_a )).
+
+tff(sy_c_Set__Interval_Oord_OatLeastAtMost_001tf__a,type,(
+    set_atLeastAtMost_a: ( fun_a_fun_a_bool * a ) > fun_a_set_a )).
+
+tff(sy_c_Set__Interval_Oord_OatLeast_001tf__a,type,(
+    set_atLeast_a: fun_a_fun_a_bool > fun_a_set_a )).
+
+tff(sy_c_Set__Interval_Oord_OatMost_001tf__a,type,(
+    set_atMost_a: fun_a_fun_a_bool > fun_a_set_a )).
+
+tff(sy_c_aa_001tf__a_001t__HOL__Obool,type,(
+    aa_a_bool: ( fun_a_bool * a ) > bool )).
+
+tff(sy_c_aa_001tf__a_001t__Set__Oset_Itf__a_J,type,(
+    aa_a_set_a: ( fun_a_set_a * a ) > set_a )).
+
+tff(sy_c_aa_001tf__a_001t__fun_Itf__a_Mt__HOL__Obool_J,type,(
+    aa_a_fun_a_bool: ( fun_a_fun_a_bool * a ) > fun_a_bool )).
+
+tff(sy_c_aa_001tf__a_001t__fun_Itf__a_Mtf__a_J,type,(
+    aa_a_fun_a_a: ( fun_a_fun_a_a * a ) > fun_a_a )).
+
+tff(sy_c_aa_001tf__a_001tf__a,type,(
+    aa_a_a: ( fun_a_a * a ) > a )).
+
+tff(sy_c_fFalse,type,(
+    fFalse: bool )).
+
+tff(sy_c_fTrue,type,(
+    fTrue: bool )).
+
+tff(sy_c_member_001tf__a,type,(
+    member_a: ( a * set_a ) > $o )).
+
+tff(sy_c_pp,type,(
+    pp: bool > $o )).
+
+tff(sy_v_bot,type,(
+    bot: a )).
+
+tff(sy_v_composition,type,(
+    composition: fun_a_fun_a_a )).
+
+tff(sy_v_converse,type,(
+    converse: fun_a_a )).
+
+tff(sy_v_inf,type,(
+    inf: fun_a_fun_a_a )).
+
+tff(sy_v_less,type,(
+    less: fun_a_fun_a_bool )).
+
+tff(sy_v_less__eq,type,(
+    less_eq: fun_a_fun_a_bool )).
+
+tff(sy_v_sup,type,(
+    sup: fun_a_fun_a_a )).
+
+tff(sy_v_top,type,(
+    top: a )).
+
+tff(sy_v_uminus,type,(
+    uminus: fun_a_a )).
+
+tff(sy_v_unit,type,(
+    unit: a )).
+
+tff(sy_v_x,type,(
+    x: a )).
+
+tff(sy_v_y,type,(
+    y: a )).
+
+tff(fact_0_local_Oantisym,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,Y),X))
+       => X = Y ) ) )).
+
+tff(fact_1__092_060open_062y_A_092_060le_062_Ax_092_060close_062,axiom,(
+    pp(aa_a_bool(aa_a_fun_a_bool(less_eq,y),x)) )).
+
+tff(fact_2_assms_I3_J,axiom,(
+    pp(aa_a_bool(aa_a_fun_a_bool(less_eq,x),y)) )).
+
+tff(fact_3_local_Oantisym__conv,axiom,(
+    ! [Y: a,X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,Y),X))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+      <=> X = Y ) ) )).
+
+tff(fact_4_local_Oeq__iff,axiom,(
+    ! [X: a,Y: a] : 
+      ( X = Y
+    <=> ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+        & pp(aa_a_bool(aa_a_fun_a_bool(less_eq,Y),X)) ) ) )).
+
+tff(fact_5_local_Odual__order_Otrans,axiom,(
+    ! [B: a,A: a,C: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,B),A))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,C),B))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,C),A)) ) ) )).
+
+tff(fact_6_local_Odual__order_Oantisym,axiom,(
+    ! [B: a,A: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,B),A))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B))
+       => A = B ) ) )).
+
+tff(fact_7_local_Oeq__refl,axiom,(
+    ! [X: a,Y: a] : 
+      ( X = Y
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y)) ) )).
+
+tff(fact_8_assms_I2_J,axiom,(
+    pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,y),top)),aa_a_a(aa_a_fun_a_a(composition,x),top))) )).
+
+tff(fact_9_semilattice__axioms_Ointro,axiom,(
+    ! [F: fun_a_fun_a_a] : 
+      ( ! [A2: a] : aa_a_a(aa_a_fun_a_a(F,A2),A2) = A2
+     => semilattice_axioms_a(F) ) )).
+
+tff(fact_10_semilattice_Ointro,axiom,(
+    ! [F: fun_a_fun_a_a] : 
+      ( abel_semigroup_a(F)
+     => ( semilattice_axioms_a(F)
+       => semilattice_a(F) ) ) )).
+
+tff(fact_11_local_Omaddux__20,axiom,(
+    ! [X: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),aa_a_a(aa_a_fun_a_a(composition,X),top))) )).
+
+tff(fact_12_local_Oord__eq__le__trans,axiom,(
+    ! [A: a,B: a,C: a] : 
+      ( A = B
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,B),C))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),C)) ) ) )).
+
+tff(fact_13_local_Oorder__trans,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,Y),Z))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Z)) ) ) )).
+
+tff(fact_14_local_Oord__le__eq__trans,axiom,(
+    ! [A: a,B: a,C: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B))
+     => ( B = C
+       => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),C)) ) ) )).
+
+tff(fact_15_local_Oorder_Oantisym,axiom,(
+    ! [A: a,B: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,B),A))
+       => A = B ) ) )).
+
+tff(fact_16_local_Oorder_Otrans,axiom,(
+    ! [A: a,B: a,C: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,B),C))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),C)) ) ) )).
+
+tff(fact_17_local_Oorder__refl,axiom,(
+    ! [X: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),X)) )).
+
+tff(fact_18_abel__semigroup__axioms_Ointro,axiom,(
+    ! [F: fun_a_fun_a_a] : 
+      ( ! [A2: a,B2: a] : aa_a_a(aa_a_fun_a_a(F,A2),B2) = aa_a_a(aa_a_fun_a_a(F,B2),A2)
+     => abel_s2117090225ioms_a(F) ) )).
+
+tff(fact_19__092_060open_062x_A_059_A_Iy_092_060_094sup_062_092_060smile_062_A_059_Ay_J_A_092_060le_062_Ax_092_060close_062,axiom,(
+    pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,x),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,y)),y))),x)) )).
+
+tff(fact_20_local_Omult__isol__var,axiom,(
+    ! [U: a,X: a,V: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,U),X))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,V),Y))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,U),V)),aa_a_a(aa_a_fun_a_a(composition,X),Y))) ) ) )).
+
+tff(fact_21_semilattice__def,axiom,(
+    ! [F: fun_a_fun_a_a] : 
+      ( semilattice_a(F)
+    <=> ( abel_semigroup_a(F)
+        & semilattice_axioms_a(F) ) ) )).
+
+tff(fact_22_semilattice_Oidem,axiom,(
+    ! [F: fun_a_fun_a_a,A: a] : 
+      ( semilattice_a(F)
+     => aa_a_a(aa_a_fun_a_a(F,A),A) = A ) )).
+
+tff(fact_23_local_Ocomp__assoc,axiom,(
+    ! [X: a,Y: a,Z: a] : aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(composition,X),Y)),Z) = aa_a_a(aa_a_fun_a_a(composition,X),aa_a_a(aa_a_fun_a_a(composition,Y),Z)) )).
+
+tff(fact_24_local_Omax__def,axiom,(
+    ! [A: a,B: a] : 
+      ( ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B))
+       => aa_a_a(aa_a_fun_a_a(max_a(less_eq),A),B) = B )
+      & ( ~ pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B))
+       => aa_a_a(aa_a_fun_a_a(max_a(less_eq),A),B) = A ) ) )).
+
+tff(fact_25_abel__semigroup_Ointro,axiom,(
+    ! [F: fun_a_fun_a_a] : 
+      ( semigroup_a(F)
+     => ( abel_s2117090225ioms_a(F)
+       => abel_semigroup_a(F) ) ) )).
+
+tff(fact_26_semigroup_Ointro,axiom,(
+    ! [F: fun_a_fun_a_a] : 
+      ( ! [A2: a,B2: a,C2: a] : aa_a_a(aa_a_fun_a_a(F,aa_a_a(aa_a_fun_a_a(F,A2),B2)),C2) = aa_a_a(aa_a_fun_a_a(F,A2),aa_a_a(aa_a_fun_a_a(F,B2),C2))
+     => semigroup_a(F) ) )).
+
+tff(fact_27_local_Omin__def,axiom,(
+    ! [A: a,B: a] : 
+      ( ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B))
+       => aa_a_a(aa_a_fun_a_a(min_a(less_eq),A),B) = A )
+      & ( ~ pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B))
+       => aa_a_a(aa_a_fun_a_a(min_a(less_eq),A),B) = B ) ) )).
+
+tff(fact_28_local_Oconv__iso,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(converse,X)),aa_a_a(converse,Y))) ) )).
+
+tff(fact_29_abel__semigroup_Oleft__commute,axiom,(
+    ! [F: fun_a_fun_a_a,B: a,A: a,C: a] : 
+      ( abel_semigroup_a(F)
+     => aa_a_a(aa_a_fun_a_a(F,B),aa_a_a(aa_a_fun_a_a(F,A),C)) = aa_a_a(aa_a_fun_a_a(F,A),aa_a_a(aa_a_fun_a_a(F,B),C)) ) )).
+
+tff(fact_30_local_Oorder_Orefl,axiom,(
+    ! [A: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),A)) )).
+
+tff(fact_31_local_OLeastI2__order,axiom,(
+    ! [P: fun_a_bool,X: a,Q: fun_a_bool] : 
+      ( pp(aa_a_bool(P,X))
+     => ( ! [Y2: a] : 
+            ( pp(aa_a_bool(P,Y2))
+           => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y2)) )
+       => ( ! [X2: a] : 
+              ( pp(aa_a_bool(P,X2))
+             => ( ! [Y3: a] : 
+                    ( pp(aa_a_bool(P,Y3))
+                   => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X2),Y3)) )
+               => pp(aa_a_bool(Q,X2)) ) )
+         => pp(aa_a_bool(Q,least_a(less_eq,P))) ) ) ) )).
+
+tff(fact_32_local_OLeast__equality,axiom,(
+    ! [P: fun_a_bool,X: a] : 
+      ( pp(aa_a_bool(P,X))
+     => ( ! [Y2: a] : 
+            ( pp(aa_a_bool(P,Y2))
+           => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y2)) )
+       => least_a(less_eq,P) = X ) ) )).
+
+tff(fact_33_local_Oinf_OorderE,axiom,(
+    ! [A: a,B: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B))
+     => A = aa_a_a(aa_a_fun_a_a(inf,A),B) ) )).
+
+tff(fact_34_local_Omult__double__iso,axiom,(
+    ! [X: a,Y: a,W: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(composition,W),X)),Z)),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(composition,W),Y)),Z))) ) )).
+
+tff(fact_35_local_Oinf_Oabsorb__iff2,axiom,(
+    ! [B: a,A: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,B),A))
+    <=> aa_a_a(aa_a_fun_a_a(inf,A),B) = B ) )).
+
+tff(fact_36_abel__semigroup_Ocommute,axiom,(
+    ! [F: fun_a_fun_a_a,A: a,B: a] : 
+      ( abel_semigroup_a(F)
+     => aa_a_a(aa_a_fun_a_a(F,A),B) = aa_a_a(aa_a_fun_a_a(F,B),A) ) )).
+
+tff(fact_37_local_Oinf_Oabsorb1,axiom,(
+    ! [A: a,B: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B))
+     => aa_a_a(aa_a_fun_a_a(inf,A),B) = A ) )).
+
+tff(fact_38_local_Omult__isor,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,X),Z)),aa_a_a(aa_a_fun_a_a(composition,Y),Z))) ) )).
+
+tff(fact_39_semilattice__order_Ointro,axiom,(
+    ! [F: fun_a_fun_a_a,Less_eq: fun_a_fun_a_bool,Less: fun_a_fun_a_bool] : 
+      ( semilattice_a(F)
+     => ( semila1396341003ioms_a(F,Less_eq,Less)
+       => semilattice_order_a(F,Less_eq,Less) ) ) )).
+
+tff(fact_40_local_Omult__assoc,axiom,(
+    ! [A: a,B: a,C: a] : aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(composition,A),B)),C) = aa_a_a(aa_a_fun_a_a(composition,A),aa_a_a(aa_a_fun_a_a(composition,B),C)) )).
+
+tff(fact_41_local_OatLeast__iff,axiom,(
+    ! [I: a,K: a] : 
+      ( member_a(I,aa_a_set_a(set_atLeast_a(less_eq),K))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,K),I)) ) )).
+
+tff(fact_42_local_Omult__isol,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,Z),X)),aa_a_a(aa_a_fun_a_a(composition,Z),Y))) ) )).
+
+tff(fact_43_local_OatMost__iff,axiom,(
+    ! [I: a,K: a] : 
+      ( member_a(I,aa_a_set_a(set_atMost_a(less_eq),K))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,I),K)) ) )).
+
+tff(fact_44_local_OIcc__eq__Icc,axiom,(
+    ! [L: a,H: a,L2: a,H2: a] : 
+      ( aa_a_set_a(set_atLeastAtMost_a(less_eq,L),H) = aa_a_set_a(set_atLeastAtMost_a(less_eq,L2),H2)
+    <=> ( ( L = L2
+          & H = H2 )
+        | ( ~ pp(aa_a_bool(aa_a_fun_a_bool(less_eq,L),H))
+          & ~ pp(aa_a_bool(aa_a_fun_a_bool(less_eq,L2),H2)) ) ) ) )).
+
+tff(fact_45_semilattice__order__axioms_Ointro,axiom,(
+    ! [Less_eq: fun_a_fun_a_bool,F: fun_a_fun_a_a,Less: fun_a_fun_a_bool] : 
+      ( ! [A2: a,B2: a] : 
+          ( pp(aa_a_bool(aa_a_fun_a_bool(Less_eq,A2),B2))
+        <=> A2 = aa_a_a(aa_a_fun_a_a(F,A2),B2) )
+     => ( ! [A2: a,B2: a] : 
+            ( pp(aa_a_bool(aa_a_fun_a_bool(Less,A2),B2))
+          <=> ( A2 = aa_a_a(aa_a_fun_a_a(F,A2),B2)
+              & A2 != B2 ) )
+       => semila1396341003ioms_a(F,Less_eq,Less) ) ) )).
+
+tff(fact_46_local_Ophl__seq,axiom,(
+    ! [P2: a,X: a,R: a,Y: a,Q2: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,P2),X)),aa_a_a(aa_a_fun_a_a(composition,X),R)))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,R),Y)),aa_a_a(aa_a_fun_a_a(composition,Y),Q2)))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,P2),aa_a_a(aa_a_fun_a_a(composition,X),Y))),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(composition,X),Y)),Q2))) ) ) )).
+
+tff(fact_47_local_Oone__idem__mult,axiom,(
+    aa_a_a(aa_a_fun_a_a(composition,top),top) = top )).
+
+tff(fact_48_local_Oinf__top__left,axiom,(
+    ! [X: a] : aa_a_a(aa_a_fun_a_a(inf,top),X) = X )).
+
+tff(fact_49_local_OatLeastAtMost__iff,axiom,(
+    ! [I: a,L: a,U: a] : 
+      ( member_a(I,aa_a_set_a(set_atLeastAtMost_a(less_eq,L),U))
+    <=> ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,L),I))
+        & pp(aa_a_bool(aa_a_fun_a_bool(less_eq,I),U)) ) ) )).
+
+tff(fact_50_local_Ole__infE,axiom,(
+    ! [X: a,A: a,B: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),aa_a_a(aa_a_fun_a_a(inf,A),B)))
+     => ~ ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),A))
+         => ~ pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),B)) ) ) )).
+
+tff(fact_51_local_Oconv__one,axiom,(
+    aa_a_a(converse,top) = top )).
+
+tff(fact_52_local_Ophl__export1,axiom,(
+    ! [X: a,Y: a,Z: a,W: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,X),Y)),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(composition,Y),X)),Y)))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(composition,X),Y)),Z)),aa_a_a(aa_a_fun_a_a(composition,Z),W)))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,X),aa_a_a(aa_a_fun_a_a(composition,Y),Z))),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(composition,Y),Z)),W))) ) ) )).
+
+tff(fact_53_local_Oinf_OboundedI,axiom,(
+    ! [A: a,B: a,C: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),C))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),aa_a_a(aa_a_fun_a_a(inf,B),C))) ) ) )).
+
+tff(fact_54_local_Oconv__invol,axiom,(
+    ! [X: a] : aa_a_a(converse,aa_a_a(converse,X)) = X )).
+
+tff(fact_55_local_Ophl__export2,axiom,(
+    ! [Z: a,W: a,X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,Z),W)),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(composition,W),Z)),W)))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,X),Y)),aa_a_a(aa_a_fun_a_a(composition,Y),Z)))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,X),aa_a_a(aa_a_fun_a_a(composition,Y),W))),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(composition,Y),W)),aa_a_a(aa_a_fun_a_a(composition,Z),W)))) ) ) )).
+
+tff(fact_56_semilattice__order_Ocobounded1,axiom,(
+    ! [F: fun_a_fun_a_a,Less_eq: fun_a_fun_a_bool,Less: fun_a_fun_a_bool,A: a,B: a] : 
+      ( semilattice_order_a(F,Less_eq,Less)
+     => pp(aa_a_bool(aa_a_fun_a_bool(Less_eq,aa_a_a(aa_a_fun_a_a(F,A),B)),A)) ) )).
+
+tff(fact_57_local_OantimonoD,axiom,(
+    ! [F: fun_a_set_a,X: a,Y: a] : 
+      ( antimono_a_set_a(less_eq,F)
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+       => ord_less_eq_set_a(aa_a_set_a(F,Y),aa_a_set_a(F,X)) ) ) )).
+
+tff(fact_58_local_Omaddux__21,axiom,(
+    ! [X: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),aa_a_a(aa_a_fun_a_a(composition,top),X))) )).
+
+tff(fact_59_local_OantimonoE,axiom,(
+    ! [F: fun_a_set_a,X: a,Y: a] : 
+      ( antimono_a_set_a(less_eq,F)
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+       => ord_less_eq_set_a(aa_a_set_a(F,Y),aa_a_set_a(F,X)) ) ) )).
+
+tff(fact_60_local_Oconv__contrav,axiom,(
+    ! [X: a,Y: a] : aa_a_a(converse,aa_a_a(aa_a_fun_a_a(composition,X),Y)) = aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,Y)),aa_a_a(converse,X)) )).
+
+tff(fact_61_local_Otarski,axiom,(
+    ! [X: a] : 
+      ( X != bot
+    <=> aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(composition,top),X)),top) = top ) )).
+
+tff(fact_62__092_060open_062y_A_092_060le_062_Ax_A_059_A_I1_A_092_060cdot_062_Ax_092_060_094sup_062_092_060smile_062_A_059_Ay_J_092_060close_062,axiom,(
+    pp(aa_a_bool(aa_a_fun_a_bool(less_eq,y),aa_a_a(aa_a_fun_a_a(composition,x),aa_a_a(aa_a_fun_a_a(inf,top),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,x)),y))))) )).
+
+tff(fact_63_local_OantimonoI,axiom,(
+    ! [F: fun_a_set_a] : 
+      ( ! [X2: a,Y2: a] : 
+          ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X2),Y2))
+         => ord_less_eq_set_a(aa_a_set_a(F,Y2),aa_a_set_a(F,X2)) )
+     => antimono_a_set_a(less_eq,F) ) )).
+
+tff(fact_64_assms_I1_J,axiom,(
+    pp(aa_a_bool(aa_a_fun_a_bool(relati1280118755_fun_a(less_eq,composition,converse),unit),y)) )).
+
+tff(fact_65_local_Oantimono__def,axiom,(
+    ! [F: fun_a_set_a] : 
+      ( antimono_a_set_a(less_eq,F)
+    <=> ! [X3: a,Y4: a] : 
+          ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X3),Y4))
+         => ord_less_eq_set_a(aa_a_set_a(F,Y4),aa_a_set_a(F,X3)) ) ) )).
+
+tff(fact_66_local_Obot__least,axiom,(
+    ! [A: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,bot),A)) )).
+
+tff(fact_67_local_Ole__inf__iff,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),aa_a_a(aa_a_fun_a_a(inf,Y),Z)))
+    <=> ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+        & pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Z)) ) ) )).
+
+tff(fact_68_local_Otop__unique,axiom,(
+    ! [A: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,top),A))
+    <=> A = top ) )).
+
+tff(fact_69_local_Obot__unique,axiom,(
+    ! [A: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),bot))
+    <=> A = bot ) )).
+
+tff(fact_70_local_Ovector__comp,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(relati1593128644ctor_a(top,composition),X))
+     => ( pp(aa_a_bool(relati1593128644ctor_a(top,composition),Y))
+       => pp(aa_a_bool(relati1593128644ctor_a(top,composition),aa_a_a(aa_a_fun_a_a(composition,X),Y))) ) ) )).
+
+tff(fact_71_local_Ois__vector__def,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(relati1593128644ctor_a(top,composition),X))
+    <=> X = aa_a_a(aa_a_fun_a_a(composition,X),top) ) )).
+
+tff(fact_72_local_Ois__rectangle__def,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(relati1879477145ngle_a(less_eq,top,composition),X))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(composition,X),top)),X)),X)) ) )).
+
+tff(fact_73_local_Omodular__1_H,axiom,(
+    ! [X: a,Y: a,Z: a] : aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,X),Y)),Z) = aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,X),aa_a_a(aa_a_fun_a_a(inf,Y),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,X)),Z)))),Z) )).
+
+tff(fact_74_local_Otop__le,axiom,(
+    ! [A: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,top),A))
+     => A = top ) )).
+
+tff(fact_75_local_Otop__greatest,axiom,(
+    ! [A: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),top)) )).
+
+tff(fact_76_local_Ophl__cons2,axiom,(
+    ! [W: a,X: a,Z: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,W),X))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,Z),Y)),aa_a_a(aa_a_fun_a_a(composition,Y),W)))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,Z),Y)),aa_a_a(aa_a_fun_a_a(composition,Y),X))) ) ) )).
+
+tff(fact_77_local_Orectangle__eq,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(relati1879477145ngle_a(less_eq,top,composition),X))
+    <=> aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(composition,X),top)),X) = X ) )).
+
+tff(fact_78__092_060open_062x_A_059_A_I1_A_092_060cdot_062_Ax_092_060_094sup_062_092_060smile_062_A_059_Ay_J_A_092_060le_062_Ax_A_059_A_Iy_092_060_094sup_062_092_060smile_062_A_059_Ay_J_092_060close_062,axiom,(
+    pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,x),aa_a_a(aa_a_fun_a_a(inf,top),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,x)),y)))),aa_a_a(aa_a_fun_a_a(composition,x),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,y)),y)))) )).
+
+tff(fact_79_local_Ophl__cons1,axiom,(
+    ! [X: a,W: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),W))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,W),Y)),aa_a_a(aa_a_fun_a_a(composition,Y),Z)))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,X),Y)),aa_a_a(aa_a_fun_a_a(composition,Y),Z))) ) ) )).
+
+tff(fact_80_local_Omult__1__right,axiom,(
+    ! [A: a] : aa_a_a(aa_a_fun_a_a(composition,A),unit) = A )).
+
+tff(fact_81_local_Oinf__top_Oleft__neutral,axiom,(
+    ! [A: a] : aa_a_a(aa_a_fun_a_a(inf,top),A) = A )).
+
+tff(fact_82_local_Ototal__one,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1193222756otal_a(less_eq,composition,converse),unit),X))
+     => aa_a_a(aa_a_fun_a_a(composition,X),top) = top ) )).
+
+tff(fact_83_local_Ole__bot,axiom,(
+    ! [A: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),bot))
+     => A = bot ) )).
+
+tff(fact_84_local_Ois__p__fun__def,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1280118755_fun_a(less_eq,composition,converse),unit),X))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,X)),X)),unit)) ) )).
+
+tff(fact_85_local_Og__iso,axiom,(
+    ! [F: fun_a_a,G: fun_a_a,X: a,Y: a] : 
+      ( more_B123986365tion_a(inf,bot,F,G)
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(G,X)),aa_a_a(G,Y))) ) ) )).
+
+tff(fact_86_local_Osur__def__var1,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati87626936_sur_a(less_eq,composition,converse),unit),X))
+    <=> aa_a_a(aa_a_fun_a_a(composition,top),X) = top ) )).
+
+tff(fact_87_local_Oinf__absorb2,axiom,(
+    ! [Y: a,X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,Y),X))
+     => aa_a_a(aa_a_fun_a_a(inf,X),Y) = Y ) )).
+
+tff(fact_88_local_Oinf__absorb1,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+     => aa_a_a(aa_a_fun_a_a(inf,X),Y) = X ) )).
+
+tff(fact_89_local_Oinf_Oabsorb__iff1,axiom,(
+    ! [A: a,B: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B))
+    <=> aa_a_a(aa_a_fun_a_a(inf,A),B) = A ) )).
+
+tff(fact_90_local_Ole__iff__inf,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+    <=> aa_a_a(aa_a_fun_a_a(inf,X),Y) = X ) )).
+
+tff(fact_91_local_Oinf_Oabsorb2,axiom,(
+    ! [B: a,A: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,B),A))
+     => aa_a_a(aa_a_fun_a_a(inf,A),B) = B ) )).
+
+tff(fact_92_local_Oinf_Oorder__iff,axiom,(
+    ! [A: a,B: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B))
+    <=> A = aa_a_a(aa_a_fun_a_a(inf,A),B) ) )).
+
+tff(fact_93_local_Ovector__mult,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(relati1593128644ctor_a(top,composition),X))
+     => ( pp(aa_a_bool(relati1593128644ctor_a(top,composition),Y))
+       => pp(aa_a_bool(relati1593128644ctor_a(top,composition),aa_a_a(aa_a_fun_a_a(inf,X),Y))) ) ) )).
+
+tff(fact_94_local_Ora__2,axiom,(
+    ! [X: a,Z: a,Y: a] : aa_a_a(aa_a_fun_a_a(composition,X),aa_a_a(aa_a_fun_a_a(inf,Z),aa_a_a(aa_a_fun_a_a(composition,Y),top))) = aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(inf,X),aa_a_a(converse,aa_a_a(aa_a_fun_a_a(composition,Y),top)))),Z) )).
+
+tff(fact_95_local_Oinf_OorderI,axiom,(
+    ! [A: a,B: a] : 
+      ( A = aa_a_a(aa_a_fun_a_a(inf,A),B)
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B)) ) )).
+
+tff(fact_96_local_Ois__point__def,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati761776312oint_a(less_eq,bot,top,composition,converse),unit),X))
+    <=> ( pp(aa_a_bool(relati1593128644ctor_a(top,composition),X))
+        & pp(aa_a_bool(aa_a_fun_a_bool(relati692168899_inj_a(less_eq,composition,converse),unit),X))
+        & X != bot ) ) )).
+
+tff(fact_97_local_OatMost__eq__UNIV__iff,axiom,(
+    ! [X: a] : 
+      ( aa_a_set_a(set_atMost_a(less_eq),X) = top_top_set_a
+    <=> X = top ) )).
+
+tff(fact_98_local_Osur__total,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati87626936_sur_a(less_eq,composition,converse),unit),X))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(relati1193222756otal_a(less_eq,composition,converse),unit),aa_a_a(converse,X))) ) )).
+
+tff(fact_99_local_Oconv__self__conjugate__var,axiom,(
+    more_B123986365tion_a(inf,bot,converse,converse) )).
+
+tff(fact_100_local_OatLeastAtMost__eq__UNIV__iff,axiom,(
+    ! [X: a,Y: a] : 
+      ( aa_a_set_a(set_atLeastAtMost_a(less_eq,X),Y) = top_top_set_a
+    <=> ( X = bot
+        & Y = top ) ) )).
+
+tff(fact_101_mem__Collect__eq,axiom,(
+    ! [A: a,P: fun_a_bool] : 
+      ( member_a(A,collect_a(P))
+    <=> pp(aa_a_bool(P,A)) ) )).
+
+tff(fact_102_local_Ototal__def__var__1,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1193222756otal_a(less_eq,composition,converse),unit),X))
+    <=> aa_a_a(aa_a_fun_a_a(composition,X),top) = top ) )).
+
+tff(fact_103_local_OatLeastatMost__subset__iff,axiom,(
+    ! [A: a,B: a,C: a,D: a] : 
+      ( ord_less_eq_set_a(aa_a_set_a(set_atLeastAtMost_a(less_eq,A),B),aa_a_set_a(set_atLeastAtMost_a(less_eq,C),D))
+    <=> ( ~ pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B))
+        | ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,C),A))
+          & pp(aa_a_bool(aa_a_fun_a_bool(less_eq,B),D)) ) ) ) )).
+
+tff(fact_104_Collect__mem__eq,axiom,(
+    ! [A3: set_a] : collect_a(aTP_Lamm_a(A3)) = A3 )).
+
+tff(fact_105_local_Oss__p18,axiom,(
+    ! [X: a] : 
+      ( aa_a_a(aa_a_fun_a_a(composition,X),top) = bot
+    <=> X = bot ) )).
+
+tff(fact_106_local_Omodular__var__2,axiom,(
+    ! [X: a,Y: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,X),Y)),aa_a_a(aa_a_fun_a_a(composition,X),aa_a_a(aa_a_fun_a_a(inf,Y),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,X)),top))))) )).
+
+tff(fact_107_Collect__cong,axiom,(
+    ! [P: fun_a_bool,Q: fun_a_bool] : 
+      ( ! [X2: a] : 
+          ( pp(aa_a_bool(P,X2))
+        <=> pp(aa_a_bool(Q,X2)) )
+     => collect_a(P) = collect_a(Q) ) )).
+
+tff(fact_108_local_Omodular__var__3,axiom,(
+    ! [X: a,Y: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,X),Y)),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(inf,X),aa_a_a(aa_a_fun_a_a(composition,top),aa_a_a(converse,Y)))),Y))) )).
+
+tff(fact_109_local_Ovector__2__var,axiom,(
+    ! [Y: a,X: a,Z: a] : 
+      ( pp(aa_a_bool(relati1593128644ctor_a(top,composition),Y))
+     => aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(inf,X),aa_a_a(converse,Y))),Z) = aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(inf,X),aa_a_a(converse,Y))),aa_a_a(aa_a_fun_a_a(inf,Y),Z)) ) )).
+
+tff(fact_110_local_Oopp__mult__def,axiom,(
+    ! [X: a,Y: a] : aa_a_a(aa_a_fun_a_a(opp_mult_a(composition),X),Y) = aa_a_a(aa_a_fun_a_a(composition,Y),X) )).
+
+tff(fact_111_local_Oinf__unique,axiom,(
+    ! [F: fun_a_fun_a_a,X: a,Y: a] : 
+      ( ! [X2: a,Y2: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(F,X2),Y2)),X2))
+     => ( ! [X2: a,Y2: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(F,X2),Y2)),Y2))
+       => ( ! [X2: a,Y2: a,Z2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X2),Y2))
+             => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X2),Z2))
+               => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X2),aa_a_a(aa_a_fun_a_a(F,Y2),Z2))) ) )
+         => aa_a_a(aa_a_fun_a_a(inf,X),Y) = aa_a_a(aa_a_fun_a_a(F,X),Y) ) ) ) )).
+
+tff(fact_112_local_Ovector__3,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(relati1593128644ctor_a(top,composition),X))
+     => aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(inf,X),unit)),Y) = aa_a_a(aa_a_fun_a_a(inf,X),Y) ) )).
+
+tff(fact_113_local_Odedekind__var__1,axiom,(
+    ! [X: a,Y: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,X),Y)),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(inf,X),aa_a_a(aa_a_fun_a_a(composition,top),aa_a_a(converse,Y)))),aa_a_a(aa_a_fun_a_a(inf,Y),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,X)),top))))) )).
+
+tff(fact_114_local_Ovector__2,axiom,(
+    ! [Y: a,X: a,Z: a] : 
+      ( pp(aa_a_bool(relati1593128644ctor_a(top,composition),Y))
+     => aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(inf,X),aa_a_a(converse,Y))),Z) = aa_a_a(aa_a_fun_a_a(composition,X),aa_a_a(aa_a_fun_a_a(inf,Y),Z)) ) )).
+
+tff(fact_115_local_Odedekind,axiom,(
+    ! [X: a,Y: a,Z: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,X),Y)),Z)),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(inf,X),aa_a_a(aa_a_fun_a_a(composition,Z),aa_a_a(converse,Y)))),aa_a_a(aa_a_fun_a_a(inf,Y),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,X)),Z))))) )).
+
+tff(fact_116_semilattice__order_Oabsorb__iff2,axiom,(
+    ! [F: fun_a_fun_a_a,Less_eq: fun_a_fun_a_bool,Less: fun_a_fun_a_bool,B: a,A: a] : 
+      ( semilattice_order_a(F,Less_eq,Less)
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(Less_eq,B),A))
+      <=> aa_a_a(aa_a_fun_a_a(F,A),B) = B ) ) )).
+
+tff(fact_117_local_Ovector__rectangle,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(relati1593128644ctor_a(top,composition),X))
+     => aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(composition,X),top)),X) = X ) )).
+
+tff(fact_118_local_Ovector__1__comm,axiom,(
+    ! [Y: a,X: a,Z: a] : 
+      ( pp(aa_a_bool(relati1593128644ctor_a(top,composition),Y))
+     => aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(inf,X),Y)),Z) = aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,X),Z)),Y) ) )).
+
+tff(fact_119_local_Omult__subdistr,axiom,(
+    ! [X: a,Y: a,Z: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(inf,X),Y)),Z)),aa_a_a(aa_a_fun_a_a(composition,X),Z))) )).
+
+tff(fact_120_local_Ovector__1,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(relati1593128644ctor_a(top,composition),X))
+     => aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(inf,X),Y)),Z) = aa_a_a(aa_a_fun_a_a(inf,X),aa_a_a(aa_a_fun_a_a(composition,Y),Z)) ) )).
+
+tff(fact_121_local_Omult__subdistl,axiom,(
+    ! [X: a,Y: a,Z: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,X),aa_a_a(aa_a_fun_a_a(inf,Y),Z))),aa_a_a(aa_a_fun_a_a(composition,X),Y))) )).
+
+tff(fact_122_points__surj,axiom,(
+    ! [P2: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati761776312oint_a(less_eq,bot,top,composition,converse),unit),P2))
+     => pp(aa_a_bool(aa_a_fun_a_bool(relati87626936_sur_a(less_eq,composition,converse),unit),P2)) ) )).
+
+tff(fact_123_local_OIcc__subset__Iic__iff,axiom,(
+    ! [L: a,H: a,H2: a] : 
+      ( ord_less_eq_set_a(aa_a_set_a(set_atLeastAtMost_a(less_eq,L),H),aa_a_set_a(set_atMost_a(less_eq),H2))
+    <=> ( ~ pp(aa_a_bool(aa_a_fun_a_bool(less_eq,L),H))
+        | pp(aa_a_bool(aa_a_fun_a_bool(less_eq,H),H2)) ) ) )).
+
+tff(fact_124_local_Oannil,axiom,(
+    ! [X: a] : aa_a_a(aa_a_fun_a_a(composition,bot),X) = bot )).
+
+tff(fact_125_local_OIcc__subset__Ici__iff,axiom,(
+    ! [L: a,H: a,L2: a] : 
+      ( ord_less_eq_set_a(aa_a_set_a(set_atLeastAtMost_a(less_eq,L),H),aa_a_set_a(set_atLeast_a(less_eq),L2))
+    <=> ( ~ pp(aa_a_bool(aa_a_fun_a_bool(less_eq,L),H))
+        | pp(aa_a_bool(aa_a_fun_a_bool(less_eq,L2),L)) ) ) )).
+
+tff(fact_126_local_Omono__def,axiom,(
+    ! [F: fun_a_set_a] : 
+      ( mono_a_set_a(less_eq,F)
+    <=> ! [X3: a,Y4: a] : 
+          ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X3),Y4))
+         => ord_less_eq_set_a(aa_a_set_a(F,X3),aa_a_set_a(F,Y4)) ) ) )).
+
+tff(fact_127_local_Otest__1,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati197917286test_a(less_eq),unit),X))
+     => aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,X),top)),Y) = aa_a_a(aa_a_fun_a_a(composition,X),Y) ) )).
+
+tff(fact_128_local_Oannir,axiom,(
+    ! [X: a] : aa_a_a(aa_a_fun_a_a(composition,X),bot) = bot )).
+
+tff(fact_129_local_OmonoI,axiom,(
+    ! [F: fun_a_set_a] : 
+      ( ! [X2: a,Y2: a] : 
+          ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X2),Y2))
+         => ord_less_eq_set_a(aa_a_set_a(F,X2),aa_a_set_a(F,Y2)) )
+     => mono_a_set_a(less_eq,F) ) )).
+
+tff(fact_130_local_OmonoE,axiom,(
+    ! [F: fun_a_set_a,X: a,Y: a] : 
+      ( mono_a_set_a(less_eq,F)
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+       => ord_less_eq_set_a(aa_a_set_a(F,X),aa_a_set_a(F,Y)) ) ) )).
+
+tff(fact_131_local_Omodular__2__var,axiom,(
+    ! [X: a,Y: a,Z: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,X),Y)),Z)),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(inf,X),aa_a_a(aa_a_fun_a_a(composition,Z),aa_a_a(converse,Y)))),Y))) )).
+
+tff(fact_132_local_Oinf_OboundedE,axiom,(
+    ! [A: a,B: a,C: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),aa_a_a(aa_a_fun_a_a(inf,B),C)))
+     => ~ ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B))
+         => ~ pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),C)) ) ) )).
+
+tff(fact_133_local_OmonoD,axiom,(
+    ! [F: fun_a_set_a,X: a,Y: a] : 
+      ( mono_a_set_a(less_eq,F)
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+       => ord_less_eq_set_a(aa_a_set_a(F,X),aa_a_set_a(F,Y)) ) ) )).
+
+tff(fact_134_local_Oinf_Ocobounded2,axiom,(
+    ! [A: a,B: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(inf,A),B)),B)) )).
+
+tff(fact_135_local_Oinf_Ocobounded1,axiom,(
+    ! [A: a,B: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(inf,A),B)),A)) )).
+
+tff(fact_136_local_Oinf_OcoboundedI1,axiom,(
+    ! [A: a,C: a,B: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),C))
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(inf,A),B)),C)) ) )).
+
+tff(fact_137_local_Oinf_OcoboundedI2,axiom,(
+    ! [B: a,C: a,A: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,B),C))
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(inf,A),B)),C)) ) )).
+
+tff(fact_138_local_Omodular__1__var,axiom,(
+    ! [X: a,Y: a,Z: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,X),Y)),Z)),aa_a_a(aa_a_fun_a_a(composition,X),aa_a_a(aa_a_fun_a_a(inf,Y),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,X)),Z))))) )).
+
+tff(fact_139_local_Ototal__sur,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1193222756otal_a(less_eq,composition,converse),unit),X))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(relati87626936_sur_a(less_eq,composition,converse),unit),aa_a_a(converse,X))) ) )).
+
+tff(fact_140_local_Oinf__le1,axiom,(
+    ! [X: a,Y: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(inf,X),Y)),X)) )).
+
+tff(fact_141_local_Onot__empty__eq__Iic__eq__empty,axiom,(
+    ! [H: a] : 
+      bot_bot_set_a != aa_a_set_a(set_atMost_a(less_eq),H) )).
+
+tff(fact_142_local_Oinf__le2,axiom,(
+    ! [X: a,Y: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(inf,X),Y)),Y)) )).
+
+tff(fact_143_local_OatLeast__eq__UNIV__iff,axiom,(
+    ! [X: a] : 
+      ( aa_a_set_a(set_atLeast_a(less_eq),X) = top_top_set_a
+    <=> X = bot ) )).
+
+tff(fact_144_local_Omeet__interchange,axiom,(
+    ! [W: a,X: a,Y: a,Z: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(inf,W),X)),aa_a_a(aa_a_fun_a_a(inf,Y),Z))),aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,W),Y)),aa_a_a(aa_a_fun_a_a(composition,X),Z)))) )).
+
+tff(fact_145_local_Oinf__greatest,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Z))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),aa_a_a(aa_a_fun_a_a(inf,Y),Z))) ) ) )).
+
+tff(fact_146_local_Ole__infI,axiom,(
+    ! [X: a,A: a,B: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),A))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),B))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),aa_a_a(aa_a_fun_a_a(inf,A),B))) ) ) )).
+
+tff(fact_147_local_Ole__infI1,axiom,(
+    ! [A: a,X: a,B: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),X))
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(inf,A),B)),X)) ) )).
+
+tff(fact_148_local_Ole__infI2,axiom,(
+    ! [B: a,X: a,A: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,B),X))
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(inf,A),B)),X)) ) )).
+
+tff(fact_149_local_Ois__map__def,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1341526444_map_a(less_eq,composition,converse),unit),X))
+    <=> ( pp(aa_a_bool(aa_a_fun_a_bool(relati1280118755_fun_a(less_eq,composition,converse),unit),X))
+        & pp(aa_a_bool(aa_a_fun_a_bool(relati1193222756otal_a(less_eq,composition,converse),unit),X)) ) ) )).
+
+tff(fact_150_local_Oconv__zero,axiom,(
+    aa_a_a(converse,bot) = bot )).
+
+tff(fact_151_local_OatLeastAtMost__def,axiom,(
+    ! [L: a,U: a] : aa_a_set_a(set_atLeastAtMost_a(less_eq,L),U) = inf_inf_set_a(aa_a_set_a(set_atLeast_a(less_eq),L),aa_a_set_a(set_atMost_a(less_eq),U)) )).
+
+tff(fact_152_local_Ovector__compl,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(relati1593128644ctor_a(top,composition),X))
+     => pp(aa_a_bool(relati1593128644ctor_a(top,composition),aa_a_a(uminus,X))) ) )).
+
+tff(fact_153_local_Omult__subdistr__var,axiom,(
+    ! [X: a,Y: a,Z: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(inf,X),Y)),Z)),aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,X),Z)),aa_a_a(aa_a_fun_a_a(composition,Y),Z)))) )).
+
+tff(fact_154_local_Ogalois__aux4,axiom,(
+    ! [X: a,Y: a] : 
+      ( aa_a_a(aa_a_fun_a_a(sup,aa_a_a(uminus,X)),Y) = top
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y)) ) )).
+
+tff(fact_155_local_Omult_Osemigroup__axioms,axiom,(
+    semigroup_a(composition) )).
+
+tff(fact_156_local_Omeet__assoc,axiom,(
+    ! [X: a,Y: a,Z: a] : aa_a_a(aa_a_fun_a_a(inf,X),aa_a_a(aa_a_fun_a_a(inf,Y),Z)) = aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(inf,X),Y)),Z) )).
+
+tff(fact_157_local_Ovector__add,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(relati1593128644ctor_a(top,composition),X))
+     => ( pp(aa_a_bool(relati1593128644ctor_a(top,composition),Y))
+       => pp(aa_a_bool(relati1593128644ctor_a(top,composition),aa_a_a(aa_a_fun_a_a(sup,X),Y))) ) ) )).
+
+tff(fact_158_local_Oinf__commute,axiom,(
+    ! [X: a,Y: a] : aa_a_a(aa_a_fun_a_a(inf,X),Y) = aa_a_a(aa_a_fun_a_a(inf,Y),X) )).
+
+tff(fact_159_local_Oinf__left__commute,axiom,(
+    ! [X: a,Y: a,Z: a] : aa_a_a(aa_a_fun_a_a(inf,X),aa_a_a(aa_a_fun_a_a(inf,Y),Z)) = aa_a_a(aa_a_fun_a_a(inf,Y),aa_a_a(aa_a_fun_a_a(inf,X),Z)) )).
+
+tff(fact_160_local_Osurj__one,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati87626936_sur_a(less_eq,composition,converse),unit),X))
+     => aa_a_a(aa_a_fun_a_a(composition,top),X) = top ) )).
+
+tff(fact_161_local_Oinf__mono,axiom,(
+    ! [A: a,C: a,B: a,D: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),C))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,B),D))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(inf,A),B)),aa_a_a(aa_a_fun_a_a(inf,C),D))) ) ) )).
+
+tff(fact_162_local_Oinf_Ocommute,axiom,(
+    ! [A: a,B: a] : aa_a_a(aa_a_fun_a_a(inf,A),B) = aa_a_a(aa_a_fun_a_a(inf,B),A) )).
+
+tff(fact_163_local_Oinf_Oleft__commute,axiom,(
+    ! [B: a,A: a,C: a] : aa_a_a(aa_a_fun_a_a(inf,B),aa_a_a(aa_a_fun_a_a(inf,A),C)) = aa_a_a(aa_a_fun_a_a(inf,A),aa_a_a(aa_a_fun_a_a(inf,B),C)) )).
+
+tff(fact_164_local_Onot__empty__eq__Ici__eq__empty,axiom,(
+    ! [L: a] : 
+      bot_bot_set_a != aa_a_set_a(set_atLeast_a(less_eq),L) )).
+
+tff(fact_165_local_Omeet__double__iso,axiom,(
+    ! [X: a,Y: a,W: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(inf,W),X)),Z)),aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(inf,W),Y)),Z))) ) )).
+
+tff(fact_166_local_Oinf_Oassoc,axiom,(
+    ! [A: a,B: a,C: a] : aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(inf,A),B)),C) = aa_a_a(aa_a_fun_a_a(inf,A),aa_a_a(aa_a_fun_a_a(inf,B),C)) )).
+
+tff(fact_167_local_Oinf_Obounded__iff,axiom,(
+    ! [A: a,B: a,C: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),aa_a_a(aa_a_fun_a_a(inf,B),C)))
+    <=> ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B))
+        & pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),C)) ) ) )).
+
+tff(fact_168_local_Omeet__iso,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(inf,X),Z)),aa_a_a(aa_a_fun_a_a(inf,Y),Z))) ) )).
+
+tff(fact_169_local_Omeet__isor,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(inf,Z),X)),aa_a_a(aa_a_fun_a_a(inf,Z),Y))) ) )).
+
+tff(fact_170_local_Oss__422iii,axiom,(
+    ! [Y: a,X: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1280118755_fun_a(less_eq,composition,converse),unit),Y))
+     => aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(inf,X),aa_a_a(aa_a_fun_a_a(composition,Z),aa_a_a(converse,Y)))),Y) = aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,X),Y)),Z) ) )).
+
+tff(fact_171_local_Osup__absorb2,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+     => aa_a_a(aa_a_fun_a_a(sup,X),Y) = Y ) )).
+
+tff(fact_172_local_Osup__absorb1,axiom,(
+    ! [Y: a,X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,Y),X))
+     => aa_a_a(aa_a_fun_a_a(sup,X),Y) = X ) )).
+
+tff(fact_173_local_Osup_Oorder__iff,axiom,(
+    ! [B: a,A: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,B),A))
+    <=> A = aa_a_a(aa_a_fun_a_a(sup,A),B) ) )).
+
+tff(fact_174_local_Ovector__idem,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(relati1593128644ctor_a(top,composition),X))
+     => aa_a_a(aa_a_fun_a_a(composition,X),X) = X ) )).
+
+tff(fact_175_local_Osup_OorderI,axiom,(
+    ! [A: a,B: a] : 
+      ( A = aa_a_a(aa_a_fun_a_a(sup,A),B)
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,B),A)) ) )).
+
+tff(fact_176_local_Omaddux__32,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati197917286test_a(less_eq),unit),X))
+     => aa_a_a(aa_a_fun_a_a(inf,aa_a_a(uminus,aa_a_a(aa_a_fun_a_a(composition,X),top))),unit) = aa_a_a(aa_a_fun_a_a(inf,aa_a_a(uminus,X)),unit) ) )).
+
+tff(fact_177_surj__tx,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati87626936_sur_a(less_eq,composition,converse),unit),X))
+     => aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,X)),top) = top ) )).
+
+tff(fact_178_local_Omodular__2_H,axiom,(
+    ! [Y: a,X: a,Z: a] : aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,Y),X)),Z) = aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(inf,Y),aa_a_a(aa_a_fun_a_a(composition,Z),aa_a_a(converse,X)))),X)),Z) )).
+
+tff(fact_179_local_Osup_OorderE,axiom,(
+    ! [B: a,A: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,B),A))
+     => A = aa_a_a(aa_a_fun_a_a(sup,A),B) ) )).
+
+tff(fact_180_local_Ois__maprop3,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1341526444_map_a(less_eq,composition,converse),unit),X))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,X)),Y)),X)),Z))
+      <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,X)),Y)),aa_a_a(aa_a_fun_a_a(composition,Z),aa_a_a(converse,X)))) ) ) )).
+
+tff(fact_181_local_Ogalois__aux3,axiom,(
+    ! [X: a,Y: a] : 
+      ( aa_a_a(aa_a_fun_a_a(sup,X),Y) = top
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(uminus,X)),Y)) ) )).
+
+tff(fact_182_local_Osup_Oabsorb__iff2,axiom,(
+    ! [A: a,B: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B))
+    <=> aa_a_a(aa_a_fun_a_a(sup,A),B) = B ) )).
+
+tff(fact_183_local_Omono__inf,axiom,(
+    ! [F: fun_a_set_a,A3: a,B3: a] : 
+      ( mono_a_set_a(less_eq,F)
+     => ord_less_eq_set_a(aa_a_set_a(F,aa_a_a(aa_a_fun_a_a(inf,A3),B3)),inf_inf_set_a(aa_a_set_a(F,A3),aa_a_set_a(F,B3))) ) )).
+
+tff(fact_184_local_OatLeastatMost__empty__iff2,axiom,(
+    ! [A: a,B: a] : 
+      ( bot_bot_set_a = aa_a_set_a(set_atLeastAtMost_a(less_eq,A),B)
+    <=> ~ pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B)) ) )).
+
+tff(fact_185_local_OatLeastatMost__empty__iff,axiom,(
+    ! [A: a,B: a] : 
+      ( aa_a_set_a(set_atLeastAtMost_a(less_eq,A),B) = bot_bot_set_a
+    <=> ~ pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B)) ) )).
+
+tff(fact_186_local_Ois__maprop2,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1341526444_map_a(less_eq,composition,converse),unit),X))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,Y),X)),aa_a_a(aa_a_fun_a_a(composition,X),Z)))
+      <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,X)),Y)),X)),Z)) ) ) )).
+
+tff(fact_187_local_Osup_Oabsorb__iff1,axiom,(
+    ! [B: a,A: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,B),A))
+    <=> aa_a_a(aa_a_fun_a_a(sup,A),B) = A ) )).
+
+tff(fact_188_local_Osup_Oabsorb2,axiom,(
+    ! [A: a,B: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B))
+     => aa_a_a(aa_a_fun_a_a(sup,A),B) = B ) )).
+
+tff(fact_189_local_Oconv__self__conjugate,axiom,(
+    ! [X: a,Y: a] : 
+      ( aa_a_a(aa_a_fun_a_a(inf,aa_a_a(converse,X)),Y) = bot
+    <=> aa_a_a(aa_a_fun_a_a(inf,X),aa_a_a(converse,Y)) = bot ) )).
+
+tff(fact_190_local_Otest__distr__1,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati197917286test_a(less_eq),unit),X))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(relati197917286test_a(less_eq),unit),Y))
+       => aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,X),Z)),aa_a_a(aa_a_fun_a_a(composition,Y),Z)) = aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(inf,X),Y)),Z) ) ) )).
+
+tff(fact_191_local_Osup_Oabsorb1,axiom,(
+    ! [B: a,A: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,B),A))
+     => aa_a_a(aa_a_fun_a_a(sup,A),B) = A ) )).
+
+tff(fact_192_local_Ora__1,axiom,(
+    ! [X: a,Y: a,Z: a] : aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(inf,X),aa_a_a(aa_a_fun_a_a(composition,Y),top))),Z) = aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,X),Z)),aa_a_a(aa_a_fun_a_a(composition,Y),top)) )).
+
+tff(fact_193_local_Oinf_Osemigroup__axioms,axiom,(
+    semigroup_a(inf) )).
+
+tff(fact_194_local_Oorder__prop,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+    <=> ? [Z3: a] : aa_a_a(aa_a_fun_a_a(sup,X),Z3) = Y ) )).
+
+tff(fact_195_semilattice__neutr_Ointro,axiom,(
+    ! [F: fun_a_fun_a_a,Z: a] : 
+      ( semilattice_a(F)
+     => ( pp(aa_a_bool(comm_monoid_a(F),Z))
+       => pp(aa_a_bool(semilattice_neutr_a(F),Z)) ) ) )).
+
+tff(fact_196_local_Oinj__p__fun,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati692168899_inj_a(less_eq,composition,converse),unit),X))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(relati1280118755_fun_a(less_eq,composition,converse),unit),aa_a_a(converse,X))) ) )).
+
+tff(fact_197_local_Oless__eq__def,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+    <=> aa_a_a(aa_a_fun_a_a(sup,X),Y) = Y ) )).
+
+tff(fact_198_local_Oschroeder__2,axiom,(
+    ! [Y: a,X: a,Z: a] : 
+      ( aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,Y),X)),Z) = bot
+    <=> aa_a_a(aa_a_fun_a_a(inf,Y),aa_a_a(aa_a_fun_a_a(composition,Z),aa_a_a(converse,X))) = bot ) )).
+
+tff(fact_199_local_Ogalois__aux2,axiom,(
+    ! [X: a,Y: a] : 
+      ( aa_a_a(aa_a_fun_a_a(inf,X),aa_a_a(uminus,Y)) = bot
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y)) ) )).
+
+tff(fact_200_local_Oschroeder__1,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,X),Y)),Z) = bot
+    <=> aa_a_a(aa_a_fun_a_a(inf,Y),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,X)),Z)) = bot ) )).
+
+tff(fact_201_local_Omaddux__142,axiom,(
+    ! [X: a,Z: a,Y: a] : 
+      ( aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,X)),Z)),Y) = bot
+    <=> aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,Z),aa_a_a(converse,Y))),X) = bot ) )).
+
+tff(fact_202_local_Omaddux__141,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,X),Y)),Z) = bot
+    <=> aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,X)),Z)),Y) = bot ) )).
+
+tff(fact_203_local_Osup__unique,axiom,(
+    ! [F: fun_a_fun_a_a,X: a,Y: a] : 
+      ( ! [X2: a,Y2: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X2),aa_a_a(aa_a_fun_a_a(F,X2),Y2)))
+     => ( ! [X2: a,Y2: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,Y2),aa_a_a(aa_a_fun_a_a(F,X2),Y2)))
+       => ( ! [X2: a,Y2: a,Z2: a] : 
+              ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,Y2),X2))
+             => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,Z2),X2))
+               => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(F,Y2),Z2)),X2)) ) )
+         => aa_a_a(aa_a_fun_a_a(sup,X),Y) = aa_a_a(aa_a_fun_a_a(F,X),Y) ) ) ) )).
+
+tff(fact_204_local_Ocompl__top__eq,axiom,(
+    aa_a_a(uminus,top) = bot )).
+
+tff(fact_205_local_Oss__422v,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1280118755_fun_a(less_eq,composition,converse),unit),X))
+     => aa_a_a(aa_a_fun_a_a(composition,X),aa_a_a(uminus,Y)) = aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,X),top)),aa_a_a(uminus,aa_a_a(aa_a_fun_a_a(composition,X),Y))) ) )).
+
+tff(fact_206_local_Ocompl__bot__eq,axiom,(
+    aa_a_a(uminus,bot) = top )).
+
+tff(fact_207_local_Op__fun__distl,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1280118755_fun_a(less_eq,composition,converse),unit),X))
+     => aa_a_a(aa_a_fun_a_a(composition,X),aa_a_a(aa_a_fun_a_a(inf,Y),Z)) = aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,X),Y)),aa_a_a(aa_a_fun_a_a(composition,X),Z)) ) )).
+
+tff(fact_208_local_Oinf__idem,axiom,(
+    ! [X: a] : aa_a_a(aa_a_fun_a_a(inf,X),X) = X )).
+
+tff(fact_209_local_Oinf__right__idem,axiom,(
+    ! [X: a,Y: a] : aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(inf,X),Y)),Y) = aa_a_a(aa_a_fun_a_a(inf,X),Y) )).
+
+tff(fact_210_local_Oinf__left__idem,axiom,(
+    ! [X: a,Y: a] : aa_a_a(aa_a_fun_a_a(inf,X),aa_a_a(aa_a_fun_a_a(inf,X),Y)) = aa_a_a(aa_a_fun_a_a(inf,X),Y) )).
+
+tff(fact_211_local_Omap__distl,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1341526444_map_a(less_eq,composition,converse),unit),X))
+     => aa_a_a(aa_a_fun_a_a(composition,X),aa_a_a(aa_a_fun_a_a(inf,Y),Z)) = aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,X),Y)),aa_a_a(aa_a_fun_a_a(composition,X),Z)) ) )).
+
+tff(fact_212_local_Oinf__top__right,axiom,(
+    ! [X: a] : aa_a_a(aa_a_fun_a_a(inf,X),top) = X )).
+
+tff(fact_213_local_Oinf_Oidem,axiom,(
+    ! [A: a] : aa_a_a(aa_a_fun_a_a(inf,A),A) = A )).
+
+tff(fact_214_local_Oinf__top_Oright__neutral,axiom,(
+    ! [A: a] : aa_a_a(aa_a_fun_a_a(inf,A),top) = A )).
+
+tff(fact_215_local_Op__fun__inj,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1280118755_fun_a(less_eq,composition,converse),unit),X))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(relati692168899_inj_a(less_eq,composition,converse),unit),aa_a_a(converse,X))) ) )).
+
+tff(fact_216_local_Opeirce__1,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,X),Y)),aa_a_a(converse,Z)) = bot
+     => aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,Y),Z)),aa_a_a(converse,X)) = bot ) )).
+
+tff(fact_217_local_Otest__comp__eq__mult,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati197917286test_a(less_eq),unit),X))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(relati197917286test_a(less_eq),unit),Y))
+       => aa_a_a(aa_a_fun_a_a(composition,X),Y) = aa_a_a(aa_a_fun_a_a(inf,X),Y) ) ) )).
+
+tff(fact_218_local_Oinf_Oright__idem,axiom,(
+    ! [A: a,B: a] : aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(inf,A),B)),B) = aa_a_a(aa_a_fun_a_a(inf,A),B) )).
+
+tff(fact_219_local_Oconjugation__prop1,axiom,(
+    ! [F: fun_a_a,G: fun_a_a,Y: a,Z: a] : 
+      ( more_B123986365tion_a(inf,bot,F,G)
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(inf,aa_a_a(F,Y)),Z)),aa_a_a(F,aa_a_a(aa_a_fun_a_a(inf,Y),aa_a_a(G,Z))))) ) )).
+
+tff(fact_220_local_Oconjugation__prop2,axiom,(
+    ! [F: fun_a_a,G: fun_a_a,Z: a,Y: a] : 
+      ( more_B123986365tion_a(inf,bot,F,G)
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(inf,aa_a_a(G,Z)),Y)),aa_a_a(G,aa_a_a(aa_a_fun_a_a(inf,Z),aa_a_a(F,Y))))) ) )).
+
+tff(fact_221_local_Opeirce,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,X),Y)),aa_a_a(converse,Z)) = bot
+    <=> aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,Y),Z)),aa_a_a(converse,X)) = bot ) )).
+
+tff(fact_222_local_Oinf_Oleft__idem,axiom,(
+    ! [A: a,B: a] : aa_a_a(aa_a_fun_a_a(inf,A),aa_a_a(aa_a_fun_a_a(inf,A),B)) = aa_a_a(aa_a_fun_a_a(inf,A),B) )).
+
+tff(fact_223_local_Otest__domain,axiom,(
+    ! [X: a] : 
+      ( X = aa_a_a(aa_a_fun_a_a(relati1626140988_dom_a(uminus,inf,top,composition),unit),X)
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),unit)) ) )).
+
+tff(fact_224_local_Osubdistl,axiom,(
+    ! [Z: a,X: a,Y: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,Z),X)),aa_a_a(aa_a_fun_a_a(composition,Z),aa_a_a(aa_a_fun_a_a(sup,X),Y)))) )).
+
+tff(fact_225_local_Oinf__eq__top__iff,axiom,(
+    ! [X: a,Y: a] : 
+      ( aa_a_a(aa_a_fun_a_a(inf,X),Y) = top
+    <=> ( X = top
+        & Y = top ) ) )).
+
+tff(fact_226_local_Of__iso,axiom,(
+    ! [F: fun_a_a,G: fun_a_a,X: a,Y: a] : 
+      ( more_B123986365tion_a(inf,bot,F,G)
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(F,X)),aa_a_a(F,Y))) ) ) )).
+
+tff(fact_227_local_Of__subdist,axiom,(
+    ! [F: fun_a_a,G: fun_a_a,X: a,Y: a] : 
+      ( more_B123986365tion_a(inf,bot,F,G)
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(F,aa_a_a(aa_a_fun_a_a(inf,X),Y))),aa_a_a(F,X))) ) )).
+
+tff(fact_228_local_Omult__isol__equiv__subdistl,axiom,
+    ( ! [X3: a,Y4: a,Z3: a] : 
+        ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X3),Y4))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,Z3),X3)),aa_a_a(aa_a_fun_a_a(composition,Z3),Y4))) )
+  <=> ! [X3: a,Y4: a,Z3: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,Z3),X3)),aa_a_a(aa_a_fun_a_a(composition,Z3),aa_a_a(aa_a_fun_a_a(sup,X3),Y4)))) )).
+
+tff(fact_229_local_Oone__compl,axiom,(
+    ! [X: a] : aa_a_a(aa_a_fun_a_a(composition,aa_a_a(uminus,aa_a_a(aa_a_fun_a_a(composition,X),top))),top) = aa_a_a(uminus,aa_a_a(aa_a_fun_a_a(composition,X),top)) )).
+
+tff(fact_230_local_Og__subdist,axiom,(
+    ! [F: fun_a_a,G: fun_a_a,X: a,Y: a] : 
+      ( more_B123986365tion_a(inf,bot,F,G)
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(G,aa_a_a(aa_a_fun_a_a(inf,X),Y))),aa_a_a(G,X))) ) )).
+
+tff(fact_231_comm__monoid__axioms_Ointro,axiom,(
+    ! [F: fun_a_fun_a_a,Z: a] : 
+      ( ! [A2: a] : aa_a_a(aa_a_fun_a_a(F,A2),Z) = A2
+     => pp(aa_a_bool(comm_monoid_axioms_a(F),Z)) ) )).
+
+tff(fact_232_local_Oinf__bot__right,axiom,(
+    ! [X: a] : aa_a_a(aa_a_fun_a_a(inf,X),bot) = bot )).
+
+tff(fact_233_local_Oinf__bot__left,axiom,(
+    ! [X: a] : aa_a_a(aa_a_fun_a_a(inf,bot),X) = bot )).
+
+tff(fact_234_local_Op__fun__mult__var,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,X)),X)),unit))
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,aa_a_a(aa_a_fun_a_a(inf,X),Y))),aa_a_a(aa_a_fun_a_a(inf,X),Y))),unit)) ) )).
+
+tff(fact_235_local_Oinf__top_Osemilattice__neutr__axioms,axiom,(
+    pp(aa_a_bool(semilattice_neutr_a(inf),top)) )).
+
+tff(fact_236_local_Oinf__top_Omonoid__axioms,axiom,(
+    pp(aa_a_bool(monoid_a(inf),top)) )).
+
+tff(fact_237_local_Ogalois__aux,axiom,(
+    ! [X: a,Y: a] : 
+      ( aa_a_a(aa_a_fun_a_a(inf,X),Y) = bot
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),aa_a_a(uminus,Y))) ) )).
+
+tff(fact_238_comm__monoid_Ointro,axiom,(
+    ! [F: fun_a_fun_a_a,Z: a] : 
+      ( abel_semigroup_a(F)
+     => ( pp(aa_a_bool(comm_monoid_axioms_a(F),Z))
+       => pp(aa_a_bool(comm_monoid_a(F),Z)) ) ) )).
+
+tff(fact_239_semilattice__set_Ointro,axiom,(
+    ! [F: fun_a_fun_a_a] : 
+      ( semilattice_a(F)
+     => lattic1885654924_set_a(F) ) )).
+
+tff(fact_240_local_Oinf__top_Ocomm__monoid__axioms,axiom,(
+    pp(aa_a_bool(comm_monoid_a(inf),top)) )).
+
+tff(fact_241_local_Ois__maprop1,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1341526444_map_a(less_eq,composition,converse),unit),X))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,Y),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(composition,X),Z)),aa_a_a(converse,X))))
+      <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,Y),X)),aa_a_a(aa_a_fun_a_a(composition,X),Z))) ) ) )).
+
+tff(fact_242_local_Ophl__skip,axiom,(
+    ! [X: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,X),unit)),aa_a_a(aa_a_fun_a_a(composition,unit),X))) )).
+
+tff(fact_243_local_Op__fun__zero,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1280118755_fun_a(less_eq,composition,converse),unit),X))
+     => aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,X),Y)),aa_a_a(aa_a_fun_a_a(composition,X),aa_a_a(uminus,Y))) = bot ) )).
+
+tff(fact_244_local_Oconv__times,axiom,(
+    ! [X: a,Y: a] : aa_a_a(converse,aa_a_a(aa_a_fun_a_a(inf,X),Y)) = aa_a_a(aa_a_fun_a_a(inf,aa_a_a(converse,X)),aa_a_a(converse,Y)) )).
+
+tff(fact_245_local_Omaddux__35,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati197917286test_a(less_eq),unit),X))
+     => aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,X),Y)),aa_a_a(uminus,Z)) = aa_a_a(aa_a_fun_a_a(inf,aa_a_a(aa_a_fun_a_a(composition,X),Y)),aa_a_a(uminus,aa_a_a(aa_a_fun_a_a(composition,X),Z))) ) )).
+
+tff(fact_246_local_Ototal__alt__def,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1193222756otal_a(less_eq,composition,converse),unit),X))
+    <=> aa_a_a(aa_a_fun_a_a(relati1626140988_dom_a(uminus,inf,top,composition),unit),X) = unit ) )).
+
+tff(fact_247_local_Ototal__1,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1193222756otal_a(less_eq,composition,converse),unit),X))
+     => ! [Y3: a] : 
+          ( aa_a_a(aa_a_fun_a_a(composition,Y3),X) = bot
+         => Y3 = bot ) ) )).
+
+tff(fact_248_local_OatLeastAtMost__singleton_H,axiom,(
+    ! [A: a,B: a] : 
+      ( A = B
+     => aa_a_set_a(set_atLeastAtMost_a(less_eq,A),B) = insert_a(A,bot_bot_set_a) ) )).
+
+tff(fact_249_local_Oschroeder__1__var,axiom,(
+    ! [X: a] : more_B123986365tion_a(inf,bot,aa_a_fun_a_a(composition,X),aa_a_fun_a_a(composition,aa_a_a(converse,X))) )).
+
+tff(fact_250_local_Osurj__1,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati87626936_sur_a(less_eq,composition,converse),unit),X))
+     => ! [Y3: a] : 
+          ( aa_a_a(aa_a_fun_a_a(composition,X),Y3) = bot
+         => Y3 = bot ) ) )).
+
+tff(fact_251_local_Ois__bijrop,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1283760645_bij_a(less_eq,composition,converse),unit),X))
+     => ( Y = aa_a_a(aa_a_fun_a_a(composition,X),Z)
+      <=> Z = aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,X)),Y) ) ) )).
+
+tff(fact_252_local_Osubdistl__var,axiom,(
+    ! [Z: a,X: a,Y: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(sup,aa_a_a(aa_a_fun_a_a(composition,Z),X)),aa_a_a(aa_a_fun_a_a(composition,Z),Y))),aa_a_a(aa_a_fun_a_a(composition,Z),aa_a_a(aa_a_fun_a_a(sup,X),Y)))) )).
+
+tff(fact_253_local_Obij__inv__comm,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1283760645_bij_a(less_eq,composition,converse),unit),X))
+     => aa_a_a(aa_a_fun_a_a(composition,X),aa_a_a(converse,X)) = aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,X)),X) ) )).
+
+tff(fact_254_local_Ocompl__le__swap2,axiom,(
+    ! [Y: a,X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(uminus,Y)),X))
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(uminus,X)),Y)) ) )).
+
+tff(fact_255_local_Ocomp__fun__idem__inf,axiom,(
+    finite40241356em_a_a(inf) )).
+
+tff(fact_256_local_OatLeastAtMost__singleton__iff,axiom,(
+    ! [A: a,B: a,C: a] : 
+      ( aa_a_set_a(set_atLeastAtMost_a(less_eq,A),B) = insert_a(C,bot_bot_set_a)
+    <=> ( A = B
+        & B = C ) ) )).
+
+tff(fact_257_local_Obij__inv__2,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1283760645_bij_a(less_eq,composition,converse),unit),X))
+     => aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,X)),X) = unit ) )).
+
+tff(fact_258_local_Osup__least,axiom,(
+    ! [Y: a,X: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,Y),X))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,Z),X))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(sup,Y),Z)),X)) ) ) )).
+
+tff(fact_259_local_Ocompl__le__swap1,axiom,(
+    ! [Y: a,X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,Y),aa_a_a(uminus,X)))
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),aa_a_a(uminus,Y))) ) )).
+
+tff(fact_260_local_Obij__inv__1,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1283760645_bij_a(less_eq,composition,converse),unit),X))
+     => aa_a_a(aa_a_fun_a_a(composition,X),aa_a_a(converse,X)) = unit ) )).
+
+tff(fact_261_local_Osup__ge2,axiom,(
+    ! [Y: a,X: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,Y),aa_a_a(aa_a_fun_a_a(sup,X),Y))) )).
+
+tff(fact_262_local_OatLeastAtMost__singleton,axiom,(
+    ! [A: a] : aa_a_set_a(set_atLeastAtMost_a(less_eq,A),A) = insert_a(A,bot_bot_set_a) )).
+
+tff(fact_263_local_Osup__ge1,axiom,(
+    ! [X: a,Y: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),aa_a_a(aa_a_fun_a_a(sup,X),Y))) )).
+
+tff(fact_264_local_Odom__def__aux__var,axiom,(
+    ! [X: a] : aa_a_a(aa_a_fun_a_a(relati1626140988_dom_a(uminus,inf,top,composition),unit),X) = aa_a_a(aa_a_fun_a_a(inf,unit),aa_a_a(aa_a_fun_a_a(composition,X),aa_a_a(converse,X))) )).
+
+tff(fact_265_local_Ophl__cond,axiom,(
+    ! [U: a,V: a,W: a,X: a,Z: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,U),V)),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(composition,V),U)),V)))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,U),W)),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(composition,W),U)),W)))
+       => ( ! [X2: a,Y2: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,U),aa_a_a(aa_a_fun_a_a(sup,X2),Y2))),aa_a_a(aa_a_fun_a_a(sup,aa_a_a(aa_a_fun_a_a(composition,U),X2)),aa_a_a(aa_a_fun_a_a(composition,U),Y2))))
+         => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(composition,U),V)),X)),aa_a_a(aa_a_fun_a_a(composition,X),Z)))
+           => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(composition,U),W)),Y)),aa_a_a(aa_a_fun_a_a(composition,Y),Z)))
+             => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,U),aa_a_a(aa_a_fun_a_a(sup,aa_a_a(aa_a_fun_a_a(composition,V),X)),aa_a_a(aa_a_fun_a_a(composition,W),Y)))),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(sup,aa_a_a(aa_a_fun_a_a(composition,V),X)),aa_a_a(aa_a_fun_a_a(composition,W),Y))),Z))) ) ) ) ) ) )).
+
+tff(fact_266_local_Osup_OcoboundedI2,axiom,(
+    ! [C: a,B: a,A: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,C),B))
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,C),aa_a_a(aa_a_fun_a_a(sup,A),B))) ) )).
+
+tff(fact_267_local_Osup_OcoboundedI1,axiom,(
+    ! [C: a,A: a,B: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,C),A))
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,C),aa_a_a(aa_a_fun_a_a(sup,A),B))) ) )).
+
+tff(fact_268_local_Otest__dom,axiom,(
+    ! [X: a] : pp(aa_a_bool(aa_a_fun_a_bool(relati197917286test_a(less_eq),unit),aa_a_a(aa_a_fun_a_a(relati1626140988_dom_a(uminus,inf,top,composition),unit),X))) )).
+
+tff(fact_269_local_Osup_Ocobounded2,axiom,(
+    ! [B: a,A: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,B),aa_a_a(aa_a_fun_a_a(sup,A),B))) )).
+
+tff(fact_270_local_Ogalois__1,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(inf,X),aa_a_a(uminus,Y))),Z))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),aa_a_a(aa_a_fun_a_a(sup,Y),Z))) ) )).
+
+tff(fact_271_local_Osup_Ocobounded1,axiom,(
+    ! [A: a,B: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),aa_a_a(aa_a_fun_a_a(sup,A),B))) )).
+
+tff(fact_272_local_Oss423,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1341526444_map_a(less_eq,composition,converse),unit),X))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,Y),X)),Z))
+      <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,Y),aa_a_a(aa_a_fun_a_a(composition,Z),aa_a_a(converse,X)))) ) ) )).
+
+tff(fact_273_local_Of__strict,axiom,(
+    ! [F: fun_a_a,G: fun_a_a] : 
+      ( more_B123986365tion_a(inf,bot,F,G)
+     => aa_a_a(F,bot) = bot ) )).
+
+tff(fact_274_local_Ois__conjugation__def,axiom,(
+    ! [F: fun_a_a,G: fun_a_a] : 
+      ( more_B123986365tion_a(inf,bot,F,G)
+    <=> ! [X3: a,Y4: a] : 
+          ( aa_a_a(aa_a_fun_a_a(inf,aa_a_a(F,X3)),Y4) = bot
+        <=> aa_a_a(aa_a_fun_a_a(inf,X3),aa_a_a(G,Y4)) = bot ) ) )).
+
+tff(fact_275_local_Og__strict,axiom,(
+    ! [F: fun_a_a,G: fun_a_a] : 
+      ( more_B123986365tion_a(inf,bot,F,G)
+     => aa_a_a(G,bot) = bot ) )).
+
+tff(fact_276_local_Ois__conjugation__sym,axiom,(
+    ! [F: fun_a_a,G: fun_a_a] : 
+      ( more_B123986365tion_a(inf,bot,F,G)
+    <=> more_B123986365tion_a(inf,bot,G,F) ) )).
+
+tff(fact_277_local_Osup_OboundedI,axiom,(
+    ! [B: a,A: a,C: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,B),A))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,C),A))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(sup,B),C)),A)) ) ) )).
+
+tff(fact_278_local_Omodular__1,axiom,(
+    ! [F: fun_a_a,G: fun_a_a,X: a,Y: a] : 
+      ( more_B123986365tion_a(inf,bot,F,G)
+     => aa_a_a(aa_a_fun_a_a(inf,aa_a_a(F,X)),Y) = aa_a_a(aa_a_fun_a_a(inf,aa_a_a(F,aa_a_a(aa_a_fun_a_a(inf,X),aa_a_a(G,Y)))),Y) ) )).
+
+tff(fact_279_local_Ois__conjugation__unique,axiom,(
+    ! [F: fun_a_a,G: fun_a_a,H: fun_a_a] : 
+      ( more_B123986365tion_a(inf,bot,F,G)
+     => ( more_B123986365tion_a(inf,bot,F,H)
+       => G = H ) ) )).
+
+tff(fact_280_local_Omodular__2,axiom,(
+    ! [F: fun_a_a,G: fun_a_a,X: a,Y: a] : 
+      ( more_B123986365tion_a(inf,bot,F,G)
+     => aa_a_a(aa_a_fun_a_a(inf,aa_a_a(G,X)),Y) = aa_a_a(aa_a_fun_a_a(inf,aa_a_a(G,aa_a_a(aa_a_fun_a_a(inf,X),aa_a_a(F,Y)))),Y) ) )).
+
+tff(fact_281_local_Osup_OboundedE,axiom,(
+    ! [B: a,C: a,A: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(sup,B),C)),A))
+     => ~ ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,B),A))
+         => ~ pp(aa_a_bool(aa_a_fun_a_bool(less_eq,C),A)) ) ) )).
+
+tff(fact_282_local_Ogalois__2,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),aa_a_a(aa_a_fun_a_a(sup,Y),aa_a_a(uminus,Z))))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(inf,X),Z)),Y)) ) )).
+
+tff(fact_283_local_Otest__eq__conv,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati197917286test_a(less_eq),unit),X))
+     => aa_a_a(converse,X) = X ) )).
+
+tff(fact_284_local_Osup_Obounded__iff,axiom,(
+    ! [B: a,C: a,A: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(sup,B),C)),A))
+    <=> ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,B),A))
+        & pp(aa_a_bool(aa_a_fun_a_bool(less_eq,C),A)) ) ) )).
+
+tff(fact_285_local_Ole__supI2,axiom,(
+    ! [X: a,B: a,A: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),B))
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),aa_a_a(aa_a_fun_a_a(sup,A),B))) ) )).
+
+tff(fact_286_Collect__empty__eq,axiom,(
+    ! [P: fun_a_bool] : 
+      ( collect_a(P) = bot_bot_set_a
+    <=> ! [X3: a] : 
+          ~ pp(aa_a_bool(P,X3)) ) )).
+
+tff(fact_287_local_Ois__maprop,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1341526444_map_a(less_eq,composition,converse),unit),X))
+    <=> aa_a_a(aa_a_fun_a_a(composition,X),aa_a_a(uminus,unit)) = aa_a_a(uminus,X) ) )).
+
+tff(fact_288_local_Ole__supI1,axiom,(
+    ! [X: a,A: a,B: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),A))
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),aa_a_a(aa_a_fun_a_a(sup,A),B))) ) )).
+
+tff(fact_289_local_Ole__supI,axiom,(
+    ! [A: a,X: a,B: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),X))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,B),X))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(sup,A),B)),X)) ) ) )).
+
+tff(fact_290_empty__Collect__eq,axiom,(
+    ! [P: fun_a_bool] : 
+      ( bot_bot_set_a = collect_a(P)
+    <=> ! [X3: a] : 
+          ~ pp(aa_a_bool(P,X3)) ) )).
+
+tff(fact_291_local_Ole__supE,axiom,(
+    ! [A: a,B: a,X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(sup,A),B)),X))
+     => ~ ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),X))
+         => ~ pp(aa_a_bool(aa_a_fun_a_bool(less_eq,B),X)) ) ) )).
+
+tff(fact_292_empty__iff,axiom,(
+    ! [C: a] : 
+      ~ member_a(C,bot_bot_set_a) )).
+
+tff(fact_293_subsetI,axiom,(
+    ! [A3: set_a,B3: set_a] : 
+      ( ! [X2: a] : 
+          ( member_a(X2,A3)
+         => member_a(X2,B3) )
+     => ord_less_eq_set_a(A3,B3) ) )).
+
+tff(fact_294_local_Ole__sup__iff,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(sup,X),Y)),Z))
+    <=> ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Z))
+        & pp(aa_a_bool(aa_a_fun_a_bool(less_eq,Y),Z)) ) ) )).
+
+tff(fact_295_subset__antisym,axiom,(
+    ! [A3: set_a,B3: set_a] : 
+      ( ord_less_eq_set_a(A3,B3)
+     => ( ord_less_eq_set_a(B3,A3)
+       => A3 = B3 ) ) )).
+
+tff(fact_296_bounded__lattice__bot__class_Oinf__bot__right,axiom,(
+    ! [X: set_a] : inf_inf_set_a(X,bot_bot_set_a) = bot_bot_set_a )).
+
+tff(fact_297_local_Oss43iii,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1341526444_map_a(less_eq,composition,converse),unit),X))
+    <=> ! [Y4: a] : aa_a_a(aa_a_fun_a_a(composition,X),aa_a_a(uminus,Y4)) = aa_a_a(uminus,aa_a_a(aa_a_fun_a_a(composition,X),Y4)) ) )).
+
+tff(fact_298_empty__subsetI,axiom,(
+    ! [A3: set_a] : ord_less_eq_set_a(bot_bot_set_a,A3) )).
+
+tff(fact_299_all__not__in__conv,axiom,(
+    ! [A3: set_a] : 
+      ( ! [X3: a] : 
+          ~ member_a(X3,A3)
+    <=> A3 = bot_bot_set_a ) )).
+
+tff(fact_300_UNIV__I,axiom,(
+    ! [X: a] : member_a(X,top_top_set_a) )).
+
+tff(fact_301_local_Ois__total__def,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1193222756otal_a(less_eq,composition,converse),unit),X))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,unit),aa_a_a(aa_a_fun_a_a(composition,X),aa_a_a(converse,X)))) ) )).
+
+tff(fact_302_local_Op__fun__sur__id,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1280118755_fun_a(less_eq,composition,converse),unit),X))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(relati87626936_sur_a(less_eq,composition,converse),unit),X))
+       => aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,X)),X) = unit ) ) )).
+
+tff(fact_303_local_Ototal__inj__id,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1193222756otal_a(less_eq,composition,converse),unit),X))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(relati692168899_inj_a(less_eq,composition,converse),unit),X))
+       => aa_a_a(aa_a_fun_a_a(composition,X),aa_a_a(converse,X)) = unit ) ) )).
+
+tff(fact_304_local_Oconv__galois__1,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,X),Y)),Z))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,Y),aa_a_a(uminus,aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,X)),aa_a_a(uminus,Z))))) ) )).
+
+tff(fact_305_local_Ois__sur__def,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati87626936_sur_a(less_eq,composition,converse),unit),X))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,unit),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,X)),X))) ) )).
+
+tff(fact_306_local_Oconv__galois__2,axiom,(
+    ! [Y: a,X: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,Y),X)),Z))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,Y),aa_a_a(uminus,aa_a_a(aa_a_fun_a_a(composition,aa_a_a(uminus,Z)),aa_a_a(converse,X))))) ) )).
+
+tff(fact_307_semigroup_Oassoc,axiom,(
+    ! [F: fun_a_fun_a_a,A: a,B: a,C: a] : 
+      ( semigroup_a(F)
+     => aa_a_a(aa_a_fun_a_a(F,aa_a_a(aa_a_fun_a_a(F,A),B)),C) = aa_a_a(aa_a_fun_a_a(F,A),aa_a_a(aa_a_fun_a_a(F,B),C)) ) )).
+
+tff(fact_308_local_Ois__inj__def,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati692168899_inj_a(less_eq,composition,converse),unit),X))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,X),aa_a_a(converse,X))),unit)) ) )).
+
+tff(fact_309_local_Osur__map__epimorph,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati87626936_sur_a(less_eq,composition,converse),unit),X))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(relati1341526444_map_a(less_eq,composition,converse),unit),X))
+       => ! [Y3: a,Z4: a] : 
+            ( aa_a_a(aa_a_fun_a_a(composition,X),Y3) = aa_a_a(aa_a_fun_a_a(composition,X),Z4)
+           => Y3 = Z4 ) ) ) )).
+
+tff(fact_310_local_Obij__is__maprop,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1283760645_bij_a(less_eq,composition,converse),unit),X))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(relati1341526444_map_a(less_eq,composition,converse),unit),X))
+       => ( aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,X)),X) = unit
+          & aa_a_a(aa_a_fun_a_a(composition,X),aa_a_a(converse,X)) = unit ) ) ) )).
+
+tff(fact_311_ord_OatMost__iff,axiom,(
+    ! [I: a,Less_eq: fun_a_fun_a_bool,K: a] : 
+      ( member_a(I,aa_a_set_a(set_atMost_a(Less_eq),K))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(Less_eq,I),K)) ) )).
+
+tff(fact_312_local_Oinj__map__monomorph,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati692168899_inj_a(less_eq,composition,converse),unit),X))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(relati1341526444_map_a(less_eq,composition,converse),unit),X))
+       => ! [Y3: a,Z4: a] : 
+            ( aa_a_a(aa_a_fun_a_a(composition,Y3),X) = aa_a_a(aa_a_fun_a_a(composition,Z4),X)
+           => Y3 = Z4 ) ) ) )).
+
+tff(fact_313_emptyE,axiom,(
+    ! [A: a] : 
+      ~ member_a(A,bot_bot_set_a) )).
+
+tff(fact_314_ord_OatLeast__iff,axiom,(
+    ! [I: a,Less_eq: fun_a_fun_a_bool,K: a] : 
+      ( member_a(I,aa_a_set_a(set_atLeast_a(Less_eq),K))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(Less_eq,K),I)) ) )).
+
+tff(fact_315_local_Ois__test__def,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati197917286test_a(less_eq),unit),X))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),unit)) ) )).
+
+tff(fact_316_ord_OatLeastAtMost__iff,axiom,(
+    ! [I: a,Less_eq: fun_a_fun_a_bool,L: a,U: a] : 
+      ( member_a(I,aa_a_set_a(set_atLeastAtMost_a(Less_eq,L),U))
+    <=> ( pp(aa_a_bool(aa_a_fun_a_bool(Less_eq,L),I))
+        & pp(aa_a_bool(aa_a_fun_a_bool(Less_eq,I),U)) ) ) )).
+
+tff(fact_317_equals0D,axiom,(
+    ! [A3: set_a,A: a] : 
+      ( A3 = bot_bot_set_a
+     => ~ member_a(A,A3) ) )).
+
+tff(fact_318_local_Ojoin__interchange,axiom,(
+    ! [W: a,X: a,Y: a,Z: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(sup,aa_a_a(aa_a_fun_a_a(composition,W),X)),aa_a_a(aa_a_fun_a_a(composition,Y),Z))),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(aa_a_fun_a_a(sup,W),Y)),aa_a_a(aa_a_fun_a_a(sup,X),Z)))) )).
+
+tff(fact_319_subsetCE,axiom,(
+    ! [A3: set_a,B3: set_a,C: a] : 
+      ( ord_less_eq_set_a(A3,B3)
+     => ( member_a(C,A3)
+       => member_a(C,B3) ) ) )).
+
+tff(fact_320_local_Osubdist__2__var,axiom,(
+    ! [X: a,Y: a,Z: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(sup,X),aa_a_a(aa_a_fun_a_a(inf,Y),Z))),aa_a_a(aa_a_fun_a_a(sup,X),Y))) )).
+
+tff(fact_321_point__cnv__map,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati761776312oint_a(less_eq,bot,top,composition,converse),unit),X))
+     => pp(aa_a_bool(aa_a_fun_a_bool(relati1341526444_map_a(less_eq,composition,converse),unit),aa_a_a(converse,X))) ) )).
+
+tff(fact_322_IntI,axiom,(
+    ! [C: a,A3: set_a,B3: set_a] : 
+      ( member_a(C,A3)
+     => ( member_a(C,B3)
+       => member_a(C,inf_inf_set_a(A3,B3)) ) ) )).
+
+tff(fact_323_local_Otest__comp,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati197917286test_a(less_eq),unit),X))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(relati197917286test_a(less_eq),unit),Y))
+       => pp(aa_a_bool(aa_a_fun_a_bool(relati197917286test_a(less_eq),unit),aa_a_a(aa_a_fun_a_a(composition,X),Y))) ) ) )).
+
+tff(fact_324_local_Oorder_Ostrict__trans2,axiom,(
+    ! [A: a,B: a,C: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less,A),B))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,B),C))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less,A),C)) ) ) )).
+
+tff(fact_325_Int__iff,axiom,(
+    ! [C: a,A3: set_a,B3: set_a] : 
+      ( member_a(C,inf_inf_set_a(A3,B3))
+    <=> ( member_a(C,A3)
+        & member_a(C,B3) ) ) )).
+
+tff(fact_326_monoid_Oright__neutral,axiom,(
+    ! [F: fun_a_fun_a_a,Z: a,A: a] : 
+      ( pp(aa_a_bool(monoid_a(F),Z))
+     => aa_a_a(aa_a_fun_a_a(F,A),Z) = A ) )).
+
+tff(fact_327_local_Op__fun__dom,axiom,(
+    ! [X: a] : pp(aa_a_bool(aa_a_fun_a_bool(relati1280118755_fun_a(less_eq,composition,converse),unit),aa_a_a(aa_a_fun_a_a(relati1626140988_dom_a(uminus,inf,top,composition),unit),X))) )).
+
+tff(fact_328_ex__in__conv,axiom,(
+    ! [A3: set_a] : 
+      ( ? [X3: a] : member_a(X3,A3)
+    <=> A3 != bot_bot_set_a ) )).
+
+tff(fact_329_local_Oorder_Ostrict__trans1,axiom,(
+    ! [A: a,B: a,C: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less,B),C))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less,A),C)) ) ) )).
+
+tff(fact_330_local_Oconj__galois__2,axiom,(
+    ! [F: fun_a_a,G: fun_a_a,X: a,Y: a] : 
+      ( more_B123986365tion_a(inf,bot,F,G)
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(G,X)),Y))
+      <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),aa_a_a(uminus,aa_a_a(F,aa_a_a(uminus,Y))))) ) ) )).
+
+tff(fact_331_local_Ototal__add__var,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,unit),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,X)),X)))
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,unit),aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,aa_a_a(aa_a_fun_a_a(sup,X),Y))),aa_a_a(aa_a_fun_a_a(sup,X),Y)))) ) )).
+
+tff(fact_332_local_Oinj__dom,axiom,(
+    ! [X: a] : pp(aa_a_bool(aa_a_fun_a_bool(relati692168899_inj_a(less_eq,composition,converse),unit),aa_a_a(aa_a_fun_a_a(relati1626140988_dom_a(uminus,inf,top,composition),unit),X))) )).
+
+tff(fact_333_Collect__mono,axiom,(
+    ! [P: fun_a_bool,Q: fun_a_bool] : 
+      ( ! [X2: a] : 
+          ( pp(aa_a_bool(P,X2))
+         => pp(aa_a_bool(Q,X2)) )
+     => ord_less_eq_set_a(collect_a(P),collect_a(Q)) ) )).
+
+tff(fact_334_local_Oconj__galois__1,axiom,(
+    ! [F: fun_a_a,G: fun_a_a,X: a,Y: a] : 
+      ( more_B123986365tion_a(inf,bot,F,G)
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(F,X)),Y))
+      <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),aa_a_a(uminus,aa_a_a(G,aa_a_a(uminus,Y))))) ) ) )).
+
+tff(fact_335_semilattice__inf__class_Ole__iff__inf,axiom,(
+    ! [X: set_a,Y: set_a] : 
+      ( ord_less_eq_set_a(X,Y)
+    <=> inf_inf_set_a(X,Y) = X ) )).
+
+tff(fact_336_equals0I,axiom,(
+    ! [A3: set_a] : 
+      ( ! [Y2: a] : 
+          ~ member_a(Y2,A3)
+     => A3 = bot_bot_set_a ) )).
+
+tff(fact_337_local_Oorder_Ostrict__implies__order,axiom,(
+    ! [A: a,B: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less,A),B))
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B)) ) )).
+
+tff(fact_338_local_Ocompl__mono,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(uminus,Y)),aa_a_a(uminus,X))) ) )).
+
+tff(fact_339_local_Otest__prod,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati197917286test_a(less_eq),unit),X))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(relati197917286test_a(less_eq),unit),Y))
+       => pp(aa_a_bool(aa_a_fun_a_bool(relati197917286test_a(less_eq),unit),aa_a_a(aa_a_fun_a_a(inf,X),Y))) ) ) )).
+
+tff(fact_340_Collect__mono__iff,axiom,(
+    ! [P: fun_a_bool,Q: fun_a_bool] : 
+      ( ord_less_eq_set_a(collect_a(P),collect_a(Q))
+    <=> ! [X3: a] : 
+          ( pp(aa_a_bool(P,X3))
+         => pp(aa_a_bool(Q,X3)) ) ) )).
+
+tff(fact_341_local_Ocomp__anti,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(uminus,Y)),aa_a_a(uminus,X))) ) )).
+
+tff(fact_342_semilattice__inf__class_Oinf__le1,axiom,(
+    ! [X: set_a,Y: set_a] : ord_less_eq_set_a(inf_inf_set_a(X,Y),X) )).
+
+tff(fact_343_local_Oorder_Ostrict__iff__order,axiom,(
+    ! [A: a,B: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less,A),B))
+    <=> ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B))
+        & A != B ) ) )).
+
+tff(fact_344_local_Oinf_Oabel__semigroup__axioms,axiom,(
+    abel_semigroup_a(inf) )).
+
+tff(fact_345_local_Oinf_Osemilattice__axioms,axiom,(
+    semilattice_a(inf) )).
+
+tff(fact_346_local_Otest__compl__2,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati197917286test_a(less_eq),unit),X))
+     => aa_a_a(aa_a_fun_a_a(inf,X),aa_a_a(aa_a_fun_a_a(relati1726020595n_tc_a(uminus,inf),unit),X)) = bot ) )).
+
+tff(fact_347_set__mp,axiom,(
+    ! [A3: set_a,B3: set_a,X: a] : 
+      ( ord_less_eq_set_a(A3,B3)
+     => ( member_a(X,A3)
+       => member_a(X,B3) ) ) )).
+
+tff(fact_348_semilattice__neutr__order_Ointro,axiom,(
+    ! [F: fun_a_fun_a_a,Z: a,Less_eq: fun_a_fun_a_bool,Less: fun_a_fun_a_bool] : 
+      ( pp(aa_a_bool(semilattice_neutr_a(F),Z))
+     => ( semilattice_order_a(F,Less_eq,Less)
+       => semila577284780rder_a(F,Z,Less_eq,Less) ) ) )).
+
+tff(fact_349_IntE,axiom,(
+    ! [C: a,A3: set_a,B3: set_a] : 
+      ( member_a(C,inf_inf_set_a(A3,B3))
+     => ~ ( member_a(C,A3)
+         => ~ member_a(C,B3) ) ) )).
+
+tff(fact_350_subset__eq,axiom,(
+    ! [A3: set_a,B3: set_a] : 
+      ( ord_less_eq_set_a(A3,B3)
+    <=> ! [X3: a] : 
+          ( member_a(X3,A3)
+         => member_a(X3,B3) ) ) )).
+
+tff(fact_351_preorder__class_Oorder__refl,axiom,(
+    ! [X: set_a] : ord_less_eq_set_a(X,X) )).
+
+tff(fact_352_local_Ocompl__le__compl__iff,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(uminus,X)),aa_a_a(uminus,Y)))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,Y),X)) ) )).
+
+tff(fact_353_subset__iff,axiom,(
+    ! [A3: set_a,B3: set_a] : 
+      ( ord_less_eq_set_a(A3,B3)
+    <=> ! [T: a] : 
+          ( member_a(T,A3)
+         => member_a(T,B3) ) ) )).
+
+tff(fact_354_local_Oorder_Oorder__iff__strict,axiom,(
+    ! [A: a,B: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B))
+    <=> ( pp(aa_a_bool(aa_a_fun_a_bool(less,A),B))
+        | A = B ) ) )).
+
+tff(fact_355_semilattice_Oright__idem,axiom,(
+    ! [F: fun_a_fun_a_a,A: a,B: a] : 
+      ( semilattice_a(F)
+     => aa_a_a(aa_a_fun_a_a(F,aa_a_a(aa_a_fun_a_a(F,A),B)),B) = aa_a_a(aa_a_fun_a_a(F,A),B) ) )).
+
+tff(fact_356_equalityE,axiom,(
+    ! [A3: set_a,B3: set_a] : 
+      ( A3 = B3
+     => ~ ( ord_less_eq_set_a(A3,B3)
+         => ~ ord_less_eq_set_a(B3,A3) ) ) )).
+
+tff(fact_357_semilattice_Oleft__idem,axiom,(
+    ! [F: fun_a_fun_a_a,A: a,B: a] : 
+      ( semilattice_a(F)
+     => aa_a_a(aa_a_fun_a_a(F,A),aa_a_a(aa_a_fun_a_a(F,A),B)) = aa_a_a(aa_a_fun_a_a(F,A),B) ) )).
+
+tff(fact_358_local_Oorder_Onot__eq__order__implies__strict,axiom,(
+    ! [A: a,B: a] : 
+      ( A != B
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),B))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less,A),B)) ) ) )).
+
+tff(fact_359_local_Osup__mono,axiom,(
+    ! [A: a,C: a,B: a,D: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,A),C))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,B),D))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(sup,A),B)),aa_a_a(aa_a_fun_a_a(sup,C),D))) ) ) )).
+
+tff(fact_360_local_Ocancellation__2,axiom,(
+    ! [F: fun_a_a,G: fun_a_a,X: a] : 
+      ( more_B123986365tion_a(inf,bot,F,G)
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(G,aa_a_a(uminus,aa_a_a(F,X)))),aa_a_a(uminus,X))) ) )).
+
+tff(fact_361_local_Ocancellation__1,axiom,(
+    ! [F: fun_a_a,G: fun_a_a,X: a] : 
+      ( more_B123986365tion_a(inf,bot,F,G)
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(F,aa_a_a(uminus,aa_a_a(G,X)))),aa_a_a(uminus,X))) ) )).
+
+tff(fact_362_local_Otest__conv__var,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati197917286test_a(less_eq),unit),X))
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(converse,X)),unit)) ) )).
+
+tff(fact_363_local_Oone__conv,axiom,(
+    ! [X: a] : aa_a_a(aa_a_fun_a_a(inf,unit),aa_a_a(aa_a_fun_a_a(composition,X),top)) = aa_a_a(aa_a_fun_a_a(inf,unit),aa_a_a(aa_a_fun_a_a(composition,X),aa_a_a(converse,X))) )).
+
+tff(fact_364_local_Omult__oner,axiom,(
+    ! [X: a] : aa_a_a(aa_a_fun_a_a(composition,X),unit) = X )).
+
+tff(fact_365_local_Osup_Omono,axiom,(
+    ! [C: a,A: a,D: a,B: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,C),A))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,D),B))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(sup,C),D)),aa_a_a(aa_a_fun_a_a(sup,A),B))) ) ) )).
+
+tff(fact_366_local_Omult__onel,axiom,(
+    ! [X: a] : aa_a_a(aa_a_fun_a_a(composition,unit),X) = X )).
+
+tff(fact_367_local_Omult__1__left,axiom,(
+    ! [A: a] : aa_a_a(aa_a_fun_a_a(composition,unit),A) = A )).
+
+tff(fact_368_monoid_Oleft__neutral,axiom,(
+    ! [F: fun_a_fun_a_a,Z: a,A: a] : 
+      ( pp(aa_a_bool(monoid_a(F),Z))
+     => aa_a_a(aa_a_fun_a_a(F,Z),A) = A ) )).
+
+tff(fact_369_comm__monoid_Ocomm__neutral,axiom,(
+    ! [F: fun_a_fun_a_a,Z: a,A: a] : 
+      ( pp(aa_a_bool(comm_monoid_a(F),Z))
+     => aa_a_a(aa_a_fun_a_a(F,A),Z) = A ) )).
+
+tff(fact_370_subset__refl,axiom,(
+    ! [A3: set_a] : ord_less_eq_set_a(A3,A3) )).
+
+tff(fact_371_equalityD2,axiom,(
+    ! [A3: set_a,B3: set_a] : 
+      ( A3 = B3
+     => ord_less_eq_set_a(B3,A3) ) )).
+
+tff(fact_372_local_Odistrib__inf__le,axiom,(
+    ! [X: a,Y: a,Z: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(sup,aa_a_a(aa_a_fun_a_a(inf,X),Y)),aa_a_a(aa_a_fun_a_a(inf,X),Z))),aa_a_a(aa_a_fun_a_a(inf,X),aa_a_a(aa_a_fun_a_a(sup,Y),Z)))) )).
+
+tff(fact_373_local_Ototal__comp,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1193222756otal_a(less_eq,composition,converse),unit),X))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(relati1193222756otal_a(less_eq,composition,converse),unit),Y))
+       => pp(aa_a_bool(aa_a_fun_a_bool(relati1193222756otal_a(less_eq,composition,converse),unit),aa_a_a(aa_a_fun_a_a(composition,X),Y))) ) ) )).
+
+tff(fact_374_subset__trans,axiom,(
+    ! [A3: set_a,B3: set_a,C3: set_a] : 
+      ( ord_less_eq_set_a(A3,B3)
+     => ( ord_less_eq_set_a(B3,C3)
+       => ord_less_eq_set_a(A3,C3) ) ) )).
+
+tff(fact_375_semilattice__neutr__def,axiom,(
+    ! [F: fun_a_fun_a_a,Z: a] : 
+      ( pp(aa_a_bool(semilattice_neutr_a(F),Z))
+    <=> ( semilattice_a(F)
+        & pp(aa_a_bool(comm_monoid_a(F),Z)) ) ) )).
+
+tff(fact_376_local_Oless__le__trans,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less,X),Y))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,Y),Z))
+       => pp(aa_a_bool(aa_a_fun_a_bool(less,X),Z)) ) ) )).
+
+tff(fact_377_local_Otest__compl__1,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati197917286test_a(less_eq),unit),X))
+     => aa_a_a(aa_a_fun_a_a(sup,X),aa_a_a(aa_a_fun_a_a(relati1726020595n_tc_a(uminus,inf),unit),X)) = unit ) )).
+
+tff(fact_378_local_Omaddux__12,axiom,(
+    ! [Y: a,X: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,aa_a_a(uminus,aa_a_a(aa_a_fun_a_a(composition,Y),X))),aa_a_a(converse,X))),aa_a_a(uminus,Y))) )).
+
+tff(fact_379_local_Ojoin__isol,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(sup,Z),X)),aa_a_a(aa_a_fun_a_a(sup,Z),Y))) ) )).
+
+tff(fact_380_UNIV__eq__I,axiom,(
+    ! [A3: set_a] : 
+      ( ! [X2: a] : member_a(X2,A3)
+     => top_top_set_a = A3 ) )).
+
+tff(fact_381_local_Ocomp__res,axiom,(
+    ! [X: a,Y: a] : pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(composition,aa_a_a(converse,X)),aa_a_a(uminus,aa_a_a(aa_a_fun_a_a(composition,X),Y)))),aa_a_a(uminus,Y))) )).
+
+tff(fact_382_local_Ojoin__iso,axiom,(
+    ! [X: a,Y: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(sup,X),Z)),aa_a_a(aa_a_fun_a_a(sup,Y),Z))) ) )).
+
+tff(fact_383_local_Op__fun__comp,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1280118755_fun_a(less_eq,composition,converse),unit),X))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(relati1280118755_fun_a(less_eq,composition,converse),unit),Y))
+       => pp(aa_a_bool(aa_a_fun_a_bool(relati1280118755_fun_a(less_eq,composition,converse),unit),aa_a_a(aa_a_fun_a_a(composition,X),Y))) ) ) )).
+
+tff(fact_384_local_Oless__le__not__le,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less,X),Y))
+    <=> ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+        & ~ pp(aa_a_bool(aa_a_fun_a_bool(less_eq,Y),X)) ) ) )).
+
+tff(fact_385_local_Ojoin__double__iso,axiom,(
+    ! [X: a,Y: a,W: a,Z: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+     => pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(sup,aa_a_a(aa_a_fun_a_a(sup,W),X)),Z)),aa_a_a(aa_a_fun_a_a(sup,aa_a_a(aa_a_fun_a_a(sup,W),Y)),Z))) ) )).
+
+tff(fact_386_local_Obij__conv,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1283760645_bij_a(less_eq,composition,converse),unit),X))
+    <=> pp(aa_a_bool(aa_a_fun_a_bool(relati1283760645_bij_a(less_eq,composition,converse),unit),aa_a_a(converse,X))) ) )).
+
+tff(fact_387_local_Obij__comp,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1283760645_bij_a(less_eq,composition,converse),unit),X))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(relati1283760645_bij_a(less_eq,composition,converse),unit),Y))
+       => pp(aa_a_bool(aa_a_fun_a_bool(relati1283760645_bij_a(less_eq,composition,converse),unit),aa_a_a(aa_a_fun_a_a(composition,X),Y))) ) ) )).
+
+tff(fact_388_local_Oless__le,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(less,X),Y))
+    <=> ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,X),Y))
+        & X != Y ) ) )).
+
+tff(fact_389_local_Og__pre__additive,axiom,(
+    ! [F: fun_a_a,G: fun_a_a,X: a,Y: a,Z: a] : 
+      ( more_B123986365tion_a(inf,bot,F,G)
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(G,aa_a_a(aa_a_fun_a_a(sup,X),Y))),Z))
+      <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(sup,aa_a_a(G,X)),aa_a_a(G,Y))),Z)) ) ) )).
+
+tff(fact_390_local_Omap__comp,axiom,(
+    ! [X: a,Y: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati1341526444_map_a(less_eq,composition,converse),unit),X))
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(relati1341526444_map_a(less_eq,composition,converse),unit),Y))
+       => pp(aa_a_bool(aa_a_fun_a_bool(relati1341526444_map_a(less_eq,composition,converse),unit),aa_a_a(aa_a_fun_a_a(composition,X),Y))) ) ) )).
+
+tff(fact_391_local_Otest__conv,axiom,(
+    ! [X: a] : 
+      ( pp(aa_a_bool(aa_a_fun_a_bool(relati197917286test_a(less_eq),unit),X))
+     => pp(aa_a_bool(aa_a_fun_a_bool(relati197917286test_a(less_eq),unit),aa_a_a(converse,X))) ) )).
+
+tff(fact_392_local_Of__pre__additive,axiom,(
+    ! [F: fun_a_a,G: fun_a_a,X: a,Y: a,Z: a] : 
+      ( more_B123986365tion_a(inf,bot,F,G)
+     => ( pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(F,aa_a_a(aa_a_fun_a_a(sup,X),Y))),Z))
+      <=> pp(aa_a_bool(aa_a_fun_a_bool(less_eq,aa_a_a(aa_a_fun_a_a(sup,aa_a_a(F,X)),aa_a_a(F,Y))),Z)) ) ) )).
+
+tff(fact_393_ATP_Olambda__1,axiom,(
+    ! [Uu: set_a,Uua: a] : 
+      ( pp(aa_a_bool(aTP_Lamm_a(Uu),Uua))
+    <=> member_a(Uua,Uu) ) )).
+
+tff(help_pp_2_1_U,axiom,(
+    pp(fTrue) )).
+
+tff(help_pp_1_1_U,axiom,(
+    ~ pp(fFalse) )).
+
+tff(conj_1,conjecture,(
+    x = y )).
+%------------------------------------------------------------------------------

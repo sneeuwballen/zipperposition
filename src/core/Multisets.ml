@@ -3,6 +3,6 @@
 
 (** {1 Several Multisets} *)
 
-module MT = Multiset.Make(FOTerm)
+module MT = Multiset.Make(Term)
 
 module MMT = Multiset.Make(MT)

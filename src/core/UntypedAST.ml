@@ -14,13 +14,16 @@ type form = T.t
 type data = {
   data_name: string;
   data_vars: string list;
-  data_cstors: (string * ty list) list;
+  data_cstors: (string * (string option * ty) list) list;
+  (* list of constructor. Each constructor is paired with a list of
+     arguments, that is, an optional projector + the type *)
 }
 
-(** Attributes *)
+(** Attributes (general terms) *)
 type attr =
-  | A_name of string
-  | A_AC
+  | A_app of string * attr list
+  | A_quoted of string
+  | A_list of attr list
 
 type attrs = attr list
 
@@ -49,6 +52,23 @@ type statement = {
 
 let default_attrs = []
 
+module A = struct
+  type t = attr
+  let str s = A_app (s,[])
+  let app s l = A_app (s,l)
+  let quoted s = A_quoted s
+  let list l = A_list l
+end
+
+let name_of_attrs =
+  CCList.find_map
+    (function A_app ("name", [A_quoted n]) -> Some n | _ -> None)
+
+let attr_name n = A.app "name" [A.str n]
+let attr_ac = A.str "ac"
+let attr_prefix s = A.app "prefix" [A.quoted s]
+let attr_infix s = A.app "infix" [A.quoted s]
+
 let make_ ?loc ?(attrs=default_attrs) stmt = {loc; stmt; attrs; }
 
 let mk_def def_id def_ty def_rules = {def_id; def_ty; def_rules}
@@ -62,17 +82,34 @@ let assert_ ?loc ?attrs t = make_ ?attrs ?loc (Assert t)
 let lemma ?loc ?attrs t = make_ ?attrs ?loc (Lemma t)
 let goal ?loc ?attrs t = make_ ?attrs ?loc (Goal t)
 
-let pp_attr out = function
-  | A_name n -> Format.fprintf out "name:%s" n
-  | A_AC -> CCFormat.string out "AC"
+let pp_attr =
+  let rec pp_attr_gen ~inner out = function
+    | A_app (s,[]) -> CCFormat.string out s
+    | A_app (s,l) when not inner ->
+      Format.fprintf out "@[%s@ %a@]" s (Util.pp_list ~sep:" " pp_attr) l
+    | A_app (s,l) ->
+      Format.fprintf out "(@[%s@ %a@])" s (Util.pp_list ~sep:" " pp_attr) l
+    | A_quoted s -> Format.fprintf out "\"%s\"" s
+    | A_list l ->
+      Format.fprintf out "[@[<hv>%a@]]" (Util.pp_list ~sep:"," pp_attr) l
+  and pp_attr out = pp_attr_gen ~inner:true out in
+  pp_attr_gen ~inner:false
 
 let pp_attrs out = function
   | [] -> ()
   | l -> Format.fprintf out "@ [@[%a@]]" (Util.pp_list ~sep:", " pp_attr) l
 
-let name_of_attrs =
-  CCList.find_map
-    (function A_name n -> Some n | _ -> None)
+let pp_attr_zf = pp_attr
+let pp_attrs_zf = pp_attrs
+
+let rec pp_attr_tstp out = function
+  | A_app (s,[]) -> Format.fprintf out "%s()" s
+  | A_app (s,l) ->
+    Format.fprintf out "%s(@[%a@])" s (Util.pp_list ~sep:"," pp_attr_tstp) l
+  | A_quoted s -> Format.fprintf out "'%s'" s
+  | A_list l ->
+    Format.fprintf out "[@[<hv>%a@]]" (Util.pp_list ~sep:"," pp_attr_tstp) l
+
 let name st = name_of_attrs st.attrs
 
 let pp_statement out st =
@@ -93,8 +130,9 @@ let pp_statement out st =
     | Rewrite t ->
       fpf out "@[<2>rewrite%a @[%a@]@]." pp_attrs attrs T.pp t
     | Data l ->
+      let pp_arg out (_,ty) = T.pp out ty in
       let pp_cstor out (id,args) =
-        fpf out "@[<2>| @[%s@ %a@]@]" id (Util.pp_list ~sep:" " T.pp) args in
+        fpf out "@[<2>| @[%s@ %a@]@]" id (Util.pp_list ~sep:" " pp_arg) args in
       let pp_data out d =
         fpf out "@[%s %a@] :=@ @[<v>%a@]"
           d.data_name

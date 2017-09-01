@@ -3,6 +3,9 @@
 
 (** {1 Main file for the prover} *)
 
+(** This module just calls the main {!Phases} runner that processes files
+    passed as arguments on the command line. *)
+
 open Logtk
 open Libzipperposition
 
@@ -12,9 +15,9 @@ let phases =
   let open Phases.Infix in
   Phases_impl.setup_gc >>= fun () ->
   Phases_impl.setup_signal >>= fun () ->
-  Phases_impl.parse_cli >>= fun (files, _params) ->
+  Phases_impl.parse_cli >>= fun (files, params) ->
   Phases_impl.load_extensions >>= fun _ ->
-  Phases_impl.process_files_and_print files >>= fun errcode ->
+  Phases_impl.process_files_and_print params files >>= fun errcode ->
   Phases.exit >|= fun () ->
   errcode
 

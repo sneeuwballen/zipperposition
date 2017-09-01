@@ -52,8 +52,9 @@ let check file =
       (ID.Map.pp ~sep:"" ~arrow:" : " ID.pp T.pp) sigma;
   );
   (* print formulas *)
+  (* FIXME: use [Options.output] *)
   if !dump then (
-    let pp_stmt = Statement.pp T.ZF.pp T.ZF.pp T.ZF.pp in
+    let pp_stmt = Statement.ZF.pp T.ZF.pp_inner T.ZF.pp_inner T.ZF.pp_inner in
     CCFormat.set_color_default false;
     Format.printf "@[<v>%a@]@." (CCVector.pp ~sep:"" pp_stmt) decls;
   ) else if !cat_input then (
@@ -68,7 +69,7 @@ let main () =
   CCFormat.set_color_default true;
   let files = ref [] in
   let add_file f = files := f :: !files in
-  Arg.parse options add_file "check_tptp [options] [file1|stdin] file2...";
+  Arg.parse options add_file "type_check [options] [file1|stdin] file2...";
   if !files = [] then files := ["stdin"];
   files := List.rev !files;
   let res =

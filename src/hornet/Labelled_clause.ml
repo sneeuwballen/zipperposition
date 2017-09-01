@@ -6,7 +6,7 @@
 open Logtk
 open Hornet_types
 
-module T = FOTerm
+module T = Term
 
 type t = labelled_clause
 

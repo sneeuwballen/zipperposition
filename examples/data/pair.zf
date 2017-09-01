@@ -2,7 +2,7 @@
 
 # deconstruct pairs
 
-data pair a b := Pair a b.
+data pair a b := Pair (fst: a) (snd: b).
 
 goal forall a b p. exists x y. p = Pair a b x y.
 

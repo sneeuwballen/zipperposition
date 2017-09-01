@@ -1,0 +1,122 @@
+%------------------------------------------------------------------------------
+tff(ty_n_t__Temporal____Faults____Algebra____syntax__Oformula____exp_Itf__a_J,type,(
+    tempor805751935_exp_a: $tType )).
+
+tff(ty_n_t__Dlist__Odlist_Itf__a_J,type,(
+    dlist_a: $tType )).
+
+tff(ty_n_t__List__Olist_Itf__a_J,type,(
+    list_a: $tType )).
+
+tff(ty_n_t__Set__Oset_Itf__a_J,type,(
+    set_a: $tType )).
+
+tff(ty_n_t__HOL__Obool,type,(
+    bool: $tType )).
+
+tff(ty_n_tf__a,type,(
+    a: $tType )).
+
+tff(sy_c_Dlist_Olist__of__dlist_001tf__a,type,(
+    list_of_dlist_a: dlist_a > list_a )).
+
+tff(sy_c_Dlist_Oset_001tf__a,type,(
+    set_a2: dlist_a > set_a )).
+
+tff(sy_c_List_Oinsert_001tf__a,type,(
+    insert_a: ( a * list_a ) > list_a )).
+
+tff(sy_c_List_Olist_OCons_001tf__a,type,(
+    cons_a: ( a * list_a ) > list_a )).
+
+tff(sy_c_List_Olist_ONil_001tf__a,type,(
+    nil_a: list_a )).
+
+tff(sy_c_Orderings_Obot__class_Obot_001t__HOL__Obool,type,(
+    bot_bot_bool: bool )).
+
+tff(sy_c_Orderings_Obot__class_Obot_001t__Set__Oset_Itf__a_J,type,(
+    bot_bot_set_a: set_a )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__HOL__Obool,type,(
+    ord_less_eq_bool: ( bool * bool ) > bool )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Set__Oset_Itf__a_J,type,(
+    ord_less_eq_set_a: ( set_a * set_a ) > bool )).
+
+tff(sy_c_Set_Oinsert_001tf__a,type,(
+    insert_a2: ( a * set_a ) > set_a )).
+
+tff(sy_c_Temporal__Faults__Algebra__syntax_Oformula__exp_OtVar_001tf__a,type,(
+    tempor1113237175tVar_a: a > tempor805751935_exp_a )).
+
+tff(sy_c_Temporal__Faults__Algebra__syntax_Omk__minterm_001tf__a,type,(
+    tempor625710025term_a: ( list_a * set_a ) > tempor805751935_exp_a )).
+
+tff(sy_c_Temporal__Faults__Algebra__syntax_OtXB__of__list_001tf__a,type,(
+    tempor1884592342list_a: list_a > tempor805751935_exp_a )).
+
+tff(sy_c_fFalse,type,(
+    fFalse: bool )).
+
+tff(sy_c_fTrue,type,(
+    fTrue: bool )).
+
+tff(sy_c_pp,type,(
+    pp: bool > $o )).
+
+tff(sy_v_as____,type,(
+    as: dlist_a )).
+
+tff(sy_v_g,type,(
+    g: a )).
+
+tff(fact_0__092_060open_062tVar_Ag_A_061_Amk__minterm_A_Ilist__of__dlist_Aas_J_A_123g_125_A_092_060and_062_ADlist_Oset_Aas_A_092_060subseteq_062_A_123g_125_092_060close_062,axiom,
+    ( tempor1113237175tVar_a(g) = tempor625710025term_a(list_of_dlist_a(as),insert_a2(g,bot_bot_set_a))
+    & pp(ord_less_eq_set_a(set_a2(as),insert_a2(g,bot_bot_set_a))) )).
+
+tff(fact_1_insert__Nil,axiom,(
+    ! [X: a] : insert_a(X,nil_a) = cons_a(X,nil_a) )).
+
+tff(fact_2_le__boolI_H,axiom,(
+    ! [P: bool,Q: bool] : 
+      ( ( pp(P)
+       => pp(Q) )
+     => pp(ord_less_eq_bool(P,Q)) ) )).
+
+tff(fact_3_bot_Oextremum__unique,axiom,(
+    ! [A: set_a] : 
+      ( pp(ord_less_eq_set_a(A,bot_bot_set_a))
+    <=> A = bot_bot_set_a ) )).
+
+tff(fact_4_bot_Oextremum__unique,axiom,(
+    ! [A: bool] : 
+      ( pp(ord_less_eq_bool(A,bot_bot_bool))
+    <=> ( pp(A)
+      <=> pp(bot_bot_bool) ) ) )).
+
+tff(fact_5_tXB__of__list_Osimps_I2_J,axiom,(
+    ! [A: a] : tempor1884592342list_a(cons_a(A,nil_a)) = tempor1113237175tVar_a(A) )).
+
+tff(fact_6_bot_Oextremum__uniqueI,axiom,(
+    ! [A: set_a] : 
+      ( pp(ord_less_eq_set_a(A,bot_bot_set_a))
+     => A = bot_bot_set_a ) )).
+
+tff(fact_7_bot_Oextremum__uniqueI,axiom,(
+    ! [A: bool] : 
+      ( pp(ord_less_eq_bool(A,bot_bot_bool))
+     => ( pp(A)
+      <=> pp(bot_bot_bool) ) ) )).
+
+tff(help_pp_2_1_U,axiom,(
+    pp(fTrue) )).
+
+tff(help_pp_1_1_U,axiom,(
+    ~ pp(fFalse) )).
+
+tff(conj_1,conjecture,(
+    ? [As: dlist_a] : 
+      ( tempor1113237175tVar_a(g) = tempor625710025term_a(list_of_dlist_a(As),insert_a2(g,bot_bot_set_a))
+      & pp(ord_less_eq_set_a(set_a2(As),insert_a2(g,bot_bot_set_a))) ) )).
+%------------------------------------------------------------------------------

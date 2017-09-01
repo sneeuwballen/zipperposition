@@ -6,7 +6,7 @@
 open Logtk
 
 module Fmt = CCFormat
-module T = FOTerm
+module T = Term
 module TI = InnerTerm
 module P = Position
 module PW = Position.With

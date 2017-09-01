@@ -22,9 +22,9 @@ type check = [`No_check | `Check | `Check_with of form list]
 
 (** Classification of proof steps *)
 type kind =
-  | Inference of rule * string option * check
-  | Simplification of rule * string option * check
-  | Esa of rule * string option * check
+  | Inference of rule * check
+  | Simplification of rule * check
+  | Esa of rule * check
   | Assert of statement_src
   | Goal of statement_src
   | Lemma
@@ -37,6 +37,7 @@ type result =
   | Clause of SClause.t
   | BoolClause of bool_lit list
   | Stmt of Statement.input_t
+  | C_stmt of Statement.clause_t
 
 (** A proof step, without the conclusion *)
 type step
@@ -47,6 +48,10 @@ type proof
 type t = proof
 
 type parent
+
+type info = UntypedAST.attr
+
+type infos = info list
 
 (** {2 Rule} *)
 
@@ -99,6 +104,7 @@ module Step : sig
 
   val kind : t -> kind
   val parents : t -> parent list
+  val infos : t -> infos
   val compare : t -> t -> int
   val hash : t -> int
   val equal : t -> t -> bool
@@ -120,11 +126,11 @@ module Step : sig
 
   val goal' : ?loc:Loc.t -> file:string -> name:string -> unit -> t
 
-  val inference : ?check:check -> ?comment:string -> rule:rule -> parent list -> t
+  val inference : ?infos:infos -> ?check:check -> rule:rule -> parent list -> t
 
-  val simp : ?check:check -> ?comment:string -> rule:rule -> parent list -> t
+  val simp : ?infos:infos -> ?check:check -> rule:rule -> parent list -> t
 
-  val esa : ?check:check -> ?comment:string -> rule:rule -> parent list -> t
+  val esa : ?infos:infos -> ?check:check -> rule:rule -> parent list -> t
 
   val is_trivial : t -> bool
   val is_by_def : t -> bool
@@ -157,7 +163,9 @@ module Parent : sig
 
   val from : proof -> t
   val from_subst : proof Scoped.t -> Subst.t -> t
+  val add_subst : t Scoped.t -> Subst.t -> t
   val proof : t -> proof
+  val subst : t -> Subst.t list
 end
 
 (** {2 Proof} *)
@@ -212,11 +220,12 @@ module S : sig
 
   (** {6 Conversion to a graph of proofs} *)
 
-  val as_graph : (t, rule) CCGraph.t
+  val as_graph : (t, rule * Subst.t list * infos) CCGraph.t
   (** Get a graph of the proof *)
 
   val traverse :
     ?traversed:unit Tbl.t ->
+    order:[`BFS | `DFS] ->
     t ->
     t Sequence.t
 
@@ -228,6 +237,7 @@ module S : sig
 
   val pp_tstp : t CCFormat.printer
   val pp_normal : t CCFormat.printer
+  val pp_zf : t CCFormat.printer
   val pp : Options.print_format -> t CCFormat.printer
   (** Prints the proof according to the given input switch *)
 
@@ -242,5 +252,8 @@ module S : sig
 
   val pp_dot_seq_file : ?name:string -> string -> t Sequence.t -> unit
   (** same as {!pp_dot_seq} but into a file *)
+
+  val step_of_src : Statement.Src.t -> Step.t
+  val parent_of_sourced : Statement.sourced_t -> Parent.t
 end
 

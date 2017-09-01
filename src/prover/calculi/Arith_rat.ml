@@ -5,7 +5,7 @@
 
 open Logtk
 
-module T = FOTerm
+module T = Term
 module Lit = Literal
 module Lits = Literals
 module S = Subst
@@ -14,16 +14,20 @@ module MF = Monome.Focus
 module AL = Rat_lit
 module ALF = AL.Focus
 module Stmt = Statement
+module US = Unif_subst
 
 let stat_rat_sup = Util.mk_stat "rat.superposition"
 let stat_rat_cancellation = Util.mk_stat "rat.rat_cancellation"
 let stat_rat_eq_factoring = Util.mk_stat "rat.eq_factoring"
 let stat_rat_ineq_chaining = Util.mk_stat "rat.ineq_chaining"
-let stat_rat_purify = Util.mk_stat "rat.purify"
 let stat_rat_semantic_tautology = Util.mk_stat "rat.semantic_tauto"
 let stat_rat_ineq_factoring = Util.mk_stat "rat.ineq_factoring"
 let stat_rat_demod = Util.mk_stat "rat.demod"
 let stat_rat_backward_demod = Util.mk_stat "rat.backward_demod"
+let stat_rat_trivial_ineq = Util.mk_stat "rat.redundant_by_ineq.calls"
+let stat_rat_trivial_ineq_steps = Util.mk_stat "rat.redundant_by_ineq.steps"
+let stat_rat_demod_ineq = Util.mk_stat "rat.demod_ineq.calls"
+let stat_rat_demod_ineq_steps = Util.mk_stat "rat.demod_ineq.steps"
 (*
 let stat_rat_reflexivity_resolution = Util.mk_stat "rat.reflexivity_resolution"
 *)
@@ -32,11 +36,12 @@ let prof_rat_sup = Util.mk_profiler "rat.superposition"
 let prof_rat_cancellation = Util.mk_profiler "rat.rat_cancellation"
 let prof_rat_eq_factoring = Util.mk_profiler "rat.eq_factoring"
 let prof_rat_ineq_chaining = Util.mk_profiler "rat.ineq_chaining"
-let prof_rat_purify = Util.mk_profiler "rat.purify"
 let prof_rat_demod = Util.mk_profiler "rat.demod"
 let prof_rat_backward_demod = Util.mk_profiler "rat.backward_demod"
 let prof_rat_semantic_tautology = Util.mk_profiler "rat.semantic_tauto"
 let prof_rat_ineq_factoring = Util.mk_profiler "rat.ineq_factoring"
+let prof_rat_trivial_ineq = Util.mk_profiler "rat.redundant_by_ineq"
+let prof_rat_demod_ineq = Util.mk_profiler "rat.demod_ineq"
 (*
 let prof_rat_reflexivity_resolution = Util.mk_profiler "rat.reflexivity_resolution"
 *)
@@ -51,10 +56,6 @@ let dot_unit_ = ref None
 let flag_tauto = SClause.new_flag ()
 let flag_computed_tauto = SClause.new_flag ()
 
-(* TODO: global purification framework *)
-(* flag to be used to know when a clause cannot be purified *)
-let flag_no_purify = SClause.new_flag ()
-
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C
@@ -64,6 +65,9 @@ module type S = sig
 
   val register : unit -> unit
 end
+
+let enable_trivial_ineq_ = ref true
+let enable_demod_ineq_ = ref true
 
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
@@ -78,6 +82,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* unit clauses *)
   let _idx_unit_eq = ref (PS.TermIndex.empty ())
+  let _idx_unit_ineq = ref (PS.TermIndex.empty ())
 
   (* apply [f] to some subterms of [c] *)
   let update f c =
@@ -133,6 +138,18 @@ module Make(E : Env.S) : S with module Env = E = struct
                let with_pos = C.WithPos.( {term=t; pos; clause=c;} ) in
                f acc t with_pos)
             !_idx_unit_eq
+      | [| Lit.Rat ({AL.op=AL.Less; _} as alit) |] ->
+        let pos = Position.(arg 0 stop) in
+        _idx_unit_ineq :=
+          if !enable_trivial_ineq_ || !enable_demod_ineq_
+          then AL.fold_terms ~subterms:false ~vars:false ~pos ~which:`Max ~ord alit
+          |> Sequence.fold
+            (fun acc (t,pos) ->
+               assert (not (T.is_var t));
+               let with_pos = C.WithPos.( {term=t; pos; clause=c;} ) in
+               f acc t with_pos)
+            !_idx_unit_ineq
+          else !_idx_unit_ineq
       | _ -> ()
     end;
     ()
@@ -170,7 +187,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       passive_pos : Position.t;
       passive_lit : AL.Focus.t;
       passive_scope : int;
-      subst : Subst.t;
+      subst : Unif_subst.t;
     }
   end
 
@@ -181,10 +198,11 @@ module Make(E : Env.S) : S with module Env = E = struct
     let open SupInfo in
     let ord = Ctx.ord () in
     let renaming = Ctx.renaming_clear () in
-    let subst = info.subst in
+    let us = info.subst in
     let idx_a, _ = Lits.Pos.cut info.active_pos in
     let idx_p, _ = Lits.Pos.cut info.passive_pos in
     let s_a = info.active_scope and s_p = info.passive_scope in
+    let subst = Unif_subst.subst us in
     let lit_a = ALF.apply_subst ~renaming subst (info.active_lit,s_a) in
     let lit_p = ALF.apply_subst ~renaming subst (info.passive_lit,s_p) in
     Util.debugf ~section 5
@@ -221,12 +239,12 @@ module Make(E : Env.S) : S with module Env = E = struct
             (M.sum m_p (MF.rest mf_a))
             (M.sum (MF.rest mf_p) m_a)
       in
-      let all_lits = new_lit :: lits_a @ lits_p in
+      let c_guard = Literal.of_unif_subst ~renaming us in
+      let all_lits = new_lit :: c_guard @ lits_a @ lits_p in
       (* build clause *)
       let proof =
         Proof.Step.inference
           ~rule:rule_canc
-          ~comment:(CCFormat.sprintf "lhs(%a)" MF.pp mf_a)
           [C.proof_parent_subst (info.active,s_a) subst;
            C.proof_parent_subst (info.passive,s_p) subst] in
       let trail = C.trail_l [info.active;info.passive] in
@@ -340,8 +358,7 @@ module Make(E : Env.S) : S with module Env = E = struct
          || not(Lit.equal (C.lits c).(i) (C.lits c').(0))
          || not(ALF.is_max ~ord passive_lit && C.is_maxlit (c,0) S.empty ~idx:i)
     )
-    && (C.trail_subsumes c' c)
-    then (
+    && (C.trail_subsumes c' c) then (
       (* we know all variables of [active_lit] are bound, no need
          for a renaming *)
       let active_lit = ALF.apply_subst_no_renaming subst (active_lit,s_a) in
@@ -349,8 +366,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       match active_lit, passive_lit with
         | ALF.Left (AL.Equal, mf1, m1), _
         | ALF.Right (AL.Equal, m1, mf1), _ ->
-          let new_lit = ALF.replace passive_lit
-              (M.difference m1 (MF.rest mf1)) in
+          let new_lit =
+            ALF.replace passive_lit (M.difference m1 (MF.rest mf1))
+          in
           raise (SimplifyInto (new_lit, c',subst))
         | _ -> ()
     ) else ()
@@ -382,10 +400,11 @@ module Make(E : Env.S) : S with module Env = E = struct
         add_lit (Lit.mk_rat a_lit)
       with SimplifyInto (a_lit',c',subst) ->
         (* lit ----> lit' *)
-        add_premise c';
+        add_premise c' subst;
         (* recurse until the literal isn't reducible *)
         Util.debugf ~section 4
-          "@[<2>rewrite arith lit (@[%a@])@ into (@[%a@])@ using clause @[%a@]@ and subst @[%a@]@]"
+          "(@[<hv2>rewrite_rat_arith@ :lit `%a`@ :into `%a`@ \
+           :using @[%a@]@ :subst @[%a@]@])"
           (fun k->k AL.pp a_lit AL.pp a_lit' C.pp c' S.pp subst);
         _demod_lit_nf ~add_premise ~add_lit ~i c a_lit'
     end
@@ -483,13 +502,14 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun acc (a_lit,pos) ->
            let idx = Lits.Pos.idx pos in
            (* cancellation depends on what the literal looks like *)
-           let {AL.op; left=m1; right=m2} = a_lit in
+           let {AL.left=m1; right=m2; op} = a_lit in
            Util.debugf ~section 5 "@[<2>try cancellation@ in @[%a@]@]" (fun k->k AL.pp a_lit);
            (* try to unify terms in [m1] and [m2] *)
            MF.unify_mm (m1,0) (m2,0)
            |> Sequence.fold
-             (fun acc (mf1, mf2, subst) ->
+             (fun acc (mf1, mf2, us) ->
                 let renaming = Ctx.renaming_clear () in
+                let subst = US.subst us in
                 let mf1' = MF.apply_subst ~renaming subst (mf1,0) in
                 let mf2' = MF.apply_subst ~renaming subst (mf2,0) in
                 let is_max_lit = C.is_maxlit (c,0) subst ~idx in
@@ -502,7 +522,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                   let lits' = CCArray.except_idx (C.lits c) idx in
                   let lits' = Lit.apply_subst_list ~renaming subst (lits',0) in
                   let new_lit = Lit.mk_rat_op op (MF.rest mf1') (MF.rest mf2') in
-                  let all_lits = new_lit :: lits' in
+                  let c_guard = Literal.of_unif_subst ~renaming us in
+                  let all_lits = new_lit :: c_guard @ lits' in
                   let proof =
                     Proof.Step.inference
                       ~rule:(Proof.Rule.mk "cancellation")
@@ -546,14 +567,15 @@ module Make(E : Env.S) : S with module Env = E = struct
                 and mf2 = ALF.focused_monome lit2 in
                 try
                   if idx1 = idx2 then raise Unif.Fail;  (* exit *)
-                  let subst = Unif.FO.unification (t1,0) (t2,0) in
+                  let subst = Unif.FO.unify_full (t1,0) (t2,0) in
                   Util.debugf ~section 5
                     "@[<2>arith canc. eq. factoring:@ possible match in @[%a@]@ (at %d, %d)@]"
                     (fun k->k C.pp c idx1 idx2);
                   MF.unify_ff ~subst (mf1,0) (mf2,0)
                   |> Sequence.fold
-                    (fun acc (_, _, subst) ->
+                    (fun acc (_, _, us) ->
                        let renaming = Ctx.renaming_clear () in
+                       let subst = US.subst us in
                        let lit1' = ALF.apply_subst ~renaming subst (lit1,0) in
                        let lit2' = ALF.apply_subst ~renaming subst (lit2,0) in
                        if C.is_maxlit (c,0) subst ~idx:idx1
@@ -579,12 +601,12 @@ module Make(E : Env.S) : S with module Env = E = struct
                          let other_lits =
                            Lit.apply_subst_list
                              ~renaming subst (other_lits,0) in
+                         let c_guard = Literal.of_unif_subst ~renaming us in
                          (* apply subst and build clause *)
-                         let all_lits = new_lits @ other_lits in
+                         let all_lits = c_guard @ new_lits @ other_lits in
                          let proof =
                            Proof.Step.inference
                              ~rule:rule_canc_eq_fact
-                             ~comment:(CCFormat.sprintf "idx(%d,%d)" idx1 idx2)
                              [C.proof_parent_subst (c,0) subst] in
                          let penalty = C.penalty c
                          and trail = C.trail c in
@@ -617,26 +639,21 @@ module Make(E : Env.S) : S with module Env = E = struct
       right_scope : int;
       right_pos : Position.t;
       right_lit : AL.Focus.t;
-      subst : Subst.t;
+      subst : US.t;
     }
   end
 
   (* range from low to low+len *)
-  let _range low len =
-    let rec make acc i len =
-      if Z.sign len < 0 then acc
-      else make (i::acc) (Z.succ i) (Z.pred len)
-    in make [] low len
-
   (* cancellative chaining *)
   let _do_chaining info acc =
     let open ChainingInfo in
     let ord = Ctx.ord () in
     let renaming = S.Renaming.create () in
-    let subst = info.subst in
+    let us = info.subst in
     let idx_l, _ = Lits.Pos.cut info.left_pos in
     let idx_r, _ = Lits.Pos.cut info.right_pos in
     let s_l = info.left_scope and s_r = info.right_scope in
+    let subst = Unif_subst.subst us in
     let lit_l = ALF.apply_subst ~renaming subst (info.left_lit,s_l) in
     let lit_r = ALF.apply_subst ~renaming subst (info.right_lit,s_r) in
     Util.debugf ~section 5
@@ -664,12 +681,11 @@ module Make(E : Env.S) : S with module Env = E = struct
           let lits_l = Lit.apply_subst_list ~renaming subst (lits_l,s_l) in
           let lits_r = CCArray.except_idx (C.lits info.right) idx_r in
           let lits_r = Lit.apply_subst_list ~renaming subst (lits_r,s_r) in
-          let all_lits = new_lit :: lits_l @ lits_r in
+          let c_guard = Literal.of_unif_subst ~renaming us in
+          let all_lits = new_lit :: c_guard @ lits_l @ lits_r in
           let proof =
             Proof.Step.inference
               ~rule:(Proof.Rule.mk "canc_ineq_chaining")
-              ~comment:(CCFormat.sprintf "(@[idx(%d,%d)@ left(%a)@ right(%a)@])"
-                  idx_l idx_r T.pp (MF.term mf_2) T.pp (MF.term mf_1))
               [C.proof_parent_subst (info.left,s_l) subst;
                C.proof_parent_subst (info.right,s_r) subst] in
           let trail = C.trail_l [info.left; info.right] in
@@ -755,8 +771,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     let ord = Ctx.ord () in
     let acc = ref [] in
     (* do the factoring if ordering conditions are ok *)
-    let _do_factoring ~subst lit1 lit2 i j =
+    let _do_factoring ~subst:us lit1 lit2 i j =
       let renaming = S.Renaming.create () in
+      let subst = US.subst us in
       let lit1 = ALF.apply_subst ~renaming subst (lit1,0) in
       let lit2 = ALF.apply_subst ~renaming subst (lit2,0) in
       (* same coefficient for the focused term *)
@@ -789,7 +806,8 @@ module Make(E : Env.S) : S with module Env = E = struct
             in
             (* negate the literal to obtain a guard *)
             let new_lit = Lit.negate new_lit in
-            let lits = new_lit :: other_lits in
+            let c_guard = Literal.of_unif_subst ~renaming us in
+            let lits = new_lit :: c_guard @ other_lits in
             (* build clauses *)
             let proof =
               Proof.Step.inference
@@ -848,6 +866,268 @@ module Make(E : Env.S) : S with module Env = E = struct
       For instance, 0 ≤ f(x)  makes  0 ≤ f(a) + f(b) redundant, but subsumption
       is not able to detect it. *)
 
+  (* allow traces of depth at most 3 *)
+  let max_ineq_trivial_steps = 3
+
+  (* rewrite a literal [l] into a smaller literal [l'], such that [l'] and
+     the current set of unit clauses imply [l]; then compute the
+     transitive closure of this relation. If we obtain a trivial
+     literal, then [l] is redundant (we keep a trace of literals used).
+     We use continuations to deal with the multiple choices. *)
+  let rec _ineq_find_sufficient ~ord ~trace c lit k = match lit with
+    | _ when AL.is_trivial lit -> k (trace,lit)
+    | _ when List.length trace >= max_ineq_trivial_steps ->
+      () (* need another step, but it would exceed the limit *)
+    | {AL.op=AL.Less; _} when Sequence.exists T.is_var (AL.Seq.terms lit) ->
+      ()  (* no way we rewrite this into a tautology *)
+    | {AL.op=AL.Less; _} ->
+      Util.incr_stat stat_rat_trivial_ineq;
+      Util.debugf ~section 5
+        "(@[try_ineq_find_sufficient@ :lit `%a`@ :trace (@[%a@])@])"
+        (fun k->k AL.pp lit (Util.pp_list C.pp) trace);
+      AL.fold_terms ~vars:false ~which:`Max ~ord ~subterms:false lit
+      |> Sequence.iter
+        (fun (t,pos) ->
+           let plit = ALF.get_exn lit pos in
+           let is_left = match pos with
+             | Position.Left _ -> true
+             | Position.Right _ -> false
+             | _ -> assert false
+           in
+           (* try to eliminate [t] in passive lit [plit]*)
+           PS.TermIndex.retrieve_generalizations (!_idx_unit_ineq,1) (t,0)
+           |> Sequence.iter
+             (fun (_t',with_pos,subst) ->
+                let active_clause = with_pos.C.WithPos.clause in
+                let active_pos = with_pos.C.WithPos.pos in
+                match Lits.View.get_rat (C.lits active_clause) active_pos with
+                  | None -> assert false
+                  | Some (ALF.Left (AL.Less, _, _) as alit') when is_left ->
+                    let alit' = ALF.apply_subst_no_renaming subst (alit',1) in
+                    if C.trail_subsumes active_clause c
+                    && ALF.is_strictly_max ~ord alit'
+                    then (
+                      (* scale *)
+                      let plit, _alit' = ALF.scale plit alit' in
+                      let mf1', m2' =
+                        match Lits.View.get_rat (C.lits active_clause) active_pos with
+                          | Some (ALF.Left (_, mf1', m2')) -> mf1', m2'
+                          | _ -> assert false
+                      in
+                      let mf1' = MF.apply_subst_no_renaming subst (mf1',1) in
+                      let m2' = M.apply_subst_no_renaming subst (m2',1) in
+                      (* from t+mf1 ≤ m2  and t+mf1' ≤ m2', we deduce
+                         that if m2'-mf1' ≤ m2-mf1  then [lit] is redundant.
+                         That is, the sufficient literal is
+                         mf1 + m2' ≤ m2 + mf1'  (we replace [t] with [m2'-mf1']) *)
+                      let new_plit =
+                        ALF.replace plit (M.difference m2' (MF.rest mf1')) in
+                      (* transitive closure *)
+                      let trace = active_clause::trace in
+                      _ineq_find_sufficient ~ord ~trace c new_plit k
+                    )
+                  | Some (ALF.Right (AL.Less, _, _) as alit') when not is_left ->
+                    (* symmetric case *)
+                    let alit' = ALF.apply_subst_no_renaming subst (alit',1) in
+                    if C.trail_subsumes active_clause c
+                    && ALF.is_strictly_max ~ord alit'
+                    then (
+                      (* scale *)
+                      let plit, _alit' = ALF.scale plit alit' in
+                      let m1', mf2' =
+                        match Lits.View.get_rat (C.lits active_clause) active_pos with
+                          | Some (ALF.Right (_, m1', mf2')) -> m1', mf2'
+                          | _ -> assert false
+                      in
+                      let mf2' = MF.apply_subst_no_renaming subst (mf2',1) in
+                      let m1' = M.apply_subst_no_renaming subst (m1',1) in
+                      let new_plit =
+                        ALF.replace plit (M.difference m1' (MF.rest mf2')) in
+                      (* transitive closure *)
+                      let trace = active_clause::trace in
+                      _ineq_find_sufficient ~ord ~trace c new_plit k
+                    )
+                  | Some _ ->
+                    ()   (* cannot make a sufficient literal *)
+             )
+        )
+    | _ -> ()
+
+  (* is a literal redundant w.r.t the current set of unit clauses *)
+  let _ineq_is_redundant_by_unit c lit =
+    match lit with
+      | _ when Lit.is_trivial lit || Lit.is_absurd lit ->
+        None  (* something more efficient will take care of it *)
+      | Lit.Rat ({AL.op=AL.Less; _} as alit) ->
+        let ord = Ctx.ord () in
+        let traces =
+          _ineq_find_sufficient ~ord ~trace:[] c alit
+          |> Sequence.head  (* one is enough *)
+        in
+        begin match traces with
+          | Some (trace, _lit') ->
+            assert (AL.is_trivial _lit');
+            let trace = CCList.uniq ~eq:C.equal trace in
+            Some trace
+          | None -> None
+        end
+      | _ -> None
+
+  let is_redundant_by_ineq c =
+    Util.enter_prof prof_rat_trivial_ineq;
+    let res =
+      CCArray.exists
+        (fun lit -> match _ineq_is_redundant_by_unit c lit with
+           | None -> false
+           | Some trace ->
+             Util.debugf ~section 3
+               "@[<2>clause @[%a@]@ trivial by inequations @[%a@]@]"
+               (fun k->k C.pp c (CCFormat.list C.pp) trace);
+             Util.incr_stat stat_rat_trivial_ineq_steps;
+             true)
+        (C.lits c)
+    in
+    Util.exit_prof prof_rat_trivial_ineq;
+    res
+
+  (* allow traces of depth at most 3 *)
+  let max_ineq_demod_steps = 3
+
+  (* rewrite a literal [l] into a smaller literal [l'], such that [l] and
+     the current set of unit clauses imply [l']; then compute the
+     transitive closure of this relation. If we obtain an absurd
+     literal, then [l] is absurd (we keep a trace of literals used).
+     We use continuations to deal with the multiple choices.
+
+     Each step looks like: from [l == (t <= u) && l' == (l <= t)]
+     we deduce [l <= u]. If at some point we deduce [⊥], we win.  *)
+  let rec ineq_find_necessary_ ~ord ~trace c lit k = match lit with
+    | _ when AL.is_absurd lit -> k (trace,lit)
+    | _ when List.length trace >= max_ineq_demod_steps ->
+      () (* need another step, but it would exceed the limit *)
+    | {AL.op=AL.Less; _} when Sequence.exists T.is_var (AL.Seq.terms lit) ->
+      ()  (* too costly (will match too many things) *)
+    | {AL.op=AL.Less; _} ->
+      Util.incr_stat stat_rat_demod_ineq;
+      Util.debugf ~section 5
+        "(@[try_ineq_find_necessary@ :lit `%a`@ :trace (@[%a@])@])"
+        (fun k->k AL.pp lit (Util.pp_list C.pp) trace);
+      AL.fold_terms ~vars:false ~which:`Max ~ord ~subterms:false lit
+      |> Sequence.iter
+        (fun (t,pos) ->
+           let plit = ALF.get_exn lit pos in
+           let is_left = match pos with
+             | Position.Left _ -> true
+             | Position.Right _ -> false
+             | _ -> assert false
+           in
+           (* try to eliminate [t] in passive lit [plit]*)
+           PS.TermIndex.retrieve_generalizations (!_idx_unit_ineq,1) (t,0)
+           |> Sequence.iter
+             (fun (_t',with_pos,subst) ->
+                let active_clause = with_pos.C.WithPos.clause in
+                let active_pos = with_pos.C.WithPos.pos in
+                match Lits.View.get_rat (C.lits active_clause) active_pos with
+                  | None -> assert false
+                  | Some (ALF.Left (AL.Less, _, _) as alit') when not is_left ->
+                    let alit' = ALF.apply_subst_no_renaming subst (alit',1) in
+                    if C.trail_subsumes active_clause c
+                    && ALF.is_strictly_max ~ord alit'
+                    then (
+                      (* scale *)
+                      let plit, _alit' = ALF.scale plit alit' in
+                      let mf1', m2' =
+                        match Lits.View.get_rat (C.lits active_clause) active_pos with
+                          | Some (ALF.Left (_, mf1', m2')) -> mf1', m2'
+                          | _ -> assert false
+                      in
+                      let mf1' = MF.apply_subst_no_renaming subst (mf1',1) in
+                      let m2' = M.apply_subst_no_renaming subst (m2',1) in
+                      (* from m1 ≤ t+mf2  and t+mf1' ≤ m2', we deduce
+                         m1 + mf1' ≤ mf2 + m2'. If this literal is absurd
+                         then so is [m1 ≤ t+mf2].
+                         We replace [t] with [m2'-mf1'] *)
+                      let new_plit =
+                        ALF.replace plit (M.difference m2' (MF.rest mf1')) in
+                      (* transitive closure *)
+                      let trace = active_clause::trace in
+                      ineq_find_necessary_ ~ord ~trace c new_plit k
+                    )
+                  | Some (ALF.Right (AL.Less, _, _) as alit') when is_left ->
+                    (* symmetric case *)
+                    let alit' = ALF.apply_subst_no_renaming subst (alit',1) in
+                    if C.trail_subsumes active_clause c
+                    && ALF.is_strictly_max ~ord alit'
+                    then (
+                      (* scale *)
+                      let plit, _alit' = ALF.scale plit alit' in
+                      let m1', mf2' =
+                        match Lits.View.get_rat (C.lits active_clause) active_pos with
+                          | Some (ALF.Right (_, m1', mf2')) -> m1', mf2'
+                          | _ -> assert false
+                      in
+                      let mf2' = MF.apply_subst_no_renaming subst (mf2',1) in
+                      let m1' = M.apply_subst_no_renaming subst (m1',1) in
+                      let new_plit =
+                        ALF.replace plit (M.difference m1' (MF.rest mf2')) in
+                      (* transitive closure *)
+                      let trace = active_clause::trace in
+                      ineq_find_necessary_ ~ord ~trace c new_plit k
+                    )
+                  | Some _ ->
+                    ()   (* cannot make a sufficient literal *)
+             )
+        )
+    | _ -> ()
+
+  (* is a literal absurd w.r.t the current set of unit clauses *)
+  let _ineq_is_absurd_by_unit c lit =
+    match lit with
+      | _ when Lit.is_trivial lit || Lit.is_absurd lit ->
+        None  (* something more efficient will take care of it *)
+      | Lit.Rat ({AL.op=AL.Less; _} as alit) ->
+        let ord = Ctx.ord () in
+        let traces =
+          ineq_find_necessary_ ~ord ~trace:[] c alit
+          |> Sequence.head  (* one is enough *)
+        in
+        begin match traces with
+          | Some (trace, _lit') ->
+            assert (AL.is_absurd _lit');
+            let trace = CCList.uniq ~eq:C.equal trace in
+            Some trace
+          | None -> None
+        end
+      | _ -> None
+
+  (* demodulate using inequalities *)
+  let demod_ineq c : C.t SimplM.t =
+    Util.enter_prof prof_rat_demod_ineq;
+    let res =
+      CCArray.findi
+        (fun i lit -> match _ineq_is_absurd_by_unit c lit with
+           | None -> None
+           | Some trace ->
+             Util.debugf ~section 3
+               "@[<2>clause @[%a@]@ rewritten by inequations @[%a@]@]"
+               (fun k->k C.pp c (CCFormat.list C.pp) trace);
+             Util.incr_stat stat_rat_demod_ineq_steps;
+             Some (i,trace))
+        (C.lits c)
+    in
+    let res = match res with
+      | None -> SimplM.return_same c
+      | Some (i,cs) ->
+        let lits = CCArray.except_idx (C.lits c) i in
+        let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "rat.demod_ineq")
+            (C.proof_parent c :: List.map C.proof_parent cs)
+        in
+        let c' = C.create lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
+        SimplM.return_new c'
+    in
+    Util.exit_prof prof_rat_demod_ineq;
+    res
+
   (** {3 Others} *)
 
   let _has_rat c = CCArray.exists Lit.is_rat (C.lits c)
@@ -855,9 +1135,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module Simp = Simplex.MakeHelp(T)
 
   (* tautology check: take the linear system that is the negation
-     of all a≠b and a≤b, and check its (rational) satisfiability. If
-     it's unsat in Q, it's unsat in Z, and its negation (a subset of c)
-     is tautological *)
+     of all a≠b and a≤b, and check its satisfiability *)
   let _is_tautology c =
     Util.enter_prof prof_rat_semantic_tautology;
     (* convert a monome into a rational monome + Q constant *)
@@ -957,209 +1235,174 @@ module Make(E : Env.S) : S with module Env = E = struct
         SimplM.return_new c'
     end
 
-  (* replace arith subterms with fresh variable + constraint *)
-  let purify c = SimplM.return c
-  (* FIXME
-    let module TC = T.Classic in
-    Util.enter_prof prof_rat_purify;
-    (* set of new literals *)
-    let new_lits = ref [] in
-    let cache = T.Tbl.create 16 in  (* cache for term->var *)
-    let _add_lit lit = new_lits := lit :: !new_lits in
-    (* index of the next fresh variable *)
-    let varidx =
-      ref ((Lits.Seq.terms (C.lits c)
-            |> Sequence.flat_map T.Seq.vars
-            |> T.Seq.max_var) + 1) in
-    (* replace term by a fresh var + constraint *)
-    let replace t ~by =
-      (* [v]: fresh var that will replace [t] *)
-      let v =
-        try T.Tbl.find cache t
-        with Not_found ->
-          let ty = T.ty t in
-          let v = T.var_of_int ~ty !varidx in
-          T.Tbl.replace cache t v;
-          incr varidx;
-          v
-      in
-      let lit = Lit.mk_rat_neq (M.Int.singleton Z.one v) by in
-      _add_lit lit;
-      v (* return variable instead of literal *)
-    (* should we purify the term t with head symbol [s] ?
-       yes if it's an arith expression or if it a int-sorted
-       function/constant under some other function *)
-    and should_purify ~root s t =
-      Builtin.is_rat s
-      ||
-      ( not root && Type.equal (T.ty t) Type.TPTP.int)
-    in
-    let purify_sub t =
-      Util.debugf ~section 5 "@[<2>need to purify term@ @[%a@]@]" (fun k->k T.pp t);
-      (* purify the term and add a constraint *)
-      begin match M.Int.of_term t with
-        | None ->
-          Util.debugf ~section 5
-            "@[<2>could not purify@ @[%a@]@ (non linear; cache)@]" (fun k->k T.pp t);
-          C.set_flag flag_no_purify c true;
-          t  (* non linear, abort. *)
-        | Some m -> replace t ~by:m
-      end
-    in
-    (* purify a term (adding constraints to the list).  *)
-    let rec purify_term ~root t = match TC.view t with
-      | TC.AppBuiltin (b, []) when Builtin.is_numeric b -> t   (* keep constants *)
-      | TC.NonFO
-      | TC.DB _
-      | TC.Var _ -> t
-      | TC.AppBuiltin (Builtin.Int _, []) -> t  (* don't purify numbers *)
-      | TC.AppBuiltin (b, _l) when should_purify ~root b t -> purify_sub t
-      | TC.App _ when (not root && Type.equal (T.ty t) Type.TPTP.int) ->
-        purify_sub t (* uninterpreted int subterm *)
-      | TC.AppBuiltin _
-      | TC.App _ ->
-        (* not an arith term. *)
-        begin match T.view t with
-          | T.App (hd, l) ->
-            T.app hd (List.map (purify_term ~root:false) l)
-          | T.AppBuiltin (b, l) ->
-            T.app_builtin ~ty:(T.ty t) b (List.map (purify_term ~root:false) l)
-          | T.DB _
-          | T.Var _ -> assert false
-          | T.Const _ -> t
-        end
-    in
-    (* replace! *)
-    let res =
-      if C.get_flag flag_no_purify c
-      then SimplM.return_same c
-      else
-        let lits' = Lits.map (purify_term ~root:true) (C.lits c) in
-        match !new_lits with
-          | [] -> SimplM.return_same c (* no change *)
-          | _::_ ->
-            let all_lits = !new_lits @ (Array.to_list lits') in
-            let proof =
-              ProofStep.mk_inference ~rule:(ProofStep.mk_rule "purify") [C.proof c] in
-            let new_c =
-              C.create ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof
-            in
-            Util.debugf ~section 5 "@[<2>purify@ @[%a@]@ into @[%a@]@]"
-              (fun k->k C.pp c C.pp new_c);
-            Util.incr_stat stat_rat_purify;
-            SimplM.return_new new_c
-    in
-    Util.exit_prof prof_rat_purify;
-    res
-  *)
-
   (** {6 Variable Elimination Procedure} *)
 
-  let is_shielded lits ~var =
-    let rec shielded_by_term ~root t = match T.view t with
-      | T.Var v' when HVar.equal Type.equal v' var -> not root
-      | T.Var _
-      | T.DB _
-      | T.Const _ -> false
-      | T.AppBuiltin (_, l)
-      | T.App (_, l) ->
-        (* ignore arith terms, they are shielding as well. We should
-           only eliminate variables that occur directly under proper arith
-           literals *)
-        List.exists (shielded_by_term ~root:false) l
-    in
-    (* is there a term, directly under a literal, that shields the variable? *)
-    lits
-    |> Lits.Seq.terms
-    |> Sequence.exists (shielded_by_term ~root:true)
-
-  let naked_vars lits =
-    Lits.vars lits
-    |> List.filter (fun var -> Type.equal (HVar.ty var) Type.int)
-    |> List.filter (fun var -> not (is_shielded lits ~var))
+  let unshielded_vars lits =
+    Literals.unshielded_vars lits
+      ~filter:(fun var -> Type.equal (HVar.ty var) Type.rat)
 
   let _negate_lits = List.map Lit.negate
 
-  let eliminate_unshielded _ = None
-    (* FIXME: new elimination
-    let module NVE = NakedVarElim in
-    let nvars = naked_vars (C.lits c) in
-    match nvars with
+  module Elim_var = struct
+    type t = {
+      var: T.var;
+      lower: Q.t M.t list; (* monomes smaller than x *)
+      upper: Q.t M.t list; (* monomes bigger than x *)
+      eq: Q.t M.t list; (* monomes equal to x *)
+      side_lits: Literal.t list; (* other literals *)
+      initial_lits: Literals.t;
+    }
+
+    let pp out (e:t) =
+      let pp_m = CCFormat.within "`" "`" M.pp in
+      let pp_m_l out l =
+        Format.fprintf out "(@[<hv>%a@])" (Util.pp_list ~sep:" " pp_m) l
+      in
+      Format.fprintf out
+        "(@[<v>:var %a@ :lower %a@ :upper %a@ :eq %a@ :side (@[%a@])@])"
+        T.pp_var e.var
+        pp_m_l e.lower
+        pp_m_l e.upper
+        pp_m_l e.eq
+        (Util.pp_list ~sep:" " Literal.pp) e.side_lits
+
+    (* quick and dirty CNF *)
+    module Form = struct
+      type form =
+        | Atom of Literal.t
+        | And of form list
+        | Or of form list
+        | True
+        | False
+
+      let atom l = Atom l
+      let or_ = function [] -> False | [t] -> t | l -> Or l
+      let and_ = function [] -> True | [t] -> t | l -> And l
+
+      let rec cnf (f:form): Lit.t list list = match f with
+        | Atom lit -> [[lit]]
+        | True -> [[Lit.mk_tauto]]
+        | False -> [[Lit.mk_absurd]]
+        | And [] | Or [] -> assert false
+        | And [f] | Or [f] -> cnf f
+        | And l -> CCList.flat_map cnf l
+        | Or l -> Util.map_product ~f:cnf l
+
+      let rec pp out (f:form): unit = match f with
+        | True -> CCFormat.string out "⊤"
+        | False -> CCFormat.string out "⊥"
+        | Atom lit -> Lit.pp out lit
+        | Or l -> Format.fprintf out "(@[<hv>or@ %a@])" (Util.pp_list ~sep:" " pp) l
+        | And l -> Format.fprintf out "(@[<hv>and@ %a@])" (Util.pp_list ~sep:" " pp) l
+    end
+
+    (* variable elimination. First, build formula; then perform CNF. *)
+    let to_clauses (e:t): Literal.t list list =
+      (* let i range over e.eq
+             j range over e.lower
+             k range over e.upper.
+         produce:
+         [∨_j ∨_k (m_j < m_k ∨ ∨_i (m_i = m_j ∧ m_i = m_k))]
+      *)
+      let form_l =
+        let open CCList.Infix in
+        e.lower >>= fun m_j ->
+        e.upper >>= fun m_k ->
+        let f_diseq = Form.atom (Lit.mk_rat_less m_j m_k) in
+        let f_eq =
+          e.eq >|= fun m_i ->
+          Form.and_
+            [ Form.atom (Lit.mk_rat_eq m_i m_j);
+              Form.atom (Lit.mk_rat_eq m_i m_k);
+            ]
+        in
+        CCList.return (Form.or_ (f_diseq :: f_eq))
+      in
+      let form = Form.or_ form_l in
+      Util.debugf ~section 5
+        "(@[<2>elim_var_non_cnf :var %a@ :clause %a@ :state %a@ :form %a@])"
+        (fun k->k T.pp_var e.var Lits.pp e.initial_lits pp e Form.pp form);
+      begin
+        Form.cnf form
+        |> List.rev_map (fun lits -> List.rev_append e.side_lits lits)
+      end
+
+    exception Make_err
+
+    (* builder *)
+    let make_exn (lits:Literals.t) (x:T.var): t =
+      assert (not (Literals.is_shielded x lits));
+      (* gather literals *)
+      let lower = ref [] in
+      let upper = ref [] in
+      let eq = ref [] in
+      let side = ref [] in
+      let push_l = CCList.Ref.push in
+      let t_x = T.var x in
+      Array.iter
+        (fun lit -> match lit with
+           | Lit.Rat {Rat_lit.op; left=m1; right=m2} ->
+             begin match M.find m1 t_x, M.find m2 t_x with
+               | None, None -> push_l side lit
+               | Some _, Some _ -> raise Make_err (* cancellations are possible *)
+               | Some c1, None ->
+                 let m = M.Rat.divide (M.difference m2 (M.remove m1 t_x)) c1 in
+                 begin match op with
+                   | Rat_lit.Equal -> push_l eq m
+                   | Rat_lit.Less -> push_l upper m
+                 end
+               | None, Some c2 ->
+                 let m = M.Rat.divide (M.difference m1 (M.remove m2 t_x)) c2 in
+                 begin match op with
+                   | Rat_lit.Equal -> push_l eq m
+                   | Rat_lit.Less -> push_l lower m
+                 end
+             end
+           | Lit.Equation (t, u, true) when T.equal t t_x ->
+             push_l eq (M.Rat.singleton Q.one u)
+           | Lit.Equation (t, u, true) when T.equal u t_x ->
+             push_l eq (M.Rat.singleton Q.one t)
+           | Lit.Equation (t, _, false) when T.equal t t_x -> raise Make_err
+           | Lit.Equation (_, u, false) when T.equal u t_x -> raise Make_err
+           | _ ->
+             assert (not (Lit.var_occurs x lit)); (* shielding *)
+             push_l side lit)
+        lits;
+      { var=x; lower= !lower; upper= !upper; eq= !eq;
+        side_lits= !side; initial_lits=lits; }
+
+    let make lits x : t option =
+      try Some (make_exn lits x)
+      with Make_err -> None
+  end
+
+  let eliminate_unshielded (c:C.t): C.t list option =
+    let module E = Elim_var in
+    let nvars = unshielded_vars (C.lits c) in
+    begin match nvars with
       | [] -> None
-      | x::_ ->
-        (* eliminate v *)
-        Util.debugf ~section 3
-          "@[<2>eliminate naked variable %a@ from @[%a@]@]" (fun k->k HVar.pp x C.pp c);
-        (* split C into C' (not containing v) and 6 kinds of literals *)
-        let view = NVE.of_lits (C.lits c) x in
-        let delta, view = NVE.scale view in
-        if not (Z.fits_int delta) then None
-        else begin
-          let delta = Z.to_int delta in
-          let a_set = NVE.a_set view
-          and b_set = NVE.b_set view in
-          (* prepare to build clauses *)
-          let acc = ref [] in
-          let add_clause ~by ~which lits =
-            let rule_name =
-              CCFormat.sprintf "var_elim(%s×%a → %a)" (Z.to_string view.NVE.lcm)
-                HVar.pp x M.pp by
+      | x :: _ ->
+        begin match E.make (C.lits c) x with
+          | None -> None
+          | Some e ->
+            let clauses = E.to_clauses e in
+            let proof =
+              Proof.Step.simp [C.proof_parent c]
+                ~rule:(Proof.Rule.mkf "elim_var(%a)" T.pp_var x)
             in
-            let rule = ProofStep.mk_rule rule_name ~comment: [ which] in
-            let proof = ProofStep.mk_inference ~rule [C.proof c] in
-            let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
-            Util.debugf ~section 5
-              "@[<2>elimination of %s×%a@ by %a (which:%s)@ in @[%a@]:@ gives @[%a@]@]"
-              (fun k->k (Z.to_string view.NVE.lcm)
-                  HVar.pp x M.pp by which C.pp c C.pp new_c);
-            acc := new_c :: !acc
-          in
-          (* choose which form to use *)
-          if List.length a_set > List.length b_set
-          then begin
-            (* use B *)
-            Util.debug ~section 5 "use the B elimination algorithm";
-            (* first, the -infty part *)
-            for i = 1 to delta do
-              let x' = M.Int.const (Z.of_int i) in
-              let lits = view.NVE.rest @
-                  _negate_lits (NVE.eval_minus_infty view x') in
-              add_clause ~by:x' ~which:"-∝" lits
-            done;
-            (* then the enumeration *)
-            for i = 1 to delta do
-              List.iter
-                (fun x' ->
-                   (* evaluate at x'+i *)
-                   let x'' = M.add_const x' Z.(of_int i) in
-                   let lits = view.NVE.rest @ _negate_lits (NVE.eval_at view x'') in
-                   add_clause ~by:x'' ~which:"middle" lits
-                ) b_set
-            done;
-          end else begin
-            (* use A *)
-            Util.debug ~section 5 "use the A elimination algorithm";
-            (* first, the +infty part *)
-            for i = 1 to delta do
-              let x' = M.Int.const Z.(neg (of_int i)) in
-              let lits = view.NVE.rest @
-                  _negate_lits (NVE.eval_plus_infty view x') in
-              add_clause ~by:x' ~which:"+∝" lits
-            done;
-            (* then the enumeration *)
-            for i = 1 to delta do
-              List.iter
-                (fun x' ->
-                   (* evaluate at x'-i *)
-                   let x'' = M.add_const x' Z.(neg (of_int i)) in
-                   let lits = view.NVE.rest @ _negate_lits (NVE.eval_at view x'') in
-                   add_clause ~by:x'' ~which:"middle" lits
-                ) a_set
-            done;
-          end;
-          Some !acc
+            let new_c =
+              List.map
+                (fun lits ->
+                   C.create lits proof
+                     ~penalty:(C.penalty c) ~trail:(C.trail c))
+                clauses
+            in
+            Util.debugf ~section 4
+              "(@[<2>elim_var :var %a@ :clause %a@ :yields (@[<hv>%a@])@]@)"
+              (fun k->k T.pp_var x C.pp c (Util.pp_list C.pp) new_c);
+            Some new_c
         end
-    *)
+    end
 
   (** {2 Setup} *)
 
@@ -1190,13 +1433,17 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_binary_inf "rat_ineq_chaining" canc_ineq_chaining;
     Env.add_unary_inf "rat_ineq_factoring" canc_ineq_factoring;
     Env.add_multi_simpl_rule eliminate_unshielded;
-    Env.add_simplify canc_demodulation;
+    Env.add_unary_simplify canc_demodulation;
     Env.add_backward_simplify canc_backward_demodulation;
     Env.add_is_trivial is_tautology;
-    Env.add_simplify purify;
-    Env.add_simplify convert_lit;
+    Env.add_unary_simplify convert_lit;
+    if !enable_trivial_ineq_ then (
+      Env.add_redundant is_redundant_by_ineq;
+    );
+    if !enable_demod_ineq_ then (
+      Env.add_active_simplify demod_ineq;
+    );
     Env.add_multi_simpl_rule eliminate_unshielded;
-    Ctx.Lit.add_from_hook Lit.Conv.rat_hook_from;
     (* completeness? I don't think so *)
     Ctx.lost_completeness ();
     (* enable AC-property of sum *)
@@ -1256,18 +1503,18 @@ let () =
     [ "--rat-no-semantic-tauto"
     , Arg.Clear enable_semantic_tauto_
     , " disable rational arithmetic semantic tautology check"
-    ; "--rat"
+    ; "--rat-arith"
     , Arg.Set enable_rat_
     , " enable axiomatic rational arithmetic"
     ; "--no-arith"
     , Arg.Clear enable_rat_
     , " disable axiomatic rational arithmetic"
-    ; "--arith-ac"
+    ; "--rat-ac"
     , Arg.Set enable_ac_
     , " enable AC axioms for rational arithmetic (sum)"
-    ; "--dot-arith-unit"
+    ; "--dot-rat-unit"
     , Arg.String (fun s -> dot_unit_ := Some s)
-    , " print arith-unit index into file"
+    , " print arith-rat-unit index into file"
     ];
   ()
 

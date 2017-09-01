@@ -1,0 +1,3726 @@
+%------------------------------------------------------------------------------
+tff(ty_n_t__fun_It__Product____Type__Oprod_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_Mt__Product____Type__Oprod_It__Position__Opos_Mt__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_J_Mt__fun_It__Product____Type__Oprod_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_Mt__Product____Type__Oprod_It__Position__Opos_Mt__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_J_Mt__HOL__Obool_J_J,type,(
+    fun_Pr12508717v_bool: $tType )).
+
+tff(ty_n_t__fun_It__Product____Type__Oprod_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_Mt__Position__Opos_J_Mt__fun_It__Product____Type__Oprod_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_Mt__Position__Opos_J_Mt__HOL__Obool_J_J,type,(
+    fun_Pr1173112749s_bool: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_Mt__Product____Type__Oprod_It__Position__Opos_Mt__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_J,type,(
+    produc928598493xt_f_v: $tType )).
+
+tff(ty_n_t__fun_It__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_Mt__fun_It__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_Mt__HOL__Obool_J_J,type,(
+    fun_li984431149v_bool: $tType )).
+
+tff(ty_n_t__fun_It__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J_Mt__fun_It__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_Mt__HOL__Obool_J_J,type,(
+    fun_li1377181097v_bool: $tType )).
+
+tff(ty_n_t__fun_It__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_Mt__fun_It__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J_Mt__HOL__Obool_J_J,type,(
+    fun_li364704735v_bool: $tType )).
+
+tff(ty_n_t__fun_It__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_Mt__fun_It__Nat__Onat_Mt__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_J,type,(
+    fun_li1013598214xt_f_v: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_Mt__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_J,type,(
+    produc158841325xt_f_v: $tType )).
+
+tff(ty_n_t__fun_It__fun_It__Nat__Onat_Mt__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_Mt__fun_It__Nat__Onat_Mt__Set__Oset_It__Position__Opos_J_J_J,type,(
+    fun_fu376057145et_pos: $tType )).
+
+tff(ty_n_t__fun_It__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J_Mt__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J_J,type,(
+    fun_se529884269_f_nat: $tType )).
+
+tff(ty_n_t__fun_It__fun_It__Position__Opos_Mt__Position__Opos_J_Mt__fun_It__Set__Oset_It__Position__Opos_J_Mt__Set__Oset_It__Position__Opos_J_J_J,type,(
+    fun_fu1377063043et_pos: $tType )).
+
+tff(ty_n_t__fun_It__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_Mt__fun_It__Nat__Onat_Mt__Set__Oset_It__Position__Opos_J_J_J,type,(
+    fun_li136545532et_pos: $tType )).
+
+tff(ty_n_t__fun_It__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J_Mt__fun_It__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J_Mt__HOL__Obool_J_J,type,(
+    fun_li177176931v_bool: $tType )).
+
+tff(ty_n_t__fun_It__fun_It__Nat__Onat_Mt__Set__Oset_It__Position__Opos_J_J_Mt__fun_It__Nat__Onat_Mt__Set__Oset_It__Position__Opos_J_J_J,type,(
+    fun_fu1023870659et_pos: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_Mt__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J_J,type,(
+    produc1735533693rm_f_v: $tType )).
+
+tff(ty_n_t__fun_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_Mt__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J_J,type,(
+    fun_Mu932464934_f_nat: $tType )).
+
+tff(ty_n_t__fun_It__Product____Type__Oprod_It__Term__Oterm_Itf__f_Mtf__v_J_Mt__Term__Oterm_Itf__f_Mtf__v_J_J_Mt__HOL__Obool_J,type,(
+    fun_Pr243348851v_bool: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Product____Type__Oprod_It__Term__Oterm_Itf__f_Mtf__v_J_Mt__Term__Oterm_Itf__f_Mtf__v_J_J_J,type,(
+    set_Pr576123655rm_f_v: $tType )).
+
+tff(ty_n_t__fun_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_Mt__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J,type,(
+    fun_Mu1675924099xt_f_v: $tType )).
+
+tff(ty_n_t__fun_It__Nat__Onat_Mt__fun_It__Set__Oset_It__Position__Opos_J_Mt__Set__Oset_It__Position__Opos_J_J_J,type,(
+    fun_na964512336et_pos: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__Position__Opos_Mt__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J,type,(
+    produc258583121xt_f_v: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_Mt__Position__Opos_J,type,(
+    produc1300325373_v_pos: $tType )).
+
+tff(ty_n_t__fun_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_Mt__Set__Oset_It__Position__Opos_J_J,type,(
+    fun_Mu1999976057et_pos: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__Term__Oterm_Itf__f_Mtf__v_J_Mt__Term__Oterm_Itf__f_Mtf__v_J_J,type,(
+    produc589042087rm_f_v: $tType )).
+
+tff(ty_n_t__fun_It__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_Mt__HOL__Obool_J,type,(
+    fun_li1550744377v_bool: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_Mt__Nat__Onat_J,type,(
+    produc424896090_v_nat: $tType )).
+
+tff(ty_n_t__fun_Itf__f_Mt__fun_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_Mt__HOL__Obool_J_J,type,(
+    fun_f_1116233301v_bool: $tType )).
+
+tff(ty_n_t__fun_It__Term__Oterm_Itf__f_Mtf__v_J_Mt__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J,type,(
+    fun_te615323153xt_f_v: $tType )).
+
+tff(ty_n_t__fun_It__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J_Mt__HOL__Obool_J,type,(
+    fun_se1061273144t_bool: $tType )).
+
+tff(ty_n_t__fun_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_Mt__Term__Oterm_Itf__f_Mtf__v_J_J,type,(
+    fun_Mu925827665rm_f_v: $tType )).
+
+tff(ty_n_t__fun_It__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_Mt__Nat__Onat_J,type,(
+    fun_li1156273860_v_nat: $tType )).
+
+tff(ty_n_t__fun_It__HOL__Obool_Mt__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J_J,type,(
+    fun_bo1629667938_f_nat: $tType )).
+
+tff(ty_n_t__fun_It__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J_Mt__Nat__Onat_J,type,(
+    fun_se463234053at_nat: $tType )).
+
+tff(ty_n_t__fun_It__Nat__Onat_Mt__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J_J,type,(
+    fun_na1171097349_f_nat: $tType )).
+
+tff(ty_n_t__List__Olist_It__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_J,type,(
+    list_l1119543527xt_f_v: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Product____Type__Oprod_It__Position__Opos_Mt__Position__Opos_J_J,type,(
+    set_Pr700793927os_pos: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J_J,type,(
+    set_se1111331566_f_nat: $tType )).
+
+tff(ty_n_t__fun_It__Set__Oset_It__Position__Opos_J_Mt__Set__Oset_It__Position__Opos_J_J,type,(
+    fun_set_pos_set_pos: $tType )).
+
+tff(ty_n_t__fun_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_Mt__HOL__Obool_J,type,(
+    fun_Pr1604015214t_bool: $tType )).
+
+tff(ty_n_t__fun_It__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J_Mt__HOL__Obool_J,type,(
+    fun_li1075135677v_bool: $tType )).
+
+tff(ty_n_t__fun_It__Term__Oterm_Itf__f_Mtf__v_J_Mt__Term__Oterm_Itf__f_Mtf__v_J_J,type,(
+    fun_te617841475rm_f_v: $tType )).
+
+tff(ty_n_t__fun_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_Mt__HOL__Obool_J,type,(
+    fun_Mu861389503v_bool: $tType )).
+
+tff(ty_n_t__fun_It__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J_Mt__Nat__Onat_J,type,(
+    fun_li359001152_v_nat: $tType )).
+
+tff(ty_n_t__fun_It__Nat__Onat_Mt__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J,type,(
+    fun_na2081747172xt_f_v: $tType )).
+
+tff(ty_n_t__fun_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_Mt__Nat__Onat_J,type,(
+    fun_Mu1352256958_v_nat: $tType )).
+
+tff(ty_n_t__fun_It__Nat__Onat_Mt__fun_It__Position__Opos_Mt__Position__Opos_J_J,type,(
+    fun_nat_fun_pos_pos: $tType )).
+
+tff(ty_n_t__List__Olist_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J,type,(
+    list_P1298222994_f_nat: $tType )).
+
+tff(ty_n_t__List__Olist_It__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J_J,type,(
+    list_list_term_f_v: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_It__Position__Opos_Mt__Position__Opos_J,type,(
+    product_prod_pos_pos: $tType )).
+
+tff(ty_n_t__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J,type,(
+    list_M276003553xt_f_v: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J,type,(
+    set_Pr592218680_f_nat: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J,type,(
+    set_Mu1305556667xt_f_v: $tType )).
+
+tff(ty_n_t__fun_It__Nat__Onat_Mt__fun_It__Nat__Onat_Mt__HOL__Obool_J_J,type,(
+    fun_nat_fun_nat_bool: $tType )).
+
+tff(ty_n_t__fun_It__Nat__Onat_Mt__Set__Oset_It__Position__Opos_J_J,type,(
+    fun_nat_set_pos: $tType )).
+
+tff(ty_n_t__fun_Itf__f_Mt__fun_It__Nat__Onat_Mt__HOL__Obool_J_J,type,(
+    fun_f_fun_nat_bool: $tType )).
+
+tff(ty_n_t__fun_It__Term__Oterm_Itf__f_Mtf__v_J_Mt__Nat__Onat_J,type,(
+    fun_term_f_v_nat: $tType )).
+
+tff(ty_n_t__fun_It__Nat__Onat_Mt__Term__Oterm_Itf__f_Mtf__v_J_J,type,(
+    fun_nat_term_f_v: $tType )).
+
+tff(ty_n_t__fun_It__List__Olist_It__Nat__Onat_J_Mt__Nat__Onat_J,type,(
+    fun_list_nat_nat: $tType )).
+
+tff(ty_n_t__fun_Itf__f_Mt__Option__Ooption_It__Nat__Onat_J_J,type,(
+    fun_f_option_nat: $tType )).
+
+tff(ty_n_t__List__Olist_It__Set__Oset_It__Position__Opos_J_J,type,(
+    list_set_pos: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Set__Oset_It__Position__Opos_J_J,type,(
+    set_set_pos: $tType )).
+
+tff(ty_n_t__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J,type,(
+    product_prod_f_nat: $tType )).
+
+tff(ty_n_t__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J,type,(
+    list_term_f_v: $tType )).
+
+tff(ty_n_t__List__Olist_It__List__Olist_It__Nat__Onat_J_J,type,(
+    list_list_nat: $tType )).
+
+tff(ty_n_t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    multihole_mctxt_f_v: $tType )).
+
+tff(ty_n_t__fun_It__Position__Opos_Mt__Position__Opos_J,type,(
+    fun_pos_pos: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Term__Oterm_Itf__f_Mtf__v_J_J,type,(
+    set_term_f_v: $tType )).
+
+tff(ty_n_t__fun_It__Position__Opos_Mt__HOL__Obool_J,type,(
+    fun_pos_bool: $tType )).
+
+tff(ty_n_t__fun_It__Position__Opos_Mt__Nat__Onat_J,type,(
+    fun_pos_nat: $tType )).
+
+tff(ty_n_t__fun_It__HOL__Obool_Mt__HOL__Obool_J,type,(
+    fun_bool_bool: $tType )).
+
+tff(ty_n_t__fun_It__Nat__Onat_Mt__HOL__Obool_J,type,(
+    fun_nat_bool: $tType )).
+
+tff(ty_n_t__fun_It__HOL__Obool_Mt__Nat__Onat_J,type,(
+    fun_bool_nat: $tType )).
+
+tff(ty_n_t__fun_It__Nat__Onat_Mt__Nat__Onat_J,type,(
+    fun_nat_nat: $tType )).
+
+tff(ty_n_t__Option__Ooption_It__Nat__Onat_J,type,(
+    option_nat: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Position__Opos_J,type,(
+    set_pos: $tType )).
+
+tff(ty_n_t__Term__Oterm_Itf__f_Mtf__v_J,type,(
+    term_f_v: $tType )).
+
+tff(ty_n_t__List__Olist_It__Nat__Onat_J,type,(
+    list_nat: $tType )).
+
+tff(ty_n_t__fun_Itf__v_Mt__Nat__Onat_J,type,(
+    fun_v_nat: $tType )).
+
+tff(ty_n_t__fun_Itf__f_Mt__Nat__Onat_J,type,(
+    fun_f_nat: $tType )).
+
+tff(ty_n_t__Position__Opos,type,(
+    pos: $tType )).
+
+tff(ty_n_t__HOL__Obool,type,(
+    bool: $tType )).
+
+tff(ty_n_t__Num__Onum,type,(
+    num: $tType )).
+
+tff(ty_n_t__Nat__Onat,type,(
+    nat: $tType )).
+
+tff(ty_n_tf__v,type,(
+    v: $tType )).
+
+tff(ty_n_tf__f,type,(
+    f: $tType )).
+
+tff(sy_c_ATP_058Lamm__a____,type,(
+    aTP_Lamm_a: set_pos > fun_pos_bool )).
+
+tff(sy_c_ATP_058Lamm__aa____,type,(
+    aTP_Lamm_aa: set_Pr592218680_f_nat > fun_Pr1604015214t_bool )).
+
+tff(sy_c_ATP_058Lamm__ab____,type,(
+    aTP_Lamm_ab: set_Mu1305556667xt_f_v > fun_Mu861389503v_bool )).
+
+tff(sy_c_ATP_058Lamm__ac____,type,(
+    aTP_Lamm_ac: set_Pr576123655rm_f_v > fun_Pr243348851v_bool )).
+
+tff(sy_c_ATP_058Lamm__ad____,type,(
+    aTP_Lamm_ad: fun_f_fun_nat_bool )).
+
+tff(sy_c_ATP_058Lamm__ae____,type,(
+    aTP_Lamm_ae: fun_f_fun_nat_bool )).
+
+tff(sy_c_ATP_058Lamm__af____,type,(
+    aTP_Lamm_af: list_M276003553xt_f_v > fun_pos_bool )).
+
+tff(sy_c_ATP_058Lamm__ag____,type,(
+    aTP_Lamm_ag: fun_Mu861389503v_bool )).
+
+tff(sy_c_ATP_058Lamm__ah____,type,(
+    aTP_Lamm_ah: fun_f_option_nat > fun_f_1116233301v_bool )).
+
+tff(sy_c_ATP_058Lamm__ai____,type,(
+    aTP_Lamm_ai: fun_f_option_nat > fun_f_fun_nat_bool )).
+
+tff(sy_c_ATP_058Lamm__aj____,type,(
+    aTP_Lamm_aj: list_M276003553xt_f_v > fun_pos_bool )).
+
+tff(sy_c_ATP_058Lamm__ak____,type,(
+    aTP_Lamm_ak: fun_li136545532et_pos )).
+
+tff(sy_c_ATP_058Lamm__al____,type,(
+    aTP_Lamm_al: fun_Pr243348851v_bool )).
+
+tff(sy_c_COMBB_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_001t__Set__Oset_It__Position__Opos_J_001t__Nat__Onat,type,(
+    cOMBB_337648044os_nat: fun_Mu1999976057et_pos > fun_fu376057145et_pos )).
+
+tff(sy_c_COMBB_001t__fun_It__Nat__Onat_Mt__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_001t__fun_It__Nat__Onat_Mt__Set__Oset_It__Position__Opos_J_J_001t__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J,type,(
+    cOMBB_1644720325xt_f_v: ( fun_fu376057145et_pos * fun_li1013598214xt_f_v ) > fun_li136545532et_pos )).
+
+tff(sy_c_COMBB_001t__fun_It__Nat__Onat_Mt__Set__Oset_It__Position__Opos_J_J_001t__fun_It__Nat__Onat_Mt__Set__Oset_It__Position__Opos_J_J_001t__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J,type,(
+    cOMBB_1186650171xt_f_v: ( fun_fu1023870659et_pos * fun_li136545532et_pos ) > fun_li136545532et_pos )).
+
+tff(sy_c_COMBB_001t__fun_It__Position__Opos_Mt__Position__Opos_J_001t__fun_It__Set__Oset_It__Position__Opos_J_Mt__Set__Oset_It__Position__Opos_J_J_001t__Nat__Onat,type,(
+    cOMBB_1457624702os_nat: ( fun_fu1377063043et_pos * fun_nat_fun_pos_pos ) > fun_na964512336et_pos )).
+
+tff(sy_c_COMBS_001t__Nat__Onat_001t__Set__Oset_It__Position__Opos_J_001t__Set__Oset_It__Position__Opos_J,type,(
+    cOMBS_438613959et_pos: fun_na964512336et_pos > fun_fu1023870659et_pos )).
+
+tff(sy_c_Complete__Lattices_OSup__class_OSup_001t__Set__Oset_It__Position__Opos_J,type,(
+    comple1220921406et_pos: set_set_pos > set_pos )).
+
+tff(sy_c_Complete__Lattices_OSup__class_OSup_001t__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J,type,(
+    comple1145127051_f_nat: set_se1111331566_f_nat > set_Pr592218680_f_nat )).
+
+tff(sy_c_Currying_Opp__cr_001tf__f_001tf__v,type,(
+    pp_cr_f_v: ( fun_f_option_nat * set_Pr576123655rm_f_v * f ) > $o )).
+
+tff(sy_c_Currying_Opp__cr_O_092_060F_062_001tf__f,type,(
+    pp_F_f: fun_f_option_nat > set_Pr592218680_f_nat )).
+
+tff(sy_c_Currying_Opp__cr_O_092_060F_062_092_060_094sub_062U_001tf__f,type,(
+    pp_F_U_f: ( fun_f_option_nat * f ) > set_Pr592218680_f_nat )).
+
+tff(sy_c_Currying_Opp__cr_O_092_060LL_062_001tf__f_001tf__v,type,(
+    pp_LL_f_v: ( fun_f_option_nat * f ) > set_Mu1305556667xt_f_v )).
+
+tff(sy_c_Currying_Opp__cr_O_092_060LL_062_092_060_094sub_0621_001tf__f_001tf__v,type,(
+    pp_LL_1_f_v: ( fun_f_option_nat * f ) > fun_Mu861389503v_bool )).
+
+tff(sy_c_Currying_Opp__cr_O_092_060LL_062_092_060_094sub_0622_001tf__f_001tf__v,type,(
+    pp_LL_2_f_v: ( fun_f_option_nat * f ) > fun_Mu861389503v_bool )).
+
+tff(sy_c_Currying_Opp__cr_O_092_060U_062_001tf__f_001tf__v,type,(
+    pp_U_f_v: ( fun_f_option_nat * f ) > set_Pr576123655rm_f_v )).
+
+tff(sy_c_Currying_Opp__cr_Omissing__args_001tf__f_001tf__v,type,(
+    pp_missing_args_f_v: ( fun_f_option_nat * f * multihole_mctxt_f_v ) > fun_nat_bool )).
+
+tff(sy_c_Groups_Ominus__class_Ominus_001t__Nat__Onat,type,(
+    minus_minus_nat: nat > fun_nat_nat )).
+
+tff(sy_c_Groups_Ominus__class_Ominus_001t__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J,type,(
+    minus_140170257_f_nat: set_Pr592218680_f_nat > fun_se529884269_f_nat )).
+
+tff(sy_c_Groups_Oone__class_Oone_001t__Nat__Onat,type,(
+    one_one_nat: nat )).
+
+tff(sy_c_Groups_Oone__class_Oone_001t__Position__Opos,type,(
+    one_one_pos: pos )).
+
+tff(sy_c_Groups_Oplus__class_Oplus_001t__Nat__Onat,type,(
+    plus_plus_nat: nat > fun_nat_nat )).
+
+tff(sy_c_Groups_Ozero__class_Ozero_001t__Nat__Onat,type,(
+    zero_zero_nat: nat )).
+
+tff(sy_c_Groups__List_Omonoid__add__class_Olistsum_001t__Nat__Onat,type,(
+    groups1604586427um_nat: list_nat > nat )).
+
+tff(sy_c_HOL_Oundefined_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    undefi637609667xt_f_v: multihole_mctxt_f_v )).
+
+tff(sy_c_LS__Extras_Oall__poss__mctxt_001tf__f_001tf__v,type,(
+    lS_all750120224xt_f_v: multihole_mctxt_f_v > set_pos )).
+
+tff(sy_c_LS__Extras_Omreplace__at_001tf__f_001tf__v,type,(
+    lS_mreplace_at_f_v: ( multihole_mctxt_f_v * pos ) > fun_Mu1675924099xt_f_v )).
+
+tff(sy_c_LS__Extras_Omreplace__at__rel_001tf__f_001tf__v,type,(
+    lS_mre1091278265el_f_v: fun_Pr12508717v_bool )).
+
+tff(sy_c_LS__Extras_Osubm__at_001tf__f_001tf__v,type,(
+    lS_subm_at_f_v: ( multihole_mctxt_f_v * pos ) > multihole_mctxt_f_v )).
+
+tff(sy_c_LS__Extras_Osubm__at__rel_001tf__f_001tf__v,type,(
+    lS_subm_at_rel_f_v: fun_Pr1173112749s_bool )).
+
+tff(sy_c_Lattices_Oinf__class_Oinf_001t__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J,type,(
+    inf_in969140938_f_nat: set_Pr592218680_f_nat > fun_se529884269_f_nat )).
+
+tff(sy_c_Lattices_Osup__class_Osup_001t__Set__Oset_It__Position__Opos_J,type,(
+    sup_sup_set_pos: ( set_pos * set_pos ) > set_pos )).
+
+tff(sy_c_Lattices_Osup__class_Osup_001t__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J,type,(
+    sup_su1335354212_f_nat: set_Pr592218680_f_nat > fun_se529884269_f_nat )).
+
+tff(sy_c_List_Oappend_001t__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J,type,(
+    append948291708xt_f_v: ( list_l1119543527xt_f_v * list_l1119543527xt_f_v ) > list_l1119543527xt_f_v )).
+
+tff(sy_c_List_Oappend_001t__List__Olist_It__Nat__Onat_J,type,(
+    append_list_nat: ( list_list_nat * list_list_nat ) > list_list_nat )).
+
+tff(sy_c_List_Oappend_001t__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J,type,(
+    append_list_term_f_v: ( list_list_term_f_v * list_list_term_f_v ) > list_list_term_f_v )).
+
+tff(sy_c_List_Oappend_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    append460316534xt_f_v: ( list_M276003553xt_f_v * list_M276003553xt_f_v ) > list_M276003553xt_f_v )).
+
+tff(sy_c_List_Oappend_001t__Nat__Onat,type,(
+    append_nat: ( list_nat * list_nat ) > list_nat )).
+
+tff(sy_c_List_Oappend_001t__Term__Oterm_Itf__f_Mtf__v_J,type,(
+    append_term_f_v: ( list_term_f_v * list_term_f_v ) > list_term_f_v )).
+
+tff(sy_c_List_Oconcat_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    concat926579484xt_f_v: list_l1119543527xt_f_v > list_M276003553xt_f_v )).
+
+tff(sy_c_List_Oconcat_001t__Nat__Onat,type,(
+    concat_nat: list_list_nat > list_nat )).
+
+tff(sy_c_List_Oconcat_001t__Term__Oterm_Itf__f_Mtf__v_J,type,(
+    concat_term_f_v: list_list_term_f_v > list_term_f_v )).
+
+tff(sy_c_List_Odistinct_001t__Term__Oterm_Itf__f_Mtf__v_J,type,(
+    distinct_term_f_v: fun_li1075135677v_bool )).
+
+tff(sy_c_List_Odrop_001t__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J,type,(
+    drop_l1801606695xt_f_v: ( nat * list_l1119543527xt_f_v ) > list_l1119543527xt_f_v )).
+
+tff(sy_c_List_Odrop_001t__List__Olist_It__Nat__Onat_J,type,(
+    drop_list_nat: ( nat * list_list_nat ) > list_list_nat )).
+
+tff(sy_c_List_Odrop_001t__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J,type,(
+    drop_list_term_f_v: ( nat * list_list_term_f_v ) > list_list_term_f_v )).
+
+tff(sy_c_List_Odrop_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    drop_M1817411233xt_f_v: ( nat * list_M276003553xt_f_v ) > list_M276003553xt_f_v )).
+
+tff(sy_c_List_Odrop_001t__Nat__Onat,type,(
+    drop_nat: ( nat * list_nat ) > list_nat )).
+
+tff(sy_c_List_Odrop_001t__Term__Oterm_Itf__f_Mtf__v_J,type,(
+    drop_term_f_v: ( nat * list_term_f_v ) > list_term_f_v )).
+
+tff(sy_c_List_Olist_OCons_001t__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J,type,(
+    cons_l194641047xt_f_v: ( list_M276003553xt_f_v * list_l1119543527xt_f_v ) > list_l1119543527xt_f_v )).
+
+tff(sy_c_List_Olist_OCons_001t__List__Olist_It__Nat__Onat_J,type,(
+    cons_list_nat: ( list_nat * list_list_nat ) > list_list_nat )).
+
+tff(sy_c_List_Olist_OCons_001t__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J,type,(
+    cons_list_term_f_v: ( list_term_f_v * list_list_term_f_v ) > list_list_term_f_v )).
+
+tff(sy_c_List_Olist_OCons_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    cons_M10820881xt_f_v: ( multihole_mctxt_f_v * list_M276003553xt_f_v ) > list_M276003553xt_f_v )).
+
+tff(sy_c_List_Olist_OCons_001t__Nat__Onat,type,(
+    cons_nat: ( nat * list_nat ) > list_nat )).
+
+tff(sy_c_List_Olist_OCons_001t__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J,type,(
+    cons_P1182348108_f_nat: ( product_prod_f_nat * list_P1298222994_f_nat ) > list_P1298222994_f_nat )).
+
+tff(sy_c_List_Olist_OCons_001t__Term__Oterm_Itf__f_Mtf__v_J,type,(
+    cons_term_f_v: ( term_f_v * list_term_f_v ) > list_term_f_v )).
+
+tff(sy_c_List_Olist_ONil_001t__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J,type,(
+    nil_li2102218983xt_f_v: list_l1119543527xt_f_v )).
+
+tff(sy_c_List_Olist_ONil_001t__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J,type,(
+    nil_list_term_f_v: list_list_term_f_v )).
+
+tff(sy_c_List_Olist_ONil_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    nil_Mu1963645281xt_f_v: list_M276003553xt_f_v )).
+
+tff(sy_c_List_Olist_ONil_001t__Nat__Onat,type,(
+    nil_nat: list_nat )).
+
+tff(sy_c_List_Olist_ONil_001t__Term__Oterm_Itf__f_Mtf__v_J,type,(
+    nil_term_f_v: list_term_f_v )).
+
+tff(sy_c_List_Olist_Ohd_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    hd_Mul1441970630xt_f_v: list_M276003553xt_f_v > multihole_mctxt_f_v )).
+
+tff(sy_c_List_Olist_Ohd_001t__Nat__Onat,type,(
+    hd_nat: list_nat > nat )).
+
+tff(sy_c_List_Olist_Ohd_001t__Term__Oterm_Itf__f_Mtf__v_J,type,(
+    hd_term_f_v: list_term_f_v > term_f_v )).
+
+tff(sy_c_List_Olist_Omap_001t__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_001t__Nat__Onat,type,(
+    map_li1299761261_v_nat: ( fun_li1156273860_v_nat * list_l1119543527xt_f_v ) > list_nat )).
+
+tff(sy_c_List_Olist_Omap_001t__List__Olist_It__Nat__Onat_J_001t__Nat__Onat,type,(
+    map_list_nat_nat: ( fun_list_nat_nat * list_list_nat ) > list_nat )).
+
+tff(sy_c_List_Olist_Omap_001t__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J_001t__Nat__Onat,type,(
+    map_li2117692169_v_nat: ( fun_li359001152_v_nat * list_list_term_f_v ) > list_nat )).
+
+tff(sy_c_List_Olist_Omap_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    map_Mu37731844xt_f_v: ( fun_Mu1675924099xt_f_v * list_M276003553xt_f_v ) > list_M276003553xt_f_v )).
+
+tff(sy_c_List_Olist_Omap_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_001t__Nat__Onat,type,(
+    map_Mu730314599_v_nat: ( fun_Mu1352256958_v_nat * list_M276003553xt_f_v ) > list_nat )).
+
+tff(sy_c_List_Olist_Omap_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_001t__Term__Oterm_Itf__f_Mtf__v_J,type,(
+    map_Mu1435028346rm_f_v: ( fun_Mu925827665rm_f_v * list_M276003553xt_f_v ) > list_term_f_v )).
+
+tff(sy_c_List_Olist_Omap_001t__Nat__Onat_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    map_na433213253xt_f_v: ( fun_na2081747172xt_f_v * list_nat ) > list_M276003553xt_f_v )).
+
+tff(sy_c_List_Olist_Omap_001t__Nat__Onat_001t__Nat__Onat,type,(
+    map_nat_nat: ( fun_nat_nat * list_nat ) > list_nat )).
+
+tff(sy_c_List_Olist_Omap_001t__Nat__Onat_001t__Set__Oset_It__Position__Opos_J,type,(
+    map_nat_set_pos: ( fun_nat_set_pos * list_nat ) > list_set_pos )).
+
+tff(sy_c_List_Olist_Omap_001t__Nat__Onat_001t__Term__Oterm_Itf__f_Mtf__v_J,type,(
+    map_nat_term_f_v: ( fun_nat_term_f_v * list_nat ) > list_term_f_v )).
+
+tff(sy_c_List_Olist_Omap_001t__Term__Oterm_Itf__f_Mtf__v_J_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    map_te1879702642xt_f_v: ( fun_te615323153xt_f_v * list_term_f_v ) > list_M276003553xt_f_v )).
+
+tff(sy_c_List_Olist_Omap_001t__Term__Oterm_Itf__f_Mtf__v_J_001t__Nat__Onat,type,(
+    map_term_f_v_nat: ( fun_term_f_v_nat * list_term_f_v ) > list_nat )).
+
+tff(sy_c_List_Olist_Omap_001t__Term__Oterm_Itf__f_Mtf__v_J_001t__Term__Oterm_Itf__f_Mtf__v_J,type,(
+    map_te594762124rm_f_v: ( fun_te617841475rm_f_v * list_term_f_v ) > list_term_f_v )).
+
+tff(sy_c_List_Olist_Oset_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    set_Mu1483390320xt_f_v: list_M276003553xt_f_v > set_Mu1305556667xt_f_v )).
+
+tff(sy_c_List_Olist_Oset_001t__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J,type,(
+    set_Pr8039085_f_nat: list_P1298222994_f_nat > set_Pr592218680_f_nat )).
+
+tff(sy_c_List_Olist_Oset_001t__Set__Oset_It__Position__Opos_J,type,(
+    set_set_pos2: list_set_pos > set_set_pos )).
+
+tff(sy_c_List_Olist_Oset_001t__Term__Oterm_Itf__f_Mtf__v_J,type,(
+    set_term_f_v2: list_term_f_v > set_term_f_v )).
+
+tff(sy_c_List_Olist__update_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    list_u1095619529xt_f_v: ( list_M276003553xt_f_v * nat * multihole_mctxt_f_v ) > list_M276003553xt_f_v )).
+
+tff(sy_c_List_Olist__update_001t__Nat__Onat,type,(
+    list_update_nat: ( list_nat * nat * nat ) > list_nat )).
+
+tff(sy_c_List_Olist__update_001t__Term__Oterm_Itf__f_Mtf__v_J,type,(
+    list_update_term_f_v: ( list_term_f_v * nat * term_f_v ) > list_term_f_v )).
+
+tff(sy_c_List_On__lists_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    n_list127787369xt_f_v: ( nat * list_M276003553xt_f_v ) > list_l1119543527xt_f_v )).
+
+tff(sy_c_List_On__lists_001t__Term__Oterm_Itf__f_Mtf__v_J,type,(
+    n_lists_term_f_v: ( nat * list_term_f_v ) > list_list_term_f_v )).
+
+tff(sy_c_List_Onth_001t__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J,type,(
+    nth_li549420136xt_f_v: ( list_l1119543527xt_f_v * nat ) > list_M276003553xt_f_v )).
+
+tff(sy_c_List_Onth_001t__List__Olist_It__Nat__Onat_J,type,(
+    nth_list_nat: ( list_list_nat * nat ) > list_nat )).
+
+tff(sy_c_List_Onth_001t__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J,type,(
+    nth_list_term_f_v: ( list_list_term_f_v * nat ) > list_term_f_v )).
+
+tff(sy_c_List_Onth_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    nth_Mu2056616290xt_f_v: fun_li1013598214xt_f_v )).
+
+tff(sy_c_List_Onth_001t__Nat__Onat,type,(
+    nth_nat: list_nat > fun_nat_nat )).
+
+tff(sy_c_List_Onth_001t__Term__Oterm_Itf__f_Mtf__v_J,type,(
+    nth_term_f_v: list_term_f_v > fun_nat_term_f_v )).
+
+tff(sy_c_List_Otake_001t__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J,type,(
+    take_l1715667151xt_f_v: ( nat * list_l1119543527xt_f_v ) > list_l1119543527xt_f_v )).
+
+tff(sy_c_List_Otake_001t__List__Olist_It__Nat__Onat_J,type,(
+    take_list_nat: ( nat * list_list_nat ) > list_list_nat )).
+
+tff(sy_c_List_Otake_001t__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J,type,(
+    take_list_term_f_v: ( nat * list_list_term_f_v ) > list_list_term_f_v )).
+
+tff(sy_c_List_Otake_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    take_M241671497xt_f_v: ( nat * list_M276003553xt_f_v ) > list_M276003553xt_f_v )).
+
+tff(sy_c_List_Otake_001t__Nat__Onat,type,(
+    take_nat: ( nat * list_nat ) > list_nat )).
+
+tff(sy_c_List_Otake_001t__Term__Oterm_Itf__f_Mtf__v_J,type,(
+    take_term_f_v: ( nat * list_term_f_v ) > list_term_f_v )).
+
+tff(sy_c_List_Oupt,type,(
+    upt: ( nat * nat ) > list_nat )).
+
+tff(sy_c_Multihole__Context_Ofunas__mctxt_001tf__f_001tf__v,type,(
+    multih192222139xt_f_v: fun_Mu932464934_f_nat )).
+
+tff(sy_c_Multihole__Context_Ohole__poss_001tf__f_001tf__v,type,(
+    multih482138097ss_f_v: multihole_mctxt_f_v > set_pos )).
+
+tff(sy_c_Multihole__Context_Oinf__mctxt__args_001tf__f_001tf__v,type,(
+    multih984015656gs_f_v: ( multihole_mctxt_f_v * multihole_mctxt_f_v ) > list_M276003553xt_f_v )).
+
+tff(sy_c_Multihole__Context_Omctxt_OMFun_001tf__f_001tf__v,type,(
+    multihole_MFun_f_v: ( f * list_M276003553xt_f_v ) > multihole_mctxt_f_v )).
+
+tff(sy_c_Multihole__Context_Omctxt_OMHole_001tf__f_001tf__v,type,(
+    multihole_MHole_f_v: multihole_mctxt_f_v )).
+
+tff(sy_c_Multihole__Context_Omctxt_OMVar_001tf__v_001tf__f,type,(
+    multihole_MVar_v_f: v > multihole_mctxt_f_v )).
+
+tff(sy_c_Multihole__Context_Omctxt_Osize__mctxt_001tf__f_001tf__v,type,(
+    multih975569953xt_f_v: ( fun_f_nat * fun_v_nat ) > fun_Mu1352256958_v_nat )).
+
+tff(sy_c_Multihole__Context_Oposs__mctxt_001tf__f_001tf__v,type,(
+    multih37762601xt_f_v: fun_Mu1999976057et_pos )).
+
+tff(sy_c_Nat_OSuc,type,(
+    suc: fun_nat_nat )).
+
+tff(sy_c_Nat_Osize__class_Osize_001t__List__Olist_It__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_J,type,(
+    size_s1309995859xt_f_v: list_l1119543527xt_f_v > nat )).
+
+tff(sy_c_Nat_Osize__class_Osize_001t__List__Olist_It__List__Olist_It__Nat__Onat_J_J,type,(
+    size_s1898481668st_nat: list_list_nat > nat )).
+
+tff(sy_c_Nat_Osize__class_Osize_001t__List__Olist_It__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J_J,type,(
+    size_s748919191rm_f_v: list_list_term_f_v > nat )).
+
+tff(sy_c_Nat_Osize__class_Osize_001t__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J,type,(
+    size_s1130017613xt_f_v: fun_li1156273860_v_nat )).
+
+tff(sy_c_Nat_Osize__class_Osize_001t__List__Olist_It__Nat__Onat_J,type,(
+    size_size_list_nat: fun_list_nat_nat )).
+
+tff(sy_c_Nat_Osize__class_Osize_001t__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J,type,(
+    size_s693102343rm_f_v: fun_li359001152_v_nat )).
+
+tff(sy_c_Nat_Osize__class_Osize_001t__Position__Opos,type,(
+    size_size_pos: fun_pos_nat )).
+
+tff(sy_c_Num_Onum_OBit0,type,(
+    bit0: num > num )).
+
+tff(sy_c_Num_Onum_OOne,type,(
+    one: num )).
+
+tff(sy_c_Num_Onumeral__class_Onumeral_001t__Nat__Onat,type,(
+    numeral_numeral_nat: num > nat )).
+
+tff(sy_c_Option_Ooption_ONone_001t__Nat__Onat,type,(
+    none_nat: option_nat )).
+
+tff(sy_c_Option_Ooption_OSome_001t__Nat__Onat,type,(
+    some_nat: nat > option_nat )).
+
+tff(sy_c_Option_Ooption_Othe_001t__Nat__Onat,type,(
+    the_nat: option_nat > nat )).
+
+tff(sy_c_Orderings_Obot__class_Obot_001t__Set__Oset_It__Position__Opos_J,type,(
+    bot_bot_set_pos: set_pos )).
+
+tff(sy_c_Orderings_Obot__class_Obot_001t__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J,type,(
+    bot_bo1362251980_f_nat: set_Pr592218680_f_nat )).
+
+tff(sy_c_Orderings_Oord__class_Oless_001t__HOL__Obool,type,(
+    ord_less_bool: bool > fun_bool_bool )).
+
+tff(sy_c_Orderings_Oord__class_Oless_001t__Nat__Onat,type,(
+    ord_less_nat: fun_nat_fun_nat_bool )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__HOL__Obool,type,(
+    ord_less_eq_bool: bool > fun_bool_bool )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    ord_le891359227xt_f_v: multihole_mctxt_f_v > fun_Mu861389503v_bool )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Nat__Onat,type,(
+    ord_less_eq_nat: fun_nat_fun_nat_bool )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J,type,(
+    ord_le2116922008_f_nat: set_Pr592218680_f_nat > fun_se1061273144t_bool )).
+
+tff(sy_c_Orderings_Oord__class_Omin_001t__HOL__Obool,type,(
+    ord_min_bool: bool > fun_bool_bool )).
+
+tff(sy_c_Orderings_Oord__class_Omin_001t__Nat__Onat,type,(
+    ord_min_nat: nat > fun_nat_nat )).
+
+tff(sy_c_Orderings_Oord__class_Omin_001t__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J,type,(
+    ord_mi1157341457_f_nat: set_Pr592218680_f_nat > fun_se529884269_f_nat )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001t__HOL__Obool_001t__HOL__Obool,type,(
+    order_mono_bool_bool: fun_bool_bool > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001t__HOL__Obool_001t__Nat__Onat,type,(
+    order_mono_bool_nat: fun_bool_nat > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001t__HOL__Obool_001t__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J,type,(
+    order_138987359_f_nat: fun_bo1629667938_f_nat > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001t__Nat__Onat_001t__HOL__Obool,type,(
+    order_mono_nat_bool: fun_nat_bool > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001t__Nat__Onat_001t__Nat__Onat,type,(
+    order_mono_nat_nat: fun_nat_nat > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001t__Nat__Onat_001t__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J,type,(
+    order_945249658_f_nat: fun_na1171097349_f_nat > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001t__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J_001t__HOL__Obool,type,(
+    order_66348013t_bool: fun_se1061273144t_bool > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001t__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J_001t__Nat__Onat,type,(
+    order_2082380410at_nat: fun_se463234053at_nat > $o )).
+
+tff(sy_c_Orderings_Oorder__class_Omono_001t__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J_001t__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J,type,(
+    order_1466478306_f_nat: fun_se529884269_f_nat > $o )).
+
+tff(sy_c_Position_Opos_OEmpty,type,(
+    empty: pos )).
+
+tff(sy_c_Position_Opos_OPCons,type,(
+    pCons: fun_nat_fun_pos_pos )).
+
+tff(sy_c_Position_Opos_Osize__pos,type,(
+    size_pos: fun_pos_nat )).
+
+tff(sy_c_Product__Type_OPair_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_001t__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J,type,(
+    produc969282269xt_f_v: ( multihole_mctxt_f_v * list_M276003553xt_f_v ) > produc158841325xt_f_v )).
+
+tff(sy_c_Product__Type_OPair_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_001t__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J,type,(
+    produc401433463rm_f_v: ( multihole_mctxt_f_v * list_term_f_v ) > produc1735533693rm_f_v )).
+
+tff(sy_c_Product__Type_OPair_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_001t__Nat__Onat,type,(
+    produc302379220_v_nat: ( multihole_mctxt_f_v * nat ) > produc424896090_v_nat )).
+
+tff(sy_c_Product__Type_OPair_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_001t__Position__Opos,type,(
+    produc1270057197_v_pos: ( multihole_mctxt_f_v * pos ) > produc1300325373_v_pos )).
+
+tff(sy_c_Product__Type_OPair_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_001t__Product____Type__Oprod_It__Position__Opos_Mt__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J,type,(
+    produc1704173645xt_f_v: ( multihole_mctxt_f_v * produc258583121xt_f_v ) > produc928598493xt_f_v )).
+
+tff(sy_c_Product__Type_OPair_001t__Position__Opos_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    produc1409864257xt_f_v: ( pos * multihole_mctxt_f_v ) > produc258583121xt_f_v )).
+
+tff(sy_c_Product__Type_OPair_001t__Position__Opos_001t__Position__Opos,type,(
+    product_Pair_pos_pos: ( pos * pos ) > product_prod_pos_pos )).
+
+tff(sy_c_Product__Type_OPair_001t__Term__Oterm_Itf__f_Mtf__v_J_001t__Term__Oterm_Itf__f_Mtf__v_J,type,(
+    produc368081759rm_f_v: ( term_f_v * term_f_v ) > produc589042087rm_f_v )).
+
+tff(sy_c_Product__Type_OPair_001tf__f_001t__Nat__Onat,type,(
+    product_Pair_f_nat: ( f * nat ) > product_prod_f_nat )).
+
+tff(sy_c_Product__Type_Oprod_Ocase__prod_001tf__f_001t__Nat__Onat_001t__HOL__Obool,type,(
+    produc1153485486t_bool: fun_f_fun_nat_bool > fun_Pr1604015214t_bool )).
+
+tff(sy_c_Product__Type_Oprod_Ofst_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_001t__Nat__Onat,type,(
+    produc1397634536_v_nat: produc424896090_v_nat > multihole_mctxt_f_v )).
+
+tff(sy_c_Product__Type_Oprod_Ofst_001t__Position__Opos_001t__Position__Opos,type,(
+    product_fst_pos_pos: product_prod_pos_pos > pos )).
+
+tff(sy_c_Product__Type_Oprod_Ofst_001t__Term__Oterm_Itf__f_Mtf__v_J_001t__Term__Oterm_Itf__f_Mtf__v_J,type,(
+    produc1808628555rm_f_v: produc589042087rm_f_v > term_f_v )).
+
+tff(sy_c_Product__Type_Oprod_Ofst_001tf__f_001t__Nat__Onat,type,(
+    product_fst_f_nat: product_prod_f_nat > f )).
+
+tff(sy_c_Product__Type_Oprod_Osnd_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_001t__Nat__Onat,type,(
+    produc703880998_v_nat: produc424896090_v_nat > nat )).
+
+tff(sy_c_Product__Type_Oprod_Osnd_001t__Position__Opos_001t__Position__Opos,type,(
+    product_snd_pos_pos: product_prod_pos_pos > pos )).
+
+tff(sy_c_Product__Type_Oprod_Osnd_001t__Term__Oterm_Itf__f_Mtf__v_J_001t__Term__Oterm_Itf__f_Mtf__v_J,type,(
+    produc1743757709rm_f_v: produc589042087rm_f_v > term_f_v )).
+
+tff(sy_c_Product__Type_Oprod_Osnd_001tf__f_001t__Nat__Onat,type,(
+    product_snd_f_nat: product_prod_f_nat > nat )).
+
+tff(sy_c_Set_OCollect_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    collec1020609606xt_f_v: fun_Mu861389503v_bool > set_Mu1305556667xt_f_v )).
+
+tff(sy_c_Set_OCollect_001t__Position__Opos,type,(
+    collect_pos: fun_pos_bool > set_pos )).
+
+tff(sy_c_Set_OCollect_001t__Product____Type__Oprod_It__Term__Oterm_Itf__f_Mtf__v_J_Mt__Term__Oterm_Itf__f_Mtf__v_J_J,type,(
+    collec525259922rm_f_v: fun_Pr243348851v_bool > set_Pr576123655rm_f_v )).
+
+tff(sy_c_Set_OCollect_001t__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J,type,(
+    collec1032313175_f_nat: fun_Pr1604015214t_bool > set_Pr592218680_f_nat )).
+
+tff(sy_c_Set_Oimage_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_001t__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J,type,(
+    image_1818164302_f_nat: ( fun_Mu932464934_f_nat * set_Mu1305556667xt_f_v ) > set_se1111331566_f_nat )).
+
+tff(sy_c_Set_Oimage_001t__Position__Opos_001t__Position__Opos,type,(
+    image_pos_pos: fun_fu1377063043et_pos )).
+
+tff(sy_c_Set_Oinsert_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    insert1004260907xt_f_v: ( multihole_mctxt_f_v * set_Mu1305556667xt_f_v ) > set_Mu1305556667xt_f_v )).
+
+tff(sy_c_Set_Oinsert_001t__Position__Opos,type,(
+    insert_pos: ( pos * set_pos ) > set_pos )).
+
+tff(sy_c_Set_Oinsert_001t__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J,type,(
+    insert168347826_f_nat: product_prod_f_nat > fun_se529884269_f_nat )).
+
+tff(sy_c_Set_Oinsert_001t__Term__Oterm_Itf__f_Mtf__v_J,type,(
+    insert_term_f_v: ( term_f_v * set_term_f_v ) > set_term_f_v )).
+
+tff(sy_c_Term_Oterm_OFun_001tf__f_001tf__v,type,(
+    fun_f_v: ( f * list_term_f_v ) > term_f_v )).
+
+tff(sy_c_Term_Oterm_OVar_001tf__v_001tf__f,type,(
+    var_v_f: v > term_f_v )).
+
+tff(sy_c_Trs_Ofunas__trs_001tf__f_001tf__v,type,(
+    funas_trs_f_v: set_Pr576123655rm_f_v > set_Pr592218680_f_nat )).
+
+tff(sy_c_Trs_Owf__trs_001tf__f_001tf__v,type,(
+    wf_trs_f_v: set_Pr576123655rm_f_v > $o )).
+
+tff(sy_c_Util_Oadjust__idx__rev,type,(
+    adjust_idx_rev: nat > fun_nat_nat )).
+
+tff(sy_c_Util_Oremove__idx_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    remove1041833647xt_f_v: ( nat * list_M276003553xt_f_v ) > list_M276003553xt_f_v )).
+
+tff(sy_c_Util_Oremove__idx_001t__Nat__Onat,type,(
+    remove_idx_nat: ( nat * list_nat ) > list_nat )).
+
+tff(sy_c_Util_Oremove__idx_001t__Term__Oterm_Itf__f_Mtf__v_J,type,(
+    remove_idx_term_f_v: ( nat * list_term_f_v ) > list_term_f_v )).
+
+tff(sy_c_Wellfounded_Oaccp_001t__Product____Type__Oprod_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_Mt__Position__Opos_J,type,(
+    accp_P1585139078_v_pos: ( fun_Pr1173112749s_bool * produc1300325373_v_pos ) > $o )).
+
+tff(sy_c_Wellfounded_Oaccp_001t__Product____Type__Oprod_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_Mt__Product____Type__Oprod_It__Position__Opos_Mt__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_J,type,(
+    accp_P926708710xt_f_v: ( fun_Pr12508717v_bool * produc928598493xt_f_v ) > $o )).
+
+tff(sy_c_Wellfounded_Omlex__prod_001t__Position__Opos,type,(
+    mlex_prod_pos: ( fun_pos_nat * set_Pr700793927os_pos ) > set_Pr700793927os_pos )).
+
+tff(sy_c_Wellfounded_Omlex__prod_001t__Term__Oterm_Itf__f_Mtf__v_J,type,(
+    mlex_prod_term_f_v: ( fun_term_f_v_nat * set_Pr576123655rm_f_v ) > set_Pr576123655rm_f_v )).
+
+tff(sy_c_aa_001t__HOL__Obool_001t__HOL__Obool,type,(
+    aa_bool_bool: ( fun_bool_bool * bool ) > bool )).
+
+tff(sy_c_aa_001t__HOL__Obool_001t__Nat__Onat,type,(
+    aa_bool_nat: ( fun_bool_nat * bool ) > nat )).
+
+tff(sy_c_aa_001t__HOL__Obool_001t__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J,type,(
+    aa_boo54241171_f_nat: ( fun_bo1629667938_f_nat * bool ) > set_Pr592218680_f_nat )).
+
+tff(sy_c_aa_001t__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_001t__HOL__Obool,type,(
+    aa_lis1678885170v_bool: ( fun_li1550744377v_bool * list_M276003553xt_f_v ) > bool )).
+
+tff(sy_c_aa_001t__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_001t__Nat__Onat,type,(
+    aa_lis1425841141_v_nat: ( fun_li1156273860_v_nat * list_M276003553xt_f_v ) > nat )).
+
+tff(sy_c_aa_001t__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_001t__fun_It__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_Mt__HOL__Obool_J,type,(
+    aa_lis619323870v_bool: ( fun_li984431149v_bool * list_M276003553xt_f_v ) > fun_li1550744377v_bool )).
+
+tff(sy_c_aa_001t__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_001t__fun_It__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J_Mt__HOL__Obool_J,type,(
+    aa_lis367169752v_bool: ( fun_li364704735v_bool * list_M276003553xt_f_v ) > fun_li1075135677v_bool )).
+
+tff(sy_c_aa_001t__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_001t__fun_It__Nat__Onat_Mt__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J,type,(
+    aa_lis3365503xt_f_v: ( fun_li1013598214xt_f_v * list_M276003553xt_f_v ) > fun_na2081747172xt_f_v )).
+
+tff(sy_c_aa_001t__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_001t__fun_It__Nat__Onat_Mt__Set__Oset_It__Position__Opos_J_J,type,(
+    aa_lis1919791221et_pos: ( fun_li136545532et_pos * list_M276003553xt_f_v ) > fun_nat_set_pos )).
+
+tff(sy_c_aa_001t__List__Olist_It__Nat__Onat_J_001t__Nat__Onat,type,(
+    aa_list_nat_nat: ( fun_list_nat_nat * list_nat ) > nat )).
+
+tff(sy_c_aa_001t__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J_001t__HOL__Obool,type,(
+    aa_lis1953671846v_bool: ( fun_li1075135677v_bool * list_term_f_v ) > bool )).
+
+tff(sy_c_aa_001t__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J_001t__Nat__Onat,type,(
+    aa_list_term_f_v_nat: ( fun_li359001152_v_nat * list_term_f_v ) > nat )).
+
+tff(sy_c_aa_001t__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J_001t__fun_It__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_Mt__HOL__Obool_J,type,(
+    aa_lis1235071338v_bool: ( fun_li1377181097v_bool * list_term_f_v ) > fun_li1550744377v_bool )).
+
+tff(sy_c_aa_001t__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J_001t__fun_It__List__Olist_It__Term__Oterm_Itf__f_Mtf__v_J_J_Mt__HOL__Obool_J,type,(
+    aa_lis1264987724v_bool: ( fun_li177176931v_bool * list_term_f_v ) > fun_li1075135677v_bool )).
+
+tff(sy_c_aa_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_001t__HOL__Obool,type,(
+    aa_Mul1846291640v_bool: ( fun_Mu861389503v_bool * multihole_mctxt_f_v ) > bool )).
+
+tff(sy_c_aa_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    aa_Mul1979903100xt_f_v: ( fun_Mu1675924099xt_f_v * multihole_mctxt_f_v ) > multihole_mctxt_f_v )).
+
+tff(sy_c_aa_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_001t__Nat__Onat,type,(
+    aa_Mul588312303_v_nat: ( fun_Mu1352256958_v_nat * multihole_mctxt_f_v ) > nat )).
+
+tff(sy_c_aa_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_001t__Set__Oset_It__Position__Opos_J,type,(
+    aa_Mul1241491826et_pos: ( fun_Mu1999976057et_pos * multihole_mctxt_f_v ) > set_pos )).
+
+tff(sy_c_aa_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_001t__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J,type,(
+    aa_Mul438137431_f_nat: ( fun_Mu932464934_f_nat * multihole_mctxt_f_v ) > set_Pr592218680_f_nat )).
+
+tff(sy_c_aa_001t__Nat__Onat_001t__HOL__Obool,type,(
+    aa_nat_bool: ( fun_nat_bool * nat ) > bool )).
+
+tff(sy_c_aa_001t__Nat__Onat_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    aa_nat291210957xt_f_v: ( fun_na2081747172xt_f_v * nat ) > multihole_mctxt_f_v )).
+
+tff(sy_c_aa_001t__Nat__Onat_001t__Nat__Onat,type,(
+    aa_nat_nat: ( fun_nat_nat * nat ) > nat )).
+
+tff(sy_c_aa_001t__Nat__Onat_001t__Set__Oset_It__Position__Opos_J,type,(
+    aa_nat_set_pos: ( fun_nat_set_pos * nat ) > set_pos )).
+
+tff(sy_c_aa_001t__Nat__Onat_001t__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J,type,(
+    aa_nat1671770182_f_nat: ( fun_na1171097349_f_nat * nat ) > set_Pr592218680_f_nat )).
+
+tff(sy_c_aa_001t__Nat__Onat_001t__Term__Oterm_Itf__f_Mtf__v_J,type,(
+    aa_nat_term_f_v: ( fun_nat_term_f_v * nat ) > term_f_v )).
+
+tff(sy_c_aa_001t__Nat__Onat_001t__fun_It__Nat__Onat_Mt__HOL__Obool_J,type,(
+    aa_nat_fun_nat_bool: ( fun_nat_fun_nat_bool * nat ) > fun_nat_bool )).
+
+tff(sy_c_aa_001t__Nat__Onat_001t__fun_It__Position__Opos_Mt__Position__Opos_J,type,(
+    aa_nat_fun_pos_pos: ( fun_nat_fun_pos_pos * nat ) > fun_pos_pos )).
+
+tff(sy_c_aa_001t__Nat__Onat_001t__fun_It__Set__Oset_It__Position__Opos_J_Mt__Set__Oset_It__Position__Opos_J_J,type,(
+    aa_nat1661677329et_pos: ( fun_na964512336et_pos * nat ) > fun_set_pos_set_pos )).
+
+tff(sy_c_aa_001t__Position__Opos_001t__HOL__Obool,type,(
+    aa_pos_bool: ( fun_pos_bool * pos ) > bool )).
+
+tff(sy_c_aa_001t__Position__Opos_001t__Nat__Onat,type,(
+    aa_pos_nat: ( fun_pos_nat * pos ) > nat )).
+
+tff(sy_c_aa_001t__Position__Opos_001t__Position__Opos,type,(
+    aa_pos_pos: ( fun_pos_pos * pos ) > pos )).
+
+tff(sy_c_aa_001t__Product____Type__Oprod_It__Term__Oterm_Itf__f_Mtf__v_J_Mt__Term__Oterm_Itf__f_Mtf__v_J_J_001t__HOL__Obool,type,(
+    aa_Pro1758283628v_bool: ( fun_Pr243348851v_bool * produc589042087rm_f_v ) > bool )).
+
+tff(sy_c_aa_001t__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_001t__HOL__Obool,type,(
+    aa_Pro335067735t_bool: ( fun_Pr1604015214t_bool * product_prod_f_nat ) > bool )).
+
+tff(sy_c_aa_001t__Set__Oset_It__Position__Opos_J_001t__Set__Oset_It__Position__Opos_J,type,(
+    aa_set_pos_set_pos: ( fun_set_pos_set_pos * set_pos ) > set_pos )).
+
+tff(sy_c_aa_001t__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J_001t__HOL__Obool,type,(
+    aa_set2129085473t_bool: ( fun_se1061273144t_bool * set_Pr592218680_f_nat ) > bool )).
+
+tff(sy_c_aa_001t__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J_001t__Nat__Onat,type,(
+    aa_set661417286at_nat: ( fun_se463234053at_nat * set_Pr592218680_f_nat ) > nat )).
+
+tff(sy_c_aa_001t__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J_001t__Set__Oset_It__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J_J,type,(
+    aa_set1604101550_f_nat: ( fun_se529884269_f_nat * set_Pr592218680_f_nat ) > set_Pr592218680_f_nat )).
+
+tff(sy_c_aa_001t__Term__Oterm_Itf__f_Mtf__v_J_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    aa_ter2005782522xt_f_v: ( fun_te615323153xt_f_v * term_f_v ) > multihole_mctxt_f_v )).
+
+tff(sy_c_aa_001t__Term__Oterm_Itf__f_Mtf__v_J_001t__Nat__Onat,type,(
+    aa_term_f_v_nat: ( fun_term_f_v_nat * term_f_v ) > nat )).
+
+tff(sy_c_aa_001t__fun_It__Nat__Onat_Mt__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_001t__fun_It__Nat__Onat_Mt__Set__Oset_It__Position__Opos_J_J,type,(
+    aa_fun2063682738et_pos: ( fun_fu376057145et_pos * fun_na2081747172xt_f_v ) > fun_nat_set_pos )).
+
+tff(sy_c_aa_001t__fun_It__Nat__Onat_Mt__Set__Oset_It__Position__Opos_J_J_001t__fun_It__Nat__Onat_Mt__Set__Oset_It__Position__Opos_J_J,type,(
+    aa_fun1395737148et_pos: ( fun_fu1023870659et_pos * fun_nat_set_pos ) > fun_nat_set_pos )).
+
+tff(sy_c_aa_001t__fun_It__Position__Opos_Mt__Position__Opos_J_001t__fun_It__Set__Oset_It__Position__Opos_J_Mt__Set__Oset_It__Position__Opos_J_J,type,(
+    aa_fun814674244et_pos: ( fun_fu1377063043et_pos * fun_pos_pos ) > fun_set_pos_set_pos )).
+
+tff(sy_c_aa_001tf__f_001t__Option__Ooption_It__Nat__Onat_J,type,(
+    aa_f_option_nat: ( fun_f_option_nat * f ) > option_nat )).
+
+tff(sy_c_aa_001tf__f_001t__fun_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_Mt__HOL__Obool_J,type,(
+    aa_f_f1445875462v_bool: ( fun_f_1116233301v_bool * f ) > fun_Mu861389503v_bool )).
+
+tff(sy_c_aa_001tf__f_001t__fun_It__Nat__Onat_Mt__HOL__Obool_J,type,(
+    aa_f_fun_nat_bool: ( fun_f_fun_nat_bool * f ) > fun_nat_bool )).
+
+tff(sy_c_aa_001tf__v_001t__Nat__Onat,type,(
+    aa_v_nat: ( fun_v_nat * v ) > nat )).
+
+tff(sy_c_fFalse,type,(
+    fFalse: bool )).
+
+tff(sy_c_fTrue,type,(
+    fTrue: bool )).
+
+tff(sy_c_member_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J,type,(
+    member995025156xt_f_v: ( multihole_mctxt_f_v * set_Mu1305556667xt_f_v ) > $o )).
+
+tff(sy_c_member_001t__Position__Opos,type,(
+    member_pos: ( pos * set_pos ) > $o )).
+
+tff(sy_c_member_001t__Product____Type__Oprod_It__Position__Opos_Mt__Position__Opos_J,type,(
+    member1236036240os_pos: ( product_prod_pos_pos * set_Pr700793927os_pos ) > $o )).
+
+tff(sy_c_member_001t__Product____Type__Oprod_It__Term__Oterm_Itf__f_Mtf__v_J_Mt__Term__Oterm_Itf__f_Mtf__v_J_J,type,(
+    member816187216rm_f_v: ( produc589042087rm_f_v * set_Pr576123655rm_f_v ) > $o )).
+
+tff(sy_c_member_001t__Product____Type__Oprod_Itf__f_Mt__Nat__Onat_J,type,(
+    member2050190361_f_nat: product_prod_f_nat > fun_se1061273144t_bool )).
+
+tff(sy_c_member_001t__Term__Oterm_Itf__f_Mtf__v_J,type,(
+    member_term_f_v: ( term_f_v * set_term_f_v ) > $o )).
+
+tff(sy_c_pp,type,(
+    pp: bool > $o )).
+
+tff(sy_v_Ap,type,(
+    ap: f )).
+
+tff(sy_v_C,type,(
+    c: multihole_mctxt_f_v )).
+
+tff(sy_v_Cs____,type,(
+    cs: list_M276003553xt_f_v )).
+
+tff(sy_v__092_060R_062,type,(
+    r: set_Pr576123655rm_f_v )).
+
+tff(sy_v_f____,type,(
+    f2: f )).
+
+tff(sy_v_i____,type,(
+    i: nat )).
+
+tff(sy_v_p,type,(
+    p: pos )).
+
+tff(sy_v_pa____,type,(
+    pa: pos )).
+
+tff(sy_v_sigF,type,(
+    sigF: fun_f_option_nat )).
+
+tff(sy_v_thesis____,type,(
+    thesis: $o )).
+
+tff(sy_v_x,type,(
+    x: v )).
+
+tff(fact_0__092_060LL_062_092_060_094sub_0622_Osimps,axiom,(
+    ! [A: multihole_mctxt_f_v] : 
+      ( pp(aa_Mul1846291640v_bool(pp_LL_2_f_v(sigF,ap),A))
+    <=> ( ? [C: multihole_mctxt_f_v] : 
+            ( A = multihole_MFun_f_v(ap,cons_M10820881xt_f_v(multihole_MHole_f_v,cons_M10820881xt_f_v(C,nil_Mu1963645281xt_f_v)))
+            & pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(sigF,ap),C)) )
+        | ? [C: multihole_mctxt_f_v,X: v] : 
+            ( A = multihole_MFun_f_v(ap,cons_M10820881xt_f_v(multihole_MVar_v_f(X),cons_M10820881xt_f_v(C,nil_Mu1963645281xt_f_v)))
+            & pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(sigF,ap),C)) ) ) ) )).
+
+tff(fact_1_assms,axiom,(
+    member_pos(p,aa_Mul1241491826et_pos(multih37762601xt_f_v,c)) )).
+
+tff(fact_2__092_060open_062i_A_060_D_Ap_A_092_060in_062_Aposs__mctxt_A_IMFun_Af_ACs_J_092_060close_062,axiom,(
+    member_pos(aa_pos_pos(aa_nat_fun_pos_pos(pCons,i),pa),aa_Mul1241491826et_pos(multih37762601xt_f_v,multihole_MFun_f_v(f2,cs))) )).
+
+tff(fact_3__092_060open_062mreplace__at_A_IMFun_Af_ACs_J_A_Ii_A_060_D_Ap_J_A_IMVar_Ax_J_A_061_AMFun_AAp_A_Itake_Ai_ACs_A_064_Amreplace__at_A_ICs_A_B_Ai_J_Ap_A_IMVar_Ax_J_A_D_Adrop_A_Ii_A_L_A1_J_ACs_J_092_060close_062,axiom,(
+    aa_Mul1979903100xt_f_v(lS_mreplace_at_f_v(multihole_MFun_f_v(f2,cs),aa_pos_pos(aa_nat_fun_pos_pos(pCons,i),pa)),multihole_MVar_v_f(x)) = multihole_MFun_f_v(ap,append460316534xt_f_v(take_M241671497xt_f_v(i,cs),cons_M10820881xt_f_v(aa_Mul1979903100xt_f_v(lS_mreplace_at_f_v(aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,cs),i),pa),multihole_MVar_v_f(x)),drop_M1817411233xt_f_v(aa_nat_nat(plus_plus_nat(i),one_one_nat),cs)))) )).
+
+tff(fact_4_that_I1_J,axiom,
+    ( i = zero_zero_nat
+   => thesis )).
+
+tff(fact_5__092_060open_062f_A_061_AAp_092_060close_062,axiom,(
+    f2 = ap )).
+
+tff(fact_6_in___092_060LL_062_092_060_094sub_0622,axiom,(
+    pp(aa_Mul1846291640v_bool(pp_LL_2_f_v(sigF,ap),aa_Mul1979903100xt_f_v(lS_mreplace_at_f_v(multihole_MFun_f_v(f2,cs),aa_pos_pos(aa_nat_fun_pos_pos(pCons,i),pa)),multihole_MVar_v_f(x)))) )).
+
+tff(fact_7_that_I2_J,axiom,
+    ( i = aa_nat_nat(suc,zero_zero_nat)
+   => thesis )).
+
+tff(fact_8_mreplace__at_Osimps_I2_J,axiom,(
+    ! [F: f,Cs: list_M276003553xt_f_v,I: nat,P: pos,D: multihole_mctxt_f_v] : aa_Mul1979903100xt_f_v(lS_mreplace_at_f_v(multihole_MFun_f_v(F,Cs),aa_pos_pos(aa_nat_fun_pos_pos(pCons,I),P)),D) = multihole_MFun_f_v(F,append460316534xt_f_v(take_M241671497xt_f_v(I,Cs),cons_M10820881xt_f_v(aa_Mul1979903100xt_f_v(lS_mreplace_at_f_v(aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Cs),I),P),D),drop_M1817411233xt_f_v(aa_nat_nat(plus_plus_nat(I),one_one_nat),Cs)))) )).
+
+tff(fact_9__C2_Ohyps_C,axiom,
+    ( member_pos(pa,aa_Mul1241491826et_pos(multih37762601xt_f_v,aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,cs),i)))
+   => ( pp(aa_Mul1846291640v_bool(pp_LL_2_f_v(sigF,ap),aa_Mul1979903100xt_f_v(lS_mreplace_at_f_v(aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,cs),i),pa),multihole_MVar_v_f(x))))
+    <=> pp(aa_Mul1846291640v_bool(pp_LL_2_f_v(sigF,ap),aa_Mul1979903100xt_f_v(lS_mreplace_at_f_v(aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,cs),i),pa),multihole_MHole_f_v))) ) )).
+
+tff(fact_10__092_060LL_062_092_060_094sub_0621_Omvar,axiom,(
+    ! [X2: v] : pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(sigF,ap),multihole_MVar_v_f(X2))) )).
+
+tff(fact_11_mreplace__at_Oelims,axiom,(
+    ! [X2: multihole_mctxt_f_v,Xa: pos,Xb: multihole_mctxt_f_v,Y: multihole_mctxt_f_v] : 
+      ( aa_Mul1979903100xt_f_v(lS_mreplace_at_f_v(X2,Xa),Xb) = Y
+     => ( ( Xa = empty
+         => Y != Xb )
+       => ( ! [F2: f,Cs2: list_M276003553xt_f_v] : 
+              ( X2 = multihole_MFun_f_v(F2,Cs2)
+             => ! [I2: nat,P2: pos] : 
+                  ( Xa = aa_pos_pos(aa_nat_fun_pos_pos(pCons,I2),P2)
+                 => Y != multihole_MFun_f_v(F2,append460316534xt_f_v(take_M241671497xt_f_v(I2,Cs2),cons_M10820881xt_f_v(aa_Mul1979903100xt_f_v(lS_mreplace_at_f_v(aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Cs2),I2),P2),Xb),drop_M1817411233xt_f_v(aa_nat_nat(plus_plus_nat(I2),one_one_nat),Cs2)))) ) )
+         => ( ( ? [Vb: v] : X2 = multihole_MVar_v_f(Vb)
+             => ( ? [V: nat,Va: pos] : Xa = aa_pos_pos(aa_nat_fun_pos_pos(pCons,V),Va)
+               => Y != undefi637609667xt_f_v ) )
+           => ~ ( X2 = multihole_MHole_f_v
+               => ( ? [V: nat,Va: pos] : Xa = aa_pos_pos(aa_nat_fun_pos_pos(pCons,V),Va)
+                 => Y != undefi637609667xt_f_v ) ) ) ) ) ) )).
+
+tff(fact_12_replacing__var__holes1,axiom,(
+    ! [P: pos,C2: multihole_mctxt_f_v,X2: v] : 
+      ( member_pos(P,aa_Mul1241491826et_pos(multih37762601xt_f_v,C2))
+     => ( pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(sigF,ap),aa_Mul1979903100xt_f_v(lS_mreplace_at_f_v(C2,P),multihole_MVar_v_f(X2))))
+      <=> pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(sigF,ap),aa_Mul1979903100xt_f_v(lS_mreplace_at_f_v(C2,P),multihole_MHole_f_v))) ) ) )).
+
+tff(fact_13__092_060LL_062_092_060_094sub_0621_Omhole,axiom,(
+    pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(sigF,ap),multihole_MHole_f_v)) )).
+
+tff(fact_14_mctxt_Oinject_I2_J,axiom,(
+    ! [X31: f,X32: list_M276003553xt_f_v,Y31: f,Y32: list_M276003553xt_f_v] : 
+      ( multihole_MFun_f_v(X31,X32) = multihole_MFun_f_v(Y31,Y32)
+    <=> ( X31 = Y31
+        & X32 = Y32 ) ) )).
+
+tff(fact_15__092_060LL_062_092_060_094sub_0622_Ocases,axiom,(
+    ! [A: multihole_mctxt_f_v] : 
+      ( pp(aa_Mul1846291640v_bool(pp_LL_2_f_v(sigF,ap),A))
+     => ( ! [C3: multihole_mctxt_f_v] : 
+            ( A = multihole_MFun_f_v(ap,cons_M10820881xt_f_v(multihole_MHole_f_v,cons_M10820881xt_f_v(C3,nil_Mu1963645281xt_f_v)))
+           => ~ pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(sigF,ap),C3)) )
+       => ~ ( ! [C3: multihole_mctxt_f_v] : 
+                ( ? [X3: v] : A = multihole_MFun_f_v(ap,cons_M10820881xt_f_v(multihole_MVar_v_f(X3),cons_M10820881xt_f_v(C3,nil_Mu1963645281xt_f_v)))
+               => ~ pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(sigF,ap),C3)) ) ) ) ) )).
+
+tff(fact_16_mctxt_Odistinct_I5_J,axiom,(
+    ! [X31: f,X32: list_M276003553xt_f_v] : 
+      multihole_MHole_f_v != multihole_MFun_f_v(X31,X32) )).
+
+tff(fact_17__092_060LL_062_092_060_094sub_0622_Omhole,axiom,(
+    ! [C2: multihole_mctxt_f_v] : 
+      ( pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(sigF,ap),C2))
+     => pp(aa_Mul1846291640v_bool(pp_LL_2_f_v(sigF,ap),multihole_MFun_f_v(ap,cons_M10820881xt_f_v(multihole_MHole_f_v,cons_M10820881xt_f_v(C2,nil_Mu1963645281xt_f_v))))) ) )).
+
+tff(fact_18__092_060LL_062_092_060_094sub_0622_Omvar,axiom,(
+    ! [C2: multihole_mctxt_f_v,X2: v] : 
+      ( pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(sigF,ap),C2))
+     => pp(aa_Mul1846291640v_bool(pp_LL_2_f_v(sigF,ap),multihole_MFun_f_v(ap,cons_M10820881xt_f_v(multihole_MVar_v_f(X2),cons_M10820881xt_f_v(C2,nil_Mu1963645281xt_f_v))))) ) )).
+
+tff(fact_19_append__take__drop__id,axiom,(
+    ! [N: nat,Xs: list_nat] : append_nat(take_nat(N,Xs),drop_nat(N,Xs)) = Xs )).
+
+tff(fact_20_append__take__drop__id,axiom,(
+    ! [N: nat,Xs: list_M276003553xt_f_v] : append460316534xt_f_v(take_M241671497xt_f_v(N,Xs),drop_M1817411233xt_f_v(N,Xs)) = Xs )).
+
+tff(fact_21_append__take__drop__id,axiom,(
+    ! [N: nat,Xs: list_term_f_v] : append_term_f_v(take_term_f_v(N,Xs),drop_term_f_v(N,Xs)) = Xs )).
+
+tff(fact_22_pp__cr_O_092_060LL_062_092_060_094sub_0621_Ointros_I3_J,axiom,(
+    ! [SigF: fun_f_option_nat,R: set_Pr576123655rm_f_v,Ap: f,F: f,M: nat,Cs: list_M276003553xt_f_v] : 
+      ( pp_cr_f_v(SigF,R,Ap)
+     => ( pp(aa_set2129085473t_bool(member2050190361_f_nat(product_Pair_f_nat(F,M)),aa_set1604101550_f_nat(minus_140170257_f_nat(pp_F_U_f(SigF,Ap)),aa_set1604101550_f_nat(insert168347826_f_nat(product_Pair_f_nat(Ap,numeral_numeral_nat(bit0(one)))),bot_bo1362251980_f_nat))))
+       => ( aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Cs) = M
+         => ( ! [X3: multihole_mctxt_f_v] : 
+                ( member995025156xt_f_v(X3,set_Mu1483390320xt_f_v(Cs))
+               => pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(SigF,Ap),X3)) )
+           => pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(SigF,Ap),multihole_MFun_f_v(F,Cs))) ) ) ) ) )).
+
+tff(fact_23_pp__cr_O_092_060LL_062_092_060_094sub_0622_Omvar,axiom,(
+    ! [SigF: fun_f_option_nat,R: set_Pr576123655rm_f_v,Ap: f,C2: multihole_mctxt_f_v,X2: v] : 
+      ( pp_cr_f_v(SigF,R,Ap)
+     => ( pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(SigF,Ap),C2))
+       => pp(aa_Mul1846291640v_bool(pp_LL_2_f_v(SigF,Ap),multihole_MFun_f_v(Ap,cons_M10820881xt_f_v(multihole_MVar_v_f(X2),cons_M10820881xt_f_v(C2,nil_Mu1963645281xt_f_v))))) ) ) )).
+
+tff(fact_24_nth__append__take,axiom,(
+    ! [I: nat,Xs: list_M276003553xt_f_v,Y: multihole_mctxt_f_v,Ys: list_M276003553xt_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,I),aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)))
+     => aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,append460316534xt_f_v(take_M241671497xt_f_v(I,Xs),cons_M10820881xt_f_v(Y,Ys))),I) = Y ) )).
+
+tff(fact_25_nth__append__take,axiom,(
+    ! [I: nat,Xs: list_term_f_v,Y: term_f_v,Ys: list_term_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,I),aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)))
+     => aa_nat_term_f_v(nth_term_f_v(append_term_f_v(take_term_f_v(I,Xs),cons_term_f_v(Y,Ys))),I) = Y ) )).
+
+tff(fact_26_nth__append__take,axiom,(
+    ! [I: nat,Xs: list_nat,Y: nat,Ys: list_nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,I),aa_list_nat_nat(size_size_list_nat,Xs)))
+     => aa_nat_nat(nth_nat(append_nat(take_nat(I,Xs),cons_nat(Y,Ys))),I) = Y ) )).
+
+tff(fact_27_addAp,axiom,(
+    ! [C2: multihole_mctxt_f_v,C4: multihole_mctxt_f_v] : 
+      ( pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(sigF,ap),C2))
+     => ( pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(sigF,ap),C4))
+       => ( pp(aa_nat_bool(pp_missing_args_f_v(sigF,ap,C2),zero_zero_nat))
+         => pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(sigF,ap),multihole_MFun_f_v(ap,cons_M10820881xt_f_v(C2,cons_M10820881xt_f_v(C4,nil_Mu1963645281xt_f_v))))) ) ) ) )).
+
+tff(fact_28_list_Oinject,axiom,(
+    ! [X21: multihole_mctxt_f_v,X22: list_M276003553xt_f_v,Y21: multihole_mctxt_f_v,Y22: list_M276003553xt_f_v] : 
+      ( cons_M10820881xt_f_v(X21,X22) = cons_M10820881xt_f_v(Y21,Y22)
+    <=> ( X21 = Y21
+        & X22 = Y22 ) ) )).
+
+tff(fact_29_list_Oinject,axiom,(
+    ! [X21: term_f_v,X22: list_term_f_v,Y21: term_f_v,Y22: list_term_f_v] : 
+      ( cons_term_f_v(X21,X22) = cons_term_f_v(Y21,Y22)
+    <=> ( X21 = Y21
+        & X22 = Y22 ) ) )).
+
+tff(fact_30_mctxt_Odistinct_I3_J,axiom,(
+    ! [X1: v,X31: f,X32: list_M276003553xt_f_v] : 
+      multihole_MVar_v_f(X1) != multihole_MFun_f_v(X31,X32) )).
+
+tff(fact_31_nth__Cons__0,axiom,(
+    ! [X2: nat,Xs: list_nat] : aa_nat_nat(nth_nat(cons_nat(X2,Xs)),zero_zero_nat) = X2 )).
+
+tff(fact_32_nth__Cons__0,axiom,(
+    ! [X2: multihole_mctxt_f_v,Xs: list_M276003553xt_f_v] : aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,cons_M10820881xt_f_v(X2,Xs)),zero_zero_nat) = X2 )).
+
+tff(fact_33_nth__Cons__0,axiom,(
+    ! [X2: term_f_v,Xs: list_term_f_v] : aa_nat_term_f_v(nth_term_f_v(cons_term_f_v(X2,Xs)),zero_zero_nat) = X2 )).
+
+tff(fact_34_less__or__eq__imp__le,axiom,(
+    ! [M: nat,N: nat] : 
+      ( ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,M),N))
+        | M = N )
+     => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,M),N)) ) )).
+
+tff(fact_35_pp__cr_O_092_060LL_062_092_060_094sub_0622_Omhole,axiom,(
+    ! [SigF: fun_f_option_nat,R: set_Pr576123655rm_f_v,Ap: f,C2: multihole_mctxt_f_v] : 
+      ( pp_cr_f_v(SigF,R,Ap)
+     => ( pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(SigF,Ap),C2))
+       => pp(aa_Mul1846291640v_bool(pp_LL_2_f_v(SigF,Ap),multihole_MFun_f_v(Ap,cons_M10820881xt_f_v(multihole_MHole_f_v,cons_M10820881xt_f_v(C2,nil_Mu1963645281xt_f_v))))) ) ) )).
+
+tff(fact_36_drop__Suc__Cons,axiom,(
+    ! [N: nat,X2: nat,Xs: list_nat] : drop_nat(aa_nat_nat(suc,N),cons_nat(X2,Xs)) = drop_nat(N,Xs) )).
+
+tff(fact_37_drop__Suc__Cons,axiom,(
+    ! [N: nat,X2: multihole_mctxt_f_v,Xs: list_M276003553xt_f_v] : drop_M1817411233xt_f_v(aa_nat_nat(suc,N),cons_M10820881xt_f_v(X2,Xs)) = drop_M1817411233xt_f_v(N,Xs) )).
+
+tff(fact_38_drop__Suc__Cons,axiom,(
+    ! [N: nat,X2: term_f_v,Xs: list_term_f_v] : drop_term_f_v(aa_nat_nat(suc,N),cons_term_f_v(X2,Xs)) = drop_term_f_v(N,Xs) )).
+
+tff(fact_39_length__take,axiom,(
+    ! [N: nat,Xs: list_M276003553xt_f_v] : aa_lis1425841141_v_nat(size_s1130017613xt_f_v,take_M241671497xt_f_v(N,Xs)) = aa_nat_nat(ord_min_nat(aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)),N) )).
+
+tff(fact_40_length__take,axiom,(
+    ! [N: nat,Xs: list_term_f_v] : aa_list_term_f_v_nat(size_s693102343rm_f_v,take_term_f_v(N,Xs)) = aa_nat_nat(ord_min_nat(aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)),N) )).
+
+tff(fact_41_length__take,axiom,(
+    ! [N: nat,Xs: list_nat] : aa_list_nat_nat(size_size_list_nat,take_nat(N,Xs)) = aa_nat_nat(ord_min_nat(aa_list_nat_nat(size_size_list_nat,Xs)),N) )).
+
+tff(fact_42_mem__Collect__eq,axiom,(
+    ! [A: pos,P3: fun_pos_bool] : 
+      ( member_pos(A,collect_pos(P3))
+    <=> pp(aa_pos_bool(P3,A)) ) )).
+
+tff(fact_43_mem__Collect__eq,axiom,(
+    ! [A: product_prod_f_nat,P3: fun_Pr1604015214t_bool] : 
+      ( pp(aa_set2129085473t_bool(member2050190361_f_nat(A),collec1032313175_f_nat(P3)))
+    <=> pp(aa_Pro335067735t_bool(P3,A)) ) )).
+
+tff(fact_44_mem__Collect__eq,axiom,(
+    ! [A: multihole_mctxt_f_v,P3: fun_Mu861389503v_bool] : 
+      ( member995025156xt_f_v(A,collec1020609606xt_f_v(P3))
+    <=> pp(aa_Mul1846291640v_bool(P3,A)) ) )).
+
+tff(fact_45_mem__Collect__eq,axiom,(
+    ! [A: produc589042087rm_f_v,P3: fun_Pr243348851v_bool] : 
+      ( member816187216rm_f_v(A,collec525259922rm_f_v(P3))
+    <=> pp(aa_Pro1758283628v_bool(P3,A)) ) )).
+
+tff(fact_46_list_Osize_I3_J,axiom,(
+    aa_lis1425841141_v_nat(size_s1130017613xt_f_v,nil_Mu1963645281xt_f_v) = zero_zero_nat )).
+
+tff(fact_47_list_Osize_I3_J,axiom,(
+    aa_list_term_f_v_nat(size_s693102343rm_f_v,nil_term_f_v) = zero_zero_nat )).
+
+tff(fact_48_list_Osize_I3_J,axiom,(
+    aa_list_nat_nat(size_size_list_nat,nil_nat) = zero_zero_nat )).
+
+tff(fact_49_take__0,axiom,(
+    ! [Xs: list_nat] : take_nat(zero_zero_nat,Xs) = nil_nat )).
+
+tff(fact_50_take__0,axiom,(
+    ! [Xs: list_M276003553xt_f_v] : take_M241671497xt_f_v(zero_zero_nat,Xs) = nil_Mu1963645281xt_f_v )).
+
+tff(fact_51_take__0,axiom,(
+    ! [Xs: list_term_f_v] : take_term_f_v(zero_zero_nat,Xs) = nil_term_f_v )).
+
+tff(fact_52_add__Suc__right,axiom,(
+    ! [M: nat,N: nat] : aa_nat_nat(plus_plus_nat(M),aa_nat_nat(suc,N)) = aa_nat_nat(suc,aa_nat_nat(plus_plus_nat(M),N)) )).
+
+tff(fact_53_take__Suc__Cons,axiom,(
+    ! [N: nat,X2: nat,Xs: list_nat] : take_nat(aa_nat_nat(suc,N),cons_nat(X2,Xs)) = cons_nat(X2,take_nat(N,Xs)) )).
+
+tff(fact_54_take__Suc__Cons,axiom,(
+    ! [N: nat,X2: multihole_mctxt_f_v,Xs: list_M276003553xt_f_v] : take_M241671497xt_f_v(aa_nat_nat(suc,N),cons_M10820881xt_f_v(X2,Xs)) = cons_M10820881xt_f_v(X2,take_M241671497xt_f_v(N,Xs)) )).
+
+tff(fact_55_take__Suc__Cons,axiom,(
+    ! [N: nat,X2: term_f_v,Xs: list_term_f_v] : take_term_f_v(aa_nat_nat(suc,N),cons_term_f_v(X2,Xs)) = cons_term_f_v(X2,take_term_f_v(N,Xs)) )).
+
+tff(fact_56_append__Nil,axiom,(
+    ! [Ys: list_M276003553xt_f_v] : append460316534xt_f_v(nil_Mu1963645281xt_f_v,Ys) = Ys )).
+
+tff(fact_57_append__Nil,axiom,(
+    ! [Ys: list_term_f_v] : append_term_f_v(nil_term_f_v,Ys) = Ys )).
+
+tff(fact_58_List_Oappend__assoc,axiom,(
+    ! [Xs: list_M276003553xt_f_v,Ys: list_M276003553xt_f_v,Zs: list_M276003553xt_f_v] : append460316534xt_f_v(append460316534xt_f_v(Xs,Ys),Zs) = append460316534xt_f_v(Xs,append460316534xt_f_v(Ys,Zs)) )).
+
+tff(fact_59_List_Oappend__assoc,axiom,(
+    ! [Xs: list_term_f_v,Ys: list_term_f_v,Zs: list_term_f_v] : append_term_f_v(append_term_f_v(Xs,Ys),Zs) = append_term_f_v(Xs,append_term_f_v(Ys,Zs)) )).
+
+tff(fact_60_add_Oright__neutral,axiom,(
+    ! [A: nat] : aa_nat_nat(plus_plus_nat(A),zero_zero_nat) = A )).
+
+tff(fact_61_nth__Cons__Suc,axiom,(
+    ! [X2: nat,Xs: list_nat,N: nat] : aa_nat_nat(nth_nat(cons_nat(X2,Xs)),aa_nat_nat(suc,N)) = aa_nat_nat(nth_nat(Xs),N) )).
+
+tff(fact_62_nth__Cons__Suc,axiom,(
+    ! [X2: multihole_mctxt_f_v,Xs: list_M276003553xt_f_v,N: nat] : aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,cons_M10820881xt_f_v(X2,Xs)),aa_nat_nat(suc,N)) = aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Xs),N) )).
+
+tff(fact_63_nth__Cons__Suc,axiom,(
+    ! [X2: term_f_v,Xs: list_term_f_v,N: nat] : aa_nat_term_f_v(nth_term_f_v(cons_term_f_v(X2,Xs)),aa_nat_nat(suc,N)) = aa_nat_term_f_v(nth_term_f_v(Xs),N) )).
+
+tff(fact_64_pp__cr_O_092_060LL_062_092_060_094sub_0622_Ocases,axiom,(
+    ! [SigF: fun_f_option_nat,R: set_Pr576123655rm_f_v,Ap: f,A: multihole_mctxt_f_v] : 
+      ( pp_cr_f_v(SigF,R,Ap)
+     => ( pp(aa_Mul1846291640v_bool(pp_LL_2_f_v(SigF,Ap),A))
+       => ( ! [C3: multihole_mctxt_f_v] : 
+              ( A = multihole_MFun_f_v(Ap,cons_M10820881xt_f_v(multihole_MHole_f_v,cons_M10820881xt_f_v(C3,nil_Mu1963645281xt_f_v)))
+             => ~ pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(SigF,Ap),C3)) )
+         => ~ ( ! [C3: multihole_mctxt_f_v] : 
+                  ( ? [X3: v] : A = multihole_MFun_f_v(Ap,cons_M10820881xt_f_v(multihole_MVar_v_f(X3),cons_M10820881xt_f_v(C3,nil_Mu1963645281xt_f_v)))
+                 => ~ pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(SigF,Ap),C3)) ) ) ) ) ) )).
+
+tff(fact_65_length__greater__0__conv,axiom,(
+    ! [Xs: list_M276003553xt_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,zero_zero_nat),aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)))
+    <=> Xs != nil_Mu1963645281xt_f_v ) )).
+
+tff(fact_66_length__greater__0__conv,axiom,(
+    ! [Xs: list_term_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,zero_zero_nat),aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)))
+    <=> Xs != nil_term_f_v ) )).
+
+tff(fact_67_length__greater__0__conv,axiom,(
+    ! [Xs: list_nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,zero_zero_nat),aa_list_nat_nat(size_size_list_nat,Xs)))
+    <=> Xs != nil_nat ) )).
+
+tff(fact_68_append__Nil2,axiom,(
+    ! [Xs: list_M276003553xt_f_v] : append460316534xt_f_v(Xs,nil_Mu1963645281xt_f_v) = Xs )).
+
+tff(fact_69_append__Nil2,axiom,(
+    ! [Xs: list_term_f_v] : append_term_f_v(Xs,nil_term_f_v) = Xs )).
+
+tff(fact_70_List_Osame__append__eq,axiom,(
+    ! [Xs: list_M276003553xt_f_v,Ys: list_M276003553xt_f_v,Zs: list_M276003553xt_f_v] : 
+      ( append460316534xt_f_v(Xs,Ys) = append460316534xt_f_v(Xs,Zs)
+    <=> Ys = Zs ) )).
+
+tff(fact_71_List_Osame__append__eq,axiom,(
+    ! [Xs: list_term_f_v,Ys: list_term_f_v,Zs: list_term_f_v] : 
+      ( append_term_f_v(Xs,Ys) = append_term_f_v(Xs,Zs)
+    <=> Ys = Zs ) )).
+
+tff(fact_72_pp__cr_O_092_060LL_062_092_060_094sub_0622_Osimps,axiom,(
+    ! [SigF: fun_f_option_nat,R: set_Pr576123655rm_f_v,Ap: f,A: multihole_mctxt_f_v] : 
+      ( pp_cr_f_v(SigF,R,Ap)
+     => ( pp(aa_Mul1846291640v_bool(pp_LL_2_f_v(SigF,Ap),A))
+      <=> ( ? [C: multihole_mctxt_f_v] : 
+              ( A = multihole_MFun_f_v(Ap,cons_M10820881xt_f_v(multihole_MHole_f_v,cons_M10820881xt_f_v(C,nil_Mu1963645281xt_f_v)))
+              & pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(SigF,Ap),C)) )
+          | ? [C: multihole_mctxt_f_v,X: v] : 
+              ( A = multihole_MFun_f_v(Ap,cons_M10820881xt_f_v(multihole_MVar_v_f(X),cons_M10820881xt_f_v(C,nil_Mu1963645281xt_f_v)))
+              & pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(SigF,Ap),C)) ) ) ) ) )).
+
+tff(fact_73_pp__cr_O_092_060LL_062_092_060_094sub_0621_Osimps,axiom,(
+    ! [SigF: fun_f_option_nat,R: set_Pr576123655rm_f_v,Ap: f,A: multihole_mctxt_f_v] : 
+      ( pp_cr_f_v(SigF,R,Ap)
+     => ( pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(SigF,Ap),A))
+      <=> ( A = multihole_MHole_f_v
+          | ? [X: v] : A = multihole_MVar_v_f(X)
+          | ? [F3: f,Cs3: list_M276003553xt_f_v] : 
+              ( A = multihole_MFun_f_v(F3,Cs3)
+              & pp(aa_set2129085473t_bool(member2050190361_f_nat(product_Pair_f_nat(F3,aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Cs3))),aa_set1604101550_f_nat(minus_140170257_f_nat(pp_F_U_f(SigF,Ap)),aa_set1604101550_f_nat(insert168347826_f_nat(product_Pair_f_nat(Ap,numeral_numeral_nat(bit0(one)))),bot_bo1362251980_f_nat))))
+              & ! [X: multihole_mctxt_f_v] : 
+                  ( member995025156xt_f_v(X,set_Mu1483390320xt_f_v(Cs3))
+                 => pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(SigF,Ap),X)) ) )
+          | ? [C: multihole_mctxt_f_v,C5: multihole_mctxt_f_v] : 
+              ( A = multihole_MFun_f_v(Ap,cons_M10820881xt_f_v(C,cons_M10820881xt_f_v(C5,nil_Mu1963645281xt_f_v)))
+              & pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(SigF,Ap),C))
+              & pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(SigF,Ap),C5))
+              & pp(aa_nat_bool(pp_missing_args_f_v(SigF,Ap,C),zero_zero_nat)) ) ) ) ) )).
+
+tff(fact_74_take__eq__Nil,axiom,(
+    ! [N: nat,Xs: list_nat] : 
+      ( take_nat(N,Xs) = nil_nat
+    <=> ( N = zero_zero_nat
+        | Xs = nil_nat ) ) )).
+
+tff(fact_75_take__eq__Nil,axiom,(
+    ! [N: nat,Xs: list_M276003553xt_f_v] : 
+      ( take_M241671497xt_f_v(N,Xs) = nil_Mu1963645281xt_f_v
+    <=> ( N = zero_zero_nat
+        | Xs = nil_Mu1963645281xt_f_v ) ) )).
+
+tff(fact_76_take__eq__Nil,axiom,(
+    ! [N: nat,Xs: list_term_f_v] : 
+      ( take_term_f_v(N,Xs) = nil_term_f_v
+    <=> ( N = zero_zero_nat
+        | Xs = nil_term_f_v ) ) )).
+
+tff(fact_77_pos_Oinject,axiom,(
+    ! [X21: nat,X22: pos,Y21: nat,Y22: pos] : 
+      ( aa_pos_pos(aa_nat_fun_pos_pos(pCons,X21),X22) = aa_pos_pos(aa_nat_fun_pos_pos(pCons,Y21),Y22)
+    <=> ( X21 = Y21
+        & X22 = Y22 ) ) )).
+
+tff(fact_78_pp__cr_O_092_060LL_062_092_060_094sub_0621_Ocases,axiom,(
+    ! [SigF: fun_f_option_nat,R: set_Pr576123655rm_f_v,Ap: f,A: multihole_mctxt_f_v] : 
+      ( pp_cr_f_v(SigF,R,Ap)
+     => ( pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(SigF,Ap),A))
+       => ( A != multihole_MHole_f_v
+         => ( ! [X3: v] : 
+                A != multihole_MVar_v_f(X3)
+           => ( ! [F2: f,M2: nat,Cs2: list_M276003553xt_f_v] : 
+                  ( A = multihole_MFun_f_v(F2,Cs2)
+                 => ( pp(aa_set2129085473t_bool(member2050190361_f_nat(product_Pair_f_nat(F2,M2)),aa_set1604101550_f_nat(minus_140170257_f_nat(pp_F_U_f(SigF,Ap)),aa_set1604101550_f_nat(insert168347826_f_nat(product_Pair_f_nat(Ap,numeral_numeral_nat(bit0(one)))),bot_bo1362251980_f_nat))))
+                   => ( aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Cs2) = M2
+                     => ~ ( ! [X4: multihole_mctxt_f_v] : 
+                              ( member995025156xt_f_v(X4,set_Mu1483390320xt_f_v(Cs2))
+                             => pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(SigF,Ap),X4)) ) ) ) ) )
+             => ~ ( ! [C3: multihole_mctxt_f_v,C6: multihole_mctxt_f_v] : 
+                      ( A = multihole_MFun_f_v(Ap,cons_M10820881xt_f_v(C3,cons_M10820881xt_f_v(C6,nil_Mu1963645281xt_f_v)))
+                     => ( pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(SigF,Ap),C3))
+                       => ( pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(SigF,Ap),C6))
+                         => ~ pp(aa_nat_bool(pp_missing_args_f_v(SigF,Ap,C3),zero_zero_nat)) ) ) ) ) ) ) ) ) ) )).
+
+tff(fact_79_One__nat__def,axiom,(
+    one_one_nat = aa_nat_nat(suc,zero_zero_nat) )).
+
+tff(fact_80_missing__args_Osimps_I2_J,axiom,(
+    ! [X2: v,N: nat] : 
+      ~ pp(aa_nat_bool(pp_missing_args_f_v(sigF,ap,multihole_MVar_v_f(X2)),N)) )).
+
+tff(fact_81_min__def,axiom,(
+    ! [A: nat,B: nat] : 
+      ( ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),B))
+       => aa_nat_nat(ord_min_nat(A),B) = A )
+      & ( ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),B))
+       => aa_nat_nat(ord_min_nat(A),B) = B ) ) )).
+
+tff(fact_82_min__def,axiom,(
+    ! [A: bool,B: bool] : 
+      ( pp(aa_bool_bool(ord_min_bool(A),B))
+    <=> ( ( pp(aa_bool_bool(ord_less_eq_bool(A),B))
+         => pp(A) )
+        & ( ~ pp(aa_bool_bool(ord_less_eq_bool(A),B))
+         => pp(B) ) ) ) )).
+
+tff(fact_83_min__def,axiom,(
+    ! [A: set_Pr592218680_f_nat,B: set_Pr592218680_f_nat] : 
+      ( ( pp(aa_set2129085473t_bool(ord_le2116922008_f_nat(A),B))
+       => aa_set1604101550_f_nat(ord_mi1157341457_f_nat(A),B) = A )
+      & ( ~ pp(aa_set2129085473t_bool(ord_le2116922008_f_nat(A),B))
+       => aa_set1604101550_f_nat(ord_mi1157341457_f_nat(A),B) = B ) ) )).
+
+tff(fact_84_append__same__eq,axiom,(
+    ! [Ys: list_M276003553xt_f_v,Xs: list_M276003553xt_f_v,Zs: list_M276003553xt_f_v] : 
+      ( append460316534xt_f_v(Ys,Xs) = append460316534xt_f_v(Zs,Xs)
+    <=> Ys = Zs ) )).
+
+tff(fact_85_append__same__eq,axiom,(
+    ! [Ys: list_term_f_v,Xs: list_term_f_v,Zs: list_term_f_v] : 
+      ( append_term_f_v(Ys,Xs) = append_term_f_v(Zs,Xs)
+    <=> Ys = Zs ) )).
+
+tff(fact_86_missing__args_Osimps_I1_J,axiom,(
+    ! [N: nat] : 
+      ~ pp(aa_nat_bool(pp_missing_args_f_v(sigF,ap,multihole_MHole_f_v),N)) )).
+
+tff(fact_87_pos_Osimps_I3_J,axiom,(
+    ! [X21: nat,X22: pos] : 
+      aa_pos_pos(aa_nat_fun_pos_pos(pCons,X21),X22) != empty )).
+
+tff(fact_88_drop__0,axiom,(
+    ! [Xs: list_M276003553xt_f_v] : drop_M1817411233xt_f_v(zero_zero_nat,Xs) = Xs )).
+
+tff(fact_89_drop__0,axiom,(
+    ! [Xs: list_nat] : drop_nat(zero_zero_nat,Xs) = Xs )).
+
+tff(fact_90_nth__append__length,axiom,(
+    ! [Xs: list_M276003553xt_f_v,X2: multihole_mctxt_f_v,Ys: list_M276003553xt_f_v] : aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,append460316534xt_f_v(Xs,cons_M10820881xt_f_v(X2,Ys))),aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)) = X2 )).
+
+tff(fact_91_nth__append__length,axiom,(
+    ! [Xs: list_term_f_v,X2: term_f_v,Ys: list_term_f_v] : aa_nat_term_f_v(nth_term_f_v(append_term_f_v(Xs,cons_term_f_v(X2,Ys))),aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)) = X2 )).
+
+tff(fact_92_nth__append__length,axiom,(
+    ! [Xs: list_nat,X2: nat,Ys: list_nat] : aa_nat_nat(nth_nat(append_nat(Xs,cons_nat(X2,Ys))),aa_list_nat_nat(size_size_list_nat,Xs)) = X2 )).
+
+tff(fact_93_append__is__Nil__conv,axiom,(
+    ! [Xs: list_M276003553xt_f_v,Ys: list_M276003553xt_f_v] : 
+      ( append460316534xt_f_v(Xs,Ys) = nil_Mu1963645281xt_f_v
+    <=> ( Xs = nil_Mu1963645281xt_f_v
+        & Ys = nil_Mu1963645281xt_f_v ) ) )).
+
+tff(fact_94_append__is__Nil__conv,axiom,(
+    ! [Xs: list_term_f_v,Ys: list_term_f_v] : 
+      ( append_term_f_v(Xs,Ys) = nil_term_f_v
+    <=> ( Xs = nil_term_f_v
+        & Ys = nil_term_f_v ) ) )).
+
+tff(fact_95_append1__eq__conv,axiom,(
+    ! [Xs: list_M276003553xt_f_v,X2: multihole_mctxt_f_v,Ys: list_M276003553xt_f_v,Y: multihole_mctxt_f_v] : 
+      ( append460316534xt_f_v(Xs,cons_M10820881xt_f_v(X2,nil_Mu1963645281xt_f_v)) = append460316534xt_f_v(Ys,cons_M10820881xt_f_v(Y,nil_Mu1963645281xt_f_v))
+    <=> ( Xs = Ys
+        & X2 = Y ) ) )).
+
+tff(fact_96_append1__eq__conv,axiom,(
+    ! [Xs: list_term_f_v,X2: term_f_v,Ys: list_term_f_v,Y: term_f_v] : 
+      ( append_term_f_v(Xs,cons_term_f_v(X2,nil_term_f_v)) = append_term_f_v(Ys,cons_term_f_v(Y,nil_term_f_v))
+    <=> ( Xs = Ys
+        & X2 = Y ) ) )).
+
+tff(fact_97_append__Cons__nth__not__middle,axiom,(
+    ! [I: nat,Xs: list_M276003553xt_f_v,U: multihole_mctxt_f_v,Ys: list_M276003553xt_f_v,Z: multihole_mctxt_f_v] : 
+      ( I != aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)
+     => aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,append460316534xt_f_v(Xs,cons_M10820881xt_f_v(U,Ys))),I) = aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,append460316534xt_f_v(Xs,cons_M10820881xt_f_v(Z,Ys))),I) ) )).
+
+tff(fact_98_append__Cons__nth__not__middle,axiom,(
+    ! [I: nat,Xs: list_term_f_v,U: term_f_v,Ys: list_term_f_v,Z: term_f_v] : 
+      ( I != aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)
+     => aa_nat_term_f_v(nth_term_f_v(append_term_f_v(Xs,cons_term_f_v(U,Ys))),I) = aa_nat_term_f_v(nth_term_f_v(append_term_f_v(Xs,cons_term_f_v(Z,Ys))),I) ) )).
+
+tff(fact_99_append__Cons__nth__not__middle,axiom,(
+    ! [I: nat,Xs: list_nat,U: nat,Ys: list_nat,Z: nat] : 
+      ( I != aa_list_nat_nat(size_size_list_nat,Xs)
+     => aa_nat_nat(nth_nat(append_nat(Xs,cons_nat(U,Ys))),I) = aa_nat_nat(nth_nat(append_nat(Xs,cons_nat(Z,Ys))),I) ) )).
+
+tff(fact_100_Nil__is__append__conv,axiom,(
+    ! [Xs: list_M276003553xt_f_v,Ys: list_M276003553xt_f_v] : 
+      ( nil_Mu1963645281xt_f_v = append460316534xt_f_v(Xs,Ys)
+    <=> ( Xs = nil_Mu1963645281xt_f_v
+        & Ys = nil_Mu1963645281xt_f_v ) ) )).
+
+tff(fact_101_Nil__is__append__conv,axiom,(
+    ! [Xs: list_term_f_v,Ys: list_term_f_v] : 
+      ( nil_term_f_v = append_term_f_v(Xs,Ys)
+    <=> ( Xs = nil_term_f_v
+        & Ys = nil_term_f_v ) ) )).
+
+tff(fact_102_drop__drop,axiom,(
+    ! [N: nat,M: nat,Xs: list_M276003553xt_f_v] : drop_M1817411233xt_f_v(N,drop_M1817411233xt_f_v(M,Xs)) = drop_M1817411233xt_f_v(aa_nat_nat(plus_plus_nat(N),M),Xs) )).
+
+tff(fact_103_drop__drop,axiom,(
+    ! [N: nat,M: nat,Xs: list_nat] : drop_nat(N,drop_nat(M,Xs)) = drop_nat(aa_nat_nat(plus_plus_nat(N),M),Xs) )).
+
+tff(fact_104_self__append__conv2,axiom,(
+    ! [Ys: list_M276003553xt_f_v,Xs: list_M276003553xt_f_v] : 
+      ( Ys = append460316534xt_f_v(Xs,Ys)
+    <=> Xs = nil_Mu1963645281xt_f_v ) )).
+
+tff(fact_105_self__append__conv2,axiom,(
+    ! [Ys: list_term_f_v,Xs: list_term_f_v] : 
+      ( Ys = append_term_f_v(Xs,Ys)
+    <=> Xs = nil_term_f_v ) )).
+
+tff(fact_106_append__Cons,axiom,(
+    ! [X2: multihole_mctxt_f_v,Xs: list_M276003553xt_f_v,Ys: list_M276003553xt_f_v] : append460316534xt_f_v(cons_M10820881xt_f_v(X2,Xs),Ys) = cons_M10820881xt_f_v(X2,append460316534xt_f_v(Xs,Ys)) )).
+
+tff(fact_107_append__Cons,axiom,(
+    ! [X2: term_f_v,Xs: list_term_f_v,Ys: list_term_f_v] : append_term_f_v(cons_term_f_v(X2,Xs),Ys) = cons_term_f_v(X2,append_term_f_v(Xs,Ys)) )).
+
+tff(fact_108_not__less,axiom,(
+    ! [X2: nat,Y: nat] : 
+      ( ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X2),Y))
+    <=> pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),X2)) ) )).
+
+tff(fact_109_not__less,axiom,(
+    ! [X2: bool,Y: bool] : 
+      ( ~ pp(aa_bool_bool(ord_less_bool(X2),Y))
+    <=> pp(aa_bool_bool(ord_less_eq_bool(Y),X2)) ) )).
+
+tff(fact_110_List_Oself__append__conv,axiom,(
+    ! [Xs: list_M276003553xt_f_v,Ys: list_M276003553xt_f_v] : 
+      ( Xs = append460316534xt_f_v(Xs,Ys)
+    <=> Ys = nil_Mu1963645281xt_f_v ) )).
+
+tff(fact_111_List_Oself__append__conv,axiom,(
+    ! [Xs: list_term_f_v,Ys: list_term_f_v] : 
+      ( Xs = append_term_f_v(Xs,Ys)
+    <=> Ys = nil_term_f_v ) )).
+
+tff(fact_112_length__append,axiom,(
+    ! [Xs: list_M276003553xt_f_v,Ys: list_M276003553xt_f_v] : aa_lis1425841141_v_nat(size_s1130017613xt_f_v,append460316534xt_f_v(Xs,Ys)) = aa_nat_nat(plus_plus_nat(aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)),aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Ys)) )).
+
+tff(fact_113_length__append,axiom,(
+    ! [Xs: list_term_f_v,Ys: list_term_f_v] : aa_list_term_f_v_nat(size_s693102343rm_f_v,append_term_f_v(Xs,Ys)) = aa_nat_nat(plus_plus_nat(aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)),aa_list_term_f_v_nat(size_s693102343rm_f_v,Ys)) )).
+
+tff(fact_114_length__append,axiom,(
+    ! [Xs: list_nat,Ys: list_nat] : aa_list_nat_nat(size_size_list_nat,append_nat(Xs,Ys)) = aa_nat_nat(plus_plus_nat(aa_list_nat_nat(size_size_list_nat,Xs)),aa_list_nat_nat(size_size_list_nat,Ys)) )).
+
+tff(fact_115_list_Oexhaust,axiom,(
+    ! [Y: list_M276003553xt_f_v] : 
+      ( Y != nil_Mu1963645281xt_f_v
+     => ~ ( ! [X212: multihole_mctxt_f_v,X222: list_M276003553xt_f_v] : 
+              Y != cons_M10820881xt_f_v(X212,X222) ) ) )).
+
+tff(fact_116_list_Oexhaust,axiom,(
+    ! [Y: list_term_f_v] : 
+      ( Y != nil_term_f_v
+     => ~ ( ! [X212: term_f_v,X222: list_term_f_v] : 
+              Y != cons_term_f_v(X212,X222) ) ) )).
+
+tff(fact_117_list_Osize_I4_J,axiom,(
+    ! [X21: multihole_mctxt_f_v,X22: list_M276003553xt_f_v] : aa_lis1425841141_v_nat(size_s1130017613xt_f_v,cons_M10820881xt_f_v(X21,X22)) = aa_nat_nat(plus_plus_nat(aa_lis1425841141_v_nat(size_s1130017613xt_f_v,X22)),aa_nat_nat(suc,zero_zero_nat)) )).
+
+tff(fact_118_list_Osize_I4_J,axiom,(
+    ! [X21: term_f_v,X22: list_term_f_v] : aa_list_term_f_v_nat(size_s693102343rm_f_v,cons_term_f_v(X21,X22)) = aa_nat_nat(plus_plus_nat(aa_list_term_f_v_nat(size_s693102343rm_f_v,X22)),aa_nat_nat(suc,zero_zero_nat)) )).
+
+tff(fact_119_list_Osize_I4_J,axiom,(
+    ! [X21: nat,X22: list_nat] : aa_list_nat_nat(size_size_list_nat,cons_nat(X21,X22)) = aa_nat_nat(plus_plus_nat(aa_list_nat_nat(size_size_list_nat,X22)),aa_nat_nat(suc,zero_zero_nat)) )).
+
+tff(fact_120_append__self__conv2,axiom,(
+    ! [Xs: list_M276003553xt_f_v,Ys: list_M276003553xt_f_v] : 
+      ( append460316534xt_f_v(Xs,Ys) = Ys
+    <=> Xs = nil_Mu1963645281xt_f_v ) )).
+
+tff(fact_121_append__self__conv2,axiom,(
+    ! [Xs: list_term_f_v,Ys: list_term_f_v] : 
+      ( append_term_f_v(Xs,Ys) = Ys
+    <=> Xs = nil_term_f_v ) )).
+
+tff(fact_122_take__Nil,axiom,(
+    ! [N: nat] : take_nat(N,nil_nat) = nil_nat )).
+
+tff(fact_123_take__Nil,axiom,(
+    ! [N: nat] : take_M241671497xt_f_v(N,nil_Mu1963645281xt_f_v) = nil_Mu1963645281xt_f_v )).
+
+tff(fact_124_take__Nil,axiom,(
+    ! [N: nat] : take_term_f_v(N,nil_term_f_v) = nil_term_f_v )).
+
+tff(fact_125_length__Cons,axiom,(
+    ! [X2: multihole_mctxt_f_v,Xs: list_M276003553xt_f_v] : aa_lis1425841141_v_nat(size_s1130017613xt_f_v,cons_M10820881xt_f_v(X2,Xs)) = aa_nat_nat(suc,aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)) )).
+
+tff(fact_126_length__Cons,axiom,(
+    ! [X2: term_f_v,Xs: list_term_f_v] : aa_list_term_f_v_nat(size_s693102343rm_f_v,cons_term_f_v(X2,Xs)) = aa_nat_nat(suc,aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)) )).
+
+tff(fact_127_length__Cons,axiom,(
+    ! [X2: nat,Xs: list_nat] : aa_list_nat_nat(size_size_list_nat,cons_nat(X2,Xs)) = aa_nat_nat(suc,aa_list_nat_nat(size_size_list_nat,Xs)) )).
+
+tff(fact_128_drop__Nil,axiom,(
+    ! [N: nat] : drop_nat(N,nil_nat) = nil_nat )).
+
+tff(fact_129_drop__Nil,axiom,(
+    ! [N: nat] : drop_M1817411233xt_f_v(N,nil_Mu1963645281xt_f_v) = nil_Mu1963645281xt_f_v )).
+
+tff(fact_130_drop__Nil,axiom,(
+    ! [N: nat] : drop_term_f_v(N,nil_term_f_v) = nil_term_f_v )).
+
+tff(fact_131_Suc__eq__plus1,axiom,(
+    ! [N: nat] : aa_nat_nat(suc,N) = aa_nat_nat(plus_plus_nat(N),one_one_nat) )).
+
+tff(fact_132_List_Oappend__self__conv,axiom,(
+    ! [Xs: list_M276003553xt_f_v,Ys: list_M276003553xt_f_v] : 
+      ( append460316534xt_f_v(Xs,Ys) = Xs
+    <=> Ys = nil_Mu1963645281xt_f_v ) )).
+
+tff(fact_133_List_Oappend__self__conv,axiom,(
+    ! [Xs: list_term_f_v,Ys: list_term_f_v] : 
+      ( append_term_f_v(Xs,Ys) = Xs
+    <=> Ys = nil_term_f_v ) )).
+
+tff(fact_134_mctxt__neq__mholeE,axiom,(
+    ! [X2: multihole_mctxt_f_v] : 
+      ( X2 != multihole_MHole_f_v
+     => ( ! [V: v] : 
+            X2 != multihole_MVar_v_f(V)
+       => ~ ( ! [F2: f,Cs2: list_M276003553xt_f_v] : 
+                X2 != multihole_MFun_f_v(F2,Cs2) ) ) ) )).
+
+tff(fact_135_pp__cr_Oreplacing__var__holes1,axiom,(
+    ! [SigF: fun_f_option_nat,R: set_Pr576123655rm_f_v,Ap: f,P: pos,C2: multihole_mctxt_f_v,X2: v] : 
+      ( pp_cr_f_v(SigF,R,Ap)
+     => ( member_pos(P,aa_Mul1241491826et_pos(multih37762601xt_f_v,C2))
+       => ( pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(SigF,Ap),aa_Mul1979903100xt_f_v(lS_mreplace_at_f_v(C2,P),multihole_MVar_v_f(X2))))
+        <=> pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(SigF,Ap),aa_Mul1979903100xt_f_v(lS_mreplace_at_f_v(C2,P),multihole_MHole_f_v))) ) ) ) )).
+
+tff(fact_136_less__imp__le__nat,axiom,(
+    ! [M: nat,N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,M),N))
+     => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,M),N)) ) )).
+
+tff(fact_137_Collect__mem__eq,axiom,(
+    ! [A2: set_pos] : collect_pos(aTP_Lamm_a(A2)) = A2 )).
+
+tff(fact_138_Collect__mem__eq,axiom,(
+    ! [A2: set_Pr592218680_f_nat] : collec1032313175_f_nat(aTP_Lamm_aa(A2)) = A2 )).
+
+tff(fact_139_Collect__mem__eq,axiom,(
+    ! [A2: set_Mu1305556667xt_f_v] : collec1020609606xt_f_v(aTP_Lamm_ab(A2)) = A2 )).
+
+tff(fact_140_Collect__mem__eq,axiom,(
+    ! [A2: set_Pr576123655rm_f_v] : collec525259922rm_f_v(aTP_Lamm_ac(A2)) = A2 )).
+
+tff(fact_141_Pair__inject,axiom,(
+    ! [A: f,B: nat,A3: f,B2: nat] : 
+      ( product_Pair_f_nat(A,B) = product_Pair_f_nat(A3,B2)
+     => ~ ( A = A3
+         => B != B2 ) ) )).
+
+tff(fact_142_Pair__inject,axiom,(
+    ! [A: multihole_mctxt_f_v,B: nat,A3: multihole_mctxt_f_v,B2: nat] : 
+      ( produc302379220_v_nat(A,B) = produc302379220_v_nat(A3,B2)
+     => ~ ( A = A3
+         => B != B2 ) ) )).
+
+tff(fact_143_Pair__inject,axiom,(
+    ! [A: pos,B: pos,A3: pos,B2: pos] : 
+      ( product_Pair_pos_pos(A,B) = product_Pair_pos_pos(A3,B2)
+     => ~ ( A = A3
+         => B != B2 ) ) )).
+
+tff(fact_144_Pair__inject,axiom,(
+    ! [A: term_f_v,B: term_f_v,A3: term_f_v,B2: term_f_v] : 
+      ( produc368081759rm_f_v(A,B) = produc368081759rm_f_v(A3,B2)
+     => ~ ( A = A3
+         => B != B2 ) ) )).
+
+tff(fact_145__092_060F_062_092_060_094sub_062U__def,axiom,(
+    pp_F_U_f(sigF,ap) = aa_set1604101550_f_nat(sup_su1335354212_f_nat(aa_set1604101550_f_nat(insert168347826_f_nat(product_Pair_f_nat(ap,numeral_numeral_nat(bit0(one)))),bot_bo1362251980_f_nat)),collec1032313175_f_nat(produc1153485486t_bool(aTP_Lamm_ad))) )).
+
+tff(fact_146_Cons__nth__drop__Suc,axiom,(
+    ! [I: nat,Xs: list_M276003553xt_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I),aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)))
+     => cons_M10820881xt_f_v(aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Xs),I),drop_M1817411233xt_f_v(aa_nat_nat(suc,I),Xs)) = drop_M1817411233xt_f_v(I,Xs) ) )).
+
+tff(fact_147_Cons__nth__drop__Suc,axiom,(
+    ! [I: nat,Xs: list_term_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I),aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)))
+     => cons_term_f_v(aa_nat_term_f_v(nth_term_f_v(Xs),I),drop_term_f_v(aa_nat_nat(suc,I),Xs)) = drop_term_f_v(I,Xs) ) )).
+
+tff(fact_148_Cons__nth__drop__Suc,axiom,(
+    ! [I: nat,Xs: list_nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I),aa_list_nat_nat(size_size_list_nat,Xs)))
+     => cons_nat(aa_nat_nat(nth_nat(Xs),I),drop_nat(aa_nat_nat(suc,I),Xs)) = drop_nat(I,Xs) ) )).
+
+tff(fact_149_id__take__nth__drop,axiom,(
+    ! [I: nat,Xs: list_M276003553xt_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I),aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)))
+     => Xs = append460316534xt_f_v(take_M241671497xt_f_v(I,Xs),cons_M10820881xt_f_v(aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Xs),I),drop_M1817411233xt_f_v(aa_nat_nat(suc,I),Xs))) ) )).
+
+tff(fact_150_id__take__nth__drop,axiom,(
+    ! [I: nat,Xs: list_term_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I),aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)))
+     => Xs = append_term_f_v(take_term_f_v(I,Xs),cons_term_f_v(aa_nat_term_f_v(nth_term_f_v(Xs),I),drop_term_f_v(aa_nat_nat(suc,I),Xs))) ) )).
+
+tff(fact_151_id__take__nth__drop,axiom,(
+    ! [I: nat,Xs: list_nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I),aa_list_nat_nat(size_size_list_nat,Xs)))
+     => Xs = append_nat(take_nat(I,Xs),cons_nat(aa_nat_nat(nth_nat(Xs),I),drop_nat(aa_nat_nat(suc,I),Xs))) ) )).
+
+tff(fact_152_pp__cr_O_092_060LL_062_092_060_094sub_0621_Omvar,axiom,(
+    ! [SigF: fun_f_option_nat,R: set_Pr576123655rm_f_v,Ap: f,X2: v] : 
+      ( pp_cr_f_v(SigF,R,Ap)
+     => pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(SigF,Ap),multihole_MVar_v_f(X2))) ) )).
+
+tff(fact_153_pp__cr_O_092_060LL_062_092_060_094sub_0621_Omhole,axiom,(
+    ! [SigF: fun_f_option_nat,R: set_Pr576123655rm_f_v,Ap: f] : 
+      ( pp_cr_f_v(SigF,R,Ap)
+     => pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(SigF,Ap),multihole_MHole_f_v)) ) )).
+
+tff(fact_154_Collect__cong,axiom,(
+    ! [P3: fun_Pr1604015214t_bool,Q: fun_Pr1604015214t_bool] : 
+      ( ! [X3: product_prod_f_nat] : 
+          ( pp(aa_Pro335067735t_bool(P3,X3))
+        <=> pp(aa_Pro335067735t_bool(Q,X3)) )
+     => collec1032313175_f_nat(P3) = collec1032313175_f_nat(Q) ) )).
+
+tff(fact_155_Collect__cong,axiom,(
+    ! [P3: fun_Mu861389503v_bool,Q: fun_Mu861389503v_bool] : 
+      ( ! [X3: multihole_mctxt_f_v] : 
+          ( pp(aa_Mul1846291640v_bool(P3,X3))
+        <=> pp(aa_Mul1846291640v_bool(Q,X3)) )
+     => collec1020609606xt_f_v(P3) = collec1020609606xt_f_v(Q) ) )).
+
+tff(fact_156_Collect__cong,axiom,(
+    ! [P3: fun_Pr243348851v_bool,Q: fun_Pr243348851v_bool] : 
+      ( ! [X3: produc589042087rm_f_v] : 
+          ( pp(aa_Pro1758283628v_bool(P3,X3))
+        <=> pp(aa_Pro1758283628v_bool(Q,X3)) )
+     => collec525259922rm_f_v(P3) = collec525259922rm_f_v(Q) ) )).
+
+tff(fact_157__092_060F_062__def,axiom,(
+    pp_F_f(sigF) = collec1032313175_f_nat(produc1153485486t_bool(aTP_Lamm_ae)) )).
+
+tff(fact_158_mreplace__at_Osimps_I1_J,axiom,(
+    ! [C2: multihole_mctxt_f_v,D: multihole_mctxt_f_v] : aa_Mul1979903100xt_f_v(lS_mreplace_at_f_v(C2,empty),D) = D )).
+
+tff(fact_159_take__drop__imp__nth,axiom,(
+    ! [I: nat,Ss: list_nat,X2: nat] : 
+      ( append_nat(take_nat(I,Ss),cons_nat(X2,drop_nat(aa_nat_nat(suc,I),Ss))) = Ss
+     => X2 = aa_nat_nat(nth_nat(Ss),I) ) )).
+
+tff(fact_160_take__drop__imp__nth,axiom,(
+    ! [I: nat,Ss: list_M276003553xt_f_v,X2: multihole_mctxt_f_v] : 
+      ( append460316534xt_f_v(take_M241671497xt_f_v(I,Ss),cons_M10820881xt_f_v(X2,drop_M1817411233xt_f_v(aa_nat_nat(suc,I),Ss))) = Ss
+     => X2 = aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Ss),I) ) )).
+
+tff(fact_161_take__drop__imp__nth,axiom,(
+    ! [I: nat,Ss: list_term_f_v,X2: term_f_v] : 
+      ( append_term_f_v(take_term_f_v(I,Ss),cons_term_f_v(X2,drop_term_f_v(aa_nat_nat(suc,I),Ss))) = Ss
+     => X2 = aa_nat_term_f_v(nth_term_f_v(Ss),I) ) )).
+
+tff(fact_162_not__Cons__self2,axiom,(
+    ! [X2: multihole_mctxt_f_v,Xs: list_M276003553xt_f_v] : 
+      cons_M10820881xt_f_v(X2,Xs) != Xs )).
+
+tff(fact_163_not__Cons__self2,axiom,(
+    ! [X2: term_f_v,Xs: list_term_f_v] : 
+      cons_term_f_v(X2,Xs) != Xs )).
+
+tff(fact_164_neq__Nil__conv,axiom,(
+    ! [Xs: list_M276003553xt_f_v] : 
+      ( Xs != nil_Mu1963645281xt_f_v
+    <=> ? [Y2: multihole_mctxt_f_v,Ys2: list_M276003553xt_f_v] : Xs = cons_M10820881xt_f_v(Y2,Ys2) ) )).
+
+tff(fact_165_neq__Nil__conv,axiom,(
+    ! [Xs: list_term_f_v] : 
+      ( Xs != nil_term_f_v
+    <=> ? [Y2: term_f_v,Ys2: list_term_f_v] : Xs = cons_term_f_v(Y2,Ys2) ) )).
+
+tff(fact_166_list__induct2_H,axiom,(
+    ! [P3: fun_li984431149v_bool,Xs: list_M276003553xt_f_v,Ys: list_M276003553xt_f_v] : 
+      ( pp(aa_lis1678885170v_bool(aa_lis619323870v_bool(P3,nil_Mu1963645281xt_f_v),nil_Mu1963645281xt_f_v))
+     => ( ! [X3: multihole_mctxt_f_v,Xs2: list_M276003553xt_f_v] : pp(aa_lis1678885170v_bool(aa_lis619323870v_bool(P3,cons_M10820881xt_f_v(X3,Xs2)),nil_Mu1963645281xt_f_v))
+       => ( ! [Y3: multihole_mctxt_f_v,Ys3: list_M276003553xt_f_v] : pp(aa_lis1678885170v_bool(aa_lis619323870v_bool(P3,nil_Mu1963645281xt_f_v),cons_M10820881xt_f_v(Y3,Ys3)))
+         => ( ! [X3: multihole_mctxt_f_v,Xs2: list_M276003553xt_f_v,Y3: multihole_mctxt_f_v,Ys3: list_M276003553xt_f_v] : 
+                ( pp(aa_lis1678885170v_bool(aa_lis619323870v_bool(P3,Xs2),Ys3))
+               => pp(aa_lis1678885170v_bool(aa_lis619323870v_bool(P3,cons_M10820881xt_f_v(X3,Xs2)),cons_M10820881xt_f_v(Y3,Ys3))) )
+           => pp(aa_lis1678885170v_bool(aa_lis619323870v_bool(P3,Xs),Ys)) ) ) ) ) )).
+
+tff(fact_167_list__induct2_H,axiom,(
+    ! [P3: fun_li364704735v_bool,Xs: list_M276003553xt_f_v,Ys: list_term_f_v] : 
+      ( pp(aa_lis1953671846v_bool(aa_lis367169752v_bool(P3,nil_Mu1963645281xt_f_v),nil_term_f_v))
+     => ( ! [X3: multihole_mctxt_f_v,Xs2: list_M276003553xt_f_v] : pp(aa_lis1953671846v_bool(aa_lis367169752v_bool(P3,cons_M10820881xt_f_v(X3,Xs2)),nil_term_f_v))
+       => ( ! [Y3: term_f_v,Ys3: list_term_f_v] : pp(aa_lis1953671846v_bool(aa_lis367169752v_bool(P3,nil_Mu1963645281xt_f_v),cons_term_f_v(Y3,Ys3)))
+         => ( ! [X3: multihole_mctxt_f_v,Xs2: list_M276003553xt_f_v,Y3: term_f_v,Ys3: list_term_f_v] : 
+                ( pp(aa_lis1953671846v_bool(aa_lis367169752v_bool(P3,Xs2),Ys3))
+               => pp(aa_lis1953671846v_bool(aa_lis367169752v_bool(P3,cons_M10820881xt_f_v(X3,Xs2)),cons_term_f_v(Y3,Ys3))) )
+           => pp(aa_lis1953671846v_bool(aa_lis367169752v_bool(P3,Xs),Ys)) ) ) ) ) )).
+
+tff(fact_168_list__induct2_H,axiom,(
+    ! [P3: fun_li1377181097v_bool,Xs: list_term_f_v,Ys: list_M276003553xt_f_v] : 
+      ( pp(aa_lis1678885170v_bool(aa_lis1235071338v_bool(P3,nil_term_f_v),nil_Mu1963645281xt_f_v))
+     => ( ! [X3: term_f_v,Xs2: list_term_f_v] : pp(aa_lis1678885170v_bool(aa_lis1235071338v_bool(P3,cons_term_f_v(X3,Xs2)),nil_Mu1963645281xt_f_v))
+       => ( ! [Y3: multihole_mctxt_f_v,Ys3: list_M276003553xt_f_v] : pp(aa_lis1678885170v_bool(aa_lis1235071338v_bool(P3,nil_term_f_v),cons_M10820881xt_f_v(Y3,Ys3)))
+         => ( ! [X3: term_f_v,Xs2: list_term_f_v,Y3: multihole_mctxt_f_v,Ys3: list_M276003553xt_f_v] : 
+                ( pp(aa_lis1678885170v_bool(aa_lis1235071338v_bool(P3,Xs2),Ys3))
+               => pp(aa_lis1678885170v_bool(aa_lis1235071338v_bool(P3,cons_term_f_v(X3,Xs2)),cons_M10820881xt_f_v(Y3,Ys3))) )
+           => pp(aa_lis1678885170v_bool(aa_lis1235071338v_bool(P3,Xs),Ys)) ) ) ) ) )).
+
+tff(fact_169_list__induct2_H,axiom,(
+    ! [P3: fun_li177176931v_bool,Xs: list_term_f_v,Ys: list_term_f_v] : 
+      ( pp(aa_lis1953671846v_bool(aa_lis1264987724v_bool(P3,nil_term_f_v),nil_term_f_v))
+     => ( ! [X3: term_f_v,Xs2: list_term_f_v] : pp(aa_lis1953671846v_bool(aa_lis1264987724v_bool(P3,cons_term_f_v(X3,Xs2)),nil_term_f_v))
+       => ( ! [Y3: term_f_v,Ys3: list_term_f_v] : pp(aa_lis1953671846v_bool(aa_lis1264987724v_bool(P3,nil_term_f_v),cons_term_f_v(Y3,Ys3)))
+         => ( ! [X3: term_f_v,Xs2: list_term_f_v,Y3: term_f_v,Ys3: list_term_f_v] : 
+                ( pp(aa_lis1953671846v_bool(aa_lis1264987724v_bool(P3,Xs2),Ys3))
+               => pp(aa_lis1953671846v_bool(aa_lis1264987724v_bool(P3,cons_term_f_v(X3,Xs2)),cons_term_f_v(Y3,Ys3))) )
+           => pp(aa_lis1953671846v_bool(aa_lis1264987724v_bool(P3,Xs),Ys)) ) ) ) ) )).
+
+tff(fact_170_remdups__adj_Ocases,axiom,(
+    ! [X2: list_M276003553xt_f_v] : 
+      ( X2 != nil_Mu1963645281xt_f_v
+     => ( ! [X3: multihole_mctxt_f_v] : 
+            X2 != cons_M10820881xt_f_v(X3,nil_Mu1963645281xt_f_v)
+       => ~ ( ! [X3: multihole_mctxt_f_v,Y3: multihole_mctxt_f_v,Xs2: list_M276003553xt_f_v] : 
+                X2 != cons_M10820881xt_f_v(X3,cons_M10820881xt_f_v(Y3,Xs2)) ) ) ) )).
+
+tff(fact_171_remdups__adj_Ocases,axiom,(
+    ! [X2: list_term_f_v] : 
+      ( X2 != nil_term_f_v
+     => ( ! [X3: term_f_v] : 
+            X2 != cons_term_f_v(X3,nil_term_f_v)
+       => ~ ( ! [X3: term_f_v,Y3: term_f_v,Xs2: list_term_f_v] : 
+                X2 != cons_term_f_v(X3,cons_term_f_v(Y3,Xs2)) ) ) ) )).
+
+tff(fact_172_append__eq__append__conv2,axiom,(
+    ! [Xs: list_M276003553xt_f_v,Ys: list_M276003553xt_f_v,Zs: list_M276003553xt_f_v,Ts: list_M276003553xt_f_v] : 
+      ( append460316534xt_f_v(Xs,Ys) = append460316534xt_f_v(Zs,Ts)
+    <=> ? [Us: list_M276003553xt_f_v] : 
+          ( ( Xs = append460316534xt_f_v(Zs,Us)
+            & append460316534xt_f_v(Us,Ys) = Ts )
+          | ( append460316534xt_f_v(Xs,Us) = Zs
+            & Ys = append460316534xt_f_v(Us,Ts) ) ) ) )).
+
+tff(fact_173_append__eq__append__conv2,axiom,(
+    ! [Xs: list_term_f_v,Ys: list_term_f_v,Zs: list_term_f_v,Ts: list_term_f_v] : 
+      ( append_term_f_v(Xs,Ys) = append_term_f_v(Zs,Ts)
+    <=> ? [Us: list_term_f_v] : 
+          ( ( Xs = append_term_f_v(Zs,Us)
+            & append_term_f_v(Us,Ys) = Ts )
+          | ( append_term_f_v(Xs,Us) = Zs
+            & Ys = append_term_f_v(Us,Ts) ) ) ) )).
+
+tff(fact_174_add__Suc,axiom,(
+    ! [M: nat,N: nat] : aa_nat_nat(plus_plus_nat(aa_nat_nat(suc,M)),N) = aa_nat_nat(suc,aa_nat_nat(plus_plus_nat(M),N)) )).
+
+tff(fact_175_transpose_Ocases,axiom,(
+    ! [X2: list_l1119543527xt_f_v] : 
+      ( X2 != nil_li2102218983xt_f_v
+     => ( ! [Xss: list_l1119543527xt_f_v] : 
+            X2 != cons_l194641047xt_f_v(nil_Mu1963645281xt_f_v,Xss)
+       => ~ ( ! [X3: multihole_mctxt_f_v,Xs2: list_M276003553xt_f_v,Xss: list_l1119543527xt_f_v] : 
+                X2 != cons_l194641047xt_f_v(cons_M10820881xt_f_v(X3,Xs2),Xss) ) ) ) )).
+
+tff(fact_176_transpose_Ocases,axiom,(
+    ! [X2: list_list_term_f_v] : 
+      ( X2 != nil_list_term_f_v
+     => ( ! [Xss: list_list_term_f_v] : 
+            X2 != cons_list_term_f_v(nil_term_f_v,Xss)
+       => ~ ( ! [X3: term_f_v,Xs2: list_term_f_v,Xss: list_list_term_f_v] : 
+                X2 != cons_list_term_f_v(cons_term_f_v(X3,Xs2),Xss) ) ) ) )).
+
+tff(fact_177_append__eq__appendI,axiom,(
+    ! [Xs: list_M276003553xt_f_v,Xs1: list_M276003553xt_f_v,Zs: list_M276003553xt_f_v,Ys: list_M276003553xt_f_v,Us2: list_M276003553xt_f_v] : 
+      ( append460316534xt_f_v(Xs,Xs1) = Zs
+     => ( Ys = append460316534xt_f_v(Xs1,Us2)
+       => append460316534xt_f_v(Xs,Ys) = append460316534xt_f_v(Zs,Us2) ) ) )).
+
+tff(fact_178_append__eq__appendI,axiom,(
+    ! [Xs: list_term_f_v,Xs1: list_term_f_v,Zs: list_term_f_v,Ys: list_term_f_v,Us2: list_term_f_v] : 
+      ( append_term_f_v(Xs,Xs1) = Zs
+     => ( Ys = append_term_f_v(Xs1,Us2)
+       => append_term_f_v(Xs,Ys) = append_term_f_v(Zs,Us2) ) ) )).
+
+tff(fact_179_Nat_Oadd__0__right,axiom,(
+    ! [M: nat] : aa_nat_nat(plus_plus_nat(M),zero_zero_nat) = M )).
+
+tff(fact_180_add_Oleft__neutral,axiom,(
+    ! [A: nat] : aa_nat_nat(plus_plus_nat(zero_zero_nat),A) = A )).
+
+tff(fact_181_take__add,axiom,(
+    ! [I: nat,J: nat,Xs: list_nat] : take_nat(aa_nat_nat(plus_plus_nat(I),J),Xs) = append_nat(take_nat(I,Xs),take_nat(J,drop_nat(I,Xs))) )).
+
+tff(fact_182_take__add,axiom,(
+    ! [I: nat,J: nat,Xs: list_M276003553xt_f_v] : take_M241671497xt_f_v(aa_nat_nat(plus_plus_nat(I),J),Xs) = append460316534xt_f_v(take_M241671497xt_f_v(I,Xs),take_M241671497xt_f_v(J,drop_M1817411233xt_f_v(I,Xs))) )).
+
+tff(fact_183_take__add,axiom,(
+    ! [I: nat,J: nat,Xs: list_term_f_v] : take_term_f_v(aa_nat_nat(plus_plus_nat(I),J),Xs) = append_term_f_v(take_term_f_v(I,Xs),take_term_f_v(J,drop_term_f_v(I,Xs))) )).
+
+tff(fact_184_take__equalityI,axiom,(
+    ! [Xs: list_M276003553xt_f_v,Ys: list_M276003553xt_f_v] : 
+      ( ! [I2: nat] : take_M241671497xt_f_v(I2,Xs) = take_M241671497xt_f_v(I2,Ys)
+     => Xs = Ys ) )).
+
+tff(fact_185_take__equalityI,axiom,(
+    ! [Xs: list_nat,Ys: list_nat] : 
+      ( ! [I2: nat] : take_nat(I2,Xs) = take_nat(I2,Ys)
+     => Xs = Ys ) )).
+
+tff(fact_186_add__diff__cancel__left_H,axiom,(
+    ! [A: nat,B: nat] : aa_nat_nat(minus_minus_nat(aa_nat_nat(plus_plus_nat(A),B)),A) = B )).
+
+tff(fact_187_old_Oprod_Oinject,axiom,(
+    ! [A: f,B: nat,A3: f,B2: nat] : 
+      ( product_Pair_f_nat(A,B) = product_Pair_f_nat(A3,B2)
+    <=> ( A = A3
+        & B = B2 ) ) )).
+
+tff(fact_188_old_Oprod_Oinject,axiom,(
+    ! [A: multihole_mctxt_f_v,B: nat,A3: multihole_mctxt_f_v,B2: nat] : 
+      ( produc302379220_v_nat(A,B) = produc302379220_v_nat(A3,B2)
+    <=> ( A = A3
+        & B = B2 ) ) )).
+
+tff(fact_189_old_Oprod_Oinject,axiom,(
+    ! [A: pos,B: pos,A3: pos,B2: pos] : 
+      ( product_Pair_pos_pos(A,B) = product_Pair_pos_pos(A3,B2)
+    <=> ( A = A3
+        & B = B2 ) ) )).
+
+tff(fact_190_old_Oprod_Oinject,axiom,(
+    ! [A: term_f_v,B: term_f_v,A3: term_f_v,B2: term_f_v] : 
+      ( produc368081759rm_f_v(A,B) = produc368081759rm_f_v(A3,B2)
+    <=> ( A = A3
+        & B = B2 ) ) )).
+
+tff(fact_191_pp__cr_OaddAp,axiom,(
+    ! [SigF: fun_f_option_nat,R: set_Pr576123655rm_f_v,Ap: f,C2: multihole_mctxt_f_v,C4: multihole_mctxt_f_v] : 
+      ( pp_cr_f_v(SigF,R,Ap)
+     => ( pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(SigF,Ap),C2))
+       => ( pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(SigF,Ap),C4))
+         => ( pp(aa_nat_bool(pp_missing_args_f_v(SigF,Ap,C2),zero_zero_nat))
+           => pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(SigF,Ap),multihole_MFun_f_v(Ap,cons_M10820881xt_f_v(C2,cons_M10820881xt_f_v(C4,nil_Mu1963645281xt_f_v))))) ) ) ) ) )).
+
+tff(fact_192_nth__append__take__drop__is__nth__conv,axiom,(
+    ! [I: nat,Xs: list_M276003553xt_f_v,J: nat,Y: multihole_mctxt_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,I),aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,J),aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)))
+       => ( I != J
+         => aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,append460316534xt_f_v(take_M241671497xt_f_v(J,Xs),cons_M10820881xt_f_v(Y,drop_M1817411233xt_f_v(aa_nat_nat(suc,J),Xs)))),I) = aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Xs),I) ) ) ) )).
+
+tff(fact_193_nth__append__take__drop__is__nth__conv,axiom,(
+    ! [I: nat,Xs: list_term_f_v,J: nat,Y: term_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,I),aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,J),aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)))
+       => ( I != J
+         => aa_nat_term_f_v(nth_term_f_v(append_term_f_v(take_term_f_v(J,Xs),cons_term_f_v(Y,drop_term_f_v(aa_nat_nat(suc,J),Xs)))),I) = aa_nat_term_f_v(nth_term_f_v(Xs),I) ) ) ) )).
+
+tff(fact_194_nth__append__take__drop__is__nth__conv,axiom,(
+    ! [I: nat,Xs: list_nat,J: nat,Y: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,I),aa_list_nat_nat(size_size_list_nat,Xs)))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,J),aa_list_nat_nat(size_size_list_nat,Xs)))
+       => ( I != J
+         => aa_nat_nat(nth_nat(append_nat(take_nat(J,Xs),cons_nat(Y,drop_nat(aa_nat_nat(suc,J),Xs)))),I) = aa_nat_nat(nth_nat(Xs),I) ) ) ) )).
+
+tff(fact_195_diff__Suc__Suc,axiom,(
+    ! [M: nat,N: nat] : aa_nat_nat(minus_minus_nat(aa_nat_nat(suc,M)),aa_nat_nat(suc,N)) = aa_nat_nat(minus_minus_nat(M),N) )).
+
+tff(fact_196_prod_Oinject,axiom,(
+    ! [X1: f,X23: nat,Y1: f,Y23: nat] : 
+      ( product_Pair_f_nat(X1,X23) = product_Pair_f_nat(Y1,Y23)
+    <=> ( X1 = Y1
+        & X23 = Y23 ) ) )).
+
+tff(fact_197_prod_Oinject,axiom,(
+    ! [X1: multihole_mctxt_f_v,X23: nat,Y1: multihole_mctxt_f_v,Y23: nat] : 
+      ( produc302379220_v_nat(X1,X23) = produc302379220_v_nat(Y1,Y23)
+    <=> ( X1 = Y1
+        & X23 = Y23 ) ) )).
+
+tff(fact_198_prod_Oinject,axiom,(
+    ! [X1: pos,X23: pos,Y1: pos,Y23: pos] : 
+      ( product_Pair_pos_pos(X1,X23) = product_Pair_pos_pos(Y1,Y23)
+    <=> ( X1 = Y1
+        & X23 = Y23 ) ) )).
+
+tff(fact_199_prod_Oinject,axiom,(
+    ! [X1: term_f_v,X23: term_f_v,Y1: term_f_v,Y23: term_f_v] : 
+      ( produc368081759rm_f_v(X1,X23) = produc368081759rm_f_v(Y1,Y23)
+    <=> ( X1 = Y1
+        & X23 = Y23 ) ) )).
+
+tff(fact_200_take__drop,axiom,(
+    ! [N: nat,M: nat,Xs: list_M276003553xt_f_v] : take_M241671497xt_f_v(N,drop_M1817411233xt_f_v(M,Xs)) = drop_M1817411233xt_f_v(M,take_M241671497xt_f_v(aa_nat_nat(plus_plus_nat(N),M),Xs)) )).
+
+tff(fact_201_take__drop,axiom,(
+    ! [N: nat,M: nat,Xs: list_nat] : take_nat(N,drop_nat(M,Xs)) = drop_nat(M,take_nat(aa_nat_nat(plus_plus_nat(N),M),Xs)) )).
+
+tff(fact_202_nat__induct,axiom,(
+    ! [P3: fun_nat_bool,N: nat] : 
+      ( pp(aa_nat_bool(P3,zero_zero_nat))
+     => ( ! [N2: nat] : 
+            ( pp(aa_nat_bool(P3,N2))
+           => pp(aa_nat_bool(P3,aa_nat_nat(suc,N2))) )
+       => pp(aa_nat_bool(P3,N)) ) ) )).
+
+tff(fact_203_Cons__eq__appendI,axiom,(
+    ! [X2: multihole_mctxt_f_v,Xs1: list_M276003553xt_f_v,Ys: list_M276003553xt_f_v,Xs: list_M276003553xt_f_v,Zs: list_M276003553xt_f_v] : 
+      ( cons_M10820881xt_f_v(X2,Xs1) = Ys
+     => ( Xs = append460316534xt_f_v(Xs1,Zs)
+       => cons_M10820881xt_f_v(X2,Xs) = append460316534xt_f_v(Ys,Zs) ) ) )).
+
+tff(fact_204_Cons__eq__appendI,axiom,(
+    ! [X2: term_f_v,Xs1: list_term_f_v,Ys: list_term_f_v,Xs: list_term_f_v,Zs: list_term_f_v] : 
+      ( cons_term_f_v(X2,Xs1) = Ys
+     => ( Xs = append_term_f_v(Xs1,Zs)
+       => cons_term_f_v(X2,Xs) = append_term_f_v(Ys,Zs) ) ) )).
+
+tff(fact_205_nat_Oinject,axiom,(
+    ! [X23: nat,Y23: nat] : 
+      ( aa_nat_nat(suc,X23) = aa_nat_nat(suc,Y23)
+    <=> X23 = Y23 ) )).
+
+tff(fact_206_mctxt_Osimps_I8_J,axiom,(
+    ! [X31: f,X32: list_M276003553xt_f_v] : 
+      multihole_MFun_f_v(X31,X32) != multihole_MHole_f_v )).
+
+tff(fact_207_option_Odistinct_I1_J,axiom,(
+    ! [X23: nat] : 
+      none_nat != some_nat(X23) )).
+
+tff(fact_208_pp__cr__axioms,axiom,(
+    pp_cr_f_v(sigF,r,ap) )).
+
+tff(fact_209_add__is__0,axiom,(
+    ! [M: nat,N: nat] : 
+      ( aa_nat_nat(plus_plus_nat(M),N) = zero_zero_nat
+    <=> ( M = zero_zero_nat
+        & N = zero_zero_nat ) ) )).
+
+tff(fact_210_rev__nonempty__induct,axiom,(
+    ! [Xs: list_M276003553xt_f_v,P3: fun_li1550744377v_bool] : 
+      ( Xs != nil_Mu1963645281xt_f_v
+     => ( ! [X3: multihole_mctxt_f_v] : pp(aa_lis1678885170v_bool(P3,cons_M10820881xt_f_v(X3,nil_Mu1963645281xt_f_v)))
+       => ( ! [X3: multihole_mctxt_f_v,Xs2: list_M276003553xt_f_v] : 
+              ( Xs2 != nil_Mu1963645281xt_f_v
+             => ( pp(aa_lis1678885170v_bool(P3,Xs2))
+               => pp(aa_lis1678885170v_bool(P3,append460316534xt_f_v(Xs2,cons_M10820881xt_f_v(X3,nil_Mu1963645281xt_f_v)))) ) )
+         => pp(aa_lis1678885170v_bool(P3,Xs)) ) ) ) )).
+
+tff(fact_211_rev__nonempty__induct,axiom,(
+    ! [Xs: list_term_f_v,P3: fun_li1075135677v_bool] : 
+      ( Xs != nil_term_f_v
+     => ( ! [X3: term_f_v] : pp(aa_lis1953671846v_bool(P3,cons_term_f_v(X3,nil_term_f_v)))
+       => ( ! [X3: term_f_v,Xs2: list_term_f_v] : 
+              ( Xs2 != nil_term_f_v
+             => ( pp(aa_lis1953671846v_bool(P3,Xs2))
+               => pp(aa_lis1953671846v_bool(P3,append_term_f_v(Xs2,cons_term_f_v(X3,nil_term_f_v)))) ) )
+         => pp(aa_lis1953671846v_bool(P3,Xs)) ) ) ) )).
+
+tff(fact_212_list__nonempty__induct,axiom,(
+    ! [Xs: list_M276003553xt_f_v,P3: fun_li1550744377v_bool] : 
+      ( Xs != nil_Mu1963645281xt_f_v
+     => ( ! [X3: multihole_mctxt_f_v] : pp(aa_lis1678885170v_bool(P3,cons_M10820881xt_f_v(X3,nil_Mu1963645281xt_f_v)))
+       => ( ! [X3: multihole_mctxt_f_v,Xs2: list_M276003553xt_f_v] : 
+              ( Xs2 != nil_Mu1963645281xt_f_v
+             => ( pp(aa_lis1678885170v_bool(P3,Xs2))
+               => pp(aa_lis1678885170v_bool(P3,cons_M10820881xt_f_v(X3,Xs2))) ) )
+         => pp(aa_lis1678885170v_bool(P3,Xs)) ) ) ) )).
+
+tff(fact_213_list__nonempty__induct,axiom,(
+    ! [Xs: list_term_f_v,P3: fun_li1075135677v_bool] : 
+      ( Xs != nil_term_f_v
+     => ( ! [X3: term_f_v] : pp(aa_lis1953671846v_bool(P3,cons_term_f_v(X3,nil_term_f_v)))
+       => ( ! [X3: term_f_v,Xs2: list_term_f_v] : 
+              ( Xs2 != nil_term_f_v
+             => ( pp(aa_lis1953671846v_bool(P3,Xs2))
+               => pp(aa_lis1953671846v_bool(P3,cons_term_f_v(X3,Xs2))) ) )
+         => pp(aa_lis1953671846v_bool(P3,Xs)) ) ) ) )).
+
+tff(fact_214_List_Orev__induct,axiom,(
+    ! [P3: fun_li1550744377v_bool,Xs: list_M276003553xt_f_v] : 
+      ( pp(aa_lis1678885170v_bool(P3,nil_Mu1963645281xt_f_v))
+     => ( ! [X3: multihole_mctxt_f_v,Xs2: list_M276003553xt_f_v] : 
+            ( pp(aa_lis1678885170v_bool(P3,Xs2))
+           => pp(aa_lis1678885170v_bool(P3,append460316534xt_f_v(Xs2,cons_M10820881xt_f_v(X3,nil_Mu1963645281xt_f_v)))) )
+       => pp(aa_lis1678885170v_bool(P3,Xs)) ) ) )).
+
+tff(fact_215_List_Orev__induct,axiom,(
+    ! [P3: fun_li1075135677v_bool,Xs: list_term_f_v] : 
+      ( pp(aa_lis1953671846v_bool(P3,nil_term_f_v))
+     => ( ! [X3: term_f_v,Xs2: list_term_f_v] : 
+            ( pp(aa_lis1953671846v_bool(P3,Xs2))
+           => pp(aa_lis1953671846v_bool(P3,append_term_f_v(Xs2,cons_term_f_v(X3,nil_term_f_v)))) )
+       => pp(aa_lis1953671846v_bool(P3,Xs)) ) ) )).
+
+tff(fact_216_eq__Nil__appendI,axiom,(
+    ! [Xs: list_M276003553xt_f_v,Ys: list_M276003553xt_f_v] : 
+      ( Xs = Ys
+     => Xs = append460316534xt_f_v(nil_Mu1963645281xt_f_v,Ys) ) )).
+
+tff(fact_217_eq__Nil__appendI,axiom,(
+    ! [Xs: list_term_f_v,Ys: list_term_f_v] : 
+      ( Xs = Ys
+     => Xs = append_term_f_v(nil_term_f_v,Ys) ) )).
+
+tff(fact_218_rev__exhaust,axiom,(
+    ! [Xs: list_M276003553xt_f_v] : 
+      ( Xs != nil_Mu1963645281xt_f_v
+     => ~ ( ! [Ys3: list_M276003553xt_f_v,Y3: multihole_mctxt_f_v] : 
+              Xs != append460316534xt_f_v(Ys3,cons_M10820881xt_f_v(Y3,nil_Mu1963645281xt_f_v)) ) ) )).
+
+tff(fact_219_rev__exhaust,axiom,(
+    ! [Xs: list_term_f_v] : 
+      ( Xs != nil_term_f_v
+     => ~ ( ! [Ys3: list_term_f_v,Y3: term_f_v] : 
+              Xs != append_term_f_v(Ys3,cons_term_f_v(Y3,nil_term_f_v)) ) ) )).
+
+tff(fact_220_mctxt_Oexhaust,axiom,(
+    ! [Y: multihole_mctxt_f_v] : 
+      ( ! [X12: v] : 
+          Y != multihole_MVar_v_f(X12)
+     => ( Y != multihole_MHole_f_v
+       => ~ ( ! [X312: f,X322: list_M276003553xt_f_v] : 
+                Y != multihole_MFun_f_v(X312,X322) ) ) ) )).
+
+tff(fact_221_mreplace__at_Opelims,axiom,(
+    ! [X2: multihole_mctxt_f_v,Xa: pos,Xb: multihole_mctxt_f_v,Y: multihole_mctxt_f_v] : 
+      ( aa_Mul1979903100xt_f_v(lS_mreplace_at_f_v(X2,Xa),Xb) = Y
+     => ( accp_P926708710xt_f_v(lS_mre1091278265el_f_v,produc1704173645xt_f_v(X2,produc1409864257xt_f_v(Xa,Xb)))
+       => ( ( Xa = empty
+           => ( Y = Xb
+             => ~ accp_P926708710xt_f_v(lS_mre1091278265el_f_v,produc1704173645xt_f_v(X2,produc1409864257xt_f_v(empty,Xb))) ) )
+         => ( ! [F2: f,Cs2: list_M276003553xt_f_v] : 
+                ( X2 = multihole_MFun_f_v(F2,Cs2)
+               => ! [I2: nat,P2: pos] : 
+                    ( Xa = aa_pos_pos(aa_nat_fun_pos_pos(pCons,I2),P2)
+                   => ( Y = multihole_MFun_f_v(F2,append460316534xt_f_v(take_M241671497xt_f_v(I2,Cs2),cons_M10820881xt_f_v(aa_Mul1979903100xt_f_v(lS_mreplace_at_f_v(aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Cs2),I2),P2),Xb),drop_M1817411233xt_f_v(aa_nat_nat(plus_plus_nat(I2),one_one_nat),Cs2))))
+                     => ~ accp_P926708710xt_f_v(lS_mre1091278265el_f_v,produc1704173645xt_f_v(multihole_MFun_f_v(F2,Cs2),produc1409864257xt_f_v(aa_pos_pos(aa_nat_fun_pos_pos(pCons,I2),P2),Xb))) ) ) )
+           => ( ! [Vb: v] : 
+                  ( X2 = multihole_MVar_v_f(Vb)
+                 => ! [V: nat,Va: pos] : 
+                      ( Xa = aa_pos_pos(aa_nat_fun_pos_pos(pCons,V),Va)
+                     => ( Y = undefi637609667xt_f_v
+                       => ~ accp_P926708710xt_f_v(lS_mre1091278265el_f_v,produc1704173645xt_f_v(multihole_MVar_v_f(Vb),produc1409864257xt_f_v(aa_pos_pos(aa_nat_fun_pos_pos(pCons,V),Va),Xb))) ) ) )
+             => ~ ( X2 = multihole_MHole_f_v
+                 => ! [V: nat,Va: pos] : 
+                      ( Xa = aa_pos_pos(aa_nat_fun_pos_pos(pCons,V),Va)
+                     => ( Y = undefi637609667xt_f_v
+                       => ~ accp_P926708710xt_f_v(lS_mre1091278265el_f_v,produc1704173645xt_f_v(multihole_MHole_f_v,produc1409864257xt_f_v(aa_pos_pos(aa_nat_fun_pos_pos(pCons,V),Va),Xb))) ) ) ) ) ) ) ) ) )).
+
+tff(fact_222__092_060LL_062_092_060_094sub_0621_Ocases,axiom,(
+    ! [A: multihole_mctxt_f_v] : 
+      ( pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(sigF,ap),A))
+     => ( A != multihole_MHole_f_v
+       => ( ! [X3: v] : 
+              A != multihole_MVar_v_f(X3)
+         => ( ! [F2: f,M2: nat,Cs2: list_M276003553xt_f_v] : 
+                ( A = multihole_MFun_f_v(F2,Cs2)
+               => ( pp(aa_set2129085473t_bool(member2050190361_f_nat(product_Pair_f_nat(F2,M2)),aa_set1604101550_f_nat(minus_140170257_f_nat(pp_F_U_f(sigF,ap)),aa_set1604101550_f_nat(insert168347826_f_nat(product_Pair_f_nat(ap,numeral_numeral_nat(bit0(one)))),bot_bo1362251980_f_nat))))
+                 => ( aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Cs2) = M2
+                   => ~ ( ! [X4: multihole_mctxt_f_v] : 
+                            ( member995025156xt_f_v(X4,set_Mu1483390320xt_f_v(Cs2))
+                           => pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(sigF,ap),X4)) ) ) ) ) )
+           => ~ ( ! [C3: multihole_mctxt_f_v,C6: multihole_mctxt_f_v] : 
+                    ( A = multihole_MFun_f_v(ap,cons_M10820881xt_f_v(C3,cons_M10820881xt_f_v(C6,nil_Mu1963645281xt_f_v)))
+                   => ( pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(sigF,ap),C3))
+                     => ( pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(sigF,ap),C6))
+                       => ~ pp(aa_nat_bool(pp_missing_args_f_v(sigF,ap,C3),zero_zero_nat)) ) ) ) ) ) ) ) ) )).
+
+tff(fact_223_mctxt_Odistinct_I1_J,axiom,(
+    ! [X1: v] : 
+      multihole_MVar_v_f(X1) != multihole_MHole_f_v )).
+
+tff(fact_224_nat__less__le,axiom,(
+    ! [M: nat,N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,M),N))
+    <=> ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,M),N))
+        & M != N ) ) )).
+
+tff(fact_225__092_060LL_062_092_060_094sub_0621_Osimps,axiom,(
+    ! [A: multihole_mctxt_f_v] : 
+      ( pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(sigF,ap),A))
+    <=> ( A = multihole_MHole_f_v
+        | ? [X: v] : A = multihole_MVar_v_f(X)
+        | ? [F3: f,Cs3: list_M276003553xt_f_v] : 
+            ( A = multihole_MFun_f_v(F3,Cs3)
+            & pp(aa_set2129085473t_bool(member2050190361_f_nat(product_Pair_f_nat(F3,aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Cs3))),aa_set1604101550_f_nat(minus_140170257_f_nat(pp_F_U_f(sigF,ap)),aa_set1604101550_f_nat(insert168347826_f_nat(product_Pair_f_nat(ap,numeral_numeral_nat(bit0(one)))),bot_bo1362251980_f_nat))))
+            & ! [X: multihole_mctxt_f_v] : 
+                ( member995025156xt_f_v(X,set_Mu1483390320xt_f_v(Cs3))
+               => pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(sigF,ap),X)) ) )
+        | ? [C: multihole_mctxt_f_v,C5: multihole_mctxt_f_v] : 
+            ( A = multihole_MFun_f_v(ap,cons_M10820881xt_f_v(C,cons_M10820881xt_f_v(C5,nil_Mu1963645281xt_f_v)))
+            & pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(sigF,ap),C))
+            & pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(sigF,ap),C5))
+            & pp(aa_nat_bool(pp_missing_args_f_v(sigF,ap,C),zero_zero_nat)) ) ) ) )).
+
+tff(fact_226_Cons__eq__append__conv,axiom,(
+    ! [X2: multihole_mctxt_f_v,Xs: list_M276003553xt_f_v,Ys: list_M276003553xt_f_v,Zs: list_M276003553xt_f_v] : 
+      ( cons_M10820881xt_f_v(X2,Xs) = append460316534xt_f_v(Ys,Zs)
+    <=> ( ( Ys = nil_Mu1963645281xt_f_v
+          & cons_M10820881xt_f_v(X2,Xs) = Zs )
+        | ? [Ys4: list_M276003553xt_f_v] : 
+            ( cons_M10820881xt_f_v(X2,Ys4) = Ys
+            & Xs = append460316534xt_f_v(Ys4,Zs) ) ) ) )).
+
+tff(fact_227_Cons__eq__append__conv,axiom,(
+    ! [X2: term_f_v,Xs: list_term_f_v,Ys: list_term_f_v,Zs: list_term_f_v] : 
+      ( cons_term_f_v(X2,Xs) = append_term_f_v(Ys,Zs)
+    <=> ( ( Ys = nil_term_f_v
+          & cons_term_f_v(X2,Xs) = Zs )
+        | ? [Ys4: list_term_f_v] : 
+            ( cons_term_f_v(X2,Ys4) = Ys
+            & Xs = append_term_f_v(Ys4,Zs) ) ) ) )).
+
+tff(fact_228_monoI,axiom,(
+    ! [F: fun_nat_nat] : 
+      ( ! [X3: nat,Y3: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y3))
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(F,X3)),aa_nat_nat(F,Y3))) )
+     => order_mono_nat_nat(F) ) )).
+
+tff(fact_229_monoI,axiom,(
+    ! [F: fun_nat_bool] : 
+      ( ! [X3: nat,Y3: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y3))
+         => pp(aa_bool_bool(ord_less_eq_bool(aa_nat_bool(F,X3)),aa_nat_bool(F,Y3))) )
+     => order_mono_nat_bool(F) ) )).
+
+tff(fact_230_monoI,axiom,(
+    ! [F: fun_na1171097349_f_nat] : 
+      ( ! [X3: nat,Y3: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X3),Y3))
+         => pp(aa_set2129085473t_bool(ord_le2116922008_f_nat(aa_nat1671770182_f_nat(F,X3)),aa_nat1671770182_f_nat(F,Y3))) )
+     => order_945249658_f_nat(F) ) )).
+
+tff(fact_231_monoI,axiom,(
+    ! [F: fun_bool_nat] : 
+      ( ! [X3: bool,Y3: bool] : 
+          ( pp(aa_bool_bool(ord_less_eq_bool(X3),Y3))
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_bool_nat(F,X3)),aa_bool_nat(F,Y3))) )
+     => order_mono_bool_nat(F) ) )).
+
+tff(fact_232_monoI,axiom,(
+    ! [F: fun_bool_bool] : 
+      ( ! [X3: bool,Y3: bool] : 
+          ( pp(aa_bool_bool(ord_less_eq_bool(X3),Y3))
+         => pp(aa_bool_bool(ord_less_eq_bool(aa_bool_bool(F,X3)),aa_bool_bool(F,Y3))) )
+     => order_mono_bool_bool(F) ) )).
+
+tff(fact_233_monoI,axiom,(
+    ! [F: fun_bo1629667938_f_nat] : 
+      ( ! [X3: bool,Y3: bool] : 
+          ( pp(aa_bool_bool(ord_less_eq_bool(X3),Y3))
+         => pp(aa_set2129085473t_bool(ord_le2116922008_f_nat(aa_boo54241171_f_nat(F,X3)),aa_boo54241171_f_nat(F,Y3))) )
+     => order_138987359_f_nat(F) ) )).
+
+tff(fact_234_monoI,axiom,(
+    ! [F: fun_se463234053at_nat] : 
+      ( ! [X3: set_Pr592218680_f_nat,Y3: set_Pr592218680_f_nat] : 
+          ( pp(aa_set2129085473t_bool(ord_le2116922008_f_nat(X3),Y3))
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_set661417286at_nat(F,X3)),aa_set661417286at_nat(F,Y3))) )
+     => order_2082380410at_nat(F) ) )).
+
+tff(fact_235_monoI,axiom,(
+    ! [F: fun_se1061273144t_bool] : 
+      ( ! [X3: set_Pr592218680_f_nat,Y3: set_Pr592218680_f_nat] : 
+          ( pp(aa_set2129085473t_bool(ord_le2116922008_f_nat(X3),Y3))
+         => pp(aa_bool_bool(ord_less_eq_bool(aa_set2129085473t_bool(F,X3)),aa_set2129085473t_bool(F,Y3))) )
+     => order_66348013t_bool(F) ) )).
+
+tff(fact_236_monoI,axiom,(
+    ! [F: fun_se529884269_f_nat] : 
+      ( ! [X3: set_Pr592218680_f_nat,Y3: set_Pr592218680_f_nat] : 
+          ( pp(aa_set2129085473t_bool(ord_le2116922008_f_nat(X3),Y3))
+         => pp(aa_set2129085473t_bool(ord_le2116922008_f_nat(aa_set1604101550_f_nat(F,X3)),aa_set1604101550_f_nat(F,Y3))) )
+     => order_1466478306_f_nat(F) ) )).
+
+tff(fact_237_ground__mctxt_Ocases,axiom,(
+    ! [X2: multihole_mctxt_f_v] : 
+      ( ! [Uu: v] : 
+          X2 != multihole_MVar_v_f(Uu)
+     => ( X2 != multihole_MHole_f_v
+       => ~ ( ! [F2: f,Cs2: list_M276003553xt_f_v] : 
+                X2 != multihole_MFun_f_v(F2,Cs2) ) ) ) )).
+
+tff(fact_238_mctxt__term__conv_Ocases,axiom,(
+    ! [X2: multihole_mctxt_f_v] : 
+      ( X2 != multihole_MHole_f_v
+     => ( ! [V: v] : 
+            X2 != multihole_MVar_v_f(V)
+       => ~ ( ! [F2: f,Cs2: list_M276003553xt_f_v] : 
+                X2 != multihole_MFun_f_v(F2,Cs2) ) ) ) )).
+
+tff(fact_239_upd__conv__take__nth__drop,axiom,(
+    ! [I: nat,Xs: list_M276003553xt_f_v,A: multihole_mctxt_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I),aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)))
+     => list_u1095619529xt_f_v(Xs,I,A) = append460316534xt_f_v(take_M241671497xt_f_v(I,Xs),cons_M10820881xt_f_v(A,drop_M1817411233xt_f_v(aa_nat_nat(suc,I),Xs))) ) )).
+
+tff(fact_240_upd__conv__take__nth__drop,axiom,(
+    ! [I: nat,Xs: list_term_f_v,A: term_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I),aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)))
+     => list_update_term_f_v(Xs,I,A) = append_term_f_v(take_term_f_v(I,Xs),cons_term_f_v(A,drop_term_f_v(aa_nat_nat(suc,I),Xs))) ) )).
+
+tff(fact_241_upd__conv__take__nth__drop,axiom,(
+    ! [I: nat,Xs: list_nat,A: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I),aa_list_nat_nat(size_size_list_nat,Xs)))
+     => list_update_nat(Xs,I,A) = append_nat(take_nat(I,Xs),cons_nat(A,drop_nat(aa_nat_nat(suc,I),Xs))) ) )).
+
+tff(fact_242_list_OdiscI,axiom,(
+    ! [List: list_M276003553xt_f_v,X21: multihole_mctxt_f_v,X22: list_M276003553xt_f_v] : 
+      ( List = cons_M10820881xt_f_v(X21,X22)
+     => List != nil_Mu1963645281xt_f_v ) )).
+
+tff(fact_243_list_OdiscI,axiom,(
+    ! [List: list_term_f_v,X21: term_f_v,X22: list_term_f_v] : 
+      ( List = cons_term_f_v(X21,X22)
+     => List != nil_term_f_v ) )).
+
+tff(fact_244_fresh,axiom,(
+    aa_f_option_nat(sigF,ap) = none_nat )).
+
+tff(fact_245_nth__via__drop,axiom,(
+    ! [N: nat,Xs: list_nat,Y: nat,Ys: list_nat] : 
+      ( drop_nat(N,Xs) = cons_nat(Y,Ys)
+     => aa_nat_nat(nth_nat(Xs),N) = Y ) )).
+
+tff(fact_246_nth__via__drop,axiom,(
+    ! [N: nat,Xs: list_M276003553xt_f_v,Y: multihole_mctxt_f_v,Ys: list_M276003553xt_f_v] : 
+      ( drop_M1817411233xt_f_v(N,Xs) = cons_M10820881xt_f_v(Y,Ys)
+     => aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Xs),N) = Y ) )).
+
+tff(fact_247_nth__via__drop,axiom,(
+    ! [N: nat,Xs: list_term_f_v,Y: term_f_v,Ys: list_term_f_v] : 
+      ( drop_term_f_v(N,Xs) = cons_term_f_v(Y,Ys)
+     => aa_nat_term_f_v(nth_term_f_v(Xs),N) = Y ) )).
+
+tff(fact_248_add_Ocommute,axiom,(
+    ! [A: nat,B: nat] : aa_nat_nat(plus_plus_nat(A),B) = aa_nat_nat(plus_plus_nat(B),A) )).
+
+tff(fact_249_insert__iff,axiom,(
+    ! [A: pos,B: pos,A2: set_pos] : 
+      ( member_pos(A,insert_pos(B,A2))
+    <=> ( A = B
+        | member_pos(A,A2) ) ) )).
+
+tff(fact_250_insert__iff,axiom,(
+    ! [A: product_prod_f_nat,B: product_prod_f_nat,A2: set_Pr592218680_f_nat] : 
+      ( pp(aa_set2129085473t_bool(member2050190361_f_nat(A),aa_set1604101550_f_nat(insert168347826_f_nat(B),A2)))
+    <=> ( A = B
+        | pp(aa_set2129085473t_bool(member2050190361_f_nat(A),A2)) ) ) )).
+
+tff(fact_251_list_Odistinct_I1_J,axiom,(
+    ! [X21: multihole_mctxt_f_v,X22: list_M276003553xt_f_v] : 
+      nil_Mu1963645281xt_f_v != cons_M10820881xt_f_v(X21,X22) )).
+
+tff(fact_252_list_Odistinct_I1_J,axiom,(
+    ! [X21: term_f_v,X22: list_term_f_v] : 
+      nil_term_f_v != cons_term_f_v(X21,X22) )).
+
+tff(fact_253_Suc__leI,axiom,(
+    ! [M: nat,N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,M),N))
+     => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(suc,M)),N)) ) )).
+
+tff(fact_254_add_Oleft__commute,axiom,(
+    ! [B: nat,A: nat,C7: nat] : aa_nat_nat(plus_plus_nat(B),aa_nat_nat(plus_plus_nat(A),C7)) = aa_nat_nat(plus_plus_nat(A),aa_nat_nat(plus_plus_nat(B),C7)) )).
+
+tff(fact_255_nth__list__update__eq,axiom,(
+    ! [I: nat,Xs: list_M276003553xt_f_v,X2: multihole_mctxt_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I),aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)))
+     => aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,list_u1095619529xt_f_v(Xs,I,X2)),I) = X2 ) )).
+
+tff(fact_256_nth__list__update__eq,axiom,(
+    ! [I: nat,Xs: list_term_f_v,X2: term_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I),aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)))
+     => aa_nat_term_f_v(nth_term_f_v(list_update_term_f_v(Xs,I,X2)),I) = X2 ) )).
+
+tff(fact_257_nth__list__update__eq,axiom,(
+    ! [I: nat,Xs: list_nat,X2: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I),aa_list_nat_nat(size_size_list_nat,Xs)))
+     => aa_nat_nat(nth_nat(list_update_nat(Xs,I,X2)),I) = X2 ) )).
+
+tff(fact_258_missing__args_Ocases,axiom,(
+    ! [X2: produc424896090_v_nat] : 
+      ( ! [N2: nat] : 
+          X2 != produc302379220_v_nat(multihole_MHole_f_v,N2)
+     => ( ! [X3: v,N2: nat] : 
+            X2 != produc302379220_v_nat(multihole_MVar_v_f(X3),N2)
+       => ~ ( ! [F2: f,Cs2: list_M276003553xt_f_v,N2: nat] : 
+                X2 != produc302379220_v_nat(multihole_MFun_f_v(F2,Cs2),N2) ) ) ) )).
+
+tff(fact_259_le__boolI_H,axiom,(
+    ! [P3: bool,Q: bool] : 
+      ( ( pp(P3)
+       => pp(Q) )
+     => pp(aa_bool_bool(ord_less_eq_bool(P3),Q)) ) )).
+
+tff(fact_260_less__imp__Suc__add,axiom,(
+    ! [M: nat,N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,M),N))
+     => ? [K: nat] : N = aa_nat_nat(suc,aa_nat_nat(plus_plus_nat(M),K)) ) )).
+
+tff(fact_261_take__all,axiom,(
+    ! [Xs: list_M276003553xt_f_v,N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)),N))
+     => take_M241671497xt_f_v(N,Xs) = Xs ) )).
+
+tff(fact_262_take__all,axiom,(
+    ! [Xs: list_term_f_v,N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)),N))
+     => take_term_f_v(N,Xs) = Xs ) )).
+
+tff(fact_263_take__all,axiom,(
+    ! [Xs: list_nat,N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_list_nat_nat(size_size_list_nat,Xs)),N))
+     => take_nat(N,Xs) = Xs ) )).
+
+tff(fact_264_le__boolD,axiom,(
+    ! [P3: bool,Q: bool] : 
+      ( pp(aa_bool_bool(ord_less_eq_bool(P3),Q))
+     => ( pp(P3)
+       => pp(Q) ) ) )).
+
+tff(fact_265_poss__mctxt__simp,axiom,(
+    ! [F: f,Cs4: list_M276003553xt_f_v] : aa_Mul1241491826et_pos(multih37762601xt_f_v,multihole_MFun_f_v(F,Cs4)) = sup_sup_set_pos(insert_pos(empty,bot_bot_set_pos),collect_pos(aTP_Lamm_af(Cs4))) )).
+
+tff(fact_266_add__left__cancel,axiom,(
+    ! [A: nat,B: nat,C7: nat] : 
+      ( aa_nat_nat(plus_plus_nat(A),B) = aa_nat_nat(plus_plus_nat(A),C7)
+    <=> B = C7 ) )).
+
+tff(fact_267_nth__list__update__neq,axiom,(
+    ! [I: nat,J: nat,Xs: list_M276003553xt_f_v,X2: multihole_mctxt_f_v] : 
+      ( I != J
+     => aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,list_u1095619529xt_f_v(Xs,I,X2)),J) = aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Xs),J) ) )).
+
+tff(fact_268_nth__list__update__neq,axiom,(
+    ! [I: nat,J: nat,Xs: list_nat,X2: nat] : 
+      ( I != J
+     => aa_nat_nat(nth_nat(list_update_nat(Xs,I,X2)),J) = aa_nat_nat(nth_nat(Xs),J) ) )).
+
+tff(fact_269_pos_Odistinct_I1_J,axiom,(
+    ! [X21: nat,X22: pos] : 
+      empty != aa_pos_pos(aa_nat_fun_pos_pos(pCons,X21),X22) )).
+
+tff(fact_270_option_Osel,axiom,(
+    ! [X23: nat] : the_nat(some_nat(X23)) = X23 )).
+
+tff(fact_271_subm__at_Osimps_I2_J,axiom,(
+    ! [F: f,Cs: list_M276003553xt_f_v,I: nat,P: pos] : lS_subm_at_f_v(multihole_MFun_f_v(F,Cs),aa_pos_pos(aa_nat_fun_pos_pos(pCons,I),P)) = lS_subm_at_f_v(aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Cs),I),P) )).
+
+tff(fact_272_Nat_Oadd__diff__assoc,axiom,(
+    ! [K2: nat,J: nat,I: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,K2),J))
+     => aa_nat_nat(plus_plus_nat(I),aa_nat_nat(minus_minus_nat(J),K2)) = aa_nat_nat(minus_minus_nat(aa_nat_nat(plus_plus_nat(I),J)),K2) ) )).
+
+tff(fact_273_lessI,axiom,(
+    ! [N: nat] : pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,N),aa_nat_nat(suc,N))) )).
+
+tff(fact_274_append__eq__Cons__conv,axiom,(
+    ! [Ys: list_M276003553xt_f_v,Zs: list_M276003553xt_f_v,X2: multihole_mctxt_f_v,Xs: list_M276003553xt_f_v] : 
+      ( append460316534xt_f_v(Ys,Zs) = cons_M10820881xt_f_v(X2,Xs)
+    <=> ( ( Ys = nil_Mu1963645281xt_f_v
+          & Zs = cons_M10820881xt_f_v(X2,Xs) )
+        | ? [Ys4: list_M276003553xt_f_v] : 
+            ( Ys = cons_M10820881xt_f_v(X2,Ys4)
+            & append460316534xt_f_v(Ys4,Zs) = Xs ) ) ) )).
+
+tff(fact_275_append__eq__Cons__conv,axiom,(
+    ! [Ys: list_term_f_v,Zs: list_term_f_v,X2: term_f_v,Xs: list_term_f_v] : 
+      ( append_term_f_v(Ys,Zs) = cons_term_f_v(X2,Xs)
+    <=> ( ( Ys = nil_term_f_v
+          & Zs = cons_term_f_v(X2,Xs) )
+        | ? [Ys4: list_term_f_v] : 
+            ( Ys = cons_term_f_v(X2,Ys4)
+            & append_term_f_v(Ys4,Zs) = Xs ) ) ) )).
+
+tff(fact_276_nat__le__linear,axiom,(
+    ! [M: nat,N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,M),N))
+      | pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,N),M)) ) )).
+
+tff(fact_277_length__append__singleton,axiom,(
+    ! [Xs: list_M276003553xt_f_v,X2: multihole_mctxt_f_v] : aa_lis1425841141_v_nat(size_s1130017613xt_f_v,append460316534xt_f_v(Xs,cons_M10820881xt_f_v(X2,nil_Mu1963645281xt_f_v))) = aa_nat_nat(suc,aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)) )).
+
+tff(fact_278_length__append__singleton,axiom,(
+    ! [Xs: list_term_f_v,X2: term_f_v] : aa_list_term_f_v_nat(size_s693102343rm_f_v,append_term_f_v(Xs,cons_term_f_v(X2,nil_term_f_v))) = aa_nat_nat(suc,aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)) )).
+
+tff(fact_279_length__append__singleton,axiom,(
+    ! [Xs: list_nat,X2: nat] : aa_list_nat_nat(size_size_list_nat,append_nat(Xs,cons_nat(X2,nil_nat))) = aa_nat_nat(suc,aa_list_nat_nat(size_size_list_nat,Xs)) )).
+
+tff(fact_280_sup__bot_Oleft__neutral,axiom,(
+    ! [A: set_Pr592218680_f_nat] : aa_set1604101550_f_nat(sup_su1335354212_f_nat(bot_bo1362251980_f_nat),A) = A )).
+
+tff(fact_281_pp__cr_Omissing__args_Ocases,axiom,(
+    ! [SigF: fun_f_option_nat,R: set_Pr576123655rm_f_v,Ap: f,X2: produc424896090_v_nat] : 
+      ( pp_cr_f_v(SigF,R,Ap)
+     => ( ! [N2: nat] : 
+            X2 != produc302379220_v_nat(multihole_MHole_f_v,N2)
+       => ( ! [X3: v,N2: nat] : 
+              X2 != produc302379220_v_nat(multihole_MVar_v_f(X3),N2)
+         => ~ ( ! [F2: f,Cs2: list_M276003553xt_f_v,N2: nat] : 
+                  X2 != produc302379220_v_nat(multihole_MFun_f_v(F2,Cs2),N2) ) ) ) ) )).
+
+tff(fact_282_order__refl,axiom,(
+    ! [X2: nat] : pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X2),X2)) )).
+
+tff(fact_283_order__refl,axiom,(
+    ! [X2: bool] : pp(aa_bool_bool(ord_less_eq_bool(X2),X2)) )).
+
+tff(fact_284_order__refl,axiom,(
+    ! [X2: set_Pr592218680_f_nat] : pp(aa_set2129085473t_bool(ord_le2116922008_f_nat(X2),X2)) )).
+
+tff(fact_285_less__antisym,axiom,(
+    ! [N: nat,M: nat] : 
+      ( ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,N),M))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,N),aa_nat_nat(suc,M)))
+       => M = N ) ) )).
+
+tff(fact_286_zero__less__Suc,axiom,(
+    ! [N: nat] : pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,zero_zero_nat),aa_nat_nat(suc,N))) )).
+
+tff(fact_287_Un__insert__left,axiom,(
+    ! [A: product_prod_f_nat,B3: set_Pr592218680_f_nat,C2: set_Pr592218680_f_nat] : aa_set1604101550_f_nat(sup_su1335354212_f_nat(aa_set1604101550_f_nat(insert168347826_f_nat(A),B3)),C2) = aa_set1604101550_f_nat(insert168347826_f_nat(A),aa_set1604101550_f_nat(sup_su1335354212_f_nat(B3),C2)) )).
+
+tff(fact_288_mctxt_Oinject_I1_J,axiom,(
+    ! [X1: v,Y1: v] : 
+      ( multihole_MVar_v_f(X1) = multihole_MVar_v_f(Y1)
+    <=> X1 = Y1 ) )).
+
+tff(fact_289_le__SucI,axiom,(
+    ! [M: nat,N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,M),N))
+     => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,M),aa_nat_nat(suc,N))) ) )).
+
+tff(fact_290_prod_Osel_I1_J,axiom,(
+    ! [X1: f,X23: nat] : product_fst_f_nat(product_Pair_f_nat(X1,X23)) = X1 )).
+
+tff(fact_291_prod_Osel_I1_J,axiom,(
+    ! [X1: multihole_mctxt_f_v,X23: nat] : produc1397634536_v_nat(produc302379220_v_nat(X1,X23)) = X1 )).
+
+tff(fact_292_prod_Osel_I1_J,axiom,(
+    ! [X1: pos,X23: pos] : product_fst_pos_pos(product_Pair_pos_pos(X1,X23)) = X1 )).
+
+tff(fact_293_prod_Osel_I1_J,axiom,(
+    ! [X1: term_f_v,X23: term_f_v] : produc1808628555rm_f_v(produc368081759rm_f_v(X1,X23)) = X1 )).
+
+tff(fact_294_pos_Osize__gen_I2_J,axiom,(
+    ! [X21: nat,X22: pos] : aa_pos_nat(size_pos,aa_pos_pos(aa_nat_fun_pos_pos(pCons,X21),X22)) = aa_nat_nat(plus_plus_nat(aa_pos_nat(size_pos,X22)),aa_nat_nat(suc,zero_zero_nat)) )).
+
+tff(fact_295_add__is__1,axiom,(
+    ! [M: nat,N: nat] : 
+      ( aa_nat_nat(plus_plus_nat(M),N) = aa_nat_nat(suc,zero_zero_nat)
+    <=> ( ( M = aa_nat_nat(suc,zero_zero_nat)
+          & N = zero_zero_nat )
+        | ( M = zero_zero_nat
+          & N = aa_nat_nat(suc,zero_zero_nat) ) ) ) )).
+
+tff(fact_296_one__is__add,axiom,(
+    ! [M: nat,N: nat] : 
+      ( aa_nat_nat(suc,zero_zero_nat) = aa_nat_nat(plus_plus_nat(M),N)
+    <=> ( ( M = aa_nat_nat(suc,zero_zero_nat)
+          & N = zero_zero_nat )
+        | ( M = zero_zero_nat
+          & N = aa_nat_nat(suc,zero_zero_nat) ) ) ) )).
+
+tff(fact_297_le__trans,axiom,(
+    ! [I: nat,J: nat,K2: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,I),J))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,J),K2))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,I),K2)) ) ) )).
+
+tff(fact_298_less__Suc__eq__le,axiom,(
+    ! [M: nat,N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,M),aa_nat_nat(suc,N)))
+    <=> pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,M),N)) ) )).
+
+tff(fact_299__092_060LL_062_092_060_094sub_0621_Ointros_I3_J,axiom,(
+    ! [F: f,M: nat,Cs: list_M276003553xt_f_v] : 
+      ( pp(aa_set2129085473t_bool(member2050190361_f_nat(product_Pair_f_nat(F,M)),aa_set1604101550_f_nat(minus_140170257_f_nat(pp_F_U_f(sigF,ap)),aa_set1604101550_f_nat(insert168347826_f_nat(product_Pair_f_nat(ap,numeral_numeral_nat(bit0(one)))),bot_bo1362251980_f_nat))))
+     => ( aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Cs) = M
+       => ( ! [X3: multihole_mctxt_f_v] : 
+              ( member995025156xt_f_v(X3,set_Mu1483390320xt_f_v(Cs))
+             => pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(sigF,ap),X3)) )
+         => pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(sigF,ap),multihole_MFun_f_v(F,Cs))) ) ) ) )).
+
+tff(fact_300_length__drop,axiom,(
+    ! [N: nat,Xs: list_M276003553xt_f_v] : aa_lis1425841141_v_nat(size_s1130017613xt_f_v,drop_M1817411233xt_f_v(N,Xs)) = aa_nat_nat(minus_minus_nat(aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)),N) )).
+
+tff(fact_301_length__drop,axiom,(
+    ! [N: nat,Xs: list_term_f_v] : aa_list_term_f_v_nat(size_s693102343rm_f_v,drop_term_f_v(N,Xs)) = aa_nat_nat(minus_minus_nat(aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)),N) )).
+
+tff(fact_302_length__drop,axiom,(
+    ! [N: nat,Xs: list_nat] : aa_list_nat_nat(size_size_list_nat,drop_nat(N,Xs)) = aa_nat_nat(minus_minus_nat(aa_list_nat_nat(size_size_list_nat,Xs)),N) )).
+
+tff(fact_303_pp__cr_Ofresh,axiom,(
+    ! [SigF: fun_f_option_nat,R: set_Pr576123655rm_f_v,Ap: f] : 
+      ( pp_cr_f_v(SigF,R,Ap)
+     => aa_f_option_nat(SigF,Ap) = none_nat ) )).
+
+tff(fact_304_append__Cons__nth__middle,axiom,(
+    ! [I: nat,Xs: list_M276003553xt_f_v,Y: multihole_mctxt_f_v,Zs: list_M276003553xt_f_v] : 
+      ( I = aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)
+     => aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,append460316534xt_f_v(Xs,cons_M10820881xt_f_v(Y,Zs))),I) = Y ) )).
+
+tff(fact_305_append__Cons__nth__middle,axiom,(
+    ! [I: nat,Xs: list_term_f_v,Y: term_f_v,Zs: list_term_f_v] : 
+      ( I = aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)
+     => aa_nat_term_f_v(nth_term_f_v(append_term_f_v(Xs,cons_term_f_v(Y,Zs))),I) = Y ) )).
+
+tff(fact_306_append__Cons__nth__middle,axiom,(
+    ! [I: nat,Xs: list_nat,Y: nat,Zs: list_nat] : 
+      ( I = aa_list_nat_nat(size_size_list_nat,Xs)
+     => aa_nat_nat(nth_nat(append_nat(Xs,cons_nat(Y,Zs))),I) = Y ) )).
+
+tff(fact_307_funas__mctxt_Osimps_I3_J,axiom,(
+    aa_Mul438137431_f_nat(multih192222139xt_f_v,multihole_MHole_f_v) = bot_bo1362251980_f_nat )).
+
+tff(fact_308_Suc__n__not__le__n,axiom,(
+    ! [N: nat] : 
+      ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(suc,N)),N)) )).
+
+tff(fact_309_add_Oassoc,axiom,(
+    ! [A: nat,B: nat,C7: nat] : aa_nat_nat(plus_plus_nat(aa_nat_nat(plus_plus_nat(A),B)),C7) = aa_nat_nat(plus_plus_nat(A),aa_nat_nat(plus_plus_nat(B),C7)) )).
+
+tff(fact_310__092_060LL_062__def,axiom,(
+    pp_LL_f_v(sigF,ap) = collec1020609606xt_f_v(aTP_Lamm_ag) )).
+
+tff(fact_311_funas__mctxt_Osimps_I1_J,axiom,(
+    ! [F: f,Cs: list_M276003553xt_f_v] : aa_Mul438137431_f_nat(multih192222139xt_f_v,multihole_MFun_f_v(F,Cs)) = aa_set1604101550_f_nat(sup_su1335354212_f_nat(aa_set1604101550_f_nat(insert168347826_f_nat(product_Pair_f_nat(F,aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Cs))),bot_bo1362251980_f_nat)),comple1145127051_f_nat(image_1818164302_f_nat(multih192222139xt_f_v,set_Mu1483390320xt_f_v(Cs)))) )).
+
+tff(fact_312_not__less0,axiom,(
+    ! [N: nat] : 
+      ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,N),zero_zero_nat)) )).
+
+tff(fact_313_mctxt_Osize__gen_I1_J,axiom,(
+    ! [Xa: fun_f_nat,X2: fun_v_nat,X1: v] : aa_Mul588312303_v_nat(multih975569953xt_f_v(Xa,X2),multihole_MVar_v_f(X1)) = aa_nat_nat(plus_plus_nat(aa_v_nat(X2,X1)),aa_nat_nat(suc,zero_zero_nat)) )).
+
+tff(fact_314_funas__mctxt_Osimps_I2_J,axiom,(
+    ! [V2: v] : aa_Mul438137431_f_nat(multih192222139xt_f_v,multihole_MVar_v_f(V2)) = bot_bo1362251980_f_nat )).
+
+tff(fact_315_inf__mctxt__args_Osimps_I2_J,axiom,(
+    ! [V2: v] : multih984015656gs_f_v(multihole_MVar_v_f(V2),multihole_MHole_f_v) = cons_M10820881xt_f_v(multihole_MVar_v_f(V2),nil_Mu1963645281xt_f_v) )).
+
+tff(fact_316_funas__mctxt__list_Ocases,axiom,(
+    ! [X2: multihole_mctxt_f_v] : 
+      ( ! [F2: f,Cs2: list_M276003553xt_f_v] : 
+          X2 != multihole_MFun_f_v(F2,Cs2)
+     => ( ! [V: v] : 
+            X2 != multihole_MVar_v_f(V)
+       => X2 = multihole_MHole_f_v ) ) )).
+
+tff(fact_317_less__eq__mctxtI2_I3_J,axiom,(
+    ! [C2: multihole_mctxt_f_v,F: f,Cs4: list_M276003553xt_f_v,Ds: list_M276003553xt_f_v] : 
+      ( ( C2 = multihole_MHole_f_v
+        | ( C2 = multihole_MFun_f_v(F,Cs4)
+          & aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Cs4) = aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Ds)
+          & ! [I2: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I2),aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Cs4)))
+             => pp(aa_Mul1846291640v_bool(ord_le891359227xt_f_v(aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Cs4),I2)),aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Ds),I2))) ) ) )
+     => pp(aa_Mul1846291640v_bool(ord_le891359227xt_f_v(C2),multihole_MFun_f_v(F,Ds))) ) )).
+
+tff(fact_318_prod_Osel_I2_J,axiom,(
+    ! [X1: f,X23: nat] : product_snd_f_nat(product_Pair_f_nat(X1,X23)) = X23 )).
+
+tff(fact_319_prod_Osel_I2_J,axiom,(
+    ! [X1: multihole_mctxt_f_v,X23: nat] : produc703880998_v_nat(produc302379220_v_nat(X1,X23)) = X23 )).
+
+tff(fact_320_prod_Osel_I2_J,axiom,(
+    ! [X1: pos,X23: pos] : product_snd_pos_pos(product_Pair_pos_pos(X1,X23)) = X23 )).
+
+tff(fact_321_prod_Osel_I2_J,axiom,(
+    ! [X1: term_f_v,X23: term_f_v] : produc1743757709rm_f_v(produc368081759rm_f_v(X1,X23)) = X23 )).
+
+tff(fact_322_plus__nat_Oadd__0,axiom,(
+    ! [N: nat] : aa_nat_nat(plus_plus_nat(zero_zero_nat),N) = N )).
+
+tff(fact_323_inf__mctxt__args_Osimps_I6_J,axiom,(
+    ! [V2: v,Va2: f,Vb2: list_M276003553xt_f_v] : multih984015656gs_f_v(multihole_MVar_v_f(V2),multihole_MFun_f_v(Va2,Vb2)) = cons_M10820881xt_f_v(multihole_MVar_v_f(V2),nil_Mu1963645281xt_f_v) )).
+
+tff(fact_324_inf__mctxt__args_Osimps_I4_J,axiom,(
+    ! [X2: v,Y: v] : 
+      ( ( X2 = Y
+       => multih984015656gs_f_v(multihole_MVar_v_f(X2),multihole_MVar_v_f(Y)) = nil_Mu1963645281xt_f_v )
+      & ( X2 != Y
+       => multih984015656gs_f_v(multihole_MVar_v_f(X2),multihole_MVar_v_f(Y)) = cons_M10820881xt_f_v(multihole_MVar_v_f(X2),nil_Mu1963645281xt_f_v) ) ) )).
+
+tff(fact_325_comm__monoid__add__class_Oadd__0,axiom,(
+    ! [A: nat] : aa_nat_nat(plus_plus_nat(zero_zero_nat),A) = A )).
+
+tff(fact_326_option_Oinject,axiom,(
+    ! [X23: nat,Y23: nat] : 
+      ( some_nat(X23) = some_nat(Y23)
+    <=> X23 = Y23 ) )).
+
+tff(fact_327_add__right__cancel,axiom,(
+    ! [B: nat,A: nat,C7: nat] : 
+      ( aa_nat_nat(plus_plus_nat(B),A) = aa_nat_nat(plus_plus_nat(C7),A)
+    <=> B = C7 ) )).
+
+tff(fact_328_mctxt_Osize__gen_I2_J,axiom,(
+    ! [Xa: fun_f_nat,X2: fun_v_nat] : aa_Mul588312303_v_nat(multih975569953xt_f_v(Xa,X2),multihole_MHole_f_v) = aa_nat_nat(suc,zero_zero_nat) )).
+
+tff(fact_329_inf__mctxt__args_Osimps_I1_J,axiom,(
+    ! [D: multihole_mctxt_f_v] : multih984015656gs_f_v(multihole_MHole_f_v,D) = cons_M10820881xt_f_v(multihole_MHole_f_v,nil_Mu1963645281xt_f_v) )).
+
+tff(fact_330_le__eq__less__or__eq,axiom,(
+    ! [M: nat,N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,M),N))
+    <=> ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,M),N))
+        | M = N ) ) )).
+
+tff(fact_331_Suc__less__eq,axiom,(
+    ! [M: nat,N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,aa_nat_nat(suc,M)),aa_nat_nat(suc,N)))
+    <=> pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,M),N)) ) )).
+
+tff(fact_332_pp__cr_O_092_060LL_062__def,axiom,(
+    ! [SigF: fun_f_option_nat,R: set_Pr576123655rm_f_v,Ap: f] : 
+      ( pp_cr_f_v(SigF,R,Ap)
+     => pp_LL_f_v(SigF,Ap) = collec1020609606xt_f_v(aa_f_f1445875462v_bool(aTP_Lamm_ah(SigF),Ap)) ) )).
+
+tff(fact_333_diff__zero,axiom,(
+    ! [A: nat] : aa_nat_nat(minus_minus_nat(A),zero_zero_nat) = A )).
+
+tff(fact_334_trans__le__add2,axiom,(
+    ! [I: nat,J: nat,M: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,I),J))
+     => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,I),aa_nat_nat(plus_plus_nat(M),J))) ) )).
+
+tff(fact_335_old_Onat_Oinject,axiom,(
+    ! [Nat: nat,Nat2: nat] : 
+      ( aa_nat_nat(suc,Nat) = aa_nat_nat(suc,Nat2)
+    <=> Nat = Nat2 ) )).
+
+tff(fact_336_remove__idx__def,axiom,(
+    ! [I: nat,Xs: list_nat] : remove_idx_nat(I,Xs) = append_nat(take_nat(I,Xs),drop_nat(aa_nat_nat(suc,I),Xs)) )).
+
+tff(fact_337_remove__idx__def,axiom,(
+    ! [I: nat,Xs: list_M276003553xt_f_v] : remove1041833647xt_f_v(I,Xs) = append460316534xt_f_v(take_M241671497xt_f_v(I,Xs),drop_M1817411233xt_f_v(aa_nat_nat(suc,I),Xs)) )).
+
+tff(fact_338_remove__idx__def,axiom,(
+    ! [I: nat,Xs: list_term_f_v] : remove_idx_term_f_v(I,Xs) = append_term_f_v(take_term_f_v(I,Xs),drop_term_f_v(aa_nat_nat(suc,I),Xs)) )).
+
+tff(fact_339_le__imp__less__Suc,axiom,(
+    ! [M: nat,N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,M),N))
+     => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,M),aa_nat_nat(suc,N))) ) )).
+
+tff(fact_340_not__le,axiom,(
+    ! [X2: nat,Y: nat] : 
+      ( ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X2),Y))
+    <=> pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Y),X2)) ) )).
+
+tff(fact_341_not__le,axiom,(
+    ! [X2: bool,Y: bool] : 
+      ( ~ pp(aa_bool_bool(ord_less_eq_bool(X2),Y))
+    <=> pp(aa_bool_bool(ord_less_bool(Y),X2)) ) )).
+
+tff(fact_342_zero__diff,axiom,(
+    ! [A: nat] : aa_nat_nat(minus_minus_nat(zero_zero_nat),A) = zero_zero_nat )).
+
+tff(fact_343_Suc__eq__plus1__left,axiom,(
+    ! [N: nat] : aa_nat_nat(suc,N) = aa_nat_nat(plus_plus_nat(one_one_nat),N) )).
+
+tff(fact_344_not__PCons__self,axiom,(
+    ! [P: pos,I: nat] : 
+      P != aa_pos_pos(aa_nat_fun_pos_pos(pCons,I),P) )).
+
+tff(fact_345_pp__cr_Omissing__args_Osimps_I1_J,axiom,(
+    ! [SigF: fun_f_option_nat,R: set_Pr576123655rm_f_v,Ap: f,N: nat] : 
+      ( pp_cr_f_v(SigF,R,Ap)
+     => ~ pp(aa_nat_bool(pp_missing_args_f_v(SigF,Ap,multihole_MHole_f_v),N)) ) )).
+
+tff(fact_346_pp__cr_Omissing__args_Osimps_I2_J,axiom,(
+    ! [SigF: fun_f_option_nat,R: set_Pr576123655rm_f_v,Ap: f,X2: v,N: nat] : 
+      ( pp_cr_f_v(SigF,R,Ap)
+     => ~ pp(aa_nat_bool(pp_missing_args_f_v(SigF,Ap,multihole_MVar_v_f(X2)),N)) ) )).
+
+tff(fact_347_Nil__or__last,axiom,(
+    ! [Xs: list_M276003553xt_f_v] : 
+      ( Xs = nil_Mu1963645281xt_f_v
+      | ? [Ys3: list_M276003553xt_f_v,Y3: multihole_mctxt_f_v] : Xs = append460316534xt_f_v(Ys3,cons_M10820881xt_f_v(Y3,nil_Mu1963645281xt_f_v)) ) )).
+
+tff(fact_348_Nil__or__last,axiom,(
+    ! [Xs: list_term_f_v] : 
+      ( Xs = nil_term_f_v
+      | ? [Ys3: list_term_f_v,Y3: term_f_v] : Xs = append_term_f_v(Ys3,cons_term_f_v(Y3,nil_term_f_v)) ) )).
+
+tff(fact_349_take__Suc__conv__app__nth,axiom,(
+    ! [I: nat,Xs: list_M276003553xt_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I),aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)))
+     => take_M241671497xt_f_v(aa_nat_nat(suc,I),Xs) = append460316534xt_f_v(take_M241671497xt_f_v(I,Xs),cons_M10820881xt_f_v(aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Xs),I),nil_Mu1963645281xt_f_v)) ) )).
+
+tff(fact_350_take__Suc__conv__app__nth,axiom,(
+    ! [I: nat,Xs: list_term_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I),aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)))
+     => take_term_f_v(aa_nat_nat(suc,I),Xs) = append_term_f_v(take_term_f_v(I,Xs),cons_term_f_v(aa_nat_term_f_v(nth_term_f_v(Xs),I),nil_term_f_v)) ) )).
+
+tff(fact_351_take__Suc__conv__app__nth,axiom,(
+    ! [I: nat,Xs: list_nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I),aa_list_nat_nat(size_size_list_nat,Xs)))
+     => take_nat(aa_nat_nat(suc,I),Xs) = append_nat(take_nat(I,Xs),cons_nat(aa_nat_nat(nth_nat(Xs),I),nil_nat)) ) )).
+
+tff(fact_352_not__Nil__imp__last,axiom,(
+    ! [Xs: list_M276003553xt_f_v] : 
+      ( Xs != nil_Mu1963645281xt_f_v
+     => ? [Ys3: list_M276003553xt_f_v,Y3: multihole_mctxt_f_v] : Xs = append460316534xt_f_v(Ys3,cons_M10820881xt_f_v(Y3,nil_Mu1963645281xt_f_v)) ) )).
+
+tff(fact_353_not__Nil__imp__last,axiom,(
+    ! [Xs: list_term_f_v] : 
+      ( Xs != nil_term_f_v
+     => ? [Ys3: list_term_f_v,Y3: term_f_v] : Xs = append_term_f_v(Ys3,cons_term_f_v(Y3,nil_term_f_v)) ) )).
+
+tff(fact_354_zero__reorient,axiom,(
+    ! [X2: nat] : 
+      ( zero_zero_nat = X2
+    <=> X2 = zero_zero_nat ) )).
+
+tff(fact_355_pos_Oexhaust,axiom,(
+    ! [Y: pos] : 
+      ( Y != empty
+     => ~ ( ! [X212: nat,X222: pos] : 
+              Y != aa_pos_pos(aa_nat_fun_pos_pos(pCons,X212),X222) ) ) )).
+
+tff(fact_356_ab__semigroup__add__class_Oadd__ac_I1_J,axiom,(
+    ! [A: nat,B: nat,C7: nat] : aa_nat_nat(plus_plus_nat(aa_nat_nat(plus_plus_nat(A),B)),C7) = aa_nat_nat(plus_plus_nat(A),aa_nat_nat(plus_plus_nat(B),C7)) )).
+
+tff(fact_357_mlex__less,axiom,(
+    ! [F: fun_pos_nat,X2: pos,Y: pos,R2: set_Pr700793927os_pos] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,aa_pos_nat(F,X2)),aa_pos_nat(F,Y)))
+     => member1236036240os_pos(product_Pair_pos_pos(X2,Y),mlex_prod_pos(F,R2)) ) )).
+
+tff(fact_358_mlex__less,axiom,(
+    ! [F: fun_term_f_v_nat,X2: term_f_v,Y: term_f_v,R2: set_Pr576123655rm_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,aa_term_f_v_nat(F,X2)),aa_term_f_v_nat(F,Y)))
+     => member816187216rm_f_v(produc368081759rm_f_v(X2,Y),mlex_prod_term_f_v(F,R2)) ) )).
+
+tff(fact_359_add__mono__thms__linordered__semiring_I4_J,axiom,(
+    ! [I: nat,J: nat,K2: nat,L: nat] : 
+      ( ( I = J
+        & K2 = L )
+     => aa_nat_nat(plus_plus_nat(I),K2) = aa_nat_nat(plus_plus_nat(J),L) ) )).
+
+tff(fact_360_not__PCons__self2,axiom,(
+    ! [I: nat,T: pos] : 
+      aa_pos_pos(aa_nat_fun_pos_pos(pCons,I),T) != T )).
+
+tff(fact_361_length__map,axiom,(
+    ! [F: fun_Mu1675924099xt_f_v,Xs: list_M276003553xt_f_v] : aa_lis1425841141_v_nat(size_s1130017613xt_f_v,map_Mu37731844xt_f_v(F,Xs)) = aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs) )).
+
+tff(fact_362_length__map,axiom,(
+    ! [F: fun_te615323153xt_f_v,Xs: list_term_f_v] : aa_lis1425841141_v_nat(size_s1130017613xt_f_v,map_te1879702642xt_f_v(F,Xs)) = aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs) )).
+
+tff(fact_363_length__map,axiom,(
+    ! [F: fun_na2081747172xt_f_v,Xs: list_nat] : aa_lis1425841141_v_nat(size_s1130017613xt_f_v,map_na433213253xt_f_v(F,Xs)) = aa_list_nat_nat(size_size_list_nat,Xs) )).
+
+tff(fact_364_length__map,axiom,(
+    ! [F: fun_Mu925827665rm_f_v,Xs: list_M276003553xt_f_v] : aa_list_term_f_v_nat(size_s693102343rm_f_v,map_Mu1435028346rm_f_v(F,Xs)) = aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs) )).
+
+tff(fact_365_length__map,axiom,(
+    ! [F: fun_te617841475rm_f_v,Xs: list_term_f_v] : aa_list_term_f_v_nat(size_s693102343rm_f_v,map_te594762124rm_f_v(F,Xs)) = aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs) )).
+
+tff(fact_366_length__map,axiom,(
+    ! [F: fun_nat_term_f_v,Xs: list_nat] : aa_list_term_f_v_nat(size_s693102343rm_f_v,map_nat_term_f_v(F,Xs)) = aa_list_nat_nat(size_size_list_nat,Xs) )).
+
+tff(fact_367_length__map,axiom,(
+    ! [F: fun_Mu1352256958_v_nat,Xs: list_M276003553xt_f_v] : aa_list_nat_nat(size_size_list_nat,map_Mu730314599_v_nat(F,Xs)) = aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs) )).
+
+tff(fact_368_length__map,axiom,(
+    ! [F: fun_term_f_v_nat,Xs: list_term_f_v] : aa_list_nat_nat(size_size_list_nat,map_term_f_v_nat(F,Xs)) = aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs) )).
+
+tff(fact_369_length__map,axiom,(
+    ! [F: fun_nat_nat,Xs: list_nat] : aa_list_nat_nat(size_size_list_nat,map_nat_nat(F,Xs)) = aa_list_nat_nat(size_size_list_nat,Xs) )).
+
+tff(fact_370_subm__at_Oelims,axiom,(
+    ! [X2: multihole_mctxt_f_v,Xa: pos,Y: multihole_mctxt_f_v] : 
+      ( lS_subm_at_f_v(X2,Xa) = Y
+     => ( ( Xa = empty
+         => Y != X2 )
+       => ( ! [F2: f,Cs2: list_M276003553xt_f_v] : 
+              ( X2 = multihole_MFun_f_v(F2,Cs2)
+             => ! [I2: nat,P2: pos] : 
+                  ( Xa = aa_pos_pos(aa_nat_fun_pos_pos(pCons,I2),P2)
+                 => Y != lS_subm_at_f_v(aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Cs2),I2),P2) ) )
+         => ( ( ? [Vb: v] : X2 = multihole_MVar_v_f(Vb)
+             => ( ? [V: nat,Va: pos] : Xa = aa_pos_pos(aa_nat_fun_pos_pos(pCons,V),Va)
+               => Y != undefi637609667xt_f_v ) )
+           => ~ ( X2 = multihole_MHole_f_v
+               => ( ? [V: nat,Va: pos] : Xa = aa_pos_pos(aa_nat_fun_pos_pos(pCons,V),Va)
+                 => Y != undefi637609667xt_f_v ) ) ) ) ) ) )).
+
+tff(fact_371_mreplace__at_Ocases,axiom,(
+    ! [X2: produc928598493xt_f_v] : 
+      ( ! [C3: multihole_mctxt_f_v,D2: multihole_mctxt_f_v] : 
+          X2 != produc1704173645xt_f_v(C3,produc1409864257xt_f_v(empty,D2))
+     => ( ! [F2: f,Cs2: list_M276003553xt_f_v,I2: nat,P2: pos,D2: multihole_mctxt_f_v] : 
+            X2 != produc1704173645xt_f_v(multihole_MFun_f_v(F2,Cs2),produc1409864257xt_f_v(aa_pos_pos(aa_nat_fun_pos_pos(pCons,I2),P2),D2))
+       => ( ! [Vb: v,V: nat,Va: pos,C8: multihole_mctxt_f_v] : 
+              X2 != produc1704173645xt_f_v(multihole_MVar_v_f(Vb),produc1409864257xt_f_v(aa_pos_pos(aa_nat_fun_pos_pos(pCons,V),Va),C8))
+         => ~ ( ! [V: nat,Va: pos,C8: multihole_mctxt_f_v] : 
+                  X2 != produc1704173645xt_f_v(multihole_MHole_f_v,produc1409864257xt_f_v(aa_pos_pos(aa_nat_fun_pos_pos(pCons,V),Va),C8)) ) ) ) ) )).
+
+tff(fact_372_pp__cr_O_092_060F_062_092_060_094sub_062U__def,axiom,(
+    ! [SigF: fun_f_option_nat,R: set_Pr576123655rm_f_v,Ap: f] : 
+      ( pp_cr_f_v(SigF,R,Ap)
+     => pp_F_U_f(SigF,Ap) = aa_set1604101550_f_nat(sup_su1335354212_f_nat(aa_set1604101550_f_nat(insert168347826_f_nat(product_Pair_f_nat(Ap,numeral_numeral_nat(bit0(one)))),bot_bo1362251980_f_nat)),collec1032313175_f_nat(produc1153485486t_bool(aTP_Lamm_ai(SigF)))) ) )).
+
+tff(fact_373_add__left__imp__eq,axiom,(
+    ! [A: nat,B: nat,C7: nat] : 
+      ( aa_nat_nat(plus_plus_nat(A),B) = aa_nat_nat(plus_plus_nat(A),C7)
+     => B = C7 ) )).
+
+tff(fact_374_add__right__imp__eq,axiom,(
+    ! [B: nat,A: nat,C7: nat] : 
+      ( aa_nat_nat(plus_plus_nat(B),A) = aa_nat_nat(plus_plus_nat(C7),A)
+     => B = C7 ) )).
+
+tff(fact_375_one__reorient,axiom,(
+    ! [X2: nat] : 
+      ( one_one_nat = X2
+    <=> X2 = one_one_nat ) )).
+
+tff(fact_376_one__reorient,axiom,(
+    ! [X2: pos] : 
+      ( one_one_pos = X2
+    <=> X2 = one_one_pos ) )).
+
+tff(fact_377_subm__at_Ocases,axiom,(
+    ! [X2: produc1300325373_v_pos] : 
+      ( ! [C3: multihole_mctxt_f_v] : 
+          X2 != produc1270057197_v_pos(C3,empty)
+     => ( ! [F2: f,Cs2: list_M276003553xt_f_v,I2: nat,P2: pos] : 
+            X2 != produc1270057197_v_pos(multihole_MFun_f_v(F2,Cs2),aa_pos_pos(aa_nat_fun_pos_pos(pCons,I2),P2))
+       => ( ! [Vb: v,V: nat,Va: pos] : 
+              X2 != produc1270057197_v_pos(multihole_MVar_v_f(Vb),aa_pos_pos(aa_nat_fun_pos_pos(pCons,V),Va))
+         => ~ ( ! [V: nat,Va: pos] : 
+                  X2 != produc1270057197_v_pos(multihole_MHole_f_v,aa_pos_pos(aa_nat_fun_pos_pos(pCons,V),Va)) ) ) ) ) )).
+
+tff(fact_378_pos_Osize_I4_J,axiom,(
+    ! [X21: nat,X22: pos] : aa_pos_nat(size_size_pos,aa_pos_pos(aa_nat_fun_pos_pos(pCons,X21),X22)) = aa_nat_nat(plus_plus_nat(aa_pos_nat(size_size_pos,X22)),aa_nat_nat(suc,zero_zero_nat)) )).
+
+tff(fact_379_hole__num_Ocases,axiom,(
+    ! [X2: produc258583121xt_f_v] : 
+      ( X2 != produc1409864257xt_f_v(empty,multihole_MHole_f_v)
+     => ( ! [I2: nat,Q2: pos,F2: f,Cs2: list_M276003553xt_f_v] : 
+            X2 != produc1409864257xt_f_v(aa_pos_pos(aa_nat_fun_pos_pos(pCons,I2),Q2),multihole_MFun_f_v(F2,Cs2))
+       => ( ! [V: nat,Va: pos,Vb: v] : 
+              X2 != produc1409864257xt_f_v(aa_pos_pos(aa_nat_fun_pos_pos(pCons,V),Va),multihole_MVar_v_f(Vb))
+         => ( ! [V: nat,Va: pos] : 
+                X2 != produc1409864257xt_f_v(aa_pos_pos(aa_nat_fun_pos_pos(pCons,V),Va),multihole_MHole_f_v)
+           => ( ! [A4: pos,V: v] : 
+                  X2 != produc1409864257xt_f_v(A4,multihole_MVar_v_f(V))
+             => ~ ( ! [V: f,Va: list_M276003553xt_f_v] : 
+                      X2 != produc1409864257xt_f_v(empty,multihole_MFun_f_v(V,Va)) ) ) ) ) ) ) )).
+
+tff(fact_380_Suc__inject,axiom,(
+    ! [X2: nat,Y: nat] : 
+      ( aa_nat_nat(suc,X2) = aa_nat_nat(suc,Y)
+     => X2 = Y ) )).
+
+tff(fact_381_le0,axiom,(
+    ! [N: nat] : pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,zero_zero_nat),N)) )).
+
+tff(fact_382_linear,axiom,(
+    ! [X2: nat,Y: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,X2),Y))
+      | pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Y),X2)) ) )).
+
+tff(fact_383_linear,axiom,(
+    ! [X2: bool,Y: bool] : 
+      ( pp(aa_bool_bool(ord_less_eq_bool(X2),Y))
+      | pp(aa_bool_bool(ord_less_eq_bool(Y),X2)) ) )).
+
+tff(fact_384_n__not__Suc__n,axiom,(
+    ! [N: nat] : 
+      N != aa_nat_nat(suc,N) )).
+
+tff(fact_385_nat__add__left__cancel,axiom,(
+    ! [K2: nat,M: nat,N: nat] : 
+      ( aa_nat_nat(plus_plus_nat(K2),M) = aa_nat_nat(plus_plus_nat(K2),N)
+    <=> M = N ) )).
+
+tff(fact_386_nth__append__drop__is__nth__conv,axiom,(
+    ! [J: nat,I: nat,Xs: list_M276003553xt_f_v,Y: multihole_mctxt_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,J),I))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,J),aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)))
+       => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,I),aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)))
+         => aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,append460316534xt_f_v(take_M241671497xt_f_v(J,Xs),cons_M10820881xt_f_v(Y,drop_M1817411233xt_f_v(aa_nat_nat(suc,J),Xs)))),I) = aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Xs),I) ) ) ) )).
+
+tff(fact_387_nth__append__drop__is__nth__conv,axiom,(
+    ! [J: nat,I: nat,Xs: list_term_f_v,Y: term_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,J),I))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,J),aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)))
+       => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,I),aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)))
+         => aa_nat_term_f_v(nth_term_f_v(append_term_f_v(take_term_f_v(J,Xs),cons_term_f_v(Y,drop_term_f_v(aa_nat_nat(suc,J),Xs)))),I) = aa_nat_term_f_v(nth_term_f_v(Xs),I) ) ) ) )).
+
+tff(fact_388_nth__append__drop__is__nth__conv,axiom,(
+    ! [J: nat,I: nat,Xs: list_nat,Y: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,J),I))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,J),aa_list_nat_nat(size_size_list_nat,Xs)))
+       => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,I),aa_list_nat_nat(size_size_list_nat,Xs)))
+         => aa_nat_nat(nth_nat(append_nat(take_nat(J,Xs),cons_nat(Y,drop_nat(aa_nat_nat(suc,J),Xs)))),I) = aa_nat_nat(nth_nat(Xs),I) ) ) ) )).
+
+tff(fact_389_proper__prefix__list_Ocases,axiom,(
+    ! [X2: pos] : 
+      ( X2 != empty
+     => ~ ( ! [I2: nat,P2: pos] : 
+              X2 != aa_pos_pos(aa_nat_fun_pos_pos(pCons,I2),P2) ) ) )).
+
+tff(fact_390_n__lists__Nil,axiom,(
+    ! [N: nat] : 
+      ( ( N = zero_zero_nat
+       => n_list127787369xt_f_v(N,nil_Mu1963645281xt_f_v) = cons_l194641047xt_f_v(nil_Mu1963645281xt_f_v,nil_li2102218983xt_f_v) )
+      & ( N != zero_zero_nat
+       => n_list127787369xt_f_v(N,nil_Mu1963645281xt_f_v) = nil_li2102218983xt_f_v ) ) )).
+
+tff(fact_391_n__lists__Nil,axiom,(
+    ! [N: nat] : 
+      ( ( N = zero_zero_nat
+       => n_lists_term_f_v(N,nil_term_f_v) = cons_list_term_f_v(nil_term_f_v,nil_list_term_f_v) )
+      & ( N != zero_zero_nat
+       => n_lists_term_f_v(N,nil_term_f_v) = nil_list_term_f_v ) ) )).
+
+tff(fact_392_nat__add__right__cancel,axiom,(
+    ! [M: nat,K2: nat,N: nat] : 
+      ( aa_nat_nat(plus_plus_nat(M),K2) = aa_nat_nat(plus_plus_nat(N),K2)
+    <=> M = N ) )).
+
+tff(fact_393_wf__R,axiom,(
+    wf_trs_f_v(r) )).
+
+tff(fact_394_take__hd__drop,axiom,(
+    ! [N: nat,Xs: list_M276003553xt_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,N),aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)))
+     => append460316534xt_f_v(take_M241671497xt_f_v(N,Xs),cons_M10820881xt_f_v(hd_Mul1441970630xt_f_v(drop_M1817411233xt_f_v(N,Xs)),nil_Mu1963645281xt_f_v)) = take_M241671497xt_f_v(aa_nat_nat(suc,N),Xs) ) )).
+
+tff(fact_395_take__hd__drop,axiom,(
+    ! [N: nat,Xs: list_term_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,N),aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)))
+     => append_term_f_v(take_term_f_v(N,Xs),cons_term_f_v(hd_term_f_v(drop_term_f_v(N,Xs)),nil_term_f_v)) = take_term_f_v(aa_nat_nat(suc,N),Xs) ) )).
+
+tff(fact_396_take__hd__drop,axiom,(
+    ! [N: nat,Xs: list_nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,N),aa_list_nat_nat(size_size_list_nat,Xs)))
+     => append_nat(take_nat(N,Xs),cons_nat(hd_nat(drop_nat(N,Xs)),nil_nat)) = take_nat(aa_nat_nat(suc,N),Xs) ) )).
+
+tff(fact_397_Suc__le__mono,axiom,(
+    ! [N: nat,M: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(suc,N)),aa_nat_nat(suc,M)))
+    <=> pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,N),M)) ) )).
+
+tff(fact_398_shows__pos_Ocases,axiom,(
+    ! [X2: pos] : 
+      ( ! [I2: nat] : 
+          X2 != aa_pos_pos(aa_nat_fun_pos_pos(pCons,I2),empty)
+     => ( ! [I2: nat,V: nat,Va: pos] : 
+            X2 != aa_pos_pos(aa_nat_fun_pos_pos(pCons,I2),aa_pos_pos(aa_nat_fun_pos_pos(pCons,V),Va))
+       => X2 = empty ) ) )).
+
+tff(fact_399_add_Ocomm__neutral,axiom,(
+    ! [A: nat] : aa_nat_nat(plus_plus_nat(A),zero_zero_nat) = A )).
+
+tff(fact_400_old_Oprod_Oexhaust,axiom,(
+    ! [Y: product_prod_f_nat] : 
+      ~ ( ! [A4: f,B4: nat] : 
+            Y != product_Pair_f_nat(A4,B4) ) )).
+
+tff(fact_401_old_Oprod_Oexhaust,axiom,(
+    ! [Y: produc424896090_v_nat] : 
+      ~ ( ! [A4: multihole_mctxt_f_v,B4: nat] : 
+            Y != produc302379220_v_nat(A4,B4) ) )).
+
+tff(fact_402_old_Oprod_Oexhaust,axiom,(
+    ! [Y: product_prod_pos_pos] : 
+      ~ ( ! [A4: pos,B4: pos] : 
+            Y != product_Pair_pos_pos(A4,B4) ) )).
+
+tff(fact_403_old_Oprod_Oexhaust,axiom,(
+    ! [Y: produc589042087rm_f_v] : 
+      ~ ( ! [A4: term_f_v,B4: term_f_v] : 
+            Y != produc368081759rm_f_v(A4,B4) ) )).
+
+tff(fact_404_parallel__pos_Ocases,axiom,(
+    ! [X2: product_prod_pos_pos] : 
+      ( ! [Uu: pos] : 
+          X2 != product_Pair_pos_pos(empty,Uu)
+     => ( ! [V: nat,Va: pos] : 
+            X2 != product_Pair_pos_pos(aa_pos_pos(aa_nat_fun_pos_pos(pCons,V),Va),empty)
+       => ~ ( ! [I2: nat,P2: pos,J2: nat,Q2: pos] : 
+                X2 != product_Pair_pos_pos(aa_pos_pos(aa_nat_fun_pos_pos(pCons,I2),P2),aa_pos_pos(aa_nat_fun_pos_pos(pCons,J2),Q2)) ) ) ) )).
+
+tff(fact_405_n__lists_Osimps_I1_J,axiom,(
+    ! [Xs: list_M276003553xt_f_v] : n_list127787369xt_f_v(zero_zero_nat,Xs) = cons_l194641047xt_f_v(nil_Mu1963645281xt_f_v,nil_li2102218983xt_f_v) )).
+
+tff(fact_406_n__lists_Osimps_I1_J,axiom,(
+    ! [Xs: list_term_f_v] : n_lists_term_f_v(zero_zero_nat,Xs) = cons_list_term_f_v(nil_term_f_v,nil_list_term_f_v) )).
+
+tff(fact_407_nat_Odistinct_I1_J,axiom,(
+    ! [X23: nat] : 
+      zero_zero_nat != aa_nat_nat(suc,X23) )).
+
+tff(fact_408_old_Onat_Odistinct_I2_J,axiom,(
+    ! [Nat2: nat] : 
+      aa_nat_nat(suc,Nat2) != zero_zero_nat )).
+
+tff(fact_409_old_Onat_Odistinct_I1_J,axiom,(
+    ! [Nat2: nat] : 
+      zero_zero_nat != aa_nat_nat(suc,Nat2) )).
+
+tff(fact_410_nat_OdiscI,axiom,(
+    ! [Nat: nat,X23: nat] : 
+      ( Nat = aa_nat_nat(suc,X23)
+     => Nat != zero_zero_nat ) )).
+
+tff(fact_411_concat__remove__idx,axiom,(
+    ! [I: nat,Sss: list_l1119543527xt_f_v,J: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I),size_s1309995859xt_f_v(Sss)))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,J),aa_lis1425841141_v_nat(size_s1130017613xt_f_v,nth_li549420136xt_f_v(Sss,I))))
+       => concat926579484xt_f_v(append948291708xt_f_v(take_l1715667151xt_f_v(I,Sss),cons_l194641047xt_f_v(remove1041833647xt_f_v(J,nth_li549420136xt_f_v(Sss,I)),drop_l1801606695xt_f_v(aa_nat_nat(suc,I),Sss)))) = remove1041833647xt_f_v(aa_nat_nat(plus_plus_nat(groups1604586427um_nat(map_li1299761261_v_nat(size_s1130017613xt_f_v,take_l1715667151xt_f_v(I,Sss)))),J),concat926579484xt_f_v(Sss)) ) ) )).
+
+tff(fact_412_concat__remove__idx,axiom,(
+    ! [I: nat,Sss: list_list_term_f_v,J: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I),size_s748919191rm_f_v(Sss)))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,J),aa_list_term_f_v_nat(size_s693102343rm_f_v,nth_list_term_f_v(Sss,I))))
+       => concat_term_f_v(append_list_term_f_v(take_list_term_f_v(I,Sss),cons_list_term_f_v(remove_idx_term_f_v(J,nth_list_term_f_v(Sss,I)),drop_list_term_f_v(aa_nat_nat(suc,I),Sss)))) = remove_idx_term_f_v(aa_nat_nat(plus_plus_nat(groups1604586427um_nat(map_li2117692169_v_nat(size_s693102343rm_f_v,take_list_term_f_v(I,Sss)))),J),concat_term_f_v(Sss)) ) ) )).
+
+tff(fact_413_concat__remove__idx,axiom,(
+    ! [I: nat,Sss: list_list_nat,J: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I),size_s1898481668st_nat(Sss)))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,J),aa_list_nat_nat(size_size_list_nat,nth_list_nat(Sss,I))))
+       => concat_nat(append_list_nat(take_list_nat(I,Sss),cons_list_nat(remove_idx_nat(J,nth_list_nat(Sss,I)),drop_list_nat(aa_nat_nat(suc,I),Sss)))) = remove_idx_nat(aa_nat_nat(plus_plus_nat(groups1604586427um_nat(map_list_nat_nat(size_size_list_nat,take_list_nat(I,Sss)))),J),concat_nat(Sss)) ) ) )).
+
+tff(fact_414_diff__induct,axiom,(
+    ! [P3: fun_nat_fun_nat_bool,M: nat,N: nat] : 
+      ( ! [X3: nat] : pp(aa_nat_bool(aa_nat_fun_nat_bool(P3,X3),zero_zero_nat))
+     => ( ! [Y3: nat] : pp(aa_nat_bool(aa_nat_fun_nat_bool(P3,zero_zero_nat),aa_nat_nat(suc,Y3)))
+       => ( ! [X3: nat,Y3: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(P3,X3),Y3))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(P3,aa_nat_nat(suc,X3)),aa_nat_nat(suc,Y3))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(P3,M),N)) ) ) ) )).
+
+tff(fact_415_empty__iff,axiom,(
+    ! [C7: pos] : 
+      ~ member_pos(C7,bot_bot_set_pos) )).
+
+tff(fact_416_empty__iff,axiom,(
+    ! [C7: product_prod_f_nat] : 
+      ~ pp(aa_set2129085473t_bool(member2050190361_f_nat(C7),bot_bo1362251980_f_nat)) )).
+
+tff(fact_417_zero__induct,axiom,(
+    ! [P3: fun_nat_bool,K2: nat] : 
+      ( pp(aa_nat_bool(P3,K2))
+     => ( ! [N2: nat] : 
+            ( pp(aa_nat_bool(P3,aa_nat_nat(suc,N2)))
+           => pp(aa_nat_bool(P3,N2)) )
+       => pp(aa_nat_bool(P3,zero_zero_nat)) ) ) )).
+
+tff(fact_418_subm__at_Opelims,axiom,(
+    ! [X2: multihole_mctxt_f_v,Xa: pos,Y: multihole_mctxt_f_v] : 
+      ( lS_subm_at_f_v(X2,Xa) = Y
+     => ( accp_P1585139078_v_pos(lS_subm_at_rel_f_v,produc1270057197_v_pos(X2,Xa))
+       => ( ( Xa = empty
+           => ( Y = X2
+             => ~ accp_P1585139078_v_pos(lS_subm_at_rel_f_v,produc1270057197_v_pos(X2,empty)) ) )
+         => ( ! [F2: f,Cs2: list_M276003553xt_f_v] : 
+                ( X2 = multihole_MFun_f_v(F2,Cs2)
+               => ! [I2: nat,P2: pos] : 
+                    ( Xa = aa_pos_pos(aa_nat_fun_pos_pos(pCons,I2),P2)
+                   => ( Y = lS_subm_at_f_v(aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Cs2),I2),P2)
+                     => ~ accp_P1585139078_v_pos(lS_subm_at_rel_f_v,produc1270057197_v_pos(multihole_MFun_f_v(F2,Cs2),aa_pos_pos(aa_nat_fun_pos_pos(pCons,I2),P2))) ) ) )
+           => ( ! [Vb: v] : 
+                  ( X2 = multihole_MVar_v_f(Vb)
+                 => ! [V: nat,Va: pos] : 
+                      ( Xa = aa_pos_pos(aa_nat_fun_pos_pos(pCons,V),Va)
+                     => ( Y = undefi637609667xt_f_v
+                       => ~ accp_P1585139078_v_pos(lS_subm_at_rel_f_v,produc1270057197_v_pos(multihole_MVar_v_f(Vb),aa_pos_pos(aa_nat_fun_pos_pos(pCons,V),Va))) ) ) )
+             => ~ ( X2 = multihole_MHole_f_v
+                 => ! [V: nat,Va: pos] : 
+                      ( Xa = aa_pos_pos(aa_nat_fun_pos_pos(pCons,V),Va)
+                     => ( Y = undefi637609667xt_f_v
+                       => ~ accp_P1585139078_v_pos(lS_subm_at_rel_f_v,produc1270057197_v_pos(multihole_MHole_f_v,aa_pos_pos(aa_nat_fun_pos_pos(pCons,V),Va))) ) ) ) ) ) ) ) ) )).
+
+tff(fact_419_fill__holes_Ocases,axiom,(
+    ! [X2: produc1735533693rm_f_v] : 
+      ( ! [X3: v,Uu: list_term_f_v] : 
+          X2 != produc401433463rm_f_v(multihole_MVar_v_f(X3),Uu)
+     => ( ! [T2: term_f_v] : 
+            X2 != produc401433463rm_f_v(multihole_MHole_f_v,cons_term_f_v(T2,nil_term_f_v))
+       => ( ! [F2: f,Cs5: list_M276003553xt_f_v,Ts2: list_term_f_v] : 
+              X2 != produc401433463rm_f_v(multihole_MFun_f_v(F2,Cs5),Ts2)
+         => ( X2 != produc401433463rm_f_v(multihole_MHole_f_v,nil_term_f_v)
+           => ~ ( ! [V: term_f_v,Vb: term_f_v,Vc: list_term_f_v] : 
+                    X2 != produc401433463rm_f_v(multihole_MHole_f_v,cons_term_f_v(V,cons_term_f_v(Vb,Vc))) ) ) ) ) ) )).
+
+tff(fact_420_all__poss__mctxt__simp,axiom,(
+    ! [F: f,Cs4: list_M276003553xt_f_v] : lS_all750120224xt_f_v(multihole_MFun_f_v(F,Cs4)) = sup_sup_set_pos(insert_pos(empty,bot_bot_set_pos),collect_pos(aTP_Lamm_aj(Cs4))) )).
+
+tff(fact_421_Suc__neq__Zero,axiom,(
+    ! [M: nat] : 
+      aa_nat_nat(suc,M) != zero_zero_nat )).
+
+tff(fact_422_one__pos__def,axiom,(
+    one_one_pos = empty )).
+
+tff(fact_423_Zero__neq__Suc,axiom,(
+    ! [M: nat] : 
+      zero_zero_nat != aa_nat_nat(suc,M) )).
+
+tff(fact_424_Zero__not__Suc,axiom,(
+    ! [M: nat] : 
+      zero_zero_nat != aa_nat_nat(suc,M) )).
+
+tff(fact_425_fill__holes__mctxt_Ocases,axiom,(
+    ! [X2: produc158841325xt_f_v] : 
+      ( ! [X3: v,Uu: list_M276003553xt_f_v] : 
+          X2 != produc969282269xt_f_v(multihole_MVar_v_f(X3),Uu)
+     => ( X2 != produc969282269xt_f_v(multihole_MHole_f_v,nil_Mu1963645281xt_f_v)
+       => ( ! [T2: multihole_mctxt_f_v] : 
+              X2 != produc969282269xt_f_v(multihole_MHole_f_v,cons_M10820881xt_f_v(T2,nil_Mu1963645281xt_f_v))
+         => ( ! [F2: f,Cs5: list_M276003553xt_f_v,Ts2: list_M276003553xt_f_v] : 
+                X2 != produc969282269xt_f_v(multihole_MFun_f_v(F2,Cs5),Ts2)
+           => ~ ( ! [V: multihole_mctxt_f_v,Vb: multihole_mctxt_f_v,Vc: list_M276003553xt_f_v] : 
+                    X2 != produc969282269xt_f_v(multihole_MHole_f_v,cons_M10820881xt_f_v(V,cons_M10820881xt_f_v(Vb,Vc))) ) ) ) ) ) )).
+
+tff(fact_426_diff__is__0__eq_H,axiom,(
+    ! [M: nat,N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,M),N))
+     => aa_nat_nat(minus_minus_nat(M),N) = zero_zero_nat ) )).
+
+tff(fact_427_old_Onat_Oexhaust,axiom,(
+    ! [Y: nat] : 
+      ( Y != zero_zero_nat
+     => ~ ( ! [Nat3: nat] : 
+              Y != aa_nat_nat(suc,Nat3) ) ) )).
+
+tff(fact_428_add__le__cancel__left,axiom,(
+    ! [C7: nat,A: nat,B: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(plus_plus_nat(C7),A)),aa_nat_nat(plus_plus_nat(C7),B)))
+    <=> pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,A),B)) ) )).
+
+tff(fact_429_not0__implies__Suc,axiom,(
+    ! [N: nat] : 
+      ( N != zero_zero_nat
+     => ? [M2: nat] : N = aa_nat_nat(suc,M2) ) )).
+
+tff(fact_430_neq0__conv,axiom,(
+    ! [N: nat] : 
+      ( N != zero_zero_nat
+    <=> pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,zero_zero_nat),N)) ) )).
+
+tff(fact_431_nth__map,axiom,(
+    ! [N: nat,Xs: list_M276003553xt_f_v,F: fun_Mu1675924099xt_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,N),aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)))
+     => aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,map_Mu37731844xt_f_v(F,Xs)),N) = aa_Mul1979903100xt_f_v(F,aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Xs),N)) ) )).
+
+tff(fact_432_nth__map,axiom,(
+    ! [N: nat,Xs: list_M276003553xt_f_v,F: fun_Mu1352256958_v_nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,N),aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)))
+     => aa_nat_nat(nth_nat(map_Mu730314599_v_nat(F,Xs)),N) = aa_Mul588312303_v_nat(F,aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Xs),N)) ) )).
+
+tff(fact_433_nth__map,axiom,(
+    ! [N: nat,Xs: list_term_f_v,F: fun_te615323153xt_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,N),aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)))
+     => aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,map_te1879702642xt_f_v(F,Xs)),N) = aa_ter2005782522xt_f_v(F,aa_nat_term_f_v(nth_term_f_v(Xs),N)) ) )).
+
+tff(fact_434_nth__map,axiom,(
+    ! [N: nat,Xs: list_term_f_v,F: fun_term_f_v_nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,N),aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)))
+     => aa_nat_nat(nth_nat(map_term_f_v_nat(F,Xs)),N) = aa_term_f_v_nat(F,aa_nat_term_f_v(nth_term_f_v(Xs),N)) ) )).
+
+tff(fact_435_nth__map,axiom,(
+    ! [N: nat,Xs: list_nat,F: fun_na2081747172xt_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,N),aa_list_nat_nat(size_size_list_nat,Xs)))
+     => aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,map_na433213253xt_f_v(F,Xs)),N) = aa_nat291210957xt_f_v(F,aa_nat_nat(nth_nat(Xs),N)) ) )).
+
+tff(fact_436_nth__map,axiom,(
+    ! [N: nat,Xs: list_nat,F: fun_nat_nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,N),aa_list_nat_nat(size_size_list_nat,Xs)))
+     => aa_nat_nat(nth_nat(map_nat_nat(F,Xs)),N) = aa_nat_nat(F,aa_nat_nat(nth_nat(Xs),N)) ) )).
+
+tff(fact_437_nth__drop__0,axiom,(
+    ! [Ss: list_M276003553xt_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,zero_zero_nat),aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Ss)))
+     => cons_M10820881xt_f_v(aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Ss),zero_zero_nat),drop_M1817411233xt_f_v(aa_nat_nat(suc,zero_zero_nat),Ss)) = Ss ) )).
+
+tff(fact_438_nth__drop__0,axiom,(
+    ! [Ss: list_term_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,zero_zero_nat),aa_list_term_f_v_nat(size_s693102343rm_f_v,Ss)))
+     => cons_term_f_v(aa_nat_term_f_v(nth_term_f_v(Ss),zero_zero_nat),drop_term_f_v(aa_nat_nat(suc,zero_zero_nat),Ss)) = Ss ) )).
+
+tff(fact_439_nth__drop__0,axiom,(
+    ! [Ss: list_nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,zero_zero_nat),aa_list_nat_nat(size_size_list_nat,Ss)))
+     => cons_nat(aa_nat_nat(nth_nat(Ss),zero_zero_nat),drop_nat(aa_nat_nat(suc,zero_zero_nat),Ss)) = Ss ) )).
+
+tff(fact_440_add__eq__self__zero,axiom,(
+    ! [M: nat,N: nat] : 
+      ( aa_nat_nat(plus_plus_nat(M),N) = M
+     => N = zero_zero_nat ) )).
+
+tff(fact_441_add__Suc__shift,axiom,(
+    ! [M: nat,N: nat] : aa_nat_nat(plus_plus_nat(aa_nat_nat(suc,M)),N) = aa_nat_nat(plus_plus_nat(M),aa_nat_nat(suc,N)) )).
+
+tff(fact_442_drop__all,axiom,(
+    ! [Xs: list_M276003553xt_f_v,N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)),N))
+     => drop_M1817411233xt_f_v(N,Xs) = nil_Mu1963645281xt_f_v ) )).
+
+tff(fact_443_drop__all,axiom,(
+    ! [Xs: list_term_f_v,N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)),N))
+     => drop_term_f_v(N,Xs) = nil_term_f_v ) )).
+
+tff(fact_444_drop__all,axiom,(
+    ! [Xs: list_nat,N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_list_nat_nat(size_size_list_nat,Xs)),N))
+     => drop_nat(N,Xs) = nil_nat ) )).
+
+tff(fact_445_singletonD,axiom,(
+    ! [B: pos,A: pos] : 
+      ( member_pos(B,insert_pos(A,bot_bot_set_pos))
+     => B = A ) )).
+
+tff(fact_446_singletonD,axiom,(
+    ! [B: product_prod_f_nat,A: product_prod_f_nat] : 
+      ( pp(aa_set2129085473t_bool(member2050190361_f_nat(B),aa_set1604101550_f_nat(insert168347826_f_nat(A),bot_bo1362251980_f_nat)))
+     => B = A ) )).
+
+tff(fact_447_poss__mctxt_Oelims,axiom,(
+    ! [X2: multihole_mctxt_f_v,Y: set_pos] : 
+      ( aa_Mul1241491826et_pos(multih37762601xt_f_v,X2) = Y
+     => ( ( ? [X3: v] : X2 = multihole_MVar_v_f(X3)
+         => Y != insert_pos(empty,bot_bot_set_pos) )
+       => ( ( X2 = multihole_MHole_f_v
+           => Y != bot_bot_set_pos )
+         => ~ ( ! [F2: f,Cs5: list_M276003553xt_f_v] : 
+                  ( X2 = multihole_MFun_f_v(F2,Cs5)
+                 => Y != sup_sup_set_pos(insert_pos(empty,bot_bot_set_pos),comple1220921406et_pos(set_set_pos2(map_nat_set_pos(aa_lis1919791221et_pos(aTP_Lamm_ak,Cs5),upt(zero_zero_nat,aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Cs5)))))) ) ) ) ) ) )).
+
+tff(fact_448_inf__bot__right,axiom,(
+    ! [X2: set_Pr592218680_f_nat] : aa_set1604101550_f_nat(inf_in969140938_f_nat(X2),bot_bo1362251980_f_nat) = bot_bo1362251980_f_nat )).
+
+tff(fact_449_Un__iff,axiom,(
+    ! [C7: pos,A2: set_pos,B3: set_pos] : 
+      ( member_pos(C7,sup_sup_set_pos(A2,B3))
+    <=> ( member_pos(C7,A2)
+        | member_pos(C7,B3) ) ) )).
+
+tff(fact_450_Un__iff,axiom,(
+    ! [C7: product_prod_f_nat,A2: set_Pr592218680_f_nat,B3: set_Pr592218680_f_nat] : 
+      ( pp(aa_set2129085473t_bool(member2050190361_f_nat(C7),aa_set1604101550_f_nat(sup_su1335354212_f_nat(A2),B3)))
+    <=> ( pp(aa_set2129085473t_bool(member2050190361_f_nat(C7),A2))
+        | pp(aa_set2129085473t_bool(member2050190361_f_nat(C7),B3)) ) ) )).
+
+tff(fact_451_le__0__eq,axiom,(
+    ! [N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,N),zero_zero_nat))
+    <=> N = zero_zero_nat ) )).
+
+tff(fact_452_add__diff__cancel__right_H,axiom,(
+    ! [A: nat,B: nat] : aa_nat_nat(minus_minus_nat(aa_nat_nat(plus_plus_nat(A),B)),B) = A )).
+
+tff(fact_453_not__less__eq__eq,axiom,(
+    ! [M: nat,N: nat] : 
+      ( ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,M),N))
+    <=> pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(suc,N)),M)) ) )).
+
+tff(fact_454_cancel__comm__monoid__add__class_Odiff__cancel,axiom,(
+    ! [A: nat] : aa_nat_nat(minus_minus_nat(A),A) = zero_zero_nat )).
+
+tff(fact_455_Suc__pred,axiom,(
+    ! [N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,zero_zero_nat),N))
+     => aa_nat_nat(suc,aa_nat_nat(minus_minus_nat(N),aa_nat_nat(suc,zero_zero_nat))) = N ) )).
+
+tff(fact_456_add__less__cancel__left,axiom,(
+    ! [C7: nat,A: nat,B: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,aa_nat_nat(plus_plus_nat(C7),A)),aa_nat_nat(plus_plus_nat(C7),B)))
+    <=> pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,A),B)) ) )).
+
+tff(fact_457_less__Suc0,axiom,(
+    ! [N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,N),aa_nat_nat(suc,zero_zero_nat)))
+    <=> N = zero_zero_nat ) )).
+
+tff(fact_458_take__drop__update__first,axiom,(
+    ! [J: nat,Ds: list_M276003553xt_f_v,Cs4: list_M276003553xt_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,J),aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Ds)))
+     => ( aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Cs4) = aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Ds)
+       => list_u1095619529xt_f_v(append460316534xt_f_v(take_M241671497xt_f_v(J,Ds),drop_M1817411233xt_f_v(J,Cs4)),J,aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Ds),J)) = append460316534xt_f_v(take_M241671497xt_f_v(aa_nat_nat(suc,J),Ds),drop_M1817411233xt_f_v(aa_nat_nat(suc,J),Cs4)) ) ) )).
+
+tff(fact_459_take__drop__update__first,axiom,(
+    ! [J: nat,Ds: list_term_f_v,Cs4: list_term_f_v] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,J),aa_list_term_f_v_nat(size_s693102343rm_f_v,Ds)))
+     => ( aa_list_term_f_v_nat(size_s693102343rm_f_v,Cs4) = aa_list_term_f_v_nat(size_s693102343rm_f_v,Ds)
+       => list_update_term_f_v(append_term_f_v(take_term_f_v(J,Ds),drop_term_f_v(J,Cs4)),J,aa_nat_term_f_v(nth_term_f_v(Ds),J)) = append_term_f_v(take_term_f_v(aa_nat_nat(suc,J),Ds),drop_term_f_v(aa_nat_nat(suc,J),Cs4)) ) ) )).
+
+tff(fact_460_take__drop__update__first,axiom,(
+    ! [J: nat,Ds: list_nat,Cs4: list_nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,J),aa_list_nat_nat(size_size_list_nat,Ds)))
+     => ( aa_list_nat_nat(size_size_list_nat,Cs4) = aa_list_nat_nat(size_size_list_nat,Ds)
+       => list_update_nat(append_nat(take_nat(J,Ds),drop_nat(J,Cs4)),J,aa_nat_nat(nth_nat(Ds),J)) = append_nat(take_nat(aa_nat_nat(suc,J),Ds),drop_nat(aa_nat_nat(suc,J),Cs4)) ) ) )).
+
+tff(fact_461_subm__at__mreplace__at,axiom,(
+    ! [P: pos,C2: multihole_mctxt_f_v,D: multihole_mctxt_f_v] : 
+      ( member_pos(P,lS_all750120224xt_f_v(C2))
+     => lS_subm_at_f_v(aa_Mul1979903100xt_f_v(lS_mreplace_at_f_v(C2,P),D),P) = D ) )).
+
+tff(fact_462_list_Oset_I2_J,axiom,(
+    ! [X21: product_prod_f_nat,X22: list_P1298222994_f_nat] : set_Pr8039085_f_nat(cons_P1182348108_f_nat(X21,X22)) = aa_set1604101550_f_nat(insert168347826_f_nat(X21),set_Pr8039085_f_nat(X22)) )).
+
+tff(fact_463_list_Oset_I2_J,axiom,(
+    ! [X21: multihole_mctxt_f_v,X22: list_M276003553xt_f_v] : set_Mu1483390320xt_f_v(cons_M10820881xt_f_v(X21,X22)) = insert1004260907xt_f_v(X21,set_Mu1483390320xt_f_v(X22)) )).
+
+tff(fact_464_list_Oset_I2_J,axiom,(
+    ! [X21: term_f_v,X22: list_term_f_v] : set_term_f_v2(cons_term_f_v(X21,X22)) = insert_term_f_v(X21,set_term_f_v2(X22)) )).
+
+tff(fact_465_sigU,axiom,(
+    pp(aa_set2129085473t_bool(ord_le2116922008_f_nat(funas_trs_f_v(pp_U_f_v(sigF,ap))),pp_F_U_f(sigF,ap))) )).
+
+tff(fact_466_nth__equalityI,axiom,(
+    ! [Xs: list_M276003553xt_f_v,Ys: list_M276003553xt_f_v] : 
+      ( aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs) = aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Ys)
+     => ( ! [I2: nat] : 
+            ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I2),aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Xs)))
+           => aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Xs),I2) = aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Ys),I2) )
+       => Xs = Ys ) ) )).
+
+tff(fact_467_nth__equalityI,axiom,(
+    ! [Xs: list_term_f_v,Ys: list_term_f_v] : 
+      ( aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs) = aa_list_term_f_v_nat(size_s693102343rm_f_v,Ys)
+     => ( ! [I2: nat] : 
+            ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I2),aa_list_term_f_v_nat(size_s693102343rm_f_v,Xs)))
+           => aa_nat_term_f_v(nth_term_f_v(Xs),I2) = aa_nat_term_f_v(nth_term_f_v(Ys),I2) )
+       => Xs = Ys ) ) )).
+
+tff(fact_468_nth__equalityI,axiom,(
+    ! [Xs: list_nat,Ys: list_nat] : 
+      ( aa_list_nat_nat(size_size_list_nat,Xs) = aa_list_nat_nat(size_size_list_nat,Ys)
+     => ( ! [I2: nat] : 
+            ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I2),aa_list_nat_nat(size_size_list_nat,Xs)))
+           => aa_nat_nat(nth_nat(Xs),I2) = aa_nat_nat(nth_nat(Ys),I2) )
+       => Xs = Ys ) ) )).
+
+tff(fact_469_linorder__neqE__nat,axiom,(
+    ! [X2: nat,Y: nat] : 
+      ( X2 != Y
+     => ( ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,X2),Y))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,Y),X2)) ) ) )).
+
+tff(fact_470_all__poss__mctxt__conv,axiom,(
+    ! [C2: multihole_mctxt_f_v] : lS_all750120224xt_f_v(C2) = sup_sup_set_pos(aa_Mul1241491826et_pos(multih37762601xt_f_v,C2),multih482138097ss_f_v(C2)) )).
+
+tff(fact_471_take__Cons_H,axiom,(
+    ! [N: nat,X2: multihole_mctxt_f_v,Xs: list_M276003553xt_f_v] : 
+      ( ( N = zero_zero_nat
+       => take_M241671497xt_f_v(N,cons_M10820881xt_f_v(X2,Xs)) = nil_Mu1963645281xt_f_v )
+      & ( N != zero_zero_nat
+       => take_M241671497xt_f_v(N,cons_M10820881xt_f_v(X2,Xs)) = cons_M10820881xt_f_v(X2,take_M241671497xt_f_v(aa_nat_nat(minus_minus_nat(N),one_one_nat),Xs)) ) ) )).
+
+tff(fact_472_take__Cons_H,axiom,(
+    ! [N: nat,X2: term_f_v,Xs: list_term_f_v] : 
+      ( ( N = zero_zero_nat
+       => take_term_f_v(N,cons_term_f_v(X2,Xs)) = nil_term_f_v )
+      & ( N != zero_zero_nat
+       => take_term_f_v(N,cons_term_f_v(X2,Xs)) = cons_term_f_v(X2,take_term_f_v(aa_nat_nat(minus_minus_nat(N),one_one_nat),Xs)) ) ) )).
+
+tff(fact_473_ex__least__nat__less,axiom,(
+    ! [P3: fun_nat_bool,N: nat] : 
+      ( ~ pp(aa_nat_bool(P3,zero_zero_nat))
+     => ( pp(aa_nat_bool(P3,N))
+       => ? [K: nat] : 
+            ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,K),N))
+            & ! [I3: nat] : 
+                ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,I3),K))
+               => ~ pp(aa_nat_bool(P3,I3)) )
+            & pp(aa_nat_bool(P3,aa_nat_nat(plus_plus_nat(K),one_one_nat))) ) ) ) )).
+
+tff(fact_474__092_060U_062__def,axiom,(
+    pp_U_f_v(sigF,ap) = collec525259922rm_f_v(aTP_Lamm_al) )).
+
+tff(fact_475_Suc__le__eq,axiom,(
+    ! [M: nat,N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,aa_nat_nat(suc,M)),N))
+    <=> pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,M),N)) ) )).
+
+tff(fact_476__092_060F_062__in___092_060F_062_092_060_094sub_062U,axiom,(
+    pp(aa_set2129085473t_bool(ord_le2116922008_f_nat(pp_F_f(sigF)),pp_F_U_f(sigF,ap))) )).
+
+tff(fact_477_numeral__2__eq__2,axiom,(
+    numeral_numeral_nat(bit0(one)) = aa_nat_nat(suc,aa_nat_nat(suc,zero_zero_nat)) )).
+
+tff(fact_478_less__Suc__eq,axiom,(
+    ! [M: nat,N: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,M),aa_nat_nat(suc,N)))
+    <=> ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,M),N))
+        | M = N ) ) )).
+
+tff(fact_479_ex__least__nat__le,axiom,(
+    ! [P3: fun_nat_bool,N: nat] : 
+      ( ~ pp(aa_nat_bool(P3,zero_zero_nat))
+     => ( pp(aa_nat_bool(P3,N))
+       => ? [K: nat] : 
+            ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,K),N))
+            & ! [I3: nat] : 
+                ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I3),K))
+               => ~ pp(aa_nat_bool(P3,I3)) )
+            & pp(aa_nat_bool(P3,K)) ) ) ) )).
+
+tff(fact_480_not__gr0,axiom,(
+    ! [N: nat] : 
+      ( ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,zero_zero_nat),N))
+    <=> N = zero_zero_nat ) )).
+
+tff(fact_481_all__less__two,axiom,(
+    ! [P3: fun_nat_bool] : 
+      ( ! [I4: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I4),aa_nat_nat(suc,aa_nat_nat(suc,zero_zero_nat))))
+         => pp(aa_nat_bool(P3,I4)) )
+    <=> ( pp(aa_nat_bool(P3,zero_zero_nat))
+        & pp(aa_nat_bool(P3,aa_nat_nat(suc,zero_zero_nat))) ) ) )).
+
+tff(fact_482_diff__less,axiom,(
+    ! [N: nat,M: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,zero_zero_nat),N))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,zero_zero_nat),M))
+       => pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,aa_nat_nat(minus_minus_nat(M),N)),M)) ) ) )).
+
+tff(fact_483_ind__euclid,axiom,(
+    ! [P3: fun_nat_fun_nat_bool,A: nat,B: nat] : 
+      ( ! [A4: nat,B4: nat] : 
+          ( pp(aa_nat_bool(aa_nat_fun_nat_bool(P3,A4),B4))
+        <=> pp(aa_nat_bool(aa_nat_fun_nat_bool(P3,B4),A4)) )
+     => ( ! [A4: nat] : pp(aa_nat_bool(aa_nat_fun_nat_bool(P3,A4),zero_zero_nat))
+       => ( ! [A4: nat,B4: nat] : 
+              ( pp(aa_nat_bool(aa_nat_fun_nat_bool(P3,A4),B4))
+             => pp(aa_nat_bool(aa_nat_fun_nat_bool(P3,A4),aa_nat_nat(plus_plus_nat(A4),B4))) )
+         => pp(aa_nat_bool(aa_nat_fun_nat_bool(P3,A),B)) ) ) ) )).
+
+tff(fact_484_Suc__1,axiom,(
+    aa_nat_nat(suc,one_one_nat) = numeral_numeral_nat(bit0(one)) )).
+
+tff(fact_485_pos_Osize__gen_I1_J,axiom,(
+    aa_pos_nat(size_pos,empty) = zero_zero_nat )).
+
+tff(fact_486_zero__less__diff,axiom,(
+    ! [N: nat,M: nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,zero_zero_nat),aa_nat_nat(minus_minus_nat(N),M)))
+    <=> pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,M),N)) ) )).
+
+tff(fact_487_adjust__idx__rev__def,axiom,(
+    ! [J: nat,I: nat] : 
+      ( ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,J),I))
+       => aa_nat_nat(adjust_idx_rev(I),J) = J )
+      & ( ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,J),I))
+       => aa_nat_nat(adjust_idx_rev(I),J) = aa_nat_nat(minus_minus_nat(J),aa_nat_nat(suc,zero_zero_nat)) ) ) )).
+
+tff(fact_488_diff__diff__left,axiom,(
+    ! [I: nat,J: nat,K2: nat] : aa_nat_nat(minus_minus_nat(aa_nat_nat(minus_minus_nat(I),J)),K2) = aa_nat_nat(minus_minus_nat(I),aa_nat_nat(plus_plus_nat(J),K2)) )).
+
+tff(fact_489_listsum__take__eq,axiom,(
+    ! [K2: nat,I: nat,Xs: list_nat] : 
+      ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,K2),I))
+     => ( pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I),aa_list_nat_nat(size_size_list_nat,Xs)))
+       => groups1604586427um_nat(take_nat(I,Xs)) = aa_nat_nat(plus_plus_nat(aa_nat_nat(plus_plus_nat(groups1604586427um_nat(take_nat(K2,Xs))),aa_nat_nat(nth_nat(Xs),K2))),groups1604586427um_nat(take_nat(aa_nat_nat(minus_minus_nat(I),aa_nat_nat(suc,K2)),drop_nat(aa_nat_nat(suc,K2),Xs)))) ) ) )).
+
+tff(fact_490_add__eq__if,axiom,(
+    ! [M: nat,N: nat] : 
+      ( ( M = zero_zero_nat
+       => aa_nat_nat(plus_plus_nat(M),N) = N )
+      & ( M != zero_zero_nat
+       => aa_nat_nat(plus_plus_nat(M),N) = aa_nat_nat(suc,aa_nat_nat(plus_plus_nat(aa_nat_nat(minus_minus_nat(M),one_one_nat)),N)) ) ) )).
+
+tff(fact_491_ATP_Olambda__1,axiom,(
+    ! [Uu2: multihole_mctxt_f_v] : 
+      ( pp(aa_Mul1846291640v_bool(aTP_Lamm_ag,Uu2))
+    <=> ( pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(sigF,ap),Uu2))
+        | pp(aa_Mul1846291640v_bool(pp_LL_2_f_v(sigF,ap),Uu2)) ) ) )).
+
+tff(fact_492_ATP_Olambda__2,axiom,(
+    ! [Uu2: produc589042087rm_f_v] : 
+      ( pp(aa_Pro1758283628v_bool(aTP_Lamm_al,Uu2))
+    <=> ? [F3: f,N3: nat,X: v,Ts3: list_term_f_v] : 
+          ( Uu2 = produc368081759rm_f_v(fun_f_v(ap,cons_term_f_v(fun_f_v(F3,Ts3),cons_term_f_v(var_v_f(X),nil_term_f_v))),fun_f_v(F3,append_term_f_v(Ts3,cons_term_f_v(var_v_f(X),nil_term_f_v))))
+          & pp(aa_set2129085473t_bool(member2050190361_f_nat(product_Pair_f_nat(F3,N3)),pp_F_f(sigF)))
+          & pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,aa_list_term_f_v_nat(size_s693102343rm_f_v,Ts3)),N3))
+          & ! [Xa2: term_f_v] : 
+              ( member_term_f_v(Xa2,set_term_f_v2(Ts3))
+             => ? [X_i: v] : Xa2 = var_v_f(X_i) )
+          & pp(aa_lis1953671846v_bool(distinct_term_f_v,append_term_f_v(Ts3,cons_term_f_v(var_v_f(X),nil_term_f_v)))) ) ) )).
+
+tff(fact_493_ATP_Olambda__3,axiom,(
+    ! [Uu2: f,Uua: nat] : 
+      ( pp(aa_nat_bool(aa_f_fun_nat_bool(aTP_Lamm_ae,Uu2),Uua))
+    <=> aa_f_option_nat(sigF,Uu2) = some_nat(Uua) ) )).
+
+tff(fact_494_ATP_Olambda__4,axiom,(
+    aTP_Lamm_ak = cOMBB_1186650171xt_f_v(cOMBS_438613959et_pos(cOMBB_1457624702os_nat(image_pos_pos,pCons)),cOMBB_1644720325xt_f_v(cOMBB_337648044os_nat(multih37762601xt_f_v),nth_Mu2056616290xt_f_v)) )).
+
+tff(fact_495_ATP_Olambda__5,axiom,(
+    ! [Uu2: set_Mu1305556667xt_f_v,Uua: multihole_mctxt_f_v] : 
+      ( pp(aa_Mul1846291640v_bool(aTP_Lamm_ab(Uu2),Uua))
+    <=> member995025156xt_f_v(Uua,Uu2) ) )).
+
+tff(fact_496_ATP_Olambda__6,axiom,(
+    ! [Uu2: set_Pr576123655rm_f_v,Uua: produc589042087rm_f_v] : 
+      ( pp(aa_Pro1758283628v_bool(aTP_Lamm_ac(Uu2),Uua))
+    <=> member816187216rm_f_v(Uua,Uu2) ) )).
+
+tff(fact_497_ATP_Olambda__7,axiom,(
+    ! [Uu2: set_Pr592218680_f_nat,Uua: product_prod_f_nat] : 
+      ( pp(aa_Pro335067735t_bool(aTP_Lamm_aa(Uu2),Uua))
+    <=> pp(aa_set2129085473t_bool(member2050190361_f_nat(Uua),Uu2)) ) )).
+
+tff(fact_498_ATP_Olambda__8,axiom,(
+    ! [Uu2: set_pos,Uua: pos] : 
+      ( pp(aa_pos_bool(aTP_Lamm_a(Uu2),Uua))
+    <=> member_pos(Uua,Uu2) ) )).
+
+tff(fact_499_ATP_Olambda__9,axiom,(
+    ! [Uu2: f,Uua: nat] : 
+      ( pp(aa_nat_bool(aa_f_fun_nat_bool(aTP_Lamm_ad,Uu2),Uua))
+    <=> ? [N3: nat] : 
+          ( aa_f_option_nat(sigF,Uu2) = some_nat(N3)
+          & pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Uua),N3)) ) ) )).
+
+tff(fact_500_ATP_Olambda__10,axiom,(
+    ! [Uu2: list_M276003553xt_f_v,Uua: pos] : 
+      ( pp(aa_pos_bool(aTP_Lamm_af(Uu2),Uua))
+    <=> ? [I4: nat,P4: pos] : 
+          ( Uua = aa_pos_pos(aa_nat_fun_pos_pos(pCons,I4),P4)
+          & pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I4),aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Uu2)))
+          & member_pos(P4,aa_Mul1241491826et_pos(multih37762601xt_f_v,aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Uu2),I4))) ) ) )).
+
+tff(fact_501_ATP_Olambda__11,axiom,(
+    ! [Uu2: list_M276003553xt_f_v,Uua: pos] : 
+      ( pp(aa_pos_bool(aTP_Lamm_aj(Uu2),Uua))
+    <=> ? [I4: nat,P4: pos] : 
+          ( Uua = aa_pos_pos(aa_nat_fun_pos_pos(pCons,I4),P4)
+          & pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_nat,I4),aa_lis1425841141_v_nat(size_s1130017613xt_f_v,Uu2)))
+          & member_pos(P4,lS_all750120224xt_f_v(aa_nat291210957xt_f_v(aa_lis3365503xt_f_v(nth_Mu2056616290xt_f_v,Uu2),I4))) ) ) )).
+
+tff(fact_502_ATP_Olambda__12,axiom,(
+    ! [Uu2: fun_f_option_nat,Uua: f,Uub: multihole_mctxt_f_v] : 
+      ( pp(aa_Mul1846291640v_bool(aa_f_f1445875462v_bool(aTP_Lamm_ah(Uu2),Uua),Uub))
+    <=> ( pp(aa_Mul1846291640v_bool(pp_LL_1_f_v(Uu2,Uua),Uub))
+        | pp(aa_Mul1846291640v_bool(pp_LL_2_f_v(Uu2,Uua),Uub)) ) ) )).
+
+tff(fact_503_ATP_Olambda__13,axiom,(
+    ! [Uu2: fun_f_option_nat,Uua: f,Uub: nat] : 
+      ( pp(aa_nat_bool(aa_f_fun_nat_bool(aTP_Lamm_ai(Uu2),Uua),Uub))
+    <=> ? [N3: nat] : 
+          ( aa_f_option_nat(Uu2,Uua) = some_nat(N3)
+          & pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,Uub),N3)) ) ) )).
+
+tff(help_pp_2_1_U,axiom,(
+    pp(fTrue) )).
+
+tff(help_pp_1_1_U,axiom,(
+    ~ pp(fFalse) )).
+
+tff(help_COMBS_1_1_COMBS_001t__Nat__Onat_001t__Set__Oset_It__Position__Opos_J_001t__Set__Oset_It__Position__Opos_J_U,axiom,(
+    ! [P3: fun_na964512336et_pos,Q: fun_nat_set_pos,R2: nat] : aa_nat_set_pos(aa_fun1395737148et_pos(cOMBS_438613959et_pos(P3),Q),R2) = aa_set_pos_set_pos(aa_nat1661677329et_pos(P3,R2),aa_nat_set_pos(Q,R2)) )).
+
+tff(help_COMBB_1_1_COMBB_001t__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_001t__Set__Oset_It__Position__Opos_J_001t__Nat__Onat_U,axiom,(
+    ! [P3: fun_Mu1999976057et_pos,Q: fun_na2081747172xt_f_v,R2: nat] : aa_nat_set_pos(aa_fun2063682738et_pos(cOMBB_337648044os_nat(P3),Q),R2) = aa_Mul1241491826et_pos(P3,aa_nat291210957xt_f_v(Q,R2)) )).
+
+tff(help_COMBB_1_1_COMBB_001t__fun_It__Position__Opos_Mt__Position__Opos_J_001t__fun_It__Set__Oset_It__Position__Opos_J_Mt__Set__Oset_It__Position__Opos_J_J_001t__Nat__Onat_U,axiom,(
+    ! [P3: fun_fu1377063043et_pos,Q: fun_nat_fun_pos_pos,R2: nat] : aa_nat1661677329et_pos(cOMBB_1457624702os_nat(P3,Q),R2) = aa_fun814674244et_pos(P3,aa_nat_fun_pos_pos(Q,R2)) )).
+
+tff(help_COMBB_1_1_COMBB_001t__fun_It__Nat__Onat_Mt__Set__Oset_It__Position__Opos_J_J_001t__fun_It__Nat__Onat_Mt__Set__Oset_It__Position__Opos_J_J_001t__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_U,axiom,(
+    ! [P3: fun_fu1023870659et_pos,Q: fun_li136545532et_pos,R2: list_M276003553xt_f_v] : aa_lis1919791221et_pos(cOMBB_1186650171xt_f_v(P3,Q),R2) = aa_fun1395737148et_pos(P3,aa_lis1919791221et_pos(Q,R2)) )).
+
+tff(help_COMBB_1_1_COMBB_001t__fun_It__Nat__Onat_Mt__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_001t__fun_It__Nat__Onat_Mt__Set__Oset_It__Position__Opos_J_J_001t__List__Olist_It__Multihole____Context__Omctxt_Itf__f_Mtf__v_J_J_U,axiom,(
+    ! [P3: fun_fu376057145et_pos,Q: fun_li1013598214xt_f_v,R2: list_M276003553xt_f_v] : aa_lis1919791221et_pos(cOMBB_1644720325xt_f_v(P3,Q),R2) = aa_fun2063682738et_pos(P3,aa_lis3365503xt_f_v(Q,R2)) )).
+
+tff(conj_4,conjecture,(
+    thesis )).
+%------------------------------------------------------------------------------

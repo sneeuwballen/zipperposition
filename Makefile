@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 0ea630b0d23ed49c1bf5c457a3a51866)
+# DO NOT EDIT (digest: b2ac72b97ac10c57bd1c0d74a664b293)
 
 SETUP = ./setup.exe
 
@@ -39,7 +39,7 @@ configure: $(SETUP)
 
 setup.exe: setup.ml
 	ocamlfind ocamlopt -o $@ setup.ml || ocamlfind ocamlc -o $@ setup.ml || true
-	$(RM) setup.cmi setup.cmo setup.cmx setup.o
+	$(RM) setup.cmi setup.cmo setup.cmx setup.o setup.cmt
 
 .PHONY: build doc test all install uninstall reinstall clean distclean configure
 
@@ -78,38 +78,57 @@ dot:
 	for i in *.dot; do dot -Tsvg "$$i" > "$$( basename $$i .dot )".svg; done
 
 TEST_FILES = tests/ examples/
+TEST_TOOL = logitest
+TEST_OPTS ?= -j 2 --junit test.xml
 
-frogtest:
-	frogtest run -c ./tests/conf.toml $(TEST_FILES)
+check-test-tool:
+	@if ! ( which $(TEST_TOOL) > /dev/null ) ; then echo "install $(TEST_TOOL)"; exit 1; fi
 
-frogtest-zipper:
-	frogtest run -p zipperposition -c ./tests/conf.toml $(TEST_FILES)
+$(TEST_TOOL): check-test-tool
+	$(TEST_TOOL) run -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES)
 
-frogtest-hornet:
-	frogtest run -p hornet -c ./tests/conf.toml $(TEST_FILES)
+$(TEST_TOOL)-zipper: check-test-tool
+	$(TEST_TOOL) run -p zipperposition -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES)
+
+$(TEST_TOOL)-hornet: check-test-tool
+
+check_$(TEST_TOOL):
+	@if not (which $(TEST_TOOL) > /dev/null) ; then echo "install $(TEST_TOOL)"; exit 1; fi
+
+$(TEST_TOOL): check_$(TEST_TOOL)
+	$(TEST_TOOL) run -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES)
+
+$(TEST_TOOL)-zipper:
+	$(TEST_TOOL) run -p zipperposition -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES)
+
+$(TEST_TOOL)-hornet:
+	$(TEST_TOOL) run -p hornet -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES)
 
 tip-benchmarks:
 	git submodule update --init tip-benchmarks
 
-frogtest-tip: tip-benchmarks
+$(TEST_TOOL)-tip: check-test-tool tip-benchmarks
 	@[ -d tip-benchmarks ] || (echo "missing tip-benchmarks/" && exit 1)
-	frogtest run --meta=`git rev-parse HEAD` -c ./data/tip.toml
+	$(TEST_TOOL) run --meta=`git rev-parse HEAD` -c ./data/tip.toml $(TEST_OPTS) 
 
-# restricted version of frogtest-tip
-frogtest-tip-isaplanner: tip-benchmarks
+# restricted version of $(TEST_TOOL)-tip
+$(TEST_TOOL)-tip-isaplanner: check-test-tool tip-benchmarks
 	@[ -d tip-benchmarks ] || (echo "missing tip-benchmarks/" && exit 1)
-	frogtest run --meta=`git rev-parse HEAD` -c ./data/tip.toml \
-	  tip-benchmarks/benchmarks/isaplanner/
+	$(TEST_TOOL) run --meta=`git rev-parse HEAD` -c ./data/tip.toml \
+	  $(TEST_OPTS) tip-benchmarks/benchmarks/isaplanner/
+
+$(TEST_TOOL)-thf: check-test-tool
+	$(TEST_TOOL) run -c data/bench.toml --profile=thf $(TEST_OPTS)
 
 BENCH_DIR="bench-$(shell date -Iminutes)"
-frogtest-tptp:
+$(TEST_TOOL)-tptp:
 	@echo "start benchmarks in ${BENCH_DIR}"
 	mkdir -p ${BENCH_DIR}
 	cp zipperposition.native hornet.native ${BENCH_DIR}/
 	ln -s ../tptp/ ${BENCH_DIR}/tptp
 	cp data/bench.toml ${BENCH_DIR}/conf.toml
-	cd ${BENCH_DIR} && frogtest run --meta=`git rev-parse HEAD` \
-	  -c conf.toml
+	cd ${BENCH_DIR} && $(TEST_TOOL) run --meta=`git rev-parse HEAD` \
+	  -c conf.toml $(TEST_OPTS)
 
 TARBALL=zipperposition.tar.gz
 

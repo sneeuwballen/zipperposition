@@ -1,0 +1,14 @@
+# expect: unsat
+
+# find set intersection on a set of sets
+# Given a set of sets `I`, we seek the intersection of all these sets, i.e.
+# `λx. ∀y. (y ∈ I ⇒ x ∈ y)`
+
+val a : type.
+
+goal forall (I: (a -> prop) -> prop).
+  exists (Q:a -> prop).
+    forall x. (Q x <=> (forall Y. (I Y => Y x))).
+
+
+

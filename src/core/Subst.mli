@@ -1,10 +1,12 @@
 
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
-(** {1 Substitutions}
+(** {1 Substitutions} *)
 
-    Substitutions map variables to terms/types. They work on free variables (within
-    a scope, so that the same variable can live within several scopes).
+(** Substitutions map (scoped) variables to terms/types.
+    
+    They work on free variables (within a scope, so that the same variable can
+    live within several scopes).
 
     The concept of scope is to allow the same free variable to be used in
     several contexts without being renamed. A scope is kind of a namespace,
@@ -76,6 +78,9 @@ val append : t -> t -> t
 val remove : t -> var Scoped.t -> t
 (** Remove the given binding. No other variable should depend on it... *)
 
+val restrict_scope : t -> Scoped.scope -> t
+(** Only keep bindings from this scope *)
+
 (** {2 Set operations} *)
 
 val domain : t -> (var Scoped.t) Sequence.t
@@ -86,6 +91,17 @@ val codomain : t -> (term Scoped.t) Sequence.t
 
 val introduced : t -> (var Scoped.t) Sequence.t
 (** Variables introduced by the substitution (ie vars of codomain) *)
+
+val normalize : t -> t
+(** Normalize bindings that are in the same scope.
+    E.g. [x0 -> f(y0), y0 -> g(z0), z0->a]
+    becomes [x0->f(g(a))0, y0->g(a)0, z0->g(z0)] *)
+
+val map : (term -> term) -> t -> t
+(** Map on term *)
+
+val filter : (var Scoped.t -> term Scoped.t -> bool) -> t -> t
+(** Filter bindings *)
 
 (*
 val compose : t -> t -> t
@@ -103,6 +119,9 @@ val compare : t -> t -> int
 val hash : t -> int
 
 include Interfaces.PRINT with type t := t
+
+val pp_bindings : t CCFormat.printer
+(** Only print the bindings, no box *)
 
 val fold : ('a -> var Scoped.t -> term Scoped.t -> 'a) -> 'a -> t -> 'a
 val iter : (var Scoped.t -> term Scoped.t -> unit) -> t -> unit
@@ -157,7 +176,10 @@ end
 module Ty : SPECIALIZED with type term = Type.t
 
 module FO : sig
-  include SPECIALIZED with type term = FOTerm.t
+  include SPECIALIZED with type term = Term.t
   val bind' : t -> Type.t HVar.t Scoped.t -> term Scoped.t -> t
+  val apply_l : t -> renaming:Renaming.t -> term list Scoped.t -> term list
   val of_list' : ?init:t -> (Type.t HVar.t Scoped.t * term Scoped.t) list -> t
+  val map : (term -> term) -> t -> t
+  val filter : (Type.t HVar.t Scoped.t -> term Scoped.t -> bool) -> t -> t
 end

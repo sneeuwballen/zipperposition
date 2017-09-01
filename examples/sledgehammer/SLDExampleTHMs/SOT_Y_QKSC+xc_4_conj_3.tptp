@@ -1,0 +1,109 @@
+%------------------------------------------------------------------------------
+tff(ty_n_t__Set__Oset_It__List__Olist_It__Product____Type__Oprod_It__Nat__Onat_Mt__Nat__Onat_J_J_J,type,(
+    set_li664300135at_nat: $tType )).
+
+tff(ty_n_t__fun_It__Product____Type__Oprod_It__Nat__Onat_Mt__Nat__Onat_J_Mt__Nat__Onat_J,type,(
+    fun_Pr1217210468at_nat: $tType )).
+
+tff(ty_n_t__List__Olist_It__Product____Type__Oprod_It__Nat__Onat_Mt__Nat__Onat_J_J,type,(
+    list_P559422087at_nat: $tType )).
+
+tff(ty_n_t__fun_It__Nat__Onat_Mt__fun_It__Nat__Onat_Mt__HOL__Obool_J_J,type,(
+    fun_nat_fun_nat_bool: $tType )).
+
+tff(ty_n_t__fun_It__Nat__Onat_Mt__HOL__Obool_J,type,(
+    fun_nat_bool: $tType )).
+
+tff(ty_n_t__Set__Oset_It__Nat__Onat_J,type,(
+    set_nat: $tType )).
+
+tff(ty_n_t__HOL__Obool,type,(
+    bool: $tType )).
+
+tff(ty_n_t__Nat__Onat,type,(
+    nat: $tType )).
+
+tff(sy_c_Finite__Set_Ofinite_001t__List__Olist_It__Product____Type__Oprod_It__Nat__Onat_Mt__Nat__Onat_J_J,type,(
+    finite1299096496at_nat: set_li664300135at_nat > bool )).
+
+tff(sy_c_Groups_Ominus__class_Ominus_001t__Set__Oset_It__List__Olist_It__Product____Type__Oprod_It__Nat__Onat_Mt__Nat__Onat_J_J_J,type,(
+    minus_1339288782at_nat: ( set_li664300135at_nat * set_li664300135at_nat ) > set_li664300135at_nat )).
+
+tff(sy_c_List_Olist_ONil_001t__Product____Type__Oprod_It__Nat__Onat_Mt__Nat__Onat_J,type,(
+    nil_Pr1308055047at_nat: list_P559422087at_nat )).
+
+tff(sy_c_MinimumSpanningTree_OConnectedGraph_Ospanning__tree__set,type,(
+    spanning_tree_set: fun_Pr1217210468at_nat > set_li664300135at_nat )).
+
+tff(sy_c_MinimumSpanningTree_OGraph_OV,type,(
+    v: fun_Pr1217210468at_nat > set_nat )).
+
+tff(sy_c_MinimumSpanningTree_OGraph_OpathWeight,type,(
+    pathWeight: ( fun_Pr1217210468at_nat * list_P559422087at_nat ) > nat )).
+
+tff(sy_c_Orderings_Obot__class_Obot_001t__Set__Oset_It__List__Olist_It__Product____Type__Oprod_It__Nat__Onat_Mt__Nat__Onat_J_J_J,type,(
+    bot_bo1437122771at_nat: set_li664300135at_nat )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Nat__Onat,type,(
+    ord_less_eq_nat: fun_nat_fun_nat_bool )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Set__Oset_It__List__Olist_It__Product____Type__Oprod_It__Nat__Onat_Mt__Nat__Onat_J_J_J,type,(
+    ord_le1343857159at_nat: ( set_li664300135at_nat * set_li664300135at_nat ) > bool )).
+
+tff(sy_c_Set_Oinsert_001t__List__Olist_It__Product____Type__Oprod_It__Nat__Onat_Mt__Nat__Onat_J_J,type,(
+    insert1119705175at_nat: ( list_P559422087at_nat * set_li664300135at_nat ) > set_li664300135at_nat )).
+
+tff(sy_c_aa_001t__Nat__Onat_001t__HOL__Obool,type,(
+    aa_nat_bool: ( fun_nat_bool * nat ) > bool )).
+
+tff(sy_c_aa_001t__Nat__Onat_001t__fun_It__Nat__Onat_Mt__HOL__Obool_J,type,(
+    aa_nat_fun_nat_bool: ( fun_nat_fun_nat_bool * nat ) > fun_nat_bool )).
+
+tff(sy_c_fFalse,type,(
+    fFalse: bool )).
+
+tff(sy_c_fTrue,type,(
+    fTrue: bool )).
+
+tff(sy_c_member_001t__List__Olist_It__Product____Type__Oprod_It__Nat__Onat_Mt__Nat__Onat_J_J,type,(
+    member1608759472at_nat: ( list_P559422087at_nat * set_li664300135at_nat ) > bool )).
+
+tff(sy_c_member_001t__Nat__Onat,type,(
+    member_nat: ( nat * set_nat ) > bool )).
+
+tff(sy_c_pp,type,(
+    pp: bool > $o )).
+
+tff(sy_v_aa,type,(
+    aa: set_li664300135at_nat )).
+
+tff(sy_v_ba,type,(
+    ba: list_P559422087at_nat )).
+
+tff(sy_v_c,type,(
+    c: fun_Pr1217210468at_nat )).
+
+tff(sy_v_x,type,(
+    x: list_P559422087at_nat )).
+
+tff(sy_v_xa,type,(
+    xa: list_P559422087at_nat )).
+
+tff(fact_0_nodes__connected,axiom,(
+    ! [IsReachable: fun_nat_fun_nat_bool,V: nat,U: nat] : 
+      ( V != U
+      & pp(member_nat(V,v(c)))
+      & pp(member_nat(U,v(c)))
+      & pp(aa_nat_bool(aa_nat_fun_nat_bool(IsReachable,V),U)) ) )).
+
+tff(help_pp_2_1_U,axiom,(
+    pp(fTrue) )).
+
+tff(help_pp_1_1_U,axiom,(
+    ~ pp(fFalse) )).
+
+tff(conj_3,conjecture,
+    ( ba != nil_Pr1308055047at_nat
+    & ( x = nil_Pr1308055047at_nat
+      | ~ pp(aa_nat_bool(aa_nat_fun_nat_bool(ord_less_eq_nat,pathWeight(c,x)),pathWeight(c,ba))) ) )).
+%------------------------------------------------------------------------------

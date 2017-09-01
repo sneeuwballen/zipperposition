@@ -1,0 +1,36 @@
+
+# induction on lists
+# expect: UNSAT
+
+val term : type.
+
+data list := nil | cons term list.
+
+val append : list -> list -> list.
+val length : list -> int.
+val dup : list -> list.
+val rev : list -> list.
+val rev_append : list -> list -> list.
+
+rewrite (length nil) = 0.
+rewrite
+  forall (X:term).
+    (forall (L:list). ((length (cons X L)) = (1 + (length L)))).
+rewrite forall (L:list). ((append nil L) = L).
+rewrite
+  forall (X:term).
+    (forall (L:list).
+       (forall (L2:list). ((append (cons X L) L2) = (cons X (append L L2))))).
+rewrite (dup nil) = nil.
+rewrite
+  forall (X:term).
+    (forall (L:list). ((dup (cons X L)) = (cons X (cons X (dup L))))).
+rewrite forall (L:list). ((rev L) = (rev_append nil L)).
+rewrite forall (L:list). ((rev_append L nil) = L).
+rewrite
+  forall (X:term).
+    (forall (L1:list).
+       (forall (L2:list).
+          ((rev_append L1 (cons X L2)) = (rev_append (cons X L1) L2)))).
+
+goal forall (L:list). ((length (dup L)) = (2 * (length L))).

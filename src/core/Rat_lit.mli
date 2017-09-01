@@ -1,9 +1,12 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Arithmetic Literal} *)
+(** {1 Arithmetic Rational Literal} *)
 
-type term = FOTerm.t
+(** Atomic formulas for linear rational arithmetic.
+    Similar to {!Int_lit}. *)
+
+type term = Term.t
 
 (** {2 Type Decls} *)
 
@@ -40,6 +43,7 @@ val to_term : t -> term
 
 val pp : t CCFormat.printer
 val pp_tstp : t CCFormat.printer
+val pp_zf : t CCFormat.printer
 val to_string : t -> string
 
 (** {2 Operators} *)
@@ -48,9 +52,10 @@ val fold : ('a -> term -> 'a) -> 'a -> t -> 'a
 
 val map : (term -> term) -> t -> t (** functor *)
 
-type 'a unif = subst:Subst.t -> 'a Scoped.t -> 'a Scoped.t -> Subst.t Sequence.t
+type ('subst,'a) unif =
+  subst:'subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Sequence.t
 
-val generic_unif: Q.t Monome.t unif -> t unif
+val generic_unif: ('subst, Q.t Monome.t) unif -> ('subst,t) unif
 (** Generic unification/matching/variant, given such an operation on monomes *)
 
 val apply_subst : renaming:Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
@@ -69,7 +74,7 @@ val matching : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
 val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
   Subst.t Sequence.t
 
-val unify : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> Subst.t Sequence.t
+val unify : ?subst:Unif_subst.t -> t Scoped.t -> t Scoped.t -> Unif_subst.t Sequence.t
 
 val subsumes : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> Subst.t Sequence.t
 (** Find substitutions such that [subst(lit_a)] implies [lit_b]. This is
@@ -88,14 +93,14 @@ val fold_terms : ?pos:Position.t -> ?vars:bool -> ?ty_args:bool ->
 val max_terms : ord:Ordering.t -> t -> term list
 (** Maximal terms of the literal *)
 
-val to_form : t -> FOTerm.t SLiteral.t
+val to_form : t -> Term.t SLiteral.t
 (** Conversion into a simple literal *)
 
 (** {2 Iterators} *)
 
 module Seq : sig
   val terms : t -> term Sequence.t
-  val vars : t -> FOTerm.var Sequence.t
+  val vars : t -> Term.var Sequence.t
   val to_multiset : t -> (term * Q.t) Sequence.t
 end
 
@@ -160,8 +165,8 @@ module Focus : sig
   val apply_subst_no_renaming : Subst.t -> t Scoped.t -> t
   (** Apply a substitution with renaming (careful with collisions!) *)
 
-  val unify : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
-    (t * t * Subst.t) Sequence.t
+  val unify : ?subst:Unif_subst.t -> t Scoped.t -> t Scoped.t ->
+    (t * t * Unif_subst.t) Sequence.t
   (** Unify the two focused terms, and possibly other terms of their
       respective focused monomes; yield the new literals accounting for
       the unification along with the unifier *)

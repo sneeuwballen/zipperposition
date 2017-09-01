@@ -1,8 +1,8 @@
 # expect: UNSAT
 val term : type.
 assert
-  exists (X:b).
-    (exists (Y:b). ((forall (Z:b). ((Z = Y) || (Z = X))) && (X != Y))).
+  exists (X:term).
+    (exists (Y:term). ((forall (Z:term). ((Z = Y) || (Z = X))) && (X != Y))).
 val f : term -> term -> prop.
 goal
   (exists (Z:term).

@@ -1,0 +1,172 @@
+%------------------------------------------------------------------------------
+tff(ty_n_t__Congruence__Opartial____object__Opartial____object____ext_Itf__a_Mt__Congruence__Oeq____object__Oeq____object____ext_Itf__a_Mt__Order__Ogorder__Ogorder____ext_Itf__a_Mtf__b_J_J_J,type,(
+    partia1200667062xt_a_b: $tType )).
+
+tff(ty_n_t__fun_Itf__a_Mt__Set__Oset_Itf__a_J_J,type,(
+    fun_a_set_a: $tType )).
+
+tff(ty_n_t__Set__Oset_It__fun_Itf__a_Mtf__a_J_J,type,(
+    set_fun_a_a: $tType )).
+
+tff(ty_n_t__fun_Itf__a_Mtf__a_J,type,(
+    fun_a_a: $tType )).
+
+tff(ty_n_t__Set__Oset_Itf__a_J,type,(
+    set_a: $tType )).
+
+tff(ty_n_t__HOL__Obool,type,(
+    bool: $tType )).
+
+tff(ty_n_tf__a,type,(
+    a: $tType )).
+
+tff(sy_c_ATP_058Lamm__a____,type,(
+    aTP_Lamm_a: fun_a_set_a )).
+
+tff(sy_c_COMBK_001t__Set__Oset_Itf__a_J_001tf__a,type,(
+    cOMBK_set_a_a: set_a > fun_a_set_a )).
+
+tff(sy_c_Complete__Lattice_Oweak__complete__lattice_001tf__a_001tf__b,type,(
+    comple1989854997ce_a_b: partia1200667062xt_a_b > $o )).
+
+tff(sy_c_Congruence_Oeq__object_Oeq_001tf__a_001t__Order__Ogorder__Ogorder____ext_Itf__a_Mtf__b_J,type,(
+    eq_eq_656220518xt_a_b: ( partia1200667062xt_a_b * a * a ) > $o )).
+
+tff(sy_c_Congruence_Opartial__object_Ocarrier_001tf__a_001t__Congruence__Oeq____object__Oeq____object____ext_Itf__a_Mt__Order__Ogorder__Ogorder____ext_Itf__a_Mtf__b_J_J,type,(
+    partia1648700841xt_a_b: partia1200667062xt_a_b > set_a )).
+
+tff(sy_c_FuncSet_OPi_001tf__a_001tf__a,type,(
+    pi_a_a: ( set_a * fun_a_set_a ) > set_fun_a_a )).
+
+tff(sy_c_Lattice_Oasup_001tf__a_001tf__b,type,(
+    asup_a_b: ( partia1200667062xt_a_b * set_a ) > a )).
+
+tff(sy_c_Order_Ogorder_Ole_001tf__a_001tf__b,type,(
+    le_a_b: ( partia1200667062xt_a_b * a * a ) > $o )).
+
+tff(sy_c_Order_Oisotone_001tf__a_001tf__b_001tf__a_001tf__b,type,(
+    isotone_a_b_a_b: ( partia1200667062xt_a_b * partia1200667062xt_a_b * fun_a_a ) > $o )).
+
+tff(sy_c_Order_Oweak__partial__order_001tf__a_001tf__b,type,(
+    weak_p1556482856er_a_b: partia1200667062xt_a_b > $o )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Set__Oset_It__fun_Itf__a_Mtf__a_J_J,type,(
+    ord_le1336001497un_a_a: ( set_fun_a_a * set_fun_a_a ) > $o )).
+
+tff(sy_c_Orderings_Oord__class_Oless__eq_001t__Set__Oset_Itf__a_J,type,(
+    ord_less_eq_set_a: ( set_a * set_a ) > $o )).
+
+tff(sy_c_aa_001tf__a_001t__Set__Oset_Itf__a_J,type,(
+    aa_a_set_a: ( fun_a_set_a * a ) > set_a )).
+
+tff(sy_c_aa_001tf__a_001tf__a,type,(
+    aa_a_a: ( fun_a_a * a ) > a )).
+
+tff(sy_c_fFalse,type,(
+    fFalse: bool )).
+
+tff(sy_c_fTrue,type,(
+    fTrue: bool )).
+
+tff(sy_c_member_001t__fun_Itf__a_Mtf__a_J,type,(
+    member_fun_a_a: ( fun_a_a * set_fun_a_a ) > $o )).
+
+tff(sy_c_member_001tf__a,type,(
+    member_a: ( a * set_a ) > $o )).
+
+tff(sy_c_pp,type,(
+    pp: bool > $o )).
+
+tff(sy_v_A____,type,(
+    a2: set_a )).
+
+tff(sy_v_L,type,(
+    l: partia1200667062xt_a_b )).
+
+tff(sy_v_f,type,(
+    f: fun_a_a )).
+
+tff(sy_v_y____,type,(
+    y: a )).
+
+tff(fact_0__092_060open_062y_A_O_061_092_060_094bsub_062L_092_060_094esub_062_Af_Ay_092_060close_062,axiom,(
+    eq_eq_656220518xt_a_b(l,y,aa_a_a(f,y)) )).
+
+tff(fact_1__092_060open_062y_A_092_060sqsubseteq_062_092_060_094bsub_062L_092_060_094esub_062_A_092_060Squnion_062_092_060_094bsub_062L_092_060_094esub_062A_092_060close_062,axiom,(
+    le_a_b(l,y,asup_a_b(l,a2)) )).
+
+tff(fact_2_c_I1_J,axiom,(
+    member_a(y,a2) )).
+
+tff(fact_3_AL,axiom,(
+    ord_less_eq_set_a(a2,partia1648700841xt_a_b(l)) )).
+
+tff(fact_4_L_Oweak__complete__lattice__axioms,axiom,(
+    comple1989854997ce_a_b(l) )).
+
+tff(fact_5_assms_I2_J,axiom,(
+    member_fun_a_a(f,pi_a_a(partia1648700841xt_a_b(l),aTP_Lamm_a)) )).
+
+tff(fact_6_assms_I3_J,axiom,(
+    isotone_a_b_a_b(l,l,f) )).
+
+tff(fact_7_L_Oftype__carrier,axiom,(
+    ! [X: a,F: fun_a_a] : 
+      ( member_a(X,partia1648700841xt_a_b(l))
+     => ( member_fun_a_a(F,pi_a_a(partia1648700841xt_a_b(l),aTP_Lamm_a))
+       => member_a(aa_a_a(F,X),partia1648700841xt_a_b(l)) ) ) )).
+
+tff(fact_8_weak__complete__lattice_Osup__closed,axiom,(
+    ! [L: partia1200667062xt_a_b,A: set_a] : 
+      ( comple1989854997ce_a_b(L)
+     => ( ord_less_eq_set_a(A,partia1648700841xt_a_b(L))
+       => member_a(asup_a_b(L,A),partia1648700841xt_a_b(L)) ) ) )).
+
+tff(fact_9_rev__subsetD,axiom,(
+    ! [C: fun_a_a,A: set_fun_a_a,B: set_fun_a_a] : 
+      ( member_fun_a_a(C,A)
+     => ( ord_le1336001497un_a_a(A,B)
+       => member_fun_a_a(C,B) ) ) )).
+
+tff(fact_10_rev__subsetD,axiom,(
+    ! [C: a,A: set_a,B: set_a] : 
+      ( member_a(C,A)
+     => ( ord_less_eq_set_a(A,B)
+       => member_a(C,B) ) ) )).
+
+tff(fact_11_weak__partial__order_Ole__cong__l,axiom,(
+    ! [L: partia1200667062xt_a_b,X: a,Y: a,Z: a] : 
+      ( weak_p1556482856er_a_b(L)
+     => ( eq_eq_656220518xt_a_b(L,X,Y)
+       => ( le_a_b(L,Y,Z)
+         => ( member_a(X,partia1648700841xt_a_b(L))
+           => ( member_a(Y,partia1648700841xt_a_b(L))
+             => ( member_a(Z,partia1648700841xt_a_b(L))
+               => le_a_b(L,X,Z) ) ) ) ) ) ) )).
+
+tff(fact_12_L_Oweak__partial__order__axioms,axiom,(
+    weak_p1556482856er_a_b(l) )).
+
+tff(fact_13_use__iso1,axiom,(
+    ! [A: partia1200667062xt_a_b,F: fun_a_a,X: a,Y: a] : 
+      ( isotone_a_b_a_b(A,A,F)
+     => ( member_a(X,partia1648700841xt_a_b(A))
+       => ( member_a(Y,partia1648700841xt_a_b(A))
+         => ( le_a_b(A,X,Y)
+           => le_a_b(A,aa_a_a(F,X),aa_a_a(F,Y)) ) ) ) ) )).
+
+tff(fact_14_ATP_Olambda__1,axiom,(
+    aTP_Lamm_a = cOMBK_set_a_a(partia1648700841xt_a_b(l)) )).
+
+tff(help_pp_2_1_U,axiom,(
+    pp(fTrue) )).
+
+tff(help_pp_1_1_U,axiom,(
+    ~ pp(fFalse) )).
+
+tff(help_COMBK_1_1_COMBK_001t__Set__Oset_Itf__a_J_001tf__a_U,axiom,(
+    ! [P: set_a,Q: a] : aa_a_set_a(cOMBK_set_a_a(P),Q) = P )).
+
+tff(conj_2,conjecture,(
+    le_a_b(l,y,aa_a_a(f,asup_a_b(l,a2))) )).
+%------------------------------------------------------------------------------

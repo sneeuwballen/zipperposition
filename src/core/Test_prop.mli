@@ -4,9 +4,14 @@
 (** {1 Test Properties} *)
 
 (** Test universal properties that use defined functions,
-    within some "reasonable" bound (e.g. smallcheck/quickcheck) *)
+    within some "reasonable" bound (e.g. smallcheck/quickcheck).
 
-type term = FOTerm.t
+    This is used to test a property semantically (by evaluation)
+    before trying the costly proof by induction; if the property is
+    false there is no need to try to prove it.
+*)
+
+type term = Term.t
 type lit = Literal.t
 type form = Literals.t list
 

@@ -1,20 +1,29 @@
 
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
+(** {1 Interface for unification} *)
+
+type unif_subst = Unif_subst.t
 type subst = Subst.t
 
 module type S = sig
   type ty
   type term
 
-  val bind : subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst
+  val bind : ?check:bool -> subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst
   (** [bind subst v t] binds [v] to [t], but fails if [v] occurs in [t]
       (performs an occur-check first)
-      @raise Fail if occurs-check fires *)
+      @param check if true, perform occur check
+      @raise Fail if occurs-check fires or if the variable is bound already *)
 
-  val unification : ?subst:subst ->
+  val unify_syn : ?subst:subst ->
     term Scoped.t -> term Scoped.t -> subst
-  (** Unify terms, returns a subst or
+  (** Unify terms syntictally, returns a subst
+      @raise Fail if the terms are not unifiable *)
+
+  val unify_full : ?subst:unif_subst ->
+    term Scoped.t -> term Scoped.t -> unif_subst
+  (** Unify terms, returns a subst + constraints or
       @raise Fail if the terms are not unifiable *)
 
   val matching : ?subst:subst ->
@@ -55,7 +64,11 @@ module type S = sig
       are equal under the given substitution, i.e. if applying the
       substitution will return the same term. *)
 
-  val are_unifiable : term -> term -> bool
+  val are_unifiable_full : term -> term -> bool
+  (** Unifiable with some additional constraints? *)
+
+  val are_unifiable_syn : term -> term -> bool
+  (** Unifiable syntactically? *)
 
   val matches : pattern:term -> term -> bool
 
