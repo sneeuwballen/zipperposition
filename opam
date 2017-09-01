@@ -32,7 +32,6 @@ depends: [
   "zarith"
   "containers" { >= "1.0" }
   "sequence" { >= "0.4" }
-  "oclock"
   "msat" { >= "0.5" }
   "menhir" {build}
   "tip-parser"
