@@ -1,0 +1,126 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Ind_cst.html">
+<link rel="next" href="Cut_form.html">
+<link rel="Up" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="ClauseQueue" rel="Chapter" href="ClauseQueue.html">
+<link title="Clause" rel="Chapter" href="Clause.html">
+<link title="SClause" rel="Chapter" href="SClause.html">
+<link title="Const" rel="Chapter" href="Const.html">
+<link title="Extensions" rel="Chapter" href="Extensions.html">
+<link title="Ctx" rel="Chapter" href="Ctx.html">
+<link title="Proof" rel="Chapter" href="Proof.html">
+<link title="ProofState" rel="Chapter" href="ProofState.html">
+<link title="Saturate" rel="Chapter" href="Saturate.html">
+<link title="Selection" rel="Chapter" href="Selection.html">
+<link title="AC" rel="Chapter" href="AC.html">
+<link title="AC_intf" rel="Chapter" href="AC_intf.html">
+<link title="SimplM" rel="Chapter" href="SimplM.html">
+<link title="Params" rel="Chapter" href="Params.html">
+<link title="Env" rel="Chapter" href="Env.html">
+<link title="Signals" rel="Chapter" href="Signals.html">
+<link title="Classify_cst" rel="Chapter" href="Classify_cst.html">
+<link title="Ctx_intf" rel="Chapter" href="Ctx_intf.html">
+<link title="Clause_intf" rel="Chapter" href="Clause_intf.html">
+<link title="Env_intf" rel="Chapter" href="Env_intf.html">
+<link title="ProofState_intf" rel="Chapter" href="ProofState_intf.html">
+<link title="BBox" rel="Chapter" href="BBox.html">
+<link title="ClauseContext" rel="Chapter" href="ClauseContext.html">
+<link title="ClauseQueue_intf" rel="Chapter" href="ClauseQueue_intf.html">
+<link title="Bool_lit" rel="Chapter" href="Bool_lit.html">
+<link title="Bool_lit_intf" rel="Chapter" href="Bool_lit_intf.html">
+<link title="Sat_solver" rel="Chapter" href="Sat_solver.html">
+<link title="Sat_solver_intf" rel="Chapter" href="Sat_solver_intf.html">
+<link title="Trail" rel="Chapter" href="Trail.html">
+<link title="Ind_cst" rel="Chapter" href="Ind_cst.html">
+<link title="Cover_set" rel="Chapter" href="Cover_set.html">
+<link title="Cut_form" rel="Chapter" href="Cut_form.html">
+<link title="Phases" rel="Chapter" href="Phases.html">
+<link title="Phases_impl" rel="Chapter" href="Phases_impl.html">
+<link title="Avatar" rel="Chapter" href="Avatar.html">
+<link title="Avatar_intf" rel="Chapter" href="Avatar_intf.html">
+<link title="Induction" rel="Chapter" href="Induction.html">
+<link title="Induction_intf" rel="Chapter" href="Induction_intf.html">
+<link title="Superposition" rel="Chapter" href="Superposition.html">
+<link title="Superposition_intf" rel="Chapter" href="Superposition_intf.html">
+<link title="Rewriting" rel="Chapter" href="Rewriting.html">
+<link title="EnumTypes" rel="Chapter" href="EnumTypes.html">
+<link title="Arith_int" rel="Chapter" href="Arith_int.html">
+<link title="Arith_rat" rel="Chapter" href="Arith_rat.html">
+<link title="Heuristics" rel="Chapter" href="Heuristics.html">
+<link title="Ind_types" rel="Chapter" href="Ind_types.html">
+<link title="Fool" rel="Chapter" href="Fool.html">
+<link title="Higher_order" rel="Chapter" href="Higher_order.html"><title>Cover_set</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Ind_cst.html" title="Ind_cst">Previous</a>
+&nbsp;<a class="up" href="index.html" title="Index">Up</a>
+&nbsp;<a class="post" href="Cut_form.html" title="Cut_form">Next</a>
+</div>
+<h1>Module <a href="type_Cover_set.html">Cover_set</a></h1>
+
+<pre><span class="keyword">module</span> Cover_set: <code class="code">sig</code> <a href="Cover_set.html">..</a> <code class="code">end</code></pre><div class="info module top">
+<h1 id="1_CoverSet">Cover Set</h1><br>
+</div>
+<hr width="100%">
+<br>
+Use for reasoning by case during induction<br>
+
+<pre><span id="TYPEcst"><span class="keyword">type</span> <code class="type"></code>cst</span> = <code class="type"><a href="Ind_cst.html#TYPEt">Ind_cst.t</a></code> </pre>
+
+
+<pre><span id="TYPEterm"><span class="keyword">type</span> <code class="type"></code>term</span> = <code class="type">Logtk.Term.t</code> </pre>
+
+
+<pre><span id="TYPEcase"><span class="keyword">type</span> <code class="type"></code>case</span> </pre>
+
+
+<pre><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> </pre>
+
+
+<pre><span class="keyword">module</span> <a href="Cover_set.Case.html">Case</a>: <code class="code">sig</code> <a href="Cover_set.Case.html">..</a> <code class="code">end</code></pre><div class="info">
+Inductive Case
+</div>
+
+<pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Cover_set.html#TYPEt">t</a> CCFormat.printer</code></pre>
+<pre><span id="VALty"><span class="keyword">val</span> ty</span> : <code class="type"><a href="Cover_set.html#TYPEt">t</a> -> Logtk.Type.t</code></pre>
+<pre><span id="VALtop"><span class="keyword">val</span> top</span> : <code class="type"><a href="Cover_set.html#TYPEt">t</a> -> <a href="Cover_set.html#TYPEcst">cst</a></code></pre><div class="info ">
+top constant of the coverset<br>
+</div>
+
+<pre><span id="VALdeclarations"><span class="keyword">val</span> declarations</span> : <code class="type"><a href="Cover_set.html#TYPEt">t</a> -> (Logtk.ID.t * Logtk.Type.t) Sequence.t</code></pre><div class="info ">
+<code class="code">declarations set</code> returns a list of type declarations that should
+    be made if <code class="code">set</code> is new (declare the top cst and its subcases)<br>
+</div>
+
+<pre><span id="VALcases"><span class="keyword">val</span> cases</span> : <code class="type">?which:[ `All | `Base | `Rec ] -> <a href="Cover_set.html#TYPEt">t</a> -> <a href="Cover_set.html#TYPEcase">case</a> Sequence.t</code></pre><div class="info ">
+Cases of the cover set<br>
+</div>
+
+<pre><span id="VALsub_constants"><span class="keyword">val</span> sub_constants</span> : <code class="type"><a href="Cover_set.html#TYPEt">t</a> -> <a href="Cover_set.html#TYPEcst">cst</a> Sequence.t</code></pre><div class="info ">
+All sub-constants of a given inductive constant<br>
+</div>
+
+<pre><span id="VALmake"><span class="keyword">val</span> make</span> : <code class="type">?cover_set_depth:int -> depth:int -> Logtk.Type.t -> <a href="Cover_set.html#TYPEt">t</a></code></pre><div class="info ">
+Build a cover set for the given type.
+<p>
+
+    a set of ground terms <code class="code">[t1,...,tn]</code> with fresh
+    constants inside (that are not declared as inductive!) such that
+    <code class="code">bigor_{i in 1...n} t=ti</code> is the skolemized version of the
+    exhaustivity axiom on <code class="code">t</code>'s type.<br>
+</div>
+<div class="param_info"><code class="code">cover_set_depth</code> : the depth of each case, that is, the number of
+    constructor between the root of terms and leaf constants. default <code class="code">1</code>.</div>
+<div class="param_info"><code class="code">depth</code> : the induction depth for the top constant in the coverset</div>
+</body></html>

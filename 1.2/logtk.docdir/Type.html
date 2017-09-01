@@ -1,0 +1,490 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Term.html">
+<link rel="next" href="Util.html">
+<link rel="Up" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="InnerTerm" rel="Chapter" href="InnerTerm.html">
+<link title="Term" rel="Chapter" href="Term.html">
+<link title="Type" rel="Chapter" href="Type.html">
+<link title="Util" rel="Chapter" href="Util.html">
+<link title="STerm" rel="Chapter" href="STerm.html">
+<link title="Interfaces" rel="Chapter" href="Interfaces.html">
+<link title="DBEnv" rel="Chapter" href="DBEnv.html">
+<link title="Position" rel="Chapter" href="Position.html">
+<link title="Var" rel="Chapter" href="Var.html">
+<link title="HVar" rel="Chapter" href="HVar.html">
+<link title="Defined_pos" rel="Chapter" href="Defined_pos.html">
+<link title="Subst" rel="Chapter" href="Subst.html">
+<link title="Signature" rel="Chapter" href="Signature.html">
+<link title="Scoped" rel="Chapter" href="Scoped.html">
+<link title="Unif" rel="Chapter" href="Unif.html">
+<link title="Unif_intf" rel="Chapter" href="Unif_intf.html">
+<link title="Unif_constr" rel="Chapter" href="Unif_constr.html">
+<link title="Unif_subst" rel="Chapter" href="Unif_subst.html">
+<link title="HO_unif" rel="Chapter" href="HO_unif.html">
+<link title="TypeInference" rel="Chapter" href="TypeInference.html">
+<link title="Options" rel="Chapter" href="Options.html">
+<link title="Comparison" rel="Chapter" href="Comparison.html">
+<link title="Precedence" rel="Chapter" href="Precedence.html">
+<link title="Builtin" rel="Chapter" href="Builtin.html">
+<link title="Ordering" rel="Chapter" href="Ordering.html">
+<link title="Skolem" rel="Chapter" href="Skolem.html">
+<link title="Cnf" rel="Chapter" href="Cnf.html">
+<link title="ID" rel="Chapter" href="ID.html">
+<link title="ID_or_builtin" rel="Chapter" href="ID_or_builtin.html">
+<link title="SLiteral" rel="Chapter" href="SLiteral.html">
+<link title="Index" rel="Chapter" href="Index.html">
+<link title="Index_intf" rel="Chapter" href="Index_intf.html">
+<link title="Dtree" rel="Chapter" href="Dtree.html">
+<link title="Fingerprint" rel="Chapter" href="Fingerprint.html">
+<link title="NPDtree" rel="Chapter" href="NPDtree.html">
+<link title="Binder" rel="Chapter" href="Binder.html">
+<link title="Congruence" rel="Chapter" href="Congruence.html">
+<link title="Congruence_intf" rel="Chapter" href="Congruence_intf.html">
+<link title="Lambda" rel="Chapter" href="Lambda.html">
+<link title="FeatureVector" rel="Chapter" href="FeatureVector.html">
+<link title="FV_tree" rel="Chapter" href="FV_tree.html">
+<link title="UntypedAST" rel="Chapter" href="UntypedAST.html">
+<link title="Ind_ty" rel="Chapter" href="Ind_ty.html">
+<link title="TypedSTerm" rel="Chapter" href="TypedSTerm.html">
+<link title="Statement" rel="Chapter" href="Statement.html">
+<link title="Flex_state" rel="Chapter" href="Flex_state.html">
+<link title="Compute_prec" rel="Chapter" href="Compute_prec.html">
+<link title="Ordinal" rel="Chapter" href="Ordinal.html">
+<link title="Rewrite" rel="Chapter" href="Rewrite.html">
+<link title="Test_prop" rel="Chapter" href="Test_prop.html">
+<link title="Input_format" rel="Chapter" href="Input_format.html">
+<link title="Output_format" rel="Chapter" href="Output_format.html">
+<link title="LLProof" rel="Chapter" href="LLProof.html">
+<link title="LLProof_check" rel="Chapter" href="LLProof_check.html">
+<link title="Multisets" rel="Chapter" href="Multisets.html">
+<link title="Literal" rel="Chapter" href="Literal.html">
+<link title="Literals" rel="Chapter" href="Literals.html">
+<link title="Int_lit" rel="Chapter" href="Int_lit.html">
+<link title="Rat_lit" rel="Chapter" href="Rat_lit.html">
+<link title="Monome" rel="Chapter" href="Monome.html">
+<link title="Hashcons" rel="Chapter" href="Hashcons.html">
+<link title="ParseLocation" rel="Chapter" href="ParseLocation.html">
+<link title="Multiset" rel="Chapter" href="Multiset.html">
+<link title="LazyList" rel="Chapter" href="LazyList.html">
+<link title="Hash" rel="Chapter" href="Hash.html">
+<link title="IArray" rel="Chapter" href="IArray.html">
+<link title="AllocCache" rel="Chapter" href="AllocCache.html">
+<link title="Multiset_intf" rel="Chapter" href="Multiset_intf.html">
+<link title="Signal" rel="Chapter" href="Signal.html">
+<link title="UnionFind" rel="Chapter" href="UnionFind.html"><link title="Main Type representation" rel="Section" href="#2_MainTyperepresentation">
+<link title="Constructors" rel="Section" href="#2_Constructors">
+<link title="Definition" rel="Section" href="#2_Definition">
+<link title="Containers" rel="Section" href="#2_Containers">
+<link title="Utils" rel="Section" href="#2_Utils">
+<link title="IO" rel="Section" href="#2_IO">
+<link title="TPTP" rel="Section" href="#2_TPTP">
+<link title="Conversions" rel="Section" href="#2_Conversions">
+<title>Type</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Term.html" title="Term">Previous</a>
+&nbsp;<a class="up" href="index.html" title="Index">Up</a>
+&nbsp;<a class="post" href="Util.html" title="Util">Next</a>
+</div>
+<h1>Module <a href="type_Type.html">Type</a></h1>
+
+<pre><span class="keyword">module</span> Type: <code class="code"><span class="keyword">sig</span></code> <a href="Type.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info module top">
+<h1 id="1_Types">Types</h1><br>
+</div>
+<hr width="100%">
+<br>
+<h2 id="2_MainTyperepresentation">Main Type representation</h2>
+<p>
+
+    Types are represented using InnerTerm, with kind Type. Therefore, they
+    are hashconsed and scoped.
+<p>
+
+    Common representation of types, including higher-order
+    and polymorphic types. All type variables
+    are assumed to be universally quantified in the outermost possible
+    scope (outside any other quantifier).
+<p>
+
+    See <a href="TypeInference.html"><code class="code"><span class="constructor">TypeInference</span></code></a> for inferring types from terms and formulas,
+    and <a href="Signature.html"><code class="code"><span class="constructor">Signature</span></code></a> to associate types with symbols.
+<p>
+
+    TODO: think of a good way of representating AC operators (+, ...)<br>
+
+<pre><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> = private <code class="type"><a href="InnerTerm.html#TYPEt">InnerTerm.t</a></code> </pre>
+<div class="info ">
+Type is a subtype of the term structure
+    (itself a subtype of InnerTerm.t),
+    with explicit conversion<br>
+</div>
+
+
+<pre><span id="TYPEty"><span class="keyword">type</span> <code class="type"></code>ty</span> = <code class="type"><a href="Type.html#TYPEt">t</a></code> </pre>
+
+
+<pre><code><span id="TYPEbuiltin"><span class="keyword">type</span> <code class="type"></code>builtin</span> = </code></pre><table class="typetable">
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTbuiltin.TType"><span class="constructor">TType</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTbuiltin.Prop"><span class="constructor">Prop</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTbuiltin.Term"><span class="constructor">Term</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTbuiltin.Rat"><span class="constructor">Rat</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTbuiltin.Int"><span class="constructor">Int</span></span></code></td>
+
+</tr></table>
+
+
+
+<pre><span id="VALpp_builtin"><span class="keyword">val</span> pp_builtin</span> : <code class="type"><a href="Type.html#TYPEbuiltin">builtin</a> CCFormat.printer</code></pre>
+<pre><span id="VALbuiltin_conv"><span class="keyword">val</span> builtin_conv</span> : <code class="type"><a href="Type.html#TYPEbuiltin">builtin</a> -> <a href="Builtin.html#TYPEt">Builtin.t</a></code></pre>
+<pre><code><span id="TYPEview"><span class="keyword">type</span> <code class="type"></code>view</span> = private </code></pre><table class="typetable">
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTview.Builtin"><span class="constructor">Builtin</span></span> <span class="keyword">of</span> <code class="type"><a href="Type.html#TYPEbuiltin">builtin</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTview.Var"><span class="constructor">Var</span></span> <span class="keyword">of</span> <code class="type"><a href="Type.html#TYPEt">t</a> <a href="HVar.html#TYPEt">HVar.t</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTview.DB"><span class="constructor">DB</span></span> <span class="keyword">of</span> <code class="type">int</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTview.App"><span class="constructor">App</span></span> <span class="keyword">of</span> <code class="type"><a href="ID.html#TYPEt">ID.t</a> * <a href="Type.html#TYPEt">t</a> list</code></code></td>
+<td class="typefieldcomment" align="left" valign="top" ><code>(*</code></td><td class="typefieldcomment" align="left" valign="top" ><div class="info ">
+parametrized type<br>
+</div>
+</td><td class="typefieldcomment" align="left" valign="bottom" ><code>*)</code></td>
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTview.Fun"><span class="constructor">Fun</span></span> <span class="keyword">of</span> <code class="type"><a href="Type.html#TYPEt">t</a> list * <a href="Type.html#TYPEt">t</a></code></code></td>
+<td class="typefieldcomment" align="left" valign="top" ><code>(*</code></td><td class="typefieldcomment" align="left" valign="top" ><div class="info ">
+Function type (left to right, no left-nesting)<br>
+</div>
+</td><td class="typefieldcomment" align="left" valign="bottom" ><code>*)</code></td>
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTview.Forall"><span class="constructor">Forall</span></span> <span class="keyword">of</span> <code class="type"><a href="Type.html#TYPEt">t</a></code></code></td>
+<td class="typefieldcomment" align="left" valign="top" ><code>(*</code></td><td class="typefieldcomment" align="left" valign="top" ><div class="info ">
+explicit quantification using De Bruijn index<br>
+</div>
+</td><td class="typefieldcomment" align="left" valign="bottom" ><code>*)</code></td>
+</tr></table>
+
+
+
+<pre><span id="VALview"><span class="keyword">val</span> view</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> <a href="Type.html#TYPEview">view</a></code></pre><div class="info ">
+Type-centric view of the head of this type.<br>
+<b>Raises</b> <code>Assert_failure</code> if the argument is not a type<br>
+</div>
+
+<pre><span class="keyword">include</span> <a href="Interfaces.HASH.html">Interfaces.HASH</a></pre>
+
+<pre><span class="keyword">include</span> <a href="Interfaces.ORD.html">Interfaces.ORD</a></pre>
+
+<pre><span id="VALis_tType"><span class="keyword">val</span> is_tType</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALis_var"><span class="keyword">val</span> is_var</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALis_bvar"><span class="keyword">val</span> is_bvar</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALis_app"><span class="keyword">val</span> is_app</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALis_const"><span class="keyword">val</span> is_const</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALis_fun"><span class="keyword">val</span> is_fun</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALis_forall"><span class="keyword">val</span> is_forall</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALis_prop"><span class="keyword">val</span> is_prop</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALhash_mod_alpha"><span class="keyword">val</span> hash_mod_alpha</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> int</code></pre><div class="info ">
+Hash invariant w.r.t variable renaming<br>
+</div>
+<br>
+<h2 id="2_Constructors">Constructors</h2><br>
+
+<pre><span id="VALtType"><span class="keyword">val</span> tType</span> : <code class="type"><a href="Type.html#TYPEt">t</a></code></pre>
+<pre><span id="VALprop"><span class="keyword">val</span> prop</span> : <code class="type"><a href="Type.html#TYPEt">t</a></code></pre>
+<pre><span id="VALterm"><span class="keyword">val</span> term</span> : <code class="type"><a href="Type.html#TYPEt">t</a></code></pre>
+<pre><span id="VALint"><span class="keyword">val</span> int</span> : <code class="type"><a href="Type.html#TYPEt">t</a></code></pre>
+<pre><span id="VALrat"><span class="keyword">val</span> rat</span> : <code class="type"><a href="Type.html#TYPEt">t</a></code></pre>
+<pre><span id="VALvar"><span class="keyword">val</span> var</span> : <code class="type"><a href="Type.html#TYPEt">t</a> <a href="HVar.html#TYPEt">HVar.t</a> -> <a href="Type.html#TYPEt">t</a></code></pre>
+<pre><span id="VALvar_of_int"><span class="keyword">val</span> var_of_int</span> : <code class="type">int -> <a href="Type.html#TYPEt">t</a></code></pre><div class="info ">
+Build a type variable.<br>
+</div>
+
+<pre><span id="VALapp"><span class="keyword">val</span> app</span> : <code class="type"><a href="ID.html#TYPEt">ID.t</a> -> <a href="Type.html#TYPEt">t</a> list -> <a href="Type.html#TYPEt">t</a></code></pre><div class="info ">
+Parametrized type<br>
+</div>
+
+<pre><span id="VALbuiltin"><span class="keyword">val</span> builtin</span> : <code class="type"><a href="Type.html#TYPEbuiltin">builtin</a> -> <a href="Type.html#TYPEt">t</a></code></pre>
+<pre><span id="VALconst"><span class="keyword">val</span> const</span> : <code class="type"><a href="ID.html#TYPEt">ID.t</a> -> <a href="Type.html#TYPEt">t</a></code></pre><div class="info ">
+Constant sort<br>
+</div>
+
+<pre><span id="VALarrow"><span class="keyword">val</span> arrow</span> : <code class="type"><a href="Type.html#TYPEt">t</a> list -> <a href="Type.html#TYPEt">t</a> -> <a href="Type.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">arrow&nbsp;l&nbsp;r</code> is the type <code class="code">l&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;r</code>.<br>
+</div>
+
+<pre><span id="VALforall"><span class="keyword">val</span> forall</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> <a href="Type.html#TYPEt">t</a></code></pre><div class="info ">
+Quantify over one type variable. Careful with the De Bruijn indices!<br>
+</div>
+
+<pre><span id="VALforall_n"><span class="keyword">val</span> forall_n</span> : <code class="type">int -> <a href="Type.html#TYPEt">t</a> -> <a href="Type.html#TYPEt">t</a></code></pre><div class="info ">
+Quantify over <code class="code">n</code> type variable. Careful with the De Bruijn indices!<br>
+</div>
+
+<pre><span id="VALforall_fvars"><span class="keyword">val</span> forall_fvars</span> : <code class="type"><a href="Type.html#TYPEt">t</a> <a href="HVar.html#TYPEt">HVar.t</a> list -> <a href="Type.html#TYPEt">t</a> -> <a href="Type.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">forall_fvars&nbsp;vars&nbsp;body</code> makes the De Bruijn conversion before quantifying
+    on <code class="code">vars</code><br>
+</div>
+
+<pre><span id="VALbvar"><span class="keyword">val</span> bvar</span> : <code class="type">int -> <a href="Type.html#TYPEt">t</a></code></pre><div class="info ">
+bound variable<br>
+</div>
+
+<pre><span id="VAL(==>)"><span class="keyword">val</span> (==&gt;)</span> : <code class="type"><a href="Type.html#TYPEt">t</a> list -> <a href="Type.html#TYPEt">t</a> -> <a href="Type.html#TYPEt">t</a></code></pre><div class="info ">
+General function type. <code class="code">l&nbsp;==&gt;&nbsp;x</code> is the same as <code class="code">x</code> if <code class="code">l</code>
+    is empty. Invariant: the return type is never a function type.<br>
+</div>
+
+<pre><span id="VALof_term_unsafe"><span class="keyword">val</span> of_term_unsafe</span> : <code class="type"><a href="InnerTerm.html#TYPEt">InnerTerm.t</a> -> <a href="Type.html#TYPEt">t</a></code></pre><div class="info ">
+<b>NOTE</b>: this can break the invariants and make <a href="Type.html#VALview"><code class="code"><span class="constructor">Type</span>.view</code></a> fail. Only
+    use with caution.<br>
+</div>
+
+<pre><span id="VALof_terms_unsafe"><span class="keyword">val</span> of_terms_unsafe</span> : <code class="type"><a href="InnerTerm.html#TYPEt">InnerTerm.t</a> list -> <a href="Type.html#TYPEt">t</a> list</code></pre>
+<pre><span id="VALcast_var_unsafe"><span class="keyword">val</span> cast_var_unsafe</span> : <code class="type"><a href="InnerTerm.html#TYPEt">InnerTerm.t</a> <a href="HVar.html#TYPEt">HVar.t</a> -> <a href="Type.html#TYPEt">t</a> <a href="HVar.html#TYPEt">HVar.t</a></code></pre><br>
+<h2 id="2_Definition">Definition</h2><br>
+
+<pre><code><span id="TYPEdef"><span class="keyword">type</span> <code class="type"></code>def</span> = </code></pre><table class="typetable">
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTdef.Def_unin"><span class="constructor">Def_unin</span></span> <span class="keyword">of</span> <code class="type">int</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTdef.Def_data"><span class="constructor">Def_data</span></span> <span class="keyword">of</span> <code class="type">int * <a href="Type.html#TYPEty">ty</a> list</code></code></td>
+
+</tr></table>
+
+
+
+<pre><span id="VALdef"><span class="keyword">val</span> def</span> : <code class="type"><a href="ID.html#TYPEt">ID.t</a> -> <a href="Type.html#TYPEdef">def</a> option</code></pre><div class="info ">
+Access the definition of a type<br>
+</div>
+
+<pre><span id="VALdef_exn"><span class="keyword">val</span> def_exn</span> : <code class="type"><a href="ID.html#TYPEt">ID.t</a> -> <a href="Type.html#TYPEdef">def</a></code></pre><div class="info ">
+Unsafe version of <a href="Type.html#VALdef"><code class="code"><span class="constructor">Type</span>.def</code></a><br>
+<b>Raises</b> <code>Not_found</code> if not a proper constant<br>
+</div>
+
+<pre><span id="VALset_def"><span class="keyword">val</span> set_def</span> : <code class="type"><a href="ID.html#TYPEt">ID.t</a> -> <a href="Type.html#TYPEdef">def</a> -> unit</code></pre><div class="info ">
+Set definition of an ID<br>
+</div>
+<br>
+<h2 id="2_Containers">Containers</h2><br>
+
+<pre><span class="keyword">module</span> <a href="Type.Set.html">Set</a>: <code class="type">CCSet.S</code><code class="type">  with type elt = t</code></pre>
+<pre><span class="keyword">module</span> <a href="Type.Map.html">Map</a>: <code class="type">CCMap.S</code><code class="type">  with type key = t</code></pre>
+<pre><span class="keyword">module</span> <a href="Type.Tbl.html">Tbl</a>: <code class="type">CCHashtbl.S</code><code class="type">  with type key = t</code></pre>
+<pre><span class="keyword">module</span> <a href="Type.Seq.html">Seq</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Type.Seq.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><br>
+<h2 id="2_Utils">Utils</h2><br>
+
+<pre><span class="keyword">module</span> <a href="Type.VarSet.html">VarSet</a>: <code class="type">CCSet.S</code><code class="type">  with type elt = t <a href="HVar.html">HVar</a>.t</code></pre>
+<pre><span class="keyword">module</span> <a href="Type.VarMap.html">VarMap</a>: <code class="type">CCMap.S</code><code class="type">  with type key = t <a href="HVar.html">HVar</a>.t</code></pre>
+<pre><span class="keyword">module</span> <a href="Type.VarTbl.html">VarTbl</a>: <code class="type">CCHashtbl.S</code><code class="type">  with type key = t <a href="HVar.html">HVar</a>.t</code></pre>
+<pre><span id="VALvars_set"><span class="keyword">val</span> vars_set</span> : <code class="type">VarSet.t -> <a href="Type.html#TYPEt">t</a> -> VarSet.t</code></pre><div class="info ">
+Add the free variables to the given set<br>
+</div>
+
+<pre><span id="VALvars"><span class="keyword">val</span> vars</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> <a href="Type.html#TYPEt">t</a> <a href="HVar.html#TYPEt">HVar.t</a> list</code></pre><div class="info ">
+List of free variables<br>
+</div>
+
+<pre><span id="VALclose_forall"><span class="keyword">val</span> close_forall</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> <a href="Type.html#TYPEt">t</a></code></pre><div class="info ">
+bind free variables<br>
+</div>
+
+<pre><code><span id="TYPEarity_result"><span class="keyword">type</span> <code class="type"></code>arity_result</span> = </code></pre><table class="typetable">
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTarity_result.Arity"><span class="constructor">Arity</span></span> <span class="keyword">of</span> <code class="type">int * int</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTarity_result.NoArity"><span class="constructor">NoArity</span></span></code></td>
+
+</tr></table>
+
+
+
+<pre><span id="VALarity"><span class="keyword">val</span> arity</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> <a href="Type.html#TYPEarity_result">arity_result</a></code></pre><div class="info ">
+Number of arguments the type expects.
+    If <code class="code">arity&nbsp;ty</code> returns <code class="code"><span class="constructor">Arity</span>&nbsp;(a,&nbsp;b)</code> that means that it
+    expects <code class="code">a</code> arguments to be used as arguments of Forall, and
+    <code class="code">b</code> arguments to be used for function application. If
+    it returns <code class="code"><span class="constructor">NoArity</span></code> then the arity is unknown (variable)<br>
+</div>
+
+<pre><span id="VALexpected_args"><span class="keyword">val</span> expected_args</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> <a href="Type.html#TYPEt">t</a> list</code></pre><div class="info ">
+Types expected as function argument by <code class="code">ty</code>. The length of the
+    list <code class="code">expected_args&nbsp;ty</code> is the same as <code class="code">snd&nbsp;(arity&nbsp;ty)</code>.<br>
+</div>
+
+<pre><span id="VALexpected_ty_vars"><span class="keyword">val</span> expected_ty_vars</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> int</code></pre><div class="info ">
+Number of type parameters expected. 0 for monomorphic types.<br>
+</div>
+
+<pre><span id="VALneeds_args"><span class="keyword">val</span> needs_args</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+<code class="code">needs_args&nbsp;ty</code> iff <code class="code">expected_ty_vars&nbsp;ty&gt;0&nbsp;<span class="keywordsign">||</span>&nbsp;expected_args&nbsp;ty&lt;&gt;[]</code><br>
+</div>
+
+<pre><span id="VALorder"><span class="keyword">val</span> order</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> int</code></pre><div class="info ">
+Number of left-nested function types (1 for constant and variables).
+    <code class="code">order&nbsp;(a<span class="keywordsign">-&gt;</span>b)&nbsp;=&nbsp;1</code>
+    <code class="code">order&nbsp;((a<span class="keywordsign">-&gt;</span>b)<span class="keywordsign">-&gt;</span>c)&nbsp;=&nbsp;2</code>
+    <code class="code">order&nbsp;(((a<span class="keywordsign">-&gt;</span>b)<span class="keywordsign">-&gt;</span>c)<span class="keywordsign">-&gt;</span>d)&nbsp;=&nbsp;2</code><br>
+</div>
+
+<pre><span id="VALis_ground"><span class="keyword">val</span> is_ground</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+Is the type ground? (means that no <a href="Var.html"><code class="code"><span class="constructor">Var</span></code></a> not <code class="code"><span class="constructor">BVar</span></code> occurs in it)<br>
+</div>
+
+<pre><span id="VALsize"><span class="keyword">val</span> size</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> int</code></pre><div class="info ">
+Size of type, in number of "nodes"<br>
+</div>
+
+<pre><span id="VALdepth"><span class="keyword">val</span> depth</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> int</code></pre><div class="info ">
+Depth of the type (length of the longest path to some leaf)<br>
+<b>Since</b> 0.5.3<br>
+</div>
+
+<pre><span id="VALopen_poly_fun"><span class="keyword">val</span> open_poly_fun</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> int * <a href="Type.html#TYPEt">t</a> list * <a href="Type.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">open_poly_fun&nbsp;ty</code> "unrolls" polymorphic function arrows from the left, so that
+    <code class="code">open_fun&nbsp;(forall&nbsp;a&nbsp;b.&nbsp;f&nbsp;a&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;(g&nbsp;b&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;(c&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;d)))</code> returns <code class="code">2;&nbsp;[f&nbsp;a;g&nbsp;b;c],&nbsp;d</code>.<br>
+<b>Returns</b> the return type, the number of type variables,
+      and the list of all its arguments<br>
+</div>
+
+<pre><span id="VALopen_fun"><span class="keyword">val</span> open_fun</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> <a href="Type.html#TYPEt">t</a> list * <a href="Type.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">open_fun&nbsp;ty</code> "unrolls" function arrows from the left, so that
+    <code class="code">open_fun&nbsp;(a&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;(b&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;(c&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;d)))</code> returns <code class="code">[a;b;c],&nbsp;d</code>.<br>
+<b>Returns</b> the return type and the list of all its arguments<br>
+</div>
+
+<pre><span id="VALreturns"><span class="keyword">val</span> returns</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> <a href="Type.html#TYPEt">t</a></code></pre><div class="info ">
+returned type (going through foralls and arrows).
+    <code class="code">returns&nbsp;a</code> is like <code class="code"><span class="keyword">let</span>&nbsp;_,&nbsp;_,&nbsp;ret&nbsp;=&nbsp;open_poly_fun&nbsp;a&nbsp;<span class="keyword">in</span>&nbsp;ret</code>
+    <b>NOTE</b> caution, not always closed<br>
+</div>
+
+<pre><span id="VALreturns_prop"><span class="keyword">val</span> returns_prop</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALreturns_tType"><span class="keyword">val</span> returns_tType</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="EXCEPTIONApplyError"><span class="keyword">exception</span> ApplyError</span> <span class="keyword">of</span> <code class="type">string</code></pre>
+<div class="info ">
+Error raised when <a href="Type.html#VALapply"><code class="code"><span class="constructor">Type</span>.apply</code></a> fails<br>
+</div>
+
+<pre><span id="VALapply"><span class="keyword">val</span> apply</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> <a href="Type.html#TYPEt">t</a> list -> <a href="Type.html#TYPEt">t</a></code></pre><div class="info ">
+Given a function/forall type, and arguments, return the
+    type that results from applying the function/forall to the arguments.
+    No unification is done, types must check exactly.<br>
+<b>Raises</b> <code>ApplyError</code> if the types do not match<br>
+</div>
+
+<pre><span id="VALapply1"><span class="keyword">val</span> apply1</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> <a href="Type.html#TYPEt">t</a> -> <a href="Type.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">apply1&nbsp;a&nbsp;b</code> is short for <code class="code">apply&nbsp;a&nbsp;[b]</code>.<br>
+</div>
+
+<pre><span id="VALapply_unsafe"><span class="keyword">val</span> apply_unsafe</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> <a href="InnerTerm.html#TYPEt">InnerTerm.t</a> list -> <a href="Type.html#TYPEt">t</a></code></pre><div class="info ">
+Similar to <a href="Type.html#VALapply"><code class="code"><span class="constructor">Type</span>.apply</code></a>, but assumes its arguments are well-formed
+    types without more ado.<br>
+<b>Raises</b><ul><li><code>ApplyError</code> if types do not match</li>
+<li><code>Assert_failure</code> if the arguments are not proper types</li>
+</ul>
+</div>
+
+<pre><span id="VALis_unifiable"><span class="keyword">val</span> is_unifiable</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+Are terms of this type syntactically unifiable?
+    See <a href="InnerTerm.html#VALtype_is_unifiable"><code class="code"><span class="constructor">InnerTerm</span>.type_is_unifiable</code></a><br>
+</div>
+<br>
+<h2 id="2_IO">IO</h2><br>
+
+<pre><span class="keyword">include</span> <a href="Interfaces.PRINT_DE_BRUIJN.html">Interfaces.PRINT_DE_BRUIJN</a></pre>
+
+<pre><span class="keyword">include</span> <a href="Interfaces.PRINT.html">Interfaces.PRINT</a></pre>
+
+<pre><span id="VALpp_surrounded"><span class="keyword">val</span> pp_surrounded</span> : <code class="type"><a href="Type.html#TYPEt">t</a> CCFormat.printer</code></pre>
+<pre><span id="VALpp_typed_var"><span class="keyword">val</span> pp_typed_var</span> : <code class="type"><a href="Type.html#TYPEt">t</a> <a href="HVar.html#TYPEt">HVar.t</a> CCFormat.printer</code></pre>
+<pre><span id="VALmangle"><span class="keyword">val</span> mangle</span> : <code class="type"><a href="Type.html#TYPEt">t</a> -> string</code></pre>
+<pre><span id="VALpp_mangle"><span class="keyword">val</span> pp_mangle</span> : <code class="type"><a href="Type.html#TYPEt">t</a> CCFormat.printer</code></pre><br>
+<h2 id="2_TPTP">TPTP</h2> specific printer and types<br>
+
+<pre><span class="keyword">module</span> <a href="Type.TPTP.html">TPTP</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Type.TPTP.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
+<pre><span class="keyword">module</span> <a href="Type.ZF.html">ZF</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Type.ZF.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
+<pre><span id="VALpp_in"><span class="keyword">val</span> pp_in</span> : <code class="type"><a href="Output_format.html#TYPEt">Output_format.t</a> -> <a href="Type.html#TYPEt">t</a> CCFormat.printer</code></pre><br>
+<h2 id="2_Conversions">Conversions</h2><br>
+
+<pre><span class="keyword">module</span> <a href="Type.Conv.html">Conv</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Type.Conv.html">..</a> <code class="code"><span class="keyword">end</span></code></pre></body></html>

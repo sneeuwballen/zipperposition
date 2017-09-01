@@ -1,0 +1,113 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Parsing_utils.html">
+<link rel="Up" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Parse_tptp" rel="Chapter" href="Parse_tptp.html">
+<link title="Lex_tptp" rel="Chapter" href="Lex_tptp.html">
+<link title="Ast_tptp" rel="Chapter" href="Ast_tptp.html">
+<link title="Util_tptp" rel="Chapter" href="Util_tptp.html">
+<link title="Trace_tstp" rel="Chapter" href="Trace_tstp.html">
+<link title="Parse_zf" rel="Chapter" href="Parse_zf.html">
+<link title="Lex_zf" rel="Chapter" href="Lex_zf.html">
+<link title="Util_zf" rel="Chapter" href="Util_zf.html">
+<link title="Util_tip" rel="Chapter" href="Util_tip.html">
+<link title="Parsing_utils" rel="Chapter" href="Parsing_utils.html">
+<link title="CallProver" rel="Chapter" href="CallProver.html"><link title="Description of provers" rel="Section" href="#2_Descriptionofprovers">
+<link title="Run provers" rel="Section" href="#2_Runprovers">
+<link title="E-prover specific functions" rel="Section" href="#2_Eproverspecificfunctions">
+<title>CallProver</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Parsing_utils.html" title="Parsing_utils">Previous</a>
+&nbsp;<a class="up" href="index.html" title="Index">Up</a>
+&nbsp;</div>
+<h1>Module <a href="type_CallProver.html">CallProver</a></h1>
+
+<pre><span class="keyword">module</span> CallProver: <code class="code">sig</code> <a href="CallProver.html">..</a> <code class="code">end</code></pre><div class="info module top">
+<h1 id="1_CallexternalproverswithTSTPOld">Call external provers with TSTP (Old)</h1><br>
+</div>
+<hr width="100%">
+<br>
+This module is intended to provide a uniform interface to invoke
+    some classic first-order provers (E, SPASS, …) on a problem
+    specified as a TPTP Ast.
+<p>
+
+    The point is that this AST might be generated programmatically,
+    or manipulated from an existing TSTP proof (for checking purpose),
+    rather than being handled as text.<br>
+
+<pre><span id="TYPEor_error"><span class="keyword">type</span> <code class="type">'a</code> or_error</span> = <code class="type">('a, string) CCResult.t</code> </pre>
+
+
+<pre><span id="TYPEuntyped"><span class="keyword">type</span> <code class="type"></code>untyped</span> = <code class="type">Logtk.STerm.t</code> </pre>
+
+
+<pre><span class="keyword">module</span> <a href="CallProver.A.html">A</a>: <code class="type"><a href="Ast_tptp.html">Ast_tptp</a></code></pre><br>
+<h2 id="2_Descriptionofprovers">Description of provers</h2><br>
+
+<pre><span class="keyword">module</span> <a href="CallProver.Prover.html">Prover</a>: <code class="code">sig</code> <a href="CallProver.Prover.html">..</a> <code class="code">end</code></pre>
+<pre><span id="VALname"><span class="keyword">val</span> name</span> : <code class="type"><a href="CallProver.Prover.html#TYPEt">Prover.t</a> -> string</code></pre><div class="info ">
+Name of the prover<br>
+</div>
+<br>
+<h2 id="2_Runprovers">Run provers</h2><br>
+
+<pre><code><span id="TYPEresult"><span class="keyword">type</span> <code class="type"></code>result</span> = </code></pre><table class="typetable">
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTresult.Unsat"><span class="constructor">Unsat</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTresult.Sat"><span class="constructor">Sat</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTresult.Unknown"><span class="constructor">Unknown</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTresult.Error"><span class="constructor">Error</span></span> <span class="keyword">of</span> <code class="type">string</code></code></td>
+
+</tr></table>
+
+
+
+<pre><span id="VALcall"><span class="keyword">val</span> call</span> : <code class="type">?timeout:int -><br>       ?args:string list -><br>       prover:<a href="CallProver.Prover.html#TYPEt">Prover.t</a> -><br>       <a href="CallProver.html#TYPEuntyped">untyped</a> A.t list -> <a href="CallProver.html#TYPEresult">result</a> <a href="CallProver.html#TYPEor_error">or_error</a></code></pre><div class="info ">
+Call the prover (if present) on the given problem, and
+    return a result. Default timeout is 30.<br>
+</div>
+
+<pre><span id="VALcall_proof"><span class="keyword">val</span> call_proof</span> : <code class="type">?timeout:int -><br>       ?args:string list -><br>       prover:<a href="CallProver.Prover.html#TYPEt">Prover.t</a> -><br>       <a href="CallProver.html#TYPEuntyped">untyped</a> A.t list -><br>       (<a href="CallProver.html#TYPEresult">result</a> * <a href="Trace_tstp.html#TYPEt">Trace_tstp.t</a>) <a href="CallProver.html#TYPEor_error">or_error</a></code></pre><div class="info ">
+Call the prover, and also tries to parse a TSTP derivation,
+    if the prover succeeded<br>
+</div>
+
+<pre><span id="VALcall_with_out"><span class="keyword">val</span> call_with_out</span> : <code class="type">?timeout:int -><br>       ?args:string list -><br>       prover:<a href="CallProver.Prover.html#TYPEt">Prover.t</a> -><br>       <a href="CallProver.html#TYPEuntyped">untyped</a> A.t list -><br>       (<a href="CallProver.html#TYPEresult">result</a> * string) <a href="CallProver.html#TYPEor_error">or_error</a></code></pre><div class="info ">
+Same as <a href="CallProver.html#VALcall"><code class="code">CallProver.call</code></a>, but also returns the raw output of the prover<br>
+</div>
+<br>
+<h2 id="2_Eproverspecificfunctions">E-prover specific functions</h2><br>
+
+<pre><span class="keyword">module</span> <a href="CallProver.Eprover.html">Eprover</a>: <code class="code">sig</code> <a href="CallProver.Eprover.html">..</a> <code class="code">end</code></pre></body></html>
