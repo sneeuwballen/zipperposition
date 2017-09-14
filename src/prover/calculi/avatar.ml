@@ -291,17 +291,6 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
 
   let skolem_count_ = ref 0
 
-  (* make a new skolem symbol *)
-  let skolem_ ~ty =
-    let id = ID.makef "_avatar_%d" !skolem_count_  in
-    incr skolem_count_;
-    ID.set_payload id
-      (ID.Attr_skolem
-         (if Ind_ty.is_inductive_type ty then ID.K_ind else ID.K_normal));
-    Ctx.declare id ty;
-    Ordering.add_list (Ctx.ord ()) [id];
-    id
-
   type cut_res = {
     cut_form: Cut_form.t; (** the lemma itself *)
     cut_pos: E.C.t list; (** clauses true if lemma is true *)
