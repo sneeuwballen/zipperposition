@@ -16,7 +16,6 @@ module type PARAMETERS = sig
   val signature : Signature.t
   val ord : Ordering.t
   val select : Selection.t
-  val combinators : HO_unif.Combinators.t
 end
 
 (** {2 Create a new context} *)

@@ -668,6 +668,10 @@ module Ty = struct
     | Ty_forall (_,_) -> false
 end
 
+let fun_l ?loc vars body =
+  let ty = Ty.fun_ ?loc (List.map Var.ty vars) (ty_exn body) in
+  bind_list ?loc ~ty Binder.Lambda vars body
+
 let sort_ty_vars_first : t Var.t list -> t Var.t list =
   List.sort
     (fun v1 v2 ->
@@ -909,6 +913,15 @@ module Subst = struct
 
   let eval subst t = if is_empty subst then t else eval_ subst t
 end
+
+(** {2 Table of Variables} *)
+
+module Var_tbl = CCHashtbl.Make(struct
+    type t_ = t
+    type t = t_ Var.t
+    let equal = Var.equal
+    let hash = Var.hash
+  end)
 
 (** {2 Substitutions, Unification} *)
 
@@ -1321,4 +1334,10 @@ module ZF = struct
   let pp_inner out t = STerm.ZF.pp_inner out (erase t)
   let to_string t = STerm.ZF.to_string (erase t)
 end
+
+let pp_in = function
+  | Output_format.O_zf -> ZF.pp
+  | Output_format.O_tptp -> TPTP.pp
+  | Output_format.O_normal -> pp
+  | Output_format.O_none -> CCFormat.silent
 

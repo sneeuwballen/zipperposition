@@ -361,11 +361,6 @@ let level_of_rule (d:_ def_rule): int =
   |> Sequence.max
   |> CCOpt.get_or ~default:0
 
-let max_exn seq =
-  seq
-  |> Sequence.max
-  |> CCOpt.get_lazy (fun () -> assert false)
-
 let scan_stmt_for_defined_cst (st:(clause,Term.t,Type.t) t): unit = match view st with
   | Def [] -> assert false
   | Def l ->
@@ -382,7 +377,8 @@ let scan_stmt_for_defined_cst (st:(clause,Term.t,Type.t) t): unit = match view s
            let lev =
              Sequence.of_list def_rules
              |> Sequence.map level_of_rule
-             |> max_exn
+             |> Sequence.max
+             |> CCOpt.get_or ~default:0
            and def =
              conv_rules def_rules
            in
@@ -391,8 +387,7 @@ let scan_stmt_for_defined_cst (st:(clause,Term.t,Type.t) t): unit = match view s
     let level =
       Sequence.of_list ids_and_levels
       |> Sequence.map (fun (_,l,_) -> l)
-      |> max_exn
-      |> succ
+      |> Sequence.max |> CCOpt.map_or ~default:0 succ
     in
     List.iter
       (fun (id,_,def) ->
@@ -841,3 +836,13 @@ module TPTP = struct
   let to_string ppf ppt ppty = CCFormat.to_string (pp ppf ppt ppty)
 end
 
+let pp_in pp_f pp_t pp_ty = function
+  | Output_format.O_zf -> ZF.pp pp_f pp_t pp_ty
+  | Output_format.O_tptp -> TPTP.pp pp_f pp_t pp_ty
+  | Output_format.O_normal -> pp pp_f pp_t pp_ty
+  | Output_format.O_none -> CCFormat.silent
+
+let pp_clause_in o =
+  pp_in (Util.pp_list ~sep:" ∨ " (SLiteral.pp Term.pp)) Term.pp Type.pp o
+
+let pp_input_in o = pp_in TypedSTerm.pp TypedSTerm.pp TypedSTerm.pp o

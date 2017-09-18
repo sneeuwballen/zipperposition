@@ -16,7 +16,6 @@ let prof_dtree_retrieve = Util.mk_profiler "dtree_retrieve"
 
 type character =
   | Symbol of ID.t
-  | BoundVariable of int
   | Variable of Type.t HVar.t
   | Subterm of T.t (* opaque term, just do matching *)
 
@@ -28,7 +27,6 @@ type iterator = {
 
 let char_to_int_ = function
   | Symbol _ -> 0
-  | BoundVariable _ -> 1
   | Variable _ -> 2
   | Subterm _ -> 3
 
@@ -40,7 +38,6 @@ let compare_char c1 c2 =
   in
   match c1, c2 with
     | Symbol s1, Symbol s2 -> ID.compare s1 s2
-    | BoundVariable i, BoundVariable j -> i - j
     | Variable v1, Variable v2 -> compare_vars v1 v2
     | Subterm t1, Subterm t2 -> T.compare t1 t2
     | _ -> char_to_int_ c1 - char_to_int_ c2
@@ -48,17 +45,17 @@ let compare_char c1 c2 =
 let eq_char c1 c2 = compare_char c1 c2 = 0
 
 (** first symbol of t, or variable *)
-let term_to_char t =
+let term_to_char t : character * T.t list =
   match T.Classic.view t with
-    | T.Classic.Var v -> Variable v
-    | T.Classic.DB i -> BoundVariable i
-    | T.Classic.App (f, _) -> Symbol f
+    | T.Classic.Var v -> Variable v, []
+    | _ when Type.is_fun (T.ty t) -> Subterm t, [] (* partial app *)
+    | T.Classic.App (f, l) -> Symbol f, l
+    | T.Classic.DB _
     | T.Classic.AppBuiltin _
-    | T.Classic.NonFO -> Subterm t
+    | T.Classic.NonFO -> Subterm t, []
 
 let pp_char out = function
   | Variable v -> Type.pp_typed_var out v
-  | BoundVariable i -> Format.fprintf out "Y%d" i
   | Symbol f -> ID.pp out f
   | Subterm t -> CCFormat.hbox T.pp out t
 
@@ -72,15 +69,8 @@ let open_term ~stack t =
     let cur_char = Subterm t in
     {cur_char; cur_term=t; stack=[]::stack}
   ) else (
-    let cur_char = term_to_char t in
-    match T.view t with
-      | T.Var _
-      | T.DB _
-      | T.AppBuiltin _
-      | T.Const _ ->
-        {cur_char; cur_term=t; stack=[]::stack;}
-      | T.App (_, l) ->
-        {cur_char; cur_term=t; stack=l::stack;}
+    let cur_char, l = term_to_char t in
+    {cur_char; cur_term=t; stack=l::stack;}
   )
 
 let rec next_rec stack = match stack with
@@ -231,7 +221,7 @@ module Make(E : Index.EQUATION) = struct
                                (Scoped.set t (T.ty t_pos))
                            in
                            let subst =
-                             Unif.FO.bind subst
+                             Unif.FO.bind ~check:false subst
                                (Scoped.set dt v2) (Scoped.set t t_pos) in
                            traverse subtrie (skip i) subst
                          with Unif.Fail -> () (* incompatible binding, or occur check *)

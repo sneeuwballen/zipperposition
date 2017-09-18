@@ -29,6 +29,7 @@ type view = private
   | Var of var (** Term variable *)
   | Const of ID.t (** Typed constant *)
   | App of t * t list (** Application to a list of terms (cannot be left-nested) *)
+  | Fun of Type.t * t (** Lambda abstraction *)
 
 val view : t -> view
 
@@ -99,6 +100,19 @@ val app_full : t -> Type.t list -> t list -> t
 val true_ : t
 val false_ : t
 
+val fun_: Type.t -> t -> t
+val fun_l : Type.t list -> t -> t
+
+val fun_of_fvars : var list -> t -> t
+(** Build a function from a list of free vars + the body.
+    This performs the De Bruijn transformation, and shifts the body. *)
+
+val open_fun : t -> Type.t list * t
+
+val open_fun_offset : offset:int -> t -> var list * t * int
+(** [open_fun ~offset (λxy. F)] returns [[v1,v2], F[v1/x,v2/y], offset+2]
+    where [v1] and [v2] are fresh variables starting from offset *)
+
 val grounding : Type.t -> t
 (** [grounding ty] is a unique constant of type [ty] *)
 
@@ -106,6 +120,7 @@ val is_var : t -> bool
 val is_bvar : t -> bool
 val is_app : t -> bool
 val is_const : t -> bool
+val is_fun : t -> bool
 val is_type : t -> bool (** Does it have type [tType]? *)
 
 val as_const : t -> ID.t option
@@ -117,8 +132,14 @@ val as_app : t -> t * t list
 (** [as_app t] decomposes [t] into a head (non-application) and arguments,
     such as [(let f,l = as_app t in app f l) = t] *)
 
+val as_fun : t -> Type.t list * t
+(** Open functions *)
+
 val head_term : t -> t
 (** [head_term t = fst (as_app t)] *)
+
+val head_term_mono : t -> t
+(** head term, but still with type arguments *)
 
 val args : t -> t list
 (** [args t = snd (as_app t)] *)
@@ -326,6 +347,14 @@ module Arith : sig
   (** hook to print arithmetic expressions *)
 end
 
+(** {2 De Bruijn} *)
+module DB : sig
+  val is_closed : t -> bool
+  val shift : ?depth:int -> int -> t -> t
+  val unshift : ?depth:int -> int -> t -> t
+  val eval : t DBEnv.t -> t -> t
+end
+
 (** {2 TPTP} *)
 
 module TPTP : sig
@@ -340,6 +369,8 @@ module ZF : sig
   include Interfaces.PRINT with type t := t
 end
 
+val pp_in : Output_format.t -> t CCFormat.printer
+
 module Conv : sig
   type ctx = Type.Conv.ctx
   val create : unit -> ctx
@@ -352,3 +383,7 @@ module Conv : sig
     TypedSTerm.t
   val var_to_simple_var : ?prefix:string -> ctx -> var -> TypedSTerm.t Var.t
 end
+
+(**/**)
+val rebuild_rec : t -> t (* rebuild term fully, checking types *)
+(**/**)

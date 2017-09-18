@@ -3,12 +3,12 @@
 
 (** {1 Simple Typed Terms}. *)
 
-(** Similar to {!STerm}, but this time the terms are properly 
+(** Similar to {!STerm}, but this time the terms are properly
     scoped (using {!Var}) and typed.
 
     These terms are suitable for many preprocessing transformations,
     including {!CNF}.
-    
+
     They can be obtained from {!STerm.t} using {!TypeInference}.
 *)
 
@@ -82,6 +82,8 @@ val record : ?loc:location -> ty:t -> (string*t) list -> rest:t Var.t option -> 
 val record_flatten : ?loc:location -> ty:t -> (string*t) list -> rest:t option -> t
 (** Build a record with possibly a row variable.
     @raise IllFormedTerm if the [rest] is not either a record or a variable. *)
+
+val fun_l : ?loc:location -> t Var.t list -> t -> t
 
 val of_string : ?loc:location -> ty:t -> string -> t
 (** Make a constant from this string *)
@@ -259,6 +261,8 @@ include Interfaces.PRINT with type t := t
 
 val pp_inner : t CCFormat.printer
 
+val pp_in : Output_format.t -> t CCFormat.printer
+
 module Set : Sequence.Set.S with type elt = term
 module Map : Sequence.Map.S with type key = term
 module Tbl : Hashtbl.S with type key = term
@@ -295,6 +299,11 @@ module Subst : sig
 
   include Interfaces.PRINT with type t := t
 end
+
+
+(** {2 Table of Variables} *)
+
+module Var_tbl : CCHashtbl.S with type key = t Var.t
 
 (** {2 Unification} *)
 

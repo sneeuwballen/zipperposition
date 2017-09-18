@@ -23,7 +23,6 @@ type t = private
   | Prop of term * bool
   | Int of Int_lit.t
   | Rat of Rat_lit.t
-  | HO_constraint of term * term (** t1 =≠= t2 *)
 
 val equal_com : t -> t -> bool     (** commutative equality of lits *)
 val compare : t -> t -> int     (** lexicographic comparison of literals *)
@@ -82,7 +81,9 @@ val mk_rat_op : Rat_lit.op -> Q.t Monome.t -> Q.t Monome.t -> t
 val mk_rat_eq : Q.t Monome.t -> Q.t Monome.t -> t
 val mk_rat_less : Q.t Monome.t -> Q.t Monome.t -> t
 
-val mk_ho_constraint : term -> term -> t
+val mk_constraint : term -> term -> t
+(** [mk_constraint t u] makes a disequation or a HO constraint depending
+    on how [t] and [u] look. *)
 
 val matching : ?subst:Subst.t -> pattern:t Scoped.t -> t Scoped.t ->
   Subst.t Sequence.t

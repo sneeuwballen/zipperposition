@@ -23,31 +23,25 @@ let input_format_of_string s =
     | "tip" -> I_tip
     | s -> failwith ("unknown input format " ^ s)
 
-type print_format =
-  | Print_none
-  | Print_normal
-  | Print_tptp
-  | Print_zf
+type print_format = Output_format.t =
+  | O_none
+  | O_normal
+  | O_tptp
+  | O_zf
 
 let print_format_of_string s =
   match s |> String.trim |> CCString.lowercase_ascii with
-    | "none" -> Print_none
-    | "tptp" | "tstp" -> Print_tptp
-    | "default" | "normal" -> Print_normal
-    | "zf" -> Print_zf
+    | "none" -> O_none
+    | "tptp" | "tstp" -> O_tptp
+    | "default" | "normal" -> O_normal
+    | "zf" -> O_zf
     | _ -> failwith ("unknown print format " ^ s)
 
-let comment_of_format = function
-  | Print_tptp -> "% "
-  | Print_normal
-  | Print_zf -> "# "
-  | Print_none -> ""
-
 let input = ref I_guess
-let output = ref Print_normal
+let output = ref O_normal
 let set_in s = input := input_format_of_string s
 let set_out s = output := print_format_of_string s
-let comment() = comment_of_format !output
+let comment() = Output_format.comment_prefix !output
 
 let _print_types () =
   Term.print_all_types := true;

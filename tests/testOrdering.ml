@@ -34,12 +34,15 @@ let more_specific cmp1 cmp2 = Comparison.(match cmp1, cmp2 with
   | _, _ -> false
   )
 
-let check_ordering_inv_by_subst ord arbitrary =
+let gen_t = ArTerm.default_ho_g
+let arb_t = ArTerm.default_ho
+
+let check_ordering_inv_by_subst ord =
   let name = CCFormat.sprintf "ordering_%s_inv_by_subst" (O.name ord) in
   let pp = QCheck.Print.triple T.to_string T.to_string Subst.to_string in
   (* generate pairs of terms, and grounding substitutions *)
   let gen = QCheck.Gen.(
-    (pair (QCheck.gen arbitrary) (QCheck.gen arbitrary))
+    (pair gen_t gen_t)
     >>= fun (t1, t2) ->
     let vars = Sequence.of_list [t1; t2]
       |> Sequence.flat_map T.Seq.vars
@@ -78,9 +81,9 @@ let check_ordering_inv_by_subst ord arbitrary =
   in
   QCheck.Test.make ~count ~long_factor ~name gen prop
 
-let check_ordering_trans ord arbitrary =
+let check_ordering_trans ord =
   let name = CCFormat.sprintf "ordering_%s_transitive" (O.name ord) in
-  let arb = QCheck.triple arbitrary arbitrary arbitrary in
+  let arb = QCheck.triple arb_t arb_t arb_t in
   let ord = ref ord in
   let prop (t1, t2, t3) =
     (* declare symbols *)
@@ -99,9 +102,9 @@ let check_ordering_trans ord arbitrary =
   in
   QCheck.Test.make ~count ~long_factor ~name arb prop
 
-let check_ordering_swap_args ord arbitrary =
+let check_ordering_swap_args ord =
   let name = CCFormat.sprintf "ordering_%s_swap_args" (O.name ord) in
-  let arb = QCheck.pair arbitrary arbitrary in
+  let arb = QCheck.pair arb_t arb_t in
   let ord = ref ord in
   let prop (t1, t2) =
     (* declare symbols *)
@@ -123,11 +126,17 @@ let check_ordering_swap_args ord arbitrary =
   in
   QCheck.Test.make ~count ~long_factor ~name arb prop
 
-let check_ordering_subterm ord arbitrary =
+let contains_ho t =
+  T.Seq.subterms t
+  |> Sequence.exists
+    (fun t -> T.is_ho_at_root t || T.is_fun t)
+
+let check_ordering_subterm ord =
   let name = CCFormat.sprintf "ordering_%s_subterm_property" (O.name ord) in
-  let arb = arbitrary in
+  let arb = arb_t in
   let ord = ref ord in
   let prop t =
+    if contains_ho t then QCheck.assume_fail() else
     (* declare symbols *)
     Sequence.of_list [t]
       |> Sequence.flat_map T.Seq.symbols
@@ -136,7 +145,8 @@ let check_ordering_subterm ord arbitrary =
     T.Seq.subterms_depth t
     |> Sequence.filter_map (fun (t,i) -> if i>0 then Some t else None)
     |> Sequence.for_all
-      (fun sub -> O.compare !ord t sub = Comparison.Gt)
+      (fun sub ->
+         O.compare !ord t sub = Comparison.Gt)
   in
   QCheck.Test.make ~count ~long_factor ~name arb prop
 
@@ -199,14 +209,14 @@ let suite =
 
 let props =
   CCList.flat_map
-    (fun (o,a) ->
-       [ check_ordering_inv_by_subst o a;
-         check_ordering_trans o a;
-         check_ordering_swap_args o a;
-         check_ordering_subterm o a;
+    (fun o ->
+       [ check_ordering_inv_by_subst o;
+         check_ordering_trans o;
+         check_ordering_swap_args o;
+         check_ordering_subterm o;
        ])
-    [ (O.lfhorpo (Precedence.default []), ArTerm.default_appvars);
-      (O.lfhokbo (Precedence.default []), ArTerm.default_appvars);
-      (O.kbo (Precedence.default []), ArTerm.default);
-      (O.rpo6 (Precedence.default []), ArTerm.default)
+    [ O.kbo (Precedence.default []);
+      O.rpo6 (Precedence.default []);
+      O.lfhokbo (Precedence.default []);
+      O.lfhorpo (Precedence.default []);
     ]

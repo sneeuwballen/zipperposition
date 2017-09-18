@@ -147,6 +147,33 @@ let introduced subst k =
        T.Seq.vars t (fun v -> k (v,sc_t)))
     subst
 
+let normalize subst : t =
+  let rec aux sc t =
+    if T.equal t T.tType then t
+    else (
+      let ty = aux sc (T.ty_exn t) in
+      match T.view t with
+        | T.Var v ->
+          (* follow binding if it stays in the same domain *)
+          begin match find subst (v,sc) with
+            | Some (u, sc') when sc=sc' -> aux sc u
+            | _ -> T.var (HVar.cast ~ty v)
+          end
+        | T.DB i -> T.bvar ~ty i
+        | T.Const id -> T.const ~ty id
+        | T.App (f, l) -> T.app ~ty (aux sc f) (List.map (aux sc) l)
+        | T.AppBuiltin (b, l) -> T.app_builtin b ~ty (List.map (aux sc) l)
+        | T.Bind (b,varty,body) ->
+          let varty = aux sc varty in
+          T.bind b ~ty ~varty (aux sc body)
+    )
+  in
+  M.map (fun (t,sc) -> aux sc t, sc) subst
+
+let map f subst = M.map (fun (t,sc) -> f t, sc) subst
+
+let filter f subst = M.filter f subst
+
 let to_seq subst k = M.iter (fun v t -> k (v,t)) subst
 
 let to_list subst = M.fold (fun v t acc -> (v,t)::acc) subst []
@@ -200,11 +227,11 @@ let apply subst ~renaming t =
             (* the most interesting cases!
                switch depending on whether [t] is bound by [subst] or not *)
             begin try
-                let (t', _) as term'  = find_exn subst (v,sc_t) in
-                (* NOTE: we used to shift [t'], in case it contained free De
-                   Bruijn indices, but that shouldn't happen because only
-                   closed terms should appear in substitutions. *)
-                assert (T.DB.closed t');
+                let term'  = find_exn subst (v,sc_t) in
+                (* NOTE: if [t'] is not closed, we assume that it
+                   is always replaced in a context where variables
+                   are properly bound. Typically, that means only
+                   in rewriting. *)
                 (* also apply [subst] to [t'] *)
                 aux term'
               with Not_found ->
@@ -237,7 +264,9 @@ let apply subst ~renaming t =
   aux t
 
 let apply_no_renaming subst t =
-  apply subst ~renaming:Renaming.dummy t
+  if is_empty subst
+  then fst t
+  else apply subst ~renaming:Renaming.dummy t
 
 (** {2 Specializations} *)
 
@@ -322,4 +351,14 @@ module FO = struct
 
   let bind' = (bind :> t -> Type.t HVar.t Scoped.t -> term Scoped.t -> t)
   let of_list' = (of_list :> ?init:t -> (Type.t HVar.t Scoped.t * term Scoped.t) list -> t)
+
+  let map f s = map (fun t -> (f (Term.of_term_unsafe t) : term :> T.t)) s
+
+  let filter f s =
+    filter
+      (fun (v,sc_v) (t,sc_t) ->
+         f
+           (HVar.update_ty ~f:Type.of_term_unsafe v,sc_v)
+           (Term.of_term_unsafe t,sc_t))
+      s
 end

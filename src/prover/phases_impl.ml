@@ -165,13 +165,12 @@ let compute_ord_select precedence =
   Util.debugf ~section 2 "@[<2>selection function:@ %s@]" (fun k->k params.param_select);
   Phases.return_phase (ord, select)
 
-let make_ctx ~signature ~ord ~select ~combinators =
+let make_ctx ~signature ~ord ~select () =
   Phases.start_phase Phases.MakeCtx >>= fun () ->
   let module Res = struct
     let signature = signature
     let ord = ord
     let select = select
-    let combinators = combinators
   end in
   let module MyCtx = Ctx.Make(Res) in
   let ctx = (module MyCtx : Ctx_intf.S) in
@@ -354,12 +353,12 @@ let print_szs_result (type c) ~file
     | Saturate.Sat ->
       Format.printf "%sSZS status GaveUp for '%s'@." comment file;
       begin match !Options.output with
-        | Options.Print_none -> ()
-        | Options.Print_zf -> failwith "not implemented: printing in ZF" (* TODO *)
-        | Options.Print_tptp ->
+        | Options.O_none -> ()
+        | Options.O_zf -> failwith "not implemented: printing in ZF" (* TODO *)
+        | Options.O_tptp ->
           Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
             (fun k->k (Util.pp_seq ~sep:" " Env.C.pp_tstp_full) (Env.get_active ()))
-        | Options.Print_normal ->
+        | Options.O_normal ->
           Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
             (fun k->k (Util.pp_seq ~sep:" " Env.C.pp) (Env.get_active ()))
       end
@@ -417,9 +416,8 @@ let process_file (prelude:Phases.prelude) file =
   compute_ord_select precedence >>= fun (ord, select) ->
   (* HO *)
   Phases.get_key Params.key >>= fun params ->
-  let combinators = HO_unif.Combinators.by_name params.Params.param_combinators in
   (* build the context and env *)
-  make_ctx ~signature ~ord ~select ~combinators >>= fun ctx ->
+  make_ctx ~signature ~ord ~select () >>= fun ctx ->
   make_env ~params ~ctx stmts >>= fun (Phases.Env_clauses (env,clauses)) ->
   (* main workload *)
   has_goal_ := has_goal; (* FIXME: should be computed at Env initialization *)

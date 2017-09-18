@@ -529,8 +529,6 @@ module ZF = struct
     | Record _ -> failwith "cannot print records in ZF"
   and pp_typed_var out (v,o) = match o with
     | None -> pp_var out v
-    | Some {term=AppBuiltin (Builtin.TType ,[]); _} ->
-      pp_var out v (* implicit type *)
     | Some ty -> Format.fprintf out "(@[%a:%a@])" pp_var v pp_surrounded ty
   and pp_surrounded out t = match t.term with
     | AppBuiltin (_, _::_)
@@ -545,6 +543,12 @@ module ZF = struct
   let pp_inner = pp_surrounded
   let to_string = CCFormat.to_string pp
 end
+
+let pp_in = function
+  | Output_format.O_zf -> ZF.pp
+  | Output_format.O_tptp -> TPTP.pp
+  | Output_format.O_normal -> pp
+  | Output_format.O_none -> CCFormat.silent
 
 (** {2 Subst} *)
 

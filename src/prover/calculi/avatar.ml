@@ -289,6 +289,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       |> C.ClauseSet.of_seq
     ) else C.ClauseSet.empty
 
+  let skolem_count_ = ref 0
+
   type cut_res = {
     cut_form: Cut_form.t; (** the lemma itself *)
     cut_pos: E.C.t list; (** clauses true if lemma is true *)

@@ -41,3 +41,5 @@ let fresh ~ty () =
   let v = make_unsafe ~ty !fresh_ in
   decr fresh_;
   v
+
+let is_fresh v = id v < 0

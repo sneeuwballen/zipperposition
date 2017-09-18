@@ -13,11 +13,19 @@ let section = Util.Section.make ~parent:Const.section "ho"
 let stat_eq_res = Util.mk_stat "ho.eq_res.steps"
 let stat_eq_res_syntactic = Util.mk_stat "ho.eq_res_syntactic.steps"
 let stat_ext_neg = Util.mk_stat "ho.extensionality-.steps"
+let stat_ext_pos = Util.mk_stat "ho.extensionality+.steps"
 let stat_complete_eq = Util.mk_stat "ho.complete_eq.steps"
-let stat_factor = Util.mk_stat "ho.factor.steps"
+let stat_beta = Util.mk_stat "ho.beta_reduce.steps"
+let stat_eta_expand = Util.mk_stat "ho.eta_expand.steps"
+let stat_eta_reduce = Util.mk_stat "ho.eta_reduce.steps"
+let stat_prim_enum = Util.mk_stat "ho.prim_enum.steps"
+let stat_elim_pred = Util.mk_stat "ho.elim_pred.steps"
+let stat_ho_unif = Util.mk_stat "ho.unif.calls"
+let stat_ho_unif_steps = Util.mk_stat "ho.unif.steps"
 
 let prof_eq_res = Util.mk_profiler "ho.eq_res"
 let prof_eq_res_syn = Util.mk_profiler "ho.eq_res_syntactic"
+let prof_ho_unif = Util.mk_profiler "ho.unif"
 
 let _purify_applied_vars = ref false
 
@@ -31,151 +39,61 @@ module type S = sig
   (** Register rules in the environment *)
 end
 
+let k_some_ho : bool Flex_state.key = Flex_state.create_key()
+let k_enabled : bool Flex_state.key = Flex_state.create_key()
+let k_enable_ho_unif : bool Flex_state.key = Flex_state.create_key()
+let k_ho_prim_mode : _ Flex_state.key = Flex_state.create_key()
+let k_ho_prim_max_penalty : int Flex_state.key = Flex_state.create_key()
+let k_eta : [`Reduce | `Expand | `None] Flex_state.key = Flex_state.create_key()
+
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
   module C = Env.C
   module Ctx = Env.Ctx
 
-  (* TODO: do blind enumeration for fully applied HO variables instead *)
-
-  let lit_is_ho_unif (i:int)(lit:Literal.t): bool = match lit with
-    | Literal.Equation (t, u, false) ->
-      begin match T.as_var (T.head_term t), T.as_var (T.head_term u) with
-        | Some _, _ -> true
-        | _, Some _ -> true
-        | _ -> false
-      end
-    | _ -> false
-
-  (* HO unif rule, applies to literals [F t != u] or [P t] or [¬ P t] *)
-  let eq_res_ (c:C.t) : C.t list =
-    (* try HO unif with [l != r] *)
-    let try_unif_ l r l_pos =
-      let pos = Literals.Pos.idx l_pos in
-      if BV.get (C.eligible_res_no_subst c) pos then (
-        Util.debugf ~section 5 "(@[try_ho_eq_res@ :lit %a@ :idx %d@])"
-          (fun k->k Literal.pp (C.lits c).(pos) pos);
-        HO_unif.unif_step (Ctx.combinators (), 1) ((l,r),0)
-        |> List.rev_map
-          (fun (subst,subst_penalty) ->
-             Util.incr_stat stat_eq_res;
-             let renaming = Ctx.renaming_clear () in
-             let rule = Proof.Rule.mk "ho_eq_res" in
-             let proof = Proof.Step.inference ~rule
-                 [C.proof_parent_subst (c,0) subst] in
-             let new_lits = Literals.apply_subst ~renaming subst (C.lits c,0) in
-             let trail = C.trail c in
-             let penalty = C.penalty c + subst_penalty in
-             let new_c = C.create_a ~trail ~penalty new_lits proof in
-             Util.debugf ~section 3
-               "(@[<hv2>ho_eq_res@ :on @[%a@]@ :yields @[%a@]@])"
-               (fun k->k C.pp c C.pp new_c);
-             new_c)
-      ) else []
-    in
-    (* try negative HO unif lits that are also eligible for resolution *)
-    let eligible = C.Eligible.(lit_is_ho_unif ** res c) in
-    let new_clauses =
-      Literals.fold_eqn (C.lits c) ~ord:(Ctx.ord ()) ~both:false ~eligible
-      |> Sequence.flat_map_l
-        (fun (l, r, sign, l_pos) ->
-           if not sign || Type.is_prop (T.ty l)
-           then try_unif_ l r l_pos
-           else [])
-      |> Sequence.to_rev_list
-    in
-    new_clauses
-
-  let eq_res c = Util.with_prof prof_eq_res eq_res_ c
-
-  (* flex-rigid (dis)equation? *)
-  let is_flex_rigid t u =
-    (T.is_var @@ T.head_term t) <> (T.is_var @@ T.head_term u)
-
-  (* TODO: make eq_res_syntactic optional, investigate whether it's useful *)
-
-  (* incremental synctactic elimination rules for HO unif:
-     [F t1 t2 != g u1 u2] becomes [t1 != u1 | t2 != u2]
-     (inference rule, no penalty) *)
-  let eq_res_syntactic_ (c:C.t) : C.t list =
-    (* try HO unif with [l != r], only in flex/rigid case *)
-    let try_unif_ idx l r l_pos =
-      let pos = Literals.Pos.idx l_pos in
-      if is_flex_rigid l r &&
-         BV.get (C.eligible_res_no_subst c) pos then (
-        (* decompose into syntactic problem *)
-        let f1, l1 = T.as_app l in
-        let f2, l2 = T.as_app r in
-        assert (T.is_var f1 <> T.is_var f2);
-        let l1, l2 = Unif.FO.pair_lists f1 l1 f2 l2 in
-        begin match l1, l2 with
-          | [], _ | _, [] -> assert false
-          | hd1 :: tail1, hd2 :: tail2 ->
-            assert (List.length tail1 = List.length tail2);
-            (* unify heads, delay the other sub-problems, but unify their types *)
-            try
-              let subst = Unif.FO.unify_full (hd1,0)(hd2,0) in
-              let subst =
-                List.fold_left2
-                  (fun subst t u ->
-                     Unif.Ty.unify_full ~subst (T.ty t,0)(T.ty u,0))
-                  subst tail1 tail2
-              in
-              Util.incr_stat stat_eq_res_syntactic;
-              let renaming = Ctx.renaming_clear () in
-              let c_guard = Literal.of_unif_subst ~renaming subst
-              and subst = Unif_subst.subst subst in
-              let rule = Proof.Rule.mk "ho_eq_res_syn" in
-              let proof = Proof.Step.inference ~rule
-                  [C.proof_parent_subst (c,0) subst] in
-              (* remove the literal, but add [combine tail1 tail2] as new constraints *)
-              let new_lits =
-                List.rev_append
-                  (List.map2
-                     (fun t u ->
-                        Literal.mk_neq
-                          (Subst.FO.apply ~renaming subst (t,0))
-                          (Subst.FO.apply ~renaming subst (u,0)))
-                     tail1 tail2)
-                  (Literal.apply_subst_list ~renaming subst
-                     (CCArray.except_idx (C.lits c) idx,0))
-              in
-              let new_lits =
-                Literal.apply_subst_list ~renaming subst (new_lits,0)
-              in
-              let trail = C.trail c and penalty = C.penalty c in
-              let new_c = C.create ~trail ~penalty (c_guard @ new_lits) proof in
-              Util.debugf ~section 3
-                "(@[<hv2>ho_eq_res_syn@ :on @[%a@]@ :yields @[%a@]@ :subst %a@])"
-                (fun k->k C.pp c C.pp new_c Subst.pp subst);
-              Some new_c
-            with Unif.Fail -> None
-        end
-      ) else None
-    in
-    (* try negative HO unif lits that are also eligible for resolution *)
-    let eligible = C.Eligible.(lit_is_ho_unif ** res c) in
-    let new_clauses =
-      Literals.fold_eqn ~sign:false ~ord:(Ctx.ord ())
-        ~both:false ~eligible (C.lits c)
-      |> Sequence.zip_i |> Sequence.zip
-      |> Sequence.filter_map
-        (fun (i,(l, r, sign, l_pos)) ->
-           assert (not sign);
-           try_unif_ i l r l_pos)
-      |> Sequence.to_rev_list
-    in
-    new_clauses
-
-  let eq_res_syntactic c = Util.with_prof prof_eq_res_syn eq_res_syntactic_ c
-
+  (* @param vars the free variables the parameter must depend upon
+     @param ty_ret the return type *)
   let mk_parameter =
     let n = ref 0 in
-    fun ty ->
+    fun vars ty_ret ->
       let i = CCRef.incr_then_get n in
       let id = ID.makef "#k%d" i in
       ID.set_payload id (ID.Attr_parameter i);
-      T.const id ~ty
+      let ty_vars, vars =
+        List.partition (fun v -> Type.is_tType (HVar.ty v)) vars
+      in
+      let ty =
+        Type.forall_fvars ty_vars
+          (Type.arrow (List.map HVar.ty vars) ty_ret)
+      in
+      T.app_full (T.const id ~ty)
+        (List.map Type.var ty_vars)
+        (List.map T.var vars)
+
+  (* index for ext-neg, to ensure α-equivalent negative equations have the same skolems *)
+  module FV_ext_neg = FV_tree.Make(struct
+      type t = Literal.t * T.t list (* lit -> skolems *)
+      let compare = CCOrd.(pair Literal.compare (list T.compare))
+      let to_lits (l,_) = Sequence.return (Literal.Conv.to_form l)
+      let labels _ = Util.Int_set.empty
+  end)
+
+  let idx_ext_neg_ : FV_ext_neg.t ref = ref (FV_ext_neg.empty())
+
+  (* retrieve skolems for this literal, if any *)
+  let find_skolems_ (lit:Literal.t) : T.t list option =
+    FV_ext_neg.retrieve_alpha_equiv_c !idx_ext_neg_ (lit, [])
+    |> Sequence.find_map
+      (fun (lit',skolems) ->
+         let subst = Literal.variant (lit',0) (lit,1) |> Sequence.head in
+         begin match subst with
+           | Some subst ->
+             let skolems =
+               List.map (fun t -> Subst.FO.apply_no_renaming subst (t,0)) skolems
+             in
+             Some skolems
+           | None -> None
+         end)
 
   (* negative extensionality rule:
      [f != g] where [f : a -> b] becomes [f k != g k] for a fresh parameter [k] *)
@@ -187,7 +105,16 @@ module Make(E : Env.S) : S with module Env = E = struct
            not (T.equal f g) ->
       let n_ty_params, ty_args, _ = Type.open_poly_fun (T.ty f) in
       assert (n_ty_params=0);
-      let params = List.map mk_parameter ty_args in
+      let params = match find_skolems_ lit with
+        | Some l -> l
+        | None ->
+          (* create new skolems, parametrized by free variables *)
+          let vars = Literal.vars lit in
+          let l = List.map (mk_parameter vars) ty_args in
+          (* save list *)
+          idx_ext_neg_ := FV_ext_neg.add !idx_ext_neg_ (lit,l);
+          l
+      in
       let new_lit =
         Literal.mk_neq
           (T.app f params)
@@ -199,6 +126,52 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun k->k Literal.pp lit Literal.pp new_lit);
       Some new_lit
     | _ -> None
+
+  (* positive extensionality `m x = n x --> m = n` *)
+  let ext_pos (c:C.t): C.t list =
+    begin match C.lits c with
+      | [| Literal.Equation (t1, t2, true) |] ->
+        let f1, l1 = T.as_app t1 in
+        let f2, l2 = T.as_app t2 in
+        begin match List.rev l1, List.rev l2 with
+          | last1 :: l1, last2 :: l2 ->
+            begin match T.view last1, T.view last2 with
+              | T.Var x, T.Var y
+                when HVar.equal Type.equal x y &&
+                     begin
+                       Sequence.of_list
+                         [Sequence.doubleton f1 f2;
+                          Sequence.of_list l1;
+                          Sequence.of_list l2]
+                       |> Sequence.flatten
+                       |> Sequence.flat_map T.Seq.vars
+                       |> Sequence.for_all
+                         (fun v' -> not (HVar.equal Type.equal v' x))
+                     end ->
+                (* it works! *)
+                let new_lit =
+                  Literal.mk_eq
+                    (T.app f1 (List.rev l1))
+                    (T.app f2 (List.rev l2))
+                in
+                let proof =
+                  Proof.Step.inference [C.proof_parent c]
+                    ~rule:(Proof.Rule.mk "ho_ext_pos")
+                in
+                let new_c =
+                  C.create [new_lit] proof ~penalty:(C.penalty c) ~trail:(C.trail c)
+                in
+                Util.incr_stat stat_ext_pos;
+                Util.debugf ~section 4
+                  "(@[ext_pos@ :clause %a@ :yields %a@])"
+                  (fun k->k C.pp c C.pp new_c);
+                [new_c]
+              | _ -> []
+            end
+          | _ -> []
+        end
+      | _ -> []
+    end
 
   (* complete [f = g] into [f x1…xn = g x1…xn] for each [n ≥ 1] *)
   let complete_eq_args (c:C.t) : C.t list =
@@ -219,20 +192,16 @@ module Make(E : Env.S) : S with module Env = E = struct
                 (fun i ty -> HVar.make ~ty (i+var_offset) |> T.var)
                 ty_args
             in
-            CCList.(1 -- List.length vars)
-            |> List.map
-              (fun prefix_len ->
-                 let vars_prefix = CCList.take prefix_len vars in
-                 let new_lit = Literal.mk_eq (T.app t vars_prefix) (T.app u vars_prefix) in
-                 let new_lits = new_lit :: CCArray.except_idx (C.lits c) lit_idx in
-                 let proof =
-                   Proof.Step.inference [C.proof_parent c]
-                     ~rule:(Proof.Rule.mk "ho_complete_eq")
-                 in
-                 let new_c =
-                   C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
-                 in
-                 new_c)
+            let new_lit = Literal.mk_eq (T.app t vars) (T.app u vars) in
+            let new_lits = new_lit :: CCArray.except_idx (C.lits c) lit_idx in
+            let proof =
+              Proof.Step.inference [C.proof_parent c]
+                ~rule:(Proof.Rule.mk "ho_complete_eq")
+            in
+            let new_c =
+              C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
+            in
+            [new_c]
           | _ -> [])
       |> Sequence.to_rev_list
     in
@@ -244,58 +213,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     );
     new_c
 
-(* reverse complete_eq_args: f X = g X becomes f = g,
-   only if the variable occors nowhere else in the clause.
-   Removes variables in all literals at once,
-   but only one variable at a time for each literal.
-  *)
-  let positive_extensionality c =
-    let new_lits = C.lits c
-      |> Sequence.of_array |> Sequence.mapi
-        (fun lit_idx lit -> match lit with
-           | Literal.Equation (t, s, true)  ->
-             begin match T.view t , T.view s with
-               | T.App (f, tt), T.App (g, ss) ->
-               let lastt = List.hd (List.rev tt) in
-               let lasts = List.hd (List.rev ss) in
-               if lastt = lasts then
-                 match T.as_var lastt with
-                 | Some v ->
-                   if not (T.var_occurs ~var:v f)
-                   && not (T.var_occurs ~var:v g)
-                   && not (List.exists (T.var_occurs ~var:v) (List.tl (List.rev tt)))
-                   && not (List.exists (T.var_occurs ~var:v) (List.tl (List.rev ss)))
-                   && not (List.exists (Literal.var_occurs v) (CCArray.except_idx (C.lits c) lit_idx))
-                   then
-                     let butlast = (fun l -> List.rev (List.tl (List.rev l))) in
-                     Literal.mk_eq (T.app f (butlast tt)) (T.app g (butlast ss))
-                   else
-                     lit
-                 | None -> lit
-               else
-                 lit
-             | _ -> lit
-             end
-           | _ -> lit
-        )
-      |> Sequence.to_list
-    in
-    if new_lits<>Array.to_list (C.lits c) then (
-      let parent = C.proof_parent c in
-      let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "ho.positive_extensionality") [parent] in
-      let new_c = (C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof) in (
-        Util.debugf ~section 4
-          "(@[positive-extensionality@ :clause %a@ :yields %a"
-          (fun k->k C.pp c C.pp new_c);
-        [new_c]
-      )
-    )
-    else
-      []
-
-
-
-
   (* try to eliminate a predicate variable in one fell swoop *)
   let elim_pred_variable (c:C.t) : C.t list =
     (* find unshielded predicate vars *)
@@ -303,7 +220,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       C.Seq.vars c
       |> T.VarSet.of_seq |> T.VarSet.to_seq
       |> Sequence.filter
-        (fun v -> Type.is_prop @@ Type.returns @@ HVar.ty v)
+        (fun v ->
+           (Type.is_prop @@ Type.returns @@ HVar.ty v) &&
+           not (Literals.is_shielded v (C.lits c)))
     (* find all constraints on [v], also returns the remaining literals.
        returns None if some constraints contains [v] itself. *)
     and gather_lits v : (Literal.t list * (T.t list * bool) list) option =
@@ -363,11 +282,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             in
             Util.debugf ~section 5
               "(@[elim-pred-with@ (@[@<1>λ @[%a@].@ %a@])@])"
-              (fun k->k (Util.pp_list Type.pp_typed_var) vars T.pp body);
-            let t =
-              HO_unif.Combinators.conv_lambda
-                (Ctx.combinators()) vars body
-            in
+              (fun k->k (Util.pp_list ~sep:" " Type.pp_typed_var) vars T.pp body);
+            Util.incr_stat stat_elim_pred;
+            let t = T.fun_of_fvars vars body in
             Subst.FO.of_list [((v:>InnerTerm.t HVar.t),0), (t,0)]
           in
         (* build new clause *)
@@ -406,62 +323,171 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Sequence.to_rev_list
     end
 
-  (* smart [t ≠ₒ u] that turns [(¬ F a) ≠ t] into [F a ≠ ¬t] *)
-  let mk_prop_unif_constraint t u : Literal.t =
-    assert (Type.is_prop @@ T.ty t);
-    begin match T.view t, T.view u with
-      | T.AppBuiltin (Builtin.Not, [t']), _
-        when Term.is_ho_pred t' && not (Term.is_ho_pred u) ->
-        Literal.mk_neq t' (T.Form.not_ u)
-      | _, T.AppBuiltin (Builtin.Not, [u'])
-        when Term.is_ho_pred u' && not (Term.is_ho_pred t) ->
-        Literal.mk_neq (T.Form.not_ t) u'
-      | _ -> Literal.mk_neq t u
-    end
+  (* maximum penalty on clauses to perform Primitive Enum on *)
+  let max_penalty_prim_ = E.flex_get k_ho_prim_max_penalty
 
-  (* factor together literals.
-     [C ∨ l ∨ l'] becomes  [C ∨ l ∨ l≠l'] where at least one of [l,l'] is HO *)
-  let factor_rule (c:C.t): C.t list =
-    let res =
-      C.lits c
-      |> Sequence.of_array_i
-      |> Sequence.diagonal
+  (* rule for primitive enumeration of predicates [P t1…tn]
+     (using ¬ and ∧ and =) *)
+  let prim_enum_ ~mode (c:C.t) : C.t list =
+    (* set of variables to refine (only those occurring in "interesting" lits) *)
+    let vars =
+      Literals.fold_lits ~eligible:C.Eligible.always (C.lits c)
+      |> Sequence.map fst
+      |> Sequence.flat_map Literal.Seq.terms
+      |> Sequence.flat_map T.Seq.subterms
+      |> Sequence.filter (fun t -> Type.is_prop (T.ty t))
       |> Sequence.filter_map
-        (fun ((i1,lit1),(i2,lit2)) ->
-           let is_ho_lit1 = Literal.is_ho_predicate lit1 in
-           let is_ho_lit2 = Literal.is_ho_predicate lit2 in
-           begin match Literal.to_ho_term lit1, Literal.to_ho_term lit2 with
-             | Some t1, Some t2 when is_ho_lit1 || is_ho_lit2  ->
-               (* we shall do factoring! *)
-               let constr = mk_prop_unif_constraint t1 t2 in
-               (* now, which literal do we remove? if one of them
-                  is first-order, then keep it (will restrict unifications) *)
-               let remove_idx =
-                 if is_ho_lit1 && not is_ho_lit2 then i1 else i2
-               in
-               Some (remove_idx, constr)
+        (fun t ->
+           let hd = T.head_term t in
+           begin match T.as_var hd, Type.arity (T.ty hd) with
+             | Some v, Type.Arity (0, n)
+               when n>0 && Type.returns_prop (T.ty hd) ->
+               Some v
              | _ -> None
            end)
+      |> T.VarSet.of_seq (* unique *)
+    in
+    if not (T.VarSet.is_empty vars) then (
+      Util.debugf ~section 5 "(@[<hv2>ho.refine@ :clause %a@ :terms {@[%a@]}@])"
+        (fun k->k C.pp c (Util.pp_seq T.pp_var) (T.VarSet.to_seq vars));
+    );
+    let sc_c = 0 in
+    let offset = C.Seq.vars c |> T.Seq.max_var |> succ in
+    begin
+      vars
+      |> T.VarSet.to_seq
+      |> Sequence.flat_map_l
+        (fun v -> HO_unif.enum_prop ~mode (v,sc_c) ~offset)
       |> Sequence.map
-        (fun (remove_idx,constr) ->
-           let new_lits = Array.copy (C.lits c) in
-           new_lits.(remove_idx) <- constr;
+        (fun (subst,penalty) ->
+           let renaming = Ctx.renaming_clear() in
+           let lits = Literals.apply_subst ~renaming subst (C.lits c,sc_c) in
            let proof =
-             Proof.Step.inference ~rule:(Proof.Rule.mk "ho.factor")
-               [C.proof_parent c]
+             Proof.Step.inference ~rule:(Proof.Rule.mk "ho.refine")
+               [C.proof_parent_subst (c,sc_c) subst]
            in
            let new_c =
-             C.create_a new_lits proof
-               ~penalty:(C.penalty c+1) ~trail:(C.trail c)
+             C.create_a lits proof
+               ~penalty:(C.penalty c + penalty) ~trail:(C.trail c)
            in
-           Util.incr_stat stat_factor;
-           Util.debugf ~section 4
-             "(@[<hv2>ho_factor@ :clause %a@ :idx %d :yields %a@])"
-             (fun k->k C.pp c remove_idx C.pp new_c);
+           Util.debugf ~section 3
+             "(@[<hv2>ho.refine@ :from %a@ :subst %a@ :yields %a@])"
+             (fun k->k C.pp c Subst.pp subst C.pp new_c);
+           Util.incr_stat stat_prim_enum;
            new_c)
       |> Sequence.to_rev_list
-    in
-    res
+    end
+
+  let prim_enum ~mode c =
+    if C.penalty c < max_penalty_prim_
+    then prim_enum_ ~mode c
+    else []
+
+  let pp_pairs_ out =
+    let open CCFormat in
+    Format.fprintf out "(@[<hv>%a@])"
+      (Util.pp_list ~sep:" " @@ hvbox @@ HO_unif.pp_pair)
+
+  (* perform HO unif on [pairs].
+     invariant: [C.lits c = pairs @ other_lits] *)
+  let ho_unif_real_ c pairs other_lits : C.t list =
+    Util.debugf ~section 5
+      "(@[ho_unif.try@ :pairs (@[<hv>%a@])@ :other_lits %a@])"
+      (fun k->k pp_pairs_ pairs (Util.pp_list~sep:" " Literal.pp) other_lits);
+    Util.incr_stat stat_ho_unif;
+    let offset = C.Seq.vars c |> T.Seq.max_var |> succ in
+    begin
+      HO_unif.unif_pairs ?fuel:None (pairs,0) ~offset
+      |> List.map
+        (fun (new_pairs, us, penalty) ->
+           let renaming = Ctx.renaming_clear() in
+           let subst = Unif_subst.subst us in
+           let c_guard = Literal.of_unif_subst ~renaming us in
+           let new_pairs =
+             List.map
+               (fun (env,t,u) ->
+                  let t = Subst.FO.apply ~renaming subst (T.fun_l env t,0) in
+                  let u = Subst.FO.apply ~renaming subst (T.fun_l env u,0) in
+                  Literal.mk_constraint t u)
+               new_pairs
+           and other_lits =
+             Literal.apply_subst_list ~renaming subst (other_lits,0)
+           in
+           let all_lits = c_guard @ new_pairs @ other_lits in
+           let proof =
+             Proof.Step.inference ~rule:(Proof.Rule.mk "ho_unif")
+               [C.proof_parent_subst (c,0) subst]
+           in
+           let new_c =
+             C.create all_lits proof
+               ~trail:(C.trail c) ~penalty:(C.penalty c + penalty)
+           in
+           Util.debugf ~section 5
+             "(@[ho_unif.step@ :pairs (@[%a@])@ :subst %a@ :yields %a@])"
+             (fun k->k pp_pairs_ pairs Subst.pp subst C.pp new_c);
+           Util.incr_stat stat_ho_unif_steps;
+           new_c
+        )
+    end
+
+  (* HO unification of constraints *)
+  let ho_unif (c:C.t) : C.t list =
+    if C.lits c |> CCArray.exists Literal.is_ho_constraint then (
+      (* separate constraints from the rest *)
+      let pairs, others =
+        C.lits c
+        |> Array.to_list
+        |> CCList.partition_map
+          (function
+            | Literal.Equation (t,u, false) as lit
+              when Literal.is_ho_constraint lit -> `Left ([],t,u)
+            | lit -> `Right lit)
+      in
+      assert (pairs <> []);
+      Util.enter_prof prof_ho_unif;
+      let r = ho_unif_real_ c pairs others in
+      Util.exit_prof prof_ho_unif;
+      r
+    ) else []
+
+  (* rule for β-reduction *)
+  let beta_reduce t =
+    assert (T.DB.is_closed t);
+    let t' = Lambda.snf t in
+    if (T.equal t t') then None
+    else (
+      Util.debugf ~section 4 "(@[beta_reduce `%a`@ :into `%a`@])"
+        (fun k->k T.pp t T.pp t');
+      Util.incr_stat stat_beta;
+      assert (T.DB.is_closed t');
+      Some t'
+    )
+
+  (* rule for eta-expansion *)
+  let eta_expand t =
+    assert (T.DB.is_closed t);
+    let t' = Lambda.eta_expand t in
+    if (T.equal t t') then None
+    else (
+      Util.debugf ~section 4 "(@[eta_expand `%a`@ :into `%a`@])"
+        (fun k->k T.pp t T.pp t');
+      Util.incr_stat stat_eta_expand;
+      assert (T.DB.is_closed t');
+      Some t'
+    )
+
+  (* rule for eta-expansion *)
+  let eta_reduce t =
+    assert (T.DB.is_closed t);
+    let t' = Lambda.eta_reduce t in
+    if (T.equal t t') then None
+    else (
+      Util.debugf ~section 4 "(@[eta_reduce `%a`@ :into `%a`@])"
+        (fun k->k T.pp t T.pp t');
+      Util.incr_stat stat_eta_reduce;
+      assert (T.DB.is_closed t');
+      Some t'
+    )
 
   module TVar = struct
     type t = Type.t HVar.t
@@ -472,9 +498,9 @@ module Make(E : Env.S) : S with module Env = E = struct
   module VarTermMultiMap = CCMultiMap.Make (TVar) (Term)
   module VTbl = CCHashtbl.Make(TVar)
 
-(* Purify variables with different arguments.
-   g X = X a \/ X a = b becomes g X = Y a \/ Y a = b \/ X != Y.
-   Variables at the top level (= naked variables) are not affected. *)
+  (* Purify variables with different arguments.
+     g X = X a \/ X a = b becomes g X = Y a \/ Y a = b \/ X != Y.
+     Variables at the top level (= naked variables) are not affected. *)
   let purify_applied_variable c =
     (* set of new literals *)
     let new_lits = ref [] in
@@ -577,41 +603,50 @@ module Make(E : Env.S) : S with module Env = E = struct
         SimplM.return_new new_clause
     end
 
-  (* ensure that combinators are defined functions *)
-  let declare_combinators() =
-    let module RW = Rewrite in
-    let c = Ctx.combinators () in
-    (* define combinators *)
-    List.iter
-      (fun (r,_) ->
-         let id = RW.Term.Rule.head_id r in
-         RW.Defined_cst.declare_or_add id (Rewrite.T_rule r))
-      (HO_unif.Combinators.rules c);
-    (* now that combinators are defined, we can declare them *)
-    List.iter
-      (fun (id,ty) -> Ctx.declare id ty)
-      (HO_unif.Combinators.decls c);
-    ()
-
   let setup () =
-    Util.debug ~section 1 "setup HO rules";
-    Env.Ctx.lost_completeness();
-    (* force rules *)
-    let () = ignore (HO_unif.Combinators.rules @@ Ctx.combinators ()) in
-    declare_combinators ();
-    Env.add_unary_inf "ho_eq_res" eq_res;
-    Env.add_unary_inf "ho_eq_res_syn" eq_res_syntactic;
-    Env.add_unary_inf "ho_complete_eq" complete_eq_args;
-    Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
-    Env.add_unary_inf "ho_factor" factor_rule;
-    Env.add_unary_inf "ho_positive_extensionality" positive_extensionality;
-    if !_purify_applied_vars then
-      Env.add_unary_simplify purify_applied_variable;
-    Env.add_lit_rule "ho_ext_neg" ext_neg;
+    if not (Env.flex_get k_enabled) then (
+      Util.debug ~section 1 "HO rules disabled";
+    ) else (
+      Util.debug ~section 1 "setup HO rules";
+      Env.Ctx.lost_completeness();
+      Env.add_unary_inf "ho_complete_eq" complete_eq_args;
+      Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
+      Env.add_lit_rule "ho_ext_neg" ext_neg;
+      Env.add_unary_inf "ho_ext_pos" ext_pos;
+      Env.add_rewrite_rule "beta_reduce" beta_reduce;
+      begin match Env.flex_get k_eta with
+        | `Expand -> Env.add_rewrite_rule "eta_expand" eta_expand
+        | `Reduce -> Env.add_rewrite_rule "eta_reduce" eta_reduce
+        | `None -> ()
+      end;
+      if Env.flex_get k_enable_ho_unif then (
+        Env.add_unary_inf "ho_unif" ho_unif;
+      );
+      begin match Env.flex_get k_ho_prim_mode with
+        | `None -> ()
+        | mode ->
+          Env.add_unary_inf "ho_prim_enum" (prim_enum ~mode);
+      end;
+      if !_purify_applied_vars then
+        Env.add_unary_simplify purify_applied_variable;
+    );
     ()
 end
 
-let k_some_ho : bool Flex_state.key = Flex_state.create_key()
+let enabled_ = ref true
+let enable_unif_ = ref true
+let prim_mode_ = ref `Neg
+let prim_max_penalty = ref 15 (* FUDGE *)
+let eta_ = ref `Reduce
+
+let set_prim_mode_ =
+  let l = [
+    "neg", `Neg;
+    "full", `Full;
+    "none", `None;
+  ] in
+  let set_ s = prim_mode_ := List.assoc s l in
+  Arg.Symbol (List.map fst l, set_)
 
 let st_contains_ho (st:(_,_,_) Statement.t): bool =
   let is_non_atomic_ty ty =
@@ -655,7 +690,13 @@ let extension =
     if is_ho then (
       Util.debug ~section 2 "problem is HO"
     );
-    Flex_state.add k_some_ho is_ho state
+    state
+    |> Flex_state.add k_some_ho is_ho
+    |> Flex_state.add k_enabled !enabled_
+    |> Flex_state.add k_enable_ho_unif (!enabled_ && !enable_unif_)
+    |> Flex_state.add k_ho_prim_mode (if !enabled_ then !prim_mode_ else `None)
+    |> Flex_state.add k_ho_prim_max_penalty !prim_max_penalty
+    |> Flex_state.add k_eta !eta_
   in
   { Extensions.default with
       Extensions.name = "ho";
@@ -663,12 +704,20 @@ let extension =
       env_actions=[register];
   }
 
-let () = Extensions.register extension
-
+let eta_opt =
+  let set_ n = eta_ := n in
+  let l = [ "reduce", `Reduce; "expand", `Expand; "none", `None] in
+  Arg.Symbol (List.map fst l, fun s -> set_ (List.assoc s l))
 
 let () =
-  Params.add_opts
-    [  "--purify"
-    , Arg.Set _purify_applied_vars
-    , " enable purification of applied variables"
-    ]
+  Options.add_opts
+    [ "--ho", Arg.Set enabled_, " enable HO reasoning";
+      "--no-ho", Arg.Clear enabled_, " disable HO reasoning";
+      "--ho-unif", Arg.Set enable_unif_, " enable full HO unification";
+      "--no-ho-unif", Arg.Clear enable_unif_, " disable full HO unification";
+      "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";
+      "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
+      "--ho-eta", eta_opt, " eta-expansion/reduction";
+      "--purify", Arg.Set _purify_applied_vars, " enable purification of applied variables"
+    ];
+  Extensions.register extension;

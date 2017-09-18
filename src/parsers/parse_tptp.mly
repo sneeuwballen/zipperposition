@@ -211,6 +211,11 @@ unitary_infix_formula:
 
 unary_formula:
   | f=unitary_infix_formula { f }
+  | o=unary_connective AT f=unary_formula
+    {
+     let loc = L.mk_pos $startpos $endpos in
+     o ?loc:(Some loc) f
+    }
   | o=unary_connective f=unary_formula
     {
      let loc = L.mk_pos $startpos $endpos in
@@ -222,6 +227,21 @@ binary_formula:
   | f=assoc_binary_formula { f }
 
 nonassoc_binary_formula:
+  | o=binary_connective AT l=unary_formula AT r=unary_formula
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      o ?loc:(Some loc) l r
+    }
+  | AND AT l=unary_formula AT r=unary_formula
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      PT.and_ ?loc:(Some loc) [l; r]
+    }
+  | VLINE AT l=unary_formula AT r=unary_formula
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      PT.or_ ?loc:(Some loc) [l; r]
+    }
   | l=unary_formula o=binary_connective r=unary_formula
     {
       let loc = L.mk_pos $startpos $endpos in

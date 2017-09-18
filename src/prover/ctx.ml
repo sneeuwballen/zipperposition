@@ -19,7 +19,6 @@ module type PARAMETERS = sig
   val signature : Signature.t
   val ord : Ordering.t
   val select : Selection.t
-  val combinators : HO_unif.Combinators.t
 end
 
 module Key = struct
@@ -38,7 +37,6 @@ module Make(X : PARAMETERS) = struct
   let selection_fun () = !_select
   let set_selection_fun s = _select := s
   let signature () = !_signature
-  let combinators () = X.combinators
 
   let on_new_symbol = Signal.create()
   let on_signature_update = Signal.create()

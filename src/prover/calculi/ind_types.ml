@@ -27,6 +27,7 @@ module Make(Env : Env_intf.S) = struct
         end
       | T.Const id when Ind_ty.is_constructor id -> Some (id, [])
       | T.Const _
+      | T.Fun _
       | T.Var _
       | T.DB _
       | T.AppBuiltin _ -> None
@@ -231,6 +232,7 @@ module Make(Env : Env_intf.S) = struct
       begin match T.view t with
         | T.Const id -> not (Classify_cst.id_is_defined id)
         | T.App (f,l) -> pure_value f && List.for_all pure_value l
+        | T.Fun (_,u) -> pure_value u
         | T.Var _ | T.DB _ | T.AppBuiltin _
           -> false
       end

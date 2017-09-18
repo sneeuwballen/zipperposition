@@ -331,6 +331,14 @@ module Term = struct
                  end
                | _ -> k t'
              end)
+      | T.Fun (arg, body) ->
+        (* term rewrite rules, because [vars(rhs)⊆vars(lhs)], map
+           closed terms to closed terms, so we can safely rewrite under λ *)
+        reduce body
+          (fun body' ->
+             let t =
+               if T.equal body body then t else (T.fun_ arg body')
+             in k t)
       | T.Var _
       | T.DB _ -> k t
       | T.AppBuiltin (_,[]) -> k t
@@ -368,6 +376,7 @@ module Term = struct
                  with Unif.Fail -> None)
           | _ -> Sequence.empty
         end
+      | T.Fun _
       | T.Var _
       | T.DB _
       | T.AppBuiltin _ -> Sequence.empty
@@ -394,8 +403,12 @@ module Lit = struct
 
     let head_id c = match lhs c with
       | Literal.Prop (t, _) ->
-        begin match T.Classic.view t with
-          | T.Classic.App (id, _) -> Some id
+        begin match T.view t with
+          | T.Const id -> Some id
+          | T.App (f, _) ->
+              begin match T.view f with
+                | T.Const id -> Some id | _ -> assert false
+              end
           | _ -> assert false
         end
       | Literal.Equation _ -> None
@@ -423,9 +436,9 @@ module Lit = struct
   let eq_rules_ : Set.t ref = ref Set.empty
 
   let add_eq_rule (r:Rule.t): unit = match Rule.lhs r with
-    | Literal.Equation (t,_,sign) ->
+    | Literal.Equation (t,u,sign) ->
       let ty = T.ty t in
-      if sign && not !allow_pos_eqn_rewrite_ then (
+      if sign && not !allow_pos_eqn_rewrite_ && T.is_var t && T.is_var u then (
         (* ignore positive rules *)
         Util.debugf ~section 2 "@[<2>ignore positive equational rewrite `%a`@]"
           (fun k->k Rule.pp r);
@@ -559,7 +572,7 @@ let pseudo_rule_of_rule (r:rule): pseudo_rule = match r with
             id, args, rhs
           | _ -> fail()
         end
-      | Literal.True | Literal.False | Literal.HO_constraint _
+      | Literal.True | Literal.False
       | Literal.Equation _ | Literal.Int _ | Literal.Rat _ -> fail()
     end
 

@@ -160,6 +160,8 @@ module KBO : ORD = struct
     | Head.I s -> Prec.weight prec s
     | Head.V _ -> W.int 1  (* TODO: Maybe not a good value *)
 
+  exception Has_lambda
+
   (* TODO: ghc() that maps (in theory) variables to sets of symbols
      their instances can have as head (for a symbol [f] it's just [{f}] itself).
      Then [x > y] if [forall f∈ghc(x),y∈ghd(y), f>g] in precedence.
@@ -178,35 +180,36 @@ module KBO : ORD = struct
         stands for positive (is t the left term) *)
     let rec balance_weight (wb:W.t) t y ~pos : W.t * bool =
       match T.view t with
-      | T.Var x ->
-        let x = HVar.id x in
-        if pos then (
-          add_pos_var balance x;
-          W.(wb + one), x = y
-        ) else (
-          add_neg_var balance x;
-          W.(wb - one), x = y
-        )
-      | T.DB _ ->
-        let w = if pos then W.(wb + one) else W.(wb - one) in
-        w, false
-      | T.Const s ->
-        let open W.Infix in
-        let wb' =
-          if pos
-          then wb + weight prec (Head.I s)
-          else wb - weight prec (Head.I s)
-        in wb', false
-      | T.App (f, l) ->
-        let wb', res = balance_weight wb f y ~pos in
-        balance_weight_rec wb' l y ~pos res
-      | T.AppBuiltin (b,l) ->
-        let open W.Infix in
-        let wb' = if pos
-          then wb + weight prec (Head.B b)
-          else wb - weight prec (Head.B b)
-        in
-        balance_weight_rec wb' l y ~pos false
+        | T.Var x ->
+          let x = HVar.id x in
+          if pos then (
+            add_pos_var balance x;
+            W.(wb + one), x = y
+          ) else (
+            add_neg_var balance x;
+            W.(wb - one), x = y
+          )
+        | T.DB _ ->
+          let w = if pos then W.(wb + one) else W.(wb - one) in
+          w, false
+        | T.Const s ->
+          let open W.Infix in
+          let wb' =
+            if pos
+            then wb + weight prec (Head.I s)
+            else wb - weight prec (Head.I s)
+          in wb', false
+        | T.App (f, l) ->
+          let wb', res = balance_weight wb f y ~pos in
+          balance_weight_rec wb' l y ~pos res
+        | T.AppBuiltin (b,l) ->
+          let open W.Infix in
+          let wb' = if pos
+            then wb + weight prec (Head.B b)
+            else wb - weight prec (Head.B b)
+          in
+          balance_weight_rec wb' l y ~pos false
+        | T.Fun _ -> raise Has_lambda
     (** list version of the previous one, threaded with the check result *)
     and balance_weight_rec wb terms y ~pos res = match terms with
       | [] -> (wb, res)
@@ -340,9 +343,15 @@ module KBO : ORD = struct
       let _, res = tckbo W.zero t1 t2 in
       AllocCache.Arr.free alloc_cache balance.balance;
       res
-    with e ->
-      AllocCache.Arr.free alloc_cache balance.balance;
-      raise e
+    with
+      | Has_lambda ->
+        (* lambda terms are not comparable, except trivial
+           case when they are syntactically equal *)
+        AllocCache.Arr.free alloc_cache balance.balance;
+        Incomparable
+      | e ->
+        AllocCache.Arr.free alloc_cache balance.balance;
+        raise e
 
   let compare_terms ~prec x y =
     Util.enter_prof prof_kbo;
@@ -416,6 +425,8 @@ module LFHOKBO : ORD = struct
     | Head.I s -> Prec.weight prec s
     | Head.V _ -> W.int 1  (* TODO: Maybe not a good value *)
 
+  exception Has_lambda
+
   (** Blanchette's higher-order KBO *)
   let rec lfhokbo ~prec t1 t2 =
     let balance = mk_balance t1 t2 in
@@ -452,6 +463,7 @@ module LFHOKBO : ORD = struct
           else wb - weight prec (Head.B b)
         in
         balance_weight_rec wb' l y ~pos false
+      | T.Fun _ -> raise Has_lambda
     (** list version of the previous one, threaded with the check result *)
     and balance_weight_rec wb terms y ~pos res = match terms with
       | [] -> (wb, res)
@@ -566,9 +578,15 @@ module LFHOKBO : ORD = struct
       let _, res = tckbo W.zero t1 t2 in
       AllocCache.Arr.free alloc_cache balance.balance;
       res
-    with e ->
-      AllocCache.Arr.free alloc_cache balance.balance;
-      raise e
+    with
+      | Has_lambda ->
+        (* lambda terms are not comparable, except trivial
+           case when they are syntactically equal *)
+        AllocCache.Arr.free alloc_cache balance.balance;
+        Incomparable
+      | e ->
+        AllocCache.Arr.free alloc_cache balance.balance;
+        raise e
 
   let compare_terms ~prec x y =
     Util.enter_prof prof_lfhokbo;

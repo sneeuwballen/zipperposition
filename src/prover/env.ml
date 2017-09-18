@@ -12,7 +12,6 @@ module P = Proof
 
 let section = Util.Section.make ~parent:Const.section "env"
 
-let stat_orphan_criterion = Util.mk_stat "env.orphan_criterion"
 let stat_inferred = Util.mk_stat "env.inferred clauses"
 
 let prof_generate = Util.mk_profiler "env.generate"
@@ -23,8 +22,6 @@ let prof_simplify = Util.mk_profiler "env.simplify"
 let prof_all_simplify = Util.mk_profiler "env.all_simplify"
 let prof_is_redundant = Util.mk_profiler "env.is_redundant"
 let prof_subsumed_by = Util.mk_profiler "env.subsumed_by"
-
-let orphan_criterion_ = ref false
 
 (** {2 Signature} *)
 module type S = Env_intf.S
@@ -290,46 +287,6 @@ module Make(X : sig
     in
     Sequence.of_list clauses
 
-  (* is [c] the result (after simplification) of an inference in which
-     at least one premise has been backward simplified? *)
-  let orphan_criterion_real c =
-    (* is the current step [p] an inference step? *)
-    let is_inf p = match P.Step.kind @@ P.S.step p with
-      | P.Inference _ -> true
-      | _ -> false
-    in
-    (* recursive traversal of the proof of [c].
-       @param after_inf true if we just crossed an inference step *)
-    let rec aux ~after_inf p =
-      if after_inf
-      then
-        (* after inference step: stop recursion and check *)
-        match P.S.result p with
-          | P.Clause c' -> SClause.is_backward_simplified c'
-          | P.BoolClause _
-          | P.C_stmt _
-          | P.Stmt _
-          | P.Form _ -> false
-      else
-        List.exists
-          (fun p' -> aux ~after_inf:(is_inf p) @@ P.Parent.proof p')
-          (P.Step.parents @@ P.S.step p)
-    in
-    let p = C.proof c in
-    let res =
-      List.exists (fun p' -> aux ~after_inf:(is_inf p) @@ P.Parent.proof p')
-        (P.Step.parents @@ P.S.step p)
-    in
-    if res then (
-      Util.incr_stat stat_orphan_criterion;
-      Util.debugf ~section 3
-        "@[<2>`@[%a@]` is redundant by orphan criterion@]" (fun k->k C.pp c);
-    );
-    res
-
-  let orphan_criterion c =
-    if !orphan_criterion_ then orphan_criterion_real c else false
-
   let is_trivial_trail trail = match !_is_trivial_trail with
     | [] -> false
     | [f] -> f trail
@@ -342,7 +299,6 @@ module Make(X : sig
       let res =
         C.is_redundant c
         || is_trivial_trail (C.trail c)
-        || orphan_criterion c
         || begin match !_is_trivial with
           | [] -> false
           | [f] -> f c
@@ -815,14 +771,4 @@ module Make(X : sig
   let flex_add k v = flex_state_ := Flex_state.add k v !flex_state_
   let flex_get k = Flex_state.get_exn k !flex_state_
 end
-
-let () =
-  let set_or () =
-    Util.warn "caution: orphan criterion seems to be incomplete";
-    orphan_criterion_ := true
-  in
-  Params.add_opts
-    [ "--orphan-criterion", Arg.Unit set_or, " enable orphan criterion"
-    ; "--no-orphan-criterion", Arg.Clear orphan_criterion_, " disable orphan criterion"
-    ]
 

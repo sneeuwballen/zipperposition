@@ -92,6 +92,17 @@ val codomain : t -> (term Scoped.t) Sequence.t
 val introduced : t -> (var Scoped.t) Sequence.t
 (** Variables introduced by the substitution (ie vars of codomain) *)
 
+val normalize : t -> t
+(** Normalize bindings that are in the same scope.
+    E.g. [x0 -> f(y0), y0 -> g(z0), z0->a]
+    becomes [x0->f(g(a))0, y0->g(a)0, z0->g(z0)] *)
+
+val map : (term -> term) -> t -> t
+(** Map on term *)
+
+val filter : (var Scoped.t -> term Scoped.t -> bool) -> t -> t
+(** Filter bindings *)
+
 (*
 val compose : t -> t -> t
   (** [compose s1 s2] is the substitution that to [x] associates
@@ -169,4 +180,6 @@ module FO : sig
   val bind' : t -> Type.t HVar.t Scoped.t -> term Scoped.t -> t
   val apply_l : t -> renaming:Renaming.t -> term list Scoped.t -> term list
   val of_list' : ?init:t -> (Type.t HVar.t Scoped.t * term Scoped.t) list -> t
+  val map : (term -> term) -> t -> t
+  val filter : (Type.t HVar.t Scoped.t -> term Scoped.t -> bool) -> t -> t
 end

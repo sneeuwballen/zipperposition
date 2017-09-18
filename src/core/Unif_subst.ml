@@ -40,6 +40,7 @@ module FO = struct
     {t with subst=Subst.FO.bind t.subst (v:>InnerTerm.t HVar.t Scoped.t) u}
   let mem t (v:Type.t HVar.t Scoped.t) =
     Subst.mem t.subst (v :> InnerTerm.t HVar.t Scoped.t)
+  let deref s t = Subst.FO.deref s.subst t
 end
 
 let has_constr t: bool = constr_l t <> []

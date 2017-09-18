@@ -30,6 +30,8 @@ val push : 'a t -> 'a -> 'a t
 (** Create a new environment, when entering a scope, where the De Bruijn
     index 0 is bound to the given value *)
 
+val push_l : 'a t -> 'a list -> 'a t
+
 val push_none : 'a t -> 'a t
 (** Create a new environment, when entering a scope, where
     the De Bruijn index 0 is bound to nothing. *)
@@ -72,7 +74,15 @@ val num_bindings : _ t -> int
 val map : ('a -> 'b) -> 'a t -> 'b t
 (** Map bound objects to other bound objects *)
 
+val filteri : (int -> 'a -> bool) -> 'a t -> 'a t
+
 val of_list : (int * 'a) list -> 'a t
 (** Map indices to objects *)
+
+val to_list : 'a t -> 'a option list
+(** List of underlying elements *)
+
+val to_list_i : 'a t -> (int * 'a) option list
+(** List of underlying elements *)
 
 include Interfaces.PRINT1 with type 'a t := 'a t

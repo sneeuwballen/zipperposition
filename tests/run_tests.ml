@@ -18,11 +18,12 @@ let props =
 
 let suite =
   "all_tests" >:::
-    (  TestSubsts.suite
-       :: TestMultiset.suite
-       :: TestOrdering.suite
-       :: []
-    )
+    [ TestSubsts.suite;
+      TestMultiset.suite;
+      TestOrdering.suite;
+      TestTerm.suite;
+      TestUnif.suite;
+    ]
 
 let () =
   ignore (OUnit.run_test_tt suite);

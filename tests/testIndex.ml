@@ -25,9 +25,9 @@ end
 (* lists of unique terms *)
 let gen low high =
   QCheck.Gen.(
-    let t = (1 -- 7) >>= ArTerm.default_fuel in
+    let t = (1 -- 7) >>= ArTerm.default_ho_fuel in
     list_size (low -- high) t >>= fun l ->
-    let seq = T.Set.of_list l |> T.Set.to_seq in
+    let seq = List.map Lambda.snf l |> T.Set.of_list |> T.Set.to_seq in
     let seq = Sequence.mapi (fun i t -> t, i) seq in
     return (Sequence.to_list seq)
   )

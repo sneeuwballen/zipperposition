@@ -298,4 +298,6 @@ module TPTP : sig
   include Interfaces.PRINT3 with type ('a, 'b, 'c) t := ('a, 'b, 'c) t
 end
 
+val pp_clause_in : Output_format.t -> clause_t CCFormat.printer
+val pp_input_in : Output_format.t -> input_t CCFormat.printer
 

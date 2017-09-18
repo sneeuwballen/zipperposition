@@ -14,18 +14,15 @@ val g : i -> i.
 val a : i.
 val b : i.
 
-assert f = g.
-
 val f1: i->i.
 val f2: i->i.
 
-assert f1 != f2.
+assert f1 (f1 a) != f2 (f2 b).
 
 goal exists (F:(i->i)->i->i).
-  map (F f) = map (F g) &&
   F f a = f (f a) &&
-  F f b = f (f b) &&
+  F g b = g (g b) &&
   (F = (fun f x. f (f x))) && # FIXME: this kills the prover, by getting it stuck… HO unif should deal with it
-  F f1 != F f2. # not identity
+  F f1 a != F f2 b. # not identity
 
 
