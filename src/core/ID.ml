@@ -108,7 +108,7 @@ exception Attr_parameter of int
 
 type skolem_kind = K_normal | K_ind (* inductive *)
 
-exception Attr_skolem of skolem_kind
+exception Attr_skolem of skolem_kind * int
 
 let as_infix = payload_find ~f:(function Attr_infix s->Some s | _ -> None)
 let is_infix id = as_infix id |> CCOpt.is_some
@@ -124,5 +124,5 @@ let is_skolem id =
 let as_skolem id =
   payload_find id
     ~f:(function
-      | Attr_skolem a -> Some a
+      | Attr_skolem (a,_) -> Some a
       | _ -> None)

@@ -20,6 +20,8 @@ let prof_matching = Util.mk_profiler "matching"
 
 let fail () = raise Fail
 
+let _allow_partial_skolem_application = ref false
+
 (** {2 Signatures} *)
 
 module type S = Unif_intf.S
@@ -158,6 +160,22 @@ module Inner = struct
     | T.NoType -> false
     | T.HasType ty -> not (T.type_is_unifiable ty)
 
+
+  let num_mandatory_args id =
+    let n_option =
+      ID.payload_find id
+      ~f:(function
+          | ID.Attr_skolem (_, n) -> Some n
+          | _ -> None)
+    in
+    match n_option with
+    | Some n -> n
+    | None -> 0
+
+  let partial_skolem_fail f l1 l2 =
+    not !_allow_partial_skolem_application &&
+    List.length l1 - List.length l2 < num_mandatory_args f
+
   (* @param op which operation to perform (unification,matching,alpha-eq)
      @param root if we are at the root of the original problem. This is
      useful for constraints (only allowed in subterms, where [root=false])
@@ -228,6 +246,10 @@ module Inner = struct
             (* TODO: notion of value, here, to fail fast in some cases *)
             then US.add_constr (Unif_constr.make (t1,sc1) (t2,sc2)) subst
             else fail()
+          | T.Const f, T.Var _  when partial_skolem_fail f l1 l2 ->
+            fail()
+          | T.Var _, T.Const g when partial_skolem_fail g l2 l1 ->
+            fail()
           | T.Var _, _
           | _, T.Var _ ->
             (* currying: unify "from the right" *)
@@ -480,3 +502,11 @@ module FO = struct
     let l1, l2 = pair_lists_ f1 l1 f2 l2 in
     Term.of_term_unsafe_l l1, Term.of_term_unsafe_l l2
 end
+
+
+let () =
+  Options.add_opts
+    [  "--partial-skolem"
+    , Arg.Set _allow_partial_skolem_application
+    , " allow partial application of skolem constants (sound only assuming the axiom of choice)"
+    ]
