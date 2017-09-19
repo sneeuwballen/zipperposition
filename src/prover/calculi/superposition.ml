@@ -60,7 +60,7 @@ let _dot_sup_into = ref None
 let _dot_sup_from = ref None
 let _dot_simpl = ref None
 let _dont_simplify = ref false
-let _no_sup_at_vars = ref false
+let _sup_at_vars = ref false
 let _dot_demod_into = ref None
 
 module Make(Env : Env.S) : S with module Env = Env = struct
@@ -91,7 +91,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let ord = Ctx.ord () in
     (* index subterms that can be rewritten by superposition *)
     _idx_sup_into :=
-      Lits.fold_terms ~vars:(not !_no_sup_at_vars) ~ty_args:false ~ord ~which:`Max ~subterms:true
+      Lits.fold_terms ~vars:!_sup_at_vars ~ty_args:false ~ord ~which:`Max ~subterms:true
         ~eligible:(C.Eligible.res c) (C.lits c)
       |> Sequence.filter (fun (t, _) -> not (T.is_var t) || T.is_ho_var t)
       (* TODO: could exclude more variables from the index:
@@ -301,7 +301,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
       ) then raise (ExitSuperposition "bad ordering conditions");
       (* Check for superposition at a variable *)
-      if !_no_sup_at_vars then
+      if not !_sup_at_vars then
         assert (not (T.is_var info.u_p))
       else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then
          raise (ExitSuperposition "superposition at variable");
@@ -397,7 +397,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
       ) then raise (ExitSuperposition "bad ordering conditions");
       (* Check for superposition at a variable *)
-      if !_no_sup_at_vars then
+      if not !_sup_at_vars then
         assert (not (T.is_var info.u_p))
       else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then
         raise (ExitSuperposition "superposition at variable");
@@ -488,7 +488,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* do the inferences in which clause is passive (rewritten),
        so we consider both negative and positive literals *)
     let new_clauses =
-      Lits.fold_terms ~vars:(not !_no_sup_at_vars) ~subterms:true ~ord:(Ctx.ord ())
+      Lits.fold_terms ~vars:!_sup_at_vars ~subterms:true ~ord:(Ctx.ord ())
         ~which:`Max ~eligible (C.lits clause)
       |> Sequence.filter (fun (u_p, _) -> not (T.is_var u_p) || T.is_ho_var u_p)
       (* TODO: could exclude more variables from the index:
@@ -1638,7 +1638,7 @@ let () =
     ; "--dont-simplify"
     , Arg.Set _dont_simplify
     , " disable simplification rules"
-    ; "--no-sup-at-vars"
-    , Arg.Set _no_sup_at_vars
-    , " disable superposition at variables"
+    ; "--sup-at-vars"
+    , Arg.Set _sup_at_vars
+    , " enable superposition at variables under certain ordering conditions"
     ]
