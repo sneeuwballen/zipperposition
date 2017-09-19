@@ -488,6 +488,17 @@ module LFHOKBO : ORD = struct
       | _, [] ->
         let wb, _ = balance_weight_rec wb terms1 0 ~pos:true false in
         wb, Gt
+    (** length-lexicographic comparison *)
+    and tckbolenlex wb terms1 terms2 =
+      if List.length terms1 = List.length terms2
+      then tckbolex wb terms1 terms2
+      else (
+        (* just compute the weights and return result *)
+        let wb', _ = balance_weight_rec wb terms1 0 ~pos:true false in
+        let wb'', _ = balance_weight_rec wb' terms2 0 ~pos:false false in
+        let res = if List.length terms1 > List.length terms2 then Gt else Lt in
+        wb'', res
+      )
     (** commutative comparison. Not linear, must call kbo to
         avoid breaking the weight computing invariants *)
     and tckbocommute wb ss ts =
@@ -552,7 +563,6 @@ module LFHOKBO : ORD = struct
         | Gt -> wb'', g_or_n
         | Lt ->  wb'', l_or_n
         | Eq ->
-          assert (List.length ss = List.length ts);
           if res = Eq then wb'', Eq
           else if res = Lt then wb'', l_or_n
           else if res = Gt then wb'', g_or_n
@@ -566,7 +576,7 @@ module LFHOKBO : ORD = struct
           (* use multiset or lexicographic comparison *)
           tckbocommute wb ss ts
         | Prec.Lexicographic ->
-          tckbolex wb ss ts
+          tckbolenlex wb ss ts
       else (
         (* just compute variable and weight balances *)
         let wb', _ = balance_weight_rec wb ss 0 ~pos:true false in
