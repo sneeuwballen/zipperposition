@@ -486,7 +486,7 @@ module RPO6 : ORD = struct
     begin match prec_compare prec f g  with
       | Eq ->
         begin match prec_status prec f with
-          | Prec.Multiset ->  cMultiset ~prec ss ts
+          | Prec.Multiset ->  cMultiset ~prec s t ss ts
           | Prec.Lexicographic ->  cLMA ~prec s t ss ts
           | Prec.LengthLexicographic ->  cLLMA ~prec s t ss ts
         end
@@ -524,8 +524,11 @@ module RPO6 : ORD = struct
     else
       Comparison.opp (cMA ~prec t ss)
   (** multiset comparison of subterms (not optimized) *)
-  and cMultiset ~prec ss ts =
-    MT.compare_partial_l (rpo6 ~prec) ss ts
+  and cMultiset ~prec s t ss ts =
+    match MT.compare_partial_l (rpo6 ~prec) ss ts with
+    | Eq | Incomparable -> Incomparable
+    | Gt -> cMA ~prec s ts
+    | Lt -> Comparison.opp (cMA ~prec t ss)
   (** bidirectional comparison by subterm property (bidirectional alpha) *)
   and cAA ~prec s t ss ts =
     match alpha ~prec ss t with
