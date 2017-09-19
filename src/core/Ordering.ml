@@ -91,8 +91,10 @@ let prec_compare prec a b = match a,b with
 let prec_status prec = function
   | Head.I s -> Prec.status prec s
   | Head.B Builtin.Eq -> Prec.Multiset
-  | Head.B _ -> Prec.Lexicographic
-  | Head.V _ -> Prec.Lexicographic (* TODO: Not a good default *)
+  | Head.B _ -> Prec.LengthLexicographic
+  | Head.V _ -> Prec.LengthLexicographic
+(* TODO: Variables should get a different status here. LengthLexicographic for variables
+will only work as long as all other symbols are LengthLexicographic as well. *)
 
 module KBO : ORD = struct
   let name = "kbo"
@@ -259,27 +261,10 @@ module KBO : ORD = struct
         (W.(wb' - one), if contains then Gt else Incomparable)
       | T.DB i, T.DB j ->
         (wb, if i = j then Eq else Incomparable)
-      | _ -> begin match term_to_head t1, term_to_head t2 with
-          | Some f, Some g -> tckbo_composite wb f g (term_to_args t1) (term_to_args t2)
+      | _ -> begin match Head.term_to_head t1, Head.term_to_head t2 with
+          | Some f, Some g -> tckbo_composite wb f g (Head.term_to_args t1) (Head.term_to_args t2)
         | _ -> (wb, Incomparable)
         end
-    and term_to_head s =
-      match T.view s with
-      | T.App (f,_) ->
-        begin match T.view f with
-          | T.Const fid -> Some (Head.I fid)
-          | T.Var x ->     Some (Head.V x)
-          | _ -> None
-        end
-      | T.AppBuiltin (fid,_) -> Some (Head.B fid)
-      | T.Const fid -> Some (Head.I fid)
-      | T.Var x ->     Some (Head.V x)
-      | _ -> None
-    and term_to_args s =
-      match T.view s with
-      | T.App (_,ss) -> ss
-      | T.AppBuiltin (_,ss) -> ss
-      | _ -> []
     (** tckbo, for composite terms (ie non variables). It takes a ID.t
         and a list of subterms. *)
     and tckbo_composite wb f g ss ts =
@@ -306,9 +291,10 @@ module KBO : ORD = struct
       if prec_compare prec f g = Eq
       then match prec_status prec f with
         | Prec.Multiset ->
-          (* use multiset or lexicographic comparison *)
           tckbocommute wb ss ts
         | Prec.Lexicographic ->
+          tckbolex wb ss ts
+        | Prec.LengthLexicographic ->
           tckbolenlex wb ss ts
       else (
         (* just compute variable and weight balances *)
@@ -338,94 +324,75 @@ module KBO : ORD = struct
     compare
 end
 
-module Weight_indet = struct
-  type var = Type.t HVar.t
-
-  type t =
-    | Weight of var
-    | Arg_coeff of var * int;;
-
-  let compare x y = match (x, y) with
-      Weight x', Weight y' -> HVar.compare Type.compare x' y'
-    | Arg_coeff (x', i), Arg_coeff (y', j) ->
-      let c = HVar.compare Type.compare x' y' in
-      if c <> 0 then c else abs(i-j)
-    | Weight _, Arg_coeff (_, _) -> 1
-    | Arg_coeff (_, _), Weight _ -> -1
-
-  let pp out (a:t): unit =
-    begin match a with
-      Weight x-> Format.fprintf out "w_%a" HVar.pp x
-    | Arg_coeff (x, i) -> Format.fprintf out "k_%a_%d" HVar.pp x i
-  end
-  let to_string = CCFormat.to_string pp
-end
-
-(* TODO: Reuse this everywhere *)
-let term_to_head s =
-  match T.view s with
-  | T.App (f,_) ->
-    begin match T.view f with
-      | T.Const fid -> Some (Head.I fid)
-      | T.Var x ->     Some (Head.V x)
-      | _ -> None
-    end
-  | T.AppBuiltin (fid,_) -> Some (Head.B fid)
-  | T.Const fid -> Some (Head.I fid)
-  | T.Var x ->     Some (Head.V x)
-  | _ -> None
-
-let term_to_args s =
-  match T.view s with
-  | T.App (_,ss) -> ss
-  | T.AppBuiltin (_,ss) -> ss
-  | _ -> []
-
-
-module WI = Weight_indet
-module Weight_polynomial = Polynomial.Make(W)(WI)
-module WP = Weight_polynomial
-
-let rec weight prec t =
-  (* Returns a function that is applied to the weight of argument i of a term
-     headed by t before adding the weights of all arguments *)
-  let arg_coeff_multiplier t i =
-    begin match T.view t with
-      | T.Const fid -> Some (WP.mult_const (Prec.arg_coeff prec fid i))
-      | T.Var x ->     Some (WP.mult_indet (WI.Arg_coeff (x, i)))
-      | _ -> None
-    end
-  in
-  (* recursively calculates weights of args, applies coeff_multipliers, and
-     adds all those weights plus the head_weight.*)
-  let app_weight head_weight coeff_multipliers args =
-    args
-    |> List.mapi (fun i s ->
-        begin match weight prec s, coeff_multipliers i with
-          | Some w, Some c -> Some (c w)
-          | _ -> None
-        end )
-    |> List.fold_left
-      (fun w1 w2 ->
-         begin match (w1, w2) with
-           | Some w1', Some w2' -> Some (WP.add w1' w2')
-           | _, _ -> None
-         end )
-      head_weight
-  in
-  begin match T.view t with
-    | T.App (f,args) -> app_weight (weight prec f) (arg_coeff_multiplier f) args
-    | T.AppBuiltin (_,args) -> app_weight (Some (WP.const (W.one))) (fun _ -> Some (fun x -> x)) args
-    | T.Const fid -> Some (WP.const (Prec.weight prec fid))
-    | T.Var x ->     Some (WP.indet (WI.Weight x))
-    | _ -> None
-  end
 
 module LFHOKBO_arg_coeff : ORD = struct
   let name = "lfhokbo_arg_coeff"
 
+
+  module Weight_indet = struct
+    type var = Type.t HVar.t
+
+    type t =
+      | Weight of var
+      | Arg_coeff of var * int;;
+
+    let compare x y = match (x, y) with
+        Weight x', Weight y' -> HVar.compare Type.compare x' y'
+      | Arg_coeff (x', i), Arg_coeff (y', j) ->
+        let c = HVar.compare Type.compare x' y' in
+        if c <> 0 then c else abs(i-j)
+      | Weight _, Arg_coeff (_, _) -> 1
+      | Arg_coeff (_, _), Weight _ -> -1
+
+    let pp out (a:t): unit =
+      begin match a with
+          Weight x-> Format.fprintf out "w_%a" HVar.pp x
+        | Arg_coeff (x, i) -> Format.fprintf out "k_%a_%d" HVar.pp x i
+      end
+    let to_string = CCFormat.to_string pp
+  end
+
+  module WI = Weight_indet
+  module Weight_polynomial = Polynomial.Make(W)(WI)
+  module WP = Weight_polynomial
+
+  let rec weight prec t =
+    (* Returns a function that is applied to the weight of argument i of a term
+       headed by t before adding the weights of all arguments *)
+    let arg_coeff_multiplier t i =
+      begin match T.view t with
+        | T.Const fid -> Some (WP.mult_const (Prec.arg_coeff prec fid i))
+        | T.Var x ->     Some (WP.mult_indet (WI.Arg_coeff (x, i)))
+        | _ -> None
+      end
+    in
+    (* recursively calculates weights of args, applies coeff_multipliers, and
+       adds all those weights plus the head_weight.*)
+    let app_weight head_weight coeff_multipliers args =
+      args
+      |> List.mapi (fun i s ->
+          begin match weight prec s, coeff_multipliers i with
+            | Some w, Some c -> Some (c w)
+            | _ -> None
+          end )
+      |> List.fold_left
+        (fun w1 w2 ->
+           begin match (w1, w2) with
+             | Some w1', Some w2' -> Some (WP.add w1' w2')
+             | _, _ -> None
+           end )
+        head_weight
+    in
+    begin match T.view t with
+      | T.App (f,args) -> app_weight (weight prec f) (arg_coeff_multiplier f) args
+      | T.AppBuiltin (_,args) -> app_weight (Some (WP.const (W.one))) (fun _ -> Some (fun x -> x)) args
+      | T.Const fid -> Some (WP.const (Prec.weight prec fid))
+      | T.Var x ->     Some (WP.indet (WI.Weight x))
+      | _ -> None
+    end
+
   let rec lfhokbo_arg_coeff ~prec t s =
-    (* length-lexicographic comparison *)
+    (* lexicographic comparison *)
     let rec lfhokbo_lex ts ss = match ts, ss with
       | [], [] -> Eq
       | _ :: _, [] -> Gt
@@ -437,6 +404,15 @@ module LFHOKBO_arg_coeff : ORD = struct
         | Eq -> lfhokbo_lex t_rest s_rest
         | Incomparable -> Incomparable
         end
+    in
+    let lfhokbo_lenlex ts ss =
+      if List.length ts = List.length ss then
+        lfhokbo_lex ts ss
+      else (
+        if List.length ts > List.length ss
+        then Gt
+        else Lt
+      )
     in
     (* compare t = g tt and s = f ss (assuming they have the same weight) *)
     let lfhokbo_composite g f ts ss =
@@ -452,14 +428,15 @@ module LFHOKBO_arg_coeff : ORD = struct
       | Eq -> (* try rule C4 *)
         begin match prec_status prec g with
           | Prec.Lexicographic -> lfhokbo_lex ts ss
+          | Prec.LengthLexicographic -> lfhokbo_lenlex ts ss
           | _ -> assert false
         end
     in
     (* compare t and s assuming they have the same weight *)
     let lfhokbo_same_weight t s =
       match T.view t, T.view s with
-      | _ -> begin match term_to_head t, term_to_head s with
-          | Some g, Some f -> lfhokbo_composite g f (term_to_args t) (term_to_args s)
+      | _ -> begin match Head.term_to_head t, Head.term_to_head s with
+          | Some g, Some f -> lfhokbo_composite g f (Head.term_to_args t) (Head.term_to_args s)
           | _ -> Incomparable
         end
     in
@@ -499,33 +476,20 @@ module RPO6 : ORD = struct
         | T.Var var, _ -> if T.var_occurs ~var t then Lt else Incomparable
         | T.DB _, T.DB _ -> Incomparable
         | _ ->
-          begin match term_to_head s, term_to_head t with
-            | Some head1, Some head2 -> rpo6_composite ~prec s t head1 head2 (term_to_args s) (term_to_args t)
+          begin match Head.term_to_head s, Head.term_to_head t with
+            | Some head1, Some head2 ->
+              rpo6_composite ~prec s t head1 head2 (Head.term_to_args s) (Head.term_to_args t)
             | _ -> Incomparable
           end
-  and term_to_head s =
-    match T.view s with
-      | T.App (f,_) ->
-        begin match T.view f with
-          | T.Const fid -> Some (Head.I fid)
-          | T.Var x ->     Some (Head.V x)
-          | _ -> None
-        end
-      | T.AppBuiltin (fid,_) -> Some (Head.B fid)
-      | T.Const fid -> Some (Head.I fid)
-      | T.Var x ->     Some (Head.V x)
-      | _ -> None
-  and term_to_args s =
-    match T.view s with
-      | T.App (_,ss) -> ss
-      | T.AppBuiltin (_,ss) -> ss
-      | _ -> []
   (* handle the composite cases *)
   and rpo6_composite ~prec s t f g ss ts =
     begin match prec_compare prec f g  with
       | Eq ->
-        cLLMA ~prec s t ss ts  (* length-lexicographic subterm comparison *)
-          (* TODO: add other extensions *)
+        begin match prec_status prec f with
+          | Prec.Multiset ->  cMultiset ~prec ss ts
+          | Prec.Lexicographic ->  cLMA ~prec s t ss ts
+          | Prec.LengthLexicographic ->  cLLMA ~prec s t ss ts
+        end
       | Gt -> cMA ~prec s ts
       | Lt -> Comparison.opp (cMA ~prec t ss)
       | Incomparable -> cAA ~prec s t ss ts

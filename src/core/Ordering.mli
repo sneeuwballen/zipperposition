@@ -27,10 +27,6 @@ val compare : t -> term -> term -> Comparison.t
 
 val precedence : t -> Precedence.t
 (** Current precedence *)
-module Weight_polynomial : Polynomial.S
-
-val weight : Precedence.t -> term -> Weight_polynomial.t option
-(** Current precedence *)
 
 val add_list : t -> ID.t list -> unit
 (** Update precedence with symbols *)

@@ -6,6 +6,7 @@
 type symbol_status =
   | Multiset
   | Lexicographic
+  | LengthLexicographic
 
 (** {2 Weight of Symbols} *)
 module Weight : sig

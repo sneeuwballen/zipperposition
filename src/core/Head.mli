@@ -10,4 +10,10 @@ type t =
   | B of Builtin.t
   | V of var
 
+val term_to_head : Term.t -> t option
+(** Return the head of a term if it can be expressed by Head.t *)
+
+val term_to_args : Term.t -> Term.t list
+(** Return the arguments of a term *)
+
 include Interfaces.PRINT with type t := t
