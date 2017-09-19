@@ -51,19 +51,13 @@ include Interfaces.PRINT with type t := t
     with the subterm property, and monotonic), some other are not. *)
 
 val kbo : Precedence.t -> t
-(** Knuth-Bendix simplification ordering *)
-
-val lfhokbo : Precedence.t -> t
-(** Blanchette's lambda-free higher-order KPO *)
+(** Knuth-Bendix simplification ordering (Blanchette's lambda-free higher-order version) *)
 
 val lfhokbo_arg_coeff : Precedence.t -> t
 (** Blanchette's lambda-free higher-order KPO with argument coefficients *)
 
 val rpo6 : Precedence.t -> t
-(** Efficient implementation of RPO (recursive path ordering) *)
-
-val lfhorpo : Precedence.t -> t
-(** Blanchette's lambda-free higher-order RPO *)
+(** Efficient implementation of RPO (recursive path ordering) (Blanchette's lambda-free higher-order version)  *)
 
 val none : t
 (** All terms are incomparable (equality still works).

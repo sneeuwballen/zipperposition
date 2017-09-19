@@ -150,8 +150,8 @@ let check_ordering_subterm ord =
   in
   QCheck.Test.make ~count ~long_factor ~name arb prop
 
-let test_lfhorpo _ =
-  let ord = O.lfhorpo (Precedence.default [a_; b_; c_; f_; g_; h_]) in
+let test_rpo6 _ =
+  let ord = O.rpo6 (Precedence.default [a_; b_; c_; f_; g_; h_]) in
   let compare = O.compare ord in
 
   (* x a < x b *)
@@ -186,10 +186,10 @@ let test_lfhorpo _ =
   assert_equal (compare (Term.app f [a;a]) (Term.app f [b])) Comparison.Gt
 
 
-let test_lfhokbo _ =
+let test_kbo _ =
   (* alphabetical precedence, h has weight 2, all other symbols weight 1*)
   let weight id = (if id=h_ then Precedence.Weight.add Precedence.Weight.one Precedence.Weight.one else Precedence.Weight.one) in
-  let ord = O.lfhokbo (Precedence.create ~weight Precedence.Constr.alpha [a_; b_; c_; f_; g_; h_]) in
+  let ord = O.kbo (Precedence.create ~weight Precedence.Constr.alpha [a_; b_; c_; f_; g_; h_]) in
   let compare = O.compare ord in
 
   (* h (x y) > f y (x a) *)
@@ -203,8 +203,8 @@ let test_lfhokbo _ =
 
 let suite =
   "test_ordering" >:::
-  [ "lfhorpo" >:: test_lfhorpo;
-    "lfhokbo" >:: test_lfhokbo
+  [ "rpo6" >:: test_rpo6;
+    "kbo" >:: test_kbo
   ]
 
 let props =
@@ -215,8 +215,8 @@ let props =
          check_ordering_swap_args o;
          check_ordering_subterm o;
        ])
-    [ O.kbo (Precedence.default []);
+    [
+      O.kbo (Precedence.default []);
+      O.lfhokbo_arg_coeff (Precedence.default []);
       O.rpo6 (Precedence.default []);
-      O.lfhokbo (Precedence.default []);
-      O.lfhorpo (Precedence.default []);
     ]
