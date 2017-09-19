@@ -434,21 +434,9 @@ module Inner = struct
       )
     )
 
-
-  let num_mandatory_args id =
-    let n_option =
-      ID.payload_find id
-      ~f:(function
-          | ID.Attr_skolem (_, n) -> Some n
-          | _ -> None)
-    in
-    match n_option with
-    | Some n -> n
-    | None -> 0
-
   let partial_skolem_fail f l1 l2 =
     not !_allow_partial_skolem_application &&
-    List.length l1 - List.length l2 < num_mandatory_args f
+    List.length l1 - List.length l2 < ID.num_mandatory_args f
 
   (* @param op which operation to perform (unification,matching,alpha-eq)
      @param root if we are at the root of the original problem. This is

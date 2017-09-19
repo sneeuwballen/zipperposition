@@ -99,3 +99,6 @@ val is_skolem : t -> bool
 (** [is_skolem id] returns [true] iff [id] is a Skolem symbol *)
 
 val as_skolem : t -> skolem_kind option
+
+val num_mandatory_args : t -> int
+(** number of mandatory arguments of a skolem constant or 0 otherwise *)

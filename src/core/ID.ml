@@ -116,13 +116,26 @@ let as_prefix = payload_find ~f:(function Attr_prefix s->Some s | _ -> None)
 let is_prefix id = as_prefix id |> CCOpt.is_some
 let as_parameter id = payload_find id ~f:(function Attr_parameter i -> Some i | _ -> None)
 let is_parameter id = as_parameter id |> CCOpt.is_some
+
 let is_skolem id =
   payload_pred id
     ~f:(function
       | Attr_skolem _ -> true
       | _ -> false)
+
 let as_skolem id =
   payload_find id
     ~f:(function
       | Attr_skolem (a,_) -> Some a
       | _ -> None)
+
+let num_mandatory_args id =
+  let n_option =
+    payload_find id
+    ~f:(function
+        | Attr_skolem (_, n) -> Some n
+        | _ -> None)
+  in
+  match n_option with
+  | Some n -> n
+  | None -> 0
