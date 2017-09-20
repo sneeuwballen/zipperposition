@@ -47,7 +47,7 @@ let add_status l t = { t with status = List.rev_append l t.status }
 
 (* Add weights specified by the user using the cli option *)
 let _add_custom_weights weights arg_coeff=
-  let input_list = String.split_on_char ',' !_custom_weights in
+  let input_list = CCString.split_on_char ',' !_custom_weights in
   if input_list = [""] then weights, arg_coeff
   else List.fold_left (fun (weights, arg_coeff) input ->
       try
@@ -55,7 +55,7 @@ let _add_custom_weights weights arg_coeff=
         let name = String.sub input 0 i in
         let values =
           String.sub input (i+1) (String.length input - i - 1)
-          |> String.split_on_char ':'
+          |> CCString.split_on_char ':'
           |> List.map int_of_string
         in
         (fun constant ->
