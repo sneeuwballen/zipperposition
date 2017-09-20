@@ -22,6 +22,8 @@ let prof_matching = Util.mk_profiler "matching"
 
 let fail () = raise Fail
 
+let _allow_partial_skolem_application = ref false
+
 (** {2 Signatures} *)
 
 module type S = Unif_intf.S
@@ -432,6 +434,10 @@ module Inner = struct
       )
     )
 
+  let partial_skolem_fail f l1 l2 =
+    not !_allow_partial_skolem_application &&
+    List.length l1 - List.length l2 < ID.num_mandatory_args f
+
   (* @param op which operation to perform (unification,matching,alpha-eq)
      @param root if we are at the root of the original problem. This is
      @param env typing environment for binders
@@ -670,6 +676,10 @@ module Inner = struct
         unif_rec ~op ~bvars ~root subst (t1,scope) (t2, scope) (* to bind *)
       | _, T.Var _ when l2=[] ->
         unif_rec ~op ~bvars ~root subst (t1,scope) (t2, scope) (* to bind *)
+      | T.Const f, T.Var _  when partial_skolem_fail f l1 l2 ->
+        fail()
+      | T.Var _, T.Const g when partial_skolem_fail g l2 l1 ->
+        fail()
       | T.Var v1, T.Const _ ->
         begin match op with
           | O_match_protect (P_scope sc2')
@@ -1070,3 +1080,11 @@ module FO = struct
     let l1, l2 = pair_lists_ f1 l1 f2 l2 in
     Term.of_term_unsafe_l l1, Term.of_term_unsafe_l l2
 end
+
+
+let () =
+  Options.add_opts
+    [  "--partial-skolem"
+    , Arg.Set _allow_partial_skolem_application
+    , " allow partial application of skolem constants (sound only assuming the axiom of choice)"
+    ]

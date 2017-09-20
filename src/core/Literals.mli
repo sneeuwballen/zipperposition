@@ -22,6 +22,8 @@ type t = Literal.t array
 val equal_com : t -> t -> bool
 val compare : t -> t -> int
 
+val compare_multiset :  ord:Ordering.t -> t -> t -> Comparison.t
+
 include Interfaces.HASH with type t := t
 
 val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> Subst.t Sequence.t

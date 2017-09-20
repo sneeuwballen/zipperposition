@@ -67,13 +67,13 @@ Library "logtk"
                     Subst, Signature, Scoped,
                     Unif, Unif_intf, Unif_constr, Unif_subst, HO_unif,
                     TypeInference, Options, Comparison, Precedence, Builtin,
-                    Ordering, Skolem, Cnf, ID, ID_or_builtin, SLiteral,
+                    Ordering, Skolem, Cnf, ID, Head, SLiteral,
                     Index, Index_intf, Dtree, Fingerprint, NPDtree, Binder,
                     Congruence, Congruence_intf, Lambda,
                     FeatureVector, FV_tree, UntypedAST, Ind_ty,
-                    TypedSTerm, Statement, Flex_state, Compute_prec, 
-                    Ordinal, Rewrite, Test_prop, Input_format, Output_format,
-                    LLProof, LLProof_check,
+                    TypedSTerm, Statement, Flex_state, Compute_prec,
+                    Ordinal, Polynomial, Rewrite, Test_prop, Input_format,
+                    Output_format, LLProof, LLProof_check,
                     Multisets, Literal, Literals, Int_lit, Rat_lit, Monome,
                     lib/Hashcons, lib/ParseLocation, lib/Multiset, lib/LazyList,
                     lib/Hash, lib/IArray, lib/AllocCache, lib/Multiset_intf,
@@ -92,7 +92,7 @@ Library "logtk_parsers"
   Build$:           flag(parsers)
   Install$:         flag(parsers)
   FindlibName:      parsers
-  FindlibParent:    logtk 
+  FindlibParent:    logtk
   BuildDepends:     logtk, tip_parser
   BuildTools:       menhir
 

@@ -194,7 +194,6 @@ let default_ho = mk_ default_ho_g
 
 let default_fuel f =
   QA.Gen.map (Term.Conv.of_simple_term_exn ctx) (PT.default_fuel f)
-
 let default_ho_fuel f =
   QA.Gen.map (Term.Conv.of_simple_term_exn ctx) (PT.default_ho_fuel f)
 
