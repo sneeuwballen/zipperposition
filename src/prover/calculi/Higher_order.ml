@@ -718,6 +718,6 @@ let () =
       "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";
       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
       "--ho-eta", eta_opt, " eta-expansion/reduction";
-      "--purify", Arg.Set _purify_applied_vars, " enable purification of applied variables"
+      "--ho-purify", Arg.Set _purify_applied_vars, " enable purification of applied variables"
     ];
   Extensions.register extension;
