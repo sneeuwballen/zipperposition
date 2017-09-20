@@ -72,15 +72,13 @@ let prec_compare prec a b = match a,b with
     begin match Prec.compare prec a b with
       | 0 -> Eq
       | n when n > 0 -> Gt
-      | n when n < 0 -> Lt
-      | _ -> assert false  (* match exhaustively *)
+      | _ -> Lt
     end
   | Head.B a, Head.B b ->
     begin match Builtin.compare a b  with
       | 0 -> Eq
       | n when n > 0 -> Gt
-      | n when n < 0 -> Lt
-      | _ -> assert false  (* match exhaustively *)
+      | _ -> Lt
     end
   | Head.I _, Head.B _ -> Gt (* id > builtin *)
   | Head.B _, Head.I _ -> Lt
