@@ -94,7 +94,7 @@ let prec_status prec = function
   | Head.B _ -> Prec.LengthLexicographic
   | Head.V _ -> Prec.LengthLexicographic
 (* TODO: Variables should get a different status here. LengthLexicographic for variables
-will only work as long as all other symbols are LengthLexicographic as well. *)
+   will only work as long as all other symbols are LengthLexicographic as well. *)
 
 module KBO : ORD = struct
   let name = "kbo"
@@ -169,36 +169,36 @@ module KBO : ORD = struct
         stands for positive (is t the left term) *)
     let rec balance_weight (wb:W.t) t y ~pos : W.t * bool =
       match T.view t with
-      | T.Var x ->
-        let x = HVar.id x in
-        if pos then (
-          add_pos_var balance x;
-          W.(wb + one), x = y
-        ) else (
-          add_neg_var balance x;
-          W.(wb - one), x = y
-        )
-      | T.DB _ ->
-        let w = if pos then W.(wb + one) else W.(wb - one) in
-        w, false
-      | T.Const s ->
-        let open W.Infix in
-        let wb' =
-          if pos
-          then wb + weight prec (Head.I s)
-          else wb - weight prec (Head.I s)
-        in wb', false
-      | T.App (f, l) ->
-        let wb', res = balance_weight wb f y ~pos in
-        balance_weight_rec wb' l y ~pos res
-      | T.AppBuiltin (b,l) ->
-        let open W.Infix in
-        let wb' = if pos
-          then wb + weight prec (Head.B b)
-          else wb - weight prec (Head.B b)
-        in
-        balance_weight_rec wb' l y ~pos false
-      | T.Fun _ -> raise Has_lambda
+        | T.Var x ->
+          let x = HVar.id x in
+          if pos then (
+            add_pos_var balance x;
+            W.(wb + one), x = y
+          ) else (
+            add_neg_var balance x;
+            W.(wb - one), x = y
+          )
+        | T.DB _ ->
+          let w = if pos then W.(wb + one) else W.(wb - one) in
+          w, false
+        | T.Const s ->
+          let open W.Infix in
+          let wb' =
+            if pos
+            then wb + weight prec (Head.I s)
+            else wb - weight prec (Head.I s)
+          in wb', false
+        | T.App (f, l) ->
+          let wb', res = balance_weight wb f y ~pos in
+          balance_weight_rec wb' l y ~pos res
+        | T.AppBuiltin (b,l) ->
+          let open W.Infix in
+          let wb' = if pos
+            then wb + weight prec (Head.B b)
+            else wb - weight prec (Head.B b)
+          in
+          balance_weight_rec wb' l y ~pos false
+        | T.Fun _ -> raise Has_lambda
     (** list version of the previous one, threaded with the check result *)
     and balance_weight_rec wb terms y ~pos res = match terms with
       | [] -> (wb, res)
@@ -208,21 +208,21 @@ module KBO : ORD = struct
     (** lexicographic comparison *)
     and tckbolex wb terms1 terms2 =
       match terms1, terms2 with
-      | [], [] -> wb, Eq
-      | t1::terms1', t2::terms2' ->
-        begin match tckbo wb t1 t2 with
-          | (wb', Eq) -> tckbolex wb' terms1' terms2'
-          | (wb', res) -> (* just compute the weights and return result *)
-            let wb'', _ = balance_weight_rec wb' terms1' 0 ~pos:true false in
-            let wb''', _ = balance_weight_rec wb'' terms2' 0 ~pos:false false in
-            wb''', res
-        end
-      | [], _ ->
-        let wb, _ = balance_weight_rec wb terms2 0 ~pos:false false in
-        wb, Lt
-      | _, [] ->
-        let wb, _ = balance_weight_rec wb terms1 0 ~pos:true false in
-        wb, Gt
+        | [], [] -> wb, Eq
+        | t1::terms1', t2::terms2' ->
+          begin match tckbo wb t1 t2 with
+            | (wb', Eq) -> tckbolex wb' terms1' terms2'
+            | (wb', res) -> (* just compute the weights and return result *)
+              let wb'', _ = balance_weight_rec wb' terms1' 0 ~pos:true false in
+              let wb''', _ = balance_weight_rec wb'' terms2' 0 ~pos:false false in
+              wb''', res
+          end
+        | [], _ ->
+          let wb, _ = balance_weight_rec wb terms2 0 ~pos:false false in
+          wb, Lt
+        | _, [] ->
+          let wb, _ = balance_weight_rec wb terms1 0 ~pos:true false in
+          wb, Gt
     (** length-lexicographic comparison *)
     and tckbolenlex wb terms1 terms2 =
       if List.length terms1 = List.length terms2
@@ -246,25 +246,25 @@ module KBO : ORD = struct
     (** tupled version of kbo (kbo_5 of the paper) *)
     and tckbo (wb:W.t) t1 t2 =
       match T.view t1, T.view t2 with
-      | _ when T.equal t1 t2 -> (wb, Eq) (* do not update weight or var balance *)
-      | T.Var x, T.Var y ->
-        add_pos_var balance (HVar.id x);
-        add_neg_var balance (HVar.id y);
-        (wb, Incomparable)
-      | T.Var x,  _ ->
-        add_pos_var balance (HVar.id x);
-        let wb', contains = balance_weight wb t2 (HVar.id x) ~pos:false in
-        (W.(wb' + one), if contains then Lt else Incomparable)
-      |  _, T.Var y ->
-        add_neg_var balance (HVar.id y);
-        let wb', contains = balance_weight wb t1 (HVar.id y) ~pos:true in
-        (W.(wb' - one), if contains then Gt else Incomparable)
-      | T.DB i, T.DB j ->
-        (wb, if i = j then Eq else Incomparable)
-      | _ -> begin match Head.term_to_head t1, Head.term_to_head t2 with
-          | Some f, Some g -> tckbo_composite wb f g (Head.term_to_args t1) (Head.term_to_args t2)
-        | _ -> (wb, Incomparable)
-        end
+        | _ when T.equal t1 t2 -> (wb, Eq) (* do not update weight or var balance *)
+        | T.Var x, T.Var y ->
+          add_pos_var balance (HVar.id x);
+          add_neg_var balance (HVar.id y);
+          (wb, Incomparable)
+        | T.Var x,  _ ->
+          add_pos_var balance (HVar.id x);
+          let wb', contains = balance_weight wb t2 (HVar.id x) ~pos:false in
+          (W.(wb' + one), if contains then Lt else Incomparable)
+        |  _, T.Var y ->
+          add_neg_var balance (HVar.id y);
+          let wb', contains = balance_weight wb t1 (HVar.id y) ~pos:true in
+          (W.(wb' - one), if contains then Gt else Incomparable)
+        | T.DB i, T.DB j ->
+          (wb, if i = j then Eq else Incomparable)
+        | _ -> begin match Head.term_to_head t1, Head.term_to_head t2 with
+            | Some f, Some g -> tckbo_composite wb f g (Head.term_to_args t1) (Head.term_to_args t2)
+            | _ -> (wb, Incomparable)
+          end
     (** tckbo, for composite terms (ie non variables). It takes a ID.t
         and a list of subterms. *)
     and tckbo_composite wb f g ss ts =
@@ -399,10 +399,10 @@ module LFHOKBO_arg_coeff : ORD = struct
       | [] , _ :: _ -> Lt
       | t0 :: t_rest , s0 :: s_rest ->
         begin match lfhokbo_arg_coeff ~prec t0 s0 with
-        | Gt -> Gt
-        | Lt -> Lt
-        | Eq -> lfhokbo_lex t_rest s_rest
-        | Incomparable -> Incomparable
+          | Gt -> Gt
+          | Lt -> Lt
+          | Eq -> lfhokbo_lex t_rest s_rest
+          | Incomparable -> Incomparable
         end
     in
     let lfhokbo_lenlex ts ss =
@@ -417,39 +417,39 @@ module LFHOKBO_arg_coeff : ORD = struct
     (* compare t = g tt and s = f ss (assuming they have the same weight) *)
     let lfhokbo_composite g f ts ss =
       match prec_compare prec g f with
-      | Incomparable -> (* try rule C2 *)
-        let hd_ts_s = lfhokbo_arg_coeff ~prec (List.hd ts) s in
-        let hd_ss_t = lfhokbo_arg_coeff ~prec (List.hd ss) t in
-        if List.length ts = 1 && (hd_ts_s = Gt || hd_ts_s = Eq) then Gt else
-        if List.length ss = 1 && (hd_ss_t = Gt || hd_ss_t = Eq) then Lt else
-        Incomparable
-      | Gt -> Gt (* by rule C3 *)
-      | Lt -> Lt (* by rule C3 inversed *)
-      | Eq -> (* try rule C4 *)
-        begin match prec_status prec g with
-          | Prec.Lexicographic -> lfhokbo_lex ts ss
-          | Prec.LengthLexicographic -> lfhokbo_lenlex ts ss
-          | _ -> assert false
-        end
+        | Incomparable -> (* try rule C2 *)
+          let hd_ts_s = lfhokbo_arg_coeff ~prec (List.hd ts) s in
+          let hd_ss_t = lfhokbo_arg_coeff ~prec (List.hd ss) t in
+          if List.length ts = 1 && (hd_ts_s = Gt || hd_ts_s = Eq) then Gt else
+          if List.length ss = 1 && (hd_ss_t = Gt || hd_ss_t = Eq) then Lt else
+            Incomparable
+        | Gt -> Gt (* by rule C3 *)
+        | Lt -> Lt (* by rule C3 inversed *)
+        | Eq -> (* try rule C4 *)
+          begin match prec_status prec g with
+            | Prec.Lexicographic -> lfhokbo_lex ts ss
+            | Prec.LengthLexicographic -> lfhokbo_lenlex ts ss
+            | _ -> assert false
+          end
     in
     (* compare t and s assuming they have the same weight *)
     let lfhokbo_same_weight t s =
       match T.view t, T.view s with
-      | _ -> begin match Head.term_to_head t, Head.term_to_head s with
-          | Some g, Some f -> lfhokbo_composite g f (Head.term_to_args t) (Head.term_to_args s)
-          | _ -> Incomparable
-        end
+        | _ -> begin match Head.term_to_head t, Head.term_to_head s with
+            | Some g, Some f -> lfhokbo_composite g f (Head.term_to_args t) (Head.term_to_args s)
+            | _ -> Incomparable
+          end
     in
     (
       if t = s then Eq else
         match weight prec t, weight prec s with
-        | Some wt, Some ws ->
-          if WP.compare wt ws > 0 then Gt (* by rule C1 *)
-          else if WP.compare wt ws < 0 then Lt (* by rule C1 *)
-          else if wt = ws then lfhokbo_same_weight t s (* try rules C2 - C4 *)
-          else Incomparable (* Our approximation of comparing polynomials cannot
-                               determine the greater polynomial *)
-        | _ -> Incomparable
+          | Some wt, Some ws ->
+            if WP.compare wt ws > 0 then Gt (* by rule C1 *)
+            else if WP.compare wt ws < 0 then Lt (* by rule C1 *)
+            else if wt = ws then lfhokbo_same_weight t s (* try rules C2 - C4 *)
+            else Incomparable (* Our approximation of comparing polynomials cannot
+                                 determine the greater polynomial *)
+          | _ -> Incomparable
     )
 
   let compare_terms ~prec x y =
@@ -526,9 +526,9 @@ module RPO6 : ORD = struct
   (** multiset comparison of subterms (not optimized) *)
   and cMultiset ~prec s t ss ts =
     match MT.compare_partial_l (rpo6 ~prec) ss ts with
-    | Eq | Incomparable -> Incomparable
-    | Gt -> cMA ~prec s ts
-    | Lt -> Comparison.opp (cMA ~prec t ss)
+      | Eq | Incomparable -> Incomparable
+      | Gt -> cMA ~prec s ts
+      | Lt -> Comparison.opp (cMA ~prec t ss)
   (** bidirectional comparison by subterm property (bidirectional alpha) *)
   and cAA ~prec s t ss ts =
     match alpha ~prec ss t with
