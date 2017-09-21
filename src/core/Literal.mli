@@ -129,6 +129,7 @@ val of_unif_subst: renaming:Subst.Renaming.t -> Unif_subst.t -> t list
 
 val map : (term -> term) -> t -> t (** functor *)
 val fold : ('a -> term -> 'a) -> 'a -> t -> 'a  (** basic fold *)
+val for_all : (term -> bool) -> t -> bool  (** for the term or both terms of the literal *)
 val vars : t -> Type.t HVar.t list (** gather variables *)
 val var_occurs : Type.t HVar.t -> t -> bool
 val is_ground : t -> bool

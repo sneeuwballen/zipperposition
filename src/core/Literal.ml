@@ -84,6 +84,8 @@ let fold f acc lit = match lit with
   | True
   | False -> acc
 
+let for_all f lit = fold (fun b t -> b && f t) true lit
+
 let hash lit =
   match lit with
     | Int o -> Int_lit.hash o

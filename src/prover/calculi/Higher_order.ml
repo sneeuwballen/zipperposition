@@ -500,7 +500,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* Purify variables with different arguments.
      g X = X a \/ X a = b becomes g X = Y a \/ Y a = b \/ X != Y.
-     Variables at the top level (= naked variables) are not affected. *)
+     Literals with only a variable on both sides are not affected. *)
   let purify_applied_variable c =
     (* set of new literals *)
     let new_lits = ref [] in
@@ -529,63 +529,57 @@ module Make(E : Env.S) : S with module Env = E = struct
         v
     in
     (* Term should not be purified if
-       - this is a naked variable at the top level or
        - this is the first term we encounter with this variable as head or
        - it is equal to the first term encountered with this variable as head *)
-    let should_purify t v toplevel =
-      if toplevel && T.is_var t then (
+    let should_purify t v =
+      try (
+        if t = VTbl.find cache_untouched_ v then (
+          Util.debugf ~section 5
+            "Leaving untouched: %a"
+            (fun k->k T.pp t);false
+        )
+        else (
+          Util.debugf ~section 5
+            "To purify: %a"
+            (fun k->k T.pp t);true
+        )
+      )
+      with Not_found ->
+        VTbl.add cache_untouched_ v t;
         Util.debugf ~section 5
-          "Will not purify because toplevel: %a"
+          "Add untouched term: %a"
           (fun k->k T.pp t);
         false
-      )
-      else (
-        try (
-          if t = VTbl.find cache_untouched_ v then (
-            Util.debugf ~section 5
-              "Leaving untouched: %a"
-              (fun k->k T.pp t);false
-          )
-          else (
-            Util.debugf ~section 5
-              "To purify: %a"
-              (fun k->k T.pp t);true
-          )
-        )
-        with Not_found ->
-          VTbl.add cache_untouched_ v t;
-          Util.debugf ~section 5
-            "Add untouched term: %a"
-            (fun k->k T.pp t);
-          false
-      )
     in
     (* purify a term *)
-    let rec purify_term toplevel t =
+    let rec purify_term t =
       let head, args = T.as_app t in
       match T.as_var head with
       | Some v ->
-        if should_purify t v toplevel then (
+        if should_purify t v then (
           (* purify *)
           Util.debugf ~section 5
             "Purifying: %a. Untouched is: %a"
             (fun k->k T.pp t T.pp (VTbl.find cache_untouched_ v));
           T.app
             (replacement_var t)
-            (List.map (purify_term false) args)
+            (List.map purify_term args)
         )
         else (* dont purify *)
           T.app
             head
-            (List.map (purify_term false) args)
+            (List.map purify_term args)
       | None -> (* dont purify *)
         T.app
           head
-          (List.map (purify_term false) args)
+          (List.map purify_term args)
     in
     (* purify a literal *)
     let purify_lit lit =
-      Literal.map (purify_term true) lit
+      (* don't purify literals with only a variable on both sides *)
+      if Literal.for_all T.is_var lit
+      then lit
+      else Literal.map purify_term lit
     in
     (* try to purify *)
     let lits' = Array.map purify_lit (C.lits c) in
