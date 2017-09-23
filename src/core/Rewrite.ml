@@ -17,19 +17,21 @@ let allow_pos_eqn_rewrite_ = ref false
 
 type term = Term.t
 
+type proof = Statement.clause_t
+
 type term_rule = {
   term_head: ID.t; (* head symbol of LHS *)
   term_args: term list; (* arguments *)
   term_arity: int; (* [length args] *)
   term_lhs: term; (* [lhs = head args] *)
   term_rhs: term;
-  term_meta: exn list;
+  term_proof: proof;
 }
 
 type lit_rule = {
   lit_lhs: Literal.t;
   lit_rhs: Literal.t list list; (* list of clauses *)
-  lit_meta: exn list;
+  lit_proof: proof;
 }
 
 let compare_tr r1 r2 =
@@ -206,12 +208,12 @@ module Term = struct
     let vars r = T.vars (lhs r)
     let vars_l r = vars r |> T.VarSet.to_list
 
-    let make_ meta head args term_lhs term_rhs =
+    let make_ head args term_lhs term_rhs term_proof =
       { term_head=head; term_args=args; term_arity=List.length args;
-        term_lhs; term_rhs; term_meta=meta; }
+        term_lhs; term_rhs; term_proof }
 
     (* constant rule [id := rhs] *)
-    let make_const ?(meta=[]) id ty rhs =
+    let make_const ~proof id ty rhs : t =
       let lhs = T.const ~ty id in
       assert (Type.equal (T.ty rhs) (T.ty lhs));
       if not (T.VarSet.is_empty @@ T.vars rhs) then (
@@ -222,7 +224,7 @@ module Term = struct
       make_ meta id [] lhs rhs
 
     (* [id args := rhs] *)
-    let make ?(meta=[]) id ty args rhs =
+    let make ~proof id ty args rhs : t =
       let lhs = T.app (T.const ~ty id) args in
       assert (Type.equal (T.ty lhs) (T.ty rhs));
       if not (T.VarSet.subset (T.vars rhs) (T.vars lhs)) then (
@@ -230,7 +232,7 @@ module Term = struct
           "Rule.make_const %a %a:@ invalid rule, RHS contains variables"
           ID.pp id T.pp rhs
       );
-      make_ meta id args lhs rhs
+      make_ id args lhs rhs proof
 
     let pp out r = pp_term_rule out r
 
@@ -396,7 +398,7 @@ module Lit = struct
   module Rule = struct
     type t = lit_rule
 
-    let make ?(meta=[]) lit_lhs lit_rhs = {lit_lhs; lit_rhs; lit_meta=meta;}
+    let make ~proof lit_lhs lit_rhs = {lit_lhs; lit_rhs; lit_proof=proof}
 
     let lhs c = c.lit_lhs
     let rhs c = c.lit_rhs
@@ -595,7 +597,8 @@ module Rule = struct
     T.Seq.symbols t
     |> Sequence.exists ID.is_skolem
 
-  let make_lit lit_lhs lit_rhs = L_rule (Lit.Rule.make lit_lhs lit_rhs)
+  let make_lit ~proof lit_lhs lit_rhs =
+    L_rule (Lit.Rule.make ~proof lit_lhs lit_rhs)
 end
 
 let allcst_ : Cst_.t list ref = ref []
@@ -712,7 +715,12 @@ module Defined_cst = struct
         (List.map T.var vars)
     in
     let rhs = T.var (List.nth vars i) in
-    T_rule (Term.Rule.make id ty_proj (List.map T.var ty_vars @ [t]) rhs)
+    let proof =
+      let lit = SLiteral.eq t rhs in
+      let c = [lit] in
+      Statement.assert_ ~src:(Statement.Src.define id) c
+    in
+    T_rule (Term.Rule.make ~proof id ty_proj (List.map T.var ty_vars @ [t]) rhs)
 
   let declare_proj (p:Ind_ty.projector): unit =
     let p_id = Ind_ty.projector_id p in

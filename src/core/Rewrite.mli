@@ -21,6 +21,9 @@ type term = Term.t
 type defined_cst
 (** Payload of a defined function symbol or type *)
 
+type proof = Statement.clause_t
+(** A rule is justified by an input statement *)
+
 val section : Util.Section.t
 
 (** {2 Rewriting on Terms} *)
@@ -37,14 +40,14 @@ module Term : sig
     val head_id : t -> ID.t
     val args : t -> term list
     val arity : t -> int
-    val meta : t -> exn list
+    val proof : t -> proof
 
     val as_lit : t -> Literal.t
 
-    val make_const : ?meta:exn list -> ID.t -> Type.t -> term -> t
+    val make_const : proof:proof -> ID.t -> Type.t -> term -> t
     (** [make_const id ty rhs] is the same as [T.const id ty --> rhs] *)
 
-    val make : ?meta:exn list -> ID.t -> Type.t -> term list -> term -> t
+    val make : proof:proof -> ID.t -> Type.t -> term list -> term -> t
     (** [make id ty args rhs] is the same as [T.app (T.const id ty) args --> rhs] *)
 
     include Interfaces.HASH with type t := t
@@ -90,7 +93,8 @@ module Lit : sig
     type t = rule
     val lhs : t -> Literal.t
     val rhs : t -> Literal.t list list
-    val make : ?meta:exn list -> Literal.t -> Literal.t list list -> t
+    val proof : t -> proof
+    val make : proof:proof -> Literal.t -> Literal.t list list -> t
     val is_equational : t -> bool
     val as_clauses : t -> Literals.t list
     val meta : t -> exn list
@@ -125,9 +129,10 @@ module Rule : sig
   type t = rule
   val of_term : Term.Rule.t -> t
   val of_lit : Lit.Rule.t -> t
+  val proof : t -> proof
   val pp : t CCFormat.printer
 
-  val make_lit : Literal.t -> Literal.t list list -> t
+  val make_lit : proof:proof -> Literal.t -> Literal.t list list -> t
   (** Make a literal rule *)
 end
 
