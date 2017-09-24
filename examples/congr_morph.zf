@@ -1,0 +1,31 @@
+
+# expect: unsat
+
+val a : type.
+val b : type.
+
+val[prefix "0ₐ"] a0 : a.
+val[prefix "0♭"] b0 : b.
+
+val[infix "+ₐ"] plus_a : a -> a -> a.
+val[infix "+♭"] plus_b : b -> b -> b.
+val morph : a -> b.
+
+val[infix "=ₐ"] eq_a : a -> a -> prop.
+val[infix "=♭"] eq_b : b -> b -> prop.
+
+assert forall x. eq_b x x.
+assert forall x y. eq_b x y => eq_b y x.
+assert forall x y z. eq_b x y && eq_b y z  => eq_b x z.
+
+assert forall x y. eq_a x y => eq_b (morph x) (morph y).
+
+assert forall x1 y1 x2 y2. eq_b x1 x2 && eq_b y1 y2 => eq_b (plus_b x1 y1) (plus_b x2 y2).
+
+assert eq_b (morph a0) b0.
+assert forall y. eq_a (plus_a a0 y) y.
+assert forall y. eq_b (plus_b b0 y) y.
+
+goal forall x. eq_b (morph (plus_a a0 x)) (plus_b (morph a0) (morph x)).
+#goal forall x. eq_b (morph (plus_a a0 x)) (plus_b b0 (morph x)).  # easier?
+
