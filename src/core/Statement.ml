@@ -65,12 +65,6 @@ type formula = TypedSTerm.t
 type input_def = (TypedSTerm.t,TypedSTerm.t,TypedSTerm.t) def
 type clause = lit list
 
-type role =
-  | R_assert
-  | R_goal
-  | R_def
-  | R_decl
-
 type ('f, 't, 'ty) t = {
   id: int;
   view: ('f, 't, 'ty) view;
@@ -504,7 +498,6 @@ module TPTP = struct
   let pp ppf ppt ppty out st =
     let name = match Proof.Step.src st.proof with
       | Some {Proof.src_view=Proof.From_file (f,_);_} ->
-        let open CCOpt.Infix in
         Proof.Src.name f |> CCOpt.get_or ~default:"no_name"
       | _ -> "no_name"
     in

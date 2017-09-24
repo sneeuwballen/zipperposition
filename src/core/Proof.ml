@@ -148,7 +148,7 @@ module Src = struct
     | R_def -> CCFormat.string out "def"
     | R_lemma -> CCFormat.string out "lemma"
 
-  let rec pp_tstp out src = match view src with
+  let pp_tstp out src = match view src with
     | Internal _ -> ()
     | From_file (src,_) ->
       let file = src.file in
@@ -157,7 +157,7 @@ module Src = struct
         | Some name -> Format.fprintf out "file(@['%s',@ '%s'@])" file name
       end
 
-  let rec pp out src = match view src with
+  let pp out src = match view src with
     | Internal _ -> ()
     | From_file (src,attrs) ->
       let file = src.file in
