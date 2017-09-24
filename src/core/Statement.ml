@@ -187,24 +187,24 @@ let declare_defined_cst id ~level (rules:definition) : unit =
   let _ = Rewrite.Defined_cst.declare ~level id rules in
   ()
 
-let conv_term_rule (r:_ term_rule): Rewrite.Term.rule =
+let conv_term_rule (r:_ term_rule) proof: Rewrite.Term.rule =
   let _, id, ty, args, rhs = r in
-  Rewrite.Term.Rule.make id ty args rhs
+  Rewrite.Term.Rule.make id ty args rhs ~proof
 
 (* returns either a term or a lit rule (depending on whether RHS is atomic) *)
-let conv_lit_rule (r:_ form_rule): Rewrite.rule =
+let conv_lit_rule (r:_ form_rule) proof : Rewrite.rule =
   let _, lhs, rhs, _ = r in
   let lhs = Literal.Conv.of_form lhs in
   let rhs = List.map (List.map Literal.Conv.of_form) rhs in
-  Rewrite.Rule.make_lit lhs rhs
+  Rewrite.Rule.make_lit lhs rhs ~proof
 
 (* convert rules *)
-let conv_rules (l:_ def_rule list): definition =
+let conv_rules (l:_ def_rule list) proof : definition =
   assert (l <> []);
   List.map
     (function
-      | Def_term r -> Rewrite.Rule.of_term (conv_term_rule r)
-      | Def_form r -> conv_lit_rule r)
+      | Def_term r -> Rewrite.Rule.of_term (conv_term_rule r proof)
+      | Def_form r -> conv_lit_rule r proof)
     l
   |> Rewrite.Rule_set.of_list
 
@@ -222,122 +222,23 @@ let level_of_rule (d:_ def_rule): int =
   |> Sequence.max
   |> CCOpt.get_or ~default:0
 
-let scan_stmt_for_defined_cst (st:(clause,Term.t,Type.t) t): unit = match view st with
-  | Def [] -> assert false
-  | Def l ->
-    (* define all IDs at the same level (the max of those computed) *)
-    let ids_and_levels =
-      l
-      |> List.filter
-        (fun {def_ty=ty; def_rewrite=b; _} ->
-           (* definitions require [b=true] or the LHS be a constant *)
-           let _, args, _ = Type.open_poly_fun ty in
-           b || CCList.is_empty args)
-      |> List.map
-        (fun {def_id; def_rules; _} ->
-           let lev =
-             Sequence.of_list def_rules
-             |> Sequence.map level_of_rule
-             |> Sequence.max
-             |> CCOpt.get_or ~default:0
-           and def =
-             conv_rules def_rules
-           in
-           def_id, lev, def)
-    in
-    let level =
-      Sequence.of_list ids_and_levels
-      |> Sequence.map (fun (_,l,_) -> l)
-      |> Sequence.max |> CCOpt.map_or ~default:0 succ
-    in
-    List.iter
-      (fun (id,_,def) ->
-         let _ = Rewrite.Defined_cst.declare ~level id def in
-         ())
-      ids_and_levels
-  | Rewrite d ->
-    begin match d with
-      | Def_term rule ->
-        (* declare the rule, possibly making its head defined *)
-        let r = conv_term_rule rule in
-        let id = Rewrite.Term.Rule.head_id r in
-        Rewrite.Defined_cst.declare_or_add id (Rewrite.T_rule r)
-      | Def_form r ->
-        let r = conv_lit_rule r in
-        begin match r with
-          | Rewrite.T_rule tr ->
-            let id = Rewrite.Term.Rule.head_id tr in
-            Rewrite.Defined_cst.declare_or_add id r
-          | Rewrite.L_rule lr ->
-            begin match Rewrite.Lit.Rule.head_id lr with
-              | Some id ->
-                Rewrite.Defined_cst.declare_or_add id r
-              | None ->
-                assert (Rewrite.Lit.Rule.is_equational lr);
-                Rewrite.Defined_cst.add_eq_rule lr
-            end
-        end
-    end
-  | _ -> ()
-
 (** {2 Inductive Types} *)
 
 (* add rewrite rules for functions associated
    with this datatype (projectors, etc.) *)
-let decl_data_functions ity: unit =
+let decl_data_functions ity proof : unit =
   let one_cstor = List.length ity.Ind_ty.ty_constructors = 1 in
   List.iter
     (fun cstor ->
        (* projectors *)
        List.iter
-         (fun (_, proj) -> Rewrite.Defined_cst.declare_proj proj)
+         (fun (_, proj) -> Rewrite.Defined_cst.declare_proj ~proof proj)
          cstor.Ind_ty.cstor_args;
        (* if there is exactly one cstor, add [cstor (proj_1 x)…(proj_n x) --> x] *)
        if one_cstor then (
-         Rewrite.Defined_cst.declare_cstor cstor
+         Rewrite.Defined_cst.declare_cstor ~proof cstor
        );)
     ity.Ind_ty.ty_constructors
-
-let scan_stmt_for_ind_ty st = match view st with
-  | Data l ->
-    List.iter
-      (fun d ->
-         let ty_vars =
-           List.mapi (fun i v -> HVar.make ~ty:(Var.ty v) i) d.data_args
-         and cstors =
-           List.map
-             (fun (c,ty,args) -> Ind_ty.mk_constructor c ty args)
-             d.data_cstors
-         in
-         let ity = Ind_ty.declare_ty d.data_id ~ty_vars cstors in
-         decl_data_functions ity;
-         ())
-      l
-  | _ -> ()
-
-let scan_simple_stmt_for_ind_ty st = match view st with
-  | Data l ->
-    let conv = Type.Conv.create() in
-    let conv_ty = Type.Conv.of_simple_term_exn conv in
-    List.iter
-      (fun d ->
-         let ty_vars =
-           List.mapi (fun i v -> HVar.make ~ty:(Var.ty v |> conv_ty) i) d.data_args
-         and cstors =
-           List.map
-             (fun (c,ty,args) ->
-                let args =
-                  List.map
-                    (fun (ty,(p_id,p_ty)) -> conv_ty ty, (p_id, conv_ty p_ty))
-                    args in
-                Ind_ty.mk_constructor c (conv_ty ty) args)
-             d.data_cstors
-         in
-         let ity = Ind_ty.declare_ty d.data_id ~ty_vars cstors in
-         decl_data_functions ity;
-         ())
-      l
-  | _ -> ()
 
 (** {2 Iterators} *)
 
@@ -688,6 +589,8 @@ let pp_clause_in o =
 
 let pp_input_in o = pp_in TypedSTerm.pp TypedSTerm.pp TypedSTerm.pp o
 
+(** {2 Proofs} *)
+
 exception E_i of input_t
 exception E_c of clause_t
 
@@ -711,3 +614,108 @@ let res_tc_c : clause_t Proof.result_tc =
 
 let as_proof_i t = Proof.S.mk t.proof (Proof.Result.make res_tc_i t)
 let as_proof_c t = Proof.S.mk t.proof (Proof.Result.make res_tc_c t)
+
+(** {2 Scanning} *)
+
+let scan_stmt_for_defined_cst (st:(clause,Term.t,Type.t) t): unit = match view st with
+  | Def [] -> assert false
+  | Def l ->
+    (* define all IDs at the same level (the max of those computed) *)
+    let proof = as_proof_c st in
+    let ids_and_levels =
+      l
+      |> List.filter
+        (fun {def_ty=ty; def_rewrite=b; _} ->
+           (* definitions require [b=true] or the LHS be a constant *)
+           let _, args, _ = Type.open_poly_fun ty in
+           b || CCList.is_empty args)
+      |> List.map
+        (fun {def_id; def_rules; _} ->
+           let lev =
+             Sequence.of_list def_rules
+             |> Sequence.map level_of_rule
+             |> Sequence.max
+             |> CCOpt.get_or ~default:0
+           and def =
+             conv_rules def_rules proof
+           in
+           def_id, lev, def)
+    in
+    let level =
+      Sequence.of_list ids_and_levels
+      |> Sequence.map (fun (_,l,_) -> l)
+      |> Sequence.max |> CCOpt.map_or ~default:0 succ
+    in
+    List.iter
+      (fun (id,_,def) ->
+         let _ = Rewrite.Defined_cst.declare ~level id def in
+         ())
+      ids_and_levels
+  | Rewrite d ->
+    let proof = as_proof_c st in
+    begin match d with
+      | Def_term rule ->
+        (* declare the rule, possibly making its head defined *)
+        let r = conv_term_rule rule proof in
+        let id = Rewrite.Term.Rule.head_id r in
+        Rewrite.Defined_cst.declare_or_add id (Rewrite.T_rule r)
+      | Def_form r ->
+        let r = conv_lit_rule r proof in
+        begin match r with
+          | Rewrite.T_rule tr ->
+            let id = Rewrite.Term.Rule.head_id tr in
+            Rewrite.Defined_cst.declare_or_add id r
+          | Rewrite.L_rule lr ->
+            begin match Rewrite.Lit.Rule.head_id lr with
+              | Some id ->
+                Rewrite.Defined_cst.declare_or_add id r
+              | None ->
+                assert (Rewrite.Lit.Rule.is_equational lr);
+                Rewrite.Defined_cst.add_eq_rule lr
+            end
+        end
+    end
+  | _ -> ()
+
+let scan_stmt_for_ind_ty st = match view st with
+  | Data l ->
+    let proof = as_proof_c st in
+    List.iter
+      (fun d ->
+         let ty_vars =
+           List.mapi (fun i v -> HVar.make ~ty:(Var.ty v) i) d.data_args
+         and cstors =
+           List.map
+             (fun (c,ty,args) -> Ind_ty.mk_constructor c ty args)
+             d.data_cstors
+         in
+         let ity = Ind_ty.declare_ty d.data_id ~ty_vars cstors ~proof in
+         decl_data_functions ity proof;
+         ())
+      l
+  | _ -> ()
+
+let scan_simple_stmt_for_ind_ty st = match view st with
+  | Data l ->
+    let conv = Type.Conv.create() in
+    let conv_ty = Type.Conv.of_simple_term_exn conv in
+    let proof = as_proof_i st in
+    List.iter
+      (fun d ->
+         let ty_vars =
+           List.mapi (fun i v -> HVar.make ~ty:(Var.ty v |> conv_ty) i) d.data_args
+         and cstors =
+           List.map
+             (fun (c,ty,args) ->
+                let args =
+                  List.map
+                    (fun (ty,(p_id,p_ty)) -> conv_ty ty, (p_id, conv_ty p_ty))
+                    args in
+                Ind_ty.mk_constructor c (conv_ty ty) args)
+             d.data_cstors
+         in
+         let ity = Ind_ty.declare_ty d.data_id ~ty_vars cstors ~proof in
+         decl_data_functions ity proof;
+         ())
+      l
+  | _ -> ()

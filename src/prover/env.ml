@@ -78,10 +78,10 @@ module Make(X : sig
   type is_trivial_rule = C.t -> bool
   (** Rule that checks whether the clause is trivial (a tautology) *)
 
-  type term_rewrite_rule = Term.t -> Term.t option
+  type term_rewrite_rule = Term.t -> (Term.t * Proof.t list) option
   (** Rewrite rule on terms *)
 
-  type lit_rewrite_rule = Literal.t -> Literal.t option
+  type lit_rewrite_rule = Literal.t -> (Literal.t * Proof.t list) option
   (** Rewrite rule on literals *)
 
   type multi_simpl_rule = C.t -> C.t list option
@@ -322,16 +322,19 @@ module Make(X : sig
   let rewrite c =
     Util.debugf ~section 5 "@[<2>rewrite clause@ `@[%a@]`...@]" (fun k->k C.pp c);
     let applied_rules = ref StrSet.empty in
+    let proofs = ref [] in
     let rec reduce_term rules t =
       match rules with
         | [] -> t
         | (name, r)::rules' ->
           begin match r t with
             | None -> reduce_term rules' t (* try next rules *)
-            | Some t' ->
+            | Some (t',proof) ->
               applied_rules := StrSet.add name !applied_rules;
-              Util.debugf ~section 5 "@[<2>rewrite `@[%a@]`@ into `@[%a@]`@]"
-                (fun k->k T.pp t T.pp t');
+              proofs := List.rev_append proof !proofs;
+              Util.debugf ~section 5
+                "@[<2>rewrite `@[%a@]`@ into `@[%a@]`@ :proof (@[%a@])@]"
+                (fun k->k T.pp t T.pp t' (Util.pp_list Proof.S.pp_normal) proof);
               reduce_term !_rewrite_rules t'  (* re-apply all rules *)
           end
     in
@@ -347,7 +350,10 @@ module Make(X : sig
       C.mark_redundant c;
       (* FIXME: put the rules as parameters *)
       let rule = Proof.Rule.mk "rw" in
-      let proof = Proof.Step.simp [C.proof_parent c] ~rule in
+      let proof =
+        Proof.Step.simp ~rule
+          (C.proof_parent c :: List.rev_map Proof.Parent.from !proofs)
+      in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
       assert (not (C.equal c c'));
       Util.debugf ~section 3 "@[term rewritten clause `@[%a@]`@ into `@[%a@]`"
@@ -358,15 +364,18 @@ module Make(X : sig
   (** Apply literal rewrite rules *)
   let rewrite_lits c =
     let applied_rules = ref StrSet.empty in
+    let proofs = ref [] in
     let rec rewrite_lit rules lit = match rules with
       | [] -> lit
       | (name,r)::rules' ->
         match r lit with
           | None -> rewrite_lit rules' lit
-          | Some lit' ->
+          | Some (lit',proof) ->
             applied_rules := StrSet.add name !applied_rules;
-            Util.debugf ~section 5 "@[rewritten lit `@[%a@]`@ into `@[%a@]`@ (using %s)@]"
-              (fun k->k Lit.pp lit Lit.pp lit' name);
+            proofs := List.rev_append proof !proofs;
+            Util.debugf ~section 5
+              "@[rewritten lit `@[%a@]`@ into `@[%a@]`@ (using %s)@ :proof (@[%a@])@]"
+              (fun k->k Lit.pp lit Lit.pp lit' name (Util.pp_list Proof.S.pp_normal) proof);
             rewrite_lit !_lit_rules lit'
     in
     (* apply lit rules *)
@@ -378,7 +387,10 @@ module Make(X : sig
       C.mark_redundant c;
       (* FIXME: put the rules as parameters *)
       let rule = Proof.Rule.mk "rw_lit" in
-      let proof = Proof.Step.simp [C.proof_parent c] ~rule in
+      let proof =
+        Proof.Step.simp ~rule
+          (C.proof_parent c :: List.rev_map Proof.Parent.from !proofs)
+      in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
       assert (not (C.equal c c'));
       Util.debugf ~section 3 "@[lit rewritten `@[%a@]`@ into `@[%a@]`@]"
@@ -477,21 +489,6 @@ module Make(X : sig
     in
     Util.exit_prof prof_simplify;
     res
-
-  let simplify_term (t:T.t): T.t SimplM.t =
-    let is_new = ref false in
-    let rec reduce_term rules t = match rules with
-      | [] -> if !is_new then SimplM.return_new t else SimplM.return_same t
-      | (_, r)::rules' ->
-        begin match r t with
-          | None -> reduce_term rules' t (* try next rules *)
-          | Some t' ->
-            assert (not (T.equal t t'));
-            is_new := true;
-            reduce_term !_rewrite_rules t'  (* re-apply all rules *)
-        end
-    in
-    reduce_term !_rewrite_rules t
 
   let multi_simplify c : C.t list option =
     let did_something = ref false in

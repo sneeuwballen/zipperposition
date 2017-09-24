@@ -97,7 +97,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* negative extensionality rule:
      [f != g] where [f : a -> b] becomes [f k != g k] for a fresh parameter [k] *)
-  let ext_neg (lit:Literal.t): Literal.t option = match lit with
+  let ext_neg (lit:Literal.t) : _ option = match lit with
     | Literal.Equation (f, g, false)
       when Type.is_fun (T.ty f) &&
            not (T.is_var f) &&
@@ -124,7 +124,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debugf ~section 4
         "(@[ho_ext_neg@ :old `%a`@ :new `%a`@])"
         (fun k->k Literal.pp lit Literal.pp new_lit);
-      Some new_lit
+      Some (new_lit,[])
     | _ -> None
 
   (* positive extensionality `m x = n x --> m = n` *)
@@ -460,7 +460,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun k->k T.pp t T.pp t');
       Util.incr_stat stat_beta;
       assert (T.DB.is_closed t');
-      Some t'
+      Some (t',[])
     )
 
   (* rule for eta-expansion *)
@@ -473,7 +473,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun k->k T.pp t T.pp t');
       Util.incr_stat stat_eta_expand;
       assert (T.DB.is_closed t');
-      Some t'
+      Some (t',[])
     )
 
   (* rule for eta-expansion *)
@@ -486,7 +486,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun k->k T.pp t T.pp t');
       Util.incr_stat stat_eta_reduce;
       assert (T.DB.is_closed t');
-      Some t'
+      Some (t',[])
     )
 
   module TVar = struct

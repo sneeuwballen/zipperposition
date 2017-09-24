@@ -59,6 +59,7 @@ type flavor =
   | `Absurd_lits
   | `Proof_of_false
   | `Vanilla
+  | `Def
   ]
 
 (** Typeclass for the result of a proof step *)
@@ -249,6 +250,7 @@ module Result = struct
     | `Absurd_lits
     | `Proof_of_false
     | `Vanilla
+    | `Def
     ]
 
   let compare a b = match a, b with
@@ -499,6 +501,7 @@ module S = struct
   let is_proof_of_false p = Result.flavor (result p) = `Proof_of_false
 
   let is_pure_bool p = Result.flavor (result p) = `Pure_bool
+  let is_def p = Result.flavor (result p) = `Def
 
   let mk step res = {step; result=res}
   let mk_f step res = mk step (Result.of_form res)
@@ -758,6 +761,7 @@ module S = struct
         if is_proof_of_false p then [`Color "red"; `Label "[]"; `Shape "box"; `Style "filled"]
         else if is_pure_bool p then `Color "cyan3" :: shape :: attrs
         else if has_absurd_lits p then `Color "orange" :: shape :: attrs
+        else if is_def p then `Color "navajowhite" :: shape :: attrs
         else if Step.is_assert @@ step p then `Color "yellow" :: shape :: attrs
         else if Step.is_goal @@ step p then `Color "green" :: shape :: attrs
         else if Step.is_trivial @@ step p then `Color "cyan" :: shape :: attrs

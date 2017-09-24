@@ -21,8 +21,7 @@ type term = Term.t
 type defined_cst
 (** Payload of a defined function symbol or type *)
 
-type proof = Statement.clause_t
-(** A rule is justified by an input statement *)
+type proof = Proof.step
 
 val section : Util.Section.t
 
@@ -44,10 +43,10 @@ module Term : sig
 
     val as_lit : t -> Literal.t
 
-    val make_const : proof:proof -> ID.t -> Type.t -> term -> t
+    val make_const : proof:Proof.t -> ID.t -> Type.t -> term -> t
     (** [make_const id ty rhs] is the same as [T.const id ty --> rhs] *)
 
-    val make : proof:proof -> ID.t -> Type.t -> term list -> term -> t
+    val make : proof:Proof.t -> ID.t -> Type.t -> term list -> term -> t
     (** [make id ty args rhs] is the same as [T.app (T.const id ty) args --> rhs] *)
 
     include Interfaces.HASH with type t := t
@@ -94,16 +93,15 @@ module Lit : sig
     val lhs : t -> Literal.t
     val rhs : t -> Literal.t list list
     val proof : t -> proof
-    val make : proof:proof -> Literal.t -> Literal.t list list -> t
+    val make : proof:Proof.t -> Literal.t -> Literal.t list list -> t
     val is_equational : t -> bool
     val as_clauses : t -> Literals.t list
-    val meta : t -> exn list
     val head_id : t -> ID.t option
     val compare : t -> t -> int
     val pp : t CCFormat.printer
   end
 
-  val normalize_clause : Literals.t -> Literals.t list option
+  val normalize_clause : Literals.t -> (Literals.t list * rule) option
   (** normalize literals of the clause w.r.t. rules, or return [None]
       if no rule applies *)
 
@@ -123,8 +121,6 @@ type rule =
   | T_rule of Term.rule
   | L_rule of Lit.rule
 
-val meta : rule -> exn list
-
 module Rule : sig
   type t = rule
   val of_term : Term.Rule.t -> t
@@ -132,7 +128,9 @@ module Rule : sig
   val proof : t -> proof
   val pp : t CCFormat.printer
 
-  val make_lit : proof:proof -> Literal.t -> Literal.t list list -> t
+  val as_proof : t -> Proof.t
+
+  val make_lit : proof:Proof.t -> Literal.t -> Literal.t list list -> t
   (** Make a literal rule *)
 end
 
@@ -171,10 +169,10 @@ module Defined_cst : sig
   (** [declare_or_add id rule] defines [id] if it's not already a
       defined constant, and add [rule] to it *)
 
-  val declare_proj : Ind_ty.projector -> unit
+  val declare_proj : proof:Proof.t -> Ind_ty.projector -> unit
   (** Declare an inductive projector *)
 
-  val declare_cstor : Ind_ty.constructor -> unit
+  val declare_cstor : proof:Proof.t -> Ind_ty.constructor -> unit
   (** Add a rewrite rule [cstor (proj1 x)…(projn x) --> x] *)
 
   val add_term_rule : t -> Term.rule -> unit

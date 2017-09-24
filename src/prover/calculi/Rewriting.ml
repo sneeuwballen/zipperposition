@@ -38,7 +38,12 @@ module Make(E : Env_intf.S) = struct
       Util.debugf ~section 2
         "@[<2>@{<green>rewrite@} `@[%a@]`@ into `@[%a@]`@ :using %a@]"
         (fun k->k T.pp t T.pp t' RW.Term.Set.pp rules);
-      Some t'
+      let proof =
+        RW.Term.Set.to_seq rules
+        |> Sequence.map (fun r -> RW.Rule.as_proof (RW.T_rule r))
+        |> Sequence.to_rev_list
+      in
+      Some (t',proof)
     )
 
   (* perform term narrowing in [c] *)
@@ -75,7 +80,9 @@ module Make(E : Env_intf.S) = struct
               (* make new clause *)
               Util.incr_stat stat_narrowing_term;
               let proof =
-                Proof.Step.inference [C.proof_parent_subst (c,0) subst]
+                Proof.Step.inference
+                  [C.proof_parent_subst (c,0) subst;
+                   Proof.Parent.from @@ RW.Rule.as_proof (RW.T_rule rule)]
                   ~rule:(Proof.Rule.mk "narrow") in
               let c' =
                 C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
@@ -98,10 +105,12 @@ module Make(E : Env_intf.S) = struct
     let lits = C.lits c in
     match RW.Lit.normalize_clause lits with
       | None -> None
-      | Some clauses ->
+      | Some (clauses,r) ->
         let proof =
           Proof.Step.simp ~rule:(Proof.Rule.mk "rw_clause")
-            [C.proof_parent c] in
+            [C.proof_parent c;
+             Proof.Parent.from @@ RW.Rule.as_proof @@ RW.L_rule r]
+        in
         let clauses =
           List.map
             (fun c' -> C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) c' proof)
@@ -126,7 +135,9 @@ module Make(E : Env_intf.S) = struct
               let renaming = E.Ctx.renaming_clear () in
               let c_guard = Literal.of_unif_subst ~renaming us in
               let proof =
-                Proof.Step.inference [C.proof_parent_subst (c,0) subst]
+                Proof.Step.inference
+                  [C.proof_parent_subst (c,0) subst;
+                   Proof.Parent.from @@ RW.Rule.as_proof (RW.L_rule rule)]
                   ~rule:(Proof.Rule.mk "narrow_clause") in
               let lits' = CCArray.except_idx lits i in
               (* create new clauses that correspond to replacing [lit]
@@ -228,7 +239,8 @@ module Make(E : Env_intf.S) = struct
              let proof =
                Proof.Step.inference
                  ~rule:(Proof.Rule.mk "contextual_narrowing")
-                 [C.proof_parent_subst (c,sc_a) subst]
+                 [C.proof_parent_subst (c,sc_a) subst;
+                  Proof.Parent.from @@ RW.Rule.as_proof rule]
              in
              (* add some penalty on every inference *)
              let penalty = Array.length (C.lits c) + C.penalty c in

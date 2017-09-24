@@ -149,17 +149,17 @@ val declare_defined_cst : ID.t -> level:int -> definition -> unit
     constant of given [level]. It means that it is defined based only
     on constants of strictly lower levels *)
 
-val scan_stmt_for_defined_cst : (clause, Term.t, Type.t) t -> unit
+val scan_stmt_for_defined_cst : clause_t -> unit
 (** Try and declare defined constants in the given statement *)
 
 (** {2 Inductive Types} *)
 
-val scan_stmt_for_ind_ty : (_, _, Type.t) t -> unit
+val scan_stmt_for_ind_ty : clause_t -> unit
 (** [scan_stmt_for_ind_ty stmt] examines [stmt], and, if the statement is a
     declaration of inductive types or constants,
     it declares them using {!declare_ty} or {!declare_inductive_constant}. *)
 
-val scan_simple_stmt_for_ind_ty : (_, _, TypedSTerm.t) t -> unit
+val scan_simple_stmt_for_ind_ty : input_t -> unit
 (** Same as {!scan_stmt} but on earlier statements *)
 
 (** {2 Iterators} *)

@@ -147,6 +147,7 @@ module Result : sig
     | `Absurd_lits
     | `Proof_of_false
     | `Vanilla
+    | `Def
     ]
 
   val make_tc :

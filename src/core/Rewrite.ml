@@ -17,7 +17,7 @@ let allow_pos_eqn_rewrite_ = ref false
 
 type term = Term.t
 
-type proof = Statement.clause_t
+type proof = Proof.step
 
 type term_rule = {
   term_head: ID.t; (* head symbol of LHS *)
@@ -53,17 +53,14 @@ type rule =
   | T_rule of term_rule
   | L_rule of lit_rule
 
-let meta = function
-  | T_rule r -> r.term_meta
-  | L_rule r -> r.lit_meta
-
 let compare_rule r1 r2 =
   let to_int = function T_rule _ -> 0 | L_rule _ -> 1 in
-  match r1, r2 with
-  | T_rule r1, T_rule r2 -> compare_tr r1 r2
-  | L_rule r1, L_rule r2 -> compare_lr r1 r2
-  | T_rule _, _
-  | L_rule _, _ -> CCInt.compare (to_int r1) (to_int r2)
+  begin match r1, r2 with
+    | T_rule r1, T_rule r2 -> compare_tr r1 r2
+    | L_rule r1, L_rule r2 -> compare_lr r1 r2
+    | T_rule _, _
+    | L_rule _, _ -> CCInt.compare (to_int r1) (to_int r2)
+  end
 
 module Rule_set = CCSet.Make(struct type t = rule let compare = compare_rule end)
 
@@ -81,22 +78,22 @@ type defined_cst = {
 }
 
 let pp_term_rule out r =
-  Fmt.fprintf out "@[<2>@[%a@] -->@ @[%a@]@]" T.pp r.term_lhs T.pp r.term_rhs
+  Fmt.fprintf out "@[<2>@[%a@] :=@ @[%a@]@]" T.pp r.term_lhs T.pp r.term_rhs
 
 let pp_term_rules out (s:term_rule Sequence.t): unit =
   Fmt.(within "{" "}" @@ hvbox @@ Util.pp_seq pp_term_rule) out s
 
 let pp_lit_rule out r =
   let pp_c = CCFormat.hvbox (Util.pp_list ~sep:" ∨ " Literal.pp) in
-  Format.fprintf out "@[<2>@[%a@] ==>@ [@[<v>%a@]]@]"
+  Format.fprintf out "@[<2>@[%a@] :=@ [@[<v>%a@]]@]"
     Literal.pp r.lit_lhs (Util.pp_list ~sep:"∧" pp_c) r.lit_rhs
 
 let pp_lit_rules out (s:lit_rule Sequence.t): unit =
   Format.fprintf out "{@[<hv>%a@]}" (Util.pp_seq pp_lit_rule) s
 
 let pp_rule out = function
-  | T_rule r -> Format.fprintf out "(@[(term) %a@])" pp_term_rule r
-  | L_rule l -> Format.fprintf out "(@[(lit) %a@])" pp_lit_rule l
+  | T_rule r -> Format.fprintf out "(@[%a [T]@])" pp_term_rule r
+  | L_rule l -> Format.fprintf out "(@[%a [B]@])" pp_lit_rule l
 
 let pp_rule_set out (rs: rule_set): unit =
   Fmt.(within "{" "}" @@ hvbox @@ Util.pp_seq pp_rule) out (Rule_set.to_seq rs)
@@ -201,14 +198,17 @@ module Term = struct
     let args r = r.term_args
     let arity r = r.term_arity
     let ty r = T.ty r.term_rhs
-    let meta r = r.term_meta
+    let proof r = r.term_proof
 
     let as_lit (r:t): Literal.t = Literal.mk_eq (lhs r)(rhs r)
 
     let vars r = T.vars (lhs r)
     let vars_l r = vars r |> T.VarSet.to_list
 
-    let make_ head args term_lhs term_rhs term_proof =
+    let make_ head args term_lhs term_rhs proof =
+      let term_proof =
+        Proof.Step.define head (Proof.Src.internal[]) [Proof.Parent.from proof]
+      in
       { term_head=head; term_args=args; term_arity=List.length args;
         term_lhs; term_rhs; term_proof }
 
@@ -221,7 +221,7 @@ module Term = struct
           "Rule.make_const %a %a:@ invalid rule, RHS contains variables"
           ID.pp id T.pp rhs
       );
-      make_ meta id [] lhs rhs
+      make_ id [] lhs rhs proof
 
     (* [id args := rhs] *)
     let make ~proof id ty args rhs : t =
@@ -235,6 +235,13 @@ module Term = struct
       make_ id args lhs rhs proof
 
     let pp out r = pp_term_rule out r
+
+    let to_form ~ctx r =
+      let module F = TypedSTerm.Form in
+      F.eq
+        (Term.Conv.to_simple_term ctx (lhs r))
+        (Term.Conv.to_simple_term ctx (rhs r))
+      |> F.close_forall
 
     let compare = compare_tr
     let hash r = Hash.combine2 (T.hash @@ lhs r) (T.hash @@ rhs r)
@@ -398,11 +405,17 @@ module Lit = struct
   module Rule = struct
     type t = lit_rule
 
-    let make ~proof lit_lhs lit_rhs = {lit_lhs; lit_rhs; lit_proof=proof}
+    let rule = Proof.Rule.mk "rw.lit"
+
+    let make ~proof lit_lhs lit_rhs =
+      let lit_proof =
+        Proof.Step.inference ~rule [Proof.Parent.from proof]
+      in
+      {lit_lhs; lit_rhs; lit_proof}
 
     let lhs c = c.lit_lhs
     let rhs c = c.lit_rhs
-    let meta c = c.lit_meta
+    let proof c = c.lit_proof
 
     (* conversion into regular clauses *)
     let as_clauses (c:t): Literals.t list =
@@ -427,6 +440,19 @@ module Lit = struct
     let is_equational c = match lhs c with
       | Literal.Equation _ -> true
       | _ -> false
+
+    let to_form ~ctx r =
+      let module F = TypedSTerm.Form in
+      let conv_lit lit =
+        lit
+        |> Literal.Conv.to_form
+        |> SLiteral.map ~f:(T.Conv.to_simple_term ctx)
+        |> SLiteral.to_form
+      in
+      F.equiv
+        (conv_lit (lhs r))
+        (List.map (fun l -> List.map conv_lit l |> F.or_) (rhs r) |> F.and_)
+      |> F.close_forall
 
     let compare r1 r2: int = compare_lr r1 r2
     let pp = pp_lit_rule
@@ -510,12 +536,12 @@ module Lit = struct
                    (Util.pp_list (CCFormat.hvbox (Util.pp_list ~sep:" ∨ " Literal.pp)))
                    clauses Subst.pp subst Rule.pp rule);
              Util.incr_stat stat_lit_rw;
-             Some (i, clauses, subst))
+             Some (i, clauses, subst, rule))
         lits
     in
     begin match step with
       | None -> None
-      | Some (i, clause_chunks, subst) ->
+      | Some (i, clause_chunks, subst, rule) ->
         let renaming = Subst.Renaming.create () in
         (* remove rewritten literal, replace by [clause_chunks], apply
            substitution (clause_chunks might contain other variables!),
@@ -528,7 +554,7 @@ module Lit = struct
             (fun new_lits -> Array.of_list (new_lits @ lits))
             clause_chunks
         in
-        Some clauses
+        Some (clauses,rule)
     end
 
   let normalize_clause lits =
@@ -586,12 +612,30 @@ let pseudo_rule_of_rule (r:rule): pseudo_rule = match r with
       | Literal.Equation _ | Literal.Int _ | Literal.Rat _ -> fail()
     end
 
-
 module Rule = struct
   type t = rule
   let of_term t = T_rule t
   let of_lit t = L_rule t
   let pp = pp_rule
+
+  let to_form ?(ctx=Type.Conv.create()) (r:rule) : TypedSTerm.t =
+    begin match r with
+      | T_rule r -> Term.Rule.to_form ~ctx r
+      | L_rule r -> Lit.Rule.to_form ~ctx r
+    end
+
+  let pp_zf out r = TypedSTerm.ZF.pp out (to_form r)
+  let pp_tptp out r = TypedSTerm.TPTP.pp out (to_form r)
+
+  let pp_in = function
+    | Output_format.O_normal -> pp
+    | Output_format.O_zf -> pp_zf
+    | Output_format.O_tptp -> pp_tptp
+    | Output_format.O_none -> (fun _ _ -> ())
+
+  let proof = function
+    | T_rule r -> Term.Rule.proof r
+    | L_rule r -> Lit.Rule.proof r
 
   let contains_skolems (t:term): bool =
     T.Seq.symbols t
@@ -599,6 +643,26 @@ module Rule = struct
 
   let make_lit ~proof lit_lhs lit_rhs =
     L_rule (Lit.Rule.make ~proof lit_lhs lit_rhs)
+
+  let compare a b = match a, b with
+    | T_rule r1, T_rule r2 -> Term.Rule.compare r1 r2
+    | L_rule r1, L_rule r2 -> Lit.Rule.compare r1 r2
+    | T_rule _, L_rule _ -> -1
+    | L_rule _, T_rule _ -> 1
+
+  exception E_p of t
+
+  let res_tc : t Proof.result_tc =
+    Proof.Result.make_tc
+      ~to_exn:(fun t -> E_p t)
+      ~of_exn:(function E_p p -> Some p | _ -> None)
+      ~pp_in:pp_in
+      ~compare ~flavor:(fun _ -> `Def)
+      ~to_form:(fun ~ctx r -> to_form ~ctx r)
+      ()
+
+  let as_proof r =
+    Proof.S.mk (proof r) (Proof.Result.make res_tc r)
 end
 
 let allcst_ : Cst_.t list ref = ref []
@@ -693,7 +757,7 @@ module Defined_cst = struct
       ignore (declare ?level:None id (Rule_set.singleton rule))
 
   (* make a single rule [proj (C … x_i …) --> x_i] *)
-  let mk_rule_proj_ (p:Ind_ty.projector): rule =
+  let mk_rule_proj_ (p:Ind_ty.projector) proof : rule =
     let i = Ind_ty.projector_idx p in
     let id = Ind_ty.projector_id p in
     let cstor = Ind_ty.projector_cstor p in
@@ -715,27 +779,22 @@ module Defined_cst = struct
         (List.map T.var vars)
     in
     let rhs = T.var (List.nth vars i) in
-    let proof =
-      let lit = SLiteral.eq t rhs in
-      let c = [lit] in
-      Statement.assert_ ~src:(Statement.Src.define id) c
-    in
     T_rule (Term.Rule.make ~proof id ty_proj (List.map T.var ty_vars @ [t]) rhs)
 
-  let declare_proj (p:Ind_ty.projector): unit =
+  let declare_proj ~proof (p:Ind_ty.projector): unit =
     let p_id = Ind_ty.projector_id p in
     begin match as_defined_cst p_id with
       | Some _ ->
         Util.invalid_argf "cannot declare proj %a, already defined" ID.pp p_id
       | None ->
-        let rule = mk_rule_proj_ p in
+        let rule = mk_rule_proj_ p proof in
         Util.debugf ~section 3 "(@[declare-proj %a@ :rule %a@])"
           (fun k->k ID.pp p_id Rule.pp rule);
         ignore (declare ?level:None p_id (Rule_set.singleton rule))
     end
 
   (* make a single rule [C (proj_1 x)…(proj_n x) --> x] *)
-  let mk_rule_cstor_ (c:Ind_ty.constructor): rule =
+  let mk_rule_cstor_ (c:Ind_ty.constructor) proof : rule =
     let c_id = c.Ind_ty.cstor_name in
     let projs = List.map snd c.Ind_ty.cstor_args in
     assert (projs <> []);
@@ -759,16 +818,16 @@ module Defined_cst = struct
         projs
     in
     let rhs = T.var x in
-    T_rule (Term.Rule.make c_id c_ty (List.map T.var ty_vars @ args) rhs)
+    T_rule (Term.Rule.make ~proof c_id c_ty (List.map T.var ty_vars @ args) rhs)
 
-  let declare_cstor (c:Ind_ty.constructor): unit =
+  let declare_cstor ~proof (c:Ind_ty.constructor): unit =
     let c_id = c.Ind_ty.cstor_name in
     if not (CCList.is_empty c.Ind_ty.cstor_args) then (
       begin match as_defined_cst c_id with
         | Some _ ->
           Util.invalid_argf "cannot declare cstor %a, already defined" ID.pp c_id
         | None ->
-          let rule = mk_rule_cstor_ c in
+          let rule = mk_rule_cstor_ c proof in
           Util.debugf ~section 3 "(@[declare-cstor %a@ :rule %a@])"
             (fun k->k ID.pp c_id Rule.pp rule);
           ignore (declare ?level:None c_id (Rule_set.singleton rule))
