@@ -7,7 +7,7 @@ build: [
         "--bindir" "%{bin}%"
         "--disable-tests"
         "--disable-docs"
-        "--%{menhir+tip-parser:enable}%-parsers"
+        "--%{menhir:enable}%-parsers"
         "--disable-hornet-prover"
         "--enable-zipperposition-prover"
         "--disable-solving"
@@ -33,7 +33,6 @@ depends: [
   "oasis" { build }
   "msat" { >= "0.5" }
   "menhir" {build}
-  "tip-parser"
 ]
 depopts: [
   "qcheck" {test}
