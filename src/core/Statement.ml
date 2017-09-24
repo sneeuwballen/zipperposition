@@ -462,7 +462,7 @@ module ZF = struct
     let pp_attrs = UntypedAST.pp_attrs_zf in
     match st.view with
       | TyDecl (id,ty) ->
-        fpf out "@[<2>val%a %a :@ @[%a@]@]." pp_attrs attrs ID.pp id ppty ty
+        fpf out "@[<2>val%a %a :@ @[%a@]@]." pp_attrs attrs ID.pp_zf id ppty ty
       | Def l ->
         fpf out "@[<2>def%a %a@]."
           pp_attrs attrs (Util.pp_list ~sep:" and " (pp_def ppf ppt ppty)) l
@@ -470,7 +470,7 @@ module ZF = struct
         begin match d with
           | Def_term (vars, id, _, args, rhs) ->
             fpf out "@[<2>rewrite%a @[<2>%a@[%a %a@]@ = @[%a@]@]@]." pp_attrs attrs
-              pp_vars vars ID.pp id (Util.pp_list ~sep:" " ppt) args ppt rhs
+              pp_vars vars ID.pp_zf id (Util.pp_list ~sep:" " ppt) args ppt rhs
           | Def_form (vars, lhs, rhs, pol) ->
             let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
             fpf out "@[<2>rewrite%a @[<2>%a@[%a@]@ %s @[%a@]@]@]." pp_attrs attrs
@@ -479,10 +479,10 @@ module ZF = struct
         end
       | Data l ->
         let pp_cstor out (id,ty,_) =
-          fpf out "@[<2>| %a :@ @[%a@]@]" ID.pp id ppty ty in
+          fpf out "@[<2>| %a :@ @[%a@]@]" ID.pp_zf id ppty ty in
         let pp_data out d =
           fpf out "@[<hv2>@[%a : %a@] :=@ %a@]"
-            ID.pp d.data_id ppty d.data_ty (Util.pp_list ~sep:"" pp_cstor) d.data_cstors
+            ID.pp_zf d.data_id ppty d.data_ty (Util.pp_list ~sep:"" pp_cstor) d.data_cstors
         in
         fpf out "@[<hv2>data%a@ %a@]." pp_attrs attrs (Util.pp_list ~sep:" and " pp_data) l
       | Assert f ->
@@ -509,7 +509,7 @@ module TPTP = struct
       | _ -> "no_name"
     in
     let pp_decl out (id,ty) =
-      fpf out "tff(@[%s, type,@ %a :@ @[%a@]@])." name ID.pp id ppty ty
+      fpf out "tff(@[%s, type,@ %a :@ @[%a@]@])." name ID.pp_tstp id ppty ty
     and pp_quant_vars out = function
       | [] -> ()
       | l ->
@@ -526,7 +526,7 @@ module TPTP = struct
       in
       let pp_rule out = function
         | Def_term (vars,id,_,args,rhs) ->
-          fpf out "%a(@[%a%a@] =@ %a)" pp_quant_vars vars ID.pp id pp_args args ppt rhs
+          fpf out "%a(@[%a%a@] =@ %a)" pp_quant_vars vars ID.pp_tstp id pp_args args ppt rhs
         | Def_form (vars,lhs,rhs,pol) ->
           let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
           fpf out "%a(@[%a@] %s@ (@[<hv>%a@]))"
@@ -567,7 +567,7 @@ module TPTP = struct
         begin match d with
           | Def_term (_, id, _, args, rhs) ->
             fpf out "@[<2>tff(%s, axiom,@ %a(%a) =@ @[%a@])@]."
-              name ID.pp id (Util.pp_list ~sep:", " ppt) args ppt rhs
+              name ID.pp_tstp id (Util.pp_list ~sep:", " ppt) args ppt rhs
           | Def_form (_, lhs, rhs, pol) ->
             let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
             fpf out "@[<2>tff(%s, axiom,@ %a %s@ (@[%a@]))@]."
