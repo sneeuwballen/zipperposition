@@ -70,6 +70,7 @@ type ('f, 't, 'ty) t = {
   view: ('f, 't, 'ty) view;
   attrs: attrs;
   proof: proof;
+  mutable name: string option;
 }
 
 and proof = Proof.Step.t
@@ -89,7 +90,7 @@ let mk_def ?(rewrite=false) id ty rules =
 
 let id_n_ = ref 0
 let mk_ ?(attrs=[]) ~proof view: (_,_,_) t =
-  {id=CCRef.incr_then_get id_n_; proof; view; attrs; }
+  {id=CCRef.incr_then_get id_n_; proof; view; attrs; name=None}
 
 let ty_decl ?attrs ~proof id ty = mk_ ?attrs ~proof (TyDecl (id,ty))
 let def ?attrs ~proof l = mk_ ?attrs ~proof (Def l)
@@ -443,6 +444,24 @@ let pp_clause =
 
 let pp_input = pp TypedSTerm.pp TypedSTerm.pp TypedSTerm.pp
 
+let name_gen_ =
+  let n = ref 0 in
+  fun () -> Printf.sprintf "zf_stmt_%d" (CCRef.get_then_incr n)
+
+let name (st:(_,_,_)t) : string =
+  let from_src = match Proof.Step.src st.proof with
+    | Some {Proof.src_view=Proof.From_file (f,_);_} -> Proof.Src.name f
+    | _ -> None
+  in
+  begin match st.name, from_src with
+    | Some s, _ -> s
+    | None, Some s -> s
+    | None, None ->
+      let s = name_gen_ () in
+      st.name <- Some s;
+      s
+  end
+
 module ZF = struct
   module UA = UntypedAST.A
 
@@ -496,11 +515,7 @@ end
 
 module TPTP = struct
   let pp ppf ppt ppty out st =
-    let name = match Proof.Step.src st.proof with
-      | Some {Proof.src_view=Proof.From_file (f,_);_} ->
-        Proof.Src.name f |> CCOpt.get_or ~default:"no_name"
-      | _ -> "no_name"
-    in
+    let name = name st in
     let pp_decl out (id,ty) =
       fpf out "tff(@[%s, type,@ %a :@ @[%a@]@])." name ID.pp_tstp id ppty ty
     and pp_quant_vars out = function
@@ -595,10 +610,6 @@ let pp_input_in o =
 exception E_i of input_t
 exception E_c of clause_t
 
-let get_name_ st = match Proof.Step.src st.proof with
-  | Some {Proof.src_view=Proof.From_file (f,_);_} -> Proof.Src.name f
-  | _ -> None
-
 let res_tc_i : input_t Proof.result_tc =
   Proof.Result.make_tc
     ~of_exn:(function E_i c -> Some c | _ -> None)
@@ -606,7 +617,7 @@ let res_tc_i : input_t Proof.result_tc =
     ~compare:compare
     ~pp_in:pp_input_in
     ~is_stmt:true
-    ~name:get_name_
+    ~name
     ~to_form:(fun ~ctx:_ _ -> assert false) (* TODO *)
     ()
 
@@ -617,7 +628,7 @@ let res_tc_c : clause_t Proof.result_tc =
     ~compare:compare
     ~pp_in:pp_clause_in
     ~is_stmt:true
-    ~name:get_name_
+    ~name
     ~to_form:(fun ~ctx:_ _ -> assert false) (* TODO *)
     ()
 

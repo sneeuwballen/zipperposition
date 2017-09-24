@@ -77,6 +77,7 @@ type ('f, 't, 'ty) t = private {
   view: ('f, 't, 'ty) view;
   attrs: attrs;
   proof : proof;
+  mutable name: string option;
 }
 
 and proof = Proof.Step.t
@@ -88,6 +89,9 @@ val compare : (_, _, _) t -> (_, _, _) t -> int
 val view : ('f, 't, 'ty) t -> ('f, 't, 'ty) view
 val attrs : (_, _, _) t -> attrs
 val proof_step : (_, _, _) t -> proof
+
+val name : (_,_,_) t -> string
+(** Retrieve a name from the proof, or generate+save a new one *)
 
 val as_proof_i : input_t -> Proof.t
 val res_tc_i : input_t Proof.result_tc

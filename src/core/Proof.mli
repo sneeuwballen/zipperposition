@@ -156,7 +156,7 @@ module Result : sig
     compare:('a -> 'a -> int) ->
     to_form:(ctx:Term.Conv.ctx -> 'a -> form) ->
     pp_in:(Output_format.t -> 'a CCFormat.printer) ->
-    ?name:('a -> string option) ->
+    ?name:('a -> string) ->
     ?is_stmt:bool ->
     ?apply_subst:(Subst.t -> 'a Scoped.t -> 'a) ->
     ?flavor:('a -> flavor) ->
@@ -316,9 +316,6 @@ module S : sig
   (** Convert to low level t *)
 
   val is_proof_of_false : t -> bool
-
-  val name : t -> string
-  (** Unique name, either from the input or generated on the fly *)
 
   (** {6 Conversion to a graph of proofs} *)
 

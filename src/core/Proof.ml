@@ -72,7 +72,7 @@ type 'a result_tc = {
   res_pp_in: Output_format.t -> 'a CCFormat.printer;
   res_to_form: ctx:Term.Conv.ctx -> 'a -> TypedSTerm.Form.t;
   res_apply_subst: (Subst.t -> 'a Scoped.t -> 'a) option;
-  res_name:('a -> string option);
+  res_name:('a -> string) option;
   res_flavor: 'a -> flavor;
 }
 
@@ -96,7 +96,6 @@ and parent =
 and proof = {
   step: step;
   result : result;
-  mutable p_name: string option; (* unique name for this proof *)
 }
 
 type t = proof
@@ -297,14 +296,18 @@ module Result = struct
 
   let name (Res (r,x)) = match r.res_of_exn x with
     | None -> assert false
-    | Some x -> r.res_name x
+    | Some x ->
+      begin match r.res_name with
+        | None -> None
+        | Some f -> Some (f x)
+      end
 
   let n_ = ref 0
   let make_tc (type a)
       ~of_exn ~to_exn ~compare
       ~to_form
       ~pp_in
-      ?(name=fun _ -> None)
+      ?name
       ?(is_stmt=false)
       ?apply_subst
       ?(flavor=fun _ -> `Vanilla)
@@ -503,7 +506,7 @@ module S = struct
   let is_pure_bool p = Result.flavor (result p) = `Pure_bool
   let is_def p = Result.flavor (result p) = `Def
 
-  let mk step res = {step; result=res; p_name=None}
+  let mk step res = {step; result=res}
   let mk_f step res = mk step (Result.of_form res)
 
   let mk_f_trivial = mk_f Step.trivial
@@ -527,17 +530,19 @@ module S = struct
 
   let name_gen_ = ref 0
 
-  let name (p:t) : string = match p.p_name with
-    | Some s -> s
-    | None ->
-      (* look if the result is a named thing from the input, otherwise
-         generate a fresh one *)
-      let s = match Result.name (result p) with
-        | Some s -> s
-        | None -> Printf.sprintf "'%d'" (CCRef.get_then_incr name_gen_)
-      in
-      p.p_name <- Some s;
-      s
+  (* retrieve the name, or create a new one on the fly *)
+  let name ~namespace (p:t) : string =
+    (* look if the result is a named thing from the input, otherwise
+       generate a fresh one from the namespace *)
+    begin match Result.name (result p) with
+      | Some s -> s
+      | None ->
+        try Tbl.find namespace p
+        with Not_found ->
+          let s = Printf.sprintf "'%d'" (Tbl.length namespace) in
+          Tbl.add namespace p s;
+          s
+    end
 
   (** {2 Conversion to a graph of proofs} *)
 
@@ -617,12 +622,13 @@ module S = struct
     Format.fprintf out "@]"
 
   let pp_tstp out proof =
+    let namespace = Tbl.create 8 in
     Format.fprintf out "@[<v>";
     traverse ~order:`DFS proof
       (fun p ->
-         let p_name = name p in
+         let p_name = name ~namespace p in
          let parents =
-           List.map (fun p -> `Name (name @@ Parent.proof p))
+           List.map (fun p -> `Name (name ~namespace @@ Parent.proof p))
              (Step.parents @@ step p)
          in
          let role = "plain" in (* TODO *)
@@ -646,11 +652,12 @@ module S = struct
   let pp_zf out proof =
     let module UA = UntypedAST.A in
     Format.fprintf out "@[<v>";
+    let namespace = Tbl.create 8 in
     traverse ~order:`DFS proof
       (fun p ->
-         let p_name = name p in
+         let p_name = name ~namespace p in
          let parents =
-           List.map (fun p -> name @@ Parent.proof p)
+           List.map (fun p -> name ~namespace @@ Parent.proof p)
              (Step.parents @@ step p)
          in
          let mk_status r = UA.app "status" [UA.quoted r] in
