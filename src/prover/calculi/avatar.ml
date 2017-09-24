@@ -324,7 +324,11 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     let box = BBox.inject_lemma f in
     let cut_proof_parent =
       let form = Cut_form.to_s_form f in
-      Proof.Parent.from @@ Proof.S.mk_f proof form
+      let st =
+        Statement.lemma ~proof:(Proof.Step.lemma @@ Proof.Src.internal[])
+          [form]
+      in
+      Proof.Parent.from @@ Statement.as_proof_i st
     in
     (* positive clauses *)
     let proof_pos =
