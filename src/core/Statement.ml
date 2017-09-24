@@ -414,16 +414,16 @@ let pp ppf ppt ppty out st =
     | TyDecl (id,ty) ->
       fpf out "@[<2>val%a %a :@ @[%a@]@]." pp_attrs attrs ID.pp id ppty ty
     | Def l ->
-      fpf out "@[<2>def%a %a@]."
+      fpf out "@[<2>def%a@ %a@]."
         pp_attrs attrs (Util.pp_list ~sep:" and " (pp_def ppf ppt ppty)) l
     | Rewrite d ->
       begin match d with
         | Def_term (_, id, _, args, rhs) ->
-          fpf out "@[<2>rewrite%a @[%a %a@]@ = @[%a@]@]." pp_attrs attrs
+          fpf out "@[<2>rewrite%a@ @[%a %a@]@ = @[%a@]@]." pp_attrs attrs
             ID.pp id (Util.pp_list ~sep:" " ppt) args ppt rhs
         | Def_form (_, lhs, rhs, pol) ->
           let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
-          fpf out "@[<2>rewrite%a @[%a@]@ %s @[%a@]@]." pp_attrs attrs
+          fpf out "@[<2>rewrite%a@ @[%a@]@ %s @[%a@]@]." pp_attrs attrs
             (SLiteral.pp ppt) lhs op (Util.pp_list ~sep:" && " ppf) rhs
       end
     | Data l ->
