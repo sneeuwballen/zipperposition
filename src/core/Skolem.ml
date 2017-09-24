@@ -183,7 +183,8 @@ let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~parents form 
     proof;
   } in
   ctx.sc_new_defs <- Def_form def :: ctx.sc_new_defs;
-  Util.debugf ~section 5 "@[<2>define_form@ %a@]" (fun k->k pp_form_definition def);
+  Util.debugf ~section 5 "@[<2>define_form@ %a@ :proof %a@]"
+    (fun k->k pp_form_definition def Proof.Step.pp proof);
   def
 
 let pp_rules =
@@ -245,7 +246,8 @@ let define_term ?(pattern="fun_") ~ctx ~parents rules : term_definition =
     td_proof=proof;
   } in
   ctx.sc_new_defs <- Def_term def :: ctx.sc_new_defs;
-  Util.debugf ~section 4 "@[<2>define_term@ %a@]" (fun k->k pp_term_definition def);
+  Util.debugf ~section 4 "@[<2>define_term@ %a@ :proof %a@]"
+    (fun k->k pp_term_definition def Proof.Step.pp proof);
   def
 
 let new_definitions ~ctx = ctx.sc_new_defs

@@ -457,7 +457,7 @@ module Step = struct
 
   let pp out step = match kind step with
     | Intro (_,(R_assert|R_goal|R_def|R_decl)) ->
-      Format.fprintf out "@[<hv2>%a@]%a@," Kind.pp (kind step) pp_infos step.infos
+      Format.fprintf out "@[<hv2>%a@]%a" Kind.pp (kind step) pp_infos step.infos
     | Intro (_,R_lemma) -> Format.fprintf out "@[<2>lemma%a@]" pp_infos step.infos
     | Trivial -> Format.fprintf out "@[<2>trivial%a@]" pp_infos step.infos
     | By_def id -> Format.fprintf out "@[<2>by_def %a%a@]" ID.pp id pp_infos step.infos
@@ -466,7 +466,7 @@ module Step = struct
     | Inference _
     | Simplification _
     | Esa _ ->
-      Format.fprintf out "@[<hv2>%a@ with @[<hv>%a@]%a@]@,"
+      Format.fprintf out "@[<hv2>%a@ with @[<hv>%a@]%a@]"
         Kind.pp (kind step)
         (Util.pp_list Result.pp)
         (List.map (fun p -> (Parent.proof p).result) @@ parents step)
