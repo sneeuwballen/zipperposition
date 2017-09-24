@@ -458,16 +458,16 @@ module ZF = struct
       | TyDecl (id,ty) ->
         fpf out "@[<2>val%a %a :@ @[%a@]@]." pp_attrs attrs ID.pp_zf id ppty ty
       | Def l ->
-        fpf out "@[<2>def%a %a@]."
+        fpf out "@[<2>def%a@ %a@]."
           pp_attrs attrs (Util.pp_list ~sep:" and " (pp_def ppf ppt ppty)) l
       | Rewrite d ->
         begin match d with
           | Def_term (vars, id, _, args, rhs) ->
-            fpf out "@[<2>rewrite%a @[<2>%a@[%a %a@]@ = @[%a@]@]@]." pp_attrs attrs
+            fpf out "@[<2>rewrite%a@ @[<2>%a@[%a %a@]@ = @[%a@]@]@]." pp_attrs attrs
               pp_vars vars ID.pp_zf id (Util.pp_list ~sep:" " ppt) args ppt rhs
           | Def_form (vars, lhs, rhs, pol) ->
             let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
-            fpf out "@[<2>rewrite%a @[<2>%a@[%a@]@ %s @[%a@]@]@]." pp_attrs attrs
+            fpf out "@[<2>rewrite%a@ @[<2>%a@[%a@]@ %s @[%a@]@]@]." pp_attrs attrs
               pp_vars vars (SLiteral.ZF.pp ppt) lhs op
               (Util.pp_list ~sep:" && " ppf) rhs
         end
@@ -530,7 +530,7 @@ module TPTP = struct
       let pp_top_rule out r =
         fpf out "@[<2>tff(%s, axiom,@ %a)@]." name pp_rule r
       in
-      fpf out "@[<hv>%a@]" (Util.pp_list ~sep:"" pp_top_rule) d.def_rules
+      Util.pp_list ~sep:"" pp_top_rule out d.def_rules
     in
     match st.view with
       | TyDecl (id,ty) -> pp_decl out (id,ty)
@@ -551,12 +551,14 @@ module TPTP = struct
              fpf out "@[<2>tff(%a, %s,@ (@[%a@]))@]." pp_name name role ppf f)
           l
       | Def l ->
+        Format.fprintf out "@[<v>";
         (* declare *)
         List.iter
-          (fun {def_id; def_ty; _} -> pp_decl out (def_id,def_ty))
+          (fun {def_id; def_ty; _} -> Format.fprintf out "%a@," pp_decl (def_id,def_ty))
           l;
         (* define *)
-        List.iter (pp_def_axiom out) l
+        Util.pp_list ~sep:"" pp_def_axiom out l;
+        Format.fprintf out "@]";
       | Rewrite d ->
         begin match d with
           | Def_term (_, id, _, args, rhs) ->
