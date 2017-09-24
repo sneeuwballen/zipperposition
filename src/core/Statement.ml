@@ -403,43 +403,51 @@ let pp_def ppf ppt ppty out d =
 
 let pp_input_def = pp_def TypedSTerm.pp TypedSTerm.pp TypedSTerm.pp
 
-let pp ppf ppt ppty out st = match st.view with
-  | TyDecl (id,ty) ->
-    fpf out "@[<2>val%a %a :@ @[%a@]@]." pp_attrs st.attrs ID.pp id ppty ty
-  | Def l ->
-    fpf out "@[<2>def%a %a@]."
-      pp_attrs st.attrs (Util.pp_list ~sep:" and " (pp_def ppf ppt ppty)) l
-  | Rewrite d ->
-    begin match d with
-      | Def_term (_, id, _, args, rhs) ->
-        fpf out "@[<2>rewrite%a @[%a %a@]@ = @[%a@]@]." pp_attrs st.attrs
-          ID.pp id (Util.pp_list ~sep:" " ppt) args ppt rhs
-      | Def_form (_, lhs, rhs, pol) ->
-        let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
-        fpf out "@[<2>rewrite%a @[%a@]@ %s @[%a@]@]." pp_attrs st.attrs
-          (SLiteral.pp ppt) lhs op (Util.pp_list ~sep:" && " ppf) rhs
-    end
-  | Data l ->
-    let pp_cstor out (id,ty,_) =
-      fpf out "@[<2>| %a :@ @[%a@]@]" ID.pp id ppty ty in
-    let pp_data out d =
-      fpf out "@[<hv2>@[%a : %a@] :=@ %a@]"
-        ID.pp d.data_id ppty d.data_ty (Util.pp_list ~sep:"" pp_cstor) d.data_cstors
-    in
-    fpf out "@[<hv2>data%a@ %a@]." pp_attrs st.attrs (Util.pp_list ~sep:" and " pp_data) l
-  | Assert f ->
-    fpf out "@[<2>assert%a@ @[%a@]@]." pp_attrs st.attrs ppf f
-  | Lemma l ->
-    fpf out "@[<2>lemma%a@ @[%a@]@]."
-      pp_attrs st.attrs (Util.pp_list ~sep:" && " ppf) l
-  | Goal f ->
-    fpf out "@[<2>goal%a@ @[%a@]@]." pp_attrs st.attrs ppf f
-  | NegatedGoal (sk, l) ->
-    let pp_sk out (id,ty) = fpf out "(%a:%a)" ID.pp id ppty ty in
-    fpf out "@[<hv2>negated_goal%a@ @[<hv>%a@]@ # skolems: [@[<hv>%a@]]@]."
-      pp_attrs st.attrs
-      (Util.pp_list ~sep:", " (CCFormat.hovbox ppf)) l
-      (Util.pp_list pp_sk) sk
+let attrs_ua st =
+  let src_attrs = Proof.Step.to_attrs st.proof in
+  List.rev_append src_attrs (List.map attr_to_ua st.attrs)
+
+let pp ppf ppt ppty out st =
+  let attrs = attrs_ua st in
+  let pp_attrs = UntypedAST.pp_attrs in
+  begin match st.view with
+    | TyDecl (id,ty) ->
+      fpf out "@[<2>val%a %a :@ @[%a@]@]." pp_attrs attrs ID.pp id ppty ty
+    | Def l ->
+      fpf out "@[<2>def%a %a@]."
+        pp_attrs attrs (Util.pp_list ~sep:" and " (pp_def ppf ppt ppty)) l
+    | Rewrite d ->
+      begin match d with
+        | Def_term (_, id, _, args, rhs) ->
+          fpf out "@[<2>rewrite%a @[%a %a@]@ = @[%a@]@]." pp_attrs attrs
+            ID.pp id (Util.pp_list ~sep:" " ppt) args ppt rhs
+        | Def_form (_, lhs, rhs, pol) ->
+          let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
+          fpf out "@[<2>rewrite%a @[%a@]@ %s @[%a@]@]." pp_attrs attrs
+            (SLiteral.pp ppt) lhs op (Util.pp_list ~sep:" && " ppf) rhs
+      end
+    | Data l ->
+      let pp_cstor out (id,ty,_) =
+        fpf out "@[<2>| %a :@ @[%a@]@]" ID.pp id ppty ty in
+      let pp_data out d =
+        fpf out "@[<hv2>@[%a : %a@] :=@ %a@]"
+          ID.pp d.data_id ppty d.data_ty (Util.pp_list ~sep:"" pp_cstor) d.data_cstors
+      in
+      fpf out "@[<hv2>data%a@ %a@]." pp_attrs attrs (Util.pp_list ~sep:" and " pp_data) l
+    | Assert f ->
+      fpf out "@[<2>assert%a@ @[%a@]@]." pp_attrs attrs ppf f
+    | Lemma l ->
+      fpf out "@[<2>lemma%a@ @[%a@]@]."
+        pp_attrs attrs (Util.pp_list ~sep:" && " ppf) l
+    | Goal f ->
+      fpf out "@[<2>goal%a@ @[%a@]@]." pp_attrs attrs ppf f
+    | NegatedGoal (sk, l) ->
+      let pp_sk out (id,ty) = fpf out "(%a:%a)" ID.pp id ppty ty in
+      fpf out "@[<hv2>negated_goal%a@ @[<hv>%a@]@ # skolems: [@[<hv>%a@]]@]."
+        pp_attrs attrs
+        (Util.pp_list ~sep:", " (CCFormat.hovbox ppf)) l
+        (Util.pp_list pp_sk) sk
+  end
 
 let to_string ppf ppt ppty = CCFormat.to_string (pp ppf ppt ppty)
 
@@ -457,8 +465,7 @@ module ZF = struct
       | [] -> ()
       | vars -> Format.fprintf out "forall %a.@ " (Util.pp_list ~sep:" " pp_var) vars
     in
-    let src_attrs = Proof.Step.to_attrs st.proof in
-    let attrs = src_attrs @ List.map attr_to_ua st.attrs in
+    let attrs = attrs_ua st in
     let pp_attrs = UntypedAST.pp_attrs_zf in
     match st.view with
       | TyDecl (id,ty) ->
@@ -508,7 +515,7 @@ module TPTP = struct
       | _ -> "no_name"
     in
     let pp_decl out (id,ty) =
-      fpf out "@[<2>tff(%s, type,@ %a :@ @[%a@])@].@," name ID.pp id ppty ty
+      fpf out "@[<2>tff(%s, type,@ %a :@ @[%a@])@]." name ID.pp id ppty ty
     and pp_quant_vars out = function
       | [] -> ()
       | l ->
@@ -533,7 +540,7 @@ module TPTP = struct
             (Util.pp_list ~sep:" & " ppf) rhs
       in
       let pp_top_rule out r =
-        fpf out "@[<2>tff(%s, axiom,@ %a)@].@," name pp_rule r
+        fpf out "@[<2>tff(%s, axiom,@ %a)@]." name pp_rule r
       in
       fpf out "@[<hv>%a@]" (Util.pp_list ~sep:"" pp_top_rule) d.def_rules
     in
@@ -541,19 +548,19 @@ module TPTP = struct
       | TyDecl (id,ty) -> pp_decl out (id,ty)
       | Assert f ->
         let role = "axiom" in
-        fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@].@," name role ppf f
+        fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@]." name role ppf f
       | Lemma l ->
         let role = "lemma" in
-        fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@].@," name role
+        fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@]." name role
           (Util.pp_list ~sep:" & " ppf) l
       | Goal f ->
         let role = "conjecture" in
-        fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@].@," name role ppf f
+        fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@]." name role ppf f
       | NegatedGoal (_,l) ->
         let role = "negated_conjecture" in
         List.iter
           (fun f ->
-             fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@].@," name role ppf f)
+             fpf out "@[<2>tff(%s, %s,@ (@[%a@]))@]." name role ppf f)
           l
       | Def l ->
         (* declare *)
@@ -565,11 +572,11 @@ module TPTP = struct
       | Rewrite d ->
         begin match d with
           | Def_term (_, id, _, args, rhs) ->
-            fpf out "@[<2>tff(%s, axiom,@ %a(%a) =@ @[%a@])@].@,"
+            fpf out "@[<2>tff(%s, axiom,@ %a(%a) =@ @[%a@])@]."
               name ID.pp id (Util.pp_list ~sep:", " ppt) args ppt rhs
           | Def_form (_, lhs, rhs, pol) ->
             let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
-            fpf out "@[<2>tff(%s, axiom,@ %a %s@ (@[%a@]))@].@,"
+            fpf out "@[<2>tff(%s, axiom,@ %a %s@ (@[%a@]))@]."
               name (SLiteral.TPTP.pp ppt) lhs op
               (Util.pp_list ~sep:" & " ppf) rhs
         end
@@ -585,9 +592,13 @@ let pp_in pp_f pp_t pp_ty = function
   | Output_format.O_none -> CCFormat.silent
 
 let pp_clause_in o =
-  pp_in (Util.pp_list ~sep:" ∨ " (SLiteral.pp Term.pp)) Term.pp Type.pp o
+  let pp_t = Term.pp_in o in
+  let pp_ty = Type.pp_in o in
+  pp_in (Util.pp_list ~sep:" ∨ " (SLiteral.pp_in o pp_t)) pp_t pp_ty o
 
-let pp_input_in o = pp_in TypedSTerm.pp TypedSTerm.pp TypedSTerm.pp o
+let pp_input_in o =
+  let pp_t = TypedSTerm.pp_in o in
+  pp_in pp_t pp_t pp_t o
 
 (** {2 Proofs} *)
 

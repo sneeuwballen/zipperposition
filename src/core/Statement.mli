@@ -98,6 +98,9 @@ val mk_data : ID.t -> args:'ty Var.t list -> 'ty ->
   (ID.t * 'ty * ('ty * (ID.t * 'ty)) list) list -> 'ty data
 val mk_def : ?rewrite:bool -> ID.t -> 'ty -> ('f,'t,'ty) def_rule list -> ('f,'t,'ty) def
 
+val attrs_ua : (_,_,_) t -> UntypedAST.attrs
+(** All attributes, included these in the proof *)
+
 val ty_decl : ?attrs:attrs -> proof:proof -> ID.t -> 'ty -> (_, _, 'ty) t
 val def : ?attrs:attrs -> proof:proof -> ('f,'t,'ty) def list -> ('f, 't, 'ty) t
 val rewrite : ?attrs:attrs -> proof:proof -> ('f,'t,'ty) def_rule -> ('f,'t,'ty) t

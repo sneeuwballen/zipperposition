@@ -156,7 +156,6 @@ let proof_tc =
           subst (lits c,sc_c)
       in
       make ~trail lits')
-    ~pp_in
     ()
 
 let mk_proof_res = Proof.Result.make proof_tc

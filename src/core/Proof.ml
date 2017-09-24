@@ -68,7 +68,7 @@ type 'a result_tc = {
   res_of_exn: exn -> 'a option;
   res_to_exn: 'a -> exn;
   res_compare: 'a -> 'a -> int;
-  res_pp_in: Output_format.t -> 'a CCFormat.printer;
+  res_pp_in: (Output_format.t -> 'a CCFormat.printer) option;
   res_to_form: ctx:Term.Conv.ctx -> 'a -> TypedSTerm.Form.t;
   res_apply_subst: (Subst.t -> 'a Scoped.t -> 'a) option;
   res_flavor: 'a -> flavor;
@@ -263,15 +263,27 @@ module Result = struct
 
   let equal a b = compare a b = 0
 
-  let pp_in o out (Res (r,x)) = match r.res_of_exn x with
-    | None -> assert false
-    | Some x -> r.res_pp_in o out x
-
-  let pp = pp_in Output_format.normal
-
   let to_form ?(ctx=Term.Conv.create()) (Res (r,x)) = match r.res_of_exn x with
     | None -> assert false
     | Some x -> r.res_to_form ~ctx x
+
+  let pp_in_opt (Res (r,x)) = match r.res_of_exn x with
+    | None -> assert false
+    | Some x ->
+      begin match r.res_pp_in with
+        | None -> None
+        | Some f -> Some (fun o out () -> f o out x)
+      end
+
+  let pp_in o out ((Res (r,x))as p) = match r.res_of_exn x with
+    | None -> assert false
+    | Some x ->
+      begin match r.res_pp_in with
+        | Some f -> f o out x
+        | None -> TypedSTerm.pp_in o out (to_form p)
+      end
+
+  let pp = pp_in Output_format.normal
 
   let flavor (Res (r,x)) = match r.res_of_exn x with
     | None -> assert false
@@ -288,8 +300,9 @@ module Result = struct
 
   let n_ = ref 0
   let make_tc (type a)
-      ~of_exn ~to_exn ~compare ~pp_in
+      ~of_exn ~to_exn ~compare
       ~to_form
+      ?pp_in
       ?apply_subst
       ?(flavor=fun _ -> `Vanilla)
       () : a result_tc
@@ -317,35 +330,9 @@ module Result = struct
       ~to_form:(fun ~ctx:_ t -> t)
       ~compare:T.compare
       ~flavor:(fun f -> if T.equal f F.false_ then `Proof_of_false else `Vanilla)
-      ~pp_in:T.pp_in
       ()
 
   let of_form = make form_tc
-
-  (* FIXME
-  let c_to_sform ctx c = SClause.to_s_form ~ctx c |> F.close_forall
-
-  let to_s_form ?(ctx=Term.Conv.create()) (r:t): form = match r with
-    | Form f -> f
-    | Clause c -> SClause.to_s_form ~ctx c |> F.close_forall
-    | BoolClause c ->
-      List.map BBox.to_s_form c |> F.or_
-    | Stmt st ->
-      (* assimilate the statement to its formulas *)
-      Stmt.Seq.forms st |> Sequence.to_list |> F.and_
-    | C_stmt st ->
-      (* assimilate the statement to its formulas *)
-      Stmt.Seq.forms st
-      |> Sequence.map
-        (fun c ->
-           c
-           |> List.map
-             (fun lit ->
-                SLiteral.map lit ~f:(Term.Conv.to_simple_term ctx)
-                |> SLiteral.to_form)
-           |> F.or_ |> F.close_forall)
-      |> Sequence.to_list |> F.and_
-     *)
 end
 
 module Step = struct
@@ -627,35 +614,16 @@ module S = struct
                (Util.pp_list ~sep:", " UntypedAST.pp_attr_tstp) l
          in
          let infos = p.step |> Step.infos in
-         Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]%a).@]@,"
-           name role (Result.pp_in Output_format.tptp) (result p)
-           Kind.pp_tstp (Step.kind @@ step p,parents) pp_infos infos);
+         begin match Result.pp_in_opt (result p) with
+           | None ->
+             Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]%a).@]@,"
+               name role (Result.pp_in Output_format.tptp) (result p)
+               Kind.pp_tstp (Step.kind @@ step p,parents) pp_infos infos
+           | Some f ->
+             Format.fprintf out "%a@," (f Output_format.tptp) ()
+         end);
     Format.fprintf out "@]";
     ()
-
-           (* FIXME: readapt this (custom fun in res_tc?)
-         begin match result p with
-           | Form f ->
-             Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]%a).@]@,"
-               name role TypedSTerm.TPTP.pp f
-               Kind.pp_tstp (Step.kind @@ step p,parents) pp_infos infos
-           | BoolClause c ->
-             Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]%a).@]@,"
-               name role (Util.pp_list ~sep:" | " BBox.pp_tstp) c
-               Kind.pp_tstp (Step.kind @@ step p,parents) pp_infos infos
-           | Clause c ->
-             Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]%a).@]@,"
-               name role SClause.pp_tstp c
-               Kind.pp_tstp (Step.kind @@ step p,parents) pp_infos infos
-           | Stmt stmt ->
-             let module T = TypedSTerm in
-             Statement.TPTP.pp T.TPTP.pp T.TPTP.pp T.TPTP.pp out stmt
-           | C_stmt stmt ->
-             let pp_t = Term.TPTP.pp in
-             let pp_c = Util.pp_list ~sep:"|" (SLiteral.TPTP.pp pp_t) in
-             Statement.TPTP.pp pp_c pp_t Type.TPTP.pp out stmt
-         end);
-           *)
 
   let pp_zf out proof =
     let module UA = UntypedAST.A in
@@ -696,31 +664,15 @@ module S = struct
          let infos =
            info_name :: info_from @ info_rule @ info_status @ (Step.infos p.step)
          in
-         Format.fprintf out "@[<2>assert%a@ %a@].@,"
-           pp_infos infos (Result.pp_in Output_format.zf) (result p));
+         begin match Result.pp_in_opt (result p) with
+           | None ->
+             Format.fprintf out "@[<2>assert%a@ %a@].@,"
+               pp_infos infos (Result.pp_in Output_format.zf) (result p)
+           | Some f ->
+             Format.fprintf out "%a@," (f Output_format.zf) ()
+         end);
     Format.fprintf out "@]";
     ()
-
-  (* FIXME:
-         begin match result p with
-           | Form f ->
-             Format.fprintf out "@[<2>assert%a@ %a@].@,"
-               pp_infos infos TypedSTerm.ZF.pp f
-           | BoolClause c ->
-             Format.fprintf out "@[<2>assert%a@ %a@].@,"
-               pp_infos infos (Util.pp_list ~sep:" || " BBox.pp_zf) c
-           | Clause c ->
-             Format.fprintf out "@[<2>assert%a@ %a@].@,"
-               pp_infos infos SClause.pp_zf c
-           | Stmt stmt ->
-             let module T = TypedSTerm in
-             Statement.ZF.pp T.ZF.pp T.ZF.pp T.ZF.pp out stmt
-           | C_stmt stmt ->
-             let pp_t = Term.ZF.pp in
-             let pp_c = Util.pp_list ~sep:" || " (SLiteral.ZF.pp pp_t) in
-             Statement.ZF.pp pp_c pp_t Type.ZF.pp out stmt
-         end);
-     *)
 
   (** Prints the proof according to the given input switch *)
   let pp_in o out proof = match o with
@@ -748,7 +700,6 @@ module S = struct
     Util.ksprintf_noc ~f:_escape_dot fmt
 
   let pp_dot_seq ~name out seq =
-    (* TODO: check proof is a DAG *)
     CCGraph.Dot.pp_seq
       ~tbl:(CCGraph.mk_table ~eq:equal ~hash:hash 64)
       ~eq:equal

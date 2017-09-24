@@ -656,7 +656,6 @@ module Rule = struct
     Proof.Result.make_tc
       ~to_exn:(fun t -> E_p t)
       ~of_exn:(function E_p p -> Some p | _ -> None)
-      ~pp_in:pp_in
       ~compare ~flavor:(fun _ -> `Def)
       ~to_form:(fun ~ctx r -> to_form ~ctx r)
       ()

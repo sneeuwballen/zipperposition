@@ -1095,7 +1095,7 @@ type c_statement = (clause, term, type_) Statement.t
 
 let id_ x = x
 
-let rule_cnf = Proof.Rule.mk "cnf.cnf"
+let rule_cnf = Proof.Rule.mk "cnf"
 let rule_neg = Proof.Rule.mk "cnf.neg"
 
 let proof_cnf stmt =

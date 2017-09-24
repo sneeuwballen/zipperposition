@@ -154,8 +154,8 @@ module Result : sig
     of_exn:(exn -> 'a option) ->
     to_exn:('a -> exn) ->
     compare:('a -> 'a -> int) ->
-    pp_in:(Output_format.t -> 'a CCFormat.printer) ->
     to_form:(ctx:Term.Conv.ctx -> 'a -> form) ->
+    ?pp_in:(Output_format.t -> 'a CCFormat.printer) ->
     ?apply_subst:(Subst.t -> 'a Scoped.t -> 'a) ->
     ?flavor:('a -> flavor) ->
     unit ->
@@ -170,6 +170,7 @@ module Result : sig
   include Interfaces.ORD with type t := t
   include Interfaces.EQ with type t := t
   val pp_in : Output_format.t -> t CCFormat.printer
+  val pp_in_opt : t -> (Output_format.t -> unit CCFormat.printer) option
   val pp : t CCFormat.printer
   val to_form : ?ctx:Term.Conv.ctx -> t -> form
   val flavor : t -> flavor
