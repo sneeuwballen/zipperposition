@@ -124,7 +124,7 @@ module Src = struct
 
   let mk_name_ =
     let n = ref 0 in
-    fun () -> Printf.sprintf "_zf_stmt_%d" (CCRef.get_then_incr n)
+    fun () -> Printf.sprintf "zf_stmt_%d" (CCRef.get_then_incr n)
 
   let from_file ?loc ?name ?(attrs=[]) file : t =
     (* NOTE: we always give a unique name if not present *)
