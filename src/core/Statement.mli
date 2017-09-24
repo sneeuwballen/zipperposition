@@ -67,53 +67,19 @@ type ('f, 't, 'ty) view =
   | Goal of 'f (** goal to prove *)
   | NegatedGoal of 'ty skolem list * 'f list (** goal after negation, with skolems *)
 
-(* a statement in a file *)
-type from_file = {
-  file : string;
-  name : string option;
-  loc: ParseLocation.t option;
-}
-
 type lit = Term.t SLiteral.t
 type formula = TypedSTerm.t
 type input_def = (TypedSTerm.t,TypedSTerm.t,TypedSTerm.t) def
 type clause = lit list
 
-type role =
-  | R_assert
-  | R_goal
-  | R_def
-  | R_decl
-
-type ('f, 't, 'ty) t = {
+type ('f, 't, 'ty) t = private {
   id: int;
   view: ('f, 't, 'ty) view;
   attrs: attrs;
-  src: source;
+  proof : proof;
 }
 
-and source = private {
-  src_id: int;
-  src_view: source_view;
-}
-and source_view =
-  | Input of UntypedAST.attrs * role
-  | From_file of from_file * role
-  | Internal of role
-  | Neg of sourced_t
-  | CNF of sourced_t
-  | Renaming of sourced_t * ID.t * formula (* renamed this formula *)
-  | Define of ID.t
-  | Preprocess of sourced_t * sourced_t list * string (* stmt, definitions, info *)
-
-and result =
-  | Sourced_input of TypedSTerm.t
-  | Sourced_clause of clause
-  | Sourced_statement of input_t
-  | Sourced_clause_stmt of clause_t
-
-and sourced_t = result * source
-
+and proof = Proof.Step.t
 and input_t = (TypedSTerm.t, TypedSTerm.t, TypedSTerm.t) t
 and clause_t = (clause, Term.t, Type.t) t
 
@@ -121,36 +87,34 @@ val compare : (_, _, _) t -> (_, _, _) t -> int
 
 val view : ('f, 't, 'ty) t -> ('f, 't, 'ty) view
 val attrs : (_, _, _) t -> attrs
-val src : (_, _, _) t -> source
+val proof_step : (_, _, _) t -> proof
+
+val as_proof_i : input_t -> Proof.t
+val res_tc_i : input_t Proof.result_tc
+val as_proof_c : clause_t -> Proof.t
+val res_tc_c : clause_t Proof.result_tc
 
 val mk_data : ID.t -> args:'ty Var.t list -> 'ty ->
   (ID.t * 'ty * ('ty * (ID.t * 'ty)) list) list -> 'ty data
 val mk_def : ?rewrite:bool -> ID.t -> 'ty -> ('f,'t,'ty) def_rule list -> ('f,'t,'ty) def
 
-val ty_decl : ?attrs:attrs -> src:source -> ID.t -> 'ty -> (_, _, 'ty) t
-val def : ?attrs:attrs -> src:source -> ('f,'t,'ty) def list -> ('f, 't, 'ty) t
-val rewrite : ?attrs:attrs -> src:source -> ('f,'t,'ty) def_rule -> ('f,'t,'ty) t
-val rewrite_term : ?attrs:attrs -> src:source -> ('t, 'ty) term_rule -> (_, 't, 'ty) t
-val rewrite_form : ?attrs:attrs -> src:source -> ('f, 't, 'ty) form_rule -> ('f, 't, 'ty) t
-val data : ?attrs:attrs -> src:source -> 'ty data list -> (_, _, 'ty) t
-val assert_ : ?attrs:attrs -> src:source -> 'f -> ('f, _, _) t
-val lemma : ?attrs:attrs -> src:source -> 'f list -> ('f, _, _) t
-val goal : ?attrs:attrs -> src:source -> 'f -> ('f, _, _) t
+val ty_decl : ?attrs:attrs -> proof:proof -> ID.t -> 'ty -> (_, _, 'ty) t
+val def : ?attrs:attrs -> proof:proof -> ('f,'t,'ty) def list -> ('f, 't, 'ty) t
+val rewrite : ?attrs:attrs -> proof:proof -> ('f,'t,'ty) def_rule -> ('f,'t,'ty) t
+val rewrite_term : ?attrs:attrs -> proof:proof -> ('t, 'ty) term_rule -> (_, 't, 'ty) t
+val rewrite_form : ?attrs:attrs -> proof:proof -> ('f, 't, 'ty) form_rule -> ('f, 't, 'ty) t
+val data : ?attrs:attrs -> proof:proof -> 'ty data list -> (_, _, 'ty) t
+val assert_ : ?attrs:attrs -> proof:proof -> 'f -> ('f, _, _) t
+val lemma : ?attrs:attrs -> proof:proof -> 'f list -> ('f, _, _) t
+val goal : ?attrs:attrs -> proof:proof -> 'f -> ('f, _, _) t
 val neg_goal :
-  ?attrs:attrs -> src:source -> skolems:'ty skolem list -> 'f list -> ('f, _, 'ty) t
+  ?attrs:attrs -> proof:proof -> skolems:'ty skolem list -> 'f list -> ('f, _, 'ty) t
 
 val signature : ?init:Signature.t -> (_, _, Type.t) t Sequence.t -> Signature.t
 (** Compute signature when the types are using {!Type} *)
 
 val conv_attrs : UntypedAST.attrs -> attrs
 val attr_to_ua : attr -> UntypedAST.attr
-
-val add_src : file:string -> ('f, 't, 'ty) t -> ('f, 't, 'ty) t
-
-val as_sourced : input_t -> sourced_t
-(** Just wrap the statement with its source *)
-
-val as_sourced_clause : clause_t -> sourced_t
 
 val map_data : ty:('ty1 -> 'ty2) -> 'ty1 data -> 'ty2 data
 
@@ -197,56 +161,6 @@ val scan_stmt_for_ind_ty : (_, _, Type.t) t -> unit
 
 val scan_simple_stmt_for_ind_ty : (_, _, TypedSTerm.t) t -> unit
 (** Same as {!scan_stmt} but on earlier statements *)
-
-(** {2 Sourced Statements} *)
-
-(** {2 Statement Source}
-
-    Where a statement originally comes from (file, location, named statement,
-    or result of some transformations, etc.) *)
-module Src : sig
-  type t = source
-
-  val equal : t -> t -> bool
-  val hash : t -> int
-
-  val view : t -> source_view
-
-  val file : from_file -> string
-  val name : from_file -> string option
-  val loc : from_file -> ParseLocation.t option
-
-  val from_input : UntypedAST.attrs -> role -> t
-
-  val from_file : ?loc:ParseLocation.t -> ?name:string -> string -> role -> t
-  (** make a new sourced item. Default [is_conjecture] is [false]. *)
-
-  val internal : role -> t
-
-  val neg : sourced_t -> t
-  val cnf : sourced_t -> t
-  val preprocess : sourced_t -> sourced_t list -> string -> t
-  val renaming : sourced_t -> ID.t -> formula -> t
-  val define : ID.t -> t
-
-  val neg_input : TypedSTerm.t -> source -> t
-  val neg_clause : clause -> source -> t
-
-  val cnf_input : TypedSTerm.t -> source -> t
-  val cnf_clause : clause -> source -> t
-
-  val preprocess_input : input_t -> sourced_t list -> string -> t
-  val renaming_input : input_t -> ID.t -> formula -> t
-
-  val pp_from_file : from_file CCFormat.printer
-  (* include Interfaces.PRINT with type t := t *)
-
-  val pp_role : role CCFormat.printer
-
-  val pp : t CCFormat.printer
-  val pp_tstp : t CCFormat.printer
-  val to_attr : t -> UntypedAST.attr
-end
 
 (** {2 Iterators} *)
 

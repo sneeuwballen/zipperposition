@@ -109,6 +109,7 @@ let check_step_ (p:proof): res option =
     | P.Goal
     | P.Assert
     | P.By_def _
+    | P.Define _
       -> Some R_ok
     | P.Negated_goal p' ->
       (* [p'] should prove [not concl] *)

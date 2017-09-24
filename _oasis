@@ -73,7 +73,7 @@ Library "logtk"
                     FeatureVector, FV_tree, UntypedAST, Ind_ty,
                     TypedSTerm, Statement, Flex_state, Compute_prec,
                     Ordinal, Polynomial, Rewrite, Test_prop, Input_format,
-                    Output_format, LLProof, LLProof_check,
+                    Output_format, Proof, LLProof, LLProof_check,
                     Multisets, Literal, Literals, Int_lit, Rat_lit, Monome,
                     lib/Hashcons, lib/ParseLocation, lib/Multiset, lib/LazyList,
                     lib/Hash, lib/IArray, lib/AllocCache, lib/Multiset_intf,
@@ -121,7 +121,7 @@ Library "libzipperposition"
   Pack:             true
   FindlibName:      libzipperposition
   Modules:          ClauseQueue, Clause, SClause, Const, Extensions,
-                    Ctx, Proof, ProofState, Bool_clause,
+                    Ctx, ProofState, Bool_clause,
                     Saturate, Selection, AC, AC_intf, SimplM,
                     Params, Env, Signals, Classify_cst,
                     Ctx_intf, Clause_intf, Env_intf, ProofState_intf,

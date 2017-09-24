@@ -75,7 +75,7 @@ type form_definition = private {
      [proxy -> true if form]
      [proxy -> false if not form] (depending on polarity) *)
   polarity : polarity;
-  src: Statement.source;
+  proof: Proof.step;
   (* source for this definition *)
 }
 
@@ -86,7 +86,7 @@ val define_form :
   ctx:ctx ->
   rw_rules:bool ->
   polarity:polarity ->
-  src:(ID.t -> Statement.source) ->
+  parents:Proof.Parent.t list ->
   form ->
   form_definition
 (** [define ~ctx f] returns a new predicate for [f],
@@ -99,11 +99,13 @@ type term_definition = private {
   td_ty: type_;
   td_rules: (form, term, type_) Statement.def_rule list;
   td_as_def: (form,term,type_) Statement.def;
+  td_proof: Proof.step;
 }
 
 val define_term :
   ?pattern:string ->
   ctx:ctx ->
+  parents:Proof.Parent.t list ->
   (term list * term) list ->
   term_definition
 (** [define_term l] introduces a new function symbol [f] that is
@@ -131,8 +133,5 @@ val pop_new_definitions : ctx:ctx -> definition list
 
 val def_as_stmt : definition -> Statement.input_t list
 (** Project the definition into a list of statements *)
-
-val def_as_sourced_stmt : definition -> Statement.sourced_t list
-(** Project the definition into a statement *)
 
 (** {2 Attribute} *)

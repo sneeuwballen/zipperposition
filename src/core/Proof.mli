@@ -3,34 +3,53 @@
 
 (** {1 Manipulate proofs} *)
 
-open Logtk
-
 module Loc = ParseLocation
 
 type form = TypedSTerm.t
-type bool_lit = BBox.Lit.t
 type 'a sequence = ('a -> unit) -> unit
 
 val section : Util.Section.t
-
-type statement_src = Statement.source
 
 type rule
 
 (** How do we check a step? *)
 type check = [`No_check | `Check | `Check_with of form list]
 
+type attrs = UntypedAST.attrs
+
 (** Classification of proof steps *)
 type kind =
+  | Intro of source * role
   | Inference of rule * check
   | Simplification of rule * check
   | Esa of rule * check
-  | Assert of statement_src
-  | Goal of statement_src
-  | Lemma
-  | Data of statement_src * Type.t Statement.data
   | Trivial (** trivial, or trivial within theories *)
-  | By_def of ID.t
+  | Define of ID.t * source (** definition *)
+  | By_def of ID.t (** following from the def of ID *)
+
+(** Source of leaves (from some input problem, or internal def) *)
+and source = private {
+  src_id: int;
+  src_view: source_view;
+}
+and source_view =
+  | From_file of from_file * attrs
+  | Internal of attrs
+
+(** Intro role *)
+and role =
+  | R_assert
+  | R_goal
+  | R_def
+  | R_decl
+  | R_lemma
+
+(* a statement in a file *)
+and from_file = {
+  file : string;
+  name : string option;
+  loc: ParseLocation.t option;
+}
 
 (** Typeclass for the result of a proof step *)
 type 'a result_tc
@@ -77,6 +96,42 @@ module Kind : sig
   val pp : t CCFormat.printer
 end
 
+(** {2 Source}
+
+    Where a statement/object originally comes from
+    (file, location, named statement, etc.)
+*)
+module Src : sig
+  type t = source
+
+  val equal : t -> t -> bool
+  val hash : t -> int
+
+  val view : t -> source_view
+
+  val file : from_file -> string
+  val name : from_file -> string option
+  val loc : from_file -> ParseLocation.t option
+
+  val from_file :
+    ?loc:ParseLocation.t ->
+    ?name:string ->
+    ?attrs:UntypedAST.attrs ->
+    string ->
+    t
+
+  val internal : attrs -> t
+
+  val pp_from_file : from_file CCFormat.printer
+  (* include Interfaces.PRINT with type t := t *)
+
+  val pp_role : role CCFormat.printer
+
+  val pp : t CCFormat.printer
+  val pp_tstp : t CCFormat.printer
+  val to_attrs : t -> UntypedAST.attrs
+end
+
 (** {2 Proof Results} *)
 
 (** A proof is used to deduce some results. We can handle diverse results
@@ -99,7 +154,8 @@ module Result : sig
     to_exn:('a -> exn) ->
     compare:('a -> 'a -> int) ->
     pp_in:(Output_format.t -> 'a CCFormat.printer) ->
-    to_form:('a -> form) ->
+    to_form:(ctx:Term.Conv.ctx -> 'a -> form) ->
+    ?apply_subst:(Subst.t -> 'a Scoped.t -> 'a) ->
     ?flavor:('a -> flavor) ->
     unit ->
     'a tc
@@ -114,8 +170,9 @@ module Result : sig
   include Interfaces.EQ with type t := t
   val pp_in : Output_format.t -> t CCFormat.printer
   val pp : t CCFormat.printer
-  val to_form : t -> form
+  val to_form : ?ctx:Term.Conv.ctx -> t -> form
   val flavor : t -> flavor
+  val apply_subst : Subst.t -> t Scoped.t -> t
 end
 
 (** {2 A proof step} *)
@@ -136,21 +193,23 @@ module Step : sig
   val hash : t -> int
   val equal : t -> t -> bool
 
+  val src : t -> source option
 
   val trivial : t
 
   val by_def : ID.t -> t
 
-  val data : statement_src -> Type.t Statement.data -> t
+  val define : ID.t -> source -> parent list -> t
+  val define_internal : ID.t -> parent list -> t
 
-  val assert_ : statement_src -> t
+  val lemma : source -> t
 
-  val goal : statement_src -> t
+  val intro : source -> role -> t
 
-  val lemma : t
-
+  val assert_ : source -> t
   val assert' : ?loc:Loc.t -> file:string -> name:string -> unit -> t
 
+  val goal : source -> t
   val goal' : ?loc:Loc.t -> file:string -> name:string -> unit -> t
 
   val inference : ?infos:infos -> ?check:check -> rule:rule -> parent list -> t
@@ -158,6 +217,8 @@ module Step : sig
   val simp : ?infos:infos -> ?check:check -> rule:rule -> parent list -> t
 
   val esa : ?infos:infos -> ?check:check -> rule:rule -> parent list -> t
+
+  val to_attrs : t -> UntypedAST.attrs
 
   val is_trivial : t -> bool
   val is_by_def : t -> bool
@@ -235,16 +296,6 @@ module S : sig
 
   val mk_f_esa : ?check:check -> rule:rule -> form -> parent list -> t
 
-  (* FIXME
-  val mk_c : step -> SClause.t -> t
-
-  val mk_bc : step -> bool_lit list -> t
-
-  val mk_stmt : step -> Statement.input_t -> t
-
-  val adapt_c : t -> SClause.t -> t
-     *)
-
   val adapt : t -> Result.t -> t
 
   val adapt_f : t -> form -> t
@@ -288,8 +339,5 @@ module S : sig
 
   val pp_dot_seq_file : ?name:string -> string -> t Sequence.t -> unit
   (** same as {!pp_dot_seq} but into a file *)
-
-  val step_of_src : Statement.Src.t -> Step.t
-  val parent_of_sourced : Statement.sourced_t -> Parent.t
 end
 

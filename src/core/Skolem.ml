@@ -37,7 +37,7 @@ type form_definition = {
      [proxy -> true if form]
      [proxy -> false if not form] (depending on polarity) *)
   polarity : polarity;
-  src: Statement.source;
+  proof: Proof.step;
   (* source for this definition *)
 }
 
@@ -46,6 +46,7 @@ type term_definition = {
   td_ty: type_;
   td_rules: (form, term, type_) Statement.def_rule list;
   td_as_def: (form,term,type_) Statement.def;
+  td_proof: Proof.step;
 }
 
 type definition =
@@ -160,7 +161,7 @@ let pp_definition out = function
   | Def_form f -> pp_form_definition out f
   | Def_term t -> pp_term_definition out t
 
-let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~src form =
+let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~parents form =
   incr_counter ctx;
   let tyvars, vars = collect_vars Var.Subst.empty form in
   let vars_t = List.map (fun v->T.var v) vars in
@@ -170,6 +171,7 @@ let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~src form =
   (* not a skolem (but a defined term). Will be defined, not declared. *)
   let f = fresh_id ~start0:true ~ctx pattern in
   let proxy = T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t) in
+  let proof = Proof.Step.define_internal f parents in
   (* register the new definition *)
   let def = {
     form;
@@ -178,7 +180,7 @@ let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~src form =
     rw_rules;
     proxy;
     polarity;
-    src=src f;
+    proof;
   } in
   ctx.sc_new_defs <- Def_form def :: ctx.sc_new_defs;
   Util.debugf ~section 5 "@[<2>define_form@ %a@]" (fun k->k pp_form_definition def);
@@ -187,7 +189,7 @@ let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~src form =
 let pp_rules =
   Fmt.(Util.pp_list Dump.(pair (list T.pp_inner |> hovbox) T.pp) |> hovbox)
 
-let define_term ?(pattern="fun_") ~ctx rules : term_definition =
+let define_term ?(pattern="fun_") ~ctx ~parents rules : term_definition =
   Util.debugf ~section 5
     "(@[<hv2>define_term@ :rules (@[<hv>%a@])@])" (fun k->k pp_rules rules);
   incr_counter ctx;
@@ -234,11 +236,13 @@ let define_term ?(pattern="fun_") ~ctx rules : term_definition =
       rules
   in
   let td_as_def = Stmt.mk_def ~rewrite:true id ty rules in
+  let proof = Proof.Step.define_internal id parents in
   let def = {
     td_id=id;
     td_ty=ty;
     td_rules=rules;
     td_as_def;
+    td_proof=proof;
   } in
   ctx.sc_new_defs <- Def_term def :: ctx.sc_new_defs;
   Util.debugf ~section 4 "@[<2>define_term@ %a@]" (fun k->k pp_term_definition def);
@@ -250,6 +254,8 @@ let pop_new_definitions ~ctx =
   let l = ctx.sc_new_defs in
   ctx.sc_new_defs <- [];
   l
+
+let rule_def = Proof.Rule.mk "define"
 
 let def_as_stmt (d:definition): Stmt.input_t list =
   let module F = T.Form in
@@ -265,8 +271,8 @@ let def_as_stmt (d:definition): Stmt.input_t list =
         in
         Stmt.Def_form (vars, lhs, [rhs], polarity)
       in
-      let src = d.src in
-      [Stmt.def ~src [Stmt.mk_def ~rewrite:true d.proxy_id d.proxy_ty [rule]]]
+      let proof = d.proof in
+      [Stmt.def ~proof [Stmt.mk_def ~rewrite:true d.proxy_id d.proxy_ty [rule]]]
     | Def_form d ->
       (* introduce the required axiom, with polarity as needed *)
       let f' = match d.polarity with
@@ -274,18 +280,15 @@ let def_as_stmt (d:definition): Stmt.input_t list =
         | `Neg -> F.imply d.form d.proxy
         | `Both -> F.equiv d.proxy d.form
       in
-      let src = d.src in
-      [ Stmt.ty_decl ~src d.proxy_id d.proxy_ty;
-        Stmt.assert_ ~src f'
+      let proof = d.proof in
+      [ Stmt.ty_decl ~proof d.proxy_id d.proxy_ty;
+        Stmt.assert_ ~proof f'
       ]
     | Def_term d ->
       let id = d.td_id in
       let ty = d.td_ty in
       let rules = d.td_rules in
-      let src = Stmt.Src.define id in
-      [Stmt.def ~src [Stmt.mk_def ~rewrite:true id ty rules]]
+      let proof = d.td_proof in
+      [Stmt.def ~proof [Stmt.mk_def ~rewrite:true id ty rules]]
   end
 
-let def_as_sourced_stmt d : Stmt.sourced_t list =
-  let stmt = def_as_stmt d in
-  List.map Stmt.as_sourced stmt

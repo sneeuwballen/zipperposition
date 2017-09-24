@@ -1047,7 +1047,8 @@ module Make
              let new_cuts =
                List.map
                  (fun g ->
-                    A.introduce_cut ~depth:(A.cut_depth cut) g Proof.Step.lemma
+                    A.introduce_cut ~depth:(A.cut_depth cut) g
+                      (Proof.Step.lemma @@ Proof.Src.internal [])
                       ~reason:Fmt.(fun out ()->
                           fprintf out "generalizing %a" Cut_form.pp g0))
                  new_goals
@@ -1169,7 +1170,7 @@ module Make
              Util.debugf ~section 1
                "(@[<2>@{<green>prove_by_induction@}@ :clauses (@[%a@])@ :goal %a@])"
                (fun k->k (Util.pp_list C.pp) clauses Goal.pp goal);
-             let proof = Proof.Step.lemma in
+             let proof = Proof.Step.lemma @@ Proof.Src.internal [] in
              (* new lemma has same penalty as the clauses *)
              let penalty = List.fold_left (fun n c -> n+C.penalty c) 0 clauses in
              let cut =

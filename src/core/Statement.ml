@@ -82,38 +82,17 @@ type ('f, 't, 'ty) t = {
   id: int;
   view: ('f, 't, 'ty) view;
   attrs: attrs;
-  src: source;
+  proof: proof;
 }
 
-and source = {
-  src_id: int;
-  src_view: source_view;
-}
-and source_view =
-  | Input of UntypedAST.attrs * role
-  | From_file of from_file * role
-  | Internal of role
-  | Neg of sourced_t
-  | CNF of sourced_t
-  | Renaming of sourced_t * ID.t * formula (* renamed this formula *)
-  | Define of ID.t
-  | Preprocess of sourced_t * sourced_t list * string (* stmt, definitions, info *)
-
-and result =
-  | Sourced_input of TypedSTerm.t
-  | Sourced_clause of clause
-  | Sourced_statement of input_t
-  | Sourced_clause_stmt of clause_t
-
-and sourced_t = result * source
-
+and proof = Proof.Step.t
 and input_t = (TypedSTerm.t, TypedSTerm.t, TypedSTerm.t) t
 and clause_t = (clause, Term.t, Type.t) t
 
 let compare a b = CCInt.compare a.id b.id
 let view t = t.view
 let attrs t = t.attrs
-let src t = t.src
+let proof_step t = t.proof
 
 let mk_data id ~args ty cstors =
   {data_id=id; data_args=args; data_ty=ty; data_cstors=cstors; }
@@ -122,19 +101,19 @@ let mk_def ?(rewrite=false) id ty rules =
   { def_id=id; def_ty=ty; def_rules=rules; def_rewrite=rewrite; }
 
 let id_n_ = ref 0
-let mk_ ?(attrs=[]) ~src view: (_,_,_) t =
-  {id=CCRef.incr_then_get id_n_; src; view; attrs; }
+let mk_ ?(attrs=[]) ~proof view: (_,_,_) t =
+  {id=CCRef.incr_then_get id_n_; proof; view; attrs; }
 
-let ty_decl ?attrs ~src id ty = mk_ ?attrs ~src (TyDecl (id,ty))
-let def ?attrs ~src l = mk_ ?attrs ~src (Def l)
-let rewrite ?attrs ~src d = mk_ ?attrs ~src (Rewrite d)
-let rewrite_term ?attrs ~src r = rewrite ?attrs ~src (Def_term r)
-let rewrite_form ?attrs ~src r = rewrite ?attrs ~src (Def_form r)
-let data ?attrs ~src l = mk_ ?attrs ~src (Data l)
-let assert_ ?attrs ~src c = mk_ ?attrs ~src (Assert c)
-let lemma ?attrs ~src l = mk_ ?attrs ~src (Lemma l)
-let goal ?attrs ~src c = mk_ ?attrs ~src (Goal c)
-let neg_goal ?attrs ~src ~skolems l = mk_ ?attrs ~src (NegatedGoal (skolems, l))
+let ty_decl ?attrs ~proof id ty = mk_ ?attrs ~proof (TyDecl (id,ty))
+let def ?attrs ~proof l = mk_ ?attrs ~proof (Def l)
+let rewrite ?attrs ~proof d = mk_ ?attrs ~proof (Rewrite d)
+let rewrite_term ?attrs ~proof r = rewrite ?attrs ~proof (Def_term r)
+let rewrite_form ?attrs ~proof r = rewrite ?attrs ~proof (Def_form r)
+let data ?attrs ~proof l = mk_ ?attrs ~proof (Data l)
+let assert_ ?attrs ~proof c = mk_ ?attrs ~proof (Assert c)
+let lemma ?attrs ~proof l = mk_ ?attrs ~proof (Lemma l)
+let goal ?attrs ~proof c = mk_ ?attrs ~proof (Goal c)
+let neg_goal ?attrs ~proof ~skolems l = mk_ ?attrs ~proof (NegatedGoal (skolems, l))
 
 let map_data ~ty:fty d =
   { d with
@@ -188,124 +167,6 @@ let map ~form ~term ~ty st =
     | TyDecl (id, ty) -> TyDecl (id, fty ty)
   in
   {st with view = map_view ~form ~term ~ty st.view; }
-
-(** {2 Statement Source} *)
-
-module Src = struct
-  type t = source
-
-  let file x = x.file
-  let name x = x.name
-  let loc x = x.loc
-
-  let equal a b = a.src_id = b.src_id
-  let hash a = a.src_id
-  let view a = a.src_view
-
-  let mk_ =
-    let n = ref 0 in
-    fun src_view -> {src_view; src_id=CCRef.get_then_incr n}
-
-  let from_input attrs r : t = mk_ (Input (attrs, r))
-  let from_file ?loc ?name file r : t = mk_ (From_file ({ name; loc; file; }, r))
-  let internal r : t = mk_ (Internal r)
-  let neg x : t = mk_ (Neg x)
-  let cnf x : t = mk_ (CNF x)
-  let renaming x id f : t = mk_ (Renaming (x, id, f))
-  let define id : t = mk_ (Define id)
-  let preprocess x l str : t = mk_ (Preprocess (x,l,str))
-
-  let neg_input f src = neg (Sourced_input f, src)
-  let neg_clause c src = neg (Sourced_clause c, src)
-
-  let cnf_input f src = cnf (Sourced_input f, src)
-  let cnf_clause c src = cnf (Sourced_clause c, src)
-
-  let renaming_input input id f =
-    renaming (Sourced_statement input, input.src) id f
-  let preprocess_input input l str =
-    preprocess (Sourced_statement input, input.src) l str
-
-  let pp_from_file out x =
-    let pp_name out = function
-      | None -> ()
-      | Some n -> Format.fprintf out "at %s " n
-    in
-    Format.fprintf out "@[<2>%ain@ `%s`@,%a@]"
-      pp_name x.name x.file ParseLocation.pp_opt x.loc
-
-  let pp_role out = function
-    | R_decl -> CCFormat.string out "decl"
-    | R_assert -> CCFormat.string out "assert"
-    | R_goal -> CCFormat.string out "goal"
-    | R_def -> CCFormat.string out "def"
-
-  let rec pp_tstp out src = match view src with
-    | Internal _
-    | Input _
-    | Define _ -> ()
-    | From_file (src,_) ->
-      let file = src.file in
-      begin match src.name with
-        | None -> Format.fprintf out "file('%s')" file
-        | Some name -> Format.fprintf out "file(@['%s',@ '%s'@])" file name
-      end
-    | Neg (_,src') ->
-      Format.fprintf out "inference(@['negate_goal',@ [status(thm)],@ [%a]@])"
-        pp_tstp src'
-    | CNF (_,src') ->
-      Format.fprintf out "inference(@['clausify',@ [status(esa)],@ [%a]@])"
-        pp_tstp src'
-    | Preprocess ((_,src'),_,msg) ->
-      Format.fprintf out
-        "inference(@['%s',@ [status(esa)],@ [%a]@])"
-        msg pp_tstp src'
-    | Renaming ((_,src'), id, form) ->
-      Format.fprintf out
-        "inference(@['renaming',@ [status(esa)],@ [%a],@ on(@[%a<=>%a@])@])"
-        pp_tstp src' ID.pp id TypedSTerm.TPTP.pp form
-
-  let rec pp out src = match view src with
-    | Internal _
-    | Input _ -> ()
-    | From_file (src,_) ->
-      let file = src.file in
-      begin match src.name with
-        | None -> Format.fprintf out "'%s'" file
-        | Some name -> Format.fprintf out "'%s' in '%s'" name file
-      end
-    | Neg (_,src') ->
-      Format.fprintf out "(@[neg@ %a@])" pp src'
-    | CNF (_,src') ->
-      Format.fprintf out "(@[CNF@ %a@])" pp src'
-    | Renaming ((_,src'), id, form) ->
-      Format.fprintf out "(@[renaming@ [%a]@ :name %a@ :on @[%a@]@])"
-        pp src' ID.pp id TypedSTerm.pp form
-    | Define id ->
-      Format.fprintf out "(@[define %a@])" ID.pp id
-    | Preprocess ((_,src'),_,msg) ->
-      Format.fprintf out "(@[preprocess@ [%a]@ :msg %S@])"
-        pp src' msg
-
-  let rec to_attr src : UntypedAST.attr =
-    let open UntypedAST.A in
-    begin match view src with
-      | Input (_,_) -> str "input"
-      | Internal _ -> str "internal"
-      | From_file (f,_) ->
-        begin match f.name with
-          | None -> app "file" [quoted f.file]
-          | Some n -> app "file" [quoted f.file; app "name" [quoted n]]
-        end
-      | Neg (_,src') -> app "neg" [to_attr src']
-      | CNF (_,src') -> app "cnf" [to_attr src']
-      | Renaming ((_,src'),id,_) ->
-        app "renaming" [to_attr src'; quoted (ID.to_string id)]
-      | Define id -> app "define" [quoted (ID.to_string id)]
-      | Preprocess ((_,src'),_,msg) ->
-        app "preprocess" [to_attr src'; quoted msg]
-    end
-end
 
 (** {2 Defined Constants} *)
 
@@ -594,34 +455,13 @@ let conv_attrs =
       | A.A_app ("prefix", [A.A_quoted s]) -> Some (A_prefix s)
       | _ -> None)
 
-let attr_to_ua =
+let attr_to_ua : attr -> UntypedAST.attr =
   let open UntypedAST.A in
   function
     | A_AC -> str "AC"
     | A_sos -> str "sos"
     | A_prefix s -> app "prefix" [quoted s]
     | A_infix s -> app "infix" [quoted s]
-
-let add_src ~file st = match st.src.src_view with
-  | Input (attrs,r) ->
-    let module A = UntypedAST in
-    let attrs = conv_attrs attrs
-    and name =
-      CCList.find_map
-        (function
-          | A.A_app ("name", [(A.A_quoted s | A.A_app (s,[]))]) -> Some s
-          | _ -> None)
-        attrs
-    in
-    { st with
-        src=Src.from_file ?name file r;
-        attrs;
-    }
-  | _ -> st
-
-let as_sourced st = Sourced_statement st, src st
-
-let as_sourced_clause st = Sourced_clause_stmt st, src st
 
 (** {2 IO} *)
 
@@ -716,8 +556,8 @@ module ZF = struct
       | [] -> ()
       | vars -> Format.fprintf out "forall %a.@ " (Util.pp_list ~sep:" " pp_var) vars
     in
-    let src = Src.to_attr st.src in
-    let attrs = src :: List.map attr_to_ua st.attrs in
+    let src_attrs = Proof.Step.to_attrs st.proof in
+    let attrs = src_attrs @ List.map attr_to_ua st.attrs in
     let pp_attrs = UntypedAST.pp_attrs_zf in
     match st.view with
       | TyDecl (id,ty) ->
@@ -761,8 +601,9 @@ end
 
 module TPTP = struct
   let pp ppf ppt ppty out st =
-    let name = match st.src.src_view with
-      | From_file (f,_) -> CCOpt.get_or ~default:"no_name" (Src.name f)
+    let name = match Proof.Step.src st.proof with
+      | Some {Proof.src_view=Proof.From_file (f,_);_} ->
+        CCOpt.get_or ~default:"no_name" (Proof.Src.name f)
       | _ -> "no_name"
     in
     let pp_decl out (id,ty) =
@@ -846,3 +687,27 @@ let pp_clause_in o =
   pp_in (Util.pp_list ~sep:" ∨ " (SLiteral.pp Term.pp)) Term.pp Type.pp o
 
 let pp_input_in o = pp_in TypedSTerm.pp TypedSTerm.pp TypedSTerm.pp o
+
+exception E_i of input_t
+exception E_c of clause_t
+
+let res_tc_i : input_t Proof.result_tc =
+  Proof.Result.make_tc
+    ~of_exn:(function E_i c -> Some c | _ -> None)
+    ~to_exn:(fun i -> E_i i)
+    ~compare:compare
+    ~pp_in:pp_input_in
+    ~to_form:(fun ~ctx:_ _ -> assert false) (* TODO *)
+    ()
+
+let res_tc_c : clause_t Proof.result_tc =
+  Proof.Result.make_tc
+    ~of_exn:(function E_c c -> Some c | _ -> None)
+    ~to_exn:(fun i -> E_c i)
+    ~compare:compare
+    ~pp_in:pp_clause_in
+    ~to_form:(fun ~ctx:_ _ -> assert false) (* TODO *)
+    ()
+
+let as_proof_i t = Proof.S.mk t.proof (Proof.Result.make res_tc_i t)
+let as_proof_c t = Proof.S.mk t.proof (Proof.Result.make res_tc_c t)

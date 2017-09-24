@@ -147,9 +147,15 @@ let proof_tc =
       then if Trail.is_empty (trail c) then `Proof_of_false
         else `Absurd_lits
       else `Vanilla)
-    ~to_form:(fun c ->
-      let ctx=Term.Conv.create() in
+    ~to_form:(fun ~ctx c ->
       to_s_form ~ctx c |> TypedSTerm.Form.close_forall)
+    ~apply_subst:(fun subst (c,sc_c) ->
+      let trail = trail c in
+      let lits' =
+        Literals.apply_subst ~renaming:(Subst.Renaming.create())
+          subst (lits c,sc_c)
+      in
+      make ~trail lits')
     ~pp_in
     ()
 
