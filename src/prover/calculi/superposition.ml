@@ -464,6 +464,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun acc (s, t, _, s_pos) ->
            (* rewrite clauses using s *)
            I.retrieve_unifiables (!_idx_sup_into, 1) (s, 0)
+           |> Sequence.filter (fun (u_p,_,_) -> T.DB.is_closed u_p)
            |> Sequence.fold
              (fun acc (u_p, with_pos, subst) ->
                 (* rewrite u_p with s *)
@@ -493,6 +494,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       |> Sequence.filter (fun (u_p, _) -> not (T.is_var u_p) || T.is_ho_var u_p)
       (* TODO: could exclude more variables from the index:
          they are not needed if they occur with the same args everywhere in the clause *)
+      |> Sequence.filter (fun (u_p, _) -> T.DB.is_closed u_p)
       |> Sequence.fold
         (fun acc (u_p, passive_pos) ->
            let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
