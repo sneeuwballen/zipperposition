@@ -657,6 +657,7 @@ module Rule = struct
       ~to_exn:(fun t -> E_p t)
       ~of_exn:(function E_p p -> Some p | _ -> None)
       ~compare ~flavor:(fun _ -> `Def)
+      ~pp_in
       ~to_form:(fun ~ctx r -> to_form ~ctx r)
       ()
 

@@ -155,11 +155,17 @@ module Result : sig
     to_exn:('a -> exn) ->
     compare:('a -> 'a -> int) ->
     to_form:(ctx:Term.Conv.ctx -> 'a -> form) ->
-    ?pp_in:(Output_format.t -> 'a CCFormat.printer) ->
+    pp_in:(Output_format.t -> 'a CCFormat.printer) ->
+    ?is_stmt:bool ->
     ?apply_subst:(Subst.t -> 'a Scoped.t -> 'a) ->
     ?flavor:('a -> flavor) ->
     unit ->
     'a tc
+  (** Make a result typeclass, for considering values of type ['a] as proof
+      results.
+      @param pp_in print in given syntax
+      @param is_stmt true only if ['a] is a toplevel statement (default false)
+  *)
 
   val make : 'a tc -> 'a -> t
 
@@ -170,8 +176,8 @@ module Result : sig
   include Interfaces.ORD with type t := t
   include Interfaces.EQ with type t := t
   val pp_in : Output_format.t -> t CCFormat.printer
-  val pp_in_opt : t -> (Output_format.t -> unit CCFormat.printer) option
   val pp : t CCFormat.printer
+  val is_stmt : t -> bool
   val to_form : ?ctx:Term.Conv.ctx -> t -> form
   val flavor : t -> flavor
   val apply_subst : Subst.t -> t Scoped.t -> t

@@ -68,7 +68,8 @@ type 'a result_tc = {
   res_of_exn: exn -> 'a option;
   res_to_exn: 'a -> exn;
   res_compare: 'a -> 'a -> int;
-  res_pp_in: (Output_format.t -> 'a CCFormat.printer) option;
+  res_is_stmt: bool;
+  res_pp_in: Output_format.t -> 'a CCFormat.printer;
   res_to_form: ctx:Term.Conv.ctx -> 'a -> TypedSTerm.Form.t;
   res_apply_subst: (Subst.t -> 'a Scoped.t -> 'a) option;
   res_flavor: 'a -> flavor;
@@ -267,21 +268,9 @@ module Result = struct
     | None -> assert false
     | Some x -> r.res_to_form ~ctx x
 
-  let pp_in_opt (Res (r,x)) = match r.res_of_exn x with
+  let pp_in o out (Res (r,x)) = match r.res_of_exn x with
     | None -> assert false
-    | Some x ->
-      begin match r.res_pp_in with
-        | None -> None
-        | Some f -> Some (fun o out () -> f o out x)
-      end
-
-  let pp_in o out ((Res (r,x))as p) = match r.res_of_exn x with
-    | None -> assert false
-    | Some x ->
-      begin match r.res_pp_in with
-        | Some f -> f o out x
-        | None -> TypedSTerm.pp_in o out (to_form p)
-      end
+    | Some x -> r.res_pp_in o out x
 
   let pp = pp_in Output_format.normal
 
@@ -302,7 +291,8 @@ module Result = struct
   let make_tc (type a)
       ~of_exn ~to_exn ~compare
       ~to_form
-      ?pp_in
+      ~pp_in
+      ?(is_stmt=false)
       ?apply_subst
       ?(flavor=fun _ -> `Vanilla)
       () : a result_tc
@@ -312,6 +302,7 @@ module Result = struct
       res_of_exn=of_exn;
       res_to_exn=to_exn;
       res_compare=compare;
+      res_is_stmt=is_stmt;
       res_pp_in=pp_in;
       res_apply_subst=apply_subst;
       res_to_form=to_form;
@@ -329,10 +320,12 @@ module Result = struct
       ~to_exn:(fun f -> E_form f)
       ~to_form:(fun ~ctx:_ t -> t)
       ~compare:T.compare
+      ~pp_in:TypedSTerm.pp_in
       ~flavor:(fun f -> if T.equal f F.false_ then `Proof_of_false else `Vanilla)
       ()
 
   let of_form = make form_tc
+  let is_stmt (Res (r,_)) = r.res_is_stmt
 end
 
 module Step = struct
@@ -366,6 +359,7 @@ module Step = struct
       -> Some rule
 
   let is_assert p = match p.kind with Intro (_,R_assert) -> true | _ -> false
+  let is_assert_like p = match p.kind with Intro (_,(R_assert|R_def|R_decl)) -> true | _ -> false
   let is_goal p = match p.kind with Intro (_,(R_goal|R_lemma)) -> true | _ -> false
   let is_trivial p = match p.kind with Trivial -> true | _ -> false
   let is_by_def p = match p.kind with By_def _ -> true | _ -> false
@@ -442,6 +436,13 @@ module Step = struct
     | l ->
       Format.fprintf out "@ %a" (Util.pp_list ~sep:" " UntypedAST.pp_attr) l
 
+  let pp_parents out = function
+    | [] -> ()
+    | l ->
+      Format.fprintf out "@ with @[<hv>%a@]"
+        (Util.pp_list Result.pp)
+        (List.map (fun p -> (Parent.proof p).result) @@ l)
+
   let pp out step = match kind step with
     | Intro (_,(R_assert|R_goal|R_def|R_decl)) ->
       Format.fprintf out "@[<hv2>%a@]%a" Kind.pp (kind step) pp_infos step.infos
@@ -449,15 +450,13 @@ module Step = struct
     | Trivial -> Format.fprintf out "@[<2>trivial%a@]" pp_infos step.infos
     | By_def id -> Format.fprintf out "@[<2>by_def %a%a@]" ID.pp id pp_infos step.infos
     | Define (id,src) ->
-      Format.fprintf out "@[<2>define %a@ %a%a@]" ID.pp id Src.pp src pp_infos step.infos
+      Format.fprintf out "@[<2>define %a@ %a%a%a@]"
+        ID.pp id Src.pp src pp_parents (parents step) pp_infos step.infos
     | Inference _
     | Simplification _
     | Esa _ ->
-      Format.fprintf out "@[<hv2>%a@ with @[<hv>%a@]%a@]"
-        Kind.pp (kind step)
-        (Util.pp_list Result.pp)
-        (List.map (fun p -> (Parent.proof p).result) @@ parents step)
-        pp_infos step.infos
+      Format.fprintf out "@[<hv2>%a%a%a@]"
+        Kind.pp (kind step) pp_parents (parents step) pp_infos step.infos
 end
 
 module S = struct
@@ -527,14 +526,15 @@ module S = struct
     CCGraph.make
       (fun p ->
          let st = step p in
-         match Step.rule st with
-         | None -> Sequence.empty
-         | Some rule ->
-           st
-           |> Step.parents
-           |> Sequence.of_list
-           |> Sequence.map
-             (fun p' -> (rule,Parent.subst p',Step.infos st), Parent.proof p'))
+         let rule = match Step.rule st with
+           | None -> ""
+           | Some rule -> rule
+         in
+         st
+         |> Step.parents
+         |> Sequence.of_list
+         |> Sequence.map
+           (fun p' -> (rule,Parent.subst p',Step.infos st), Parent.proof p'))
 
   (** {2 IO} *)
 
@@ -614,14 +614,13 @@ module S = struct
                (Util.pp_list ~sep:", " UntypedAST.pp_attr_tstp) l
          in
          let infos = p.step |> Step.infos in
-         begin match Result.pp_in_opt (result p) with
-           | None ->
-             Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]%a).@]@,"
-               name role (Result.pp_in Output_format.tptp) (result p)
-               Kind.pp_tstp (Step.kind @@ step p,parents) pp_infos infos
-           | Some f ->
-             Format.fprintf out "%a@," (f Output_format.tptp) ()
-         end);
+         if Result.is_stmt (result p) then (
+           Format.fprintf out "%a@," (Result.pp_in Output_format.tptp) (result p)
+         ) else (
+           Format.fprintf out "tff(@[%d, %s,@ @[%a@],@ @[%a@]%a@]).@,"
+             name role (Result.pp_in Output_format.tptp) (result p)
+             Kind.pp_tstp (Step.kind @@ step p,parents) pp_infos infos
+         ));
     Format.fprintf out "@]";
     ()
 
@@ -664,13 +663,12 @@ module S = struct
          let infos =
            info_name :: info_from @ info_rule @ info_status @ (Step.infos p.step)
          in
-         begin match Result.pp_in_opt (result p) with
-           | None ->
-             Format.fprintf out "@[<2>assert%a@ %a@].@,"
-               pp_infos infos (Result.pp_in Output_format.zf) (result p)
-           | Some f ->
-             Format.fprintf out "%a@," (f Output_format.zf) ()
-         end);
+         if Result.is_stmt (result p) then (
+           Format.fprintf out "%a@," (Result.pp_in Output_format.zf) (result p)
+         ) else (
+           Format.fprintf out "@[<2>assert%a@ %a@].@,"
+             pp_infos infos (Result.pp_in Output_format.zf) (result p)
+         ));
     Format.fprintf out "@]";
     ()
 
@@ -713,10 +711,10 @@ module S = struct
         else if is_pure_bool p then `Color "cyan3" :: shape :: attrs
         else if has_absurd_lits p then `Color "orange" :: shape :: attrs
         else if is_def p then `Color "navajowhite" :: shape :: attrs
-        else if Step.is_assert @@ step p then `Color "yellow" :: shape :: attrs
         else if Step.is_goal @@ step p then `Color "green" :: shape :: attrs
         else if Step.is_trivial @@ step p then `Color "cyan" :: shape :: attrs
         else if Step.is_by_def @@ step p then `Color "navajowhite" :: shape :: attrs
+        else if Step.is_assert_like @@ step p then `Color "yellow" :: shape :: attrs
         else shape :: attrs
       )
       ~attrs_e:(fun (r,s,infos) ->

@@ -149,6 +149,7 @@ let proof_tc =
       else `Vanilla)
     ~to_form:(fun ~ctx c ->
       to_s_form ~ctx c |> TypedSTerm.Form.close_forall)
+    ~pp_in
     ~apply_subst:(fun subst (c,sc_c) ->
       let trail = trail c in
       let lits' =

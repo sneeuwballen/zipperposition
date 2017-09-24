@@ -60,13 +60,6 @@ type ('f, 't, 'ty) view =
   | Goal of 'f (** goal to prove *)
   | NegatedGoal of 'ty skolem list * 'f list (** goal after negation, with skolems *)
 
-(* a statement in a file *)
-type from_file = {
-  file : string;
-  name : string option;
-  loc: ParseLocation.t option;
-}
-
 type lit = Term.t SLiteral.t
 type formula = TypedSTerm.t
 type input_def = (TypedSTerm.t,TypedSTerm.t,TypedSTerm.t) def
@@ -511,18 +504,19 @@ module TPTP = struct
   let pp ppf ppt ppty out st =
     let name = match Proof.Step.src st.proof with
       | Some {Proof.src_view=Proof.From_file (f,_);_} ->
-        CCOpt.get_or ~default:"no_name" (Proof.Src.name f)
+        let open CCOpt.Infix in
+        Proof.Src.name f |> CCOpt.get_or ~default:"no_name"
       | _ -> "no_name"
     in
     let pp_decl out (id,ty) =
-      fpf out "@[<2>tff(%s, type,@ %a :@ @[%a@])@]." name ID.pp id ppty ty
+      fpf out "tff(@[%s, type,@ %a :@ @[%a@]@])." name ID.pp id ppty ty
     and pp_quant_vars out = function
       | [] -> ()
       | l ->
         let pp_typedvar out v =
           fpf out "%a:%a" Var.pp v ppty (Var.ty v)
         in
-        fpf out "@[<2>![@[%a@]]:@ " (Util.pp_list pp_typedvar) l
+        fpf out "![@[%a@]]:@ " (Util.pp_list pp_typedvar) l
     in
     (* print a single definition as an axiom *)
     let pp_def_axiom out d =
@@ -611,6 +605,7 @@ let res_tc_i : input_t Proof.result_tc =
     ~to_exn:(fun i -> E_i i)
     ~compare:compare
     ~pp_in:pp_input_in
+    ~is_stmt:true
     ~to_form:(fun ~ctx:_ _ -> assert false) (* TODO *)
     ()
 
@@ -620,6 +615,7 @@ let res_tc_c : clause_t Proof.result_tc =
     ~to_exn:(fun i -> E_c i)
     ~compare:compare
     ~pp_in:pp_clause_in
+    ~is_stmt:true
     ~to_form:(fun ~ctx:_ _ -> assert false) (* TODO *)
     ()
 
