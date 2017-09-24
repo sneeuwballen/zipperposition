@@ -72,6 +72,7 @@ type 'a result_tc = {
   res_pp_in: Output_format.t -> 'a CCFormat.printer;
   res_to_form: ctx:Term.Conv.ctx -> 'a -> TypedSTerm.Form.t;
   res_apply_subst: (Subst.t -> 'a Scoped.t -> 'a) option;
+  res_name:('a -> string option);
   res_flavor: 'a -> flavor;
 }
 
@@ -95,6 +96,7 @@ and parent =
 and proof = {
   step: step;
   result : result;
+  mutable p_name: string option; (* unique name for this proof *)
 }
 
 type t = proof
@@ -207,7 +209,7 @@ module Kind = struct
   type t = kind
 
   let _pp_parent out = function
-    | `Name i -> Format.fprintf out "%d" i
+    | `Name s -> Format.fprintf out "%s" s
     | `Theory s -> Format.fprintf out "theory(%s)" s
 
   let pp out k = match k with
@@ -293,11 +295,16 @@ module Result = struct
       in
       Res (r, r.res_to_exn y)
 
+  let name (Res (r,x)) = match r.res_of_exn x with
+    | None -> assert false
+    | Some x -> r.res_name x
+
   let n_ = ref 0
   let make_tc (type a)
       ~of_exn ~to_exn ~compare
       ~to_form
       ~pp_in
+      ?(name=fun _ -> None)
       ?(is_stmt=false)
       ?apply_subst
       ?(flavor=fun _ -> `Vanilla)
@@ -312,6 +319,7 @@ module Result = struct
       res_pp_in=pp_in;
       res_apply_subst=apply_subst;
       res_to_form=to_form;
+      res_name=name;
       res_flavor=flavor;
     }
 
@@ -495,7 +503,7 @@ module S = struct
   let is_pure_bool p = Result.flavor (result p) = `Pure_bool
   let is_def p = Result.flavor (result p) = `Def
 
-  let mk step res = {step; result=res}
+  let mk step res = {step; result=res; p_name=None}
   let mk_f step res = mk step (Result.of_form res)
 
   let mk_f_trivial = mk_f Step.trivial
@@ -517,13 +525,19 @@ module S = struct
 
   let adapt_f p f = adapt p (Result.of_form f)
 
-  let get_name ~namespace p =
-    try
-      Tbl.find namespace p
-    with Not_found ->
-      let n = Tbl.length namespace in
-      Tbl.add namespace p n;
-      n
+  let name_gen_ = ref 0
+
+  let name (p:t) : string = match p.p_name with
+    | Some s -> s
+    | None ->
+      (* look if the result is a named thing from the input, otherwise
+         generate a fresh one *)
+      let s = match Result.name (result p) with
+        | Some s -> s
+        | None -> Printf.sprintf "'%d'" (CCRef.get_then_incr name_gen_)
+      in
+      p.p_name <- Some s;
+      s
 
   (** {2 Conversion to a graph of proofs} *)
 
@@ -603,13 +617,12 @@ module S = struct
     Format.fprintf out "@]"
 
   let pp_tstp out proof =
-    let namespace = Tbl.create 8 in
     Format.fprintf out "@[<v>";
     traverse ~order:`DFS proof
       (fun p ->
-         let name = get_name ~namespace p in
+         let p_name = name p in
          let parents =
-           List.map (fun p -> `Name (get_name ~namespace @@ Parent.proof p))
+           List.map (fun p -> `Name (name @@ Parent.proof p))
              (Step.parents @@ step p)
          in
          let role = "plain" in (* TODO *)
@@ -623,8 +636,8 @@ module S = struct
          if Result.is_stmt (result p) then (
            Format.fprintf out "%a@," (Result.pp_in Output_format.tptp) (result p)
          ) else (
-           Format.fprintf out "tff(@[%d, %s,@ @[%a@],@ @[%a@]%a@]).@,"
-             name role (Result.pp_in Output_format.tptp) (result p)
+           Format.fprintf out "tff(@[%s, %s,@ @[%a@],@ @[%a@]%a@]).@,"
+             p_name role (Result.pp_in Output_format.tptp) (result p)
              Kind.pp_tstp (Step.kind @@ step p,parents) pp_infos infos
          ));
     Format.fprintf out "@]";
@@ -632,24 +645,21 @@ module S = struct
 
   let pp_zf out proof =
     let module UA = UntypedAST.A in
-    let namespace = Tbl.create 8 in
     Format.fprintf out "@[<v>";
     traverse ~order:`DFS proof
       (fun p ->
-         let name = get_name ~namespace p in
+         let p_name = name p in
          let parents =
-           List.map (fun p -> get_name ~namespace @@ Parent.proof p)
+           List.map (fun p -> name @@ Parent.proof p)
              (Step.parents @@ step p)
          in
-         let str_of_name s = CCFormat.sprintf "'%d'" s in
          let mk_status r = UA.app "status" [UA.quoted r] in
          let info_name =
-           UA.(app "name" [str (str_of_name name)])
+           UA.(app "name" [str p_name])
          and info_from =
            if parents=[] then []
            else (
-             let l = List.map str_of_name parents in
-             [UA.(app "from" [list (List.map str l)])]
+             [UA.(app "from" [list (List.map str parents)])]
            )
          and info_rule = match Step.rule (step p) with
            | Some r -> [UA.(app "rule" [quoted r])]

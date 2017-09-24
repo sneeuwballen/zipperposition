@@ -156,6 +156,7 @@ module Result : sig
     compare:('a -> 'a -> int) ->
     to_form:(ctx:Term.Conv.ctx -> 'a -> form) ->
     pp_in:(Output_format.t -> 'a CCFormat.printer) ->
+    ?name:('a -> string option) ->
     ?is_stmt:bool ->
     ?apply_subst:(Subst.t -> 'a Scoped.t -> 'a) ->
     ?flavor:('a -> flavor) ->
@@ -165,6 +166,8 @@ module Result : sig
       results.
       @param pp_in print in given syntax
       @param is_stmt true only if ['a] is a toplevel statement (default false)
+      @param name returns the name of the result. Typically, a name from
+        the input file
   *)
 
   val make : 'a tc -> 'a -> t
@@ -180,6 +183,7 @@ module Result : sig
   val is_stmt : t -> bool
   val to_form : ?ctx:Term.Conv.ctx -> t -> form
   val flavor : t -> flavor
+  val name : t -> string option
   val apply_subst : Subst.t -> t Scoped.t -> t
 end
 
@@ -312,6 +316,9 @@ module S : sig
   (** Convert to low level t *)
 
   val is_proof_of_false : t -> bool
+
+  val name : t -> string
+  (** Unique name, either from the input or generated on the fly *)
 
   (** {6 Conversion to a graph of proofs} *)
 

@@ -593,6 +593,10 @@ let pp_input_in o =
 exception E_i of input_t
 exception E_c of clause_t
 
+let get_name_ st = match Proof.Step.src st.proof with
+  | Some {Proof.src_view=Proof.From_file (f,_);_} -> Proof.Src.name f
+  | _ -> None
+
 let res_tc_i : input_t Proof.result_tc =
   Proof.Result.make_tc
     ~of_exn:(function E_i c -> Some c | _ -> None)
@@ -600,6 +604,7 @@ let res_tc_i : input_t Proof.result_tc =
     ~compare:compare
     ~pp_in:pp_input_in
     ~is_stmt:true
+    ~name:get_name_
     ~to_form:(fun ~ctx:_ _ -> assert false) (* TODO *)
     ()
 
@@ -610,6 +615,7 @@ let res_tc_c : clause_t Proof.result_tc =
     ~compare:compare
     ~pp_in:pp_clause_in
     ~is_stmt:true
+    ~name:get_name_
     ~to_form:(fun ~ctx:_ _ -> assert false) (* TODO *)
     ()
 
