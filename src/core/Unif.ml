@@ -339,7 +339,7 @@ module Inner = struct
       |> CCList.filter_map
         (function
           | None -> None
-          | Some (i, t) -> match CCList.find_idx (T.is_bvar_i i) l with
+          | Some (i, _) -> match CCList.find_idx (T.is_bvar_i i) l with
             | None -> None
             | Some (j, ty) ->
               (* map DB i into db (n-j) *)
