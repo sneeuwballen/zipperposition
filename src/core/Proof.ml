@@ -122,7 +122,13 @@ module Src = struct
     let n = ref 0 in
     fun src_view -> {src_view; src_id=CCRef.get_then_incr n}
 
+  let mk_name_ =
+    let n = ref 0 in
+    fun () -> Printf.sprintf "_zf_stmt_%d" (CCRef.get_then_incr n)
+
   let from_file ?loc ?name ?(attrs=[]) file : t =
+    (* NOTE: we always give a unique name if not present *)
+    let name = match name with Some _ -> name | None -> Some(mk_name_()) in
     mk_ (From_file ({ name; loc; file; }, attrs))
 
   let internal attrs = mk_ (Internal attrs)
