@@ -79,7 +79,8 @@ dot:
 
 TEST_FILES = tests/ examples/
 TEST_TOOL = logitest
-TEST_OPTS ?= -j 2 --junit test.xml
+J?=2
+TEST_OPTS ?= -j $(J) --junit test.xml
 
 check-test-tool:
 	@if ! ( which $(TEST_TOOL) > /dev/null ) ; then echo "install $(TEST_TOOL)"; exit 1; fi
