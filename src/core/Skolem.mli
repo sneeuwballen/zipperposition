@@ -77,6 +77,7 @@ type form_definition = private {
   polarity : polarity;
   proof: Proof.step;
   (* source for this definition *)
+  as_stmt: Statement.input_t list lazy_t;
 }
 
 val pp_form_definition : form_definition CCFormat.printer
@@ -100,6 +101,7 @@ type term_definition = private {
   td_rules: (form, term, type_) Statement.def_rule list;
   td_as_def: (form,term,type_) Statement.def;
   td_proof: Proof.step;
+  td_stmt: Statement.input_t list lazy_t;
 }
 
 val define_term :
