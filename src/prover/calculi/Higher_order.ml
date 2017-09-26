@@ -28,6 +28,7 @@ let prof_eq_res_syn = Util.mk_profiler "ho.eq_res_syntactic"
 let prof_ho_unif = Util.mk_profiler "ho.unif"
 
 let _purify_applied_vars = ref false
+let _general_ext_pos = ref false
 
 module type S = sig
   module Env : Env.S
@@ -172,6 +173,78 @@ module Make(E : Env.S) : S with module Env = E = struct
         end
       | _ -> []
     end
+
+  (* More general version of ext_pos:
+     e.g. C \/ f X Y = g X Y becomes C \/ f X = g X and C \/ f = g,
+       if the variables X and Y occur nowhere else in the clause.
+       Removes variables only in literals eligible for paramodulation,
+       and only in one literal at a time.
+  *)
+  let ext_pos_general (c:C.t) : C.t list =
+    let eligible = C.Eligible.param c in
+    (* Remove recursively variables at the end of the liiteral t = s if possible.
+       e.g. ext_pos_lit (f X Y) (g X Y) other_lits = [f X = g X, f = g]
+       if X and Y do not appear in other_lits *)
+    let rec ext_pos_lit t s other_lits =
+      let f, tt = T.as_app t in
+      let g, ss = T.as_app s in
+      begin match List.rev tt, List.rev ss with
+        | last_t :: upto_last_t, last_s :: upto_last_s ->
+          if last_t = last_s then
+            match T.as_var last_t with
+              | Some v ->
+                if not (T.var_occurs ~var:v f)
+                && not (T.var_occurs ~var:v g)
+                && not (List.exists (T.var_occurs ~var:v) (List.tl (List.rev tt)))
+                && not (List.exists (T.var_occurs ~var:v) (List.tl (List.rev ss)))
+                && not (List.exists (Literal.var_occurs v) other_lits)
+                then (
+                  let butlast = (fun l -> CCList.take (List.length l - 1) l) in
+                  let t' = T.app f (butlast tt) in
+                  let s' = T.app g (butlast ss) in
+                  Literal.mk_eq t' s'
+                  :: ext_pos_lit t' s' other_lits
+                )
+                else
+                  []
+              | None -> []
+          else []
+        | _ -> []
+      end
+    in
+    let new_clauses =
+      (* iterate over all literals eligible for paramodulation *)
+      C.lits c
+      |> Sequence.of_array |> Sequence.zip_i |> Sequence.zip
+      |> Sequence.filter (fun (idx,lit) -> eligible idx lit)
+      |> Sequence.flat_map_l
+        (fun (lit_idx,lit) -> match lit with
+           | Literal.Equation (t, s, true) ->
+             ext_pos_lit t s (CCArray.except_idx (C.lits c) lit_idx)
+             |> Sequence.of_list
+             |> Sequence.flat_map_l
+               (fun new_lit ->
+                  (* create a clause with new_lit instead of lit *)
+                  let new_lits = new_lit :: CCArray.except_idx (C.lits c) lit_idx in
+                  let proof =
+                    Proof.Step.inference [C.proof_parent c]
+                      ~rule:(Proof.Rule.mk "ho_ext_pos_general")
+                  in
+                  let new_c =
+                    C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
+                  in
+                  [new_c])
+             |> Sequence.to_list
+           | _ -> [])
+      |> Sequence.to_rev_list
+    in
+    if new_clauses<>[] then (
+      Util.add_stat stat_complete_eq (List.length new_clauses);
+      Util.debugf ~section 4
+        "(@[complete-eq@ :clause %a@ :yields (@[<hv>%a@])@])"
+        (fun k->k C.pp c (Util.pp_list ~sep:" " C.pp) new_clauses);
+    );
+    new_clauses
 
   (* complete [f = g] into [f x1…xn = g x1…xn] for each [n ≥ 1] *)
   let complete_eq_args (c:C.t) : C.t list =
@@ -606,7 +679,12 @@ module Make(E : Env.S) : S with module Env = E = struct
       Env.add_unary_inf "ho_complete_eq" complete_eq_args;
       Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
       Env.add_lit_rule "ho_ext_neg" ext_neg;
-      Env.add_unary_inf "ho_ext_pos" ext_pos;
+      if !_general_ext_pos then (
+        Env.add_unary_inf "ho_ext_pos_general" ext_pos_general
+      )
+      else (
+        Env.add_unary_inf "ho_ext_pos" ext_pos
+      );
       Env.add_rewrite_rule "beta_reduce" beta_reduce;
       begin match Env.flex_get k_eta with
         | `Expand -> Env.add_rewrite_rule "eta_expand" eta_expand
@@ -712,6 +790,7 @@ let () =
       "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";
       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
       "--ho-eta", eta_opt, " eta-expansion/reduction";
-      "--ho-purify", Arg.Set _purify_applied_vars, " enable purification of applied variables"
+      "--ho-purify", Arg.Set _purify_applied_vars, " enable purification of applied variables";
+      "--ho-general-ext-pos", Arg.Set _general_ext_pos, " enable general positive extensionality rule"
     ];
   Extensions.register extension;
