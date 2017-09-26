@@ -323,8 +323,8 @@ goal forall a (s1:set a) s2 s3.
 +
 there are several variations on literal rewrite rules:
 +
-- `rewrite forall x. p x` (short for `p x <=> true`) 
-- `rewrite forall x. ~ p x` (short for `p x <=> false`) 
+- `rewrite forall x. p x` (short for `p x <=> true`)
+- `rewrite forall x. ~ p x` (short for `p x <=> false`)
 - `rewrite forall x. p x => q x`
   (one way rule, will rewrite `p x` but not `~ p x`; also called _polarized rewriting_)
 - `rewrite forall x. ~ p x => q x`
@@ -409,6 +409,7 @@ The syntax is:
 assert[name "foo"] bar.
 ----
 
+[[graphical-proof]]
 === Graphical Display of Proofs
 
 A handy way of displaying the proof is to use http://graphviz.org/[graphviz]:
@@ -441,6 +442,27 @@ parts for logic-related implementations:
 - a library packed in a module `Logtk_parsers`, with parsers for input formats;
 - small tools (see directory `src/tools/`) to illustrate how to use the library
     and provide basic services (type-checking, reduction to CNF, etc.);
+
+== Hacking
+
+Some advices if you want to hack on the code:
+
+- `--debug 5` prints everything the prover does
+- `--debug.foo <n>` changes the verbosity only for `foo` (see `--help`
+  for a list of such flags)
+- `--backtrace` is very useful to get stack traces when a
+  wild uncaught exception appears
+- `--stats` prints some statistics, and you can add your own easily
+  with `Util.mk_stat`
+- `--dot <some-file>.dot` dumps the proof in the given file
+  in graphviz. This is very useful for reading proofs, e.g.
+  using `dot -Txlib <some-file>.dot`.
+  See <<graphical-proof, graphical display of proofs>> for more details.
+- many flags control the behavior of the prover; to dumb heuristics down
+  a bit you can try:
+  * `-cq bfs` (BFS traversal of the search space, instead of weight-based
+    clause selection rules)
+  * `--ord none` for disabling term orderings
 
 == Documentation
 
