@@ -79,7 +79,9 @@ dot:
 
 TEST_FILES = tests/ examples/
 TEST_TOOL = logitest
-TEST_OPTS ?= -j 2 --junit test.xml
+J?=2
+TEST_OPTS ?= -j $(J) --junit test.xml
+DATE=$(shell date +%FT%H:%M)
 
 check-test-tool:
 	@if ! ( which $(TEST_TOOL) > /dev/null ) ; then echo "install $(TEST_TOOL)"; exit 1; fi
@@ -99,7 +101,11 @@ $(TEST_TOOL): check_$(TEST_TOOL)
 	$(TEST_TOOL) run -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES)
 
 $(TEST_TOOL)-zipper:
-	$(TEST_TOOL) run -p zipperposition -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES)
+	@mkdir -p snapshots
+	$(TEST_TOOL) run -p zipperposition -c ./tests/conf.toml \
+	  --summary snapshots/tip-$(DATE).txt \
+	  --csv snapshots/tip-$(DATE).csv \
+	  $(TEST_OPTS) $(TEST_FILES)
 
 $(TEST_TOOL)-hornet:
 	$(TEST_TOOL) run -p hornet -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES)
@@ -109,25 +115,39 @@ tip-benchmarks:
 
 $(TEST_TOOL)-tip: check-test-tool tip-benchmarks
 	@[ -d tip-benchmarks ] || (echo "missing tip-benchmarks/" && exit 1)
-	$(TEST_TOOL) run --meta=`git rev-parse HEAD` -c ./data/tip.toml $(TEST_OPTS) 
+	@mkdir -p snapshots
+	$(TEST_TOOL) run --meta=`git rev-parse HEAD` -c ./data/tip.toml \
+	  --summary snapshots/tip-$(DATE).txt \
+	  --csv snapshots/tip-$(DATE).csv \
+	  $(TEST_OPTS)
 
 # restricted version of $(TEST_TOOL)-tip
 $(TEST_TOOL)-tip-isaplanner: check-test-tool tip-benchmarks
 	@[ -d tip-benchmarks ] || (echo "missing tip-benchmarks/" && exit 1)
+	@mkdir -p snapshots
 	$(TEST_TOOL) run --meta=`git rev-parse HEAD` -c ./data/tip.toml \
+	  --summary snapshots/tip-isa-$(DATE).txt \
+	  --csv snapshots/tip-isa-$(DATE).csv \
 	  $(TEST_OPTS) tip-benchmarks/benchmarks/isaplanner/
 
 $(TEST_TOOL)-thf: check-test-tool
-	$(TEST_TOOL) run -c data/bench.toml --profile=thf $(TEST_OPTS)
+	@mkdir -p snapshots
+	$(TEST_TOOL) run -c data/bench.toml --profile=thf  \
+	  --summary snapshots/thf-$(DATE).txt \
+	  --csv snapshots/thf-$(DATE).csv \
+	  $(TEST_OPTS)
 
 BENCH_DIR="bench-$(shell date -Iminutes)"
 $(TEST_TOOL)-tptp:
 	@echo "start benchmarks in ${BENCH_DIR}"
+	@mkdir -p snapshots
 	mkdir -p ${BENCH_DIR}
 	cp zipperposition.native hornet.native ${BENCH_DIR}/
 	ln -s ../tptp/ ${BENCH_DIR}/tptp
 	cp data/bench.toml ${BENCH_DIR}/conf.toml
 	cd ${BENCH_DIR} && $(TEST_TOOL) run --meta=`git rev-parse HEAD` \
+	  --summary snapshots/bench-$(DATE).txt \
+	  --csv snapshots/bench-$(DATE).csv \
 	  -c conf.toml $(TEST_OPTS)
 
 TARBALL=zipperposition.tar.gz

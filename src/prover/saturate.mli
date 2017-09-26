@@ -4,6 +4,8 @@
 (** {1 Main saturation algorithm.}
     It uses inference rules and simplification rules from Superposition. *)
 
+open Logtk
+
 val check_timeout : float option -> bool
 (** check whether we still have some time w.r.t timeout *)
 

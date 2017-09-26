@@ -182,7 +182,11 @@ let rec unfold_binder b f = match f.term with
 
 let rec pp out t = match view t with
   | Var s -> Var.pp_fullc out s
-  | Const s -> ID.pp out s
+  | Const s ->
+    begin match ID.as_prefix s with
+      | Some s -> CCFormat.string out s
+      | None -> ID.pp out s
+    end
   | App (_, []) -> assert false
   | App (f, l) ->
     let l =

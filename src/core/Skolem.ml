@@ -37,8 +37,9 @@ type form_definition = {
      [proxy -> true if form]
      [proxy -> false if not form] (depending on polarity) *)
   polarity : polarity;
-  src: Statement.source;
+  proof: Proof.step;
   (* source for this definition *)
+  as_stmt: Statement.input_t list lazy_t;
 }
 
 type term_definition = {
@@ -46,6 +47,8 @@ type term_definition = {
   td_ty: type_;
   td_rules: (form, term, type_) Statement.def_rule list;
   td_as_def: (form,term,type_) Statement.def;
+  td_proof: Proof.step;
+  td_stmt: Statement.input_t list lazy_t;
 }
 
 type definition =
@@ -83,13 +86,13 @@ let fresh_id ?(start0=false) ~ctx prefix =
   let name = if n=0 && not start0 then prefix else prefix ^ string_of_int n in
   ID.make name
 
-let fresh_skolem_prefix ~ctx ~ty prefix =
+let fresh_skolem_prefix ~ctx ~ty ~vars_count prefix =
   incr_counter ctx;
   let s = fresh_id ~ctx prefix in
   let kind =
     if Ind_ty.is_inductive_simple_type ty then ID.K_ind else ID.K_normal
   in
-  ID.set_payload s (ID.Attr_skolem kind);
+  ID.set_payload s (ID.Attr_skolem (kind, vars_count));
   ctx.sc_new_ids <- (s,ty) :: ctx.sc_new_ids;
   ctx.sc_on_new s ty;
   Util.debugf ~section 3 "@[<2>new skolem symbol %a@ with type @[%a@]@]"
@@ -133,7 +136,8 @@ let skolem_form ~ctx subst var form =
   let ty_var = T.Subst.eval subst (Var.ty var) in
   let ty = ty_forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) ty_var) in
   let prefix = "sk_" ^ Var.to_string var in
-  let f = fresh_skolem_prefix ~ctx ~ty prefix in
+  let vars_count = List.length vars in
+  let f = fresh_skolem_prefix ~ctx ~ty ~vars_count prefix in
   let skolem_t = T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t) in
   T.Subst.eval subst skolem_t
 
@@ -159,7 +163,35 @@ let pp_definition out = function
   | Def_form f -> pp_form_definition out f
   | Def_term t -> pp_term_definition out t
 
-let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~src form =
+let stmt_of_form rw_rules polarity proxy proxy_id proxy_ty form proof =
+  let module F = T.Form in
+  if rw_rules then (
+    (* introduce the required definition as an axiom, with polarity as needed *)
+    let rule : _ Stmt.def_rule =
+      let vars = T.vars proxy in
+      let lhs, polarity, rhs = match polarity with
+        | `Neg -> SLiteral.atom_false proxy, `Imply, F.not_ form
+        | `Pos -> SLiteral.atom_true proxy, `Imply, form
+        | `Both -> SLiteral.atom_true proxy, `Equiv, form
+      in
+      Stmt.Def_form (vars, lhs, [rhs], polarity)
+    in
+    let proof = proof in
+    [Stmt.def ~proof [Stmt.mk_def ~rewrite:true proxy_id proxy_ty [rule]]]
+  ) else (
+    (* introduce the required axiom, with polarity as needed *)
+    let f' = match polarity with
+      | `Pos -> F.imply proxy form
+      | `Neg -> F.imply form proxy
+      | `Both -> F.equiv proxy form
+    in
+    let proof = proof in
+    [ Stmt.ty_decl ~proof proxy_id proxy_ty;
+      Stmt.assert_ ~proof f'
+    ]
+  )
+
+let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~parents form =
   incr_counter ctx;
   let tyvars, vars = collect_vars Var.Subst.empty form in
   let vars_t = List.map (fun v->T.var v) vars in
@@ -169,6 +201,7 @@ let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~src form =
   (* not a skolem (but a defined term). Will be defined, not declared. *)
   let f = fresh_id ~start0:true ~ctx pattern in
   let proxy = T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t) in
+  let proof = Proof.Step.define_internal f parents in
   (* register the new definition *)
   let def = {
     form;
@@ -177,16 +210,22 @@ let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~src form =
     rw_rules;
     proxy;
     polarity;
-    src=src f;
+    proof;
+    as_stmt=lazy (stmt_of_form rw_rules polarity proxy f ty form proof);
   } in
   ctx.sc_new_defs <- Def_form def :: ctx.sc_new_defs;
-  Util.debugf ~section 5 "@[<2>define_form@ %a@]" (fun k->k pp_form_definition def);
+  Util.debugf ~section 5 "@[<2>define_form@ %a@ :proof %a@]"
+    (fun k->k pp_form_definition def Proof.Step.pp proof);
   def
 
 let pp_rules =
   Fmt.(Util.pp_list Dump.(pair (list T.pp_inner |> hovbox) T.pp) |> hovbox)
 
-let define_term ?(pattern="fun_") ~ctx rules : term_definition =
+let stmt_of_term id ty rules proof : Stmt.input_t list =
+  let module F = T.Form in
+  [Stmt.def ~proof [Stmt.mk_def ~rewrite:true id ty rules]]
+
+let define_term ?(pattern="fun_") ~ctx ~parents rules : term_definition =
   Util.debugf ~section 5
     "(@[<hv2>define_term@ :rules (@[<hv>%a@])@])" (fun k->k pp_rules rules);
   incr_counter ctx;
@@ -233,14 +272,18 @@ let define_term ?(pattern="fun_") ~ctx rules : term_definition =
       rules
   in
   let td_as_def = Stmt.mk_def ~rewrite:true id ty rules in
+  let proof = Proof.Step.define_internal id parents in
   let def = {
     td_id=id;
     td_ty=ty;
     td_rules=rules;
     td_as_def;
+    td_proof=proof;
+    td_stmt=lazy (stmt_of_term id ty rules proof);
   } in
   ctx.sc_new_defs <- Def_term def :: ctx.sc_new_defs;
-  Util.debugf ~section 4 "@[<2>define_term@ %a@]" (fun k->k pp_term_definition def);
+  Util.debugf ~section 4 "@[<2>define_term@ %a@ :proof %a@]"
+    (fun k->k pp_term_definition def Proof.Step.pp proof);
   def
 
 let new_definitions ~ctx = ctx.sc_new_defs
@@ -250,42 +293,8 @@ let pop_new_definitions ~ctx =
   ctx.sc_new_defs <- [];
   l
 
-let def_as_stmt (d:definition): Stmt.input_t list =
-  let module F = T.Form in
-  begin match d with
-    | Def_form d when d.rw_rules ->
-      (* introduce the required definition as an axiom, with polarity as needed *)
-      let rule : _ Stmt.def_rule =
-        let vars = T.vars d.proxy in
-        let lhs, polarity, rhs = match d.polarity with
-          | `Neg -> SLiteral.atom_false d.proxy, `Imply, F.not_ d.form
-          | `Pos -> SLiteral.atom_true d.proxy, `Imply, d.form
-          | `Both -> SLiteral.atom_true d.proxy, `Equiv, d.form
-        in
-        Stmt.Def_form (vars, lhs, [rhs], polarity)
-      in
-      let src = d.src in
-      [Stmt.def ~src [Stmt.mk_def ~rewrite:true d.proxy_id d.proxy_ty [rule]]]
-    | Def_form d ->
-      (* introduce the required axiom, with polarity as needed *)
-      let f' = match d.polarity with
-        | `Pos -> F.imply d.proxy d.form
-        | `Neg -> F.imply d.form d.proxy
-        | `Both -> F.equiv d.proxy d.form
-      in
-      let src = d.src in
-      [ Stmt.ty_decl ~src d.proxy_id d.proxy_ty;
-        Stmt.assert_ ~src f'
-      ]
-    | Def_term d ->
-      let id = d.td_id in
-      let ty = d.td_ty in
-      let rules = d.td_rules in
-      let src = Stmt.Src.define id in
-      [Stmt.def ~src [Stmt.mk_def ~rewrite:true id ty rules]]
-  end
+let rule_def = Proof.Rule.mk "define"
 
-let def_as_sourced_stmt d : Stmt.sourced_t list =
-  let stmt = def_as_stmt d in
-  List.map Stmt.as_sourced stmt
-
+let def_as_stmt (d:definition): Stmt.input_t list = match d with
+  | Def_form d -> Lazy.force d.as_stmt
+  | Def_term d -> Lazy.force d.td_stmt

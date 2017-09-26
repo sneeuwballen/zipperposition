@@ -784,7 +784,11 @@ let rec pp_depth ?(hooks=[]) depth out t =
   and _pp_root depth out t = match view t with
     | Var v -> pp_var out v
     | DB i -> Format.fprintf out "Y%d" (depth-i-1)
-    | Const s -> ID.pp out s
+    | Const s ->
+      begin match ID.as_prefix s with
+        | Some s -> CCFormat.string out s
+        | None -> ID.pp out s
+      end
     | Bind (b, _, _) ->
       (* unfold *)
       let varty_l, t' = open_bind b t in

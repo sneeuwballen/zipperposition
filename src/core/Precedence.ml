@@ -6,6 +6,7 @@
 type symbol_status =
   | Multiset
   | Lexicographic
+  | LengthLexicographic
 
 let section = Util.Section.(make "precedence")
 
@@ -20,10 +21,12 @@ module Weight = struct
   let make omega one = {omega; one}
 
   let int i : t = make 0 i
-  let zero = int 0
+  let zero = int  0
   let one = int 1
   let omega : t = make 1 0
   let omega_plus i : t = make 1 i
+
+  let mult c a : t = {omega = a.omega * c; one = a.one * c}
 
   let add a b: t = {omega=a.omega+b.omega; one=a.one+b.one}
   let diff a b: t = {omega=a.omega-b.omega; one=a.one-b.one}
@@ -127,6 +130,8 @@ type t = {
   (* symbol -> status *)
   mutable weight: ID.t -> Weight.t;
   (* weight function *)
+  mutable arg_coeff: ID.t -> int list;
+  (* argument coefficients *)
   constr : [`total] Constr.t;
   (* constraint used to build and update the precedence *)
 }
@@ -162,9 +167,11 @@ let mem p s =
   let lazy tbl = p.tbl in
   ID.Tbl.mem tbl s
 
-let status p s = ID.Tbl.get_or ~default:Lexicographic p.status s
+let status p s = ID.Tbl.get_or ~default:LengthLexicographic p.status s
 
 let weight p s = p.weight s
+
+let arg_coeff p s i = try List.nth (p.arg_coeff s) i with _ -> 1
 
 let declare_status p s status =
   ID.Tbl.replace p.status s status
@@ -181,14 +188,16 @@ let pp_snapshot out l = pp_ ID.pp out l
 let pp out prec =
   let pp_id out s = match status prec s with
     | Multiset -> Format.fprintf out "%a[M]" ID.pp s
-    | Lexicographic -> ID.pp out s
+    | Lexicographic -> Format.fprintf out "%a[L]" ID.pp s
+    | LengthLexicographic -> Format.fprintf out "%a" ID.pp s
   in
   pp_ pp_id out prec.snapshot
 
 let pp_debugf out prec =
   let pp_id out s = match status prec s with
     | Multiset -> Format.fprintf out "%a[M]" ID.pp_full s
-    | Lexicographic -> ID.pp_full out s
+    | Lexicographic -> Format.fprintf out "%a[L]" ID.pp_full s
+    | LengthLexicographic -> Format.fprintf out "%a" ID.pp_full s
   in
   pp_ pp_id out prec.snapshot
 
@@ -206,12 +215,16 @@ let mk_tbl_ l =
 (** {3 Weight} *)
 
 type weight_fun = ID.t -> Weight.t
+type arg_coeff_fun = ID.t -> int list
 
 (* weight of f = arity of f + 4 *)
 let weight_modarity ~arity a = Weight.int (arity a + 4)
 
 (* constant weight *)
 let weight_constant _ = Weight.int 4
+
+(* default argument coefficients *)
+let arg_coeff_default _ = []
 
 let set_weight p f = p.weight <- f
 
@@ -229,13 +242,14 @@ let check_inv_ p =
   in
   sorted_ p.snapshot
 
-let create ?(weight=weight_constant) c l =
+let create ?(weight=weight_constant) ?(arg_coeff=arg_coeff_default) c l =
   let l = CCList.sort_uniq ~cmp:c l in
   let tbl = lazy (mk_tbl_ l) in
   let res = {
     snapshot=l;
     tbl;
     weight;
+    arg_coeff;
     status=ID.Tbl.create 16;
     constr=c;
   } in

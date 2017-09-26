@@ -148,7 +148,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let of_lits lits =
       (* convert literals *)
       let lits = List.map Ctx.Lit.of_form lits in
-      let proof = Proof.S.step_of_src (Stmt.src st) in
+      let proof = Stmt.proof_step st in
       let c = create ~trail:Trail.empty ~penalty:0 lits proof in
       c
     in
@@ -168,7 +168,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let proof_step c = c.proof
 
-  let proof c = Proof.S.mk_c c.proof c.sclause
+  let proof c = Proof.S.mk c.proof (SClause.mk_proof_res c.sclause)
   let proof_parent c = Proof.Parent.from (proof c)
   let proof_parent_subst (c,sc) subst = Proof.Parent.from_subst (proof c,sc) subst
 

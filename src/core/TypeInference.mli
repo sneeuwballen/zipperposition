@@ -152,6 +152,7 @@ val constrain_term_type : ?loc:loc -> Ctx.t -> untyped -> type_ -> unit or_error
 type typed_statement = (typed, typed, type_) Statement.t
 
 val infer_statement_exn :
+  ?file:string ->
   Ctx.t ->
   UntypedAST.statement ->
   typed_statement * typed_statement list
@@ -164,6 +165,7 @@ val infer_statements_exn :
   ?on_var:[`Infer | `Default] ->
   ?on_undef:[`Warn | `Fail | `Guess] ->
   ?ctx:Ctx.t ->
+  ?file:string ->
   UntypedAST.statement Sequence.t ->
   typed_statement CCVector.ro_vector
 (** Infer all statements
@@ -174,5 +176,6 @@ val infer_statements :
   ?on_var:[`Infer | `Default] ->
   ?on_undef:[`Warn | `Fail | `Guess] ->
   ?ctx:Ctx.t ->
+  ?file:string ->
   UntypedAST.statement Sequence.t ->
   typed_statement CCVector.ro_vector or_error

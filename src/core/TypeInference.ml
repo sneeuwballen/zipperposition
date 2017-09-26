@@ -939,12 +939,23 @@ let set_notation id attrs: unit =
       | _ -> ())
     attrs
 
-let infer_statement_exn ctx st =
+let read_attrs ~file attrs =
+  let module A = UntypedAST in
+  let attrs = Stmt.conv_attrs attrs
+  and name =
+    CCList.find_map
+      (function
+        | A.A_app ("name", [(A.A_quoted s | A.A_app (s,[]))]) -> Some s
+        | _ -> None)
+      attrs
+  in
+  Proof.Src.from_file ?name file, attrs
+
+let infer_statement_exn ?(file="<no file>") ctx st =
   Util.debugf ~section 3 "@[<2>infer types for @{<yellow>statement@}@ `@[%a@]`@]"
     (fun k->k A.pp_statement st);
   (* auxiliary statements *)
-  let mk_src r = Stmt.Src.from_input st.A.attrs r in
-  let attrs = Stmt.conv_attrs st.A.attrs in
+  let src, attrs = read_attrs ~file st.A.attrs in
   let loc = st.A.loc in
   let st = match st.A.stmt with
     | A.Include _ ->
@@ -956,13 +967,13 @@ let infer_statement_exn ctx st =
       let ty = infer_ty_exn ctx ty in
       Ctx.declare ctx id ty;
       set_notation id st.A.attrs;
-      Stmt.ty_decl ~src:(mk_src Stmt.R_decl) id ty
+      Stmt.ty_decl ~proof:(Proof.Step.intro src Proof.R_decl) id ty
     | A.Def l ->
       let l = infer_defs ?loc ctx l in
       List.iter
         (fun d -> set_notation d.Stmt.def_id st.A.attrs)
         l;
-      Stmt.def ~src:(mk_src Stmt.R_def) l
+      Stmt.def ~proof:(Proof.Step.intro src Proof.R_def) l
     | A.Rewrite t ->
       let t =  infer_prop_ ctx t in
       begin match as_def ?loc Var.Set.empty t with
@@ -971,10 +982,10 @@ let infer_statement_exn ctx st =
             error_ ?loc
               "in definition of %a,@ equality between types is forbidden" ID.pp id;
           );
-          Stmt.rewrite_term ~src:(mk_src Stmt.R_assert) (vars,id,ty,args,rhs)
+          Stmt.rewrite_term ~proof:(Proof.Step.intro src Proof.R_def) (vars,id,ty,args,rhs)
         | `Prop (vars,lhs,rhs,pol) ->
           assert (T.Ty.is_prop (T.ty_exn rhs));
-          Stmt.rewrite_form ~src:(mk_src Stmt.R_assert) (vars,lhs,[rhs],pol)
+          Stmt.rewrite_form ~proof:(Proof.Step.intro src Proof.R_def) (vars,lhs,[rhs],pol)
       end
     | A.Data l ->
       (* declare the inductive types *)
@@ -1041,16 +1052,16 @@ let infer_statement_exn ctx st =
           data_types
       in
       Ctx.exit_scope ctx;
-      Stmt.data ~src:(mk_src Stmt.R_def) l'
+      Stmt.data ~proof:(Proof.Step.intro src Proof.R_def) l'
     | A.Assert t ->
       let t = infer_prop_exn ctx t in
-      Stmt.assert_ ~attrs ~src:(mk_src Stmt.R_assert) t
+      Stmt.assert_ ~attrs ~proof:(Proof.Step.intro src Proof.R_assert) t
     | A.Lemma t ->
       let t = infer_prop_exn ctx t in
-      Stmt.lemma ~src:(mk_src Stmt.R_assert) [t]
+      Stmt.lemma ~proof:(Proof.Step.intro src Proof.R_lemma) [t]
     | A.Goal t ->
       let t = infer_prop_exn ctx t in
-      Stmt.goal ~src:(mk_src Stmt.R_goal) t
+      Stmt.goal ~proof:(Proof.Step.intro src Proof.R_goal) t
   in
   (* be sure to bind the remaining meta variables *)
   Ctx.exit_scope ctx;
@@ -1058,12 +1069,12 @@ let infer_statement_exn ctx st =
     Ctx.pop_new_types ctx
     |> List.map
       (fun (id,ty) ->
-         let src = Stmt.Src.from_input A.default_attrs Stmt.R_decl in
-         Stmt.ty_decl ~src id ty)
+         let proof = Proof.Step.intro (Proof.Src.internal []) Proof.R_decl in
+         Stmt.ty_decl ~proof id ty)
   in
   st, aux
 
-let infer_statements_exn ?def_as_rewrite ?on_var ?on_undef ?ctx seq =
+let infer_statements_exn ?def_as_rewrite ?on_var ?on_undef ?ctx ?file seq =
   let ctx = match ctx with
     | None -> Ctx.create ?def_as_rewrite ?on_var ?on_undef ()
     | Some c -> c
@@ -1072,13 +1083,13 @@ let infer_statements_exn ?def_as_rewrite ?on_var ?on_undef ?ctx seq =
   Sequence.iter
     (fun st ->
        (* add declarations first *)
-       let st, aux = infer_statement_exn ctx st in
+       let st, aux = infer_statement_exn ?file ctx st in
        List.iter (CCVector.push res) aux;
        CCVector.push res st)
     seq;
   CCVector.freeze res
 
-let infer_statements ?def_as_rewrite ?on_var ?on_undef ?ctx seq =
-  try Err.return (infer_statements_exn ?def_as_rewrite ?on_var ?on_undef ?ctx seq)
+let infer_statements ?def_as_rewrite ?on_var ?on_undef ?ctx ?file seq =
+  try Err.return (infer_statements_exn ?def_as_rewrite ?on_var ?on_undef ?ctx ?file seq)
   with e -> Err.of_exn_trace e
 

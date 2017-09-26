@@ -58,3 +58,5 @@ end
 module ZF : sig
   include Interfaces.PRINT1 with type 'a t := 'a t
 end
+
+val pp_in : Output_format.t -> 'a CCFormat.printer -> 'a t CCFormat.printer

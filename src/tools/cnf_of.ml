@@ -41,9 +41,15 @@ let print_res decls = match !Options.output with
       (CCVector.pp ~sep:"" ppst)
       decls
   | Options.O_tptp ->
+    let pp_c out c =
+      let f = c
+              |> List.map SLiteral.to_form |> TypedSTerm.Form.or_
+              |> TypedSTerm.Form.close_forall
+      in
+      TypedSTerm.TPTP.pp out f in
     let ppst out st =
       Statement.TPTP.pp
-        (Util.pp_list ~sep:" | " (SLiteral.TPTP.pp T.TPTP.pp)) T.TPTP.pp T.TPTP.pp
+        pp_c T.TPTP.pp T.TPTP.pp
         out st
     in
     Format.printf "@[<v>%a@]@."
@@ -66,7 +72,7 @@ let process file =
     (* parse *)
     let input = Parsing_utils.input_of_file file in
     Parsing_utils.parse_file input file
-    >>= TypeInference.infer_statements ?ctx:None
+    >>= TypeInference.infer_statements ?ctx:None ~file
       ~on_var:(Input_format.on_var input)
       ~on_undef:(Input_format.on_undef_id input)
     >|= fun st ->

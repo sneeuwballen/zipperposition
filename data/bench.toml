@@ -1,5 +1,5 @@
 
-provers = [ "zipperposition", "hornet", "read-tptp", "leo2", "satallax" ]
+provers = [ "zipperposition", "zipperposition-thf", "hornet", "read-tptp", "leo2", "satallax" ]
 
 [test]
 
@@ -16,7 +16,7 @@ default_expect = "unknown"
 
 timeout = 30 # in s
 memory = 2000 # in MB
-provers = [ "zipperposition", "leo2", "satallax" ]
+provers = [ "zipperposition-thf", "zipperposition", "leo2", "satallax" ]
 problems = ".*\\^.*.p"
 dir = [ "tptp" ]
 expect = "program:read-tptp"
@@ -25,6 +25,15 @@ expect = "program:read-tptp"
 
 binary = "./zipperposition.native"
 cmd = "./zipperposition.native $file --timeout $timeout --mem-limit $memory --output none"
+unsat = "SZS status (Theorem|Unsatisfiable)"
+sat = "SZS status (CounterSatisfiable|Satisfiable)"
+timeout = "SZS Status ResourceOut"
+version = "git:."
+
+[zipperposition-thf]
+
+binary = "./zipperposition.native"
+cmd = "./zipperposition.native $file --timeout $timeout --mem-limit $memory --output none --tptp-def-as-rewrite"
 unsat = "SZS status (Theorem|Unsatisfiable)"
 sat = "SZS status (CounterSatisfiable|Satisfiable)"
 timeout = "SZS Status ResourceOut"

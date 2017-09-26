@@ -224,7 +224,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     if has_ac_attr then (
       let proof =
         Proof.Step.esa ~rule:(Proof.Rule.mk "ac")
-          [Proof.S.parent_of_sourced (St.as_sourced_clause st)]
+          [Proof.Parent.from @@ St.as_proof_c st]
       in
       begin match St.view st with
         | St.TyDecl (id, ty) -> add ~proof id ty

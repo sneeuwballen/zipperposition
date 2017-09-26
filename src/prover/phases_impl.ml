@@ -97,14 +97,14 @@ let parse_file file =
     ~x:parsed >>= fun () ->
   Phases.return_phase (input,parsed)
 
-let typing prelude (input,stmts) =
+let typing ~file prelude (input,stmts) =
   Phases.start_phase Phases.Typing >>= fun () ->
   Phases.get_key Params.key >>= fun params ->
   let def_as_rewrite = params.Params.param_def_as_rewrite in
   TypeInference.infer_statements
     ~on_var:(Input_format.on_var input)
     ~on_undef:(Input_format.on_undef_id input)
-    ~def_as_rewrite ?ctx:None
+    ~def_as_rewrite ?ctx:None ~file
     (Sequence.append prelude stmts)
   >>?= fun stmts ->
   Util.debugf ~section 3 "@[<hv2>@{<green>typed statements@}@ %a@]"
@@ -114,12 +114,11 @@ let typing prelude (input,stmts) =
   Phases.return_phase stmts
 
 (* obtain clauses  *)
-let cnf ~file decls =
+let cnf decls =
   Phases.start_phase Phases.CNF >>= fun () ->
   let stmts =
     decls
     |> CCVector.to_seq
-    |> Sequence.map (Statement.add_src ~file)
     |> Cnf.cnf_of_seq
     |> CCVector.to_seq
     |> Cnf.convert
@@ -366,7 +365,7 @@ let print_szs_result (type c) ~file
       (* print status then proof *)
       Format.printf "%sSZS status %s for '%s'@." comment (unsat_to_str ()) file;
       Format.printf "%sSZS output start Refutation@." comment;
-      Format.printf "%a@." (Proof.S.pp !Options.output) proof;
+      Format.printf "%a@." (Proof.S.pp_in !Options.output) proof;
       Format.printf "%sSZS output end Refutation@." comment;
   end;
   Phases.return_phase ()
@@ -399,13 +398,13 @@ let parse_cli =
 let process_file (prelude:Phases.prelude) file =
   start_file file >>= fun () ->
   parse_file file >>= fun stmts ->
-  typing prelude stmts >>= fun decls ->
+  typing ~file prelude stmts >>= fun decls ->
   (* declare inductive types and constants *)
   CCVector.iter Statement.scan_simple_stmt_for_ind_ty decls;
   let has_goal = has_goal_decls_ decls in
   Util.debugf ~section 1 "parsed %d declarations (%s goal(s))"
     (fun k->k (CCVector.length decls) (if has_goal then "some" else "no"));
-  cnf ~file decls >>= fun stmts ->
+  cnf decls >>= fun stmts ->
   (* compute signature, precedence, ordering *)
   let signature = Statement.signature (CCVector.to_seq stmts) in
   Util.debugf ~section 1 "@[<2>signature:@ @[<hv>%a@]@]" (fun k->k Signature.pp signature);

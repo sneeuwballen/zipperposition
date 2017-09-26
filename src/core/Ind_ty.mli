@@ -36,6 +36,7 @@ type t = private {
      no other type variables than [ty_vars] *)
   ty_is_rec: bool lazy_t;
   (* true iff the type is (mutually) recursive *)
+  ty_proof: Proof.t;
 }
 
 val pp : t CCFormat.printer
@@ -46,7 +47,7 @@ exception NotAnInductiveType of ID.t
 
 exception NotAnInductiveConstructor of ID.t
 
-val declare_ty : ID.t -> ty_vars:Type.t HVar.t list -> constructor list -> t
+val declare_ty : ID.t -> ty_vars:Type.t HVar.t list -> constructor list -> proof:Proof.t -> t
 (** Declare the given inductive type.
     @raise InvalidDecl if the type is already declared, or the list
       of constructors is empty *)
@@ -72,6 +73,8 @@ val is_inductive_type : Type.t -> bool
 val is_inductive_simple_type : TypedSTerm.t -> bool
 
 val is_recursive : t -> bool
+
+val proof : t -> Proof.t
 
 (** {6 Constructors} *)
 

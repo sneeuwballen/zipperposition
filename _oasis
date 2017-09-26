@@ -67,13 +67,13 @@ Library "logtk"
                     Subst, Signature, Scoped,
                     Unif, Unif_intf, Unif_constr, Unif_subst, HO_unif,
                     TypeInference, Options, Comparison, Precedence, Builtin,
-                    Ordering, Skolem, Cnf, ID, ID_or_builtin, SLiteral,
+                    Ordering, Skolem, Cnf, ID, Head, SLiteral,
                     Index, Index_intf, Dtree, Fingerprint, NPDtree, Binder,
                     Congruence, Congruence_intf, Lambda,
                     FeatureVector, FV_tree, UntypedAST, Ind_ty,
-                    TypedSTerm, Statement, Flex_state, Compute_prec, 
-                    Ordinal, Rewrite, Test_prop, Input_format, Output_format,
-                    LLProof, LLProof_check,
+                    TypedSTerm, Statement, Flex_state, Compute_prec,
+                    Ordinal, Polynomial, Rewrite, Test_prop, Input_format,
+                    Output_format, Proof, LLProof, LLProof_check,
                     Multisets, Literal, Literals, Int_lit, Rat_lit, Monome,
                     lib/Hashcons, lib/ParseLocation, lib/Multiset, lib/LazyList,
                     lib/Hash, lib/IArray, lib/AllocCache, lib/Multiset_intf,
@@ -88,12 +88,13 @@ Library "logtk_parsers"
   Pack:             true
   Modules:          Parse_tptp, Lex_tptp, Ast_tptp, Util_tptp,
                     Trace_tstp, Parse_zf, Lex_zf, Util_zf, Util_tip,
+                    Tip_ast, Tip_parser, Tip_lexer,
                     Parsing_utils, CallProver
   Build$:           flag(parsers)
   Install$:         flag(parsers)
   FindlibName:      parsers
-  FindlibParent:    logtk 
-  BuildDepends:     logtk, tip_parser
+  FindlibParent:    logtk
+  BuildDepends:     logtk
   BuildTools:       menhir
 
 Library "logtk_solving"
@@ -121,7 +122,7 @@ Library "libzipperposition"
   Pack:             true
   FindlibName:      libzipperposition
   Modules:          ClauseQueue, Clause, SClause, Const, Extensions,
-                    Ctx, Proof, ProofState,
+                    Ctx, ProofState, Bool_clause,
                     Saturate, Selection, AC, AC_intf, SimplM,
                     Params, Env, Signals, Classify_cst,
                     Ctx_intf, Clause_intf, Env_intf, ProofState_intf,

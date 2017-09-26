@@ -215,9 +215,13 @@ module Make(Env : Env_intf.S) = struct
           (* s1(...) = s2(...) is absurd,
              s1(...) != s2(...) is obvious *)
           Util.incr_stat stat_disjointness;
+          let proof =
+            let ity = T.head_term l |> T.ty |> Type.returns in
+            Ind_ty.as_inductive_type_exn ity |> fst |> Ind_ty.proof
+          in
           if sign
-          then Some Literal.mk_absurd
-          else Some Literal.mk_tauto
+          then Some (Literal.mk_absurd, [proof])
+          else Some (Literal.mk_tauto, [proof])
         | _ -> None
       end
     | _ -> None

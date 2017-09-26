@@ -291,17 +291,6 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
 
   let skolem_count_ = ref 0
 
-  (* make a new skolem symbol *)
-  let skolem_ ~ty =
-    let id = ID.makef "_avatar_%d" !skolem_count_  in
-    incr skolem_count_;
-    ID.set_payload id
-      (ID.Attr_skolem
-         (if Ind_ty.is_inductive_type ty then ID.K_ind else ID.K_normal));
-    Ctx.declare id ty;
-    Ordering.add_list (Ctx.ord ()) [id];
-    id
-
   type cut_res = {
     cut_form: Cut_form.t; (** the lemma itself *)
     cut_pos: E.C.t list; (** clauses true if lemma is true *)
@@ -335,7 +324,11 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     let box = BBox.inject_lemma f in
     let cut_proof_parent =
       let form = Cut_form.to_s_form f in
-      Proof.Parent.from @@ Proof.S.mk_f proof form
+      let st =
+        Statement.lemma ~proof:(Proof.Step.lemma @@ Proof.Src.internal[])
+          [form]
+      in
+      Proof.Parent.from @@ Statement.as_proof_i st
     in
     (* positive clauses *)
     let proof_pos =
@@ -466,12 +459,9 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       List.exists (fun parent -> in_proof_of_ (Proof.Parent.proof parent) lit) (Proof.Step.parents p)
     in
     begin match Proof.S.result p with
-      | Proof.C_stmt _
-      | Proof.Stmt _
-      | Proof.Form _
-      | Proof.Clause _ -> in_proof_ (Proof.S.step p) lit
-      | Proof.BoolClause l ->
+      | Proof.Res (_, Bool_clause.E_proof l) ->
         List.exists (eq_abs lit) l || in_proof_ (Proof.S.step p) lit
+      | _ -> in_proof_ (Proof.S.step p) lit
     end
 
   let print_lemmas out () =
@@ -498,7 +488,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
 
   let convert_lemma st = match Statement.view st with
     | Statement.Lemma l ->
-      let proof_st = Proof.Step.goal (Statement.src st) in
+      let proof_st = Statement.proof_step st in
       let f =
         l
         |> List.map (List.map Ctx.Lit.of_form)
@@ -509,8 +499,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         Cut_form.cs f
         |> List.map
           (fun c ->
-             Proof.Parent.from @@ Proof.S.mk_c proof_st @@
-             SClause.make ~trail:Trail.empty c)
+             Proof.Parent.from @@ Proof.S.mk proof_st @@
+             SClause.mk_proof_res @@ SClause.make ~trail:Trail.empty c)
         |> Proof.Step.simp ~rule:(Proof.Rule.mk "lemma")
       in
       let cut = introduce_cut ~reason:Fmt.(return "in-input") f proof in

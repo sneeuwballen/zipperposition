@@ -31,6 +31,7 @@ and step =
   | Negated_goal of t
   | Trivial
   | By_def of ID.t
+  | Define of ID.t
   | Instantiate of subst * t
   | Esa of name * t list * check_info
   | Inference of name * t list * check_info
@@ -45,20 +46,21 @@ let pp_step out (s:step): unit = match s with
   | Negated_goal _ -> Fmt.string out "negated_goal"
   | Trivial -> Fmt.string out "trivial"
   | By_def id -> Fmt.fprintf out "(by_def :of %a)" ID.pp id
+  | Define id -> Fmt.fprintf out "(@[define@ %a@])" ID.pp id
   | Instantiate (subst, _) ->
     Fmt.fprintf out "(@[instantiate %a@])" (Var.Subst.pp T.pp) subst
   | Esa (n,_,_) -> Fmt.fprintf out "(esa %s)" n
   | Inference (n,_,_) -> Fmt.fprintf out "(inf %s)" n
 
 let premises (p:t): t list = match p.step with
-  | Goal | Assert | Trivial | By_def _ -> []
+  | Goal | Assert | Trivial | By_def _ | Define _ -> []
   | Negated_goal p2
   | Instantiate (_,p2) -> [p2]
   | Esa (_,l,_)
   | Inference (_,l,_) -> l
 
 let check_info (p:t): check_info = match p.step with
-  | Goal | Assert | Trivial | Negated_goal _ | By_def _ -> C_other
+  | Goal | Assert | Trivial | Negated_goal _ | By_def _ | Define _ -> C_other
   | Instantiate (_,_) -> C_check []
   | Esa (_,_,c)
   | Inference (_,_,c) -> c
@@ -105,6 +107,7 @@ let negated_goal f p = mk_ f (Negated_goal p)
 let assert_ f = mk_ f Assert
 let trivial f = mk_ f Trivial
 let by_def id f = mk_ f (By_def id)
+let define id f = mk_ f (Define id)
 let instantiate f subst p = mk_ f (Instantiate (subst,p))
 
 let conv_check_ = function

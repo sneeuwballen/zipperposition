@@ -3,47 +3,81 @@
 
 (** {1 Manipulate proofs} *)
 
-open Logtk
-
 module Loc = ParseLocation
-module Stmt = Statement
 module T = TypedSTerm
 module F = T.Form
+module UA = UntypedAST
 
 type form = TypedSTerm.t
-type bool_lit = BBox.Lit.t
 type 'a sequence = ('a -> unit) -> unit
 
-let section = Util.Section.make ~parent:Const.section "proof"
-
-type statement_src = Statement.source
+let section = Util.Section.make "proof"
 
 type rule = string
 
 type check = [`No_check | `Check | `Check_with of form list]
 
+type attrs = UntypedAST.attrs
+
 type info = UntypedAST.attr
 
 type infos = info list
 
-(** Classification of proof steps *)
 type kind =
+  | Intro of source * role
   | Inference of rule * check
   | Simplification of rule * check
   | Esa of rule * check
-  | Assert of statement_src
-  | Goal of statement_src
-  | Lemma
-  | Data of statement_src * Type.t Statement.data
   | Trivial (** trivial, or trivial within theories *)
-  | By_def of ID.t
+  | Define of ID.t * source (** definition *)
+  | By_def of ID.t (** following from the def of ID *)
 
-type result =
-  | Form of form
-  | Clause of SClause.t
-  | BoolClause of bool_lit list
-  | Stmt of Statement.input_t
-  | C_stmt of Statement.clause_t
+and source = {
+  src_id: int;
+  src_view: source_view;
+}
+and source_view =
+  | From_file of from_file * UntypedAST.attrs
+  | Internal of attrs
+
+and role =
+  | R_assert
+  | R_goal
+  | R_def
+  | R_decl
+  | R_lemma
+
+(* a statement in a file *)
+and from_file = {
+  file : string;
+  name : string option;
+  loc: ParseLocation.t option;
+}
+
+type flavor =
+  [ `Pure_bool
+  | `Absurd_lits
+  | `Proof_of_false
+  | `Vanilla
+  | `Def
+  ]
+
+(** Typeclass for the result of a proof step *)
+type 'a result_tc = {
+  res_id: int; (* unique ID of the class *)
+  res_of_exn: exn -> 'a option;
+  res_to_exn: 'a -> exn;
+  res_compare: 'a -> 'a -> int;
+  res_is_stmt: bool;
+  res_pp_in: Output_format.t -> 'a CCFormat.printer;
+  res_to_form: ctx:Term.Conv.ctx -> 'a -> TypedSTerm.Form.t;
+  res_apply_subst: (Subst.t -> 'a Scoped.t -> 'a) option;
+  res_name:('a -> string) option;
+  res_flavor: 'a -> flavor;
+}
+
+(** existential type for result of an inference *)
+type result = Res : 'a result_tc * exn -> result
 
 (** A proof step, without the conclusion *)
 type step = {
@@ -72,6 +106,77 @@ module Rule = struct
   let name r = r
   let mk name = name
   let mkf fmt = CCFormat.ksprintf ~f:mk fmt
+end
+
+module Src = struct
+  type t = source
+
+  let file x = x.file
+  let name x = x.name
+  let loc x = x.loc
+
+  let equal a b = a.src_id = b.src_id
+  let hash a = a.src_id
+  let view a = a.src_view
+
+  let mk_ =
+    let n = ref 0 in
+    fun src_view -> {src_view; src_id=CCRef.get_then_incr n}
+
+  let mk_name_ =
+    let n = ref 0 in
+    fun () -> Printf.sprintf "zf_stmt_%d" (CCRef.get_then_incr n)
+
+  let from_file ?loc ?name ?(attrs=[]) file : t =
+    (* NOTE: we always give a unique name if not present *)
+    let name = match name with Some _ -> name | None -> Some(mk_name_()) in
+    mk_ (From_file ({ name; loc; file; }, attrs))
+
+  let internal attrs = mk_ (Internal attrs)
+
+  let pp_from_file out x =
+    let pp_name out = function
+      | None -> ()
+      | Some n -> Format.fprintf out "at %s " n
+    in
+    Format.fprintf out "@[<2>%ain@ `%s`@,%a@]"
+      pp_name x.name x.file ParseLocation.pp_opt x.loc
+
+  let pp_role out = function
+    | R_decl -> CCFormat.string out "decl"
+    | R_assert -> CCFormat.string out "assert"
+    | R_goal -> CCFormat.string out "goal"
+    | R_def -> CCFormat.string out "def"
+    | R_lemma -> CCFormat.string out "lemma"
+
+  let pp_tstp out src = match view src with
+    | Internal _ -> ()
+    | From_file (src,_) ->
+      let file = src.file in
+      begin match src.name with
+        | None -> Format.fprintf out "file('%s')" file
+        | Some name -> Format.fprintf out "file(@['%s',@ '%s'@])" file name
+      end
+
+  let pp out src = match view src with
+    | Internal _ -> ()
+    | From_file (src,attrs) ->
+      let file = src.file in
+      begin match src.name with
+        | None -> Format.fprintf out "'%s'%a" file UA.pp_attrs attrs
+        | Some name -> Format.fprintf out "'%s' in '%s'%a" name file UA.pp_attrs attrs
+      end
+
+  let to_attrs src : UntypedAST.attrs =
+    let open UntypedAST.A in
+    begin match view src with
+      | Internal attrs -> str "internal" :: attrs
+      | From_file (f,attrs) ->
+        begin match f.name with
+          | None -> app "file" [quoted f.file] :: attrs
+          | Some n -> app "file" [quoted f.file; app "name" [quoted n]] :: attrs
+        end
+    end
 end
 
 module Parent = struct
@@ -103,14 +208,14 @@ module Kind = struct
   type t = kind
 
   let _pp_parent out = function
-    | `Name i -> Format.fprintf out "%d" i
+    | `Name s -> Format.fprintf out "%s" s
     | `Theory s -> Format.fprintf out "theory(%s)" s
 
   let pp out k = match k with
-    | Assert src -> Stmt.Src.pp out src
-    | Goal src -> Format.fprintf out "goal %a" Stmt.Src.pp src
-    | Lemma -> Format.fprintf out "lemma"
-    | Data (src, _) -> Format.fprintf out "data %a" Stmt.Src.pp src
+    | Intro (src,R_goal) -> Format.fprintf out "goal %a" Src.pp src
+    | Intro (src,R_lemma) -> Format.fprintf out "lemma %a" Src.pp src
+    | Intro (src,R_assert) -> Src.pp out src
+    | Intro (src, (R_def | R_decl)) -> Src.pp out src
     | Inference (rule,_) ->
       Format.fprintf out "inf %a" Rule.pp rule
     | Simplification (rule,_) ->
@@ -119,6 +224,7 @@ module Kind = struct
       Format.fprintf out "esa %a" Rule.pp rule
     | Trivial -> CCFormat.string out "trivial"
     | By_def id -> Format.fprintf out "by_def(%a)" ID.pp id
+    | Define (id,src) -> Format.fprintf out "define(@[%a@ %a@])" ID.pp id Src.pp src
 
   let pp_tstp out (k,parents) =
     let pp_parents = Util.pp_list _pp_parent in
@@ -130,84 +236,113 @@ module Kind = struct
           Rule.pp rule status pp_parents parents
     in
     begin match k with
-      | Assert src
-      | Goal src -> Stmt.Src.pp_tstp out src
-      | Data _ -> Util.error ~where:"ProofStep" "cannot print `Data` step in TPTP"
+      | Intro (src,(R_assert|R_goal|R_def|R_decl)) -> Src.pp_tstp out src
       | Inference (rule,_)
       | Simplification (rule,_) -> pp_step "thm" out (rule,parents)
       | Esa (rule,_) -> pp_step "esa" out (rule,parents)
-      | Lemma -> Format.fprintf out "lemma"
+      | Intro (_,R_lemma) -> Format.fprintf out "lemma"
       | Trivial -> assert(parents=[]); Format.fprintf out "trivial([status(thm)])"
       | By_def _ -> Format.fprintf out "by_def([status(thm)])"
+      | Define _ -> Format.fprintf out "define([status(thm)])"
     end
 end
 
 module Result = struct
   type t = result
+  type 'a tc = 'a result_tc
 
-  let res_to_int_ = function
-    | Clause _ -> 0
-    | Form _ -> 1
-    | BoolClause _ -> 2
-    | Stmt _ -> 3
-    | C_stmt _ -> 4
+  let res_to_int_ = function (Res ({res_id; _}, _)) -> res_id
+
+  type flavor =
+    [ `Pure_bool
+    | `Absurd_lits
+    | `Proof_of_false
+    | `Vanilla
+    | `Def
+    ]
 
   let compare a b = match a, b with
-    | Clause c1, Clause c2 -> SClause.compare c1 c2
-    | Form f1, Form f2 -> TypedSTerm.compare f1 f2
-    | BoolClause l1, BoolClause l2 -> CCOrd.list BBox.Lit.compare l1 l2
-    | Stmt s1, Stmt s2 -> Statement.compare s1 s2
-    | C_stmt s1, C_stmt s2 -> Statement.compare s1 s2
-    | Clause _, _
-    | Form _, _
-    | BoolClause _, _
-    | Stmt _, _
-    | C_stmt _, _
-      -> CCInt.compare (res_to_int_ a) (res_to_int_ b)
+    | Res (r1,x1), Res (r2,x2) ->
+      if r1.res_id <> r2.res_id
+      then CCInt.compare r1.res_id r2.res_id
+      else match r1.res_of_exn x1, r1.res_of_exn x2 with
+        | Some y1, Some y2 -> r1.res_compare y1 y2
+        | _ -> assert false (* same ID?? *)
 
-  let equal a b = match a, b with
-    | Clause c1, Clause c2 -> SClause.equal c1 c2
-    | Form f1, Form f2 -> TypedSTerm.equal f1 f2
-    | BoolClause l1, BoolClause l2 -> CCList.equal BBox.Lit.equal l1 l2
-    | Stmt s1, Stmt s2 -> Statement.compare s1 s2 = 0
-    | C_stmt s1, C_stmt s2 -> Statement.compare s1 s2 = 0
-    | Clause _, _
-    | Form _, _
-    | BoolClause _, _
-    | Stmt _, _
-    | C_stmt _, _
-      -> false
+  let equal a b = compare a b = 0
 
-  let pp out = function
-    | Form f -> TypedSTerm.pp out f
-    | Clause c ->
-      Format.fprintf out "%a/%d" SClause.pp c (SClause.id c)
-    | BoolClause lits -> BBox.pp_bclause out lits
-    | Stmt stmt -> Statement.pp_input out stmt
-    | C_stmt st -> Statement.pp_clause out st
+  let to_form ?(ctx=Term.Conv.create()) (Res (r,x)) = match r.res_of_exn x with
+    | None -> assert false
+    | Some x -> r.res_to_form ~ctx x
 
-  let c_to_sform ctx c = SClause.to_s_form ~ctx c |> F.close_forall
+  let pp_in o out (Res (r,x)) = match r.res_of_exn x with
+    | None -> assert false
+    | Some x -> r.res_pp_in o out x
 
-  let to_s_form ?(ctx=Term.Conv.create()) (r:t): form = match r with
-    | Form f -> f
-    | Clause c -> SClause.to_s_form ~ctx c |> F.close_forall
-    | BoolClause c ->
-      List.map BBox.to_s_form c |> F.or_
-    | Stmt st ->
-      (* assimilate the statement to its formulas *)
-      Stmt.Seq.forms st |> Sequence.to_list |> F.and_
-    | C_stmt st ->
-      (* assimilate the statement to its formulas *)
-      Stmt.Seq.forms st
-      |> Sequence.map
-        (fun c ->
-           c
-           |> List.map
-             (fun lit ->
-                SLiteral.map lit ~f:(Term.Conv.to_simple_term ctx)
-                |> SLiteral.to_form)
-           |> F.or_ |> F.close_forall)
-      |> Sequence.to_list |> F.and_
+  let pp = pp_in Output_format.normal
+
+  let flavor (Res (r,x)) = match r.res_of_exn x with
+    | None -> assert false
+    | Some x -> r.res_flavor x
+
+  let apply_subst subst (Res (r,x),sc) : t = match r.res_of_exn x with
+    | None -> assert false
+    | Some y ->
+      let y = match r.res_apply_subst with
+        | None -> y
+        | Some f -> f subst (y,sc)
+      in
+      Res (r, r.res_to_exn y)
+
+  let name (Res (r,x)) = match r.res_of_exn x with
+    | None -> assert false
+    | Some x ->
+      begin match r.res_name with
+        | None -> None
+        | Some f -> Some (f x)
+      end
+
+  let n_ = ref 0
+  let make_tc (type a)
+      ~of_exn ~to_exn ~compare
+      ~to_form
+      ~pp_in
+      ?name
+      ?(is_stmt=false)
+      ?apply_subst
+      ?(flavor=fun _ -> `Vanilla)
+      () : a result_tc
+    =
+    let id = CCRef.incr_then_get n_ in
+    { res_id=id;
+      res_of_exn=of_exn;
+      res_to_exn=to_exn;
+      res_compare=compare;
+      res_is_stmt=is_stmt;
+      res_pp_in=pp_in;
+      res_apply_subst=apply_subst;
+      res_to_form=to_form;
+      res_name=name;
+      res_flavor=flavor;
+    }
+
+  let make tc x : t = Res (tc, tc.res_to_exn x)
+
+  exception E_form of form
+
+  let form_tc : form result_tc =
+    make_tc
+      ~of_exn:(function
+        | E_form f -> Some f | _ -> None)
+      ~to_exn:(fun f -> E_form f)
+      ~to_form:(fun ~ctx:_ t -> t)
+      ~compare:T.compare
+      ~pp_in:TypedSTerm.pp_in
+      ~flavor:(fun f -> if T.equal f F.false_ then `Proof_of_false else `Vanilla)
+      ()
+
+  let of_form = make form_tc
+  let is_stmt (Res (r,_)) = r.res_is_stmt
 end
 
 module Step = struct
@@ -221,20 +356,28 @@ module Step = struct
   let parents p = p.parents
   let infos p = p.infos
 
+  let src p = match p.kind with
+    | Intro (src,_) | Define (_,src) -> Some src
+    | Trivial | By_def _ | Esa (_,_) | Inference _ | Simplification _
+      -> None
+
+  let to_attrs p = match src p with
+    | None -> []
+    | Some src -> Src.to_attrs src
+
   let rule p = match p.kind with
+    | Intro _
     | Trivial
-    | Lemma
-    | Assert _
-    | Data _
     | By_def _
-    | Goal _-> None
+    | Define _ -> None
     | Esa (rule,_)
     | Simplification (rule,_)
     | Inference (rule,_)
       -> Some rule
 
-  let is_assert p = match p.kind with Assert _ -> true | _ -> false
-  let is_goal p = match p.kind with Goal _ | Lemma -> true | _ -> false
+  let is_assert p = match p.kind with Intro (_,R_assert) -> true | _ -> false
+  let is_assert_like p = match p.kind with Intro (_,(R_assert|R_def|R_decl)) -> true | _ -> false
+  let is_goal p = match p.kind with Intro (_,(R_goal|R_lemma)) -> true | _ -> false
   let is_trivial p = match p.kind with Trivial -> true | _ -> false
   let is_by_def p = match p.kind with By_def _ -> true | _ -> false
 
@@ -246,7 +389,16 @@ module Step = struct
 
   let trivial = {id=get_id_(); parents=[]; kind=Trivial; dist_to_goal=None; infos=[]; }
   let by_def id = {id=get_id_(); parents=[]; kind=By_def id; dist_to_goal=None; infos=[]; }
-  let lemma = {id=get_id_(); parents=[]; kind=Lemma; dist_to_goal=Some 0; infos=[]; }
+  let intro src r =
+    let dist_to_goal = match r with
+      | R_goal | R_lemma -> Some 0 | _ -> None
+    in
+    {id=get_id_(); parents=[]; kind=Intro(src,r); dist_to_goal; infos=[]}
+  let define id src parents =
+    {id=get_id_(); parents; kind=Define (id,src); dist_to_goal=None; infos=[]; }
+  let define_internal id parents = define id (Src.internal []) parents
+  let lemma src =
+    {id=get_id_(); parents=[]; kind=Intro(src,R_lemma); dist_to_goal=Some 0; infos=[]; }
 
   let combine_dist o p = match o, (Parent.proof p).step.dist_to_goal with
     | None, None -> None
@@ -257,7 +409,7 @@ module Step = struct
   let step_ ?(infos=[]) kind parents =
     (* distance to goal (0 if a goal itself) *)
     let dist_to_goal = match kind with
-      | Goal _ | Lemma -> Some 0
+      | Intro (_,(R_goal | R_lemma)) -> Some 0
       | _ ->
         let d = match parents with
           | [] -> None
@@ -271,19 +423,18 @@ module Step = struct
     in
     { id=get_id_(); kind; parents; dist_to_goal; infos; }
 
-  let data src data =
-    step_ (Data (src,data)) []
+  let intro src r = step_ (Intro(src,r)) []
 
-  let assert_ src = step_ (Assert src) []
-
-  let goal src = step_ (Goal src) []
+  let assert_ src = intro src R_assert
 
   let assert' ?loc ~file ~name () =
-    let src = Stmt.Src.from_file ?loc ~name file Stmt.R_assert in
+    let src = Src.from_file ?loc ~name file in
     assert_ src
 
+  let goal src = intro src R_goal
+
   let goal' ?loc ~file ~name () =
-    let src = Stmt.Src.from_file ?loc ~name file Stmt.R_goal in
+    let src = Src.from_file ?loc ~name file in
     goal src
 
   let default_check : check = `Check
@@ -302,23 +453,27 @@ module Step = struct
     | l ->
       Format.fprintf out "@ %a" (Util.pp_list ~sep:" " UntypedAST.pp_attr) l
 
+  let pp_parents out = function
+    | [] -> ()
+    | l ->
+      Format.fprintf out "@ with @[<hv>%a@]"
+        (Util.pp_list Result.pp)
+        (List.map (fun p -> (Parent.proof p).result) @@ l)
+
   let pp out step = match kind step with
-    | Assert _
-    | Goal _ ->
-      Format.fprintf out "@[<hv2>%a@]%a@," Kind.pp (kind step) pp_infos step.infos
-    | Data _ ->
-      Format.fprintf out "@[<hv2>data %a@]%a@," Kind.pp (kind step) pp_infos step.infos
-    | Lemma -> Format.fprintf out "@[<2>lemma%a@]" pp_infos step.infos
+    | Intro (_,(R_assert|R_goal|R_def|R_decl)) ->
+      Format.fprintf out "@[<hv2>%a@]%a" Kind.pp (kind step) pp_infos step.infos
+    | Intro (_,R_lemma) -> Format.fprintf out "@[<2>lemma%a@]" pp_infos step.infos
     | Trivial -> Format.fprintf out "@[<2>trivial%a@]" pp_infos step.infos
     | By_def id -> Format.fprintf out "@[<2>by_def %a%a@]" ID.pp id pp_infos step.infos
+    | Define (id,src) ->
+      Format.fprintf out "@[<2>define %a@ %a%a%a@]"
+        ID.pp id Src.pp src pp_parents (parents step) pp_infos step.infos
     | Inference _
     | Simplification _
     | Esa _ ->
-      Format.fprintf out "@[<hv2>%a@ with @[<hv>%a@]%a@]@,"
-        Kind.pp (kind step)
-        (Util.pp_list Result.pp)
-        (List.map (fun p -> (Parent.proof p).result) @@ parents step)
-        pp_infos step.infos
+      Format.fprintf out "@[<hv2>%a%a%a@]"
+        Kind.pp (kind step) pp_parents (parents step) pp_infos step.infos
 end
 
 module S = struct
@@ -344,21 +499,15 @@ module S = struct
       let hash = hash
     end)
 
-  let has_absurd_lits p = match result p with
-    | Clause c -> Literals.is_absurd (SClause.lits c)
-    | _ -> false
+  let has_absurd_lits p = Result.flavor (result p) = `Absurd_lits
 
-  let is_proof_of_false p = match result p with
-    | Form f when TypedSTerm.equal f TypedSTerm.Form.false_ -> true
-    | Clause c ->
-      Literals.is_absurd (SClause.lits c) && Trail.is_empty (SClause.trail c)
-    | _ -> false
+  let is_proof_of_false p = Result.flavor (result p) = `Proof_of_false
 
-  let is_pure_bool p = match result p with
-    | BoolClause _ -> true
-    | _ -> false
+  let is_pure_bool p = Result.flavor (result p) = `Pure_bool
+  let is_def p = Result.flavor (result p) = `Def
 
-  let mk_f step res = {step; result=Form res; }
+  let mk step res = {step; result=res}
+  let mk_f step res = mk step (Result.of_form res)
 
   let mk_f_trivial = mk_f Step.trivial
   let mk_f_by_def id f = mk_f (Step.by_def id) f
@@ -375,24 +524,25 @@ module S = struct
     let step = Step.esa ?check ~rule parents in
     mk_f step f
 
-  let mk_c step c = {step; result=Clause c; }
-  let mk_bc step c = {step; result=BoolClause c; }
-  let mk_stmt step stmt = {step; result=Stmt stmt; }
-  let mk_c_stmt step stmt = {step; result=C_stmt stmt }
+  let adapt p r = { p with result=r; }
 
-  let adapt_c p c =
-    { p with result=Clause c; }
+  let adapt_f p f = adapt p (Result.of_form f)
 
-  let adapt_f p f =
-    { p with result=Form f; }
+  let name_gen_ = ref 0
 
-  let get_name ~namespace p =
-    try
-      Tbl.find namespace p
-    with Not_found ->
-      let n = Tbl.length namespace in
-      Tbl.add namespace p n;
-      n
+  (* retrieve the name, or create a new one on the fly *)
+  let name ~namespace (p:t) : string =
+    (* look if the result is a named thing from the input, otherwise
+       generate a fresh one from the namespace *)
+    begin match Result.name (result p) with
+      | Some s -> s
+      | None ->
+        try Tbl.find namespace p
+        with Not_found ->
+          let s = Printf.sprintf "'%d'" (Tbl.length namespace) in
+          Tbl.add namespace p s;
+          s
+    end
 
   (** {2 Conversion to a graph of proofs} *)
 
@@ -401,14 +551,15 @@ module S = struct
     CCGraph.make
       (fun p ->
          let st = step p in
-         match Step.rule st with
-         | None -> Sequence.empty
-         | Some rule ->
-           st
-           |> Step.parents
-           |> Sequence.of_list
-           |> Sequence.map
-             (fun p' -> (rule,Parent.subst p',Step.infos st), Parent.proof p'))
+         let rule = match Step.rule st with
+           | None -> ""
+           | Some rule -> rule
+         in
+         st
+         |> Step.parents
+         |> Sequence.of_list
+         |> Sequence.map
+           (fun p' -> (rule,Parent.subst p',Step.infos st), Parent.proof p'))
 
   (** {2 IO} *)
 
@@ -475,9 +626,9 @@ module S = struct
     Format.fprintf out "@[<v>";
     traverse ~order:`DFS proof
       (fun p ->
-         let name = get_name ~namespace p in
+         let p_name = name ~namespace p in
          let parents =
-           List.map (fun p -> `Name (get_name ~namespace @@ Parent.proof p))
+           List.map (fun p -> `Name (name ~namespace @@ Parent.proof p))
              (Step.parents @@ step p)
          in
          let role = "plain" in (* TODO *)
@@ -488,90 +639,64 @@ module S = struct
                (Util.pp_list ~sep:", " UntypedAST.pp_attr_tstp) l
          in
          let infos = p.step |> Step.infos in
-         begin match result p with
-           | Form f ->
-             Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]%a).@]@,"
-               name role TypedSTerm.TPTP.pp f
-               Kind.pp_tstp (Step.kind @@ step p,parents) pp_infos infos
-           | BoolClause c ->
-             Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]%a).@]@,"
-               name role (Util.pp_list ~sep:" | " BBox.pp_tstp) c
-               Kind.pp_tstp (Step.kind @@ step p,parents) pp_infos infos
-           | Clause c ->
-             Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]%a).@]@,"
-               name role SClause.pp_tstp c
-               Kind.pp_tstp (Step.kind @@ step p,parents) pp_infos infos
-           | Stmt stmt ->
-             let module T = TypedSTerm in
-             Statement.TPTP.pp T.TPTP.pp T.TPTP.pp T.TPTP.pp out stmt
-           | C_stmt stmt ->
-             let pp_t = Term.TPTP.pp in
-             let pp_c = Util.pp_list ~sep:"|" (SLiteral.TPTP.pp pp_t) in
-             Statement.TPTP.pp pp_c pp_t Type.TPTP.pp out stmt
-         end);
+         if Result.is_stmt (result p) then (
+           Format.fprintf out "%a@," (Result.pp_in Output_format.tptp) (result p)
+         ) else (
+           Format.fprintf out "tff(@[%s, %s,@ @[%a@],@ @[%a@]%a@]).@,"
+             p_name role (Result.pp_in Output_format.tptp) (result p)
+             Kind.pp_tstp (Step.kind @@ step p,parents) pp_infos infos
+         ));
     Format.fprintf out "@]";
     ()
 
   let pp_zf out proof =
     let module UA = UntypedAST.A in
-    let namespace = Tbl.create 8 in
     Format.fprintf out "@[<v>";
+    let namespace = Tbl.create 8 in
     traverse ~order:`DFS proof
       (fun p ->
-         let name = get_name ~namespace p in
+         let p_name = name ~namespace p in
          let parents =
-           List.map (fun p -> get_name ~namespace @@ Parent.proof p)
+           List.map (fun p -> name ~namespace @@ Parent.proof p)
              (Step.parents @@ step p)
          in
-         let str_of_name s = CCFormat.sprintf "'%d'" s in
          let mk_status r = UA.app "status" [UA.quoted r] in
          let info_name =
-           UA.(app "name" [str (str_of_name name)])
+           UA.(app "name" [str p_name])
          and info_from =
            if parents=[] then []
            else (
-             let l = List.map str_of_name parents in
-             [UA.(app "from" [list (List.map str l)])]
+             [UA.(app "from" [list (List.map str parents)])]
            )
          and info_rule = match Step.rule (step p) with
            | Some r -> [UA.(app "rule" [quoted r])]
            | None -> []
          and info_status = match Step.kind (step p) with
            | Inference _ | Simplification _ -> [mk_status "inference"]
-           | Lemma -> [mk_status "lemma"]
            | Esa _ -> [mk_status "equisatisfiable"]
-           | Goal src -> [mk_status "goal"; Statement.Src.to_attr src]
-           | Assert src -> [mk_status "assert"; Statement.Src.to_attr src]
+           | Intro (src,R_lemma) -> mk_status "lemma" :: Src.to_attrs src
+           | Intro (src,R_goal) -> mk_status "goal" :: Src.to_attrs src
+           | Intro (src,R_assert) -> mk_status "assert" :: Src.to_attrs src
+           | Intro (src,R_def) -> mk_status "def" :: Src.to_attrs src
+           | Intro (src,R_decl) -> mk_status "decl" :: Src.to_attrs src
            | Trivial -> [mk_status "trivial"]
-           | Data _ | By_def _ -> []
+           | By_def _ | Define _ -> []
          in
          let pp_infos = UntypedAST.pp_attrs_zf in
          let infos =
            info_name :: info_from @ info_rule @ info_status @ (Step.infos p.step)
          in
-         begin match result p with
-           | Form f ->
-             Format.fprintf out "@[<2>assert%a@ %a@].@,"
-               pp_infos infos TypedSTerm.ZF.pp f
-           | BoolClause c ->
-             Format.fprintf out "@[<2>assert%a@ %a@].@,"
-               pp_infos infos (Util.pp_list ~sep:" || " BBox.pp_zf) c
-           | Clause c ->
-             Format.fprintf out "@[<2>assert%a@ %a@].@,"
-               pp_infos infos SClause.pp_zf c
-           | Stmt stmt ->
-             let module T = TypedSTerm in
-             Statement.ZF.pp T.ZF.pp T.ZF.pp T.ZF.pp out stmt
-           | C_stmt stmt ->
-             let pp_t = Term.ZF.pp in
-             let pp_c = Util.pp_list ~sep:" || " (SLiteral.ZF.pp pp_t) in
-             Statement.ZF.pp pp_c pp_t Type.ZF.pp out stmt
-         end);
+         if Result.is_stmt (result p) then (
+           Format.fprintf out "%a@," (Result.pp_in Output_format.zf) (result p)
+         ) else (
+           Format.fprintf out "@[<2>assert%a@ %a@].@,"
+             pp_infos infos (Result.pp_in Output_format.zf) (result p)
+         ));
     Format.fprintf out "@]";
     ()
 
   (** Prints the proof according to the given input switch *)
-  let pp o out proof = match o with
+  let pp_in o out proof = match o with
     | Output_format.O_none -> Util.debug ~section 1 "proof printing disabled"
     | Output_format.O_tptp -> pp_tstp out proof
     | Output_format.O_normal -> pp_normal out proof
@@ -596,7 +721,6 @@ module S = struct
     Util.ksprintf_noc ~f:_escape_dot fmt
 
   let pp_dot_seq ~name out seq =
-    (* TODO: check proof is a DAG *)
     CCGraph.Dot.pp_seq
       ~tbl:(CCGraph.mk_table ~eq:equal ~hash:hash 64)
       ~eq:equal
@@ -609,10 +733,11 @@ module S = struct
         if is_proof_of_false p then [`Color "red"; `Label "[]"; `Shape "box"; `Style "filled"]
         else if is_pure_bool p then `Color "cyan3" :: shape :: attrs
         else if has_absurd_lits p then `Color "orange" :: shape :: attrs
-        else if Step.is_assert @@ step p then `Color "yellow" :: shape :: attrs
+        else if is_def p then `Color "navajowhite" :: shape :: attrs
         else if Step.is_goal @@ step p then `Color "green" :: shape :: attrs
         else if Step.is_trivial @@ step p then `Color "cyan" :: shape :: attrs
         else if Step.is_by_def @@ step p then `Color "navajowhite" :: shape :: attrs
+        else if Step.is_assert_like @@ step p then `Color "yellow" :: shape :: attrs
         else shape :: attrs
       )
       ~attrs_e:(fun (r,s,infos) ->
@@ -654,7 +779,7 @@ module S = struct
           res
       end
     and conv_step ?(ctx=Term.Conv.create()) p =
-      let res = Result.to_s_form ~ctx (result p) in
+      let res = Result.to_form ~ctx (result p) in
       let parents =
         List.map (conv_parent ~ctx) (Step.parents @@ step p)
       in
@@ -664,26 +789,20 @@ module S = struct
         | Esa (name,c) -> LLProof.esa c res name parents
         | Trivial -> LLProof.trivial res
         | By_def id -> LLProof.by_def id res
-        | Assert _ -> LLProof.assert_ res
-        | Goal _ -> LLProof.assert_ res
-        | Lemma -> LLProof.trivial res
-        | Data (_,_) -> assert false (* TODO *)
+        | Define (id,_) -> LLProof.define id res
+        | Intro (_,R_assert) -> LLProof.assert_ res
+        | Intro (_,R_goal) -> LLProof.assert_ res
+        | Intro (_,(R_lemma|R_def|R_decl)) -> LLProof.trivial res
       end
     and conv_parent ~ctx (p:Parent.t): LLProof.t = match p with
       | P_of p -> conv p
       | P_subst (p,sc_p,subst) ->
         let p' = conv_parent ~ctx p in
         (* build instance of result *)
-        let res_subst = match result @@ Parent.proof p with
-          | Clause c ->
-            let trail = SClause.trail c in
-            let lits' =
-              Literals.apply_subst ~renaming:(Subst.Renaming.create())
-                subst (SClause.lits c,sc_p)
-            in
-            let c' = SClause.make ~trail lits' in
-            Result.to_s_form ~ctx (Clause c')
-          | _ -> assert false
+        let res = result @@ Parent.proof p in
+        let res_subst =
+          Result.apply_subst subst (res,sc_p)
+          |> Result.to_form ~ctx
         in
         (* "translate" substitution *)
         let subst =
@@ -704,58 +823,4 @@ module S = struct
         LLProof.instantiate res_subst subst p'
     in
     conv p
-
-  module Src_tbl = CCHashtbl.Make(struct
-      type t = Stmt.source
-      let equal = Stmt.Src.equal
-      let hash = Stmt.Src.hash
-    end)
-
-  (* used to share the same SClause.t in the proof *)
-  let input_proof_tbl_ : Step.t Src_tbl.t = Src_tbl.create 32
-
-  let rule_neg_ = Rule.mk "neg_goal"
-  let rule_cnf_ = Rule.mk "cnf"
-  let rule_renaming_ = Rule.mk "renaming"
-  let rule_define_ = Rule.mk "define"
-  let rule_preprocess_ msg = Rule.mkf "preprocess(%s)" msg
-
-  let rec step_of_src src: step =
-    try Src_tbl.find input_proof_tbl_ src
-    with Not_found ->
-      let p = match Stmt.Src.view src with
-        | Stmt.Input (_, Stmt.R_goal) -> Step.goal src
-        | Stmt.Input (_, _) -> Step.assert_ src
-        | Stmt.From_file (_, Stmt.R_goal) -> Step.goal src
-        | Stmt.From_file (_, _) -> Step.assert_ src
-        | Stmt.Internal _ -> Step.trivial
-        | Stmt.Neg srcd -> Step.esa ~rule:rule_neg_ [parent_of_sourced srcd]
-        | Stmt.CNF srcd -> Step.esa ~rule:rule_cnf_ [parent_of_sourced srcd]
-        | Stmt.Preprocess (srcd,l,msg) ->
-          Step.esa ~rule:(rule_preprocess_ msg)
-            (parent_of_sourced srcd :: List.map parent_of_sourced l)
-        | Stmt.Renaming (srcd,id,form) ->
-          Step.esa ~rule:rule_renaming_
-            [parent_of_sourced srcd;
-             Parent.from @@ mk_f_by_def id @@
-               TypedSTerm.(Form.eq (const id ~ty:Ty.prop) form)]
-        | Stmt.Define id -> Step.by_def id
-      in
-      Src_tbl.add input_proof_tbl_ src p;
-      p
-
-  and parent_of_sourced (res, src) : Parent.t =
-    let p = step_of_src src in
-    begin match res with
-      | Stmt.Sourced_input f ->
-        Parent.from (mk_f p f)
-      | Stmt.Sourced_clause c ->
-        let lits = List.map Literal.Conv.of_form c |> Array.of_list in
-        let c = SClause.make ~trail:Trail.empty lits in
-        Parent.from (mk_c p c)
-      | Stmt.Sourced_statement stmt ->
-        Parent.from (mk_stmt p stmt)
-      | Stmt.Sourced_clause_stmt stmt ->
-        Parent.from (mk_c_stmt p stmt)
-    end
 end
