@@ -174,7 +174,7 @@ module Src = struct
       | From_file (f,attrs) ->
         begin match f.name with
           | None -> app "file" [quoted f.file] :: attrs
-          | Some n -> app "file" [quoted f.file; app "name" [quoted n]] :: attrs
+          | Some n -> app "file" [quoted f.file; quoted n] :: attrs
         end
     end
 end
