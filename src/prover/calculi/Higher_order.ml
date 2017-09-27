@@ -189,14 +189,14 @@ module Make(E : Env.S) : S with module Env = E = struct
       let f, tt = T.as_app t in
       let g, ss = T.as_app s in
       begin match List.rev tt, List.rev ss with
-        | last_t :: upto_last_t, last_s :: upto_last_s ->
+        | last_t :: tl_rev_t, last_s :: tl_rev_s ->
           if last_t = last_s then
             match T.as_var last_t with
               | Some v ->
                 if not (T.var_occurs ~var:v f)
                 && not (T.var_occurs ~var:v g)
-                && not (List.exists (T.var_occurs ~var:v) (List.tl (List.rev tt)))
-                && not (List.exists (T.var_occurs ~var:v) (List.tl (List.rev ss)))
+                && not (List.exists (T.var_occurs ~var:v) tl_rev_t)
+                && not (List.exists (T.var_occurs ~var:v) tl_rev_s)
                 && not (List.exists (Literal.var_occurs v) other_lits)
                 then (
                   let butlast = (fun l -> CCList.take (List.length l - 1) l) in
