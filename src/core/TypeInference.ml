@@ -603,6 +603,12 @@ let rec infer_rec ?loc ctx t =
     | PT.AppBuiltin (Builtin.Term, []) -> T.Ty.term
     | PT.AppBuiltin (Builtin.Prop, []) -> T.Ty.prop
     | PT.AppBuiltin (Builtin.TType, []) -> T.Ty.tType
+    | PT.AppBuiltin (Builtin.HasType, [t;ty]) ->
+      (* cast *)
+      let t = infer_rec ?loc ctx t in
+      let ty = infer_ty_exn ctx ty in
+      unify ?loc (T.ty_exn t) ty;
+      t
     | PT.AppBuiltin (b,l) ->
       begin match TyBuiltin.ty b with
         | None ->
