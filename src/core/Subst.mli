@@ -32,6 +32,8 @@ module Renaming : sig
   type snapshot (** Immutable snapshot *)
 
   val snapshot : t -> snapshot
+
+  val pp_snapshot : snapshot CCFormat.printer
 end
 
 (** {3 Basics} *)
@@ -186,4 +188,28 @@ module FO : sig
   val of_list' : ?init:t -> (Type.t HVar.t Scoped.t * term Scoped.t) list -> t
   val map : (term -> term) -> t -> t
   val filter : (Type.t HVar.t Scoped.t -> term Scoped.t -> bool) -> t -> t
+end
+
+(** {2 Projections for proofs} *)
+
+module Projection : sig
+  type t = {
+    scope: Scoped.scope;
+    bindings: (var * term) list lazy_t;
+  }
+  (** A representation of the substitution for a given scope, after applying
+      the renaming. *)
+
+  val scope : t -> Scoped.scope
+  val bindings : t -> (var * term) list
+
+  val make : renaming:Renaming.t -> subst Scoped.t -> t
+
+  val make_no_renaming : subst Scoped.t -> t
+
+  type ll_subst = LLProof.subst
+
+  val conv : ctx:Term.Conv.ctx -> t -> ll_subst
+
+  val pp : t CCFormat.printer
 end

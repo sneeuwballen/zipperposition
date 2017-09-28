@@ -34,26 +34,22 @@ module Renaming = struct
     r.map <- M.empty;
     r.n <- 0
 
-  (* special renaming that does nothing *)
-  let dummy = create()
-
-  let is_dummy r = r == dummy
-
   (* rename variable *)
   let rename r ((v,_) as var) =
-    if is_dummy r then (
-      v (* do not rename *)
-    ) else (
-      try
-        M.find var r.map
-      with Not_found ->
-        let v' = HVar.make ~ty:(HVar.ty v) r.n in
-        r.n <- r.n + 1;
-        r.map <- M.add var v' r.map;
-        v'
-    )
+    try
+      M.find var r.map
+    with Not_found ->
+      let v' = HVar.make ~ty:(HVar.ty v) r.n in
+      r.n <- r.n + 1;
+      r.map <- M.add var v' r.map;
+      v'
 
   let snapshot r = r.map
+
+  let pp_snapshot out (s:snapshot) : unit =
+    let pp_v = Scoped.pp HVar.pp in
+    Format.fprintf out "{@[<hv>%a@]}"
+      (M.pp ~arrow:" → " pp_v HVar.pp) s
 end
 
 (* map from scoped variables, to scoped terms *)
@@ -212,7 +208,7 @@ let to_string = CCFormat.to_string pp
 
 (** {2 Applying a substitution} *)
 
-let apply subst ~renaming t =
+let apply_aux subst ~f_rename t =
   let rec aux (t,sc_t) =
     match T.ty t with
       | T.NoType ->
@@ -220,7 +216,7 @@ let apply subst ~renaming t =
         t
       | T.HasType ty ->
         let ty' = aux (ty,sc_t) in
-        match T.view t with
+        begin match T.view t with
           | T.Const id ->
             (* regular constant *)
             if T.equal ty ty'
@@ -233,7 +229,8 @@ let apply subst ~renaming t =
           | T.Var v ->
             (* the most interesting cases!
                switch depending on whether [t] is bound by [subst] or not *)
-            begin try
+            begin
+              try
                 let term'  = find_exn subst (v,sc_t) in
                 (* NOTE: if [t'] is not closed, we assume that it
                    is always replaced in a context where variables
@@ -242,10 +239,8 @@ let apply subst ~renaming t =
                 (* also apply [subst] to [t'] *)
                 aux term'
               with Not_found ->
-                (* variable not bound by [subst], rename it
-                    (after specializing its type if needed) *)
-                let v = HVar.cast v ~ty:ty' in
-                let v = Renaming.rename renaming (v,sc_t) in
+                (* rename the variable using [f_rename] *)
+                let v = f_rename (v,sc_t) ty' in
                 T.var v
             end
           | T.Bind (s, varty, sub_t) ->
@@ -263,6 +258,7 @@ let apply subst ~renaming t =
             if T.equal ty ty' && T.same_l l l'
             then t
             else T.app_builtin ~ty:ty' s l'
+        end
   and aux_list l sc = match l with
     | [] -> []
     | t::l' ->
@@ -270,10 +266,37 @@ let apply subst ~renaming t =
   in
   aux t
 
+(* variable not bound by [subst], rename it
+   (after specializing its type if needed) *)
+let f_rename_sn ~renaming (v,sc_v) new_ty =
+  let v = HVar.cast v ~ty:new_ty in
+  Renaming.rename renaming (v,sc_v)
+
+let apply subst ~renaming t =
+  (* variable not bound by [subst], rename it
+     (after specializing its type if needed) *)
+  let f_rename ~renaming (v,sc_v) new_ty =
+    let v = HVar.cast v ~ty:new_ty in
+    Renaming.rename renaming (v,sc_v)
+  in
+  apply_aux subst ~f_rename:(f_rename ~renaming) t
+
+let f_rename_no_renaming (v,_) _new_ty = v
+
 let apply_no_renaming subst t =
   if is_empty subst
   then fst t
-  else apply subst ~renaming:Renaming.dummy t
+  else apply_aux subst ~f_rename:f_rename_no_renaming t
+
+let f_rename_snapshot ~snapshot v _new_ty =
+  try M.find v snapshot
+  with Not_found ->
+    Util.errorf ~where:"subst"
+      "(@[apply snapshot failed@ :var %a@ :snapshot %a@])"
+      (Scoped.pp HVar.pp) v Renaming.pp_snapshot snapshot
+
+let apply_snapshot subst ~snapshot t =
+  apply_aux subst ~f_rename:(f_rename_snapshot ~snapshot) t
 
 (** {2 Specializations} *)
 
@@ -369,3 +392,54 @@ module FO = struct
            (Term.of_term_unsafe t,sc_t))
       s
 end
+
+(** {2 Projections for proofs} *)
+
+module Projection = struct
+  type t = {
+    scope: Scoped.scope;
+    bindings: (var * term) list lazy_t;
+  }
+
+  let scope t = t.scope
+  let bindings t = Lazy.force t.bindings
+
+  (* actual constructor from a substitution *)
+  let make_real ~f_rename (subst,sc) : t =
+    let bindings = lazy (
+      fold
+        (fun l (v,sc_v) (t,sc_t) ->
+           if sc_v = sc then (
+             let v = f_rename_no_renaming (v,sc_v) (HVar.ty v) in
+             let t = apply_aux ~f_rename subst (t,sc_t) in
+             (v,t) :: l
+           ) else l)
+        [] subst
+    ) in
+    { scope=sc; bindings }
+
+  let make ~renaming s : t =
+    let snapshot = Renaming.snapshot renaming in
+    make_real ~f_rename:(f_rename_snapshot ~snapshot) s
+
+  let make_no_renaming s : t =
+    make_real ~f_rename:f_rename_no_renaming s
+
+  let pp out (p:t) : unit =
+    let pp_p out (v,t) =
+      Format.fprintf out "@[<2>%a@ @<1>→ %a@]" HVar.pp v T.pp t
+    in
+    Format.fprintf out "{@[<hv>%a@]}" (Util.pp_list ~sep:"," pp_p) (bindings p)
+
+  type ll_subst = LLProof.subst
+
+  let conv ~ctx p : ll_subst =
+    List.fold_left
+      (fun lsubst (v,t) ->
+         let v = Term.Conv.var_to_simple_var ctx (Type.cast_var_unsafe v) in
+         let t = Term.Conv.to_simple_term ctx (Term.of_term_unsafe t) in
+         assert (not (Var.Subst.mem lsubst v));
+         Var.Subst.add lsubst v t)
+      Var.Subst.empty (bindings p)
+end
+
