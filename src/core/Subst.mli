@@ -4,7 +4,7 @@
 (** {1 Substitutions} *)
 
 (** Substitutions map (scoped) variables to terms/types.
-    
+
     They work on free variables (within a scope, so that the same variable can
     live within several scopes).
 
