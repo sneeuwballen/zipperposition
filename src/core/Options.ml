@@ -14,6 +14,7 @@ type input_format =
   | I_tptp
   | I_zf
   | I_tip
+  | I_dk
   | I_guess
 
 let input_format_of_string s =
@@ -21,6 +22,7 @@ let input_format_of_string s =
     | "tptp" | "tstp" -> I_tptp
     | "zf" -> I_zf
     | "tip" -> I_tip
+    | "dk" -> I_dk
     | s -> failwith ("unknown input format " ^ s)
 
 type print_format = Output_format.t =
@@ -34,6 +36,7 @@ let print_format_of_string s =
     | "none" -> O_none
     | "tptp" | "tstp" -> O_tptp
     | "default" | "normal" -> O_normal
+    | "dk"
     | "zf" -> O_zf
     | _ -> failwith ("unknown print format " ^ s)
 
