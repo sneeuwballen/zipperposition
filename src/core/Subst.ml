@@ -288,12 +288,13 @@ let apply_no_renaming subst t =
   then fst t
   else apply_aux subst ~f_rename:f_rename_no_renaming t
 
-let f_rename_snapshot ~snapshot v _new_ty =
-  try M.find v snapshot
+let f_rename_snapshot ~snapshot (v,sc_v) new_ty =
+  let v = HVar.cast v ~ty:new_ty in
+  try M.find (v,sc_v) snapshot
   with Not_found ->
     Util.errorf ~where:"subst"
       "(@[apply snapshot failed@ :var %a@ :snapshot %a@])"
-      (Scoped.pp HVar.pp) v Renaming.pp_snapshot snapshot
+      (Scoped.pp HVar.pp) (v,sc_v) Renaming.pp_snapshot snapshot
 
 let apply_snapshot subst ~snapshot t =
   apply_aux subst ~f_rename:(f_rename_snapshot ~snapshot) t
@@ -396,13 +397,13 @@ end
 (** {2 Projections for proofs} *)
 
 module Projection = struct
-  type t = {
-    scope: Scoped.scope;
-    bindings: (var * term) list lazy_t;
-  }
+  type t = (var * term) list lazy_t
 
-  let scope t = t.scope
-  let bindings t = Lazy.force t.bindings
+  let bindings t = Lazy.force t
+
+  let empty : t = Lazy.from_val []
+
+  let is_empty (p:t) : bool = CCList.is_empty (bindings p)
 
   (* actual constructor from a substitution *)
   let make_real ~f_rename (subst,sc) : t =
@@ -416,7 +417,7 @@ module Projection = struct
            ) else l)
         [] subst
     ) in
-    { scope=sc; bindings }
+    bindings
 
   let make ~renaming s : t =
     let snapshot = Renaming.snapshot renaming in
@@ -424,6 +425,11 @@ module Projection = struct
 
   let make_no_renaming s : t =
     make_real ~f_rename:f_rename_no_renaming s
+
+  let merge (a:t) (b:t) : t =
+    lazy (
+      List.rev_append (bindings a) (bindings b)
+    )
 
   let pp out (p:t) : unit =
     let pp_p out (v,t) =

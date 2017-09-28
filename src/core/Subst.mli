@@ -193,19 +193,23 @@ end
 (** {2 Projections for proofs} *)
 
 module Projection : sig
-  type t = {
-    scope: Scoped.scope;
-    bindings: (var * term) list lazy_t;
-  }
+  type t
   (** A representation of the substitution for a given scope, after applying
       the renaming. *)
 
-  val scope : t -> Scoped.scope
   val bindings : t -> (var * term) list
+
+  val empty : t
+
+  val is_empty : t -> bool
 
   val make : renaming:Renaming.t -> subst Scoped.t -> t
 
   val make_no_renaming : subst Scoped.t -> t
+
+  val merge : t -> t -> t
+  (** [merge a b] composes [a] and [b], assuming they don't both bind
+      any common variable *)
 
   type ll_subst = LLProof.subst
 

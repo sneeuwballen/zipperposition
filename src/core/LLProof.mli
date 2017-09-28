@@ -36,16 +36,25 @@ type step =
   | Define of ID.t
   | Instantiate of subst * t
   | Esa of name * t list * check_info
-  | Inference of name * t list * check_info
+  | Inference of name * parent list * check_info
+
+and parent =
+  | P_of of t
+  | P_instantiate of t * subst
 
 val id : t -> int
 val concl : t -> form
 val step : t -> step
+val parents : t -> parent list
 val premises : t -> t list
+
+val p_of : t -> parent
+val p_instantiate : t -> subst -> parent
 
 val check_info : t -> check_info
 
 val pp_step : step CCFormat.printer
+val pp_parent : parent CCFormat.printer
 
 val pp_id : t CCFormat.printer
 val pp_res : t CCFormat.printer
@@ -67,7 +76,11 @@ val trivial : form -> t
 val by_def : ID.t -> form -> t
 val define : ID.t -> form -> t
 val instantiate : form -> subst -> t -> t
-val esa : [`No_check | `Check | `Check_with of form list] -> form -> name -> t list -> t
-val inference : [`No_check | `Check | `Check_with of form list] -> form -> name -> t list -> t
+val esa :
+  [`No_check | `Check | `Check_with of form list] ->
+  form -> name -> t list -> t
+val inference :
+  [`No_check | `Check | `Check_with of form list] ->
+  form -> name -> parent list -> t
 
 module Tbl : CCHashtbl.S with type key = t

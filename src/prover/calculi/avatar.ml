@@ -391,7 +391,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       (* for each clause, apply [subst] to it and negate its
           literals, obtaining a DNF of [¬ And_i ctx_i[case]];
           then turn DNF into CNF *)
-      let renaming = Ctx.renaming_clear () in
+      let renaming = Subst.Renaming.create () in
       let clauses =
         begin
           Cut_form.apply_subst ~renaming subst (g,0)

@@ -331,8 +331,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       let proof =
         Proof.Step.inference ~rule
-          [C.proof_parent_subst (info.active,sc_a) subst;
-           C.proof_parent_subst (info.passive,sc_p) subst]
+          [C.proof_parent_subst ~renaming (info.active,sc_a) subst;
+           C.proof_parent_subst ~renaming (info.passive,sc_p) subst]
       and penalty =
         C.penalty info.active
         + C.penalty info.passive
@@ -425,8 +425,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       let proof =
         Proof.Step.inference ~rule
-          [C.proof_parent_subst (info.active,sc_a) subst;
-           C.proof_parent_subst (info.passive,sc_p) subst]
+          [C.proof_parent_subst ~renaming (info.active,sc_a) subst;
+           C.proof_parent_subst ~renaming (info.passive,sc_p) subst]
       and penalty =
         C.penalty info.active
         + C.penalty info.passive
@@ -535,15 +535,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
              (* subst(lit) is maximal, we can do the inference *)
              then (
                Util.incr_stat stat_equality_resolution_call;
-               let renaming = Ctx.renaming_clear () in
+               let renaming = Subst.Renaming.create () in
                let subst = US.subst us in
                let rule = Proof.Rule.mk "eq_res" in
-               let proof = Proof.Step.inference ~rule
-                   [C.proof_parent_subst (clause,0) subst] in
                let new_lits = CCArray.except_idx (C.lits clause) pos in
                let new_lits = Lit.apply_subst_list ~renaming subst (new_lits,0) in
                let c_guard = Literal.of_unif_subst ~renaming us in
                let trail = C.trail clause and penalty = C.penalty clause in
+               let proof = Proof.Step.inference ~rule
+                   [C.proof_parent_subst ~renaming (clause,0) subst] in
                let new_clause = C.create ~trail ~penalty (c_guard@new_lits) proof in
                Util.debugf ~section 3 "@[<hv2>equality resolution on@ @[%a@]@ yields @[%a@]@]"
                  (fun k->k C.pp clause C.pp new_clause);
@@ -588,7 +588,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let proof =
         Proof.Step.inference
           ~rule:(Proof.Rule.mk"eq_fact")
-          [C.proof_parent_subst (info.clause,0) subst]
+          [C.proof_parent_subst ~renaming (info.clause,0) subst]
       (* new_lits: literals of the new clause. remove active literal
          and replace it by a t!=v one, and apply subst *)
       and new_lits = CCArray.except_idx (C.lits info.clause) info.active_idx in
@@ -813,7 +813,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Proof.Step.simp
           ~rule:(Proof.Rule.mk "demod")
           (C.proof_parent c ::
-             List.map (fun (c,s) -> C.proof_parent_subst (c,1) s) !clauses) in
+             List.rev_map
+               (fun (c,s) -> C.proof_parent_subst_no_renaming (c,1) s)
+               !clauses) in
       let trail = C.trail c in (* we know that demodulating rules have smaller trail *)
       let new_c = C.create_a ~trail ~penalty:(C.penalty c) lits proof in
       Util.debugf ~section 3 "@[<hv2>demodulate@ @[%a@]@ into @[%a@]@ using @[%a@]@]"
@@ -831,7 +833,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let backward_demodulate set given =
     Util.enter_prof prof_back_demodulate;
     let ord = Ctx.ord () in
-    let renaming = Ctx.renaming_clear () in
+    let renaming = Subst.Renaming.create () in
     (* find clauses that might be rewritten by l -> r *)
     let recurse ~oriented set l r =
       I.retrieve_specializations (!_idx_back_demod,1) (l,0)
@@ -985,10 +987,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         if US.is_empty !us then new_lits
         else (
           assert !has_changed;
-          let renaming = Ctx.renaming_clear () in
           let subst = US.subst !us in
-          let c_guard = Literal.of_unif_subst ~renaming !us in
-          c_guard @ Lit.apply_subst_list ~renaming subst (new_lits,0)
+          let c_guard = Literal.of_unif_subst_no_renaming !us in
+          c_guard @ Lit.apply_subst_list_no_renaming subst (new_lits,0)
         )
       in
       let new_lits = CCList.uniq ~eq:Lit.equal_com new_lits in
@@ -999,7 +1000,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       ) else (
         let parent =
           if Subst.is_empty (US.subst !us) then C.proof_parent c
-          else C.proof_parent_subst (c,0) (US.subst !us)
+          else C.proof_parent_subst_no_renaming (c,0) (US.subst !us)
         in
         let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "simplify") [parent] in
         let new_clause =
@@ -1087,7 +1088,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           );
         None (* no match *)
       with FoundMatch (_r, c', subst) ->
-        Some (C.proof_parent_subst (c',1) subst :: clauses)  (* success *)
+        Some (C.proof_parent_subst_no_renaming (c',1) subst :: clauses)  (* success *)
     in
     (* fold over literals *)
     let lits, premises = iterate_lits [] (C.lits c |> Array.to_list) [] in
@@ -1140,7 +1141,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           );
         None (* no match *)
       with FoundMatch (_r, c', subst) ->
-        Some (C.proof_parent_subst (c',1) subst) (* success *)
+        Some (C.proof_parent_subst_no_renaming (c',1) subst) (* success *)
     in
     (* fold over literals *)
     let lits, premises = iterate_lits [] (C.lits c |> Array.to_list) [] in
@@ -1439,7 +1440,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             Proof.Step.inference
               ~rule:(Proof.Rule.mk "clc")
               [C.proof_parent c;
-               C.proof_parent_subst (c',1) subst] in
+               C.proof_parent_subst_no_renaming (c',1) subst] in
           let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
           Util.debugf ~section 3
             "@[<2>contextual literal cutting@ in @[%a@]@ using @[%a@]@ gives @[%a@]@]"
@@ -1460,7 +1461,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
    * contraction (condensation)
    * ---------------------------------------------------------------------- *)
 
-  exception CondensedInto of Lit.t array * S.t
+  exception CondensedInto of Lit.t array * S.t * Subst.Renaming.t
 
   (** performs condensation on the clause. It looks for two literals l1 and l2 of same
       sign such that l1\sigma = l2, and hc\sigma \ {l2} subsumes hc. Then
@@ -1499,21 +1500,21 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                  let new_lits = Array.sub lits 0 (n - 1) in
                  if idx_to_remove <> n-1
                  then new_lits.(idx_to_remove) <- lits.(n-1);  (* remove lit *)
-                 let renaming = Ctx.renaming_clear () in
+                 let renaming = Subst.Renaming.create () in
                  let new_lits = Lits.apply_subst ~renaming subst (new_lits,0) in
                  (* check subsumption *)
                  if subsumes new_lits lits
-                 then raise (CondensedInto (new_lits, subst)))
+                 then raise (CondensedInto (new_lits, subst, renaming)))
               substs
           done;
         done;
         SimplM.return_same c
-      with CondensedInto (new_lits, subst) ->
+      with CondensedInto (new_lits, subst, renaming) ->
         (* clause is simplified *)
         let proof =
           Proof.Step.simp
             ~rule:(Proof.Rule.mk "condensation")
-            [C.proof_parent_subst (c,0) subst] in
+            [C.proof_parent_subst ~renaming (c,0) subst] in
         let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
         Util.debugf ~section 3
           "@[<2>condensation@ of @[%a@] (with @[%a@])@ gives @[%a@]@]"

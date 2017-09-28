@@ -103,6 +103,14 @@ end
 
 (** {2 Checking Proofs} *)
 
+(* TODO: have another global graph structure with inference steps, ESA,
+   instantiation steps? *)
+
+let concl_of_parent (p:LLProof.parent) : form = match p with
+  | LLProof.P_of c -> P.concl c
+  | LLProof.P_instantiate (c,subst) ->
+    P.concl c |> T.Subst.eval subst
+
 let check_step_ (p:proof): res option =
   let concl = P.concl p in
   begin match P.step p with
@@ -121,9 +129,9 @@ let check_step_ (p:proof): res option =
     | P.Esa (_,_,_) -> None (* TODO *)
     | P.Inference (_,_, P.C_other) -> Some R_ok
     | P.Inference (_,_, P.C_no_check) -> None
-    | P.Inference (_, premises, P.C_check axioms) ->
+    | P.Inference (_, parents, P.C_check axioms) ->
       let all_premises =
-        axioms @ List.map P.concl premises
+        axioms @ List.map concl_of_parent parents
       in
       Some (Tab.prove all_premises [concl])
   end

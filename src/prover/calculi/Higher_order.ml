@@ -288,7 +288,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             Subst.FO.of_list [((v:>InnerTerm.t HVar.t),0), (t,0)]
           in
         (* build new clause *)
-        let renaming = Ctx.renaming_clear () in
+        let renaming = Subst.Renaming.create () in
         let new_lits =
           let l1 = Literal.apply_subst_list ~renaming subst (other_lits,0) in
           let l2 =
@@ -305,7 +305,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         in
         let proof =
           Proof.Step.inference ~rule:(Proof.Rule.mk "ho_elim_pred")
-            [ C.proof_parent_subst (c,0) subst ]
+            [ C.proof_parent_subst ~renaming (c,0) subst ]
         in
         let new_c =
           C.create new_lits proof
@@ -360,11 +360,11 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun v -> HO_unif.enum_prop ~mode (v,sc_c) ~offset)
       |> Sequence.map
         (fun (subst,penalty) ->
-           let renaming = Ctx.renaming_clear() in
+           let renaming = Subst.Renaming.create() in
            let lits = Literals.apply_subst ~renaming subst (C.lits c,sc_c) in
            let proof =
              Proof.Step.inference ~rule:(Proof.Rule.mk "ho.refine")
-               [C.proof_parent_subst (c,sc_c) subst]
+               [C.proof_parent_subst ~renaming (c,sc_c) subst]
            in
            let new_c =
              C.create_a lits proof
@@ -400,7 +400,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       HO_unif.unif_pairs ?fuel:None (pairs,0) ~offset
       |> List.map
         (fun (new_pairs, us, penalty) ->
-           let renaming = Ctx.renaming_clear() in
+           let renaming = Subst.Renaming.create() in
            let subst = Unif_subst.subst us in
            let c_guard = Literal.of_unif_subst ~renaming us in
            let new_pairs =
@@ -416,7 +416,7 @@ module Make(E : Env.S) : S with module Env = E = struct
            let all_lits = c_guard @ new_pairs @ other_lits in
            let proof =
              Proof.Step.inference ~rule:(Proof.Rule.mk "ho_unif")
-               [C.proof_parent_subst (c,0) subst]
+               [C.proof_parent_subst ~renaming (c,0) subst]
            in
            let new_c =
              C.create all_lits proof

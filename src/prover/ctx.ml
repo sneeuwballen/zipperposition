@@ -79,10 +79,6 @@ module Make(X : PARAMETERS) = struct
     Util.exit_prof prof_declare_sym;
     ()
 
-  let renaming_clear () =
-    S.Renaming.clear renaming;
-    renaming
-
   module Lit = struct
     let _from = ref []
     let _to = ref []

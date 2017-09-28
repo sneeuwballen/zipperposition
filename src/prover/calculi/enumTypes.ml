@@ -325,7 +325,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                  (fun case ->
                     (* replace [v] with [case] now *)
                     let subst = Unif.FO.unify_full ~subst (v,s_c) (case,s_decl) in
-                    let renaming = Ctx.renaming_clear () in
+                    let renaming = Subst.Renaming.create () in
                     let c_guard = Literals.of_unif_subst ~renaming subst
                     and subst = Unif_subst.subst subst in
                     let lits' = Lits.apply_subst ~renaming subst (C.lits c,s_c) in
@@ -367,7 +367,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun k->k pp_id_or_builtin decl.decl_ty_id T.pp t);
       let us = bind_vars_ (decl,0) (poly_args,1) |> Unif_subst.of_subst in
       let us = Unif.FO.unify_full ~subst:us (T.var decl.decl_var,0) (t,1) in
-      let renaming = Ctx.renaming_clear () in
+      let renaming = Subst.Renaming.create () in
       let subst = Unif_subst.subst us
       and c_guard = Literal.of_unif_subst ~renaming us in
       let lits =

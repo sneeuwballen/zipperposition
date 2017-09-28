@@ -297,6 +297,10 @@ module Subst : sig
 
   val eval : t -> term -> term
 
+  val eval_nonrec : t -> term -> term
+  (** Evaluate under substitution, but consider the substitution as
+      not idempotent *)
+
   include Interfaces.PRINT with type t := t
 end
 

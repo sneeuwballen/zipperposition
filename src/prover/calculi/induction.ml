@@ -576,7 +576,7 @@ module Make
                     |> List.map (fun (v,t) -> (v,0),(t,1))
                     |> Subst.FO.of_list' ?init:None
                   in
-                  let renaming = Ctx.renaming_clear () in
+                  let renaming = Subst.Renaming.create () in
                   let g' = Cut_form.apply_subst ~renaming subst (g,0) in
                   Cut_form.cs g'
                   |> List.map
@@ -597,7 +597,7 @@ module Make
                |> List.map (fun (v,c) -> (v,0),(Cover_set.Case.to_term c,1))
                |> Subst.FO.of_list' ~init:subst_skolems
              in
-             let renaming = Ctx.renaming_clear () in
+             let renaming = Subst.Renaming.create () in
              (* for each clause, apply [subst] to it and negate its
                 literals, obtaining a DNF of [¬ And_i ctx_i[case]];
                 then turn DNF into CNF *)

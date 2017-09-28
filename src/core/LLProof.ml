@@ -36,11 +36,21 @@ and step =
   | Define of ID.t
   | Instantiate of subst * t
   | Esa of name * t list * check_info
-  | Inference of name * t list * check_info
+  | Inference of name * parent list * check_info
+
+and parent =
+  | P_of of t
+  | P_instantiate of t * subst
 
 let concl p = p.concl
 let step p = p.step
 let id p = p.id
+
+let p_of p = P_of p
+let p_instantiate p subst = P_instantiate (p,subst)
+
+let pp_subst out (s:subst) : unit =
+  Format.fprintf out "{@[<hv>%a@]}" (Var.Subst.pp T.pp) s
 
 let pp_step out (s:step): unit = match s with
   | Goal -> Fmt.string out "goal"
@@ -50,16 +60,23 @@ let pp_step out (s:step): unit = match s with
   | By_def id -> Fmt.fprintf out "(by_def :of %a)" ID.pp id
   | Define id -> Fmt.fprintf out "(@[define@ %a@])" ID.pp id
   | Instantiate (subst, _) ->
-    Fmt.fprintf out "(@[instantiate %a@])" (Var.Subst.pp T.pp) subst
+    Fmt.fprintf out "(@[instantiate %a@])" pp_subst subst
   | Esa (n,_,_) -> Fmt.fprintf out "(esa %s)" n
   | Inference (n,_,_) -> Fmt.fprintf out "(inf %s)" n
 
-let premises (p:t): t list = match p.step with
+let parents (p:t): parent list = match p.step with
   | Goal | Assert | Trivial | By_def _ | Define _ -> []
-  | Negated_goal p2
-  | Instantiate (_,p2) -> [p2]
-  | Esa (_,l,_)
+  | Negated_goal p2 -> [p_of p2]
+  | Instantiate (subst,p2) -> [p_instantiate p2 subst]
+  | Esa (_,l,_) -> List.map p_of l
   | Inference (_,l,_) -> l
+
+let premises (p:t): t list =
+  let open_p = function
+    | P_of x -> x
+    | P_instantiate (p,_) -> p
+  in
+  List.rev_map open_p @@ parents p
 
 let check_info (p:t): check_info = match p.step with
   | Goal | Assert | Trivial | Negated_goal _ | By_def _ | Define _ -> C_other
@@ -81,11 +98,16 @@ module Tbl = CCHashtbl.Make(struct
 let pp_id out (p:t): unit = Fmt.int out p.id
 let pp_res out (p:t) = TypedSTerm.pp out (concl p)
 
+let pp_parent out = function
+  | P_of p -> pp_res out p
+  | P_instantiate (p,subst) ->
+    Format.fprintf out "@[(@[%a@])@,%a@]" pp_res p pp_subst subst
+
 let pp out (p:t): unit =
   Fmt.fprintf out "(@[<hv2>%a@ :res `%a`@ :from [@[%a@]]@])"
     pp_step (step p)
     pp_res p
-    (Util.pp_list pp_res) (premises p)
+    (Util.pp_list pp_parent) (parents p)
 
 let pp_dag out (p:t): unit =
   let seen = Tbl.create 32 in
@@ -94,7 +116,7 @@ let pp_dag out (p:t): unit =
       Tbl.add seen p ();
       pp out p;
       Fmt.fprintf out "@,";
-      List.iter (pp out) (premises p);
+      List.iter (pp_parent out) (parents p);
     )
   in
   Fmt.fprintf out "(@[<hv2>proof@ %a@])" pp p

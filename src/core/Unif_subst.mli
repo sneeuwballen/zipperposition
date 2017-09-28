@@ -32,6 +32,10 @@ val constr_l_subst :
   (term*term) list
 (** Apply the substitution to the constraint *)
 
+val constr_l_subst_no_renaming : t -> (term*term) list
+(** Apply the substitution to the constraint *)
+
+
 val has_constr : t -> bool
 (** Is there any constraint? *)
 

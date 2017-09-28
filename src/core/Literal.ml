@@ -519,6 +519,11 @@ let apply_subst_list ~renaming subst (lits,sc) =
     (fun lit -> apply_subst ~renaming subst (lit,sc))
     lits
 
+let apply_subst_list_no_renaming subst (lits,sc) =
+  List.map
+    (fun lit -> apply_subst_no_renaming subst (lit,sc))
+    lits
+
 exception Lit_is_constraint
 
 let is_ho_constraint = function
@@ -672,6 +677,15 @@ let is_ho_unif lit = match lit with
 
 let of_unif_subst ~renaming (s:Unif_subst.t) : t list =
   Unif_subst.constr_l_subst ~renaming s
+  |> List.map
+    (fun (t,u) ->
+       (* upcast *)
+       let t = T.of_term_unsafe t in
+       let u = T.of_term_unsafe u in
+       mk_constraint t u)
+
+let of_unif_subst_no_renaming (s:Unif_subst.t) : t list =
+  Unif_subst.constr_l_subst_no_renaming s
   |> List.map
     (fun (t,u) ->
        (* upcast *)

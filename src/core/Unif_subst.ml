@@ -71,3 +71,7 @@ let to_string = CCFormat.to_string pp
 let constr_l_subst ~renaming (s:t): _ list =
   constr_l s
   |> Unif_constr.apply_subst_l ~renaming (subst s)
+
+let constr_l_subst_no_renaming (s:t): _ list =
+  constr_l s
+  |> Unif_constr.apply_subst_l_no_renaming (subst s)

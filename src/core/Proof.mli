@@ -262,10 +262,11 @@ module Parent : sig
   type t = parent
 
   val from : proof -> t
-  val from_subst : proof Scoped.t -> Subst.t -> t
-  val add_subst : t Scoped.t -> Subst.t -> t
+  val from_subst_proj : proof -> Subst.Projection.t -> t
+  val from_subst : renaming:Subst.Renaming.t -> proof Scoped.t -> Subst.t -> t
+  val from_subst_no_renaming : proof Scoped.t -> Subst.t -> t
   val proof : t -> proof
-  val subst : t -> Subst.t list
+  val subst : t -> Subst.Projection.t option
 end
 
 (** {2 Proof} *)
@@ -319,7 +320,7 @@ module S : sig
 
   (** {6 Conversion to a graph of proofs} *)
 
-  val as_graph : (t, rule * Subst.t list * infos) CCGraph.t
+  val as_graph : (t, rule * Subst.Projection.t option * infos) CCGraph.t
   (** Get a graph of the proof *)
 
   val traverse :

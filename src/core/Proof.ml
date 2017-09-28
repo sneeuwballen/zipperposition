@@ -90,7 +90,7 @@ type step = {
 
 and parent =
   | P_of of proof
-  | P_subst of parent * Scoped.scope * Subst.t
+  | P_subst of proof * Subst.Projection.t
 
 (** Proof Step with its conclusion *)
 and proof = {
@@ -184,24 +184,26 @@ module Parent = struct
 
   let from p: t = P_of p
 
-  (* restrict subst to [sc_p] *)
-  let from_subst (p,sc_p) subst: t =
-    let subst = Subst.restrict_scope subst sc_p in
-    if Subst.is_empty subst
+  let from_subst_proj p (subst:Subst.Projection.t) : t =
+    if Subst.Projection.is_empty subst
     then P_of p
-    else P_subst (P_of p,sc_p,subst)
+    else P_subst (p,subst)
 
-  let add_subst (p,sc_p) subst: t =
-    if Subst.is_empty subst then p
-    else P_subst (p,sc_p,subst)
+  let from_subst ~renaming (p,sc_p) subst: t =
+    let subst = Subst.Projection.make ~renaming (subst,sc_p) in
+    from_subst_proj p subst
 
-  let rec proof = function
+  let from_subst_no_renaming (p,sc_p) subst: t =
+    let subst = Subst.Projection.make_no_renaming (subst,sc_p) in
+    from_subst_proj p subst
+
+  let proof = function
     | P_of p -> p
-    | P_subst (p,_,_) -> proof p
+    | P_subst (p,_) -> p
 
-  let rec subst = function
-    | P_of _ -> []
-    | P_subst (p,_,s) -> s :: subst p
+  let subst = function
+    | P_of _ -> None
+    | P_subst (_,s) -> Some s
 end
 
 module Kind = struct
@@ -547,7 +549,7 @@ module S = struct
   (** {2 Conversion to a graph of proofs} *)
 
   (** Get a graph of the proof *)
-  let as_graph =
+  let as_graph : (t, rule * Subst.Projection.t option * infos) CCGraph.t =
     CCGraph.make
       (fun p ->
          let st = step p in
@@ -742,12 +744,14 @@ module S = struct
       )
       ~attrs_e:(fun (r,s,infos) ->
         let pp_subst out s =
-          Format.fprintf out "@,{@[<v>%a@]}" Subst.pp_bindings s
+          Format.fprintf out "@,%a" Subst.Projection.pp s
         in
         let label =
-          if s=[] && infos=[] then Rule.name r
-          else _to_str_escape "@[<v>%s%a%a@]@."
-              (Rule.name r) (Util.pp_list ~sep:"" pp_subst) s Step.pp_infos infos
+          if s=None && infos=[] then Rule.name r
+          else (
+            _to_str_escape "@[<v>%s%a%a@]@."
+              (Rule.name r) (CCFormat.some pp_subst) s Step.pp_infos infos
+          )
         in
         [`Label label; `Other ("dir", "back")])
       out
@@ -782,11 +786,16 @@ module S = struct
       let res = Result.to_form ~ctx (result p) in
       let parents =
         List.map (conv_parent ~ctx) (Step.parents @@ step p)
+      and parent_as_proof_exn = function
+        | LLProof.P_of c -> c
+        | LLProof.P_instantiate _ -> assert false
       in
       begin match Step.kind @@ step p with
         | Inference (name,c)
         | Simplification (name,c) -> LLProof.inference c res name parents
-        | Esa (name,c) -> LLProof.esa c res name parents
+        | Esa (name,c) ->
+          let l = List.map parent_as_proof_exn parents in
+          LLProof.esa c res name l
         | Trivial -> LLProof.trivial res
         | By_def id -> LLProof.by_def id res
         | Define (id,_) -> LLProof.define id res
@@ -794,33 +803,12 @@ module S = struct
         | Intro (_,R_goal) -> LLProof.assert_ res
         | Intro (_,(R_lemma|R_def|R_decl)) -> LLProof.trivial res
       end
-    and conv_parent ~ctx (p:Parent.t): LLProof.t = match p with
-      | P_of p -> conv p
-      | P_subst (p,sc_p,subst) ->
-        let p' = conv_parent ~ctx p in
-        (* build instance of result *)
-        let res = result @@ Parent.proof p in
-        let res_subst =
-          Result.apply_subst subst (res,sc_p)
-          |> Result.to_form ~ctx
-        in
-        (* "translate" substitution *)
-        let subst =
-          Subst.to_seq subst
-          |> Sequence.filter_map
-            (fun ((v,sc),(t,_)) ->
-               if sc=sc_p then (
-                 let v' =
-                   HVar.cast v ~ty:(Type.of_term_unsafe (HVar.ty v))
-                   |> Term.Conv.var_to_simple_var ctx
-                 and t' =
-                   Term.of_term_unsafe t
-                   |> Term.Conv.to_simple_term ctx in
-                 Some (v',t')
-               ) else None)
-          |> Var.Subst.of_seq
-        in
-        LLProof.instantiate res_subst subst p'
+    and conv_parent ~ctx (p:Parent.t): LLProof.parent = match p with
+      | P_of p -> LLProof.p_of (conv p)
+      | P_subst (p,subst) ->
+        let p = conv p in
+        let subst = Subst.Projection.conv ~ctx subst in
+        LLProof.p_instantiate p subst
     in
     conv p
 end

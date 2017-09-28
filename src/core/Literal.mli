@@ -113,6 +113,8 @@ val apply_subst_no_simp : renaming:Subst.Renaming.t ->
 val apply_subst_list : renaming:Subst.Renaming.t ->
   Subst.t -> t list Scoped.t -> t list
 
+val apply_subst_list_no_renaming : Subst.t -> t list Scoped.t -> t list
+
 exception Lit_is_constraint
 
 val negate : t -> t
@@ -124,6 +126,10 @@ val is_constraint : t -> bool
 val is_ho_constraint : t -> bool
 
 val of_unif_subst: renaming:Subst.Renaming.t -> Unif_subst.t -> t list
+(** Make a list of (negative) literals out of the unification constraints
+    contained in this substitution. *)
+
+val of_unif_subst_no_renaming: Unif_subst.t -> t list
 (** Make a list of (negative) literals out of the unification constraints
     contained in this substitution. *)
 

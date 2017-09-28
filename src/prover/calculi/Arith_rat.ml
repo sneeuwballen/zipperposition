@@ -197,7 +197,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let _do_canc info acc =
     let open SupInfo in
     let ord = Ctx.ord () in
-    let renaming = Ctx.renaming_clear () in
+    let renaming = Subst.Renaming.create () in
     let us = info.subst in
     let idx_a, _ = Lits.Pos.cut info.active_pos in
     let idx_p, _ = Lits.Pos.cut info.passive_pos in
@@ -245,8 +245,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       let proof =
         Proof.Step.inference
           ~rule:rule_canc
-          [C.proof_parent_subst (info.active,s_a) subst;
-           C.proof_parent_subst (info.passive,s_p) subst] in
+          [C.proof_parent_subst ~renaming (info.active,s_a) subst;
+           C.proof_parent_subst ~renaming (info.passive,s_p) subst] in
       let trail = C.trail_l [info.active;info.passive] in
       let penalty = C.penalty info.active + C.penalty info.passive in
       let new_c = C.create ~penalty ~trail all_lits proof in
@@ -441,7 +441,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           Proof.Step.inference
             ~rule:(Proof.Rule.mk "canc_demod")
             (C.proof_parent c ::
-               List.map (fun (c,subst) -> C.proof_parent_subst (c,1) subst) !clauses)
+               List.map (fun (c,subst) -> C.proof_parent_subst_no_renaming (c,1) subst) !clauses)
         in
         let trail = C.trail c in
         let new_c = C.create ~penalty:(C.penalty c) ~trail (List.rev !lits) proof in
@@ -508,7 +508,7 @@ module Make(E : Env.S) : S with module Env = E = struct
            MF.unify_mm (m1,0) (m2,0)
            |> Sequence.fold
              (fun acc (mf1, mf2, us) ->
-                let renaming = Ctx.renaming_clear () in
+                let renaming = Subst.Renaming.create () in
                 let subst = US.subst us in
                 let mf1' = MF.apply_subst ~renaming subst (mf1,0) in
                 let mf2' = MF.apply_subst ~renaming subst (mf2,0) in
@@ -527,7 +527,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   let proof =
                     Proof.Step.inference
                       ~rule:(Proof.Rule.mk "cancellation")
-                      [C.proof_parent_subst (c,0) subst] in
+                      [C.proof_parent_subst ~renaming (c,0) subst] in
                   let trail = C.trail c in
                   let penalty = C.penalty c in
                   let new_c = C.create ~trail ~penalty all_lits proof in
@@ -574,7 +574,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   MF.unify_ff ~subst (mf1,0) (mf2,0)
                   |> Sequence.fold
                     (fun acc (_, _, us) ->
-                       let renaming = Ctx.renaming_clear () in
+                       let renaming = Subst.Renaming.create () in
                        let subst = US.subst us in
                        let lit1' = ALF.apply_subst ~renaming subst (lit1,0) in
                        let lit2' = ALF.apply_subst ~renaming subst (lit2,0) in
@@ -607,7 +607,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                          let proof =
                            Proof.Step.inference
                              ~rule:rule_canc_eq_fact
-                             [C.proof_parent_subst (c,0) subst] in
+                             [C.proof_parent_subst ~renaming (c,0) subst] in
                          let penalty = C.penalty c
                          and trail = C.trail c in
                          let new_c = C.create ~trail ~penalty all_lits proof in
@@ -686,8 +686,8 @@ module Make(E : Env.S) : S with module Env = E = struct
           let proof =
             Proof.Step.inference
               ~rule:(Proof.Rule.mk "canc_ineq_chaining")
-              [C.proof_parent_subst (info.left,s_l) subst;
-               C.proof_parent_subst (info.right,s_r) subst] in
+              [C.proof_parent_subst ~renaming (info.left,s_l) subst;
+               C.proof_parent_subst ~renaming (info.right,s_r) subst] in
           let trail = C.trail_l [info.left; info.right] in
           (* penalty for some chaining *)
           let penalty =
@@ -812,7 +812,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             let proof =
               Proof.Step.inference
                 ~rule:(Proof.Rule.mk "canc_ineq_factoring")
-                [C.proof_parent_subst (c,0) subst] in
+                [C.proof_parent_subst ~renaming (c,0) subst] in
             let trail = C.trail c
             and penalty = C.penalty c in
             let new_c = C.create ~trail ~penalty lits proof in
