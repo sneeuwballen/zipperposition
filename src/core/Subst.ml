@@ -21,32 +21,39 @@ module M = CCMap.Make(VarInt)
 (** {2 Renaming} *)
 
 module Renaming = struct
-  type t =
-    | Dummy
-    | Tbl of T.t HVar.t H.t
+  type snapshot = var M.t
 
-  let create () = Tbl (H.create 8)
+  type t = {
+    mutable map: snapshot;
+    mutable n: int;
+  }
 
-  let clear r = match r with
-    | Dummy -> ()
-    | Tbl r ->
-      H.clear r;
-      ()
+  let create () = {map=M.empty; n=0}
+
+  let clear r =
+    r.map <- M.empty;
+    r.n <- 0
 
   (* special renaming that does nothing *)
-  let dummy = Dummy
+  let dummy = create()
+
+  let is_dummy r = r == dummy
 
   (* rename variable *)
-  let rename r ((v,_) as var) = match r with
-    | Dummy -> v  (* do not rename *)
-    | Tbl tbl ->
-      begin try
-          H.find tbl var
-        with Not_found ->
-          let v' = HVar.make ~ty:(HVar.ty v) (H.length tbl) in
-          H.add tbl var v';
-          v'
-      end
+  let rename r ((v,_) as var) =
+    if is_dummy r then (
+      v (* do not rename *)
+    ) else (
+      try
+        M.find var r.map
+      with Not_found ->
+        let v' = HVar.make ~ty:(HVar.ty v) r.n in
+        r.n <- r.n + 1;
+        r.map <- M.add var v' r.map;
+        v'
+    )
+
+  let snapshot r = r.map
 end
 
 (* map from scoped variables, to scoped terms *)

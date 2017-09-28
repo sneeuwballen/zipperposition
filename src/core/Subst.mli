@@ -28,6 +28,10 @@ module Renaming : sig
   type t
   val create : unit -> t
   val clear : t -> unit
+
+  type snapshot (** Immutable snapshot *)
+
+  val snapshot : t -> snapshot
 end
 
 (** {3 Basics} *)
