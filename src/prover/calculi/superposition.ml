@@ -213,8 +213,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                          match T.as_var (Array.get s_args idx) with
                          | Some v ->
                            (* Check whether variable occurs in previous arguments: *)
-                           not (Array.exists (T.var_occurs ~var:v) (Array.sub s_args 0 idx))
-                           && not (Array.exists (T.var_occurs ~var:v) (Array.sub t_args 0 (Array.length t_args - List.length args))
+                           not (CCArray.exists (T.var_occurs ~var:v) (Array.sub s_args 0 idx))
+                           && not (CCArray.exists (T.var_occurs ~var:v) (Array.sub t_args 0 (Array.length t_args - List.length args))
                            (* Check whether variable occurs in heads: *)
                            && not (T.var_occurs ~var:v f)
                            && not (T.var_occurs ~var:v g)
