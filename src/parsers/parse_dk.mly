@@ -80,13 +80,13 @@ term_simple:
 | IMP t=term_simple u=term_simple { T.imply t u }
 | EQV t=term_simple u=term_simple { T.equiv t u }
 | ALL ty=type_simple LPAREN x=ID COLON complex_type DOUBLE_ARROW body=term_simple RPAREN
-  { T.forall [ (T.mk_var x, Some ty) ] body }
+  { T.forall [ (T.v x, Some ty) ] body }
 | EX ty=type_simple LPAREN x=ID COLON complex_type DOUBLE_ARROW body=term_simple RPAREN
-  { T.exists [ (T.mk_var x, Some ty) ] body }
+  { T.exists [ (T.v x, Some ty) ] body }
 | ALL_TYPE LPAREN x=ID COLON TYPE DOUBLE_ARROW body=term_simple RPAREN
-  { T.forall [ (T.mk_var x, Some T.tType) ] body }
+  { T.forall [ (T.v x, Some T.tType) ] body }
 | EX_TYPE LPAREN x=ID COLON TYPE DOUBLE_ARROW body=term_simple RPAREN
-  { T.exists [ (T.mk_var x, Some T.tType) ] body }
+  { T.exists [ (T.v x, Some T.tType) ] body }
 | ISTRUE t=term_simple
   { T.mk_app
       (T.mk_const "dk_logic.ebP"
@@ -96,9 +96,9 @@ term_simple:
 | EQUAL ty=type_simple t=term_simple u=term_simple { T.eq (T.cast t ty) u }
 | LPAREN t=term RPAREN { t }
 | x=ID COLON ty=typ DOUBLE_ARROW body=term_simple
-  { T.mk_fun [ (T.mk_var x, Some ty) ] body }
+  { T.mk_fun [ (T.v x, Some ty) ] body }
 | x=ID DEF t=term DOUBLE_ARROW u=term_simple
-  { T.let_ [ (T.mk_var x, t) ] u }
+  { T.let_ [ (T.v x, t) ] u }
 | CCARR a=type_simple b=type_simple
   { T.mk_arrow a b }
 
@@ -116,8 +116,8 @@ term:
 }
 
 type_qid:
-| x=ID { T.find_alias x ~or_else:(T.mk_const_t x) }
-| x=QID { T.find_alias x ~or_else:(T.mk_const_t x) }
+| x=ID { T.find_alias x ~or_else:(T.mk_var_t x) }
+| x=QID { T.find_alias x ~or_else:(T.mk_var_t x) }
 
 type_simple:
 | ty=type_qid { ty }
@@ -180,9 +180,9 @@ compact_arg:
 | LPAREN id=ID COLON ty=arrow_type RPAREN { id, ty }
 
 env_decl:
-| id=ID COLON ty=arrow_type { T.mk_var id, Some ty }
-| id=ID COLON TYPE { T.mk_var id, Some T.tType }
-| id=ID { T.mk_var id, None }
+| id=ID COLON ty=arrow_type { T.v id, Some ty }
+| id=ID COLON TYPE { T.v id, Some T.tType }
+| id=ID { T.v id, None }
 
 env:
 | LBRACK l=separated_list(COMMA, env_decl) RBRACK { l }

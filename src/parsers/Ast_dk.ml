@@ -15,9 +15,12 @@ type ty = T.t
 
 let cast t ty : term = T.app_builtin Builtin.has_type [t;ty]
 let const s = T.const s
-let mk_const s ty : term = cast (T.const s) ty
+let mk_const s ty : term = cast (const s) ty
 let mk_const_t s = mk_const s T.tType
-let mk_var v = V v
+let var s = T.var s
+let mk_var s ty = cast (var s) ty
+let mk_var_t s = mk_var s T.tType
+let v v = V v
 
 (* Global list of type aliases *)
 let ty_aliases : (string, ty) Hashtbl.t = Hashtbl.create 16
