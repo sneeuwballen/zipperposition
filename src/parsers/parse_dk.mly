@@ -36,34 +36,30 @@ module L = ParseLocation
 
 file:
 | b=body EOF { b }
-| BEGINPROOF h=proofheader* b=body ENDPROOF EOF
-{ let h = CCList.filter_map CCFun.id h in
-  CCList.append h b }
+| BEGINPROOF h=proofheaders EOF { h }
 | error {
   let loc = L.mk_pos $startpos $endpos in
   UntypedAST.errorf loc "expected problem"
 }
 
-body:
-| l=hyp_def* g=goal { CCList.append l [g] }
-
 goal:
 | name=ID COLON PROOF t=term DOT { T.mk_goal ~name t }
 
-proofheader:
-  | BEGINNAME ID { None }
-  | BEGINHEADER { None }
-  | BEGIN_TY id=ID { Some (T.mk_ty_decl id T.tType) }
-  | BEGIN_TYPEALIAS f=ID DEF ty=type_simple END_TYPEALIAS
+proofheaders:
+  | BEGINNAME h=proofheaders { h }
+  | BEGINHEADER h=proofheaders { h }
+  | BEGIN_TY id=ID h=proofheaders { T.mk_ty_decl id T.tType :: h }
+  | BEGIN_TYPEALIAS f=ID DEF ty=type_simple END_TYPEALIAS h=proofheaders
       { (* Type aliases are substituted in the parser *)
         (* This does not work because it does not substitute
            the alias in already-parsed input.
            TODO: give it to the typer. *)
         T.add_alias f ty;
-        None
+        h
       }
-  | BEGIN_VAR ID COLON typ END_VAR { None }
-  | BEGIN_HYP ID COLON PROOF term_simple END_HYP { None }
+  | BEGIN_VAR ID COLON typ END_VAR h=proofheaders { h }
+  | BEGIN_HYP ID COLON PROOF term_simple END_HYP h=proofheaders { h }
+  | b=body ENDPROOF { b }
   | error {
   let loc = L.mk_pos $startpos $endpos in
   UntypedAST.errorf loc "expected proofheader"
@@ -153,31 +149,32 @@ declared_or_defined_id:
 | x=ID { x }
 | x=QID { x }
 
-hyp_def:
-| id=ID COLON ty=kind DOT { T.mk_ty_decl id ty }
-| id=QID COLON ty=kind DOT { T.mk_ty_decl id ty }
-| name=ID COLON PROOF t=term DOT { T.mk_assert ~name t }
-| name=QID COLON PROOF t=term DOT { T.mk_assert ~name t }
-| id=ID COLON ty=arrow_type DOT { T.mk_ty_decl id ty }
-| id=QID COLON ty=arrow_type DOT { T.mk_ty_decl id ty }
-| DEFKW id=ID COLON ty=arrow_type DOT { T.mk_ty_decl id ty }
-| DEFKW id=QID COLON ty=arrow_type DOT { T.mk_ty_decl id ty }
-| DEFKW id=ID COLON ty=typ DEF body=term DOT
-  { T.mk_def id ty body }
-| DEFKW id=QID COLON ty=typ DEF body=term DOT
-  { T.mk_def id ty body }
-| DEFKW id=declared_or_defined_id args=compact_arg+ COLON ty_ret=typ DEF body=term DOT
+body:
+| id=ID COLON ty=kind DOT l=body { T.mk_ty_decl id ty :: l }
+| id=QID COLON ty=kind DOT l=body { T.mk_ty_decl id ty :: l }
+| name=ID COLON PROOF t=term DOT l=body { T.mk_assert ~name t :: l }
+| name=QID COLON PROOF t=term DOT l=body { T.mk_assert ~name t :: l }
+| id=ID COLON ty=arrow_type DOT l=body { T.mk_ty_decl id ty :: l }
+| id=QID COLON ty=arrow_type DOT l=body { T.mk_ty_decl id ty :: l }
+| DEFKW id=ID COLON ty=arrow_type DOT l=body { T.mk_ty_decl id ty :: l }
+| DEFKW id=QID COLON ty=arrow_type DOT l=body { T.mk_ty_decl id ty :: l }
+| DEFKW id=ID COLON ty=typ DEF body=term DOT l=body
+  { T.mk_def id ty body :: l }
+| DEFKW id=QID COLON ty=typ DEF body=term DOT l=body
+  { T.mk_def id ty body :: l }
+| DEFKW id=declared_or_defined_id args=compact_arg+ COLON ty_ret=typ DEF body=term DOT l=body
   {
     let ty_args = List.map snd args in
     let ty = T.mk_arrow_l ty_args ty_ret in
-    let l = List.map (fun (id,ty) -> T.V id, Some ty) args in
-    T.mk_def id ty (T.mk_fun l body)
+    let args = List.map (fun (id,ty) -> T.V id, Some ty) args in
+    T.mk_def id ty (T.mk_fun args body) :: l
   }
-| env=env lhs=term REW rhs=term DOT
+| env=env lhs=term REW rhs=term DOT l=body
   {
     let t = T.mk_forall env (T.eq lhs rhs) in
-    T.mk_rewrite t
+    T.mk_rewrite t :: l
   }
+| g=goal { [g] }
 
 compact_arg:
 | LPAREN id=ID COLON ty=arrow_type RPAREN { id, ty }
