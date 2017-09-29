@@ -100,12 +100,7 @@ term_simple:
 
 term:
 | t=term_simple { t }
-| f=term_simple l=term_simple+ {
-      (* The "applicatives" rules contains a list of
-         arguments in reverse order.
-         This list is not empty. *)
-      T.mk_app f l
-    }
+| f=term_simple l=term_simple+ { T.mk_app f l }
 | error {
   let loc = L.mk_pos $startpos $endpos in
   UntypedAST.errorf loc "expected term"
