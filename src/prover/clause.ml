@@ -17,7 +17,6 @@ let stat_clause_create = Util.mk_stat "clause.create"
 module type S = Clause_intf.S
 
 type proof_step = Proof.Step.t
-type proof = Proof.S.t
 
 (** Bundle of clause sets *)
 type 'c sets = {

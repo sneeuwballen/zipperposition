@@ -1788,7 +1788,6 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* a != b ------> a+1 ≤ b | a ≥ b+1 *)
   let canc_diff_to_lesseq c =
-    let ord = Ctx.ord () in
     let eligible = C.Eligible.(filter Lit.is_arith_neq ** max c) in
     try
       Lits.fold_lits ~eligible (C.lits c)
