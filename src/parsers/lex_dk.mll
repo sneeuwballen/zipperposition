@@ -53,8 +53,6 @@ rule token = parse
 | "," { COMMA }
 | "-->" { REW }
 
-| "(;_MUST_USE_;)"        { MUSTUSE }
-
 | "%%begin-auto-proof"                      { BEGINPROOF }
 | "%%type:"                                 { BEGIN_TY }
 | "%%begin-type-alias:"                     { BEGIN_TYPEALIAS }
