@@ -36,7 +36,6 @@ rule token = parse
 | "dk_logic.forall_type" { ALL_TYPE }
 | "dk_logic.exists_type" { EX_TYPE }
 | "dk_logic.eP" { PROOF }
-| "dk_logic.ebP" { ISTRUE }
 | "dk_logic.Prop" { PROP }
 | "dk_builtins.prop" { PROP }
 | number as n { NUMBER(n) }

@@ -11,7 +11,7 @@ module L = ParseLocation
 %token TYPE TERM PROOF CCARR PROP
 %token LPAREN RPAREN EOF
 %token LBRACK COMMA RBRACK REW DEFKW
-%token TRUE FALSE NOT AND OR IMP EQV ALL EX ALL_TYPE EX_TYPE ISTRUE EQUAL
+%token TRUE FALSE NOT AND OR IMP EQV ALL EX ALL_TYPE EX_TYPE EQUAL
 
 %token MUSTUSE
 %token BEGINPROOF
@@ -81,20 +81,14 @@ term_simple:
 | OR  t=term_simple u=term_simple { T.or_ [t;u] }
 | IMP t=term_simple u=term_simple { T.imply t u }
 | EQV t=term_simple u=term_simple { T.equiv t u }
-| ALL ty=type_simple LPAREN x=ID COLON complex_type DOUBLE_ARROW body=term_simple RPAREN
+| ALL ty=type_simple LPAREN x=ID COLON complex_type DOUBLE_ARROW body=term RPAREN
   { T.forall [ (T.v x, Some ty) ] body }
-| EX ty=type_simple LPAREN x=ID COLON complex_type DOUBLE_ARROW body=term_simple RPAREN
+| EX ty=type_simple LPAREN x=ID COLON complex_type DOUBLE_ARROW body=term RPAREN
   { T.exists [ (T.v x, Some ty) ] body }
-| ALL_TYPE LPAREN x=ID COLON TYPE DOUBLE_ARROW body=term_simple RPAREN
+| ALL_TYPE LPAREN x=ID COLON TYPE DOUBLE_ARROW body=term RPAREN
   { T.forall [ (T.v x, Some T.tType) ] body }
-| EX_TYPE LPAREN x=ID COLON TYPE DOUBLE_ARROW body=term_simple RPAREN
+| EX_TYPE LPAREN x=ID COLON TYPE DOUBLE_ARROW body=term RPAREN
   { T.exists [ (T.v x, Some T.tType) ] body }
-| ISTRUE t=term_simple
-  { T.mk_app
-      (T.mk_const "dk_logic.ebP"
-        (T.mk_arrow (T.const "basics.bool__t") T.ty_prop))
-      [t]
-    }
 | EQUAL ty=type_simple t=term_simple u=term_simple { T.eq t (T.cast u ty) }
 | LPAREN t=term RPAREN { t }
 | x=ID COLON ty=typ DOUBLE_ARROW body=term_simple
