@@ -218,16 +218,11 @@ module Ctx = struct
       | Some (`ID (_,ty_old) | `Var {Var.ty=ty_old;_}) ->
         begin match ctx.on_shadow with
           | `Ignore ->
-            if T.Ty.equal ty ty_old then (
-              (* ignore decl *)
-              Util.debugf ~section 5 "ignore duplicate declaration of `%a`"
-                (fun k->k ID.pp s);
-              false
-            ) else (
-              error_ ?loc
-                "symbol `%a` declared twice with incompatible types@ :old %a@ :new %a"
-                ID.pp s T.pp ty_old T.pp ty
-            )
+            (* ignore decl, but ensure the two types are the same *)
+            Util.debugf ~section 5 "ignore duplicate declaration of `%a`"
+              (fun k->k ID.pp s);
+            T.unify ?loc ty_old ty;
+            false
           | `Warn ->
             Util.warnf "@[<2>shadowing identifier %s@]" name;
             true
