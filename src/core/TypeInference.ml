@@ -352,6 +352,13 @@ let rec infer_ty_ ?loc ctx ty =
       let ret = aux ret in
       let args = List.map aux args in
       T.Ty.fun_ ?loc args ret
+    | PT.AppBuiltin (Builtin.HasType, [t;ty]) ->
+      (* cast *)
+      let t = aux t in
+      let ty = aux ty in
+      unify ?loc ty T.Ty.tType;
+      unify ?loc (T.ty_exn t) ty;
+      t
     | PT.Var v ->
       begin match Ctx.get_var_ ctx v with
         | `Var v ->
