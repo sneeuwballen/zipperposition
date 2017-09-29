@@ -43,7 +43,9 @@ file:
 }
 
 goal:
-| name=ID COLON PROOF t=term DOT { T.mk_goal ~name t }
+| name=ID COLON PROOF t=term DOT
+  { let loc = L.mk_pos $startpos $endpos in
+    T.mk_goal ~loc ~name t }
 
 proofheaders:
   | BEGINNAME h=proofheaders { h }
@@ -66,8 +68,8 @@ proofheaders:
 }
 
 qid:
-| x=QID { T.find_alias x ~or_else:(T.const x) }
-| x=ID { T.find_alias x ~or_else:(T.const x) }
+| x=QID { T.find_alias x ~or_else:(T.var x) }
+| x=ID { T.find_alias x ~or_else:(T.var x) }
 
 term_simple:
 | x=qid { x }
@@ -93,7 +95,7 @@ term_simple:
         (T.mk_arrow (T.const "basics.bool__t") T.ty_prop))
       [t]
     }
-| EQUAL ty=type_simple t=term_simple u=term_simple { T.eq (T.cast t ty) u }
+| EQUAL ty=type_simple t=term_simple u=term_simple { T.eq t (T.cast u ty) }
 | LPAREN t=term RPAREN { t }
 | x=ID COLON ty=typ DOUBLE_ARROW body=term_simple
   { T.mk_fun [ (T.v x, Some ty) ] body }
@@ -159,20 +161,22 @@ body:
 | DEFKW id=ID COLON ty=arrow_type DOT l=body { T.mk_ty_decl id ty :: l }
 | DEFKW id=QID COLON ty=arrow_type DOT l=body { T.mk_ty_decl id ty :: l }
 | DEFKW id=ID COLON ty=typ DEF body=term DOT l=body
-  { T.mk_def id ty body :: l }
+  { let loc = L.mk_pos $startpos $endpos in
+    T.mk_def ~loc id ty body :: l }
 | DEFKW id=QID COLON ty=typ DEF body=term DOT l=body
-  { T.mk_def id ty body :: l }
+  { let loc = L.mk_pos $startpos $endpos in
+    T.mk_def ~loc id ty body :: l }
 | DEFKW id=declared_or_defined_id args=compact_arg+ COLON ty_ret=typ DEF body=term DOT l=body
-  {
+  { let loc = L.mk_pos $startpos $endpos in
     let ty_args = List.map snd args in
     let ty = T.mk_arrow_l ty_args ty_ret in
     let args = List.map (fun (id,ty) -> T.V id, Some ty) args in
-    T.mk_def id ty (T.mk_fun args body) :: l
+    T.mk_def ~loc id ty (T.mk_fun args body) :: l
   }
 | env=env lhs=term REW rhs=term DOT l=body
-  {
+  { let loc = L.mk_pos $startpos $endpos in
     let t = T.mk_forall env (T.eq lhs rhs) in
-    T.mk_rewrite t :: l
+    T.mk_rewrite ~loc t :: l
   }
 | g=goal { [g] }
 

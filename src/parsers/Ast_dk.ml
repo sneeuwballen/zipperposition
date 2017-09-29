@@ -50,9 +50,9 @@ let mk_forall l t = T.forall l t
 let mk_int x = T.int_ (Z.of_string x)
 let ty_prop = T.prop
 
-let mk_ty_decl id ty = A.decl id ty
-let mk_assert ~name t = A.assert_ ~attrs:[A.attr_name name] t
-let mk_goal ~name t = A.goal ~attrs:[A.attr_name name] t
-let mk_def id ty body = A.def [A.mk_def id ty [body]]
-let mk_rewrite t = A.rewrite t
+let mk_ty_decl ?loc id ty = A.decl ?loc id ty
+let mk_assert ?loc ~name t = A.assert_ ?loc ~attrs:[A.attr_name name] t
+let mk_goal ?loc ~name t = A.goal ?loc ~attrs:[A.attr_name name] t
+let mk_def ?loc id ty body = A.def ?loc [A.mk_def id ty [body]]
+let mk_rewrite ?loc t = A.rewrite ?loc t
 

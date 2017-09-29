@@ -47,7 +47,7 @@ let error_ ?loc msg =
     ~f:(fun msg ->
       let msg = match loc with
         | None -> msg
-        | Some l -> CCFormat.sprintf "@[<hv>%s@ at %a@]" msg Loc.pp l
+        | Some l -> Util.err_spf "@[<hv>%s@ at %a@]" msg Loc.pp l
       in
       raise (Error msg))
 
@@ -616,6 +616,8 @@ let rec infer_rec ?loc ctx t =
       let ty = infer_ty_exn ctx ty in
       unify ?loc (T.ty_exn t) ty;
       t
+    | PT.AppBuiltin (Builtin.HasType, l) ->
+      error_ ?loc "ill-formed has_type@ [@[<hv>%a@]]" (Util.pp_list PT.pp) l
     | PT.AppBuiltin (b,l) ->
       begin match TyBuiltin.ty b with
         | None ->
