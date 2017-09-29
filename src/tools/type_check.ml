@@ -40,6 +40,7 @@ let check file =
   >>= TypeInference.infer_statements
     ~on_var:(Input_format.on_var input)
     ~on_undef:(Input_format.on_undef_id input)
+    ~on_shadow:(Input_format.on_shadow input)
     ?ctx:None
   >|= fun decls ->
   let sigma =

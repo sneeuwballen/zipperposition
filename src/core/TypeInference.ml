@@ -129,6 +129,8 @@ module Ctx = struct
     (* what to do for variables without type annotation *)
     on_undef: [`Warn | `Fail | `Guess];
     (* what to do when we meet an undefined symbol *)
+    on_shadow: [`Warn | `Ignore];
+    (* what to do when an identifier is re-declared *)
     mutable new_metas: T.meta_var list;
     (* variables that should be generalized in the global scope
        or bound to [default], if they are not bound *)
@@ -140,12 +142,17 @@ module Ctx = struct
     (* list of symbols whose type has been inferred recently *)
   }
 
-  let create ?(def_as_rewrite=true) ?(default=T.Ty.term) ?(on_var=`Infer) ?(on_undef=`Guess) () =
+  let create
+      ?(def_as_rewrite=true) ?(default=T.Ty.term)
+      ?(on_var=`Infer) ?(on_undef=`Guess)
+      ?(on_shadow=`Warn)
+      () =
     let ctx = {
       default;
       def_as_rewrite;
       on_var;
       on_undef;
+      on_shadow;
       env = Hashtbl.create 32;
       datatypes = ID.Tbl.create 32;
       new_metas=[];
@@ -204,13 +211,33 @@ module Ctx = struct
     ctx.new_metas <- [];
     ()
 
-  let declare ctx s ty =
+  let declare ?loc ctx s ty =
     let name = ID.name s in
-    Util.debugf ~section 3 "@{<yellow>declare@} %a:@ @[%a@]" (fun k->k ID.pp s T.pp ty);
-    if Hashtbl.mem ctx.env name then (
-      Util.warnf "@[<2>shadowing identifier %s@]" name;
-    );
-    Hashtbl.add ctx.env name (`ID (s,ty))
+    let doit = match CCHashtbl.get ctx.env name with
+      | None -> true
+      | Some (`ID (_,ty_old) | `Var {Var.ty=ty_old;_}) ->
+        begin match ctx.on_shadow with
+          | `Ignore ->
+            if T.Ty.equal ty ty_old then (
+              (* ignore decl *)
+              Util.debugf ~section 5 "ignore duplicate declaration of `%a`"
+                (fun k->k ID.pp s);
+              false
+            ) else (
+              error_ ?loc
+                "symbol `%a` declared twice with incompatible types@ :old %a@ :new %a"
+                ID.pp s T.pp ty_old T.pp ty
+            )
+          | `Warn ->
+            Util.warnf "@[<2>shadowing identifier %s@]" name;
+            true
+        end
+    in
+    if doit then (
+      Util.debugf ~section 3 "@{<yellow>declare@} %a:@ @[%a@]"
+        (fun k->k ID.pp s T.pp ty);
+      Hashtbl.add ctx.env name (`ID (s,ty))
+    )
 
   let default_dest ctx = match ctx.on_var with
     | `Default -> `BindDefault
@@ -904,7 +931,7 @@ let infer_defs ?loc ctx (l:A.def list): (_,_,_) Stmt.def list =
              "in definition of %a,@ equality between types is forbidden"
              ID.pp id;
          );
-         Ctx.declare ctx id ty;
+         Ctx.declare ?loc ctx id ty;
          id, ty, d.A.def_rules)
       l
   in
@@ -980,7 +1007,7 @@ let infer_statement_exn ?(file="<no file>") ctx st =
          TODO: warning if it shadows? *)
       let id = ID.make s in
       let ty = infer_ty_exn ctx ty in
-      Ctx.declare ctx id ty;
+      Ctx.declare ?loc ctx id ty;
       set_notation id st.A.attrs;
       Stmt.ty_decl ~proof:(Proof.Step.intro src Proof.R_decl) id ty
     | A.Def l ->
@@ -1012,7 +1039,7 @@ let infer_statement_exn ?(file="<no file>") ctx st =
              let ty_of_data_ty =
                T.Ty.fun_ (List.map (fun _ -> T.Ty.tType) d.A.data_vars) T.Ty.tType
              in
-             Ctx.declare ctx data_ty ty_of_data_ty;
+             Ctx.declare ?loc ctx data_ty ty_of_data_ty;
              data_ty, ty_of_data_ty)
           l
       in
@@ -1047,7 +1074,7 @@ let infer_statement_exn ?(file="<no file>") ctx st =
                                    (* create projector *)
                                    ID.makef "proj_%a_%d" ID.pp c_id i
                                in
-                               Ctx.declare ctx p_id p_ty;
+                               Ctx.declare ?loc ctx p_id p_ty;
                                ty, (p_id, p_ty))
                             args
                         in
@@ -1055,7 +1082,7 @@ let infer_statement_exn ?(file="<no file>") ctx st =
                         let ty_c =
                           T.Ty.forall_l ty_vars (T.Ty.fun_ ty_args ty_ret)
                         in
-                        Ctx.declare ctx c_id ty_c;
+                        Ctx.declare ?loc ctx c_id ty_c;
                         (* TODO: check absence of other type variables in ty_c *)
                         c_id, ty_c, args)
                      d.A.data_cstors
@@ -1089,9 +1116,9 @@ let infer_statement_exn ?(file="<no file>") ctx st =
   in
   st, aux
 
-let infer_statements_exn ?def_as_rewrite ?on_var ?on_undef ?ctx ?file seq =
+let infer_statements_exn ?def_as_rewrite ?on_var ?on_undef ?on_shadow ?ctx ?file seq =
   let ctx = match ctx with
-    | None -> Ctx.create ?def_as_rewrite ?on_var ?on_undef ()
+    | None -> Ctx.create ?def_as_rewrite ?on_var ?on_undef ?on_shadow ()
     | Some c -> c
   in
   let res = CCVector.create () in
@@ -1104,7 +1131,8 @@ let infer_statements_exn ?def_as_rewrite ?on_var ?on_undef ?ctx ?file seq =
     seq;
   CCVector.freeze res
 
-let infer_statements ?def_as_rewrite ?on_var ?on_undef ?ctx ?file seq =
-  try Err.return (infer_statements_exn ?def_as_rewrite ?on_var ?on_undef ?ctx ?file seq)
+let infer_statements ?def_as_rewrite ?on_var ?on_undef ?on_shadow ?ctx ?file seq =
+  try Err.return
+        (infer_statements_exn ?def_as_rewrite ?on_var ?on_undef ?on_shadow ?ctx ?file seq)
   with e -> Err.of_exn_trace e
 

@@ -28,6 +28,13 @@ let on_undef_id (i:t) = match i with
   | I_tip
   | I_zf -> `Fail
 
+(** What to do when we have a shadowing decl? *)
+let on_shadow (i:t) = match i with
+  | I_dk -> `Ignore
+  | I_tptp
+  | I_tip
+  | I_zf -> `Warn
+
 (** what to do when we have a variable without a type declaration? *)
 let on_var (i:t) = match i with
   | I_tptp -> `Default

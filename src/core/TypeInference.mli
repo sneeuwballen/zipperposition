@@ -65,6 +65,7 @@ module Ctx : sig
     ?default:type_ ->
     ?on_var:[`Default | `Infer] ->
     ?on_undef:[`Warn | `Fail | `Guess] ->
+    ?on_shadow:[`Warn | `Ignore] ->
     unit ->
     t
   (** New context with a signature and default types.
@@ -85,7 +86,7 @@ module Ctx : sig
       at creation of the context.
       Some ree variables will be generalized, i.e., kept as (free) variables *)
 
-  val declare : t -> ID.t -> type_ -> unit
+  val declare : ?loc:loc -> t -> ID.t -> type_ -> unit
   (** Declare the type of a symbol, possibly shadowing a previous version  *)
 
   val pop_new_types : t -> (ID.t * type_) list
@@ -164,6 +165,7 @@ val infer_statements_exn :
   ?def_as_rewrite:bool ->
   ?on_var:[`Infer | `Default] ->
   ?on_undef:[`Warn | `Fail | `Guess] ->
+  ?on_shadow:[`Warn | `Ignore] ->
   ?ctx:Ctx.t ->
   ?file:string ->
   UntypedAST.statement Sequence.t ->
@@ -175,6 +177,7 @@ val infer_statements :
   ?def_as_rewrite:bool ->
   ?on_var:[`Infer | `Default] ->
   ?on_undef:[`Warn | `Fail | `Guess] ->
+  ?on_shadow:[`Warn | `Ignore] ->
   ?ctx:Ctx.t ->
   ?file:string ->
   UntypedAST.statement Sequence.t ->
