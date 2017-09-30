@@ -65,7 +65,9 @@ type proof
 
 type t = proof
 
-type parent
+type parent =
+  | P_of of t
+  | P_subst of t * Subst.Projection.t
 
 type info = UntypedAST.attr
 
@@ -311,9 +313,6 @@ module S : sig
   val adapt : t -> Result.t -> t
 
   val adapt_f : t -> form -> t
-
-  val to_llproof : t -> LLProof.t
-  (** Convert to low level t *)
 
   val is_proof_of_false : t -> bool
 

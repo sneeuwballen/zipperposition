@@ -194,9 +194,5 @@ module Projection : sig
 
   val make : Renaming.t -> subst Scoped.t -> t
 
-  type ll_subst = LLProof.subst
-
-  val conv : ctx:Term.Conv.ctx -> t -> ll_subst
-
   val pp : t CCFormat.printer
 end

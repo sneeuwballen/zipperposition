@@ -761,45 +761,4 @@ module S = struct
 
   let pp_dot_file ?name filename proof =
     pp_dot_seq_file ?name filename (Sequence.singleton proof)
-
-  let to_llproof (p:t): LLProof.t =
-    let tbl = Tbl.create 32 in
-    let rec conv ?ctx p: LLProof.t =
-      begin match Tbl.get tbl p with
-        | Some r -> r
-        | None ->
-          let res = conv_step ?ctx p in
-          Tbl.add tbl p res;
-          res
-      end
-    and conv_step ?(ctx=Term.Conv.create()) p =
-      let res = Result.to_form ~ctx (result p) in
-      let parents =
-        List.map conv_parent (Step.parents @@ step p)
-      and parent_as_proof_exn = function
-        | LLProof.P_of c -> c
-        | LLProof.P_instantiate _ -> assert false
-      in
-      begin match Step.kind @@ step p with
-        | Inference (name,c)
-        | Simplification (name,c) -> LLProof.inference c res name parents
-        | Esa (name,c) ->
-          let l = List.map parent_as_proof_exn parents in
-          LLProof.esa c res name l
-        | Trivial -> LLProof.trivial res
-        | By_def id -> LLProof.by_def id res
-        | Define (id,_) -> LLProof.define id res
-        | Intro (_,R_assert) -> LLProof.assert_ res
-        | Intro (_,R_goal) -> LLProof.assert_ res
-        | Intro (_,(R_lemma|R_def|R_decl)) -> LLProof.trivial res
-      end
-    and conv_parent (p:Parent.t): LLProof.parent = match p with
-      | P_of p -> LLProof.p_of (conv p)
-      | P_subst (p,subst) ->
-        let ctx = Term.Conv.create() in
-        let p = conv ~ctx p in
-        let subst = Subst.Projection.conv ~ctx subst in
-        LLProof.p_instantiate p subst
-    in
-    conv p
 end

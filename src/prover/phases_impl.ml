@@ -5,6 +5,7 @@
 
 open Logtk
 open Logtk_parsers
+open Logtk_proofs
 open Params
 
 open Phases.Infix
@@ -440,7 +441,7 @@ let check res =
     | Saturate.Unsat p when params.Params.param_check ->
       (* check proof! *)
       Util.debug ~section 1 "start checking proof…";
-      let p' = Proof.S.to_llproof p in
+      let p' = LLProof_conv.conv p in
       let res, stats = LLProof_check.check p' in
       Util.debugf ~section 1 "(@[proof_check@ :res %a@ :stats %a@])"
         (fun k->k LLProof_check.pp_res res LLProof_check.pp_stats stats);

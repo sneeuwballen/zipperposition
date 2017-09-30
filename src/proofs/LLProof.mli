@@ -11,11 +11,13 @@
     NOTE: this is still uncooked, and will probably change.
 *)
 
+open Logtk
+
 val section : Util.Section.t
 
 type term = TypedSTerm.t
 type ty = term
-type form = TypedSTerm.Form.t
+type form = term
 type subst = (term, ty) Var.Subst.t
 
 type name = string

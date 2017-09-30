@@ -3,6 +3,8 @@
 
 (** {1 Low Level Proofs} *)
 
+open Logtk
+
 module T = TypedSTerm
 module F = T.Form
 module Ty = T.Ty
@@ -141,4 +143,3 @@ let conv_check_ = function
 
 let esa c f name ps = mk_ f (Esa (name,ps,conv_check_ c))
 let inference c f name ps = mk_ f (Inference (name,ps,conv_check_ c))
-

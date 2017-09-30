@@ -9,6 +9,8 @@
     simple way.
 *)
 
+open Logtk
+
 type proof = LLProof.t
 
 type res =

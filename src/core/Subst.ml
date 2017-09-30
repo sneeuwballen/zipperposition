@@ -393,18 +393,5 @@ module Projection = struct
       Format.fprintf out "@[<2>%a@ @<1>→ %a@]" HVar.pp v T.pp t
     in
     Format.fprintf out "{@[<hv>%a@]}" (Util.pp_list ~sep:"," pp_p) (bindings p)
-
-  type ll_subst = LLProof.subst
-
-  let conv ~ctx p : ll_subst =
-    List.fold_left
-      (fun lsubst (v,t) ->
-         let v = Type.cast_var_unsafe v in
-         let prefix = if Type.is_tType (HVar.ty v) then "A" else "X" in
-         let v = Term.Conv.var_to_simple_var ~prefix ctx v in
-         let t = Term.Conv.to_simple_term ctx (Term.of_term_unsafe t) in
-         assert (not (Var.Subst.mem lsubst v));
-         Var.Subst.add lsubst v t)
-      Var.Subst.empty (bindings p)
 end
 
