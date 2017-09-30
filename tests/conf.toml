@@ -1,5 +1,5 @@
 
-provers = [ "zipperposition", "hornet", "zipperposition-avatar" ]
+provers = [ "zipperposition", "zipperposition-avatar" ]
 default_expect = "unsat"
 
 [test]

@@ -142,7 +142,7 @@ $(TEST_TOOL)-tptp:
 	@echo "start benchmarks in ${BENCH_DIR}"
 	@mkdir -p snapshots
 	mkdir -p ${BENCH_DIR}
-	cp zipperposition.native hornet.native ${BENCH_DIR}/
+	cp zipperposition.native ${BENCH_DIR}/
 	ln -s ../tptp/ ${BENCH_DIR}/tptp
 	cp data/bench.toml ${BENCH_DIR}/conf.toml
 	cd ${BENCH_DIR} && $(TEST_TOOL) run --meta=`git rev-parse HEAD` \
