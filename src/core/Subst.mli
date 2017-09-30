@@ -26,8 +26,10 @@ type var = InnerTerm.t HVar.t
 
 module Renaming : sig
   type t
+
   val create : unit -> t
-  val clear : t -> unit
+  (** Make a fresh renaming. It can only grow, so it is safe to use
+      it as a value. *)
 
   val none: t
   (** Renaming that doesn't actually rename(!) *)
@@ -188,15 +190,9 @@ module Projection : sig
 
   val bindings : t -> (var * term) list
 
-  val empty : t
-
   val is_empty : t -> bool
 
   val make : Renaming.t -> subst Scoped.t -> t
-
-  val merge : t -> t -> t
-  (** [merge a b] composes [a] and [b], assuming they don't both bind
-      any common variable *)
 
   type ll_subst = LLProof.subst
 

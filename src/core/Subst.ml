@@ -34,12 +34,6 @@ module Renaming = struct
 
   let[@inline] create () = R_some {map=M.empty; n=0}
 
-  let clear r = match r with
-    | R_none -> ()
-    | R_some r ->
-      r.map <- M.empty;
-      r.n <- 0
-
   (* rename variable *)
   let rename r ((v,_) as var) = match r with
     | R_none -> v
@@ -373,35 +367,26 @@ end
 (** {2 Projections for proofs} *)
 
 module Projection = struct
-  type t = (var * term) list lazy_t
-
-  let bindings t = Lazy.force t
-
-  let empty : t = Lazy.from_val []
-
-  let is_empty (p:t) : bool = CCList.is_empty (bindings p)
+  type t = {
+    scope: Scoped.scope;
+    subst: subst;
+    renaming: Renaming.t;
+  }
 
   (* actual constructor from a substitution *)
-  let make_real ~f_rename (subst,sc) : t =
-    let bindings = lazy (
-      fold
-        (fun l (v,sc_v) (t,sc_t) ->
-           if sc_v = sc then (
-             let v = f_rename (v,sc_v) (HVar.ty v) in
-             let t = apply_aux ~f_rename subst (t,sc_t) in
-             (v,t) :: l
-           ) else l)
-        [] subst
-    ) in
-    bindings
+  let bindings (p:t) : _ list =
+    fold
+      (fun l (v,sc_v) (t,sc_t) ->
+         if sc_v = p.scope then (
+           let v = f_rename_sn p.renaming (v,sc_v) (HVar.ty v) in
+           let t = apply p.renaming p.subst (t,sc_t) in
+           (v,t) :: l
+         ) else l)
+      [] p.subst
 
-  let[@inline] make renaming s : t =
-    make_real ~f_rename:(f_rename_sn renaming) s
+  let[@inline] make renaming (subst,sc) : t = { scope=sc; subst; renaming; }
 
-  let merge (a:t) (b:t) : t =
-    lazy (
-      List.rev_append (bindings a) (bindings b)
-    )
+  let[@inline] is_empty (p:t) : bool = is_empty p.subst && Renaming.is_none p.renaming
 
   let pp out (p:t) : unit =
     let pp_p out (v,t) =
