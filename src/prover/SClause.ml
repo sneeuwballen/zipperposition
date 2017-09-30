@@ -150,13 +150,6 @@ let proof_tc =
     ~to_form:(fun ~ctx c ->
       to_s_form ~ctx c |> TypedSTerm.Form.close_forall)
     ~pp_in
-    ~apply_subst:(fun subst (c,sc_c) ->
-      let trail = trail c in
-      let lits' =
-        Literals.apply_subst (Subst.Renaming.create())
-          subst (lits c,sc_c)
-      in
-      make ~trail lits')
     ()
 
 let mk_proof_res = Proof.Result.make proof_tc

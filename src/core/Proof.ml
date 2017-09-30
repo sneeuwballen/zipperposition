@@ -71,7 +71,6 @@ type 'a result_tc = {
   res_is_stmt: bool;
   res_pp_in: Output_format.t -> 'a CCFormat.printer;
   res_to_form: ctx:Term.Conv.ctx -> 'a -> TypedSTerm.Form.t;
-  res_apply_subst: (Subst.t -> 'a Scoped.t -> 'a) option;
   res_name:('a -> string) option;
   res_flavor: 'a -> flavor;
 }
@@ -283,15 +282,6 @@ module Result = struct
     | None -> assert false
     | Some x -> r.res_flavor x
 
-  let apply_subst subst (Res (r,x),sc) : t = match r.res_of_exn x with
-    | None -> assert false
-    | Some y ->
-      let y = match r.res_apply_subst with
-        | None -> y
-        | Some f -> f subst (y,sc)
-      in
-      Res (r, r.res_to_exn y)
-
   let name (Res (r,x)) = match r.res_of_exn x with
     | None -> assert false
     | Some x ->
@@ -307,7 +297,6 @@ module Result = struct
       ~pp_in
       ?name
       ?(is_stmt=false)
-      ?apply_subst
       ?(flavor=fun _ -> `Vanilla)
       () : a result_tc
     =
@@ -318,7 +307,6 @@ module Result = struct
       res_compare=compare;
       res_is_stmt=is_stmt;
       res_pp_in=pp_in;
-      res_apply_subst=apply_subst;
       res_to_form=to_form;
       res_name=name;
       res_flavor=flavor;
@@ -776,18 +764,18 @@ module S = struct
 
   let to_llproof (p:t): LLProof.t =
     let tbl = Tbl.create 32 in
-    let rec conv p: LLProof.t =
+    let rec conv ?ctx p: LLProof.t =
       begin match Tbl.get tbl p with
         | Some r -> r
         | None ->
-          let res = conv_step p in
+          let res = conv_step ?ctx p in
           Tbl.add tbl p res;
           res
       end
     and conv_step ?(ctx=Term.Conv.create()) p =
       let res = Result.to_form ~ctx (result p) in
       let parents =
-        List.map (conv_parent ~ctx) (Step.parents @@ step p)
+        List.map conv_parent (Step.parents @@ step p)
       and parent_as_proof_exn = function
         | LLProof.P_of c -> c
         | LLProof.P_instantiate _ -> assert false
@@ -805,10 +793,11 @@ module S = struct
         | Intro (_,R_goal) -> LLProof.assert_ res
         | Intro (_,(R_lemma|R_def|R_decl)) -> LLProof.trivial res
       end
-    and conv_parent ~ctx (p:Parent.t): LLProof.parent = match p with
+    and conv_parent (p:Parent.t): LLProof.parent = match p with
       | P_of p -> LLProof.p_of (conv p)
       | P_subst (p,subst) ->
-        let p = conv p in
+        let ctx = Term.Conv.create() in
+        let p = conv ~ctx p in
         let subst = Subst.Projection.conv ~ctx subst in
         LLProof.p_instantiate p subst
     in

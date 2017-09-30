@@ -158,7 +158,6 @@ module Result : sig
     pp_in:(Output_format.t -> 'a CCFormat.printer) ->
     ?name:('a -> string) ->
     ?is_stmt:bool ->
-    ?apply_subst:(Subst.t -> 'a Scoped.t -> 'a) ->
     ?flavor:('a -> flavor) ->
     unit ->
     'a tc
@@ -184,7 +183,6 @@ module Result : sig
   val to_form : ?ctx:Term.Conv.ctx -> t -> form
   val flavor : t -> flavor
   val name : t -> string option
-  val apply_subst : Subst.t -> t Scoped.t -> t
 end
 
 (** {2 A proof step} *)
