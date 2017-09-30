@@ -5,7 +5,7 @@ include "list.zf".
 
 # NOTE: lemmas
 lemma forall L. append L nil = L.
-lemma forall L1 L2 L2. append L1 (append L2 L3) = append (append L1 L2) L3.
+lemma forall L1 L2 L3. append L1 (append L2 L3) = append (append L1 L2) L3.
 lemma forall L1 L2. rev (append L1 L2) = append (rev L2) (rev L1).
 
 goal forall (L:list). rev (rev L) = L.
