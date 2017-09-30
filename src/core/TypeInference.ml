@@ -1004,13 +1004,13 @@ let infer_statement_exn ?(file="<no file>") ctx st =
       let ty = infer_ty_exn ctx ty in
       Ctx.declare ?loc ctx id ty;
       set_notation id st.A.attrs;
-      Stmt.ty_decl ~proof:(Proof.Step.intro src Proof.R_decl) id ty
+      Stmt.ty_decl ~attrs ~proof:(Proof.Step.intro src Proof.R_decl) id ty
     | A.Def l ->
       let l = infer_defs ?loc ctx l in
       List.iter
         (fun d -> set_notation d.Stmt.def_id st.A.attrs)
         l;
-      Stmt.def ~proof:(Proof.Step.intro src Proof.R_def) l
+      Stmt.def ~attrs ~proof:(Proof.Step.intro src Proof.R_def) l
     | A.Rewrite t ->
       let t =  infer_prop_ ctx t in
       begin match as_def ?loc Var.Set.empty t with
@@ -1022,7 +1022,7 @@ let infer_statement_exn ?(file="<no file>") ctx st =
           Stmt.rewrite_term ~proof:(Proof.Step.intro src Proof.R_def) (vars,id,ty,args,rhs)
         | `Prop (vars,lhs,rhs,pol) ->
           assert (T.Ty.is_prop (T.ty_exn rhs));
-          Stmt.rewrite_form ~proof:(Proof.Step.intro src Proof.R_def) (vars,lhs,[rhs],pol)
+          Stmt.rewrite_form ~attrs ~proof:(Proof.Step.intro src Proof.R_def) (vars,lhs,[rhs],pol)
       end
     | A.Data l ->
       (* declare the inductive types *)
@@ -1089,16 +1089,16 @@ let infer_statement_exn ?(file="<no file>") ctx st =
           data_types
       in
       Ctx.exit_scope ctx;
-      Stmt.data ~proof:(Proof.Step.intro src Proof.R_def) l'
+      Stmt.data ~attrs ~proof:(Proof.Step.intro src Proof.R_def) l'
     | A.Assert t ->
       let t = infer_prop_exn ctx t in
       Stmt.assert_ ~attrs ~proof:(Proof.Step.intro src Proof.R_assert) t
     | A.Lemma t ->
       let t = infer_prop_exn ctx t in
-      Stmt.lemma ~proof:(Proof.Step.intro src Proof.R_lemma) [t]
+      Stmt.lemma ~attrs ~proof:(Proof.Step.intro src Proof.R_lemma) [t]
     | A.Goal t ->
       let t = infer_prop_exn ctx t in
-      Stmt.goal ~proof:(Proof.Step.intro src Proof.R_goal) t
+      Stmt.goal ~attrs ~proof:(Proof.Step.intro src Proof.R_goal) t
   in
   (* be sure to bind the remaining meta variables *)
   Ctx.exit_scope ctx;
