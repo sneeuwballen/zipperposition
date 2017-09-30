@@ -490,38 +490,27 @@ let apply_subst_ ~f_term ~f_arith_lit ~f_rat subst (lit,sc) =
     | True
     | False -> lit
 
-let apply_subst ~renaming subst (lit,sc) =
+let apply_subst renaming subst (lit,sc) =
   apply_subst_ subst (lit,sc)
-    ~f_term:(S.FO.apply ~renaming)
-    ~f_arith_lit:(Int_lit.apply_subst ~renaming)
-    ~f_rat:(Rat_lit.apply_subst ~renaming)
+    ~f_term:(S.FO.apply renaming)
+    ~f_arith_lit:(Int_lit.apply_subst renaming)
+    ~f_rat:(Rat_lit.apply_subst renaming)
 
-let apply_subst_no_renaming subst (lit,sc) =
-  apply_subst_ subst (lit,sc)
-    ~f_term:S.FO.apply_no_renaming
-    ~f_arith_lit:Int_lit.apply_subst_no_renaming
-    ~f_rat:Rat_lit.apply_subst_no_renaming
-
-let apply_subst_no_simp ~renaming subst (lit,sc) =
+let apply_subst_no_simp renaming subst (lit,sc) =
   match lit with
-    | Int o -> Int (Int_lit.apply_subst_no_simp ~renaming subst (o,sc))
-    | Rat o -> Rat (Rat_lit.apply_subst_no_simp ~renaming subst (o,sc))
+    | Int o -> Int (Int_lit.apply_subst_no_simp renaming subst (o,sc))
+    | Rat o -> Rat (Rat_lit.apply_subst_no_simp renaming subst (o,sc))
     | Equation (l,r,sign) ->
-      Equation (S.FO.apply ~renaming subst (l,sc),
-        S.FO.apply ~renaming subst (r,sc), sign)
+      Equation (S.FO.apply renaming subst (l,sc),
+        S.FO.apply renaming subst (r,sc), sign)
     | Prop (p, sign) ->
-      Prop (S.FO.apply ~renaming subst (p,sc), sign)
+      Prop (S.FO.apply renaming subst (p,sc), sign)
     | True
     | False -> lit
 
-let apply_subst_list ~renaming subst (lits,sc) =
+let apply_subst_list renaming subst (lits,sc) =
   List.map
-    (fun lit -> apply_subst ~renaming subst (lit,sc))
-    lits
-
-let apply_subst_list_no_renaming subst (lits,sc) =
-  List.map
-    (fun lit -> apply_subst_no_renaming subst (lit,sc))
+    (fun lit -> apply_subst renaming subst (lit,sc))
     lits
 
 exception Lit_is_constraint
@@ -675,17 +664,8 @@ let is_ho_unif lit = match lit with
   | Equation (t, u, false) -> Term.is_ho_app t || Term.is_ho_app u
   | _ -> false
 
-let of_unif_subst ~renaming (s:Unif_subst.t) : t list =
-  Unif_subst.constr_l_subst ~renaming s
-  |> List.map
-    (fun (t,u) ->
-       (* upcast *)
-       let t = T.of_term_unsafe t in
-       let u = T.of_term_unsafe u in
-       mk_constraint t u)
-
-let of_unif_subst_no_renaming (s:Unif_subst.t) : t list =
-  Unif_subst.constr_l_subst_no_renaming s
+let of_unif_subst renaming (s:Unif_subst.t) : t list =
+  Unif_subst.constr_l_subst renaming s
   |> List.map
     (fun (t,u) ->
        (* upcast *)

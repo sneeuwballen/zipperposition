@@ -170,11 +170,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let proof c = Proof.S.mk c.proof (SClause.mk_proof_res c.sclause)
   let proof_parent c = Proof.Parent.from (proof c)
 
-  let proof_parent_subst ~renaming (c,sc) subst =
-    Proof.Parent.from_subst ~renaming (proof c,sc) subst
-
-  let proof_parent_subst_no_renaming (c,sc) subst =
-    Proof.Parent.from_subst_no_renaming (proof c,sc) subst
+  let proof_parent_subst renaming (c,sc) subst =
+    Proof.Parent.from_subst renaming (proof c,sc) subst
 
   let update_proof c f =
     let new_proof = f c.proof in
@@ -191,7 +188,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     else
       let renaming = S.Renaming.create () in
       Array.map
-        (fun l -> Lit.apply_subst_no_simp ~renaming subst (l,sc))
+        (fun l -> Lit.apply_subst_no_simp renaming subst (l,sc))
         lits
 
   (** Bitvector that indicates which of the literals of [subst(clause)]

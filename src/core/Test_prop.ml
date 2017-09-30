@@ -122,10 +122,10 @@ end = struct
     |> List.map (fun (v,t) -> (v,0),(t,1))
     |> Subst.FO.of_list' ?init:None
 
-  let compose (subst:Subst.t) ~renaming (s1:subst_acc Scoped.t): subst_acc =
+  let compose renaming (subst:Subst.t) (s1:subst_acc Scoped.t): subst_acc =
     let s1, sc1 = s1 in
     T.VarMap.map
-      (fun t -> Subst.FO.apply ~renaming subst (t,sc1))
+      (fun t -> Subst.FO.apply renaming subst (t,sc1))
       s1
 
   let form_is_false (f:form): bool = List.exists Literals.is_absurd f
@@ -158,14 +158,14 @@ end = struct
         (fun (rule,us) ->
            let renaming = Subst.Renaming.create() in
            let subst = Unif_subst.subst us in
-           let c_guard = Literals.of_unif_subst ~renaming us in
+           let c_guard = Literals.of_unif_subst renaming us in
            (* evaluate new formula by substituting and evaluating *)
            let f' =
              f
              |> List.map
                (fun lits ->
                   CCArray.append c_guard
-                    (Literals.apply_subst ~renaming subst (lits,sc_c)))
+                    (Literals.apply_subst renaming subst (lits,sc_c)))
              |> normalize_form
            in
            (* make new formula *)
@@ -173,7 +173,7 @@ end = struct
            Util.debugf ~section 5
              "(@[<2>test_prop.narrow_term@ :from %a@ :to %a@ :rule %a@ :subst %a@])"
              (fun k->k pp_form f pp_form f' RW.Term.Rule.pp rule Subst.pp subst);
-           let new_acc = compose ~renaming subst (acc,sc_c) in
+           let new_acc = compose renaming subst (acc,sc_c) in
            new_acc, f')
     end
 
@@ -198,14 +198,14 @@ end = struct
         (fun (rule,us) ->
            let renaming = Subst.Renaming.create() in
            let subst = Unif_subst.subst us in
-           let c_guard = Literals.of_unif_subst ~renaming us in
+           let c_guard = Literals.of_unif_subst renaming us in
            (* evaluate new formula by substituting and evaluating *)
            let f' =
              f
              |> List.map
                (fun lits ->
                   CCArray.append c_guard
-                    (Literals.apply_subst ~renaming subst (lits,sc_c)))
+                    (Literals.apply_subst renaming subst (lits,sc_c)))
              |> normalize_form
            in
            (* make new formula *)
@@ -213,7 +213,7 @@ end = struct
            Util.debugf ~section 5
              "(@[<2>test_prop.narrow_lit@ :from %a@ :to %a@ :rule %a@ :subst %a@])"
              (fun k->k pp_form f pp_form f' RW.Lit.Rule.pp rule Subst.pp subst);
-           let new_acc = compose ~renaming subst (acc,sc_c) in
+           let new_acc = compose renaming subst (acc,sc_c) in
            new_acc, f')
     end
 

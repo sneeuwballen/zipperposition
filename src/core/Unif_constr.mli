@@ -25,21 +25,17 @@ val make : term Scoped.t -> term Scoped.t -> t
 
 (** Apply a substitution to a delayed constraint *)
 val apply_subst :
-  renaming:Subst.Renaming.t ->
+  Subst.Renaming.t ->
   Subst.t ->
   t ->
   term * term
 
-val apply_subst_no_renaming : Subst.t -> t -> term * term
-
 (** Apply a substitution to delayed constraints *)
 val apply_subst_l :
-  renaming:Subst.Renaming.t ->
+  Subst.Renaming.t ->
   Subst.t ->
   t list ->
   (term * term) list
-
-val apply_subst_l_no_renaming : Subst.t -> t list -> (term * term) list
 
 module FO : sig
   val make : Term.t Scoped.t -> Term.t Scoped.t -> t

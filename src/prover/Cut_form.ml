@@ -92,9 +92,9 @@ let ind_vars t =
          | None -> false
        end)
 
-let apply_subst ~renaming subst (f,sc): t =
+let apply_subst renaming subst (f,sc): t =
   let cs =
-    List.map (fun lits -> Literals.apply_subst ~renaming subst (lits,sc)) f.cs
+    List.map (fun lits -> Literals.apply_subst renaming subst (lits,sc)) f.cs
   in
   make cs
 
@@ -103,7 +103,7 @@ let subst1 (v:var) (t:term) (f:t): t =
   let subst =
     Subst.FO.bind Subst.empty ((v:var:>InnerTerm.t HVar.t),0) (t,1)
   in
-  apply_subst ~renaming subst (f,0)
+  apply_subst renaming subst (f,0)
 
 (* find substitutions making [f1] and [f2] variants, if possible *)
 let variant ~subst (f1,sc1)(f2,sc2): Subst.t Sequence.t =

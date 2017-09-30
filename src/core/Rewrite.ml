@@ -340,7 +340,7 @@ module Term = struct
                      Util.incr_stat stat_term_rw;
                      decr fuel;
                      (* NOTE: not efficient, will traverse [t'] fully *)
-                     let t' = Subst.FO.apply_no_renaming subst (r.term_rhs,1) in
+                     let t' = Subst.FO.apply Subst.Renaming.none subst (r.term_rhs,1) in
                      (* add leftover arguments *)
                      let t' = T.app t' l_rest in
                      reduce t' k
@@ -518,10 +518,10 @@ module Lit = struct
 
   (* try to rewrite this literal, returning a list of list of lits instead *)
   let normalize_clause_ (lits:Literals.t) =
-    let eval_ll ~renaming subst (l,sc) =
+    let eval_ll renaming subst (l,sc) =
       List.map
         (List.map
-           (fun lit -> Literal.apply_subst ~renaming subst (lit,sc)))
+           (fun lit -> Literal.apply_subst renaming subst (lit,sc)))
         l
     in
     let step =
@@ -547,8 +547,8 @@ module Lit = struct
            substitution (clause_chunks might contain other variables!),
            distribute to get a CNF again *)
         let lits = CCArray.except_idx lits i in
-        let lits = Literal.apply_subst_list ~renaming subst (lits,0) in
-        let clause_chunks = eval_ll ~renaming subst (clause_chunks,1) in
+        let lits = Literal.apply_subst_list renaming subst (lits,0) in
+        let clause_chunks = eval_ll renaming subst (clause_chunks,1) in
         let clauses =
           List.rev_map
             (fun new_lits -> Array.of_list (new_lits @ lits))

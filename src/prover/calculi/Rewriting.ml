@@ -61,17 +61,17 @@ module Make(E : Env_intf.S) = struct
               let i, _ = Literals.Pos.cut passive_pos in
               let renaming = Subst.Renaming.create() in
               let subst = Unif_subst.subst us in
-              let c_guard = Literal.of_unif_subst ~renaming us in
+              let c_guard = Literal.of_unif_subst renaming us in
               (* side literals *)
               let lits_passive = C.lits c in
               let lits_passive =
-                Literals.apply_subst ~renaming subst (lits_passive,sc_c) in
+                Literals.apply_subst renaming subst (lits_passive,sc_c) in
               let lits' = CCArray.except_idx lits_passive i in
               (* substitute in rule *)
               let rhs =
-                Subst.FO.apply ~renaming subst (RW.Term.Rule.rhs rule, sc_rule)
+                Subst.FO.apply renaming subst (RW.Term.Rule.rhs rule, sc_rule)
               and lhs =
-                Subst.FO.apply ~renaming subst (RW.Term.Rule.lhs rule, sc_rule)
+                Subst.FO.apply renaming subst (RW.Term.Rule.lhs rule, sc_rule)
               in
               (* literal in which narrowing took place: replace lhs by rhs *)
               let new_lit =
@@ -81,7 +81,7 @@ module Make(E : Env_intf.S) = struct
               Util.incr_stat stat_narrowing_term;
               let proof =
                 Proof.Step.inference
-                  [C.proof_parent_subst ~renaming (c,0) subst;
+                  [C.proof_parent_subst renaming (c,0) subst;
                    Proof.Parent.from @@ RW.Rule.as_proof (RW.T_rule rule)]
                   ~rule:(Proof.Rule.mk "narrow") in
               let c' =
@@ -133,10 +133,10 @@ module Make(E : Env_intf.S) = struct
            (fun acc (rule,us) ->
               let subst = Unif_subst.subst us in
               let renaming = Subst.Renaming.create () in
-              let c_guard = Literal.of_unif_subst ~renaming us in
+              let c_guard = Literal.of_unif_subst renaming us in
               let proof =
                 Proof.Step.inference
-                  [C.proof_parent_subst ~renaming (c,0) subst;
+                  [C.proof_parent_subst renaming (c,0) subst;
                    Proof.Parent.from @@ RW.Rule.as_proof (RW.L_rule rule)]
                   ~rule:(Proof.Rule.mk "narrow_clause") in
               let lits' = CCArray.except_idx lits i in
@@ -147,8 +147,8 @@ module Make(E : Env_intf.S) = struct
                   (fun c' ->
                      let new_lits =
                        c_guard
-                       @ Literal.apply_subst_list ~renaming subst (lits',0)
-                       @ Literal.apply_subst_list ~renaming subst (c',1)
+                       @ Literal.apply_subst_list renaming subst (lits',0)
+                       @ Literal.apply_subst_list renaming subst (c',1)
                      in
                      C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof)
                   (RW.Lit.Rule.rhs rule)
@@ -213,9 +213,9 @@ module Make(E : Env_intf.S) = struct
       in
       let renaming = Subst.Renaming.create() in
       let subst = Unif_subst.subst us in
-      let c_guard = Literal.of_unif_subst ~renaming us in
-      let s' = Subst.FO.apply ~renaming subst (s,sc_a) in
-      let t' = Subst.FO.apply ~renaming subst (t,sc_a) in
+      let c_guard = Literal.of_unif_subst renaming us in
+      let s' = Subst.FO.apply renaming subst (s,sc_a) in
+      let t' = Subst.FO.apply renaming subst (t,sc_a) in
       if Ordering.compare ord s' t' <> Comparison.Lt then (
         Util.incr_stat stat_ctx_narrowing;
         rule_clauses
@@ -223,7 +223,7 @@ module Make(E : Env_intf.S) = struct
           (fun rule_clause ->
              (* instantiate rule and replace [s'] by [t'] now *)
              let new_lits =
-               Literals.apply_subst ~renaming subst (rule_clause,sc_p)
+               Literals.apply_subst renaming subst (rule_clause,sc_p)
                |> Literals.map (T.replace ~old:s' ~by:t')
                |> Array.to_list
              in
@@ -232,14 +232,14 @@ module Make(E : Env_intf.S) = struct
                | P.Arg (n,_) -> n | _ -> assert false
              in
              let ctx =
-               Literal.apply_subst_list ~renaming subst
+               Literal.apply_subst_list renaming subst
                  (CCArray.except_idx (C.lits c) idx_active, sc_a)
              in
              (* build new clause *)
              let proof =
                Proof.Step.inference
                  ~rule:(Proof.Rule.mk "contextual_narrowing")
-                 [C.proof_parent_subst ~renaming (c,sc_a) subst;
+                 [C.proof_parent_subst renaming (c,sc_a) subst;
                   Proof.Parent.from @@ RW.Rule.as_proof rule]
              in
              (* add some penalty on every inference *)

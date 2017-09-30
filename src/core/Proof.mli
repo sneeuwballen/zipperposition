@@ -263,8 +263,7 @@ module Parent : sig
 
   val from : proof -> t
   val from_subst_proj : proof -> Subst.Projection.t -> t
-  val from_subst : renaming:Subst.Renaming.t -> proof Scoped.t -> Subst.t -> t
-  val from_subst_no_renaming : proof Scoped.t -> Subst.t -> t
+  val from_subst : Subst.Renaming.t -> proof Scoped.t -> Subst.t -> t
   val proof : t -> proof
   val subst : t -> Subst.Projection.t option
 end

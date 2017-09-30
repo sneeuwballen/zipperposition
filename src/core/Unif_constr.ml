@@ -16,19 +16,12 @@ type t = {
 
 let make (t1,sc1) (t2,sc2) = {t1;sc1;t2;sc2}
 
-let apply_subst ~renaming subst (c:t): term * term =
-  Subst.apply ~renaming subst (c.t1, c.sc1),
-  Subst.apply ~renaming subst (c.t2, c.sc2)
+let apply_subst renaming subst (c:t): term * term =
+  Subst.apply renaming subst (c.t1, c.sc1),
+  Subst.apply renaming subst (c.t2, c.sc2)
 
-let apply_subst_no_renaming subst (c:t): term * term =
-  Subst.apply_no_renaming subst (c.t1, c.sc1),
-  Subst.apply_no_renaming subst (c.t2, c.sc2)
-
-let apply_subst_l ~renaming subst (l:t list): _ list =
-  List.map (apply_subst ~renaming subst) l
-
-let apply_subst_l_no_renaming subst (l:t list): _ list =
-  List.map (apply_subst_no_renaming subst) l
+let apply_subst_l renaming subst (l:t list): _ list =
+  List.map (apply_subst renaming subst) l
 
 let pp out (c:t) =
   CCFormat.fprintf out "(@[%a =?=@ %a@])" T.pp c.t1 T.pp c.t2

@@ -29,11 +29,8 @@ module Renaming : sig
   val create : unit -> t
   val clear : t -> unit
 
-  type snapshot (** Immutable snapshot *)
-
-  val snapshot : t -> snapshot
-
-  val pp_snapshot : snapshot CCFormat.printer
+  val none: t
+  (** Renaming that doesn't actually rename(!) *)
 end
 
 (** {3 Basics} *)
@@ -139,7 +136,7 @@ val of_list : ?init:t -> (var Scoped.t * term Scoped.t) list -> t
 
 (** {2 Applying a substitution} *)
 
-val apply : t -> renaming:Renaming.t -> term Scoped.t -> term
+val apply : Renaming.t -> t -> term Scoped.t -> term
 (** Apply the substitution to the given term.
     This function assumes that all terms in the substitution are closed,
     and it will not perform De Bruijn indices shifting. For instance,
@@ -147,10 +144,6 @@ val apply : t -> renaming:Renaming.t -> term Scoped.t -> term
     to the term [forall. p(X)] will yield [forall. p(f(db0))] (capturing)
     and not [forall. p(f(db1))].
     @param renaming used to desambiguate free variables from distinct scopes *)
-
-val apply_no_renaming : t -> term Scoped.t -> term
-(** Same as {!apply}, but performs no renaming of free variables.
-    {b Caution}, can entail collisions between scopes! *)
 
 (** {2 Specializations} *)
 
@@ -164,13 +157,9 @@ module type SPECIALIZED = sig
 
   val deref : t -> term Scoped.t -> term Scoped.t
 
-  val apply : t -> renaming:Renaming.t -> term Scoped.t -> term
+  val apply : Renaming.t -> t -> term Scoped.t -> term
   (** Apply the substitution to the given term/type.
       @param renaming used to desambiguate free variables from distinct scopes *)
-
-  val apply_no_renaming : t -> term Scoped.t -> term
-  (** Same as {!apply}, but performs no renaming of free variables.
-      {b Caution}, can entail collisions between scopes! *)
 
   val bind : t -> var Scoped.t -> term Scoped.t -> t
   (** Add [v] -> [t] to the substitution. Both terms have a context.
@@ -184,7 +173,7 @@ module Ty : SPECIALIZED with type term = Type.t
 module FO : sig
   include SPECIALIZED with type term = Term.t
   val bind' : t -> Type.t HVar.t Scoped.t -> term Scoped.t -> t
-  val apply_l : t -> renaming:Renaming.t -> term list Scoped.t -> term list
+  val apply_l : Renaming.t -> t -> term list Scoped.t -> term list
   val of_list' : ?init:t -> (Type.t HVar.t Scoped.t * term Scoped.t) list -> t
   val map : (term -> term) -> t -> t
   val filter : (Type.t HVar.t Scoped.t -> term Scoped.t -> bool) -> t -> t
@@ -203,9 +192,7 @@ module Projection : sig
 
   val is_empty : t -> bool
 
-  val make : renaming:Renaming.t -> subst Scoped.t -> t
-
-  val make_no_renaming : subst Scoped.t -> t
+  val make : Renaming.t -> subst Scoped.t -> t
 
   val merge : t -> t -> t
   (** [merge a b] composes [a] and [b], assuming they don't both bind

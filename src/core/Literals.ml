@@ -76,13 +76,13 @@ let to_form lits =
   Array.to_list lits
 
 (** Apply the substitution to the array of literals, with scope *)
-let apply_subst ~renaming subst (lits,sc) =
+let apply_subst renaming subst (lits,sc) =
   Array.map
-    (fun lit -> Lit.apply_subst ~renaming subst (lit,sc))
+    (fun lit -> Lit.apply_subst renaming subst (lit,sc))
     lits
 
-let of_unif_subst ~renaming s =
-  Literal.of_unif_subst ~renaming s |> Array.of_list
+let of_unif_subst renaming s =
+  Literal.of_unif_subst renaming s |> Array.of_list
 
 let map f lits =
   Array.map (fun lit -> Lit.map f lit) lits

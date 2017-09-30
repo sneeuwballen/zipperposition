@@ -89,7 +89,9 @@ module Make(E : Env.S) : S with module Env = E = struct
          begin match subst with
            | Some subst ->
              let skolems =
-               List.map (fun t -> Subst.FO.apply_no_renaming subst (t,0)) skolems
+               List.rev_map
+                 (fun t -> Subst.FO.apply Subst.Renaming.none subst (t,0))
+                 skolems
              in
              Some skolems
            | None -> None
@@ -290,12 +292,12 @@ module Make(E : Env.S) : S with module Env = E = struct
         (* build new clause *)
         let renaming = Subst.Renaming.create () in
         let new_lits =
-          let l1 = Literal.apply_subst_list ~renaming subst (other_lits,0) in
+          let l1 = Literal.apply_subst_list renaming subst (other_lits,0) in
           let l2 =
             CCList.product
               (fun args_pos args_neg ->
-                 let args_pos = Subst.FO.apply_l ~renaming subst (args_pos,0) in
-                 let args_neg = Subst.FO.apply_l ~renaming subst (args_neg,0) in
+                 let args_pos = Subst.FO.apply_l renaming subst (args_pos,0) in
+                 let args_neg = Subst.FO.apply_l renaming subst (args_neg,0) in
                  List.map2 Literal.mk_eq args_pos args_neg)
               pos_args
               neg_args
@@ -305,7 +307,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         in
         let proof =
           Proof.Step.inference ~rule:(Proof.Rule.mk "ho_elim_pred")
-            [ C.proof_parent_subst ~renaming (c,0) subst ]
+            [ C.proof_parent_subst renaming (c,0) subst ]
         in
         let new_c =
           C.create new_lits proof
@@ -361,10 +363,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Sequence.map
         (fun (subst,penalty) ->
            let renaming = Subst.Renaming.create() in
-           let lits = Literals.apply_subst ~renaming subst (C.lits c,sc_c) in
+           let lits = Literals.apply_subst renaming subst (C.lits c,sc_c) in
            let proof =
              Proof.Step.inference ~rule:(Proof.Rule.mk "ho.refine")
-               [C.proof_parent_subst ~renaming (c,sc_c) subst]
+               [C.proof_parent_subst renaming (c,sc_c) subst]
            in
            let new_c =
              C.create_a lits proof
@@ -402,21 +404,21 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun (new_pairs, us, penalty) ->
            let renaming = Subst.Renaming.create() in
            let subst = Unif_subst.subst us in
-           let c_guard = Literal.of_unif_subst ~renaming us in
+           let c_guard = Literal.of_unif_subst renaming us in
            let new_pairs =
              List.map
                (fun (env,t,u) ->
-                  let t = Subst.FO.apply ~renaming subst (T.fun_l env t,0) in
-                  let u = Subst.FO.apply ~renaming subst (T.fun_l env u,0) in
+                  let t = Subst.FO.apply renaming subst (T.fun_l env t,0) in
+                  let u = Subst.FO.apply renaming subst (T.fun_l env u,0) in
                   Literal.mk_constraint t u)
                new_pairs
            and other_lits =
-             Literal.apply_subst_list ~renaming subst (other_lits,0)
+             Literal.apply_subst_list renaming subst (other_lits,0)
            in
            let all_lits = c_guard @ new_pairs @ other_lits in
            let proof =
              Proof.Step.inference ~rule:(Proof.Rule.mk "ho_unif")
-               [C.proof_parent_subst ~renaming (c,0) subst]
+               [C.proof_parent_subst renaming (c,0) subst]
            in
            let new_c =
              C.create all_lits proof

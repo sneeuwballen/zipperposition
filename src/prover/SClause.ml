@@ -153,7 +153,7 @@ let proof_tc =
     ~apply_subst:(fun subst (c,sc_c) ->
       let trail = trail c in
       let lits' =
-        Literals.apply_subst ~renaming:(Subst.Renaming.create())
+        Literals.apply_subst (Subst.Renaming.create())
           subst (lits c,sc_c)
       in
       make ~trail lits')

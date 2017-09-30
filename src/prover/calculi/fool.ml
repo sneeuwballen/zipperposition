@@ -105,11 +105,11 @@ module Make(E : Env.S) : S with module Env = E = struct
                let new_lits = CCArray.except_idx (C.lits c) idx in
                let renaming = Subst.Renaming.create() in
                let new_lits =
-                 Literal.apply_subst_list ~renaming subst (new_lits,0)
+                 Literal.apply_subst_list renaming subst (new_lits,0)
                in
                let proof =
                  Proof.Step.inference ~rule:(Proof.Rule.mk "fool.elim_var")
-                   [ C.proof_parent_subst ~renaming (c,0) subst ]
+                   [ C.proof_parent_subst renaming (c,0) subst ]
                in
                let new_c =
                  C.create new_lits proof

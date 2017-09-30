@@ -189,12 +189,8 @@ module Parent = struct
     then P_of p
     else P_subst (p,subst)
 
-  let from_subst ~renaming (p,sc_p) subst: t =
-    let subst = Subst.Projection.make ~renaming (subst,sc_p) in
-    from_subst_proj p subst
-
-  let from_subst_no_renaming (p,sc_p) subst: t =
-    let subst = Subst.Projection.make_no_renaming (subst,sc_p) in
+  let from_subst renaming (p,sc_p) subst: t =
+    let subst = Subst.Projection.make renaming (subst,sc_p) in
     from_subst_proj p subst
 
   let proof = function

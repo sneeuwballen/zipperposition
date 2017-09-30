@@ -326,9 +326,9 @@ module Make(E : Env.S) : S with module Env = E = struct
                     (* replace [v] with [case] now *)
                     let subst = Unif.FO.unify_full ~subst (v,s_c) (case,s_decl) in
                     let renaming = Subst.Renaming.create () in
-                    let c_guard = Literals.of_unif_subst ~renaming subst
+                    let c_guard = Literals.of_unif_subst renaming subst
                     and subst = Unif_subst.subst subst in
-                    let lits' = Lits.apply_subst ~renaming subst (C.lits c,s_c) in
+                    let lits' = Lits.apply_subst renaming subst (C.lits c,s_c) in
                     let proof =
                       Proof.Step.inference [Proof.Parent.from @@ C.proof c]
                         ~rule:(Proof.Rule.mk"enum_type_case_switch")
@@ -369,13 +369,13 @@ module Make(E : Env.S) : S with module Env = E = struct
       let us = Unif.FO.unify_full ~subst:us (T.var decl.decl_var,0) (t,1) in
       let renaming = Subst.Renaming.create () in
       let subst = Unif_subst.subst us
-      and c_guard = Literal.of_unif_subst ~renaming us in
+      and c_guard = Literal.of_unif_subst renaming us in
       let lits =
         List.map
           (fun case ->
              Lit.mk_eq
-               (S.FO.apply ~renaming subst (t,1))
-               (S.FO.apply ~renaming subst (case,0)))
+               (S.FO.apply renaming subst (t,1))
+               (S.FO.apply renaming subst (case,0)))
           decl.decl_cases
       in
       let proof =

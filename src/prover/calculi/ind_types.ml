@@ -132,12 +132,12 @@ module Make(Env : Env_intf.S) = struct
            (* delete i-th literal and build new clause *)
            let new_lits = CCArray.except_idx (C.lits c) i in
            let renaming = Subst.Renaming.create () in
-           let c_guard = Literal.of_unif_subst ~renaming us in
+           let c_guard = Literal.of_unif_subst renaming us in
            let new_lits =
-             c_guard @ Literal.apply_subst_list ~renaming subst (new_lits,0)
+             c_guard @ Literal.apply_subst_list renaming subst (new_lits,0)
            in
            let proof =
-             Proof.Step.inference [C.proof_parent_subst ~renaming (c,0) subst]
+             Proof.Step.inference [C.proof_parent_subst renaming (c,0) subst]
                ~rule:(Proof.Rule.mk "acyclicity")
            in
            let new_c =

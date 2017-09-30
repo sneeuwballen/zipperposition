@@ -46,10 +46,9 @@ val is_ground : t -> bool       (** all the literals are ground? *)
 val to_form : t -> term SLiteral.t list
 (** Make a 'or' formula from literals *)
 
-val apply_subst : renaming:Subst.Renaming.t ->
-  Subst.t -> t Scoped.t -> t
+val apply_subst : Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
 
-val of_unif_subst : renaming:Subst.Renaming.t -> Unif_subst.t -> t
+val of_unif_subst : Subst.Renaming.t -> Unif_subst.t -> t
 
 val map : (term -> term) -> t -> t
 

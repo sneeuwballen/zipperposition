@@ -102,18 +102,11 @@ val unify : ?subst:Unif_subst.t -> t Scoped.t -> t Scoped.t -> Unif_subst.t Sequ
 
 val are_variant : t -> t -> bool
 
-val apply_subst : renaming:Subst.Renaming.t ->
-  Subst.t -> t Scoped.t -> t
+val apply_subst : Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
 
-val apply_subst_no_renaming : Subst.t -> t Scoped.t -> t
+val apply_subst_no_simp : Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
 
-val apply_subst_no_simp : renaming:Subst.Renaming.t ->
-  Subst.t -> t Scoped.t -> t
-
-val apply_subst_list : renaming:Subst.Renaming.t ->
-  Subst.t -> t list Scoped.t -> t list
-
-val apply_subst_list_no_renaming : Subst.t -> t list Scoped.t -> t list
+val apply_subst_list : Subst.Renaming.t -> Subst.t -> t list Scoped.t -> t list
 
 exception Lit_is_constraint
 
@@ -125,11 +118,7 @@ val is_constraint : t -> bool
 
 val is_ho_constraint : t -> bool
 
-val of_unif_subst: renaming:Subst.Renaming.t -> Unif_subst.t -> t list
-(** Make a list of (negative) literals out of the unification constraints
-    contained in this substitution. *)
-
-val of_unif_subst_no_renaming: Unif_subst.t -> t list
+val of_unif_subst: Subst.Renaming.t -> Unif_subst.t -> t list
 (** Make a list of (negative) literals out of the unification constraints
     contained in this substitution. *)
 

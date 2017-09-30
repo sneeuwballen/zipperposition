@@ -530,7 +530,7 @@ module Make
     let c_sets =
       List.map
         (fun v ->
-           let ty = Subst.Ty.apply_no_renaming subst_skolems (HVar.ty v,0) in
+           let ty = Subst.Ty.apply Subst.Renaming.none subst_skolems (HVar.ty v,0) in
            v, Cover_set.make ~cover_set_depth ~depth ty)
         vars
     in
@@ -577,7 +577,7 @@ module Make
                     |> Subst.FO.of_list' ?init:None
                   in
                   let renaming = Subst.Renaming.create () in
-                  let g' = Cut_form.apply_subst ~renaming subst (g,0) in
+                  let g' = Cut_form.apply_subst renaming subst (g,0) in
                   Cut_form.cs g'
                   |> List.map
                     (fun lits ->
@@ -602,7 +602,7 @@ module Make
                 literals, obtaining a DNF of [¬ And_i ctx_i[case]];
                 then turn DNF into CNF *)
              begin
-               Cut_form.apply_subst ~renaming subst (g,0)
+               Cut_form.apply_subst renaming subst (g,0)
                |> Cut_form.cs
                |> Util.map_product
                  ~f:(fun lits ->

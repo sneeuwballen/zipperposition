@@ -394,7 +394,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       let renaming = Subst.Renaming.create () in
       let clauses =
         begin
-          Cut_form.apply_subst ~renaming subst (g,0)
+          Cut_form.apply_subst renaming subst (g,0)
           |> Cut_form.cs
           |> Util.map_product
             ~f:(fun lits ->
