@@ -160,9 +160,9 @@ let () =
   Printexc.register_printer
     (function
       | Error (where,msg) ->
-        Some (Fmt.sprintf "@[<2>error in %s:@ %s@]" where msg)
+        Some (err_spf "@[<2>error in %s:@ %s@]" where msg)
       | Invalid_argument msg ->
-        Some (Fmt.sprintf "@[<2>invalid_argument: %s@]" msg)
+        Some (err_spf "@[<2>invalid_argument: %s@]" msg)
       | _ -> None)
 
 let error ~where msg = raise (Error (where,msg))
