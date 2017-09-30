@@ -26,8 +26,12 @@ let v v = V v
 let ty_aliases : (string, ty) Hashtbl.t = Hashtbl.create 16
 
 let find_alias ~or_else(s:string) : ty =
-  try Hashtbl.find ty_aliases s
-  with Not_found -> or_else
+  try let ty = Hashtbl.find ty_aliases s in
+      Util.debugf 4 "Using \"%s\" as alias for (%a)" (fun k->k s T.pp ty);
+      ty
+  with Not_found ->
+    Util.debugf 4 "\"%s\" is not an alias" (fun k -> k s);
+    or_else
 
 let add_alias s ty : unit =
   Util.debugf 2 "Registering alias %s := %a" (fun k->k s T.pp ty);
