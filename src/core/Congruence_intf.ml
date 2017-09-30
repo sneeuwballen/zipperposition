@@ -50,20 +50,7 @@ module type S = sig
   (** [mk_eq congruence t1 t2] asserts that [t1 = t2] belongs to
       the congruence *)
 
-  val mk_less : t -> term -> term -> unit
-  (** [mk_less congruence t1 t2] asserts that [t1 < t2] belongs to
-      the congruence *)
-
   val is_eq : t -> term -> term -> bool
   (** Returns true if the two terms are equal in the congruence. This
       updates the congruence, because the two terms need to be added. *)
-
-  val is_less : t -> term -> term -> bool
-  (** Returns true if the first term is strictly lower than the second
-      one in the congruence *)
-
-  val cycles : t -> bool
-  (** Checks whether there are cycles in inequalities.
-      @return true if calls to [mk_eq] and [mk_less] entail a cycle in
-      the ordering (hence contradicting irreflexivity/transitivity of less) *)
 end
