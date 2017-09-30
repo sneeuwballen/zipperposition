@@ -618,7 +618,8 @@ let res_tc_i : input_t Proof.result_tc =
     ~pp_in:pp_input_in
     ~is_stmt:true
     ~name
-    ~to_form:(fun ~ctx:_ _ -> assert false) (* TODO *)
+    ~to_form:(fun ~ctx:_ st ->
+      Seq.forms st |> Sequence.to_list |> TypedSTerm.Form.and_)
     ()
 
 let res_tc_c : clause_t Proof.result_tc =
@@ -629,7 +630,21 @@ let res_tc_c : clause_t Proof.result_tc =
     ~pp_in:pp_clause_in
     ~is_stmt:true
     ~name
-    ~to_form:(fun ~ctx:_ _ -> assert false) (* TODO *)
+    ~to_form:(fun ~ctx st ->
+      let module F = TypedSTerm.Form in
+      let conv_c (c:clause) : formula =
+        c
+        |> List.rev_map
+          (fun lit ->
+             SLiteral.map lit ~f:(Term.Conv.to_simple_term ctx)
+             |> SLiteral.to_form)
+        |> F.or_
+        |> F.close_forall
+      in
+      Seq.forms st
+      |> Sequence.map conv_c
+      |> Sequence.to_list
+      |> F.and_)
     ()
 
 let as_proof_i t = Proof.S.mk t.proof (Proof.Result.make res_tc_i t)
