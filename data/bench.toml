@@ -5,7 +5,7 @@ provers = [ "zipperposition", "zipperposition-thf", "hornet", "read-tptp", "leo2
 
 timeout = 30 # in s
 memory = 2000 # in MB
-provers = [ "zipperposition", "hornet" ]
+provers = [ "zipperposition" ]
 problems = ".*(\\+|-).*\\.p"
 dir = [ "tptp" ]
 
