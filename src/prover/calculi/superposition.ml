@@ -875,14 +875,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let is_semantic_tautology_real (c:C.t) : bool =
     (* create the congruence closure of all negative equations of [c] *)
     let cc = Congruence.FO.create ~size:8 () in
-    Array.iter
-      (function
-        | Lit.Equation (l, r, false) ->
-          Congruence.FO.mk_eq cc l r
-        | Lit.Prop (p, false) ->
-          Congruence.FO.mk_eq cc p T.true_
-        | _ -> ())
-      (C.lits c);
+    let cc =
+      Array.fold_left
+        (fun cc lit -> match lit with
+           | Lit.Equation (l, r, false) ->
+             Congruence.FO.mk_eq cc l r
+           | Lit.Prop (p, false) ->
+             Congruence.FO.mk_eq cc p T.true_
+           | _ -> cc)
+        cc (C.lits c)
+    in
     let res = CCArray.exists
         (function
           | Lit.Equation (l, r, true) ->

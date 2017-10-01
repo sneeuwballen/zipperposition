@@ -9,13 +9,13 @@ module CC = Congruence.FO
 
 (* build a congruence closure from a list of list of terms.
   each list of terms represents a congruence. *)
-let _cc_of_classes classes =
+let _cc_of_classes classes : CC.t =
   let cc = CC.create () in
-  List.iter (fun cls -> match cls with
-    | [] -> ()
-    | t::cls' -> List.iter (fun t' -> CC.mk_eq cc t t') cls')
-    classes;
-  cc
+  List.fold_left
+    (fun cc cls -> match cls with
+       | [] -> cc
+       | t::cls' -> List.fold_left (fun cc t' -> CC.mk_eq cc t t') cc cls')
+    cc classes
 
 let _size_class l =
   List.fold_left (fun acc t -> T.size t + acc) 0 l
