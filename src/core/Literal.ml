@@ -615,28 +615,33 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ?ty_args ~which ~ord ~sub
     then () (* ignore *)
     else k (t, pos)
   in
-  begin match lit, which with
-    | Equation (l, r, _), `All
-    | Equation (l, r, _), `Max ->
-      begin match Ordering.compare ord l r with
-        | Comparison.Gt ->
-          at_term ~pos:P.(append position (left stop)) l
-        | Comparison.Lt ->
-          at_term ~pos:P.(append position (right stop)) r
-        | Comparison.Eq | Comparison.Incomparable ->
-          (* visit both sides, they are both (potentially) maximal *)
+  begin match lit with
+    | Equation (l, r, _) ->
+      begin match which with
+        | `All ->
           at_term ~pos:P.(append position (left stop)) l;
           at_term ~pos:P.(append position (right stop)) r
+        | `Max ->
+          begin match Ordering.compare ord l r with
+            | Comparison.Gt ->
+              at_term ~pos:P.(append position (left stop)) l
+            | Comparison.Lt ->
+              at_term ~pos:P.(append position (right stop)) r
+            | Comparison.Eq | Comparison.Incomparable ->
+              (* visit both sides, they are both (potentially) maximal *)
+              at_term ~pos:P.(append position (left stop)) l;
+              at_term ~pos:P.(append position (right stop)) r
+          end
       end
-    | Prop (p, _), _ ->
+    | Prop (p, _) ->
       (* p is the only term, and it's maximal *)
       at_term ~pos:P.(append position (left stop)) p
-    | Int o, _ ->
+    | Int o ->
       Int_lit.fold_terms ~pos:position ?ty_args ~vars ~which ~ord ~subterms o k
-    | Rat o, _ ->
+    | Rat o  ->
       Rat_lit.fold_terms ~pos:position ?ty_args ~vars ~which ~ord ~subterms o k
-    | True, _
-    | False, _ -> ()
+    | True
+    | False -> ()
   end
 
 (* try to convert a literal into a term *)
