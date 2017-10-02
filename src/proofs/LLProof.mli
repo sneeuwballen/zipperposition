@@ -18,7 +18,7 @@ val section : Util.Section.t
 type term = TypedSTerm.t
 type ty = term
 type form = term
-type subst = (term, ty) Var.Subst.t
+type inst = term list (** Instantiate some binder with the following terms. Order matters. *)
 
 type name = string
 
@@ -36,13 +36,13 @@ type step =
   | Trivial
   | By_def of ID.t
   | Define of ID.t
-  | Instantiate of subst * t
+  | Instantiate of t * inst
   | Esa of name * t list * check_info
   | Inference of name * parent list * check_info
 
 and parent =
   | P_of of t
-  | P_instantiate of t * subst
+  | P_instantiate of t * term list (* open foralls and replace by given terms *)
 
 val id : t -> int
 val concl : t -> form
@@ -51,7 +51,7 @@ val parents : t -> parent list
 val premises : t -> t list
 
 val p_of : t -> parent
-val p_instantiate : t -> subst -> parent
+val p_instantiate : t -> inst -> parent
 
 val check_info : t -> check_info
 
@@ -67,6 +67,8 @@ val pp : t CCFormat.printer
 val pp_dag : t CCFormat.printer
 (** Print the whole DAG *)
 
+val pp_inst : inst CCFormat.printer
+
 val equal : t -> t -> bool
 val compare : t -> t -> int
 val hash : t -> int
@@ -77,7 +79,7 @@ val assert_ : form -> t
 val trivial : form -> t
 val by_def : ID.t -> form -> t
 val define : ID.t -> form -> t
-val instantiate : form -> subst -> t -> t
+val instantiate : form -> t -> inst -> t
 val esa :
   [`No_check | `Check | `Check_with of form list] ->
   form -> name -> t list -> t

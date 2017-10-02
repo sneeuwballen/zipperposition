@@ -15,7 +15,7 @@ let section = Util.Section.make "llproof"
 type term = TypedSTerm.t
 type ty = term
 type form = TypedSTerm.Form.t
-type subst = (term, ty) Var.Subst.t
+type inst = term list (** Instantiate some binder with the following terms. Order matters. *)
 
 type name = string
 
@@ -36,13 +36,13 @@ and step =
   | Trivial
   | By_def of ID.t
   | Define of ID.t
-  | Instantiate of subst * t
+  | Instantiate of t * term list
   | Esa of name * t list * check_info
   | Inference of name * parent list * check_info
 
 and parent =
   | P_of of t
-  | P_instantiate of t * subst
+  | P_instantiate of t * term list (* open foralls and replace by given terms *)
 
 let concl p = p.concl
 let step p = p.step
@@ -51,8 +51,8 @@ let id p = p.id
 let p_of p = P_of p
 let p_instantiate p subst = P_instantiate (p,subst)
 
-let pp_subst out (s:subst) : unit =
-  Format.fprintf out "{@[<hv>%a@]}" (Var.Subst.pp T.pp) s
+let pp_inst out (l:inst) : unit =
+  Format.fprintf out "[@[<hv>%a@]]" (Util.pp_list ~sep:"," T.pp) l
 
 let pp_step out (s:step): unit = match s with
   | Goal -> Fmt.string out "goal"
@@ -61,15 +61,15 @@ let pp_step out (s:step): unit = match s with
   | Trivial -> Fmt.string out "trivial"
   | By_def id -> Fmt.fprintf out "(by_def :of %a)" ID.pp id
   | Define id -> Fmt.fprintf out "(@[define@ %a@])" ID.pp id
-  | Instantiate (subst, _) ->
-    Fmt.fprintf out "(@[instantiate %a@])" pp_subst subst
+  | Instantiate (_,inst) ->
+    Fmt.fprintf out "(@[instantiate %a@])" pp_inst inst
   | Esa (n,_,_) -> Fmt.fprintf out "(esa %s)" n
   | Inference (n,_,_) -> Fmt.fprintf out "(inf %s)" n
 
 let parents (p:t): parent list = match p.step with
   | Goal | Assert | Trivial | By_def _ | Define _ -> []
   | Negated_goal p2 -> [p_of p2]
-  | Instantiate (subst,p2) -> [p_instantiate p2 subst]
+  | Instantiate (p2,inst) -> [p_instantiate p2 inst]
   | Esa (_,l,_) -> List.map p_of l
   | Inference (_,l,_) -> l
 
@@ -102,8 +102,8 @@ let pp_res out (p:t) = TypedSTerm.pp out (concl p)
 
 let pp_parent out = function
   | P_of p -> pp_res out p
-  | P_instantiate (p,subst) ->
-    Format.fprintf out "@[(@[%a@])@,%a@]" pp_res p pp_subst subst
+  | P_instantiate (p,inst) ->
+    Format.fprintf out "@[(@[%a@])@,%a@]" pp_res p pp_inst inst
 
 let pp out (p:t): unit =
   Fmt.fprintf out "(@[<hv2>%a@ :res `%a`@ :from [@[%a@]]@])"
@@ -134,7 +134,7 @@ let assert_ f = mk_ f Assert
 let trivial f = mk_ f Trivial
 let by_def id f = mk_ f (By_def id)
 let define id f = mk_ f (Define id)
-let instantiate f subst p = mk_ f (Instantiate (subst,p))
+let instantiate f p inst = mk_ f (Instantiate (p,inst))
 
 let conv_check_ = function
   | `No_check -> C_no_check

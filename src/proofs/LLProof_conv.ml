@@ -3,7 +3,12 @@
 
 open Logtk
 
-type ll_subst = LLProof.subst
+module T = TypedSTerm
+
+type ll_subst = (T.t,T.t) Var.Subst.t
+type inst = LLProof.inst
+
+let errorf msg = Util.errorf ~where:"llproof_conv" msg
 
 let conv_subst ~ctx (p:Subst.Projection.t) : ll_subst =
   List.fold_left
@@ -30,7 +35,7 @@ let conv (p:Proof.t) : LLProof.t =
   and conv_step ?(ctx=Term.Conv.create()) p =
     let res = Proof.Result.to_form ~ctx (Proof.S.result p) in
     let parents =
-      List.map conv_parent (Proof.Step.parents @@ Proof.S.step p)
+      List.map (conv_parent p) (Proof.Step.parents @@ Proof.S.step p)
     and parent_as_proof_exn = function
       | LLProof.P_of c -> c
       | LLProof.P_instantiate _ -> assert false
@@ -46,16 +51,32 @@ let conv (p:Proof.t) : LLProof.t =
       | Proof.By_def id -> LLProof.by_def id res
       | Proof.Define (id,_) -> LLProof.define id res
       | Proof.Intro (_,Proof.R_assert) -> LLProof.assert_ res
-      | Proof.Intro (_,Proof.R_goal) -> LLProof.assert_ res
+      | Proof.Intro (_,Proof.R_goal) -> LLProof.goal res
       | Proof.Intro (_,(Proof.R_lemma|Proof.R_def|Proof.R_decl)) ->
         LLProof.trivial res
     end
-  and conv_parent (p:Proof.Parent.t): LLProof.parent = match p with
+  (* convert parent of the given result formula *)
+  and conv_parent step (p:Proof.Parent.t): LLProof.parent = match p with
     | Proof.P_of p -> LLProof.p_of (conv p)
-    | Proof.P_subst (p,subst) ->
+    | Proof.P_subst (p,subst) as p_old ->
       let ctx = Term.Conv.create() in
       let p = conv ~ctx p in
       let subst = conv_subst ~ctx subst in
-      LLProof.p_instantiate p subst
+      (* TODO: renaming of variables? *)
+      (* now open foralls in [p] and find their instantiation in [subst] *)
+      let vars, _ = T.unfold_binder Binder.forall (LLProof.concl p) in
+      let inst = List.map
+          (fun v ->
+             begin match Var.Subst.find subst v with
+               | Some t -> t
+               | None ->
+                 errorf "(@[<2>cannot find instantiation for `%a`@ \
+                         :subst {%a}@ :form %a@ :in %a@ :parent %a@"
+                   Var.pp v (Var.Subst.pp T.pp) subst T.pp (LLProof.concl p)
+                   Proof.S.pp_notrec step Proof.pp_parent p_old
+             end)
+          vars
+      in
+      LLProof.p_instantiate p inst
   in
   conv p

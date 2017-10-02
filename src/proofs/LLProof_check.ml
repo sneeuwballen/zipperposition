@@ -38,6 +38,16 @@ let pp_stats out (s:stats) =
   Fmt.fprintf out "(@[<hv>:ok %d@ :fail %d@ :nocheck %d@])"
     s.n_ok s.n_fail s.n_nocheck
 
+exception Error of string
+
+let error msg = raise (Error msg)
+let errorf msg = Fmt.ksprintf ~f:error msg
+
+let () = Printexc.register_printer
+    (function
+      | Error msg -> Some (Util.err_spf "llproof_check: %s" msg)
+      | _ -> None)
+
 (** {2 Tableau Prover} *)
 
 (** A simple tableau prover for discharging every proof obligation.
@@ -108,7 +118,7 @@ end = struct
     val debug : t Fmt.printer
   end = struct
     type t = {
-      expansed: form list;
+      expanded: form list;
       to_expand : form list;
       cc: CC.t;
       diseq: (term * term) list; (* negative constraints *)
@@ -117,7 +127,7 @@ end = struct
 
     (* make a new empty branch *)
     let empty () = {
-      expansed=[];
+      expanded=[];
       to_expand=[];
       cc=CC.create();
       diseq=[(F.true_, F.false_)];
@@ -135,8 +145,8 @@ end = struct
     let[@inline] add_cc_eq t u b = { b with cc=CC.mk_eq b.cc t u }
     let[@inline] add_diseq_ t u b = { b with diseq=(t,u)::b.diseq }
 
-    let[@inline] add_expansed f b = {b with expansed = f::b.expansed}
-    let[@inline] add_eq t u b : t = b |> add_expansed (F.eq t u) |> add_cc_eq t u |> check_closed
+    let[@inline] add_expanded f b = {b with expanded = f::b.expanded}
+    let[@inline] add_eq t u b : t = b |> add_expanded (F.eq t u) |> add_cc_eq t u |> check_closed
     let[@inline] add_diseq t u b : t = b |> add_diseq_ t u |> check_closed
     let[@inline] add_to_expand f b = {b with to_expand = f::b.to_expand}
 
@@ -150,12 +160,10 @@ end = struct
         | F.Neq (t,u) -> add_diseq t u br
         | F.Not f' ->
           begin match F.view f' with
-            | F.Not _ -> assert false
+            | F.Eq _ | F.Neq _ | F.Not _ -> assert false
             | F.True -> add_diseq F.true_ F.false_ br
             | F.False -> br
             | F.Atom t -> add_eq t F.false_ br
-            | F.Eq (t,u) -> add_diseq t u br
-            | F.Neq (t,u) -> add_eq t u br
             | F.And l -> add_to_expand (F.or_ (List.map F.not_ l)) br
             | F.Or l -> add_to_expand (F.and_ (List.map F.not_ l)) br
             | F.Imply (a,b) -> add_to_expand (F.and_ [a; F.not_ b]) br
@@ -164,9 +172,9 @@ end = struct
             | F.Xor (a,b) ->
               add_to_expand (F.and_ [F.or_ [a; F.not_ b]; F.or_ [b; F.not_ a]]) br
             | F.Forall (v,body) ->
-              add_expansed (F.exists v (F.not_ body)) br (* TODO? *)
+              add_expanded (F.exists v (F.not_ body)) br (* TODO? *)
             | F.Exists (v,body) ->
-              add_expansed (F.forall v (F.not_ body)) br (* TODO? *)
+              add_expanded (F.forall v (F.not_ body)) br (* TODO? *)
           end
         | F.And _ | F.Or _ -> add_to_expand f br
         | F.Imply (a,b) -> add_to_expand (F.or_ [F.not_ a; b]) br
@@ -175,9 +183,9 @@ end = struct
         | F.Equiv (a,b) ->
           add_to_expand (F.and_ [F.or_ [a; F.not_ b]; F.or_ [b; F.not_ a]]) br
         | F.Forall (v,body) ->
-          add_expansed (F.exists v (F.not_ body)) br (* TODO? *)
+          add_expanded (F.exists v (F.not_ body)) br (* TODO? *)
         | F.Exists (v,body) ->
-          add_expansed (F.forall v (F.not_ body)) br (* TODO? *)
+          add_expanded (F.forall v (F.not_ body)) br (* TODO? *)
       end
 
     let[@inline] add b l = List.fold_left add1 b l
@@ -186,14 +194,16 @@ end = struct
 
     let pop_open b =
       if closed b then None
-      else match b.to_expand with
+      else begin match b.to_expand with
         | [] -> None
-        | f :: tail -> Some (f, {b with to_expand=tail})
+        | f :: tail -> Some (f, {b with to_expand=tail; expanded=f::b.expanded})
+      end
 
     let debug out (b:t) : unit =
       Fmt.fprintf out
-        "(@[<hv>branch :closed %B@ :to_expand (@[<hv>%a@])@ :expansed (@[%a@])@])"
-        b.closed (Util.pp_list T.pp) b.to_expand (Util.pp_list T.pp) b.expansed
+        "(@[<hv>branch (closed %B)@ \
+         :to_expand (@[<hv>%a@])@ :expanded (@[<hv>%a@])@])"
+        b.closed (Util.pp_list T.pp) b.to_expand (Util.pp_list T.pp) b.expanded
   end
 
   (** Rules for the Tableau calculus *)
@@ -233,9 +243,9 @@ end = struct
   }
 
   let debug_tag out (tab:t) : unit =
-    Fmt.fprintf out "(@[<v>(@[<v2>open@ %a@])@ (@[<v2>closed@ %a@])@])"
-      (Util.pp_list Branch.debug) tab.open_branches
-      (Util.pp_list Branch.debug) tab.closed_branches
+    Fmt.fprintf out "(@[<v>%a@])"
+      (Util.pp_list Branch.debug)
+      (List.rev_append tab.open_branches tab.closed_branches)
 
   exception Saturated_branch of branch
 
@@ -302,10 +312,26 @@ end
 (* TODO: have another global graph structure with inference steps, ESA,
    instantiation steps? *)
 
+let instantiate (f:form) (inst:LLProof.inst) : form =
+  let vars, body = T.unfold_binder Binder.Forall f in
+  if List.length vars <> List.length inst then (
+    errorf "mismatched arities in instantiate `%a`@ :with %a"
+      T.pp f LLProof.pp_inst inst
+  );
+  let subst =
+    List.fold_left2 Var.Subst.add Var.Subst.empty vars inst
+  in
+  let f' = T.Subst.eval_nonrec subst body in
+  Util.debugf ~section 5
+    "(@[<hv>instantiate@ :inst %a@ :from %a@ :into %a@])"
+    (fun k->k LLProof.pp_inst inst T.pp f T.pp f');
+  f'
+
 let concl_of_parent (p:LLProof.parent) : form = match p with
   | LLProof.P_of c -> P.concl c
-  | LLProof.P_instantiate (c,subst) ->
-    P.concl c |> T.Subst.eval subst
+  | LLProof.P_instantiate (c,inst) ->
+    let f = P.concl c in
+    instantiate f inst
 
 let check_step_ (p:proof): res option =
   let concl = P.concl p in
