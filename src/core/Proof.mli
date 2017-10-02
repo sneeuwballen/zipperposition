@@ -268,6 +268,8 @@ module Parent : sig
   val subst : t -> Subst.Projection.t option
 end
 
+val pp_parent : Parent.t CCFormat.printer
+
 (** {2 Proof} *)
 
 (** A proof is a pair of a result, with its proof step.

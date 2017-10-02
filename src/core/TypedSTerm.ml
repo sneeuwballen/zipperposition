@@ -216,6 +216,8 @@ let rec pp out t = match view t with
     Format.fprintf out "{%a}" pp_fields l
   | Record (l, Some r) ->
     Format.fprintf out "{%a | %a}" pp_fields l pp r
+  | AppBuiltin (Builtin.Box_opaque, [t]) ->
+    Format.fprintf out "@<1>⟦@[%a@]@<1>⟧" pp_inner t
   | AppBuiltin (b, [a]) when Builtin.is_prefix b ->
     Format.fprintf out "@[%a %a@]" Builtin.pp b pp_inner a
   | AppBuiltin (Builtin.Arrow, ret::args) ->

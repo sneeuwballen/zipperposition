@@ -343,6 +343,12 @@ module Result = struct
   let is_stmt (Res (r,_)) = r.res_is_stmt
 end
 
+let pp_parent out = function
+  | P_of p -> Result.pp out p.result
+  | P_subst (p,subst) ->
+    Format.fprintf out "(@[instantiate %a@ :subst %a@])"
+      Result.pp p.result Subst.Projection.pp subst
+
 module Step = struct
   type t = step
 
