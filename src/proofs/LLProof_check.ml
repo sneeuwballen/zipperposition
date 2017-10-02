@@ -233,7 +233,7 @@ end = struct
   }
 
   let debug_tag out (tab:t) : unit =
-    Fmt.fprintf out "(@[<v>([<v2>open@ %a@])@ (@[<v2>closed@ %a@])@])"
+    Fmt.fprintf out "(@[<v>(@[<v2>open@ %a@])@ (@[<v2>closed@ %a@])@])"
       (Util.pp_list Branch.debug) tab.open_branches
       (Util.pp_list Branch.debug) tab.closed_branches
 
@@ -246,7 +246,7 @@ end = struct
         let b = List.hd tab.open_branches in
         tab.open_branches <- List.tl tab.open_branches;
         Util.debugf ~section 3
-          "(@[llproof_check.tab.solve@ :cur %a@])"
+          "(@[llproof_check.tab.solve@ %a@])"
           (fun k->k debug_tag tab);
         begin match Branch.pop_open b with
           | None ->
