@@ -146,8 +146,8 @@ $(TEST_TOOL)-tptp:
 	ln -s ../tptp/ ${BENCH_DIR}/tptp
 	cp data/bench.toml ${BENCH_DIR}/conf.toml
 	cd ${BENCH_DIR} && $(TEST_TOOL) run --meta=`git rev-parse HEAD` \
-	  --summary snapshots/bench-$(DATE).txt \
-	  --csv snapshots/bench-$(DATE).csv \
+	  --summary ../snapshots/bench-$(DATE).txt \
+	  --csv ../snapshots/bench-$(DATE).csv \
 	  -c conf.toml $(TEST_OPTS)
 
 TARBALL=zipperposition.tar.gz
