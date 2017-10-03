@@ -49,14 +49,15 @@ goal:
 proofheaders:
   | BEGINNAME h=proofheaders { h }
   | BEGINHEADER h=proofheaders { h }
-  | BEGIN_TY id=ID h=proofheaders { T.mk_ty_decl id T.tType :: h }
+  | BEGIN_TY id=ID h=proofheaders
+      {
+        let loc = L.mk_pos $startpos $endpos in
+        T.mk_ty_decl ~loc id T.tType :: h
+      }
   | BEGIN_TYPEALIAS f=ID DEF ty=type_simple END_TYPEALIAS h=proofheaders
-      { (* Type aliases are substituted in the parser *)
-        (* This does not work because it does not substitute
-           the alias in already-parsed input.
-           TODO: give it to the typer. *)
-        T.add_alias f ty;
-        h
+      {
+        let loc = L.mk_pos $startpos $endpos in
+        T.mk_ty_alias ~loc f ty :: h
       }
   | BEGIN_VAR ID COLON typ END_VAR h=proofheaders { h }
   | BEGIN_HYP ID COLON PROOF term_simple END_HYP h=proofheaders { h }
@@ -67,8 +68,8 @@ proofheaders:
 }
 
 qid:
-| x=QID { T.find_alias x ~or_else:(T.var x) }
-| x=ID { T.find_alias x ~or_else:(T.var x) }
+| x=QID { T.var x }
+| x=ID { T.var x }
 
 term_simple:
 | x=qid { x }
@@ -106,8 +107,8 @@ term:
 }
 
 type_qid:
-| x=ID { T.find_alias x ~or_else:(T.mk_var_t x) }
-| x=QID { T.find_alias x ~or_else:(T.mk_var_t x) }
+| x=ID { T.mk_var_t x }
+| x=QID { T.mk_var_t x }
 
 type_simple:
 | ty=type_qid { ty }

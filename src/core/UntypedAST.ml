@@ -36,6 +36,7 @@ type def = {
 (** Statement *)
 type statement_view =
   | Include of string
+  | TypeAlias of string * ty
   | Decl of string * ty
   | Def of def list
   | Rewrite of term
@@ -74,6 +75,7 @@ let make_ ?loc ?(attrs=default_attrs) stmt = {loc; stmt; attrs; }
 let mk_def def_id def_ty def_rules = {def_id; def_ty; def_rules}
 
 let include_ ?loc ?attrs s = make_ ?loc ?attrs (Include s)
+let type_alias ?loc ?attrs alpha ty = make_ ?loc ?attrs (TypeAlias (alpha, ty))
 let decl ?loc ?attrs f ty = make_ ?loc ?attrs (Decl (f,ty))
 let def ?loc ?attrs l = make_ ?loc ?attrs (Def l)
 let rewrite ?loc ?attrs t = make_ ?loc ?attrs (Rewrite t)
@@ -118,6 +120,8 @@ let pp_statement out st =
   match st.stmt with
     | Include s ->
       fpf out "@[<2>include \"%s\"@]@." (String.escaped s)
+    | TypeAlias (alpha, ty) ->
+      fpf out "@[<2>def%a %s :@ type@ := @[%a@]@]@." pp_attrs attrs alpha T.pp ty
     | Decl (id,ty) ->
       fpf out "@[<2>val%a %s :@ @[%a@]@]." pp_attrs attrs id T.pp ty
     | Def l ->

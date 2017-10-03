@@ -43,6 +43,7 @@ type def = {
 (** Statement *)
 type statement_view =
   | Include of string
+  | TypeAlias of string * ty
   | Decl of string * ty
   | Def of def list
   | Rewrite of term
@@ -62,6 +63,7 @@ val default_attrs : attrs
 val mk_def : string -> ty -> term list -> def
 
 val include_ : ?loc:Loc.t -> ?attrs:attrs -> string -> statement
+val type_alias : ?loc:Loc.t -> ?attrs:attrs -> string -> ty -> statement
 val decl : ?loc:Loc.t -> ?attrs:attrs -> string -> ty -> statement
 val def : ?loc:Loc.t -> ?attrs:attrs -> def list -> statement
 val data : ?loc:Loc.t -> ?attrs:attrs -> data list -> statement

@@ -282,6 +282,7 @@ let of_ast st =
       let name = name_sym_ s in
       (* XXX we should look if [ty] returns tType or not *)
       A.TypeDecl (name, s, ty, [])
+    | UA.TypeAlias _ -> error "cannot convert type alias statement into TPTP"
     | UA.Def _ -> error "cannot convert `def` statement into TPTP"
     | UA.Rewrite _ -> error "cannot convert `rewrite` statement into TPTP"
     | UA.Data _ -> error "cannot convert `data` statement into TPTP"
