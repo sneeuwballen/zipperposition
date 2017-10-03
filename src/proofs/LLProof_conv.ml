@@ -36,19 +36,26 @@ let rec conv_proof st p: LLProof.t =
       Proof.S.Tbl.add st.tbl p res;
       res
   end
+
 and conv_step st p =
   let res = Proof.Result.to_form ~ctx:st.ctx (Proof.S.result p) in
   let vars, _ = open_forall res in
   let intros = List.mapi (fun i v -> Var.makef ~ty:(Var.ty v) "x_%d" i) vars in
-  let parents =
-    List.map (conv_parent st p res intros) (Proof.Step.parents @@ Proof.S.step p)
-  in
   begin match Proof.Step.kind @@ Proof.S.step p with
     | Proof.Inference (rule,c,tags)
     | Proof.Simplification (rule,c,tags) ->
+      let parents =
+        List.map (conv_parent st p res intros) (Proof.Step.parents @@ Proof.S.step p)
+      in
       LLProof.inference c ~intros ~tags res (Proof.Rule.name rule) parents
     | Proof.Esa (rule,c) ->
-      let l = List.map (fun p->p.LLProof.p_proof) parents in
+      let l =
+        List.map
+          (function
+            | Proof.P_of p -> conv_proof st p
+            | Proof.P_subst _ -> assert false)
+          (Proof.Step.parents @@ Proof.S.step p)
+      in
       LLProof.esa c res (Proof.Rule.name rule) l
     | Proof.Trivial -> LLProof.trivial res
     | Proof.By_def id -> LLProof.by_def id res
@@ -65,7 +72,7 @@ and conv_parent st step res intros (parent:Proof.Parent.t): LLProof.parent =
     | Proof.P_of p ->
       let p = conv_proof st p in
       p, LLProof.concl p
-    | Proof.P_subst (p,subst) as p_old ->
+    | Proof.P_subst (p,subst) ->
       (* perform instantiation *)
       assert (not (Subst.Projection.is_empty subst));
       (* instantiated result of [p'] *)
@@ -107,11 +114,11 @@ and conv_parent st step res intros (parent:Proof.Parent.t): LLProof.parent =
            | Some v2 -> v2
            | None ->
              errorf "(@[<hv2>cannot find renaming for `%a`@ \
-                     :subst {%a}@ :form `%a`@ :from %a@ :in %a@ :parent %a@])"
+                     :subst {%a}@ :form `%a`@ :res %a@ :parent %a@ :in-step %a@])"
                Var.pp v (Var.Subst.pp Var.pp) renaming
-               T.pp p_instantiated_res
-               T.pp res
-               Proof.S.pp_notrec1 step Proof.pp_parent parent
+               T.pp p_instantiated_res T.pp res
+               Proof.pp_parent parent
+               Proof.S.pp_notrec1 step
          end)
       vars_instantiated
   in

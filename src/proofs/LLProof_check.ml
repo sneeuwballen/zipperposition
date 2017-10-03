@@ -78,8 +78,8 @@ end = struct
         | T.Ite (a,b,c) -> [a;b;c]
         | T.Const _ | T.Var _
           -> []
+        | T.Bind _ -> []
         | T.Match _
-        | T.Bind _
         | T.Let _
         | T.Multiset _
         | T.Record _
@@ -124,9 +124,11 @@ end = struct
 
     val debug : t Fmt.printer
   end = struct
+    module F_set = T.Set
+
     type t = {
-      expanded: form list;
-      to_expand : form list;
+      expanded: F_set.t;
+      to_expand : F_set.t;
       cc: CC.t;
       diseq: (term * term) list; (* negative constraints *)
       closed: bool;
@@ -134,8 +136,8 @@ end = struct
 
     (* make a new empty branch *)
     let empty () = {
-      expanded=[];
-      to_expand=[];
+      expanded=F_set.empty;
+      to_expand=F_set.empty;
       cc=CC.create();
       diseq=[(F.true_, F.false_)];
       closed=false;
@@ -152,10 +154,13 @@ end = struct
     let[@inline] add_cc_eq t u b = { b with cc=CC.mk_eq b.cc t u }
     let[@inline] add_diseq_ t u b = { b with diseq=(t,u)::b.diseq }
 
-    let[@inline] add_expanded f b = {b with expanded = f::b.expanded}
+    let[@inline] add_expanded f b = {b with expanded = F_set.add f b.expanded}
     let[@inline] add_eq t u b : t = b |> add_expanded (F.eq t u) |> add_cc_eq t u |> check_closed
     let[@inline] add_diseq t u b : t = b |> add_diseq_ t u |> check_closed
-    let[@inline] add_to_expand f b = {b with to_expand = f::b.to_expand}
+    let[@inline] add_to_expand f b = {b with to_expand = F_set.add f b.to_expand}
+
+    let[@inline] add_form_to_expand f b =
+      b |> add_to_expand f |> add_cc_eq f F.true_ |> check_closed
 
     (* add one formula to [b] *)
     let add1 (br:t) (f:form): t =
@@ -171,24 +176,24 @@ end = struct
             | F.True -> add_diseq F.true_ F.false_ br
             | F.False -> br
             | F.Atom t -> add_eq t F.false_ br
-            | F.And l -> add_to_expand (F.or_ (List.map F.not_ l)) br
-            | F.Or l -> add_to_expand (F.and_ (List.map F.not_ l)) br
-            | F.Imply (a,b) -> add_to_expand (F.and_ [a; F.not_ b]) br
+            | F.And l -> add_form_to_expand (F.or_ (List.map F.not_ l)) br
+            | F.Or l -> add_form_to_expand (F.and_ (List.map F.not_ l)) br
+            | F.Imply (a,b) -> add_form_to_expand (F.and_ [a; F.not_ b]) br
             | F.Equiv (a,b) ->
-              add_to_expand (F.or_ [F.and_ [a; F.not_ b]; F.and_ [b; F.not_ a]]) br
+              add_form_to_expand (F.or_ [F.and_ [a; F.not_ b]; F.and_ [b; F.not_ a]]) br
             | F.Xor (a,b) ->
-              add_to_expand (F.and_ [F.or_ [a; F.not_ b]; F.or_ [b; F.not_ a]]) br
+              add_form_to_expand (F.and_ [F.or_ [a; F.not_ b]; F.or_ [b; F.not_ a]]) br
             | F.Forall (v,body) ->
               add_expanded (F.exists v (F.not_ body)) br (* TODO? *)
             | F.Exists (v,body) ->
               add_expanded (F.forall v (F.not_ body)) br (* TODO? *)
           end
-        | F.And _ | F.Or _ -> add_to_expand f br
-        | F.Imply (a,b) -> add_to_expand (F.or_ [F.not_ a; b]) br
+        | F.And _ | F.Or _ -> add_form_to_expand f br
+        | F.Imply (a,b) -> add_form_to_expand (F.or_ [F.not_ a; b]) br
         | F.Xor (a,b) ->
-          add_to_expand (F.or_ [F.and_ [a; F.not_ b]; F.and_ [b; F.not_ a]]) br
+          add_form_to_expand (F.or_ [F.and_ [a; F.not_ b]; F.and_ [b; F.not_ a]]) br
         | F.Equiv (a,b) ->
-          add_to_expand (F.and_ [F.or_ [a; F.not_ b]; F.or_ [b; F.not_ a]]) br
+          add_form_to_expand (F.and_ [F.or_ [a; F.not_ b]; F.or_ [b; F.not_ a]]) br
         | F.Forall (v,body) ->
           add_expanded (F.exists v (F.not_ body)) br (* TODO? *)
         | F.Exists (v,body) ->
@@ -201,16 +206,20 @@ end = struct
 
     let pop_open b =
       if closed b then None
-      else begin match b.to_expand with
-        | [] -> None
-        | f :: tail -> Some (f, {b with to_expand=tail; expanded=f::b.expanded})
+      else begin match F_set.choose b.to_expand with
+        | f ->
+          let tail = F_set.remove f b.to_expand in
+          Some (f, {b with to_expand=tail; expanded=F_set.add f b.expanded})
+        | exception Not_found -> None
       end
 
     let debug out (b:t) : unit =
       Fmt.fprintf out
         "(@[<hv>branch (closed %B)@ \
          :to_expand (@[<hv>%a@])@ :expanded (@[<hv>%a@])@])"
-        b.closed (Util.pp_list T.pp) b.to_expand (Util.pp_list T.pp) b.expanded
+        b.closed
+        (Util.pp_seq T.pp) (F_set.to_seq b.to_expand)
+        (Util.pp_seq T.pp) (F_set.to_seq b.expanded)
   end
 
   (** Rules for the Tableau calculus *)
@@ -360,6 +369,8 @@ let concl_of_parent (p:LLProof.parent) : form = match p.LLProof.p_rename with
     let f = P.concl p.LLProof.p_proof in
     rename f r
 
+let open_forall = T.unfold_binder Binder.Forall
+
 let check_step_ (p:proof): res option =
   let concl = P.concl p in
   begin match P.step p with
@@ -374,7 +385,11 @@ let check_step_ (p:proof): res option =
     | P.Trivial ->
       (* should be able to prove the conclusion directly *)
       Some (Tab.prove [] concl)
-    | P.Instantiate (_,_) -> None (* TODO *)
+    | P.Instantiate (p',inst) ->
+      (* re-instantiate and check we get the same thing *)
+      let p'_inst = instantiate (LLProof.concl p') inst in
+      let _, body_concl = open_forall concl in
+      Some (Tab.prove [p'_inst] body_concl)
     | P.Esa (_,_,_) -> None (* TODO *)
     | P.Inference {check=P.C_other;_} -> Some R_ok
     | P.Inference {check=P.C_no_check;_} -> None
