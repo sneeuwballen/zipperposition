@@ -63,6 +63,8 @@ let mk_debug_opts () =
            ("--debug." ^ name, Arg.Int (Util.Section.set_debug sec),
             " debug level for section " ^ name))
   |> Sequence.to_list
+  |> CCList.cons
+    ("-d", Arg.Int (Util.Section.set_debug Util.Section.root), " alias to --debug")
 
 (* Options that can be added by plugins *)
 let other_opts = ref []

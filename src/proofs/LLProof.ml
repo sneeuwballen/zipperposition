@@ -167,3 +167,78 @@ let conv_check_ = function
 let esa c f name ps = mk_ f (Esa (name,ps,conv_check_ c))
 let inference c ~intros ~tags f name ps : t =
   mk_ f (Inference {name;intros;parents=ps;check=conv_check_ c;tags})
+
+module Dot = struct
+  (** Get a graph of the proof *)
+  let as_graph : (t, string * inst) CCGraph.t =
+    CCGraph.make
+      (fun p ->
+         let descr = match step p with
+           | Goal -> "goal"
+           | Assert -> "assert"
+           | Negated_goal _ -> "negated_goal"
+           | Trivial -> "trivial"
+           | By_def id -> Fmt.sprintf "by_def(%a)" ID.pp id
+           | Define id -> Fmt.sprintf "define(%a)" ID.pp id
+           | Instantiate (_,_) -> "instantiate"
+           | Esa (name,_,_) -> name
+           | Inference {name;_} -> name
+         in
+         parents p
+         |> Sequence.of_list
+         |> Sequence.map
+           (fun p' -> (descr,inst p), p'.p_proof))
+
+  let _to_str_escape fmt =
+    Util.ksprintf_noc ~f:Util.escape_dot fmt
+
+  let color p : string option =
+    let rec is_bool_atom t = match T.view t with
+      | T.AppBuiltin (Builtin.Box_opaque,_) -> true
+      | T.AppBuiltin (Builtin.Not, [t]) -> is_bool_atom t
+      | _ -> false
+    in
+    begin match step p, F.view (concl p) with
+      | _, F.False -> Some "red"
+      | _ when is_bool_atom (concl p) -> Some "cyan"
+      | _, F.Or l when List.for_all is_bool_atom l -> Some "cyan"
+      | Goal, _ -> Some "green"
+      | Assert, _ -> Some "yellow"
+      | (By_def _ | Define _), _ -> Some "navajowhite"
+      | _ -> None
+    end
+
+  let pp_dot_seq ~name out seq =
+    CCGraph.Dot.pp_seq
+      ~tbl:(CCGraph.mk_table ~eq:equal ~hash:hash 64)
+      ~eq:equal
+      ~name
+      ~graph:as_graph
+      ~attrs_v:(fun p ->
+        let label = _to_str_escape "@[<2>%a@]@." T.pp (concl p) in
+        let attrs = [`Label label; `Style "filled"] in
+        let shape = `Shape "box" in
+        let color = match color p with None -> [] | Some c -> [`Color c] in
+        shape :: color @ attrs
+      )
+      ~attrs_e:(fun (r,inst) ->
+        let label = _to_str_escape "@[<v>%s%a@]@." r pp_inst_some inst in
+        [`Label label; `Other ("dir", "back")])
+      out
+      seq;
+    Format.pp_print_newline out ();
+    ()
+
+  let pp_dot ~name out proof = pp_dot_seq ~name out (Sequence.singleton proof)
+
+  let pp_dot_seq_file ?(name="llproof") filename seq =
+    (* print graph on file *)
+    Util.debugf ~section 1 "print LLProof graph to@ `%s`" (fun k->k filename);
+    CCIO.with_out filename
+      (fun oc ->
+         let out = Format.formatter_of_out_channel oc in
+         Format.fprintf out "%a@." (pp_dot_seq ~name) seq)
+
+  let pp_dot_file ?name filename proof =
+    pp_dot_seq_file ?name filename (Sequence.singleton proof)
+end

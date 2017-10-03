@@ -449,6 +449,14 @@ let check res =
       (* check proof! *)
       Util.debug ~section 1 "start checking proof…";
       let p' = LLProof_conv.conv p in
+      (* print proof? *)
+      begin match params.Params.param_dot_llproof with
+        | None -> ()
+        | Some file ->
+          Util.debugf ~section 2 "print LLProof into `%s`"(fun k->k file);
+          LLProof.Dot.pp_dot_file file p';
+      end;
+      (* check *)
       let res, stats = LLProof_check.check p' in
       Format.printf "%s(@[<h>proof_check@ :res %a@ :stats %a@])@."
         comment LLProof_check.pp_res res LLProof_check.pp_stats stats;

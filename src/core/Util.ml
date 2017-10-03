@@ -410,6 +410,19 @@ let failwithf msg = Fmt.ksprintf msg ~f:failwith
 module Int_map = CCMap.Make(CCInt)
 module Int_set = CCSet.Make(CCInt)
 
+let escape_dot s =
+  let b = Buffer.create (String.length s + 5) in
+  String.iter
+    (fun c ->
+       begin match c with
+         | '|' | '\\' | '{' | '}' | '<' | '>' | '"' ->
+           Buffer.add_char b '\\'; Buffer.add_char b c
+         | '\n' -> Buffer.add_string b "\\l"; (* left justify *)
+         | _ -> Buffer.add_char b c
+       end)
+    s;
+  Buffer.contents b
+
 (** {2 File utils} *)
 
 type 'a or_error = ('a, string) CCResult.t

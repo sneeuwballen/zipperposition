@@ -100,32 +100,32 @@ and conv_parent st step res intros (parent:Proof.Parent.t): LLProof.parent =
   in
   (* now open foralls in [p_instantiated_res]
      and find which variable of [intros] they rename into *)
-  let inst_rename : LLProof.inst =
+  let inst_intros : LLProof.inst =
     (* rename variables of result *)
     let vars_res, _ = T.unfold_binder Binder.forall res in
     if List.length intros <> List.length vars_res then (
-      errorf "length mismatch, cannot intros@ %a@ :into [@[%a@]]"
+      errorf "length mismatch, cannot do intros@ %a@ :with [@[%a@]]"
         T.pp res (Util.pp_list ~sep:"," T.pp) intros
     );
-    let renaming =
+    let intro_subst =
       Var.Subst.of_list (List.combine vars_res intros)
     in
     let vars_instantiated, _ = T.unfold_binder Binder.forall p_instantiated_res in
     List.map
       (fun v ->
-         begin match Var.Subst.find renaming v with
+         begin match Var.Subst.find intro_subst v with
            | Some v2 -> v2
            | None ->
-             errorf "(@[<hv2>cannot find renaming for `%a`@ \
+             errorf "(@[<hv2>cannot find intros-inst for `%a`@ \
                      :subst {%a}@ :form `%a`@ :res %a@ :parent %a@ :in-step %a@])"
-               Var.pp v (Var.Subst.pp T.pp) renaming
+               Var.pp v (Var.Subst.pp T.pp) intro_subst
                T.pp p_instantiated_res T.pp res
                Proof.pp_parent parent
                Proof.S.pp_notrec1 step
          end)
       vars_instantiated
   in
-  LLProof.p_inst prev_proof inst_rename
+  LLProof.p_inst prev_proof inst_intros
 
 let conv (p:Proof.t) : LLProof.t =
   let st = {

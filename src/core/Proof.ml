@@ -733,21 +733,8 @@ module S = struct
 
   let _pp_list_str = Util.pp_list CCFormat.string
 
-  let _escape_dot s =
-    let b = Buffer.create (String.length s + 5) in
-    String.iter
-      (fun c ->
-         begin match c with
-           | '|' | '\\' | '{' | '}' | '<' | '>' | '"' ->
-             Buffer.add_char b '\\'; Buffer.add_char b c
-           | '\n' -> Buffer.add_string b "\\l"; (* left justify *)
-           | _ -> Buffer.add_char b c
-         end)
-      s;
-    Buffer.contents b
-
   let _to_str_escape fmt =
-    Util.ksprintf_noc ~f:_escape_dot fmt
+    Util.ksprintf_noc ~f:Util.escape_dot fmt
 
   let pp_dot_seq ~name out seq =
     CCGraph.Dot.pp_seq

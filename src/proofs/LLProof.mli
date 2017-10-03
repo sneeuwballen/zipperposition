@@ -99,3 +99,17 @@ val inference :
   form -> name -> parent list -> t
 
 module Tbl : CCHashtbl.S with type key = t
+
+module Dot : sig
+  val pp_dot : name:string -> t CCFormat.printer
+  (** Pretty print the proof as a DOT graph *)
+
+  val pp_dot_file : ?name:string -> string -> t -> unit
+  (** print to dot into a file *)
+
+  val pp_dot_seq : name:string -> t Sequence.t CCFormat.printer
+  (** Print a set of proofs as a DOT graph, sharing common subproofs *)
+
+  val pp_dot_seq_file : ?name:string -> string -> t Sequence.t -> unit
+  (** same as {!pp_dot_seq} but into a file *)
+end
