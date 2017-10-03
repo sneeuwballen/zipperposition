@@ -506,7 +506,7 @@ module ZF = struct
       | Goal f ->
         fpf out "@[<2>goal%a@ @[%a@]@]." pp_attrs attrs ppf f
       | NegatedGoal (_, l) ->
-        fpf out "@[<hv2>goal%a@ ~(@[<hv>%a@])."
+        fpf out "@[<hv2>goal%a@ ~(@[<hv>%a@])@]."
           pp_attrs attrs
           (Util.pp_list ~sep:", " (CCFormat.hovbox ppf)) l
 
