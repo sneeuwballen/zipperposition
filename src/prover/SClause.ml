@@ -32,12 +32,17 @@ let is_empty c = length c = 0 && Trail.is_empty c.trail
 
 let update_trail f c = make ~trail:(f c.trail) c.lits
 
+let add_trail_ trail f =
+  let module F = TypedSTerm.Form in
+  if Trail.is_empty trail
+  then f
+  else F.imply (Trail.to_s_form trail) f
+
 let to_s_form ?(ctx=Term.Conv.create()) c =
   let module F = TypedSTerm.Form in
-  let concl = Literals.Conv.to_s_form ~ctx (lits c) |> F.close_forall in
-  if Trail.is_empty (trail c)
-  then concl
-  else F.imply (Trail.to_s_form (trail c)) concl
+  Literals.Conv.to_s_form ~ctx (lits c)
+  |> add_trail_ (trail c)
+  |> F.close_forall
 
 (** {2 Flags} *)
 
@@ -140,14 +145,10 @@ exception E_proof of t
 let to_s_form_subst ~ctx subst c =
   let module F = TypedSTerm.Form in
   let module SP = Subst.Projection in
-  let concl =
-    Literals.apply_subst (SP.renaming subst) (SP.subst subst) (lits c,SP.scope subst)
-    |> Literals.Conv.to_s_form ~ctx
-    |> F.close_forall
-  in
-  if Trail.is_empty (trail c)
-  then concl
-  else F.imply (Trail.to_s_form (trail c)) concl
+  Literals.apply_subst (SP.renaming subst) (SP.subst subst) (lits c,SP.scope subst)
+  |> Literals.Conv.to_s_form ~ctx
+  |> add_trail_ (trail c)
+  |> F.close_forall
 
 let proof_tc =
   Proof.Result.make_tc
