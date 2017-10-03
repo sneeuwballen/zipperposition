@@ -34,6 +34,10 @@ let pp_res out = function
   | R_ok -> Fmt.fprintf out "@{<Green>ok@}"
   | R_fail -> Fmt.fprintf out "@{<Red>fail@}"
 
+let pp_res_opt out = function
+  | Some r -> pp_res out r
+  | None -> Fmt.fprintf out "@{<Yellow>nocheck@}"
+
 let pp_stats out (s:stats) =
   Fmt.fprintf out "(@[<hv>:ok %d@ :fail %d@ :nocheck %d@])"
     s.n_ok s.n_fail s.n_nocheck
@@ -56,6 +60,9 @@ let () = Printexc.register_printer
 *)
 
 module Tab : sig
+  val can_check : LLProof.tag list -> bool
+  (** Is this set of tags accepted by the tableau prover? *)
+
   val prove : form list -> form -> res
   (** [prove a b] returns [R_ok] if [a => b] is a tautology. *)
 end = struct
@@ -295,6 +302,11 @@ end = struct
         (fun k->k Branch.debug b);
       R_fail
 
+  let can_check : LLProof.tag list -> bool =
+    let module P = Proof in
+    let f = function P.T_lra | P.T_lia | P.T_ho | P.T_ind | P.T_data -> false in
+    List.for_all f
+
   let prove (a:form list) (b:form) =
     Util.debugf ~section 3
       "(@[llproof_checl.tab.prove@ :hyps (@[<hv>%a@])@ :concl %a@])"
@@ -327,11 +339,26 @@ let instantiate (f:form) (inst:LLProof.inst) : form =
     (fun k->k LLProof.pp_inst inst T.pp f T.pp f');
   f'
 
-let concl_of_parent (p:LLProof.parent) : form = match p with
-  | LLProof.P_of c -> P.concl c
-  | LLProof.P_instantiate (c,inst) ->
-    let f = P.concl c in
-    instantiate f inst
+let rename (f:form) (rn:LLProof.renaming) : form =
+  let vars, body = T.unfold_binder Binder.Forall f in
+  if List.length vars <> List.length rn then (
+    errorf "mismatched arities in rename `%a`@ :with %a"
+      T.pp f LLProof.pp_renaming rn
+  );
+  let subst =
+    List.fold_left2 Var.Subst.add Var.Subst.empty vars rn
+  in
+  let f' = T.rename subst body in
+  Util.debugf ~section 5
+    "(@[<hv>instantiate@ :inst %a@ :from %a@ :into %a@])"
+    (fun k->k LLProof.pp_renaming rn T.pp f T.pp f');
+  f'
+
+let concl_of_parent (p:LLProof.parent) : form = match p.LLProof.p_rename with
+  | [] -> P.concl p.LLProof.p_proof
+  | r ->
+    let f = P.concl p.LLProof.p_proof in
+    rename f r
 
 let check_step_ (p:proof): res option =
   let concl = P.concl p in
@@ -349,13 +376,18 @@ let check_step_ (p:proof): res option =
       Some (Tab.prove [] concl)
     | P.Instantiate (_,_) -> None (* TODO *)
     | P.Esa (_,_,_) -> None (* TODO *)
-    | P.Inference (_,_, P.C_other) -> Some R_ok
-    | P.Inference (_,_, P.C_no_check) -> None
-    | P.Inference (_, parents, P.C_check axioms) ->
-      let all_premises =
-        axioms @ List.map concl_of_parent parents
-      in
-      Some (Tab.prove all_premises concl)
+    | P.Inference {check=P.C_other;_} -> Some R_ok
+    | P.Inference {check=P.C_no_check;_} -> None
+    | P.Inference {parents;check=P.C_check axioms;tags;intros;_} ->
+      if Tab.can_check tags then (
+        (* within the fragment of {!Tab.prove} *)
+        let all_premises =
+          axioms @ List.map concl_of_parent parents
+        and concl =
+          rename concl intros
+        in
+        Some (Tab.prove all_premises concl)
+      ) else None
   end
 
 let check_step p = Util.with_prof prof_check check_step_ p
@@ -376,7 +408,7 @@ let check
       P.Tbl.add tbl p res;
       Util.debugf ~section 3
         "(@[<hv>@{<Yellow>done_checking_proof@}@ :of %a@ :res %a@])"
-        (fun k->k P.pp p (Fmt.Dump.option pp_res) res);
+        (fun k->k P.pp p pp_res_opt res);
       on_check p res;
       begin match res with
         | Some R_ok -> upd_stats (fun s -> {s with n_ok = s.n_ok+1})

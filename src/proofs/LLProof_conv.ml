@@ -6,7 +6,6 @@ open Logtk
 module T = TypedSTerm
 
 type ll_subst = (T.t,T.t) Var.Subst.t
-type inst = LLProof.inst
 
 let errorf msg = Util.errorf ~where:"llproof_conv" msg
 
@@ -22,61 +21,105 @@ let conv_subst ~ctx (p:Subst.Projection.t) : ll_subst =
     Var.Subst.empty
     (Subst.Projection.bindings p)
 
-let conv (p:Proof.t) : LLProof.t =
-  let tbl = Proof.S.Tbl.create 32 in
-  let rec conv ?ctx p: LLProof.t =
-    begin match Proof.S.Tbl.get tbl p with
-      | Some r -> r
-      | None ->
-        let res = conv_step ?ctx p in
-        Proof.S.Tbl.add tbl p res;
-        res
-    end
-  and conv_step ?(ctx=Term.Conv.create()) p =
-    let res = Proof.Result.to_form ~ctx (Proof.S.result p) in
-    let parents =
-      List.map (conv_parent p) (Proof.Step.parents @@ Proof.S.step p)
-    and parent_as_proof_exn = function
-      | LLProof.P_of c -> c
-      | LLProof.P_instantiate _ -> assert false
-    in
-    begin match Proof.Step.kind @@ Proof.S.step p with
-      | Proof.Inference (rule,c)
-      | Proof.Simplification (rule,c) ->
-        LLProof.inference c res (Proof.Rule.name rule) parents
-      | Proof.Esa (rule,c) ->
-        let l = List.map parent_as_proof_exn parents in
-        LLProof.esa c res (Proof.Rule.name rule) l
-      | Proof.Trivial -> LLProof.trivial res
-      | Proof.By_def id -> LLProof.by_def id res
-      | Proof.Define (id,_) -> LLProof.define id res
-      | Proof.Intro (_,Proof.R_assert) -> LLProof.assert_ res
-      | Proof.Intro (_,Proof.R_goal) -> LLProof.goal res
-      | Proof.Intro (_,(Proof.R_lemma|Proof.R_def|Proof.R_decl)) ->
-        LLProof.trivial res
-    end
-  (* convert parent of the given result formula *)
-  and conv_parent step (p:Proof.Parent.t): LLProof.parent = match p with
-    | Proof.P_of p -> LLProof.p_of (conv p)
+type state = {
+  ctx: Term.Conv.ctx;
+  tbl: LLProof.t Proof.S.Tbl.t;
+}
+
+let open_forall = T.unfold_binder Binder.Forall
+
+let rec conv_proof st p: LLProof.t =
+  begin match Proof.S.Tbl.get st.tbl p with
+    | Some r -> r
+    | None ->
+      let res = conv_step st p in
+      Proof.S.Tbl.add st.tbl p res;
+      res
+  end
+and conv_step st p =
+  let res = Proof.Result.to_form ~ctx:st.ctx (Proof.S.result p) in
+  let vars, _ = open_forall res in
+  let intros = List.mapi (fun i v -> Var.makef ~ty:(Var.ty v) "x_%d" i) vars in
+  let parents =
+    List.map (conv_parent st p res intros) (Proof.Step.parents @@ Proof.S.step p)
+  in
+  begin match Proof.Step.kind @@ Proof.S.step p with
+    | Proof.Inference (rule,c,tags)
+    | Proof.Simplification (rule,c,tags) ->
+      LLProof.inference c ~intros ~tags res (Proof.Rule.name rule) parents
+    | Proof.Esa (rule,c) ->
+      let l = List.map (fun p->p.LLProof.p_proof) parents in
+      LLProof.esa c res (Proof.Rule.name rule) l
+    | Proof.Trivial -> LLProof.trivial res
+    | Proof.By_def id -> LLProof.by_def id res
+    | Proof.Define (id,_) -> LLProof.define id res
+    | Proof.Intro (_,Proof.R_assert) -> LLProof.assert_ res
+    | Proof.Intro (_,Proof.R_goal) -> LLProof.goal res
+    | Proof.Intro (_,(Proof.R_lemma|Proof.R_def|Proof.R_decl)) ->
+      LLProof.trivial res
+  end
+
+(* convert parent of the given result formula *)
+and conv_parent st step res intros (parent:Proof.Parent.t): LLProof.parent =
+  let prev_proof, p_instantiated_res = match parent with
+    | Proof.P_of p ->
+      let p = conv_proof st p in
+      p, LLProof.concl p
     | Proof.P_subst (p,subst) as p_old ->
-      let ctx = Term.Conv.create() in
-      let p = conv ~ctx p in
-      let subst = conv_subst ~ctx subst in
-      (* TODO: renaming of variables? *)
-      (* now open foralls in [p] and find their instantiation in [subst] *)
-      let vars, _ = T.unfold_binder Binder.forall (LLProof.concl p) in
-      let inst = List.map
+      (* perform instantiation *)
+      assert (not (Subst.Projection.is_empty subst));
+      (* instantiated result of [p'] *)
+      let p_instantiated_res =
+        Proof.Result.to_form_subst ~ctx:st.ctx subst (Proof.S.result p)
+      in
+      (* convert [p] itself *)
+      let p = conv_proof st p in
+      (* find instantiation for [p] *)
+      let inst_subst : LLProof.inst =
+        let vars_p, _ = T.unfold_binder Binder.forall (LLProof.concl p) in
+        let subst = conv_subst ~ctx:st.ctx subst in
+        List.map
           (fun v ->
              begin match Var.Subst.find subst v with
                | Some t -> t
-               | None ->
-                 errorf "(@[<2>cannot find instantiation for `%a`@ \
-                         :subst {%a}@ :form %a@ :in %a@ :parent %a@"
-                   Var.pp v (Var.Subst.pp T.pp) subst T.pp (LLProof.concl p)
-                   Proof.S.pp_notrec step Proof.pp_parent p_old
+               | None -> T.var v
              end)
-          vars
+          vars_p
       in
-      LLProof.p_instantiate p inst
+      LLProof.instantiate p_instantiated_res p inst_subst, p_instantiated_res
   in
-  conv p
+  (* now open foralls in [p_instantiated_res]
+     and find which variable of [intros] they rename into *)
+  let inst_rename : LLProof.renaming =
+    (* rename variables of result *)
+    let vars_res, _ = T.unfold_binder Binder.forall res in
+    if List.length intros <> List.length vars_res then (
+      errorf "length mismatch, cannot intros@ %a@ :into [@[%a@]]"
+        T.pp res (Util.pp_list ~sep:"," Var.pp) intros
+    );
+    let renaming =
+      Var.Subst.of_list (List.combine vars_res intros)
+    in
+    let vars_instantiated, _ = T.unfold_binder Binder.forall p_instantiated_res in
+    List.map
+      (fun v ->
+         begin match Var.Subst.find renaming v with
+           | Some v2 -> v2
+           | None ->
+             errorf "(@[<hv2>cannot find renaming for `%a`@ \
+                     :subst {%a}@ :form `%a`@ :from %a@ :in %a@ :parent %a@])"
+               Var.pp v (Var.Subst.pp Var.pp) renaming
+               T.pp p_instantiated_res
+               T.pp res
+               Proof.S.pp_notrec1 step Proof.pp_parent parent
+         end)
+      vars_instantiated
+  in
+  LLProof.p_rename prev_proof inst_rename
+
+let conv (p:Proof.t) : LLProof.t =
+  let st = {
+    ctx = Term.Conv.create();
+    tbl = Proof.S.Tbl.create 32;
+  } in
+  conv_proof st p

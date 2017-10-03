@@ -141,7 +141,7 @@ let pp_error_prefix out () = Format.fprintf out "@{<Red>Error@}: "
 
 let err_spf fmt =
   Fmt.ksprintf fmt
-    ~f:(fun s -> Fmt.sprintf "@[<2>%a%s@]" pp_error_prefix () s)
+    ~f:(fun s -> Fmt.sprintf "@[%a@,%s@]" pp_error_prefix () s)
 
 
 let warn_fmt_ = Format.err_formatter
@@ -160,7 +160,7 @@ let () =
   Printexc.register_printer
     (function
       | Error (where,msg) ->
-        Some (err_spf "@[<2>error in %s:@ %s@]" where msg)
+        Some (err_spf "error in %s:@ %s" where msg)
       | Invalid_argument msg ->
         Some (err_spf "@[<2>invalid_argument: %s@]" msg)
       | _ -> None)

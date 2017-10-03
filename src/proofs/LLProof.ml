@@ -15,7 +15,10 @@ let section = Util.Section.make "llproof"
 type term = TypedSTerm.t
 type ty = term
 type form = TypedSTerm.Form.t
+type var = ty Var.t
 type inst = term list (** Instantiate some binder with the following terms. Order matters. *)
+type renaming = var list
+type tag = Proof.tag
 
 type name = string
 
@@ -38,21 +41,31 @@ and step =
   | Define of ID.t
   | Instantiate of t * term list
   | Esa of name * t list * check_info
-  | Inference of name * parent list * check_info
+  | Inference of {
+      intros: var list; (* local renaming *)
+      name: name;
+      parents: parent list;
+      check: check_info;
+      tags: tag list;
+    }
 
-and parent =
-  | P_of of t
-  | P_instantiate of t * term list (* open foralls and replace by given terms *)
+and parent = {
+  p_proof: t;
+  p_rename: renaming; (* rename [forall] variables *)
+}
 
 let concl p = p.concl
 let step p = p.step
 let id p = p.id
 
-let p_of p = P_of p
-let p_instantiate p subst = P_instantiate (p,subst)
+let p_rename p vars = {p_proof=p; p_rename=vars}
+let p_of p = p_rename p []
 
 let pp_inst out (l:inst) : unit =
   Format.fprintf out "[@[<hv>%a@]]" (Util.pp_list ~sep:"," T.pp) l
+
+let pp_renaming out (l:var list) : unit =
+  Format.fprintf out "[@[<hv>%a@]]" (Util.pp_list ~sep:"," Var.pp) l
 
 let pp_step out (s:step): unit = match s with
   | Goal -> Fmt.string out "goal"
@@ -64,27 +77,32 @@ let pp_step out (s:step): unit = match s with
   | Instantiate (_,inst) ->
     Fmt.fprintf out "(@[instantiate %a@])" pp_inst inst
   | Esa (n,_,_) -> Fmt.fprintf out "(esa %s)" n
-  | Inference (n,_,_) -> Fmt.fprintf out "(inf %s)" n
+  | Inference {name=n;_} -> Fmt.fprintf out "(inf %s)" n
 
 let parents (p:t): parent list = match p.step with
   | Goal | Assert | Trivial | By_def _ | Define _ -> []
   | Negated_goal p2 -> [p_of p2]
-  | Instantiate (p2,inst) -> [p_instantiate p2 inst]
+  | Instantiate (p2,_) -> [p_of p2]
   | Esa (_,l,_) -> List.map p_of l
-  | Inference (_,l,_) -> l
+  | Inference {parents=l;_} -> l
 
 let premises (p:t): t list =
-  let open_p = function
-    | P_of x -> x
-    | P_instantiate (p,_) -> p
-  in
+  let open_p {p_proof;_} = p_proof in
   List.rev_map open_p @@ parents p
+
+let inst (p:t): inst = match p.step with
+  | Instantiate (_,inst) -> inst
+  | _ -> []
 
 let check_info (p:t): check_info = match p.step with
   | Goal | Assert | Trivial | Negated_goal _ | By_def _ | Define _ -> C_other
   | Instantiate (_,_) -> C_check []
   | Esa (_,_,c)
-  | Inference (_,_,c) -> c
+  | Inference {check=c;_} -> c
+
+let tags (p:t) : tag list = match p.step with
+  | Inference {tags;_} -> tags
+  | _ -> []
 
 let equal a b = a.id = b.id
 let compare a b = CCInt.compare a.id b.id
@@ -100,16 +118,19 @@ module Tbl = CCHashtbl.Make(struct
 let pp_id out (p:t): unit = Fmt.int out p.id
 let pp_res out (p:t) = TypedSTerm.pp out (concl p)
 
-let pp_parent out = function
-  | P_of p -> pp_res out p
-  | P_instantiate (p,inst) ->
-    Format.fprintf out "@[(@[%a@])@,%a@]" pp_res p pp_inst inst
+let pp_parent out p = match p.p_rename with
+  | [] -> pp_res out p.p_proof
+  | _::_ ->
+    Format.fprintf out "@[(@[%a@])@,%a@]" pp_res p.p_proof pp_renaming p.p_rename
+
+let pp_inst_some out = function [] -> () | l -> Fmt.fprintf out "@ :inst %a" pp_inst l
 
 let pp out (p:t): unit =
-  Fmt.fprintf out "(@[<hv2>%a@ :res `%a`@ :from [@[%a@]]@])"
-    pp_step (step p)
+  Fmt.fprintf out "(@[<hv2>%a%a@ :res `%a`@ :from [@[%a@]]%a@])"
+    pp_step (step p) Proof.pp_tags (tags p)
     pp_res p
     (Util.pp_list pp_parent) (parents p)
+    pp_inst_some (inst p)
 
 let pp_dag out (p:t): unit =
   let seen = Tbl.create 32 in
@@ -142,4 +163,5 @@ let conv_check_ = function
   | `Check_with l -> C_check l
 
 let esa c f name ps = mk_ f (Esa (name,ps,conv_check_ c))
-let inference c f name ps = mk_ f (Inference (name,ps,conv_check_ c))
+let inference c ~intros ~tags f name ps : t =
+  mk_ f (Inference {name;intros;parents=ps;check=conv_check_ c;tags})

@@ -373,12 +373,15 @@ module Projection = struct
     renaming: Renaming.t;
   }
 
+  let[@inline] scope t = t.scope
+  let[@inline] subst t = t.subst
+  let[@inline] renaming t = t.renaming
+
   (* actual constructor from a substitution *)
-  let bindings (p:t) : _ list =
+  let bindings (p:t) : (var * term) list =
     fold
       (fun l (v,sc_v) (t,sc_t) ->
          if sc_v = p.scope then (
-           let v = f_rename_sn p.renaming (v,sc_v) (HVar.ty v) in
            let t = apply p.renaming p.subst (t,sc_t) in
            (v,t) :: l
          ) else l)
@@ -388,10 +391,6 @@ module Projection = struct
 
   let[@inline] is_empty (p:t) : bool = is_empty p.subst && Renaming.is_none p.renaming
 
-  let pp out (p:t) : unit =
-    let pp_p out (v,t) =
-      Format.fprintf out "@[<2>%a@ @<1>→ %a@]" HVar.pp v T.pp t
-    in
-    Format.fprintf out "{@[<hv>%a@]}" (Util.pp_list ~sep:"," pp_p) (bindings p)
+  let pp out (p:t) : unit = Format.fprintf out "%a[%d]" pp p.subst p.scope
 end
 

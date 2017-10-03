@@ -188,7 +188,14 @@ module Projection : sig
   (** A representation of the substitution for a given scope, after applying
       the renaming. *)
 
+  val subst : t -> subst
+  val scope : t -> Scoped.scope
+  val renaming : t -> Renaming.t
+
   val bindings : t -> (var * term) list
+(** List of bindings of the projection.
+    Variables in the domain are bound in [scope subst], but variables
+    in terms of the codomain are bound in the renaming *)
 
   val is_empty : t -> bool
 

@@ -137,6 +137,18 @@ let pp_in = function
 
 exception E_proof of t
 
+let to_s_form_subst ~ctx subst c =
+  let module F = TypedSTerm.Form in
+  let module SP = Subst.Projection in
+  let concl =
+    Literals.apply_subst (SP.renaming subst) (SP.subst subst) (lits c,SP.scope subst)
+    |> Literals.Conv.to_s_form ~ctx
+    |> F.close_forall
+  in
+  if Trail.is_empty (trail c)
+  then concl
+  else F.imply (Trail.to_s_form (trail c)) concl
+
 let proof_tc =
   Proof.Result.make_tc
     ~of_exn:(function | E_proof c -> Some c | _ -> None)
@@ -147,8 +159,8 @@ let proof_tc =
       then if Trail.is_empty (trail c) then `Proof_of_false
         else `Absurd_lits
       else `Vanilla)
-    ~to_form:(fun ~ctx c ->
-      to_s_form ~ctx c |> TypedSTerm.Form.close_forall)
+    ~to_form:(fun ~ctx c -> to_s_form ~ctx c)
+    ~to_form_subst:to_s_form_subst
     ~pp_in
     ()
 
