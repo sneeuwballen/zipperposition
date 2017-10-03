@@ -61,6 +61,7 @@ let _dot_sup_from = ref None
 let _dot_simpl = ref None
 let _dont_simplify = ref false
 let _sup_at_vars = ref false
+let _restrict_hidden_sup_at_vars = ref false
 let _dot_demod_into = ref None
 
 module Make(Env : Env.S) : S with module Env = Env = struct
@@ -235,22 +236,63 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       | _ -> None
     end
 
-  (* Checks whether C\sigma is either <= or incomparable to C[var -> replacement]\sigma.
-  In that case we must allow superposition at variables to be complete.*)
+  (* Checks whether we must allow superposition at variables to be complete. *)
   let sup_at_var_condition info var replacement =
     let open SupInfo in
+    let ord = Ctx.ord () in
     let us = info.subst in
     let subst = US.subst us in
     let renaming = S.Renaming.create () in
-    let passive'_lits = CCArray.map (fun l -> Lit.apply_subst ~renaming subst (l, info.scope_passive)) (C.lits info.passive) in
     let replacement' = S.FO.apply ~renaming subst (replacement, info.scope_active) in
-    let passive_t'_lits =
-      Sequence.of_array (C.lits info.passive)
-      |> Sequence.map (fun l -> Lit.replace l ~old:var ~by:replacement')
-      |> Sequence.map (fun l -> Lit.apply_subst ~renaming subst (l, info.scope_passive))
-      |> Sequence.to_array in
-    let ord = Ctx.ord () in
-    not (Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt)
+    let var' = S.FO.apply ~renaming subst (var, info.scope_passive) in
+    let var'' = S.FO.apply ~renaming subst (var', info.scope_active) in
+    if (not (Type.is_fun (Term.ty var'')) || not (O.might_flip ord var'' replacement'))
+    then (
+      Util.debugf ~section 5
+        "Cannot flip: %a = %a"
+        (fun k->k T.pp var'' T.pp replacement');
+      false (* If the lhs vs rhs cannot flip, we don't need a sup at var *)
+    )
+    else (
+      (* Check whether var occurs only with the same arguments everywhere. *)
+      let unique_args_of_var =
+        C.lits info.passive
+        |> Lits.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord ~subterms:true ~eligible:(fun _ _ -> true)
+        |> Sequence.fold_while
+          (fun unique_args (t,_) ->
+             if Head.term_to_head t == Head.term_to_head var
+             then (
+               if unique_args == Some (Head.term_to_args t)
+               then (unique_args, `Continue) (* found the same arguments of var again *)
+               else (None, `Stop) (* different arguments of var found *)
+             ) else (unique_args, `Continue) (* this term doesn't have var as head *)
+          )
+          None
+      in
+      match unique_args_of_var with
+        | Some _ ->
+          Util.debugf ~section 5
+            "Variable %a has same args everywhere in %a"
+            (fun k->k T.pp var C.pp info.passive);
+          false (* If var occurs with the same arguments everywhere, we don't need sup at vars *)
+        | None ->
+          (* Check whether Cσ is >= C[var -> replacement]σ *)
+          let passive'_lits = CCArray.map (fun l -> Lit.apply_subst ~renaming subst (l, info.scope_passive)) (C.lits info.passive) in
+          let passive_t'_lits =
+            Sequence.of_array (C.lits info.passive)
+            |> Sequence.map (fun l -> Lit.replace l ~old:var ~by:replacement')
+            |> Sequence.map (fun l -> Lit.apply_subst ~renaming subst (l, info.scope_passive))
+            |> Sequence.to_array in
+          if Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt
+          then (
+            Util.debugf ~section 5
+              "Sup at var condition is not fulfilled because: %a >= %a"
+              (fun k->k Lits.pp passive'_lits Lits.pp passive_t'_lits);
+            false
+          )
+          else true (* If Cσ is either <= or incomparable to C[var -> replacement]σ, we need sup at var.*)
+    )
+
 
   (* Helper that does one or zero superposition inference, with all
      the given parameters. Clauses have a scope. *)
@@ -306,10 +348,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then
          raise (ExitSuperposition "superposition at variable");
       (* Check for hidden superposition at a variable *)
-      match is_hidden_sup_at_var info with
-      | Some (var,replacement) when not (sup_at_var_condition info var replacement)
-        -> raise (ExitSuperposition "hidden superposition at variable")
-      | _ -> ();
+      if !_restrict_hidden_sup_at_vars then (
+        match is_hidden_sup_at_var info with
+          | Some (var,replacement) when not (sup_at_var_condition info var replacement)
+          -> raise (ExitSuperposition "hidden superposition at variable")
+        | _ -> ()
+      );
       (* ordering constraints are ok *)
       let lits_a = CCArray.except_idx (C.lits info.active) active_idx in
       let lits_p = CCArray.except_idx (C.lits info.passive) passive_idx in
@@ -1645,4 +1689,7 @@ let () =
     ; "--sup-at-vars"
     , Arg.Set _sup_at_vars
     , " enable superposition at variables under certain ordering conditions"
+    ; "--restrict-hidden-sup-at-vars"
+    , Arg.Set _restrict_hidden_sup_at_vars
+    , " perform hidden superposition at variables only under certain ordering conditions"
     ]
