@@ -12,7 +12,6 @@ module Fmt = CCFormat
 module P = LLProof
 
 type proof = LLProof.t
-type term = T.t
 type form = F.t
 
 (** {2 Types} *)
@@ -28,11 +27,13 @@ type stats = {
 }
 
 let section = LLProof.section
-let prof_check = Util.mk_profiler "llproof_check.step"
+let prof_check = Util.mk_profiler "llproof.check.step"
+let stat_check = Util.mk_stat "llproof.check.step"
+let stat_tab_solve = Util.mk_stat "llproof.check.tab_solve"
 
 let pp_res out = function
-  | R_ok -> Fmt.fprintf out "@{<Green>ok@}"
-  | R_fail -> Fmt.fprintf out "@{<Red>fail@}"
+  | R_ok -> Fmt.fprintf out "@{<Green>OK@}"
+  | R_fail -> Fmt.fprintf out "@{<Red>FAIL@}"
 
 let pp_res_opt out = function
   | Some r -> pp_res out r
@@ -66,44 +67,40 @@ module Tab : sig
   val prove : form list -> form -> res
   (** [prove a b] returns [R_ok] if [a => b] is a tautology. *)
 end = struct
-  module T = TypedSTerm
+  module T = LLTerm
+  module F = LLTerm.Form
 
   (** Congruence Closure *)
   module CC = Congruence.Make(struct
       include T
 
       let subterms t = match T.view t with
-        | T.App (f, l) -> f :: l
+        | T.App (f, a) -> [f;a]
+        | T.Arrow (a,b) -> [a;b]
         | T.AppBuiltin (_,l) -> l
         | T.Ite (a,b,c) -> [a;b;c]
-        | T.Const _ | T.Var _
+        | T.Bind {body;_} -> [body]
+        | T.Const _ | T.Var _ | T.Type
           -> []
-        | T.Bind _ -> []
-        | T.Match _
-        | T.Let _
-        | T.Multiset _
-        | T.Record _
-        | T.Meta _
-          -> assert false (* TODO *)
 
       let update_subterms t l = match T.view t, l with
-        | T.App (_, l1), f :: l1' when List.length l1 = List.length l1' ->
-          T.app ~ty:(T.ty_exn t) f l1'
+        | T.App (_, _), [f;a] -> T.app f a
+        | T.Arrow (_, _), [a;b] -> T.arrow a b
         | T.AppBuiltin (b, l1), l1' when List.length l1 = List.length l1' ->
           T.app_builtin ~ty:(T.ty_exn t) b l1'
+        | T.Bind {binder;ty_var;_}, [body] ->
+          T.bind ~ty:(T.ty_exn t) binder ~ty_var body
         | (T.Const _ | T.Var _), [] -> t
         | T.Ite (_,_,_), [a;b;c] -> T.ite a b c
         | T.App _, _
+        | T.Arrow _, _
         | T.AppBuiltin _, _
+        | T.Bind _, _
         | T.Const _, _
         | T.Var _, _
+        | T.Type, _
         | T.Ite _, _
-        | T.Match _, _
-        | T.Bind _, _
-        | T.Let _, _
-        | T.Multiset _, _
-        | T.Record _, _
-        | T.Meta _, _ -> assert false
+          -> assert false
     end)
 
   (** Branches of the tableau. A branch is a conjunction of formulas
@@ -112,32 +109,32 @@ end = struct
   module Branch : sig
     type t
 
-    val make : form list -> t
+    val make : T.t list -> t
 
     val closed : t -> bool
 
-    val add : t -> form list -> t
+    val add : t -> T.t list -> t
     (** add the given set of formulas *)
 
-    val pop_open : t -> (form * t) option
+    val pop_open : t -> (T.t * t) option
     (** remove and return next formula to expand *)
 
     val debug : t Fmt.printer
   end = struct
-    module F_set = T.Set
+    module T_set = T.Set
 
     type t = {
-      expanded: F_set.t;
-      to_expand : F_set.t;
+      expanded: T_set.t;
+      to_expand : T_set.t;
       cc: CC.t;
-      diseq: (term * term) list; (* negative constraints *)
+      diseq: (T.t * T.t) list; (* negative constraints *)
       closed: bool;
     }
 
     (* make a new empty branch *)
     let empty () = {
-      expanded=F_set.empty;
-      to_expand=F_set.empty;
+      expanded=T_set.empty;
+      to_expand=T_set.empty;
       cc=CC.create();
       diseq=[(F.true_, F.false_)];
       closed=false;
@@ -154,16 +151,16 @@ end = struct
     let[@inline] add_cc_eq t u b = { b with cc=CC.mk_eq b.cc t u }
     let[@inline] add_diseq_ t u b = { b with diseq=(t,u)::b.diseq }
 
-    let[@inline] add_expanded f b = {b with expanded = F_set.add f b.expanded}
+    let[@inline] add_expanded f b = {b with expanded = T_set.add f b.expanded}
     let[@inline] add_eq t u b : t = b |> add_expanded (F.eq t u) |> add_cc_eq t u |> check_closed
     let[@inline] add_diseq t u b : t = b |> add_diseq_ t u |> check_closed
-    let[@inline] add_to_expand f b = {b with to_expand = F_set.add f b.to_expand}
+    let[@inline] add_to_expand f b = {b with to_expand = T_set.add f b.to_expand}
 
     let[@inline] add_form_to_expand f b =
       b |> add_to_expand f |> add_cc_eq f F.true_ |> check_closed
 
     (* add one formula to [b] *)
-    let add1 (br:t) (f:form): t =
+    let add1 (br:t) (f:T.t): t =
       begin match F.view f with
         | F.Atom t -> add_eq t F.true_ br
         | F.True -> br
@@ -183,10 +180,11 @@ end = struct
               add_form_to_expand (F.or_ [F.and_ [a; F.not_ b]; F.and_ [b; F.not_ a]]) br
             | F.Xor (a,b) ->
               add_form_to_expand (F.and_ [F.or_ [a; F.not_ b]; F.or_ [b; F.not_ a]]) br
-            | F.Forall (v,body) ->
-              add_expanded (F.exists v (F.not_ body)) br (* TODO? *)
-            | F.Exists (v,body) ->
-              add_expanded (F.forall v (F.not_ body)) br (* TODO? *)
+            | F.Exists {ty_var;body}  ->
+              let f = F.forall ~ty_var (F.not_ body) in
+              br |> add_expanded f |> add_cc_eq f F.true_ |> check_closed
+            | F.Forall _ ->
+              br |> add_expanded f |> add_cc_eq f F.false_ |> check_closed
           end
         | F.And _ | F.Or _ -> add_form_to_expand f br
         | F.Imply (a,b) -> add_form_to_expand (F.or_ [F.not_ a; b]) br
@@ -194,10 +192,11 @@ end = struct
           add_form_to_expand (F.or_ [F.and_ [a; F.not_ b]; F.and_ [b; F.not_ a]]) br
         | F.Equiv (a,b) ->
           add_form_to_expand (F.and_ [F.or_ [a; F.not_ b]; F.or_ [b; F.not_ a]]) br
-        | F.Forall (v,body) ->
-          add_expanded (F.exists v (F.not_ body)) br (* TODO? *)
-        | F.Exists (v,body) ->
-          add_expanded (F.forall v (F.not_ body)) br (* TODO? *)
+        | F.Forall _ ->
+          br |> add_expanded f |> add_cc_eq f F.true_ |> check_closed
+        | F.Exists {ty_var;body} ->
+          let f = F.forall ~ty_var (F.not_ body) in
+          br |> add_expanded f |> add_cc_eq f F.false_ |> check_closed
       end
 
     let[@inline] add b l = List.fold_left add1 b l
@@ -206,10 +205,10 @@ end = struct
 
     let pop_open b =
       if closed b then None
-      else begin match F_set.choose b.to_expand with
+      else begin match T_set.choose b.to_expand with
         | f ->
-          let tail = F_set.remove f b.to_expand in
-          Some (f, {b with to_expand=tail; expanded=F_set.add f b.expanded})
+          let tail = T_set.remove f b.to_expand in
+          Some (f, {b with to_expand=tail; expanded=T_set.add f b.expanded})
         | exception Not_found -> None
       end
 
@@ -218,20 +217,20 @@ end = struct
         "(@[<hv>branch (closed %B)@ \
          :to_expand (@[<hv>%a@])@ :expanded (@[<hv>%a@])@])"
         b.closed
-        (Util.pp_seq T.pp) (F_set.to_seq b.to_expand)
-        (Util.pp_seq T.pp) (F_set.to_seq b.expanded)
+        (Util.pp_seq T.pp) (T_set.to_seq b.to_expand)
+        (Util.pp_seq T.pp) (T_set.to_seq b.expanded)
   end
 
   (** Rules for the Tableau calculus *)
   module Rule : sig
     type t
 
-    val apply : t list -> form -> form list list
+    val apply : t list -> F.t -> F.t list list
     (** Return a disjunctive list of conjuctions *)
 
     val all : t list
   end = struct
-    type t = form -> form list list
+    type t = F.t -> F.t list list
 
     let or_ f = match F.view f with
       | F.Or l -> List.map CCList.return l
@@ -246,7 +245,7 @@ end = struct
       and_;
     ]
 
-    let[@inline] apply (l:t list) (f:form) : form list list =
+    let[@inline] apply (l:t list) (f:F.t) : F.t list list =
       CCList.flat_map (fun r -> r f) l
   end
 
@@ -318,8 +317,14 @@ end = struct
 
   let prove (a:form list) (b:form) =
     Util.debugf ~section 3
-      "(@[llproof_checl.tab.prove@ :hyps (@[<hv>%a@])@ :concl %a@])"
-      (fun k->k (Util.pp_list T.pp) a T.pp b);
+      "(@[@{<yellow>llproof_check.tab.prove@}@ :hyps (@[<hv>%a@])@ :concl %a@])"
+      (fun k->k (Util.pp_list TypedSTerm.pp) a TypedSTerm.pp b);
+    Util.incr_stat stat_tab_solve;
+    (* convert into {!LLTerm.t} *)
+    let ctx = T.Conv.create() in
+    let a = List.map (T.Conv.of_term ctx) a in
+    let b = T.Conv.of_term ctx b in
+    (* prove [a ∧ -b ⇒ ⊥] *)
     let b_init = Branch.make (F.not_ b :: a) in
     let tab = {
       open_branches=[b_init];
@@ -329,9 +334,6 @@ end = struct
 end
 
 (** {2 Checking Proofs} *)
-
-(* TODO: have another global graph structure with inference steps, ESA,
-   instantiation steps? *)
 
 let instantiate (f:form) (inst:LLProof.inst) : form =
   let vars, body = T.unfold_binder Binder.Forall f in
@@ -348,31 +350,17 @@ let instantiate (f:form) (inst:LLProof.inst) : form =
     (fun k->k LLProof.pp_inst inst T.pp f T.pp f');
   f'
 
-let rename (f:form) (rn:LLProof.renaming) : form =
-  let vars, body = T.unfold_binder Binder.Forall f in
-  if List.length vars <> List.length rn then (
-    errorf "mismatched arities in rename `%a`@ :with %a"
-      T.pp f LLProof.pp_renaming rn
-  );
-  let subst =
-    List.fold_left2 Var.Subst.add Var.Subst.empty vars rn
-  in
-  let f' = T.rename subst body in
-  Util.debugf ~section 5
-    "(@[<hv>instantiate@ :inst %a@ :from %a@ :into %a@])"
-    (fun k->k LLProof.pp_renaming rn T.pp f T.pp f');
-  f'
-
-let concl_of_parent (p:LLProof.parent) : form = match p.LLProof.p_rename with
+let concl_of_parent (p:LLProof.parent) : form = match p.LLProof.p_inst with
   | [] -> P.concl p.LLProof.p_proof
   | r ->
     let f = P.concl p.LLProof.p_proof in
-    rename f r
+    instantiate f r
 
 let open_forall = T.unfold_binder Binder.Forall
 
 let check_step_ (p:proof): res option =
   let concl = P.concl p in
+  Util.incr_stat stat_check;
   begin match P.step p with
     | P.Goal
     | P.Assert
@@ -388,8 +376,14 @@ let check_step_ (p:proof): res option =
     | P.Instantiate (p',inst) ->
       (* re-instantiate and check we get the same thing *)
       let p'_inst = instantiate (LLProof.concl p') inst in
-      let _, body_concl = open_forall concl in
-      Some (Tab.prove [p'_inst] body_concl)
+      let vars, body_concl = open_forall concl in
+      (* now remove free variables by using fresh constants *)
+      let subst =
+        vars
+        |> List.mapi (fun i v -> v, T.const ~ty:(Var.ty v) (ID.makef "sk_%d" i))
+        |> Var.Subst.of_list
+      in
+      Some (Tab.prove [T.Subst.eval subst p'_inst] (T.Subst.eval subst body_concl))
     | P.Esa (_,_,_) -> None (* TODO *)
     | P.Inference {check=P.C_other;_} -> Some R_ok
     | P.Inference {check=P.C_no_check;_} -> None
@@ -399,7 +393,7 @@ let check_step_ (p:proof): res option =
         let all_premises =
           axioms @ List.map concl_of_parent parents
         and concl =
-          rename concl intros
+          instantiate concl intros
         in
         Some (Tab.prove all_premises concl)
       ) else None
@@ -418,7 +412,8 @@ let check
   let rec check (p:proof): unit =
     if not (P.Tbl.mem tbl p) then (
       before_check p;
-      Util.debugf ~section 3 "(@[@{<Yellow>start_checking_proof@}@ %a@])" (fun k->k P.pp p);
+      Util.debugf ~section 3 "(@[@{<Yellow>start_checking_proof@}@ %a@])"
+        (fun k->k P.pp p);
       let res = check_step p in
       P.Tbl.add tbl p res;
       Util.debugf ~section 3

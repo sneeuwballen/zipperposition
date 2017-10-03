@@ -20,7 +20,6 @@ type ty = term
 type form = term
 type var = ty Var.t
 type inst = term list (** Instantiate some binder with the following terms. Order matters. *)
-type renaming = var list
 type tag = Proof.tag
 
 type name = string
@@ -42,7 +41,7 @@ type step =
   | Instantiate of t * inst
   | Esa of name * t list * check_info
   | Inference of {
-      intros: var list; (* local renaming *)
+      intros: term list; (* local renaming, with fresh constants *)
       name: name;
       parents: parent list;
       check: check_info;
@@ -51,7 +50,7 @@ type step =
 
 and parent = {
   p_proof: t;
-  p_rename: renaming; (* rename [forall] variables *)
+  p_inst: inst; (* instantiate [forall] variables *)
 }
 
 val id : t -> int
@@ -61,7 +60,7 @@ val parents : t -> parent list
 val premises : t -> t list
 
 val p_of : t -> parent
-val p_rename : t -> renaming -> parent
+val p_inst : t -> inst -> parent
 
 val check_info : t -> check_info
 
@@ -78,7 +77,6 @@ val pp_dag : t CCFormat.printer
 (** Print the whole DAG *)
 
 val pp_inst : inst CCFormat.printer
-val pp_renaming : renaming CCFormat.printer
 
 val equal : t -> t -> bool
 val compare : t -> t -> int
@@ -96,7 +94,7 @@ val esa :
   form -> name -> t list -> t
 val inference :
   [`No_check | `Check | `Check_with of form list] ->
-  intros:var list ->
+  intros:term list ->
   tags:tag list ->
   form -> name -> parent list -> t
 

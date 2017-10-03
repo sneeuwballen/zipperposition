@@ -17,7 +17,6 @@ type ty = term
 type form = TypedSTerm.Form.t
 type var = ty Var.t
 type inst = term list (** Instantiate some binder with the following terms. Order matters. *)
-type renaming = var list
 type tag = Proof.tag
 
 type name = string
@@ -42,7 +41,7 @@ and step =
   | Instantiate of t * term list
   | Esa of name * t list * check_info
   | Inference of {
-      intros: var list; (* local renaming *)
+      intros: term list; (* local renaming, with fresh constants *)
       name: name;
       parents: parent list;
       check: check_info;
@@ -51,21 +50,18 @@ and step =
 
 and parent = {
   p_proof: t;
-  p_rename: renaming; (* rename [forall] variables *)
+  p_inst: inst; (* instantiate [forall] variables *)
 }
 
 let concl p = p.concl
 let step p = p.step
 let id p = p.id
 
-let p_rename p vars = {p_proof=p; p_rename=vars}
-let p_of p = p_rename p []
+let p_inst p inst = {p_proof=p; p_inst=inst}
+let p_of p = p_inst p []
 
 let pp_inst out (l:inst) : unit =
   Format.fprintf out "[@[<hv>%a@]]" (Util.pp_list ~sep:"," T.pp) l
-
-let pp_renaming out (l:var list) : unit =
-  Format.fprintf out "[@[<hv>%a@]]" (Util.pp_list ~sep:"," Var.pp) l
 
 let pp_step out (s:step): unit = match s with
   | Goal -> Fmt.string out "goal"
@@ -104,6 +100,10 @@ let tags (p:t) : tag list = match p.step with
   | Inference {tags;_} -> tags
   | _ -> []
 
+let intros (p:t) : inst = match p.step with
+  | Inference {intros;_} -> intros
+  | _ -> []
+
 let equal a b = a.id = b.id
 let compare a b = CCInt.compare a.id b.id
 let hash a = Hash.int a.id
@@ -118,19 +118,21 @@ module Tbl = CCHashtbl.Make(struct
 let pp_id out (p:t): unit = Fmt.int out p.id
 let pp_res out (p:t) = TypedSTerm.pp out (concl p)
 
-let pp_parent out p = match p.p_rename with
+let pp_parent out p = match p.p_inst with
   | [] -> pp_res out p.p_proof
   | _::_ ->
-    Format.fprintf out "@[(@[%a@])@,%a@]" pp_res p.p_proof pp_renaming p.p_rename
+    Format.fprintf out "@[(@[%a@])@,%a@]" pp_res p.p_proof pp_inst p.p_inst
 
 let pp_inst_some out = function [] -> () | l -> Fmt.fprintf out "@ :inst %a" pp_inst l
+let pp_intro_some out = function [] -> () | l -> Fmt.fprintf out "@ :intro %a" pp_inst l
 
 let pp out (p:t): unit =
-  Fmt.fprintf out "(@[<hv2>%a%a@ :res `%a`@ :from [@[%a@]]%a@])"
+  Fmt.fprintf out "(@[<hv2>%a%a@ :res `%a`@ :from [@[%a@]]%a%a@])"
     pp_step (step p) Proof.pp_tags (tags p)
     pp_res p
     (Util.pp_list pp_parent) (parents p)
     pp_inst_some (inst p)
+    pp_intro_some (intros p)
 
 let pp_dag out (p:t): unit =
   let seen = Tbl.create 32 in

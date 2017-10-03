@@ -9,7 +9,9 @@ module F = T.Form
 module UA = UntypedAST
 module Fmt = CCFormat
 
+type term = TypedSTerm.t
 type form = TypedSTerm.t
+type inst_subst = (term, term) Var.Subst.t
 type 'a sequence = ('a -> unit) -> unit
 
 let section = Util.Section.make "proof"
@@ -81,7 +83,7 @@ type 'a result_tc = {
   res_is_stmt: bool;
   res_pp_in: Output_format.t -> 'a CCFormat.printer;
   res_to_form: ctx:Term.Conv.ctx -> 'a -> TypedSTerm.Form.t;
-  res_to_form_subst: ctx:Term.Conv.ctx -> Subst.Projection.t -> 'a -> TypedSTerm.Form.t;
+  res_to_form_subst: ctx:Term.Conv.ctx -> Subst.Projection.t -> 'a -> form * inst_subst;
   res_name:('a -> string) option;
   res_flavor: 'a -> flavor;
 }
@@ -343,6 +345,8 @@ module Result = struct
   let make tc x : t = Res (tc, tc.res_to_exn x)
 
   exception E_form of form
+
+  type inst_subst = (term,term) Var.Subst.t
 
   let form_tc : form result_tc =
     make_tc

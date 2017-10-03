@@ -5,6 +5,7 @@
 
 module Loc = ParseLocation
 
+type term = TypedSTerm.t
 type form = TypedSTerm.t
 type 'a sequence = ('a -> unit) -> unit
 
@@ -161,12 +162,16 @@ module Result : sig
     | `Def
     ]
 
+  (** A mapping used during instantiation, to map pre-instantiation
+      variables to post-instantiation terms *)
+  type inst_subst = (term, term) Var.Subst.t
+
   val make_tc :
     of_exn:(exn -> 'a option) ->
     to_exn:('a -> exn) ->
     compare:('a -> 'a -> int) ->
     to_form:(ctx:Term.Conv.ctx -> 'a -> form) ->
-    ?to_form_subst:(ctx:Term.Conv.ctx -> Subst.Projection.t -> 'a -> form) ->
+    ?to_form_subst:(ctx:Term.Conv.ctx -> Subst.Projection.t -> 'a -> form * inst_subst) ->
     pp_in:(Output_format.t -> 'a CCFormat.printer) ->
     ?name:('a -> string) ->
     ?is_stmt:bool ->
@@ -195,7 +200,10 @@ module Result : sig
   val pp : t CCFormat.printer
   val is_stmt : t -> bool
   val to_form : ?ctx:Term.Conv.ctx -> t -> form
-  val to_form_subst : ?ctx:Term.Conv.ctx -> Subst.Projection.t -> t -> form
+
+  val to_form_subst : ?ctx:Term.Conv.ctx -> Subst.Projection.t -> t -> form * inst_subst
+  (** instantiated form + bindings for vars *)
+
   val flavor : t -> flavor
   val name : t -> string option
 end

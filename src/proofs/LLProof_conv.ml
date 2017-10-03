@@ -40,7 +40,9 @@ let rec conv_proof st p: LLProof.t =
 and conv_step st p =
   let res = Proof.Result.to_form ~ctx:st.ctx (Proof.S.result p) in
   let vars, _ = open_forall res in
-  let intros = List.mapi (fun i v -> Var.makef ~ty:(Var.ty v) "x_%d" i) vars in
+  let intros =
+    List.mapi (fun i v -> T.const ~ty:(Var.ty v) (ID.makef "sk_%d" i)) vars
+  in
   begin match Proof.Step.kind @@ Proof.S.step p with
     | Proof.Inference (rule,c,tags)
     | Proof.Simplification (rule,c,tags) ->
@@ -76,33 +78,34 @@ and conv_parent st step res intros (parent:Proof.Parent.t): LLProof.parent =
       (* perform instantiation *)
       assert (not (Subst.Projection.is_empty subst));
       (* instantiated result of [p'] *)
-      let p_instantiated_res =
+      let p_instantiated_res, inst_subst =
         Proof.Result.to_form_subst ~ctx:st.ctx subst (Proof.S.result p)
       in
       (* convert [p] itself *)
       let p = conv_proof st p in
       (* find instantiation for [p] *)
-      let inst_subst : LLProof.inst =
+      let inst : LLProof.inst =
         let vars_p, _ = T.unfold_binder Binder.forall (LLProof.concl p) in
-        let subst = conv_subst ~ctx:st.ctx subst in
         List.map
           (fun v ->
-             begin match Var.Subst.find subst v with
+             begin match Var.Subst.find inst_subst v with
                | Some t -> t
-               | None -> T.var v
+               | None ->
+                 errorf "cannot find variable `%a`@ in inst-subst %a"
+                   Var.pp v (Var.Subst.pp T.pp) inst_subst
              end)
           vars_p
       in
-      LLProof.instantiate p_instantiated_res p inst_subst, p_instantiated_res
+      LLProof.instantiate p_instantiated_res p inst, p_instantiated_res
   in
   (* now open foralls in [p_instantiated_res]
      and find which variable of [intros] they rename into *)
-  let inst_rename : LLProof.renaming =
+  let inst_rename : LLProof.inst =
     (* rename variables of result *)
     let vars_res, _ = T.unfold_binder Binder.forall res in
     if List.length intros <> List.length vars_res then (
       errorf "length mismatch, cannot intros@ %a@ :into [@[%a@]]"
-        T.pp res (Util.pp_list ~sep:"," Var.pp) intros
+        T.pp res (Util.pp_list ~sep:"," T.pp) intros
     );
     let renaming =
       Var.Subst.of_list (List.combine vars_res intros)
@@ -115,14 +118,14 @@ and conv_parent st step res intros (parent:Proof.Parent.t): LLProof.parent =
            | None ->
              errorf "(@[<hv2>cannot find renaming for `%a`@ \
                      :subst {%a}@ :form `%a`@ :res %a@ :parent %a@ :in-step %a@])"
-               Var.pp v (Var.Subst.pp Var.pp) renaming
+               Var.pp v (Var.Subst.pp T.pp) renaming
                T.pp p_instantiated_res T.pp res
                Proof.pp_parent parent
                Proof.S.pp_notrec1 step
          end)
       vars_instantiated
   in
-  LLProof.p_rename prev_proof inst_rename
+  LLProof.p_inst prev_proof inst_rename
 
 let conv (p:Proof.t) : LLProof.t =
   let st = {
