@@ -12,6 +12,15 @@ val section : Util.Section.t
 
 type rule
 
+(** Tag for checking an inference. Each tag describes an extension of FO
+    that is used in the inference *)
+type tag =
+  | T_lia (** integer arith *)
+  | T_lra (** rational arith *)
+  | T_ho (** higher order *)
+  | T_ind (** induction *)
+  | T_data (** datatypes *)
+
 (** How do we check a step? *)
 type check = [`No_check | `Check | `Check_with of form list]
 
@@ -20,8 +29,8 @@ type attrs = UntypedAST.attrs
 (** Classification of proof steps *)
 type kind =
   | Intro of source * role
-  | Inference of rule * check
-  | Simplification of rule * check
+  | Inference of rule * check * tag list
+  | Simplification of rule * check * tag list
   | Esa of rule * check
   | Trivial (** trivial, or trivial within theories *)
   | Define of ID.t * source (** definition *)
@@ -157,6 +166,7 @@ module Result : sig
     to_exn:('a -> exn) ->
     compare:('a -> 'a -> int) ->
     to_form:(ctx:Term.Conv.ctx -> 'a -> form) ->
+    ?to_form_subst:(ctx:Term.Conv.ctx -> Subst.Projection.t -> 'a -> form) ->
     pp_in:(Output_format.t -> 'a CCFormat.printer) ->
     ?name:('a -> string) ->
     ?is_stmt:bool ->
@@ -169,6 +179,8 @@ module Result : sig
       @param is_stmt true only if ['a] is a toplevel statement (default false)
       @param name returns the name of the result. Typically, a name from
         the input file
+      @param to_form_subst apply substitution, then convert to form.
+      If not provided, will fail.
   *)
 
   val make : 'a tc -> 'a -> t
@@ -183,6 +195,7 @@ module Result : sig
   val pp : t CCFormat.printer
   val is_stmt : t -> bool
   val to_form : ?ctx:Term.Conv.ctx -> t -> form
+  val to_form_subst : ?ctx:Term.Conv.ctx -> Subst.Projection.t -> t -> form
   val flavor : t -> flavor
   val name : t -> string option
 end
@@ -224,9 +237,9 @@ module Step : sig
   val goal : source -> t
   val goal' : ?loc:Loc.t -> file:string -> name:string -> unit -> t
 
-  val inference : ?infos:infos -> ?check:check -> rule:rule -> parent list -> t
+  val inference : ?infos:infos -> ?check:check -> ?tags:tag list -> rule:rule -> parent list -> t
 
-  val simp : ?infos:infos -> ?check:check -> rule:rule -> parent list -> t
+  val simp : ?infos:infos -> ?check:check -> ?tags:tag list -> rule:rule -> parent list -> t
 
   val esa : ?infos:infos -> ?check:check -> rule:rule -> parent list -> t
 
@@ -269,6 +282,9 @@ module Parent : sig
 end
 
 val pp_parent : Parent.t CCFormat.printer
+
+val pp_tag : tag CCFormat.printer
+val pp_tags : tag list CCFormat.printer
 
 (** {2 Proof} *)
 
@@ -332,6 +348,9 @@ module S : sig
   val pp_result_of : t CCFormat.printer
   val pp_notrec : t CCFormat.printer
   (** Non recursive printing on formatter *)
+
+  val pp_notrec1 : t CCFormat.printer
+  (** Non recursive printing on formatter, including parents *)
 
   val pp_tstp : t CCFormat.printer
   val pp_normal : t CCFormat.printer

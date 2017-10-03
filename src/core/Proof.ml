@@ -7,6 +7,7 @@ module Loc = ParseLocation
 module T = TypedSTerm
 module F = T.Form
 module UA = UntypedAST
+module Fmt = CCFormat
 
 type form = TypedSTerm.t
 type 'a sequence = ('a -> unit) -> unit
@@ -14,6 +15,15 @@ type 'a sequence = ('a -> unit) -> unit
 let section = Util.Section.make "proof"
 
 type rule = string
+
+(** Tag for checking an inference. Each tag describes an extension of FO
+    that is used in the inference *)
+type tag =
+  | T_lia (** integer arith *)
+  | T_lra (** rational arith *)
+  | T_ho (** higher order *)
+  | T_ind (** induction *)
+  | T_data (** datatypes *)
 
 type check = [`No_check | `Check | `Check_with of form list]
 
@@ -25,8 +35,8 @@ type infos = info list
 
 type kind =
   | Intro of source * role
-  | Inference of rule * check
-  | Simplification of rule * check
+  | Inference of rule * check * tag list
+  | Simplification of rule * check * tag list
   | Esa of rule * check
   | Trivial (** trivial, or trivial within theories *)
   | Define of ID.t * source (** definition *)
@@ -71,6 +81,7 @@ type 'a result_tc = {
   res_is_stmt: bool;
   res_pp_in: Output_format.t -> 'a CCFormat.printer;
   res_to_form: ctx:Term.Conv.ctx -> 'a -> TypedSTerm.Form.t;
+  res_to_form_subst: ctx:Term.Conv.ctx -> Subst.Projection.t -> 'a -> TypedSTerm.Form.t;
   res_name:('a -> string) option;
   res_flavor: 'a -> flavor;
 }
@@ -201,10 +212,21 @@ module Parent = struct
     | P_subst (_,s) -> Some s
 end
 
+let pp_tag out = function
+  | T_lia -> Fmt.string out "lia"
+  | T_lra -> Fmt.string out "lra"
+  | T_ho -> Fmt.string out "ho"
+  | T_ind -> Fmt.string out "ind"
+  | T_data -> Fmt.string out "data"
+
+let pp_tags out = function
+  | [] -> ()
+  | l -> Fmt.fprintf out "@ [@[%a@]]" (Util.pp_list ~sep:"," pp_tag) l
+
 module Kind = struct
   type t = kind
 
-  let _pp_parent out = function
+  let pp_parent_ out = function
     | `Name s -> Format.fprintf out "%s" s
     | `Theory s -> Format.fprintf out "theory(%s)" s
 
@@ -213,10 +235,10 @@ module Kind = struct
     | Intro (src,R_lemma) -> Format.fprintf out "lemma %a" Src.pp src
     | Intro (src,R_assert) -> Src.pp out src
     | Intro (src, (R_def | R_decl)) -> Src.pp out src
-    | Inference (rule,_) ->
-      Format.fprintf out "inf %a" Rule.pp rule
-    | Simplification (rule,_) ->
-      Format.fprintf out "simp %a" Rule.pp rule
+    | Inference (rule,_,tags) ->
+      Format.fprintf out "inf %a%a" Rule.pp rule pp_tags tags
+    | Simplification (rule,_,tags) ->
+      Format.fprintf out "simp %a%a" Rule.pp rule pp_tags tags
     | Esa (rule,_) ->
       Format.fprintf out "esa %a" Rule.pp rule
     | Trivial -> CCFormat.string out "trivial"
@@ -224,7 +246,7 @@ module Kind = struct
     | Define (id,src) -> Format.fprintf out "define(@[%a@ %a@])" ID.pp id Src.pp src
 
   let pp_tstp out (k,parents) =
-    let pp_parents = Util.pp_list _pp_parent in
+    let pp_parents = Util.pp_list pp_parent_ in
     let pp_step status out (rule,parents) = match parents with
       | [] ->
         Format.fprintf out "inference(@[%a,@ [status(%s)]@])" Rule.pp rule status
@@ -234,8 +256,8 @@ module Kind = struct
     in
     begin match k with
       | Intro (src,(R_assert|R_goal|R_def|R_decl)) -> Src.pp_tstp out src
-      | Inference (rule,_)
-      | Simplification (rule,_) -> pp_step "thm" out (rule,parents)
+      | Inference (rule,_,_)
+      | Simplification (rule,_,_) -> pp_step "thm" out (rule,parents)
       | Esa (rule,_) -> pp_step "esa" out (rule,parents)
       | Intro (_,R_lemma) -> Format.fprintf out "lemma"
       | Trivial -> assert(parents=[]); Format.fprintf out "trivial([status(thm)])"
@@ -272,6 +294,10 @@ module Result = struct
     | None -> assert false
     | Some x -> r.res_to_form ~ctx x
 
+  let to_form_subst ?(ctx=Term.Conv.create()) subst (Res (r,x)) = match r.res_of_exn x with
+    | None -> assert false
+    | Some x -> r.res_to_form_subst ~ctx subst x
+
   let pp_in o out (Res (r,x)) = match r.res_of_exn x with
     | None -> assert false
     | Some x -> r.res_pp_in o out x
@@ -294,6 +320,7 @@ module Result = struct
   let make_tc (type a)
       ~of_exn ~to_exn ~compare
       ~to_form
+      ?(to_form_subst=fun ~ctx:_ _ _ -> assert false)
       ~pp_in
       ?name
       ?(is_stmt=false)
@@ -308,6 +335,7 @@ module Result = struct
       res_is_stmt=is_stmt;
       res_pp_in=pp_in;
       res_to_form=to_form;
+      res_to_form_subst=to_form_subst;
       res_name=name;
       res_flavor=flavor;
     }
@@ -334,7 +362,7 @@ end
 let pp_parent out = function
   | P_of p -> Result.pp out p.result
   | P_subst (p,subst) ->
-    Format.fprintf out "(@[instantiate %a@ :subst %a@])"
+    Format.fprintf out "(@[instantiate `%a`@ :subst %a@])"
       Result.pp p.result Subst.Projection.pp subst
 
 module Step = struct
@@ -363,8 +391,8 @@ module Step = struct
     | By_def _
     | Define _ -> None
     | Esa (rule,_)
-    | Simplification (rule,_)
-    | Inference (rule,_)
+    | Simplification (rule,_,_)
+    | Inference (rule,_,_)
       -> Some rule
 
   let is_assert p = match p.kind with Intro (_,R_assert) -> true | _ -> false
@@ -431,11 +459,11 @@ module Step = struct
 
   let default_check : check = `Check
 
-  let inference ?infos ?(check=default_check) ~rule parents =
-    step_ ?infos (Inference (rule,check)) parents
+  let inference ?infos ?(check=default_check) ?(tags=[]) ~rule parents =
+    step_ ?infos (Inference (rule,check,tags)) parents
 
-  let simp ?infos ?(check=default_check) ~rule parents =
-    step_ ?infos (Simplification (rule,check)) parents
+  let simp ?infos ?(check=default_check) ?(tags=[]) ~rule parents =
+    step_ ?infos (Simplification (rule,check,tags)) parents
 
   let esa ?infos ?(check=default_check) ~rule parents =
     step_ ?infos (Esa (rule,check)) parents
@@ -560,6 +588,11 @@ module S = struct
   let pp_notrec out p =
     Format.fprintf out "@[%a by %a@]"
       pp_result_of p Kind.pp (Step.kind @@ step p)
+
+  let pp_notrec1 out p =
+    Format.fprintf out "@[<hv>%a by %a@ from [@[<v>%a@]]@]"
+      pp_result_of p Kind.pp (Step.kind @@ step p)
+      (Util.pp_list pp_parent) p.step.parents
 
   let traverse_bfs ~traversed proof k =
     (* layered BFS *)

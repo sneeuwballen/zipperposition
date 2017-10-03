@@ -90,7 +90,8 @@ module Make(Env : Env_intf.S) = struct
     then SimplM.return_same c
     else (
       let proof =
-        Proof.Step.inference ~rule:(Proof.Rule.mk "acyclicity") [C.proof_parent c] in
+        Proof.Step.inference ~rule:(Proof.Rule.mk "acyclicity")
+          ~tags:[Proof.T_data] [C.proof_parent c] in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
       Util.incr_stat stat_acyclicity;
       Util.debugf ~section 3
@@ -138,7 +139,7 @@ module Make(Env : Env_intf.S) = struct
            in
            let proof =
              Proof.Step.inference [C.proof_parent_subst renaming (c,0) subst]
-               ~rule:(Proof.Rule.mk "acyclicity")
+               ~rule:(Proof.Rule.mk "acyclicity") ~tags:[Proof.T_data]
            in
            let new_c =
              C.create
@@ -186,7 +187,7 @@ module Make(Env : Env_intf.S) = struct
                if T.equal t1 t2 then None else Some (Literal.mk_eq t1 t2))
         in
         let rule = Proof.Rule.mk "injectivity_destruct+" in
-        let proof = Proof.Step.inference ~rule [C.proof_parent c] in
+        let proof = Proof.Step.inference ~tags:[Proof.T_data] ~rule [C.proof_parent c] in
         (* make one clause per [new_lits] *)
         let clauses =
           List.map
