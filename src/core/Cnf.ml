@@ -1103,7 +1103,7 @@ let proof_cnf stmt =
     [Stmt.as_proof_i stmt |> Proof.Parent.from]
 
 let proof_neg stmt =
-  Proof.Step.inference ~rule:rule_neg
+  Proof.Step.esa ~rule:rule_neg
     [Stmt.as_proof_i stmt |> Proof.Parent.from]
 
 (* Transform the clauses into proper CNF; returns a list of clauses *)
@@ -1238,8 +1238,10 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
          | Stmt.Goal f ->
            (* intermediate statement to represent the negation step *)
            let not_f = F.not_ f in
+           let stmt = Stmt.neg_goal ~proof:(proof_neg stmt) ~skolems:[] [not_f] in
+           (* now take the CNF of negated goal *)
            let skolems, l = conv_form_sk not_f in
-           let proof = proof_neg stmt in
+           let proof = proof_cnf stmt in
            CCVector.push res (Stmt.neg_goal ~attrs ~proof ~skolems l)
          | Stmt.NegatedGoal (sk1,l) ->
            let proof = proof_cnf stmt in
