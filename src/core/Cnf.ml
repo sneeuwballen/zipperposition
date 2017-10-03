@@ -1099,7 +1099,7 @@ let rule_cnf = Proof.Rule.mk "cnf"
 let rule_neg = Proof.Rule.mk "cnf.neg"
 
 let proof_cnf stmt =
-  Proof.Step.inference ~rule:rule_cnf
+  Proof.Step.esa ~rule:rule_cnf
     [Stmt.as_proof_i stmt |> Proof.Parent.from]
 
 let proof_neg stmt =
