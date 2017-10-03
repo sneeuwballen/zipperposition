@@ -205,9 +205,7 @@ let make_env ~ctx:(module Ctx : Ctx_intf.S) ~params stmts =
 let has_goal_ = ref false
 
 (* print stats *)
-let print_stats (type c) (module Env : Env.S with type C.t = c) =
-  Phases.start_phase Phases.Print_stats >>= fun () ->
-  Signal.send Signals.on_print_stats ();
+let print_stats_env (type c) (module Env : Env.S with type C.t = c) =
   let comment = Options.comment() in
   let print_hashcons_stats what (sz, num, sum_length, small, median, big) =
     Format.printf
@@ -215,11 +213,20 @@ let print_stats (type c) (module Env : Env.S with type C.t = c) =
        buckets: small %d, median %d, big %d@]@."
       comment what sz num sum_length small median big
   and print_state_stats (num_active, num_passive, num_simpl) =
-    Format.printf "%sproof state stats:@." comment;
-    Format.printf "%sstat:  active clauses          %d@." comment num_active;
-    Format.printf "%sstat:  passive clauses         %d@." comment num_passive;
-    Format.printf "%sstat:  simplification clauses  %d@." comment num_simpl;
-  and print_gc () =
+    Format.printf "%sproof state stats: {active %d, passive %d, simpl %d}@."
+      comment num_active num_passive num_simpl;
+  in
+  if Env.params.param_stats then (
+    print_hashcons_stats "terms" (InnerTerm.hashcons_stats ());
+    print_state_stats (Env.stats ());
+  )
+
+(* print stats *)
+let print_stats () =
+  Phases.start_phase Phases.Print_stats >>= fun () ->
+  Signal.send Signals.on_print_stats ();
+  let comment = Options.comment() in
+  let print_gc () =
     let stats = Gc.stat () in
     Format.printf
       "@[<h>%sGC: minor words %.0f; major_words: %.0f; max_heap: %d; \
@@ -228,10 +235,9 @@ let print_stats (type c) (module Env : Env.S with type C.t = c) =
       stats.Gc.minor_words stats.Gc.major_words stats.Gc.top_heap_words
       stats.Gc.minor_collections stats.Gc.major_collections;
   in
-  if Env.params.param_stats then (
+  Phases.get_key Params.key >>= fun params ->
+  if params.Params.param_stats then (
     print_gc ();
-    print_hashcons_stats "terms" (InnerTerm.hashcons_stats ());
-    print_state_stats (Env.stats ());
     Util.print_global_stats ~comment ();
   );
   Phases.return_phase ()
@@ -430,21 +436,22 @@ let process_file (prelude:Phases.prelude) file =
 
 let print file env result =
   (* print some statistics *)
-  print_stats env >>= fun () ->
+  print_stats_env env;
   print_szs_result ~file env result >>= fun () ->
   print_dots env result
 
 let check res =
   Phases.start_phase Phases.Check_proof >>= fun () ->
   Phases.get_key Params.key >>= fun params ->
+  let comment = Options.comment() in
   let errcode = match res with
     | Saturate.Unsat p when params.Params.param_check ->
       (* check proof! *)
       Util.debug ~section 1 "start checking proof…";
       let p' = LLProof_conv.conv p in
       let res, stats = LLProof_check.check p' in
-      Util.debugf ~section 1 "(@[proof_check@ :res %a@ :stats %a@])"
-        (fun k->k LLProof_check.pp_res res LLProof_check.pp_stats stats);
+      Format.printf "%s(@[<h>proof_check@ :res %a@ :stats %a@])@."
+        comment LLProof_check.pp_res res LLProof_check.pp_stats stats;
       if res = LLProof_check.R_fail then 1 else 0
     | _ -> 0
   in
@@ -482,4 +489,6 @@ let process_files_and_print (params:Params.t) files =
     check res
   in
   let phases = List.map f files in
-  Phases.run_parallel phases
+  Phases.run_parallel phases >>= fun r ->
+  print_stats () >>= fun () ->
+  Phases.return r
