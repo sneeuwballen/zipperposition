@@ -507,6 +507,61 @@ let close_all ~ty s t =
 
 let unfold_fun = unfold_binder Binder.Lambda
 
+(* non recursive map *)
+let map ~f ~bind:f_bind b_acc t = match view t with
+  | Var v -> var ?loc:t.loc (Var.update_ty ~f:(f b_acc) v)
+  | Const id -> const ?loc:t.loc id ~ty:(f b_acc (ty_exn t))
+  | App (hd, l) ->
+    let hd = f b_acc hd in
+    let l = List.map (f b_acc) l in
+    app ?loc:t.loc ~ty:(f b_acc (ty_exn t)) hd l
+  | Bind (s, v, body) ->
+    let b_acc', v' = f_bind b_acc v in
+    let body = f b_acc' body in
+    bind ?loc:t.loc ~ty:(f b_acc (ty_exn t)) s v' body
+  | AppBuiltin (Builtin.TType,_) -> t
+  | AppBuiltin (b,l) ->
+    let l = List.map (f b_acc) l in
+    let ty = f b_acc (ty_exn t) in
+    app_builtin ?loc:t.loc ~ty b l
+  | Record (l, rest) ->
+    let ty = f b_acc (ty_exn t) in
+    record_flatten ?loc:t.loc ~ty
+      (List.map (CCPair.map2 (f b_acc)) l)
+      ~rest:(CCOpt.map (f b_acc) rest)
+  | Ite (a,b,c) ->
+    let a = f b_acc a in
+    let b = f b_acc b in
+    let c = f b_acc c in
+    ite ?loc:t.loc a b c
+  | Let (l, u) ->
+    let b_acc', l =
+      CCList.fold_map
+        (fun b_acc' (v,t) ->
+           let t = f b_acc t in
+           let b_acc', v = f_bind b_acc' v in
+           b_acc', (v,t))
+        b_acc l
+    in
+    let u = f b_acc' u in
+    let_ ?loc:t.loc l u
+  | Match (u, l) ->
+    let u = f b_acc u in
+    let l =
+      List.map
+        (fun (c, vars, rhs) ->
+           let b_acc, vars = CCList.fold_map f_bind b_acc vars in
+           c, vars, f b_acc rhs)
+        l
+    in
+    match_ ?loc:t.loc u l
+  | Multiset l ->
+    let ty = f b_acc (ty_exn t) in
+    multiset ?loc:t.loc ~ty (List.map (f b_acc) l)
+  | Meta (v,r,k) ->
+    let v = Var.update_ty v ~f:(f b_acc) in
+    meta ?loc:t.loc (v, r, k)
+
 (** {2 Specific Views} *)
 
 module Ty = struct
@@ -853,7 +908,8 @@ module Subst = struct
 
   let rec eval_ ~recursive subst t = match view t with
     | Var v ->
-      begin try
+      begin
+        try
           let t' = Var.Subst.find_exn subst v in
           assert (t != t');
           if recursive then (
@@ -864,58 +920,10 @@ module Subst = struct
         with Not_found ->
           var ?loc:t.loc (Var.update_ty v ~f:(eval_ ~recursive subst))
       end
-    | Const _ -> t
-    | App (f, l) ->
-      let ty = eval_ ~recursive subst (ty_exn t) in
-      app ?loc:t.loc ~ty (eval_ ~recursive subst f) (eval_list_ ~recursive subst l)
-    | Bind (s, v, body) ->
-      let ty = eval_ ~recursive subst (ty_exn t) in
-      (* bind [v] to a fresh name to avoid collision *)
-      let subst, v' = rename_var subst v in
-      bind ?loc:t.loc ~ty s v' (eval_ ~recursive subst body)
-    | AppBuiltin (Builtin.TType,_) -> t
-    | AppBuiltin (b,l) ->
-      let ty = eval_ ~recursive subst (ty_exn t) in
-      app_builtin ?loc:t.loc ~ty b (eval_list_ ~recursive subst l)
-    | Record (l, rest) ->
-      let ty = eval_ ~recursive subst (ty_exn t) in
-      record_flatten ?loc:t.loc ~ty
-        (List.map (CCPair.map2 (eval_ ~recursive subst)) l)
-        ~rest:(CCOpt.map (eval_ ~recursive subst) rest)
-    | Ite (a,b,c) ->
-      let a = eval_ ~recursive subst a in
-      let b = eval_ ~recursive subst b in
-      let c = eval_ ~recursive subst c in
-      ite ?loc:t.loc a b c
-    | Let (l, u) ->
-      let subst', l =
-        CCList.fold_map
-          (fun subst' (v,t) ->
-             let t = eval_ ~recursive subst t in
-             let subst', v = rename_var subst' v in
-             subst', (v,t))
-          subst l
-      in
-      let u = eval_ ~recursive subst' u in
-      let_ ?loc:t.loc l u
-    | Match (u, l) ->
-      let u = eval_ ~recursive subst u in
-      let l =
-        List.map
-          (fun (c, vars, rhs) ->
-             let subst, vars = CCList.fold_map rename_var subst vars in
-             c, vars, eval_ ~recursive subst rhs)
-          l
-      in
-      match_ ?loc:t.loc u l
-    | Multiset l ->
-      let ty = eval_ ~recursive subst (ty_exn t) in
-      multiset ?loc:t.loc ~ty (eval_list_ ~recursive subst l)
-    | Meta (v,r,k) ->
-      let v = Var.update_ty v ~f:(eval_ ~recursive subst) in
-      meta ?loc:t.loc (v, r, k)
-  and eval_list_ ~recursive subst l =
-    List.map (eval_ ~recursive subst) l
+    | _ ->
+      map subst t
+        ~bind:rename_var
+        ~f:(eval_ ~recursive)
 
   (* rename variable and evaluate its type *)
   and rename_var subst v =
@@ -927,6 +935,26 @@ module Subst = struct
 
   let eval_nonrec subst t = if is_empty subst then t else eval_ ~recursive:false subst t
 end
+
+let rec rename subst t = match view t with
+  | Var v ->
+    begin
+      try
+        let v' = Var.Subst.find_exn subst v in
+        var v'
+      with Not_found ->
+        var ?loc:t.loc (Var.update_ty v ~f:(rename subst))
+    end
+  | _ ->
+    map subst t
+      ~bind:rename_var
+      ~f:rename
+
+(* rename variable and evaluate its type *)
+and rename_var subst v =
+  let v' = Var.copy v |> Var.update_ty ~f:(rename subst) in
+  let subst = Var.Subst.add subst v v' in
+  subst, v'
 
 (** {2 Table of Variables} *)
 

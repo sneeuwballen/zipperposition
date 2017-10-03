@@ -304,6 +304,8 @@ module Subst : sig
   include Interfaces.PRINT with type t := t
 end
 
+val rename : (term, term Var.t) Var.Subst.t -> t -> t
+(** Perform renaming *)
 
 (** {2 Table of Variables} *)
 
