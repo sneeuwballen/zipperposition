@@ -38,6 +38,23 @@ let open_term ~stack t = match T.view t with
   | T.App (_, l) ->
     Some {cur_term=t; stack=l::stack;}
 
+
+type view_head =
+  | As_star
+  | As_app of ID.t * T.t list
+
+let view_head (t:T.t) : view_head =
+  if
+    not (T.is_app t) ||
+    not (Unif.Ty.type_is_unifiable (T.ty t)) ||
+    Type.is_fun (T.ty t) ||
+    T.is_ho_app t
+  then As_star
+  else (
+    let s,l = T.as_app t in
+    As_app (T.as_const_exn s, l)
+  )
+
 let rec next_rec stack = match stack with
   | [] -> None
   | []::stack' -> next_rec stack'
@@ -95,8 +112,8 @@ module Make(E : Index.EQUATION) = struct
             | leaf' -> rebuild {trie with leaf=leaf'; }
           end
         | Some i ->
-          match TC.view i.cur_term with
-            | (TC.Var _ | TC.DB _ | TC.AppBuiltin _ | TC.NonFO) ->
+          match view_head i.cur_term with
+            | As_star ->
               let subtrie = match trie.star with
                 | None -> empty ()
                 | Some trie' -> trie'
@@ -107,7 +124,7 @@ module Make(E : Index.EQUATION) = struct
                 else rebuild {trie with star=Some subtrie ;}
               in
               goto subtrie (next i) rebuild
-            | TC.App (s, _) ->
+            | As_app (s, _) ->
               let subtrie =
                 try find_sub trie.map s
                 with NoSuchTrie -> empty ()
@@ -151,14 +168,14 @@ module Make(E : Index.EQUATION) = struct
           Leaf.fold_match ~subst (Scoped.set dt trie.leaf) t k';
           Util.enter_prof prof_npdtree_retrieve;
         | Some i ->
-          match TC.view i.cur_term with
-            | (TC.Var _ | TC.DB _ | TC.AppBuiltin _ | TC.NonFO) ->
+          match view_head i.cur_term with
+            | As_star ->
               begin match trie.star with
                 | None -> ()
                 | Some subtrie ->
                   traverse subtrie (next i)  (* match "*" against "*" *)
               end
-            | TC.App (s, _) ->
+            | As_app (s, _) ->
               begin try
                   let subtrie = find_sub trie.map s in
                   traverse subtrie (next i)
@@ -261,8 +278,8 @@ module MakeTerm(X : Set.OrderedType) = struct
           | leaf' -> rebuild {trie with leaf=leaf'; }
         end
       | Some i ->
-        match TC.view i.cur_term with
-          | (TC.Var _ | TC.DB _ | TC.AppBuiltin _ | TC.NonFO) ->
+        match view_head i.cur_term with
+          | As_star ->
             let subtrie = match trie.star with
               | None -> empty ()
               | Some trie' -> trie'
@@ -273,7 +290,7 @@ module MakeTerm(X : Set.OrderedType) = struct
               else rebuild {trie with star=Some subtrie ;}
             in
             goto subtrie (next i) rebuild
-          | TC.App (s, l) ->
+          | As_app (s,l) ->
             let arity = List.length l in
             let subtrie =
               try find_sub trie.map (s,arity)
@@ -332,12 +349,12 @@ module MakeTerm(X : Set.OrderedType) = struct
         Leaf.fold_unify ~subst (Scoped.set dt trie.leaf) t k;
         Util.enter_prof prof_npdtree_term_unify;
       | Some i ->
-        match TC.view i.cur_term with
-          | (TC.Var _ | TC.DB _ | TC.AppBuiltin _ | TC.NonFO) ->
+        match view_head i.cur_term with
+          | As_star ->
             (* skip one term in all branches of the trie *)
             skip_tree trie
               (fun subtrie -> traverse subtrie (next i))
-          | TC.App (s, l) ->
+          | As_app (s,l) ->
             let arity = List.length l in
             begin try
                 let subtrie = SIMap.find (s,arity) trie.map in
@@ -366,14 +383,14 @@ module MakeTerm(X : Set.OrderedType) = struct
         Leaf.fold_match ~subst (Scoped.set dt trie.leaf) t k;
         Util.enter_prof prof_npdtree_term_generalizations;
       | Some i ->
-        match TC.view i.cur_term with
-          | (TC.Var _ | TC.DB _ | TC.AppBuiltin _ | TC.NonFO) ->
+        match view_head i.cur_term with
+          | As_star ->
             begin match trie.star with
               | None -> ()
               | Some subtrie ->
                 traverse subtrie (next i) (* match "*" against "*" only *)
             end
-          | TC.App (s, l) ->
+          | As_app (s,l) ->
             let arity = List.length l in
             begin try
                 let subtrie = SIMap.find (s,arity) trie.map in
@@ -402,12 +419,12 @@ module MakeTerm(X : Set.OrderedType) = struct
         Leaf.fold_matched ~subst (Scoped.set dt trie.leaf) t k;
         Util.enter_prof prof_npdtree_term_specializations;
       | Some i ->
-        match TC.view i.cur_term with
-          | (TC.Var _ | TC.DB _ | TC.AppBuiltin _ | TC.NonFO) ->
+        match view_head i.cur_term with
+          | As_star ->
             (* match * against any subterm *)
             skip_tree trie
               (fun subtrie -> traverse subtrie (next i))
-          | TC.App (s, l) ->
+          | As_app (s,l) ->
             (* only same symbol *)
             let arity = List.length l in
             begin try
