@@ -687,17 +687,22 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let lazy_false = Lazy.from_val false
 
+  type demod_state = {
+    mutable demod_clauses: (C.t * Subst.t * Scoped.scope) list; (* rules used *)
+    mutable demod_sc: Scoped.scope; (* current scope *)
+  }
+
   (** Compute normal form of term w.r.t active set. Clauses used to
       rewrite are added to the clauses hashset.
       restrict is an option for restricting demodulation in positive maximal terms *)
-  let demod_nf ?(restrict=lazy_false) c clauses t =
+  let demod_nf ?(restrict=lazy_false) (st:demod_state) c t =
     let ord = Ctx.ord () in
     (* compute normal form of subterm. If restrict is true, substitutions that
        are variable renamings are forbidden (since we are at root of a max term) *)
-    let rec reduce_at_root ~restrict t =
+    let rec reduce_at_root ~restrict t scope =
       (* find equations l=r that match subterm *)
       try
-        UnitIdx.retrieve ~sign:true (!_idx_simpl, 1) (t, 0)
+        UnitIdx.retrieve ~sign:true (!_idx_simpl, st.demod_sc) (t, scope)
         |> Sequence.iter
           (fun (l, r, (_,_,_,unit_clause), subst) ->
              (* r is the term subterm is going to be rewritten into *)
@@ -705,35 +710,39 @@ module Make(Env : Env.S) : S with module Env = Env = struct
              if (not (Lazy.force restrict) || not (S.is_renaming subst))
              && C.trail_subsumes unit_clause c
              && (O.compare ord
-                   (S.FO.apply Subst.Renaming.none subst (l,1))
-                   (S.FO.apply Subst.Renaming.none subst (r,1)) = Comp.Gt)
+                   (S.FO.apply Subst.Renaming.none subst (l,st.demod_sc))
+                   (S.FO.apply Subst.Renaming.none subst (r,st.demod_sc)) = Comp.Gt)
              (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
              then (
                Util.debugf ~section 5
-                 "@[<hv2>demod:@ @[<hv>t=%a[0],@ l=%a[1],@ r=%a[1]@],@ subst=@[%a@]@]"
-                 (fun k->k T.pp t T.pp l T.pp r S.pp subst);
+                 "@[<hv2>demod:@ @[<hv>t=%a[%d],@ l=%a[%d],@ r=%a[%d]@],@ subst=@[%a@]@]"
+                 (fun k->k T.pp t scope T.pp l st.demod_sc T.pp r st.demod_sc S.pp subst);
                (* sanity checks *)
                assert (Type.equal (T.ty l) (T.ty r));
                assert (O.compare ord
-                   (S.FO.apply Subst.Renaming.none subst (l,1))
-                   (S.FO.apply Subst.Renaming.none subst (r,1)) = Comp.Gt);
-               clauses := (unit_clause,subst) :: !clauses;
+                   (S.FO.apply Subst.Renaming.none subst (l,st.demod_sc))
+                   (S.FO.apply Subst.Renaming.none subst (r,st.demod_sc)) = Comp.Gt);
+               st.demod_clauses <-
+                 (unit_clause,subst,st.demod_sc) :: st.demod_clauses;
                Util.incr_stat stat_demodulate_step;
                raise (RewriteInto (r, subst))
              ));
         t (* not found any match, normal form found *)
-      with RewriteInto (t', subst) ->
+      with RewriteInto (rhs, subst) ->
+        (* allocate new scope, reduce [rhs] in current scope *)
+        let cur_sc = st.demod_sc in
+        st.demod_sc <- 1 + st.demod_sc;
         Util.debugf ~section 5
-          "@[<2>demod:@ rewrite `@[%a@]`@ into `@[%a@]`@ using %a@]"
-          (fun k->k T.pp t T.pp t' Subst.pp subst);
-        normal_form ~restrict subst t' 1 (* done one rewriting step, continue *)
+          "@[<2>demod:@ rewrite `@[%a@]`@ into `@[%a@]`@ using %a[%d]@]"
+          (fun k->k T.pp t T.pp rhs Subst.pp subst cur_sc);
+        normal_form ~restrict subst rhs cur_sc (* done one rewriting step, continue *)
     (* rewrite innermost-leftmost of [subst(t,scope)]. The initial scope is
        0, but then we normal_form terms in which variables are really the variables
-       of the RHS of a previously applied rule (in context 1); all those
+       of the RHS of a previously applied rule (in context !sc); all those
        variables are bound to terms in context 0 *)
     and normal_form ~restrict subst t scope =
       match T.view t with
-        | T.Const _ -> reduce_at_root ~restrict t
+        | T.Const _ -> reduce_at_root ~restrict t scope
         | T.App (hd, l) ->
           (* rewrite subterms in call by value *)
           let l' =
@@ -746,7 +755,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             else T.app hd' l'
           in
           (* rewrite term at root *)
-          reduce_at_root ~restrict t'
+          reduce_at_root ~restrict t' scope
         | T.Fun (ty_arg, body) ->
           (* reduce under lambdas *)
           let body' = normal_form ~restrict:lazy_false subst body scope in
@@ -761,14 +770,18 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     normal_form ~restrict S.empty t 0
 
-  let eq_c_subst (c1,s1)(c2,s2) = C.equal c1 c2 && Subst.equal s1 s2
+  let[@inline] eq_c_subst (c1,s1,sc1)(c2,s2,sc2) =
+    C.equal c1 c2 && sc1=sc2 && Subst.equal s1 s2
 
   (* Demodulate the clause, with restrictions on which terms to rewrite *)
   let demodulate_ c =
     Util.incr_stat stat_demodulate_call;
     let ord = Ctx.ord () in
-    (* clauses used to rewrite *)
-    let clauses = ref [] in
+    (* state for storing proofs and scope *)
+    let st = {
+      demod_clauses=[];
+      demod_sc=1;
+    } in
     (* literals that are eligible for paramodulation. *)
     let eligible_param = lazy (C.eligible_param (c,0) S.empty) in
     (* demodulate literals *)
@@ -799,7 +812,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         else false
       ) in
       Lit.map
-        (fun t -> demod_nf ~restrict:(restrict_term t) c clauses t)
+        (fun t -> demod_nf ~restrict:(restrict_term t) st c t)
         lit
     in
     (* demodulate every literal *)
@@ -810,21 +823,22 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       SimplM.return_same c
     ) else (
       (* construct new clause *)
-      clauses := CCList.uniq ~eq:eq_c_subst !clauses;
+      st.demod_clauses <- CCList.uniq ~eq:eq_c_subst st.demod_clauses;
       let proof =
         Proof.Step.simp
           ~rule:(Proof.Rule.mk "demod")
           (C.proof_parent c ::
              List.rev_map
-               (fun (c,s) -> C.proof_parent_subst Subst.Renaming.none (c,1) s)
-               !clauses) in
+               (fun (c,subst,sc) ->
+                  C.proof_parent_subst Subst.Renaming.none (c,sc) subst)
+               st.demod_clauses) in
       let trail = C.trail c in (* we know that demodulating rules have smaller trail *)
       let new_c = C.create_a ~trail ~penalty:(C.penalty c) lits proof in
       Util.debugf ~section 3 "@[<hv2>demodulate@ @[%a@]@ into @[%a@]@ using @[%a@]@]"
         (fun k->
-           let pp_c_s out (c,s) =
-             Format.fprintf out "(@[%a@ :subst %a@])" C.pp c Subst.pp s in
-           k C.pp c C.pp new_c (Util.pp_list pp_c_s) !clauses);
+           let pp_c_s out (c,s,sc) =
+             Format.fprintf out "(@[%a@ :subst %a[%d]@])" C.pp c Subst.pp s sc in
+           k C.pp c C.pp new_c (Util.pp_list pp_c_s) st.demod_clauses);
       (* return simplified clause *)
       SimplM.return_new new_c
     )

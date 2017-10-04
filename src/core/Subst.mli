@@ -184,7 +184,11 @@ end
 (** {2 Projections for proofs} *)
 
 module Projection : sig
-  type t
+  type t = private {
+    scope: Scoped.scope;
+    subst: subst;
+    renaming: Renaming.t;
+  }
   (** A representation of the substitution for a given scope, after applying
       the renaming. *)
 
@@ -193,9 +197,16 @@ module Projection : sig
   val renaming : t -> Renaming.t
 
   val bindings : t -> (var * term) list
-(** List of bindings of the projection.
-    Variables in the domain are bound in [scope subst], but variables
-    in terms of the codomain are bound in the renaming *)
+  (** List of bindings of the projection.
+      Variables in the domain are bound in [scope subst], but variables
+      in terms of the codomain are bound in the renaming *)
+
+  val as_inst :
+    ctx:Term.Conv.ctx ->
+    t ->
+    Type.t HVar.t list ->
+    (TypedSTerm.t,TypedSTerm.t) Var.Subst.t
+  (** Convert into an instantiation on the given variables *)
 
   val is_empty : t -> bool
 

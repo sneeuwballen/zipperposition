@@ -47,7 +47,7 @@ module type S = sig
   type is_trivial_rule = C.t -> bool
   (** Rule that checks whether the clause is trivial (a tautology) *)
 
-  type term_rewrite_rule = Term.t -> (Term.t * Proof.t list) option
+  type term_rewrite_rule = Term.t -> (Term.t * Proof.parent list) option
   (** Rewrite rule on terms *)
 
   type lit_rewrite_rule = Literal.t -> (Literal.t * Proof.t list) option

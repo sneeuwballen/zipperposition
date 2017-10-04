@@ -147,22 +147,13 @@ exception E_proof of t
 let to_s_form_subst ~ctx subst c : _ * _ Var.Subst.t =
   let module F = TypedSTerm.Form in
   let module SP = Subst.Projection in
-  let inst_subst =
-    Literals.vars (lits c)
-    |> List.map
-      (fun v ->
-         let t_v = Term.var v in
-         let t =
-           Subst.FO.apply (SP.renaming subst) (SP.subst subst)
-             ((t_v,SP.scope subst))
-         in
-         Term.Conv.var_to_simple_var ctx v, Term.Conv.to_simple_term ctx t)
-    |> Var.Subst.of_list
-  and f =
+  let f =
     Literals.apply_subst (SP.renaming subst) (SP.subst subst) (lits c,SP.scope subst)
     |> Literals.Conv.to_s_form ~ctx
     |> add_trail_ (trail c)
     |> F.close_forall
+  and inst_subst =
+    SP.as_inst ~ctx subst (Literals.vars (lits c))
   in
   f, inst_subst
 

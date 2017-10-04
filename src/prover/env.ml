@@ -78,7 +78,7 @@ module Make(X : sig
   type is_trivial_rule = C.t -> bool
   (** Rule that checks whether the clause is trivial (a tautology) *)
 
-  type term_rewrite_rule = Term.t -> (Term.t * Proof.t list) option
+  type term_rewrite_rule = Term.t -> (Term.t * Proof.parent list) option
   (** Rewrite rule on terms *)
 
   type lit_rewrite_rule = Literal.t -> (Literal.t * Proof.t list) option
@@ -322,7 +322,7 @@ module Make(X : sig
   let rewrite c =
     Util.debugf ~section 5 "@[<2>rewrite clause@ `@[%a@]`...@]" (fun k->k C.pp c);
     let applied_rules = ref StrSet.empty in
-    let proofs = ref [] in
+    let proofs : Proof.parent list ref = ref [] in
     let rec reduce_term rules t =
       match rules with
         | [] -> t
@@ -334,7 +334,7 @@ module Make(X : sig
               proofs := List.rev_append proof !proofs;
               Util.debugf ~section 5
                 "@[<2>rewrite `@[%a@]`@ into `@[%a@]`@ :proof (@[%a@])@]"
-                (fun k->k T.pp t T.pp t' (Util.pp_list Proof.S.pp_normal) proof);
+                (fun k->k T.pp t T.pp t' (Util.pp_list Proof.pp_parent) proof);
               reduce_term !_rewrite_rules t'  (* re-apply all rules *)
           end
     in
@@ -352,7 +352,7 @@ module Make(X : sig
       let rule = Proof.Rule.mk "rw" in
       let proof =
         Proof.Step.simp ~rule
-          (C.proof_parent c :: List.rev_map Proof.Parent.from !proofs)
+          (C.proof_parent c :: !proofs)
       in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
       assert (not (C.equal c c'));

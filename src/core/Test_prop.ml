@@ -84,13 +84,13 @@ let normalize_form (f:form): form =
     (* how to normalize a term/lit (with restricted resources) *)
     let rw_term t =
       let t', rules = RW.Term.normalize_term ~max_steps:10 t in
-      if not (RW.Term.Set.is_empty rules) then progress := true;
+      if not (RW.Term.Rule_inst_set.is_empty rules) then progress := true;
       t'
     in
     let rw_terms c = Literals.map rw_term c
     and rw_clause c = match RW.Lit.normalize_clause c with
       | None -> [c]
-      | Some (cs,_) ->
+      | Some (cs,_,_,_) ->
         progress := true;
         cs
     and rm_trivial =

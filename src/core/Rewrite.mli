@@ -61,7 +61,13 @@ module Term : sig
 
   type rule_set = Set.t
 
-  val normalize_term : ?max_steps:int -> term -> term * rule_set
+  (** Set of rules with their instantiation *)
+  module Rule_inst_set : sig
+    include CCSet.S with type elt = rule * Subst.t * Scoped.scope
+    val pp : t CCFormat.printer
+  end
+
+  val normalize_term : ?max_steps:int -> term -> term * Rule_inst_set.t
   (** [normalize t] computes the normal form of [t] w.r.t the set
       of rewrite rules stored in IDs.
       Returns the new term and the set of rules that were used
@@ -101,7 +107,7 @@ module Lit : sig
     val pp : t CCFormat.printer
   end
 
-  val normalize_clause : Literals.t -> (Literals.t list * rule) option
+  val normalize_clause : Literals.t -> (Literals.t list * rule * Subst.t * Scoped.scope) option
   (** normalize literals of the clause w.r.t. rules, or return [None]
       if no rule applies *)
 
@@ -129,6 +135,9 @@ module Rule : sig
   val pp : t CCFormat.printer
 
   val as_proof : t -> Proof.t
+
+  val set_as_proof_parents : Term.Rule_inst_set.t -> Proof.parent list
+  (** Proof parents from a set of rules instances *)
 
   val make_lit : proof:Proof.t -> Literal.t -> Literal.t list list -> t
   (** Make a literal rule *)
