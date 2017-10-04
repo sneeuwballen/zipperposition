@@ -667,8 +667,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
    * simplifications
    * ---------------------------------------------------------------------- *)
 
-  exception RewriteInto of T.t * S.t
-
   (* TODO: put forward pointers in simpl_set, to make some rewriting steps
       faster? (invalidate when updated, also allows to reclaim memory) *)
 
@@ -695,80 +693,97 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   (** Compute normal form of term w.r.t active set. Clauses used to
       rewrite are added to the clauses hashset.
       restrict is an option for restricting demodulation in positive maximal terms *)
-  let demod_nf ?(restrict=lazy_false) (st:demod_state) c t =
+  let demod_nf ?(restrict=lazy_false) (st:demod_state) c t : T.t =
     let ord = Ctx.ord () in
     (* compute normal form of subterm. If restrict is true, substitutions that
        are variable renamings are forbidden (since we are at root of a max term) *)
-    let rec reduce_at_root ~restrict t scope =
+    let rec reduce_at_root ~restrict t k =
       (* find equations l=r that match subterm *)
-      try
-        UnitIdx.retrieve ~sign:true (!_idx_simpl, st.demod_sc) (t, scope)
-        |> Sequence.iter
+      let cur_sc = st.demod_sc in
+      assert (cur_sc > 0);
+      let step =
+        UnitIdx.retrieve ~sign:true (!_idx_simpl, cur_sc) (t, 0)
+        |> Sequence.find_map
           (fun (l, r, (_,_,_,unit_clause), subst) ->
              (* r is the term subterm is going to be rewritten into *)
              assert (C.is_unit_clause unit_clause);
              if (not (Lazy.force restrict) || not (S.is_renaming subst))
              && C.trail_subsumes unit_clause c
              && (O.compare ord
-                   (S.FO.apply Subst.Renaming.none subst (l,st.demod_sc))
-                   (S.FO.apply Subst.Renaming.none subst (r,st.demod_sc)) = Comp.Gt)
+                 (S.FO.apply Subst.Renaming.none subst (l,cur_sc))
+                 (S.FO.apply Subst.Renaming.none subst (r,cur_sc)) = Comp.Gt)
              (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
              then (
                Util.debugf ~section 5
                  "@[<hv2>demod:@ @[<hv>t=%a[%d],@ l=%a[%d],@ r=%a[%d]@],@ subst=@[%a@]@]"
-                 (fun k->k T.pp t scope T.pp l st.demod_sc T.pp r st.demod_sc S.pp subst);
+                 (fun k->k T.pp t 0 T.pp l cur_sc T.pp r cur_sc S.pp subst);
                (* sanity checks *)
                assert (Type.equal (T.ty l) (T.ty r));
                assert (O.compare ord
-                   (S.FO.apply Subst.Renaming.none subst (l,st.demod_sc))
-                   (S.FO.apply Subst.Renaming.none subst (r,st.demod_sc)) = Comp.Gt);
+                   (S.FO.apply Subst.Renaming.none subst (l,cur_sc))
+                   (S.FO.apply Subst.Renaming.none subst (r,cur_sc)) = Comp.Gt);
                st.demod_clauses <-
-                 (unit_clause,subst,st.demod_sc) :: st.demod_clauses;
+                 (unit_clause,subst,cur_sc) :: st.demod_clauses;
+               st.demod_sc <- 1 + st.demod_sc; (* allocate new scope *)
                Util.incr_stat stat_demodulate_step;
-               raise (RewriteInto (r, subst))
-             ));
-        t (* not found any match, normal form found *)
-      with RewriteInto (rhs, subst) ->
-        (* allocate new scope, reduce [rhs] in current scope *)
-        let cur_sc = st.demod_sc in
-        st.demod_sc <- 1 + st.demod_sc;
-        Util.debugf ~section 5
-          "@[<2>demod:@ rewrite `@[%a@]`@ into `@[%a@]`@ using %a[%d]@]"
-          (fun k->k T.pp t T.pp rhs Subst.pp subst cur_sc);
-        normal_form ~restrict subst rhs cur_sc (* done one rewriting step, continue *)
+               Some (r, subst, cur_sc)
+             ) else None)
+      in
+      begin match step with
+        | None -> k t (* not found any match, normal form found *)
+        | Some (rhs,subst,cur_sc) ->
+          (* reduce [rhs] in current scope [cur_sc] *)
+          assert (cur_sc < st.demod_sc);
+          Util.debugf ~section 5
+            "@[<2>demod:@ rewrite `@[%a@]`@ into `@[%a@]`@ using %a[%d]@]"
+            (fun k->k T.pp t T.pp rhs Subst.pp subst cur_sc);
+          (* NOTE: we retraverse the term several times, but this is simpler *)
+          let rhs = Subst.FO.apply Subst.Renaming.none subst (rhs,cur_sc) in
+          normal_form ~restrict rhs k (* done one rewriting step, continue *)
+      end
     (* rewrite innermost-leftmost of [subst(t,scope)]. The initial scope is
        0, but then we normal_form terms in which variables are really the variables
        of the RHS of a previously applied rule (in context !sc); all those
        variables are bound to terms in context 0 *)
-    and normal_form ~restrict subst t scope =
+    and normal_form ~restrict t k =
       match T.view t with
-        | T.Const _ -> reduce_at_root ~restrict t scope
+        | T.Const _ -> reduce_at_root ~restrict t k
         | T.App (hd, l) ->
           (* rewrite subterms in call by value *)
-          let l' =
-            List.map (fun t' -> normal_form ~restrict:lazy_false subst t' scope) l
-          in
-          let hd' = normal_form ~restrict:lazy_false subst hd scope in
-          let t' =
-            if T.equal hd hd' && T.same_l l l'
-            then t
-            else T.app hd' l'
-          in
-          (* rewrite term at root *)
-          reduce_at_root ~restrict t' scope
+          normal_form ~restrict:lazy_false hd
+            (fun hd' ->
+               normal_form_l l
+                 (fun l' ->
+                    let t' =
+                      if T.equal hd hd' && T.same_l l l'
+                      then t
+                      else T.app hd' l'
+                    in
+                    (* rewrite term at root *)
+                    reduce_at_root ~restrict t' k))
         | T.Fun (ty_arg, body) ->
           (* reduce under lambdas *)
-          let body' = normal_form ~restrict:lazy_false subst body scope in
-          if T.equal body body' then t else T.fun_ ty_arg body'
-        | T.Var _ | T.DB _ ->
-          S.FO.apply Subst.Renaming.none subst (t,scope)
+          normal_form ~restrict:lazy_false body
+            (fun body' ->
+               let u = if T.equal body body' then t else T.fun_ ty_arg body' in
+               k u)
+        | T.Var _ | T.DB _ -> k t
         | T.AppBuiltin (b, l) ->
-          let l' =
-            List.map (fun t' -> normal_form ~restrict:lazy_false subst t' scope) l
-          in
-          if T.same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l'
+          normal_form_l l
+            (fun l' ->
+               let u =
+                 if T.same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l'
+               in
+               k u)
+    and normal_form_l l k = match l with
+      | [] -> k []
+      | t :: tail ->
+        normal_form ~restrict:lazy_false t
+          (fun t' ->
+             normal_form_l tail
+               (fun l' -> k (t' :: l')))
     in
-    normal_form ~restrict S.empty t 0
+    normal_form ~restrict t (fun t->t)
 
   let[@inline] eq_c_subst (c1,s1,sc1)(c2,s2,sc2) =
     C.equal c1 c2 && sc1=sc2 && Subst.equal s1 s2
