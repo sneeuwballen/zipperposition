@@ -50,7 +50,7 @@ module type S = sig
   type term_rewrite_rule = Term.t -> (Term.t * Proof.parent list) option
   (** Rewrite rule on terms *)
 
-  type lit_rewrite_rule = Literal.t -> (Literal.t * Proof.t list) option
+  type lit_rewrite_rule = Literal.t -> (Literal.t * Proof.parent list * Proof.tag list) option
   (** Rewrite rule on literals *)
 
   type multi_simpl_rule = C.t -> C.t list option

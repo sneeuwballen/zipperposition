@@ -26,6 +26,7 @@ type tag =
   | T_ho (** higher order *)
   | T_ind (** induction *)
   | T_data (** datatypes *)
+  | T_distinct (** distinct constants *)
 
 type check = [`No_check | `Check | `Check_with of form list]
 
@@ -220,6 +221,7 @@ let pp_tag out = function
   | T_ho -> Fmt.string out "ho"
   | T_ind -> Fmt.string out "ind"
   | T_data -> Fmt.string out "data"
+  | T_distinct -> Fmt.string out "distinct_constants"
 
 let pp_tags out = function
   | [] -> ()

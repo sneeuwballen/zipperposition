@@ -21,6 +21,7 @@ type tag =
   | T_ho (** higher order *)
   | T_ind (** induction *)
   | T_data (** datatypes *)
+  | T_distinct (** distinct constants *)
 
 (** How do we check a step? *)
 type check = [`No_check | `Check | `Check_with of form list]

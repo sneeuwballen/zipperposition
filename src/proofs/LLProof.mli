@@ -38,7 +38,11 @@ type step =
   | Trivial
   | By_def of ID.t
   | Define of ID.t
-  | Instantiate of t * inst
+  | Instantiate of {
+      form: t;
+      inst: inst;
+      tags: tag list;
+    }
   | Esa of name * t list * check_info
   | Inference of {
       intros: term list; (* local renaming for the conclusion's foralls, with fresh constants *)
@@ -89,7 +93,7 @@ val assert_ : form -> t
 val trivial : form -> t
 val by_def : ID.t -> form -> t
 val define : ID.t -> form -> t
-val instantiate : form -> t -> inst -> t
+val instantiate : ?tags:tag list -> form -> t -> inst -> t
 val esa :
   [`No_check | `Check | `Check_with of form list] ->
   form -> name -> t list -> t

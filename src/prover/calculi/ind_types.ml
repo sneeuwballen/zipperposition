@@ -218,11 +218,11 @@ module Make(Env : Env_intf.S) = struct
           Util.incr_stat stat_disjointness;
           let proof =
             let ity = T.head_term l |> T.ty |> Type.returns in
-            Ind_ty.as_inductive_type_exn ity |> fst |> Ind_ty.proof
+            Ind_ty.as_inductive_type_exn ity |> fst |> Ind_ty.proof |> Proof.Parent.from
           in
           if sign
-          then Some (Literal.mk_absurd, [proof])
-          else Some (Literal.mk_tauto, [proof])
+          then Some (Literal.mk_absurd, [proof], [Proof.T_data])
+          else Some (Literal.mk_tauto, [proof], [Proof.T_data])
         | _ -> None
       end
     | _ -> None

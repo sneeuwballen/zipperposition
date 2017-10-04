@@ -1641,7 +1641,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                    assuming 0<=opp<n *)
                 let m = M.add_const m Z.(rem (~- opp') n) in
                 let lit = Lit.mk_divides ~sign n ~power:1 m in
-                Some (lit,[])
+                Some (lit,[],[Proof.T_lia])
               | Some _,
                 T.AppBuiltin (Builtin.Int n,[]),
                 T.AppBuiltin (Builtin.Int opp', [])
@@ -1649,15 +1649,15 @@ module Make(E : Env.S) : S with module Env = E = struct
                 (* remainder(l1, n) = opp --> false
                    assuming opp ∉ [0.. n-1] *)
                 let lit = if sign then Lit.mk_absurd else Lit.mk_tauto in
-                Some (lit,[])
+                Some (lit,[],[Proof.T_lia])
               | _ -> None
             end
           | _ ->
             begin match Monome.Int.of_term l, Monome.Int.of_term r with
               | Some m1, Some m2 ->
                 if sign
-                then Some (Lit.mk_arith_eq m1 m2,[])
-                else Some (Lit.mk_arith_neq m1 m2,[])
+                then Some (Lit.mk_arith_eq m1 m2,[],[Proof.T_lia])
+                else Some (Lit.mk_arith_neq m1 m2,[],[Proof.T_lia])
               | _, None
               | None, _-> None
             end
@@ -1727,7 +1727,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* Simplification:  a < b  ----> a+1 ≤ b *)
   let canc_less_to_lesseq = function
     | Lit.Int (AL.Binary (AL.Less, m1, m2)) ->
-      Some (Lit.mk_arith_lesseq (M.succ m1) m2, [])
+      Some (Lit.mk_arith_lesseq (M.succ m1) m2, [], [Proof.T_lia])
     | _ -> None
 
   exception VarElim of int * S.t

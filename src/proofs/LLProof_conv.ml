@@ -51,7 +51,7 @@ and conv_step st p =
     | Proof.Simplification (rule,c,tags) ->
       let local_intros = ref Var.Subst.empty in
       let parents =
-        List.map (conv_parent st res intros local_intros)
+        List.map (conv_parent st res intros local_intros tags)
           (Proof.Step.parents @@ Proof.S.step p)
       in
       let local_intros = Var.Subst.to_list !local_intros |> List.rev_map snd in
@@ -80,7 +80,9 @@ and conv_step st p =
 
 (* convert parent of the given result formula. Also make instantiations
    explicit. *)
-and conv_parent st step_res intros local_intros (parent:Proof.Parent.t): LLProof.parent =
+and conv_parent
+    st step_res intros local_intros tags
+    (parent:Proof.Parent.t) : LLProof.parent =
   Util.debugf ~section 5 "(@[llproof.conv_parent@ %a@])"
     (fun k->k Proof.pp_parent parent);
   let prev_proof, p_instantiated_res = match parent with
@@ -111,7 +113,7 @@ and conv_parent st step_res intros local_intros (parent:Proof.Parent.t): LLProof
              end)
           vars_p
       in
-      LLProof.instantiate p_instantiated_res p inst, p_instantiated_res
+      LLProof.instantiate ~tags p_instantiated_res p inst, p_instantiated_res
   in
   (* now open foralls in [p_instantiated_res]
      and find which variable of [intros] they rename into *)

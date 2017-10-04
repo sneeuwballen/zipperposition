@@ -126,7 +126,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debugf ~section 4
         "(@[ho_ext_neg@ :old `%a`@ :new `%a`@])"
         (fun k->k Literal.pp lit Literal.pp new_lit);
-      Some (new_lit,[])
+      Some (new_lit,[],[Proof.T_ho])
     | _ -> None
 
   (* positive extensionality `m x = n x --> m = n` *)

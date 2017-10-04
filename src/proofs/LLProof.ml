@@ -38,7 +38,11 @@ and step =
   | Trivial
   | By_def of ID.t
   | Define of ID.t
-  | Instantiate of t * term list
+  | Instantiate of {
+      form: t;
+      inst: inst;
+      tags: tag list;
+    }
   | Esa of name * t list * check_info
   | Inference of {
       intros: term list; (* local renaming, with fresh constants *)
@@ -61,6 +65,7 @@ let id p = p.id
 let p_inst p inst = {p_proof=p; p_inst=inst}
 let p_of p = p_inst p []
 
+let pp_tags = Proof.pp_tags
 let pp_inst out (l:inst) : unit =
   Format.fprintf out "[@[<hv>%a@]]" (Util.pp_list ~sep:"," T.pp) l
 
@@ -71,15 +76,15 @@ let pp_step out (s:step): unit = match s with
   | Trivial -> Fmt.string out "trivial"
   | By_def id -> Fmt.fprintf out "(by_def :of %a)" ID.pp id
   | Define id -> Fmt.fprintf out "(@[define@ %a@])" ID.pp id
-  | Instantiate (_,inst) ->
-    Fmt.fprintf out "(@[instantiate %a@])" pp_inst inst
+  | Instantiate {inst;tags;_} ->
+    Fmt.fprintf out "(@[instantiate %a%a@])" pp_inst inst pp_tags tags
   | Esa (n,_,_) -> Fmt.fprintf out "(esa %s)" n
-  | Inference {name=n;_} -> Fmt.fprintf out "(inf %s)" n
+  | Inference {name=n;tags;_} -> Fmt.fprintf out "(inf %s%a)" n pp_tags tags
 
 let parents (p:t): parent list = match p.step with
   | Goal | Assert | Trivial | By_def _ | Define _ -> []
   | Negated_goal p2 -> [p_of p2]
-  | Instantiate (p2,_) -> [p_of p2]
+  | Instantiate {form=p2;_} -> [p_of p2]
   | Esa (_,l,_) -> List.map p_of l
   | Inference {parents=l;_} -> l
 
@@ -88,17 +93,17 @@ let premises (p:t): t list =
   List.rev_map open_p @@ parents p
 
 let inst (p:t): inst = match p.step with
-  | Instantiate (_,inst) -> inst
+  | Instantiate {inst;_} -> inst
   | _ -> []
 
 let check_info (p:t): check_info = match p.step with
   | Goal | Assert | Trivial | Negated_goal _ | By_def _ | Define _ -> C_other
-  | Instantiate (_,_) -> C_check []
+  | Instantiate _ -> C_check []
   | Esa (_,_,c)
   | Inference {check=c;_} -> c
 
 let tags (p:t) : tag list = match p.step with
-  | Inference {tags;_} -> tags
+  | Inference {tags;_} | Instantiate {tags;_} -> tags
   | _ -> []
 
 let intros (p:t) : inst = match p.step with
@@ -164,7 +169,7 @@ let assert_ f = mk_ f Assert
 let trivial f = mk_ f Trivial
 let by_def id f = mk_ f (By_def id)
 let define id f = mk_ f (Define id)
-let instantiate f p inst = mk_ f (Instantiate (p,inst))
+let instantiate ?(tags=[]) f p inst = mk_ f (Instantiate {form=p;inst;tags})
 
 let conv_check_ = function
   | `No_check -> C_no_check
@@ -189,7 +194,7 @@ module Dot = struct
            | Trivial -> "trivial"
            | By_def id -> Fmt.sprintf "by_def(%a)" ID.pp id
            | Define id -> Fmt.sprintf "define(%a)" ID.pp id
-           | Instantiate (_,_) -> "instantiate"
+           | Instantiate _ -> "instantiate"
            | Esa (name,_,_) -> name
            | Inference {name;_} -> name
          in

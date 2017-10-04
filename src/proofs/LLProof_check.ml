@@ -312,7 +312,8 @@ end = struct
 
   let can_check : LLProof.tag list -> bool =
     let module P = Proof in
-    let f = function P.T_lra | P.T_lia | P.T_ho | P.T_ind | P.T_data -> false in
+    let f = function
+      | P.T_lra | P.T_lia | P.T_ho | P.T_ind | P.T_data | P.T_distinct -> false in
     List.for_all f
 
   let prove (a:form list) (b:form) =
@@ -373,7 +374,8 @@ let check_step_ (p:proof): res option =
     | P.Trivial ->
       (* should be able to prove the conclusion directly *)
       Some (Tab.prove [] concl)
-    | P.Instantiate (p',inst) ->
+    | P.Instantiate {tags;_} when not (Tab.can_check tags) -> None
+    | P.Instantiate {form=p';inst;_} ->
       (* re-instantiate and check we get the same thing *)
       let p'_inst = instantiate (LLProof.concl p') inst in
       let vars, body_concl = open_forall concl in
