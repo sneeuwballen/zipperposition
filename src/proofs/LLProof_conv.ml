@@ -49,10 +49,13 @@ and conv_step st p =
   let res = match Proof.Step.kind @@ Proof.S.step p with
     | Proof.Inference (rule,c,tags)
     | Proof.Simplification (rule,c,tags) ->
+      let local_intros = ref Var.Subst.empty in
       let parents =
-        List.map (conv_parent st p res intros) (Proof.Step.parents @@ Proof.S.step p)
+        List.map (conv_parent st res intros local_intros)
+          (Proof.Step.parents @@ Proof.S.step p)
       in
-      LLProof.inference c ~intros ~tags
+      let local_intros = Var.Subst.to_list !local_intros |> List.rev_map snd in
+      LLProof.inference c ~intros ~local_intros ~tags
         (T.rename_all_vars res) (Proof.Rule.name rule) parents
     | Proof.Esa (rule,c) ->
       let l =
@@ -77,7 +80,7 @@ and conv_step st p =
 
 (* convert parent of the given result formula. Also make instantiations
    explicit. *)
-and conv_parent st step step_res intros (parent:Proof.Parent.t): LLProof.parent =
+and conv_parent st step_res intros local_intros (parent:Proof.Parent.t): LLProof.parent =
   Util.debugf ~section 5 "(@[llproof.conv_parent@ %a@])"
     (fun k->k Proof.pp_parent parent);
   let prev_proof, p_instantiated_res = match parent with
@@ -126,15 +129,19 @@ and conv_parent st step step_res intros (parent:Proof.Parent.t): LLProof.parent 
     List.map
       (fun v ->
          begin match Var.Subst.find intro_subst v with
-           | Some v2 -> v2
+           | Some t -> t
            | None ->
-             errorf "(@[<hv2>cannot find intros-inst for `%a`@ \
-                     :subst {%a}@ :form `%a`@ :step-res %a@ :inst-parent-res %a@ \
-                     :parent %a@ :in-step %a@])"
-               Var.pp v (Var.Subst.pp T.pp) intro_subst
-               T.pp p_instantiated_res T.pp step_res T.pp p_instantiated_res
-               Proof.pp_parent parent
-               Proof.S.pp_notrec1 step
+             begin match Var.Subst.find !local_intros v with
+               | Some t -> t
+               | None ->
+                 let c =
+                   ID.makef "sk_%d"
+                     (List.length intros + Var.Subst.size !local_intros)
+                 in
+                 let c = T.const ~ty:(Var.ty v) c in
+                 local_intros := Var.Subst.add !local_intros v c;
+                 c
+             end
          end)
       vars_instantiated
   in

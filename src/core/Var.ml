@@ -61,6 +61,7 @@ module Subst = struct
   type ('a,'b) t = ('a var * 'b) ID.Map.t
   let empty = ID.Map.empty
   let is_empty = ID.Map.is_empty
+  let size = ID.Map.cardinal
   let add t v x = ID.Map.add v.id (v,x) t
   let singleton v x = add empty v x
   let mem t v = ID.Map.mem v.id t

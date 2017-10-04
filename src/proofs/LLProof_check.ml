@@ -271,7 +271,7 @@ end = struct
         let b = List.hd tab.open_branches in
         tab.open_branches <- List.tl tab.open_branches;
         Util.debugf ~section 3
-          "(@[llproof_check.tab.solve@ %a@])"
+          "(@[llproof.check.tab.solve@ %a@])"
           (fun k->k debug_tag tab);
         begin match Branch.pop_open b with
           | None ->
@@ -301,12 +301,12 @@ end = struct
       done;
       (* closed all branches *)
       assert (tab.open_branches=[]);
-      Util.debugf ~section 5 "(@[proof.tableau.success@ :branches (@[<v>%a@])@])"
+      Util.debugf ~section 5 "(@[llproof.check.tab.success@ :branches (@[<v>%a@])@])"
         (fun k->k (Util.pp_list Branch.debug) tab.closed_branches);
       R_ok
     with Saturated_branch b ->
       (* found a branch that is not refutable *)
-      Util.debugf ~section 1 "(@[proof.tableau.failed@ :branch %a@])"
+      Util.debugf ~section 1 "(@[llproof.check.tab.failed@ :branch %a@])"
         (fun k->k Branch.debug b);
       R_fail
 
@@ -317,7 +317,7 @@ end = struct
 
   let prove (a:form list) (b:form) =
     Util.debugf ~section 3
-      "(@[@{<yellow>llproof_check.tab.prove@}@ :hyps (@[<hv>%a@])@ :concl %a@])"
+      "(@[@{<yellow>llproof.check.tab.prove@}@ :hyps (@[<hv>%a@])@ :concl %a@])"
       (fun k->k (Util.pp_list TypedSTerm.pp) a TypedSTerm.pp b);
     Util.incr_stat stat_tab_solve;
     (* convert into {!LLTerm.t} *)

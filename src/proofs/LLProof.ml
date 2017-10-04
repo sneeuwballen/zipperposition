@@ -42,6 +42,7 @@ and step =
   | Esa of name * t list * check_info
   | Inference of {
       intros: term list; (* local renaming, with fresh constants *)
+      local_intros: term list; (* variables introduced between hypothesis, not in conclusion *)
       name: name;
       parents: parent list;
       check: check_info;
@@ -104,6 +105,10 @@ let intros (p:t) : inst = match p.step with
   | Inference {intros;_} -> intros
   | _ -> []
 
+let local_intros (p:t) : inst = match p.step with
+  | Inference {local_intros;_} -> local_intros
+  | _ -> []
+
 let equal a b = a.id = b.id
 let compare a b = CCInt.compare a.id b.id
 let hash a = Hash.int a.id
@@ -125,14 +130,16 @@ let pp_parent out p = match p.p_inst with
 
 let pp_inst_some out = function [] -> () | l -> Fmt.fprintf out "@ :inst %a" pp_inst l
 let pp_intro_some out = function [] -> () | l -> Fmt.fprintf out "@ :intro %a" pp_inst l
+let pp_lintro_some out = function [] -> () | l -> Fmt.fprintf out "@ :local-intro %a" pp_inst l
 
 let pp out (p:t): unit =
-  Fmt.fprintf out "(@[<hv2>%a%a@ :res `%a`@ :from [@[%a@]]%a%a@])"
+  Fmt.fprintf out "(@[<hv2>%a%a@ :res `%a`@ :from [@[<hv>%a@]]%a%a%a@])"
     pp_step (step p) Proof.pp_tags (tags p)
     pp_res p
     (Util.pp_list pp_parent) (parents p)
     pp_inst_some (inst p)
     pp_intro_some (intros p)
+    pp_lintro_some (local_intros p)
 
 let pp_dag out (p:t): unit =
   let seen = Tbl.create 32 in
@@ -165,8 +172,10 @@ let conv_check_ = function
   | `Check_with l -> C_check l
 
 let esa c f name ps = mk_ f (Esa (name,ps,conv_check_ c))
-let inference c ~intros ~tags f name ps : t =
-  mk_ f (Inference {name;intros;parents=ps;check=conv_check_ c;tags})
+
+let inference c ~intros ~local_intros ~tags f name ps : t =
+  mk_ f (Inference
+      {name;intros;local_intros;parents=ps;check=conv_check_ c;tags})
 
 module Dot = struct
   (** Get a graph of the proof *)
