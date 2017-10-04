@@ -23,7 +23,7 @@ type res =
 type stats = {
   n_ok: int;
   n_fail: int;
-  n_nocheck: int;
+  n_skip: int;
 }
 
 let section = LLProof.section
@@ -37,11 +37,11 @@ let pp_res out = function
 
 let pp_res_opt out = function
   | Some r -> pp_res out r
-  | None -> Fmt.fprintf out "@{<Yellow>nocheck@}"
+  | None -> Fmt.fprintf out "@{<Yellow>SKIP@}"
 
 let pp_stats out (s:stats) =
-  Fmt.fprintf out "(@[<hv>:ok %d@ :fail %d@ :nocheck %d@])"
-    s.n_ok s.n_fail s.n_nocheck
+  Fmt.fprintf out "(@[<hv>:ok %d@ :fail %d@ :skip %d@])"
+    s.n_ok s.n_fail s.n_skip
 
 exception Error of string
 
@@ -407,7 +407,7 @@ let check
     (p:proof) : res * stats
   =
   let tbl = P.Tbl.create 64 in
-  let stats = ref {n_ok=0; n_fail=0; n_nocheck=0} in
+  let stats = ref {n_ok=0; n_fail=0; n_skip=0} in
   let upd_stats f = stats := f !stats in
   let rec check (p:proof): unit =
     if not (P.Tbl.mem tbl p) then (
@@ -423,7 +423,7 @@ let check
       begin match res with
         | Some R_ok -> upd_stats (fun s -> {s with n_ok = s.n_ok+1})
         | Some R_fail -> upd_stats (fun s -> {s with n_fail = s.n_fail+1})
-        | None -> upd_stats (fun s -> {s with n_nocheck = s.n_nocheck+1})
+        | None -> upd_stats (fun s -> {s with n_skip = s.n_skip+1})
       end;
       (* now check premises *)
       List.iter check (P.premises p)

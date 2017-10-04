@@ -14,7 +14,9 @@ let _cc_of_classes classes : CC.t =
   List.fold_left
     (fun cc cls -> match cls with
        | [] -> cc
-       | t::cls' -> List.fold_left (fun cc t' -> CC.mk_eq cc t t') cc cls')
+       | t::cls' ->
+         let cc = CC.add cc t in
+         List.fold_left (fun cc t' -> CC.mk_eq cc t t') cc cls')
     cc classes
 
 let _size_class l =
@@ -66,7 +68,7 @@ end = struct
       cc
 
   (* are these two classes congruent? *)
-  let are_congruent_ (cc:t) s1 s2 : bool =
+  let are_congruent_ (cc:t) (s1:T.Set.t) (s2:T.Set.t) : bool =
     T.Set.exists
       (fun t ->
          T.Set.exists
@@ -87,19 +89,22 @@ end = struct
       TSet_set.to_seq cc
       |> Sequence.flat_map
         (fun s1 ->
-           TSet_set.remove s1 cc
-           |> TSet_set.to_seq
+           assert (not (T.Set.is_empty s1));
+           TSet_set.to_seq cc
+           |> Sequence.filter (fun s2 -> s1 != s2)
            |> Sequence.map (fun s2 -> s1, s2))
       |> Sequence.find_map
         (fun (s1,s2) -> if are_congruent_ cc s1 s2 then Some (s1,s2) else None)
-  in
-  begin match find_merge_ cc with
-    | None -> cc (* fixpoint *)
-    | Some (s1,s2) ->
-      cc |> TSet_set.remove s1 |> TSet_set.remove s2
-      |> TSet_set.add (T.Set.union s1 s2)
-      |> update
-  end
+    in
+    begin match find_merge_ cc with
+      | None -> cc (* fixpoint *)
+      | Some (s1,s2) ->
+        cc
+        |> TSet_set.remove s1
+        |> TSet_set.remove s2
+        |> TSet_set.add (T.Set.union s1 s2)
+        |> update
+    end
 
   let of_classes (l:T.t list list) : t =
     let s = List.map T.Set.of_list l |> TSet_set.of_list in
@@ -107,7 +112,10 @@ end = struct
 
   let is_eq (cc:t) (t:T.t) (u:T.t) : bool =
     (* add t and u *)
-    let cc = TSet_set.add_list cc [T.Set.singleton t; T.Set.singleton u] in
+    let cc =
+      TSet_set.add_list cc [T.Set.singleton t; T.Set.singleton u]
+      |> update
+    in
     is_eq_ cc t u
 
   let pp out (cc:t): unit =
@@ -118,7 +126,7 @@ end = struct
 end
 
 let check_ref =
-  let gen = QCheck.(list_of_size Gen.(10--30) (list_of_size Gen.(1--10) ArTerm.default)) in
+  let gen = QCheck.(list_of_size Gen.(3--16) (list_of_size Gen.(1--8) ArTerm.default)) in
   let prop classes =
     let cc1 = _cc_of_classes classes in
     let cc2 = CC_ref.of_classes classes in

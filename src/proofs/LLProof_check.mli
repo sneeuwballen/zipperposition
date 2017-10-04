@@ -20,9 +20,9 @@ type res =
 val pp_res : res CCFormat.printer
 
 type stats = {
-  n_ok: int;
-  n_fail: int;
-  n_nocheck: int;
+  n_ok: int; (** steps that were successfully checked *)
+  n_fail: int; (** steps that failed *)
+  n_skip: int; (** steps skipped, not checked *)
 }
 
 val pp_stats : stats CCFormat.printer

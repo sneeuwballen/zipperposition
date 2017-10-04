@@ -9,10 +9,10 @@ let props =
       TestTerm.props;
       TestUnif.props;
       TestCNF.props;
+      TestCongruence.props;
       TestIndex.props;
       TestType.props;
       TestOrdering.props;
-      TestCongruence.props;
       TestMultiset.props;
     ]
 

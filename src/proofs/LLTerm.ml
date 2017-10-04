@@ -93,7 +93,7 @@ module H_cons = Hashcons.Make(struct
       t.id <- i
   end)
 
-let rec pp_rec depth out t = match view t with
+let rec pp_rec depth out (t:t) = match view t with
   | Type -> Fmt.string out "type"
   | Const id -> ID.pp_fullc out id
   | App (f,a) -> Fmt.fprintf out "@[%a@ %a@]" (pp_rec depth) f (pp_inner depth) a
@@ -125,8 +125,9 @@ let rec pp_rec depth out t = match view t with
       (pp_inner depth) c
 and pp_inner depth out t = match view t with
   | App _ | Bind _ | AppBuiltin (_,_::_) | Arrow _ | Ite _ ->
-    Fmt.within "(" ")" (pp_rec depth) out t
-  | Type | Const _ | Var _ | AppBuiltin (_,[]) -> pp_rec depth out t
+    Fmt.fprintf out "(%a)@{<Black>/%d@}" (pp_rec depth) t t.id
+  | Type | Const _ | Var _ | AppBuiltin (_,[]) ->
+    Fmt.fprintf out "%a@{<Black>/%d@}" (pp_rec depth) t t.id
 and pp_infix_ depth b out l = match l with
   | [] -> assert false
   | [t] -> pp_inner depth out t

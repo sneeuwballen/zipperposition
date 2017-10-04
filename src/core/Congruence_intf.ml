@@ -33,6 +33,9 @@ module type S = sig
       Exactly one term per congruence class will be passed to the
       function. *)
 
+  val add : t -> term -> t
+  (** Add the term to the congruence closure *)
+
   val mk_eq : t -> term -> term -> t
   (** [mk_eq congruence t1 t2] asserts that [t1 = t2] belongs to
       the congruence *)

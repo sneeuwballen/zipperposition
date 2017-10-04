@@ -77,7 +77,7 @@ and conv_step st p =
 
 (* convert parent of the given result formula. Also make instantiations
    explicit. *)
-and conv_parent st step res intros (parent:Proof.Parent.t): LLProof.parent =
+and conv_parent st step step_res intros (parent:Proof.Parent.t): LLProof.parent =
   Util.debugf ~section 5 "(@[llproof.conv_parent@ %a@])"
     (fun k->k Proof.pp_parent parent);
   let prev_proof, p_instantiated_res = match parent with
@@ -114,13 +114,13 @@ and conv_parent st step res intros (parent:Proof.Parent.t): LLProof.parent =
      and find which variable of [intros] they rename into *)
   let inst_intros : LLProof.inst =
     (* rename variables of result of inference *)
-    let vars_res, _ = T.unfold_binder Binder.forall res in
-    if List.length intros <> List.length vars_res then (
+    let vars_step_res, _ = T.unfold_binder Binder.forall step_res in
+    if List.length intros <> List.length vars_step_res then (
       errorf "length mismatch, cannot do intros@ :res %a@ :with [@[%a@]]"
-        T.pp res (Util.pp_list ~sep:"," T.pp) intros
+        T.pp step_res (Util.pp_list ~sep:"," T.pp) intros
     );
     let intro_subst =
-      Var.Subst.of_list (List.combine vars_res intros)
+      Var.Subst.of_list (List.combine vars_step_res intros)
     in
     let vars_instantiated, _ = T.unfold_binder Binder.forall p_instantiated_res in
     List.map
@@ -129,9 +129,10 @@ and conv_parent st step res intros (parent:Proof.Parent.t): LLProof.parent =
            | Some v2 -> v2
            | None ->
              errorf "(@[<hv2>cannot find intros-inst for `%a`@ \
-                     :subst {%a}@ :form `%a`@ :res %a@ :parent %a@ :in-step %a@])"
+                     :subst {%a}@ :form `%a`@ :step-res %a@ :inst-parent-res %a@ \
+                     :parent %a@ :in-step %a@])"
                Var.pp v (Var.Subst.pp T.pp) intro_subst
-               T.pp p_instantiated_res T.pp res
+               T.pp p_instantiated_res T.pp step_res T.pp p_instantiated_res
                Proof.pp_parent parent
                Proof.S.pp_notrec1 step
          end)

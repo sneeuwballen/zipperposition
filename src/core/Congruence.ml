@@ -96,10 +96,8 @@ module Make(T : TERM) = struct
       (* check congruence of parents of n1 and n2 *)
       List.fold_left
         (fun cc p1 ->
-           let p1 = find_ cc p1 in
            List.fold_left
              (fun cc p2 ->
-                let p2 = find_ cc p2 in
                 if not (T.equal p1 p2) && are_congruent_ cc p1 p2 then (
                   merge_ cc p1 p2
                 ) else cc)
@@ -112,17 +110,24 @@ module Make(T : TERM) = struct
     if H.mem cc.parents t then cc, find_ cc t
     else (
       let cc = set_parents_ cc t [] in
+      let cc = set_next_ cc t t in
       (* add subterms *)
       let cc, subs_repr = CCList.fold_map add_ cc (T.subterms t) in
+      (* add [t] to list of subterms *)
+      let cc =
+        List.fold_left
+          (fun cc sub ->
+             set_parents_ cc sub (t :: parents_ cc sub))
+          cc (T.subterms t)
+      in
       let cc =
         List.fold_left
           (fun cc sub_repr ->
              List.fold_left
-               (fun cc sub_repr_parent ->
-                  let repr = find_ cc t in
-                  if not (T.equal repr sub_repr_parent) &&
-                     are_congruent_ cc repr sub_repr_parent then (
-                    merge_ cc repr sub_repr_parent
+               (fun cc parent_sub_repr ->
+                  if not (T.equal (find_ cc t) (find_ cc parent_sub_repr)) &&
+                     are_congruent_ cc t parent_sub_repr then (
+                    merge_ cc t parent_sub_repr
                   ) else cc)
                cc (parents_ cc sub_repr))
           cc subs_repr
@@ -142,15 +147,14 @@ module Make(T : TERM) = struct
     H.iter cc.next
       (fun t next -> if T.equal t next then f t)
 
+  let[@inline] add cc t = add_ cc t |> fst
+
   let mk_eq cc t1 t2 =
     let cc, t1 = add_ cc t1 in
     let cc, t2 = add_ cc t2 in
     merge_ cc t1 t2
 
-  let is_eq cc t1 t2 =
-    let cc, t1 = add_ cc t1 in
-    let _, t2 = add_ cc t2 in
-    T.equal t1 t2
+  let[@inline] is_eq cc t1 t2 = T.equal (find cc t1) (find cc t2)
 end
 
 module FO = Make(struct
