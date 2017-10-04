@@ -154,8 +154,9 @@ val is_absurd : t -> bool
 
 val fold_terms :
   ?position:Position.t -> ?vars:bool -> ?ty_args:bool ->
+  ?ord:Ordering.t -> 
   which:[<`Max|`All] ->
-  ord:Ordering.t -> subterms:bool ->
+  subterms:bool ->
   t ->
   term Position.With.t Sequence.t
 (** Iterate on terms, maybe subterms, of the literal.

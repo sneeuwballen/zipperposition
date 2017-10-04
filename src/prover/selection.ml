@@ -19,8 +19,19 @@ type parametrized = strict:bool -> ord:Ordering.t -> t
 (* no need for classification here *)
 let no_select _ : BV.t = BV.empty ()
 
+let _select_ho_var_lits = ref true
+
 (* is it a good idea to select this kind of literal? *)
-let can_select_lit (lit:Lit.t) : bool = Lit.is_neg lit
+let can_select_lit (lit:Lit.t) : bool =
+  Lit.is_neg lit
+  && (
+    !_select_ho_var_lits ||
+    (* If this flag is false, we cannot select literals containing a HO variable: *)
+    not (
+      Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lit
+      |> Sequence.exists (fun (t,_) -> T.is_ho_var t)
+    )
+  )
 
 (* checks that [bv] is an acceptable selection for [lits]. In case
    some literal is selected, at least one negative literal must be selected. *)
@@ -108,5 +119,8 @@ let () =
   Params.add_opts
     [ "--select",
       Arg.Symbol (all(), set_select),
-      " set literal selection function"
+      " set literal selection function";
+      "--dont-select-ho-var-lits",
+      Arg.Clear _select_ho_var_lits,
+      " prohibit to select only literals containing higher-order variables"
     ]

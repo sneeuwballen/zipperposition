@@ -608,7 +608,7 @@ let is_absurd lit = match lit with
   | Rat o -> Rat_lit.is_absurd o
   | Equation _ | Prop _ | True -> false
 
-let fold_terms ?(position=Position.stop) ?(vars=false) ?ty_args ~which ~ord ~subterms lit k =
+let fold_terms ?(position=Position.stop) ?(vars=false) ?ty_args ?(ord=Ordering.none) ~which ~subterms lit k =
   (* function to call at terms *)
   let at_term ~pos t =
     if subterms
