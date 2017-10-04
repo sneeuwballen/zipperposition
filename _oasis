@@ -97,6 +97,7 @@ Library "logtk_parsers"
   Modules:          Parse_tptp, Lex_tptp, Ast_tptp, Util_tptp,
                     Trace_tstp, Parse_zf, Lex_zf, Util_zf, Util_tip,
                     Tip_ast, Tip_parser, Tip_lexer,
+                    Util_dk, Parse_dk, Lex_dk, Ast_dk,
                     Parsing_utils, CallProver
   Build$:           flag(parsers)
   Install$:         flag(parsers)
