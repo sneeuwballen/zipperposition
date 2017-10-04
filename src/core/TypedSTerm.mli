@@ -307,6 +307,9 @@ end
 val rename : (term, term Var.t) Var.Subst.t -> t -> t
 (** Perform renaming *)
 
+val rename_all_vars : t -> t
+(** Rename bound variables *)
+
 (** {2 Table of Variables} *)
 
 module Var_tbl : CCHashtbl.S with type key = t Var.t

@@ -716,7 +716,8 @@ module Conv = struct
   type ctx = Type.Conv.ctx
   let create = Type.Conv.create
 
-  let var_to_simple_var = Type.Conv.var_to_simple_var
+  let[@inline] var_to_simple_var ?(prefix="X") ctx v =
+    Type.Conv.var_to_simple_var ~prefix ctx v
 
   let of_simple_term_exn ctx t =
     let tbl = PT.Var_tbl.create 8 in

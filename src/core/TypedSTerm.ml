@@ -947,14 +947,16 @@ let rec rename subst t = match view t with
     end
   | _ ->
     map subst t
-      ~bind:rename_var
+      ~bind:bind_rename_var
       ~f:rename
 
 (* rename variable and evaluate its type *)
-and rename_var subst v =
+and bind_rename_var subst v =
   let v' = Var.copy v |> Var.update_ty ~f:(rename subst) in
   let subst = Var.Subst.add subst v v' in
   subst, v'
+
+let rename_all_vars t = rename Subst.empty t
 
 (** {2 Table of Variables} *)
 
