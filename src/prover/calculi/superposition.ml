@@ -955,6 +955,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Util.incr_stat stat_basic_simplify_calls;
       let lits = C.lits c in
       let has_changed = ref false in
+      let tags = ref [] in
       (* bv: literals to keep *)
       let bv = BV.create ~size:(Array.length lits) true in
       (* eliminate absurd lits *)
@@ -962,6 +963,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun i lit ->
            if Lit.is_absurd lit then (
              has_changed := true;
+             tags := Lit.is_absurd_tags lit @ !tags;
              BV.reset bv i
            ))
         lits;
@@ -1033,7 +1035,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           if Subst.is_empty (US.subst !us) then C.proof_parent c
           else C.proof_parent_subst Subst.Renaming.none (c,0) (US.subst !us)
         in
-        let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "simplify") [parent] in
+        let proof =
+          Proof.Step.simp [parent]
+            ~tags:!tags ~rule:(Proof.Rule.mk "simplify") in
         let new_clause =
           C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof
         in

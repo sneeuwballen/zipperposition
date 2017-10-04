@@ -600,6 +600,12 @@ let is_absurd lit = match lit with
   | Rat o -> Rat_lit.is_absurd o
   | Equation _ | Prop _ | True -> false
 
+let is_absurd_tags lit = match lit with
+  | Equation _ | Prop _ | False -> []
+  | True -> assert false
+  | Int _ -> [Proof.T_lia]
+  | Rat _ -> [Proof.T_lra]
+
 let fold_terms ?(position=Position.stop) ?(vars=false) ?ty_args ~which ~ord ~subterms lit k =
   (* function to call at terms *)
   let at_term ~pos t =

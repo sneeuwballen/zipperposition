@@ -145,6 +145,7 @@ module Set : CCSet.S with type elt = t
 
 val is_trivial : t -> bool
 val is_absurd : t -> bool
+val is_absurd_tags : t -> Proof.tag list (** if [is_absurd lit], return why *)
 
 val fold_terms :
   ?position:Position.t -> ?vars:bool -> ?ty_args:bool ->
