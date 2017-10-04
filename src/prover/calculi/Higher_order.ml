@@ -87,7 +87,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       (fun (lit',skolems) ->
          let subst = Literal.variant (lit',0) (lit,1) |> Sequence.head in
          begin match subst with
-           | Some subst ->
+           | Some (subst,_) ->
              let skolems =
                List.rev_map
                  (fun t -> Subst.FO.apply Subst.Renaming.none subst (t,0))
@@ -126,7 +126,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debugf ~section 4
         "(@[ho_ext_neg@ :old `%a`@ :new `%a`@])"
         (fun k->k Literal.pp lit Literal.pp new_lit);
-      Some (new_lit,[],[Proof.T_ho])
+      Some (new_lit,[],[Proof.Tag.T_ho])
     | _ -> None
 
   (* positive extensionality `m x = n x --> m = n` *)
@@ -158,7 +158,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                 in
                 let proof =
                   Proof.Step.inference [C.proof_parent c]
-                    ~rule:(Proof.Rule.mk "ho_ext_pos") ~tags:[Proof.T_ho]
+                    ~rule:(Proof.Rule.mk "ho_ext_pos") ~tags:[Proof.Tag.T_ho]
                 in
                 let new_c =
                   C.create [new_lit] proof ~penalty:(C.penalty c) ~trail:(C.trail c)
@@ -198,7 +198,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             let new_lits = new_lit :: CCArray.except_idx (C.lits c) lit_idx in
             let proof =
               Proof.Step.inference [C.proof_parent c]
-                ~rule:(Proof.Rule.mk "ho_complete_eq") ~tags:[Proof.T_ho]
+                ~rule:(Proof.Rule.mk "ho_complete_eq") ~tags:[Proof.Tag.T_ho]
             in
             let new_c =
               C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
@@ -306,7 +306,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           l1 @ l2
         in
         let proof =
-          Proof.Step.inference ~rule:(Proof.Rule.mk "ho_elim_pred") ~tags:[Proof.T_ho]
+          Proof.Step.inference ~rule:(Proof.Rule.mk "ho_elim_pred") ~tags:[Proof.Tag.T_ho]
             [ C.proof_parent_subst renaming (c,0) subst ]
         in
         let new_c =
@@ -365,7 +365,7 @@ module Make(E : Env.S) : S with module Env = E = struct
            let renaming = Subst.Renaming.create() in
            let lits = Literals.apply_subst renaming subst (C.lits c,sc_c) in
            let proof =
-             Proof.Step.inference ~rule:(Proof.Rule.mk "ho.refine") ~tags:[Proof.T_ho]
+             Proof.Step.inference ~rule:(Proof.Rule.mk "ho.refine") ~tags:[Proof.Tag.T_ho]
                [C.proof_parent_subst renaming (c,sc_c) subst]
            in
            let new_c =
@@ -417,7 +417,7 @@ module Make(E : Env.S) : S with module Env = E = struct
            in
            let all_lits = c_guard @ new_pairs @ other_lits in
            let proof =
-             Proof.Step.inference ~rule:(Proof.Rule.mk "ho_unif") ~tags:[Proof.T_ho]
+             Proof.Step.inference ~rule:(Proof.Rule.mk "ho_unif") ~tags:[Proof.Tag.T_ho]
                [C.proof_parent_subst renaming (c,0) subst]
            in
            let new_c =
@@ -599,7 +599,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let parent = C.proof_parent c in
         let proof =
           Proof.Step.simp
-            ~rule:(Proof.Rule.mk "ho.purify_applied_variable") ~tags:[Proof.T_ho]
+            ~rule:(Proof.Rule.mk "ho.purify_applied_variable") ~tags:[Proof.Tag.T_ho]
             [parent] in
         let new_clause = (C.create ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof) in
         Util.debugf ~section 5

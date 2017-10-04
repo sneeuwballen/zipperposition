@@ -23,6 +23,8 @@ type res =
 type stats = {
   n_ok: int;
   n_fail: int;
+  n_skip_esa: int; (** steps skipped because ESA *)
+  n_skip_tags: int; (** steps skipped because of theory tags *)
   n_skip: int;
 }
 
@@ -35,13 +37,9 @@ let pp_res out = function
   | R_ok -> Fmt.fprintf out "@{<Green>OK@}"
   | R_fail -> Fmt.fprintf out "@{<Red>FAIL@}"
 
-let pp_res_opt out = function
-  | Some r -> pp_res out r
-  | None -> Fmt.fprintf out "@{<Yellow>SKIP@}"
-
 let pp_stats out (s:stats) =
-  Fmt.fprintf out "(@[<hv>:ok %d@ :fail %d@ :skip %d@])"
-    s.n_ok s.n_fail s.n_skip
+  Fmt.fprintf out "(@[<hv>:ok %d@ :fail %d@ :skip %d (:esa %d@ :tags %d)@])"
+    s.n_ok s.n_fail s.n_skip s.n_skip_esa s.n_skip_tags
 
 exception Error of string
 
@@ -311,9 +309,9 @@ end = struct
       R_fail
 
   let can_check : LLProof.tag list -> bool =
-    let module P = Proof in
+    let open Builtin.Tag in
     let f = function
-      | P.T_lra | P.T_lia | P.T_ho | P.T_ind | P.T_data | P.T_distinct -> false in
+      | T_lra | T_lia | T_ho | T_ind | T_data | T_distinct -> false in
     List.for_all f
 
   let prove (a:form list) (b:form) =
@@ -359,7 +357,17 @@ let concl_of_parent (p:LLProof.parent) : form = match p.LLProof.p_inst with
 
 let open_forall = T.unfold_binder Binder.Forall
 
-let check_step_ (p:proof): res option =
+type check_step_res =
+  | CS_check of res
+  | CS_skip of [`ESA | `Other | `Tags]
+
+let pp_csr out = function
+  | CS_check r -> pp_res out r
+  | CS_skip r ->
+    let s = match r with `ESA -> "esa" | `Tags -> "tags" | `Other -> "other" in
+    Fmt.fprintf out "@{<Yellow>SKIP@} (%s)" s
+
+let check_step_ (p:proof): check_step_res =
   let concl = P.concl p in
   Util.incr_stat stat_check;
   begin match P.step p with
@@ -367,14 +375,14 @@ let check_step_ (p:proof): res option =
     | P.Assert
     | P.By_def _
     | P.Define _
-      -> Some R_ok
+      -> CS_check R_ok
     | P.Negated_goal p' ->
       (* [p'] should prove [not concl] *)
-      Some (Tab.prove [P.concl p'] (F.not_ concl))
+      CS_check (Tab.prove [P.concl p'] (F.not_ concl))
     | P.Trivial ->
       (* should be able to prove the conclusion directly *)
-      Some (Tab.prove [] concl)
-    | P.Instantiate {tags;_} when not (Tab.can_check tags) -> None
+      CS_check (Tab.prove [] concl)
+    | P.Instantiate {tags;_} when not (Tab.can_check tags) -> CS_skip `Tags
     | P.Instantiate {form=p';inst;_} ->
       (* re-instantiate and check we get the same thing *)
       let p'_inst = instantiate (LLProof.concl p') inst in
@@ -385,10 +393,10 @@ let check_step_ (p:proof): res option =
         |> List.mapi (fun i v -> v, T.const ~ty:(Var.ty v) (ID.makef "sk_%d" i))
         |> Var.Subst.of_list
       in
-      Some (Tab.prove [T.Subst.eval subst p'_inst] (T.Subst.eval subst body_concl))
-    | P.Esa (_,_,_) -> None (* TODO *)
-    | P.Inference {check=P.C_other;_} -> Some R_ok
-    | P.Inference {check=P.C_no_check;_} -> None
+      CS_check (Tab.prove [T.Subst.eval subst p'_inst] (T.Subst.eval subst body_concl))
+    | P.Esa (_,_,_) -> CS_skip `ESA (* TODO *)
+    | P.Inference {check=P.C_other;_} -> CS_check R_ok
+    | P.Inference {check=P.C_no_check;_} -> CS_skip `Other
     | P.Inference {parents;check=P.C_check axioms;tags;intros;_} ->
       if Tab.can_check tags then (
         (* within the fragment of {!Tab.prove} *)
@@ -397,8 +405,8 @@ let check_step_ (p:proof): res option =
         and concl =
           instantiate concl intros
         in
-        Some (Tab.prove all_premises concl)
-      ) else None
+        CS_check (Tab.prove all_premises concl)
+      ) else CS_skip `Tags
   end
 
 let check_step p = Util.with_prof prof_check check_step_ p
@@ -409,7 +417,7 @@ let check
     (p:proof) : res * stats
   =
   let tbl = P.Tbl.create 64 in
-  let stats = ref {n_ok=0; n_fail=0; n_skip=0} in
+  let stats = ref {n_ok=0; n_fail=0; n_skip_esa=0; n_skip_tags=0; n_skip=0} in
   let upd_stats f = stats := f !stats in
   let rec check (p:proof): unit =
     if not (P.Tbl.mem tbl p) then (
@@ -420,12 +428,19 @@ let check
       P.Tbl.add tbl p res;
       Util.debugf ~section 3
         "(@[<hv>@{<Yellow>done_checking_proof@}@ :of %a@ :res %a@])"
-        (fun k->k P.pp p pp_res_opt res);
+        (fun k->k P.pp p pp_csr res);
       on_check p res;
       begin match res with
-        | Some R_ok -> upd_stats (fun s -> {s with n_ok = s.n_ok+1})
-        | Some R_fail -> upd_stats (fun s -> {s with n_fail = s.n_fail+1})
-        | None -> upd_stats (fun s -> {s with n_skip = s.n_skip+1})
+        | CS_check R_ok -> upd_stats (fun s -> {s with n_ok = s.n_ok+1})
+        | CS_check R_fail -> upd_stats (fun s -> {s with n_fail = s.n_fail+1})
+        | CS_skip r ->
+          upd_stats
+            (fun s ->
+               {s with
+                  n_skip = s.n_skip+1;
+                  n_skip_esa=if r=`ESA then s.n_skip_esa+1 else s.n_skip_esa;
+                  n_skip_tags=if r=`Tags then s.n_skip_tags+1 else s.n_skip_tags;
+               })
       end;
       (* now check premises *)
       List.iter check (P.premises p)

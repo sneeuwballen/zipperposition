@@ -106,13 +106,14 @@ let subst1 (v:var) (t:term) (f:t): t =
   apply_subst renaming subst (f,0)
 
 (* find substitutions making [f1] and [f2] variants, if possible *)
-let variant ~subst (f1,sc1)(f2,sc2): Subst.t Sequence.t =
+let variant_ ~subst (f1,sc1)(f2,sc2): _ Sequence.t =
   Unif.unif_list_com ~size:`Same subst
-    ~op:(fun subst c1 c2 -> Literals.variant ~subst c1 c2)
+    ~op:(fun subst c1 c2 k ->
+      Literals.variant ~subst c1 c2 (fun (subst,_tags) -> k subst))
     (f1.cs,sc1)(f2.cs,sc2)
 
 let are_variant f1 f2: bool =
-  not @@ Sequence.is_empty @@ variant ~subst:Subst.empty (f1,1)(f2,0)
+  not @@ Sequence.is_empty @@ variant_ ~subst:Subst.empty (f1,1)(f2,0)
 
 let normalize (f:t): t = cs f |> Test_prop.normalize_form |> make
 

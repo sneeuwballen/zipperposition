@@ -18,15 +18,7 @@ let section = Util.Section.make "proof"
 
 type rule = string
 
-(** Tag for checking an inference. Each tag describes an extension of FO
-    that is used in the inference *)
-type tag =
-  | T_lia (** integer arith *)
-  | T_lra (** rational arith *)
-  | T_ho (** higher order *)
-  | T_ind (** induction *)
-  | T_data (** datatypes *)
-  | T_distinct (** distinct constants *)
+type tag = Builtin.Tag.t
 
 type check = [`No_check | `Check | `Check_with of form list]
 
@@ -112,6 +104,8 @@ and proof = {
 }
 
 type t = proof
+
+module Tag = Builtin.Tag
 
 module Rule = struct
   type t = rule
@@ -215,14 +209,7 @@ module Parent = struct
     | P_subst (_,s) -> Some s
 end
 
-let pp_tag out = function
-  | T_lia -> Fmt.string out "lia"
-  | T_lra -> Fmt.string out "lra"
-  | T_ho -> Fmt.string out "ho"
-  | T_ind -> Fmt.string out "ind"
-  | T_data -> Fmt.string out "data"
-  | T_distinct -> Fmt.string out "distinct_constants"
-
+let pp_tag = Tag.pp
 let pp_tags out = function
   | [] -> ()
   | l -> Fmt.fprintf out "@ [@[%a@]]" (Util.pp_list ~sep:"," pp_tag) l

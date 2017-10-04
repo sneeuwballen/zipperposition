@@ -104,9 +104,9 @@ module Make(E : Env_intf.S) = struct
     let lits = C.lits c in
     match RW.Lit.normalize_clause lits with
       | None -> None
-      | Some (clauses,r,subst,sc_r) ->
+      | Some (clauses,r,subst,sc_r,tags) ->
         let proof =
-          Proof.Step.simp ~rule:(Proof.Rule.mk "rw_clause")
+          Proof.Step.simp ~rule:(Proof.Rule.mk "rw_clause") ~tags
             [C.proof_parent c;
              Proof.Parent.from_subst Subst.Renaming.none
                (RW.Rule.as_proof (RW.L_rule r),sc_r) subst]
@@ -130,7 +130,7 @@ module Make(E : Env_intf.S) = struct
       (fun acc (lit,i) ->
          RW.Lit.narrow_lit ~scope_rules:1 (lit,0)
          |> Sequence.fold
-           (fun acc (rule,us) ->
+           (fun acc (rule,us,tags) ->
               let subst = Unif_subst.subst us in
               let renaming = Subst.Renaming.create () in
               let c_guard = Literal.of_unif_subst renaming us in
@@ -139,7 +139,7 @@ module Make(E : Env_intf.S) = struct
                   [C.proof_parent_subst renaming (c,0) subst;
                    Proof.Parent.from_subst renaming
                      (RW.Rule.as_proof (RW.L_rule rule),1) subst]
-                  ~rule:(Proof.Rule.mk "narrow_clause") in
+                  ~rule:(Proof.Rule.mk "narrow_clause") ~tags in
               let lits' = CCArray.except_idx lits i in
               (* create new clauses that correspond to replacing [lit]
                  by [rule.rhs] *)

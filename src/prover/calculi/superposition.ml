@@ -320,6 +320,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Lit.Pos.replace passive_lit'
           ~at:passive_lit_pos ~by:t' in
       let c_guard = Literal.of_unif_subst renaming us in
+      let tags = Unif_subst.tags us in
       (* apply substitution to other literals *)
       let new_lits =
         new_passive_lit ::
@@ -332,7 +333,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Proof.Rule.mk name
       in
       let proof =
-        Proof.Step.inference ~rule
+        Proof.Step.inference ~rule ~tags
           [C.proof_parent_subst renaming (info.active,sc_a) subst;
            C.proof_parent_subst renaming (info.passive,sc_p) subst]
       and penalty =
@@ -419,6 +420,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (* assert (T.equal (Lits.Pos.at (Array.of_list lits_p) info.passive_pos) u'); *)
       let lits_p = List.map (Lit.map (fun t-> T.replace t ~old:u' ~by:t')) lits_p in
       let c_guard = Literal.of_unif_subst renaming us in
+      let tags = Unif_subst.tags us in
       (* build clause *)
       let new_lits = c_guard @ lits_a @ lits_p in
       let rule =
@@ -426,7 +428,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Proof.Rule.mk name
       in
       let proof =
-        Proof.Step.inference ~rule
+        Proof.Step.inference ~rule ~tags
           [C.proof_parent_subst renaming (info.active,sc_a) subst;
            C.proof_parent_subst renaming (info.passive,sc_p) subst]
       and penalty =
@@ -543,8 +545,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                let new_lits = CCArray.except_idx (C.lits clause) pos in
                let new_lits = Lit.apply_subst_list renaming subst (new_lits,0) in
                let c_guard = Literal.of_unif_subst renaming us in
+               let tags = Unif_subst.tags us in
                let trail = C.trail clause and penalty = C.penalty clause in
-               let proof = Proof.Step.inference ~rule
+               let proof = Proof.Step.inference ~rule ~tags
                    [C.proof_parent_subst renaming (clause,0) subst] in
                let new_clause = C.create ~trail ~penalty (c_guard@new_lits) proof in
                Util.debugf ~section 3 "@[<hv2>equality resolution on@ @[%a@]@ yields @[%a@]@]"
@@ -587,9 +590,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
        C.is_eligible_param (info.clause,info.scope) subst ~idx:info.active_idx
     then (
       Util.incr_stat stat_equality_factoring_call;
+      let tags = Unif_subst.tags us in
       let proof =
         Proof.Step.inference
-          ~rule:(Proof.Rule.mk"eq_fact")
+          ~rule:(Proof.Rule.mk"eq_fact") ~tags
           [C.proof_parent_subst renaming (info.clause,0) subst]
       (* new_lits: literals of the new clause. remove active literal
          and replace it by a t!=v one, and apply subst *)
@@ -1021,6 +1025,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         else (
           assert !has_changed;
           let subst = US.subst !us in
+          let tgs = US.tags !us in
+          tags := tgs @ !tags; 
           let c_guard = Literal.of_unif_subst Subst.Renaming.none !us in
           c_guard @ Lit.apply_subst_list Subst.Renaming.none subst (new_lits,0)
         )
@@ -1061,8 +1067,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         if is_distinct_ s1 && is_distinct_ s2
         then
           if sign = (ID.equal s1 s2)
-          then Some (Lit.mk_tauto,[],[Proof.T_distinct])  (* "a" = "a", or "a" != "b" *)
-          else Some (Lit.mk_absurd,[],[Proof.T_distinct]) (* "a" = "b" or "a" != "a" *)
+          then Some (Lit.mk_tauto,[],[Proof.Tag.T_distinct])  (* "a" = "a", or "a" != "b" *)
+          else Some (Lit.mk_absurd,[],[Proof.Tag.T_distinct]) (* "a" = "b" or "a" != "a" *)
         else None
       | _ -> None
 
@@ -1235,15 +1241,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   (** Check whether [a] subsumes [b], and if it does, return the
       corresponding substitution *)
-  let subsumes_with_ (a,sc_a) (b,sc_b) =
+  let subsumes_with_ (a,sc_a) (b,sc_b) : _ option =
     (* a must not have more literals, and it must be possible to bind
         all its vars during subsumption *)
     if Array.length a > Array.length b
     || not (all_lits_match a sc_a b sc_b)
     then None
-    else
+    else (
       (* sort a copy of [a] by decreasing difficulty *)
       let a = Array.copy a in
+      let tags = ref [] in
       (* try to subsumes literals of b whose index are not in bv, with [subst] *)
       let rec try_permutations i subst bv =
         if i = Array.length a
@@ -1262,7 +1269,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           (* match lita and litb, then flag litb as used, and try with next literal of a *)
           let n_subst = ref 0 in
           Lit.subsumes ~subst (lita, sc_a) (litb, sc_b)
-            (fun subst' -> incr n_subst; try_permutations (i+1) subst' bv);
+            (fun (subst',tgs) ->
+               incr n_subst;
+               tags := tgs @ !tags;
+               try_permutations (i+1) subst' bv);
           BV.reset bv j;
           (* some variable of lita occur in a[j+1...], try another literal of b *)
           if !n_subst > 0 && not (check_vars lita (i+1))
@@ -1289,9 +1299,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         try_permutations 0 S.empty bv;
         None
       with (SubsumptionFound subst) ->
-        Util.debugf ~section 2 "(@[<hv>subsumes@ :c1 @[%a@]@ :c2 @[%a@]@ :subst %a@]"
-          (fun k->k Lits.pp a Lits.pp b Subst.pp subst);
-        Some subst
+        Util.debugf ~section 2 "(@[<hv>subsumes@ :c1 @[%a@]@ :c2 @[%a@]@ :subst %a%a@]"
+          (fun k->k Lits.pp a Lits.pp b Subst.pp subst Proof.pp_tags !tags);
+        Some (subst, !tags)
+    )
 
   let subsumes_with a b =
     Util.enter_prof prof_subsumption;
@@ -1452,14 +1463,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                       then eq_subsumes_with (C.lits c',1) (lits,0)
                       else None
                     with
-                      | Some _ as s -> s
+                      | Some s -> Some (s, [])
                       | None -> subsumes_with (C.lits c',1) (lits,0)
                   in
                   subst
                   |> CCOpt.map
-                    (fun subst ->
+                    (fun (subst,tags) ->
                        (* remove the literal and recurse *)
-                       CCArray.except_idx lits i, i, c', subst))
+                       CCArray.except_idx lits i, i, c', subst, tags))
              |> CCFun.tap
                (fun _ ->
                   (* restore literal *)
@@ -1468,12 +1479,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       begin match remove_one_lit (Array.copy (C.lits c)) with
         | None ->
           SimplM.return_same c (* no literal removed *)
-        | Some (new_lits, _, c',subst) ->
+        | Some (new_lits, _, c',subst,tags) ->
           (* hc' allowed us to cut a literal *)
           assert (List.length new_lits + 1 = Array.length (C.lits c));
           let proof =
             Proof.Step.inference
-              ~rule:(Proof.Rule.mk "clc")
+              ~rule:(Proof.Rule.mk "clc") ~tags
               [C.proof_parent c;
                C.proof_parent_subst Subst.Renaming.none (c',1) subst] in
           let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
@@ -1496,7 +1507,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
    * contraction (condensation)
    * ---------------------------------------------------------------------- *)
 
-  exception CondensedInto of Lit.t array * S.t * Subst.Renaming.t
+  exception CondensedInto of Lit.t array * S.t * Subst.Renaming.t * Proof.tag list
 
   (** performs condensation on the clause. It looks for two literals l1 and l2 of same
       sign such that l1\sigma = l2, and hc\sigma \ {l2} subsumes hc. Then
@@ -1531,24 +1542,25 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             (* potential condensing substitutions *)
             let substs = Sequence.append subst_remove_lit subst_remove_lit' in
             Sequence.iter
-              (fun (subst,idx_to_remove) ->
+              (fun ((subst,tags),idx_to_remove) ->
                  let new_lits = Array.sub lits 0 (n - 1) in
                  if idx_to_remove <> n-1
                  then new_lits.(idx_to_remove) <- lits.(n-1);  (* remove lit *)
                  let renaming = Subst.Renaming.create () in
                  let new_lits = Lits.apply_subst renaming subst (new_lits,0) in
                  (* check subsumption *)
-                 if subsumes new_lits lits
-                 then raise (CondensedInto (new_lits, subst, renaming)))
+                 if subsumes new_lits lits then (
+                   raise (CondensedInto (new_lits, subst, renaming, tags))
+                 ))
               substs
           done;
         done;
         SimplM.return_same c
-      with CondensedInto (new_lits, subst, renaming) ->
+      with CondensedInto (new_lits, subst, renaming, tags) ->
         (* clause is simplified *)
         let proof =
           Proof.Step.simp
-            ~rule:(Proof.Rule.mk "condensation")
+            ~rule:(Proof.Rule.mk "condensation") ~tags
             [C.proof_parent_subst renaming (c,0) subst] in
         let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
         Util.debugf ~section 3

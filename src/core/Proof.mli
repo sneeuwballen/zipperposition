@@ -15,13 +15,7 @@ type rule
 
 (** Tag for checking an inference. Each tag describes an extension of FO
     that is used in the inference *)
-type tag =
-  | T_lia (** integer arith *)
-  | T_lra (** rational arith *)
-  | T_ho (** higher order *)
-  | T_ind (** induction *)
-  | T_data (** datatypes *)
-  | T_distinct (** distinct constants *)
+type tag = Builtin.Tag.t
 
 (** How do we check a step? *)
 type check = [`No_check | `Check | `Check_with of form list]
@@ -83,6 +77,8 @@ type parent =
 type info = UntypedAST.attr
 
 type infos = info list
+
+module Tag = Builtin.Tag
 
 (** {2 Rule} *)
 

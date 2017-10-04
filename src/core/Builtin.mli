@@ -162,6 +162,19 @@ module Map : Sequence.Map.S with type key = t
 module Set : Sequence.Set.S with type elt = t
 module Tbl : Hashtbl.S with type key = t
 
+(** Each tag describes an extension of FO logic *)
+module Tag : sig
+  type t =
+    | T_lia (** integer arith *)
+    | T_lra (** rational arith *)
+    | T_ho (** higher order *)
+    | T_ind (** induction *)
+    | T_data (** datatypes *)
+    | T_distinct (** distinct constants *)
+
+  val pp : t CCFormat.printer
+end
+
 (** {2 TPTP Interface}
     Creates symbol and give them properties. *)
 

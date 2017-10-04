@@ -107,7 +107,9 @@ module Lit : sig
     val pp : t CCFormat.printer
   end
 
-  val normalize_clause : Literals.t -> (Literals.t list * rule * Subst.t * Scoped.scope) option
+  val normalize_clause :
+    Literals.t ->
+    (Literals.t list * rule * Subst.t * Scoped.scope * Proof.tag list) option
   (** normalize literals of the clause w.r.t. rules, or return [None]
       if no rule applies *)
 
@@ -115,7 +117,7 @@ module Lit : sig
     ?subst:Unif_subst.t ->
     scope_rules:Scoped.scope ->
     Literal.t Scoped.t ->
-    (rule * Unif_subst.t) Sequence.t
+    (rule * Unif_subst.t * Proof.tag list) Sequence.t
   (** [narrow_term rules lit] finds the set of rules [(l --> clauses) in rules]
       and substitutions [sigma] such that [sigma(l) = sigma(lit)]
       @param scope_rules used for rules (LEFT) *)

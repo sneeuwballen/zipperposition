@@ -86,19 +86,21 @@ val mk_constraint : term -> term -> t
     on how [t] and [u] look. *)
 
 val matching : ?subst:Subst.t -> pattern:t Scoped.t -> t Scoped.t ->
-  Subst.t Sequence.t
+  (Subst.t * Builtin.Tag.t list) Sequence.t
 (** checks whether subst(lit_a) matches lit_b. Returns alternative
     substitutions s such that s(lit_a) = lit_b and s contains subst. *)
 
 val subsumes : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
-  Subst.t Sequence.t
+  (Subst.t * Builtin.Tag.t list) Sequence.t
 (** More general version of {!matching}, yields [subst]
     such that [subst(lit_a) => lit_b]. *)
 
 val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
-  Subst.t Sequence.t
+  (Subst.t * Builtin.Tag.t list) Sequence.t
 
-val unify : ?subst:Unif_subst.t -> t Scoped.t -> t Scoped.t -> Unif_subst.t Sequence.t
+val unify :
+  ?subst:Unif_subst.t -> t Scoped.t -> t Scoped.t ->
+  (Unif_subst.t * Builtin.Tag.t list) Sequence.t
 
 val are_variant : t -> t -> bool
 

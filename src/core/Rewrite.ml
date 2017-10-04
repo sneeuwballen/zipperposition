@@ -538,7 +538,7 @@ module Lit = struct
          let substs = Literal.matching ~pattern:(r.lit_lhs,1) (lit,0) in
          begin match Sequence.head substs with
            | None -> None
-           | Some subst -> Some (r, subst)
+           | Some (subst,tags) -> Some (r, subst, tags)
          end)
 
   (* try to rewrite this literal, returning a list of list of lits instead *)
@@ -553,20 +553,20 @@ module Lit = struct
       CCArray.findi
         (fun i lit -> match step_lit lit with
            | None -> None
-           | Some (rule,subst) ->
+           | Some (rule,subst,tags) ->
              let clauses = rule.lit_rhs in
              Util.debugf ~section 5
                "@[<2>rewrite `@[%a@]`@ :into `@[<v>%a@]`@ :with @[%a@]@ :rule `%a`@]"
                (fun k->k Literal.pp lit
-                   (Util.pp_list (CCFormat.hvbox (Util.pp_list ~sep:" ∨ " Literal.pp)))
+                   (Util.pp_list (Fmt.hvbox (Util.pp_list ~sep:" ∨ " Literal.pp)))
                    clauses Subst.pp subst Rule.pp rule);
              Util.incr_stat stat_lit_rw;
-             Some (i, clauses, subst, rule))
+             Some (i, clauses, subst, rule, tags))
         lits
     in
     begin match step with
       | None -> None
-      | Some (i, clause_chunks, subst, rule) ->
+      | Some (i, clause_chunks, subst, rule, tags) ->
         let renaming = Subst.Renaming.create () in
         (* remove rewritten literal, replace by [clause_chunks], apply
            substitution (clause_chunks might contain other variables!),
@@ -579,7 +579,7 @@ module Lit = struct
             (fun new_lits -> Array.of_list (new_lits @ lits))
             clause_chunks
         in
-        Some (clauses,rule,subst,1)
+        Some (clauses,rule,subst,1,tags)
     end
 
   let normalize_clause lits =
@@ -590,7 +590,7 @@ module Lit = struct
     |> Sequence.flat_map
       (fun r ->
          Literal.unify ~subst (r.lit_lhs,sc_r) (lit,sc_lit)
-         |> Sequence.map (fun subst -> r, subst))
+         |> Sequence.map (fun (subst,tags) -> r, subst, tags))
 end
 
 let pseudo_rule_of_rule (r:rule): pseudo_rule = match r with

@@ -512,7 +512,7 @@ module Make
              (List.map (fun v -> quoted (HVar.to_string_tstp v)) vars)])
       in
       Proof.Step.inference [proof_parent]
-        ~infos ~rule:(Proof.Rule.mk "induction") ~tags:[Proof.T_ind]
+        ~infos ~rule:(Proof.Rule.mk "induction") ~tags:[Proof.Tag.T_ind]
     in
     (* other variables -> become skolems *)
     let subst_skolems: Subst.t =

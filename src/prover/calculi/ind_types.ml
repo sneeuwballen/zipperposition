@@ -91,7 +91,7 @@ module Make(Env : Env_intf.S) = struct
     else (
       let proof =
         Proof.Step.inference ~rule:(Proof.Rule.mk "acyclicity")
-          ~tags:[Proof.T_data] [C.proof_parent c] in
+          ~tags:[Proof.Tag.T_data] [C.proof_parent c] in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
       Util.incr_stat stat_acyclicity;
       Util.debugf ~section 3
@@ -139,7 +139,7 @@ module Make(Env : Env_intf.S) = struct
            in
            let proof =
              Proof.Step.inference [C.proof_parent_subst renaming (c,0) subst]
-               ~rule:(Proof.Rule.mk "acyclicity") ~tags:[Proof.T_data]
+               ~rule:(Proof.Rule.mk "acyclicity") ~tags:[Proof.Tag.T_data]
            in
            let new_c =
              C.create
@@ -187,7 +187,7 @@ module Make(Env : Env_intf.S) = struct
                if T.equal t1 t2 then None else Some (Literal.mk_eq t1 t2))
         in
         let rule = Proof.Rule.mk "injectivity_destruct+" in
-        let proof = Proof.Step.inference ~tags:[Proof.T_data] ~rule [C.proof_parent c] in
+        let proof = Proof.Step.inference ~tags:[Proof.Tag.T_data] ~rule [C.proof_parent c] in
         (* make one clause per [new_lits] *)
         let clauses =
           List.map
@@ -221,8 +221,8 @@ module Make(Env : Env_intf.S) = struct
             Ind_ty.as_inductive_type_exn ity |> fst |> Ind_ty.proof |> Proof.Parent.from
           in
           if sign
-          then Some (Literal.mk_absurd, [proof], [Proof.T_data])
-          else Some (Literal.mk_tauto, [proof], [Proof.T_data])
+          then Some (Literal.mk_absurd, [proof], [Proof.Tag.T_data])
+          else Some (Literal.mk_tauto, [proof], [Proof.Tag.T_data])
         | _ -> None
       end
     | _ -> None

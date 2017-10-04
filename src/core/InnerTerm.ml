@@ -729,6 +729,12 @@ let type_is_unifiable (ty:t): bool = match view ty with
   | Bind (Binder.ForallTy, _, _) -> false
   | _ -> true
 
+let type_non_unifiable_tags (ty:t): _ list = match view ty with
+  | AppBuiltin (Builtin.TyInt,_) -> [Builtin.Tag.T_lia]
+  | AppBuiltin (Builtin.TyRat,_) -> [Builtin.Tag.T_lra]
+  | Bind (Binder.ForallTy, _, _) -> [Builtin.Tag.T_ho]
+  | _ -> []
+
 let type_is_prop t = match view t with AppBuiltin (Builtin.Prop, _) -> true | _ -> false
 
 let is_a_type t = match ty t with

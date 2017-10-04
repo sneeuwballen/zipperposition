@@ -12,9 +12,11 @@ type t = {
   sc1: Scoped.scope;
   t2: term;
   sc2: Scoped.scope;
+  tags: Proof.tag list;
 }
 
-let make (t1,sc1) (t2,sc2) = {t1;sc1;t2;sc2}
+let[@inline] make ~tags (t1,sc1) (t2,sc2) = {t1;sc1;t2;sc2;tags}
+let[@inline] tags t = t.tags
 
 let apply_subst renaming subst (c:t): term * term =
   Subst.apply renaming subst (c.t1, c.sc1),
@@ -43,5 +45,5 @@ let compare c1 c2: int =
 let to_string = CCFormat.to_string pp
 
 module FO = struct
-  let make (t1,sc1) (t2,sc2) = make ((t1:Term.t:>T.t),sc1) ((t2:Term.t:>T.t),sc2)
+  let make ~tags (t1,sc1) (t2,sc2) = make ~tags ((t1:Term.t:>T.t),sc1) ((t2:Term.t:>T.t),sc2)
 end

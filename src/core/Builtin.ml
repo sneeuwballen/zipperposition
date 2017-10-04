@@ -3,6 +3,8 @@
 
 (** {1 Builtin Objects} *)
 
+module Fmt = CCFormat
+
 type t =
   | Not
   | And
@@ -249,6 +251,25 @@ let term = Term
 let ty_int = TyInt
 let ty_rat = TyRat
 let grounding = Grounding
+
+module Tag = struct
+  type t =
+    | T_lia (** integer arith *)
+    | T_lra (** rational arith *)
+    | T_ho (** higher order *)
+    | T_ind (** induction *)
+    | T_data (** datatypes *)
+    | T_distinct (** distinct constants *)
+
+  let pp out = function
+    | T_lia -> Fmt.string out "lia"
+    | T_lra -> Fmt.string out "lra"
+    | T_ho -> Fmt.string out "ho"
+    | T_ind -> Fmt.string out "ind"
+    | T_data -> Fmt.string out "data"
+    | T_distinct -> Fmt.string out "distinct_constants"
+end
+
 
 module Arith = struct
   let floor = Floor

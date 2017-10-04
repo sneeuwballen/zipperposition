@@ -19,9 +19,12 @@ type t = private {
   sc1: Scoped.scope;
   t2: term;
   sc2: Scoped.scope;
+  tags: Proof.tag list;
 }
 
-val make : term Scoped.t -> term Scoped.t -> t
+val make : tags:Proof.tag list -> term Scoped.t -> term Scoped.t -> t
+
+val tags : t -> Proof.tag list
 
 (** Apply a substitution to a delayed constraint *)
 val apply_subst :
@@ -38,7 +41,7 @@ val apply_subst_l :
   (term * term) list
 
 module FO : sig
-  val make : Term.t Scoped.t -> Term.t Scoped.t -> t
+  val make : tags:Proof.tag list -> Term.t Scoped.t -> Term.t Scoped.t -> t
 end
 
 include Interfaces.HASH with type t := t

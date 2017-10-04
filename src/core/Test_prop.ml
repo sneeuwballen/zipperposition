@@ -90,7 +90,7 @@ let normalize_form (f:form): form =
     let rw_terms c = Literals.map rw_term c
     and rw_clause c = match RW.Lit.normalize_clause c with
       | None -> [c]
-      | Some (cs,_,_,_) ->
+      | Some (cs,_,_,_,_) ->
         progress := true;
         cs
     and rm_trivial =
@@ -189,13 +189,13 @@ end = struct
         (fun lit -> RW.Lit.narrow_lit ~scope_rules:sc_rule (lit,sc_c))
       |> Sequence.to_rev_list
       |> CCList.sort_uniq
-        ~cmp:CCOrd.(pair RW.Lit.Rule.compare Unif_subst.compare)
+        ~cmp:CCOrd.(triple RW.Lit.Rule.compare Unif_subst.compare (list compare))
     in
     (* now do one step for each *)
     begin
       Sequence.of_list subst_rule_l
       |> Sequence.map
-        (fun (rule,us) ->
+        (fun (rule,us,_) ->
            let renaming = Subst.Renaming.create() in
            let subst = Unif_subst.subst us in
            let c_guard = Literals.of_unif_subst renaming us in
