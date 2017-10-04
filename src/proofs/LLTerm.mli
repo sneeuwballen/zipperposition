@@ -33,6 +33,8 @@ val equal : t -> t -> bool
 val hash : t -> int
 val compare : t -> t -> int
 
+val is_type : t -> bool
+
 val t_type : ty
 val var : var -> t
 val const : ty:ty -> ID.t -> t

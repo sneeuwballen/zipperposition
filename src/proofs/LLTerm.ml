@@ -37,7 +37,7 @@ let[@inline] view t = t.view
 let[@inline] ty t = t.ty
 let[@inline] ty_exn t = match t.ty with Some ty -> ty | None -> assert false
 let[@inline] equal (a:t) (b:t) : bool = a == b
-let[@inline] hash (a:t) : int = a.id
+let[@inline] hash (a:t) : int = CCHash.int a.id
 let[@inline] compare (a:t) (b:t) : int = CCInt.compare a.id b.id
 
 module H_cons = Hashcons.Make(struct
@@ -145,6 +145,10 @@ let t_type = mk_ Type None
 let[@inline] var v = mk_ (Var v) (Some (HVar.ty v))
 let[@inline] const ~ty id = mk_ (Const id) (Some ty)
 
+let[@inline] is_type t : bool = match ty t with
+  | Some ty -> ty == t_type
+  | None -> false
+
 let ite a b c =
   begin match ty b, ty c with
     | Some ty1, Some ty2 when equal ty1 ty2 ->
@@ -187,25 +191,32 @@ let eval_db ~(sub:t) (t:t) : t =
 
 let app f x = match ty f, ty x with
   | Some {view=Arrow (a,b);_}, Some a' when equal a a' -> app_ f x ~ty:b
-  | Some {view=Bind{binder=Binder.ForallTy;ty_var;body};_}, Some a' ->
+  | Some {view=Bind{binder=Binder.ForallTy;ty_var;body};_}, Some ty_x ->
     (* polymorphic type *)
-    if not (equal (ty_exn a') t_type) then (
-      errorf "cannot apply `%a`@ to non-type `%a`" pp f pp x
+    if not (equal ty_x t_type) then (
+      errorf "cannot apply `@[<2>%a@ : %a@]`@ to non-type `@[<2>%a@ : %a@]`"
+        pp f (Fmt.opt pp) (ty f) pp x (Fmt.opt pp) (ty x)
     );
     if not (equal ty_var t_type) then (
       errorf "ill-formed polymorphic type `%a`" pp (ty_exn f);
     );
-    let ty = eval_db ~sub:a' body in
+    let ty = eval_db ~sub:x body in
     app_ f x ~ty
   | _ ->
-    errorf "type error: cannot apply `%a`@ to `%a`" pp f pp x
+    errorf "type error: cannot apply `@[<2>%a@ : %a@]`@ to `@[<2>%a@ : %a@]`"
+      pp f (Fmt.opt pp) (ty f) pp x (Fmt.opt pp) (ty x)
 
 let rec app_l f = function
   | [] -> f
   | a :: tail -> app_l (app f a) tail
 
+let rec returns (t:t) : ty = match view t with
+  | Arrow (_, ret) -> returns ret
+  | _ -> t
+
 let arrow a b = match ty a, ty b with
   | Some {view=Type;_}, Some {view=Type;_} -> arrow_ a b
+  | _ when a == t_type && returns b == t_type -> arrow_ a b (* type constructor *)
   | _ ->
     errorf "type error: cannot make arrow between non-types@ :from `%a`@ :to `%a`"
       pp a pp b
