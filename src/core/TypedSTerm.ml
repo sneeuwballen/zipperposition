@@ -345,7 +345,9 @@ let record_flatten ?loc ~ty l ~rest =
 let at_loc ?loc t = {t with loc; }
 let with_ty ~ty t = {t with ty=Some ty; }
 let map_ty t ~f =
-  {t with ty=match t.ty with
+  {t with
+     hash= ~-1;
+     ty=match t.ty with
        | None -> None
        | Some x -> Some (f x)
   }
