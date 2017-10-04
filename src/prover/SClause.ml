@@ -152,7 +152,7 @@ let to_s_form_subst ~ctx subst c : _ * _ Var.Subst.t =
     |> List.map
       (fun v ->
          let t_v = Term.var v in
-         let t = 
+         let t =
            Subst.FO.apply (SP.renaming subst) (SP.subst subst)
              ((t_v,SP.scope subst))
          in
