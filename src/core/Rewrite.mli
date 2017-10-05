@@ -109,7 +109,8 @@ module Lit : sig
 
   val normalize_clause :
     Literals.t ->
-    (Literals.t list * rule * Subst.t * Scoped.scope * Proof.tag list) option
+    (Literals.t list * rule * Subst.t * Scoped.scope *
+       Subst.Renaming.t * Proof.tag list) option
   (** normalize literals of the clause w.r.t. rules, or return [None]
       if no rule applies *)
 
@@ -138,7 +139,9 @@ module Rule : sig
 
   val as_proof : t -> Proof.t
 
-  val as_proof_parent_subst : t -> Subst.t Scoped.t -> Proof.parent
+  val lit_as_proof_parent_subst :
+    Subst.Renaming.t -> Subst.t -> Lit.Rule.t Scoped.t -> Proof.parent
+  (** Helper for clause rewriting *)
 
   val set_as_proof_parents : Term.Rule_inst_set.t -> Proof.parent list
   (** Proof parents from a set of rules instances *)

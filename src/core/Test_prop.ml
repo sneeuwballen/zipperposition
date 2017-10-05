@@ -90,7 +90,7 @@ let normalize_form (f:form): form =
     let rw_terms c = Literals.map rw_term c
     and rw_clause c = match RW.Lit.normalize_clause c with
       | None -> [c]
-      | Some (cs,_,_,_,_) ->
+      | Some (cs,_,_,_,_,_) ->
         progress := true;
         cs
     and rm_trivial =

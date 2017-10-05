@@ -104,11 +104,11 @@ module Make(E : Env_intf.S) = struct
     let lits = C.lits c in
     match RW.Lit.normalize_clause lits with
       | None -> None
-      | Some (clauses,r,subst,sc_r,tags) ->
+      | Some (clauses,r,subst,sc_r,renaming,tags) ->
         let proof =
           Proof.Step.simp ~rule:(Proof.Rule.mk "rw_clause") ~tags
             [C.proof_parent c;
-             RW.Rule.as_proof_parent_subst (RW.L_rule r) (subst,sc_r)]
+             RW.Rule.lit_as_proof_parent_subst renaming subst (r,sc_r)]
         in
         let clauses =
           List.map

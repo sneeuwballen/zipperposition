@@ -597,7 +597,7 @@ module Lit = struct
             (fun new_lits -> Array.of_list (new_lits @ lits))
             clause_chunks
         in
-        Some (clauses,rule,subst,1,tags)
+        Some (clauses,rule,subst,1,renaming,tags)
     end
 
   let normalize_clause lits =
@@ -728,11 +728,11 @@ module Rule = struct
   let as_proof r =
     Proof.S.mk (proof r) (Proof.Result.make res_tc r)
 
-  let as_proof_parent_subst r (subst,sc) : Proof.parent =
+  let lit_as_proof_parent_subst renaming subst (r,sc) : Proof.parent =
     let proof =
-      Proof.S.mk (proof r) (Proof.Result.make res_tc r)
+      Proof.S.mk (Lit.Rule.proof r) (Proof.Result.make res_tc (L_rule r))
     in
-    Proof.Parent.from_subst Subst.Renaming.none (proof,sc) subst
+    Proof.Parent.from_subst renaming (proof,sc) subst
 
   let set_as_proof_parents (s:Term.Rule_inst_set.t) : Proof.parent list =
     Term.Rule_inst_set.to_seq s
