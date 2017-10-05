@@ -462,7 +462,7 @@ let check res =
       let stop = Util.total_time_s () in
       Format.printf "%s(@[<h>proof_check@ :res %a@ :stats %a :time %.2fs@])@."
         comment LLProof_check.pp_res res LLProof_check.pp_stats stats (stop-.start);
-      if res = LLProof_check.R_fail then 1 else 0
+      if res = LLProof_check.R_fail then 15 else 0
     | _ -> 0
   in
   Phases.return_phase errcode
