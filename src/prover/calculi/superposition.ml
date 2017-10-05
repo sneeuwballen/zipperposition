@@ -245,12 +245,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let renaming = S.Renaming.create () in
     let replacement' = S.FO.apply ~renaming subst (replacement, info.scope_active) in
     let var' = S.FO.apply ~renaming subst (var, info.scope_passive) in
-    let var'' = S.FO.apply ~renaming subst (var', info.scope_active) in
-    if (not (Type.is_fun (Term.ty var'')) || not (O.might_flip ord var'' replacement'))
+    if (not (Type.is_fun (Term.ty var')) || not (O.might_flip ord var' replacement'))
     then (
       Util.debugf ~section 5
         "Cannot flip: %a = %a"
-        (fun k->k T.pp var'' T.pp replacement');
+        (fun k->k T.pp var' T.pp replacement');
       false (* If the lhs vs rhs cannot flip, we don't need a sup at var *)
     )
     else (
@@ -278,10 +277,19 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | None ->
           (* Check whether Cσ is >= C[var -> replacement]σ *)
           let passive'_lits = CCArray.map (fun l -> Lit.apply_subst ~renaming subst (l, info.scope_passive)) (C.lits info.passive) in
+          let fresh_var = HVar.fresh ~ty:(Term.ty var) () in
           let passive_t'_lits =
             Sequence.of_array (C.lits info.passive)
-            |> Sequence.map (fun l -> Lit.replace l ~old:var ~by:replacement')
-            |> Sequence.map (fun l -> Lit.apply_subst ~renaming subst (l, info.scope_passive))
+            |> Sequence.map (fun l -> Lit.replace l ~old:var ~by:(Term.var fresh_var))
+            (* replace var by fresh_var, resulting in C[var -> fresh_var] *)
+            |> Sequence.map
+              (fun l ->
+                 Lit.apply_subst ~renaming
+                   (Unif.FO.bind subst (fresh_var, info.scope_passive) (replacement',2))
+                   (l, info.scope_passive)
+              )
+            (* apply subst (which ignores fresh_var) and replace fresh_var by replacement',
+               resulting in C[var -> replacement']σ *)
             |> Sequence.to_array in
           if Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt
           then (
