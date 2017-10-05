@@ -16,9 +16,6 @@ module type S = sig
   (** New congruence.
       @param size a hint for the initial size of the hashtable. *)
 
-  val find : t -> term -> term
-  (** Current representative of this term *)
-
   val iter : t -> (mem:term -> repr:term -> unit) -> unit
   (** Iterate on terms that are explicitely present in the congruence.
       The callback is given [mem], the term itself, and [repr],

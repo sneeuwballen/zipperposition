@@ -57,13 +57,13 @@ module Make(T : TERM) = struct
   (* find representative *)
   let rec find_ cc (t:term) : term =
     let next = next_ cc t in
-    if t == next
+    if T.equal t next
     then t  (* root *)
     else (
       let root = find_ cc next in
       (* path compression. Can be done in place as it doesn't change
          the semantics of the CC *)
-      if root != next then (
+      if not (T.equal root next) then (
         cc.next <- H.replace cc.next t root;
       );
       root
@@ -89,9 +89,9 @@ module Make(T : TERM) = struct
     let t2 = find_ cc t2 in
     if T.equal t1 t2 then cc
     else (
-      let cc = set_next_ cc t1 t2 in
-      (* n1 now points to n2, put every class information in n2 *)
       let left, right = parents_ cc t1, parents_ cc t2 in
+      (* n1 now points to n2, put every class information in n2 *)
+      let cc = set_next_ cc t1 t2 in
       let cc = set_parents_ cc t2 (List.rev_append left right) in
       (* check congruence of parents of n1 and n2 *)
       List.fold_left
@@ -105,37 +105,42 @@ module Make(T : TERM) = struct
         cc left
     )
 
-  (* add [t] to the CC, return its representative *)
-  let rec add_ cc (t:term) : t * term =
-    if H.mem cc.parents t then cc, find_ cc t
-    else (
+  (* add [t] to the CC *)
+  let rec add cc (t:term) : t =
+    if H.mem cc.parents t then (
+      assert (H.mem cc.next t);
+      cc
+    ) else (
+      let subs = T.subterms t in
       let cc = set_parents_ cc t [] in
       let cc = set_next_ cc t t in
       (* add subterms *)
-      let cc, subs_repr = CCList.fold_map add_ cc (T.subterms t) in
+      let cc = List.fold_left add cc subs in
       (* add [t] to list of subterms *)
       let cc =
         List.fold_left
           (fun cc sub ->
-             set_parents_ cc sub (t :: parents_ cc sub))
-          cc (T.subterms t)
+             let repr = find_ cc sub in
+             set_parents_ cc repr (t :: parents_ cc repr))
+          cc
+          subs
       in
       let cc =
         List.fold_left
-          (fun cc sub_repr ->
+          (fun cc sub ->
+             let parents = find_ cc sub |> parents_ cc in
              List.fold_left
-               (fun cc parent_sub_repr ->
-                  if not (T.equal (find_ cc t) (find_ cc parent_sub_repr)) &&
-                     are_congruent_ cc t parent_sub_repr then (
-                    merge_ cc t parent_sub_repr
+               (fun cc parent_sub ->
+                  if not (T.equal t parent_sub) &&
+                     are_congruent_ cc t parent_sub then (
+                    merge_ cc t parent_sub
                   ) else cc)
-               cc (parents_ cc sub_repr))
-          cc subs_repr
+               cc parents)
+          cc
+          subs
       in
-      cc, find_ cc t
+      cc
     )
-
-  let[@inline] find cc (t:term) : term = add_ cc t |> snd
 
   let iter cc f =
     H.iter cc.next
@@ -147,14 +152,15 @@ module Make(T : TERM) = struct
     H.iter cc.next
       (fun t next -> if T.equal t next then f t)
 
-  let[@inline] add cc t = add_ cc t |> fst
-
-  let mk_eq cc t1 t2 =
-    let cc, t1 = add_ cc t1 in
-    let cc, t2 = add_ cc t2 in
+  let[@inline] mk_eq cc t1 t2 =
+    let cc = add cc t1 in
+    let cc = add cc t2 in
     merge_ cc t1 t2
 
-  let[@inline] is_eq cc t1 t2 = T.equal (find cc t1) (find cc t2)
+  let[@inline] is_eq cc t1 t2 =
+    let cc = add cc t1 in
+    let cc = add cc t2 in
+    T.equal (find_ cc t1) (find_ cc t2)
 end
 
 module FO = Make(struct
