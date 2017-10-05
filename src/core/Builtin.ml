@@ -262,6 +262,8 @@ module Tag = struct
     | T_distinct (** distinct constants *)
     | T_ac of ID.t (** AC symbols *)
 
+  let compare = Pervasives.compare
+
   let pp out = function
     | T_lia -> Fmt.string out "lia"
     | T_lra -> Fmt.string out "lra"

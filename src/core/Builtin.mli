@@ -173,6 +173,7 @@ module Tag : sig
     | T_distinct (** distinct constants *)
     | T_ac of ID.t (** AC symbol *)
 
+  val compare : t -> t -> int
   val pp : t CCFormat.printer
 end
 

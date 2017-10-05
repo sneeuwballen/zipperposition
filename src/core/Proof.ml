@@ -452,10 +452,15 @@ module Step = struct
 
   let default_check : check = `Check
 
+  let[@inline] dedup_tags (tgs:tag list) : tag list =
+    CCList.sort_uniq ~cmp:Builtin.Tag.compare tgs
+
   let inference ?infos ?(check=default_check) ?(tags=[]) ~rule parents =
+    let tags = dedup_tags tags in
     step_ ?infos (Inference (rule,check,tags)) parents
 
   let simp ?infos ?(check=default_check) ?(tags=[]) ~rule parents =
+    let tags = dedup_tags tags in
     step_ ?infos (Simplification (rule,check,tags)) parents
 
   let esa ?infos ?(check=default_check) ~rule parents =

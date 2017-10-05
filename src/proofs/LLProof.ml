@@ -169,7 +169,9 @@ let assert_ f = mk_ f Assert
 let trivial f = mk_ f Trivial
 let by_def id f = mk_ f (By_def id)
 let define id f = mk_ f (Define id)
-let instantiate ?(tags=[]) f p inst = mk_ f (Instantiate {form=p;inst;tags})
+
+let instantiate ?(tags=[]) f p inst =
+  mk_ f (Instantiate {form=p;inst;tags})
 
 let conv_check_ = function
   | `No_check -> C_no_check
