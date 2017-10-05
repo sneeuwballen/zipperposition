@@ -102,7 +102,7 @@ $(TEST_TOOL): check_$(TEST_TOOL)
 
 $(TEST_TOOL)-zipper:
 	@mkdir -p snapshots
-	$(TEST_TOOL) run -p zipperposition -c ./tests/conf.toml \
+	$(TEST_TOOL) run -p zipperposition,zipperposition-check -c ./tests/conf.toml \
 	  --summary snapshots/tip-$(DATE).txt \
 	  --csv snapshots/tip-$(DATE).csv \
 	  $(TEST_OPTS) $(TEST_FILES)
