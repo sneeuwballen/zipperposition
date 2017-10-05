@@ -51,8 +51,8 @@ val bool : ty
 val box_opaque : t -> t
 val lambda : ty_var:ty -> t -> t
 
-val eval_db : sub:t -> t -> t
-(** [eval_db ~sub t] replaces De Bruijn 0 in [t] by [sub] *)
+val db_eval : sub:t -> t -> t
+(** [db_eval ~sub t] replaces De Bruijn 0 in [t] by [sub] *)
 
 val pp : t CCFormat.printer
 

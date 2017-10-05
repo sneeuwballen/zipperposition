@@ -180,10 +180,29 @@ let[@inline] map ~f ~bind:f_bind b_acc t = match view t with
   | Ite (a,b,c) ->
     ite (f b_acc a) (f b_acc b) (f b_acc c)
 
-(* replace DB 0 by [sub] in [t] *)
-let eval_db ~(sub:t) (t:t) : t =
+(* shift DB indices by [n] *)
+let db_shift n (t:t) : t =
   let rec aux k t = match view t with
-    | Var v when HVar.id v = k -> sub
+    | Var v ->
+      if HVar.id v >= k then var (HVar.make (HVar.id v+n) ~ty:(HVar.ty v))
+      else t
+    | _ ->
+      map ~f:aux ~bind:succ k t
+  in
+  aux 0 t
+
+(* replace DB 0 by [sub] in [t] *)
+let db_eval ~(sub:t) (t:t) : t =
+  let rec aux k t = match view t with
+    | Var v ->
+      if HVar.id v = k then (
+        (* shift [sub] by the number of binders added since binding point *)
+        db_shift k sub
+      ) else if (HVar.id v > k) then (
+        (* shift down by 1, to account for the vanished binder *)
+        var (HVar.make (HVar.id v-1) ~ty:(HVar.ty v))
+      )
+      else t
     | _ ->
       map ~f:aux ~bind:succ k t
   in
@@ -194,13 +213,13 @@ let app f x = match ty f, ty x with
   | Some {view=Bind{binder=Binder.ForallTy;ty_var;body};_}, Some ty_x ->
     (* polymorphic type *)
     if not (equal ty_x t_type) then (
-      errorf "cannot apply `@[<2>%a@ : %a@]`@ to non-type `@[<2>%a@ : %a@]`"
+      errorf "cannot apply@ `@[<2>%a@ : %a@]`@ to non-type `@[<2>%a@ : %a@]`"
         pp f (Fmt.opt pp) (ty f) pp x (Fmt.opt pp) (ty x)
     );
     if not (equal ty_var t_type) then (
-      errorf "ill-formed polymorphic type `%a`" pp (ty_exn f);
+      errorf "ill-formed polymorphic type@ `%a`" pp (ty_exn f);
     );
-    let ty = eval_db ~sub:x body in
+    let ty = db_eval ~sub:x body in
     app_ f x ~ty
   | _ ->
     errorf "type error: cannot apply `@[<2>%a@ : %a@]`@ to `@[<2>%a@ : %a@]`"
@@ -309,7 +328,10 @@ module Conv = struct
     | T.Var v ->
       begin match Var.Subst.find ctx.vars v with
         | None -> errorf "cannot find var `%a`@ in %a" Var.pp v pp_ctx ctx
-        | Some (i,ty) -> var (HVar.make (ctx.depth-i-1) ~ty)
+        | Some (i,ty) ->
+          assert (ctx.depth > i);
+          let ty = db_shift (ctx.depth-i) ty in
+          var (HVar.make (ctx.depth-i-1) ~ty)
       end
     | T.Const id ->
       let ty = of_term ctx (T.ty_exn t) in
