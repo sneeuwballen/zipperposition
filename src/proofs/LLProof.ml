@@ -198,10 +198,13 @@ module Dot = struct
            | Esa (name,_,_) -> name
            | Inference {name;_} -> name
          in
-         parents p
-         |> Sequence.of_list
-         |> Sequence.map
-           (fun p' -> (descr,inst p), p'.p_proof))
+         let descr = Fmt.sprintf "@[<h>%s%a@]" descr pp_tags (tags p) in
+         begin
+           parents p
+           |> Sequence.of_list
+           |> Sequence.map
+             (fun p' -> (descr,inst p), p'.p_proof)
+         end)
 
   let _to_str_escape fmt =
     Util.ksprintf_noc ~f:Util.escape_dot fmt
