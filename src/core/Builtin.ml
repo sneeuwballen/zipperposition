@@ -260,6 +260,7 @@ module Tag = struct
     | T_ind (** induction *)
     | T_data (** datatypes *)
     | T_distinct (** distinct constants *)
+    | T_ac of ID.t (** AC symbols *)
 
   let pp out = function
     | T_lia -> Fmt.string out "lia"
@@ -268,6 +269,7 @@ module Tag = struct
     | T_ind -> Fmt.string out "ind"
     | T_data -> Fmt.string out "data"
     | T_distinct -> Fmt.string out "distinct_constants"
+    | T_ac id -> Fmt.fprintf out "(ac %a)" ID.pp_full id
 end
 
 

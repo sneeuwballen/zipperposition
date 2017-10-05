@@ -171,6 +171,7 @@ module Tag : sig
     | T_ind (** induction *)
     | T_data (** datatypes *)
     | T_distinct (** distinct constants *)
+    | T_ac of ID.t (** AC symbol *)
 
   val pp : t CCFormat.printer
 end

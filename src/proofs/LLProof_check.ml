@@ -312,7 +312,8 @@ end = struct
   let can_check : LLProof.tag list -> bool =
     let open Builtin.Tag in
     let f = function
-      | T_lra | T_lia | T_ho | T_ind | T_data | T_distinct -> false in
+      | T_lra | T_lia | T_ho | T_ind | T_data
+      | T_distinct | T_ac _ -> false in
     List.for_all f
 
   let prove (a:form list) (b:form) =
