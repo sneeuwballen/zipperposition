@@ -36,19 +36,27 @@ type attrs = attr list
 
 type 'ty skolem = ID.t * 'ty
 
-type ('t, 'ty) term_rule = 'ty Var.t list * ID.t * 'ty * 't list * 't
-(** [forall vars, id args = rhs] *)
-
 (** polarity for rewrite rules *)
 type polarity = [`Equiv | `Imply]
 
-type ('f, 't, 'ty) form_rule = 'ty Var.t list * 't SLiteral.t * 'f list * polarity
-(** [forall vars, lhs op bigand rhs] where [op] depends on
-    [polarity] (in [{=>, <=>, <=}]) *)
-
 type ('f, 't, 'ty) def_rule =
-  | Def_term of ('t, 'ty) term_rule
-  | Def_form of ('f, 't, 'ty) form_rule
+  | Def_term of {
+      vars: 'ty Var.t list;
+      id: ID.t;
+      ty: 'ty;
+      args: 't list;
+      rhs: 't;
+      as_form: 'f;
+    } (** [forall vars, id args = rhs] *)
+
+  | Def_form of {
+      vars: 'ty Var.t list;
+      lhs: 't SLiteral.t;
+      rhs: 'f list;
+      polarity: polarity;
+      as_form: 'f list;
+    } (** [forall vars, lhs op bigand rhs] where [op] depends on
+          [polarity] (in [{=>, <=>, <=}]) *)
 
 type ('f, 't, 'ty) def = {
   def_id: ID.t;
@@ -108,8 +116,6 @@ val attrs_ua : (_,_,_) t -> UntypedAST.attrs
 val ty_decl : ?attrs:attrs -> proof:proof -> ID.t -> 'ty -> (_, _, 'ty) t
 val def : ?attrs:attrs -> proof:proof -> ('f,'t,'ty) def list -> ('f, 't, 'ty) t
 val rewrite : ?attrs:attrs -> proof:proof -> ('f,'t,'ty) def_rule -> ('f,'t,'ty) t
-val rewrite_term : ?attrs:attrs -> proof:proof -> ('t, 'ty) term_rule -> (_, 't, 'ty) t
-val rewrite_form : ?attrs:attrs -> proof:proof -> ('f, 't, 'ty) form_rule -> ('f, 't, 'ty) t
 val data : ?attrs:attrs -> proof:proof -> 'ty data list -> (_, _, 'ty) t
 val assert_ : ?attrs:attrs -> proof:proof -> 'f -> ('f, _, _) t
 val lemma : ?attrs:attrs -> proof:proof -> 'f list -> ('f, _, _) t
