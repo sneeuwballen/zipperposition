@@ -708,14 +708,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let step =
         UnitIdx.retrieve ~sign:true (!_idx_simpl, cur_sc) (t, 0)
         |> Sequence.find_map
-          (fun (l, r, (_,_,_,unit_clause), subst) ->
+          (fun (l, r, (_,_,sign,unit_clause), subst) ->
              (* r is the term subterm is going to be rewritten into *)
              assert (C.is_unit_clause unit_clause);
-             if (not (Lazy.force restrict) || not (S.is_renaming subst))
-             && C.trail_subsumes unit_clause c
-             && (O.compare ord
-                 (S.FO.apply Subst.Renaming.none subst (l,cur_sc))
-                 (S.FO.apply Subst.Renaming.none subst (r,cur_sc)) = Comp.Gt)
+             if sign &&
+                (not (Lazy.force restrict) || not (S.is_renaming subst)) &&
+                C.trail_subsumes unit_clause c &&
+                (O.compare ord
+                   (S.FO.apply Subst.Renaming.none subst (l,cur_sc))
+                   (S.FO.apply Subst.Renaming.none subst (r,cur_sc)) = Comp.Gt)
              (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
              then (
                Util.debugf ~section 5
@@ -723,6 +724,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                  (fun k->k T.pp t 0 T.pp l cur_sc T.pp r cur_sc S.pp subst);
                (* sanity checks *)
                assert (Type.equal (T.ty l) (T.ty r));
+               assert (Unif.FO.equal ~subst (l,cur_sc) (t,0));
                st.demod_clauses <-
                  (unit_clause,subst,cur_sc) :: st.demod_clauses;
                st.demod_sc <- 1 + st.demod_sc; (* allocate new scope *)
@@ -1023,7 +1025,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           assert !has_changed;
           let subst = US.subst !us in
           let tgs = US.tags !us in
-          tags := tgs @ !tags; 
+          tags := tgs @ !tags;
           let c_guard = Literal.of_unif_subst Subst.Renaming.none !us in
           c_guard @ Lit.apply_subst_list Subst.Renaming.none subst (new_lits,0)
         )
