@@ -147,6 +147,7 @@ end = struct
         if closed then {b with closed} else b
       )
 
+    let[@inline] add_cc_ t b = { b with cc=CC.add b.cc t }
     let[@inline] add_cc_eq t u b = { b with cc=CC.mk_eq b.cc t u }
     let[@inline] add_diseq_ t u b = { b with diseq=(t,u)::b.diseq }
 
@@ -160,6 +161,7 @@ end = struct
 
     (* add one formula to [b] *)
     let add1 (br:t) (f:T.t): t =
+      let br = add_cc_ f br in
       begin match F.view f with
         | F.Atom t -> add_eq t F.true_ br
         | F.True -> br
