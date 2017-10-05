@@ -29,6 +29,7 @@ let prof_ho_unif = Util.mk_profiler "ho.unif"
 
 let _purify_applied_vars = ref false
 let _general_ext_pos = ref false
+let _ext_axiom = ref false
 
 module type S = sig
   module Env : Env.S
@@ -670,6 +671,21 @@ module Make(E : Env.S) : S with module Env = E = struct
         SimplM.return_new new_clause
     end
 
+  let extensionality_clause =
+    let diff_id = ID.make("zf_ext_diff") in
+    ID.set_payload diff_id (ID.Attr_skolem (ID.K_normal, 2)); (* make the arguments of diff mandatory *)
+    let alpha = Type.var (HVar.fresh ~ty:Type.tType ()) in
+    let beta = Type.var (HVar.fresh ~ty:Type.tType ()) in
+    let alpha_to_beta = Type.arrow [alpha] beta in
+    let diff_type = Type.arrow [alpha_to_beta; alpha_to_beta] alpha in
+    let diff = Term.const ~ty:diff_type diff_id in
+    let x = Term.var (HVar.make ~ty:alpha_to_beta 0) in
+    let y = Term.var (HVar.make ~ty:alpha_to_beta 1) in
+    let x_diff = Term.app x [Term.app diff [x; y]] in
+    let y_diff = Term.app y [Term.app diff [x; y]] in
+    let lits = [Literal.mk_eq x y; Literal.mk_neq x_diff y_diff] in
+    Env.C.create ~penalty:5 ~trail:Trail.empty lits Proof.Step.trivial
+
   let setup () =
     if not (Env.flex_get k_enabled) then (
       Util.debug ~section 1 "HO rules disabled";
@@ -701,6 +717,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       end;
       if !_purify_applied_vars then
         Env.add_unary_simplify purify_applied_variable;
+      if !_ext_axiom then
+        Env.ProofState.PassiveSet.add (Sequence.singleton extensionality_clause);
     );
     ()
 end
@@ -791,6 +809,7 @@ let () =
       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
       "--ho-eta", eta_opt, " eta-expansion/reduction";
       "--ho-purify", Arg.Set _purify_applied_vars, " enable purification of applied variables";
-      "--ho-general-ext-pos", Arg.Set _general_ext_pos, " enable general positive extensionality rule"
+      "--ho-general-ext-pos", Arg.Set _general_ext_pos, " enable general positive extensionality rule";
+      "--ho-ext-axiom", Arg.Set _ext_axiom, " enable extensionality axiom"
     ];
   Extensions.register extension;
