@@ -253,6 +253,7 @@ val as_id_app : t -> (ID.t * Ty.t * t list) option
 val vars : t -> t Var.t list
 val free_vars : t -> t Var.t list
 val free_vars_l : t list -> t Var.t list
+val free_vars_set : t -> t Var.Set.t
 
 val close_all : ty:t -> Binder.t -> t -> t
 (** Bind all free vars with the symbol *)

@@ -432,7 +432,7 @@ module Lit = struct
 
     let make ~proof lit_lhs lit_rhs =
       let lit_proof =
-        Proof.Step.inference ~rule [Proof.Parent.from proof]
+        Proof.Step.esa ~rule [Proof.Parent.from proof]
       in
       {lit_lhs; lit_rhs; lit_proof}
 
@@ -466,16 +466,34 @@ module Lit = struct
 
     let conv_ ~ctx lhs rhs =
       let module F = TypedSTerm.Form in
+      (* put variables of [lhs] first, so that that instances of [lhs := rhs]
+         resemble [forall vars(lhs). (lhs = (forall …. rhs))] *)
+      let close_forall_ord lhs f =
+        let module TT = TypedSTerm in
+        let vars_lhs = TT.free_vars_set lhs in
+        let vars =
+          TT.free_vars f
+          |> List.sort
+            (fun v1 v2 ->
+               let c1 = Var.Set.mem vars_lhs v1 in
+               let c2 = Var.Set.mem vars_lhs v2 in
+               if c1=c2 then Var.compare v1 v2
+               else if c1 then -1
+               else 1)
+        in
+        F.forall_l vars f
+      in
       let conv_lit lit =
         lit
         |> Literal.Conv.to_form
         |> SLiteral.map ~f:(T.Conv.to_simple_term ctx)
         |> SLiteral.to_form
       in
+      let lhs = conv_lit lhs in
       F.equiv
-        (conv_lit lhs)
-        (List.map (fun l -> List.map conv_lit l |> F.or_) rhs |> F.and_)
-      |> F.close_forall
+        lhs
+        (rhs |> List.map (fun l -> List.map conv_lit l |> F.or_) |> F.and_)
+      |> close_forall_ord lhs
 
     let to_form ~ctx r = conv_ ~ctx (lhs r) (rhs r)
 
@@ -709,6 +727,12 @@ module Rule = struct
 
   let as_proof r =
     Proof.S.mk (proof r) (Proof.Result.make res_tc r)
+
+  let as_proof_parent_subst r (subst,sc) : Proof.parent =
+    let proof =
+      Proof.S.mk (proof r) (Proof.Result.make res_tc r)
+    in
+    Proof.Parent.from_subst Subst.Renaming.none (proof,sc) subst
 
   let set_as_proof_parents (s:Term.Rule_inst_set.t) : Proof.parent list =
     Term.Rule_inst_set.to_seq s

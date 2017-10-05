@@ -138,6 +138,8 @@ module Rule : sig
 
   val as_proof : t -> Proof.t
 
+  val as_proof_parent_subst : t -> Subst.t Scoped.t -> Proof.parent
+
   val set_as_proof_parents : Term.Rule_inst_set.t -> Proof.parent list
   (** Proof parents from a set of rules instances *)
 

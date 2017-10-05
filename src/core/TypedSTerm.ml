@@ -492,6 +492,7 @@ let as_id_app t = match view t with
 
 let vars t = Seq.vars t |> Var.Set.of_seq |> Var.Set.to_list
 
+let free_vars_set t = Seq.free_vars t |> Var.Set.of_seq
 let free_vars t = Seq.free_vars t |> Var.Set.of_seq |> Var.Set.to_list
 
 let free_vars_l l =
