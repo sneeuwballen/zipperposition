@@ -156,7 +156,7 @@ end = struct
     let[@inline] add_to_expand f b = {b with to_expand = T_set.add f b.to_expand}
 
     let[@inline] add_form_to_expand f b =
-      b |> add_to_expand f |> add_cc_eq f F.true_ |> check_closed
+      b |> add_to_expand f |> check_closed
 
     (* add one formula to [b] *)
     let add1 (br:t) (f:T.t): t =
