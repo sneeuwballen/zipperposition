@@ -812,13 +812,6 @@ module Comp = struct
     in
     C.of_total (Pervasives.compare (_to_int l1) (_to_int l2))
 
-  (* make HO unif constraints smaller *)
-  let _cmp_by_constraint l1 l2 = match is_ho_unif l1, is_ho_unif l2 with
-    | true, true
-    | false, false -> C.Eq
-    | true, false -> C.Lt
-    | false, true -> C.Gt
-
   (* by multiset of terms *)
   let _cmp_by_term_multiset ~ord l1 l2 =
     let m1 = to_multiset l1 and m2 = to_multiset l2 in
@@ -873,7 +866,6 @@ module Comp = struct
 
   let compare ~ord l1 l2 =
     let f = Comparison.(
-        _cmp_by_constraint @>>
         _cmp_by_maxterms ~ord @>>
         _cmp_by_polarity @>>
         _cmp_by_kind @>>
