@@ -723,9 +723,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                  (fun k->k T.pp t 0 T.pp l cur_sc T.pp r cur_sc S.pp subst);
                (* sanity checks *)
                assert (Type.equal (T.ty l) (T.ty r));
-               assert (O.compare ord
-                   (S.FO.apply Subst.Renaming.none subst (l,cur_sc))
-                   (S.FO.apply Subst.Renaming.none subst (r,cur_sc)) = Comp.Gt);
                st.demod_clauses <-
                  (unit_clause,subst,cur_sc) :: st.demod_clauses;
                st.demod_sc <- 1 + st.demod_sc; (* allocate new scope *)

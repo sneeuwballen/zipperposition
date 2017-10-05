@@ -258,6 +258,14 @@ val free_vars_set : t -> t Var.Set.t
 val close_all : ty:t -> Binder.t -> t -> t
 (** Bind all free vars with the symbol *)
 
+(** Generic non-recursive map *)
+val map :
+  f:('a -> t -> t) ->
+  bind:('a -> ty Var.t -> 'a * ty Var.t) ->
+  'a ->
+  t ->
+  t
+
 include Interfaces.PRINT with type t := t
 
 val pp_inner : t CCFormat.printer
