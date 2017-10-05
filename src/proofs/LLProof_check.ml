@@ -25,6 +25,7 @@ type stats = {
   n_fail: int;
   n_skip_esa: int; (** steps skipped because ESA *)
   n_skip_tags: int; (** steps skipped because of theory tags *)
+  n_skip_trivial: int; (** steps skipped because they are trivial *)
   n_skip: int;
 }
 
@@ -359,12 +360,14 @@ let open_forall = T.unfold_binder Binder.Forall
 
 type check_step_res =
   | CS_check of res
-  | CS_skip of [`ESA | `Other | `Tags]
+  | CS_skip of [`ESA | `Other | `Tags | `Trivial]
 
 let pp_csr out = function
   | CS_check r -> pp_res out r
   | CS_skip r ->
-    let s = match r with `ESA -> "esa" | `Tags -> "tags" | `Other -> "other" in
+    let s = match r with
+      | `ESA -> "esa" | `Tags -> "tags"
+      | `Other -> "other" | `Trivial -> "trivial" in
     Fmt.fprintf out "@{<Yellow>SKIP@} (%s)" s
 
 let check_step_ (p:proof): check_step_res =
@@ -379,9 +382,7 @@ let check_step_ (p:proof): check_step_res =
     | P.Negated_goal p' ->
       (* [p'] should prove [not concl] *)
       CS_check (Tab.prove [P.concl p'] (F.not_ concl))
-    | P.Trivial ->
-      (* should be able to prove the conclusion directly *)
-      CS_check (Tab.prove [] concl)
+    | P.Trivial -> CS_skip `Other (* axiom of the theory *)
     | P.Instantiate {tags;_} when not (Tab.can_check tags) -> CS_skip `Tags
     | P.Instantiate {form=p';inst;_} ->
       (* re-instantiate and check we get the same thing *)
@@ -417,7 +418,10 @@ let check
     (p:proof) : res * stats
   =
   let tbl = P.Tbl.create 64 in
-  let stats = ref {n_ok=0; n_fail=0; n_skip_esa=0; n_skip_tags=0; n_skip=0} in
+  let stats = ref {
+      n_ok=0; n_fail=0; n_skip_esa=0; n_skip_tags=0;
+      n_skip_trivial=0; n_skip=0;
+    } in
   let upd_stats f = stats := f !stats in
   let rec check (p:proof): unit =
     if not (P.Tbl.mem tbl p) then (
@@ -440,6 +444,7 @@ let check
                   n_skip = s.n_skip+1;
                   n_skip_esa=if r=`ESA then s.n_skip_esa+1 else s.n_skip_esa;
                   n_skip_tags=if r=`Tags then s.n_skip_tags+1 else s.n_skip_tags;
+                  n_skip_trivial=if r=`Trivial then s.n_skip_trivial+1 else s.n_skip_trivial;
                })
       end;
       (* now check premises *)

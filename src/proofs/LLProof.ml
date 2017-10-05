@@ -97,7 +97,7 @@ let inst (p:t): inst = match p.step with
   | _ -> []
 
 let check_info (p:t): check_info = match p.step with
-  | Goal | Assert | Trivial | Negated_goal _ | By_def _ | Define _ -> C_other
+  | Goal | Assert | Trivial |  Negated_goal _ | By_def _ | Define _ -> C_other
   | Instantiate _ -> C_check []
   | Esa (_,_,c)
   | Inference {check=c;_} -> c
@@ -138,8 +138,8 @@ let pp_intro_some out = function [] -> () | l -> Fmt.fprintf out "@ :intro %a" p
 let pp_lintro_some out = function [] -> () | l -> Fmt.fprintf out "@ :local-intro %a" pp_inst l
 
 let pp out (p:t): unit =
-  Fmt.fprintf out "(@[<hv2>%a%a@ :res `%a`@ :from [@[<hv>%a@]]%a%a%a@])"
-    pp_step (step p) Proof.pp_tags (tags p)
+  Fmt.fprintf out "(@[<hv2>proof/%d %a%a@ :res `%a`@ :from [@[<hv>%a@]]%a%a%a@])"
+    p.id pp_step (step p) Proof.pp_tags (tags p)
     pp_res p
     (Util.pp_list pp_parent) (parents p)
     pp_inst_some (inst p)
@@ -218,6 +218,7 @@ module Dot = struct
       | _, F.Or l when List.for_all is_bool_atom l -> Some "cyan"
       | Goal, _ -> Some "green"
       | Assert, _ -> Some "yellow"
+      | Trivial, _ -> Some "gold"
       | (By_def _ | Define _), _ -> Some "navajowhite"
       | _ -> None
     end

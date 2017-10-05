@@ -24,6 +24,7 @@ type stats = {
   n_fail: int; (** steps that failed *)
   n_skip_esa: int; (** steps skipped because ESA *)
   n_skip_tags: int; (** steps skipped because of theory tags *)
+  n_skip_trivial: int; (** steps skipped because they are trivial *)
   n_skip: int; (** steps skipped, not checked *)
 }
 
@@ -32,7 +33,7 @@ val pp_stats : stats CCFormat.printer
 (** Result for checking only one step *)
 type check_step_res =
   | CS_check of res
-  | CS_skip of [`ESA | `Other | `Tags]
+  | CS_skip of [`ESA | `Other | `Tags | `Trivial]
 
 val check :
   ?before_check:(proof -> unit) ->

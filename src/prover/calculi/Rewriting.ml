@@ -108,8 +108,7 @@ module Make(E : Env_intf.S) = struct
         let proof =
           Proof.Step.simp ~rule:(Proof.Rule.mk "rw_clause") ~tags
             [C.proof_parent c;
-             Proof.Parent.from_subst Subst.Renaming.none
-               (RW.Rule.as_proof (RW.L_rule r),sc_r) subst]
+             RW.Rule.as_proof_parent_subst (RW.L_rule r) (subst,sc_r)]
         in
         let clauses =
           List.map

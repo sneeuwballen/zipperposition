@@ -457,9 +457,11 @@ let check res =
           LLProof.Dot.pp_dot_file file p';
       end;
       (* check *)
+      let start = Util.total_time_s () in
       let res, stats = LLProof_check.check p' in
-      Format.printf "%s(@[<h>proof_check@ :res %a@ :stats %a@])@."
-        comment LLProof_check.pp_res res LLProof_check.pp_stats stats;
+      let stop = Util.total_time_s () in
+      Format.printf "%s(@[<h>proof_check@ :res %a@ :stats %a :time %.2fs@])@."
+        comment LLProof_check.pp_res res LLProof_check.pp_stats stats (stop-.start);
       if res = LLProof_check.R_fail then 1 else 0
     | _ -> 0
   in
