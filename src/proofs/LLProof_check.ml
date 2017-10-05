@@ -345,10 +345,10 @@ let instantiate (f:form) (inst:LLProof.inst) : form =
   let subst =
     List.fold_left2 Var.Subst.add Var.Subst.empty vars inst
   in
-  let f' = T.Subst.eval_nonrec subst body in
+  let f' = T.Subst.eval subst body in
   Util.debugf ~section 5
-    "(@[<hv>instantiate@ :inst %a@ :from %a@ :into %a@])"
-    (fun k->k LLProof.pp_inst inst T.pp f T.pp f');
+    "(@[<hv>instantiate@ :inst %a@ :from %a@ :into %a@ :subst {%a}@])"
+    (fun k->k LLProof.pp_inst inst T.pp f T.pp f' (Var.Subst.pp T.pp_with_ty) subst);
   f'
 
 let concl_of_parent (p:LLProof.parent) : form = match p.LLProof.p_inst with

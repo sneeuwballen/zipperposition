@@ -270,6 +270,8 @@ and pp_var_ty out v =
     | AppBuiltin (Builtin.Term, []) -> ()
     | _ -> Format.fprintf out ":%a" pp_inner ty
 
+let pp_with_ty out t = Format.fprintf out "(@[%a@,:%a@])" pp t pp (ty_exn t)
+
 exception IllFormedTerm of string
 
 let ill_formed m = raise (IllFormedTerm m)
@@ -942,7 +944,7 @@ let rec rename subst t = match view t with
     begin
       try
         let v' = Var.Subst.find_exn subst v in
-        var v'
+        var (Var.update_ty v' ~f:(rename subst))
       with Not_found ->
         var ?loc:t.loc (Var.update_ty v ~f:(rename subst))
     end

@@ -75,7 +75,7 @@ module Subst = struct
     let pp_pair out (v,x) =
       Format.fprintf out "@[%a → %a@]" pp_full v pp_v x
     in
-    Util.pp_seq ~sep:", " pp_pair out (to_seq t)
+    Format.fprintf out "@[%a@]" (Util.pp_seq ~sep:", " pp_pair) (to_seq t)
   let merge a b =
     ID.Map.merge_safe a b
       ~f:(fun _ v -> match v with

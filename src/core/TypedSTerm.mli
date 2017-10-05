@@ -261,6 +261,7 @@ val close_all : ty:t -> Binder.t -> t -> t
 include Interfaces.PRINT with type t := t
 
 val pp_inner : t CCFormat.printer
+val pp_with_ty : t CCFormat.printer
 
 val pp_in : Output_format.t -> t CCFormat.printer
 

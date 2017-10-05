@@ -43,9 +43,17 @@ and conv_step st p =
     (fun k->k Proof.S.pp_notrec1 p);
   let res = Proof.Result.to_form ~ctx:st.ctx (Proof.S.result p) in
   let vars, _ = open_forall res in
+  (* introduce local symbols for making proof checking locally ground.
+     Some variables are typed using other variables, so we
+     need to substitute eagerly *)
   let intros =
-    List.mapi (fun i v -> T.const ~ty:(Var.ty v) (ID.makef "sk_%d" i)) vars
+    let l =
+      List.mapi (fun i v -> v, T.const ~ty:(Var.ty v) (ID.makef "sk_%d" i)) vars
+    in
+    let subst = Var.Subst.of_list l in
+    List.map (fun (_,c) -> T.Subst.eval subst c) l
   in
+  (* convert result *)
   let res = match Proof.Step.kind @@ Proof.S.step p with
     | Proof.Inference (rule,c,tags)
     | Proof.Simplification (rule,c,tags) ->
@@ -85,6 +93,16 @@ and conv_parent
     (parent:Proof.Parent.t) : LLProof.parent =
   Util.debugf ~section 5 "(@[llproof.conv_parent@ %a@])"
     (fun k->k Proof.pp_parent parent);
+  (* rename variables of result of inference *)
+  let vars_step_res, _ = T.unfold_binder Binder.forall step_res in
+  if List.length intros <> List.length vars_step_res then (
+    errorf "length mismatch, cannot do intros@ :res %a@ :with [@[%a@]]"
+      T.pp step_res (Util.pp_list ~sep:"," T.pp) intros
+  );
+  let intro_subst =
+    Var.Subst.of_list (List.combine vars_step_res intros)
+  in
+  (* build an instantiation step, if needed *)
   let prev_proof, p_instantiated_res = match parent with
     | Proof.P_of p ->
       let p_res = Proof.Result.to_form ~ctx:st.ctx (Proof.S.result p) in
@@ -108,8 +126,12 @@ and conv_parent
              begin match Var.Subst.find inst_subst v with
                | Some t -> t
                | None ->
-                 errorf "cannot find variable `%a`@ in inst-subst %a"
+                 errorf "cannot find variable `%a`@ \
+                         in inst-subst {%a}@ :inst-res %a@ :res %a@ \
+                         :parent %a@ :intros [@[%a@]]"
                    Var.pp_fullc v (Var.Subst.pp T.pp) inst_subst
+                   T.pp p_instantiated_res T.pp step_res Proof.pp_parent parent
+                   (Util.pp_list ~sep:"," T.pp) intros
              end)
           vars_p
       in
@@ -118,15 +140,6 @@ and conv_parent
   (* now open foralls in [p_instantiated_res]
      and find which variable of [intros] they rename into *)
   let inst_intros : LLProof.inst =
-    (* rename variables of result of inference *)
-    let vars_step_res, _ = T.unfold_binder Binder.forall step_res in
-    if List.length intros <> List.length vars_step_res then (
-      errorf "length mismatch, cannot do intros@ :res %a@ :with [@[%a@]]"
-        T.pp step_res (Util.pp_list ~sep:"," T.pp) intros
-    );
-    let intro_subst =
-      Var.Subst.of_list (List.combine vars_step_res intros)
-    in
     let vars_instantiated, _ = T.unfold_binder Binder.forall p_instantiated_res in
     List.map
       (fun v ->
@@ -140,7 +153,7 @@ and conv_parent
                    ID.makef "sk_%d"
                      (List.length intros + Var.Subst.size !local_intros)
                  in
-                 let c = T.const ~ty:(Var.ty v) c in
+                 let c = T.const ~ty:(Var.ty v |> T.Subst.eval intro_subst) c in
                  local_intros := Var.Subst.add !local_intros v c;
                  c
              end
