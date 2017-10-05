@@ -497,6 +497,12 @@ module Lit = struct
 
     let to_form ~ctx r = conv_ ~ctx (lhs r) (rhs r)
 
+    let vars r =
+      Sequence.cons (lhs r)
+        (Sequence.of_list (rhs r) |> Sequence.flat_map_l CCFun.id)
+      |> Sequence.flat_map Literal.Seq.vars
+      |> T.VarSet.of_seq |> T.VarSet.to_list
+
     let compare r1 r2: int = compare_lr r1 r2
     let pp = pp_lit_rule
   end
@@ -678,12 +684,12 @@ module Rule = struct
         let f = Term.Rule.conv_ ~ctx lhs rhs in
         let inst = Subst.Projection.as_inst ~ctx sp (T.vars_prefix_order term_lhs) in
         f, inst
-      | L_rule {lit_lhs;lit_rhs;_} ->
+      | L_rule ({lit_lhs;lit_rhs;_} as lit_r) ->
         let lhs = Literal.apply_subst renaming subst (lit_lhs,sc) in
         let rhs =
           List.map (fun l-> Literal.apply_subst_list renaming subst (l,sc)) lit_rhs
         in
-        let inst = Subst.Projection.as_inst ~ctx sp (Literal.vars lit_lhs) in
+        let inst = Subst.Projection.as_inst ~ctx sp (Lit.Rule.vars lit_r) in
         Lit.Rule.conv_ ~ctx lhs rhs, inst
     end
 
