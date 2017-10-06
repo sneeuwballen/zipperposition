@@ -289,7 +289,7 @@ module Term = struct
 
      Use the Term.DB case extensively... *)
 
-  let normalize_term_ max_steps (t:term): term * Rule_inst_set.t =
+  let normalize_term_ max_steps (t0:term): term * Rule_inst_set.t =
     assert (max_steps >= 0);
     let set = ref Rule_inst_set.empty in
     let sc_t = 0 in (* scope of variables of term being normalized *)
@@ -376,7 +376,7 @@ module Term = struct
         reduce body
           (fun body' ->
              let t =
-               if T.equal body body then t else (T.fun_ arg body')
+               if T.equal body body' then t else (T.fun_ arg body')
              in k t)
       | T.Var _
       | T.DB _ -> k t
@@ -394,7 +394,7 @@ module Term = struct
           (fun tail' ->
              reduce t (fun t' -> k (t' :: tail')))
     in
-    reduce t (fun t->t, !set)
+    reduce t0 (fun t->t, !set)
 
   let normalize_term ?(max_steps=max_int) (t:term): term * Rule_inst_set.t =
     Util.with_prof prof_term_rw (normalize_term_ max_steps) t
