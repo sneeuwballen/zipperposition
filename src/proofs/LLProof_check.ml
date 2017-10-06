@@ -159,6 +159,11 @@ end = struct
     let[@inline] add_form_to_expand f b =
       b |> add_to_expand f |> check_closed
 
+    let rec is_atomic f = match F.view f with
+      | F.Eq _ | F.Neq _ | F.Atom _ -> true
+      | F.Not u -> is_atomic u
+      | _ -> false
+
     (* add one formula to [b] *)
     let add1 (br:t) (f:T.t): t =
       let br = add_cc_ f br in
@@ -200,7 +205,17 @@ end = struct
           br |> add_expanded f |> add_cc_eq f F.false_ |> check_closed
       end
 
-    let[@inline] add b l = List.fold_left add1 b l
+    let[@inline] add b l =
+      (* put atomic formulas first *)
+      let l =
+        List.sort
+          (fun a b -> match is_atomic a, is_atomic b with
+             | true, true | false, false -> 0
+             | true, false -> -1 | false, true -> 1)
+          l
+      in
+      List.fold_left add1 b l
+
     let[@inline] make l = add (empty ()) l
     let[@inline] closed b = b.closed
 
