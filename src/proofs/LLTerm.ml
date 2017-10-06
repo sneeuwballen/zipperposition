@@ -163,13 +163,20 @@ let[@inline] arrow_ a b = mk_ (Arrow (a,b)) (Some t_type)
 
 let[@inline] bind ~ty binder ~ty_var body = mk_ (Bind {binder;ty_var;body}) (Some ty)
 
-let norm_builtin_ b l = match b, l with
-  | Builtin.Eq, [a;b] when compare a b > 0 -> Builtin.Eq, [b;a]
-  | _ -> b, l
-
 let[@inline] app_builtin ~ty b l =
-  let b, l = norm_builtin_ b l in
-  mk_ (AppBuiltin (b,l)) (Some ty)
+  let mk_ b l = mk_ (AppBuiltin(b,l)) (Some ty) in
+  begin match b, l with
+    | Builtin.Not, [f'] ->
+      begin match view f' with
+        | AppBuiltin (Builtin.Eq,l) -> mk_ Builtin.Neq l
+        | AppBuiltin (Builtin.Neq,l) -> mk_ Builtin.Eq l
+        | AppBuiltin (Builtin.Not,[t]) -> t
+        | AppBuiltin (Builtin.True,[]) -> mk_ Builtin.False []
+        | AppBuiltin (Builtin.False,[]) -> mk_ Builtin.True []
+        | _ -> mk_ b l
+      end
+    | _ -> mk_ b l
+  end
 
 let[@inline] builtin ~ty b = app_builtin ~ty b []
 

@@ -288,7 +288,22 @@ let var ?loc v = make_ ?loc ~ty:v.Var.ty (Var v)
 let var_of_string ?loc ~ty n = var ?loc (Var.of_string ~ty n)
 let const ?loc ~ty s = make_ ?loc ~ty (Const s)
 let const_of_cstor ?loc c = const ?loc c.cstor_id ~ty:c.cstor_ty
-let app_builtin ?loc ~ty b l = make_ ?loc ~ty (AppBuiltin (b,l))
+
+let app_builtin ?loc ~ty b l =
+  let mk_ b l = make_ ?loc ~ty (AppBuiltin(b,l)) in
+  begin match b, l with
+    | Builtin.Not, [f'] ->
+      begin match view f' with
+        | AppBuiltin (Builtin.Eq,l) -> mk_ Builtin.Neq l
+        | AppBuiltin (Builtin.Neq,l) -> mk_ Builtin.Eq l
+        | AppBuiltin (Builtin.Not,[t]) -> t
+        | AppBuiltin (Builtin.True,[]) -> mk_ Builtin.False []
+        | AppBuiltin (Builtin.False,[]) -> mk_ Builtin.True []
+        | _ -> mk_ b l
+      end
+    | _ -> mk_ b l
+  end
+
 let ite ?loc a b c =
   let ty = match b.ty with None -> assert false | Some ty -> ty in
   make_ ?loc ~ty (Ite (a,b,c))
@@ -839,13 +854,7 @@ module Form = struct
     | [t] -> t
     | l -> app_builtin ?loc ~ty:Ty.prop Builtin.Or (flatten_ `Or [] l)
 
-  let not_ ?loc f = match view f with
-    | Not f' -> f'
-    | Eq (a,b) -> neq ?loc a b
-    | Neq (a,b) -> eq ?loc a b
-    | True -> false_
-    | False -> true_
-    | _ -> app_builtin ?loc ~ty:Ty.prop Builtin.Not [f]
+  let not_ ?loc f = app_builtin ?loc ~ty:Ty.prop Builtin.Not [f]
 
   let forall ?loc v t = bind ?loc ~ty:Ty.prop Binder.Forall v t
   let exists ?loc v t = bind ?loc ~ty:Ty.prop Binder.Exists v t
@@ -896,10 +905,10 @@ module Subst = struct
   let to_string = CCFormat.to_string pp
 
   let add subst v t =
-    if mem subst v
-    then invalid_arg
-        (CCFormat.sprintf
-           "@[<2>var `@[%a@]` already bound in `@[%a@]`@]" Var.pp_full v pp subst);
+    if mem subst v then (
+      Util.invalid_argf
+        "@[<2>var `@[%a@]`@ already bound in {@[%a@]}@]" Var.pp_full v pp subst
+    );
     Var.Subst.add subst v t
 
   let add_l = List.fold_left (fun subst (v,t) -> add subst v t)

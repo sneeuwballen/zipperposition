@@ -295,6 +295,8 @@ module Subst : sig
   val mem : t -> term Var.t -> bool
 
   val add : t -> term Var.t -> term -> t
+  (** Add new binding to substitution
+      Fails if the variable is bound already *)
 
   val find : t -> term Var.t -> term option
 
