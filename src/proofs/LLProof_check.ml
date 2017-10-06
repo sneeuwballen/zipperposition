@@ -415,14 +415,12 @@ let check_step_ (p:proof): check_step_res =
         |> Var.Subst.of_list
       in
       CS_check (Tab.prove [T.Subst.eval subst p'_inst] (T.Subst.eval subst body_concl))
-    | P.Esa (_,_,_) -> CS_skip `ESA (* TODO *)
-    | P.Inference {check=P.C_other;_} -> CS_check R_ok
-    | P.Inference {check=P.C_no_check;_} -> CS_skip `Other
-    | P.Inference {parents;check=P.C_check axioms;tags;intros;_} ->
+    | P.Esa (_,_) -> CS_skip `ESA (* TODO *)
+    | P.Inference {parents;tags;intros;_} ->
       if Tab.can_check tags then (
         (* within the fragment of {!Tab.prove} *)
         let all_premises =
-          axioms @ List.map concl_of_parent parents
+          List.map concl_of_parent parents
         and concl =
           instantiate concl intros
         in

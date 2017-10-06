@@ -20,8 +20,6 @@ type rule = string
 
 type tag = Builtin.Tag.t
 
-type check = [`No_check | `Check | `Check_with of form list]
-
 type attrs = UntypedAST.attrs
 
 type info = UntypedAST.attr
@@ -30,9 +28,9 @@ type infos = info list
 
 type kind =
   | Intro of source * role
-  | Inference of rule * check * tag list
-  | Simplification of rule * check * tag list
-  | Esa of rule * check
+  | Inference of rule * tag list
+  | Simplification of rule * tag list
+  | Esa of rule
   | Trivial (** trivial, or trivial within theories *)
   | Define of ID.t * source (** definition *)
   | By_def of ID.t (** following from the def of ID *)
@@ -226,11 +224,11 @@ module Kind = struct
     | Intro (src,R_lemma) -> Format.fprintf out "lemma %a" Src.pp src
     | Intro (src,R_assert) -> Src.pp out src
     | Intro (src, (R_def | R_decl)) -> Src.pp out src
-    | Inference (rule,_,tags) ->
+    | Inference (rule,tags) ->
       Format.fprintf out "inf %a%a" Rule.pp rule pp_tags tags
-    | Simplification (rule,_,tags) ->
+    | Simplification (rule,tags) ->
       Format.fprintf out "simp %a%a" Rule.pp rule pp_tags tags
-    | Esa (rule,_) ->
+    | Esa rule ->
       Format.fprintf out "esa %a" Rule.pp rule
     | Trivial -> CCFormat.string out "trivial"
     | By_def id -> Format.fprintf out "by_def(%a)" ID.pp id
@@ -247,9 +245,9 @@ module Kind = struct
     in
     begin match k with
       | Intro (src,(R_assert|R_goal|R_def|R_decl)) -> Src.pp_tstp out src
-      | Inference (rule,_,_)
-      | Simplification (rule,_,_) -> pp_step "thm" out (rule,parents)
-      | Esa (rule,_) -> pp_step "esa" out (rule,parents)
+      | Inference (rule,_)
+      | Simplification (rule,_) -> pp_step "thm" out (rule,parents)
+      | Esa rule -> pp_step "esa" out (rule,parents)
       | Intro (_,R_lemma) -> Format.fprintf out "lemma"
       | Trivial -> assert(parents=[]); Format.fprintf out "trivial([status(thm)])"
       | By_def _ -> Format.fprintf out "by_def([status(thm)])"
@@ -371,7 +369,7 @@ module Step = struct
 
   let src p = match p.kind with
     | Intro (src,_) | Define (_,src) -> Some src
-    | Trivial | By_def _ | Esa (_,_) | Inference _ | Simplification _
+    | Trivial | By_def _ | Esa _ | Inference _ | Simplification _
       -> None
 
   let to_attrs p = match src p with
@@ -383,9 +381,9 @@ module Step = struct
     | Trivial
     | By_def _
     | Define _ -> None
-    | Esa (rule,_)
-    | Simplification (rule,_,_)
-    | Inference (rule,_,_)
+    | Esa rule
+    | Simplification (rule,_)
+    | Inference (rule,_)
       -> Some rule
 
   let is_assert p = match p.kind with Intro (_,R_assert) -> true | _ -> false
@@ -450,21 +448,19 @@ module Step = struct
     let src = Src.from_file ?loc ~name file in
     goal src
 
-  let default_check : check = `Check
-
   let[@inline] dedup_tags (tgs:tag list) : tag list =
     CCList.sort_uniq ~cmp:Builtin.Tag.compare tgs
 
-  let inference ?infos ?(check=default_check) ?(tags=[]) ~rule parents =
+  let inference ?infos ?(tags=[]) ~rule parents =
     let tags = dedup_tags tags in
-    step_ ?infos (Inference (rule,check,tags)) parents
+    step_ ?infos (Inference (rule,tags)) parents
 
-  let simp ?infos ?(check=default_check) ?(tags=[]) ~rule parents =
+  let simp ?infos ?(tags=[]) ~rule parents =
     let tags = dedup_tags tags in
-    step_ ?infos (Simplification (rule,check,tags)) parents
+    step_ ?infos (Simplification (rule,tags)) parents
 
-  let esa ?infos ?(check=default_check) ~rule parents =
-    step_ ?infos (Esa (rule,check)) parents
+  let esa ?infos ~rule parents =
+    step_ ?infos (Esa rule) parents
 
   let pp_infos out = function
     | [] -> ()
@@ -530,16 +526,16 @@ module S = struct
   let mk_f_trivial = mk_f Step.trivial
   let mk_f_by_def id f = mk_f (Step.by_def id) f
 
-  let mk_f_inference ?check ~rule f parents =
-    let step = Step.inference ?check ~rule parents in
+  let mk_f_inference ~rule f parents =
+    let step = Step.inference ~rule parents in
     mk_f step f
 
-  let mk_f_simp ?check ~rule f parents =
-    let step = Step.simp ?check ~rule parents in
+  let mk_f_simp ~rule f parents =
+    let step = Step.simp ~rule parents in
     mk_f step f
 
-  let mk_f_esa ?check ~rule f parents =
-    let step = Step.esa ?check ~rule parents in
+  let mk_f_esa ~rule f parents =
+    let step = Step.esa ~rule parents in
     mk_f step f
 
   let adapt p r = { p with result=r; }

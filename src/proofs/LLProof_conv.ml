@@ -55,17 +55,17 @@ and conv_step st p =
   in
   (* convert result *)
   let res = match Proof.Step.kind @@ Proof.S.step p with
-    | Proof.Inference (rule,c,tags)
-    | Proof.Simplification (rule,c,tags) ->
+    | Proof.Inference (rule,tags)
+    | Proof.Simplification (rule,tags) ->
       let local_intros = ref Var.Subst.empty in
       let parents =
         List.map (conv_parent st res intros local_intros tags)
           (Proof.Step.parents @@ Proof.S.step p)
       in
       let local_intros = Var.Subst.to_list !local_intros |> List.rev_map snd in
-      LLProof.inference c ~intros ~local_intros ~tags
+      LLProof.inference ~intros ~local_intros ~tags
         (T.rename_all_vars res) (Proof.Rule.name rule) parents
-    | Proof.Esa (rule,c) ->
+    | Proof.Esa rule ->
       let l =
         List.map
           (function
@@ -73,7 +73,7 @@ and conv_step st p =
             | Proof.P_subst _ -> assert false)
           (Proof.Step.parents @@ Proof.S.step p)
       in
-      LLProof.esa c (T.rename_all_vars res) (Proof.Rule.name rule) l
+      LLProof.esa (T.rename_all_vars res) (Proof.Rule.name rule) l
     | Proof.Trivial -> LLProof.trivial res
     | Proof.By_def id -> LLProof.by_def id res
     | Proof.Define (id,_) -> LLProof.define id res

@@ -18,16 +18,10 @@ val section : Util.Section.t
 type term = TypedSTerm.t
 type ty = term
 type form = term
-type var = ty Var.t
 type inst = term list (** Instantiate some binder with the following terms. Order matters. *)
 type tag = Proof.tag
 
 type name = string
-
-type check_info =
-  | C_check of form list (* additional inputs *)
-  | C_no_check
-  | C_other
 
 type t
 
@@ -43,13 +37,12 @@ type step =
       inst: inst;
       tags: tag list;
     }
-  | Esa of name * t list * check_info
+  | Esa of name * t list
   | Inference of {
       intros: term list; (* local renaming for the conclusion's foralls, with fresh constants *)
       local_intros: term list; (* variables introduced between hypothesis, not in conclusion *)
       name: name;
       parents: parent list;
-      check: check_info;
       tags: tag list;
     }
 
@@ -66,8 +59,6 @@ val premises : t -> t list
 
 val p_of : t -> parent
 val p_inst : t -> inst -> parent
-
-val check_info : t -> check_info
 
 val pp_step : step CCFormat.printer
 val pp_parent : parent CCFormat.printer
@@ -95,10 +86,8 @@ val by_def : ID.t -> form -> t
 val define : ID.t -> form -> t
 val instantiate : ?tags:tag list -> form -> t -> inst -> t
 val esa :
-  [`No_check | `Check | `Check_with of form list] ->
   form -> name -> t list -> t
 val inference :
-  [`No_check | `Check | `Check_with of form list] ->
   intros:term list ->
   local_intros:term list ->
   tags:tag list ->

@@ -7,24 +7,17 @@ open Logtk
 
 module T = TypedSTerm
 module F = T.Form
-module Ty = T.Ty
 module Fmt = CCFormat
 
 let section = Util.Section.make "llproof"
 
-type term = TypedSTerm.t
+type term = T.t
 type ty = term
-type form = TypedSTerm.Form.t
-type var = ty Var.t
+type form = term
 type inst = term list (** Instantiate some binder with the following terms. Order matters. *)
 type tag = Proof.tag
 
 type name = string
-
-type check_info =
-  | C_check of form list (* additional inputs *)
-  | C_no_check
-  | C_other
 
 type t = {
   id: int; (* unique ID *)
@@ -43,13 +36,12 @@ and step =
       inst: inst;
       tags: tag list;
     }
-  | Esa of name * t list * check_info
+  | Esa of name * t list
   | Inference of {
       intros: term list; (* local renaming, with fresh constants *)
       local_intros: term list; (* variables introduced between hypothesis, not in conclusion *)
       name: name;
       parents: parent list;
-      check: check_info;
       tags: tag list;
     }
 
@@ -78,14 +70,14 @@ let pp_step out (s:step): unit = match s with
   | Define id -> Fmt.fprintf out "(@[define@ %a@])" ID.pp id
   | Instantiate {inst;tags;_} ->
     Fmt.fprintf out "(@[instantiate %a%a@])" pp_inst inst pp_tags tags
-  | Esa (n,_,_) -> Fmt.fprintf out "(esa %s)" n
+  | Esa (n,_) -> Fmt.fprintf out "(esa %s)" n
   | Inference {name=n;tags;_} -> Fmt.fprintf out "(inf %s%a)" n pp_tags tags
 
 let parents (p:t): parent list = match p.step with
   | Goal | Assert | Trivial | By_def _ | Define _ -> []
   | Negated_goal p2 -> [p_of p2]
   | Instantiate {form=p2;_} -> [p_of p2]
-  | Esa (_,l,_) -> List.map p_of l
+  | Esa (_,l) -> List.map p_of l
   | Inference {parents=l;_} -> l
 
 let premises (p:t): t list =
@@ -95,12 +87,6 @@ let premises (p:t): t list =
 let inst (p:t): inst = match p.step with
   | Instantiate {inst;_} -> inst
   | _ -> []
-
-let check_info (p:t): check_info = match p.step with
-  | Goal | Assert | Trivial |  Negated_goal _ | By_def _ | Define _ -> C_other
-  | Instantiate _ -> C_check []
-  | Esa (_,_,c)
-  | Inference {check=c;_} -> c
 
 let tags (p:t) : tag list = match p.step with
   | Inference {tags;_} | Instantiate {tags;_} -> tags
@@ -126,7 +112,7 @@ module Tbl = CCHashtbl.Make(struct
   end)
 
 let pp_id out (p:t): unit = Fmt.int out p.id
-let pp_res out (p:t) = TypedSTerm.pp out (concl p)
+let pp_res out (p:t) = T.pp out (concl p)
 
 let pp_parent out p = match p.p_inst with
   | [] -> pp_res out p.p_proof
@@ -173,16 +159,11 @@ let define id f = mk_ f (Define id)
 let instantiate ?(tags=[]) f p inst =
   mk_ f (Instantiate {form=p;inst;tags})
 
-let conv_check_ = function
-  | `No_check -> C_no_check
-  | `Check -> C_check []
-  | `Check_with l -> C_check l
+let esa f name ps = mk_ f (Esa (name,ps))
 
-let esa c f name ps = mk_ f (Esa (name,ps,conv_check_ c))
-
-let inference c ~intros ~local_intros ~tags f name ps : t =
+let inference ~intros ~local_intros ~tags f name ps : t =
   mk_ f (Inference
-      {name;intros;local_intros;parents=ps;check=conv_check_ c;tags})
+      {name;intros;local_intros;parents=ps;tags})
 
 module Dot = struct
   (** Get a graph of the proof *)
@@ -197,7 +178,7 @@ module Dot = struct
            | By_def id -> Fmt.sprintf "by_def(%a)" ID.pp id
            | Define id -> Fmt.sprintf "define(%a)" ID.pp id
            | Instantiate _ -> "instantiate"
-           | Esa (name,_,_) -> name
+           | Esa (name,_) -> name
            | Inference {name;_} -> name
          in
          let descr = Fmt.sprintf "@[<h>%s%a@]" descr pp_tags (tags p) in

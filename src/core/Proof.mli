@@ -17,17 +17,14 @@ type rule
     that is used in the inference *)
 type tag = Builtin.Tag.t
 
-(** How do we check a step? *)
-type check = [`No_check | `Check | `Check_with of form list]
-
 type attrs = UntypedAST.attrs
 
 (** Classification of proof steps *)
 type kind =
   | Intro of source * role
-  | Inference of rule * check * tag list
-  | Simplification of rule * check * tag list
-  | Esa of rule * check
+  | Inference of rule * tag list
+  | Simplification of rule * tag list
+  | Esa of rule
   | Trivial (** trivial, or trivial within theories *)
   | Define of ID.t * source (** definition *)
   | By_def of ID.t (** following from the def of ID *)
@@ -242,11 +239,11 @@ module Step : sig
   val goal : source -> t
   val goal' : ?loc:Loc.t -> file:string -> name:string -> unit -> t
 
-  val inference : ?infos:infos -> ?check:check -> ?tags:tag list -> rule:rule -> parent list -> t
+  val inference : ?infos:infos -> ?tags:tag list -> rule:rule -> parent list -> t
 
-  val simp : ?infos:infos -> ?check:check -> ?tags:tag list -> rule:rule -> parent list -> t
+  val simp : ?infos:infos -> ?tags:tag list -> rule:rule -> parent list -> t
 
-  val esa : ?infos:infos -> ?check:check -> rule:rule -> parent list -> t
+  val esa : ?infos:infos -> rule:rule -> parent list -> t
 
   val to_attrs : t -> UntypedAST.attrs
 
@@ -325,11 +322,11 @@ module S : sig
   val mk_f_trivial : form -> t
   val mk_f_by_def : ID.t -> form -> t
 
-  val mk_f_inference : ?check:check -> rule:rule -> form -> parent list -> t
+  val mk_f_inference : rule:rule -> form -> parent list -> t
 
-  val mk_f_simp : ?check:check -> rule:rule -> form -> parent list -> t
+  val mk_f_simp : rule:rule -> form -> parent list -> t
 
-  val mk_f_esa : ?check:check -> rule:rule -> form -> parent list -> t
+  val mk_f_esa : rule:rule -> form -> parent list -> t
 
   val adapt : t -> Result.t -> t
 
