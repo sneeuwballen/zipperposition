@@ -15,7 +15,7 @@ open Logtk
 
 val section : Util.Section.t
 
-type term = TypedSTerm.t
+type term = LLTerm.t
 type ty = term
 type form = term
 type inst = term list (** Instantiate some binder with the following terms. Order matters. *)

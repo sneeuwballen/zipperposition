@@ -59,6 +59,20 @@ type 'a result_tc
 (** result of an inference *)
 type result = Res : 'a result_tc * exn -> result
 
+(** Build terms *)
+module type TERM_BUILDER = sig
+  type t
+
+  val t_type : t
+  val db : ty:t -> int -> t
+  val app : t -> t list -> t
+  val const : ty:t -> ID.t -> t
+  val app_builtin : ty:t -> Builtin.t -> t list -> t
+  val bind : ty:t -> ty_var:t -> Binder.t -> t -> t
+end
+
+type 'a term_builder = (module TERM_BUILDER with type t = 'a)
+
 (** A proof step, without the conclusion *)
 type step
 
@@ -158,14 +172,14 @@ module Result : sig
 
   (** A mapping used during instantiation, to map pre-instantiation
       variables to post-instantiation terms *)
-  type inst_subst = (term, term) Var.Subst.t
+  type 't inst_subst = (Type.t HVar.t * 't) list
 
   val make_tc :
     of_exn:(exn -> 'a option) ->
     to_exn:('a -> exn) ->
     compare:('a -> 'a -> int) ->
-    to_form:(ctx:Term.Conv.ctx -> 'a -> form) ->
-    ?to_form_subst:(ctx:Term.Conv.ctx -> Subst.Projection.t -> 'a -> form * inst_subst) ->
+    to_term:('t term_builder -> 'a -> 't) ->
+    ?to_llterm_subst:('t term_builder -> Subst.Projection.t -> 'a -> 't * 't inst_subst) ->
     pp_in:(Output_format.t -> 'a CCFormat.printer) ->
     ?name:('a -> string) ->
     ?is_stmt:bool ->
@@ -193,9 +207,11 @@ module Result : sig
   val pp_in : Output_format.t -> t CCFormat.printer
   val pp : t CCFormat.printer
   val is_stmt : t -> bool
-  val to_form : ?ctx:Term.Conv.ctx -> t -> form
 
-  val to_form_subst : ?ctx:Term.Conv.ctx -> Subst.Projection.t -> t -> form * inst_subst
+  val to_term : 't term_builder -> t -> 't
+
+  val to_form_subst :
+    't term_builder -> Subst.Projection.t -> t -> 't * 't inst_subst
   (** instantiated form + bindings for vars *)
 
   val flavor : t -> flavor

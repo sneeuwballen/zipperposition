@@ -11,10 +11,13 @@ module Fmt = CCFormat
 
 type term = TypedSTerm.t
 type form = TypedSTerm.t
-type inst_subst = (term, term) Var.Subst.t
 type 'a sequence = ('a -> unit) -> unit
 
 let section = Util.Section.make "proof"
+
+(** A mapping used during instantiation, to map pre-instantiation
+    variables to post-instantiation terms *)
+type 't inst_subst = (Type.t HVar.t * 't) list
 
 type rule = string
 
@@ -65,6 +68,20 @@ type flavor =
   | `Def
   ]
 
+(** Build terms *)
+module type TERM_BUILDER = sig
+  type t
+
+  val t_type : t
+  val db : ty:t -> int -> t
+  val app : t -> t list -> t
+  val const : ty:t -> ID.t -> t
+  val app_builtin : ty:t -> Builtin.t -> t list -> t
+  val bind : ty:t -> ty_var:t -> Binder.t -> t -> t
+end
+
+type 'a term_builder = (module TERM_BUILDER with type t = 'a)
+
 (** Typeclass for the result of a proof step *)
 type 'a result_tc = {
   res_id: int; (* unique ID of the class *)
@@ -73,8 +90,8 @@ type 'a result_tc = {
   res_compare: 'a -> 'a -> int;
   res_is_stmt: bool;
   res_pp_in: Output_format.t -> 'a CCFormat.printer;
-  res_to_form: ctx:Term.Conv.ctx -> 'a -> TypedSTerm.Form.t;
-  res_to_form_subst: ctx:Term.Conv.ctx -> Subst.Projection.t -> 'a -> form * inst_subst;
+  res_to_term: 't. 't term_builder -> 'a -> 't;
+  res_to_term_subst: 't. 't term_builder -> Subst.Projection.t -> 'a -> 't * 't inst_subst;
   res_name:('a -> string) option;
   res_flavor: 'a -> flavor;
 }
@@ -279,13 +296,13 @@ module Result = struct
 
   let equal a b = compare a b = 0
 
-  let to_form ?(ctx=Term.Conv.create()) (Res (r,x)) = match r.res_of_exn x with
+  let to_form (b:'t term_builder) (Res (r,x)) = match r.res_of_exn x with
     | None -> assert false
-    | Some x -> r.res_to_form ~ctx x
+    | Some x -> r.res_to_term b x
 
-  let to_form_subst ?(ctx=Term.Conv.create()) subst (Res (r,x)) = match r.res_of_exn x with
+  let to_form_subst (b:'t term_builder) subst (Res (r,x)) = match r.res_of_exn x with
     | None -> assert false
-    | Some x -> r.res_to_form_subst ~ctx subst x
+    | Some x -> r.res_to_term_subst b subst x
 
   let pp_in o out (Res (r,x)) = match r.res_of_exn x with
     | None -> assert false
@@ -306,10 +323,10 @@ module Result = struct
       end
 
   let n_ = ref 0
-  let make_tc (type a)
+  let make_tc (type a t)
       ~of_exn ~to_exn ~compare
-      ~to_form
-      ?(to_form_subst=fun ~ctx:_ _ _ -> assert false)
+      ~(to_term:(t term_builder -> a -> t))
+      ?(to_term_subst=fun _ _ _ -> assert false)
       ~pp_in
       ?name
       ?(is_stmt=false)
@@ -323,8 +340,8 @@ module Result = struct
       res_compare=compare;
       res_is_stmt=is_stmt;
       res_pp_in=pp_in;
-      res_to_form=to_form;
-      res_to_form_subst=to_form_subst;
+      res_to_term_subst=to_term_subst;
+      res_to_term=to_term;
       res_name=name;
       res_flavor=flavor;
     }
@@ -340,7 +357,7 @@ module Result = struct
       ~of_exn:(function
         | E_form f -> Some f | _ -> None)
       ~to_exn:(fun f -> E_form f)
-      ~to_form:(fun ~ctx:_ t -> t)
+      ~to_term:(fun _ t -> t)
       ~compare:T.compare
       ~pp_in:TypedSTerm.pp_in
       ~flavor:(fun f -> if T.equal f F.false_ then `Proof_of_false else `Vanilla)

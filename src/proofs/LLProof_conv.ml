@@ -3,7 +3,7 @@
 
 open Logtk
 
-module T = TypedSTerm
+module T = LLTerm
 
 type ll_subst = (T.t,T.t) Var.Subst.t
 

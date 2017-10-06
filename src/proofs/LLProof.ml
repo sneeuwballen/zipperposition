@@ -5,7 +5,7 @@
 
 open Logtk
 
-module T = TypedSTerm
+module T = LLTerm
 module F = T.Form
 module Fmt = CCFormat
 
