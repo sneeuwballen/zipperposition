@@ -483,12 +483,7 @@ module Lit = struct
         in
         F.forall_l vars f
       in
-      let conv_lit lit =
-        lit
-        |> Literal.Conv.to_form
-        |> SLiteral.map ~f:(T.Conv.to_simple_term ctx)
-        |> SLiteral.to_form
-      in
+      let conv_lit lit = Literal.Conv.to_s_form ~ctx lit in
       let lhs = conv_lit lhs in
       F.equiv
         lhs

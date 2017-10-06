@@ -39,7 +39,7 @@ let rec conv_proof st p: LLProof.t =
   end
 
 and conv_step st p =
-  Util.debugf ~section 5 "(@[llproof.conv_step@ %a@])"
+  Util.debugf ~section 5 "(@[llproof.conv.step@ %a@])"
     (fun k->k Proof.S.pp_notrec1 p);
   let res = Proof.Result.to_form ~ctx:st.ctx (Proof.S.result p) in
   let vars, _ = open_forall res in
@@ -82,7 +82,7 @@ and conv_step st p =
     | Proof.Intro (_,(Proof.R_def|Proof.R_decl)) ->
       LLProof.trivial res
   in
-  Util.debugf ~section 4 "(@[llproof.conv_step.->@ :from %a@ :to %a@])"
+  Util.debugf ~section 4 "(@[llproof.conv.step.->@ :from %a@ :to %a@])"
     (fun k->k Proof.S.pp_notrec1 p LLProof.pp res);
   res
 
@@ -94,7 +94,7 @@ and conv_parent
   Util.debugf ~section 5 "(@[llproof.conv_parent@ %a@])"
     (fun k->k Proof.pp_parent parent);
   (* rename variables of result of inference *)
-  let vars_step_res, _ = T.unfold_binder Binder.forall step_res in
+  let vars_step_res, _ = open_forall step_res in
   if List.length intros <> List.length vars_step_res then (
     errorf "length mismatch, cannot do intros@ :res %a@ :with [@[%a@]]"
       T.pp step_res (Util.pp_list ~sep:"," T.pp) intros
@@ -118,9 +118,9 @@ and conv_parent
       let p_res = Proof.Result.to_form ~ctx:st.ctx (Proof.S.result p) in
       (* convert [p] itself *)
       let p = conv_proof st p in
-      (* find instantiation for [p] *)
+      (* find instantiation for [p] by looking at variables of [p_res] *)
       let inst : LLProof.inst =
-        let vars_p, _ = T.unfold_binder Binder.forall p_res in
+        let vars_p, _ = open_forall p_res in
         List.map
           (fun v ->
              begin match Var.Subst.find inst_subst v with
@@ -149,12 +149,16 @@ and conv_parent
              begin match Var.Subst.find !local_intros v with
                | Some t -> t
                | None ->
+                 (* introduce local_intro *)
                  let c =
                    ID.makef "sk_%d"
                      (List.length intros + Var.Subst.size !local_intros)
+                   |> T.const ~ty:(Var.ty v |> T.Subst.eval intro_subst)
                  in
-                 let c = T.const ~ty:(Var.ty v |> T.Subst.eval intro_subst) c in
                  local_intros := Var.Subst.add !local_intros v c;
+                 Util.debugf ~section 5
+                   "(@[llproof.conv.add_local_intro@ %a := %a@ :p-instantiated `%a`@])"
+                   (fun k->k Var.pp_fullc v T.pp c T.pp p_instantiated_res);
                  c
              end
          end)

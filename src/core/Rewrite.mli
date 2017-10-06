@@ -112,7 +112,7 @@ module Lit : sig
     (Literals.t list * rule * Subst.t * Scoped.scope *
        Subst.Renaming.t * Proof.tag list) option
   (** normalize literals of the clause w.r.t. rules, or return [None]
-      if no rule applies *)
+      if no rule applies. The input clause lives in scope 0. *)
 
   val narrow_lit :
     ?subst:Unif_subst.t ->

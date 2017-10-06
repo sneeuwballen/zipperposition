@@ -162,7 +162,15 @@ let[@inline] app_ f x ~ty = mk_ (App (f,x)) (Some ty)
 let[@inline] arrow_ a b = mk_ (Arrow (a,b)) (Some t_type)
 
 let[@inline] bind ~ty binder ~ty_var body = mk_ (Bind {binder;ty_var;body}) (Some ty)
-let[@inline] app_builtin ~ty b l = mk_ (AppBuiltin (b,l)) (Some ty)
+
+let norm_builtin_ b l = match b, l with
+  | Builtin.Eq, [a;b] when compare a b > 0 -> Builtin.Eq, [b;a]
+  | _ -> b, l
+
+let[@inline] app_builtin ~ty b l =
+  let b, l = norm_builtin_ b l in
+  mk_ (AppBuiltin (b,l)) (Some ty)
+
 let[@inline] builtin ~ty b = app_builtin ~ty b []
 
 let[@inline] map ~f ~bind:f_bind b_acc t = match view t with
