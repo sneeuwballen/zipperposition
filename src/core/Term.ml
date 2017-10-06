@@ -781,7 +781,12 @@ module Conv = struct
     let rec to_simple_term env t =
       match view t with
         | Var i -> ST.var (aux_var i)
-        | DB i -> ST.var (DBEnv.find_exn env i)
+        | DB i ->
+          begin
+            try ST.var (DBEnv.find_exn env i)
+            with Failure _ ->
+              Util.errorf ~where:"Term" "cannot find `Y%d`@ @[:in [%a]@]" i (DBEnv.pp Var.pp) env
+          end
         | Const id -> ST.const ~ty:(aux_ty (ty t)) id
         | App (f,l) ->
           ST.app ~ty:(aux_ty (ty t))
