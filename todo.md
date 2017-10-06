@@ -9,6 +9,34 @@
   bind twice some var?
   `./zipperposition.native --stats --dot-sat -o none -t 30 --dot /tmp/truc.dot examples/ho/find_set_inter.zf`
 
+- proof checking
+  * [x] update proof generation with renamings (or not), including rewrite
+    steps and demod steps
+  * [x] test this (without checking) on all TPTP; look for quick errors; merge into dev
+  * ~~[ ] write `LLTerm.t` and basic functions (substitution/typing in particular)~~
+  * [x] write simple CC based tableau (if possible, somehow incremental)
+  * [x] conversion statement → formula
+  * [x] make inference steps sth like
+        `intros [x,y,z]; apply C1 [g(y),x+1]; apply C2[z,z]; tableau`
+  * [x] skip some steps based on metadata (esa/arith) **for now**
+  * [x] final summary on how many steps skipped/ok/fail
+  * [x] debug on pure FO
+  * [ ] store result of checking inside proof steps
+  * [x] direct β reduction of llterms
+      ~~ite/bool/β reduction rules in tableau~~
+  * [ ] make rewriting under λ terms pass proof checking
+  * [ ] proof checking for arith: FM / omega(?)/cooper
+  * [ ] lazy equality exchange (case split on all equalities between arith terms?)
+  * [ ] turn checking on by default
+
+- write some examples based on HO patterns
+
+- investigate useless arith inferences in
+  `./zipperposition.native --stats --dot-sat -o none -t 30 --dot /tmp/truc.dot examples/verifast/foreach_remove_easy_pb.zf --induction-depth 0 --debug 1 | less`
+
+- HO enumeration for fully applied function or predicate variables.
+  should complement syntactic unif with constraints for HO.
+
 - investigate very slow induction in
   `./zipperposition.native --stats --dot-sat -o none -t 30 --dot /tmp/truc.dot examples/verifast/foreach_remove_easy_pb.zf --induction-depth 0 --debug 1 | less`
 
@@ -415,6 +443,21 @@
 
 ### Higher-Order
 
+- unification under constraints
+  * [x] propose `unif_constraint: term -> term -> subst * (term*term) list`
+  * [x] provide `is_syntactic_unifiable: term -> bool`
+    (returns false on int,rat,HO terms)
+  * [x] change `fold_terms` so it doesn't recurse under non-syntactic unifiable terms
+  * [x] modify term indexing so it puts all non-syntactic unifiable terms in a box
+  * [x] use `unif_constraint` in all inference rules, adding constraints
+    as new literals
+  * [x] disable purification
+  * [ ] → evaluate perf impact on arith
+  * [x] restore notion of "value" and fail constraints between distinct values
+      (e.g. `0` and `1`)
+  * [ ] some more advanced plugin scheme for failing fast on `a+1 = a`
+  * [ ] two variations (optional arg) to avoid unifying `t` and `u:int` at
+      root (useful for monome unif), or allow it (for subterms)
 * [x] parse THF-0 and try on TPTP
     → some inductive problems contain higher-order
 * [x] targets in `Makefile` for running on `^.p` problems
@@ -486,10 +529,14 @@
   **OR**: purify all HO terms into HO constraints, i.e. `F a ≠ G b` actually
   becomes `X₁ ≠ X₂ ∨ X₁ =?= F a ∨ X₂ =?= G b`, then normal FO eq-res,
   then `F a =?= G b` solved by HO unif
+- [x] pattern unification
+  * on the fly abstraction over ground arguments:
+    `F a = t` becomes `λx. F x = λx. t[x/a]`
+  * also allows for pattern HO-matching in rewrite rules
 
 ### Arith
 
-- simplification rule similar to `trivial_ineq` but for removing literals? E.g. to
+- [x] simplification rule similar to `trivial_ineq` but for removing literals? E.g. to
   simplify `len a+len b < 0` from `len x ≥ 0`
 
 
@@ -561,6 +608,7 @@
 
 ## Done
 
+- proof format with rewrite rules + CNF-introduced defs
 - only do induction on active positions
   * [x] check that it fixes previous regression on `list10_easy.zf`, `nat2.zf`…)
   * [x] also check that sub-induction seems to hold water with smallcheck
