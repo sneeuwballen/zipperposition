@@ -95,7 +95,7 @@ let fresh_skolem_prefix ~ctx ~ty ~vars_count prefix =
   ID.set_payload s (ID.Attr_skolem (kind, vars_count));
   ctx.sc_new_ids <- (s,ty) :: ctx.sc_new_ids;
   ctx.sc_on_new s ty;
-  Util.debugf ~section 3 "@[<2>new skolem symbol %a@ with type @[%a@]@]"
+  Util.debugf ~section 3 "@[<2>new skolem symbol `%a`@ with type `@[%a@]`@]"
     (fun k->k ID.pp s T.pp ty);
   s
 

@@ -567,12 +567,14 @@ let skolemize ~ctx f =
     | F.Exists (var,f') ->
       (* replace [v] by a fresh skolem term *)
       let t = Skolem.skolem_form ~ctx subst var f in
+      Util.debugf 2 ~section "@[<2>bind `%a` to@ `@[%a@]`@ :subst {%a}@]"
+        (fun k->k Var.pp_fullc var T.pp t T.Subst.pp subst);
       let subst = Var.Subst.add subst var t in
-      Util.debugf 2 ~section "@[<2>bind %a to@ @[%a@]@]"
-        (fun k->k Var.pp_full var T.pp t);
       skolemize subst f'
     | F.Forall (var,f') ->
       let var' = Var.copy var in
+      Util.debugf 5 ~section "@[<2>rename `%a` to@ `%a`@ :subst {%a}@]"
+        (fun k->k Var.pp_fullc var Var.pp_fullc var' T.Subst.pp subst);
       let subst = Var.Subst.add subst var (T.var var') in
       skolemize subst f'
   in

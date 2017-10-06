@@ -920,27 +920,27 @@ module Subst = struct
 
   let rec eval_ ~recursive subst t = match view t with
     | Var v ->
-      begin
-        try
-          let t' = Var.Subst.find_exn subst v in
+      begin match Var.Subst.find subst v with
+        | None ->
+          var ?loc:t.loc (Var.update_ty v ~f:(eval_ ~recursive subst))
+        | Some t' ->
           assert (t != t');
           if recursive then (
             eval_ ~recursive subst t'
           ) else (
             t'
           )
-        with Not_found ->
-          var ?loc:t.loc (Var.update_ty v ~f:(eval_ ~recursive subst))
       end
     | _ ->
       map subst t
         ~bind:rename_var
         ~f:(eval_ ~recursive)
 
-  (* rename variable and evaluate its type *)
+  (* rename variable and evaluate its type. *)
   and rename_var subst v =
     let v' = Var.copy v |> Var.update_ty ~f:(eval_ ~recursive:true subst) in
-    let subst = add subst v (var v') in
+    (* (re-)bind [v] to [v'] *)
+    let subst = Var.Subst.add subst v (var v') in
     subst, v'
 
   let eval subst t = if is_empty subst then t else eval_ ~recursive:true subst t
