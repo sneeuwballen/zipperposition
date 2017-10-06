@@ -2,55 +2,21 @@
 
 ## Now
 
-- investigate useless arith inferences in
-  `./zipperposition.native --stats --dot-sat -o none -t 30 --dot /tmp/truc.dot examples/verifast/foreach_remove_easy_pb.zf --induction-depth 0 --debug 1 | less`
+- FIX: ordering issue in arith
+  `./zipperposition.native --stats --dot-sat -o none -t 30 --dot /tmp/truc.dot --prelude ~/workspace/bset/bset.zf examples/Operators-B_translation-op1_2.p -p -t 300 --backtrace `
 
 - FIX:
-  `./zipperposition.native --stats --dot-sat -o none -t 30 --dot /tmp/truc.dot examples/verifast/take_length_easy_pb.zf --induction-depth 0 --debug 1 --print-lemmas --int-trivial-ineq --debug 5 | less`
+  bind twice some var?
+  `./zipperposition.native --stats --dot-sat -o none -t 30 --dot /tmp/truc.dot examples/ho/find_set_inter.zf`
 
-- unification under constraints
-  * [x] propose `unif_constraint: term -> term -> subst * (term*term) list`
-  * [x] provide `is_syntactic_unifiable: term -> bool`
-    (returns false on int,rat,HO terms)
-  * [x] change `fold_terms` so it doesn't recurse under non-syntactic unifiable terms
-  * [x] modify term indexing so it puts all non-syntactic unifiable terms in a box
-  * [x] use `unif_constraint` in all inference rules, adding constraints
-    as new literals
-  * [x] disable purification
-  * [ ] → evaluate perf impact on arith
-  * [ ] restore notion of "value" and fail constraints between distinct values
-      (e.g. `0` and `1`)
-  * [ ] two variations (optional arg) to avoid unifying `t` and `u:int` at
-      root (useful for monome unif), or allow it (for subterms)
-
-- HO enumeration for fully applied function or predicate variables.
-  should complement syntactic unif with constraints for HO.
-
-- ~~add special "ho constraint" literals~~
-  * automatically used for purification of HO subterms
-  * purification can occur in them for arithmetic terms, not FOOL nor HO
-  * smaller than anything else(?)
-  * always selected if they are not of the form `x =?= t` with `x` shielded,
-    or flex/flex
-    → in short, do flex/rigid prioritarily, but delay flex/flex or shielded
-    variable purification
-  * HO unification proceeds on these literals (perhaps by batch with
-    a max number of steps), including syntactic steps → yields DNF.
-    Put relatively high limit of steps?
-  * no superposition/rewriting in them
-
-- HO equality resolution (in addition to HO factoring and resolution)?
-  **OR**: purify all HO terms into HO constraints, i.e. `F a ≠ G b` actually
-  becomes `X₁ ≠ X₂ ∨ X₁ =?= F a ∨ X₂ =?= G b`, then normal FO eq-res,
-  then `F a =?= G b` solved by HO unif
-
-- update FOOL so it doesn't act in HO constraints
-
-- update purify's definition of `shielded` so it totally ignores constraints?
-  or at least that it only looks under uninterpreted symbols
-  and totally ignores HO unif constraints
+- investigate very slow induction in
+  `./zipperposition.native --stats --dot-sat -o none -t 30 --dot /tmp/truc.dot examples/verifast/foreach_remove_easy_pb.zf --induction-depth 0 --debug 1 | less`
 
 ## Misc
+
+- in indexing, for `λx. f t1…tn` with `f` constant, perhaps still return `f`
+  as head (with no sub)
+  → no other head can work anyway
 
 - [ ] use ocamlify for loading prelude files from `data/`? With special
     handling in `--prelude` for extensionless files (e.g. `--prelude set`)
@@ -493,10 +459,39 @@
         all arguments in each case, so we can properly write recursive
         definitions)
 
+* [x] fix skolemization (in extensionality): need to depend on free vars
+
+- [x] introduce λ terms
+  * restore HO constraints (smallest lits, etc. but no eq-res)
+  * check that superposition, etc. works inside λ terms
+  * check orderings (compare λ between them, incomparable with others)
+  * check indexing (under λ)
+  * in unif, make `F t1…tn = u` delay as a (HO) constraint
+  * implement full HO unif with depth limit, apply it on HO constraints
+
+- [x] add special "ho constraint" literals
+  * automatically used for purification of HO subterms
+  * purification can occur in them for arithmetic terms, not FOOL nor HO
+  * smaller than anything else(?)
+  * always selected if they are not of the form `x =?= t` with `x` shielded,
+    or flex/flex
+    → in short, do flex/rigid prioritarily, but delay flex/flex or shielded
+    variable purification
+  * HO unification proceeds on these literals (perhaps by batch with
+    a max number of steps), including syntactic steps → yields DNF.
+    Put relatively high limit of steps?
+  * no superposition/rewriting in them
+
+- HO equality resolution (in addition to HO factoring and resolution)?
+  **OR**: purify all HO terms into HO constraints, i.e. `F a ≠ G b` actually
+  becomes `X₁ ≠ X₂ ∨ X₁ =?= F a ∨ X₂ =?= G b`, then normal FO eq-res,
+  then `F a =?= G b` solved by HO unif
+
 ### Arith
 
 - simplification rule similar to `trivial_ineq` but for removing literals? E.g. to
   simplify `len a+len b < 0` from `len x ≥ 0`
+
 
 ### Misc
 
@@ -523,6 +518,22 @@
     `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot examples/ind/nat15_def.zf`
 
 - factor code between int arith and rat arith (and HO?)
+
+- unification under constraints
+  * [x] propose `unif_constraint: term -> term -> subst * (term*term) list`
+  * [x] provide `is_syntactic_unifiable: term -> bool`
+    (returns false on int,rat,HO terms)
+  * [x] change `fold_terms` so it doesn't recurse under non-syntactic unifiable terms
+  * [x] modify term indexing so it puts all non-syntactic unifiable terms in a box
+  * [x] use `unif_constraint` in all inference rules, adding constraints
+    as new literals
+  * [x] disable purification
+  * [ ] → evaluate perf impact on arith
+  * [ ] restore notion of "value" and fail constraints between distinct values
+      (e.g. `0` and `1`)
+  * [x] two variations (optional arg) to avoid unifying `t` and `u:int` at
+      root (useful for monome unif), or allow it (for subterms)
+
 
 - heuristics:
   * [x] get back to a simple "pick-given ratio" with current sophisticated
