@@ -126,7 +126,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debugf ~section 4
         "(@[ho_ext_neg@ :old `%a`@ :new `%a`@])"
         (fun k->k Literal.pp lit Literal.pp new_lit);
-      Some (new_lit,[],[Proof.Tag.T_ho])
+      Some (new_lit,[],[Proof.Tag.T_ho; Proof.Tag.T_ext])
     | _ -> None
 
   (* positive extensionality `m x = n x --> m = n` *)
@@ -158,7 +158,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                 in
                 let proof =
                   Proof.Step.inference [C.proof_parent c]
-                    ~rule:(Proof.Rule.mk "ho_ext_pos") ~tags:[Proof.Tag.T_ho]
+                    ~rule:(Proof.Rule.mk "ho_ext_pos")
+                    ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext]
                 in
                 let new_c =
                   C.create [new_lit] proof ~penalty:(C.penalty c) ~trail:(C.trail c)

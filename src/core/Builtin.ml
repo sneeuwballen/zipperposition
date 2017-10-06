@@ -257,6 +257,7 @@ module Tag = struct
     | T_lia (** integer arith *)
     | T_lra (** rational arith *)
     | T_ho (** higher order *)
+    | T_ext (** extensionality *)
     | T_ind (** induction *)
     | T_data (** datatypes *)
     | T_distinct (** distinct constants *)
@@ -268,6 +269,7 @@ module Tag = struct
     | T_lia -> Fmt.string out "lia"
     | T_lra -> Fmt.string out "lra"
     | T_ho -> Fmt.string out "ho"
+    | T_ext -> Fmt.string out "extensionality"
     | T_ind -> Fmt.string out "ind"
     | T_data -> Fmt.string out "data"
     | T_distinct -> Fmt.string out "distinct_constants"

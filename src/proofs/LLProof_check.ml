@@ -331,7 +331,7 @@ end = struct
     let f = function
       | T_ho -> true
       | T_lra | T_lia | T_ind | T_data
-      | T_distinct | T_ac _ -> false
+      | T_distinct | T_ac _ | T_ext -> false
     in
     List.for_all f
 
