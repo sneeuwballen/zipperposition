@@ -748,7 +748,9 @@ module S = struct
       )
       ~attrs_e:(fun (r,s,infos) ->
         let pp_subst out s =
-          Format.fprintf out "@,%a" Subst.Projection.pp s
+          if not (Subst.is_empty @@ Subst.Projection.subst s) then (
+            Format.fprintf out "@,%a" Subst.Projection.pp s
+          )
         in
         let label =
           if s=None && infos=[] then Rule.name r
