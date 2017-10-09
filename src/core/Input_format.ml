@@ -41,3 +41,8 @@ let on_var (i:t) = match i with
   | I_dk
   | I_tip
   | I_zf -> `Infer
+
+(** Do we add implicit type parameters when '@' is not present? *)
+let implicit_ty_args (i:t) : bool = match i with
+  | I_tptp | I_dk -> false
+  | I_tip | I_zf -> true

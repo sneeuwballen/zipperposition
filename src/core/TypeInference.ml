@@ -131,6 +131,8 @@ module Ctx = struct
     (* what to do when we meet an undefined symbol *)
     on_shadow: [`Warn | `Ignore];
     (* what to do when an identifier is re-declared *)
+    implicit_ty_args: bool;
+    (* add implicit type arguments in applications? *)
     mutable new_metas: T.meta_var list;
     (* variables that should be generalized in the global scope
        or bound to [default], if they are not bound *)
@@ -146,6 +148,7 @@ module Ctx = struct
       ?(def_as_rewrite=true) ?(default=T.Ty.term)
       ?(on_var=`Infer) ?(on_undef=`Guess)
       ?(on_shadow=`Warn)
+      ~implicit_ty_args
       () =
     let ctx = {
       default;
@@ -153,6 +156,7 @@ module Ctx = struct
       on_var;
       on_undef;
       on_shadow;
+      implicit_ty_args;
       env = Hashtbl.create 32;
       datatypes = ID.Tbl.create 32;
       new_metas=[];
@@ -437,14 +441,16 @@ let infer_ty ctx ty =
   with e -> Err.of_exn_trace e
 
 (* add type variables if needed, to apply [some_fun:ty_fun] to [l] *)
-let add_implicit_params ty_fun l =
-  let tyvars, args, _ = T.Ty.unfold ty_fun in
-  let l' =
-    if List.length l = List.length args
-    then List.map (fun _ -> PT.wildcard) tyvars
-    else []
-  in
-  l'@l
+let add_implicit_params ctx ty_fun l =
+  if ctx.Ctx.implicit_ty_args then (
+    let tyvars, args, _ = T.Ty.unfold ty_fun in
+    let l' =
+      if List.length l = List.length args
+      then List.map (fun _ -> PT.wildcard) tyvars
+      else []
+    in
+    l'@l
+  ) else l
 
 let mk_metas ctx n =
   CCList.init n
@@ -468,21 +474,23 @@ let rec infer_rec ?loc ctx t =
         | `Var v -> T.var v
         | `ID (id, ty_id) ->
           (* implicit parameters, e.g. for [nil] *)
-          let l = add_implicit_params ty_id [] |> List.map (infer_rec ?loc ctx) in
+          let l =
+            add_implicit_params ctx ty_id [] |> List.map (infer_rec ?loc ctx)
+          in
           let ty = apply_unify ctx ?loc ~allow_open:true ty_id l in
           T.app ?loc ~ty (T.const ?loc ~ty:ty_id id) l
       end
     | PT.Const s ->
       let id, ty_id = Ctx.get_id_ ?loc ~arity:0 ctx s in
       (* implicit parameters, e.g. for [nil] *)
-      let l = add_implicit_params ty_id [] |> List.map (infer_rec ?loc ctx) in
+      let l = add_implicit_params ctx ty_id [] |> List.map (infer_rec ?loc ctx) in
       let ty = apply_unify ctx ?loc ~allow_open:true ty_id l in
       T.app ?loc ~ty (T.const ?loc ~ty:ty_id id) l
     | PT.App ({PT.term=PT.Var v; _}, l) ->
       begin match Ctx.get_var_ ?loc ctx v with
         | `ID (id,ty) -> infer_app ?loc ctx id ty l
         | `Var v ->
-          let l = add_implicit_params (Var.ty v) l in
+          let l = add_implicit_params ctx (Var.ty v) l in
           (* infer types for arguments *)
           let l = List.map (infer_rec ?loc ctx) l in
           Util.debugf ~section 5 "@[<2>apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]"
@@ -670,7 +678,7 @@ let rec infer_rec ?loc ctx t =
   t'
 
 and infer_app ?loc ctx id ty_id l =
-  let l = add_implicit_params ty_id l in
+  let l = add_implicit_params ctx ty_id l in
   (* infer types for arguments *)
   let l = List.map (infer_rec ?loc ctx) l in
   Util.debugf ~section 5 "@[<2>apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]"
@@ -1104,9 +1112,12 @@ let infer_statement_exn ?(file="<no file>") ctx st =
   in
   st, aux
 
-let infer_statements_exn ?def_as_rewrite ?on_var ?on_undef ?on_shadow ?ctx ?file seq =
+let infer_statements_exn
+    ?def_as_rewrite ?on_var ?on_undef ?on_shadow
+    ?ctx ?file ~implicit_ty_args seq =
   let ctx = match ctx with
-    | None -> Ctx.create ?def_as_rewrite ?on_var ?on_undef ?on_shadow ()
+    | None ->
+      Ctx.create ?def_as_rewrite ?on_var ?on_undef ?on_shadow ~implicit_ty_args ()
     | Some c -> c
   in
   let res = CCVector.create () in
@@ -1119,8 +1130,12 @@ let infer_statements_exn ?def_as_rewrite ?on_var ?on_undef ?on_shadow ?ctx ?file
     seq;
   CCVector.freeze res
 
-let infer_statements ?def_as_rewrite ?on_var ?on_undef ?on_shadow ?ctx ?file seq =
-  try Err.return
-        (infer_statements_exn ?def_as_rewrite ?on_var ?on_undef ?on_shadow ?ctx ?file seq)
+let infer_statements
+    ?def_as_rewrite ?on_var ?on_undef ?on_shadow
+    ?ctx ?file ~implicit_ty_args seq =
+  try
+    Err.return
+      (infer_statements_exn ?def_as_rewrite ?on_var ?on_undef
+         ?on_shadow ?ctx ?file ~implicit_ty_args seq)
   with e -> Err.of_exn_trace e
 

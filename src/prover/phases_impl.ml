@@ -106,6 +106,7 @@ let typing ~file prelude (input,stmts) =
     ~on_var:(Input_format.on_var input)
     ~on_undef:(Input_format.on_undef_id input)
     ~on_shadow:(Input_format.on_shadow input)
+    ~implicit_ty_args:(Input_format.implicit_ty_args input)
     ~def_as_rewrite ?ctx:None ~file
     (Sequence.append prelude stmts)
   >>?= fun stmts ->
