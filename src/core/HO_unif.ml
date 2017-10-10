@@ -239,7 +239,8 @@ module U = struct
     let env, t1, t2 = p in
     let t1 = T.fun_l env t1 in
     let t2 = T.fun_l env t2 in
-    Unif_constr.FO.make (t1,sc)(t2,sc)
+    let tags = [Proof.Tag.T_ho] in
+    Unif_constr.FO.make ~tags (t1,sc)(t2,sc)
 
   (* unify [v args = t], where [t] is rigid *)
   let unif_rigid ~sc ~subst ~offset env v args t : (pair list * _ * _ * _) Sequence.t =

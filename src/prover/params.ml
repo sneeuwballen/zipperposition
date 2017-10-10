@@ -18,6 +18,7 @@ type t = {
   param_files : (string, CCVector.ro) CCVector.t;
   param_select : string; (** name of the selection function *)
   param_dot_file : string option; (** file to print the final state in *)
+  param_dot_llproof: string option; (** file to print llproof *)
   param_dot_sat : bool; (** Print saturated set into DOT? *)
   param_dot_all_roots : bool;
   param_def_as_rewrite: bool;
@@ -35,6 +36,7 @@ and version = ref false
 and timeout = ref 0.
 and presaturate = ref false
 and dot_file = ref None
+and dot_llproof = ref None
 and dot_sat = ref false
 and dot_all_roots = ref false
 and expand_def = ref false
@@ -61,6 +63,7 @@ let parse_args () =
     ; "--presaturate", Arg.Set presaturate,
       " pre-saturate (interreduction of) the initial clause set"
     ; "--dot", Arg.String (fun s -> dot_file := Some s) , " print final state to file in DOT"
+    ; "--dot-llproof", Arg.String (fun s -> dot_llproof := Some s) , " print LLProof to file in DOT"
     ; "--dot-sat", Arg.Set dot_sat, " print saturated set into DOT"
     ; "--dot-all-roots", Arg.Set dot_all_roots, " print all empty clauses into DOT"
     ; "--color", Arg.Bool CCFormat.set_color_default, " enable/disable ANSI color codes"
@@ -89,7 +92,7 @@ let parse_args () =
     param_files = files; param_select = !select;
     param_stats= ! Options.stats; param_def_as_rewrite= !def_as_rewrite;
     param_presaturate = !presaturate; param_dot_all_roots= !dot_all_roots;
-    param_dot_file = !dot_file;
+    param_dot_file = !dot_file; param_dot_llproof= !dot_llproof;
     param_unary_depth= !unary_depth; param_dot_sat= !dot_sat;
     param_expand_def= !expand_def; param_check= !check; }
 

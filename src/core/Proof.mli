@@ -5,6 +5,7 @@
 
 module Loc = ParseLocation
 
+type term = TypedSTerm.t
 type form = TypedSTerm.t
 type 'a sequence = ('a -> unit) -> unit
 
@@ -12,17 +13,18 @@ val section : Util.Section.t
 
 type rule
 
-(** How do we check a step? *)
-type check = [`No_check | `Check | `Check_with of form list]
+(** Tag for checking an inference. Each tag describes an extension of FO
+    that is used in the inference *)
+type tag = Builtin.Tag.t
 
 type attrs = UntypedAST.attrs
 
 (** Classification of proof steps *)
 type kind =
   | Intro of source * role
-  | Inference of rule * check
-  | Simplification of rule * check
-  | Esa of rule * check
+  | Inference of rule * tag list
+  | Simplification of rule * tag list
+  | Esa of rule
   | Trivial (** trivial, or trivial within theories *)
   | Define of ID.t * source (** definition *)
   | By_def of ID.t (** following from the def of ID *)
@@ -65,11 +67,15 @@ type proof
 
 type t = proof
 
-type parent
+type parent =
+  | P_of of t
+  | P_subst of t * Subst.Projection.t
 
 type info = UntypedAST.attr
 
 type infos = info list
+
+module Tag = Builtin.Tag
 
 (** {2 Rule} *)
 
@@ -150,15 +156,19 @@ module Result : sig
     | `Def
     ]
 
+  (** A mapping used during instantiation, to map pre-instantiation
+      variables to post-instantiation terms *)
+  type inst_subst = (term, term) Var.Subst.t
+
   val make_tc :
     of_exn:(exn -> 'a option) ->
     to_exn:('a -> exn) ->
     compare:('a -> 'a -> int) ->
     to_form:(ctx:Term.Conv.ctx -> 'a -> form) ->
+    ?to_form_subst:(ctx:Term.Conv.ctx -> Subst.Projection.t -> 'a -> form * inst_subst) ->
     pp_in:(Output_format.t -> 'a CCFormat.printer) ->
     ?name:('a -> string) ->
     ?is_stmt:bool ->
-    ?apply_subst:(Subst.t -> 'a Scoped.t -> 'a) ->
     ?flavor:('a -> flavor) ->
     unit ->
     'a tc
@@ -168,6 +178,8 @@ module Result : sig
       @param is_stmt true only if ['a] is a toplevel statement (default false)
       @param name returns the name of the result. Typically, a name from
         the input file
+      @param to_form_subst apply substitution, then convert to form.
+      If not provided, will fail.
   *)
 
   val make : 'a tc -> 'a -> t
@@ -182,9 +194,12 @@ module Result : sig
   val pp : t CCFormat.printer
   val is_stmt : t -> bool
   val to_form : ?ctx:Term.Conv.ctx -> t -> form
+
+  val to_form_subst : ?ctx:Term.Conv.ctx -> Subst.Projection.t -> t -> form * inst_subst
+  (** instantiated form + bindings for vars *)
+
   val flavor : t -> flavor
   val name : t -> string option
-  val apply_subst : Subst.t -> t Scoped.t -> t
 end
 
 (** {2 A proof step} *)
@@ -224,11 +239,11 @@ module Step : sig
   val goal : source -> t
   val goal' : ?loc:Loc.t -> file:string -> name:string -> unit -> t
 
-  val inference : ?infos:infos -> ?check:check -> rule:rule -> parent list -> t
+  val inference : ?infos:infos -> ?tags:tag list -> rule:rule -> parent list -> t
 
-  val simp : ?infos:infos -> ?check:check -> rule:rule -> parent list -> t
+  val simp : ?infos:infos -> ?tags:tag list -> rule:rule -> parent list -> t
 
-  val esa : ?infos:infos -> ?check:check -> rule:rule -> parent list -> t
+  val esa : ?infos:infos -> rule:rule -> parent list -> t
 
   val to_attrs : t -> UntypedAST.attrs
 
@@ -262,11 +277,16 @@ module Parent : sig
   type t = parent
 
   val from : proof -> t
-  val from_subst : proof Scoped.t -> Subst.t -> t
-  val add_subst : t Scoped.t -> Subst.t -> t
+  val from_subst_proj : proof -> Subst.Projection.t -> t
+  val from_subst : Subst.Renaming.t -> proof Scoped.t -> Subst.t -> t
   val proof : t -> proof
-  val subst : t -> Subst.t list
+  val subst : t -> Subst.Projection.t option
 end
+
+val pp_parent : Parent.t CCFormat.printer
+
+val pp_tag : tag CCFormat.printer
+val pp_tags : tag list CCFormat.printer
 
 (** {2 Proof} *)
 
@@ -302,24 +322,21 @@ module S : sig
   val mk_f_trivial : form -> t
   val mk_f_by_def : ID.t -> form -> t
 
-  val mk_f_inference : ?check:check -> rule:rule -> form -> parent list -> t
+  val mk_f_inference : rule:rule -> form -> parent list -> t
 
-  val mk_f_simp : ?check:check -> rule:rule -> form -> parent list -> t
+  val mk_f_simp : rule:rule -> form -> parent list -> t
 
-  val mk_f_esa : ?check:check -> rule:rule -> form -> parent list -> t
+  val mk_f_esa : rule:rule -> form -> parent list -> t
 
   val adapt : t -> Result.t -> t
 
   val adapt_f : t -> form -> t
 
-  val to_llproof : t -> LLProof.t
-  (** Convert to low level t *)
-
   val is_proof_of_false : t -> bool
 
   (** {6 Conversion to a graph of proofs} *)
 
-  val as_graph : (t, rule * Subst.t list * infos) CCGraph.t
+  val as_graph : (t, rule * Subst.Projection.t option * infos) CCGraph.t
   (** Get a graph of the proof *)
 
   val traverse :
@@ -333,6 +350,9 @@ module S : sig
   val pp_result_of : t CCFormat.printer
   val pp_notrec : t CCFormat.printer
   (** Non recursive printing on formatter *)
+
+  val pp_notrec1 : t CCFormat.printer
+  (** Non recursive printing on formatter, including parents *)
 
   val pp_tstp : t CCFormat.printer
   val pp_normal : t CCFormat.printer

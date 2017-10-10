@@ -264,6 +264,9 @@ val head : t -> ID.t option
 val type_is_unifiable : t -> bool
 (** Can we (syntactically) unify terms of this type? *)
 
+val type_non_unifiable_tags: t -> Builtin.Tag.t list
+(** Theory tags that justify this type not being unifiable *)
+
 val type_is_prop : t -> bool
 (** Is is equal to [prop] *)
 

@@ -344,7 +344,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       assert (HC.is_alive c);
       assert (HC.is_alive c');
       let subst = sup.hc_sup_subst in
-      let renaming = Ctx.renaming_cleared () in
+      let renaming = Subst.Renaming.createed () in
       let s = sup.hc_sup_s in
       let s' = Subst.FO.apply ~renaming subst (s,sc_active) in
       let t' = Subst.FO.apply ~renaming subst (sup.hc_sup_t,sc_active) in
@@ -529,7 +529,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           try
             let subst = Unif.FO.unification (a,sc) (b,sc) in
             (* do inference, by removing [a=b] from body *)
-            let renaming = Ctx.renaming_cleared () in
+            let renaming = Subst.Renaming.createed () in
             let new_head =
               Lit.apply_subst ~renaming subst (HC.head c,sc)
             and new_body =
@@ -586,7 +586,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
             IArray.init (IArray.length lits-1)
               (fun j-> if j<i then IArray.get lits j else IArray.get lits (j+1))
           in
-          let renaming = Ctx.renaming_cleared () in
+          let renaming = Subst.Renaming.createed () in
           let new_head = Lit.apply_subst ~renaming subst (HC.head c,sc)
           and new_body = Lit.apply_subst_arr ~renaming subst (new_body,sc)
           and proof = Proof.hc_eq_res c subst
@@ -746,7 +746,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
        returns the list of demodulated clauses, removed from active set *)
     let back_demod_ (c:HC.t): HC.t list =
       let idx = Active_set.idx_sup_into () in
-      let renaming = Ctx.renaming_cleared () in
+      let renaming = Subst.Renaming.createed () in
       (* find clauses that might be rewritten by l -> r *)
       let find_candidates ~oriented set l r =
         CP_idx.retrieve_specializations (idx,1) (l,0)

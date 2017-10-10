@@ -16,9 +16,6 @@ module type S = sig
   (** New congruence.
       @param size a hint for the initial size of the hashtable. *)
 
-  val find : t -> term -> term
-  (** Current representative of this term *)
-
   val iter : t -> (mem:term -> repr:term -> unit) -> unit
   (** Iterate on terms that are explicitely present in the congruence.
       The callback is given [mem], the term itself, and [repr],
@@ -32,6 +29,9 @@ module type S = sig
   (** Iterate on the congruence classes' representative elements.
       Exactly one term per congruence class will be passed to the
       function. *)
+
+  val add : t -> term -> t
+  (** Add the term to the congruence closure *)
 
   val mk_eq : t -> term -> term -> t
   (** [mk_eq congruence t1 t2] asserts that [t1 = t2] belongs to

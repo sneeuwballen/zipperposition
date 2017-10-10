@@ -369,15 +369,17 @@ let unif_lits op ~subst (lit1,sc1) (lit2,sc2) k =
   let open UnifOp in
   match lit1, lit2 with
     | Prop (p1, sign1), Prop (p2, sign2) when sign1 = sign2 ->
-      op.term ~subst (p1,sc1) (p2,sc2) k
+      op.term ~subst (p1,sc1) (p2,sc2) (fun s -> k (s,[]))
     | True, True
-    | False, False -> k subst
+    | False, False -> k (subst,[])
     | Equation (l1, r1, sign1), Equation (l2, r2, sign2) when sign1 = sign2 ->
-      unif4 op.term ~subst l1 r1 sc1 l2 r2 sc2 k
+      unif4 op.term ~subst l1 r1 sc1 l2 r2 sc2 (fun s -> k (s,[]))
     | Int o1, Int o2 ->
-      Int_lit.generic_unif op.monomes ~subst (o1,sc1) (o2,sc2) k
+      Int_lit.generic_unif op.monomes ~subst (o1,sc1) (o2,sc2)
+        (fun s -> k(s,[Builtin.Tag.T_lia]))
     | Rat o1, Rat o2 ->
-      Rat_lit.generic_unif op.monomes ~subst (o1,sc1) (o2,sc2) k
+      Rat_lit.generic_unif op.monomes ~subst (o1,sc1) (o2,sc2)
+        (fun s -> k(s,[Builtin.Tag.T_lra]))
     | _, _ -> ()
 
 let variant ?(subst=S.empty) lit1 lit2 k =
@@ -389,7 +391,7 @@ let variant ?(subst=S.empty) lit1 lit2 k =
     })
   in
   unif_lits op ~subst lit1 lit2
-    (fun subst -> if Subst.is_renaming subst then k subst)
+    (fun (subst,tags) -> if Subst.is_renaming subst then k (subst,tags))
 
 let are_variant lit1 lit2 =
   not (Sequence.is_empty (variant (Scoped.make lit1 0) (Scoped.make lit2 1)))
@@ -450,9 +452,10 @@ let subsumes ?(subst=Subst.empty) (lit1,sc1) (lit2,sc2) k =
   match lit1, lit2 with
     | Int o1, Int o2 ->
       (* use the more specific subsumption mechanism *)
-      Int_lit.subsumes ~subst (o1,sc1) (o2,sc2) k
+      Int_lit.subsumes ~subst (o1,sc1) (o2,sc2)
+        (fun s -> k(s,[Builtin.Tag.T_lia]))
     | Equation (l1, r1, true), Equation (l2, r2, true) ->
-      _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 k
+      _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 (fun s -> k(s,[]))
     | _ -> matching ~subst ~pattern:(lit1,sc1) (lit2,sc2) k
 
 let unify ?(subst=US.empty) lit1 lit2 k =
@@ -492,33 +495,27 @@ let apply_subst_ ~f_term ~f_arith_lit ~f_rat subst (lit,sc) =
     | True
     | False -> lit
 
-let apply_subst ~renaming subst (lit,sc) =
+let apply_subst renaming subst (lit,sc) =
   apply_subst_ subst (lit,sc)
-    ~f_term:(S.FO.apply ~renaming)
-    ~f_arith_lit:(Int_lit.apply_subst ~renaming)
-    ~f_rat:(Rat_lit.apply_subst ~renaming)
+    ~f_term:(S.FO.apply renaming)
+    ~f_arith_lit:(Int_lit.apply_subst renaming)
+    ~f_rat:(Rat_lit.apply_subst renaming)
 
-let apply_subst_no_renaming subst (lit,sc) =
-  apply_subst_ subst (lit,sc)
-    ~f_term:S.FO.apply_no_renaming
-    ~f_arith_lit:Int_lit.apply_subst_no_renaming
-    ~f_rat:Rat_lit.apply_subst_no_renaming
-
-let apply_subst_no_simp ~renaming subst (lit,sc) =
+let apply_subst_no_simp renaming subst (lit,sc) =
   match lit with
-    | Int o -> Int (Int_lit.apply_subst_no_simp ~renaming subst (o,sc))
-    | Rat o -> Rat (Rat_lit.apply_subst_no_simp ~renaming subst (o,sc))
+    | Int o -> Int (Int_lit.apply_subst_no_simp renaming subst (o,sc))
+    | Rat o -> Rat (Rat_lit.apply_subst_no_simp renaming subst (o,sc))
     | Equation (l,r,sign) ->
-      Equation (S.FO.apply ~renaming subst (l,sc),
-        S.FO.apply ~renaming subst (r,sc), sign)
+      Equation (S.FO.apply renaming subst (l,sc),
+        S.FO.apply renaming subst (r,sc), sign)
     | Prop (p, sign) ->
-      Prop (S.FO.apply ~renaming subst (p,sc), sign)
+      Prop (S.FO.apply renaming subst (p,sc), sign)
     | True
     | False -> lit
 
-let apply_subst_list ~renaming subst (lits,sc) =
+let apply_subst_list renaming subst (lits,sc) =
   List.map
-    (fun lit -> apply_subst ~renaming subst (lit,sc))
+    (fun lit -> apply_subst renaming subst (lit,sc))
     lits
 
 exception Lit_is_constraint
@@ -608,7 +605,13 @@ let is_absurd lit = match lit with
   | Rat o -> Rat_lit.is_absurd o
   | Equation _ | Prop _ | True -> false
 
-let fold_terms ?(position=Position.stop) ?(vars=false) ?ty_args ?(ord=Ordering.none) ~which ~subterms lit k =
+let is_absurd_tags lit = match lit with
+  | Equation _ | Prop _ | False -> []
+  | True -> assert false
+  | Int _ -> [Builtin.Tag.T_lia]
+  | Rat _ -> [Builtin.Tag.T_lra]
+
+let fold_terms ?(position=Position.stop) ?(vars=false) ?ty_args ~which ?(ord=Ordering.none) ~subterms lit k =
   (* function to call at terms *)
   let at_term ~pos t =
     if subterms
@@ -672,8 +675,8 @@ let is_ho_unif lit = match lit with
   | Equation (t, u, false) -> Term.is_ho_app t || Term.is_ho_app u
   | _ -> false
 
-let of_unif_subst ~renaming (s:Unif_subst.t) : t list =
-  Unif_subst.constr_l_subst ~renaming s
+let of_unif_subst renaming (s:Unif_subst.t) : t list =
+  Unif_subst.constr_l_subst renaming s
   |> List.map
     (fun (t,u) ->
        (* upcast *)

@@ -14,13 +14,13 @@ module type S = sig
 
   val on_add : spec Signal.t
 
-  val add : proof:Proof.step -> ID.t -> Type.t -> unit
+  val add : proof:Proof.parent -> ID.t -> Type.t -> unit
   (** Declare that the given symbol is AC, and update the Env subsequently
       by adding clauses, etc. *)
 
   val is_ac : ID.t -> bool
 
-  val find_proof : ID.t -> Proof.step
+  val find_proof : ID.t -> Proof.parent
   (** Recover the proof for the AC-property of this symbol.
       @raise Not_found if the symbol is not AC *)
 

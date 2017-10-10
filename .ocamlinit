@@ -110,4 +110,5 @@ module MF = Monome.Focus;;
 #install_printer Monome.pp;;
 let pterm_tptp s = Parse_tptp.parse_term Lex_tptp.token (Lexing.from_string s);;
 let pform_tptp s = Parse_tptp.parse_formula Lex_tptp.token (Lexing.from_string s);;
+let pterm_zf s = Parse_zf.parse_term Lex_zf.token (Lexing.from_string s);;
 Printf.printf "finished loading\n";;

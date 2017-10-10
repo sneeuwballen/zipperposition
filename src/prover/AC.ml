@@ -33,14 +33,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   type cell = {
     spec: spec;
-    proof: Proof.step;
-    axioms: C.t list;
+    proof: Proof.parent;
+    axioms: C.t list; (* ground-complete set of axioms (see "E: a brainiac theorem prover") *)
   }
 
   let tbl : cell ID.Tbl.t = ID.Tbl.create 3
   let on_add : spec Signal.t = Signal.create ()
 
-  let mk_axioms_ ~proof s ty: C.t list =
+  let mk_axioms_ proof s ty: C.t list =
     let ty_args_n, ty_args, _ty_ret = Type.open_poly_fun ty in
     if List.length ty_args <> 2 then (
       Util.errorf ~where:"AC" "AC symbol `%a`must be of arity 2" ID.pp s;
@@ -68,6 +68,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* build clause l=r *)
     let mk_clause l r =
       let penalty = 0 in
+      let proof = Proof.Step.esa ~rule:(Proof.Rule.mk "ac") [proof] in
       let c = C.create ~trail:Trail.empty ~penalty [ Lit.mk_eq l r ] proof in
       C.set_flag flag_axiom c true;
       C.set_flag SClause.flag_persistent c true;
@@ -80,11 +81,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ; mk_clause (f x (f y z)) (f z (f y x))
     ]
 
-  let add_ ~proof ~ty s =
+  let add_ proof ~ty s =
     try ID.Tbl.find tbl s
     with Not_found ->
       let spec = {ty; sym=s} in
-      let axioms = mk_axioms_ ~proof s ty in
+      let axioms = mk_axioms_ proof s ty in
       let cell = {spec; proof; axioms; } in
       ID.Tbl.add tbl s cell;
       Signal.send on_add spec;
@@ -157,18 +158,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (* did some simplification *)
         let symbols = symbols_of_terms (C.Seq.terms c) in
         let symbols = ID.Set.to_list symbols in
-        (* gather axioms that were used, removing duplicates *)
-        let ac_axioms =
-          symbols
-          |> CCList.flat_map
-            (fun id ->
-               let ax = (ID.Tbl.find tbl id).axioms in
-               List.map C.proof_parent ax)
+        let tags = List.map (fun id -> Builtin.Tag.T_ac id) symbols in
+        let premises =
+          C.proof_parent c ::
+            List.map (fun id -> (ID.Tbl.find tbl id).proof) symbols
         in
-        let premises = C.proof_parent c :: ac_axioms in
         let proof =
           Proof.Step.simp premises
-            ~rule:(Proof.Rule.mk "AC.normalize")
+            ~rule:(Proof.Rule.mk "AC.normalize") ~tags
         in
         let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
         Util.exit_prof prof_simplify;
@@ -191,12 +188,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let add ~proof s ty =
     Util.debugf ~section 1
       "@[enable AC redundancy criterion@ for `@[%a : @[%a@]@]`@ :proof %a@]"
-      (fun k->k ID.pp s Type.pp ty Proof.Step.pp proof);
+      (fun k->k ID.pp s Type.pp ty Proof.pp_parent proof);
     (* is this the first case of AC symbols? If yes, then add inference rules *)
     let first = not (exists_ac ()) in
     if first then install_rules_ ();
     (* remember that the symbols is AC *)
-    let cell = add_ ~proof ~ty s in
+    let cell = add_ proof ~ty s in
     (* add clauses *)
     Util.debugf ~section 3
       "@[<2>add AC axioms for `%a : @[%a@]`:@ @[<hv>%a@]@]"
@@ -222,10 +219,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (Statement.attrs st)
     in
     if has_ac_attr then (
-      let proof =
-        Proof.Step.esa ~rule:(Proof.Rule.mk "ac")
-          [Proof.Parent.from @@ St.as_proof_c st]
-      in
+      let proof = Proof.Parent.from @@ St.as_proof_c st in
       begin match St.view st with
         | St.TyDecl (id, ty) -> add ~proof id ty
         | St.Def l ->

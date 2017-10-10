@@ -73,7 +73,7 @@ Library "logtk"
                     FeatureVector, FV_tree, UntypedAST, Ind_ty,
                     TypedSTerm, Statement, Flex_state, Compute_prec,
                     Ordinal, Polynomial, Rewrite, Test_prop, Input_format,
-                    Output_format, Proof, LLProof, LLProof_check,
+                    Output_format, Proof,
                     Multisets, Literal, Literals, Int_lit, Rat_lit, Monome,
                     lib/Hashcons, lib/ParseLocation, lib/Multiset, lib/LazyList,
                     lib/Hash, lib/IArray, lib/AllocCache, lib/Multiset_intf,
@@ -83,12 +83,21 @@ Library "logtk"
   BuildDepends:     zarith, unix, sequence, containers,
                     containers.data, bytes
 
+Library "logtk_proofs"
+  Path:             src/proofs
+  Pack:             true
+  FindlibParent:    logtk
+  FindlibName:      proofs
+  Modules:          LLProof, LLProof_conv, LLProof_check, LLTerm
+  BuildDepends:     logtk
+
 Library "logtk_parsers"
   Path:             src/parsers
   Pack:             true
   Modules:          Parse_tptp, Lex_tptp, Ast_tptp, Util_tptp,
                     Trace_tstp, Parse_zf, Lex_zf, Util_zf, Util_tip,
                     Tip_ast, Tip_parser, Tip_lexer,
+                    Util_dk, Parse_dk, Lex_dk, Ast_dk,
                     Parsing_utils, CallProver
   Build$:           flag(parsers)
   Install$:         flag(parsers)
@@ -144,7 +153,7 @@ Library "libzipperposition"
   Build$:           flag(parsers) && flag("zipperposition_prover")
   Install$:         flag(parsers) && flag("zipperposition_prover")
   BuildDepends:     containers, sequence, unix, zarith, msat,
-                    logtk, logtk.parsers
+                    logtk, logtk.parsers, logtk.proofs
 
 # main executable for the prover
 Executable zipperposition

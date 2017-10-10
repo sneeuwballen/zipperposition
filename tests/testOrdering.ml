@@ -72,8 +72,8 @@ let check_ordering_inv_by_subst ord =
       |> Sequence.flat_map T.Seq.symbols
       |> ID.Set.of_seq |> ID.Set.to_seq
       |> O.add_seq !ord;
-    let t1' = S.apply_no_renaming subst (t1,0) in
-    let t2' = S.apply_no_renaming subst (t2,0) in
+    let t1' = S.apply Subst.Renaming.none subst (t1,0) in
+    let t2' = S.apply Subst.Renaming.none subst (t2,0) in
     (* check that instantiating variables preserves ordering *)
     let o1 = O.compare !ord t1 t2 in
     let o2 = O.compare !ord t1' t2' in

@@ -2,6 +2,7 @@ S src
 S src/arbitrary/
 S src/core
 S src/core/lib
+S src/proofs
 S src/parsers/
 S src/arbitrary/
 S src/meta

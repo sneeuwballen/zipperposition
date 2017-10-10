@@ -46,6 +46,9 @@ This project is licensed under the BSD2 license. See the `LICENSE` file.
 
 == Build
 
+Zipperposition requires OCaml >= 4.03.0, and some libraries that are
+available on opam.
+
 [[via-opam]]
 === Via opam
 

@@ -182,7 +182,7 @@ let make_coverset_ ~cover_set_depth ~depth (ty:Type.t)(ity:Ind_ty.t) : t =
       (fun k->k Ind_ty.pp ity cs_depth Subst.pp subst);
     (* leaves: fresh constants *)
     if cs_depth=0 then (
-      let ty = Subst.Ty.apply_no_renaming subst (ity.Ind_ty.ty_pattern,scope) in
+      let ty = Subst.Ty.apply Subst.Renaming.none subst (ity.Ind_ty.ty_pattern,scope) in
       decl_sub ty
     ) else (
       (* inner nodes or base cases: constructors *)
@@ -195,7 +195,7 @@ let make_coverset_ ~cover_set_depth ~depth (ty:Type.t)(ity:Ind_ty.t) : t =
         List.map
           (fun v ->
              let v = Type.var v in
-             Subst.Ty.apply_no_renaming subst (v,scope))
+             Subst.Ty.apply Subst.Renaming.none subst (v,scope))
           ity.Ind_ty.ty_vars
       in
       let ty_f_applied = Type.apply ty_f ty_params in

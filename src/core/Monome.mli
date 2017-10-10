@@ -107,19 +107,13 @@ val split : 'a t -> 'a t * 'a t
     @return [m1, m2] such that [m = m1 - m2] and [m1,m2] both have positive
       coefficients *)
 
-val apply_subst : renaming:Subst.Renaming.t ->
-  Subst.t -> 'a t Scoped.t -> 'a t
+val apply_subst : Subst.Renaming.t -> Subst.t -> 'a t Scoped.t -> 'a t
 (** Apply a substitution to the monome's terms.
     This does not preserve positions in the monome. *)
 
-val apply_subst_no_simp : renaming:Subst.Renaming.t ->
-  Subst.t -> 'a t Scoped.t -> 'a t
+val apply_subst_no_simp : Subst.Renaming.t -> Subst.t -> 'a t Scoped.t -> 'a t
 (** Apply a substitution to the monome's terms, without renormalizing.
     This preserves positions. *)
-
-val apply_subst_no_renaming : Subst.t -> 'a t Scoped.t -> 'a t
-(** Apply a substitution but doesn't rename free variables. Careful
-    with the collisions *)
 
 val variant : ?subst:Subst.t -> 'a t Scoped.t -> 'a t Scoped.t -> Subst.t Sequence.t
 
@@ -201,14 +195,9 @@ module Focus : sig
   (** Fold on terms of the given monome, focusing on them one by one,
       along with the position of the focused term *)
 
-  val apply_subst : renaming:Subst.Renaming.t ->
-    Subst.t -> 'a t Scoped.t -> 'a t
+  val apply_subst : Subst.Renaming.t -> Subst.t -> 'a t Scoped.t -> 'a t
   (** Apply a substitution. This can modify the set of terms in [rest]
       because some of them may become equal to the focused term. *)
-
-  val apply_subst_no_renaming : Subst.t -> 'a t Scoped.t -> 'a t
-  (** Apply a substitution but doesn't rename free variables. Careful
-      with the collisions *)
 
   (** Here we don't unify full (focused) monomes together, but only the
       focused part (and possibly some unfocused terms too) together.

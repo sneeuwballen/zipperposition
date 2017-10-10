@@ -124,7 +124,8 @@ module type S = sig
   (** Obtain the pair [conclusion, step] *)
 
   val proof_parent : t -> Proof.Parent.t
-  val proof_parent_subst : t Scoped.t -> Subst.t -> Proof.Parent.t
+
+  val proof_parent_subst : Subst.Renaming.t -> t Scoped.t -> Subst.t -> Proof.Parent.t
 
   val update_proof : t -> (proof_step -> proof_step) -> t
   (** [update_proof c f] creates a new clause that is

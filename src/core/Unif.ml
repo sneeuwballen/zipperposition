@@ -423,13 +423,13 @@ module Inner = struct
       subst
 
   (* delay pair, closing it if necessary *)
-  let delay ~bvars subst t1 sc1 t2 sc2 =
+  let delay ~bvars ~tags subst t1 sc1 t2 sc2 =
     if T.equal t1 t2 && sc1=sc2 then subst (* trivial *)
     else (
       let u1 = T.fun_l (env_l_dense bvars.B_vars.left |> List.rev) t1 in
       let u2 = T.fun_l (env_l_dense bvars.B_vars.right |> List.rev) t2 in
       if T.DB.closed u1 && T.DB.closed u2 then (
-        US.add_constr (Unif_constr.make (u1,sc1)(u2,sc2)) subst
+        US.add_constr (Unif_constr.make ~tags (u1,sc1)(u2,sc2)) subst
       ) else (
         fail()
       )
@@ -484,7 +484,10 @@ module Inner = struct
         if ID.equal f g
         then subst
         else if op=O_unify && not root && has_non_unifiable_type_or_is_prop t1
-        then US.add_constr (Unif_constr.make (t1,sc1)(t2,sc2)) subst
+        then (
+          let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
+          US.add_constr (Unif_constr.make ~tags (t1,sc1)(t2,sc2)) subst
+        )
         else raise Fail
       | T.App ({T.term=T.Const id1; _}, l1),
         T.App ({T.term=T.Const id2; _}, l2) ->
@@ -497,7 +500,8 @@ module Inner = struct
         ) else if op=O_unify && not root && has_non_unifiable_type_or_is_prop t1 then (
           (* TODO: notion of value, here, to fail fast in some cases.
              e.g.  [a + 1 = a] should fail immediately *)
-          delay()
+          let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
+          delay ~tags ()
         ) else fail()
       | T.App ({T.term=(T.Var _ | T.DB _ | T.Bind (Binder.Lambda, _, _)); _}, _), _
       | _, T.App ({T.term=(T.Var _ | T.DB _ | T.Bind (Binder.Lambda, _, _)); _}, _)
@@ -543,7 +547,7 @@ module Inner = struct
           subst (t1',sc1) (t2',sc2)
       | T.Bind ((Binder.Forall | Binder.Exists), _, _), _
       | _, T.Bind ((Binder.Forall | Binder.Exists), _, _) ->
-        delay() (* cannot unify non-atomic propositions, so delay *)
+        delay ~tags:[] () (* cannot unify non-atomic propositions, so delay *)
       | T.AppBuiltin (Builtin.Int n1,[]),
         T.AppBuiltin (Builtin.Int n2,[]) ->
         if Z.equal n1 n2 then subst else raise Fail (* int equality *)
@@ -554,7 +558,8 @@ module Inner = struct
       | T.AppBuiltin (Builtin.False, _), _ ->
         if T.equal t1 t2 then subst else raise Fail (* boolean equality *)
       | _ when op=O_unify && not root && has_non_unifiable_type_or_is_prop t1 ->
-        delay() (* push pair as a constraint, because of typing. *)
+        let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
+        delay ~tags () (* push pair as a constraint, because of typing. *)
       | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Builtin.equal s1 s2 ->
         (* try to unify/match builtins pairwise *)
         unif_list ~op ~bvars subst l1 sc1 l2 sc2
@@ -621,7 +626,8 @@ module Inner = struct
         (* just unify subterms pairwise *)
         unif_list ~op ~bvars subst l1 scope l2 scope
       ) else if op=O_unify && not root && has_non_unifiable_type_or_is_prop t1 then (
-        delay()
+        let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
+        delay ~tags ()
       ) else fail()
     in
     begin match T.view f1, T.view f2 with
@@ -669,7 +675,10 @@ module Inner = struct
         (* first-order applications *)
         if ID.equal id1 id2 then same_rigid_head()
         else if op=O_unify && not root && has_non_unifiable_type_or_is_prop t1
-        then delay() (* push pair as a constraint, because of typing. *)
+        then (
+          let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
+          delay ~tags () (* push pair as a constraint, because of typing. *)
+        )
         else fail()
       | T.DB i1, T.DB i2 ->
         if i1=i2 then same_rigid_head() else fail()

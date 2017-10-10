@@ -131,6 +131,8 @@ module Ctx = struct
     (* what to do when we meet an undefined symbol *)
     on_shadow: [`Warn | `Ignore];
     (* what to do when an identifier is re-declared *)
+    implicit_ty_args: bool;
+    (* add implicit type arguments in applications? *)
     mutable new_metas: T.meta_var list;
     (* variables that should be generalized in the global scope
        or bound to [default], if they are not bound *)
@@ -146,6 +148,7 @@ module Ctx = struct
       ?(def_as_rewrite=true) ?(default=T.Ty.term)
       ?(on_var=`Infer) ?(on_undef=`Guess)
       ?(on_shadow=`Warn)
+      ~implicit_ty_args
       () =
     let ctx = {
       default;
@@ -153,6 +156,7 @@ module Ctx = struct
       on_var;
       on_undef;
       on_shadow;
+      implicit_ty_args;
       env = Hashtbl.create 32;
       datatypes = ID.Tbl.create 32;
       new_metas=[];
@@ -437,14 +441,16 @@ let infer_ty ctx ty =
   with e -> Err.of_exn_trace e
 
 (* add type variables if needed, to apply [some_fun:ty_fun] to [l] *)
-let add_implicit_params ty_fun l =
-  let tyvars, args, _ = T.Ty.unfold ty_fun in
-  let l' =
-    if List.length l = List.length args
-    then List.map (fun _ -> PT.wildcard) tyvars
-    else []
-  in
-  l'@l
+let add_implicit_params ctx ty_fun l =
+  if ctx.Ctx.implicit_ty_args then (
+    let tyvars, args, _ = T.Ty.unfold ty_fun in
+    let l' =
+      if List.length l = List.length args
+      then List.map (fun _ -> PT.wildcard) tyvars
+      else []
+    in
+    l'@l
+  ) else l
 
 let mk_metas ctx n =
   CCList.init n
@@ -468,21 +474,23 @@ let rec infer_rec ?loc ctx t =
         | `Var v -> T.var v
         | `ID (id, ty_id) ->
           (* implicit parameters, e.g. for [nil] *)
-          let l = add_implicit_params ty_id [] |> List.map (infer_rec ?loc ctx) in
+          let l =
+            add_implicit_params ctx ty_id [] |> List.map (infer_rec ?loc ctx)
+          in
           let ty = apply_unify ctx ?loc ~allow_open:true ty_id l in
           T.app ?loc ~ty (T.const ?loc ~ty:ty_id id) l
       end
     | PT.Const s ->
       let id, ty_id = Ctx.get_id_ ?loc ~arity:0 ctx s in
       (* implicit parameters, e.g. for [nil] *)
-      let l = add_implicit_params ty_id [] |> List.map (infer_rec ?loc ctx) in
+      let l = add_implicit_params ctx ty_id [] |> List.map (infer_rec ?loc ctx) in
       let ty = apply_unify ctx ?loc ~allow_open:true ty_id l in
       T.app ?loc ~ty (T.const ?loc ~ty:ty_id id) l
     | PT.App ({PT.term=PT.Var v; _}, l) ->
       begin match Ctx.get_var_ ?loc ctx v with
         | `ID (id,ty) -> infer_app ?loc ctx id ty l
         | `Var v ->
-          let l = add_implicit_params (Var.ty v) l in
+          let l = add_implicit_params ctx (Var.ty v) l in
           (* infer types for arguments *)
           let l = List.map (infer_rec ?loc ctx) l in
           Util.debugf ~section 5 "@[<2>apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]"
@@ -670,7 +678,7 @@ let rec infer_rec ?loc ctx t =
   t'
 
 and infer_app ?loc ctx id ty_id l =
-  let l = add_implicit_params ty_id l in
+  let l = add_implicit_params ctx ty_id l in
   (* infer types for arguments *)
   let l = List.map (infer_rec ?loc ctx) l in
   Util.debugf ~section 5 "@[<2>apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]"
@@ -853,7 +861,7 @@ let check_vars_eqn ?loc bound lhs rhs =
    or [forall vars. lhs <=> rhs]
    @return [id, ty, args, rhs] or [lhs,rhs]
    @param bound the set of bound variables so far *)
-let rec as_def ?loc bound t =
+let rec as_def ?loc ?of_ bound t =
   let fail() =
     error_ ?loc "expected `forall <vars>. <lhs> =/<=> <rhs>`"
   and yield_term id ty args rhs =
@@ -864,7 +872,21 @@ let rec as_def ?loc bound t =
       |> Var.Set.to_list
       |> T.sort_ty_vars_first
     in
-    `Term (vars, id, ty, args, rhs)
+    (* check that we talk about the same ID *)
+    begin match of_ with
+      | Some id' when not (ID.equal id id') ->
+        error_ ?loc
+          "rule `%a`@ for `%a` has head symbol `%a`@ \
+           every rule in the definition of `%a` \
+           must start with `%a`"
+          T.pp t ID.pp id ID.pp id' ID.pp id ID.pp id;
+      | _ -> ()
+    end;
+    if T.Ty.returns_tType ty then (
+      error_ ?loc
+        "in definition of %a,@ equality between types is forbidden" ID.pp id;
+    );
+    Stmt.Def_term {vars;id;ty;args;rhs;as_form=t}
   and yield_prop lhs rhs pol =
     let vars =
       SLiteral.to_seq lhs
@@ -873,7 +895,19 @@ let rec as_def ?loc bound t =
       |> Var.Set.to_list
       |> T.sort_ty_vars_first
     in
-    `Prop (vars, lhs, rhs, pol)
+    assert (T.Ty.is_prop (T.ty_exn rhs));
+    begin match lhs with
+      | SLiteral.Atom (t,_) ->
+        begin match T.head t, of_ with
+          | Some id, Some id' when not (ID.equal id' id) ->
+            error_ ?loc
+              "rule `%a`@ must have `%a` as head symbol, not `%a`"
+              T.pp t ID.pp id' ID.pp id
+          | _ -> ()
+        end
+      | _ -> ()
+    end;
+    Stmt.Def_form {vars;lhs;rhs=[rhs];polarity=pol;as_form=[t]}
   in
   begin match T.view t with
     | T.Bind (Binder.Forall, v, t) ->
@@ -937,31 +971,7 @@ let infer_defs ?loc ctx (l:A.def list): (_,_,_) Stmt.def list =
          List.map
            (fun r ->
               let r = infer_prop_exn ctx r in
-              begin match as_def ?loc Var.Set.empty r with
-                | `Term (vars,id',_,args,rhs) ->
-                  (* check that we talk about the same ID *)
-                  if not (ID.equal id id') then (
-                    error_ ?loc
-                      "rule `%a`@ for `%a` has head symbol `%a`@ \
-                       every rule in the definition of `%a` \
-                       must start with `%a`"
-                      T.pp r ID.pp id ID.pp id' ID.pp id ID.pp id;
-                  );
-                  Stmt.Def_term (vars,id,ty,args,rhs)
-                | `Prop (vars,lhs,rhs,pol) ->
-                  assert (T.Ty.is_prop (T.ty_exn rhs));
-                  let ok = match lhs with
-                    | SLiteral.Atom (t,_) ->
-                      T.head t |> CCOpt.map_or (ID.equal id) ~default:false
-                    | _ -> false
-                  in
-                  if not ok then (
-                    error_ ?loc
-                      "rule `%a`@ must have `%a` as head symbol"
-                      T.pp r ID.pp id
-                  );
-                  Stmt.Def_form (vars,lhs,[rhs],pol)
-              end)
+              as_def ?loc ~of_:id Var.Set.empty r)
            rules
        in
        Stmt.mk_def ~rewrite:ctx.Ctx.def_as_rewrite id ty rules)
@@ -1013,17 +1023,8 @@ let infer_statement_exn ?(file="<no file>") ctx st =
       Stmt.def ~attrs ~proof:(Proof.Step.intro src Proof.R_def) l
     | A.Rewrite t ->
       let t =  infer_prop_ ctx t in
-      begin match as_def ?loc Var.Set.empty t with
-        | `Term (vars,id,ty,args,rhs) ->
-          if T.Ty.returns_tType ty then (
-            error_ ?loc
-              "in definition of %a,@ equality between types is forbidden" ID.pp id;
-          );
-          Stmt.rewrite_term ~proof:(Proof.Step.intro src Proof.R_def) (vars,id,ty,args,rhs)
-        | `Prop (vars,lhs,rhs,pol) ->
-          assert (T.Ty.is_prop (T.ty_exn rhs));
-          Stmt.rewrite_form ~attrs ~proof:(Proof.Step.intro src Proof.R_def) (vars,lhs,[rhs],pol)
-      end
+      let def = as_def ?loc Var.Set.empty t in
+      Stmt.rewrite ~proof:(Proof.Step.intro src Proof.R_def) def
     | A.Data l ->
       (* declare the inductive types *)
       let data_types =
@@ -1111,9 +1112,12 @@ let infer_statement_exn ?(file="<no file>") ctx st =
   in
   st, aux
 
-let infer_statements_exn ?def_as_rewrite ?on_var ?on_undef ?on_shadow ?ctx ?file seq =
+let infer_statements_exn
+    ?def_as_rewrite ?on_var ?on_undef ?on_shadow
+    ?ctx ?file ~implicit_ty_args seq =
   let ctx = match ctx with
-    | None -> Ctx.create ?def_as_rewrite ?on_var ?on_undef ?on_shadow ()
+    | None ->
+      Ctx.create ?def_as_rewrite ?on_var ?on_undef ?on_shadow ~implicit_ty_args ()
     | Some c -> c
   in
   let res = CCVector.create () in
@@ -1126,8 +1130,12 @@ let infer_statements_exn ?def_as_rewrite ?on_var ?on_undef ?on_shadow ?ctx ?file
     seq;
   CCVector.freeze res
 
-let infer_statements ?def_as_rewrite ?on_var ?on_undef ?on_shadow ?ctx ?file seq =
-  try Err.return
-        (infer_statements_exn ?def_as_rewrite ?on_var ?on_undef ?on_shadow ?ctx ?file seq)
+let infer_statements
+    ?def_as_rewrite ?on_var ?on_undef ?on_shadow
+    ?ctx ?file ~implicit_ty_args seq =
+  try
+    Err.return
+      (infer_statements_exn ?def_as_rewrite ?on_var ?on_undef
+         ?on_shadow ?ctx ?file ~implicit_ty_args seq)
   with e -> Err.of_exn_trace e
 

@@ -141,7 +141,7 @@ let pp_error_prefix out () = Format.fprintf out "@{<Red>Error@}: "
 
 let err_spf fmt =
   Fmt.ksprintf fmt
-    ~f:(fun s -> Fmt.sprintf "@[<2>%a%s@]" pp_error_prefix () s)
+    ~f:(fun s -> Fmt.sprintf "@[%a@,%s@]" pp_error_prefix () s)
 
 
 let warn_fmt_ = Format.err_formatter
@@ -160,7 +160,7 @@ let () =
   Printexc.register_printer
     (function
       | Error (where,msg) ->
-        Some (err_spf "@[<2>error in %s:@ %s@]" where msg)
+        Some (err_spf "error in %s:@ %s" where msg)
       | Invalid_argument msg ->
         Some (err_spf "@[<2>invalid_argument: %s@]" msg)
       | _ -> None)
@@ -409,6 +409,19 @@ let failwithf msg = Fmt.ksprintf msg ~f:failwith
 
 module Int_map = CCMap.Make(CCInt)
 module Int_set = CCSet.Make(CCInt)
+
+let escape_dot s =
+  let b = Buffer.create (String.length s + 5) in
+  String.iter
+    (fun c ->
+       begin match c with
+         | '|' | '\\' | '{' | '}' | '<' | '>' | '"' ->
+           Buffer.add_char b '\\'; Buffer.add_char b c
+         | '\n' -> Buffer.add_string b "\\l"; (* left justify *)
+         | _ -> Buffer.add_char b c
+       end)
+    s;
+  Buffer.contents b
 
 (** {2 File utils} *)
 
