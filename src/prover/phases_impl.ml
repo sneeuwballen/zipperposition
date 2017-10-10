@@ -288,7 +288,7 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
   and timeout = if Env.params.param_timeout = 0.
     then None
     else (
-      Util.debugf ~section 1 "run for %.2f s" (fun k->k Env.params.param_timeout);
+      Util.debugf ~section 1 "run for %.3f s" (fun k->k Env.params.param_timeout);
       (* FIXME: only do that for zipperposition, not the library? *)
       ignore (setup_alarm Env.params.param_timeout);
       Some (Util.total_time_s () +. Env.params.param_timeout -. 0.25)
@@ -300,7 +300,7 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
     | _ -> Sat.given_clause ~generating:true ?steps ?timeout ()
   in
   let comment = Options.comment() in
-  Format.printf "%sdone %d iterations in %.2fs@." comment num (Util.total_time_s());
+  Format.printf "%sdone %d iterations in %.3fs@." comment num (Util.total_time_s());
   Util.debugf ~section 1 "@[<2>final precedence:@ @[%a@]@]"
     (fun k->k Precedence.pp (Env.precedence ()));
   Phases.return_phase result
@@ -461,7 +461,7 @@ let check res =
       let start = Util.total_time_s () in
       let res, stats = LLProof_check.check p' in
       let stop = Util.total_time_s () in
-      Format.printf "%s(@[<h>proof_check@ :res %a@ :stats %a :time %.2fs@])@."
+      Format.printf "%s(@[<h>proof_check@ :res %a@ :stats %a :time %.3fs@])@."
         comment LLProof_check.pp_res res LLProof_check.pp_stats stats (stop-.start);
       if res = LLProof_check.R_fail then 15 else 0
     | _ -> 0

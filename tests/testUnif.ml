@@ -15,7 +15,7 @@ module Q = QCheck
 (** {2 Unit Tests} *)
 
 let psterm, pstmt, pstmt_l, clear_scope, unif_ty =
-  let tyctx = TypeInference.Ctx.create () in
+  let tyctx = TypeInference.Ctx.create ~implicit_ty_args:true () in
   let pt s =
     let t = Parse_zf.parse_term Lex_zf.token (Lexing.from_string s) in
     let t = TypeInference.infer_exn tyctx t in
@@ -28,7 +28,9 @@ let psterm, pstmt, pstmt_l, clear_scope, unif_ty =
     t
   and pst_l s =
     let l = Parse_zf.parse_statement_list Lex_zf.token (Lexing.from_string s) in
-    let l = TypeInference.infer_statements_exn ~on_var:`Default ~ctx:tyctx (Sequence.of_list l) in
+    let l = TypeInference.infer_statements_exn
+        ~on_var:`Default ~ctx:tyctx ~implicit_ty_args:true
+        (Sequence.of_list l) in
     (* TypeInference.Ctx.exit_scope tyctx; *)
     CCVector.to_list l
   and unif_ty t u =
