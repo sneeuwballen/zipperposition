@@ -76,6 +76,7 @@ end = struct
       let subterms t = match T.view t with
         | T.App (f, a) -> [f;a]
         | T.Arrow (a,b) -> [a;b]
+        | T.AppBuiltin (Builtin.Box_opaque, _) -> []  (* simple equality *)
         | T.AppBuiltin (_,l) -> l
         | T.Ite (a,b,c) -> [a;b;c]
         | T.Bind {body;_} -> [body]
