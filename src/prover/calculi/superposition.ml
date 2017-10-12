@@ -286,7 +286,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             |> Sequence.map
               (fun l ->
                  Lit.apply_subst renaming
-                   (Unif.FO.bind subst (fresh_var, info.scope_passive) (replacement',2))
+                   (Unif.FO.bind subst (fresh_var, info.scope_passive) (replacement', info.scope_active))
                    (l, info.scope_passive)
               )
             (* apply subst (which ignores fresh_var) and replace fresh_var by replacement',
