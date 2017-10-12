@@ -92,7 +92,7 @@ module Make(E : Env.S) : S with module Env = E = struct
          begin match subst with
            | Some (subst,_) ->
              let skolems =
-               List.rev_map
+               List.map
                  (fun t -> Subst.FO.apply Subst.Renaming.none subst (t,0))
                  skolems
              in
