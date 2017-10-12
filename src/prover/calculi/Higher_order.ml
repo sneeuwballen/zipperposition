@@ -29,6 +29,7 @@ let prof_ho_unif = Util.mk_profiler "ho.unif"
 
 let _purify_applied_vars = ref false
 let _general_ext_pos = ref false
+let _ext_pos = ref true
 let _ext_axiom = ref false
 
 module type S = sig
@@ -701,10 +702,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       Env.add_unary_inf "ho_complete_eq" complete_eq_args;
       Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
       Env.add_lit_rule "ho_ext_neg" ext_neg;
-      if !_general_ext_pos then (
+      if !_ext_pos && !_general_ext_pos then (
         Env.add_unary_inf "ho_ext_pos_general" ext_pos_general
       )
-      else (
+      else if !_ext_pos then (
         Env.add_unary_inf "ho_ext_pos" ext_pos
       );
       Env.add_rewrite_rule "beta_reduce" beta_reduce;
@@ -816,6 +817,7 @@ let () =
       "--ho-eta", eta_opt, " eta-expansion/reduction";
       "--ho-purify", Arg.Set _purify_applied_vars, " enable purification of applied variables";
       "--ho-general-ext-pos", Arg.Set _general_ext_pos, " enable general positive extensionality rule";
-      "--ho-ext-axiom", Arg.Set _ext_axiom, " enable extensionality axiom"
+      "--ho-ext-axiom", Arg.Set _ext_axiom, " enable extensionality axiom";
+      "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule"
     ];
   Extensions.register extension;
