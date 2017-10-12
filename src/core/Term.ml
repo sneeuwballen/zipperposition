@@ -412,11 +412,12 @@ let all_positions ?(vars=false) ?(ty_args=true) ?(pos=Position.stop) t f =
       if ty_args || not (Type.is_tType (ty t)) then (
         f (PW.make t (PB.to_pos pb));
       );
+      let invi i = List.length tl - 1 - i in
       List.iteri
         (fun i t' ->
            (* if [t'] is a type parameter and [not ty_args], ignore *)
            if ty_args || not (Type.is_tType (ty t'))
-           then aux (PB.arg i pb) t')
+           then aux (PB.arg (invi i) pb) t')
         tl
   in
   aux (PB.of_pos pos) t

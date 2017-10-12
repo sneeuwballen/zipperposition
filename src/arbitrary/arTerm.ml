@@ -215,7 +215,7 @@ let pos t =
       | T.DB _ -> PB.to_pos pb
       | T.AppBuiltin (_, l)
       | T.App (_, l) ->
-        oneof (stop :: List.mapi (fun i t' -> recurse t' (PB.arg i pb)) l) st
+        oneof (stop :: List.mapi (fun i t' -> recurse t' (PB.arg (List.length l - 1 - i) pb)) l) st
       | T.Fun (_,bod) ->
         oneof [stop; recurse bod (PB.body pb)] st
   in
