@@ -133,7 +133,7 @@ module Pos = struct
     | P.Stop -> bad_pos f p
     | P.Arg (n,p') ->
       let cs = cs f in
-      if n<0 || n>= List.length cs then bad_pos f p;
+      if n<0 || n >= List.length cs then bad_pos f p;
       List.nth cs n, p'
     | _ -> bad_pos f p
 

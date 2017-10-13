@@ -571,7 +571,7 @@ module Pos = struct
     | Bind(_, _, t'), P.Body subpos -> at t' subpos
     | App (t, _), P.Head subpos -> at t subpos
     | App (_, l), P.Arg (n,subpos) when n < List.length l ->
-      at (List.nth l (List.length l - 1- n)) subpos
+      at (List.nth l (List.length l - 1 - n)) subpos
     | AppBuiltin (_, l), P.Arg(n,subpos) when n < List.length l ->
       at (List.nth l (List.length l - 1 - n)) subpos
     | _ -> fail_ t pos

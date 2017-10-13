@@ -673,14 +673,15 @@ module Make
       begin match T_view.view t with
         | T_view.T_app_defined (_, c, l) ->
           let d_pos = RW.Defined_cst.defined_positions c in
-          assert (IArray.length d_pos >= List.length l);
+          let len = IArray.length d_pos in
+          assert (len >= List.length l);
           (* only look under active positions *)
           List.iteri
             (fun i u ->
                let d = IArray.get d_pos i in
                aux
                  (defined_path_add dp d)
-                 Position.(append p @@ arg i @@ stop)
+                 Position.(append p @@ arg (len-i-1) @@ stop)
                  u k)
             l
         | T_view.T_var _ | T_view.T_db _ -> ()
@@ -688,8 +689,9 @@ module Make
         | T_view.T_app_unin (_,l) (* approx, we assume all positions are active *)
         | T_view.T_builtin (_,l) ->
           let dp = defined_path_add dp Defined_pos.P_active in
+          let len = List.length l in
           List.iteri
-            (fun i u -> aux dp Position.(append p @@ arg i @@ stop) u k)
+            (fun i u -> aux dp Position.(append p @@ arg (len-i-1) @@ stop) u k)
             l
         | T_view.T_fun (_,u) ->
           let dp = defined_path_add dp Defined_pos.P_invariant in
@@ -698,8 +700,9 @@ module Make
           let dp = match dp with
             | P_inactive -> P_inactive | _ -> P_under_cstor
           in
+          let len = List.length l in
           List.iteri
-            (fun i u -> aux dp Position.(append p @@ arg i @@ stop) u k)
+            (fun i u -> aux dp Position.(append p @@ arg (len-i-1) @@ stop) u k)
             l
       end
     in
@@ -823,8 +826,9 @@ module Make
           let f' = Cut_form.Pos.replace_many f m in
           Util.debugf ~section 5
             "(@[<2>candidate_generalize@ :of %a@ :gen_to %a@ \
-             :by vars_active_pos :on (@[%a@])@])"
-            (fun k->k Cut_form.pp f Cut_form.pp f' (Util.pp_list HVar.pp) vars);
+             :by vars_active_pos :on (@[%a@])@ :map {@[%a@]}@])"
+            (fun k->k Cut_form.pp f Cut_form.pp f' (Util.pp_list HVar.pp) vars
+                (Position.Map.pp Position.pp Term.pp) m);
           if Goal.is_acceptable_goal @@ Goal.of_cut_form f'
           then (
             Util.incr_stat stat_generalize_vars_active_pos;
