@@ -67,6 +67,8 @@
 %token WITH
 %token END
 %token FUN
+%token LET
+%token IN
 
 %token INT
 %token PROP
@@ -296,6 +298,11 @@ term:
     {
       let loc = L.mk_pos $startpos $endpos in
       T.ite ~loc a b c
+    }
+  | LET x=raw_var EQDEF t=term IN u=term
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.let_ ~loc [T.V x,t] u
     }
   | error
     {

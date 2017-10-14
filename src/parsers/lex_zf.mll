@@ -67,6 +67,8 @@ rule token = parse
   | "false" { LOGIC_FALSE }
   | "pi" { PI }
   | "if" { IF }
+  | "let" { LET }
+  | "in" { IN }
   | "then" { THEN }
   | "else" { ELSE }
   | "match" { MATCH }
