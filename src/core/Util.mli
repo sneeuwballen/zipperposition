@@ -194,6 +194,9 @@ val failwithf : ('a, Format.formatter, unit, 'b) format4 -> 'a
 module Int_map : CCMap.S with type key = int
 module Int_set : CCSet.S with type elt = int
 
+val escape_dot : string -> string
+(** String escaping for graphviz *)
+
 (** {2 File utils} *)
 
 type 'a or_error = ('a, string) CCResult.t

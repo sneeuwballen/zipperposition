@@ -61,7 +61,13 @@ module Term : sig
 
   type rule_set = Set.t
 
-  val normalize_term : ?max_steps:int -> term -> term * rule_set
+  (** Set of rules with their instantiation *)
+  module Rule_inst_set : sig
+    include CCSet.S with type elt = rule * Subst.t * Scoped.scope
+    val pp : t CCFormat.printer
+  end
+
+  val normalize_term : ?max_steps:int -> term -> term * Rule_inst_set.t
   (** [normalize t] computes the normal form of [t] w.r.t the set
       of rewrite rules stored in IDs.
       Returns the new term and the set of rules that were used
@@ -101,15 +107,18 @@ module Lit : sig
     val pp : t CCFormat.printer
   end
 
-  val normalize_clause : Literals.t -> (Literals.t list * rule) option
+  val normalize_clause :
+    Literals.t ->
+    (Literals.t list * rule * Subst.t * Scoped.scope *
+       Subst.Renaming.t * Proof.tag list) option
   (** normalize literals of the clause w.r.t. rules, or return [None]
-      if no rule applies *)
+      if no rule applies. The input clause lives in scope 0. *)
 
   val narrow_lit :
     ?subst:Unif_subst.t ->
     scope_rules:Scoped.scope ->
     Literal.t Scoped.t ->
-    (rule * Unif_subst.t) Sequence.t
+    (rule * Unif_subst.t * Proof.tag list) Sequence.t
   (** [narrow_term rules lit] finds the set of rules [(l --> clauses) in rules]
       and substitutions [sigma] such that [sigma(l) = sigma(lit)]
       @param scope_rules used for rules (LEFT) *)
@@ -129,6 +138,13 @@ module Rule : sig
   val pp : t CCFormat.printer
 
   val as_proof : t -> Proof.t
+
+  val lit_as_proof_parent_subst :
+    Subst.Renaming.t -> Subst.t -> Lit.Rule.t Scoped.t -> Proof.parent
+  (** Helper for clause rewriting *)
+
+  val set_as_proof_parents : Term.Rule_inst_set.t -> Proof.parent list
+  (** Proof parents from a set of rules instances *)
 
   val make_lit : proof:Proof.t -> Literal.t -> Literal.t list list -> t
   (** Make a literal rule *)

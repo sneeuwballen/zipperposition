@@ -332,7 +332,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     in
     (* positive clauses *)
     let proof_pos =
-      Proof.Step.simp ~rule:(Proof.Rule.mk "cut") [cut_proof_parent]
+      Proof.Step.esa ~rule:(Proof.Rule.mk "cut") [cut_proof_parent]
     in
     let c_pos =
       List.map
@@ -371,7 +371,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       let g = cut_form c in
       (* proof step *)
       let proof =
-        Proof.Step.simp [cut_proof_parent c] ~rule:(Proof.Rule.mk "cut")
+        Proof.Step.esa [cut_proof_parent c] ~rule:(Proof.Rule.mk "cut")
       in
       let vars = Cut_form.vars g |> T.VarSet.to_list in
       Util.debugf ~section 2
@@ -391,10 +391,10 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       (* for each clause, apply [subst] to it and negate its
           literals, obtaining a DNF of [¬ And_i ctx_i[case]];
           then turn DNF into CNF *)
-      let renaming = Ctx.renaming_clear () in
+      let renaming = Subst.Renaming.create () in
       let clauses =
         begin
-          Cut_form.apply_subst ~renaming subst (g,0)
+          Cut_form.apply_subst renaming subst (g,0)
           |> Cut_form.cs
           |> Util.map_product
             ~f:(fun lits ->
@@ -501,7 +501,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
           (fun c ->
              Proof.Parent.from @@ Proof.S.mk proof_st @@
              SClause.mk_proof_res @@ SClause.make ~trail:Trail.empty c)
-        |> Proof.Step.simp ~rule:(Proof.Rule.mk "lemma")
+        |> Proof.Step.esa ~rule:(Proof.Rule.mk "lemma")
       in
       let cut = introduce_cut ~reason:Fmt.(return "in-input") f proof in
       let all_clauses = cut_res_clauses cut |> Sequence.to_rev_list in

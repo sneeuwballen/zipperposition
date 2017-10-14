@@ -26,10 +26,6 @@ module type S = sig
 
   val select : Selection.t
 
-  val renaming_clear : unit  -> Subst.Renaming.t
-  (** Obtain the global renaming. The renaming is cleared before
-      it is returned. *)
-
   val lost_completeness : unit -> unit
   (** To be called when completeness is not preserved *)
 

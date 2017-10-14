@@ -511,7 +511,8 @@ module Make
           [app "induction"
              (List.map (fun v -> quoted (HVar.to_string_tstp v)) vars)])
       in
-      Proof.Step.inference [proof_parent] ~infos ~rule:(Proof.Rule.mk "induction")
+      Proof.Step.inference [proof_parent]
+        ~infos ~rule:(Proof.Rule.mk "induction") ~tags:[Proof.Tag.T_ind]
     in
     (* other variables -> become skolems *)
     let subst_skolems: Subst.t =
@@ -530,7 +531,7 @@ module Make
     let c_sets =
       List.map
         (fun v ->
-           let ty = Subst.Ty.apply_no_renaming subst_skolems (HVar.ty v,0) in
+           let ty = Subst.Ty.apply Subst.Renaming.none subst_skolems (HVar.ty v,0) in
            v, Cover_set.make ~cover_set_depth ~depth ty)
         vars
     in
@@ -576,8 +577,8 @@ module Make
                     |> List.map (fun (v,t) -> (v,0),(t,1))
                     |> Subst.FO.of_list' ?init:None
                   in
-                  let renaming = Ctx.renaming_clear () in
-                  let g' = Cut_form.apply_subst ~renaming subst (g,0) in
+                  let renaming = Subst.Renaming.create () in
+                  let g' = Cut_form.apply_subst renaming subst (g,0) in
                   Cut_form.cs g'
                   |> List.map
                     (fun lits ->
@@ -597,12 +598,12 @@ module Make
                |> List.map (fun (v,c) -> (v,0),(Cover_set.Case.to_term c,1))
                |> Subst.FO.of_list' ~init:subst_skolems
              in
-             let renaming = Ctx.renaming_clear () in
+             let renaming = Subst.Renaming.create () in
              (* for each clause, apply [subst] to it and negate its
                 literals, obtaining a DNF of [¬ And_i ctx_i[case]];
                 then turn DNF into CNF *)
              begin
-               Cut_form.apply_subst ~renaming subst (g,0)
+               Cut_form.apply_subst renaming subst (g,0)
                |> Cut_form.cs
                |> Util.map_product
                  ~f:(fun lits ->

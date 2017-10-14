@@ -32,16 +32,14 @@ module Make(E : Env_intf.S) = struct
   let simpl_term t =
     let t', rules = RW.Term.normalize_term t in
     if T.equal t t' then (
-      assert (RW.Term.Set.is_empty rules);
+      assert (RW.Term.Rule_inst_set.is_empty rules);
       None
     ) else (
       Util.debugf ~section 2
-        "@[<2>@{<green>rewrite@} `@[%a@]`@ into `@[%a@]`@ :using %a@]"
-        (fun k->k T.pp t T.pp t' RW.Term.Set.pp rules);
+        "@[<2>@{<green>rewrite@} `@[%a@]`@ :into `@[%a@]`@ :using %a@]"
+        (fun k->k T.pp t T.pp t' RW.Term.Rule_inst_set.pp rules);
       let proof =
-        RW.Term.Set.to_seq rules
-        |> Sequence.map (fun r -> RW.Rule.as_proof (RW.T_rule r))
-        |> Sequence.to_rev_list
+        RW.Rule.set_as_proof_parents rules
       in
       Some (t',proof)
     )
@@ -59,19 +57,19 @@ module Make(E : Env_intf.S) = struct
          |> Sequence.map
            (fun (rule,us) ->
               let i, _ = Literals.Pos.cut passive_pos in
-              let renaming = C.Ctx.renaming_clear() in
+              let renaming = Subst.Renaming.create() in
               let subst = Unif_subst.subst us in
-              let c_guard = Literal.of_unif_subst ~renaming us in
+              let c_guard = Literal.of_unif_subst renaming us in
               (* side literals *)
               let lits_passive = C.lits c in
               let lits_passive =
-                Literals.apply_subst ~renaming subst (lits_passive,sc_c) in
+                Literals.apply_subst renaming subst (lits_passive,sc_c) in
               let lits' = CCArray.except_idx lits_passive i in
               (* substitute in rule *)
               let rhs =
-                Subst.FO.apply ~renaming subst (RW.Term.Rule.rhs rule, sc_rule)
+                Subst.FO.apply renaming subst (RW.Term.Rule.rhs rule, sc_rule)
               and lhs =
-                Subst.FO.apply ~renaming subst (RW.Term.Rule.lhs rule, sc_rule)
+                Subst.FO.apply renaming subst (RW.Term.Rule.lhs rule, sc_rule)
               in
               (* literal in which narrowing took place: replace lhs by rhs *)
               let new_lit =
@@ -81,8 +79,9 @@ module Make(E : Env_intf.S) = struct
               Util.incr_stat stat_narrowing_term;
               let proof =
                 Proof.Step.inference
-                  [C.proof_parent_subst (c,0) subst;
-                   Proof.Parent.from @@ RW.Rule.as_proof (RW.T_rule rule)]
+                  [C.proof_parent_subst renaming (c,sc_c) subst;
+                   Proof.Parent.from_subst renaming
+                     (RW.Rule.as_proof (RW.T_rule rule),sc_rule) subst]
                   ~rule:(Proof.Rule.mk "narrow") in
               let c' =
                 C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
@@ -105,11 +104,11 @@ module Make(E : Env_intf.S) = struct
     let lits = C.lits c in
     match RW.Lit.normalize_clause lits with
       | None -> None
-      | Some (clauses,r) ->
+      | Some (clauses,r,subst,sc_r,renaming,tags) ->
         let proof =
-          Proof.Step.simp ~rule:(Proof.Rule.mk "rw_clause")
-            [C.proof_parent c;
-             Proof.Parent.from @@ RW.Rule.as_proof @@ RW.L_rule r]
+          Proof.Step.simp ~rule:(Proof.Rule.mk "rw_clause") ~tags
+            [C.proof_parent_subst renaming (c,0) subst;
+             RW.Rule.lit_as_proof_parent_subst renaming subst (r,sc_r)]
         in
         let clauses =
           List.map
@@ -130,15 +129,16 @@ module Make(E : Env_intf.S) = struct
       (fun acc (lit,i) ->
          RW.Lit.narrow_lit ~scope_rules:1 (lit,0)
          |> Sequence.fold
-           (fun acc (rule,us) ->
+           (fun acc (rule,us,tags) ->
               let subst = Unif_subst.subst us in
-              let renaming = E.Ctx.renaming_clear () in
-              let c_guard = Literal.of_unif_subst ~renaming us in
+              let renaming = Subst.Renaming.create () in
+              let c_guard = Literal.of_unif_subst renaming us in
               let proof =
                 Proof.Step.inference
-                  [C.proof_parent_subst (c,0) subst;
-                   Proof.Parent.from @@ RW.Rule.as_proof (RW.L_rule rule)]
-                  ~rule:(Proof.Rule.mk "narrow_clause") in
+                  [C.proof_parent_subst renaming (c,0) subst;
+                   Proof.Parent.from_subst renaming
+                     (RW.Rule.as_proof (RW.L_rule rule),1) subst]
+                  ~rule:(Proof.Rule.mk "narrow_clause") ~tags in
               let lits' = CCArray.except_idx lits i in
               (* create new clauses that correspond to replacing [lit]
                  by [rule.rhs] *)
@@ -147,8 +147,8 @@ module Make(E : Env_intf.S) = struct
                   (fun c' ->
                      let new_lits =
                        c_guard
-                       @ Literal.apply_subst_list ~renaming subst (lits',0)
-                       @ Literal.apply_subst_list ~renaming subst (c',1)
+                       @ Literal.apply_subst_list renaming subst (lits',0)
+                       @ Literal.apply_subst_list renaming subst (c',1)
                      in
                      C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof)
                   (RW.Lit.Rule.rhs rule)
@@ -207,15 +207,15 @@ module Make(E : Env_intf.S) = struct
     let sc_a = 1 and sc_p = 0 in
     (* do narrowing inside this rule? *)
     let do_narrowing rule rule_pos (us:Unif_subst.t) =
-      let rule_clauses =match rule with
+      let rule_clauses = match rule with
         | RW.T_rule r -> [ [| RW.Term.Rule.as_lit r |] ]
         | RW.L_rule r -> RW.Lit.Rule.as_clauses r
       in
-      let renaming = E.Ctx.renaming_clear() in
+      let renaming = Subst.Renaming.create() in
       let subst = Unif_subst.subst us in
-      let c_guard = Literal.of_unif_subst ~renaming us in
-      let s' = Subst.FO.apply ~renaming subst (s,sc_a) in
-      let t' = Subst.FO.apply ~renaming subst (t,sc_a) in
+      let c_guard = Literal.of_unif_subst renaming us in
+      let s' = Subst.FO.apply renaming subst (s,sc_a) in
+      let t' = Subst.FO.apply renaming subst (t,sc_a) in
       if Ordering.compare ord s' t' <> Comparison.Lt then (
         Util.incr_stat stat_ctx_narrowing;
         rule_clauses
@@ -223,7 +223,7 @@ module Make(E : Env_intf.S) = struct
           (fun rule_clause ->
              (* instantiate rule and replace [s'] by [t'] now *)
              let new_lits =
-               Literals.apply_subst ~renaming subst (rule_clause,sc_p)
+               Literals.apply_subst renaming subst (rule_clause,sc_p)
                |> Literals.map (T.replace ~old:s' ~by:t')
                |> Array.to_list
              in
@@ -232,15 +232,16 @@ module Make(E : Env_intf.S) = struct
                | P.Arg (n,_) -> n | _ -> assert false
              in
              let ctx =
-               Literal.apply_subst_list ~renaming subst
+               Literal.apply_subst_list renaming subst
                  (CCArray.except_idx (C.lits c) idx_active, sc_a)
              in
              (* build new clause *)
              let proof =
                Proof.Step.inference
                  ~rule:(Proof.Rule.mk "contextual_narrowing")
-                 [C.proof_parent_subst (c,sc_a) subst;
-                  Proof.Parent.from @@ RW.Rule.as_proof rule]
+                 [C.proof_parent_subst renaming (c,sc_a) subst;
+                  Proof.Parent.from_subst renaming
+                    (RW.Rule.as_proof rule,sc_p) subst]
              in
              (* add some penalty on every inference *)
              let penalty = Array.length (C.lits c) + C.penalty c in
@@ -249,8 +250,8 @@ module Make(E : Env_intf.S) = struct
                  ~trail:(C.trail c) ~penalty
              in
              Util.debugf ~section 4
-               "(@[<2>ctx_narrow@ :rule %a@ :clause %a@ :pos %a@ :subst %a@ :yield %a@])"
-               (fun k->k RW.Rule.pp rule C.pp c P.pp rule_pos Subst.pp subst C.pp new_c);
+               "(@[<2>ctx_narrow@ :rule %a[%d]@ :clause %a[%d]@ :pos %a@ :subst %a@ :yield %a@])"
+               (fun k->k RW.Rule.pp rule sc_p C.pp c sc_a P.pp rule_pos Subst.pp subst C.pp new_c);
              new_c)
         |> CCOpt.return
       ) else None

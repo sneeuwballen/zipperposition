@@ -21,35 +21,30 @@ module M = CCMap.Make(VarInt)
 (** {2 Renaming} *)
 
 module Renaming = struct
-  type snapshot = var M.t
+  type t =
+    | R_none
+    | R_some of {
+        mutable map: var M.t;
+        mutable n: int;
+      }
 
-  type t = {
-    mutable map: snapshot;
-    mutable n: int;
-  }
+  let none = R_none
 
-  let create () = {map=M.empty; n=0}
+  let[@inline] is_none = function R_none -> true | R_some _ -> false
 
-  let clear r =
-    r.map <- M.empty;
-    r.n <- 0
+  let[@inline] create () = R_some {map=M.empty; n=0}
 
   (* rename variable *)
-  let rename r ((v,_) as var) =
-    try
-      M.find var r.map
-    with Not_found ->
-      let v' = HVar.make ~ty:(HVar.ty v) r.n in
-      r.n <- r.n + 1;
-      r.map <- M.add var v' r.map;
-      v'
-
-  let snapshot r = r.map
-
-  let pp_snapshot out (s:snapshot) : unit =
-    let pp_v = Scoped.pp HVar.pp in
-    Format.fprintf out "{@[<hv>%a@]}"
-      (M.pp ~arrow:" → " pp_v HVar.pp) s
+  let rename r ((v,_) as var) = match r with
+    | R_none -> v
+    | R_some r ->
+      try
+        M.find var r.map
+      with Not_found ->
+        let v' = HVar.make ~ty:(HVar.ty v) r.n in
+        r.n <- r.n + 1;
+        r.map <- M.add var v' r.map;
+        v'
 end
 
 (* map from scoped variables, to scoped terms *)
@@ -59,14 +54,14 @@ type subst = t
 
 let empty = M.empty
 
-let is_empty = M.is_empty
+let[@inline] is_empty s = M.is_empty s
 
-let find_exn subst v = M.find v subst
-let find subst v = try Some (M.find v subst) with Not_found -> None
+let[@inline] find_exn subst v = M.find v subst
+let[@inline] find subst v = try Some (M.find v subst) with Not_found -> None
 
-let mem subst v = M.mem v subst
+let[@inline] mem subst v = M.mem v subst
 
-let rec deref subst ((t,sc_t) as term) =
+let[@unroll 2] rec deref subst ((t,sc_t) as term) =
   match T.view t with
     | T.Var v ->
       begin match find subst (v,sc_t) with
@@ -100,7 +95,7 @@ let bind
     assert (not (M.mem v subst));
     M.add v t subst
 
-let remove subst v = M.remove v subst
+let[@inline] remove subst v = M.remove v subst
 
 let restrict_scope subst sc = M.filter (fun (_,sc_v) _ -> sc=sc_v) subst
 
@@ -173,13 +168,13 @@ let normalize subst : t =
   in
   M.map (fun (t,sc) -> aux sc t, sc) subst
 
-let map f subst = M.map (fun (t,sc) -> f t, sc) subst
+let[@inline] map f subst = M.map (fun (t,sc) -> f t, sc) subst
 
-let filter f subst = M.filter f subst
+let[@inline] filter f subst = M.filter f subst
 
-let to_seq subst k = M.iter (fun v t -> k (v,t)) subst
+let[@inline] to_seq subst k = M.iter (fun v t -> k (v,t)) subst
 
-let to_list subst = M.fold (fun v t acc -> (v,t)::acc) subst []
+let[@inline] to_list subst = M.fold (fun v t acc -> (v,t)::acc) subst []
 
 let of_seq ?(init=empty) seq =
   Sequence.fold (fun subst (v,t) -> bind subst v t) init seq
@@ -189,10 +184,10 @@ let of_list ?(init=empty) l = match l with
   | _::_ ->
     List.fold_left (fun subst (v,t) -> bind subst v t) init l
 
-let equal (s1:t) s2 : bool = M.equal (Scoped.equal T.equal) s1 s2
-let compare s1 s2 = M.compare (Scoped.compare T.compare) s1 s2
+let[@inline] equal (s1:t) s2 : bool = M.equal (Scoped.equal T.equal) s1 s2
+let[@inline] compare s1 s2 = M.compare (Scoped.compare T.compare) s1 s2
 
-let hash (s:t): int =
+let[@inline] hash (s:t): int =
   CCHash.(seq (pair (Scoped.hash HVar.hash) (Scoped.hash T.hash))) (M.to_seq s)
 
 let pp_bindings out subst =
@@ -208,7 +203,7 @@ let to_string = CCFormat.to_string pp
 
 (** {2 Applying a substitution} *)
 
-let apply_aux subst ~f_rename t =
+let[@inline] apply_aux subst ~f_rename t =
   let rec aux (t,sc_t) =
     match T.ty t with
       | T.NoType ->
@@ -268,35 +263,21 @@ let apply_aux subst ~f_rename t =
 
 (* variable not bound by [subst], rename it
    (after specializing its type if needed) *)
-let f_rename_sn ~renaming (v,sc_v) new_ty =
+let f_rename_sn renaming (v,sc_v) new_ty =
   let v = HVar.cast v ~ty:new_ty in
   Renaming.rename renaming (v,sc_v)
 
-let apply subst ~renaming t =
-  (* variable not bound by [subst], rename it
-     (after specializing its type if needed) *)
-  let f_rename ~renaming (v,sc_v) new_ty =
-    let v = HVar.cast v ~ty:new_ty in
-    Renaming.rename renaming (v,sc_v)
-  in
-  apply_aux subst ~f_rename:(f_rename ~renaming) t
-
-let f_rename_no_renaming (v,_) _new_ty = v
-
-let apply_no_renaming subst t =
-  if is_empty subst
-  then fst t
-  else apply_aux subst ~f_rename:f_rename_no_renaming t
-
-let f_rename_snapshot ~snapshot v _new_ty =
-  try M.find v snapshot
-  with Not_found ->
-    Util.errorf ~where:"subst"
-      "(@[apply snapshot failed@ :var %a@ :snapshot %a@])"
-      (Scoped.pp HVar.pp) v Renaming.pp_snapshot snapshot
-
-let apply_snapshot subst ~snapshot t =
-  apply_aux subst ~f_rename:(f_rename_snapshot ~snapshot) t
+let apply renaming subst t =
+  if is_empty subst && Renaming.is_none renaming then fst t
+  else (
+    (* variable not bound by [subst], rename it
+       (after specializing its type if needed) *)
+    let[@inline] f_rename renaming (v,sc_v) new_ty =
+      let v = HVar.cast v ~ty:new_ty in
+      Renaming.rename renaming (v,sc_v)
+    in
+    apply_aux subst ~f_rename:(f_rename renaming) t
+  )
 
 (** {2 Specializations} *)
 
@@ -310,13 +291,9 @@ module type SPECIALIZED = sig
 
   val deref : t -> term Scoped.t -> term Scoped.t
 
-  val apply : t -> renaming:Renaming.t -> term Scoped.t -> term
+  val apply : Renaming.t -> t -> term Scoped.t -> term
   (** Apply the substitution to the given term/type.
       @param renaming used to desambiguate free variables from distinct scopes *)
-
-  val apply_no_renaming : t -> term Scoped.t -> term
-  (** Same as {!apply}, but performs no renaming of free variables.
-      {b Caution}, can entail collisions between scopes! *)
 
   val bind : t -> var Scoped.t -> term Scoped.t -> t
   (** Add [v] -> [t] to the substitution. Both terms have a context.
@@ -341,11 +318,8 @@ module Ty : SPECIALIZED with type term = Type.t = struct
     let t = find_exn subst v in
     Scoped.map Type.of_term_unsafe t
 
-  let apply subst ~renaming t =
-    Type.of_term_unsafe (apply subst ~renaming (t : term Scoped.t :> T.t Scoped.t))
-
-  let apply_no_renaming subst t =
-    Type.of_term_unsafe (apply_no_renaming subst (t : term Scoped.t :> T.t Scoped.t))
+  let apply renaming subst t =
+    Type.of_term_unsafe (apply renaming subst (t : term Scoped.t :> T.t Scoped.t))
 
   let bind = (bind :> t -> var Scoped.t -> term Scoped.t -> t)
   let of_list = (of_list :> ?init:t -> (var Scoped.t * term Scoped.t) list -> t)
@@ -367,14 +341,11 @@ module FO = struct
     let t = find_exn subst v in
     Scoped.map Term.of_term_unsafe t
 
-  let apply subst ~renaming t =
-    Term.of_term_unsafe (apply subst ~renaming (t : term Scoped.t :> T.t Scoped.t))
+  let apply renaming subst t =
+    Term.of_term_unsafe (apply renaming subst (t : term Scoped.t :> T.t Scoped.t))
 
-  let apply_l subst ~renaming (l,sc) =
-    List.map (fun t -> apply subst ~renaming (t,sc)) l
-
-  let apply_no_renaming subst t =
-    Term.of_term_unsafe (apply_no_renaming  subst (t : term Scoped.t :> T.t Scoped.t))
+  let apply_l renaming subst (l,sc) =
+    List.map (fun t -> apply renaming subst (t,sc)) l
 
   let bind = (bind :> t -> var Scoped.t -> term Scoped.t -> t)
   let of_list = (of_list :> ?init:t -> (var Scoped.t * term Scoped.t) list -> t)
@@ -398,48 +369,39 @@ end
 module Projection = struct
   type t = {
     scope: Scoped.scope;
-    bindings: (var * term) list lazy_t;
+    subst: subst;
+    renaming: Renaming.t;
   }
 
-  let scope t = t.scope
-  let bindings t = Lazy.force t.bindings
+  let[@inline] scope t = t.scope
+  let[@inline] subst t = t.subst
+  let[@inline] renaming t = t.renaming
 
   (* actual constructor from a substitution *)
-  let make_real ~f_rename (subst,sc) : t =
-    let bindings = lazy (
-      fold
-        (fun l (v,sc_v) (t,sc_t) ->
-           if sc_v = sc then (
-             let v = f_rename_no_renaming (v,sc_v) (HVar.ty v) in
-             let t = apply_aux ~f_rename subst (t,sc_t) in
-             (v,t) :: l
-           ) else l)
-        [] subst
-    ) in
-    { scope=sc; bindings }
+  let bindings (p:t) : (var * term) list =
+    fold
+      (fun l (v,sc_v) (t,sc_t) ->
+         if sc_v = p.scope then (
+           let t = apply p.renaming p.subst (t,sc_t) in
+           (v,t) :: l
+         ) else l)
+      [] p.subst
 
-  let make ~renaming s : t =
-    let snapshot = Renaming.snapshot renaming in
-    make_real ~f_rename:(f_rename_snapshot ~snapshot) s
+  let as_inst ~ctx (sp:t) (vars:_ HVar.t list) : (_,_) Var.Subst.t =
+    List.map
+      (fun v ->
+         let t_v = Term.var v in
+         let t =
+           FO.apply (renaming sp) (subst sp) ((t_v,scope sp))
+         in
+         Term.Conv.var_to_simple_var ctx v, Term.Conv.to_simple_term ctx t)
+      vars
+    |> Var.Subst.of_list
 
-  let make_no_renaming s : t =
-    make_real ~f_rename:f_rename_no_renaming s
+  let[@inline] make renaming (subst,sc) : t = { scope=sc; subst; renaming; }
 
-  let pp out (p:t) : unit =
-    let pp_p out (v,t) =
-      Format.fprintf out "@[<2>%a@ @<1>→ %a@]" HVar.pp v T.pp t
-    in
-    Format.fprintf out "{@[<hv>%a@]}" (Util.pp_list ~sep:"," pp_p) (bindings p)
+  let[@inline] is_empty (p:t) : bool = is_empty p.subst && Renaming.is_none p.renaming
 
-  type ll_subst = LLProof.subst
-
-  let conv ~ctx p : ll_subst =
-    List.fold_left
-      (fun lsubst (v,t) ->
-         let v = Term.Conv.var_to_simple_var ctx (Type.cast_var_unsafe v) in
-         let t = Term.Conv.to_simple_term ctx (Term.of_term_unsafe t) in
-         assert (not (Var.Subst.mem lsubst v));
-         Var.Subst.add lsubst v t)
-      Var.Subst.empty (bindings p)
+  let pp out (p:t) : unit = Format.fprintf out "%a[%d]" pp p.subst p.scope
 end
 

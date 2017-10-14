@@ -38,6 +38,7 @@ val check :
 val process_files_and_print :
   Params.t ->
   Phases.filename list ->
-  (Phases.errcode, [`LoadExtensions], [`Check_proof]) Phases.t
+  (Phases.errcode, [`LoadExtensions], [`Print_stats]) Phases.t
 (** Process each file in the list successively, printing the results. *)
 
+val print_stats : unit -> (unit, [`Check_proof], [`Print_stats]) Phases.t

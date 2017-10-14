@@ -78,10 +78,10 @@ module Make(X : sig
   type is_trivial_rule = C.t -> bool
   (** Rule that checks whether the clause is trivial (a tautology) *)
 
-  type term_rewrite_rule = Term.t -> (Term.t * Proof.t list) option
+  type term_rewrite_rule = Term.t -> (Term.t * Proof.parent list) option
   (** Rewrite rule on terms *)
 
-  type lit_rewrite_rule = Literal.t -> (Literal.t * Proof.t list) option
+  type lit_rewrite_rule = Literal.t -> (Literal.t * Proof.parent list * Proof.tag list) option
   (** Rewrite rule on literals *)
 
   type multi_simpl_rule = C.t -> C.t list option
@@ -322,7 +322,7 @@ module Make(X : sig
   let rewrite c =
     Util.debugf ~section 5 "@[<2>rewrite clause@ `@[%a@]`...@]" (fun k->k C.pp c);
     let applied_rules = ref StrSet.empty in
-    let proofs = ref [] in
+    let proofs : Proof.parent list ref = ref [] in
     let rec reduce_term rules t =
       match rules with
         | [] -> t
@@ -334,7 +334,7 @@ module Make(X : sig
               proofs := List.rev_append proof !proofs;
               Util.debugf ~section 5
                 "@[<2>rewrite `@[%a@]`@ into `@[%a@]`@ :proof (@[%a@])@]"
-                (fun k->k T.pp t T.pp t' (Util.pp_list Proof.S.pp_normal) proof);
+                (fun k->k T.pp t T.pp t' (Util.pp_list Proof.pp_parent) proof);
               reduce_term !_rewrite_rules t'  (* re-apply all rules *)
           end
     in
@@ -352,7 +352,7 @@ module Make(X : sig
       let rule = Proof.Rule.mk "rw" in
       let proof =
         Proof.Step.simp ~rule
-          (C.proof_parent c :: List.rev_map Proof.Parent.from !proofs)
+          (C.proof_parent c :: !proofs)
       in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
       assert (not (C.equal c c'));
@@ -364,18 +364,20 @@ module Make(X : sig
   (** Apply literal rewrite rules *)
   let rewrite_lits c =
     let applied_rules = ref StrSet.empty in
-    let proofs = ref [] in
+    let proofs : Proof.parent list ref = ref [] in
+    let tags : Proof.tag list ref = ref [] in
     let rec rewrite_lit rules lit = match rules with
       | [] -> lit
       | (name,r)::rules' ->
         match r lit with
           | None -> rewrite_lit rules' lit
-          | Some (lit',proof) ->
+          | Some (lit',proof,tgs) ->
             applied_rules := StrSet.add name !applied_rules;
             proofs := List.rev_append proof !proofs;
+            tags := List.rev_append tgs !tags;
             Util.debugf ~section 5
               "@[rewritten lit `@[%a@]`@ into `@[%a@]`@ (using %s)@ :proof (@[%a@])@]"
-              (fun k->k Lit.pp lit Lit.pp lit' name (Util.pp_list Proof.S.pp_normal) proof);
+              (fun k->k Lit.pp lit Lit.pp lit' name (Util.pp_list Proof.pp_parent) proof);
             rewrite_lit !_lit_rules lit'
     in
     (* apply lit rules *)
@@ -388,8 +390,8 @@ module Make(X : sig
       (* FIXME: put the rules as parameters *)
       let rule = Proof.Rule.mk "rw_lit" in
       let proof =
-        Proof.Step.simp ~rule
-          (C.proof_parent c :: List.rev_map Proof.Parent.from !proofs)
+        Proof.Step.simp ~rule ~tags:!tags
+          (C.proof_parent c :: !proofs)
       in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
       assert (not (C.equal c c'));

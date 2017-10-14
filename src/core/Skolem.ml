@@ -95,7 +95,7 @@ let fresh_skolem_prefix ~ctx ~ty ~vars_count prefix =
   ID.set_payload s (ID.Attr_skolem (kind, vars_count));
   ctx.sc_new_ids <- (s,ty) :: ctx.sc_new_ids;
   ctx.sc_on_new s ty;
-  Util.debugf ~section 3 "@[<2>new skolem symbol %a@ with type @[%a@]@]"
+  Util.debugf ~section 3 "@[<2>new skolem symbol `%a`@ with type `@[%a@]`@]"
     (fun k->k ID.pp s T.pp ty);
   s
 
@@ -174,7 +174,7 @@ let stmt_of_form rw_rules polarity proxy proxy_id proxy_ty form proof =
         | `Pos -> SLiteral.atom_true proxy, `Imply, form
         | `Both -> SLiteral.atom_true proxy, `Equiv, form
       in
-      Stmt.Def_form (vars, lhs, [rhs], polarity)
+      Stmt.Def_form {vars;lhs;rhs=[rhs];polarity;as_form=[form]}
     in
     let proof = proof in
     [Stmt.def ~proof [Stmt.mk_def ~rewrite:true proxy_id proxy_ty [rule]]]
@@ -264,11 +264,21 @@ let define_term ?(pattern="fun_") ~ctx ~parents rules : term_definition =
            |> Var.Set.of_seq |> Var.Set.to_list
          in
          if is_prop
-         then
+         then (
            let atom = T.app ~ty:ty_ret (T.const ~ty id) args in
-           Stmt.Def_form (all_vars, SLiteral.atom atom true, [rhs], `Equiv)
-         else
-           Stmt.Def_term (all_vars, id, ty, args, rhs))
+           Stmt.Def_form {
+             vars=all_vars; lhs=SLiteral.atom atom true;
+             rhs=[rhs]; polarity=`Equiv;
+             as_form=[T.Form.eq atom rhs |> T.Form.close_forall];
+           }
+         ) else (
+           Stmt.Def_term {
+             vars=all_vars;id;ty;args;rhs;
+             as_form=
+               T.Form.eq (T.app (T.const ~ty id) ~ty:(T.ty_exn rhs) args) rhs
+               |> T.Form.close_forall;
+           }
+         ))
       rules
   in
   let td_as_def = Stmt.mk_def ~rewrite:true id ty rules in

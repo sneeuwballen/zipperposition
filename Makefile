@@ -102,7 +102,7 @@ $(TEST_TOOL): check_$(TEST_TOOL)
 
 $(TEST_TOOL)-zipper:
 	@mkdir -p snapshots
-	$(TEST_TOOL) run -p zipperposition -c ./tests/conf.toml \
+	$(TEST_TOOL) run -p zipperposition,zipperposition-check -c ./tests/conf.toml \
 	  --summary snapshots/tip-$(DATE).txt \
 	  --csv snapshots/tip-$(DATE).csv \
 	  $(TEST_OPTS) $(TEST_FILES)
@@ -142,12 +142,12 @@ $(TEST_TOOL)-tptp:
 	@echo "start benchmarks in ${BENCH_DIR}"
 	@mkdir -p snapshots
 	mkdir -p ${BENCH_DIR}
-	cp zipperposition.native hornet.native ${BENCH_DIR}/
+	cp zipperposition.native ${BENCH_DIR}/
 	ln -s ../tptp/ ${BENCH_DIR}/tptp
 	cp data/bench.toml ${BENCH_DIR}/conf.toml
 	cd ${BENCH_DIR} && $(TEST_TOOL) run --meta=`git rev-parse HEAD` \
-	  --summary snapshots/bench-$(DATE).txt \
-	  --csv snapshots/bench-$(DATE).csv \
+	  --summary ../snapshots/bench-$(DATE).txt \
+	  --csv ../snapshots/bench-$(DATE).csv \
 	  -c conf.toml $(TEST_OPTS)
 
 TARBALL=zipperposition.tar.gz

@@ -66,6 +66,7 @@ module Ctx : sig
     ?on_var:[`Default | `Infer] ->
     ?on_undef:[`Warn | `Fail | `Guess] ->
     ?on_shadow:[`Warn | `Ignore] ->
+    implicit_ty_args:bool ->
     unit ->
     t
   (** New context with a signature and default types.
@@ -169,6 +170,7 @@ val infer_statements_exn :
   ?on_shadow:[`Warn | `Ignore] ->
   ?ctx:Ctx.t ->
   ?file:string ->
+  implicit_ty_args:bool ->
   UntypedAST.statement Sequence.t ->
   typed_statement CCVector.ro_vector
 (** Infer all statements
@@ -181,5 +183,6 @@ val infer_statements :
   ?on_shadow:[`Warn | `Ignore] ->
   ?ctx:Ctx.t ->
   ?file:string ->
+  implicit_ty_args:bool ->
   UntypedAST.statement Sequence.t ->
   typed_statement CCVector.ro_vector or_error

@@ -392,7 +392,7 @@ let variant ?(subst=Subst.empty) lit1 lit2 =
 module Subsumption = struct
   (* verify postcondition of [matching] *)
   let _matching_postcond (m1,sc1) (m2,sc2) (subst,c1,c2) =
-    let m1 = M.apply_subst_no_renaming subst (m1,sc1) in
+    let m1 = M.apply_subst Subst.Renaming.none subst (m1,sc1) in
     let m1 = M.product m1 c1
     and m2 = M.product m2 c2 in
     let d = M.difference m1 m2 in
@@ -639,31 +639,22 @@ let subsumes ?(subst=Subst.empty) (lit1,sc1) (lit2, sc2) k =
 let are_variant lit1 lit2 =
   not (Sequence.is_empty (variant (lit1, 0)(lit2, 1)))
 
-let apply_subst ~renaming subst (lit,scope) = match lit with
+let apply_subst renaming subst (lit,scope) = match lit with
   | Binary (op, m1, m2) ->
     make op
-      (M.apply_subst ~renaming subst (m1, scope))
-      (M.apply_subst ~renaming subst (m2, scope))
+      (M.apply_subst renaming subst (m1, scope))
+      (M.apply_subst renaming subst (m2, scope))
   | Divides d ->
     mk_divides ~sign:d.sign d.num ~power:d.power
-      (M.apply_subst ~renaming subst (Scoped.make d.monome scope))
+      (M.apply_subst renaming subst (Scoped.make d.monome scope))
 
-let apply_subst_no_renaming subst (lit,sc) = match lit with
-  | Binary (op, m1, m2) ->
-    make op
-      (M.apply_subst_no_renaming subst (m1,sc))
-      (M.apply_subst_no_renaming subst (m2,sc))
-  | Divides d ->
-    mk_divides ~sign:d.sign d.num ~power:d.power
-      (M.apply_subst_no_renaming subst (d.monome,sc))
-
-let apply_subst_no_simp ~renaming subst (lit,sc) = match lit with
+let apply_subst_no_simp renaming subst (lit,sc) = match lit with
   | Binary (op, m1, m2) ->
     make_no_simp op
-      (M.apply_subst_no_simp ~renaming subst (m1,sc))
-      (M.apply_subst_no_simp ~renaming subst (m2,sc))
+      (M.apply_subst_no_simp renaming subst (m1,sc))
+      (M.apply_subst_no_simp renaming subst (m2,sc))
   | Divides d ->
-    Divides {d with monome=M.apply_subst_no_simp ~renaming subst (d.monome,sc); }
+    Divides {d with monome=M.apply_subst_no_simp renaming subst (d.monome,sc); }
 
 let is_trivial = function
   | Divides d when d.sign && (Z.equal d.num Z.one || d.power = 0) ->
@@ -927,16 +918,10 @@ module Focus = struct
       ~f_m:(fun m -> M.product m z)
       lit
 
-  let apply_subst ~renaming subst (lit,sc) =
+  let apply_subst renaming subst (lit,sc) =
     map_lit
-      ~f_mf:(fun mf -> MF.apply_subst ~renaming subst (mf,sc))
-      ~f_m:(fun m -> M.apply_subst ~renaming subst (m,sc))
-      lit
-
-  let apply_subst_no_renaming subst (lit,sc) =
-    map_lit
-      ~f_mf:(fun mf -> MF.apply_subst_no_renaming subst (mf,sc))
-      ~f_m:(fun m -> M.apply_subst_no_renaming subst (m,sc))
+      ~f_mf:(fun mf -> MF.apply_subst renaming subst (mf,sc))
+      ~f_m:(fun m -> M.apply_subst renaming subst (m,sc))
       lit
 
   let unify ?(subst=Unif_subst.empty) (lit1,sc1) (lit2,sc2) k =
