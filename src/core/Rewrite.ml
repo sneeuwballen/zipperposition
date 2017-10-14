@@ -168,8 +168,9 @@ let compute_pos_gen (l:pseudo_rule list): defined_positions =
                rhs
                |> Sequence.filter_map
                  (fun args' ->
-                    if List.length args' > i
-                    then Some (List.nth args' i)
+                    let len = List.length args' in
+                    if len > i
+                    then Some (List.nth args' (len-i-1))
                     else None)
                |> Sequence.for_all
                  (fun sub -> match T.view sub with
