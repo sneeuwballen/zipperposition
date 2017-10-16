@@ -412,11 +412,13 @@ let all_positions ?(vars=false) ?(ty_args=true) ?(pos=Position.stop) t f =
       if ty_args || not (Type.is_tType (ty t)) then (
         f (PW.make t (PB.to_pos pb));
       );
+      let len = List.length tl in
+      let invi i = len - 1 - i in
       List.iteri
         (fun i t' ->
            (* if [t'] is a type parameter and [not ty_args], ignore *)
            if ty_args || not (Type.is_tType (ty t'))
-           then aux (PB.arg i pb) t')
+           then aux (PB.arg (invi i) pb) t')
         tl
   in
   aux (PB.of_pos pos) t
@@ -716,7 +718,8 @@ module Conv = struct
   type ctx = Type.Conv.ctx
   let create = Type.Conv.create
 
-  let var_to_simple_var = Type.Conv.var_to_simple_var
+  let[@inline] var_to_simple_var ?(prefix="X") ctx v =
+    Type.Conv.var_to_simple_var ~prefix ctx v
 
   let of_simple_term_exn ctx t =
     let tbl = PT.Var_tbl.create 8 in
@@ -780,7 +783,12 @@ module Conv = struct
     let rec to_simple_term env t =
       match view t with
         | Var i -> ST.var (aux_var i)
-        | DB i -> ST.var (DBEnv.find_exn env i)
+        | DB i ->
+          begin
+            try ST.var (DBEnv.find_exn env i)
+            with Failure _ ->
+              Util.errorf ~where:"Term" "cannot find `Y%d`@ @[:in [%a]@]" i (DBEnv.pp Var.pp) env
+          end
         | Const id -> ST.const ~ty:(aux_ty (ty t)) id
         | App (f,l) ->
           ST.app ~ty:(aux_ty (ty t))

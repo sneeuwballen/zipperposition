@@ -1,6 +1,6 @@
 # OASIS_START
-# DO NOT EDIT (digest: 74272c1353c81001338bba09ea6b2da0)
-version = "1.2"
+# DO NOT EDIT (digest: 2a1233420419c19f052a5a15d28754db)
+version = "1.3"
 description =
 "Superposition theorem prover, for first order logic with equality."
 requires = "zarith unix sequence containers containers.data bytes"
@@ -10,7 +10,7 @@ archive(native) = "logtk.cmxa"
 archive(native, plugin) = "logtk.cmxs"
 exists_if = "logtk.cma"
 package "solving" (
- version = "1.2"
+ version = "1.3"
  description =
  "Superposition theorem prover, for first order logic with equality."
  requires = "logtk msat"
@@ -21,11 +21,23 @@ package "solving" (
  exists_if = "logtk_solving.cma"
 )
 
-package "parsers" (
- version = "1.2"
+package "proofs" (
+ version = "1.3"
  description =
  "Superposition theorem prover, for first order logic with equality."
- requires = "logtk tip_parser"
+ requires = "logtk"
+ archive(byte) = "logtk_proofs.cma"
+ archive(byte, plugin) = "logtk_proofs.cma"
+ archive(native) = "logtk_proofs.cmxa"
+ archive(native, plugin) = "logtk_proofs.cmxs"
+ exists_if = "logtk_proofs.cma"
+)
+
+package "parsers" (
+ version = "1.3"
+ description =
+ "Superposition theorem prover, for first order logic with equality."
+ requires = "logtk"
  archive(byte) = "logtk_parsers.cma"
  archive(byte, plugin) = "logtk_parsers.cma"
  archive(native) = "logtk_parsers.cmxa"
@@ -34,7 +46,7 @@ package "parsers" (
 )
 
 package "arbitrary" (
- version = "1.2"
+ version = "1.3"
  description =
  "Superposition theorem prover, for first order logic with equality."
  requires = "logtk qcheck"

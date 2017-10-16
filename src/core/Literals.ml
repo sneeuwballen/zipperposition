@@ -34,19 +34,27 @@ let equal_com lits1 lits2 =
 
 let compare lits1 lits2 = CCArray.compare Lit.compare lits1 lits2
 
+let compare_multiset ~ord (l1:t) (l2:t) : Comparison.t =
+  let module M = Multiset.Make(Literal) in
+  M.compare_partial_l (Literal.Comp.compare ~ord)
+    (Array.to_list l1) (Array.to_list l2)
+
 let hash lits = Hash.array Lit.hash lits
 
 let variant ?(subst=S.empty) (a1,sc1) (a2,sc2) =
-  Unif.unif_array_com ~size:`Same subst (a1,sc1) (a2,sc2)
-    ~op:(fun subst x y -> Lit.variant ~subst x y)
-  |> Sequence.filter Subst.is_renaming
+  Unif.unif_array_com ~size:`Same (subst,[]) (a1,sc1) (a2,sc2)
+    ~op:(fun (subst,t1) x y k ->
+      Lit.variant ~subst x y (fun (s,t2) -> k (s,t1@t2)))
+  |> Sequence.filter (fun (s,_) -> Subst.is_renaming s)
 
 let are_variant a1 a2 =
   not (Sequence.is_empty (variant (Scoped.make a1 0) (Scoped.make a2 1)))
 
 let matching ?(subst=S.empty) ~pattern:(a1,sc1) (a2,sc2) =
-  Unif.unif_array_com ~size:`Same subst (a1,sc1) (a2,sc2)
-    ~op:(fun subst x y -> Lit.matching ~subst ~pattern:x y)
+  Unif.unif_array_com ~size:`Same (subst,[]) (a1,sc1) (a2,sc2)
+    ~op:(fun (subst,t1) x y k ->
+      Lit.matching ~subst ~pattern:x y
+        (fun (s,t2) -> k (s,t1@t2)))
 
 let matches a1 a2 =
   not (Sequence.is_empty (matching ~pattern:(Scoped.make a1 0) (Scoped.make a2 1)))
@@ -71,13 +79,13 @@ let to_form lits =
   Array.to_list lits
 
 (** Apply the substitution to the array of literals, with scope *)
-let apply_subst ~renaming subst (lits,sc) =
+let apply_subst renaming subst (lits,sc) =
   Array.map
-    (fun lit -> Lit.apply_subst ~renaming subst (lit,sc))
+    (fun lit -> Lit.apply_subst renaming subst (lit,sc))
     lits
 
-let of_unif_subst ~renaming s =
-  Literal.of_unif_subst ~renaming s |> Array.of_list
+let of_unif_subst renaming s =
+  Literal.of_unif_subst renaming s |> Array.of_list
 
 let map f lits =
   Array.map (fun lit -> Lit.map f lit) lits

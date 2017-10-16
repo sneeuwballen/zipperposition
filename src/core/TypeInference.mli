@@ -65,6 +65,8 @@ module Ctx : sig
     ?default:type_ ->
     ?on_var:[`Default | `Infer] ->
     ?on_undef:[`Warn | `Fail | `Guess] ->
+    ?on_shadow:[`Warn | `Ignore] ->
+    implicit_ty_args:bool ->
     unit ->
     t
   (** New context with a signature and default types.
@@ -85,7 +87,7 @@ module Ctx : sig
       at creation of the context.
       Some ree variables will be generalized, i.e., kept as (free) variables *)
 
-  val declare : t -> ID.t -> type_ -> unit
+  val declare : ?loc:loc -> t -> ID.t -> type_ -> unit
   (** Declare the type of a symbol, possibly shadowing a previous version  *)
 
   val pop_new_types : t -> (ID.t * type_) list
@@ -152,6 +154,7 @@ val constrain_term_type : ?loc:loc -> Ctx.t -> untyped -> type_ -> unit or_error
 type typed_statement = (typed, typed, type_) Statement.t
 
 val infer_statement_exn :
+  ?file:string ->
   Ctx.t ->
   UntypedAST.statement ->
   typed_statement * typed_statement list
@@ -163,7 +166,10 @@ val infer_statements_exn :
   ?def_as_rewrite:bool ->
   ?on_var:[`Infer | `Default] ->
   ?on_undef:[`Warn | `Fail | `Guess] ->
+  ?on_shadow:[`Warn | `Ignore] ->
   ?ctx:Ctx.t ->
+  ?file:string ->
+  implicit_ty_args:bool ->
   UntypedAST.statement Sequence.t ->
   typed_statement CCVector.ro_vector
 (** Infer all statements
@@ -173,6 +179,9 @@ val infer_statements :
   ?def_as_rewrite:bool ->
   ?on_var:[`Infer | `Default] ->
   ?on_undef:[`Warn | `Fail | `Guess] ->
+  ?on_shadow:[`Warn | `Ignore] ->
   ?ctx:Ctx.t ->
+  ?file:string ->
+  implicit_ty_args:bool ->
   UntypedAST.statement Sequence.t ->
   typed_statement CCVector.ro_vector or_error

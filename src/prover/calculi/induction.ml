@@ -511,7 +511,8 @@ module Make
           [app "induction"
              (List.map (fun v -> quoted (HVar.to_string_tstp v)) vars)])
       in
-      Proof.Step.inference [proof_parent] ~infos ~rule:(Proof.Rule.mk "induction")
+      Proof.Step.inference [proof_parent]
+        ~infos ~rule:(Proof.Rule.mk "induction") ~tags:[Proof.Tag.T_ind]
     in
     (* other variables -> become skolems *)
     let subst_skolems: Subst.t =
@@ -530,7 +531,7 @@ module Make
     let c_sets =
       List.map
         (fun v ->
-           let ty = Subst.Ty.apply_no_renaming subst_skolems (HVar.ty v,0) in
+           let ty = Subst.Ty.apply Subst.Renaming.none subst_skolems (HVar.ty v,0) in
            v, Cover_set.make ~cover_set_depth ~depth ty)
         vars
     in
@@ -576,8 +577,8 @@ module Make
                     |> List.map (fun (v,t) -> (v,0),(t,1))
                     |> Subst.FO.of_list' ?init:None
                   in
-                  let renaming = Ctx.renaming_clear () in
-                  let g' = Cut_form.apply_subst ~renaming subst (g,0) in
+                  let renaming = Subst.Renaming.create () in
+                  let g' = Cut_form.apply_subst renaming subst (g,0) in
                   Cut_form.cs g'
                   |> List.map
                     (fun lits ->
@@ -597,12 +598,12 @@ module Make
                |> List.map (fun (v,c) -> (v,0),(Cover_set.Case.to_term c,1))
                |> Subst.FO.of_list' ~init:subst_skolems
              in
-             let renaming = Ctx.renaming_clear () in
+             let renaming = Subst.Renaming.create () in
              (* for each clause, apply [subst] to it and negate its
                 literals, obtaining a DNF of [¬ And_i ctx_i[case]];
                 then turn DNF into CNF *)
              begin
-               Cut_form.apply_subst ~renaming subst (g,0)
+               Cut_form.apply_subst renaming subst (g,0)
                |> Cut_form.cs
                |> Util.map_product
                  ~f:(fun lits ->
@@ -672,14 +673,15 @@ module Make
       begin match T_view.view t with
         | T_view.T_app_defined (_, c, l) ->
           let d_pos = RW.Defined_cst.defined_positions c in
-          assert (IArray.length d_pos >= List.length l);
+          let len = IArray.length d_pos in
+          assert (len >= List.length l);
           (* only look under active positions *)
           List.iteri
             (fun i u ->
                let d = IArray.get d_pos i in
                aux
                  (defined_path_add dp d)
-                 Position.(append p @@ arg i @@ stop)
+                 Position.(append p @@ arg (len-i-1) @@ stop)
                  u k)
             l
         | T_view.T_var _ | T_view.T_db _ -> ()
@@ -687,8 +689,9 @@ module Make
         | T_view.T_app_unin (_,l) (* approx, we assume all positions are active *)
         | T_view.T_builtin (_,l) ->
           let dp = defined_path_add dp Defined_pos.P_active in
+          let len = List.length l in
           List.iteri
-            (fun i u -> aux dp Position.(append p @@ arg i @@ stop) u k)
+            (fun i u -> aux dp Position.(append p @@ arg (len-i-1) @@ stop) u k)
             l
         | T_view.T_fun (_,u) ->
           let dp = defined_path_add dp Defined_pos.P_invariant in
@@ -697,8 +700,9 @@ module Make
           let dp = match dp with
             | P_inactive -> P_inactive | _ -> P_under_cstor
           in
+          let len = List.length l in
           List.iteri
-            (fun i u -> aux dp Position.(append p @@ arg i @@ stop) u k)
+            (fun i u -> aux dp Position.(append p @@ arg (len-i-1) @@ stop) u k)
             l
       end
     in
@@ -822,8 +826,9 @@ module Make
           let f' = Cut_form.Pos.replace_many f m in
           Util.debugf ~section 5
             "(@[<2>candidate_generalize@ :of %a@ :gen_to %a@ \
-             :by vars_active_pos :on (@[%a@])@])"
-            (fun k->k Cut_form.pp f Cut_form.pp f' (Util.pp_list HVar.pp) vars);
+             :by vars_active_pos :on (@[%a@])@ :map {@[%a@]}@])"
+            (fun k->k Cut_form.pp f Cut_form.pp f' (Util.pp_list HVar.pp) vars
+                (Position.Map.pp Position.pp Term.pp) m);
           if Goal.is_acceptable_goal @@ Goal.of_cut_form f'
           then (
             Util.incr_stat stat_generalize_vars_active_pos;
@@ -1030,6 +1035,12 @@ module Make
         CCList.flat_map (ind_on_vars cut) clusters
     end
 
+  let new_lemma_ =
+    let n = ref 0 in
+    fun () ->
+      let s = Printf.sprintf "zip_lemma_%d" (CCRef.incr_then_get n) in
+      UntypedAST.(A_app ("name", [A_quoted s]))
+
   (* prove any lemma that has inductive variables. First we try
      to generalize it, otherwise we prove it by induction *)
   let inductions_on_lemma (cut:A.cut_res): C.t list =
@@ -1047,7 +1058,8 @@ module Make
              let new_cuts =
                List.map
                  (fun g ->
-                    A.introduce_cut ~depth:(A.cut_depth cut) g Proof.Step.lemma
+                    A.introduce_cut ~depth:(A.cut_depth cut) g
+                      (Proof.Step.lemma @@ Proof.Src.internal [new_lemma_()])
                       ~reason:Fmt.(fun out ()->
                           fprintf out "generalizing %a" Cut_form.pp g0))
                  new_goals
@@ -1169,7 +1181,7 @@ module Make
              Util.debugf ~section 1
                "(@[<2>@{<green>prove_by_induction@}@ :clauses (@[%a@])@ :goal %a@])"
                (fun k->k (Util.pp_list C.pp) clauses Goal.pp goal);
-             let proof = Proof.Step.lemma in
+             let proof = Proof.Step.lemma @@ Proof.Src.internal [new_lemma_()] in
              (* new lemma has same penalty as the clauses *)
              let penalty = List.fold_left (fun n c -> n+C.penalty c) 0 clauses in
              let cut =

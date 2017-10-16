@@ -17,7 +17,6 @@ let stat_clause_create = Util.mk_stat "clause.create"
 module type S = Clause_intf.S
 
 type proof_step = Proof.Step.t
-type proof = Proof.S.t
 
 (** Bundle of clause sets *)
 type 'c sets = {
@@ -148,7 +147,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let of_lits lits =
       (* convert literals *)
       let lits = List.map Ctx.Lit.of_form lits in
-      let proof = Proof.S.step_of_src (Stmt.src st) in
+      let proof = Stmt.proof_step st in
       let c = create ~trail:Trail.empty ~penalty:0 lits proof in
       c
     in
@@ -168,9 +167,11 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let proof_step c = c.proof
 
-  let proof c = Proof.S.mk_c c.proof c.sclause
+  let proof c = Proof.S.mk c.proof (SClause.mk_proof_res c.sclause)
   let proof_parent c = Proof.Parent.from (proof c)
-  let proof_parent_subst (c,sc) subst = Proof.Parent.from_subst (proof c,sc) subst
+
+  let proof_parent_subst renaming (c,sc) subst =
+    Proof.Parent.from_subst renaming (proof c,sc) subst
 
   let update_proof c f =
     let new_proof = f c.proof in
@@ -187,7 +188,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     else
       let renaming = S.Renaming.create () in
       Array.map
-        (fun l -> Lit.apply_subst_no_simp ~renaming subst (l,sc))
+        (fun l -> Lit.apply_subst_no_simp renaming subst (l,sc))
         lits
 
   (** Bitvector that indicates which of the literals of [subst(clause)]

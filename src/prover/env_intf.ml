@@ -47,10 +47,10 @@ module type S = sig
   type is_trivial_rule = C.t -> bool
   (** Rule that checks whether the clause is trivial (a tautology) *)
 
-  type term_rewrite_rule = Term.t -> Term.t option
+  type term_rewrite_rule = Term.t -> (Term.t * Proof.parent list) option
   (** Rewrite rule on terms *)
 
-  type lit_rewrite_rule = Literal.t -> Literal.t option
+  type lit_rewrite_rule = Literal.t -> (Literal.t * Proof.parent list * Proof.tag list) option
   (** Rewrite rule on literals *)
 
   type multi_simpl_rule = C.t -> C.t list option
@@ -219,9 +219,6 @@ module type S = sig
 
   val unary_simplify : simplify_rule
   (** Simplify the clause. *)
-
-  val simplify_term : Term.t -> Term.t SimplM.t
-  (** Simplify the term *)
 
   val backward_simplify : C.t -> C.ClauseSet.t * C.t Sequence.t
   (** Perform backward simplification with the given clause. It returns the

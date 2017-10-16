@@ -17,7 +17,11 @@ let pp_stmts out seq =
 
 let declare_term out () =
   let id = ID.make "term" in
-  let st = Statement.ty_decl ~src:Statement.(Src.internal R_decl) id T.Ty.tType in
+  let st =
+    Statement.ty_decl
+      ~proof:(Proof.Step.intro (Proof.Src.internal []) Proof.R_decl)
+      id T.Ty.tType
+  in
   pp_stmt out st
 
 let process file =
@@ -27,6 +31,8 @@ let process file =
   >>= TypeInference.infer_statements ?ctx:None
     ~on_var:(Input_format.on_var input)
     ~on_undef:(Input_format.on_undef_id input)
+    ~on_shadow:(Input_format.on_shadow input)
+    ~implicit_ty_args:(Input_format.implicit_ty_args input)
   >|= fun stmts ->
   (* declare "term" then proceed *)
   Format.printf "@[<v>%a@,%a@]@." declare_term () pp_stmts stmts;

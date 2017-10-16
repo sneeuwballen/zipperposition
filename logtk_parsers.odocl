@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: ca1d7b1e587e9ce9508bdb11ab4b8646)
+# DO NOT EDIT (digest: 22bb77dfe110de62f431717a96f3aa9d)
 src/parsers/Parse_tptp
 src/parsers/Lex_tptp
 src/parsers/Ast_tptp
@@ -9,6 +9,13 @@ src/parsers/Parse_zf
 src/parsers/Lex_zf
 src/parsers/Util_zf
 src/parsers/Util_tip
+src/parsers/Tip_ast
+src/parsers/Tip_parser
+src/parsers/Tip_lexer
+src/parsers/Util_dk
+src/parsers/Parse_dk
+src/parsers/Lex_dk
+src/parsers/Ast_dk
 src/parsers/Parsing_utils
 src/parsers/CallProver
 # OASIS_STOP

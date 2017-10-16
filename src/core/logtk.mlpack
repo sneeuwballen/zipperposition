@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 671ebc77337f1e59152ac020cd8325b5)
+# DO NOT EDIT (digest: 34fa01a343c7c65712ca3bc4a9c43388)
 InnerTerm
 Term
 Type
@@ -28,7 +28,7 @@ Ordering
 Skolem
 Cnf
 ID
-ID_or_builtin
+Head
 SLiteral
 Index
 Index_intf
@@ -48,12 +48,12 @@ Statement
 Flex_state
 Compute_prec
 Ordinal
+Polynomial
 Rewrite
 Test_prop
 Input_format
 Output_format
-LLProof
-LLProof_check
+Proof
 Multisets
 Literal
 Literals

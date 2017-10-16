@@ -159,3 +159,9 @@ module ZF = struct
 
   let to_string ppt = CCFormat.to_string (pp ppt)
 end
+
+let pp_in o pp_x = match o with
+  | Output_format.O_zf -> ZF.pp pp_x
+  | Output_format.O_normal -> pp pp_x
+  | Output_format.O_tptp -> TPTP.pp pp_x
+  | Output_format.O_none -> (fun _ _ -> ())

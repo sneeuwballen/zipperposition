@@ -36,7 +36,7 @@ val ind_vars : t -> var list
 val subst1 : var -> term -> t -> t
 (** Substitution of one variable *)
 
-val apply_subst : renaming:Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
+val apply_subst : Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
 
 val are_variant : t -> t -> bool
 (** Are these two cut formulas alpha-equivalent? *)

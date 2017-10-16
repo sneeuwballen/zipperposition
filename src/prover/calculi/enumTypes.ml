@@ -106,7 +106,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     decl_var : Type.t HVar.t; (* x = ... *)
     decl_cases : term list; (* ... t1 | t2 | ... | tn *)
     decl_proof :
-      [ `Data of Statement.source * Type.t Statement.data
+      [ `Data of Proof.t * Type.t Statement.data
       | `Clause of Proof.t
       ]; (* justification for the enumeration axiom *)
     mutable decl_symbols : ID.Set.t; (* set of declared symbols for t1,...,tn *)
@@ -325,10 +325,10 @@ module Make(E : Env.S) : S with module Env = E = struct
                  (fun case ->
                     (* replace [v] with [case] now *)
                     let subst = Unif.FO.unify_full ~subst (v,s_c) (case,s_decl) in
-                    let renaming = Ctx.renaming_clear () in
-                    let c_guard = Literals.of_unif_subst ~renaming subst
+                    let renaming = Subst.Renaming.create () in
+                    let c_guard = Literals.of_unif_subst renaming subst
                     and subst = Unif_subst.subst subst in
-                    let lits' = Lits.apply_subst ~renaming subst (C.lits c,s_c) in
+                    let lits' = Lits.apply_subst renaming subst (C.lits c,s_c) in
                     let proof =
                       Proof.Step.inference [Proof.Parent.from @@ C.proof c]
                         ~rule:(Proof.Rule.mk"enum_type_case_switch")
@@ -367,23 +367,25 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun k->k pp_id_or_builtin decl.decl_ty_id T.pp t);
       let us = bind_vars_ (decl,0) (poly_args,1) |> Unif_subst.of_subst in
       let us = Unif.FO.unify_full ~subst:us (T.var decl.decl_var,0) (t,1) in
-      let renaming = Ctx.renaming_clear () in
+      let renaming = Subst.Renaming.create () in
       let subst = Unif_subst.subst us
-      and c_guard = Literal.of_unif_subst ~renaming us in
+      and c_guard = Literal.of_unif_subst renaming us in
       let lits =
         List.map
           (fun case ->
              Lit.mk_eq
-               (S.FO.apply ~renaming subst (t,1))
-               (S.FO.apply ~renaming subst (case,0)))
+               (S.FO.apply renaming subst (t,1))
+               (S.FO.apply renaming subst (case,0)))
           decl.decl_cases
       in
-      let proof = match decl.decl_proof with
-        | `Data (src,d) -> Proof.Step.data src d
-        | `Clause step ->
-          Proof.Step.inference
-            ~rule:(Proof.Rule.mk "axiom_enum_types")
-            [Proof.Parent.from_subst (step,0) subst]
+      let proof =
+        let parent = match decl.decl_proof with
+          | `Data (src,_) -> src
+          | `Clause src -> src
+        in
+        Proof.Step.inference
+          ~rule:(Proof.Rule.mk "axiom_enum_types")
+          [Proof.Parent.from parent]
       in
       let trail = Trail.empty in
       (* start with initial penalty *)
@@ -474,7 +476,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* introduce projectors for each constructor's argument, in order to
      declare the inductive type as an EnumType. *)
-  let _declare_inductive ~src d =
+  let _declare_inductive ~proof d =
     Util.debugf ~section 5 "@[<2>examine data `%a`@]" (fun k->k ID.pp d.Stmt.data_id);
     (* make HVars *)
     let ty_vars = List.mapi (fun i _ -> HVar.make ~ty:Type.tType i) d.Stmt.data_args in
@@ -501,21 +503,21 @@ module Make(E : Env.S) : S with module Env = E = struct
         d.Stmt.data_cstors
     in
     let _ =
-      declare_ ~proof:(`Data (src,d))
+      declare_ ~proof:(`Data (proof,d))
         ~var:v ~ty_id:(I d.Stmt.data_id) ~ty_vars cases
     in
     ()
 
   (* detect whether the input statement contains some EnumType declaration *)
   let _detect_stmt stmt =
-    let src = Stmt.src stmt in
     match Stmt.view stmt with
       | Stmt.Assert c ->
-        let proof = Proof.Step.assert_ src in
+        let proof = Stmt.proof_step stmt in
         let c = C.of_forms ~trail:Trail.empty c proof in
         _detect_and_declare c
       | Stmt.Data l ->
-        List.iter (_declare_inductive ~src) l
+        let proof = Stmt.as_proof_c stmt in
+        List.iter (_declare_inductive ~proof) l
       | Stmt.TyDecl _
       | Stmt.Def _
       | Stmt.Rewrite _

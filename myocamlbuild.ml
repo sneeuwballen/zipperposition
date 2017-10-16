@@ -1,5 +1,5 @@
 (* OASIS_START *)
-(* DO NOT EDIT (digest: ebde95de24ef1b3dc3eee395038649b6) *)
+(* DO NOT EDIT (digest: 6e0e46e4f1f2658932a826addf81a5a0) *)
 module OASISGettext = struct
 (* # 22 "src/oasis/OASISGettext.ml" *)
 
@@ -882,6 +882,7 @@ let package_default =
      MyOCamlbuildBase.lib_ocaml =
        [
           ("logtk", ["src/core"; "src/core/lib"], []);
+          ("logtk_proofs", ["src/proofs"], []);
           ("logtk_parsers", ["src/parsers"], []);
           ("logtk_solving", ["src/solving"], []);
           ("logtk_arbitrary", ["src/arbitrary"], []);
@@ -914,6 +915,7 @@ let package_default =
                "src/core";
                "src/core/lib";
                "src/parsers";
+               "src/proofs";
                "src/prover";
                "src/prover/calculi"
             ]);
@@ -922,6 +924,7 @@ let package_default =
                "src/core";
                "src/core/lib";
                "src/parsers";
+               "src/proofs";
                "src/prover";
                "src/prover/lib"
             ]);
@@ -930,9 +933,11 @@ let package_default =
                "src/core";
                "src/core/lib";
                "src/parsers";
+               "src/proofs";
                "src/prover/calculi";
                "src/prover/lib"
             ]);
+          ("src/proofs", ["src/core"; "src/core/lib"]);
           ("src/parsers", ["src/core"; "src/core/lib"]);
           ("src/main",
             [
@@ -956,6 +961,6 @@ let conf = {MyOCamlbuildFindlib.no_automatic_syntax = false}
 
 let dispatch_default = MyOCamlbuildBase.dispatch_default conf package_default;;
 
-# 960 "myocamlbuild.ml"
+# 965 "myocamlbuild.ml"
 (* OASIS_STOP *)
 Ocamlbuild_plugin.dispatch dispatch_default;;

@@ -178,7 +178,7 @@ module Make(Ctx : State.CONTEXT) = struct
              ((v:>InnerTerm.t HVar.t),0), ((t:>InnerTerm.t),0))
         |> Subst.of_list
       in
-      let renaming = Ctx.renaming_cleared () in
+      let renaming = Subst.Renaming.createed () in
       let lits =
         C.lits c
         |> IArray.mapi
@@ -349,7 +349,7 @@ module Make(Ctx : State.CONTEXT) = struct
              let subst = Labelled_clause.to_subst lc in
              assert (not (Subst.is_renaming subst));
              (* apply substitution to create a new instance *)
-             let renaming = Ctx.renaming_cleared () in
+             let renaming = Subst.Renaming.createed () in
              let lits' =
                C.lits c
                |> IArray.map (fun lit -> Lit.apply_subst ~renaming subst (lit,0))

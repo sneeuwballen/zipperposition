@@ -1,6 +1,8 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
+open Logtk
+
 type proof_step = Proof.Step.t
 type proof = Proof.t
 

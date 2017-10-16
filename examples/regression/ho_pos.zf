@@ -1,0 +1,15 @@
+
+# expect: unsat
+
+# positions should be stable under substitution
+
+val i : type.
+
+val a : i.
+val f : i -> i -> i.
+val g : i -> i .
+
+assert (forall X. X (g (X a)) = a).
+assert f a a = a.
+
+goal f a (g a) = a.

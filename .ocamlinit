@@ -32,7 +32,9 @@ let (~<) = ID.make;;
 #install_printer Signature.pp;;
 #install_printer ParseLocation.pp;;
 #install_printer Precedence.pp;;
+#install_printer Precedence.Weight.pp;;
 #install_printer Ordering.pp;;
+#install_printer Ordering.Weight_polynomial.pp;;
 #install_printer Position.pp;;
 #install_printer Ordinal.pp;;
 
@@ -109,4 +111,5 @@ module MF = Monome.Focus;;
 #install_printer Monome.pp;;
 let pterm_tptp s = Parse_tptp.parse_term Lex_tptp.token (Lexing.from_string s);;
 let pform_tptp s = Parse_tptp.parse_formula Lex_tptp.token (Lexing.from_string s);;
+let pterm_zf s = Parse_zf.parse_term Lex_zf.token (Lexing.from_string s);;
 Printf.printf "finished loading\n";;

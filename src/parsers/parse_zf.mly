@@ -67,6 +67,8 @@
 %token WITH
 %token END
 %token FUN
+%token LET
+%token IN
 
 %token INT
 %token PROP
@@ -132,6 +134,14 @@ typed_ty_var_block:
 typed_ty_var_list:
   | l=typed_ty_var_block { l }
   | l=typed_ty_var_block l2=typed_ty_var_list { l @ l2 }
+
+mandatory_typed_var_block:
+  | LEFT_PAREN v=raw_var+ COLON t=term RIGHT_PAREN
+    { List.map (fun v -> v, t) v }
+
+mandatory_typed_var_list:
+  | l=mandatory_typed_var_block { l }
+  | l=mandatory_typed_var_block l2=mandatory_typed_var_list { l @ l2 }
 
 var:
   | WILDCARD { T.wildcard }
@@ -289,6 +299,11 @@ term:
       let loc = L.mk_pos $startpos $endpos in
       T.ite ~loc a b c
     }
+  | LET x=raw_var EQDEF t=term IN u=term
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.let_ ~loc [T.V x,t] u
+    }
   | error
     {
       let loc = L.mk_pos $startpos $endpos in
@@ -338,6 +353,15 @@ def:
    { A.mk_def v ty [T.eq (T.var v) t] }
  | v=raw_var COLON ty=term WHERE rules=separated_nonempty_list(SEMI_COLON,term)
    { A.mk_def v ty rules }
+ | v=raw_var l=mandatory_typed_var_list COLON ty_ret=term EQDEF rhs=term
+   {
+      let ty_args = List.map snd l in
+      let args = List.map (fun (v,_) -> T.var v) l in
+      A.mk_def v (T.fun_ty ty_args ty_ret)
+        [T.forall
+          (List.map (fun (v,ty) -> T.V v, Some ty) l)
+          (T.eq (T.app (T.var v) args) rhs)]
+   }
 
 statement:
   | INCLUDE s=QUOTED DOT

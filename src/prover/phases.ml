@@ -56,10 +56,10 @@ type ('ret, 'before, 'after) phase =
   | Saturate :
       (env_with_result, [`Pre_saturate], [`Saturate]) phase
 
-  | Print_stats : (unit, [`Saturate], [`Print_stats]) phase
-  | Print_result : (unit, [`Print_stats], [`Print_result]) phase
+  | Print_result : (unit, [`Saturate], [`Print_result]) phase
   | Print_dot : (unit, [`Print_result], [`Print_dot]) phase
-  | Check_proof : (int, [`Print_dot], [`Check_proof]) phase
+  | Check_proof : (errcode, [`Print_dot], [`Check_proof]) phase
+  | Print_stats : (unit, [`Check_proof], [`Print_stats]) phase
   | Exit : (unit, _, [`Exit]) phase
 
 type any_phase = Any_phase : (_, _, _) phase -> any_phase

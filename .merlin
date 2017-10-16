@@ -2,6 +2,7 @@ S src
 S src/arbitrary/
 S src/core
 S src/core/lib
+S src/proofs
 S src/parsers/
 S src/arbitrary/
 S src/meta
@@ -26,4 +27,4 @@ PKG qcheck
 PKG unix
 PKG msat
 PKG tip_parser
-FLG -w +a-4-44-48-50-58
+FLG -w +a-4-44-48-50-58-60

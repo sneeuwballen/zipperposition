@@ -176,6 +176,7 @@ val pp_list0 : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
 val tstp_needs_escaping: string -> bool
 (** Is this name a proper TSTP identifier, or does it need ' ' around it? *)
 
+val pp_str_tstp : string CCFormat.printer (** possibly escaping *)
 val pp_var_tstp : string CCFormat.printer
 
 val ord_option : 'a CCOrd.t -> 'a option CCOrd.t
@@ -192,6 +193,9 @@ val failwithf : ('a, Format.formatter, unit, 'b) format4 -> 'a
 
 module Int_map : CCMap.S with type key = int
 module Int_set : CCSet.S with type elt = int
+
+val escape_dot : string -> string
+(** String escaping for graphviz *)
 
 (** {2 File utils} *)
 

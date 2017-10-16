@@ -5,6 +5,7 @@
 
 open Logtk
 open Logtk_parsers
+open Logtk_proofs
 open Params
 
 open Phases.Infix
@@ -97,14 +98,16 @@ let parse_file file =
     ~x:parsed >>= fun () ->
   Phases.return_phase (input,parsed)
 
-let typing prelude (input,stmts) =
+let typing ~file prelude (input,stmts) =
   Phases.start_phase Phases.Typing >>= fun () ->
   Phases.get_key Params.key >>= fun params ->
   let def_as_rewrite = params.Params.param_def_as_rewrite in
   TypeInference.infer_statements
     ~on_var:(Input_format.on_var input)
     ~on_undef:(Input_format.on_undef_id input)
-    ~def_as_rewrite ?ctx:None
+    ~on_shadow:(Input_format.on_shadow input)
+    ~implicit_ty_args:(Input_format.implicit_ty_args input)
+    ~def_as_rewrite ?ctx:None ~file
     (Sequence.append prelude stmts)
   >>?= fun stmts ->
   Util.debugf ~section 3 "@[<hv2>@{<green>typed statements@}@ %a@]"
@@ -114,12 +117,11 @@ let typing prelude (input,stmts) =
   Phases.return_phase stmts
 
 (* obtain clauses  *)
-let cnf ~file decls =
+let cnf decls =
   Phases.start_phase Phases.CNF >>= fun () ->
   let stmts =
     decls
     |> CCVector.to_seq
-    |> Sequence.map (Statement.add_src ~file)
     |> Cnf.cnf_of_seq
     |> CCVector.to_seq
     |> Cnf.convert
@@ -204,9 +206,7 @@ let make_env ~ctx:(module Ctx : Ctx_intf.S) ~params stmts =
 let has_goal_ = ref false
 
 (* print stats *)
-let print_stats (type c) (module Env : Env.S with type C.t = c) =
-  Phases.start_phase Phases.Print_stats >>= fun () ->
-  Signal.send Signals.on_print_stats ();
+let print_stats_env (type c) (module Env : Env.S with type C.t = c) =
   let comment = Options.comment() in
   let print_hashcons_stats what (sz, num, sum_length, small, median, big) =
     Format.printf
@@ -214,11 +214,20 @@ let print_stats (type c) (module Env : Env.S with type C.t = c) =
        buckets: small %d, median %d, big %d@]@."
       comment what sz num sum_length small median big
   and print_state_stats (num_active, num_passive, num_simpl) =
-    Format.printf "%sproof state stats:@." comment;
-    Format.printf "%sstat:  active clauses          %d@." comment num_active;
-    Format.printf "%sstat:  passive clauses         %d@." comment num_passive;
-    Format.printf "%sstat:  simplification clauses  %d@." comment num_simpl;
-  and print_gc () =
+    Format.printf "%sproof state stats: {active %d, passive %d, simpl %d}@."
+      comment num_active num_passive num_simpl;
+  in
+  if Env.params.param_stats then (
+    print_hashcons_stats "terms" (InnerTerm.hashcons_stats ());
+    print_state_stats (Env.stats ());
+  )
+
+(* print stats *)
+let print_stats () =
+  Phases.start_phase Phases.Print_stats >>= fun () ->
+  Signal.send Signals.on_print_stats ();
+  let comment = Options.comment() in
+  let print_gc () =
     let stats = Gc.stat () in
     Format.printf
       "@[<h>%sGC: minor words %.0f; major_words: %.0f; max_heap: %d; \
@@ -227,10 +236,9 @@ let print_stats (type c) (module Env : Env.S with type C.t = c) =
       stats.Gc.minor_words stats.Gc.major_words stats.Gc.top_heap_words
       stats.Gc.minor_collections stats.Gc.major_collections;
   in
-  if Env.params.param_stats then (
+  Phases.get_key Params.key >>= fun params ->
+  if params.Params.param_stats then (
     print_gc ();
-    print_hashcons_stats "terms" (InnerTerm.hashcons_stats ());
-    print_state_stats (Env.stats ());
     Util.print_global_stats ~comment ();
   );
   Phases.return_phase ()
@@ -280,7 +288,7 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
   and timeout = if Env.params.param_timeout = 0.
     then None
     else (
-      Util.debugf ~section 1 "run for %.2f s" (fun k->k Env.params.param_timeout);
+      Util.debugf ~section 1 "run for %.3f s" (fun k->k Env.params.param_timeout);
       (* FIXME: only do that for zipperposition, not the library? *)
       ignore (setup_alarm Env.params.param_timeout);
       Some (Util.total_time_s () +. Env.params.param_timeout -. 0.25)
@@ -292,7 +300,7 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
     | _ -> Sat.given_clause ~generating:true ?steps ?timeout ()
   in
   let comment = Options.comment() in
-  Format.printf "%sdone %d iterations in %.2fs@." comment num (Util.total_time_s());
+  Format.printf "%sdone %d iterations in %.3fs@." comment num (Util.total_time_s());
   Util.debugf ~section 1 "@[<2>final precedence:@ @[%a@]@]"
     (fun k->k Precedence.pp (Env.precedence ()));
   Phases.return_phase result
@@ -366,7 +374,7 @@ let print_szs_result (type c) ~file
       (* print status then proof *)
       Format.printf "%sSZS status %s for '%s'@." comment (unsat_to_str ()) file;
       Format.printf "%sSZS output start Refutation@." comment;
-      Format.printf "%a@." (Proof.S.pp !Options.output) proof;
+      Format.printf "%a@." (Proof.S.pp_in !Options.output) proof;
       Format.printf "%sSZS output end Refutation@." comment;
   end;
   Phases.return_phase ()
@@ -399,13 +407,13 @@ let parse_cli =
 let process_file (prelude:Phases.prelude) file =
   start_file file >>= fun () ->
   parse_file file >>= fun stmts ->
-  typing prelude stmts >>= fun decls ->
+  typing ~file prelude stmts >>= fun decls ->
   (* declare inductive types and constants *)
   CCVector.iter Statement.scan_simple_stmt_for_ind_ty decls;
   let has_goal = has_goal_decls_ decls in
   Util.debugf ~section 1 "parsed %d declarations (%s goal(s))"
     (fun k->k (CCVector.length decls) (if has_goal then "some" else "no"));
-  cnf ~file decls >>= fun stmts ->
+  cnf decls >>= fun stmts ->
   (* compute signature, precedence, ordering *)
   let signature = Statement.signature (CCVector.to_seq stmts) in
   Util.debugf ~section 1 "@[<2>signature:@ @[<hv>%a@]@]" (fun k->k Signature.pp signature);
@@ -429,22 +437,33 @@ let process_file (prelude:Phases.prelude) file =
 
 let print file env result =
   (* print some statistics *)
-  print_stats env >>= fun () ->
+  print_stats_env env;
   print_szs_result ~file env result >>= fun () ->
   print_dots env result
 
 let check res =
   Phases.start_phase Phases.Check_proof >>= fun () ->
   Phases.get_key Params.key >>= fun params ->
+  let comment = Options.comment() in
   let errcode = match res with
     | Saturate.Unsat p when params.Params.param_check ->
       (* check proof! *)
       Util.debug ~section 1 "start checking proof…";
-      let p' = Proof.S.to_llproof p in
+      let p' = LLProof_conv.conv p in
+      (* print proof? *)
+      begin match params.Params.param_dot_llproof with
+        | None -> ()
+        | Some file ->
+          Util.debugf ~section 2 "print LLProof into `%s`"(fun k->k file);
+          LLProof.Dot.pp_dot_file file p';
+      end;
+      (* check *)
+      let start = Util.total_time_s () in
       let res, stats = LLProof_check.check p' in
-      Util.debugf ~section 1 "(@[proof_check@ :res %a@ :stats %a@])"
-        (fun k->k LLProof_check.pp_res res LLProof_check.pp_stats stats);
-      if res = LLProof_check.R_fail then 1 else 0
+      let stop = Util.total_time_s () in
+      Format.printf "%s(@[<h>proof_check@ :res %a@ :stats %a :time %.3fs@])@."
+        comment LLProof_check.pp_res res LLProof_check.pp_stats stats (stop-.start);
+      if res = LLProof_check.R_fail then 15 else 0
     | _ -> 0
   in
   Phases.return_phase errcode
@@ -481,4 +500,6 @@ let process_files_and_print (params:Params.t) files =
     check res
   in
   let phases = List.map f files in
-  Phases.run_parallel phases
+  Phases.run_parallel phases >>= fun r ->
+  print_stats () >>= fun () ->
+  Phases.return r

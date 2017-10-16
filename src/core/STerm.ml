@@ -463,9 +463,10 @@ end
 (** {2 ZF} *)
 
 module ZF = struct
+  let pp_id = TPTP.pp_id
   let rec pp out t = match t.term with
     | Var v -> pp_var out v
-    | Const s -> CCFormat.string out s
+    | Const s -> pp_id out s
     | List l ->
       Format.fprintf out "[@[<hv>%a@]]"
         (Util.pp_list ~sep:"," pp) l;

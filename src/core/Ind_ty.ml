@@ -34,6 +34,7 @@ type t = {
      no other type variables than [ty_vars] *)
   ty_is_rec: bool lazy_t;
   (* true iff the type is (mutually) recursive *)
+  ty_proof: Proof.t;
 }
 
 let equal a b = ID.equal a.ty_id b.ty_id
@@ -129,6 +130,8 @@ let is_recursive (t:t) =
   );
   res
 
+let proof (t:t) : Proof.t = t.ty_proof
+
 (* is [top] recursive? *)
 let is_rec_ (top:t): bool =
   let rec find_in_ity (seen:t list) (ity:t): bool =
@@ -154,7 +157,7 @@ let is_rec_ (top:t): bool =
   find_in_ity [] top
 
 (* declare that the given type is inductive *)
-let declare_ty id ~ty_vars constructors =
+let declare_ty id ~ty_vars constructors ~proof =
   Util.debugf ~section 1 "declare inductive type %a" (fun k->k ID.pp id);
   if constructors = [] then (
     invalid_declf_ "Ind_types.declare_ty %a: no constructors provided" ID.pp id;
@@ -170,6 +173,7 @@ let declare_ty id ~ty_vars constructors =
     ty_pattern=Type.app id (List.map Type.var ty_vars);
     ty_constructors=constructors;
     ty_is_rec=lazy (is_rec_ ity);
+    ty_proof=proof;
   } in
   (* map the constructors to [ity] too *)
   List.iter

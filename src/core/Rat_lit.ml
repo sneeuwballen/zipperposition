@@ -141,7 +141,7 @@ let variant ?(subst=Subst.empty) lit1 lit2 =
 module Subsumption = struct
   (* verify postcondition of [matching] *)
   let _matching_postcond (m1,sc1) (m2,sc2) (subst,c1,c2) =
-    let m1 = M.apply_subst_no_renaming subst (m1,sc1) in
+    let m1 = M.apply_subst Subst.Renaming.none subst (m1,sc1) in
     let m1 = M.product m1 c1
     and m2 = M.product m2 c2 in
     let d = M.difference m1 m2 in
@@ -303,20 +303,15 @@ let subsumes ?(subst=Subst.empty) (lit1,sc1) (lit2, sc2) k =
 let are_variant lit1 lit2 =
   not (Sequence.is_empty (variant (lit1, 0)(lit2, 1)))
 
-let apply_subst ~renaming subst (lit,scope) =
+let apply_subst renaming subst (lit,scope) =
   make lit.op
-    (M.apply_subst ~renaming subst (lit.left, scope))
-    (M.apply_subst ~renaming subst (lit.right, scope))
+    (M.apply_subst renaming subst (lit.left, scope))
+    (M.apply_subst renaming subst (lit.right, scope))
 
-let apply_subst_no_renaming subst (lit,sc) =
-  make lit.op
-    (M.apply_subst_no_renaming subst (lit.left, sc))
-    (M.apply_subst_no_renaming subst (lit.right, sc))
-
-let apply_subst_no_simp ~renaming subst (lit,sc) =
+let apply_subst_no_simp renaming subst (lit,sc) =
   {lit with
-     left=M.apply_subst_no_simp ~renaming subst (lit.left, sc);
-     right=M.apply_subst_no_simp ~renaming subst (lit.right, sc);
+     left=M.apply_subst_no_simp renaming subst (lit.left, sc);
+     right=M.apply_subst_no_simp renaming subst (lit.right, sc);
   }
 
 let is_trivial lit = match lit.op with
@@ -484,16 +479,10 @@ module Focus = struct
       ~f_m:(fun m -> M.product m z)
       lit
 
-  let apply_subst ~renaming subst (lit,sc) =
+  let apply_subst renaming subst (lit,sc) =
     map_lit
-      ~f_mf:(fun mf -> MF.apply_subst ~renaming subst (mf,sc))
-      ~f_m:(fun m -> M.apply_subst ~renaming subst (m,sc))
-      lit
-
-  let apply_subst_no_renaming subst (lit,sc) =
-    map_lit
-      ~f_mf:(fun mf -> MF.apply_subst_no_renaming subst (mf,sc))
-      ~f_m:(fun m -> M.apply_subst_no_renaming subst (m,sc))
+      ~f_mf:(fun mf -> MF.apply_subst renaming subst (mf,sc))
+      ~f_m:(fun m -> M.apply_subst renaming subst (m,sc))
       lit
 
   let unify ?(subst=Unif_subst.empty) (lit1,sc1) (lit2,sc2) k =

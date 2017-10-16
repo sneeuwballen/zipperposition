@@ -4,7 +4,7 @@
 (** {1 Variable} *)
 
 (** A Variable is a pair of a unique {!ID.t}, and a type.
-    
+
     It is used in {!TypedSTerm.t} for manipulating free and bound variables.
 
   @since 1.0 *)
@@ -66,6 +66,7 @@ module Subst : sig
   val empty : (_,_) t
   val is_empty : (_,_) t -> bool
   val singleton : 'a var -> 'b -> ('a,'b) t
+  val size: (_,_) t -> int
   val add : ('a,'b) t -> 'a var -> 'b -> ('a,'b) t
   val mem : ('a,_) t -> 'a var -> bool
   val find : ('a,'b) t -> 'a var -> 'b option

@@ -26,11 +26,10 @@ val subst : t -> Subst.t
 val constr_l : t -> Unif_constr.t list
 (** Constraints *)
 
-val constr_l_subst :
-  renaming:Subst.Renaming.t ->
-  t ->
-  (term*term) list
+val constr_l_subst : Subst.Renaming.t -> t -> (term*term) list
 (** Apply the substitution to the constraint *)
+
+val tags : t -> Proof.tag list
 
 val has_constr : t -> bool
 (** Is there any constraint? *)

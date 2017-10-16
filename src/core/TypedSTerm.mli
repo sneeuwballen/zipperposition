@@ -253,13 +253,23 @@ val as_id_app : t -> (ID.t * Ty.t * t list) option
 val vars : t -> t Var.t list
 val free_vars : t -> t Var.t list
 val free_vars_l : t list -> t Var.t list
+val free_vars_set : t -> t Var.Set.t
 
 val close_all : ty:t -> Binder.t -> t -> t
 (** Bind all free vars with the symbol *)
 
+(** Generic non-recursive map *)
+val map :
+  f:('a -> t -> t) ->
+  bind:('a -> ty Var.t -> 'a * ty Var.t) ->
+  'a ->
+  t ->
+  t
+
 include Interfaces.PRINT with type t := t
 
 val pp_inner : t CCFormat.printer
+val pp_with_ty : t CCFormat.printer
 
 val pp_in : Output_format.t -> t CCFormat.printer
 
@@ -285,6 +295,8 @@ module Subst : sig
   val mem : t -> term Var.t -> bool
 
   val add : t -> term Var.t -> term -> t
+  (** Add new binding to substitution
+      Fails if the variable is bound already *)
 
   val find : t -> term Var.t -> term option
 
@@ -297,9 +309,18 @@ module Subst : sig
 
   val eval : t -> term -> term
 
+  val eval_nonrec : t -> term -> term
+  (** Evaluate under substitution, but consider the substitution as
+      not idempotent *)
+
   include Interfaces.PRINT with type t := t
 end
 
+val rename : (term, term Var.t) Var.Subst.t -> t -> t
+(** Perform renaming *)
+
+val rename_all_vars : t -> t
+(** Rename bound variables *)
 
 (** {2 Table of Variables} *)
 

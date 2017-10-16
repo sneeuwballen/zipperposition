@@ -22,6 +22,9 @@ let prof_matching = Util.mk_profiler "matching"
 
 let fail () = raise Fail
 
+let _allow_partial_skolem_application = ref false
+let _allow_pattern_unif = ref true
+
 (** {2 Signatures} *)
 
 module type S = Unif_intf.S
@@ -337,7 +340,7 @@ module Inner = struct
       |> CCList.filter_map
         (function
           | None -> None
-          | Some (i, t) -> match CCList.find_idx (T.is_bvar_i i) l with
+          | Some (i, _) -> match CCList.find_idx (T.is_bvar_i i) l with
             | None -> None
             | Some (j, ty) ->
               (* map DB i into db (n-j) *)
@@ -420,17 +423,21 @@ module Inner = struct
       subst
 
   (* delay pair, closing it if necessary *)
-  let delay ~bvars subst t1 sc1 t2 sc2 =
+  let delay ~bvars ~tags subst t1 sc1 t2 sc2 =
     if T.equal t1 t2 && sc1=sc2 then subst (* trivial *)
     else (
       let u1 = T.fun_l (env_l_dense bvars.B_vars.left |> List.rev) t1 in
       let u2 = T.fun_l (env_l_dense bvars.B_vars.right |> List.rev) t2 in
       if T.DB.closed u1 && T.DB.closed u2 then (
-        US.add_constr (Unif_constr.make (u1,sc1)(u2,sc2)) subst
+        US.add_constr (Unif_constr.make ~tags (u1,sc1)(u2,sc2)) subst
       ) else (
         fail()
       )
     )
+
+  let partial_skolem_fail f l1 l2 =
+    not !_allow_partial_skolem_application &&
+    List.length l1 - List.length l2 < ID.num_mandatory_args f
 
   (* @param op which operation to perform (unification,matching,alpha-eq)
      @param root if we are at the root of the original problem. This is
@@ -477,7 +484,10 @@ module Inner = struct
         if ID.equal f g
         then subst
         else if op=O_unify && not root && has_non_unifiable_type_or_is_prop t1
-        then US.add_constr (Unif_constr.make (t1,sc1)(t2,sc2)) subst
+        then (
+          let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
+          US.add_constr (Unif_constr.make ~tags (t1,sc1)(t2,sc2)) subst
+        )
         else raise Fail
       | T.App ({T.term=T.Const id1; _}, l1),
         T.App ({T.term=T.Const id2; _}, l2) ->
@@ -490,7 +500,8 @@ module Inner = struct
         ) else if op=O_unify && not root && has_non_unifiable_type_or_is_prop t1 then (
           (* TODO: notion of value, here, to fail fast in some cases.
              e.g.  [a + 1 = a] should fail immediately *)
-          delay()
+          let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
+          delay ~tags ()
         ) else fail()
       | T.App ({T.term=(T.Var _ | T.DB _ | T.Bind (Binder.Lambda, _, _)); _}, _), _
       | _, T.App ({T.term=(T.Var _ | T.DB _ | T.Bind (Binder.Lambda, _, _)); _}, _)
@@ -536,7 +547,7 @@ module Inner = struct
           subst (t1',sc1) (t2',sc2)
       | T.Bind ((Binder.Forall | Binder.Exists), _, _), _
       | _, T.Bind ((Binder.Forall | Binder.Exists), _, _) ->
-        delay() (* cannot unify non-atomic propositions, so delay *)
+        delay ~tags:[] () (* cannot unify non-atomic propositions, so delay *)
       | T.AppBuiltin (Builtin.Int n1,[]),
         T.AppBuiltin (Builtin.Int n2,[]) ->
         if Z.equal n1 n2 then subst else raise Fail (* int equality *)
@@ -547,7 +558,8 @@ module Inner = struct
       | T.AppBuiltin (Builtin.False, _), _ ->
         if T.equal t1 t2 then subst else raise Fail (* boolean equality *)
       | _ when op=O_unify && not root && has_non_unifiable_type_or_is_prop t1 ->
-        delay() (* push pair as a constraint, because of typing. *)
+        let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
+        delay ~tags () (* push pair as a constraint, because of typing. *)
       | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Builtin.equal s1 s2 ->
         (* try to unify/match builtins pairwise *)
         unif_list ~op ~bvars subst l1 sc1 l2 sc2
@@ -614,7 +626,8 @@ module Inner = struct
         (* just unify subterms pairwise *)
         unif_list ~op ~bvars subst l1 scope l2 scope
       ) else if op=O_unify && not root && has_non_unifiable_type_or_is_prop t1 then (
-        delay()
+        let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
+        delay ~tags ()
       ) else fail()
     in
     begin match T.view f1, T.view f2 with
@@ -662,7 +675,10 @@ module Inner = struct
         (* first-order applications *)
         if ID.equal id1 id2 then same_rigid_head()
         else if op=O_unify && not root && has_non_unifiable_type_or_is_prop t1
-        then delay() (* push pair as a constraint, because of typing. *)
+        then (
+          let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
+          delay ~tags () (* push pair as a constraint, because of typing. *)
+        )
         else fail()
       | T.DB i1, T.DB i2 ->
         if i1=i2 then same_rigid_head() else fail()
@@ -670,6 +686,10 @@ module Inner = struct
         unif_rec ~op ~bvars ~root subst (t1,scope) (t2, scope) (* to bind *)
       | _, T.Var _ when l2=[] ->
         unif_rec ~op ~bvars ~root subst (t1,scope) (t2, scope) (* to bind *)
+      | T.Const f, T.Var _  when partial_skolem_fail f l1 l2 ->
+        fail()
+      | T.Var _, T.Const g when partial_skolem_fail g l2 l1 ->
+        fail()
       | T.Var v1, T.Const _ ->
         begin match op with
           | O_match_protect (P_scope sc2')
@@ -682,10 +702,10 @@ module Inner = struct
           "(@[unif_ho.flex_rigid@ `@[:f1 %a :l1 %a@]`@ :t2 `%a`@ :subst %a@ :bvars %a@])@."
           (Scoped.pp T.pp) (f1,scope) (CCFormat.Dump.list T.pp) l1
           (Scoped.pp T.pp) (t2,scope) US.pp subst B_vars.pp bvars;*)
-        if distinct_bvar_l ~bvars:bvars.B_vars.left l1 then (
+        if !_allow_pattern_unif && distinct_bvar_l ~bvars:bvars.B_vars.left l1 then (
           (* flex/rigid pattern unif *)
           flex_rigid ~bvars:bvars.B_vars.left subst f1 l1 t2 ~scope
-        ) else if distinct_ground_l l1 then (
+        ) else if !_allow_pattern_unif && distinct_ground_l l1 then (
           (* [v t = t2] becomes [v = λx. t2[x/t]] *)
           let t2 = lift_terms l1 t2 in
           unif_rec ~op ~root ~bvars subst (f1,scope) (t2,scope)
@@ -699,10 +719,10 @@ module Inner = struct
           "(@[unif_ho.flex_rigid@ `@[:f2 %a :l2 %a@]`@ :t1 `%a`@ :subst %a@ :bvars %a@])@."
           (Scoped.pp T.pp) (f2,scope) (CCFormat.Dump.list T.pp) l2
           (Scoped.pp T.pp) (t1,scope) US.pp subst B_vars.pp bvars;*)
-        if distinct_bvar_l ~bvars:bvars.B_vars.right l2 && op=O_unify then (
+        if !_allow_pattern_unif && distinct_bvar_l ~bvars:bvars.B_vars.right l2 && op=O_unify then (
           (* flex/rigid pattern unif *)
           flex_rigid ~bvars:bvars.B_vars.right subst f2 l2 t1 ~scope
-        ) else if distinct_ground_l l2 && op=O_unify then (
+        ) else if !_allow_pattern_unif && distinct_ground_l l2 && op=O_unify then (
           (* [t1 = v t] becomes [v = λx. t1[x/t]] *)
           let t1 = lift_terms l2 t1 in
           unif_rec ~op ~root ~bvars subst (t1,scope) (f2,scope)
@@ -713,6 +733,7 @@ module Inner = struct
         ) else fail()
       | T.Var v1, T.Var v2
         when op=O_unify &&
+             !_allow_pattern_unif &&
              distinct_bvar_l ~bvars:bvars.B_vars.left l1 &&
              distinct_bvar_l ~bvars:bvars.B_vars.right l2 ->
         (* flex/flex equation for pattern unif *)
@@ -720,6 +741,7 @@ module Inner = struct
           v1 l1 v2 l2
       | T.Var v1, T.Var v2
         when is_match_op op &&
+             !_allow_pattern_unif &&
              distinct_bvar_l ~bvars:bvars.B_vars.left l1 &&
              distinct_bvar_l ~bvars:bvars.B_vars.right l2 &&
              CCList.subset ~eq:T.equal l2 l1 ->
@@ -1070,3 +1092,13 @@ module FO = struct
     let l1, l2 = pair_lists_ f1 l1 f2 l2 in
     Term.of_term_unsafe_l l1, Term.of_term_unsafe_l l2
 end
+
+
+let () =
+  Options.add_opts
+    [  "--partial-skolem",
+       Arg.Set _allow_partial_skolem_application,
+       " allow partial application of skolem constants (sound only assuming the axiom of choice)";
+       "--no-unif-pattern", Arg.Clear _allow_pattern_unif, " disable pattern unification";
+       "--unif-pattern", Arg.Set _allow_pattern_unif, " enable pattern unification";
+    ]

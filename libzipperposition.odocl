@@ -1,13 +1,13 @@
 # OASIS_START
-# DO NOT EDIT (digest: 25e94741e13e50b525ca49357a9ab941)
+# DO NOT EDIT (digest: 3b88eb037da90e86b49e2856ccc7213c)
 src/prover/ClauseQueue
 src/prover/Clause
 src/prover/SClause
 src/prover/Const
 src/prover/Extensions
 src/prover/Ctx
-src/prover/Proof
 src/prover/ProofState
+src/prover/Bool_clause
 src/prover/Saturate
 src/prover/Selection
 src/prover/AC

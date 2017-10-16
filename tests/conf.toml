@@ -1,12 +1,12 @@
 
-provers = [ "zipperposition", "hornet", "zipperposition-avatar" ]
+provers = [ "zipperposition", "zipperposition-avatar", "zipperposition-check" ]
 default_expect = "unsat"
 
 [test]
 
 timeout = 10 # in s
 memory = 2000 # in MB
-provers = [ "zipperposition", "hornet", "zipperposition-avatar" ]
+provers = [ "zipperposition", "zipperposition-check" ]
 problems = ".*.zf"
 dir = [ "examples", "tests" ]
 
@@ -20,6 +20,16 @@ unsat = "SZS status (Theorem|Unsatisfiable)"
 sat = "SZS status (CounterSatisfiable|Satisfiable)"
 timeout = "SZS Status ResourceOut"
 version = "git:."
+
+[zipperposition-check]
+
+binary = "./zipperposition.native"
+cmd = "./zipperposition.native $file --timeout $timeout --mem-limit $memory --output none --check"
+unsat = "SZS status (Theorem|Unsatisfiable)"
+sat = "SZS status (CounterSatisfiable|Satisfiable)"
+timeout = "SZS Status ResourceOut"
+version = "git:."
+
 
 [zipperposition-avatar]
 

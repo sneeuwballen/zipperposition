@@ -25,7 +25,7 @@ Hashcons
 HVar
 IArray
 ID
-ID_or_builtin
+Head
 Index
 Ind_ty
 InnerTerm
@@ -67,5 +67,3 @@ Var
 {2 List of modules}
 
 {!indexlist}
-
-

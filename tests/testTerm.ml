@@ -9,7 +9,6 @@ open OUnit
 
 module T = Term
 module H = Helpers
-module S = Substs
 
 let (==>) = QCheck.(==>)
 

@@ -85,7 +85,7 @@ exception Attr_parameter of int
 
 type skolem_kind = K_normal | K_ind (* inductive *)
 
-exception Attr_skolem of skolem_kind
+exception Attr_skolem of skolem_kind * int
 
 val as_infix : t -> string option
 val is_infix : t -> bool
@@ -101,3 +101,5 @@ val is_skolem : t -> bool
 
 val as_skolem : t -> skolem_kind option
 
+val num_mandatory_args : t -> int
+(** number of mandatory arguments of a skolem constant or 0 otherwise *)

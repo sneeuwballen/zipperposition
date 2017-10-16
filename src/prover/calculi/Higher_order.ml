@@ -27,6 +27,8 @@ let prof_eq_res = Util.mk_profiler "ho.eq_res"
 let prof_eq_res_syn = Util.mk_profiler "ho.eq_res_syntactic"
 let prof_ho_unif = Util.mk_profiler "ho.unif"
 
+let _purify_applied_vars = ref false
+
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C
@@ -85,9 +87,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       (fun (lit',skolems) ->
          let subst = Literal.variant (lit',0) (lit,1) |> Sequence.head in
          begin match subst with
-           | Some subst ->
+           | Some (subst,_) ->
              let skolems =
-               List.map (fun t -> Subst.FO.apply_no_renaming subst (t,0)) skolems
+               List.map
+                 (fun t -> Subst.FO.apply Subst.Renaming.none subst (t,0))
+                 skolems
              in
              Some skolems
            | None -> None
@@ -95,7 +99,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* negative extensionality rule:
      [f != g] where [f : a -> b] becomes [f k != g k] for a fresh parameter [k] *)
-  let ext_neg (lit:Literal.t): Literal.t option = match lit with
+  let ext_neg (lit:Literal.t) : _ option = match lit with
     | Literal.Equation (f, g, false)
       when Type.is_fun (T.ty f) &&
            not (T.is_var f) &&
@@ -122,7 +126,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debugf ~section 4
         "(@[ho_ext_neg@ :old `%a`@ :new `%a`@])"
         (fun k->k Literal.pp lit Literal.pp new_lit);
-      Some new_lit
+      Some (new_lit,[],[Proof.Tag.T_ho; Proof.Tag.T_ext])
     | _ -> None
 
   (* positive extensionality `m x = n x --> m = n` *)
@@ -155,6 +159,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                 let proof =
                   Proof.Step.inference [C.proof_parent c]
                     ~rule:(Proof.Rule.mk "ho_ext_pos")
+                    ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext]
                 in
                 let new_c =
                   C.create [new_lit] proof ~penalty:(C.penalty c) ~trail:(C.trail c)
@@ -174,9 +179,11 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* complete [f = g] into [f x1…xn = g x1…xn] for each [n ≥ 1] *)
   let complete_eq_args (c:C.t) : C.t list =
     let var_offset = C.Seq.vars c |> Type.Seq.max_var |> succ in
+    let eligible = C.Eligible.param c in
     let new_c =
       C.lits c
       |> Sequence.of_array |> Sequence.zip_i |> Sequence.zip
+      |> Sequence.filter (fun (idx,lit) -> eligible idx lit)
       |> Sequence.flat_map_l
         (fun (lit_idx,lit) -> match lit with
           | Literal.Equation (t, u, true) when Type.is_fun (T.ty t) ->
@@ -192,7 +199,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             let new_lits = new_lit :: CCArray.except_idx (C.lits c) lit_idx in
             let proof =
               Proof.Step.inference [C.proof_parent c]
-                ~rule:(Proof.Rule.mk "ho_complete_eq")
+                ~rule:(Proof.Rule.mk "ho_complete_eq") ~tags:[Proof.Tag.T_ho]
             in
             let new_c =
               C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
@@ -284,14 +291,14 @@ module Make(E : Env.S) : S with module Env = E = struct
             Subst.FO.of_list [((v:>InnerTerm.t HVar.t),0), (t,0)]
           in
         (* build new clause *)
-        let renaming = Ctx.renaming_clear () in
+        let renaming = Subst.Renaming.create () in
         let new_lits =
-          let l1 = Literal.apply_subst_list ~renaming subst (other_lits,0) in
+          let l1 = Literal.apply_subst_list renaming subst (other_lits,0) in
           let l2 =
             CCList.product
               (fun args_pos args_neg ->
-                 let args_pos = Subst.FO.apply_l ~renaming subst (args_pos,0) in
-                 let args_neg = Subst.FO.apply_l ~renaming subst (args_neg,0) in
+                 let args_pos = Subst.FO.apply_l renaming subst (args_pos,0) in
+                 let args_neg = Subst.FO.apply_l renaming subst (args_neg,0) in
                  List.map2 Literal.mk_eq args_pos args_neg)
               pos_args
               neg_args
@@ -300,8 +307,8 @@ module Make(E : Env.S) : S with module Env = E = struct
           l1 @ l2
         in
         let proof =
-          Proof.Step.inference ~rule:(Proof.Rule.mk "ho_elim_pred")
-            [ C.proof_parent_subst (c,0) subst ]
+          Proof.Step.inference ~rule:(Proof.Rule.mk "ho_elim_pred") ~tags:[Proof.Tag.T_ho]
+            [ C.proof_parent_subst renaming (c,0) subst ]
         in
         let new_c =
           C.create new_lits proof
@@ -356,11 +363,11 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun v -> HO_unif.enum_prop ~mode (v,sc_c) ~offset)
       |> Sequence.map
         (fun (subst,penalty) ->
-           let renaming = Ctx.renaming_clear() in
-           let lits = Literals.apply_subst ~renaming subst (C.lits c,sc_c) in
+           let renaming = Subst.Renaming.create() in
+           let lits = Literals.apply_subst renaming subst (C.lits c,sc_c) in
            let proof =
-             Proof.Step.inference ~rule:(Proof.Rule.mk "ho.refine")
-               [C.proof_parent_subst (c,sc_c) subst]
+             Proof.Step.inference ~rule:(Proof.Rule.mk "ho.refine") ~tags:[Proof.Tag.T_ho]
+               [C.proof_parent_subst renaming (c,sc_c) subst]
            in
            let new_c =
              C.create_a lits proof
@@ -396,23 +403,23 @@ module Make(E : Env.S) : S with module Env = E = struct
       HO_unif.unif_pairs ?fuel:None (pairs,0) ~offset
       |> List.map
         (fun (new_pairs, us, penalty) ->
-           let renaming = Ctx.renaming_clear() in
+           let renaming = Subst.Renaming.create() in
            let subst = Unif_subst.subst us in
-           let c_guard = Literal.of_unif_subst ~renaming us in
+           let c_guard = Literal.of_unif_subst renaming us in
            let new_pairs =
              List.map
                (fun (env,t,u) ->
-                  let t = Subst.FO.apply ~renaming subst (T.fun_l env t,0) in
-                  let u = Subst.FO.apply ~renaming subst (T.fun_l env u,0) in
+                  let t = Subst.FO.apply renaming subst (T.fun_l env t,0) in
+                  let u = Subst.FO.apply renaming subst (T.fun_l env u,0) in
                   Literal.mk_constraint t u)
                new_pairs
            and other_lits =
-             Literal.apply_subst_list ~renaming subst (other_lits,0)
+             Literal.apply_subst_list renaming subst (other_lits,0)
            in
            let all_lits = c_guard @ new_pairs @ other_lits in
            let proof =
-             Proof.Step.inference ~rule:(Proof.Rule.mk "ho_unif")
-               [C.proof_parent_subst (c,0) subst]
+             Proof.Step.inference ~rule:(Proof.Rule.mk "ho_unif") ~tags:[Proof.Tag.T_ho]
+               [C.proof_parent_subst renaming (c,0) subst]
            in
            let new_c =
              C.create all_lits proof
@@ -456,7 +463,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun k->k T.pp t T.pp t');
       Util.incr_stat stat_beta;
       assert (T.DB.is_closed t');
-      Some t'
+      Some (t',[])
     )
 
   (* rule for eta-expansion *)
@@ -469,7 +476,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun k->k T.pp t T.pp t');
       Util.incr_stat stat_eta_expand;
       assert (T.DB.is_closed t');
-      Some t'
+      Some (t',[])
     )
 
   (* rule for eta-expansion *)
@@ -482,8 +489,125 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun k->k T.pp t T.pp t');
       Util.incr_stat stat_eta_reduce;
       assert (T.DB.is_closed t');
-      Some t'
+      Some (t',[])
     )
+
+  module TVar = struct
+    type t = Type.t HVar.t
+    let equal = HVar.equal Type.equal
+    let hash = HVar.hash
+    let compare = HVar.compare Type.compare
+  end
+  module VarTermMultiMap = CCMultiMap.Make (TVar) (Term)
+  module VTbl = CCHashtbl.Make(TVar)
+
+  (* Purify variables with different arguments.
+     g X = X a \/ X a = b becomes g X = Y a \/ Y a = b \/ X != Y.
+     Variables at the top level (= naked variables) are not affected. *)
+  let purify_applied_variable c =
+    (* set of new literals *)
+    let new_lits = ref [] in
+    let add_lit_ lit = new_lits := lit :: !new_lits in
+    (* cache for term headed by variable -> replacement variable *)
+    let cache_replacement_ = T.Tbl.create 8 in
+    (* cache for variable -> untouched term (the first term we encounter with a certain variable as head) *)
+    let cache_untouched_ = VTbl.create 8 in
+    (* index of the next fresh variable *)
+    let varidx =
+      Literals.Seq.terms (C.lits c)
+      |> Sequence.flat_map T.Seq.vars
+      |> T.Seq.max_var |> succ
+      |> CCRef.create
+    in
+    (* variable used to purify a term *)
+    let replacement_var t =
+      try T.Tbl.find cache_replacement_ t
+      with Not_found ->
+        let head, _ = T.as_app t in
+        let ty = T.ty head in
+        let v = T.var_of_int ~ty (CCRef.get_then_incr varidx) in
+        let lit = Literal.mk_neq v head in
+        add_lit_ lit;
+        T.Tbl.add cache_replacement_ t v;
+        v
+    in
+    (* Term should not be purified if
+       - this is a naked variable at the top level or
+       - this is the first term we encounter with this variable as head or
+       - it is equal to the first term encountered with this variable as head *)
+    let should_purify t v toplevel =
+      if toplevel && T.is_var t then (
+        Util.debugf ~section 5
+          "Will not purify because toplevel: %a"
+          (fun k->k T.pp t);
+        false
+      )
+      else (
+        try (
+          if t = VTbl.find cache_untouched_ v then (
+            Util.debugf ~section 5
+              "Leaving untouched: %a"
+              (fun k->k T.pp t);false
+          )
+          else (
+            Util.debugf ~section 5
+              "To purify: %a"
+              (fun k->k T.pp t);true
+          )
+        )
+        with Not_found ->
+          VTbl.add cache_untouched_ v t;
+          Util.debugf ~section 5
+            "Add untouched term: %a"
+            (fun k->k T.pp t);
+          false
+      )
+    in
+    (* purify a term *)
+    let rec purify_term toplevel t =
+      let head, args = T.as_app t in
+      match T.as_var head with
+      | Some v ->
+        if should_purify t v toplevel then (
+          (* purify *)
+          Util.debugf ~section 5
+            "Purifying: %a. Untouched is: %a"
+            (fun k->k T.pp t T.pp (VTbl.find cache_untouched_ v));
+          T.app
+            (replacement_var t)
+            (List.map (purify_term false) args)
+        )
+        else (* dont purify *)
+          T.app
+            head
+            (List.map (purify_term false) args)
+      | None -> (* dont purify *)
+        T.app
+          head
+          (List.map (purify_term false) args)
+    in
+    (* purify a literal *)
+    let purify_lit lit =
+      Literal.map (purify_term true) lit
+    in
+    (* try to purify *)
+    let lits' = Array.map purify_lit (C.lits c) in
+    begin match !new_lits with
+      | [] -> SimplM.return_same c
+      | _::_ ->
+        (* replace! *)
+        let all_lits = !new_lits @ (Array.to_list lits') in
+        let parent = C.proof_parent c in
+        let proof =
+          Proof.Step.simp
+            ~rule:(Proof.Rule.mk "ho.purify_applied_variable") ~tags:[Proof.Tag.T_ho]
+            [parent] in
+        let new_clause = (C.create ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof) in
+        Util.debugf ~section 5
+          "Purified: Old: %a New: %a"
+          (fun k->k C.pp c C.pp new_clause);
+        SimplM.return_new new_clause
+    end
 
   let setup () =
     if not (Env.flex_get k_enabled) then (
@@ -509,6 +633,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         | mode ->
           Env.add_unary_inf "ho_prim_enum" (prim_enum ~mode);
       end;
+      if !_purify_applied_vars then
+        Env.add_unary_simplify purify_applied_variable;
     );
     ()
 end
@@ -598,5 +724,6 @@ let () =
       "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";
       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
       "--ho-eta", eta_opt, " eta-expansion/reduction";
+      "--ho-purify", Arg.Set _purify_applied_vars, " enable purification of applied variables"
     ];
   Extensions.register extension;
