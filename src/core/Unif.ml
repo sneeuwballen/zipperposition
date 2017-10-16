@@ -190,6 +190,13 @@ module Inner = struct
     else if S.mem subst v then fail()
     else S.bind subst v t
 
+  (* public "update" function to replace a binding (with occur check) *)
+  let update ?(check=true) subst v t =
+    if check && occurs_check ~depth:0 subst v t
+    then fail()
+    else if not (S.mem subst v) then fail()
+    else S.update subst v t
+
   (* is the type of [t] prop, or some other non-syntactically unifiable type? *)
   let has_non_unifiable_type_or_is_prop (t:T.t): bool = match T.ty t with
     | T.NoType -> false
@@ -975,6 +982,9 @@ module Ty = struct
   let bind =
     (bind :> ?check:bool -> subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst)
 
+  let update =
+    (update :> ?check:bool -> subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst)
+
   let unify_full =
     (unify_full :> ?subst:unif_subst -> term Scoped.t -> term Scoped.t -> unif_subst)
 
@@ -1022,6 +1032,9 @@ module FO = struct
 
   let bind =
     (bind :> ?check:bool -> subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst)
+
+  let update =
+    (update :> ?check:bool -> subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst)
 
   let unify_full =
     (unify_full :> ?subst:unif_subst -> term Scoped.t -> term Scoped.t -> unif_subst)
