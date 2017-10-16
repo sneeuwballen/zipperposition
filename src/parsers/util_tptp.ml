@@ -147,7 +147,8 @@ let parse_file ?cache ~recursive f =
     parse_this_file ?names:None f;
     Err.return (Sequence.of_queue result_decls)
   with
-    | Error msg | Sys_error msg -> Err.fail msg
+    | Error msg | Sys_error msg ->
+      Err.fail (Util.err_spf "in parse_tptp: %s" msg)
     | e -> Err.fail (Printexc.to_string e)
 
 let fpf = Format.fprintf

@@ -75,6 +75,8 @@ let process file =
     >>= TypeInference.infer_statements ?ctx:None ~file
       ~on_var:(Input_format.on_var input)
       ~on_undef:(Input_format.on_undef_id input)
+      ~on_shadow:(Input_format.on_shadow input)
+      ~implicit_ty_args:(Input_format.implicit_ty_args input)
     >|= fun st ->
     if !print_in
     then Format.printf "@[<v2>input:@ %a@]@."

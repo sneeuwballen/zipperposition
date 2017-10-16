@@ -26,7 +26,9 @@ val compare_multiset :  ord:Ordering.t -> t -> t -> Comparison.t
 
 include Interfaces.HASH with type t := t
 
-val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> Subst.t Sequence.t
+val variant :
+  ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
+  (Subst.t * Builtin.Tag.t list) Sequence.t
 (** Variant checking (alpha-equivalence). It can reorder literals to do its
     check, so that might be computationnally expensive (a bit
     like subsumption). *)
@@ -34,7 +36,9 @@ val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> Subst.t Sequence.t
 val are_variant : t -> t -> bool
 (** Simple interface on top of {!variant} with distinc scopes *)
 
-val matching : ?subst:Subst.t -> pattern:t Scoped.t -> t Scoped.t -> Subst.t Sequence.t
+val matching :
+  ?subst:Subst.t -> pattern:t Scoped.t -> t Scoped.t ->
+  (Subst.t * Builtin.Tag.t list) Sequence.t
 
 val matches : t -> t -> bool
 
@@ -46,10 +50,9 @@ val is_ground : t -> bool       (** all the literals are ground? *)
 val to_form : t -> term SLiteral.t list
 (** Make a 'or' formula from literals *)
 
-val apply_subst : renaming:Subst.Renaming.t ->
-  Subst.t -> t Scoped.t -> t
+val apply_subst : Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
 
-val of_unif_subst : renaming:Subst.Renaming.t -> Unif_subst.t -> t
+val of_unif_subst : Subst.Renaming.t -> Unif_subst.t -> t
 
 val map : (term -> term) -> t -> t
 

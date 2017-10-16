@@ -48,6 +48,10 @@ let rec deref t = match t.term with
   | Meta (_, {contents=Some t'}, _) -> deref t'
   | _ -> t
 
+let[@inline] must_deref t : bool = match t.term with
+  | Meta (_, {contents=Some _}, _) -> true
+  | _ -> false
+
 let view t = match t.term with
   | Meta (_, {contents=Some t'}, _) -> (deref t').term
   | v -> v
@@ -216,6 +220,8 @@ let rec pp out t = match view t with
     Format.fprintf out "{%a}" pp_fields l
   | Record (l, Some r) ->
     Format.fprintf out "{%a | %a}" pp_fields l pp r
+  | AppBuiltin (Builtin.Box_opaque, [t]) ->
+    Format.fprintf out "@<1>⟦@[%a@]@<1>⟧" pp_inner t
   | AppBuiltin (b, [a]) when Builtin.is_prefix b ->
     Format.fprintf out "@[%a %a@]" Builtin.pp b pp_inner a
   | AppBuiltin (Builtin.Arrow, ret::args) ->
@@ -268,6 +274,8 @@ and pp_var_ty out v =
     | AppBuiltin (Builtin.Term, []) -> ()
     | _ -> Format.fprintf out ":%a" pp_inner ty
 
+let pp_with_ty out t = Format.fprintf out "(@[%a@,:%a@])" pp t pp (ty_exn t)
+
 exception IllFormedTerm of string
 
 let ill_formed m = raise (IllFormedTerm m)
@@ -284,7 +292,22 @@ let var ?loc v = make_ ?loc ~ty:v.Var.ty (Var v)
 let var_of_string ?loc ~ty n = var ?loc (Var.of_string ~ty n)
 let const ?loc ~ty s = make_ ?loc ~ty (Const s)
 let const_of_cstor ?loc c = const ?loc c.cstor_id ~ty:c.cstor_ty
-let app_builtin ?loc ~ty b l = make_ ?loc ~ty (AppBuiltin (b,l))
+
+let app_builtin ?loc ~ty b l =
+  let mk_ b l = make_ ?loc ~ty (AppBuiltin(b,l)) in
+  begin match b, l with
+    | Builtin.Not, [f'] ->
+      begin match view f' with
+        | AppBuiltin (Builtin.Eq,l) -> mk_ Builtin.Neq l
+        | AppBuiltin (Builtin.Neq,l) -> mk_ Builtin.Eq l
+        | AppBuiltin (Builtin.Not,[t]) -> t
+        | AppBuiltin (Builtin.True,[]) -> mk_ Builtin.False []
+        | AppBuiltin (Builtin.False,[]) -> mk_ Builtin.True []
+        | _ -> mk_ b l
+      end
+    | _ -> mk_ b l
+  end
+
 let ite ?loc a b c =
   let ty = match b.ty with None -> assert false | Some ty -> ty in
   make_ ?loc ~ty (Ite (a,b,c))
@@ -345,7 +368,9 @@ let record_flatten ?loc ~ty l ~rest =
 let at_loc ?loc t = {t with loc; }
 let with_ty ~ty t = {t with ty=Some ty; }
 let map_ty t ~f =
-  {t with ty=match t.ty with
+  {t with
+     hash= ~-1;
+     ty=match t.ty with
        | None -> None
        | Some x -> Some (f x)
   }
@@ -488,6 +513,7 @@ let as_id_app t = match view t with
 
 let vars t = Seq.vars t |> Var.Set.of_seq |> Var.Set.to_list
 
+let free_vars_set t = Seq.free_vars t |> Var.Set.of_seq
 let free_vars t = Seq.free_vars t |> Var.Set.of_seq |> Var.Set.to_list
 
 let free_vars_l l =
@@ -502,6 +528,61 @@ let close_all ~ty s t =
   bind_list ~ty s vars t
 
 let unfold_fun = unfold_binder Binder.Lambda
+
+(* non recursive map *)
+let map ~f ~bind:f_bind b_acc t = match view t with
+  | Var v -> var ?loc:t.loc (Var.update_ty ~f:(f b_acc) v)
+  | Const id -> const ?loc:t.loc id ~ty:(f b_acc (ty_exn t))
+  | App (hd, l) ->
+    let hd = f b_acc hd in
+    let l = List.map (f b_acc) l in
+    app ?loc:t.loc ~ty:(f b_acc (ty_exn t)) hd l
+  | Bind (s, v, body) ->
+    let b_acc', v' = f_bind b_acc v in
+    let body = f b_acc' body in
+    bind ?loc:t.loc ~ty:(f b_acc (ty_exn t)) s v' body
+  | AppBuiltin (Builtin.TType,_) -> t
+  | AppBuiltin (b,l) ->
+    let l = List.map (f b_acc) l in
+    let ty = f b_acc (ty_exn t) in
+    app_builtin ?loc:t.loc ~ty b l
+  | Record (l, rest) ->
+    let ty = f b_acc (ty_exn t) in
+    record_flatten ?loc:t.loc ~ty
+      (List.map (CCPair.map2 (f b_acc)) l)
+      ~rest:(CCOpt.map (f b_acc) rest)
+  | Ite (a,b,c) ->
+    let a = f b_acc a in
+    let b = f b_acc b in
+    let c = f b_acc c in
+    ite ?loc:t.loc a b c
+  | Let (l, u) ->
+    let b_acc', l =
+      CCList.fold_map
+        (fun b_acc' (v,t) ->
+           let t = f b_acc t in
+           let b_acc', v = f_bind b_acc' v in
+           b_acc', (v,t))
+        b_acc l
+    in
+    let u = f b_acc' u in
+    let_ ?loc:t.loc l u
+  | Match (u, l) ->
+    let u = f b_acc u in
+    let l =
+      List.map
+        (fun (c, vars, rhs) ->
+           let b_acc, vars = CCList.fold_map f_bind b_acc vars in
+           c, vars, f b_acc rhs)
+        l
+    in
+    match_ ?loc:t.loc u l
+  | Multiset l ->
+    let ty = f b_acc (ty_exn t) in
+    multiset ?loc:t.loc ~ty (List.map (f b_acc) l)
+  | Meta (v,r,k) ->
+    let v = Var.update_ty v ~f:(f b_acc) in
+    meta ?loc:t.loc (v, r, k)
 
 (** {2 Specific Views} *)
 
@@ -777,13 +858,7 @@ module Form = struct
     | [t] -> t
     | l -> app_builtin ?loc ~ty:Ty.prop Builtin.Or (flatten_ `Or [] l)
 
-  let not_ ?loc f = match view f with
-    | Not f' -> f'
-    | Eq (a,b) -> neq ?loc a b
-    | Neq (a,b) -> eq ?loc a b
-    | True -> false_
-    | False -> true_
-    | _ -> app_builtin ?loc ~ty:Ty.prop Builtin.Not [f]
+  let not_ ?loc f = app_builtin ?loc ~ty:Ty.prop Builtin.Not [f]
 
   let forall ?loc v t = bind ?loc ~ty:Ty.prop Binder.Forall v t
   let exists ?loc v t = bind ?loc ~ty:Ty.prop Binder.Exists v t
@@ -834,10 +909,10 @@ module Subst = struct
   let to_string = CCFormat.to_string pp
 
   let add subst v t =
-    if mem subst v
-    then invalid_arg
-        (CCFormat.sprintf
-           "@[<2>var `@[%a@]` already bound in `@[%a@]`@]" Var.pp_full v pp subst);
+    if mem subst v then (
+      Util.invalid_argf
+        "@[<2>var `@[%a@]`@ already bound in {@[%a@]}@]" Var.pp_full v pp subst
+    );
     Var.Subst.add subst v t
 
   let add_l = List.fold_left (fun subst (v,t) -> add subst v t)
@@ -847,76 +922,57 @@ module Subst = struct
 
   let merge a b = Var.Subst.merge a b
 
-  let rec eval_ subst t = match view t with
+  let rec eval_ ~recursive subst t = match view t with
     | Var v ->
-      begin try
-          let t' = Var.Subst.find_exn subst v in
+      begin match Var.Subst.find subst v with
+        | None ->
+          var ?loc:t.loc (Var.update_ty v ~f:(eval_ ~recursive subst))
+        | Some t' ->
           assert (t != t');
-          eval_ subst t'
-        with Not_found ->
-          var ?loc:t.loc (Var.update_ty v ~f:(eval_ subst))
+          if recursive then (
+            eval_ ~recursive subst t'
+          ) else (
+            t'
+          )
       end
-    | Const _ -> t
-    | App (f, l) ->
-      let ty = eval_ subst (ty_exn t) in
-      app ?loc:t.loc ~ty (eval_ subst f) (eval_list subst l)
-    | Bind (s, v, body) ->
-      let ty = eval_ subst (ty_exn t) in
-      (* bind [v] to a fresh name to avoid collision *)
-      let subst, v' = rename_var subst v in
-      bind ?loc:t.loc ~ty s v' (eval_ subst body)
-    | AppBuiltin (Builtin.TType,_) -> t
-    | AppBuiltin (b,l) ->
-      let ty = eval_ subst (ty_exn t) in
-      app_builtin ?loc:t.loc ~ty b (eval_list subst l)
-    | Record (l, rest) ->
-      let ty = eval_ subst (ty_exn t) in
-      record_flatten ?loc:t.loc ~ty
-        (List.map (CCPair.map2 (eval_ subst)) l)
-        ~rest:(CCOpt.map (eval_ subst) rest)
-    | Ite (a,b,c) ->
-      let a = eval_ subst a in
-      let b = eval_ subst b in
-      let c = eval_ subst c in
-      ite ?loc:t.loc a b c
-    | Let (l, u) ->
-      let subst', l =
-        CCList.fold_map
-          (fun subst' (v,t) ->
-             let t = eval_ subst t in
-             let subst', v = rename_var subst' v in
-             subst', (v,t))
-          subst l
-      in
-      let u = eval_ subst' u in
-      let_ ?loc:t.loc l u
-    | Match (u, l) ->
-      let u = eval_ subst u in
-      let l =
-        List.map
-          (fun (c, vars, rhs) ->
-             let subst, vars = CCList.fold_map rename_var subst vars in
-             c, vars, eval_ subst rhs)
-          l
-      in
-      match_ ?loc:t.loc u l
-    | Multiset l ->
-      let ty = eval_ subst (ty_exn t) in
-      multiset ?loc:t.loc ~ty (eval_list subst l)
-    | Meta (v,r,k) ->
-      let v = Var.update_ty v ~f:(eval_ subst) in
-      meta ?loc:t.loc (v, r, k)
-  and eval_list subst l =
-    List.map (eval_ subst) l
+    | _ ->
+      map subst t
+        ~bind:rename_var
+        ~f:(eval_ ~recursive)
 
-  (* rename variable and evaluate its type *)
+  (* rename variable and evaluate its type. *)
   and rename_var subst v =
-    let v' = Var.copy v |> Var.update_ty ~f:(eval_ subst) in
-    let subst = add subst v (var v') in
+    let v' = Var.copy v |> Var.update_ty ~f:(eval_ ~recursive:true subst) in
+    (* (re-)bind [v] to [v'] *)
+    let subst = Var.Subst.add subst v (var v') in
     subst, v'
 
-  let eval subst t = if is_empty subst then t else eval_ subst t
+  let eval subst t = if is_empty subst then t else eval_ ~recursive:true subst t
+
+  let eval_nonrec subst t = if is_empty subst then t else eval_ ~recursive:false subst t
 end
+
+let rec rename subst t = match view t with
+  | Var v ->
+    begin
+      try
+        let v' = Var.Subst.find_exn subst v in
+        var (Var.update_ty v' ~f:(rename subst))
+      with Not_found ->
+        var ?loc:t.loc (Var.update_ty v ~f:(rename subst))
+    end
+  | _ ->
+    map subst t
+      ~bind:bind_rename_var
+      ~f:rename
+
+(* rename variable and evaluate its type *)
+and bind_rename_var subst v =
+  let v' = Var.copy v |> Var.update_ty ~f:(rename subst) in
+  let subst = Var.Subst.add subst v v' in
+  subst, v'
+
+let rename_all_vars t = rename Subst.empty t
 
 (** {2 Table of Variables} *)
 
@@ -1052,6 +1108,27 @@ let rec rename_vars_l subst l1 l2 = match l1, l2 with
     let subst = rename_vars subst v1 v2 in
     rename_vars_l subst tail1 tail2
 
+(* normalize some terms; a more thorough version of {!deref}.
+   flatten applications and arrow that contain bound variables *)
+let[@inline][@unfold 1] rec normalize subst (t:term) : term = match view t with
+  | App (f,l) when must_deref f ->
+    normalize subst (app ?loc:t.loc ~ty:(ty_exn t) (deref f) l)
+  | App ({term=Var v;_},l) when Subst.mem subst v ->
+    let f = Subst.find_exn subst v in
+    normalize subst (app ?loc:t.loc ~ty:(ty_exn t) (deref f) l)
+  | AppBuiltin (Builtin.Arrow, ret :: args) when must_deref ret ->
+    let vars, args', ret' = Ty.unfold @@ deref ret in
+    if vars=[] then (
+      Ty.fun_ ?loc:t.loc (args @ args') ret'
+    ) else t
+  | AppBuiltin (Builtin.Arrow, {term=Var v;_} :: args) when Subst.mem subst v ->
+    let ret = Subst.find_exn subst v in
+    let vars, args', ret' = Ty.unfold @@ deref ret in
+    if vars=[] then (
+      Ty.fun_ ?loc:t.loc (args @ args') ret' |> normalize subst
+    ) else t
+  | _ -> deref t
+
 let unify ?(allow_open=false) ?loc ?(st=UStack.create()) ?(subst=Subst.empty) t1 t2 =
   let stack = ref [] in
   let fail_ msg = fail_uniff_ ?loc !stack msg in
@@ -1060,6 +1137,8 @@ let unify ?(allow_open=false) ?loc ?(st=UStack.create()) ?(subst=Subst.empty) t1
     else (
       let old_stack = !stack in
       unify_tys subst t1 t2;
+      let t1 = normalize subst t1 in
+      let t2 = normalize subst t2 in
       stack := (t1,t2) :: old_stack;
       unify_terms subst t1 t2;
       stack := old_stack; (* restore stack *)

@@ -29,19 +29,27 @@ type attrs = attr list
 
 type 'ty skolem = ID.t * 'ty
 
-type ('t, 'ty) term_rule = 'ty Var.t list * ID.t * 'ty * 't list * 't
-(** [forall vars, id args = rhs] *)
-
 (** polarity for rewrite rules *)
 type polarity = [`Equiv | `Imply]
 
-type ('f, 't, 'ty) form_rule = 'ty Var.t list * 't SLiteral.t * 'f list * polarity
-(** [forall vars, lhs op bigand rhs] where [op] depends on
-    [polarity] (in [{=>, <=>, <=}]) *)
-
 type ('f, 't, 'ty) def_rule =
-  | Def_term of ('t, 'ty) term_rule
-  | Def_form of ('f, 't, 'ty) form_rule
+  | Def_term of {
+      vars: 'ty Var.t list;
+      id: ID.t;
+      ty: 'ty;
+      args: 't list;
+      rhs: 't;
+      as_form: 'f;
+    } (** [forall vars, id args = rhs] *)
+
+  | Def_form of {
+      vars: 'ty Var.t list;
+      lhs: 't SLiteral.t;
+      rhs: 'f list;
+      polarity: polarity;
+      as_form: 'f list;
+    } (** [forall vars, lhs op bigand rhs] where [op] depends on
+          [polarity] (in [{=>, <=>, <=}]) *)
 
 type ('f, 't, 'ty) def = {
   def_id: ID.t;
@@ -95,8 +103,6 @@ let mk_ ?(attrs=[]) ~proof view: (_,_,_) t =
 let ty_decl ?attrs ~proof id ty = mk_ ?attrs ~proof (TyDecl (id,ty))
 let def ?attrs ~proof l = mk_ ?attrs ~proof (Def l)
 let rewrite ?attrs ~proof d = mk_ ?attrs ~proof (Rewrite d)
-let rewrite_term ?attrs ~proof r = rewrite ?attrs ~proof (Def_term r)
-let rewrite_form ?attrs ~proof r = rewrite ?attrs ~proof (Def_form r)
 let data ?attrs ~proof l = mk_ ?attrs ~proof (Data l)
 let assert_ ?attrs ~proof c = mk_ ?attrs ~proof (Assert c)
 let lemma ?attrs ~proof l = mk_ ?attrs ~proof (Lemma l)
@@ -113,19 +119,22 @@ let map_data ~ty:fty d =
           d.data_cstors;
   }
 
+let map_def_rule ~form:fform ~term:fterm ~ty:fty d = match d with
+  | Def_term {vars;id;ty;args;rhs;as_form} ->
+    let vars = List.map (Var.update_ty ~f:fty) vars in
+    Def_term {vars;id;ty=fty ty;args=List.map fterm args;
+              rhs=fterm rhs; as_form=fform as_form}
+  | Def_form {vars;lhs;rhs;polarity;as_form} ->
+    let vars = List.map (Var.update_ty ~f:fty) vars in
+    Def_form {vars;lhs=SLiteral.map ~f:fterm lhs;
+              rhs=List.map fform rhs;polarity;
+              as_form=List.map fform as_form}
+
 let map_def ~form:fform ~term:fterm ~ty:fty d =
   { d with
       def_ty=fty d.def_ty;
       def_rules=
-        List.map
-          (function
-            | Def_term (vars,id,ty,args,rhs) ->
-              let vars = List.map (Var.update_ty ~f:fty) vars in
-              Def_term (vars, id, fty ty, List.map fterm args, fterm rhs)
-            | Def_form (vars,lhs,rhs,pol) ->
-              let vars = List.map (Var.update_ty ~f:fty) vars in
-              Def_form (vars, SLiteral.map ~f:fterm lhs, List.map fform rhs, pol))
-          d.def_rules;
+        List.map (map_def_rule ~form:fform ~term:fterm ~ty:fty) d.def_rules;
   }
 
 let map ~form ~term ~ty st =
@@ -134,14 +143,7 @@ let map ~form ~term ~ty st =
       let l = List.map (map_def ~form ~term ~ty) l in
       Def l
     | Rewrite d ->
-      let d = match d with
-        | Def_term (vars, id, ty, args, rhs) ->
-          let vars = List.map (Var.update_ty ~f:fty) vars in
-          Def_term (vars, id, fty ty, List.map term args, term rhs)
-        | Def_form (vars,lhs,rhs,pol) ->
-          let vars = List.map (Var.update_ty ~f:fty) vars in
-          Def_form (vars, SLiteral.map ~f:term lhs, List.map form rhs, pol)
-      in
+      let d = map_def_rule ~form ~term ~ty d in
       Rewrite d
     | Data l ->
       let l = List.map (map_data ~ty:fty) l in
@@ -175,31 +177,25 @@ let declare_defined_cst id ~level (rules:definition) : unit =
   let _ = Rewrite.Defined_cst.declare ~level id rules in
   ()
 
-let conv_term_rule (r:_ term_rule) proof: Rewrite.Term.rule =
-  let _, id, ty, args, rhs = r in
-  Rewrite.Term.Rule.make id ty args rhs ~proof
-
-(* returns either a term or a lit rule (depending on whether RHS is atomic) *)
-let conv_lit_rule (r:_ form_rule) proof : Rewrite.rule =
-  let _, lhs, rhs, _ = r in
-  let lhs = Literal.Conv.of_form lhs in
-  let rhs = List.map (List.map Literal.Conv.of_form) rhs in
-  Rewrite.Rule.make_lit lhs rhs ~proof
+let conv_rule ~proof (r:_ def_rule) : Rewrite.rule = match r with
+  | Def_term {id;ty;args;rhs;_} ->
+    Rewrite.T_rule (Rewrite.Term.Rule.make id ty args rhs ~proof)
+  | Def_form {lhs;rhs;_} ->
+    (* returns either a term or a lit rule (depending on whether RHS is atomic) *)
+    let lhs = Literal.Conv.of_form lhs in
+    let rhs = List.map (List.map Literal.Conv.of_form) rhs in
+    Rewrite.Rule.make_lit lhs rhs ~proof
 
 (* convert rules *)
 let conv_rules (l:_ def_rule list) proof : definition =
   assert (l <> []);
-  List.map
-    (function
-      | Def_term r -> Rewrite.Rule.of_term (conv_term_rule r proof)
-      | Def_form r -> conv_lit_rule r proof)
-    l
+  List.map (conv_rule ~proof) l
   |> Rewrite.Rule_set.of_list
 
 let terms_of_rule (d:_ def_rule): _ Sequence.t = match d with
-  | Def_term (_, _, _, args, rhs) ->
+  | Def_term {args;rhs;_} ->
     Sequence.of_list (rhs::args)
-  | Def_form (_, lhs, rhs, _) ->
+  | Def_form {lhs;rhs;_} ->
     Sequence.cons lhs (Sequence.of_list rhs |> Sequence.flat_map Sequence.of_list)
     |> Sequence.flat_map SLiteral.to_seq
 
@@ -235,18 +231,18 @@ module Seq = struct
   let mk_form f = `Form f
 
   let seq_of_rule (d:_ def_rule): _ Sequence.t = fun k -> match d with
-    | Def_term (vars, _, ty, args, rhs) ->
+    | Def_term {vars; ty; args; rhs; _} ->
       k (`Ty ty);
       List.iter (fun v->k (`Ty (Var.ty v))) vars;
       List.iter (fun t->k (`Term t)) (rhs::args);
-    | Def_form (vars, lhs, rhs, _) ->
+    | Def_form {vars;lhs;rhs;_} ->
       List.iter (fun v->k (`Ty (Var.ty v))) vars;
       SLiteral.to_seq lhs |> Sequence.map mk_term |> Sequence.iter k;
       Sequence.of_list rhs |> Sequence.map mk_form |> Sequence.iter k
 
   let to_seq st k =
     let decl id ty = k (`ID id); k (`Ty ty) in
-    match view st with
+    begin match view st with
       | TyDecl (id,ty) -> decl id ty;
       | Def l ->
         List.iter
@@ -257,11 +253,11 @@ module Seq = struct
           l
       | Rewrite d ->
         begin match d with
-          | Def_term (_,_,ty,args,rhs) ->
+          | Def_term {ty;args;rhs;_}  ->
             k (`Ty ty);
             List.iter (fun t -> k (`Term t)) args;
             k (`Term rhs)
-          | Def_form (_,lhs,rhs,_) ->
+          | Def_form {lhs;rhs;_} ->
             SLiteral.iter ~f:(fun t -> k (`Term t)) lhs;
             List.iter (fun f -> k (`Form f)) rhs
         end
@@ -279,6 +275,7 @@ module Seq = struct
       | Assert f
       | Goal f -> k (`Form f)
       | NegatedGoal (_,l) -> List.iter (fun f -> k (`Form f)) l
+    end
 
   let ty_decls st k = match view st with
     | Def l ->
@@ -303,8 +300,20 @@ module Seq = struct
     | Assert _ -> ()
 
   let forms st =
-    to_seq st
-    |> Sequence.filter_map (function `Form f -> Some f | _ -> None)
+    let forms_def = function
+      | Def_term {as_form;_} -> [as_form]
+      | Def_form {as_form;_} -> as_form
+    in
+    begin match view st with
+      | Rewrite d -> Sequence.of_list (forms_def d)
+      | Def l ->
+        Sequence.of_list l
+        |> Sequence.flat_map_l (fun d -> d.def_rules)
+        |> Sequence.flat_map_l forms_def
+      | _ ->
+        to_seq st
+        |> Sequence.filter_map (function `Form f -> Some f | _ -> None)
+    end
 
   let lits st = forms st |> Sequence.flat_map Sequence.of_list
 
@@ -372,10 +381,10 @@ let pp_def_rule ppf ppt ppty out d =
     | l -> fpf out "forall %a.@ " (pp_typedvar_l ppty) l
   in
   begin match d with
-    | Def_term (vars,id,_,args,rhs) ->
+    | Def_term {vars;id;args;rhs;_} ->
       fpf out "@[<2>%a@[<2>%a%a@] =@ %a@]"
         pp_vars vars ID.pp id pp_args args ppt rhs
-    | Def_form (vars,lhs,rhs,pol) ->
+    | Def_form {vars;lhs;rhs;polarity=pol;_} ->
       let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
       fpf out "@[<2>%a%a %s@ (@[<hv>%a@])@]"
         pp_vars vars
@@ -406,10 +415,10 @@ let pp ppf ppt ppty out st =
         pp_attrs attrs (Util.pp_list ~sep:" and " (pp_def ppf ppt ppty)) l
     | Rewrite d ->
       begin match d with
-        | Def_term (_, id, _, args, rhs) ->
+        | Def_term {id;args;rhs;_} ->
           fpf out "@[<2>rewrite%a@ @[%a %a@]@ = @[%a@]@]." pp_attrs attrs
             ID.pp id (Util.pp_list ~sep:" " ppt) args ppt rhs
-        | Def_form (_, lhs, rhs, pol) ->
+        | Def_form {lhs;rhs;polarity=pol;_} ->
           let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
           fpf out "@[<2>rewrite%a@ @[%a@]@ %s @[%a@]@]." pp_attrs attrs
             (SLiteral.pp ppt) lhs op (Util.pp_list ~sep:" && " ppf) rhs
@@ -481,10 +490,10 @@ module ZF = struct
           pp_attrs attrs (Util.pp_list ~sep:" and " (pp_def ppf ppt ppty)) l
       | Rewrite d ->
         begin match d with
-          | Def_term (vars, id, _, args, rhs) ->
+          | Def_term {vars;id;args;rhs;_} ->
             fpf out "@[<2>rewrite%a@ @[<2>%a@[%a %a@]@ = @[%a@]@]@]." pp_attrs attrs
               pp_vars vars ID.pp_zf id (Util.pp_list ~sep:" " ppt) args ppt rhs
-          | Def_form (vars, lhs, rhs, pol) ->
+          | Def_form {vars;lhs;rhs;polarity=pol;_} ->
             let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
             fpf out "@[<2>rewrite%a@ @[<2>%a@[%a@]@ %s @[%a@]@]@]." pp_attrs attrs
               pp_vars vars (SLiteral.ZF.pp ppt) lhs op
@@ -506,7 +515,7 @@ module ZF = struct
       | Goal f ->
         fpf out "@[<2>goal%a@ @[%a@]@]." pp_attrs attrs ppf f
       | NegatedGoal (_, l) ->
-        fpf out "@[<hv2>goal%a@ ~(@[<hv>%a@])."
+        fpf out "@[<hv2>goal%a@ ~(@[<hv>%a@])@]."
           pp_attrs attrs
           (Util.pp_list ~sep:", " (CCFormat.hovbox ppf)) l
 
@@ -534,9 +543,9 @@ module TPTP = struct
         | l -> fpf out "(@[%a@])" (Util.pp_list ~sep:"," ppt) l
       in
       let pp_rule out = function
-        | Def_term (vars,id,_,args,rhs) ->
+        | Def_term {vars;id;args;rhs;_} ->
           fpf out "%a(@[%a%a@] =@ %a)" pp_quant_vars vars ID.pp_tstp id pp_args args ppt rhs
-        | Def_form (vars,lhs,rhs,pol) ->
+        | Def_form {vars;lhs;rhs;polarity=pol;_} ->
           let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
           fpf out "%a(@[%a@] %s@ (@[<hv>%a@]))"
             pp_quant_vars vars (SLiteral.pp ppt) lhs op
@@ -576,10 +585,10 @@ module TPTP = struct
         Format.fprintf out "@]";
       | Rewrite d ->
         begin match d with
-          | Def_term (_, id, _, args, rhs) ->
+          | Def_term {id;args;rhs;_} ->
             fpf out "@[<2>tff(%a, axiom,@ %a(%a) =@ @[%a@])@]."
               pp_name name ID.pp_tstp id (Util.pp_list ~sep:", " ppt) args ppt rhs
-          | Def_form (_, lhs, rhs, pol) ->
+          | Def_form {lhs;rhs;polarity=pol;_} ->
             let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
             fpf out "@[<2>tff(%a, axiom,@ %a %s@ (@[%a@]))@]."
               pp_name name (SLiteral.TPTP.pp ppt) lhs op
@@ -618,7 +627,8 @@ let res_tc_i : input_t Proof.result_tc =
     ~pp_in:pp_input_in
     ~is_stmt:true
     ~name
-    ~to_form:(fun ~ctx:_ _ -> assert false) (* TODO *)
+    ~to_form:(fun ~ctx:_ st ->
+      Seq.forms st |> Sequence.to_list |> TypedSTerm.Form.and_)
     ()
 
 let res_tc_c : clause_t Proof.result_tc =
@@ -629,7 +639,21 @@ let res_tc_c : clause_t Proof.result_tc =
     ~pp_in:pp_clause_in
     ~is_stmt:true
     ~name
-    ~to_form:(fun ~ctx:_ _ -> assert false) (* TODO *)
+    ~to_form:(fun ~ctx st ->
+      let module F = TypedSTerm.Form in
+      let conv_c (c:clause) : formula =
+        c
+        |> List.rev_map
+          (fun lit ->
+             SLiteral.map lit ~f:(Term.Conv.to_simple_term ctx)
+             |> SLiteral.to_form)
+        |> F.or_
+        |> F.close_forall
+      in
+      Seq.forms st
+      |> Sequence.map conv_c
+      |> Sequence.to_list
+      |> F.and_)
     ()
 
 let as_proof_i t = Proof.S.mk t.proof (Proof.Result.make res_tc_i t)
@@ -673,26 +697,18 @@ let scan_stmt_for_defined_cst (st:(clause,Term.t,Type.t) t): unit = match view s
       ids_and_levels
   | Rewrite d ->
     let proof = as_proof_c st in
-    begin match d with
-      | Def_term rule ->
-        (* declare the rule, possibly making its head defined *)
-        let r = conv_term_rule rule proof in
+    let r = conv_rule ~proof d in
+    begin match r with
+      | Rewrite.T_rule r ->
         let id = Rewrite.Term.Rule.head_id r in
         Rewrite.Defined_cst.declare_or_add id (Rewrite.T_rule r)
-      | Def_form r ->
-        let r = conv_lit_rule r proof in
-        begin match r with
-          | Rewrite.T_rule tr ->
-            let id = Rewrite.Term.Rule.head_id tr in
+      | Rewrite.L_rule lr ->
+        begin match Rewrite.Lit.Rule.head_id lr with
+          | Some id ->
             Rewrite.Defined_cst.declare_or_add id r
-          | Rewrite.L_rule lr ->
-            begin match Rewrite.Lit.Rule.head_id lr with
-              | Some id ->
-                Rewrite.Defined_cst.declare_or_add id r
-              | None ->
-                assert (Rewrite.Lit.Rule.is_equational lr);
-                Rewrite.Defined_cst.add_eq_rule lr
-            end
+          | None ->
+            assert (Rewrite.Lit.Rule.is_equational lr);
+            Rewrite.Defined_cst.add_eq_rule lr
         end
     end
   | _ -> ()

@@ -16,22 +16,6 @@ module type S = sig
   (** New congruence.
       @param size a hint for the initial size of the hashtable. *)
 
-  val clear : t -> unit
-  (** Clear the content of the congruence. It is now equivalent to
-      the empty congruence. *)
-
-  type level
-
-  val save : t -> level
-  (** Push a checkpoint on the stack of the congruence. An equivalent call
-      to {!pop} will restore the congruence to its current state. *)
-
-  val restore : t -> level -> unit
-  (** Restore to the given checkpoint. *)
-
-  val find : t -> term -> term
-  (** Current representative of this term *)
-
   val iter : t -> (mem:term -> repr:term -> unit) -> unit
   (** Iterate on terms that are explicitely present in the congruence.
       The callback is given [mem], the term itself, and [repr],
@@ -46,24 +30,14 @@ module type S = sig
       Exactly one term per congruence class will be passed to the
       function. *)
 
-  val mk_eq : t -> term -> term -> unit
-  (** [mk_eq congruence t1 t2] asserts that [t1 = t2] belongs to
-      the congruence *)
+  val add : t -> term -> t
+  (** Add the term to the congruence closure *)
 
-  val mk_less : t -> term -> term -> unit
-  (** [mk_less congruence t1 t2] asserts that [t1 < t2] belongs to
+  val mk_eq : t -> term -> term -> t
+  (** [mk_eq congruence t1 t2] asserts that [t1 = t2] belongs to
       the congruence *)
 
   val is_eq : t -> term -> term -> bool
   (** Returns true if the two terms are equal in the congruence. This
       updates the congruence, because the two terms need to be added. *)
-
-  val is_less : t -> term -> term -> bool
-  (** Returns true if the first term is strictly lower than the second
-      one in the congruence *)
-
-  val cycles : t -> bool
-  (** Checks whether there are cycles in inequalities.
-      @return true if calls to [mk_eq] and [mk_less] entail a cycle in
-      the ordering (hence contradicting irreflexivity/transitivity of less) *)
 end

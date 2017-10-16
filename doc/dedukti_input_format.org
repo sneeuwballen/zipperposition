@@ -1,0 +1,334 @@
+#+Title: Dedukti Input Format for Automated Theorem Provers
+
+* Introduction
+
+This document is a proposal for a format used as input for
+Dedukti-aware automated theorem provers.
+
+This format is used in the FoCaLiZe system to integrate Zenon Modulo
+when translating FoCaLiZe to Dedukti hence a prover implementing this
+format and producing Dedukti proofs can be integrated in FoCaLiZe.
+
+More precisely, this document describes Zenon Modulo Dedukti parser.
+
+* Overview and Term Syntax
+
+The format describes problems in a polymorphic logic.  As usual in
+type theory and thougeven if Zenon is classical prover, booleans are
+distinguished from propositions; booleans are a datatype with two
+constructors (true and false) wheras propositions are built from
+logical connectives and quantifiers.
+
+This overview is structured as follows: we first describe the minimal
+core of the language then list all the extensions implemented in Zenon
+Modulo.  These extensions are fairly independent.
+
+** Minimal core
+
+*** Simple types
+
+ - the Dedukti type =cc.uT : Type= is the type of codes for simple types
+ - if =ty : cc.uT= is (the code of) a simple type, then =cc.eT ty : Type=
+   is the Dedukti type of its terms.
+ - if =ty1 : cc.uT= and =ty2 : cc.uT= are simple types,
+   then =cc.Arrow ty1 ty2 : cc.uT= is a simple type and the Dedukti
+   type =cc.eT (cc.Arrow ty1 ty2) : Type= is identical to
+   =cc.eT ty1 -> cc.eT ty2=.
+
+ Type variables are represented shallowly by Dedukti variables of type
+ =cc.uT=. Type schemes are represented as Dedukti dependent types; for
+ example the type scheme \(\Pi \alpha, \beta, \gamma.~(\alpha \to \beta) \to
+ (\beta \to \gamma) \to \alpha \to \gamma\) is written
+ =__var_a : cc.uT -> __var_b : cc.uT -> __var_c : cc.uT -> cc.eT (cc.Arrow (cc.Arrow __var_a __var_b) (cc.Arrow (cc.Arrow __var_b __var_c) (cc.Arrow __var_a __var_c)))=.
+
+Remark that since our type system uses simple types, higher-order
+functions are syntactically allowed.  However, contrary to
+higher-order logic, there is no simple type for propositions.
+
+*** Propositions
+
+ - =dk_logic.Prop : Type= is the Dedukti type of propositions, it is not
+   considered as a simple type.
+ - =dk_builtins.prop= is an alias for =dk_logic.Prop=.
+ - if =A= is a proposition, then =dk_logic.eP A= is the Dedukti type of its proofs.
+ - =cc.eP= is an alias for =dk_logic.eP= (TODO: is this alias still used?)
+
+ - propositions are built from
+   + =dk_logic.true : dk_logic.Prop= (truth)
+   + =dk_logic.false : dk_logic.Prop= (falsehood)
+   + =dk_logic.not : dk_logic.Prop -> dk_logic.Prop= (negation)
+   + =dk_logic.and : dk_logic.Prop -> dk_logic.Prop -> dk_logic.Prop= (conjunction)
+   + =dk_logic.or : dk_logic.Prop -> dk_logic.Prop -> dk_logic.Prop= (disjunction)
+   + =dk_logic.imp : dk_logic.Prop -> dk_logic.Prop -> dk_logic.Prop= (implication)
+   + =dk_logic.eqv : dk_logic.Prop -> dk_logic.Prop -> dk_logic.Prop= (logical equivalence)
+   + =dk_logic.equal : __var_a : cc.uT -> cc.eT __var_a -> cc.eT __var_a -> dk_logic.Prop= (polymorphic equality)
+   + =dk_logic.forall : __var_a : cc.uT -> (cc.eT __var_a -> dk_logic.Prop) -> dk_logic.Prop= (universal quantification)
+   + =dk_logic.exists : __var_a : cc.uT -> (cc.eT __var_a -> dk_logic.Prop) -> dk_logic.Prop= (existential quantification)
+
+** Type-level quantification
+
+This extension adds quantifiers allowing to state properties about types.
+
+ - =dk_logic.forall_type : (cc.uT -> dk_logic.Prop) -> dk_logic.Prop= (type-level universal quantification)
+ - =dk_logic.exists_type : (cc.uT -> dk_logic.Prop) -> dk_logic.Prop= (type-level existential quantification)
+
+For example, reflexivity of the polymorphic equality can be stated as =refl : dk_logic.eP (dk_logic.forall_type (__var_a : cc.uT => dk_logic.forall __var_a (x : cc.eT __var_a => dk_logic.equal __var_a x x)))=.
+
+** Booleans
+
+The type =basics.bool__t : cc.uT= of booleans is built-in with the
+following operations:
+- =dk_logic.ebP : cc.eT basics.bool__t -> dk_logic.Prop= (canonical injection)
+- =basics.true : cc.eT basics.bool__t=
+- =dk_bool.true= is an alias for =basics.true=
+- =basics.false : cc.eT basics.bool__t=
+- =dk_bool.false= is an alias for =basics.false=
+- =basics._amper__amper_ : cc.eT basics.bool__t -> cc.eT basics.bool__t -> cc.eT basics.bool__t= (boolean conjunction)
+- =basics._bar__bar_ : cc.eT basics.bool__t -> cc.eT basics.bool__t -> cc.eT basics.bool__t= (boolean disjunction)
+- =basics._bar__lt__gt__bar_ : cc.eT basics.bool__t -> cc.eT basics.bool__t -> cc.eT basics.bool__t= (boolean exclusive disjunction)
+- =basics._tilda__tilda_ : basics._tilda__tilda_ -> basics._tilda__tilda_= (boolean negation)
+- =basics._equal_ : __var_a : cc.uT -> cc.eT __var_a -> cc.eT __var_a -> cc.eT basics.bool__t= (polymorphic decidable equality)
+- =basics.syntactic_equal= is an alias for =basics._equal=
+- =dk_bool.ite : __var_a : cc.uT -> cc.eT basics.bool__t -> cc.eT __var_a -> cc.eT __var_a -> cc.eT __var_a= (polymorphic if then else)
+
+The following rewrite rules are assumed:
+- =[__var_a : cc.uT, x : cc.eT __var_a, y : cc.eT __var_a] dk_logic.ebP (basics._equal_ __var_a x y) --> dk_logic.equal __var_a x y=
+- =[] dk_logic.ebP basics.true --> dk_logic.true=
+- =[] dk_logic.ebP basics.false --> dk_logic.false=
+
+** Failure
+   Simple types are assumed non-empty thanks to the polymorphic
+   failure function =dk_fail.fail : __var_a : cc.uT -> cc.eT __var_a=.
+
+   This function is uninterpreted.
+
+** Tuples
+
+The binary type constructor =dk_tuple.prod : cc.uT -> cc.uT -> cc.uT=
+of tuples is built-in with the following operations:
+- =dk_tuple.pair : __var_a : cc.uT -> __var_b : cc.uT -> cc.eT __var_a -> cc.eT __var_b -> cc.eT (dk_tuple.prod __var_a __var_b)= (constructor)
+- =basics.pair= is an alias for =dk_tuple.pair=
+- =basics.fst : __var_a : cc.uT -> __var_b : cc.uT -> cc.eT (dk_tuple.prod __var_a __var_b) -> cc.eT __var_a= (first projection)
+- =basics.snd : __var_a : cc.uT -> __var_b : cc.uT -> cc.eT (dk_tuple.prod __var_a __var_b) -> cc.eT __var_b= (second projection)
+- =dk_tuple.match__pair : __var_a : cc.uT -> __var_b : cc.uT -> __var_c : cc.uT -> cc.eT (dk_tuple.prod __var_a __var_b) -> (cc.eT __var_a -> cc.eT __var_b -> cc.eT __var_c) -> cc.eT __var_c -> cc.eT __var_c= (destructor)
+
+The following rewrite rules are assumed:
+- =[__var_a : cc.uT, __var_b : cc.uT, a : cc.eT __var_a, b : cc.eT __var_b] dk_tuple.fst __var_a __var_b (dk_tuple.pair __var_a __var_b a b) --> a=
+- =[__var_a : cc.uT, __var_b : cc.uT, a : cc.eT __var_a, b : cc.eT __var_b] dk_tuple.snd __var_a __var_b (dk_tuple.pair __var_a __var_b a b) --> b=
+- =[__var_a : cc.uT, __var_b : cc.uT, __var_c : cc.uT, t : cc.eT (dk_tuple.prod __var_a __var_b), f : cc.eT __var_a -> cc.eT __var_b -> cc.eT __var c, d : cc.eT __var_c] dk_tuple.match_pair __var_a __var_b __var_c t f d --> f (dk_tuple.fst t) (dk_tuple.snd t)=
+
+The last argument of the destructor is never used, it is only present
+for the sake of consistency with the destructors of user-defined
+datatypes as encoded by FoCaLiZe Dedukti backend.
+
+** Lists
+
+The unary type constructor =basics.list__t : cc.uT -> cc.uT= of
+polymorphic lists is built-in with the following operations:
+- =nil : __var_a : cc.uT -> cc.eT (basics.list__t __var_a)=
+- =cons : __var_a : cc.uT -> cc.eT __var_a -> cc.eT (basics.list__t __var_a) -> cc.eT (basics.list__t __var_a)=
+- =basics.match_nil : __var_a : cc.uT -> __var_b : cc.uT -> cc.eT (basics.list__t __var_a) -> cc.eT __var_b -> cc.eT __var_b -> cc.eT __var_b=
+- =basics.match_cons : __var_a : cc.uT -> __var_b : cc.uT -> cc.eT (basics.list__t __var_a) -> (cc.eT __var_a -> cc.eT (basics.list__t __var_a) -> cc.eT __var_b) -> cc.eT __var_b -> cc.eT __var_b=
+The following rewrite rules are assumed:
+- =[__var_a : cc.uT, __var_b : cc.uT, p : cc.eT __var_b, d : cc.eT __var_b] basics.match_nil __var_a __var_b nil p d --> p=
+- =[__var_a : cc.uT, __var_b : cc.uT, a : cc.eT __var_a, l : cc.eT (basics.list__t __var_a), p : cc.eT __var_b, d : cc.eT __var_b] basics.match_nil __var_a __var_b (cons __var_a a l) p d --> d=
+- =[__var_a : cc.uT, __var_b : cc.uT, f : (cc.eT __var_a -> cc.eT (basics.list__t __var_a) -> cc.eT __var_b), d : cc.eT __var_b] basics.match_cons __var_a __var_b nil f d --> d=
+- =[__var_a : cc.uT, __var_b : cc.uT, a : cc.eT __var_a, l : cc.eT (basics.list__t __var_a), f : (cc.eT __var_a -> cc.eT (basics.list__t __var_a) -> cc.eT __var_b), d : cc.eT __var_b] baiscs.match_cons __var_a __var_b (cons __var_a a l) f d --> f a l=
+
+Remark that the name of the constructors =nil= and =cons= are not qualified because =nil= and =cons= are keywords in Sukerujo.
+
+** Numbers
+
+The type =dk_nat.nat= of natural numbers is built-in. Natural numbers
+literals ar entered in decimal notation.
+
+The type =basics.int__t= of integers is built-in with the following operation:
+- =dk_int.from_nat : cc.eT dk_nat.nat -> cc.eT basics.int__t=
+
+** Other Built-in Types
+
+The following types are also built-in but come for now without operation:
+- =basics.char__t=
+- =basics.string__t=
+- =basics.float__t=
+
+** Recursion
+
+Recursive definitions are written as rewrite systems. To avoid the definition to trivially diverge, the polymorphic function =dk_builtins.call_by_value : __var_a : cc.uT -> __var_b : cc.uT -> (cc.eT __var_a -> cc.eT __var_b) -> cc.eT __var_a -> cc.eT __var_b= is used to freeze the computation until its last argument looks like a value (starts with a constructor).  The ATP does not need to interpret this function because it will recieve the necessary axiom.
+
+* File structure
+
+ A file describes an individual problem, it is composed of three
+ parts:
+- optional headers
+- declarations, axioms, and rewrite rules
+- goal
+
+** Headers
+
+Headers are optional. When at least one header is present, the whole
+file must be enclosed between "%%begin-auto-proof" and
+"%%end-auto-proof".
+
+There are two kinds of headers; block headers enclosed between
+"%%begin-[KEY]:" and "%%end-[KEY]" for some "[KEY]" and inline headers
+starting with "%%[KEY]:" for some "[KEY]".
+
+*** Inline headers
+
+- "type": the header introduces an abstract type
+  Example: %%type: real
+- "name": the header introduces a name for the problem
+  Example: %%name: my_conjecture
+- any other identifier: the header is ignored
+  Syntax: %%foo:
+
+*** Block headers
+
+The following block headers keys should be understood:
+- "type-alias": the header introduces a name for a simple type
+  Example: %%begin-type-alias: nat_pred := cc.Arrow dk_nat.nat basics.bool__t %%end-type-alias
+- "variable": the header declares a symbol
+  Example: %%begin-variable: o : cc.Arrow dk_nat.nat (cc.Arrow dk_nat.nat dk_nat.nat) %%end-variable
+
+  This is deprecated: variables should be declared in the body of the
+  problem.  Provers can ignore this header.
+
+- "hypothesis": the header adds an axiom
+  Example: %%begin-hypothesis: o_commutes : dk_logic.eP (dk_logic.forall dk_nat.nat (x : cc.eT dk_nat.nat => dk_logic.forall dk_nat.nat (y : cc.eT dk_nat.nat => dk_logic.equal dk_nat.nat (o x y) (o y x)))) %%end-hypothesis
+
+  This is deprecated: axioms should be added in the body of the
+  problem. Provers can ignore this header.
+
+** Declarations, Axioms, and Rewrite Rules
+
+The main part of a problem is a list of Dedukti sentences which can be
+either declarations (of symbols or axioms), definitions, or rewrite
+rules.
+
+Each sentence can be preceded by the keyword "(;_MUST_USE_;)"
+(considered as a comment by Dedukti) indicated that the prover should
+fail in case it finds a proof not using the given sentence.
+
+*** Declarations
+
+the following kinds of declarations are allowed:
+- types and type constructors:
+- predicate symbols
+- function symbols
+- axioms
+
+*** Definitions
+
+Only functions can be defined:
+
+*** Rewrite rules
+
+Rewrite rules are at term level only.
+
+** Goal
+The goal is declared with the same syntax than an axiom. The goal is
+distinguished from axioms by coming last.
+
+* BNF
+
+%% Tokens
+
+<ID> ::- [_'0-9a-zA-Z]+
+<QID> ::- <ID>.<ID>
+<NUMBER> ::- [0-9]+
+<DEFKW> ::- def
+<TYPE> ::- cc.uT | Type
+<TERM> ::- cc.eT
+<PROOF> ::- cc.eP | dk_logic.eP
+<CCARR> ::- cc.Arrow
+<TRUE> ::- dk_logic.true
+<FALSE> ::- dk_logic.false
+<NOT> ::- dk_logic.not
+<AND> ::- dk_logic.and
+<OR> ::- dk_logic.or
+<IMP> ::- dk_logic.imp
+<EQV> ::- dk_logic.eqv
+<EQUAL> ::- dk_logic.equal
+<ALL> ::- dk_logic.forall
+<EX> ::- dk_logic.exists
+<ALL_TYPE> ::- dk_logic.forall_type
+<EX_TYPE> ::- dk_logic.exists_type
+<ISTRUE> ::- dk_logic.ebP
+<PROP> ::- dk_logic.Prop | dk_builtins.prop
+<COLON> ::- [:]
+<DOT> ::- [.]
+<ARROW> ::- ->
+<DOUBLE_ARROW> ::- =>
+<DEF> ::- :=
+<LPAREN> ::- [(]
+<RPAREN> ::- [)]
+<LBRACK> ::- [[]
+<RBRACK> ::- []]
+<COMMA> ::- [,]
+<REW> ::- -->
+<MUSTUSE> ::- (;_MUST_USE_;)
+<BEGINPROOF> ::- %%begin-auto-proof
+<BEGIN_TY> ::- %%type:
+<BEGIN_TYPEALIAS> ::- %%begin-type-alias:
+<BEGIN_VAR> ::- %%begin-variable:
+<BEGIN_HYP> ::- %%begin-hypothesis:
+<END_TYPEALIAS> ::- %%end-type-alias
+<END_VAR> ::- %%end-variable
+<END_HYP> ::- %%end-hypothesis
+<BEGINNAME> ::- %%name:
+<BEGINHEADER> ::- %%
+<ENDPROOF> ::- %%end-auto-proof
+
+%% Rules
+
+<file> ::= <body> | <proof_head> <body> <ENDPROOF>
+<body> ::= <ID> <COLON> <PROOF> <closed_term> <DOT> | <dep_hyp_def> <body>
+<proof_head> ::= <BEGINPROOF> <proofheader>*
+<proofheader> ::= <BEGINNAME> | <BEGINHEADER> | <BEGIN_TY> <ID> | <BEGIN_TYPEALIAS> <ID> <DEF> <type_simple> <END_TYPEALIAS> |
+                  <BEGIN_VAR> <ID> <COLON> <typ> <END_VAR> | <BEGIN_HYP> <ID> <COLON> <PROOF> <term_simple> <END_HYP>
+<qid> ::= <QID> | <ID>
+<binary_connective> ::= <AND> | <OR> | <IMP> | <EQV>
+<quantifier> ::= <ALL> | <EX>
+<type_quantifier> ::= <ALL_TYPE> | <EX_TYPE>
+<term_simple> ::= <qid> | <NUMBER> | <TRUE> | <FALSE> | <NOT> <term_simple> |
+                  <binary_connective> <term_simple> <term_simple> |
+                  <quantifier> <type_simple> <LPAREN> <ID> <COLON> <complex_type> <DOUBLE_ARROW> <term_simple> <RPAREN> |
+                  <type_quantifier> <LPAREN> <ID> <COLON> <TYPE> <DOUBLE_ARROW> <term_simple> <RPAREN> |
+                  <ISTRUE> <term_simple> |
+                  <EQUAL> <type_simple> <term_simple> <term_simple> |
+                  <LPAREN> <term> <RPAREN> |
+                  <ID> <COLON> <typ> <DOUBLE_ARROW> <term_simple> |
+                  <ID> <DEF> <term> <DOUBLE_ARROW> <term_simple> |
+                  <CCARR> <type_simple> <type_simple>
+<term> ::= <term>*
+<closed_term> ::= <term>
+<type_qid> ::= <ID> | <QID>
+<type_simple> ::= <type_qid> | <LPAREN> <pre_typ> <RPAREN>
+<pre_typ> ::= <type_simple>* | <CCARR> <type_simple> <type_simple>
+<typ> ::= <TERM> <type_simple> | <PROP>
+<complex_type> ::= <typ> | <LPAREN> <arrow_type> <RPAREN>
+<arrow_type> ::= <typ> | <TERM> <type_simple> <ARROW> <arrow_type> |
+                 <LPAREN> <arrow_type> <RPAREN> <ARROW> <arrow_type> |
+                 <ID> <COLON> <TYPE> <ARROW> <arrow_type>
+<closed_arr_type> ::= <arrow_type>
+<kind> ::= <TYPE> | <ID> <COLON> <TYPE> <ARROW> <kind>
+<declared_or_defined_id> ::= <ID> | <QID>
+<hyp_def> ::= <ID> <COLON> <kind> <DOT> |
+              <QID> <COLON> <kind> <DOT> |
+              <ID> <COLON> <PROOF> <closed_term> <DOT> |
+              <QID> <COLON> <PROOF> <closed_term> <DOT> |
+              <ID> <COLON> <closed_arr_type> <DOT> |
+              <QID> <COLON> <closed_arr_type> <DOT> |
+              <DEFKW> <ID> <COLON> <closed_arr_type> <DOT> |
+              <DEFKW> <QID> <COLON> <closed_arr_type> <DOT> |
+              <DEFKW> <ID> <COLON> <typ> <DEF> <closed_term> <DOT> |
+              <DEFKW> <QID> <COLON> <typ> <DEF> <closed_term> <DOT> |
+              <DEFKW> <declared_or_defined_id> <compact_args> <COLON> <typ> <DEF> <term> <DOT> |
+              <env> <term> <REW> <term> <DOT>
+<compact_args> ::= <LPAREN> <ID> <COLON> <arrow_type> <RPAREN> |
+                   <LPAREN> <ID> <COLON> <arrow_type> <RPAREN> <compact_args>
+<env_decl> ::= <ID> <COLON> <arrow_type> | <ID> <COLON> <TYPE> | <ID>
+<env_decls> ::= <env_decl> | <env_decl> <COMMA> <env_decls>
+<env> ::= <LBRACK> <RBRACK> | <LBRACK> <env_decls> <RBRACK>
+<dep_hyp_def> ::= <MUSTUSE> <hyp_def> | <hyp_def>

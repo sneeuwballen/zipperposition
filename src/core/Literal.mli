@@ -86,32 +86,29 @@ val mk_constraint : term -> term -> t
     on how [t] and [u] look. *)
 
 val matching : ?subst:Subst.t -> pattern:t Scoped.t -> t Scoped.t ->
-  Subst.t Sequence.t
+  (Subst.t * Builtin.Tag.t list) Sequence.t
 (** checks whether subst(lit_a) matches lit_b. Returns alternative
     substitutions s such that s(lit_a) = lit_b and s contains subst. *)
 
 val subsumes : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
-  Subst.t Sequence.t
+  (Subst.t * Builtin.Tag.t list) Sequence.t
 (** More general version of {!matching}, yields [subst]
     such that [subst(lit_a) => lit_b]. *)
 
 val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
-  Subst.t Sequence.t
+  (Subst.t * Builtin.Tag.t list) Sequence.t
 
-val unify : ?subst:Unif_subst.t -> t Scoped.t -> t Scoped.t -> Unif_subst.t Sequence.t
+val unify :
+  ?subst:Unif_subst.t -> t Scoped.t -> t Scoped.t ->
+  (Unif_subst.t * Builtin.Tag.t list) Sequence.t
 
 val are_variant : t -> t -> bool
 
-val apply_subst : renaming:Subst.Renaming.t ->
-  Subst.t -> t Scoped.t -> t
+val apply_subst : Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
 
-val apply_subst_no_renaming : Subst.t -> t Scoped.t -> t
+val apply_subst_no_simp : Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
 
-val apply_subst_no_simp : renaming:Subst.Renaming.t ->
-  Subst.t -> t Scoped.t -> t
-
-val apply_subst_list : renaming:Subst.Renaming.t ->
-  Subst.t -> t list Scoped.t -> t list
+val apply_subst_list : Subst.Renaming.t -> Subst.t -> t list Scoped.t -> t list
 
 exception Lit_is_constraint
 
@@ -123,7 +120,7 @@ val is_constraint : t -> bool
 
 val is_ho_constraint : t -> bool
 
-val of_unif_subst: renaming:Subst.Renaming.t -> Unif_subst.t -> t list
+val of_unif_subst: Subst.Renaming.t -> Unif_subst.t -> t list
 (** Make a list of (negative) literals out of the unification constraints
     contained in this substitution. *)
 
@@ -150,6 +147,7 @@ module Set : CCSet.S with type elt = t
 
 val is_trivial : t -> bool
 val is_absurd : t -> bool
+val is_absurd_tags : t -> Proof.tag list (** if [is_absurd lit], return why *)
 
 val fold_terms :
   ?position:Position.t -> ?vars:bool -> ?ty_args:bool ->

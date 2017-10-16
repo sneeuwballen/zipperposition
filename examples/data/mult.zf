@@ -7,9 +7,11 @@ data nat :=
   | Z
   | S nat.
 
-val plus : nat -> nat -> nat.
-rewrite forall x. plus Z x = x.
-rewrite forall x y. plus (S x) y = S (plus x y).
+def plus (x y:nat) : nat :=
+  match x with
+  | Z -> y
+  | S x2 -> S (plus x2 y)
+  end.
 
 val mult : nat -> nat -> nat.
 rewrite forall x. mult Z x = Z.

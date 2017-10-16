@@ -197,14 +197,14 @@ module Make(E : Env.S) : S with module Env = E = struct
   let _do_canc info acc =
     let open SupInfo in
     let ord = Ctx.ord () in
-    let renaming = Ctx.renaming_clear () in
+    let renaming = Subst.Renaming.create () in
     let us = info.subst in
     let idx_a, _ = Lits.Pos.cut info.active_pos in
     let idx_p, _ = Lits.Pos.cut info.passive_pos in
     let s_a = info.active_scope and s_p = info.passive_scope in
     let subst = Unif_subst.subst us in
-    let lit_a = ALF.apply_subst ~renaming subst (info.active_lit,s_a) in
-    let lit_p = ALF.apply_subst ~renaming subst (info.passive_lit,s_p) in
+    let lit_a = ALF.apply_subst renaming subst (info.active_lit,s_a) in
+    let lit_p = ALF.apply_subst renaming subst (info.passive_lit,s_p) in
     Util.debugf ~section 5
       "@[<2>arith superposition@ between @[%a[%d]@]@ and @[%a[%d]@]@ (subst @[%a@])...@]"
       (fun k->k C.pp info.active s_a C.pp info.passive s_p Subst.pp subst);
@@ -218,9 +218,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       let lit_a, lit_p = ALF.scale lit_a lit_p in
       (* other literals *)
       let lits_a = CCArray.except_idx (C.lits info.active) idx_a in
-      let lits_a = Lit.apply_subst_list ~renaming subst (lits_a,s_a) in
+      let lits_a = Lit.apply_subst_list renaming subst (lits_a,s_a) in
       let lits_p = CCArray.except_idx (C.lits info.passive) idx_p in
-      let lits_p = Lit.apply_subst_list ~renaming subst (lits_p,s_p) in
+      let lits_p = Lit.apply_subst_list renaming subst (lits_p,s_p) in
       (* new literal: lit_a=[t+m1=m2], lit_p=[t'+m1' R m2'] for some
          relation R. Now let's replace t' by [m2-m1] in lit', ie,
          build m = [m1'-m2'+(m2-m1) R 0]. *)
@@ -239,14 +239,14 @@ module Make(E : Env.S) : S with module Env = E = struct
             (M.sum m_p (MF.rest mf_a))
             (M.sum (MF.rest mf_p) m_a)
       in
-      let c_guard = Literal.of_unif_subst ~renaming us in
+      let c_guard = Literal.of_unif_subst renaming us in
       let all_lits = new_lit :: c_guard @ lits_a @ lits_p in
       (* build clause *)
       let proof =
-        Proof.Step.inference
+        Proof.Step.inference ~tags:[Proof.Tag.T_lra]
           ~rule:rule_canc
-          [C.proof_parent_subst (info.active,s_a) subst;
-           C.proof_parent_subst (info.passive,s_p) subst] in
+          [C.proof_parent_subst renaming (info.active,s_a) subst;
+           C.proof_parent_subst renaming (info.passive,s_p) subst] in
       let trail = C.trail_l [info.active;info.passive] in
       let penalty = C.penalty info.active + C.penalty info.passive in
       let new_c = C.create ~penalty ~trail all_lits proof in
@@ -343,7 +343,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let ord = Ctx.ord () in
     let i = Lits.Pos.idx pos in
     let renaming = S.Renaming.create () in
-    let active_lit' = ALF.apply_subst ~renaming subst (active_lit,s_a) in
+    let active_lit' = ALF.apply_subst renaming subst (active_lit,s_a) in
     (* restrictions:
        - the rewriting term must be bigger than other terms
         (in other words, the inference is strictly decreasing)
@@ -361,7 +361,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     && (C.trail_subsumes c' c) then (
       (* we know all variables of [active_lit] are bound, no need
          for a renaming *)
-      let active_lit = ALF.apply_subst_no_renaming subst (active_lit,s_a) in
+      let active_lit = ALF.apply_subst Subst.Renaming.none subst (active_lit,s_a) in
       let active_lit, passive_lit = ALF.scale active_lit passive_lit in
       match active_lit, passive_lit with
         | ALF.Left (AL.Equal, mf1, m1), _
@@ -438,10 +438,12 @@ module Make(E : Env.S) : S with module Env = E = struct
       if !did_simplify then (
         clauses := CCList.uniq ~eq:eq_c_subst !clauses;
         let proof =
-          Proof.Step.inference
+          Proof.Step.inference ~tags:[Proof.Tag.T_lra]
             ~rule:(Proof.Rule.mk "canc_demod")
             (C.proof_parent c ::
-               List.map (fun (c,subst) -> C.proof_parent_subst (c,1) subst) !clauses)
+               List.rev_map
+                 (fun (c,subst) -> C.proof_parent_subst Subst.Renaming.none (c,1) subst)
+                 !clauses)
         in
         let trail = C.trail c in
         let new_c = C.create ~penalty:(C.penalty c) ~trail (List.rev !lits) proof in
@@ -479,7 +481,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   (* check whether the term [t] is indeed maximal in
                      its literal (and clause) after substitution *)
                   let alit' = ALF.get_exn alit pos in
-                  let alit' = ALF.apply_subst_no_renaming subst (alit',1) in
+                  let alit' = ALF.apply_subst Subst.Renaming.none subst (alit',1) in
                   if C.trail_subsumes c' c && ALF.is_max ~ord alit'
                   then (
                     Util.incr_stat stat_rat_backward_demod;
@@ -508,10 +510,10 @@ module Make(E : Env.S) : S with module Env = E = struct
            MF.unify_mm (m1,0) (m2,0)
            |> Sequence.fold
              (fun acc (mf1, mf2, us) ->
-                let renaming = Ctx.renaming_clear () in
+                let renaming = Subst.Renaming.create () in
                 let subst = US.subst us in
-                let mf1' = MF.apply_subst ~renaming subst (mf1,0) in
-                let mf2' = MF.apply_subst ~renaming subst (mf2,0) in
+                let mf1' = MF.apply_subst renaming subst (mf1,0) in
+                let mf2' = MF.apply_subst renaming subst (mf2,0) in
                 let is_max_lit = C.is_maxlit (c,0) subst ~idx in
                 Util.debugf ~section 5
                   "@[<4>... candidate:@ @[%a@] (max lit ? %B)@]"
@@ -520,14 +522,14 @@ module Make(E : Env.S) : S with module Env = E = struct
                 then (
                   (* do the inference *)
                   let lits' = CCArray.except_idx (C.lits c) idx in
-                  let lits' = Lit.apply_subst_list ~renaming subst (lits',0) in
+                  let lits' = Lit.apply_subst_list renaming subst (lits',0) in
                   let new_lit = Lit.mk_rat_op op (MF.rest mf1') (MF.rest mf2') in
-                  let c_guard = Literal.of_unif_subst ~renaming us in
+                  let c_guard = Literal.of_unif_subst renaming us in
                   let all_lits = new_lit :: c_guard @ lits' in
                   let proof =
-                    Proof.Step.inference
+                    Proof.Step.inference ~tags:[Proof.Tag.T_lra]
                       ~rule:(Proof.Rule.mk "cancellation")
-                      [C.proof_parent_subst (c,0) subst] in
+                      [C.proof_parent_subst renaming (c,0) subst] in
                   let trail = C.trail c in
                   let penalty = C.penalty c in
                   let new_c = C.create ~trail ~penalty all_lits proof in
@@ -574,10 +576,10 @@ module Make(E : Env.S) : S with module Env = E = struct
                   MF.unify_ff ~subst (mf1,0) (mf2,0)
                   |> Sequence.fold
                     (fun acc (_, _, us) ->
-                       let renaming = Ctx.renaming_clear () in
+                       let renaming = Subst.Renaming.create () in
                        let subst = US.subst us in
-                       let lit1' = ALF.apply_subst ~renaming subst (lit1,0) in
-                       let lit2' = ALF.apply_subst ~renaming subst (lit2,0) in
+                       let lit1' = ALF.apply_subst renaming subst (lit1,0) in
+                       let lit2' = ALF.apply_subst renaming subst (lit2,0) in
                        if C.is_maxlit (c,0) subst ~idx:idx1
                        && ALF.is_max ~ord lit1'
                        && ALF.is_max ~ord lit2'
@@ -600,14 +602,14 @@ module Make(E : Env.S) : S with module Env = E = struct
                          let other_lits = CCArray.except_idx (C.lits c) idx1 in
                          let other_lits =
                            Lit.apply_subst_list
-                             ~renaming subst (other_lits,0) in
-                         let c_guard = Literal.of_unif_subst ~renaming us in
+                             renaming subst (other_lits,0) in
+                         let c_guard = Literal.of_unif_subst renaming us in
                          (* apply subst and build clause *)
                          let all_lits = c_guard @ new_lits @ other_lits in
                          let proof =
-                           Proof.Step.inference
+                           Proof.Step.inference ~tags:[Proof.Tag.T_lra]
                              ~rule:rule_canc_eq_fact
-                             [C.proof_parent_subst (c,0) subst] in
+                             [C.proof_parent_subst renaming (c,0) subst] in
                          let penalty = C.penalty c
                          and trail = C.trail c in
                          let new_c = C.create ~trail ~penalty all_lits proof in
@@ -654,8 +656,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     let idx_r, _ = Lits.Pos.cut info.right_pos in
     let s_l = info.left_scope and s_r = info.right_scope in
     let subst = Unif_subst.subst us in
-    let lit_l = ALF.apply_subst ~renaming subst (info.left_lit,s_l) in
-    let lit_r = ALF.apply_subst ~renaming subst (info.right_lit,s_r) in
+    let lit_l = ALF.apply_subst renaming subst (info.left_lit,s_l) in
+    let lit_r = ALF.apply_subst renaming subst (info.right_lit,s_r) in
     Util.debugf ~section 5
       "@[<2>arith chaining@ between @[%a[%d]@]@ and @[%a[%d]@]@ (subst @[%a@])...@]"
       (fun k->k C.pp info.left s_l C.pp info.right s_r Subst.pp subst);
@@ -678,16 +680,16 @@ module Make(E : Env.S) : S with module Env = E = struct
               (M.sum m1 (MF.rest mf_2))
           in
           let lits_l = CCArray.except_idx (C.lits info.left) idx_l in
-          let lits_l = Lit.apply_subst_list ~renaming subst (lits_l,s_l) in
+          let lits_l = Lit.apply_subst_list renaming subst (lits_l,s_l) in
           let lits_r = CCArray.except_idx (C.lits info.right) idx_r in
-          let lits_r = Lit.apply_subst_list ~renaming subst (lits_r,s_r) in
-          let c_guard = Literal.of_unif_subst ~renaming us in
+          let lits_r = Lit.apply_subst_list renaming subst (lits_r,s_r) in
+          let c_guard = Literal.of_unif_subst renaming us in
           let all_lits = new_lit :: c_guard @ lits_l @ lits_r in
           let proof =
-            Proof.Step.inference
+            Proof.Step.inference ~tags:[Proof.Tag.T_lra]
               ~rule:(Proof.Rule.mk "canc_ineq_chaining")
-              [C.proof_parent_subst (info.left,s_l) subst;
-               C.proof_parent_subst (info.right,s_r) subst] in
+              [C.proof_parent_subst renaming (info.left,s_l) subst;
+               C.proof_parent_subst renaming (info.right,s_r) subst] in
           let trail = C.trail_l [info.left; info.right] in
           (* penalty for some chaining *)
           let penalty =
@@ -774,8 +776,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     let _do_factoring ~subst:us lit1 lit2 i j =
       let renaming = S.Renaming.create () in
       let subst = US.subst us in
-      let lit1 = ALF.apply_subst ~renaming subst (lit1,0) in
-      let lit2 = ALF.apply_subst ~renaming subst (lit2,0) in
+      let lit1 = ALF.apply_subst renaming subst (lit1,0) in
+      let lit2 = ALF.apply_subst renaming subst (lit2,0) in
       (* same coefficient for the focused term *)
       let lit1, lit2 = ALF.scale lit1 lit2 in
       match lit1, lit2 with
@@ -791,7 +793,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             let left = match lit1 with ALF.Left _ -> true | _ -> false in
             (* remove lit1, add the guard *)
             let other_lits = CCArray.except_idx (C.lits c) i in
-            let other_lits = Lit.apply_subst_list ~renaming subst (other_lits,0) in
+            let other_lits = Lit.apply_subst_list renaming subst (other_lits,0) in
             (* build new literal *)
             let new_lit =
               if left
@@ -806,13 +808,13 @@ module Make(E : Env.S) : S with module Env = E = struct
             in
             (* negate the literal to obtain a guard *)
             let new_lit = Lit.negate new_lit in
-            let c_guard = Literal.of_unif_subst ~renaming us in
+            let c_guard = Literal.of_unif_subst renaming us in
             let lits = new_lit :: c_guard @ other_lits in
             (* build clauses *)
             let proof =
-              Proof.Step.inference
+              Proof.Step.inference ~tags:[Proof.Tag.T_lra]
                 ~rule:(Proof.Rule.mk "canc_ineq_factoring")
-                [C.proof_parent_subst (c,0) subst] in
+                [C.proof_parent_subst renaming (c,0) subst] in
             let trail = C.trail c
             and penalty = C.penalty c in
             let new_c = C.create ~trail ~penalty lits proof in
@@ -903,7 +905,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                 match Lits.View.get_rat (C.lits active_clause) active_pos with
                   | None -> assert false
                   | Some (ALF.Left (AL.Less, _, _) as alit') when is_left ->
-                    let alit' = ALF.apply_subst_no_renaming subst (alit',1) in
+                    let alit' = ALF.apply_subst Subst.Renaming.none subst (alit',1) in
                     if C.trail_subsumes active_clause c
                     && ALF.is_strictly_max ~ord alit'
                     then (
@@ -914,8 +916,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                           | Some (ALF.Left (_, mf1', m2')) -> mf1', m2'
                           | _ -> assert false
                       in
-                      let mf1' = MF.apply_subst_no_renaming subst (mf1',1) in
-                      let m2' = M.apply_subst_no_renaming subst (m2',1) in
+                      let mf1' = MF.apply_subst Subst.Renaming.none subst (mf1',1) in
+                      let m2' = M.apply_subst Subst.Renaming.none subst (m2',1) in
                       (* from t+mf1 ≤ m2  and t+mf1' ≤ m2', we deduce
                          that if m2'-mf1' ≤ m2-mf1  then [lit] is redundant.
                          That is, the sufficient literal is
@@ -928,7 +930,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     )
                   | Some (ALF.Right (AL.Less, _, _) as alit') when not is_left ->
                     (* symmetric case *)
-                    let alit' = ALF.apply_subst_no_renaming subst (alit',1) in
+                    let alit' = ALF.apply_subst Subst.Renaming.none subst (alit',1) in
                     if C.trail_subsumes active_clause c
                     && ALF.is_strictly_max ~ord alit'
                     then (
@@ -939,8 +941,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                           | Some (ALF.Right (_, m1', mf2')) -> m1', mf2'
                           | _ -> assert false
                       in
-                      let mf2' = MF.apply_subst_no_renaming subst (mf2',1) in
-                      let m1' = M.apply_subst_no_renaming subst (m1',1) in
+                      let mf2' = MF.apply_subst Subst.Renaming.none subst (mf2',1) in
+                      let m1' = M.apply_subst Subst.Renaming.none subst (m1',1) in
                       let new_plit =
                         ALF.replace plit (M.difference m1' (MF.rest mf2')) in
                       (* transitive closure *)
@@ -1030,7 +1032,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                 match Lits.View.get_rat (C.lits active_clause) active_pos with
                   | None -> assert false
                   | Some (ALF.Left (AL.Less, _, _) as alit') when not is_left ->
-                    let alit' = ALF.apply_subst_no_renaming subst (alit',1) in
+                    let alit' = ALF.apply_subst Subst.Renaming.none subst (alit',1) in
                     if C.trail_subsumes active_clause c
                     && ALF.is_strictly_max ~ord alit'
                     then (
@@ -1041,8 +1043,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                           | Some (ALF.Left (_, mf1', m2')) -> mf1', m2'
                           | _ -> assert false
                       in
-                      let mf1' = MF.apply_subst_no_renaming subst (mf1',1) in
-                      let m2' = M.apply_subst_no_renaming subst (m2',1) in
+                      let mf1' = MF.apply_subst Subst.Renaming.none subst (mf1',1) in
+                      let m2' = M.apply_subst Subst.Renaming.none subst (m2',1) in
                       (* from m1 ≤ t+mf2  and t+mf1' ≤ m2', we deduce
                          m1 + mf1' ≤ mf2 + m2'. If this literal is absurd
                          then so is [m1 ≤ t+mf2].
@@ -1055,7 +1057,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     )
                   | Some (ALF.Right (AL.Less, _, _) as alit') when is_left ->
                     (* symmetric case *)
-                    let alit' = ALF.apply_subst_no_renaming subst (alit',1) in
+                    let alit' = ALF.apply_subst Subst.Renaming.none subst (alit',1) in
                     if C.trail_subsumes active_clause c
                     && ALF.is_strictly_max ~ord alit'
                     then (
@@ -1066,8 +1068,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                           | Some (ALF.Right (_, m1', mf2')) -> m1', mf2'
                           | _ -> assert false
                       in
-                      let mf2' = MF.apply_subst_no_renaming subst (mf2',1) in
-                      let m1' = M.apply_subst_no_renaming subst (m1',1) in
+                      let mf2' = MF.apply_subst Subst.Renaming.none subst (mf2',1) in
+                      let m1' = M.apply_subst Subst.Renaming.none subst (m1',1) in
                       let new_plit =
                         ALF.replace plit (M.difference m1' (MF.rest mf2')) in
                       (* transitive closure *)
@@ -1119,7 +1121,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       | None -> SimplM.return_same c
       | Some (i,cs) ->
         let lits = CCArray.except_idx (C.lits c) i in
-        let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "rat.demod_ineq")
+        let proof = Proof.Step.simp ~tags:[Proof.Tag.T_lra]
+            ~rule:(Proof.Rule.mk "rat.demod_ineq")
             (C.proof_parent c :: List.map C.proof_parent cs)
         in
         let c' = C.create lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
@@ -1225,7 +1228,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         let lits =
           new_lits @ CCArray.except_idx (C.lits c) i
         and proof =
-          Proof.Step.simp ~rule:(Proof.Rule.mk "convert_lit") [C.proof_parent c]
+          Proof.Step.simp ~tags:[Proof.Tag.T_lra] ~rule:(Proof.Rule.mk "convert_lit")
+            [C.proof_parent c]
         in
         let c' =
           C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof
@@ -1388,6 +1392,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             let clauses = E.to_clauses e in
             let proof =
               Proof.Step.simp [C.proof_parent c]
+                ~tags:[Proof.Tag.T_lra]
                 ~rule:(Proof.Rule.mkf "elim_var(%a)" T.pp_var x)
             in
             let new_c =

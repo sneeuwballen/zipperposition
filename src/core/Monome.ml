@@ -299,20 +299,15 @@ let split m =
   let m2 = {m with terms=terms2; const=const2; } in
   m1, m2
 
-let apply_subst ~renaming subst (m,sc) =
+let apply_subst renaming subst (m,sc) =
   map
-    (fun t -> Subst.FO.apply ~renaming subst (t,sc))
+    (fun t -> Subst.FO.apply renaming subst (t,sc))
     m
 
-let apply_subst_no_simp ~renaming subst (m,sc) = {
+let apply_subst_no_simp renaming subst (m,sc) = {
   m with
-    terms=List.map (fun (c,t) -> c, Subst.FO.apply ~renaming subst (t,sc)) m.terms;
+    terms=List.map (fun (c,t) -> c, Subst.FO.apply renaming subst (t,sc)) m.terms;
 }
-
-let apply_subst_no_renaming subst (m,sc) =
-  map
-    (fun t -> Subst.FO.apply_no_renaming subst (t,sc))
-    m
 
 let is_ground m =
   List.for_all (fun (_, t) -> T.is_ground t) m.terms
@@ -493,11 +488,8 @@ module Focus = struct
     if rest.num.sign coeff = 0 then failwith "Monome.Focus.apply_subst: coeff 0";
     {coeff; rest; term; }
 
-  let apply_subst ~renaming subst mf =
-    _apply_subst (Subst.FO.apply ~renaming) subst mf
-
-  let apply_subst_no_renaming subst mf =
-    _apply_subst Subst.FO.apply_no_renaming subst mf
+  let apply_subst renaming subst mf =
+    _apply_subst (Subst.FO.apply renaming) subst mf
 
   let _id x = x
   let map ?(term=_id) ?(coeff=_id) ?(rest=_id) mf =

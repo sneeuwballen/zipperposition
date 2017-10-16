@@ -37,7 +37,10 @@ let parse_file file : parser_res =
            ParseLocation.set_file lexbuf file;
            parse_lexbuf_ lexbuf)
       |> E.return
-    with e -> E.of_exn e
+    with
+      | Sys_error e ->
+        CCResult.fail (Util.err_spf "sys_error when parsing `%s`:@ %s" file e)
+      | e -> E.of_exn e
 
 let conv_loc (loc:A.Loc.t): ParseLocation.t =
   let {A.Loc.file; start_line; start_column; stop_line; stop_column} = loc in

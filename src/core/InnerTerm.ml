@@ -571,9 +571,9 @@ module Pos = struct
     | Bind(_, _, t'), P.Body subpos -> at t' subpos
     | App (t, _), P.Head subpos -> at t subpos
     | App (_, l), P.Arg (n,subpos) when n < List.length l ->
-      at (List.nth l n) subpos
+      at (List.nth l (List.length l - 1 - n)) subpos
     | AppBuiltin (_, l), P.Arg(n,subpos) when n < List.length l ->
-      at (List.nth l n) subpos
+      at (List.nth l (List.length l - 1 - n)) subpos
     | _ -> fail_ t pos
 
   let rec replace t pos ~by = match t.ty, view t, pos with
@@ -588,12 +588,14 @@ module Pos = struct
     | HasType ty, App (f, l), P.Head subpos ->
       app ~ty (replace f subpos ~by) l
     | HasType ty, App (f, l), P.Arg (n,subpos) when n < List.length l ->
-      let t' = replace (List.nth l n) subpos ~by in
-      let l' = CCList.set_at_idx n t' l in
+      let n' = List.length l - 1 - n in
+      let t' = replace (List.nth l n') subpos ~by in
+      let l' = CCList.set_at_idx n' t' l in
       app ~ty f l'
     | HasType ty, AppBuiltin (s,l), P.Arg (n,subpos) when n < List.length l ->
-      let t' = replace (List.nth l n) subpos ~by in
-      let l' = CCList.set_at_idx n t' l in
+      let n' = List.length l - 1 - n in
+      let t' = replace (List.nth l n') subpos ~by in
+      let l' = CCList.set_at_idx n' t' l in
       app_builtin ~ty s l'
     | _ -> fail_ t pos
 end
@@ -728,6 +730,12 @@ let type_is_unifiable (ty:t): bool = match view ty with
   | AppBuiltin ((Builtin.TyInt | Builtin.TyRat), _)
   | Bind (Binder.ForallTy, _, _) -> false
   | _ -> true
+
+let type_non_unifiable_tags (ty:t): _ list = match view ty with
+  | AppBuiltin (Builtin.TyInt,_) -> [Builtin.Tag.T_lia]
+  | AppBuiltin (Builtin.TyRat,_) -> [Builtin.Tag.T_lra]
+  | Bind (Binder.ForallTy, _, _) -> [Builtin.Tag.T_ho]
+  | _ -> []
 
 let type_is_prop t = match view t with AppBuiltin (Builtin.Prop, _) -> true | _ -> false
 

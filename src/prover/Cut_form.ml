@@ -92,9 +92,9 @@ let ind_vars t =
          | None -> false
        end)
 
-let apply_subst ~renaming subst (f,sc): t =
+let apply_subst renaming subst (f,sc): t =
   let cs =
-    List.map (fun lits -> Literals.apply_subst ~renaming subst (lits,sc)) f.cs
+    List.map (fun lits -> Literals.apply_subst renaming subst (lits,sc)) f.cs
   in
   make cs
 
@@ -103,16 +103,17 @@ let subst1 (v:var) (t:term) (f:t): t =
   let subst =
     Subst.FO.bind Subst.empty ((v:var:>InnerTerm.t HVar.t),0) (t,1)
   in
-  apply_subst ~renaming subst (f,0)
+  apply_subst renaming subst (f,0)
 
 (* find substitutions making [f1] and [f2] variants, if possible *)
-let variant ~subst (f1,sc1)(f2,sc2): Subst.t Sequence.t =
+let variant_ ~subst (f1,sc1)(f2,sc2): _ Sequence.t =
   Unif.unif_list_com ~size:`Same subst
-    ~op:(fun subst c1 c2 -> Literals.variant ~subst c1 c2)
+    ~op:(fun subst c1 c2 k ->
+      Literals.variant ~subst c1 c2 (fun (subst,_tags) -> k subst))
     (f1.cs,sc1)(f2.cs,sc2)
 
 let are_variant f1 f2: bool =
-  not @@ Sequence.is_empty @@ variant ~subst:Subst.empty (f1,1)(f2,0)
+  not @@ Sequence.is_empty @@ variant_ ~subst:Subst.empty (f1,1)(f2,0)
 
 let normalize (f:t): t = cs f |> Test_prop.normalize_form |> make
 
@@ -132,7 +133,7 @@ module Pos = struct
     | P.Stop -> bad_pos f p
     | P.Arg (n,p') ->
       let cs = cs f in
-      if n<0 || n>= List.length cs then bad_pos f p;
+      if n<0 || n >= List.length cs then bad_pos f p;
       List.nth cs n, p'
     | _ -> bad_pos f p
 

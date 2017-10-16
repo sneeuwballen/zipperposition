@@ -168,8 +168,9 @@ let compute_pos_gen (l:pseudo_rule list): defined_positions =
                rhs
                |> Sequence.filter_map
                  (fun args' ->
-                    if List.length args' > i
-                    then Some (List.nth args' i)
+                    let len = List.length args' in
+                    if len > i
+                    then Some (List.nth args' (len-i-1))
                     else None)
                |> Sequence.for_all
                  (fun sub -> match T.view sub with
@@ -236,12 +237,15 @@ module Term = struct
 
     let pp out r = pp_term_rule out r
 
-    let to_form ~ctx r =
+    let conv_ ~ctx lhs rhs =
       let module F = TypedSTerm.Form in
       F.eq
-        (Term.Conv.to_simple_term ctx (lhs r))
-        (Term.Conv.to_simple_term ctx (rhs r))
+        (Term.Conv.to_simple_term ctx lhs)
+        (Term.Conv.to_simple_term ctx rhs)
       |> F.close_forall
+
+
+    let to_form ~ctx r = conv_ ~ctx (lhs r) (rhs r)
 
     let compare = compare_tr
     let hash r = Hash.combine2 (T.hash @@ lhs r) (T.hash @@ rhs r)
@@ -262,6 +266,22 @@ module Term = struct
       | Some dcst -> Cst_.rules_term_seq dcst
     end
 
+  module Rule_inst_set = struct
+    include CCSet.Make(struct
+        type t = term_rule * Subst.t * Scoped.scope
+        let compare (t1,s1,sc1) (t2,s2,sc2) =
+          let open CCOrd.Infix in
+          CCInt.compare sc1 sc2
+          <?> (Rule.compare, t1, t2)
+          <?> (Subst.compare, s1, s2)
+      end)
+    let pp out (s:t) : unit =
+      let pp_triple out (r,subst,sc) =
+        Fmt.fprintf out "(@[%a@ :with %a[%d]@])" pp_term_rule r Subst.pp subst sc
+      in
+      Fmt.fprintf out "{@[<hv>%a@]}" (Util.pp_seq pp_triple) (to_seq s)
+  end
+
   (* TODO: {b long term}
 
      use De Bruijn  indices for rewrite rules, with RuleSet.t being a
@@ -270,9 +290,11 @@ module Term = struct
 
      Use the Term.DB case extensively... *)
 
-  let normalize_term_ max_steps (t:term): term * rule_set =
+  let normalize_term_ max_steps (t0:term): term * Rule_inst_set.t =
     assert (max_steps >= 0);
-    let set = ref TR_set.empty in
+    let set = ref Rule_inst_set.empty in
+    let sc_t = 0 in (* scope of variables of term being normalized *)
+    let sc_r = 1 in
     let fuel = ref max_steps in
     (* compute normal form of subterm. Tail-recursive.
        @param k the continuation
@@ -285,7 +307,8 @@ module Term = struct
           | Some r when T.is_const r.term_lhs ->
             (* reduce [rhs], but no variable can be bound *)
             assert (T.equal t r.term_lhs);
-            set := TR_set.add r !set;
+            let cur_sc_r = sc_r in
+            set := Rule_inst_set.add (r,Subst.empty,cur_sc_r) !set;
             Util.incr_stat stat_term_rw;
             decr fuel;
             Util.debugf ~section 5
@@ -321,29 +344,30 @@ module Term = struct
                             )
                           in
                           let subst' =
-                            Unif.FO.matching ~pattern:(r.term_lhs,1) (t',0)
+                            Unif.FO.matching ~pattern:(r.term_lhs,sc_r) (t',sc_t)
                           in
-                          Some (r, subst', l_rest)
+                          let cur_sc_r = sc_r in
+                          Some (r, subst', cur_sc_r, l_rest)
                         with Unif.Fail | Exit -> None)
                  in
                  begin match find_rule with
                    | None -> k t'
-                   | Some (r, subst, l_rest) ->
+                   | Some (r, subst, sc_r, l_rest) ->
                      (* rewrite [t = r.lhs\sigma] into [rhs] (and normalize [rhs],
                         which contain variables bound by [subst]) *)
                      Util.debugf ~section 5
                        "(@[<2>rewrite `@[%a@]`@ :using `@[%a@]`@ \
-                        :with `@[%a@]`@ :rest [@[%a@]]@])"
-                       (fun k->k T.pp t' Rule.pp r Subst.pp subst
+                        :with `@[%a@]`[%d]@ :rest [@[%a@]]@])"
+                       (fun k->k T.pp t' Rule.pp r Subst.pp subst sc_r
                            (Util.pp_list ~sep:"," T.pp) l_rest);
-                     set := TR_set.add r !set;
+                     set := Rule_inst_set.add (r,subst,sc_r) !set;
                      Util.incr_stat stat_term_rw;
                      decr fuel;
                      (* NOTE: not efficient, will traverse [t'] fully *)
-                     let t' = Subst.FO.apply_no_renaming subst (r.term_rhs,1) in
+                     let rhs = Subst.FO.apply Subst.Renaming.none subst (r.term_rhs,sc_r) in
                      (* add leftover arguments *)
-                     let t' = T.app t' l_rest in
-                     reduce t' k
+                     let rhs = T.app rhs l_rest in
+                     reduce rhs k
                  end
                | _ -> k t'
              end)
@@ -353,7 +377,7 @@ module Term = struct
         reduce body
           (fun body' ->
              let t =
-               if T.equal body body then t else (T.fun_ arg body')
+               if T.equal body body' then t else (T.fun_ arg body')
              in k t)
       | T.Var _
       | T.DB _ -> k t
@@ -364,16 +388,16 @@ module Term = struct
              let t' = if T.same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l' in
              k t')
     (* reduce list *)
-    and reduce_l l k = match l with
+    and reduce_l (l:_ list) k = match l with
       | [] -> k []
       | t :: tail ->
         reduce_l tail
           (fun tail' ->
              reduce t (fun t' -> k (t' :: tail')))
     in
-    reduce t (fun t->t, !set)
+    reduce t0 (fun t->t, !set)
 
-  let normalize_term ?(max_steps=max_int) (t:term): term * rule_set =
+  let normalize_term ?(max_steps=max_int) (t:term): term * Rule_inst_set.t =
     Util.with_prof prof_term_rw (normalize_term_ max_steps) t
 
   let normalize_term_fst ?max_steps t = fst (normalize_term ?max_steps t)
@@ -409,7 +433,7 @@ module Lit = struct
 
     let make ~proof lit_lhs lit_rhs =
       let lit_proof =
-        Proof.Step.inference ~rule [Proof.Parent.from proof]
+        Proof.Step.esa ~rule [Proof.Parent.from proof]
       in
       {lit_lhs; lit_rhs; lit_proof}
 
@@ -441,18 +465,39 @@ module Lit = struct
       | Literal.Equation _ -> true
       | _ -> false
 
-    let to_form ~ctx r =
+    let conv_ ~ctx lhs rhs =
       let module F = TypedSTerm.Form in
-      let conv_lit lit =
-        lit
-        |> Literal.Conv.to_form
-        |> SLiteral.map ~f:(T.Conv.to_simple_term ctx)
-        |> SLiteral.to_form
+      (* put variables of [lhs] first, so that that instances of [lhs := rhs]
+         resemble [forall vars(lhs). (lhs = (forall …. rhs))] *)
+      let close_forall_ord lhs f =
+        let module TT = TypedSTerm in
+        let vars_lhs = TT.free_vars_set lhs in
+        let vars =
+          TT.free_vars f
+          |> List.sort
+            (fun v1 v2 ->
+               let c1 = Var.Set.mem vars_lhs v1 in
+               let c2 = Var.Set.mem vars_lhs v2 in
+               if c1=c2 then Var.compare v1 v2
+               else if c1 then -1
+               else 1)
+        in
+        F.forall_l vars f
       in
+      let conv_lit lit = Literal.Conv.to_s_form ~ctx lit in
+      let lhs = conv_lit lhs in
       F.equiv
-        (conv_lit (lhs r))
-        (List.map (fun l -> List.map conv_lit l |> F.or_) (rhs r) |> F.and_)
-      |> F.close_forall
+        lhs
+        (rhs |> List.map (fun l -> List.map conv_lit l |> F.or_) |> F.and_)
+      |> close_forall_ord lhs
+
+    let to_form ~ctx r = conv_ ~ctx (lhs r) (rhs r)
+
+    let vars r =
+      Sequence.cons (lhs r)
+        (Sequence.of_list (rhs r) |> Sequence.flat_map_l CCFun.id)
+      |> Sequence.flat_map Literal.Seq.vars
+      |> T.VarSet.of_seq |> T.VarSet.to_list
 
     let compare r1 r2: int = compare_lr r1 r2
     let pp = pp_lit_rule
@@ -513,48 +558,48 @@ module Lit = struct
          let substs = Literal.matching ~pattern:(r.lit_lhs,1) (lit,0) in
          begin match Sequence.head substs with
            | None -> None
-           | Some subst -> Some (r, subst)
+           | Some (subst,tags) -> Some (r, subst, tags)
          end)
 
   (* try to rewrite this literal, returning a list of list of lits instead *)
-  let normalize_clause_ (lits:Literals.t) =
-    let eval_ll ~renaming subst (l,sc) =
+  let normalize_clause_ (lits:Literals.t) : _ option =
+    let eval_ll renaming subst (l,sc) =
       List.map
         (List.map
-           (fun lit -> Literal.apply_subst ~renaming subst (lit,sc)))
+           (fun lit -> Literal.apply_subst renaming subst (lit,sc)))
         l
     in
     let step =
       CCArray.findi
         (fun i lit -> match step_lit lit with
            | None -> None
-           | Some (rule,subst) ->
+           | Some (rule,subst,tags) ->
              let clauses = rule.lit_rhs in
              Util.debugf ~section 5
                "@[<2>rewrite `@[%a@]`@ :into `@[<v>%a@]`@ :with @[%a@]@ :rule `%a`@]"
                (fun k->k Literal.pp lit
-                   (Util.pp_list (CCFormat.hvbox (Util.pp_list ~sep:" ∨ " Literal.pp)))
+                   (Util.pp_list (Fmt.hvbox (Util.pp_list ~sep:" ∨ " Literal.pp)))
                    clauses Subst.pp subst Rule.pp rule);
              Util.incr_stat stat_lit_rw;
-             Some (i, clauses, subst, rule))
+             Some (i, clauses, subst, rule, tags))
         lits
     in
     begin match step with
       | None -> None
-      | Some (i, clause_chunks, subst, rule) ->
+      | Some (i, clause_chunks, subst, rule, tags) ->
         let renaming = Subst.Renaming.create () in
         (* remove rewritten literal, replace by [clause_chunks], apply
            substitution (clause_chunks might contain other variables!),
            distribute to get a CNF again *)
         let lits = CCArray.except_idx lits i in
-        let lits = Literal.apply_subst_list ~renaming subst (lits,0) in
-        let clause_chunks = eval_ll ~renaming subst (clause_chunks,1) in
+        let lits = Literal.apply_subst_list renaming subst (lits,0) in
+        let clause_chunks = eval_ll renaming subst (clause_chunks,1) in
         let clauses =
           List.rev_map
             (fun new_lits -> Array.of_list (new_lits @ lits))
             clause_chunks
         in
-        Some (clauses,rule)
+        Some (clauses,rule,subst,1,renaming,tags)
     end
 
   let normalize_clause lits =
@@ -565,7 +610,7 @@ module Lit = struct
     |> Sequence.flat_map
       (fun r ->
          Literal.unify ~subst (r.lit_lhs,sc_r) (lit,sc_lit)
-         |> Sequence.map (fun subst -> r, subst))
+         |> Sequence.map (fun (subst,tags) -> r, subst, tags))
 end
 
 let pseudo_rule_of_rule (r:rule): pseudo_rule = match r with
@@ -624,6 +669,26 @@ module Rule = struct
       | L_rule r -> Lit.Rule.to_form ~ctx r
     end
 
+  let to_form_subst
+      ?(ctx=Type.Conv.create()) (sp:Subst.Projection.t) (r:rule) : TypedSTerm.t * _ =
+    let module TT = TypedSTerm in
+    let {Subst.Projection.renaming;scope=sc;subst} = sp in
+    begin match r with
+      | T_rule {term_lhs;term_rhs;_} ->
+        let lhs = Subst.FO.apply renaming subst (term_lhs,sc) in
+        let rhs = Subst.FO.apply renaming subst (term_rhs,sc) in
+        let f = Term.Rule.conv_ ~ctx lhs rhs in
+        let inst = Subst.Projection.as_inst ~ctx sp (T.vars_prefix_order term_lhs) in
+        f, inst
+      | L_rule ({lit_lhs;lit_rhs;_} as lit_r) ->
+        let lhs = Literal.apply_subst renaming subst (lit_lhs,sc) in
+        let rhs =
+          List.map (fun l-> Literal.apply_subst_list renaming subst (l,sc)) lit_rhs
+        in
+        let inst = Subst.Projection.as_inst ~ctx sp (Lit.Rule.vars lit_r) in
+        Lit.Rule.conv_ ~ctx lhs rhs, inst
+    end
+
   let pp_zf out r = TypedSTerm.ZF.pp out (to_form r)
   let pp_tptp out r = TypedSTerm.TPTP.pp out (to_form r)
 
@@ -659,10 +724,27 @@ module Rule = struct
       ~compare ~flavor:(fun _ -> `Def)
       ~pp_in
       ~to_form:(fun ~ctx r -> to_form ~ctx r)
+      ~to_form_subst:(fun ~ctx subst r -> to_form_subst ~ctx subst r)
       ()
 
   let as_proof r =
     Proof.S.mk (proof r) (Proof.Result.make res_tc r)
+
+  let lit_as_proof_parent_subst renaming subst (r,sc) : Proof.parent =
+    let proof =
+      Proof.S.mk (Lit.Rule.proof r) (Proof.Result.make res_tc (L_rule r))
+    in
+    Proof.Parent.from_subst renaming (proof,sc) subst
+
+  let set_as_proof_parents (s:Term.Rule_inst_set.t) : Proof.parent list =
+    Term.Rule_inst_set.to_seq s
+    |> Sequence.map
+      (fun (r,subst,sc) ->
+         let proof =
+           Proof.S.mk (Term.Rule.proof r) (Proof.Result.make res_tc (T_rule r))
+         in
+         Proof.Parent.from_subst Subst.Renaming.none (proof,sc) subst)
+    |> Sequence.to_rev_list
 end
 
 let allcst_ : Cst_.t list ref = ref []

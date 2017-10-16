@@ -87,9 +87,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       (fun (lit',skolems) ->
          let subst = Literal.variant (lit',0) (lit,1) |> Sequence.head in
          begin match subst with
-           | Some subst ->
+           | Some (subst,_) ->
              let skolems =
-               List.map (fun t -> Subst.FO.apply_no_renaming subst (t,0)) skolems
+               List.map
+                 (fun t -> Subst.FO.apply Subst.Renaming.none subst (t,0))
+                 skolems
              in
              Some skolems
            | None -> None
@@ -124,7 +126,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debugf ~section 4
         "(@[ho_ext_neg@ :old `%a`@ :new `%a`@])"
         (fun k->k Literal.pp lit Literal.pp new_lit);
-      Some (new_lit,[])
+      Some (new_lit,[],[Proof.Tag.T_ho; Proof.Tag.T_ext])
     | _ -> None
 
   (* positive extensionality `m x = n x --> m = n` *)
@@ -157,6 +159,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                 let proof =
                   Proof.Step.inference [C.proof_parent c]
                     ~rule:(Proof.Rule.mk "ho_ext_pos")
+                    ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext]
                 in
                 let new_c =
                   C.create [new_lit] proof ~penalty:(C.penalty c) ~trail:(C.trail c)
@@ -196,7 +199,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             let new_lits = new_lit :: CCArray.except_idx (C.lits c) lit_idx in
             let proof =
               Proof.Step.inference [C.proof_parent c]
-                ~rule:(Proof.Rule.mk "ho_complete_eq")
+                ~rule:(Proof.Rule.mk "ho_complete_eq") ~tags:[Proof.Tag.T_ho]
             in
             let new_c =
               C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
@@ -288,14 +291,14 @@ module Make(E : Env.S) : S with module Env = E = struct
             Subst.FO.of_list [((v:>InnerTerm.t HVar.t),0), (t,0)]
           in
         (* build new clause *)
-        let renaming = Ctx.renaming_clear () in
+        let renaming = Subst.Renaming.create () in
         let new_lits =
-          let l1 = Literal.apply_subst_list ~renaming subst (other_lits,0) in
+          let l1 = Literal.apply_subst_list renaming subst (other_lits,0) in
           let l2 =
             CCList.product
               (fun args_pos args_neg ->
-                 let args_pos = Subst.FO.apply_l ~renaming subst (args_pos,0) in
-                 let args_neg = Subst.FO.apply_l ~renaming subst (args_neg,0) in
+                 let args_pos = Subst.FO.apply_l renaming subst (args_pos,0) in
+                 let args_neg = Subst.FO.apply_l renaming subst (args_neg,0) in
                  List.map2 Literal.mk_eq args_pos args_neg)
               pos_args
               neg_args
@@ -304,8 +307,8 @@ module Make(E : Env.S) : S with module Env = E = struct
           l1 @ l2
         in
         let proof =
-          Proof.Step.inference ~rule:(Proof.Rule.mk "ho_elim_pred")
-            [ C.proof_parent_subst (c,0) subst ]
+          Proof.Step.inference ~rule:(Proof.Rule.mk "ho_elim_pred") ~tags:[Proof.Tag.T_ho]
+            [ C.proof_parent_subst renaming (c,0) subst ]
         in
         let new_c =
           C.create new_lits proof
@@ -360,11 +363,11 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun v -> HO_unif.enum_prop ~mode (v,sc_c) ~offset)
       |> Sequence.map
         (fun (subst,penalty) ->
-           let renaming = Ctx.renaming_clear() in
-           let lits = Literals.apply_subst ~renaming subst (C.lits c,sc_c) in
+           let renaming = Subst.Renaming.create() in
+           let lits = Literals.apply_subst renaming subst (C.lits c,sc_c) in
            let proof =
-             Proof.Step.inference ~rule:(Proof.Rule.mk "ho.refine")
-               [C.proof_parent_subst (c,sc_c) subst]
+             Proof.Step.inference ~rule:(Proof.Rule.mk "ho.refine") ~tags:[Proof.Tag.T_ho]
+               [C.proof_parent_subst renaming (c,sc_c) subst]
            in
            let new_c =
              C.create_a lits proof
@@ -400,23 +403,23 @@ module Make(E : Env.S) : S with module Env = E = struct
       HO_unif.unif_pairs ?fuel:None (pairs,0) ~offset
       |> List.map
         (fun (new_pairs, us, penalty) ->
-           let renaming = Ctx.renaming_clear() in
+           let renaming = Subst.Renaming.create() in
            let subst = Unif_subst.subst us in
-           let c_guard = Literal.of_unif_subst ~renaming us in
+           let c_guard = Literal.of_unif_subst renaming us in
            let new_pairs =
              List.map
                (fun (env,t,u) ->
-                  let t = Subst.FO.apply ~renaming subst (T.fun_l env t,0) in
-                  let u = Subst.FO.apply ~renaming subst (T.fun_l env u,0) in
+                  let t = Subst.FO.apply renaming subst (T.fun_l env t,0) in
+                  let u = Subst.FO.apply renaming subst (T.fun_l env u,0) in
                   Literal.mk_constraint t u)
                new_pairs
            and other_lits =
-             Literal.apply_subst_list ~renaming subst (other_lits,0)
+             Literal.apply_subst_list renaming subst (other_lits,0)
            in
            let all_lits = c_guard @ new_pairs @ other_lits in
            let proof =
-             Proof.Step.inference ~rule:(Proof.Rule.mk "ho_unif")
-               [C.proof_parent_subst (c,0) subst]
+             Proof.Step.inference ~rule:(Proof.Rule.mk "ho_unif") ~tags:[Proof.Tag.T_ho]
+               [C.proof_parent_subst renaming (c,0) subst]
            in
            let new_c =
              C.create all_lits proof
@@ -595,7 +598,10 @@ module Make(E : Env.S) : S with module Env = E = struct
         (* replace! *)
         let all_lits = !new_lits @ (Array.to_list lits') in
         let parent = C.proof_parent c in
-        let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "ho.purify_applied_variable") [parent] in
+        let proof =
+          Proof.Step.simp
+            ~rule:(Proof.Rule.mk "ho.purify_applied_variable") ~tags:[Proof.Tag.T_ho]
+            [parent] in
         let new_clause = (C.create ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof) in
         Util.debugf ~section 5
           "Purified: Old: %a New: %a"

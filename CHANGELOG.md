@@ -1,5 +1,169 @@
 # Changelog
 
+## 1.3
+
+- experimental proof checking with `--check` (and `--dot-llproof <file>`)
+  does not work on all proofs, ignores arith and fails on demodulation
+  under lambdas, for now.
+- experimental HO branches from Alex Bentkamp (@benti), including advanced term orderings
+  and variations on higher-order lambda-free superposition
+- parser for a fragment of dedukti
+- end-to-end proof output, starting from input statements
+- large refactoring of `Proof`, with `Proof.result` being object-like
+- get rid of dependency on `tip-parser`
+- bugfix: prevent superposition on non-closed terms (from Geoff)
+- Rename `--purify` to `--ho-purify`
+- dont do sup at vars by default
+- Replace kbo and rpo6 by their lambda-free counter-parts
+  * Length-Lexicographic symbol status; Merge redundant term_to_head definitions
+  * length-lexicographic comparison for lfhokbo
+  * mandatory args for skolem constants (to not depend on choice)
+- KBO with argument coefficients
+- Blanchette's lambda-free higher order KBO (by @benti)
+- Rename IDOrBuiltin to Head
+- Blanchette's lambda-free higher-order RPO (by @benti)
+
+## 1.2
+
+- some HO support (with pattern unification)
+- only ignore positive version of `x=y → …`, not other equational rules
+- remove remnants of orphan criterion
+- add `pp_in` signature in many modules
+- demodulation under lambdas
+- HO pattern unification
+- add positive extensionality rule in HO
+- add eta-reduction, enabled by default
+- allow superposition to operate on non-closed terms
+- better random generator for HO terms
+- only perform primitive enum on clauses with low penalty
+- primitive enumeration of predicate variables
+- in FOOL, only extract closed terms to toplevel
+- add `Lambda` module with WHNF and SNF
+- proper skolemization in negative extensionality rule
+- bugfixes for `Multiset`
+- use logitest for tests
+- remove `orient` tool
+- full ZF printing, with proof output and proper commenting
+- better stats and options for arith; cli option for `redundant_by_ineq`
+- add polarized rewriting `rewrite foo => bar`
+- fix bug in AC for non-FO terms (closes #13)
+- introduce attribute for SOS (set of support)
+- propagate attributes properly in CNF and type inference
+- in induction, only keep inductive clusters(!)
+- basic TPTP THF parser; update TPTP parser to support THF, remove ambiguities
+- update literal ordering to have a basic approximation for rational lits
+- add `ho-complete-eq` for completing positive equations
+- block eq-resolution and destr-eq-res on shielded variables
+- in induction, `x=y` puts x and y in same cluster
+- branch using full HO unification
+- branch using combinators for HO functions
+- detect `.tptp` files as TPTP
+- in `Cnf`, rewrite `f=λ x.t` into `∀x. f x=t`
+- add `calculi/Higher_order` module; disable completeness if HO
+- declare missing rule `C (proj-1 x)…(proj-n x) --> x` for cstors
+- associate a rewrite rule to inductive type's projectors
+- option for dumping sat solver logs into a file
+
+## 1.1
+
+- calculus for rational arith
+
+- do not simplify too eagerly before trying induction
+- add optional fuel limit on term rewriting
+- disable orphan criterion by default
+- remove age in clause queues; make FIFO queue simpler
+- re-strenghten again eq-subsumption, by using anti-unification
+- generalization on variables occurring both in active and passive pos in induction
+- add `ArLiteral` to generate arbitrary literals
+- disable `trivial-ineq` for arith, by default
+- new clause queue, "almost-bfs"
+- induction: simplify goals before doing cut on them
+- apply exhaustiveness only for non-rec datatypes
+- refactor `Test_prop` to use narrowing, instead of smallcheck
+- in arith, remove completeness in case of `--no-arith`, too
+- use a weight `α·ω+β` in (T)KBO precedence; use classify_cst for weights
+- have some warnings in .zf files if identifiers are used undeclared
+- normalize term `a=b`  into the corresponding literal
+- do not do sub-inductions in clauses with positive lemma(s) in trail
+- only do induction on active positions (or under uninterpreted syms)
+- add pattern-matching and `if/then/else` to .zf native format
+- add `Test_prop` in core library, with basic smallcheck
+- add arithmetic to ZF parser
+- bugfix in zipper: stornger purification avoid some spurious saturations
+- in induction, only perform sub-induction in an already inductive clause
+- rename `libzipperposition` back into `logtk`, fix some compat issues
+- improvements in `Unif.unif_list_com` and IArray
+- use new `FV_tree` in zipperposition
+- add `FV_tree` structure, a new implem of feature vectors
+- skolemization re-uses variables names, but lowercase
+- add warn-error @8
+- add dimacs dump for the SAT solver
+- extract proof from SAT solver
+- update to containers 1.0
+- use a simpler `Hash` module
+- use result everywhere, ditch variant-based error type
+- add `forall (x y : ty). …` syntax (close #4 again)
+- more concise syntax for `pi (a:type)(b:type).…` (close #4)
+- collapse `Πx:type.… → type` into `type→…→type`
+- lambda-lifting in `Cnf.flatten` to deal with anonymous functions
+- fix type inference for higher-order applications (`var args`)
+- basic parsing of arith operators and constants for TIP
+- end-to-end proof tracing, simpler Statement, remove StatementSrc
+- make `def-as-rewrite` true by default
+- add `let` to core terms
+- add `ite` and `match` in STerm and TypedSTerm
+- add `Fool` calculus for dealing with boolean subterms
+- more rules in `basic_simplification`
+- remove everything about the meta-prover
+- bugfix in `sat_solver` for evaluating 0-level lits
+- allow boolean rewrite rules of the form `t` or `~ t`
+- automatic re-generalization of non-induction variables in strengthening
+
+## 1.0
+
+- rewrite induction
+- rewrite typechecking and CNF with new intermediate typed AST
+- merge logtk into zipperposition again
+- TIP parser
+- remove hashconsed strings, use `ID` instead
+- in TPTP, role "lemma" will be considered as a proper lemma
+- share subproofs obtained from SAT solver
+- better heuristic in ClauseQueue for deep inductive clauses
+- add an `include` statement for ZF
+- properly use Msat proofs in `Avatar.simplify_trail`
+- make proof handling in `Sat_solver` transparent
+- make `Dtree` bounded in depth
+- add a new "AC" attribute in ZF, extend attribute system
+- add `SClause`, unfunctorize `BBox,ProofStep,Trail`, use Msat proofs
+- implement term narrowing (+ add some profiling)
+- term and clause rewriting (deduction modulo)
+- tests: use OUnit2
+- Cnf: conversion of prop rewrite rules requires polarization
+- optimize `injectivity_destruct{+,-}`: disregard type (dis)equations
+- move almost everything from Zipperposition to Phases_impl
+- introduce Phases, a monadic description of the steps taken by main
+- make induction enabled by default
+- add translation of inductive problems in .zf
+- rename `type_check_tptp` into `type_check` (several input formats)
+- conditional compilation of the prover itself (for debugging the library)
+- add `warn` in Util, add colors in `Util.debug`
+- update Hashcons, with global state, and alternative impl with Hashtbl
+- move printing exception, factor code, rename `cnf_of_tptp`
+- options for choosing the input format (zf/tptp)
+- new parser and lexer for a ML-like format, `ZF`
+- simpler, more efficient `Superposition.compare_literals_subsumption`
+- change `FOTerm.Classic` so that `App` merges type and term arguments
+- introduce TypedSTerm.Meta for destructive unification
+- add a Binder module
+- split Symbol into Symbol and Builtin
+- distinction debug/debugf
+- big change: use a pack again for core library
+- refactor: rename `PrologTerm` into `STerm` (simple term)
+- move src/base to src/core
+- refactor: use `equal` and `compare`
+- refactoring: change some types, fix warning, Format everywhere
+- move `pelletier_problems` into `examples`; add `tests/` dir with script
+
 ## 0.8
 
 ### breaking

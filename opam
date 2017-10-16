@@ -38,7 +38,7 @@ depopts: [
   "qcheck" {test}
 ]
 available: [
-    ocaml-version >= "4.02.1"
+    ocaml-version >= "4.03.0"
 ]
 conflicts: [
   "logtk"

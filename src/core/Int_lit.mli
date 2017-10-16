@@ -86,11 +86,9 @@ type ('subst,'a) unif =
 val generic_unif: ('subst,Z.t Monome.t) unif -> ('subst,t) unif
 (** Generic unification/matching/variant, given such an operation on monomes *)
 
-val apply_subst : renaming:Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
+val apply_subst : Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
 
-val apply_subst_no_renaming : Subst.t -> t Scoped.t -> t
-
-val apply_subst_no_simp : renaming:Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
+val apply_subst_no_simp : Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
 (** Same as {!apply_subst} but takes care {B NOT} simplifying the
     literal. In practice, mostly useful for comparison purpose. *)
 
@@ -199,11 +197,8 @@ module Focus : sig
         than the argument (cannot scale down), or if the literal
         is not a {!Div} *)
 
-  val apply_subst : renaming:Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
+  val apply_subst : Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
   (** Apply a substitution *)
-
-  val apply_subst_no_renaming : Subst.t -> t Scoped.t -> t
-  (** Apply a substitution with renaming (careful with collisions!) *)
 
   val unify : ?subst:Unif_subst.t -> t Scoped.t -> t Scoped.t ->
     (t * t * Unif_subst.t) Sequence.t

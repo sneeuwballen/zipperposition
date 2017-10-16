@@ -90,7 +90,8 @@ module Make(Env : Env_intf.S) = struct
     then SimplM.return_same c
     else (
       let proof =
-        Proof.Step.inference ~rule:(Proof.Rule.mk "acyclicity") [C.proof_parent c] in
+        Proof.Step.inference ~rule:(Proof.Rule.mk "acyclicity")
+          ~tags:[Proof.Tag.T_data] [C.proof_parent c] in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
       Util.incr_stat stat_acyclicity;
       Util.debugf ~section 3
@@ -131,14 +132,14 @@ module Make(Env : Env_intf.S) = struct
            let subst = Unif_subst.subst us in
            (* delete i-th literal and build new clause *)
            let new_lits = CCArray.except_idx (C.lits c) i in
-           let renaming = Env.Ctx.renaming_clear () in
-           let c_guard = Literal.of_unif_subst ~renaming us in
+           let renaming = Subst.Renaming.create () in
+           let c_guard = Literal.of_unif_subst renaming us in
            let new_lits =
-             c_guard @ Literal.apply_subst_list ~renaming subst (new_lits,0)
+             c_guard @ Literal.apply_subst_list renaming subst (new_lits,0)
            in
            let proof =
-             Proof.Step.inference [C.proof_parent_subst (c,0) subst]
-               ~rule:(Proof.Rule.mk "acyclicity")
+             Proof.Step.inference [C.proof_parent_subst renaming (c,0) subst]
+               ~rule:(Proof.Rule.mk "acyclicity") ~tags:[Proof.Tag.T_data]
            in
            let new_c =
              C.create
@@ -186,7 +187,7 @@ module Make(Env : Env_intf.S) = struct
                if T.equal t1 t2 then None else Some (Literal.mk_eq t1 t2))
         in
         let rule = Proof.Rule.mk "injectivity_destruct+" in
-        let proof = Proof.Step.inference ~rule [C.proof_parent c] in
+        let proof = Proof.Step.inference ~tags:[Proof.Tag.T_data] ~rule [C.proof_parent c] in
         (* make one clause per [new_lits] *)
         let clauses =
           List.map
@@ -217,11 +218,11 @@ module Make(Env : Env_intf.S) = struct
           Util.incr_stat stat_disjointness;
           let proof =
             let ity = T.head_term l |> T.ty |> Type.returns in
-            Ind_ty.as_inductive_type_exn ity |> fst |> Ind_ty.proof
+            Ind_ty.as_inductive_type_exn ity |> fst |> Ind_ty.proof |> Proof.Parent.from
           in
           if sign
-          then Some (Literal.mk_absurd, [proof])
-          else Some (Literal.mk_tauto, [proof])
+          then Some (Literal.mk_absurd, [proof], [Proof.Tag.T_data])
+          else Some (Literal.mk_tauto, [proof], [Proof.Tag.T_data])
         | _ -> None
       end
     | _ -> None
