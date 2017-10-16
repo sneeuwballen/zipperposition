@@ -1,0 +1,122 @@
+<html><head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="Start" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="ClauseQueue" rel="Chapter" href="ClauseQueue.html">
+<link title="Clause" rel="Chapter" href="Clause.html">
+<link title="SClause" rel="Chapter" href="SClause.html">
+<link title="Const" rel="Chapter" href="Const.html">
+<link title="Extensions" rel="Chapter" href="Extensions.html">
+<link title="Ctx" rel="Chapter" href="Ctx.html">
+<link title="ProofState" rel="Chapter" href="ProofState.html">
+<link title="Bool_clause" rel="Chapter" href="Bool_clause.html">
+<link title="Saturate" rel="Chapter" href="Saturate.html">
+<link title="Selection" rel="Chapter" href="Selection.html">
+<link title="AC" rel="Chapter" href="AC.html">
+<link title="AC_intf" rel="Chapter" href="AC_intf.html">
+<link title="SimplM" rel="Chapter" href="SimplM.html">
+<link title="Params" rel="Chapter" href="Params.html">
+<link title="Env" rel="Chapter" href="Env.html">
+<link title="Signals" rel="Chapter" href="Signals.html">
+<link title="Classify_cst" rel="Chapter" href="Classify_cst.html">
+<link title="Ctx_intf" rel="Chapter" href="Ctx_intf.html">
+<link title="Clause_intf" rel="Chapter" href="Clause_intf.html">
+<link title="Env_intf" rel="Chapter" href="Env_intf.html">
+<link title="ProofState_intf" rel="Chapter" href="ProofState_intf.html">
+<link title="BBox" rel="Chapter" href="BBox.html">
+<link title="ClauseContext" rel="Chapter" href="ClauseContext.html">
+<link title="ClauseQueue_intf" rel="Chapter" href="ClauseQueue_intf.html">
+<link title="Bool_lit" rel="Chapter" href="Bool_lit.html">
+<link title="Bool_lit_intf" rel="Chapter" href="Bool_lit_intf.html">
+<link title="Sat_solver" rel="Chapter" href="Sat_solver.html">
+<link title="Sat_solver_intf" rel="Chapter" href="Sat_solver_intf.html">
+<link title="Trail" rel="Chapter" href="Trail.html">
+<link title="Ind_cst" rel="Chapter" href="Ind_cst.html">
+<link title="Cover_set" rel="Chapter" href="Cover_set.html">
+<link title="Cut_form" rel="Chapter" href="Cut_form.html">
+<link title="Phases" rel="Chapter" href="Phases.html">
+<link title="Phases_impl" rel="Chapter" href="Phases_impl.html">
+<link title="Avatar" rel="Chapter" href="Avatar.html">
+<link title="Avatar_intf" rel="Chapter" href="Avatar_intf.html">
+<link title="Induction" rel="Chapter" href="Induction.html">
+<link title="Induction_intf" rel="Chapter" href="Induction_intf.html">
+<link title="Superposition" rel="Chapter" href="Superposition.html">
+<link title="Superposition_intf" rel="Chapter" href="Superposition_intf.html">
+<link title="Rewriting" rel="Chapter" href="Rewriting.html">
+<link title="EnumTypes" rel="Chapter" href="EnumTypes.html">
+<link title="Arith_int" rel="Chapter" href="Arith_int.html">
+<link title="Arith_rat" rel="Chapter" href="Arith_rat.html">
+<link title="Heuristics" rel="Chapter" href="Heuristics.html">
+<link title="Ind_types" rel="Chapter" href="Ind_types.html">
+<link title="Fool" rel="Chapter" href="Fool.html">
+<link title="Higher_order" rel="Chapter" href="Higher_order.html"><title>Cut_form</title>
+</head>
+<body>
+<code class="code"><span class="keyword">sig</span><br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;var&nbsp;=&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Term</span>.var<br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;term&nbsp;=&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Term</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;clause&nbsp;=&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Literals</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;form&nbsp;=&nbsp;<span class="constructor">Cut_form</span>.clause&nbsp;list<br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;t&nbsp;=&nbsp;<span class="keyword">private</span>&nbsp;{&nbsp;vars&nbsp;:&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Term</span>.<span class="constructor">VarSet</span>.t;&nbsp;cs&nbsp;:&nbsp;<span class="constructor">Cut_form</span>.form;&nbsp;}<br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;cut_form&nbsp;=&nbsp;<span class="constructor">Cut_form</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;make&nbsp;:&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Literals</span>.t&nbsp;list&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Cut_form</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;trivial&nbsp;:&nbsp;<span class="constructor">Cut_form</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;equal&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;hash&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;int<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;compare&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;int<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;pp&nbsp;:&nbsp;t&nbsp;<span class="constructor">CCFormat</span>.printer<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;to_string&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;string<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;pp_tstp&nbsp;:&nbsp;<span class="constructor">Cut_form</span>.t&nbsp;<span class="constructor">CCFormat</span>.printer<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;pp_zf&nbsp;:&nbsp;<span class="constructor">Cut_form</span>.t&nbsp;<span class="constructor">CCFormat</span>.printer<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;vars&nbsp;:&nbsp;<span class="constructor">Cut_form</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Term</span>.<span class="constructor">VarSet</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;cs&nbsp;:&nbsp;<span class="constructor">Cut_form</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Literals</span>.t&nbsp;list<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;ind_vars&nbsp;:&nbsp;<span class="constructor">Cut_form</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Cut_form</span>.var&nbsp;list<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;subst1&nbsp;:&nbsp;<span class="constructor">Cut_form</span>.var&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Cut_form</span>.term&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Cut_form</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Cut_form</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;apply_subst&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Subst</span>.<span class="constructor">Renaming</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Subst</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Cut_form</span>.t&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Scoped</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Cut_form</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;are_variant&nbsp;:&nbsp;<span class="constructor">Cut_form</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Cut_form</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;normalize&nbsp;:&nbsp;<span class="constructor">Cut_form</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Cut_form</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;to_s_form&nbsp;:&nbsp;<span class="constructor">Cut_form</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">TypedSTerm</span>.<span class="constructor">Form</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">module</span>&nbsp;<span class="constructor">Pos</span>&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">sig</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;at&nbsp;:&nbsp;<span class="constructor">Cut_form</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Position</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Cut_form</span>.term<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;lit_at&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Cut_form</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Position</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Literal</span>.t&nbsp;*&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Position</span>.t<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;clause_at&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Cut_form</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Position</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Cut_form</span>.clause&nbsp;*&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Position</span>.t<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;replace&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Cut_form</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;at:<span class="constructor">Logtk</span>.<span class="constructor">Position</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;by:<span class="constructor">Cut_form</span>.term&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Cut_form</span>.t<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;replace_many&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Cut_form</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Cut_form</span>.term&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Position</span>.<span class="constructor">Map</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Cut_form</span>.t<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">end</span><br>
+&nbsp;&nbsp;<span class="keyword">module</span>&nbsp;<span class="constructor">Seq</span>&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">sig</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;terms&nbsp;:&nbsp;<span class="constructor">Cut_form</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Cut_form</span>.term&nbsp;<span class="constructor">Sequence</span>.t<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;terms_with_pos&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?subterms:bool&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Cut_form</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Cut_form</span>.term&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Position</span>.<span class="constructor">With</span>.t&nbsp;<span class="constructor">Sequence</span>.t<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">end</span><br>
+&nbsp;&nbsp;<span class="keyword">module</span>&nbsp;<span class="constructor">FV_tbl</span>&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">functor</span>&nbsp;(<span class="constructor">X</span>&nbsp;:&nbsp;<span class="constructor">Map</span>.<span class="constructor">OrderedType</span>)&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">sig</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;value&nbsp;=&nbsp;<span class="constructor">X</span>.t<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;t<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;create&nbsp;:&nbsp;unit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Cut_form</span>.<span class="constructor">FV_tbl</span>.t<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;add&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Cut_form</span>.<span class="constructor">FV_tbl</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Cut_form</span>.cut_form&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Cut_form</span>.<span class="constructor">FV_tbl</span>.value&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;mem&nbsp;:&nbsp;<span class="constructor">Cut_form</span>.<span class="constructor">FV_tbl</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Cut_form</span>.cut_form&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;get&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Cut_form</span>.<span class="constructor">FV_tbl</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Cut_form</span>.cut_form&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Cut_form</span>.<span class="constructor">FV_tbl</span>.value&nbsp;option<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;to_seq&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Cut_form</span>.<span class="constructor">FV_tbl</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;(<span class="constructor">Cut_form</span>.cut_form&nbsp;*&nbsp;<span class="constructor">X</span>.t)&nbsp;<span class="constructor">Sequence</span>.t<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">end</span><br>
+<span class="keyword">end</span></code></body></html>

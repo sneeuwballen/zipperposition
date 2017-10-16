@@ -1,0 +1,103 @@
+<html><head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="Start" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="ClauseQueue" rel="Chapter" href="ClauseQueue.html">
+<link title="Clause" rel="Chapter" href="Clause.html">
+<link title="SClause" rel="Chapter" href="SClause.html">
+<link title="Const" rel="Chapter" href="Const.html">
+<link title="Extensions" rel="Chapter" href="Extensions.html">
+<link title="Ctx" rel="Chapter" href="Ctx.html">
+<link title="ProofState" rel="Chapter" href="ProofState.html">
+<link title="Bool_clause" rel="Chapter" href="Bool_clause.html">
+<link title="Saturate" rel="Chapter" href="Saturate.html">
+<link title="Selection" rel="Chapter" href="Selection.html">
+<link title="AC" rel="Chapter" href="AC.html">
+<link title="AC_intf" rel="Chapter" href="AC_intf.html">
+<link title="SimplM" rel="Chapter" href="SimplM.html">
+<link title="Params" rel="Chapter" href="Params.html">
+<link title="Env" rel="Chapter" href="Env.html">
+<link title="Signals" rel="Chapter" href="Signals.html">
+<link title="Classify_cst" rel="Chapter" href="Classify_cst.html">
+<link title="Ctx_intf" rel="Chapter" href="Ctx_intf.html">
+<link title="Clause_intf" rel="Chapter" href="Clause_intf.html">
+<link title="Env_intf" rel="Chapter" href="Env_intf.html">
+<link title="ProofState_intf" rel="Chapter" href="ProofState_intf.html">
+<link title="BBox" rel="Chapter" href="BBox.html">
+<link title="ClauseContext" rel="Chapter" href="ClauseContext.html">
+<link title="ClauseQueue_intf" rel="Chapter" href="ClauseQueue_intf.html">
+<link title="Bool_lit" rel="Chapter" href="Bool_lit.html">
+<link title="Bool_lit_intf" rel="Chapter" href="Bool_lit_intf.html">
+<link title="Sat_solver" rel="Chapter" href="Sat_solver.html">
+<link title="Sat_solver_intf" rel="Chapter" href="Sat_solver_intf.html">
+<link title="Trail" rel="Chapter" href="Trail.html">
+<link title="Ind_cst" rel="Chapter" href="Ind_cst.html">
+<link title="Cover_set" rel="Chapter" href="Cover_set.html">
+<link title="Cut_form" rel="Chapter" href="Cut_form.html">
+<link title="Phases" rel="Chapter" href="Phases.html">
+<link title="Phases_impl" rel="Chapter" href="Phases_impl.html">
+<link title="Avatar" rel="Chapter" href="Avatar.html">
+<link title="Avatar_intf" rel="Chapter" href="Avatar_intf.html">
+<link title="Induction" rel="Chapter" href="Induction.html">
+<link title="Induction_intf" rel="Chapter" href="Induction_intf.html">
+<link title="Superposition" rel="Chapter" href="Superposition.html">
+<link title="Superposition_intf" rel="Chapter" href="Superposition_intf.html">
+<link title="Rewriting" rel="Chapter" href="Rewriting.html">
+<link title="EnumTypes" rel="Chapter" href="EnumTypes.html">
+<link title="Arith_int" rel="Chapter" href="Arith_int.html">
+<link title="Arith_rat" rel="Chapter" href="Arith_rat.html">
+<link title="Heuristics" rel="Chapter" href="Heuristics.html">
+<link title="Ind_types" rel="Chapter" href="Ind_types.html">
+<link title="Fool" rel="Chapter" href="Fool.html">
+<link title="Higher_order" rel="Chapter" href="Higher_order.html"><title>Avatar_intf.S</title>
+</head>
+<body>
+<code class="code"><span class="keyword">sig</span><br>
+&nbsp;&nbsp;<span class="keyword">module</span>&nbsp;<span class="constructor">E</span>&nbsp;:&nbsp;<span class="constructor">Env</span>.<span class="constructor">S</span><br>
+&nbsp;&nbsp;<span class="keyword">module</span>&nbsp;<span class="constructor">Solver</span>&nbsp;:&nbsp;<span class="constructor">Sat_solver</span>.<span class="constructor">S</span><br>
+&nbsp;&nbsp;<span class="keyword">module</span>&nbsp;<span class="constructor">BLit</span>&nbsp;=&nbsp;<span class="constructor">BBox</span>.<span class="constructor">Lit</span><br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;split&nbsp;:&nbsp;<span class="constructor">E</span>.multi_simpl_rule<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;check_empty&nbsp;:&nbsp;<span class="constructor">E</span>.unary_inf_rule<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;before_check_sat&nbsp;:&nbsp;unit&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Signal</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;after_check_sat&nbsp;:&nbsp;unit&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Signal</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;filter_absurd_trails&nbsp;:&nbsp;(<span class="constructor">Trail</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool)&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;check_satisfiability&nbsp;:&nbsp;<span class="constructor">E</span>.generate_rule<br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;cut_res&nbsp;=&nbsp;<span class="keyword">private</span>&nbsp;{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cut_form&nbsp;:&nbsp;<span class="constructor">Cut_form</span>.t;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cut_pos&nbsp;:&nbsp;<span class="constructor">E</span>.<span class="constructor">C</span>.t&nbsp;list;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cut_lit&nbsp;:&nbsp;<span class="constructor">BLit</span>.t;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cut_depth&nbsp;:&nbsp;int;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cut_proof&nbsp;:&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Proof</span>.<span class="constructor">Step</span>.t;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cut_proof_parent&nbsp;:&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Proof</span>.<span class="constructor">Parent</span>.t;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cut_reason&nbsp;:&nbsp;unit&nbsp;<span class="constructor">CCFormat</span>.printer&nbsp;option;<br>
+&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;cut_form&nbsp;:&nbsp;<span class="constructor">Avatar_intf</span>.<span class="constructor">S</span>.cut_res&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Cut_form</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;cut_pos&nbsp;:&nbsp;<span class="constructor">Avatar_intf</span>.<span class="constructor">S</span>.cut_res&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">E</span>.<span class="constructor">C</span>.t&nbsp;list<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;cut_lit&nbsp;:&nbsp;<span class="constructor">Avatar_intf</span>.<span class="constructor">S</span>.cut_res&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">BLit</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;cut_depth&nbsp;:&nbsp;<span class="constructor">Avatar_intf</span>.<span class="constructor">S</span>.cut_res&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;int<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;cut_proof&nbsp;:&nbsp;<span class="constructor">Avatar_intf</span>.<span class="constructor">S</span>.cut_res&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Proof</span>.<span class="constructor">Step</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;cut_proof_parent&nbsp;:&nbsp;<span class="constructor">Avatar_intf</span>.<span class="constructor">S</span>.cut_res&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Proof</span>.<span class="constructor">Parent</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;pp_cut_res&nbsp;:&nbsp;<span class="constructor">Avatar_intf</span>.<span class="constructor">S</span>.cut_res&nbsp;<span class="constructor">CCFormat</span>.printer<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;cut_res_clauses&nbsp;:&nbsp;<span class="constructor">Avatar_intf</span>.<span class="constructor">S</span>.cut_res&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">E</span>.<span class="constructor">C</span>.t&nbsp;<span class="constructor">Sequence</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;print_lemmas&nbsp;:&nbsp;unit&nbsp;<span class="constructor">CCFormat</span>.printer<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;introduce_cut&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;?reason:unit&nbsp;<span class="constructor">CCFormat</span>.printer&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;?penalty:int&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;?depth:int&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Cut_form</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Proof</span>.<span class="constructor">Step</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Avatar_intf</span>.<span class="constructor">S</span>.cut_res<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;add_prove_lemma&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(<span class="constructor">Avatar_intf</span>.<span class="constructor">S</span>.cut_res&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">E</span>.<span class="constructor">C</span>.t&nbsp;list&nbsp;<span class="constructor">E</span>.conversion_result)&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;add_lemma&nbsp;:&nbsp;<span class="constructor">Avatar_intf</span>.<span class="constructor">S</span>.cut_res&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;add_imply&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Avatar_intf</span>.<span class="constructor">S</span>.cut_res&nbsp;list&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Avatar_intf</span>.<span class="constructor">S</span>.cut_res&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Proof</span>.<span class="constructor">Step</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;on_input_lemma&nbsp;:&nbsp;<span class="constructor">Avatar_intf</span>.<span class="constructor">S</span>.cut_res&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Signal</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;on_lemma&nbsp;:&nbsp;<span class="constructor">Avatar_intf</span>.<span class="constructor">S</span>.cut_res&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Signal</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;convert_lemma&nbsp;:&nbsp;<span class="constructor">E</span>.clause_conversion_rule<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;register&nbsp;:&nbsp;split:bool&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit<br>
+<span class="keyword">end</span></code></body></html>

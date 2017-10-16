@@ -1,0 +1,232 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="Start" href="index.html">
+<link rel="Up" href="Avatar.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="ClauseQueue" rel="Chapter" href="ClauseQueue.html">
+<link title="Clause" rel="Chapter" href="Clause.html">
+<link title="SClause" rel="Chapter" href="SClause.html">
+<link title="Const" rel="Chapter" href="Const.html">
+<link title="Extensions" rel="Chapter" href="Extensions.html">
+<link title="Ctx" rel="Chapter" href="Ctx.html">
+<link title="ProofState" rel="Chapter" href="ProofState.html">
+<link title="Bool_clause" rel="Chapter" href="Bool_clause.html">
+<link title="Saturate" rel="Chapter" href="Saturate.html">
+<link title="Selection" rel="Chapter" href="Selection.html">
+<link title="AC" rel="Chapter" href="AC.html">
+<link title="AC_intf" rel="Chapter" href="AC_intf.html">
+<link title="SimplM" rel="Chapter" href="SimplM.html">
+<link title="Params" rel="Chapter" href="Params.html">
+<link title="Env" rel="Chapter" href="Env.html">
+<link title="Signals" rel="Chapter" href="Signals.html">
+<link title="Classify_cst" rel="Chapter" href="Classify_cst.html">
+<link title="Ctx_intf" rel="Chapter" href="Ctx_intf.html">
+<link title="Clause_intf" rel="Chapter" href="Clause_intf.html">
+<link title="Env_intf" rel="Chapter" href="Env_intf.html">
+<link title="ProofState_intf" rel="Chapter" href="ProofState_intf.html">
+<link title="BBox" rel="Chapter" href="BBox.html">
+<link title="ClauseContext" rel="Chapter" href="ClauseContext.html">
+<link title="ClauseQueue_intf" rel="Chapter" href="ClauseQueue_intf.html">
+<link title="Bool_lit" rel="Chapter" href="Bool_lit.html">
+<link title="Bool_lit_intf" rel="Chapter" href="Bool_lit_intf.html">
+<link title="Sat_solver" rel="Chapter" href="Sat_solver.html">
+<link title="Sat_solver_intf" rel="Chapter" href="Sat_solver_intf.html">
+<link title="Trail" rel="Chapter" href="Trail.html">
+<link title="Ind_cst" rel="Chapter" href="Ind_cst.html">
+<link title="Cover_set" rel="Chapter" href="Cover_set.html">
+<link title="Cut_form" rel="Chapter" href="Cut_form.html">
+<link title="Phases" rel="Chapter" href="Phases.html">
+<link title="Phases_impl" rel="Chapter" href="Phases_impl.html">
+<link title="Avatar" rel="Chapter" href="Avatar.html">
+<link title="Avatar_intf" rel="Chapter" href="Avatar_intf.html">
+<link title="Induction" rel="Chapter" href="Induction.html">
+<link title="Induction_intf" rel="Chapter" href="Induction_intf.html">
+<link title="Superposition" rel="Chapter" href="Superposition.html">
+<link title="Superposition_intf" rel="Chapter" href="Superposition_intf.html">
+<link title="Rewriting" rel="Chapter" href="Rewriting.html">
+<link title="EnumTypes" rel="Chapter" href="EnumTypes.html">
+<link title="Arith_int" rel="Chapter" href="Arith_int.html">
+<link title="Arith_rat" rel="Chapter" href="Arith_rat.html">
+<link title="Heuristics" rel="Chapter" href="Heuristics.html">
+<link title="Ind_types" rel="Chapter" href="Ind_types.html">
+<link title="Fool" rel="Chapter" href="Fool.html">
+<link title="Higher_order" rel="Chapter" href="Higher_order.html"><title>Avatar.S</title>
+</head>
+<body>
+<div class="navbar">&nbsp;<a class="up" href="Avatar.html" title="Avatar">Up</a>
+&nbsp;</div>
+<h1>Module type <a href="type_Avatar.S.html">Avatar.S</a></h1>
+
+<pre><span class="keyword">module type</span> S = <code class="type"><a href="Avatar_intf.S.html">Avatar_intf.S</a></code></pre><hr width="100%">
+
+<pre><span class="keyword">module</span> <a href="Avatar_intf.S.E.html">E</a>: <code class="type"><a href="Env.S.html">Env.S</a></code><code class="type"> </code></pre>
+<pre><span class="keyword">module</span> <a href="Avatar_intf.S.Solver.html">Solver</a>: <code class="type">Sat_solver.S</code><code class="type"> </code></pre>
+<pre><span class="keyword">module</span> <a href="Avatar_intf.S.BLit.html">BLit</a>: <code class="type"><a href="BBox.Lit.html">BBox.Lit</a></code></pre>
+<pre><span id="VALsplit"><span class="keyword">val</span> split</span> : <code class="type">E.multi_simpl_rule</code></pre><div class="info ">
+Split a clause into components<br>
+</div>
+
+<pre><span id="VALcheck_empty"><span class="keyword">val</span> check_empty</span> : <code class="type">E.unary_inf_rule</code></pre><div class="info ">
+Forbid empty clauses with trails, i.e. adds the negation of their
+      trails to the SAT-solver<br>
+</div>
+
+<pre><span id="VALbefore_check_sat"><span class="keyword">val</span> before_check_sat</span> : <code class="type">unit Logtk.Signal.t</code></pre>
+<pre><span id="VALafter_check_sat"><span class="keyword">val</span> after_check_sat</span> : <code class="type">unit Logtk.Signal.t</code></pre>
+<pre><span id="VALfilter_absurd_trails"><span class="keyword">val</span> filter_absurd_trails</span> : <code class="type">(<a href="Trail.html#TYPEt">Trail.t</a> -> bool) -> unit</code></pre><div class="info ">
+<code class="code">filter_trails f</code> calls <code class="code">f</code> on every trail associated with the empty
+      clause. If <code class="code">f</code> returns <code class="code">false</code>, the trail is ignored, otherwise
+      it's negated and sent to the SAT solver<br>
+</div>
+
+<pre><span id="VALcheck_satisfiability"><span class="keyword">val</span> check_satisfiability</span> : <code class="type">E.generate_rule</code></pre><div class="info ">
+Checks that the SAT context is still valid<br>
+</div>
+
+<pre><code><span id="TYPEcut_res"><span class="keyword">type</span> <code class="type"></code>cut_res</span> = private {</code></pre><table class="typetable">
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTcut_res.cut_form">cut_form</span>&nbsp;: <code class="type"><a href="Cut_form.html#TYPEt">Cut_form.t</a></code>;</code></td>
+<td class="typefieldcomment" align="left" valign="top" ><code>(*</code></td><td class="typefieldcomment" align="left" valign="top" ><div class="info ">
+the lemma itself<br>
+</div>
+</td><td class="typefieldcomment" align="left" valign="bottom" ><code>*)</code></td>
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTcut_res.cut_pos">cut_pos</span>&nbsp;: <code class="type">E.C.t list</code>;</code></td>
+<td class="typefieldcomment" align="left" valign="top" ><code>(*</code></td><td class="typefieldcomment" align="left" valign="top" ><div class="info ">
+clauses true if lemma is true<br>
+</div>
+</td><td class="typefieldcomment" align="left" valign="bottom" ><code>*)</code></td>
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTcut_res.cut_lit">cut_lit</span>&nbsp;: <code class="type">BLit.t</code>;</code></td>
+<td class="typefieldcomment" align="left" valign="top" ><code>(*</code></td><td class="typefieldcomment" align="left" valign="top" ><div class="info ">
+lit that is true if lemma is true<br>
+</div>
+</td><td class="typefieldcomment" align="left" valign="bottom" ><code>*)</code></td>
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTcut_res.cut_depth">cut_depth</span>&nbsp;: <code class="type">int</code>;</code></td>
+<td class="typefieldcomment" align="left" valign="top" ><code>(*</code></td><td class="typefieldcomment" align="left" valign="top" ><div class="info ">
+if the lemma is used to prove another lemma<br>
+</div>
+</td><td class="typefieldcomment" align="left" valign="bottom" ><code>*)</code></td>
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTcut_res.cut_proof">cut_proof</span>&nbsp;: <code class="type">Logtk.Proof.Step.t</code>;</code></td>
+<td class="typefieldcomment" align="left" valign="top" ><code>(*</code></td><td class="typefieldcomment" align="left" valign="top" ><div class="info ">
+where does the lemma come from?<br>
+</div>
+</td><td class="typefieldcomment" align="left" valign="bottom" ><code>*)</code></td>
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTcut_res.cut_proof_parent">cut_proof_parent</span>&nbsp;: <code class="type">Logtk.Proof.Parent.t</code>;</code></td>
+<td class="typefieldcomment" align="left" valign="top" ><code>(*</code></td><td class="typefieldcomment" align="left" valign="top" ><div class="info ">
+how to justify sth from the lemma<br>
+</div>
+</td><td class="typefieldcomment" align="left" valign="bottom" ><code>*)</code></td>
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTcut_res.cut_reason">cut_reason</span>&nbsp;: <code class="type">unit CCFormat.printer option</code>;</code></td>
+<td class="typefieldcomment" align="left" valign="top" ><code>(*</code></td><td class="typefieldcomment" align="left" valign="top" ><div class="info ">
+Informal reason why the lemma was added<br>
+</div>
+</td><td class="typefieldcomment" align="left" valign="bottom" ><code>*)</code></td>
+</tr></table>
+}
+
+<div class="info ">
+This represents a cut on a formula, where we obtain a list
+      of clauses <code class="code">cut_pos</code> representing the formula itself with the
+      trail <code class="code">lemma</code>, and a boolean literal <code class="code">cut_lit</code> that is true iff
+      the trail is true.
+<p>
+
+      Other modules, when a cut is introduced, will try to disprove
+      the lemma (e.g. by induction or theory reasoning).<br>
+</div>
+
+
+<pre><span id="VALcut_form"><span class="keyword">val</span> cut_form</span> : <code class="type"><a href="Avatar_intf.S.html#TYPEcut_res">cut_res</a> -> <a href="Cut_form.html#TYPEt">Cut_form.t</a></code></pre>
+<pre><span id="VALcut_pos"><span class="keyword">val</span> cut_pos</span> : <code class="type"><a href="Avatar_intf.S.html#TYPEcut_res">cut_res</a> -> E.C.t list</code></pre>
+<pre><span id="VALcut_lit"><span class="keyword">val</span> cut_lit</span> : <code class="type"><a href="Avatar_intf.S.html#TYPEcut_res">cut_res</a> -> BLit.t</code></pre>
+<pre><span id="VALcut_depth"><span class="keyword">val</span> cut_depth</span> : <code class="type"><a href="Avatar_intf.S.html#TYPEcut_res">cut_res</a> -> int</code></pre>
+<pre><span id="VALcut_proof"><span class="keyword">val</span> cut_proof</span> : <code class="type"><a href="Avatar_intf.S.html#TYPEcut_res">cut_res</a> -> Logtk.Proof.Step.t</code></pre>
+<pre><span id="VALcut_proof_parent"><span class="keyword">val</span> cut_proof_parent</span> : <code class="type"><a href="Avatar_intf.S.html#TYPEcut_res">cut_res</a> -> Logtk.Proof.Parent.t</code></pre>
+<pre><span id="VALpp_cut_res"><span class="keyword">val</span> pp_cut_res</span> : <code class="type"><a href="Avatar_intf.S.html#TYPEcut_res">cut_res</a> CCFormat.printer</code></pre>
+<pre><span id="VALcut_res_clauses"><span class="keyword">val</span> cut_res_clauses</span> : <code class="type"><a href="Avatar_intf.S.html#TYPEcut_res">cut_res</a> -> E.C.t Sequence.t</code></pre>
+<pre><span id="VALprint_lemmas"><span class="keyword">val</span> print_lemmas</span> : <code class="type">unit CCFormat.printer</code></pre><div class="info ">
+print the current list of lemmas, and their status<br>
+</div>
+
+<pre><span id="VALintroduce_cut"><span class="keyword">val</span> introduce_cut</span> : <code class="type">?reason:unit CCFormat.printer -><br>       ?penalty:int -><br>       ?depth:int -> <a href="Cut_form.html#TYPEt">Cut_form.t</a> -> Logtk.Proof.Step.t -> <a href="Avatar_intf.S.html#TYPEcut_res">cut_res</a></code></pre><div class="info ">
+Introduce a cut on the given clause(s). Pure.<br>
+</div>
+<div class="param_info"><code class="code">reason</code> : some comment on why the lemma was added</div>
+
+<pre><span id="VALadd_prove_lemma"><span class="keyword">val</span> add_prove_lemma</span> : <code class="type">(<a href="Avatar_intf.S.html#TYPEcut_res">cut_res</a> -> E.C.t list E.conversion_result) -> unit</code></pre><div class="info ">
+Add a mean of proving lemmas<br>
+</div>
+
+<pre><span id="VALadd_lemma"><span class="keyword">val</span> add_lemma</span> : <code class="type"><a href="Avatar_intf.S.html#TYPEcut_res">cut_res</a> -> unit</code></pre><div class="info ">
+Add the given cut to the list of lemmas. Modifies the global list
+      of lemmas.
+      It will call the functions added by <a href="Avatar_intf.S.html#VALadd_prove_lemma"><code class="code">Avatar_intf.S.add_prove_lemma</code></a> to try and
+      prove this one.<br>
+</div>
+
+<pre><span id="VALadd_imply"><span class="keyword">val</span> add_imply</span> : <code class="type"><a href="Avatar_intf.S.html#TYPEcut_res">cut_res</a> list -><br>       <a href="Avatar_intf.S.html#TYPEcut_res">cut_res</a> -> Logtk.Proof.Step.t -> unit</code></pre><div class="info ">
+<code class="code">add_imply l res</code> means that the conjunction of lemmas in <code class="code">l</code>
+      implies that the lemma <code class="code">res</code> is proven<br>
+</div>
+
+<pre><span id="VALon_input_lemma"><span class="keyword">val</span> on_input_lemma</span> : <code class="type"><a href="Avatar_intf.S.html#TYPEcut_res">cut_res</a> Logtk.Signal.t</code></pre><div class="info ">
+Triggered every time a cut is introduced  for an input lemma
+      (i.e. every time a statement of the form `lemma F` is translated)<br>
+</div>
+
+<pre><span id="VALon_lemma"><span class="keyword">val</span> on_lemma</span> : <code class="type"><a href="Avatar_intf.S.html#TYPEcut_res">cut_res</a> Logtk.Signal.t</code></pre><div class="info ">
+Triggered every time a cut is introduced, by any means. In
+      particular it is triggered at least as often as <a href="Avatar_intf.S.html#VALon_input_lemma"><code class="code">Avatar_intf.S.on_input_lemma</code></a><br>
+</div>
+
+<pre><span id="VALconvert_lemma"><span class="keyword">val</span> convert_lemma</span> : <code class="type">E.clause_conversion_rule</code></pre><div class="info ">
+Intercepts input lemmas and converts them into clauses.
+      Triggers <a href="Avatar_intf.S.html#VALon_input_lemma"><code class="code">Avatar_intf.S.on_input_lemma</code></a> with the resulting cut<br>
+</div>
+
+<pre><span id="VALregister"><span class="keyword">val</span> register</span> : <code class="type">split:bool -> unit -> unit</code></pre><div class="info ">
+Register inference rules to the environment<br>
+</div>
+<div class="param_info"><code class="code">split</code> : if true, the clause splitting rule is added. Otherwise
+      Avatar is only used for other things such as induction.</div>
+</body></html>

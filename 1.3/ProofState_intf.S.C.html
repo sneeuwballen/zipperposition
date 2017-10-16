@@ -1,0 +1,311 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="Start" href="index.html">
+<link rel="previous" href="ProofState_intf.S.Ctx.html">
+<link rel="next" href="ProofState_intf.S.CQueue.html">
+<link rel="Up" href="ProofState_intf.S.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="ClauseQueue" rel="Chapter" href="ClauseQueue.html">
+<link title="Clause" rel="Chapter" href="Clause.html">
+<link title="SClause" rel="Chapter" href="SClause.html">
+<link title="Const" rel="Chapter" href="Const.html">
+<link title="Extensions" rel="Chapter" href="Extensions.html">
+<link title="Ctx" rel="Chapter" href="Ctx.html">
+<link title="ProofState" rel="Chapter" href="ProofState.html">
+<link title="Bool_clause" rel="Chapter" href="Bool_clause.html">
+<link title="Saturate" rel="Chapter" href="Saturate.html">
+<link title="Selection" rel="Chapter" href="Selection.html">
+<link title="AC" rel="Chapter" href="AC.html">
+<link title="AC_intf" rel="Chapter" href="AC_intf.html">
+<link title="SimplM" rel="Chapter" href="SimplM.html">
+<link title="Params" rel="Chapter" href="Params.html">
+<link title="Env" rel="Chapter" href="Env.html">
+<link title="Signals" rel="Chapter" href="Signals.html">
+<link title="Classify_cst" rel="Chapter" href="Classify_cst.html">
+<link title="Ctx_intf" rel="Chapter" href="Ctx_intf.html">
+<link title="Clause_intf" rel="Chapter" href="Clause_intf.html">
+<link title="Env_intf" rel="Chapter" href="Env_intf.html">
+<link title="ProofState_intf" rel="Chapter" href="ProofState_intf.html">
+<link title="BBox" rel="Chapter" href="BBox.html">
+<link title="ClauseContext" rel="Chapter" href="ClauseContext.html">
+<link title="ClauseQueue_intf" rel="Chapter" href="ClauseQueue_intf.html">
+<link title="Bool_lit" rel="Chapter" href="Bool_lit.html">
+<link title="Bool_lit_intf" rel="Chapter" href="Bool_lit_intf.html">
+<link title="Sat_solver" rel="Chapter" href="Sat_solver.html">
+<link title="Sat_solver_intf" rel="Chapter" href="Sat_solver_intf.html">
+<link title="Trail" rel="Chapter" href="Trail.html">
+<link title="Ind_cst" rel="Chapter" href="Ind_cst.html">
+<link title="Cover_set" rel="Chapter" href="Cover_set.html">
+<link title="Cut_form" rel="Chapter" href="Cut_form.html">
+<link title="Phases" rel="Chapter" href="Phases.html">
+<link title="Phases_impl" rel="Chapter" href="Phases_impl.html">
+<link title="Avatar" rel="Chapter" href="Avatar.html">
+<link title="Avatar_intf" rel="Chapter" href="Avatar_intf.html">
+<link title="Induction" rel="Chapter" href="Induction.html">
+<link title="Induction_intf" rel="Chapter" href="Induction_intf.html">
+<link title="Superposition" rel="Chapter" href="Superposition.html">
+<link title="Superposition_intf" rel="Chapter" href="Superposition_intf.html">
+<link title="Rewriting" rel="Chapter" href="Rewriting.html">
+<link title="EnumTypes" rel="Chapter" href="EnumTypes.html">
+<link title="Arith_int" rel="Chapter" href="Arith_int.html">
+<link title="Arith_rat" rel="Chapter" href="Arith_rat.html">
+<link title="Heuristics" rel="Chapter" href="Heuristics.html">
+<link title="Ind_types" rel="Chapter" href="Ind_types.html">
+<link title="Fool" rel="Chapter" href="Fool.html">
+<link title="Higher_order" rel="Chapter" href="Higher_order.html"><link title="Flags" rel="Section" href="#2_Flags">
+<link title="Basics" rel="Section" href="#2_Basics">
+<link title="Boolean Abstraction" rel="Section" href="#2_BooleanAbstraction">
+<link title="Constructors" rel="Section" href="#2_Constructors">
+<link title="Iterators" rel="Section" href="#2_Iterators">
+<link title="Filter literals" rel="Section" href="#2_Filterliterals">
+<link title="Set of clauses" rel="Section" href="#2_Setofclauses">
+<link title="Position" rel="Section" href="#2_Position">
+<link title="Clauses with more data" rel="Section" href="#2_Clauseswithmoredata">
+<link title="IO" rel="Section" href="#2_IO">
+<title>ProofState_intf.S.C</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="ProofState_intf.S.Ctx.html" title="ProofState_intf.S.Ctx">Previous</a>
+&nbsp;<a class="up" href="ProofState_intf.S.html" title="ProofState_intf.S">Up</a>
+&nbsp;<a class="post" href="ProofState_intf.S.CQueue.html" title="ProofState_intf.S.CQueue">Next</a>
+</div>
+<h1>Module <a href="type_ProofState_intf.S.C.html">ProofState_intf.S.C</a></h1>
+
+<pre><span class="keyword">module</span> C: <code class="type"><a href="Clause_intf.S.html">Clause_intf.S</a></code><code class="type"> </code></pre><hr width="100%">
+
+<pre><span class="keyword">module</span> <a href="Clause_intf.S.Ctx.html">Ctx</a>: <code class="type"><a href="Ctx.S.html">Ctx.S</a></code><code class="type"> </code></pre>
+<pre><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> </pre>
+
+
+<pre><span id="TYPEclause"><span class="keyword">type</span> <code class="type"></code>clause</span> = <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a></code> </pre>
+
+<br>
+<h2 id="2_Flags">Flags</h2><br>
+
+<pre><span id="TYPEflag"><span class="keyword">type</span> <code class="type"></code>flag</span> = <code class="type"><a href="SClause.html#TYPEflag">SClause.flag</a></code> </pre>
+
+
+<pre><span id="VALset_flag"><span class="keyword">val</span> set_flag</span> : <code class="type"><a href="Clause_intf.S.html#TYPEflag">flag</a> -> <a href="Clause_intf.S.html#TYPEt">t</a> -> bool -> unit</code></pre><div class="info ">
+set boolean flag<br>
+</div>
+
+<pre><span id="VALget_flag"><span class="keyword">val</span> get_flag</span> : <code class="type"><a href="Clause_intf.S.html#TYPEflag">flag</a> -> <a href="Clause_intf.S.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+get value of boolean flag<br>
+</div>
+
+<pre><span id="VALmark_redundant"><span class="keyword">val</span> mark_redundant</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> unit</code></pre>
+<pre><span id="VALis_redundant"><span class="keyword">val</span> is_redundant</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALmark_backward_simplified"><span class="keyword">val</span> mark_backward_simplified</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> unit</code></pre>
+<pre><span id="VALis_backward_simplified"><span class="keyword">val</span> is_backward_simplified</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> bool</code></pre><br>
+<h2 id="2_Basics">Basics</h2><br>
+
+<pre><span class="keyword">include</span> Interfaces.EQ</pre>
+
+<pre><span class="keyword">include</span> Interfaces.HASH</pre>
+
+<pre><span id="VALcompare"><span class="keyword">val</span> compare</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> <a href="Clause_intf.S.html#TYPEt">t</a> -> int</code></pre>
+<pre><span id="VALid"><span class="keyword">val</span> id</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> int</code></pre>
+<pre><span id="VALlits"><span class="keyword">val</span> lits</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> Logtk.Literal.t array</code></pre>
+<pre><span id="VALis_ground"><span class="keyword">val</span> is_ground</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALweight"><span class="keyword">val</span> weight</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> int</code></pre>
+<pre><span class="keyword">module</span> <a href="Clause_intf.S.Tbl.html">Tbl</a>: <code class="type">CCHashtbl.S</code><code class="type">  with type key = t</code></pre>
+<pre><span id="VALis_goal"><span class="keyword">val</span> is_goal</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+Looking at the clause's proof, return <code class="code">true</code> iff the clause is an
+      initial (negated) goal from the problem<br>
+</div>
+
+<pre><span id="VALdistance_to_goal"><span class="keyword">val</span> distance_to_goal</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> int option</code></pre><div class="info ">
+See <code class="code">Proof.distance_to_goal</code>, applied to the clause's proof<br>
+</div>
+
+<pre><span id="VALcomes_from_goal"><span class="keyword">val</span> comes_from_goal</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+<code class="code">true</code> iff the clause is (indirectly) deduced from a goal or lemma<br>
+</div>
+<br>
+<h2 id="2_BooleanAbstraction">Boolean Abstraction</h2><br>
+
+<pre><span id="VALpp_trail"><span class="keyword">val</span> pp_trail</span> : <code class="type"><a href="Trail.html#TYPEt">Trail.t</a> CCFormat.printer</code></pre><div class="info ">
+Printer for boolean trails, that uses <a href="Clause_intf.S.Ctx.html"><code class="code">Clause_intf.S.Ctx</code></a> to display boxes<br>
+</div>
+
+<pre><span id="VALhas_trail"><span class="keyword">val</span> has_trail</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+Has a non-empty trail?<br>
+</div>
+
+<pre><span id="VALtrail"><span class="keyword">val</span> trail</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> <a href="Trail.html#TYPEt">Trail.t</a></code></pre><div class="info ">
+Get the clause's trail<br>
+</div>
+
+<pre><span id="VALtrail_l"><span class="keyword">val</span> trail_l</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> list -> <a href="Trail.html#TYPEt">Trail.t</a></code></pre><div class="info ">
+Merge the trails of several clauses<br>
+</div>
+
+<pre><span id="VALupdate_trail"><span class="keyword">val</span> update_trail</span> : <code class="type">(<a href="Trail.html#TYPEt">Trail.t</a> -> <a href="Trail.html#TYPEt">Trail.t</a>) -> <a href="Clause_intf.S.html#TYPEt">t</a> -> <a href="Clause_intf.S.html#TYPEt">t</a></code></pre><div class="info ">
+Change the trail. The resulting clause has same parents, proof
+      and literals as the input one<br>
+</div>
+
+<pre><span id="VALtrail_subsumes"><span class="keyword">val</span> trail_subsumes</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> <a href="Clause_intf.S.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+<code class="code">trail_subsumes c1 c2 = Trail.subsumes (get_trail c1) (get_trail c2)</code><br>
+</div>
+
+<pre><span id="VALis_active"><span class="keyword">val</span> is_active</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> v:<a href="Trail.html#TYPEvaluation">Trail.valuation</a> -> bool</code></pre><div class="info ">
+True if the clause's trail is active in this valuation<br>
+</div>
+<br>
+<h2 id="2_Constructors">Constructors</h2><br>
+
+<pre><span id="VALcreate"><span class="keyword">val</span> create</span> : <code class="type">penalty:int -><br>       trail:<a href="Trail.html#TYPEt">Trail.t</a> -><br>       Logtk.Literal.t list -> <a href="Clause_intf.html#TYPEproof_step">Clause_intf.proof_step</a> -> <a href="Clause_intf.S.html#TYPEt">t</a></code></pre><div class="info ">
+Build a new clause from the given literals.<br>
+</div>
+<div class="param_info"><code class="code">penalty</code> : heuristic penalty due to history of the clause
+        (the higher, the less likely the clause is to be picked soon)
+      also takes a list of literals and a proof builder</div>
+<div class="param_info"><code class="code">trail</code> : boolean trail</div>
+
+<pre><span id="VALcreate_a"><span class="keyword">val</span> create_a</span> : <code class="type">penalty:int -><br>       trail:<a href="Trail.html#TYPEt">Trail.t</a> -><br>       Logtk.Literal.t array -> <a href="Clause_intf.html#TYPEproof_step">Clause_intf.proof_step</a> -> <a href="Clause_intf.S.html#TYPEt">t</a></code></pre><div class="info ">
+Build a new clause from the given literals.<br>
+</div>
+
+<pre><span id="VALof_sclause"><span class="keyword">val</span> of_sclause</span> : <code class="type">?penalty:int -> <a href="SClause.html#TYPEt">SClause.t</a> -> <a href="Clause_intf.html#TYPEproof_step">Clause_intf.proof_step</a> -> <a href="Clause_intf.S.html#TYPEt">t</a></code></pre>
+<pre><span id="VALof_forms"><span class="keyword">val</span> of_forms</span> : <code class="type">?penalty:int -><br>       trail:<a href="Trail.html#TYPEt">Trail.t</a> -><br>       Logtk.Term.t Logtk.SLiteral.t list -><br>       <a href="Clause_intf.html#TYPEproof_step">Clause_intf.proof_step</a> -> <a href="Clause_intf.S.html#TYPEt">t</a></code></pre><div class="info ">
+Directly from list of formulas<br>
+</div>
+
+<pre><span id="VALof_forms_axiom"><span class="keyword">val</span> of_forms_axiom</span> : <code class="type">?penalty:int -><br>       file:string -><br>       name:string -> Logtk.Term.t Logtk.SLiteral.t list -> <a href="Clause_intf.S.html#TYPEt">t</a></code></pre><div class="info ">
+Construction from formulas as axiom (initial clause)<br>
+</div>
+
+<pre><span id="VALof_statement"><span class="keyword">val</span> of_statement</span> : <code class="type">Logtk.Statement.clause_t -> <a href="Clause_intf.S.html#TYPEt">t</a> list</code></pre><div class="info ">
+Extract a clause from a statement, if any<br>
+</div>
+
+<pre><span id="VALproof_step"><span class="keyword">val</span> proof_step</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> <a href="Clause_intf.html#TYPEproof_step">Clause_intf.proof_step</a></code></pre><div class="info ">
+Extract its proof from the clause<br>
+</div>
+
+<pre><span id="VALproof"><span class="keyword">val</span> proof</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> <a href="Clause_intf.html#TYPEproof">Clause_intf.proof</a></code></pre><div class="info ">
+Obtain the pair <code class="code">conclusion, step</code><br>
+</div>
+
+<pre><span id="VALproof_parent"><span class="keyword">val</span> proof_parent</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> Logtk.Proof.Parent.t</code></pre>
+<pre><span id="VALproof_parent_subst"><span class="keyword">val</span> proof_parent_subst</span> : <code class="type">Logtk.Subst.Renaming.t -><br>       <a href="Clause_intf.S.html#TYPEt">t</a> Logtk.Scoped.t -> Logtk.Subst.t -> Logtk.Proof.Parent.t</code></pre>
+<pre><span id="VALupdate_proof"><span class="keyword">val</span> update_proof</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -><br>       (<a href="Clause_intf.html#TYPEproof_step">Clause_intf.proof_step</a> -> <a href="Clause_intf.html#TYPEproof_step">Clause_intf.proof_step</a>) -> <a href="Clause_intf.S.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">update_proof c f</code> creates a new clause that is
+      similar to <code class="code">c</code> in all aspects, but with
+      the proof <code class="code">f (proof_step c)</code><br>
+</div>
+
+<pre><span id="VALis_empty"><span class="keyword">val</span> is_empty</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+Is the clause an empty clause?<br>
+</div>
+
+<pre><span id="VALlength"><span class="keyword">val</span> length</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> int</code></pre><div class="info ">
+Number of literals<br>
+</div>
+
+<pre><span id="VALmaxlits"><span class="keyword">val</span> maxlits</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> Logtk.Scoped.t -> Logtk.Subst.t -> CCBV.t</code></pre><div class="info ">
+List of maximal literals<br>
+</div>
+
+<pre><span id="VALis_maxlit"><span class="keyword">val</span> is_maxlit</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> Logtk.Scoped.t -> Logtk.Subst.t -> idx:int -> bool</code></pre><div class="info ">
+Is the i-th literal maximal in subst(clause)? Equivalent to
+      Bitvector.get (maxlits ~ord c subst) i<br>
+</div>
+
+<pre><span id="VALeligible_res"><span class="keyword">val</span> eligible_res</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> Logtk.Scoped.t -> Logtk.Subst.t -> CCBV.t</code></pre><div class="info ">
+Bitvector that indicates which of the literals of <code class="code">subst(clause)</code>
+      are eligible for resolution. THe literal has to be either maximal
+      among selected literals of the same sign, if some literal is selected,
+      or maximal if none is selected.<br>
+</div>
+
+<pre><span id="VALeligible_res_no_subst"><span class="keyword">val</span> eligible_res_no_subst</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> CCBV.t</code></pre><div class="info ">
+More efficient version of <a href="Clause_intf.S.html#VALeligible_res"><code class="code">Clause_intf.S.eligible_res</code></a> with <code class="code">Subst.empty</code><br>
+</div>
+
+<pre><span id="VALeligible_param"><span class="keyword">val</span> eligible_param</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> Logtk.Scoped.t -> Logtk.Subst.t -> CCBV.t</code></pre><div class="info ">
+Bitvector that indicates which of the literals of <code class="code">subst(clause)</code>
+      are eligible for paramodulation. That means the literal
+      is positive, no literal is selecteed, and the literal
+      is maximal among literals of <code class="code">subst(clause)</code>.<br>
+</div>
+
+<pre><span id="VALis_eligible_param"><span class="keyword">val</span> is_eligible_param</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> Logtk.Scoped.t -> Logtk.Subst.t -> idx:int -> bool</code></pre><div class="info ">
+Check whether the <code class="code">idx</code>-th literal is eligible for paramodulation<br>
+</div>
+
+<pre><span id="VALhas_selected_lits"><span class="keyword">val</span> has_selected_lits</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+does the clause have some selected literals?<br>
+</div>
+
+<pre><span id="VALis_selected"><span class="keyword">val</span> is_selected</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> int -> bool</code></pre><div class="info ">
+check whether a literal is selected<br>
+</div>
+
+<pre><span id="VALselected_lits"><span class="keyword">val</span> selected_lits</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> (Logtk.Literal.t * int) list</code></pre><div class="info ">
+get the list of selected literals<br>
+</div>
+
+<pre><span id="VALpenalty"><span class="keyword">val</span> penalty</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> int</code></pre>
+<pre><span id="VALis_unit_clause"><span class="keyword">val</span> is_unit_clause</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+is the clause a unit clause?<br>
+</div>
+
+<pre><span id="VALis_oriented_rule"><span class="keyword">val</span> is_oriented_rule</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+Is the clause a positive oriented clause?<br>
+</div>
+
+<pre><span id="VALsymbols"><span class="keyword">val</span> symbols</span> : <code class="type">?init:Logtk.ID.Set.t -> <a href="Clause_intf.S.html#TYPEt">t</a> Sequence.t -> Logtk.ID.Set.t</code></pre><div class="info ">
+symbols that occur in the clause<br>
+</div>
+
+<pre><span id="VALto_sclause"><span class="keyword">val</span> to_sclause</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> <a href="SClause.html#TYPEt">SClause.t</a></code></pre>
+<pre><span id="VALto_forms"><span class="keyword">val</span> to_forms</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> Logtk.Term.t Logtk.SLiteral.t list</code></pre><div class="info ">
+Easy iteration on an abstract view of literals<br>
+</div>
+
+<pre><span id="VALto_s_form"><span class="keyword">val</span> to_s_form</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> Logtk.TypedSTerm.Form.t</code></pre><br>
+<h2 id="2_Iterators">Iterators</h2><br>
+
+<pre><span class="keyword">module</span> <a href="Clause_intf.S.Seq.html">Seq</a>: <code class="code">sig</code> <a href="Clause_intf.S.Seq.html">..</a> <code class="code">end</code></pre><br>
+<h2 id="2_Filterliterals">Filter literals</h2><br>
+
+<pre><span class="keyword">module</span> <a href="Clause_intf.S.Eligible.html">Eligible</a>: <code class="code">sig</code> <a href="Clause_intf.S.Eligible.html">..</a> <code class="code">end</code></pre><br>
+<h2 id="2_Setofclauses">Set of clauses</h2><br>
+
+<pre><span class="keyword">module</span> <a href="Clause_intf.S.ClauseSet.html">ClauseSet</a>: <code class="type">CCSet.S</code><code class="type">  with type elt = t</code></pre><div class="info">
+Simple set
+</div>
+<br>
+<h2 id="2_Position">Position</h2><br>
+
+<pre><span class="keyword">module</span> <a href="Clause_intf.S.Pos.html">Pos</a>: <code class="code">sig</code> <a href="Clause_intf.S.Pos.html">..</a> <code class="code">end</code></pre><br>
+<h2 id="2_Clauseswithmoredata">Clauses with more data</h2><br>
+
+<pre><span class="keyword">module</span> <a href="Clause_intf.S.WithPos.html">WithPos</a>: <code class="code">sig</code> <a href="Clause_intf.S.WithPos.html">..</a> <code class="code">end</code></pre><div class="info">
+Clause within which a subterm (and its position) are hilighted
+</div>
+<br>
+<h2 id="2_IO">IO</h2><br>
+
+<pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> CCFormat.printer</code></pre>
+<pre><span id="VALpp_tstp"><span class="keyword">val</span> pp_tstp</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> CCFormat.printer</code></pre>
+<pre><span id="VALpp_tstp_full"><span class="keyword">val</span> pp_tstp_full</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> CCFormat.printer</code></pre><div class="info ">
+Print in a cnf() statement<br>
+</div>
+
+<pre><span id="VALto_string"><span class="keyword">val</span> to_string</span> : <code class="type"><a href="Clause_intf.S.html#TYPEt">t</a> -> string</code></pre><div class="info ">
+Debug printing to a  string<br>
+</div>
+
+<pre><span id="VALpp_set"><span class="keyword">val</span> pp_set</span> : <code class="type">ClauseSet.t CCFormat.printer</code></pre>
+<pre><span id="VALpp_set_tstp"><span class="keyword">val</span> pp_set_tstp</span> : <code class="type">ClauseSet.t CCFormat.printer</code></pre></body></html>
