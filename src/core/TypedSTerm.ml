@@ -48,6 +48,10 @@ let rec deref t = match t.term with
   | Meta (_, {contents=Some t'}, _) -> deref t'
   | _ -> t
 
+let[@inline] must_deref t : bool = match t.term with
+  | Meta (_, {contents=Some _}, _) -> true
+  | _ -> false
+
 let view t = match t.term with
   | Meta (_, {contents=Some t'}, _) -> (deref t').term
   | v -> v
@@ -1104,6 +1108,27 @@ let rec rename_vars_l subst l1 l2 = match l1, l2 with
     let subst = rename_vars subst v1 v2 in
     rename_vars_l subst tail1 tail2
 
+(* normalize some terms; a more thorough version of {!deref}.
+   flatten applications and arrow that contain bound variables *)
+let[@inline][@unfold 1] rec normalize subst (t:term) : term = match view t with
+  | App (f,l) when must_deref f ->
+    normalize subst (app ?loc:t.loc ~ty:(ty_exn t) (deref f) l)
+  | App ({term=Var v;_},l) when Subst.mem subst v ->
+    let f = Subst.find_exn subst v in
+    normalize subst (app ?loc:t.loc ~ty:(ty_exn t) (deref f) l)
+  | AppBuiltin (Builtin.Arrow, ret :: args) when must_deref ret ->
+    let vars, args', ret' = Ty.unfold @@ deref ret in
+    if vars=[] then (
+      Ty.fun_ ?loc:t.loc (args @ args') ret'
+    ) else t
+  | AppBuiltin (Builtin.Arrow, {term=Var v;_} :: args) when Subst.mem subst v ->
+    let ret = Subst.find_exn subst v in
+    let vars, args', ret' = Ty.unfold @@ deref ret in
+    if vars=[] then (
+      Ty.fun_ ?loc:t.loc (args @ args') ret' |> normalize subst
+    ) else t
+  | _ -> deref t
+
 let unify ?(allow_open=false) ?loc ?(st=UStack.create()) ?(subst=Subst.empty) t1 t2 =
   let stack = ref [] in
   let fail_ msg = fail_uniff_ ?loc !stack msg in
@@ -1112,6 +1137,8 @@ let unify ?(allow_open=false) ?loc ?(st=UStack.create()) ?(subst=Subst.empty) t1
     else (
       let old_stack = !stack in
       unify_tys subst t1 t2;
+      let t1 = normalize subst t1 in
+      let t2 = normalize subst t2 in
       stack := (t1,t2) :: old_stack;
       unify_terms subst t1 t2;
       stack := old_stack; (* restore stack *)
