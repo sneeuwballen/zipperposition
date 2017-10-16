@@ -2,6 +2,8 @@
 
 link:rst/contents.html[High-Level Documentation]
 
+https://github.com/c-cube/zipperposition/[Repository on github]
+
 == API Documentation
 
 - link:dev/index.html[dev]
