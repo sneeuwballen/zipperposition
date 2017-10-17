@@ -865,13 +865,16 @@ let rec as_def ?loc ?of_ bound t =
   let fail() =
     error_ ?loc "expected `forall <vars>. <lhs> =/<=> <rhs>`"
   and yield_term id ty args rhs =
+    let vars', rhs = T.unfold_fun rhs in (* turn [a=fun x.b] into [a x=b] *)
     let vars =
       Sequence.of_list args
       |> Sequence.flat_map T.Seq.free_vars
       |> Var.Set.add_seq bound
+      |> CCFun.flip Var.Set.add_list vars'
       |> Var.Set.to_list
       |> T.sort_ty_vars_first
     in
+    let args = args @ List.map T.var vars' in
     (* check that we talk about the same ID *)
     begin match of_ with
       | Some id' when not (ID.equal id id') ->
@@ -888,12 +891,20 @@ let rec as_def ?loc ?of_ bound t =
     );
     Stmt.Def_term {vars;id;ty;args;rhs;as_form=t}
   and yield_prop lhs rhs pol =
+    let vars', rhs = T.unfold_fun rhs in (* turn [a=fun x.b] into [a x=b] *)
     let vars =
       SLiteral.to_seq lhs
       |> Sequence.flat_map T.Seq.free_vars
       |> Var.Set.add_seq bound
+      |> CCFun.flip Var.Set.add_list vars'
       |> Var.Set.to_list
       |> T.sort_ty_vars_first
+    in
+    let lhs = match lhs with
+      | SLiteral.Atom (t,b) ->
+        let t = T.app ~ty:T.Ty.prop t (List.map T.var vars') in
+        SLiteral.atom t b
+      | _ -> assert (vars'=[]); lhs (* by typing *)
     in
     assert (T.Ty.is_prop (T.ty_exn rhs));
     begin match lhs with
