@@ -376,8 +376,10 @@ module Make(X : sig
             proofs := List.rev_append proof !proofs;
             tags := List.rev_append tgs !tags;
             Util.debugf ~section 5
-              "@[rewritten lit `@[%a@]`@ into `@[%a@]`@ (using %s)@ :proof (@[%a@])@]"
-              (fun k->k Lit.pp lit Lit.pp lit' name (Util.pp_list Proof.pp_parent) proof);
+              "@[rewritten lit `@[%a@]`@ into `@[%a@]`@ (using %s)@ \
+               :proof (@[%a@]) :tags %a@]"
+              (fun k->k Lit.pp lit Lit.pp lit' name
+                  (Util.pp_list Proof.pp_parent) proof Proof.pp_tags tgs);
             rewrite_lit !_lit_rules lit'
     in
     (* apply lit rules *)

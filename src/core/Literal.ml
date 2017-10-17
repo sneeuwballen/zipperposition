@@ -579,23 +579,28 @@ let is_trivial lit = match lit with
 
 (* is it impossible for these terms to be equal? check if a cstor-only
      path leads to distinct constructors/constants *)
-let rec cannot_be_eq (t1:term)(t2:term): bool =
+let rec cannot_be_eq (t1:term)(t2:term): Builtin.Tag.t list option =
   let module TC = T.Classic in
   begin match TC.view t1, TC.view t2 with
-    | TC.AppBuiltin (Builtin.Int z1,[]), TC.AppBuiltin (Builtin.Int z2,[]) -> not (Z.equal z1 z2)
-    | TC.AppBuiltin (Builtin.Rat n1,[]), TC.AppBuiltin (Builtin.Rat n2,[]) -> not (Q.equal n1 n2)
+    | TC.AppBuiltin (Builtin.Int z1,[]), TC.AppBuiltin (Builtin.Int z2,[]) ->
+      if Z.equal z1 z2 then None else Some [Builtin.Tag.T_lia]
+    | TC.AppBuiltin (Builtin.Rat n1,[]), TC.AppBuiltin (Builtin.Rat n2,[]) ->
+      if Q.equal n1 n2 then None else Some [Builtin.Tag.T_lra]
     | TC.App (c1, l1), TC.App (c2, l2)
       when Ind_ty.is_constructor c1 && Ind_ty.is_constructor c2 ->
       (* two constructor applications cannot be equal if they
          don't have the same constructor *)
-      not (ID.equal c1 c2) ||
-      (List.length l1 = List.length l2 && List.exists2 cannot_be_eq l1 l2)
-    | _ -> false
+      if ID.equal c1 c2 && List.length l1=List.length l2 then (
+        List.combine l1 l2
+        |> Sequence.of_list
+        |> Sequence.find_map (fun (a,b) -> cannot_be_eq a b)
+      ) else Some [Builtin.Tag.T_data]
+    | _ -> None
   end
 
 let is_absurd lit = match lit with
   | Equation (l, r, false) when T.equal l r -> true
-  | Equation (l, r, true) -> cannot_be_eq l r
+  | Equation (l, r, true) -> CCOpt.is_some (cannot_be_eq l r)
   | Prop (p, false) when T.equal p T.true_ -> true
   | Prop (p, true) when T.equal p T.false_ -> true
   | False -> true
@@ -604,6 +609,7 @@ let is_absurd lit = match lit with
   | Equation _ | Prop _ | True -> false
 
 let is_absurd_tags lit = match lit with
+  | Equation (l,r,true) -> cannot_be_eq l r |> CCOpt.get_or ~default:[]
   | Equation _ | Prop _ | False -> []
   | True -> assert false
   | Int _ -> [Builtin.Tag.T_lia]
