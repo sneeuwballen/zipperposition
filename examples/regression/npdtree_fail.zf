@@ -1,0 +1,29 @@
+
+# expect: unsat
+
+data bool := btrue | bfalse.
+
+def is_true : bool -> prop where
+  is_true btrue = true;
+  is_true bfalse = false.
+
+def band : bool -> bool -> bool where
+  forall b. band btrue b = b;
+  forall b. band bfalse b = bfalse;
+  forall b. band b btrue = b;
+  forall b. band b bfalse = bfalse.
+
+### This is proved by Zipperposition
+# goal forall (x y : bool). is_true (band x y) <=> (is_true x && is_true y).
+
+
+### This is not proved (GaveUp)
+
+val t : type.
+val leq : (t -> t -> bool).
+val diff : (t -> t -> bool).
+def lt : (t -> t -> bool) := fun (x : t) (y : t). (band (leq x y) (diff x y)).
+
+## Raises "exception raised in signal: Error: invalid_argument: as_const_exn"
+goal forall (x y : t). is_true (lt x y) <=> (is_true (leq x y) && is_true (diff x y)).
+

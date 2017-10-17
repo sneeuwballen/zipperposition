@@ -52,7 +52,10 @@ let view_head (t:T.t) : view_head =
   then As_star
   else (
     let s,l = T.as_app t in
-    As_app (T.as_const_exn s, l)
+    begin match T.view s with
+      | T.Const id -> As_app (id, l)
+      | _ -> As_star
+    end
   )
 
 let rec next_rec stack = match stack with

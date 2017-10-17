@@ -393,16 +393,20 @@ tff_quantified_type:
 /* toplevel type, possibly with arrows, but without quantifier */
 tff_toplevel_type:
   | ty=tff_type { ty  }
-  | LEFT_PAREN args=tff_ty_star_list RIGHT_PAREN ARROW r=tff_atom_type
+  | LEFT_PAREN args=tff_ty_star_list RIGHT_PAREN ARROW r=tff_app_type
     { PT.fun_ty args r }
 
 /* general type that a variable can have */
 tff_type:
-  | ty=tff_atom_type { ty }
-  | l=tff_atom_type ARROW r=tff_type
+  | ty=tff_app_type { ty }
+  | l=tff_app_type ARROW r=tff_type
     { PT.fun_ty [l] r }
 
-tff_atom_type:
+tff_app_type:
+  | ty=tff_atomic_type { ty }
+  | f=tff_app_type AT a=tff_atomic_type { PT.app f [a] }
+
+tff_atomic_type:
   | v=variable { v }
   | w=defined_ty { w }
   | w=type_const { w }
@@ -412,9 +416,9 @@ tff_atom_type:
   | LEFT_PAREN ty=tff_toplevel_type RIGHT_PAREN { ty }
 
 tff_ty_star_list:
-  | ty=tff_atom_type
+  | ty=tff_app_type
     STAR
-    l=separated_nonempty_list(STAR,tff_atom_type)
+    l=separated_nonempty_list(STAR,tff_app_type)
     { ty :: l }
 
 tff_ty_vars:

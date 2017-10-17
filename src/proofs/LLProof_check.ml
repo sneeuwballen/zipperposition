@@ -357,6 +357,7 @@ end
 (** {2 Checking Proofs} *)
 
 let instantiate (f:form) (inst:LLProof.inst) : form =
+  let f = T.rename_all_vars f in
   let vars, body = T.unfold_binder Binder.Forall f in
   if List.length vars <> List.length inst then (
     errorf "mismatched arities in instantiate `%a`@ :with %a"
