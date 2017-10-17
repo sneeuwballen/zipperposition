@@ -437,19 +437,6 @@ module Flatten = struct
     map_m (flatten_rec ?of_ ctx stmt pos vars) l
 end
 
-(* FIXME
-        | Neg srcd -> Step.esa ~rule:rule_neg_ [parent_of_sourced srcd]
-        | CNF srcd -> Step.esa ~rule:rule_cnf_ [parent_of_sourced srcd]
-        | Preprocess (srcd,l,msg) ->
-          Step.esa ~rule:(rule_preprocess_ msg)
-            (parent_of_sourced srcd :: List.map parent_of_sourced l)
-        | Renaming (srcd,id,form) ->
-          Step.esa ~rule:rule_renaming_
-            [parent_of_sourced srcd;
-             Parent.from @@ mk_f_by_def id @@
-               TypedSTerm.(Form.eq (const id ~ty:Ty.prop) form)]
-   *)
-
 (* miniscoping (push quantifiers as deep as possible in the formula) *)
 let miniscope ?(distribute_exists=false) f =
   Util.enter_prof prof_miniscope;
