@@ -752,8 +752,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       match T.view t with
         | T.Const _ -> reduce_at_root ~restrict t k
         | T.App (hd, l) ->
-          (* rewrite subterms in call by value *)
-          normal_form ~restrict:lazy_false hd
+          (* rewrite subterms in call by value.
+             Note that we keep restrictions for the head, so as
+             not to rewrite [f x=g x] into ⊤ after equality completion
+             of [f=g] *)
+          normal_form ~restrict hd
             (fun hd' ->
                normal_form_l l
                  (fun l' ->
