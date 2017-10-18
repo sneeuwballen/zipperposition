@@ -157,10 +157,11 @@ val infer_statement_exn :
   ?file:string ->
   Ctx.t ->
   UntypedAST.statement ->
-  typed_statement * typed_statement list
+  typed_statement option * typed_statement list
 (** [infer_statement ctx ~f st] checks and convert [st] into a
     typed statements, and a list of auxiliary type declarations for symbols
-    that were inferred implicitely. *)
+    that were inferred implicitely. In the particular case of the type alias
+    statement, which cannot be properly typed, the function returns None.  *)
 
 val infer_statements_exn :
   ?def_as_rewrite:bool ->

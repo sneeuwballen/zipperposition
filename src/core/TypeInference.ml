@@ -24,6 +24,14 @@ type untyped = STerm.t (** untyped term *)
 type typed = TypedSTerm.t (** typed term *)
 type loc = ParseLocation.t
 
+(* Global list of type aliases.  Untyped types are stored because in
+   Dedukti input, aliases precede declarations of type symbols. *)
+let ty_aliases : (PT.var, untyped) Hashtbl.t = Hashtbl.create 16
+
+let add_alias s ty : unit =
+  Util.debugf 2 "Registering alias %a := %a" (fun k->k PT.pp_var s PT.pp ty);
+  Hashtbl.replace ty_aliases s ty
+
 exception Error of string
 
 let () = Printexc.register_printer
@@ -386,14 +394,21 @@ let rec infer_ty_ ?loc ctx ty =
       unify ?loc (T.ty_exn t) ty;
       t
     | PT.Var v ->
-      begin match Ctx.get_var_ ctx v with
-        | `Var v ->
-          unify ?loc (Var.ty v) T.Ty.tType;
-          T.Ty.var ?loc v
-        | `ID (id, ty) ->
-          unify ?loc ty T.Ty.tType;
-          T.Ty.const id
-      end
+      (* first resolve type aliasing *)
+       begin try let ty = Hashtbl.find ty_aliases v in
+         Util.debugf 4 "Using \"%a\" as alias for (%a)" (fun k->k PT.pp_var v PT.pp ty);
+         infer_ty_ ctx ty
+       with Not_found ->
+         Util.debugf 4 "\"%a\" is not an alias" (fun k -> k PT.pp_var v);
+         begin match Ctx.get_var_ ctx v with
+         | `Var v ->
+            unify ?loc (Var.ty v) T.Ty.tType;
+            T.Ty.var ?loc v
+         | `ID (id, ty) ->
+            unify ?loc ty T.Ty.tType;
+            T.Ty.const id
+         end
+       end
     | PT.Const f ->
       (* constant type *)
       let id, ty = Ctx.get_id_ ?loc ctx ~arity:0 f in
@@ -1007,6 +1022,9 @@ let infer_statement_exn ?(file="<no file>") ctx st =
   let st = match st.A.stmt with
     | A.Include _ ->
       error_ ?loc "remaining include statement"
+    | A.TypeAlias (alpha,ty) ->
+       add_alias (PT.V alpha) ty;
+       None
     | A.Decl (s,ty) ->
       (* new type
          TODO: warning if it shadows? *)
@@ -1014,17 +1032,17 @@ let infer_statement_exn ?(file="<no file>") ctx st =
       let ty = infer_ty_exn ctx ty in
       Ctx.declare ?loc ctx id ty;
       set_notation id st.A.attrs;
-      Stmt.ty_decl ~attrs ~proof:(Proof.Step.intro src Proof.R_decl) id ty
+      Some (Stmt.ty_decl ~attrs ~proof:(Proof.Step.intro src Proof.R_decl) id ty)
     | A.Def l ->
       let l = infer_defs ?loc ctx l in
       List.iter
         (fun d -> set_notation d.Stmt.def_id st.A.attrs)
         l;
-      Stmt.def ~attrs ~proof:(Proof.Step.intro src Proof.R_def) l
+      Some (Stmt.def ~proof:(Proof.Step.intro src Proof.R_def) l)
     | A.Rewrite t ->
       let t =  infer_prop_ ctx t in
       let def = as_def ?loc Var.Set.empty t in
-      Stmt.rewrite ~proof:(Proof.Step.intro src Proof.R_def) def
+      Some (Stmt.rewrite ~proof:(Proof.Step.intro src Proof.R_def) def)
     | A.Data l ->
       (* declare the inductive types *)
       let data_types =
@@ -1090,16 +1108,16 @@ let infer_statement_exn ?(file="<no file>") ctx st =
           data_types
       in
       Ctx.exit_scope ctx;
-      Stmt.data ~attrs ~proof:(Proof.Step.intro src Proof.R_def) l'
+      Some (Stmt.data ~attrs ~proof:(Proof.Step.intro src Proof.R_def) l')
     | A.Assert t ->
       let t = infer_prop_exn ctx t in
-      Stmt.assert_ ~attrs ~proof:(Proof.Step.intro src Proof.R_assert) t
+      Some (Stmt.assert_ ~attrs ~proof:(Proof.Step.intro src Proof.R_assert) t)
     | A.Lemma t ->
       let t = infer_prop_exn ctx t in
-      Stmt.lemma ~attrs ~proof:(Proof.Step.intro src Proof.R_lemma) [t]
+      Some (Stmt.lemma ~attrs ~proof:(Proof.Step.intro src Proof.R_lemma) [t])
     | A.Goal t ->
       let t = infer_prop_exn ctx t in
-      Stmt.goal ~attrs ~proof:(Proof.Step.intro src Proof.R_goal) t
+      Some (Stmt.goal ~attrs ~proof:(Proof.Step.intro src Proof.R_goal) t)
   in
   (* be sure to bind the remaining meta variables *)
   Ctx.exit_scope ctx;
@@ -1126,7 +1144,7 @@ let infer_statements_exn
        (* add declarations first *)
        let st, aux = infer_statement_exn ?file ctx st in
        List.iter (CCVector.push res) aux;
-       CCVector.push res st)
+       match st with None -> () | Some st -> CCVector.push res st)
     seq;
   CCVector.freeze res
 
