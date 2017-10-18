@@ -271,6 +271,7 @@ or_formula: l=assoc_binary_formula_aux(VLINE) { PT.or_ l }
   | XOR { PT.xor }
   | NOTVLINE { fun ?loc x y -> PT.not_ ?loc (PT.or_ ?loc [x; y]) }
   | NOTAND { fun ?loc x y -> PT.not_ ?loc (PT.and_ ?loc [x; y]) }
+  | ARROW { fun ?loc x y -> PT.fun_ty ?loc [x] y }
 %inline quantifier:
   | FORALL { PT.forall }
   | EXISTS { PT.exists }
