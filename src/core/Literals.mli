@@ -74,6 +74,8 @@ val is_trivial : t -> bool
 val is_absurd : t -> bool
 (** All literals are false, or there are no literals *)
 
+val apply_subst : Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
+
 module Seq : sig
   val vars : t -> Type.t HVar.t Sequence.t
   val terms : t -> term Sequence.t

@@ -77,6 +77,11 @@ val bind : t -> var Scoped.t -> term Scoped.t -> t
     @raise InconsistentBinding if [v] is already bound in
       the same context, to another term. *)
 
+val update : t -> var Scoped.t -> term Scoped.t -> t
+(** Replace [v] -> ? by  [v] -> [t] in the substitution. Both terms have a context.
+    It is {b important} that the bound term is De-Bruijn-closed (assert).
+    @raise InconsistentBinding if [v] is not yet bound in the same context. *)
+
 val append : t -> t -> t
 (** [append s1 s2] is the substitution that maps [t] to [s2 (s1 t)]. *)
 
@@ -167,6 +172,11 @@ module type SPECIALIZED = sig
   (** Add [v] -> [t] to the substitution. Both terms have a context.
       @raise InconsistentBinding if [v] is already bound in
         the same context, to another term. *)
+
+  val update : t -> var Scoped.t -> term Scoped.t -> t
+  (** Replace [v] -> ? by  [v] -> [t] in the substitution. Both terms have a context.
+      @raise InconsistentBinding if [v] is not yet bound in the same context. *)
+
   val of_list : ?init:t -> (var Scoped.t * term Scoped.t) list -> t
 end
 

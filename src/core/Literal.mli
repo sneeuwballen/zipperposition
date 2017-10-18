@@ -126,6 +126,7 @@ val of_unif_subst: Subst.Renaming.t -> Unif_subst.t -> t list
 
 val map : (term -> term) -> t -> t (** functor *)
 val fold : ('a -> term -> 'a) -> 'a -> t -> 'a  (** basic fold *)
+val for_all : (term -> bool) -> t -> bool  (** for the term or both terms of the literal *)
 val vars : t -> Type.t HVar.t list (** gather variables *)
 val var_occurs : Type.t HVar.t -> t -> bool
 val is_ground : t -> bool
@@ -152,7 +153,8 @@ val is_absurd_tags : t -> Proof.tag list (** if [is_absurd lit], return why *)
 val fold_terms :
   ?position:Position.t -> ?vars:bool -> ?ty_args:bool ->
   which:[<`Max|`All] ->
-  ord:Ordering.t -> subterms:bool ->
+  ?ord:Ordering.t -> 
+  subterms:bool ->
   t ->
   term Position.With.t Sequence.t
 (** Iterate on terms, maybe subterms, of the literal.

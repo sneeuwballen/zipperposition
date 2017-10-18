@@ -84,6 +84,8 @@ let fold f acc lit = match lit with
   | True
   | False -> acc
 
+let for_all f lit = fold (fun b t -> b && f t) true lit
+
 let hash lit =
   match lit with
     | Int o -> Int_lit.hash o
@@ -615,7 +617,7 @@ let is_absurd_tags lit = match lit with
   | Int _ -> [Builtin.Tag.T_lia]
   | Rat _ -> [Builtin.Tag.T_lra]
 
-let fold_terms ?(position=Position.stop) ?(vars=false) ?ty_args ~which ~ord ~subterms lit k =
+let fold_terms ?(position=Position.stop) ?(vars=false) ?ty_args ~which ?(ord=Ordering.none) ~subterms lit k =
   (* function to call at terms *)
   let at_term ~pos t =
     if subterms
@@ -819,13 +821,6 @@ module Comp = struct
     in
     C.of_total (Pervasives.compare (_to_int l1) (_to_int l2))
 
-  (* make HO unif constraints smaller *)
-  let _cmp_by_constraint l1 l2 = match is_ho_unif l1, is_ho_unif l2 with
-    | true, true
-    | false, false -> C.Eq
-    | true, false -> C.Lt
-    | false, true -> C.Gt
-
   (* by multiset of terms *)
   let _cmp_by_term_multiset ~ord l1 l2 =
     let m1 = to_multiset l1 and m2 = to_multiset l2 in
@@ -880,7 +875,6 @@ module Comp = struct
 
   let compare ~ord l1 l2 =
     let f = Comparison.(
-        _cmp_by_constraint @>>
         _cmp_by_maxterms ~ord @>>
         _cmp_by_polarity @>>
         _cmp_by_kind @>>

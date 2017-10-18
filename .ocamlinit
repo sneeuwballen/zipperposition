@@ -34,7 +34,6 @@ let (~<) = ID.make;;
 #install_printer Precedence.pp;;
 #install_printer Precedence.Weight.pp;;
 #install_printer Ordering.pp;;
-#install_printer Ordering.Weight_polynomial.pp;;
 #install_printer Position.pp;;
 #install_printer Ordinal.pp;;
 

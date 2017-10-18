@@ -90,6 +90,7 @@ val is_bvar : t -> bool
 val is_const : t -> bool
 val is_bind : t -> bool
 val is_app : t -> bool
+val is_tType : t -> bool
 
 val is_lambda : t -> bool
 
