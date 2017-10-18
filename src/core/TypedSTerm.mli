@@ -67,6 +67,7 @@ val prop : t
 val var : ?loc:location -> t Var.t -> t
 val var_of_string : ?loc:location -> ty:t -> string -> t
 val app : ?loc:location -> ty:t -> t -> t list -> t
+val app_whnf : ?loc:location -> ty:t -> t -> t list -> t (** application + WHNF *)
 val const : ?loc:location -> ty:t -> ID.t -> t
 val const_of_cstor : ?loc:location -> match_cstor -> t
 val ite : ?loc:location -> t -> t -> t -> t
