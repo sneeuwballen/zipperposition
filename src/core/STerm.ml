@@ -140,6 +140,7 @@ let app_builtin ?loc s l = make_ ?loc (AppBuiltin(s,l))
 let app ?loc s l = match s.term, l with
   | _, [] -> s
   | AppBuiltin (s1,l1), _ -> app_builtin ?loc s1 (l1@l)
+  | App (s1,l1), _::_ -> make_ ?loc (App (s1,l1@l))
   | _, _::_ -> make_ ?loc (App(s,l))
 let const ?loc s = make_ ?loc (Const s)
 let app_const ?loc s l = app (const ?loc s) l
