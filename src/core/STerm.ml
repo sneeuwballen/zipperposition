@@ -137,8 +137,9 @@ let var ?loc s = mk_var ?loc (V s)
 let v_wild = mk_var Wildcard
 let builtin ?loc s = make_ ?loc (AppBuiltin (s,[]))
 let app_builtin ?loc s l = make_ ?loc (AppBuiltin(s,l))
-let app ?loc s l = match s.term, l with
+let rec app ?loc s l = match s.term, l with
   | _, [] -> s
+  | App (s1,l1), _ -> app ?loc s1 (l1@l)
   | AppBuiltin (s1,l1), _ -> app_builtin ?loc s1 (l1@l)
   | _, _::_ -> make_ ?loc (App(s,l))
 let const ?loc s = make_ ?loc (Const s)
