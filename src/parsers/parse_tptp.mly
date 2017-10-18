@@ -409,7 +409,7 @@ tff_type:
 
 tff_app_type:
   | ty=tff_atomic_type { ty }
-  | f=tff_app_type AT a=tff_atomic_type { PT.app f [a] }
+  | f=tff_app_type AT a=separated_nonempty_list(AT, tff_atomic_type) { PT.app f a }
 
 tff_atomic_type:
   | v=variable { v }
