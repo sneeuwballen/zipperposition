@@ -27,7 +27,7 @@ binary = "./zipperposition.native"
 cmd = "./zipperposition.native $file --timeout $timeout --mem-limit $memory --output none"
 unsat = "SZS status (Theorem|Unsatisfiable)"
 sat = "SZS status (CounterSatisfiable|Satisfiable)"
-timeout = "SZS Status ResourceOut"
+timeout = "SZS status ResourceOut"
 version = "git:."
 
 [zipperposition-check]
@@ -36,7 +36,7 @@ binary = "./zipperposition.native"
 cmd = "./zipperposition.native $file --timeout $timeout --mem-limit $memory --output none --check"
 unsat = "SZS status (Theorem|Unsatisfiable)"
 sat = "SZS status (CounterSatisfiable|Satisfiable)"
-timeout = "SZS Status ResourceOut"
+timeout = "SZS status ResourceOut"
 version = "git:."
 
 [zipperposition-thf]
@@ -45,7 +45,7 @@ binary = "./zipperposition.native"
 cmd = "./zipperposition.native $file --timeout $timeout --mem-limit $memory --output none --tptp-def-as-rewrite"
 unsat = "SZS status (Theorem|Unsatisfiable)"
 sat = "SZS status (CounterSatisfiable|Satisfiable)"
-timeout = "SZS Status ResourceOut"
+timeout = "SZS status ResourceOut"
 version = "git:."
 
 [hornet]
@@ -54,7 +54,7 @@ binary = "./hornet.native"
 cmd = "./hornet.native $file -t $timeout --max-depth 200"
 unsat = "UNSAT"
 sat = "^SAT"
-timeout = "SZS Status ResourceOut"
+timeout = "SZS status ResourceOut"
 version = "git:."
 
 [satallax]
@@ -76,4 +76,3 @@ binary = "grep"
 cmd = "grep Status $file"
 unsat = "(Theorem|Unsatisfiable)"
 sat = "(CounterSatisfiable|Satisfiable)"
-

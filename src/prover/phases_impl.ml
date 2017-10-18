@@ -19,7 +19,7 @@ let section = Const.section
 (* setup an alarm for abrupt stop *)
 let setup_alarm timeout =
   let handler _ =
-    Format.printf "%% SZS Status ResourceOut@.";
+    Format.printf "%% SZS status ResourceOut@.";
     exit 0
   in
   ignore (Sys.signal Sys.sigalrm (Sys.Signal_handle handler));
