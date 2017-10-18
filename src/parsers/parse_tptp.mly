@@ -60,6 +60,9 @@
 %token FORALL
 %token EXISTS
 
+%token FORALLCONST
+%token EXISTSCONST
+
 %token UNDERSCORE
 
 %token <string> LOWER_WORD
@@ -278,6 +281,8 @@ or_formula: l=assoc_binary_formula_aux(VLINE) { PT.or_ l }
 atomic_formula:
   | TRUE { PT.true_ }
   | FALSE { PT.false_ }
+  | EXISTSCONST { PT.builtin Builtin.ExistsConst }
+  | FORALLCONST { PT.builtin Builtin.ForallConst }
   | t=term
     {
       let loc = L.mk_pos $startpos $endpos in

@@ -70,7 +70,9 @@ rule token = parse
   | '@' { AT }
   | "!>" { FORALL_TY }
   | '!' { FORALL }
+  | "!!" { FORALLCONST }
   | '?' { EXISTS }
+  | "??" { EXISTSCONST }
   | '^' { LAMBDA }
   | "$true" { TRUE }
   | "$false" { FALSE }
