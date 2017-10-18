@@ -44,7 +44,7 @@ let rec app_encode_ty ty =
     | T.App (f, args) ->
       assert (not (T.equal f function_type));
       T.app ~ty:T.tType (app_encode_ty f) (CCList.map app_encode_ty args)
-    | T.AppBuiltin (Builtin.Arrow, ret::args) ->
+    | T.AppBuiltin (Builtin.Arrow, ret::args) when (not (T.Ty.is_tType ret)) ->
       CCList.fold_right
         (fun arg t ->
            T.app ~ty:T.tType function_type [app_encode_ty arg;t]
@@ -65,7 +65,7 @@ let rec app_encode_ty ty =
 
 (** Is a term a type? i.e. is a term of type tType? *)
 let is_type a =
-  T.Ty.is_tType (CCOpt.get_exn (T.ty a))
+  T.Ty.is_tType (T.ty_exn a)
 
 (** encode a variable *)
 let app_encode_var var =
@@ -106,7 +106,17 @@ let rec app_encode_term toplevel t  =
     | T.AppBuiltin (f, ts) ->
       Util.debugf 5 "Term: %a" (fun k -> k T.pp t);
       assert toplevel;
-      assert (f == Builtin.Eq || f == Builtin.Neq || f == Builtin.And || f == Builtin.Or || f == Builtin.Not || f == Builtin.Imply || f == Builtin.Equiv);
+      assert (
+        f == Builtin.Eq ||
+        f == Builtin.Neq ||
+        f == Builtin.And ||
+        f == Builtin.Or ||
+        f == Builtin.Not ||
+        f == Builtin.Imply ||
+        f == Builtin.Equiv ||
+        f == Builtin.False ||
+        f == Builtin.True
+      );
       T.app_builtin ~ty f (List.map (app_encode_term (not (f == Builtin.Eq || f == Builtin.Neq))) ts)
     | T.Const c -> T.const ~ty c
     | T.Var v -> T.var (app_encode_var v)
@@ -122,7 +132,7 @@ let app_encode stmt =
     | Statement.Rewrite _ -> failwith "Not implemented"
     | Statement.Data _ -> failwith "Not implemented"
     | Statement.Lemma _ -> failwith "Not implemented"
-    | Statement.Goal f -> Statement.assert_ ~proof:Proof.Step.trivial (app_encode_term true f)
+    | Statement.Goal f -> Statement.goal ~proof:Proof.Step.trivial (app_encode_term true f)
     | Statement.NegatedGoal (_,_) -> failwith "Not implemented"
     | Statement.Assert f -> Statement.assert_ ~proof:Proof.Step.trivial (app_encode_term true f)
     | Statement.TyDecl (id, ty) ->
