@@ -1,0 +1,22 @@
+
+# expect: unsat
+
+val i : type.
+
+val map : (i -> i) -> i.
+
+val f : i -> i.
+val g : i -> i.
+
+val a : i.
+val b : i.
+
+assert a != b.
+assert f != g.
+
+goal exists (F:(i->i)->i->i).
+  F f a = f (f a) &&
+  F g b = g (g b).
+
+
+
