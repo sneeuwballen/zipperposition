@@ -2,6 +2,18 @@
 
 ## Now
 
+- FIX:
+  `./zipperposition.native --check --dot /tmp/truc.dot --dot-sat -o none -t 30 examples/regression/ho_demod_partial_app.zf -d 5 |& less`
+  completing `f=λx. t` into `f x=t` makes this problem unsolvable
+  → keep both completed and original defs? (in Cnf)
+
+- FIX:
+  `./zipperposition.native --check --dot-llproof /tmp/foo.dot -o none -t 30 --dot /tmp/truc.dot examples/ho/sum_unin.zf --debug 5 --backtrace`
+  pb is that rewriting under λ is not accounted for properly in proof
+  checking because the instance of the rewrite rule is not closed.
+  * possible solution: store (closed) context along with instantiation so
+    we can have `λx y. f(x)+f(y)=f(y)+f(x)` instead of open terms `f(x)+f(y)=f(y)+f(x)`
+
 - FIX: ordering issue in arith
   `./zipperposition.native --stats --dot-sat -o none -t 30 --dot /tmp/truc.dot --prelude ~/workspace/bset/bset.zf examples/Operators-B_translation-op1_2.p -p -t 300 --backtrace `
 
