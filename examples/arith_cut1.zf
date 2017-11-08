@@ -1,0 +1,16 @@
+
+# expect: unsat
+
+val a : int.
+val b : int.
+val c : int.
+
+assert exists x. 5 * x = a. # 5|a
+assert 11 + a <= 5 * c.
+assert 5 * c <= 12 + b + a.
+
+assert b >= 0.
+assert b <= 2.
+
+goal false.
+
