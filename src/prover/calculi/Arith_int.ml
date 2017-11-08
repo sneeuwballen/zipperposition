@@ -812,8 +812,49 @@ module Make(E : Env.S) : S with module Env = E = struct
     let lit_l = ALF.apply_subst renaming subst (info.left_lit,s_l) in
     let lit_r = ALF.apply_subst renaming subst (info.right_lit,s_r) in
     Util.debugf ~section 5
-      "@[<2>arith chaining@ between @[%a[%d]@]@ and @[%a[%d]@]@ (subst @[%a@])...@]"
-      (fun k->k C.pp info.left s_l C.pp info.right s_r Subst.pp subst);
+      "@[<2>arith chaining@ between @[%a[%d]@]@ and @[%a[%d]@]@ \
+       :on (@[%a, %a@])@ :subst @[%a@]...@]"
+      (fun k->k C.pp info.left s_l C.pp info.right s_r
+          ALF.pp lit_l ALF.pp lit_r
+          Subst.pp subst);
+    (* m2 ≤ mf_2 and mf_1 ≤ m1, with mf_1 and mf_2 sharing the same
+       focused term with coeff 1.
+       We deduce m2 + mf_1 ≤ m1 + mf_2 and cancel the
+       term out (after scaling) *)
+    let _do_chaining_simple mf_1 m1 mf_2 m2 : Lit.t list list =
+      let new_lit =
+        Lit.mk_arith_lesseq
+          (M.sum m2 (MF.rest mf_1))
+          (M.sum m1 (MF.rest mf_2))
+      in
+      [[new_lit]]
+    (* cutting plane: reason on divisibility of [mf1.rest] and [mf2.rest]
+       modulo [coeff], and yield a tight bound in every case *)
+    and _do_chaining_cutting_planes mf_1 m1 mf_2 m2 : Lit.t list list =
+      let coeff = MF.coeff mf_1 in
+      assert (Z.equal coeff (MF.coeff mf_2));
+      CCList.product
+        (fun mod1 mod2 ->
+           (* [m1 ≤ mf1 + coeff·t] and
+                [mf2 + coeff·t ≤ m2], where
+                [coeff | m1-mf1-mod1] and [coeff | m2-mf2-mod2].
+                Therefore, we can tighten the bounds to
+                [m1-mf1+(coeff-mod1)] and [m2-mf2-mod2]*)
+           let new_lit =
+             Lit.mk_arith_lesseq
+               (M.add_const (M.sum m2 (MF.rest mf_1)) (Z.sub coeff mod1))
+               (M.add_const (M.sum m1 (MF.rest mf_2)) (Z.neg mod2))
+           and guard1 =
+             Lit.mk_divides ~sign:false coeff ~power:1
+               (M.add_const (M.difference m1 (MF.rest mf_1)) (Z.neg mod1))
+           and guard2 =
+             Lit.mk_divides ~sign:false coeff ~power:1
+               (M.add_const (M.difference m2 (MF.rest mf_2)) (Z.neg mod2))
+           in
+           [new_lit; guard1; guard2])
+        (_range Z.zero (Z.add coeff Z.minus_one))
+        (_range Z.zero (Z.add coeff Z.minus_one))
+    in
     (* check ordering conditions *)
     if C.is_maxlit (info.left,s_l) subst ~idx:idx_l
     && C.is_maxlit (info.right,s_r) subst ~idx:idx_r
@@ -824,43 +865,46 @@ module Make(E : Env.S) : S with module Env = E = struct
       let lit_l, lit_r = ALF.scale lit_l lit_r in
       match lit_l, lit_r with
         | ALF.Left (AL.Lesseq, mf_1, m1), ALF.Right (AL.Lesseq, m2, mf_2) ->
-          (* m2 ≤ mf_2 and mf_1 ≤ m1, with mf_1 and mf_2 sharing the same
-             focused term. We deduce m2 + mf_1 ≤ m1 + mf_2 and cancel the
-             term out (after scaling) *)
-          assert (Z.equal (MF.coeff mf_1) (MF.coeff mf_2));
-          let new_lit = Lit.mk_arith_lesseq
-              (M.sum m2 (MF.rest mf_1))
-              (M.sum m1 (MF.rest mf_2))
-          in
           let lits_l = CCArray.except_idx (C.lits info.left) idx_l in
           let lits_l = Lit.apply_subst_list renaming subst (lits_l,s_l) in
           let lits_r = CCArray.except_idx (C.lits info.right) idx_r in
           let lits_r = Lit.apply_subst_list renaming subst (lits_r,s_r) in
           let c_guard = Literal.of_unif_subst renaming us in
-          let all_lits = new_lit :: c_guard @ lits_l @ lits_r in
-          let proof =
-            Proof.Step.inference ~tags:[Proof.Tag.T_lia]
-              ~rule:(Proof.Rule.mk "canc_ineq_chaining")
-              [C.proof_parent_subst renaming (info.left,s_l) subst;
-               C.proof_parent_subst renaming (info.right,s_r) subst] in
-          let trail = C.trail_l [info.left; info.right] in
-          (* penalty for some chaining *)
-          let penalty =
-            C.penalty info.left
-            + C.penalty info.right
-            + 3 (* nested chainings are dangerous *)
-            + (if MF.term mf_1 |> T.is_var then 10 else 0)
-            + (if MF.term mf_2 |> T.is_var then 10 else 0)
+          (* do the chaining(s) of the two literals *)
+          let acc =
+            let new_lits_l =
+              if Z.equal Z.one (MF.coeff mf_1)
+              then _do_chaining_simple mf_1 m1 mf_2 m2
+              else _do_chaining_cutting_planes mf_1 m1 mf_2 m2
+            in
+            List.fold_left
+              (fun acc new_lits ->
+                 let all_lits = new_lits @ c_guard @ lits_l @ lits_r in
+                 let proof =
+                   Proof.Step.inference ~tags:[Proof.Tag.T_lia]
+                     ~rule:(Proof.Rule.mk "canc_ineq_chaining")
+                     [C.proof_parent_subst renaming (info.left,s_l) subst;
+                      C.proof_parent_subst renaming (info.right,s_r) subst] in
+                 let trail = C.trail_l [info.left; info.right] in
+                 (* penalty for some chaining *)
+                 let penalty =
+                   C.penalty info.left
+                   + C.penalty info.right
+                   + 3 (* nested chainings are dangerous *)
+                   + (if MF.term mf_1 |> T.is_var then 10 else 0)
+                   + (if MF.term mf_2 |> T.is_var then 10 else 0)
+                 in
+                 let new_c = C.create ~penalty ~trail all_lits proof in
+                 Util.debugf ~section 5
+                   "@[<2>ineq chaining@ of @[%a@]@ and @[%a@]@ gives @[%a@]@]"
+                   (fun k->k C.pp info.left C.pp info.right C.pp new_c);
+                 Util.incr_stat stat_arith_ineq_chaining;
+                 new_c :: acc)
+              acc new_lits_l
           in
-          let new_c = C.create ~penalty ~trail all_lits proof in
-          Util.debugf ~section 5 "@[<2>ineq chaining@ of @[%a@]@ and @[%a@]@ gives @[%a@]@]"
-            (fun k->k C.pp info.left C.pp info.right C.pp new_c);
-          Util.incr_stat stat_arith_ineq_chaining;
-          let acc = new_c :: acc in
-
           (* now, maybe we can also perform case switch! We can if
-             mf_1 - m1 = k + (m2 - mf_2). In this case necessarily
-             Or_{i=0...k} mf_2 = m2 + i *)
+              mf_1 - m1 = k + (m2 - mf_2). In this case necessarily
+              Or_{i=0...k} mf_2 = m2 + i *)
           let diff = M.difference
               (M.sum m1 (MF.rest mf_2))
               (M.sum m2 (MF.rest mf_1)) in
