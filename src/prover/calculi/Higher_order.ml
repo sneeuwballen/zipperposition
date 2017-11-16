@@ -731,6 +731,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 end
 
 let enabled_ = ref true
+let force_enabled_ = ref false
 let enable_unif_ = ref true
 let prim_mode_ = ref `Neg
 let prim_max_penalty = ref 15 (* FUDGE *)
@@ -774,7 +775,7 @@ let st_contains_ho (st:(_,_,_) Statement.t): bool =
 let extension =
   let register env =
     let module E = (val env : Env.S) in
-    if E.flex_get k_some_ho then (
+    if E.flex_get k_some_ho || !force_enabled_ then (
       let module ET = Make(E) in
       ET.setup ()
     )
@@ -809,6 +810,7 @@ let eta_opt =
 let () =
   Options.add_opts
     [ "--ho", Arg.Set enabled_, " enable HO reasoning";
+      "--force-ho", Arg.Set force_enabled_, " enable HO reasoning even if the problem is first-order";
       "--no-ho", Arg.Clear enabled_, " disable HO reasoning";
       "--ho-unif", Arg.Set enable_unif_, " enable full HO unification";
       "--no-ho-unif", Arg.Clear enable_unif_, " disable full HO unification";
