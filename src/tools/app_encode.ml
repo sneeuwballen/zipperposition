@@ -105,7 +105,12 @@ let rec app_encode_term toplevel t  =
         args
     | T.AppBuiltin (f, ts) ->
       Util.debugf 5 "Term: %a" (fun k -> k T.pp t);
+      (* Assert that the problem does not require first-class booleans: *)
       assert toplevel;
+      (* These builtins cannot be easily app-encoded: *)
+      assert (f != Builtin.ExistsConst);
+      assert (f != Builtin.ForallConst);
+      (* Assert that no other weird builtins are used: *)
       assert (
         f == Builtin.Eq ||
         f == Builtin.Neq ||
