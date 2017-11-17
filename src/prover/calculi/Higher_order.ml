@@ -31,6 +31,7 @@ let _purify_applied_vars = ref false
 let _general_ext_pos = ref false
 let _ext_pos = ref true
 let _ext_axiom = ref false
+let _elim_pred_var = ref true
 
 module type S = sig
   module Env : Env.S
@@ -700,7 +701,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debug ~section 1 "setup HO rules";
       Env.Ctx.lost_completeness();
       Env.add_unary_inf "ho_complete_eq" complete_eq_args;
-      Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
+      if !_elim_pred_var then
+        Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
       Env.add_lit_rule "ho_ext_neg" ext_neg;
       if !_ext_pos && !_general_ext_pos then (
         Env.add_unary_inf "ho_ext_pos_general" ext_pos_general
@@ -814,6 +816,7 @@ let () =
       "--no-ho", Arg.Clear enabled_, " disable HO reasoning";
       "--ho-unif", Arg.Set enable_unif_, " enable full HO unification";
       "--no-ho-unif", Arg.Clear enable_unif_, " disable full HO unification";
+      "--no-ho-elim-pred-var", Arg.Clear _elim_pred_var, " disable predicate variable elimination";
       "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";
       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
       "--ho-eta", eta_opt, " eta-expansion/reduction";
