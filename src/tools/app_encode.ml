@@ -106,10 +106,10 @@ let rec app_encode_term toplevel t  =
     | T.AppBuiltin (f, ts) ->
       Util.debugf 5 "Term: %a" (fun k -> k T.pp t);
       (* Assert that the problem does not require first-class booleans: *)
-      assert toplevel;
+      if not toplevel then failwith "requires FOOL";
       (* These builtins cannot be easily app-encoded: *)
-      assert (f != Builtin.ExistsConst);
-      assert (f != Builtin.ForallConst);
+      if f == Builtin.ExistsConst then failwith "contains ExistsConst";
+      if f == Builtin.ForallConst then failwith "contains ExistsConst";
       (* Assert that no other weird builtins are used: *)
       assert (
         f == Builtin.Eq ||
@@ -120,13 +120,15 @@ let rec app_encode_term toplevel t  =
         f == Builtin.Imply ||
         f == Builtin.Equiv ||
         f == Builtin.False ||
-        f == Builtin.True
+        f == Builtin.True ||
+        f == Builtin.Equiv ||
+        f == Builtin.Xor
       );
       T.app_builtin ~ty f (List.map (app_encode_term (not (f == Builtin.Eq || f == Builtin.Neq))) ts)
     | T.Const c -> T.const ~ty c
     | T.Var v -> T.var (app_encode_var v)
     | T.Bind (Binder.Forall | Binder.Exists as b, v, u) ->
-      assert toplevel;
+      if not toplevel then failwith "requires FOOL";
       T.bind ~ty b (app_encode_var v) (app_encode_term true u)
     | _ -> failwith "Not implemented"
 
@@ -147,6 +149,7 @@ let process file =
   let o = !Options.output in
   let input = Input_format.I_tptp in
   let parse = Util_tptp.parse_file ~recursive:true file in
+  Util.debugf 5 "Parse: %s" (fun k -> k (match parse with | CCResult.Error e -> e | CCResult.Ok _ -> "OK"));
   let ast = Sequence.map Util_tptp.to_ast (CCResult.get_exn parse) in
   let typed_ast = TypeInference.infer_statements ?ctx:None
       ~on_var:(Input_format.on_var input)
