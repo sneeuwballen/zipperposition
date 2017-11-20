@@ -32,6 +32,7 @@ let _general_ext_pos = ref false
 let _ext_pos = ref true
 let _ext_axiom = ref false
 let _elim_pred_var = ref true
+let _ext_neg = ref true
 
 module type S = sig
   module Env : Env.S
@@ -703,7 +704,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       Env.add_unary_inf "ho_complete_eq" complete_eq_args;
       if !_elim_pred_var then
         Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
-      Env.add_lit_rule "ho_ext_neg" ext_neg;
+      if !_ext_neg then
+        Env.add_lit_rule "ho_ext_neg" ext_neg;
       if !_ext_pos && !_general_ext_pos then (
         Env.add_unary_inf "ho_ext_pos_general" ext_pos_general
       )
@@ -823,6 +825,7 @@ let () =
       "--ho-purify", Arg.Set _purify_applied_vars, " enable purification of applied variables";
       "--ho-general-ext-pos", Arg.Set _general_ext_pos, " enable general positive extensionality rule";
       "--ho-ext-axiom", Arg.Set _ext_axiom, " enable extensionality axiom";
-      "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule"
+      "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule";
+      "--ho-no-ext-neg", Arg.Clear _ext_neg, " disable negative extensionality rule"
     ];
   Extensions.register extension;
