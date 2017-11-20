@@ -810,19 +810,25 @@ end
 
 let rebuild_rec t =
   let rec aux env t =
-    let ty = ty t in
+    let ty = Type.rebuild_rec ~env (ty t) in
     begin match view t with
       | Var v -> var (HVar.cast ~ty v)
       | DB i ->
         assert (if i >= 0 && i < List.length env then true
           else (Format.printf "%d not in %a@." i (CCFormat.Dump.list Type.pp) env; false));
         assert (if Type.equal ty (List.nth env i) then true
-          else (Format.printf "%a:%a or %a@." pp t Type.pp ty Type.pp (List.nth env i); false));
+          else (Format.printf "@[%a@ has type %a@ but bound with type %a@]@."
+              pp t Type.pp ty Type.pp (List.nth env i); false));
         bvar ~ty i
       | Const id -> const ~ty id
       | App (f, l) -> app (aux env f) (List.map (aux env) l)
       | AppBuiltin (b,l) -> app_builtin ~ty b (List.map (aux env) l)
-      | Fun (ty,bod) -> fun_ ty (aux (ty::env) bod)
+      | Fun (ty_arg,bod) ->
+        let ty_arg =
+          Type.rebuild_rec ~env ty_arg
+          |> Type.unsafe_eval_db env
+        in
+        fun_ ty_arg (aux (ty_arg::env) bod)
     end
   in
   aux [] t

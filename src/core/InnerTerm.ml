@@ -602,16 +602,21 @@ end
 
 let replace_m t m =
   let rec aux depth t = match Map.get t m with
-    | Some u -> DB.shift depth u
+    | Some u ->
+      assert (ty_exn u == ty_exn t);
+      DB.shift depth u
     | None ->
       begin match t.ty, view t with
         | HasType ty, Bind (s, varty, t') ->
+          let ty = aux depth ty in
           bind ~ty ~varty s (aux (depth+1) t')
         | HasType ty, App (f, l) ->
+          let ty = aux depth ty in
           let f' = aux depth f in
           let l' = List.map (aux depth) l in
           app ~ty f' l'
         | HasType ty, AppBuiltin (s,l) ->
+          let ty = aux depth ty in
           let l' = List.map (aux depth) l in
           app_builtin ~ty s l'
         | NoType, _ -> t
