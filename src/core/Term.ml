@@ -508,7 +508,7 @@ end
 
 (** {2 Printing/parsing} *)
 
-let print_all_types = ref false
+let print_all_types = T.print_all_types
 
 type print_hook = int -> (CCFormat.t -> t -> unit) -> CCFormat.t -> t -> bool
 
