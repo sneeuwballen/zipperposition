@@ -864,13 +864,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
          it seems it might be a typo
       *)
       let restrict_term t = lazy (
-        if Lit.is_pos lit && BV.get (Lazy.force eligible_param) i
-        then
-          (* restrict max terms in positive literals eligible for resolution *)
-          CCList.mem ~eq:T.equal t (Lazy.force strictly_max)
-        else false
+        Lit.is_pos lit &&
+        BV.get (Lazy.force eligible_param) i &&
+        (* restrict max terms in positive literals eligible for resolution *)
+        CCList.mem ~eq:T.equal t (Lazy.force strictly_max)
       ) in
-      Lit.map
+      Lit.map_no_simp
         (fun t -> demod_nf ~restrict:(restrict_term t) st c t)
         lit
     in
@@ -881,6 +880,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (* no rewriting performed *)
       SimplM.return_same c
     ) else (
+      assert (not (CCList.is_empty st.demod_clauses));
       (* construct new clause *)
       st.demod_clauses <- CCList.uniq ~eq:eq_c_subst st.demod_clauses;
       let proof =
@@ -893,7 +893,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                st.demod_clauses) in
       let trail = C.trail c in (* we know that demodulating rules have smaller trail *)
       let new_c = C.create_a ~trail ~penalty:(C.penalty c) lits proof in
-      Util.debugf ~section 3 "@[<hv2>demodulate@ @[%a@]@ into @[%a@]@ using @[%a@]@]"
+      Util.debugf ~section 3 "@[<hv2>demodulate@ @[%a@]@ into @[%a@]@ using {@[<hv>%a@]}@]"
         (fun k->
            let pp_c_s out (c,s,sc) =
              Format.fprintf out "(@[%a@ :subst %a[%d]@])" C.pp c Subst.pp s sc in

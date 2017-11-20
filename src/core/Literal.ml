@@ -468,18 +468,25 @@ let unify ?(subst=US.empty) lit1 lit2 k =
   in
   unif_lits op ~subst lit1 lit2 k
 
-let map f = function
+let map_ ~simp f = function
   | Equation (left, right, sign) ->
     let new_left = f left
     and new_right = f right in
-    mk_lit new_left new_right sign
+    if simp
+    then mk_lit new_left new_right sign
+    else Equation (new_left, new_right, sign)
   | Prop (p, sign) ->
     let p' = f p in
-    mk_prop p' sign
+    if simp
+    then mk_prop p' sign
+    else Prop (p', sign)
   | Int o -> Int (Int_lit.map f o)
   | Rat o -> Rat (Rat_lit.map f o)
   | True -> True
   | False -> False
+
+let map f lit = map_ ~simp:true f lit
+let map_no_simp f lit = map_ ~simp:false f lit
 
 let apply_subst_ ~f_term ~f_arith_lit ~f_rat subst (lit,sc) =
   match lit with

@@ -125,6 +125,7 @@ val of_unif_subst: Subst.Renaming.t -> Unif_subst.t -> t list
     contained in this substitution. *)
 
 val map : (term -> term) -> t -> t (** functor *)
+val map_no_simp : (term -> term) -> t -> t (** functor *)
 val fold : ('a -> term -> 'a) -> 'a -> t -> 'a  (** basic fold *)
 val for_all : (term -> bool) -> t -> bool  (** for the term or both terms of the literal *)
 val vars : t -> Type.t HVar.t list (** gather variables *)
