@@ -437,7 +437,7 @@ true: annot, bin_annot
 # OASIS_STOP
 
 # avoid compiler error
-<src/parsers/parse_dk.*>: optimize(classic), inline(0)
+<src/parsers/parse*.*>: optimize(classic), inline(0)
 
 <**/*.cmx>: inline(15)
 true: bin_annot, no_alias_deps, use_menhir, color(always), optimize(3)
