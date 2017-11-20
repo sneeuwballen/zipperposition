@@ -802,7 +802,7 @@ let rec pp_depth ?(hooks=[]) depth out t =
     | Var v ->
       pp_var out v;
       if !print_all_types then (
-        Format.fprintf out ":%a" (_pp depth) (ty_exn t)
+        Format.fprintf out ":%a" (_pp_surrounded depth) (ty_exn t)
       );
     | DB i ->
       Format.fprintf out "Y%d" (depth-i-1);

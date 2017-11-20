@@ -349,7 +349,8 @@ module Inner = struct
           | None -> None
           | Some (i, _) -> match CCList.find_idx (T.is_bvar_i i) l with
             | None -> None
-            | Some (j, ty) ->
+            | Some (j, t_bvar) ->
+              let ty = T.ty_exn t_bvar in
               (* map DB i into db (n-j) *)
               Some (i, T.bvar ~ty (n-j-1)))
       |> DBEnv.of_list
