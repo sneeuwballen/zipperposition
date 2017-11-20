@@ -81,7 +81,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let compare = CCOrd.(pair Literal.compare (list T.compare))
       let to_lits (l,_) = Sequence.return (Literal.Conv.to_form l)
       let labels _ = Util.Int_set.empty
-  end)
+    end)
 
   let idx_ext_neg_ : FV_ext_neg.t ref = ref (FV_ext_neg.empty())
 
@@ -263,26 +263,26 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Sequence.filter (fun (idx,lit) -> eligible idx lit)
       |> Sequence.flat_map_l
         (fun (lit_idx,lit) -> match lit with
-          | Literal.Equation (t, u, true) when Type.is_fun (T.ty t) ->
-            let n_ty_args, ty_args, _ = Type.open_poly_fun (T.ty t) in
-            assert (n_ty_args = 0);
-            assert (ty_args <> []);
-            let vars =
-              List.mapi
-                (fun i ty -> HVar.make ~ty (i+var_offset) |> T.var)
-                ty_args
-            in
-            let new_lit = Literal.mk_eq (T.app t vars) (T.app u vars) in
-            let new_lits = new_lit :: CCArray.except_idx (C.lits c) lit_idx in
-            let proof =
-              Proof.Step.inference [C.proof_parent c]
-                ~rule:(Proof.Rule.mk "ho_complete_eq") ~tags:[Proof.Tag.T_ho]
-            in
-            let new_c =
-              C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
-            in
-            [new_c]
-          | _ -> [])
+           | Literal.Equation (t, u, true) when Type.is_fun (T.ty t) ->
+             let n_ty_args, ty_args, _ = Type.open_poly_fun (T.ty t) in
+             assert (n_ty_args = 0);
+             assert (ty_args <> []);
+             let vars =
+               List.mapi
+                 (fun i ty -> HVar.make ~ty (i+var_offset) |> T.var)
+                 ty_args
+             in
+             let new_lit = Literal.mk_eq (T.app t vars) (T.app u vars) in
+             let new_lits = new_lit :: CCArray.except_idx (C.lits c) lit_idx in
+             let proof =
+               Proof.Step.inference [C.proof_parent c]
+                 ~rule:(Proof.Rule.mk "ho_complete_eq") ~tags:[Proof.Tag.T_ho]
+             in
+             let new_c =
+               C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
+             in
+             [new_c]
+           | _ -> [])
       |> Sequence.to_rev_list
     in
     if new_c<>[] then (
@@ -367,34 +367,34 @@ module Make(E : Env.S) : S with module Env = E = struct
             let t = T.fun_of_fvars vars body in
             Subst.FO.of_list [((v:>InnerTerm.t HVar.t),0), (t,0)]
           in
-        (* build new clause *)
-        let renaming = Subst.Renaming.create () in
-        let new_lits =
-          let l1 = Literal.apply_subst_list renaming subst (other_lits,0) in
-          let l2 =
-            CCList.product
-              (fun args_pos args_neg ->
-                 let args_pos = Subst.FO.apply_l renaming subst (args_pos,0) in
-                 let args_neg = Subst.FO.apply_l renaming subst (args_neg,0) in
-                 List.map2 Literal.mk_eq args_pos args_neg)
-              pos_args
-              neg_args
-            |> List.flatten
+          (* build new clause *)
+          let renaming = Subst.Renaming.create () in
+          let new_lits =
+            let l1 = Literal.apply_subst_list renaming subst (other_lits,0) in
+            let l2 =
+              CCList.product
+                (fun args_pos args_neg ->
+                   let args_pos = Subst.FO.apply_l renaming subst (args_pos,0) in
+                   let args_neg = Subst.FO.apply_l renaming subst (args_neg,0) in
+                   List.map2 Literal.mk_eq args_pos args_neg)
+                pos_args
+                neg_args
+              |> List.flatten
+            in
+            l1 @ l2
           in
-          l1 @ l2
-        in
-        let proof =
-          Proof.Step.inference ~rule:(Proof.Rule.mk "ho_elim_pred") ~tags:[Proof.Tag.T_ho]
-            [ C.proof_parent_subst renaming (c,0) subst ]
-        in
-        let new_c =
-          C.create new_lits proof
-            ~penalty:(C.penalty c) ~trail:(C.trail c)
-        in
-        Util.debugf ~section 3
-          "(@[<2>elim_pred_var %a@ :clause %a@ :yields %a@])"
-          (fun k->k T.pp_var v C.pp c C.pp new_c);
-        Some new_c
+          let proof =
+            Proof.Step.inference ~rule:(Proof.Rule.mk "ho_elim_pred") ~tags:[Proof.Tag.T_ho]
+              [ C.proof_parent_subst renaming (c,0) subst ]
+          in
+          let new_c =
+            C.create new_lits proof
+              ~penalty:(C.penalty c) ~trail:(C.trail c)
+          in
+          Util.debugf ~section 3
+            "(@[<2>elim_pred_var %a@ :clause %a@ :yields %a@])"
+            (fun k->k T.pp_var v C.pp c C.pp new_c);
+          Some new_c
       end
     in
     begin
@@ -612,18 +612,16 @@ module Make(E : Env.S) : S with module Env = E = struct
        - this is the first term we encounter with this variable as head or
        - it is equal to the first term encountered with this variable as head *)
     let should_purify t v =
-      try (
+      try
         if t = VTbl.find cache_untouched_ v then (
           Util.debugf ~section 5
             "Leaving untouched: %a"
             (fun k->k T.pp t);false
-        )
-        else (
+        ) else (
           Util.debugf ~section 5
             "To purify: %a"
             (fun k->k T.pp t);true
         )
-      )
       with Not_found ->
         VTbl.add cache_untouched_ v t;
         Util.debugf ~section 5
@@ -635,24 +633,25 @@ module Make(E : Env.S) : S with module Env = E = struct
     let rec purify_term t =
       let head, args = T.as_app t in
       match T.as_var head with
-      | Some v ->
-        if should_purify t v then (
-          (* purify *)
-          Util.debugf ~section 5
-            "Purifying: %a. Untouched is: %a"
-            (fun k->k T.pp t T.pp (VTbl.find cache_untouched_ v));
-          T.app
-            (replacement_var t)
-            (List.map purify_term args)
-        )
-        else (* dont purify *)
+        | Some v ->
+          if should_purify t v then (
+            (* purify *)
+            Util.debugf ~section 5
+              "Purifying: %a. Untouched is: %a"
+              (fun k->k T.pp t T.pp (VTbl.find cache_untouched_ v));
+            T.app
+              (replacement_var t)
+              (List.map purify_term args)
+          ) else (
+            (* dont purify *)
+            T.app
+              head
+              (List.map purify_term args)
+          )
+        | None -> (* dont purify *)
           T.app
             head
             (List.map purify_term args)
-      | None -> (* dont purify *)
-        T.app
-          head
-          (List.map purify_term args)
     in
     (* purify a literal *)
     let purify_lit lit =
