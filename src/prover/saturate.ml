@@ -22,8 +22,8 @@ let check_timeout = function
   | None -> false
   | Some timeout -> Util.total_time_s () > timeout
 
-(* progress bar? *)
-let progress_ = ref false
+let _progress = ref false (* progress bar? *)
+let _check_types = ref false
 
 (* print progress (i out of steps) *)
 let print_progress i ~steps =
@@ -64,8 +64,13 @@ module type S = sig
       the number of steps done for presaturation, with status of the set. *)
 end
 
+
 module Make(E : Env.S) = struct
   module Env = E
+
+  let[@inline] check_clause_ c = if !_check_types then Env.C.check_types c
+  let[@inline] check_clauses_ seq =
+    if !_check_types then Sequence.iter Env.C.check_types seq
 
   (** One iteration of the main loop ("given clause loop") *)
   let given_clause_step ?(generating=true) num =
@@ -78,6 +83,7 @@ module Make(E : Env.S) = struct
           Env.do_generate ~full:true ()
           |> Sequence.filter_map
             (fun c ->
+               check_clause_ c;
                let c, _ = Env.unary_simplify c in
                if Env.is_trivial c || Env.is_active c || Env.is_passive c
                then None
@@ -93,6 +99,7 @@ module Make(E : Env.S) = struct
           Unknown
         )
       | Some c ->
+        check_clause_ c;
         Util.incr_stat stat_steps;
         begin match Env.all_simplify c with
           | [], _ ->
@@ -127,6 +134,8 @@ module Make(E : Env.S) = struct
             (* the simplified active clauses are removed from active set and
                added to the set of new clauses. Their descendants are also removed
                from passive set *)
+            check_clauses_ simplified_actives;
+            check_clauses_ newly_simplified;
             Env.remove_active simplified_actives;
             Env.remove_simpl simplified_actives;
             CCVector.append_seq new_clauses newly_simplified;
@@ -142,7 +151,9 @@ module Make(E : Env.S) = struct
             let inferred_clauses =
               Sequence.filter_map
                 (fun c ->
+                   check_clause_ c;
                    let c, _ = Env.forward_simplify c in
+                   check_clause_ c;
                    (* keep clauses  that are not redundant *)
                    if Env.is_trivial c || Env.is_active c || Env.is_passive c
                    then (
@@ -171,7 +182,7 @@ module Make(E : Env.S) = struct
         | Some i when num >= i -> Unknown, num
         | _ ->
           (* do one step *)
-          if !progress_ then print_progress num ~steps;
+          if !_progress then print_progress num ~steps;
           let status = given_clause_step ~generating num in
           match status with
             | Sat | Unsat _ | Error _ -> status, num (* finished *)
@@ -186,6 +197,7 @@ end
 
 let () =
   Params.add_opts
-    [ "--progress", Arg.Set progress_, " progress bar"
-    ; "-p", Arg.Set progress_, " alias to --progress"
+    [ "--progress", Arg.Set _progress, " progress bar";
+      "-p", Arg.Set _progress, " alias to --progress";
+      "--check-types", Arg.Set _check_types, " check types in new clauses";
     ]
