@@ -632,26 +632,25 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* purify a term *)
     let rec purify_term t =
       let head, args = T.as_app t in
-      match T.as_var head with
+      let res = match T.as_var head with
         | Some v ->
           if should_purify t v then (
             (* purify *)
             Util.debugf ~section 5
-              "Purifying: %a. Untouched is: %a"
+              "@[Purifying: %a.@ Untouched is: %a@]"
               (fun k->k T.pp t T.pp (VTbl.find cache_untouched_ v));
-            T.app
-              (replacement_var t)
-              (List.map purify_term args)
+            let v' = replacement_var t in
+            assert (Type.equal (HVar.ty v) (T.ty v'));
+            T.app v' (List.map purify_term args)
           ) else (
             (* dont purify *)
-            T.app
-              head
-              (List.map purify_term args)
+            T.app head (List.map purify_term args)
           )
         | None -> (* dont purify *)
-          T.app
-            head
-            (List.map purify_term args)
+          T.app head (List.map purify_term args)
+      in
+      assert (Type.equal (T.ty res) (T.ty t));
+      res
     in
     (* purify a literal *)
     let purify_lit lit =
@@ -674,7 +673,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             [parent] in
         let new_clause = (C.create ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof) in
         Util.debugf ~section 5
-          "Purified: Old: %a New: %a"
+          "@[<hv2>Purified:@ Old: %a@ New: %a@]"
           (fun k->k C.pp c C.pp new_clause);
         SimplM.return_new new_clause
     end

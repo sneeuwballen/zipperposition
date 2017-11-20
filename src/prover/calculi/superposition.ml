@@ -300,7 +300,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let sc_a = info.scope_active in
     let sc_p = info.scope_passive in
     Util.debugf ~section 3
-      "@[<2>sup@ @[%a[%d] s=%a t=%a@]@ @[%a[%d] passive_lit=%a p=%a@]@ with subst=@[%a@]@]"
+      "@[<2>sup@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a@]@])@ \
+       (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
       (fun k->k C.pp info.active sc_a T.pp info.s T.pp info.t
           C.pp info.passive sc_p Lit.pp info.passive_lit
           Position.pp info.passive_pos US.pp info.subst);
