@@ -21,7 +21,8 @@ let singleton x = { size=1; stack = [Some x]; }
 
 let push env x = {size=env.size+1; stack=(Some x) :: env.stack; }
 
-let push_l env l = List.fold_right (fun x e -> push e x) l env
+let push_l_same_order env l = List.fold_right (fun x e -> push e x) l env
+let push_l_rev env l = List.fold_left push env l
 
 let push_none env =  {size=env.size+1; stack=None :: env.stack; }
 
