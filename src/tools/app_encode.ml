@@ -8,6 +8,8 @@ open Logtk_parsers
 
 module T = TypedSTerm
 
+let extensional_ = ref false
+
 let pp_stmt_in o =
   Statement.pp_input_in o
 
@@ -145,6 +147,26 @@ let app_encode stmt =
     | Statement.TyDecl (id, ty) ->
       Statement.ty_decl ~proof:Proof.Step.trivial id (app_encode_ty ty)
 
+let extensionality_axiom =
+  let alpha = Var.make ~ty:T.tType (ID.make "alpha") in
+  let beta = Var.make ~ty:T.tType (ID.make "beta") in
+  let fun_alpha_beta = T.app ~ty:T.tType (function_type) [T.var alpha; T.var beta] in
+  let x = Var.make ~ty:fun_alpha_beta (ID.make "x") in
+  let y = Var.make ~ty:fun_alpha_beta (ID.make "y") in
+  let z = Var.make ~ty:(T.var alpha) (ID.make "z") in
+  let xz = T.app ~ty:(T.var beta) app_const [T.var x; T.var z] in
+  let yz = T.app ~ty:(T.var beta) app_const [T.var y; T.var z] in
+  let prop = T.builtin ~ty:T.tType Builtin.Prop in
+  Statement.assert_ ~proof:Proof.Step.trivial
+    (T.bind_list ~ty:prop Binder.forall [x; y]
+      (T.app_builtin ~ty:prop Builtin.Imply [
+          T.bind ~ty:prop Binder.forall z
+            (T.app_builtin ~ty:prop Builtin.Eq [xz; yz]);
+          T.app_builtin ~ty:prop Builtin.Eq [T.var x; T.var y]
+        ]
+      )
+    )
+
 let process file =
   let o = !Options.output in
   let input = Input_format.I_tptp in
@@ -163,12 +185,20 @@ let process file =
       (T.app_builtin ~ty:T.tType Builtin.arrow [T.tType;T.tType;T.tType])
   in
   let decl_app = Statement.ty_decl ~proof:Proof.Step.trivial app_id app_type in
-  Format.printf "@[<v>%a@,%a@,%a@]@."
-    (pp_stmt_in o) decl_fun
-    (pp_stmt_in o) decl_app
+  Format.printf "@[<v>%a@]@."
+    (pp_stmt_in o) decl_fun;
+  Format.printf "@[<v>%a@]@."
+    (pp_stmt_in o) decl_app;
+  if !extensional_ then
+    Format.printf "@[<v>%a@]@."
+      (pp_stmt_in o) extensionality_axiom;
+  Format.printf "@[<v>%a@]@."
     (pp_stmts_in o) app_encoded
 
-let options = Options.make()
+let options =
+  Options.add_opts
+    [ "--app-encode-extensional", Arg.Set extensional_, " enable extensionality axiom in app-encoding"];
+  Options.make()
 
 let () =
   CCFormat.set_color_default true;
