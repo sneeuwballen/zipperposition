@@ -204,7 +204,7 @@ let () =
   CCFormat.set_color_default true;
   let files = ref [] in
   let add_file f = files := f :: !files in
-  Arg.parse options add_file "app_encode [options] [file|stdin]";
+  Arg.parse (Arg.align options) add_file "app_encode [options] [file|stdin]";
   let file = match !files with
     | [] -> "stdin"
     | [f] -> f
