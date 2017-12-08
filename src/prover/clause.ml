@@ -433,4 +433,12 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     Format.fprintf out "@[<v>%a@]"
       (Util.pp_seq ~sep:"," pp_tstp)
       (ClauseSet.to_seq set)
+
+
+  let check_types c =
+    Util.debugf 5 "(@[check_types@ %a@])" (fun k->k pp c);
+    lits c
+    |> Literals.Seq.terms
+    |> Sequence.iter
+      (fun t -> ignore (Term.rebuild_rec t))
 end

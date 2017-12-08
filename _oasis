@@ -259,6 +259,15 @@ Executable cnf_of
   MainIs:           cnf_of.ml
   BuildDepends:     logtk, logtk.parsers
 
+# Applicative encoding
+Executable app_encode
+  Path:             src/tools/
+  Build$:           flag(tools) && flag(parsers)
+  Install$:         flag(tools) && flag(parsers)
+  CompiledObject:   native
+  MainIs:           app_encode.ml
+  BuildDepends:     logtk, logtk.parsers
+
 # proof checking
 Executable tptp_to_zf
   Path:             src/tools/

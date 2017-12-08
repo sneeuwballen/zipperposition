@@ -60,6 +60,9 @@
 %token FORALL
 %token EXISTS
 
+%token FORALLCONST
+%token EXISTSCONST
+
 %token UNDERSCORE
 
 %token <string> LOWER_WORD
@@ -268,6 +271,7 @@ or_formula: l=assoc_binary_formula_aux(VLINE) { PT.or_ l }
   | XOR { PT.xor }
   | NOTVLINE { fun ?loc x y -> PT.not_ ?loc (PT.or_ ?loc [x; y]) }
   | NOTAND { fun ?loc x y -> PT.not_ ?loc (PT.and_ ?loc [x; y]) }
+  | ARROW { fun ?loc x y -> PT.fun_ty ?loc [x] y }
 %inline quantifier:
   | FORALL { PT.forall }
   | EXISTS { PT.exists }
@@ -278,6 +282,8 @@ or_formula: l=assoc_binary_formula_aux(VLINE) { PT.or_ l }
 atomic_formula:
   | TRUE { PT.true_ }
   | FALSE { PT.false_ }
+  | EXISTSCONST { PT.builtin Builtin.ExistsConst }
+  | FORALLCONST { PT.builtin Builtin.ForallConst }
   | t=term
     {
       let loc = L.mk_pos $startpos $endpos in
@@ -393,16 +399,20 @@ tff_quantified_type:
 /* toplevel type, possibly with arrows, but without quantifier */
 tff_toplevel_type:
   | ty=tff_type { ty  }
-  | LEFT_PAREN args=tff_ty_star_list RIGHT_PAREN ARROW r=tff_atom_type
+  | LEFT_PAREN args=tff_ty_star_list RIGHT_PAREN ARROW r=tff_app_type
     { PT.fun_ty args r }
 
 /* general type that a variable can have */
 tff_type:
-  | ty=tff_atom_type { ty }
-  | l=tff_atom_type ARROW r=tff_type
+  | ty=tff_app_type { ty }
+  | l=tff_app_type ARROW r=tff_type
     { PT.fun_ty [l] r }
 
-tff_atom_type:
+tff_app_type:
+  | ty=tff_atomic_type { ty }
+  | f=tff_app_type AT a=tff_atomic_type { PT.app f [a] }
+
+tff_atomic_type:
   | v=variable { v }
   | w=defined_ty { w }
   | w=type_const { w }
@@ -412,9 +422,9 @@ tff_atom_type:
   | LEFT_PAREN ty=tff_toplevel_type RIGHT_PAREN { ty }
 
 tff_ty_star_list:
-  | ty=tff_atom_type
+  | ty=tff_app_type
     STAR
-    l=separated_nonempty_list(STAR,tff_atom_type)
+    l=separated_nonempty_list(STAR,tff_app_type)
     { ty :: l }
 
 tff_ty_vars:

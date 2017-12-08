@@ -61,6 +61,7 @@ let _dot_sup_from = ref None
 let _dot_simpl = ref None
 let _dont_simplify = ref false
 let _sup_at_vars = ref false
+let _restrict_hidden_sup_at_vars = ref false
 let _dot_demod_into = ref None
 
 module Make(Env : Env.S) : S with module Env = Env = struct
@@ -235,24 +236,59 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       | _ -> None
     end
 
-  (* Checks whether C\sigma is either <= or incomparable to C[var -> replacement]\sigma.
-  In that case we must allow superposition at variables to be complete.*)
+  (* Checks whether we must allow superposition at variables to be complete. *)
   let sup_at_var_condition info var replacement =
     let open SupInfo in
+    let ord = Ctx.ord () in
     let us = info.subst in
     let subst = US.subst us in
     let renaming = S.Renaming.create () in
-    let passive'_lits =
-      CCArray.map (fun l -> Lit.apply_subst renaming subst (l, info.scope_passive)) (C.lits info.passive)
-    in
     let replacement' = S.FO.apply renaming subst (replacement, info.scope_active) in
-    let passive_t'_lits =
-      Sequence.of_array (C.lits info.passive)
-      |> Sequence.map (fun l -> Lit.replace l ~old:var ~by:replacement')
-      |> Sequence.map (fun l -> Lit.apply_subst renaming subst (l, info.scope_passive))
-      |> Sequence.to_array in
-    let ord = Ctx.ord () in
-    not (Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt)
+    let var' = S.FO.apply renaming subst (var, info.scope_passive) in
+    if (not (Type.is_fun (Term.ty var')) || not (O.might_flip ord var' replacement'))
+    then (
+      Util.debugf ~section 5
+        "Cannot flip: %a = %a"
+        (fun k->k T.pp var' T.pp replacement');
+      false (* If the lhs vs rhs cannot flip, we don't need a sup at var *)
+    )
+    else (
+      (* Check whether var occurs only with the same arguments everywhere. *)
+      let unique_args_of_var =
+        C.lits info.passive
+        |> Lits.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord ~subterms:true ~eligible:(fun _ _ -> true)
+        |> Sequence.fold_while
+          (fun unique_args (t,_) ->
+             if Head.term_to_head t == Head.term_to_head var
+             then (
+               if unique_args == Some (Head.term_to_args t)
+               then (unique_args, `Continue) (* found the same arguments of var again *)
+               else (None, `Stop) (* different arguments of var found *)
+             ) else (unique_args, `Continue) (* this term doesn't have var as head *)
+          )
+          None
+      in
+      match unique_args_of_var with
+        | Some _ ->
+          Util.debugf ~section 5
+            "Variable %a has same args everywhere in %a"
+            (fun k->k T.pp var C.pp info.passive);
+          false (* If var occurs with the same arguments everywhere, we don't need sup at vars *)
+        | None ->
+          (* Check whether Cσ is >= C[var -> replacement]σ *)
+          let passive'_lits = Lits.apply_subst renaming subst (C.lits info.passive, info.scope_passive) in
+          let subst_t = Unif.FO.update subst (T.as_var_exn var, info.scope_passive) (replacement, info.scope_active) in
+          let passive_t'_lits = Lits.apply_subst renaming subst_t (C.lits info.passive, info.scope_passive) in 
+          if Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt
+          then (
+            Util.debugf ~section 5
+              "Sup at var condition is not fulfilled because: %a >= %a"
+              (fun k->k Lits.pp passive'_lits Lits.pp passive_t'_lits);
+            false
+          )
+          else true (* If Cσ is either <= or incomparable to C[var -> replacement]σ, we need sup at var.*)
+    )
+
 
   (* Helper that does one or zero superposition inference, with all
      the given parameters. Clauses have a scope. *)
@@ -264,7 +300,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let sc_a = info.scope_active in
     let sc_p = info.scope_passive in
     Util.debugf ~section 3
-      "@[<2>sup@ @[%a[%d] s=%a t=%a@]@ @[%a[%d] passive_lit=%a p=%a@]@ with subst=@[%a@]@]"
+      "@[<2>sup@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a@]@])@ \
+       (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
       (fun k->k C.pp info.active sc_a T.pp info.s T.pp info.t
           C.pp info.passive sc_p Lit.pp info.passive_lit
           Position.pp info.passive_pos US.pp info.subst);
@@ -308,10 +345,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then
          raise (ExitSuperposition "superposition at variable");
       (* Check for hidden superposition at a variable *)
-      match is_hidden_sup_at_var info with
-      | Some (var,replacement) when not (sup_at_var_condition info var replacement)
-        -> raise (ExitSuperposition "hidden superposition at variable")
-      | _ -> ();
+      if !_restrict_hidden_sup_at_vars then (
+        match is_hidden_sup_at_var info with
+          | Some (var,replacement) when not (sup_at_var_condition info var replacement)
+          -> raise (ExitSuperposition "hidden superposition at variable")
+        | _ -> ()
+      );
       (* ordering constraints are ok *)
       let lits_a = CCArray.except_idx (C.lits info.active) active_idx in
       let lits_p = CCArray.except_idx (C.lits info.passive) passive_idx in
@@ -752,8 +791,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       match T.view t with
         | T.Const _ -> reduce_at_root ~restrict t k
         | T.App (hd, l) ->
-          (* rewrite subterms in call by value *)
-          normal_form ~restrict:lazy_false hd
+          (* rewrite subterms in call by value.
+             Note that we keep restrictions for the head, so as
+             not to rewrite [f x=g x] into ⊤ after equality completion
+             of [f=g] *)
+          normal_form ~restrict hd
             (fun hd' ->
                normal_form_l l
                  (fun l' ->
@@ -823,13 +865,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
          it seems it might be a typo
       *)
       let restrict_term t = lazy (
-        if Lit.is_pos lit && BV.get (Lazy.force eligible_param) i
-        then
-          (* restrict max terms in positive literals eligible for resolution *)
-          CCList.mem ~eq:T.equal t (Lazy.force strictly_max)
-        else false
+        Lit.is_pos lit &&
+        BV.get (Lazy.force eligible_param) i &&
+        (* restrict max terms in positive literals eligible for resolution *)
+        CCList.mem ~eq:T.equal t (Lazy.force strictly_max)
       ) in
-      Lit.map
+      Lit.map_no_simp
         (fun t -> demod_nf ~restrict:(restrict_term t) st c t)
         lit
     in
@@ -840,6 +881,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (* no rewriting performed *)
       SimplM.return_same c
     ) else (
+      assert (not (CCList.is_empty st.demod_clauses));
       (* construct new clause *)
       st.demod_clauses <- CCList.uniq ~eq:eq_c_subst st.demod_clauses;
       let proof =
@@ -852,7 +894,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                st.demod_clauses) in
       let trail = C.trail c in (* we know that demodulating rules have smaller trail *)
       let new_c = C.create_a ~trail ~penalty:(C.penalty c) lits proof in
-      Util.debugf ~section 3 "@[<hv2>demodulate@ @[%a@]@ into @[%a@]@ using @[%a@]@]"
+      Util.debugf ~section 3 "@[<hv2>demodulate@ @[%a@]@ into @[%a@]@ using {@[<hv>%a@]}@]"
         (fun k->
            let pp_c_s out (c,s,sc) =
              Format.fprintf out "(@[%a@ :subst %a[%d]@])" C.pp c Subst.pp s sc in
@@ -1692,4 +1734,7 @@ let () =
     ; "--sup-at-vars"
     , Arg.Set _sup_at_vars
     , " enable superposition at variables under certain ordering conditions"
+    ; "--restrict-hidden-sup-at-vars"
+    , Arg.Set _restrict_hidden_sup_at_vars
+    , " perform hidden superposition at variables only under certain ordering conditions"
     ]

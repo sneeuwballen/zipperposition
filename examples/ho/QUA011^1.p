@@ -1,0 +1,1 @@
+/home/simon/workspace/tptp/tptp/Problems/QUA/QUA011^1.p

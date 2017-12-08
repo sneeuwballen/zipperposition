@@ -1,0 +1,1 @@
+../../tptp/Problems/SEU/SEU684^1.p

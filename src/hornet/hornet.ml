@@ -92,7 +92,7 @@ let compute_ord (ord:string) precedence =
 (* setup an alarm for abrupt stop *)
 let setup_alarm timeout =
   let handler _ =
-    Format.printf "%% SZS Status ResourceOut@.";
+    Format.printf "%% SZS status ResourceOut@.";
     Unix.kill (Unix.getpid ()) Sys.sigterm
   in
   ignore (Sys.signal Sys.sigalrm (Sys.Signal_handle handler));

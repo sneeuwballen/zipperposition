@@ -1,0 +1,1 @@
+/home/simon/workspace/tptp/tptp/Problems/SYO/SYO265^5.p

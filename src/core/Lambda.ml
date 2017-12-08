@@ -52,10 +52,11 @@ module Inner = struct
           |> normalize
           |> whnf_rec
         )
-      | T.Bind (Binder.Lambda, _, body), a :: args' ->
+      | T.Bind (Binder.Lambda, ty_var, body), a :: args' ->
         (* beta-reduce *)
         Util.debugf 10 "(@[<2>beta-reduce@ @[%a@ %a@]@])"
           (fun k->k T.pp st.head T.pp a);
+        assert (T.equal ty_var (T.ty_exn a));
         let st' =
           { head=body;
             env=DBEnv.push st.env a;

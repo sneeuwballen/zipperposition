@@ -25,6 +25,11 @@ type ordering = t
 val compare : t -> term -> term -> Comparison.t
 (** Compare two terms using the given ordering *)
 
+val might_flip : t -> term -> term -> bool
+(** Returns false for two terms t and s if for any ground substitution θ the ordering
+    of tθ vs sθ cannot change when appending arguments. This function is allowed
+    to overapproximate, i.e. we get no information if it returns true. *)
+
 val precedence : t -> Precedence.t
 (** Current precedence *)
 

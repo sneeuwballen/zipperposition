@@ -55,6 +55,7 @@ module Set : sig
   val of_seq : 'a var Sequence.t -> 'a t
   val to_seq : 'a t -> 'a var Sequence.t
   val add_seq : 'a t -> 'a var Sequence.t -> 'a t
+  val add_list : 'a t -> 'a var list -> 'a t
   val to_list : 'a t -> 'a var list
   val of_list : 'a var list -> 'a t
   val cardinal : _ t -> int

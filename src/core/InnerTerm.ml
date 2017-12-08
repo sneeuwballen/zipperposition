@@ -602,16 +602,21 @@ end
 
 let replace_m t m =
   let rec aux depth t = match Map.get t m with
-    | Some u -> DB.shift depth u
+    | Some u ->
+      assert (ty_exn u == ty_exn t);
+      DB.shift depth u
     | None ->
       begin match t.ty, view t with
         | HasType ty, Bind (s, varty, t') ->
+          let ty = aux depth ty in
           bind ~ty ~varty s (aux (depth+1) t')
         | HasType ty, App (f, l) ->
+          let ty = aux depth ty in
           let f' = aux depth f in
           let l' = List.map (aux depth) l in
           app ~ty f' l'
         | HasType ty, AppBuiltin (s,l) ->
+          let ty = aux depth ty in
           let l' = List.map (aux depth) l in
           app_builtin ~ty s l'
         | NoType, _ -> t
@@ -756,6 +761,7 @@ let is_bvar_i i t = match view t with DB j -> i=j | _ -> false
 (** {3 IO} *)
 
 let print_hashconsing_ids = ref false
+let print_all_types = ref false
 
 type print_hook = int -> (CCFormat.t -> t -> unit) -> CCFormat.t -> t -> bool
 
@@ -786,17 +792,28 @@ let rec pp_depth ?(hooks=[]) depth out t =
   let rec _pp depth out t =
     if List.exists (fun h -> h depth (_pp depth) out t) hooks
     then () (* hook took control *)
-    else if !print_hashconsing_ids
-    then Format.fprintf out "%a@{<Black>/%d@}" (_pp_root depth) t t.id
-    else _pp_root depth out t
+    else (
+      _pp_root depth out t ;
+      if !print_hashconsing_ids then (
+        Format.fprintf out "@{<Black>/%d@}" t.id
+      );
+    )
   and _pp_root depth out t = match view t with
-    | Var v -> pp_var out v
-    | DB i -> Format.fprintf out "Y%d" (depth-i-1)
+    | Var v ->
+      pp_var out v;
+      if !print_all_types then (
+        Format.fprintf out ":%a" (_pp_surrounded depth) (ty_exn t)
+      );
+    | DB i ->
+      Format.fprintf out "Y%d" (depth-i-1);
+      if !print_all_types then (
+        Format.fprintf out ":%a" (_pp_surrounded depth) (ty_exn t)
+      );
     | Const s ->
       begin match ID.as_prefix s with
         | Some s -> CCFormat.string out s
         | None -> ID.pp out s
-      end
+      end;
     | Bind (b, _, _) ->
       (* unfold *)
       let varty_l, t' = open_bind b t in

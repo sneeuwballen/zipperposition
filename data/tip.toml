@@ -24,7 +24,7 @@ binary = "./zipperposition.native"
 cmd = "./zipperposition.native $file --timeout $timeout --mem-limit $memory --output none"
 unsat = "SZS status (Theorem|Unsatisfiable)"
 sat = "SZS status (CounterSatisfiable|Satisfiable)"
-timeout = "SZS Status ResourceOut"
+timeout = "SZS status ResourceOut"
 version = "git:."
 
 [zipperposition-v]
@@ -33,7 +33,7 @@ binary = "./zipperposition.native"
 cmd = "./zipperposition.native $file --timeout $timeout --mem-limit $memory --output none --no-ind-gen-var"
 unsat = "SZS status (Theorem|Unsatisfiable)"
 sat = "SZS status (CounterSatisfiable|Satisfiable)"
-timeout = "SZS Status ResourceOut"
+timeout = "SZS status ResourceOut"
 version = "git:."
 
 [zipperposition-t]
@@ -42,7 +42,7 @@ binary = "./zipperposition.native"
 cmd = "./zipperposition.native $file --timeout $timeout --mem-limit $memory --output none  --no-ind-gen-term"
 unsat = "SZS status (Theorem|Unsatisfiable)"
 sat = "SZS status (CounterSatisfiable|Satisfiable)"
-timeout = "SZS Status ResourceOut"
+timeout = "SZS status ResourceOut"
 version = "git:."
 
 [zipperposition-vt]
@@ -51,7 +51,7 @@ binary = "./zipperposition.native"
 cmd = "./zipperposition.native $file --timeout $timeout --mem-limit $memory --output none --no-ind-gen-var --no-ind-gen-term"
 unsat = "SZS status (Theorem|Unsatisfiable)"
 sat = "SZS status (CounterSatisfiable|Satisfiable)"
-timeout = "SZS Status ResourceOut"
+timeout = "SZS status ResourceOut"
 version = "git:."
 
 [cvc4]

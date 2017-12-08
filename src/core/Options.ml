@@ -81,6 +81,7 @@ let make () =
       Arg.Set InnerTerm.print_hashconsing_ids,
       " print each term's unique hashconsing ID"
     ; "--backtrace", switch_opt true Printexc.record_backtrace, " enable backtraces"
+    ; "-bt", switch_opt true Printexc.record_backtrace, " enable backtraces (alias to --backtrace)"
     ; "--no-backtrace", switch_opt false Printexc.record_backtrace, " disable backtraces"
     ; "--color", switch_opt true CCFormat.set_color_default, " enable colors"
     ; "--no-color", switch_opt false CCFormat.set_color_default, " disable colors"
