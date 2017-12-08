@@ -190,6 +190,13 @@ module Inner = struct
     else if S.mem subst v then fail()
     else S.bind subst v t
 
+  (* public "update" function to replace a binding (with occur check) *)
+  let update ?(check=true) subst v t =
+    if check && occurs_check ~depth:0 subst v t
+    then fail()
+    else if not (S.mem subst v) then fail()
+    else S.update subst v t
+
   (* is the type of [t] prop, or some other non-syntactically unifiable type? *)
   let has_non_unifiable_type_or_is_prop (t:T.t): bool = match T.ty t with
     | T.NoType -> false
@@ -342,7 +349,8 @@ module Inner = struct
           | None -> None
           | Some (i, _) -> match CCList.find_idx (T.is_bvar_i i) l with
             | None -> None
-            | Some (j, ty) ->
+            | Some (j, t_bvar) ->
+              let ty = T.ty_exn t_bvar in
               (* map DB i into db (n-j) *)
               Some (i, T.bvar ~ty (n-j-1)))
       |> DBEnv.of_list
@@ -640,8 +648,8 @@ module Inner = struct
         in
         unif_rec ~op ~root:false
           ~bvars:(B_vars.make
-            (DBEnv.push_l bvars.B_vars.left new_vars1)
-            (DBEnv.push_l bvars.B_vars.right new_vars2))
+            (DBEnv.push_l_rev bvars.B_vars.left new_vars1)
+            (DBEnv.push_l_rev bvars.B_vars.right new_vars2))
           subst (f1,scope) (f2,scope)
       | T.Bind (Binder.Lambda, _, _), _ ->
         (* [λx. t = u] becomes [t = u x] *)
@@ -650,8 +658,8 @@ module Inner = struct
         let n = List.length new_vars in
         unif_rec ~op ~root
           ~bvars:(B_vars.make
-            (DBEnv.push_l bvars.B_vars.left new_vars)
-            (DBEnv.push_l bvars.B_vars.right new_vars))
+            (DBEnv.push_l_rev bvars.B_vars.left new_vars)
+            (DBEnv.push_l_rev bvars.B_vars.right new_vars))
           subst
           (f1,scope)
           (T.app ~ty:(T.ty_exn f1)
@@ -664,8 +672,8 @@ module Inner = struct
         let n = List.length new_vars in
         unif_rec ~op ~root
           ~bvars:(B_vars.make
-            (DBEnv.push_l bvars.B_vars.left new_vars)
-            (DBEnv.push_l bvars.B_vars.right new_vars))
+            (DBEnv.push_l_rev bvars.B_vars.left new_vars)
+            (DBEnv.push_l_rev bvars.B_vars.right new_vars))
           subst
           (T.app ~ty:(T.ty_exn f2)
              (T.DB.shift n t1)
@@ -784,7 +792,7 @@ module Inner = struct
       | T.Bind (b, _, _) ->
         assert (l=[]);
         let new_vars, body = T.open_bind b f in
-        proj_fun ~bvars:(DBEnv.push_l bvars new_vars) subst (body,sc_t)
+        proj_fun ~bvars:(DBEnv.push_l_rev bvars new_vars) subst (body,sc_t)
       | T.App _ -> assert false
       | T.AppBuiltin (_, l2) ->
         assert (l=[]);
@@ -975,6 +983,9 @@ module Ty = struct
   let bind =
     (bind :> ?check:bool -> subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst)
 
+  let update =
+    (update :> ?check:bool -> subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst)
+
   let unify_full =
     (unify_full :> ?subst:unif_subst -> term Scoped.t -> term Scoped.t -> unif_subst)
 
@@ -1022,6 +1033,9 @@ module FO = struct
 
   let bind =
     (bind :> ?check:bool -> subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst)
+
+  let update =
+    (update :> ?check:bool -> subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst)
 
   let unify_full =
     (unify_full :> ?subst:unif_subst -> term Scoped.t -> term Scoped.t -> unif_subst)

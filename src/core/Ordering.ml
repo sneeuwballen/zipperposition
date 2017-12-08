@@ -32,11 +32,14 @@ type t = {
   compare : Prec.t -> term -> term -> Comparison.t;
   prec : Prec.t;
   name : string;
+  might_flip : Prec.t -> term -> term -> bool;
 } (** Partial ordering on terms *)
 
 type ordering = t
 
 let compare ord t1 t2 = ord.compare ord.prec t1 t2
+
+let might_flip ord t1 t2 = ord.might_flip ord.prec t1 t2
 
 let precedence ord = ord.prec
 
@@ -57,9 +60,11 @@ let to_string ord = CCFormat.to_string pp ord
 module type ORD = sig
   (* This order relation should be:
    * - stable for instantiation
-   * - monotonic
+   * - compatible with function contexts
    * - total on ground terms *)
   val compare_terms : prec:Prec.t -> term -> term -> Comparison.t
+
+  val might_flip : Prec.t -> term -> term -> bool
 
   val name : string
 end
@@ -320,6 +325,9 @@ module KBO : ORD = struct
     let compare = kbo ~prec x y in
     Util.exit_prof prof_kbo;
     compare
+
+  (* KBO is monotonic *)
+  let might_flip _ _ _ = false
 end
 
 
@@ -455,6 +463,29 @@ module LFHOKBO_arg_coeff : ORD = struct
     let compare = lfhokbo_arg_coeff ~prec x y in
     Util.exit_prof prof_lfhokbo_arg_coeff;
     compare
+
+  let might_flip prec t s =
+    (* Terms can flip if they have different argument coefficients for remaining arguments. *)
+    assert (Term.ty t = Term.ty s);
+    let term_arity =
+      match Type.arity (Term.ty t) with
+        | Type.NoArity ->
+          failwith (CCFormat.sprintf "term %a has ill-formed type %a" Term.pp t Type.pp (Term.ty t))
+        | Type.Arity (_,n) -> n in
+    let id_arity s =
+      match Type.arity (Type.const s) with
+        | Type.NoArity ->
+          failwith (CCFormat.sprintf "symbol %a has ill-formed type %a" ID.pp s Type.pp (Type.const s))
+        | Type.Arity (_,n) -> n in
+    match Head.term_to_head t, Head.term_to_head s with
+      | Some (Head.I g), Some (Head.I f) ->
+        List.exists
+          (fun i ->
+             Prec.arg_coeff prec g (id_arity g - i) != Prec.arg_coeff prec f (id_arity f - i)
+          )
+          CCList.(0 --^ term_arity)
+      | Some (Head.V _), Some (Head.I _) | Some (Head.I _), Some (Head.V _) -> true
+      | _ -> assert false
 end
 
 
@@ -546,6 +577,13 @@ module RPO6 : ORD = struct
     let compare = rpo6 ~prec x y in
     Util.exit_prof prof_rpo6;
     compare
+
+  (* The ordering might flip if it is established using the subterm rule *)
+  let might_flip prec t s =
+    let c = rpo6 ~prec t s in
+    c = Incomparable ||
+    c = Gt && alpha ~prec (Head.term_to_args t) s = Gt ||
+    c = Lt && alpha ~prec (Head.term_to_args s) t = Gt
 end
 
 
@@ -557,27 +595,32 @@ let kbo prec =
   let compare prec a b = CCCache.with_cache cache
       (fun (a, b) -> KBO.compare_terms ~prec a b) (a,b)
   in
-  { cache; compare; name=KBO.name; prec; }
+  { cache; compare; name=KBO.name; prec; might_flip=KBO.might_flip }
 
 let lfhokbo_arg_coeff prec =
   let cache = mk_cache 256 in
   let compare prec a b = CCCache.with_cache cache
       (fun (a, b) -> LFHOKBO_arg_coeff.compare_terms ~prec a b) (a,b)
   in
-  { cache; compare; name=LFHOKBO_arg_coeff.name; prec; }
+  { cache; compare; name=LFHOKBO_arg_coeff.name; prec; might_flip=LFHOKBO_arg_coeff.might_flip}
 
 let rpo6 prec =
   let cache = mk_cache 256 in
   let compare prec a b = CCCache.with_cache cache
       (fun (a, b) -> RPO6.compare_terms ~prec a b) (a,b)
   in
-  { cache; compare; name=RPO6.name; prec; }
+  let cache_might_flip = mk_cache 256 in
+  let might_flip prec a b = CCCache.with_cache cache_might_flip
+      (fun (a, b) -> RPO6.might_flip prec a b) (a,b)
+  in
+  { cache; compare; name=RPO6.name; prec; might_flip}
 
 let dummy_cache_ = CCCache.dummy
 
 let none =
   let compare _ t1 t2 = if T.equal t1 t2 then Eq else Incomparable in
-  { cache=dummy_cache_; compare; prec=Prec.default []; name="none"; }
+  let might_flip _ _ _ = false in
+  { cache=dummy_cache_; compare; prec=Prec.default []; name="none"; might_flip}
 
 let subterm =
   let compare _ t1 t2 =
@@ -586,7 +629,8 @@ let subterm =
     else if T.subterm ~sub:t2 t1 then Gt
     else Incomparable
   in
-  { cache=dummy_cache_; compare; prec=Prec.default []; name="subterm"; }
+  let might_flip _ _ _ = false in
+  { cache=dummy_cache_; compare; prec=Prec.default []; name="subterm"; might_flip}
 
 (** {2 Global table of orders} *)
 

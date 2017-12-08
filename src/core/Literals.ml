@@ -189,6 +189,9 @@ let is_trivial lits =
 let is_absurd lits =
   CCArray.for_all Lit.is_absurd lits
 
+let apply_subst renaming subst (lits,sc) =
+  CCArray.map (fun l -> Lit.apply_subst renaming subst (l,sc)) lits
+
 module Seq = struct
   let vars lits =
     Sequence.of_array lits |> Sequence.flat_map Lit.Seq.vars

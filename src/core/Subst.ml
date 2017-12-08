@@ -95,6 +95,12 @@ let bind
     assert (not (M.mem v subst));
     M.add v t subst
 
+let update
+  : t -> var Scoped.t -> T.t Scoped.t -> t
+  = fun subst v t ->
+    assert (M.mem v subst);
+    M.add v t subst
+
 let[@inline] remove subst v = M.remove v subst
 
 let restrict_scope subst sc = M.filter (fun (_,sc_v) _ -> sc=sc_v) subst
@@ -299,6 +305,11 @@ module type SPECIALIZED = sig
   (** Add [v] -> [t] to the substitution. Both terms have a context.
       @raise InconsistentBinding if [v] is already bound in
         the same context, to another term. *)
+
+  val update : t -> var Scoped.t -> term Scoped.t -> t
+  (** Replaces [v] -> ? by [v] -> [t] in the substitution. Both terms have a context.
+      @raise InconsistentBinding if [v] is not yet bound in the same context. *)
+
   val of_list : ?init:t -> (var Scoped.t * term Scoped.t) list -> t
 end
 
@@ -322,6 +333,7 @@ module Ty : SPECIALIZED with type term = Type.t = struct
     Type.of_term_unsafe (apply renaming subst (t : term Scoped.t :> T.t Scoped.t))
 
   let bind = (bind :> t -> var Scoped.t -> term Scoped.t -> t)
+  let update = (update :> t -> var Scoped.t -> term Scoped.t -> t)
   let of_list = (of_list :> ?init:t -> (var Scoped.t * term Scoped.t) list -> t)
 end
 
@@ -348,9 +360,11 @@ module FO = struct
     List.map (fun t -> apply renaming subst (t,sc)) l
 
   let bind = (bind :> t -> var Scoped.t -> term Scoped.t -> t)
+  let update = (update :> t -> var Scoped.t -> term Scoped.t -> t)
   let of_list = (of_list :> ?init:t -> (var Scoped.t * term Scoped.t) list -> t)
 
   let bind' = (bind :> t -> Type.t HVar.t Scoped.t -> term Scoped.t -> t)
+  let update' = (update :> t -> Type.t HVar.t Scoped.t -> term Scoped.t -> t)
   let of_list' = (of_list :> ?init:t -> (Type.t HVar.t Scoped.t * term Scoped.t) list -> t)
 
   let map f s = map (fun t -> (f (Term.of_term_unsafe t) : term :> T.t)) s

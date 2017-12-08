@@ -467,6 +467,105 @@ Some advices if you want to hack on the code:
     clause selection rules)
   * `--ord none` for disabling term orderings
 
+== StarExec
+
+StarExec is a service for experimental evaluation of logic solvers like Zipperposition. 
+
+The easiest way to import Zipperposition as a solver is to pre-compile Zipperposition on the https://www.starexec.org/vmimage/[StarExec virtual machine]. Download the VM image and open it in VirtualBox. 
+
+Open the settings of the VM. Set "Network > Adapter 1 > Attached to" to NAT to have internet access from inside the VM. To allow SSH access into the VM open "Network > Adapter 1 > Advanced > Port Forwarding" and create a new rule:
+
+----
+Name: ssh
+Protocol: TCP
+Host Port: 3022
+Guest Port: 22
+----
+
+Leave the two IP fields empty.
+
+Start the VM. Log in as root using the password "St@rexec".
+
+----
+starclone login: root
+Password: St@rexec
+----
+
+Install the openssh server to get a more convenient access to the machine and to copy the compiled binary later.
+
+----
+$ yum install openssh-server
+----
+
+Now open a terminal on the host machine while the VM is still running. Tunnel into the VM via SSH:
+
+----
+$ ssh -p 3022 root@127.0.0.1
+root@127.0.0.1's password: St@rexec
+----
+
+Install OPAM:
+
+----
+$ wget https://raw.github.com/ocaml/opam/master/shell/opam_installer.sh -O - | sh -s /usr/local/bin
+----
+
+So far we have used the superuser root. To download and compile Zipperposition we will use a regular user that we create as follows:
+
+----
+$ useradd -m bob
+$ passwd bob
+New password: bob
+BAD PASSWORD: The password is a palindrome
+Retype new password: bob
+passwd: all authentication tokens updated successfully.
+----
+
+Close the SSH connection and reopen it as the new user:
+
+----
+$ exit
+$ ssh -p 3022 bob@127.0.0.1
+bob@127.0.0.1's password: bob
+----
+
+Initialize OPAM. Install OCaml 4.05 and the dependencies of Zipperposition (Look in the file `opam` to see which dependencies you need to install).
+
+----
+$ opam init
+$ opam switch 4.05.0+flambda
+$ eval `opam config env`
+$ opam install zarith containers sequence oasis msat menhir
+----
+
+Clone Zipperposition and compile it:
+
+----
+$ git clone https://github.com/c-cube/zipperposition.git --branch dev
+$ cd zipperposition
+$ make
+----
+
+Close the SSH connection and copy the binary from the VM onto your host machine.
+
+----
+$ exit
+$ scp -P 3022 bob@127.0.0.1:~/zipperposition/zipperposition.native  /some/path/on/the/host/machine
+bob@127.0.0.1's password: bob
+----
+
+As described https://www.starexec.org/starexec/secure/help.jsp?ref=/starexec/secure/add/solver.help[in the StarExec documentation] you need a script whose filename has the prefix `starexec_run_` to execute your solver. For Zipperposition this script could look like this:
+
+----
+#!/bin/sh
+
+./zipperposition.native -o tptp "$1" \
+  --timeout "$STAREXEC_WALLCLOCK_LIMIT" \
+  --mem-limit "$STAREXEC_MAX_MEM"
+----
+
+Put this script and the file `zipperposition.native` into a folder called `bin`. Create a ZIP archive containing that folder. Now Zipperposition is ready to be uploaded to StarExec!
+
 == Documentation
 
 See http://c-cube.github.io/zipperposition/[this page].

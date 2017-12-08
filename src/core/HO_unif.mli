@@ -30,11 +30,12 @@ val unif_pairs :
   ?fuel:int ->
   pair list Scoped.t ->
   offset:int ->
-  (pair list * Unif_subst.t * penalty) list
+  (pair list * Unif_subst.t * penalty * Subst.Renaming.t) list
 (** [unif_pairs pairs ~scope_new_vars] returns a list of (partial) solutions
     to the HO unification problem [pairs].
-    Each solution is a list of remaining constraints, a substitution,
-    and some penalty to influence the search space *)
+    Each solution is a list of remaining constraints (with the substitution already applied),
+    a substitution, some penalty to influence the search space,
+    and a renaming used for the substitution *)
 
 val default_fuel : int ref
 (** Default amount of fuel for {!unif_pairs} *)

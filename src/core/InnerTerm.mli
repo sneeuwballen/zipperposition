@@ -90,6 +90,7 @@ val is_bvar : t -> bool
 val is_const : t -> bool
 val is_bind : t -> bool
 val is_app : t -> bool
+val is_tType : t -> bool
 
 val is_lambda : t -> bool
 
@@ -288,6 +289,9 @@ val is_bvar_i : int -> t -> bool
 
 val print_hashconsing_ids : bool ref
 (** if enabled, every term will be printed with its unique ID *)
+
+val print_all_types : bool ref
+(** if enabled, print all types *)
 
 val show_type_arguments : bool ref
 (** Parameter for printing/hiding type arguments in terms *)

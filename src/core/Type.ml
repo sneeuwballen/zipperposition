@@ -561,3 +561,32 @@ module Conv = struct
       ctx.hvars <- VarMap.add v v' ctx.hvars;
       v'
 end
+
+let rebuild_rec ?(env=[]) (t:t) : t =
+  let rec aux env t = match T.ty t with
+    | T.NoType -> assert (t == tType); t
+    | T.HasType ty ->
+      begin match view t with
+        | Var v -> var (HVar.cast ~ty v)
+        | DB i ->
+          assert (if i >= 0 && i < List.length env then true
+            else (Format.printf "%d not in %a@." i (CCFormat.Dump.list pp) env; false));
+          assert (if equal ty (List.nth env i) then true
+            else (Format.printf "%a:%a or %a@." pp t pp ty pp (List.nth env i); false));
+          bvar i
+        | App (f, l) -> app f (List.map (aux env) l)
+        | Fun (args, ret) -> arrow (List.map (aux env) args) (aux env ret)
+        | Builtin b -> builtin b
+        | Forall body ->
+          let body' = aux (tType :: env) body in
+          forall body'
+      end
+  in
+  aux env t
+
+let unsafe_eval_db env t : t =
+  if CCList.is_empty env then t
+  else (
+    let env = List.fold_right (fun ty env -> DBEnv.push env ty) env DBEnv.empty in
+    of_term_unsafe (T.DB.eval env t)
+  )

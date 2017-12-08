@@ -299,3 +299,9 @@ module Conv : sig
     (** convert a type to a prolog term.
         @param env the current environement for De Bruijn indices *)
 end
+
+
+(**/**)
+val rebuild_rec : ?env:t list -> t -> t (** rebuild recursively and checks *)
+val unsafe_eval_db : t list -> t -> t
+(**/**)

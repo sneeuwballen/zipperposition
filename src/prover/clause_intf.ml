@@ -278,5 +278,9 @@ module type S = sig
 
   val pp_set : ClauseSet.t CCFormat.printer
   val pp_set_tstp : ClauseSet.t CCFormat.printer
+
+  (**/**)
+  val check_types : t -> unit
+  (**/**)
 end
 

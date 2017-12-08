@@ -179,6 +179,7 @@ let declare_defined_cst id ~level (rules:definition) : unit =
 
 let conv_rule ~proof (r:_ def_rule) : Rewrite.rule = match r with
   | Def_term {id;ty;args;rhs;_} ->
+    let rhs = Lambda.snf rhs in
     Rewrite.T_rule (Rewrite.Term.Rule.make id ty args rhs ~proof)
   | Def_form {lhs;rhs;_} ->
     (* returns either a term or a lit rule (depending on whether RHS is atomic) *)

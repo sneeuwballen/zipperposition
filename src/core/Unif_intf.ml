@@ -16,6 +16,12 @@ module type S = sig
       @param check if true, perform occur check
       @raise Fail if occurs-check fires or if the variable is bound already *)
 
+  val update : ?check:bool -> subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst
+  (** [bind subst v t] replaces the binding of [v] to [t], but fails if [v] occurs in [t]
+      (performs an occur-check first)
+      @param check if true, perform occur check
+      @raise Fail if occurs-check fires or if the variable is not yet bound *)
+
   val unify_syn : ?subst:subst ->
     term Scoped.t -> term Scoped.t -> subst
   (** Unify terms syntictally, returns a subst

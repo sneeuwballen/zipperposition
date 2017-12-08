@@ -1,0 +1,20 @@
+
+# expect: unsat
+
+# see #25
+
+
+val list : type -> type.
+
+val map : pi a b. (a -> b) -> list a -> list b.
+
+val a : type.
+val b : type.
+
+def f : a -> a := fun x. x.
+def g : a -> a := fun x. x.
+
+# The goal is not proved without this lemma
+# lemma f = g.
+
+goal forall l. map f l = map g l.

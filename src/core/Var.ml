@@ -51,6 +51,7 @@ module Set = struct
   let cardinal t = ID.Map.cardinal t
   let of_seq s = s |> Sequence.map (fun v->v.id, v) |> ID.Map.of_seq
   let add_seq m s = s |> Sequence.map (fun v->v.id, v) |> ID.Map.add_seq m
+  let add_list m s = s |> List.map (fun v->v.id, v) |> ID.Map.add_list m
   let of_list l = l |> List.map (fun v->v.id,v) |> ID.Map.of_list
   let to_seq t = ID.Map.to_seq t |> Sequence.map snd
   let to_list t = ID.Map.fold (fun _ v acc ->v::acc) t []

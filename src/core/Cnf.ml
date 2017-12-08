@@ -220,8 +220,9 @@ module Flatten = struct
     in
     let args_t, subst_t = mk_args_subst vars_t in
     let args_u, subst_u = mk_args_subst vars_u in
-    let t = T.app ~ty:ty_ret (T.Subst.eval subst_t t) args_t in
-    let u = T.app ~ty:ty_ret (T.Subst.eval subst_u u) args_u in
+    (* apply and normalize *)
+    let t = T.app_whnf ~ty:ty_ret (T.Subst.eval subst_t t) args_t in
+    let u = T.app_whnf ~ty:ty_ret (T.Subst.eval subst_u u) args_u in
     ty_vars @ vars, t, u
 
   (* conversion of terms can yield several possible terms, by
@@ -436,19 +437,6 @@ module Flatten = struct
   let flatten_rec_l ?of_ ctx stmt pos vars l =
     map_m (flatten_rec ?of_ ctx stmt pos vars) l
 end
-
-(* FIXME
-        | Neg srcd -> Step.esa ~rule:rule_neg_ [parent_of_sourced srcd]
-        | CNF srcd -> Step.esa ~rule:rule_cnf_ [parent_of_sourced srcd]
-        | Preprocess (srcd,l,msg) ->
-          Step.esa ~rule:(rule_preprocess_ msg)
-            (parent_of_sourced srcd :: List.map parent_of_sourced l)
-        | Renaming (srcd,id,form) ->
-          Step.esa ~rule:rule_renaming_
-            [parent_of_sourced srcd;
-             Parent.from @@ mk_f_by_def id @@
-               TypedSTerm.(Form.eq (const id ~ty:Ty.prop) form)]
-   *)
 
 (* miniscoping (push quantifiers as deep as possible in the formula) *)
 let miniscope ?(distribute_exists=false) f =
@@ -991,11 +979,11 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
         in
         let vars = vars @ new_vars in
         let rhs =
-          T.app ~ty:ty_ret rhs (List.map T.var new_vars)
+          T.app_whnf ~ty:ty_ret rhs (List.map T.var new_vars)
         in
         if T.Ty.is_prop ty_ret then (
           let lhs_t =
-            T.app ~ty:ty_ret (T.const ~ty:ty_id id)
+            T.app_whnf ~ty:ty_ret (T.const ~ty:ty_id id)
               (args @ List.map T.var new_vars)
           and rhs_t =
             process_form stmt ~is_goal:false rhs
@@ -1032,12 +1020,16 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
              let l =
                List.map
                  (fun d ->
-                    Util.debugf ~section 5 "(@[simplify-def@ `@[%a@]`@])"
-                      (fun k->k (Stmt.pp_def T.pp T.pp T.pp) d);
                     let rules =
                       List.map (process_def stmt) d.Stmt.def_rules
                     in
-                    { d with Stmt.def_rules=rules })
+                    let new_d = { d with Stmt.def_rules=rules } in
+                    Util.debugf ~section 5
+                      "(@[simplify-def@ `@[%a@]`@ :into `@[%a@]`@])"
+                      (fun k->
+                         let pp_st = Stmt.pp_def T.pp T.pp T.pp in
+                         k pp_st d pp_st new_d);
+                    new_d)
                  l
              in
              Stmt.def ~attrs ~proof:(proof ()) l

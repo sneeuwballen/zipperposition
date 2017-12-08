@@ -30,7 +30,11 @@ val push : 'a t -> 'a -> 'a t
 (** Create a new environment, when entering a scope, where the De Bruijn
     index 0 is bound to the given value *)
 
-val push_l : 'a t -> 'a list -> 'a t
+val push_l_same_order : 'a t -> 'a list -> 'a t
+(** [push_l_same_order env l] builds env [l0 :: l1 :: … :: env] *)
+
+val push_l_rev : 'a t -> 'a list -> 'a t
+(** [push_l_rev env l] builds env [l(n-1) :: … :: l1 :: l0 :: env] *)
 
 val push_none : 'a t -> 'a t
 (** Create a new environment, when entering a scope, where

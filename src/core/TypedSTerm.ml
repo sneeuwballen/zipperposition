@@ -974,6 +974,17 @@ and bind_rename_var subst v =
 
 let rename_all_vars t = rename Subst.empty t
 
+(* apply and reduce *)
+let app_whnf ?loc ~ty f l =
+  let rec aux subst f l = match view f, l with
+    | Bind (Binder.Lambda, v, body), a :: tail ->
+      let subst = Subst.add subst v a in
+      aux subst body tail
+    | _ ->
+      app ?loc ~ty (Subst.eval subst f) l
+  in
+  aux Subst.empty f l
+
 (** {2 Table of Variables} *)
 
 module Var_tbl = CCHashtbl.Make(struct
