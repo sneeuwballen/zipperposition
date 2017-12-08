@@ -573,3 +573,47 @@ See http://c-cube.github.io/zipperposition/[this page].
 There are some examples of how to use the code in `src/tools/`
 and `src/demo/`.
 
+== Howto (for devs)
+
+=== Make a release
+
+- merge `dev` into `master`:
+  `git checkout master; git merge dev`
+
+- `make clean all` (to rerun tests, etc. see if merge was ok)
+
+- merge `master` into `stable` (branch with only releases):
+  `git checkout stable; git merge master --no-ff`
+
+- edit `_oasis` to update the version number (field `Version`).
+  Also edit the same field in `opam`.
+
+- run `oasis setup` to update the build system with the new modules, version,
+  etc.
+
+- `make clean all` (to check everything builds properly)
+
+- `git tag <version>` (e.g. `git tag 1.4`)
+
+- `git push origin <version>` (`origin` being the name of the github remote)
+
+- `opam publish prepare zipperposition.1.4 https://github.com/c-cube/zipperposition/archive/1.4.tar.gz`
+  (using the actual version number).
+  This might require to `opam install opam-publish` first, it's a handy opam plugin
+  for managing releases.
+
+- if that works properly, then it will create a directory `zipperposition.<version>`.
+  Just run `opam publish submit zipperposition.1.4` to open a PR against
+  opam-repository.
+
+If something is wrong with the release, it's possible to change it.
+This is a bit brutal, *never* do it for older releases that have been
+merged into opam-repo, only for the next release while no one has seen it yet.
+
+- `git tag -f <version>; git push origin :<version> ; git push origin <version>`
+  to change the tag
+
+- re-run the two `opam publish` commands to update the directory and
+  the PR.
+
+
