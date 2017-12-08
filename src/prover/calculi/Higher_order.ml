@@ -479,15 +479,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     begin
       HO_unif.unif_pairs ?fuel:None (pairs,0) ~offset
       |> List.map
-        (fun (new_pairs, us, penalty) ->
-           let renaming = Subst.Renaming.create() in
+        (fun (new_pairs, us, penalty, renaming) ->
            let subst = Unif_subst.subst us in
            let c_guard = Literal.of_unif_subst renaming us in
            let new_pairs =
              List.map
                (fun (env,t,u) ->
-                  let t = Subst.FO.apply renaming subst (T.fun_l env t,0) in
-                  let u = Subst.FO.apply renaming subst (T.fun_l env u,0) in
+                  assert (env == []);
                   Literal.mk_constraint t u)
                new_pairs
            and other_lits =
