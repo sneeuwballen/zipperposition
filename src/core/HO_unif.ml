@@ -542,16 +542,31 @@ module U = struct
     then Util.with_prof prof_norm_subst (norm_subst_ offset sc us) ()
     else us
 
+  let apply_subst pairs us =
+    let renaming = Subst.Renaming.create() in
+    let subst = Unif_subst.subst us in
+    let pairs =
+      List.map
+        (fun (env,t,u) ->
+           let t = Subst.FO.apply renaming subst (T.fun_l env t,0) in
+           let u = Subst.FO.apply renaming subst (T.fun_l env u,0) in
+           [], t, u)
+        pairs
+    in
+    pairs, renaming
+
   (* extract the (partial) solutions *)
-  let get_solutions (st:state): (pair list * _ * _) list =
+  let get_solutions (st:state): (pair list * US.t * penalty * Subst.Renaming.t) list =
     let sols1 =
       st.sols
-      |> List.rev_map (fun (subst,p) -> [], norm_subst st.offset0 st.sc subst, p)
+      |> List.rev_map (fun (subst,p) -> [], norm_subst st.offset0 st.sc subst, p, Subst.Renaming.create())
     and sols2 =
       st.queue
       |> Sequence.of_queue
       |> Sequence.map
-        (fun pb -> pb.pairs, norm_subst st.offset0 st.sc pb.subst, pb.penalty)
+        (fun pb ->
+          let pairs, renaming = apply_subst pb.pairs pb.subst in
+          pairs, norm_subst st.offset0 st.sc pb.subst, pb.penalty, renaming)
       |> Sequence.to_rev_list
     in
   List.rev_append sols1 sols2
