@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 54a0603eb7e995d81154db0521e15702)
+# DO NOT EDIT (digest: bf0e9b4542a1ebdd9122f6807c0f025f)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -359,6 +359,15 @@ true: annot, bin_annot
 "src/tools/cnf_of.native": package(zarith)
 "src/tools/cnf_of.native": use_logtk
 "src/tools/cnf_of.native": use_logtk_parsers
+# Executable app_encode
+"src/tools/app_encode.native": package(bytes)
+"src/tools/app_encode.native": package(containers)
+"src/tools/app_encode.native": package(containers.data)
+"src/tools/app_encode.native": package(sequence)
+"src/tools/app_encode.native": package(unix)
+"src/tools/app_encode.native": package(zarith)
+"src/tools/app_encode.native": use_logtk
+"src/tools/app_encode.native": use_logtk_parsers
 # Executable tptp_to_zf
 "src/tools/tptp_to_zf.native": package(bytes)
 "src/tools/tptp_to_zf.native": package(containers)
