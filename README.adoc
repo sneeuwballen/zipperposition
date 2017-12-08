@@ -588,6 +588,8 @@ and `src/demo/`.
 - edit `_oasis` to update the version number (field `Version`).
   Also edit the same field in `opam`.
 
+- `git commit -a -m "prepare for <version>"` (to save the changes on the stable branch)
+
 - run `oasis setup` to update the build system with the new modules, version,
   etc.
 
