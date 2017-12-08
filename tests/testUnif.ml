@@ -419,12 +419,12 @@ let check_ho_unify_gives_unifiers =
     let l =
       HO_unif.unif_pairs ~fuel:20 ~offset ([[],t1,t2],0)
       |> List.filter
-        (fun (pairs,us,_) -> pairs=[] && not (Unif_subst.has_constr us))
+        (fun (pairs,us,_,_) -> pairs=[] && not (Unif_subst.has_constr us))
     in
     if l=[] then QCheck.assume_fail()
     else (
       List.iter
-        (fun (_,us,_) ->
+        (fun (_,us,_,_) ->
            let subst = Unif_subst.subst us in
            let renaming = Subst.Renaming.create() in
            let u1 = Subst.FO.apply renaming subst (t1,0) |> Lambda.snf in
