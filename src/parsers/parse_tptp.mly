@@ -130,7 +130,7 @@ declaration:
   | INCLUDE LEFT_PAREN x=SINGLE_QUOTED RIGHT_PAREN DOT
     { A.Include (remove_quotes x) }
   | INCLUDE LEFT_PAREN x=SINGLE_QUOTED COMMA names=name_list RIGHT_PAREN DOT
-    { A.IncludeOnly (x, names) }
+    { A.IncludeOnly (remove_quotes x, names) }
   | error
     {
       let loc = L.mk_pos $startpos $endpos in
@@ -445,7 +445,7 @@ variable:
     }
 
 atomic_word:
-  | s=SINGLE_QUOTED { s }
+  | s=SINGLE_QUOTED { remove_quotes s }
   | s=LOWER_WORD { s }
 
 atomic_defined_word:
