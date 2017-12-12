@@ -27,7 +27,7 @@ let prof_eq_res = Util.mk_profiler "ho.eq_res"
 let prof_eq_res_syn = Util.mk_profiler "ho.eq_res_syntactic"
 let prof_ho_unif = Util.mk_profiler "ho.unif"
 
-let _purify_applied_vars = ref false
+let _purify_applied_vars = ref `None
 let _general_ext_pos = ref false
 let _ext_pos = ref true
 let _ext_axiom = ref false
@@ -576,9 +576,11 @@ module Make(E : Env.S) : S with module Env = E = struct
   module VarTermMultiMap = CCMultiMap.Make (TVar) (Term)
   module VTbl = CCHashtbl.Make(TVar)
 
-  (* Purify variables with different arguments.
-     g X = X a \/ X a = b becomes g X = Y a \/ Y a = b \/ X != Y.
-     Literals with only a variable on both sides are not affected. *)
+  (* Purify variables
+     - if they occur applied and unapplied ("int" mode).
+     - if they occur with differen argumetns ("ext" mode).
+    Example: g X = X a \/ X a = b becomes g X = Y a \/ Y a = b \/ X != Y.
+    Literals with only a variable on both sides are not affected. *)
   let purify_applied_variable c =
     (* set of new literals *)
     let new_lits = ref [] in
@@ -606,12 +608,32 @@ module Make(E : Env.S) : S with module Env = E = struct
         T.Tbl.add cache_replacement_ t v;
         v
     in
+    (* We make the variables of two (variable-headed) terms different if they are
+       in different classes.
+       For extensional variable purification, two terms are only in the same class
+       if they are identical.
+       For intensional variable purification, two terms are in the same class if
+       they are both unapplied variables or both applied variables. *)
+    let same_class t1 t2 =
+      assert (T.is_var (fst (T.as_app t1)));
+      assert (T.is_var (fst (T.as_app t2)));
+      if !_purify_applied_vars == `Ext
+      then
+        t1 = t2
+      else (
+        assert (!_purify_applied_vars == `Int);
+        match T.view t1, T.view t2 with
+          | T.Var x, T.Var y when x=y -> true
+          | T.App (f, _), T.App (g, _) when f=g -> true
+          | _ -> false
+      )
+    in
     (* Term should not be purified if
        - this is the first term we encounter with this variable as head or
        - it is equal to the first term encountered with this variable as head *)
     let should_purify t v =
       try
-        if t = VTbl.find cache_untouched_ v then (
+        if same_class t (VTbl.find cache_untouched_ v) then (
           Util.debugf ~section 5
             "Leaving untouched: %a"
             (fun k->k T.pp t);false
@@ -722,7 +744,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         | mode ->
           Env.add_unary_inf "ho_prim_enum" (prim_enum ~mode);
       end;
-      if !_purify_applied_vars then
+      if !_purify_applied_vars != `None then
         Env.add_unary_simplify purify_applied_variable;
       if !_ext_axiom then
         Env.ProofState.PassiveSet.add (Sequence.singleton extensionality_clause);
@@ -807,6 +829,11 @@ let eta_opt =
   let l = [ "reduce", `Reduce; "expand", `Expand; "none", `None] in
   Arg.Symbol (List.map fst l, fun s -> set_ (List.assoc s l))
 
+let purify_opt =
+  let set_ n = _purify_applied_vars := n in
+  let l = [ "ext", `Ext; "int", `Int; "none", `None] in
+  Arg.Symbol (List.map fst l, fun s -> set_ (List.assoc s l))
+
 let () =
   Options.add_opts
     [ "--ho", Arg.Set enabled_, " enable HO reasoning";
@@ -818,7 +845,9 @@ let () =
       "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";
       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
       "--ho-eta", eta_opt, " eta-expansion/reduction";
-      "--ho-purify", Arg.Set _purify_applied_vars, " enable purification of applied variables";
+      "--ho-purify", purify_opt, " enable purification of applied variables: 'ext' purifies" ^
+                                 " whenever a variable is applied to different arguments." ^
+                                 " 'int' purifies whenever a variable appears applied and unapplied.";
       "--ho-general-ext-pos", Arg.Set _general_ext_pos, " enable general positive extensionality rule";
       "--ho-ext-axiom", Arg.Set _ext_axiom, " enable extensionality axiom";
       "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule";
