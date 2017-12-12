@@ -230,19 +230,18 @@ let[@inline] apply_aux subst ~f_rename t =
           | T.Var v ->
             (* the most interesting cases!
                switch depending on whether [t] is bound by [subst] or not *)
-            begin
-              try
-                let term'  = find_exn subst (v,sc_t) in
+            begin match find_exn subst (v,sc_t) with
+              | term' ->
                 (* NOTE: if [t'] is not closed, we assume that it
                    is always replaced in a context where variables
                    are properly bound. Typically, that means only
                    in rewriting. *)
                 (* also apply [subst] to [t'] *)
                 aux term'
-              with Not_found ->
+              | exception Not_found ->
                 (* rename the variable using [f_rename] *)
-                let v = f_rename (v,sc_t) ty' in
-                T.var v
+                let v' = f_rename (v,sc_t) ty' in
+                T.var v'
             end
           | T.Bind (s, varty, sub_t) ->
             let varty' = aux (varty,sc_t) in
