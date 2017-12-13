@@ -1036,8 +1036,13 @@ end
 exception UnifyFailure of string * (term * term) list * location option
 
 let pp_stack out l =
+  let pp_ty out = function
+    | None -> ()
+    | Some ty -> Format.fprintf out ":%a" pp ty
+  in
   let pp_frame out (t1,t2) =
-    Format.fprintf out "@[unifying `@[%a@]` and `@[%a@]`@]" pp t1 pp t2
+    Format.fprintf out "@[unifying `@[%a@,%a@]` and `@[%a@,%a@]`@]"
+      pp t1 pp_ty (ty t1) pp t2 pp_ty (ty t2)
   in
   Format.fprintf out "@[<v>%a@]" (Util.pp_list pp_frame) l
 
