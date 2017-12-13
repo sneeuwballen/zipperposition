@@ -47,10 +47,6 @@ Flag "zipperposition_prover"
   Description:  Build and install Zipperposition
   Default:      true
 
-Flag "hornet_prover"
-  Description:  Build and install Hornet
-  Default:      false
-
 Flag "qcheck"
   Description:  Build and install QCheck random generators
   Default:      false
@@ -165,17 +161,6 @@ Executable zipperposition
   Install$:         flag(parsers) && flag("zipperposition_prover")
   BuildDepends:     containers, sequence, unix,
                     logtk, logtk.parsers, libzipperposition
-
-# experimental prover
-Executable hornet
-  Path:             src/hornet/
-  Install:          true
-  CompiledObject:   native
-  MainIs:           hornet.ml
-  Build$:           flag(parsers) && flag("hornet_prover")
-  Install$:         flag(parsers) && flag("hornet_prover")
-  BuildDepends:     containers, sequence, unix, msat,
-                    logtk, logtk.parsers
 
 Document logtk
   Title:                Documentation for Logtk
