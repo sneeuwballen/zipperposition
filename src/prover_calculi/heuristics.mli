@@ -3,7 +3,6 @@
 
 (** {1 Heuristics} *)
 
-open Logtk
 open Libzipperposition
 
 val enable_depth_limit : int -> unit
