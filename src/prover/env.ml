@@ -636,7 +636,7 @@ module Make(X : sig
       if not (is_trivial c) then (
         (* add the clause to set of inferred clauses, if it's not the original clause *)
         if depth > 0 then unary_clauses := c :: !unary_clauses;
-        if depth < params.Params.param_unary_depth
+        if depth < params.Params.unary_depth
         then (
           (* infer clauses from c, add them to the queue *)
           let new_clauses = do_unary_inferences c in

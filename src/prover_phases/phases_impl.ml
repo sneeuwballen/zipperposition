@@ -7,7 +7,6 @@ open Logtk
 open Logtk_parsers
 open Logtk_proofs
 open Libzipperposition
-open Params
 
 open Phases.Infix
 
@@ -28,7 +27,7 @@ let setup_alarm timeout =
 
 (* TODO: move into Zipperposition *)
 let print_version ~params =
-  if params.param_version then (
+  if params.Params.version then (
     Format.printf "zipperposition %s@." Const.version;
     exit 0
   )
@@ -74,7 +73,7 @@ let start_file file =
 
 let parse_prelude (params:Params.t) =
   Phases.start_phase Phases.Parse_prelude >>= fun () ->
-  let prelude_files = params.Params.param_prelude in
+  let prelude_files = params.Params.prelude in
   let res =
     if CCVector.is_empty prelude_files
     then CCResult.return Sequence.empty
@@ -103,7 +102,7 @@ let parse_file file =
 let typing ~file prelude (input,stmts) =
   Phases.start_phase Phases.Typing >>= fun () ->
   Phases.get_key Params.key >>= fun params ->
-  let def_as_rewrite = params.Params.param_def_as_rewrite in
+  let def_as_rewrite = params.Params.def_as_rewrite in
   TypeInference.infer_statements
     ~on_var:(Input_format.on_var input)
     ~on_undef:(Input_format.on_undef_id input)
@@ -161,12 +160,12 @@ let compute_prec stmts =
 let compute_ord_select precedence =
   Phases.start_phase Phases.Compute_ord_select >>= fun () ->
   Phases.get_key Params.key >>= fun params ->
-  let ord = Ordering.by_name params.param_ord precedence in
+  let ord = Ordering.by_name params.Params.ord precedence in
   Util.debugf ~section 2 "@[<2>ordering %s@]" (fun k->k (Ordering.name ord));
-  let select = Selection.from_string ~ord params.param_select in
+  let select = Selection.from_string ~ord params.Params.select in
   do_extensions ~field:(fun e->e.Extensions.ord_select_actions)
     ~x:(ord,select) >>= fun () ->
-  Util.debugf ~section 2 "@[<2>selection function:@ %s@]" (fun k->k params.param_select);
+  Util.debugf ~section 2 "@[<2>selection function:@ %s@]" (fun k->k params.Params.select);
   Phases.return_phase (ord, select)
 
 let make_ctx ~signature ~ord ~select () =
@@ -219,7 +218,7 @@ let print_stats_env (type c) (module Env : Env.S with type C.t = c) =
     Format.printf "%sproof state stats: {active %d, passive %d, simpl %d}@."
       comment num_active num_passive num_simpl;
   in
-  if Env.params.param_stats then (
+  if Env.params.Params.stats then (
     print_hashcons_stats "terms" (InnerTerm.hashcons_stats ());
     print_state_stats (Env.stats ());
   )
@@ -239,7 +238,7 @@ let print_stats () =
       stats.Gc.minor_collections stats.Gc.major_collections;
   in
   Phases.get_key Params.key >>= fun params ->
-  if params.Params.param_stats then (
+  if params.Params.stats then (
     print_gc ();
     Util.print_global_stats ~comment ();
   );
@@ -252,7 +251,7 @@ let presaturate_clauses (type c)
   Phases.start_phase Phases.Pre_saturate >>= fun () ->
   let module Sat = Saturate.Make(Env) in
   let num_clauses = CCVector.length c_sets.Clause.c_set in
-  if Env.params.param_presaturate
+  if Env.params.Params.presaturate
   then (
     Util.debug ~section 1 "presaturate initial clauses";
     Env.add_passive (CCVector.to_seq c_sets.Clause.c_set);
@@ -281,19 +280,19 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
   );
   Env.add_active (CCVector.to_seq clauses.Clause.c_sos);
   Env.add_passive (CCVector.to_seq clauses.Clause.c_set);
-  let steps = if Env.params.param_steps < 0
+  let steps = if Env.params.Params.steps < 0
     then None
     else (
-      Util.debugf ~section 1 "run for %d steps" (fun k->k Env.params.param_steps);
-      Some Env.params.param_steps
+      Util.debugf ~section 1 "run for %d steps" (fun k->k Env.params.Params.steps);
+      Some Env.params.Params.steps
     )
-  and timeout = if Env.params.param_timeout = 0.
+  and timeout = if Env.params.Params.timeout = 0.
     then None
     else (
-      Util.debugf ~section 1 "run for %.3f s" (fun k->k Env.params.param_timeout);
+      Util.debugf ~section 1 "run for %.3f s" (fun k->k Env.params.Params.timeout);
       (* FIXME: only do that for zipperposition, not the library? *)
-      ignore (setup_alarm Env.params.param_timeout);
-      Some (Util.total_time_s () +. Env.params.param_timeout -. 0.25)
+      ignore (setup_alarm Env.params.Params.timeout);
+      Some (Util.total_time_s () +. Env.params.Params.timeout -. 0.25)
     )
   in
   Signal.send Env.on_start ();
@@ -314,12 +313,12 @@ let print_dots (type c)
   Phases.start_phase Phases.Print_dot >>= fun () ->
   Signal.send Signals.on_dot_output ();
   (* see if we need to print proof state *)
-  begin match Env.params.param_dot_file, result with
+  begin match Env.params.Params.dot_file, result with
     | Some dot_f, Saturate.Unsat proof ->
       let name = "unsat_graph" in
       (* print proof of false *)
       let proof =
-        if Env.params.param_dot_all_roots
+        if Env.params.Params.dot_all_roots
         then
           Env.(Sequence.append (get_active()) (get_passive()))
           |> Sequence.filter_map
@@ -330,7 +329,7 @@ let print_dots (type c)
         else Sequence.singleton proof
       in
       Proof.S.pp_dot_seq_file ~name dot_f proof
-    | Some dot_f, (Saturate.Sat | Saturate.Unknown) when Env.params.param_dot_sat ->
+    | Some dot_f, (Saturate.Sat | Saturate.Unknown) when Env.params.Params.dot_sat ->
       (* print saturated set *)
       let name = "sat_set" in
       let seq = Sequence.append (Env.get_active ()) (Env.get_passive ()) in
@@ -400,13 +399,13 @@ let parse_cli =
   CCFormat.set_color_default true;
   (* parse arguments *)
   let params = Params.parse_args () in
-  let files = CCVector.to_list Params.files in
+  let files = CCVector.to_list params.Params.files in
   Phases.set_key Params.key params >>= fun () ->
   print_version ~params;
   Phases.return_phase (files, params)
 
 (* Process the given file (try to solve it) *)
-let process_file (prelude:Phases.prelude) file =
+let process_file ?(prelude=Sequence.empty) file =
   start_file file >>= fun () ->
   parse_file file >>= fun stmts ->
   typing ~file prelude stmts >>= fun decls ->
@@ -448,12 +447,12 @@ let check res =
   Phases.get_key Params.key >>= fun params ->
   let comment = Options.comment() in
   let errcode = match res with
-    | Saturate.Unsat p when params.Params.param_check ->
+    | Saturate.Unsat p when params.Params.check ->
       (* check proof! *)
       Util.debug ~section 1 "start checking proof…";
       let p' = LLProof_conv.conv p in
       (* print proof? *)
-      begin match params.Params.param_dot_llproof with
+      begin match params.Params.dot_llproof with
         | None -> ()
         | Some file ->
           Util.debugf ~section 2 "print LLProof into `%s`"(fun k->k file);
@@ -494,10 +493,10 @@ let setup_signal =
   Phases.return_phase ()
 
 (* process several files, printing the result *)
-let process_files_and_print (params:Params.t) files =
+let process_files_and_print ?(params=Params.default) files =
   parse_prelude params >>= fun prelude ->
   let f file =
-    process_file prelude file >>= fun (Phases.Env_result (env, res)) ->
+    process_file ~prelude file >>= fun (Phases.Env_result (env, res)) ->
     print file env res >>= fun () ->
     check res
   in
@@ -505,3 +504,29 @@ let process_files_and_print (params:Params.t) files =
   Phases.run_parallel phases >>= fun r ->
   print_stats () >>= fun () ->
   Phases.return r
+
+let main_cli ?setup_gc:(gc=true) () =
+  let open Phases.Infix in
+  (if gc then setup_gc else Phases.return ()) >>= fun () ->
+  setup_signal >>= fun () ->
+  parse_cli >>= fun (files, params) ->
+  load_extensions >>= fun _ ->
+  process_files_and_print ~params files >>= fun errcode ->
+  Phases.exit >|= fun () ->
+  errcode
+
+let skip_parse_cli ?(params=Params.default) file =
+  Phases.start_phase Phases.Parse_CLI >>= fun () ->
+  CCFormat.set_color_default true;
+  Phases.set_key Params.key params >>= fun () ->
+  Phases.return_phase ([file], params)
+
+let main ?setup_gc:(gc=true) ?params file =
+  let open Phases.Infix in
+  (if gc then setup_gc else Phases.return ()) >>= fun () ->
+  (* pseudo-parse *)
+  skip_parse_cli ?params file >>= fun (files, params) ->
+  load_extensions >>= fun _ ->
+  process_files_and_print ~params files >>= fun errcode ->
+  Phases.exit >|= fun () ->
+  errcode
