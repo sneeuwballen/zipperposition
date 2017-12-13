@@ -73,7 +73,7 @@ let pterm_ =
 let pterm ?ty s =
   try pterm_ ?ty s
   with e ->
-    Format.printf "error in pterm %s" s;
+    Format.printf "%s@." (Util.err_spf "pterm %s" s);
     raise e
 
 (* parse two terms of same type *)
@@ -87,7 +87,6 @@ let pterm2 =
     let ty = CCOpt.map psterm ty in
     CCOpt.iter (fun ty -> TypedSTerm.unify ty (TypedSTerm.ty_exn t1)) ty;
     CCOpt.iter (fun ty -> TypedSTerm.unify ty (TypedSTerm.ty_exn t2)) ty;
-    clear_scope(); (* generalize, etc. *)
     T.Conv.of_simple_term_exn tyctx t1,
     T.Conv.of_simple_term_exn tyctx t2
 
@@ -155,14 +154,14 @@ let check_eq t1 t2 =
 
 let unifier2 t u =
   try
-    let subst = Unif.FO.unify_syn (t,0)(u,0) in
+    let subst = Unif.FO.unify_syn (t,0)(u,1) in
     let renaming = Subst.Renaming.create() in
     Subst.FO.apply renaming subst (t,0) |> Lambda.snf,
-    Subst.FO.apply renaming subst (u,0) |> Lambda.snf,
+    Subst.FO.apply renaming subst (u,1) |> Lambda.snf,
     renaming,
     subst
   with Unif.Fail ->
-    let msg = CCFormat.sprintf "@[<2>`%a`@ and `%a`@ should be unifiable@]@."
+    let msg = CCFormat.sprintf "@[<2>`%a`[0]@ and `%a`[1]@ should be unifiable@]@."
         T.ZF.pp t T.ZF.pp u in
     OUnit.assert_failure msg
 
@@ -196,31 +195,31 @@ let check_unifier_matches t u =
     check_matches t t';
     check_matches u t'
 
-let check_same t u t1 t2 =
-  let name = Fmt.sprintf "(@[unify `%a`@ `%a`@ :makes-eq `%a`@ `%a`@])"
-      T.ZF.pp t T.ZF.pp u T.ZF.pp t1 T.ZF.pp t2 in
+let check_same t u t1 sc1 t2 sc2 =
+  let name = Fmt.sprintf "(@[unify `%a`@ `%a`@ :makes-eq @[`%a`[%d]@ and `%a`[%d]@]@])"
+      T.ZF.pp t T.ZF.pp u T.ZF.pp t1 sc1 T.ZF.pp t2 sc2 in
   name >:: fun () ->
     let _, _, renaming, subst = unifier2 t u in
-    let t1 = Subst.FO.apply renaming subst (t1,0) |> Lambda.snf in
-    let t2 = Subst.FO.apply renaming subst (t2,0) |> Lambda.snf in
+    let t1 = Subst.FO.apply renaming subst (t1,sc1) |> Lambda.snf in
+    let t2 = Subst.FO.apply renaming subst (t2,sc2) |> Lambda.snf in
     check_eq t1 t2
 
 module Action : sig
   type 'a t = private
     | Yield of {t: 'a ; ty: 'a option}
-    | Eq of {t1: 'a; t2: 'a ; ty: 'a option}
+    | Eq of {t1: 'a; sc1:int; t2: 'a; sc2: int; ty: 'a option}
 
   val yield : string -> string t
-  val eq : string -> string -> string t
+  val eq : string -> int -> string -> int -> string t
   val set_with_ty : 'a -> 'a t -> 'a t
   val parse : string t -> T.t t
   val check : T.t -> T.t -> T.t t -> OUnit.test
 end = struct
   type 'a t =
     | Yield of {t: 'a ; ty: 'a option}
-    | Eq of {t1: 'a; t2: 'a ; ty: 'a option}
+    | Eq of {t1: 'a; sc1:int; t2: 'a; sc2: int; ty: 'a option}
 
-  let eq t1 t2 = Eq{t1;t2;ty=None}
+  let eq t1 sc1 t2 sc2 = Eq{t1;t2;sc1;sc2;ty=None}
   let yield t = Yield{t; ty=None}
 
   let set_with_ty ty = function
@@ -233,12 +232,12 @@ end = struct
       let t = pterm ?ty:r.ty r.t in
       Yield {t; ty=None}
     | Eq r ->
-      let t1, t2 = pterm2 ?ty:r.ty r.t1 r.t2 in
-      Eq {t1; t2; ty=None}
+      let t1, t2 = pterm2 ~unif_types:false ?ty:r.ty r.t1 r.t2 in
+      Eq {t1; t2; sc1=r.sc1; sc2=r.sc2; ty=None}
 
   let check t u a = match a with
     | Yield {t=res;_} -> check_unifier t u ~res
-    | Eq {t1;t2;_} -> check_same t u t1 t2
+    | Eq {t1;t2;sc1;sc2;_} -> check_same t u t1 sc1 t2 sc2
 end
 
 let suite_unif1 : OUnit.test list =
@@ -257,34 +256,38 @@ let suite_unif1 : OUnit.test list =
   CCList.flat_map mk_tests
     [ "f X b" =?= "f a Y", [
           Action.yield "f a b";
-          Action.eq "X" "a";
-          Action.eq "Y" "b";
+          Action.eq "X" 0 "a" 0;
+          Action.eq "Y" 1 "b" 0;
         ];
       "F a" =?= "f a (g (g a))", [
         Action.yield "f a (g (g a))";
-        Action.eq "F" "fun (x:term). f x (g (g x))";
+        Action.eq "F" 0 "fun (x:term). f x (g (g x))" 0;
       ];
       ("fun (x y:term). F x" =?= "fun x y. G x y") >-> "term -> term -> term", [
         Action.yield "fun x y. H x" >?-> "term -> term -> term";
-        Action.eq "G" "fun x y. F x" >?-> "term -> term -> term";
+        Action.eq "G" 1 "fun x y. F x" 0 >?-> "term -> term -> term";
       ];
       ("fun (x y z:term). F x" =?= "fun x y z. G x y z") >-> "term -> term -> term -> term", [
         Action.yield "fun x y z. H x" >?-> "term -> term -> term -> term";
-        Action.eq "G" "fun x y z. F x" >?-> "term -> term -> term -> term";
+        Action.eq "G" 1 "fun x y z. F x" 0 >?-> "term -> term -> term -> term";
       ];
       ("X" =?= "(fun Y. X1) (fun (x y:term). c)") >-> "term", [
         Action.yield "Y" >?-> "term";
       ];
       ("p_ho2 (fun a. F1 a) (fun a. F2 a)" =?= "p_ho2 (fun a. G a) (fun a. G a)"), [
         Action.yield "p_ho2 (fun a. G a) (fun a. G a)";
-        Action.eq "F1" "G" >?-> "term -> term";
-        Action.eq "F2" "G" >?-> "term -> term";
+        Action.eq "F1" 0 "G" 1 >?-> "term -> term";
+        Action.eq "F2" 0 "G" 1 >?-> "term -> term";
       ];
       ("p_ho2 (fun Y0. d) (fun Y0. F1 Y0)" =?=
        "p_ho2 (fun Y0. d) (fun Y0. (f_ho2 (fun Y1. Y1) (fun Y2. X)))"), [
       ];
       ("F1 (f_poly A1 A2 F1 F2)" =?= "f (f a b) X") |> Task.set_unif_types false, [
-        Action.yield "f (f a b) (f_ho2 (f (f a b)) F2)";
+        Action.eq "F1" 0 "f (f a b)" 1;
+        (*
+        Action.eq "X" 1 "f_poly term term (f (f a b)) F2" 0;
+        Action.yield "f (f a b) (f_poly _ _ (f (f a b)) F2)";
+        *)
       ];
     ]
 
