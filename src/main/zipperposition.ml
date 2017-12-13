@@ -7,9 +7,9 @@
     passed as arguments on the command line. *)
 
 open Logtk
-open Libzipperposition
+open Libzipperposition_phases
 
-let section = Const.section
+let section = Libzipperposition.Const.section
 
 let phases =
   let open Phases.Infix in
@@ -33,4 +33,4 @@ let _ =
   at_exit
     (fun () ->
        Util.debugf ~section 1 "run time: %.3f" (fun k->k (Util.total_time_s ()));
-       Signal.send Signals.on_exit 0)
+       Signal.send Libzipperposition.Signals.on_exit 0)

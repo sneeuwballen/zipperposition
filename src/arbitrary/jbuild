@@ -1,0 +1,19 @@
+; vim:ft=lisp:
+
+(jbuild_version 1)
+
+; main lib
+(library
+  ((name logtk_arbitrary)
+   (public_name logtk.arbitrary)
+   (synopsis "random generators for logtk")
+   (optional)
+   (libraries (containers logtk qcheck))
+   (flags (:standard -w +a-4-42-44-48-50-58-32-60@8 -color always))
+   (ocamlopt_flags (:standard -O3 -bin-annot
+                    -unbox-closures -unbox-closures-factor 20))
+  ))
+
+
+
+

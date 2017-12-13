@@ -1,8 +1,0 @@
-REC
-S tests/
-S src/arbitrary/
-B _build/tests/
-B _build/src/arbitrary
-PKG oUnit
-PKG qcheck
-PKG benchmark

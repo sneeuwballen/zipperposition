@@ -6,6 +6,7 @@
 open OUnit
 open Logtk
 open Logtk_arbitrary
+open Logtk_parsers
 
 module Fmt = CCFormat
 module T = Term
