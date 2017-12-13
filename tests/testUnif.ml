@@ -284,10 +284,10 @@ let suite_unif1 : OUnit.test list =
       ];
       ("F1 (f_poly A1 A2 F1 F2)" =?= "f (f a b) X") |> Task.set_unif_types false, [
         Action.eq "F1" 0 "f (f a b)" 1;
-        (*
-        Action.eq "X" 1 "f_poly term term (f (f a b)) F2" 0;
-        Action.yield "f (f a b) (f_poly _ _ (f (f a b)) F2)";
-        *)
+        Action.yield "f (f a b) (f_poly _ _ (f (f a b)) F_renamed)";
+        (* FIXME
+        Action.eq "X" 1 "f_poly _ _ (f (f a b)) F2" 0;
+           *)
       ];
     ]
 
