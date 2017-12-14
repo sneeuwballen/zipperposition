@@ -1,10 +1,10 @@
 
-J?= -j 3
+J?=3
 
 all: build test
 
 build:
-	jbuilder build @install $J
+	jbuilder build @install -j $J
 
 clean:
 	jbuilder clean
@@ -13,7 +13,7 @@ doc:
 	jbuilder build @doc
 
 test:
-	jbuilder runtest --no-buffer $J
+	jbuilder runtest --no-buffer -j $J
 	# ./tests/quick/all.sh # FIXME?
 
 open_doc: doc
@@ -41,38 +41,31 @@ update_next_tag:
 	zsh -c 'sed -i "s/NEXT_VERSION/$(VERSION)/g" src/**/*.ml{,i}(.)'
 	zsh -c 'sed -i "s/NEXT_RELEASE/$(VERSION)/g" src/**/*.ml{,i}(.)'
 
-TEST_FILES = tests/ examples/
-TEST_TOOL = logitest
-J?=2
-TEST_OPTS ?= -j $(J) --junit test.xml
+TEST_FILES=tests/ examples/
+TEST_TOOL=logitest
+TEST_OPTS?= -j $(J) --junit test.xml
 DATE=$(shell date +%FT%H:%M)
 
-check-test-tool:
-	@if ! ( which $(TEST_TOOL) > /dev/null ) ; then echo "install $(TEST_TOOL)"; exit 1; fi
-
-$(TEST_TOOL): check-test-tool
-	$(TEST_TOOL) run -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES)
-
-$(TEST_TOOL)-zipper: check-test-tool
-	$(TEST_TOOL) run -p zipperposition -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES)
-
-$(TEST_TOOL)-hornet: check-test-tool
-
 check_$(TEST_TOOL):
-	@if not (which $(TEST_TOOL) > /dev/null) ; then echo "install $(TEST_TOOL)"; exit 1; fi
+	@if ` which $(TEST_TOOL) > /dev/null ` ; then true ; else echo "install $(TEST_TOOL)"; exit 1; fi
 
 $(TEST_TOOL): check_$(TEST_TOOL)
 	$(TEST_TOOL) run -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES)
 
+$(TEST_TOOL)-zipper: check_$(TEST_TOOL)
+	$(TEST_TOOL) run -p zipperposition -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES)
+
+$(TEST_TOOL): check_$(TEST_TOOL)
+	$(TEST_TOOL) run -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES) \
+	  --summary snapshots/full-$(DATE).txt \
+	  --csv snapshots/full-$(DATE).csv \
+
 $(TEST_TOOL)-zipper:
 	@mkdir -p snapshots
 	$(TEST_TOOL) run -p zipperposition,zipperposition-check -c ./tests/conf.toml \
-	  --summary snapshots/tip-$(DATE).txt \
-	  --csv snapshots/tip-$(DATE).csv \
+	  --summary snapshots/zipper-$(DATE).txt \
+	  --csv snapshots/zipper-$(DATE).csv \
 	  $(TEST_OPTS) $(TEST_FILES)
-
-$(TEST_TOOL)-hornet:
-	$(TEST_TOOL) run -p hornet -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES)
 
 tip-benchmarks:
 	git submodule update --init tip-benchmarks
