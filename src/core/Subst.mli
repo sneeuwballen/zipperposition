@@ -84,7 +84,7 @@ val update : t -> var Scoped.t -> term Scoped.t -> t
 
 val merge : t -> t -> t
 (** [merge s1 s2] is the substitution that maps [t] to [(s1 t)] or to [(s2 t)].
-    Raises InconsistentBinding if the substitutions disagree. *)
+    @raise InconsistentBinding if the substitutions disagree. *)
 
 val remove : t -> var Scoped.t -> t
 (** Remove the given binding. No other variable should depend on it... *)
