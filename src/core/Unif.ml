@@ -216,13 +216,19 @@ module Inner = struct
             begin match Subst.find (US.subst subst) (v,sc_t) with
               | Some (u,sc_u) ->
                 if sc_t = scope
-                then subst, T.var v
+                then
+                  (* Variable is already in [scope] *)
+                  subst, T.var v
                 else if T.is_var u && sc_u = scope
-                then subst, u
+                then
+                  (* We already have a corresponging variable in [scope]. Use that one.*)
+                  subst, u
                 else (
+                  (* Create a corresponding variable v' in [scope].
+                     Modify the substitution from v -> u into v -> v', v -> u' *)
                   let v' = HVar.fresh ~ty () in
-                  let subst = US.update subst (v,sc_t) (T.var v', scope) in
                   let subst, u' = aux sc_u subst u in
+                  let subst = US.update subst (v,sc_t) (T.var v', scope) in
                   let subst = US.bind subst (v',scope) (u', scope) in
                   subst, T.var v'
                 )
