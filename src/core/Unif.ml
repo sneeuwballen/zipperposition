@@ -224,10 +224,11 @@ module Inner = struct
                   (* We already have a corresponging variable in [scope]. Use that one.*)
                   subst, u
                 else (
-                  (* Create a corresponding variable v' in [scope].
-                     Modify the substitution from v -> u into v -> v', v -> u' *)
+                  (* Create a corresponding variable v' in [scope]. *)
                   let v' = HVar.fresh ~ty () in
+                  (* Recursive call on u, giving u' *)
                   let subst, u' = aux sc_u subst u in
+                  (* Modify the substitution from v -> u into v -> v', v' -> u' *)
                   let subst = US.update subst (v,sc_t) (T.var v', scope) in
                   let subst = US.bind subst (v',scope) (u', scope) in
                   subst, T.var v'
