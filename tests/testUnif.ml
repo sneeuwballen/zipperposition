@@ -283,9 +283,9 @@ let suite_unif1 : OUnit.test list =
       ("p_ho2 (fun Y0. d) (fun Y0. F1 Y0)" =?=
        "p_ho2 (fun Y0. d) (fun Y0. (f_ho2 (fun Y1. Y1) (fun Y2. X)))"), [
       ];
-      ("F1 (f_poly A1 A2 F1 F2)" =?= "f (f a b) X") |> Task.set_unif_types false, [
-        Action.eq "F1" 0 "f (f a b)" 1;
-        Action.yield "f (f a b) (f_poly _ _ (f (f a b)) F_renamed)";
+      ("f (f a b) X" =?= "F1 (f_poly A1 A2 F1 F2)") |> Task.set_unif_types false, [
+        Action.eq "f (f a b)" 0 "F1" 1;
+         Action.yield "f (f a b) (f_poly _ _ (f (f a b)) F_renamed)";
         (* FIXME
         Action.eq "X" 1 "f_poly _ _ (f (f a b)) F2" 0;
            *)

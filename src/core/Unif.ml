@@ -214,7 +214,18 @@ module Inner = struct
         begin match T.view t with
           | T.Var v ->
             begin match Subst.find (US.subst subst) (v,sc_t) with
-              | Some (u,sc_u) -> aux sc_u subst u
+              | Some (u,sc_u) ->
+                if sc_t = scope
+                then subst, T.var v
+                else if T.is_var u && sc_u = scope
+                then subst, u
+                else (
+                  let v' = HVar.fresh ~ty () in
+                  let subst = US.update subst (v,sc_t) (T.var v', scope) in
+                  let subst, u' = aux sc_u subst u in
+                  let subst = US.bind subst (v',scope) (u', scope) in
+                  subst, T.var v'
+                )
               | None ->
                 if sc_t = scope
                 then subst, T.var (HVar.cast ~ty v)
