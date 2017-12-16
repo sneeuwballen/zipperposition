@@ -154,8 +154,8 @@ let extensionality_axiom =
   let x = Var.make ~ty:fun_alpha_beta (ID.make "x") in
   let y = Var.make ~ty:fun_alpha_beta (ID.make "y") in
   let z = Var.make ~ty:(T.var alpha) (ID.make "z") in
-  let xz = T.app ~ty:(T.var beta) app_const [T.var x; T.var z] in
-  let yz = T.app ~ty:(T.var beta) app_const [T.var y; T.var z] in
+  let xz = T.app ~ty:(T.var beta) app_const [T.var alpha; T.var beta; T.var x; T.var z] in
+  let yz = T.app ~ty:(T.var beta) app_const [T.var alpha; T.var beta; T.var y; T.var z] in
   let prop = T.builtin ~ty:T.tType Builtin.Prop in
   Statement.assert_ ~proof:Proof.Step.trivial
     (T.bind_list ~ty:prop Binder.forall [x; y]
