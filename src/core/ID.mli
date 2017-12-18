@@ -102,3 +102,6 @@ val as_skolem : t -> skolem_kind option
 
 val num_mandatory_args : t -> int
 (** number of mandatory arguments of a skolem constant or 0 otherwise *)
+
+val is_distinct_object : t -> bool
+(** whether the identifier is a distinct object (as defined in TPTP syntax) *)

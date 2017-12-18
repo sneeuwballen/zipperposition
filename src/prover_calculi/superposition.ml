@@ -1098,15 +1098,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       )
     )
 
-  let is_distinct_ id =
-    let s = ID.name id in
-    String.length s > 2 && s.[0] = '"' && s.[String.length s-1] = '"'
-
   let handle_distinct_constants lit =
     match lit with
       | Lit.Equation (l, r, sign) when T.is_const l && T.is_const r ->
         let s1 = T.head_exn l and s2 = T.head_exn r in
-        if is_distinct_ s1 && is_distinct_ s2
+        if ID.is_distinct_object s1 && ID.is_distinct_object s2
         then
           if sign = (ID.equal s1 s2)
           then Some (Lit.mk_tauto,[],[Proof.Tag.T_distinct])  (* "a" = "a", or "a" != "b" *)

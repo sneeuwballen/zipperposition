@@ -139,3 +139,7 @@ let num_mandatory_args id =
   match n_option with
   | Some n -> n
   | None -> 0
+
+let is_distinct_object id =
+  let s = name id in
+  String.length s > 2 && s.[0] = '"' && s.[String.length s-1] = '"'
