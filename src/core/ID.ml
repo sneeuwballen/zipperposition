@@ -145,5 +145,5 @@ let num_mandatory_args id =
 let is_distinct_object id =
   payload_pred id
     ~f:(function
-        | Attr_distinct _ -> true
+        | Attr_distinct -> true
         | _ -> false)
