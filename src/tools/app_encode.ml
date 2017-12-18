@@ -99,7 +99,7 @@ let rec app_encode_term toplevel t  =
              | T.Bind (Binder.ForallTy, var, t) ->
                assert (is_type arg);
                let arg' = app_encode_ty arg in
-               let t' = T.Subst.eval (Var.Subst.singleton var arg) t in
+               let t' = T.Subst.eval (Var.Subst.singleton var arg') t in
                T.app ~ty:t' term [arg']
              | _ -> failwith "Not implemented"
         )
