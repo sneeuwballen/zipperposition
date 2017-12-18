@@ -276,6 +276,10 @@ module Ctx = struct
     | l ->
       Fmt.fprintf out " (did you mean any of [@[%a@]]?)" (Util.pp_list Fmt.string) l
 
+  (* Does the identifier represent a (TPTP) distinct object? *)
+  let is_distinct_ s =
+    String.length s > 2 && s.[0] = '"' && s.[String.length s-1] = '"'
+
   let get_id_ ?loc ~arity ctx name =
     try match Hashtbl.find ctx.env name with
       | `ID (id, ty) -> id, ty
@@ -291,6 +295,7 @@ module Ctx = struct
             name pp_names (find_close_names ctx name) T.pp ty;
       end;
       let id = ID.make name in
+      if is_distinct_ name then ID.set_payload id ID.Attr_distinct;
       Hashtbl.add ctx.env name (`ID (id, ty));
       ctx.new_types <- (id, ty) :: ctx.new_types;
       id, ty
@@ -1138,4 +1143,3 @@ let infer_statements
       (infer_statements_exn ?def_as_rewrite ?on_var ?on_undef
          ?on_shadow ?ctx ?file ~implicit_ty_args seq)
   with e -> Err.of_exn_trace e
-
