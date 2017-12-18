@@ -218,6 +218,8 @@ module Inner = struct
                 if sc_t = scope
                 then
                   (* Variable is already in [scope] *)
+                  let subst, u' = aux sc_u subst u in
+                  let subst = US.update subst (v,scope) (u', scope) in
                   subst, T.var v
                 else if T.is_var u && sc_u = scope
                 then
