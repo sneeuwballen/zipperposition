@@ -146,6 +146,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             begin match T.view last1, T.view last2 with
               | T.Var x, T.Var y
                 when HVar.equal Type.equal x y &&
+                     not (Type.is_tType (HVar.ty x)) &&
                      begin
                        Sequence.of_list
                          [Sequence.doubleton f1 f2;
@@ -198,7 +199,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let g, ss = T.as_app s in
       begin match List.rev tt, List.rev ss with
         | last_t :: tl_rev_t, last_s :: tl_rev_s ->
-          if last_t = last_s then
+          if last_t = last_s && not (T.is_type last_t) then
             match T.as_var last_t with
               | Some v ->
                 if not (T.var_occurs ~var:v f)
