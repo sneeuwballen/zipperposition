@@ -191,7 +191,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   *)
   let ext_pos_general (c:C.t) : C.t list =
     let eligible = C.Eligible.param c in
-    (* Remove recursively variables at the end of the liiteral t = s if possible.
+    (* Remove recursively variables at the end of the literal t = s if possible.
        e.g. ext_pos_lit (f X Y) (g X Y) other_lits = [f X = g X, f = g]
        if X and Y do not appear in other_lits *)
     let rec ext_pos_lit t s other_lits =
@@ -248,9 +248,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Sequence.to_rev_list
     in
     if new_clauses<>[] then (
-      Util.add_stat stat_complete_eq (List.length new_clauses);
       Util.debugf ~section 4
-        "(@[complete-eq@ :clause %a@ :yields (@[<hv>%a@])@])"
+        "(@[ext-pos-general-eq@ :clause %a@ :yields (@[<hv>%a@])@])"
         (fun k->k C.pp c (Util.pp_list ~sep:" " C.pp) new_clauses);
     );
     new_clauses
