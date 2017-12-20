@@ -75,12 +75,24 @@ let test_whnf2 () =
   assert_equal ~cmp:T.equal ~printer:T.to_string t1 t';
   ()
 
+let test_polymorphic_app () =
+  (* Π α. α *)
+  let polyty = Type.forall_fvars [HVar.make ~ty:Type.tType 0] (Type.var_of_int 0) in
+  let f_poly = Term.const ~ty:polyty (ID.make "f_poly") in
+  (* ty → ty *)
+  let funty = Type.([ty] ==> ty) in
+  (* apply term of type `Π α. α` to terms of type `ty → ty` and `ty`: *)
+  let result = Term.app f_poly [Term.of_ty funty; a] in
+  assert_equal ~cmp:Type.equal ~printer:Type.to_string (Term.ty result) ty;
+  ()
+
 let suite =
   "test_term" >:::
     [ "test_db_shift" >:: test_db_shift
     ; "test_db_unshift" >:: test_db_unshift
     ; "test_whnf1" >:: test_whnf1
     ; "test_whnf2" >:: test_whnf2
+    ; "test_polymorphic_app" >:: test_polymorphic_app
     ]
 
 (** Properties *)
