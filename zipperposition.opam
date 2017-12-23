@@ -1,0 +1,30 @@
+opam-version: "1.2"
+maintainer: "simon.cruanes@inria.fr"
+author: "Simon Cruanes"
+homepage: "https://github.com/c-cube/zipperposition"
+version: "1.4"
+build: [
+    ["jbuilder" "build" "@install"]
+]
+install: ["jbuilder" "install"]
+remove: [
+    ["rm" "-f" "%{bin}%/zipperposition"]
+]
+depends: [
+  "ocamlfind" { build }
+  "base-bytes"
+  "base-unix"
+  "zarith"
+  "containers" { >= "1.0" }
+  "sequence" { >= "0.4" }
+  "jbuilder" { build }
+  "msat" { >= "0.5" }
+  "menhir" {build}
+]
+available: [
+    ocaml-version >= "4.03.0"
+]
+tags: [ "logic" "unification" "term" "superposition" "prover" ]
+bug-reports: "https://github.com/c-cube/zipperposition/issues"
+dev-repo: "https://github.com/c-cube/zipperposition.git"
+

@@ -126,7 +126,7 @@ end = struct
 end
 
 let check_ref =
-  let gen = QCheck.(list_of_size Gen.(3--16) (list_of_size Gen.(1--8) ArTerm.default)) in
+  let gen = QCheck.(list_of_size Gen.(3--8) (list_of_size Gen.(1--6) ArTerm.default)) in
   let prop classes =
     let cc1 = _cc_of_classes classes in
     let cc2 = CC_ref.of_classes classes in

@@ -38,3 +38,5 @@ setup.*
 examples
 benchs
 *.exe
+*.install
+.merlin

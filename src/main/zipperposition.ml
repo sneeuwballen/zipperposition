@@ -7,30 +7,23 @@
     passed as arguments on the command line. *)
 
 open Logtk
-open Libzipperposition
+open Libzipperposition_phases
 
-let section = Const.section
+let section = Libzipperposition.Const.section
 
-let phases =
-  let open Phases.Infix in
-  Phases_impl.setup_gc >>= fun () ->
-  Phases_impl.setup_signal >>= fun () ->
-  Phases_impl.parse_cli >>= fun (files, params) ->
-  Phases_impl.load_extensions >>= fun _ ->
-  Phases_impl.process_files_and_print params files >>= fun errcode ->
-  Phases.exit >|= fun () ->
-  errcode
+let phases = Phases_impl.main_cli ~setup_gc:true ()
 
 let () =
-  match Phases.run phases with
+  begin match Phases.run phases with
     | CCResult.Error msg ->
       print_endline msg;
       exit 1
     | CCResult.Ok (_, 0) -> ()
     | CCResult.Ok (_, errcode) -> exit errcode (* failure *)
+  end
 
 let _ =
   at_exit
     (fun () ->
        Util.debugf ~section 1 "run time: %.3f" (fun k->k (Util.total_time_s ()));
-       Signal.send Signals.on_exit 0)
+       Signal.send Libzipperposition.Signals.on_exit 0)

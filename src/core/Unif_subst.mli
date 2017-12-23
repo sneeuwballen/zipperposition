@@ -46,6 +46,8 @@ val deref : t -> term Scoped.t -> term Scoped.t
 
 val bind : t -> var Scoped.t -> term Scoped.t -> t
 
+val update : t -> var Scoped.t -> term Scoped.t -> t
+
 val mem : t -> var Scoped.t -> bool
 
 module FO : sig

@@ -1,0 +1,26 @@
+; vim:ft=lisp:
+
+(jbuild_version 1)
+
+; main lib
+(library
+  ((name logtk_parsers)
+   (public_name logtk.parsers)
+   (synopsis "parsers for logtk")
+   (optional)
+   (libraries (containers logtk))
+   (flags (:standard -w +a-4-42-44-48-50-58-32-60@8 -color always))
+   (ocamlopt_flags (:standard -Oclassic))
+  ))
+
+(menhir
+  (;(flags (--infer))
+   (modules (Parse_tptp Parse_zf Parse_dk Tip_parser))))
+
+(ocamllex
+    (Lex_tptp Lex_zf Lex_dk Tip_lexer))
+
+;(ocamllex (Lex_tptp))
+;(ocamllex (Lex_zf))
+;(ocamllex (Lex_dk))
+;(ocamllex (Tip_lexer))

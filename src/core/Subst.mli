@@ -82,13 +82,14 @@ val update : t -> var Scoped.t -> term Scoped.t -> t
     It is {b important} that the bound term is De-Bruijn-closed (assert).
     @raise InconsistentBinding if [v] is not yet bound in the same context. *)
 
-val append : t -> t -> t
-(** [append s1 s2] is the substitution that maps [t] to [s2 (s1 t)]. *)
+val merge : t -> t -> t
+(** [merge s1 s2] is the substitution that maps [t] to [(s1 t)] or to [(s2 t)].
+    @raise InconsistentBinding if the substitutions disagree. *)
 
 val remove : t -> var Scoped.t -> t
 (** Remove the given binding. No other variable should depend on it... *)
 
-val restrict_scope : t -> Scoped.scope -> t
+val filter_scope : t -> Scoped.scope -> t
 (** Only keep bindings from this scope *)
 
 (** {2 Set operations} *)

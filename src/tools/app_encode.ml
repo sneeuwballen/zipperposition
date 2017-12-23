@@ -99,7 +99,7 @@ let rec app_encode_term toplevel t  =
              | T.Bind (Binder.ForallTy, var, t) ->
                assert (is_type arg);
                let arg' = app_encode_ty arg in
-               let t' = T.Subst.eval (Var.Subst.singleton var arg) t in
+               let t' = T.Subst.eval (Var.Subst.singleton var arg') t in
                T.app ~ty:t' term [arg']
              | _ -> failwith "Not implemented"
         )
@@ -154,8 +154,8 @@ let extensionality_axiom =
   let x = Var.make ~ty:fun_alpha_beta (ID.make "x") in
   let y = Var.make ~ty:fun_alpha_beta (ID.make "y") in
   let z = Var.make ~ty:(T.var alpha) (ID.make "z") in
-  let xz = T.app ~ty:(T.var beta) app_const [T.var x; T.var z] in
-  let yz = T.app ~ty:(T.var beta) app_const [T.var y; T.var z] in
+  let xz = T.app ~ty:(T.var beta) app_const [T.var alpha; T.var beta; T.var x; T.var z] in
+  let yz = T.app ~ty:(T.var beta) app_const [T.var alpha; T.var beta; T.var y; T.var z] in
   let prop = T.builtin ~ty:T.tType Builtin.Prop in
   Statement.assert_ ~proof:Proof.Step.trivial
     (T.bind_list ~ty:prop Binder.forall [x; y]

@@ -245,6 +245,9 @@ let apply ty0 args0 =
     | T.Bind (Binder.ForallTy, _, ty'), arg :: args' ->
       let arg = T.DB.eval env arg in
       aux ty' args' (DBEnv.push env arg)
+    | T.DB _, _ ->
+      let ty = T.DB.eval env ty in
+      aux ty args env
     | _ ->
       err_applyf_
         "@[<2>Type.apply:@ expected quantified or function type,@ but got @[%a@]"

@@ -45,6 +45,12 @@ module Renaming = struct
         r.n <- r.n + 1;
         r.map <- M.add var v' r.map;
         v'
+
+  (* rename variable (after specializing its type if needed) *)
+  let rename_with_type renaming (v,sc_v) new_ty =
+    let v' = rename renaming (v,sc_v) in
+    HVar.cast v' ~ty:new_ty
+
 end
 
 (* map from scoped variables, to scoped terms *)
@@ -103,9 +109,9 @@ let update
 
 let[@inline] remove subst v = M.remove v subst
 
-let restrict_scope subst sc = M.filter (fun (_,sc_v) _ -> sc=sc_v) subst
+let filter_scope subst sc = M.filter (fun (_,sc_v) _ -> sc=sc_v) subst
 
-let append s1 s2 =
+let merge s1 s2 =
   M.merge
     (fun v b1 b2 -> match b1, b2 with
        | None, _ -> b2
@@ -230,19 +236,18 @@ let[@inline] apply_aux subst ~f_rename t =
           | T.Var v ->
             (* the most interesting cases!
                switch depending on whether [t] is bound by [subst] or not *)
-            begin
-              try
-                let term'  = find_exn subst (v,sc_t) in
+            begin match find_exn subst (v,sc_t) with
+              | term' ->
                 (* NOTE: if [t'] is not closed, we assume that it
                    is always replaced in a context where variables
                    are properly bound. Typically, that means only
                    in rewriting. *)
                 (* also apply [subst] to [t'] *)
                 aux term'
-              with Not_found ->
+              | exception Not_found ->
                 (* rename the variable using [f_rename] *)
-                let v = f_rename (v,sc_t) ty' in
-                T.var v
+                let v' = f_rename (v,sc_t) ty' in
+                T.var v'
             end
           | T.Bind (s, varty, sub_t) ->
             let varty' = aux (varty,sc_t) in
@@ -267,22 +272,11 @@ let[@inline] apply_aux subst ~f_rename t =
   in
   aux t
 
-(* variable not bound by [subst], rename it
-   (after specializing its type if needed) *)
-let f_rename_sn renaming (v,sc_v) new_ty =
-  let v = HVar.cast v ~ty:new_ty in
-  Renaming.rename renaming (v,sc_v)
-
+(* Apply substitution to a term and rename variables not bound by [subst]*)
 let apply renaming subst t =
   if is_empty subst && Renaming.is_none renaming then fst t
   else (
-    (* variable not bound by [subst], rename it
-       (after specializing its type if needed) *)
-    let[@inline] f_rename renaming (v,sc_v) new_ty =
-      let v = HVar.cast v ~ty:new_ty in
-      Renaming.rename renaming (v,sc_v)
-    in
-    apply_aux subst ~f_rename:(f_rename renaming) t
+    apply_aux subst ~f_rename:(Renaming.rename_with_type renaming) t
   )
 
 (** {2 Specializations} *)
@@ -418,4 +412,3 @@ module Projection = struct
 
   let pp out (p:t) : unit = Format.fprintf out "%a[%d]" pp p.subst p.scope
 end
-
