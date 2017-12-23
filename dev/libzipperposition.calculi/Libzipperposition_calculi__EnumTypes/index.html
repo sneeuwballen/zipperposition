@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><title>Libzipperposition_calculi__EnumTypes (libzipperposition.calculi.Libzipperposition_calculi__EnumTypes)</title><link rel="stylesheet" href="../../odoc.css"/><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><meta name="generator" content="doc-ock-html v1.0.0-1-g1fc9bf0"/></head><body><nav id="top"><a href="../index.html">Up</a> &mdash; <span class="package">package <a href="../index.html">libzipperposition.calculi</a></span></nav><header><h1><span class="keyword">Module</span> <span class="module-path">Libzipperposition_calculi__EnumTypes</span></h1></header><h2>Inference and simplification rules for &quot;Enum Types&quot;</h2><div class="spec type" id="type-term"><a href="#type-term" class="anchor"></a><div class="def type"><code><span class="keyword">type </span>term</code><code><span class="keyword"> = </span><a href="../../logtk/Logtk/Term/index.html#type-t">Logtk.Term.t</a></code><code></code></div><div class="doc"></div></div><h3>Inference rules</h3><p>An Enum Type is a possibly parametrized type
+<code class="code">c : type -&gt; type -&gt; ... -&gt; type</code> with an exhaustiveness axiom
+<code class="code">forall a1....an:type,
+       forall x:(c a1...an),
+         x = t_1 or x = t_2 or ... or x = t_m</code>
+where the <code class="code">t_i</code> are non-variable terms that contain
+only <code class="code">x</code> as a variable.</p><p>This calculus is designed to remove the axiom (which is very prolific
+in superposition) and do its job more efficiently.</p><p>Inductive types (algebraic types) belong to this category of types,
+and have additional axioms that are dealt with elsewhere.</p><p>We require that the type is as general as possible: either
+a constant, or a polymorphic type that has only type variables as
+arguments. Enum types for things like <code class="code">list(int)</code> would be dangerous
+because if we remove the axiom, because instantiation is a
+simplification, we won't deal properly with <code class="code">list(rat)</code> (no unification
+whatsoever)</p><p>The rules are:</p><p>instantiation of variables:</p><p>C<code class="code">x</code> where x:tau unshielded enum(tau, x in t1....tm)
+-----------------------------------------------------------
+C<code class="code">t_1</code> or ... or C<code class="code">tm</code></p><p>specialization of exhaustiveness for f:</p><p>f : a1 -&gt; ... -&gt; ak -&gt; tau enum(tau, x in t1....tm)
+------------------------------------------------------------
+forall x1:a1, ... xk:ak,
+f(x1...xk)=t1\sigma or .... or f(x1...xk) = tm\sigma
+where sigma = <span class="x">-&gt; f(x1...xk)</span></p><div class="spec exception" id="exception-Error"><a href="#exception-Error" class="anchor"></a><div class="def exception"><code><span class="keyword">exception </span></code><code><span class="exception">Error</span><span class="keyword"> of </span>string</code></div><div class="doc"></div></div><div class="spec module-type" id="module-type-S"><a href="#module-type-S" class="anchor"></a><div class="def module-type"><code><span class="keyword">module type </span><a href="module-type-S/index.html">S</a> : <span class="keyword">sig</span> ... <span class="keyword">end</span></code></div><div class="doc"></div></div><div class="spec module" id="module-Make"><a href="#module-Make" class="anchor"></a><div class="def module"><code><span class="keyword">module </span><a href="Make/index.html">Make</a> : <span class="keyword">functor</span> (<a href="Make/argument-1-E/index.html">E</a> : <a href="../../libzipperposition/Libzipperposition/Env/index.html#module-type-S">Libzipperposition.Env.S</a>) -&gt; <a href="index.html#module-type-S">S</a><span class="keyword"> with </span><span class="keyword">module </span><a href="Make/Env/index.html">Env</a> = <a href="Make/index.html#argument-1-E">E</a></code></div><div class="doc"></div></div><h3>As Extension</h3><div class="spec val" id="val-extension"><a href="#val-extension" class="anchor"></a><div class="def val"><code><span class="keyword">val </span>extension : <a href="../../libzipperposition/Libzipperposition/Extensions/index.html#type-t">Libzipperposition.Extensions.t</a></code></div><div class="doc"></div></div></body></html>
