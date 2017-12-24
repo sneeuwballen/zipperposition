@@ -577,6 +577,8 @@ and `src/demo/`.
 
 === Make a release
 
+Now we use jbuilder, it should simplify the process compared to oasis.
+
 - merge `dev` into `master`:
   `git checkout master; git merge dev`
 
@@ -585,13 +587,9 @@ and `src/demo/`.
 - merge `master` into `stable` (branch with only releases):
   `git checkout stable; git merge master --no-ff`
 
-- edit `_oasis` to update the version number (field `Version`).
-  Also edit the same field in `opam`.
+- edit `*.opam` files to update the version number (field `version`).
 
 - `git commit -a -m "prepare for <version>"` (to save the changes on the stable branch)
-
-- run `oasis setup` to update the build system with the new modules, version,
-  etc.
 
 - `make clean all` (to check everything builds properly)
 
