@@ -232,8 +232,8 @@ module Dot = struct
       ~attrs_v:(fun p ->
         let top, b_color = match get_check_res p with
           | None -> "[no-check]", []
-          | Some R_ok -> "[check ✔]", [`Color "green"]
-          | Some R_fail -> "[check ×]", [`Color "red"]
+          | Some R_ok -> "[check ✔]", [`Color "green"; `Other ("penwidth", "6")]
+          | Some R_fail -> "[check ×]", [`Color "red"; `Other ("penwidth", "8")]
           | Some R_skip -> "[check ø]", [`Color "yellow"]
         in
         let label = _to_str_escape "@[<v>%s@,@[<2>%a@]@]@." top T.pp (concl p) in
