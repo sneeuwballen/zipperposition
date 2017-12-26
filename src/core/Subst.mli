@@ -213,6 +213,7 @@ module Projection : sig
       in terms of the codomain are bound in the renaming *)
 
   val as_inst :
+    ?allow_free_db:bool ->
     ctx:Term.Conv.ctx ->
     t ->
     Type.t HVar.t list ->

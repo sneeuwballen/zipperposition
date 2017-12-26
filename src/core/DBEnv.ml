@@ -40,6 +40,7 @@ let rec pop_many env n = match n with
   | _ -> pop_many (pop env) (n-1)
 
 let find env n =
+  assert (n>=0);
   if n < env.size then List.nth env.stack n else None
 
 let find_exn env n =

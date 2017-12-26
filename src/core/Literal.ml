@@ -1035,9 +1035,9 @@ module Conv = struct
         end
     end
 
-  let to_s_form ?(ctx=T.Conv.create()) ?hooks lit =
+  let to_s_form ?allow_free_db ?(ctx=T.Conv.create()) ?hooks lit =
     to_form ?hooks lit
-    |> SLiteral.map ~f:(T.Conv.to_simple_term ctx)
+    |> SLiteral.map ~f:(T.Conv.to_simple_term ?allow_free_db ctx)
     |> SLiteral.to_form
 end
 

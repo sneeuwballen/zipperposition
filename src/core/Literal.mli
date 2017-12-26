@@ -154,7 +154,7 @@ val is_absurd_tags : t -> Proof.tag list (** if [is_absurd lit], return why *)
 val fold_terms :
   ?position:Position.t -> ?vars:bool -> ?ty_args:bool ->
   which:[<`Max|`All] ->
-  ?ord:Ordering.t -> 
+  ?ord:Ordering.t ->
   subterms:bool ->
   t ->
   term Position.With.t Sequence.t
@@ -276,7 +276,9 @@ module Conv : sig
 
   val to_form : ?hooks:hook_to list -> t -> term SLiteral.t
 
-  val to_s_form : ?ctx:Term.Conv.ctx -> ?hooks:hook_to list -> t -> TypedSTerm.Form.t
+  val to_s_form :
+    ?allow_free_db:bool -> ?ctx:Term.Conv.ctx -> ?hooks:hook_to list ->
+    t -> TypedSTerm.Form.t
 end
 
 (** {2 IO} *)

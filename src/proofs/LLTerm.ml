@@ -360,6 +360,12 @@ module Conv = struct
           let ty = db_shift (ctx.depth-i) ty in
           var (HVar.make (ctx.depth-i-1) ~ty)
       end
+    | T.AppBuiltin (Builtin.Pseudo_de_bruijn i, []) ->
+      (* NOTE: magic here. This was a free De Bruijn index, typically coming
+         from rewriting under lambdas. Now we convert it back into a
+         normal DB index. *)
+      let ty = of_term ctx (T.ty_exn t) in
+      var (HVar.make i ~ty)
     | T.Const id ->
       let ty = of_term ctx (T.ty_exn t) in
       const id ~ty
