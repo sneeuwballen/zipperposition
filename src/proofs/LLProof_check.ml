@@ -80,6 +80,8 @@ end = struct
         | T.AppBuiltin (_,l) -> l
         | T.Ite (a,b,c) -> [a;b;c]
         | T.Bind {body;_} -> [body]
+        | Int_pred (l,_) -> T.Linexp_int.subterms l |> Sequence.to_list
+        | Rat_pred (l,_) -> T.Linexp_rat.subterms l |> Sequence.to_list
         | T.Const _ | T.Var _ | T.Type
           -> []
 
@@ -92,6 +94,18 @@ end = struct
           T.bind ~ty:(T.ty_exn t) binder ~ty_var body
         | (T.Const _ | T.Var _), [] -> t
         | T.Ite (_,_,_), [a;b;c] -> T.ite a b c
+        | Int_pred (le,op), l ->
+          let l' = T.Linexp_int.subterms le |> Sequence.to_list in
+          assert (List.length l = List.length l');
+          let map = List.combine l' l in
+          let le' = T.Linexp_int.map (fun t -> CCList.Assoc.get_exn ~eq:T.equal t map) le in
+          T.int_pred le' op
+        | Rat_pred (le,op), l ->
+          let l' = T.Linexp_rat.subterms le |> Sequence.to_list in
+          assert (List.length l = List.length l');
+          let map = List.combine l' l in
+          let le' = T.Linexp_rat.map (fun t -> CCList.Assoc.get_exn ~eq:T.equal t map) le in
+          T.rat_pred le' op
         | T.App _, _
         | T.Arrow _, _
         | T.AppBuiltin _, _
@@ -174,9 +188,11 @@ end = struct
         | F.False -> add_eq F.true_ F.false_ br
         | F.Eq (t,u) -> add_eq t u br
         | F.Neq (t,u) -> add_diseq t u br
+        | F.Int_pred (_,_) -> add_eq f F.true_ br (* TODO: decision proc *)
+        | F.Rat_pred (_,_) -> add_eq f F.true_ br (* TODO: simplex *)
         | F.Not f' ->
           begin match F.view f' with
-            | F.Eq _ | F.Neq _ | F.Not _ -> assert false
+            | F.Eq _ | F.Neq _ | F.Not _ | F.Int_pred _ | F.Rat_pred _ -> assert false
             | F.True -> add_diseq F.true_ F.false_ br
             | F.False -> br
             | F.Atom t -> add_eq t F.false_ br

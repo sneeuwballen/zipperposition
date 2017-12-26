@@ -6,8 +6,54 @@
 open Logtk
 
 module Fmt = CCFormat
+module I_map = Util.Int_map
 
 let errorf msg = Util.errorf ~where:"llterm" msg
+
+module Int_op = struct
+  type t = Leq0 | Geq0 | Lt0 | Gt0 | Eq0 | Neq0 | Divisible_by of Z.t | Not_div_by of Z.t
+  let equal a b = match a, b with
+    | Divisible_by a, Divisible_by b -> Z.equal a b
+    | Not_div_by a, Not_div_by b -> Z.equal a b
+    | Divisible_by _, _ | _, Divisible_by _
+    | Not_div_by _, _ | _, Not_div_by _ -> false
+    | _ -> a=b
+  let hash = function
+    | Divisible_by n -> Hash.combine2 10 (Z.hash n)
+    | Not_div_by n -> Hash.combine2 20 (Z.hash n)
+    | x -> Hash.poly x
+  let not = function
+    | Leq0 -> Gt0 | Geq0 -> Lt0
+    | Lt0 -> Geq0 | Gt0 -> Leq0
+    | Eq0 -> Neq0 | Neq0 -> Eq0
+    | Divisible_by n -> Not_div_by n | Not_div_by n -> Divisible_by n
+  let pp out = function
+    | Leq0 -> Fmt.fprintf out "=< 0"
+    | Geq0 -> Fmt.fprintf out ">= 0"
+    | Lt0 -> Fmt.fprintf out "< 0"
+    | Gt0 -> Fmt.fprintf out "> 0"
+    | Eq0 -> Fmt.fprintf out "= 0"
+    | Neq0 -> Fmt.fprintf out "!= 0"
+    | Divisible_by n -> Fmt.fprintf out "div_by %a" Z.pp_print n
+    | Not_div_by n -> Fmt.fprintf out "not_div_by %a" Z.pp_print n
+end
+
+module Rat_op = struct
+  type t = Leq0 | Geq0 | Lt0 | Gt0 | Eq0 | Neq0
+  let equal : t -> t -> bool = (=)
+  let hash : t -> int = Hash.poly
+  let pp out = function
+    | Leq0 -> Fmt.fprintf out "=< 0"
+    | Geq0 -> Fmt.fprintf out ">= 0"
+    | Lt0 -> Fmt.fprintf out "< 0"
+    | Gt0 -> Fmt.fprintf out "> 0"
+    | Eq0 -> Fmt.fprintf out "= 0"
+    | Neq0 -> Fmt.fprintf out "!= 0"
+  let not = function
+    | Leq0 -> Gt0 | Geq0 -> Lt0
+    | Lt0 -> Geq0 | Gt0 -> Leq0
+    | Eq0 -> Neq0 | Neq0 -> Eq0
+end
 
 type t = {
   view: view;
@@ -28,10 +74,113 @@ and view =
     }
   | AppBuiltin of Builtin.t * t list
   | Ite of t * t * t
+  | Int_pred of Z.t linexp * Int_op.t
+  | Rat_pred of Q.t linexp * Rat_op.t
 
 and var = t HVar.t
+and 'a linexp = {
+  const: 'a;
+  coeffs: (t * 'a) I_map.t;
+}
+
 type term = t
 type ty = t
+
+module type NUM = sig
+  type t
+  val equal : t -> t -> bool
+  val zero : t
+  val one : t
+  val (+) : t -> t -> t
+  val (-) : t -> t -> t
+  val ( * ) : t -> t -> t
+  val to_string : t -> string
+  val pp_print : t CCFormat.printer
+end
+
+module type LINEXP = sig
+  type num
+  type t = num linexp
+  val zero : t
+  val is_zero : t -> bool
+  val is_const : t -> bool
+  val ( + ) : t -> t -> t
+  val ( - ) : t -> t -> t
+  val ( * ) : num -> t -> t
+  val add : num -> term -> t -> t
+  val const : num -> t
+  val monomial : num -> term -> t
+  val monomial1 : term -> t
+  val equal : t -> t -> bool
+  val map : (term -> term) -> t -> t
+  val subterms : t -> term Sequence.t
+  val pp : term CCFormat.printer -> t CCFormat.printer
+end
+
+module Make_linexp(N : NUM) = struct
+  type num = N.t
+  type t = num linexp
+  let zero : t = {const=N.zero; coeffs=I_map.empty}
+  let is_const e = I_map.is_empty e.coeffs
+  let is_zero e = is_const e && N.equal N.zero e.const
+  let merge_ f a b : t = {
+    const=f a.const b.const;
+    coeffs=I_map.merge_safe a.coeffs b.coeffs
+      ~f:(fun _ o -> match o with
+        | `Left n | `Right n -> Some n
+        | `Both ((t,a),(t2,b)) ->
+          assert (t==t2);
+          let c = f a b in
+          if N.equal N.zero c then None else Some (t,c))
+  }
+
+  let (+) = merge_ N.(+)
+  let (-) = merge_ N.(-)
+  let ( * ) c e : t =
+    if N.equal N.zero c then zero
+    else {const=N.(c * e.const); coeffs=I_map.map (fun (t,n) -> t, N.(c*n)) e.coeffs}
+  let const c = {const=c; coeffs=I_map.empty}
+  let add c t e =
+    let _, n = I_map.get_or ~default:(t,N.zero) t.id e.coeffs in
+    let n = N.(n + c) in
+    let coeffs =
+      if N.equal N.zero n
+      then I_map.remove t.id e.coeffs else I_map.add t.id (t,n) e.coeffs
+    in
+    {e with coeffs;}
+  let monomial c t = {const=N.zero; coeffs=I_map.singleton t.id (t,c)}
+  let monomial1 t = {const=N.zero; coeffs=I_map.singleton t.id (t,N.one)}
+  let equal e1 e2 =
+    N.equal e1.const e2.const &&
+    I_map.equal (CCEqual.pair (==) N.equal) e1.coeffs e2.coeffs
+  let hash hash_t e =
+    let hash_n n = Hash.string @@ N.to_string n in
+    Hash.combine3 10
+      (hash_n e.const)
+      (Hash.seq (Hash.pair hash_t hash_n) @@ I_map.values e.coeffs)
+  let map f e =
+    I_map.fold (fun _ (t,n) acc -> add n (f t) acc) e.coeffs (const e.const)
+
+  let subterms e = I_map.values e.coeffs |> Sequence.map fst
+
+  let pp pp_t out (e:t): unit =
+    if is_const e then N.pp_print out e.const
+    else (
+      let pp_const out () =
+        if N.equal N.zero e.const then ()
+        else Fmt.fprintf out "@ + %a" N.pp_print e.const
+      and pp_pair out (t,c) =
+        if N.equal N.one c then pp_t out t
+        else Fmt.fprintf out "@[<2>%a@ @<1>· %a@]" N.pp_print c pp_t t
+      in
+      Fmt.fprintf out "(@[<hv>%a%a@])"
+        Fmt.(seq ~sep:(return "@ + ") pp_pair)
+        (I_map.values e.coeffs) pp_const ()
+    )
+end
+
+module Linexp_int = Make_linexp(Z)
+module Linexp_rat = Make_linexp(Q)
 
 let[@inline] view t = t.view
 let[@inline] ty t = t.ty
@@ -64,6 +213,10 @@ module H_cons = Hashcons.Make(struct
           CCList.equal equal l1 l2
         | Ite (a1,b1,c1), Ite (a2,b2,c2) ->
           equal a1 a2 && equal b1 b2 && equal c1 c2
+        | Int_pred (l1,o1), Int_pred (l2,o2) ->
+          Int_op.equal o1 o2 && Linexp_int.equal l1 l2
+        | Rat_pred (l1,o1), Rat_pred (l2,o2) ->
+          Rat_op.equal o1 o2 && Linexp_rat.equal l1 l2
         | Type, _
         | Const _, _
         | App _, _
@@ -72,6 +225,8 @@ module H_cons = Hashcons.Make(struct
         | Bind _, _
         | AppBuiltin _, _
         | Ite _, _
+        | Int_pred _, _
+        | Rat_pred _, _
           -> false
       end
 
@@ -87,6 +242,8 @@ module H_cons = Hashcons.Make(struct
         CCHash.combine3 50 (Builtin.hash b) (CCHash.list hash l)
       | Ite (a,b,c) ->
         CCHash.combine4 60 (hash a)(hash b)(hash c)
+      | Int_pred (l,o) -> Hash.combine3 70 (Linexp_int.hash hash l) (Int_op.hash o)
+      | Rat_pred (l,o) -> Hash.combine3 80 (Linexp_rat.hash hash l) (Rat_op.hash o)
 
     let tag (i:int) (t:t) : unit =
       assert (t.id = -1);
@@ -103,9 +260,9 @@ let rec pp_rec depth out (t:t) = match view t with
   | AppBuiltin (Builtin.Box_opaque, [t]) ->
     Format.fprintf out "@<1>⟦@[%a@]@<1>⟧" (pp_rec depth) t
   | AppBuiltin (b, [a]) when Builtin.is_prefix b ->
-    Format.fprintf out "@[%a %a@]" Builtin.pp b (pp_inner depth) a
+    Format.fprintf out "@[<1>%a@ %a@]" Builtin.pp b (pp_inner depth) a
   | AppBuiltin (b, ([t1;t2] | [_;t1;t2])) when Builtin.fixity b = Builtin.Infix_binary ->
-    Format.fprintf out "@[%a %a@ %a@]"
+    Format.fprintf out "@[<1>%a %a@ %a@]"
       (pp_inner depth) t1 Builtin.pp b (pp_inner depth) t2
   | AppBuiltin (b, l) when Builtin.is_infix b && List.length l > 0 ->
     Format.fprintf out "@[<hv>%a@]" (pp_infix_ depth b) l
@@ -123,10 +280,14 @@ let rec pp_rec depth out (t:t) = match view t with
       (pp_inner depth) a
       (pp_inner depth) b
       (pp_inner depth) c
+  | Int_pred (l,o) ->
+    Fmt.fprintf out "(@[%a@ %a@])" (Linexp_int.pp (pp_inner depth)) l Int_op.pp o
+  | Rat_pred (l,o) ->
+    Fmt.fprintf out "(@[%a@ %a@])" (Linexp_rat.pp (pp_inner depth)) l Rat_op.pp o
 and pp_inner depth out t = match view t with
   | App _ | Bind _ | AppBuiltin (_,_::_) | Arrow _ | Ite _ ->
     Fmt.fprintf out "(%a)@{<Black>/%d@}" (pp_rec depth) t t.id
-  | Type | Const _ | Var _ | AppBuiltin (_,[]) ->
+  | Type | Const _ | Var _ | AppBuiltin (_,[]) | Int_pred _ | Rat_pred _ ->
     Fmt.fprintf out "%a@{<Black>/%d@}" (pp_rec depth) t t.id
 and pp_infix_ depth b out l = match l with
   | [] -> assert false
@@ -144,6 +305,7 @@ let[@inline] mk_ view ty : t =
 let t_type = mk_ Type None
 let[@inline] var v = mk_ (Var v) (Some (HVar.ty v))
 let[@inline] const ~ty id = mk_ (Const id) (Some ty)
+let prop = mk_ (AppBuiltin (Builtin.Prop,[])) (Some t_type)
 
 let[@inline] is_type t : bool = match ty t with
   | Some ty -> ty == t_type
@@ -180,6 +342,41 @@ let[@inline] app_builtin ~ty b l =
 
 let[@inline] builtin ~ty b = app_builtin ~ty b []
 
+let bool = builtin ~ty:t_type Builtin.Prop
+let true_ = builtin ~ty:bool Builtin.True
+let false_ = builtin ~ty:bool Builtin.False
+let of_bool b = if b then true_ else false_
+
+let int_pred l o =
+  if Linexp_int.is_const l then (
+    let module O = Int_op in
+    let n = l.const in
+    begin match o with
+      | O.Leq0 -> Z.sign n <= 0
+      | O.Geq0 -> Z.sign n >= 0
+      | O.Lt0 -> Z.sign n < 0
+      | O.Gt0 -> Z.sign n > 0
+      | O.Eq0 -> Z.sign n = 0
+      | O.Neq0 -> Z.sign n <> 0
+      | O.Divisible_by k -> Z.equal Z.zero (Z.rem n k)
+      | O.Not_div_by k -> not (Z.equal Z.zero (Z.rem n k))
+    end |> of_bool
+  ) else mk_ (Int_pred (l,o)) (Some prop)
+
+let rat_pred l o =
+  if Linexp_rat.is_const l then (
+    let module O = Rat_op in
+    let n = l.const in
+    begin match o with
+      | O.Leq0 -> Q.sign n <= 0
+      | O.Geq0 -> Q.sign n >= 0
+      | O.Lt0 -> Q.sign n < 0
+      | O.Gt0 -> Q.sign n > 0
+      | O.Eq0 -> Q.sign n = 0
+      | O.Neq0 -> Q.sign n <> 0
+    end |> of_bool
+  ) else mk_ (Rat_pred (l,o)) (Some prop)
+
 let[@inline] map ~f ~bind:f_bind b_acc t = match view t with
   | Type -> t_type
   | Var v -> var (HVar.update_ty v ~f:(f b_acc))
@@ -194,6 +391,8 @@ let[@inline] map ~f ~bind:f_bind b_acc t = match view t with
     app_builtin ~ty:(f b_acc @@ ty_exn t) b (List.map (f b_acc) l)
   | Ite (a,b,c) ->
     ite (f b_acc a) (f b_acc b) (f b_acc c)
+  | Int_pred (l,o) -> int_pred (Linexp_int.map (f b_acc) l) o
+  | Rat_pred (l,o) -> rat_pred (Linexp_rat.map (f b_acc) l) o
 
 (* shift DB indices by [n] *)
 let db_shift n (t:t) : t =
@@ -271,7 +470,6 @@ let rec arrow_l l ret = match l with
   | [] -> ret
   | a :: tail -> arrow a (arrow_l tail ret)
 
-let bool = builtin ~ty:t_type Builtin.Prop
 let box_opaque t = app_builtin ~ty:(ty_exn t) Builtin.Box_opaque [t]
 
 let lambda ~ty_var body =
@@ -291,6 +489,8 @@ module Form = struct
     | Atom of t
     | Eq of t * t
     | Neq of t * t
+    | Int_pred of Z.t linexp * Int_op.t
+    | Rat_pred of Q.t linexp * Rat_op.t
     | Forall of {ty_var: ty; body: t}
     | Exists of {ty_var: ty; body: t}
 
@@ -309,10 +509,12 @@ module Form = struct
     | AppBuiltin (Builtin.Xor, [t;u]) -> Xor(t,u)
     | Bind {binder=Binder.Forall; ty_var; body; _} -> Forall {ty_var;body}
     | Bind {binder=Binder.Exists; ty_var; body; _} -> Exists {ty_var;body}
+    | Int_pred (l,o) -> Int_pred (l,o)
+    | Rat_pred (l,o) -> Rat_pred (l,o)
     | _ -> Atom t
 
-  let true_ = builtin ~ty:bool Builtin.True
-  let false_ = builtin ~ty:bool Builtin.False
+  let true_ = true_
+  let false_ = false_
   let eq a b = app_builtin ~ty:(ty_exn a) Builtin.Eq [a;b]
   let neq a b = app_builtin ~ty:bool Builtin.Neq [a;b]
   let and_ a = app_builtin ~ty:bool Builtin.And a
@@ -320,6 +522,8 @@ module Form = struct
   let equiv a b = app_builtin ~ty:(ty_exn a) Builtin.Equiv [a;b]
   let imply a b = app_builtin ~ty:(ty_exn a) Builtin.Imply [a;b]
   let xor a b = app_builtin ~ty:(ty_exn a) Builtin.Xor [a;b]
+  let int_pred = int_pred
+  let rat_pred = rat_pred
   let forall ~ty_var body = bind Binder.Forall ~ty:bool ~ty_var body
   let exists ~ty_var body = bind Binder.Exists ~ty:bool ~ty_var body
 
@@ -327,6 +531,8 @@ module Form = struct
     | Eq (a,b) -> neq a b
     | Neq (a,b) -> eq a b
     | Not f -> f
+    | Int_pred (l,o) -> int_pred l (Int_op.not o)
+    | Rat_pred (l,o) -> rat_pred l (Rat_op.not o)
     | _ -> app_builtin ~ty:bool Builtin.Not [a]
 end
 
@@ -392,12 +598,99 @@ module Conv = struct
       let l = List.map (of_term ctx) l in
       arrow_l l ret
     | T.AppBuiltin (b, l) ->
-      let ty = of_term ctx (T.ty_exn t) in
-      let l = List.map (of_term ctx) l in
-      app_builtin ~ty b l
+      let ty = T.ty_exn t in
+      begin match b with
+        | (Builtin.Greatereq | Builtin.Lesseq | Builtin.Less
+          | Builtin.Greater | Builtin.Eq | Builtin.Neq) when List.exists is_arith l ->
+          if List.exists is_int l then (
+            conv_int_pred ctx ~ty b l
+          ) else (
+            assert (List.exists is_rat l);
+            conv_rat_pred ctx ~ty b l
+          )
+        | _ -> conv_builtin ctx ~ty b l
+      end
     | T.Let _ -> assert false (* FIXME *)
     | T.Match _ -> assert false (* FIXME? *)
     | T.Multiset _ -> assert false (* FIXME? *)
     | T.Record _ -> assert false (* FIXME? *)
     | T.Meta _ -> assert false
+
+  and is_int t = T.Ty.equal T.Ty.int (T.ty_exn t)
+  and is_rat t = T.Ty.equal T.Ty.rat (T.ty_exn t)
+  and is_arith t = is_int t || is_rat t
+
+  (* default conv for builtins *)
+  and conv_builtin ctx ~ty b l =
+    let ty = of_term ctx ty in
+    let l = List.map (of_term ctx) l in
+    app_builtin ~ty b l
+
+  and conv_int_pred ctx ~ty b l : term =
+    let module O = Int_op in
+    let op = match b with
+      | Builtin.Greatereq -> O.Geq0
+      | Builtin.Lesseq -> O.Leq0
+      | Builtin.Less -> O.Lt0
+      | Builtin.Greater -> O.Gt0
+      | Builtin.Eq -> O.Eq0
+      | Builtin.Neq -> O.Neq0
+      | _ -> assert false
+    in
+    match l with
+      | [_; a; b] | [a;b] ->
+        let a = conv_int_linexp ctx a in
+        let b = conv_int_linexp ctx b in
+        int_pred Linexp_int.(a - b) op
+      | _ -> conv_builtin ctx ~ty b l
+
+  and conv_rat_pred ctx ~ty b l : term =
+    let module O = Rat_op in
+    let op = match b with
+      | Builtin.Greatereq -> O.Geq0
+      | Builtin.Lesseq -> O.Leq0
+      | Builtin.Less -> O.Lt0
+      | Builtin.Greater -> O.Gt0
+      | Builtin.Eq -> O.Eq0
+      | Builtin.Neq -> O.Neq0
+      | _ -> assert false
+    in
+    match l with
+      | [_; a; b] | [a;b] ->
+        let a = conv_rat_linexp ctx a in
+        let b = conv_rat_linexp ctx b in
+        rat_pred Linexp_rat.(a - b) op
+      | _ -> conv_builtin ctx ~ty b l
+
+  and conv_int_linexp ctx t : Linexp_int.t = match T.view t with
+    | T.AppBuiltin (Builtin.Int z, []) -> Linexp_int.const z
+    | T.AppBuiltin (Builtin.Sum, [_;a;b]) ->
+      Linexp_int.(conv_int_linexp ctx a + conv_int_linexp ctx b)
+    | T.AppBuiltin (Builtin.Difference, [_;a;b]) ->
+      Linexp_int.(conv_int_linexp ctx a - conv_int_linexp ctx b)
+    | T.AppBuiltin (Builtin.Product, [_;a;b]) ->
+      begin match T.view a, T.view b with
+        | T.AppBuiltin (Builtin.Int n,[]), _ ->
+          Linexp_int.(n * conv_int_linexp ctx b)
+        | _, T.AppBuiltin (Builtin.Int n,[]) ->
+          Linexp_int.(n * conv_int_linexp ctx a)
+        | _ -> Linexp_int.monomial1 (of_term ctx t)
+      end
+    | _ -> Linexp_int.monomial1 (of_term ctx t)
+
+  and conv_rat_linexp ctx t : Linexp_rat.t = match T.view t with
+    | T.AppBuiltin (Builtin.Rat z, []) -> Linexp_rat.const z
+    | T.AppBuiltin (Builtin.Sum, [_;a;b]) ->
+      Linexp_rat.(conv_rat_linexp ctx a + conv_rat_linexp ctx b)
+    | T.AppBuiltin (Builtin.Difference, [_;a;b]) ->
+      Linexp_rat.(conv_rat_linexp ctx a - conv_rat_linexp ctx b)
+    | T.AppBuiltin (Builtin.Product, [_;a;b]) ->
+      begin match T.view a, T.view b with
+        | T.AppBuiltin (Builtin.Rat n,[]), _ ->
+          Linexp_rat.(n * conv_rat_linexp ctx b)
+        | _, T.AppBuiltin (Builtin.Rat n,[]) ->
+          Linexp_rat.(n * conv_rat_linexp ctx a)
+        | _ -> Linexp_rat.monomial1 (of_term ctx t)
+      end
+    | _ -> Linexp_rat.monomial1 (of_term ctx t)
 end
