@@ -877,12 +877,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     (* demodulate every literal *)
     let lits = Array.mapi demod_lit (C.lits c) in
-    if Lits.equal_com (C.lits c) lits
-    then (
+    if CCList.is_empty st.demod_clauses then (
       (* no rewriting performed *)
       SimplM.return_same c
     ) else (
-      assert (not (CCList.is_empty st.demod_clauses));
+      assert (not (Lits.equal_com lits (C.lits c)));
       (* construct new clause *)
       st.demod_clauses <- CCList.uniq ~eq:eq_c_subst st.demod_clauses;
       let proof =
