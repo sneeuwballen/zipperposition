@@ -1,0 +1,4 @@
+
+Library with the core data structures and algorithms for a Superposition prover.
+
+{!modules: Libzipperposition}

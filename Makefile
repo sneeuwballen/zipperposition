@@ -134,5 +134,5 @@ reindent: ocp-indent
 gallery.svg:
 	for i in gallery/*.dot ; do dot -Tsvg "$$i" > "gallery/`basename $${i} .dot`.svg" ; done
 
-.PHONY: push_doc dot package tags rst_doc open_doc test-all
+.PHONY: doc push_doc dot package tags rst_doc open_doc test-all
 
