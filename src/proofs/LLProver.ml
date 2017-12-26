@@ -70,9 +70,9 @@ module CC = Congruence.Make(struct
 module Branch : sig
   type t
 
-  val make : T.t list -> t
+  val root : unit -> t
 
-  val closed : t -> bool
+  val is_closed : t -> bool
 
   val add : t -> T.t list -> t
   (** add the given set of formulas *)
@@ -80,43 +80,86 @@ module Branch : sig
   val pop_open : t -> (T.t * t) option
   (** remove and return next formula to expand *)
 
+  type closed =
+    | C_not_closed
+    | C_closed_by_diseq of T.t * T.t
+    | C_closed_by_theory of string
+
+  val to_expand : t -> T.t Sequence.t
+  val form : t -> F.t option
+  val closed : t -> closed
+  val id : t -> int
+  val parent : t -> t option
+  val diseq : t -> (T.t * T.t) Sequence.t
+
   val debug : t CCFormat.printer
 end = struct
   module T_set = T.Set
 
+  type closed =
+    | C_not_closed
+    | C_closed_by_diseq of T.t * T.t
+    | C_closed_by_theory of string
+
   type t = {
-    expanded: T_set.t;
-    to_expand : T_set.t;
+    id: int; (* generative ID *)
+    form: T.t option;
+    to_expand : T_set.t; (* all to expand *)
     cc: CC.t;
     diseq: (T.t * T.t) list; (* negative constraints *)
-    closed: bool;
+    mutable closed: closed;
+    parent: t option;
   }
 
-  (* make a new empty branch *)
-  let empty () = {
-    expanded=T_set.empty;
+  let[@inline] closed t = t.closed
+  let[@inline] to_expand t = T_set.to_seq t.to_expand
+  let[@inline] parent t = t.parent
+  let[@inline] id t = t.id
+  let[@inline] diseq t = Sequence.of_list t.diseq
+  let[@inline] form t = t.form
+
+  let root () : t = {
+    id=0;
+    form=None;
     to_expand=T_set.empty;
     cc=CC.create();
     diseq=[(F.true_, F.false_)];
-    closed=false;
+    closed=C_not_closed;
+    parent=None;
   }
+
+  let[@inline] is_closed b : bool = match b.closed with
+    | C_not_closed -> false
+    | _ -> true
+
+  let mk_child =
+    let n = ref 1 in
+    let aux (f:F.t) (b:t) : t =
+      { b with id=CCRef.incr_then_get n; form=Some f; parent=Some b }
+    in
+    aux
 
   (* check if some diseq is true *)
   let check_closed (b:t) : t =
-    if b.closed then b
+    if is_closed b then b
     else (
-      let closed = List.exists (fun (t,u) -> CC.is_eq b.cc t u) b.diseq in
-      if closed then {b with closed} else b
+      begin match CCList.find_pred (fun (t,u) -> CC.is_eq b.cc t u) b.diseq with
+        | None -> ()
+        | Some (t,u) -> b.closed <- C_closed_by_diseq (t,u)
+      end;
+      b
     )
 
-  let[@inline] add_cc_ t b = { b with cc=CC.add b.cc t }
+  let[@inline] add_cc_ t b = { b with cc=CC.add b.cc t; }
   let[@inline] add_cc_eq t u b = { b with cc=CC.mk_eq b.cc t u }
-  let[@inline] add_diseq_ t u b = { b with diseq=(t,u)::b.diseq }
+  let[@inline] add_diseq_l_ t u b = { b with diseq=(t,u)::b.diseq }
 
-  let[@inline] add_expanded f b = {b with expanded = T_set.add f b.expanded}
-  let[@inline] add_eq t u b : t = b |> add_expanded (F.eq t u) |> add_cc_eq t u |> check_closed
-  let[@inline] add_diseq t u b : t = b |> add_diseq_ t u |> check_closed
-  let[@inline] add_to_expand f b = {b with to_expand = T_set.add f b.to_expand}
+  let[@inline] add_eq t u b : t =
+    if is_closed b then b else b |> add_cc_eq t u |> check_closed
+  let[@inline] add_diseq t u b : t =
+    if is_closed b then b else b |> add_diseq_l_ t u |> check_closed
+  let[@inline] add_to_expand f b =
+    if is_closed b then b else {b with to_expand=T_set.add f b.to_expand}
 
   let[@inline] add_form_to_expand f b =
     b |> add_to_expand f |> check_closed
@@ -127,8 +170,8 @@ end = struct
     | _ -> false
 
   (* add one formula to [b] *)
-  let add1 (br:t) (f:T.t): t =
-    let br = add_cc_ f br in
+  let add1_ (br:t) (f:T.t): t =
+    let br = mk_child f @@ add_cc_ f br in
     begin match F.view f with
       | F.Atom t -> add_eq t F.true_ br
       | F.True -> br
@@ -152,9 +195,9 @@ end = struct
             add_form_to_expand (F.and_ [F.or_ [a; F.not_ b]; F.or_ [b; F.not_ a]]) br
           | F.Exists {ty_var;body}  ->
             let f = F.forall ~ty_var (F.not_ body) in
-            br |> add_expanded f |> add_cc_eq f F.true_ |> check_closed
+            br |> add_cc_eq f F.true_ |> check_closed
           | F.Forall _ ->
-            br |> add_expanded f |> add_cc_eq f F.false_ |> check_closed
+            br |> add_cc_eq f F.false_ |> check_closed
         end
       | F.And _ | F.Or _ -> add_form_to_expand f br
       | F.Imply (a,b) -> add_form_to_expand (F.or_ [F.not_ a; b]) br
@@ -163,13 +206,15 @@ end = struct
       | F.Equiv (a,b) ->
         add_form_to_expand (F.and_ [F.or_ [a; F.not_ b]; F.or_ [b; F.not_ a]]) br
       | F.Forall _ ->
-        br |> add_expanded f |> add_cc_eq f F.true_ |> check_closed
+        br |> add_cc_eq f F.true_ |> check_closed
       | F.Exists {ty_var;body} ->
         let f = F.forall ~ty_var (F.not_ body) in
-        br |> add_expanded f |> add_cc_eq f F.false_ |> check_closed
+        br |> add_cc_eq f F.false_ |> check_closed
     end
 
-  let[@inline] add b l =
+  let add1 br f : t = if is_closed br then br else add1_ br f
+
+  let add b l =
     (* put atomic formulas first *)
     let l =
       List.sort
@@ -180,25 +225,30 @@ end = struct
     in
     List.fold_left add1 b l
 
-  let[@inline] make l = add (empty ()) l
-  let[@inline] closed b = b.closed
-
   let pop_open b =
-    if closed b then None
+    if is_closed b then None
     else begin match T_set.choose b.to_expand with
       | f ->
         let tail = T_set.remove f b.to_expand in
-        Some (f, {b with to_expand=tail; expanded=T_set.add f b.expanded})
+        Some (f, {b with to_expand=tail;})
       | exception Not_found -> None
     end
 
+  let rec unfold_parents b = match b.parent with
+    | None -> [b]
+    | Some p -> b :: unfold_parents p
+
   let debug out (b:t) : unit =
-    Fmt.fprintf out
-      "(@[<hv>branch (closed %B)@ \
-       :to_expand (@[<hv>%a@])@ :expanded (@[<hv>%a@])@])"
-      b.closed
-      (Util.pp_seq T.pp) (T_set.to_seq b.to_expand)
-      (Util.pp_seq T.pp) (T_set.to_seq b.expanded)
+    (* print one branch *)
+    let pp_b out b =
+      Fmt.fprintf out
+        "(@[<hv>branch/%d :closed %B@ :form (%a)@ \
+         :to_expand (@[<hv>%a@])@])"
+        b.id (is_closed b)
+        (Fmt.some T.pp) b.form
+        (Util.pp_seq T.pp) (T_set.to_seq b.to_expand)
+    in
+    Fmt.fprintf out "(@[<v>%a@])" (Util.pp_list pp_b) (unfold_parents b)
 end
 
 (** Rules for the Tableau calculus *)
@@ -235,62 +285,65 @@ type branch = Branch.t
 type t = {
   mutable open_branches: branch list;
   mutable closed_branches: branch list;
+  mutable saturated: branch option;
 }
 
 type final_state = t
 
-let debug_tag out (tab:t) : unit =
-  Fmt.fprintf out "(@[<v>%a@])"
+let debug_tab out (tab:t) : unit =
+  Fmt.fprintf out "(@[tab@ :branches (@[<v>%a@])@ :saturated (%a)@])"
     (Util.pp_list Branch.debug)
     (List.rev_append tab.open_branches tab.closed_branches)
-
-exception Saturated_branch of branch
+    (Fmt.some Branch.debug) tab.saturated
 
 (* solve tableau by expanding it piece by piece *)
 let solve_ (tab:t) : res =
-  try
-    while tab.open_branches <> [] do
-      let b = List.hd tab.open_branches in
-      tab.open_branches <- List.tl tab.open_branches;
-      Util.debugf ~section 3
-        "(@[llproof.check.tab.solve@ %a@])"
-        (fun k->k debug_tag tab);
-      begin match Branch.pop_open b with
-        | None ->
-          if Branch.closed b then (
-            tab.closed_branches <- b :: tab.closed_branches
-          ) else (
-            (* cannot close this branch *)
-            raise (Saturated_branch b)
-          )
-        (* saturated *)
-        | Some (f, b_tail) ->
-          let new_branches =
-            Rule.apply Rule.all f
-            |> List.map
-              (fun forms -> Branch.add b_tail forms)
-          in
-          (* add new branches *)
-          List.iter
-            (fun b ->
-               if Branch.closed b then (
-                 tab.closed_branches <- b :: tab.closed_branches
-               ) else  (
-                 tab.open_branches <- b :: tab.open_branches
-               ))
-            new_branches
-      end
-    done;
-    (* closed all branches *)
-    assert (tab.open_branches=[]);
-    Util.debugf ~section 5 "(@[llproof.check.tab.success@ :branches (@[<v>%a@])@])"
-      (fun k->k (Util.pp_list Branch.debug) tab.closed_branches);
-    R_ok
-  with Saturated_branch b ->
-    (* found a branch that is not refutable *)
-    Util.debugf ~section 1 "(@[llproof.check.tab.failed@ :branch %a@])"
-      (fun k->k Branch.debug b);
-    R_fail
+  while not (CCList.is_empty tab.open_branches) && CCOpt.is_none tab.saturated do
+    let b = List.hd tab.open_branches in
+    tab.open_branches <- List.tl tab.open_branches;
+    Util.debugf ~section 3
+      "(@[llproof.check.tab.solve@ %a@])" (fun k->k debug_tab tab);
+    begin match Branch.pop_open b with
+      | None ->
+        if Branch.is_closed b then (
+          tab.closed_branches <- b :: tab.closed_branches
+        ) else (
+          (* cannot close this branch, it has no form to expand *)
+          tab.saturated <- Some b;
+        )
+      | Some (f, b_tail) ->
+        let new_branches =
+          Rule.apply Rule.all f
+          |> List.map
+            (fun forms -> Branch.add b_tail forms)
+        in
+        assert (not @@ CCList.is_empty new_branches);
+        (* add new branches *)
+        List.iter
+          (fun b ->
+             if Branch.is_closed b then (
+               tab.closed_branches <- b :: tab.closed_branches
+             ) else  (
+               tab.open_branches <- b :: tab.open_branches
+             ))
+          new_branches;
+    end
+  done;
+  (* closed all branches, or found saturation *)
+  begin match tab.saturated with
+    | Some b ->
+      (* found a branch that is not refutable *)
+      Util.debugf ~section 1 "(@[llprover.prove.failed@ :branch %a@])"
+        (fun k->k Branch.debug b);
+      R_fail
+    | None ->
+      assert (CCList.is_empty tab.open_branches);
+      Util.debugf ~section 5
+        "(@[llprover.prove.success@ :branches (@[<v>%a@])@ :saturated %a@])"
+        (fun k->k (Util.pp_list Branch.debug) tab.closed_branches
+            (Fmt.some Branch.debug) tab.saturated);
+      R_ok
+  end
 
 let can_check : LLProof.tag list -> bool =
   let open Builtin.Tag in
@@ -307,10 +360,11 @@ let prove (a:form list) (b:form) =
     (fun k->k (Util.pp_list T.pp) a T.pp b);
   Util.incr_stat stat_solve;
   (* prove [a ∧ -b ⇒ ⊥] *)
-  let b_init = Branch.make (F.not_ b :: a) in
+  let b_init = Branch.add (Branch.root()) (F.not_ b :: a) in
   let tab = {
     open_branches=[b_init];
     closed_branches=[];
+    saturated=None;
   } in
   solve_ tab, tab
 
@@ -320,5 +374,53 @@ let pp_stats out (s:final_state) =
   Format.fprintf out "(@[llprover.stats@ :n_branches %d@ :n_closed %d@])"
     (n_closed + n_open) n_closed
 
-let pp_dot _out (_s:final_state) : unit =
+let _to_str_escape fmt =
+  Util.ksprintf_noc ~f:Util.escape_dot fmt
+
+let pp_dot out (s:final_state) : unit =
+  let module ISet = Util.Int_set in
+  let as_graph =
+    CCGraph.make
+      (fun b -> Branch.parent b |> Sequence.of_opt |> Sequence.map (fun v->(),v))
+  in
+  let saturated_set =
+    Sequence.of_opt s.saturated |>
+    Sequence.fold (fun s b -> ISet.add (Branch.id b) s) ISet.empty
+  in
+  let br_eq b1 b2 = CCInt.equal (Branch.id b1) (Branch.id b2) in
+  let br_hash b = Hash.int @@ Branch.id b in
+  let tbl = CCGraph.mk_table ~eq:br_eq ~hash:br_hash 32 in
+  let attrs_v (b:Branch.t) : _ list =
+    let color =
+      if Branch.is_closed b then [`Color "green"]
+      else if ISet.mem (Branch.id b) saturated_set then [`Color "red"]
+      else []
+    in
+    let pp_closed out b = match Branch.closed b with
+      | Branch.C_not_closed ->
+        Fmt.fprintf out "<not closed> (%d to expand)" (Branch.to_expand b |> Sequence.length)
+      | Branch.C_closed_by_diseq (t,u) ->
+        Fmt.fprintf out "<closed by `@[<1>%a ≠@ %a@]`>" T.pp t T.pp u
+      | Branch.C_closed_by_theory s ->
+        Fmt.fprintf out "<closed by theory %S>" s
+    in
+    let label =
+      _to_str_escape "@[<v>[%d] %a@ (@[%a@])@]"
+        (Branch.id b) pp_closed b
+        (Fmt.some T.pp) (Branch.form b)
+    in
+    [`Label label; `Shape "box"; `Style "filled"] @ color
+  in
+  let all_branches =
+    Sequence.append
+      (Sequence.of_list s.open_branches)
+      (Sequence.of_list s.closed_branches)
+  in
+  CCGraph.Dot.pp_seq
+    ~tbl
+    ~eq:br_eq
+    ~graph:as_graph
+    ~attrs_v
+    out all_branches
+  ;
   () (* TODO *)
