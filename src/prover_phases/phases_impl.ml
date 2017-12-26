@@ -451,13 +451,6 @@ let check res =
       (* check proof! *)
       Util.debug ~section 1 "start checking proof…";
       let p' = LLProof_conv.conv p in
-      (* print proof? *)
-      begin match params.Params.dot_llproof with
-        | None -> ()
-        | Some file ->
-          Util.debugf ~section 2 "print LLProof into `%s`"(fun k->k file);
-          LLProof.Dot.pp_dot_file file p';
-      end;
       (* check *)
       let start = Util.total_time_s () in
       let dot_prefix = params.Params.dot_check in
@@ -465,6 +458,14 @@ let check res =
       let stop = Util.total_time_s () in
       Format.printf "%s(@[<h>proof_check@ :res %a@ :stats %a :time %.3fs@])@."
         comment LLProof_check.pp_res res LLProof_check.pp_stats stats (stop-.start);
+      (* print proof? (do it after check, results are cached) *)
+      begin match params.Params.dot_llproof with
+        | None -> ()
+        | Some file ->
+          Util.debugf ~section 2 "print LLProof into `%s`"(fun k->k file);
+          LLProof.Dot.pp_dot_file file p';
+      end;
+      (* exit code *)
       if res = LLProof_check.R_fail then 15 else 0
     | _ -> 0
   in

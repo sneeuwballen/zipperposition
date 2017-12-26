@@ -182,9 +182,14 @@ let check
         (fun k->k P.pp p pp_csr res);
       on_check p res;
       begin match res with
-        | CS_check R_ok -> upd_stats (fun s -> {s with n_ok = s.n_ok+1})
-        | CS_check R_fail -> upd_stats (fun s -> {s with n_fail = s.n_fail+1})
+        | CS_check R_ok ->
+          P.set_check_res p P.R_ok;
+          upd_stats (fun s -> {s with n_ok = s.n_ok+1})
+        | CS_check R_fail ->
+          P.set_check_res p P.R_fail;
+          upd_stats (fun s -> {s with n_fail = s.n_fail+1})
         | CS_skip r ->
+          P.set_check_res p P.R_skip;
           upd_stats
             (fun s ->
                {s with

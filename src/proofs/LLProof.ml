@@ -19,10 +19,16 @@ type tag = Proof.tag
 
 type name = string
 
+type check_res =
+  | R_ok
+  | R_fail
+  | R_skip
+
 type t = {
   id: int; (* unique ID *)
   concl: form;
   step: step;
+  mutable checked: check_res option; (* caching result of checking *)
 }
 and step =
   | Goal
@@ -147,7 +153,7 @@ let pp_dag out (p:t): unit =
 let mk_ : form -> step -> t =
   let n = ref 0 in
   fun concl step ->
-    { id=CCRef.incr_then_get n; concl; step }
+    { id=CCRef.incr_then_get n; concl; step; checked=None; }
 
 let goal f = mk_ f Goal
 let negated_goal f p = mk_ f (Negated_goal p)
@@ -164,6 +170,14 @@ let esa f name ps = mk_ f (Esa (name,ps))
 let inference ~intros ~local_intros ~tags f name ps : t =
   mk_ f (Inference
       {name;intros;local_intros;parents=ps;tags})
+
+let get_check_res t = t.checked
+let set_check_res t r = t.checked <- Some r
+
+let pp_check_res out = function
+  | R_ok -> Fmt.string out "ok"
+  | R_fail -> Fmt.string out "fail"
+  | R_skip -> Fmt.string out "skip"
 
 module Dot = struct
   (** Get a graph of the proof *)
@@ -206,7 +220,7 @@ module Dot = struct
       | Assert, _ -> Some "yellow"
       | Trivial, _ -> Some "gold"
       | (By_def _ | Define _), _ -> Some "navajowhite"
-      | _ -> None
+      | _ -> Some "grey"
     end
 
   let pp_dot_seq ~name out seq =
@@ -216,11 +230,17 @@ module Dot = struct
       ~name
       ~graph:as_graph
       ~attrs_v:(fun p ->
-        let label = _to_str_escape "@[<2>%a@]@." T.pp (concl p) in
+        let top, b_color = match get_check_res p with
+          | None -> "[no-check]", []
+          | Some R_ok -> "[check ✔]", [`Color "green"]
+          | Some R_fail -> "[check ×]", [`Color "red"]
+          | Some R_skip -> "[check ø]", [`Color "yellow"]
+        in
+        let label = _to_str_escape "@[<v>%s@,@[<2>%a@]@]@." top T.pp (concl p) in
         let attrs = [`Label label; `Style "filled"] in
         let shape = `Shape "box" in
-        let color = match color p with None -> [] | Some c -> [`Color c] in
-        shape :: color @ attrs
+        let color = match color p with None -> [] | Some c -> [`Other ("fillcolor", c)] in
+        shape :: color @ b_color @ attrs
       )
       ~attrs_e:(fun (r,inst) ->
         let label = _to_str_escape "@[<v>%s%a@]@." r pp_inst_some inst in
