@@ -159,12 +159,12 @@ let extensionality_axiom =
   let prop = T.builtin ~ty:T.tType Builtin.Prop in
   Statement.assert_ ~proof:Proof.Step.trivial
     (T.bind_list ~ty:prop Binder.forall [x; y]
-      (T.app_builtin ~ty:prop Builtin.Imply [
-          T.bind ~ty:prop Binder.forall z
-            (T.app_builtin ~ty:prop Builtin.Eq [xz; yz]);
-          T.app_builtin ~ty:prop Builtin.Eq [T.var x; T.var y]
-        ]
-      )
+       (T.app_builtin ~ty:prop Builtin.Imply [
+           T.bind ~ty:prop Binder.forall z
+             (T.app_builtin ~ty:prop Builtin.Eq [xz; yz]);
+           T.app_builtin ~ty:prop Builtin.Eq [T.var x; T.var y]
+         ]
+       )
     )
 
 let process file =

@@ -36,9 +36,9 @@ let error_on_incomplete_match_ = ref false
 let () =
   Options.add_opts
     [ "--require-exhaustive-matches", Arg.Set error_on_incomplete_match_,
-        " fail if pattern matches are not exhaustive";
+      " fail if pattern matches are not exhaustive";
       "--no-require-exhautive-matches", Arg.Clear error_on_incomplete_match_,
-        " accept non-exhaustive pattern matches";
+      " accept non-exhaustive pattern matches";
     ]
 
 (* error-raising function *)

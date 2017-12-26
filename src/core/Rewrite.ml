@@ -453,9 +453,9 @@ module Lit = struct
         begin match T.view t with
           | T.Const id -> Some id
           | T.App (f, _) ->
-              begin match T.view f with
-                | T.Const id -> Some id | _ -> assert false
-              end
+            begin match T.view f with
+              | T.Const id -> Some id | _ -> assert false
+            end
           | _ -> assert false
         end
       | Literal.Equation _ -> None

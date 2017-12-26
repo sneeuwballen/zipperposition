@@ -224,12 +224,12 @@ module Make(E : Env.S) : S with module Env = E = struct
         _idx_unit_ineq :=
           if !enable_trivial_ineq_ || !enable_demod_ineq_
           then AL.fold_terms ~subterms:false ~vars:false ~pos ~which:`Max ~ord alit
-          |> Sequence.fold
-            (fun acc (t,pos) ->
-               assert (not (T.is_var t));
-               let with_pos = C.WithPos.( {term=t; pos; clause=c;} ) in
-               f acc t with_pos)
-            !_idx_unit_ineq
+               |> Sequence.fold
+                 (fun acc (t,pos) ->
+                    assert (not (T.is_var t));
+                    let with_pos = C.WithPos.( {term=t; pos; clause=c;} ) in
+                    f acc t with_pos)
+                 !_idx_unit_ineq
           else !_idx_unit_ineq
       | [| Lit.Int (AL.Divides d as alit) |] when d.AL.sign ->
         let pos = Position.(arg 0 stop) in
@@ -1810,7 +1810,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                  Lit.pp lit i C.pp c (Lits.is_max ~ord (C.lits c) i)
                  CCBV.print (Lits.maxlits ~ord @@ C.lits c);*)
                (* FIXME: find why this sometimes fails
-               assert (Lits.is_max ~ord (C.lits c) i); *)
+                  assert (Lits.is_max ~ord (C.lits c) i); *)
                let lits = CCArray.except_idx (C.lits c) i in
                let new_lits =
                  [ Lit.mk_arith_lesseq (M.succ m1) m2

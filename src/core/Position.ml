@@ -87,9 +87,9 @@ let is_strict_prefix p1 p2 = not (equal p1 p2) && is_prefix p1 p2
 
 module Map = struct
   include CCMap.Make(struct
-    type t = position
-    let compare = compare
-  end)
+      type t = position
+      let compare = compare
+    end)
 
   let prune_subsumed (m:_ t): _ t =
     filter

@@ -150,13 +150,13 @@ let fpf = Format.fprintf
 
 let pp_list ?(start="") ?(stop="") ?(sep=" ") pp out l =
   let rec pp_list l = match l with
-  | x::((_::_) as l) ->
-    pp out x;
-    Format.pp_print_string out sep;
-    Format.pp_print_cut out ();
-    pp_list l
-  | x::[] -> pp out x
-  | [] -> ()
+    | x::((_::_) as l) ->
+      pp out x;
+      Format.pp_print_string out sep;
+      Format.pp_print_cut out ();
+      pp_list l
+    | x::[] -> pp out x
+    | [] -> ()
   in
   Format.pp_print_string out start;
   pp_list l;

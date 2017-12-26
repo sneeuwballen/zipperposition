@@ -380,7 +380,7 @@ module Inner = struct
 
   let restrict_fun1
     : unif_subst -> ty:T.t -> to_:T.t DBEnv.t -> scope:Scoped.scope ->
-      (_ HVar.t * T.t list) -> unif_subst
+    (_ HVar.t * T.t list) -> unif_subst
     = fun subst ~ty ~to_:subset ~scope (v,args) ->
       assert (not (US.mem subst (v,scope)));
       (* only keep bound args *)
@@ -412,7 +412,7 @@ module Inner = struct
      [λall_vars. H (l1 ∩ l2)] *)
   let restrict_fun2
     : unif_subst -> ty_ret:T.t -> bvars:B_vars.t -> scope:Scoped.scope ->
-      _ -> _ -> unif_subst
+    _ -> _ -> unif_subst
     = fun subst ~ty_ret ~bvars ~scope (v1,l1) (v2,l2) ->
       assert (not (HVar.equal T.equal v1 v2)); (* non-trivial *)
       assert (not (US.mem subst (v1,scope)));
@@ -436,10 +436,10 @@ module Inner = struct
         let n = List.length l in
         let args =
           List.map
-             (fun a ->
-                let i = CCList.find_idx (T.equal a) l |> CCOpt.get_exn |> fst in
-                T.bvar ~ty:(T.ty_exn a) (n-i-1))
-             inter
+            (fun a ->
+               let i = CCList.find_idx (T.equal a) l |> CCOpt.get_exn |> fst in
+               T.bvar ~ty:(T.ty_exn a) (n-i-1))
+            inter
         in
         let body = T.app ~ty:ty_ret (T.var f) args in
         T.fun_l (List.map T.ty_exn l) body
@@ -668,8 +668,8 @@ module Inner = struct
         in
         unif_rec ~op ~root:false
           ~bvars:(B_vars.make
-            (DBEnv.push_l_rev bvars.B_vars.left new_vars1)
-            (DBEnv.push_l_rev bvars.B_vars.right new_vars2))
+              (DBEnv.push_l_rev bvars.B_vars.left new_vars1)
+              (DBEnv.push_l_rev bvars.B_vars.right new_vars2))
           subst (f1,scope) (f2,scope)
       | T.Bind (Binder.Lambda, _, _), _ ->
         (* [λx. t = u] becomes [t = u x] *)
@@ -678,8 +678,8 @@ module Inner = struct
         let n = List.length new_vars in
         unif_rec ~op ~root
           ~bvars:(B_vars.make
-            (DBEnv.push_l_rev bvars.B_vars.left new_vars)
-            (DBEnv.push_l_rev bvars.B_vars.right new_vars))
+              (DBEnv.push_l_rev bvars.B_vars.left new_vars)
+              (DBEnv.push_l_rev bvars.B_vars.right new_vars))
           subst
           (f1,scope)
           (T.app ~ty:(T.ty_exn f1)
@@ -692,8 +692,8 @@ module Inner = struct
         let n = List.length new_vars in
         unif_rec ~op ~root
           ~bvars:(B_vars.make
-            (DBEnv.push_l_rev bvars.B_vars.left new_vars)
-            (DBEnv.push_l_rev bvars.B_vars.right new_vars))
+              (DBEnv.push_l_rev bvars.B_vars.left new_vars)
+              (DBEnv.push_l_rev bvars.B_vars.right new_vars))
           subst
           (T.app ~ty:(T.ty_exn f2)
              (T.DB.shift n t1)

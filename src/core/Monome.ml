@@ -732,11 +732,11 @@ let normalize (type a) (m:a t): a t =
   List.fold_left
     (fun acc (c,t) ->
        (* flatten this term into a full monome *)
-         try
-           let m = of_term_exn m.num t in
-           sum acc (product m c)
-         with NotLinear ->
-           add acc c t)
+       try
+         let m = of_term_exn m.num t in
+         sum acc (product m c)
+       with NotLinear ->
+         add acc c t)
     acc m.terms
 
 module Int = struct

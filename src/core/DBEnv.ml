@@ -76,8 +76,8 @@ let filteri f db =
   let stack =
     CCList.foldi
       (fun acc i o -> match o with
-        | Some x when f i x -> Some x :: acc
-        | _ -> None :: acc)
+         | Some x when f i x -> Some x :: acc
+         | _ -> None :: acc)
       [] db.stack
     |> List.rev
   in

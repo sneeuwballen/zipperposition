@@ -558,7 +558,7 @@ module Pos = struct
   let fail_ t pos =
     Util.errorf ~where:"Term.Pos"
       "@[<2>invalid position `@[%a@]`@ in term `@[%a@]`@]"
-        P.pp pos debugf t
+      P.pp pos debugf t
 
   let rec at t pos = match view t, pos with
     | _, P.Type pos' ->

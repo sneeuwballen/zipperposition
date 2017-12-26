@@ -2,7 +2,7 @@
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Scoped Value} *)
- 
+
 type scope = int
 type +'a t = 'a * scope
 

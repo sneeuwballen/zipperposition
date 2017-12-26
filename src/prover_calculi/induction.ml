@@ -1188,8 +1188,8 @@ module Make
              let cut =
                A.introduce_cut ~penalty ~depth (Goal.form goal) proof
                  ~reason:Fmt.(fun out () -> fprintf out
-                     "(@[prove_ind@ :clauses (@[%a@])@ :on (@[%a@])@])"
-                     (Util.pp_list C.pp) clauses pp_csts generalize_on)
+                       "(@[prove_ind@ :clauses (@[%a@])@ :on (@[%a@])@])"
+                       (Util.pp_list C.pp) clauses pp_csts generalize_on)
              in
              A.add_lemma cut
            ))

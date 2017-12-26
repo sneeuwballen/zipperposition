@@ -298,7 +298,7 @@ end = struct
               (* cannot close this branch *)
               raise (Saturated_branch b)
             )
-            (* saturated *)
+          (* saturated *)
           | Some (f, b_tail) ->
             let new_branches =
               Rule.apply Rule.all f

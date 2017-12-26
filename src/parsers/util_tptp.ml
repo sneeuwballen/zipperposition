@@ -139,7 +139,7 @@ let parse_file ?cache ~recursive f =
            | (A.Include _ | A.IncludeOnly _), _ ->
              Queue.push decl result_decls)
         decls;
-        close_in input
+      close_in input
     with e ->
       close_in input;
       raise e

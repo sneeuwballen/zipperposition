@@ -443,9 +443,9 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
 
   let add_imply (l:cut_res list) (res:cut_res) (p:Proof.Step.t): unit =
     let c = res.cut_lit :: List.map (fun cut -> BLit.neg cut.cut_lit) l in
-      Util.debugf ~section 3
-        "(@[<2>add_imply@ :premises (@[<hv>%a@])@ :concl %a@ :proof %a@])"
-        (fun k->k (Util.pp_list pp_cut_res) l pp_cut_res res Proof.Step.pp p);
+    Util.debugf ~section 3
+      "(@[<2>add_imply@ :premises (@[<hv>%a@])@ :concl %a@ :proof %a@])"
+      (fun k->k (Util.pp_list pp_cut_res) l pp_cut_res res Proof.Step.pp p);
     Solver.add_clause ~proof:p c;
     ()
 
