@@ -299,6 +299,23 @@ and pp_infix_ depth b out l = match l with
 let pp = pp_rec 0
 let pp_inner = pp_rec_inner 0
 
+let subterms (t:t) (k:t -> unit) : unit =
+  let rec aux t =
+    k t;
+    CCOpt.iter aux (ty t);
+    begin match view t with
+      | Type | Const _ | Var _ -> ()
+      | App (f,a) -> aux f; aux a
+      | Arrow (a,b) -> aux a; aux b
+      | Bind { body;_ } -> aux body
+      | AppBuiltin  (_,l) -> List.iter aux l
+      | Ite (a,b,c) -> aux a; aux b; aux c
+      | Int_pred (l,_) -> Linexp_int.subterms l k
+      | Rat_pred (l,_) -> Linexp_rat.subterms l k
+    end
+  in
+  aux t
+
 let[@inline] mk_ view ty : t =
   let t = {view; ty; id= -1; } in
   H_cons.hashcons t
@@ -324,7 +341,9 @@ let ite a b c =
 let[@inline] app_ f x ~ty = mk_ (App (f,x)) (Some ty)
 let[@inline] arrow_ a b = mk_ (Arrow (a,b)) (Some t_type)
 
-let[@inline] bind ~ty binder ~ty_var body = mk_ (Bind {binder;ty_var;body}) (Some ty)
+let[@inline] bind_ ~ty binder ~ty_var body = mk_ (Bind {binder;ty_var;body}) (Some ty)
+
+let id_eta_ = ID.make "test_eta_" (* privat to {!as_eta_expansion} *)
 
 let[@inline] app_builtin ~ty b l =
   let mk_ b l = mk_ (AppBuiltin(b,l)) (Some ty) in
@@ -386,7 +405,7 @@ let[@inline] map ~f ~bind:f_bind b_acc t = match view t with
   | Arrow (a,b) -> arrow_ (f b_acc a) (f b_acc b)
   | Bind b ->
     let b_acc' = f_bind b_acc in
-    bind b.binder ~ty:(f b_acc @@ ty_exn t) ~ty_var:(f b_acc b.ty_var)
+    bind_ b.binder ~ty:(f b_acc @@ ty_exn t) ~ty_var:(f b_acc b.ty_var)
       (f b_acc' b.body)
   | AppBuiltin (b,l) ->
     app_builtin ~ty:(f b_acc @@ ty_exn t) b (List.map (f b_acc) l)
@@ -422,6 +441,17 @@ let db_eval ~(sub:t) (t:t) : t =
       map ~f:aux ~bind:succ k t
   in
   aux 0 t
+
+let bind ~ty binder ~ty_var body = match binder, view body with
+  | Binder.Lambda, App (t, {view=Var v; _}) when HVar.id v = 0 ->
+    (* eta reduction for λ:
+       check if replacing [db0] with a fresh [c] in [t] contains [c] *)
+    let c = const id_eta_ ~ty:(HVar.ty v) in
+    let t_reduced = db_eval ~sub:c t in
+    if subterms t_reduced |> Sequence.exists (equal c)
+    then bind_ binder ~ty ~ty_var body
+    else t_reduced
+  | _ -> bind_ binder ~ty ~ty_var body
 
 let app_ f x = match ty f, ty x with
   | Some {view=Arrow (a,b);_}, Some a' when equal a a' -> app_ f x ~ty:b
@@ -473,7 +503,19 @@ let rec arrow_l l ret = match l with
 
 let box_opaque t = app_builtin ~ty:(ty_exn t) Builtin.Box_opaque [t]
 
-let lambda ~ty_var body =
+let id_eta_ = ID.make "test_eta_" (* privat to {!as_eta_expansion} *)
+
+(* check if [body = t db0], with [db0 ∉ t].
+   returns [Some (t shift -1)] if it's the case *)
+let as_eta_expansion body : _ option = match view body with
+  | App (t, {view=Var v; _}) when HVar.id v = 0 ->
+    (* check if replacing [db0] with a fresh [c] in [t] contains [c] *)
+    let c = const id_eta_ ~ty:(HVar.ty v) in
+    let t_reduced = db_eval ~sub:c t in
+    if subterms t_reduced |> Sequence.exists (equal c) then None else Some t_reduced
+  | _ -> None
+
+let[@inline] lambda ~ty_var body =
   bind Binder.Lambda ~ty:(arrow ty_var @@ ty_exn body) ~ty_var body
 
 module Form = struct
