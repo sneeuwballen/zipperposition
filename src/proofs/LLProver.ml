@@ -19,6 +19,7 @@ let stat_solve = Util.mk_stat "llprover.prove"
 (** Congruence Closure *)
 module CC = Congruence.Make(struct
     include T
+    let pp = pp_inner
 
     let subterms t = match T.view t with
       | T.App (f, a) -> [f;a]
@@ -72,12 +73,13 @@ module Branch : sig
 
   val root : unit -> t
 
+  val check_closed : t -> t
   val is_closed : t -> bool
 
   val add : t -> T.t list -> t
   (** add the given set of formulas *)
 
-  val pop_open : t -> (T.t * t) option
+  val pop_to_expand : t -> (T.t * t) option
   (** remove and return next formula to expand *)
 
   type closed =
@@ -157,7 +159,7 @@ end = struct
   let[@inline] add_eq t u b : t =
     if is_closed b then b else b |> add_cc_eq t u |> check_closed
   let[@inline] add_diseq t u b : t =
-    if is_closed b then b else b |> add_diseq_l_ t u |> check_closed
+    if is_closed b then b else b |> add_cc_ t |> add_cc_ u |> add_diseq_l_ t u |> check_closed
   let[@inline] add_to_expand f b =
     if is_closed b then b else {b with to_expand=T_set.add f b.to_expand}
 
@@ -165,7 +167,7 @@ end = struct
     b |> add_to_expand f |> check_closed
 
   let rec is_atomic f = match F.view f with
-    | F.Eq _ | F.Neq _ | F.Atom _ -> true
+    | F.Eq _ | F.Neq _ | F.Atom _ | F.Int_pred _ | F.Rat_pred _ -> true
     | F.Not u -> is_atomic u
     | _ -> false
 
@@ -195,9 +197,9 @@ end = struct
             add_form_to_expand (F.and_ [F.or_ [a; F.not_ b]; F.or_ [b; F.not_ a]]) br
           | F.Exists {ty_var;body}  ->
             let f = F.forall ~ty_var (F.not_ body) in
-            br |> add_cc_eq f F.true_ |> check_closed
+            br |> add_eq f F.true_
           | F.Forall _ ->
-            br |> add_cc_eq f F.false_ |> check_closed
+            br |> add_eq f F.false_
         end
       | F.And _ | F.Or _ -> add_form_to_expand f br
       | F.Imply (a,b) -> add_form_to_expand (F.or_ [F.not_ a; b]) br
@@ -206,10 +208,10 @@ end = struct
       | F.Equiv (a,b) ->
         add_form_to_expand (F.and_ [F.or_ [a; F.not_ b]; F.or_ [b; F.not_ a]]) br
       | F.Forall _ ->
-        br |> add_cc_eq f F.true_ |> check_closed
+        br |> add_eq f F.true_
       | F.Exists {ty_var;body} ->
         let f = F.forall ~ty_var (F.not_ body) in
-        br |> add_cc_eq f F.false_ |> check_closed
+        br |> add_eq f F.false_
     end
 
   let add1 br f : t = if is_closed br then br else add1_ br f
@@ -225,7 +227,7 @@ end = struct
     in
     List.fold_left add1 b l
 
-  let pop_open b =
+  let pop_to_expand b =
     if is_closed b then None
     else begin match T_set.choose b.to_expand with
       | f ->
@@ -303,7 +305,7 @@ let solve_ (tab:t) : res =
     tab.open_branches <- List.tl tab.open_branches;
     Util.debugf ~section 3
       "(@[llproof.check.tab.solve@ %a@])" (fun k->k debug_tab tab);
-    begin match Branch.pop_open b with
+    begin match Branch.pop_to_expand b with
       | None ->
         if Branch.is_closed b then (
           tab.closed_branches <- b :: tab.closed_branches
@@ -333,6 +335,7 @@ let solve_ (tab:t) : res =
   begin match tab.saturated with
     | Some b ->
       (* found a branch that is not refutable *)
+      assert (not (Branch.is_closed @@ Branch.check_closed b));
       Util.debugf ~section 1 "(@[llprover.prove.failed@ :branch %a@])"
         (fun k->k Branch.debug b);
       R_fail

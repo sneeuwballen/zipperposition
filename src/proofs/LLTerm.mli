@@ -100,6 +100,7 @@ val db_eval : sub:t -> t -> t
 (** [db_eval ~sub t] replaces De Bruijn 0 in [t] by [sub] *)
 
 val pp : t CCFormat.printer
+val pp_inner : t CCFormat.printer
 
 module Form : sig
   type t = term

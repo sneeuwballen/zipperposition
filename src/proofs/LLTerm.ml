@@ -253,23 +253,23 @@ module H_cons = Hashcons.Make(struct
 let rec pp_rec depth out (t:t) = match view t with
   | Type -> Fmt.string out "type"
   | Const id -> ID.pp_fullc out id
-  | App (f,a) -> Fmt.fprintf out "@[%a@ %a@]" (pp_rec depth) f (pp_inner depth) a
+  | App (f,a) -> Fmt.fprintf out "@[%a@ %a@]" (pp_rec depth) f (pp_rec_inner depth) a
   | Arrow (a,b) ->
-    Fmt.fprintf out "@[%a@ @<1>→ %a@]" (pp_inner depth) a (pp_rec depth) b
+    Fmt.fprintf out "@[%a@ @<1>→ %a@]" (pp_rec_inner depth) a (pp_rec depth) b
   | Var v -> Format.fprintf out "Y%d" (depth-HVar.id v-1)
   | AppBuiltin (Builtin.Box_opaque, [t]) ->
     Format.fprintf out "@<1>⟦@[%a@]@<1>⟧" (pp_rec depth) t
   | AppBuiltin (b, [a]) when Builtin.is_prefix b ->
-    Format.fprintf out "@[<1>%a@ %a@]" Builtin.pp b (pp_inner depth) a
+    Format.fprintf out "@[<1>%a@ %a@]" Builtin.pp b (pp_rec_inner depth) a
   | AppBuiltin (b, ([t1;t2] | [_;t1;t2])) when Builtin.fixity b = Builtin.Infix_binary ->
     Format.fprintf out "@[<1>%a %a@ %a@]"
-      (pp_inner depth) t1 Builtin.pp b (pp_inner depth) t2
+      (pp_rec_inner depth) t1 Builtin.pp b (pp_rec_inner depth) t2
   | AppBuiltin (b, l) when Builtin.is_infix b && List.length l > 0 ->
     Format.fprintf out "@[<hv>%a@]" (pp_infix_ depth b) l
   | AppBuiltin (b, []) -> Builtin.pp out b
   | AppBuiltin (b, l) ->
     Format.fprintf out "(@[<hv>%a@ %a@])"
-      Builtin.pp b (Util.pp_list (pp_inner depth)) l
+      Builtin.pp b (Util.pp_list (pp_rec_inner depth)) l
   | Bind {ty_var;binder;body} ->
     Fmt.fprintf out "@[%a (@[Y%d:%a@]).@ %a@]"
       Binder.pp binder
@@ -277,26 +277,27 @@ let rec pp_rec depth out (t:t) = match view t with
       (pp_rec @@ depth+1) body
   | Ite (a,b,c) ->
     Fmt.fprintf out "@[<hv2>ite %a@ %a@ %a@]"
-      (pp_inner depth) a
-      (pp_inner depth) b
-      (pp_inner depth) c
+      (pp_rec_inner depth) a
+      (pp_rec_inner depth) b
+      (pp_rec_inner depth) c
   | Int_pred (l,o) ->
-    Fmt.fprintf out "(@[%a@ %a@])" (Linexp_int.pp (pp_inner depth)) l Int_op.pp o
+    Fmt.fprintf out "(@[%a@ %a@])" (Linexp_int.pp (pp_rec_inner depth)) l Int_op.pp o
   | Rat_pred (l,o) ->
-    Fmt.fprintf out "(@[%a@ %a@])" (Linexp_rat.pp (pp_inner depth)) l Rat_op.pp o
-and pp_inner depth out t = match view t with
+    Fmt.fprintf out "(@[%a@ %a@])" (Linexp_rat.pp (pp_rec_inner depth)) l Rat_op.pp o
+and pp_rec_inner depth out t = match view t with
   | App _ | Bind _ | AppBuiltin (_,_::_) | Arrow _ | Ite _ ->
     Fmt.fprintf out "(%a)@{<Black>/%d@}" (pp_rec depth) t t.id
   | Type | Const _ | Var _ | AppBuiltin (_,[]) | Int_pred _ | Rat_pred _ ->
     Fmt.fprintf out "%a@{<Black>/%d@}" (pp_rec depth) t t.id
 and pp_infix_ depth b out l = match l with
   | [] -> assert false
-  | [t] -> pp_inner depth out t
+  | [t] -> pp_rec_inner depth out t
   | t :: l' ->
     Format.fprintf out "@[%a@]@ %a %a"
-      (pp_inner depth) t Builtin.pp b (pp_infix_ depth b) l'
+      (pp_rec_inner depth) t Builtin.pp b (pp_infix_ depth b) l'
 
 let pp = pp_rec 0
+let pp_inner = pp_rec_inner 0
 
 let[@inline] mk_ view ty : t =
   let t = {view; ty; id= -1; } in
@@ -502,8 +503,8 @@ module Form = struct
     | AppBuiltin (Builtin.And, l) -> And l
     | AppBuiltin (Builtin.Or, l) -> Or l
     | AppBuiltin (Builtin.Not, [t]) -> Not t
-    | AppBuiltin (Builtin.Eq, [t;u]) -> Eq(t,u)
-    | AppBuiltin (Builtin.Neq, [t;u]) -> Neq(t,u)
+    | AppBuiltin (Builtin.Eq, ([_;t;u]|[t;u])) -> Eq(t,u)
+    | AppBuiltin (Builtin.Neq, ([_;t;u]|[t;u])) -> Neq(t,u)
     | AppBuiltin (Builtin.Imply, [t;u]) -> Imply(t,u)
     | AppBuiltin (Builtin.Equiv, [t;u]) -> Equiv(t,u)
     | AppBuiltin (Builtin.Xor, [t;u]) -> Xor(t,u)
