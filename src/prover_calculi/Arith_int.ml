@@ -1670,7 +1670,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   let _has_arith c =
     CCArray.exists Lit.is_arith (C.lits c)
 
-  module Simp = Simplex.MakeHelp(T)
+  module Simp_var = Funarith.Linear_expr.Make_var_gen(T)
+  module Simp = Funarith_zarith.Simplex.Make_full(Simp_var)
 
   (* tautology check: take the linear system that is the negation
      of all a≠b and a≤b, and check its (rational) satisfiability. If
@@ -1686,24 +1687,34 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* create a list of constraints for some arith lits *)
     let constraints =
       Lits.fold_arith ~eligible:C.Eligible.arith (C.lits c)
-      |> Sequence.fold
-        (fun acc (lit,_) ->
+      |> Sequence.filter_map
+        (fun (lit,_) ->
            (* negate the literal and make a constraint out of it *)
            match lit with
              | AL.Binary (AL.Lesseq, m1, m2) ->
                (* m1 ≤ m2 ----> m1-m2 > 0 ---> m1-m2 ≥ 1 *)
                let m, c = to_rat (M.difference m1 m2) in
-               (Simp.GreaterEq, m, Q.add (Q.neg c) Q.one) :: acc
+               let m =
+                 List.map (fun (c,t) -> c, Simp_var.User t) m |> Simp.L.Comb.of_list
+               in
+               let c = Simp.L.Constr.geq m (Q.add (Q.neg c) Q.one) in
+               Some c
              | AL.Binary (AL.Different, m1, m2) ->
                (* m1 != m2  -----> (m1-m2) = 0 *)
                let m, c = to_rat (M.difference m1 m2) in
-               (Simp.Eq, m, Q.neg c) :: acc
-             | _ -> acc)
-        []
+               let m =
+                 List.map (fun (c,t) -> c, Simp_var.User t) m |> Simp.L.Comb.of_list
+               in
+               let c = Simp.L.Constr.eq m (Q.neg c) in
+               Some c
+             | _ -> None)
+        |> Sequence.to_rev_list
     in
-    let simplex = Simp.add_constraints Simp.empty constraints in
+    let simplex = Simp.create () in
+    Simp.add_problem simplex constraints;
+    let res = Simp.solve simplex in
     Util.exit_prof prof_arith_semantic_tautology;
-    match Simp.ksolve simplex with
+    match res with
       | Simp.Unsatisfiable _ -> true (* negation unsatisfiable *)
       | Simp.Solution _ -> false
 
@@ -1717,11 +1728,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       C.set_flag flag_tauto c res;
       C.set_flag flag_computed_tauto c true;
       if res then (
-        Util.incr_stat stat_arith_semantic_tautology_steps;
+        Util.incr_stat stat_arith_semantic_tautology;
         Util.debugf ~section 4
           "@[<2>clause@ @[%a@]@ is an arith tautology@]" (fun k->k C.pp c);
       );
-      Util.incr_stat stat_arith_semantic_tautology;
+      Util.incr_stat stat_arith_semantic_tautology_steps;
       res
     )
 

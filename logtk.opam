@@ -25,6 +25,7 @@ depopts: [
   "qcheck" {test}
   "msat" { >= "0.5" }
   "menhir" {build}
+  "funarith"
 ]
 available: [
     ocaml-version >= "4.03.0"
