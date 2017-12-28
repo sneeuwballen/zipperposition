@@ -65,6 +65,10 @@ module CC = Congruence.Make(struct
         -> assert false
   end)
 
+module Simp_var = Funarith_zarith.Linear_expr.Make_var_gen(T)
+module Simp_expr = Funarith_zarith.Linear_expr.Make(Simp_var)
+module Simp = Funarith_zarith.Simplex.Make_full_for_expr(Simp_var)(Simp_expr)
+
 (** Branches of the tableau. A branch is a conjunction of formulas
     plus some theory context (congruence closure).
     A branch is closed if it's inconsistent *)
@@ -85,6 +89,7 @@ module Branch : sig
   type closed =
     | C_not_closed
     | C_closed_by_diseq of T.t * T.t
+    | C_closed_by_lra of Simp.cert
     | C_closed_by_theory of string
 
   val to_expand : t -> T.t Sequence.t
@@ -92,7 +97,8 @@ module Branch : sig
   val closed : t -> closed
   val id : t -> int
   val parent : t -> t option
-  val diseq : t -> (T.t * T.t) Sequence.t
+  val diseq : t -> (T.t * T.t) list
+  val lra : t -> Simp.op Simp_expr.Constr.t list
 
   val debug : t CCFormat.printer
 end = struct
@@ -101,6 +107,7 @@ end = struct
   type closed =
     | C_not_closed
     | C_closed_by_diseq of T.t * T.t
+    | C_closed_by_lra of Simp.cert
     | C_closed_by_theory of string
 
   type t = {
@@ -109,6 +116,7 @@ end = struct
     to_expand : T_set.t; (* all to expand *)
     cc: CC.t;
     diseq: (T.t * T.t) list; (* negative constraints *)
+    lra : Simp.op Simp_expr.Constr.t list; (* LRA constraints *)
     mutable closed: closed;
     parent: t option;
   }
@@ -117,7 +125,8 @@ end = struct
   let[@inline] to_expand t = T_set.to_seq t.to_expand
   let[@inline] parent t = t.parent
   let[@inline] id t = t.id
-  let[@inline] diseq t = Sequence.of_list t.diseq
+  let[@inline] diseq t = t.diseq
+  let[@inline] lra t = t.lra
   let[@inline] form t = t.form
 
   let root () : t = {
@@ -126,6 +135,7 @@ end = struct
     to_expand=T_set.empty;
     cc=CC.create();
     diseq=[(F.true_, F.false_)];
+    lra=[];
     closed=C_not_closed;
     parent=None;
   }
@@ -141,6 +151,19 @@ end = struct
     in
     aux
 
+  let check_closed_lra (b:t) : t =
+    if is_closed b then b
+    else (
+      let simp = Simp.create() in
+      Simp.add_problem simp b.lra;
+      begin match Simp.solve simp with
+        | Simp.Solution _ -> ()
+        | Simp.Unsatisfiable cert ->
+          b.closed <- C_closed_by_lra cert
+      end;
+      b
+    )
+
   (* check if some diseq is true *)
   let check_closed (b:t) : t =
     if is_closed b then b
@@ -149,12 +172,26 @@ end = struct
         | None -> ()
         | Some (t,u) -> b.closed <- C_closed_by_diseq (t,u)
       end;
-      b
+      check_closed_lra b
     )
+
+  let conv_lra (le:T.Linexp_rat.t) (o:T.Rat_op.t) : _ Simp.L.Constr.t =
+    let c, l = T.Linexp_rat.extract le in
+    let l = List.map (fun (t,c) -> c, Simp_var.User t) l in
+    let op = match o with
+      | T.Rat_op.Leq0 -> `Leq
+      | T.Rat_op.Geq0 -> `Geq
+      | T.Rat_op.Lt0 -> `Lt
+      | T.Rat_op.Gt0 -> `Gt
+      | T.Rat_op.Eq0 -> `Eq
+      | T.Rat_op.Neq0 -> assert false
+      in
+    Simp.L.Constr.make (Simp.L.Comb.of_list l) op (Q.neg c)
 
   let[@inline] add_cc_ t b = { b with cc=CC.add b.cc t; }
   let[@inline] add_cc_eq t u b = { b with cc=CC.mk_eq b.cc t u }
   let[@inline] add_diseq_l_ t u b = { b with diseq=(t,u)::b.diseq }
+  let[@inline] add_lra_ l o b = {b with lra=conv_lra l o :: b.lra}
 
   let[@inline] add_eq t u b : t =
     if is_closed b then b else b |> add_cc_eq t u |> check_closed
@@ -162,6 +199,8 @@ end = struct
     if is_closed b then b else b |> add_cc_ t |> add_cc_ u |> add_diseq_l_ t u |> check_closed
   let[@inline] add_to_expand f b =
     if is_closed b then b else {b with to_expand=T_set.add f b.to_expand}
+  let[@inline] add_lra l o b : t =
+    if is_closed b then b else b |> add_lra_ l o |> check_closed_lra
 
   let[@inline] add_form_to_expand f b =
     b |> add_to_expand f |> check_closed
@@ -181,7 +220,19 @@ end = struct
       | F.Eq (t,u) -> add_eq t u br
       | F.Neq (t,u) -> add_diseq t u br
       | F.Int_pred (_,_) -> add_eq f F.true_ br (* TODO: decision proc *)
-      | F.Rat_pred (_,_) -> add_eq f F.true_ br (* TODO: simplex *)
+      | F.Rat_pred (l,T.Rat_op.Neq0) ->
+        (* case split *)
+        let split =
+          F.or_
+            [ F.rat_pred l T.Rat_op.Gt0;
+              F.rat_pred l T.Rat_op.Lt0;
+            ]
+        in
+        br |> add_eq f F.true_ |> add_form_to_expand split
+      | F.Rat_pred (l,o) ->
+        br
+        |> add_eq f F.true_
+        |> add_lra l o
       | F.Not f' ->
         begin match F.view f' with
           | F.Eq _ | F.Neq _ | F.Not _ | F.Int_pred _ | F.Rat_pred _ -> assert false
@@ -351,8 +402,8 @@ let solve_ (tab:t) : res =
 let can_check : LLProof.tag list -> bool =
   let open Builtin.Tag in
   let f = function
-    | T_ho -> true
-    | T_lra | T_lia | T_ind | T_data
+    | T_ho | T_lra -> true
+    | T_lia | T_ind | T_data
     | T_distinct | T_ac _ | T_ext -> false
   in
   List.for_all f
@@ -404,6 +455,8 @@ let pp_dot out (s:final_state) : unit =
         Fmt.fprintf out "<not closed> (%d to expand)" (Branch.to_expand b |> Sequence.length)
       | Branch.C_closed_by_diseq (t,u) ->
         Fmt.fprintf out "<closed by `@[<1>%a ≠@ %a@]`>" T.pp t T.pp u
+      | Branch.C_closed_by_lra cert ->
+        Fmt.fprintf out "<closed by LRA %a>" Simp.pp_cert cert
       | Branch.C_closed_by_theory s ->
         Fmt.fprintf out "<closed by theory %S>" s
     in

@@ -114,6 +114,7 @@ module type LINEXP = sig
   val equal : t -> t -> bool
   val map : (term -> term) -> t -> t
   val subterms : t -> term Sequence.t
+  val extract : t -> num * (term * num) list
   val pp : term CCFormat.printer -> t CCFormat.printer
 end
 
@@ -162,6 +163,9 @@ module Make_linexp(N : NUM) = struct
     I_map.fold (fun _ (t,n) acc -> add n (f t) acc) e.coeffs (const e.const)
 
   let subterms e = I_map.values e.coeffs |> Sequence.map fst
+  let extract e =
+    let l = I_map.values e.coeffs |> Sequence.to_rev_list in
+    e.const, l
 
   let pp pp_t out (e:t): unit =
     if is_const e then N.pp_print out e.const

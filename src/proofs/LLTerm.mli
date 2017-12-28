@@ -63,6 +63,7 @@ module type LINEXP = sig
   val equal : t -> t -> bool
   val map : (term -> term) -> t -> t
   val subterms : t -> term Sequence.t
+  val extract : t -> num * (term * num) list
   val pp : term CCFormat.printer -> t CCFormat.printer
 end
 
