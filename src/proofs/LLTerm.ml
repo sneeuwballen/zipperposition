@@ -124,19 +124,20 @@ module Make_linexp(N : NUM) = struct
   let zero : t = {const=N.zero; coeffs=I_map.empty}
   let is_const e = I_map.is_empty e.coeffs
   let is_zero e = is_const e && N.equal N.zero e.const
-  let merge_ f a b : t = {
-    const=f a.const b.const;
+  let merge_ ~f2 ~f1 a b : t = {
+    const=f2 a.const b.const;
     coeffs=I_map.merge_safe a.coeffs b.coeffs
       ~f:(fun _ o -> match o with
-        | `Left n | `Right n -> Some n
+        | `Left n -> Some n
+        | `Right n -> Some (f1 n)
         | `Both ((t,a),(t2,b)) ->
           assert (t==t2);
-          let c = f a b in
+          let c = f2 a b in
           if N.equal N.zero c then None else Some (t,c))
   }
 
-  let (+) = merge_ N.(+)
-  let (-) = merge_ N.(-)
+  let (+) = merge_ ~f2:N.(+) ~f1:CCFun.id
+  let (-) = merge_ ~f2:N.(-) ~f1:(fun (t,n) -> t, N.(-) N.zero n)
   let ( * ) c e : t =
     if N.equal N.zero c then zero
     else {const=N.(c * e.const); coeffs=I_map.map (fun (t,n) -> t, N.(c*n)) e.coeffs}
