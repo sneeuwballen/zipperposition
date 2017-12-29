@@ -15,8 +15,10 @@ depends: [
   "containers" { >= "1.0" }
   "sequence" { >= "0.4" }
   "jbuilder" { build }
-  "msat" { >= "0.5" }
+  "msat" { >= "0.5" < "1.0" }
   "menhir" {build}
+  "logtk"
+  "libzipperposition"
 ]
 available: [
     ocaml-version >= "4.03.0"

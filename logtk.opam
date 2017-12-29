@@ -20,7 +20,7 @@ depends: [
 ]
 depopts: [
   "qcheck" {test}
-  "msat" { >= "0.5" }
+  "msat" { >= "0.5" < "1.0" }
   "menhir" {build}
 ]
 available: [
