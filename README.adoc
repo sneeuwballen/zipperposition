@@ -573,6 +573,18 @@ See http://c-cube.github.io/zipperposition/[this page].
 There are some examples of how to use the code in `src/tools/`
 and `src/demo/`.
 
+== Docker
+
+(experimental)
+
+to build an image:
+
+- `docker build -t zipper .`
+
+to use the image:
+
+- `docker run -i zipper < examples/pelletier_problems/pb47.zf`
+
 == Howto (for devs)
 
 === Make a release
