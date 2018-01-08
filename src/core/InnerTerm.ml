@@ -708,6 +708,10 @@ let rec open_poly_fun ty = match view ty with
     let args, ret = open_fun ty in
     0, args, ret
 
+let rec expected_ty_vars ty = match view ty with
+  | Bind (Binder.ForallTy, _, ty') -> 1 + expected_ty_vars ty'
+  | _ -> 0
+
 let is_ground t = Sequence.is_empty (Seq.vars t)
 
 (** {3 Misc} *)

@@ -186,9 +186,7 @@ let rec expected_args ty = match view ty with
   | Forall ty' -> expected_args ty'
   | DB _ | Var _ | Builtin _ | App _ -> []
 
-let rec expected_ty_vars ty = match view ty with
-  | Forall ty' -> 1 + expected_ty_vars ty'
-  | _ -> 0
+let expected_ty_vars t = T.expected_ty_vars t
 
 let needs_args ty = expected_ty_vars ty>0 || expected_args ty<>[]
 

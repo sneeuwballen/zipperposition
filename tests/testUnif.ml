@@ -16,7 +16,7 @@ module Q = QCheck
 (** {2 Unit Tests} *)
 
 let psterm, pstmt, pstmt_l, clear_scope, unif_ty =
-  let tyctx = TypeInference.Ctx.create ~implicit_ty_args:true () in
+  let tyctx = TypeInference.Ctx.create ~implicit_ty_args:false () in
   let pt s =
     let t = Parse_zf.parse_term Lex_zf.token (Lexing.from_string s) in
     let t = TypeInference.infer_exn tyctx t in
@@ -30,7 +30,7 @@ let psterm, pstmt, pstmt_l, clear_scope, unif_ty =
   and pst_l s =
     let l = Parse_zf.parse_statement_list Lex_zf.token (Lexing.from_string s) in
     let l = TypeInference.infer_statements_exn
-        ~on_var:`Default ~ctx:tyctx ~implicit_ty_args:true
+        ~on_var:`Default ~ctx:tyctx ~implicit_ty_args:false
         (Sequence.of_list l) in
     (* TypeInference.Ctx.exit_scope tyctx; *)
     CCVector.to_list l
@@ -57,7 +57,9 @@ let () =
      val r : term -> prop.
      val s : prop.
      val f_ho2: (term -> term ) -> (term -> term) -> term.
+     val g_ho: (term -> term -> term) -> term.
      val p_ho2: (term -> term ) -> (term -> term) -> prop.
+     val a_poly : pi a. a -> a.
      val f_poly : pi a b. (a -> b) -> (a -> b) -> a.
    ")
 
@@ -93,9 +95,10 @@ let pterm2 =
 
 module Task : sig
   type t
-  val mk_unif : ?unif_types:bool -> ?with_ty:string -> string -> string -> t
+  val mk_unif : ?negated:bool -> ?unif_types:bool -> ?with_ty:string -> string -> string -> t
   val set_with_ty : string -> t -> t
   val set_unif_types : bool -> t -> t
+  val is_negated : t -> bool
   val pp : t CCFormat.printer
   val parse : t -> T.t * T.t
 end = struct
@@ -105,10 +108,11 @@ end = struct
         t2: string;
         unif_types: bool;
         with_ty: string option;
+        negated: bool;
       }
 
-  let mk_unif ?(unif_types=true) ?with_ty t1 t2 : t =
-    Unif {t1;t2;unif_types; with_ty}
+  let mk_unif ?(negated=false) ?(unif_types=true) ?with_ty t1 t2 : t =
+    Unif {t1;t2;unif_types; with_ty; negated}
 
   let set_with_ty ty = function
     | Unif r -> Unif {r with with_ty=Some ty}
@@ -116,12 +120,15 @@ end = struct
   let set_unif_types b = function
     | Unif r -> Unif {r with unif_types=b}
 
+  let is_negated = function
+    | Unif {negated; _} -> negated
+
   let pp out = function
     | Unif {t1; t2; with_ty=None; _} -> Format.fprintf out "(%s, %s)" t1 t2
     | Unif {t1; t2; with_ty=Some ty; _} -> Format.fprintf out "(%s, %s) : %s" t1 t2 ty
 
   let parse_ = function
-    | Unif {with_ty; t1; t2; unif_types} -> pterm2 ~unif_types ?ty:with_ty t1 t2
+    | Unif {with_ty; t1; t2; unif_types; _} -> pterm2 ~unif_types ?ty:with_ty t1 t2
 
   let parse p =
     try parse_ p
@@ -154,28 +161,34 @@ let check_eq t1 t2 =
   OUnit.assert_equal ~printer:T.ZF.to_string ~cmp:T.equal t1 t2
 
 let unifier2 t u =
-  try
     let subst = Unif.FO.unify_syn (t,0)(u,1) in
     let renaming = Subst.Renaming.create() in
     Subst.FO.apply renaming subst (t,0) |> Lambda.snf,
     Subst.FO.apply renaming subst (u,1) |> Lambda.snf,
     renaming,
     subst
-  with Unif.Fail ->
-    let msg = CCFormat.sprintf "@[<2>`%a`[0]@ and `%a`[1]@ should be unifiable@]@."
-        T.ZF.pp t T.ZF.pp u in
-    OUnit.assert_failure msg
 
 let unifier t u =
   let t', u', _, _ = unifier2 t u in
   OUnit.assert_equal ~printer:T.ZF.to_string ~cmp:T.equal t' u';
   t'
 
-let check_unifiable t u =
+let check_unifiable ?(negated=false) t u =
   let name = Fmt.sprintf "(@[unifiable `%a`@ `%a`@])" T.ZF.pp t T.ZF.pp u in
   name >:: fun () ->
-    let _ = unifier2 t u in
-    ()
+    try
+      let _ = unifier2 t u in
+      if negated then (
+        let msg = CCFormat.sprintf "@[<2>`%a`[0]@ and `%a`[1]@ should not be unifiable@]@."
+            T.ZF.pp t T.ZF.pp u in
+        OUnit.assert_failure msg
+      )
+    with Unif.Fail ->
+      if not negated then (
+        let msg = CCFormat.sprintf "@[<2>`%a`[0]@ and `%a`[1]@ should be unifiable@]@."
+            T.ZF.pp t T.ZF.pp u in
+        OUnit.assert_failure msg
+      )
 
 let check_unify_correct t u =
   let name = Fmt.sprintf "(@[unify_correct `%a`@ `%a`@])" T.ZF.pp t T.ZF.pp u in
@@ -243,16 +256,22 @@ end
 
 let suite_unif1 : OUnit.test list =
   let (=?=) a b = Task.mk_unif a b in (* unif pair *)
+  let (<?>) a b = Task.mk_unif ~negated:true a b in (* unif pair *)
   let (>->) a b = Task.set_with_ty b a in (* specify return type *)
   let (>?->) a b = Action.set_with_ty b a in (* specify return type *)
   let mk_tests (pair,actions) =
     let t, u = Task.parse pair in
     let actions = List.map Action.parse actions in
     clear_scope();
-    check_unifiable t u ::
+    if Task.is_negated pair then
+      check_unifiable ~negated:true t u ::
+      List.map (Action.check t u) actions
+    else (
+      check_unifiable t u ::
       check_unify_correct t u ::
       check_unifier_matches t u ::
       List.map (Action.check t u) actions
+    )
   in
   CCList.flat_map mk_tests
     [ "f X b" =?= "f a Y", [
@@ -290,6 +309,7 @@ let suite_unif1 : OUnit.test list =
         Action.eq "X" 1 "f_poly _ _ (f (f a b)) F2" 0;
            *)
       ];
+      ( "F (g_ho F)" <?> "a_poly A") |> Task.set_unif_types false, [];
     ]
 
 let reg_matching1 () =
