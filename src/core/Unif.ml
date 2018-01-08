@@ -500,7 +500,7 @@ module Inner = struct
     (*Format.printf "(@[unif_rec@ :t1 `%a`@ :t2 `%a`@ :op %a@ :subst @[%a@]@ :bvars %a@])@."
       (Scoped.pp T.pp) (t1,sc1) (Scoped.pp T.pp) (t2,sc2)
       pp_op op US.pp subst B_vars.pp bvars;*)
-    if T.is_a_type t1 && Type.is_forall (Type.of_term_unsafe t1) then assert false;  
+    assert (not (T.is_a_type t1 && Type.is_forall (Type.of_term_unsafe t1)));
     begin match view1, view2 with
       | _ when sc1=sc2 && T.equal t1 t2 ->
         subst (* the terms are equal under any substitution *)
@@ -741,11 +741,13 @@ module Inner = struct
         ) else if l2<>[] then (
           (* λfree-HO: unify with currying, "from the right" *)
           let l1, l2 = pair_lists_right f1 l1 f2 l2 in
-          assert (let i,_,_ = (T.open_poly_fun (T.ty_exn (List.hd l1))) in i = 0);
-          assert (let i,_,_ = (T.open_poly_fun (T.ty_exn (List.hd l2))) in i = 0);
+          (* Variables do not take type arguments. So we can fail early if `hd l2`
+             does take type arguments. This avoids errors with the debug output. *)
+          assert (T.expected_ty_vars (HVar.ty v1) = 0);
+          if T.expected_ty_vars (T.ty_exn (List.hd l2)) != 0 then fail();
           unif_list ~op ~bvars subst l1 scope l2 scope
         ) else fail()
-      | T.Const _, T.Var _ ->
+      | T.Const _, T.Var v2 ->
         (*Format.printf
           "(@[unif_ho.flex_rigid@ `@[:f2 %a :l2 %a@]`@ :t1 `%a`@ :subst %a@ :bvars %a@])@."
           (Scoped.pp T.pp) (f2,scope) (CCFormat.Dump.list T.pp) l2
@@ -760,8 +762,10 @@ module Inner = struct
         ) else if l1<>[] then (
           (* λfree-HO: unify with currying, "from the right" *)
           let l1, l2 = pair_lists_right f1 l1 f2 l2 in
-          assert (let i,_,_ = (T.open_poly_fun (T.ty_exn (List.hd l1))) in i = 0);
-          assert (let i,_,_ = (T.open_poly_fun (T.ty_exn (List.hd l2))) in i = 0);
+          (* Variables do not take type arguments. So we can fail early if `hd l1`
+             does take type arguments. This avoids errors with the debug output. *)
+          assert (T.expected_ty_vars (HVar.ty v2) = 0);
+          if T.expected_ty_vars (T.ty_exn (List.hd l1)) != 0 then fail();
           unif_list ~op ~bvars subst l1 scope l2 scope
         ) else fail()
       | T.Var v1, T.Var v2
