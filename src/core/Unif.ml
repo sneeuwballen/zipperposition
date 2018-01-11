@@ -500,7 +500,7 @@ module Inner = struct
     (*Format.printf "(@[unif_rec@ :t1 `%a`@ :t2 `%a`@ :op %a@ :subst @[%a@]@ :bvars %a@])@."
       (Scoped.pp T.pp) (t1,sc1) (Scoped.pp T.pp) (t2,sc2)
       pp_op op US.pp subst B_vars.pp bvars;*)
-    assert (not (T.is_a_type t1 && Type.is_forall (Type.of_term_unsafe t1)));
+    (* assert (not (T.is_a_type t1 && Type.is_forall (Type.of_term_unsafe t1))); *)
     begin match view1, view2 with
       | _ when sc1=sc2 && T.equal t1 t2 ->
         subst (* the terms are equal under any substitution *)
