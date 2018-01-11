@@ -198,7 +198,37 @@ let test_kbo _ =
   let a = Term.const ~ty a_ in
   let x = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
   let y = Term.var (HVar.fresh ~ty ()) in
-  assert_equal (compare (Term.app h [Term.app x [y]]) (Term.app f [y; Term.app x [a]])) Comparison.Gt
+  assert_equal (compare (Term.app h [Term.app x [y]]) (Term.app f [y; Term.app x [a]])) Comparison.Gt;
+
+  (* polymorphic example *)
+  let funty_ = (ID.make "funty") in
+  let appty = Type.forall_n 2 (Type.arrow [Type.app funty_ [Type.bvar 1; Type.bvar 0]; Type.bvar 1] (Type.bvar 0)) in
+  let app_ = ID.make "app" in
+  let app = T.const ~ty:appty app_ in
+  let add_ = ID.make "add" in
+  let add = T.const ~ty:(Type.app funty_ [ty;Type.app funty_ [ty;ty]]) add_ in
+  let s_ = ID.make "s" in
+  let s = T.const ~ty:(Type.app funty_ [ty;ty]) s_ in
+  let k_ = ID.make "k" in
+  let k = T.const ~ty k_ in
+  let zero_ = ID.make "zero" in
+  let zero = T.const ~ty zero_ in
+  let ty1 = Term.of_ty ty in
+  let ty2 = Term.of_ty (Type.app funty_ [ty; ty]) in
+  let ord = O.kbo (Precedence.create ~weight Precedence.Constr.alpha [add_; app_; funty_; k_; s_; zero_]) in
+  let x = Term.var (HVar.fresh ~ty ()) in
+  let y = Term.var (HVar.fresh ~ty ()) in
+  let compare = O.compare ord in
+  (*app (app add (app s zero)) k > app (app add zero)(app s k)*)
+  assert_equal (compare
+                  (T.app app [ty1; ty1; T.app app [ty1; ty2; add; (T.app app [ty1; ty1; s; zero])]; k])
+                  (T.app app [ty1; ty1; T.app app [ty1; ty2; add; zero]; T.app app [ty1; ty1; s; k]])
+               ) Comparison.Gt;
+  (*app (app add (app s x)) y > app (app add x)(app s y)*)
+   assert_equal (compare
+                   (T.app app [ty1; ty1; T.app app [ty1; ty2; add; (T.app app [ty1; ty1; s; x])]; y])
+                   (T.app app [ty1; ty1; T.app app [ty1; ty2; add; x]; T.app app [ty1; ty1; s; y]])
+                ) Comparison.Gt
 
 
 let suite =
