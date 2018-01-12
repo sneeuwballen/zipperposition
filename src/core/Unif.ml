@@ -267,7 +267,7 @@ module Inner = struct
     begin match T.view t with
       | T.Var _ ->
         let u, sc_u = US.deref subst (t,sc_t) in
-        assert (sc_t=sc_u);
+        assert (sc_t=sc_u || T.is_ground u);
         if T.equal t u then subst, u
         else whnf_deref_rec subst (u,sc_t) (* fixpoint, maybe [u] is reducible *)
       | T.App (f0, l) ->
