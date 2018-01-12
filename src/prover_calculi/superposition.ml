@@ -796,7 +796,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
              Note that we keep restrictions for the head, so as
              not to rewrite [f x=g x] into ⊤ after equality completion
              of [f=g] *)
-          normal_form ~restrict hd
+          let rewrite_head =
+            (* Don't rewrite heads in the following situations: *)
+            (List.length l = 0 || not (T.is_type (List.hd l)))
+            && not (Ordering.monotonic ord)
+          in
+          (if rewrite_head then normal_form ~restrict hd else (fun k -> k hd))
             (fun hd' ->
                normal_form_l l
                  (fun l' ->
