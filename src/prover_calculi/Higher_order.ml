@@ -224,7 +224,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let new_clauses =
       (* iterate over all literals eligible for paramodulation *)
       C.lits c
-      |> Sequence.of_array |> Sequence.zip_i |> Sequence.zip
+      |> Sequence.of_array |> Util.seq_zipi
       |> Sequence.filter (fun (idx,lit) -> eligible idx lit)
       |> Sequence.flat_map_l
         (fun (lit_idx,lit) -> match lit with
@@ -260,7 +260,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let eligible = C.Eligible.param c in
     let new_c =
       C.lits c
-      |> Sequence.of_array |> Sequence.zip_i |> Sequence.zip
+      |> Sequence.of_array |> Util.seq_zipi
       |> Sequence.filter (fun (idx,lit) -> eligible idx lit)
       |> Sequence.flat_map_l
         (fun (lit_idx,lit) -> match lit with

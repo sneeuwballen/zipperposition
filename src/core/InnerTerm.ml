@@ -260,7 +260,7 @@ module DB = struct
       | HasType ty -> _to_seq ~depth ty k
     end;
     match view t with
-      | DB v -> k v depth
+      | DB v -> k (v,depth)
       | Var _
       | Const _ -> ()
       | Bind (_, varty, t') ->

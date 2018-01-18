@@ -269,7 +269,7 @@ module U = struct
        where the [F] are fresh,
        and return the pair [arg_k (F1 x1…xn)…(Fm x1…xn) = t args] *)
     let proj =
-      Sequence.of_list all_ty_args |> Sequence.zip_i |> Sequence.zip
+      Sequence.of_list all_ty_args |> Util.seq_zipi
       |> Sequence.filter_map
         (fun (i,ty_arg_i) ->
            let ty_args_i, ty_ret_i = Type.open_fun ty_arg_i in

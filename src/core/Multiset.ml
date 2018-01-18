@@ -279,16 +279,17 @@ module Make(E : Map.OrderedType) = struct
                | Comparison.Incomparable -> acc)
             !m n
         in
-        k x n'
+        k (x, n')
       with Exit -> ()
     done
 
   let max f m =
-    max_seq f m |> Sequence.fold2 add_coeff empty
+    max_seq f m
+    |> Sequence.fold (fun m (c,t) -> add_coeff m c t) empty
 
   let max_l f l =
     max_seq f (of_list l)
-    |> Sequence.fold2 (fun acc x _n -> x::acc) []
+    |> Sequence.fold (fun acc (x,_) -> x::acc) []
 
   let compare_partial_l f l1 l2 =
     compare_partial f (of_list l1) (of_list l2)
