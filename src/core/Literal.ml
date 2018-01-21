@@ -203,8 +203,8 @@ let rec mk_lit a b sign =
     | T.AppBuiltin (Builtin.False, []), _ -> Prop (b, not sign)
     | _, T.AppBuiltin (Builtin.False, []) -> Prop (a, not sign)
     (* NOTE: keep negation for higher-order unification constraints
-    | T.AppBuiltin (Builtin.Not, [a']), _ -> mk_lit a' b (not sign)
-    | _, T.AppBuiltin (Builtin.Not, [b']) -> mk_lit a b' (not sign)
+       | T.AppBuiltin (Builtin.Not, [a']), _ -> mk_lit a' b (not sign)
+       | _, T.AppBuiltin (Builtin.Not, [b']) -> mk_lit a b' (not sign)
     *)
     | _ when has_num_ty a ->
       begin match mk_num_eq a b sign with
@@ -1035,9 +1035,9 @@ module Conv = struct
         end
     end
 
-  let to_s_form ?(ctx=T.Conv.create()) ?hooks lit =
+  let to_s_form ?allow_free_db ?(ctx=T.Conv.create()) ?hooks lit =
     to_form ?hooks lit
-    |> SLiteral.map ~f:(T.Conv.to_simple_term ctx)
+    |> SLiteral.map ~f:(T.Conv.to_simple_term ?allow_free_db ctx)
     |> SLiteral.to_form
 end
 

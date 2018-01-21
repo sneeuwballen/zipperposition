@@ -119,6 +119,7 @@ module Conv : sig
   (** To list of formulas *)
 
   val to_s_form :
+    ?allow_free_db:bool ->
     ?ctx:Term.Conv.ctx ->
     ?hooks:Literal.Conv.hook_to list ->
     t ->

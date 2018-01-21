@@ -20,6 +20,8 @@ module type TERM = sig
   val update_subterms : t -> t list -> t
   (** Replace immediate subterms by the given list.
       This is used to test for equality *)
+
+  val pp : t CCFormat.printer
 end
 
 module Make(T : TERM) = struct
@@ -161,6 +163,18 @@ module Make(T : TERM) = struct
     let cc = add cc t1 in
     let cc = add cc t2 in
     T.equal (find_ cc t1) (find_ cc t2)
+
+  let pp_debug out (cc:t) : unit =
+    let module Fmt = CCFormat in
+    let pp_parent out (t,l) =
+      Fmt.fprintf out "(@[<hv1>parents@ :of %a@ (@[<v>%a@])@])"
+        T.pp t (Util.pp_list ~sep:" " T.pp) l
+    and pp_next out (t,u) =
+      Fmt.fprintf out "(@[<hv>next@ :of %a@ :is %a@])" T.pp t T.pp u
+    in
+    Fmt.fprintf out "(@[<v>cc@ :parent_tbl (@[<v>%a@])@ :next_tbl (@[<v>%a@])@])"
+      (Util.pp_seq pp_parent) (H.to_seq cc.parents)
+      (Util.pp_seq pp_next) (H.to_seq cc.next)
 end
 
 module FO = Make(struct
@@ -169,6 +183,7 @@ module FO = Make(struct
     type t = T.t
     let equal = T.equal
     let hash = T.hash
+    let pp = T.pp
 
     let subterms t = match T.Classic.view t with
       | T.Classic.App (_, l) -> l

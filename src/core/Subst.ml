@@ -395,14 +395,14 @@ module Projection = struct
          ) else l)
       [] p.subst
 
-  let as_inst ~ctx (sp:t) (vars:_ HVar.t list) : (_,_) Var.Subst.t =
+  let as_inst ?allow_free_db ~ctx (sp:t) (vars:_ HVar.t list) : (_,_) Var.Subst.t =
     List.map
       (fun v ->
          let t_v = Term.var v in
          let t =
            FO.apply (renaming sp) (subst sp) ((t_v,scope sp))
          in
-         Term.Conv.var_to_simple_var ctx v, Term.Conv.to_simple_term ctx t)
+         Term.Conv.var_to_simple_var ctx v, Term.Conv.to_simple_term ?allow_free_db ctx t)
       vars
     |> Var.Subst.of_list
 

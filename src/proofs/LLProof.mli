@@ -93,6 +93,22 @@ val inference :
   tags:tag list ->
   form -> name -> parent list -> t
 
+
+(** {2 Checking steps} *)
+
+type check_res =
+  | R_ok
+  | R_fail
+  | R_skip
+
+val get_check_res : t -> check_res option
+
+val set_check_res : t -> check_res -> unit
+
+val pp_check_res : check_res CCFormat.printer
+
+(** {2 Printing} *)
+
 module Tbl : CCHashtbl.S with type key = t
 
 module Dot : sig

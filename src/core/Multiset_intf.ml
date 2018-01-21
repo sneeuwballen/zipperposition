@@ -140,7 +140,7 @@ module type S = sig
   val max : (elt -> elt -> Comparison.t) -> t -> t
   (** Maximal elements of the multiset, w.r.t the given ordering. *)
 
-  val max_seq : (elt -> elt -> Comparison.t) -> t -> (elt, Z.t) Sequence.t2
+  val max_seq : (elt -> elt -> Comparison.t) -> t -> (elt * Z.t) Sequence.t
   (** Fold on maximal elements *)
 
   val max_l : (elt -> elt -> Comparison.t) -> elt list -> elt list

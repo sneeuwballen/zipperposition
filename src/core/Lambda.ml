@@ -215,10 +215,10 @@ let snf t =
 
 let eta_expand t =
   Inner.eta_expand (t:T.t :> IT.t) |> T.of_term_unsafe
-  (*|> CCFun.tap (fun t' ->
-    if t != t' then Format.printf "@[eta_expand `%a`@ into `%a`@]@." T.pp t T.pp t')*)
+(*|> CCFun.tap (fun t' ->
+  if t != t' then Format.printf "@[eta_expand `%a`@ into `%a`@]@." T.pp t T.pp t')*)
 
 let eta_reduce t =
   Inner.eta_reduce (t:T.t :> IT.t) |> T.of_term_unsafe
-  (*|> CCFun.tap (fun t' ->
-    if t != t' then Format.printf "@[eta_reduce `%a`@ into `%a`@]@." T.pp t T.pp t')*)
+(*|> CCFun.tap (fun t' ->
+  if t != t' then Format.printf "@[eta_reduce `%a`@ into `%a`@]@." T.pp t T.pp t')*)

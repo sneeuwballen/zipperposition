@@ -260,7 +260,7 @@ module DB = struct
       | HasType ty -> _to_seq ~depth ty k
     end;
     match view t with
-      | DB v -> k v depth
+      | DB v -> k (v,depth)
       | Var _
       | Const _ -> ()
       | Bind (_, varty, t') ->
@@ -276,15 +276,13 @@ module DB = struct
 
   let closed t =
     _to_seq ~depth:0 t
-    |> Sequence.map2
-      (fun bvar depth -> bvar < depth)
+    |> Sequence.map (fun (bvar,depth) -> bvar < depth)
     |> Sequence.for_all _id
 
   (* check whether t contains the De Bruijn symbol n *)
   let contains t n =
     _to_seq ~depth:0 t
-    |> Sequence.map2
-      (fun bvar depth -> bvar=n+depth)
+    |> Sequence.map (fun (bvar,depth) -> bvar=n+depth)
     |> Sequence.exists _id
 
   (* maps the term to another term, calling [on_binder acc t]
@@ -558,7 +556,7 @@ module Pos = struct
   let fail_ t pos =
     Util.errorf ~where:"Term.Pos"
       "@[<2>invalid position `@[%a@]`@ in term `@[%a@]`@]"
-        P.pp pos debugf t
+      P.pp pos debugf t
 
   let rec at t pos = match view t, pos with
     | _, P.Type pos' ->
@@ -707,6 +705,10 @@ let rec open_poly_fun ty = match view ty with
   | _ ->
     let args, ret = open_fun ty in
     0, args, ret
+
+let rec expected_ty_vars ty = match view ty with
+  | Bind (Binder.ForallTy, _, ty') -> 1 + expected_ty_vars ty'
+  | _ -> 0
 
 let is_ground t = Sequence.is_empty (Seq.vars t)
 

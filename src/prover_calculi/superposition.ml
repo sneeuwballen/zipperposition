@@ -97,7 +97,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~eligible:(C.Eligible.res c) (C.lits c)
       |> Sequence.filter (fun (t, _) -> not (T.is_var t) || T.is_ho_var t)
       (* TODO: could exclude more variables from the index:
-      they are not needed if they occur with the same args everywhere in the clause *)
+         they are not needed if they occur with the same args everywhere in the clause *)
       |> Sequence.fold
         (fun tree (t, pos) ->
            let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
@@ -208,22 +208,22 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   && Array.length t_args >= List.length args
                   (* Check whether the last argument(s) of s and t are equal *)
                   && Array.sub s_args (Array.length s_args - List.length args) (List.length args) =
-                     Array.sub t_args (Array.length t_args - List.length args) (List.length args)
+                  Array.sub t_args (Array.length t_args - List.length args) (List.length args)
                   (* Check whether they are all variables that occur nowhere else *)
                   && CCList.(Array.length s_args - List.length args --^ Array.length s_args)
                      |> List.for_all (fun idx ->
-                         match T.as_var (Array.get s_args idx) with
+                       match T.as_var (Array.get s_args idx) with
                          | Some v ->
                            (* Check whether variable occurs in previous arguments: *)
                            not (CCArray.exists (T.var_occurs ~var:v) (Array.sub s_args 0 idx))
                            && not (CCArray.exists (T.var_occurs ~var:v) (Array.sub t_args 0 (Array.length t_args - List.length args))
-                           (* Check whether variable occurs in heads: *)
-                           && not (T.var_occurs ~var:v f)
-                           && not (T.var_occurs ~var:v g)
-                           (* Check whether variable occurs in other literals: *)
-                           && not (List.exists (Literal.var_occurs v) (CCArray.except_idx (C.lits info.active) active_idx)))
+                                   (* Check whether variable occurs in heads: *)
+                                   && not (T.var_occurs ~var:v f)
+                                   && not (T.var_occurs ~var:v g)
+                                   (* Check whether variable occurs in other literals: *)
+                                   && not (List.exists (Literal.var_occurs v) (CCArray.except_idx (C.lits info.active) active_idx)))
                          | None -> false
-                       )
+                     )
                 then
                   (* Calculate the part of t that unifies with the variable *)
                   let t_prefix = T.app g (Array.to_list (Array.sub t_args 0 (Array.length t_args - List.length args))) in
@@ -279,7 +279,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           (* Check whether Cσ is >= C[var -> replacement]σ *)
           let passive'_lits = Lits.apply_subst renaming subst (C.lits info.passive, info.scope_passive) in
           let subst_t = Unif.FO.update subst (T.as_var_exn var, info.scope_passive) (replacement, info.scope_active) in
-          let passive_t'_lits = Lits.apply_subst renaming subst_t (C.lits info.passive, info.scope_passive) in 
+          let passive_t'_lits = Lits.apply_subst renaming subst_t (C.lits info.passive, info.scope_passive) in
           if Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt
           then (
             Util.debugf ~section 5
@@ -344,13 +344,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       if not !_sup_at_vars then
         assert (not (T.is_var info.u_p))
       else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then
-         raise (ExitSuperposition "superposition at variable");
+        raise (ExitSuperposition "superposition at variable");
       (* Check for hidden superposition at a variable *)
       if !_restrict_hidden_sup_at_vars then (
         match is_hidden_sup_at_var info with
           | Some (var,replacement) when not (sup_at_var_condition info var replacement)
-          -> raise (ExitSuperposition "hidden superposition at variable")
-        | _ -> ()
+            -> raise (ExitSuperposition "hidden superposition at variable")
+          | _ -> ()
       );
       (* ordering constraints are ok *)
       let lits_a = CCArray.except_idx (C.lits info.active) active_idx in
@@ -446,39 +446,39 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         raise (ExitSuperposition "superposition at variable");
       (* Check for hidden superposition at a variable *)
       match is_hidden_sup_at_var info with
-      | Some (var,replacement) when not (sup_at_var_condition info var replacement)
-        -> raise (ExitSuperposition "hidden superposition at variable")
-      | _ -> ();
-      (* ordering constraints are ok, build new active lits (excepted s=t) *)
-      let lits_a = CCArray.except_idx (C.lits info.active) active_idx in
-      let lits_a = Lit.apply_subst_list renaming subst (lits_a, sc_a) in
-      (* build passive literals and replace u|p\sigma with t\sigma *)
-      let u' = S.FO.apply renaming subst (info.u_p, sc_p) in
-      assert (Type.equal (T.ty u') (T.ty t'));
-      let lits_p = Array.to_list (C.lits info.passive) in
-      let lits_p = Lit.apply_subst_list renaming subst (lits_p, sc_p) in
-      (* assert (T.equal (Lits.Pos.at (Array.of_list lits_p) info.passive_pos) u'); *)
-      let lits_p = List.map (Lit.map (fun t-> T.replace t ~old:u' ~by:t')) lits_p in
-      let c_guard = Literal.of_unif_subst renaming us in
-      let tags = Unif_subst.tags us in
-      (* build clause *)
-      let new_lits = c_guard @ lits_a @ lits_p in
-      let rule =
-        let name = if Lit.sign passive_lit' then "s_sup+" else "s_sup-" in
-        Proof.Rule.mk name
-      in
-      let proof =
-        Proof.Step.inference ~rule ~tags
-          [C.proof_parent_subst renaming (info.active,sc_a) subst;
-           C.proof_parent_subst renaming (info.passive,sc_p) subst]
-      and penalty =
-        C.penalty info.active
-        + C.penalty info.passive
-        + (if T.is_var s' then 2 else 0) (* superposition from var = bad *)
-      in
-      let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
-      Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
-      new_clause :: acc
+        | Some (var,replacement) when not (sup_at_var_condition info var replacement)
+          -> raise (ExitSuperposition "hidden superposition at variable")
+        | _ -> ();
+          (* ordering constraints are ok, build new active lits (excepted s=t) *)
+          let lits_a = CCArray.except_idx (C.lits info.active) active_idx in
+          let lits_a = Lit.apply_subst_list renaming subst (lits_a, sc_a) in
+          (* build passive literals and replace u|p\sigma with t\sigma *)
+          let u' = S.FO.apply renaming subst (info.u_p, sc_p) in
+          assert (Type.equal (T.ty u') (T.ty t'));
+          let lits_p = Array.to_list (C.lits info.passive) in
+          let lits_p = Lit.apply_subst_list renaming subst (lits_p, sc_p) in
+          (* assert (T.equal (Lits.Pos.at (Array.of_list lits_p) info.passive_pos) u'); *)
+          let lits_p = List.map (Lit.map (fun t-> T.replace t ~old:u' ~by:t')) lits_p in
+          let c_guard = Literal.of_unif_subst renaming us in
+          let tags = Unif_subst.tags us in
+          (* build clause *)
+          let new_lits = c_guard @ lits_a @ lits_p in
+          let rule =
+            let name = if Lit.sign passive_lit' then "s_sup+" else "s_sup-" in
+            Proof.Rule.mk name
+          in
+          let proof =
+            Proof.Step.inference ~rule ~tags
+              [C.proof_parent_subst renaming (info.active,sc_a) subst;
+               C.proof_parent_subst renaming (info.passive,sc_p) subst]
+          and penalty =
+            C.penalty info.active
+            + C.penalty info.passive
+            + (if T.is_var s' then 2 else 0) (* superposition from var = bad *)
+          in
+          let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
+          Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
+          new_clause :: acc
     with ExitSuperposition reason ->
       Util.debugf ~section 3 "@[... cancel, %s@]" (fun k->k reason);
       acc
@@ -757,7 +757,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                 (O.compare ord
                    (S.FO.apply Subst.Renaming.none subst (l,cur_sc))
                    (S.FO.apply Subst.Renaming.none subst (r,cur_sc)) = Comp.Gt)
-             (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
+                (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
              then (
                Util.debugf ~section 5
                  "@[<hv2>demod:@ @[<hv>t=%a[%d],@ l=%a[%d],@ r=%a[%d]@],@ subst=@[%a@]@]"
@@ -877,12 +877,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     (* demodulate every literal *)
     let lits = Array.mapi demod_lit (C.lits c) in
-    if Lits.equal_com (C.lits c) lits
-    then (
+    if CCList.is_empty st.demod_clauses then (
       (* no rewriting performed *)
       SimplM.return_same c
     ) else (
-      assert (not (CCList.is_empty st.demod_clauses));
+      assert (not (Lits.equal_com lits (C.lits c)));
       (* construct new clause *)
       st.demod_clauses <- CCList.uniq ~eq:eq_c_subst st.demod_clauses;
       let proof =

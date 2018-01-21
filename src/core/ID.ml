@@ -134,16 +134,16 @@ let as_skolem id =
 let num_mandatory_args id =
   let n_option =
     payload_find id
-    ~f:(function
+      ~f:(function
         | Attr_skolem (_, n) -> Some n
         | _ -> None)
   in
   match n_option with
-  | Some n -> n
-  | None -> 0
+    | Some n -> n
+    | None -> 0
 
 let is_distinct_object id =
   payload_pred id
     ~f:(function
-        | Attr_distinct -> true
-        | _ -> false)
+      | Attr_distinct -> true
+      | _ -> false)

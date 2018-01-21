@@ -39,12 +39,12 @@ module type S = sig
 
   val compare : t -> t -> int
   (** Compares two polynomials by comparing the coefficients for each monomial:
-     If all coefficients of p1 >= the corresponding coefficient in p2,
-     and one is even >, then return 1.
-     If all coefficients of p1 <= the corresponding coefficient in p2,
-     and one is even <, then return -1.
-     If the polynomials are equal, return 0.
-     If some coefficients are < and some are >, return 0. *)
+      If all coefficients of p1 >= the corresponding coefficient in p2,
+      and one is even >, then return 1.
+      If all coefficients of p1 <= the corresponding coefficient in p2,
+      and one is even <, then return -1.
+      If the polynomials are equal, return 0.
+      If some coefficients are < and some are >, return 0. *)
 
   val pp : Format.formatter -> t -> unit
 end

@@ -40,4 +40,6 @@ module type S = sig
   val is_eq : t -> term -> term -> bool
   (** Returns true if the two terms are equal in the congruence. This
       updates the congruence, because the two terms need to be added. *)
+
+  val pp_debug : t CCFormat.printer
 end

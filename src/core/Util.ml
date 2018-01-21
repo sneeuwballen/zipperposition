@@ -404,6 +404,10 @@ let seq_map_l ~f l =
   in
   aux l
 
+let seq_zipi seq k =
+  let i = ref 0 in
+  seq (fun x -> k (!i, x); incr i)
+
 let invalid_argf msg = Fmt.ksprintf msg ~f:invalid_arg
 let failwithf msg = Fmt.ksprintf msg ~f:failwith
 

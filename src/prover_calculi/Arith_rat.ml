@@ -144,12 +144,12 @@ module Make(E : Env.S) : S with module Env = E = struct
         _idx_unit_ineq :=
           if !enable_trivial_ineq_ || !enable_demod_ineq_
           then AL.fold_terms ~subterms:false ~vars:false ~pos ~which:`Max ~ord alit
-          |> Sequence.fold
-            (fun acc (t,pos) ->
-               assert (not (T.is_var t));
-               let with_pos = C.WithPos.( {term=t; pos; clause=c;} ) in
-               f acc t with_pos)
-            !_idx_unit_ineq
+               |> Sequence.fold
+                 (fun acc (t,pos) ->
+                    assert (not (T.is_var t));
+                    let with_pos = C.WithPos.( {term=t; pos; clause=c;} ) in
+                    f acc t with_pos)
+                 !_idx_unit_ineq
           else !_idx_unit_ineq
       | _ -> ()
     end;

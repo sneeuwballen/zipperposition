@@ -77,11 +77,11 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) l
     in
     CCList.filter_map
       (fun (o,penalty) -> match o with
-        | None -> None
-        | Some t ->
-          assert (T.DB.is_closed t);
-          let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
-          Some (subst, penalty))
+         | None -> None
+         | Some t ->
+           assert (T.DB.is_closed t);
+           let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
+           Some (subst, penalty))
       [ l_not, 2;
         l_and, 5;
         l_eq, 10;
@@ -269,7 +269,7 @@ module U = struct
        where the [F] are fresh,
        and return the pair [arg_k (F1 x1…xn)…(Fm x1…xn) = t args] *)
     let proj =
-      Sequence.of_list all_ty_args |> Sequence.zip_i |> Sequence.zip
+      Sequence.of_list all_ty_args |> Util.seq_zipi
       |> Sequence.filter_map
         (fun (i,ty_arg_i) ->
            let ty_args_i, ty_ret_i = Type.open_fun ty_arg_i in
@@ -499,7 +499,7 @@ module U = struct
                   let subst =
                     List.fold_left
                       (fun subst p -> US.add_constr (delay_pair p sc) subst)
-                    pb.subst pb.pairs
+                      pb.subst pb.pairs
                   in
                   add_sol subst pb.penalty
                 | T.App _, _ | _, T.App _ -> assert false (* heads *)
@@ -565,11 +565,11 @@ module U = struct
       |> Sequence.of_queue
       |> Sequence.map
         (fun pb ->
-          let pairs, renaming = apply_subst pb.pairs pb.subst in
-          pairs, norm_subst st.offset0 st.sc pb.subst, pb.penalty, renaming)
+           let pairs, renaming = apply_subst pb.pairs pb.subst in
+           pairs, norm_subst st.offset0 st.sc pb.subst, pb.penalty, renaming)
       |> Sequence.to_rev_list
     in
-  List.rev_append sols1 sols2
+    List.rev_append sols1 sols2
 end
 
 let unif_pairs ?(fuel= !default_fuel) (pairs,sc) ~offset : _ list =

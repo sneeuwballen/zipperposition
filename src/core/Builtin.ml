@@ -58,6 +58,7 @@ type t =
   | Greater
   | Greatereq
   | Box_opaque (** hint not to open this formula *)
+  | Pseudo_de_bruijn of int (** magic to embed De Bruijn indices in normal terms *)
 
 type t_ = t
 
@@ -114,6 +115,7 @@ let to_int_ = function
   | Box_opaque -> 60
   | TyReal -> 70
   | Real _ -> 71
+  | Pseudo_de_bruijn _ -> 100
 
 let compare a b = match a, b with
   | Int i, Int j -> Z.compare i j
@@ -196,6 +198,7 @@ let to_string s = match s with
   | Greater -> ">"
   | Greatereq -> "≥"
   | Box_opaque -> "<box>"
+  | Pseudo_de_bruijn i -> Printf.sprintf "db_%d" i
 
 let pp out s = Format.pp_print_string out (to_string s)
 
@@ -359,6 +362,7 @@ module TPTP = struct
     | Greater -> "$greater"
     | Greatereq -> "$greatereq"
     | Box_opaque -> "$$box"
+    | Pseudo_de_bruijn i -> Printf.sprintf "$$db_%d" i
 
   let pp out b = CCFormat.string out (to_string b)
 
@@ -693,6 +697,7 @@ module ZF = struct
     | Greater -> ">"
     | Greatereq -> ">="
     | Box_opaque -> "<box>"
+    | Pseudo_de_bruijn i -> Printf.sprintf "<db %d>" i
 
   let pp out b = CCFormat.string out (to_string b)
 end

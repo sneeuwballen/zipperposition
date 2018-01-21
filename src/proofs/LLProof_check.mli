@@ -34,6 +34,7 @@ type check_step_res =
   | CS_skip of [`ESA | `Other | `Tags | `Trivial]
 
 val check :
+  ?dot_prefix:string ->
   ?before_check:(proof -> unit) ->
   ?on_check:(proof -> check_step_res -> unit) ->
   proof ->

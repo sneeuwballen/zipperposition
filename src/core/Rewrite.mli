@@ -119,9 +119,9 @@ module Lit : sig
     scope_rules:Scoped.scope ->
     Literal.t Scoped.t ->
     (rule * Unif_subst.t * Proof.tag list) Sequence.t
-  (** [narrow_term rules lit] finds the set of rules [(l --> clauses) in rules]
-      and substitutions [sigma] such that [sigma(l) = sigma(lit)]
-      @param scope_rules used for rules (LEFT) *)
+    (** [narrow_term rules lit] finds the set of rules [(l --> clauses) in rules]
+        and substitutions [sigma] such that [sigma(l) = sigma(lit)]
+        @param scope_rules used for rules (LEFT) *)
 end
 
 (** {2 Rules in General} *)

@@ -11,6 +11,7 @@ module Lit = Literal
 
 let depth_limit_ = ref None
 let max_vars = ref 10
+let no_max_vars = ref false
 
 let enable_depth_limit i =
   if i <= 0 then invalid_arg "Heuristics.enable_depth_limit";
@@ -60,20 +61,24 @@ module Make(E : Env.S) = struct
         ) else false
 
   let has_too_many_vars c =
-    let lits = C.lits c in
-    (* number of distinct term variables *)
-    let n_vars =
-      Literals.vars lits
-      |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))
-      |> List.length
-    in
-    if n_vars > !max_vars then (
-      Ctx.lost_completeness();
-      Util.incr_stat stat_vars;
-      Util.debugf ~section 5 "@[<2>clause dismissed (%d vars is too much):@ @[%a@]@]"
-        (fun k->k n_vars C.pp c);
-      true
-    ) else false
+    if !no_max_vars
+    then false
+    else (
+      let lits = C.lits c in
+      (* number of distinct term variables *)
+      let n_vars =
+        Literals.vars lits
+        |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))
+        |> List.length
+      in
+      if n_vars > !max_vars then (
+        Ctx.lost_completeness();
+        Util.incr_stat stat_vars;
+        Util.debugf ~section 5 "@[<2>clause dismissed (%d vars is too much):@ @[%a@]@]"
+          (fun k->k n_vars C.pp c);
+        true
+      ) else false
+    )
 
   let register () =
     Util.debug ~section 2 "register heuristics...";
@@ -96,6 +101,6 @@ let () =
   Params.add_opts
     [ "--depth-limit", Arg.Int enable_depth_limit, " set maximal term depth";
       "--max-vars", Arg.Set_int max_vars, " maximum number of variables per clause";
+      "--no-max-vars", Arg.Set no_max_vars, " disable maximum number of variables per clause";
     ];
   ()
-

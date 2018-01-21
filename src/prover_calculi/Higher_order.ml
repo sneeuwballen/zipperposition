@@ -224,7 +224,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let new_clauses =
       (* iterate over all literals eligible for paramodulation *)
       C.lits c
-      |> Sequence.of_array |> Sequence.zip_i |> Sequence.zip
+      |> Sequence.of_array |> Util.seq_zipi
       |> Sequence.filter (fun (idx,lit) -> eligible idx lit)
       |> Sequence.flat_map_l
         (fun (lit_idx,lit) -> match lit with
@@ -260,7 +260,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let eligible = C.Eligible.param c in
     let new_c =
       C.lits c
-      |> Sequence.of_array |> Sequence.zip_i |> Sequence.zip
+      |> Sequence.of_array |> Util.seq_zipi
       |> Sequence.filter (fun (idx,lit) -> eligible idx lit)
       |> Sequence.flat_map_l
         (fun (lit_idx,lit) -> match lit with
@@ -580,8 +580,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* Purify variables
      - if they occur applied and unapplied ("int" mode).
      - if they occur with differen argumetns ("ext" mode).
-    Example: g X = X a \/ X a = b becomes g X = Y a \/ Y a = b \/ X != Y.
-    Literals with only a variable on both sides are not affected. *)
+     Example: g X = X a \/ X a = b becomes g X = Y a \/ Y a = b \/ X != Y.
+     Literals with only a variable on both sides are not affected. *)
   let purify_applied_variable c =
     (* set of new literals *)
     let new_lits = ref [] in
@@ -847,8 +847,8 @@ let () =
       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
       "--ho-eta", eta_opt, " eta-expansion/reduction";
       "--ho-purify", purify_opt, " enable purification of applied variables: 'ext' purifies" ^
-                                 " whenever a variable is applied to different arguments." ^
-                                 " 'int' purifies whenever a variable appears applied and unapplied.";
+        " whenever a variable is applied to different arguments." ^
+        " 'int' purifies whenever a variable appears applied and unapplied.";
       "--ho-general-ext-pos", Arg.Set _general_ext_pos, " enable general positive extensionality rule";
       "--ho-ext-axiom", Arg.Set _ext_axiom, " enable extensionality axiom";
       "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule";

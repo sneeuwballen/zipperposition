@@ -325,7 +325,7 @@ let fold_max ~ord f acc m =
     Seq.terms m
     |> MT.Seq.of_seq MT.empty
     |> MT.max_seq (Ordering.compare ord)
-    |> Sequence.map2 (fun t _ -> t)
+    |> Sequence.map fst
     |> T.Seq.add_set T.Set.empty
   in
   CCList.foldi
@@ -732,11 +732,11 @@ let normalize (type a) (m:a t): a t =
   List.fold_left
     (fun acc (c,t) ->
        (* flatten this term into a full monome *)
-         try
-           let m = of_term_exn m.num t in
-           sum acc (product m c)
-         with NotLinear ->
-           add acc c t)
+       try
+         let m = of_term_exn m.num t in
+         sum acc (product m c)
+       with NotLinear ->
+         add acc c t)
     acc m.terms
 
 module Int = struct

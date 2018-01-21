@@ -38,9 +38,9 @@ let add_trail_ trail f =
   then f
   else F.imply (Trail.to_s_form trail) f
 
-let to_s_form ?(ctx=Term.Conv.create()) c =
+let to_s_form ?allow_free_db ?(ctx=Term.Conv.create()) c =
   let module F = TypedSTerm.Form in
-  Literals.Conv.to_s_form ~ctx (lits c)
+  Literals.Conv.to_s_form ?allow_free_db ~ctx (lits c)
   |> add_trail_ (trail c)
   |> F.close_forall
 
@@ -149,11 +149,11 @@ let to_s_form_subst ~ctx subst c : _ * _ Var.Subst.t =
   let module SP = Subst.Projection in
   let f =
     Literals.apply_subst (SP.renaming subst) (SP.subst subst) (lits c,SP.scope subst)
-    |> Literals.Conv.to_s_form ~ctx
+    |> Literals.Conv.to_s_form ~allow_free_db:true ~ctx
     |> add_trail_ (trail c)
     |> F.close_forall
   and inst_subst =
-    SP.as_inst ~ctx subst (Literals.vars (lits c))
+    SP.as_inst ~allow_free_db:true ~ctx subst (Literals.vars (lits c))
   in
   f, inst_subst
 
@@ -167,7 +167,7 @@ let proof_tc =
       then if Trail.is_empty (trail c) then `Proof_of_false
         else `Absurd_lits
       else `Vanilla)
-    ~to_form:(fun ~ctx c -> to_s_form ~ctx c)
+    ~to_form:(fun ~ctx c -> to_s_form ~allow_free_db:true ~ctx c)
     ~to_form_subst:to_s_form_subst
     ~pp_in
     ()

@@ -217,6 +217,9 @@ val open_poly_fun : t -> int * t list * t
     @return the return type, the number of type variables,
       and the list of all its arguments *)
 
+val expected_ty_vars : t -> int
+(** @return the number of type variables that a type requires. *)
+
 val open_bind : Binder.t -> t -> t list * t
 
 val open_bind_fresh : Binder.t -> t -> t HVar.t list * t
@@ -318,4 +321,3 @@ val pp_in : Output_format.t -> t CCFormat.printer
 
 (* TODO: functor for scoping operation (and inverse) between
         ScopedTerm and NamedTerm *)
-
