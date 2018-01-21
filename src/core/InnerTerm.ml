@@ -276,15 +276,13 @@ module DB = struct
 
   let closed t =
     _to_seq ~depth:0 t
-    |> Sequence.map2
-      (fun bvar depth -> bvar < depth)
+    |> Sequence.map (fun (bvar,depth) -> bvar < depth)
     |> Sequence.for_all _id
 
   (* check whether t contains the De Bruijn symbol n *)
   let contains t n =
     _to_seq ~depth:0 t
-    |> Sequence.map2
-      (fun bvar depth -> bvar=n+depth)
+    |> Sequence.map (fun (bvar,depth) -> bvar=n+depth)
     |> Sequence.exists _id
 
   (* maps the term to another term, calling [on_binder acc t]
