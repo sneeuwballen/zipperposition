@@ -19,7 +19,7 @@
     information about the identifier (e.g. special sugar notation,
     whether it's a skolem, etc.)
 
-    @since NEXT_RELEASE
+    @since 1.5
 *)
 
 type t = private {

@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.5
+
+- be compatible with sequence >= 1.0
+- cli option to switch off maximal number of variables per clause
+- Dockerfile and instructions to build a docker image
+- add eta-reduction to `LLTerm`
+- update phases API + params so it's easier to use from utop
+- move to jbuilder
+
+- fail early when unifying a variable and a polymorphic constant
+- More realistic test to expose a bug in unification of polymorphic terms
+- upper bound on msat and deps on logtk
+- fix for llprover (use congruence correctly for poly equalities)
+- printer for congruence
+- cache llproof checking result, display it in llproof-printing
+- refactor proof checker to look more like a tableaux prover + dot printing
+- llprover: hack to allow checking of rewriting steps that occur under binders
+- split proof checker into its own module `LLProver`
+- add linear expressions and arith predicates in `LLTerm`
+- make demodulation more robust
+- bugfix in `Type.apply` for polymorphic type arguments
+- stop positive extensionality rule from removing type arguments
+- moved detection for "distinct object" syntax into TypeInference
+- omit type declarations for distinct objects in TPTP output
+- bugfix restrict_to_scope: recursive call when variable already in scope
+- bugfix: type of polymorphic application in app_encode tool
+- bugfix: app_encode extensionality axiom needs type arguments
+- `fo_detector` tool to count problems with applied variables
+- clean up Subst module
+- bugfix: wrong polymorphic types in returned unifier
+- remove hornet from makefile, improve logitest targets
+- remove hornet
+- better type error messages
+- make `Subst.apply` tailrec
+- "int" mode for variable purification
+- bugfix: unquote identifiers in TPTP parser
+
 ## 1.4
 
 - remove inlining on parsers

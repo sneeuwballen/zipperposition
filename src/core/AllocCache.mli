@@ -8,7 +8,7 @@
 
     {b NOT THREAD SAFE}
 
-    @since NEXT_RELEASE
+    @since 1.5
 *)
 
 module Arr : sig

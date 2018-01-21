@@ -1,12 +1,10 @@
 opam-version: "1.2"
-maintainer: "simon.cruanes@inria.fr"
+maintainer: "simon.cruanes.2007@m4x.org"
 author: "Simon Cruanes"
 homepage: "https://github.com/c-cube/zipperposition"
-version: "1.4"
-build: ["jbuilder" "build" "-p" name]
+version: "1.5"
+build: ["jbuilder" "build" "@install"]
 build-doc: ["jbuilder" "build" "@doc"]
-install: ["jbuilder" "install" name]
-remove: ["jbuilder" "uninstall" name]
 depends: [
   "ocamlfind" { build }
   "base-bytes"

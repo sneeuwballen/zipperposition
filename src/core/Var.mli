@@ -7,7 +7,7 @@
 
     It is used in {!TypedSTerm.t} for manipulating free and bound variables.
 
-    @since NEXT_RELEASE *)
+    @since 1.5 *)
 
 type +'a t = private {
   id: ID.t;

@@ -9,7 +9,7 @@
 
     Builtins cover numbers, connectives, and builtin types, among others.
 
-    @since NEXT_RELEASE *)
+    @since 1.5 *)
 
 type t =
   | Not
