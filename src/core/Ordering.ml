@@ -377,10 +377,10 @@ module LFHOKBO_arg_coeff : ORD = struct
     let app_weight head_weight coeff_multipliers args =
       args
       |> List.mapi (fun i s ->
-          begin match weight prec s, coeff_multipliers i with
-            | Some w, Some c -> Some (c w)
-            | _ -> None
-          end )
+        begin match weight prec s, coeff_multipliers i with
+          | Some w, Some c -> Some (c w)
+          | _ -> None
+        end )
       |> List.fold_left
         (fun w1 w2 ->
            begin match (w1, w2) with

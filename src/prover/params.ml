@@ -9,46 +9,71 @@ open Logtk
 (* TODO: params to enable/disable some preprocessing *)
 
 type t = {
-  param_ord : string;
-  param_seed : int;
-  param_steps : int;
-  param_version : bool;
-  param_timeout : float;
-  param_prelude : (string, CCVector.ro) CCVector.t;
-  param_files : (string, CCVector.ro) CCVector.t;
-  param_select : string; (** name of the selection function *)
-  param_dot_file : string option; (** file to print the final state in *)
-  param_dot_llproof: string option; (** file to print llproof *)
-  param_dot_sat : bool; (** Print saturated set into DOT? *)
-  param_dot_all_roots : bool;
-  param_def_as_rewrite: bool;
-  param_expand_def : bool; (** expand definitions *)
-  param_stats : bool;
-  param_presaturate : bool; (** initial interreduction of proof state? *)
-  param_unary_depth : int; (** Maximum successive levels of unary inferences *)
-  param_check: bool; (** check proof *)
+  ord : string;
+  seed : int;
+  steps : int;
+  version : bool;
+  timeout : float;
+  prelude : (string, CCVector.ro) CCVector.t;
+  files : (string, CCVector.ro) CCVector.t;
+  select : string; (** name of the selection function *)
+  dot_file : string option; (** file to print the final state in *)
+  dot_llproof: string option; (** file to print llproof *)
+  dot_sat : bool; (** Print saturated set into DOT? *)
+  dot_all_roots : bool;
+  dot_check: string option; (** prefix for printing checker proofs *)
+  def_as_rewrite: bool;
+  expand_def : bool; (** expand definitions *)
+  stats : bool;
+  presaturate : bool; (** initial interreduction of proof state? *)
+  unary_depth : int; (** Maximum successive levels of unary inferences *)
+  check: bool; (** check proof *)
 }
 
-let ord = ref "kbo"
-and seed = ref 1928575
-and steps = ref ~-1
-and version = ref false
-and timeout = ref 0.
-and presaturate = ref false
-and dot_file = ref None
-and dot_llproof = ref None
-and dot_sat = ref false
-and dot_all_roots = ref false
-and expand_def = ref false
-and select = ref "default"
-and unary_depth = ref 1
-and def_as_rewrite = ref true
-and prelude = CCVector.create()
-and files = CCVector.create ()
-and check = ref false
+let default : t = {
+  ord= "kbo";
+  seed = 1928575;
+  steps = -1;
+  version= false;
+  timeout = 0.;
+  prelude= CCVector.create() |> CCVector.freeze;
+  files = CCVector.create() |> CCVector.freeze;
+  select = "default";
+  stats= !Options.stats;
+  def_as_rewrite= true;
+  presaturate = false;
+  dot_all_roots= false;
+  dot_file = None;
+  dot_llproof= None;
+  dot_check=None;
+  unary_depth= 1;
+  dot_sat= false;
+  expand_def= false;
+  check= false;
+}
+
+let select = ref default.select
 
 (** parse_args returns parameters *)
 let parse_args () =
+  let ord = ref default.ord
+  and seed = ref default.seed
+  and steps = ref default.steps
+  and version = ref default.version
+  and timeout = ref default.timeout
+  and presaturate = ref default.presaturate
+  and dot_file = ref default.dot_file
+  and dot_llproof = ref default.dot_llproof
+  and dot_sat = ref default.dot_sat
+  and dot_all_roots = ref default.dot_all_roots
+  and dot_check = ref default.dot_check
+  and expand_def = ref default.expand_def
+  and unary_depth = ref default.unary_depth
+  and def_as_rewrite = ref default.def_as_rewrite
+  and prelude = CCVector.create()
+  and files = CCVector.create ()
+  and check = ref default.check
+  in
   (* special handlers *)
   let add_file s = CCVector.push files s in
   (* options list *)
@@ -66,6 +91,7 @@ let parse_args () =
     ; "--dot-llproof", Arg.String (fun s -> dot_llproof := Some s) , " print LLProof to file in DOT"
     ; "--dot-sat", Arg.Set dot_sat, " print saturated set into DOT"
     ; "--dot-all-roots", Arg.Set dot_all_roots, " print all empty clauses into DOT"
+    ; "--dot-check-prefix", Arg.String (fun s-> dot_check :=Some s), " prefix for printing checker proofs in DOT"
     ; "--color", Arg.Bool CCFormat.set_color_default, " enable/disable ANSI color codes"
     ; "--seed", Arg.Set_int seed, " set random seed"
     ; "--unary-depth", Arg.Set_int unary_depth, " maximum depth for successive unary inferences"
@@ -87,14 +113,15 @@ let parse_args () =
   let prelude = CCVector.freeze prelude in
   let files = CCVector.freeze files in
   (* return parameter structure *)
-  { param_ord= !ord; param_seed = !seed; param_steps = !steps;
-    param_version= !version; param_timeout = !timeout; param_prelude= prelude;
-    param_files = files; param_select = !select;
-    param_stats= ! Options.stats; param_def_as_rewrite= !def_as_rewrite;
-    param_presaturate = !presaturate; param_dot_all_roots= !dot_all_roots;
-    param_dot_file = !dot_file; param_dot_llproof= !dot_llproof;
-    param_unary_depth= !unary_depth; param_dot_sat= !dot_sat;
-    param_expand_def= !expand_def; param_check= !check; }
+  { ord= !ord; seed = !seed; steps = !steps;
+    version= !version; timeout = !timeout; prelude= prelude;
+    files = files; select = !select;
+    stats= ! Options.stats; def_as_rewrite= !def_as_rewrite;
+    presaturate = !presaturate; dot_all_roots= !dot_all_roots;
+    dot_file = !dot_file; dot_llproof= !dot_llproof;
+    dot_check= !dot_check;
+    unary_depth= !unary_depth; dot_sat= !dot_sat;
+    expand_def= !expand_def; check= !check; }
 
 let add_opt = Options.add_opt
 let add_opts = Options.add_opts

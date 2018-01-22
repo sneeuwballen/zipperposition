@@ -34,6 +34,7 @@ let of_subst s = make s []
 let tags (s:t) : _ list = CCList.flat_map Unif_constr.tags (constr_l s)
 
 let bind t v u = {t with subst=Subst.bind t.subst v u}
+let update t v u = {t with subst=Subst.update t.subst v u}
 let mem t v = Subst.mem t.subst v
 let deref t v = Subst.deref t.subst v
 

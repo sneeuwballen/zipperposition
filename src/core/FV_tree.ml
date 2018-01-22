@@ -247,22 +247,22 @@ module Make(C: Index_intf.CLAUSE) = struct
         | TrieNode m, c ->
           begin
             try  (* insert in subtrie *)
-             let subtrie = Feat_map.find c m in
-             let rebuild' subtrie = match subtrie with
-               | _ when empty_trie subtrie -> rebuild (TrieNode (Feat_map.remove c m))
-               | _ -> rebuild (TrieNode (Feat_map.add c subtrie m))
-             in
-             goto subtrie (i+1) rebuild'
-           with Not_found -> (* no subtrie found *)
-             let subtrie =
-               if i+1 = IArray.length fv
-               then TrieLeaf C_set.empty
-               else TrieNode Feat_map.empty
-             and rebuild' subtrie = match subtrie with
-               | _ when empty_trie subtrie -> rebuild (TrieNode (Feat_map.remove c m))
-               | _ -> rebuild (TrieNode (Feat_map.add c subtrie m))
-             in
-             goto subtrie (i+1) rebuild'
+              let subtrie = Feat_map.find c m in
+              let rebuild' subtrie = match subtrie with
+                | _ when empty_trie subtrie -> rebuild (TrieNode (Feat_map.remove c m))
+                | _ -> rebuild (TrieNode (Feat_map.add c subtrie m))
+              in
+              goto subtrie (i+1) rebuild'
+            with Not_found -> (* no subtrie found *)
+              let subtrie =
+                if i+1 = IArray.length fv
+                then TrieLeaf C_set.empty
+                else TrieNode Feat_map.empty
+              and rebuild' subtrie = match subtrie with
+                | _ when empty_trie subtrie -> rebuild (TrieNode (Feat_map.remove c m))
+                | _ -> rebuild (TrieNode (Feat_map.add c subtrie m))
+              in
+              goto subtrie (i+1) rebuild'
           end
         | TrieLeaf _, _ -> assert false  (* wrong arity *)
     in

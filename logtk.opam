@@ -1,0 +1,32 @@
+opam-version: "1.2"
+maintainer: "simon.cruanes@inria.fr"
+author: "Simon Cruanes"
+homepage: "https://github.com/c-cube/zipperposition"
+build: ["jbuilder" "build" "-p" name]
+build-doc: ["jbuilder" "build" "@doc"]
+install: ["jbuilder" "install" name]
+remove: ["jbuilder" "uninstall" name]
+build-test: [
+    ["jbuilder" "runtest"]
+]
+depends: [
+  "ocamlfind" { build }
+  "base-bytes"
+  "base-unix"
+  "zarith"
+  "containers" { >= "1.0" }
+  "sequence" { >= "0.4" }
+  "jbuilder" { build }
+]
+depopts: [
+  "qcheck" {test}
+  "msat" { >= "0.5" < "1.0" }
+  "menhir" {build}
+]
+available: [
+    ocaml-version >= "4.03.0"
+]
+tags: [ "logic" "unification" "term" ]
+bug-reports: "https://github.com/c-cube/zipperposition/issues"
+dev-repo: "https://github.com/c-cube/zipperposition.git"
+

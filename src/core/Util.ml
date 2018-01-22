@@ -361,7 +361,7 @@ let pp_list0 ?(sep=" ") pp_x out = function
 let tstp_needs_escaping s =
   assert (s<>"");
   s.[0] = '_' ||
-  CCString.exists (function '#' | '$' | '+' | '-' -> true | _ -> false) s
+  CCString.exists (function ' ' | '#' | '$' | '+' | '-' | '/' -> true | _ -> false) s
 
 let pp_str_tstp out s =
   CCFormat.string out (if tstp_needs_escaping s then "'" ^ String.escaped s ^ "'" else s)
@@ -403,6 +403,10 @@ let seq_map_l ~f l =
         ys
   in
   aux l
+
+let seq_zipi seq k =
+  let i = ref 0 in
+  seq (fun x -> k (!i, x); incr i)
 
 let invalid_argf msg = Fmt.ksprintf msg ~f:invalid_arg
 let failwithf msg = Fmt.ksprintf msg ~f:failwith

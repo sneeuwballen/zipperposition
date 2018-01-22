@@ -9,7 +9,6 @@ open Logtk
 module C = Clause
 module O = Ordering
 module PS = ProofState
-module Sup = Superposition
 module Sel = Selection
 
 let stat_redundant_given = Util.mk_stat "saturate.redundant given clauses"

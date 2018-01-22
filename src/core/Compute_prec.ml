@@ -65,7 +65,7 @@ let _add_custom_weights weights arg_coeff=
            if ID.name constant = name then List.tl values
            else arg_coeff constant)
       with
-      | Failure _ | Not_found -> failwith "Syntax error in custom weights"
+        | Failure _ | Not_found -> failwith "Syntax error in custom weights"
     ) (weights, arg_coeff) input_list
 
 let mk_precedence t seq =
@@ -103,6 +103,6 @@ let () =
     , Arg.Set _alpha_precedence
     , " use pure alphabetical precedence"
     ;  "--weights"
-    , Arg.Set_string _custom_weights
-    , " set weights, e.g. f=2,g=3,h=1, or weights and argument coefficients, e.g. f=2:3:4,g=3:2"
+     , Arg.Set_string _custom_weights
+     , " set weights, e.g. f=2,g=3,h=1, or weights and argument coefficients, e.g. f=2:3:4,g=3:2"
     ]

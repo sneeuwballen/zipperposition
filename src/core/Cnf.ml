@@ -358,9 +358,9 @@ module Flatten = struct
         aux Pos_toplevel vars a >>= fun a ->
         aux Pos_toplevel vars b >|= fun b ->
         let f = T.Form.or_
-          [ T.app_builtin ~ty:T.Ty.prop Builtin.Less [a; b];
-            T.app_builtin ~ty:T.Ty.prop Builtin.Less [b; a];
-          ]
+            [ T.app_builtin ~ty:T.Ty.prop Builtin.Less [a; b];
+              T.app_builtin ~ty:T.Ty.prop Builtin.Less [b; a];
+            ]
         in aux_maybe_define pos f
       | T.AppBuiltin (Builtin.Eq, [a;b]) when T.is_fun a || T.is_fun b ->
         (* turn [f = λx. t] into [∀x. f x=t] *)

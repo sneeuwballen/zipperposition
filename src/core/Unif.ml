@@ -214,7 +214,27 @@ module Inner = struct
         begin match T.view t with
           | T.Var v ->
             begin match Subst.find (US.subst subst) (v,sc_t) with
-              | Some (u,sc_u) -> aux sc_u subst u
+              | Some (u,sc_u) ->
+                if sc_t = scope
+                then
+                  (* Variable is already in [scope] *)
+                  let subst, u' = aux sc_u subst u in
+                  let subst = US.update subst (v,scope) (u', scope) in
+                  subst, T.var v
+                else if T.is_var u && sc_u = scope
+                then
+                  (* We already have a corresponging variable in [scope]. Use that one.*)
+                  subst, u
+                else (
+                  (* Create a corresponding variable v' in [scope]. *)
+                  let v' = HVar.fresh ~ty () in
+                  (* Recursive call on u, giving u' *)
+                  let subst, u' = aux sc_u subst u in
+                  (* Modify the substitution from v -> u into v -> v', v' -> u' *)
+                  let subst = US.update subst (v,sc_t) (T.var v', scope) in
+                  let subst = US.bind subst (v',scope) (u', scope) in
+                  subst, T.var v'
+                )
               | None ->
                 if sc_t = scope
                 then subst, T.var (HVar.cast ~ty v)
@@ -360,7 +380,7 @@ module Inner = struct
 
   let restrict_fun1
     : unif_subst -> ty:T.t -> to_:T.t DBEnv.t -> scope:Scoped.scope ->
-      (_ HVar.t * T.t list) -> unif_subst
+    (_ HVar.t * T.t list) -> unif_subst
     = fun subst ~ty ~to_:subset ~scope (v,args) ->
       assert (not (US.mem subst (v,scope)));
       (* only keep bound args *)
@@ -392,7 +412,7 @@ module Inner = struct
      [λall_vars. H (l1 ∩ l2)] *)
   let restrict_fun2
     : unif_subst -> ty_ret:T.t -> bvars:B_vars.t -> scope:Scoped.scope ->
-      _ -> _ -> unif_subst
+    _ -> _ -> unif_subst
     = fun subst ~ty_ret ~bvars ~scope (v1,l1) (v2,l2) ->
       assert (not (HVar.equal T.equal v1 v2)); (* non-trivial *)
       assert (not (US.mem subst (v1,scope)));
@@ -416,10 +436,10 @@ module Inner = struct
         let n = List.length l in
         let args =
           List.map
-             (fun a ->
-                let i = CCList.find_idx (T.equal a) l |> CCOpt.get_exn |> fst in
-                T.bvar ~ty:(T.ty_exn a) (n-i-1))
-             inter
+            (fun a ->
+               let i = CCList.find_idx (T.equal a) l |> CCOpt.get_exn |> fst in
+               T.bvar ~ty:(T.ty_exn a) (n-i-1))
+            inter
         in
         let body = T.app ~ty:ty_ret (T.var f) args in
         T.fun_l (List.map T.ty_exn l) body
@@ -480,6 +500,7 @@ module Inner = struct
     (*Format.printf "(@[unif_rec@ :t1 `%a`@ :t2 `%a`@ :op %a@ :subst @[%a@]@ :bvars %a@])@."
       (Scoped.pp T.pp) (t1,sc1) (Scoped.pp T.pp) (t2,sc2)
       pp_op op US.pp subst B_vars.pp bvars;*)
+    assert (not (T.is_a_type t1 && Type.is_forall (Type.of_term_unsafe t1)));
     begin match view1, view2 with
       | _ when sc1=sc2 && T.equal t1 t2 ->
         subst (* the terms are equal under any substitution *)
@@ -648,8 +669,8 @@ module Inner = struct
         in
         unif_rec ~op ~root:false
           ~bvars:(B_vars.make
-            (DBEnv.push_l_rev bvars.B_vars.left new_vars1)
-            (DBEnv.push_l_rev bvars.B_vars.right new_vars2))
+              (DBEnv.push_l_rev bvars.B_vars.left new_vars1)
+              (DBEnv.push_l_rev bvars.B_vars.right new_vars2))
           subst (f1,scope) (f2,scope)
       | T.Bind (Binder.Lambda, _, _), _ ->
         (* [λx. t = u] becomes [t = u x] *)
@@ -658,8 +679,8 @@ module Inner = struct
         let n = List.length new_vars in
         unif_rec ~op ~root
           ~bvars:(B_vars.make
-            (DBEnv.push_l_rev bvars.B_vars.left new_vars)
-            (DBEnv.push_l_rev bvars.B_vars.right new_vars))
+              (DBEnv.push_l_rev bvars.B_vars.left new_vars)
+              (DBEnv.push_l_rev bvars.B_vars.right new_vars))
           subst
           (f1,scope)
           (T.app ~ty:(T.ty_exn f1)
@@ -672,8 +693,8 @@ module Inner = struct
         let n = List.length new_vars in
         unif_rec ~op ~root
           ~bvars:(B_vars.make
-            (DBEnv.push_l_rev bvars.B_vars.left new_vars)
-            (DBEnv.push_l_rev bvars.B_vars.right new_vars))
+              (DBEnv.push_l_rev bvars.B_vars.left new_vars)
+              (DBEnv.push_l_rev bvars.B_vars.right new_vars))
           subst
           (T.app ~ty:(T.ty_exn f2)
              (T.DB.shift n t1)
@@ -720,9 +741,13 @@ module Inner = struct
         ) else if l2<>[] then (
           (* λfree-HO: unify with currying, "from the right" *)
           let l1, l2 = pair_lists_right f1 l1 f2 l2 in
+          (* Variables do not take type arguments. So we can fail early if `hd l2`
+             does take type arguments. This avoids errors with the debug output. *)
+          assert (T.expected_ty_vars (HVar.ty v1) = 0);
+          if T.expected_ty_vars (T.ty_exn (List.hd l2)) != 0 then fail();
           unif_list ~op ~bvars subst l1 scope l2 scope
         ) else fail()
-      | T.Const _, T.Var _ ->
+      | T.Const _, T.Var v2 ->
         (*Format.printf
           "(@[unif_ho.flex_rigid@ `@[:f2 %a :l2 %a@]`@ :t1 `%a`@ :subst %a@ :bvars %a@])@."
           (Scoped.pp T.pp) (f2,scope) (CCFormat.Dump.list T.pp) l2
@@ -737,6 +762,10 @@ module Inner = struct
         ) else if l1<>[] then (
           (* λfree-HO: unify with currying, "from the right" *)
           let l1, l2 = pair_lists_right f1 l1 f2 l2 in
+          (* Variables do not take type arguments. So we can fail early if `hd l1`
+             does take type arguments. This avoids errors with the debug output. *)
+          assert (T.expected_ty_vars (HVar.ty v2) = 0);
+          if T.expected_ty_vars (T.ty_exn (List.hd l1)) != 0 then fail();
           unif_list ~op ~bvars subst l1 scope l2 scope
         ) else fail()
       | T.Var v1, T.Var v2

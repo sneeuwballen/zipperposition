@@ -619,7 +619,7 @@ module S = struct
         List.iter
           (fun p' -> aux (Parent.proof p'))
           (Step.parents @@ step proof);
-          (* yield proof *)
+        (* yield proof *)
         k proof
       )
     in

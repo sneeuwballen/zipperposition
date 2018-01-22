@@ -40,11 +40,3 @@ sat = "SZS status (CounterSatisfiable|Satisfiable)"
 timeout = "SZS status ResourceOut"
 version = "git:."
 
-[hornet]
-
-binary = "./hornet.native"
-cmd = "./hornet.native $file -t $timeout --max-depth 200"
-unsat = "UNSAT"
-sat = "^SAT"
-timeout = "SZS status ResourceOut"
-version = "git:."

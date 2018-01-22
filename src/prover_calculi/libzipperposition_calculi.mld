@@ -1,0 +1,7 @@
+
+Superposition calculus (in {!Libzipperposition_calculi.Superposition})
+and other calculi for Zipperposition. A calculus is a set of inference rules
+and simplification rules.
+
+{!modules: Libzipperposition_calculi}
+

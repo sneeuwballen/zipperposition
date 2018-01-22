@@ -27,6 +27,8 @@ module type TERM = sig
   val update_subterms : t -> t list -> t
   (** Replace immediate subterms by the given list.
       This is used to test for equality *)
+
+  val pp : t CCFormat.printer
 end
 
 module Make(T : TERM) : S with type term = T.t

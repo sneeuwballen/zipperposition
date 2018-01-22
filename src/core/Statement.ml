@@ -527,7 +527,11 @@ module TPTP = struct
   let pp ppf ppt ppty out st =
     let name = name st in
     let pp_decl out (id,ty) =
-      fpf out "tff(@[%s, type,@ %a :@ @[%a@]@])." name ID.pp_tstp id ppty ty
+      if ID.is_distinct_object id
+      then
+        fpf out "%% (omitted type declaration for distinct object %a.)" ID.pp_tstp id
+      else
+        fpf out "tff(@[%s, type,@ %a :@ @[%a@]@])." name ID.pp_tstp id ppty ty
     and pp_quant_vars out = function
       | [] -> ()
       | l ->

@@ -1,0 +1,26 @@
+; vim:ft=lisp:
+
+(jbuild_version 1)
+
+(rule
+  ((targets (const.ml))
+   (deps ())
+   (action
+     (with-stdout-to ${@}
+       (progn
+         (echo "let version = \"${version:zipperposition}\"\n")
+         (echo "let section = Logtk.Util.Section.make \"zip\"\n"))))
+  ))
+
+; main lib
+(library
+  ((name libzipperposition)
+   (public_name libzipperposition)
+   (synopsis "library for the Zipperposition theorem prover")
+   (libraries (containers zarith msat logtk logtk.proofs logtk.parsers))
+   (flags (:standard -w +a-4-42-44-48-50-58-32-60@8 -color always))
+   (ocamlopt_flags (:standard -O3 -bin-annot
+                    -unbox-closures -unbox-closures-factor 20))
+  ))
+
+

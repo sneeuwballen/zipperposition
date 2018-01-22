@@ -1,0 +1,5 @@
+
+Logtk_arbitrary contains random generators for terms, clauses, formulas. These
+are to be used in property tests (see {b qcheck}) or perhaps benchmarks.
+
+{!modules: Logtk_arbitrary}

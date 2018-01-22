@@ -1,0 +1,18 @@
+; vim:ft=lisp:
+
+(jbuild_version 1)
+
+; main lib
+(library
+  ((name logtk)
+   (public_name logtk)
+   (synopsis "core data structures and algorithms for Logtk")
+   (libraries (containers containers.data sequence zarith unix))
+   (flags (:standard -w +a-4-42-44-48-50-58-32-60@8 -color always))
+   (ocamlopt_flags (:standard -O3 -bin-annot
+                    -unbox-closures -unbox-closures-factor 20))
+   (c_names (util_stubs))
+   (c_flags (-Wextra -Wno-unused-parameter))
+  ))
+
+

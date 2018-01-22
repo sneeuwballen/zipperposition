@@ -186,9 +186,7 @@ let rec expected_args ty = match view ty with
   | Forall ty' -> expected_args ty'
   | DB _ | Var _ | Builtin _ | App _ -> []
 
-let rec expected_ty_vars ty = match view ty with
-  | Forall ty' -> 1 + expected_ty_vars ty'
-  | _ -> 0
+let expected_ty_vars t = T.expected_ty_vars t
 
 let needs_args ty = expected_ty_vars ty>0 || expected_args ty<>[]
 
@@ -245,6 +243,9 @@ let apply ty0 args0 =
     | T.Bind (Binder.ForallTy, _, ty'), arg :: args' ->
       let arg = T.DB.eval env arg in
       aux ty' args' (DBEnv.push env arg)
+    | T.DB _, _ ->
+      let ty = T.DB.eval env ty in
+      aux ty args env
     | _ ->
       err_applyf_
         "@[<2>Type.apply:@ expected quantified or function type,@ but got @[%a@]"

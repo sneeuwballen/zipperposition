@@ -777,35 +777,38 @@ module Conv = struct
     try Some (of_simple_term_exn ctx t)
     with Type.Conv.Error _ -> None
 
-  let to_simple_term ?(env=DBEnv.empty) ctx t =
+  let to_simple_term ?(allow_free_db=false) ?(env=DBEnv.empty) ctx t =
     let module ST = TypedSTerm in
     let n = ref 0 in
-    let rec to_simple_term env t =
+    let rec aux_t env t =
       match view t with
         | Var i -> ST.var (aux_var i)
         | DB i ->
-          begin
-            try ST.var (DBEnv.find_exn env i)
-            with Failure _ ->
+          begin match DBEnv.find env i with
+            | Some v -> ST.var v
+            | None when allow_free_db ->
+              (* encode DB index *)
+              ST.builtin ~ty:(aux_ty @@ ty t) (Builtin.Pseudo_de_bruijn i)
+            | None ->
               Util.errorf ~where:"Term" "cannot find `Y%d`@ @[:in [%a]@]" i (DBEnv.pp Var.pp) env
           end
         | Const id -> ST.const ~ty:(aux_ty (ty t)) id
         | App (f,l) ->
           ST.app ~ty:(aux_ty (ty t))
-            (to_simple_term env f) (List.map (to_simple_term env) l)
+            (aux_t env f) (List.map (aux_t env) l)
         | AppBuiltin (b,l) ->
           ST.app_builtin ~ty:(aux_ty (ty t))
-            b (List.map (to_simple_term env) l)
+            b (List.map (aux_t env) l)
         | Fun (ty_arg, body) ->
           let v = Var.makef ~ty:(aux_ty ty_arg) "v_%d" (CCRef.incr_then_get n) in
-          let body = to_simple_term (DBEnv.push env v) body in
+          let body = aux_t (DBEnv.push env v) body in
           ST.bind Binder.Lambda ~ty:(aux_ty (ty t)) v body
     and aux_var v =
       Type.Conv.var_to_simple_var ~prefix:"X" ctx v
     and aux_ty ty =
       Type.Conv.to_simple_term ~env ctx ty
     in
-    to_simple_term env t
+    aux_t env t
 end
 
 let rebuild_rec t =

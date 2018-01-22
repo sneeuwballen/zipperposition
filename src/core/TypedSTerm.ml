@@ -121,57 +121,57 @@ let rec compare t1 t2 =
   let h2 = hash t2 in
   if h1<>h2 then CCInt.compare h1 h2 (* compare by hash, first *)
   else match view t1, view t2 with
-  | Var s1, Var s2 -> Var.compare s1 s2
-  | Const s1, Const s2 -> ID.compare s1 s2
-  | App (s1,l1), App (s2, l2) ->
-    CCOrd.(
-      compare s1 s2
-      <?> (CCOrd.list compare, l1, l2)
-    )
-  | Bind (s1, v1, t1), Bind (s2, v2, t2) ->
-    CCOrd.(
-      Binder.compare s1 s2
-      <?> (compare, v1, v2)
-      <?> (compare, t1, t2)
-    )
-  | AppBuiltin (b1,l1), AppBuiltin (b2,l2) ->
-    CCOrd.(
-      Builtin.compare b1 b2
-      <?> (CCOrd.list compare, l1, l2)
-    )
-  | Multiset l1, Multiset l2 ->
-    let l1 = List.sort compare l1 and l2 = List.sort compare l2 in
-    CCOrd.list compare l1 l2
-  | Record (l1, rest1), Record (l2, rest2) ->
-    CCOrd.(
-      CCOpt.compare compare rest1 rest2
-      <?> (cmp_fields, l1, l2)
-    )
-  | Meta (id1,_,_), Meta (id2,_,_) -> Var.compare id1 id2
-  | Ite (a1,b1,c1), Ite (a2,b2,c2) ->
-    CCList.compare compare [a1;b1;c1] [a2;b2;c2]
-  | Let (l1,t1), Let (l2,t2) ->
-    CCOrd.( compare t1 t2
-      <?> (list (pair Var.compare compare), l1, l2))
-  | Match (u1,l1), Match (u2,l2) ->
-    let cmp_branch (c1,vars1,rhs1) (c2,vars2,rhs2) =
-      CCOrd.(ID.compare c1.cstor_id c2.cstor_id
-        <?> (list compare, c1.cstor_args, c2.cstor_args)
-        <?> (list Var.compare, vars1,vars2)
-        <?> (compare,rhs1,rhs2))
-    in
-    CCOrd.( compare u1 u2 <?> (list cmp_branch,l1,l2))
-  | Var _, _
-  | Const _, _
-  | App _, _
-  | Bind _, _
-  | Ite _, _
-  | Let _, _
-  | Match _, _
-  | Multiset _, _
-  | AppBuiltin _, _
-  | Meta _, _
-  | Record _, _ -> to_int_ t1.term - to_int_ t2.term
+    | Var s1, Var s2 -> Var.compare s1 s2
+    | Const s1, Const s2 -> ID.compare s1 s2
+    | App (s1,l1), App (s2, l2) ->
+      CCOrd.(
+        compare s1 s2
+        <?> (CCOrd.list compare, l1, l2)
+      )
+    | Bind (s1, v1, t1), Bind (s2, v2, t2) ->
+      CCOrd.(
+        Binder.compare s1 s2
+        <?> (compare, v1, v2)
+        <?> (compare, t1, t2)
+      )
+    | AppBuiltin (b1,l1), AppBuiltin (b2,l2) ->
+      CCOrd.(
+        Builtin.compare b1 b2
+        <?> (CCOrd.list compare, l1, l2)
+      )
+    | Multiset l1, Multiset l2 ->
+      let l1 = List.sort compare l1 and l2 = List.sort compare l2 in
+      CCOrd.list compare l1 l2
+    | Record (l1, rest1), Record (l2, rest2) ->
+      CCOrd.(
+        CCOpt.compare compare rest1 rest2
+        <?> (cmp_fields, l1, l2)
+      )
+    | Meta (id1,_,_), Meta (id2,_,_) -> Var.compare id1 id2
+    | Ite (a1,b1,c1), Ite (a2,b2,c2) ->
+      CCList.compare compare [a1;b1;c1] [a2;b2;c2]
+    | Let (l1,t1), Let (l2,t2) ->
+      CCOrd.( compare t1 t2
+        <?> (list (pair Var.compare compare), l1, l2))
+    | Match (u1,l1), Match (u2,l2) ->
+      let cmp_branch (c1,vars1,rhs1) (c2,vars2,rhs2) =
+        CCOrd.(ID.compare c1.cstor_id c2.cstor_id
+          <?> (list compare, c1.cstor_args, c2.cstor_args)
+          <?> (list Var.compare, vars1,vars2)
+          <?> (compare,rhs1,rhs2))
+      in
+      CCOrd.( compare u1 u2 <?> (list cmp_branch,l1,l2))
+    | Var _, _
+    | Const _, _
+    | App _, _
+    | Bind _, _
+    | Ite _, _
+    | Let _, _
+    | Match _, _
+    | Multiset _, _
+    | AppBuiltin _, _
+    | Meta _, _
+    | Record _, _ -> to_int_ t1.term - to_int_ t2.term
 and cmp_field x y = CCOrd.pair String.compare compare x y
 and cmp_fields x y = CCOrd.list cmp_field x y
 
@@ -1036,8 +1036,13 @@ end
 exception UnifyFailure of string * (term * term) list * location option
 
 let pp_stack out l =
+  let pp_ty out = function
+    | None -> ()
+    | Some ty -> Format.fprintf out ":%a" pp ty
+  in
   let pp_frame out (t1,t2) =
-    Format.fprintf out "@[unifying `@[%a@]` and `@[%a@]`@]" pp t1 pp t2
+    Format.fprintf out "@[unifying `@[%a@,%a@]` and `@[%a@,%a@]`@]"
+      pp t1 pp_ty (ty t1) pp t2 pp_ty (ty t2)
   in
   Format.fprintf out "@[<v>%a@]" (Util.pp_list pp_frame) l
 

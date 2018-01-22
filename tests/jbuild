@@ -1,0 +1,13 @@
+
+(executable
+    ((name run_tests)
+     (libraries (logtk logtk.parsers logtk.arbitrary qcheck oUnit))
+     (flags (:standard -w +a-4-29-42-44-48-50-58-32-60@8 -color always))))
+
+(alias
+ ((name    runtest)
+  (deps    (run_tests.exe))
+  (action  (run ${<} --verbose))))
+
+
+

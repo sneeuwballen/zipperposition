@@ -110,6 +110,8 @@ type skolem_kind = K_normal | K_ind (* inductive *)
 
 exception Attr_skolem of skolem_kind * int
 
+exception Attr_distinct
+
 let as_infix = payload_find ~f:(function Attr_infix s->Some s | _ -> None)
 let is_infix id = as_infix id |> CCOpt.is_some
 let as_prefix = payload_find ~f:(function Attr_prefix s->Some s | _ -> None)
@@ -132,10 +134,16 @@ let as_skolem id =
 let num_mandatory_args id =
   let n_option =
     payload_find id
-    ~f:(function
+      ~f:(function
         | Attr_skolem (_, n) -> Some n
         | _ -> None)
   in
   match n_option with
-  | Some n -> n
-  | None -> 0
+    | Some n -> n
+    | None -> 0
+
+let is_distinct_object id =
+  payload_pred id
+    ~f:(function
+      | Attr_distinct -> true
+      | _ -> false)

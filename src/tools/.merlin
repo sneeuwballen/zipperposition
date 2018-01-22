@@ -1,8 +1,0 @@
-REC
-PKG msat
-PKG qcheck
-S orient
-S hysteresis
-B ../_build/src/tools/
-B ../_build/src/tools/orient/
-B ../_build/src/tools/hysteresis/
