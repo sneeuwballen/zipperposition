@@ -416,8 +416,11 @@ let _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 k =
     match T.view l2, T.view r2 with
       | _ when T.equal l2 r2 -> k subst
       | T.App (f, ss), T.App (g, ts) when List.length ss = List.length ts ->
-        equate_terms ~subst f g
-          (fun subst -> equate_lists ~subst ss ts k)
+        (* Don't rewrite heads because it can cause incompletness, e.g. by
+           subsuming ho_complete_eq inferences. *)
+        if T.equal f g
+        then equate_lists ~subst ss ts k
+        else ()
       | _ -> ()
   and equate_lists ~subst l2s r2s k = match l2s, r2s with
     | [], [] -> k subst
