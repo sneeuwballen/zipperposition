@@ -348,7 +348,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (* Check for hidden superposition at a variable *)
       if !_restrict_hidden_sup_at_vars then (
         match is_hidden_sup_at_var info with
-          | Some (var,replacement) when not (sup_at_var_condition info var replacement)
+          | Some (var,replacement) when not (!_sup_at_vars && sup_at_var_condition info var replacement)
             -> raise (ExitSuperposition "hidden superposition at variable")
           | _ -> ()
       );
@@ -446,7 +446,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         raise (ExitSuperposition "superposition at variable");
       (* Check for hidden superposition at a variable *)
       match is_hidden_sup_at_var info with
-        | Some (var,replacement) when not (sup_at_var_condition info var replacement)
+        | Some (var,replacement) when not (!_sup_at_vars && sup_at_var_condition info var replacement)
           -> raise (ExitSuperposition "hidden superposition at variable")
         | _ -> ();
           (* ordering constraints are ok, build new active lits (excepted s=t) *)
@@ -796,7 +796,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
              Note that we keep restrictions for the head, so as
              not to rewrite [f x=g x] into ⊤ after equality completion
              of [f=g] *)
-          normal_form ~restrict hd
+          let rewrite_head =
+            (* Don't rewrite heads in the following situations: *)
+            (List.length l = 0 || not (T.is_type (List.hd l)))
+            && not (Ordering.monotonic ord)
+          in
+          (if rewrite_head then normal_form ~restrict hd else (fun k -> k hd))
             (fun hd' ->
                normal_form_l l
                  (fun l' ->

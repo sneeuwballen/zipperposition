@@ -31,10 +31,9 @@ let term_to_head s =
     | _ -> None
 
 let term_to_args s =
-  let ignore_ty_args = List.filter (fun u -> not (Type.is_tType (T.ty u))) in
   match T.view s with
-    | T.App (_,ss) -> ignore_ty_args ss
-    | T.AppBuiltin (_,ss) -> ignore_ty_args ss
+    | T.App (_,ss) -> ss
+    | T.AppBuiltin (_,ss) -> ss
     | _ -> []
 
 let to_string = CCFormat.to_string pp

@@ -267,7 +267,7 @@ module Inner = struct
     begin match T.view t with
       | T.Var _ ->
         let u, sc_u = US.deref subst (t,sc_t) in
-        assert (sc_t=sc_u);
+        assert (sc_t=sc_u || T.is_ground u);
         if T.equal t u then subst, u
         else whnf_deref_rec subst (u,sc_t) (* fixpoint, maybe [u] is reducible *)
       | T.App (f0, l) ->
@@ -501,6 +501,7 @@ module Inner = struct
       (Scoped.pp T.pp) (t1,sc1) (Scoped.pp T.pp) (t2,sc2)
       pp_op op US.pp subst B_vars.pp bvars;*)
     assert (not (T.is_a_type t1 && Type.is_forall (Type.of_term_unsafe t1)));
+    assert (not (T.is_a_type t2 && Type.is_forall (Type.of_term_unsafe t2)));
     begin match view1, view2 with
       | _ when sc1=sc2 && T.equal t1 t2 ->
         subst (* the terms are equal under any substitution *)
