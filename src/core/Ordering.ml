@@ -277,6 +277,14 @@ module KBO : ORD = struct
       (* do the recursive computation of kbo *)
       let wb', res = tckbo_rec wb f g ss ts in
       let wb'' = W.(wb' + weight prec f - weight prec g) in
+      begin match f with
+        | Head.V x -> add_pos_var balance (HVar.id x)
+        | _ -> ()
+      end;
+      begin match g with
+        | Head.V x -> add_neg_var balance (HVar.id x)
+        | _ -> ()
+      end;
       (* check variable condition *)
       let g_or_n = if balance.neg_counter = 0 then Gt else Incomparable
       and l_or_n = if balance.pos_counter = 0 then Lt else Incomparable in
