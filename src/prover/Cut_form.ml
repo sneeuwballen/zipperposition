@@ -169,7 +169,7 @@ module Seq = struct
   let terms_with_pos ?(subterms=true) f =
     cs f
     |> Sequence.of_list
-    |> Sequence.zip_i |> Sequence.zip
+    |> Util.seq_zipi
     |> Sequence.flat_map
       (fun (i,c) ->
          Sequence.of_array_i c

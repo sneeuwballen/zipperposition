@@ -9,7 +9,6 @@ install: ["jbuilder" "install" name]
 remove: ["jbuilder" "uninstall" name]
 depends: [
   "ocamlfind" { build }
-  "base-bytes"
   "base-unix"
   "zarith"
   "containers" { >= "1.0" }

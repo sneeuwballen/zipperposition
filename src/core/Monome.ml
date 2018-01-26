@@ -325,7 +325,7 @@ let fold_max ~ord f acc m =
     Seq.terms m
     |> MT.Seq.of_seq MT.empty
     |> MT.max_seq (Ordering.compare ord)
-    |> Sequence.map2 (fun t _ -> t)
+    |> Sequence.map fst
     |> T.Seq.add_set T.Set.empty
   in
   CCList.foldi

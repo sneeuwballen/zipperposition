@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.4
+
+- remove inlining on parsers
+- cli option for ext-neg rule
+- add `--check-types` for checking types deeply in new clauses
+- Add ExistsConst (??) and ForallConst (!!) to TPTP parser
+- TPTP parser: allow function types as THF terms
+- add cli option `-bt` (alias to `--backtraces`)
+- completion of equalities with λ-abstractions as RHS in type inference
+- THF parser: allow for `@` applications in types
+- cli flag for ext_pos
+- App encode: binary for app-encoding HO applications into FO
+
+- bugfix in ho unification
+- in unification, fix order in which bound variables are added to env
+- bugfix in unification (would produce wrong type)
+- do not simplify in demodulation
+- Add StarExec instructions to readme
+- bugfixes `app_encode`
+- β-normalize rewrite rules that are eq-completed
+- uniform output of “SZS status” instead of “SZS Status”
+- auto flattening of applications in STerm
+- fix `examples/ho/extensionality1.zf` by forbidding some HO demodulations
+- fix tag managing (and therefore proof checking) for `Lit.is_absurd`
+- bugfix in proof checking related to instantiation
+- bugfix in NPDtree
+- more elegant and robust sup-at-var condition
+- sup-at-var condition with polymorphism
+- remove literal comparison by constraint
+- no selection of literals containing ho variables
+- Stricter sup-at-vars condition
+- purify naked variables
+
 ## 1.3
 
 - experimental proof checking with `--check` (and `--dot-llproof <file>`)

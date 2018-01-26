@@ -187,6 +187,7 @@ val take_drop_while : ('a -> bool) -> 'a list -> 'a list * 'a list
 val map_product : f:('a -> 'b list list) -> 'a list -> 'b list list
 
 val seq_map_l : f:('a -> 'b list) -> 'a list -> 'b list Sequence.t
+val seq_zipi : 'a Sequence.t -> (int * 'a) Sequence.t
 
 val invalid_argf: ('a, Format.formatter, unit, 'b) format4 -> 'a
 val failwithf : ('a, Format.formatter, unit, 'b) format4 -> 'a

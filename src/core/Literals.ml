@@ -132,7 +132,7 @@ let maxlits_l ~ord lits =
   Util.enter_prof prof_maxlits;
   let m = _to_multiset_with_idx lits in
   let max = MLI.max_seq (_compare_lit_with_idx ~ord) m
-            |> Sequence.map2 (fun x _ -> x)
+            |> Sequence.map fst
             |> Sequence.to_list
   in
   Util.exit_prof prof_maxlits;
@@ -142,7 +142,7 @@ let maxlits ~ord lits =
   Util.enter_prof prof_maxlits;
   let m = _to_multiset_with_idx lits in
   let max = MLI.max_seq (_compare_lit_with_idx ~ord) m
-            |> Sequence.map2 (fun x _ -> snd x)
+            |> Sequence.map (fun (x,_) -> snd x)
             |> Sequence.to_list
             |> BV.of_list
   in

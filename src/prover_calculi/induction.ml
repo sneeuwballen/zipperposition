@@ -969,7 +969,7 @@ module Make
            | T_view.T_app_defined (_,c,l) ->
              let pos = RW.Defined_cst.defined_positions c in
              Sequence.of_list l
-             |> Sequence.zip_i |> Sequence.zip
+             |> Util.seq_zipi
              |> Sequence.diagonal
              |> Sequence.filter_map
                (fun ((i1,t1),(i2,t2)) ->
