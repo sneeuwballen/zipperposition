@@ -14,6 +14,8 @@ let section = Util.Section.make ~parent:Const.section "fool"
 let stat_fool_param = Util.mk_stat "fool.param_step"
 let stat_elim_var = Util.mk_stat "fool.elim_var"
 
+let enabled_ = ref true
+
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C
@@ -189,11 +191,15 @@ let extension =
   let register env =
     let module E = (val env : Env.S) in
     let module ET = Make(E) in
-    ET.setup ()
+    if !enabled_
+    then ET.setup ()
   in
   { Extensions.default with Extensions.
                          name = "fool";
                          env_actions=[register];
   }
 
-let () = Extensions.register extension
+let () =
+  Options.add_opts
+    [ "--no-fool", Arg.Clear enabled_, " disable fool (first-class booleans)"  ];
+  Extensions.register extension
