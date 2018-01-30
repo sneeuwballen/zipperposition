@@ -19,40 +19,65 @@ type parametrized = strict:bool -> ord:Ordering.t -> t
 (* no need for classification here *)
 let no_select _ : BV.t = BV.empty ()
 
-let _select_ho_var_lits = ref true
+let _ho_restriction = ref `None
 
 (* is it a good idea to select this kind of literal? *)
-let can_select_lit (lit:Lit.t) : bool =
-  Lit.is_neg lit
-  && (
-    !_select_ho_var_lits ||
-    (* If this flag is false, we cannot select literals containing a HO variable: *)
-    not (
-      Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lit
-      |> Sequence.exists (fun (t,_) -> T.is_ho_var t)
-    )
+let can_select_lit ~ord (lits:Lits.t) (i:int) : bool =
+  if Lit.is_neg lits.(i)
+  then (
+    match !_ho_restriction with
+      | `None -> true
+      | `Nonpurifying ->
+        (* Search for the maximal terms with variable heads. Create a list of (var_head, args) pairs: *)
+        let max_var_headed =
+          lits |> CCArray.fold (
+            fun vars lit ->
+              let new_vars =
+                Lit.fold_terms ~vars:true ~ty_args:false ~which:`Max ~ord ~subterms:false lit
+                |> Sequence.map (fun (t,_) -> T.as_app t)
+                |> Sequence.filter (fun (head,_) -> T.is_var head)
+                |> Sequence.to_list
+              in
+              CCList.append new_vars vars
+          ) [] in
+        (* Does one of those variables occur with different arguments in our literal? *)
+        let occur_with_other_args =
+          Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
+          |> Sequence.exists (fun (t,_) ->
+              let t_head, t_args = T.as_app t in
+              max_var_headed |> CCList.exists (fun (head, args) -> head = t_head && t_args != args)
+            )
+        in
+        not occur_with_other_args
+      | `Purifying ->
+        (* We cannot select literals containing a HO variable: *)
+        not (
+          Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
+          |> Sequence.exists (fun (t,_) -> T.is_ho_var (fst (T.as_app t)))
+        )
   )
+  else false
 
 (* checks that [bv] is an acceptable selection for [lits]. In case
    some literal is selected, at least one negative literal must be selected. *)
-let validate_fun_ lits bv =
+let validate_fun_ ~ord lits bv =
   if BV.is_empty bv then true
   else (
     Sequence.of_array_i lits
     |> Sequence.exists
-      (fun (i,_) -> can_select_lit lits.(i) && BV.get bv i)
+      (fun (i,_) -> can_select_lit ~ord lits i && BV.get bv i)
   )
 
 (* build a selection function in general, given the more specialized
    one there *)
-let mk_ ~(f:Lits.t -> BV.t) (lits:Lits.t) : BV.t =
+let mk_ ~ord ~(f:Lits.t -> BV.t) (lits:Lits.t) : BV.t =
   if Array.length lits <= 1 then BV.empty ()
   else (
     (* should we select anything? *)
-    let should_select = CCArray.exists can_select_lit lits in
+    let should_select = CCList.exists (can_select_lit ~ord lits) (CCList.range' 0 (CCArray.length lits)) in
     if should_select then (
       let bv = f lits in
-      assert (validate_fun_ lits bv);
+      assert (validate_fun_ ~ord lits bv);
       bv
     ) else (
       (*Util.debugf ~section 5 "(@[should-not-select@ %a@])" (fun k->k Lits.pp lits);*)
@@ -63,11 +88,11 @@ let mk_ ~(f:Lits.t -> BV.t) (lits:Lits.t) : BV.t =
 let bv_first_ bv = BV.iter_true bv |> Sequence.head
 
 let max_goal ~strict ~ord lits =
-  mk_ lits ~f:(fun lits ->
+  mk_ ~ord lits ~f:(fun lits ->
     let bv = Lits.maxlits ~ord lits in
     (* only retain negative normal lits, or constraints
        that are unshielded *)
-    BV.filter bv (fun i -> can_select_lit lits.(i));
+    BV.filter bv (fun i -> can_select_lit ~ord lits i);
     begin match bv_first_ bv with
       | Some i ->
         (* keep only first satisfying lit *)
@@ -88,7 +113,7 @@ let except_RR_horn (p:parametrized) ~strict ~ord lits =
 
 (** {2 Global selection Functions} *)
 
-let default ~ord = max_goal ~strict:true ~ord
+let default = max_goal ~strict:true
 
 let l =
   let basics =
@@ -114,13 +139,14 @@ let from_string ~ord s =
 
 let all () = List.map fst l
 
+let ho_restriction_opt =
+  let set_ n = _ho_restriction := n in
+  let l = [ "none", `None; "purifying", `Purifying; "nonpurifying", `Nonpurifying] in
+  Arg.Symbol (List.map fst l, fun s -> set_ (List.assoc s l))
+
 let () =
   let set_select s = Params.select := s in
   Params.add_opts
-    [ "--select",
-      Arg.Symbol (all(), set_select),
-      " set literal selection function";
-      "--dont-select-ho-var-lits",
-      Arg.Clear _select_ho_var_lits,
-      " prohibit to select only literals containing higher-order variables"
+    [ "--select", Arg.Symbol (all(), set_select), " set literal selection function";
+      "--ho-selection-restriction", ho_restriction_opt, " selection restrictions for lambda-free higher-order terms (none/purifying/nonpurifying)"
     ]
