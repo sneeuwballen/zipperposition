@@ -21,35 +21,58 @@ let no_select _ : BV.t = BV.empty ()
 
 let _ho_restriction = ref `None
 
-(* is it a good idea to select this kind of literal? *)
+(* May we select this literal? *)
 let can_select_lit ~ord (lits:Lits.t) (i:int) : bool =
   if Lit.is_neg lits.(i)
   then (
+    (* Search for the (maximal) terms with variable heads.
+       Returns a list of (var_head, args) pairs. *)
+    let var_headed_subterms which =
+      let lits =
+        if which = `Max
+        then Lits.maxlits_l ~ord lits |> CCList.map (fun (l,_) -> l) |> Array.of_list
+        else lits
+      in
+      lits |> CCArray.fold (
+        fun vars lit ->
+          let new_vars =
+            Lit.fold_terms ~vars:true ~ty_args:false ~which ~ord ~subterms:false lit
+            |> Sequence.map (fun (t,_) -> T.as_app t)
+            |> Sequence.filter (fun (head,_) -> T.is_var head)
+            |> Sequence.to_list
+          in
+          CCList.append new_vars vars
+      ) [] in
+    (* Given a list of (var_head, args) pairs, check whether our lit contains
+       one of those variables, but with different arguments. *)
+    let occur_with_other_args vars_args =
+        Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
+        |> Sequence.exists (fun (t,_) ->
+            let t_head, t_args = T.as_app t in
+            vars_args |> CCList.exists (fun (head, args) -> head = t_head && t_args != args)
+          )
+      in
     match !_ho_restriction with
       | `None -> true
-      | `Nonpurifying ->
-        (* Search for the maximal terms with variable heads. Create a list of (var_head, args) pairs: *)
-        let max_var_headed =
-          lits |> CCArray.fold (
-            fun vars lit ->
-              let new_vars =
-                Lit.fold_terms ~vars:true ~ty_args:false ~which:`Max ~ord ~subterms:false lit
-                |> Sequence.map (fun (t,_) -> T.as_app t)
-                |> Sequence.filter (fun (head,_) -> T.is_var head)
-                |> Sequence.to_list
-              in
-              CCList.append new_vars vars
-          ) [] in
-        (* Does one of those variables occur with different arguments in our literal? *)
-        let occur_with_other_args =
-          Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
-          |> Sequence.exists (fun (t,_) ->
-              let t_head, t_args = T.as_app t in
-              max_var_headed |> CCList.exists (fun (head, args) -> head = t_head && t_args != args)
-            )
-        in
-        not occur_with_other_args
-      | `Purifying ->
+      | `NoVarHeadingMaxTerm ->
+        (* Don't select literals containing a variable that heads the maximal term
+           of the clause but occurs with different arguments there. *)
+        let vars_args = var_headed_subterms `Max in
+        not (occur_with_other_args vars_args)
+      | `NoVarDifferentArgs ->
+        (* Don't selected if the literal contains a variable that is applied to
+           different arguments in the clause *)
+        let vars_args = var_headed_subterms `All in
+        not (occur_with_other_args vars_args)
+      | `NoUnappliedVarOccurringApplied ->
+        (* Don't selected if the literal contains an unapplied variable that also
+           occurs applied in the clause *)
+        let vars_args = var_headed_subterms `All in
+        Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
+        |> Sequence.exists (fun (t,_) ->
+            vars_args |> CCList.exists (fun (head, args) -> head = t && not (CCList.is_empty args))
+          )
+      | `NoHigherOrderVariables ->
         (* We cannot select literals containing a HO variable: *)
         not (
           Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
@@ -141,12 +164,17 @@ let all () = List.map fst l
 
 let ho_restriction_opt =
   let set_ n = _ho_restriction := n in
-  let l = [ "none", `None; "purifying", `Purifying; "nonpurifying", `Nonpurifying] in
+  let l = [
+    "none", `None;
+    "no-var-heading-max-term", `NoVarHeadingMaxTerm;
+    "no-var-different-args", `NoVarDifferentArgs;
+    "no-unapplied-var-occurring-applied", `NoUnappliedVarOccurringApplied;
+    "no-ho-vars", `NoHigherOrderVariables] in
   Arg.Symbol (List.map fst l, fun s -> set_ (List.assoc s l))
 
 let () =
   let set_select s = Params.select := s in
   Params.add_opts
     [ "--select", Arg.Symbol (all(), set_select), " set literal selection function";
-      "--ho-selection-restriction", ho_restriction_opt, " selection restrictions for lambda-free higher-order terms (none/purifying/nonpurifying)"
+      "--ho-selection-restriction", ho_restriction_opt, " selection restrictions for lambda-free higher-order terms (none/no-var-heading-max-term/no-var-different-args/no-unapplied-var-occurring-applied/no-ho-vars)"
     ]
