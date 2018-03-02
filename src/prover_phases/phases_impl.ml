@@ -473,7 +473,6 @@ let check res =
 
 let setup_gc =
   Phases.start_phase Phases.Setup_gc >>= fun () ->
-  Util.debug ~section 2 "setup GC";
   (* GC! increase max overhead because we want the GC to be faster, even if
       it implies more wasted memory. *)
   let gc = Gc.get () in
@@ -482,7 +481,6 @@ let setup_gc =
 
 let setup_signal =
   Phases.start_phase Phases.Setup_signal >>= fun () ->
-  Util.debug ~section 2 "setup signal handler";
   (* signal handler. Re-raise, bugs shouldn't keep hidden *)
   Signal.set_exn_handler
     (fun e ->

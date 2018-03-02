@@ -25,29 +25,53 @@ let start_time () = start_
 (** Debug section *)
 module Section = struct
   let null_level = -1 (* absence of level *)
+
   type t = {
     descr : descr;
-    mutable full_name : string;
+    full_name : string;
     mutable level : int;
+    mutable cur_level: int lazy_t; (* cached computed level *)
   }
   and descr =
     | Root
     | Sub of string * t * t list  (* name, parent, inheriting *)
 
-  let root={descr=Root; full_name=""; level=0; }
+  (* inlinable function *)
+  let[@inline] cur_level s = Lazy.force s.cur_level
+
+  (* recursive lookup of level, with inheritance from parent *)
+  let compute_cur_level_ s =
+    if s.level <> null_level then s.level
+    else match s.descr with
+      | Root -> 0
+      | Sub (_, parent, []) -> cur_level parent
+      | Sub (_, parent, [i]) -> max (cur_level parent) (cur_level i)
+      | Sub (_, parent, inheriting) ->
+        List.fold_left
+          (fun m i -> max m (cur_level i))
+          (cur_level parent) inheriting
+
+  (* build a section *)
+  let mk ?(level=null_level) descr full_name : t =
+    let rec self = {
+      descr; full_name; level; cur_level= lazy (compute_cur_level_ self);
+    } in
+    self
+
+  let root : t = mk ~level:0 Root ""
 
   (* computes full name of section *)
-  let compute_full_name s =
+  let compute_full_name (d:descr) =
     let buf = Buffer.create 15 in
-    let rec add s = match s.descr with
+    let rec add d = match d with
       | Root -> true
       | Sub (name, parent, _) ->
-        let parent_is_root = add parent in
+        let parent_is_root = add parent.descr in
         if not parent_is_root then Buffer.add_char buf '.';
         Buffer.add_string buf name;
         false
     in
-    ignore (add s);
+    ignore (add d);
     Buffer.contents buf
 
   let full_name s = s.full_name
@@ -55,51 +79,31 @@ module Section = struct
   (* full name -> section *)
   let section_table = Hashtbl.create 15
 
-  let set_debug s i = assert (i>=0); s.level <- i
-  let clear_debug s = s.level <- null_level
+  (* reset all cached levels *)
+  let invalidate_cache () =
+    root.cur_level <- lazy (compute_cur_level_ root);
+    Hashtbl.iter (fun _ s -> s.cur_level <- lazy (compute_cur_level_ s)) section_table
+
+  let set_debug s i = assert (i>=0); s.level <- i; invalidate_cache ()
+  let clear_debug s = s.level <- null_level; invalidate_cache()
   let get_debug s =
     if s.level=null_level then None else Some s.level
 
   let make ?(parent=root) ?(inheriting=[]) name =
     if name="" then invalid_arg "Section.make: empty name";
-    let sec = {
-      descr=Sub(name, parent, inheriting);
-      full_name="";
-      level=null_level;
-    } in
-    let name' = compute_full_name sec in
+    let descr = Sub(name, parent, inheriting) in
+    let name' = compute_full_name descr in
     try
       Hashtbl.find section_table name'
     with Not_found ->
       (* new section! register it, add an option to set its level *)
-      sec.full_name <- name';
+      let sec = mk descr name' in
       Hashtbl.add section_table name' sec;
       sec
-
-  let base = make "base"
 
   let iter yield =
     yield ("", root);
     Hashtbl.iter (fun name sec -> yield (name,sec)) section_table
-
-  (* recursive lookup, with inheritance from parent *)
-  let rec cur_level_rec s =
-    if s.level = null_level
-    then match s.descr with
-      | Root -> 0
-      | Sub (_, parent, []) -> cur_level_rec parent
-      | Sub (_, parent, [i]) -> max (cur_level_rec parent) (cur_level_rec i)
-      | Sub (_, parent, inheriting) ->
-        List.fold_left
-          (fun m i -> max m (cur_level_rec i))
-          (cur_level_rec parent) inheriting
-    else s.level
-
-  (* inlinable function *)
-  let cur_level s =
-    if s.level = null_level
-    then cur_level_rec s
-    else s.level
 end
 
 let break_on_debug = ref false
@@ -113,22 +117,25 @@ let get_debug () = Section.root.Section.level
 
 let debug_fmt_ = Format.std_formatter
 
-let debugf ?(section=Section.root) l msg k =
+let debugf_real ~section msg k =
+  let now = total_time_s() in
+  if section == Section.root
+  then Format.fprintf debug_fmt_ "@{<Black>@[<4>%.3f[]@}@ " now
+  else Format.fprintf debug_fmt_ "@{<Black>@[<4>%.3f[%s]@}@ "
+      now section.Section.full_name;
+  k (Format.kfprintf
+      (fun fmt ->
+         Format.fprintf fmt "@]@.";
+         if !break_on_debug then wait_user_input();
+      )
+      debug_fmt_ msg)
+
+let[@inline] debugf ?(section=Section.root) l msg k =
   if l <= Section.cur_level section then (
-    let now = total_time_s() in
-    if section == Section.root
-    then Format.fprintf debug_fmt_ "@{<Black>@[<4>%.3f[]@}@ " now
-    else Format.fprintf debug_fmt_ "@{<Black>@[<4>%.3f[%s]@}@ "
-        now section.Section.full_name;
-    k (Format.kfprintf
-        (fun fmt ->
-           Format.fprintf fmt "@]@.";
-           if !break_on_debug then wait_user_input();
-        )
-        debug_fmt_ msg)
+    debugf_real ~section msg k
   )
 
-let debug ?section l msg = debugf ?section l "%s" (fun k->k msg)
+let[@inline] debug ?section l msg = debugf ?section l "%s" (fun k->k msg)
 
 let ksprintf_noc ~f fmt =
   let buf = Buffer.create 32 in

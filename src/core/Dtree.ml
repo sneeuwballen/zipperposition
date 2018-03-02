@@ -275,7 +275,7 @@ module Make(E : Index.EQUATION) = struct
     (a.leaf == b.leaf && CharMap.equal equal_ a.map b.map)
 
   let to_dot out t =
-    Util.debugf ~section:Util.Section.base 2
+    Util.debugf 2
       "@[<2>print graph of size %d@]" (fun k->k (size t));
     let pp = CCGraph.Dot.pp
         ~eq:equal_

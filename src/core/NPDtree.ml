@@ -484,7 +484,7 @@ module MakeTerm(X : Set.OrderedType) = struct
   (* TODO: print leaf itself *)
 
   let to_dot _ out t =
-    Util.debugf ~section:Util.Section.base 2
+    Util.debugf 2
       "@[<2>print graph of size %d@]" (fun k->k (size t));
     let pp = CCGraph.Dot.pp
         ~eq:(==)
