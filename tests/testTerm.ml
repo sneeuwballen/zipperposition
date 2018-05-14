@@ -183,7 +183,8 @@ let add_stat = ref false
 
 let gen_ho =
   let a =
-    {ArTerm.default_ho with QCheck.gen=ArTerm.default_ho_fuel 8}
+    ArTerm.default_ho
+    |> QCheck.set_gen (ArTerm.default_ho_fuel 8)
     |> QCheck.set_print T.ZF.to_string
   in
   if !add_stat then (
