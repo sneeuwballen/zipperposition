@@ -2,7 +2,8 @@ opam-version: "1.2"
 maintainer: "simon.cruanes@inria.fr"
 author: "Simon Cruanes"
 homepage: "https://github.com/c-cube/zipperposition"
-build: ["jbuilder" "build" "-p" name]
+version: "1.5"
+build: ["jbuilder" "build"]
 build-doc: ["jbuilder" "build" "@doc" "-p" name]
 build-test: [
     ["jbuilder" "runtest"]
