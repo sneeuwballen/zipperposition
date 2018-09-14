@@ -4,8 +4,12 @@
 (** {1 Jensen-Pietrzykowski Unification} *)
 
 module T = Term
-module US = Unif_subst
 module S = Subst
+
+
+let scope = 0 (* TODO: scopes *)
+
+let subst_bind s (v:T.var) t = ((Subst.FO.bind s ((v,scope):>InnerTerm.t HVar.t Scoped.t)) (t,scope)) 
 
 (* Find disagreeing subterms, TODO: preferably one that is not below a variable (to get preunification if possible) *)
 let rec find_disagreement s t = 
@@ -29,34 +33,31 @@ let rec find_disagreement s t =
 
 (* Projection rule *)
 
-(* find substitutions for the projection rule (u is a member of the disagreement pair) *)
-let projection_substs u =
+(* find substitutions for the projection rule, given a member of the disagreement pair *)
+let project_onesided u =
   let head, args = T.as_app u in
-  let scope = 0 in (* TODO: scopes *)
   let prefix_types, return_type = Type.open_fun (T.ty head) in
-  Util.debugf 1 "return_type %a" (fun k -> k Type.pp return_type);
   if T.is_var head 
   then
     args 
-    |> List.mapi (fun i arg -> List.length prefix_types - 1 - i, arg) (* Determine DB-index of the argument *)
-    |> List.filter (fun (dbindex, arg) -> T.ty arg = return_type) (* necessary to make substitution type correct *)
-    |> List.map (fun (dbindex, arg) -> 
+    |> Sequence.of_list
+    |> Sequence.mapi (fun i arg -> List.length prefix_types - 1 - i, arg) (* Determine DB-index of the argument *)
+    |> Sequence.filter (fun (dbindex, arg) -> T.ty arg = return_type) (* necessary to make substitution type correct *)
+    |> Sequence.map (fun (dbindex, arg) -> 
         (* substitute x for a projection to the j-th argument *)
-        (US.FO.bind US.empty (T.as_var_exn head,scope) (T.fun_l prefix_types (T.bvar ~ty:(T.ty arg) dbindex),scope)) 
+        subst_bind Subst.empty (T.as_var_exn head) (T.fun_l prefix_types (T.bvar ~ty:(T.ty arg) dbindex)) 
     )
-  else []
+  else Sequence.empty
 
-(* apply projection substitutions to the given member of the disagreement pair *)
-let project u = projection_substs u |> List.map (fun s -> Lambda.whnf (S.FO.apply S.Renaming.none (US.subst s) (u, 0)))
-(* TODO: Scope & Renaming ? *)
+(* find substitutions for the projection rule, given a disagreement pair *)
+let project u v = Sequence.append (project_onesided u) (project_onesided v)
 
 
 (* Imitation rule *)
 
-let imitation_subst u v = 
+let imitate_onesided u v = 
   let head_u, args_u = T.as_app u in
   let head_v, args_v = T.as_app v in
-  let scope = 0 in (* TODO: scopes *)
   let prefix_types_u, _ = Type.open_fun (T.ty head_u) in
   let prefix_types_v, _ = Type.open_fun (T.ty head_v) in
   if T.is_var head_u && (T.is_var head_v || T.is_const head_v) 
@@ -72,23 +73,19 @@ let imitation_subst u v =
     in
     let matrix = T.app head_v matrix_args in
     let subst_value = T.fun_l prefix_types_u matrix in 
-    let subst = US.FO.bind US.empty (T.as_var_exn head_u,scope) (subst_value,scope) in
-    [subst]
-  else []
-(* TODO: again with swapped roles *)
+    let subst = subst_bind Subst.empty (T.as_var_exn head_u) subst_value in
+    Sequence.singleton subst
+  else Sequence.empty
 
-(* apply imitation substitutions *)
-let imitate u v = imitation_subst u v |> List.map (fun s -> Lambda.whnf (S.FO.apply S.Renaming.none (US.subst s) (u, 0)))
-(* TODO: Scope & Renaming ? *)
-(* TODO: avoid this code duplication *)
+(* find substitutions for the projection rule, given a disagreement pair *)
+let imitate u v = Sequence.append (imitate_onesided u v) (imitate_onesided v u)
 
 
 (* Identification rule *)
 
-let identification_subst u v =
+let identify u v =
   let head_u, args_u = T.as_app u in
   let head_v, args_v = T.as_app v in
-  let scope = 0 in (* TODO: scopes *)
   let prefix_types_u, return_type = Type.open_fun (T.ty head_u) in
   let prefix_types_v, return_type2 = Type.open_fun (T.ty head_v) in
   assert (return_type = return_type2);
@@ -117,18 +114,38 @@ let identification_subst u v =
     let matrix_v = T.app matrix_head (matrix_args_v @ bvars_v) in
     let subst_value_u = T.fun_l prefix_types_u matrix_u in 
     let subst_value_v = T.fun_l prefix_types_v matrix_v in 
-    let subst = US.empty in
-    let subst = US.FO.bind subst (T.as_var_exn head_u,scope) (subst_value_u,scope) in
-    let subst = US.FO.bind subst (T.as_var_exn head_v,scope) (subst_value_v,scope) in
-    [subst]
-  else []
+    let subst = Subst.empty in
+    let subst = subst_bind subst (T.as_var_exn head_u) subst_value_u in
+    let subst = subst_bind subst (T.as_var_exn head_v) subst_value_v in
+    Sequence.singleton subst
+  else Sequence.empty
 
-(* apply identification substitution *)
-let identify u v = 
-  let apply u s = Lambda.whnf (S.FO.apply S.Renaming.none (US.subst s) (u, 0)) in
-  identification_subst u v |> List.map (fun s -> (apply u s, apply v s))
-(* TODO: Scope & Renaming ? *)
-(* TODO: avoid this code duplication *)
+
+
+
+(* apply a substitution and reduce to normal form *)
+let nfapply s u = Lambda.snf (S.FO.apply S.Renaming.none s (u, scope))
+
+
+
+
+let rec unify t s ?(rules=[]) = 
+  Util.debugf 1 "Unify (rules: %a) %a and %a" (fun k -> k (CCList.pp CCString.print) rules T.pp t T.pp s);
+  match find_disagreement t s with
+    | Some (u, v) -> 
+      [project,"proj"; imitate,"imit"; identify,"id"] 
+      |> Sequence.of_list 
+      |> Sequence.flat_map (fun (rule,rulename) -> rule u v |> Sequence.map (fun subst -> (subst, rulename)))
+      |> Sequence.flat_map (fun (subst,rulename) -> 
+        let t_subst = nfapply subst t in
+        let s_subst = nfapply subst s in
+        let unifiers = unify t_subst s_subst ~rules:(rules @ [rulename]) in
+        unifiers 
+        |> Sequence.map (fun unifier -> Subst.merge unifier subst)
+        )
+    | None -> 
+      Util.debugf 1 "-- unified!" (fun k -> k);
+      Sequence.singleton Subst.empty
 
 
 (* TODO: better solution for fresh vars? *)
