@@ -1,10 +1,10 @@
 
 J?=3
 
-all: build test
+all: build test-cached
 
 build:
-	jbuilder build @install -j $J
+	@jbuilder build @install -j $J
 
 clean:
 	@jbuilder clean
@@ -13,8 +13,11 @@ doc:
 	@jbuilder build @doc
 
 test:
+	@jbuilder runtest --no-buffer -j $J -f
+
+test-cached:
 	@jbuilder runtest --no-buffer -j $J
-	# ./tests/quick/all.sh # FIXME?
+# ./tests/quick/all.sh # FIXME?
 
 test-long:
 	@echo "run qcheck tests with --long"
