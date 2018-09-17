@@ -62,17 +62,17 @@ let () =
     let term1 = pterm "g (g a)" in
     let term2 = pterm "g (h a)" in
     Util.debugf 1 "find_disagreement %a, %a" (fun k -> k T.pp term1 T.pp term2);
-    Util.debugf 1 "Result: %a" (fun k -> k (CCOpt.pp (CCPair.pp T.pp T.pp)) (JP_unif.find_disagreement term1 term2));
+    Util.debugf 1 "Result: %a" (fun k -> k (CCOpt.pp (CCPair.pp T.pp T.pp)) (CCOpt.map fst (JP_unif.find_disagreement term1 term2)));
 
     let term1 = pterm "g (g a)" in
     let term2 = pterm "g (g b)" in
     Util.debugf 1 "find_disagreement %a, %a" (fun k -> k T.pp term1 T.pp term2);
-    Util.debugf 1 "Result: %a" (fun k -> k (CCOpt.pp (CCPair.pp T.pp T.pp)) (JP_unif.find_disagreement term1 term2));
+    Util.debugf 1 "Result: %a" (fun k -> k (CCOpt.pp (CCPair.pp T.pp T.pp)) (CCOpt.map fst (JP_unif.find_disagreement term1 term2)));
 
     let term1 = pterm "f_ho2 (fun (x:term). x)" in
     let term2 = pterm "f_ho2 (fun (x:term). a)" in
     Util.debugf 1 "find_disagreement %a, %a" (fun k -> k T.pp term1 T.pp term2);
-    Util.debugf 1 "Result: %a" (fun k -> k (CCOpt.pp (CCPair.pp T.pp T.pp)) (JP_unif.find_disagreement term1 term2));
+    Util.debugf 1 "Result: %a" (fun k -> k (CCOpt.pp (CCPair.pp T.pp T.pp)) (CCOpt.map fst (JP_unif.find_disagreement term1 term2)));
 
 
     let term1 = List.hd (snd (T.as_app (pterm "q (x a b)"))) in
@@ -83,13 +83,13 @@ let () =
     let term1 = pterm "x a b" in
     let term2 = pterm "f c d" in
     Util.debugf 1 "imitate %a, %a" (fun k -> k T.pp term1 T.pp term2);
-    Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (Subst.pp))  (Sequence.to_list (JP_unif.imitate term1 term2)));
+    Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (Subst.pp))  (Sequence.to_list (JP_unif.imitate term1 term2 [])));
 
 
     let term1 = List.hd (snd (T.as_app (pterm "q (x a b)"))) in
     let term2 = List.hd (snd (T.as_app (pterm "q (y c d)"))) in
     Util.debugf 1 "identify %a, %a" (fun k -> k T.pp term1 T.pp term2);
-    Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (Subst.pp)) (Sequence.to_list (JP_unif.identify term1 term2)));
+    Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (Subst.pp)) (Sequence.to_list (JP_unif.identify term1 term2 [])));
 
 
     let term1 = List.hd (snd (T.as_app (pterm "q (x a)"))) in

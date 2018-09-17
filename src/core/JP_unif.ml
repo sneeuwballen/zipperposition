@@ -11,24 +11,39 @@ let scope = 0 (* TODO: scopes *)
 
 let subst_bind s (v:T.var) t = ((Subst.FO.bind s ((v,scope):>InnerTerm.t HVar.t Scoped.t)) (t,scope)) 
 
-(* Find disagreeing subterms, TODO: preferably one that is not below a variable (to get preunification if possible) *)
+(** Find disagreeing subterms. 
+    This function also returns a list of variables occurring above the
+    disagreement pair, along with the index of the argument that the disagreement
+    pair occurs in. 
+    TODO: preferably one that is not below a variable (to get preunification if possible) 
+*)
 let rec find_disagreement s t = 
-  let rec find_disagreement_l ss tt = 
+  let rec find_disagreement_l ?(applied_var = None) ?(argindex=0) ss tt = 
     match ss, tt with
       | [], [] -> None
       | s' :: ss', t' :: tt' -> 
         let d = find_disagreement s' t' in 
-        if d = None then find_disagreement_l ss' tt' else d
+        begin match d with
+        | Some ((u,v),l) -> 
+          begin match applied_var with
+            | Some x -> Some ((u,v), (T.as_var_exn x, argindex) :: l) 
+            | None -> d
+          end
+        | None -> 
+            let argindex = argindex + 1 in
+            find_disagreement_l ~applied_var ~argindex ss' tt'
+        end
       | _, _ -> raise (Invalid_argument "types of unified terms should be equal")
   in
   match T.view s, T.view t with
-    | T.App (f, ss), T.App (g, tt) when f = g -> find_disagreement_l ss tt 
+    | T.App (f, ss), T.App (g, tt) when f = g && not (T.is_var f)-> find_disagreement_l ss tt 
+    | T.App (f, ss), T.App (g, tt) when f = g && T.is_var f -> find_disagreement_l ~applied_var:(Some f) ss tt 
     | T.AppBuiltin (f, ss), T.AppBuiltin (g, tt) when f = g -> find_disagreement_l ss tt 
     | T.Var x, T.Var y when x = y -> None
     | T.DB i, T.DB j when i = j -> None
     | T.Const a, T.Const b when a = b -> None
     | T.Fun (ty_s, s'), T.Fun (ty_t, t') -> find_disagreement s' t' (*TODO: what about the types?*)
-    | _ -> Some (s, t)
+    | _ -> Some ((s, t),[])
 
 
 (* Projection rule *)
@@ -50,7 +65,7 @@ let project_onesided u =
   else Sequence.empty
 
 (* find substitutions for the projection rule, given a disagreement pair *)
-let project u v = Sequence.append (project_onesided u) (project_onesided v)
+let project u v (_ : (T.var * int) list) = Sequence.append (project_onesided u) (project_onesided v)
 
 
 (* Imitation rule *)
@@ -78,12 +93,12 @@ let imitate_onesided u v =
   else Sequence.empty
 
 (* find substitutions for the projection rule, given a disagreement pair *)
-let imitate u v = Sequence.append (imitate_onesided u v) (imitate_onesided v u)
+let imitate u v (_ : (T.var * int) list) = Sequence.append (imitate_onesided u v) (imitate_onesided v u)
 
 
 (* Identification rule *)
 
-let identify u v =
+let identify u v (_ : (T.var * int) list) =
   let head_u, args_u = T.as_app u in
   let head_v, args_v = T.as_app v in
   let prefix_types_u, return_type = Type.open_fun (T.ty head_u) in
@@ -122,6 +137,21 @@ let identify u v =
 
 
 
+let eliminate u v l =
+  l |> List.map (fun (v, k) -> 
+    (* create substitution: v |-> λ u1 ... um. x u1 ... u{k-1} u{k+1} ... um *)
+    let prefix_types, return_type = Type.open_fun (HVar.ty v) in
+    let bvars = prefix_types |> List.rev |> List.mapi (fun i ty -> T.bvar ~ty i) |> List.rev in
+    let bvars' = CCList.remove_at_idx k bvars in
+    let matrix_head = T.var (HVar.fresh ~ty:(Type.arrow (prefix_types) return_type) ()) in
+    let matrix = T.app matrix_head bvars' in
+    let subst_value = T.fun_l prefix_types matrix in
+    let subst = subst_bind Subst.empty v subst_value in
+    subst
+  )
+  |> Sequence.of_list
+(* TODO: use Sequence directly? *)
+
 
 (* apply a substitution and reduce to normal form *)
 let nfapply s u = Lambda.snf (S.FO.apply S.Renaming.none s (u, scope))
@@ -132,16 +162,17 @@ let nfapply s u = Lambda.snf (S.FO.apply S.Renaming.none s (u, scope))
 let rec unify t s ?(rules=[]) = 
   Util.debugf 1 "Unify (rules: %a) %a and %a" (fun k -> k (CCList.pp CCString.print) rules T.pp t T.pp s);
   match find_disagreement t s with
-    | Some (u, v) -> 
-      [project,"proj"; imitate,"imit"; identify,"id"] 
+    | Some ((u, v), l) -> 
+      [project,"proj"; imitate,"imit"; identify,"id"; eliminate,"elim"] 
       |> Sequence.of_list 
-      |> Sequence.flat_map (fun (rule,rulename) -> rule u v |> Sequence.map (fun subst -> (subst, rulename)))
+      |> Sequence.flat_map (fun (rule,rulename) -> rule u v l |> Sequence.map (fun subst -> (subst, rulename)))
       |> Sequence.flat_map (fun (subst,rulename) -> 
         let t_subst = nfapply subst t in
         let s_subst = nfapply subst s in
         let unifiers = unify t_subst s_subst ~rules:(rules @ [rulename]) in
         unifiers 
         |> Sequence.map (fun unifier -> Subst.merge unifier subst)
+        (* TODO: we actually want to concatenate, not merge*)
         )
     | None -> 
       Util.debugf 1 "-- unified!" (fun k -> k);
