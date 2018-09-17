@@ -5,7 +5,7 @@
 
 open Logtk
 open Logtk_arbitrary
-open OUnit
+open OUnit2
 
 module T = Term
 module H = Helpers
@@ -28,21 +28,21 @@ let b = T.const ~ty (ID.make "b")
 let x = T.var_of_int ~ty 0
 let y = T.var_of_int ~ty 1
 
-let test_db_shift () =
+let test_db_shift _ =
   let t = T.fun_ ty (f (T.bvar ~ty 0) (g (T.bvar ~ty 1))) in
   let t' = T.of_term_unsafe (InnerTerm.DB.shift 1 (t:T.t:>InnerTerm.t)) in
   let t1 = T.fun_ ty (f (T.bvar ~ty 0) (g (T.bvar ~ty 2))) in
   assert_equal ~cmp:T.equal ~printer:T.to_string t1 t';
   ()
 
-let test_db_unshift () =
+let test_db_unshift _ =
   let t = T.fun_ ty (f (T.bvar ~ty 0) (g (T.bvar ~ty 2))) in
   let t' = T.of_term_unsafe (InnerTerm.DB.unshift 1 (t:T.t:>InnerTerm.t)) in
   let t1 = T.fun_ ty (f (T.bvar ~ty 0) (g (T.bvar ~ty 1))) in
   assert_equal ~cmp:T.equal ~printer:T.to_string t1 t';
   ()
 
-let test_whnf1 () =
+let test_whnf1 _ =
   (* eta expansion of [g] *)
   let g_eta = T.fun_ ty (g (T.bvar ~ty 0)) in
   let redex =
@@ -60,7 +60,7 @@ let test_whnf1 () =
   assert_equal ~cmp:T.equal ~printer:T.to_string t1 t';
   ()
 
-let test_whnf2 () =
+let test_whnf2 _ =
   let redex =
     let ty2 = Type.([ty] ==> ty) in
     T.app
@@ -75,7 +75,7 @@ let test_whnf2 () =
   assert_equal ~cmp:T.equal ~printer:T.to_string t1 t';
   ()
 
-let test_polymorphic_app () =
+let test_polymorphic_app _ =
   (* Π α. α *)
   let polyty = Type.forall_fvars [HVar.make ~ty:Type.tType 0] (Type.var_of_int 0) in
   let f_poly = Term.const ~ty:polyty (ID.make "f_poly") in
@@ -87,12 +87,12 @@ let test_polymorphic_app () =
   ()
 
 let suite =
-  "test_term" >:::
-    [ "test_db_shift" >:: test_db_shift
-    ; "test_db_unshift" >:: test_db_unshift
-    ; "test_whnf1" >:: test_whnf1
-    ; "test_whnf2" >:: test_whnf2
-    ; "test_polymorphic_app" >:: test_polymorphic_app
+  "term" >:::
+    [ "db_shift" >:: test_db_shift
+    ; "db_unshift" >:: test_db_unshift
+    ; "whnf1" >:: test_whnf1
+    ; "whnf2" >:: test_whnf2
+    ; "polymorphic_app" >:: test_polymorphic_app
     ]
 
 (** Properties *)

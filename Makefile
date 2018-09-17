@@ -7,14 +7,25 @@ build:
 	jbuilder build @install -j $J
 
 clean:
-	jbuilder clean
+	@jbuilder clean
 
 doc:
-	jbuilder build @doc
+	@jbuilder build @doc
 
 test:
-	jbuilder runtest --no-buffer -j $J
+	@jbuilder runtest --no-buffer -j $J
 	# ./tests/quick/all.sh # FIXME?
+
+test-long:
+	@echo "run qcheck tests with --long"
+	@./tests/run_tests.sh -only-test 1:qcheck -qcheck-long true
+
+test-unit:
+	@./tests/run_tests.sh -only-test 0:unit
+
+test-list:
+	@./tests/run_tests.sh -list-test
+	@echo "to run a particular test: ./tests/run_tests.sh -only-test <path>
 
 open_doc: doc
 	xdg-open _build/default/_doc/index.html
@@ -48,12 +59,6 @@ DATE=$(shell date +%FT%H:%M)
 
 check_$(TEST_TOOL):
 	@if ` which $(TEST_TOOL) > /dev/null ` ; then true ; else echo "install $(TEST_TOOL)"; exit 1; fi
-
-$(TEST_TOOL): check_$(TEST_TOOL)
-	$(TEST_TOOL) run -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES)
-
-$(TEST_TOOL)-zipper: check_$(TEST_TOOL)
-	$(TEST_TOOL) run -p zipperposition -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES)
 
 $(TEST_TOOL): check_$(TEST_TOOL)
 	$(TEST_TOOL) run -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES) \

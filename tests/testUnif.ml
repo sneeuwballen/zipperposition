@@ -3,7 +3,7 @@
 
 (** Test unification *)
 
-open OUnit
+open OUnit2
 open Logtk
 open Logtk_arbitrary
 open Logtk_parsers
@@ -175,7 +175,7 @@ let unifier t u =
 
 let check_unifiable ?(negated=false) t u =
   let name = Fmt.sprintf "(@[unifiable `%a`@ `%a`@])" T.ZF.pp t T.ZF.pp u in
-  name >:: fun () ->
+  name >:: fun _ ->
     try
       let _ = unifier2 t u in
       if negated then (
@@ -192,19 +192,19 @@ let check_unifiable ?(negated=false) t u =
 
 let check_unify_correct t u =
   let name = Fmt.sprintf "(@[unify_correct `%a`@ `%a`@])" T.ZF.pp t T.ZF.pp u in
-  name >:: fun () ->
+  name >:: fun _ ->
     let t', u', _, _ = unifier2 t u in
     check_eq t' u'
 
 let check_unifier t u ~res =
   let name = Fmt.sprintf "(@[unify `%a`@ `%a`@ :gives `%a`@])" T.ZF.pp t T.ZF.pp u T.ZF.pp res in
-  name >:: fun () ->
+  name >:: fun _ ->
     let t' = unifier t u in
     check_variant t' res
 
 let check_unifier_matches t u =
   let name = Fmt.sprintf "(@[unify_matches `%a`@ `%a`@])" T.ZF.pp t T.ZF.pp u in
-  name >:: fun () ->
+  name >:: fun _ ->
     let t' = unifier t u in
     check_matches t t';
     check_matches u t'
@@ -212,7 +212,7 @@ let check_unifier_matches t u =
 let check_same t u t1 sc1 t2 sc2 =
   let name = Fmt.sprintf "(@[unify `%a`@ `%a`@ :makes-eq @[`%a`[%d]@ and `%a`[%d]@]@])"
       T.ZF.pp t T.ZF.pp u T.ZF.pp t1 sc1 T.ZF.pp t2 sc2 in
-  name >:: fun () ->
+  name >:: fun _ ->
     let _, _, renaming, subst = unifier2 t u in
     let t1 = Subst.FO.apply renaming subst (t1,sc1) |> Lambda.snf in
     let t2 = Subst.FO.apply renaming subst (t2,sc2) |> Lambda.snf in
@@ -227,7 +227,7 @@ module Action : sig
   val eq : string -> int -> string -> int -> string t
   val set_with_ty : 'a -> 'a t -> 'a t
   val parse : string t -> T.t t
-  val check : T.t -> T.t -> T.t t -> OUnit.test
+  val check : T.t -> T.t -> T.t t -> OUnit2.test
 end = struct
   type 'a t =
     | Yield of {t: 'a ; ty: 'a option}
@@ -254,7 +254,7 @@ end = struct
     | Eq {t1;t2;sc1;sc2;_} -> check_same t u t1 sc1 t2 sc2
 end
 
-let suite_unif1 : OUnit.test list =
+let suite_unif1 : OUnit2.test list =
   let (=?=) a b = Task.mk_unif a b in (* unif pair *)
   let (<?>) a b = Task.mk_unif ~negated:true a b in (* unif pair *)
   let (>->) a b = Task.set_with_ty b a in (* specify return type *)
@@ -312,7 +312,7 @@ let suite_unif1 : OUnit.test list =
       ( "F (g_ho F)" <?> "a_poly A") |> Task.set_unif_types false, [];
     ]
 
-let reg_matching1 () =
+let reg_matching1 _ =
   let t1, t2 =
     pterm "p_ho2 (fun a. F a) (fun a. F a)",
     pterm "p_ho2 (fun a. G a) (fun a. H a)"

@@ -5,7 +5,7 @@
 
 open Logtk
 open Logtk_arbitrary
-open OUnit
+open OUnit2
 
 module T = Term
 module S = Subst.FO
@@ -202,7 +202,7 @@ let test_kbo _ =
 
 
 let suite =
-  "test_ordering" >:::
+  "ordering" >:::
   [ "rpo6" >:: test_rpo6;
     "kbo" >:: test_kbo
   ]

@@ -1,7 +1,7 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-open OUnit
+open OUnit2
 
 let props =
   List.flatten
@@ -17,15 +17,18 @@ let props =
     ]
 
 let suite =
-  "all_tests" >:::
-    [ TestSubsts.suite;
-      TestMultiset.suite;
-      TestOrdering.suite;
-      TestTerm.suite;
-      TestUnif.suite;
+  let props = QCheck_runner.to_ounit2_test_list props in
+  test_list
+    ["unit" >:::
+      [TestSubsts.suite;
+       TestMultiset.suite;
+       TestOrdering.suite;
+       TestTerm.suite;
+       TestUnif.suite;
+      ];
+      "qcheck" >::: props;
     ]
 
 let () =
   CCFormat.set_color_default true;
-  ignore (OUnit.run_test_tt suite);
-  QCheck_runner.run_tests_main props
+  OUnit2.run_test_tt_main suite

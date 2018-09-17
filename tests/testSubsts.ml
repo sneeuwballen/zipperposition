@@ -2,7 +2,7 @@
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 open Logtk
-open OUnit
+open OUnit2
 
 module T = Term
 module S = Subst
@@ -73,7 +73,7 @@ let test_unify _ =
   ()
 
 let suite =
-  "test_substs" >:::
-    [ "test_rename" >:: test_rename
-    ; "test_unify" >:: test_unify
+  "subst" >:::
+    [ "rename" >:: test_rename
+    ; "unify" >:: test_unify
     ]

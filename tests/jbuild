@@ -7,7 +7,7 @@
 (alias
  ((name    runtest)
   (deps    (run_tests.exe))
-  (action  (run ${<} --verbose))))
+  (action  (run ${<}))))
 
 
 
