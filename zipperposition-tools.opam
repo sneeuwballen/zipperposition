@@ -12,7 +12,8 @@ depends: [
   "sequence" { >= "0.4" }
   "msat" { >= "0.5" < "1.0" }
   "zarith"
-  "libzipperposition"
+  "logtk" { >= "1.5" }
+  "libzipperposition" { >= "1.5" }
 ]
 available: [
     ocaml-version >= "4.03.0"

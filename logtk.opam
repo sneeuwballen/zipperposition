@@ -3,10 +3,10 @@ maintainer: "simon.cruanes@inria.fr"
 author: "Simon Cruanes"
 homepage: "https://github.com/c-cube/zipperposition"
 version: "1.5"
-build: ["jbuilder" "build"]
+build: ["jbuilder" "build" "-p" name]
 build-doc: ["jbuilder" "build" "@doc" "-p" name]
 build-test: [
-    ["jbuilder" "runtest"]
+    ["jbuilder" "runtest" "-p" name]
 ]
 depends: [
   "ocamlfind" { build }
