@@ -27,6 +27,15 @@ let options = Arg.align (
     ] @ Options.make ()
   )
 
+(* TODO: also pick statement printer based on Options.output *)
+let pp_stmt out s =
+  let pp_t = match !Options.output with
+    | Logtk.Options.O_none | Logtk.Options.O_zf -> T.ZF.pp_inner
+    | Logtk.Options.O_normal -> T.pp_inner
+    | Logtk.Options.O_tptp -> T.TPTP.pp
+  in
+  Statement.pp pp_t pp_t pp_t out s
+
 (* check the given file *)
 let check file =
   if !dump then  (
@@ -54,13 +63,10 @@ let check file =
       (ID.Map.pp ~sep:"" ~arrow:" : " ID.pp T.pp) sigma;
   );
   (* print formulas *)
-  (* FIXME: use [Options.output] *)
   if !dump then (
-    let pp_stmt = Statement.ZF.pp T.ZF.pp_inner T.ZF.pp_inner T.ZF.pp_inner in
     CCFormat.set_color_default false;
     Format.printf "@[<v>%a@]@." (CCVector.pp ~sep:"" pp_stmt) decls;
   ) else if !cat_input then (
-    let pp_stmt = Statement.pp T.pp T.pp T.pp in
     Format.printf "@[<v2>statements:@ %a@]@."
       (CCVector.pp ~sep:"" pp_stmt)
       decls;

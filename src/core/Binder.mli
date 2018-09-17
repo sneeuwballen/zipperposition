@@ -5,7 +5,7 @@
 
 (** The classic binders for the internal AST and various term representations.
 
-    @since NEXT_RELEASE *)
+    @since 1.5 *)
 
 type t =
   | Exists

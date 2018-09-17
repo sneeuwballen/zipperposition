@@ -2,20 +2,20 @@ opam-version: "1.2"
 maintainer: "simon.cruanes@inria.fr"
 author: "Simon Cruanes"
 homepage: "https://github.com/c-cube/zipperposition"
+version: "1.5"
 build: ["jbuilder" "build" "-p" name]
-build-doc: ["jbuilder" "build" "@doc"]
-install: ["jbuilder" "install" name]
-remove: ["jbuilder" "uninstall" name]
+build-doc: ["jbuilder" "build" "@doc" "-p" name]
 depends: [
-  "ocamlfind" { build }
   "base-bytes"
   "base-unix"
   "zarith"
+  "logtk" { >= "1.5" }
   "containers" { >= "1.0" }
   "sequence" { >= "0.4" }
   "jbuilder" { build }
   "msat" { >= "0.5" < "1.0" }
   "menhir" {build}
+  "logtk"
 ]
 available: [
     ocaml-version >= "4.03.0"

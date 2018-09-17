@@ -1,6 +1,6 @@
 
 open Logtk
-open OUnit
+open OUnit2
 module Q = QCheck
 
 module M = Multiset.Make(struct
@@ -144,7 +144,7 @@ let max_is_max =
     gen prop
 
 let suite =
-  "test_multiset" >:::
+  "multiset" >:::
     [ "max" >:: test_max
     ; "compare" >:: test_compare
     ; "cardinal_size" >:: test_cardinal_size

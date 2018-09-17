@@ -8,7 +8,7 @@
    (action
      (with-stdout-to ${@}
        (progn
-         (echo "let version = \"${version:zipperposition}\"\n")
+         (echo "let version = \"${version:libzipperposition}\"\n")
          (echo "let section = Logtk.Util.Section.make \"zip\"\n"))))
   ))
 

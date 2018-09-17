@@ -10,7 +10,14 @@ open CCResult.Infix
 
 module T = TypedSTerm
 
-let pp_stmt = Statement.pp T.ZF.pp T.ZF.pp T.ZF.pp
+(* TODO: also pick statement printer based on Options.output *)
+let pp_stmt out s =
+  let pp_t = match !Options.output with
+    | Logtk.Options.O_none | Logtk.Options.O_zf -> T.ZF.pp_inner
+    | Logtk.Options.O_normal -> T.pp_inner
+    | Logtk.Options.O_tptp -> T.TPTP.pp
+  in
+  Statement.pp pp_t pp_t pp_t out s
 
 let pp_stmts out seq =
   CCVector.pp ~sep:"" pp_stmt out seq
@@ -38,7 +45,7 @@ let process file =
   Format.printf "@[<v>%a@,%a@]@." declare_term () pp_stmts stmts;
   ()
 
-let options = Options.make()
+let options = Arg.align @@ Options.make()
 
 let () =
   CCFormat.set_color_default true;
