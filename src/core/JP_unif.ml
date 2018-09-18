@@ -156,6 +156,7 @@ let eliminate u v l =
 (* apply a substitution and reduce to normal form *)
 let nfapply s u = Lambda.snf (S.FO.apply S.Renaming.none s (u, scope))
 
+(* TODO: comparison form is actually slightly different from short normal form! *)
 
 
 
