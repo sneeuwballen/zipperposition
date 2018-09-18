@@ -224,6 +224,11 @@ unary_formula:
      let loc = L.mk_pos $startpos $endpos in
      o ?loc:(Some loc) f
     }
+  | LEFT_PAREN o=unary_connective RIGHT_PAREN AT f=unary_formula
+    {
+     let loc = L.mk_pos $startpos $endpos in
+     o ?loc:(Some loc) f
+    }
 
 binary_formula:
   | f=nonassoc_binary_formula { f }
@@ -241,6 +246,21 @@ nonassoc_binary_formula:
       PT.and_ ?loc:(Some loc) [l; r]
     }
   | VLINE AT l=unary_formula AT r=unary_formula
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      PT.or_ ?loc:(Some loc) [l; r]
+    }
+  | LEFT_PAREN o=binary_connective RIGHT_PAREN AT l=unary_formula AT r=unary_formula
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      o ?loc:(Some loc) l r
+    }
+  | LEFT_PAREN AND RIGHT_PAREN AT l=unary_formula AT r=unary_formula
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      PT.and_ ?loc:(Some loc) [l; r]
+    }
+  | LEFT_PAREN VLINE RIGHT_PAREN AT l=unary_formula AT r=unary_formula
     {
       let loc = L.mk_pos $startpos $endpos in
       PT.or_ ?loc:(Some loc) [l; r]

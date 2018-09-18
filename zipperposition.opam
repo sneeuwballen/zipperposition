@@ -7,7 +7,6 @@ build: ["jbuilder" "build" "-p" name]
 build-doc: ["jbuilder" "build" "@doc" "-p" name]
 depends: [
   "ocamlfind" { build }
-  "base-bytes"
   "base-unix"
   "zarith"
   "logtk" { >= "1.5" }

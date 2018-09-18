@@ -346,7 +346,7 @@ let with_typed_vars_ ?loc ~infer_ty ctx vars ~f =
     | [] -> f (List.rev acc)
     | (v,o) :: l' ->
       let ty = match o with
-        | None -> T.Ty.meta (Ctx.fresh_ty_meta_var ~dest:`Generalize ctx ())
+        | None -> T.Ty.meta (Ctx.fresh_ty_meta_var ~dest:(Ctx.default_dest ctx) ctx ())
         | Some ty -> infer_ty ?loc ctx ty
       in
       let v = match v with

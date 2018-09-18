@@ -273,16 +273,20 @@ module Make(E : Env.S) : S with module Env = E = struct
                  (fun i ty -> HVar.make ~ty (i+var_offset) |> T.var)
                  ty_args
              in
-             let new_lit = Literal.mk_eq (T.app t vars) (T.app u vars) in
-             let new_lits = new_lit :: CCArray.except_idx (C.lits c) lit_idx in
-             let proof =
-               Proof.Step.inference [C.proof_parent c]
-                 ~rule:(Proof.Rule.mk "ho_complete_eq") ~tags:[Proof.Tag.T_ho]
-             in
-             let new_c =
-               C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
-             in
-             [new_c]
+             CCList.(1 -- List.length vars)
+             |> List.map
+               (fun prefix_len ->
+                  let vars_prefix = CCList.take prefix_len vars in
+                  let new_lit = Literal.mk_eq (T.app t vars_prefix) (T.app u vars_prefix) in
+                  let new_lits = new_lit :: CCArray.except_idx (C.lits c) lit_idx in
+                  let proof =
+                    Proof.Step.inference [C.proof_parent c]
+                      ~rule:(Proof.Rule.mk "ho_complete_eq")
+                  in
+                  let new_c =
+                    C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
+                  in
+                  new_c)
            | _ -> [])
       |> Sequence.to_rev_list
     in

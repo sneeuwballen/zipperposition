@@ -21,7 +21,7 @@ exception Error of string
 
 let error msg = raise (Error msg)
 let errorf msg = CCFormat.ksprintf msg ~f:error
-let section = Util.Section.base
+let section = Util.Section.root
 
 let stat_def_as_rw = Util.mk_stat "tptp.def_as_rewrite"
 

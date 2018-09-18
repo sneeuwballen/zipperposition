@@ -60,10 +60,10 @@ TEST_TOOL=logitest
 TEST_OPTS?= -j $(J) --junit test.xml
 DATE=$(shell date +%FT%H:%M)
 
-check_$(TEST_TOOL):
+check-test-tool:
 	@if ` which $(TEST_TOOL) > /dev/null ` ; then true ; else echo "install $(TEST_TOOL)"; exit 1; fi
 
-$(TEST_TOOL): check_$(TEST_TOOL)
+$(TEST_TOOL): check-test-tool
 	$(TEST_TOOL) run -c ./tests/conf.toml $(TEST_OPTS) $(TEST_FILES) \
 	  --summary snapshots/full-$(DATE).txt \
 	  --csv snapshots/full-$(DATE).csv \
