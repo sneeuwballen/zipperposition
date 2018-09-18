@@ -319,9 +319,50 @@ let reg_matching1 = "regression matching", `Quick, fun () ->
       "@[<hv>`%a`@ and `%a@ should not match@]" T.ZF.pp t1 T.ZF.pp t2
   with Unif.Fail -> ()
 
-let suite_unif2 = [ reg_matching1; ]
+let test_jp_unif = "JP unification", `Quick, fun () ->
+  Printexc.record_backtrace true;
+  CCFormat.set_color_default true;
+  Util.set_debug 1;
+  let term1 = pterm "g (g a)" in
+  let term2 = pterm "g (h a)" in
+  Util.debugf 1 "find_disagreement %a, %a" (fun k -> k T.pp term1 T.pp term2);
+  Util.debugf 1 "Result: %a" (fun k -> k (CCOpt.pp (CCPair.pp T.pp T.pp)) (CCOpt.map fst (JP_unif.find_disagreement term1 term2)));
+
+  let term1 = pterm "g (g a)" in
+  let term2 = pterm "g (g b)" in
+  Util.debugf 1 "find_disagreement %a, %a" (fun k -> k T.pp term1 T.pp term2);
+  Util.debugf 1 "Result: %a" (fun k -> k (CCOpt.pp (CCPair.pp T.pp T.pp)) (CCOpt.map fst (JP_unif.find_disagreement term1 term2)));
+
+  let term1 = pterm "f_ho2 (fun (x:term). x)" in
+  let term2 = pterm "f_ho2 (fun (x:term). a)" in
+  Util.debugf 1 "find_disagreement %a, %a" (fun k -> k T.pp term1 T.pp term2);
+  Util.debugf 1 "Result: %a" (fun k -> k (CCOpt.pp (CCPair.pp T.pp T.pp)) (CCOpt.map fst (JP_unif.find_disagreement term1 term2)));
+
+  let term1 = List.hd (snd (T.as_app (pterm "q (x a b)"))) in
+  Util.debugf 1 "project %a" (fun k -> k T.pp term1);
+  Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (Subst.pp))  (Sequence.to_list (JP_unif.project_onesided term1)));
+
+  let term1 = pterm "x a b" in
+  let term2 = pterm "f c d" in
+  Util.debugf 1 "imitate %a, %a" (fun k -> k T.pp term1 T.pp term2);
+  Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (Subst.pp))  (Sequence.to_list (JP_unif.imitate term1 term2 [])));
+
+  let term1 = List.hd (snd (T.as_app (pterm "q (x a b)"))) in
+  let term2 = List.hd (snd (T.as_app (pterm "q (y c d)"))) in
+  Util.debugf 1 "identify %a, %a" (fun k -> k T.pp term1 T.pp term2);
+  Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (Subst.pp)) (Sequence.to_list (JP_unif.identify term1 term2 [])));
+
+  let term1 = List.hd (snd (T.as_app (pterm "q (x2 a)"))) in
+  let term2 = List.hd (snd (T.as_app (pterm "q (y2 b)"))) in
+  Util.debugf 1 "unify %a, %a" (fun k -> k T.pp term1 T.pp term2);
+  Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (Subst.pp)) (Sequence.to_list (JP_unif.unify term1 term2)));
+  
+  ()
+
+let suite_unif2 = [ reg_matching1; test_jp_unif ]
 
 let suite = suite_unif1 @ suite_unif2
+
 
 (** {2 Properties} *)
 
