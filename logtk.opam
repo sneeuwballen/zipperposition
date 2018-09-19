@@ -16,6 +16,8 @@ depends: [
   "containers" { >= "1.0" }
   "sequence" { >= "0.4" }
   "jbuilder" { build }
+  "alcotest" {test}
+  "qcheck" {test}
 ]
 depopts: [
   "qcheck" {test}

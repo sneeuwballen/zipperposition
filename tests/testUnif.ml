@@ -3,7 +3,6 @@
 
 (** Test unification *)
 
-open OUnit2
 open Logtk
 open Logtk_arbitrary
 open Logtk_parsers
@@ -12,6 +11,8 @@ module Fmt = CCFormat
 module T = Term
 module S = Subst
 module Q = QCheck
+
+let t_test = Alcotest.testable T.ZF.pp T.equal
 
 (** {2 Unit Tests} *)
 
@@ -137,28 +138,24 @@ end = struct
       raise e
 end
 
-let check_variant t u =
+let check_variant ?(msg="") t u =
   if Unif.FO.are_variant t u then ()
   else (
-    let msg =
-      Util.err_spf "@[<2>`%a`@ and `%a`@ should be variant@]@."
-        T.ZF.pp t T.ZF.pp u
-    in
-    OUnit.assert_failure msg
+    Alcotest.failf
+      "@[<2>`%a`@ and `%a`@ should be variant@,%s@]@."
+        T.ZF.pp t T.ZF.pp u msg
   )
 
-let check_matches t u =
+let check_matches ?(msg="") t u =
   if Unif.FO.matches ~pattern:t u then ()
   else (
-    let msg =
-      Util.err_spf "@[<2>`%a`@ should match@ `%a`@]@."
-        T.ZF.pp t T.ZF.pp u
-    in
-    OUnit.assert_failure msg
+    Alcotest.failf
+      "@[<2>`%a`@ should match@ `%a`%s@]@."
+        T.ZF.pp t T.ZF.pp u msg
   )
 
-let check_eq t1 t2 =
-  OUnit.assert_equal ~printer:T.ZF.to_string ~cmp:T.equal t1 t2
+let check_eq ?(msg="check eq") t1 t2 =
+  Alcotest.(check t_test) msg t1 t2
 
 let unifier2 t u =
     let subst = Unif.FO.unify_syn (t,0)(u,1) in
@@ -170,53 +167,52 @@ let unifier2 t u =
 
 let unifier t u =
   let t', u', _, _ = unifier2 t u in
-  OUnit.assert_equal ~printer:T.ZF.to_string ~cmp:T.equal t' u';
+  Alcotest.(check t_test) "check unified versions are equal" t' u';
   t'
 
-let check_unifiable ?(negated=false) t u =
-  let name = Fmt.sprintf "(@[unifiable `%a`@ `%a`@])" T.ZF.pp t T.ZF.pp u in
-  name >:: fun _ ->
+let check_unifiable ?(negated=false) t u : unit Alcotest.test_case =
+  "check unifiable", `Quick, fun () ->
     try
       let _ = unifier2 t u in
       if negated then (
-        let msg = CCFormat.sprintf "@[<2>`%a`[0]@ and `%a`[1]@ should not be unifiable@]@."
-            T.ZF.pp t T.ZF.pp u in
-        OUnit.assert_failure msg
+        Alcotest.failf
+         "@[<2>`%a`[0]@ and `%a`[1]@ should not be unifiable@]@."
+            T.ZF.pp t T.ZF.pp u
       )
     with Unif.Fail ->
       if not negated then (
-        let msg = CCFormat.sprintf "@[<2>`%a`[0]@ and `%a`[1]@ should be unifiable@]@."
-            T.ZF.pp t T.ZF.pp u in
-        OUnit.assert_failure msg
+        Alcotest.failf "@[<2>`%a`[0]@ and `%a`[1]@ should be unifiable@]@."
+            T.ZF.pp t T.ZF.pp u
       )
 
 let check_unify_correct t u =
-  let name = Fmt.sprintf "(@[unify_correct `%a`@ `%a`@])" T.ZF.pp t T.ZF.pp u in
-  name >:: fun _ ->
+  "check unify is correct", `Quick, fun() ->
     let t', u', _, _ = unifier2 t u in
-    check_eq t' u'
+    let msg = Fmt.sprintf "(@[unify_correct `%a`@ `%a`@])" T.ZF.pp t T.ZF.pp u in
+    check_eq ~msg t' u'
 
 let check_unifier t u ~res =
-  let name = Fmt.sprintf "(@[unify `%a`@ `%a`@ :gives `%a`@])" T.ZF.pp t T.ZF.pp u T.ZF.pp res in
-  name >:: fun _ ->
+  "check unifier", `Quick, fun () ->
     let t' = unifier t u in
-    check_variant t' res
+    let msg = Fmt.sprintf "(@[unify `%a`@ `%a`@ :gives `%a`@])" T.ZF.pp t T.ZF.pp u T.ZF.pp res in
+    check_variant ~msg t' res
 
 let check_unifier_matches t u =
-  let name = Fmt.sprintf "(@[unify_matches `%a`@ `%a`@])" T.ZF.pp t T.ZF.pp u in
-  name >:: fun _ ->
+  "check unifier matches unified terms", `Quick, fun () ->
     let t' = unifier t u in
-    check_matches t t';
-    check_matches u t'
+    let msg = Fmt.sprintf "(@[unify_matches `%a`@ `%a`@])" T.ZF.pp t T.ZF.pp u in
+    check_matches ~msg t t';
+    check_matches ~msg u t'
 
 let check_same t u t1 sc1 t2 sc2 =
-  let name = Fmt.sprintf "(@[unify `%a`@ `%a`@ :makes-eq @[`%a`[%d]@ and `%a`[%d]@]@])"
-      T.ZF.pp t T.ZF.pp u T.ZF.pp t1 sc1 T.ZF.pp t2 sc2 in
-  name >:: fun _ ->
+  "check unify makes same", `Quick, fun () ->
     let _, _, renaming, subst = unifier2 t u in
     let t1 = Subst.FO.apply renaming subst (t1,sc1) |> Lambda.snf in
     let t2 = Subst.FO.apply renaming subst (t2,sc2) |> Lambda.snf in
-    check_eq t1 t2
+    let msg = Fmt.sprintf
+        "(@[<h>unify `%a`@ `%a`@ :makes-eq @[`%a`[%d]@ and `%a`[%d]@]@])"
+      T.ZF.pp t T.ZF.pp u T.ZF.pp t1 sc1 T.ZF.pp t2 sc2 in
+    check_eq ~msg t1 t2
 
 module Action : sig
   type 'a t = private
@@ -227,7 +223,7 @@ module Action : sig
   val eq : string -> int -> string -> int -> string t
   val set_with_ty : 'a -> 'a t -> 'a t
   val parse : string t -> T.t t
-  val check : T.t -> T.t -> T.t t -> OUnit2.test
+  val check : T.t -> T.t -> T.t t -> unit Alcotest.test_case
 end = struct
   type 'a t =
     | Yield of {t: 'a ; ty: 'a option}
@@ -254,7 +250,7 @@ end = struct
     | Eq {t1;t2;sc1;sc2;_} -> check_same t u t1 sc1 t2 sc2
 end
 
-let suite_unif1 : OUnit2.test list =
+let suite_unif1 : unit Alcotest.test_case list =
   let (=?=) a b = Task.mk_unif a b in (* unif pair *)
   let (<?>) a b = Task.mk_unif ~negated:true a b in (* unif pair *)
   let (>->) a b = Task.set_with_ty b a in (* specify return type *)
@@ -312,27 +308,20 @@ let suite_unif1 : OUnit2.test list =
       ( "F (g_ho F)" <?> "a_poly A") |> Task.set_unif_types false, [];
     ]
 
-let reg_matching1 _ =
+let reg_matching1 = "regression matching", `Quick, fun () ->
   let t1, t2 =
     pterm "p_ho2 (fun a. F a) (fun a. F a)",
     pterm "p_ho2 (fun a. G a) (fun a. H a)"
   in
   try
     let _ = Unif.FO.matching ~pattern:(t1,0) (t2,1) in
-    OUnit.assert_failure
-      (Fmt.sprintf "@[<hv>`%a`@ and `%a@ should not match@]" T.ZF.pp t1 T.ZF.pp t2)
+    Alcotest.failf
+      "@[<hv>`%a`@ and `%a@ should not match@]" T.ZF.pp t1 T.ZF.pp t2
   with Unif.Fail -> ()
 
-let suite_unif2 : _ list = [
-  "reg_matching1" >:: reg_matching1;
-]
+let suite_unif2 = [ reg_matching1; ]
 
-let suite =
-  "unif" >:::
-    (List.flatten
-       [ suite_unif1;
-         suite_unif2;
-       ])
+let suite = suite_unif1 @ suite_unif2
 
 (** {2 Properties} *)
 

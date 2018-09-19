@@ -1,6 +1,5 @@
 
 open Logtk
-open OUnit2
 module Q = QCheck
 
 module M = Multiset.Make(struct
@@ -8,26 +7,31 @@ module M = Multiset.Make(struct
   let compare i j=Pervasives.compare i j
 end)
 
+(* for testing *)
+let m_test = Alcotest.testable (M.pp Fmt.int) M.equal
+let z_test = Alcotest.testable Z.pp_print Z.equal
+
 let f x y =
   if x = y then Comparison.Eq
   else if x < y then Comparison.Lt
   else Comparison.Gt
 
-let test_max _ =
+let test_max = "multiset.max", `Quick, fun()->
   let m = M.of_list [1;2;2;3;1] in
-  assert_equal (M.of_list [3]) (M.max f m)
+  Alcotest.(check m_test) "must be equal" (M.of_list [3]) (M.max f m)
 
-let test_compare _ =
+let test_compare = "multiset.compare", `Quick, fun()->
   let m1 = M.of_list [1;1;2;3] in
   let m2 = M.of_list [1;2;2;3] in
-  assert_equal ~printer:Comparison.to_string Comparison.Lt (M.compare_partial f m1 m2);
-  assert_bool "ord" (M.compare m1 m2 < 0);
+  Alcotest.(check (module Comparison)) "must be lt"
+    Comparison.Lt (M.compare_partial f m1 m2);
+  Alcotest.(check bool) "ord" true (M.compare m1 m2 < 0);
   ()
 
-let test_cardinal_size _ =
+let test_cardinal_size = "multiset.size", `Quick, fun()->
   let m = M.of_coeffs [1, Z.(~$ 2); 3, Z.(~$ 40)] in
-  assert_equal 2 (M.size m);
-  assert_equal ~cmp:Z.equal ~printer:Z.to_string Z.(~$ 42) (M.cardinal m);
+  Alcotest.(check int) "size=2" 2 (M.size m);
+  Alcotest.(check z_test) "cardinal=42" Z.(~$ 42) (M.cardinal m);
   ()
 
 let _sign = function
@@ -144,10 +148,9 @@ let max_is_max =
     gen prop
 
 let suite =
-  "multiset" >:::
-    [ "max" >:: test_max
-    ; "compare" >:: test_compare
-    ; "cardinal_size" >:: test_cardinal_size
+  [ test_max;
+    test_compare;
+    test_cardinal_size;
     ]
 
 let props =

@@ -5,11 +5,12 @@
 
 open Logtk
 open Logtk_arbitrary
-open OUnit2
 
 module T = Term
 module S = Subst.FO
 module O = Ordering
+
+let comp_test = Alcotest.testable Comparison.pp Comparison.equal
 
 let count = 1_000
 let long_factor = 10
@@ -150,7 +151,7 @@ let check_ordering_subterm ord =
   in
   QCheck.Test.make ~count ~long_factor ~name arb prop
 
-let test_rpo6 _ =
+let test_rpo6 = "ordering.rpo", `Quick, fun () ->
   let ord = O.rpo6 (Precedence.default [a_; b_; c_; f_; g_; h_]) in
   let compare = O.compare ord in
 
@@ -158,35 +159,35 @@ let test_rpo6 _ =
   let a = Term.const ~ty a_ in
   let b = Term.const ~ty b_ in
   let x = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
-  assert_equal (compare (Term.app x [a]) (Term.app x [b])) Comparison.Lt ;
+  Alcotest.(check comp_test) "x a < x b" (compare (Term.app x [a]) (Term.app x [b])) Comparison.Lt ;
 
   (* f x y is incomparable with  x y *)
   let f = Term.const ~ty:(Type.arrow [(Type.arrow [ty] ty); ty] ty) f_ in
   let x = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
   let y = Term.var (HVar.fresh ~ty ()) in
-  assert_equal (compare (Term.app f [x;y]) (Term.app x [y])) Comparison.Incomparable;
+  Alcotest.(check comp_test) "f x y <> x y" (compare (Term.app f [x;y]) (Term.app x [y])) Comparison.Incomparable;
 
   (* g x > f x x *)
   let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
   let g = Term.const ~ty:(Type.arrow [ty] ty) g_ in
   let x = Term.var (HVar.fresh ~ty ()) in
-  assert_equal (compare (Term.app g [x]) (Term.app f [x; x])) Comparison.Gt;
+  Alcotest.(check comp_test) "g x > f x x" (compare (Term.app g [x]) (Term.app f [x; x])) Comparison.Gt;
 
   (* f (x b) > x a *)
   let f = Term.const ~ty:(Type.arrow [ty] ty) f_ in
   let x = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty)  ()) in
   let a = Term.const ~ty a_ in
   let b = Term.const ~ty b_ in
-  assert_equal (compare (Term.app f [Term.app x [b]]) (Term.app x [a])) Comparison.Gt;
+  Alcotest.(check comp_test) "f (x b) > x a" (compare (Term.app f [Term.app x [b]]) (Term.app x [a])) Comparison.Gt;
 
   (* f a a > f b  ( test for length-lexicographic extension ) *)
   let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
   let a = Term.const ~ty a_ in
   let b = Term.const ~ty b_ in
-  assert_equal (compare (Term.app f [a;a]) (Term.app f [b])) Comparison.Gt
+  Alcotest.(check comp_test) "f a a > f b" (compare (Term.app f [a;a]) (Term.app f [b])) Comparison.Gt
 
 
-let test_kbo _ =
+let test_kbo = "ordering.kbo", `Quick, fun () ->
   (* alphabetical precedence, h has weight 2, all other symbols weight 1*)
   let weight id = (if id=h_ then Precedence.Weight.add Precedence.Weight.one Precedence.Weight.one else Precedence.Weight.one) in
   let ord = O.kbo (Precedence.create ~weight Precedence.Constr.alpha [a_; b_; c_; f_; g_; h_]) in
@@ -198,7 +199,8 @@ let test_kbo _ =
   let a = Term.const ~ty a_ in
   let x = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
   let y = Term.var (HVar.fresh ~ty ()) in
-  assert_equal (compare (Term.app h [Term.app x [y]]) (Term.app f [y; Term.app x [a]])) Comparison.Gt;
+  Alcotest.(check comp_test) "h (x y) > f y (x a)"
+    (compare (Term.app h [Term.app x [y]]) (Term.app f [y; Term.app x [a]])) Comparison.Gt;
 
   (* polymorphic example *)
   let funty_ = (ID.make "funty") in
@@ -220,21 +222,24 @@ let test_kbo _ =
   let y = Term.var (HVar.fresh ~ty ()) in
   let compare = O.compare ord in
   (*app (app add (app s zero)) k > app (app add zero)(app s k)*)
-  assert_equal (compare
+  Alcotest.(check comp_test)
+    "… > …"
+    (compare
                   (T.app app [ty1; ty1; T.app app [ty1; ty2; add; (T.app app [ty1; ty1; s; zero])]; k])
                   (T.app app [ty1; ty1; T.app app [ty1; ty2; add; zero]; T.app app [ty1; ty1; s; k]])
                ) Comparison.Gt;
   (*app (app add (app s x)) y > app (app add x)(app s y)*)
-   assert_equal (compare
+  Alcotest.(check comp_test) 
+    "… > …"
+   (compare
                    (T.app app [ty1; ty1; T.app app [ty1; ty2; add; (T.app app [ty1; ty1; s; x])]; y])
                    (T.app app [ty1; ty1; T.app app [ty1; ty2; add; x]; T.app app [ty1; ty1; s; y]])
                 ) Comparison.Gt
 
 
 let suite =
-  "ordering" >:::
-  [ "rpo6" >:: test_rpo6;
-    "kbo" >:: test_kbo
+  [ test_rpo6;
+    test_kbo
   ]
 
 let props =

@@ -19,15 +19,18 @@ test-cached:
 	@jbuilder runtest --no-buffer -j $J
 # ./tests/quick/all.sh # FIXME?
 
+test-qcheck:
+	@./tests/run_tests.sh test qcheck
+
 test-long:
 	@echo "run qcheck tests with --long"
-	@./tests/run_tests.sh -only-test 1:qcheck -qcheck-long true
+	@QCHECK_LONG=1 ./tests/run_tests.sh test qcheck
 
 test-unit:
-	@./tests/run_tests.sh -only-test 0:unit
+	@./tests/run_tests.sh test units
 
 test-list:
-	@./tests/run_tests.sh -list-test
+	@./tests/run_tests.sh list
 	@echo "to run a particular test: ./tests/run_tests.sh -only-test <path>
 
 open_doc: doc

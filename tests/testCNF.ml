@@ -43,6 +43,6 @@ let check_miniscope_db_closed =
   QCheck.Test.make ~long_factor:20 ~name gen prop
 
 let props =
-  [ check_cnf_gives_clauses
-  ; check_miniscope_db_closed
+  [ check_cnf_gives_clauses;
+    check_miniscope_db_closed
   ]

@@ -8,6 +8,8 @@ type t = Lt | Eq | Gt | Incomparable
 
 type comparison = t
 
+val equal : t -> t -> bool
+
 include Interfaces.PRINT with type t := t
 
 val combine : t -> t -> t

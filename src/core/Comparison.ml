@@ -7,6 +7,7 @@ type t = Lt | Eq | Gt | Incomparable
 (** partial order *)
 
 type comparison = t
+let equal : t -> t -> bool = Pervasives.(=)
 
 let to_string = function
   | Lt -> "=<="

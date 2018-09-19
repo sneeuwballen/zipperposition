@@ -5,12 +5,13 @@
 
 open Logtk
 open Logtk_arbitrary
-open OUnit2
 
 module T = Term
 module H = Helpers
 
 let (==>) = QCheck.(==>)
+let t_test = (module T : Alcotest.TESTABLE with type t = T.t)
+let ty_test = (module Type : Alcotest.TESTABLE with type t = Type.t)
 
 (* unit tests *)
 
@@ -28,21 +29,21 @@ let b = T.const ~ty (ID.make "b")
 let x = T.var_of_int ~ty 0
 let y = T.var_of_int ~ty 1
 
-let test_db_shift _ =
+let test_db_shift = "db shift", `Quick, fun () ->
   let t = T.fun_ ty (f (T.bvar ~ty 0) (g (T.bvar ~ty 1))) in
   let t' = T.of_term_unsafe (InnerTerm.DB.shift 1 (t:T.t:>InnerTerm.t)) in
   let t1 = T.fun_ ty (f (T.bvar ~ty 0) (g (T.bvar ~ty 2))) in
-  assert_equal ~cmp:T.equal ~printer:T.to_string t1 t';
+  Alcotest.(check t_test) "db_shift" t1 t';
   ()
 
-let test_db_unshift _ =
+let test_db_unshift = "db unshift", `Quick, fun () ->
   let t = T.fun_ ty (f (T.bvar ~ty 0) (g (T.bvar ~ty 2))) in
   let t' = T.of_term_unsafe (InnerTerm.DB.unshift 1 (t:T.t:>InnerTerm.t)) in
   let t1 = T.fun_ ty (f (T.bvar ~ty 0) (g (T.bvar ~ty 1))) in
-  assert_equal ~cmp:T.equal ~printer:T.to_string t1 t';
+  Alcotest.(check t_test) "db_unshift" t1 t';
   ()
 
-let test_whnf1 _ =
+let test_whnf1 = "whnf1", `Quick, fun () ->
   (* eta expansion of [g] *)
   let g_eta = T.fun_ ty (g (T.bvar ~ty 0)) in
   let redex =
@@ -57,10 +58,10 @@ let test_whnf1 _ =
   let t' = Lambda.whnf redex in
   (* WHNF: does not reduce in subterms *)
   let t1 = f (T.app g_eta [a]) (T.app g_eta [b]) in
-  assert_equal ~cmp:T.equal ~printer:T.to_string t1 t';
+  Alcotest.(check t_test) "whnf1" t1 t';
   ()
 
-let test_whnf2 _ =
+let test_whnf2 = "whnf2", `Quick, fun () ->
   let redex =
     let ty2 = Type.([ty] ==> ty) in
     T.app
@@ -72,10 +73,10 @@ let test_whnf2 _ =
   in
   let t' = Lambda.whnf redex in
   let t1 = f (g a) (g b) in
-  assert_equal ~cmp:T.equal ~printer:T.to_string t1 t';
+  Alcotest.(check t_test) "whnf2" t1 t';
   ()
 
-let test_polymorphic_app _ =
+let test_polymorphic_app = "poly app", `Quick, fun () ->
   (* Π α. α *)
   let polyty = Type.forall_fvars [HVar.make ~ty:Type.tType 0] (Type.var_of_int 0) in
   let f_poly = Term.const ~ty:polyty (ID.make "f_poly") in
@@ -83,17 +84,16 @@ let test_polymorphic_app _ =
   let funty = Type.([ty] ==> ty) in
   (* apply term of type `Π α. α` to terms of type `ty → ty` and `ty`: *)
   let result = Term.app f_poly [Term.of_ty funty; a] in
-  assert_equal ~cmp:Type.equal ~printer:Type.to_string (Term.ty result) ty;
+  Alcotest.(check ty_test) "polyapp" (Term.ty result) ty;
   ()
 
-let suite =
-  "term" >:::
-    [ "db_shift" >:: test_db_shift
-    ; "db_unshift" >:: test_db_unshift
-    ; "whnf1" >:: test_whnf1
-    ; "whnf2" >:: test_whnf2
-    ; "polymorphic_app" >:: test_polymorphic_app
-    ]
+let suite : unit Alcotest.test_case list =
+  [ test_db_shift;
+    test_db_unshift;
+    test_whnf1;
+    test_whnf2;
+    test_polymorphic_app;
+  ]
 
 (** Properties *)
 
