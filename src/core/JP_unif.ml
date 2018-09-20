@@ -6,7 +6,6 @@
 module T = Term
 module S = Subst
 
-
 let scope = 0 (* TODO: scopes *)
 
 let subst_bind s (v:T.var) t = ((Subst.FO.bind s ((v,scope):>InnerTerm.t HVar.t Scoped.t)) (t,scope)) 
@@ -55,17 +54,17 @@ let project_onesided u =
   if T.is_var head 
   then
     args 
-    |> Sequence.of_list
-    |> Sequence.mapi (fun i arg -> List.length prefix_types - 1 - i, arg) (* Determine DB-index of the argument *)
-    |> Sequence.filter (fun (dbindex, arg) -> T.ty arg = return_type) (* necessary to make substitution type correct *)
-    |> Sequence.map (fun (dbindex, arg) -> 
+    |> OSeq.of_list
+    |> OSeq.mapi (fun i arg -> List.length prefix_types - 1 - i, arg) (* Determine DB-index of the argument *)
+    |> OSeq.filter (fun (dbindex, arg) -> T.ty arg = return_type) (* necessary to make substitution type correct *)
+    |> OSeq.map (fun (dbindex, arg) -> 
         (* substitute x for a projection to the j-th argument *)
         subst_bind Subst.empty (T.as_var_exn head) (T.fun_l prefix_types (T.bvar ~ty:(T.ty arg) dbindex)) 
     )
-  else Sequence.empty
+  else OSeq.empty
 
 (* find substitutions for the projection rule, given a disagreement pair *)
-let project u v (_ : (T.var * int) list) = Sequence.append (project_onesided u) (project_onesided v)
+let project u v (_ : (T.var * int) list) = OSeq.append (project_onesided u) (project_onesided v)
 
 
 (* Imitation rule *)
@@ -89,11 +88,11 @@ let imitate_onesided u v =
     let matrix = T.app head_v matrix_args in
     let subst_value = T.fun_l prefix_types_u matrix in 
     let subst = subst_bind Subst.empty (T.as_var_exn head_u) subst_value in
-    Sequence.singleton subst
-  else Sequence.empty
+    OSeq.return subst
+  else OSeq.empty
 
 (* find substitutions for the projection rule, given a disagreement pair *)
-let imitate u v (_ : (T.var * int) list) = Sequence.append (imitate_onesided u v) (imitate_onesided v u)
+let imitate u v (_ : (T.var * int) list) = OSeq.append (imitate_onesided u v) (imitate_onesided v u)
 
 
 (* Identification rule *)
@@ -132,10 +131,8 @@ let identify u v (_ : (T.var * int) list) =
     let subst = Subst.empty in
     let subst = subst_bind subst (T.as_var_exn head_u) subst_value_u in
     let subst = subst_bind subst (T.as_var_exn head_v) subst_value_v in
-    Sequence.singleton subst
-  else Sequence.empty
-
-
+    OSeq.return subst
+  else OSeq.empty
 
 let eliminate u v l =
   l |> List.map (fun (v, k) -> 
@@ -149,8 +146,8 @@ let eliminate u v l =
     let subst = subst_bind Subst.empty v subst_value in
     subst
   )
-  |> Sequence.of_list
-(* TODO: use Sequence directly? *)
+  |> OSeq.of_list
+(* TODO: use OSeq directly? *)
 
 
 (* apply a substitution and reduce to normal form *)
@@ -158,26 +155,65 @@ let nfapply s u = Lambda.snf (S.FO.apply S.Renaming.none s (u, scope))
 
 (* TODO: comparison form is actually slightly different from short normal form! *)
 
+(** Dovetailing through a sequence of sequences:
+    (0,0),(1,0),(0,1),(2,0),(1,1),(0,2),(3,0),(2,1),(1,2),(0,3),(4,0),(3,1),(2,2),(1,3),(0,4),... *)
+let dovetail seqs () =
+  let rec aux passive_seqs active_seqs () =
+    match passive_seqs() with 
+    | OSeq.Nil -> 
+      (* All seqs are active now *)
+      if CCList.is_empty active_seqs 
+      then Seq.empty ()
+      else
+        let line, tail = get_line active_seqs in
+        OSeq.append line (aux passive_seqs tail) ()
+    | OSeq.Cons (new_seq, passive_seqs') ->
+      (* Move new seq from passive to active *)
+      let active_seqs = new_seq :: active_seqs in
+      let line, active_seqs = get_line active_seqs in
+      OSeq.append line (aux passive_seqs' active_seqs) ()
+  and get_line active_seqs =
+    (* Retrieve the head of each active sequence & remove empty active sequences from the list *)
+    CCList.fold_right
+      (fun seq (line, active_seqs) ->
+        match seq() with
+        | OSeq.Nil -> (line, active_seqs)
+        | OSeq.Cons (read, seq') -> (OSeq.cons read line, seq' :: active_seqs)
+      ) active_seqs (OSeq.empty, [])
+  in
+  aux seqs [] () (* Initially, all seqs are passive *)
 
+let unify t s = 
+  let rec unify_rec t s ?(rules = []) =
+    Util.debugf 1 "Unify (rules: %a) %a and %a" (fun k -> k (CCList.pp CCString.pp) rules T.pp t T.pp s);
+    match find_disagreement t s with
+      | Some ((u, v), l) -> 
+        [project,"proj"; imitate,"imit"; identify,"id"; eliminate,"elim"] 
+        |> OSeq.of_list  
+        |> OSeq.flat_map
+          (fun (rule,rulename) -> 
+            rule u v l 
+            |> OSeq.map (fun subst -> (subst, rulename)))
+        |> OSeq.map 
+          (fun (subst,rulename) -> 
+            let t_subst = nfapply subst t in
+            let s_subst = nfapply subst s in
+            let unifiers = unify_rec t_subst s_subst ~rules:(rules @ [rulename]) in
+            unifiers 
+            |> OSeq.map (CCOpt.map (fun unifier -> Subst.merge unifier subst))
+            (* TODO: we actually want to concatenate, not merge *)
+          )
+        |> dovetail
+        |> OSeq.append (OSeq.return None)
+      | None -> 
+        Util.debugf 1 "-- unified!" (fun k -> k);
+        OSeq.return (Some Subst.empty)
+  in
+  unify_rec t s ~rules:[]
 
-let rec unify t s ?(rules=[]) = 
-  Util.debugf 1 "Unify (rules: %a) %a and %a" (fun k -> k (CCList.pp CCString.print) rules T.pp t T.pp s);
-  match find_disagreement t s with
-    | Some ((u, v), l) -> 
-      [project,"proj"; imitate,"imit"; identify,"id"; eliminate,"elim"] 
-      |> Sequence.of_list 
-      |> Sequence.flat_map (fun (rule,rulename) -> rule u v l |> Sequence.map (fun subst -> (subst, rulename)))
-      |> Sequence.flat_map (fun (subst,rulename) -> 
-        let t_subst = nfapply subst t in
-        let s_subst = nfapply subst s in
-        let unifiers = unify t_subst s_subst ~rules:(rules @ [rulename]) in
-        unifiers 
-        |> Sequence.map (fun unifier -> Subst.merge unifier subst)
-        (* TODO: we actually want to concatenate, not merge*)
-        )
-    | None -> 
-      Util.debugf 1 "-- unified!" (fun k -> k);
-      Sequence.singleton Subst.empty
+(* TODO: Remove tracking of rules for efficiency? *)
+
+let unify_nonterminating t s = OSeq.take 10 (OSeq.filter_map (fun x -> x) (unify t s))
 
 
 (* TODO: better solution for fresh vars? *)

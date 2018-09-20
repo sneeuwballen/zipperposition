@@ -340,23 +340,41 @@ let test_jp_unif = "JP unification", `Quick, fun () ->
 
   let term1 = List.hd (snd (T.as_app (pterm "q (x a b)"))) in
   Util.debugf 1 "project %a" (fun k -> k T.pp term1);
-  Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (Subst.pp))  (Sequence.to_list (JP_unif.project_onesided term1)));
+  Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (Subst.pp))  (OSeq.to_list (JP_unif.project_onesided term1)));
 
   let term1 = pterm "x a b" in
   let term2 = pterm "f c d" in
   Util.debugf 1 "imitate %a, %a" (fun k -> k T.pp term1 T.pp term2);
-  Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (Subst.pp))  (Sequence.to_list (JP_unif.imitate term1 term2 [])));
+  Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (Subst.pp))  (OSeq.to_list (JP_unif.imitate term1 term2 [])));
 
   let term1 = List.hd (snd (T.as_app (pterm "q (x a b)"))) in
   let term2 = List.hd (snd (T.as_app (pterm "q (y c d)"))) in
   Util.debugf 1 "identify %a, %a" (fun k -> k T.pp term1 T.pp term2);
-  Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (Subst.pp)) (Sequence.to_list (JP_unif.identify term1 term2 [])));
+  Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (Subst.pp)) (OSeq.to_list (JP_unif.identify term1 term2 [])));
 
   let term1 = List.hd (snd (T.as_app (pterm "q (x2 a)"))) in
   let term2 = List.hd (snd (T.as_app (pterm "q (y2 b)"))) in
   Util.debugf 1 "unify %a, %a" (fun k -> k T.pp term1 T.pp term2);
-  Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (Subst.pp)) (Sequence.to_list (JP_unif.unify term1 term2)));
-  
+  Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (Subst.pp)) (OSeq.to_list (JP_unif.unify_nonterminating term1 term2)));
+
+  let countseq = OSeq.(iterate 0 succ) in
+  let myseq = OSeq.(countseq |> map (fun i -> countseq |> map (fun j -> (i, j)))) in
+  Util.debugf 1 "%a" (fun k -> k (OSeq.pp (CCPair.pp ~sep:"." CCInt.pp CCInt.pp))
+  (OSeq.flatten (OSeq.take 10 (OSeq.map (OSeq.take 20) myseq))));
+  Util.debugf 1 "merge: %a" (fun k -> k (OSeq.pp (CCPair.pp ~sep:"." CCInt.pp CCInt.pp))
+  (OSeq.take 200 (OSeq.merge myseq)));
+
+
+  Util.debugf 1 "dovetail: %a" (fun k -> k (OSeq.pp (CCPair.pp ~sep:"." CCInt.pp CCInt.pp))
+  (OSeq.take 200 (JP_unif.dovetail myseq)));
+ (* Sequence.to_list (Sequence.take 10 (Sequence.flat_map (fun s -> Sequence.forever (fun () -> 2)) (Sequence.forever (fun () -> Util.debugf 1 "K" (fun k -> k); 5)))); *)
+
+  let term1 = List.hd (snd (T.as_app (pterm "q (x3 a)"))) in
+  let term2 = List.hd (snd (T.as_app (pterm "q (g (x3 a))"))) in
+  Util.debugf 1 "unify %a, %a" (fun k -> k T.pp term1 T.pp term2);
+  (* Gen.get (JP_unif.unify term1 term2); *)
+  Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (CCOpt.pp Subst.pp)) (OSeq.to_list (OSeq.take 10 (JP_unif.unify term1 term2))));
+
   ()
 
 let suite_unif2 = [ reg_matching1; test_jp_unif ]
