@@ -1,10 +1,12 @@
-opam-version: "1.2"
+opam-version: "2.0"
 maintainer: "simon.cruanes.2007@m4x.org"
 author: "Simon Cruanes"
 homepage: "https://github.com/c-cube/zipperposition"
 version: "1.5"
-build: ["jbuilder" "build" "-p" name]
-build-doc: ["jbuilder" "build" "@doc" "-p" name]
+build: [
+  ["jbuilder" "build" "-p" name]
+  ["jbuilder" "build" "@doc" "-p" name] {with-doc}
+]
 depends: [
   "ocamlfind" { build }
   "jbuilder" { build }
@@ -14,10 +16,7 @@ depends: [
   "zarith"
   "logtk" { >= "1.5" }
   "libzipperposition" { >= "1.5" }
-]
-available: [
-    ocaml-version >= "4.03.0"
+  "ocaml" {>= "4.03"}
 ]
 bug-reports: "https://github.com/c-cube/zipperposition/issues"
-dev-repo: "https://github.com/c-cube/zipperposition.git"
-
+dev-repo: "git+https://github.com/c-cube/zipperposition.git"
