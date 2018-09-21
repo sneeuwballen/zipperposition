@@ -319,61 +319,81 @@ let reg_matching1 = "regression matching", `Quick, fun () ->
       "@[<hv>`%a`@ and `%a@ should not match@]" T.ZF.pp t1 T.ZF.pp t2
   with Unif.Fail -> ()
 
+
+(** Jensen-Pietrzykowski Unification tests *)
 let test_jp_unif = "JP unification", `Quick, fun () ->
   Printexc.record_backtrace true;
   CCFormat.set_color_default true;
   Util.set_debug 1;
-  let term1 = pterm "g (g a)" in
-  let term2 = pterm "g (h a)" in
-  Util.debugf 1 "find_disagreement %a, %a" (fun k -> k T.pp term1 T.pp term2);
-  Util.debugf 1 "Result: %a" (fun k -> k (CCOpt.pp (CCPair.pp T.pp T.pp)) (CCOpt.map fst (JP_unif.find_disagreement term1 term2)));
 
-  let term1 = pterm "g (g a)" in
-  let term2 = pterm "g (g b)" in
-  Util.debugf 1 "find_disagreement %a, %a" (fun k -> k T.pp term1 T.pp term2);
-  Util.debugf 1 "Result: %a" (fun k -> k (CCOpt.pp (CCPair.pp T.pp T.pp)) (CCOpt.map fst (JP_unif.find_disagreement term1 term2)));
+  (** Find disagreement tests *)
 
-  let term1 = pterm "f_ho2 (fun (x:term). x)" in
-  let term2 = pterm "f_ho2 (fun (x:term). a)" in
-  Util.debugf 1 "find_disagreement %a, %a" (fun k -> k T.pp term1 T.pp term2);
-  Util.debugf 1 "Result: %a" (fun k -> k (CCOpt.pp (CCPair.pp T.pp T.pp)) (CCOpt.map fst (JP_unif.find_disagreement term1 term2)));
+  OUnit.assert_equal 
+    (JP_unif.find_disagreement (pterm "g (g a)") (pterm "g (h a)")) 
+    (Some ((pterm "g a", pterm "h a"), []));
 
-  let term1 = List.hd (snd (T.as_app (pterm "q (x a b)"))) in
-  Util.debugf 1 "project %a" (fun k -> k T.pp term1);
-  Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (Subst.pp))  (OSeq.to_list (JP_unif.project_onesided term1)));
+  OUnit.assert_equal 
+    (JP_unif.find_disagreement (pterm "g (g a)") (pterm "g (g b)")) 
+    (Some ((pterm "a", pterm "b"), []));
+  
+  OUnit.assert_equal 
+    (JP_unif.find_disagreement (pterm "f_ho2 (fun (x:term). x)") (pterm "f_ho2 (fun (x:term). a)")) 
+    (Some ((T.bvar ~ty:(Type.Conv.of_simple_term_exn (Type.Conv.create ()) (psterm "term")) 0, pterm "a"), []));
 
-  let term1 = pterm "x a b" in
+  (** Rule tests *)
+
+  let term = pterm ~ty:"term" "X a b" in
+  let result = 
+    JP_unif.project_onesided term 
+    |> OSeq.map (fun subst -> Lambda.snf (Subst.FO.apply S.Renaming.none subst (term,0)))
+    |> OSeq.to_list in
+  let expected = [pterm "a"; pterm "b"] in
+  OUnit.assert_equal expected result;
+
+  let term1 = pterm ~ty:"term" "X a b" in
   let term2 = pterm "f c d" in
-  Util.debugf 1 "imitate %a, %a" (fun k -> k T.pp term1 T.pp term2);
-  Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (Subst.pp))  (OSeq.to_list (JP_unif.imitate term1 term2 [])));
+  let results = 
+    JP_unif.imitate term1 term2 []
+    |> OSeq.map (fun subst -> Lambda.snf (Subst.FO.apply S.Renaming.none subst (term1,0)))
+    |> OSeq.to_array in
+  OUnit.assert_equal 1 (Array.length results);
+  check_variant (results.(0)) (pterm ~ty:"term" "f (X0 a b) (Y0 a b)");
 
-  let term1 = List.hd (snd (T.as_app (pterm "q (x a b)"))) in
-  let term2 = List.hd (snd (T.as_app (pterm "q (y c d)"))) in
-  Util.debugf 1 "identify %a, %a" (fun k -> k T.pp term1 T.pp term2);
-  Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (Subst.pp)) (OSeq.to_list (JP_unif.identify term1 term2 [])));
+  let term1 = pterm ~ty:"term" "X a b" in
+  let term2 = pterm ~ty:"term" "Y c d" in
+  let substs = JP_unif.identify term1 term2 [] in
+  OUnit.assert_equal 1 (OSeq.length substs);
+  let subst = OSeq.nth 0 substs in
+  let result1 = Lambda.snf (Subst.FO.apply S.Renaming.none subst (term1,0)) in
+  let result2 = Lambda.snf (Subst.FO.apply S.Renaming.none subst (term2,0)) in
+  check_variant (result1) 
+    (T.app (pterm ~ty:"term -> term -> term -> term -> term" "X1") 
+      [pterm "a"; pterm "b";pterm ~ty:"term" "Y1 a b"; pterm ~ty:"term" "Z1 a b"]);
+  check_variant (result2) 
+    (T.app (pterm ~ty:"term -> term -> term -> term -> term" "X1") 
+      [pterm ~ty:"term" "Y1 c d"; pterm ~ty:"term" "Z1 c d"; pterm "c"; pterm "d"]);
 
-  let term1 = List.hd (snd (T.as_app (pterm "q (x2 a)"))) in
-  let term2 = List.hd (snd (T.as_app (pterm "q (y2 b)"))) in
+  (** Unification tests *)
+
+  let term1 = pterm ~ty:"term" "X2 a" in
+  let term2 = pterm ~ty:"term" "Y2 b" in
+  let term1 = List.hd (snd (T.as_app (pterm "q (X2 a)"))) in
+  let term2 = List.hd (snd (T.as_app (pterm "q (X3 b)"))) in
+  OUnit.assert_equal 17 (OSeq.length (JP_unif.unify_nonterminating term1 term2));
+
+  let term1 = pterm ~ty:"term" "X3 a" in
+  let term2 = pterm ~ty:"term" "g (X3 a)" in
+  OUnit.assert_bool "all None" (OSeq.for_all CCOpt.is_none (OSeq.take 20 (JP_unif.unify term1 term2)));
+
+  let term1 = pterm "(fun (x : term). x) (g (x4 a))" in
+  let term2 = pterm "(fun (x : term). x) (x4 (g a))" in
   Util.debugf 1 "unify %a, %a" (fun k -> k T.pp term1 T.pp term2);
-  Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (Subst.pp)) (OSeq.to_list (JP_unif.unify_nonterminating term1 term2)));
-
-  let countseq = OSeq.(iterate 0 succ) in
-  let myseq = OSeq.(countseq |> map (fun i -> countseq |> map (fun j -> (i, j)))) in
-  Util.debugf 1 "%a" (fun k -> k (OSeq.pp (CCPair.pp ~sep:"." CCInt.pp CCInt.pp))
-  (OSeq.flatten (OSeq.take 10 (OSeq.map (OSeq.take 20) myseq))));
-  Util.debugf 1 "merge: %a" (fun k -> k (OSeq.pp (CCPair.pp ~sep:"." CCInt.pp CCInt.pp))
-  (OSeq.take 200 (OSeq.merge myseq)));
-
-
-  Util.debugf 1 "dovetail: %a" (fun k -> k (OSeq.pp (CCPair.pp ~sep:"." CCInt.pp CCInt.pp))
-  (OSeq.take 200 (JP_unif.dovetail myseq)));
- (* Sequence.to_list (Sequence.take 10 (Sequence.flat_map (fun s -> Sequence.forever (fun () -> 2)) (Sequence.forever (fun () -> Util.debugf 1 "K" (fun k -> k); 5)))); *)
-
-  let term1 = List.hd (snd (T.as_app (pterm "q (x3 a)"))) in
-  let term2 = List.hd (snd (T.as_app (pterm "q (g (x3 a))"))) in
-  Util.debugf 1 "unify %a, %a" (fun k -> k T.pp term1 T.pp term2);
-  (* Gen.get (JP_unif.unify term1 term2); *)
   Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (CCOpt.pp Subst.pp)) (OSeq.to_list (OSeq.take 10 (JP_unif.unify term1 term2))));
+
+  let term1 = Lambda.snf (pterm "(fun (x : term). x) (z5 (fun (zz : term). (fun (x : term). x) (y5 zz)) ((fun (x : term). x) x5))") in
+  let term2 = Lambda.snf (pterm "(fun (x : term). x) (z5 (fun (zz : term). zz) (g a))") in
+  Util.debugf 1 "ITERATE %a, %a" (fun k -> k T.pp term1 T.pp term2);
+  Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (CCOpt.pp Subst.pp)) (OSeq.to_list (OSeq.take 3 (JP_unif.unify term1 term2))));
 
   ()
 
