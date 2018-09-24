@@ -35,12 +35,14 @@ let project u v (_ : (T.var * int) list) = OSeq.append (project_onesided u) (pro
 
 (** {2 Imitation rule} *)
 
+(* TODO: Replace as_app by head_term_mono everywhere? *)
+
 let imitate_onesided u v = 
-  let head_u, args_u = T.as_app u in
-  let head_v, args_v = T.as_app v in
+  let head_u = T.head_term_mono u in
+  let head_v = T.head_term_mono v in
   let prefix_types_u, _ = Type.open_fun (T.ty head_u) in
   let prefix_types_v, _ = Type.open_fun (T.ty head_v) in
-  if T.is_var head_u && (T.is_var head_v || T.is_const head_v) 
+  if T.is_var head_u && not (T.is_bvar head_v) 
   then
     (* create substitution: head_u |-> λ u1 ... um. head_v (x1 u1 ... um) ... (xn u1 ... um)) *)
     let bvars = prefix_types_u |> List.rev |> List.mapi (fun i ty -> T.bvar ~ty i) |> List.rev in
@@ -64,8 +66,8 @@ let imitate u v (_ : (T.var * int) list) = OSeq.append (imitate_onesided u v) (i
 (** {3 Identification rule} *)
 
 let identify u v (_ : (T.var * int) list) =
-  let head_u, args_u = T.as_app u in
-  let head_v, args_v = T.as_app v in
+  let head_u = T.head_term_mono u in
+  let head_v = T.head_term_mono v in
   let prefix_types_u, return_type = Type.open_fun (T.ty head_u) in
   let prefix_types_v, return_type2 = Type.open_fun (T.ty head_v) in
   assert (return_type = return_type2);
@@ -234,7 +236,7 @@ let dovetail seqs () =
 
 let rec unify t s = 
   let rec unify_terms ?(rules = []) t s  =
-    Util.debugf 1 "Unify (rules: %a) %a and %a" (fun k -> k (CCList.pp CCString.pp) rules T.pp t T.pp s); 
+    Util.debugf 1 "Unify (rules: %a) %a and %a" (fun k -> k (CCList.pp CCString.pp) rules T.pp t T.pp s);
     match find_disagreement t s with
       | Some ((u, v), l) -> 
         [project,"proj"; imitate,"imit"; identify,"id"; eliminate,"elim"; iterate,"iter"]
@@ -256,7 +258,7 @@ let rec unify t s =
         |> dovetail 
         |> OSeq.append (OSeq.return None)
       | None -> 
-        Util.debugf 1 "-- unified! (rules: %a)" (fun k -> k (CCList.pp CCString.pp) rules);
+        (* Util.debugf 1 "-- unified! (rules: %a)" (fun k -> k (CCList.pp CCString.pp) rules); *)
         OSeq.return (Some Subst.empty)
   in
   unify_terms ~rules:[] (T.of_ty (T.ty t)) (T.of_ty (T.ty s)) (* TODO: Can I use Simon's unification here? There are mgus for types! *)
@@ -265,7 +267,8 @@ let rec unify t s =
     | Some type_unifier ->
       let t' = nfapply type_unifier t in
       let s' = nfapply type_unifier s in
-      unify_terms t' s' ~rules:[]
+      let term_unifiers = unify_terms t' s' ~rules:[] in
+      OSeq.map (CCOpt.map (Subst.merge type_unifier)) term_unifiers
     | None -> OSeq.return None
   )
   |> dovetail
@@ -277,3 +280,4 @@ let unify_nonterminating t s = OSeq.filter_map (fun x -> x) (unify t s)
 
 (* TODO: better solution for fresh vars? *)
 (* TODO: Polymorphism? *)
+(* TODO: operate on inner types like in `Unif`. Test for NO-TYPE terms. *)
