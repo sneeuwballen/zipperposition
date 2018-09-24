@@ -22,7 +22,7 @@ let project_onesided u =
     args 
     |> OSeq.of_list
     |> OSeq.mapi (fun i arg -> List.length prefix_types - 1 - i, arg) (* Determine DB-index of the argument *)
-    |> OSeq.filter (fun (dbindex, arg) -> T.ty arg = return_type) (* necessary to make substitution type correct *)
+    |> OSeq.filter (fun (_, arg) -> T.ty arg = return_type) (* necessary to make substitution type correct *)
     |> OSeq.map (fun (dbindex, arg) -> 
         (* substitute x for a projection to the j-th argument *)
         subst_bind Subst.empty (T.as_var_exn head) (T.fun_l prefix_types (T.bvar ~ty:(T.ty arg) dbindex)) 
@@ -34,8 +34,6 @@ let project u v (_ : (T.var * int) list) = OSeq.append (project_onesided u) (pro
 
 
 (** {2 Imitation rule} *)
-
-(* TODO: Replace as_app by head_term_mono everywhere? *)
 
 let imitate_onesided u v = 
   let head_u = T.head_term_mono u in
@@ -105,7 +103,7 @@ let identify u v (_ : (T.var * int) list) =
 
 (** {4 Elimination rule} *)
 
-let eliminate u v l =
+let eliminate _ _ l =
   l |> List.map (fun (v, k) -> 
     (* create substitution: v |-> λ u1 ... um. x u1 ... u{k-1} u{k+1} ... um *)
     let prefix_types, return_type = Type.open_fun (HVar.ty v) in
@@ -125,37 +123,42 @@ let eliminate u v l =
 
 (** {5 Iteration rule} *)
 
-let iterate u v l = (*TODO: e = f or g *)
-  l |> CCList.flat_map (fun (v, _) -> 
-    let prefix_types, return_type = Type.open_fun (HVar.ty v) in
-    prefix_types |> List.mapi (fun i type_ul ->
-      if Type.is_fun type_ul
-      then 
-        let prefix_types_ul, return_type_ul = Type.open_fun type_ul in
-        (* create substitution: v |-> λ u1 ... um. x u1 ... um (λ w. ui (y1 (u1...um w)) ... (yn (u1...um w))) *)
+let iterate v =
+  let prefix_types, return_type = Type.open_fun (HVar.ty v) in
+  prefix_types |> List.mapi (fun i type_ul ->
+    if Type.is_fun type_ul
+    then 
+      let prefix_types_ul, return_type_ul = Type.open_fun type_ul in
+      (* create substitution: v |-> λ u1 ... um. x u1 ... um (λ w. ui (y1 (u1...um w)) ... (yn (u1...um w))) *)
 
-        let types_w = [] in (* TODO: w *)
+      let types_w = [] in (* TODO: w *)
 
-        let inner_lambda_expr = 
-          (* create term: (λ w. ui (y1 (u1...um w)) ... (yn (u1...um w)) *)
-          let bvars_u_under_w = prefix_types |> List.rev |> List.mapi (fun i ty -> T.bvar ~ty (i + List.length types_w)) |> List.rev in
-          let bvars_w = types_w |> List.rev |> List.mapi (fun i ty -> T.bvar ~ty i) |> List.rev in
-          let bvar_ul_under_w = T.bvar ~ty:type_ul (List.length prefix_types - 1 - i + List.length types_w) in
-          let vars_y = prefix_types_ul |> List.map (fun ty -> T.var (HVar.fresh ~ty:(Type.arrow (prefix_types @ types_w) ty) ())) in
-          let matrix = T.app bvar_ul_under_w (vars_y |> List.map (fun y -> T.app y (bvars_u_under_w @ bvars_w))) in
-          T.fun_l types_w matrix
-        in
-        let bvars_u = prefix_types |> List.rev |> List.mapi (fun i ty -> T.bvar ~ty i) |> List.rev in
-        let var_x = T.var (HVar.fresh ~ty:(Type.arrow (prefix_types @ [Type.arrow types_w return_type_ul]) return_type) ()) in
-        let matrix = T.app var_x (bvars_u @ [inner_lambda_expr]) in
-        let subst_value = T.fun_l prefix_types matrix in
-        let subst = subst_bind Subst.empty v subst_value in
-        Some subst
-      else 
-        None
-    )
-    |> CCList.filter_map (fun x -> x)
+      let inner_lambda_expr = 
+        (* create term: (λ w. ui (y1 (u1...um w)) ... (yn (u1...um w)) *)
+        let bvars_u_under_w = prefix_types |> List.rev |> List.mapi (fun i ty -> T.bvar ~ty (i + List.length types_w)) |> List.rev in
+        let bvars_w = types_w |> List.rev |> List.mapi (fun i ty -> T.bvar ~ty i) |> List.rev in
+        let bvar_ul_under_w = T.bvar ~ty:type_ul (List.length prefix_types - 1 - i + List.length types_w) in
+        let vars_y = prefix_types_ul |> List.map (fun ty -> T.var (HVar.fresh ~ty:(Type.arrow (prefix_types @ types_w) ty) ())) in
+        let matrix = T.app bvar_ul_under_w (vars_y |> List.map (fun y -> T.app y (bvars_u_under_w @ bvars_w))) in
+        T.fun_l types_w matrix
+      in
+      let bvars_u = prefix_types |> List.rev |> List.mapi (fun i ty -> T.bvar ~ty i) |> List.rev in
+      let var_x = T.var (HVar.fresh ~ty:(Type.arrow (prefix_types @ [Type.arrow types_w return_type_ul]) return_type) ()) in
+      let matrix = T.app var_x (bvars_u @ [inner_lambda_expr]) in
+      let subst_value = T.fun_l prefix_types matrix in
+      let subst = subst_bind Subst.empty v subst_value in
+      Some subst
+    else 
+      None
   )
+  |> CCList.filter_map (fun x -> x)
+
+let iterate u v l =
+  l 
+  |> CCList.map fst
+  |> CCList.cons_maybe (T.as_var (T.head_term u))
+  |> CCList.cons_maybe (T.as_var (T.head_term v))
+  |> CCList.flat_map iterate
   |> OSeq.of_list
   
 (* TODO: use OSeq directly? *)
@@ -164,7 +167,8 @@ let iterate u v l = (*TODO: e = f or g *)
 (** {6 Unification procedure} *)
 
 (* apply a substitution and reduce to normal form *)
-let nfapply s u = Lambda.snf (S.FO.apply S.Renaming.none s (u, scope))
+let nfapply s u = Lambda.eta_expand (Lambda.snf (S.FO.apply S.Renaming.none s (u, scope)))
+
 
 (* TODO: comparison form is actually slightly different from short normal form! *)
 
@@ -200,7 +204,7 @@ let rec find_disagreement s t =
     | T.Var x, T.Var y when x = y -> None
     | T.DB i, T.DB j when i = j -> None
     | T.Const a, T.Const b when a = b -> None
-    | T.Fun (ty_s, s'), T.Fun (ty_t, t') -> find_disagreement s' t' (*TODO: what about the types?*)
+    | T.Fun (_, s'), T.Fun (_, t') -> find_disagreement s' t' (*TODO: what about the types?*)
     | _ -> Some ((s, t),[])
 
 
@@ -236,7 +240,7 @@ let dovetail seqs () =
 
 let rec unify t s = 
   let rec unify_terms ?(rules = []) t s  =
-    Util.debugf 1 "Unify (rules: %a) %a and %a" (fun k -> k (CCList.pp CCString.pp) rules T.pp t T.pp s);
+    (* Util.debugf 1 "Unify (rules: %a) %a and %a" (fun k -> k (CCList.pp CCString.pp) rules T.pp t T.pp s); *)
     match find_disagreement t s with
       | Some ((u, v), l) -> 
         [project,"proj"; imitate,"imit"; identify,"id"; eliminate,"elim"; iterate,"iter"]
@@ -261,17 +265,14 @@ let rec unify t s =
         (* Util.debugf 1 "-- unified! (rules: %a)" (fun k -> k (CCList.pp CCString.pp) rules); *)
         OSeq.return (Some Subst.empty)
   in
-  unify_terms ~rules:[] (T.of_ty (T.ty t)) (T.of_ty (T.ty s)) (* TODO: Can I use Simon's unification here? There are mgus for types! *)
-  |> OSeq.map (fun tu ->
-    match tu with
-    | Some type_unifier ->
-      let t' = nfapply type_unifier t in
-      let s' = nfapply type_unifier s in
-      let term_unifiers = unify_terms t' s' ~rules:[] in
-      OSeq.map (CCOpt.map (Subst.merge type_unifier)) term_unifiers
-    | None -> OSeq.return None
-  )
-  |> dovetail
+  (* Unify types first ... *)
+  let type_unifier = Subst.empty in
+  let type_unifier = Unif.Ty.unify_syn ~subst:type_unifier (T.ty t, 0) (T.ty s, 0) in
+  let t' = nfapply type_unifier t in
+  let s' = nfapply type_unifier s in
+  (* ... then terms. *)
+  let term_unifiers = unify_terms t' s' ~rules:[] in
+  OSeq.map (CCOpt.map (Subst.merge type_unifier)) term_unifiers
 
 (* TODO: Remove tracking of rules for efficiency? *)
 
