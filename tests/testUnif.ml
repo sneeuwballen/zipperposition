@@ -411,6 +411,20 @@ let test_jp_unif = "JP unification", `Quick, fun () ->
         (pterm ~ty:"(term -> term) -> term -> term" "fun (z : term -> term). fun (x : term). x6 (z x)")
   ) substs);
 
+  (* Iterate on head of disagreement pair *)
+  let term1 = pterm ~ty:"term" "x9 g" in
+  let term2 = pterm "g a" in
+  let substs = JP_unif.unify term1 term2 in
+  OUnit.assert_bool "Unif exists" (OSeq.exists (fun subst ->
+    match subst with
+    | None -> false
+    | Some s ->
+      let expected = pterm ~ty:"(term -> term) -> term" "fun z. z a" in
+      let result = Lambda.snf (Subst.FO.apply S.Renaming.none s (pterm "x9",0)) in
+      Unif.FO.are_variant expected result
+  ) substs);
+
+  (* Polymorphism *)
 
   let term1 = pterm "fun (x7 : alpha). x7" in
   let term2 = pterm "fun (x7 : term). x7" in
@@ -419,12 +433,12 @@ let test_jp_unif = "JP unification", `Quick, fun () ->
   let subst = OSeq.nth 0 substs in
   check_variant term2 (Subst.FO.apply S.Renaming.none subst (term1,0));
 
-
-
   let term1 = pterm "f_ho2 (a_poly term) (a_poly term)" in
   let term2 = pterm "f_ho2 x8 x8" in
   let substs = JP_unif.unify_nonterminating term1 term2 in
-  Util.debugf 1 "RES: %a" (fun k -> k (OSeq.pp Subst.pp) substs);
+  OUnit.assert_equal 1 (OSeq.length substs);
+  let subst = OSeq.nth 0 substs in
+  check_variant term1 (Subst.FO.apply S.Renaming.none subst (term2,0));
 
   ()
 
