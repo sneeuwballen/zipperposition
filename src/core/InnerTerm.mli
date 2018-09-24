@@ -213,7 +213,7 @@ val open_fun : t -> t list * t
 
 val open_poly_fun : t -> int * t list * t
 (** [open_poly_fun ty] "unrolls" polymorphic function arrows from the left, so that
-    [open_fun (forall a b. f a -> (g b -> (c -> d)))] returns [2; [f a;g b;c], d].
+    [open_poly_fun (forall a b. f a -> (g b -> (c -> d)))] returns [2; [f a;g b;c], d].
     @return the return type, the number of type variables,
       and the list of all its arguments *)
 
@@ -242,7 +242,7 @@ val open_fun : t -> t list * t
 
 val open_poly_fun : t -> int * t list * t
 (** [open_poly_fun ty] "unrolls" polymorphic function arrows from the left, so that
-    [open_fun (forall a b. f a -> (g b -> (c -> d)))] returns [2; [f a;g b;c], d].
+    [open_poly_fun (forall a b. f a -> (g b -> (c -> d)))] returns [2; [f a;g b;c], d].
     @return the return type, the number of type variables,
       and the list of all its arguments *)
 
