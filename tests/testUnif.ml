@@ -325,6 +325,7 @@ let test_jp_unif = "JP unification", `Quick, fun () ->
   Printexc.record_backtrace true;
   CCFormat.set_color_default true;
   Util.set_debug 1;
+  InnerTerm.show_type_arguments := true;
 
   (** Find disagreement tests *)
 
@@ -377,23 +378,53 @@ let test_jp_unif = "JP unification", `Quick, fun () ->
 
   let term1 = pterm ~ty:"term" "X2 a" in
   let term2 = pterm ~ty:"term" "Y2 b" in
-  let term1 = List.hd (snd (T.as_app (pterm "q (X2 a)"))) in
-  let term2 = List.hd (snd (T.as_app (pterm "q (X3 b)"))) in
   OUnit.assert_equal 17 (OSeq.length (JP_unif.unify_nonterminating term1 term2));
 
   let term1 = pterm ~ty:"term" "X3 a" in
   let term2 = pterm ~ty:"term" "g (X3 a)" in
   OUnit.assert_bool "all None" (OSeq.for_all CCOpt.is_none (OSeq.take 20 (JP_unif.unify term1 term2)));
 
-  let term1 = pterm "(fun (x : term). x) (g (x4 a))" in
-  let term2 = pterm "(fun (x : term). x) (x4 (g a))" in
-  Util.debugf 1 "unify %a, %a" (fun k -> k T.pp term1 T.pp term2);
-  Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (CCOpt.pp Subst.pp)) (OSeq.to_list (OSeq.take 10 (JP_unif.unify term1 term2))));
+  let term1 = pterm ~ty:"term" "(g (x4 a))" in
+  let term2 = pterm ~ty:"term" "(x4 (g a))" in
+  let substs = JP_unif.unify term1 term2 in
+  OUnit.assert_bool "Unif exists" (OSeq.exists (fun subst ->
+    match subst with
+    | None -> false
+    | Some s ->
+      let expected = pterm ~ty:"term" "g (g (g (g a)))" in
+      let result = Lambda.snf (Subst.FO.apply S.Renaming.none s (term1,0)) in
+      Unif.FO.are_variant expected result
+  ) substs);
 
-  let term1 = Lambda.snf (pterm "(fun (x : term). x) (z5 (fun (zz : term). (fun (x : term). x) (y5 zz)) ((fun (x : term). x) x5))") in
-  let term2 = Lambda.snf (pterm "(fun (x : term). x) (z5 (fun (zz : term). zz) (g a))") in
-  Util.debugf 1 "ITERATE %a, %a" (fun k -> k T.pp term1 T.pp term2);
-  Util.debugf 1 "Result: %a" (fun k -> k (CCList.pp (CCOpt.pp Subst.pp)) (OSeq.to_list (OSeq.take 3 (JP_unif.unify term1 term2))));
+  (* Example 3 in the Jensen-Pietrzykowski paper *)
+  (* Small hack: I added "(fun (x : term). x)" to declare the types of y5 and x5 *)
+  let term1 = Lambda.snf (pterm ~ty:"term" "z5 (fun (zz : term). (fun (x : term). x) (y5 zz)) ((fun (x : term). x) x5)") in
+  let term2 = Lambda.snf (pterm ~ty:"term" "z5 (fun (zz : term). zz) (g a)") in
+  let substs = JP_unif.unify term1 term2 in
+  OUnit.assert_bool "Unif exists" (OSeq.exists (fun subst -> 
+    match subst with
+    | None -> false
+    | Some s ->
+      Unif.FO.are_variant (Lambda.snf (Subst.FO.apply S.Renaming.none s (pterm "y5",0))) (pterm "g") &&
+      Unif.FO.are_variant (Lambda.snf (Subst.FO.apply S.Renaming.none s (pterm "x5",0))) (pterm "a") &&
+      Unif.FO.are_variant (Lambda.snf (Subst.FO.apply S.Renaming.none s (pterm "z5",0)))
+        (pterm ~ty:"(term -> term) -> term -> term" "fun (z : term -> term). fun (x : term). x6 (z x)")
+  ) substs);
+
+
+  let term1 = pterm "fun (x7 : alpha). x7" in
+  let term2 = pterm "fun (x7 : term). x7" in
+  let substs = JP_unif.unify_nonterminating term1 term2 in
+  OUnit.assert_equal 1 (OSeq.length substs);
+  let subst = OSeq.nth 0 substs in
+  check_variant term2 (Subst.FO.apply S.Renaming.none subst (term1,0));
+
+
+
+  let term1 = pterm "f_ho2 (a_poly term) (a_poly term)" in
+  let term2 = pterm "f_ho2 x8 x8" in
+  let substs = JP_unif.unify_nonterminating term1 term2 in
+  Util.debugf 1 "RES: %a" (fun k -> k (OSeq.pp Subst.pp) substs);
 
   ()
 
