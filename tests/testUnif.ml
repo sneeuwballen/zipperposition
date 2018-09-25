@@ -396,12 +396,13 @@ let test_jp_unif = "JP unification", `Quick, fun () ->
       Unif.FO.are_variant expected result
   ) substs);
 
+(* TODO: Does not terminate in time *)
   (* Example 3 in the Jensen-Pietrzykowski paper *)
   (* Small hack: I added "(fun (x : term). x)" to declare the types of y5 and x5 *)
   let term1 = Lambda.snf (pterm ~ty:"term" "z5 (fun (zz : term). (fun (x : term). x) (y5 zz)) ((fun (x : term). x) x5)") in
   let term2 = Lambda.snf (pterm ~ty:"term" "z5 (fun (zz : term). zz) (g a)") in
   let substs = JP_unif.unify term1 term2 in
-  OUnit.assert_bool "Unif exists" (OSeq.exists (fun subst -> 
+  OUnit.assert_bool "Unif exists (ex3)" (OSeq.exists (fun subst -> 
     match subst with
     | None -> false
     | Some s ->
@@ -423,6 +424,8 @@ let test_jp_unif = "JP unification", `Quick, fun () ->
       let result = Lambda.snf (Subst.FO.apply S.Renaming.none s (pterm "x9",0)) in
       Unif.FO.are_variant expected result
   ) substs);
+
+  (* TODO: Test for iterate with non-empty w tuple *)
 
   (* Polymorphism *)
 
