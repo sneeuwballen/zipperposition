@@ -258,7 +258,7 @@ let dovetail seqs () =
 
 let unify t s = 
   let rec unify_terms ?(rules = []) t s  =
-    (* Util.debugf 1 "Unify (rules: %a) %a and %a" (fun k -> k (CCList.pp CCString.pp) rules T.pp t T.pp s); *)
+    (* Util.debugf 1 "@[Unify@ @[(rules: %a)@]@ @[%a@]@ and@ @[%a@]@]" (fun k -> k (CCList.pp CCString.pp) rules T.pp t T.pp s); *)
     match find_disagreement t s with
       | Some ((u, v), l) -> 
         let add_some f u v l = f u v l |> OSeq.map (fun s -> Some s) in
@@ -285,7 +285,7 @@ let unify t s =
         |> dovetail 
         |> OSeq.append (OSeq.return None)
       | None -> 
-        (* Util.debugf 1 "-- unified! (rules: %a)" (fun k -> k (CCList.pp CCString.pp) rules); *)
+        (* Util.debugf 1 "@[...unified!@ @[(rules: %a)@]@]" (fun k -> k (CCList.pp CCString.pp) rules); *)
         OSeq.return (Some Subst.empty)
   in
   (* Unify types first ... *)
