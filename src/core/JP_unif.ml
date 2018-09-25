@@ -10,7 +10,6 @@ let scope = 0 (* TODO: scopes *)
 
 let subst_bind s (v:T.var) t = ((Subst.FO.bind s ((v,scope):>InnerTerm.t HVar.t Scoped.t)) (t,scope)) 
 
-
 (** {1 Projection rule} *)
 
 (* find substitutions for the projection rule, given a member of the disagreement pair *)
@@ -25,7 +24,7 @@ let project_onesided u =
     |> OSeq.filter (fun (_, arg) -> T.ty arg = return_type) (* necessary to make substitution type correct *)
     |> OSeq.map (fun (dbindex, arg) -> 
         (* substitute x for a projection to the j-th argument *)
-        subst_bind Subst.empty (T.as_var_exn head) (T.fun_l prefix_types (T.bvar ~ty:(T.ty arg) dbindex)) 
+        subst_bind Subst.empty (T.as_var_exn head) (T.fun_l prefix_types (T.bvar ~ty:(T.ty arg) dbindex))
     )
   else OSeq.empty
 
@@ -123,43 +122,66 @@ let eliminate _ _ l =
 
 (** {5 Iteration rule} *)
 
-let iterate v =
-  let prefix_types, return_type = Type.open_fun (HVar.ty v) in
-  prefix_types |> List.mapi (fun i type_ul ->
-    if Type.is_fun type_ul
-    then 
-      let prefix_types_ul, return_type_ul = Type.open_fun type_ul in
-      (* create substitution: v |-> λ u1 ... um. x u1 ... um (λ w. ui (y1 (u1...um w)) ... (yn (u1...um w))) *)
-
-      let types_w = [] in (* TODO: w *)
-
-      let inner_lambda_expr = 
-        (* create term: (λ w. ui (y1 (u1...um w)) ... (yn (u1...um w)) *)
-        let bvars_u_under_w = prefix_types |> List.rev |> List.mapi (fun i ty -> T.bvar ~ty (i + List.length types_w)) |> List.rev in
-        let bvars_w = types_w |> List.rev |> List.mapi (fun i ty -> T.bvar ~ty i) |> List.rev in
-        let bvar_ul_under_w = T.bvar ~ty:type_ul (List.length prefix_types - 1 - i + List.length types_w) in
-        let vars_y = prefix_types_ul |> List.map (fun ty -> T.var (HVar.fresh ~ty:(Type.arrow (prefix_types @ types_w) ty) ())) in
-        let matrix = T.app bvar_ul_under_w (vars_y |> List.map (fun y -> T.app y (bvars_u_under_w @ bvars_w))) in
-        T.fun_l types_w matrix
-      in
-      let bvars_u = prefix_types |> List.rev |> List.mapi (fun i ty -> T.bvar ~ty i) |> List.rev in
-      let var_x = T.var (HVar.fresh ~ty:(Type.arrow (prefix_types @ [Type.arrow types_w return_type_ul]) return_type) ()) in
-      let matrix = T.app var_x (bvars_u @ [inner_lambda_expr]) in
-      let subst_value = T.fun_l prefix_types matrix in
-      let subst = subst_bind Subst.empty v subst_value in
-      Some subst
-    else 
-      None
-  )
-  |> CCList.filter_map (fun x -> x)
+let iterate_one types_w v prefix_types return_type i type_ul =
+  let prefix_types_ul, return_type_ul = Type.open_fun type_ul in
+  (* create substitution: v |-> λ u1 ... um. x u1 ... um (λ w. ui (y1 (u1...um w)) ... (yn (u1...um w))) *)
+  let inner_lambda_expr = 
+    (* create term: (λ w. ui (y1 (u1...um w)) ... (yn (u1...um w)) *)
+    let bvars_u_under_w = prefix_types |> List.rev |> List.mapi (fun i ty -> T.bvar ~ty (i + List.length types_w)) |> List.rev in
+    let bvars_w = types_w |> List.rev |> List.mapi (fun i ty -> T.bvar ~ty i) |> List.rev in
+    let bvar_ul_under_w = T.bvar ~ty:type_ul (List.length prefix_types - 1 - i + List.length types_w) in
+    let vars_y = prefix_types_ul |> List.map (fun ty -> T.var (HVar.fresh ~ty:(Type.arrow (prefix_types @ types_w) ty) ())) in
+    let matrix = T.app bvar_ul_under_w (vars_y |> List.map (fun y -> T.app y (bvars_u_under_w @ bvars_w))) in
+    T.fun_l types_w matrix
+  in
+  let bvars_u = prefix_types |> List.rev |> List.mapi (fun i ty -> T.bvar ~ty i) |> List.rev in
+  let var_x = T.var (HVar.fresh ~ty:(Type.arrow (prefix_types @ [Type.arrow types_w return_type_ul]) return_type) ()) in
+  let matrix = T.app var_x (bvars_u @ [inner_lambda_expr]) in
+  let subst_value = T.fun_l prefix_types matrix in
+  let subst = subst_bind Subst.empty v subst_value in
+  subst
 
 let iterate u v l =
-  l 
-  |> CCList.map fst
-  |> CCList.cons_maybe (T.as_var (T.head_term u))
-  |> CCList.cons_maybe (T.as_var (T.head_term v))
-  |> CCList.flat_map iterate
-  |> OSeq.of_list
+  (* The variable can be either above the disagreement pair (i.e., in l) 
+     or it can be the head of either member of the disagreement pair *)
+  let positions =
+    l 
+    |> CCList.map fst
+    |> CCList.cons_maybe (T.as_var (T.head_term u))
+    |> CCList.cons_maybe (T.as_var (T.head_term v))
+    |> OSeq.of_list
+    |> OSeq.flat_map
+      (fun v ->
+        let prefix_types, return_type = Type.open_fun (HVar.ty v) in
+        prefix_types 
+        |> List.mapi
+          (fun i type_ul ->
+            if Type.is_fun type_ul
+            then 
+              Some (v, prefix_types, return_type, i, type_ul)
+            else 
+              None
+          ) 
+        |> CCList.filter_map (fun x -> x)
+        |> OSeq.of_list
+      )
+  in
+  (* The tuple `w` can be of any length. Hence we use the sequence [[alpha], [alpha, beta], [alpha, beta, gamma], ...] *)
+  let types_w_seq = OSeq.iterate [] (fun types_w -> Type.var (HVar.fresh ~ty:Type.tType ()) :: types_w) in
+  if OSeq.is_empty positions 
+  then OSeq.empty
+  else 
+    types_w_seq 
+    |> OSeq.flat_map 
+      (fun types_w -> 
+        positions
+        |> OSeq.map
+          (fun (v, prefix_types, return_type, i, type_ul) -> 
+            Some (iterate_one types_w v prefix_types return_type i type_ul)
+          )
+        (* Append some "None"s to delay the substitutions containing long w tuples *)
+        |> (fun seq -> OSeq.append seq (OSeq.take 50 (OSeq.repeat None)))
+      )
   
 (* TODO: use OSeq directly? *)
 
@@ -169,9 +191,7 @@ let iterate u v l =
 (* apply a substitution and reduce to normal form *)
 let nfapply s u = Lambda.eta_expand (Lambda.snf (S.FO.apply S.Renaming.none s (u, scope)))
 
-
 (* TODO: comparison form is actually slightly different from short normal form! *)
-
 
 (* Find disagreeing subterms. 
     This function also returns a list of variables occurring above the
@@ -207,8 +227,6 @@ let rec find_disagreement s t =
     | T.Fun (_, s'), T.Fun (_, t') -> find_disagreement s' t' (*TODO: what about the types?*)
     | _ -> Some ((s, t),[])
 
-
-
 (* TODO: Replace by the updated OSeq.merge *)
 (** Dovetailing through a sequence of sequences:
     (0,0),(1,0),(0,1),(2,0),(1,1),(0,2),(3,0),(2,1),(1,2),(0,3),(4,0),(3,1),(2,2),(1,3),(0,4),... *)
@@ -238,26 +256,31 @@ let dovetail seqs () =
   in
   aux seqs [] () (* Initially, all seqs are passive *)
 
-let rec unify t s = 
+let unify t s = 
   let rec unify_terms ?(rules = []) t s  =
     (* Util.debugf 1 "Unify (rules: %a) %a and %a" (fun k -> k (CCList.pp CCString.pp) rules T.pp t T.pp s); *)
     match find_disagreement t s with
       | Some ((u, v), l) -> 
-        [project,"proj"; imitate,"imit"; identify,"id"; eliminate,"elim"; iterate,"iter"]
+        let add_some f u v l = f u v l |> OSeq.map (fun s -> Some s) in
+        [add_some project,"proj"; add_some imitate,"imit"; add_some identify,"id"; add_some eliminate,"elim"; iterate,"iter"]
+        (* iterate must be last in this list because it is the only one with infinitely many child nodes *)
         |> OSeq.of_list  
         |> OSeq.flat_map
           (fun (rule,rulename) -> 
             rule u v l 
             |> OSeq.map (fun subst -> (subst, rulename)))
         |> OSeq.map 
-          (fun (subst,rulename) -> 
-            let t_subst = nfapply subst t in
-            let s_subst = nfapply subst s in
-            let unifiers = unify_terms t_subst s_subst ~rules:(rules @ [rulename]) in
-            unifiers 
-            |> OSeq.map (CCOpt.map (fun unifier -> Subst.merge unifier subst))
-            (* We actually want to concatenate, but Subst.merge should do the job 
-               since the substitutes only contain fresh variables *)
+          (fun (osubst,rulename) -> 
+            match osubst with
+            | Some subst ->
+              let t_subst = nfapply subst t in
+              let s_subst = nfapply subst s in
+              let unifiers = unify_terms t_subst s_subst ~rules:(rules @ [rulename]) in
+              unifiers 
+              |> OSeq.map (CCOpt.map (fun unifier -> Subst.merge unifier subst))
+              (* We actually want to concatenate, but Subst.merge should do the job 
+                since the substitutes only contain fresh variables *)
+            | None -> OSeq.empty
           )
         |> dovetail 
         |> OSeq.append (OSeq.return None)
