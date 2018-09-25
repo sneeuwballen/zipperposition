@@ -171,7 +171,7 @@ let iterate u v l =
   if OSeq.is_empty positions 
   then OSeq.empty
   else 
-    types_w_seq 
+    types_w_seq
     |> OSeq.flat_map 
       (fun types_w -> 
         positions
