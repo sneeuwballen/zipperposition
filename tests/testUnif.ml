@@ -346,7 +346,7 @@ let test_jp_unif = "JP unification", `Quick, fun () ->
   let term = pterm ~ty:"term" "X a b" in
   let result = 
     JP_unif.project_onesided term 
-    |> OSeq.map (fun subst -> Lambda.snf (Subst.FO.apply S.Renaming.none subst (term,0)))
+    |> OSeq.map (fun subst -> Lambda.snf (JP_unif.S.apply subst term))
     |> OSeq.to_list in
   let expected = [pterm "a"; pterm "b"] in
   OUnit.assert_equal expected result;
@@ -355,7 +355,7 @@ let test_jp_unif = "JP unification", `Quick, fun () ->
   let term2 = pterm "f c d" in
   let results = 
     JP_unif.imitate term1 term2 []
-    |> OSeq.map (fun subst -> Lambda.snf (Subst.FO.apply S.Renaming.none subst (term1,0)))
+    |> OSeq.map (fun subst -> Lambda.snf (JP_unif.S.apply subst term1))
     |> OSeq.to_array in
   OUnit.assert_equal 1 (Array.length results);
   check_variant (results.(0)) (pterm ~ty:"term" "f (X0 a b) (Y0 a b)");
@@ -365,8 +365,8 @@ let test_jp_unif = "JP unification", `Quick, fun () ->
   let substs = JP_unif.identify term1 term2 [] in
   OUnit.assert_equal 1 (OSeq.length substs);
   let subst = OSeq.nth 0 substs in
-  let result1 = Lambda.snf (Subst.FO.apply S.Renaming.none subst (term1,0)) in
-  let result2 = Lambda.snf (Subst.FO.apply S.Renaming.none subst (term2,0)) in
+  let result1 = Lambda.snf (JP_unif.S.apply subst term1) in
+  let result2 = Lambda.snf (JP_unif.S.apply subst term2) in
   check_variant (result1) 
     (T.app (pterm ~ty:"term -> term -> term -> term -> term" "X1") 
       [pterm "a"; pterm "b";pterm ~ty:"term" "Y1 a b"; pterm ~ty:"term" "Z1 a b"]);
@@ -392,7 +392,7 @@ let test_jp_unif = "JP unification", `Quick, fun () ->
     | None -> false
     | Some s ->
       let expected = pterm ~ty:"term" "g (g (g (g a)))" in
-      let result = Lambda.snf (Subst.FO.apply S.Renaming.none s (term1,0)) in
+      let result = Lambda.snf (JP_unif.S.apply s term1) in
       Unif.FO.are_variant expected result
   ) substs);
 
@@ -405,9 +405,9 @@ let test_jp_unif = "JP unification", `Quick, fun () ->
     match subst with
     | None -> false
     | Some s ->
-      Unif.FO.are_variant (Lambda.snf (Subst.FO.apply S.Renaming.none s (pterm "y5",0))) (pterm "g") &&
-      Unif.FO.are_variant (Lambda.snf (Subst.FO.apply S.Renaming.none s (pterm "x5",0))) (pterm "a") &&
-      Unif.FO.are_variant (Lambda.snf (Subst.FO.apply S.Renaming.none s (pterm "z5",0)))
+      Unif.FO.are_variant (Lambda.snf (JP_unif.S.apply s (pterm "y5"))) (pterm "g") &&
+      Unif.FO.are_variant (Lambda.snf (JP_unif.S.apply s (pterm "x5"))) (pterm "a") &&
+      Unif.FO.are_variant (Lambda.snf (JP_unif.S.apply s (pterm "z5")))
         (pterm ~ty:"(term -> term) -> term -> term" "fun (z : term -> term). fun (x : term). x6 (z x)")
   ) substs);
 
@@ -420,7 +420,7 @@ let test_jp_unif = "JP unification", `Quick, fun () ->
     | None -> false
     | Some s ->
       let expected = pterm ~ty:"(term -> term) -> term" "fun z. z a" in
-      let result = Lambda.snf (Subst.FO.apply S.Renaming.none s (pterm "x9",0)) in
+      let result = Lambda.snf (JP_unif.S.apply s (pterm "x9")) in
       Unif.FO.are_variant expected result
   ) substs);
 
@@ -434,7 +434,7 @@ let test_jp_unif = "JP unification", `Quick, fun () ->
     | None -> false
     | Some s ->
       let expected = pterm ~ty:"(term -> term) -> term" "fun (z : term -> term). z9 (fun (w : alpha). z a)" in
-      let result = Lambda.snf (Subst.FO.apply S.Renaming.none s (pterm "x9",0)) in
+      let result = Lambda.snf (JP_unif.S.apply s (pterm "x9")) in
       Unif.FO.are_variant expected result
   ) substs);
 
@@ -445,14 +445,40 @@ let test_jp_unif = "JP unification", `Quick, fun () ->
   let substs = JP_unif.unify_nonterminating term1 term2 in
   OUnit.assert_equal 1 (OSeq.length substs);
   let subst = OSeq.nth 0 substs in
-  check_variant term2 (Subst.FO.apply S.Renaming.none subst (term1,0));
+  check_variant term2 (JP_unif.S.apply subst term1);
 
   let term1 = pterm "f_ho2 (a_poly term) (a_poly term)" in
   let term2 = pterm "f_ho2 x8 x8" in
   let substs = JP_unif.unify_nonterminating term1 term2 in
   OUnit.assert_equal 1 (OSeq.length substs);
   let subst = OSeq.nth 0 substs in
-  check_variant term1 (Subst.FO.apply S.Renaming.none subst (term2,0));
+  check_variant term1 (JP_unif.S.apply subst term2);
+
+  (* Example from "Higher-Order Unification, Polymorphism, and Subsorts (Extended Abstract)" by T. Nipkow *)
+  let term1 = pterm ~ty:"term" "(fun (y : term). y) (x10 ((fun (z : beta). z) y10))" in
+  let term2 = pterm ~ty:"term" "a" in
+  let substs = JP_unif.unify term1 term2 in
+  OUnit.assert_bool "Unif exists" (OSeq.exists (fun subst ->
+    match subst with
+    | None -> false
+    | Some s ->
+      let expected1 = pterm "fun (z : term -> term). z (z (z a))" in
+      let result1 = Lambda.snf (JP_unif.S.apply s (pterm "x10")) in
+      let expected2 = pterm "fun (z : term). z" in
+      let result2 = Lambda.snf (JP_unif.S.apply s (pterm "y10")) in
+      Unif.FO.are_variant expected1 result1 && Unif.FO.are_variant expected2 result2
+  ) substs);
+  OUnit.assert_bool "Unif exists" (OSeq.exists (fun subst ->
+    match subst with
+    | None -> false
+    | Some s ->
+      (* The example actually states the unifier "z (x11 z) (y11 z)", but the following equally general unifier comes out of our procedure: *)
+      let expected1 = pterm "fun (z : alpha -> beta -> term). z (x11 z) (y11 z (z (x11 z)))" in
+      let result1 = Lambda.eta_reduce (Lambda.snf (JP_unif.S.apply s (pterm "x10"))) in
+      let expected2 = pterm "fun (x : alpha) (y : beta). a" in
+      let result2 = Lambda.snf (JP_unif.S.apply s (pterm "y10")) in
+      Unif.FO.are_variant expected1 result1 && Unif.FO.are_variant expected2 result2
+  ) substs);  
 
   ()
 
