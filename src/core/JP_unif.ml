@@ -279,36 +279,6 @@ let find_disagreement s t =
         | OSeq.Cons (d, _) -> Some d
       end
 
-
-(* TODO: Replace by the updated OSeq.merge *)
-(** Dovetailing through a sequence of sequences:
-    (0,0),(1,0),(0,1),(2,0),(1,1),(0,2),(3,0),(2,1),(1,2),(0,3),(4,0),(3,1),(2,2),(1,3),(0,4),... *)
-let dovetail seqs () =
-  let rec aux passive_seqs active_seqs () =
-    match passive_seqs() with 
-    | OSeq.Nil -> 
-      (* All seqs are active now *)
-      if CCList.is_empty active_seqs 
-      then Seq.empty ()
-      else
-        let line, tail = get_line active_seqs in
-        OSeq.append line (aux passive_seqs tail) ()
-    | OSeq.Cons (new_seq, passive_seqs') ->
-      (* Move new seq from passive to active *)
-      let active_seqs = new_seq :: active_seqs in
-      let line, active_seqs = get_line active_seqs in
-      OSeq.append line (aux passive_seqs' active_seqs) ()
-  and get_line active_seqs =
-    (* Retrieve the head of each active sequence & remove empty active sequences from the list *)
-    CCList.fold_right
-      (fun seq (line, active_seqs) ->
-        match seq() with
-        | OSeq.Nil -> (line, active_seqs)
-        | OSeq.Cons (read, seq') -> (OSeq.cons read line, seq' :: active_seqs)
-      ) active_seqs (OSeq.empty, [])
-  in
-  aux seqs [] () (* Initially, all seqs are passive *)
-
 let unify t s = 
   let rec unify_terms ?(rules = []) t s  =
     (* Util.debugf 1 "@[Unify@ @[(rules: %a)@]@ @[%a@]@ and@ @[%a@]@]" (fun k -> k (CCList.pp CCString.pp) rules T.pp t T.pp s); *)
@@ -333,7 +303,7 @@ let unify t s =
               |> OSeq.map (CCOpt.map (fun unifier -> S.append subst unifier))
             | None -> OSeq.empty
           )
-        |> dovetail 
+        |> OSeq.merge 
         |> OSeq.append (OSeq.return None)
       | None -> 
         assert (t == s);
