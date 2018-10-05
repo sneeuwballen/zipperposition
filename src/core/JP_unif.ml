@@ -11,7 +11,7 @@ type subst = Subst.t Sequence.t
 
 module S = struct
 
-  let empty = Sequence.empty
+  let (empty : subst) = Sequence.empty
   
   let add s (v:T.var) t = Sequence.snoc s ((Subst.FO.bind Subst.empty ((v,scope):>InnerTerm.t HVar.t Scoped.t)) (t,scope)) 
 
@@ -23,7 +23,7 @@ module S = struct
 
   let apply s t = s |> Sequence.fold (fun term subst -> Subst.FO.apply Subst.Renaming.none subst (term, scope)) t
 
-  let apply_ty s ty = s |> Sequence.fold (fun term subst -> Subst.Ty.apply Subst.Renaming.none subst (ty, scope)) ty
+  let apply_ty s ty = s |> Sequence.fold (fun _ subst -> Subst.Ty.apply Subst.Renaming.none subst (ty, scope)) ty
 
 end
 
@@ -149,7 +149,7 @@ let eliminate _ _ l =
 
 (** {5 Iteration rule} *)
 
-let iterate_one types_w v prefix_types return_type i type_ul =
+let iterate_one types_w prefix_types return_type i type_ul =
   let prefix_types_ul, return_type_ul = Type.open_fun type_ul in
   (* create substitution: v |-> λ u1 ... um. x u1 ... um (λ w. ui (y1 (u1...um w)) ... (yn (u1...um w))) *)
   let inner_lambda_expr = 
@@ -205,7 +205,7 @@ let iterate u v l =
         |> OSeq.map
           (fun (v, prefix_types, return_type, i, type_ul) -> 
             if Type.is_fun type_ul 
-            then Some (S.singleton v (iterate_one types_w v prefix_types return_type i type_ul))
+            then Some (S.singleton v (iterate_one types_w prefix_types return_type i type_ul))
             else 
               (* To get a complete polymorphic algorithm, we need to consider the case that a type variable could be instantiated as a function. *)
               match Type.view type_ul with
@@ -217,7 +217,7 @@ let iterate u v l =
                   let v' = HVar.cast ~ty:(S.apply_ty ty_subst (HVar.ty v)) v in
                   let prefix_types' = prefix_types |> CCList.map (S.apply_ty ty_subst) in
                   let return_type' = S.apply_ty ty_subst return_type in
-                  Some (S.add ty_subst v' (iterate_one types_w v' prefix_types' return_type' i alpha'))
+                  Some (S.add ty_subst v' (iterate_one types_w prefix_types' return_type' i alpha'))
                 | _ -> None
           )
         (* Append some "None"s to delay the substitutions containing long w tuples *)
@@ -271,7 +271,7 @@ let find_disagreement s t =
       | _ -> OSeq.return ((s, t),[])
   in
   let s = find_disagreement_aux s t in
-  match OSeq.find (fun ((u,v),l) -> CCList.is_empty l) s with
+  match OSeq.find (fun ((_,_),l) -> CCList.is_empty l) s with
     | Some d -> Some d
     | None -> 
       begin match s () with
