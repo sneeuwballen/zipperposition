@@ -323,7 +323,6 @@ let reg_matching1 = "regression matching", `Quick, fun () ->
 (** Jensen-Pietrzykowski Unification tests *)
 let test_jp_unif = "JP unification", `Quick, fun () ->
   Printexc.record_backtrace true;
-  CCFormat.set_color_default true;
   Util.set_debug 1;
   InnerTerm.show_type_arguments := true;
 
@@ -478,7 +477,7 @@ let test_jp_unif = "JP unification", `Quick, fun () ->
       let expected2 = pterm "fun (x : alpha) (y : beta). a" in
       let result2 = Lambda.snf (JP_unif.S.apply s (pterm "y10")) in
       Unif.FO.are_variant expected1 result1 && Unif.FO.are_variant expected2 result2
-  ) substs);  
+  ) substs); 
 
   ()
 
