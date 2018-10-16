@@ -10,8 +10,8 @@ type var = T.t HVar.t
 
 module VarInt = struct
   type t = var Scoped.t
-  let compare = Scoped.compare (HVar.compare T.compare)
-  let equal = Scoped.equal (HVar.equal T.equal)
+  let compare = Scoped.compare (fun a b -> CCOrd.int (HVar.id a) (HVar.id b))
+  let equal = Scoped.equal (fun a b -> HVar.id a = HVar.id b)
   let hash = Scoped.hash HVar.hash
 end
 

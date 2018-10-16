@@ -7,29 +7,27 @@ module T = Term
 
 let scope = 0 (* TODO: scopes *)
 
-type subst = Subst.t Sequence.t
+type subst = Subst.t
 
 module S = struct
 
-  let (empty : subst) = Sequence.empty
+  let (empty : subst) = Subst.empty
   
-  let add s (v:T.var) t = Sequence.snoc s ((Subst.FO.bind Subst.empty ((v,scope):>InnerTerm.t HVar.t Scoped.t)) (t,scope)) 
+  let add s (v:T.var) (t:T.t) = Subst.bind s ((v,scope):>InnerTerm.t HVar.t Scoped.t) ((t:>InnerTerm.t),scope)
 
-  let append = Sequence.append
+  let merge = Subst.merge
 
   let singleton (v:T.var) t = add empty v t
 
-  let of_subst s = Sequence.singleton s
+  let apply s t = Subst.FO.apply Subst.Renaming.none s (t, scope)
 
-  let apply s t = s |> Sequence.fold (fun term subst -> Subst.FO.apply Subst.Renaming.none subst (term, scope)) t
-
-  let apply_ty s ty = s |> Sequence.fold (fun _ subst -> Subst.Ty.apply Subst.Renaming.none subst (ty, scope)) ty
+  let apply_ty s ty = Subst.Ty.apply Subst.Renaming.none s (ty, scope)
 
 end
 
 let unif_ty t s = 
   try 
-    let type_unifier = S.of_subst (Unif.Ty.unify_syn ~subst:Subst.empty (t, scope) (s, scope)) in
+    let type_unifier = Unif.Ty.unify_syn ~subst:Subst.empty (t, scope) (s, scope) in
     Some type_unifier
   with Unif.Fail -> None
 
@@ -300,14 +298,15 @@ let unify t s =
               let s_subst = nfapply subst s in
               let unifiers = unify_terms t_subst s_subst ~rules:(rules @ [rulename]) in
               unifiers 
-              |> OSeq.map (CCOpt.map (fun unifier -> S.append subst unifier))
+              |> OSeq.map (CCOpt.map (fun unifier -> S.merge subst unifier))
+              (* We actually want to compose the substitutions here, but merge will have the same effect. *)
             | None -> OSeq.empty
           )
         |> OSeq.merge 
         |> OSeq.append (OSeq.return None)
       | None -> 
         assert (t == s);
-        Util.debugf 1 "@[...unified!@ @[(rules: %a)@]@]" (fun k -> k (CCList.pp CCString.pp) rules); 
+        (*Util.debugf 1 "@[...unified!@ @[(rules: %a)@]@]" (fun k -> k (CCList.pp CCString.pp) rules); *)
         OSeq.return (Some S.empty)
   in
   (* Unify types first ... *)
@@ -317,7 +316,7 @@ let unify t s =
       let s' = nfapply type_unifier s in
       (* ... then terms. *)
       let term_unifiers = unify_terms t' s' ~rules:[] in
-      OSeq.map (CCOpt.map (S.append type_unifier)) term_unifiers
+      OSeq.map (CCOpt.map (S.merge type_unifier)) term_unifiers
     | None -> OSeq.empty
 
 (* TODO: Remove tracking of rules for efficiency? *)
