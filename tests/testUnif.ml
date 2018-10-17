@@ -218,23 +218,31 @@ module Action : sig
   type 'a t = private
     | Yield of {t: 'a ; ty: 'a option}
     | Eq of {t1: 'a; sc1:int; t2: 'a; sc2: int; ty: 'a option}
+    | Eqs of {ts: ('a * 'a * 'a option) list}
+    | Count of {count : int}
 
   val yield : string -> string t
   val eq : string -> int -> string -> int -> string t
+  val eqs : (string * string * string option) list -> string t
+  val count : int -> string t
   val set_with_ty : 'a -> 'a t -> 'a t
   val parse : string t -> T.t t
-  val check : T.t -> T.t -> T.t t -> unit Alcotest.test_case
 end = struct
   type 'a t =
     | Yield of {t: 'a ; ty: 'a option}
     | Eq of {t1: 'a; sc1:int; t2: 'a; sc2: int; ty: 'a option}
+    | Eqs of {ts: ('a * 'a * 'a option) list}
+    | Count of {count : int}
 
   let eq t1 sc1 t2 sc2 = Eq{t1;t2;sc1;sc2;ty=None}
+  let eqs ts = Eqs{ts}
   let yield t = Yield{t; ty=None}
+  let count count = Count{count}
 
   let set_with_ty ty = function
     | Yield r -> Yield {r with ty=Some ty}
     | Eq r -> Eq {r with ty=Some ty}
+    | _ as a -> a
 
   (* parse action *)
   let parse : string t -> T.t t = function
@@ -244,10 +252,15 @@ end = struct
     | Eq r ->
       let t1, t2 = pterm2 ~unif_types:false ?ty:r.ty r.t1 r.t2 in
       Eq {t1; t2; sc1=r.sc1; sc2=r.sc2; ty=None}
+    | Eqs {ts} -> 
+      let ts = CCList.map (fun (t1, t2, ty) -> 
+          let t1, t2 = pterm2 ~unif_types:false ?ty t1 t2 in
+          t1, t2, None
+        ) ts 
+      in
+      Eqs {ts}
+    | Count c -> Count c
 
-  let check t u a = match a with
-    | Yield {t=res;_} -> check_unifier t u ~res
-    | Eq {t1;t2;sc1;sc2;_} -> check_same t u t1 sc1 t2 sc2
 end
 
 let suite_unif1 : unit Alcotest.test_case list =
@@ -255,18 +268,25 @@ let suite_unif1 : unit Alcotest.test_case list =
   let (<?>) a b = Task.mk_unif ~negated:true a b in (* unif pair *)
   let (>->) a b = Task.set_with_ty b a in (* specify return type *)
   let (>?->) a b = Action.set_with_ty b a in (* specify return type *)
+
+  let check_action t u a = match a with
+    | Action.Yield {t=res;_} -> check_unifier t u ~res
+    | Action.Eq {t1;t2;sc1;sc2;_} -> check_same t u t1 sc1 t2 sc2
+    | Action.Eqs _ -> assert false
+    | Action.Count _ -> assert false in
+
   let mk_tests (pair,actions) =
     let t, u = Task.parse pair in
     let actions = List.map Action.parse actions in
     clear_scope();
     if Task.is_negated pair then
       check_unifiable ~negated:true t u ::
-      List.map (Action.check t u) actions
+      CCList.map (check_action t u) actions
     else (
       check_unifiable t u ::
       check_unify_correct t u ::
       check_unifier_matches t u ::
-      List.map (Action.check t u) actions
+      CCList.map (check_action t u) actions
     )
   in
   CCList.flat_map mk_tests
@@ -308,6 +328,137 @@ let suite_unif1 : unit Alcotest.test_case list =
       ( "F (g_ho F)" <?> "a_poly A") |> Task.set_unif_types false, [];
     ]
 
+let jp_check_count t u count : unit Alcotest.test_case =
+  "JP-unif check count", `Quick, fun () ->
+    let t' = JP_unif.unify_nonterminating t u in
+    if count = OSeq.length t' then ()
+    else
+      Alcotest.failf
+        "@[<hv>Found %d unifiers instead of %d@]" (OSeq.length t') count
+
+let jp_check_nonunifiable ?(msg="") t u : unit Alcotest.test_case =
+  "JP-unif check nonunifiable", `Quick, fun () ->
+  if OSeq.for_all CCOpt.is_none (OSeq.take 20 (JP_unif.unify t u)) then ()
+  else (
+    Alcotest.failf
+      "@[<2>`%a`@ should not unify with @ `%a`%s@]@."
+        T.ZF.pp t T.ZF.pp u msg
+  )
+
+let jp_check_unifier t u ~res =
+  "JP-unif check unifier", `Quick, fun () ->
+  let is_res subst = match subst with
+    | None -> false
+    | Some s ->
+      let found = Lambda.snf (JP_unif.S.apply s t) in
+      Unif.FO.are_variant res found 
+  in
+  let unifiers = JP_unif.unify t u in
+  if OSeq.exists is_res unifiers then () 
+  else (
+    Alcotest.failf
+      "@[<2>`%a`@ and `%a`@ should unify as @ `%a`@]@."
+        T.ZF.pp t T.ZF.pp u T.ZF.pp res
+  )
+
+let jp_check_eqs t u ts =
+  "JP-unif check equalities", `Quick, fun () ->
+  let is_res subst = match subst with
+    | None -> false
+    | Some s ->
+      CCList.for_all (fun (t1,t2,_) -> 
+        let t1 = Lambda.eta_reduce (Lambda.snf (JP_unif.S.apply s t1)) in
+        let t2 = Lambda.eta_reduce (Lambda.snf (JP_unif.S.apply s t2)) in
+        Unif.FO.are_variant t1 t2 
+      ) ts
+  in
+  let unifiers = JP_unif.unify t u in
+  if OSeq.exists is_res unifiers then () 
+  else (
+    Alcotest.failf
+      "@[<2>`%a`@ and `%a`@ should unify this list: @ `%a`@]@."
+        T.ZF.pp t T.ZF.pp u (CCList.pp (CCPair.pp T.ZF.pp T.ZF.pp)) (CCList.map (fun (t1, t2, _) -> t1, t2) ts)
+  )
+
+let suite_jp_unif : unit Alcotest.test_case list =
+  let (=?=) a b = Task.mk_unif a b in (* unif pair *)
+  let (<?>) a b = Task.mk_unif ~negated:true a b in (* unif pair *)
+  let (>->) a b = Task.set_with_ty b a in (* specify return type *)
+  let (>?->) a b = Action.set_with_ty b a in (* specify return type *)
+  let mk_tests (pair,actions) =
+    let t, u = Task.parse pair in
+    let actions = List.map Action.parse actions in
+    clear_scope();
+    if Task.is_negated pair then
+      [jp_check_nonunifiable t u]
+    else 
+      actions |> CCList.flat_map  (fun action -> match action with
+        | Action.Count {count} -> [jp_check_count t u count]
+        | Action.Yield {t=res;_} -> [jp_check_unifier t u ~res]
+        | Action.Eqs {ts} -> [jp_check_eqs t u ts]
+        | _ -> assert false
+      ) 
+  in
+
+  CCList.flat_map mk_tests
+    [ "X a" =?= "Y b" >-> "term", [
+          Action.count 17
+        ];
+
+      "X a" <?> "g (X a)" >-> "term", [];
+
+      "(g (X a))" =?= "(X (g a))" >-> "term", [
+          Action.yield "g (g (g (g a)))" >?-> "term"
+        ];
+
+      (* Example 3 in the Jensen-Pietrzykowski paper *)
+      (* Small hack: I added "(fun (x : term). x)" to declare the types of Y and X *)
+      "Z (fun (zz : term). (fun (x : term). x) (Y zz)) ((fun (x : term). x) X)" =?= "Z (fun (zz : term). zz) (g a)" >-> "term", [
+          Action.eqs [
+            "X", "a", None; 
+            "Y", "g", None; 
+            "Z", "fun (z : term -> term). fun (x : term). X0 (z x)", Some "(term -> term) -> term -> term"
+          ]
+        ];
+
+      (* Iterate on head of disagreement pair *)
+      "X g" =?= "g a" >-> "term", [
+          Action.eqs [
+            "X", "fun z. z a", Some "(term -> term) -> term"
+          ]
+        ];
+
+      (* Iterate with non-empty w tuple *)
+      "X (fun z. f z a)" =?= "X (fun z. f a z)" >-> "term", [
+          Action.eqs ["X", "fun (z : term -> term). Z (fun (w : alpha). z a)", Some "(term -> term) -> term"]
+        ];
+
+
+      (* Polymorphism *)
+
+      "fun (x : alpha). x" =?= "fun (x : term). x" |> Task.set_unif_types false, [
+          Action.count 1
+        ];
+
+      "f_ho2 (a_poly term) (a_poly term)" =?= "f_ho2 X X" |> Task.set_unif_types false, [
+          Action.count 1
+        ];
+
+      (* Example from "Higher-Order Unification, Polymorphism, and Subsorts (Extended Abstract)" by T. Nipkow *)
+      "(fun (y : term). y) (X ((fun (z : beta). z) Y))" =?= "a" >-> "term" |> Task.set_unif_types false, [
+        Action.eqs [
+              "X", "fun (z : term -> term). z (z (z a))", None;
+              "Y", "fun (z : term). z", None
+          ];
+        Action.eqs[ 
+          (* The example actually states the unifier "z (X z) (Y z)", but the following equally general unifier comes out of our procedure: *)
+              "X", "fun (z : alpha -> gamma -> term). z (X000 z) (Y000 z (z (X000 z)))", None;
+              "Y", "fun (x : alpha) (y : gamma). a", None 
+          ]
+      ]
+
+    ]
+
 let reg_matching1 = "regression matching", `Quick, fun () ->
   let t1, t2 =
     pterm "p_ho2 (fun a. F a) (fun a. F a)",
@@ -320,11 +471,8 @@ let reg_matching1 = "regression matching", `Quick, fun () ->
   with Unif.Fail -> ()
 
 
-(** Jensen-Pietrzykowski Unification tests *)
-let test_jp_unif = "JP unification", `Quick, fun () ->
-  Printexc.record_backtrace true;
-  Util.set_debug 1;
-  InnerTerm.show_type_arguments := true;
+(** Jensen-Pietrzykowski auxiliary functions tests *)
+let test_jp_unif_aux = "JP unification", `Quick, fun () ->
 
   (** Find disagreement tests *)
 
@@ -350,6 +498,8 @@ let test_jp_unif = "JP unification", `Quick, fun () ->
   let expected = [pterm "a"; pterm "b"] in
   OUnit.assert_equal expected result;
 
+  clear_scope ();
+
   let term1 = pterm ~ty:"term" "X a b" in
   let term2 = pterm "f c d" in
   let results = 
@@ -357,7 +507,9 @@ let test_jp_unif = "JP unification", `Quick, fun () ->
     |> OSeq.map (fun subst -> Lambda.snf (JP_unif.S.apply subst term1))
     |> OSeq.to_array in
   OUnit.assert_equal 1 (Array.length results);
-  check_variant (results.(0)) (pterm ~ty:"term" "f (X0 a b) (Y0 a b)");
+  check_variant (results.(0)) (pterm ~ty:"term" "f (X a b) (Y a b)");
+
+  clear_scope ();
 
   let term1 = pterm ~ty:"term" "X a b" in
   let term2 = pterm ~ty:"term" "Y c d" in
@@ -368,122 +520,16 @@ let test_jp_unif = "JP unification", `Quick, fun () ->
   let result2 = Lambda.snf (JP_unif.S.apply subst term2) in
   check_variant (result1) 
     (T.app (pterm ~ty:"term -> term -> term -> term -> term" "X1") 
-      [pterm "a"; pterm "b";pterm ~ty:"term" "Y1 a b"; pterm ~ty:"term" "Z1 a b"]);
+      [pterm "a"; pterm "b";pterm ~ty:"term" "Y a b"; pterm ~ty:"term" "Z a b"]);
   check_variant (result2) 
     (T.app (pterm ~ty:"term -> term -> term -> term -> term" "X1") 
-      [pterm ~ty:"term" "Y1 c d"; pterm ~ty:"term" "Z1 c d"; pterm "c"; pterm "d"]);
-
-  (** Unification tests *)
-
-  let term1 = pterm ~ty:"term" "X2 a" in
-  let term2 = pterm ~ty:"term" "Y2 b" in
-  OUnit.assert_equal 17 (OSeq.length (JP_unif.unify_nonterminating term1 term2));
-
-  let term1 = pterm ~ty:"term" "X3 a" in
-  let term2 = pterm ~ty:"term" "g (X3 a)" in
-  OUnit.assert_bool "all None" (OSeq.for_all CCOpt.is_none (OSeq.take 20 (JP_unif.unify term1 term2)));
-
-  let term1 = pterm ~ty:"term" "(g (x4 a))" in
-  let term2 = pterm ~ty:"term" "(x4 (g a))" in
-  let substs = JP_unif.unify term1 term2 in
-  OUnit.assert_bool "Unif exists" (OSeq.exists (fun subst ->
-    match subst with
-    | None -> false
-    | Some s ->
-      let expected = pterm ~ty:"term" "g (g (g (g a)))" in
-      let result = Lambda.snf (JP_unif.S.apply s term1) in
-      Unif.FO.are_variant expected result
-  ) substs);
-
-  (* Example 3 in the Jensen-Pietrzykowski paper *)
-  (* Small hack: I added "(fun (x : term). x)" to declare the types of y5 and x5 *)
-  let term1 = Lambda.snf (pterm ~ty:"term" "z5 (fun (zz : term). (fun (x : term). x) (y5 zz)) ((fun (x : term). x) x5)") in
-  let term2 = Lambda.snf (pterm ~ty:"term" "z5 (fun (zz : term). zz) (g a)") in
-  let substs = JP_unif.unify term1 term2 in
-  OUnit.assert_bool "Unif exists (ex3)" (OSeq.exists (fun subst -> 
-    match subst with
-    | None -> false
-    | Some s ->
-      Unif.FO.are_variant (Lambda.snf (JP_unif.S.apply s (pterm "y5"))) (pterm "g") &&
-      Unif.FO.are_variant (Lambda.snf (JP_unif.S.apply s (pterm "x5"))) (pterm "a") &&
-      Unif.FO.are_variant (Lambda.snf (JP_unif.S.apply s (pterm "z5")))
-        (pterm ~ty:"(term -> term) -> term -> term" "fun (z : term -> term). fun (x : term). x6 (z x)")
-  ) substs);
-
-  (* Iterate on head of disagreement pair *)
-  let term1 = pterm ~ty:"term" "x9 g" in
-  let term2 = pterm "g a" in
-  let substs = JP_unif.unify term1 term2 in
-  OUnit.assert_bool "Unif exists" (OSeq.exists (fun subst ->
-    match subst with
-    | None -> false
-    | Some s ->
-      let expected = pterm ~ty:"(term -> term) -> term" "fun z. z a" in
-      let result = Lambda.snf (JP_unif.S.apply s (pterm "x9")) in
-      Unif.FO.are_variant expected result
-  ) substs);
-
-  (* Iterate with non-empty w tuple *)
-  let term1 = pterm ~ty:"term" "x9 (fun z. f z a)" in
-  let term2 = pterm ~ty:"term" "x9 (fun z. f a z)" in
-  let substs = JP_unif.unify term1 term2 in
-  (*Util.debugf 1 "RES %a" (fun k -> k (OSeq.pp (CCOpt.pp Subst.pp)) substs);*)
-  OUnit.assert_bool "Unif exists" (OSeq.exists (fun subst ->
-    match subst with
-    | None -> false
-    | Some s ->
-      let expected = pterm ~ty:"(term -> term) -> term" "fun (z : term -> term). z9 (fun (w : alpha). z a)" in
-      let result = Lambda.snf (JP_unif.S.apply s (pterm "x9")) in
-      Unif.FO.are_variant expected result
-  ) substs);
-
-  (* Polymorphism *)
-
-  let term1 = pterm "fun (x7 : alpha). x7" in
-  let term2 = pterm "fun (x7 : term). x7" in
-  let substs = JP_unif.unify_nonterminating term1 term2 in
-  OUnit.assert_equal 1 (OSeq.length substs);
-  let subst = OSeq.nth 0 substs in
-  check_variant term2 (JP_unif.S.apply subst term1);
-
-  let term1 = pterm "f_ho2 (a_poly term) (a_poly term)" in
-  let term2 = pterm "f_ho2 x8 x8" in
-  let substs = JP_unif.unify_nonterminating term1 term2 in
-  OUnit.assert_equal 1 (OSeq.length substs);
-  let subst = OSeq.nth 0 substs in
-  check_variant term1 (JP_unif.S.apply subst term2);
-
-  (* Example from "Higher-Order Unification, Polymorphism, and Subsorts (Extended Abstract)" by T. Nipkow *)
-  let term1 = pterm ~ty:"term" "(fun (y : term). y) (x10 ((fun (z : beta). z) y10))" in
-  let term2 = pterm ~ty:"term" "a" in
-  let substs = JP_unif.unify term1 term2 in
-  OUnit.assert_bool "Unif exists" (OSeq.exists (fun subst ->
-    match subst with
-    | None -> false
-    | Some s ->
-      let expected1 = pterm "fun (z : term -> term). z (z (z a))" in
-      let result1 = Lambda.snf (JP_unif.S.apply s (pterm "x10")) in
-      let expected2 = pterm "fun (z : term). z" in
-      let result2 = Lambda.snf (JP_unif.S.apply s (pterm "y10")) in
-      Unif.FO.are_variant expected1 result1 && Unif.FO.are_variant expected2 result2
-  ) substs);
-  OUnit.assert_bool "Unif exists" (OSeq.exists (fun subst ->
-    match subst with
-    | None -> false
-    | Some s ->
-      (* The example actually states the unifier "z (x11 z) (y11 z)", but the following equally general unifier comes out of our procedure: *)
-      let expected1 = pterm "fun (z : alpha -> beta -> term). z (x11 z) (y11 z (z (x11 z)))" in
-      let result1 = Lambda.eta_reduce (Lambda.snf (JP_unif.S.apply s (pterm "x10"))) in
-      let expected2 = pterm "fun (x : alpha) (y : beta). a" in
-      let result2 = Lambda.snf (JP_unif.S.apply s (pterm "y10")) in
-      Unif.FO.are_variant expected1 result1 && Unif.FO.are_variant expected2 result2
-  ) substs); 
+      [pterm ~ty:"term" "Y c d"; pterm ~ty:"term" "Z c d"; pterm "c"; pterm "d"]);
 
   ()
 
-let suite_unif2 = [ reg_matching1; test_jp_unif ]
+let suite_unif2 = [ reg_matching1; test_jp_unif_aux ]
 
-let suite = suite_unif1 @ suite_unif2
+let suite = suite_unif1 @ suite_unif2 @ suite_jp_unif
 
 
 (** {2 Properties} *)
