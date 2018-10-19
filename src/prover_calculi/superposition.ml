@@ -260,9 +260,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         |> Lits.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord ~subterms:true ~eligible:(fun _ _ -> true)
         |> Sequence.fold_while
           (fun unique_args (t,_) ->
-             if Head.term_to_head t == Head.term_to_head var
+             if Term.equal (fst (T.as_app t)) var
              then (
-               if unique_args == Some (Head.term_to_args t)
+               if unique_args == Some (snd (T.as_app t))
                then (unique_args, `Continue) (* found the same arguments of var again *)
                else (None, `Stop) (* different arguments of var found *)
              ) else (unique_args, `Continue) (* this term doesn't have var as head *)
