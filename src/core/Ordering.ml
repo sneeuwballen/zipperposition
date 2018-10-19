@@ -72,9 +72,48 @@ module type ORD = sig
   val name : string
 end
 
-(** {2 Ordering implementations} *)
+module Head = struct
+  type var = Type.t HVar.t
 
-(* compare the two symbols (ID or builtin) using the precedence *)
+  module T = Term
+
+  type t =
+    | I of ID.t
+    | B of Builtin.t
+    | V of var
+    | DB of int
+    | LAM
+
+  let pp out = function
+    | I id -> ID.pp out id
+    | B b -> Builtin.pp out b
+    | V x -> HVar.pp out x
+    | DB i -> CCInt.pp out i
+    | LAM -> CCString.pp out "LAM"
+
+  let rec term_to_head s =
+    match T.view s with
+      | T.App (f,_) ->          term_to_head f
+      | T.AppBuiltin (fid,_) -> B fid
+      | T.Const fid ->          I fid
+      | T.Var x ->              V x
+      | T.DB i ->               DB i
+      | T.Fun _ ->              LAM
+
+  let term_to_args s =
+    match T.view s with
+      | T.App (_,ss) -> ss
+      | T.AppBuiltin (_,ss) -> ss
+      (* The orderings treat lambda-expressions like a "LAM" symbol applied to the body of the lambda-expression *)
+      | T.Fun (_,t) -> [t] 
+      | _ -> []
+
+  let to_string = CCFormat.to_string pp
+end
+
+(** {3 Ordering implementations} *)
+
+(* compare the two heads (ID or builtin or variable) using the precedence *)
 let prec_compare prec a b = match a,b with
   | Head.I a, Head.I b ->
     begin match Prec.compare prec a b with
@@ -88,87 +127,81 @@ let prec_compare prec a b = match a,b with
       | n when n > 0 -> Gt
       | _ -> Lt
     end
-  | Head.I _, Head.B _ -> Gt (* id > builtin *)
-  | Head.B _, Head.I _ -> Lt
-  | Head.V x, Head.V y -> if x=y then Eq else Incomparable
+  | Head.DB a, Head.DB b ->
+    begin match CCInt.compare a b  with
+      | 0 -> Eq
+      | n when n > 0 -> Gt
+      | _ -> Lt
+    end
+  | Head.LAM,  Head.LAM  -> Eq
+  | Head.I _,  Head.B _  -> Gt (* lam > db > id > builtin *)
+  | Head.B _,  Head.I _  -> Lt
+  | Head.DB _, Head.I _  -> Gt 
+  | Head.I _,  Head.DB _ -> Lt
+  | Head.DB _, Head.B _  -> Gt 
+  | Head.B _,  Head.DB _ -> Lt
+  | Head.LAM,  Head.DB _ -> Gt 
+  | Head.DB _, Head.LAM  -> Lt
+  | Head.LAM,  Head.I _  -> Gt 
+  | Head.I _,  Head.LAM  -> Lt
+  | Head.LAM,  Head.B _  -> Gt
+  | Head.B _,  Head.LAM  -> Lt
+
+  | Head.V x,  Head.V y -> if x=y then Eq else Incomparable
   | Head.V _, _ -> Incomparable
   | _, Head.V _ -> Incomparable
 
 let prec_status prec = function
   | Head.I s -> Prec.status prec s
   | Head.B Builtin.Eq -> Prec.Multiset
-  | Head.B _ -> Prec.LengthLexicographic
-  | Head.V _ -> Prec.LengthLexicographic
-(* TODO: Variables should get a different status here. LengthLexicographic for variables
-   will only work as long as all other symbols are LengthLexicographic as well. *)
+  | _ -> Prec.LengthLexicographic
 
 module KBO : ORD = struct
   let name = "kbo"
 
-  (* small cache for allocated arrays *)
-  let alloc_cache = AllocCache.Arr.create ~buck_size:2 10
+  module TermHashtbl = CCHashtbl.Make(T)
 
   (** used to keep track of the balance of variables *)
   type var_balance = {
     offset : int;
     mutable pos_counter : int;
     mutable neg_counter : int;
-    mutable balance : int array;
+    mutable balance : CCInt.t TermHashtbl.t;
   }
 
   (** create a balance for the two terms *)
-  let mk_balance t1 t2: var_balance =
-    if T.is_ground t1 && T.is_ground t2
-    then (
-      { offset = 0; pos_counter = 0; neg_counter = 0; balance = [||]; }
-    ) else (
-      let vars = Sequence.of_list [t1; t2] |> Sequence.flat_map T.Seq.vars in
-      (* TODO: compute both at the same time *)
-      let minvar = T.Seq.min_var vars in
-      let maxvar = T.Seq.max_var vars in
-      assert (minvar <= maxvar);
-      (* width between min var and max var *)
-      let width = maxvar - minvar + 1 in
-      let vb = {
-        offset = minvar; (* offset of variables to 0 *)
-        pos_counter = 0;
-        neg_counter = 0;
-        balance = AllocCache.Arr.make alloc_cache width 0;
-      } in
-      Obj.set_tag (Obj.repr vb.balance) Obj.no_scan_tag;  (* no GC scan *)
-      vb
-    )
+  let mk_balance t1 t2 =
+    let numvars = Sequence.length (T.Seq.vars t1) + Sequence.length (T.Seq.vars t2) in
+    { offset = 0; pos_counter = 0; neg_counter = 0; balance = TermHashtbl.create numvars; }
 
   (** add a positive variable *)
-  let add_pos_var balance idx =
-    let idx = idx - balance.offset in
-    let n = balance.balance.(idx) in
+  let add_pos_var balance var =
+    let n = TermHashtbl.get_or balance.balance var ~default:0 in
     if n = 0
     then balance.pos_counter <- balance.pos_counter + 1
     else (
       if n = -1 then balance.neg_counter <- balance.neg_counter - 1
     );
-    balance.balance.(idx) <- n + 1
+    TermHashtbl.add balance.balance var (n + 1) 
 
   (** add a negative variable *)
-  let add_neg_var balance idx =
-    let idx = idx - balance.offset in
-    let n = balance.balance.(idx) in
+  let add_neg_var balance var =
+    let n = TermHashtbl.get_or balance.balance var ~default:0 in
     if n = 0
     then balance.neg_counter <- balance.neg_counter + 1
     else (
       if n = 1 then balance.pos_counter <- balance.pos_counter - 1
     );
-    balance.balance.(idx) <- n - 1
+    TermHashtbl.add balance.balance var (n - 1) 
 
   let weight prec = function
     | Head.B _ -> W.int 1
     | Head.I s -> Prec.weight prec s
-    | Head.V _ -> W.int 1  (* TODO: Maybe not a good value *)
+    | Head.V _ -> W.int 1
+    | Head.DB _ -> W.int 1
+    | Head.LAM -> W.int 1
 
-  exception Has_lambda
-
-  (** Blanchette's higher-order KBO *)
+  (** Higher-order KBO *)
   let rec kbo ~prec t1 t2 =
     let balance = mk_balance t1 t2 in
     (** variable balance, weight balance, t contains variable y. pos
@@ -178,10 +211,10 @@ module KBO : ORD = struct
         | T.Var x ->
           let x = HVar.id x in
           if pos then (
-            add_pos_var balance x;
+            add_pos_var balance t;
             W.(wb + one), x = y
           ) else (
-            add_neg_var balance x;
+            add_neg_var balance t;
             W.(wb - one), x = y
           )
         | T.DB _ ->
@@ -204,7 +237,14 @@ module KBO : ORD = struct
             else wb - weight prec (Head.B b)
           in
           balance_weight_rec wb' l y ~pos false
-        | T.Fun _ -> raise Has_lambda
+        | T.Fun (_, s) -> 
+          let open W.Infix in
+          let wb' =
+            if pos
+            then wb + weight prec Head.LAM
+            else wb - weight prec Head.LAM
+          in
+          balance_weight wb' s y ~pos
     (** list version of the previous one, threaded with the check result *)
     and balance_weight_rec wb terms y ~pos res = match terms with
       | [] -> (wb, res)
@@ -254,23 +294,18 @@ module KBO : ORD = struct
       match T.view t1, T.view t2 with
         | _ when T.equal t1 t2 -> (wb, Eq) (* do not update weight or var balance *)
         | T.Var x, T.Var y ->
-          add_pos_var balance (HVar.id x);
-          add_neg_var balance (HVar.id y);
+          add_pos_var balance t1;
+          add_neg_var balance t2;
           (wb, Incomparable)
         | T.Var x,  _ ->
-          add_pos_var balance (HVar.id x);
+          add_pos_var balance t1;
           let wb', contains = balance_weight wb t2 (HVar.id x) ~pos:false in
           (W.(wb' + one), if contains then Lt else Incomparable)
         |  _, T.Var y ->
-          add_neg_var balance (HVar.id y);
+          add_neg_var balance t2;
           let wb', contains = balance_weight wb t1 (HVar.id y) ~pos:true in
           (W.(wb' - one), if contains then Gt else Incomparable)
-        | T.DB i, T.DB j ->
-          (wb, if i = j then Eq else Incomparable)
-        | _ -> begin match Head.term_to_head t1, Head.term_to_head t2 with
-            | Some f, Some g -> tckbo_composite wb f g (Head.term_to_args t1) (Head.term_to_args t2)
-            | _ -> (wb, Incomparable)
-          end
+        | _ -> tckbo_composite wb (Head.term_to_head t1) (Head.term_to_head t2) (Head.term_to_args t1) (Head.term_to_args t2)
     (** tckbo, for composite terms (ie non variables). It takes a ID.t
         and a list of subterms. *)
     and tckbo_composite wb f g ss ts =
@@ -278,11 +313,11 @@ module KBO : ORD = struct
       let wb', res = tckbo_rec wb f g ss ts in
       let wb'' = W.(wb' + weight prec f - weight prec g) in
       begin match f with
-        | Head.V x -> add_pos_var balance (HVar.id x)
+        | Head.V x -> add_pos_var balance (T.var x)
         | _ -> ()
       end;
       begin match g with
-        | Head.V x -> add_neg_var balance (HVar.id x)
+        | Head.V x -> add_neg_var balance (T.var x)
         | _ -> ()
       end;
       (* check variable condition *)
@@ -317,19 +352,8 @@ module KBO : ORD = struct
         wb'', Incomparable
       )
     in
-    try
-      let _, res = tckbo W.zero t1 t2 in
-      AllocCache.Arr.free alloc_cache balance.balance;
-      res
-    with
-      | Has_lambda ->
-        (* lambda terms are not comparable, except trivial
-           case when they are syntactically equal *)
-        AllocCache.Arr.free alloc_cache balance.balance;
-        Incomparable
-      | e ->
-        AllocCache.Arr.free alloc_cache balance.balance;
-        raise e
+    let _, res = tckbo W.zero t1 t2 in
+    res
 
   let compare_terms ~prec x y =
     Util.enter_prof prof_kbo;
@@ -452,10 +476,7 @@ module LFHOKBO_arg_coeff : ORD = struct
     (* compare t and s assuming they have the same weight *)
     let lfhokbo_same_weight t s =
       match T.view t, T.view s with
-        | _ -> begin match Head.term_to_head t, Head.term_to_head s with
-            | Some g, Some f -> lfhokbo_composite g f (Head.term_to_args t) (Head.term_to_args s)
-            | _ -> Incomparable
-          end
+          g, f -> lfhokbo_composite (Head.term_to_head t) (Head.term_to_head s) (Head.term_to_args t) (Head.term_to_args s)
     in
     (
       if t = s then Eq else
@@ -489,13 +510,13 @@ module LFHOKBO_arg_coeff : ORD = struct
           failwith (CCFormat.sprintf "symbol %a has ill-formed type %a" ID.pp s Type.pp (Type.const s))
         | Type.Arity (_,n) -> n in
     match Head.term_to_head t, Head.term_to_head s with
-      | Some (Head.I g), Some (Head.I f) ->
+      | Head.I g, Head.I f ->
         List.exists
           (fun i ->
              Prec.arg_coeff prec g (id_arity g - i) != Prec.arg_coeff prec f (id_arity f - i)
           )
           CCList.(0 --^ term_arity)
-      | Some (Head.V _), Some (Head.I _) | Some (Head.I _), Some (Head.V _) -> true
+      | Head.V _, Head.I _ | Head.I _, Head.V _ -> true
       | _ -> assert false
 end
 
@@ -515,12 +536,7 @@ module RPO6 : ORD = struct
         | _, T.Var var -> if T.var_occurs ~var s then Gt else Incomparable
         | T.Var var, _ -> if T.var_occurs ~var t then Lt else Incomparable
         | T.DB _, T.DB _ -> Incomparable
-        | _ ->
-          begin match Head.term_to_head s, Head.term_to_head t with
-            | Some head1, Some head2 ->
-              rpo6_composite ~prec s t head1 head2 (Head.term_to_args s) (Head.term_to_args t)
-            | _ -> Incomparable
-          end
+        | _ -> rpo6_composite ~prec s t (Head.term_to_head s) (Head.term_to_head t) (Head.term_to_args s) (Head.term_to_args t)
   (* handle the composite cases *)
   and rpo6_composite ~prec s t f g ss ts =
     begin match prec_compare prec f g  with
