@@ -524,7 +524,7 @@ module LFHOKBO_arg_coeff : ORD = struct
 end
 
 
-(** Blanchette's lambda-free higher-order RPO.
+(** Lambda-free higher-order RPO.
     hopefully more efficient (polynomial) implementation of LPO,
     following the paper "things to know when implementing LPO" by Löchner.
     We adapt here the implementation clpo6 with some multiset symbols (=) *)
@@ -534,12 +534,19 @@ module RPO6 : ORD = struct
   (** recursive path ordering *)
   let rec rpo6 ~prec s t =
     if T.equal s t then Eq else  (* equality test is cheap *)
-      match T.view s, T.view t with
-        | T.Var _, T.Var _ -> Incomparable
-        | _, T.Var var -> if T.var_occurs ~var s then Gt else Incomparable
-        | T.Var var, _ -> if T.var_occurs ~var t then Lt else Incomparable
-        | T.DB _, T.DB _ -> Incomparable
-        | _ -> rpo6_composite ~prec s t (Head.term_to_head s) (Head.term_to_head t) (Head.term_to_args s) (Head.term_to_args t)
+      match Head.term_to_head s, Head.term_to_head t with
+        | Head.V _, Head.V _ -> Incomparable
+        | _, Head.V _  -> if has_varheaded_subterm s t then Gt else Incomparable
+        | Head.V _, _ -> if has_varheaded_subterm t s then Lt else Incomparable
+        | h1, h2 -> rpo6_composite ~prec s t h1 h2 (Head.term_to_args s) (Head.term_to_args t)
+  and has_varheaded_subterm t sub =
+    T.equal t sub ||
+    match T.view t with
+      | T.Var _ | T.DB _ | T.Const _ -> false
+      | T.App (f, _) when T.is_var f -> false
+      | T.App (_, l) -> List.exists (fun t -> has_varheaded_subterm t sub) l
+      | T.Fun (_, t') -> has_varheaded_subterm t' sub
+      | T.AppBuiltin (_, l) -> List.exists (fun t -> has_varheaded_subterm t sub) l
   (* handle the composite cases *)
   and rpo6_composite ~prec s t f g ss ts =
     begin match prec_compare prec f g  with
