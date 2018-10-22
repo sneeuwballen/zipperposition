@@ -364,14 +364,14 @@ module KBO : ORD = struct
     Util.exit_prof prof_kbo;
     compare
 
-  (* KBO is monotonic *)
-  let might_flip _ _ _ = false
+  (* The ordering might flip if one side is a lambda-expression *)
+  let might_flip _ s t = T.is_fun s || T.is_fun t
 end
 
 
+(* TODO: LFHOKBO_arg_coeff does not work with lambda-expressions! *)
 module LFHOKBO_arg_coeff : ORD = struct
   let name = "lfhokbo_arg_coeff"
-
 
   module Weight_indet = struct
     type var = Type.t HVar.t
@@ -615,8 +615,9 @@ module RPO6 : ORD = struct
     Util.exit_prof prof_rpo6;
     compare
 
-  (* The ordering might flip if it is established using the subterm rule *)
+  (* The ordering might flip if one side is a lambda-expression or if the order is established using the subterm rule *)
   let might_flip prec t s =
+    T.is_fun t || T.is_fun s ||
     let c = rpo6 ~prec t s in
     c = Incomparable ||
     c = Gt && alpha ~prec (Head.term_to_args t) s = Gt ||
