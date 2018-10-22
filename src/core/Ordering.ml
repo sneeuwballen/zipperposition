@@ -159,98 +159,107 @@ let prec_status prec = function
 module KBO : ORD = struct
   let name = "kbo"
 
-  module TermHashtbl = CCHashtbl.Make(T)
-
   (** used to keep track of the balance of variables *)
   type var_balance = {
     offset : int;
     mutable pos_counter : int;
     mutable neg_counter : int;
-    mutable balance : CCInt.t TermHashtbl.t;
+    mutable balance : CCInt.t Term.Tbl.t;
   }
 
   (** create a balance for the two terms *)
   let mk_balance t1 t2 =
     let numvars = Sequence.length (T.Seq.vars t1) + Sequence.length (T.Seq.vars t2) in
-    { offset = 0; pos_counter = 0; neg_counter = 0; balance = TermHashtbl.create numvars; }
+    { offset = 0; pos_counter = 0; neg_counter = 0; balance = Term.Tbl.create numvars; }
 
   (** add a positive variable *)
   let add_pos_var balance var =
-    let n = TermHashtbl.get_or balance.balance var ~default:0 in
+    let n = Term.Tbl.get_or balance.balance var ~default:0 in
     if n = 0
     then balance.pos_counter <- balance.pos_counter + 1
     else (
       if n = -1 then balance.neg_counter <- balance.neg_counter - 1
     );
-    TermHashtbl.add balance.balance var (n + 1) 
+    Term.Tbl.add balance.balance var (n + 1) 
 
   (** add a negative variable *)
   let add_neg_var balance var =
-    let n = TermHashtbl.get_or balance.balance var ~default:0 in
+    let n = Term.Tbl.get_or balance.balance var ~default:0 in
     if n = 0
     then balance.neg_counter <- balance.neg_counter + 1
     else (
       if n = 1 then balance.pos_counter <- balance.pos_counter - 1
     );
-    TermHashtbl.add balance.balance var (n - 1) 
+    Term.Tbl.add balance.balance var (n - 1) 
+
+  let weight_var_headed = W.one
 
   let weight prec = function
-    | Head.B _ -> W.int 1
+    | Head.B _ -> W.one
     | Head.I s -> Prec.weight prec s
-    | Head.V _ -> W.int 1
-    | Head.DB _ -> W.int 1
-    | Head.LAM -> W.int 1
+    | Head.V _ -> weight_var_headed
+    | Head.DB _ -> W.one
+    | Head.LAM -> W.one
 
   (** Higher-order KBO *)
   let rec kbo ~prec t1 t2 =
     let balance = mk_balance t1 t2 in
-    (** variable balance, weight balance, t contains variable y. pos
-        stands for positive (is t the left term) *)
-    let rec balance_weight (wb:W.t) t y ~pos : W.t * bool =
+    (** Update variable balance, weight balance, and check whether the term contains the variable-headed term s.
+        @param pos stands for positive (is t the left term?)
+        @return weight balance, was `s` found?
+    *)
+    let rec balance_weight (wb:W.t) t s ~pos : W.t * bool =
       match T.view t with
         | T.Var x ->
-          let x = HVar.id x in
-          if pos then (
-            add_pos_var balance t;
-            W.(wb + one), x = y
-          ) else (
-            add_neg_var balance t;
-            W.(wb - one), x = y
-          )
-        | T.DB _ ->
-          let w = if pos then W.(wb + one) else W.(wb - one) in
-          w, false
-        | T.Const s ->
+          balance_weight_var wb t s ~pos
+        | T.App (f, _) when (T.is_var f) ->
+          balance_weight_var wb t s ~pos
+        | T.DB i ->
+          let wb' = 
+          if pos 
+          then W.(wb + weight prec (Head.DB i)) 
+          else W.(wb - weight prec (Head.DB i)) in
+          wb', false
+        | T.Const c ->
           let open W.Infix in
           let wb' =
             if pos
-            then wb + weight prec (Head.I s)
-            else wb - weight prec (Head.I s)
+            then wb + weight prec (Head.I c)
+            else wb - weight prec (Head.I c)
           in wb', false
         | T.App (f, l) ->
-          let wb', res = balance_weight wb f y ~pos in
-          balance_weight_rec wb' l y ~pos res
+          let wb', res = balance_weight wb f s ~pos in
+          balance_weight_rec wb' l s ~pos res
         | T.AppBuiltin (b,l) ->
           let open W.Infix in
           let wb' = if pos
             then wb + weight prec (Head.B b)
             else wb - weight prec (Head.B b)
           in
-          balance_weight_rec wb' l y ~pos false
-        | T.Fun (_, s) -> 
+          balance_weight_rec wb' l s ~pos false
+        | T.Fun (_, body) -> 
           let open W.Infix in
           let wb' =
             if pos
             then wb + weight prec Head.LAM
             else wb - weight prec Head.LAM
           in
-          balance_weight wb' s y ~pos
+          balance_weight wb' body s ~pos
+    (** balance_weight for the case where t is an applied variable *)
+    and balance_weight_var (wb:W.t) t s ~pos : W.t * bool =
+      if pos then (
+        add_pos_var balance t;
+        W.(wb + weight_var_headed), Some t = s
+      ) else (
+        add_neg_var balance t;
+        W.(wb - weight_var_headed), Some t = s
+      )
     (** list version of the previous one, threaded with the check result *)
-    and balance_weight_rec wb terms y ~pos res = match terms with
+    and balance_weight_rec wb terms s ~pos res = match terms with
       | [] -> (wb, res)
       | t::terms' ->
-        let wb', res' = balance_weight wb t y ~pos in
-        balance_weight_rec wb' terms' y ~pos (res || res')
+        let wb', res' = balance_weight wb t s ~pos in
+        balance_weight_rec wb' terms' s ~pos (res || res')
     (** lexicographic comparison *)
     and tckbolex wb terms1 terms2 =
       match terms1, terms2 with
@@ -259,15 +268,15 @@ module KBO : ORD = struct
           begin match tckbo wb t1 t2 with
             | (wb', Eq) -> tckbolex wb' terms1' terms2'
             | (wb', res) -> (* just compute the weights and return result *)
-              let wb'', _ = balance_weight_rec wb' terms1' 0 ~pos:true false in
-              let wb''', _ = balance_weight_rec wb'' terms2' 0 ~pos:false false in
+              let wb'', _ = balance_weight_rec wb' terms1' None ~pos:true false in
+              let wb''', _ = balance_weight_rec wb'' terms2' None ~pos:false false in
               wb''', res
           end
         | [], _ ->
-          let wb, _ = balance_weight_rec wb terms2 0 ~pos:false false in
+          let wb, _ = balance_weight_rec wb terms2 None ~pos:false false in
           wb, Lt
         | _, [] ->
-          let wb, _ = balance_weight_rec wb terms1 0 ~pos:true false in
+          let wb, _ = balance_weight_rec wb terms1 None ~pos:true false in
           wb, Gt
     (** length-lexicographic comparison *)
     and tckbolenlex wb terms1 terms2 =
@@ -275,8 +284,8 @@ module KBO : ORD = struct
       then tckbolex wb terms1 terms2
       else (
         (* just compute the weights and return result *)
-        let wb', _ = balance_weight_rec wb terms1 0 ~pos:true false in
-        let wb'', _ = balance_weight_rec wb' terms2 0 ~pos:false false in
+        let wb', _ = balance_weight_rec wb terms1 None ~pos:true false in
+        let wb'', _ = balance_weight_rec wb' terms2 None ~pos:false false in
         let res = if List.length terms1 > List.length terms2 then Gt else Lt in
         wb'', res
       )
@@ -286,40 +295,34 @@ module KBO : ORD = struct
       (* multiset comparison *)
       let res = MT.compare_partial_l (kbo ~prec) ss ts in
       (* also compute weights of subterms *)
-      let wb', _ = balance_weight_rec wb ss 0 ~pos:true false in
-      let wb'', _ = balance_weight_rec wb' ts 0 ~pos:false false in
+      let wb', _ = balance_weight_rec wb ss None ~pos:true false in
+      let wb'', _ = balance_weight_rec wb' ts None ~pos:false false in
       wb'', res
     (** tupled version of kbo (kbo_5 of the paper) *)
     and tckbo (wb:W.t) t1 t2 =
-      match T.view t1, T.view t2 with
-        | _ when T.equal t1 t2 -> (wb, Eq) (* do not update weight or var balance *)
-        | T.Var x, T.Var y ->
-          add_pos_var balance t1;
-          add_neg_var balance t2;
-          (wb, Incomparable)
-        | T.Var x,  _ ->
-          add_pos_var balance t1;
-          let wb', contains = balance_weight wb t2 (HVar.id x) ~pos:false in
-          (W.(wb' + one), if contains then Lt else Incomparable)
-        |  _, T.Var y ->
-          add_neg_var balance t2;
-          let wb', contains = balance_weight wb t1 (HVar.id y) ~pos:true in
-          (W.(wb' - one), if contains then Gt else Incomparable)
-        | _ -> tckbo_composite wb (Head.term_to_head t1) (Head.term_to_head t2) (Head.term_to_args t1) (Head.term_to_args t2)
+      if T.equal t1 t2
+      then (wb, Eq) (* do not update weight or var balance *)
+      else 
+        match Head.term_to_head t1, Head.term_to_head t2 with
+          | Head.V _, Head.V _ ->
+            add_pos_var balance t1;
+            add_neg_var balance t2;
+            (wb, Incomparable)
+          | Head.V _,  _ ->
+            add_pos_var balance t1;
+            let wb', contains = balance_weight wb t2 (Some t1) ~pos:false in
+            (W.(wb' + weight_var_headed), if contains then Lt else Incomparable)
+          |  _, Head.V _ ->
+            add_neg_var balance t2;
+            let wb', contains = balance_weight wb t1 (Some t2) ~pos:true in
+            (W.(wb' - weight_var_headed), if contains then Gt else Incomparable)
+          | h1, h2 -> tckbo_composite wb h1 h2 (Head.term_to_args t1) (Head.term_to_args t2)
     (** tckbo, for composite terms (ie non variables). It takes a ID.t
         and a list of subterms. *)
     and tckbo_composite wb f g ss ts =
       (* do the recursive computation of kbo *)
       let wb', res = tckbo_rec wb f g ss ts in
       let wb'' = W.(wb' + weight prec f - weight prec g) in
-      begin match f with
-        | Head.V x -> add_pos_var balance (T.var x)
-        | _ -> ()
-      end;
-      begin match g with
-        | Head.V x -> add_neg_var balance (T.var x)
-        | _ -> ()
-      end;
       (* check variable condition *)
       let g_or_n = if balance.neg_counter = 0 then Gt else Incomparable
       and l_or_n = if balance.pos_counter = 0 then Lt else Incomparable in
@@ -347,8 +350,8 @@ module KBO : ORD = struct
           tckbolenlex wb ss ts
       else (
         (* just compute variable and weight balances *)
-        let wb', _ = balance_weight_rec wb ss 0 ~pos:true false in
-        let wb'', _ = balance_weight_rec wb' ts 0 ~pos:false false in
+        let wb', _ = balance_weight_rec wb ss None ~pos:true false in
+        let wb'', _ = balance_weight_rec wb' ts None ~pos:false false in
         wb'', Incomparable
       )
     in

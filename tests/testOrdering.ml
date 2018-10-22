@@ -193,14 +193,14 @@ let test_kbo = "ordering.kbo", `Quick, fun () ->
   let ord = O.kbo (Precedence.create ~weight Precedence.Constr.alpha [a_; b_; c_; f_; g_; h_]) in
   let compare = O.compare ord in
 
-  (* h (x y) > f y (x a) *)
+  (* h (x y) > f a (x y) *)
   let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
   let h = Term.const ~ty:(Type.arrow [ty] ty) h_ in
   let a = Term.const ~ty a_ in
   let x = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
   let y = Term.var (HVar.fresh ~ty ()) in
   Alcotest.(check comp_test) "h (x y) > f y (x a)"
-    (compare (Term.app h [Term.app x [y]]) (Term.app f [y; Term.app x [a]])) Comparison.Gt;
+    (compare (Term.app h [Term.app x [y]]) (Term.app f [a; Term.app x [y]])) Comparison.Gt;
 
   (* polymorphic example *)
   let funty_ = (ID.make "funty") in
