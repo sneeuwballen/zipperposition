@@ -8,6 +8,7 @@ open Libzipperposition
 
 module BV = CCBV
 module T = Term
+module Lits = Literals
 
 let section = Util.Section.make ~parent:Const.section "ho"
 
@@ -718,6 +719,133 @@ module Make(E : Env.S) : S with module Env = E = struct
     let lits = [Literal.mk_eq x y; Literal.mk_neq x_diff y_diff] in
     Env.C.create ~penalty:5 ~trail:Trail.empty lits Proof.Step.trivial
 
+
+  type fixed_arg_status = 
+    | Always of T.t (* This argument is always the given term in all occurences *)
+    | Varies        (* This argument contains different terms in differen occurrences *)
+
+  type dupl_arg_status = 
+    | AlwaysSameAs of int (* This argument is always the same as some other argument across occurences (links to the next arg with this property) *)
+    | Unique              (* This argument is not always the same as some other argument across occurences *)
+  
+  (** Removal of fixed/duplicate arguments of variables.
+    - If within a clause, there exists a variable F that's always applied
+      to at least i arguments and the ith argument is always the same DB-free term,
+      we can systematically remove the argument (and repair F's type).
+    - If within a clause, there exist a variable F, and indices i < j
+      such that all occurrences of F are applied to at least j arguments and the
+      ith argument is syntactically same as the jth argument, we can
+      systematically remove the ith argument (and repair F's type accordingly).
+  *)
+  let remove_var_args c = 
+    let status : (fixed_arg_status * dupl_arg_status) list VTbl.t = VTbl.create 8 in
+    C.lits c 
+    |> Literals.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord:Ordering.none ~subterms:true ~eligible:(fun _ _ -> true) 
+    |> Sequence.iter 
+      (fun (t,_) -> 
+        let head, args = T.as_app t in
+        match T.as_var head with
+          | Some var ->
+            begin match VTbl.get status var with
+            | Some var_status -> 
+              (* We have seen this var before *)
+              let update_fas fas arg =
+                match fas with 
+                  | Always u -> if T.equal u arg then Always u else Varies
+                  | Varies -> Varies
+              in
+              let rec update_das das arg =
+                match das with 
+                | AlwaysSameAs j -> 
+                  begin 
+                    try
+                      if T.equal (List.nth args j) arg 
+                      then AlwaysSameAs j 
+                      else update_das (snd (List.nth var_status j)) (List.nth args j)
+                    with Failure _ -> Unique 
+                  end
+                | Unique -> Unique
+              in
+              (* Shorten the lists to have equal lengths. Arguments positions are only interesting if they appear behind every occurrence of a var.*)
+              let minlen = min (List.length var_status) (List.length args) in
+              let args = CCList.take minlen args in
+              let var_status = CCList.take minlen var_status in
+              VTbl.replace status var (CCList.map (fun ((fas, das), arg) -> update_fas fas arg, update_das das arg) (List.combine var_status args))
+            | None -> 
+              (* First time to encounter this var *)
+              let rec create_var_status ?(i=0) args : (fixed_arg_status * dupl_arg_status) list =
+                match args with 
+                | [] -> []
+                | arg :: args' -> 
+                  let fas = 
+                    if T.DB.is_closed arg then Always arg else Varies
+                  in
+                  (* Find next identical argument *)
+                  let das = match CCList.find_idx ((=) arg) args' with
+                    | Some (j, _) -> AlwaysSameAs (i + j + 1)
+                    | None -> Unique
+                  in 
+                  (fas, das) :: create_var_status ~i:(i+1) args'
+              in
+              VTbl.add status var (create_var_status args)
+            end
+          | None -> ()
+          ;
+        ()
+      );
+    let subst = 
+      VTbl.to_list status
+      |> CCList.filter_map (
+        fun (var, var_status) -> 
+          let ty_args, ty_return = Type.open_fun (HVar.ty var) in
+          let keep = var_status |> CCList.map 
+            (fun (fas, das) -> 
+                (* Keep argument if this is true: *)
+                fas == Varies && das == Unique
+            )
+          in
+          if CCList.for_all ((=) true) keep
+          then None
+          else (
+            (* Keep argument if var_status list is not long enough (This happens when the argument does not appear for some occurrence of var): *)
+            let keep = CCList.(append keep (replicate (length ty_args - length keep) true)) in
+            (* Create substitution: *)
+            let ty_args' = ty_args
+              |> CCList.combine keep 
+              |> CCList.filter fst
+              |> CCList.map snd
+            in
+            let var' = HVar.cast var ~ty:(Type.arrow ty_args' ty_return) in
+            let bvars = 
+              CCList.combine keep ty_args
+              |> List.mapi (fun i (k, ty) -> k, T.bvar ~ty (List.length ty_args - i - 1))
+              |> CCList.filter fst
+              |> CCList.map snd
+            in
+            let replacement = T.fun_l ty_args (T.app (T.var var') bvars) in
+            Some ((var,0), (replacement,1))
+          )
+      )
+      |> Subst.FO.of_list'
+    in
+
+    if Subst.is_empty subst
+    then SimplM.return_same c
+    else (
+      let renaming = Subst.Renaming.none in
+      let new_lits = Lits.apply_subst renaming subst (C.lits c, 0) in
+      let proof =
+          Proof.Step.simp
+            ~rule:(Proof.Rule.mk "remove_var_args")
+            [C.proof_parent_subst renaming (c,0) subst] in
+      let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
+      Util.debugf ~section 3
+          "@[<>@[%a@]@ @[<2>remove_var_args into@ @[%a@]@]@ with @[%a@]@]"
+          (fun k->k C.pp c C.pp c' Subst.pp subst);
+      SimplM.return_new c'
+    )
+    (* TODO: Simplified flag like in first-order? Profiler?*)
+
   let setup () =
     if not (Env.flex_get k_enabled) then (
       Util.debug ~section 1 "HO rules disabled";
@@ -736,6 +864,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_unary_inf "ho_ext_pos" ext_pos
       );
       Env.add_rewrite_rule "beta_reduce" beta_reduce;
+      Env.add_unary_simplify remove_var_args;
       begin match Env.flex_get k_eta with
         | `Expand -> Env.add_rewrite_rule "eta_expand" eta_expand
         | `Reduce -> Env.add_rewrite_rule "eta_reduce" eta_reduce
