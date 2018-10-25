@@ -1,6 +1,7 @@
-FROM ocaml/opam:alpine as build
+FROM ocaml/opam2:alpine as build
 # init and set perms
 WORKDIR /zipper/build
+RUN sudo apk update
 RUN sudo chown opam: /zipper/build
 # deps
 RUN eval `opam config env` && \
