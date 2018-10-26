@@ -3,6 +3,7 @@ maintainer: "simon.cruanes.2007@m4x.org"
 author: "Simon Cruanes"
 homepage: "https://github.com/c-cube/zipperposition"
 version: "1.5"
+synopsis: "Library for Zipperposition"
 build: [
   ["jbuilder" "build" "-p" name]
   ["jbuilder" "build" "@doc" "-p" name] {with-doc}
