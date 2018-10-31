@@ -23,7 +23,6 @@ let prof_matching = Util.mk_profiler "matching"
 let fail () = raise Fail
 
 let _allow_partial_skolem_application = ref false
-let _allow_pattern_unif = ref true
 
 (** {2 Signatures} *)
 
@@ -732,10 +731,10 @@ module Inner = struct
           "(@[unif_ho.flex_rigid@ `@[:f1 %a :l1 %a@]`@ :t2 `%a`@ :subst %a@ :bvars %a@])@."
           (Scoped.pp T.pp) (f1,scope) (CCFormat.Dump.list T.pp) l1
           (Scoped.pp T.pp) (t2,scope) US.pp subst B_vars.pp bvars;*)
-        if !_allow_pattern_unif && distinct_bvar_l ~bvars:bvars.B_vars.left l1 then (
+        if distinct_bvar_l ~bvars:bvars.B_vars.left l1 then (
           (* flex/rigid pattern unif *)
           flex_rigid ~bvars:bvars.B_vars.left subst f1 l1 t2 ~scope
-        ) else if !_allow_pattern_unif && distinct_ground_l l1 then (
+        ) else if distinct_ground_l l1 then (
           (* [v t = t2] becomes [v = λx. t2[x/t]] *)
           let t2 = lift_terms l1 t2 in
           unif_rec ~op ~root ~bvars subst (f1,scope) (t2,scope)
@@ -753,10 +752,10 @@ module Inner = struct
           "(@[unif_ho.flex_rigid@ `@[:f2 %a :l2 %a@]`@ :t1 `%a`@ :subst %a@ :bvars %a@])@."
           (Scoped.pp T.pp) (f2,scope) (CCFormat.Dump.list T.pp) l2
           (Scoped.pp T.pp) (t1,scope) US.pp subst B_vars.pp bvars;*)
-        if !_allow_pattern_unif && distinct_bvar_l ~bvars:bvars.B_vars.right l2 && op=O_unify then (
+        if distinct_bvar_l ~bvars:bvars.B_vars.right l2 && op=O_unify then (
           (* flex/rigid pattern unif *)
           flex_rigid ~bvars:bvars.B_vars.right subst f2 l2 t1 ~scope
-        ) else if !_allow_pattern_unif && distinct_ground_l l2 && op=O_unify then (
+        ) else if distinct_ground_l l2 && op=O_unify then (
           (* [t1 = v t] becomes [v = λx. t1[x/t]] *)
           let t1 = lift_terms l2 t1 in
           unif_rec ~op ~root ~bvars subst (t1,scope) (f2,scope)
@@ -771,7 +770,6 @@ module Inner = struct
         ) else fail()
       | T.Var v1, T.Var v2
         when op=O_unify &&
-             !_allow_pattern_unif &&
              distinct_bvar_l ~bvars:bvars.B_vars.left l1 &&
              distinct_bvar_l ~bvars:bvars.B_vars.right l2 ->
         (* flex/flex equation for pattern unif *)
@@ -779,7 +777,6 @@ module Inner = struct
           v1 l1 v2 l2
       | T.Var v1, T.Var v2
         when is_match_op op &&
-             !_allow_pattern_unif &&
              distinct_bvar_l ~bvars:bvars.B_vars.left l1 &&
              distinct_bvar_l ~bvars:bvars.B_vars.right l2 &&
              CCList.subset ~eq:T.equal l2 l1 ->
@@ -1143,6 +1140,4 @@ let () =
     [  "--partial-skolem",
        Arg.Set _allow_partial_skolem_application,
        " allow partial application of skolem constants (sound only assuming the axiom of choice)";
-       "--no-unif-pattern", Arg.Clear _allow_pattern_unif, " disable pattern unification";
-       "--unif-pattern", Arg.Set _allow_pattern_unif, " enable pattern unification";
     ]
