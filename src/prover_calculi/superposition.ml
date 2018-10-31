@@ -205,40 +205,18 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       false (* If the lhs vs rhs cannot flip, we don't need a sup at var *)
     )
     else (
-      (* Check whether var occurs only with the same arguments everywhere. *)
-      let unique_args_of_var =
-        C.lits info.passive
-        |> Lits.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord ~subterms:true ~eligible:(fun _ _ -> true)
-        |> Sequence.fold_while
-          (fun unique_args (t,_) ->
-             if Term.equal (fst (T.as_app t)) var
-             then (
-               if unique_args == Some (snd (T.as_app t))
-               then (unique_args, `Continue) (* found the same arguments of var again *)
-               else (None, `Stop) (* different arguments of var found *)
-             ) else (unique_args, `Continue) (* this term doesn't have var as head *)
-          )
-          None
-      in
-      match unique_args_of_var with
-        | Some _ ->
-          Util.debugf ~section 5
-            "Variable %a has same args everywhere in %a"
-            (fun k->k T.pp var C.pp info.passive);
-          false (* If var occurs with the same arguments everywhere, we don't need sup at vars *)
-        | None ->
-          (* Check whether Cσ is >= C[var -> replacement]σ *)
-          let passive'_lits = Lits.apply_subst renaming subst (C.lits info.passive, info.scope_passive) in
-          let subst_t = Unif.FO.update subst (T.as_var_exn var, info.scope_passive) (replacement, info.scope_active) in
-          let passive_t'_lits = Lits.apply_subst renaming subst_t (C.lits info.passive, info.scope_passive) in
-          if Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt
-          then (
-            Util.debugf ~section 5
-              "Sup at var condition is not fulfilled because: %a >= %a"
-              (fun k->k Lits.pp passive'_lits Lits.pp passive_t'_lits);
-            false
-          )
-          else true (* If Cσ is either <= or incomparable to C[var -> replacement]σ, we need sup at var.*)
+      (* Check whether Cσ is >= C[var -> replacement]σ *)
+      let passive'_lits = Lits.apply_subst renaming subst (C.lits info.passive, info.scope_passive) in
+      let subst_t = Unif.FO.update subst (T.as_var_exn var, info.scope_passive) (replacement, info.scope_active) in
+      let passive_t'_lits = Lits.apply_subst renaming subst_t (C.lits info.passive, info.scope_passive) in
+      if Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt
+      then (
+        Util.debugf ~section 5
+          "Sup at var condition is not fulfilled because: %a >= %a"
+          (fun k->k Lits.pp passive'_lits Lits.pp passive_t'_lits);
+        false
+      )
+      else true (* If Cσ is either <= or incomparable to C[var -> replacement]σ, we need sup at var.*)
     )
 
 
