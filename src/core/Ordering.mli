@@ -30,10 +30,6 @@ val might_flip : t -> term -> term -> bool
     of tθ vs sθ cannot change when appending arguments. This function is allowed
     to overapproximate, i.e. we get no information if it returns true. *)
 
-val monotonic : t -> bool
-(** Is the ordering fully monotonic? Is it in particular compatible with arguments,
-    i.e., t > s ==> t a > s a *)
-
 val precedence : t -> Precedence.t
 (** Current precedence *)
 

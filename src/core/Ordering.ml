@@ -32,7 +32,6 @@ type t = {
   prec : Prec.t;
   name : string;
   might_flip : Prec.t -> term -> term -> bool;
-  monotonic : bool;
 } (** Partial ordering on terms *)
 
 type ordering = t
@@ -40,8 +39,6 @@ type ordering = t
 let compare ord t1 t2 = ord.compare ord.prec t1 t2
 
 let might_flip ord t1 t2 = ord.might_flip ord.prec t1 t2
-
-let monotonic ord = ord.monotonic
 
 let precedence ord = ord.prec
 
@@ -209,7 +206,7 @@ module KBO : ORD = struct
     *)
     let rec balance_weight (wb:W.t) t s ~pos : W.t * bool =
       match T.view t with
-        | T.Var x ->
+        | T.Var _ ->
           balance_weight_var wb t s ~pos
         | T.App (f, _) when (T.is_var f) ->
           balance_weight_var wb t s ~pos
@@ -476,7 +473,11 @@ let kbo prec =
   let compare prec a b = CCCache.with_cache cache
       (fun (a, b) -> KBO.compare_terms ~prec a b) (a,b)
   in
-  { cache; compare; name=KBO.name; prec; might_flip=KBO.might_flip; monotonic=true }
+  let cache_might_flip = mk_cache 256 in
+  let might_flip prec a b = CCCache.with_cache cache_might_flip
+      (fun (a, b) -> KBO.might_flip prec a b) (a,b)
+  in
+  { cache; compare; name=KBO.name; prec; might_flip}
 
 let rpo6 prec =
   let cache = mk_cache 256 in
@@ -487,14 +488,14 @@ let rpo6 prec =
   let might_flip prec a b = CCCache.with_cache cache_might_flip
       (fun (a, b) -> RPO6.might_flip prec a b) (a,b)
   in
-  { cache; compare; name=RPO6.name; prec; might_flip; monotonic=false}
+  { cache; compare; name=RPO6.name; prec; might_flip}
 
 let dummy_cache_ = CCCache.dummy
 
 let none =
   let compare _ t1 t2 = if T.equal t1 t2 then Eq else Incomparable in
   let might_flip _ _ _ = false in
-  { cache=dummy_cache_; compare; prec=Prec.default []; name="none"; might_flip; monotonic=true}
+  { cache=dummy_cache_; compare; prec=Prec.default []; name="none"; might_flip}
 
 let subterm =
   let compare _ t1 t2 =
@@ -504,7 +505,7 @@ let subterm =
     else Incomparable
   in
   let might_flip _ _ _ = false in
-  { cache=dummy_cache_; compare; prec=Prec.default []; name="subterm"; might_flip; monotonic=true}
+  { cache=dummy_cache_; compare; prec=Prec.default []; name="subterm"; might_flip}
 
 (** {2 Global table of orders} *)
 

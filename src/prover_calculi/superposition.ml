@@ -731,29 +731,20 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       match T.view t with
         | T.Const _ -> reduce_at_root ~restrict t k
         | T.App (hd, l) ->
-          (* rewrite subterms in call by value.
-             Note that we keep restrictions for the head, so as
-             not to rewrite [f x=g x] into ⊤ after equality completion
-             of [f=g] *)
-          let rewrite_head =
-            (* Don't rewrite heads in the following situations: *)
-            (List.length l = 0 || not (T.is_type (List.hd l)))
-            && not (Ordering.monotonic ord)
-          in
-          let rewrite_args =
-            !_sup_in_var_args || not (T.is_var hd)
-          in
-          (if rewrite_head then normal_form ~restrict hd else (fun k -> k hd))
-            (fun hd' ->
-               (if rewrite_args then normal_form_l l else (fun k -> k l))
-                 (fun l' ->
-                    let t' =
-                      if T.equal hd hd' && T.same_l l l'
-                      then t
-                      else T.app hd' l'
-                    in
-                    (* rewrite term at root *)
-                    reduce_at_root ~restrict t' k))
+          (* rewrite subterms in call by value. *)
+          let rewrite_args = !_sup_in_var_args || not (T.is_var hd) in
+          if rewrite_args 
+          then 
+            normal_form_l l 
+              (fun l' ->
+                let t' =
+                  if T.same_l l l'
+                  then t
+                  else T.app hd l'
+                in
+                (* rewrite term at root *)
+                reduce_at_root ~restrict t' k)
+          else reduce_at_root ~restrict t k
         | T.Fun (ty_arg, body) ->
           (* reduce under lambdas *)
           if !_sup_under_lambdas
