@@ -534,7 +534,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
        so we consider both negative and positive literals *)
     let new_clauses =
       Lits.fold_terms ~vars:!_sup_at_vars ~subterms:true ~ord:(Ctx.ord ())
-        ~which:`Max ~eligible (C.lits clause)
+        ~which:`Max ~eligible ~ty_args:false (C.lits clause)
       |> Sequence.filter (fun (u_p, _) -> not (T.is_var u_p) || T.is_ho_var u_p)
       (* TODO: could exclude more variables from the index:
          they are not needed if they occur with the same args everywhere in the clause *)
