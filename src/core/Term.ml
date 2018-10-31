@@ -398,7 +398,7 @@ let contains_symbol f t =
 
 (** {2 Fold} *)
 
-let all_positions ?(vars=false) ?(ty_args=true) ?(pos=Position.stop) t f =
+let all_positions ?(vars=false) ?(ty_args=true) ?(var_args=true) ?(fun_bodies=true) ?(pos=Position.stop) t f =
   let rec aux pb t = match view t with
     | Var _ | DB _ ->
       if vars && (ty_args || not (Type.is_tType (ty t)))
@@ -406,20 +406,24 @@ let all_positions ?(vars=false) ?(ty_args=true) ?(pos=Position.stop) t f =
     | Const _ ->
       if ty_args || not (Type.is_tType (ty t))
       then f (PW.make t (PB.to_pos pb))
-    | Fun (_, u) -> aux (PB.body pb) u
-    | AppBuiltin (_,tl)
-    | App (_, tl) ->
-      if ty_args || not (Type.is_tType (ty t)) then (
-        f (PW.make t (PB.to_pos pb));
-      );
-      let len = List.length tl in
-      let invi i = len - 1 - i in
-      List.iteri
-        (fun i t' ->
-           (* if [t'] is a type parameter and [not ty_args], ignore *)
-           if ty_args || not (Type.is_tType (ty t'))
-           then aux (PB.arg (invi i) pb) t')
-        tl
+    | Fun (_, u) -> 
+      if fun_bodies 
+      then aux (PB.body pb) u
+    | App (head, args) when not var_args && T.is_var head ->
+      f (PW.make t (PB.to_pos pb))
+    | AppBuiltin (_, args)
+    | App (_, args) ->
+        if ty_args || not (Type.is_tType (ty t)) then (
+          f (PW.make t (PB.to_pos pb));
+        );
+        let len = List.length args in
+        let invi i = len - 1 - i in
+        List.iteri
+          (fun i t' ->
+              (* if [t'] is a type parameter and [not ty_args], ignore *)
+              if ty_args || not (Type.is_tType (ty t'))
+              then aux (PB.arg (invi i) pb) t')
+          args
   in
   aux (PB.of_pos pos) t
 

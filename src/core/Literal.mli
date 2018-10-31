@@ -152,7 +152,7 @@ val is_absurd : t -> bool
 val is_absurd_tags : t -> Proof.tag list (** if [is_absurd lit], return why *)
 
 val fold_terms :
-  ?position:Position.t -> ?vars:bool -> ?ty_args:bool ->
+  ?position:Position.t -> ?vars:bool -> ?var_args:bool -> ?fun_bodies:bool -> ?ty_args:bool -> 
   which:[<`Max|`All] ->
   ?ord:Ordering.t ->
   subterms:bool ->
@@ -162,6 +162,9 @@ val fold_terms :
     Variables are ignored if [vars] is [false].
 
     [vars] decides whether variables are iterated on too (default [false])
+    [var_args] decides whether arguments of applied variables are iterated on too
+    [fun_bodies] decides whether bodies of lambda-expressions are iterated on too
+    [ty_args] decides whether type arguments are iterated on too
     [subterms] decides whether strict subterms, not only terms that
     occur directly under the literal, are explored.
 

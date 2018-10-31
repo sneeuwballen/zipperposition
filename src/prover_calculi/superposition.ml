@@ -62,6 +62,8 @@ let _dot_sup_from = ref None
 let _dot_simpl = ref None
 let _dont_simplify = ref false
 let _sup_at_vars = ref false
+let _sup_in_var_args = ref true
+let _sup_under_lambdas = ref true
 let _dot_demod_into = ref None
 
 module Make(Env : Env.S) : S with module Env = Env = struct
@@ -92,7 +94,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let ord = Ctx.ord () in
     (* index subterms that can be rewritten by superposition *)
     _idx_sup_into :=
-      Lits.fold_terms ~vars:!_sup_at_vars ~ty_args:false ~ord ~which:`Max ~subterms:true
+      Lits.fold_terms ~vars:!_sup_at_vars ~var_args:!_sup_in_var_args ~fun_bodies:!_sup_under_lambdas ~ty_args:false ~ord ~which:`Max ~subterms:true
         ~eligible:(C.Eligible.res c) (C.lits c)
       |> Sequence.filter (fun (t, _) -> not (T.is_var t) || T.is_ho_var t)
       (* TODO: could exclude more variables from the index:
@@ -114,7 +116,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         !_idx_sup_from ;
     (* terms that can be demodulated: all subterms (but vars) *)
     _idx_back_demod :=
-      Lits.fold_terms ~vars:false ~ty_args:false ~ord ~subterms:true ~which:`All
+      (* TODO: allow demod under lambdas under certain conditions (DemodExt) *)
+      Lits.fold_terms ~vars:false ~var_args:!_sup_in_var_args ~fun_bodies:!_sup_under_lambdas ~ty_args:false ~ord ~subterms:true ~which:`All
         ~eligible:C.Eligible.always (C.lits c)
       |> Sequence.fold
         (fun tree (t, pos) ->
@@ -469,7 +472,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* do the inferences in which clause is passive (rewritten),
        so we consider both negative and positive literals *)
     let new_clauses =
-      Lits.fold_terms ~vars:!_sup_at_vars ~subterms:true ~ord:(Ctx.ord ())
+      Lits.fold_terms ~vars:!_sup_at_vars ~var_args:!_sup_in_var_args ~fun_bodies:!_sup_under_lambdas ~subterms:true ~ord:(Ctx.ord ())
         ~which:`Max ~eligible ~ty_args:false (C.lits clause)
       |> Sequence.filter (fun (u_p, _) -> not (T.is_var u_p) || T.is_ho_var u_p)
       (* TODO: could exclude more variables from the index:
@@ -737,9 +740,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             (List.length l = 0 || not (T.is_type (List.hd l)))
             && not (Ordering.monotonic ord)
           in
+          let rewrite_args =
+            !_sup_in_var_args || not (T.is_var hd)
+          in
           (if rewrite_head then normal_form ~restrict hd else (fun k -> k hd))
             (fun hd' ->
-               normal_form_l l
+               (if rewrite_args then normal_form_l l else (fun k -> k l))
                  (fun l' ->
                     let t' =
                       if T.equal hd hd' && T.same_l l l'
@@ -750,10 +756,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                     reduce_at_root ~restrict t' k))
         | T.Fun (ty_arg, body) ->
           (* reduce under lambdas *)
-          normal_form ~restrict:lazy_false body
-            (fun body' ->
-               let u = if T.equal body body' then t else T.fun_ ty_arg body' in
-               k u)
+          if !_sup_under_lambdas
+          then
+            normal_form ~restrict:lazy_false body
+              (fun body' ->
+                let u = if T.equal body body' then t else T.fun_ ty_arg body' in
+                k u)
+          else k t (* TODO: DemodExt *)
         | T.Var _ | T.DB _ -> k t
         | T.AppBuiltin (b, l) ->
           normal_form_l l
@@ -1671,4 +1680,10 @@ let () =
     ; "--sup-at-vars"
     , Arg.Set _sup_at_vars
     , " enable superposition at variables under certain ordering conditions"
+    ; "--no-sup-in-var-args"
+    , Arg.Clear _sup_in_var_args
+    , " disable superposition in arguments of applied variables"
+    ; "--no-sup-under-lambdas"
+    , Arg.Clear _sup_under_lambdas
+    , " disable superposition in bodies of lambda-expressions"
     ]

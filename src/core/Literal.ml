@@ -627,11 +627,11 @@ let is_absurd_tags lit = match lit with
   | Int _ -> [Builtin.Tag.T_lia]
   | Rat _ -> [Builtin.Tag.T_lra]
 
-let fold_terms ?(position=Position.stop) ?(vars=false) ?ty_args ~which ?(ord=Ordering.none) ~subterms lit k =
+let fold_terms ?(position=Position.stop) ?(vars=false) ?(var_args=true) ?(fun_bodies=true) ?ty_args ~which ?(ord=Ordering.none) ~subterms lit k =
   (* function to call at terms *)
   let at_term ~pos t =
     if subterms
-    then T.all_positions ?ty_args ~vars ~pos t k
+    then T.all_positions ?ty_args ~vars ~var_args ~fun_bodies ~pos t k
     else if T.is_var t && not vars
     then () (* ignore *)
     else k (t, pos)

@@ -405,7 +405,7 @@ let fold_rat_terms ~eligible ~which ~ord lits k =
             if do_term t then k (t, foc_lit, pos))
     )
 
-let fold_terms ?(vars=false) ?ty_args ~(which : [< `All|`Max])
+let fold_terms ?(vars=false) ?(var_args=true) ?(fun_bodies=true) ?ty_args ~(which : [< `All|`Max])
     ~ord ~subterms ~eligible lits k =
   let rec aux i =
     if i = Array.length lits then ()
@@ -413,7 +413,7 @@ let fold_terms ?(vars=false) ?ty_args ~(which : [< `All|`Max])
     then aux (i+1) (* ignore lit *)
     else (
       Lit.fold_terms
-        ~position:Position.(arg i stop) ?ty_args ~vars ~which ~ord ~subterms
+        ~position:Position.(arg i stop) ?ty_args ~vars ~var_args ~fun_bodies ~which ~ord ~subterms
         lits.(i) k;
       aux (i+1)
     )
