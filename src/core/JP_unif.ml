@@ -232,13 +232,8 @@ let nfapply s u = Lambda.eta_expand (Lambda.snf (S.apply s u))
 
 (* TODO: comparison form is actually slightly different, but eta_expand also works *)
 
-(* Find disagreeing subterms. 
-    This function also returns a list of variables occurring above the
-    disagreement pair, along with the index of the argument that the disagreement
-    pair occurs in. 
-    TODO: preferably one that is not below a variable (to get preunification if possible) 
-*)
 let find_disagreement s t = 
+  (* TODO: preferably one that is not below a variable (to get preunification if possible) *)
   let rec find_disagreement_l ?(applied_var = None) ?(argindex=0) ss tt = 
     match ss, tt with
       | [], [] -> OSeq.empty
@@ -325,8 +320,6 @@ let unify_nonterminating t s = OSeq.filter_map (fun x -> x) (unify t s)
 
 let (unify_scoped : T.t Scoped.t -> T.t Scoped.t -> Unif_subst.t option OSeq.t) = 
   fun (t1, _) (t2, _) -> OSeq.map (CCOpt.map Unif_subst.of_subst) (unify t1 t2) (* TODO: scopes *)
-
-(* TODO: Interface *)
 
 (* TODO: better solution for fresh vars? *)
 (* TODO: operate on inner types like in `Unif`? Test for NO-TYPE terms? *)
