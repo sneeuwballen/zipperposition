@@ -139,7 +139,7 @@ module TestTerm(I : TermIndex) = struct
 
   (* list of (term,int) that can be retrieved using [retrieve] in [t] *)
   let find_all retrieve idx s_idx t s_t =
-    retrieve ?subst:None (idx,s_idx) (t,s_t)
+    retrieve (idx,s_idx) (t,s_t)
     |> Sequence.fold
       (fun acc (t',i,_) -> (t', i) :: acc)
       []

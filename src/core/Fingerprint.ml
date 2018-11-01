@@ -273,11 +273,15 @@ module Make(X : Set.OrderedType) = struct
       Util.exit_prof prof_traverse;
       raise e
 
-  let retrieve_unifiables ?(subst=Unif_subst.empty) (idx,sc_idx) t k =
+  let retrieve_unifiables_aux fold_unify (idx,sc_idx) t k =
     let features = idx.fp (fst t) in
     let compatible = compatible_features_unif in
     traverse ~compatible idx features
-      (fun leaf -> Leaf.fold_unify ~subst (leaf,sc_idx) t k)
+      (fun leaf -> fold_unify (leaf,sc_idx) t k)
+
+  let retrieve_unifiables = retrieve_unifiables_aux Leaf.fold_unify
+  
+  let retrieve_unifiables_complete = retrieve_unifiables_aux Leaf.fold_unify_complete
 
   let retrieve_generalizations ?(subst=S.empty) (idx,sc_idx) t k =
     let features = idx.fp (fst t) in

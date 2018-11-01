@@ -323,7 +323,10 @@ let unify t s =
 
 let unify_nonterminating t s = OSeq.filter_map (fun x -> x) (unify t s)
 
+let (unify_scoped : T.t Scoped.t -> T.t Scoped.t -> Unif_subst.t option OSeq.t) = 
+  fun (t1, _) (t2, _) -> OSeq.map (CCOpt.map Unif_subst.of_subst) (unify t1 t2) (* TODO: scopes *)
+
+(* TODO: Interface *)
 
 (* TODO: better solution for fresh vars? *)
-(* TODO: Polymorphism? *)
-(* TODO: operate on inner types like in `Unif`. Test for NO-TYPE terms. *)
+(* TODO: operate on inner types like in `Unif`? Test for NO-TYPE terms? *)
