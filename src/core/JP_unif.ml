@@ -4,37 +4,29 @@
 (** {1 Jensen-Pietrzykowski Unification} *)
 
 module T = Term
+module US = Unif_subst
 
-let scope = 0 (* TODO: scopes *)
 
-type subst = Subst.t
+type subst = US.t
 
 module S = struct
 
-  let (empty : subst) = Subst.empty
-  
-  let add s (v:T.var) (t:T.t) = Subst.bind s ((v,scope):>InnerTerm.t HVar.t Scoped.t) ((t:>InnerTerm.t),scope)
+  let apply s t = Subst.FO.apply Subst.Renaming.none (US.subst s) t
 
-  let merge = Subst.merge
-
-  let singleton (v:T.var) t = add empty v t
-
-  let apply s t = Subst.FO.apply Subst.Renaming.none s (t, scope)
-
-  let apply_ty s ty = Subst.Ty.apply Subst.Renaming.none s (ty, scope)
+  let apply_ty s ty = Subst.Ty.apply Subst.Renaming.none (US.subst s) ty
 
 end
 
-let unif_ty t s = 
+let unif_ty ~scope t s = 
   try 
     let type_unifier = Unif.Ty.unify_syn ~subst:Subst.empty (t, scope) (s, scope) in
-    Some type_unifier
+    Some (US.of_subst type_unifier)
   with Unif.Fail -> None
 
 (** {1 Projection rule} *)
 
 (* find substitutions for the projection rule, given a member of the disagreement pair *)
-let project_onesided u =
+let project_onesided ~scope u =
   let head, args = T.as_app u in
   let prefix_types, return_type = Type.open_fun (T.ty head) in
   if T.is_var head 
@@ -44,23 +36,23 @@ let project_onesided u =
     |> OSeq.mapi (fun i arg -> List.length prefix_types - 1 - i, arg) (* Determine DB-index of the argument *)
     |> OSeq.filter_map (fun (dbindex, arg) -> 
       (* Unify type of argument and return type *)
-      match unif_ty (T.ty arg) (return_type) with
+      match unif_ty ~scope (T.ty arg) (return_type) with
         | Some type_unifier -> Some (dbindex, arg, type_unifier)
         | None -> None
     )
     |> OSeq.map (fun (dbindex, arg, type_unifier) -> 
         (* substitute x for a projection to the j-th argument *)
-        S.add type_unifier (T.as_var_exn head) (T.fun_l prefix_types (T.bvar ~ty:(T.ty arg) dbindex))
+        US.FO.bind type_unifier (T.as_var_exn head, scope) (T.fun_l prefix_types (T.bvar ~ty:(T.ty arg) dbindex), scope)
     )
   else OSeq.empty
 
 (* find substitutions for the projection rule, given a disagreement pair *)
-let project u v (_ : (T.var * int) list) = OSeq.append (project_onesided u) (project_onesided v)
+let project ~scope u v (_ : (T.var * int) list) = OSeq.append (project_onesided ~scope u) (project_onesided ~scope v)
 
 
 (** {2 Imitation rule} *)
 
-let imitate_onesided u v = 
+let imitate_onesided ~scope u v = 
   let head_u = T.head_term_mono u in
   let head_v = T.head_term_mono v in
   let prefix_types_u, _ = Type.open_fun (T.ty head_u) in
@@ -78,17 +70,17 @@ let imitate_onesided u v =
     in
     let matrix = T.app head_v matrix_args in
     let subst_value = T.fun_l prefix_types_u matrix in 
-    let subst = S.singleton (T.as_var_exn head_u) subst_value in
+    let subst = US.FO.singleton (T.as_var_exn head_u, scope) (subst_value, scope) in
     OSeq.return subst
   else OSeq.empty
 
 (* find substitutions for the projection rule, given a disagreement pair *)
-let imitate u v (_ : (T.var * int) list) = OSeq.append (imitate_onesided u v) (imitate_onesided v u)
+let imitate ~scope u v (_ : (T.var * int) list) = OSeq.append (imitate_onesided ~scope u v) (imitate_onesided ~scope v u)
 
 
 (** {3 Identification rule} *)
 
-let identify u v (_ : (T.var * int) list) =
+let identify ~scope u v (_ : (T.var * int) list) =
   let head_u = T.head_term_mono u in
   let head_v = T.head_term_mono v in
   let prefix_types_u, return_type = Type.open_fun (T.ty head_u) in
@@ -119,15 +111,15 @@ let identify u v (_ : (T.var * int) list) =
     let matrix_v = T.app matrix_head (matrix_args_v @ bvars_v) in
     let subst_value_u = T.fun_l prefix_types_u matrix_u in 
     let subst_value_v = T.fun_l prefix_types_v matrix_v in 
-    let subst = S.singleton (T.as_var_exn head_u) subst_value_u in
-    let subst = S.add subst (T.as_var_exn head_v) subst_value_v in
+    let subst = US.FO.singleton (T.as_var_exn head_u, scope) (subst_value_u, scope) in
+    let subst = US.FO.bind subst (T.as_var_exn head_v, scope) (subst_value_v, scope) in
     OSeq.return subst
   else OSeq.empty
 
 
 (** {4 Elimination rule} *)
 
-let eliminate _ _ l =
+let eliminate ~scope _ _ l =
   l |> List.map (fun (v, k) -> 
     (* create substitution: v |-> λ u1 ... um. x u1 ... u{k-1} u{k+1} ... um *)
     let prefix_types, return_type = Type.open_fun (HVar.ty v) in
@@ -137,12 +129,11 @@ let eliminate _ _ l =
     let matrix_head = T.var (HVar.fresh ~ty:(Type.arrow prefix_types' return_type) ()) in
     let matrix = T.app matrix_head bvars' in
     let subst_value = T.fun_l prefix_types matrix in
-    let subst = S.singleton v subst_value in
+    let subst = US.FO.singleton (v, scope) (subst_value, scope) in
     subst
   )
   |> OSeq.of_list
 (* TODO: use OSeq directly? *)
-
 
 
 (** {5 Iteration rule} *)
@@ -166,7 +157,7 @@ let iterate_one types_w prefix_types return_type i type_ul =
   subst_value
 
 
-let iterate u v l =
+let iterate ~scope u v l =
   (* The variable can be either above the disagreement pair (i.e., in l) 
      or it can be the head of either member of the disagreement pair *)
   let positions =
@@ -203,7 +194,7 @@ let iterate u v l =
         |> OSeq.map
           (fun (v, prefix_types, return_type, i, type_ul) -> 
             if Type.is_fun type_ul 
-            then Some (S.singleton v (iterate_one types_w prefix_types return_type i type_ul))
+            then Some (US.FO.singleton (v, scope) (iterate_one types_w prefix_types return_type i type_ul, scope))
             else 
               (* To get a complete polymorphic algorithm, we need to consider the case that a type variable could be instantiated as a function. *)
               match Type.view type_ul with
@@ -211,11 +202,11 @@ let iterate u v l =
                   let beta = (HVar.fresh ~ty:Type.tType ()) in
                   let gamma = (HVar.fresh ~ty:Type.tType ()) in
                   let alpha' = (Type.arrow [Type.var beta] (Type.var gamma)) in
-                  let ty_subst = S.singleton alpha (Term.of_ty alpha') in
-                  let v' = HVar.cast ~ty:(S.apply_ty ty_subst (HVar.ty v)) v in
-                  let prefix_types' = prefix_types |> CCList.map (S.apply_ty ty_subst) in
-                  let return_type' = S.apply_ty ty_subst return_type in
-                  Some (S.add ty_subst v' (iterate_one types_w prefix_types' return_type' i alpha'))
+                  let ty_subst = US.FO.singleton (alpha, scope) (Term.of_ty alpha', scope) in
+                  let v' = HVar.cast ~ty:(S.apply_ty ty_subst (HVar.ty v, scope)) v in
+                  let prefix_types' = prefix_types |> CCList.map (fun ty -> S.apply_ty ty_subst (ty, scope)) in
+                  let return_type' = S.apply_ty ty_subst (return_type, scope) in
+                  Some (US.FO.bind ty_subst (v', scope) (iterate_one types_w prefix_types' return_type' i alpha', scope))
                 | _ -> None
           )
         (* Append some "None"s to delay the substitutions containing long w tuples *)
@@ -272,13 +263,13 @@ let find_disagreement s t =
         | OSeq.Cons (d, _) -> Some d
       end
 
-let unify t s = 
+let unify ~scope t s = 
   let rec unify_terms ?(rules = []) t s  =
     (* Util.debugf 1 "@[Unify@ @[(rules: %a)@]@ @[%a@]@ and@ @[%a@]@]" (fun k -> k (CCList.pp CCString.pp) rules T.pp t T.pp s); *)
     match find_disagreement t s with
       | Some ((u, v), l) -> 
-        let add_some f u v l = f u v l |> OSeq.map (fun s -> Some s) in
-        [add_some project,"proj"; add_some imitate,"imit"; add_some identify,"id"; add_some eliminate,"elim"; iterate,"iter"]
+        let add_some f u v l = f ~scope u v l |> OSeq.map (fun s -> Some s) in
+        [add_some project,"proj"; add_some imitate,"imit"; add_some identify,"id"; add_some eliminate,"elim"; iterate ~scope,"iter"]
         (* iterate must be last in this list because it is the only one with infinitely many child nodes *)
         |> OSeq.of_list  
         |> OSeq.flat_map
@@ -289,11 +280,11 @@ let unify t s =
           (fun (osubst,rulename) -> 
             match osubst with
             | Some subst ->
-              let t_subst = nfapply subst t in
-              let s_subst = nfapply subst s in
+              let t_subst = nfapply subst (t, scope) in
+              let s_subst = nfapply subst (s, scope) in
               let unifiers = unify_terms t_subst s_subst ~rules:(rules @ [rulename]) in
               unifiers 
-              |> OSeq.map (CCOpt.map (fun unifier -> S.merge subst unifier))
+              |> OSeq.map (CCOpt.map (fun unifier -> US.merge subst unifier))
               (* We actually want to compose the substitutions here, but merge will have the same effect. *)
             | None -> OSeq.empty
           )
@@ -301,25 +292,44 @@ let unify t s =
         |> OSeq.append (OSeq.return None)
       | None -> 
         assert (t == s);
-        (*Util.debugf 1 "@[...unified!@ @[(rules: %a)@]@]" (fun k -> k (CCList.pp CCString.pp) rules); *)
-        OSeq.return (Some S.empty)
+        (* Util.debugf 1 "@[...unified!@ @[(rules: %a)@]@]" (fun k -> k (CCList.pp CCString.pp) rules); *)
+        OSeq.return (Some US.empty)
   in
   (* Unify types first ... *)
-  match unif_ty (T.ty t) (T.ty s) with
+  match unif_ty ~scope (T.ty t) (T.ty s) with
     | Some type_unifier ->
-      let t' = nfapply type_unifier t in
-      let s' = nfapply type_unifier s in
+      let t' = nfapply type_unifier (t, scope) in
+      let s' = nfapply type_unifier (s, scope) in
       (* ... then terms. *)
       let term_unifiers = unify_terms t' s' ~rules:[] in
-      OSeq.map (CCOpt.map (S.merge type_unifier)) term_unifiers
+      OSeq.map (CCOpt.map (US.merge type_unifier)) term_unifiers
     | None -> OSeq.empty
 
 (* TODO: Remove tracking of rules for efficiency? *)
 
-let unify_nonterminating t s = OSeq.filter_map (fun x -> x) (unify t s)
+let unify_scoped (t0, scope0) (t1, scope1) =
+  if scope0 == scope1
+  then unify ~scope:scope0 t0 t1
+  else (
+    (* Find a scope that's different from the two given ones *)
+    let unifscope = if scope0 < scope1 then scope1 + 1 else scope0 + 1 in
+    let add_renaming scope offset s v =
+      (* Add substitution v -> v*2+offset to s *)
+      let newvar = T.var (HVar.make ~ty:(HVar.ty v) (HVar.id v * 2 + offset)) in
+      US.FO.bind s (v,scope) (newvar, unifscope) 
+    in
+    let subst = US.empty in
+    (* Rename variables apart into scope `unifscope` *)
+    let subst = T.Seq.vars t0 |> Sequence.fold (add_renaming scope0 0) subst in
+    let subst = T.Seq.vars t1 |> Sequence.fold (add_renaming scope1 1) subst in
+    (* Unify *)
+    unify ~scope:unifscope (S.apply subst (t0, scope0)) (S.apply subst (t1, scope1))
+    (* merge with var renaming *)
+    |> OSeq.map (CCOpt.map (US.merge subst))
+  )
 
-let (unify_scoped : T.t Scoped.t -> T.t Scoped.t -> Unif_subst.t option OSeq.t) = 
-  fun (t1, _) (t2, _) -> OSeq.map (CCOpt.map Unif_subst.of_subst) (unify t1 t2) (* TODO: scopes *)
+  let unify_scoped_nonterminating t s = OSeq.filter_map (fun x -> x) (unify_scoped t s)
 
 (* TODO: better solution for fresh vars? *)
 (* TODO: operate on inner types like in `Unif`? Test for NO-TYPE terms? *)
+(* TODO: `dont care` unification, i.e. stopping at flex-flex pairs because exact result does not matter? *)

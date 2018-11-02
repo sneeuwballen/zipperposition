@@ -37,6 +37,7 @@ let bind t v u = {t with subst=Subst.bind t.subst v u}
 let update t v u = {t with subst=Subst.update t.subst v u}
 let mem t v = Subst.mem t.subst v
 let deref t v = Subst.deref t.subst v
+let merge t1 t2 = {subst=Subst.merge t1.subst t2.subst; cstr_l = t1.cstr_l @ t2.cstr_l} 
 
 module FO = struct
   let bind t (v:Type.t HVar.t Scoped.t) u =
@@ -44,6 +45,7 @@ module FO = struct
   let mem t (v:Type.t HVar.t Scoped.t) =
     Subst.mem t.subst (v :> InnerTerm.t HVar.t Scoped.t)
   let deref s t = Subst.FO.deref s.subst t
+  let singleton v t = bind empty v t
 end
 
 let has_constr t: bool = constr_l t <> []

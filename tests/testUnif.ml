@@ -330,7 +330,7 @@ let suite_unif1 : unit Alcotest.test_case list =
 
 let jp_check_count t u count : unit Alcotest.test_case =
   "JP-unif check count", `Quick, fun () ->
-    let t' = JP_unif.unify_nonterminating t u in
+    let t' = JP_unif.unify_scoped_nonterminating t u in
     if count = OSeq.length t' then ()
     else
       Alcotest.failf
@@ -338,11 +338,11 @@ let jp_check_count t u count : unit Alcotest.test_case =
 
 let jp_check_nonunifiable ?(msg="") t u : unit Alcotest.test_case =
   "JP-unif check nonunifiable", `Quick, fun () ->
-  if OSeq.for_all CCOpt.is_none (OSeq.take 20 (JP_unif.unify t u)) then ()
+  if OSeq.for_all CCOpt.is_none (OSeq.take 20 (JP_unif.unify_scoped t u)) then ()
   else (
     Alcotest.failf
       "@[<2>`%a`@ should not unify with @ `%a`%s@]@."
-        T.ZF.pp t T.ZF.pp u msg
+       (Scoped.pp T.ZF.pp) t (Scoped.pp T.ZF.pp) u msg
   )
 
 let jp_check_unifier t u ~res =
@@ -353,12 +353,12 @@ let jp_check_unifier t u ~res =
       let found = Lambda.snf (JP_unif.S.apply s t) in
       Unif.FO.are_variant res found 
   in
-  let unifiers = JP_unif.unify t u in
+  let unifiers = JP_unif.unify_scoped t u in
   if OSeq.exists is_res unifiers then () 
   else (
     Alcotest.failf
       "@[<2>`%a`@ and `%a`@ should unify as @ `%a`@]@."
-        T.ZF.pp t T.ZF.pp u T.ZF.pp res
+        (Scoped.pp T.ZF.pp) t (Scoped.pp T.ZF.pp) u T.ZF.pp res
   )
 
 let jp_check_eqs t u ts =
@@ -372,21 +372,23 @@ let jp_check_eqs t u ts =
         Unif.FO.are_variant t1 t2 
       ) ts
   in
-  let unifiers = JP_unif.unify t u in
+  let unifiers = JP_unif.unify_scoped t u in
   if OSeq.exists is_res unifiers then () 
   else (
     Alcotest.failf
       "@[<2>`%a`@ and `%a`@ should unify this list: @ `%a`@]@."
-        T.ZF.pp t T.ZF.pp u (CCList.pp (CCPair.pp T.ZF.pp T.ZF.pp)) (CCList.map (fun (t1, t2, _) -> t1, t2) ts)
+        (Scoped.pp T.ZF.pp) t (Scoped.pp T.ZF.pp) u (CCList.pp (CCPair.pp T.ZF.pp T.ZF.pp)) (CCList.map (fun ((t1, _), (t2, _), _) -> t1, t2) ts)
   )
 
 let suite_jp_unif : unit Alcotest.test_case list =
+  (* Util.set_debug 1; *)
   let (=?=) a b = Task.mk_unif a b in (* unif pair *)
   let (<?>) a b = Task.mk_unif ~negated:true a b in (* unif pair *)
   let (>->) a b = Task.set_with_ty b a in (* specify return type *)
   let (>?->) a b = Action.set_with_ty b a in (* specify return type *)
   let mk_tests (pair,actions) =
     let t, u = Task.parse pair in
+    let t, u = (t,0), (u,0) in
     let actions = List.map Action.parse actions in
     clear_scope();
     if Task.is_negated pair then
@@ -395,7 +397,7 @@ let suite_jp_unif : unit Alcotest.test_case list =
       actions |> CCList.flat_map  (fun action -> match action with
         | Action.Count {count} -> [jp_check_count t u count]
         | Action.Yield {t=res;_} -> [jp_check_unifier t u ~res]
-        | Action.Eqs {ts} -> [jp_check_eqs t u ts]
+        | Action.Eqs {ts} -> [jp_check_eqs t u (List.map (fun (t1,t2,ty) -> (t1,0),(t2,0),ty) ts)]
         | _ -> assert false
       ) 
   in
@@ -404,7 +406,7 @@ let suite_jp_unif : unit Alcotest.test_case list =
     [ "X a" =?= "Y b" >-> "term", [
           Action.count 17
         ];
-
+(*
       "X a" <?> "g (X a)" >-> "term", [];
 
       "(g (X a))" =?= "(X (g a))" >-> "term", [
@@ -455,7 +457,7 @@ let suite_jp_unif : unit Alcotest.test_case list =
               "X", "fun (z : alpha -> gamma -> term). z (X000 z) (Y000 z (z (X000 z)))", None;
               "Y", "fun (x : alpha) (y : gamma). a", None 
           ]
-      ]
+      ]*)
 
     ]
 
@@ -490,10 +492,12 @@ let test_jp_unif_aux = "JP unification", `Quick, fun () ->
 
   (** Rule tests *)
 
+  let scope = 0 in
+
   let term = pterm ~ty:"term" "X a b" in
   let result = 
-    JP_unif.project_onesided term 
-    |> OSeq.map (fun subst -> Lambda.snf (JP_unif.S.apply subst term))
+    JP_unif.project_onesided ~scope term 
+    |> OSeq.map (fun subst -> Lambda.snf (JP_unif.S.apply subst (term,scope)))
     |> OSeq.to_list in
   let expected = [pterm "a"; pterm "b"] in
   OUnit.assert_equal expected result;
@@ -503,8 +507,8 @@ let test_jp_unif_aux = "JP unification", `Quick, fun () ->
   let term1 = pterm ~ty:"term" "X a b" in
   let term2 = pterm "f c d" in
   let results = 
-    JP_unif.imitate term1 term2 []
-    |> OSeq.map (fun subst -> Lambda.snf (JP_unif.S.apply subst term1))
+    JP_unif.imitate ~scope term1 term2 []
+    |> OSeq.map (fun subst -> Lambda.snf (JP_unif.S.apply subst (term1,scope)))
     |> OSeq.to_array in
   OUnit.assert_equal 1 (Array.length results);
   check_variant (results.(0)) (pterm ~ty:"term" "f (X a b) (Y a b)");
@@ -513,11 +517,11 @@ let test_jp_unif_aux = "JP unification", `Quick, fun () ->
 
   let term1 = pterm ~ty:"term" "X a b" in
   let term2 = pterm ~ty:"term" "Y c d" in
-  let substs = JP_unif.identify term1 term2 [] in
+  let substs = JP_unif.identify ~scope term1 term2 [] in
   OUnit.assert_equal 1 (OSeq.length substs);
   let subst = OSeq.nth 0 substs in
-  let result1 = Lambda.snf (JP_unif.S.apply subst term1) in
-  let result2 = Lambda.snf (JP_unif.S.apply subst term2) in
+  let result1 = Lambda.snf (JP_unif.S.apply subst (term1,scope)) in
+  let result2 = Lambda.snf (JP_unif.S.apply subst (term2,scope)) in
   check_variant (result1) 
     (T.app (pterm ~ty:"term -> term -> term -> term -> term" "X1") 
       [pterm "a"; pterm "b";pterm ~ty:"term" "Y a b"; pterm ~ty:"term" "Z a b"]);
