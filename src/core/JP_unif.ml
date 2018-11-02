@@ -17,6 +17,11 @@ module S = struct
 
 end
 
+let make_fresh_var fresh_var_ ~ty () = 
+  let var = HVar.make ~ty !fresh_var_ in 
+  incr fresh_var_; 
+  var
+
 let unif_ty ~scope t s = 
   try 
     let type_unifier = Unif.Ty.unify_syn ~subst:Subst.empty (t, scope) (s, scope) in
@@ -26,7 +31,7 @@ let unif_ty ~scope t s =
 (** {1 Projection rule} *)
 
 (* find substitutions for the projection rule, given a member of the disagreement pair *)
-let project_onesided ~scope u =
+let project_onesided ~scope ~fresh_var_ u =
   let head, args = T.as_app u in
   let prefix_types, return_type = Type.open_fun (T.ty head) in
   if T.is_var head 
@@ -47,12 +52,12 @@ let project_onesided ~scope u =
   else OSeq.empty
 
 (* find substitutions for the projection rule, given a disagreement pair *)
-let project ~scope u v (_ : (T.var * int) list) = OSeq.append (project_onesided ~scope u) (project_onesided ~scope v)
+let project ~scope ~fresh_var_ u v (_ : (T.var * int) list) = OSeq.append (project_onesided ~scope ~fresh_var_ u) (project_onesided ~scope ~fresh_var_ v)
 
 
 (** {2 Imitation rule} *)
 
-let imitate_onesided ~scope u v = 
+let imitate_onesided ~scope ~fresh_var_ u v = 
   let head_u = T.head_term_mono u in
   let head_v = T.head_term_mono v in
   let prefix_types_u, _ = Type.open_fun (T.ty head_u) in
@@ -65,7 +70,7 @@ let imitate_onesided ~scope u v =
       prefix_types_v 
       |> List.map (fun prefix_type_v ->
         let ty = Type.arrow prefix_types_u prefix_type_v in
-        let var = T.var (HVar.fresh ~ty ()) in
+        let var = T.var (make_fresh_var fresh_var_ ~ty ()) in
         T.app var bvars) 
     in
     let matrix = T.app head_v matrix_args in
@@ -75,12 +80,13 @@ let imitate_onesided ~scope u v =
   else OSeq.empty
 
 (* find substitutions for the projection rule, given a disagreement pair *)
-let imitate ~scope u v (_ : (T.var * int) list) = OSeq.append (imitate_onesided ~scope u v) (imitate_onesided ~scope v u)
+let imitate ~scope ~fresh_var_ u v (_ : (T.var * int) list) = 
+  OSeq.append (imitate_onesided ~scope ~fresh_var_ u v) (imitate_onesided ~scope ~fresh_var_ v u)
 
 
 (** {3 Identification rule} *)
 
-let identify ~scope u v (_ : (T.var * int) list) =
+let identify ~scope ~fresh_var_ u v (_ : (T.var * int) list) =
   let head_u = T.head_term_mono u in
   let head_v = T.head_term_mono v in
   let prefix_types_u, return_type = Type.open_fun (T.ty head_u) in
@@ -96,17 +102,17 @@ let identify ~scope u v (_ : (T.var * int) list) =
       prefix_types_v 
       |> List.map (fun prefix_type_v ->
         let ty = Type.arrow prefix_types_u prefix_type_v in
-        let var = T.var (HVar.fresh ~ty ()) in
+        let var = T.var (make_fresh_var fresh_var_ ~ty ()) in
         T.app var bvars_u) 
     in
     let matrix_args_v = 
       prefix_types_u
       |> List.map (fun prefix_type_u ->
         let ty = Type.arrow prefix_types_v prefix_type_u in
-        let var = T.var (HVar.fresh ~ty ()) in
+        let var = T.var (make_fresh_var fresh_var_ ~ty ()) in
         T.app var bvars_v) 
     in
-    let matrix_head = T.var (HVar.fresh ~ty:(Type.arrow (prefix_types_u @ prefix_types_v) return_type) ()) in
+    let matrix_head = T.var (make_fresh_var fresh_var_ ~ty:(Type.arrow (prefix_types_u @ prefix_types_v) return_type) ()) in
     let matrix_u = T.app matrix_head (bvars_u @ matrix_args_u) in
     let matrix_v = T.app matrix_head (matrix_args_v @ bvars_v) in
     let subst_value_u = T.fun_l prefix_types_u matrix_u in 
@@ -119,14 +125,14 @@ let identify ~scope u v (_ : (T.var * int) list) =
 
 (** {4 Elimination rule} *)
 
-let eliminate ~scope _ _ l =
+let eliminate ~scope ~fresh_var_ _ _ l =
   l |> List.map (fun (v, k) -> 
     (* create substitution: v |-> λ u1 ... um. x u1 ... u{k-1} u{k+1} ... um *)
     let prefix_types, return_type = Type.open_fun (HVar.ty v) in
     let bvars = prefix_types |> List.rev |> List.mapi (fun i ty -> T.bvar ~ty i) |> List.rev in
     let prefix_types' = CCList.remove_at_idx k prefix_types in
     let bvars' = CCList.remove_at_idx k bvars in
-    let matrix_head = T.var (HVar.fresh ~ty:(Type.arrow prefix_types' return_type) ()) in
+    let matrix_head = T.var (make_fresh_var fresh_var_ ~ty:(Type.arrow prefix_types' return_type) ()) in
     let matrix = T.app matrix_head bvars' in
     let subst_value = T.fun_l prefix_types matrix in
     let subst = US.FO.singleton (v, scope) (subst_value, scope) in
@@ -138,7 +144,7 @@ let eliminate ~scope _ _ l =
 
 (** {5 Iteration rule} *)
 
-let iterate_one types_w prefix_types return_type i type_ul =
+let iterate_one ~fresh_var_ types_w prefix_types return_type i type_ul =
   let prefix_types_ul, return_type_ul = Type.open_fun type_ul in
   (* create substitution: v |-> λ u1 ... um. x u1 ... um (λ w. ui (y1 (u1...um w)) ... (yn (u1...um w))) *)
   let inner_lambda_expr = 
@@ -146,18 +152,18 @@ let iterate_one types_w prefix_types return_type i type_ul =
     let bvars_u_under_w = prefix_types |> List.rev |> List.mapi (fun i ty -> T.bvar ~ty (i + List.length types_w)) |> List.rev in
     let bvars_w = types_w |> List.rev |> List.mapi (fun i ty -> T.bvar ~ty i) |> List.rev in
     let bvar_ul_under_w = T.bvar ~ty:type_ul (List.length prefix_types - 1 - i + List.length types_w) in
-    let vars_y = prefix_types_ul |> List.map (fun ty -> T.var (HVar.fresh ~ty:(Type.arrow (prefix_types @ types_w) ty) ())) in
+    let vars_y = prefix_types_ul |> List.map (fun ty -> T.var (make_fresh_var fresh_var_ ~ty:(Type.arrow (prefix_types @ types_w) ty) ())) in
     let matrix = T.app bvar_ul_under_w (vars_y |> List.map (fun y -> T.app y (bvars_u_under_w @ bvars_w))) in
     T.fun_l types_w matrix
   in
   let bvars_u = prefix_types |> List.rev |> List.mapi (fun i ty -> T.bvar ~ty i) |> List.rev in
-  let var_x = T.var (HVar.fresh ~ty:(Type.arrow (prefix_types @ [Type.arrow types_w return_type_ul]) return_type) ()) in
+  let var_x = T.var (make_fresh_var fresh_var_ ~ty:(Type.arrow (prefix_types @ [Type.arrow types_w return_type_ul]) return_type) ()) in
   let matrix = T.app var_x (bvars_u @ [inner_lambda_expr]) in
   let subst_value = T.fun_l prefix_types matrix in
   subst_value
 
 
-let iterate ~scope u v l =
+let iterate ~scope ~fresh_var_ u v l =
   (* The variable can be either above the disagreement pair (i.e., in l) 
      or it can be the head of either member of the disagreement pair *)
   let positions =
@@ -183,7 +189,7 @@ let iterate ~scope u v l =
       )
   in
   (* The tuple `w` can be of any length. Hence we use the sequence [[alpha], [alpha, beta], [alpha, beta, gamma], ...] *)
-  let types_w_seq = OSeq.iterate [] (fun types_w -> Type.var (HVar.fresh ~ty:Type.tType ()) :: types_w) in
+  let types_w_seq = OSeq.iterate [] (fun types_w -> Type.var (make_fresh_var fresh_var_ ~ty:Type.tType ()) :: types_w) in
   if OSeq.is_empty positions 
   then OSeq.empty
   else 
@@ -194,19 +200,19 @@ let iterate ~scope u v l =
         |> OSeq.map
           (fun (v, prefix_types, return_type, i, type_ul) -> 
             if Type.is_fun type_ul 
-            then Some (US.FO.singleton (v, scope) (iterate_one types_w prefix_types return_type i type_ul, scope))
+            then Some (US.FO.singleton (v, scope) (iterate_one ~fresh_var_ types_w prefix_types return_type i type_ul, scope))
             else 
               (* To get a complete polymorphic algorithm, we need to consider the case that a type variable could be instantiated as a function. *)
               match Type.view type_ul with
                 | Type.Var alpha -> 
-                  let beta = (HVar.fresh ~ty:Type.tType ()) in
-                  let gamma = (HVar.fresh ~ty:Type.tType ()) in
+                  let beta = (make_fresh_var fresh_var_ ~ty:Type.tType ()) in
+                  let gamma = (make_fresh_var fresh_var_ ~ty:Type.tType ()) in
                   let alpha' = (Type.arrow [Type.var beta] (Type.var gamma)) in
                   let ty_subst = US.FO.singleton (alpha, scope) (Term.of_ty alpha', scope) in
                   let v' = HVar.cast ~ty:(S.apply_ty ty_subst (HVar.ty v, scope)) v in
                   let prefix_types' = prefix_types |> CCList.map (fun ty -> S.apply_ty ty_subst (ty, scope)) in
                   let return_type' = S.apply_ty ty_subst (return_type, scope) in
-                  Some (US.FO.bind ty_subst (v', scope) (iterate_one types_w prefix_types' return_type' i alpha', scope))
+                  Some (US.FO.bind ty_subst (v', scope) (iterate_one ~fresh_var_ types_w prefix_types' return_type' i alpha', scope))
                 | _ -> None
           )
         (* Append some "None"s to delay the substitutions containing long w tuples *)
@@ -263,13 +269,13 @@ let find_disagreement s t =
         | OSeq.Cons (d, _) -> Some d
       end
 
-let unify ~scope t s = 
+let unify ~scope ~fresh_var_ t s = 
   let rec unify_terms ?(rules = []) t s  =
     (* Util.debugf 1 "@[Unify@ @[(rules: %a)@]@ @[%a@]@ and@ @[%a@]@]" (fun k -> k (CCList.pp CCString.pp) rules T.pp t T.pp s); *)
     match find_disagreement t s with
       | Some ((u, v), l) -> 
-        let add_some f u v l = f ~scope u v l |> OSeq.map (fun s -> Some s) in
-        [add_some project,"proj"; add_some imitate,"imit"; add_some identify,"id"; add_some eliminate,"elim"; iterate ~scope,"iter"]
+        let add_some f u v l = f ~scope ~fresh_var_ u v l |> OSeq.map (fun s -> Some s) in
+        [add_some project,"proj"; add_some imitate,"imit"; add_some identify,"id"; add_some eliminate,"elim"; iterate ~scope ~fresh_var_,"iter"]
         (* iterate must be last in this list because it is the only one with infinitely many child nodes *)
         |> OSeq.of_list  
         |> OSeq.flat_map
@@ -308,28 +314,26 @@ let unify ~scope t s =
 (* TODO: Remove tracking of rules for efficiency? *)
 
 let unify_scoped (t0, scope0) (t1, scope1) =
-  if scope0 == scope1
-  then unify ~scope:scope0 t0 t1
-  else (
-    (* Find a scope that's different from the two given ones *)
-    let unifscope = if scope0 < scope1 then scope1 + 1 else scope0 + 1 in
-    let add_renaming scope offset s v =
-      (* Add substitution v -> v*2+offset to s *)
-      let newvar = T.var (HVar.make ~ty:(HVar.ty v) (HVar.id v * 2 + offset)) in
-      US.FO.bind s (v,scope) (newvar, unifscope) 
-    in
-    let subst = US.empty in
-    (* Rename variables apart into scope `unifscope` *)
-    let subst = T.Seq.vars t0 |> Sequence.fold (add_renaming scope0 0) subst in
-    let subst = T.Seq.vars t1 |> Sequence.fold (add_renaming scope1 1) subst in
-    (* Unify *)
-    unify ~scope:unifscope (S.apply subst (t0, scope0)) (S.apply subst (t1, scope1))
-    (* merge with var renaming *)
-    |> OSeq.map (CCOpt.map (US.merge subst))
-  )
+  (* Find a scope that's different from the two given ones *)
+  let unifscope = if scope0 < scope1 then scope1 + 1 else scope0 + 1 in
+  let fresh_var_ = ref 0 in
+  let add_renaming scope offset s v =
+    (* Add substitution v -> v*2+offset to s *)
+    let id = HVar.id v * 2 + offset in
+    if id >= !fresh_var_ then fresh_var_ := id + 1;
+    let newvar = T.var (HVar.make ~ty:(HVar.ty v) id) in
+    US.FO.bind s (v,scope) (newvar, unifscope) 
+  in
+  let subst = US.empty in
+  (* Rename variables apart into scope `unifscope` *)
+  let subst = T.Seq.vars t0 |> Sequence.fold (add_renaming scope0 0) subst in
+  let subst = T.Seq.vars t1 |> Sequence.fold (add_renaming scope1 1) subst in
+  (* Unify *)
+  unify ~scope:unifscope ~fresh_var_ (S.apply subst (t0, scope0)) (S.apply subst (t1, scope1))
+  (* merge with var renaming *)
+  |> OSeq.map (CCOpt.map (US.merge subst))
 
-  let unify_scoped_nonterminating t s = OSeq.filter_map (fun x -> x) (unify_scoped t s)
+let unify_scoped_nonterminating t s = OSeq.filter_map (fun x -> x) (unify_scoped t s)
 
-(* TODO: better solution for fresh vars? *)
 (* TODO: operate on inner types like in `Unif`? Test for NO-TYPE terms? *)
 (* TODO: `dont care` unification, i.e. stopping at flex-flex pairs because exact result does not matter? *)

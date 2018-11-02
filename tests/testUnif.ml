@@ -496,7 +496,7 @@ let test_jp_unif_aux = "JP unification", `Quick, fun () ->
 
   let term = pterm ~ty:"term" "X a b" in
   let result = 
-    JP_unif.project_onesided ~scope term 
+    JP_unif.project_onesided ~scope ~fresh_var_:(ref 1000) term 
     |> OSeq.map (fun subst -> Lambda.snf (JP_unif.S.apply subst (term,scope)))
     |> OSeq.to_list in
   let expected = [pterm "a"; pterm "b"] in
@@ -507,7 +507,7 @@ let test_jp_unif_aux = "JP unification", `Quick, fun () ->
   let term1 = pterm ~ty:"term" "X a b" in
   let term2 = pterm "f c d" in
   let results = 
-    JP_unif.imitate ~scope term1 term2 []
+    JP_unif.imitate ~scope ~fresh_var_:(ref 1000) term1 term2 []
     |> OSeq.map (fun subst -> Lambda.snf (JP_unif.S.apply subst (term1,scope)))
     |> OSeq.to_array in
   OUnit.assert_equal 1 (Array.length results);
@@ -517,7 +517,7 @@ let test_jp_unif_aux = "JP unification", `Quick, fun () ->
 
   let term1 = pterm ~ty:"term" "X a b" in
   let term2 = pterm ~ty:"term" "Y c d" in
-  let substs = JP_unif.identify ~scope term1 term2 [] in
+  let substs = JP_unif.identify ~scope ~fresh_var_:(ref 1000) term1 term2 [] in
   OUnit.assert_equal 1 (OSeq.length substs);
   let subst = OSeq.nth 0 substs in
   let result1 = Lambda.snf (JP_unif.S.apply subst (term1,scope)) in
