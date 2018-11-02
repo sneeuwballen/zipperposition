@@ -731,7 +731,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               (fun body' ->
                 let u = if T.equal body body' then t else T.fun_ ty_arg body' in
                 k u)
-          else k t (* TODO: DemodExt *)
+          else reduce_at_root ~restrict t k (* TODO: DemodExt *)
         | T.Var _ | T.DB _ -> k t
         | T.AppBuiltin (b, l) ->
           normal_form_l l
