@@ -503,7 +503,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       ~retrieve_from_index:I.retrieve_unifiables_complete
       ~process_retrieved:(fun do_sup (u_p, with_pos, substs) -> Some (OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
 
-  let infer_equality_resolution_aux ~unify clause =
+  let infer_equality_resolution_aux ~unify ~iterate_substs clause =
     Util.enter_prof prof_infer_equality_resolution;
     let eligible = C.Eligible.always in
     (* iterate on those literals *)
@@ -534,7 +534,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               Some new_clause
             ) else None
           in
-          unify (l, 0) (r, 0) do_eq_res
+          let substs = unify (l, 0) (r, 0) in
+          iterate_substs substs do_eq_res
         )
       |> Sequence.to_rev_list
     in
@@ -543,21 +544,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let infer_equality_resolution = 
     infer_equality_resolution_aux 
-      ~unify:(fun l r do_eq_res -> 
-        try
-          Unif.FO.unify_full l r |> do_eq_res
-        with Unif.Fail ->
-          (* l and r not unifiable, try next *)
-          None
-      )
+      ~unify:(fun l r -> try Some (Unif.FO.unify_full l r) with Unif.Fail -> None)
+      ~iterate_substs:(fun substs do_eq_res -> CCOpt.flat_map do_eq_res substs)
 
   let infer_equality_resolution_complete_ho = 
     infer_equality_resolution_aux 
-      ~unify:(fun l r do_eq_res -> 
-        JP_unif.unify_scoped l r
-        |> OSeq.map (CCOpt.flat_map do_eq_res)
-        |> (fun c -> Some c)
-      )
+      ~unify:JP_unif.unify_scoped
+      ~iterate_substs:(fun substs do_eq_res -> Some (OSeq.map (CCOpt.flat_map do_eq_res) substs))
 
   module EqFactInfo = struct
     type t = {
@@ -573,7 +566,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   end
 
   (* do the inference between given positions, if ordering conditions are respected *)
-  let do_eq_factoring info acc =
+  let do_eq_factoring info =
     let open EqFactInfo in
     let ord = Ctx.ord () in
     let s = info.s and t = info.t and v = info.v in
@@ -608,11 +601,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       Util.debugf ~section 3 "@[<hv2>equality factoring on@ @[%a@]@ yields @[%a@]@]"
         (fun k->k C.pp info.clause C.pp new_clause);
-      new_clause :: acc
+      Some new_clause
     ) else
-      acc
+      None
 
-  let infer_equality_factoring clause =
+  let infer_equality_factoring_aux ~unify ~iterate_substs clause =
     Util.enter_prof prof_infer_equality_factoring;
     let eligible = C.Eligible.(filter Lit.is_pos) in
     (* find root terms that are unifiable with s and are not in the
@@ -624,23 +617,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
              | _ when i = idx -> () (* same index *)
              | Lit.Prop (p, true) ->
                (* positive proposition *)
-               begin try
-                   let subst = Unif.FO.unify_full (s,0) (p,0) in
-                   k (p, T.true_, subst)
-                 with Unif.Fail -> ()
-               end
+               k (p, T.true_, unify (s,0) (p,0));
              | Lit.Equation (u, v, true) ->
                (* positive equation *)
-               begin try
-                   let subst = Unif.FO.unify_full (s,0) (u,0) in
-                   k (u, v, subst)
-                 with Unif.Fail -> ()
-               end;
-               begin try
-                   let subst = Unif.FO.unify_full (s,0) (v,0) in
-                   k (v, u, subst)
-                 with Unif.Fail -> ()
-               end;
+               k (u, v, unify (s,0) (u,0));
+               k (v, u, unify (s,0) (v,0));
              | _ -> () (* ignore other literals *)
         ) (C.lits clause)
     in
@@ -648,21 +629,35 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let new_clauses =
       Lits.fold_eqn ~sign:true ~ord:(Ctx.ord ())
         ~both:true ~eligible (C.lits clause)
-      |> Sequence.fold
-        (fun acc (s, t, _, s_pos) -> (* try with s=t *)
+      |> Sequence.flat_map
+        (fun (s, t, _, s_pos) -> (* try with s=t *)
            let active_idx = Lits.Pos.idx s_pos in
            find_unifiable_lits active_idx s s_pos
-           |> Sequence.fold
-             (fun acc (u,v,subst) ->
-                let info = EqFactInfo.({
-                    clause; s; t; u; v; active_idx; subst; scope=0;
-                  }) in
-                do_eq_factoring info acc)
-             acc)
-        []
+           |> Sequence.filter_map
+             (fun (u,v,substs) ->
+                iterate_substs substs 
+                  (fun subst ->
+                    let info = EqFactInfo.({
+                        clause; s; t; u; v; active_idx; subst; scope=0;
+                      }) in
+                    do_eq_factoring info
+                  )
+             ) 
+        )
+      |> Sequence.to_rev_list
     in
     Util.exit_prof prof_infer_equality_factoring;
     new_clauses
+
+    let infer_equality_factoring = 
+      infer_equality_factoring_aux 
+        ~unify:(fun s t -> try Some (Unif.FO.unify_full s t) with Unif.Fail -> None)
+        ~iterate_substs:(fun subst do_eq_fact -> CCOpt.flat_map do_eq_fact subst)
+
+    let infer_equality_factoring_complete_ho = 
+      infer_equality_factoring_aux 
+        ~unify:JP_unif.unify_scoped
+        ~iterate_substs:(fun substs do_eq_fact -> Some (OSeq.map (CCOpt.flat_map do_eq_fact) substs))
 
   (* ----------------------------------------------------------------------
    * simplifications
@@ -1623,7 +1618,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     then (
       Env.add_binary_inf_nonterminating "superposition_passive" infer_passive_complete_ho;
       Env.add_binary_inf_nonterminating "superposition_active" infer_active_complete_ho;
-      (* TODO: Env.add_unary_inf_nonterminating "equality_factoring" infer_equality_factoring_complete_ho; *)
+      Env.add_unary_inf_nonterminating "equality_factoring" infer_equality_factoring_complete_ho;
       Env.add_unary_inf_nonterminating "equality_resolution" infer_equality_resolution_complete_ho;
     )
     else (
