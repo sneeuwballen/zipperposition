@@ -442,7 +442,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           retrieve_from_index (!_idx_sup_into, 1) (s, 0)
           |> Sequence.filter_map (process_retrieved do_sup)
         )
-      |> Sequence.to_list
+      |> Sequence.to_rev_list
     in
     Util.exit_prof prof_infer_active;
     new_clauses
@@ -478,7 +478,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           retrieve_from_index (!_idx_sup_from, 1) (u_p,0)
           |> Sequence.filter_map (process_retrieved do_sup)
         )
-        |> Sequence.to_list
+        |> Sequence.to_rev_list
     in
     Util.exit_prof prof_infer_passive;
     new_clauses
@@ -503,7 +503,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       ~retrieve_from_index:I.retrieve_unifiables_complete
       ~process_retrieved:(fun do_sup (u_p, with_pos, substs) -> Some (OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
 
-  let infer_equality_resolution clause =
+  let infer_equality_resolution_aux ~unify clause =
     Util.enter_prof prof_infer_equality_resolution;
     let eligible = C.Eligible.always in
     (* iterate on those literals *)
@@ -512,35 +512,52 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~both:false ~eligible (C.lits clause)
       |> Sequence.filter_map
         (fun (l, r, _, l_pos) ->
-           let pos = Lits.Pos.idx l_pos in
-           try
-             let us = Unif.FO.unify_full (l, 0) (r, 0) in
-             if BV.get (C.eligible_res_no_subst clause) pos
-             (* subst(lit) is maximal, we can do the inference *)
-             then (
-               Util.incr_stat stat_equality_resolution_call;
-               let renaming = Subst.Renaming.create () in
-               let subst = US.subst us in
-               let rule = Proof.Rule.mk "eq_res" in
-               let new_lits = CCArray.except_idx (C.lits clause) pos in
-               let new_lits = Lit.apply_subst_list renaming subst (new_lits,0) in
-               let c_guard = Literal.of_unif_subst renaming us in
-               let tags = Unif_subst.tags us in
-               let trail = C.trail clause and penalty = C.penalty clause in
-               let proof = Proof.Step.inference ~rule ~tags
-                   [C.proof_parent_subst renaming (clause,0) subst] in
-               let new_clause = C.create ~trail ~penalty (c_guard@new_lits) proof in
-               Util.debugf ~section 3 "@[<hv2>equality resolution on@ @[%a@]@ yields @[%a@]@]"
-                 (fun k->k C.pp clause C.pp new_clause);
-               Some new_clause
-             ) else None
-           with Unif.Fail ->
-             (* l and r not unifiable, try next *)
-             None)
+          let do_eq_res us =
+            let pos = Lits.Pos.idx l_pos in
+            if BV.get (C.eligible_res_no_subst clause) pos
+            (* subst(lit) is maximal, we can do the inference *)
+            then (
+              Util.incr_stat stat_equality_resolution_call;
+              let renaming = Subst.Renaming.create () in
+              let subst = US.subst us in
+              let rule = Proof.Rule.mk "eq_res" in
+              let new_lits = CCArray.except_idx (C.lits clause) pos in
+              let new_lits = Lit.apply_subst_list renaming subst (new_lits,0) in
+              let c_guard = Literal.of_unif_subst renaming us in
+              let tags = Unif_subst.tags us in
+              let trail = C.trail clause and penalty = C.penalty clause in
+              let proof = Proof.Step.inference ~rule ~tags
+                  [C.proof_parent_subst renaming (clause,0) subst] in
+              let new_clause = C.create ~trail ~penalty (c_guard@new_lits) proof in
+              Util.debugf ~section 3 "@[<hv2>equality resolution on@ @[%a@]@ yields @[%a@]@]"
+                (fun k->k C.pp clause C.pp new_clause);
+              Some new_clause
+            ) else None
+          in
+          unify (l, 0) (r, 0) do_eq_res
+        )
       |> Sequence.to_rev_list
     in
     Util.exit_prof prof_infer_equality_resolution;
     new_clauses
+
+  let infer_equality_resolution = 
+    infer_equality_resolution_aux 
+      ~unify:(fun l r do_eq_res -> 
+        try
+          Unif.FO.unify_full l r |> do_eq_res
+        with Unif.Fail ->
+          (* l and r not unifiable, try next *)
+          None
+      )
+
+  let infer_equality_resolution_complete_ho = 
+    infer_equality_resolution_aux 
+      ~unify:(fun l r do_eq_res -> 
+        JP_unif.unify_scoped l r
+        |> OSeq.map (CCOpt.flat_map do_eq_res)
+        |> (fun c -> Some c)
+      )
 
   module EqFactInfo = struct
     type t = {
@@ -1605,14 +1622,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     if !_complete_ho_unification
     then (
       Env.add_binary_inf_nonterminating "superposition_passive" infer_passive_complete_ho;
-      Env.add_binary_inf_nonterminating "superposition_active" infer_active_complete_ho
+      Env.add_binary_inf_nonterminating "superposition_active" infer_active_complete_ho;
+      (* TODO: Env.add_unary_inf_nonterminating "equality_factoring" infer_equality_factoring_complete_ho; *)
+      Env.add_unary_inf_nonterminating "equality_resolution" infer_equality_resolution_complete_ho;
     )
     else (
       Env.add_binary_inf "superposition_passive" infer_passive;
-      Env.add_binary_inf "superposition_active" infer_active
+      Env.add_binary_inf "superposition_active" infer_active;
+      Env.add_unary_inf "equality_factoring" infer_equality_factoring;
+      Env.add_unary_inf "equality_resolution" infer_equality_resolution;
     );
-    Env.add_unary_inf "equality_factoring" infer_equality_factoring;
-    Env.add_unary_inf "equality_resolution" infer_equality_resolution;
     if not (!_dont_simplify) then (
       Env.add_rw_simplify rw_simplify;
       Env.add_basic_simplify basic_simplify;
