@@ -11,12 +11,17 @@ module type S = sig
   type inf_rule = C.t -> C.t list
   (** An inference returns a list of conclusions *)
 
+  type inf_rule_nonterminating = C.t -> C.t option OSeq.t list
+  (** An inference with (possibly) infintely many conclusions. It returns a list of conclusion streams *)
+
   type generate_rule = full:bool -> unit -> C.t list
   (** Generation of clauses regardless of current clause.
       @param full if true, perform more thorough checks *)
 
   type binary_inf_rule = inf_rule
   type unary_inf_rule = inf_rule
+  type binary_inf_rule_nonterminating = inf_rule_nonterminating
+  type unary_inf_rule_nonterminating = inf_rule_nonterminating
 
   type simplify_rule = C.t -> C.t SimplM.t
   (** Simplify the clause structurally (basic simplifications),
@@ -95,7 +100,13 @@ module type S = sig
   val add_binary_inf : string -> binary_inf_rule -> unit
   (** Add a binary inference rule *)
 
+  val add_binary_inf_nonterminating : string -> binary_inf_rule_nonterminating -> unit
+  (** Add a binary inference rule *)
+
   val add_unary_inf : string -> unary_inf_rule -> unit
+  (** Add a unary inference rule *)
+
+  val add_unary_inf_nonterminating : string -> unary_inf_rule_nonterminating -> unit
   (** Add a unary inference rule *)
 
   val add_rw_simplify : rw_simplify_rule -> unit

@@ -65,6 +65,7 @@ let _sup_at_vars = ref false
 let _sup_in_var_args = ref true
 let _sup_under_lambdas = ref true
 let _dot_demod_into = ref None
+let _complete_ho_unification = ref false
 
 module Make(Env : Env.S) : S with module Env = Env = struct
   module Env = Env
@@ -222,7 +223,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   (* Helper that does one or zero superposition inference, with all
      the given parameters. Clauses have a scope. *)
-  let do_classic_superposition info acc =
+  let do_classic_superposition info =
     let ord = Ctx.ord () in
     let open SupInfo in
     let module P = Position in
@@ -305,14 +306,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
       Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
-      new_clause :: acc
+      Some new_clause
     with ExitSuperposition reason ->
       Util.debugf ~section 3 "... cancel, %s" (fun k->k reason);
-      acc
+      None
 
   (* simultaneous superposition: when rewriting D with C \lor s=t,
       replace s with t everywhere in D rather than at one place. *)
-  let do_simultaneous_superposition info acc =
+  let do_simultaneous_superposition info =
     let ord = Ctx.ord () in
     let open SupInfo in
     let module P = Position in
@@ -395,22 +396,22 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
       Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
-      new_clause :: acc
+      Some new_clause
     with ExitSuperposition reason ->
       Util.debugf ~section 3 "@[... cancel, %s@]" (fun k->k reason);
-      acc
+      None
 
   (* choose between regular and simultaneous superposition *)
-  let do_superposition info acc=
+  let do_superposition info =
     let open SupInfo in
     assert (Type.equal (T.ty info.s) (T.ty info.t));
     assert (Unif.Ty.equal ~subst:(US.subst info.subst)
         (T.ty info.s, info.scope_active) (T.ty info.u_p, info.scope_passive));
     if !_use_simultaneous_sup
-    then do_simultaneous_superposition info acc
-    else do_classic_superposition info acc
+    then do_simultaneous_superposition info
+    else do_classic_superposition info
 
-  let infer_active clause =
+  let infer_active_aux ~retrieve_from_index ~process_retrieved clause =
     Util.enter_prof prof_infer_active;
     (* no literal can be eligible for paramodulation if some are selected.
        This checks if inferences with i-th literal are needed? *)
@@ -421,29 +422,32 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let new_clauses =
       Lits.fold_eqn ~sign:true ~ord:(Ctx.ord ())
         ~both:true ~eligible (C.lits clause)
-      |> Sequence.fold
-        (fun acc (s, t, _, s_pos) ->
-           (* rewrite clauses using s *)
-           I.retrieve_unifiables (!_idx_sup_into, 1) (s, 0)
-           |> Sequence.filter (fun (u_p,_,_) -> T.DB.is_closed u_p)
-           |> Sequence.fold
-             (fun acc (u_p, with_pos, subst) ->
-                (* rewrite u_p with s *)
-                let passive = with_pos.C.WithPos.clause in
-                let passive_pos = with_pos.C.WithPos.pos in
-                let passive_lit, _ = Lits.Pos.lit_at (C.lits passive) passive_pos in
-                let info = SupInfo.( {
-                    s; t; active=clause; active_pos=s_pos; scope_active=0;
-                    u_p; passive; passive_lit; passive_pos; scope_passive=1; subst;
-                  }) in
-                do_superposition info acc)
-             acc)
-        []
+      |> Sequence.flat_map
+        (fun (s, t, _, s_pos) ->
+          let do_sup u_p with_pos subst = 
+            (* rewrite u_p with s *)
+            if T.DB.is_closed u_p
+            then
+              let passive = with_pos.C.WithPos.clause in
+              let passive_pos = with_pos.C.WithPos.pos in
+              let passive_lit, _ = Lits.Pos.lit_at (C.lits passive) passive_pos in
+              let info = SupInfo.( {
+                  s; t; active=clause; active_pos=s_pos; scope_active=0;
+                  u_p; passive; passive_lit; passive_pos; scope_passive=1; subst;
+                }) in
+              do_superposition info 
+            else None
+          in
+          (* rewrite clauses using s *)
+          retrieve_from_index (!_idx_sup_into, 1) (s, 0)
+          |> Sequence.filter_map (process_retrieved do_sup)
+        )
+      |> Sequence.to_list
     in
     Util.exit_prof prof_infer_active;
     new_clauses
 
-  let infer_passive clause =
+  let infer_passive_aux ~retrieve_from_index ~process_retrieved clause =
     Util.enter_prof prof_infer_passive;
     (* perform inference on this lit? *)
     let eligible = C.Eligible.(res clause) in
@@ -453,32 +457,51 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Lits.fold_terms ~vars:!_sup_at_vars ~var_args:!_sup_in_var_args ~fun_bodies:!_sup_under_lambdas ~subterms:true ~ord:(Ctx.ord ())
         ~which:`Max ~eligible ~ty_args:false (C.lits clause)
       |> Sequence.filter (fun (u_p, _) -> not (T.is_var u_p) || T.is_ho_var u_p)
-      (* TODO: could exclude more variables from the index:
-         they are not needed if they occur with the same args everywhere in the clause *)
       |> Sequence.filter (fun (u_p, _) -> T.DB.is_closed u_p)
-      |> Sequence.fold
-        (fun acc (u_p, passive_pos) ->
-           let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
-           (* all terms that occur in an equation in the active_set
-              and that are potentially unifiable with u_p (u at position p) *)
-           I.retrieve_unifiables (!_idx_sup_from, 1) (u_p,0)
-           |> Sequence.fold
-             (fun acc (_, with_pos, subst) ->
-                let active = with_pos.C.WithPos.clause in
-                let s_pos = with_pos.C.WithPos.pos in
-                match Lits.View.get_eqn (C.lits active) s_pos with
-                  | Some (s, t, true) ->
-                    let info = SupInfo.({
-                        s; t; active; active_pos=s_pos; scope_active=1; subst;
-                        u_p; passive=clause; passive_lit; passive_pos; scope_passive=0;
-                      }) in
-                    do_superposition info acc
-                  | _ -> acc)
-             acc)
-        []
+      |> Sequence.flat_map
+        (fun (u_p, passive_pos) ->
+          let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
+          let do_sup _ with_pos subst = 
+            let active = with_pos.C.WithPos.clause in
+            let s_pos = with_pos.C.WithPos.pos in
+            match Lits.View.get_eqn (C.lits active) s_pos with
+              | Some (s, t, true) ->
+                let info = SupInfo.({
+                    s; t; active; active_pos=s_pos; scope_active=1; subst;
+                    u_p; passive=clause; passive_lit; passive_pos; scope_passive=0;
+                  }) in
+                do_superposition info  
+              | _ -> None 
+          in
+          (* all terms that occur in an equation in the active_set
+            and that are potentially unifiable with u_p (u at position p) *)
+          retrieve_from_index (!_idx_sup_from, 1) (u_p,0)
+          |> Sequence.filter_map (process_retrieved do_sup)
+        )
+        |> Sequence.to_list
     in
     Util.exit_prof prof_infer_passive;
     new_clauses
+
+  let infer_active = 
+    infer_active_aux 
+      ~retrieve_from_index:I.retrieve_unifiables 
+      ~process_retrieved:(fun do_sup (u_p, with_pos, subst) -> do_sup u_p with_pos subst)
+
+  let infer_passive = 
+    infer_passive_aux
+      ~retrieve_from_index:I.retrieve_unifiables 
+      ~process_retrieved:(fun do_sup (u_p, with_pos, subst) -> do_sup u_p with_pos subst)
+
+  let infer_active_complete_ho = 
+    infer_active_aux 
+      ~retrieve_from_index:I.retrieve_unifiables_complete
+      ~process_retrieved:(fun do_sup (u_p, with_pos, substs) -> Some (OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
+
+  let infer_passive_complete_ho = 
+    infer_passive_aux 
+      ~retrieve_from_index:I.retrieve_unifiables_complete
+      ~process_retrieved:(fun do_sup (u_p, with_pos, substs) -> Some (OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
 
   let infer_equality_resolution clause =
     Util.enter_prof prof_infer_equality_resolution;
@@ -1579,8 +1602,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and redundant = subsumed_by_active_set
     and backward_redundant = subsumed_in_active_set
     and is_trivial = is_tautology in
-    Env.add_binary_inf "superposition_passive" infer_passive;
-    Env.add_binary_inf "superposition_active" infer_active;
+    if !_complete_ho_unification
+    then (
+      Env.add_binary_inf_nonterminating "superposition_passive" infer_passive_complete_ho;
+      Env.add_binary_inf_nonterminating "superposition_active" infer_active_complete_ho
+    )
+    else (
+      Env.add_binary_inf "superposition_passive" infer_passive;
+      Env.add_binary_inf "superposition_active" infer_active
+    );
     Env.add_unary_inf "equality_factoring" infer_equality_factoring;
     Env.add_unary_inf "equality_resolution" infer_equality_resolution;
     if not (!_dont_simplify) then (
@@ -1655,4 +1685,7 @@ let () =
     ; "--no-sup-under-lambdas"
     , Arg.Clear _sup_under_lambdas
     , " disable superposition in bodies of lambda-expressions"
+    ; "--complete-ho-unif"
+    , Arg.Set _complete_ho_unification
+    , " enable complete higher-order unification algorithm (Jensen-Pietrzykowski)"
     ]
