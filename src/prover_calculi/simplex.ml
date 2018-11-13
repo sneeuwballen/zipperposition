@@ -398,7 +398,7 @@ module Make(Var: OrderedType) = struct
   (* Strangely here, using Queue instade of Stack leads to better perfomances *)
   (* TODO: insert user functions between iterations ? + debug function for ksolve ? *)
   let nsolve_aux t int_vars =
-    let f = fun _ _ -> () in
+    let f = fun _ -> () in
     let to_do = Queue.create () in
     let final = ref None in
     Queue.push (t.bounds, (List.hd int_vars, minus_inf, inf), final) to_do;

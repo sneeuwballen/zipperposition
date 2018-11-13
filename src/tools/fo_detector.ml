@@ -13,7 +13,7 @@ let rec detect_term t  =
   match T.view t with
     | T.App (f, args) -> T.is_var(f) || CCList.exists detect_term args
     | T.AppBuiltin (_, args) -> CCList.exists detect_term args
-    | T.Bind (b, v, t) -> detect_term t
+    | T.Bind (_, _, t) -> detect_term t
     | _ -> false
 
 (** encode a statement *)

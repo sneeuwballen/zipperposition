@@ -5,8 +5,8 @@ homepage: "https://github.com/c-cube/zipperposition"
 version: "1.5"
 synopsis: "Library for Zipperposition"
 build: [
-  ["jbuilder" "build" "-p" name]
-  ["jbuilder" "build" "@doc" "-p" name] {with-doc}
+  ["dune" "build" "-p" name]
+  ["dune" "build" "@doc" "-p" name] {with-doc}
 ]
 depends: [
   "base-bytes"
@@ -15,7 +15,7 @@ depends: [
   "logtk" { >= "1.5" }
   "containers" { >= "1.0" }
   "sequence" { >= "0.4" }
-  "jbuilder" { build }
+  "dune" { build }
   "msat" { >= "0.5" < "1.0" }
   "menhir" {build}
   "logtk"

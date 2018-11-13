@@ -5,18 +5,17 @@ homepage: "https://github.com/c-cube/zipperposition"
 version: "1.5"
 synopsis: "Core types and algorithms for logic"
 build: [
-  ["jbuilder" "build" "-p" name]
-  ["jbuilder" "build" "@doc" "-p" name] {with-doc}
-  ["jbuilder" "runtest" "-p" name] {with-test}
+  ["dune" "build" "-p" name]
+  ["dune" "build" "@doc" "-p" name] {with-doc}
+  ["dune" "runtest" "-p" name] {with-test}
 ]
 depends: [
-  "ocamlfind" { build }
   "base-bytes"
   "base-unix"
   "zarith"
   "containers" { >= "1.0" }
   "sequence" { >= "0.4" }
-  "jbuilder" { build }
+  "dune" { build }
   "alcotest" {with-test}
   "qcheck" {with-test & >= "0.9"}
   "ocaml" {>= "4.03"}

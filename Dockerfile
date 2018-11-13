@@ -1,4 +1,4 @@
-FROM ocaml/opam2:alpine as build
+FROM ocaml/opam2:alpine-3.8-ocaml-4.06 as build
 # init and set perms
 WORKDIR /zipper/build
 RUN sudo apk update
@@ -7,9 +7,9 @@ RUN sudo chown opam: /zipper/build
 RUN eval `opam config env` && \
     opam update && \
     opam depext -i zarith && \
-    opam install jbuilder zarith containers sequence msat menhir
+    opam install dune zarith containers sequence msat menhir
 # main build
-COPY --chown=opam:nogroup src *.opam Makefile ./
+COPY --chown=opam:nogroup src *.opam Makefile dune-project ./
 RUN eval `opam config env` && \
     make build && \
     cp _build/default/main/zipperposition.exe ./zipperposition

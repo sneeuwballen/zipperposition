@@ -592,7 +592,7 @@ to use the image:
 
 === Make a release
 
-Now we use jbuilder, it should simplify the process compared to oasis.
+Now we use dune, it should simplify the process compared to oasis.
 
 - merge `dev` into `master`:
   `git checkout master; git merge dev`

@@ -4,19 +4,19 @@ J?=3
 all: build test-cached
 
 build:
-	@jbuilder build @install -j $J
+	@dune build @install -j $J
 
 clean:
-	@jbuilder clean
+	@dune clean
 
 doc:
-	@jbuilder build @doc
+	@dune build @doc
 
 test:
-	@jbuilder runtest --no-buffer -j $J -f
+	@dune runtest --no-buffer -j $J -f
 
 test-cached:
-	@jbuilder runtest --no-buffer -j $J
+	@dune runtest --no-buffer -j $J
 # ./tests/quick/all.sh # FIXME?
 
 test-qcheck:
@@ -31,23 +31,7 @@ test-unit:
 
 test-list:
 	@./tests/run_tests.sh list
-	@echo "to run a particular test: ./tests/run_tests.sh -only-test <path>
-
-open_doc: doc
-	xdg-open _build/default/_doc/index.html
-
-rst_doc:
-	@echo "build Sphinx documentation (into _build/doc)"
-	sphinx-build doc _build/doc
-	mkdir -p gh-pages/rst/
-	cp -r _build/doc/*.html _build/doc/*.js _build/doc/_static gh-pages/rst
-
-open_rst_doc: rst_doc
-	xdg-open _build/doc/contents.html
-
-push_doc: doc rst_doc
-	rsync -tavu logtk.docdir/* cedeela.fr:~/simon/root/software/logtk/
-	rsync -tavu _build/doc/* cedeela.fr:~/simon/root/software/logtk/rst/
+	@echo "to run a particular test: ./tests/run_tests.sh -only-test <path>"
 
 INTERFACE_FILES = $(shell find src -name '*.mli')
 IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
@@ -80,6 +64,9 @@ $(TEST_TOOL)-zipper:
 
 tip-benchmarks:
 	git submodule update --init tip-benchmarks
+
+docker-build:
+	docker build -t zipperposition .
 
 $(TEST_TOOL)-tip: check-test-tool tip-benchmarks
 	@[ -d tip-benchmarks ] || (echo "missing tip-benchmarks/" && exit 1)
@@ -145,5 +132,5 @@ reindent: ocp-indent
 gallery.svg:
 	for i in gallery/*.dot ; do dot -Tsvg "$$i" > "gallery/`basename $${i} .dot`.svg" ; done
 
-.PHONY: doc push_doc dot package tags rst_doc open_doc test-all
+.PHONY: doc push_doc dot package tags test-all
 
