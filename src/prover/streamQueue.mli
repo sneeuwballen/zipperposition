@@ -9,15 +9,7 @@
     criterion (e.g. the age of the clause, so that older clauses are more
     likely to be chosen). *)
 
-type profile = StreamQueue_intf.profile
-
-val profile_of_string : string -> profile
-(** @raise Invalid_argument if the string is not recognized *)
-
-val get_profile : unit -> profile
-val set_profile : profile -> unit
-
 module type S = StreamQueue_intf.S
 
-module Make(C : Stream.S) : S with module C = C
+module Make(Stm : Stream.S) : S with module Stm = Stm
 (* TODO: create module Stream *)

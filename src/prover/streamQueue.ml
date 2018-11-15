@@ -30,9 +30,9 @@ module Make(Stm : Stream_intf.S) = struct
   module H = CCHeap.Make(struct
       (* heap ordered by [weight, real age(id)] *)
       type t = (int * Stm.t)
-      let leq (i1, c1) (i2, c2) =
+      let leq (i1, s1) (i2, s2) =
         i1 < i2 ||
-        (i1 = i2 && Stm.compare c1 c2 <= 0)
+        (i1 = i2 && Stm.compare s1 s2 <= 0)
     end)
 
   (** A priority queue of streams *)
@@ -58,10 +58,10 @@ module Make(Stm : Stream_intf.S) = struct
       name;
       ratio;
       time_before_drip=ratio;
-      heap = H.empty;
+      hp = H.empty;
     }
 
-  let is_empty (q:t) = H.is_empty q.hp
+  let is_empty (q:t) = H.is_empty (q.hp)
 
   let length q = H.size q.hp
 

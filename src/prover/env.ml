@@ -45,7 +45,7 @@ module Make(X : sig
 
   type inf_rule_nonterminating = C.t -> C.t option OSeq.t list
   (** An inference with (possibly) infintely many conclusions. It returns a list of conclusion streams *)
-  
+
   type generate_rule = full:bool -> unit -> C.t list
   (** Generation of clauses regardless of current clause *)
 
