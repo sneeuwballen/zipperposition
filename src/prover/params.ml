@@ -54,6 +54,14 @@ let default : t = {
 
 let select = ref default.select
 
+let _modes = Hashtbl.create 10
+let mode_spec () =
+  Arg.Symbol 
+    (List.sort_uniq String.compare (CCHashtbl.keys_list _modes), 
+    fun s -> List.iter (fun f -> f ()) (Hashtbl.find_all _modes s))
+let add_to_mode mode f = 
+  Hashtbl.add _modes mode f
+
 (** parse_args returns parameters *)
 let parse_args () =
   let ord = ref default.ord
@@ -78,7 +86,8 @@ let parse_args () =
   let add_file s = CCVector.push files s in
   (* options list *)
   let options = (
-    [ "--ord", Arg.Set_string ord, " choose ordering (rpo,kbo)"
+    [ "--mode", mode_spec (), " mode"
+    ; "--ord", Arg.Set_string ord, " choose ordering (rpo,kbo)"
     ; "--version", Arg.Set version, " print version"
     ; "--steps", Arg.Set_int steps,
       " maximal number of steps of given clause loop (no limit if negative)"

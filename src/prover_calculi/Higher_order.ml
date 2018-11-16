@@ -778,4 +778,13 @@ let () =
       "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule";
       "--ho-no-ext-neg", Arg.Clear _ext_neg, " disable negative extensionality rule"
     ];
+  Params.add_to_mode "ho-complete" (fun () -> 
+    enabled_ := true;
+    force_enabled_ := true;
+    _ext_axiom := true;
+    eta_ := `Reduce;
+    prim_mode_ := `None;
+    _elim_pred_var := false;
+    enable_unif_ := false
+  );
   Extensions.register extension;

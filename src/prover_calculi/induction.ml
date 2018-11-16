@@ -1386,4 +1386,7 @@ let () =
     ; "--ind-gen-term", Arg.Set gen_term, " generalize on terms"
     ; "--no-ind-gen-var", Arg.Clear gen_var, " do not generalize on variables"
     ; "--no-ind-gen-term", Arg.Clear gen_term, " do not generalize on terms"
-    ]
+    ];
+  Params.add_to_mode "ho-complete" (fun () ->
+    enabled_ := false
+  );

@@ -177,4 +177,7 @@ let () =
   Params.add_opts
     [ "--select", Arg.Symbol (all(), set_select), " set literal selection function";
       "--ho-selection-restriction", ho_restriction_opt, " selection restrictions for lambda-free higher-order terms (none/no-var-heading-max-term/no-var-different-args/no-unapplied-var-occurring-applied/no-ho-vars)"
-    ]
+    ];
+  Params.add_to_mode "ho-complete" (fun () ->
+    _ho_restriction := `NoHigherOrderVariables
+  );

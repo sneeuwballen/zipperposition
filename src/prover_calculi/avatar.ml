@@ -591,4 +591,7 @@ let () =
     ; "--no-avatar-simp-trail", Arg.Clear simplify_trail_, " do not simplify boolean trails in Avatar"
     ; "--avatar-backward-simp-trail", Arg.Set back_simplify_trail_, " backward-simplify boolean trails in Avatar"
     ; "--no-avatar-backward-simp-trail", Arg.Clear back_simplify_trail_, " do not backward-simplify boolean trails in Avatar"
-    ]
+    ];
+  Params.add_to_mode "ho-complete" (fun () ->
+    enabled_ := false
+  );

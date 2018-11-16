@@ -202,4 +202,7 @@ let extension =
 let () =
   Options.add_opts
     [ "--no-fool", Arg.Clear enabled_, " disable fool (first-class booleans)"  ];
+  Params.add_to_mode "ho-complete" (fun () ->
+    enabled_ := false
+  );
   Extensions.register extension
