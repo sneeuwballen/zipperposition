@@ -22,8 +22,6 @@ val id : t -> int
 
 val is_empty : t -> bool
 
-val length : t -> int
-
 val penalty : t -> int
 
 (** {2 IO} *)

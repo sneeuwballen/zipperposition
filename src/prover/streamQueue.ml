@@ -3,10 +3,6 @@
 
 (** {1 A priority queue of streams} *)
 
-open List
-
-module O = Ordering
-
 module type S = StreamQueue_intf.S
 
 module Make(Stm : Stream_intf.S) = struct

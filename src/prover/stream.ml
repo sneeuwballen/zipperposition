@@ -3,13 +3,10 @@
 
 open Logtk
 
-(* TODO: what is the precise use of doing this? *)
 let stat_stream_create = Util.mk_stat "stream.create"
 
 (** {2 Signature} *)
 module type S = Stream_intf.S
-
-type 'a packed = (module S with type C.t = 'a)
 
 module Make(X : sig
     module Ctx : Ctx.S
@@ -31,6 +28,7 @@ let id_count_ = ref 0
 (** {2 Basics} *)
 
 let make ?penalty:(p=1) s =
+  Util.incr_stat stat_stream_create;
   let id = !id_count_ in
   incr id_count_;
   { id; penalty = p; stm = s; }
@@ -41,12 +39,10 @@ let id s = s.id
 let hash s = Hashtbl.hash s.id
 
 (* TODO: does it really pop an element? *)
+(* normally it should be fine, check with Simon *)
 let is_empty s = OSeq.is_empty s.stm
 
-(*
-   TODO: what happens when the sequence is infinite? /!\ Caution: non-termination risk /!\
-*)
-let length s = OSeq.length s.stm
+(* No length function because some streams are infinite *)
 
 let penalty s = s.penalty
 

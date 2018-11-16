@@ -9,10 +9,8 @@ module type S = sig
   (** {6 Weight functions} *)
   module WeightFun : sig
     type t = Stm.t -> int
-    (** attribute a weight to a clause. The smaller, the better (lightweight
-        clauses will be favored). A weight must always be positive;
-        the weight of the empty clause should alwyays be 0. *)
-    (*TODO: is this still true for streams or only for clauses?*)
+    (** attribute a weight to a stream. The smaller, the better (lightweight
+        streams will be favored). A weight must always be positive. *)
 
     val penalty : t
     (** Returns the penalty of the stream *)
@@ -50,10 +48,10 @@ module type S = sig
   (** {6 Available Queues} *)
 
   val make : ratio:int -> weight:(Stm.t -> int) -> string -> t
-  (** Bring your own implementation of queue.
-      @param ratio pick-given ratio. One in [ratio] calls to {!take_first},
-        the returned stream comes from a FIFO; the other times it comes
-        from a priority queue that uses [weight] to sort streams
+  (** Creates a priority queue that uses [weight] to sort streams.
+      @param ratio pick-given ratio. Only one in [ratio] truly returns
+        a clause if there is one available in calls to {!take_first_when_available}
+        and {!take_first_anyway}.
       @param name the name of this stream queue *)
 
   val default : unit -> t
