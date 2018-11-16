@@ -36,10 +36,7 @@ module Make(Stm : Stream_intf.S) = struct
     end)
 
   (** A priority queue of streams *)
-  type t =
-    | Queue of heap
-
-  and heap = {
+  type t = {
     mutable hp : H.t;
     mutable time_before_drip: int;
     (* cycles from 0 to ratio, changed at every [take_first].
@@ -53,7 +50,7 @@ module Make(Stm : Stream_intf.S) = struct
       by a weight function *)
   let make ~ratio ~weight name =
     if ratio <= 0 then invalid_arg "StreamQueue.make: ratio must be >0";
-    Queue {
+    {
       weight;
       name;
       ratio;

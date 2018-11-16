@@ -12,4 +12,3 @@
 module type S = StreamQueue_intf.S
 
 module Make(Stm : Stream.S) : S with module Stm = Stm
-(* TODO: create module Stream *)
