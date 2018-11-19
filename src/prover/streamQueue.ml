@@ -35,8 +35,9 @@ module Make(Stm : Stream_intf.S) = struct
   type t = {
     mutable hp : H.t;
     mutable time_before_drip: int;
-    (* cycles from 0 to ratio, changed at every [take_first].
-       when 0, pick a (clause, unifier) pair in hp; otherwise don't pick anything and decrease *)
+    (* cycles from 0 to ratio, changed at every [take_first_if_available].
+       when 0, pick a clause in hp; otherwise don't pick anything and decrease.
+       reset at ratio when [take_first_anyway] is called *)
     ratio: int;
     weight: Stm.t -> int; (* function that assigns an initial weight to a stream (based on what criteria?) *)
     name: string;
@@ -66,22 +67,25 @@ module Make(Stm : Stream_intf.S) = struct
 
   let add_lst q sl = List.iter (add q) sl
 
-  let take_first_when_available q =
+  let rec take_first_when_available q =
     if H.is_empty q.hp then raise Not_found;
     if q.time_before_drip = 0
     then (
-      q.time_before_drip <- q.ratio;
+      let dripped = ref None in
       let reduced_hp, (w, s) = H.take_exn q.hp in
       let new_hp =
         if Stm.is_empty s
         then reduced_hp
         else (
-          (* TODO: make the weight update function generic *)
-          H.insert (w+1, s) reduced_hp
+          dripped := Stm.drip s;
+          H.insert (w + (Stm.penalty s), s) reduced_hp
         ) in
-      (* TODO: extract only a clause-unifier pair instead of a whole stream, the stream should stay in the queue until it is empty*)
       q.hp <- new_hp;
-      Some s
+      match !dripped with
+        | None -> take_first_when_available q
+        | Some _ ->
+          q.time_before_drip <- q.ratio;
+          !dripped
     ) else (
       assert (q.time_before_drip > 0);
       q.time_before_drip <- q.time_before_drip - 1;
@@ -90,18 +94,21 @@ module Make(Stm : Stream_intf.S) = struct
 
   let take_first_anyway q =
     if H.is_empty q.hp then raise Not_found;
-    q.time_before_drip <- q.ratio;
+    let dripped = ref None in
     let reduced_hp, (w, s) = H.take_exn q.hp in
     let new_hp =
       if Stm.is_empty s
       then reduced_hp
       else (
-        (* TODO: make the weight update function generic (using the Stm.penalty argument?) *)
-        H.insert (w+1, s) reduced_hp
-      ) in
-    (* TODO: extract only a clause-unifier pair instead of a whole stream, the stream should stay in the queue until it is empty*)
+          dripped := Stm.drip s;
+          H.insert (w + (Stm.penalty s), s) reduced_hp
+       ) in
     q.hp <- new_hp;
-    s
+    match !dripped with
+      | None -> take_first_when_available q
+      | Some _ ->
+        q.time_before_drip <- q.ratio;
+        !dripped
 
   let name q = q.name
 

@@ -24,6 +24,8 @@ val is_empty : t -> bool
 
 val penalty : t -> int
 
+val drip : t -> C.t option
+
 (** {2 IO} *)
 
 val pp : t CCFormat.printer

@@ -46,6 +46,11 @@ let is_empty s = OSeq.is_empty s.stm
 
 let penalty s = s.penalty
 
+let drip s =
+  let dripped = OSeq.nth 1 s.stm in
+  s.stm <- OSeq.drop 1 s.stm;
+  dripped
+
 let pp out s =
   Format.fprintf out "stream %i" s.id;
   ()

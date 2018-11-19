@@ -36,10 +36,10 @@ module type S = sig
   val is_empty : t -> bool
   (** check whether the queue is empty *)
 
-  val take_first_when_available : t -> Stm.t option
+  val take_first_when_available : t -> Stm.C.t option
   (** Take first element of the queue if available, or raise Not_found *)
 
-  val take_first_anyway: t -> Stm.t
+  val take_first_anyway: t -> Stm.C.t option
   (** Take first element of the queue, or raise Not_found *)
 
   val name : t -> string
