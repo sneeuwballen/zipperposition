@@ -15,6 +15,12 @@ doc:
 test:
 	@dune runtest --no-buffer -j $J -f
 
+install:
+	@dune build @install && dune install
+
+uninstall:
+	@ocamlfind remove zipperposition libzipperposition logtk || true
+
 test-cached:
 	@dune runtest --no-buffer -j $J
 # ./tests/quick/all.sh # FIXME?
