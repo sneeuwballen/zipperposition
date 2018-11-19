@@ -111,7 +111,7 @@ module Clause = struct
       applies a substitution to a first-order term)
   *)
   let apply_subst ~renaming subst (c, s_c) =
-    make (List.map (fun (t,b) -> Subst.FO.apply ~renaming subst (t, s_c), b) c)
+    make (List.map (fun (t,b) -> Subst.FO.apply renaming subst (t, s_c), b) c)
 
   (** printing a clause: print literals separated with "|" *)
   let pp out c = Util.pp_list ~sep:" | " Lit.pp out c
@@ -212,7 +212,7 @@ let _factoring c =
               *)
               if i<j && b'
               then try
-                  let subst = Unif.FO.unification (t, 0) (t', 0) in
+                  let subst = Unif.FO.unify_syn (t, 0) (t', 0) in
                   (** Now we have subst(t)=subst(t'), the inference can proceed *)
                   let c' = CCList.remove_at_idx i c in
                   let renaming = Subst.Renaming.create() in
@@ -269,7 +269,8 @@ let _resolve_with c =
            such that [term] unifies with [t]. 0 and 1 are again scopes. *)
        Index.retrieve_unifiables (!_idx,0) (t,1)
        |> Sequence.iter
-         (fun (_t', (d,j), subst) ->
+         (fun (_t', (d,j), uf) ->
+            let subst = Unif_subst.subst uf in
             let (_,b') = List.nth d j in
             (** We have found [_t'], and a pair [(d, j)] such
                 that [d] is another clause, and the [j]-th literal of [d]
@@ -343,16 +344,15 @@ let process_file f =
   Util.debugf 2 "process file %s..." (fun k->k f);
   let res = E.(
       (** parse the file in the format *)
-      P.Parsing_utils.parse_tptp f
+      P.Parsing_utils.parse_tptp f >>= fun stmts ->
       (** Perform type inference and type checking (possibly updating
           the signature) *)
-      >>= TypeInference.infer_statements ?ctx:None
+      TypeInference.infer_statements ?ctx:None ~implicit_ty_args:true stmts >>= fun st ->
       (** CNF ("clausal normal form"). We transform arbitrary first order
           formulas into a set of clauses (see the {!Clause} module)
           because resolution only works on clauses.
 
           This algorithm is already implemented in {!Logtk}. *)
-      >>= fun st ->
       let decls = Cnf.cnf_of_seq ?ctx:None (CCVector.to_seq st) in
       _signature :=
         CCVector.to_seq decls
