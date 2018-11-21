@@ -103,7 +103,10 @@ let () =
       "--max-vars", Arg.Set_int max_vars, " maximum number of variables per clause";
       "--no-max-vars", Arg.Set no_max_vars, " disable maximum number of variables per clause";
     ];
-  Params.add_to_mode "ho-complete" (fun () ->
+  Params.add_to_mode "ho-complete-basic" (fun () ->
+    no_max_vars := true
+  );
+  Params.add_to_mode "fo-complete-basic" (fun () ->
     no_max_vars := true
   );
   ()

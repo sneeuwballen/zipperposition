@@ -1703,10 +1703,13 @@ let () =
     , Arg.Set _complete_ho_unification
     , " enable complete higher-order unification algorithm (Jensen-Pietrzykowski)"
     ];
-    Params.add_to_mode "ho-complete" (fun () ->
+    Params.add_to_mode "ho-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
       _sup_at_vars := true;
       _sup_in_var_args := false;
       _sup_under_lambdas := false;
       _complete_ho_unification := true
+    );
+    Params.add_to_mode "fo-complete-basic" (fun () ->
+      _use_simultaneous_sup := false;
     )
