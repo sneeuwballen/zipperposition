@@ -36,8 +36,8 @@ module type S = sig
   val is_empty : t -> bool
   (** check whether the queue is empty *)
 
-  val take_first_when_available : t -> Stm.C.t option
-  (** Take first element of the queue if available, or raise Not_found *)
+  val take_first_when_available : ?guard:int -> t -> Stm.C.t option
+  (** Attempts to take first element of the queue if available, or raise Not_found *)
 
   val take_first_anyway: t -> Stm.C.t option
   (** Take first element of the queue, or raise Not_found *)
@@ -47,7 +47,7 @@ module type S = sig
 
   (** {6 Available Queues} *)
 
-  val make : ratio:int -> weight:(Stm.t -> int) -> string -> t
+  val make : guard:int -> ratio:int -> weight:(Stm.t -> int) -> string -> t
   (** Creates a priority queue that uses [weight] to sort streams.
       @param ratio pick-given ratio. Only one in [ratio] truly returns
         a clause if there is one available in calls to {!take_first_when_available}

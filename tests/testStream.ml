@@ -40,5 +40,5 @@ let check_take_first_when_available = ()
 let check_take_first_anyway = ()
 
 let suite : unit Alcotest.test_case list =
-  [  check_empty_stm;
+  [  (*check_empty_stm;*)
   ]

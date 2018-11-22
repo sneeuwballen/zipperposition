@@ -39,19 +39,21 @@ module Make(Stm : Stream_intf.S) = struct
        when 0, pick a clause in hp; otherwise don't pick anything and decrease.
        reset at ratio when [take_first_anyway] is called *)
     ratio: int;
+    guard: int;
     weight: Stm.t -> int; (* function that assigns an initial weight to a stream (based on what criteria?) *)
     name: string;
   }
 
 (** generic stream queue based on some ordering on streams, given
       by a weight function *)
-  let make ~ratio ~weight name =
+  let make ~guard ~ratio ~weight name =
     if ratio <= 0 then invalid_arg "StreamQueue.make: ratio must be >0";
     {
       weight;
       name;
       ratio;
       time_before_drip=ratio;
+      guard;
       hp = H.empty;
     }
 
@@ -67,8 +69,9 @@ module Make(Stm : Stream_intf.S) = struct
 
   let add_lst q sl = List.iter (add q) sl
 
-  let rec take_first_when_available q =
+  let rec take_first_when_available ?guard:(g=0) q =
     if H.is_empty q.hp then raise Not_found;
+    if g = q.guard then None;
     if q.time_before_drip = 0
     then (
       let dripped = ref None in
@@ -82,7 +85,7 @@ module Make(Stm : Stream_intf.S) = struct
         ) in
       q.hp <- new_hp;
       match !dripped with
-        | None -> take_first_when_available q
+        | None -> take_first_when_available (g+1) q
         | Some _ ->
           q.time_before_drip <- q.ratio;
           !dripped
@@ -92,7 +95,7 @@ module Make(Stm : Stream_intf.S) = struct
       None
     )
 
-  let take_first_anyway q =
+  let rec take_first_anyway q =
     if H.is_empty q.hp then raise Not_found;
     let dripped = ref None in
     let reduced_hp, (w, s) = H.take_exn q.hp in
@@ -105,7 +108,7 @@ module Make(Stm : Stream_intf.S) = struct
        ) in
     q.hp <- new_hp;
     match !dripped with
-      | None -> take_first_when_available q
+      | None -> take_first_anyway q
       | Some _ ->
         q.time_before_drip <- q.ratio;
         !dripped
