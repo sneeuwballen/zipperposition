@@ -69,31 +69,38 @@ module Make(Stm : Stream_intf.S) = struct
 
   let add_lst q sl = List.iter (add q) sl
 
-  let rec take_first_when_available ?guard:(g=0) q =
+  let rec _take_first_when_available guard q =
     if H.is_empty q.hp then raise Not_found;
-    if g = q.guard then None;
-    if q.time_before_drip = 0
-    then (
-      let dripped = ref None in
-      let reduced_hp, (w, s) = H.take_exn q.hp in
-      let new_hp =
-        if Stm.is_empty s
-        then reduced_hp
-        else (
-          dripped := Stm.drip s;
-          H.insert (w + (Stm.penalty s), s) reduced_hp
-        ) in
-      q.hp <- new_hp;
-      match !dripped with
-        | None -> take_first_when_available (g+1) q
-        | Some _ ->
-          q.time_before_drip <- q.ratio;
-          !dripped
-    ) else (
-      assert (q.time_before_drip > 0);
-      q.time_before_drip <- q.time_before_drip - 1;
-      None
+    if guard = 0 then None
+    else (
+      if q.time_before_drip = 0
+      then (
+        let dripped = ref None in
+        let reduced_hp, (w, s) = H.take_exn q.hp in
+        let new_hp =
+          if Stm.is_empty s
+          then reduced_hp
+          else (
+            dripped := Stm.drip s;
+            H.insert (w + (Stm.penalty s), s) reduced_hp
+          ) in
+        q.hp <- new_hp;
+        match !dripped with
+          | None -> _take_first_when_available (guard-1) q
+          | Some _ ->
+            q.time_before_drip <- q.ratio;
+            !dripped
+      ) else (
+        assert (q.time_before_drip > 0);
+        q.time_before_drip <- q.time_before_drip - 1;
+        None
+      )
     )
+
+  let take_first_when_available q =
+    assert (q.guard >= 0);
+    _take_first_when_available q.guard q
+
 
   let rec take_first_anyway q =
     if H.is_empty q.hp then raise Not_found;
@@ -119,7 +126,7 @@ module Make(Stm : Stream_intf.S) = struct
     let open WeightFun in
     let weight = penalty
     in
-    make ~ratio:10 ~weight "default"
+    make ~guard:100 ~ratio:10 ~weight "default"
 
   let pp out q = CCFormat.fprintf out "queue %s" (name q)
   let to_string = CCFormat.to_string pp

@@ -22,7 +22,7 @@ let units : unit Alcotest.test_case list =
    TestOrdering.suite;
    TestTerm.suite;
    TestUnif.suite;
-   TestStream.suite;
+   (*TestStream.suite;*)
    ] |> List.flatten
 
 let units = "units", units

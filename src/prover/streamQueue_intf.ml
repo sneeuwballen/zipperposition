@@ -36,11 +36,13 @@ module type S = sig
   val is_empty : t -> bool
   (** check whether the queue is empty *)
 
-  val take_first_when_available : ?guard:int -> t -> Stm.C.t option
-  (** Attempts to take first element of the queue if available, or raise Not_found *)
+  val take_first_when_available : t -> Stm.C.t option
+  (** Attempts to take first element of the queue if available,
+      or raise Not_found. Guarded recursion: can't loop forever *)
 
   val take_first_anyway: t -> Stm.C.t option
-  (** Take first element of the queue, or raise Not_found *)
+  (** Take first element of the queue, or raise Not_found
+      Unguarded recursion, may loop forever *)
 
   val name : t -> string
   (** Name of the implementation/role of the queue *)
