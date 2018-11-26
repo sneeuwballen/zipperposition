@@ -76,6 +76,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   module TermIndex = PS.TermIndex
   module SubsumIdx = PS.SubsumptionIndex
   module UnitIdx = PS.UnitIndex
+  module Stm = Stream.Make(C)
+  module StmQ = StreamQueue.Make(Stm)
+
+  (** {6 Stream queue} *)
+
+  type queue = {q : StmQ.t;}
+
+  let _stmq = {q = StmQ.default();}
 
   (** {6 Index Management} *)
 
@@ -493,15 +501,18 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       ~retrieve_from_index:I.retrieve_unifiables 
       ~process_retrieved:(fun do_sup (u_p, with_pos, subst) -> do_sup u_p with_pos subst)
 
-  let infer_active_complete_ho = 
-    infer_active_aux 
+  let infer_active_complete_ho =
+    infer_active_aux
       ~retrieve_from_index:I.retrieve_unifiables_complete
       ~process_retrieved:(fun do_sup (u_p, with_pos, substs) -> Some (OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
 
-  let infer_passive_complete_ho = 
-    infer_passive_aux 
+  let infer_passive_complete_ho clause =
+    let inf_res = infer_passive_aux
       ~retrieve_from_index:I.retrieve_unifiables_complete
       ~process_retrieved:(fun do_sup (u_p, with_pos, substs) -> Some (OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
+      clause
+    in
+    StmQ.add_lst _stmq.q (inf_res : Stm.t list)
 
   let infer_equality_resolution_aux ~unify ~iterate_substs clause =
     Util.enter_prof prof_infer_equality_resolution;
