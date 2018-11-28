@@ -76,7 +76,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   module TermIndex = PS.TermIndex
   module SubsumIdx = PS.SubsumptionIndex
   module UnitIdx = PS.UnitIndex
-  module Stm = Stream.Make(C)
+  module Stm = Stream.Make(Env.Ctx.S)
   module StmQ = StreamQueue.Make(Stm)
 
   (** {6 Stream queue} *)
@@ -469,7 +469,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       |> Sequence.flat_map
         (fun (u_p, passive_pos) ->
           let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
-          let do_sup _ with_pos subst = 
+          let do_sup _ with_pos subst =
             let active = with_pos.C.WithPos.clause in
             let s_pos = with_pos.C.WithPos.pos in
             match Lits.View.get_eqn (C.lits active) s_pos with
@@ -478,8 +478,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                     s; t; active; active_pos=s_pos; scope_active=1; subst;
                     u_p; passive=clause; passive_lit; passive_pos; scope_passive=0;
                   }) in
-                do_superposition info  
-              | _ -> None 
+                do_superposition info
+              | _ -> None
           in
           (* all terms that occur in an equation in the active_set
             and that are potentially unifiable with u_p (u at position p) *)
@@ -491,14 +491,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.exit_prof prof_infer_passive;
     new_clauses
 
-  let infer_active = 
-    infer_active_aux 
-      ~retrieve_from_index:I.retrieve_unifiables 
+  let infer_active =
+    infer_active_aux
+      ~retrieve_from_index:I.retrieve_unifiables
       ~process_retrieved:(fun do_sup (u_p, with_pos, subst) -> do_sup u_p with_pos subst)
 
-  let infer_passive = 
+  let infer_passive =
     infer_passive_aux
-      ~retrieve_from_index:I.retrieve_unifiables 
+      ~retrieve_from_index:I.retrieve_unifiables
       ~process_retrieved:(fun do_sup (u_p, with_pos, subst) -> do_sup u_p with_pos subst)
 
   let infer_active_complete_ho =
@@ -512,7 +512,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       ~process_retrieved:(fun do_sup (u_p, with_pos, substs) -> Some (OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
       clause
     in
-    StmQ.add_lst _stmq.q (inf_res : Stm.t list)
+    let stm_res = List.map (Stm.make ~penalty:1) inf_res
+    in
+    StmQ.add_lst _stmq.q (List.map Stm.make stm_res)
 
   let infer_equality_resolution_aux ~unify ~iterate_substs clause =
     Util.enter_prof prof_infer_equality_resolution;
