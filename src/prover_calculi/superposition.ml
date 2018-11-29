@@ -76,7 +76,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   module TermIndex = PS.TermIndex
   module SubsumIdx = PS.SubsumptionIndex
   module UnitIdx = PS.UnitIndex
-  module Stm = Stream.Make(Env.Ctx.S)
+  module Stm = Stream.Make(struct
+      module Ctx = Ctx
+      module C = C
+    end)
   module StmQ = StreamQueue.Make(Stm)
 
   (** {6 Stream queue} *)
@@ -512,9 +515,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       ~process_retrieved:(fun do_sup (u_p, with_pos, substs) -> Some (OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
       clause
     in
-    let stm_res = List.map (Stm.make ~penalty:1) inf_res
-    in
-    StmQ.add_lst _stmq.q (List.map Stm.make stm_res)
+    let stm_res = List.map (Stm.make ~penalty:1) inf_res in
+    StmQ.add_lst _stmq.q stm_res
 
   let infer_equality_resolution_aux ~unify ~iterate_substs clause =
     Util.enter_prof prof_infer_equality_resolution;

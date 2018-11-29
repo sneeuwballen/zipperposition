@@ -11,9 +11,10 @@ val stat_stream_create : Util.stat
 
 module type S = Stream_intf.S
 
-(** {2 Build a new Stream} *)
-module Make(X : sig
-    module Ctx : Ctx.S
-  end) : sig
-  include S with module Ctx = X.Ctx
+module type ARG = sig
+  module Ctx : Ctx.S
+  module C : Clause.S with module Ctx = Ctx
 end
+
+(** {2 Build a new Stream} *)
+module Make(A : ARG) : S with module Ctx = A.Ctx and module C = A.C

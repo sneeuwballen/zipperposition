@@ -8,12 +8,12 @@ module type S = sig
 type t = private {
   id : int; (** unique ID of the stream *)
   penalty: int; (** heuristic penalty *)
-  mutable stm : C.t CCOpt.t OSeq.t; (** the stream itself *)
+  mutable stm : C.t option OSeq.t; (** the stream itself *)
 }
 
 (** {2 Basics} *)
 
-val make : ?penalty:int -> C.t CCOpt.t OSeq.t -> t
+val make : ?penalty:int -> C.t option OSeq.t -> t
 
 val equal : t -> t -> bool
 val compare : t -> t -> int
