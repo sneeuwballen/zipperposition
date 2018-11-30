@@ -1632,9 +1632,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     if !_complete_ho_unification
     then (
       Env.add_binary_inf_nonterminating "superposition_passive" infer_passive_complete_ho;
-      Env.add_binary_inf_nonterminating "superposition_active" infer_active_complete_ho;
+    (*   Env.add_binary_inf_nonterminating "superposition_active" infer_active_complete_ho;
       Env.add_unary_inf_nonterminating "equality_factoring" infer_equality_factoring_complete_ho;
-      Env.add_unary_inf_nonterminating "equality_resolution" infer_equality_resolution_complete_ho;
+         Env.add_unary_inf_nonterminating "equality_resolution" infer_equality_resolution_complete_ho; *)
     )
     else (
       Env.add_binary_inf "superposition_passive" infer_passive;
