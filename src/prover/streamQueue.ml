@@ -126,7 +126,7 @@ module Make(Stm : Stream_intf.S) = struct
     let open WeightFun in
     let weight = penalty
     in
-    make ~guard:100 ~ratio:10 ~weight "default"
+    make ~guard:100 ~ratio:0 ~weight "default"
 
   let pp out q = CCFormat.fprintf out "queue %s" (name q)
   let to_string = CCFormat.to_string pp
