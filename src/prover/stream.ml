@@ -8,14 +8,14 @@ let stat_stream_create = Util.mk_stat "stream.create"
 (** {2 Signature} *)
 module type S = Stream_intf.S
 
-module Make(X : sig
-    module Ctx : Ctx.S
-  end)
-  : S with module Ctx = X.Ctx
-= struct
-  module Ctx = X.Ctx
-  module C = Clause.Make(Ctx)
+module type ARG = sig
+  module Ctx : Ctx.S
+  module C : Clause.S with module Ctx = Ctx
+end
 
+module Make(A:ARG) = struct
+  module Ctx = A.Ctx
+  module C = A.C
 
 type t = {
   id : int; (** unique ID of the stream *)
@@ -45,6 +45,11 @@ let is_empty s = OSeq.is_empty s.stm
 (* No length function because some streams are infinite *)
 
 let penalty s = s.penalty
+
+let drip s =
+  let dripped = OSeq.nth 1 s.stm in
+  s.stm <- OSeq.drop 1 s.stm;
+  dripped
 
 let pp out s =
   Format.fprintf out "stream %i" s.id;
