@@ -70,30 +70,32 @@ module Make(Stm : Stream_intf.S) = struct
   let add_lst q sl = List.iter (add q) sl
 
   let rec _take_first_when_available guard q =
-    if H.is_empty q.hp then raise Not_found;
-    if guard = 0 then None
+    if H.is_empty q.hp then None 
     else (
-      if q.time_before_drip = 0
-      then (
-        let dripped = ref None in
-        let reduced_hp, (w, s) = H.take_exn q.hp in
-        let new_hp =
-          if Stm.is_empty s
-          then reduced_hp
-          else (
-            dripped := Stm.drip s;
-            H.insert (w + (Stm.penalty s), s) reduced_hp
-          ) in
-        q.hp <- new_hp;
-        match !dripped with
-          | None -> _take_first_when_available (guard-1) q
-          | Some _ ->
-            q.time_before_drip <- q.ratio;
-            !dripped
-      ) else (
-        assert (q.time_before_drip > 0);
-        q.time_before_drip <- q.time_before_drip - 1;
-        None
+      if guard = 0 then None
+      else (
+        if q.time_before_drip = 0
+        then (
+          let dripped = ref None in
+          let reduced_hp, (w, s) = H.take_exn q.hp in
+          let new_hp =
+            if Stm.is_empty s
+            then reduced_hp
+            else (
+              dripped := Stm.drip s;
+              H.insert (w + (Stm.penalty s), s) reduced_hp
+            ) in
+          q.hp <- new_hp;
+          match !dripped with
+            | None -> _take_first_when_available (guard-1) q
+            | Some _ ->
+              q.time_before_drip <- q.ratio;
+              !dripped
+        ) else (
+          assert (q.time_before_drip > 0);
+          q.time_before_drip <- q.time_before_drip - 1;
+          None
+        )
       )
     )
 
@@ -103,22 +105,24 @@ module Make(Stm : Stream_intf.S) = struct
 
 
   let rec take_first_anyway q =
-    if H.is_empty q.hp then raise Not_found;
-    let dripped = ref None in
-    let reduced_hp, (w, s) = H.take_exn q.hp in
-    let new_hp =
-      if Stm.is_empty s
-      then reduced_hp
-      else (
-          dripped := Stm.drip s;
-          H.insert (w + (Stm.penalty s), s) reduced_hp
-       ) in
-    q.hp <- new_hp;
-    match !dripped with
-      | None -> take_first_anyway q
-      | Some _ ->
-        q.time_before_drip <- q.ratio;
-        !dripped
+    if H.is_empty q.hp then None 
+    else (
+      let dripped = ref None in
+      let reduced_hp, (w, s) = H.take_exn q.hp in
+      let new_hp =
+        if Stm.is_empty s
+        then reduced_hp
+        else (
+            dripped := Stm.drip s;
+            H.insert (w + (Stm.penalty s), s) reduced_hp
+        ) in
+      q.hp <- new_hp;
+      match !dripped with
+        | None -> take_first_anyway q
+        | Some _ ->
+          q.time_before_drip <- q.ratio;
+          !dripped
+    )
 
   let name q = q.name
 
