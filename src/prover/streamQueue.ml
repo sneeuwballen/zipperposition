@@ -41,6 +41,7 @@ module Make(Stm : Stream_intf.S) = struct
     ratio: int;
     guard: int;
     weight: Stm.t -> int; (* function that assigns an initial weight to a stream (based on what criteria?) *)
+    mutable stm_nb: int;
     name: string;
   }
 
@@ -54,6 +55,7 @@ module Make(Stm : Stream_intf.S) = struct
       ratio;
       time_before_drip=ratio;
       guard;
+      stm_nb = 0;
       hp = H.empty;
     }
 
@@ -65,24 +67,31 @@ module Make(Stm : Stream_intf.S) = struct
     (* No verification that the stream is already in there TODO: should it be verified?*)
     let w = q.weight s in
     let hp = H.insert (w, s) q.hp in
+    q.stm_nb <- q.stm_nb + 1;
     q.hp <- hp
 
   let add_lst q sl = List.iter (add q) sl
 
   let rec _take_first_when_available guard q =
-    if H.is_empty q.hp then raise Not_found;
-    if guard = 0 then None
+    if H.is_empty q.hp then None (* TODO: replace with cheaper test q.stm_nb = 0 ? *)
     else (
+      if guard = 0 then raise Not_found;
       if q.time_before_drip = 0
       then (
         let dripped = ref None in
         let reduced_hp, (w, s) = H.take_exn q.hp in
         let new_hp =
           if Stm.is_empty s
-          then reduced_hp
+          then (
+            assert (q.stm_nb > 0);
+            q.stm_nb <- q.stm_nb - 1;
+            reduced_hp
+          )
           else (
             dripped := Stm.drip s;
             H.insert (w + (Stm.penalty s), s) reduced_hp
+            (* No matter if a clause or None is dripped the penalty is the same:
+               TODO: should the penalty be higher when None is dripped? *)
           ) in
         q.hp <- new_hp;
         match !dripped with
@@ -101,24 +110,69 @@ module Make(Stm : Stream_intf.S) = struct
     assert (q.guard >= 0);
     _take_first_when_available q.guard q
 
-
-  let rec take_first_anyway q =
-    if H.is_empty q.hp then raise Not_found;
-    let dripped = ref None in
-    let reduced_hp, (w, s) = H.take_exn q.hp in
-    let new_hp =
-      if Stm.is_empty s
-      then reduced_hp
-      else (
+  let rec _take_first guard q =
+    if H.is_empty q.hp then None (* TODO: replace with cheaper test q.stm_nb = 0 ? *)
+    else (
+      if guard = 0 then raise Not_found;
+      let dripped = ref None in
+      let reduced_hp, (w, s) = H.take_exn q.hp in
+      let new_hp =
+        if Stm.is_empty s
+        then (
+          assert (q.stm_nb > 0); (* TODO: stronger but more costly assert using H.size ?*)
+          q.stm_nb <- q.stm_nb - 1;
+          reduced_hp
+        )
+        else (
           dripped := Stm.drip s;
           H.insert (w + (Stm.penalty s), s) reduced_hp
-       ) in
-    q.hp <- new_hp;
-    match !dripped with
-      | None -> take_first_anyway q
-      | Some _ ->
-        q.time_before_drip <- q.ratio;
-        !dripped
+          (* No matter if a clause or None is dripped the penalty is the same:
+             TODO: should the penalty be higher when None is dripped? *)
+        ) in
+      q.hp <- new_hp;
+      match !dripped with
+        | None -> _take_first (guard-1) q
+        | Some _ ->
+          !dripped
+    )
+
+  let take_first q =
+    assert (q.guard >= 0);
+    _take_first q.guard q
+
+  let rec take_first_anyway q =
+    if H.is_empty q.hp then None
+    else (
+      let dripped = ref None in
+      let reduced_hp, (w, s) = H.take_exn q.hp in
+      let new_hp =
+        if Stm.is_empty s
+        then (
+          assert (q.stm_nb > 0);
+          q.stm_nb <- q.stm_nb - 1;
+          reduced_hp
+        )
+        else (
+          dripped := Stm.drip s;
+          H.insert (w + (Stm.penalty s), s) reduced_hp
+        ) in
+      q.hp <- new_hp;
+      match !dripped with
+        | None -> take_first_anyway q
+        | Some _ ->
+          q.time_before_drip <- q.ratio;
+          !dripped
+    )
+
+  let rec _take_nb q nb prev_res =
+    if H.is_empty q.hp || nb = 0 then prev_res
+    else
+      try
+        _take_nb q (nb-1) ((take_first q)::prev_res)
+      with
+        | Not_found -> prev_res
+
+  let take_stm_nb q = _take_nb q q.stm_nb []
 
   let name q = q.name
 

@@ -34,6 +34,13 @@ module type S = sig
 
   val infer_equality_factoring: Env.unary_inf_rule
 
+  (** {6 Extraction of clauses from the queue (HO feature)} *)
+
+  val extract_from_stream_queue: Env.generate_rule
+  (** Extracts at most as many clauses from the stream queue as there are
+  streams in the queue. If called with [~full=true] extracts only one clause
+  but may loop forever. *)
+
   (** {6 Simplifications rules} *)
 
   val is_tautology : C.t -> bool
