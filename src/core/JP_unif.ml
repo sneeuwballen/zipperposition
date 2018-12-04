@@ -318,11 +318,10 @@ let unify_scoped (t0, scope0) (t1, scope1) =
   let unifscope = if scope0 < scope1 then scope1 + 1 else scope0 + 1 in
   let fresh_var_ = ref 0 in
   let add_renaming scope offset s v =
-    (* Add substitution v -> v*2+offset to s *)
-    let id = HVar.id v * 2 + offset in
-    if id >= !fresh_var_ then fresh_var_ := id + 1;
-    let newvar = T.var (HVar.make ~ty:(HVar.ty v) id) in
-    US.FO.bind s (v,scope) (newvar, unifscope) 
+    let newvar = T.var (make_fresh_var fresh_var_ ~ty:(HVar.ty v) ()) in
+    if US.FO.mem s (v,scope) 
+    then s
+    else US.FO.bind s (v,scope) (newvar, unifscope) 
   in
   let subst = US.empty in
   (* Rename variables apart into scope `unifscope` *)
