@@ -511,7 +511,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       clause
     in
     let stm_res = List.map (Stm.make ~penalty:1) inf_res in
-      StmQ.add_lst _stmq.q stm_res
+      StmQ.add_lst _stmq.q stm_res; []
 
 
   let infer_passive_complete_ho clause =
@@ -521,7 +521,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       clause
     in
     let stm_res = List.map (Stm.make ~penalty:1) inf_res in
-      StmQ.add_lst _stmq.q stm_res
+      StmQ.add_lst _stmq.q stm_res; []
 
   let infer_equality_resolution_aux ~unify ~iterate_substs clause =
     Util.enter_prof prof_infer_equality_resolution;
@@ -574,7 +574,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         clause
     in
     let stm_res = List.map (Stm.make ~penalty:1) inf_res in
-    StmQ.add_lst _stmq.q stm_res
+    StmQ.add_lst _stmq.q stm_res; []
 
   module EqFactInfo = struct
     type t = {
@@ -685,7 +685,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         clause
     in
     let stm_res = List.map (Stm.make ~penalty:1) inf_res in
-    StmQ.add_lst _stmq.q stm_res
+    StmQ.add_lst _stmq.q stm_res; []
 
   (* ----------------------------------------------------------------------
    * extraction of a clause from the stream queue (HO feature)
@@ -1660,10 +1660,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and is_trivial = is_tautology in
     if !_complete_ho_unification
     then (
-      Env.add_binary_inf_nonterminating "superposition_passive" infer_passive_complete_ho;
-      Env.add_binary_inf_nonterminating "superposition_active" infer_active_complete_ho;
-      Env.add_unary_inf_nonterminating "equality_factoring" infer_equality_factoring_complete_ho;
-      Env.add_unary_inf_nonterminating "equality_resolution" infer_equality_resolution_complete_ho;
+      Env.add_binary_inf "superposition_passive" infer_passive_complete_ho;
+      Env.add_binary_inf "superposition_active" infer_active_complete_ho;
+      Env.add_unary_inf "equality_factoring" infer_equality_factoring_complete_ho;
+      Env.add_unary_inf "equality_resolution" infer_equality_resolution_complete_ho;
       Env.add_generate "stream_queue_extraction" extract_from_stream_queue;
     )
     else (

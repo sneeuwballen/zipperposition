@@ -43,16 +43,11 @@ module Make(X : sig
   type inf_rule = C.t -> C.t list
   (** An inference returns a list of conclusions *)
 
-  type inf_rule_nonterminating = C.t -> unit (*C.t option OSeq.t list*)
-  (** An inference with (possibly) infintely many conclusions. It returns a list of conclusion streams *)
-
   type generate_rule = full:bool -> unit -> C.t list
   (** Generation of clauses regardless of current clause *)
 
   type binary_inf_rule = inf_rule
   type unary_inf_rule = inf_rule
-  type binary_inf_rule_nonterminating = inf_rule_nonterminating
-  type unary_inf_rule_nonterminating = inf_rule_nonterminating
 
   type simplify_rule = C.t -> C.t SimplM.t
   (** Simplify the clause structurally (basic simplifications),
@@ -104,8 +99,6 @@ module Make(X : sig
 
   let _binary_rules : (string * binary_inf_rule) list ref = ref []
   let _unary_rules : (string * unary_inf_rule) list ref = ref []
-  let _binary_rules_nonterminating : (string * binary_inf_rule_nonterminating) list ref = ref []
-  let _unary_rules_nonterminating : (string * unary_inf_rule_nonterminating) list ref = ref []
   let _rewrite_rules : (string * term_rewrite_rule) list ref = ref []
   let _lit_rules : (string * lit_rewrite_rule) list ref = ref []
   let _basic_simplify : simplify_rule list ref = ref []
@@ -172,14 +165,6 @@ module Make(X : sig
   let add_unary_inf name rule =
     if not (List.mem_assoc name !_unary_rules)
     then _unary_rules := (name, rule) :: !_unary_rules
-
-  let add_binary_inf_nonterminating name rule =
-    if not (List.mem_assoc name !_binary_rules)
-    then _binary_rules_nonterminating := (name, rule) :: !_binary_rules_nonterminating
-
-  let add_unary_inf_nonterminating name rule =
-    if not (List.mem_assoc name !_unary_rules)
-    then _unary_rules_nonterminating := (name, rule) :: !_unary_rules_nonterminating
 
   let add_generate name rule =
     if not (List.mem_assoc name !_generate_rules)
