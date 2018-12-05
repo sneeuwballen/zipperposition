@@ -37,12 +37,24 @@ module type S = sig
   (** check whether the queue is empty *)
 
   val take_first_when_available : t -> Stm.C.t option
-  (** Attempts to take first element of the queue if available,
-      or raise Not_found. Guarded recursion: can't loop forever *)
+  (** Attempts to take a clause out of the queue if available
+      (meaning that the clause is searched for only when the
+      time_before_drip counter reaches 0), or raise Not_found.
+      Guarded recursion: can't loop forever
+      @raises Not_found in the guard is reached *)
+
+  val take_first : t -> Stm.C.t option
+  (** Attempts to take a clause out of the queue.
+      Guarded recursion: can't loop forever
+      @raises Not_found in the guard is reached *)
 
   val take_first_anyway: t -> Stm.C.t option
-  (** Take first element of the queue, or raise Not_found
+  (** Takes a clause out of the queue.
       Unguarded recursion, may loop forever *)
+
+  val take_stm_nb: t -> Stm.C.t option list
+  (** Attempts to take as many clauses from the queue as there are streams in
+      the queue. Calls take_first to do so and stops if its guard is reached *)
 
   val name : t -> string
   (** Name of the implementation/role of the queue *)

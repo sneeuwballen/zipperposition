@@ -692,15 +692,17 @@ module Make(Env : Env.S) : S with module Env = Env = struct
    * ---------------------------------------------------------------------- *)
 
   let extract_from_stream_queue ~full () =
-    let c_res =
+    let cl =
       if full then
-        StmQ.take_first_anyway _stmq.q
+        [StmQ.take_first_anyway _stmq.q]
       else
-        StmQ.take_first_when_available _stmq.q
+        StmQ.take_stm_nb _stmq.q
     in
-    match c_res with
+    let opt_res = CCOpt.sequence_l (List.filter CCOpt.is_some cl)
+    in
+    match opt_res with
       | None -> []
-      | Some c -> [c]
+      | Some l -> l
 
 
   (* ----------------------------------------------------------------------
@@ -790,9 +792,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | T.App (hd, l) ->
           (* rewrite subterms in call by value. *)
           let rewrite_args = !_sup_in_var_args || not (T.is_var hd) in
-          if rewrite_args 
-          then 
-            normal_form_l l 
+          if rewrite_args
+          then
+            normal_form_l l
               (fun l' ->
                 let t' =
                   if T.same_l l l'
