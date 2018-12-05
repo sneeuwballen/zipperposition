@@ -511,7 +511,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let extensionality_clause =
     let diff_id = ID.make("zf_ext_diff") in
-    ID.set_payload diff_id (ID.Attr_skolem (ID.K_normal, 2)); (* make the arguments of diff mandatory *)
+    ID.set_payload diff_id (ID.Attr_skolem (ID.K_normal, 4)); (* make the arguments of diff mandatory *)
     let alpha_var = HVar.make ~ty:Type.tType 0 in
     let alpha = Type.var alpha_var in
     let beta_var = HVar.make ~ty:Type.tType 1 in
