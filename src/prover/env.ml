@@ -280,7 +280,7 @@ module Make(X : sig
     let clauses =
       List.fold_left
         (fun acc (name,g) ->
-           Util.debugf ~section 3 "apply generating rule %s" (fun k->k name);
+           Util.debugf ~section 3 "apply generating rule %s (full: %b)" (fun k->k name full);
            List.rev_append (g ~full ()) acc)
         []
         !_generate_rules
