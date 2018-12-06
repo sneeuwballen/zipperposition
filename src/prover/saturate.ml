@@ -80,18 +80,19 @@ module Make(E : Env.S) = struct
         (* final check: might generate other clauses *)
         let clauses =
           Env.do_generate ~full:true ()
+        in
+        if Sequence.is_empty clauses
+        then Sat
+        else (
+          let clauses = clauses
           |> Sequence.filter_map
             (fun c ->
                check_clause_ c;
                let c, _ = Env.unary_simplify c in
                if Env.is_trivial c || Env.is_active c || Env.is_passive c
                then None
-               else Some c)
-          |> Sequence.to_list
-        in
-        if clauses=[]
-        then Sat
-        else (
+               else Some c) 
+          |> Sequence.to_list in
           Util.debugf 2 ~section "@[<2>inferred @{<green>new clauses@}@ @[<v>%a@]@]"
             (fun k->k (CCFormat.list Env.C.pp) clauses);
           Env.add_passive (Sequence.of_list clauses);
