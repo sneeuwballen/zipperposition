@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 module type S = sig
@@ -10,6 +9,8 @@ type t = private {
   penalty: int; (** heuristic penalty *)
   mutable stm : C.t option OSeq.t; (** the stream itself *)
 }
+
+exception Empty_Stream
 
 (** {2 Basics} *)
 

@@ -3,8 +3,6 @@
 
 open Logtk
 
-exception Empty_Stream
-
 let stat_stream_create = Util.mk_stat "stream.create"
 
 (** {2 Signature} *)
@@ -24,6 +22,8 @@ type t = {
   penalty: int; (** heuristic penalty *)
   mutable stm : C.t option OSeq.t; (** the stream itself *)
 }
+
+exception Empty_Stream
 
 let id_count_ = ref 0
 
