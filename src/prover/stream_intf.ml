@@ -26,7 +26,7 @@ val penalty : t -> int
 
 val drip : t -> C.t option
 (** Remove the first element in the stream and return it.
-    Fails if the stream is empty *)
+    @raise Empty_Stream if the stream is empty *)
 
 (** {2 IO} *)
 

@@ -3,6 +3,8 @@
 
 open Logtk
 
+exception Empty_Stream
+
 let stat_stream_create = Util.mk_stat "stream.create"
 
 (** {2 Signature} *)
@@ -48,7 +50,7 @@ let penalty s = s.penalty
 
 let drip s =
   match s.stm () with
-    | OSeq.Nil -> assert false;
+    | OSeq.Nil -> raise Empty_Stream
     | OSeq.Cons (hd,tl) ->
       s.stm <- tl;
       hd
