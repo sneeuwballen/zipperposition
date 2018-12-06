@@ -81,14 +81,7 @@ module Make(Stm : Stream_intf.S) = struct
         let dripped = ref None in
         let reduced_hp, (w, s) = H.take_exn q.hp in
         let new_hp =
-          (* if Stm.is_empty s
-             then (
-             assert (q.stm_nb > 0);
-             q.stm_nb <- q.stm_nb - 1;
-             reduced_hp
-             )
-             else  *)
-          (
+         (
             try
               dripped := Stm.drip s;
               H.insert (w + (Stm.penalty s), s) reduced_hp
@@ -124,17 +117,17 @@ module Make(Stm : Stream_intf.S) = struct
       let dripped = ref None in
       let reduced_hp, (w, s) = H.take_exn q.hp in
       let new_hp =
-        if Stm.is_empty s
-        then (
-          assert (q.stm_nb > 0); (* TODO: stronger but more costly assert using H.size ?*)
-          q.stm_nb <- q.stm_nb - 1;
-          reduced_hp
-        )
-        else (
-          dripped := Stm.drip s;
-          H.insert (w + (Stm.penalty s), s) reduced_hp
+        (
+          try
+            dripped := Stm.drip s;
+            H.insert (w + (Stm.penalty s), s) reduced_hp
           (* No matter if a clause or None is dripped the penalty is the same:
              TODO: should the penalty be higher when None is dripped? *)
+          with
+            | Stm.Empty_Stream ->
+              assert (q.stm_nb > 0); (* TODO: stronger but more costly assert using H.size ?*)
+              q.stm_nb <- q.stm_nb - 1;
+              reduced_hp
         ) in
       q.hp <- new_hp;
       match !dripped with
@@ -153,15 +146,15 @@ module Make(Stm : Stream_intf.S) = struct
       let dripped = ref None in
       let reduced_hp, (w, s) = H.take_exn q.hp in
       let new_hp =
-        if Stm.is_empty s
-        then (
-          assert (q.stm_nb > 0);
-          q.stm_nb <- q.stm_nb - 1;
-          reduced_hp
-        )
-        else (
-          dripped := Stm.drip s;
-          H.insert (w + (Stm.penalty s), s) reduced_hp
+        (
+          try
+            dripped := Stm.drip s;
+            H.insert (w + (Stm.penalty s), s) reduced_hp
+          with
+            | Stm.Empty_Stream ->
+              assert (q.stm_nb > 0);
+              q.stm_nb <- q.stm_nb - 1;
+              reduced_hp
         ) in
       q.hp <- new_hp;
       match !dripped with
