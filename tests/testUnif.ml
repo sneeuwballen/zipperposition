@@ -16,7 +16,7 @@ let t_test = Alcotest.testable T.ZF.pp T.equal
 
 (** {2 Unit Tests} *)
 
-let psterm, pstmt, pstmt_l, clear_scope, unif_ty =
+let psterm, pstmt, pstmt_l, clear_scope, unif_ty, pstyctx =
   let tyctx = TypeInference.Ctx.create ~implicit_ty_args:false () in
   let pt s =
     let t = Parse_zf.parse_term Lex_zf.token (Lexing.from_string s) in
@@ -38,7 +38,9 @@ let psterm, pstmt, pstmt_l, clear_scope, unif_ty =
   and unif_ty t u =
     TypedSTerm.unify (TypedSTerm.ty_exn t) (TypedSTerm.ty_exn u)
   in
-  pt, pst, pst_l, (fun () -> TypeInference.Ctx.exit_scope tyctx), unif_ty
+  pt, pst, pst_l, (fun () -> TypeInference.Ctx.exit_scope tyctx), unif_ty, tyctx
+
+let parse_with_vars vars ~f = TypeInference.Ctx.with_vars pstyctx (CCList.map (fun (name, ty) -> Var.of_string ~ty:(psterm ty) name) vars) ~f
 
 (* prelude *)
 let () =
@@ -381,15 +383,21 @@ let jp_check_eqs t u ts =
   )
 
 let suite_jp_unif : unit Alcotest.test_case list =
-  (* Util.set_debug 1; *)
+  Util.set_debug 1; Printexc.record_backtrace true;
   let (=?=) a b = Task.mk_unif a b in (* unif pair *)
   let (<?>) a b = Task.mk_unif ~negated:true a b in (* unif pair *)
   let (>->) a b = Task.set_with_ty b a in (* specify return type *)
   let (>?->) a b = Action.set_with_ty b a in (* specify return type *)
-  let mk_tests (pair,actions) =
-    let t, u = Task.parse pair in
+  let mk_tests (pair,actions,vars) =
+    let parsed_pair = ref None in
+    let parsed_actions = ref [] in
+    parse_with_vars vars ~f:(fun () ->
+       parsed_pair := Some (Task.parse pair);
+       parsed_actions := List.map Action.parse actions
+    );
+    let t, u = CCOpt.get_exn !parsed_pair in
     let t, u = (t,0), (u,0) in
-    let actions = List.map Action.parse actions in
+    let actions = !parsed_actions in
     clear_scope();
     if Task.is_negated pair then
       [jp_check_nonunifiable t u]
@@ -405,49 +413,48 @@ let suite_jp_unif : unit Alcotest.test_case list =
   CCList.flat_map mk_tests
     [ "X a" =?= "Y b" >-> "term", [
           Action.count 17
-        ];
-(*
-      "X a" <?> "g (X a)" >-> "term", [];
+        ],[];
+
+      "X a" <?> "g (X a)" >-> "term", [], [];
 
       "(g (X a))" =?= "(X (g a))" >-> "term", [
           Action.yield "g (g (g (g a)))" >?-> "term"
-        ];
+        ],[];
 
       (* Example 3 in the Jensen-Pietrzykowski paper *)
-      (* Small hack: I added "(fun (x : term). x)" to declare the types of Y and X *)
-      "Z (fun (zz : term). (fun (x : term). x) (Y zz)) ((fun (x : term). x) X)" =?= "Z (fun (zz : term). zz) (g a)" >-> "term", [
+      "Z Y X" =?= "Z (fun u. u) (g a)" >-> "term", [
           Action.eqs [
             "X", "a", None; 
             "Y", "g", None; 
             "Z", "fun (z : term -> term). fun (x : term). X0 (z x)", Some "(term -> term) -> term -> term"
           ]
-        ];
+        ],["X","term";"Y","term -> term"];
 
       (* Iterate on head of disagreement pair *)
       "X g" =?= "g a" >-> "term", [
           Action.eqs [
             "X", "fun z. z a", Some "(term -> term) -> term"
           ]
-        ];
+        ],[];
 
       (* Iterate with non-empty w tuple *)
       "X (fun z. f z a)" =?= "X (fun z. f a z)" >-> "term", [
           Action.eqs ["X", "fun (z : term -> term). Z (fun (w : alpha). z a)", Some "(term -> term) -> term"]
-        ];
+        ],[];
 
 
       (* Polymorphism *)
 
       "fun (x : alpha). x" =?= "fun (x : term). x" |> Task.set_unif_types false, [
           Action.count 1
-        ];
+        ],[];
 
       "f_ho2 (a_poly term) (a_poly term)" =?= "f_ho2 X X" |> Task.set_unif_types false, [
           Action.count 1
-        ];
+        ],[];
 
       (* Example from "Higher-Order Unification, Polymorphism, and Subsorts (Extended Abstract)" by T. Nipkow *)
-      "(fun (y : term). y) (X ((fun (z : beta). z) Y))" =?= "a" >-> "term" |> Task.set_unif_types false, [
+      "(fun (y : term). y) (X Y)" =?= "a" >-> "term" |> Task.set_unif_types false, [
         Action.eqs [
               "X", "fun (z : term -> term). z (z (z a))", None;
               "Y", "fun (z : term). z", None
@@ -457,7 +464,7 @@ let suite_jp_unif : unit Alcotest.test_case list =
               "X", "fun (z : alpha -> gamma -> term). z (X000 z) (Y000 z (z (X000 z)))", None;
               "Y", "fun (x : alpha) (y : gamma). a", None 
           ]
-      ]*)
+      ],["X","beta -> term"; "Y","beta"]
 
     ]
 
@@ -475,6 +482,7 @@ let reg_matching1 = "regression matching", `Quick, fun () ->
 
 (** Jensen-Pietrzykowski auxiliary functions tests *)
 let test_jp_unif_aux = "JP unification", `Quick, fun () ->
+  Util.set_debug 1; Printexc.record_backtrace true;
 
   (** Find disagreement tests *)
 
