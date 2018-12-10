@@ -141,6 +141,9 @@ val head_term : t -> t
 val head_term_mono : t -> t
 (** head term, but still with type arguments *)
 
+val head_term_with_mandatory_args : t -> t
+(** head term, but still with type arguments and mandatory arguments *)
+
 val args : t -> t list
 (** [args t = snd (as_app t)] *)
 

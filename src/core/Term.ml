@@ -225,6 +225,20 @@ let head_term_mono t = match view t with
     app f l1 (* re-apply to type parameters *)
   | _ -> t
 
+let head_term_with_mandatory_args t = 
+  match view t with
+    | App (f,l) ->
+      let num_mand_args = 
+        begin match as_const f with
+          | Some id -> ID.num_mandatory_args id
+          | None -> 0
+        end 
+      in
+      let ty_args = CCList.take_while is_type l in
+      let mand_args = CCList.take num_mand_args l in
+      app f (ty_args @ mand_args) (* re-apply to type & mandatory args *)
+    | _ -> t
+
 let is_ho_var t = match view t with
   | Var v -> Type.needs_args (HVar.ty v)
   | _ -> false

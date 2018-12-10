@@ -31,7 +31,7 @@ let unif_ty ~scope t s =
 (** {1 Projection rule} *)
 
 (* find substitutions for the projection rule, given a member of the disagreement pair *)
-let project_onesided ~scope ~fresh_var_ u =
+let project_onesided ~scope ~fresh_var_:_ u =
   let head, args = T.as_app u in
   let prefix_types, return_type = Type.open_fun (T.ty head) in
   if T.is_var head 
@@ -59,7 +59,7 @@ let project ~scope ~fresh_var_ u v (_ : (T.var * int) list) = OSeq.append (proje
 
 let imitate_onesided ~scope ~fresh_var_ u v = 
   let head_u = T.head_term_mono u in
-  let head_v = T.head_term_mono v in
+  let head_v = T.head_term_with_mandatory_args v in
   let prefix_types_u, _ = Type.open_fun (T.ty head_u) in
   let prefix_types_v, _ = Type.open_fun (T.ty head_v) in
   if T.is_var head_u && not (T.is_bvar head_v) 
@@ -91,7 +91,7 @@ let identify ~scope ~fresh_var_ u v (_ : (T.var * int) list) =
   let head_v = T.head_term_mono v in
   let prefix_types_u, return_type = Type.open_fun (T.ty head_u) in
   let prefix_types_v, return_type2 = Type.open_fun (T.ty head_v) in
-  assert (return_type = return_type2);
+  assert (Type.equal return_type return_type2);
   if T.is_var head_u && T.is_var head_v (* TODO: necessary when args_u or args_v is empty? *)
   then
     (* create substitution: head_u |-> λ u1 ... um. x u1 ... um (y1 u1 ... um) ... (yn u1 ... um) 
@@ -317,7 +317,7 @@ let unify_scoped (t0, scope0) (t1, scope1) =
   (* Find a scope that's different from the two given ones *)
   let unifscope = if scope0 < scope1 then scope1 + 1 else scope0 + 1 in
   let fresh_var_ = ref 0 in
-  let add_renaming scope offset s v =
+  let add_renaming scope s v =
     let newvar = T.var (make_fresh_var fresh_var_ ~ty:(S.apply_ty s (HVar.ty v, scope)) ()) in
     if US.FO.mem s (v,scope) 
     then s
@@ -325,12 +325,16 @@ let unify_scoped (t0, scope0) (t1, scope1) =
   in
   let subst = US.empty in
   (* Rename variables apart into scope `unifscope` *)
-  let subst = T.Seq.vars t0 |> Sequence.fold (add_renaming scope0 0) subst in
-  let subst = T.Seq.vars t1 |> Sequence.fold (add_renaming scope1 1) subst in
+  let subst = T.Seq.vars t0 |> Sequence.fold (add_renaming scope0) subst in
+  let subst = T.Seq.vars t1 |> Sequence.fold (add_renaming scope1) subst in
   (* Unify *)
-  unify ~scope:unifscope ~fresh_var_ (S.apply subst (t0, scope0)) (S.apply subst (t1, scope1))
+  let unifiers = unify ~scope:unifscope ~fresh_var_ (S.apply subst (t0, scope0)) (S.apply subst (t1, scope1))
   (* merge with var renaming *)
   |> OSeq.map (CCOpt.map (US.merge subst))
+  in
+  Util.debugf 5 " Unifying %a and %a" (fun k -> k T.pp t0 T.pp t1);
+  Util.debugf 5 "XXX %a" (fun k -> k (OSeq.pp (CCOpt.pp US.pp)) (OSeq.take 50 unifiers));
+  unifiers
 
 let unify_scoped_nonterminating t s = OSeq.filter_map (fun x -> x) (unify_scoped t s)
 
