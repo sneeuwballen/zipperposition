@@ -175,16 +175,23 @@ module Make(Stm : Stream_intf.S) = struct
   let take_stm_nb q = _take_nb q q.stm_nb []
 
   let rec _take_stm_nb_fix_stm q n res =
-    if H.is_empty q.hp || n = 0 then res
+    if n = 0 || H.is_empty q.hp then res
     else
       let red_hp, (w,s)= H.take_exn q.hp in
       try
-        let res = Stm.drip_n s n in
-        q.hp <- H.insert (w + n * Stm.penalty s, s) red_hp;
-        res
+        if Stm.is_empty s then
+          ( q.stm_nb <- q.stm_nb - 1;
+            q.hp <- red_hp;
+            _take_stm_nb_fix_stm q n res
+          )
+        else
+          (
+            let res = Stm.drip_n s n q.guard in
+            q.hp <- H.insert (w + n * Stm.penalty s, s) red_hp;
+            res
+          )
       with
         | Stm.Drip_n_Unfinished (res', n') ->
-          q.stm_nb <- q.stm_nb - 1;
           _take_stm_nb_fix_stm q n' (res'@res)
 
   let take_stm_nb_fix_stm q =
