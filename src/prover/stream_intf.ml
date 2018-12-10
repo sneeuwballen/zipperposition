@@ -11,6 +11,7 @@ type t = private {
 }
 
 exception Empty_Stream
+exception Drip_n_Unfinished of C.t option list * int
 
 (** {2 Basics} *)
 
@@ -28,6 +29,8 @@ val penalty : t -> int
 val drip : t -> C.t option
 (** Remove the first element in the stream and return it.
     @raise Empty_Stream if the stream is empty *)
+
+val drip_n : t -> int -> C.t option list
 
 (** {2 IO} *)
 
