@@ -41,6 +41,10 @@ module type S = sig
   streams in the queue. If called with [~full=true] extracts only one clause
   but may loop forever. *)
 
+  val extract_from_stream_queue_fix_stm: Env.generate_rule
+  (** Same as [extract_from_stream_queue] with a different extraction heuristic
+  If possible, all clauses are taken from the first stream *)
+
   (** {6 Simplifications rules} *)
 
   val is_tautology : C.t -> bool
