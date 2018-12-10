@@ -24,6 +24,7 @@ type t = {
 }
 
 exception Empty_Stream
+exception Drip_n_Unfinished of C.t option list * int
 
 let id_count_ = ref 0
 
@@ -57,6 +58,29 @@ let drip s =
   (* let dripped = OSeq.nth 0 s.stm in
   s.stm <- OSeq.drop 1 s.stm;
   dripped *)
+
+let rec _drip_n st n =
+  match n with
+    | 0 -> (st,[])
+    | _ ->
+      match st () with
+        | OSeq.Nil -> raise (Drip_n_Unfinished([],n))
+        | OSeq.Cons (hd,tl) ->
+          try
+          let (s',tl_res) = _drip_n tl (n-1) in
+          (s',(hd::tl_res))
+          with
+            | Drip_n_Unfinished (partial_res,n') -> raise (Drip_n_Unfinished((hd::partial_res),n'))
+
+let drip_n s n =
+  try
+    let (s',cl) = _drip_n s.stm n in
+    s.stm <- s';
+    cl
+  with
+    | Drip_n_Unfinished (res,n') ->
+      s.stm <- OSeq.empty;
+      raise (Drip_n_Unfinished (res,n'))
 
 let pp out s =
   Format.fprintf out "stream %i" s.id;

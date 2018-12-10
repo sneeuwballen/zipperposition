@@ -66,6 +66,7 @@ let _sup_in_var_args = ref true
 let _sup_under_lambdas = ref true
 let _dot_demod_into = ref None
 let _complete_ho_unification = ref false
+let _switch_stream_extraction = ref false
 
 module Make(Env : Env.S) : S with module Env = Env = struct
   module Env = Env
@@ -697,6 +698,19 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         [StmQ.take_first_anyway _stmq.q]
       else
         StmQ.take_stm_nb _stmq.q
+    in
+    let opt_res = CCOpt.sequence_l (List.filter CCOpt.is_some cl)
+    in
+    match opt_res with
+      | None -> []
+      | Some l -> l
+
+  let extract_from_stream_queue_fix_stm ~full () =
+    let cl =
+      if full then
+        [StmQ.take_first_anyway _stmq.q]
+      else
+        StmQ.take_stm_nb_fix_stm _stmq.q
     in
     let opt_res = CCOpt.sequence_l (List.filter CCOpt.is_some cl)
     in
@@ -1666,7 +1680,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Env.add_binary_inf "superposition_active" infer_active_complete_ho;
       Env.add_unary_inf "equality_factoring" infer_equality_factoring_complete_ho;
       Env.add_unary_inf "equality_resolution" infer_equality_resolution_complete_ho;
-      Env.add_generate "stream_queue_extraction" extract_from_stream_queue;
+      if !_switch_stream_extraction then
+        Env.add_generate "stream_queue_extraction" extract_from_stream_queue_fix_stm
+      else
+        Env.add_generate "stream_queue_extraction" extract_from_stream_queue;
     )
     else (
       Env.add_binary_inf "superposition_passive" infer_passive;
@@ -1749,6 +1766,9 @@ let () =
     ; "--complete-ho-unif"
     , Arg.Set _complete_ho_unification
     , " enable complete higher-order unification algorithm (Jensen-Pietrzykowski)"
+    ; "--switch-stream-extract"
+    , Arg.Set _switch_stream_extraction
+    , " in ho mode, switches heuristic of clause extraction from the stream queue"
     ];
     Params.add_to_mode "ho-complete-basic" (fun () ->
       _use_simultaneous_sup := false;

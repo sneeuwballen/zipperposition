@@ -56,6 +56,11 @@ module type S = sig
   (** Attempts to take as many clauses from the queue as there are streams in
       the queue. Calls take_first to do so and stops if its guard is reached *)
 
+  val take_stm_nb_fix_stm: t -> Stm.C.t option list
+  (** Attempts to take as many clauses from the queue as there are streams in
+      the queue. Extract as many clauses as possible from first stream before
+      moving to a new stream to find more clauses if necessary *)
+
   val name : t -> string
   (** Name of the implementation/role of the queue *)
 
