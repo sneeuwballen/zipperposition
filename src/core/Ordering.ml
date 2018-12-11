@@ -507,6 +507,13 @@ let subterm =
   let might_flip _ _ _ = false in
   { cache=dummy_cache_; compare; prec=Prec.default []; name="subterm"; might_flip}
 
+let map f { cache; compare; prec; name; might_flip } = 
+  let cache = mk_cache 256 in
+  let cache_might_flip = mk_cache 256 in
+  let compare prec a b = CCCache.with_cache cache (fun (a, b) -> compare prec (f a) (f b)) (a,b) in
+  let might_flip prec a b = CCCache.with_cache cache_might_flip (fun (a, b) -> might_flip prec (f a) (f b)) (a,b) in
+  { cache; compare; prec; name; might_flip }
+
 (** {2 Global table of orders} *)
 
 let tbl_ =

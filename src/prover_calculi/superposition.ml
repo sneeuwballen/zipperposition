@@ -67,6 +67,7 @@ let _sup_under_lambdas = ref true
 let _dot_demod_into = ref None
 let _complete_ho_unification = ref false
 let _switch_stream_extraction = ref false
+let _ord_in_normal_form = ref false
 
 module Make(Env : Env.S) : S with module Env = Env = struct
   module Env = Env
@@ -101,10 +102,17 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let idx_sup_from () = !_idx_sup_from
   let idx_fv () = !_idx_fv
 
+  let ord = 
+    (* TODO: This option only makes sense in combination with the beta and eta rules in Higher_order.ml.
+       They should be connected to each other. Note that the Clause module calls Ctx.ord () independently.
+      *)
+    if !_ord_in_normal_form
+    then Ordering.map (fun t -> Lambda.eta_reduce (Lambda.snf t)) (Ctx.ord ())
+    else Ctx.ord ()
+
   (* apply operation [f] to some parts of the clause [c] just added/removed
      from the active set *)
   let _update_active f c =
-    let ord = Ctx.ord () in
     (* index subterms that can be rewritten by superposition *)
     _idx_sup_into :=
       Lits.fold_terms ~vars:!_sup_at_vars ~var_args:!_sup_in_var_args ~fun_bodies:!_sup_under_lambdas ~ty_args:false ~ord ~which:`Max ~subterms:true
@@ -142,7 +150,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   (* update simpl. index using the clause [c] just added or removed to
      the simplification set *)
   let _update_simpl f c =
-    let ord = Ctx.ord () in
     let idx = !_idx_simpl in
     let idx' = match C.lits c with
       | [| Lit.Equation (l,r,true) |] ->
@@ -204,7 +211,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   (* Checks whether we must allow superposition at variables to be complete. *)
   let sup_at_var_condition info var replacement =
     let open SupInfo in
-    let ord = Ctx.ord () in
     let us = info.subst in
     let subst = US.subst us in
     let renaming = S.Renaming.create () in
@@ -236,7 +242,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   (* Helper that does one or zero superposition inference, with all
      the given parameters. Clauses have a scope. *)
   let do_classic_superposition info =
-    let ord = Ctx.ord () in
     let open SupInfo in
     let module P = Position in
     Util.incr_stat stat_superposition_call;
@@ -326,7 +331,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   (* simultaneous superposition: when rewriting D with C \lor s=t,
       replace s with t everywhere in D rather than at one place. *)
   let do_simultaneous_superposition info =
-    let ord = Ctx.ord () in
     let open SupInfo in
     let module P = Position in
     Util.incr_stat stat_superposition_call;
@@ -432,7 +436,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
        we try to rewrite conditionally other clauses using
        non-minimal sides of every positive literal *)
     let new_clauses =
-      Lits.fold_eqn ~sign:true ~ord:(Ctx.ord ())
+      Lits.fold_eqn ~sign:true ~ord
         ~both:true ~eligible (C.lits clause)
       |> Sequence.flat_map
         (fun (s, t, _, s_pos) ->
@@ -466,7 +470,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* do the inferences in which clause is passive (rewritten),
        so we consider both negative and positive literals *)
     let new_clauses =
-      Lits.fold_terms ~vars:!_sup_at_vars ~var_args:!_sup_in_var_args ~fun_bodies:!_sup_under_lambdas ~subterms:true ~ord:(Ctx.ord ())
+      Lits.fold_terms ~vars:!_sup_at_vars ~var_args:!_sup_in_var_args ~fun_bodies:!_sup_under_lambdas ~subterms:true ~ord
         ~which:`Max ~eligible ~ty_args:false (C.lits clause)
       |> Sequence.filter (fun (u_p, _) -> not (T.is_var u_p) || T.is_ho_var u_p)
       |> Sequence.filter (fun (u_p, _) -> T.DB.is_closed u_p)
@@ -529,7 +533,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let eligible = C.Eligible.always in
     (* iterate on those literals *)
     let new_clauses =
-      Lits.fold_eqn ~sign:false ~ord:(Ctx.ord ())
+      Lits.fold_eqn ~sign:false ~ord
         ~both:false ~eligible (C.lits clause)
       |> Sequence.filter_map
         (fun (l, r, _, l_pos) ->
@@ -593,7 +597,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   (* do the inference between given positions, if ordering conditions are respected *)
   let do_eq_factoring info =
     let open EqFactInfo in
-    let ord = Ctx.ord () in
     let s = info.s and t = info.t and v = info.v in
     let us = info.subst in
     (* check whether subst(lit) is maximal, and not (subst(s) < subst(t)) *)
@@ -652,7 +655,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     (* try to do inferences with each positive literal *)
     let new_clauses =
-      Lits.fold_eqn ~sign:true ~ord:(Ctx.ord ())
+      Lits.fold_eqn ~sign:true ~ord
         ~both:true ~eligible (C.lits clause)
       |> Sequence.flat_map
         (fun (s, t, _, s_pos) -> (* try with s=t *)
@@ -750,7 +753,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       rewrite are added to the clauses hashset.
       restrict is an option for restricting demodulation in positive maximal terms *)
   let demod_nf ?(restrict=lazy_false) (st:demod_state) c t : T.t =
-    let ord = Ctx.ord () in
     (* compute normal form of subterm. If restrict is true, substitutions that
        are variable renamings are forbidden (since we are at root of a max term) *)
     let rec reduce_at_root ~restrict t k =
@@ -851,7 +853,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   (* Demodulate the clause, with restrictions on which terms to rewrite *)
   let demodulate_ c =
     Util.incr_stat stat_demodulate_call;
-    let ord = Ctx.ord () in
     (* state for storing proofs and scope *)
     let st = {
       demod_clauses=[];
@@ -922,7 +923,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   (** Find clauses that [given] may demodulate, add them to set *)
   let backward_demodulate set given =
     Util.enter_prof prof_back_demodulate;
-    let ord = Ctx.ord () in
     let renaming = Subst.Renaming.create () in
     (* find clauses that might be rewritten by l -> r *)
     let recurse ~oriented set l r =
@@ -1769,13 +1769,17 @@ let () =
     ; "--switch-stream-extract"
     , Arg.Set _switch_stream_extraction
     , " in ho mode, switches heuristic of clause extraction from the stream queue"
+    ; "--ord-in-normal-form"
+    , Arg.Set _ord_in_normal_form
+    , " compare intermediate terms in calculus rules in beta-normal-eta-long form"
     ];
     Params.add_to_mode "ho-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
       _sup_at_vars := true;
       _sup_in_var_args := false;
       _sup_under_lambdas := false;
-      _complete_ho_unification := true
+      _complete_ho_unification := true;
+      _ord_in_normal_form := true
     );
     Params.add_to_mode "fo-complete-basic" (fun () ->
       _use_simultaneous_sup := false;

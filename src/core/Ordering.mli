@@ -64,6 +64,8 @@ val none : t
 val subterm : t
 (** Subterm ordering. Not a simplification ordering. *)
 
+val map : (term -> term) -> t -> t
+
 (** {2 Global table of Orders} *)
 
 val default_of_list : ID.t list -> t
