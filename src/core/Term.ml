@@ -234,8 +234,8 @@ let head_term_with_mandatory_args t =
           | None -> 0
         end 
       in
-      let ty_args = CCList.take_while is_type l in
-      let mand_args = CCList.take num_mand_args l in
+      let ty_args, other_args = CCList.take_drop_while is_type l in
+      let mand_args = CCList.take num_mand_args other_args in
       app f (ty_args @ mand_args) (* re-apply to type & mandatory args *)
     | _ -> t
 

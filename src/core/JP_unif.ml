@@ -62,7 +62,9 @@ let imitate_onesided ~scope ~fresh_var_ u v =
   let head_v = T.head_term_with_mandatory_args v in
   let prefix_types_u, _ = Type.open_fun (T.ty head_u) in
   let prefix_types_v, _ = Type.open_fun (T.ty head_v) in
-  if T.is_var head_u && not (T.is_bvar head_v) 
+  if T.is_var head_u                                        (* u has a varaible head *)
+    && not (T.is_bvar head_v)                               (* the head of v is not a bound variable *)
+    && not (T.var_occurs ~var:(T.as_var_exn head_u) head_v) (* the head of u does not occur in the mandatory args of v *)
   then
     (* create substitution: head_u |-> λ u1 ... um. head_v (x1 u1 ... um) ... (xn u1 ... um)) *)
     let bvars = prefix_types_u |> List.rev |> List.mapi (fun i ty -> T.bvar ~ty i) |> List.rev in
@@ -328,13 +330,9 @@ let unify_scoped (t0, scope0) (t1, scope1) =
   let subst = T.Seq.vars t0 |> Sequence.fold (add_renaming scope0) subst in
   let subst = T.Seq.vars t1 |> Sequence.fold (add_renaming scope1) subst in
   (* Unify *)
-  let unifiers = unify ~scope:unifscope ~fresh_var_ (S.apply subst (t0, scope0)) (S.apply subst (t1, scope1))
+  unify ~scope:unifscope ~fresh_var_ (S.apply subst (t0, scope0)) (S.apply subst (t1, scope1))
   (* merge with var renaming *)
   |> OSeq.map (CCOpt.map (US.merge subst))
-  in
-  Util.debugf 5 " Unifying %a and %a" (fun k -> k T.pp t0 T.pp t1);
-  Util.debugf 5 "XXX %a" (fun k -> k (OSeq.pp (CCOpt.pp US.pp)) (OSeq.take 50 unifiers));
-  unifiers
 
 let unify_scoped_nonterminating t s = OSeq.filter_map (fun x -> x) (unify_scoped t s)
 
