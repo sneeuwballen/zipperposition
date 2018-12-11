@@ -30,7 +30,12 @@ val drip : t -> C.t option
 (** Remove the first element in the stream and return it.
     @raise Empty_Stream if the stream is empty *)
 
-val drip_n : t -> int -> C.t option list
+val drip_n : t -> int -> int -> C.t option list
+(** Attempt to remove the n first elements in the stream
+    and return them. Return less if the guard is reached.
+    @raise Drip_n_Unfinished(cl,n) where cl is the list of elements
+      already found and n the number of elements if the stream contains
+      less than n elements *)
 
 (** {2 IO} *)
 

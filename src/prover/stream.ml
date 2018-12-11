@@ -59,22 +59,34 @@ let drip s =
   s.stm <- OSeq.drop 1 s.stm;
   dripped *)
 
-let rec _drip_n st n =
-  match n with
-    | 0 -> (st,[])
-    | _ ->
-      match st () with
-        | OSeq.Nil -> raise (Drip_n_Unfinished([],n))
-        | OSeq.Cons (hd,tl) ->
-          try
-          let (s',tl_res) = _drip_n tl (n-1) in
-          (s',(hd::tl_res))
-          with
-            | Drip_n_Unfinished (partial_res,n') -> raise (Drip_n_Unfinished((hd::partial_res),n'))
+let rec _drip_n st n guard =
+  if guard = 0 then (st,[])
+  else
+    match n with
+      | 0 -> (st,[])
+      | _ ->
+        match st () with
+          | OSeq.Nil -> raise (Drip_n_Unfinished([],n))
+          | OSeq.Cons (hd,tl) ->
+            match hd with
+              | None -> (
+                  try
+                    let (s',tl_res) = _drip_n tl n (guard - 1) in
+                    (s',tl_res)
+                  with
+                    | Drip_n_Unfinished (partial_res,n') -> raise (Drip_n_Unfinished((hd::partial_res),n'))
+                )
+              | _ -> (
+                  try
+                    let (s',tl_res) = _drip_n tl (n-1) (guard - 1) in
+                    (s',(hd::tl_res))
+                  with
+                    | Drip_n_Unfinished (partial_res,n') -> raise (Drip_n_Unfinished((hd::partial_res),n'))
+                )
 
-let drip_n s n =
+let drip_n s n guard =
   try
-    let (s',cl) = _drip_n s.stm n in
+    let (s',cl) = _drip_n s.stm n guard in
     s.stm <- s';
     cl
   with
