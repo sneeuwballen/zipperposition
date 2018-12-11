@@ -27,10 +27,11 @@ type term = T.t
 (** {2 Type definitions} *)
 
 type t = {
-  cache : (T.t * T.t, Comparison.t) CCCache.t;
+  cache_compare : (T.t * T.t, Comparison.t) CCCache.t;
   compare : Prec.t -> term -> term -> Comparison.t;
   prec : Prec.t;
   name : string;
+  cache_might_flip : (T.t * T.t, bool) CCCache.t;
   might_flip : Prec.t -> term -> term -> bool;
 } (** Partial ordering on terms *)
 
@@ -47,7 +48,7 @@ let add_seq ord seq = Prec.add_seq ord.prec seq
 
 let name ord = ord.name
 
-let clear_cache ord = CCCache.clear ord.cache
+let clear_cache ord = CCCache.clear ord.cache_compare;  CCCache.clear ord.cache_might_flip
 
 let pp out ord =
   Format.fprintf out "%s(@[%a@])" ord.name Prec.pp ord.prec
@@ -469,33 +470,33 @@ end
 (** {2 Value interface} *)
 
 let kbo prec =
-  let cache = mk_cache 256 in
-  let compare prec a b = CCCache.with_cache cache
+  let cache_compare = mk_cache 256 in
+  let compare prec a b = CCCache.with_cache cache_compare
       (fun (a, b) -> KBO.compare_terms ~prec a b) (a,b)
   in
   let cache_might_flip = mk_cache 256 in
   let might_flip prec a b = CCCache.with_cache cache_might_flip
       (fun (a, b) -> KBO.might_flip prec a b) (a,b)
   in
-  { cache; compare; name=KBO.name; prec; might_flip}
+  { cache_compare; compare; name=KBO.name; prec; might_flip; cache_might_flip}
 
 let rpo6 prec =
-  let cache = mk_cache 256 in
-  let compare prec a b = CCCache.with_cache cache
+  let cache_compare = mk_cache 256 in
+  let compare prec a b = CCCache.with_cache cache_compare
       (fun (a, b) -> RPO6.compare_terms ~prec a b) (a,b)
   in
   let cache_might_flip = mk_cache 256 in
   let might_flip prec a b = CCCache.with_cache cache_might_flip
       (fun (a, b) -> RPO6.might_flip prec a b) (a,b)
   in
-  { cache; compare; name=RPO6.name; prec; might_flip}
+  { cache_compare; compare; name=RPO6.name; prec; might_flip; cache_might_flip}
 
 let dummy_cache_ = CCCache.dummy
 
 let none =
   let compare _ t1 t2 = if T.equal t1 t2 then Eq else Incomparable in
   let might_flip _ _ _ = false in
-  { cache=dummy_cache_; compare; prec=Prec.default []; name="none"; might_flip}
+  { cache_compare=dummy_cache_; compare; prec=Prec.default []; name="none"; might_flip; cache_might_flip=dummy_cache_}
 
 let subterm =
   let compare _ t1 t2 =
@@ -505,14 +506,14 @@ let subterm =
     else Incomparable
   in
   let might_flip _ _ _ = false in
-  { cache=dummy_cache_; compare; prec=Prec.default []; name="subterm"; might_flip}
+  { cache_compare=dummy_cache_; compare; prec=Prec.default []; name="subterm"; might_flip; cache_might_flip=dummy_cache_ }
 
-let map f { cache; compare; prec; name; might_flip } = 
-  let cache = mk_cache 256 in
+let map f { cache_compare=_; compare; prec; name; might_flip; cache_might_flip=_ } = 
+  let cache_compare = mk_cache 256 in
   let cache_might_flip = mk_cache 256 in
-  let compare prec a b = CCCache.with_cache cache (fun (a, b) -> compare prec (f a) (f b)) (a,b) in
+  let compare prec a b = CCCache.with_cache cache_compare (fun (a, b) -> compare prec (f a) (f b)) (a,b) in
   let might_flip prec a b = CCCache.with_cache cache_might_flip (fun (a, b) -> might_flip prec (f a) (f b)) (a,b) in
-  { cache; compare; prec; name; might_flip }
+  { cache_compare; compare; prec; name; might_flip; cache_might_flip }
 
 (** {2 Global table of orders} *)
 
