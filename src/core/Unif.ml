@@ -444,7 +444,7 @@ module Inner = struct
 
   let partial_skolem_fail f l1 l2 =
     not !_allow_partial_skolem_application &&
-    List.length l1 - List.length l2 < ID.num_mandatory_args f
+    List.length l1 - List.length l2 < T.expected_ty_vars (T.ty_exn f) + ID.num_mandatory_args (T.as_const_exn f)
 
   (* @param op which operation to perform (unification,matching,alpha-eq)
      @param root if we are at the root of the original problem. This is
@@ -695,9 +695,9 @@ module Inner = struct
         unif_rec ~op ~bvars ~root subst (t1,scope) (t2, scope) (* to bind *)
       | _, T.Var _ when l2=[] ->
         unif_rec ~op ~bvars ~root subst (t1,scope) (t2, scope) (* to bind *)
-      | T.Const f, T.Var _  when partial_skolem_fail f l1 l2 ->
+      | T.Const _, T.Var _  when partial_skolem_fail f1 l1 l2 ->
         fail()
-      | T.Var _, T.Const g when partial_skolem_fail g l2 l1 ->
+      | T.Var _, T.Const _ when partial_skolem_fail f2 l2 l1 ->
         fail()
       | T.Var v1, T.Const _ ->
         begin match op with

@@ -284,6 +284,9 @@ val as_app : t -> t * t list
 val as_var : t -> t HVar.t option
 val as_var_exn : t -> t HVar.t
 
+val as_const : t -> ID.t option
+val as_const_exn : t -> ID.t
+
 val as_bvar_exn : t -> int
 val is_bvar_i : int -> t -> bool
 (** [is_bvar_i n t] is [true] iff [t = bvar i] *)

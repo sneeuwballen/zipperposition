@@ -757,6 +757,9 @@ let as_app t = match view t with
 let as_var t = match view t with Var v -> Some v | _ -> None
 let as_var_exn t = match view t with Var v -> v | _ -> invalid_arg "as_var_exn"
 
+let as_const t = match view t with Const v -> Some v | _ -> None
+let as_const_exn t = match view t with Const v -> v | _ -> invalid_arg "as_const_exn"
+
 let as_bvar_exn t = match view t with DB i -> i | _ -> invalid_arg "as_bvar_exn"
 let is_bvar_i i t = match view t with DB j -> i=j | _ -> false
 
