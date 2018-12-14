@@ -8,8 +8,7 @@
   at providing basic types and algorithms (terms, unification, orderings,
   indexing, etc.) that can be factored out of several applications.
 
-image::https://api.travis-ci.org/c-cube/zipperposition.svg?branch=master[link="https://travis-ci.org/c-cube/zipperposition", alt="Build status on travis"]
-https://travis-ci.org/c-cube/zipperposition[Travis build]
+https://travis-ci.org/c-cube/zipperposition[image::https://api.travis-ci.org/c-cube/zipperposition.svg?branch=master[link="https://travis-ci.org/c-cube/zipperposition", alt="Build status on travis"]]
 
 toc::[]
 
