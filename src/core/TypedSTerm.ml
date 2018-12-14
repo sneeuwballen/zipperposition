@@ -295,9 +295,9 @@ let const_of_cstor ?loc c = const ?loc c.cstor_id ~ty:c.cstor_ty
 
 let app_builtin ?loc ~ty b l =
   let mk_ b l = make_ ?loc ~ty (AppBuiltin(b,l)) in
-  begin match b, l with
-    | Builtin.Not, [f'] ->
-      begin match view f' with
+  begin match b, List.map view l with
+    | Builtin.Not, [_] ->
+      begin match view (List.hd l) with
         | AppBuiltin (Builtin.Eq,l) -> mk_ Builtin.Neq l
         | AppBuiltin (Builtin.Neq,l) -> mk_ Builtin.Eq l
         | AppBuiltin (Builtin.Not,[t]) -> t
@@ -305,6 +305,8 @@ let app_builtin ?loc ~ty b l =
         | AppBuiltin (Builtin.False,[]) -> mk_ Builtin.True []
         | _ -> mk_ b l
       end
+    | Builtin.Arrow, AppBuiltin (Builtin.Arrow, ret :: args) :: _ -> 
+      mk_ Builtin.Arrow (ret :: List.tl l @ args)
     | _ -> mk_ b l
   end
 
@@ -332,6 +334,7 @@ let meta ?loc (v, r, k) =
 let app ?loc ~ty s l = match view s, l with
   | _, [] -> s
   | App (f, l'), _ -> make_ ?loc ~ty (App (f, l' @ l))
+  | AppBuiltin (b, l'), _ -> make_ ?loc ~ty (AppBuiltin (b, l' @ l))
   | _ -> make_ ?loc ~ty (App(s,l))
 
 let bind ?loc ~ty s v l = make_ ?loc ~ty (Bind(s,v,l))
@@ -1363,6 +1366,9 @@ let apply_unify ?gen_fresh_meta ?allow_open ?loc ?st ?(subst=Subst.empty) ty l =
             (Ty.fun_ (List.map ty_exn l) ret);
           ret
       end
+    | Ty.Ty_var v, _ when Subst.mem subst v -> 
+      (* Apply the substitution because it could replace the type variable by a function type *)
+      aux subst (Subst.eval subst ty) l
     | (Ty.Ty_var _ | Ty.Ty_app _ | Ty.Ty_builtin _
       | Ty.Ty_multiset _ | Ty.Ty_record _), _ ->
       fail_uniff_ ?loc [] "cannot apply type `@[%a@]`@ to `@[%a@]`"
@@ -1370,7 +1376,7 @@ let apply_unify ?gen_fresh_meta ?allow_open ?loc ?st ?(subst=Subst.empty) ty l =
   and aux_l subst exp ret l = match exp, l with
     | [], [] -> Subst.eval subst ret
     | _, [] -> Subst.eval subst (Ty.fun_ exp ret)
-    | [], _ -> fail_uniff_ ?loc [] "@[<2>cannot apply type@ `@[%a@]`@]" pp ret
+    | [], _ -> aux subst ret l
     | exp_a :: exp', a :: l' ->
       unify ?allow_open ?loc ?st ~subst exp_a (ty_exn a);
       aux_l subst exp' ret l'
