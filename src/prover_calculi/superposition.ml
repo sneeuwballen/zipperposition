@@ -93,6 +93,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   (** {6 Index Management} *)
 
   let _idx_sup_into = ref (TermIndex.empty ())
+  let _idx_supav_into = ref (TermIndex.empty ())
   let _idx_sup_from = ref (TermIndex.empty ())
   let _idx_back_demod = ref (TermIndex.empty ())
   let _idx_fv = ref (SubsumIdx.empty ())
@@ -125,6 +126,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
            f tree t with_pos)
         !_idx_sup_into;
+    (* index subterms that can be rewritten by SupAV *)
+    _idx_supav_into :=
+      Lits.fold_terms ~vars:false ~var_args:!_sup_in_var_args ~fun_bodies:!_sup_under_lambdas ~ty_args:false ~ord ~which:`Max ~subterms:true
+        ~eligible:(C.Eligible.res c) (C.lits c)
+      |> Sequence.filter (fun (t, _) -> T.is_var (T.head_term t)) (* Only applied variables *)
+      |> Sequence.fold
+        (fun tree (t, pos) ->
+           let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
+           f tree t with_pos)
+        !_idx_supav_into;
     (* index terms that can rewrite into other clauses *)
     _idx_sup_from :=
       Lits.fold_eqn ~ord ~both:true ~sign:true
@@ -188,6 +199,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ()
 
   (** {6 Inference Rules} *)
+
+  (* ----------------------------------------------------------------------
+   * Superposition rule
+   * ---------------------------------------------------------------------- *)
 
   (* all the information needed for a superposition inference *)
   module SupInfo = struct
@@ -528,6 +543,19 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let stm_res = List.map (Stm.make ~penalty:1) inf_res in
       StmQ.add_lst _stmq.q stm_res; []
 
+  (* ----------------------------------------------------------------------
+   * SupAV rule (Superposition at applied variables)
+   * ---------------------------------------------------------------------- *)
+
+  let infer_supav_active c = I.iter !_idx_supav_into ( fun t with_pos -> Util.debugf 1 "SupAV: %a in %a" (fun k -> k T.pp t C.pp with_pos.C.WithPos.clause)); []
+
+  let infer_supav_passive c = _idx_sup_from; []
+
+
+  (* ----------------------------------------------------------------------
+   * Equality Resolution rule
+   * ---------------------------------------------------------------------- *)
+
   let infer_equality_resolution_aux ~unify ~iterate_substs clause =
     Util.enter_prof prof_infer_equality_resolution;
     let eligible = C.Eligible.always in
@@ -580,6 +608,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     let stm_res = List.map (Stm.make ~penalty:1) inf_res in
     StmQ.add_lst _stmq.q stm_res; []
+
+  (* ----------------------------------------------------------------------
+   * Equality Factoring rule
+   * ---------------------------------------------------------------------- *)
 
   module EqFactInfo = struct
     type t = {
@@ -1678,6 +1710,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     then (
       Env.add_binary_inf "superposition_passive" infer_passive_complete_ho;
       Env.add_binary_inf "superposition_active" infer_active_complete_ho;
+      Env.add_binary_inf "supav_passive" infer_supav_passive;
+      Env.add_binary_inf "supav_active" infer_supav_active;
       Env.add_unary_inf "equality_factoring" infer_equality_factoring_complete_ho;
       Env.add_unary_inf "equality_resolution" infer_equality_resolution_complete_ho;
       if !_switch_stream_extraction then
