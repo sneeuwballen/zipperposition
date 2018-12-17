@@ -328,6 +328,7 @@ let suite_unif1 : unit Alcotest.test_case list =
            *)
       ];
       ( "F (g_ho F)" <?> "a_poly A") |> Task.set_unif_types false, [];
+      ( "(fun (x:term). x)" <?> "(fun (x:term). Y)") , [];
     ]
 
 let jp_check_count t u count : unit Alcotest.test_case =
@@ -469,15 +470,20 @@ let suite_jp_unif : unit Alcotest.test_case list =
     ]
 
 let reg_matching1 = "regression matching", `Quick, fun () ->
-  let t1, t2 =
-    pterm "p_ho2 (fun a. F a) (fun a. F a)",
-    pterm "p_ho2 (fun a. G a) (fun a. H a)"
+  let terms =
+    [ pterm "p_ho2 (fun a. F a) (fun a. F a)"
+    , pterm "p_ho2 (fun a. G a) (fun a. H a)"
+    ; pterm "f_ho2 (fun (x:term). Y) g"
+    , pterm "f_ho2 (fun (x:term). x) g"
+    ]
   in
-  try
-    let _ = Unif.FO.matching ~pattern:(t1,0) (t2,1) in
-    Alcotest.failf
-      "@[<hv>`%a`@ and `%a@ should not match@]" T.ZF.pp t1 T.ZF.pp t2
-  with Unif.Fail -> ()
+  terms |> List.iter (fun (t1,t2) ->
+    try
+      let _ = Unif.FO.matching ~pattern:(t1,0) (t2,1) in
+      Alcotest.failf
+        "@[<hv>`%a`@ and `%a@ should not match@]" T.ZF.pp t1 T.ZF.pp t2
+    with Unif.Fail -> ();
+  ) 
 
 
 (** Jensen-Pietrzykowski auxiliary functions tests *)

@@ -588,10 +588,7 @@ module Inner = struct
       | T.Var v1, _, O_match_protect (P_scope sc)
         when sc1 = sc && not (HVar.is_fresh v1) ->
         fail() (* variable belongs to the protected scope and is not fresh *)
-      | T.Var v1, _, O_match_protect (P_scope _) ->
-        (* no need for occur check when matching from distinct scopes *)
-        US.bind subst (v1,sc1) (t2,sc2)
-      | T.Var v1, _, (O_unify | O_match_protect (P_vars _)) ->
+      | T.Var v1, _, (O_unify | O_match_protect _) ->
         if occurs_check ~depth:0 (US.subst subst) (v1,sc1) (t2,sc2)
         then fail () (* occur check or t2 is open *)
         else US.bind subst (v1,sc1) (t2,sc2)
