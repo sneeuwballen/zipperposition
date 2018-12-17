@@ -101,10 +101,10 @@ module TyBuiltin = struct
     | Builtin.Remainder_e -> ty2op_to_i
     | Builtin.Remainder_f -> ty2op_to_i
     | Builtin.Remainder_t -> ty2op_to_i
-    | Builtin.Floor -> ty_1_to_int
-    | Builtin.Ceiling -> ty_1_to_int
-    | Builtin.Round -> ty_1_to_int
-    | Builtin.Truncate -> ty_1_to_int
+    | Builtin.Floor -> ty1op
+    | Builtin.Ceiling -> ty1op
+    | Builtin.Round -> ty1op
+    | Builtin.Truncate -> ty1op
     | Builtin.To_int -> T.Ty.(forall a ([a_] ==> int))
     | Builtin.To_rat -> T.Ty.(forall a ([a_] ==> rat))
     | Builtin.Is_int -> T.Ty.(forall a ([a_] ==> prop))
