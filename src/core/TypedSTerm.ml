@@ -293,11 +293,11 @@ let var_of_string ?loc ~ty n = var ?loc (Var.of_string ~ty n)
 let const ?loc ~ty s = make_ ?loc ~ty (Const s)
 let const_of_cstor ?loc c = const ?loc c.cstor_id ~ty:c.cstor_ty
 
-let app_builtin ?loc ~ty b l =
+let app_builtin ?loc ~ty b (l:t list) =
   let mk_ b l = make_ ?loc ~ty (AppBuiltin(b,l)) in
-  begin match b, List.map view l with
-    | Builtin.Not, [_] ->
-      begin match view (List.hd l) with
+  begin match b, l with
+    | Builtin.Not, [f'] ->
+      begin match view f' with
         | AppBuiltin (Builtin.Eq,l) -> mk_ Builtin.Neq l
         | AppBuiltin (Builtin.Neq,l) -> mk_ Builtin.Eq l
         | AppBuiltin (Builtin.Not,[t]) -> t
@@ -305,8 +305,12 @@ let app_builtin ?loc ~ty b l =
         | AppBuiltin (Builtin.False,[]) -> mk_ Builtin.True []
         | _ -> mk_ b l
       end
-    | Builtin.Arrow, AppBuiltin (Builtin.Arrow, ret :: args) :: _ -> 
-      mk_ Builtin.Arrow (ret :: List.tl l @ args)
+    | Builtin.Arrow, ret1 :: args1 -> 
+        begin match view ret1 with 
+          | AppBuiltin (Builtin.Arrow, ret2 :: args2) -> 
+            mk_ Builtin.Arrow (ret2 :: args1 @ args2)
+          | _ -> mk_ b l
+        end
     | _ -> mk_ b l
   end
 
