@@ -244,7 +244,15 @@ let find_disagreement s t =
               | None -> ((u,v),l)
             end
         )
-        |> (fun s -> OSeq.append s (find_disagreement_l ~applied_var ~argindex:(argindex + 1) ss' tt'))
+        |> (fun seq ->
+          if Term.is_type s' && not (OSeq.is_empty seq) then
+          (* If type arguments need to be unified, do that first and ignore disagreements in the remaining arguments
+            (because the number of remaining arguments may vary in this case) *)
+            seq 
+          else
+            OSeq.append seq 
+              (find_disagreement_l ~applied_var ~argindex:(argindex + 1) ss' tt')
+        )
       | _, _ -> raise (Invalid_argument "types of unified terms should be equal")
   and find_disagreement_aux s t = 
     match T.view s, T.view t with
