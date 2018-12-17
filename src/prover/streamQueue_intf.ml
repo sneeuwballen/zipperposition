@@ -36,12 +36,12 @@ module type S = sig
   val is_empty : t -> bool
   (** check whether the queue is empty *)
 
-  val take_first_when_available : t -> Stm.C.t option
-  (** Attempts to take a clause out of the queue if available
-      (meaning that the clause is searched for only when the
-      time_before_drip counter reaches 0), or raise Not_found.
-      Guarded recursion: can't loop forever
-      @raises Not_found in the guard is reached *)
+  (* val take_first_when_available : t -> Stm.C.t option
+   * (\** Attempts to take a clause out of the queue if available
+   *     (meaning that the clause is searched for only when the
+   *     time_before_drip counter reaches 0), or raise Not_found.
+   *     Guarded recursion: can't loop forever
+   *     @raises Not_found in the guard is reached *\) *)
 
   val take_first : t -> Stm.C.t option
   (** Attempts to take a clause out of the queue.
