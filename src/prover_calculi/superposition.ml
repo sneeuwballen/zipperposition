@@ -52,6 +52,8 @@ let prof_subsumption_set = Util.mk_profiler "sup.forward_subsumption"
 let prof_subsumption_in_set = Util.mk_profiler "sup.backward_subsumption"
 let prof_infer_active = Util.mk_profiler "sup.infer_active"
 let prof_infer_passive = Util.mk_profiler "sup.infer_passive"
+let prof_infer_supav_active = Util.mk_profiler "sup.infer_supav_active"
+let prof_infer_supav_passive = Util.mk_profiler "sup.infer_supav_passive"
 let prof_infer_equality_resolution = Util.mk_profiler "sup.infer_equality_resolution"
 let prof_infer_equality_factoring = Util.mk_profiler "sup.infer_equality_factoring"
 
@@ -218,6 +220,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       scope_passive : int;
       u_p : T.t; (* rewritten subterm *)
       subst : US.t;
+      supav: bool;
     }
   end
 
@@ -464,7 +467,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               let passive_lit, _ = Lits.Pos.lit_at (C.lits passive) passive_pos in
               let info = SupInfo.( {
                   s; t; active=clause; active_pos=s_pos; scope_active=0;
-                  u_p; passive; passive_lit; passive_pos; scope_passive=1; subst;
+                  u_p; passive; passive_lit; passive_pos; scope_passive=1; subst; supav=false
                 }) in
               do_superposition info 
             else None
@@ -499,7 +502,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               | Some (s, t, true) ->
                 let info = SupInfo.({
                     s; t; active; active_pos=s_pos; scope_active=1; subst;
-                    u_p; passive=clause; passive_lit; passive_pos; scope_passive=0;
+                    u_p; passive=clause; passive_lit; passive_pos; scope_passive=0; supav=false
                   }) in
                 do_superposition info
               | _ -> None
@@ -547,7 +550,49 @@ module Make(Env : Env.S) : S with module Env = Env = struct
    * SupAV rule (Superposition at applied variables)
    * ---------------------------------------------------------------------- *)
 
-  let infer_supav_active c = I.iter !_idx_supav_into ( fun t with_pos -> Util.debugf 1 "SupAV: %a in %a" (fun k -> k T.pp t C.pp with_pos.C.WithPos.clause)); []
+  let infer_supav_active clause = 
+    Util.enter_prof prof_infer_supav_active;
+    (* no literal can be eligible for paramodulation if some are selected.
+      This checks if inferences with i-th literal are needed? *)
+    let eligible = C.Eligible.param clause in
+    (* do the inferences where clause is active; for this,
+      we try to rewrite conditionally other clauses using
+      non-minimal sides of every positive literal *)
+    let new_clauses =
+      Lits.fold_eqn ~sign:true ~ord ~both:true ~eligible (C.lits clause)
+      |> Sequence.flat_map
+        (fun (s, t, _, s_pos) ->
+          I.fold !_idx_supav_into 
+            (fun acc u_p with_pos -> 
+              assert (T.is_var (T.head_term u_p));
+              assert (T.DB.is_closed u_p);
+              (* Create prefix variable H and use H s = H t for superposition *)
+              let var_h = T.var (HVar.fresh ~ty:(Type.arrow [T.ty s] (Type.var (HVar.fresh ~ty:Type.tType ()))) ()) in
+              let hs = T.app var_h [s] in
+              let ht = T.app var_h [t] in
+              let res = JP_unif.unify_scoped (u_p,1) (hs,0) |> OSeq.map (fun osubst ->
+                osubst |> CCOpt.flat_map (fun subst ->
+                  let passive = with_pos.C.WithPos.clause in
+                  let passive_pos = with_pos.C.WithPos.pos in
+                  let passive_lit, _ = Lits.Pos.lit_at (C.lits passive) passive_pos in
+                  let info = SupInfo.({
+                      s=hs; t=ht; active=clause; active_pos=s_pos; scope_active=0;
+                      u_p; passive; passive_lit; passive_pos; scope_passive=1; subst; supav=true
+                    }) in
+                  do_superposition info
+                ) 
+              )
+              in
+              Sequence.cons res acc
+            )
+          Sequence.empty
+        )
+      |> Sequence.to_rev_list
+    in
+    let stm_res = List.map (Stm.make ~penalty:1) new_clauses in
+      StmQ.add_lst _stmq.q stm_res;
+    Util.exit_prof prof_infer_supav_active;
+    []
 
   let infer_supav_passive c = _idx_sup_from; []
 
