@@ -288,7 +288,7 @@ let find_disagreement s t =
 
 let unify ~scope ~fresh_var_ t s = 
   let rec unify_terms ?(rules = []) t s  =
-    Util.debugf 1 "@[Unify@ @[(rules: %a)@]@ @[%a@]@ and@ @[%a@]@]" (fun k -> k (CCList.pp CCString.pp) rules T.pp t T.pp s); 
+    (*Util.debugf 1 "@[Unify@ @[(rules: %a)@]@ @[%a@]@ and@ @[%a@]@]" (fun k -> k (CCList.pp CCString.pp) rules T.pp t T.pp s); *)
     match find_disagreement t s with
       | Some ((u, v), l) -> 
         let subst_seq = 

@@ -64,6 +64,7 @@ let _dot_sup_from = ref None
 let _dot_simpl = ref None
 let _dont_simplify = ref false
 let _sup_at_vars = ref false
+let _sup_at_var_headed = ref true
 let _sup_in_var_args = ref true
 let _sup_under_lambdas = ref true
 let _dot_demod_into = ref None
@@ -123,6 +124,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       |> Sequence.filter (fun (t, _) -> not (T.is_var t) || T.is_ho_var t)
       (* TODO: could exclude more variables from the index:
          they are not needed if they occur with the same args everywhere in the clause *)
+      |> Sequence.filter (fun (t, _) -> !_sup_at_var_headed || not (T.is_var (T.head_term t)))
       |> Sequence.fold
         (fun tree (t, pos) ->
            let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
@@ -130,7 +132,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         !_idx_sup_into;
     (* index subterms that can be rewritten by SupAV *)
     _idx_supav_into :=
-      Lits.fold_terms ~vars:false ~var_args:!_sup_in_var_args ~fun_bodies:!_sup_under_lambdas ~ty_args:false ~ord ~which:`Max ~subterms:true
+      Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false ~ord ~which:`Max ~subterms:true
         ~eligible:(C.Eligible.res c) (C.lits c)
       |> Sequence.filter (fun (t, _) -> T.is_var (T.head_term t)) (* Only applied variables *)
       |> Sequence.fold
@@ -274,6 +276,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     assert (InnerTerm.DB.closed (info.s:>InnerTerm.t));
     assert (InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
     assert (not(T.is_var info.u_p) || T.is_ho_var info.u_p);
+    assert (!_sup_at_var_headed || info.supav || not (T.is_var (T.head_term info.u_p)));
     let active_idx = Lits.Pos.idx info.active_pos in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
     try
@@ -493,6 +496,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~which:`Max ~eligible ~ty_args:false (C.lits clause)
       |> Sequence.filter (fun (u_p, _) -> not (T.is_var u_p) || T.is_ho_var u_p)
       |> Sequence.filter (fun (u_p, _) -> T.DB.is_closed u_p)
+      |> Sequence.filter (fun (u_p, _) -> !_sup_at_var_headed || not (T.is_var (T.head_term u_p)))
       |> Sequence.flat_map
         (fun (u_p, passive_pos) ->
           let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
@@ -595,7 +599,52 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.exit_prof prof_infer_supav_active;
     []
 
-  let infer_supav_passive c = _idx_sup_from; []
+  let infer_supav_passive clause = 
+    Util.enter_prof prof_infer_supav_passive;
+    (* perform inference on this lit? *)
+    let eligible = C.Eligible.(res clause) in
+    (* do the inferences in which clause is passive (rewritten),
+      so we consider both negative and positive literals *)
+    let new_clauses =
+      Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~subterms:true ~ord
+        ~which:`Max ~eligible ~ty_args:false (C.lits clause)
+      |> Sequence.filter (fun (u_p, _) -> (T.is_var (T.head_term u_p)))
+      |> Sequence.flat_map
+        (fun (u_p, passive_pos) ->
+          let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
+          I.fold !_idx_sup_from
+            (fun acc _ with_pos -> 
+              let active = with_pos.C.WithPos.clause in
+              let s_pos = with_pos.C.WithPos.pos in
+              let res = match Lits.View.get_eqn (C.lits active) s_pos with
+                | Some (s, t, true) ->
+                (* Create prefix variable H and use H s = H t for superposition *)
+                let var_h = T.var (HVar.fresh ~ty:(Type.arrow [T.ty s] (Type.var (HVar.fresh ~ty:Type.tType ()))) ()) in
+                let hs = T.app var_h [s] in
+                let ht = T.app var_h [t] in
+                JP_unif.unify_scoped (hs,1) (u_p,0)
+                |> OSeq.map 
+                  (fun osubst ->
+                    osubst |> CCOpt.flat_map (fun subst ->
+                      let info = SupInfo.({
+                          s = hs; t = ht; active; active_pos=s_pos; scope_active=1; subst;
+                          u_p; passive=clause; passive_lit; passive_pos; scope_passive=0; supav=true
+                        }) in
+                      do_superposition info
+                    )
+                  )
+                | _ -> assert false
+              in
+              Sequence.cons res acc
+            )
+            Sequence.empty
+        )
+      |> Sequence.to_rev_list
+    in
+    let stm_res = List.map (Stm.make ~penalty:1) new_clauses in
+      StmQ.add_lst _stmq.q stm_res;
+    Util.exit_prof prof_infer_supav_passive;
+    []
 
 
   (* ----------------------------------------------------------------------
@@ -1837,6 +1886,9 @@ let () =
     ; "--sup-at-vars"
     , Arg.Set _sup_at_vars
     , " enable superposition at variables under certain ordering conditions"
+    ; "--no-sup-at-var-headed"
+    , Arg.Clear _sup_at_var_headed
+    , " disable superposition at variable headed terms"
     ; "--no-sup-in-var-args"
     , Arg.Clear _sup_in_var_args
     , " disable superposition in arguments of applied variables"
@@ -1859,7 +1911,8 @@ let () =
       _sup_in_var_args := false;
       _sup_under_lambdas := false;
       _complete_ho_unification := true;
-      _ord_in_normal_form := true
+      _ord_in_normal_form := true;
+      _sup_at_var_headed := false
     );
     Params.add_to_mode "fo-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
