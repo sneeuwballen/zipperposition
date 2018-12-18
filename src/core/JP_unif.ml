@@ -24,7 +24,7 @@ let make_fresh_var fresh_var_ ~ty () =
 
 let unif_ty ~scope t s = 
   try 
-    let type_unifier = Unif.Ty.unify_syn ~subst:Subst.empty (t, scope) (s, scope) in
+    let type_unifier = Unif.FO.unify_syn ~subst:Subst.empty (t, scope) (s, scope) in
     Some (US.of_subst type_unifier)
   with Unif.Fail -> None
 
@@ -41,7 +41,7 @@ let project_onesided ~scope ~fresh_var_:_ u =
     |> OSeq.mapi (fun i arg -> List.length prefix_types - 1 - i, arg) (* Determine DB-index of the argument *)
     |> OSeq.filter_map (fun (dbindex, arg) -> 
       (* Unify type of argument and return type *)
-      match unif_ty ~scope (T.ty arg) (return_type) with
+      match unif_ty ~scope (Term.of_ty (T.ty arg)) (Term.of_ty return_type) with
         | Some type_unifier -> Some (dbindex, arg, type_unifier)
         | None -> None
     )
@@ -255,20 +255,27 @@ let find_disagreement s t =
         )
       | _, _ -> raise (Invalid_argument "types of unified terms should be equal")
   and find_disagreement_aux s t = 
-    match T.view s, T.view t with
-      | T.App (f, ss), T.App (g, tt) when f = g && not (T.is_var f) -> 
-        find_disagreement_l ss tt 
-      | T.App (f, ss), T.App (g, tt) when f = g && T.is_var f -> 
-        find_disagreement_l ~applied_var:(Some f) ss tt 
-      | T.AppBuiltin (f, ss), T.AppBuiltin (g, tt) when f = g -> 
-        find_disagreement_l ss tt 
-      | T.Var x, T.Var y when x = y -> OSeq.empty
-      | T.DB i, T.DB j when i = j -> OSeq.empty
-      | T.Const a, T.Const b when a = b -> OSeq.empty
-      | T.Fun (ty_s, s'), T.Fun (ty_t, t') -> 
-        assert (ty_s == ty_t); 
-        find_disagreement_aux s' t'
-      | _ -> OSeq.return ((s, t),[])
+    if T.is_type s then 
+      if Term.equal s t then
+        OSeq.empty
+      else
+        OSeq.return ((s,t),[])
+    else (
+      match T.view s, T.view t with
+        | T.App (f, ss), T.App (g, tt) when T.equal f g && not (T.is_var f) -> 
+          find_disagreement_l ss tt 
+        | T.App (f, ss), T.App (g, tt) when T.equal f g && T.is_var f -> 
+          find_disagreement_l ~applied_var:(Some f) ss tt 
+        | T.AppBuiltin (f, ss), T.AppBuiltin (g, tt) when Builtin.equal f g -> 
+          find_disagreement_l ss tt 
+        | T.Var x, T.Var y when x = y -> OSeq.empty
+        | T.DB i, T.DB j when i = j -> OSeq.empty
+        | T.Const a, T.Const b when ID.equal a b -> OSeq.empty
+        | T.Fun (ty_s, s'), T.Fun (ty_t, t') -> 
+          assert (Type.equal ty_s ty_t); 
+          find_disagreement_aux s' t'
+        | _ -> OSeq.return ((s, t),[])
+    )
   in
   let s = find_disagreement_aux s t in
   match OSeq.find (fun ((_,_),l) -> CCList.is_empty l) s with
@@ -284,14 +291,21 @@ let unify ~scope ~fresh_var_ t s =
     (* Util.debugf 1 "@[Unify@ @[(rules: %a)@]@ @[%a@]@ and@ @[%a@]@]" (fun k -> k (CCList.pp CCString.pp) rules T.pp t T.pp s); *)
     match find_disagreement t s with
       | Some ((u, v), l) -> 
-        let add_some f u v l = f ~scope ~fresh_var_ u v l |> OSeq.map (fun s -> Some s) in
-        [add_some project,"proj"; add_some imitate,"imit"; add_some identify,"id"; add_some eliminate,"elim"; iterate ~scope ~fresh_var_,"iter"]
-        (* iterate must be last in this list because it is the only one with infinitely many child nodes *)
-        |> OSeq.of_list  
-        |> OSeq.flat_map
-          (fun (rule,rulename) -> 
-            rule u v l 
-            |> OSeq.map (fun subst -> (subst, rulename)))
+        let subst_seq = 
+          if T.is_type t then
+            OSeq.return ((unif_ty ~scope s t), "unif_ty")
+          else (
+            let add_some f u v l = f ~scope ~fresh_var_ u v l |> OSeq.map (fun s -> Some s) in
+            [add_some project,"proj"; add_some imitate,"imit"; add_some identify,"id"; add_some eliminate,"elim"; iterate ~scope ~fresh_var_,"iter"]
+            (* iterate must be last in this list because it is the only one with infinitely many child nodes *)
+            |> OSeq.of_list  
+            |> OSeq.flat_map
+              (fun (rule,rulename) -> 
+                rule u v l 
+                |> OSeq.map (fun subst -> (subst, rulename)))
+          )
+        in
+        subst_seq 
         |> OSeq.map 
           (fun (osubst,rulename) -> 
             match osubst with
@@ -312,7 +326,7 @@ let unify ~scope ~fresh_var_ t s =
         OSeq.return (Some US.empty)
   in
   (* Unify types first ... *)
-  match unif_ty ~scope (T.ty t) (T.ty s) with
+  match unif_ty ~scope (T.of_ty (T.ty t)) (T.of_ty (T.ty s)) with
     | Some type_unifier ->
       let t' = nfapply type_unifier (t, scope) in
       let s' = nfapply type_unifier (s, scope) in
