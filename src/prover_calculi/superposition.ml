@@ -368,6 +368,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     assert (InnerTerm.DB.closed (info.s:>InnerTerm.t));
     assert (InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
     assert (not(T.is_var info.u_p) || T.is_ho_var info.u_p);
+    assert (!_sup_at_var_headed || info.supav || not (T.is_var (T.head_term info.u_p)));
     let active_idx = Lits.Pos.idx info.active_pos in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
     try
@@ -420,8 +421,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (* build clause *)
       let new_lits = c_guard @ lits_a @ lits_p in
       let rule =
-        let name = if Lit.sign passive_lit' then "s_sup+" else "s_sup-" in
-        Proof.Rule.mk name
+        let r = if info.supav then "supav" else "sup" in
+        let sign = if Lit.sign passive_lit' then "+" else "-" in
+        Proof.Rule.mk ("s_" ^ r ^ sign)
       in
       let proof =
         Proof.Step.inference ~rule ~tags
