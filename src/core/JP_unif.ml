@@ -288,7 +288,7 @@ let find_disagreement s t =
 
 let unify ~scope ~fresh_var_ t s = 
   let rec unify_terms ?(rules = []) t s  =
-    (* Util.debugf 1 "@[Unify@ @[(rules: %a)@]@ @[%a@]@ and@ @[%a@]@]" (fun k -> k (CCList.pp CCString.pp) rules T.pp t T.pp s); *)
+    Util.debugf 1 "@[Unify@ @[(rules: %a)@]@ @[%a@]@ and@ @[%a@]@]" (fun k -> k (CCList.pp CCString.pp) rules T.pp t T.pp s); 
     match find_disagreement t s with
       | Some ((u, v), l) -> 
         let subst_seq = 
@@ -332,7 +332,7 @@ let unify ~scope ~fresh_var_ t s =
       let s' = nfapply type_unifier (s, scope) in
       (* ... then terms. *)
       let term_unifiers = unify_terms t' s' ~rules:[] in
-      OSeq.map (CCOpt.map (US.merge type_unifier)) term_unifiers
+      OSeq.map (CCOpt.map (US.merge type_unifier)) term_unifiers 
     | None -> OSeq.empty
 
 (* TODO: Remove tracking of rules for efficiency? *)
@@ -341,11 +341,13 @@ let unify_scoped (t0, scope0) (t1, scope1) =
   (* Find a scope that's different from the two given ones *)
   let unifscope = if scope0 < scope1 then scope1 + 1 else scope0 + 1 in
   let fresh_var_ = ref 0 in
-  let add_renaming scope s v =
-    let newvar = T.var (make_fresh_var fresh_var_ ~ty:(S.apply_ty s (HVar.ty v, scope)) ()) in
-    if US.FO.mem s (v,scope) 
-    then s
-    else US.FO.bind s (v,scope) (newvar, unifscope) 
+  let add_renaming scope subst v =
+    if HVar.id v = -134 then Util.debugf 5 "%a XXX %a" (fun k -> k T.pp t1 (CCList.pp (CCPair.pp HVar.pp Type.pp)) (List.map (fun e -> e, HVar.ty e) (Sequence.to_list (T.Seq.vars t1))));
+    if US.FO.mem subst (v,scope) 
+    then subst
+    else 
+      let newvar = T.var (make_fresh_var fresh_var_ ~ty:(S.apply_ty subst (HVar.ty v, scope)) ()) in
+      US.FO.bind subst (v,scope) (newvar, unifscope) 
   in
   let subst = US.empty in
   (* Rename variables apart into scope `unifscope` *)
