@@ -604,6 +604,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       VTbl.to_list status
       |> CCList.filter_map (
         fun (var, var_status) -> 
+          assert (not (Type.is_tType (HVar.ty var)));
           let ty_args, ty_return = Type.open_fun (HVar.ty var) in
           let keep = var_status |> CCList.map 
             (fun (fas, das) -> 
