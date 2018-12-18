@@ -141,19 +141,30 @@ module Inner = struct
     in
     aux t
 
-  (* do one step of eta-reduction *)
+  (* compute eta-reduced normal form *)
   let eta_reduce_rec t =
     let rec aux t =  match T.ty t with
       | T.NoType -> t
       | T.HasType ty ->
         begin match T.view t with
           | T.Var _ | T.DB _ | T.Const _ -> t
-          | T.Bind (Binder.Lambda, _, {T.term=T.App (f, [{T.term=T.DB 0; _}]); _})
-            when not (T.DB.contains f 0) ->
-            (* [fun x. f x --> f] *)
-            T.DB.unshift 1 f
           | T.Bind (b, varty, body) ->
-            T.bind ~ty ~varty b (aux body)
+            let body' = aux body in
+            let eta_reduced =
+              (* Check whether the term is of an eta-reducible shape *)
+              match b, body' with
+                | Binder.Lambda, {T.term=T.App (f, l); _} -> 
+                  begin match List.rev l with
+                    | {T.term=T.DB 0; _} :: rev_butlast when List.for_all (fun arg -> not (T.DB.contains arg 0)) (f :: rev_butlast) ->
+                      Some (T.DB.unshift 1 (T.app ~ty f (List.rev rev_butlast)))
+                    | _ -> None
+                  end
+                | _ -> None
+            in
+            begin match eta_reduced with
+              | Some eta_reduced -> aux eta_reduced
+              | None -> T.bind ~ty ~varty b body'
+            end
           | T.App (_,[]) -> assert false
           | T.App (f, l) ->
             let f' = aux f in
