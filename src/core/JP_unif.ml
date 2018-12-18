@@ -342,7 +342,6 @@ let unify_scoped (t0, scope0) (t1, scope1) =
   let unifscope = if scope0 < scope1 then scope1 + 1 else scope0 + 1 in
   let fresh_var_ = ref 0 in
   let add_renaming scope subst v =
-    if HVar.id v = -134 then Util.debugf 5 "%a XXX %a" (fun k -> k T.pp t1 (CCList.pp (CCPair.pp HVar.pp Type.pp)) (List.map (fun e -> e, HVar.ty e) (Sequence.to_list (T.Seq.vars t1))));
     if US.FO.mem subst (v,scope) 
     then subst
     else 
