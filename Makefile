@@ -4,7 +4,7 @@ J?=3
 all: build test-cached
 
 build:
-	@dune build @install -j $J
+	@dune build @install -j $J --profile=release
 
 clean:
 	@dune clean
