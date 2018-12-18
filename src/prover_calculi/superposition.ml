@@ -327,8 +327,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           Lit.apply_subst_list renaming subst (lits_p, sc_p)
       in
       let rule =
-        let name = if Lit.sign passive_lit' then "sup+" else "sup-" in
-        Proof.Rule.mk name
+        let r = if info.supav then "supav" else "sup" in
+        let sign = if Lit.sign passive_lit' then "+" else "-" in
+        Proof.Rule.mk (r ^ sign)
       in
       let proof =
         Proof.Step.inference ~rule ~tags
