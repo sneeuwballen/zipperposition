@@ -658,9 +658,9 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ?(var_args=true) ?(fun_bo
       (* p is the only term, and it's maximal *)
       at_term ~pos:P.(append position (left stop)) p
     | Int o ->
-      Int_lit.fold_terms ~pos:position ?ty_args ~vars ~which ~ord ~subterms o k
+      Int_lit.fold_terms ~pos:position ?ty_args ~vars ~var_args ~fun_bodies ~which ~ord ~subterms o k
     | Rat o  ->
-      Rat_lit.fold_terms ~pos:position ?ty_args ~vars ~which ~ord ~subterms o k
+      Rat_lit.fold_terms ~pos:position ?ty_args ~vars ~var_args ~fun_bodies ~which ~ord ~subterms o k
     | True
     | False -> ()
   end
@@ -929,6 +929,12 @@ module Pos = struct
       | Int(AL.Binary(_, _, m2)), P.Right (P.Arg (i, pos')) ->
         let term = try snd(Monome.nth m2 i) with _ -> _fail_lit lit pos in
         {lit_pos=P.(right @@ arg i stop); term_pos=pos'; term; }
+      | Rat ({Rat_lit.left; _}: Rat_lit.t), P.Left (P.Arg (i, pos')) ->
+        let term = try snd(Monome.nth left i) with _ -> _fail_lit lit pos in
+        {lit_pos=P.(left @@ arg i stop); term_pos=pos'; term; }
+      | Rat ({Rat_lit.right; _}: Rat_lit.t), P.Right (P.Arg (i, pos')) ->
+        let term = try snd(Monome.nth right i) with _ -> _fail_lit lit pos in
+        {lit_pos=P.(right @@ arg i stop); term_pos=pos'; term; }
       | _ -> _fail_lit lit pos
 
   let cut lit pos =
@@ -962,6 +968,14 @@ module Pos = struct
         let _, t = Monome.nth d.AL.monome i in
         let m' = Monome.set_term d.AL.monome i (T.Pos.replace t pos' ~by) in
         Int (AL.mk_divides ~sign:d.AL.sign ~power:d.AL.power d.AL.num m')
+      | Rat {Rat_lit.op; left; right}, P.Left (P.Arg(i,pos')) ->
+        let _, t = Monome.nth left i in
+        let left' = Monome.set_term left i (T.Pos.replace t pos' ~by) in
+        Rat (Rat_lit.make_no_simp op left' right)
+      | Rat {Rat_lit.op; left; right}, P.Right (P.Arg(i,pos')) ->
+        let _, t = Monome.nth right i in
+        let right' = Monome.set_term right i (T.Pos.replace t pos' ~by) in
+        Rat (Rat_lit.make_no_simp op left right')
       | _ -> _fail_lit lit at
 
   let root_term lit pos =

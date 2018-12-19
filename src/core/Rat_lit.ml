@@ -67,6 +67,8 @@ let make op m1 m2 =
 let mk_eq = make Equal
 let mk_less = make Less
 
+let make_no_simp op m1 m2 = {op; left=m1; right=m2}
+
 let pp out m =
   Format.fprintf out "%a %s %a"
     M.pp m.left

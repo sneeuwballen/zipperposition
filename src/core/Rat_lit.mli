@@ -31,6 +31,7 @@ val compare : t -> t -> int
 include Interfaces.HASH with type t := t
 
 val make : op -> Q.t Monome.t -> Q.t Monome.t -> t
+val make_no_simp : op -> Q.t Monome.t -> Q.t Monome.t -> t
 
 val mk_eq : Q.t Monome.t -> Q.t Monome.t -> t
 val mk_less : Q.t Monome.t -> Q.t Monome.t -> t
