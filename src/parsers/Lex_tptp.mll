@@ -86,6 +86,7 @@ rule token = parse
   | "=>" { IMPLY }
   | "<=" { LEFT_IMPLY }
   | '~' { NOT }
+  | "(~)" { NOTCONST }
   | "~|" { NOTVLINE }
   | "~&" { NOTAND }
   | '|' { VLINE }

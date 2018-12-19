@@ -62,6 +62,7 @@
 
 %token FORALLCONST
 %token EXISTSCONST
+%token NOTCONST
 
 %token UNDERSCORE
 
@@ -302,6 +303,7 @@ or_formula: l=assoc_binary_formula_aux(VLINE) { PT.or_ l }
 atomic_formula:
   | TRUE { PT.true_ }
   | FALSE { PT.false_ }
+  | NOTCONST { PT.builtin Builtin.Not }
   | EXISTSCONST { PT.builtin Builtin.ExistsConst }
   | FORALLCONST { PT.builtin Builtin.ForallConst }
   | t=term
