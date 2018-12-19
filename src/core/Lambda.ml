@@ -162,7 +162,7 @@ module Inner = struct
                 | _ -> None
             in
             begin match eta_reduced with
-              | Some eta_reduced -> aux eta_reduced
+              | Some eta_reduced -> eta_reduced
               | None -> T.bind ~ty ~varty b body'
             end
           | T.App (_,[]) -> assert false

@@ -20,7 +20,8 @@ let g_ = ID.make "g"
 let h_ = ID.make "h"
 
 let ty = Type.term
-let f x y = T.app (T.const ~ty:Type.([ty;ty] ==> ty) f_) [x; y]
+let f_fun = (T.const ~ty:Type.([ty;ty] ==> ty) f_)
+let f x y = T.app f_fun [x; y]
 let g_fun = T.const ~ty:Type.([ty] ==> ty) g_
 let g x = T.app g_fun [x]
 let h x y z = T.app (T.const ~ty:Type.([ty;ty;ty] ==> ty) h_) [x;y;z]
@@ -87,12 +88,23 @@ let test_polymorphic_app = "poly app", `Quick, fun () ->
   Alcotest.(check ty_test) "polyapp" (Term.ty result) ty;
   ()
 
+let test_eta_reduce = "eta reduce", `Quick, fun () ->
+  (* (λx. (λy. f x y)) -> f *)
+  let t1 = T.fun_of_fvars [HVar.make ~ty 0; HVar.make ~ty 1] (T.app f_fun [T.var_of_int ~ty 0; T.var_of_int ~ty 1]) in
+  let t2 = f_fun in
+  Alcotest.(check t_test) "eta reduce" (Lambda.eta_reduce t1) t2;
+  (* (λx. (λy. g y) x) -> g *)
+  let t1 = T.fun_of_fvars [HVar.make ~ty 0] (T.app (T.fun_of_fvars [HVar.make ~ty 1] (g (T.var_of_int ~ty 1))) [T.var_of_int ~ty 0]) in
+  let t2 = g_fun in
+  Alcotest.(check t_test) "eta reduce" (Lambda.eta_reduce t1) t2
+
 let suite : unit Alcotest.test_case list =
   [ test_db_shift;
     test_db_unshift;
     test_whnf1;
     test_whnf2;
     test_polymorphic_app;
+    test_eta_reduce;
   ]
 
 (** Properties *)
