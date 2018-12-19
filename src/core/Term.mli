@@ -358,6 +358,7 @@ module DB : sig
   val shift : ?depth:int -> int -> t -> t
   val unshift : ?depth:int -> int -> t -> t
   val eval : t DBEnv.t -> t -> t
+  val unbound : t -> int list
 end
 
 (** {2 TPTP} *)

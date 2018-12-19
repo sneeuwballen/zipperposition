@@ -162,8 +162,8 @@ let check_eq ?(msg="check eq") t1 t2 =
 let unifier2 t u =
     let subst = Unif.FO.unify_syn (t,0)(u,1) in
     let renaming = Subst.Renaming.create() in
-    Subst.FO.apply renaming subst (t,0) |> Lambda.snf,
-    Subst.FO.apply renaming subst (u,1) |> Lambda.snf,
+    Subst.FO.apply renaming subst (t,0) |> Lambda.snf |> Lambda.eta_reduce,
+    Subst.FO.apply renaming subst (u,1) |> Lambda.snf |> Lambda.eta_reduce,
     renaming,
     subst
 
@@ -203,14 +203,14 @@ let check_unifier_matches t u =
   "check unifier matches unified terms", `Quick, fun () ->
     let t' = unifier t u in
     let msg = Fmt.sprintf "(@[unify_matches `%a`@ `%a`@])" T.ZF.pp t T.ZF.pp u in
-    check_matches ~msg t t';
-    check_matches ~msg u t'
+    check_matches ~msg (t |> Lambda.snf |> Lambda.eta_reduce) t';
+    check_matches ~msg (u |> Lambda.snf |> Lambda.eta_reduce) t'
 
 let check_same t u t1 sc1 t2 sc2 =
   "check unify makes same", `Quick, fun () ->
     let _, _, renaming, subst = unifier2 t u in
-    let t1 = Subst.FO.apply renaming subst (t1,sc1) |> Lambda.snf in
-    let t2 = Subst.FO.apply renaming subst (t2,sc2) |> Lambda.snf in
+    let t1 = Subst.FO.apply renaming subst (t1,sc1) |> Lambda.snf |> Lambda.eta_reduce in
+    let t2 = Subst.FO.apply renaming subst (t2,sc2) |> Lambda.snf |> Lambda.eta_reduce in
     let msg = Fmt.sprintf
         "(@[<h>unify `%a`@ `%a`@ :makes-eq @[`%a`[%d]@ and `%a`[%d]@]@])"
       T.ZF.pp t T.ZF.pp u T.ZF.pp t1 sc1 T.ZF.pp t2 sc2 in
@@ -313,7 +313,7 @@ let suite_unif1 : unit Alcotest.test_case list =
         Action.yield "Y" >?-> "term";
       ];
       ("p_ho2 (fun a. F1 a) (fun a. F2 a)" =?= "p_ho2 (fun a. G a) (fun a. G a)"), [
-        Action.yield "p_ho2 (fun a. G a) (fun a. G a)";
+        Action.yield "p_ho2 G G";
         Action.eq "F1" 0 "G" 1 >?-> "term -> term";
         Action.eq "F2" 0 "G" 1 >?-> "term -> term";
       ];
@@ -329,6 +329,10 @@ let suite_unif1 : unit Alcotest.test_case list =
       ];
       ( "F (g_ho F)" <?> "a_poly A") |> Task.set_unif_types false, [];
       ( "(fun (x:term). x)" <?> "(fun (x:term). Y)") , [];
+      ( "g_ho (fun (x:term). g)" <?> "g_ho (fun (x:term) (y:term). Y x)") , [];
+      ( "g_ho (fun (x:term). g)" =?= "g_ho (fun (x:term) (y:term). Y y)") , [
+        Action.eq "fun (x:term). g x" 0 "Y" 1;
+      ];
     ]
 
 let jp_check_count t u count : unit Alcotest.test_case =
@@ -579,8 +583,8 @@ let check_unify_gives_unifier =
     try
       let subst = Unif.FO.unify_syn (t1,0) (t2,1) in
       let renaming = S.Renaming.create () in
-      let t1' = S.FO.apply renaming subst (t1,0) |> Lambda.snf in
-      let t2' = S.FO.apply renaming subst (t2,1) |> Lambda.snf in
+      let t1' = S.FO.apply renaming subst (t1,0) |> Lambda.snf |> Lambda.eta_reduce in
+      let t2' = S.FO.apply renaming subst (t2,1) |> Lambda.snf |> Lambda.eta_reduce in
       if T.equal t1' t2' then true
       else QCheck.Test.fail_reportf
           "subst=%a,@ t1'=`%a`,@ t2'=`%a`" Subst.pp subst T.ZF.pp t1' T.ZF.pp t2'
@@ -597,8 +601,8 @@ let check_unifier_matches =
     try
       let subst = Unif.FO.unify_syn (t1,0) (t2,1) in
       let renaming = S.Renaming.create () in
-      let t1' = S.FO.apply renaming subst (t1,0) |> Lambda.snf in
-      let t2' = S.FO.apply renaming subst (t2,1) |> Lambda.snf in
+      let t1' = S.FO.apply renaming subst (t1,0) |> Lambda.snf |> Lambda.eta_reduce in
+      let t2' = S.FO.apply renaming subst (t2,1) |> Lambda.snf |> Lambda.eta_reduce in
       if Unif.FO.matches ~pattern:t1 t1' &&
          Unif.FO.matches ~pattern:t2 t2'
       then true
@@ -649,8 +653,8 @@ let check_variant2 =
       let subst = Unif.FO.variant (t0,0)(t1,1) in
       (* check they are really variants *)
       let renaming = Subst.Renaming.create() in
-      let t0' = Subst.FO.apply renaming subst (t0,0) |> Lambda.snf in
-      let t1' = Subst.FO.apply renaming subst (t1,1) |> Lambda.snf in
+      let t0' = Subst.FO.apply renaming subst (t0,0) |> Lambda.snf |> Lambda.eta_reduce in
+      let t1' = Subst.FO.apply renaming subst (t1,1) |> Lambda.snf |> Lambda.eta_reduce in
       T.equal t0' t1'
     with Unif.Fail -> QCheck.assume_fail ()
   in
@@ -671,8 +675,8 @@ let check_matching =
     try
       let subst = Unif.FO.matching ~pattern:(t1,0) (t2,1) in
       let renaming = S.Renaming.create () in
-      let t1' = S.FO.apply renaming subst (t1,0) |> Lambda.snf in
-      let t2' = S.FO.apply renaming subst (t2,1) |> Lambda.snf in
+      let t1' = S.FO.apply renaming subst (t1,0) |> Lambda.snf |> Lambda.eta_reduce in
+      let t2' = S.FO.apply renaming subst (t2,1) |> Lambda.snf |> Lambda.eta_reduce in
       if T.equal t1' t2'
       then true
       else QCheck.Test.fail_reportf "@[<v>subst=%a,@ t1'=`%a`,@ t2'=`%a`@]"
@@ -688,7 +692,7 @@ let check_matching_variant =
     try
       let subst = Unif.FO.matching ~pattern:(t1,0) (t2,1) in
       let renaming = S.Renaming.create () in
-      let t2' = S.FO.apply renaming subst (t2,1) |> Lambda.snf in
+      let t2' = S.FO.apply renaming subst (t2,1) |> Lambda.snf |> Lambda.eta_reduce in
       if Unif.FO.are_variant t2 t2'
       then true
       else QCheck.Test.fail_reportf "@[<v>subst=%a,@ t2'=`%a`@]"
@@ -703,7 +707,7 @@ let check_matching_variant_same_scope =
   let prop (t1, t2) =
     try
       let subst = Unif.FO.matching_same_scope ~scope:0 ~pattern:t1 t2 in
-      let t2' = S.FO.apply Subst.Renaming.none subst (t2,0) |> Lambda.snf in
+      let t2' = S.FO.apply Subst.Renaming.none subst (t2,0) |> Lambda.snf |> Lambda.eta_reduce in
       if Unif.FO.are_variant t2 t2'
       then true
       else QCheck.Test.fail_reportf "@[<v>subst=%a,@ t2'=`%a`@]"
@@ -753,8 +757,8 @@ let check_ho_unify_gives_unifiers =
         (fun (_,us,_,_) ->
            let subst = Unif_subst.subst us in
            let renaming = Subst.Renaming.create() in
-           let u1 = Subst.FO.apply renaming subst (t1,0) |> Lambda.snf in
-           let u2 = Subst.FO.apply renaming subst (t2,0) |> Lambda.snf in
+           let u1 = Subst.FO.apply renaming subst (t1,0) |> Lambda.snf |> Lambda.eta_reduce in
+           let u2 = Subst.FO.apply renaming subst (t2,0) |> Lambda.snf |> Lambda.eta_reduce in
            if not (T.equal u1 u2) then (
              QCheck.Test.fail_reportf
                "(@[<hv2>bad solution@ t1'=`%a`@ t2'=`%a`@ :subst %a@])"

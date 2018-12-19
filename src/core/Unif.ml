@@ -708,7 +708,9 @@ module Inner = struct
           "(@[unif_ho.flex_rigid@ `@[:f1 %a :l1 %a@]`@ :t2 `%a`@ :subst %a@ :bvars %a@])@."
           (Scoped.pp T.pp) (f1,scope) (CCFormat.Dump.list T.pp) l1
           (Scoped.pp T.pp) (t2,scope) US.pp subst B_vars.pp bvars;*)
-        if distinct_bvar_l ~bvars:bvars.B_vars.left l1 then (
+        if distinct_bvar_l ~bvars:bvars.B_vars.left l1 
+          && CCList.subset ~eq:(=) (T.DB.unbound t2) (List.map T.as_bvar_exn l1) 
+        then (
           (* flex/rigid pattern unif *)
           flex_rigid ~bvars:bvars.B_vars.left subst f1 l1 t2 ~scope
         ) else if distinct_ground_l l1 then (
@@ -729,7 +731,10 @@ module Inner = struct
           "(@[unif_ho.flex_rigid@ `@[:f2 %a :l2 %a@]`@ :t1 `%a`@ :subst %a@ :bvars %a@])@."
           (Scoped.pp T.pp) (f2,scope) (CCFormat.Dump.list T.pp) l2
           (Scoped.pp T.pp) (t1,scope) US.pp subst B_vars.pp bvars;*)
-        if distinct_bvar_l ~bvars:bvars.B_vars.right l2 && op=O_unify then (
+        if distinct_bvar_l ~bvars:bvars.B_vars.right l2 
+          && CCList.subset ~eq:(=) (T.DB.unbound t1) (List.map T.as_bvar_exn l2) 
+          && op=O_unify 
+        then (
           (* flex/rigid pattern unif *)
           flex_rigid ~bvars:bvars.B_vars.right subst f2 l2 t1 ~scope
         ) else if distinct_ground_l l2 && op=O_unify then (

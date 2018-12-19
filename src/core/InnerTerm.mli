@@ -132,6 +132,9 @@ module DB : sig
   val contains : t -> int -> bool
   (** Does t contains the De Bruijn variable of index n? *)
 
+  val unbound : t -> int list
+  (** Return a list of all unbound DB indices in a term *)
+
   val shift : ?depth:int -> int -> t -> t
   (** shift the non-captured De Bruijn indexes in the term by n *)
 

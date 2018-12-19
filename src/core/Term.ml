@@ -665,6 +665,7 @@ module DB = struct
   let shift = T.DB.shift
   let eval = T.DB.eval
   let unshift = T.DB.unshift
+  let unbound = T.DB.unbound
 end
 
 let debugf = pp

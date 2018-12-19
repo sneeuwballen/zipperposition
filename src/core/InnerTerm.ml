@@ -285,6 +285,12 @@ module DB = struct
     |> Sequence.map (fun (bvar,depth) -> bvar=n+depth)
     |> Sequence.exists _id
 
+  let unbound t =
+    _to_seq ~depth:0 t
+    |> Sequence.filter_map 
+      (fun (bvar,depth) -> if bvar >= depth then Some (bvar - depth) else None)
+    |> Sequence.to_rev_list
+
   (* maps the term to another term, calling [on_binder acc t]
      when it meets a binder, and [on_bvar acc t] when it meets a
      bound variable. *)
