@@ -138,8 +138,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   let ext_pos (c:C.t): C.t list =
     begin match C.lits c with
       | [| Literal.Equation (t1, t2, true) |] ->
-        let f1, l1 = T.as_app t1 in
-        let f2, l2 = T.as_app t2 in
+        let f1, l1 = T.as_app_with_mandatory_args t1 in
+        let f2, l2 = T.as_app_with_mandatory_args t2 in
         begin match List.rev l1, List.rev l2 with
           | last1 :: l1, last2 :: l2 ->
             begin match T.view last1, T.view last2 with
