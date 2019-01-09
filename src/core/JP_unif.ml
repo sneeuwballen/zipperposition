@@ -60,8 +60,9 @@ let project ~scope ~fresh_var_ u v (_ : (T.var * int) list) = OSeq.append (proje
 let imitate_onesided ~scope ~fresh_var_ u v = 
   let head_u = T.head_term_mono u in
   let head_v = T.head_term_with_mandatory_args v in
-  let prefix_types_u, _ = Type.open_fun (T.ty head_u) in
-  let prefix_types_v, _ = Type.open_fun (T.ty head_v) in
+  let prefix_types_u, ret1 = Type.open_fun (T.ty head_u) in
+  let prefix_types_v, ret2 = Type.open_fun (T.ty head_v) in
+  assert (Type.equal ret1 ret2);
   if T.is_var head_u                                        (* u has a varaible head *)
     && not (T.is_bvar head_v)                               (* the head of v is not a bound variable *)
     && not (T.var_occurs ~var:(T.as_var_exn head_u) head_v) (* the head of u does not occur in the mandatory args of v *)
@@ -286,7 +287,7 @@ let find_disagreement s t =
         | OSeq.Cons (d, _) -> Some d
       end
 
-let unify ~scope ~fresh_var_ t s = 
+let unify ~scope ~fresh_var_ t0 s0 = 
   let rec unify_terms ?(rules = []) t s  =
     (*Util.debugf 1 "@[Unify@ @[(rules: %a)@]@ @[%a@]@ and@ @[%a@]@]" (fun k -> k (CCList.pp CCString.pp) rules T.pp t T.pp s); *)
     match find_disagreement t s with
@@ -310,6 +311,7 @@ let unify ~scope ~fresh_var_ t s =
           (fun (osubst,rulename) -> 
             match osubst with
             | Some subst ->
+              (* Util.debugf 5 "@[Subst (%s): @ @[%a@]@]" (fun k -> k rulename US.pp subst); *)
               let t_subst = nfapply subst (t, scope) in
               let s_subst = nfapply subst (s, scope) in
               let unifiers = unify_terms t_subst s_subst ~rules:(rules @ [rulename]) in
@@ -326,10 +328,10 @@ let unify ~scope ~fresh_var_ t s =
         OSeq.return (Some US.empty)
   in
   (* Unify types first ... *)
-  match unif_ty ~scope (T.of_ty (T.ty t)) (T.of_ty (T.ty s)) with
+  match unif_ty ~scope (T.of_ty (T.ty t0)) (T.of_ty (T.ty s0)) with
     | Some type_unifier ->
-      let t' = nfapply type_unifier (t, scope) in
-      let s' = nfapply type_unifier (s, scope) in
+      let t' = nfapply type_unifier (t0, scope) in
+      let s' = nfapply type_unifier (s0, scope) in
       (* ... then terms. *)
       let term_unifiers = unify_terms t' s' ~rules:[] in
       OSeq.map (CCOpt.map (US.merge type_unifier)) term_unifiers 
