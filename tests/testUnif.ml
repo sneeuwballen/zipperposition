@@ -473,6 +473,11 @@ let suite_jp_unif : unit Alcotest.test_case list =
 
 
       "fun (x : term). x" <?> "fun (x : term). X" |> Task.set_unif_types false, [],["X","term"];
+
+
+      "fun (x : term). a" =?= "X" |> Task.set_unif_types false, [
+          Action.count 1
+      ],["X","term -> term"];
     ]
 
 let reg_matching1 = "regression matching", `Quick, fun () ->

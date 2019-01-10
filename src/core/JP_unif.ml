@@ -64,7 +64,7 @@ let imitate_onesided ~scope ~fresh_var_ u v =
   let prefix_types_v, ret2 = Type.open_fun (T.ty head_v) in
   assert (Type.equal ret1 ret2);
   if T.is_var head_u                                        (* u has a varaible head *)
-    && not (T.is_bvar head_v)                               (* the head of v is not a bound variable *)
+    && not (T.is_bvar head_v) && not (T.is_fun head_v)      (* the head of v is not a bound variable or a lambda-expression *)
     && not (T.var_occurs ~var:(T.as_var_exn head_u) head_v) (* the head of u does not occur in the mandatory args of v *)
   then
     (* create substitution: head_u |-> λ u1 ... um. head_v (x1 u1 ... um) ... (xn u1 ... um)) *)
@@ -78,6 +78,7 @@ let imitate_onesided ~scope ~fresh_var_ u v =
     in
     let matrix = T.app head_v matrix_args in
     let subst_value = T.fun_l prefix_types_u matrix in 
+    assert (T.DB.is_closed subst_value);
     let subst = US.FO.singleton (T.as_var_exn head_u, scope) (subst_value, scope) in
     OSeq.return subst
   else OSeq.empty
