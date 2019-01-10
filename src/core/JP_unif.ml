@@ -295,16 +295,24 @@ let unify ~scope ~fresh_var_ t0 s0 =
       | Some ((u, v), l) -> 
         let subst_seq = 
           if T.is_type t then
-            OSeq.return ((unif_ty ~scope s t), "unif_ty")
+            OSeq.return ((unif_ty ~scope s t), "unif_ty_args")
           else (
-            let add_some f u v l = f ~scope ~fresh_var_ u v l |> OSeq.map (fun s -> Some s) in
-            [add_some project,"proj"; add_some imitate,"imit"; add_some identify,"id"; add_some eliminate,"elim"; iterate ~scope ~fresh_var_,"iter"]
-            (* iterate must be last in this list because it is the only one with infinitely many child nodes *)
-            |> OSeq.of_list  
-            |> OSeq.flat_map
-              (fun (rule,rulename) -> 
-                rule u v l 
-                |> OSeq.map (fun subst -> (subst, rulename)))
+            if Type.equal (T.ty u) (T.ty v) 
+            then (
+              let add_some f u v l = f ~scope ~fresh_var_ u v l |> OSeq.map (fun s -> Some s) in
+              [add_some project,"proj"; add_some imitate,"imit"; add_some identify,"id"; add_some eliminate,"elim"; iterate ~scope ~fresh_var_,"iter"]
+              (* iterate must be last in this list because it is the only one with infinitely many child nodes *)
+              |> OSeq.of_list  
+              |> OSeq.flat_map
+                (fun (rule,rulename) -> 
+                  rule u v l 
+                  |> OSeq.map (fun subst -> (subst, rulename)))
+            )
+            else (
+              (* Disagreeing terms may be of different types under polymorphic builtin constants 
+              such as equality because these builtins do not use type arguments. *)
+              OSeq.return ((unif_ty ~scope s t), "unif_ty")
+            )
           )
         in
         subst_seq 
