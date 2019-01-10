@@ -469,8 +469,10 @@ let suite_jp_unif : unit Alcotest.test_case list =
               "X", "fun (z : alpha -> gamma -> term). z (X000 z) (Y000 z (z (X000 z)))", None;
               "Y", "fun (x : alpha) (y : gamma). a", None 
           ]
-      ],["X","beta -> term"; "Y","beta"]
+      ],["X","beta -> term"; "Y","beta"];
 
+
+      "fun (x : term). x" <?> "fun (x : term). X" |> Task.set_unif_types false, [],["X","term"];
     ]
 
 let reg_matching1 = "regression matching", `Quick, fun () ->
