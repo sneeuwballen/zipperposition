@@ -345,7 +345,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
       Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
-      Some (penalty, new_clause)
+      Some new_clause
     with ExitSuperposition reason ->
       Util.debugf ~section 3 "... cancel, %s" (fun k->k reason);
       None
@@ -436,7 +436,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
       Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
-      Some (penalty, new_clause)
+      Some new_clause
     with ExitSuperposition reason ->
       Util.debugf ~section 3 "@[... cancel, %s@]" (fun k->k reason);
       None
@@ -483,6 +483,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           |> Sequence.filter_map (process_retrieved do_sup)
         )
       |> Sequence.to_rev_list
+
     in
     Util.exit_prof prof_infer_active;
     new_clauses
@@ -525,37 +526,36 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     new_clauses
 
   let infer_active clause =
-    let pen_inf_res = infer_active_aux
+    infer_active_aux
       ~retrieve_from_index:I.retrieve_unifiables
       ~process_retrieved:(fun do_sup (u_p, with_pos, subst) -> do_sup u_p with_pos subst)
       clause
-    in
-    let (_,inf_res) = List.split pen_inf_res in
-    inf_res
 
   let infer_passive clause =
-    let pen_inf_res = infer_passive_aux
+    infer_passive_aux
       ~retrieve_from_index:I.retrieve_unifiables
       ~process_retrieved:(fun do_sup (u_p, with_pos, subst) -> do_sup u_p with_pos subst)
       clause
-    in
-    let (_,inf_res) = List.split pen_inf_res in
-    inf_res
 
   let infer_active_complete_ho clause =
     let inf_res = infer_active_aux
       ~retrieve_from_index:I.retrieve_unifiables_complete
-      ~process_retrieved:(fun do_sup (u_p, with_pos, substs) -> Some (OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
+      ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
+          let penalty = C.penalty clause + C.penalty with_pos.C.WithPos.clause in
+          (* /!\ may differ from the actual penalty (by -2) *)
+          Some (penalty, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
       clause
     in
     let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) inf_res in
       StmQ.add_lst _stmq.q stm_res; []
 
-
   let infer_passive_complete_ho clause =
     let inf_res = infer_passive_aux
       ~retrieve_from_index:I.retrieve_unifiables_complete
-      ~process_retrieved:(fun do_sup (u_p, with_pos, substs) -> Some (OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
+      ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
+          let penalty = C.penalty clause + C.penalty with_pos.C.WithPos.clause in
+          (* /!\ may differ from the actual penalty (by -2) *)
+          Some (penalty, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
       clause
     in
     let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) inf_res in
@@ -600,7 +600,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                     )
                 )
               in
-              Sequence.cons res acc
+              let penalty = C.penalty clause + C.penalty with_pos.C.WithPos.clause in
+              (* /!\ may differ from the actual penalty (by -2) *)
+              Sequence.cons (penalty,res) acc
             )
           Sequence.empty
         )
@@ -647,13 +649,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   )
                 | _ -> assert false
               in
-              Sequence.cons res acc
+              let penalty = C.penalty clause + C.penalty with_pos.C.WithPos.clause in
+              (* /!\ may differ from the actual penalty (by -2) *)
+              Sequence.cons (penalty,res) acc
             )
             Sequence.empty
         )
       |> Sequence.to_rev_list
     in
-    let stm_res = List.map (Stm.make ~penalty:1) new_clauses in
+    let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) new_clauses in
       StmQ.add_lst _stmq.q stm_res;
     Util.exit_prof prof_infer_supav_passive;
     []
