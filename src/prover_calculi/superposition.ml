@@ -464,7 +464,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~both:true ~eligible (C.lits clause)
       |> Sequence.flat_map
         (fun (s, t, _, s_pos) ->
-          let do_sup u_p with_pos subst = 
+          let do_sup u_p with_pos subst =
             (* rewrite u_p with s *)
             if T.DB.is_closed u_p
             then
@@ -475,7 +475,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   s; t; active=clause; active_pos=s_pos; scope_active=0;
                   u_p; passive; passive_lit; passive_pos; scope_passive=1; subst; supav=false
                 }) in
-              do_superposition info 
+              do_superposition info
             else None
           in
           (* rewrite clauses using s *)
@@ -483,6 +483,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           |> Sequence.filter_map (process_retrieved do_sup)
         )
       |> Sequence.to_rev_list
+
     in
     Util.exit_prof prof_infer_active;
     new_clauses
@@ -524,40 +525,47 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.exit_prof prof_infer_passive;
     new_clauses
 
-  let infer_active =
+  let infer_active clause =
     infer_active_aux
       ~retrieve_from_index:I.retrieve_unifiables
       ~process_retrieved:(fun do_sup (u_p, with_pos, subst) -> do_sup u_p with_pos subst)
+      clause
 
-  let infer_passive =
+  let infer_passive clause =
     infer_passive_aux
       ~retrieve_from_index:I.retrieve_unifiables
       ~process_retrieved:(fun do_sup (u_p, with_pos, subst) -> do_sup u_p with_pos subst)
+      clause
 
   let infer_active_complete_ho clause =
     let inf_res = infer_active_aux
       ~retrieve_from_index:I.retrieve_unifiables_complete
-      ~process_retrieved:(fun do_sup (u_p, with_pos, substs) -> Some (OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
+      ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
+          let penalty = C.penalty clause + C.penalty with_pos.C.WithPos.clause in
+          (* /!\ may differ from the actual penalty (by -2) *)
+          Some (penalty, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
       clause
     in
-    let stm_res = List.map (Stm.make ~penalty:1) inf_res in
+    let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) inf_res in
       StmQ.add_lst _stmq.q stm_res; []
-
 
   let infer_passive_complete_ho clause =
     let inf_res = infer_passive_aux
       ~retrieve_from_index:I.retrieve_unifiables_complete
-      ~process_retrieved:(fun do_sup (u_p, with_pos, substs) -> Some (OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
+      ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
+          let penalty = C.penalty clause + C.penalty with_pos.C.WithPos.clause in
+          (* /!\ may differ from the actual penalty (by -2) *)
+          Some (penalty, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
       clause
     in
-    let stm_res = List.map (Stm.make ~penalty:1) inf_res in
+    let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) inf_res in
       StmQ.add_lst _stmq.q stm_res; []
 
   (* ----------------------------------------------------------------------
    * SupAV rule (Superposition at applied variables)
    * ---------------------------------------------------------------------- *)
 
-  let infer_supav_active clause = 
+  let infer_supav_active clause =
     Util.enter_prof prof_infer_supav_active;
     (* no literal can be eligible for paramodulation if some are selected.
       This checks if inferences with i-th literal are needed? *)
@@ -569,39 +577,43 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Lits.fold_eqn ~sign:true ~ord ~both:true ~eligible (C.lits clause)
       |> Sequence.flat_map
         (fun (s, t, _, s_pos) ->
-          I.fold !_idx_supav_into 
-            (fun acc u_p with_pos -> 
+          I.fold !_idx_supav_into
+            (fun acc u_p with_pos ->
               assert (T.is_var (T.head_term u_p));
               assert (T.DB.is_closed u_p);
               (* Create prefix variable H and use H s = H t for superposition *)
               let var_h = T.var (HVar.fresh ~ty:(Type.arrow [T.ty s] (Type.var (HVar.fresh ~ty:Type.tType ()))) ()) in
               let hs = T.app var_h [s] in
               let ht = T.app var_h [t] in
-              let res = JP_unif.unify_scoped (u_p,1) (hs,0) |> OSeq.map (fun osubst ->
-                osubst |> CCOpt.flat_map (fun subst ->
-                  let passive = with_pos.C.WithPos.clause in
-                  let passive_pos = with_pos.C.WithPos.pos in
-                  let passive_lit, _ = Lits.Pos.lit_at (C.lits passive) passive_pos in
-                  let info = SupInfo.({
-                      s=hs; t=ht; active=clause; active_pos=s_pos; scope_active=0;
-                      u_p; passive; passive_lit; passive_pos; scope_passive=1; subst; supav=true
-                    }) in
-                  do_superposition info
-                ) 
-              )
+              let res = JP_unif.unify_scoped (u_p,1) (hs,0) |> OSeq.map (
+                  fun osubst ->
+                    osubst |> CCOpt.flat_map (
+                      fun subst ->
+                        let passive = with_pos.C.WithPos.clause in
+                        let passive_pos = with_pos.C.WithPos.pos in
+                        let passive_lit, _ = Lits.Pos.lit_at (C.lits passive) passive_pos in
+                        let info = SupInfo.({
+                            s=hs; t=ht; active=clause; active_pos=s_pos; scope_active=0;
+                            u_p; passive; passive_lit; passive_pos; scope_passive=1; subst; supav=true
+                          }) in
+                        do_superposition info
+                    )
+                )
               in
-              Sequence.cons res acc
+              let penalty = C.penalty clause + C.penalty with_pos.C.WithPos.clause in
+              (* /!\ may differ from the actual penalty (by -2) *)
+              Sequence.cons (penalty,res) acc
             )
           Sequence.empty
         )
       |> Sequence.to_rev_list
     in
-    let stm_res = List.map (Stm.make ~penalty:1) new_clauses in
+    let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) new_clauses in
       StmQ.add_lst _stmq.q stm_res;
     Util.exit_prof prof_infer_supav_active;
     []
 
-  let infer_supav_passive clause = 
+  let infer_supav_passive clause =
     Util.enter_prof prof_infer_supav_passive;
     (* perform inference on this lit? *)
     let eligible = C.Eligible.(res clause) in
@@ -615,7 +627,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun (u_p, passive_pos) ->
           let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
           I.fold !_idx_sup_from
-            (fun acc _ with_pos -> 
+            (fun acc _ with_pos ->
               let active = with_pos.C.WithPos.clause in
               let s_pos = with_pos.C.WithPos.pos in
               let res = match Lits.View.get_eqn (C.lits active) s_pos with
@@ -625,7 +637,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                 let hs = T.app var_h [s] in
                 let ht = T.app var_h [t] in
                 JP_unif.unify_scoped (hs,1) (u_p,0)
-                |> OSeq.map 
+                |> OSeq.map
                   (fun osubst ->
                     osubst |> CCOpt.flat_map (fun subst ->
                       let info = SupInfo.({
@@ -637,13 +649,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   )
                 | _ -> assert false
               in
-              Sequence.cons res acc
+              let penalty = C.penalty clause + C.penalty with_pos.C.WithPos.clause in
+              (* /!\ may differ from the actual penalty (by -2) *)
+              Sequence.cons (penalty,res) acc
             )
             Sequence.empty
         )
       |> Sequence.to_rev_list
     in
-    let stm_res = List.map (Stm.make ~penalty:1) new_clauses in
+    let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) new_clauses in
       StmQ.add_lst _stmq.q stm_res;
     Util.exit_prof prof_infer_supav_passive;
     []
@@ -703,7 +717,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~iterate_substs:(fun substs do_eq_res -> Some (OSeq.map (CCOpt.flat_map do_eq_res) substs))
         clause
     in
-    let stm_res = List.map (Stm.make ~penalty:1) inf_res in
+    let penalty = C.penalty clause in
+    let stm_res = List.map (Stm.make ~penalty:penalty) inf_res in
     StmQ.add_lst _stmq.q stm_res; []
 
   (* ----------------------------------------------------------------------
@@ -817,7 +832,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~iterate_substs:(fun substs do_eq_fact -> Some (OSeq.map (CCOpt.flat_map do_eq_fact) substs))
         clause
     in
-    let stm_res = List.map (Stm.make ~penalty:1) inf_res in
+    let penalty = C.penalty clause in
+    let stm_res = List.map (Stm.make ~penalty:penalty) inf_res in
     StmQ.add_lst _stmq.q stm_res; []
 
   (* ----------------------------------------------------------------------
