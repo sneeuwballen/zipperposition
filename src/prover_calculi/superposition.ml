@@ -717,7 +717,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~iterate_substs:(fun substs do_eq_res -> Some (OSeq.map (CCOpt.flat_map do_eq_res) substs))
         clause
     in
-    let stm_res = List.map (Stm.make ~penalty:1) inf_res in
+    let penalty = C.penalty clause in
+    let stm_res = List.map (Stm.make ~penalty:penalty) inf_res in
     StmQ.add_lst _stmq.q stm_res; []
 
   (* ----------------------------------------------------------------------
@@ -831,7 +832,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~iterate_substs:(fun substs do_eq_fact -> Some (OSeq.map (CCOpt.flat_map do_eq_fact) substs))
         clause
     in
-    let stm_res = List.map (Stm.make ~penalty:1) inf_res in
+    let penalty = C.penalty clause in
+    let stm_res = List.map (Stm.make ~penalty:penalty) inf_res in
     StmQ.add_lst _stmq.q stm_res; []
 
   (* ----------------------------------------------------------------------
