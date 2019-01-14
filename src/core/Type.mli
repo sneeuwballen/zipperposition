@@ -55,6 +55,8 @@ val is_fun : t -> bool
 val is_forall : t -> bool
 val is_prop : t -> bool
 
+val as_var_exn : t -> t HVar.t
+
 val hash_mod_alpha : t -> int
 (** Hash invariant w.r.t variable renaming *)
 

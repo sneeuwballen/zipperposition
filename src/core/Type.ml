@@ -64,6 +64,10 @@ let is_fun ty = match view ty with | Fun _ -> true | _ -> false
 let is_forall ty = match view ty with | Forall _ -> true | _ -> false
 let is_prop ty = match view ty with | Builtin Prop -> true | _ -> false
 
+let as_var_exn ty = match view ty with 
+  | Var v -> v 
+  | _ -> invalid_arg "as_var_exn"
+
 let tType = T.tType
 let prop = T.builtin ~ty:tType Builtin.Prop
 let term = T.builtin ~ty:tType Builtin.Term
