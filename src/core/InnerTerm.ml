@@ -605,7 +605,7 @@ module Pos = struct
 end
 
 let replace_m t m =
-  let rec aux depth t = match Map.get t m with
+  let rec aux depth t = match Map.get (DB.shift depth t) m with
     | Some u ->
       assert (ty_exn u == ty_exn t);
       DB.shift depth u
