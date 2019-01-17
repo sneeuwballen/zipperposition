@@ -605,7 +605,7 @@ module Pos = struct
 end
 
 let replace_m t m =
-  let rec aux depth t = match Map.get t m with
+  let rec aux depth t = match Map.get (DB.shift depth t) m with
     | Some u ->
       assert (ty_exn u == ty_exn t);
       DB.shift depth u
@@ -768,6 +768,28 @@ let as_const_exn t = match view t with Const v -> v | _ -> invalid_arg "as_const
 
 let as_bvar_exn t = match view t with DB i -> i | _ -> invalid_arg "as_bvar_exn"
 let is_bvar_i i t = match view t with DB j -> i=j | _ -> false
+
+let respects_mandatory_args t =
+  let rec aux t =
+    match view t with
+      | App (f,l) -> 
+        begin match view f with
+        | Const id ->
+          let ok_here = 
+            let num_mand_args = ID.num_mandatory_args id in
+            let other_args = CCList.drop_while is_a_type l in
+            let mand_args = CCList.take num_mand_args other_args in
+            List.length mand_args = num_mand_args && List.for_all DB.closed mand_args
+          in
+          ok_here && List.for_all aux l
+        | _ -> List.for_all aux l
+        end
+      | AppBuiltin (_, l) -> List.for_all aux l
+      | Bind (_, _, u) -> aux u
+      | Const f -> ID.num_mandatory_args f = 0
+      | Var _ | DB _ -> true
+  in
+  aux t
 
 (** {3 IO} *)
 

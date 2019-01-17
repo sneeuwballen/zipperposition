@@ -186,6 +186,30 @@ module Make(E : Env.S) : S with module Env = E = struct
   let complete_eq_args (c:C.t) : C.t list =
     let var_offset = C.Seq.vars c |> Type.Seq.max_var |> succ in
     let eligible = C.Eligible.param c in
+    let aux lits lit_idx t u =
+      let n_ty_args, ty_args, _ = Type.open_poly_fun (T.ty t) in
+      assert (n_ty_args = 0);
+      assert (ty_args <> []);
+      let vars =
+        List.mapi
+          (fun i ty -> HVar.make ~ty (i+var_offset) |> T.var)
+          ty_args
+      in
+      CCList.(1 -- List.length vars)
+      |> List.map
+        (fun prefix_len ->
+          let vars_prefix = CCList.take prefix_len vars in
+          let new_lit = Literal.mk_eq (T.app t vars_prefix) (T.app u vars_prefix) in
+          let new_lits = new_lit :: CCArray.except_idx lits lit_idx in
+          let proof =
+            Proof.Step.inference [C.proof_parent c]
+              ~rule:(Proof.Rule.mk "ho_complete_eq")
+          in
+          let new_c =
+            C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
+          in
+          new_c)
+    in
     let new_c =
       C.lits c
       |> Sequence.of_array |> Util.seq_zipi
@@ -193,28 +217,18 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Sequence.flat_map_l
         (fun (lit_idx,lit) -> match lit with
            | Literal.Equation (t, u, true) when Type.is_fun (T.ty t) ->
-             let n_ty_args, ty_args, _ = Type.open_poly_fun (T.ty t) in
-             assert (n_ty_args = 0);
-             assert (ty_args <> []);
-             let vars =
-               List.mapi
-                 (fun i ty -> HVar.make ~ty (i+var_offset) |> T.var)
-                 ty_args
-             in
-             CCList.(1 -- List.length vars)
-             |> List.map
-               (fun prefix_len ->
-                  let vars_prefix = CCList.take prefix_len vars in
-                  let new_lit = Literal.mk_eq (T.app t vars_prefix) (T.app u vars_prefix) in
-                  let new_lits = new_lit :: CCArray.except_idx (C.lits c) lit_idx in
-                  let proof =
-                    Proof.Step.inference [C.proof_parent c]
-                      ~rule:(Proof.Rule.mk "ho_complete_eq")
-                  in
-                  let new_c =
-                    C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
-                  in
-                  new_c)
+             aux (C.lits c) lit_idx t u 
+           | Literal.Equation (t, u, true) when Type.is_var (T.ty t) ->
+             (* A polymorphic variable might be functional on the ground level *)
+             let var = Type.as_var_exn (T.ty t) in
+             let funty = T.of_ty (Type.arrow [Type.var (HVar.fresh ~ty:Type.tType ())] 
+                                             (Type.var (HVar.fresh ~ty:Type.tType ()))) in
+             let subst = Unif_subst.FO.singleton (var,0) (funty,0) in
+             let renaming, subst = Subst.Renaming.none, Unif_subst.subst subst in
+             let lits' = Lits.apply_subst renaming subst (C.lits c, 0) in
+             let t' = Subst.FO.apply renaming subst (t, 0) in
+             let u' = Subst.FO.apply renaming subst (u, 0) in
+             aux lits' lit_idx t' u'
            | _ -> [])
       |> Sequence.to_rev_list
     in
@@ -786,7 +800,7 @@ let () =
     enabled_ := true;
     force_enabled_ := true;
     _ext_axiom := true;
-    eta_ := `Reduce;
+    eta_ := `Expand;
     prim_mode_ := `None;
     _elim_pred_var := false;
     enable_unif_ := false

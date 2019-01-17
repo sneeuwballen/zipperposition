@@ -59,9 +59,11 @@ let () =
      val q : term -> prop.
      val r : term -> prop.
      val s : prop.
+     val f_ho: (term -> term ) -> term.
      val f_ho2: (term -> term ) -> (term -> term) -> term.
      val g_ho: (term -> term -> term) -> term.
      val p_ho2: (term -> term ) -> (term -> term) -> prop.
+     val p_prop: (prop -> prop) -> prop.
      val a_poly : pi a. a -> a.
      val f_poly : pi a b. (a -> b) -> (a -> b) -> a.
    ")
@@ -98,40 +100,62 @@ let pterm2 =
 
 module Task : sig
   type t
+  type op = Match | Unif
   val mk_unif : ?negated:bool -> ?unif_types:bool -> ?with_ty:string -> string -> string -> t
+  val mk_match : ?negated:bool -> string -> string -> t
   val set_with_ty : string -> t -> t
   val set_unif_types : bool -> t -> t
   val is_negated : t -> bool
+  val op : t -> op
   val pp : t CCFormat.printer
   val parse : t -> T.t * T.t
 end = struct
+  type op = Match | Unif
+
   type t =
-    | Unif of {
+    | TUnif of {
         t1: string;
         t2: string;
         unif_types: bool;
         with_ty: string option;
         negated: bool;
       }
+    | TMatch of {
+        t1: string;
+        t2: string;
+        negated: bool;
+      }
 
   let mk_unif ?(negated=false) ?(unif_types=true) ?with_ty t1 t2 : t =
-    Unif {t1;t2;unif_types; with_ty; negated}
+    TUnif {t1;t2;unif_types; with_ty; negated}
+
+  let mk_match ?(negated=false) t1 t2 : t =
+    TMatch {t1;t2; negated}
 
   let set_with_ty ty = function
-    | Unif r -> Unif {r with with_ty=Some ty}
+    | TUnif r -> TUnif {r with with_ty=Some ty}
+    | TMatch r -> assert false
 
   let set_unif_types b = function
-    | Unif r -> Unif {r with unif_types=b}
+    | TUnif r -> TUnif {r with unif_types=b}
+    | TMatch r -> assert false
 
   let is_negated = function
-    | Unif {negated; _} -> negated
+    | TUnif {negated; _} -> negated
+    | TMatch {negated; _} -> negated
+
+  let op = function
+    | TUnif {negated; _} -> Unif
+    | TMatch {negated; _} -> Match
 
   let pp out = function
-    | Unif {t1; t2; with_ty=None; _} -> Format.fprintf out "(%s, %s)" t1 t2
-    | Unif {t1; t2; with_ty=Some ty; _} -> Format.fprintf out "(%s, %s) : %s" t1 t2 ty
+    | TUnif {t1; t2; with_ty=None; _} -> Format.fprintf out "Unif (%s, %s)" t1 t2
+    | TUnif {t1; t2; with_ty=Some ty; _} -> Format.fprintf out "Unif (%s, %s) : %s" t1 t2 ty
+    | TMatch {t1; t2; _} -> Format.fprintf out "Match (%s, %s) " t1 t2
 
   let parse_ = function
-    | Unif {with_ty; t1; t2; unif_types; _} -> pterm2 ~unif_types ?ty:with_ty t1 t2
+    | TUnif {with_ty; t1; t2; unif_types; _} -> pterm2 ~unif_types ?ty:with_ty t1 t2
+    | TMatch {t1; t2; _} -> pterm2 ~unif_types:false t1 t2
 
   let parse p =
     try parse_ p
@@ -166,55 +190,6 @@ let unifier2 t u =
     Subst.FO.apply renaming subst (u,1) |> Lambda.snf |> Lambda.eta_reduce,
     renaming,
     subst
-
-let unifier t u =
-  let t', u', _, _ = unifier2 t u in
-  Alcotest.(check t_test) "check unified versions are equal" t' u';
-  t'
-
-let check_unifiable ?(negated=false) t u : unit Alcotest.test_case =
-  "check unifiable", `Quick, fun () ->
-    try
-      let _ = unifier2 t u in
-      if negated then (
-        Alcotest.failf
-         "@[<2>`%a`[0]@ and `%a`[1]@ should not be unifiable@]@."
-            T.ZF.pp t T.ZF.pp u
-      )
-    with Unif.Fail ->
-      if not negated then (
-        Alcotest.failf "@[<2>`%a`[0]@ and `%a`[1]@ should be unifiable@]@."
-            T.ZF.pp t T.ZF.pp u
-      )
-
-let check_unify_correct t u =
-  "check unify is correct", `Quick, fun() ->
-    let t', u', _, _ = unifier2 t u in
-    let msg = Fmt.sprintf "(@[unify_correct `%a`@ `%a`@])" T.ZF.pp t T.ZF.pp u in
-    check_eq ~msg t' u'
-
-let check_unifier t u ~res =
-  "check unifier", `Quick, fun () ->
-    let t' = unifier t u in
-    let msg = Fmt.sprintf "(@[unify `%a`@ `%a`@ :gives `%a`@])" T.ZF.pp t T.ZF.pp u T.ZF.pp res in
-    check_variant ~msg t' res
-
-let check_unifier_matches t u =
-  "check unifier matches unified terms", `Quick, fun () ->
-    let t' = unifier t u in
-    let msg = Fmt.sprintf "(@[unify_matches `%a`@ `%a`@])" T.ZF.pp t T.ZF.pp u in
-    check_matches ~msg (t |> Lambda.snf |> Lambda.eta_reduce) t';
-    check_matches ~msg (u |> Lambda.snf |> Lambda.eta_reduce) t'
-
-let check_same t u t1 sc1 t2 sc2 =
-  "check unify makes same", `Quick, fun () ->
-    let _, _, renaming, subst = unifier2 t u in
-    let t1 = Subst.FO.apply renaming subst (t1,sc1) |> Lambda.snf |> Lambda.eta_reduce in
-    let t2 = Subst.FO.apply renaming subst (t2,sc2) |> Lambda.snf |> Lambda.eta_reduce in
-    let msg = Fmt.sprintf
-        "(@[<h>unify `%a`@ `%a`@ :makes-eq @[`%a`[%d]@ and `%a`[%d]@]@])"
-      T.ZF.pp t T.ZF.pp u T.ZF.pp t1 sc1 T.ZF.pp t2 sc2 in
-    check_eq ~msg t1 t2
 
 module Action : sig
   type 'a t = private
@@ -265,74 +240,135 @@ end = struct
 
 end
 
+let check_action t u t' renaming subst a = match a with
+  | Action.Yield {t=res;_} -> check_variant t' res
+  | Action.Eq {t1;t2;sc1;sc2;_} -> 
+    let t1 = Subst.FO.apply renaming subst (t1,sc1) |> Lambda.snf |> Lambda.eta_reduce in
+    let t2 = Subst.FO.apply renaming subst (t2,sc2) |> Lambda.snf |> Lambda.eta_reduce in
+    let msg = Fmt.sprintf
+          "(@[<h>unify `%a`@ `%a`@ :makes-eq @[`%a`[%d]@ and `%a`[%d]@]@])"
+        T.ZF.pp t T.ZF.pp u T.ZF.pp t1 sc1 T.ZF.pp t2 sc2 in
+      check_eq ~msg t1 t2
+  | Action.Eqs _ -> assert false
+  | Action.Count _ -> assert false
+
+let check_unifiable ?(negated=false) t u actions : unit Alcotest.test_case =
+  "check unifiable", `Quick, fun () ->
+    try
+      let t', u', renaming, subst = unifier2 t u in
+      if negated then (
+        Alcotest.failf
+         "@[<2>`%a`[0]@ and `%a`[1]@ should not be unifiable@]@."
+            T.ZF.pp t T.ZF.pp u
+      )
+      else (
+        Alcotest.(check t_test) "check unified versions are equal" t' u';
+        let msg = Fmt.sprintf "(@[check that unified version matches original term `%a`@ `%a`@])" T.ZF.pp t T.ZF.pp u in
+        check_matches ~msg (t |> Lambda.snf |> Lambda.eta_reduce) t';
+        check_matches ~msg (u |> Lambda.snf |> Lambda.eta_reduce) t';
+        CCList.iter (check_action t u t' renaming subst) actions
+      )
+    with Unif.Fail ->
+      if not negated then (
+        Alcotest.failf "@[<2>`%a`[0]@ and `%a`[1]@ should be unifiable@]@."
+            T.ZF.pp t T.ZF.pp u
+      )
+
+let check_matchable ?(negated=false) t u actions : unit Alcotest.test_case =
+  "check matchable", `Quick, fun () ->
+    try
+      let subst = Unif.FO.matching ~pattern:(t,0) (u,1) in
+      if negated then (
+        Alcotest.failf
+         "@[<2>`%a`[0]@ should not match pattern `%a`[1]@]@."
+            T.ZF.pp u T.ZF.pp t 
+      )
+      else (
+        let renaming = Subst.Renaming.none in
+        let t' = Subst.FO.apply renaming subst (t,0) |> Lambda.snf |> Lambda.eta_reduce in
+        let u' = Subst.FO.apply renaming subst (u,0) |> Lambda.snf |> Lambda.eta_reduce in
+        check_eq ~msg:"matching subst is really a matching subst" t' u;
+        check_eq ~msg:"matching subst does not touch term" u' u;
+        CCList.iter (check_action t u t' renaming subst) actions
+      )
+    with Unif.Fail ->
+      if not negated then (
+        Alcotest.failf 
+         "@[<2>`%a`[0]@ should match pattern `%a`[1]@]@."
+            T.ZF.pp t T.ZF.pp u
+      )
+
 let suite_unif1 : unit Alcotest.test_case list =
   let (=?=) a b = Task.mk_unif a b in (* unif pair *)
   let (<?>) a b = Task.mk_unif ~negated:true a b in (* unif pair *)
+  let (=?=>) a b = Task.mk_match a b in (* matching pair *)
   let (>->) a b = Task.set_with_ty b a in (* specify return type *)
   let (>?->) a b = Action.set_with_ty b a in (* specify return type *)
 
-  let check_action t u a = match a with
-    | Action.Yield {t=res;_} -> check_unifier t u ~res
-    | Action.Eq {t1;t2;sc1;sc2;_} -> check_same t u t1 sc1 t2 sc2
-    | Action.Eqs _ -> assert false
-    | Action.Count _ -> assert false in
-
-  let mk_tests (pair,actions) =
-    let t, u = Task.parse pair in
-    let actions = List.map Action.parse actions in
+  let mk_tests (task,actions,vars) =
+    let parsed_pair = ref None in
+    let parsed_actions = ref None in
+    parse_with_vars vars ~f:(fun () ->
+      parsed_pair := Some (Task.parse task);
+      parsed_actions := Some (List.map Action.parse actions);
+    );
+    let t, u = CCOpt.get_exn !parsed_pair in
+    let actions = CCOpt.get_exn !parsed_actions in
     clear_scope();
-    if Task.is_negated pair then
-      check_unifiable ~negated:true t u ::
-      CCList.map (check_action t u) actions
-    else (
-      check_unifiable t u ::
-      check_unify_correct t u ::
-      check_unifier_matches t u ::
-      CCList.map (check_action t u) actions
-    )
+    match Task.op task with
+    | Task.Unif when Task.is_negated task ->
+      check_unifiable ~negated:true t u actions
+    | Task.Unif ->
+      check_unifiable t u actions
+    | Task.Match ->
+      check_matchable ~negated:(Task.is_negated task) t u actions
   in
-  CCList.flat_map mk_tests
+  CCList.map mk_tests
     [ "f X b" =?= "f a Y", [
           Action.yield "f a b";
           Action.eq "X" 0 "a" 0;
           Action.eq "Y" 1 "b" 0;
-        ];
+        ],[];
       "F a" =?= "f a (g (g a))", [
         Action.yield "f a (g (g a))";
         Action.eq "F" 0 "fun (x:term). f x (g (g x))" 0;
-      ];
+      ],[];
       ("fun (x y:term). F x" =?= "fun x y. G x y") >-> "term -> term -> term", [
         Action.yield "fun x y. H x" >?-> "term -> term -> term";
         Action.eq "G" 1 "fun x y. F x" 0 >?-> "term -> term -> term";
-      ];
+      ],[];
       ("fun (x y z:term). F x" =?= "fun x y z. G x y z") >-> "term -> term -> term -> term", [
         Action.yield "fun x y z. H x" >?-> "term -> term -> term -> term";
         Action.eq "G" 1 "fun x y z. F x" 0 >?-> "term -> term -> term -> term";
-      ];
+      ],[];
       ("X" =?= "(fun Y. X1) (fun (x y:term). c)") >-> "term", [
         Action.yield "Y" >?-> "term";
-      ];
+      ],[];
       ("p_ho2 (fun a. F1 a) (fun a. F2 a)" =?= "p_ho2 (fun a. G a) (fun a. G a)"), [
         Action.yield "p_ho2 G G";
         Action.eq "F1" 0 "G" 1 >?-> "term -> term";
         Action.eq "F2" 0 "G" 1 >?-> "term -> term";
-      ];
+      ],[];
       ("p_ho2 (fun Y0. d) (fun Y0. F1 Y0)" =?=
        "p_ho2 (fun Y0. d) (fun Y0. (f_ho2 (fun Y1. Y1) (fun Y2. X)))"), [
-      ];
+      ],[];
       ("f (f a b) X" =?= "F1 (f_poly A1 A2 F1 F2)") |> Task.set_unif_types false, [
         Action.eq "f (f a b)" 0 "F1" 1;
          Action.yield "f (f a b) (f_poly _ _ (f (f a b)) F_renamed)";
         (* FIXME
         Action.eq "X" 1 "f_poly _ _ (f (f a b)) F2" 0;
            *)
-      ];
-      ( "F (g_ho F)" <?> "a_poly A") |> Task.set_unif_types false, [];
-      ( "(fun (x:term). x)" <?> "(fun (x:term). Y)") , [];
-      ( "g_ho (fun (x:term). g)" <?> "g_ho (fun (x:term) (y:term). Y x)") , [];
+      ],[];
+      ( "F (g_ho F)" <?> "a_poly A") |> Task.set_unif_types false, [],[];
+      ( "(fun (x:term). x)" <?> "(fun (x:term). Y)") , [],[];
+      ( "g_ho (fun (x:term). g)" <?> "g_ho (fun (x:term) (y:term). Y x)") , [],[];
       ( "g_ho (fun (x:term). g)" =?= "g_ho (fun (x:term) (y:term). Y y)") , [
         Action.eq "fun (x:term). g x" 0 "Y" 1;
-      ];
+      ],[];
+      (*( "(f_ho (X a))" =?=> "(f_ho (fun (x:term). f_ho (fun (y:term). g (Y y))))" ), [
+        Action.eq "X" 0 "fun (z:term). fun (x:term). f_ho (fun (y:term). g (Y y))" 1;
+      ],["X","term->term->term"];*)
+      ( "F a" =?=> "fun (x : term). f_ho2 (fun (y:term). y) (fun (y:term). y)") , [],["F", "term -> term -> term"];
     ]
 
 let jp_check_count t u count : unit Alcotest.test_case =

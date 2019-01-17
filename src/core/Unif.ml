@@ -329,7 +329,15 @@ module Inner = struct
       in
       T.replace_m rhs m
     in
-    T.fun_of_fvars vars body
+    let res = T.fun_of_fvars vars body in
+    (* If the resulting term does not respect mandatory arguments, use rhs instead to be safe *)
+    (* TODO: it would be better to avoid this in the first place *)
+    let res = 
+      if !_allow_partial_skolem_application || T.respects_mandatory_args res 
+      then res 
+      else T.fun_of_fvars vars rhs 
+    in
+    res
 
   (* assuming all elements are [Some x], get the list of [x] *)
   let env_l_dense (e:'a DBEnv.t) : 'a list =
