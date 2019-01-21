@@ -98,6 +98,56 @@ let pterm2 =
     T.Conv.of_simple_term_exn tyctx t1,
     T.Conv.of_simple_term_exn tyctx t2
 
+
+module Action : sig
+  type 'a t = private
+    | Yield of {t: 'a ; ty: 'a option}
+    | Eq of {t1: 'a; sc1:int; t2: 'a; sc2: int; ty: 'a option}
+    | Eqs of {ts: ('a * 'a * 'a option) list}
+    | Count of {count : int}
+
+  val yield : string -> string t
+  val eq : string -> int -> string -> int -> string t
+  val eqs : (string * string * string option) list -> string t
+  val count : int -> string t
+  val set_with_ty : 'a -> 'a t -> 'a t
+  val parse : string t -> T.t t
+end = struct
+  type 'a t =
+    | Yield of {t: 'a ; ty: 'a option}
+    | Eq of {t1: 'a; sc1:int; t2: 'a; sc2: int; ty: 'a option}
+    | Eqs of {ts: ('a * 'a * 'a option) list}
+    | Count of {count : int}
+
+  let eq t1 sc1 t2 sc2 = Eq{t1;t2;sc1;sc2;ty=None}
+  let eqs ts = Eqs{ts}
+  let yield t = Yield{t; ty=None}
+  let count count = Count{count}
+
+  let set_with_ty ty = function
+    | Yield r -> Yield {r with ty=Some ty}
+    | Eq r -> Eq {r with ty=Some ty}
+    | _ as a -> a
+
+  (* parse action *)
+  let parse : string t -> T.t t = function
+    | Yield r ->
+      let t = pterm ?ty:r.ty r.t in
+      Yield {t; ty=None}
+    | Eq r ->
+      let t1, t2 = pterm2 ~unif_types:false ?ty:r.ty r.t1 r.t2 in
+      Eq {t1; t2; sc1=r.sc1; sc2=r.sc2; ty=None}
+    | Eqs {ts} -> 
+      let ts = CCList.map (fun (t1, t2, ty) -> 
+          let t1, t2 = pterm2 ~unif_types:false ?ty t1 t2 in
+          t1, t2, None
+        ) ts 
+      in
+      Eqs {ts}
+    | Count c -> Count c
+
+end
+
 module Task : sig
   type t
   type op = Match | Unif
@@ -106,6 +156,10 @@ module Task : sig
   val set_with_ty : string -> t -> t
   val set_unif_types : bool -> t -> t
   val is_negated : t -> bool
+  val add_action : string Action.t -> t -> t
+  val add_var_type : string -> string -> t -> t
+  val actions : t -> (string Action.t) list
+  val var_types : t -> (string * string) list
   val op : t -> op
   val pp : t CCFormat.printer
   val parse : t -> T.t * T.t
@@ -119,18 +173,38 @@ end = struct
         unif_types: bool;
         with_ty: string option;
         negated: bool;
+        actions: (string Action.t) list; 
+        var_types: (string * string) list; 
       }
     | TMatch of {
         t1: string;
         t2: string;
         negated: bool;
+        actions: (string Action.t) list; 
+        var_types: (string * string) list; 
       }
 
   let mk_unif ?(negated=false) ?(unif_types=true) ?with_ty t1 t2 : t =
-    TUnif {t1;t2;unif_types; with_ty; negated}
+    TUnif {t1;t2;unif_types; with_ty; negated; actions=[]; var_types=[]}
 
   let mk_match ?(negated=false) t1 t2 : t =
-    TMatch {t1;t2; negated}
+    TMatch {t1;t2; negated; actions=[]; var_types=[]}
+
+  let add_action a = function
+    | TUnif ({actions; _} as r) -> TUnif {r with actions=a :: actions}
+    | TMatch ({actions; _} as r) -> TMatch {r with actions=a :: actions}
+
+  let actions = function
+    | TUnif {actions; _} -> actions
+    | TMatch {actions; _}-> actions
+
+  let add_var_type v t = function
+    | TUnif ({var_types; _} as r) -> TUnif {r with var_types=(v, t) :: var_types}
+    | TMatch ({var_types; _} as r) -> TMatch {r with var_types=(v, t) :: var_types}
+
+  let var_types = function
+    | TUnif {var_types; _} -> var_types
+    | TMatch {var_types; _}-> var_types
 
   let set_with_ty ty = function
     | TUnif r -> TUnif {r with with_ty=Some ty}
@@ -191,54 +265,6 @@ let unifier2 t u =
     renaming,
     subst
 
-module Action : sig
-  type 'a t = private
-    | Yield of {t: 'a ; ty: 'a option}
-    | Eq of {t1: 'a; sc1:int; t2: 'a; sc2: int; ty: 'a option}
-    | Eqs of {ts: ('a * 'a * 'a option) list}
-    | Count of {count : int}
-
-  val yield : string -> string t
-  val eq : string -> int -> string -> int -> string t
-  val eqs : (string * string * string option) list -> string t
-  val count : int -> string t
-  val set_with_ty : 'a -> 'a t -> 'a t
-  val parse : string t -> T.t t
-end = struct
-  type 'a t =
-    | Yield of {t: 'a ; ty: 'a option}
-    | Eq of {t1: 'a; sc1:int; t2: 'a; sc2: int; ty: 'a option}
-    | Eqs of {ts: ('a * 'a * 'a option) list}
-    | Count of {count : int}
-
-  let eq t1 sc1 t2 sc2 = Eq{t1;t2;sc1;sc2;ty=None}
-  let eqs ts = Eqs{ts}
-  let yield t = Yield{t; ty=None}
-  let count count = Count{count}
-
-  let set_with_ty ty = function
-    | Yield r -> Yield {r with ty=Some ty}
-    | Eq r -> Eq {r with ty=Some ty}
-    | _ as a -> a
-
-  (* parse action *)
-  let parse : string t -> T.t t = function
-    | Yield r ->
-      let t = pterm ?ty:r.ty r.t in
-      Yield {t; ty=None}
-    | Eq r ->
-      let t1, t2 = pterm2 ~unif_types:false ?ty:r.ty r.t1 r.t2 in
-      Eq {t1; t2; sc1=r.sc1; sc2=r.sc2; ty=None}
-    | Eqs {ts} -> 
-      let ts = CCList.map (fun (t1, t2, ty) -> 
-          let t1, t2 = pterm2 ~unif_types:false ?ty t1 t2 in
-          t1, t2, None
-        ) ts 
-      in
-      Eqs {ts}
-    | Count c -> Count c
-
-end
 
 let check_action t u t' renaming subst a = match a with
   | Action.Yield {t=res;_} -> check_variant t' res
@@ -304,13 +330,14 @@ let suite_unif1 : unit Alcotest.test_case list =
   let (=?=>) a b = Task.mk_match a b in (* matching pair *)
   let (>->) a b = Task.set_with_ty b a in (* specify return type *)
   let (>?->) a b = Action.set_with_ty b a in (* specify return type *)
+  let (>>>) a b = Task.add_action b a in (* specify return type *)
 
-  let mk_tests (task,actions,vars) =
+  let mk_tests (task) =
     let parsed_pair = ref None in
     let parsed_actions = ref None in
-    parse_with_vars vars ~f:(fun () ->
+    parse_with_vars (Task.var_types task) ~f:(fun () ->
       parsed_pair := Some (Task.parse task);
-      parsed_actions := Some (List.map Action.parse actions);
+      parsed_actions := Some (List.map Action.parse (Task.actions task));
     );
     let t, u = CCOpt.get_exn !parsed_pair in
     let actions = CCOpt.get_exn !parsed_actions in
@@ -324,51 +351,50 @@ let suite_unif1 : unit Alcotest.test_case list =
       check_matchable ~negated:(Task.is_negated task) t u actions
   in
   CCList.map mk_tests
-    [ "f X b" =?= "f a Y", [
-          Action.yield "f a b";
-          Action.eq "X" 0 "a" 0;
-          Action.eq "Y" 1 "b" 0;
-        ],[];
-      "F a" =?= "f a (g (g a))", [
-        Action.yield "f a (g (g a))";
-        Action.eq "F" 0 "fun (x:term). f x (g (g x))" 0;
-      ],[];
-      ("fun (x y:term). F x" =?= "fun x y. G x y") >-> "term -> term -> term", [
-        Action.yield "fun x y. H x" >?-> "term -> term -> term";
-        Action.eq "G" 1 "fun x y. F x" 0 >?-> "term -> term -> term";
-      ],[];
-      ("fun (x y z:term). F x" =?= "fun x y z. G x y z") >-> "term -> term -> term -> term", [
-        Action.yield "fun x y z. H x" >?-> "term -> term -> term -> term";
-        Action.eq "G" 1 "fun x y z. F x" 0 >?-> "term -> term -> term -> term";
-      ],[];
-      ("X" =?= "(fun Y. X1) (fun (x y:term). c)") >-> "term", [
-        Action.yield "Y" >?-> "term";
-      ],[];
-      ("p_ho2 (fun a. F1 a) (fun a. F2 a)" =?= "p_ho2 (fun a. G a) (fun a. G a)"), [
-        Action.yield "p_ho2 G G";
-        Action.eq "F1" 0 "G" 1 >?-> "term -> term";
-        Action.eq "F2" 0 "G" 1 >?-> "term -> term";
-      ],[];
+    [ "f X b" =?= "f a Y" 
+      >>> Action.yield "f a b"
+      >>> Action.eq "X" 0 "a" 0
+      >>> Action.eq "Y" 1 "b" 0;
+
+      "F a" =?= "f a (g (g a))"
+      >>> Action.yield "f a (g (g a))"
+      >>> Action.eq "F" 0 "fun (x:term). f x (g (g x))" 0;
+
+      ("fun (x y:term). F x" =?= "fun x y. G x y") >-> "term -> term -> term"
+      >>> (Action.yield "fun x y. H x" >?-> "term -> term -> term")
+      >>> (Action.eq "G" 1 "fun x y. F x" 0 >?-> "term -> term -> term");
+
+      ("fun (x y z:term). F x" =?= "fun x y z. G x y z") >-> "term -> term -> term -> term"
+      >>> (Action.yield "fun x y z. H x" >?-> "term -> term -> term -> term")
+      >>> (Action.eq "G" 1 "fun x y z. F x" 0 >?-> "term -> term -> term -> term");
+      
+      ("X" =?= "(fun Y. X1) (fun (x y:term). c)") >-> "term"
+      >>> (Action.yield "Y" >?-> "term");
+
+      ("p_ho2 (fun a. F1 a) (fun a. F2 a)" =?= "p_ho2 (fun a. G a) (fun a. G a)")
+      >>> Action.yield "p_ho2 G G"
+      >>> (Action.eq "F1" 0 "G" 1 >?-> "term -> term")
+      >>> (Action.eq "F2" 0 "G" 1 >?-> "term -> term");
+
       ("p_ho2 (fun Y0. d) (fun Y0. F1 Y0)" =?=
-       "p_ho2 (fun Y0. d) (fun Y0. (f_ho2 (fun Y1. Y1) (fun Y2. X)))"), [
-      ],[];
-      ("f (f a b) X" =?= "F1 (f_poly A1 A2 F1 F2)") |> Task.set_unif_types false, [
-        Action.eq "f (f a b)" 0 "F1" 1;
-         Action.yield "f (f a b) (f_poly _ _ (f (f a b)) F_renamed)";
+       "p_ho2 (fun Y0. d) (fun Y0. (f_ho2 (fun Y1. Y1) (fun Y2. X)))");
+      ("f (f a b) X" =?= "F1 (f_poly A1 A2 F1 F2)") |> Task.set_unif_types false
+      >>> Action.eq "f (f a b)" 0 "F1" 1
+      >>> Action.yield "f (f a b) (f_poly _ _ (f (f a b)) F_renamed)"
         (* FIXME
-        Action.eq "X" 1 "f_poly _ _ (f (f a b)) F2" 0;
-           *)
-      ],[];
-      ( "F (g_ho F)" <?> "a_poly A") |> Task.set_unif_types false, [],[];
-      ( "(fun (x:term). x)" <?> "(fun (x:term). Y)") , [],[];
-      ( "g_ho (fun (x:term). g)" <?> "g_ho (fun (x:term) (y:term). Y x)") , [],[];
-      ( "g_ho (fun (x:term). g)" =?= "g_ho (fun (x:term) (y:term). Y y)") , [
-        Action.eq "fun (x:term). g x" 0 "Y" 1;
-      ],[];
+         >>> Action.eq "X" 1 "f_poly _ _ (f (f a b)) F2" 0;
+           *);
+
+      ( "F (g_ho F)" <?> "a_poly A") |> Task.set_unif_types false;
+      ( "(fun (x:term). x)" <?> "(fun (x:term). Y)");
+      ( "g_ho (fun (x:term). g)" <?> "g_ho (fun (x:term) (y:term). Y x)");
+      ( "g_ho (fun (x:term). g)" =?= "g_ho (fun (x:term) (y:term). Y y)")
+       >>> Action.eq "fun (x:term). g x" 0 "Y" 1;
+
       (*( "(f_ho (X a))" =?=> "(f_ho (fun (x:term). f_ho (fun (y:term). g (Y y))))" ), [
         Action.eq "X" 0 "fun (z:term). fun (x:term). f_ho (fun (y:term). g (Y y))" 1;
       ],["X","term->term->term"];*)
-      ( "F a" =?=> "fun (x : term). f_ho2 (fun (y:term). y) (fun (y:term). y)") , [],["F", "term -> term -> term"];
+      ( "F a" =?=> "fun (x : term). f_ho2 (fun (y:term). y) (fun (y:term). y)") |> Task.add_var_type "F" "term -> term -> term"
     ]
 
 let jp_check_count t u count : unit Alcotest.test_case =
@@ -429,12 +455,13 @@ let suite_jp_unif : unit Alcotest.test_case list =
   let (<?>) a b = Task.mk_unif ~negated:true a b in (* unif pair *)
   let (>->) a b = Task.set_with_ty b a in (* specify return type *)
   let (>?->) a b = Action.set_with_ty b a in (* specify return type *)
-  let mk_tests (pair,actions,vars) =
+  let (>>>) a b = Task.add_action b a in (* specify return type *)
+  let mk_tests (pair) =
     let parsed_pair = ref None in
     let parsed_actions = ref [] in
-    parse_with_vars vars ~f:(fun () ->
+    parse_with_vars (Task.var_types pair) ~f:(fun () ->
        parsed_pair := Some (Task.parse pair);
-       parsed_actions := List.map Action.parse actions
+       parsed_actions := List.map Action.parse (Task.actions pair)
     );
     let t, u = CCOpt.get_exn !parsed_pair in
     let t, u = (t,0), (u,0) in
@@ -452,68 +479,65 @@ let suite_jp_unif : unit Alcotest.test_case list =
   in
 
   CCList.flat_map mk_tests
-    [ "X a" =?= "Y b" >-> "term", [
-          Action.count 17
-        ],[];
+    [ "X a" =?= "Y b" >-> "term"
+      >>> Action.count 17;
 
-      "X a" <?> "g (X a)" >-> "term", [], [];
+      "X a" <?> "g (X a)" >-> "term";
 
-      "(g (X a))" =?= "(X (g a))" >-> "term", [
-          Action.yield "g (g (g (g a)))" >?-> "term"
-        ],[];
+      "(g (X a))" =?= "(X (g a))" >-> "term"
+      >>> (Action.yield "g (g (g (g a)))" >?-> "term");
 
       (* Example 3 in the Jensen-Pietrzykowski paper *)
-      "Z Y X" =?= "Z (fun u. u) (g a)" >-> "term", [
-          Action.eqs [
+      "Z Y X" =?= "Z (fun u. u) (g a)" >-> "term"
+      >>> Action.eqs [
             "X", "a", None; 
             "Y", "g", None; 
             "Z", "fun (z : term -> term). fun (x : term). X0 (z x)", Some "(term -> term) -> term -> term"
-          ]
-        ],["X","term";"Y","term -> term"];
+        ]
+      |> Task.add_var_type "X" "term"
+      |> Task.add_var_type "Y" "term -> term";
 
       (* Iterate on head of disagreement pair *)
-      "X g" =?= "g a" >-> "term", [
-          Action.eqs [
+      "X g" =?= "g a" >-> "term"
+      >>> Action.eqs [
             "X", "fun z. z a", Some "(term -> term) -> term"
-          ]
-        ],[];
+          ];
 
       (* Iterate with non-empty w tuple *)
-      "X (fun z. f z a)" =?= "X (fun z. f a z)" >-> "term", [
-          Action.eqs ["X", "fun (z : term -> term). Z (fun (w : alpha). z a)", Some "(term -> term) -> term"]
-        ],[];
+      "X (fun z. f z a)" =?= "X (fun z. f a z)" >-> "term"
+      >>> Action.eqs ["X", "fun (z : term -> term). Z (fun (w : alpha). z a)", Some "(term -> term) -> term"];
 
 
       (* Polymorphism *)
 
-      "fun (x : alpha). x" =?= "fun (x : term). x" |> Task.set_unif_types false, [
-          Action.count 1
-        ],[];
+      "fun (x : alpha). x" =?= "fun (x : term). x" |> Task.set_unif_types false
+      >>> Action.count 1;
 
-      "f_ho2 (a_poly term) (a_poly term)" =?= "f_ho2 X X" |> Task.set_unif_types false, [
-          Action.count 1
-        ],[];
+      "f_ho2 (a_poly term) (a_poly term)" =?= "f_ho2 X X" |> Task.set_unif_types false
+      >>> Action.count 1;
 
       (* Example from "Higher-Order Unification, Polymorphism, and Subsorts (Extended Abstract)" by T. Nipkow *)
-      "(fun (y : term). y) (X Y)" =?= "a" >-> "term" |> Task.set_unif_types false, [
-        Action.eqs [
+      "(fun (y : term). y) (X Y)" =?= "a" >-> "term" |> Task.set_unif_types false
+      >>> Action.eqs [
               "X", "fun (z : term -> term). z (z (z a))", None;
               "Y", "fun (z : term). z", None
-          ];
-        Action.eqs[ 
+          ]
+      >>> Action.eqs[ 
           (* The example actually states the unifier "z (X z) (Y z)", but the following equally general unifier comes out of our procedure: *)
               "X", "fun (z : alpha -> gamma -> term). z (X000 z) (Y000 z (z (X000 z)))", None;
               "Y", "fun (x : alpha) (y : gamma). a", None 
           ]
-      ],["X","beta -> term"; "Y","beta"];
+        |> Task.add_var_type "X" "beta -> term"
+        |> Task.add_var_type "Y" "beta";
 
 
-      "fun (x : term). x" <?> "fun (x : term). X" |> Task.set_unif_types false, [],["X","term"];
+      "fun (x : term). x" <?> "fun (x : term). X" |> Task.set_unif_types false
+      |> Task.add_var_type "X" "term";
 
 
-      "fun (x : term). a" =?= "X" |> Task.set_unif_types false, [
-          Action.count 1
-      ],["X","term -> term"];
+      "fun (x : term). a" =?= "X" |> Task.set_unif_types false
+      >>> Action.count 1
+      |> Task.add_var_type "X" "term -> term";
     ]
 
 let reg_matching1 = "regression matching", `Quick, fun () ->
