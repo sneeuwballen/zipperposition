@@ -40,7 +40,12 @@ let psterm, pstmt, pstmt_l, clear_scope, unif_ty, pstyctx =
   in
   pt, pst, pst_l, (fun () -> TypeInference.Ctx.exit_scope tyctx), unif_ty, tyctx
 
-let parse_with_vars vars ~f = TypeInference.Ctx.with_vars pstyctx (CCList.map (fun (name, ty) -> Var.of_string ~ty:(psterm ty) name) vars) ~f
+let parse_with_vars vars ~f = 
+  TypeInference.Ctx.with_vars pstyctx (CCList.map 
+      (fun (name, ty) -> 
+        Var.of_string ~ty:(psterm ty) name
+      ) 
+    vars) ~f
 
 (* prelude *)
 let () =
@@ -66,7 +71,11 @@ let () =
      val p_prop: (prop -> prop) -> prop.
      val a_poly : pi a. a -> a.
      val f_poly : pi a b. (a -> b) -> (a -> b) -> a.
-   ")
+     val sk : term -> term.
+   ");
+   (* Set mandatory arg of skolem: *)
+   let id_sk, _, _ = CCOpt.get_exn (TypedSTerm.as_id_app (psterm "sk")) in
+   ID.set_payload id_sk (ID.Attr_skolem (ID.K_normal, 1))
 
 let tyctx = T.Conv.create()
 
@@ -174,7 +183,7 @@ end = struct
         with_ty: string option;
         negated: bool;
         actions: (string Action.t) list; 
-        var_types: (string * string) list; 
+        var_types: (string * string) list;
       }
     | TMatch of {
         t1: string;
@@ -335,13 +344,15 @@ let suite_unif1 : unit Alcotest.test_case list =
   let mk_tests (task) =
     let parsed_pair = ref None in
     let parsed_actions = ref None in
-    parse_with_vars (Task.var_types task) ~f:(fun () ->
+    parse_with_vars (Task.var_types task)
+     ~f:(fun () ->
       parsed_pair := Some (Task.parse task);
       parsed_actions := Some (List.map Action.parse (Task.actions task));
     );
     let t, u = CCOpt.get_exn !parsed_pair in
     let actions = CCOpt.get_exn !parsed_actions in
     clear_scope();
+
     match Task.op task with
     | Task.Unif when Task.is_negated task ->
       check_unifiable ~negated:true t u actions
@@ -531,13 +542,18 @@ let suite_jp_unif : unit Alcotest.test_case list =
         |> Task.add_var_type "Y" "beta";
 
 
+      (* More *)
+
       "fun (x : term). x" <?> "fun (x : term). X" |> Task.set_unif_types false
       |> Task.add_var_type "X" "term";
 
-
-      "fun (x : term). a" =?= "X" |> Task.set_unif_types false
+      "X a" =?= "sk a" 
       >>> Action.count 1
       |> Task.add_var_type "X" "term -> term";
+
+      "X a" =?= "g a" 
+      >>> Action.count 2
+      |> Task.add_var_type "X" "term -> term"
     ]
 
 let reg_matching1 = "regression matching", `Quick, fun () ->
