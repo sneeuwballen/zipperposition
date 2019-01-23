@@ -6,6 +6,7 @@
 module T = Term
 module US = Unif_subst
 
+let prof_jp_unify = Util.mk_profiler "jp_unify"
 
 type subst = US.t
 
@@ -349,24 +350,27 @@ let unify ~scope ~fresh_var_ t0 s0 =
 (* TODO: Remove tracking of rules for efficiency? *)
 
 let unify_scoped (t0, scope0) (t1, scope1) =
-  (* Find a scope that's different from the two given ones *)
-  let unifscope = if scope0 < scope1 then scope1 + 1 else scope0 + 1 in
-  let fresh_var_ = ref 0 in
-  let add_renaming scope subst v =
-    if US.FO.mem subst (v,scope) 
-    then subst
-    else 
-      let newvar = T.var (make_fresh_var fresh_var_ ~ty:(S.apply_ty subst (HVar.ty v, scope)) ()) in
-      US.FO.bind subst (v,scope) (newvar, unifscope) 
-  in
-  let subst = US.empty in
-  (* Rename variables apart into scope `unifscope` *)
-  let subst = T.Seq.vars t0 |> Sequence.fold (add_renaming scope0) subst in
-  let subst = T.Seq.vars t1 |> Sequence.fold (add_renaming scope1) subst in
-  (* Unify *)
-  unify ~scope:unifscope ~fresh_var_ (S.apply subst (t0, scope0)) (S.apply subst (t1, scope1))
-  (* merge with var renaming *)
-  |> OSeq.map (CCOpt.map (US.merge subst))
+  Util.with_prof prof_jp_unify
+    (fun () -> 
+      (* Find a scope that's different from the two given ones *)
+      let unifscope = if scope0 < scope1 then scope1 + 1 else scope0 + 1 in
+      let fresh_var_ = ref 0 in
+      let add_renaming scope subst v =
+        if US.FO.mem subst (v,scope) 
+        then subst
+        else 
+          let newvar = T.var (make_fresh_var fresh_var_ ~ty:(S.apply_ty subst (HVar.ty v, scope)) ()) in
+          US.FO.bind subst (v,scope) (newvar, unifscope) 
+      in
+      let subst = US.empty in
+      (* Rename variables apart into scope `unifscope` *)
+      let subst = T.Seq.vars t0 |> Sequence.fold (add_renaming scope0) subst in
+      let subst = T.Seq.vars t1 |> Sequence.fold (add_renaming scope1) subst in
+      (* Unify *)
+      unify ~scope:unifscope ~fresh_var_ (S.apply subst (t0, scope0)) (S.apply subst (t1, scope1))
+      (* merge with var renaming *)
+      |> OSeq.map (CCOpt.map (US.merge subst))
+    ) ()
 
 let unify_scoped_nonterminating t s = OSeq.filter_map (fun x -> x) (unify_scoped t s)
 
