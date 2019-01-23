@@ -71,6 +71,7 @@ let _dot_demod_into = ref None
 let _complete_ho_unification = ref false
 let _switch_stream_extraction = ref false
 let _ord_in_normal_form = ref false
+let _supav_penalty = ref 0
 
 module Make(Env : Env.S) : S with module Env = Env = struct
   module Env = Env
@@ -600,7 +601,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                     )
                 )
               in
-              let penalty = C.penalty clause + C.penalty with_pos.C.WithPos.clause in
+              let penalty = C.penalty clause + C.penalty with_pos.C.WithPos.clause + !_supav_penalty in
               (* /!\ may differ from the actual penalty (by -2) *)
               Sequence.cons (penalty,res) acc
             )
@@ -649,7 +650,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   )
                 | _ -> assert false
               in
-              let penalty = C.penalty clause + C.penalty with_pos.C.WithPos.clause in
+              let penalty = C.penalty clause + C.penalty with_pos.C.WithPos.clause + !_supav_penalty in
               (* /!\ may differ from the actual penalty (by -2) *)
               Sequence.cons (penalty,res) acc
             )
@@ -1922,6 +1923,9 @@ let () =
     ; "--ord-in-normal-form"
     , Arg.Set _ord_in_normal_form
     , " compare intermediate terms in calculus rules in beta-normal-eta-long form"
+    ; "--supav-penalty"
+    , Arg.Int (fun p -> _supav_penalty := p)
+    , " penalty for SupAV inferences"
     ];
     Params.add_to_mode "ho-complete-basic" (fun () ->
       _use_simultaneous_sup := false;

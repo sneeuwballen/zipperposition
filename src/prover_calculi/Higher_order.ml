@@ -33,6 +33,7 @@ let _ext_pos = ref true
 let _ext_axiom = ref false
 let _elim_pred_var = ref true
 let _ext_neg = ref true
+let _ext_axiom_penalty = ref 5
 
 module type S = sig
   module Env : Env.S
@@ -538,7 +539,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let x_diff = Term.app x [Term.app diff [T.of_ty alpha; T.of_ty beta; x; y]] in
     let y_diff = Term.app y [Term.app diff [T.of_ty alpha; T.of_ty beta; x; y]] in
     let lits = [Literal.mk_eq x y; Literal.mk_neq x_diff y_diff] in
-    Env.C.create ~penalty:5 ~trail:Trail.empty lits Proof.Step.trivial
+    Env.C.create ~penalty:!_ext_axiom_penalty ~trail:Trail.empty lits Proof.Step.trivial
 
 
   type fixed_arg_status = 
@@ -794,7 +795,8 @@ let () =
       "--ho-ext-axiom", Arg.Set _ext_axiom, " enable extensionality axiom";
       "--no-ho-ext-axiom", Arg.Clear _ext_axiom, " disable extensionality axiom";
       "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule";
-      "--ho-no-ext-neg", Arg.Clear _ext_neg, " disable negative extensionality rule"
+      "--ho-no-ext-neg", Arg.Clear _ext_neg, " disable negative extensionality rule";
+      "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom"
     ];
   Params.add_to_mode "ho-complete-basic" (fun () -> 
     enabled_ := true;
