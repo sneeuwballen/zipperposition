@@ -230,7 +230,7 @@ let iterate ~scope ~fresh_var_ u v l =
 (** {6 Unification procedure} *)
 
 (* apply a substitution and reduce to normal form *)
-let nfapply s u = Lambda.eta_expand (Lambda.snf (S.apply s u))
+let nfapply s u = Lambda.snf (S.apply s u)
 
 (* TODO: comparison form is actually slightly different, but eta_expand also works *)
 

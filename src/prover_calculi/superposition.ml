@@ -111,7 +111,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
        They should be connected to each other. Note that the Clause module calls Ctx.ord () independently.
       *)
     if !_ord_in_normal_form
-    then Ordering.map (fun t -> Lambda.eta_expand (Lambda.snf t)) (Ctx.ord ())
+    then Ordering.map (fun t -> Lambda.snf t) (Ctx.ord ())
     else Ctx.ord ()
 
   (* apply operation [f] to some parts of the clause [c] just added/removed

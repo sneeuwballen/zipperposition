@@ -25,8 +25,11 @@ val eliminate : scope:Scoped.scope -> fresh_var_:int ref -> T.t -> T.t -> (Type.
     pair occurs in. *)
 val find_disagreement : T.t -> T.t -> ((T.t * T.t) * (T.var * int) CCList.t) option
 
+(* Unify terms of the same scope. Assumes that terms are in eta-long form. *)
 val unify : scope:Scoped.scope -> fresh_var_:int ref -> T.t -> T.t -> subst option OSeq.t
 
+(* Unify scoped terms and removes "None"s, resulting in a potentially non-terminating function. Assumes that terms are in eta-long form. *)
 val unify_scoped_nonterminating : T.t Scoped.t -> T.t Scoped.t -> subst OSeq.t
 
+(* Unify scoped terms. Assumes that terms are in eta-long form. *)
 val unify_scoped : T.t Scoped.t -> T.t Scoped.t -> subst option OSeq.t
