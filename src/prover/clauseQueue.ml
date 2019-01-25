@@ -70,6 +70,8 @@ module Make(C : Clause_intf.S) = struct
 
     let penalty = C.penalty
 
+    let penalize w c = w c * penalty c
+
     let penalty_coeff_ = 20
 
     let favor_pos_unit c =
@@ -227,8 +229,10 @@ module Make(C : Clause_intf.S) = struct
   let goal_oriented () : t =
     let open WeightFun in
     let weight =
-      combine [default, 4; favor_small_num_vars, 2;
-               favor_goal, 1; favor_all_neg, 1; penalty, 1; ] in
+      penalize ( 
+        combine [default, 4; favor_small_num_vars, 2;
+                favor_goal, 1; favor_all_neg, 1; ] in
+      )
     let name = "goal_oriented" in
     make ~ratio:6 ~weight name
 
@@ -236,32 +240,39 @@ module Make(C : Clause_intf.S) = struct
 
   let almost_bfs () : t =
     let open WeightFun in
-    let weight = combine [ default, 3; penalty, 2; ] in
+    let weight = 
+      penalize ( combine [ default, 3; ] ) in
     make ~ratio:1 ~weight "almost_bfs"
 
   let explore () : t =
     let open WeightFun in
     let weight =
-      combine
-        [default, 4; favor_small_num_vars, 1;
-         favor_all_neg, 1; penalty, 1; ]
+      penalize (
+        combine
+          [default, 4; favor_small_num_vars, 1;
+          favor_all_neg, 1 ]
+      )
     in
     make ~ratio:6 ~weight "explore"
 
   let ground () : t =
     let open WeightFun in
     let weight =
-      combine [favor_pos_unit, 1; favor_ground, 2;
-               favor_small_num_vars, 10; penalty, 1 ]
+      penalize (
+        combine [favor_pos_unit, 1; favor_ground, 2;
+                favor_small_num_vars, 10; ]
+      )
     in
     make ~ratio:6 ~weight "ground"
 
   let default () : t =
     let open WeightFun in
     let weight =
-      combine
-        [ default, 3; favor_all_neg, 1; favor_small_num_vars, 2
-        ; favor_goal, 1; favor_pos_unit, 1; penalty, 1; ]
+      penalize (
+        combine
+          [ default, 3; favor_all_neg, 1; favor_small_num_vars, 2
+          ; favor_goal, 1; favor_pos_unit, 1; ]
+      )
     in
     make ~ratio:6 ~weight "default"
 
