@@ -70,7 +70,7 @@ module Make(C : Clause_intf.S) = struct
 
     let penalty = C.penalty
 
-    let penalize w c = w c * penalty c
+    let penalize w c = w c * (1 + penalty c)
 
     let penalty_coeff_ = 20
 

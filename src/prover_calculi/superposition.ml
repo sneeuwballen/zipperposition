@@ -341,8 +341,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           [C.proof_parent_subst renaming (info.active,sc_a) subst;
            C.proof_parent_subst renaming (info.passive,sc_p) subst]
       and penalty =
-        C.penalty info.active
-        + C.penalty info.passive
+        max (C.penalty info.active) (C.penalty info.passive)
         + (if T.is_var s' then 2 else 0) (* superposition from var = bad *)
       in
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
@@ -432,8 +431,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           [C.proof_parent_subst renaming (info.active,sc_a) subst;
             C.proof_parent_subst renaming (info.passive,sc_p) subst]
       and penalty =
-        C.penalty info.active
-        + C.penalty info.passive
+        max (C.penalty info.active) (C.penalty info.passive)
         + (if T.is_var s' then 2 else 0) (* superposition from var = bad *)
       in
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
@@ -543,7 +541,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let inf_res = infer_active_aux
       ~retrieve_from_index:I.retrieve_unifiables_complete
       ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
-          let penalty = C.penalty clause + C.penalty with_pos.C.WithPos.clause in
+          let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) in
           (* /!\ may differ from the actual penalty (by -2) *)
           Some (penalty, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
       clause
@@ -555,7 +553,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let inf_res = infer_passive_aux
       ~retrieve_from_index:I.retrieve_unifiables_complete
       ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
-          let penalty = C.penalty clause + C.penalty with_pos.C.WithPos.clause in
+          let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) in
           (* /!\ may differ from the actual penalty (by -2) *)
           Some (penalty, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
       clause
@@ -602,7 +600,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                     )
                 )
               in
-              let penalty = C.penalty clause + C.penalty with_pos.C.WithPos.clause + !_supav_penalty in
+              let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) + !_supav_penalty in
               (* /!\ may differ from the actual penalty (by -2) *)
               Sequence.cons (penalty,res) acc
             )
@@ -651,7 +649,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   )
                 | _ -> assert false
               in
-              let penalty = C.penalty clause + C.penalty with_pos.C.WithPos.clause + !_supav_penalty in
+              let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) + !_supav_penalty in
               (* /!\ may differ from the actual penalty (by -2) *)
               Sequence.cons (penalty,res) acc
             )

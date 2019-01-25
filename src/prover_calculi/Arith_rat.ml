@@ -249,7 +249,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           [C.proof_parent_subst renaming (info.active,s_a) subst;
            C.proof_parent_subst renaming (info.passive,s_p) subst] in
       let trail = C.trail_l [info.active;info.passive] in
-      let penalty = C.penalty info.active + C.penalty info.passive in
+      let penalty = max (C.penalty info.active) (C.penalty info.passive) in
       let new_c = C.create ~penalty ~trail all_lits proof in
       Util.debugf ~section 5 "@[<2>... gives@ @[%a@]@]" (fun k->k C.pp new_c);
       Util.incr_stat stat_rat_sup;
@@ -694,8 +694,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           let trail = C.trail_l [info.left; info.right] in
           (* penalty for some chaining *)
           let penalty =
-            C.penalty info.left
-            + C.penalty info.right
+            max (C.penalty info.left) (C.penalty info.right)
             + 3 (* nested chainings are dangerous *)
             + (if MF.term mf_1 |> T.is_var then 10 else 0)
             + (if MF.term mf_2 |> T.is_var then 10 else 0)
