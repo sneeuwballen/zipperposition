@@ -72,6 +72,7 @@ let _complete_ho_unification = ref false
 let _switch_stream_extraction = ref false
 let _ord_in_normal_form = ref false
 let _supav_penalty = ref 0
+let _supav = ref true
 
 module Make(Env : Env.S) : S with module Env = Env = struct
   module Env = Env
@@ -1824,10 +1825,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     then (
       Env.add_binary_inf "superposition_passive" infer_passive_complete_ho;
       Env.add_binary_inf "superposition_active" infer_active_complete_ho;
-      Env.add_binary_inf "supav_passive" infer_supav_passive;
-      Env.add_binary_inf "supav_active" infer_supav_active;
       Env.add_unary_inf "equality_factoring" infer_equality_factoring_complete_ho;
       Env.add_unary_inf "equality_resolution" infer_equality_resolution_complete_ho;
+      if !_supav then (
+        Env.add_binary_inf "supav_passive" infer_supav_passive;
+        Env.add_binary_inf "supav_active" infer_supav_active;
+      );
       if !_switch_stream_extraction then
         Env.add_generate "stream_queue_extraction" extract_from_stream_queue_fix_stm
       else
@@ -1926,6 +1929,9 @@ let () =
     ; "--supav-penalty"
     , Arg.Int (fun p -> _supav_penalty := p)
     , " penalty for SupAV inferences"
+    ; "--no-supav"
+    , Arg.Clear _supav
+    , " disable SupAV inferences (only effective when complete higher-order unification is enabled)"
     ];
     Params.add_to_mode "ho-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
