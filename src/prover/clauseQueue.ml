@@ -231,8 +231,8 @@ module Make(C : Clause_intf.S) = struct
     let weight =
       penalize ( 
         combine [default, 4; favor_small_num_vars, 2;
-                favor_goal, 1; favor_all_neg, 1; ] in
-      )
+                favor_goal, 1; favor_all_neg, 1; ]
+      ) in
     let name = "goal_oriented" in
     make ~ratio:6 ~weight name
 
