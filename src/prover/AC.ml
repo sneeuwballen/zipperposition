@@ -67,7 +67,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let f x y = T.app_full (T.const ~ty s) ty_vars_t [x;y] in
     (* build clause l=r *)
     let mk_clause l r =
-      let penalty = 0 in
+      let penalty = 1 in
       let proof = Proof.Step.esa ~rule:(Proof.Rule.mk "ac") [proof] in
       let c = C.create ~trail:Trail.empty ~penalty [ Lit.mk_eq l r ] proof in
       C.set_flag flag_axiom c true;

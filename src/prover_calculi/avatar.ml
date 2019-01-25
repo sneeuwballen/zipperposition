@@ -321,7 +321,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
 
   (* generic mechanism for adding clause(s)
      and make a lemma out of them, including Skolemization, etc. *)
-  let introduce_cut ?reason ?(penalty=0) ?(depth=0) (f:Cut_form.t) proof : cut_res =
+  let introduce_cut ?reason ?(penalty=1) ?(depth=0) (f:Cut_form.t) proof : cut_res =
     let box = BBox.inject_lemma f in
     let cut_proof_parent =
       let form = Cut_form.to_s_form f in
@@ -405,7 +405,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
             (fun l ->
                let lits = Array.of_list l in
                let trail = Trail.singleton (BLit.neg @@ cut_lit c) in
-               C.create_a lits proof ~trail ~penalty:0)
+               C.create_a lits proof ~trail ~penalty:1)
         end
       in
       clauses
@@ -526,7 +526,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       | Sat_solver.Unsat proof ->
         Util.debug ~section 1 "SAT-solver reports \"UNSAT\"";
         let proof = Proof.S.step proof in
-        let c = C.create ~trail:Trail.empty ~penalty:0 [] proof in
+        let c = C.create ~trail:Trail.empty ~penalty:1 [] proof in
         [c]
     in
     Signal.send after_check_sat ();

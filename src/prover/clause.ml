@@ -113,7 +113,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     Util.incr_stat stat_clause_create;
     c
 
-  let of_sclause ?(penalty=0) c proof =
+  let of_sclause ?(penalty=1) c proof =
     let selected = lazy (Ctx.select c.lits) in
     create_inner ~penalty ~selected c proof
 
@@ -134,11 +134,11 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let create ~penalty ~trail lits proof =
     create_a ~penalty ~trail (Array.of_list lits) proof
 
-  let of_forms ?(penalty=0) ~trail forms proof =
+  let of_forms ?(penalty=1) ~trail forms proof =
     let lits = List.map Ctx.Lit.of_form forms |> Array.of_list in
     create_a ~penalty ~trail lits proof
 
-  let of_forms_axiom ?(penalty=0) ~file ~name forms =
+  let of_forms_axiom ?(penalty=1) ~file ~name forms =
     let lits = List.map Ctx.Lit.of_form forms in
     let proof = Proof.Step.assert' ~file ~name () in
     create ~penalty ~trail:Trail.empty lits proof
@@ -148,7 +148,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       (* convert literals *)
       let lits = List.map Ctx.Lit.of_form lits in
       let proof = Stmt.proof_step st in
-      let c = create ~trail:Trail.empty ~penalty:0 lits proof in
+      let c = create ~trail:Trail.empty ~penalty:1 lits proof in
       c
     in
     match Stmt.view st with

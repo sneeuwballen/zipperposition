@@ -221,7 +221,7 @@ end = struct
       (* add goal's clauses to the local saturation set *)
       List.iter
         (fun lits ->
-           let c = C.create_a ~trail:Trail.empty ~penalty:0 lits Proof.Step.trivial in
+           let c = C.create_a ~trail:Trail.empty ~penalty:1 lits Proof.Step.trivial in
            let c, _ = E.unary_simplify c in
            if E.is_trivial c then ()
            else if C.is_empty c then raise (Yield_false c)
@@ -588,7 +588,7 @@ module Make
                            BoolLit.neg cut_blit;
                          ] |> Trail.of_list
                        in
-                       C.create_a lits proof ~trail ~penalty:0))
+                       C.create_a lits proof ~trail ~penalty:1))
              |> Sequence.to_list
            in
            (* clauses [CNF[¬goal[case]) <- b_lit(case), ¬cut.blit] with
@@ -618,7 +618,7 @@ module Make
                         b_lit_case;
                       ] |> Trail.of_list
                     in
-                    C.create_a lits proof ~trail ~penalty:0)
+                    C.create_a lits proof ~trail ~penalty:1)
              end
            in
            (* all new clauses *)
