@@ -49,7 +49,7 @@ available on opam.
 
 ### Via opam
 
-The recommended way to install Zipperposition is through http://opam.ocaml.org/[opam].
+The recommended way to install Zipperposition is through [opam](http://opam.ocaml.org/).
 You need to have GMP (with headers) installed (it's not handled by opam).
 Once you have installed GMP and opam, type:
 
@@ -109,6 +109,14 @@ $ make test
 NOTE: in case of build errors, it might be because of outdated dependencies
 (see [via opam](#via-opam) for more details), or stale build files.
 Try `rm _build -rf` to try to build from scratch.
+
+
+## Documentation
+
+See [this page](http://c-cube.github.io/zipperposition/).
+
+There are some examples of how to use the libraries in `src/tools/`
+and `src/demo/`.
 
 ## Use
 
@@ -553,13 +561,6 @@ As described [in the StarExec documentation](https://www.starexec.org/starexec/s
 ```
 
 Put this script and the file `zipperposition.native` into a folder called `bin`. Create a ZIP archive containing that folder. Now Zipperposition is ready to be uploaded to StarExec!
-
-## Documentation
-
-See [this page](http://c-cube.github.io/zipperposition/).
-
-There are some examples of how to use the code in `src/tools/`
-and `src/demo/`.
 
 ## Docker
 
