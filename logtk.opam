@@ -15,6 +15,7 @@ depends: [
   "zarith"
   "containers" { >= "1.0" }
   "sequence" { >= "0.4" }
+  "menhir" {build}
   "dune" { build }
   "alcotest" {with-test}
   "qcheck" {with-test & >= "0.9"}
