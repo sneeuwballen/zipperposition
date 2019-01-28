@@ -11,7 +11,8 @@
 ## Short summary
 
 Zipperposition is intended to be a superposition prover for full first
-order logic, plus some extensions (datatypes, recursive functions, arithmetic).
+order logic, plus some extensions
+(datatypes, recursive functions, arithmetic, lambda-free higher order).
 The accent is on flexibility, modularity and simplicity rather than
 performance, to allow quick experimenting on automated theorem proving. It
 generates TSTP traces or graphviz files for nice graphical display.
@@ -20,7 +21,7 @@ Zipperposition supports several input formats:
 
 - TPTP (fof, cnf, tff)
 - [TIP](https://tip-org.github.io/)
-- its own native input, extension `.zf` (see directory `examples/`)
+- its own native input, extension `.zf` (see directory `examples/` and section below)
 
 Zipperposition is written in the functional and imperative language
 [OCaml](https://ocaml.org). The name is a bad play on the words "zipper" (a
@@ -34,9 +35,9 @@ are:
 * the paper _E: a brainiac theorem prover_ that describes the [E prover](http://eprover.org) by S.Schulz,
 * the paper _Superposition with equivalence reasoning and delayed clause normal form transformation_ by H.Ganzinger and J.Stuber
 
-**Disclaimer**: Note that the prover is currently a prototype and is
-likely not complete. Please don't use it to drive your personal
-nuclear power plant, nor as a trusted tool for critical applications.
+**Disclaimer**: Note that the prover is a research project.
+Please don't use it to drive your personal nuclear power plant, nor as a
+trusted tool for critical applications.
 
 ## License
 
@@ -158,6 +159,9 @@ ML with explicit polymorphism. Many examples
 in `examples/` are written using this syntax.
 A vim [syntax coloring file](https://github.com/c-cube/vim-zf) is available.
 
+
+<details>
+<summary>Description of the native format `.zf` </summary>
 
 #### Basics
 
@@ -409,6 +413,8 @@ The syntax is:
 assert[name "foo"] bar.
 ```
 
+</details>
+
 ### Graphical Display of Proofs
 
 A handy way of displaying the proof is to use [graphviz](http://graphviz.org/):
@@ -466,6 +472,9 @@ Some advices if you want to hack on the code:
 ## StarExec
 
 StarExec is a service for experimental evaluation of logic solvers like Zipperposition. 
+
+<details>
+<summary>How to build Zipperposition for StarExec</summary>
 
 The easiest way to import Zipperposition as a solver is to pre-compile Zipperposition on the [StarExec virtual machine](https://www.starexec.org/vmimage/). Download the VM image and open it in VirtualBox. 
 
@@ -562,6 +571,8 @@ As described [in the StarExec documentation](https://www.starexec.org/starexec/s
 
 Put this script and the file `zipperposition.native` into a folder called `bin`. Create a ZIP archive containing that folder. Now Zipperposition is ready to be uploaded to StarExec!
 
+</details>
+
 ## Docker
 
 (experimental)
@@ -578,6 +589,7 @@ to use the image:
 
 ### Make a release
 
+<details>
 Now we use dune, it should simplify the process compared to oasis.
 
 - merge `dev` into `master`:
@@ -617,4 +629,4 @@ merged into opam-repo, only for the next release while no one has seen it yet.
 - re-run the two `opam publish` commands to update the directory and
   the PR.
 
-
+</details>
