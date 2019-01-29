@@ -5,7 +5,7 @@
 
 include module type of Sat_solver_intf
 
-module Make (Dummy : sig end) : S
+module Make() : S
 
 val set_compact : bool -> unit
 (** Toggle compact proofs.

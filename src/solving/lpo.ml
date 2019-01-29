@@ -131,18 +131,19 @@ module MakeSolver(X : sig end) = struct
     let fresh = let n = ref 0 in fun () -> incr n; !n
     let sign x = x>0
     let abs = abs
-    let print = Format.pp_print_int
+    let pp = Format.pp_print_int
     let dummy = 0
     let neg i = -i
     let hash i = i land max_int
     let equal i j = i=j
-    let norm i =
-      if i>0 then i, Msat.Formula_intf.Same_sign
-      else -i, Msat.Formula_intf.Negated
-    type proof = unit
+    let norm i = if i>0 then i, SI.Same_sign else -i, SI.Negated
   end
 
-  module Solver = Msat.Solver.Make(Lit)(Msat.Solver.DummyTheory(Lit))(struct end)
+  module Solver = Msat.Make_pure_sat(struct
+      module Formula = Lit
+      type proof = unit
+    end)
+  let solver = Solver.create ~size:`Big ()
 
   (* propositional atoms map symbols to the binary digits of
      their index in the precedence *)
@@ -178,7 +179,7 @@ module MakeSolver(X : sig end) = struct
   (* get the propositional variable that represents the n-th bit of [s] *)
   let digit s n = atom_to_lit (Atom.make s n)
 
-  module F = Msat.Tseitin.Make(Lit)
+  module F = Msat_tseitin.Make(Lit)
 
   (* encode [a < b]_n where [n] is the number of digits.
       either the n-th digit of [a] is false and the one of [b] is true,
@@ -218,7 +219,7 @@ module MakeSolver(X : sig end) = struct
     | C.False -> F.f_false
 
   (* function to extract symbol -> int from a solution *)
-  let int_of_symbol sat ~n s =
+  let int_of_symbol sat ~n s : int =
     let r = ref 0 in
     for i = n downto 1 do
       let lit = digit s i in
@@ -231,7 +232,7 @@ module MakeSolver(X : sig end) = struct
     !r
 
   (* extract a solution *)
-  let get_solution sat ~n symbols =
+  let get_solution sat ~n (symbols:ID.t list) : (ID.t * ID.t) list =
     let syms = List.rev_map (fun s -> int_of_symbol sat ~n s, s) symbols in
     (* sort in increasing order *)
     let syms = List.sort (fun (n1,_)(n2,_) -> n1-n2) syms in
@@ -258,7 +259,7 @@ module MakeSolver(X : sig end) = struct
       let a = Hashtbl.find int_to_atom_ (Lit.abs i) in
       Atom.print fmt a
     with Not_found ->
-      Format.fprintf fmt "L%d" (abs (i : Solver.atom :> int))  (* tseitin *)
+      Format.fprintf fmt "L%d" (abs (i : Lit.t :> int))  (* tseitin *)
 
   let print_clause fmt c =
     Format.fprintf fmt "@[<hv2>%a@]"
@@ -284,17 +285,17 @@ module MakeSolver(X : sig end) = struct
     let encode_constr c =
       Util.debugf ~section 5 "encode constr %a..." (fun k->k C.pp c);
       let f = encode_constr ~n c in
-      Util.debugf ~section 5 " ... @[<2>%a@]" (fun k->k F.print f);
+      Util.debugf ~section 5 " ... @[<2>%a@]" (fun k->k F.pp f);
       let clauses = F.make_cnf f in
       Util.debugf ~section 5 " ... @[<0>%a@]" (fun k->k print_clauses clauses);
-      Solver.assume clauses;
+      Solver.assume solver clauses ();
       Util.debug ~section 5 "form assumed"
     in
     List.iter encode_constr l;
     (* generator of solutions *)
     let rec next () =
       Util.debug ~section 5 "check satisfiability";
-      match Solver.solve () with
+      match Solver.solve solver with
         | Solver.Sat sat ->
           Util.debug ~section 5 "next solution exists, try to extract it...";
           let solution = get_solution sat ~n symbols in
@@ -309,7 +310,7 @@ module MakeSolver(X : sig end) = struct
       (* negate current solution to get the next one... if any *)
       let c = Solution.neg_to_constraint solution in
       encode_constr c;
-      match Solver.solve () with
+      match Solver.solve solver with
         | Solver.Sat _ -> next()
         | Solver.Unsat _ -> LazyList.Nil
     in
