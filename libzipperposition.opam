@@ -16,7 +16,7 @@ depends: [
   "containers" { >= "1.0" }
   "sequence" { >= "0.4" }
   "dune" { build }
-  "msat" { >= "0.5" < "1.0" }
+  "msat" { >= "0.5" < "0.8" }
   "menhir" {build}
   "logtk"
   "ocaml" {>= "4.03"}

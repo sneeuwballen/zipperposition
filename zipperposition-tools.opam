@@ -12,7 +12,7 @@ depends: [
   "dune" { build }
   "containers" { >= "1.0" }
   "sequence" { >= "0.4" }
-  "msat" { >= "0.5" < "1.0" }
+  "msat" { >= "0.5" < "0.8" }
   "zarith"
   "logtk" { >= "1.5" }
   "libzipperposition" { >= "1.5" }
