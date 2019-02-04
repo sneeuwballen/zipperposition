@@ -203,7 +203,7 @@ let is_app t = match T.view t with
 let is_type t = Type.equal Type.tType (ty t)
 
 
-let rec is_lambda_pattern t = match view t with
+let rec is_lambda_pattern t = match view (Lambda.Inner.whnf t) with
   | AppBuiltin (_, ts) -> List.for_all is_lambda_pattern ts
   | DB _ | Var _ | Const _ -> true
   | App (hd, args) -> if is_var hd 
@@ -211,7 +211,7 @@ let rec is_lambda_pattern t = match view t with
                       else List.for_all is_lambda_pattern args 
   | Fun (_, body) -> is_lambda_pattern body
   and all_distinct_bound args =
-    List.map (fun arg -> match view arg with Var i -> Some (HVar.id i) | _ -> None) args
+    List.map (fun arg -> match view arg with DB i -> Some i | _ -> None) args
     |> OptionSet.of_list
     |> (fun set -> not (OptionSet.mem None set) && OptionSet.cardinal set = List.length args)
 
