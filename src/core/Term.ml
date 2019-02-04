@@ -210,13 +210,10 @@ let rec is_lambda_pattern t = match view t with
                         then all_distinct_bound args 
                       else List.for_all is_lambda_pattern args 
   | Fun (_, body) -> is_lambda_pattern body
-
   and all_distinct_bound args =
-    let empty_set = Set. in
-    let added = Set.add (Some 1) empty_set  in
-    List.map (fun arg -> match view arg with Var i -> Some i | _ -> None) args
+    List.map (fun arg -> match view arg with Var i -> Some (HVar.id i) | _ -> None) args
     |> OptionSet.of_list
-    |> (fun set -> not (OptionSet.mem None) && OptionSet.cardinal == List.length args)
+    |> (fun set -> not (OptionSet.mem None set) && OptionSet.cardinal set = List.length args)
 
 let as_const_exn t = match T.view t with
   | T.Const c -> c
