@@ -36,4 +36,6 @@ module Inner : sig
   val snf : term -> term
 
   val eta_expand : term -> term
+
+  val eta_reduce : term -> term
 end

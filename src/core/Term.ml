@@ -203,7 +203,7 @@ let is_app t = match T.view t with
 let is_type t = Type.equal Type.tType (ty t)
 
 
-let rec is_lambda_pattern t = match view (Lambda.Inner.whnf t) with
+let rec is_lambda_pattern t = match view (t) with
   | AppBuiltin (_, ts) -> List.for_all is_lambda_pattern ts
   | DB _ | Var _ | Const _ -> true
   | App (hd, args) -> if is_var hd 
