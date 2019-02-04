@@ -122,6 +122,7 @@ val is_app : t -> bool
 val is_const : t -> bool
 val is_fun : t -> bool
 val is_type : t -> bool (** Does it have type [tType]? *)
+val is_lambda_pattern : t -> bool
 
 val as_const : t -> ID.t option
 val as_const_exn : t -> ID.t
