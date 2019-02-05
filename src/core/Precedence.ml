@@ -223,6 +223,12 @@ let weight_modarity ~arity a = Weight.int (arity a + 4)
 (* constant weight *)
 let weight_constant _ = Weight.int 4
 
+let weight_invfreq symbs = 
+  let tbl = ID.Tbl.create 16 in
+    Sequence.iter (ID.Tbl.incr tbl) symbs;
+    let max_freq = List.fold_left (max) 0 (ID.Tbl.values_list tbl) in
+    fun sym ->Weight.int (max_freq - (ID.Tbl.get_or ~default:1 tbl sym) + 5) 
+
 (* default argument coefficients *)
 let arg_coeff_default _ = []
 

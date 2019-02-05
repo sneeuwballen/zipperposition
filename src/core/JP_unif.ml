@@ -23,7 +23,7 @@ let make_fresh_var fresh_var_ ~ty () =
   incr fresh_var_; 
   var
 
-let unif_ty ~scope t s = 
+let unif_simple ~scope t s = 
   try 
     let type_unifier = Unif.FO.unify_syn ~subst:Subst.empty (t, scope) (s, scope) in
     Some (US.of_subst type_unifier)
@@ -42,7 +42,7 @@ let project_onesided ~scope ~fresh_var_:_ u =
     |> OSeq.mapi (fun i arg -> List.length prefix_types - 1 - i, arg) (* Determine DB-index of the argument *)
     |> OSeq.filter_map (fun (dbindex, arg) -> 
       (* Unify type of argument and return type *)
-      match unif_ty ~scope (Term.of_ty (T.ty arg)) (Term.of_ty return_type) with
+      match unif_simple ~scope (Term.of_ty (T.ty arg)) (Term.of_ty return_type) with
         | Some type_unifier -> Some (dbindex, arg, type_unifier)
         | None -> None
     )
@@ -296,7 +296,7 @@ let unify ~scope ~fresh_var_ t0 s0 =
       | Some ((u, v), l) -> 
         let subst_seq = 
           if T.is_type t then
-            OSeq.return ((unif_ty ~scope s t), "unif_ty_args")
+            OSeq.return ((unif_simple ~scope s t), "unif_ty_args")
           else (
             if Type.equal (T.ty u) (T.ty v) 
             then (
@@ -312,7 +312,7 @@ let unify ~scope ~fresh_var_ t0 s0 =
             else (
               (* Disagreeing terms may be of different types under polymorphic builtin constants 
               such as equality because these builtins do not use type arguments. *)
-              OSeq.return ((unif_ty ~scope s t), "unif_ty")
+              OSeq.return ((unif_simple ~scope s t), "unif_ty")
             )
           )
         in
@@ -338,14 +338,15 @@ let unify ~scope ~fresh_var_ t0 s0 =
         OSeq.return (Some US.empty)
   in
   (* Unify types first ... *)
-  match unif_ty ~scope (T.of_ty (T.ty t0)) (T.of_ty (T.ty s0)) with
+  match unif_simple ~scope (T.of_ty (T.ty t0)) (T.of_ty (T.ty s0)) with
     | Some type_unifier ->
       let t' = nfapply type_unifier (t0, scope) in
       let s' = nfapply type_unifier (s0, scope) in
       (* ... then terms. *)
       let term_unifiers = if Lambda.is_lambda_pattern t' && Lambda.is_lambda_pattern s' then
-                          OSeq.return (unif_ty ~scope t' s')
+                          OSeq.return (unif_simple ~scope t' s')
                           else  unify_terms t' s' ~rules:[] in
+      (* let term_unifiers = unify_terms t' s' ~rules:[] in *)
       OSeq.map (CCOpt.map (US.merge type_unifier)) term_unifiers 
     | None -> OSeq.empty
 

@@ -135,6 +135,8 @@ val weight_modarity : arity:(ID.t -> int) -> weight_fun
 
 val weight_constant : weight_fun
 
+val weight_invfreq : ID.t Sequence.t -> weight_fun
+
 val set_weight : t -> weight_fun -> unit
 (** Change the weight function of the precedence
     @since 0.5.3 *)

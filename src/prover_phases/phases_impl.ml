@@ -144,7 +144,12 @@ let compute_prec stmts =
 
     (* add constraint about inductive constructors, etc. *)
     |> Compute_prec.add_constr 10 Classify_cst.prec_constr
-    |> Compute_prec.set_weight_rule (fun _ -> Classify_cst.weight_fun)
+    |> Compute_prec.set_weight_rule (
+       fun stmts -> 
+        Precedence.weight_invfreq (
+         stmts
+         |> Sequence.flat_map Statement.Seq.terms
+         |> Sequence.flat_map Term.Seq.symbols))
 
     (* use "invfreq", with low priority *)
     |> Compute_prec.add_constr_rule 90
