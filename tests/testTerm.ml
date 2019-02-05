@@ -29,6 +29,7 @@ let a = T.const ~ty (ID.make "a")
 let b = T.const ~ty (ID.make "b")
 let x = T.var_of_int ~ty 0
 let y = T.var_of_int ~ty 1
+let fun_var x y = T.app (T.var_of_int ~ty:Type.([ty;ty] ==> ty) 2) [x; y]
 
 let test_db_shift = "db shift", `Quick, fun () ->
   let t = T.fun_ ty (f (T.bvar ~ty 0) (g (T.bvar ~ty 1))) in
@@ -75,6 +76,22 @@ let test_whnf2 = "whnf2", `Quick, fun () ->
   let t' = Lambda.whnf redex in
   let t1 = f (g a) (g b) in
   Alcotest.(check t_test) "whnf2" t1 t';
+  ()
+
+let test_whnf2 = "patterns", `Quick, fun () ->
+  let t1 = f (g a) (g b) in 
+  let t2 = T.fun_ ty (f (T.bvar ~ty 0) (g (T.bvar ~ty 1))) in
+  let t3 = T.fun_ ty (f (fun_var (T.bvar ~ty 0) (T.bvar ~ty 1)) (g (T.bvar ~ty 1))) in 
+  let t4 = T.fun_ ty (f (fun_var (T.bvar ~ty 0) (T.bvar ~ty 0)) (g (T.bvar ~ty 1))) in 
+  let t5 = T.fun_ ty (f (fun_var (T.bvar ~ty 0) (g (T.bvar ~ty 1))) (g (T.bvar ~ty 1))) in
+
+
+  Alcotest.(check bool) "pattern1" (Lambda.is_lambda_pattern t1) true;
+  Alcotest.(check bool) "pattern2" (Lambda.is_lambda_pattern t2) true;
+  Alcotest.(check bool) "pattern3" (Lambda.is_lambda_pattern t3) true;
+  Alcotest.(check bool) "pattern3" (Lambda.is_lambda_pattern t4) false;
+  Alcotest.(check bool) "pattern3" (Lambda.is_lambda_pattern t5) false;
+
   ()
 
 let test_polymorphic_app = "poly app", `Quick, fun () ->

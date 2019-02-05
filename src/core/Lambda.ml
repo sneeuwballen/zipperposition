@@ -8,6 +8,13 @@ let prof_snf = Util.mk_profiler "term.snf"
 let prof_eta_expand = Util.mk_profiler "term.eta_expand"
 let prof_eta_reduce = Util.mk_profiler "term.eta_reduce"
 
+module OptionSet = Set.Make(
+   struct 
+      let compare x y = Pervasives.compare x y
+      type t = int option
+   end)
+
+
 module Inner = struct
   module T = InnerTerm
 
@@ -233,3 +240,17 @@ let eta_reduce t =
   Inner.eta_reduce (t:T.t :> IT.t) |> T.of_term_unsafe
 (*|> CCFun.tap (fun t' ->
   if t != t' then Format.printf "@[eta_reduce `%a`@ into `%a`@]@." T.pp t T.pp t')*)
+
+
+let rec is_lambda_pattern t = match T.view (whnf t) with
+  | T.AppBuiltin (_, ts) -> List.for_all is_lambda_pattern ts
+  | T.DB _ | T.Var _ | T.Const _ -> true
+  | T.App (hd, args) -> if T.is_var hd 
+                        then all_distinct_bound args 
+                      else List.for_all is_lambda_pattern args 
+  | T.Fun (_, body) -> is_lambda_pattern body
+  and all_distinct_bound args =
+    List.map (fun arg -> match T.view (eta_reduce arg) with T.DB i -> Some i | _ -> None) args
+    |> OptionSet.of_list
+    |> (fun set -> not (OptionSet.mem None set) && OptionSet.cardinal set = List.length args)
+

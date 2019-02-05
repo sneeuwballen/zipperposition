@@ -91,12 +91,6 @@ end
 
 (** {2 Containers} *)
 
-module OptionSet = Set.Make(
-   struct 
-      let compare x y = Pervasives.compare x y
-      type t = int option
-   end)
-
 module Tbl = T.Tbl
 module Set = T.Set
 module Map = T.Map
@@ -201,19 +195,6 @@ let is_app t = match T.view t with
   | _ -> false
 
 let is_type t = Type.equal Type.tType (ty t)
-
-
-let rec is_lambda_pattern t = match view (t) with
-  | AppBuiltin (_, ts) -> List.for_all is_lambda_pattern ts
-  | DB _ | Var _ | Const _ -> true
-  | App (hd, args) -> if is_var hd 
-                        then all_distinct_bound args 
-                      else List.for_all is_lambda_pattern args 
-  | Fun (_, body) -> is_lambda_pattern body
-  and all_distinct_bound args =
-    List.map (fun arg -> match view arg with DB i -> Some i | _ -> None) args
-    |> OptionSet.of_list
-    |> (fun set -> not (OptionSet.mem None set) && OptionSet.cardinal set = List.length args)
 
 let as_const_exn t = match T.view t with
   | T.Const c -> c
