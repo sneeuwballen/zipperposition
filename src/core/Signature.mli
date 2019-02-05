@@ -3,9 +3,10 @@
 
 (** {1 Signature} *)
 
-(** A signature is a finite mapping from identifiers to types. *)
+(** A signature is a finite mapping from identifiers to types
+    and a property sym_in_conjecture. *)
 
-type t = Type.t ID.Map.t
+type t = (Type.t * bool) ID.Map.t
 (** A signature maps symbols to types *)
 
 val empty : t
@@ -13,7 +14,7 @@ val empty : t
 
 val is_empty : t -> bool
 
-val singleton : ID.t -> Type.t -> t
+val singleton : ID.t -> (Type.t * bool) -> t
 
 val mem : t -> ID.t -> bool
 (** Is the symbol declared? *)
@@ -31,6 +32,10 @@ val find : t -> ID.t -> Type.t option
 val find_exn : t -> ID.t -> Type.t
 (** Lookup the type of a symbol
     @raise Not_found if the symbol is not in the signature *)
+
+val sym_in_conj : ID.t -> t -> bool
+
+val set_sym_in_conj : ID.t -> t -> t
 
 val arity : t -> ID.t -> int * int
 (** Arity of the given symbol, or failure.
@@ -59,21 +64,21 @@ val well_founded : t -> bool
 module Seq : sig
   val symbols : t -> ID.t Sequence.t
   val types : t -> Type.t Sequence.t
-  val to_seq : t -> (ID.t * Type.t) Sequence.t
-  val of_seq : (ID.t * Type.t) Sequence.t -> t
-  val add_seq : t -> (ID.t * Type.t) Sequence.t -> t
+  val to_seq : t -> (ID.t * (Type.t*bool)) Sequence.t
+  val of_seq : (ID.t * (Type.t*bool)) Sequence.t -> t
+  val add_seq : t -> (ID.t * (Type.t*bool)) Sequence.t -> t
 end
 
 val to_set : t -> ID.Set.t
 (** Set of symbols of the signature *)
 
-val to_list : t -> (ID.t * Type.t) list
-val add_list : t -> (ID.t * Type.t) list -> t
-val of_list : (ID.t * Type.t) list -> t
+val to_list : t -> (ID.t * (Type.t*bool)) list
+val add_list : t -> (ID.t * (Type.t*bool)) list -> t
+val of_list : (ID.t * (Type.t*bool)) list -> t
 
-val iter : t -> (ID.t -> Type.t -> unit) -> unit
+val iter : t -> (ID.t -> (Type.t*bool) -> unit) -> unit
 
-val fold : t -> 'a -> ('a -> ID.t -> Type.t -> 'a) -> 'a
+val fold : t -> 'a -> ('a -> ID.t -> (Type.t*bool) -> 'a) -> 'a
 
 val is_bool : t -> ID.t -> bool
 (** Has the symbol a boolean return sort?

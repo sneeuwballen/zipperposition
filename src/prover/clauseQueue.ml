@@ -21,6 +21,7 @@ let profiles_ =
   ; "explore", P_explore
   ; "ground", P_ground
   ; "goal", P_goal
+  ; "conjecture-relative", P_conj_rel
   ]
 
 let profile_of_string s =
@@ -67,6 +68,46 @@ module Make(C : Clause_intf.S) = struct
       in
       let w_lits = weight_lits_ (C.lits c) in
       w_lits * Array.length (C.lits c) + _depth_ty
+
+    let rec calc_tweight t sg v w c_mul =
+      match Term.view t with 
+         Term.AppBuiltin (_,l) -> 
+            w + List.fold_left (fun acc t -> acc + 
+                                    calc_tweight t sg v w c_mul) 0 l
+         | Term.Var _ -> v
+         | Term.DB _ -> v
+         | Term.App (f, l) -> 
+            begin match Term.view f with
+               | Term.Const id ->  int_of_float ((if Signature.sym_in_conj id sg then c_mul else 1.0)*. float_of_int w)
+               | _ -> v
+            end +  List.fold_left (fun acc t -> acc + 
+                                    calc_tweight t sg v w c_mul) 0 l
+         
+         | Term.Const id -> (int_of_float ((if Signature.sym_in_conj id sg then c_mul else 1.0)*.float_of_int w))
+         | Term.Fun (_, t) -> calc_tweight t sg v w c_mul
+
+     let calc_lweight l sg v w c_mul =
+      match l with 
+      | Lit.Equation (lhs,rhs,sign) -> (calc_tweight lhs sg v w c_mul + 
+                                        calc_tweight rhs sg v w c_mul, sign)
+      | Lit.Prop (head,sign) -> (calc_tweight head sg v w c_mul, sign)
+      | _ -> (0,false)
+
+
+    let conj_relative c =
+      let sgn = C.Ctx.signature () in
+      let pos_mul = 1.5 in
+      let max_mul = 1.5 in
+      let v,f = 100, 100 in 
+      let conj_mul = 0.1 in
+        Array.mapi (fun i xx -> i,xx) (C.lits c)
+        |> 
+        Array.fold_left (fun acc (i,l) -> acc +. 
+                          let l_w, l_s = (calc_lweight l sgn v f conj_mul) in 
+                            ( if l_s then pos_mul else 1.0 )*.
+                            ( if C.is_maxlit (c,0) Subst.empty ~idx:i then max_mul else 1.0)*. 
+                            float_of_int l_w ) 0.0
+        |> int_of_float
 
     let penalty = C.penalty
 
@@ -276,6 +317,9 @@ module Make(C : Clause_intf.S) = struct
     in
     make ~ratio:6 ~weight "default"
 
+  let conj_relative_mk () : t =
+    make ~ratio:6 ~weight:WeightFun.conj_relative "conj_relative"
+
   let of_profile p =
     let open ClauseQueue_intf in
     match p with
@@ -285,6 +329,7 @@ module Make(C : Clause_intf.S) = struct
       | P_explore -> explore ()
       | P_ground -> ground ()
       | P_goal -> goal_oriented ()
+      | P_conj_rel ->  conj_relative_mk ()
 
   let pp out q = CCFormat.fprintf out "queue %s" (name q)
   let to_string = CCFormat.to_string pp

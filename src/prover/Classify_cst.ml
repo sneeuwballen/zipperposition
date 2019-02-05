@@ -55,7 +55,7 @@ let pp_res out = function
   | Other -> CCFormat.string out "other"
 
 let pp_signature out sigma =
-  let pp_pair out (id,ty) =
+  let pp_pair out (id,(ty,_)) =
     Format.fprintf out "(@[%a : %a (%a)@])" ID.pp id Type.pp ty pp_res (classify id)
   in
   Format.fprintf out

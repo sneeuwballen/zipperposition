@@ -339,11 +339,14 @@ module Seq = struct
         | `Ty ty -> Type.Seq.symbols ty)
 end
 
-let signature ?(init=Signature.empty) seq =
-  seq
-  |> Sequence.flat_map Seq.ty_decls
-  |> Sequence.fold (fun sigma (id,ty) -> Signature.declare sigma id ty) init
-
+let signature ?(init=Signature.empty) ?(conj_syms=Sequence.empty) seq = 
+  let signtr = 
+   seq
+    |> Sequence.flat_map Seq.ty_decls
+    |> Sequence.fold (fun sigma (id,ty) -> Signature.declare sigma id ty) init in
+   conj_syms
+   |> Sequence.fold (fun sigma symb -> Signature.set_sym_in_conj symb sigma) signtr
+   
 let conv_attrs =
   let module A = UntypedAST in
   CCList.filter_map

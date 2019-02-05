@@ -210,7 +210,7 @@ module Make(C : Index.CLAUSE) = struct
     let features = ref [] in
     (* create features for the symbols *)
     Signature.iter sigma
-      (fun s ty ->
+      (fun s (ty,_) ->
          if ignore s
          then ()  (* base symbols don't count *)
          else

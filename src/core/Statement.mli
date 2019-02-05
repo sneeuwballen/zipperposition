@@ -123,7 +123,7 @@ val goal : ?attrs:attrs -> proof:proof -> 'f -> ('f, _, _) t
 val neg_goal :
   ?attrs:attrs -> proof:proof -> skolems:'ty skolem list -> 'f list -> ('f, _, 'ty) t
 
-val signature : ?init:Signature.t -> (_, _, Type.t) t Sequence.t -> Signature.t
+val signature : ?init:Signature.t -> ?conj_syms: ID.t Sequence.t -> (_, _, Type.t) t Sequence.t -> Signature.t
 (** Compute signature when the types are using {!Type} *)
 
 val conv_attrs : UntypedAST.attrs -> attrs

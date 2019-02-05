@@ -409,6 +409,27 @@ let parse_cli =
   print_version ~params;
   Phases.return_phase (files, params)
 
+let syms_in_lit cl =
+   let open Sequence in 
+      List.fold_left (<+>) empty 
+                     (List.map (fun lit -> match lit with 
+                                    | SLiteral.Atom (t, _) -> Term.Seq.symbols t
+                                    | SLiteral.Eq (l,r) 
+                                    | SLiteral.Neq (l,r) -> Term.Seq.symbols l <+> 
+                                                            Term.Seq.symbols r
+                                    | _ -> empty) 
+                                 cl)
+
+let syms_in_conj decls =
+   let open Sequence in
+      decls 
+      |> CCVector.to_seq
+      |> flat_map (fun st -> match Statement.view st with
+         | Statement.NegatedGoal (_, gl) ->
+            flatten (of_list (List.map syms_in_lit gl))
+         | Statement.Goal g -> syms_in_lit g
+         | _ -> empty)
+
 (* Process the given file (try to solve it) *)
 let process_file ?(prelude=Sequence.empty) file =
   start_file file >>= fun () ->
@@ -421,7 +442,8 @@ let process_file ?(prelude=Sequence.empty) file =
     (fun k->k (CCVector.length decls) (if has_goal then "some" else "no"));
   cnf decls >>= fun stmts ->
   (* compute signature, precedence, ordering *)
-  let signature = Statement.signature (CCVector.to_seq stmts) in
+  let conj_syms = syms_in_conj stmts in
+  let signature = Statement.signature ~conj_syms:conj_syms (CCVector.to_seq stmts) in
   Util.debugf ~section 1 "@[<2>signature:@ @[<hv>%a@]@]" (fun k->k Signature.pp signature);
   Util.debugf ~section 2 "(@[classification:@ %a@])"
     (fun k->k Classify_cst.pp_signature signature);

@@ -451,7 +451,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let _on_new_decl decl =
     let clauses =
       Signature.fold (Ctx.signature ()) []
-        (fun acc s ty ->
+        (fun acc s (ty,_) ->
            match check_decl_ s ~ty decl with
              | None -> acc
              | Some c -> c::acc)
@@ -543,7 +543,7 @@ module Make(E : Env.S) : S with module Env = E = struct
            (* need to simplify (instantiate) active clauses that have naked
               variables of the given type *)
            Env.simplify_active_with instantiate_vars);
-      Signature.iter (Ctx.signature ()) (fun s ty -> _on_new_symbol s ~ty);
+      Signature.iter (Ctx.signature ()) (fun s (ty,_) -> _on_new_symbol s ~ty);
     )
 end
 

@@ -55,7 +55,7 @@ module Make(X : PARAMETERS) = struct
   let is_completeness_preserved () = !_complete
 
   (* declare [symb : ty], with precondition that [symb] is not declared yet *)
-  let declare_new_ symb ty =
+  let declare_new_ symb (ty,_) =
     Util.debugf ~section:Const.section 2 "@[<2>@{<cyan>declare new symbol@}@ `@[%a:%a@]`@]"
       (fun k->k ID.pp symb Type.pp ty);
     _signature := Signature.declare !_signature symb ty;
@@ -75,7 +75,7 @@ module Make(X : PARAMETERS) = struct
   let declare symb ty =
     Util.enter_prof prof_declare_sym;
     let is_new = not (Signature.mem !_signature symb) in
-    if is_new then declare_new_ symb ty;
+    if is_new then declare_new_ symb (ty,false);
     Util.exit_prof prof_declare_sym;
     ()
 

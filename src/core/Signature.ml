@@ -3,7 +3,7 @@
 
 (** {1 Signature} *)
 
-type t = Type.t ID.Map.t
+type t = (Type.t * bool) ID.Map.t
 (** A signature maps symbols to their sort *)
 
 let empty = ID.Map.empty
@@ -14,12 +14,13 @@ let singleton = ID.Map.singleton
 
 let mem signature s = ID.Map.mem s signature
 
+let find_exn signature s =
+  let (t, _) = ID.Map.find s signature in t
+
 let find signature s =
-  try Some (ID.Map.find s signature)
+  try Some (find_exn signature s)
   with Not_found -> None
 
-let find_exn signature s =
-  ID.Map.find s signature
 
 exception AlreadyDeclared of ID.t * Type.t * Type.t
 
@@ -40,7 +41,7 @@ let declare signature id ty =
   with Not_found ->
     if not (InnerTerm.DB.closed (ty : Type.t :> InnerTerm.t))
     then raise (Invalid_argument "Signature.declare: non-closed type");
-    ID.Map.add id ty signature
+    ID.Map.add id (ty,false) signature
 
 let cardinal = ID.Map.cardinal
 
@@ -52,18 +53,18 @@ let arity signature s =
     | Type.Arity (a,b) -> a, b
 
 let is_ground signature =
-  ID.Map.for_all (fun _ ty -> Type.is_ground ty) signature
+   ID.Map.for_all (fun _ (ty, _) -> Type.is_ground ty) signature
 
 let merge s1 s2 =
   ID.Map.merge
     (fun s t1 t2 -> match t1, t2 with
        | None, None -> assert false
-       | Some ty1, Some ty2 ->
+       | Some (ty1, c1), Some (ty2, c2) ->
          if Type.equal ty1 ty2
-         then Some ty1
+         then Some (ty1, c1 && c2)
          else raise (AlreadyDeclared (s, ty1, ty2))
-       | Some s1, None -> Some s1
-       | None, Some s2 -> Some s2)
+       | Some (s1,c1), None -> Some (s1,c1)
+       | None, Some (s2,c2) -> Some (s2,c2))
     s1 s2
 
 let diff s1 s2 =
@@ -77,17 +78,24 @@ let diff s1 s2 =
 
 let well_founded s =
   ID.Map.exists
-    (fun _ ty -> match Type.arity ty with
+    (fun _ (ty,_) -> match Type.arity ty with
        | Type.Arity (_, 0) -> true
        | _ -> false)
     s
+
+let sym_in_conj s signature = 
+   snd (ID.Map.get_or s signature ~default:(Type.int, false))    
+
+let set_sym_in_conj s signature =
+   let t = find_exn signature s in 
+      ID.Map.add s (t, true) signature
 
 module Seq = struct
   let symbols s =
     ID.Map.to_seq s |> Sequence.map fst
 
   let types s =
-    ID.Map.to_seq s |> Sequence.map snd
+    ID.Map.to_seq s |> Sequence.map snd |> Sequence.map fst
 
   let to_seq = ID.Map.to_seq
   let add_seq = ID.Map.add_seq
@@ -104,7 +112,7 @@ let iter s f =
   ID.Map.iter f s
 
 let fold s acc f =
-  ID.Map.fold (fun s ty acc -> f acc s ty) s acc
+   ID.Map.fold (fun s (ty,c) acc -> f acc s (ty,c)) s acc
 
 let is_bool signature s =
   let rec is_bool ty = match Type.view ty with
@@ -121,8 +129,8 @@ let is_not_bool signature s =
 (** {2 IO} *)
 
 let pp out s =
-  let pp_pair out (s,ty) =
-    Format.fprintf out "@[<hov2>%a:@ %a@]" ID.pp s Type.pp ty
+  let pp_pair out (s,(ty, c)) =
+    Format.fprintf out "@[<hov2>%a:@ %a %B@]" ID.pp s Type.pp ty c
   in
   Format.fprintf out "{@[<hv>";
   Util.pp_seq ~sep:", " pp_pair out (Seq.to_seq s);
