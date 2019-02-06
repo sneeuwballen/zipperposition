@@ -328,7 +328,7 @@ module Make(X : sig
 
   (** Apply rewrite rules AND evaluation functions *)
   let rewrite c =
-    Util.debugf ~section 5 "@[<2>rewrite clause@ `@[%a@]`...@]" (fun k->k C.pp c);
+    Util.debugf ~section 2 "@[<2>rewrite clause@ `@[%a@]`...@]" (fun k->k C.pp c);
     let applied_rules = ref StrSet.empty in
     let proofs : Proof.parent list ref = ref [] in
     let rec reduce_term rules t =
@@ -340,10 +340,13 @@ module Make(X : sig
             | Some (t',proof) ->
               applied_rules := StrSet.add name !applied_rules;
               proofs := List.rev_append proof !proofs;
-              Util.debugf ~section 5
+              Util.debugf ~section 2
                 "@[<2>rewrite `@[%a@]`@ into `@[%a@]`@ :proof (@[%a@])@]"
                 (fun k->k T.pp t T.pp t' (Util.pp_list Proof.pp_parent) proof);
-              reduce_term !_rewrite_rules t'  (* re-apply all rules *)
+              let new_t = match !_norm_rule t' with 
+                                       | None -> t'
+                                       | Some tt -> tt in
+              reduce_term !_rewrite_rules new_t  (* re-apply all rules *)
           end
     in 
     let lits' =

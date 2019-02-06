@@ -19,6 +19,7 @@ let f_ = ID.make "f"
 let g_ = ID.make "g"
 let h_ = ID.make "h"
 let k_ = ID.make "k"
+let l_ = ID.make "l"
 
 
 let ty = Type.term
@@ -29,6 +30,8 @@ let g x = T.app g_fun [x]
 let h x y z = T.app (T.const ~ty:Type.([ty;ty;ty] ==> ty) h_) [x;y;z]
 let k_fun = (T.const ~ty:Type.([[ty;ty] ==> ty] ==> ty) k_)
 let k x = T.app k_fun [x]
+let l_fun = (T.const ~ty:Type.([[ty;ty] ==> ty;ty] ==> ty) l_)
+let l x = T.app l_fun [x]
 let a = T.const ~ty (ID.make "a")
 let b = T.const ~ty (ID.make "b")
 let x = T.var_of_int ~ty 0
@@ -124,6 +127,22 @@ let test_eta_reduce = "eta reduce", `Quick, fun () ->
   let reduced = k f_fun in
   Alcotest.(check t_test) "eta reduce" (Lambda.eta_reduce unreduced) reduced
 
+let test_eta_expand = "eta expand", `Quick, fun () ->
+  (* f -> (λx. (λy. f x y)) *)
+  let t1 = T.fun_of_fvars [HVar.make ~ty 0; HVar.make ~ty 1] (T.app f_fun [T.var_of_int ~ty 0; T.var_of_int ~ty 1]) in
+  let t2 = f_fun in
+  Alcotest.(check t_test) "eta expand" (Lambda.eta_expand t2) t1;
+
+  let subterm =  T.fun_of_fvars [HVar.make ~ty 0; HVar.make ~ty 1] (T.app f_fun [T.var_of_int ~ty 0; T.var_of_int ~ty 1]) in
+  let unreduced = k subterm in 
+  let reduced = k f_fun in
+  Alcotest.(check t_test) "eta expand" (Lambda.eta_expand reduced) unreduced;
+
+  let subterm =  T.fun_of_fvars [HVar.make ~ty 0; HVar.make ~ty 1] (T.app f_fun [T.var_of_int ~ty 0; T.var_of_int ~ty 1]) in
+  let expanded = T.fun_of_fvars [HVar.make ~ty 0] (T.app l_fun [subterm; T.var_of_int ~ty 0]) in 
+  let unexpanded = l f_fun in
+  Alcotest.(check t_test) "eta expand"  expanded (Lambda.eta_expand unexpanded)
+
 
 let suite : unit Alcotest.test_case list =
   [ test_db_shift;
@@ -132,6 +151,7 @@ let suite : unit Alcotest.test_case list =
     test_whnf2;
     test_polymorphic_app;
     test_eta_reduce;
+    test_eta_expand;
   ]
 
 (** Properties *)

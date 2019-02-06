@@ -127,7 +127,7 @@ module Inner = struct
           let dbvars =
             List.mapi (fun i ty_arg -> T.bvar (n_missing-i-1) ~ty:ty_arg) missing_args
           in
-          T.fun_l ty_args (T.app ~ty:ty_ret body dbvars)
+          T.fun_l ty_args (aux (T.app ~ty:ty_ret body dbvars))
         ) else (
           let ty = T.ty_exn body in
           (* traverse body *)
