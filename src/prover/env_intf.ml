@@ -50,6 +50,9 @@ module type S = sig
   type term_rewrite_rule = Term.t -> (Term.t * Proof.parent list) option
   (** Rewrite rule on terms *)
 
+  type term_norm_rule = Term.t -> Term.t option
+  (** Normalization rule on terms *)
+
   type lit_rewrite_rule = Literal.t -> (Literal.t * Proof.parent list * Proof.tag list) option
   (** Rewrite rule on literals *)
 
@@ -129,6 +132,9 @@ module type S = sig
   (** Add tautology detection rule *)
 
   val add_rewrite_rule : string -> term_rewrite_rule -> unit
+  (** Add a term rewrite rule *)
+
+  val set_ho_normalization_rule : term_norm_rule -> unit
   (** Add a term rewrite rule *)
 
   val add_lit_rule : string -> lit_rewrite_rule -> unit

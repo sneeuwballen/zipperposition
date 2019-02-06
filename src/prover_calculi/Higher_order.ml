@@ -486,8 +486,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun k->k T.pp t T.pp t');
       Util.incr_stat stat_beta;
       assert (T.DB.is_closed t');
-      Some (t',[])
-    )
+      Some t
+   )
 
   (* rule for eta-expansion *)
   let eta_expand t =
@@ -499,7 +499,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun k->k T.pp t T.pp t');
       Util.incr_stat stat_eta_expand;
       assert (T.DB.is_closed t');
-      Some (t',[])
+      Some t'
     )
 
   (* rule for eta-expansion *)
@@ -512,7 +512,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun k->k T.pp t T.pp t');
       Util.incr_stat stat_eta_reduce;
       assert (T.DB.is_closed t');
-      Some (t',[])
+      Some t'
     )
 
   module TVar = struct
@@ -683,13 +683,22 @@ module Make(E : Env.S) : S with module Env = E = struct
       if !_ext_pos then (
         Env.add_unary_inf "ho_ext_pos" ext_pos
       );
-      Env.add_rewrite_rule "beta_reduce" beta_reduce;
+
+
       Env.add_unary_simplify remove_var_args;
+      let ho_norm  = 
       begin match Env.flex_get k_eta with
-        | `Expand -> Env.add_rewrite_rule "eta_expand" eta_expand
-        | `Reduce -> Env.add_rewrite_rule "eta_reduce" eta_reduce
-        | `None -> ()
+        | `Expand -> (fun t -> t |> beta_reduce |> (fun opt -> match opt with 
+                                                                  None -> eta_expand t | 
+                                                                  Some t' -> eta_expand t'))
+        | `Reduce -> (fun t -> t |> beta_reduce |> (fun opt -> match opt with 
+                                                                  None -> eta_reduce t | 
+                                                                  Some t' -> eta_reduce t'))
+        | `None -> beta_reduce
       end;
+      in
+      Env.set_ho_normalization_rule ho_norm;
+
       if Env.flex_get k_enable_ho_unif then (
         Env.add_unary_inf "ho_unif" ho_unif;
       );

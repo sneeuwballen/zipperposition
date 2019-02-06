@@ -18,6 +18,8 @@ let ty_test = (module Type : Alcotest.TESTABLE with type t = Type.t)
 let f_ = ID.make "f"
 let g_ = ID.make "g"
 let h_ = ID.make "h"
+let k_ = ID.make "k"
+
 
 let ty = Type.term
 let f_fun = (T.const ~ty:Type.([ty;ty] ==> ty) f_)
@@ -25,6 +27,8 @@ let f x y = T.app f_fun [x; y]
 let g_fun = T.const ~ty:Type.([ty] ==> ty) g_
 let g x = T.app g_fun [x]
 let h x y z = T.app (T.const ~ty:Type.([ty;ty;ty] ==> ty) h_) [x;y;z]
+let k_fun = (T.const ~ty:Type.([[ty;ty] ==> ty] ==> ty) k_)
+let k x = T.app k_fun [x]
 let a = T.const ~ty (ID.make "a")
 let b = T.const ~ty (ID.make "b")
 let x = T.var_of_int ~ty 0
@@ -113,7 +117,13 @@ let test_eta_reduce = "eta reduce", `Quick, fun () ->
   (* (λx. (λy. g y) x) -> g *)
   let t1 = T.fun_of_fvars [HVar.make ~ty 0] (T.app (T.fun_of_fvars [HVar.make ~ty 1] (g (T.var_of_int ~ty 1))) [T.var_of_int ~ty 0]) in
   let t2 = g_fun in
-  Alcotest.(check t_test) "eta reduce" (Lambda.eta_reduce t1) t2
+  Alcotest.(check t_test) "eta reduce" (Lambda.eta_reduce t1) t2;
+
+  let subterm =  T.fun_of_fvars [HVar.make ~ty 0; HVar.make ~ty 1] (T.app f_fun [T.var_of_int ~ty 0; T.var_of_int ~ty 1]) in
+  let unreduced = k subterm in 
+  let reduced = k f_fun in
+  Alcotest.(check t_test) "eta reduce" (Lambda.eta_reduce unreduced) reduced
+
 
 let suite : unit Alcotest.test_case list =
   [ test_db_shift;

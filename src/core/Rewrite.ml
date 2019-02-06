@@ -299,7 +299,8 @@ module Term = struct
     (* compute normal form of subterm. Tail-recursive.
        @param k the continuation
        @return [t'] where [t'] is the normal form of [t] *)
-    let rec reduce t k = match T.view t with
+    let rec reduce t k = 
+    match T.view t with
       | _ when !fuel = 0 -> k t
       | T.Const id ->
         (* pick a constant rule *)
@@ -344,11 +345,20 @@ module Term = struct
                             )
                           in
                           let subst' =
+                            
+                              Util.debugf ~section 1
+                                       "@[<2> Matching @[%a@] to  @[%a@]"
+                                       (fun k->k Rule.pp r T.pp t');
                             Unif.FO.matching ~pattern:(r.term_lhs,sc_r) (t',sc_t)
                           in
                           let cur_sc_r = sc_r in
+                          Util.debugf ~section 1
+                                       "@[<2> Succeeded. @]"
+                                       (fun k->k);
                           Some (r, subst', cur_sc_r, l_rest)
-                        with Unif.Fail | Exit -> None)
+                        with Unif.Fail | Exit -> Util.debugf ~section 1
+                                       "@[<2> Failed. @]"
+                                       (fun k->k); None)
                  in
                  begin match find_rule with
                    | None -> k t'
@@ -395,7 +405,7 @@ module Term = struct
           (fun tail' ->
              reduce t (fun t' -> k (t' :: tail')))
     in
-    reduce t0 (fun t->t, !set)
+     reduce t0 (fun t->  t, !set)
 
   let normalize_term ?(max_steps=max_int) (t:term): term * Rule_inst_set.t =
     Util.with_prof prof_term_rw (normalize_term_ max_steps) t
