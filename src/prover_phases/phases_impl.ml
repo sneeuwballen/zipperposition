@@ -442,6 +442,8 @@ let process_file ?(prelude=Sequence.empty) file =
     (fun k->k (CCVector.length decls) (if has_goal then "some" else "no"));
   cnf decls >>= fun stmts ->
   (* compute signature, precedence, ordering *)
+  CCVector.iter (fun stm -> Util.debugf ~section 1 "@/%a@/"
+    (fun k->k Statement.pp_clause stm)) stmts;
   let conj_syms = syms_in_conj stmts in
   let signature = Statement.signature ~conj_syms:conj_syms (CCVector.to_seq stmts) in
   Util.debugf ~section 1 "@[<2>signature:@ @[<hv>%a@]@]" (fun k->k Signature.pp signature);

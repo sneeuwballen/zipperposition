@@ -117,7 +117,7 @@ module Inner = struct
         let n_args = List.length ty_args in
         let n_missing = n_args - List.length args in
         if n_missing>0 then (
-          Util.debugf 5 "(@[eta_expand_rec `%a`,@ missing %d args@ in %a@])"
+          Util.debugf 50 "(@[eta_expand_rec `%a`,@ missing %d args@ in %a@])"
             (fun k->k T.pp t n_missing (CCFormat.Dump.list T.pp) ty_args);
           (* missing args: suffix of length [n_missing] *)
           let missing_args = CCList.drop (n_args-n_missing) ty_args in
