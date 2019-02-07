@@ -407,7 +407,7 @@ module Term = struct
     in
      reduce t0 (fun t->  t, !set)
 
-  let normalize_term ?(max_steps=max_int) (t:term): term * Rule_inst_set.t =
+  let normalize_term ?(max_steps=1000) (t:term): term * Rule_inst_set.t =
     Util.with_prof prof_term_rw (normalize_term_ max_steps) t
 
   let normalize_term_fst ?max_steps t = fst (normalize_term ?max_steps t)

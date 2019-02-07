@@ -20,6 +20,8 @@ let prof_narrowing_term = Util.mk_profiler "narrow.term"
 let prof_narrowing_lit = Util.mk_profiler "narrow.lit"
 let prof_ctx_narrowing = Util.mk_profiler "narrow.ctx_narrow"
 
+let max_steps = 500
+
 module Key = struct
   let has_rw = Flex_state.create_key()
   let ctx_narrow = Flex_state.create_key()
@@ -31,7 +33,7 @@ module Make(E : Env_intf.S) = struct
 
   (* simplification rule *)
   let simpl_term t =
-    let t', rules = RW.Term.normalize_term t in
+    let t', rules = RW.Term.normalize_term ~max_steps t in
     if T.equal t t' then (
       assert (RW.Term.Rule_inst_set.is_empty rules);
       None
