@@ -481,20 +481,24 @@ module Make(E : Env.S) : S with module Env = E = struct
   let beta_reduce t =
     assert (T.DB.is_closed t);
     let t' = Lambda.snf t in
-    if (T.equal t t') then None
+    if (T.equal t t') then (
+       Util.debugf ~section 4 "(@[beta_reduce `%a`@ failed `@])" (fun k->k T.pp t ); 
+       None)
     else (
       Util.debugf ~section 4 "(@[beta_reduce `%a`@ :into `%a`@])"
         (fun k->k T.pp t T.pp t');
       Util.incr_stat stat_beta;
       assert (T.DB.is_closed t');
-      Some t
+      Some t'
    )
 
   (* rule for eta-expansion *)
   let eta_expand t =
     assert (T.DB.is_closed t);
     let t' = Lambda.eta_expand t in
-    if (T.equal t t') then None
+    if (T.equal t t') then (
+       Util.debugf ~section 4 "(@[eta_expand `%a`@ failed `@])" (fun k->k T.pp t ); 
+       None)
     else (
       Util.debugf ~section 4 "(@[eta_expand `%a`@ :into `%a`@])"
         (fun k->k T.pp t T.pp t');
@@ -689,12 +693,20 @@ module Make(E : Env.S) : S with module Env = E = struct
       Env.add_unary_simplify remove_var_args;
       let ho_norm  = 
       begin match Env.flex_get k_eta with
-        | `Expand -> (fun t -> t |> beta_reduce |> (fun opt -> match opt with 
-                                                                  None -> eta_expand t | 
-                                                                  Some t' -> eta_expand t'))
-        | `Reduce -> (fun t -> t |> beta_reduce |> (fun opt -> match opt with 
-                                                                  None -> eta_reduce t | 
-                                                                  Some t' -> eta_reduce t'))
+        | `Expand -> (fun t -> t |> beta_reduce |> (
+                        fun opt -> match opt with 
+                                    None -> eta_expand t 
+                                    | Some t' -> 
+                                       match eta_expand t' with
+                                          None -> Some t'
+                                          | Some tt -> Some tt))
+        | `Reduce -> (fun t -> t |> beta_reduce |> (
+                        fun opt -> match opt with 
+                                    None -> eta_reduce t 
+                                    | Some t' -> 
+                                       match eta_reduce t' with
+                                          None -> Some t'
+                                          | Some tt -> Some tt))
         | `None -> beta_reduce
       end;
       in

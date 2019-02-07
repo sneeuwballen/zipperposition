@@ -345,20 +345,11 @@ module Term = struct
                             )
                           in
                           let subst' =
-                            
-                              Util.debugf ~section 1
-                                       "@[<2> Matching @[%a@] to  @[%a@]"
-                                       (fun k->k Rule.pp r T.pp t');
-                            Unif.FO.matching ~pattern:(r.term_lhs,sc_r) (t',sc_t)
+                             Unif.FO.matching ~pattern:(r.term_lhs,sc_r) (t',sc_t)
                           in
                           let cur_sc_r = sc_r in
-                          Util.debugf ~section 1
-                                       "@[<2> Succeeded. @]"
-                                       (fun k->k);
                           Some (r, subst', cur_sc_r, l_rest)
-                        with Unif.Fail | Exit -> Util.debugf ~section 1
-                                       "@[<2> Failed. @]"
-                                       (fun k->k); None)
+                        with Unif.Fail | Exit ->  None)
                  in
                  begin match find_rule with
                    | None -> k t'
@@ -586,7 +577,7 @@ module Lit = struct
            | Some (rule,subst,tags) ->
              let clauses = rule.lit_rhs in
              Util.debugf ~section 5
-               "@[<2>rewrite `@[%a@]`@ :into `@[<v>%a@]`@ :with @[%a@]@ :rule `%a`@]"
+               "@[<2>lit rewrite `@[%a@]`@ :into `@[<v>%a@]`@ :with @[%a@]@ :rule `%a`@]"
                (fun k->k Literal.pp lit
                    (Util.pp_list (Fmt.hvbox (Util.pp_list ~sep:" ∨ " Literal.pp)))
                    clauses Subst.pp subst Rule.pp rule);

@@ -203,10 +203,14 @@ module Make(X : sig
     _is_trivial := r :: !_is_trivial
 
   let add_rewrite_rule name rule =
+    Util.debugf ~section 1 "[ Adding rule %s to env ]" (fun k-> k name);
     _rewrite_rules := (name, rule) :: !_rewrite_rules
 
   let set_ho_normalization_rule rule =
     _norm_rule := rule
+
+  let get_ho_normalization_rule () =
+    !_norm_rule
 
   let add_lit_rule name rule =
     _lit_rules := (name, rule) :: !_lit_rules
@@ -340,12 +344,12 @@ module Make(X : sig
             | Some (t',proof) ->
               applied_rules := StrSet.add name !applied_rules;
               proofs := List.rev_append proof !proofs;
-              Util.debugf ~section 2
-                "@[<2>rewrite `@[%a@]`@ into `@[%a@]`@ :proof (@[%a@])@]"
-                (fun k->k T.pp t T.pp t' (Util.pp_list Proof.pp_parent) proof);
               let new_t = match !_norm_rule t' with 
                                        | None -> t'
                                        | Some tt -> tt in
+              Util.debugf ~section 2
+                "@[<2>rewrite `@[%a@]`@ into `@[%a@]`@ :proof (@[%a@])@]"
+                (fun k->k T.pp t T.pp new_t (Util.pp_list Proof.pp_parent) proof);
               reduce_term !_rewrite_rules new_t  (* re-apply all rules *)
           end
     in 
@@ -392,7 +396,7 @@ module Make(X : sig
       in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
       assert (not (C.equal c c'));
-      Util.debugf ~section 3 "@[term rewritten clause `@[%a@]`@ into `@[%a@]`"
+      Util.debugf ~section 3 "@[lambda rewritten clause `@[%a@]`@ into `@[%a@]`"
         (fun k->k C.pp c C.pp c');
       SimplM.return_new c'
     )

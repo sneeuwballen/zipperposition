@@ -38,12 +38,13 @@ module Make(E : Env_intf.S) = struct
       assert (RW.Term.Rule_inst_set.is_empty rules);
       None
     ) else (
-      Util.debugf ~section 2
-        "@[<2>@{<green>rewrite@} `@[%a@]`@ :into `@[%a@]`@ :using %a@]"
-        (fun k->k T.pp t T.pp t' RW.Term.Rule_inst_set.pp rules);
       let proof =
         RW.Rule.set_as_proof_parents rules
       in
+
+      Util.debugf ~section 2
+        "@[<2>@{<green> simpl rewrite@} `@[%a@]`@ :into `@[%a@]`@ :using %a@]"
+        (fun k->k T.pp t T.pp t' RW.Term.Rule_inst_set.pp rules);
       Some (t',proof)
     )
 
