@@ -771,7 +771,7 @@ let scan_simple_stmt_for_ind_ty st = match view st with
       l
   | _ -> ()
 
-let get_rw_rule ?weight_incr:(w_i=15) c  =
+let get_rw_rule ?weight_incr:(w_i=20) c  =
   let distinct_free_vars l =
     l |> List.map (fun t -> Term.as_var t |> 
                     (fun v -> match v with

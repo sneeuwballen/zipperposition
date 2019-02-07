@@ -47,6 +47,7 @@ end
 
 let k_some_ho : bool Flex_state.key = Flex_state.create_key()
 let k_enabled : bool Flex_state.key = Flex_state.create_key()
+let k_enable_def_unfold : bool Flex_state.key = Flex_state.create_key()
 let k_enable_ho_unif : bool Flex_state.key = Flex_state.create_key()
 let k_ho_prim_mode : _ Flex_state.key = Flex_state.create_key()
 let k_ho_prim_max_penalty : int Flex_state.key = Flex_state.create_key()
@@ -714,6 +715,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 end
 
 let enabled_ = ref true
+let def_unfold_enabled_ = ref false
 let force_enabled_ = ref false
 let enable_unif_ = ref true
 let prim_mode_ = ref `Neg
@@ -772,7 +774,7 @@ let extension =
       Util.debug ~section 2 "problem is HO"
     );
 
-    if !enabled_ then (
+    if !def_unfold_enabled_ then (
        CCVector.iter (fun c -> match Statement.get_rw_rule c with 
                                 Some r -> Util.debugf ~section 1
                                           "@[<2> Adding constant def rule: `@[%a@]`@]"
@@ -783,6 +785,7 @@ let extension =
     state
     |> Flex_state.add k_some_ho is_ho
     |> Flex_state.add k_enabled !enabled_
+    |> Flex_state.add k_enable_def_unfold !def_unfold_enabled_
     |> Flex_state.add k_enable_ho_unif (!enabled_ && !enable_unif_)
     |> Flex_state.add k_ho_prim_mode (if !enabled_ then !prim_mode_ else `None)
     |> Flex_state.add k_ho_prim_max_penalty !prim_max_penalty
@@ -813,11 +816,13 @@ let () =
       "--ho-ext-axiom", Arg.Set _ext_axiom, " enable extensionality axiom";
       "--no-ho-ext-axiom", Arg.Clear _ext_axiom, " disable extensionality axiom";
       "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule";
-      "--ho-no-ext-neg", Arg.Clear _ext_neg, " disable negative extensionality rule";
+      "--ho-no-ext-neg", Arg.Clear _ext_neg, " disable negative extensionality rule"; 
+      "--ho-def-unfold", Arg.Set def_unfold_enabled_, " enable ho definition unfolding";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom"
     ];
   Params.add_to_mode "ho-complete-basic" (fun () -> 
     enabled_ := true;
+    def_unfold_enabled_ := false;
     force_enabled_ := true;
     _ext_axiom := true;
     eta_ := `Expand;
