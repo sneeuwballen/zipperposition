@@ -781,16 +781,16 @@ let get_rw_rule ?weight_incr:(w_i=20) c  =
     |> (fun set -> not (OptionSet.mem None set) && OptionSet.cardinal set = List.length l) in
   
   let make_rw sym vars rhs =
-    let n = List.length vars in
-    let vars_extracted = vars |> CCList.filter_map (fun x-> Term.as_var x) in     
+    let n_new = List.length vars in
+    let vars_extracted = vars |> CCList.filter_map (fun x-> Term.as_var x) in
+    let tyargs, body = Term.open_fun rhs in
+    let n_old = List.length tyargs in 
     let vars_to_db_idx = 
       vars_extracted
       |> CCList.foldi (fun sub i v -> 
-              US.FO.bind sub (v,0) (Term.bvar ~ty:(HVar.ty v) (n-1-i), 0)) (US.empty) in
-    let tyargs, body = Term.open_fun rhs in
+              US.FO.bind sub (v,0) (Term.bvar ~ty:(HVar.ty v) (n_old + n_new-1-i), 0)) (US.empty) in
     let vars_to_db = Subst.FO.apply Subst.Renaming.none (US.subst vars_to_db_idx) (Scoped.make body 0) in
-    let abs_rhs =  (Term.fun_l ((CCList.map (fun v -> HVar.ty v) vars_extracted) @ tyargs) 
-                               (Term.DB.shift n vars_to_db)) in
+    let abs_rhs =  (Term.fun_l ((CCList.map (fun v -> HVar.ty v) vars_extracted) @ tyargs) vars_to_db) in
     let r = Rewrite.Term.Rule.make ~proof:(as_proof_c c) sym (Term.ty abs_rhs) []  abs_rhs in
     let rule = Rewrite.T_rule r in 
     Rewrite.Defined_cst.declare_or_add sym  rule; 
@@ -819,9 +819,8 @@ let get_rw_rule ?weight_incr:(w_i=20) c  =
    
    let all_lits =  Seq.lits c in
    if Sequence.length all_lits = 1 then
-      ((Util.debug 1 "@[ TRYING TO CONV RW @] " );
       match Sequence.head_exn all_lits with 
       | SLiteral.Eq (t1,t2) when Term.weight t2 - Term.weight t1 <= w_i -> 
          conv_terms_rw t1 t2
-      | _ -> None)
+      | _ -> None
    else None
