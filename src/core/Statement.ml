@@ -3,6 +3,13 @@
 
 (** {1 Statement} *)
 
+module OptionSet = Set.Make(
+   struct 
+      let compare x y = Pervasives.compare x y
+      type t = int option
+   end)
+
+module US = Unif_subst
 
 (** A datatype declaration *)
 type 'ty data = {
@@ -763,3 +770,58 @@ let scan_simple_stmt_for_ind_ty st = match view st with
          ())
       l
   | _ -> ()
+
+let get_rw_rule ?weight_incr:(w_i=20) c  =
+  let distinct_free_vars l =
+    l |> List.map (fun t -> Term.as_var t |> 
+                    (fun v -> match v with
+                               | Some x -> Some (HVar.id x)
+                               | None -> None) )
+    |> OptionSet.of_list
+    |> (fun set -> not (OptionSet.mem None set) && OptionSet.cardinal set = List.length l) in
+  
+  let make_rw sym vars rhs =
+    let n = List.length vars in
+    let vars_extracted = vars |> CCList.filter_map (fun x-> Term.as_var x) in     
+    let vars_to_db_idx = 
+      vars_extracted
+      |> CCList.foldi (fun sub i v -> 
+              US.FO.bind sub (v,0) (Term.bvar ~ty:(HVar.ty v) (n-1-i), 0)) (US.empty) in
+    let tyargs, body = Term.open_fun rhs in
+    let vars_to_db = Subst.FO.apply Subst.Renaming.none (US.subst vars_to_db_idx) (Scoped.make body 0) in
+    let abs_rhs =  (Term.fun_l ((CCList.map (fun v -> HVar.ty v) vars_extracted) @ tyargs) 
+                               (Term.DB.shift n vars_to_db)) in
+    let r = Rewrite.Term.Rule.make ~proof:(as_proof_c c) sym (Term.ty abs_rhs) []  abs_rhs in
+    let rule = Rewrite.T_rule r in 
+    Rewrite.Defined_cst.declare_or_add sym  rule; 
+    rule in
+
+  let build_from_head sym vars rhs =
+    if not (Term.symbols rhs |> ID.Set.mem sym) && 
+        Term.VarSet.cardinal 
+          (Term.VarSet.diff (Term.vars rhs) 
+                            ((List.fold_left (fun acc t -> 
+                                  match Term.as_var t with 
+                                    None -> acc 
+                                    | Some v -> v :: acc) [] vars)
+                              |> Term.VarSet.of_list)) = 0 then
+      Some (make_rw sym vars rhs)
+    else
+      None in
+                                         
+  let conv_terms_rw t1 t2 = 
+    let reduced = Lambda.eta_reduce t1 in
+      match Term.view reduced with
+        Term.App (hd, l) when Term.is_const hd && distinct_free_vars l -> 
+            build_from_head (Term.as_const_exn hd) l t2
+        | Term.Const hd -> build_from_head hd [] t2
+        | _ -> None in
+   
+   let all_lits =  Seq.lits c in
+   if Sequence.length all_lits = 1 then
+      ((Util.debug 1 "@[ TRYING TO CONV RW @] " );
+      match Sequence.head_exn all_lits with 
+      | SLiteral.Eq (t1,t2) when Term.weight t2 - Term.weight t1 <= w_i -> 
+         conv_terms_rw t1 t2
+      | _ -> None)
+   else None

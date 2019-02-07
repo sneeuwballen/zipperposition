@@ -771,6 +771,15 @@ let extension =
     if is_ho then (
       Util.debug ~section 2 "problem is HO"
     );
+
+    if !enabled_ then (
+       CCVector.iter (fun c -> match Statement.get_rw_rule c with 
+                                Some r -> Util.debugf ~section 1
+                                          "@[<2> Adding constant def rule: `@[%a@]`@]"
+                                          (fun k->k Rewrite.Rule.pp r);
+                                | _ -> () ) vec;
+    );
+
     state
     |> Flex_state.add k_some_ho is_ho
     |> Flex_state.add k_enabled !enabled_

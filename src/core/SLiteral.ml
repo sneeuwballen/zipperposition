@@ -10,12 +10,6 @@ module US = Unif_subst
 type form = TypedSTerm.t
 type term = TypedSTerm.t
 
-module OptionSet = Set.Make(
-   struct 
-      let compare x y = Pervasives.compare x y
-      type t = int option
-   end)
-
 exception NotALit of form
 
 let () = Printexc.register_printer
@@ -140,53 +134,6 @@ let pp ppt out = function
   | Atom (t, false) -> fpf out "@[<2>¬@ @[%a@]@]" ppt t
   | Eq (t1,t2) -> fpf out "@[%a@ =@ %a@]" ppt t1 ppt t2
   | Neq (t1,t2) -> fpf out "@[%a@ ≠@ %a@]" ppt t1 ppt t2
-
-let as_rw l =
-  let distinct_free_vars l =
-    l |> List.map (fun t -> Term.as_var t |> 
-                    (fun v -> match v with
-                               | Some x -> Some (HVar.id x)
-                               | None -> None) )
-    |> OptionSet.of_list
-    |> (fun set -> not (OptionSet.mem None set) && OptionSet.cardinal set = List.length l) in
-  
-  let aux_conv_rw sym vars rhs =
-    let n = List.length vars in
-    let vars_extracted = vars |> CCList.filter_map (fun x-> Term.as_var x) in     
-    let vars_to_db_idx = 
-      vars_extracted
-      |> CCList.foldi (fun sub i v -> 
-              US.FO.bind sub (v,0) (Term.bvar ~ty:(HVar.ty v) (n-1-i), 0)) (US.empty) in
-    let tyargs, body = Term.open_fun rhs in
-    let vars_to_db = Subst.FO.apply Subst.Renaming.none (US.subst vars_to_db_idx) (Scoped.make body 0) in
-    Some (Term.fun_l ((CCList.map (fun v -> HVar.ty v) vars_extracted) @ tyargs) 
-               (Term.DB.shift n vars_to_db)) in
-
-
-  let try_conv_rw sym vars rhs = 
-    if (Term.symbols rhs |> ID.Set.mem sym) && 
-        Term.VarSet.cardinal 
-          (Term.VarSet.diff (Term.vars rhs) 
-                            ((List.fold_left (fun acc t -> 
-                                  match Term.as_var t with 
-                                    None -> acc 
-                                    | Some v -> v :: acc) [] vars)
-                              |> Term.VarSet.of_list)) = 0 then
-      Some (aux_conv_rw sym vars rhs)
-    else
-      None in
-                                         
-  let as_rw_aux t1 t2 = 
-    let reduced = Lambda.eta_reduce t1 in
-      match Term.view reduced with
-        Term.App (hd, l) when Term.is_const hd && distinct_free_vars l -> try_conv_rw (Term.as_const_exn hd) l t2
-        | Term.Const hd -> try_conv_rw hd [] t2
-        | _ -> None in
-
-  match l with 
-  | Eq (t1,t2) -> as_rw_aux t1 t2
-  | _ -> None
-
 
 
 let to_string ppt = CCFormat.to_string (pp ppt)
