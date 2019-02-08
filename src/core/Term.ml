@@ -357,6 +357,21 @@ let weight ?(var=1) ?(sym=fun _ -> 1) t =
 
 let is_ground t = T.is_ground t
 
+let rec in_lsup_fragment t =
+   match view t with
+    | Var _ -> type_has_no_bool (ty t)
+    | Const _ -> List.for_all type_has_no_bool (Type.expected_args (ty t))
+    | AppBuiltin( _, l)
+    | App (_, l) -> List.map ty l 
+                     |> List.for_all (fun ty_ -> not (Type.equal ty_ Type.prop))
+                    && List.for_all in_lsup_fragment l  
+    | Fun (var_t, body) -> type_has_no_bool (var_t) && 
+                           type_has_no_bool (ty body) &&
+                           in_lsup_fragment body
+    | DB _ -> true
+   and type_has_no_bool ty_ = 
+    not (Type.Seq.sub ty_ |> Sequence.mem ~eq:Type.equal (Type.prop))
+
 let monomorphic t = Sequence.is_empty (Seq.ty_vars t)
 
 let max_var set = VarSet.to_seq set |> Seq.max_var

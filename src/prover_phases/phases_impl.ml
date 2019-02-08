@@ -150,6 +150,7 @@ let compute_prec stmts =
          stmts
          |> Sequence.flat_map Statement.Seq.terms
          |> Sequence.flat_map Term.Seq.symbols))
+    (* |> Compute_prec.set_weight_rule (fun _ -> Classify_cst.weight_fun) *)
 
     (* use "invfreq", with low priority *)
     |> Compute_prec.add_constr_rule 90

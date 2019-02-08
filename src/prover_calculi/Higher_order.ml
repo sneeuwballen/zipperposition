@@ -482,10 +482,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     assert (T.DB.is_closed t);
     let t' = Lambda.snf t in
     if (T.equal t t') then (
-       Util.debugf ~section 4 "(@[beta_reduce `%a`@ failed `@])" (fun k->k T.pp t ); 
+       Util.debugf ~section 50 "(@[beta_reduce `%a`@ failed `@])" (fun k->k T.pp t ); 
        None)
     else (
-      Util.debugf ~section 4 "(@[beta_reduce `%a`@ :into `%a`@])"
+      Util.debugf ~section 50 "(@[beta_reduce `%a`@ :into `%a`@])"
         (fun k->k T.pp t T.pp t');
       Util.incr_stat stat_beta;
       assert (T.DB.is_closed t');
@@ -497,10 +497,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     assert (T.DB.is_closed t);
     let t' = Lambda.eta_expand t in
     if (T.equal t t') then (
-       Util.debugf ~section 4 "(@[eta_expand `%a`@ failed `@])" (fun k->k T.pp t ); 
+       Util.debugf ~section 50 "(@[eta_expand `%a`@ failed `@])" (fun k->k T.pp t ); 
        None)
     else (
-      Util.debugf ~section 4 "(@[eta_expand `%a`@ :into `%a`@])"
+      Util.debugf ~section 50 "(@[eta_expand `%a`@ :into `%a`@])"
         (fun k->k T.pp t T.pp t');
       Util.incr_stat stat_eta_expand;
       assert (T.DB.is_closed t');
@@ -513,7 +513,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let t' = Lambda.eta_reduce t in
     if (T.equal t t') then None
     else (
-      Util.debugf ~section 4 "(@[eta_reduce `%a`@ :into `%a`@])"
+      Util.debugf ~section 50 "(@[eta_reduce `%a`@ :into `%a`@])"
         (fun k->k T.pp t T.pp t');
       Util.incr_stat stat_eta_reduce;
       assert (T.DB.is_closed t');

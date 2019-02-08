@@ -123,6 +123,8 @@ val is_const : t -> bool
 val is_fun : t -> bool
 val is_type : t -> bool (** Does it have type [tType]? *)
 
+val in_lsup_fragment : t -> bool
+
 val as_const : t -> ID.t option
 val as_const_exn : t -> ID.t
 val as_var : t -> var option
