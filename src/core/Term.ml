@@ -439,10 +439,11 @@ let all_positions ?(vars=false) ?(ty_args=true) ?(var_args=true) ?(fun_bodies=tr
     | Const _ ->
       if ty_args || not (Type.is_tType (ty t))
       then f (PW.make t (PB.to_pos pb))
-    | Fun (_, u) -> 
+    | Fun (_, u) ->
+      f (PW.make t (PB.to_pos pb)); 
       if fun_bodies 
       then aux (PB.body pb) u
-    | App (head, args) when not var_args && T.is_var head ->
+    | App (head, _) when not var_args && T.is_var head ->
       f (PW.make t (PB.to_pos pb))
     | AppBuiltin (_, args)
     | App (_, args) ->

@@ -472,6 +472,9 @@ module Inner = struct
       | _, T.NoType -> fail()
       | T.HasType ty1, T.HasType ty2 ->
         (* unify types, then terms *)
+      Util.debugf ~section 5 "(@[unif_start@ :t1 `%a`@ :t2 `%a`@ :op %a@ :subst @[%a@]@ :bvars %a@])@."
+      (fun k -> k (Scoped.pp T.pp) (t1,sc1) (Scoped.pp T.pp) (t2,sc2)
+                pp_op op US.pp subst B_vars.pp bvars);
         let subst = unif_rec ~op ~root:true ~bvars subst (ty1,sc1) (ty2,sc2) in
         unif_term ~op ~root ~bvars subst t1 sc1 t2 sc2
     end
@@ -486,9 +489,6 @@ module Inner = struct
         not (T.is_var f && US.mem subst (T.as_var_exn f,sc_t))
       | _ -> true
     in
-    (* Format.printf "(@[unif_rec@ :t1 `%a`@ :t2 `%a`@ :op %a@ :subst @[%a@]@ :bvars %a@])@."
-      (Scoped.pp T.pp) (t1,sc1) (Scoped.pp T.pp) (t2,sc2)
-      pp_op op US.pp subst B_vars.pp bvars; *)
     assert (not (T.is_a_type t1 && Type.is_forall (Type.of_term_unsafe t1)));
     assert (not (T.is_a_type t2 && Type.is_forall (Type.of_term_unsafe t2)));
     begin match view1, view2 with
@@ -535,6 +535,7 @@ module Inner = struct
             assert (sc2=sc2');
             if sc1=sc2' then (
               (* no renaming at all, same scope already *)
+              Util.debug ~section 4 "no renaming needed *";
               unif_ho ~op ~root ~bvars subst t1 t2 ~scope:sc2
             ) else (
               let subst, t1 = restrict_to_scope subst (t1,sc1) ~into:sc2 in
@@ -542,10 +543,12 @@ module Inner = struct
                  is that by renaming variables of [t1] we allow
                  the (fresh) variables of [t1] to bind, but not the
                  variables of [t2] *)
+              Util.debug ~section 4 "restricting scope *";
               unif_ho ~op ~root ~bvars subst t1 t2 ~scope:sc2
             )
           | O_match_protect (P_vars _) | O_variant (P_vars _) | O_equal ->
             (* rename in [t1] but not [t2] *)
+            Util.debug ~section 4 "protected with set *";
             let subst, t1 = restrict_to_scope subst (t1,sc1) ~into:sc2 in
             unif_ho ~op ~root ~bvars subst t1 t2 ~scope:sc2
           | O_unify ->
@@ -631,14 +634,15 @@ module Inner = struct
     (* first, normalize and un-app both terms *)
     let subst, t1 = whnf_deref subst (t1_0,scope) in
     let subst, t2 = whnf_deref subst (t2_0,scope) in
-    (* Format.printf
+    Util.debugf ~section 2
       "(@[unif_ho@ :t1 `%a`@ :t1_nf `%a`@ :t2 `%a`@ :t2_nf `%a`@ \
        :sc %d :subst %a@ :op %a@ :bvars %a@])@."
-      T.pp t1_0 T.pp t1 T.pp t2_0 T.pp t2 scope US.pp subst pp_op op B_vars.pp bvars; *)
+      (fun k -> k T.pp t1_0 T.pp t1 T.pp t2_0 T.pp t2 scope US.pp subst pp_op op B_vars.pp bvars);
     let f1, l1 = T.as_app t1 in
     let f2, l2 = T.as_app t2 in
-    let delay() = Format.printf
-      "delaying\n"; delay ~bvars subst t1 scope t2 scope in
+    let delay() = 
+      Util.debug ~section 5 "delaying\n"; 
+      delay ~bvars subst t1 scope t2 scope in
     (* case where heads are the same *)
     let same_rigid_head() =
       if List.length l1 = List.length l2
@@ -708,15 +712,13 @@ module Inner = struct
       | _, T.Var _ when l2=[] ->
         (* Format.printf "** Unif rec, var right no args **"; *)
         unif_rec ~op ~bvars ~root subst (t1,scope) (t2, scope) (* to bind *)
-      | T.Const _, T.Var _  when not (distinct_bvar_l ~bvars:bvars.B_vars.left l1) && partial_skolem_fail f1 l1 l2 ->
+      | T.Const _, T.Var _  when (not (distinct_bvar_l ~bvars:bvars.B_vars.right l2)) && partial_skolem_fail f1 l1 l2 ->
         (* Format.printf "** skolem FAILING **"; *)
         fail()
-      | T.Var _, T.Const _ when not (distinct_bvar_l ~bvars:bvars.B_vars.right l2) && partial_skolem_fail f2 l2 l1 ->
+      | T.Var _, T.Const _ when (not (distinct_bvar_l ~bvars:bvars.B_vars.left l1)) && partial_skolem_fail f2 l2 l1 ->
         (* Format.printf "** skolem FAILING2 **"; *)
         fail()
       | T.Var v1, T.Const _ ->
-         Format.printf
-          "** VAR AGAINST CONST **";
         begin match op with
           | O_match_protect (P_scope sc2')
             when sc2' = scope && not (HVar.is_fresh v1) -> fail()
@@ -788,8 +790,7 @@ module Inner = struct
         (* λfree-HO: unify with currying, "from the right" *)
         let l1, l2 = pair_lists_right f1 l1 f2 l2 in
         unif_list ~op ~bvars subst l1 scope l2 scope
-      | _ -> Format.printf "** CATCH ALL FAIL CASE **";
-                     fail()
+      | _ ->  fail()
     end
 
   (* flex/rigid pair *)
