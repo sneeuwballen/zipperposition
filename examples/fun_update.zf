@@ -1,0 +1,13 @@
+
+val u : type.
+
+# type of cardinality >= 2
+assert exists (x y : u). x != y.
+
+# all functions are the same
+assert forall (a b: u -> u). a = b.
+
+# functional update axiom
+assert forall (f: u->u) (d r : u).
+  exists (g: u -> u).
+    (forall x. g x = (if x = d then r else f x)).
