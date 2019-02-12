@@ -414,6 +414,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       | [] -> List.rev_append (default()) acc
       | proof_handler :: tail ->
         begin match proof_handler c with
+          | E.CR_drop
           | E.CR_skip -> aux acc tail
           | E.CR_return cs -> List.rev_append cs acc
           | E.CR_add cs -> aux (List.rev_append cs acc) tail

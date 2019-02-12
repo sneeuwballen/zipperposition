@@ -412,7 +412,7 @@ let fold_terms ?(vars=false) ?(var_args=true) ?(fun_bodies=true) ?ty_args ~(whic
     else if not (eligible i lits.(i))
     then aux (i+1) (* ignore lit *)
     else (
-      Util.debugf 1 "folding literal %a, %B" (fun k -> k Lit.pp lits.(i) fun_bodies);
+      Util.debugf 50 "folding literal %a, %B" (fun k -> k Lit.pp lits.(i) fun_bodies);
       Lit.fold_terms
         ~position:Position.(arg i stop) ?ty_args ~vars ~var_args ~fun_bodies ~which ~ord ~subterms
         lits.(i) k;

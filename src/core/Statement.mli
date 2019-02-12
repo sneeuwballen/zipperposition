@@ -175,7 +175,7 @@ val scan_stmt_for_ind_ty : clause_t -> unit
 val scan_simple_stmt_for_ind_ty : input_t -> unit
 (** Same as {!scan_stmt} but on earlier statements *)
 
-val get_rw_rule:  ?weight_incr:int -> clause_t -> Rewrite.rule option
+val get_rw_rule:  ?weight_incr:int -> clause_t -> (ID.Set.elt * Rewrite.rule) option
 
 (** {2 Iterators} *)
 

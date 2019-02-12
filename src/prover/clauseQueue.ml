@@ -96,10 +96,10 @@ module Make(C : Clause_intf.S) = struct
 
     let conj_relative c =
       let sgn = C.Ctx.signature () in
-      let pos_mul = 1.5 in
-      let max_mul = 1.5 in
-      let v,f = 100, 100 in 
-      let conj_mul = 0.1 in
+      let pos_mul = 1.3 in
+      let max_mul = 1.3 in
+      let v,f = 20, 20 in 
+      let conj_mul = 0.16 in
         Array.mapi (fun i xx -> i,xx) (C.lits c)
         |> 
         Array.fold_left (fun acc (i,l) -> acc +. 
@@ -318,7 +318,7 @@ module Make(C : Clause_intf.S) = struct
     make ~ratio:6 ~weight "default"
 
   let conj_relative_mk () : t =
-    make ~ratio:6 ~weight:WeightFun.conj_relative "conj_relative"
+    make ~ratio:4 ~weight:WeightFun.conj_relative "conj_relative"
 
   let of_profile p =
     let open ClauseQueue_intf in

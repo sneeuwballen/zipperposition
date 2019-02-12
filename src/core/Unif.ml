@@ -451,7 +451,7 @@ module Inner = struct
     )
 
   let partial_skolem_fail f l1 l2 =
-    Util.debugf ~section 1 "[Sym %a, l1_len = %d, l2_len = %d, ty_vars = %d, num_mandatory = %d]"
+    Util.debugf ~section 50 "[Sym %a, l1_len = %d, l2_len = %d, ty_vars = %d, num_mandatory = %d]"
     (fun k -> k T.pp f (List.length l1) (List.length l2) (T.expected_ty_vars (T.ty_exn f)) (ID.num_mandatory_args (T.as_const_exn f)));
     not !_allow_partial_skolem_application &&
     List.length l1 - List.length l2 < T.expected_ty_vars (T.ty_exn f) + ID.num_mandatory_args (T.as_const_exn f)
@@ -472,9 +472,9 @@ module Inner = struct
       | _, T.NoType -> fail()
       | T.HasType ty1, T.HasType ty2 ->
         (* unify types, then terms *)
-      Util.debugf ~section 5 "(@[unif_start@ :t1 `%a`@ :t2 `%a`@ :op %a@ :subst @[%a@]@ :bvars %a@])@."
+      (* Util.debugf ~section 5 "(@[unif_start@ :t1 `%a`@ :t2 `%a`@ :op %a@ :subst @[%a@]@ :bvars %a@])@."
       (fun k -> k (Scoped.pp T.pp) (t1,sc1) (Scoped.pp T.pp) (t2,sc2)
-                pp_op op US.pp subst B_vars.pp bvars);
+                pp_op op US.pp subst B_vars.pp bvars); *)
         let subst = unif_rec ~op ~root:true ~bvars subst (ty1,sc1) (ty2,sc2) in
         unif_term ~op ~root ~bvars subst t1 sc1 t2 sc2
     end
@@ -495,7 +495,7 @@ module Inner = struct
       | _ when sc1=sc2 && T.equal t1 t2 ->
         subst (* the terms are equal under any substitution *)
       | T.Var _, _ when is_whnf t2 sc2 ->
-        Util.debugf ~section 4 "unifying vars: %a =?= %a" (fun k-> k T.pp t1 T.pp t2);
+        Util.debugf ~section 40 "unifying vars: %a =?= %a" (fun k-> k T.pp t1 T.pp t2);
         unif_vars ~op subst t1 sc1 t2 sc2
       | _, T.Var _ when is_whnf t1 sc1 ->
         unif_vars ~op subst t1 sc1 t2 sc2
@@ -529,13 +529,13 @@ module Inner = struct
       | _, T.Bind (Binder.Lambda, _, _) ->
         (* perform HO unification after moving both terms into same
            scope [sc2] *)
-        Util.debugf ~section 4 "var_ho-unifying: %a =?= %a" (fun k-> k T.pp t1 T.pp t2);
+        Util.debugf ~section 40 "var_ho-unifying: %a =?= %a" (fun k-> k T.pp t1 T.pp t2);
         begin match op with
           | O_match_protect (P_scope sc2') | O_variant (P_scope sc2') ->
             assert (sc2=sc2');
             if sc1=sc2' then (
               (* no renaming at all, same scope already *)
-              Util.debug ~section 4 "no renaming needed *";
+              Util.debug ~section 40 "no renaming needed *";
               unif_ho ~op ~root ~bvars subst t1 t2 ~scope:sc2
             ) else (
               let subst, t1 = restrict_to_scope subst (t1,sc1) ~into:sc2 in
@@ -543,7 +543,7 @@ module Inner = struct
                  is that by renaming variables of [t1] we allow
                  the (fresh) variables of [t1] to bind, but not the
                  variables of [t2] *)
-              Util.debug ~section 4 "restricting scope *";
+              Util.debug ~section 40 "restricting scope *";
               unif_ho ~op ~root ~bvars subst t1 t2 ~scope:sc2
             )
           | O_match_protect (P_vars _) | O_variant (P_vars _) | O_equal ->
@@ -634,7 +634,7 @@ module Inner = struct
     (* first, normalize and un-app both terms *)
     let subst, t1 = whnf_deref subst (t1_0,scope) in
     let subst, t2 = whnf_deref subst (t2_0,scope) in
-    Util.debugf ~section 2
+    Util.debugf ~section 20
       "(@[unif_ho@ :t1 `%a`@ :t1_nf `%a`@ :t2 `%a`@ :t2_nf `%a`@ \
        :sc %d :subst %a@ :op %a@ :bvars %a@])@."
       (fun k -> k T.pp t1_0 T.pp t1 T.pp t2_0 T.pp t2 scope US.pp subst pp_op op B_vars.pp bvars);

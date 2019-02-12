@@ -124,16 +124,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Lits.fold_terms ~vars:!_sup_at_vars ~var_args:!_sup_in_var_args ~fun_bodies:!_sup_under_lambdas ~ty_args:false ~ord ~which:`Max ~subterms:true
         ~eligible:(C.Eligible.res c) (C.lits c)
       |> Sequence.filter (fun (t, _) ->
-            Util.debugf ~section 5 "@[ Filtering vars %a,1  @]" (fun k-> k T.pp t);
+            (* Util.debugf ~section 5 "@[ Filtering vars %a,1  @]" (fun k-> k T.pp t); *)
             not (T.is_var t) || T.is_ho_var t)
       (* TODO: could exclude more variables from the index:
          they are not needed if they occur with the same args everywhere in the clause *)
       |> Sequence.filter (fun (t, _) -> 
-         Util.debugf ~section 5 "@[ Filtering vars %a,2  @]" (fun k-> k T.pp t);
+         (* Util.debugf ~section 5 "@[ Filtering vars %a,2  @]" (fun k-> k T.pp t); *)
          !_sup_at_var_headed || not (T.is_var (T.head_term t)))
       |> Sequence.fold
         (fun tree (t, pos) ->
-           Util.debugf ~section 5 "@[ Adding %a to into index %B @]" (fun k-> k T.pp t !_sup_under_lambdas);
+           (* Util.debugf ~section 5 "@[ Adding %a to into index %B @]" (fun k-> k T.pp t !_sup_under_lambdas); *)
            let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
            f tree t with_pos)
         !_idx_sup_into;

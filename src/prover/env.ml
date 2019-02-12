@@ -94,6 +94,7 @@ module Make(X : sig
 
   type 'a conversion_result =
     | CR_skip (** rule didn't fire *)
+    | CR_drop (** remove the clause from proof state *)
     | CR_add of 'a (** add this to the result *)
     | CR_return of 'a (** shortcut the remaining rules, return this *)
 
@@ -785,6 +786,7 @@ module Make(X : sig
       | r :: rules' ->
         begin match r st with
           | CR_skip -> conv_clause_ rules' st
+          | CR_drop -> []
           | CR_return l -> l
           | CR_add l -> List.rev_append l (conv_clause_ rules' st)
         end

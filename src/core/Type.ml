@@ -166,7 +166,7 @@ let vars t = vars_set VarSet.empty t |> VarSet.elements
 
 let close_forall ty =
   let vars = vars ty in
-  T.bind_vars ~ty:prop Binder.Forall vars ty
+  T.bind_vars ~ty:tType Binder.ForallTy vars ty
 
 type arity_result =
   | Arity of int * int

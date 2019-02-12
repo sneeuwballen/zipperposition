@@ -781,6 +781,8 @@ let get_rw_rule ?weight_incr:(w_i=20) c  =
     |> (fun set -> not (OptionSet.mem None set) && OptionSet.cardinal set = List.length l) in
   
   let make_rw sym vars rhs =
+    let ty_vars = List.filter (fun v -> Type.is_tType (Term.ty v)) vars in
+    let vars = List.filter (fun v -> not (Type.is_tType (Term.ty v))) vars in 
     let n_new = List.length vars in
     let vars_extracted = vars |> CCList.filter_map (fun x-> Term.as_var x) in
     let tyargs, body = Term.open_fun rhs in
@@ -791,9 +793,10 @@ let get_rw_rule ?weight_incr:(w_i=20) c  =
               US.FO.bind sub (v,0) (Term.bvar ~ty:(HVar.ty v) (n_old + n_new-1-i), 0)) (US.empty) in
     let vars_to_db = Subst.FO.apply Subst.Renaming.none (US.subst vars_to_db_idx) (Scoped.make body 0) in
     let abs_rhs =  (Term.fun_l ((CCList.map (fun v -> HVar.ty v) vars_extracted) @ tyargs) vars_to_db) in
-    let r = Rewrite.Term.Rule.make ~proof:(as_proof_c c) sym (Term.ty abs_rhs) []  abs_rhs in
+    let r = Rewrite.Term.Rule.make ~proof:(as_proof_c c) sym (Type.close_forall (Term.ty abs_rhs)) ty_vars abs_rhs in
     let rule = Rewrite.T_rule r in 
-    Rewrite.Defined_cst.declare_or_add sym  rule; 
+    (* Rewrite.Defined_cst.declare_or_add sym  rule;  *)
+    Util.debugf 5 "[ Declared rule %a ]" (fun k -> k Rewrite.Rule.pp rule);
     rule in
 
   let build_from_head sym vars rhs =
@@ -805,7 +808,7 @@ let get_rw_rule ?weight_incr:(w_i=20) c  =
                                     None -> acc 
                                     | Some v -> v :: acc) [] vars)
                               |> Term.VarSet.of_list)) = 0 then
-      Some (make_rw sym vars rhs)
+      Some (sym, make_rw sym vars rhs)
     else
       None in
                                          

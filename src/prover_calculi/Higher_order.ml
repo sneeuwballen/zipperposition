@@ -689,6 +689,13 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_unary_inf "ho_ext_pos" ext_pos
       );
 
+      (* removing unfolded clauses *)
+      if Env.flex_get k_enable_def_unfold then ( 
+         Env.add_clause_conversion (  
+            fun c ->  match Statement.get_rw_rule c with
+                        | Some _ -> E.CR_drop 
+                        | None -> E.CR_skip ));
+
 
       Env.add_unary_simplify remove_var_args;
       let ho_norm  = 
@@ -787,11 +794,19 @@ let extension =
     );
 
     if !def_unfold_enabled_ then (
+       (* let new_vec = *)
        CCVector.iter (fun c -> match Statement.get_rw_rule c with 
-                                Some r -> Util.debugf ~section 1
+                                Some (sym, r) -> Util.debugf ~section 1
                                           "@[<2> Adding constant def rule: `@[%a@]`@]"
                                           (fun k->k Rewrite.Rule.pp r);
-                                | _ -> () ) vec;
+                                  Rewrite.Defined_cst.declare_or_add sym  r;
+                                | _ -> ()) vec (*vec in*)
+      (* CCVector.clear vec;
+      CCVector.rev_in_place new_vec;
+      while not (CCVector.is_empty new_vec) do
+         CCVector.push vec (CCVector.pop_exn new_vec)
+      done; *)
+
     );
 
     state
