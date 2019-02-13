@@ -363,7 +363,7 @@ let rec in_lsup_fragment t =
     | Const _ -> List.for_all type_has_no_bool (Type.expected_args (ty t))
     | AppBuiltin( _, l)
     | App (_, l) -> List.map ty l 
-                     |> List.for_all (fun ty_ -> not (Type.equal ty_ Type.prop))
+                     |> List.for_all type_has_no_bool
                     && List.for_all in_lsup_fragment l  
     | Fun (var_t, body) -> type_has_no_bool (var_t) && 
                            type_has_no_bool (ty body) &&

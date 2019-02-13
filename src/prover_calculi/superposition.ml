@@ -972,6 +972,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           else reduce_at_root ~restrict t k
         | T.Fun (ty_arg, body) ->
           (* reduce under lambdas *)
+          Util.debugf ~section 1 "[Trying to rewrite under lambda %B ]"
+          (fun k-> k !_sup_under_lambdas);
           if !_sup_under_lambdas
           then
             normal_form ~restrict:lazy_false body
@@ -1943,7 +1945,7 @@ let () =
       _use_simultaneous_sup := false;
       _sup_at_vars := true;
       _sup_in_var_args := false;
-      _sup_under_lambdas := false;
+      _sup_under_lambdas := true;
       _complete_ho_unification := true;
       _ord_in_normal_form := true;
       _sup_at_var_headed := false
