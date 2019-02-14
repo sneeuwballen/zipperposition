@@ -222,6 +222,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
    | SupAV 
    | SupEXT
 
+  let kind_to_str = function 
+   | Classic -> "sup"
+   | SupAV -> "supAV"
+   | SupEXT -> "supEXT"
+
   (* all the information needed for a superposition inference *)
   module SupInfo = struct
     type t = {
@@ -344,7 +349,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           Lit.apply_subst_list renaming subst (lits_p, sc_p)
       in
       let rule =
-        let r = if info.sup_kind = SupAV then "supav" else "sup" in
+        let r = kind_to_str info.sup_kind in
         let sign = if Lit.sign passive_lit' then "+" else "-" in
         Proof.Rule.mk (r ^ sign)
       in
@@ -434,7 +439,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (* build clause *)
       let new_lits = c_guard @ lits_a @ lits_p in
       let rule =
-        let r = if info.sup_kind = SupAV then "supav" else "sup" in
+        let r = kind_to_str info.sup_kind in
         let sign = if Lit.sign passive_lit' then "+" else "-" in
         Proof.Rule.mk ("s_" ^ r ^ sign)
       in
