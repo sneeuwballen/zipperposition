@@ -796,17 +796,11 @@ let extension =
     if !def_unfold_enabled_ then (
        (* let new_vec = *)
        CCVector.iter (fun c -> match Statement.get_rw_rule c with 
-                                Some (sym, r) -> Util.debugf ~section 1
+                                  Some (sym, r) -> Util.debugf ~section 1
                                           "@[<2> Adding constant def rule: `@[%a@]`@]"
                                           (fun k->k Rewrite.Rule.pp r);
                                   Rewrite.Defined_cst.declare_or_add sym  r;
                                 | _ -> ()) vec (*vec in*)
-      (* CCVector.clear vec;
-      CCVector.rev_in_place new_vec;
-      while not (CCVector.is_empty new_vec) do
-         CCVector.push vec (CCVector.pop_exn new_vec)
-      done; *)
-
     );
 
     state
@@ -852,6 +846,7 @@ let () =
     def_unfold_enabled_ := false;
     force_enabled_ := true;
     _ext_axiom := true;
+    _ext_neg := false;
     eta_ := `Expand;
     prim_mode_ := `None;
     _elim_pred_var := false;

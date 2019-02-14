@@ -68,6 +68,7 @@ let _sup_at_var_headed = ref true
 let _sup_in_var_args = ref true
 let _sup_under_lambdas = ref true
 let _demod_under_lambdas = ref true
+let _demod_in_var_args = ref true
 let _dot_demod_into = ref None
 let _complete_ho_unification = ref false
 let _switch_stream_extraction = ref false
@@ -161,7 +162,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* terms that can be demodulated: all subterms (but vars) *)
     _idx_back_demod :=
       (* TODO: allow demod under lambdas under certain conditions (DemodExt) *)
-      Lits.fold_terms ~vars:false ~var_args:!_sup_in_var_args ~fun_bodies:!_demod_under_lambdas  ~ty_args:false ~ord ~subterms:true ~which:`All
+      Lits.fold_terms ~vars:false ~var_args:!_demod_in_var_args ~fun_bodies:!_demod_under_lambdas  ~ty_args:false ~ord ~subterms:true ~which:`All
         ~eligible:C.Eligible.always (C.lits c)
       |> Sequence.fold
         (fun tree (t, pos) ->
@@ -958,7 +959,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | T.Const _ -> reduce_at_root ~restrict t k
         | T.App (hd, l) ->
           (* rewrite subterms in call by value. *)
-          let rewrite_args = !_sup_in_var_args || not (T.is_var hd) in
+          let rewrite_args = !_demod_in_var_args || not (T.is_var hd) in
           if rewrite_args
           then
             normal_form_l l
@@ -1929,6 +1930,9 @@ let () =
     ; "--demod-under-lambdas"
     , Arg.Set _demod_under_lambdas
     , " enable demodulation in bodies of lambda-expressions"
+    ; "--demod-in-var-args"
+    , Arg.Set _demod_in_var_args
+    , " enable demodulation in arguments of variables"
     ; "--complete-ho-unif"
     , Arg.Set _complete_ho_unification
     , " enable complete higher-order unification algorithm (Jensen-Pietrzykowski)"
@@ -1951,6 +1955,7 @@ let () =
       _sup_in_var_args := false;
       _sup_under_lambdas := false;
       _demod_under_lambdas := false;
+      _demod_in_var_args := false;
       _complete_ho_unification := true;
       _ord_in_normal_form := true;
       _sup_at_var_headed := false
