@@ -67,6 +67,7 @@ let _sup_at_vars = ref false
 let _sup_at_var_headed = ref true
 let _sup_in_var_args = ref true
 let _sup_under_lambdas = ref true
+let _demod_under_lambdas = ref true
 let _dot_demod_into = ref None
 let _complete_ho_unification = ref false
 let _switch_stream_extraction = ref false
@@ -160,7 +161,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* terms that can be demodulated: all subterms (but vars) *)
     _idx_back_demod :=
       (* TODO: allow demod under lambdas under certain conditions (DemodExt) *)
-      Lits.fold_terms ~vars:false ~var_args:!_sup_in_var_args ~fun_bodies:!_sup_under_lambdas ~ty_args:false ~ord ~subterms:true ~which:`All
+      Lits.fold_terms ~vars:false ~var_args:!_sup_in_var_args ~fun_bodies:!_demod_under_lambdas  ~ty_args:false ~ord ~subterms:true ~which:`All
         ~eligible:C.Eligible.always (C.lits c)
       |> Sequence.fold
         (fun tree (t, pos) ->
@@ -972,9 +973,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           else reduce_at_root ~restrict t k
         | T.Fun (ty_arg, body) ->
           (* reduce under lambdas *)
-          Util.debugf ~section 1 "[Trying to rewrite under lambda %B ]"
-          (fun k-> k !_sup_under_lambdas);
-          if !_sup_under_lambdas
+          Util.debugf ~section 10 "[Trying to rewrite under lambda %B ]"
+          (fun k-> k !_demod_under_lambdas);
+          if !_demod_under_lambdas
           then
             normal_form ~restrict:lazy_false body
               (fun body' ->
@@ -1925,6 +1926,9 @@ let () =
     ; "--no-sup-under-lambdas"
     , Arg.Clear _sup_under_lambdas
     , " disable superposition in bodies of lambda-expressions"
+    ; "--demod-under-lambdas"
+    , Arg.Set _demod_under_lambdas
+    , " enable demodulation in bodies of lambda-expressions"
     ; "--complete-ho-unif"
     , Arg.Set _complete_ho_unification
     , " enable complete higher-order unification algorithm (Jensen-Pietrzykowski)"
@@ -1945,7 +1949,8 @@ let () =
       _use_simultaneous_sup := false;
       _sup_at_vars := true;
       _sup_in_var_args := false;
-      _sup_under_lambdas := true;
+      _sup_under_lambdas := false;
+      _demod_under_lambdas := false;
       _complete_ho_unification := true;
       _ord_in_normal_form := true;
       _sup_at_var_headed := false

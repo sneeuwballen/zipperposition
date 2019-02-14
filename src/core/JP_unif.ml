@@ -344,9 +344,10 @@ let unify ~scope ~fresh_var_ t0 s0 =
       let s' = nfapply type_unifier (s0, scope) in
       (* ... then terms. *)
       let term_unifiers = if Lambda.is_lambda_pattern t' && Lambda.is_lambda_pattern s' then
-                          (Util.debug 10 "Doing pattern unif";
+                          (Util.debugf  2 "Doing pattern unif %a = %a" (fun k -> k T.pp t0 T.pp s0);
                           OSeq.return (unif_simple ~scope t' s'))
-                          else  (Util.debug 10 "Doing JP unif"; unify_terms t' s' ~rules:[]) in
+                          else  (Util.debugf 2 "Doing JP unif %a = %a" (fun k -> k T.pp t0 T.pp s0); 
+                                 unify_terms t' s' ~rules:[]) in
       (* let term_unifiers = unify_terms t' s' ~rules:[] in *)
       OSeq.map (CCOpt.map (US.merge type_unifier)) term_unifiers 
     | None -> OSeq.empty
