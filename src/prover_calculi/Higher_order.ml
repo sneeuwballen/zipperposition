@@ -58,25 +58,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module C = Env.C
   module Ctx = Env.Ctx
 
-  (* @param vars the free variables the parameter must depend upon
-     @param ty_ret the return type *)
-  let mk_parameter =
-    let n = ref 0 in
-    fun vars ty_ret ->
-      let i = CCRef.incr_then_get n in
-      let id = ID.makef "#k%d" i in
-      ID.set_payload id (ID.Attr_parameter i);
-      let ty_vars, vars =
-        List.partition (fun v -> Type.is_tType (HVar.ty v)) vars
-      in
-      let ty =
-        Type.forall_fvars ty_vars
-          (Type.arrow (List.map HVar.ty vars) ty_ret)
-      in
-      T.app_full (T.const id ~ty)
-        (List.map Type.var ty_vars)
-        (List.map T.var vars)
-
+  
   (* index for ext-neg, to ensure α-equivalent negative equations have the same skolems *)
   module FV_ext_neg = FV_tree.Make(struct
       type t = Literal.t * T.t list (* lit -> skolems *)
@@ -119,7 +101,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         | None ->
           (* create new skolems, parametrized by free variables *)
           let vars = Literal.vars lit in
-          let l = List.map (mk_parameter vars) ty_args in
+          let l = List.map (T.mk_fresh_skolem vars) ty_args in
           (* save list *)
           idx_ext_neg_ := FV_ext_neg.add !idx_ext_neg_ (lit,l);
           l

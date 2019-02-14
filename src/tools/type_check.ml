@@ -59,9 +59,10 @@ let check file =
     |> CCVector.to_seq
     |> Cnf.convert
     |> CCResult.return) >>= (fun stmts -> CCVector.to_seq stmts |> Sequence.flat_map Statement.Seq.terms |>
-                            (Sequence.for_all Term.in_lsup_fragment) |> 
-                            function true -> CCResult.return () 
-                                     | false -> CCResult.fail "FAIL.")
+                            (fun trm -> try ignore(Sequence.for_all Term.in_pfho_fragment trm); ""
+                                        with Failure msg -> msg) |> 
+                            fun x -> if (x = "") then CCResult.return () 
+                                     else CCResult.fail ("FAIL: " ^ x))
 let main () =
   CCFormat.set_color_default true;
   let files = ref [] in

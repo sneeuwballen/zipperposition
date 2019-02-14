@@ -358,6 +358,94 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Util.debugf ~section 3 "... cancel, %s" (fun k->k reason);
       None
 
+   let do_sup_ext info =
+    let open SupInfo in
+    let module P = Position in
+    Util.incr_stat stat_superposition_call;
+    let sc_a = info.scope_active in
+    let sc_p = info.scope_passive in
+    Util.debugf ~section 3
+      "@[<2>sup@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a@]@])@ \
+       (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
+      (fun k->k C.pp info.active sc_a T.pp info.s T.pp info.t
+          C.pp info.passive sc_p Lit.pp info.passive_lit
+          Position.pp info.passive_pos US.pp info.subst);
+    assert (InnerTerm.DB.closed (info.s:>InnerTerm.t));
+    (* assert (InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t)); *)
+    assert (not(T.is_var info.u_p) || T.is_ho_var info.u_p);
+    assert (!_sup_at_var_headed || info.supav || not (T.is_var (T.head_term info.u_p)));
+    let active_idx = Lits.Pos.idx info.active_pos in
+    let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
+    try
+      let renaming = S.Renaming.create () in
+      let us = info.subst in
+      let subst = US.subst us in
+      let t' = S.FO.apply renaming subst (info.t, sc_a) in
+      begin match info.passive_lit, info.passive_pos with
+        | Lit.Prop (_, true), P.Arg(_, P.Left P.Stop) ->
+          if T.equal t' T.true_
+          then raise (ExitSuperposition "will yield a bool tautology")
+        | Lit.Equation (_, v, true), P.Arg(_, P.Left P.Stop)
+        | Lit.Equation (v, _, true), P.Arg(_, P.Right P.Stop) ->
+          (* are we in the specific, but not that rare, case where we
+             rewrite s=t using s=t (into a tautology t=t)? *)
+          (* TODO: use Unif.FO.eq? *)
+          let v' = S.FO.apply renaming subst (v, sc_p) in
+          if T.equal t' v'
+          then raise (ExitSuperposition "will yield a tautology");
+        | _ -> ()
+      end;
+      let passive_lit' = Lit.apply_subst_no_simp renaming subst (info.passive_lit, sc_p) in
+      let new_trail = C.trail_l [info.active; info.passive] in
+      if Env.is_trivial_trail new_trail then raise (ExitSuperposition "trivial trail");
+      let s' = S.FO.apply renaming subst (info.s, sc_a) in
+      if (
+        O.compare ord s' t' = Comp.Lt ||
+        not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
+        not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx) ||
+        not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
+      ) then raise (ExitSuperposition "bad ordering conditions");
+      (* Check for superposition at a variable *)
+      if not !_sup_at_vars then
+        assert (not (T.is_var info.u_p))
+      else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then
+        raise (ExitSuperposition "superposition at variable");
+      (* ordering constraints are ok *)
+      let lits_a = CCArray.except_idx (C.lits info.active) active_idx in
+      let lits_p = CCArray.except_idx (C.lits info.passive) passive_idx in
+      (* replace s\sigma by t\sigma in u|_p\sigma *)
+      let new_passive_lit =
+        Lit.Pos.replace passive_lit'
+          ~at:passive_lit_pos ~by:t' in
+      let c_guard = Literal.of_unif_subst renaming us in
+      let tags = Unif_subst.tags us in
+      (* apply substitution to other literals *)
+      let new_lits =
+        new_passive_lit ::
+          c_guard @
+          Lit.apply_subst_list renaming subst (lits_a, sc_a) @
+          Lit.apply_subst_list renaming subst (lits_p, sc_p)
+      in
+      let rule =
+        let r = if info.supav then "supav" else "sup" in
+        let sign = if Lit.sign passive_lit' then "+" else "-" in
+        Proof.Rule.mk (r ^ sign)
+      in
+      let proof =
+        Proof.Step.inference ~rule ~tags
+          [C.proof_parent_subst renaming (info.active,sc_a) subst;
+           C.proof_parent_subst renaming (info.passive,sc_p) subst]
+      and penalty =
+        max (C.penalty info.active) (C.penalty info.passive)
+        + (if T.is_var s' then 2 else 0) (* superposition from var = bad *)
+      in
+      let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
+      Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
+      Some new_clause
+    with ExitSuperposition reason ->
+      Util.debugf ~section 3 "... cancel, %s" (fun k->k reason);
+      None
+
   (* simultaneous superposition: when rewriting D with C \lor s=t,
       replace s with t everywhere in D rather than at one place. *)
   let do_simultaneous_superposition info =

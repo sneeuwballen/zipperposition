@@ -357,17 +357,22 @@ let weight ?(var=1) ?(sym=fun _ -> 1) t =
 
 let is_ground t = T.is_ground t
 
-let rec in_lsup_fragment t =
+let rec in_pfho_fragment t =
    match view t with
-    | Var _ -> type_has_no_bool (ty t)
-    | Const _ -> List.for_all type_has_no_bool (Type.expected_args (ty t))
+    | Var _ -> if (not (type_has_no_bool (ty t))) then
+               (raise (Failure (CCFormat.sprintf "Variable has wrong type %a" T.pp t)))
+               else true
+    | Const sym -> if (List.for_all type_has_no_bool (Type.expected_args (ty t))) then true
+                 else (raise (Failure (CCFormat.sprintf "Constant has wrong type: %a " ID.pp sym)))
     | AppBuiltin( _, l)
-    | App (_, l) -> List.map ty l 
+    | App (_, l) -> if(List.map ty l 
                      |> List.for_all type_has_no_bool
-                    && List.for_all in_lsup_fragment l  
-    | Fun (var_t, body) -> type_has_no_bool (var_t) && 
+                    && List.for_all in_pfho_fragment l) then true
+                    else (raise (Failure (CCFormat.sprintf "Arugment of a term has wrong type %a" T.pp t)))  
+    | Fun (var_t, body) -> if(type_has_no_bool (var_t) && 
                            type_has_no_bool (ty body) &&
-                           in_lsup_fragment body
+                           in_pfho_fragment body) then true
+                           else (raise (Failure (CCFormat.sprintf "Lambda body has wrong type %a" T.pp t)))
     | DB _ -> true
    and type_has_no_bool ty_ = 
     not (Type.Seq.sub ty_ |> Sequence.mem ~eq:Type.equal (Type.prop))
@@ -388,6 +393,27 @@ let vars_prefix_order t =
   |> List.rev
 
 let depth t = Seq.subterms_depth t |> Sequence.map snd |> Sequence.fold max 0
+
+
+(* @param vars the free variables the parameter must depend upon
+   @param ty_ret the return type *)
+let mk_fresh_skolem =
+   let n = ref 0 in
+   fun vars ty_ret ->
+   let i = CCRef.incr_then_get n in
+   (** fresh skolem **)
+   let id = ID.makef "#fsk%d" i in
+   ID.set_payload id (ID.Attr_parameter i);
+   let ty_vars, vars =
+      List.partition (fun v -> Type.is_tType (HVar.ty v)) vars
+   in
+   let ty =
+      Type.forall_fvars ty_vars
+         (Type.arrow (List.map HVar.ty vars) ty_ret)
+   in
+   app_full (const id ~ty)
+      (List.map Type.var ty_vars)
+      (List.map var vars)
 
 let rec head_exn t = match T.view t with
   | T.Const s -> s
@@ -679,6 +705,8 @@ module Arith = struct
 
   let () = add_hook pp_hook
 end
+
+
 
 module DB = struct
   let is_closed = T.DB.closed
