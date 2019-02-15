@@ -76,6 +76,7 @@ let _switch_stream_extraction = ref false
 let _ord_in_normal_form = ref false
 let _supav_penalty = ref 0
 let _supav = ref true
+let _supext = ref false
 
 module Make(Env : Env.S) : S with module Env = Env = struct
   module Env = Env
@@ -141,36 +142,39 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
            f tree t with_pos)
         !_idx_sup_into;
+
     (* index subterms that can be rewritten by SupAV *)
-    _idx_supav_into :=
-      Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false ~ord ~which:`Max ~subterms:true
-        ~eligible:(C.Eligible.res c) (C.lits c)
-      |> Sequence.filter (fun (t, _) -> T.is_var (T.head_term t)) (* Only applied variables *)
-      |> Sequence.fold
-        (fun tree (t, pos) ->
-           let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
-           f tree t with_pos)
-        !_idx_supav_into;
+    if (!_supav) then
+      _idx_supav_into :=
+        Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false ~ord ~which:`Max ~subterms:true
+          ~eligible:(C.Eligible.res c) (C.lits c)
+        |> Sequence.filter (fun (t, _) -> T.is_var (T.head_term t)) (* Only applied variables *)
+        |> Sequence.fold
+          (fun tree (t, pos) ->
+            let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
+            f tree t with_pos)
+          !_idx_supav_into;
 
     (* index subterms that can be rewritten by SupEXT --
        the ones that can rewrite those are actually the ones
        already indexed by _idx_sup_from*)
-    _idx_supext_into := 
-      Lits.fold_terms ~vars:!_sup_at_vars ~var_args:!_sup_in_var_args 
-                      ~fun_bodies:true ~ty_args:false ~ord 
-                      ~which:`Max ~subterms:true
-                      ~eligible:(C.Eligible.res c) (C.lits c)
-      (* We are going only under lambdas *)
-      |> Sequence.filter_map (fun (t, p) -> 
-            if not (T.is_fun t) then None 
-            else (let tyargs, body = T.open_fun t in 
-                  let new_pos = List.fold_left (fun p _ -> P.body p ) p tyargs in 
-                  Some (body, new_pos)))
-      |> Sequence.fold
-        (fun tree (t, pos) ->
-           let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
-           f tree t with_pos)
-        !_idx_supext_into;
+    if !_supext then 
+      _idx_supext_into := 
+        Lits.fold_terms ~vars:!_sup_at_vars ~var_args:!_sup_in_var_args 
+                        ~fun_bodies:true ~ty_args:false ~ord 
+                        ~which:`Max ~subterms:true
+                        ~eligible:(C.Eligible.res c) (C.lits c)
+        (* We are going only under lambdas *)
+        |> Sequence.filter_map (fun (t, p) -> 
+              if not (T.is_fun t) then None 
+              else (let tyargs, body = T.open_fun t in 
+                    let new_pos = List.fold_left (fun p _ -> P.body p ) p tyargs in 
+                    Some (body, new_pos)))
+        |> Sequence.fold
+          (fun tree (t, pos) ->
+            let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
+            f tree t with_pos)
+          !_idx_supext_into;
 
     (* index terms that can rewrite into other clauses *)
     _idx_sup_from :=
@@ -606,7 +610,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       clause
 
   let infer_supext_into clause =
-    Util.enter_prof prof_infer_passive;
     (* perform inference on this lit? *)
     let eligible = C.Eligible.(res clause) in
     (* do the inferences in which clause is passive (rewritten),
@@ -644,8 +647,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           (* all terms that occur in an equation in the active_set
             and that are potentially unifiable with u_p (u at position p) *)
           I.retrieve_unifiables (!_idx_sup_from, 1) (u_p,0)
-          |> Sequence.filter_map (fun (t,p,s) -> do_sup t p s)
-        )
+          |> Sequence.filter_map (fun (t,p,s) -> do_sup t p s))
         |> Sequence.to_rev_list
     in
     Util.exit_prof prof_infer_passive;
@@ -1948,6 +1950,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Env.add_binary_inf "supav_passive" infer_supav_passive;
         Env.add_binary_inf "supav_active" infer_supav_active;
       );
+      if !_supext then (
+        Env.add_binary_inf "supext_passive(from)" infer_supext_from;
+        Env.add_binary_inf "supext_active(into)" infer_supext_into;
+      );
       if !_switch_stream_extraction then
         Env.add_generate "stream_queue_extraction" extract_from_stream_queue_fix_stm
       else
@@ -2055,6 +2061,9 @@ let () =
     ; "--no-supav"
     , Arg.Clear _supav
     , " disable SupAV inferences (only effective when complete higher-order unification is enabled)"
+    ; "--supext"
+    , Arg.Set _supext
+    , " enable SupEXT inferences"
     ];
     Params.add_to_mode "ho-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
@@ -2065,7 +2074,8 @@ let () =
       _demod_in_var_args := false;
       _complete_ho_unification := true;
       _ord_in_normal_form := true;
-      _sup_at_var_headed := false
+      _sup_at_var_headed := false;
+      _supext := false
     );
     Params.add_to_mode "fo-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
