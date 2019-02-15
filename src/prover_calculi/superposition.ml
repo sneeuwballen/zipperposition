@@ -152,7 +152,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            f tree t with_pos)
         !_idx_supav_into;
 
-    (* index subterms that can be rewritten by SupEXT *)
+    (* index subterms that can be rewritten by SupEXT --
+       the ones that can rewrite those are actually the ones
+       already indexed by _idx_sup_from*)
     _idx_supext_into := 
       Lits.fold_terms ~vars:!_sup_at_vars ~var_args:!_sup_in_var_args 
                       ~fun_bodies:true ~ty_args:false ~ord 
@@ -571,11 +573,83 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       ~process_retrieved:(fun do_sup (u_p, with_pos, subst) -> do_sup u_p with_pos subst)
       clause
 
+  let infer_supext_from clause = 
+    (* no literal can be eligible for paramodulation if some are selected.
+       This checks if inferences with i-th literal are needed? *)
+    let eligible = C.Eligible.param clause in
+    (* do the inferences where clause is active; for this,
+       we try to rewrite conditionally other clauses using
+       non-minimal sides of every positive literal *)
+    Lits.fold_eqn ~sign:true ~ord  ~both:true ~eligible (C.lits clause)
+    |> Sequence.flat_map
+      (fun (s, t, _, s_pos) ->
+        let do_supext u_p with_pos subst =
+          (* rewrite u_p with s *)
+          let passive = with_pos.C.WithPos.clause in
+          let passive_pos = with_pos.C.WithPos.pos in
+          let passive_lit, _ = Lits.Pos.lit_at (C.lits passive) passive_pos in
+          let info = SupInfo.( {
+              s; t; active=clause; active_pos=s_pos; scope_active=0;
+              u_p; passive; passive_lit; passive_pos; scope_passive=1; 
+              subst; sup_kind=SupEXT
+            }) in
+          do_superposition info
+        in
+        I.retrieve_unifiables (!_idx_supext_into, 1) (s, 0)
+        |> Sequence.filter_map (fun (u_p, with_pos, subst) -> do_supext u_p with_pos subst))
+    |> Sequence.to_rev_list
+
   let infer_passive clause =
     infer_passive_aux
       ~retrieve_from_index:I.retrieve_unifiables
       ~process_retrieved:(fun do_sup (u_p, with_pos, subst) -> do_sup u_p with_pos subst)
       clause
+
+  let infer_supext_into clause =
+    Util.enter_prof prof_infer_passive;
+    (* perform inference on this lit? *)
+    let eligible = C.Eligible.(res clause) in
+    (* do the inferences in which clause is passive (rewritten),
+       so we consider both negative and positive literals *)
+    let new_clauses =
+      Lits.fold_terms ~vars:!_sup_at_vars ~var_args:!_sup_in_var_args 
+                      ~fun_bodies:true ~subterms:true ~ord
+                      ~which:`Max ~eligible ~ty_args:false (C.lits clause)
+      |> Sequence.filter_map (fun (u_p, p) ->
+          (* we rewrite only under lambdas  *)
+          if not (T.is_fun u_p) then None
+          else (let tyargs, body = T.open_fun u_p in 
+                let new_pos = List.fold_left (fun p _ -> P.body p ) p tyargs in
+                (* we check normal superposition conditions  *)
+                if (not (T.is_var u_p) || T.is_ho_var u_p) &&
+                   (!_sup_at_var_headed || not (T.is_var (T.head_term u_p))) then
+                  Some (body, new_pos) 
+                else None) )
+      |> Sequence.flat_map
+        (fun (u_p, passive_pos) ->
+          let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
+          let do_sup _ with_pos subst =
+            let active = with_pos.C.WithPos.clause in
+            let s_pos = with_pos.C.WithPos.pos in
+            match Lits.View.get_eqn (C.lits active) s_pos with
+              | Some (s, t, true) ->
+                let info = SupInfo.({
+                    s; t; active; active_pos=s_pos; scope_active=1; subst;
+                    u_p; passive=clause; passive_lit; passive_pos; 
+                    scope_passive=0; sup_kind=SupEXT
+                  }) in
+                do_superposition info
+              | _ -> None
+          in
+          (* all terms that occur in an equation in the active_set
+            and that are potentially unifiable with u_p (u at position p) *)
+          I.retrieve_unifiables (!_idx_sup_from, 1) (u_p,0)
+          |> Sequence.filter_map (fun (t,p,s) -> do_sup t p s)
+        )
+        |> Sequence.to_rev_list
+    in
+    Util.exit_prof prof_infer_passive;
+    new_clauses
 
   let infer_active_complete_ho clause =
     let inf_res = infer_active_aux
