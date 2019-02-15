@@ -8,7 +8,5 @@
     zipper_proof_check_tstp zipper_fo_detector)
   (libraries logtk logtk.parsers)
   (package zipperposition-tools)
-  (flags :standard -w +a-4-42-44-48-50-58-32-60@8 -color always)
-  (ocamlopt_flags :standard -O3 -color always
-                  -unbox-closures -unbox-closures-factor 20)
-  )
+  (flags :standard -w -32-50)
+)

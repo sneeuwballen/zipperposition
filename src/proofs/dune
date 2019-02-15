@@ -4,10 +4,8 @@
   (public_name logtk.proofs)
   (synopsis "proofs for logtk")
   (libraries containers logtk)
-  (flags :standard -w +a-4-42-44-48-50-58-32-60@8 -color always)
-  (ocamlopt_flags :standard -O3
-                  -unbox-closures -unbox-closures-factor 20)
-  )
+  (flags :standard -w -32)
+)
 
 
 
