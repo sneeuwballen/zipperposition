@@ -12,6 +12,7 @@ module Lit = Literal
 module Lits = Literals
 module Comp = Comparison
 module US = Unif_subst
+module P = Position
 
 let section = Util.Section.make ~parent:Const.section "sup"
 
@@ -100,6 +101,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   (** {6 Index Management} *)
 
   let _idx_sup_into = ref (TermIndex.empty ())
+  let _idx_supext_into = ref (TermIndex.empty ())
   let _idx_supav_into = ref (TermIndex.empty ())
   let _idx_sup_from = ref (TermIndex.empty ())
   let _idx_back_demod = ref (TermIndex.empty ())
@@ -149,6 +151,25 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
            f tree t with_pos)
         !_idx_supav_into;
+
+    (* index subterms that can be rewritten by SupEXT *)
+    _idx_supext_into := 
+      Lits.fold_terms ~vars:!_sup_at_vars ~var_args:!_sup_in_var_args 
+                      ~fun_bodies:true ~ty_args:false ~ord 
+                      ~which:`Max ~subterms:true
+                      ~eligible:(C.Eligible.res c) (C.lits c)
+      (* We are going only under lambdas *)
+      |> Sequence.filter_map (fun (t, p) -> 
+            if not (T.is_fun t) then None 
+            else (let tyargs, body = T.open_fun t in 
+                  let new_pos = List.fold_left (fun p _ -> P.body p ) p tyargs in 
+                  Some (body, new_pos)))
+      |> Sequence.fold
+        (fun tree (t, pos) ->
+           let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
+           f tree t with_pos)
+        !_idx_supext_into;
+
     (* index terms that can rewrite into other clauses *)
     _idx_sup_from :=
       Lits.fold_eqn ~ord ~both:true ~sign:true
@@ -287,13 +308,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let sc_a = info.scope_active in
     let sc_p = info.scope_passive in
     Util.debugf ~section 3
-      "@[<2>sup@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a@]@])@ \
+      "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a@]@])@ \
        (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
-      (fun k->k C.pp info.active sc_a T.pp info.s T.pp info.t
+      (fun k->k (kind_to_str info.sup_kind) C.pp info.active sc_a T.pp info.s T.pp info.t
           C.pp info.passive sc_p Lit.pp info.passive_lit
           Position.pp info.passive_pos US.pp info.subst);
     assert (InnerTerm.DB.closed (info.s:>InnerTerm.t));
-    (* assert (InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t)); *)
+    assert (info.sup_kind = SupEXT ||  InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
     assert (not(T.is_var info.u_p) || T.is_ho_var info.u_p);
     assert (!_sup_at_var_headed || info.sup_kind = SupAV || not (T.is_var (T.head_term info.u_p)));
     let active_idx = Lits.Pos.idx info.active_pos in
