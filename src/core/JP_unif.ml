@@ -324,7 +324,10 @@ let unify ~scope ~fresh_var_ t0 s0 =
               (* Util.debugf 5 "@[Subst (%s): @ @[%a@]@]" (fun k -> k rulename US.pp subst); *)
               let t_subst = nfapply subst (t, scope) in
               let s_subst = nfapply subst (s, scope) in
-              let unifiers = unify_terms t_subst s_subst ~rules:(rules @ [rulename]) in
+              let unifiers = if Lambda.is_lambda_pattern t_subst && 
+                                Lambda.is_lambda_pattern s_subst then
+                             OSeq.return (unif_simple ~scope t_subst s_subst)  else
+                             unify_terms t_subst s_subst ~rules:(rules @ [rulename]) in
               unifiers 
               |> OSeq.map (CCOpt.map (fun unifier -> US.merge subst unifier))
               (* We actually want to compose the substitutions here, but merge will have the same effect. *)
