@@ -144,7 +144,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         !_idx_sup_into;
 
     (* index subterms that can be rewritten by SupAV *)
-    if (!_supav) then
+    if !_supav then
       _idx_supav_into :=
         Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false ~ord ~which:`Max ~subterms:true
           ~eligible:(C.Eligible.res c) (C.lits c)
@@ -168,8 +168,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         |> Sequence.filter_map (fun (t, p) -> 
               if not (T.is_fun t) then None 
               else (let tyargs, body = T.open_fun t in 
-                    let new_pos = List.fold_left (fun p _ -> P.body p ) p tyargs in 
-                    Some (body, new_pos)))
+                    let new_pos = List.fold_left (fun p _ -> P.(append p (body stop)) ) p tyargs in
+                    if (not (T.is_var body) || T.is_ho_var body) &&
+                       (!_sup_at_var_headed || not (T.is_var (T.head_term body))) then
+                    Some (body, new_pos) else None))
         |> Sequence.fold
           (fun tree (t, pos) ->
             let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
@@ -597,6 +599,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               u_p; passive; passive_lit; passive_pos; scope_passive=1; 
               subst; sup_kind=SupEXT
             }) in
+          Util.debugf ~section 10 "[Trying supext from %a into %a with term %a into term %a]"
+          (fun k -> k C.pp clause C.pp passive T.pp s T.pp u_p);
+
           do_superposition info
         in
         I.retrieve_unifiables (!_idx_supext_into, 1) (s, 0)
@@ -622,10 +627,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           (* we rewrite only under lambdas  *)
           if not (T.is_fun u_p) then None
           else (let tyargs, body = T.open_fun u_p in 
-                let new_pos = List.fold_left (fun p _ -> P.body p ) p tyargs in
+                let new_pos = List.fold_left (fun p _ -> P.(append p (body stop)) ) p tyargs in
                 (* we check normal superposition conditions  *)
-                if (not (T.is_var u_p) || T.is_ho_var u_p) &&
-                   (!_sup_at_var_headed || not (T.is_var (T.head_term u_p))) then
+                if (not (T.is_var body) || T.is_ho_var body) &&
+                   (!_sup_at_var_headed || not (T.is_var (T.head_term body))) then
                   Some (body, new_pos) 
                 else None) )
       |> Sequence.flat_map
@@ -641,6 +646,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                     u_p; passive=clause; passive_lit; passive_pos; 
                     scope_passive=0; sup_kind=SupEXT
                   }) in
+                Util.debugf ~section 10 "[Trying supext from %a into %a with term %a into term %a]"
+                (fun k -> k C.pp active C.pp clause T.pp s T.pp u_p);
                 do_superposition info
               | _ -> None
           in
@@ -1951,8 +1958,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Env.add_binary_inf "supav_active" infer_supav_active;
       );
       if !_supext then (
-        Env.add_binary_inf "supext_passive(from)" infer_supext_from;
-        Env.add_binary_inf "supext_active(into)" infer_supext_into;
+        Env.add_binary_inf "supext_active(from)" infer_supext_from;
+        Env.add_binary_inf "supext_passive(into)" infer_supext_into;
       );
       if !_switch_stream_extraction then
         Env.add_generate "stream_queue_extraction" extract_from_stream_queue_fix_stm

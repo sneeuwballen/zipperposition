@@ -819,7 +819,7 @@ let () =
       "--ho-ext-axiom", Arg.Set _ext_axiom, " enable extensionality axiom";
       "--no-ho-ext-axiom", Arg.Clear _ext_axiom, " disable extensionality axiom";
       "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule";
-      "--ho-no-ext-neg", Arg.Clear _ext_neg, " disable negative extensionality rule"; 
+      "--ho-ext-neg", Arg.Set _ext_neg, " enable negative extensionality rule"; 
       "--ho-def-unfold", Arg.Set def_unfold_enabled_, " enable ho definition unfolding";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom"
     ];
@@ -828,7 +828,7 @@ let () =
     def_unfold_enabled_ := false;
     force_enabled_ := true;
     _ext_axiom := true;
-    _ext_neg := false;
+    _ext_neg := true;
     eta_ := `Expand;
     prim_mode_ := `None;
     _elim_pred_var := false;
