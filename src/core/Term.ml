@@ -90,6 +90,9 @@ module Classic = struct
 end
 
 (** {2 Containers} *)
+module IntMap = Map.Make(struct type t = int 
+                                let compare : int -> int -> int = Pervasives.compare 
+                         end)
 
 module Tbl = T.Tbl
 module Set = T.Set
@@ -98,6 +101,7 @@ module Map = T.Map
 module VarSet = Type.VarSet
 module VarMap = Type.VarMap
 module VarTbl = Type.VarTbl
+
 
 (** {2 Smart constructors} *)
 
@@ -714,6 +718,47 @@ module DB = struct
   let eval = T.DB.eval
   let unshift = T.DB.unshift
   let unbound = T.DB.unbound
+  let skolemize_loosely_bound t =  
+   let rec aux skolemized depth subt =
+      match view subt with 
+      | Const _
+      | Var _ ->  (subt, skolemized)
+      | DB i -> if i >= depth then
+               (match IntMap.find_opt (i-depth) skolemized with 
+               | (Some sk) -> (sk, skolemized)
+               | None -> 
+                  let new_sk = mk_fresh_skolem [] (ty subt) in
+                  let skolemized = IntMap.add (i-depth) new_sk skolemized in
+                  (new_sk,skolemized) )
+               else (subt, skolemized)
+      | Fun (v_ty,body) -> let b', s' = aux skolemized (depth+1) body in
+                           (fun_ v_ty b', s') 
+      | App (f, l) ->
+         let hd', s' = aux skolemized depth f in
+         let args, s'' = fold_subst l s' depth  in   
+         app hd' args, s''
+      | AppBuiltin (hd,l) -> let args, s' = fold_subst l skolemized depth in 
+                             app_builtin ~ty:(ty subt) hd args, s'
+   and fold_subst l subst depth = List.fold_right (fun arg (acc, s) -> 
+                           let arg', s_new = aux s depth arg in
+                           arg'::acc, s_new) l ([], subst)
+   in aux IntMap.empty 0 t
+
+  let unskolemize sk_to_vars t = 
+    let rec aux depth subt =
+      match Map.find_opt subt sk_to_vars  with
+        Some i -> bvar ~ty:(ty subt) (depth+i)
+        | None -> 
+          (match view subt with
+          | Const _  | Var _  | DB _ -> subt
+          | Fun (v_ty,body) -> fun_ v_ty (aux (depth+1) body) 
+          | App (f, l) -> let f' = aux depth f in
+                          app f' (List.map (aux depth) l)
+          | AppBuiltin (hd,l) -> app_builtin ~ty:(ty subt) hd (List.map (aux depth) l))
+   in aux 0 t
+
+  let reverse_sk_map sk_map = 
+    IntMap.fold (fun k v acc -> Map.add v k acc) sk_map Map.empty
 end
 
 let debugf = pp

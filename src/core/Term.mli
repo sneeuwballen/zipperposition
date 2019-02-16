@@ -55,9 +55,11 @@ include Interfaces.ORD with type t := t
 
 val ty : t -> Type.t                (** Obtain the type of a term.. *)
 
+module IntMap : Map.S with type key = int
 module Set : CCSet.S with type elt = t
 module Map : CCMap.S with type key = t
 module Tbl : CCHashtbl.S with type key = t
+
 
 val hash_mod_alpha : t -> int
 (** Hash invariant w.r.t variable renaming *)
@@ -366,6 +368,7 @@ module DB : sig
   val unshift : ?depth:int -> int -> t -> t
   val eval : t DBEnv.t -> t -> t
   val unbound : t -> int list
+  val skolemize_loosely_bound : t -> t * t IntMap.t
 end
 
 (** {2 TPTP} *)

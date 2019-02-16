@@ -322,7 +322,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           C.pp info.passive sc_p Lit.pp info.passive_lit
           Position.pp info.passive_pos US.pp info.subst);
     assert (InnerTerm.DB.closed (info.s:>InnerTerm.t));
-    assert (info.sup_kind = SupEXT ||  InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
+    assert (info.sup_kind == SupEXT || InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
     assert (not(T.is_var info.u_p) || T.is_ho_var info.u_p);
     assert (!_sup_at_var_headed || info.sup_kind = SupAV || not (T.is_var (T.head_term info.u_p)));
     let active_idx = Lits.Pos.idx info.active_pos in
@@ -370,9 +370,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           ~at:passive_lit_pos ~by:t' in
       let c_guard = Literal.of_unif_subst renaming us in
       let tags = Unif_subst.tags us in
-      (* apply substitution to other literals *)
       let subst = if info.sup_kind = SupEXT then 
                   S.FO.unleak_variables subst else subst in 
+      (* apply substitution to other literals *)
       let new_lits =
         new_passive_lit ::
           c_guard @
@@ -415,7 +415,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           C.pp info.passive sc_p Lit.pp info.passive_lit
           Position.pp info.passive_pos US.pp info.subst);
     assert (InnerTerm.DB.closed (info.s:>InnerTerm.t));
-    assert (InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
+    assert (info.sup_kind == SupEXT || InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
     assert (not(T.is_var info.u_p) || T.is_ho_var info.u_p);
     assert (!_sup_at_var_headed || info.sup_kind = SupAV || not (T.is_var (T.head_term info.u_p)));
     let active_idx = Lits.Pos.idx info.active_pos in
