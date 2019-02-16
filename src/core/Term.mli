@@ -369,6 +369,7 @@ module DB : sig
   val eval : t DBEnv.t -> t -> t
   val unbound : t -> int list
   val skolemize_loosely_bound : t -> t * t IntMap.t
+  val unskolemize : int Map.t -> Map.key -> t
 end
 
 (** {2 TPTP} *)

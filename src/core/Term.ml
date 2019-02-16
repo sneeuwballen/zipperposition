@@ -729,17 +729,17 @@ module DB = struct
                | None -> 
                   let new_sk = mk_fresh_skolem [] (ty subt) in
                   let skolemized = IntMap.add (i-depth) new_sk skolemized in
-                  (new_sk,skolemized) )
-               else (subt, skolemized)
+                  new_sk,skolemized)
+               else subt, skolemized
       | Fun (v_ty,body) -> let b', s' = aux skolemized (depth+1) body in
-                           (fun_ v_ty b', s') 
+                           fun_ v_ty b', s' 
       | App (f, l) ->
          let hd', s' = aux skolemized depth f in
-         let args, s'' = fold_subst l s' depth  in   
+         let args, s'' = sk_args l s' depth  in   
          app hd' args, s''
-      | AppBuiltin (hd,l) -> let args, s' = fold_subst l skolemized depth in 
+      | AppBuiltin (hd,l) -> let args, s' = sk_args l skolemized depth in 
                              app_builtin ~ty:(ty subt) hd args, s'
-   and fold_subst l subst depth = List.fold_right (fun arg (acc, s) -> 
+   and sk_args l subst depth = List.fold_right (fun arg (acc, s) -> 
                            let arg', s_new = aux s depth arg in
                            arg'::acc, s_new) l ([], subst)
    in aux IntMap.empty 0 t
@@ -756,9 +756,6 @@ module DB = struct
                           app f' (List.map (aux depth) l)
           | AppBuiltin (hd,l) -> app_builtin ~ty:(ty subt) hd (List.map (aux depth) l))
    in aux 0 t
-
-  let reverse_sk_map sk_map = 
-    IntMap.fold (fun k v acc -> Map.add v k acc) sk_map Map.empty
 end
 
 let debugf = pp
