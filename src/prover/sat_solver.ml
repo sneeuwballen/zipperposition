@@ -158,13 +158,14 @@ module Make()
 
   (* (clause * proof * proof) -> 'a *)
   module ResTbl = CCHashtbl.Make(struct
-      type t = sat_clause * Proof.t * Proof.t
-      let equal (c,a1,a2)(c',b1,b2) =
+      type t = sat_clause * Proof.t list
+      let equal (c,l1)(c',l2) =
         CCList.equal Lit.equal c c' &&
-        Proof.S.equal a1 b1 && Proof.S.equal a2 b2
-      let hash (c,a,b) =
-        Hashtbl.hash
-          [List.length c; Proof.S.hash a; Proof.S.hash b]
+        CCList.equal Proof.S.equal l1 l2
+      let hash (c,l) =
+        CCHash.combine2
+          (CCHash.int @@ List.length c)
+          (CCHash.list Proof.S.hash l)
     end)
 
   let tbl_res = ResTbl.create 16
@@ -181,21 +182,20 @@ module Make()
         | {P. step = P.Lemma _; _ } -> errorf "SAT proof involves a lemma"
         | {P. step = P.Assumption; _ } -> errorf "SAT proof involves an assumption"
         | {P. step = P.Duplicate (c',_); _} -> aux c'
-        | {P. conclusion=c; step = P.Resolution (p1,p2,_) } ->
+        | {P. conclusion=c; step = P.Hyper_res {P.hr_init; hr_steps} } ->
           let c = bool_clause_of_sat c in
           (* atomic resolution step *)
-          let q1 = aux p1 in
-          let q2 = aux p2 in
-          begin match ResTbl.get tbl_res (c,q1,q2) with
+          let q1 = aux hr_init in
+          let q2 = List.map (fun (_,p) -> aux p) hr_steps in
+          begin match ResTbl.get tbl_res (c,q1::q2) with
             | Some s -> s
             | None ->
-              let parents = [Proof.Parent.from q1; Proof.Parent.from q2] in
+              let parents = Proof.Parent.from q1 :: List.map Proof.Parent.from q2 in
               let step =
                 Proof.Step.inference parents
                   ~rule:(Proof.Rule.mk "sat_resolution") in
               let s = Proof.S.mk step (Bool_clause.mk_proof_res c) in
-              ResTbl.add tbl_res (c,q1,q2) s;
-              ResTbl.add tbl_res (c,q2,q1) s;
+              ResTbl.add tbl_res (c,q1::q2) s;
               s
           end
         | {P. conclusion=c; step = P.Hypothesis step; _ } ->
@@ -211,7 +211,7 @@ module Make()
         (fun acc pnode -> match pnode with
            | {P. step = P.Lemma _; _ } -> errorf "SAT proof involves a lemma"
            | {P. step = P.Assumption; _ } -> errorf "SAT proof involves an assumption"
-           | {P. step = (P.Resolution (_,_,_) | P.Duplicate _); _ } ->
+           | {P. step = (P.Hyper_res _ | P.Duplicate _); _ } ->
              acc (* ignore, intermediate node *)
            | {P. conclusion=c; step = P.Hypothesis step; _ } ->
              Proof.Parent.from (proof_of_leaf c step) :: acc)
