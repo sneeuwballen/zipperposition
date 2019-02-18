@@ -725,7 +725,7 @@ module DB = struct
       | Var _ ->  (subt, skolemized)
       | DB i -> if i >= depth then
                (match IntMap.find_opt (i-depth) skolemized with 
-               | (Some sk) -> (sk, skolemized)
+               | (Some sk) -> assert (Type.equal (ty subt) (ty sk)); (sk, skolemized)
                | None -> 
                   let new_sk = mk_fresh_skolem [] (ty subt) in
                   let skolemized = IntMap.add (i-depth) new_sk skolemized in
@@ -742,7 +742,9 @@ module DB = struct
    and sk_args l subst depth = List.fold_right (fun arg (acc, s) -> 
                            let arg', s_new = aux s depth arg in
                            arg'::acc, s_new) l ([], subst)
-   in aux IntMap.empty 0 t
+   in Util.debugf 1 "skolemizing term: %a"
+      (fun k -> k pp t);
+      aux IntMap.empty 0 t
 
   let unskolemize sk_to_vars t = 
     let rec aux depth subt =
@@ -756,6 +758,20 @@ module DB = struct
                           app f' (List.map (aux depth) l)
           | AppBuiltin (hd,l) -> app_builtin ~ty:(ty subt) hd (List.map (aux depth) l))
    in aux 0 t
+
+  let rec map_vars_shift ?(depth=0) var_map t =   
+   match view t with 
+   | Const _  | DB _ -> t
+   | Var _ -> (match Map.find_opt t var_map with 
+              | Some i -> bvar ~ty:(ty t) (i + depth)
+              | None -> t) 
+   | Fun (v_ty,body) -> let depth = depth+1 in 
+                        fun_ v_ty (map_vars_shift ~depth var_map body) 
+   | App (f, l) -> let f' = map_vars_shift ~depth var_map f in
+                   app f' (List.map (map_vars_shift ~depth var_map) l)
+   | AppBuiltin (hd,l) -> app_builtin ~ty:(ty t) hd 
+                          (List.map (map_vars_shift ~depth var_map) l)
+
 end
 
 let debugf = pp

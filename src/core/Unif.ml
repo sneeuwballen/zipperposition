@@ -1097,8 +1097,8 @@ module FO = struct
       let sk_b, sk_b_subs = Term.DB.skolemize_loosely_bound tb in
       let res = (unify_syn :> ?subst:subst -> term Scoped.t -> term Scoped.t -> subst)
                 ~subst (Scoped.make sk_a sca) (Scoped.make sk_b scb) in
-      let sk_a_rev = Term.IntMap.fold (fun k v acc -> Term.Map.add v k acc) sk_a_subs Term.Map.empty in
-      let sk_b_rev = Term.IntMap.fold (fun k v acc -> Term.Map.add v k acc) sk_b_subs Term.Map.empty in
+      let sk_a_rev = Term.IntMap.fold (fun k v -> Term.Map.add v k) sk_a_subs Term.Map.empty in
+      let sk_b_rev = Term.IntMap.fold (fun k v -> Term.Map.add v k) sk_b_subs Term.Map.empty in
       let sk_rev_union = Term.Map.union (fun _ _ _ -> raise (Invalid_argument "keys must be unique "))
                          sk_a_rev sk_b_rev in
       let res = Subst.FO.map (fun t -> Term.DB.unskolemize sk_rev_union t) res in

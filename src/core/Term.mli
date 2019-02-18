@@ -370,6 +370,7 @@ module DB : sig
   val unbound : t -> int list
   val skolemize_loosely_bound : t -> t * t IntMap.t
   val unskolemize : int Map.t -> Map.key -> t
+  val map_vars_shift : ?depth:int -> int Map.t -> t -> t
 end
 
 (** {2 TPTP} *)
