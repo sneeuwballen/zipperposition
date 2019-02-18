@@ -789,11 +789,8 @@ let get_rw_rule ?weight_incr:(w_i=20) c  =
       CCList.foldi (fun acc i v -> Term.Map.add v (n_new-i-1) acc) Term.Map.empty vars in
     let vars_to_db = Term.DB.map_vars_shift var_db_map rhs in
     let abs_rhs =  (Term.fun_l ((CCList.map Term.ty vars) @ tyargs) vars_to_db) in
-    Util.debugf 1 "[orig rhs: %a abstracted rhs: %a]" (fun k-> k Term.pp rhs Term.pp abs_rhs);
-    ignore (Term.rebuild_rec abs_rhs);
     let r = Rewrite.Term.Rule.make ~proof:(as_proof_c c) sym (Type.close_forall (Term.ty abs_rhs)) ty_vars abs_rhs in
     let rule = Rewrite.T_rule r in 
-    (* Rewrite.Defined_cst.declare_or_add sym  rule;  *)
     Util.debugf 5 "[ Declared rule %a ]" (fun k -> k Rewrite.Rule.pp rule);
     rule in
 
