@@ -168,7 +168,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         |> Sequence.filter_map (fun (t, p) -> 
               if not (T.is_fun t) then None 
               else (let tyargs, body = T.open_fun t in 
-                    let new_pos = List.fold_left (fun p _ -> P.(append p (body stop)) ) p tyargs in
+                    let new_pos = List.fold_left (fun p _ -> P.(append p (body stop))) p tyargs in
                     if (not (T.is_var body) || T.is_ho_var body) &&
                        (!_sup_at_var_headed || not (T.is_var (T.head_term body))) then
                     Some (body, new_pos) else None))
@@ -315,7 +315,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.incr_stat stat_superposition_call;
     let sc_a = info.scope_active in
     let sc_p = info.scope_passive in
-    Util.debugf ~section 3
+    Util.debugf ~section 1
       "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a@]@])@ \
        (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
       (fun k->k (kind_to_str info.sup_kind) C.pp info.active sc_a T.pp info.s T.pp info.t
@@ -346,7 +346,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           then raise (ExitSuperposition "will yield a tautology");
         | _ -> ()
       end;
-      let passive_lit' = Lit.apply_subst_no_simp renaming subst (info.passive_lit, sc_p) in
+      let subst' = if info.sup_kind = SupEXT then 
+                  S.FO.unleak_variables subst else subst in
+      let passive_lit' = Lit.apply_subst_no_simp renaming subst' (info.passive_lit, sc_p) in
       let new_trail = C.trail_l [info.active; info.passive] in
       if Env.is_trivial_trail new_trail then raise (ExitSuperposition "trivial trail");
       let s' = S.FO.apply renaming subst (info.s, sc_a) in
@@ -369,15 +371,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Lit.Pos.replace passive_lit'
           ~at:passive_lit_pos ~by:t' in
       let c_guard = Literal.of_unif_subst renaming us in
-      let tags = Unif_subst.tags us in
-      let subst = if info.sup_kind = SupEXT then 
-                  S.FO.unleak_variables subst else subst in 
+      let tags = Unif_subst.tags us in 
       (* apply substitution to other literals *)
+       (* Util.debugf 1 "Before unleak: %a, after unleak: %a"
+      (fun k -> k Subst.pp subst Subst.pp subst'); *)
       let new_lits =
         new_passive_lit ::
           c_guard @
-          Lit.apply_subst_list renaming subst (lits_a, sc_a) @
-          Lit.apply_subst_list renaming subst (lits_p, sc_p)
+          Lit.apply_subst_list renaming subst' (lits_a, sc_a) @
+          Lit.apply_subst_list renaming subst' (lits_p, sc_p)
       in
       let rule =
         let r = kind_to_str info.sup_kind in
@@ -386,14 +388,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       let proof =
         Proof.Step.inference ~rule ~tags
-          [C.proof_parent_subst renaming (info.active,sc_a) subst;
-           C.proof_parent_subst renaming (info.passive,sc_p) subst]
+          [C.proof_parent_subst renaming (info.active,sc_a) subst';
+           C.proof_parent_subst renaming (info.passive,sc_p) subst']
       and penalty =
         max (C.penalty info.active) (C.penalty info.passive)
         + (if T.is_var s' then 2 else 0) (* superposition from var = bad *)
       in
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
-      Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
+      Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
+      assert(List.for_all (Lit.for_all Term.DB.is_closed) new_lits);
       Some new_clause
     with ExitSuperposition reason ->
       Util.debugf ~section 3 "... cancel, %s" (fun k->k reason);

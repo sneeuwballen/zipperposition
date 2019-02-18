@@ -376,6 +376,7 @@ module FO = struct
                        Term.mk_fresh_skolem [] (Term.ty t) 
                        else t in 
    map unleak_var subs
+   
 end
 
 (** {2 Projections for proofs} *)
