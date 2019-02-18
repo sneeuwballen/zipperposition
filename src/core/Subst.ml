@@ -372,10 +372,7 @@ module FO = struct
       s
 
   let unleak_variables subs =
-   let unleak_var t = if not (Term.DB.is_closed t) then 
-                       Term.mk_fresh_skolem [] (Term.ty t) 
-                       else t in 
-   map unleak_var subs
+   map (fun t -> fst (Term.DB.skolemize_loosely_bound t)) subs
    
 end
 
