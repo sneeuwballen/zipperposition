@@ -790,7 +790,8 @@ let get_rw_rule ?weight_incr:(w_i=20) c  =
     let abs_rhs =  (Term.fun_l ((CCList.map Term.ty vars)) vars_to_db) in
     let r = Rewrite.Term.Rule.make ~proof:(as_proof_c c) sym (Type.close_forall (Term.ty abs_rhs)) ty_vars abs_rhs in
     let rule = Rewrite.T_rule r in 
-    (* Util.debugf 5 "[ Declared rule %a out of symbol %a and rhs %a ]" (fun k -> k Rewrite.Rule.pp rule); *)
+    Util.debugf 5 "[ Declared rule %a out of symbol %a and rhs %a ]" 
+    (fun k -> k Rewrite.Rule.pp rule ID.pp sym Term.pp rhs);
     rule in
 
   let build_from_head sym vars rhs =
