@@ -9,6 +9,8 @@ module OptionSet = Set.Make(
       type t = int option
    end)
 
+module IdSet = Set.Make(struct type t = ID.t let compare = compare end)
+
 module US = Unif_subst
 
 (** A datatype declaration *)
@@ -771,6 +773,9 @@ let scan_simple_stmt_for_ind_ty st = match view st with
       l
   | _ -> ()
 
+(** TODO: Ask Simon how to hide this in the fun *)
+let def_sym = ref IdSet.empty;;
+
 let get_rw_rule ?weight_incr:(w_i=20) c  =
   let distinct_free_vars l =
     l |> List.map (fun t -> Term.as_var t |> 
@@ -790,7 +795,7 @@ let get_rw_rule ?weight_incr:(w_i=20) c  =
     let abs_rhs =  (Term.fun_l ((CCList.map Term.ty vars)) vars_to_db) in
     let r = Rewrite.Term.Rule.make ~proof:(as_proof_c c) sym (Type.close_forall (Term.ty abs_rhs)) ty_vars abs_rhs in
     let rule = Rewrite.T_rule r in 
-    Util.debugf 5 "[ Declared rule %a out of symbol %a and rhs %a ]" 
+    Util.debugf 1 "[ Declared rule %a out of symbol %a and rhs %a ]" 
     (fun k -> k Rewrite.Rule.pp rule ID.pp sym Term.pp rhs);
     rule in
 
@@ -803,16 +808,23 @@ let get_rw_rule ?weight_incr:(w_i=20) c  =
                                     None -> acc 
                                     | Some v -> v :: acc) [] vars)
                               |> Term.VarSet.of_list)) = 0 then
-      Some (sym, make_rw sym vars rhs)
+      (def_sym := IdSet.add sym !def_sym;
+      Some (sym, make_rw sym vars rhs))
     else
       None in
                                          
   let conv_terms_rw t1 t2 = 
     let reduced = Lambda.eta_reduce t1 in
       match Term.view reduced with
-        Term.App (hd, l) when Term.is_const hd && distinct_free_vars l -> 
-            build_from_head (Term.as_const_exn hd) l t2
-        | Term.Const hd -> build_from_head hd [] t2
+        Term.App (hd, l) when Term.is_const hd && distinct_free_vars l
+                              && (let real_vars = 
+                                    List.filter (fun v -> not (Type.is_tType (Term.ty v))) l in
+                                 List.length (real_vars) >= 1) ->
+            let sym = (Term.as_const_exn hd) in
+            if IdSet.mem sym !def_sym then (
+               Util.debugf 1 "Rejected definition %a of %a " (fun k-> k Term.pp t2 ID.pp sym) ; 
+               None) 
+            else build_from_head sym l t2
         | _ -> None in
    
    let all_lits =  Seq.lits c in
