@@ -9,7 +9,7 @@ module OptionSet = Set.Make(
       type t = int option
    end)
 
-module IdSet = Set.Make(struct type t = ID.t let compare = compare end)
+module IdMap = Map.Make(struct type t = ID.t let compare = compare end)
 
 module US = Unif_subst
 
@@ -774,7 +774,7 @@ let scan_simple_stmt_for_ind_ty st = match view st with
   | _ -> ()
 
 (** TODO: Ask Simon how to hide this in the fun *)
-let def_sym = ref IdSet.empty;;
+let def_sym = ref IdMap.empty;;
 
 let get_rw_rule ?weight_incr:(w_i=20) c  =
   let distinct_free_vars l =
@@ -808,7 +808,7 @@ let get_rw_rule ?weight_incr:(w_i=20) c  =
                                     None -> acc 
                                     | Some v -> v :: acc) [] vars)
                               |> Term.VarSet.of_list)) = 0 then
-      (def_sym := IdSet.add sym !def_sym;
+      (def_sym := IdMap.add sym rhs !def_sym;
       Some (sym, make_rw sym vars rhs))
     else
       None in
@@ -821,10 +821,11 @@ let get_rw_rule ?weight_incr:(w_i=20) c  =
                                     List.filter (fun v -> not (Type.is_tType (Term.ty v))) l in
                                  List.length (real_vars) >= 1) ->
             let sym = (Term.as_const_exn hd) in
-            if IdSet.mem sym !def_sym then (
+            (match IdMap.find_opt sym !def_sym with
+            | Some rhs when not (Term.equal rhs t2) ->  (
                Util.debugf 1 "Rejected definition %a of %a " (fun k-> k Term.pp t2 ID.pp sym) ; 
                None) 
-            else build_from_head sym l t2
+            | _ -> build_from_head sym l t2)
         | _ -> None in
    
    let all_lits =  Seq.lits c in
