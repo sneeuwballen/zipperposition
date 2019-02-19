@@ -784,14 +784,13 @@ let get_rw_rule ?weight_incr:(w_i=20) c  =
     let ty_vars = List.filter (fun v -> Type.is_tType (Term.ty v)) vars in
     let vars = List.filter (fun v -> not (Type.is_tType (Term.ty v))) vars in 
     let n_new = List.length vars in
-    let tyargs, _ = Term.open_fun rhs in
     let var_db_map = 
       CCList.foldi (fun acc i v -> Term.Map.add v (n_new-i-1) acc) Term.Map.empty vars in
     let vars_to_db = Term.DB.map_vars_shift var_db_map rhs in
-    let abs_rhs =  (Term.fun_l ((CCList.map Term.ty vars) @ tyargs) vars_to_db) in
+    let abs_rhs =  (Term.fun_l ((CCList.map Term.ty vars)) vars_to_db) in
     let r = Rewrite.Term.Rule.make ~proof:(as_proof_c c) sym (Type.close_forall (Term.ty abs_rhs)) ty_vars abs_rhs in
     let rule = Rewrite.T_rule r in 
-    Util.debugf 5 "[ Declared rule %a ]" (fun k -> k Rewrite.Rule.pp rule);
+    (* Util.debugf 5 "[ Declared rule %a out of symbol %a and rhs %a ]" (fun k -> k Rewrite.Rule.pp rule); *)
     rule in
 
   let build_from_head sym vars rhs =
