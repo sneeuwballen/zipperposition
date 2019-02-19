@@ -831,7 +831,13 @@ let get_rw_rule ?weight_incr:(w_i=20) c  =
    let all_lits =  Seq.lits c in
    if Sequence.length all_lits = 1 then
       match Sequence.head_exn all_lits with 
-      | SLiteral.Eq (t1,t2) when Term.weight t2 - Term.weight t1 <= w_i -> 
-         conv_terms_rw t1 t2
+      | SLiteral.Eq (t1,t2) -> 
+         if (Term.weight t2 - Term.weight t1 <= w_i) then (
+            match conv_terms_rw t1 t2 with
+            | Some rhs -> Some rhs 
+            | None -> if Term.weight t1 - Term.weight t2 <= w_i then 
+                      conv_terms_rw t2 t1 else None)
+         else (if Term.weight t1 - Term.weight t2 <= w_i then
+               conv_terms_rw t2 t1 else None)
       | _ -> None
    else None
