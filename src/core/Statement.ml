@@ -809,7 +809,9 @@ let get_rw_rule ?weight_incr:(w_i=20) c  =
                                     | Some v -> v :: acc) [] vars)
                               |> Term.VarSet.of_list)) = 0 then
       (def_sym := IdMap.add sym rhs !def_sym;
-      Some (sym, make_rw sym vars rhs))
+      (* Here I skipped proof object creation *)
+      let rhs_nf, _ = Rewrite.Term.normalize_term rhs in 
+      Some (sym, make_rw sym vars rhs_nf))
     else
       None in
                                          
