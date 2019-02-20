@@ -800,6 +800,7 @@ let get_rw_rule ?weight_incr:(w_i=20) c  =
     rule in
 
   let build_from_head sym vars rhs =
+    let rhs = Lambda.snf (fst (Rewrite.Term.normalize_term rhs)) in
     if not (Term.symbols rhs |> ID.Set.mem sym) && 
         Term.VarSet.cardinal 
           (Term.VarSet.diff (Term.vars rhs) 
@@ -808,10 +809,10 @@ let get_rw_rule ?weight_incr:(w_i=20) c  =
                                     None -> acc 
                                     | Some v -> v :: acc) [] vars)
                               |> Term.VarSet.of_list)) = 0 then
-      (def_sym := IdMap.add sym rhs !def_sym;
       (* Here I skipped proof object creation *)
-      let rhs_nf, _ = Rewrite.Term.normalize_term rhs in 
-      Some (sym, make_rw sym vars rhs_nf))
+      let res_rw =  Some (sym, make_rw sym vars rhs) in 
+      (def_sym := IdMap.add sym (rhs, res_rw) !def_sym;
+       res_rw)
     else
       None in
                                          
@@ -824,9 +825,11 @@ let get_rw_rule ?weight_incr:(w_i=20) c  =
                                  List.length (real_vars) >= 1) ->
             let sym = (Term.as_const_exn hd) in
             (match IdMap.find_opt sym !def_sym with
-            | Some rhs when not (Term.equal rhs t2) ->  (
+            | Some (rhs, rw_rule) ->  (
+               if  not (Term.equal rhs t2) then (
                Util.debugf 1 "Rejected definition %a of %a " (fun k-> k Term.pp t2 ID.pp sym) ; 
-               None) 
+               None)
+               else rw_rule ) 
             | _ -> build_from_head sym l t2)
         | _ -> None in
    
@@ -843,3 +846,4 @@ let get_rw_rule ?weight_incr:(w_i=20) c  =
                conv_terms_rw t2 t1 else None)
       | _ -> None
    else None
+
