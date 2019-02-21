@@ -331,7 +331,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let renaming = S.Renaming.create () in
       let us = info.subst in
       let subst = US.subst us in
-      let t' = S.FO.apply renaming subst (info.t, sc_a) in
+      let t' = S.FO.apply ~shift_vars:true renaming subst (info.t, sc_a) in
       begin match info.passive_lit, info.passive_pos with
         | Lit.Prop (_, true), P.Arg(_, P.Left P.Stop) ->
           if T.equal t' T.true_
@@ -341,7 +341,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           (* are we in the specific, but no that rare, case where we
              rewrite s=t using s=t (into a tautology t=t)? *)
           (* TODO: use Unif.FO.eq? *)
-          let v' = S.FO.apply renaming subst (v, sc_p) in
+          let v' = S.FO.apply ~shift_vars:true renaming subst (v, sc_p) in
           if T.equal t' v'
           then raise (ExitSuperposition "will yield a tautology");
         | _ -> ()
@@ -352,7 +352,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let passive_lit' = Lit.apply_subst_no_simp renaming subst' (info.passive_lit, sc_p) in
       let new_trail = C.trail_l [info.active; info.passive] in
       if Env.is_trivial_trail new_trail then raise (ExitSuperposition "trivial trail");
-      let s' = S.FO.apply renaming subst (info.s, sc_a) in
+      let s' = S.FO.apply ~shift_vars:true renaming subst (info.s, sc_a) in
       if (
         O.compare ord s' t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
@@ -410,6 +410,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
       Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       assert(List.for_all (Lit.for_all Term.DB.is_closed) new_lits);
+      C.check_types new_clause;
       Some new_clause
     with ExitSuperposition reason ->
       Util.debugf ~section 3 "... cancel, %s" (fun k->k reason);

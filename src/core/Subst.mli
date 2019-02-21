@@ -144,7 +144,7 @@ val of_list : ?init:t -> (var Scoped.t * term Scoped.t) list -> t
 
 (** {2 Applying a substitution} *)
 
-val apply : Renaming.t -> t -> term Scoped.t -> term
+val apply : ?shift_vars:bool -> Renaming.t -> t -> term Scoped.t -> term
 (** Apply the substitution to the given term.
     This function assumes that all terms in the substitution are closed,
     and it will not perform De Bruijn indices shifting. For instance,
@@ -165,7 +165,7 @@ module type SPECIALIZED = sig
 
   val deref : t -> term Scoped.t -> term Scoped.t
 
-  val apply : Renaming.t -> t -> term Scoped.t -> term
+  val apply : ?shift_vars:bool -> Renaming.t -> t -> term Scoped.t -> term
   (** Apply the substitution to the given term/type.
       @param renaming used to desambiguate free variables from distinct scopes *)
 
@@ -186,7 +186,7 @@ module Ty : SPECIALIZED with type term = Type.t
 module FO : sig
   include SPECIALIZED with type term = Term.t
   val bind' : t -> Type.t HVar.t Scoped.t -> term Scoped.t -> t
-  val apply_l : Renaming.t -> t -> term list Scoped.t -> term list
+  val apply_l : ?shift_vars:bool -> Renaming.t -> t -> term list Scoped.t -> term list
   val of_list' : ?init:t -> (Type.t HVar.t Scoped.t * term Scoped.t) list -> t
   val map : (term -> term) -> t -> t
   val filter : (Type.t HVar.t Scoped.t -> term Scoped.t -> bool) -> t -> t

@@ -1073,7 +1073,9 @@ module FO = struct
       let ta, sca = sc1 in 
       let tb, scb = sc2 in
       if(not (Term.DB.is_closed ta) || not (Term.DB.is_closed tb)) then (
+         Util.debugf ~section 1 "Skolemizing 1 %a" (fun k -> k Term.TPTP.pp ta);
          let sk_a, sk_a_subs = Term.DB.skolemize_loosely_bound ta in
+         Util.debugf ~section 1 "Skolemizing 2 %a" (fun k -> k Term.TPTP.pp tb);
          let sk_b, sk_b_subs = Term.DB.skolemize_loosely_bound tb in
          let res = (unify_full :> ?subst:unif_subst -> term Scoped.t -> term Scoped.t -> unif_subst)
                   ~subst (Scoped.make sk_a sca) (Scoped.make sk_b scb) in

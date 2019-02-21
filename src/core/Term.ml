@@ -734,7 +734,10 @@ module DB = struct
       | Var _ ->  (subt, skolemized)
       | DB i -> if i >= depth then
                (match IntMap.find_opt (i-depth) skolemized with 
-               | (Some sk) -> assert (Type.equal (ty subt) (ty sk)); (sk, skolemized)
+               | (Some sk) -> (if not (Type.equal (ty subt) (ty sk)) then 
+                              (Util.debugf 1 "Type mismatch: %a <> %a" 
+                              (fun k -> k Type.pp (ty subt) Type.pp (ty sk));
+                              assert false)); (sk, skolemized)
                | None -> 
                   let new_sk = mk_fresh_skolem [] (ty subt) in
                   let skolemized = IntMap.add (i-depth) new_sk skolemized in
