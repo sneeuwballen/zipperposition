@@ -315,12 +315,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.incr_stat stat_superposition_call;
     let sc_a = info.scope_active in
     let sc_p = info.scope_passive in
-    Util.debugf ~section 1
-      "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a@]@])@ \
-       (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
-      (fun k->k (kind_to_str info.sup_kind) C.pp info.active sc_a T.pp info.s T.pp info.t
-          C.pp info.passive sc_p Lit.pp info.passive_lit
-          Position.pp info.passive_pos US.pp info.subst);
     assert (InnerTerm.DB.closed (info.s:>InnerTerm.t));
     assert (info.sup_kind == SupEXT || InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
     assert (not(T.is_var info.u_p) || T.is_ho_var info.u_p);
@@ -331,7 +325,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let renaming = S.Renaming.create () in
       let us = info.subst in
       let subst = US.subst us in
-      let t' = S.FO.apply ~shift_vars:true renaming subst (info.t, sc_a) in
+      (* let n_funs = (if info.sup_kind = SupEXT then Position.num_of_funs info.passive_pos-1
+                   else (-1)) in  *)
+      let t' = S.FO.apply ~shift_vars:0 renaming subst (info.t, sc_a) in
+       Util.debugf ~section 1
+      "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
+       (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
+      (fun k->k (kind_to_str info.sup_kind) C.pp info.active sc_a T.pp info.s T.pp info.t
+          T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
+          Position.pp info.passive_pos US.pp info.subst);
+  
       begin match info.passive_lit, info.passive_pos with
         | Lit.Prop (_, true), P.Arg(_, P.Left P.Stop) ->
           if T.equal t' T.true_
@@ -341,7 +344,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           (* are we in the specific, but no that rare, case where we
              rewrite s=t using s=t (into a tautology t=t)? *)
           (* TODO: use Unif.FO.eq? *)
-          let v' = S.FO.apply ~shift_vars:true renaming subst (v, sc_p) in
+          let v' = S.FO.apply ~shift_vars:0 renaming subst (v, sc_p) in
           if T.equal t' v'
           then raise (ExitSuperposition "will yield a tautology");
         | _ -> ()
@@ -352,7 +355,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let passive_lit' = Lit.apply_subst_no_simp renaming subst' (info.passive_lit, sc_p) in
       let new_trail = C.trail_l [info.active; info.passive] in
       if Env.is_trivial_trail new_trail then raise (ExitSuperposition "trivial trail");
-      let s' = S.FO.apply ~shift_vars:true renaming subst (info.s, sc_a) in
+      (* let n_funs = (if info.sup_kind = SupEXT then Position.num_of_funs info.active_pos-1
+                   else (-1))  in *)
+      let s' = S.FO.apply renaming subst (info.s, sc_a) in
       if (
         O.compare ord s' t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||

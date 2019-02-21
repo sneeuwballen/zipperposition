@@ -85,6 +85,12 @@ let rec is_prefix p1 p2 : bool = match p1, p2 with
 
 let is_strict_prefix p1 p2 = not (equal p1 p2) && is_prefix p1 p2
 
+let rec num_of_funs = function 
+   | Stop -> 0
+   | Type p' | Left p' | Right p' | Head p' | Arg (_,p') -> 
+     num_of_funs p'
+   | Body p' -> 1 + num_of_funs p'
+
 module Map = struct
   include CCMap.Make(struct
       type t = position

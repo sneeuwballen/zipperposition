@@ -52,6 +52,8 @@ val compare : t -> t -> int
 val equal : t -> t -> bool
 val hash : t -> int
 
+val num_of_funs : t -> int
+
 include Interfaces.PRINT with type t := t
 
 module Map : sig
