@@ -193,7 +193,7 @@ module FO : sig
   (* Takes a substitution that might map a variable x to a term
      that containts loosely bound variables. It fixes the substitution
      so that all such variables are remaped to a fresh skolem *)
-  val unleak_variables : t -> t
+  val unleak_variables : t -> t * (Term.t list)
 end
 
 (** {2 Projections for proofs} *)

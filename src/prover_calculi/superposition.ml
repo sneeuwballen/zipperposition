@@ -346,8 +346,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           then raise (ExitSuperposition "will yield a tautology");
         | _ -> ()
       end;
-      let subst' = if info.sup_kind = SupEXT then 
-                  S.FO.unleak_variables subst else subst in
+      let subst', new_sk = 
+        if info.sup_kind = SupEXT then 
+        S.FO.unleak_variables subst else subst, [] in
       let passive_lit' = Lit.apply_subst_no_simp renaming subst' (info.passive_lit, sc_p) in
       let new_trail = C.trail_l [info.active; info.passive] in
       if Env.is_trivial_trail new_trail then raise (ExitSuperposition "trivial trail");
@@ -381,6 +382,18 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           Lit.apply_subst_list renaming subst' (lits_a, sc_a) @
           Lit.apply_subst_list renaming subst' (lits_p, sc_p)
       in
+      let vars = Sequence.to_list (Literals.Seq.vars (Array.of_list new_lits)) in 
+      let sk_with_vars = 
+        List.fold_left (fun acc t -> 
+            let new_sk_vars = Term.mk_fresh_skolem vars (Term.ty t) in 
+            Term.Map.add t new_sk_vars acc) 
+         Term.Map.empty new_sk in 
+      let new_lits = 
+        List.map (fun lit -> 
+          Lit.map (fun t ->
+            Term.Map.fold 
+              (fun sk sk_v acc -> Term.replace ~old:sk ~by:sk_v acc) 
+              sk_with_vars t ) lit) new_lits in
       let rule =
         let r = kind_to_str info.sup_kind in
         let sign = if Lit.sign passive_lit' then "+" else "-" in

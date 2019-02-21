@@ -17,6 +17,10 @@ end
 
 module H = Hashtbl.Make(VarInt)
 module M = CCMap.Make(VarInt)
+module IntMap = Map.Make(struct type t = int 
+                                let compare : int -> int -> int = Pervasives.compare 
+                         end)
+
 
 (** {2 Renaming} *)
 
@@ -360,9 +364,10 @@ module FO = struct
   let bind' = (bind :> t -> Type.t HVar.t Scoped.t -> term Scoped.t -> t)
   let update' = (update :> t -> Type.t HVar.t Scoped.t -> term Scoped.t -> t)
   let of_list' = (of_list :> ?init:t -> (Type.t HVar.t Scoped.t * term Scoped.t) list -> t)
+  (* let to_list = (to_list :>  t -> (Type.t HVar.t Scoped.t * term Scoped.t) list ) *)
 
   let map f s = map (fun t -> (f (Term.of_term_unsafe t) : term :> T.t)) s
-
+  
   let filter f s =
     filter
       (fun (v,sc_v) (t,sc_t) ->
@@ -372,7 +377,14 @@ module FO = struct
       s
 
   let unleak_variables subs =
-   map (fun t -> fst (Term.DB.skolemize_loosely_bound t)) subs
+   let subs_l = to_list subs in
+   let unleaked_l, new_sk = List.fold_right 
+    (fun ((v,sc_v), (t,sc_t)) (l, sk_map) ->
+      let t = Term.of_term_unsafe t in  
+      let t', sk_map = Term.DB.skolemize_loosely_bound ~already_sk:sk_map t in
+      let v' = (HVar.update_ty ~f:Type.of_term_unsafe v,sc_v) in  
+          (v', (t',sc_t))::l, sk_map) subs_l ([],Term.IntMap.empty) in
+   of_list' unleaked_l, List.map snd (Term.IntMap.bindings new_sk)
    
 end
 

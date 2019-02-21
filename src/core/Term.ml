@@ -364,22 +364,31 @@ let is_ground t = T.is_ground t
 let rec in_pfho_fragment t =
    match view t with
     | Var _ -> if (not (type_has_no_bool (ty t))) then
-               (raise (Failure (CCFormat.sprintf "Variable has wrong type %a" T.pp t)))
+               (raise (Failure (CCFormat.sprintf "Variable has wrong type [%a]" T.pp t)))
                else true
     | Const sym -> if (List.for_all type_has_no_bool (Type.expected_args (ty t))) then true
-                 else (raise (Failure (CCFormat.sprintf "Constant has wrong type: %a " ID.pp sym)))
+                 else (raise (Failure (CCFormat.sprintf "Constant has wrong type [%a] " ID.pp sym)))
     | AppBuiltin( _, l)
     | App (_, l) -> if(List.map ty l 
                      |> List.for_all type_has_no_bool
                     && List.for_all in_pfho_fragment l) then true
-                    else (raise (Failure (CCFormat.sprintf "Arugment of a term has wrong type %a" T.pp t)))  
+                    else (raise (Failure (CCFormat.sprintf "Arugment of a term has wrong type [%a]" T.pp t)))  
     | Fun (var_t, body) -> if(type_has_no_bool (var_t) && 
                            type_has_no_bool (ty body) &&
                            in_pfho_fragment body) then true
-                           else (raise (Failure (CCFormat.sprintf "Lambda body has wrong type %a" T.pp t)))
-    | DB _ -> true
+                           else (raise (Failure (CCFormat.sprintf "Lambda body has wrong type [%a]" T.pp t)))
+    | DB _ -> if(type_has_no_bool (ty t)) then true
+              else (raise (Failure "Bound variable has wrong type")) 
    and type_has_no_bool ty_ = 
     not (Type.Seq.sub ty_ |> Sequence.mem ~eq:Type.equal (Type.prop))
+
+let in_lfho_fragment t =
+   in_pfho_fragment t && 
+      (Seq.subterms t) |> 
+      (fun subts -> 
+         if Sequence.for_all (fun subt -> not (is_fun subt)) subts 
+         then true
+         else raise (Failure "has lambda"))
 
 let monomorphic t = Sequence.is_empty (Seq.ty_vars t)
 
@@ -718,7 +727,7 @@ module DB = struct
   let eval = T.DB.eval
   let unshift = T.DB.unshift
   let unbound = T.DB.unbound
-  let skolemize_loosely_bound t =  
+  let skolemize_loosely_bound ?(already_sk=IntMap.empty) t =  
    let rec aux skolemized depth subt =
       match view subt with 
       | Const _
@@ -744,7 +753,7 @@ module DB = struct
                            arg'::acc, s_new) l ([], subst)
    in Util.debugf 1 "skolemizing term: %a"
       (fun k -> k pp t);
-      aux IntMap.empty 0 t
+      aux already_sk 0 t
 
   let unskolemize sk_to_vars t = 
     let rec aux depth subt =

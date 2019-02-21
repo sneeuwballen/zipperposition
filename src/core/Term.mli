@@ -126,6 +126,7 @@ val is_fun : t -> bool
 val is_type : t -> bool (** Does it have type [tType]? *)
 
 val in_pfho_fragment : t -> bool
+val in_lfho_fragment : t -> bool
 
 val mk_fresh_skolem : var list -> Type.t -> t
 
@@ -368,7 +369,7 @@ module DB : sig
   val unshift : ?depth:int -> int -> t -> t
   val eval : t DBEnv.t -> t -> t
   val unbound : t -> int list
-  val skolemize_loosely_bound : t -> t * t IntMap.t
+  val skolemize_loosely_bound : ?already_sk:t IntMap.t -> t -> t * t IntMap.t
   val unskolemize : int Map.t -> Map.key -> t
   val map_vars_shift : ?depth:int -> int Map.t -> t -> t
 end
