@@ -387,8 +387,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           Lit.apply_subst_list renaming subst' (lits_a, sc_a) @
           Lit.apply_subst_list renaming subst' (lits_p, sc_p)
       in
-      let vars = Literals.Seq.vars (Array.of_list new_lits)
-                 |> Sequence.to_list  in 
+      let vars = if info.sup_kind = SupEXT then 
+                  Literals.Seq.vars (Array.of_list new_lits) |> Sequence.to_list
+                 else []  in 
       let vars = List.sort_uniq (HVar.compare (fun _ _ -> 0)) vars in
       let sk_with_vars = 
         List.fold_left (fun acc t -> 
