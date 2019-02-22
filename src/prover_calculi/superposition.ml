@@ -328,7 +328,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (* let n_funs = (if info.sup_kind = SupEXT then Position.num_of_funs info.passive_pos-1
                    else (-1)) in  *)
       let t' = S.FO.apply ~shift_vars:0 renaming subst (info.t, sc_a) in
-       Util.debugf ~section 1
+       Util.debugf ~section 10
       "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
        (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
       (fun k->k (kind_to_str info.sup_kind) C.pp info.active sc_a T.pp info.s T.pp info.t
@@ -387,7 +387,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           Lit.apply_subst_list renaming subst' (lits_a, sc_a) @
           Lit.apply_subst_list renaming subst' (lits_p, sc_p)
       in
-      let vars = Sequence.to_list (Literals.Seq.vars (Array.of_list new_lits)) in 
+      let vars = Literals.Seq.vars (Array.of_list new_lits)
+                 |> Sequence.to_list  in 
+      let vars = List.sort_uniq (HVar.compare (fun _ _ -> 0)) vars in
       let sk_with_vars = 
         List.fold_left (fun acc t -> 
             let new_sk_vars = Term.mk_fresh_skolem vars (Term.ty t) in 
@@ -413,6 +415,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         + (if T.is_var s' then 2 else 0) (* superposition from var = bad *)
       in
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
+      if info.sup_kind == SupEXT then
       Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       assert(List.for_all (Lit.for_all Term.DB.is_closed) new_lits);
       C.check_types new_clause;
