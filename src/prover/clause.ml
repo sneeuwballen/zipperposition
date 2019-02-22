@@ -78,10 +78,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let is_active c ~v = Trail.is_active c.sclause.trail ~v
   let penalty c = c.penalty
 
-  let is_inj_axiom c =
-     
-    None
-
   let trail_l = function
     | [] -> Trail.empty
     | [c] -> c.sclause.trail
@@ -308,6 +304,27 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let to_sclause c = c.sclause
 
   let to_s_form c = SClause.to_s_form c.sclause
+
+  let is_inj_axiom c =
+    if CCArray.length (lits c) = 2 then (
+      let inj_defs = CCArray.filter_map Lit.as_inj_def (lits c) in
+      if (CCArray.length inj_defs) != 1 then None
+      else (
+         let sym, var_pairs = CCArray.get inj_defs 0 in
+         let l = CCArray.filter_map Lit.as_pos_pure_var (lits c) |> CCArray.to_list in
+         if List.length l != 1 then None
+         else (
+           let (x, y) = List.hd l in
+           let v_eq = HVar.equal Type.equal in
+           let rec args_same n = function 
+            | [] -> None
+            | (x', y') :: xs -> if (v_eq x x' && v_eq y y') || 
+                                   (v_eq x y' && v_eq y x') then Some (sym, n)
+                                else args_same (n+1) xs in
+           args_same 0 var_pairs
+         )
+      )
+    ) else None
 
   module Seq = struct
     let lits c = Sequence.of_array c.sclause.lits

@@ -31,7 +31,7 @@ module Make(X : PARAMETERS) = struct
   let _signature = ref X.signature
   let _complete = ref true
 
-  let _inj_syms = ref ID.Set.empty
+  let _inj_syms = ref ID.Map.empty
 
   let renaming = S.Renaming.create ()
   let ord () = !_ord
@@ -81,11 +81,17 @@ module Make(X : PARAMETERS) = struct
     Util.exit_prof prof_declare_sym;
     ()
 
-  let set_injective sym = 
-   _inj_syms := ID.Set.add sym !_inj_syms
+  let set_injective_for_arg sym i = 
+   let arg_bv = 
+      match ID.Map.find_opt sym !_inj_syms with
+       Some res -> res
+       | None -> CCBV.empty () in 
+   CCBV.set arg_bv i
 
-  let is_injective sym =
-    ID.Set.mem sym !_inj_syms
+  let is_injective_for_arg sym i  =
+    match ID.Map.find_opt sym !_inj_syms with
+     Some res -> CCBV.get res i
+     | None -> false 
    
 
   module Lit = struct

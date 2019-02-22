@@ -1108,8 +1108,8 @@ let as_inj_def lit =
   | Some (l, r, false) ->
      (try  
       let hd_l, hd_r = T.head_exn l, T.head_exn r in
-      let args_l = VS.of_list (List.map _as_var (T.args l)) in
-      let args_r = VS.of_list (List.map _as_var (T.args r)) in
+      let vars_l, vars_r = List.map _as_var (T.args l), List.map _as_var (T.args r) in
+      let args_l, args_r = VS.of_list vars_l, VS.of_list vars_r in
       
       (* We are looking for literal f X1 ... Xn ~= f Y1 ... Yn 
          where all X_i, Y_i are different pairwise, but form each
@@ -1119,7 +1119,7 @@ let as_inj_def lit =
          VS.cardinal args_r = List.length (T.args r) &&
          VS.cardinal args_l = VS.cardinal args_r &&
          VS.inter args_l args_r = VS.empty then
-      Some( hd_l, List.combine (VS.to_list args_l) (VS.to_list args_r) )
+      Some( hd_l, List.combine vars_l vars_r )
       else None
      with Invalid_argument _ -> None)
   | _ -> None

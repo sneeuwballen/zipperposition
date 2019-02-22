@@ -72,8 +72,9 @@ module type S = sig
   val is_active : t -> v:Trail.valuation -> bool
   (** True if the clause's trail is active in this valuation *)
 
-  val is_inj_axiom : t -> ID.t option
-  (** Returns Some sym if clause is injectivity axiom for symbol sym. *)
+  val is_inj_axiom : t -> (ID.t * int) option
+  (** Returns Some (sym,i) if clause is injectivity axiom for ith argument
+      of symbol sym. *)
 
   (** {2 Constructors} *)
 
