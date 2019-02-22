@@ -390,6 +390,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let vars = if info.sup_kind = SupEXT then 
                   Literals.Seq.vars (Array.of_list new_lits) |> Sequence.to_list
                  else []  in 
+      (* For some reason type comparison does not work. *)
       let vars = List.sort_uniq (HVar.compare (fun _ _ -> 0)) vars in
       let sk_with_vars = 
         List.fold_left (fun acc t -> 
@@ -1657,7 +1658,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let subsumes_with a b =
     Util.enter_prof prof_subsumption;
     Util.incr_stat stat_subsumption_call;
-    let res = subsumes_with_ a b in
+    let (c_a, _), (c_b, _) = a,b in 
+    let w_a = CCArray.fold (fun acc l -> acc + Lit.weight l) 0 c_a in
+    let w_b = CCArray.fold (fun acc l -> acc + Lit.weight l) 0 c_b in
+    let res = if w_a <= w_b then subsumes_with_ a b else None in
     Util.exit_prof prof_subsumption;
     res
 
@@ -1687,6 +1691,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and equate_root a b u v: Subst.t option =
       let check_ a b u v =
         try
+          if Term.size a > Term.size u || Term.size b > Term.size v then
+            raise Unif.Fail;
           let subst = Unif.FO.matching ~pattern:(a, sc_a) (u, sc_b) in
           let subst = Unif.FO.matching ~subst ~pattern:(b, sc_a) (v, sc_b) in
           Some subst
