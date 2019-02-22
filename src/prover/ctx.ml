@@ -85,8 +85,9 @@ module Make(X : PARAMETERS) = struct
    let arg_bv = 
       match ID.Map.find_opt sym !_inj_syms with
        Some res -> res
-       | None -> CCBV.empty () in 
-   CCBV.set arg_bv i
+       | None -> CCBV.empty () in
+   (CCBV.set arg_bv i);
+   _inj_syms := ID.Map.add sym arg_bv !_inj_syms
 
   let is_injective_for_arg sym i  =
     match ID.Map.find_opt sym !_inj_syms with

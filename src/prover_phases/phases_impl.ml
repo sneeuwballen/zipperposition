@@ -302,6 +302,10 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
     )
   in
   Signal.send Env.on_start ();
+  CCVector.iter (fun c -> match Env.C.is_inj_axiom c with 
+                          | Some (sym,i) -> (Format.eprintf "Setting %a:%d inj.\n" ID.pp sym i;
+                                            Env.Ctx.set_injective_for_arg sym i)
+                          | None -> ()) clauses.Clause.c_set;
   let result, num = match result with
     | Saturate.Unsat _ -> result, 0  (* already found unsat during presaturation *)
     | _ -> Sat.given_clause ~generating:true ?steps ?timeout ()
