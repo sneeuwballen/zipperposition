@@ -1981,6 +1981,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and is_trivial = is_tautology in
     if !_complete_ho_unification
     then (
+      
       Env.add_binary_inf "superposition_passive" infer_passive_complete_ho;
       Env.add_binary_inf "superposition_active" infer_active_complete_ho;
       Env.add_unary_inf "equality_factoring" infer_equality_factoring_complete_ho;

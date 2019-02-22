@@ -48,6 +48,9 @@ module type S = sig
   val on_new_symbol : (ID.t * Type.t) Signal.t
   val on_signature_update : Signature.t Signal.t
 
+  val set_injective : ID.t -> unit
+  val is_injective : ID.t -> bool
+
   (** {2 Literals} *)
 
   module Lit : sig

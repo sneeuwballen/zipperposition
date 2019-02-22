@@ -9,6 +9,7 @@ module PB = Position.Build
 module P = Position
 module AL = Int_lit
 module US = Unif_subst
+module VS = T.VarSet
 
 type term = Term.t
 
@@ -627,6 +628,7 @@ let is_absurd_tags lit = match lit with
   | Int _ -> [Builtin.Tag.T_lia]
   | Rat _ -> [Builtin.Tag.T_lra]
 
+
 let fold_terms ?(position=Position.stop) ?(vars=false) ?(var_args=true) ?(fun_bodies=true) ?ty_args ~which ?(ord=Ordering.none) ~subterms lit k =
   (* function to call at terms *)
   let at_term ~pos t =
@@ -1098,3 +1100,37 @@ module View = struct
 
   let unfocus_rat x = Rat (Rat_lit.Focus.unfocus x)
 end
+
+let _as_var = fun t -> T.as_var_exn (Lambda.eta_reduce t)
+
+let as_inj_def lit =
+  match View.as_eqn lit with
+  | Some (l, r, false) ->
+     (try  
+      let hd_l, hd_r = T.head_exn l, T.head_exn r in
+      let args_l = VS.of_list (List.map _as_var (T.args l)) in
+      let args_r = VS.of_list (List.map _as_var (T.args r)) in
+      
+      (* We are looking for literal f X1 ... Xn ~= f Y1 ... Yn 
+         where all X_i, Y_i are different pairwise, but form each
+         other also. *)
+      if hd_l = hd_r && 
+         VS.cardinal args_l = List.length (T.args l) &&
+         VS.cardinal args_r = List.length (T.args r) &&
+         VS.cardinal args_l = VS.cardinal args_r &&
+         VS.inter args_l args_r = VS.empty then
+      Some( hd_l, List.combine (VS.to_list args_l) (VS.to_list args_r) )
+      else None
+     with Invalid_argument _ -> None)
+  | _ -> None
+
+let as_pos_pure_var lit =
+   match View.as_eqn lit with 
+   | Some (l, r, true) ->
+      (try
+        let val_l, val_r = _as_var l, _as_var r in
+        if (HVar.equal Type.equal val_l val_r) then None
+        else Some (val_l, val_r)  
+       with Invalid_argument _ -> None)
+
+   | _ -> None

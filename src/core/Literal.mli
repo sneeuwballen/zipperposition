@@ -151,6 +151,9 @@ val is_trivial : t -> bool
 val is_absurd : t -> bool
 val is_absurd_tags : t -> Proof.tag list (** if [is_absurd lit], return why *)
 
+val as_inj_def : t -> (ID.t * (Term.var * Term.var) list) option
+val as_pos_pure_var : t -> (Term.var * Term.var) option
+
 val fold_terms :
   ?position:Position.t -> ?vars:bool -> ?var_args:bool -> ?fun_bodies:bool -> ?ty_args:bool -> 
   which:[<`Max|`All] ->

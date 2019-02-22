@@ -78,6 +78,10 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let is_active c ~v = Trail.is_active c.sclause.trail ~v
   let penalty c = c.penalty
 
+  let is_inj_axiom c =
+     
+    None
+
   let trail_l = function
     | [] -> Trail.empty
     | [c] -> c.sclause.trail
