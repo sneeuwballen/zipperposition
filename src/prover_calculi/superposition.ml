@@ -1859,10 +1859,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.exit_prof prof_clc;
     res
 
-  let inject_destruct lit = 
-    match Literal.View.as_eqn lit with
-    | Some (l, r, false) -> 
-      (try 
+  let inject_destruct lit =
+    let rec destruct l r = (try 
         let l_hd, l_args = T.as_app l in
         let r_hd, r_args = T.as_app r in
         let s_sym, t_sym = T.as_const_exn l_hd, T.as_const_exn r_hd in
@@ -1876,15 +1874,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           if CCList.length diffs = 1 then (
             let (i, s_i, t_i) = CCList.hd diffs in
             if (Env.Ctx.is_injective_for_arg s_sym i)
-            then (
-               Format.fprintf Format.err_formatter "Simplified %a ~= %a into %a ~= %a\n"
-               T.pp l T.pp r T.pp s_i T.pp t_i;
-               Some(Literal.mk_neq s_i t_i,[],[])
-            )
-            else  (Format.fprintf Format.err_formatter "%a was not inj for %d\n" ID.pp s_sym i; None)
+            then Some(Literal.mk_neq s_i t_i,[],[])
+            else destruct s_i t_i
           ) else None
         ) else None
-      with Invalid_argument _ -> None)
+      with Invalid_argument _ -> None) in  
+    match Literal.View.as_eqn lit with
+    | Some (l, r, false) -> 
+       destruct l r
     | _ -> None
 
   (* ----------------------------------------------------------------------
@@ -2045,7 +2042,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     then Env.add_is_trivial is_semantic_tautology;
     Env.add_is_trivial is_trivial;
     Env.add_lit_rule "distinct_symbol" handle_distinct_constants;
-    Env.add_lit_rule "inject_destruct" inject_destruct;
+    (* Env.add_lit_rule "inject_destruct" inject_destruct; *)
     setup_dot_printers ();
     ()
 end

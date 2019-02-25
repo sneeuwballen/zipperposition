@@ -118,6 +118,9 @@ module Make(E : Env.S) = struct
             let new_clauses = CCVector.create () in
             assert (not (Env.is_redundant c));
             (* process the given clause! *)
+            (* (match Env.C.is_inj_axiom c with 
+               | Some (sym,i) -> Env.Ctx.set_injective_for_arg sym i
+               | None -> ()); *)
             Util.incr_stat stat_processed_given;
             Util.debugf ~section 1 "@[@{<Yellow>### step %5d ###@}@]"(fun k->k num);
             Util.debugf ~section 1 "@[<2>@{<green>given@} (%d steps, penalty %d):@ `@[%a@]`@]"
