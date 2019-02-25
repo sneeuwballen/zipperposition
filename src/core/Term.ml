@@ -193,6 +193,7 @@ let is_fun t = match T.view t with
   | T.Bind (Binder.Lambda, _, _) -> true
   | _ -> false
 
+
 let is_app t = match T.view t with
   | T.Const _
   | T.App _ -> true
@@ -222,6 +223,9 @@ let rec as_fun t = match view t with
 
 let head_term t = fst (as_app t)
 let args t = snd (as_app t)
+
+let is_app_var t = is_var @@ head_term t &&
+                   List.length @@ args t > 0
 
 let head_term_mono t = match view t with
   | App (f,l) ->
@@ -369,8 +373,8 @@ let rec in_pfho_fragment t =
     | Const sym -> if (List.for_all type_has_no_bool (Type.expected_args (ty t))) then true
                  else (raise (Failure (CCFormat.sprintf "Constant has wrong type [%a] " ID.pp sym)))
     | AppBuiltin( _, l)
-    | App (_, l) -> if(List.map ty l 
-                     |> List.for_all type_has_no_bool
+    | App (_, l) -> if((not (is_var (head_term t)) || type_has_no_bool (ty t)) &&
+                      List.map ty l |> List.for_all type_has_no_bool
                     && List.for_all in_pfho_fragment l) then true
                     else (raise (Failure (CCFormat.sprintf "Arugment of a term has wrong type [%a]" T.pp t)))  
     | Fun (var_t, body) -> if(type_has_no_bool (var_t) && 

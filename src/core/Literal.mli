@@ -150,6 +150,7 @@ module Set : CCSet.S with type elt = t
 val is_trivial : t -> bool
 val is_absurd : t -> bool
 val is_absurd_tags : t -> Proof.tag list (** if [is_absurd lit], return why *)
+val is_app_var_eq : t -> bool
 
 val as_inj_def : t -> (ID.t * (Term.var * Term.var) list) option
 val as_pos_pure_var : t -> (Term.var * Term.var) option

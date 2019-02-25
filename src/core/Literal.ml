@@ -148,6 +148,10 @@ let is_eqn = function
 let is_eq lit = is_eqn lit && is_pos lit
 let is_neq lit = is_eqn lit && is_neg lit
 
+let is_app_var_eq = function
+   | Equation (l,r,_) -> T.is_app_var l && T.is_app_var r
+   | _ -> false
+
 let is_prop = function
   | Prop _
   | True

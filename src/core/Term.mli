@@ -123,6 +123,7 @@ val is_bvar : t -> bool
 val is_app : t -> bool
 val is_const : t -> bool
 val is_fun : t -> bool
+val is_app_var : t -> bool
 val is_type : t -> bool (** Does it have type [tType]? *)
 
 val in_pfho_fragment : t -> bool

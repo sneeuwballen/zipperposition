@@ -129,6 +129,41 @@ let max_goal ~strict ~ord lits =
         BV.empty ()  (* empty one *)
     end)
 
+let ho_sel_driver ~ord lits f = 
+  let neg_max = CCArray.mapi (fun i l -> i,l)  lits
+                  |> CCArray.filter (fun (i,l) -> Lit.is_neg l && 
+                                                  Literals.is_max ~ord lits i) in
+    if CCArray.length neg_max = 0 then BV.empty ()
+    else (
+      CCArray.fast_sort (fun (i, _) (j, _) -> compare (f i) (f j)) neg_max; 
+      let idx, _ = CCArray.get neg_max 0 in
+      let res = BV.empty () in
+      BV.set res idx; 
+      res 
+    )
+
+let avoid_app_var ~ord lits =
+  mk_ ~ord lits ~f:(fun lits ->
+    let avoid_av_feature i  =
+      let l = lits.(i) in 
+        (Lit.is_app_var_eq l,
+        Lit.Seq.terms l |> Sequence.fold (fun acc t -> 
+          if (T.is_app_var t) then (acc+1) else acc) 0,
+        Lit.weight l) in
+    ho_sel_driver ~ord lits avoid_av_feature
+  )
+
+let prefer_app_var ~ord lits =
+  mk_ ~ord lits ~f:(fun lits ->
+    let prefer_av_feature i  =
+      let l = lits.(i) in 
+        (not (Lit.is_app_var_eq l),
+         - (Lit.Seq.terms l |> Sequence.fold (fun acc t -> 
+          if (T.is_app_var t) then (acc+1) else acc) 0),
+        -Lit.weight l) in
+    ho_sel_driver ~ord lits prefer_av_feature
+  )
+
 let except_RR_horn (p:parametrized) ~strict ~ord lits =
   if Lits.is_RR_horn_clause lits
   then BV.empty () (* do not select (conditional rewrite rule) *)
@@ -141,7 +176,9 @@ let default = max_goal ~strict:true
 let l =
   let basics =
     [ "NoSelection", (fun ~ord:_ -> no_select);
-      "default", default
+      "default", default;
+      "avoid_app_var", avoid_app_var;
+      "prefer_app_var", prefer_app_var;
     ]
   and by_ord =
     CCList.flat_map
@@ -179,5 +216,5 @@ let () =
       "--ho-selection-restriction", ho_restriction_opt, " selection restrictions for lambda-free higher-order terms (none/no-var-heading-max-term/no-var-different-args/no-unapplied-var-occurring-applied/no-ho-vars)"
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
-    _ho_restriction := `NoHigherOrderVariables
+    _ho_restriction := `None
   );
