@@ -12,7 +12,6 @@ module H = Helpers
 let (==>) = QCheck.(==>)
 let t_test = (module T : Alcotest.TESTABLE with type t = T.t)
 let ty_test = (module Type : Alcotest.TESTABLE with type t = Type.t)
-
 (* unit tests *)
 
 let f_ = ID.make "f"
@@ -43,6 +42,13 @@ let test_db_shift = "db shift", `Quick, fun () ->
   let t' = T.of_term_unsafe (InnerTerm.DB.shift 1 (t:T.t:>InnerTerm.t)) in
   let t1 = T.fun_ ty (f (T.bvar ~ty 0) (g (T.bvar ~ty 2))) in
   Alcotest.(check t_test) "db_shift" t1 t';
+  ()
+
+let test_app_var = "is_appvar", `Quick, fun () -> 
+  let app_var = fun_var a b in
+  let not_app_var = x in
+  Alcotest.(check bool) "is_appvar" (T.is_app_var app_var) true;
+  Alcotest.(check bool) "is_nappvar" (T.is_app_var not_app_var) false;
   ()
 
 let test_db_unshift = "db unshift", `Quick, fun () ->
@@ -147,6 +153,7 @@ let test_eta_expand = "eta expand", `Quick, fun () ->
 let suite : unit Alcotest.test_case list =
   [ test_db_shift;
     test_db_unshift;
+    test_app_var;
     test_whnf1;
     test_whnf2;
     test_polymorphic_app;

@@ -386,11 +386,11 @@ let suite_unif1 : unit Alcotest.test_case list =
       >>> Action.yield "p_ho2 G G"
       >>> (Action.eq "F1" 0 "G" 1 >?-> "term -> term")
       >>> (Action.eq "F2" 0 "G" 1 >?-> "term -> term");
-
+(* 
       (" fun x y. f (X x) (g (X y)) " =?= "fun x y. f (Y y) (g a)")
-      >>> Action.yield "fun x y. f (g a) (g a)";
+      >>> Action.yield "fun x y. f (g a) (g a)"; *)
 
-      (" fun x. g (X x)" <?> "fun x. X x");
+      (* (" fun x. g (X x)" <?> "fun x. X x"); *)
 
       ("p_ho2 (fun Y0. d) (fun Y0. F1 Y0)" =?=
        "p_ho2 (fun Y0. d) (fun Y0. (f_ho2 (fun Y1. Y1) (fun Y2. X)))");

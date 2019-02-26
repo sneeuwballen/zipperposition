@@ -102,6 +102,7 @@ let () =
     [ "--depth-limit", Arg.Int enable_depth_limit, " set maximal term depth";
       "--max-vars", Arg.Set_int max_vars, " maximum number of variables per clause";
       "--no-max-vars", Arg.Set no_max_vars, " disable maximum number of variables per clause";
+      "--enable-max-vars", Arg.Clear no_max_vars, "enable maximum number of variables per clause";
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
     no_max_vars := true

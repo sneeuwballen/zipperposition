@@ -88,7 +88,7 @@ let validate_fun_ ~ord lits bv =
   else (
     Sequence.of_array_i lits
     |> Sequence.exists
-      (fun (i,_) -> can_select_lit ~ord lits i && BV.get bv i)
+      (fun (i,_) -> not (BV.get bv i) || can_select_lit ~ord lits i)
   )
 
 (* build a selection function in general, given the more specialized
@@ -129,10 +129,9 @@ let max_goal ~strict ~ord lits =
         BV.empty ()  (* empty one *)
     end)
 
-let ho_sel_driver ~ord lits f = 
+let ho_sel_driver lits f = 
   let neg_max = CCArray.mapi (fun i l -> i,l)  lits
-                  |> CCArray.filter (fun (i,l) -> Lit.is_neg l && 
-                                                  Literals.is_max ~ord lits i) in
+                  |> CCArray.filter (fun (_,l) -> Lit.is_neg l) in
     if CCArray.length neg_max = 0 then BV.empty ()
     else (
       CCArray.fast_sort (fun (i, _) (j, _) -> compare (f i) (f j)) neg_max; 
@@ -147,10 +146,11 @@ let avoid_app_var ~ord lits =
     let avoid_av_feature i  =
       let l = lits.(i) in 
         (Lit.is_app_var_eq l,
+         not (Lits.is_max ~ord lits i),
         Lit.Seq.terms l |> Sequence.fold (fun acc t -> 
           if (T.is_app_var t) then (acc+1) else acc) 0,
         Lit.weight l) in
-    ho_sel_driver ~ord lits avoid_av_feature
+    ho_sel_driver lits avoid_av_feature
   )
 
 let prefer_app_var ~ord lits =
@@ -158,10 +158,11 @@ let prefer_app_var ~ord lits =
     let prefer_av_feature i  =
       let l = lits.(i) in 
         (not (Lit.is_app_var_eq l),
+         not (Lits.is_max ~ord lits i),
          - (Lit.Seq.terms l |> Sequence.fold (fun acc t -> 
           if (T.is_app_var t) then (acc+1) else acc) 0),
         -Lit.weight l) in
-    ho_sel_driver ~ord lits prefer_av_feature
+    ho_sel_driver lits prefer_av_feature
   )
 
 let except_RR_horn (p:parametrized) ~strict ~ord lits =
@@ -216,5 +217,5 @@ let () =
       "--ho-selection-restriction", ho_restriction_opt, " selection restrictions for lambda-free higher-order terms (none/no-var-heading-max-term/no-var-different-args/no-unapplied-var-occurring-applied/no-ho-vars)"
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
-    _ho_restriction := `None
+    _ho_restriction := `NoHigherOrderVariables
   );
