@@ -11,13 +11,13 @@ module S = Subst
 let prof_traverse = Util.mk_profiler "fingerprint.traverse"
 
 (* a feature.
-   A = variable
-   B = below variable
-   NonFO = Builtin/nonFO (non-syntactically unifiable)
-   N = invalid position
-   S = symbol
+   A    = variable
+   B    = below variable
+   DB i = De-Bruijn index i 
+   N    = invalid position
+   S c  = symbol c
 *)
-type feature = A | B | NonFO | N | S of ID.t
+type feature = A | B | DB of int | N | S of ID.t | Ignore
 
 (* a fingerprint function, it computes several features of a term *)
 type fingerprint_fun = T.t -> feature list
@@ -28,21 +28,28 @@ type fingerprint_fun = T.t -> feature list
    are useful instead of folding and filtering *)
 
 (* compute a feature for a given position *)
-let rec gfpf pos t = match pos, T.Classic.view t with
-  | [], T.Classic.Var _ -> A
-  | [], T.Classic.DB _ -> B
-  | [], _
-    when not (Unif.Ty.type_is_unifiable @@ T.ty t) ||
-         Type.is_fun (T.ty t) -> NonFO
-  | [], T.Classic.App (s, _) -> S s
-  | i::pos', T.Classic.App (_, l) ->
-    begin try gfpf pos' (List.nth l i)  (* recurse in subterm *)
-      with Failure _ -> N  (* not a position in t *)
-    end
-  | _::_, T.Classic.DB _ -> N
-  | _::_, T.Classic.Var _ -> B  (* under variable *)
-  | _, T.Classic.AppBuiltin _
-  | _, T.Classic.NonFO -> NonFO (* don't filter! *)
+let rec gfpf pos t = 
+  match pos with 
+  | [] -> gfpf_root t
+  | i::is -> 
+      let _, body = T.open_fun t in
+      let hd, args = T.as_app body in
+      if T.is_var hd then B
+      else (
+        if List.length args > i then (
+          gfpf is (List.nth args i)
+        ) 
+        else N 
+      )
+and gfpf_root t =
+  match T.view t with 
+  | T.AppBuiltin(_, _) -> Ignore
+  | T.DB i -> DB i
+  | T.Var _ -> A
+  | T.Const c -> S c 
+  | T.App (hd, _) -> if (T.is_var hd) then B 
+                        else S (T.as_const_exn hd)
+  | T.Fun (_, _) -> assert false 
 
 (* TODO more efficient way to compute a vector of features: if the fingerprint
    is in BFS, compute features during only one traversal of the term? *)
@@ -75,40 +82,59 @@ let feat_to_int_ = function
   | B -> 1
   | S _ -> 2
   | N -> 3
-  | NonFO -> 4
+  | DB _ -> 4
+  | Ignore -> 5
 
 let cmp_feature f1 f2 = match f1, f2 with
   | A, A
   | B, B
   | N, N
-  | NonFO, NonFO
+  | Ignore, Ignore
     -> 0
   | S s1, S s2 -> ID.compare s1 s2
+  | DB i, DB j -> compare i j
   | _ -> feat_to_int_ f1 - feat_to_int_ f2
 
 (** check whether two features are compatible for unification. *)
 let compatible_features_unif f1 f2 =
-  match f1, f2 with
-    | S s1, S s2 -> ID.equal s1 s2
-    | NonFO, _ | _, NonFO
-    | B, _ | _, B -> true
-    | A, N | N, A -> false
-    | A, _ | _, A -> true
-    | N, S _ | S _, N -> false
-    | N, N -> true
+  match f1 with
+  | S s1 -> (match f2 with
+             | S s2 -> ID.equal s1 s2 
+             | A | B | Ignore -> true
+             | _ -> false)
+  | Ignore 
+  | B    -> true
+  | A    -> (match f2 with
+             | DB _ | N | Ignore -> false
+             | _ -> true)
+  | DB i -> (match f2 with 
+             | DB j -> i = j
+             | B | Ignore -> true
+             | _ -> false)
+  | N ->    (match f2 with 
+             | N | B | Ignore -> true
+             | _ -> false)
 
 (** check whether two features are compatible for matching. *)
 let compatible_features_match f1 f2 =
-  match f1, f2 with
-    | S s1, S s2 -> ID.equal s1 s2
-    | NonFO, _ | _, NonFO
-    | B, _ -> true
-    | N, N -> true
-    | N, _ -> false
-    | _, N -> false
-    | A, B -> false
-    | A, _ -> true
-    | S _, _ -> false
+  match f1 with
+  | S s1 -> (match f2 with
+             | S s2 -> ID.equal s1 s2
+             | Ignore -> true 
+             | _ -> false)
+  | Ignore 
+  | B    -> true
+  | A    -> (match f2 with
+             | A | S _ | Ignore -> true
+             | _ -> false)
+  | DB i -> (match f2 with 
+             | DB j -> i = j
+             | Ignore -> true
+             | _ -> false)
+  | N ->    (match f2 with 
+             | N | Ignore -> true
+             | _ -> false)
+
 
 (** Map whose keys are features *)
 module FeatureMap = Map.Make(struct
@@ -182,7 +208,7 @@ module Make(X : Set.OrderedType) = struct
         | Node _, [] | Leaf _, _::_ ->
           failwith "different feature length in fingerprint trie"
     in
-    let features = idx.fp t in  (* features of term *)
+    let features = idx.fp (Lambda.eta_expand t) in  (* features of term *)
     { idx with trie = recurse idx.trie features; }
 
   let add_ trie = CCFun.uncurry (add trie)
@@ -219,7 +245,7 @@ module Make(X : Set.OrderedType) = struct
         | Node _, [] | Leaf _, _::_ ->
           failwith "different feature length in fingerprint trie"
     in
-    let features = idx.fp t in  (* features of term *)
+    let features = idx.fp (Lambda.eta_expand t) in  (* features of term *)
     { idx with trie = recurse idx.trie features; }
 
   let remove_ trie = CCFun.uncurry (remove trie)
@@ -274,7 +300,7 @@ module Make(X : Set.OrderedType) = struct
       raise e
 
   let retrieve_unifiables_aux fold_unify (idx,sc_idx) t k =
-    let features = idx.fp (fst t) in
+    let features = idx.fp (Lambda.eta_expand @@ fst t) in
     let compatible = compatible_features_unif in
     traverse ~compatible idx features
       (fun leaf -> fold_unify (leaf,sc_idx) t k)
@@ -284,14 +310,14 @@ module Make(X : Set.OrderedType) = struct
   let retrieve_unifiables_complete = retrieve_unifiables_aux Leaf.fold_unify_complete
 
   let retrieve_generalizations ?(subst=S.empty) (idx,sc_idx) t k =
-    let features = idx.fp (fst t) in
+    let features = idx.fp (Lambda.eta_expand @@ fst t) in
     (* compatible t1 t2 if t2 can match t1 *)
     let compatible f1 f2 = compatible_features_match f2 f1 in
     traverse ~compatible idx features
       (fun leaf -> Leaf.fold_match ~subst (leaf,sc_idx) t k)
 
   let retrieve_specializations ?(subst=S.empty) (idx,sc_idx) t k =
-    let features = idx.fp (fst t) in
+    let features = idx.fp (Lambda.eta_expand @@ fst t) in
     let compatible = compatible_features_match in
     traverse ~compatible idx features
       (fun leaf -> Leaf.fold_matched ~subst (leaf,sc_idx) t k)
