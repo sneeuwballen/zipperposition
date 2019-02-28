@@ -48,7 +48,7 @@ and gfpf_root t =
   | T.Var _ -> A
   | T.Const c -> S c 
   | T.App (hd, _) -> if (T.is_var hd) then B 
-                        else S (T.as_const_exn hd)
+                     else S (T.as_const_exn hd)
   | T.Fun (_, _) -> assert false 
 
 (* TODO more efficient way to compute a vector of features: if the fingerprint
