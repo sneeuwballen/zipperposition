@@ -12,6 +12,7 @@ open Comparison
 let prof_rpo6 = Util.mk_profiler "compare_rpo6"
 let prof_kbo = Util.mk_profiler "compare_kbo"
 
+
 module T = Term
 module TC = Term.Classic
 
@@ -195,8 +196,8 @@ module KBO : ORD = struct
     | Head.B _ -> W.one
     | Head.I s -> Prec.weight prec s
     | Head.V _ -> weight_var_headed
-    | Head.DB _ -> W.one
-    | Head.LAM -> W.one
+    | Head.DB _ -> Prec.db_weight prec
+    | Head.LAM -> Prec.lam_weight prec
 
   (** Higher-order KBO *)
   let rec kbo ~prec t1 t2 =
@@ -544,3 +545,12 @@ let register name ord =
   if Hashtbl.mem tbl_ name
   then invalid_arg ("ordering name already used: " ^ name)
   else Hashtbl.add tbl_ name ord
+
+
+let () =
+  (* [ "--db-weight"
+  , Arg.Set_int _db_weight
+  , " set KBO weight of DeBrujin indices"
+  ; "--db-weight"
+  , Arg.Set_int _lam_weight
+  , " set KBO weight of lambda symbols"]; *) ();

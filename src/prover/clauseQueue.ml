@@ -22,6 +22,7 @@ let profiles_ =
   ; "ground", P_ground
   ; "goal", P_goal
   ; "conjecture-relative", P_conj_rel
+  ; "conjecture-relative-var", P_conj_rel_var
   ]
 
 let profile_of_string s =
@@ -93,8 +94,7 @@ module Make(C : Clause_intf.S) = struct
       | Lit.Prop (head,sign) -> (calc_tweight head sg v w c_mul, sign)
       | _ -> (0,false)
 
-
-    let conj_relative c =
+    let conj_relative ?(distinct_vars_mul=0) c =
       let sgn = C.Ctx.signature () in
       let pos_mul = 1.3 in
       let max_mul = 1.3 in
@@ -102,12 +102,20 @@ module Make(C : Clause_intf.S) = struct
       let conj_mul = 0.16 in
         Array.mapi (fun i xx -> i,xx) (C.lits c)
         |> 
-        Array.fold_left (fun acc (i,l) -> acc +. 
+        (Array.fold_left (fun acc (i,l) -> acc +. 
                           let l_w, l_s = (calc_lweight l sgn v f conj_mul) in 
                             ( if l_s then pos_mul else 1.0 )*.
                             ( if C.is_maxlit (c,0) Subst.empty ~idx:i then max_mul else 1.0)*. 
-                            float_of_int l_w ) 0.0
-        |> int_of_float
+                            float_of_int l_w ) 0.0) 
+        |> (fun res -> 
+              if distinct_vars_mul =0 then int_of_float res
+              else let n_vars = 
+                (Literals.vars (C.lits c)
+                 |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))
+                 |> List.length) in 
+                int_of_float ((float_of_int (n_vars*n_vars)) /. 5.0) * distinct_vars_mul 
+                + (int_of_float res) )
+
 
     let penalty = C.penalty
 
@@ -318,7 +326,11 @@ module Make(C : Clause_intf.S) = struct
     make ~ratio:6 ~weight "default"
 
   let conj_relative_mk () : t =
-    make ~ratio:4 ~weight:WeightFun.conj_relative "conj_relative"
+    make ~ratio:5 ~weight:WeightFun.conj_relative "conj_relative"
+
+  let conj_var_relative_mk () : t =
+    make ~ratio:5 ~weight:(WeightFun.conj_relative ~distinct_vars_mul:20) 
+         "conj_relative_var"
 
   let of_profile p =
     let open ClauseQueue_intf in
@@ -330,6 +342,7 @@ module Make(C : Clause_intf.S) = struct
       | P_ground -> ground ()
       | P_goal -> goal_oriented ()
       | P_conj_rel ->  conj_relative_mk ()
+      | P_conj_rel_var -> conj_var_relative_mk ()
 
   let pp out q = CCFormat.fprintf out "queue %s" (name q)
   let to_string = CCFormat.to_string pp

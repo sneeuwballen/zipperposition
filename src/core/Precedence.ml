@@ -10,6 +10,9 @@ type symbol_status =
 
 let section = Util.Section.(make "precedence")
 
+let db_w = 10
+let lmb_w = 1
+
 (** {2 Weight of Symbols} *)
 module Weight = struct
   type t = {
@@ -132,6 +135,8 @@ type t = {
   (* weight function *)
   mutable arg_coeff: ID.t -> int list;
   (* argument coefficients *)
+  db_w : int;
+  lmb_w : int;
   constr : [`total] Constr.t;
   (* constraint used to build and update the precedence *)
 }
@@ -170,6 +175,9 @@ let mem p s =
 let status p s = ID.Tbl.get_or ~default:LengthLexicographic p.status s
 
 let weight p s = p.weight s
+
+let db_weight p = Weight.int p.db_w
+let lam_weight p = Weight.int p.lmb_w
 
 let arg_coeff p s i = try List.nth (p.arg_coeff s) i with _ -> 1
 
@@ -248,7 +256,9 @@ let check_inv_ p =
   in
   sorted_ p.snapshot
 
-let create ?(weight=weight_constant) ?(arg_coeff=arg_coeff_default) c l =
+let create ?(weight=weight_constant) ?(arg_coeff=arg_coeff_default)
+           ?(db_w=db_w) ?(lmb_w=lmb_w)
+           c l =
   let l = CCList.sort_uniq ~cmp:c l in
   let tbl = lazy (mk_tbl_ l) in
   let res = {
@@ -256,6 +266,8 @@ let create ?(weight=weight_constant) ?(arg_coeff=arg_coeff_default) c l =
     tbl;
     weight;
     arg_coeff;
+    db_w;
+    lmb_w;
     status=ID.Tbl.create 16;
     constr=c;
   } in

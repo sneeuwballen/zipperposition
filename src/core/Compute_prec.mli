@@ -33,7 +33,7 @@ val add_status : (ID.t * Precedence.symbol_status) list -> t -> t
 (** Specify explicitely the status of some symbols *)
 
 val mk_precedence :
-  t ->
+  db_w:int -> lmb_w:int -> t ->
   Statement.clause_t Sequence.t ->
   Precedence.t
 (** Make a precedence *)

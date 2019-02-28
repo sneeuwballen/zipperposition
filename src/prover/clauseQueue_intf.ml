@@ -9,6 +9,7 @@ type profile =
   | P_ground
   | P_goal
   | P_conj_rel
+  | P_conj_rel_var
 
 (** {1 A priority queue of clauses, purely functional} *)
 module type S = sig
@@ -41,7 +42,7 @@ module type S = sig
     (** The closest a clause is from the initial goal, the lowest its weight.
         Some threshold is used for clauses that are too far away *)
 
-   val conj_relative : t
+   val conj_relative : ?distinct_vars_mul:int -> t
 
     val combine : (t * int) list -> t
     (** Combine a list of pairs [w, coeff] where [w] is a weight function,

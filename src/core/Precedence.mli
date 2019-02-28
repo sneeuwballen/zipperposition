@@ -108,6 +108,9 @@ val status : t -> ID.t -> symbol_status
 val weight : t -> ID.t -> Weight.t
 (** Weight of a symbol (for KBO). *)
 
+val db_weight : t -> Weight.t
+val lam_weight : t -> Weight.t
+
 val arg_coeff : t -> ID.t -> int -> int
 (** Nth argument coefficient of a symbol (for KBO with argument coefficients). *)
 
@@ -143,7 +146,7 @@ val set_weight : t -> weight_fun -> unit
 
 (** {2 Creation of a precedence from constraints} *)
 
-val create : ?weight:weight_fun -> ?arg_coeff:arg_coeff_fun -> [`total] Constr.t -> ID.t list -> t
+val create : ?weight:weight_fun -> ?arg_coeff:arg_coeff_fun -> ?db_w:int -> ?lmb_w:int -> [`total] Constr.t -> ID.t list -> t
 (** make a precedence from the given constraints. Constraints near
     the head of the list are {b more important} than constraints close
     to the tail. Only the very first constraint is assured to be totally

@@ -16,6 +16,9 @@ module Lit = Literal
 
 let section = Const.section
 
+let _db_w = ref 1
+let _lmb_w = ref 1
+
 (* setup an alarm for abrupt stop *)
 let setup_alarm timeout =
   let handler _ =
@@ -160,7 +163,7 @@ let compute_prec stmts =
          |> Sequence.flat_map Term.Seq.symbols
          |> Precedence.Constr.invfreq)
   in
-  let prec = Compute_prec.mk_precedence cp stmts in
+  let prec = Compute_prec.mk_precedence ~db_w:!_db_w ~lmb_w:!_lmb_w cp stmts in
   Phases.return_phase prec
 
 let compute_ord_select precedence =
@@ -558,3 +561,14 @@ let main ?setup_gc:(gc=true) ?params file =
   process_files_and_print ~params files >>= fun errcode ->
   Phases.exit >|= fun () ->
   errcode
+
+let () = 
+  let open Libzipperposition in
+  Params.add_opts [
+    "--de-bruijn-weight"
+    , Arg.Set_int _db_w
+    , " Set weight of de Bruijn index for KBO";
+    "--lambda-weight"
+    , Arg.Set_int _lmb_w
+    , " Set weight of lambda symbol for KBO";
+  ];

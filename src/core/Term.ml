@@ -367,24 +367,29 @@ let is_ground t = T.is_ground t
 
 let rec in_pfho_fragment t =
    match view t with
-    | Var _ -> if (not (type_has_no_bool (ty t))) then
+    | Var _ -> if (not (type_ok (ty t))) then
                (raise (Failure (CCFormat.sprintf "Variable has wrong type [%a]" T.pp t)))
                else true
-    | Const sym -> if (List.for_all type_has_no_bool (Type.expected_args (ty t))) then true
+    | Const sym -> if (List.for_all type_ok (Type.expected_args (ty t))) then true
                  else (raise (Failure (CCFormat.sprintf "Constant has wrong type [%a] " ID.pp sym)))
     | AppBuiltin( _, l)
-    | App (_, l) -> if((not (is_var (head_term t)) || type_has_no_bool (ty t)) &&
-                      List.map ty l |> List.for_all type_has_no_bool
+    | App (_, l) -> let hd = head_term t in
+                    let hd_is_skolem = match as_const hd with 
+                                    | Some sym -> ID.is_skolem sym
+                                    | None -> false in  
+                    if((not (is_var hd || hd_is_skolem) || type_ok (ty t)) &&
+                      List.map ty l |> List.for_all type_ok
                     && List.for_all in_pfho_fragment l) then true
                     else (raise (Failure (CCFormat.sprintf "Arugment of a term has wrong type [%a]" T.pp t)))  
-    | Fun (var_t, body) -> if(type_has_no_bool (var_t) && 
-                           type_has_no_bool (ty body) &&
+    | Fun (var_t, body) -> if(type_ok (var_t) && 
+                           type_ok (ty body) &&
                            in_pfho_fragment body) then true
                            else (raise (Failure (CCFormat.sprintf "Lambda body has wrong type [%a]" T.pp t)))
-    | DB _ -> if(type_has_no_bool (ty t)) then true
+    | DB _ -> if(type_ok (ty t)) then true
               else (raise (Failure "Bound variable has wrong type")) 
-   and type_has_no_bool ty_ = 
-    not (Type.Seq.sub ty_ |> Sequence.mem ~eq:Type.equal (Type.prop))
+   and type_ok ty_ = 
+    not (Type.Seq.sub ty_ |> Sequence.mem ~eq:Type.equal (Type.prop)) &&
+    not (Type.Seq.sub ty_ |> Sequence.mem ~eq:Type.equal (Type.tType))
 
 let in_lfho_fragment t =
    in_pfho_fragment t && 
