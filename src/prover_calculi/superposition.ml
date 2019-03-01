@@ -419,8 +419,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
       if info.sup_kind == SupEXT then
       Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
-      assert(List.for_all (Lit.for_all Term.DB.is_closed) new_lits);
-      C.check_types new_clause;
+      (* assert(List.for_all (Lit.for_all Term.DB.is_closed) new_lits); *)
+      (* C.check_types new_clause; *)
       Some new_clause
     with ExitSuperposition reason ->
       Util.debugf ~section 3 "... cancel, %s" (fun k->k reason);

@@ -108,7 +108,7 @@ module Make(C : Clause_intf.S) = struct
                             ( if C.is_maxlit (c,0) Subst.empty ~idx:i then max_mul else 1.0)*. 
                             float_of_int l_w ) 0.0) 
         |> (fun res -> 
-              if distinct_vars_mul =0 then int_of_float res
+              if distinct_vars_mul=0 then int_of_float res
               else let n_vars = 
                 (Literals.vars (C.lits c)
                  |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))

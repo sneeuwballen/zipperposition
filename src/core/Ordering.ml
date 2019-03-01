@@ -197,7 +197,7 @@ module KBO : ORD = struct
     | Head.I s -> Prec.weight prec s
     | Head.V _ -> weight_var_headed
     | Head.DB _ -> Prec.db_weight prec
-    | Head.LAM -> Prec.lam_weight prec
+    | Head.LAM ->  Prec.lam_weight prec
 
   (** Higher-order KBO *)
   let rec kbo ~prec t1 t2 =

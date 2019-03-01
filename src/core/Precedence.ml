@@ -10,8 +10,8 @@ type symbol_status =
 
 let section = Util.Section.(make "precedence")
 
-let db_w = 10
-let lmb_w = 1
+let db_w_def = 1
+let lmb_w_def = 1
 
 (** {2 Weight of Symbols} *)
 module Weight = struct
@@ -257,7 +257,7 @@ let check_inv_ p =
   sorted_ p.snapshot
 
 let create ?(weight=weight_constant) ?(arg_coeff=arg_coeff_default)
-           ?(db_w=db_w) ?(lmb_w=lmb_w)
+           ?(db_w=db_w_def) ?(lmb_w=lmb_w_def)
            c l =
   let l = CCList.sort_uniq ~cmp:c l in
   let tbl = lazy (mk_tbl_ l) in
