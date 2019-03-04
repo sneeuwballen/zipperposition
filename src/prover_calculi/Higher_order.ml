@@ -35,6 +35,7 @@ let _elim_pred_var = ref true
 let _ext_neg = ref true
 let _ext_axiom_penalty = ref 5
 let _var_arg_remove = ref true
+let _huet_style = ref false
 
 module type S = sig
   module Env : Env.S
@@ -704,6 +705,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       in
       Env.set_ho_normalization_rule ho_norm;
 
+      if (!_huet_style) then
+        JP_unif.set_huet_style ();
+
       if Env.flex_get k_enable_ho_unif then (
         Env.add_unary_inf "ho_unif" ho_unif;
       );
@@ -824,6 +828,7 @@ let () =
       "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule";
       "--ho-no-ext-neg", Arg.Clear _ext_neg, " enable negative extensionality rule"; 
       "--ho-def-unfold", Arg.Set def_unfold_enabled_, " enable ho definition unfolding";
+      "--ho-huet-style-unif", Arg.Set _huet_style, " enable Huet style projection";
       "--ho-disable-var-arg-removal", Arg.Clear _var_arg_remove, "disable removal of arguments of applied variables";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom"
     ];

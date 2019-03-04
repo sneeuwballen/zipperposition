@@ -7,6 +7,7 @@ module T = Term
 module US = Unif_subst
 
 let prof_jp_unify = Util.mk_profiler "jp_unify"
+let _huet_style = ref false
 
 type subst = US.t
 
@@ -108,20 +109,19 @@ let project_huet_style ~scope ~fresh_var_ u v l =
                 let prefix_types'=   prefix_types |> CCList.map (fun ty -> S.apply_ty unif (ty, scope)) in
                 let type_ul' = S.apply_ty unif (type_ul, scope) in
                 let projected =  project_hs_one ~fresh_var_ prefix_types' i type_ul', scope in
-                Format.printf "Var %a -- proj binding %a\n" T.pp (Term.var v) T.pp (fst projected); 
+                (* Format.printf "Var %a -- proj binding %a\n" T.pp (Term.var v) T.pp (fst projected);  *)
                 Some (US.FO.bind unif (v', scope) projected))
       else 
         (* To get a complete polymorphic algorithm, we need to consider the case that a type variable could be instantiated as a function. *)
         match Type.view type_ul with
-          | Type.Var alpha -> 
+          | Type.Var alpha when not @@ Type.equal type_ul var_ret_type -> 
             let beta = (make_fresh_var fresh_var_ ~ty:Type.tType ()) in
-            let gamma = var_ret_type in
-            let alpha' = (Type.arrow [Type.var beta] gamma) in
+            let alpha' = (Type.arrow [Type.var beta] var_ret_type) in
             let ty_subst = US.FO.singleton (alpha, scope) (Term.of_ty alpha', scope) in
             let v' = HVar.cast ~ty:(S.apply_ty ty_subst (HVar.ty v, scope)) v in
             let prefix_types' = prefix_types |> CCList.map (fun ty -> S.apply_ty ty_subst (ty, scope)) in
             let projected = project_hs_one ~fresh_var_ prefix_types' i alpha', scope in 
-            Format.printf "Var %a -- proj binding %a\n" T.pp (T.var v') T.pp (fst projected); 
+            (* Format.printf "Var %a -- proj binding %a\n" T.pp (T.var v') T.pp (fst projected);  *)
             Some (US.FO.bind ty_subst (v', scope) projected)
           | _ -> None
     )
@@ -375,7 +375,14 @@ let unify ~scope ~fresh_var_ t0 s0 =
             if Type.equal (T.ty u) (T.ty v) 
             then (
               let add_some f u v l = f ~scope ~fresh_var_ u v l |> OSeq.map (fun s -> Some s) in
-              [add_some project,"proj"; add_some imitate,"imit"; add_some identify,"id"; add_some eliminate,"elim";iterate ~scope ~fresh_var_,"proj_hs";]
+              [add_some project,"proj"; 
+               add_some imitate,"imit"; 
+               add_some identify,"id"; 
+               add_some eliminate,"elim";
+               (if !_huet_style 
+               then project_huet_style 
+               else iterate)
+               ~scope ~fresh_var_,"proj_hs";]
               (* iterate must be last in this list because it is the only one with infinitely many child nodes *)
               |> OSeq.of_list  
               |> OSeq.flat_map
@@ -395,9 +402,11 @@ let unify ~scope ~fresh_var_ t0 s0 =
           (fun (osubst,rulename) -> 
             match osubst with
             | Some subst ->
-              (* Util.debugf 5 "@[Subst (%s): @ @[%a@]@]" (fun k -> k rulename US.pp subst); *)
+              Util.debugf 1 "@[Subst (%s): @ @[%a@]@]" (fun k -> k rulename US.pp subst);
+              Util.debugf 1 "@[s: %a @] \n @[t: %a @]" (fun k-> k T.pp s T.pp t);
               let t_subst = nfapply subst (t, scope) in
               let s_subst = nfapply subst (s, scope) in
+              Util.debugf 1 "@[sigma(s): %a @] \n  @[sigma(t): %a @]" (fun k-> k T.pp s_subst T.pp t_subst);
               let unifiers = if Lambda.is_lambda_pattern t_subst && 
                                 Lambda.is_lambda_pattern s_subst then
                              OSeq.return (unif_simple ~scope t_subst s_subst)  else
@@ -456,6 +465,9 @@ let unify_scoped (t0, scope0) (t1, scope1) =
     ) ()
 
 let unify_scoped_nonterminating t s = OSeq.filter_map (fun x -> x) (unify_scoped t s)
+
+let set_huet_style () =
+  _huet_style := true
 
 (* TODO: operate on inner types like in `Unif`? Test for NO-TYPE terms? *)
 (* TODO: `dont care` unification, i.e. stopping at flex-flex pairs because exact result does not matter? *)
