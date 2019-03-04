@@ -34,6 +34,7 @@ let _ext_axiom = ref false
 let _elim_pred_var = ref true
 let _ext_neg = ref true
 let _ext_axiom_penalty = ref 5
+let _var_arg_remove = ref true
 
 module type S = sig
   module Env : Env.S
@@ -679,7 +680,9 @@ module Make(E : Env.S) : S with module Env = E = struct
                         | None -> E.CR_skip ));
 
 
-      Env.add_unary_simplify remove_var_args;
+      if !_var_arg_remove then
+        Env.add_unary_simplify remove_var_args;
+      
       let ho_norm  = 
       begin match Env.flex_get k_eta with
         | `Expand -> (fun t -> t |> beta_reduce |> (
@@ -821,6 +824,7 @@ let () =
       "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule";
       "--ho-no-ext-neg", Arg.Clear _ext_neg, " enable negative extensionality rule"; 
       "--ho-def-unfold", Arg.Set def_unfold_enabled_, " enable ho definition unfolding";
+      "--ho-disable-var-arg-removal", Arg.Clear _var_arg_remove, "disable removal of arguments of applied variables";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom"
     ];
   Params.add_to_mode "ho-complete-basic" (fun () -> 

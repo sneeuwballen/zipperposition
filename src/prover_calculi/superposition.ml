@@ -843,8 +843,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               let proof = Proof.Step.inference ~rule ~tags
                   [C.proof_parent_subst renaming (clause,0) subst] in
               let new_clause = C.create ~trail ~penalty (c_guard@new_lits) proof in
-              Util.debugf ~section 3 "@[<hv2>equality resolution on@ @[%a@]@ yields @[%a@]@]"
-                (fun k->k C.pp clause C.pp new_clause);
+              Util.debugf ~section 1 "@[<hv2>equality resolution on@ @[%a@]@ yields @[%a@], subst @[%a@]@]"
+                (fun k->k C.pp clause C.pp new_clause US.pp us);
               Some new_clause
             ) else None
           in
