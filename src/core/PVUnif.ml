@@ -72,8 +72,11 @@ let imitate_one ~scope ~fresh_var_ s t =
 
 let rec unify ~depth ~scope ~fresh_var_ ~subst = function
   | [] -> OSeq.return (Some subst)
-  | (s,t) :: rest -> (
-    if (depth mod 64 = 0) then OSeq.take 50 (OSeq.repeat None)
+  | (s,t) :: rest as l -> (
+    if (depth > 0 && depth mod 64 = 0) then 
+    OSeq.append 
+      (OSeq.take 50 (OSeq.repeat None))
+      (unify ~depth:(depth+1) ~scope ~fresh_var_ ~subst l)
     else 
       let s', t' = nfapply subst (s, scope), nfapply subst (t, scope) in 
       match unif_simple ~scope (T.of_ty (T.ty s')) (T.of_ty (T.ty t')) with
@@ -171,6 +174,7 @@ let unify_scoped (t0, scope0) (t1, scope1) =
     let subst = T.Seq.vars t0 |> Sequence.fold (add_renaming scope0) subst in
     let subst = T.Seq.vars t1 |> Sequence.fold (add_renaming scope1) subst in
     (* Unify *)
+    (* Format.printf "Unifying %a =?= %a" T.pp (S.apply subst (t0, scope0)) T.pp (S.apply subst (t1, scope1)); *)
     unify ~depth:0 ~scope:unifscope ~fresh_var_ ~subst [S.apply subst (t0, scope0), S.apply subst (t1, scope1)]
     (* merge with var renaming *)
     |> OSeq.map (CCOpt.map (US.merge subst))
