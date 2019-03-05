@@ -17,7 +17,6 @@ let make_fresh_var fresh_var_ ~ty () =
   incr fresh_var_; 
   var
 
-
 (* apply a substitution and reduce to normal form *)
 let nfapply s u = Lambda.snf (S.apply s u)
 
@@ -45,6 +44,7 @@ let eta_expand_otf pref1 pref2 t1 t2 =
         (t1,do_exp_otf (n1-n2) pref1 t2)
       )
     ) in
+    assert(List.length (T.args t1') == List.length (T.args t2'));
     (t1',t2')
 
 let eliminate_at_idx ~scope ~fresh_var_ v k =  
@@ -93,8 +93,8 @@ let rec unify ~scope ~fresh_var_ ~subst = function
           let pref_s, body_s = T.open_fun s' in
           let pref_t, body_t = T.open_fun t' in 
           let body_s', body_t' = eta_expand_otf pref_s pref_t body_s body_t in
-          let hd_s,args_s = T.as_app body_s' in
-          let hd_t,args_t = T.as_app body_t' in
+          let hd_s, args_s = T.as_app body_s' in
+          let hd_t, args_t = T.as_app body_t' in
           match T.view hd_s, T.view hd_t with 
           | (T.Var _, T.Var _) -> 
             if T.equal hd_s hd_t then
@@ -105,7 +105,13 @@ let rec unify ~scope ~fresh_var_ ~subst = function
               flex_rigid ~subst ~fresh_var_ ~scope body_s' body_t' rest
           | (T.Const _, T.Var _) | (T.DB _, T.Var _) ->
               flex_rigid ~subst ~fresh_var_ ~scope body_t' body_s' rest
-          | _ -> raise (Invalid_argument "Heads are not correctly decomposable.")
+          | T.Const f , T.Const g when ID.equal f g ->
+              assert(List.length args_s = List.length args_t);
+              unify ~subst ~fresh_var_ ~scope ((List.combine args_s args_t) @ rest)
+          | T.DB i, T.DB j when i = j ->
+              assert(List.length args_s = List.length args_t);
+              unify ~subst ~fresh_var_ ~scope ((List.combine args_s args_t) @ rest)
+          | _ -> OSeq.empty
         )
       )
       | None -> OSeq.empty)
