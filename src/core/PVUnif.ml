@@ -136,7 +136,7 @@ and flex_rigid ~subst ~fresh_var_ ~scope s t rest =
         | None -> None) 
     |> CCList.filter_map (fun x -> x) in
     let imit_binding = imitate_one ~scope ~fresh_var_ s t in
-    let substs = proj_bindings @ [imit_binding] in
+    let substs = List.map (US.merge subst) proj_bindings @ [imit_binding] in
     OSeq.of_list substs
     |> OSeq.flat_map (fun subst -> unify ~scope  ~fresh_var_ ~subst ((s,t) :: rest))
 and flex_same ~subst ~fresh_var_ ~scope hd_s args_s args_t rest =
