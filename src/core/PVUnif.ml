@@ -106,7 +106,7 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
               flex_rigid ~depth ~subst ~fresh_var_ ~scope body_t' body_s' rest
           | T.Const f , T.Const g when ID.equal f g ->
               assert(List.length args_s = List.length args_t);
-              (** depth stays the same for the   *)
+              (*  depth stays the same for the decomposition steps   *)
               unify ~depth ~subst ~fresh_var_ ~scope ((List.combine args_s args_t) @ rest)
           | T.DB i, T.DB j when i = j ->
               assert(List.length args_s = List.length args_t);
@@ -141,6 +141,7 @@ and flex_rigid ~depth ~subst ~fresh_var_ ~scope s t rest =
     |> OSeq.flat_map (fun subst -> unify ~depth:(depth+1) ~scope  ~fresh_var_ ~subst ((s,t) :: rest))
 and flex_same ~depth ~subst ~fresh_var_ ~scope hd_s args_s args_t rest =
   assert(T.is_var hd_s);
+  assert(List.length args_s = List.length args_t);
   let new_cstrs = (List.combine args_s args_t) @ rest in
   let all_vars = CCList.range 0 ((List.length @@ fst @@ Type.open_fun (T.ty hd_s)) -1 ) in
   OSeq.append 

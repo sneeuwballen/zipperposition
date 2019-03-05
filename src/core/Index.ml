@@ -64,7 +64,7 @@ module MakeLeaf(X : Set.OrderedType) : LEAF with type elt = X.t = struct
   let fold_unify_complete (leaf,sc_l) t k =
     T.Map.iter
       (fun t' set ->
-        let substs = JP_unif.unify_scoped (t',sc_l) t in
+        let substs = PVUnif.unify_scoped (t',sc_l) t in
         S.iter (fun data -> k (t', data, substs)) set)
       leaf
 

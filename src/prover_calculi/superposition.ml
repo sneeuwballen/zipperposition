@@ -735,7 +735,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               let var_h = T.var (HVar.fresh ~ty:(Type.arrow [T.ty s] (Type.var (HVar.fresh ~ty:Type.tType ()))) ()) in
               let hs = T.app var_h [s] in
               let ht = T.app var_h [t] in
-              let res = JP_unif.unify_scoped (u_p,1) (hs,0) |> OSeq.map (
+              let res = PVUnif.unify_scoped (u_p,1) (hs,0) |> OSeq.map (
                   fun osubst ->
                     osubst |> CCOpt.flat_map (
                       fun subst ->
@@ -786,7 +786,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                 let var_h = T.var (HVar.fresh ~ty:(Type.arrow [T.ty s] (Type.var (HVar.fresh ~ty:Type.tType ()))) ()) in
                 let hs = T.app var_h [s] in
                 let ht = T.app var_h [t] in
-                JP_unif.unify_scoped (hs,1) (u_p,0)
+                PVUnif.unify_scoped (hs,1) (u_p,0)
                 |> OSeq.map
                   (fun osubst ->
                     osubst |> CCOpt.flat_map (fun subst ->
@@ -863,7 +863,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let infer_equality_resolution_complete_ho clause =
     let inf_res = infer_equality_resolution_aux
-        ~unify:JP_unif.unify_scoped
+        ~unify:PVUnif.unify_scoped
         ~iterate_substs:(fun substs do_eq_res -> Some (OSeq.map (CCOpt.flat_map do_eq_res) substs))
         clause
     in
@@ -978,7 +978,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let infer_equality_factoring_complete_ho clause =
     let inf_res = infer_equality_factoring_aux
-        ~unify:JP_unif.unify_scoped
+        ~unify:PVUnif.unify_scoped
         ~iterate_substs:(fun substs do_eq_fact -> Some (OSeq.map (CCOpt.flat_map do_eq_fact) substs))
         clause
     in
