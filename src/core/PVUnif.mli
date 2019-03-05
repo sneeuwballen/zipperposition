@@ -16,6 +16,6 @@ end
 val unify : depth:int ->
             scope:Scoped.scope ->
             fresh_var_:int ref ->
-            subst:US.t -> (T.t * T.t) CCList.t -> US.t option OSeq.t
+            subst:US.t -> (T.t * T.t * bool) CCList.t -> US.t option OSeq.t
 
 val unify_scoped : T.t Scoped.t -> T.t Scoped.t -> subst option OSeq.t
