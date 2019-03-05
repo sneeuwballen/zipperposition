@@ -13,6 +13,9 @@ end
 
 
 (* Unify terms of the same scope. Assumes that terms are in eta-long form. *)
-val unify : scope:Scoped.scope -> fresh_var_:int ref -> subst:US.t -> (T.t * T.t) CCList.t -> US.t OSeq.t
+val unify : depth:int ->
+            scope:Scoped.scope ->
+            fresh_var_:int ref ->
+            subst:US.t -> (T.t * T.t) CCList.t -> US.t option OSeq.t
 
 val unify_scoped : T.t Scoped.t -> T.t Scoped.t -> subst option OSeq.t

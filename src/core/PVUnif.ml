@@ -33,19 +33,16 @@ let eta_expand_otf pref1 pref2 t1 t2 =
     let shifted = T.DB.shift n t in
     T.app shifted vars in 
 
-  let t1',t2' = 
-    if List.length pref1 = List.length pref2 then (t1, t2)
-    else (
-      let n1, n2 = List.length pref1, List.length pref2 in 
-      if n1 < n2 then (
-        (do_exp_otf (n2-n1) pref2 t1,t2)
-      ) else (
-        assert(n1 > n2);
-        (t1,do_exp_otf (n1-n2) pref1 t2)
-      )
-    ) in
-    assert(List.length (T.args t1') == List.length (T.args t2'));
-    (t1',t2')
+  if List.length pref1 = List.length pref2 then (t1, t2)
+  else (
+    let n1, n2 = List.length pref1, List.length pref2 in 
+    if n1 < n2 then (
+      (do_exp_otf (n2-n1) pref2 t1,t2)
+    ) else (
+      assert(n1 > n2);
+      (t1,do_exp_otf (n1-n2) pref1 t2)
+    )
+  )
 
 let eliminate_at_idx ~scope ~fresh_var_ v k =  
   (* create substitution: v |-> λ u1 ... um. x u1 ... u{k-1} u{k+1} ... um *)
@@ -68,14 +65,16 @@ let project_hs_one ~fresh_var_ pref_types i type_ui =
   let new_vars_applied = new_vars |> List.map (fun nv -> T.app nv pref_args) in
   let matrix_hd = T.bvar ~ty:type_ui (n_args_free-i-1) in
   let matrix = T.app matrix_hd new_vars_applied in
-  Lambda.eta_expand @@ T.fun_l pref_types matrix
+  T.fun_l pref_types matrix
 
 let imitate_one ~scope ~fresh_var_ s t = 
   OSeq.nth 0 (JP_unif.imitate_onesided ~scope ~fresh_var_ s t)
 
-let rec unify ~scope ~fresh_var_ ~subst = function
-  | [] -> OSeq.return subst
+let rec unify ~depth ~scope ~fresh_var_ ~subst = function
+  | [] -> OSeq.return (Some subst)
   | (s,t) :: rest -> (
+    if (depth mod 64 = 0) then OSeq.take 50 (OSeq.repeat None)
+    else 
       let s', t' = nfapply subst (s, scope), nfapply subst (t, scope) in 
       match unif_simple ~scope (T.of_ty (T.ty s')) (T.of_ty (T.ty t')) with
       | Some ty_unif -> (
@@ -86,7 +85,7 @@ let rec unify ~scope ~fresh_var_ ~subst = function
           match unif_simple ~scope s' t' with
           | Some unif -> 
               let subst = US.merge subst' unif in
-              unify ~scope ~fresh_var_ ~subst rest
+              unify ~depth:(depth+1) ~scope ~fresh_var_ ~subst rest
           | None -> OSeq.empty
         )
         else (
@@ -98,28 +97,29 @@ let rec unify ~scope ~fresh_var_ ~subst = function
           match T.view hd_s, T.view hd_t with 
           | (T.Var _, T.Var _) -> 
             if T.equal hd_s hd_t then
-              flex_same ~subst ~fresh_var_ ~scope hd_s args_s args_t rest
+              flex_same ~depth ~subst ~fresh_var_ ~scope hd_s args_s args_t rest
             else
-              identify ~subst ~fresh_var_ ~scope s' t' rest
+              identify  ~depth ~subst ~fresh_var_ ~scope s' t' rest
           | (T.Var _, T.Const _) | (T.Var _, T.DB _) ->
-              flex_rigid ~subst ~fresh_var_ ~scope body_s' body_t' rest
+              flex_rigid ~depth ~subst ~fresh_var_ ~scope body_s' body_t' rest
           | (T.Const _, T.Var _) | (T.DB _, T.Var _) ->
-              flex_rigid ~subst ~fresh_var_ ~scope body_t' body_s' rest
+              flex_rigid ~depth ~subst ~fresh_var_ ~scope body_t' body_s' rest
           | T.Const f , T.Const g when ID.equal f g ->
               assert(List.length args_s = List.length args_t);
-              unify ~subst ~fresh_var_ ~scope ((List.combine args_s args_t) @ rest)
+              (** depth stays the same for the   *)
+              unify ~depth ~subst ~fresh_var_ ~scope ((List.combine args_s args_t) @ rest)
           | T.DB i, T.DB j when i = j ->
               assert(List.length args_s = List.length args_t);
-              unify ~subst ~fresh_var_ ~scope ((List.combine args_s args_t) @ rest)
+              unify ~depth ~subst ~fresh_var_ ~scope ((List.combine args_s args_t) @ rest)
           | _ -> OSeq.empty
         )
       )
       | None -> OSeq.empty)
-and identify ~subst ~fresh_var_ ~scope s t rest = 
+and identify ~depth ~subst ~fresh_var_ ~scope s t rest = 
   let id_subs = OSeq.nth 0 (JP_unif.identify ~scope ~fresh_var_ s t []) in
   let subs_res = US.merge subst id_subs in
-  unify ~scope ~fresh_var_ ~subst:subs_res ((s,t)::rest)
-and flex_rigid ~subst ~fresh_var_ ~scope s t rest =
+  unify ~depth:(depth+1) ~scope ~fresh_var_ ~subst:subs_res ((s,t)::rest)
+and flex_rigid ~depth ~subst ~fresh_var_ ~scope s t rest =
   assert (T.is_var @@ T.head_term s);
   assert (not @@ T.is_var @@ T.head_term t);
   let hd_s = T.as_var_exn @@ T.head_term s in
@@ -136,24 +136,23 @@ and flex_rigid ~subst ~fresh_var_ ~scope s t rest =
         | None -> None) 
     |> CCList.filter_map (fun x -> x) in
     let imit_binding = imitate_one ~scope ~fresh_var_ s t in
-    let substs = List.map (US.merge subst) proj_bindings @ [imit_binding] in
+    let substs = List.map (US.merge subst) (proj_bindings @ [imit_binding]) in
     OSeq.of_list substs
-    |> OSeq.flat_map (fun subst -> unify ~scope  ~fresh_var_ ~subst ((s,t) :: rest))
-and flex_same ~subst ~fresh_var_ ~scope hd_s args_s args_t rest =
+    |> OSeq.flat_map (fun subst -> unify ~depth:(depth+1) ~scope  ~fresh_var_ ~subst ((s,t) :: rest))
+and flex_same ~depth ~subst ~fresh_var_ ~scope hd_s args_s args_t rest =
   assert(T.is_var hd_s);
   let new_cstrs = (List.combine args_s args_t) @ rest in
   let all_vars = CCList.range 0 ((List.length @@ fst @@ Type.open_fun (T.ty hd_s)) -1 ) in
   OSeq.append 
-    (unify ~subst ~fresh_var_ ~scope new_cstrs)
+    (unify ~depth:(depth+1)~subst ~fresh_var_ ~scope new_cstrs)
     (OSeq.of_list all_vars |>
      OSeq.map (fun idx -> 
        idx, eliminate_at_idx ~scope ~fresh_var_ (T.as_var_exn hd_s) idx ) 
      |>  
       (OSeq.flat_map (fun (idx, subst') -> 
       let new_subst = US.merge subst subst' in
-        unify ~scope  ~fresh_var_ ~subst:new_subst 
+        unify ~depth:(depth+1) ~scope  ~fresh_var_ ~subst:new_subst 
         (CCList.remove_at_idx idx new_cstrs))))
-
 
 let unify_scoped (t0, scope0) (t1, scope1) =
     (* Find a scope that's different from the two given ones *)
@@ -171,6 +170,6 @@ let unify_scoped (t0, scope0) (t1, scope1) =
     let subst = T.Seq.vars t0 |> Sequence.fold (add_renaming scope0) subst in
     let subst = T.Seq.vars t1 |> Sequence.fold (add_renaming scope1) subst in
     (* Unify *)
-    unify ~scope:unifscope ~fresh_var_ ~subst [S.apply subst (t0, scope0), S.apply subst (t1, scope1)]
+    unify ~depth:0 ~scope:unifscope ~fresh_var_ ~subst [S.apply subst (t0, scope0), S.apply subst (t1, scope1)]
     (* merge with var renaming *)
-    |> OSeq.map (fun s -> Some (US.merge s subst))
+    |> OSeq.map (CCOpt.map (US.merge subst))
