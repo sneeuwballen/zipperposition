@@ -6,7 +6,9 @@
   (public_names
     zipper_type_check zipper_cnf_of zipper_app_encode zipper_tptp_to_zf
     zipper_proof_check_tstp zipper_fo_detector)
+  (modes native)
   (libraries logtk logtk.parsers)
   (package zipperposition-tools)
   (flags :standard -w -32-50)
+  (ocamlopt_flags :standard -Oclassic)
 )
