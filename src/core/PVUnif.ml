@@ -67,7 +67,7 @@ let project_hs_one ~fresh_var_ pref_types i type_ui =
   let matrix = T.app matrix_hd new_vars_applied in
   T.fun_l pref_types matrix
 
-let imitate_one ~scope ~fresh_var_ s t = 
+let imitate_one ~scope ~fresh_var_ s t =
   OSeq.nth 0 (JP_unif.imitate_onesided ~scope ~fresh_var_ s t)
 
 let rec unify ~depth ~scope ~fresh_var_ ~subst = function
@@ -84,10 +84,9 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
         let s' = nfapply ty_unif (s', scope) in
         let t' = nfapply ty_unif (t', scope) in
         
-        (* Format.printf "Subst: %a" US.pp subst; *)
+        (* Format.printf "Subst: %a\n" US.pp subst; *)
         (* Format.printf "Solving pair: (%a) %a =?= (%a)%a.\n" T.pp s T.pp s' T.pp t T.pp t'; *)
 
-        (* Format.printf "Merging types \n"; *)
         let subst' = US.merge subst ty_unif in
         if Lambda.is_lambda_pattern s' && Lambda.is_lambda_pattern t' then (
           match unif_simple ~scope s' t' with
@@ -145,9 +144,11 @@ and flex_rigid ~depth ~subst ~fresh_var_ ~scope s t rest =
             Some (US.FO.bind ty_unif (hd_s, scope) (pr_bind, scope))
         | None -> None) 
     |> CCList.filter_map (fun x -> x) in
-    let imit_binding = imitate_one ~scope ~fresh_var_ s t in
-    (* Format.printf "Merging projections \n"; *)
-    let substs = List.map (US.merge subst) (proj_bindings @ [imit_binding]) in
+    let imit_binding = 
+      if (not @@ T.is_bvar @@ T.head_term t) 
+        then [imitate_one ~scope ~fresh_var_ s t] 
+      else [] in
+    let substs = List.map (US.merge subst) (proj_bindings @ imit_binding) in
     OSeq.of_list substs
     |> OSeq.flat_map (fun subst -> unify ~depth:(depth+1) ~scope  ~fresh_var_ ~subst ((s,t) :: rest))
 and flex_same ~depth ~subst ~fresh_var_ ~scope hd_s args_s args_t rest =
