@@ -15,6 +15,8 @@ val set_huet_style : unit -> unit
 
 val project_onesided : scope:Scoped.scope -> fresh_var_:int ref -> T.t -> subst OSeq.t
 
+val imitate_onesided : scope:Scoped.scope -> fresh_var_:int ref -> T.t -> T.t -> subst OSeq.t
+
 val imitate : scope:Scoped.scope -> fresh_var_:int ref -> T.t -> T.t -> (T.var * int) list -> subst OSeq.t
 
 val identify : scope:Scoped.scope -> fresh_var_:int ref -> T.t -> T.t -> (T.var * int) list -> subst OSeq.t

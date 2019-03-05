@@ -458,7 +458,7 @@ let unify_scoped (t0, scope0) (t1, scope1) =
       let subst = T.Seq.vars t0 |> Sequence.fold (add_renaming scope0) subst in
       let subst = T.Seq.vars t1 |> Sequence.fold (add_renaming scope1) subst in
       (* Unify *)
-      Util.debugf 1 "UNIFY_START %a =?= %a" (fun k -> k T.pp t0 T.pp t1);
+      (* Util.debugf 1 "UNIFY_START %a =?= %a" (fun k -> k T.pp t0 T.pp t1); *)
       unify ~scope:unifscope ~fresh_var_ (S.apply subst (t0, scope0)) (S.apply subst (t1, scope1))
       (* merge with var renaming *)
       |> OSeq.map (CCOpt.map (US.merge subst))
