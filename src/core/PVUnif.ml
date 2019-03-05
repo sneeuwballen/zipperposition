@@ -81,12 +81,18 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
       let s', t' = nfapply subst (s, scope), nfapply subst (t, scope) in 
       match unif_simple ~scope (T.of_ty (T.ty s')) (T.of_ty (T.ty t')) with
       | Some ty_unif -> (
-        let s' = nfapply ty_unif (s, scope) in
-        let t' = nfapply ty_unif (t, scope) in
+        let s' = nfapply ty_unif (s', scope) in
+        let t' = nfapply ty_unif (t', scope) in
+        
+        (* Format.printf "Subst: %a" US.pp subst; *)
+        (* Format.printf "Solving pair: (%a) %a =?= (%a)%a.\n" T.pp s T.pp s' T.pp t T.pp t'; *)
+
+        (* Format.printf "Merging types \n"; *)
         let subst' = US.merge subst ty_unif in
         if Lambda.is_lambda_pattern s' && Lambda.is_lambda_pattern t' then (
           match unif_simple ~scope s' t' with
-          | Some unif -> 
+          | Some unif ->
+              (* Format.printf "Merging patterns \n"; *)
               let subst = US.merge subst' unif in
               unify ~depth:(depth+1) ~scope ~fresh_var_ ~subst rest
           | None -> OSeq.empty
@@ -120,6 +126,7 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
       | None -> OSeq.empty)
 and identify ~depth ~subst ~fresh_var_ ~scope s t rest = 
   let id_subs = OSeq.nth 0 (JP_unif.identify ~scope ~fresh_var_ s t []) in
+  (* Format.printf "Merging id \n"; *)
   let subs_res = US.merge subst id_subs in
   unify ~depth:(depth+1) ~scope ~fresh_var_ ~subst:subs_res ((s,t)::rest)
 and flex_rigid ~depth ~subst ~fresh_var_ ~scope s t rest =
@@ -139,6 +146,7 @@ and flex_rigid ~depth ~subst ~fresh_var_ ~scope s t rest =
         | None -> None) 
     |> CCList.filter_map (fun x -> x) in
     let imit_binding = imitate_one ~scope ~fresh_var_ s t in
+    (* Format.printf "Merging projections \n"; *)
     let substs = List.map (US.merge subst) (proj_bindings @ [imit_binding]) in
     OSeq.of_list substs
     |> OSeq.flat_map (fun subst -> unify ~depth:(depth+1) ~scope  ~fresh_var_ ~subst ((s,t) :: rest))
@@ -174,7 +182,6 @@ let unify_scoped (t0, scope0) (t1, scope1) =
     let subst = T.Seq.vars t0 |> Sequence.fold (add_renaming scope0) subst in
     let subst = T.Seq.vars t1 |> Sequence.fold (add_renaming scope1) subst in
     (* Unify *)
-    (* Format.printf "Unifying %a =?= %a" T.pp (S.apply subst (t0, scope0)) T.pp (S.apply subst (t1, scope1)); *)
     unify ~depth:0 ~scope:unifscope ~fresh_var_ ~subst [S.apply subst (t0, scope0), S.apply subst (t1, scope1)]
     (* merge with var renaming *)
     |> OSeq.map (CCOpt.map (US.merge subst))
