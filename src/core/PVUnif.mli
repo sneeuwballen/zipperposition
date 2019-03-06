@@ -8,6 +8,7 @@ type subst = US.t
 module S : sig
 
   val apply : subst -> T.t Scoped.t -> T.t
+  val pp : subst CCFormat.printer
 
 end
 
