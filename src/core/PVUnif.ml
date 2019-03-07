@@ -111,10 +111,10 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
     if depth >= max_depth then
       OSeq.empty
     else 
-      if (depth > 0 && depth mod 8 = 0) then
+      if (depth > 0 && depth mod 6 = 0) then
         if (depth < max_depth) then 
           OSeq.append 
-            (OSeq.take 5 (OSeq.repeat None))
+            (OSeq.take 50 (OSeq.repeat None))
             (unify ~depth:(depth+1) ~scope ~fresh_var_ ~subst l)
         else OSeq.empty
       else  
@@ -156,9 +156,9 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
                   (flex_proj_imit ~depth ~subst ~fresh_var_ ~scope  body_s' body_t' rest)
                 else (
                   OSeq.append
-                  (flex_proj_imit  ~depth ~subst ~fresh_var_ ~scope  body_s' body_t' rest)
+                  (* (flex_proj_imit  ~depth ~subst ~fresh_var_ ~scope  body_s' body_t' rest) *)
                   (identify  ~depth ~subst ~fresh_var_ ~scope body_s' body_t' rest)
-                  (* OSeq.empty *)
+                  OSeq.empty
                 )
               ) 
             | (T.Var _, T.Const _) | (T.Var _, T.DB _) ->
@@ -242,13 +242,13 @@ let unify_scoped (t0, scope0) (t1, scope1) =
     (* merge with var renaming *)
     (* |> OSeq.map (CCOpt.map (US.merge subst)) *)
     |> OSeq.map (CCOpt.map (fun sub -> 
-      (* let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub (t0, scope0) in *)
-      (* let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub (t1, scope1) in *)
-      (* if not (T.equal l r) then (
+      (* let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub (t0, scope0) in 
+      let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub (t1, scope1) in
+      if not (T.equal l r) then (
         Format.printf "For problem: %a =?= %a\n" T.pp t0 T.pp t1;
         Format.printf "Subst: %a\n" S.pp sub;
         Format.printf "%a <> %a\n" T.pp l T.pp r;
         assert(false);
-      ); *)
-      (* assert (T.equal l r); *)
+      );
+      assert (T.equal l r); *)
       sub))
