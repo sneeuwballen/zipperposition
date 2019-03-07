@@ -152,7 +152,7 @@ let imitate_onesided ~scope ~fresh_var_ u v =
     in
     let matrix = T.app head_v matrix_args in
     let subst_value = T.fun_l prefix_types_u matrix in 
-    assert (T.DB.is_closed subst_value);
+    (* assert (T.DB.is_closed subst_value); *)
     let subst = US.FO.singleton (T.as_var_exn head_u, scope) (subst_value, scope) in
     OSeq.return subst
   else OSeq.empty

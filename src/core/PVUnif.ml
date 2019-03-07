@@ -94,7 +94,7 @@ let proj_imit_bindings ~scope ~fresh_var_  s t =
             | None -> None)
       |> CCList.filter_map (fun x -> x) in
       let imit_binding =
-        let hd_s = T.head_term s in 
+        let hd_s = T.head_term_mono s in 
         let hd_t = T.head_term_with_mandatory_args t in
         if (not @@ T.is_bvar @@ T.head_term t && 
             not (T.var_occurs ~var:(T.as_var_exn hd_s) hd_t)) 
@@ -107,7 +107,6 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
   | (s,t,ban_id) :: rest as l -> (
     (* Format.printf "Got %a =?= %a,.%d\n" T.pp s T.pp t depth; *)
     (* Format.printf "Subst: %a\n" US.pp subst; *)
-    Format.print_flush ();
     if depth >= max_depth then
       OSeq.empty
     else 
@@ -242,13 +241,13 @@ let unify_scoped (t0, scope0) (t1, scope1) =
     (* merge with var renaming *)
     (* |> OSeq.map (CCOpt.map (US.merge subst)) *)
     |> OSeq.map (CCOpt.map (fun sub -> 
-      (* let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub (t0, scope0) in 
-      let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub (t1, scope1) in
-      if not (T.equal l r) then (
-        Format.printf "For problem: %a =?= %a\n" T.pp t0 T.pp t1;
-        Format.printf "Subst: %a\n" S.pp sub;
-        Format.printf "%a <> %a\n" T.pp l T.pp r;
-        assert(false);
-      );
-      assert (T.equal l r); *)
+      (* let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub (t0, scope0) in  *)
+      (* let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub (t1, scope1) in *)
+      (* if not (T.equal l r) then ( *)
+        (* Format.printf "For problem: %a =?= %a\n" T.pp t0 T.pp t1; *)
+        (* Format.printf "Subst: %a\n" S.pp sub; *)
+        (* Format.printf "%a <> %a\n" T.pp l T.pp r; *)
+        (* assert(false); *)
+      (* ); *)
+      (* assert (T.equal l r); *)
       sub))
