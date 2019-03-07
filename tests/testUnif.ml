@@ -679,7 +679,7 @@ let suite_pv_unif : unit Alcotest.test_case list =
 
   CCList.flat_map mk_tests
     [ "X a" =?= "Y b" >-> "term"
-      >>> Action.count 3;
+      >>> Action.count 5;
 
       "X a" <?> "g (X a)" >-> "term";
 
@@ -753,13 +753,13 @@ let suite_pv_unif : unit Alcotest.test_case list =
       "X a b" =?= "f b Y"
       |> Task.add_var_type "X" "term -> term -> term"
       |> Task.add_var_type "Y" "term"
-      >>> Action.count 6;
+      >>> Action.count 10;
 
       "F b (g D)" =?= "f (g a) C"
       |> Task.add_var_type "F" "term -> term -> term"
       |> Task.add_var_type "D" "term"
       |> Task.add_var_type "C" "term"
-      >>> Action.count 6;
+      >>> Action.count 10;
 
       "X a b" =?= "Y (f a) a" >-> "term"
       >>> Action.count 28;

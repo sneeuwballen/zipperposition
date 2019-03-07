@@ -8,6 +8,8 @@ type term = Term.t
 val whnf : term -> term
 (** Beta-reduce the term into its weak head normal form *)
 
+val beta_red_head : term -> term
+
 val whnf_list : term -> term list -> term
 (** Apply a lambda to a list of arguments.
     The type of the lambda must be a generalization of a function
@@ -40,4 +42,6 @@ module Inner : sig
   val eta_expand : term -> term
 
   val eta_reduce : term -> term
+  
+  val beta_red_head : term -> term
 end

@@ -193,6 +193,11 @@ module Inner = struct
       t'
     | _ -> t
 
+  let beta_red_head t = 
+    let pref, body = T.open_fun t in
+    let res = T.fun_l pref (whnf body) in
+    res
+
   let add_args_tail ~ty st args : state =
     { st with args = st.args @ args; ty; }
 
@@ -240,6 +245,10 @@ let eta_reduce t =
   Inner.eta_reduce (t:T.t :> IT.t) |> T.of_term_unsafe
 (*|> CCFun.tap (fun t' ->
   if t != t' then Format.printf "@[eta_reduce `%a`@ into `%a`@]@." T.pp t T.pp t')*)
+
+
+let beta_red_head t =
+  Inner.beta_red_head (t:T.t :> IT.t) |> T.of_term_unsafe
 
 
 let rec is_lambda_pattern t = match T.view (whnf t) with

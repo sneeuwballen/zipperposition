@@ -12,7 +12,7 @@ module S = struct
 
 end
 
-let max_depth = 16
+let max_depth = 27
 
 
 let make_fresh_var fresh_var_ ~ty () = 
@@ -21,7 +21,7 @@ let make_fresh_var fresh_var_ ~ty () =
   var
 
 (* apply a substitution and reduce to normal form *)
-let nfapply s u = Lambda.snf (S.apply s u)
+let nfapply s u = Lambda.beta_red_head (S.apply s u)
 
 let unif_simple ~scope t s = 
   try 
@@ -72,25 +72,26 @@ let project_hs_one ~fresh_var_ pref_types i type_ui =
   let matrix = T.app matrix_hd new_vars_applied in
   T.fun_l pref_types matrix
 
-let imitate_one ~scope ~fresh_var_ s t =
+let imitate_one ~scope ~fresh_var_  s t =
   try
     OSeq.nth 0 (JP_unif.imitate_onesided ~scope ~fresh_var_ s t)
   with Not_found -> Format.printf "Could not get imitation subst!\n"; raise Not_found
-let proj_imit_bindings ~scope ~fresh_var_ s t = 
+
+let proj_imit_bindings ~scope ~fresh_var_  s t = 
   let hd_s = T.as_var_exn @@ T.head_term s in
     let prefix_types, var_ret_ty = Type.open_fun (HVar.ty hd_s) in
     let proj_bindings = 
       prefix_types 
       |> List.mapi (fun i ty ->
-          let _, arg_ret_ty = Type.open_fun ty in 
-          match unif_simple ~scope (T.of_ty arg_ret_ty) (T.of_ty var_ret_ty) with
-          | Some ty_unif -> 
-            let pr_bind = project_hs_one ~fresh_var_ 
-                          (List.map (fun typ -> S.apply_ty ty_unif (typ, scope)) prefix_types) i 
-                          (S.apply_ty ty_unif (ty, scope)) in
-            let hd_s = HVar.cast hd_s ~ty:(S.apply_ty ty_unif (HVar.ty hd_s, scope)) in
-              Some (US.FO.bind ty_unif (hd_s, scope) (pr_bind, scope))
-          | None -> None)
+            let _, arg_ret_ty = Type.open_fun ty in 
+            match unif_simple ~scope (T.of_ty arg_ret_ty) (T.of_ty var_ret_ty) with
+            | Some ty_unif -> 
+              let pr_bind = project_hs_one ~fresh_var_ 
+                            (List.map (fun typ -> S.apply_ty ty_unif (typ, scope)) prefix_types) i 
+                            (S.apply_ty ty_unif (ty, scope)) in
+              let hd_s = HVar.cast hd_s ~ty:(S.apply_ty ty_unif (HVar.ty hd_s, scope)) in
+                Some (US.FO.bind ty_unif (hd_s, scope) (pr_bind, scope))
+            | None -> None)
       |> CCList.filter_map (fun x -> x) in
       let imit_binding =
         let hd_s = T.head_term s in 
@@ -102,14 +103,15 @@ let proj_imit_bindings ~scope ~fresh_var_ s t =
   proj_bindings @ imit_binding
 
 let rec unify ~depth ~scope ~fresh_var_ ~subst = function
-  | [] -> 
-  OSeq.return (Some subst)
+  | [] -> OSeq.return (Some subst)
   | (s,t,ban_id) :: rest as l -> (
-    (* Format.printf "Got %a =?= %a\n" T.pp s T.pp t; *)
+    (* Format.printf "Got %a =?= %a,.%d\n" T.pp s T.pp t depth; *)
+    (* Format.printf "Subst: %a\n" US.pp subst; *)
+    Format.print_flush ();
     if depth >= max_depth then
       OSeq.empty
     else 
-      if (depth > 0 && depth mod 4 = 0) then
+      if (depth > 0 && depth mod 8 = 0) then
         if (depth < max_depth) then 
           OSeq.append 
             (OSeq.take 5 (OSeq.repeat None))
@@ -124,10 +126,9 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
 
           let subst = US.merge subst ty_unif in
 
-          (* Format.printf "Subst: %a\n" US.pp subst; *)
           (* Format.printf "Solving pair:\n@[%a@]\n=?=\n@[%a@].\n" T.pp s' T.pp t'; *)
+          (* Format.print_flush (); *)
 
-          
           if Lambda.is_lambda_pattern s' && Lambda.is_lambda_pattern t' &&
             T.DB.is_closed s' && T.DB.is_closed t' then (
             (* Format.printf "Solving lambda pattern.\n"; *)
@@ -152,12 +153,12 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
                   flex_same ~depth ~subst ~fresh_var_ ~scope hd_s args_s args_t rest
               else (
                 if ban_id then
-                  (flex_proj_imit  ~depth ~subst ~fresh_var_ ~scope  body_s' body_t' rest)
+                  (flex_proj_imit ~depth ~subst ~fresh_var_ ~scope  body_s' body_t' rest)
                 else (
                   OSeq.append
-                  (identify  ~depth ~subst ~fresh_var_ ~scope body_s' body_t' rest)
                   (flex_proj_imit  ~depth ~subst ~fresh_var_ ~scope  body_s' body_t' rest)
-
+                  (identify  ~depth ~subst ~fresh_var_ ~scope body_s' body_t' rest)
+                  (* OSeq.empty *)
                 )
               ) 
             | (T.Var _, T.Const _) | (T.Var _, T.DB _) ->
@@ -212,8 +213,8 @@ and flex_same ~depth ~subst ~fresh_var_ ~scope hd_s args_s args_t rest =
         unify ~depth:(depth+1) ~scope  ~fresh_var_ ~subst:new_subst 
         (CCList.remove_at_idx idx new_cstrs))))
 and flex_proj_imit  ~depth ~subst ~fresh_var_ ~scope s t rest = 
-  let bindings = proj_imit_bindings ~scope ~fresh_var_ s t in
-  let bindings = proj_imit_bindings ~scope ~fresh_var_ t s @ bindings in
+  let bindings = proj_imit_bindings  ~scope ~fresh_var_ s t in
+  let bindings = proj_imit_bindings  ~scope ~fresh_var_ t s @ bindings in
   let substs = List.map (US.merge subst) bindings in
   OSeq.of_list substs
   |> OSeq.flat_map (fun subst -> 
@@ -239,4 +240,15 @@ let unify_scoped (t0, scope0) (t1, scope1) =
     (* Format.printf "Problem: %a =?= %a.\n" T.pp (S.apply subst (t0, scope0)) T.pp (S.apply subst (t1, scope1)); *)
     unify ~depth:0 ~scope:unifscope ~fresh_var_ ~subst [S.apply subst (t0, scope0), S.apply subst (t1, scope1), false]
     (* merge with var renaming *)
-    |> OSeq.map (CCOpt.map (US.merge subst))
+    (* |> OSeq.map (CCOpt.map (US.merge subst)) *)
+    |> OSeq.map (CCOpt.map (fun sub -> 
+      (* let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub (t0, scope0) in *)
+      (* let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub (t1, scope1) in *)
+      (* if not (T.equal l r) then (
+        Format.printf "For problem: %a =?= %a\n" T.pp t0 T.pp t1;
+        Format.printf "Subst: %a\n" S.pp sub;
+        Format.printf "%a <> %a\n" T.pp l T.pp r;
+        assert(false);
+      ); *)
+      (* assert (T.equal l r); *)
+      sub))
