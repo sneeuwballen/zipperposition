@@ -241,13 +241,13 @@ let unify_scoped (t0, scope0) (t1, scope1) =
     (* merge with var renaming *)
     (* |> OSeq.map (CCOpt.map (US.merge subst)) *)
     |> OSeq.map (CCOpt.map (fun sub -> 
-      (* let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub (t0, scope0) in  *)
-      (* let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub (t1, scope1) in *)
-      (* if not (T.equal l r) then ( *)
-        (* Format.printf "For problem: %a =?= %a\n" T.pp t0 T.pp t1; *)
-        (* Format.printf "Subst: %a\n" S.pp sub; *)
-        (* Format.printf "%a <> %a\n" T.pp l T.pp r; *)
-        (* assert(false); *)
-      (* ); *)
-      (* assert (T.equal l r); *)
+      let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub (t0, scope0) in 
+      let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub (t1, scope1) in
+      if not (T.equal l r) then (
+        Format.printf "For problem: %a =?= %a\n" T.pp t0 T.pp t1;
+        Format.printf "Subst: %a\n" S.pp sub;
+        Format.printf "%a <> %a\n" T.pp l T.pp r;
+        assert(false);
+      );
+      assert (T.equal l r);
       sub))

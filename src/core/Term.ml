@@ -244,7 +244,7 @@ let as_app_with_mandatory_args t =
       in
       let ty_args, other_args = CCList.take_drop_while is_type l in
       let mand_args, other_args = CCList.take_drop num_mand_args other_args in
-      (* assert (List.for_all T.DB.closed mand_args); *)
+      assert (List.for_all T.DB.closed mand_args);
       let head = app f (ty_args @ mand_args) in (* re-apply to type & mandatory args *)
       head, other_args
     | _ -> t, []
