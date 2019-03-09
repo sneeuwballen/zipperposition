@@ -235,19 +235,24 @@ let unify_scoped (t0, scope0) (t1, scope1) =
     (* Rename variables apart into scope `unifscope` *)
     let subst = T.Seq.vars t0 |> Sequence.fold (add_renaming scope0) subst in
     let subst = T.Seq.vars t1 |> Sequence.fold (add_renaming scope1) subst in
+    let t0', t1' = S.apply subst (t0, scope0), S.apply subst (t1, scope1) in
     (* Unify *)
-    (* Format.printf "Problem: %a =?= %a.\n" T.pp (S.apply subst (t0, scope0)) T.pp (S.apply subst (t1, scope1)); *)
-    unify ~depth:0 ~scope:unifscope ~fresh_var_ ~subst [S.apply subst (t0, scope0), S.apply subst (t1, scope1), false]
+    unify ~depth:0 ~scope:unifscope ~fresh_var_ ~subst [t0', t1', false]
     (* merge with var renaming *)
     (* |> OSeq.map (CCOpt.map (US.merge subst)) *)
     |> OSeq.map (CCOpt.map (fun sub -> 
-      let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub (t0, scope0) in 
-      let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub (t1, scope1) in
-      if not (T.equal l r) then (
+      (* let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t0, scope0) in  *)
+      (* let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t1, scope1) in *)
+      (*if not (T.equal l r) then (
         Format.printf "For problem: %a =?= %a\n" T.pp t0 T.pp t1;
         Format.printf "Subst: %a\n" S.pp sub;
         Format.printf "%a <> %a\n" T.pp l T.pp r;
         assert(false);
-      );
-      assert (T.equal l r);
+      );*)
+      (* if not (T.Seq.subterms l |> Sequence.append (T.Seq.subterms r) |> *)
+           (* Sequence.for_all (fun st -> List.for_all T.DB.is_closed @@ T.get_mand_args st)) then ( *)
+        (* Format.printf "Unequal subst: %a =?= %a, res %a.\n" T.pp t0 T.pp t1 T.pp l; *)
+      (* assert(false);  *)
+      (* ); *)
+      (* assert (T.equal l r); *)
       sub))

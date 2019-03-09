@@ -379,7 +379,7 @@ module MakeTerm(X : Set.OrderedType) = struct
   
   let retrieve_unifiables = retrieve_unifiables_aux Leaf.fold_unify 
 
-  let retrieve_unifiables_complete = retrieve_unifiables_aux Leaf.fold_unify_complete 
+  let retrieve_unifiables_complete ?(unif_alg=JP_unif.unify_scoped) = retrieve_unifiables_aux (Leaf.fold_unify_complete ~unif_alg) 
 
   let retrieve_generalizations ?(subst=S.empty) dt t k =
     Util.enter_prof prof_npdtree_term_generalizations;

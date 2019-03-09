@@ -112,7 +112,7 @@ module Make(E : Env.S) = struct
             let proof = Env.C.proof (List.find Env.C.is_empty l) in
             Unsat proof
           | c :: l', _ ->
-            (* put clauses of [l'] back in passive set *)
+            (* put clauses of [l'] back in passive set *)            
             Env.add_passive (Sequence.of_list l');
             (* process the clause [c] *)
             let new_clauses = CCVector.create () in

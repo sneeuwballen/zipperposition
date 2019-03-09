@@ -73,7 +73,7 @@ let create
     sc_counter=0;
     sc_new_defs = [];
     sc_gensym = Hashtbl.create 16;
-    sc_new_ids = [];
+    sc_new_ids = []; 
     sc_on_new = on_new;
   } in
   ctx

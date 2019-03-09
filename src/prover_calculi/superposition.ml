@@ -77,6 +77,7 @@ let _ord_in_normal_form = ref false
 let _supav_penalty = ref 0
 let _supav = ref true
 let _supext = ref false
+let _unif_alg = ref JP_unif.unify_scoped
 
 module Make(Env : Env.S) : S with module Env = Env = struct
   module Env = Env
@@ -169,7 +170,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               if not (T.is_fun t) then None 
               else (let tyargs, body = T.open_fun t in 
                     let new_pos = List.fold_left (fun p _ -> P.(append p (body stop))) p tyargs in
+                    let hd = T.head_term body in
                     if (not (T.is_var body) || T.is_ho_var body) &&
+                       (not (T.is_const hd) || not (ID.is_skolem (T.as_const_exn hd))) && 
                        (!_sup_at_var_headed || not (T.is_var (T.head_term body))) then
                     Some (body, new_pos) else None))
         |> Sequence.fold
@@ -325,15 +328,20 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let renaming = S.Renaming.create () in
       let us = info.subst in
       let subst = US.subst us in
-      (* let n_funs = (if info.sup_kind = SupEXT then Position.num_of_funs info.passive_pos-1
-                   else (-1)) in  *)
       let t' = S.FO.apply ~shift_vars:0 renaming subst (info.t, sc_a) in
-       Util.debugf ~section 10
+       Util.debugf ~section 1
       "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
        (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
       (fun k->k (kind_to_str info.sup_kind) C.pp info.active sc_a T.pp info.s T.pp info.t
           T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
           Position.pp info.passive_pos US.pp info.subst);
+
+      if(info.sup_kind = SupEXT &&
+         T.Seq.subterms t'
+         |> Sequence.exists (fun st -> 
+              List.exists (fun arg -> not @@ T.DB.is_closed arg) 
+              (T.get_mand_args st))) then
+        raise @@ ExitSuperposition("SupEXT sneaks in bound variables under the skolem");
   
       begin match info.passive_lit, info.passive_pos with
         | Lit.Prop (_, true), P.Arg(_, P.Left P.Stop) ->
@@ -355,9 +363,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let passive_lit' = Lit.apply_subst_no_simp renaming subst' (info.passive_lit, sc_p) in
       let new_trail = C.trail_l [info.active; info.passive] in
       if Env.is_trivial_trail new_trail then raise (ExitSuperposition "trivial trail");
-      (* let n_funs = (if info.sup_kind = SupEXT then Position.num_of_funs info.active_pos-1
-                   else (-1))  in *)
       let s' = S.FO.apply renaming subst (info.s, sc_a) in
+      if(info.sup_kind = SupEXT &&
+         T.Seq.subterms s'
+         |> Sequence.exists (fun st -> 
+              List.exists (fun arg -> not @@ T.DB.is_closed arg) 
+              (T.get_mand_args st))) then
+        raise @@ ExitSuperposition("SupEXT sneaks in bound variables under the skolem");
       if (
         O.compare ord s' t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
@@ -369,6 +381,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         assert (not (T.is_var info.u_p))
       else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then
         raise (ExitSuperposition "superposition at variable");
+
       (* ordering constraints are ok *)
       let lits_a = CCArray.except_idx (C.lits info.active) active_idx in
       let lits_p = CCArray.except_idx (C.lits info.passive) passive_idx in
@@ -417,7 +430,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         + (if T.is_var s' then 2 else 0) (* superposition from var = bad *)
       in
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
-      if info.sup_kind == SupEXT then
       Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       (* assert(List.for_all (Lit.for_all Term.DB.is_closed) new_lits); *)
       (* C.check_types new_clause; *)
@@ -654,9 +666,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           (* we rewrite only under lambdas  *)
           if not (T.is_fun u_p) then None
           else (let tyargs, body = T.open_fun u_p in 
+                let hd = T.head_term body in
                 let new_pos = List.fold_left (fun p _ -> P.(append p (body stop)) ) p tyargs in
                 (* we check normal superposition conditions  *)
                 if (not (T.is_var body) || T.is_ho_var body) &&
+                   (not (T.is_const hd) || not (ID.is_skolem (T.as_const_exn hd))) && 
                    (!_sup_at_var_headed || not (T.is_var (T.head_term body))) then
                   Some (body, new_pos) 
                 else None) )
@@ -689,7 +703,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let infer_active_complete_ho clause =
     let inf_res = infer_active_aux
-      ~retrieve_from_index:I.retrieve_unifiables_complete
+      ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:!_unif_alg)
       ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
           let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) in
           (* /!\ may differ from the actual penalty (by -2) *)
@@ -701,7 +715,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let infer_passive_complete_ho clause =
     let inf_res = infer_passive_aux
-      ~retrieve_from_index:I.retrieve_unifiables_complete
+      ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:!_unif_alg)
       ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
           let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) in
           (* /!\ may differ from the actual penalty (by -2) *)
@@ -735,7 +749,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               let var_h = T.var (HVar.fresh ~ty:(Type.arrow [T.ty s] (Type.var (HVar.fresh ~ty:Type.tType ()))) ()) in
               let hs = T.app var_h [s] in
               let ht = T.app var_h [t] in
-              let res = PVUnif.unify_scoped (u_p,1) (hs,0) |> OSeq.map (
+              let res = !_unif_alg (u_p,1) (hs,0) |> OSeq.map (
                   fun osubst ->
                     osubst |> CCOpt.flat_map (
                       fun subst ->
@@ -786,7 +800,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                 let var_h = T.var (HVar.fresh ~ty:(Type.arrow [T.ty s] (Type.var (HVar.fresh ~ty:Type.tType ()))) ()) in
                 let hs = T.app var_h [s] in
                 let ht = T.app var_h [t] in
-                PVUnif.unify_scoped (hs,1) (u_p,0)
+                !_unif_alg (hs,1) (u_p,0)
                 |> OSeq.map
                   (fun osubst ->
                     osubst |> CCOpt.flat_map (fun subst ->
@@ -843,7 +857,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               let proof = Proof.Step.inference ~rule ~tags
                   [C.proof_parent_subst renaming (clause,0) subst] in
               let new_clause = C.create ~trail ~penalty (c_guard@new_lits) proof in
-              Util.debugf ~section 1 "@[<hv2>equality resolution on@ @[%a@]@ yields @[%a@], subst @[%a@]@]"
+              Util.debugf ~section 1 "@[<hv2>equality resolution on@ @[%a@]@ yields @[%a@],\n subst @[%a@]@]"
                 (fun k->k C.pp clause C.pp new_clause US.pp us);
               Some new_clause
             ) else None
@@ -863,7 +877,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let infer_equality_resolution_complete_ho clause =
     let inf_res = infer_equality_resolution_aux
-        ~unify:PVUnif.unify_scoped
+        ~unify:!_unif_alg
         ~iterate_substs:(fun substs do_eq_res -> Some (OSeq.map (CCOpt.flat_map do_eq_res) substs))
         clause
     in
@@ -978,7 +992,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let infer_equality_factoring_complete_ho clause =
     let inf_res = infer_equality_factoring_aux
-        ~unify:PVUnif.unify_scoped
+        ~unify:!_unif_alg
         ~iterate_substs:(fun substs do_eq_fact -> Some (OSeq.map (CCOpt.flat_map do_eq_fact) substs))
         clause
     in
@@ -2129,7 +2143,12 @@ let () =
     , " disable SupAV inferences (only effective when complete higher-order unification is enabled)"
     ; "--supext"
     , Arg.Set _supext
-    , " enable SupEXT inferences"
+    , " enable SupEXT inferences";
+      "--ho-unif-level",
+      Arg.Symbol (["full"; "pragmatic"], (fun str ->  
+        _unif_alg := if (String.equal "full" str) then JP_unif.unify_scoped
+                     else PVUnif.unify_scoped)),
+      "set the level of HO unification"
     ];
     Params.add_to_mode "ho-complete-basic" (fun () ->
       _use_simultaneous_sup := false;

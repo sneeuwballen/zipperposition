@@ -307,7 +307,8 @@ module Make(X : Set.OrderedType) = struct
 
   let retrieve_unifiables = retrieve_unifiables_aux Leaf.fold_unify
   
-  let retrieve_unifiables_complete = retrieve_unifiables_aux Leaf.fold_unify_complete
+  let retrieve_unifiables_complete ?(unif_alg=JP_unif.unify_scoped) = 
+    retrieve_unifiables_aux (Leaf.fold_unify_complete ~unif_alg)
 
   let retrieve_generalizations ?(subst=S.empty) (idx,sc_idx) t k =
     let features = idx.fp (Lambda.eta_expand @@ fst t) in
