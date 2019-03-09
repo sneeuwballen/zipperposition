@@ -99,8 +99,8 @@ module Make(Dummy : sig end)
     dump_l l;
     List.iter (add_clause_ ~proof) l
 
-  let add_clause_seq ~proof (seq:clause Sequence.t) =
-    add_clauses ~proof (Sequence.to_rev_list seq)
+  let add_clause_seq ~proof (seq:clause Iter.t) =
+    add_clauses ~proof (Iter.to_rev_list seq)
 
   let result_ = ref Sat
 
@@ -267,7 +267,7 @@ module Make(Dummy : sig end)
 
   let get_proved_lits (): Lit.Set.t =
     Lit.Tbl.to_seq lit_tbl_
-    |> Sequence.filter_map
+    |> Iter.filter_map
       (fun (lit,_) -> match proved_at_0 lit with
          | Some true -> Some lit
          | Some false -> Some (Lit.neg lit)
@@ -278,8 +278,8 @@ module Make(Dummy : sig end)
     | Sat ->
       let m =
         Lit.Tbl.keys lit_tbl_
-        |> Sequence.map (fun l -> l, valuation l)
-        |> Sequence.to_rev_list
+        |> Iter.map (fun l -> l, valuation l)
+        |> Iter.to_rev_list
       in
       let pp_pair out (l,b) = Format.fprintf out "(@[%B %a@])" b BBox.pp l in
       Format.printf "(@[<hv2>bool_model@ %a@])@." (Util.pp_list ~sep:" " pp_pair) m

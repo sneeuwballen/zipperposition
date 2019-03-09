@@ -18,10 +18,10 @@ open Logtk
 
 type 'a or_error = ('a, string) CCResult.t
 
-val parse_tptp : string -> UntypedAST.statement Sequence.t or_error
+val parse_tptp : string -> UntypedAST.statement Iter.t or_error
 (** Parse the given file as TPTP *)
 
-val parse_tip : string -> UntypedAST.statement Sequence.t or_error
+val parse_tip : string -> UntypedAST.statement Iter.t or_error
 (** Parse the given file as TIP *)
 
 val guess_input : string -> Input_format.t
@@ -32,7 +32,7 @@ val input_of_file : string -> Input_format.t
     {!guess_input}.
     This is the recommended way of picking the input format for a given file. *)
 
-val parse_file : Input_format.t -> string -> UntypedAST.statement Sequence.t or_error
+val parse_file : Input_format.t -> string -> UntypedAST.statement Iter.t or_error
 (** [parse_file fmt file] parses the file using the parser for the
     given input format. *)
 

@@ -146,9 +146,9 @@ let ind_skolem_depth (id:ID.t): int = match id_as_cst id with
   | Some c -> depth c
 
 (* find inductive constant candidates in terms *)
-let find_ind_skolems t : ind_skolem Sequence.t =
+let find_ind_skolems t : ind_skolem Iter.t =
   T.Seq.subterms t
-  |> Sequence.filter_map
+  |> Iter.filter_map
     (fun t -> match T.view t with
        | T.Const id ->
          let ty = T.ty t in

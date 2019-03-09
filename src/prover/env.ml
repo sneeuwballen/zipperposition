@@ -130,13 +130,13 @@ module Make(X : sig
 
   let add_passive cs =
     ProofState.PassiveSet.add cs;
-    Sequence.iter
+    Iter.iter
       (fun c -> if C.is_empty c then add_empty c) cs;
     ()
 
   let add_active cs =
     ProofState.ActiveSet.add cs;
-    Sequence.iter
+    Iter.iter
       (fun c -> if C.is_empty c then add_empty c) cs;
     ()
 
@@ -260,7 +260,7 @@ module Make(X : sig
         [] !_binary_rules
     in
     Util.exit_prof prof_generate_binary;
-    Sequence.of_list clauses
+    Iter.of_list clauses
 
   (** do unary inferences for the given clause *)
   let do_unary_inferences c =
@@ -274,7 +274,7 @@ module Make(X : sig
            List.rev_append new_clauses acc)
         [] !_unary_rules in
     Util.exit_prof prof_generate_unary;
-    Sequence.of_list clauses
+    Iter.of_list clauses
 
   let do_generate ~full () =
     let clauses =
@@ -285,7 +285,7 @@ module Make(X : sig
         []
         !_generate_rules
     in
-    Sequence.of_list clauses
+    Iter.of_list clauses
 
   let is_trivial_trail trail = match !_is_trivial_trail with
     | [] -> false
@@ -584,7 +584,7 @@ module Make(X : sig
         candidates (C.ClauseSet.empty, [])
     in
     Util.exit_prof prof_back_simplify;
-    before, Sequence.of_list after
+    before, Iter.of_list after
 
   let simplify_active_with f =
     let set =
@@ -609,10 +609,10 @@ module Make(X : sig
     in
     (* remove clauses from active set, put their simplified version into
         the passive set for further processing *)
-    ProofState.ActiveSet.remove (Sequence.of_list set |> Sequence.map fst);
-    Sequence.of_list set
-    |> Sequence.map snd
-    |> Sequence.flat_map Sequence.of_list
+    ProofState.ActiveSet.remove (Iter.of_list set |> Iter.map fst);
+    Iter.of_list set
+    |> Iter.map snd
+    |> Iter.flat_map Iter.of_list
     |> ProofState.PassiveSet.add;
     ()
 
@@ -640,7 +640,7 @@ module Make(X : sig
         then (
           (* infer clauses from c, add them to the queue *)
           let new_clauses = do_unary_inferences c in
-          Sequence.iter
+          Iter.iter
             (fun c' -> Queue.push (c', depth+1) unary_queue)
             new_clauses
         )
@@ -649,12 +649,12 @@ module Make(X : sig
     (* generating rules *)
     let other_clauses = do_generate ~full:false () in
     (* combine all clauses *)
-    let result = Sequence.(
+    let result = Iter.(
         append
           (of_list !unary_clauses)
           (append binary_clauses other_clauses))
     in
-    Util.add_stat stat_inferred (Sequence.length result);
+    Util.add_stat stat_inferred (Iter.length result);
     Util.exit_prof prof_generate;
     result
 

@@ -80,7 +80,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module FV_ext_neg = FV_tree.Make(struct
       type t = Literal.t * T.t list (* lit -> skolems *)
       let compare = CCOrd.(pair Literal.compare (list T.compare))
-      let to_lits (l,_) = Sequence.return (Literal.Conv.to_form l)
+      let to_lits (l,_) = Iter.return (Literal.Conv.to_form l)
       let labels _ = Util.Int_set.empty
     end)
 
@@ -89,9 +89,9 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* retrieve skolems for this literal, if any *)
   let find_skolems_ (lit:Literal.t) : T.t list option =
     FV_ext_neg.retrieve_alpha_equiv_c !idx_ext_neg_ (lit, [])
-    |> Sequence.find_map
+    |> Iter.find_map
       (fun (lit',skolems) ->
-         let subst = Literal.variant (lit',0) (lit,1) |> Sequence.head in
+         let subst = Literal.variant (lit',0) (lit,1) |> Iter.head in
          begin match subst with
            | Some (subst,_) ->
              let skolems =
@@ -148,13 +148,13 @@ module Make(E : Env.S) : S with module Env = E = struct
                 when HVar.equal Type.equal x y &&
                      not (Type.is_tType (HVar.ty x)) &&
                      begin
-                       Sequence.of_list
-                         [Sequence.doubleton f1 f2;
-                          Sequence.of_list l1;
-                          Sequence.of_list l2]
-                       |> Sequence.flatten
-                       |> Sequence.flat_map T.Seq.vars
-                       |> Sequence.for_all
+                       Iter.of_list
+                         [Iter.doubleton f1 f2;
+                          Iter.of_list l1;
+                          Iter.of_list l2]
+                       |> Iter.flatten
+                       |> Iter.flat_map T.Seq.vars
+                       |> Iter.for_all
                          (fun v' -> not (HVar.equal Type.equal v' x))
                      end ->
                 (* it works! *)
@@ -224,14 +224,14 @@ module Make(E : Env.S) : S with module Env = E = struct
     let new_clauses =
       (* iterate over all literals eligible for paramodulation *)
       C.lits c
-      |> Sequence.of_array |> Util.seq_zipi
-      |> Sequence.filter (fun (idx,lit) -> eligible idx lit)
-      |> Sequence.flat_map_l
+      |> Iter.of_array |> Util.seq_zipi
+      |> Iter.filter (fun (idx,lit) -> eligible idx lit)
+      |> Iter.flat_map_l
         (fun (lit_idx,lit) -> match lit with
            | Literal.Equation (t, s, true) ->
              ext_pos_lit t s (CCArray.except_idx (C.lits c) lit_idx)
-             |> Sequence.of_list
-             |> Sequence.flat_map_l
+             |> Iter.of_list
+             |> Iter.flat_map_l
                (fun new_lit ->
                   (* create a clause with new_lit instead of lit *)
                   let new_lits = new_lit :: CCArray.except_idx (C.lits c) lit_idx in
@@ -243,9 +243,9 @@ module Make(E : Env.S) : S with module Env = E = struct
                     C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
                   in
                   [new_c])
-             |> Sequence.to_list
+             |> Iter.to_list
            | _ -> [])
-      |> Sequence.to_rev_list
+      |> Iter.to_rev_list
     in
     if new_clauses<>[] then (
       Util.debugf ~section 4
@@ -260,9 +260,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     let eligible = C.Eligible.param c in
     let new_c =
       C.lits c
-      |> Sequence.of_array |> Util.seq_zipi
-      |> Sequence.filter (fun (idx,lit) -> eligible idx lit)
-      |> Sequence.flat_map_l
+      |> Iter.of_array |> Util.seq_zipi
+      |> Iter.filter (fun (idx,lit) -> eligible idx lit)
+      |> Iter.flat_map_l
         (fun (lit_idx,lit) -> match lit with
            | Literal.Equation (t, u, true) when Type.is_fun (T.ty t) ->
              let n_ty_args, ty_args, _ = Type.open_poly_fun (T.ty t) in
@@ -288,7 +288,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   in
                   new_c)
            | _ -> [])
-      |> Sequence.to_rev_list
+      |> Iter.to_rev_list
     in
     if new_c<>[] then (
       Util.add_stat stat_complete_eq (List.length new_c);
@@ -301,10 +301,10 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* try to eliminate a predicate variable in one fell swoop *)
   let elim_pred_variable (c:C.t) : C.t list =
     (* find unshielded predicate vars *)
-    let find_vars(): _ HVar.t Sequence.t =
+    let find_vars(): _ HVar.t Iter.t =
       C.Seq.vars c
       |> T.VarSet.of_seq |> T.VarSet.to_seq
-      |> Sequence.filter
+      |> Iter.filter
         (fun v ->
            (Type.is_prop @@ Type.returns @@ HVar.ty v) &&
            not (Literals.is_shielded v (C.lits c)))
@@ -404,8 +404,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
     begin
       find_vars()
-      |> Sequence.filter_map try_elim_var
-      |> Sequence.to_rev_list
+      |> Iter.filter_map try_elim_var
+      |> Iter.to_rev_list
     end
 
   (* maximum penalty on clauses to perform Primitive Enum on *)
@@ -417,11 +417,11 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* set of variables to refine (only those occurring in "interesting" lits) *)
     let vars =
       Literals.fold_lits ~eligible:C.Eligible.always (C.lits c)
-      |> Sequence.map fst
-      |> Sequence.flat_map Literal.Seq.terms
-      |> Sequence.flat_map T.Seq.subterms
-      |> Sequence.filter (fun t -> Type.is_prop (T.ty t))
-      |> Sequence.filter_map
+      |> Iter.map fst
+      |> Iter.flat_map Literal.Seq.terms
+      |> Iter.flat_map T.Seq.subterms
+      |> Iter.filter (fun t -> Type.is_prop (T.ty t))
+      |> Iter.filter_map
         (fun t ->
            let hd = T.head_term t in
            begin match T.as_var hd, Type.arity (T.ty hd) with
@@ -441,9 +441,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     begin
       vars
       |> T.VarSet.to_seq
-      |> Sequence.flat_map_l
+      |> Iter.flat_map_l
         (fun v -> HO_unif.enum_prop ~mode (v,sc_c) ~offset)
-      |> Sequence.map
+      |> Iter.map
         (fun (subst,penalty) ->
            let renaming = Subst.Renaming.create() in
            let lits = Literals.apply_subst renaming subst (C.lits c,sc_c) in
@@ -460,7 +460,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              (fun k->k C.pp c Subst.pp subst C.pp new_c);
            Util.incr_stat stat_prim_enum;
            new_c)
-      |> Sequence.to_rev_list
+      |> Iter.to_rev_list
     end
 
   let prim_enum ~mode c =
@@ -597,7 +597,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* index of the next fresh variable *)
     let varidx =
       Literals.Seq.terms (C.lits c)
-      |> Sequence.flat_map T.Seq.vars
+      |> Iter.flat_map T.Seq.vars
       |> T.Seq.max_var |> succ
       |> CCRef.create
     in
@@ -752,7 +752,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if !_purify_applied_vars != `None then
         Env.add_unary_simplify purify_applied_variable;
       if !_ext_axiom then
-        Env.ProofState.PassiveSet.add (Sequence.singleton extensionality_clause);
+        Env.ProofState.PassiveSet.add (Iter.singleton extensionality_clause);
     );
     ()
 end
@@ -781,15 +781,15 @@ let st_contains_ho (st:(_,_,_) Statement.t): bool =
   (* is there a HO variable? *)
   let has_ho_var () =
     Statement.Seq.terms st
-    |> Sequence.flat_map T.Seq.vars
-    |> Sequence.exists (fun v -> is_non_atomic_ty (HVar.ty v))
+    |> Iter.flat_map T.Seq.vars
+    |> Iter.exists (fun v -> is_non_atomic_ty (HVar.ty v))
   (* is there a HO symbol? *)
   and has_ho_sym () =
     Statement.Seq.ty_decls st
-    |> Sequence.exists (fun (_,ty) -> Type.order ty > 1)
+    |> Iter.exists (fun (_,ty) -> Type.order ty > 1)
   and has_ho_eq() =
     Statement.Seq.forms st
-    |> Sequence.exists
+    |> Iter.exists
       (fun c ->
          c |> List.exists
            (function
@@ -810,7 +810,7 @@ let extension =
   and check_ho vec state =
     let is_ho =
       CCVector.to_seq vec
-      |> Sequence.exists st_contains_ho
+      |> Iter.exists st_contains_ho
     in
     if is_ho then (
       Util.debug ~section 2 "problem is HO"

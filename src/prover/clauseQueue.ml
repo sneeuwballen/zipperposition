@@ -60,9 +60,9 @@ module Make(C : Clause_intf.S) = struct
       (* maximum depth of types. Avoids reasoning on list (list (list .... (list int))) *)
       let _depth_ty =
         Lits.Seq.terms (C.lits c)
-        |> Sequence.map Term.ty
-        |> Sequence.map Type.depth
-        |> Sequence.max ?lt:None
+        |> Iter.map Term.ty
+        |> Iter.map Type.depth
+        |> Iter.max ?lt:None
         |> CCOpt.map_or CCFun.id ~default:0
       in
       let w_lits = weight_lits_ (C.lits c) in
@@ -190,7 +190,7 @@ module Make(C : Clause_intf.S) = struct
         Queue.push c q.queue;
       )
 
-  let add_seq q hcs = Sequence.iter (add q) hcs
+  let add_seq q hcs = Iter.iter (add q) hcs
 
   let rec take_first_mixed q =
     if is_empty_mixed q then raise Not_found;

@@ -172,7 +172,7 @@ let process file =
   let input = Input_format.I_tptp in
   let parse = Util_tptp.parse_file ~recursive:true file in
   Util.debugf 5 "Parse: %s" (fun k -> k (match parse with | CCResult.Error e -> e | CCResult.Ok _ -> "OK"));
-  let ast = Sequence.map Util_tptp.to_ast (CCResult.get_exn parse) in
+  let ast = Iter.map Util_tptp.to_ast (CCResult.get_exn parse) in
   let typed_ast = TypeInference.infer_statements ?ctx:None
       ~on_var:(Input_format.on_var input)
       ~on_undef:(Input_format.on_undef_id input)

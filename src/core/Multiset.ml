@@ -285,11 +285,11 @@ module Make(E : Map.OrderedType) = struct
 
   let max f m =
     max_seq f m
-    |> Sequence.fold (fun m (c,t) -> add_coeff m c t) empty
+    |> Iter.fold (fun m (c,t) -> add_coeff m c t) empty
 
   let max_l f l =
     max_seq f (of_list l)
-    |> Sequence.fold (fun acc (x,_) -> x::acc) []
+    |> Iter.fold (fun acc (x,_) -> x::acc) []
 
   let compare_partial_l f l1 l2 =
     compare_partial f (of_list l1) (of_list l2)

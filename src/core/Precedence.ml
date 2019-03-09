@@ -64,7 +64,7 @@ module Constr = struct
   let invfreq seq =
     (* symbol -> number of occurrences of symbol in seq *)
     let tbl = ID.Tbl.create 16 in
-    Sequence.iter (ID.Tbl.incr tbl) seq;
+    Iter.iter (ID.Tbl.incr tbl) seq;
     let find_freq s = ID.Tbl.get_or ~default:0 tbl s in
     (* compare by inverse frequency (higher frequency => smaller) *)
     fun s1 s2 ->
@@ -177,7 +177,7 @@ let declare_status p s status =
   ID.Tbl.replace p.status s status
 
 module Seq = struct
-  let symbols p = Sequence.of_list p.snapshot
+  let symbols p = Iter.of_list p.snapshot
 end
 
 let pp_ pp_id out l =
@@ -289,11 +289,11 @@ let add_list p l =
 
 let add p id = add_list p [id]
 
-let add_seq p seq = Sequence.iter (add p) seq
+let add_seq p seq = Iter.iter (add p) seq
 
 let default l = create Constr.alpha l
 
 let default_seq seq =
-  default (Sequence.to_rev_list seq)
+  default (Iter.to_rev_list seq)
 
 let constr p = p.constr

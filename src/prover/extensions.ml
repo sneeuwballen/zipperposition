@@ -24,7 +24,7 @@ type t = {
   name : string;
   prio : int;  (** the lower, the more urgent, the earlier it is loaded *)
   start_file_actions : string state_actions;
-  post_parse_actions : UntypedAST.statement Sequence.t state_actions;
+  post_parse_actions : UntypedAST.statement Iter.t state_actions;
   post_typing_actions : TypeInference.typed_statement CCVector.ro_vector state_actions;
   post_cnf_actions: Statement.clause_t CCVector.ro_vector state_actions;
   ord_select_actions : (Ordering.t * Selection.t) state_actions;
@@ -70,8 +70,8 @@ let cmp_prio_name a b =
 
 let extensions () =
   CCHashtbl.values _extensions
-  |> Sequence.sort_uniq ~cmp:cmp_prio_name  (* sort by increasing priority *)
-  |> Sequence.to_list
+  |> Iter.sort_uniq ~cmp:cmp_prio_name  (* sort by increasing priority *)
+  |> Iter.to_list
 
 let by_name name =
   try Some (Hashtbl.find _extensions name)

@@ -113,7 +113,7 @@ module type LINEXP = sig
   val monomial1 : term -> t
   val equal : t -> t -> bool
   val map : (term -> term) -> t -> t
-  val subterms : t -> term Sequence.t
+  val subterms : t -> term Iter.t
   val pp : term CCFormat.printer -> t CCFormat.printer
 end
 
@@ -161,7 +161,7 @@ module Make_linexp(N : NUM) = struct
   let map f e =
     I_map.fold (fun _ (t,n) acc -> add n (f t) acc) e.coeffs (const e.const)
 
-  let subterms e = I_map.values e.coeffs |> Sequence.map fst
+  let subterms e = I_map.values e.coeffs |> Iter.map fst
 
   let pp pp_t out (e:t): unit =
     if is_const e then N.pp_print out e.const
@@ -448,7 +448,7 @@ let bind ~ty binder ~ty_var body = match binder, view body with
        check if replacing [db0] with a fresh [c] in [t] contains [c] *)
     let c = const id_eta_ ~ty:(HVar.ty v) in
     let t_reduced = db_eval ~sub:c t in
-    if subterms t_reduced |> Sequence.exists (equal c)
+    if subterms t_reduced |> Iter.exists (equal c)
     then bind_ binder ~ty ~ty_var body
     else t_reduced
   | _ -> bind_ binder ~ty ~ty_var body
@@ -512,7 +512,7 @@ let as_eta_expansion body : _ option = match view body with
     (* check if replacing [db0] with a fresh [c] in [t] contains [c] *)
     let c = const id_eta_ ~ty:(HVar.ty v) in
     let t_reduced = db_eval ~sub:c t in
-    if subterms t_reduced |> Sequence.exists (equal c) then None else Some t_reduced
+    if subterms t_reduced |> Iter.exists (equal c) then None else Some t_reduced
   | _ -> None
 
 let[@inline] lambda ~ty_var body =

@@ -51,11 +51,11 @@ let make_ lits var =
 
 let make lits ~var =
   assert (Lits.Seq.terms lits
-          |> Sequence.exists (T.var_occurs ~var));
+          |> Iter.exists (T.var_occurs ~var));
   make_ lits var
 
 let extract lits t =
-  if Lits.Seq.terms lits |> Sequence.exists (T.subterm ~sub:t)
+  if Lits.Seq.terms lits |> Iter.exists (T.subterm ~sub:t)
   then
     (* create fresh var to replace [t], negative to avoid collisions later *)
     let var = HVar.make_unsafe ~ty:(T.ty t) ~-2 in
@@ -76,7 +76,7 @@ let extract_exn lits t = match extract lits t with
 let trivial lits t =
   (* create fresh var to replace [t], negative to avoid collisions later *)
   let var = HVar.make_unsafe ~ty:(T.ty t) ~-2 in
-  assert (not (Literals.Seq.terms lits |> Sequence.exists (T.subterm ~sub:t)));
+  assert (not (Literals.Seq.terms lits |> Iter.exists (T.subterm ~sub:t)));
   make_ lits var
 
 let _apply_subst subst (lits, sc) =

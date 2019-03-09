@@ -87,13 +87,13 @@ let is_cnf f =
   with NotCNF _ | SLiteral.NotALit _ -> false
 
 module Flatten = struct
-  type 'a t = T.Subst.t -> (T.Subst.t * 'a) Sequence.t
+  type 'a t = T.Subst.t -> (T.Subst.t * 'a) Iter.t
 
-  let empty : 'a t = fun _ -> Sequence.empty
+  let empty : 'a t = fun _ -> Iter.empty
 
   let return
     : type a. a -> a t
-    = fun x subst -> Sequence.return (subst, x)
+    = fun x subst -> Iter.return (subst, x)
 
   let (>>=)
     : type a b. a t -> (a -> b t) -> b t
@@ -119,16 +119,16 @@ module Flatten = struct
   let add_subst
     : T.Subst.t -> unit t
     = fun sigma subst ->
-      Sequence.return (T.Subst.merge subst sigma, ())
+      Iter.return (T.Subst.merge subst sigma, ())
 
   let get_subst : T.Subst.t t
-    = fun subst -> Sequence.return (subst, subst)
+    = fun subst -> Iter.return (subst, subst)
 
   (* non deterministic choice *)
   let (<+>)
     : type a. a t -> a t -> a t
     = fun x y subst ->
-      Sequence.append (x subst) (y subst)
+      Iter.append (x subst) (y subst)
 
   let rec map_m f l = match l with
     | [] -> return []
@@ -155,20 +155,20 @@ module Flatten = struct
   let choice_l
     : 'a t list -> 'a t
     = fun l subst ->
-      Sequence.flat_map (fun x -> x subst) (Sequence.of_list l)
+      Iter.flat_map (fun x -> x subst) (Iter.of_list l)
 
   let of_list
     : 'a list -> 'a t
     = fun l subst ->
-      Sequence.of_list l |> Sequence.map (fun x->subst,x)
+      Iter.of_list l |> Iter.map (fun x->subst,x)
 
   let to_list
     : 'a t -> (T.Subst.t * 'a) list
     = fun seq ->
-      seq T.Subst.empty |> Sequence.to_rev_list
+      seq T.Subst.empty |> Iter.to_rev_list
 
   let to_list' : 'a t -> 'a list
-    = fun seq -> seq T.Subst.empty |> Sequence.map snd |> Sequence.to_rev_list
+    = fun seq -> seq T.Subst.empty |> Iter.map snd |> Iter.to_rev_list
 
   let apply_subst_vars_ subst vars =
     List.map
@@ -858,7 +858,7 @@ let pp_stmt out st = Stmt.pp T.pp T.pp_inner T.pp_inner out st
 
 (* flatten definitions, removing some constructs such as if/match,
    introducing new definitions *)
-let flatten ~ctx seq : _ Sequence.t =
+let flatten ~ctx seq : _ Iter.t =
   let open Flatten in
   let flatten_axiom stmt f =
     begin
@@ -901,7 +901,7 @@ let flatten ~ctx seq : _ Sequence.t =
         (fun (lhs,rhs) -> Stmt.Def_form {vars;lhs;rhs;polarity;as_form})
   in
   seq
-  |> Sequence.flat_map_l
+  |> Iter.flat_map_l
     (fun stmt ->
        let n = Skolem.counter ctx in
        let proof() =
@@ -1004,7 +1004,7 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
   in
   let res =
     seq
-    |> Sequence.flat_map
+    |> Iter.flat_map
       (fun stmt ->
          let old_counter = Skolem.counter ctx in
          let proof() =
@@ -1048,8 +1048,8 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
            | Stmt.NegatedGoal _ -> assert false
          in
          begin match pop_new_defs ~ctx with
-           | [] -> Sequence.return new_st
-           | l -> Sequence.of_list (List.rev (new_st :: l))
+           | [] -> Iter.return new_st
+           | l -> Iter.of_list (List.rev (new_st :: l))
          end
       )
     |> CCVector.of_seq ?init:None
@@ -1240,7 +1240,7 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
   CCVector.freeze res
 
 let cnf_of ?opts ?ctx st =
-  cnf_of_seq ?opts ?ctx (Sequence.return st)
+  cnf_of_seq ?opts ?ctx (Iter.return st)
 
 let pp_f_statement out st = Statement.pp T.pp T.pp T.pp out st
 
@@ -1255,7 +1255,7 @@ let pp_fo_c_statement = Statement.pp_clause
 let type_declarations seq =
   let open Statement in
   seq
-  |> Sequence.flat_map Seq.ty_decls
+  |> Iter.flat_map Seq.ty_decls
   |> ID.Map.of_seq
 
 let convert seq =
@@ -1320,7 +1320,7 @@ let convert seq =
       (fun k->k pp_c_statement st Stmt.pp_clause res);
     res
   in
-  Sequence.map conv_statement seq
+  Iter.map conv_statement seq
   |> CCVector.of_seq
   |> CCVector.freeze
 

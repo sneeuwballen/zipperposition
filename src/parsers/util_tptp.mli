@@ -28,14 +28,14 @@ val find_file : string -> string -> string option
 val parse_lexbuf :
   ?names:A.name list ->
   Lexing.lexbuf ->
-  untyped A.t Sequence.t or_error
+  untyped A.t Iter.t or_error
 (** Given a lexbuf, try to parse its content into a sequence of untyped
     declarations *)
 
 val parse_file :
   ?cache:parse_cache ->
   recursive:bool -> string ->
-  untyped A.t Sequence.t or_error
+  untyped A.t Iter.t or_error
 (** Parsing a TPTP file is here presented with a [recursive] option
     that, if true, will make "include" directives to be recursively
     parsed. It uses {!find_file} for included files.
@@ -47,10 +47,10 @@ val parse_file :
 
 (** Printing is simpler, because it does not involve includes. *)
 
-val print_into : 't CCFormat.printer -> 't A.t Sequence.t CCFormat.printer
-val print_into_file : 't CCFormat.printer -> string -> 't A.t Sequence.t -> unit
+val print_into : 't CCFormat.printer -> 't A.t Iter.t CCFormat.printer
+val print_into_file : 't CCFormat.printer -> string -> 't A.t Iter.t -> unit
 
-val has_includes : _ A.t Sequence.t -> bool
+val has_includes : _ A.t Iter.t -> bool
 (** Check whether some include declaration can be found in the sequence *)
 
 (** {2 Bridge to UntypedAST} *)

@@ -36,14 +36,14 @@ module Make(C : Index.CLAUSE) = struct
       { name = "size+";
         f =
           (fun lits ->
-             Sequence.filter SLiteral.is_pos lits |> Sequence.length);
+             Iter.filter SLiteral.is_pos lits |> Iter.length);
       }
 
     let size_minus =
       { name = "size-";
         f =
           (fun lits ->
-             Sequence.filter SLiteral.is_neg lits |> Sequence.length);
+             Iter.filter SLiteral.is_neg lits |> Iter.length);
       }
 
     let rec _depth_term depth t = match T.view t with
@@ -61,46 +61,46 @@ module Make(C : Index.CLAUSE) = struct
     let sum_of_depths =
       { name = "sum_of_depths";
         f = (fun lits ->
-          Sequence.fold
+          Iter.fold
             (fun acc lit ->
                SLiteral.fold (fun acc t -> acc + _depth_term 0 t) acc lit
             ) 0 lits);
       }
 
     let _select_sign ~sign lits =
-      lits |> Sequence.filter (fun l -> SLiteral.sign l = sign)
+      lits |> Iter.filter (fun l -> SLiteral.sign l = sign)
 
     (* sequence of symbols of clause, of given sign *)
     let _symbols ~sign lits =
       _select_sign ~sign lits
-      |> Sequence.flat_map SLiteral.to_seq
-      |> Sequence.flat_map T.Seq.symbols
+      |> Iter.flat_map SLiteral.to_seq
+      |> Iter.flat_map T.Seq.symbols
 
     let count_symb_plus symb =
       { name = CCFormat.sprintf "count+(%a)" ID.pp symb;
-        f = (fun lits -> Sequence.length (_symbols ~sign:true lits));
+        f = (fun lits -> Iter.length (_symbols ~sign:true lits));
       }
 
     let count_symb_minus symb =
       { name = CCFormat.sprintf "count-(%a)" ID.pp symb;
-        f = (fun lits -> Sequence.length (_symbols ~sign:false lits));
+        f = (fun lits -> Iter.length (_symbols ~sign:false lits));
       }
 
     (* max depth of the symbol in the term, or -1 *)
     let max_depth_term symb t =
       let symbs_depths =
         T.Seq.subterms_depth t
-        |> Sequence.filter_map
+        |> Iter.filter_map
           (fun (t,depth) -> match T.Classic.view t with
              | T.Classic.App (s, _) when ID.equal s symb -> Some depth
              | _ -> None)
       in
-      match Sequence.max symbs_depths with
+      match Iter.max symbs_depths with
         | None -> 0
         | Some m -> m
 
     let _max_depth_lits ~sign symb lits =
-      Sequence.fold
+      Iter.fold
         (fun depth lit  ->
            if sign = SLiteral.sign lit
            then
@@ -248,7 +248,7 @@ module Make(C : Index.CLAUSE) = struct
     let trie' = goto_leaf idx.trie fv k in
     { idx with trie=trie'; }
 
-  let add_seq = Sequence.fold add
+  let add_seq = Iter.fold add
   let add_list = List.fold_left add
 
   let remove idx c =
@@ -258,7 +258,7 @@ module Make(C : Index.CLAUSE) = struct
     let trie' = goto_leaf idx.trie fv k in
     { idx with trie=trie'; }
 
-  let remove_seq idx seq = Sequence.fold remove idx seq
+  let remove_seq idx seq = Iter.fold remove idx seq
 
   (* clauses that subsume (potentially) the given clause *)
   let retrieve_subsuming idx lits _ f =

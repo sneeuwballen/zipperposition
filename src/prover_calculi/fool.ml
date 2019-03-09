@@ -54,11 +54,11 @@ module Make(E : Env.S) : S with module Env = E = struct
   let fool_param c : C.t list =
     let sub_terms =
       C.Seq.terms c
-      |> Sequence.flat_map
+      |> Iter.flat_map
         (fun t ->
            T.Seq.subterms_depth t
-           |> Sequence.filter_map (fun (t,d) -> if d>0  then Some t else None))
-      |> Sequence.filter
+           |> Iter.filter_map (fun (t,d) -> if d>0  then Some t else None))
+      |> Iter.filter
         (fun t ->
            Type.is_prop (T.ty t) &&
            T.DB.is_closed t &&
@@ -78,9 +78,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     );
     begin
       T.Set.to_seq sub_terms
-      |> Sequence.flat_map_l
+      |> Iter.flat_map_l
         (fun sub -> [fool_param_sign ~sub true c; fool_param_sign ~sub false c])
-      |> Sequence.to_rev_list
+      |> Iter.to_rev_list
       |> CCFun.tap
         (fun l ->
            if l<>[] then (
@@ -94,8 +94,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* eliminate [P ∨ C] into [C[P := ⊥]] (and same for [¬P]) *)
   let fool_elim_var (c:C.t) : C.t list =
     C.lits c
-    |> Sequence.of_array_i
-    |> Sequence.filter_map
+    |> Iter.of_array_i
+    |> Iter.filter_map
       (fun (idx,lit) -> match lit with
          | Literal.Prop (t, sign) ->
            begin match T.as_var t with
@@ -127,7 +127,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              | _ -> None
            end
          | _ -> None)
-    |> Sequence.to_rev_list
+    |> Iter.to_rev_list
 
   (* rewrite some boolean literals:
      - [a ≠_o b --> a || b && (¬ a || ¬b)], i.e. exclusive or

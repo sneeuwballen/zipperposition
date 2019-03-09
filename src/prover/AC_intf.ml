@@ -27,7 +27,7 @@ module type S = sig
   val symbols : unit -> ID.Set.t
   (** set of AC symbols *)
 
-  val symbols_of_terms : Term.t Sequence.t -> ID.Set.t
+  val symbols_of_terms : Term.t Iter.t -> ID.Set.t
   (** set of AC symbols occurring in the given term *)
 
   val exists_ac : unit -> bool

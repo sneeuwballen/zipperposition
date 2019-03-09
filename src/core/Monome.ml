@@ -217,7 +217,7 @@ module Seq = struct
     fun k -> List.iter (fun (_, t) -> k t) m.terms
 
   let vars m =
-    Sequence.flat_map T.Seq.vars (terms m)
+    Iter.flat_map T.Seq.vars (terms m)
 
   let coeffs m =
     fun k -> List.iter k m.terms
@@ -325,7 +325,7 @@ let fold_max ~ord f acc m =
     Seq.terms m
     |> MT.Seq.of_seq MT.empty
     |> MT.max_seq (Ordering.compare ord)
-    |> Sequence.map fst
+    |> Iter.map fst
     |> T.Seq.add_set T.Set.empty
   in
   CCList.foldi
@@ -1112,7 +1112,7 @@ module Int = struct
                 let init, _gcd = diophant_l l' (Z.neg c) in
                 (* generate fresh vars to describe the solution space *)
                 let n = List.length l in
-                let vars = Sequence.(repeat () |> take (n-1) |> to_rev_list) in
+                let vars = Iter.(repeat () |> take (n-1) |> to_rev_list) in
                 let vars = List.map (fun () -> fresh_var num.ty) vars in
                 (* build general solution by summing variable part and initial solution *)
                 let monomes = List.map2

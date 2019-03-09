@@ -20,7 +20,7 @@ type env_with_result =
 
 type errcode = int
 
-type prelude = UntypedAST.statement Sequence.t
+type prelude = UntypedAST.statement Iter.t
 
 type ('ret, 'before, 'after) phase =
   | Init : (unit, _, [`Init]) phase (* global setup *)
@@ -34,7 +34,7 @@ type ('ret, 'before, 'after) phase =
   | Start_file :
       (filename, [`Parse_prelude], [`Start_file]) phase (* file to process *)
   | Parse_file :
-      (Input_format.t * UntypedAST.statement Sequence.t,
+      (Input_format.t * UntypedAST.statement Iter.t,
        [`Start_file], [`Parse_file]) phase (* parse some file *)
   | Typing :
       (TypeInference.typed_statement CCVector.ro_vector, [`Parse_file], [`Typing]) phase

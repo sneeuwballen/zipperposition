@@ -74,7 +74,7 @@ val id_is_ind_skolem : ID.t -> Type.t -> bool
     a skolem constant of an inductive type, or
     if it is already an inductive constant. *)
 
-val find_ind_skolems : Term.t -> ind_skolem Sequence.t
+val find_ind_skolems : Term.t -> ind_skolem Iter.t
 (** [find_ind_skolem term] searches subterms of [term] for constants
     that are of an inductive type and that are skolems or
     (already) inductive constants. *)

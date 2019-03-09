@@ -274,16 +274,16 @@ val pp_with_ty : t CCFormat.printer
 
 val pp_in : Output_format.t -> t CCFormat.printer
 
-module Set : Sequence.Set.S with type elt = term
-module Map : Sequence.Map.S with type key = term
+module Set : Iter.Set.S with type elt = term
+module Map : Iter.Map.S with type key = term
 module Tbl : Hashtbl.S with type key = term
 
 module Seq : sig
-  val subterms : t -> t Sequence.t
-  val subterms_with_bound : t -> (t * t Var.Set.t) Sequence.t
-  val vars : t -> t Var.t Sequence.t
-  val free_vars : t -> t Var.t Sequence.t
-  val metas : t -> meta_var Sequence.t
+  val subterms : t -> t Iter.t
+  val subterms_with_bound : t -> (t * t Var.Set.t) Iter.t
+  val vars : t -> t Var.t Iter.t
+  val free_vars : t -> t Var.t Iter.t
+  val metas : t -> meta_var Iter.t
 end
 
 (** {2 Substitutions} *)

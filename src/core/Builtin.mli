@@ -159,8 +159,8 @@ include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 include Interfaces.PRINT with type t := t
 
-module Map : Sequence.Map.S with type key = t
-module Set : Sequence.Set.S with type elt = t
+module Map : Iter.Map.S with type key = t
+module Set : Iter.Set.S with type elt = t
 module Tbl : Hashtbl.S with type key = t
 
 (** Each tag describes an extension of FO logic *)

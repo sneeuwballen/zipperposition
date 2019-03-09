@@ -68,28 +68,28 @@ module type S = sig
 
   (** {2 Modify the Env} *)
 
-  val add_passive : C.t Sequence.t -> unit
+  val add_passive : C.t Iter.t -> unit
   (** Add passive clauses *)
 
-  val add_active : C.t Sequence.t -> unit
+  val add_active : C.t Iter.t -> unit
   (** Add active clauses *)
 
-  val add_simpl : C.t Sequence.t -> unit
+  val add_simpl : C.t Iter.t -> unit
   (** Add simplification clauses *)
 
-  val remove_passive : C.t Sequence.t -> unit
+  val remove_passive : C.t Iter.t -> unit
   (** Remove passive clauses *)
 
-  val remove_active : C.t Sequence.t -> unit
+  val remove_active : C.t Iter.t -> unit
   (** Remove active clauses *)
 
-  val remove_simpl  : C.t Sequence.t -> unit
+  val remove_simpl  : C.t Iter.t -> unit
   (** Remove simplification clauses *)
 
-  val get_passive : unit -> C.t Sequence.t
+  val get_passive : unit -> C.t Iter.t
   (** Passive clauses *)
 
-  val get_active : unit -> C.t Sequence.t
+  val get_active : unit -> C.t Iter.t
   (** Active clauses *)
 
   val add_binary_inf : string -> binary_inf_rule -> unit
@@ -193,13 +193,13 @@ module type S = sig
   val next_passive : unit  -> C.t option
   (** Extract next passive clause *)
 
-  val do_binary_inferences : C.t -> C.t Sequence.t
+  val do_binary_inferences : C.t -> C.t Iter.t
   (** do binary inferences that involve the given clause *)
 
-  val do_unary_inferences : C.t -> C.t Sequence.t
+  val do_unary_inferences : C.t -> C.t Iter.t
   (** do unary inferences for the given clause *)
 
-  val do_generate : full:bool -> unit -> C.t Sequence.t
+  val do_generate : full:bool -> unit -> C.t Iter.t
   (** do generating inferences *)
 
   val is_trivial_trail : Trail.t -> bool
@@ -220,7 +220,7 @@ module type S = sig
   val unary_simplify : simplify_rule
   (** Simplify the clause. *)
 
-  val backward_simplify : C.t -> C.ClauseSet.t * C.t Sequence.t
+  val backward_simplify : C.t -> C.ClauseSet.t * C.t Iter.t
   (** Perform backward simplification with the given clause. It returns the
       CSet of clauses that become redundant, and the sequence of those
       very same clauses after simplification. *)
@@ -236,7 +236,7 @@ module type S = sig
   val forward_simplify : simplify_rule
   (** Simplify the clause w.r.t to the active set and experts *)
 
-  val generate : C.t -> C.t Sequence.t
+  val generate : C.t -> C.t Iter.t
   (** Perform all generating inferences *)
 
   val is_redundant : C.t -> bool

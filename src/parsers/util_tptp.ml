@@ -75,7 +75,7 @@ let parse_lexbuf ?names buf =
          | (A.Include _ | A.IncludeOnly _), _ ->
            Queue.push decl q)
       decls;
-    Err.return (Sequence.of_queue q)
+    Err.return (Iter.of_queue q)
   with
     | Error msg | Sys_error msg ->
       Err.fail msg
@@ -146,7 +146,7 @@ let parse_file ?cache ~recursive f =
   in
   try
     parse_this_file ?names:None f;
-    Err.return (Sequence.of_queue result_decls)
+    Err.return (Iter.of_queue result_decls)
   with
     | Error msg | Sys_error msg ->
       Err.fail (Util.err_spf "in parse_tptp: %s" msg)
@@ -167,7 +167,7 @@ let print_into_file ppt file decls =
        Format.pp_print_flush out ())
 
 let has_includes decls =
-  Sequence.exists
+  Iter.exists
     (function
       | A.Include _
       | A.IncludeOnly _ -> true
@@ -210,7 +210,7 @@ let rec looks_like_def f = match PT.view f with
     begin match as_atom lhs with
       | None -> false
       | Some id ->
-        PT.Seq.symbols rhs |> Sequence.for_all (fun id' -> id<>id')
+        PT.Seq.symbols rhs |> Iter.for_all (fun id' -> id<>id')
     end
   | _ -> false
 

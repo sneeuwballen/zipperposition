@@ -157,18 +157,18 @@ module VarSet : CCSet.S with type elt = var
 module VarMap : CCMap.S with type key = var
 module VarTbl : CCHashtbl.S with type key = var
 
-(** {2 Sequences} *)
+(** {2 Iters} *)
 
 module Seq : sig
-  val vars : t -> var Sequence.t
-  val subterms : t -> t Sequence.t
-  val subterms_depth : t -> (t * int) Sequence.t  (* subterms with their depth *)
-  val symbols : t -> ID.t Sequence.t
-  val max_var : var Sequence.t -> int (** max var *)
-  val min_var : var Sequence.t -> int (** min var *)
-  val ty_vars : t -> var Sequence.t
-  val typed_symbols : t -> (ID.t * Type.t) Sequence.t
-  val add_set : Set.t -> t Sequence.t -> Set.t
+  val vars : t -> var Iter.t
+  val subterms : t -> t Iter.t
+  val subterms_depth : t -> (t * int) Iter.t  (* subterms with their depth *)
+  val symbols : t -> ID.t Iter.t
+  val max_var : var Iter.t -> int (** max var *)
+  val min_var : var Iter.t -> int (** min var *)
+  val ty_vars : t -> var Iter.t
+  val typed_symbols : t -> (ID.t * Type.t) Iter.t
+  val add_set : Set.t -> t Iter.t -> Set.t
 end
 
 val var_occurs : var:var -> t -> bool (** [var_occurs ~var t] true iff [var] in t *)
@@ -244,7 +244,7 @@ val contains_symbol : ID.t -> t -> bool
 
 val all_positions :
   ?vars:bool -> ?ty_args:bool -> ?pos:Position.t ->
-  t -> t Position.With.t Sequence.t
+  t -> t Position.With.t Iter.t
 (** Iterate on all sub-terms with their position.
     @param vars specifies whether variables are folded on (default false).
     @param ty_args specifies whether type arguments are folded on (default true).
@@ -271,11 +271,11 @@ module AC(A : AC_SPEC) : sig
       which ID.ts are AC or commutative (by default by looking at
       attr_ac and attr_commut). *)
 
-  val symbols : t Sequence.t -> ID.Set.t
+  val symbols : t Iter.t -> ID.Set.t
   (** Set of ID.ts occurring in the terms, that are AC *)
 
-  val seq_symbols : t -> ID.t Sequence.t
-  (** Sequence of AC symbols in this term *)
+  val seq_symbols : t -> ID.t Iter.t
+  (** Iter of AC symbols in this term *)
 end
 
 (** {2 Printing/parsing} *)

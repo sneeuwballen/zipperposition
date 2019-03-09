@@ -105,9 +105,9 @@ let collect_vars subst f =
   (* traverse [t] and return free variables, dereferencing on the fly *)
   let rec vars_seq t =
     T.Seq.free_vars t
-    |> Sequence.flat_map
+    |> Iter.flat_map
       (fun v -> match Var.Subst.find subst v with
-         | None -> Sequence.return (Var.update_ty ~f:(T.Subst.eval subst) v)
+         | None -> Iter.return (Var.update_ty ~f:(T.Subst.eval subst) v)
          | Some t' -> vars_seq t')
   in
   let is_ty_var v = T.Ty.is_tType (Var.ty v) in
@@ -259,8 +259,8 @@ let define_term ?(pattern="fun_") ~ctx ~parents rules : term_definition =
     List.map
       (fun (args,rhs) ->
          let all_vars =
-           Sequence.of_list (rhs::args)
-           |> Sequence.flat_map T.Seq.free_vars
+           Iter.of_list (rhs::args)
+           |> Iter.flat_map T.Seq.free_vars
            |> Var.Set.of_seq |> Var.Set.to_list
          in
          if is_prop

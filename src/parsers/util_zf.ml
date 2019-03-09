@@ -11,7 +11,7 @@ type parse_cache = (string,unit) Hashtbl.t
 
 let create_parse_cache () = Hashtbl.create 8
 
-type parser_res = (UntypedAST.statement Sequence.t, string) CCResult.t
+type parser_res = (UntypedAST.statement Iter.t, string) CCResult.t
 type 'a parser_ = 'a -> parser_res
 
 let find_file name ~dir : string option =
@@ -58,7 +58,7 @@ and parse_file_ ?cache ?recursive file =
 
 let parse_lexbuf ?cache ?recursive file : parser_res =
   try parse_lexbuf_ ?cache ?recursive ~dir:"." file
-      |> Sequence.of_list |> CCResult.return
+      |> Iter.of_list |> CCResult.return
   with e -> CCResult.of_exn e
 
 let parse_stdin () : parser_res =
@@ -71,7 +71,7 @@ let parse_file ?cache ?recursive file : parser_res =
   then parse_stdin()
   else try
       parse_file_ ?cache ?recursive file
-      |> Sequence.of_list
+      |> Iter.of_list
       |> CCResult.return
     with
       | Sys_error e ->

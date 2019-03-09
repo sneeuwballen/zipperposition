@@ -154,7 +154,7 @@ module Eprover = struct
   type result = {
     answer : szs_answer;
     output : string;
-    decls : untyped Ast_tptp.t Sequence.t option;
+    decls : untyped Ast_tptp.t Iter.t option;
     proof : Trace_tstp.t option;
   }
   and szs_answer =

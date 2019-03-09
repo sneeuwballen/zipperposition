@@ -25,8 +25,8 @@ let make cs =
   if cs=[] then trivial
   else (
     let vars =
-      Sequence.of_list cs
-      |> Sequence.flat_map Literals.Seq.vars
+      Iter.of_list cs
+      |> Iter.flat_map Literals.Seq.vars
       |> T.VarSet.of_seq
     and cs = CCList.sort_uniq ~cmp:Literals.compare cs in
     {cs; vars;}
@@ -106,14 +106,14 @@ let subst1 (v:var) (t:term) (f:t): t =
   apply_subst renaming subst (f,0)
 
 (* find substitutions making [f1] and [f2] variants, if possible *)
-let variant_ ~subst (f1,sc1)(f2,sc2): _ Sequence.t =
+let variant_ ~subst (f1,sc1)(f2,sc2): _ Iter.t =
   Unif.unif_list_com ~size:`Same subst
     ~op:(fun subst c1 c2 k ->
       Literals.variant ~subst c1 c2 (fun (subst,_tags) -> k subst))
     (f1.cs,sc1)(f2.cs,sc2)
 
 let are_variant f1 f2: bool =
-  not @@ Sequence.is_empty @@ variant_ ~subst:Subst.empty (f1,1)(f2,0)
+  not @@ Iter.is_empty @@ variant_ ~subst:Subst.empty (f1,1)(f2,0)
 
 let normalize (f:t): t = cs f |> Test_prop.normalize_form |> make
 
@@ -163,18 +163,18 @@ end
 module Seq = struct
   let terms f =
     cs f
-    |> Sequence.of_list
-    |> Sequence.flat_map Literals.Seq.terms
+    |> Iter.of_list
+    |> Iter.flat_map Literals.Seq.terms
 
   let terms_with_pos ?(subterms=true) f =
     cs f
-    |> Sequence.of_list
+    |> Iter.of_list
     |> Util.seq_zipi
-    |> Sequence.flat_map
+    |> Iter.flat_map
       (fun (i,c) ->
-         Sequence.of_array_i c
-         |> Sequence.map (fun (j,lit) -> i, j, lit))
-    |> Sequence.flat_map
+         Iter.of_array_i c
+         |> Iter.map (fun (j,lit) -> i, j, lit))
+    |> Iter.flat_map
       (fun (i,j,lit) ->
          let position = Position.(arg i @@ arg j @@ stop) in
          Literal.fold_terms lit
@@ -188,8 +188,8 @@ module FV_tbl(X : Map.OrderedType) = struct
          boolean structure. monotonicity w.r.t features should still apply *)
   let to_lits (f:cut_form) =
     cs f
-    |> Sequence.of_list
-    |> Sequence.flat_map_l Literals.to_form
+    |> Iter.of_list
+    |> Iter.flat_map_l Literals.to_form
 
   (* index for lemmas, to ensure α-equivalent lemmas have the same lit *)
   module FV = FV_tree.Make(struct
@@ -212,7 +212,7 @@ module FV_tbl(X : Map.OrderedType) = struct
 
   let get t k =
     FV.retrieve_alpha_equiv t.fv (to_lits k) Util.Int_set.empty
-    |> Sequence.find_map
+    |> Iter.find_map
       (fun (k',v) -> if are_variant k k' then Some v else None)
 
   let mem t k = get t k |> CCOpt.is_some

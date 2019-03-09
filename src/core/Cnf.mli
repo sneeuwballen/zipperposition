@@ -110,18 +110,18 @@ val cnf_of :
 val cnf_of_seq :
   ?opts:options list ->
   ?ctx:Skolem.ctx ->
-  f_statement Sequence.t ->
+  f_statement Iter.t ->
   c_statement CCVector.ro_vector
 
 val type_declarations :
-  c_statement Sequence.t ->
+  c_statement Iter.t ->
   type_ ID.Map.t
 (** Compute the types declared in the statement sequence *)
 
 (** {2 Conversions} *)
 
 val convert :
-  c_statement Sequence.t ->
+  c_statement Iter.t ->
   Statement.clause_t CCVector.ro_vector
 (** Converts statements based on {!TypedSTerm} into statements
     based on {!Term} and {!Type} *)

@@ -55,7 +55,7 @@ let check file =
   >|= fun decls ->
   let sigma =
     CCVector.to_seq decls
-    |> Sequence.flat_map Statement.Seq.ty_decls
+    |> Iter.flat_map Statement.Seq.ty_decls
     |> ID.Map.of_seq
   in
   if not !dump then (

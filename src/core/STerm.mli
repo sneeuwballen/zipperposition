@@ -112,13 +112,13 @@ module Tbl : CCHashtbl.S with type key = term
 module StringSet : CCSet.S with type elt = string
 
 module Seq : sig
-  val vars : t -> var Sequence.t
-  val free_vars : t -> string Sequence.t
-  val subterms : t -> t Sequence.t
-  val subterms_with_bound : t -> (t * StringSet.t) Sequence.t
+  val vars : t -> var Iter.t
+  val free_vars : t -> string Iter.t
+  val subterms : t -> t Iter.t
+  val subterms_with_bound : t -> (t * StringSet.t) Iter.t
   (** subterm and variables bound at this subterm *)
 
-  val symbols : t -> string Sequence.t
+  val symbols : t -> string Iter.t
 end
 
 val ground : t -> bool

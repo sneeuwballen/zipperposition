@@ -302,22 +302,22 @@ module Seq = struct
   let min_var = Type.Seq.min_var
 
   let add_set set xs =
-    Sequence.fold (fun set x -> Set.add x set) set xs
+    Iter.fold (fun set x -> Set.add x set) set xs
 
   let ty_vars t =
     subterms t
-    |> Sequence.flat_map (fun t -> Type.Seq.vars (ty t))
+    |> Iter.flat_map (fun t -> Type.Seq.vars (ty t))
 
   let typed_symbols t =
     subterms t
-    |> Sequence.filter_map
+    |> Iter.filter_map
       (fun t -> match T.view t with
          | T.Const s -> Some (s, ty t)
          | _ -> None)
 end
 
 let var_occurs ~var t =
-  Sequence.exists (HVar.equal Type.equal var) (Seq.vars t)
+  Iter.exists (HVar.equal Type.equal var) (Seq.vars t)
 
 let rec size t = match view t with
   | Var _
@@ -339,7 +339,7 @@ let weight ?(var=1) ?(sym=fun _ -> 1) t =
 
 let is_ground t = T.is_ground t
 
-let monomorphic t = Sequence.is_empty (Seq.ty_vars t)
+let monomorphic t = Iter.is_empty (Seq.ty_vars t)
 
 let max_var set = VarSet.to_seq set |> Seq.max_var
 
@@ -351,10 +351,10 @@ let vars ts = Seq.vars ts |> VarSet.of_seq
 
 let vars_prefix_order t =
   Seq.vars t
-  |> Sequence.fold (fun l x -> if not (List.memq x l) then x::l else l) []
+  |> Iter.fold (fun l x -> if not (List.memq x l) then x::l else l) []
   |> List.rev
 
-let depth t = Seq.subterms_depth t |> Sequence.map snd |> Sequence.fold max 0
+let depth t = Seq.subterms_depth t |> Iter.map snd |> Iter.fold max 0
 
 let rec head_exn t = match T.view t with
   | T.Const s -> s
@@ -394,7 +394,7 @@ let symbols ?(init=ID.Set.empty) t =
 
 (** Does t contains the symbol f? *)
 let contains_symbol f t =
-  Sequence.exists (ID.equal f) (Seq.symbols t)
+  Iter.exists (ID.equal f) (Seq.symbols t)
 
 (** {2 Fold} *)
 
@@ -498,11 +498,11 @@ module AC(A : AC_SPEC) = struct
 
   let seq_symbols t =
     Seq.symbols t
-    |> Sequence.filter A.is_ac
+    |> Iter.filter A.is_ac
 
   let symbols seq =
     seq
-    |> Sequence.flat_map seq_symbols
+    |> Iter.flat_map seq_symbols
     |> ID.Set.add_seq ID.Set.empty
 end
 

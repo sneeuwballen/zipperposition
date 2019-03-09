@@ -129,12 +129,12 @@ module Map : CCMap.S with type key = t
 module Tbl : CCHashtbl.S with type key = t
 
 module Seq : sig
-  val vars : t -> t HVar.t Sequence.t
-  val sub : t -> t Sequence.t (** Subterms *)
-  val symbols : t -> ID.t Sequence.t
-  val add_set : Set.t -> t Sequence.t -> Set.t
-  val max_var : t HVar.t Sequence.t -> int
-  val min_var : t HVar.t Sequence.t -> int
+  val vars : t -> t HVar.t Iter.t
+  val sub : t -> t Iter.t (** Subterms *)
+  val symbols : t -> ID.t Iter.t
+  val add_set : Set.t -> t Iter.t -> Set.t
+  val max_var : t HVar.t Iter.t -> int
+  val min_var : t HVar.t Iter.t -> int
 end
 
 (** {2 Utils} *)

@@ -129,8 +129,8 @@ let hash s = match s with
   | Rat r -> Hash.combine2 2 (Hash.string (Q.to_string r))
   | c -> Hash.combine2 3 (Hashtbl.hash c)
 
-module Map = Sequence.Map.Make(struct type t = t_ let compare = compare end)
-module Set = Sequence.Set.Make(struct type t = t_ let compare = compare end)
+module Map = Iter.Map.Make(struct type t = t_ let compare = compare end)
+module Set = Iter.Set.Make(struct type t = t_ let compare = compare end)
 module Tbl = Hashtbl.Make(struct type t = t_ let equal = equal let hash = hash end)
 
 let is_int = function Int _ -> true | _ -> false
@@ -422,7 +422,7 @@ module TPTP = struct
 
   (* TODO add the other ones *)
   let connectives = Set.of_seq
-      (Sequence.of_list [ and_; or_; equiv; imply; ])
+      (Iter.of_list [ and_; or_; equiv; imply; ])
 
   let is_connective = function
     | Int _

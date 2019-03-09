@@ -28,10 +28,10 @@ module type S = sig
     val on_remove_clause : C.t Signal.t
     (** signal triggered when a clause is removed from the set *)
 
-    val add : C.t Sequence.t -> unit
+    val add : C.t Iter.t -> unit
     (** Add clauses to the set *)
 
-    val remove : C.t Sequence.t -> unit
+    val remove : C.t Iter.t -> unit
     (** Remove clauses from the set *)
   end
 

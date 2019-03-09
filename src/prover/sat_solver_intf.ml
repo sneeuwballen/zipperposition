@@ -26,7 +26,7 @@ module type S = sig
 
   val add_clauses : proof:proof_step -> Lit.t list list -> unit
 
-  val add_clause_seq : proof:proof_step -> Lit.t list Sequence.t -> unit
+  val add_clause_seq : proof:proof_step -> Lit.t list Iter.t -> unit
 
   val check : full:bool -> unit -> result
   (** Is the current problem satisfiable?

@@ -95,10 +95,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     _idx_sup_into :=
       Lits.fold_terms ~vars:!_sup_at_vars ~ty_args:false ~ord ~which:`Max ~subterms:true
         ~eligible:(C.Eligible.res c) (C.lits c)
-      |> Sequence.filter (fun (t, _) -> not (T.is_var t) || T.is_ho_var t)
+      |> Iter.filter (fun (t, _) -> not (T.is_var t) || T.is_ho_var t)
       (* TODO: could exclude more variables from the index:
          they are not needed if they occur with the same args everywhere in the clause *)
-      |> Sequence.fold
+      |> Iter.fold
         (fun tree (t, pos) ->
            let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
            f tree t with_pos)
@@ -107,7 +107,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     _idx_sup_from :=
       Lits.fold_eqn ~ord ~both:true ~sign:true
         ~eligible:(C.Eligible.param c) (C.lits c)
-      |> Sequence.fold
+      |> Iter.fold
         (fun tree (l, _, sign, pos) ->
            assert sign;
            let with_pos = C.WithPos.({term=l; pos; clause=c;}) in
@@ -117,7 +117,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     _idx_back_demod :=
       Lits.fold_terms ~vars:false ~ty_args:false ~ord ~subterms:true ~which:`All
         ~eligible:C.Eligible.always (C.lits c)
-      |> Sequence.fold
+      |> Iter.fold
         (fun tree (t, pos) ->
            let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
            f tree t with_pos)
@@ -258,7 +258,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let unique_args_of_var =
         C.lits info.passive
         |> Lits.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord ~subterms:true ~eligible:(fun _ _ -> true)
-        |> Sequence.fold_while
+        |> Iter.fold_while
           (fun unique_args (t,_) ->
              if Head.term_to_head t == Head.term_to_head var
              then (
@@ -504,12 +504,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let new_clauses =
       Lits.fold_eqn ~sign:true ~ord:(Ctx.ord ())
         ~both:true ~eligible (C.lits clause)
-      |> Sequence.fold
+      |> Iter.fold
         (fun acc (s, t, _, s_pos) ->
            (* rewrite clauses using s *)
            I.retrieve_unifiables (!_idx_sup_into, 1) (s, 0)
-           |> Sequence.filter (fun (u_p,_,_) -> T.DB.is_closed u_p)
-           |> Sequence.fold
+           |> Iter.filter (fun (u_p,_,_) -> T.DB.is_closed u_p)
+           |> Iter.fold
              (fun acc (u_p, with_pos, subst) ->
                 (* rewrite u_p with s *)
                 let passive = with_pos.C.WithPos.clause in
@@ -535,17 +535,17 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let new_clauses =
       Lits.fold_terms ~vars:!_sup_at_vars ~subterms:true ~ord:(Ctx.ord ())
         ~which:`Max ~eligible ~ty_args:false (C.lits clause)
-      |> Sequence.filter (fun (u_p, _) -> not (T.is_var u_p) || T.is_ho_var u_p)
+      |> Iter.filter (fun (u_p, _) -> not (T.is_var u_p) || T.is_ho_var u_p)
       (* TODO: could exclude more variables from the index:
          they are not needed if they occur with the same args everywhere in the clause *)
-      |> Sequence.filter (fun (u_p, _) -> T.DB.is_closed u_p)
-      |> Sequence.fold
+      |> Iter.filter (fun (u_p, _) -> T.DB.is_closed u_p)
+      |> Iter.fold
         (fun acc (u_p, passive_pos) ->
            let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
            (* all terms that occur in an equation in the active_set
               and that are potentially unifiable with u_p (u at position p) *)
            I.retrieve_unifiables (!_idx_sup_from, 1) (u_p,0)
-           |> Sequence.fold
+           |> Iter.fold
              (fun acc (_, with_pos, subst) ->
                 let active = with_pos.C.WithPos.clause in
                 let s_pos = with_pos.C.WithPos.pos in
@@ -570,7 +570,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let new_clauses =
       Lits.fold_eqn ~sign:false ~ord:(Ctx.ord ())
         ~both:false ~eligible (C.lits clause)
-      |> Sequence.filter_map
+      |> Iter.filter_map
         (fun (l, r, _, l_pos) ->
            let pos = Lits.Pos.idx l_pos in
            try
@@ -597,7 +597,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            with Unif.Fail ->
              (* l and r not unifiable, try next *)
              None)
-      |> Sequence.to_rev_list
+      |> Iter.to_rev_list
     in
     Util.exit_prof prof_infer_equality_resolution;
     new_clauses
@@ -691,11 +691,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let new_clauses =
       Lits.fold_eqn ~sign:true ~ord:(Ctx.ord ())
         ~both:true ~eligible (C.lits clause)
-      |> Sequence.fold
+      |> Iter.fold
         (fun acc (s, t, _, s_pos) -> (* try with s=t *)
            let active_idx = Lits.Pos.idx s_pos in
            find_unifiable_lits active_idx s s_pos
-           |> Sequence.fold
+           |> Iter.fold
              (fun acc (u,v,subst) ->
                 let info = EqFactInfo.({
                     clause; s; t; u; v; active_idx; subst; scope=0;
@@ -747,7 +747,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       assert (cur_sc > 0);
       let step =
         UnitIdx.retrieve ~sign:true (!_idx_simpl, cur_sc) (t, 0)
-        |> Sequence.find_map
+        |> Iter.find_map
           (fun (l, r, (_,_,sign,unit_clause), subst) ->
              (* r is the term subterm is going to be rewritten into *)
              assert (C.is_unit_clause unit_clause);
@@ -918,7 +918,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* find clauses that might be rewritten by l -> r *)
     let recurse ~oriented set l r =
       I.retrieve_specializations (!_idx_back_demod,1) (l,0)
-      |> Sequence.fold
+      |> Iter.fold
         (fun set (_t',with_pos,subst) ->
            let c = with_pos.C.WithPos.clause in
            (* subst(l) matches t' and is > subst(r), very likely to rewrite! *)
@@ -1156,7 +1156,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and equate_root clauses t1 t2 =
       try
         UnitIdx.retrieve ~sign:true (!_idx_simpl,1)(t1,0)
-        |> Sequence.iter
+        |> Iter.iter
           (fun (l,r,(_,_,_,c'),subst) ->
              assert (Unif.FO.equal ~subst (l,1)(t1,0));
              if Unif.FO.equal ~subst (r,1)(t2,0)
@@ -1209,7 +1209,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and can_refute s t =
       try
         UnitIdx.retrieve ~sign:false (!_idx_simpl,1) (s,0)
-        |> Sequence.iter
+        |> Iter.iter
           (fun (l, r, (_,_,_,c'), subst) ->
              assert (Unif.FO.equal ~subst (l, 1) (s, 0));
              if Unif.FO.equal ~subst (r, 1) (t, 0)
@@ -1258,7 +1258,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (fun lita ->
          CCArray.exists
            (fun litb ->
-              not (Sequence.is_empty (Lit.subsumes (lita, sc_a) (litb, sc_b))))
+              not (Iter.is_empty (Lit.subsumes (lita, sc_a) (litb, sc_b))))
            b)
       a
 
@@ -1418,7 +1418,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* use feature vector indexing *)
     let res =
       SubsumIdx.retrieve_subsuming_c !_idx_fv c
-      |> Sequence.exists
+      |> Iter.exists
         (fun c' ->
            C.trail_subsumes c' c
            &&
@@ -1444,7 +1444,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* use feature vector indexing *)
     let res =
       SubsumIdx.retrieve_subsumed_c !_idx_fv c
-      |> Sequence.fold
+      |> Iter.fold
         (fun res c' ->
            if C.trail_subsumes c c'
            then
@@ -1487,17 +1487,17 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let try_eq_subsumption = CCArray.exists Lit.is_eqn (C.lits c) in
       (* try to remove one literal from the literal array *)
       let remove_one_lit lits =
-        Sequence.of_array_i lits
-        |> Sequence.filter (fun (_,lit) -> not (Lit.is_constraint lit))
-        |> Sequence.find_map
+        Iter.of_array_i lits
+        |> Iter.filter (fun (_,lit) -> not (Lit.is_constraint lit))
+        |> Iter.find_map
           (fun (i,old_lit) ->
              (* negate literal *)
              lits.(i) <- Lit.negate old_lit;
              (* test for subsumption *)
              SubsumIdx.retrieve_subsuming !_idx_fv
                (Lits.Seq.to_form lits) (C.trail c |> Trail.labels)
-             |> Sequence.filter (fun c' -> C.trail_subsumes c' c)
-             |> Sequence.find_map
+             |> Iter.filter (fun c' -> C.trail_subsumes c' c)
+             |> Iter.find_map
                (fun c' ->
                   let subst =
                     match
@@ -1576,14 +1576,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                that subsumes c. Also try to swap [lit] and [lit']. *)
             let subst_remove_lit =
               Lit.subsumes (lit, 0) (lit', 0)
-              |> Sequence.map (fun s -> s, i)
+              |> Iter.map (fun s -> s, i)
             and subst_remove_lit' =
               Lit.subsumes (lit', 0) (lit, 0)
-              |> Sequence.map (fun s -> s, j)
+              |> Iter.map (fun s -> s, j)
             in
             (* potential condensing substitutions *)
-            let substs = Sequence.append subst_remove_lit subst_remove_lit' in
-            Sequence.iter
+            let substs = Iter.append subst_remove_lit subst_remove_lit' in
+            Iter.iter
               (fun ((subst,tags),idx_to_remove) ->
                  let new_lits = Array.sub lits 0 (n - 1) in
                  if idx_to_remove <> n-1

@@ -927,10 +927,10 @@ module Inner = struct
       ()
 
   let matching_same_scope
-      ?(protect=Sequence.empty) ?(subst=S.empty) ~scope ~pattern b =
+      ?(protect=Iter.empty) ?(subst=S.empty) ~scope ~pattern b =
     (* set of variables that should not be bound, including the
        free variables of [b] *)
-    let protect = Sequence.append protect (T.Seq.vars b) in
+    let protect = Iter.append protect (T.Seq.vars b) in
     let blocked = T.VarSet.of_seq protect in
     Util.with_prof prof_matching
       (fun () ->
@@ -1027,12 +1027,12 @@ module Ty = struct
      pattern:term Scoped.t -> term Scoped.t -> subst)
 
   let matching_same_scope =
-    (matching_same_scope :> ?protect:(Type.t HVar.t Sequence.t) -> ?subst:subst ->
+    (matching_same_scope :> ?protect:(Type.t HVar.t Iter.t) -> ?subst:subst ->
      scope:int -> pattern:term -> term -> subst)
 
   let matching_adapt_scope =
     (matching_adapt_scope :>
-       ?protect:(Type.t HVar.t Sequence.t) -> ?subst:subst ->
+       ?protect:(Type.t HVar.t Iter.t) -> ?subst:subst ->
      pattern:term Scoped.t -> term Scoped.t -> subst)
 
   let variant =
@@ -1078,11 +1078,11 @@ module FO = struct
      pattern:term Scoped.t -> term Scoped.t -> subst)
 
   let matching_same_scope =
-    (matching_same_scope :> ?protect:(Type.t HVar.t Sequence.t) -> ?subst:subst ->
+    (matching_same_scope :> ?protect:(Type.t HVar.t Iter.t) -> ?subst:subst ->
      scope:int -> pattern:term -> term -> subst)
 
   let matching_adapt_scope =
-    (matching_adapt_scope :> ?protect:(Type.t HVar.t Sequence.t) -> ?subst:subst ->
+    (matching_adapt_scope :> ?protect:(Type.t HVar.t Iter.t) -> ?subst:subst ->
      pattern:term Scoped.t -> term Scoped.t -> subst)
 
   let variant =

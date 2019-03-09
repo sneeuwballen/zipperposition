@@ -222,7 +222,7 @@ let is_constructor s =
 
 let contains_inductive_types t =
   T.Seq.subterms t
-  |> Sequence.exists (fun t -> is_inductive_type (T.ty t))
+  |> Iter.exists (fun t -> is_inductive_type (T.ty t))
 
 (** {6 Projectors} *)
 

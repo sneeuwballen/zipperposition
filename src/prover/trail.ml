@@ -26,7 +26,7 @@ let fold f acc t = Lit.Set.fold (fun x acc -> f acc x) t acc
 let length = Lit.Set.cardinal
 let map f set =
   Lit.Set.to_seq set
-  |> Sequence.map f
+  |> Iter.map f
   |> Lit.Set.of_seq
 let of_list = Lit.Set.of_list
 let add_list = Lit.Set.add_list
@@ -64,7 +64,7 @@ let to_seq = Lit.Set.to_seq
 
 let labels (t:t) =
   to_seq t
-  |> Sequence.map BBox.Lit.to_int
+  |> Iter.map BBox.Lit.to_int
   |> Util.Int_set.of_seq
 
 let to_s_form (t:t) =

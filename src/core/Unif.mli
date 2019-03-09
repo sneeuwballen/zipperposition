@@ -20,27 +20,27 @@ val occurs_check : depth:int -> subst ->
 val unif_array_com :
   ?size:[`Same | `Smaller] ->
   'subst ->
-  op:('subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Sequence.t) ->
+  op:('subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Iter.t) ->
   'a array Scoped.t ->
   'a array Scoped.t ->
-  'subst Sequence.t
+  'subst Iter.t
 
 (** Generic unification over two lists (of the same size) *)
 val unif_list :
   'subst ->
-  op:('subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Sequence.t) ->
+  op:('subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Iter.t) ->
   'a list Scoped.t ->
   'a list Scoped.t ->
-  'subst Sequence.t
+  'subst Iter.t
 
 (** Generic unification over two lists (of the same size or smaller) *)
 val unif_list_com :
   ?size:[`Same | `Smaller] ->
   'subst ->
-  op:('subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Sequence.t) ->
+  op:('subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Iter.t) ->
   'a list Scoped.t ->
   'a list Scoped.t ->
-  'subst Sequence.t
+  'subst Iter.t
 
 val pair_lists_right : term -> term list -> term -> term list -> term list * term list
 (** in HO, we have [f1 l1] and [f2 l2], where application is left-associative.

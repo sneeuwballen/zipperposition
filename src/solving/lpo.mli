@@ -34,7 +34,7 @@ module Constraint : sig
   val false_ : t
 
   module Seq : sig
-    val exprs : t -> expr Sequence.t
+    val exprs : t -> expr Iter.t
     (** Expressions that occur in the constraint *)
   end
 

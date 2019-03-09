@@ -56,13 +56,13 @@ let switch_set b r = Arg.Unit (fun () -> r := b)
 let mk_debug_opts () =
   (* debugf level for every section *)
   Util.Section.iter
-  |> Sequence.filter_map
+  |> Iter.filter_map
     (fun (name,sec) ->
        if name="" then None
        else Some
            ("--debug." ^ name, Arg.Int (Util.Section.set_debug sec),
             " debug level for section " ^ name))
-  |> Sequence.to_list
+  |> Iter.to_list
   |> CCList.cons
     ("-d", Arg.Int (Util.Section.set_debug Util.Section.root), " alias to --debug")
 

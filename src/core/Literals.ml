@@ -45,10 +45,10 @@ let variant ?(subst=S.empty) (a1,sc1) (a2,sc2) =
   Unif.unif_array_com ~size:`Same (subst,[]) (a1,sc1) (a2,sc2)
     ~op:(fun (subst,t1) x y k ->
       Lit.variant ~subst x y (fun (s,t2) -> k (s,t1@t2)))
-  |> Sequence.filter (fun (s,_) -> Subst.is_renaming s)
+  |> Iter.filter (fun (s,_) -> Subst.is_renaming s)
 
 let are_variant a1 a2 =
-  not (Sequence.is_empty (variant (Scoped.make a1 0) (Scoped.make a2 1)))
+  not (Iter.is_empty (variant (Scoped.make a1 0) (Scoped.make a2 1)))
 
 let matching ?(subst=S.empty) ~pattern:(a1,sc1) (a2,sc2) =
   Unif.unif_array_com ~size:`Same (subst,[]) (a1,sc1) (a2,sc2)
@@ -57,7 +57,7 @@ let matching ?(subst=S.empty) ~pattern:(a1,sc1) (a2,sc2) =
         (fun (s,t2) -> k (s,t1@t2)))
 
 let matches a1 a2 =
-  not (Sequence.is_empty (matching ~pattern:(Scoped.make a1 0) (Scoped.make a2 1)))
+  not (Iter.is_empty (matching ~pattern:(Scoped.make a1 0) (Scoped.make a2 1)))
 
 let weight lits =
   Array.fold_left (fun w lit -> w + Lit.weight lit) 0 lits
@@ -66,8 +66,8 @@ let depth lits =
   Array.fold_left (fun d lit -> max d (Lit.depth lit)) 0 lits
 
 let vars lits =
-  Sequence.of_array lits
-  |> Sequence.flat_map Lit.Seq.vars
+  Iter.of_array lits
+  |> Iter.flat_map Lit.Seq.vars
   |> T.VarSet.of_seq
   |> T.VarSet.to_list
 
@@ -132,8 +132,8 @@ let maxlits_l ~ord lits =
   Util.enter_prof prof_maxlits;
   let m = _to_multiset_with_idx lits in
   let max = MLI.max_seq (_compare_lit_with_idx ~ord) m
-            |> Sequence.map fst
-            |> Sequence.to_list
+            |> Iter.map fst
+            |> Iter.to_list
   in
   Util.exit_prof prof_maxlits;
   max
@@ -142,8 +142,8 @@ let maxlits ~ord lits =
   Util.enter_prof prof_maxlits;
   let m = _to_multiset_with_idx lits in
   let max = MLI.max_seq (_compare_lit_with_idx ~ord) m
-            |> Sequence.map (fun (x,_) -> snd x)
-            |> Sequence.to_list
+            |> Iter.map (fun (x,_) -> snd x)
+            |> Iter.to_list
             |> BV.of_list
   in
   Util.exit_prof prof_maxlits;
@@ -194,10 +194,10 @@ let apply_subst renaming subst (lits,sc) =
 
 module Seq = struct
   let vars lits =
-    Sequence.of_array lits |> Sequence.flat_map Lit.Seq.vars
+    Iter.of_array lits |> Iter.flat_map Lit.Seq.vars
   let terms a =
-    Sequence.of_array a |> Sequence.flat_map Lit.Seq.terms
-  let to_form a = Sequence.of_array a |> Sequence.map Lit.Conv.to_form
+    Iter.of_array a |> Iter.flat_map Lit.Seq.terms
+  let to_form a = Iter.of_array a |> Iter.map Lit.Conv.to_form
 end
 
 (** {3 High Order combinators} *)
@@ -421,8 +421,8 @@ let fold_terms ?(vars=false) ?ty_args ~(which : [< `All|`Max])
   aux 0
 
 let symbols ?(init=ID.Set.empty) lits =
-  Sequence.of_array lits
-  |> Sequence.flat_map Lit.Seq.symbols
+  Iter.of_array lits
+  |> Iter.flat_map Lit.Seq.symbols
   |> ID.Set.add_seq init
 
 (** {3 IO} *)
@@ -501,7 +501,7 @@ let is_shielded var (lits:t) : bool =
   let var_eq = HVar.equal Type.equal in
   let rec shielded_by_term ~root t = match T.view t with
     | T.Var v' when var_eq v' var -> not root
-    | _ when Type.Seq.vars (T.ty t) |> Sequence.exists (var_eq var) ->
+    | _ when Type.Seq.vars (T.ty t) |> Iter.exists (var_eq var) ->
       true (* shielded by type *)
     | T.Var _
     | T.DB _
@@ -517,7 +517,7 @@ let is_shielded var (lits:t) : bool =
   begin
     lits
     |> Seq.terms
-    |> Sequence.exists (shielded_by_term ~root:true)
+    |> Iter.exists (shielded_by_term ~root:true)
   end
 
 let unshielded_vars ?(filter=fun _->true) lits: _ list =

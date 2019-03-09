@@ -34,7 +34,7 @@ module Section : sig
   val cur_level : t -> int
   (** Current debug level, with parent inheritance *)
 
-  val iter : (string * t) Sequence.t
+  val iter : (string * t) Iter.t
   (** all registered sections *)
 
   val root : t (** Default section, with no parent *)
@@ -165,7 +165,7 @@ val pp_pair :
 val pp_list : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
 (** Print a list without begin/end separators *)
 
-val pp_seq : ?sep:string -> 'a CCFormat.printer -> 'a Sequence.t CCFormat.printer
+val pp_seq : ?sep:string -> 'a CCFormat.printer -> 'a Iter.t CCFormat.printer
 
 val pp_list0 : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
 (** Print a list with a whitespace in front if it's non empty, or
@@ -185,8 +185,8 @@ val take_drop_while : ('a -> bool) -> 'a list -> 'a list * 'a list
 
 val map_product : f:('a -> 'b list list) -> 'a list -> 'b list list
 
-val seq_map_l : f:('a -> 'b list) -> 'a list -> 'b list Sequence.t
-val seq_zipi : 'a Sequence.t -> (int * 'a) Sequence.t
+val seq_map_l : f:('a -> 'b list) -> 'a list -> 'b list Iter.t
+val seq_zipi : 'a Iter.t -> (int * 'a) Iter.t
 
 val invalid_argf: ('a, Format.formatter, unit, 'b) format4 -> 'a
 val failwithf : ('a, Format.formatter, unit, 'b) format4 -> 'a

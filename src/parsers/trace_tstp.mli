@@ -57,7 +57,7 @@ val traverse : ?traversed:proof_set -> t -> (t -> unit) -> unit
 (** Traverse the proof. Each proof node is traversed only once,
     using the set to recognize already traversed proofs. *)
 
-val to_seq : t -> t Sequence.t
+val to_seq : t -> t Iter.t
 (** Traversal of parent proofs *)
 
 val depth : t -> int
@@ -70,7 +70,7 @@ val size : t -> int
 
 type 'a or_error = ('a, string) CCResult.t
 
-val of_decls : form Ast_tptp.t Sequence.t -> t or_error
+val of_decls : form Ast_tptp.t Iter.t -> t or_error
 (** Try to extract a proof from a list of TSTP statements. *)
 
 val parse : ?recursive:bool -> string -> t or_error

@@ -122,7 +122,7 @@ module KBO : ORD = struct
     then (
       { offset = 0; pos_counter = 0; neg_counter = 0; balance = [||]; }
     ) else (
-      let vars = Sequence.of_list [t1; t2] |> Sequence.flat_map T.Seq.vars in
+      let vars = Iter.of_list [t1; t2] |> Iter.flat_map T.Seq.vars in
       (* TODO: compute both at the same time *)
       let minvar = T.Seq.min_var vars in
       let maxvar = T.Seq.max_var vars in

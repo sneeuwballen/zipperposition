@@ -135,10 +135,10 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* check that [var] is the only free (term) variable in all cases *)
   let check_uniq_var_is_ ~var cases =
     cases
-    |> Sequence.of_list
-    |> Sequence.flat_map T.Seq.vars
-    |> Sequence.filter (fun v -> not (Type.equal Type.tType (HVar.ty v)))
-    |> Sequence.for_all (HVar.equal Type.equal var)
+    |> Iter.of_list
+    |> Iter.flat_map T.Seq.vars
+    |> Iter.filter (fun v -> not (Type.equal Type.tType (HVar.ty v)))
+    |> Iter.for_all (HVar.equal Type.equal var)
 
   (* check that all vars in [l] are pairwise distinct *)
   let rec check_all_distinct_ acc l = match l with
@@ -247,17 +247,17 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* retrieve variables that are directly under a positive equation *)
   let vars_under_eq_ lits =
-    Sequence.of_array lits
-    |> Sequence.filter Lit.is_eq
-    |> Sequence.flat_map Lit.Seq.terms
-    |> Sequence.filter T.is_var
+    Iter.of_array lits
+    |> Iter.filter Lit.is_eq
+    |> Iter.flat_map Lit.Seq.terms
+    |> Iter.filter T.is_var
 
   (* variables occurring under some function symbol (at non-0 depth) *)
   let _shielded_vars lits =
-    Sequence.of_array lits
-    |> Sequence.flat_map Lit.Seq.terms
-    |> Sequence.flat_map T.Seq.subterms_depth
-    |> Sequence.filter_map
+    Iter.of_array lits
+    |> Iter.flat_map Lit.Seq.terms
+    |> Iter.flat_map T.Seq.subterms_depth
+    |> Iter.filter_map
       (fun (v,depth) -> if depth>0 && T.is_var v then Some v else None)
     |> T.Seq.add_set T.Set.empty
 
@@ -308,7 +308,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* which variables are candidate? depends on a CLI flag *)
     let vars =
       if !_instantiate_shielded
-      then vars_under_eq_ (C.lits c) |> Sequence.to_rev_list
+      then vars_under_eq_ (C.lits c) |> Iter.to_rev_list
       else naked_vars_ (C.lits c)
     in
     let s_c = 0 and s_decl = 1 in
@@ -446,7 +446,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         | _ -> []
     in
     (* set of support *)
-    PS.ActiveSet.add (Sequence.of_list clauses)
+    PS.ActiveSet.add (Iter.of_list clauses)
 
   let _on_new_decl decl =
     let clauses =
@@ -456,7 +456,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              | None -> acc
              | Some c -> c::acc)
     in
-    PS.PassiveSet.add (Sequence.of_list clauses)
+    PS.PassiveSet.add (Iter.of_list clauses)
 
   let is_trivial c =
     C.get_flag flag_enumeration_clause c

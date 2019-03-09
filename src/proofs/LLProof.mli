@@ -119,9 +119,9 @@ module Dot : sig
   val pp_dot_file : ?name:string -> string -> t -> unit
   (** print to dot into a file *)
 
-  val pp_dot_seq : name:string -> t Sequence.t CCFormat.printer
+  val pp_dot_seq : name:string -> t Iter.t CCFormat.printer
   (** Print a set of proofs as a DOT graph, sharing common subproofs *)
 
-  val pp_dot_seq_file : ?name:string -> string -> t Sequence.t -> unit
+  val pp_dot_seq_file : ?name:string -> string -> t Iter.t -> unit
   (** same as {!pp_dot_seq} but into a file *)
 end

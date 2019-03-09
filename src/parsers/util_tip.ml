@@ -10,12 +10,12 @@ module A = Tip_ast
 module UA = UntypedAST
 module T = STerm
 
-type parser_res = (A.statement Sequence.t, string) E.t
+type parser_res = (A.statement Iter.t, string) E.t
 type 'a parser_ = 'a -> parser_res
 
 let parse_lexbuf_ lex =
   let l = Tip_parser.parse_list Tip_lexer.token lex in
-  Sequence.of_list l
+  Iter.of_list l
 
 let parse_lexbuf file : parser_res =
   try parse_lexbuf_ file |> E.return
@@ -242,6 +242,6 @@ let convert (st:A.statement): UA.statement list =
       let l = List.map2 (conv_def ?loc) fsr_decls fsr_bodies in
       [UA.def ?loc l]
 
-let convert_seq = Sequence.flat_map_l convert
+let convert_seq = Iter.flat_map_l convert
 
 

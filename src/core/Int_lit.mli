@@ -81,7 +81,7 @@ val fold : ('a -> term -> 'a) -> 'a -> t -> 'a
 val map : (term -> term) -> t -> t (** functor *)
 
 type ('subst,'a) unif =
-  subst:'subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Sequence.t
+  subst:'subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Iter.t
 
 val generic_unif: ('subst,Z.t Monome.t) unif -> ('subst,t) unif
 (** Generic unification/matching/variant, given such an operation on monomes *)
@@ -93,16 +93,16 @@ val apply_subst_no_simp : Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
     literal. In practice, mostly useful for comparison purpose. *)
 
 val matching : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
-  Subst.t Sequence.t
+  Subst.t Iter.t
 (** checks whether subst(lit_a) is equal to lit_b. Returns alternative
     substitutions s such that s(lit_a) = lit_b and s contains subst. *)
 
 val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
-  Subst.t Sequence.t
+  Subst.t Iter.t
 
-val unify : ?subst:Unif_subst.t -> t Scoped.t -> t Scoped.t -> Unif_subst.t Sequence.t
+val unify : ?subst:Unif_subst.t -> t Scoped.t -> t Scoped.t -> Unif_subst.t Iter.t
 
-val subsumes : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> Subst.t Sequence.t
+val subsumes : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> Subst.t Iter.t
 (** Find substitutions such that [subst(lit_a)] implies [lit_b]. This is
     more general than matching. *)
 
@@ -114,7 +114,7 @@ val is_absurd : t -> bool
 val fold_terms : ?pos:Position.t -> ?vars:bool -> ?ty_args:bool ->
   which:[<`Max|`All] ->
   ord:Ordering.t -> subterms:bool ->
-  t -> (term * Position.t) Sequence.t
+  t -> (term * Position.t) Iter.t
 
 val max_terms : ord:Ordering.t -> t -> term list
 (** Maximal terms of the literal *)
@@ -125,9 +125,9 @@ val to_form : t -> Term.t SLiteral.t
 (** {2 Iterators} *)
 
 module Seq : sig
-  val terms : t -> term Sequence.t
-  val vars : t -> Term.var Sequence.t
-  val to_multiset : t -> (term * Z.t) Sequence.t
+  val terms : t -> term Iter.t
+  val vars : t -> Term.var Iter.t
+  val to_multiset : t -> (term * Z.t) Iter.t
 end
 
 (** {2 Focus on a Term} *)
@@ -201,13 +201,13 @@ module Focus : sig
   (** Apply a substitution *)
 
   val unify : ?subst:Unif_subst.t -> t Scoped.t -> t Scoped.t ->
-    (t * t * Unif_subst.t) Sequence.t
+    (t * t * Unif_subst.t) Iter.t
   (** Unify the two focused terms, and possibly other terms of their
       respective focused monomes; yield the new literals accounting for
       the unification along with the unifier *)
 
   val fold_terms :
-    ?pos:Position.t -> lit -> (t * Position.t) Sequence.t
+    ?pos:Position.t -> lit -> (t * Position.t) Iter.t
   (** Fold on focused terms in the literal, one by one, with
       the position of the focused term *)
 
@@ -235,6 +235,6 @@ module Util : sig
       [is_prime n] was called before.
       @raise Invalid_argument if the number is negative *)
 
-  val primes_leq : Z.t -> Z.t Sequence.t
-  (** Sequence of prime numbers smaller than (or equal to) the given number *)
+  val primes_leq : Z.t -> Z.t Iter.t
+  (** Iter of prime numbers smaller than (or equal to) the given number *)
 end

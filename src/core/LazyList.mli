@@ -25,7 +25,7 @@ val of_fun : (int -> 'a option) -> 'a t
 val to_list : 'a t -> 'a list
 (** Gather all values into a list *)
 
-val to_seq : 'a t -> 'a Sequence.t
+val to_seq : 'a t -> 'a Iter.t
 (** Iterate on values *)
 
 val fold : ('a -> 'b -> 'a) -> 'a -> 'b t -> 'a

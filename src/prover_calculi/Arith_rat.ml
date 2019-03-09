@@ -92,7 +92,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Lits.fold_terms ~vars:false ~ty_args:false ~which:`Max ~ord ~subterms:false
         ~eligible:C.Eligible.(filter Lit.is_rat_eq ** max c)
         (C.lits c)
-      |> Sequence.fold
+      |> Iter.fold
         (fun acc (t,pos) ->
            let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
            f acc t with_pos)
@@ -101,7 +101,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Lits.fold_terms ~vars:false ~ty_args:false ~which:`Max ~ord ~subterms:false
         ~eligible:C.Eligible.(filter Lit.is_rat_less ** max c)
         (C.lits c)
-      |> Sequence.fold
+      |> Iter.fold
         (fun (left,right) (t,pos) ->
            let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
            match pos with
@@ -118,7 +118,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Lits.fold_terms ~vars:false ~ty_args:false ~which:`Max ~ord ~subterms:false
         ~eligible:C.Eligible.(filter Lit.is_rat ** max c)
         (C.lits c)
-      |> Sequence.fold
+      |> Iter.fold
         (fun acc (t,pos) ->
            let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
            f acc t with_pos)
@@ -133,7 +133,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let pos = Position.(arg 0 stop) in
         _idx_unit_eq :=
           AL.fold_terms ~subterms:false ~vars:false ~pos ~which:`Max ~ord alit
-          |> Sequence.fold
+          |> Iter.fold
             (fun acc (t,pos) ->
                assert (not (T.is_var t));
                let with_pos = C.WithPos.( {term=t; pos; clause=c;} ) in
@@ -144,7 +144,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         _idx_unit_ineq :=
           if !enable_trivial_ineq_ || !enable_demod_ineq_
           then AL.fold_terms ~subterms:false ~vars:false ~pos ~which:`Max ~ord alit
-               |> Sequence.fold
+               |> Iter.fold
                  (fun acc (t,pos) ->
                     assert (not (T.is_var t));
                     let with_pos = C.WithPos.( {term=t; pos; clause=c;} ) in
@@ -266,13 +266,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     let sc_a = 0 and sc_p = 1 in
     let res =
       Lits.fold_rat_terms ~eligible ~which:`Max ~ord (C.lits c)
-      |> Sequence.fold
+      |> Iter.fold
         (fun acc (t,active_lit,active_pos) ->
            assert (ALF.op active_lit = AL.Equal);
            Util.debugf ~section 5 "@[<2>active canc. sup.@ with @[%a@]@ in @[%a@]@]"
              (fun k->k ALF.pp active_lit C.pp c);
            PS.TermIndex.retrieve_unifiables (!_idx_all,sc_p) (t,sc_a)
-           |> Sequence.fold
+           |> Iter.fold
              (fun acc (t',with_pos,subst) ->
                 let passive = with_pos.C.WithPos.clause in
                 let passive_pos = with_pos.C.WithPos.pos in
@@ -284,7 +284,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                 then acc
                 else
                   ALF.unify ~subst (active_lit,sc_a) (passive_lit,sc_p)
-                  |> Sequence.fold
+                  |> Iter.fold
                     (fun acc (active_lit, passive_lit, subst) ->
                        let info = SupInfo.({
                            active=c; active_pos; active_lit; active_scope=sc_a;
@@ -305,12 +305,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     let sc_a = 0 and sc_p = 1 in
     let res =
       Lits.fold_rat_terms ~eligible ~which:`All ~ord (C.lits c)
-      |> Sequence.fold
+      |> Iter.fold
         (fun acc (t,passive_lit,passive_pos) ->
            Util.debugf ~section 5 "@[<2>passive canc. sup.@ with @[%a@]@ in @[%a@]@]"
              (fun k->k ALF.pp passive_lit C.pp c);
            PS.TermIndex.retrieve_unifiables (!_idx_eq,sc_a) (t,sc_p)
-           |> Sequence.fold
+           |> Iter.fold
              (fun acc (t',with_pos,subst) ->
                 let active = with_pos.C.WithPos.clause in
                 let active_pos = with_pos.C.WithPos.pos in
@@ -322,7 +322,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                       (fun k->k ALF.pp passive_lit C.pp c);
                     (* unify literals further *)
                     ALF.unify ~subst (active_lit,sc_a) (passive_lit,sc_p)
-                    |> Sequence.fold
+                    |> Iter.fold
                       (fun acc (active_lit, passive_lit, subst) ->
                          let info = SupInfo.({
                              active; active_pos; active_lit; active_scope=sc_a;
@@ -353,7 +353,7 @@ module Make(E : Env.S) : S with module Env = E = struct
        - trail(active) must subsume trail(passive) *)
     if ALF.is_strictly_max ~ord active_lit'
     && (C.Seq.vars c'
-        |> Sequence.for_all
+        |> Iter.for_all
           (fun v -> S.mem subst ((v:Type.t HVar.t:>InnerTerm.t HVar.t),s_a)))
     && ( (C.lits c |> Array.length) > 1
          || not(Lit.equal (C.lits c).(i) (C.lits c').(0))
@@ -382,13 +382,13 @@ module Make(E : Env.S) : S with module Env = E = struct
       try
         AL.fold_terms ~pos:Position.stop ~vars:false ~which:`Max
           ~ord ~subterms:false a_lit
-        |> Sequence.iter
+        |> Iter.iter
           (fun (t,lit_pos) ->
              assert (not (T.is_var t));
              let passive_lit = ALF.get_exn a_lit lit_pos in
              (* search for generalizations of [t] *)
              PS.TermIndex.retrieve_generalizations (!_idx_unit_eq,s_a) (t,s_p)
-             |> Sequence.iter
+             |> Iter.iter
                (fun (_t',with_pos,subst) ->
                   let c' = with_pos.C.WithPos.clause in
                   let pos' = with_pos.C.WithPos.pos in
@@ -426,7 +426,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
     (* simplify each and every literal *)
     Lits.fold_lits ~eligible:C.Eligible.always (C.lits c)
-    |> Sequence.iter
+    |> Iter.iter
       (fun (lit,i) ->
          match lit with
            | Lit.Rat a_lit ->
@@ -473,10 +473,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     let res = match C.lits c with
       | [| Lit.Rat ({AL.op=AL.Equal; _} as alit) |] ->
         AL.fold_terms ~vars:false ~which:`Max ~subterms:false ~ord alit
-        |> Sequence.fold
+        |> Iter.fold
           (fun acc (t,pos) ->
              PS.TermIndex.retrieve_specializations (!_idx_all,0) (t,1)
-             |> Sequence.fold
+             |> Iter.fold
                (fun acc (_t',with_pos,subst) ->
                   let c' = with_pos.C.WithPos.clause in
                   (* check whether the term [t] is indeed maximal in
@@ -501,7 +501,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let eligible = C.Eligible.(max c ** arith) in
     let res =
       Lits.fold_rat ~eligible (C.lits c)
-      |> Sequence.fold
+      |> Iter.fold
         (fun acc (a_lit,pos) ->
            let idx = Lits.Pos.idx pos in
            (* cancellation depends on what the literal looks like *)
@@ -509,7 +509,7 @@ module Make(E : Env.S) : S with module Env = E = struct
            Util.debugf ~section 5 "@[<2>try cancellation@ in @[%a@]@]" (fun k->k AL.pp a_lit);
            (* try to unify terms in [m1] and [m2] *)
            MF.unify_mm (m1,0) (m2,0)
-           |> Sequence.fold
+           |> Iter.fold
              (fun acc (mf1, mf2, us) ->
                 let renaming = Subst.Renaming.create () in
                 let subst = US.subst us in
@@ -555,14 +555,14 @@ module Make(E : Env.S) : S with module Env = E = struct
     let eligible = C.Eligible.(max c ** filter Lit.is_rat_eq) in
     let res =
       Lits.fold_rat_terms ~which:`Max ~eligible ~ord (C.lits c)
-      |> Sequence.fold
+      |> Iter.fold
         (fun acc (t1,lit1,pos1) ->
            assert(ALF.op lit1 = AL.Equal);
            let idx1 = Lits.Pos.idx pos1 in
            (* lit1 is the factored literal *)
            Lits.fold_rat_terms ~which:`Max ~ord
              ~eligible:C.Eligible.(filter Lit.is_rat_eq) (C.lits c)
-           |> Sequence.fold
+           |> Iter.fold
              (fun acc (t2,lit2,pos2) ->
                 assert(ALF.op lit2 = AL.Equal);
                 let idx2 = Lits.Pos.idx pos2 in
@@ -575,7 +575,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     "@[<2>arith canc. eq. factoring:@ possible match in @[%a@]@ (at %d, %d)@]"
                     (fun k->k C.pp c idx1 idx2);
                   MF.unify_ff ~subst (mf1,0) (mf2,0)
-                  |> Sequence.fold
+                  |> Iter.fold
                     (fun acc (_, _, us) ->
                        let renaming = Subst.Renaming.create () in
                        let subst = US.subst us in
@@ -716,14 +716,14 @@ module Make(E : Env.S) : S with module Env = E = struct
     let sc_l = 0 and sc_r = 1 in
     let res =
       Lits.fold_rat_terms ~eligible ~ord ~which:`Max (C.lits c)
-      |> Sequence.fold
+      |> Iter.fold
         (fun acc (t,lit,pos) ->
            match lit with
              | _ when T.is_var t -> acc (* ignore variables *)
              | ALF.Left (AL.Less, mf_l, _) ->
                (* find a right-chaining literal in some other clause *)
                PS.TermIndex.retrieve_unifiables (!_idx_ineq_right,sc_r) (t,sc_l)
-               |> Sequence.fold
+               |> Iter.fold
                  (fun acc (_t',with_pos,subst) ->
                     let right = with_pos.C.WithPos.clause in
                     let right_pos = with_pos.C.WithPos.pos in
@@ -731,7 +731,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     match lit_r with
                       | ALF.Right (AL.Less, _, mf_r) ->
                         MF.unify_ff ~subst (mf_l,sc_l) (mf_r,sc_r)
-                        |> Sequence.fold
+                        |> Iter.fold
                           (fun acc (_, _, subst) ->
                              let info = ChainingInfo.({
                                  left=c; left_scope=sc_l; left_lit=lit; left_pos=pos;
@@ -744,7 +744,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              | ALF.Right (AL.Less, _, mf_r) ->
                (* find a right-chaining literal in some other clause *)
                PS.TermIndex.retrieve_unifiables (!_idx_ineq_left,sc_l) (t,sc_r)
-               |> Sequence.fold
+               |> Iter.fold
                  (fun acc (_t',with_pos,subst) ->
                     let left = with_pos.C.WithPos.clause in
                     let left_pos = with_pos.C.WithPos.pos in
@@ -752,7 +752,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     match lit_l with
                       | ALF.Left (AL.Less, mf_l, _) ->
                         MF.unify_ff ~subst (mf_l,sc_l) (mf_r,sc_r)
-                        |> Sequence.fold
+                        |> Iter.fold
                           (fun acc (_, _, subst) ->
                              let info = ChainingInfo.({
                                  left; left_scope=sc_l; left_lit=lit_l; left_pos; subst;
@@ -829,12 +829,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* traverse the clause to find matching pairs *)
     let eligible = C.Eligible.(max c ** filter Lit.is_rat_less) in
     Lits.fold_rat ~eligible (C.lits c)
-    |> Sequence.iter
+    |> Iter.iter
       (fun (lit1,pos1) ->
          let i = Lits.Pos.idx pos1 in
          let eligible' = C.Eligible.(filter Lit.is_rat_less) in
          Lits.fold_rat ~eligible:eligible' (C.lits c)
-         |> Sequence.iter
+         |> Iter.iter
            (fun (lit2,pos2) ->
               let j = Lits.Pos.idx pos2 in
               match lit1, lit2 with
@@ -881,7 +881,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     | _ when AL.is_trivial lit -> k (trace,lit)
     | _ when List.length trace >= max_ineq_trivial_steps ->
       () (* need another step, but it would exceed the limit *)
-    | {AL.op=AL.Less; _} when Sequence.exists T.is_var (AL.Seq.terms lit) ->
+    | {AL.op=AL.Less; _} when Iter.exists T.is_var (AL.Seq.terms lit) ->
       ()  (* no way we rewrite this into a tautology *)
     | {AL.op=AL.Less; _} ->
       Util.incr_stat stat_rat_trivial_ineq;
@@ -889,7 +889,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         "(@[try_ineq_find_sufficient@ :lit `%a`@ :trace (@[%a@])@])"
         (fun k->k AL.pp lit (Util.pp_list C.pp) trace);
       AL.fold_terms ~vars:false ~which:`Max ~ord ~subterms:false lit
-      |> Sequence.iter
+      |> Iter.iter
         (fun (t,pos) ->
            let plit = ALF.get_exn lit pos in
            let is_left = match pos with
@@ -899,7 +899,7 @@ module Make(E : Env.S) : S with module Env = E = struct
            in
            (* try to eliminate [t] in passive lit [plit]*)
            PS.TermIndex.retrieve_generalizations (!_idx_unit_ineq,1) (t,0)
-           |> Sequence.iter
+           |> Iter.iter
              (fun (_t',with_pos,subst) ->
                 let active_clause = with_pos.C.WithPos.clause in
                 let active_pos = with_pos.C.WithPos.pos in
@@ -965,7 +965,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let ord = Ctx.ord () in
         let traces =
           _ineq_find_sufficient ~ord ~trace:[] c alit
-          |> Sequence.head  (* one is enough *)
+          |> Iter.head  (* one is enough *)
         in
         begin match traces with
           | Some (trace, _lit') ->
@@ -1008,7 +1008,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     | _ when AL.is_absurd lit -> k (trace,lit)
     | _ when List.length trace >= max_ineq_demod_steps ->
       () (* need another step, but it would exceed the limit *)
-    | {AL.op=AL.Less; _} when Sequence.exists T.is_var (AL.Seq.terms lit) ->
+    | {AL.op=AL.Less; _} when Iter.exists T.is_var (AL.Seq.terms lit) ->
       ()  (* too costly (will match too many things) *)
     | {AL.op=AL.Less; _} ->
       Util.incr_stat stat_rat_demod_ineq;
@@ -1016,7 +1016,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         "(@[try_ineq_find_necessary@ :lit `%a`@ :trace (@[%a@])@])"
         (fun k->k AL.pp lit (Util.pp_list C.pp) trace);
       AL.fold_terms ~vars:false ~which:`Max ~ord ~subterms:false lit
-      |> Sequence.iter
+      |> Iter.iter
         (fun (t,pos) ->
            let plit = ALF.get_exn lit pos in
            let is_left = match pos with
@@ -1026,7 +1026,7 @@ module Make(E : Env.S) : S with module Env = E = struct
            in
            (* try to eliminate [t] in passive lit [plit]*)
            PS.TermIndex.retrieve_generalizations (!_idx_unit_ineq,1) (t,0)
-           |> Sequence.iter
+           |> Iter.iter
              (fun (_t',with_pos,subst) ->
                 let active_clause = with_pos.C.WithPos.clause in
                 let active_pos = with_pos.C.WithPos.pos in
@@ -1092,7 +1092,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let ord = Ctx.ord () in
         let traces =
           ineq_find_necessary_ ~ord ~trace:[] c alit
-          |> Sequence.head  (* one is enough *)
+          |> Iter.head  (* one is enough *)
         in
         begin match traces with
           | Some (trace, _lit') ->
@@ -1147,7 +1147,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* create a list of constraints for some arith lits *)
     let constraints =
       Lits.fold_rat ~eligible:C.Eligible.arith (C.lits c)
-      |> Sequence.fold
+      |> Iter.fold
         (fun acc (lit,_) ->
            (* negate the literal and make a constraint out of it *)
            match lit with
@@ -1482,14 +1482,14 @@ let extension =
     let module PT = TypedSTerm in
     let has_rat =
       CCVector.to_seq stmts
-      |> Sequence.flat_map Stmt.Seq.to_seq
-      |> Sequence.flat_map
+      |> Iter.flat_map Stmt.Seq.to_seq
+      |> Iter.flat_map
         (function
-          | `ID _ -> Sequence.empty
-          | `Ty ty -> Sequence.return ty
+          | `ID _ -> Iter.empty
+          | `Ty ty -> Iter.return ty
           | `Form t
-          | `Term t -> PT.Seq.subterms t |> Sequence.filter_map PT.ty)
-      |> Sequence.exists (PT.Ty.equal PT.Ty.rat)
+          | `Term t -> PT.Seq.subterms t |> Iter.filter_map PT.ty)
+      |> Iter.exists (PT.Ty.equal PT.Ty.rat)
     in
     let should_reg = !enable_rat_ && has_rat in
     Util.debugf ~section 2 "decision to register rat-arith: %B" (fun k->k should_reg);

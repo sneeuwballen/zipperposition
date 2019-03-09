@@ -84,10 +84,10 @@ let well_founded s =
 
 module Seq = struct
   let symbols s =
-    ID.Map.to_seq s |> Sequence.map fst
+    ID.Map.to_seq s |> Iter.map fst
 
   let types s =
-    ID.Map.to_seq s |> Sequence.map snd
+    ID.Map.to_seq s |> Iter.map snd
 
   let to_seq = ID.Map.to_seq
   let add_seq = ID.Map.add_seq

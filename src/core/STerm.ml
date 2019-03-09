@@ -251,7 +251,7 @@ module Seq = struct
     in iter t
 
   let vars t = subterms t
-               |> Sequence.filter_map
+               |> Iter.filter_map
                  (fun t -> match t.term with
                     | Var v -> Some v
                     | _ -> None)
@@ -296,19 +296,19 @@ module Seq = struct
 
   let free_vars t =
     subterms_with_bound t
-    |> Sequence.filter_map
+    |> Iter.filter_map
       (fun (t,bound) -> match t.term with
          | Var (V v) when not (StringSet.mem v bound) -> Some v
          | _ -> None)
 
   let symbols t = subterms t
-                  |> Sequence.filter_map
+                  |> Iter.filter_map
                     (function
                       | {term=Const s; _} -> Some s
                       | _ -> None)
 end
 
-let ground t = Seq.vars t |> Sequence.is_empty
+let ground t = Seq.vars t |> Iter.is_empty
 
 let close_all s t =
   let vars = Seq.free_vars t
@@ -320,7 +320,7 @@ let close_all s t =
 
 let subterm ~strict t ~sub =
   (not strict && equal t sub)
-  || Sequence.exists (equal sub) (Seq.subterms t)
+  || Iter.exists (equal sub) (Seq.subterms t)
 
 (** {2 Print} *)
 

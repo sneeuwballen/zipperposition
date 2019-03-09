@@ -69,14 +69,14 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         sets in [uf_vars] associated to their variables *)
     Array.iter
       (fun lit ->
-         let v_opt = Lit.Seq.vars lit |> Sequence.head in
+         let v_opt = Lit.Seq.vars lit |> Iter.head in
          begin match v_opt with
            | None -> (* ground, lit has its own component *)
              cluster_ground := Lit.Set.add lit !cluster_ground
            | Some v ->
              (* merge other variables of the literal with [v] *)
              Lit.Seq.vars lit
-             |> Sequence.iter
+             |> Iter.iter
                (fun v' ->
                   (* lit is in the equiv class of [v'] *)
                   UF.add uf_vars v' (Lit.Set.singleton lit);
@@ -167,7 +167,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
   let trail_is_trivial_ (trail:Trail.t): bool =
     let res =
       Trail.to_seq trail
-      |> Sequence.find_map
+      |> Iter.find_map
         (fun lit ->
            try match Sat.valuation_level lit with
              | false, 0 -> Some lit (* false at level 0: proven false *)
@@ -274,8 +274,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     if Sat.last_result () = Sat_solver.Sat && new_proved_lits () then (
       E.ProofState.ActiveSet.clauses ()
       |> C.ClauseSet.to_seq
-      |> Sequence.filter (fun c -> not (Trail.is_empty @@ C.trail c))
-      |> Sequence.filter
+      |> Iter.filter (fun c -> not (Trail.is_empty @@ C.trail c))
+      |> Iter.filter
         (fun c ->
            let ok = match simplify_opt (C.trail c) with
              | Tr_trivial | Tr_simplify_into _ -> true
@@ -317,7 +317,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       BLit.pp c.cut_lit pp_depth c.cut_depth
       (Fmt.some pp_reason) c.cut_reason
 
-  let cut_res_clauses c = Sequence.of_list c.cut_pos
+  let cut_res_clauses c = Iter.of_list c.cut_pos
 
   (* generic mechanism for adding clause(s)
      and make a lemma out of them, including Skolemization, etc. *)
@@ -450,7 +450,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     ()
 
 
-  let lemma_seq : cut_res Sequence.t =
+  let lemma_seq : cut_res Iter.t =
     fun yield -> Lemma_tbl.iter (fun _ c -> yield c) all_lemmas_
 
   (* is this literal involved in the proof? *)
@@ -480,7 +480,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       Format.fprintf out "@[<4>@[<hv>@{<Green>*@} %s %a@]%a@]"
         status Cut_form.pp c.cut_form (Fmt.some pp_reason) c.cut_reason
     in
-    let l = lemma_seq |> Sequence.to_rev_list in
+    let l = lemma_seq |> Iter.to_rev_list in
     Format.fprintf out "@[<v2>lemmas (%d): {@ %a@,@]}"
       (List.length l) (Util.pp_list ~sep:"" pp_lemma) l;
     ()
@@ -505,7 +505,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         |> Proof.Step.esa ~rule:(Proof.Rule.mk "lemma")
       in
       let cut = introduce_cut ~reason:Fmt.(return "in-input") f proof in
-      let all_clauses = cut_res_clauses cut |> Sequence.to_rev_list in
+      let all_clauses = cut_res_clauses cut |> Iter.to_rev_list in
       add_lemma cut;
       Signal.send on_input_lemma cut;
       (* interrupt here *)

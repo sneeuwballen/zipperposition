@@ -53,7 +53,7 @@ module type S = sig
   val cut_proof_parent : cut_res -> Proof.Parent.t
 
   val pp_cut_res : cut_res CCFormat.printer
-  val cut_res_clauses: cut_res -> E.C.t Sequence.t
+  val cut_res_clauses: cut_res -> E.C.t Iter.t
 
   val print_lemmas : unit CCFormat.printer
   (** print the current list of lemmas, and their status *)

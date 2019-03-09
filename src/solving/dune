@@ -4,9 +4,8 @@
   (public_name logtk.solving)
   (synopsis "solving constraints")
   (optional)
-  (libraries containers logtk msat)
-  (flags :standard -w -32-50)
-)
+  (libraries containers logtk msat iter)
+  (flags :standard -w -32-50))
 
 
 
