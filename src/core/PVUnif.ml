@@ -14,6 +14,7 @@ end
 
 let max_depth = 27
 
+let _conservative_elim = ref false
 
 let make_fresh_var fresh_var_ ~ty () = 
   let var = HVar.make ~ty !fresh_var_ in 
@@ -22,6 +23,9 @@ let make_fresh_var fresh_var_ ~ty () =
 
 (* apply a substitution and reduce to normal form *)
 let nfapply s u = Lambda.beta_red_head (S.apply s u)
+
+let enable_conservative_elim () =
+  _conservative_elim := true
 
 let unif_simple ~scope t s = 
   try 
@@ -201,16 +205,22 @@ and flex_same ~depth ~subst ~fresh_var_ ~scope hd_s args_s args_t rest =
   assert(List.length args_s = List.length args_t);
   let new_cstrs = (List.map (fun (a,b) -> a,b,true) (List.combine args_s args_t)) @ rest in
   let all_vars = CCList.range 0 ((List.length @@ fst @@ Type.open_fun (T.ty hd_s)) -1 ) in
+  let all_args_unif = unify ~depth:(depth+1)~subst ~fresh_var_ ~scope new_cstrs in
   OSeq.append 
-    (unify ~depth:(depth+1)~subst ~fresh_var_ ~scope new_cstrs)
-    (OSeq.of_list all_vars |>
-     OSeq.map (fun idx -> 
-       idx, eliminate_at_idx ~scope ~fresh_var_ (T.as_var_exn hd_s) idx ) 
-     |>  
-      (OSeq.flat_map (fun (idx, subst') -> 
-      let new_subst = US.merge subst subst' in
-        unify ~depth:(depth+1) ~scope  ~fresh_var_ ~subst:new_subst 
-        (CCList.remove_at_idx idx new_cstrs))))
+    all_args_unif
+    (if(!_conservative_elim &&
+        OSeq.exists CCOpt.is_some (OSeq.take 1 all_args_unif)) then
+      OSeq.empty
+    else (
+      (OSeq.of_list all_vars |>
+      OSeq.map (fun idx -> 
+        idx, eliminate_at_idx ~scope ~fresh_var_ (T.as_var_exn hd_s) idx ) 
+      |>  
+        (OSeq.flat_map (fun (idx, subst') -> 
+        let new_subst = US.merge subst subst' in
+          unify ~depth:(depth+1) ~scope  ~fresh_var_ ~subst:new_subst 
+          (CCList.remove_at_idx idx new_cstrs)))))
+    )
 and flex_proj_imit  ~depth ~subst ~fresh_var_ ~scope s t rest = 
   let bindings = proj_imit_bindings  ~scope ~fresh_var_ s t in
   let bindings = proj_imit_bindings  ~scope ~fresh_var_ t s @ bindings in

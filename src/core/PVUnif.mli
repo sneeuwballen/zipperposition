@@ -12,6 +12,7 @@ module S : sig
 
 end
 
+val enable_conservative_elim : unit -> unit
 
 (* Unify terms of the same scope. Assumes that terms are in eta-long form. *)
 val unify : depth:int ->
