@@ -203,7 +203,7 @@ let is_type t = Type.equal Type.tType (ty t)
 
 let as_const_exn t = match T.view t with
   | T.Const c -> c
-  | _ -> invalid_arg "as_const_exn"
+  | _ -> invalid_arg (CCFormat.sprintf "as_const_exn: %a" T.pp t)
 
 let as_const t = try Some (as_const_exn t) with Invalid_argument _ -> None
 

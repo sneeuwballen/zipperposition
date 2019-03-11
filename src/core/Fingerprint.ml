@@ -28,11 +28,11 @@ type fingerprint_fun = T.t -> feature list
    are useful instead of folding and filtering *)
 
 (* compute a feature for a given position *)
-let rec gfpf pos t = 
+let rec gfpf pos t =
+  let _, body =  T.open_fun t in 
   match pos with 
-  | [] -> gfpf_root t
-  | i::is -> 
-      let _, body = T.open_fun t in
+  | [] -> gfpf_root body
+  | i::is ->
       let hd, args = T.as_app body in
       if T.is_var hd then B
       else (
@@ -50,8 +50,11 @@ and gfpf_root t =
   | T.DB i -> DB i
   | T.Var _ -> A
   | T.Const c -> S c 
-  | T.App (hd, _) -> if (T.is_var hd) then B 
-                     else S (T.as_const_exn hd)
+  | T.App (hd, _) -> (match T.view hd with
+                     T.Var _ -> B
+                     | T.Const s -> S s
+                     | T.DB i    -> DB i
+                     | _ -> assert false)
   | T.Fun (_, _) -> assert false 
 
 (* TODO more efficient way to compute a vector of features: if the fingerprint
