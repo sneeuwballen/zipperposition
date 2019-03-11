@@ -39,7 +39,10 @@ let rec gfpf pos t =
         if List.length args > i then (
           gfpf is (List.nth args i)
         ) 
-        else N 
+        else (
+          let _, ret = Type.open_fun (Term.ty body) in
+          if (Type.is_var ret) then B else N
+        ) 
       )
 and gfpf_root t =
   match T.view t with 
@@ -57,7 +60,7 @@ and gfpf_root t =
 (** compute a feature vector for some positions *)
 let fp positions =
   (* list of fingerprint feature functions *)
-  let fpfs = List.map (fun pos -> gfpf pos) positions in
+  let fpfs = List.map gfpf positions in
   fun t ->
     List.map (fun fpf -> fpf t) fpfs
 
