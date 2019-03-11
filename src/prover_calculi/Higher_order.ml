@@ -37,6 +37,7 @@ let _ext_axiom_penalty = ref 5
 let _var_arg_remove = ref true
 let _huet_style = ref false
 let _cons_elim = ref false
+let _imit_first = ref false
 
 module type S = sig
   module Env : Env.S
@@ -712,6 +713,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       if (!_cons_elim) then
         PVUnif.enable_conservative_elim ();
 
+      if (!_imit_first) then
+        PVUnif.set_imit_first ();
+
       if Env.flex_get k_enable_ho_unif then (
         Env.add_unary_inf "ho_unif" ho_unif;
       );
@@ -834,6 +838,7 @@ let () =
       "--ho-def-unfold", Arg.Set def_unfold_enabled_, " enable ho definition unfolding";
       "--ho-huet-style-unif", Arg.Set _huet_style, " enable Huet style projection";
       "--ho-conservative-elim", Arg.Set _cons_elim, "Use conservative elimination rule in pragmatic unification";
+      "--ho-imitation-first",Arg.Set _imit_first, "Use imitation rule before projection rule";
       "--ho-disable-var-arg-removal", Arg.Clear _var_arg_remove, "disable removal of arguments of applied variables";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom"
     ];

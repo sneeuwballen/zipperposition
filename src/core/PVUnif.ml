@@ -15,6 +15,7 @@ end
 let max_depth = 27
 
 let _conservative_elim = ref false
+let _imit_first = ref false
 
 let make_fresh_var fresh_var_ ~ty () = 
   let var = HVar.make ~ty !fresh_var_ in 
@@ -26,6 +27,10 @@ let nfapply s u = Lambda.beta_red_head (S.apply s u)
 
 let enable_conservative_elim () =
   _conservative_elim := true
+
+let set_imit_first () = 
+  _imit_first := true
+
 
 let unif_simple ~scope t s = 
   try 
@@ -104,7 +109,10 @@ let proj_imit_bindings ~scope ~fresh_var_  s t =
             not (T.var_occurs ~var:(T.as_var_exn hd_s) hd_t)) 
           then [imitate_one ~scope ~fresh_var_ s t] 
         else [] in
-  proj_bindings @ imit_binding
+  let first, second = 
+    if !_imit_first then imit_binding , proj_bindings
+    else proj_bindings, imit_binding in 
+  first @ second
 
 let rec unify ~depth ~scope ~fresh_var_ ~subst = function
   | [] -> OSeq.return (Some subst)
@@ -114,7 +122,7 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
     if depth >= max_depth then
       OSeq.empty
     else 
-      if (depth > 0 && depth mod 6 = 0) then
+      if (depth > 0 && depth mod 4 = 0) then
         if (depth < max_depth) then 
           OSeq.append 
             (OSeq.take 50 (OSeq.repeat None))
@@ -251,18 +259,18 @@ let unify_scoped (t0, scope0) (t1, scope1) =
     (* merge with var renaming *)
     (* |> OSeq.map (CCOpt.map (US.merge subst)) *)
     |> OSeq.map (CCOpt.map (fun sub -> 
-      (* let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t0, scope0) in  *)
-      (* let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t1, scope1) in *)
-      (*if not (T.equal l r) then (
+      let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t0, scope0) in 
+      let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t1, scope1) in
+      if not (T.equal l r) then (
         Format.printf "For problem: %a =?= %a\n" T.pp t0 T.pp t1;
         Format.printf "Subst: %a\n" S.pp sub;
         Format.printf "%a <> %a\n" T.pp l T.pp r;
         assert(false);
-      );*)
-      (* if not (T.Seq.subterms l |> Sequence.append (T.Seq.subterms r) |> *)
-           (* Sequence.for_all (fun st -> List.for_all T.DB.is_closed @@ T.get_mand_args st)) then ( *)
-        (* Format.printf "Unequal subst: %a =?= %a, res %a.\n" T.pp t0 T.pp t1 T.pp l; *)
-      (* assert(false);  *)
-      (* ); *)
-      (* assert (T.equal l r); *)
+      );
+      if not (T.Seq.subterms l |> Sequence.append (T.Seq.subterms r) |> 
+         Sequence.for_all (fun st -> List.for_all T.DB.is_closed @@ T.get_mand_args st)) then ( 
+         Format.printf "Unequal subst: %a =?= %a, res %a.\n" T.pp t0 T.pp t1 T.pp l; 
+         assert(false); 
+      );
+      assert (T.equal l r);
       sub))
