@@ -87,13 +87,13 @@ end = struct
   let rec update (cc:t) : t =
     let find_merge_ cc =
       TSet_set.to_seq cc
-      |> Sequence.flat_map
+      |> Iter.flat_map
         (fun s1 ->
            assert (not (T.Set.is_empty s1));
            TSet_set.to_seq cc
-           |> Sequence.filter (fun s2 -> s1 != s2)
-           |> Sequence.map (fun s2 -> s1, s2))
-      |> Sequence.find_map
+           |> Iter.filter (fun s2 -> s1 != s2)
+           |> Iter.map (fun s2 -> s1, s2))
+      |> Iter.find_map
         (fun (s1,s2) -> if are_congruent_ cc s1 s2 then Some (s1,s2) else None)
     in
     begin match find_merge_ cc with
@@ -131,13 +131,13 @@ let check_ref =
     let cc1 = _cc_of_classes classes in
     let cc2 = CC_ref.of_classes classes in
     let all_terms =
-      Sequence.of_list classes
-      |> Sequence.flat_map_l CCFun.id
-      |> Sequence.to_rev_list
+      Iter.of_list classes
+      |> Iter.flat_map_l CCFun.id
+      |> Iter.to_rev_list
     in
     (* check every pair of terms *)
-    Sequence.diagonal_l all_terms
-    |> Sequence.for_all
+    Iter.diagonal_l all_terms
+    |> Iter.for_all
       (fun (t,u) ->
          let eq1 = CC.is_eq cc1 t u in
          let eq2 = CC_ref.is_eq cc2 t u in

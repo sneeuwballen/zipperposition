@@ -139,7 +139,7 @@ let check_replace_id =
 let check_ground_novar =
   let gen = ar_t in
   let prop t =
-    not (T.is_ground t) || Sequence.is_empty (T.Seq.vars t)  (* ground => no vars *)
+    not (T.is_ground t) || Iter.is_empty (T.Seq.vars t)  (* ground => no vars *)
   in
   QCheck.Test.make ~count:1000 ~name:"term_ground_has_no_var" gen prop
 
@@ -170,13 +170,13 @@ let is_fun t = match T.view t with T.Fun _ -> true | _ -> false
 
 let num_lam t =
   T.Seq.subterms t
-  |> Sequence.filter is_fun
-  |> Sequence.length
+  |> Iter.filter is_fun
+  |> Iter.length
 
 let num_var_app t =
   T.Seq.subterms t
-  |> Sequence.filter T.is_ho_app
-  |> Sequence.length
+  |> Iter.filter T.is_ho_app
+  |> Iter.length
 
 (* NOTE: this enables stats *)
 let add_stat = ref false
@@ -267,7 +267,7 @@ let check_snf_no_redex =
     if not (T.DB.is_closed t) then QCheck.assume_fail()
     else (
       T.Seq.subterms t'
-      |> Sequence.for_all
+      |> Iter.for_all
         (fun t -> match T.view t with
            | T.App (f, _) -> not (is_fun f)
            | _ -> true)
