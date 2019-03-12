@@ -75,14 +75,12 @@ module Make(C : Clause_intf.S) = struct
          Term.AppBuiltin (_,l) -> 
             w + List.fold_left (fun acc t -> acc + 
                                     calc_tweight t sg v w c_mul) 0 l
-         | Term.Var _ -> v
+         | Term.Var _ -> let var_ty = Term.ty t in
+                         if (Type.is_fun var_ty) then 2*v else v
          | Term.DB _ -> v
          | Term.App (f, l) -> 
-            begin match Term.view f with
-               | Term.Const id ->  int_of_float ((if Signature.sym_in_conj id sg then c_mul else 1.0)*. float_of_int w)
-               | _ -> v
-            end +  List.fold_left (fun acc t -> acc + 
-                                    calc_tweight t sg v w c_mul) 0 l
+            calc_tweight f sg v w c_mul +
+              List.fold_left (fun acc t -> acc + calc_tweight t sg v w c_mul) 0 l
          
          | Term.Const id -> (int_of_float ((if Signature.sym_in_conj id sg then c_mul else 1.0)*.float_of_int w))
          | Term.Fun (_, t) -> calc_tweight t sg v w c_mul

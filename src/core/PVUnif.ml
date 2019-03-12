@@ -16,6 +16,8 @@ let max_depth = 20
 
 let _conservative_elim = ref false
 let _imit_first = ref false
+let _cons_ff = ref false
+
 
 let make_fresh_var fresh_var_ ~ty () = 
   let var = HVar.make ~ty !fresh_var_ in 
@@ -30,6 +32,9 @@ let enable_conservative_elim () =
 
 let set_imit_first () = 
   _imit_first := true
+
+let set_cons_ff () = 
+  _cons_ff := true
 
 
 let unif_simple ~scope t s = 
@@ -117,8 +122,6 @@ let proj_imit_bindings ~scope ~fresh_var_  s t =
 let rec unify ~depth ~scope ~fresh_var_ ~subst = function
   | [] -> OSeq.return (Some subst)
   | (s,t,ban_id) :: rest as l -> (
-    (* Format.printf "Got %a =?= %a,.%d\n" T.pp s T.pp t depth; *)
-    (* Format.printf "Subst: %a\n" US.pp subst; *)
     if depth >= max_depth then
       OSeq.empty
     else 
@@ -167,9 +170,9 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
                   (flex_proj_imit ~depth ~subst ~fresh_var_ ~scope  body_s' body_t' rest)
                 else (
                   OSeq.append
-                  (* (flex_proj_imit  ~depth ~subst ~fresh_var_ ~scope  body_s' body_t' rest) *)
                   (identify  ~depth ~subst ~fresh_var_ ~scope body_s' body_t' rest)
-                  OSeq.empty
+                  (if not !_cons_ff then (flex_proj_imit  ~depth ~subst ~fresh_var_ ~scope  body_s' body_t' rest)
+                  else OSeq.empty)
                 )
               ) 
             | (T.Var _, T.Const _) | (T.Var _, T.DB _) ->
@@ -259,7 +262,7 @@ let unify_scoped (t0, scope0) (t1, scope1) =
     (* merge with var renaming *)
     (* |> OSeq.map (CCOpt.map (US.merge subst)) *)
     |> OSeq.map (CCOpt.map (fun sub -> 
-      let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t0, scope0) in 
+      (* let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t0, scope0) in 
       let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t1, scope1) in
       if not (T.equal l r) then (
         Format.printf "For problem: %a =?= %a\n" T.pp t0 T.pp t1;
@@ -272,5 +275,5 @@ let unify_scoped (t0, scope0) (t1, scope1) =
          Format.printf "Unequal subst: %a =?= %a, res %a.\n" T.pp t0 T.pp t1 T.pp l; 
          assert(false); 
       );
-      assert (T.equal l r);
+      assert (T.equal l r); *)
       sub))

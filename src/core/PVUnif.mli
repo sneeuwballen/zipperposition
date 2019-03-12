@@ -14,6 +14,8 @@ end
 
 val enable_conservative_elim : unit -> unit
 val set_imit_first : unit -> unit
+val set_cons_ff : unit -> unit
+
 
 
 (* Unify terms of the same scope. Assumes that terms are in eta-long form. *)
