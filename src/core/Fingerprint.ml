@@ -28,32 +28,32 @@ type fingerprint_fun = T.t -> feature list
    are useful instead of folding and filtering *)
 
 (* compute a feature for a given position *)
-let rec gfpf pos t =
-  let _, body =  T.open_fun t in 
+let rec gfpf ?(depth=0) pos t =
+  let pref_vars, body =  T.open_fun t in 
   match pos with 
-  | [] -> gfpf_root body
+  | [] -> gfpf_root ~depth body
   | i::is ->
       let hd, args = T.as_app body in
       if T.is_var hd then B
       else (
-        if List.length args > i then (
-          gfpf is (List.nth args i)
+        if List.length args >= i then (
+          gfpf ~depth:(depth + (List.length pref_vars)) is (List.nth args @@  i-1 )
         ) 
         else (
           let _, ret = Type.open_fun (Term.ty body) in
           if (Type.is_var ret) then B else N
         ) 
       )
-and gfpf_root t =
+and gfpf_root ~depth t =
   match T.view t with 
   | T.AppBuiltin(_, _) -> Ignore
-  | T.DB i -> DB i
+  | T.DB i -> if (i < depth) then DB i else B
   | T.Var _ -> A
   | T.Const c -> S c 
   | T.App (hd, _) -> (match T.view hd with
                      T.Var _ -> B
                      | T.Const s -> S s
-                     | T.DB i    -> DB i
+                     | T.DB i    -> if (i < depth) then DB i else B
                      | _ -> assert false)
   | T.Fun (_, _) -> assert false 
 
@@ -65,6 +65,7 @@ let fp positions =
   (* list of fingerprint feature functions *)
   let fpfs = List.map gfpf positions in
   fun t ->
+    (* Format.printf "@[Fingerprinting: @[%a@].@]\n" T.pp t; *)
     List.map (fun fpf -> fpf t) fpfs
 
 (** {2 Fingerprint functions} *)
@@ -107,19 +108,19 @@ let compatible_features_unif f1 f2 =
   | S s1 -> (match f2 with
              | S s2 -> ID.equal s1 s2 
              | A | B | Ignore -> true
-             | _ -> false)
+             | N | DB _ -> false)
   | Ignore 
   | B    -> true
   | A    -> (match f2 with
-             | DB _ | N | Ignore -> false
-             | _ -> true)
+             | DB _ | N  -> false
+             | Ignore | S _ | A | B  -> true)
   | DB i -> (match f2 with 
              | DB j -> i = j
              | B | Ignore -> true
-             | _ -> false)
+             | A | S _ | N -> false)
   | N ->    (match f2 with 
              | N | B | Ignore -> true
-             | _ -> false)
+             | A | DB _ | S _ -> false)
 
 (** check whether two features are compatible for matching. *)
 let compatible_features_match f1 f2 =

@@ -12,7 +12,7 @@ module S = struct
 
 end
 
-let max_depth = 27
+let max_depth = 20
 
 let _conservative_elim = ref false
 let _imit_first = ref false

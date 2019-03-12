@@ -27,7 +27,7 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
 
   module CQueue = ClauseQueue.Make(C)
 
-  (* module TermIndex = Fingerprint.Make(C.WithPos) *)
+  (* module TermIndex = NPDtree.MakeTerm(C.WithPos) *)
   module TermIndex = Fingerprint.Make(C.WithPos)
 
   module UnitIndex =
