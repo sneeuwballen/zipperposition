@@ -75,11 +75,12 @@ module Make(C : Clause_intf.S) = struct
          Term.AppBuiltin (_,l) -> 
             w + List.fold_left (fun acc t -> acc + 
                                     calc_tweight t sg v w c_mul) 0 l
-         | Term.Var _ -> let var_ty = Term.ty t in
-                         if (Type.is_fun var_ty) then 2*v else v
-         | Term.DB _ -> v
-         | Term.App (f, l) -> 
-            calc_tweight f sg v w c_mul +
+         | Term.Var _ -> v
+         | Term.DB _ -> w
+         | Term.App (f, l) ->
+            let non_bvars_num = List.length @@ List.filter (fun t -> not @@ Term.is_bvar t)  l in
+            let var_weight    = if not @@ Term.is_var f || non_bvars_num = 0 then v / 2 else v in 
+            calc_tweight f sg (var_weight) w c_mul +
               List.fold_left (fun acc t -> acc + calc_tweight t sg v w c_mul) 0 l
          
          | Term.Const id -> (int_of_float ((if Signature.sym_in_conj id sg then c_mul else 1.0)*.float_of_int w))
@@ -107,10 +108,11 @@ module Make(C : Clause_intf.S) = struct
                             float_of_int l_w ) 0.0) 
         |> (fun res -> 
               if distinct_vars_mul=0 then int_of_float res
-              else let n_vars = 
-                (Literals.vars (C.lits c)
-                 |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))
-                 |> List.length) in 
+              else
+                let dist_vars = 
+                 Literals.vars (C.lits c)
+                 |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))  in
+                let n_vars = List.length dist_vars in
                 int_of_float ((float_of_int (n_vars*n_vars)) /. 5.0) * distinct_vars_mul 
                 + (int_of_float res) )
 
