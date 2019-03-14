@@ -712,13 +712,13 @@ module Make(E : Env.S) : S with module Env = E = struct
         JP_unif.set_huet_style ();
 
       if (!_cons_elim) then
-        PVUnif.enable_conservative_elim ();
+        PragHOUnif.enable_conservative_elim ();
 
       if (!_imit_first) then
-        PVUnif.set_imit_first ();
+        PragHOUnif.set_imit_first ();
 
       if (!_cons_ff) then
-        PVUnif.set_cons_ff ();
+        PragHOUnif.set_cons_ff ();
 
       if Env.flex_get k_enable_ho_unif then (
         Env.add_unary_inf "ho_unif" ho_unif;

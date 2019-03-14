@@ -414,6 +414,18 @@ let in_lfho_fragment t =
          then true
          else raise (Failure "has lambda"))
 
+let rec is_fo_term t = 
+  match view t with
+  | Var _ -> not @@ Type.is_fun @@ ty t 
+  | AppBuiltin (_,l) -> List.for_all is_fo_term l
+  | App (hd, l) -> let expected_args = List.length @@ Type.expected_args @@ ty hd in
+                   let actual_args = List.length l in
+                   expected_args = actual_args &&
+                     List.for_all is_fo_term (hd :: l)   
+  | Const _ -> true
+  | _ -> false
+
+
 let monomorphic t = Sequence.is_empty (Seq.ty_vars t)
 
 let max_var set = VarSet.to_seq set |> Seq.max_var

@@ -2147,7 +2147,7 @@ let () =
       "--ho-unif-level",
       Arg.Symbol (["full"; "pragmatic"], (fun str ->  
         _unif_alg := if (String.equal "full" str) then JP_unif.unify_scoped
-                     else PVUnif.unify_scoped)),
+                     else PragHOUnif.unify_scoped)),
       "set the level of HO unification"
     ];
     Params.add_to_mode "ho-complete-basic" (fun () ->

@@ -424,14 +424,14 @@ let jp_check_count t u count : unit Alcotest.test_case =
 
 let pv_check_count t u count : unit Alcotest.test_case =
   "PV-unif check count", `Quick, fun () ->
-    let t' = OSeq.filter CCOpt.is_some @@ PVUnif.unify_scoped t u in
+    let t' = OSeq.filter CCOpt.is_some @@ PragHOUnif.unify_scoped t u in
     if count = OSeq.length t'  then ()
     else
       let all_subs = 
         OSeq.fold (fun acc sub -> 
           match sub with
           | None -> acc
-          | Some s -> CCFormat.sprintf "Sub: %a\nApp: %a , %a %s" PVUnif.S.pp s T.pp (Lambda.snf @@ PVUnif.S.apply s t) T.pp (Lambda.snf @@ PVUnif.S.apply s u) acc ) "" t' in
+          | Some s -> CCFormat.sprintf "Sub: %a\nApp: %a , %a %s" PragHOUnif.S.pp s T.pp (Lambda.snf @@ PragHOUnif.S.apply s t) T.pp (Lambda.snf @@ PragHOUnif.S.apply s u) acc ) "" t' in
       let problem = CCFormat.sprintf "Problem: %a = %a" T.pp (fst t) T.pp (fst u) in
       Alcotest.failf
         "@[<hv>Found %d unifiers instead of %d@]\n@[Prob: %s@]\n@[Unifs: @[%s@]@]" (OSeq.length t') count problem all_subs
@@ -447,7 +447,7 @@ let jp_check_nonunifiable ?(msg="") t u : unit Alcotest.test_case =
 
 let pv_check_nonunifiable ?(msg="") t u : unit Alcotest.test_case =
   "PV-unif check nonunifiable", `Quick, fun () ->
-  if OSeq.for_all CCOpt.is_none (OSeq.take 20 (PVUnif.unify_scoped t u)) then ()
+  if OSeq.for_all CCOpt.is_none (OSeq.take 20 (PragHOUnif.unify_scoped t u)) then ()
   else (
     Alcotest.failf
       "@[<2>`%a`@ should not unify with @ `%a`%s@]@."
@@ -475,10 +475,10 @@ let pv_check_unifier t u ~res =
   let is_res subst = match subst with
     | None -> false
     | Some s ->
-      let found = Lambda.snf (PVUnif.S.apply s t) in
+      let found = Lambda.snf (PragHOUnif.S.apply s t) in
       Unif.FO.are_variant res found 
   in
-  let unifiers = PVUnif.unify_scoped t u in
+  let unifiers = PragHOUnif.unify_scoped t u in
   if OSeq.exists is_res unifiers then () 
   else (
     Alcotest.failf
@@ -511,12 +511,12 @@ let pv_check_eqs t u ts =
     | None -> false
     | Some s ->
       CCList.for_all (fun (t1,t2,_) -> 
-        let t1 = Lambda.eta_reduce (Lambda.snf (PVUnif.S.apply s t1)) in
-        let t2 = Lambda.eta_reduce (Lambda.snf (PVUnif.S.apply s t2)) in
+        let t1 = Lambda.eta_reduce (Lambda.snf (PragHOUnif.S.apply s t1)) in
+        let t2 = Lambda.eta_reduce (Lambda.snf (PragHOUnif.S.apply s t2)) in
         Unif.FO.are_variant t1 t2 
       ) ts
   in
-  let unifiers = PVUnif.unify_scoped t u in
+  let unifiers = PragHOUnif.unify_scoped t u in
   if OSeq.exists is_res unifiers then () 
   else (
     Alcotest.failf

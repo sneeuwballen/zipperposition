@@ -128,6 +128,7 @@ val is_type : t -> bool (** Does it have type [tType]? *)
 
 val in_pfho_fragment : t -> bool
 val in_lfho_fragment : t -> bool
+val is_fo_term : t -> bool
 
 val mk_fresh_skolem : var list -> Type.t -> t
 

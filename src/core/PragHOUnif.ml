@@ -12,7 +12,7 @@ module S = struct
 
 end
 
-let max_depth = 20
+let max_depth = 64
 
 let _conservative_elim = ref false
 let _imit_first = ref false
@@ -125,7 +125,7 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
     if depth >= max_depth then
       OSeq.empty
     else 
-      if (depth > 0 && depth mod 4 = 0) then
+      if (depth > 0 && depth mod 8 = 0) then
         if (depth < max_depth) then 
           OSeq.append 
             (OSeq.take 50 (OSeq.repeat None))
@@ -143,8 +143,8 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
           (* Format.printf "Solving pair:\n@[%a@]\n=?=\n@[%a@].\n" T.pp s' T.pp t'; *)
           (* Format.print_flush (); *)
 
-          if Lambda.is_lambda_pattern s' && Lambda.is_lambda_pattern t' &&
-            T.DB.is_closed s' && T.DB.is_closed t' then (
+          if Term.DB.is_closed s' && Term.DB.is_closed t' &&
+              Lambda.is_lambda_pattern s' && Lambda.is_lambda_pattern t' then (
             (* Format.printf "Solving lambda pattern.\n"; *)
             match unif_simple ~scope s' t' with
             | Some unif ->
