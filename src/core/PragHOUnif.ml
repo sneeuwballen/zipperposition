@@ -12,7 +12,7 @@ module S = struct
 
 end
 
-let max_depth = 64
+let max_depth = 24
 
 let _conservative_elim = ref false
 let _imit_first = ref false
@@ -125,7 +125,7 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
     if depth >= max_depth then
       OSeq.empty
     else 
-      if (depth > 0 && depth mod 8 = 0) then
+      if (depth > 0 && depth mod 4 = 0) then
         if (depth < max_depth) then 
           OSeq.append 
             (OSeq.take 50 (OSeq.repeat None))
