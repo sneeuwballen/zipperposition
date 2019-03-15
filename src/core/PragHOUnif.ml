@@ -12,7 +12,7 @@ module S = struct
 
 end
 
-let max_depth = 24
+let max_depth = 13
 
 let _conservative_elim = ref false
 let _imit_first = ref false
@@ -91,12 +91,16 @@ let imitate_one ~scope ~fresh_var_  s t =
     OSeq.nth 0 (JP_unif.imitate_onesided ~scope ~fresh_var_ s t)
   with Not_found -> Format.printf "Could not get imitation subst!\n"; raise Not_found
 
-let proj_imit_bindings ~scope ~fresh_var_  s t = 
+let proj_imit_bindings ~depth ~scope ~fresh_var_  s t = 
   let hd_s = T.as_var_exn @@ T.head_term s in
     let prefix_types, var_ret_ty = Type.open_fun (HVar.ty hd_s) in
     let proj_bindings = 
-      prefix_types 
-      |> List.mapi (fun i ty ->
+      prefix_types
+      |> List.mapi (fun i ty -> i, ty)
+      |> (fun l ->
+        if depth <= 4 then l
+        else (List.filter (fun (_, ty) -> (List.length @@ Type.expected_args ty) = 0) l))
+      |> List.map (fun (i, ty) ->
             let _, arg_ret_ty = Type.open_fun ty in 
             match unif_simple ~scope (T.of_ty arg_ret_ty) (T.of_ty var_ret_ty) with
             | Some ty_unif -> 
@@ -120,82 +124,85 @@ let proj_imit_bindings ~scope ~fresh_var_  s t =
   first @ second
 
 let rec unify ~depth ~scope ~fresh_var_ ~subst = function
-  | [] -> OSeq.return (Some subst)
+  | [] ->  OSeq.return (Some subst)
   | (s,t,ban_id) :: rest as l -> (
-    if depth >= max_depth then
-      OSeq.empty
-    else 
-      if (depth > 0 && depth mod 4 = 0) then
-        if (depth < max_depth) then 
-          OSeq.append 
-            (OSeq.take 50 (OSeq.repeat None))
-            (unify ~depth:(depth+1) ~scope ~fresh_var_ ~subst l)
-        else OSeq.empty
-      else  
-        let s', t' = nfapply subst (s, scope), nfapply subst (t, scope) in
-        match unif_simple ~scope (T.of_ty (T.ty s')) (T.of_ty (T.ty t')) with
-        | Some ty_unif -> (
-          let s' = nfapply ty_unif (s', scope) in
-          let t' = nfapply ty_unif (t', scope) in
+    if T.equal s t then 
+      (unify ~depth ~scope ~fresh_var_ ~subst rest)
+    else
+      if depth >= max_depth then
+        OSeq.empty
+      else 
+        if (depth > 0 && depth mod 6 = 0) then
+          if (depth < max_depth) then 
+            OSeq.append 
+              (OSeq.take 50 (OSeq.repeat None))
+              (unify ~depth:(depth+1) ~scope ~fresh_var_ ~subst l)
+          else OSeq.empty
+        else  
+          let s', t' = nfapply subst (s, scope), nfapply subst (t, scope) in
+          match unif_simple ~scope (T.of_ty (T.ty s')) (T.of_ty (T.ty t')) with
+          | Some ty_unif -> (
+            let s' = nfapply ty_unif (s', scope) in
+            let t' = nfapply ty_unif (t', scope) in
 
-          let subst = US.merge subst ty_unif in
+            let subst = US.merge subst ty_unif in
 
-          (* Format.printf "Solving pair:\n@[%a@]\n=?=\n@[%a@].\n" T.pp s' T.pp t'; *)
-          (* Format.print_flush (); *)
+            (* Format.printf "Solving pair:\n@[%a@]\n=?=\n@[%a@].\n" T.pp s' T.pp t'; *)
+            (* Format.printf "Subst: %a" US.pp subst; *)
+            (* Format.print_flush (); *)
 
-          if Term.DB.is_closed s' && Term.DB.is_closed t' &&
-              Lambda.is_lambda_pattern s' && Lambda.is_lambda_pattern t' then (
-            (* Format.printf "Solving lambda pattern.\n"; *)
-            match unif_simple ~scope s' t' with
-            | Some unif ->
-                let subst = US.merge subst unif in
-                unify ~depth:(depth+1) ~scope ~fresh_var_ ~subst rest
-            | None -> OSeq.empty
-          )
-          else (
-            let pref_s, body_s = T.open_fun s' in
-            let pref_t, body_t = T.open_fun t' in 
-            (* Format.printf "Trying to eta expand.\n"; *)
-            let body_s', body_t', _ = eta_expand_otf pref_s pref_t body_s body_t in
-            (* Format.printf "After eta_expand %a =?= %a\n" T.pp body_s' T.pp body_t'; *)
-            let hd_s, args_s = T.as_app body_s' in
-            let hd_t, args_t = T.as_app body_t' in
-            match T.view hd_s, T.view hd_t with 
-            | (T.Var _, T.Var _) -> 
-              (* Format.printf "Var var!"; *)
-              if T.equal hd_s hd_t then
-                  flex_same ~depth ~subst ~fresh_var_ ~scope hd_s args_s args_t rest
-              else (
-                if ban_id then
-                  (flex_proj_imit ~depth ~subst ~fresh_var_ ~scope  body_s' body_t' rest)
+            if Term.is_fo_term s' && Term.is_fo_term t' then (
+              (* Format.printf "Solving lambda pattern.\n"; *)
+              match unif_simple ~scope s' t' with
+              | Some unif ->
+                  let subst = US.merge subst unif in
+                  unify ~depth:(depth+1) ~scope ~fresh_var_ ~subst rest
+              | None -> OSeq.empty
+            )
+            else (
+              let pref_s, body_s = T.open_fun s' in
+              let pref_t, body_t = T.open_fun t' in 
+              (* Format.printf "Trying to eta expand.\n"; *)
+              let body_s', body_t', _ = eta_expand_otf pref_s pref_t body_s body_t in
+              (* Format.printf "After eta_expand %a =?= %a\n" T.pp body_s' T.pp body_t'; *)
+              let hd_s, args_s = T.as_app body_s' in
+              let hd_t, args_t = T.as_app body_t' in
+              match T.view hd_s, T.view hd_t with 
+              | (T.Var _, T.Var _) -> 
+                (* Format.printf "Var var!"; *)
+                if T.equal hd_s hd_t then
+                    flex_same ~depth ~subst ~fresh_var_ ~scope hd_s args_s args_t rest
                 else (
-                  OSeq.append
-                  (identify  ~depth ~subst ~fresh_var_ ~scope body_s' body_t' rest)
-                  (if not !_cons_ff then (flex_proj_imit  ~depth ~subst ~fresh_var_ ~scope  body_s' body_t' rest)
-                  else OSeq.empty)
-                )
-              ) 
-            | (T.Var _, T.Const _) | (T.Var _, T.DB _) ->
-                (* Format.printf "Var const/Var db!\n"; *)
-                flex_rigid ~depth ~subst ~fresh_var_ ~scope ~ban_id body_s' body_t' rest
-            | (T.Const _, T.Var _) | (T.DB _, T.Var _) ->
-                (* Format.printf "Const var/DB var!\n"; *)
-                flex_rigid ~depth ~subst ~fresh_var_ ~scope ~ban_id body_t' body_s' rest
-            | T.Const f , T.Const g when ID.equal f g ->
-                (* Format.printf "Same fun symb heads.\n"; *)
-                assert(List.length args_s = List.length args_t);
-                (*  depth stays the same for the decomposition steps   *)
-                unify ~depth ~subst ~fresh_var_ ~scope 
-                  ((List.map (fun (a,b) -> a,b,ban_id) (List.combine args_s args_t)) @ rest)
-            | T.DB i, T.DB j when i = j ->
-                (* Format.printf "Same DB heads.\n"; *)
-                assert (List.length args_s = List.length args_t);
-                unify ~depth ~subst ~fresh_var_ ~scope 
-                  ((List.map (fun (a,b) -> a,b,ban_id) (List.combine args_s args_t)) @ rest)
-            | _ -> OSeq.empty
+                  if ban_id then
+                    flex_proj_imit ~depth ~subst ~fresh_var_ ~scope  body_s' body_t' rest
+                  else (
+                    OSeq.append
+                    (identify  ~depth ~subst ~fresh_var_ ~scope body_s' body_t' rest)
+                    (if not !_cons_ff then (flex_proj_imit  ~depth ~subst ~fresh_var_ ~scope  body_s' body_t' rest)
+                    else OSeq.empty)
+                  )
+                ) 
+              | (T.Var _, T.Const _) | (T.Var _, T.DB _) ->
+                  (* Format.printf "Var const/Var db!\n"; *)
+                  flex_rigid ~depth ~subst ~fresh_var_ ~scope ~ban_id body_s' body_t' rest
+              | (T.Const _, T.Var _) | (T.DB _, T.Var _) ->
+                  (* Format.printf "Const var/DB var!\n"; *)
+                  flex_rigid ~depth ~subst ~fresh_var_ ~scope ~ban_id body_t' body_s' rest
+              | T.Const f , T.Const g when ID.equal f g ->
+                  (* Format.printf "Same fun symb heads.\n"; *)
+                  assert(List.length args_s = List.length args_t);
+                  (*  depth stays the same for the decomposition steps   *)
+                  unify ~depth ~subst ~fresh_var_ ~scope 
+                    ((List.map (fun (a,b) -> a,b,ban_id) (List.combine args_s args_t)) @ rest)
+              | T.DB i, T.DB j when i = j ->
+                  (* Format.printf "Same DB heads.\n"; *)
+                  assert (List.length args_s = List.length args_t);
+                  unify ~depth ~subst ~fresh_var_ ~scope 
+                    ((List.map (fun (a,b) -> a,b,ban_id) (List.combine args_s args_t)) @ rest)
+              | _ -> OSeq.empty
+            )
           )
-        )
-        | None -> OSeq.empty)
+          | None -> OSeq.empty)
 and identify ~depth ~subst ~fresh_var_ ~scope s t rest =
   (* Format.printf "Getting identification subst for %a and %a!\n" T.pp s T.pp t; *)
   let id_subs = OSeq.nth 0 (JP_unif.identify ~scope ~fresh_var_ s t []) in
@@ -206,7 +213,7 @@ and identify ~depth ~subst ~fresh_var_ ~scope s t rest =
 and flex_rigid ~depth ~subst ~fresh_var_ ~scope ~ban_id s t rest =
   assert (T.is_var @@ T.head_term s);
   assert (not @@ T.is_var @@ T.head_term t);
-  let bindings = proj_imit_bindings ~scope ~fresh_var_ s t in
+  let bindings = proj_imit_bindings ~depth ~scope ~fresh_var_ s t in
   let substs = List.map (US.merge subst) bindings in
   OSeq.of_list substs
   |> OSeq.flat_map (fun subst -> unify ~depth:(depth+1) ~scope  ~fresh_var_ ~subst 
@@ -233,8 +240,8 @@ and flex_same ~depth ~subst ~fresh_var_ ~scope hd_s args_s args_t rest =
           (CCList.remove_at_idx idx new_cstrs)))))
     )
 and flex_proj_imit  ~depth ~subst ~fresh_var_ ~scope s t rest = 
-  let bindings = proj_imit_bindings  ~scope ~fresh_var_ s t in
-  let bindings = proj_imit_bindings  ~scope ~fresh_var_ t s @ bindings in
+  let bindings = proj_imit_bindings ~depth  ~scope ~fresh_var_ s t in
+  let bindings = proj_imit_bindings ~depth ~scope ~fresh_var_ t s @ bindings in
   let substs = List.map (US.merge subst) bindings in
   OSeq.of_list substs
   |> OSeq.flat_map (fun subst -> 

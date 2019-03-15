@@ -509,15 +509,15 @@ let pv_check_eqs t u ts =
   "PV-unif check equalities", `Quick, fun () ->
   let is_res subst = match subst with
     | None -> false
-    | Some s ->
+    | Some s  ->
       CCList.for_all (fun (t1,t2,_) -> 
-        let t1 = Lambda.eta_reduce (Lambda.snf (PragHOUnif.S.apply s t1)) in
-        let t2 = Lambda.eta_reduce (Lambda.snf (PragHOUnif.S.apply s t2)) in
+        let t1 = Lambda.eta_expand (Lambda.snf (PragHOUnif.S.apply s t1)) in
+        let t2 = Lambda.eta_expand (Lambda.snf (PragHOUnif.S.apply s t2)) in
         Unif.FO.are_variant t1 t2 
       ) ts
   in
   let unifiers = PragHOUnif.unify_scoped t u in
-  if OSeq.exists is_res unifiers then () 
+  if OSeq.exists is_res @@ OSeq.take 100000 unifiers then () 
   else (
     Alcotest.failf
       "@[<2>`%a`@ and `%a`@ should unify this list: @ `%a`@]@."
@@ -679,7 +679,7 @@ let suite_pv_unif : unit Alcotest.test_case list =
 
   CCList.flat_map mk_tests
     [ "X a" =?= "Y b" >-> "term"
-      >>> Action.count 5;
+      >>> Action.count 9;
 
       "X a" <?> "g (X a)" >-> "term";
 
@@ -689,8 +689,6 @@ let suite_pv_unif : unit Alcotest.test_case list =
       >>> ( Action.eqs [
             "X", "fun z. z", Some "term -> term"
           ]);
-
-
       
       (* Example 3 in the Jensen-Pietrzykowski paper *)
       "Z X Y" =?= "Z (fun u. u) (g a)" >-> "term"
@@ -753,16 +751,40 @@ let suite_pv_unif : unit Alcotest.test_case list =
       "X a b" =?= "f b Y"
       |> Task.add_var_type "X" "term -> term -> term"
       |> Task.add_var_type "Y" "term"
-      >>> Action.count 10;
+      >>> Action.count 18;
 
       "F b (g D)" =?= "f (g a) C"
       |> Task.add_var_type "F" "term -> term -> term"
       |> Task.add_var_type "D" "term"
       |> Task.add_var_type "C" "term"
-      >>> Action.count 10;
+      >>> Action.count 18;
 
-      "X a b" =?= "Y (f a) a" >-> "term"
-      >>> Action.count 28;
+      (* ("fun (ms: term->term) (mz:term). M " ^
+      "(fun (s:term->term) (z:term). s z) " ^ 
+      "(fun (s:term->term) (z:term). s (s z)) ms mz ")
+      =?= "fun (ms:term->term) (mz:term). ms (ms (mz))"
+      |> Task.add_var_type 
+        "M" 
+        "((term->term)->term->term) -> ((term->term)->term->term) -> (term->term) -> term -> term"
+      >>> Action.eqs [
+            "M", "fun (a : (term->term) -> term -> term)" ^
+                 "    (b : (term->term) -> term -> term)" ^
+                 "    (s: term->term) (z:term). a (b s) z ", None
+         ]; *)
+
+
+      (* ("fun (ms: term->term) (mz:term). M " ^
+      "(fun (s:term->term) (z:term). s (s (s (s z)))) " ^ 
+      "(fun (s:term->term) (z:term). s (s (s z))) ms mz ")
+      =?= "fun (ms:term->term) (mz:term). ms (ms (ms (ms (ms (ms (ms (ms (ms (ms (ms (ms z)))))))))))"
+      |> Task.add_var_type 
+        "M" 
+        "((term->term)->term->term) -> ((term->term)->term->term) -> (term->term) -> term -> term"
+      >>> Action.eqs [
+            "M", "fun (a : (term->term) -> term -> term)" ^
+                 "    (b : (term->term) -> term -> term)" ^
+                 "    (s: term->term) (z:term). a (b s) z ", None
+         ]; *)
 
       "F a b c" =?= "F a d X" >-> "term"
       >>> Action.count 1;
