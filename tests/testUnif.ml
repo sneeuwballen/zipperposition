@@ -517,7 +517,7 @@ let pv_check_eqs t u ts =
       ) ts
   in
   let unifiers = PragHOUnif.unify_scoped t u in
-  if OSeq.exists is_res @@ OSeq.take 100000 unifiers then () 
+  if OSeq.exists is_res @@ OSeq.take 300000 unifiers then () 
   else (
     Alcotest.failf
       "@[<2>`%a`@ and `%a`@ should unify this list: @ `%a`@]@."
@@ -759,24 +759,10 @@ let suite_pv_unif : unit Alcotest.test_case list =
       |> Task.add_var_type "C" "term"
       >>> Action.count 18;
 
-      (* ("fun (ms: term->term) (mz:term). M " ^
-      "(fun (s:term->term) (z:term). s z) " ^ 
-      "(fun (s:term->term) (z:term). s (s z)) ms mz ")
-      =?= "fun (ms:term->term) (mz:term). ms (ms (mz))"
-      |> Task.add_var_type 
-        "M" 
-        "((term->term)->term->term) -> ((term->term)->term->term) -> (term->term) -> term -> term"
-      >>> Action.eqs [
-            "M", "fun (a : (term->term) -> term -> term)" ^
-                 "    (b : (term->term) -> term -> term)" ^
-                 "    (s: term->term) (z:term). a (b s) z ", None
-         ]; *)
-
-
-      (* ("fun (ms: term->term) (mz:term). M " ^
-      "(fun (s:term->term) (z:term). s (s (s (s z)))) " ^ 
+      ("fun (ms: term->term) (mz:term). M " ^
+      "(fun (s:term->term) (z:term). s (s z)) " ^ 
       "(fun (s:term->term) (z:term). s (s (s z))) ms mz ")
-      =?= "fun (ms:term->term) (mz:term). ms (ms (ms (ms (ms (ms (ms (ms (ms (ms (ms (ms z)))))))))))"
+      =?= "fun (ms:term->term) (mz:term). ms (ms (ms (ms (ms (ms (mz))))))"
       |> Task.add_var_type 
         "M" 
         "((term->term)->term->term) -> ((term->term)->term->term) -> (term->term) -> term -> term"
@@ -784,7 +770,7 @@ let suite_pv_unif : unit Alcotest.test_case list =
             "M", "fun (a : (term->term) -> term -> term)" ^
                  "    (b : (term->term) -> term -> term)" ^
                  "    (s: term->term) (z:term). a (b s) z ", None
-         ]; *)
+         ];
 
       "F a b c" =?= "F a d X" >-> "term"
       >>> Action.count 1;
