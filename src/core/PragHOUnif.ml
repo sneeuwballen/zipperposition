@@ -12,11 +12,11 @@ module S = struct
 
 end
 
-let max_depth = 13
+let max_depth = 19
 
-let _conservative_elim = ref false
+let _conservative_elim = ref true
 let _imit_first = ref false
-let _cons_ff = ref false
+let _cons_ff = ref true
 
 
 let make_fresh_var fresh_var_ ~ty () = 
@@ -69,8 +69,9 @@ let eliminate_at_idx ~scope ~fresh_var_ v k =
   let m = List.length prefix_types in
   let bvars = List.mapi (fun i ty -> T.bvar ~ty (m-1-i)) prefix_types in
   let prefix_types' = CCList.remove_at_idx k prefix_types in
+  let new_ty = Type.arrow prefix_types' return_type in
   let bvars' = CCList.remove_at_idx k bvars in
-  let matrix_head = T.var (make_fresh_var fresh_var_ ~ty:(Type.arrow prefix_types' return_type) ()) in
+  let matrix_head = T.var (make_fresh_var fresh_var_ ~ty:new_ty ()) in
   let matrix = T.app matrix_head bvars' in
   let subst_value = T.fun_l prefix_types matrix in
   let subst = US.FO.singleton (v, scope) (subst_value, scope) in
@@ -79,8 +80,12 @@ let eliminate_at_idx ~scope ~fresh_var_ v k =
 let project_hs_one ~fresh_var_ pref_types i type_ui =
   let pref_types_ui, _ = Type.open_fun type_ui in
   let n_args_free = List.length pref_types in
-  let pref_args = pref_types |> List.mapi (fun i ty -> T.bvar ~ty (n_args_free-i-1)) in
-  let new_vars = pref_types_ui |> List.map (fun ty -> T.var (make_fresh_var fresh_var_ ~ty:(Type.arrow pref_types ty) () )) in
+  let pref_args = pref_types 
+                  |> List.mapi (fun i ty -> T.bvar ~ty (n_args_free-i-1)) in
+  let new_vars = pref_types_ui 
+                 |> List.map (fun ty ->
+                    let new_ty =  (Type.arrow pref_types ty) in
+                    T.var (make_fresh_var fresh_var_ ~ty:new_ty ())) in
   let new_vars_applied = new_vars |> List.map (fun nv -> T.app nv pref_args) in
   let matrix_hd = T.bvar ~ty:type_ui (n_args_free-i-1) in
   let matrix = T.app matrix_hd new_vars_applied in
@@ -89,7 +94,7 @@ let project_hs_one ~fresh_var_ pref_types i type_ui =
 let imitate_one ~scope ~fresh_var_  s t =
   try
     OSeq.nth 0 (JP_unif.imitate_onesided ~scope ~fresh_var_ s t)
-  with Not_found -> Format.printf "Could not get imitation subst!\n"; raise Not_found
+  with Not_found ->  raise Not_found
 
 let proj_imit_bindings ~depth ~scope ~fresh_var_  s t = 
   let hd_s = T.as_var_exn @@ T.head_term s in
@@ -99,17 +104,21 @@ let proj_imit_bindings ~depth ~scope ~fresh_var_  s t =
       |> List.mapi (fun i ty -> i, ty)
       |> (fun l ->
         if depth <= 4 then l
-        else (List.filter (fun (_, ty) -> (List.length @@ Type.expected_args ty) = 0) l))
+        else
+          (* if the depth is greater than 4, we only project to terms that will
+             decrease the size of unification problem *)
+          List.filter (fun (_, ty) -> List.length @@ Type.expected_args ty = 0) l)
       |> List.map (fun (i, ty) ->
-            let _, arg_ret_ty = Type.open_fun ty in 
-            match unif_simple ~scope (T.of_ty arg_ret_ty) (T.of_ty var_ret_ty) with
-            | Some ty_unif -> 
-              let pr_bind = project_hs_one ~fresh_var_ 
-                            (List.map (fun typ -> S.apply_ty ty_unif (typ, scope)) prefix_types) i 
-                            (S.apply_ty ty_unif (ty, scope)) in
-              let hd_s = HVar.cast hd_s ~ty:(S.apply_ty ty_unif (HVar.ty hd_s, scope)) in
-                Some (US.FO.bind ty_unif (hd_s, scope) (pr_bind, scope))
-            | None -> None)
+          let _, arg_ret_ty = Type.open_fun ty in
+          match unif_simple ~scope (T.of_ty arg_ret_ty) (T.of_ty var_ret_ty) with
+          | Some ty_unif ->
+            let pr_bind =
+              project_hs_one ~fresh_var_ 
+              (List.map (fun typ -> S.apply_ty ty_unif (typ, scope)) prefix_types) i 
+              (S.apply_ty ty_unif (ty, scope)) in
+            let hd_s = HVar.cast hd_s ~ty:(S.apply_ty ty_unif (HVar.ty hd_s, scope)) in
+              Some (US.FO.bind ty_unif (hd_s, scope) (pr_bind, scope))
+          | None -> None)
       |> CCList.filter_map (fun x -> x) in
       let imit_binding =
         let hd_s = T.head_term_mono s in 
@@ -119,87 +128,84 @@ let proj_imit_bindings ~depth ~scope ~fresh_var_  s t =
           then [imitate_one ~scope ~fresh_var_ s t] 
         else [] in
   let first, second = 
-    if !_imit_first then imit_binding , proj_bindings
+    if !_imit_first then imit_binding, proj_bindings
     else proj_bindings, imit_binding in 
   first @ second
 
 let rec unify ~depth ~scope ~fresh_var_ ~subst = function
   | [] -> OSeq.return (Some subst)
   | (s,t,ban_id) :: rest as l -> (
-    if depth >= max_depth then
-      OSeq.empty
-    else 
-      if (depth > 0 && depth mod 6 = 0) then
-          OSeq.append 
-            (OSeq.take 50 (OSeq.repeat None))
-            (unify ~depth:(depth+1) ~scope ~fresh_var_ ~subst l)
-      else  
-        let s', t' = nfapply subst (s, scope), nfapply subst (t, scope) in
-        match unif_simple ~scope (T.of_ty (T.ty s')) (T.of_ty (T.ty t')) with
-        | Some ty_unif -> (
-          let s' = nfapply ty_unif (s', scope) in
-          let t' = nfapply ty_unif (t', scope) in
+    if T.equal s t then
+      unify ~depth ~scope ~fresh_var_ ~subst rest
+    else (
+      if depth >= max_depth then
+        OSeq.empty
+      else 
+        if (depth > 0 && depth mod 6 = 0) then
+            OSeq.append 
+              (OSeq.take 10 (OSeq.repeat None))
+              (unify ~depth:(depth+1) ~scope ~fresh_var_ ~subst l)
+        else  
+          let s', t' = nfapply subst (s, scope), nfapply subst (t, scope) in
+          match unif_simple ~scope (T.of_ty (T.ty s')) (T.of_ty (T.ty t')) with
+          | Some ty_unif -> (
+            let s' = nfapply ty_unif (s', scope) in
+            let t' = nfapply ty_unif (t', scope) in
+            let merged = US.merge subst ty_unif in
 
-          let merged = US.merge subst ty_unif in
+            (* Format.printf "Solving: @[%a@] =?= @[%a@]\n" T.pp s' T.pp t'; *)
+            (* Format.printf "Subst: %a" US.pp subst; *)
 
-          (* Format.printf "Problem size: %d\n" (List.length l); *)
-          (* Format.printf "Solving pair:\n@[%a@]\n=?=\n@[%a@].\n" T.pp s' T.pp t'; *)
-          (* Format.printf "Subst:\n%a.\n" US.pp merged; *)
-          (* Format.print_flush (); *)
-
-           if Term.is_fo_term s' && Term.is_fo_term t' then (
-            (* Format.printf "Solving lambda pattern.\n"; *)
-            match unif_simple ~subst:(US.subst subst) ~scope s' t' with
-            | Some unif ->
-                unify ~depth ~scope ~fresh_var_ ~subst:(US.merge subst unif) rest
-            | None -> OSeq.empty
-          )
-          else (
-            let pref_s, body_s = T.open_fun s' in
-            let pref_t, body_t = T.open_fun t' in 
-            (* Format.printf "Trying to eta expand.\n"; *)
-            let body_s', body_t', _ = eta_expand_otf pref_s pref_t body_s body_t in
-            (* Format.printf "After eta_expand %a =?= %a\n" T.pp body_s' T.pp body_t'; *)
-            let hd_s, args_s = T.as_app body_s' in
-            let hd_t, args_t = T.as_app body_t' in
-            match T.view hd_s, T.view hd_t with 
-            | (T.Var _, T.Var _) -> 
-              if T.equal hd_s hd_t then (
-                  (* Format.printf "Vars same!\n"; *)
-                  flex_same ~depth ~subst:merged ~fresh_var_ ~scope hd_s args_s args_t rest
-              )
-              else (
-                (* Format.printf "Vars diff!\n"; *)
-                if ban_id then
-                  flex_proj_imit ~depth ~subst:merged ~fresh_var_ ~scope  body_s' body_t' rest
-                else (
-                  OSeq.append
-                  (identify  ~depth ~subst:merged ~fresh_var_ ~scope body_s' body_t' rest)
-                  (if not !_cons_ff then (flex_proj_imit  ~depth ~subst:merged ~fresh_var_ ~scope  body_s' body_t' rest)
-                  else OSeq.empty)
+            if Term.is_fo_term s' && Term.is_fo_term t' then (
+              match unif_simple ~subst:(US.subst subst) ~scope s' t' with
+              | Some unif ->
+                  unify ~depth ~scope ~fresh_var_ ~subst:(US.merge subst unif) rest
+              | None -> OSeq.empty
+            )
+            else (
+              let pref_s, body_s = T.open_fun s' in
+              let pref_t, body_t = T.open_fun t' in 
+              let body_s', body_t', _ = eta_expand_otf pref_s pref_t body_s body_t in
+              let hd_s, args_s = T.as_app body_s' in
+              let hd_t, args_t = T.as_app body_t' in
+              match T.view hd_s, T.view hd_t with 
+              | (T.Var _, T.Var _) -> 
+                if T.equal hd_s hd_t then (
+                  flex_same ~depth ~subst:merged ~fresh_var_ ~scope hd_s args_s args_t rest l
                 )
-              ) 
-            | (T.Var _, T.Const _) | (T.Var _, T.DB _) ->
-                (* Format.printf "Var const/Var db!\n"; *)
-                flex_rigid ~depth ~subst:merged ~fresh_var_ ~scope ~ban_id body_s' body_t' rest
-            | (T.Const _, T.Var _) | (T.DB _, T.Var _) ->
-                (* Format.printf "Const var/DB var!\n"; *)
-                flex_rigid ~depth ~subst:merged ~fresh_var_ ~scope ~ban_id body_t' body_s' rest
-            | T.Const f , T.Const g when ID.equal f g ->
-                (* Format.printf "Same fun symb heads.\n"; *)
-                assert(List.length args_s = List.length args_t);
-                (*  depth stays the same for the decomposition steps   *)
-                unify ~depth ~subst:merged ~fresh_var_ ~scope 
-                  ((List.map (fun (a,b) -> a,b,ban_id) (List.combine args_s args_t)) @ rest)
-            | T.DB i, T.DB j when i = j ->
-                (* Format.printf "Same DB heads.\n"; *)
-                assert (List.length args_s = List.length args_t);
-                unify ~depth ~subst:merged ~fresh_var_ ~scope 
-                  ((List.map (fun (a,b) -> a,b,ban_id) (List.combine args_s args_t)) @ rest)
-            | _ -> OSeq.empty
+                else (
+                  if ban_id then
+                    flex_proj_imit ~depth ~subst:merged ~fresh_var_ ~scope  body_s' body_t' rest
+                  else (
+                    OSeq.append
+                    (identify  ~depth ~subst:merged ~fresh_var_ ~scope body_s' body_t' rest)
+                    (if not !_cons_ff then 
+                      (flex_proj_imit  ~depth ~subst:merged ~fresh_var_ ~scope  body_s' body_t' rest)
+                    else 
+                      OSeq.empty)
+                  )
+                ) 
+              | (T.Var _, T.Const _) | (T.Var _, T.DB _) ->
+                  (* Format.printf "Var const/Var db!\n"; *)
+                  flex_rigid ~depth ~subst:merged ~fresh_var_ ~scope ~ban_id body_s' body_t' rest
+              | (T.Const _, T.Var _) | (T.DB _, T.Var _) ->
+                  (* Format.printf "Const var/DB var!\n"; *)
+                  flex_rigid ~depth ~subst:merged ~fresh_var_ ~scope ~ban_id body_t' body_s' rest
+              | T.Const f , T.Const g when ID.equal f g ->
+                  (* Format.printf "Same fun symb heads.\n"; *)
+                  assert(List.length args_s = List.length args_t);
+                  (*  depth stays the same for the decomposition steps   *)
+                  unify ~depth ~subst:merged ~fresh_var_ ~scope 
+                    ((List.map (fun (a,b) -> a,b,ban_id) (List.combine args_s args_t)) @ rest)
+              | T.DB i, T.DB j when i = j ->
+                  (* Format.printf "Same DB heads.\n"; *)
+                  assert (List.length args_s = List.length args_t);
+                  unify ~depth ~subst:merged ~fresh_var_ ~scope 
+                    ((List.map (fun (a,b) -> a,b,ban_id) (List.combine args_s args_t)) @ rest)
+              | _ -> OSeq.empty
+            )
           )
-        )
-        | None -> OSeq.empty)
+          | None -> OSeq.empty))
 
 and identify ~depth ~subst ~fresh_var_ ~scope s t rest =
   (* Format.printf "Getting identification subst for %a and %a!\n" T.pp s T.pp t; *)
@@ -217,31 +223,36 @@ and flex_rigid ~depth ~subst ~fresh_var_ ~scope ~ban_id s t rest =
   OSeq.of_list substs
   |> OSeq.flat_map (fun subst -> unify ~depth:(depth+1) ~scope  ~fresh_var_ ~subst 
                                   ((s, t,ban_id) :: rest))
-and flex_same ~depth ~subst ~fresh_var_ ~scope hd_s args_s args_t rest =
+
+and flex_same ~depth ~subst ~fresh_var_ ~scope hd_s args_s args_t rest all =
   assert(T.is_var hd_s);
   assert(List.length args_s = List.length args_t);
+  assert(List.length args_s <= List.length @@ fst @@ Type.open_fun (T.ty hd_s));
   if List.length args_s > 0 then (
+    let new_cstrs = (List.map (fun (a,b) -> a,b,true) (List.combine args_s args_t)) @ rest in
+    let all_vars = CCList.range 0 ((List.length args_s) -1 ) in
+    (* Format.printf "all vars %a\n" (CCList.pp CCInt.pp) all_vars; *)
+    let all_args_unif = unify ~depth ~subst ~fresh_var_ ~scope new_cstrs in
+    let first_unif = OSeq.take 1 all_args_unif |> OSeq.to_list in
+    if !_conservative_elim && CCList.exists CCOpt.is_some first_unif  then (
+        OSeq.of_list first_unif
+    ) 
+    else 
+      OSeq.append
+        all_args_unif
+        (OSeq.of_list all_vars |>
+        OSeq.filter_map (fun idx -> 
+          assert(idx >= 0);
+          if not @@ T.equal (List.nth args_s idx) (List.nth args_t idx) then
+            Some (eliminate_at_idx ~scope ~fresh_var_ (T.as_var_exn hd_s) idx)
+          else None) 
+        |>  
+          (OSeq.flat_map (fun subst' -> 
+          let new_subst = US.merge subst subst' in
+            unify ~depth:(depth+1) ~scope  ~fresh_var_ ~subst:new_subst all))))
+    else 
+      unify ~depth ~subst ~fresh_var_ ~scope rest
 
-  let new_cstrs = (List.map (fun (a,b) -> a,b,true) (List.combine args_s args_t)) @ rest in
-  let all_vars = CCList.range 0 ((List.length @@ fst @@ Type.open_fun (T.ty hd_s)) -1 ) in
-  (* Format.printf "all vars %a\n" (CCList.pp CCInt.pp) all_vars; *)
-  let all_args_unif = unify ~depth ~subst ~fresh_var_ ~scope new_cstrs in
-  OSeq.append 
-    all_args_unif
-    (if(!_conservative_elim &&
-        OSeq.exists CCOpt.is_some (OSeq.take 1 all_args_unif)) then
-      OSeq.empty
-    else (
-      (OSeq.of_list all_vars |>
-      OSeq.map (fun idx -> 
-        idx, eliminate_at_idx ~scope ~fresh_var_ (T.as_var_exn hd_s) idx ) 
-      |>  
-        (OSeq.flat_map (fun (idx, subst') -> 
-        let new_subst = US.merge subst subst' in
-          unify ~depth:(depth+1) ~scope  ~fresh_var_ ~subst:new_subst 
-          (CCList.remove_at_idx idx new_cstrs)))))
-    ))
-    else unify ~depth ~subst ~fresh_var_ ~scope rest
 and flex_proj_imit  ~depth ~subst ~fresh_var_ ~scope s t rest = 
   let bindings = proj_imit_bindings ~depth  ~scope ~fresh_var_ s t in
   let bindings = proj_imit_bindings ~depth ~scope ~fresh_var_ t s @ bindings in
@@ -263,15 +274,10 @@ let unify_scoped (t0, scope0) (t1, scope1) =
         US.FO.bind subst (v,scope) (newvar, unifscope) 
     in
     let subst = US.empty in
-    (* Rename variables apart into scope `unifscope` *)
     let subst = T.Seq.vars t0 |> Sequence.fold (add_renaming scope0) subst in
     let subst = T.Seq.vars t1 |> Sequence.fold (add_renaming scope1) subst in
     let t0', t1' = S.apply subst (t0, scope0), S.apply subst (t1, scope1) in
-    (* Unify *)
-    (* Format.printf "Problem: %a =?= %a.\n" T.pp t0' T.pp t1' ; *)
     unify ~depth:0 ~scope:unifscope ~fresh_var_ ~subst [t0', t1', false]
-    (* merge with var renaming *)
-    (* |> OSeq.map (CCOpt.map (US.merge subst)) *)
     |> OSeq.map (CCOpt.map (fun sub -> 
       let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t0, scope0) in 
       let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t1, scope1) in

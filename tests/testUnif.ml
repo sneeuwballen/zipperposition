@@ -434,7 +434,8 @@ let pv_check_count t u count : unit Alcotest.test_case =
           | Some s -> CCFormat.sprintf "Sub: %a\nApp: %a , %a %s" PragHOUnif.S.pp s T.pp (Lambda.snf @@ PragHOUnif.S.apply s t) T.pp (Lambda.snf @@ PragHOUnif.S.apply s u) acc ) "" t' in
       let problem = CCFormat.sprintf "Problem: %a = %a" T.pp (fst t) T.pp (fst u) in
       Alcotest.failf
-        "@[<hv>Found %d unifiers instead of %d@]\n@[Prob: %s@]\n@[Unifs: @[%s@]@]" (OSeq.length t') count problem all_subs
+        (* "@[<hv>Found %d unifiers instead of %d@]\n@[Prob: %s@]\n@[Unifs: @[%s@]@]" (OSeq.length t') count problem all_subs *)
+        "@[<hv>Found %d unifiers instead of %d@]" (OSeq.length t') count
 
 let jp_check_nonunifiable ?(msg="") t u : unit Alcotest.test_case =
   "JP-unif check nonunifiable", `Quick, fun () ->
@@ -522,6 +523,7 @@ let pv_check_eqs t u ts =
     Alcotest.failf
       "@[<2>`%a`@ and `%a`@ should unify this list: @ `%a`@]@."
         (Scoped.pp T.ZF.pp) t (Scoped.pp T.ZF.pp) u (CCList.pp (CCPair.pp T.ZF.pp T.ZF.pp)) (CCList.map (fun ((t1, _), (t2, _), _) -> t1, t2) ts)
+      (* "Unifier not found." *)
   )
 
 let suite_jp_unif : unit Alcotest.test_case list =
@@ -678,8 +680,9 @@ let suite_pv_unif : unit Alcotest.test_case list =
   in
 
   CCList.flat_map mk_tests
-    [ "X a" =?= "Y b" >-> "term"
-      >>> Action.count 9;
+    [ 
+      "X a" =?= "Y b" >-> "term"
+      >>> Action.count 1;
 
       "X a" <?> "g (X a)" >-> "term";
 
@@ -706,7 +709,8 @@ let suite_pv_unif : unit Alcotest.test_case list =
       >>> Action.eqs [
             "X", "fun z. z a", Some "(term -> term) -> term"
           ]
-      >>> Action.count 2; (* projection + imitation*)
+      >>> Action.count 2; 
+      (* projection + imitation *)
       
       (* Polymorphism *)
 
@@ -745,19 +749,19 @@ let suite_pv_unif : unit Alcotest.test_case list =
       |> Task.add_var_type "Y" "term -> term"
       >>> Action.eqs [
             "X", "fun (x : term). Y x", None ; 
-            "X", "fun (x : term). x", None
+            (* "X", "fun (x : term). x", None *)
          ];
 
       "X a b" =?= "f b Y"
       |> Task.add_var_type "X" "term -> term -> term"
       |> Task.add_var_type "Y" "term"
-      >>> Action.count 18;
+      >>> Action.count 2;
 
       "F b (g D)" =?= "f (g a) C"
       |> Task.add_var_type "F" "term -> term -> term"
       |> Task.add_var_type "D" "term"
       |> Task.add_var_type "C" "term"
-      >>> Action.count 18;
+      >>> Action.count 2;
 
       ("fun (ms: term->term) (mz:term). M " ^
       "(fun (s:term->term) (z:term). s (s z)) " ^ 
@@ -773,7 +777,7 @@ let suite_pv_unif : unit Alcotest.test_case list =
          ];
 
       "F a b c" =?= "F a d X" >-> "term"
-      >>> Action.count 1;
+      >>> Action.count 2;
 
       "fun (x:term) (y:term). X x b" <?> "fun (x:term) (y:term). f (g y) b";
 
@@ -784,7 +788,7 @@ let suite_pv_unif : unit Alcotest.test_case list =
       "f X Y" =?= "f Y X" >-> "term"
       |> Task.add_var_type "X" "term"
       |> Task.add_var_type "Y" "term"
-      (* >>> Action.yield "f W Z" *)
+      >>> Action.yield "f W W"
       >>> Action.count 1;
     ]
 
