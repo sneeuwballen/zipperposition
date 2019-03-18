@@ -12,7 +12,7 @@ module S = struct
 
 end
 
-let max_depth = 19
+let max_depth = 15
 
 let _conservative_elim = ref true
 let _imit_first = ref false
@@ -36,6 +36,12 @@ let set_imit_first () =
 let set_cons_ff () = 
   _cons_ff := true
 
+let build_constraints ~ban_id args1 args2 rest = 
+  let zipped = List.map (fun (x,y) -> (x,y,ban_id)) (List.combine args1 args2) in
+  let rigid, non_rigid = List.partition (fun (s,t,_) -> 
+    T.is_const (T.head_term s) && T.is_const (T.head_term t)
+    ) zipped in
+  rigid @ rest @ non_rigid
 
 let unif_simple ?(subst=Subst.empty) ~scope t s = 
   try 
@@ -143,7 +149,7 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
       else 
         if (depth > 0 && depth mod 6 = 0) then
             OSeq.append 
-              (OSeq.take 10 (OSeq.repeat None))
+              (OSeq.take 50 (OSeq.repeat None))
               (unify ~depth:(depth+1) ~scope ~fresh_var_ ~subst l)
         else  
           let s', t' = nfapply subst (s, scope), nfapply subst (t, scope) in
@@ -186,22 +192,17 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
                   )
                 ) 
               | (T.Var _, T.Const _) | (T.Var _, T.DB _) ->
-                  (* Format.printf "Var const/Var db!\n"; *)
                   flex_rigid ~depth ~subst:merged ~fresh_var_ ~scope ~ban_id body_s' body_t' rest
               | (T.Const _, T.Var _) | (T.DB _, T.Var _) ->
-                  (* Format.printf "Const var/DB var!\n"; *)
                   flex_rigid ~depth ~subst:merged ~fresh_var_ ~scope ~ban_id body_t' body_s' rest
               | T.Const f , T.Const g when ID.equal f g ->
-                  (* Format.printf "Same fun symb heads.\n"; *)
                   assert(List.length args_s = List.length args_t);
-                  (*  depth stays the same for the decomposition steps   *)
                   unify ~depth ~subst:merged ~fresh_var_ ~scope 
-                    ((List.map (fun (a,b) -> a,b,ban_id) (List.combine args_s args_t)) @ rest)
+                    (build_constraints ~ban_id args_s args_t rest)
               | T.DB i, T.DB j when i = j ->
-                  (* Format.printf "Same DB heads.\n"; *)
                   assert (List.length args_s = List.length args_t);
                   unify ~depth ~subst:merged ~fresh_var_ ~scope 
-                    ((List.map (fun (a,b) -> a,b,ban_id) (List.combine args_s args_t)) @ rest)
+                    (build_constraints ~ban_id args_s args_t rest)
               | _ -> OSeq.empty
             )
           )
@@ -229,7 +230,7 @@ and flex_same ~depth ~subst ~fresh_var_ ~scope hd_s args_s args_t rest all =
   assert(List.length args_s = List.length args_t);
   assert(List.length args_s <= List.length @@ fst @@ Type.open_fun (T.ty hd_s));
   if List.length args_s > 0 then (
-    let new_cstrs = (List.map (fun (a,b) -> a,b,true) (List.combine args_s args_t)) @ rest in
+    let new_cstrs = build_constraints ~ban_id:true args_s args_t rest in
     let all_vars = CCList.range 0 ((List.length args_s) -1 ) in
     (* Format.printf "all vars %a\n" (CCList.pp CCInt.pp) all_vars; *)
     let all_args_unif = unify ~depth ~subst ~fresh_var_ ~scope new_cstrs in

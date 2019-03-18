@@ -841,9 +841,9 @@ let () =
       "--ho-no-ext-neg", Arg.Clear _ext_neg, " enable negative extensionality rule"; 
       "--ho-def-unfold", Arg.Set def_unfold_enabled_, " enable ho definition unfolding";
       "--ho-huet-style-unif", Arg.Set _huet_style, " enable Huet style projection";
-      "--ho-conservative-elim", Arg.Set _cons_elim, "Use conservative elimination rule in pragmatic unification";
+      "--ho-conservative-elim", Arg.Clear _cons_elim, "Disables conservative elimination rule in pragmatic unification";
       "--ho-imitation-first",Arg.Set _imit_first, "Use imitation rule before projection rule";
-      "--ho-conservative-flexflex", Arg.Set _cons_ff, "Use more conservative dealing with flex-flex pairs";
+      "--ho-conservative-flexflex", Arg.Clear _cons_ff, "Use more conservative dealing with flex-flex pairs";
       "--ho-disable-var-arg-removal", Arg.Clear _var_arg_remove, "disable removal of arguments of applied variables";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom"
     ];
