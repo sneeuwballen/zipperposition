@@ -36,9 +36,10 @@ let _ext_neg = ref true
 let _ext_axiom_penalty = ref 5
 let _var_arg_remove = ref true
 let _huet_style = ref false
-let _cons_elim = ref false
+let _cons_elim = ref true
 let _imit_first = ref false
-let _cons_ff = ref false
+let _cons_ff = ref true
+let _compose_subs = ref false
 
 module type S = sig
   module Env : Env.S
@@ -711,14 +712,18 @@ module Make(E : Env.S) : S with module Env = E = struct
       if (!_huet_style) then
         JP_unif.set_huet_style ();
 
-      if (!_cons_elim) then
-        PragHOUnif.enable_conservative_elim ();
+      if (not !_cons_elim) then
+        PragHOUnif.disable_conservative_elim ();
 
       if (!_imit_first) then
         PragHOUnif.set_imit_first ();
 
-      if (!_cons_ff) then
-        PragHOUnif.set_cons_ff ();
+      if (not !_cons_ff) then
+        PragHOUnif.disable_cons_ff ();
+
+      if (!_compose_subs) then (
+        PragHOUnif.set_compose ();
+      );
 
       if Env.flex_get k_enable_ho_unif then (
         Env.add_unary_inf "ho_unif" ho_unif;
@@ -841,9 +846,10 @@ let () =
       "--ho-no-ext-neg", Arg.Clear _ext_neg, " enable negative extensionality rule"; 
       "--ho-def-unfold", Arg.Set def_unfold_enabled_, " enable ho definition unfolding";
       "--ho-huet-style-unif", Arg.Set _huet_style, " enable Huet style projection";
-      "--ho-conservative-elim", Arg.Clear _cons_elim, "Disables conservative elimination rule in pragmatic unification";
+      "--ho-no-conservative-elim", Arg.Clear _cons_elim, "Disables conservative elimination rule in pragmatic unification";
       "--ho-imitation-first",Arg.Set _imit_first, "Use imitation rule before projection rule";
-      "--ho-conservative-flexflex", Arg.Clear _cons_ff, "Use more conservative dealing with flex-flex pairs";
+      "--ho-no-conservative-flexflex", Arg.Clear _cons_ff, "Disable conservative dealing with flex-flex pairs";
+      "--ho-composition", Arg.Set _compose_subs, "Enable composition instead of merging substitutions";
       "--ho-disable-var-arg-removal", Arg.Clear _var_arg_remove, "disable removal of arguments of applied variables";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom"
     ];

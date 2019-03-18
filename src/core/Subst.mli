@@ -190,7 +190,8 @@ module FO : sig
   val of_list' : ?init:t -> (Type.t HVar.t Scoped.t * term Scoped.t) list -> t
   val map : (term -> term) -> t -> t
   val filter : (Type.t HVar.t Scoped.t -> term Scoped.t -> bool) -> t -> t
-  (* Takes a substitution that might map a variable x to a term
+  val compose:  scope:int -> t -> t -> t
+  (* (* Takes a substitution that might map a variable x to a term *)
      that containts loosely bound variables. It fixes the substitution
      so that all such variables are remaped to a fresh skolem *)
   val unleak_variables : t -> t * (Term.t list)

@@ -12,11 +12,12 @@ module S = struct
 
 end
 
-let max_depth = 15
+let max_depth = 13
 
 let _conservative_elim = ref true
 let _imit_first = ref false
 let _cons_ff = ref true
+let _compose = ref false
 
 
 let make_fresh_var fresh_var_ ~ty () = 
@@ -27,20 +28,26 @@ let make_fresh_var fresh_var_ ~ty () =
 (* apply a substitution and reduce to normal form *)
 let nfapply s u = Lambda.beta_red_head (S.apply s u)
 
-let enable_conservative_elim () =
-  _conservative_elim := true
+let disable_conservative_elim () =
+  _conservative_elim := false
 
 let set_imit_first () = 
   _imit_first := true
 
-let set_cons_ff () = 
+let disable_cons_ff () = 
   _cons_ff := true
+
+let set_compose () = 
+  _compose := true
+
+let compose_sub ~scope s1 s2 =
+  if !_compose then US.compose ~scope s1 s2
+  else US.merge s1 s2
 
 let build_constraints ~ban_id args1 args2 rest = 
   let zipped = List.map (fun (x,y) -> (x,y,ban_id)) (List.combine args1 args2) in
-  let rigid, non_rigid = List.partition (fun (s,t,_) -> 
-    T.is_const (T.head_term s) && T.is_const (T.head_term t)
-    ) zipped in
+  let rigid, non_rigid = List.partition (fun (s,t,_) ->
+    T.is_const (T.head_term s) || T.is_const (T.head_term t)) zipped in
   rigid @ rest @ non_rigid
 
 let unif_simple ?(subst=Subst.empty) ~scope t s = 
@@ -157,7 +164,7 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
           | Some ty_unif -> (
             let s' = nfapply ty_unif (s', scope) in
             let t' = nfapply ty_unif (t', scope) in
-            let merged = US.merge subst ty_unif in
+            let merged = compose_sub ~scope subst ty_unif in
 
             (* Format.printf "Solving: @[%a@] =?= @[%a@]\n" T.pp s' T.pp t'; *)
             (* Format.printf "Subst: %a" US.pp subst; *)
@@ -212,7 +219,7 @@ and identify ~depth ~subst ~fresh_var_ ~scope s t rest =
   (* Format.printf "Getting identification subst for %a and %a!\n" T.pp s T.pp t; *)
   let id_subs = OSeq.nth 0 (JP_unif.identify ~scope ~fresh_var_ s t []) in
   (* Format.printf "Merging id \n"; *)
-  let subs_res = US.merge subst id_subs in
+  let subs_res = compose_sub ~scope subst id_subs in
   unify ~depth:(depth+1) ~scope ~fresh_var_ ~subst:subs_res 
     ((s, t, true)::rest)
 
@@ -220,7 +227,7 @@ and flex_rigid ~depth ~subst ~fresh_var_ ~scope ~ban_id s t rest =
   assert (T.is_var @@ T.head_term s);
   assert (not @@ T.is_var @@ T.head_term t);
   let bindings = proj_imit_bindings ~depth ~scope ~fresh_var_ s t in
-  let substs = List.map (US.merge subst) bindings in
+  let substs = List.map (compose_sub ~scope subst) bindings in
   OSeq.of_list substs
   |> OSeq.flat_map (fun subst -> unify ~depth:(depth+1) ~scope  ~fresh_var_ ~subst 
                                   ((s, t,ban_id) :: rest))
@@ -249,7 +256,7 @@ and flex_same ~depth ~subst ~fresh_var_ ~scope hd_s args_s args_t rest all =
           else None) 
         |>  
           (OSeq.flat_map (fun subst' -> 
-          let new_subst = US.merge subst subst' in
+          let new_subst = compose_sub ~scope  subst subst' in
             unify ~depth:(depth+1) ~scope  ~fresh_var_ ~subst:new_subst all))))
     else 
       unify ~depth ~subst ~fresh_var_ ~scope rest
@@ -257,7 +264,7 @@ and flex_same ~depth ~subst ~fresh_var_ ~scope hd_s args_s args_t rest all =
 and flex_proj_imit  ~depth ~subst ~fresh_var_ ~scope s t rest = 
   let bindings = proj_imit_bindings ~depth  ~scope ~fresh_var_ s t in
   let bindings = proj_imit_bindings ~depth ~scope ~fresh_var_ t s @ bindings in
-  let substs = List.map (US.merge subst) bindings in
+  let substs = List.map (compose_sub ~scope subst) bindings in
   OSeq.of_list substs
   |> OSeq.flat_map (fun subst -> 
       unify ~depth:(depth+1) ~scope  ~fresh_var_ ~subst 

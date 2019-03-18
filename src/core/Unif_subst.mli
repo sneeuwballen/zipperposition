@@ -51,6 +51,8 @@ val update : t -> var Scoped.t -> term Scoped.t -> t
 val mem : t -> var Scoped.t -> bool
 
 val merge : t -> t -> t
+val compose : scope:Scoped.scope -> t -> t -> t
+
 
 
 module FO : sig

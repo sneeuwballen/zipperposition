@@ -12,9 +12,10 @@ module S : sig
 
 end
 
-val enable_conservative_elim : unit -> unit
+val disable_conservative_elim : unit -> unit
 val set_imit_first : unit -> unit
-val set_cons_ff : unit -> unit
+val set_compose : unit -> unit
+val disable_cons_ff : unit -> unit
 
 
 

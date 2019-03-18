@@ -38,6 +38,7 @@ let update t v u = {t with subst=Subst.update t.subst v u}
 let mem t v = Subst.mem t.subst v
 let deref t v = Subst.deref t.subst v
 let merge t1 t2 = {subst=Subst.merge t1.subst t2.subst; cstr_l = t1.cstr_l @ t2.cstr_l} 
+let compose ~scope t1 t2 = {subst=Subst.FO.compose ~scope t1.subst t2.subst; cstr_l = t1.cstr_l @ t2.cstr_l}
 
 module FO = struct
   let bind t (v:Type.t HVar.t Scoped.t) u =

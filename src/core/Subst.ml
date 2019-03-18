@@ -342,6 +342,7 @@ module Ty : SPECIALIZED with type term = Type.t = struct
   let of_list = (of_list :> ?init:t -> (var Scoped.t * term Scoped.t) list -> t)
 end
 
+
 module FO = struct
   type term = Term.t
   type t = subst
@@ -358,11 +359,22 @@ module FO = struct
     let t = find_exn subst v in
     Scoped.map Term.of_term_unsafe t
 
+
   let apply ?(shift_vars=(-1))  renaming subst t =
     Term.of_term_unsafe (apply ~shift_vars renaming subst (t : term Scoped.t :> T.t Scoped.t))
 
   let apply_l ?(shift_vars=(-1))  renaming subst (l,sc) =
     List.map (fun t -> apply ~shift_vars renaming subst (t,sc)) l
+
+
+  let compose ~scope s1 s2 = 
+    (* Format.printf "Composing: @[ %a = %a @]\n" pp s1 pp s2; *)
+    let subs_l1 = to_list s1 in
+    let subs_as_map =
+    (List.map (fun ((v,sc_v), (t,sc_t)) -> 
+      ((v,sc_v), (( (Lambda.snf (apply Renaming.none s2 (Term.of_term_unsafe t,sc_t))) : term :> T.t), scope)))
+    subs_l1) @ (to_list s2) in
+    (of_list subs_as_map)
 
   let bind = (bind :> t -> var Scoped.t -> term Scoped.t -> t)
   let update = (update :> t -> var Scoped.t -> term Scoped.t -> t)
@@ -372,6 +384,7 @@ module FO = struct
   let update' = (update :> t -> Type.t HVar.t Scoped.t -> term Scoped.t -> t)
   let of_list' = (of_list :> ?init:t -> (Type.t HVar.t Scoped.t * term Scoped.t) list -> t)
   (* let to_list = (to_list :>  t -> (Type.t HVar.t Scoped.t * term Scoped.t) list ) *)
+
 
   let map f s = map (fun t -> (f (Term.of_term_unsafe t) : term :> T.t)) s
   
@@ -383,6 +396,7 @@ module FO = struct
            (Term.of_term_unsafe t,sc_t))
       s
 
+
   let unleak_variables subs =
    let subs_l = to_list subs in
    let unleaked_l, new_sk = List.fold_right 
@@ -393,6 +407,7 @@ module FO = struct
       let v' = (HVar.update_ty ~f:Type.of_term_unsafe v,sc_v) in  
           (v', (t',sc_t))::l, sk_map) subs_l ([],Term.IntMap.empty) in
    of_list' unleaked_l, List.map snd (Term.IntMap.bindings new_sk)
+
    
 end
 
