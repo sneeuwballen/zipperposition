@@ -76,6 +76,83 @@ let eta_expand_otf pref1 pref2 t1 t2 =
     )
   )
 
+let get_bvars args =
+  let reduced = 
+    List.map (fun t -> Lambda.eta_reduce @@ Lambda.beta_red_head t) args in
+  let n = List.length reduced in
+  if List.for_all T.is_bvar reduced then (
+    let res = List.mapi (fun i a -> 
+      match T.view a with 
+      | T.DB x -> (x, T.bvar ~ty:(Term.ty a) (n-1-i)) 
+      | _ -> raise (Invalid_argument "Arg isn't a bound variable") ) reduced in
+    let no_dup = CCList.sort_uniq ~cmp:(fun (i, _) (j, _) -> compare i j) res in
+    if List.length no_dup = List.length res 
+    then Some (CCArray.of_list no_dup) 
+    else None
+  ) 
+  else None 
+
+let norm_deref subst sc =
+  Lambda.snf @@ fst @@ US.FO.deref subst sc
+
+let rec build_term ?(depth=0) ~subst ~scope ~fv_ var bvar_map t =
+  match T.view t with
+  | T.Var _ -> let t' = norm_deref subst (t,scope) in
+               if T.equal t' t then (
+                 if T.equal var t then raise (Failure "occurs check")
+                 else (t, subst)
+               ) else build_term ~depth ~subst ~scope ~fv_ var bvar_map t'  
+  | T.Const _ -> (t, subst)
+  | T.App (hd, args) ->
+    let hd', subst = build_term ~depth ~subst ~scope ~fv_ var bvar_map t in
+    if (T.equal hd hd') then (
+      if T.is_var hd then (
+        let new_args, subst =
+        List.fold_right (fun arg (l, subst) ->
+          try 
+            let arg', subst = build_term ~depth ~subst ~scope ~fv_ var bvar_map arg in
+            Some arg' :: l, subst
+          with Invalid_argument _ ->
+            None :: l, subst
+        )  args ([], subst) in
+        let pref_types = List.map Term.ty args in
+        let n = List.length pref_types in
+        let ret_type = snd @@ Type.open_fun (Term.ty hd) in
+        let matrix = 
+          CCList.filter_map (fun x->x) (List.mapi (fun i opt_arg -> 
+            (match opt_arg with
+            | Some arg -> Some (T.bvar ~ty:(Term.ty arg) (n-i-1))
+            | None -> None)) new_args) in
+        let new_hd = T.var @@ make_fresh_var fv_ ~ty:(Type.arrow (List.map Term.ty matrix) ret_type) () in
+        let hd_subs = T.fun_l pref_types (T.app new_hd matrix) in
+        let subst = US.FO.bind subst (T.as_var_exn hd, scope) (hd_subs, scope) in
+        T.app new_hd (CCList.filter_map (fun x->x) new_args), subst
+      ) else (
+        let new_args, subst =
+        List.fold_right (fun arg (l, subst) ->
+          let arg', subst = build_term ~depth ~subst ~scope ~fv_ var bvar_map arg in
+          arg' :: l, subst 
+        )  args ([], subst) in
+        T.app hd new_args, subst
+      )
+    )
+    else build_term ~depth ~subst ~scope ~fv_ var bvar_map (T.app hd' args)
+  | T.Fun(ty, body) -> 
+    let b', subst = build_term ~depth:(depth+1) ~subst ~scope ~fv_ var bvar_map body in
+    T.fun_ ty b', subst
+  | T.DB i -> 
+    if i < depth then t,subst
+    else (
+      match CCArray.bsearch ~cmp:(fun (i,_) (j, _) -> compare i j) (i, Term.true_) bvar_map with
+      | `At idx -> 
+        let _,bvar = CCArray.get bvar_map idx in
+        T.DB.shift depth bvar, subst
+      | _ -> raise (Invalid_argument "Bound variable not argument to head")
+    )
+  | T.AppBuiltin(_,_) -> assert false
+
+
+
 let eliminate_at_idx ~scope ~fresh_var_ v k =  
   (* create substitution: v |-> λ u1 ... um. x u1 ... u{k-1} u{k+1} ... um *)
   let prefix_types, return_type = Type.open_fun (HVar.ty v) in
