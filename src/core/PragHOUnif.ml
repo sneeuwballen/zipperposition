@@ -77,7 +77,9 @@ let norm_deref subst sc =
   fst @@ US.FO.deref subst sc
 
 let rec build_term ?(depth=0) ~subst ~scope ~fv_ var bvar_map t =
-  match T.view (Lambda.whnf t) with
+  let reduced = Lambda.whnf t in
+  (* Format.printf "build: @[%a@].\n" T.pp reduced; *)
+  match T.view reduced with
   | T.Var _ -> let t' = norm_deref subst (t,scope) in
                if T.equal t' t then (
                  if T.equal var t then raise (Failure "occurs check")
@@ -86,7 +88,9 @@ let rec build_term ?(depth=0) ~subst ~scope ~fv_ var bvar_map t =
   | T.Const _ -> (t, subst)
   | T.App (hd, args) ->
       if T.is_var hd then (
-        if not (US.FO.mem subst (Term.as_var_exn hd, scope)) then  
+        if not (US.FO.mem subst (Term.as_var_exn hd, scope)) then  (
+          if (T.equal var hd) then
+            raise (Invalid_argument "Occurs check!"); 
           let new_args, subst =
           List.fold_right (fun arg (l, subst) ->
             try 
@@ -98,26 +102,29 @@ let rec build_term ?(depth=0) ~subst ~scope ~fv_ var bvar_map t =
           if not (US.FO.mem subst (Term.as_var_exn hd, scope)) then (
             let pref_types = List.map Term.ty args in
             let n = List.length pref_types in
-            let ret_type = Type.apply_unsafe (Term.ty hd) (args : Term.t list :> InnerTerm.t list) in
+            let ret_type = Type.apply_unsafe (Term.ty hd) (args :> InnerTerm.t list) in
             let matrix = 
               CCList.filter_map (fun x->x) (List.mapi (fun i opt_arg -> 
                 (match opt_arg with
                 | Some arg -> Some (T.bvar ~ty:(Term.ty arg) (n-i-1))
                 | None -> None)) new_args) in
             if List.length matrix != List.length new_args then (
-              let new_hd = T.var @@ make_fresh_var fv_ ~ty:(Type.arrow (List.map Term.ty matrix) ret_type) () in
+              let ty = Type.arrow (List.map Term.ty matrix) ret_type in
+              let new_hd = T.var @@ make_fresh_var fv_ ~ty () in
               let hd_subs = T.fun_l pref_types (T.app new_hd matrix) in
               let subst = US.FO.bind subst (T.as_var_exn hd, scope) (hd_subs, scope) in
               let res_term = T.app new_hd (CCList.filter_map (fun x->x) new_args) in
               res_term, subst
             ) 
             else (
-              T.app hd (CCList.filter_map (fun x->x) new_args), subst))
+              T.app hd (CCList.filter_map (fun x->x) new_args), subst)
+          )
           else (
             let hd',_ =  US.FO.deref subst (hd, scope) in
             let t' = T.app hd' args in
             build_term ~depth ~subst ~scope ~fv_ var bvar_map t' 
           )
+        )
         else (
           let hd',_ =  US.FO.deref subst (hd, scope) in
           let t' = T.app hd' args in
@@ -265,8 +272,8 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
             let t' = nfapply ty_unif (t', scope) in
             let merged = compose_sub ~scope subst ty_unif in
 
-            (* Format.printf "Solving: @[%a@] =?= @[%a@]\n" T.pp s' T.pp t'; *)
-            (* Format.printf "Subst: %a" US.pp subst; *)
+            (* Format.printf "Solving: @[%a@] =?= @[%a@].\n" T.pp s' T.pp t'; *)
+            (* Format.printf "Subst: %a.\n" US.pp subst; *)
 
             if Term.is_fo_term s' && Term.is_fo_term t' then (
               match unif_simple ~subst:(US.subst subst) ~scope s' t' with
