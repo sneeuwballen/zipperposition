@@ -71,12 +71,13 @@ let get_bvars args =
     else None
   ) 
   else None
+  (* None *)
 
 let norm_deref subst sc =
   fst @@ US.FO.deref subst sc
 
 let rec build_term ?(depth=0) ~subst ~scope ~fv_ var bvar_map t =
-    match T.view t with
+  match T.view (Lambda.whnf t) with
   | T.Var _ -> let t' = norm_deref subst (t,scope) in
                if T.equal t' t then (
                  if T.equal var t then raise (Failure "occurs check")
@@ -84,52 +85,63 @@ let rec build_term ?(depth=0) ~subst ~scope ~fv_ var bvar_map t =
                ) else build_term ~depth ~subst ~scope ~fv_ var bvar_map t'  
   | T.Const _ -> (t, subst)
   | T.App (hd, args) ->
-    let hd', subst = build_term ~depth ~subst ~scope ~fv_ var bvar_map hd in
-    if (T.equal hd hd') then (
       if T.is_var hd then (
-        let new_args, subst =
-        List.fold_right (fun arg (l, subst) ->
-          try 
-            let arg', subst = build_term ~depth ~subst ~scope ~fv_ var bvar_map arg in
-            Some arg' :: l, subst
-          with Invalid_argument _ ->
-            None :: l, subst
-        )  args ([], subst) in
-        let pref_types = List.map Term.ty args in
-        let n = List.length pref_types in
-        let ret_type = Type.apply_unsafe (Term.ty hd') (args : Term.t list :> InnerTerm.t list) in
-        let matrix = 
-          CCList.filter_map (fun x->x) (List.mapi (fun i opt_arg -> 
-            (match opt_arg with
-            | Some arg -> Some (T.bvar ~ty:(Term.ty arg) (n-i-1))
-            | None -> None)) new_args) in
-        if List.length matrix != List.length new_args then (
-          let new_hd = T.var @@ make_fresh_var fv_ ~ty:(Type.arrow (List.map Term.ty matrix) ret_type) () in
-          let hd_subs = T.fun_l pref_types (T.app new_hd matrix) in
-          let subst = US.FO.bind subst (T.as_var_exn hd', scope) (hd_subs, scope) in
-          let res_term = T.app new_hd (CCList.filter_map (fun x->x) new_args) in
-          res_term, subst
-        ) else T.app hd (CCList.filter_map (fun x->x) new_args), subst
+        if not (US.FO.mem subst (Term.as_var_exn hd, scope)) then  
+          let new_args, subst =
+          List.fold_right (fun arg (l, subst) ->
+            try 
+              let arg', subst = build_term ~depth ~subst ~scope ~fv_ var bvar_map arg in
+              Some arg' :: l, subst
+            with Invalid_argument _ ->
+              None :: l, subst
+          )  args ([], subst) in
+          if not (US.FO.mem subst (Term.as_var_exn hd, scope)) then (
+            let pref_types = List.map Term.ty args in
+            let n = List.length pref_types in
+            let ret_type = Type.apply_unsafe (Term.ty hd) (args : Term.t list :> InnerTerm.t list) in
+            let matrix = 
+              CCList.filter_map (fun x->x) (List.mapi (fun i opt_arg -> 
+                (match opt_arg with
+                | Some arg -> Some (T.bvar ~ty:(Term.ty arg) (n-i-1))
+                | None -> None)) new_args) in
+            if List.length matrix != List.length new_args then (
+              let new_hd = T.var @@ make_fresh_var fv_ ~ty:(Type.arrow (List.map Term.ty matrix) ret_type) () in
+              let hd_subs = T.fun_l pref_types (T.app new_hd matrix) in
+              let subst = US.FO.bind subst (T.as_var_exn hd, scope) (hd_subs, scope) in
+              let res_term = T.app new_hd (CCList.filter_map (fun x->x) new_args) in
+              res_term, subst
+            ) 
+            else (
+              T.app hd (CCList.filter_map (fun x->x) new_args), subst))
+          else (
+            let hd',_ =  US.FO.deref subst (hd, scope) in
+            let t' = T.app hd' args in
+            build_term ~depth ~subst ~scope ~fv_ var bvar_map t' 
+          )
+        else (
+          let hd',_ =  US.FO.deref subst (hd, scope) in
+          let t' = T.app hd' args in
+          build_term ~depth ~subst ~scope ~fv_ var bvar_map t' 
+        )
       ) else (
+        let new_hd, subst = build_term ~depth ~subst ~scope ~fv_ var bvar_map hd in 
         let new_args, subst =
         List.fold_right (fun arg (l, subst) ->
           let arg', subst = build_term ~depth ~subst ~scope ~fv_ var bvar_map arg in
           arg' :: l, subst 
-        )  args ([], subst) in
-        T.app hd new_args, subst
+        ) args ([], subst) in
+        T.app new_hd new_args, subst
       )
-    )
-    else build_term ~depth ~subst ~scope ~fv_ var bvar_map (Lambda.whnf @@ T.app hd' args)
   | T.Fun(ty, body) -> 
     let b', subst = build_term ~depth:(depth+1) ~subst ~scope ~fv_ var bvar_map body in
     T.fun_ ty b', subst
   | T.DB i -> 
     if i < depth then t,subst
     else (
-      match CCArray.bsearch ~cmp:(fun (i,_) (j, _) -> compare i j) (i-depth, Term.true_) bvar_map with
+      match CCArray.bsearch ~cmp:(fun (a,_) (b, _) -> compare a b) (i-depth, Term.true_) bvar_map with
       | `At idx -> 
-        let _,bvar = CCArray.get bvar_map idx in
-        (* Format.printf "Found %d at %d (depth %d) = %a\n" i idx depth T.pp bvar; *)
+        let val_,bvar = CCArray.get bvar_map idx in
+        assert(val_ = (i-depth));
         assert(Type.equal (Term.ty bvar) (Term.ty t));
         T.DB.shift depth bvar, subst
       | _ -> raise (Failure "Bound variable not argument to head")
@@ -317,8 +329,10 @@ and flex_rigid ~depth ~subst ~fresh_var_ ~scope ~ban_id s t rest =
   match get_bvars args_s with
     | Some bvar_map -> 
         let pref_types = List.map Term.ty args_s in
+        (* Format.printf "[@[New prob: %a = %a@]]\n" T.pp s T.pp t; *)
         (match (bind_var ~subst ~scope ~fv_:fresh_var_ hd_s pref_types bvar_map t) with 
-        | Some subst -> unify ~depth ~scope ~fresh_var_ ~subst rest
+        | Some subst -> 
+          unify ~depth ~scope ~fresh_var_ ~subst rest
         | None -> OSeq.empty) 
     | None ->
         let bindings = proj_imit_bindings ~depth ~scope ~fresh_var_ s t in
@@ -392,7 +406,7 @@ let unify_scoped (t0, scope0) (t1, scope1) =
       );
       if not (T.Seq.subterms l |> Sequence.append (T.Seq.subterms r) |> 
          Sequence.for_all (fun st -> List.for_all T.DB.is_closed @@ T.get_mand_args st)) then ( 
-         Util.debugf 1 "Unequal subst: %a =?= %a, res %a.\n" (fun k-> k T.pp t0 T.pp t1 T.pp l); 
+         Format.printf "Unequal subst: %a =?= %a, res %a.\n" T.pp t0 T.pp t1 T.pp l; 
          assert(false); 
       );
       assert (T.equal l r);
