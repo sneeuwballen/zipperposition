@@ -57,7 +57,7 @@ let unif_simple ?(subst=Subst.empty) ~scope t s =
   with Unif.Fail -> None
 
 let get_bvars args =
-  let reduced = 
+  (* let reduced = 
     List.map (fun t -> Lambda.eta_reduce @@ Lambda.whnf t) args in
   let n = List.length reduced in
   if List.for_all T.is_bvar reduced then (
@@ -70,16 +70,16 @@ let get_bvars args =
     then Some (CCArray.of_list no_dup) 
     else None
   ) 
-  else None
-  (* None *)
+  else None *)
+  None
 
 let norm_deref subst sc =
   fst @@ US.FO.deref subst sc
 
 let rec build_term ?(depth=0) ~subst ~scope ~fv_ var bvar_map t =
-  let reduced = Lambda.whnf t in
+  let t = Lambda.whnf t in
   (* Format.printf "build: @[%a@].\n" T.pp reduced; *)
-  match T.view reduced with
+  match T.view t with
   | T.Var _ -> let t' = norm_deref subst (t,scope) in
                if T.equal t' t then (
                  if T.equal var t then raise (Failure "occurs check")
@@ -88,9 +88,9 @@ let rec build_term ?(depth=0) ~subst ~scope ~fv_ var bvar_map t =
   | T.Const _ -> (t, subst)
   | T.App (hd, args) ->
       if T.is_var hd then (
-        if not (US.FO.mem subst (Term.as_var_exn hd, scope)) then  (
-          if (T.equal var hd) then
-            raise (Invalid_argument "Occurs check!"); 
+        if (T.equal var hd) then
+            raise (Failure "Occurs check!");
+        if not (US.FO.mem subst (Term.as_var_exn hd, scope)) then  ( 
           let new_args, subst =
           List.fold_right (fun arg (l, subst) ->
             try 
