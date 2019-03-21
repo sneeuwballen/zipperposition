@@ -180,7 +180,6 @@ let rec unify ~scope ~fresh_var_ ~subst = function
   | (s,t) :: rest -> (
     let ty_unif = unif_simple ~subst:(US.subst subst) ~scope (T.of_ty (T.ty s)) (T.of_ty (T.ty t)) in
     let subst = US.merge subst ty_unif in
-
     let s', t' = norm_deref subst (s,scope), norm_deref subst (t,scope) in
     let pref_s, body_s = T.open_fun s' in
     let pref_t, body_t = T.open_fun t' in 
@@ -190,7 +189,7 @@ let rec unify ~scope ~fresh_var_ ~subst = function
 
     match T.view hd_s, T.view hd_t with 
     | (T.Var _, T.Var _) ->
-      let subst =  
+      let subst =
         (if T.equal hd_s hd_t then
           flex_same ~fresh_var_ ~scope ~subst hd_s args_s args_t
         else
@@ -223,8 +222,8 @@ and flex_same ~fresh_var_ ~scope ~subst var args_s args_t =
   let v = Term.as_var_exn var in
   let ret_ty = Type.apply_unsafe (Term.ty var) (args_s :> InnerTerm.t list) in
   let bvars = 
-    CCList.filter_map (fun x->x) 
-    (CCArray.mapi (fun i si -> 
+    CCList.filter_map (fun x->x)
+    (CCArray.mapi (fun i si ->
       if si = CCArray.get bvar_t i then Some (snd si) else None) bvar_s
      |> CCArray.to_list) in
   let var_ty = Type.arrow (List.map T.ty bvars) ret_ty in
@@ -284,21 +283,32 @@ and flex_rigid ~subst ~fresh_var_ ~scope flex rigid =
   with Failure _ -> raise NotUnifiable
 
   
-let unify_scoped (t0, scope0) (t1, scope1) =
+let unify_scoped ?(subst=US.empty) (t0, scope0) (t1, scope1) =
     (* Find a scope that's different from the two given ones *)
-    let unifscope = if scope0 < scope1 then scope1 + 1 else scope0 + 1 in
     let fresh_var_ = ref 0 in
-    let add_renaming scope subst v =
-    if US.FO.mem subst (v,scope) 
-    then subst
-    else 
-        let newvar = T.var (make_fresh_var fresh_var_ ~ty:(S.apply_ty subst (HVar.ty v, scope)) ()) in
-        US.FO.bind subst (v,scope) (newvar, unifscope) 
-    in
-    let subst = US.empty in
-    (* Rename variables apart into scope `unifscope` *)
-    let subst = T.Seq.vars t0 |> Sequence.fold (add_renaming scope0) subst in
-    let subst = T.Seq.vars t1 |> Sequence.fold (add_renaming scope1) subst in
-    let t0', t1' = S.apply subst (t0, scope0), S.apply subst (t1, scope1) in
-    (* Unify *)
-    unify ~scope:unifscope ~fresh_var_ ~subst [(t0', t1')]
+    if US.is_empty subst then (
+      let unifscope = if scope0 < scope1 then scope1 + 1 else scope0 + 1 in
+      let add_renaming scope subst v =
+      if US.FO.mem subst (v,scope) 
+      then subst
+      else 
+          let newvar = T.var (make_fresh_var fresh_var_ ~ty:(S.apply_ty subst (HVar.ty v, scope)) ()) in
+          US.FO.bind subst (v,scope) (newvar, unifscope) 
+      in
+      let subst = US.empty in
+      (* Rename variables apart into scope `unifscope` *)
+      let subst = T.Seq.vars t0 |> Sequence.fold (add_renaming scope0) subst in
+      let subst = T.Seq.vars t1 |> Sequence.fold (add_renaming scope1) subst in
+      
+      let t0', t1' = S.apply subst (t0, scope0), S.apply subst (t1, scope1) in
+      (* Unify *)
+      unify ~scope:unifscope ~fresh_var_ ~subst [(t0', t1')]
+    )
+    else (
+      if scope0 != scope1 then
+        raise (Invalid_argument "scopes should be the same")
+      else
+        let t0', t1' = S.apply subst (t0, scope0), S.apply subst (t1, scope1) in
+        (* Unify *)
+        unify ~scope:scope0 ~fresh_var_ ~subst [(t0', t1')]
+    )
