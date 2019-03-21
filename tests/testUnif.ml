@@ -689,6 +689,13 @@ let suite_pv_unif : unit Alcotest.test_case list =
         "X", "a", None;
       ];
 
+      "X" =?= "Y a" >-> "term"
+      |> Task.add_var_type "X" "term"
+      |> Task.add_var_type "Y" "term -> term"
+      >>> Action.eqs [
+        "X", "Z", Some "term";
+      ];
+
       "X a" =?= "Y b" >-> "term"
       >>> Action.count 1;
 

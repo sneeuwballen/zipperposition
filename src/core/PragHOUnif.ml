@@ -274,12 +274,11 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
           | Some ty_unif -> (
             let s' = nfapply ty_unif (s', scope) in
             let t' = nfapply ty_unif (t', scope) in
-            let merged = compose_sub ~scope subst ty_unif in
-
+            let merged = ty_unif in
             if Term.is_fo_term s' && Term.is_fo_term t' then (
               match unif_simple ~subst:(US.subst subst) ~scope s' t' with
               | Some unif ->
-                  unify ~depth ~scope ~fresh_var_ ~subst:(US.merge subst unif) rest
+                  unify ~depth ~scope ~fresh_var_ ~subst:unif rest
               | None -> OSeq.empty
             )
             else (
@@ -305,7 +304,14 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
                   let exp_arg_s = List.length @@ Type.expected_args (Term.ty hd_s) in
                   let exp_arg_t = List.length @@ Type.expected_args (Term.ty hd_t) in
                   if ban_id || exp_arg_s = 0 || exp_arg_t = 0 then
-                    flex_proj_imit ~depth ~subst:merged ~fresh_var_ ~scope  body_s' body_t' rest
+                    OSeq.append
+                      (flex_proj_imit ~depth ~subst:merged ~fresh_var_ ~scope  body_s' body_t' rest)
+                      ( if not !_cons_ff then 
+                          OSeq.append
+                            (eliminate_subs ~depth ~subst ~fresh_var_ ~scope body_s' l)
+                            (eliminate_subs ~depth ~subst ~fresh_var_ ~scope body_t' l)
+                        else OSeq.empty
+                      )
                   else (
                     OSeq.append
                     (identify  ~depth ~subst:merged ~fresh_var_ ~scope body_s' body_t' rest)
@@ -388,6 +394,17 @@ and flex_same ~depth ~subst ~fresh_var_ ~scope hd_s args_s args_t rest all =
             unify ~depth:(depth+1) ~scope  ~fresh_var_ ~subst:new_subst all)))))
   else 
     unify ~depth ~subst ~fresh_var_ ~scope rest
+
+and eliminate_subs ~depth ~subst ~fresh_var_ ~scope t constraints = 
+  let hd, args = T.as_app t in
+  if T.is_var hd && List.length args > 0 then (
+    let all_vars = CCList.range 0 ((List.length args)-1) in
+      OSeq.of_list all_vars
+      |> OSeq.map (eliminate_at_idx ~scope ~fresh_var_ (T.as_var_exn hd))
+      |> OSeq.flat_map (fun subst' -> 
+          let new_subst = compose_sub ~scope  subst subst' in
+          unify ~depth:(depth+1) ~scope  ~fresh_var_ ~subst:new_subst constraints))
+  else OSeq.empty
 
 and flex_proj_imit  ~depth ~subst ~fresh_var_ ~scope s t rest = 
   let bindings = proj_imit_bindings ~depth  ~scope ~fresh_var_ s t in
