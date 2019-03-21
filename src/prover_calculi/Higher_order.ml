@@ -40,6 +40,7 @@ let _cons_elim = ref true
 let _imit_first = ref false
 let _cons_ff = ref true
 let _compose_subs = ref false
+let _var_solve = ref false
 
 module type S = sig
   module Env : Env.S
@@ -725,6 +726,10 @@ module Make(E : Env.S) : S with module Env = E = struct
         PragHOUnif.set_compose ();
       );
 
+      if (!_var_solve) then (
+        PragHOUnif.set_solve_var ();
+      );
+
       if Env.flex_get k_enable_ho_unif then (
         Env.add_unary_inf "ho_unif" ho_unif;
       );
@@ -849,6 +854,7 @@ let () =
       "--ho-no-conservative-elim", Arg.Clear _cons_elim, "Disables conservative elimination rule in pragmatic unification";
       "--ho-imitation-first",Arg.Set _imit_first, "Use imitation rule before projection rule";
       "--ho-no-conservative-flexflex", Arg.Clear _cons_ff, "Disable conservative dealing with flex-flex pairs";
+      "--ho-solve-vars", Arg.Set _var_solve, "Enable solving variables.";
       "--ho-composition", Arg.Set _compose_subs, "Enable composition instead of merging substitutions";
       "--ho-disable-var-arg-removal", Arg.Clear _var_arg_remove, "disable removal of arguments of applied variables";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom"

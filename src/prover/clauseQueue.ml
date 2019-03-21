@@ -76,7 +76,7 @@ module Make(C : Clause_intf.S) = struct
             w + List.fold_left (fun acc t -> acc + 
                                     calc_tweight t sg v w c_mul) 0 l
          | Term.Var _ -> v
-         | Term.DB _ -> v
+         | Term.DB _ -> w
          | Term.App (f, l) ->
             let non_bvars_num = List.length @@ List.filter (fun t -> not @@ Term.is_bvar t)  l in
             let var_weight    = if not @@ Term.is_var f || non_bvars_num = 0 then v / 2 else v in 

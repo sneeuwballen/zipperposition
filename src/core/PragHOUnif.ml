@@ -18,6 +18,7 @@ let _conservative_elim = ref true
 let _imit_first = ref false
 let _cons_ff = ref true
 let _compose = ref false
+let _solve_var = ref false
 
 
 let make_fresh_var fresh_var_ ~ty () = 
@@ -40,6 +41,10 @@ let disable_cons_ff () =
 let set_compose () = 
   _compose := true
 
+let set_solve_var () = 
+  _solve_var := true
+
+
 let compose_sub ~scope s1 s2 =
   if !_compose then US.compose ~scope s1 s2
   else US.merge s1 s2
@@ -58,25 +63,26 @@ let unif_simple ?(subst=Subst.empty) ~scope t s =
   with Unif.Fail -> None
 
 let get_bvars args =
-  let reduced = 
-    List.map (fun t -> Lambda.eta_reduce t) args in
-  let n = List.length reduced in
-  if List.for_all T.is_bvar reduced then (
-    let res = List.mapi (fun i a -> 
-      match T.view a with 
-      | T.DB x -> (x, T.bvar ~ty:(Term.ty a) (n-1-i)) 
-      | _ -> assert false) reduced in
-    let no_dup = CCList.sort_uniq ~cmp:(fun (i, _) (j, _) -> compare i j) res in
-    if List.length no_dup = List.length res 
-    then Some (CCArray.of_list no_dup) 
-    else None
-  ) 
-  else None
-  (* None *)
+  if !_solve_var then ( 
+      let reduced = 
+        List.map (fun t -> Lambda.eta_reduce t) args in
+      let n = List.length reduced in
+      if List.for_all T.is_bvar reduced then (
+        let res = List.mapi (fun i a -> 
+          match T.view a with 
+          | T.DB x -> (x, T.bvar ~ty:(Term.ty a) (n-1-i)) 
+          | _ -> assert false) reduced in
+        let no_dup = CCList.sort_uniq ~cmp:(fun (i, _) (j, _) -> compare i j) res in
+        if List.length no_dup = List.length res 
+        then Some (CCArray.of_list no_dup) 
+        else None
+      ) 
+      else None 
+  )
+  else  None
 
 let rec build_term ?(depth=0) ~subst ~scope ~fv_ var bvar_map t =
   let t = Lambda.whnf t in
-  (* Format.printf "build: @[%a@].\n" T.pp t; *)
   match T.view t with
   | T.Var _ -> let t' = fst @@ US.FO.deref subst (t,scope) in
                if T.equal t' t then (
@@ -219,7 +225,7 @@ let imitate_one ~scope ~fresh_var_  s t =
     OSeq.nth 0 (JP_unif.imitate_onesided ~scope ~fresh_var_ s t)
   with Not_found ->  raise Not_found
 
-let proj_imit_bindings ~depth ~scope ~fresh_var_  s t = 
+let proj_imit_bindings ~depth ~subst ~scope ~fresh_var_  s t = 
   let hd_s = T.as_var_exn @@ T.head_term s in
     let prefix_types, var_ret_ty = Type.open_fun (HVar.ty hd_s) in
     let proj_bindings = 
@@ -233,7 +239,7 @@ let proj_imit_bindings ~depth ~scope ~fresh_var_  s t =
           List.filter (fun (_, ty) -> List.length @@ Type.expected_args ty = 0) l)
       |> List.map (fun (i, ty) ->
           let _, arg_ret_ty = Type.open_fun ty in
-          match unif_simple ~scope (T.of_ty arg_ret_ty) (T.of_ty var_ret_ty) with
+          match unif_simple ~scope ~subst:(US.subst subst) (T.of_ty arg_ret_ty) (T.of_ty var_ret_ty) with
           | Some ty_unif ->
             let pr_bind =
               project_hs_one ~fresh_var_ 
@@ -276,7 +282,8 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
             let t' = nfapply ty_unif (t', scope) in
             let merged = ty_unif in
             if Term.is_fo_term s' && Term.is_fo_term t' then (
-              match unif_simple ~subst:(US.subst subst) ~scope s' t' with
+              (* Format.printf "Solving FO: %a = %a.\n" T.pp s' T.pp t'; *)
+              match unif_simple ~subst:(US.subst merged) ~scope s' t' with
               | Some unif ->
                   unify ~depth ~scope ~fresh_var_ ~subst:unif rest
               | None -> OSeq.empty
@@ -287,13 +294,6 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
               let body_s', body_t', _ = eta_expand_otf pref_s pref_t body_s body_t in
               let hd_s, args_s = T.as_app body_s' in
               let hd_t, args_t = T.as_app body_t' in
-
-              (* Format.printf "Solving: @[%a@] =?= @[%a@].\n" T.pp s' T.pp t'; *)
-              (* Format.printf "Bodies: @[%a@] =?= @[%a@].\n" T.pp body_s' T.pp body_t'; *)
-              (* Format.printf "Subst: @[%a@].\n" US.pp subst; *)
-              (* Format.printf "Contstraints: @[%a@] =?= @[%a@].\n\n"
-                (CCList.pp T.pp) (List.map (fun (a,_,_) -> a) l)
-                (CCList.pp T.pp) (List.map (fun (_,b,_) -> b) l); *)
 
               match T.view hd_s, T.view hd_t with 
               | (T.Var _, T.Var _) -> 
@@ -359,7 +359,7 @@ and flex_rigid ~depth ~subst ~fresh_var_ ~scope ~ban_id s t rest =
           unify ~depth ~scope ~fresh_var_ ~subst rest
         | None -> OSeq.empty) 
     | None ->
-        let bindings = proj_imit_bindings ~depth ~scope ~fresh_var_ s t in
+        let bindings = proj_imit_bindings ~depth ~subst ~scope ~fresh_var_ s t in
         let substs = List.map (compose_sub ~scope subst) bindings in
         OSeq.of_list substs
         |> OSeq.flat_map (fun subst -> unify ~depth:(depth+1) ~scope  ~fresh_var_ ~subst 
@@ -407,8 +407,8 @@ and eliminate_subs ~depth ~subst ~fresh_var_ ~scope t constraints =
   else OSeq.empty
 
 and flex_proj_imit  ~depth ~subst ~fresh_var_ ~scope s t rest = 
-  let bindings = proj_imit_bindings ~depth  ~scope ~fresh_var_ s t in
-  let bindings = proj_imit_bindings ~depth ~scope ~fresh_var_ t s @ bindings in
+  let bindings = proj_imit_bindings ~subst ~depth  ~scope ~fresh_var_ s t in
+  let bindings = proj_imit_bindings ~subst ~depth ~scope ~fresh_var_ t s @ bindings in
   let substs = List.map (compose_sub ~scope subst) bindings in
   OSeq.of_list substs
   |> OSeq.flat_map (fun subst -> 
@@ -430,10 +430,20 @@ let unify_scoped (t0, scope0) (t1, scope1) =
     let subst = T.Seq.vars t0 |> Sequence.fold (add_renaming scope0) subst in
     let subst = T.Seq.vars t1 |> Sequence.fold (add_renaming scope1) subst in
     let t0', t1' = S.apply subst (t0, scope0), S.apply subst (t1, scope1) in
+    (* Format.printf "Problem : %a =?= %a.\n" T.pp t0' T.pp t1'; *)
     unify ~depth:0 ~scope:unifscope ~fresh_var_ ~subst [t0', t1', false]
-    |> OSeq.map (CCOpt.map (fun sub -> 
+    |> OSeq.map (CCOpt.map (fun sub ->       
       let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t0, scope0) in 
       let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t1, scope1) in
+      assert(Type.equal (Term.ty l) (Term.ty r));
+      if not (Unif.Ty.equal ~subst:(US.subst sub)
+              (T.ty t0, scope0) (T.ty t1, scope1)) then (
+        Format.printf "For problem: %a =?= %a\n" T.pp t0' T.pp t1';
+        Format.printf "Types are %a, %a\n" Type.pp (T.ty t0) Type.pp (T.ty t1);
+        Format.printf "Of actual types %a, %a\n" Type.pp (T.ty l) Type.pp (T.ty r);
+        Format.printf "Subst: @[%a@]\n" S.pp sub;
+        assert(false);
+      );
       if not (T.equal l r) then (
         Format.printf "For problem: %a =?= %a\n" T.pp t0' T.pp t1';
         Format.printf "Subst: @[%a@]\n" S.pp sub;
