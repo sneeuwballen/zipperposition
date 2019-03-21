@@ -48,6 +48,7 @@ let build_constraints ~ban_id args1 args2 rest =
   let zipped = List.map (fun (x,y) -> (x,y,ban_id)) (List.combine args1 args2) in
   let rigid, non_rigid = List.partition (fun (s,t,_) ->
     T.is_const (T.head_term s) || T.is_const (T.head_term t)) zipped in
+  assert(List.length rigid + List.length non_rigid = List.length zipped);
   rigid @ rest @ non_rigid
 
 let unif_simple ?(subst=Subst.empty) ~scope t s = 
@@ -57,8 +58,8 @@ let unif_simple ?(subst=Subst.empty) ~scope t s =
   with Unif.Fail -> None
 
 let get_bvars args =
-  (* let reduced = 
-    List.map (fun t -> Lambda.eta_reduce @@ Lambda.whnf t) args in
+  let reduced = 
+    List.map (fun t -> Lambda.eta_reduce t) args in
   let n = List.length reduced in
   if List.for_all T.is_bvar reduced then (
     let res = List.mapi (fun i a -> 
@@ -70,17 +71,14 @@ let get_bvars args =
     then Some (CCArray.of_list no_dup) 
     else None
   ) 
-  else None *)
-  None
-
-let norm_deref subst sc =
-  fst @@ US.FO.deref subst sc
+  else None
+  (* None *)
 
 let rec build_term ?(depth=0) ~subst ~scope ~fv_ var bvar_map t =
   let t = Lambda.whnf t in
-  (* Format.printf "build: @[%a@].\n" T.pp reduced; *)
+  (* Format.printf "build: @[%a@].\n" T.pp t; *)
   match T.view t with
-  | T.Var _ -> let t' = norm_deref subst (t,scope) in
+  | T.Var _ -> let t' = fst @@ US.FO.deref subst (t,scope) in
                if T.equal t' t then (
                  if T.equal var t then raise (Failure "occurs check")
                  else (t, subst)
@@ -93,11 +91,11 @@ let rec build_term ?(depth=0) ~subst ~scope ~fv_ var bvar_map t =
         if not (US.FO.mem subst (Term.as_var_exn hd, scope)) then  ( 
           let new_args, subst =
           List.fold_right (fun arg (l, subst) ->
-            try 
+            (try (
               let arg', subst = build_term ~depth ~subst ~scope ~fv_ var bvar_map arg in
               Some arg' :: l, subst
-            with Invalid_argument _ ->
-              None :: l, subst
+            )
+            with  Failure _ ->  None :: l, subst)
           )  args ([], subst) in
           if not (US.FO.mem subst (Term.as_var_exn hd, scope)) then (
             let pref_types = List.map Term.ty args in
@@ -153,7 +151,13 @@ let rec build_term ?(depth=0) ~subst ~scope ~fv_ var bvar_map t =
         T.DB.shift depth bvar, subst
       | _ -> raise (Failure "Bound variable not argument to head")
     )
-  | T.AppBuiltin(_,_) -> assert false
+  | T.AppBuiltin(hd,args) -> 
+    let new_args, subst =
+      List.fold_right (fun arg (l, subst) ->
+        let arg', subst = build_term ~depth ~subst ~scope ~fv_ var bvar_map arg in
+        arg' :: l, subst 
+      ) args ([], subst) in
+      T.app_builtin ~ty:(Term.ty t) hd new_args, subst
 
 let bind_var ~subst ~scope ~fv_ var pref_types bvar_map t =
   try
@@ -266,14 +270,11 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
               (unify ~depth:(depth+1) ~scope ~fresh_var_ ~subst l)
         else  
           let s', t' = nfapply subst (s, scope), nfapply subst (t, scope) in
-          match unif_simple ~scope (T.of_ty (T.ty s')) (T.of_ty (T.ty t')) with
+          match unif_simple ~subst:(US.subst subst) ~scope (T.of_ty (T.ty s')) (T.of_ty (T.ty t')) with
           | Some ty_unif -> (
             let s' = nfapply ty_unif (s', scope) in
             let t' = nfapply ty_unif (t', scope) in
             let merged = compose_sub ~scope subst ty_unif in
-
-            (* Format.printf "Solving: @[%a@] =?= @[%a@].\n" T.pp s' T.pp t'; *)
-            (* Format.printf "Subst: %a.\n" US.pp subst; *)
 
             if Term.is_fo_term s' && Term.is_fo_term t' then (
               match unif_simple ~subst:(US.subst subst) ~scope s' t' with
@@ -287,13 +288,23 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
               let body_s', body_t', _ = eta_expand_otf pref_s pref_t body_s body_t in
               let hd_s, args_s = T.as_app body_s' in
               let hd_t, args_t = T.as_app body_t' in
+
+              (* Format.printf "Solving: @[%a@] =?= @[%a@].\n" T.pp s' T.pp t'; *)
+              (* Format.printf "Bodies: @[%a@] =?= @[%a@].\n" T.pp body_s' T.pp body_t'; *)
+              (* Format.printf "Subst: @[%a@].\n" US.pp subst; *)
+              (* Format.printf "Contstraints: @[%a@] =?= @[%a@].\n\n"
+                (CCList.pp T.pp) (List.map (fun (a,_,_) -> a) l)
+                (CCList.pp T.pp) (List.map (fun (_,b,_) -> b) l); *)
+
               match T.view hd_s, T.view hd_t with 
               | (T.Var _, T.Var _) -> 
                 if T.equal hd_s hd_t then (
                   flex_same ~depth ~subst:merged ~fresh_var_ ~scope hd_s args_s args_t rest l
                 )
                 else (
-                  if ban_id then
+                  let exp_arg_s = List.length @@ Type.expected_args (Term.ty hd_s) in
+                  let exp_arg_t = List.length @@ Type.expected_args (Term.ty hd_t) in
+                  if ban_id || exp_arg_s = 0 || exp_arg_t = 0 then
                     flex_proj_imit ~depth ~subst:merged ~fresh_var_ ~scope  body_s' body_t' rest
                   else (
                     OSeq.append
@@ -314,8 +325,8 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
                     (build_constraints ~ban_id args_s args_t rest)
               | T.DB i, T.DB j when i = j ->
                   assert (List.length args_s = List.length args_t);
-                  unify ~depth ~subst:merged ~fresh_var_ ~scope 
-                    (build_constraints ~ban_id args_s args_t rest)
+                  unify ~depth ~subst:merged ~fresh_var_ ~scope  
+                    (build_constraints ~ban_id args_s args_t rest)  
               | _ -> OSeq.empty
             )
           )
@@ -355,27 +366,28 @@ and flex_same ~depth ~subst ~fresh_var_ ~scope hd_s args_s args_t rest all =
   if List.length args_s > 0 then (
     let new_cstrs = build_constraints ~ban_id:true args_s args_t rest in
     let all_vars = CCList.range 0 ((List.length args_s) -1 ) in
-    (* Format.printf "all vars %a\n" (CCList.pp CCInt.pp) all_vars; *)
     let all_args_unif = unify ~depth ~subst ~fresh_var_ ~scope new_cstrs in
     let first_unif = OSeq.take 1 all_args_unif |> OSeq.to_list in
     if !_conservative_elim && CCList.exists CCOpt.is_some first_unif  then (
         OSeq.of_list first_unif
     ) 
-    else 
+    else (
+      assert(List.length all_vars != 0); 
       OSeq.append
         all_args_unif
         (OSeq.of_list all_vars |>
         OSeq.filter_map (fun idx -> 
           assert(idx >= 0);
           if not @@ T.equal (List.nth args_s idx) (List.nth args_t idx) then
-            Some (eliminate_at_idx ~scope ~fresh_var_ (T.as_var_exn hd_s) idx)
+            let res_subs = eliminate_at_idx ~scope ~fresh_var_ (T.as_var_exn hd_s) idx in 
+            Some (res_subs)
           else None) 
         |>  
           (OSeq.flat_map (fun subst' -> 
           let new_subst = compose_sub ~scope  subst subst' in
-            unify ~depth:(depth+1) ~scope  ~fresh_var_ ~subst:new_subst all))))
-    else 
-      unify ~depth ~subst ~fresh_var_ ~scope rest
+            unify ~depth:(depth+1) ~scope  ~fresh_var_ ~subst:new_subst all)))))
+  else 
+    unify ~depth ~subst ~fresh_var_ ~scope rest
 
 and flex_proj_imit  ~depth ~subst ~fresh_var_ ~scope s t rest = 
   let bindings = proj_imit_bindings ~depth  ~scope ~fresh_var_ s t in

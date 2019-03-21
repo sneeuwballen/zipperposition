@@ -434,8 +434,8 @@ let pv_check_count t u count : unit Alcotest.test_case =
           | Some s -> CCFormat.sprintf "Sub: %a\nApp: %a , %a %s" PragHOUnif.S.pp s T.pp (Lambda.snf @@ PragHOUnif.S.apply s t) T.pp (Lambda.snf @@ PragHOUnif.S.apply s u) acc ) "" t' in
       let problem = CCFormat.sprintf "Problem: %a = %a" T.pp (fst t) T.pp (fst u) in
       Alcotest.failf
-        (* "@[<hv>Found %d unifiers instead of %d@]\n@[Prob: %s@]\n@[Unifs: @[%s@]@]" (OSeq.length t') count problem all_subs *)
-        "@[<hv>Found %d unifiers instead of %d@]" (OSeq.length t') count
+        "@[<hv>Found %d unifiers instead of %d@]\n@[Prob: %s@]\n@[Unifs: @[%s@]@]" (OSeq.length t') count problem all_subs
+        (* "@[<hv>Found %d unifiers instead of %d@]" (OSeq.length t') count *)
 
 let jp_check_nonunifiable ?(msg="") t u : unit Alcotest.test_case =
   "JP-unif check nonunifiable", `Quick, fun () ->
@@ -556,7 +556,8 @@ let suite_jp_unif : unit Alcotest.test_case list =
   in
 
   CCList.flat_map mk_tests
-    [ "X a" =?= "Y b" >-> "term"
+    [ 
+      "X a" =?= "Y b" >-> "term"
       >>> Action.count 17;
 
       "X a" <?> "g (X a)" >-> "term";
@@ -681,11 +682,27 @@ let suite_pv_unif : unit Alcotest.test_case list =
 
   CCList.flat_map mk_tests
     [ 
+      "X" =?= "Y a" >-> "term"
+      |> Task.add_var_type "X" "term"
+      |> Task.add_var_type "Y" "term -> term"
+      >>> Action.eqs [
+        "X", "a", None;
+      ];
+
       "X a" =?= "Y b" >-> "term"
       >>> Action.count 1;
 
       "X a" <?> "g (X a)" >-> "term";
 
+
+      "X" =?= "Y Z" >-> "term"
+      |> Task.add_var_type "X" "term"
+      |> Task.add_var_type "Y" "term -> term"
+      |> Task.add_var_type "Z" "term"
+      >>> Action.eqs [
+        "X", "Y Z", None;
+        "Y", "fun (x:term). YY x", Some "term->term";
+      ];
        
       "(g (X a))" =?= "(X (g a))" >-> "term"
       >>> (Action.yield "g (g (g (g a)))" >?-> "term")
@@ -709,12 +726,26 @@ let suite_pv_unif : unit Alcotest.test_case list =
       >>> Action.eqs [
             "X", "fun z. z a", Some "(term -> term) -> term"
           ]
-      >>> Action.count 2; 
+      >>> Action.count 2;
+
+      "X" =?= "f_ho (fun (x:term). f x x)"
+      >>> Action.count 1;
+
+      "X" =?= "fun (x:term->term). f_ho x"
+      >>> Action.count 1;
+
+      "fun (x:term->term) (y:term). X x" =?= 
+      "fun (x:term->term) (y:term). f (f_ho x) (Y y) "
+      >>> Action.count 1;
+
+      "fun (x:term) (y:term). X y x" =?= "fun (x:term). f x"
+      >>> Action.count 1;
+
       (* projection + imitation *)
       
       (* Polymorphism *)
 
-      (* "fun (x : alpha). x" =?= "fun (x : term). x" |> Task.set_unif_types false
+      (*"fun (x : alpha). x" =?= "fun (x : term). x" |> Task.set_unif_types false
       >>> Action.count 1;
 
       "f_ho2 (a_poly term) (a_poly term)" =?= "f_ho2 X X" |> Task.set_unif_types false
@@ -732,12 +763,12 @@ let suite_pv_unif : unit Alcotest.test_case list =
               "Y", "fun (x : alpha) (y : gamma). a", None 
           ]
         |> Task.add_var_type "X" "beta -> term"
-        |> Task.add_var_type "Y" "beta"; *)
-
+        |> Task.add_var_type "Y" "beta";
+      *)
 
       (* More *)
 
-      "fun (x : term). x" <?> "fun (x : term). X"
+       "fun (x : term). x" <?> "fun (x : term). X"
       |> Task.add_var_type "X" "term";
 
       "X a" =?= "g a" 
@@ -749,19 +780,18 @@ let suite_pv_unif : unit Alcotest.test_case list =
       |> Task.add_var_type "Y" "term -> term"
       >>> Action.eqs [
             "X", "fun (x : term). Y x", None ; 
-            (* "X", "fun (x : term). x", None *)
          ];
 
       "X a b" =?= "f b Y"
       |> Task.add_var_type "X" "term -> term -> term"
       |> Task.add_var_type "Y" "term"
-      >>> Action.count 2;
+      >>> Action.count 8;
 
       "F b (g D)" =?= "f (g a) C"
       |> Task.add_var_type "F" "term -> term -> term"
       |> Task.add_var_type "D" "term"
       |> Task.add_var_type "C" "term"
-      >>> Action.count 2;
+      >>> Action.count 8;
 
       ("fun (ms: term->term) (mz:term). M " ^
       "(fun (s:term->term) (z:term). s (s z)) " ^ 
