@@ -53,7 +53,7 @@ let eta_expand_otf pref1 pref2 t1 t2 =
 
 let get_bvars args =
   let reduced = 
-    List.map (fun t -> Lambda.eta_reduce t) args in
+    List.map (fun t -> Lambda.eta_quick_reduce @@ t) args in
   let n = List.length reduced in
   if List.for_all T.is_bvar reduced then (
     let res = List.mapi (fun i a -> 

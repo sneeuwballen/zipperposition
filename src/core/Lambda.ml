@@ -185,6 +185,65 @@ module Inner = struct
     in
     aux t
 
+    let eta_quick_reduce t =      
+      let q_reduce t =
+        let hd, args = T.as_app t in
+        let n = List.length args in
+        let redundant, r_bvars = 
+          List.fold_right (fun arg (idx, vars) -> 
+            if idx = -1 then (idx, vars)
+            else (
+              if T.is_bvar_i idx arg then 
+                (idx+1, arg :: vars)
+              else (-1, vars)
+            )
+          ) args (0, []) in
+        if redundant = -1 then 0, t
+        else (
+          let non_redundant = CCList.take (n-redundant) args in
+          let _, m = List.fold_right (fun arg (idx, m) ->
+            if idx = -1 then (idx, m)
+            else (
+              if T.Seq.subterms hd |> Sequence.mem ~eq:T.equal arg &&
+               not @@ List.exists (fun tt -> T.Seq.subterms tt |> Sequence.mem ~eq:T.equal arg) non_redundant then
+               (idx+1, m+1) 
+              else (-1, m))
+          ) r_bvars (0, 0) in
+          if m > 0 then (
+            let args = CCList.drop (n-m) args in 
+            let ty = Type.apply_unsafe (Type.of_term_unsafe @@ T.ty_exn hd) args in
+            m, T.DB.unshift m (T.app ~ty:(ty :> T.t) hd args)
+          ) else 0, t
+        ) in
+
+      let rec aux t =  match T.ty t with
+        | T.NoType -> t
+        | T.HasType ty ->
+          begin match T.view t with
+            | T.Var _ | T.DB _ | T.Const _ -> t
+            | T.Bind(Binder.Lambda,_,_) ->
+              let pref, body = T.open_bind Binder.Lambda t in
+              let n, reduced = q_reduce body in
+              if n = 0 then t
+              else (
+                T.fun_l (CCList.take (List.length pref - n) pref)  reduced 
+              )
+            | T.Bind(_,_,_) -> t
+            | T.App (_,[]) -> assert false
+            | T.App (f, l) ->
+              let f' = aux f in
+              let l' = List.map aux l in
+              if T.equal f f' && T.same_l l l'
+              then t
+              else T.app ~ty (aux f) (List.map aux l)
+            | T.AppBuiltin (b,l) ->
+              T.app_builtin ~ty b (List.map aux l)
+          end
+      in
+      aux t
+
+
+
   let whnf t = match T.view t with
     | T.App (f, _) when T.is_lambda f ->
       Util.enter_prof prof_whnf;
@@ -245,6 +304,11 @@ let eta_reduce t =
   Inner.eta_reduce (t:T.t :> IT.t) |> T.of_term_unsafe
 (*|> CCFun.tap (fun t' ->
   if t != t' then Format.printf "@[eta_reduce `%a`@ into `%a`@]@." T.pp t T.pp t')*)
+
+let eta_quick_reduce t =
+  let res = 
+    Inner.eta_quick_reduce (t:T.t :> IT.t) |> T.of_term_unsafe in
+  res
 
 
 let beta_red_head t =

@@ -62,25 +62,6 @@ let unif_simple ?(subst=Subst.empty) ~scope t s =
     Some (US.of_subst type_unifier)
   with Unif.Fail -> None
 
-let get_bvars args =
-  if !_solve_var then ( 
-      let reduced = 
-        List.map (fun t -> Lambda.eta_reduce t) args in
-      let n = List.length reduced in
-      if List.for_all T.is_bvar reduced then (
-        let res = List.mapi (fun i a -> 
-          match T.view a with 
-          | T.DB x -> (x, T.bvar ~ty:(Term.ty a) (n-1-i)) 
-          | _ -> assert false) reduced in
-        let no_dup = CCList.sort_uniq ~cmp:(fun (i, _) (j, _) -> compare i j) res in
-        if List.length no_dup = List.length res 
-        then Some (CCArray.of_list no_dup) 
-        else None
-      ) 
-      else None 
-  )
-  else  None
-
 let rec build_term ?(depth=0) ~subst ~scope ~fv_ var bvar_map t =
   let t = Lambda.whnf t in
   match T.view t with
@@ -279,12 +260,18 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
           let t' = nfapply ty_unif (t', scope) in
           let merged = ty_unif in
           try
-            (* Format.printf "Calling pattern: %a =?= %a\n" T.pp s' T.pp t'; *)
-            CCFormat.print_flush ();
-            let subst = PatternUnif.unify_scoped ~fresh_var_ ~subst:merged (s',scope) (t',scope) in
-            (* Format.printf "Solved %a\n" US.pp subst; *)
-            CCFormat.print_flush ();
-            unify ~depth ~scope ~fresh_var_ ~subst rest
+            if !_solve_var then (
+              let subst = PatternUnif.unify_scoped ~fresh_var_ ~subst:merged 
+                          (s',scope) (t',scope) in
+              unify ~depth ~scope ~fresh_var_ ~subst rest 
+            ) else 
+            (if Term.is_fo_term s' && Term.is_fo_term t' then
+              let subst = unif_simple  ~scope ~subst:(US.subst merged) s' t' in
+              if CCOpt.is_some subst then 
+                unify ~depth ~scope ~fresh_var_ ~subst:(CCOpt.get_exn subst) rest
+              else raise PatternUnif.NotUnifiable
+             else 
+              raise PatternUnif.NotInFragment)
           with
           |PatternUnif.NotUnifiable -> OSeq.empty 
           |PatternUnif.NotInFragment ->
@@ -347,22 +334,12 @@ and identify ~depth ~subst ~fresh_var_ ~scope s t rest =
 
 and flex_rigid ~depth ~subst ~fresh_var_ ~scope ~ban_id s t rest =
   assert (T.is_var @@ T.head_term s);
-  assert (not @@ T.is_var @@ T.head_term t);
-  let hd_s, args_s = T.as_app s in  
-  match get_bvars args_s with
-    | Some bvar_map -> 
-        let pref_types = List.map Term.ty args_s in
-        (* Format.printf "[@[New prob: %a = %a@]]\n" T.pp s T.pp t; *)
-        (match (bind_var ~subst ~scope ~fv_:fresh_var_ hd_s pref_types bvar_map t) with 
-        | Some subst -> 
-          unify ~depth ~scope ~fresh_var_ ~subst rest
-        | None -> OSeq.empty) 
-    | None ->
-        let bindings = proj_imit_bindings ~depth ~subst ~scope ~fresh_var_ s t in
-        let substs = List.map (compose_sub ~scope subst) bindings in
-        OSeq.of_list substs
-        |> OSeq.flat_map (fun subst -> unify ~depth:(depth+1) ~scope  ~fresh_var_ ~subst 
-                                        ((s, t,ban_id) :: rest))
+  assert (not @@ T.is_var @@ T.head_term t);  
+  let bindings = proj_imit_bindings ~depth ~subst ~scope ~fresh_var_ s t in
+  let substs = List.map (compose_sub ~scope subst) bindings in
+  OSeq.of_list substs
+  |> OSeq.flat_map (fun subst -> unify ~depth:(depth+1) ~scope  ~fresh_var_ ~subst 
+                                  ((s, t,ban_id) :: rest))
 
 and flex_same ~depth ~subst ~fresh_var_ ~scope hd_s args_s args_t rest all =
   assert(T.is_var hd_s);
