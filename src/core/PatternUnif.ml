@@ -68,26 +68,26 @@ let get_bvars args =
   else None 
 
 let rec norm_deref subst (t,sc) =
-  let pref, t = T.open_fun t in
+  let pref, tt = T.open_fun t in
   let t' =  
-    begin match T.view t with
+    begin match T.view tt with
       | T.Var _ ->
-        let u, _ = US.FO.deref subst (t,sc) in
-        if T.equal t u then u
+        let u, _ = US.FO.deref subst (tt,sc) in
+        if T.equal tt u then u
         else norm_deref subst (u,sc)
       | T.App (f0, l) ->
         let f = norm_deref subst (f0, sc) in
         let t =
-          if T.equal f0 f then t else T.app f l
+          if T.equal f0 f then tt else T.app f l
         in
         (* now reduce to WHNF *)
         let u = Lambda.whnf t in
         if T.equal t u
         then t
         else norm_deref subst (u,sc) (* reduce further? *)
-      | _ -> t
+      | _ -> tt
     end in
-  if T.equal t t' then t
+  if T.equal tt t' then t
   else T.fun_l pref t'
 
 
@@ -253,7 +253,7 @@ and flex_diff ~fresh_var_ ~scope ~subst var_s var_t args_s args_t =
       Term.ty b1) new_bvars in
   assert(Type.equal 
           (Type.apply_unsafe (Term.ty var_s) (args_s :> InnerTerm.t list))
-          (Type.apply_unsafe (Term.ty var_s) (args_t :> InnerTerm.t list)));
+          (Type.apply_unsafe (Term.ty var_t) (args_t :> InnerTerm.t list)));
   let ret_ty = Type.apply_unsafe (Term.ty var_s) (args_s :> InnerTerm.t list) in
   let new_var_ty = Type.arrow arg_types ret_ty in
   let new_var = Term.var @@ make_fresh_var fresh_var_ ~ty:new_var_ty () in
