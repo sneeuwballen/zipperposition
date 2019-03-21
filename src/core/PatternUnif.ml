@@ -283,9 +283,7 @@ and flex_rigid ~subst ~fresh_var_ ~scope flex rigid =
   with Failure _ -> raise NotUnifiable
 
   
-let unify_scoped ?(subst=US.empty) (t0, scope0) (t1, scope1) =
-    (* Find a scope that's different from the two given ones *)
-    let fresh_var_ = ref 0 in
+let unify_scoped ?(subst=US.empty) ?(fresh_var_ = ref 0) (t0, scope0) (t1, scope1) =
     if US.is_empty subst then (
       let unifscope = if scope0 < scope1 then scope1 + 1 else scope0 + 1 in
       let add_renaming scope subst v =

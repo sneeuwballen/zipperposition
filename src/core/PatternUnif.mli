@@ -15,4 +15,4 @@ end
 exception NotUnifiable
 exception NotInFragment
 
-val unify_scoped : ?subst:subst -> T.t Scoped.t -> T.t Scoped.t -> subst
+val unify_scoped : ?subst:subst -> ?fresh_var_:int ref -> T.t Scoped.t -> T.t Scoped.t -> subst
