@@ -686,14 +686,7 @@ let suite_pv_unif : unit Alcotest.test_case list =
       |> Task.add_var_type "X" "term"
       |> Task.add_var_type "Y" "term -> term"
       >>> Action.eqs [
-        "X", "a", None;
-      ];
-
-      "X" =?= "Y a" >-> "term"
-      |> Task.add_var_type "X" "term"
-      |> Task.add_var_type "Y" "term -> term"
-      >>> Action.eqs [
-        "X", "Z", Some "term";
+        "X", "Y a", None;
       ];
 
       "X a" =?= "Y b" >-> "term"
@@ -739,10 +732,6 @@ let suite_pv_unif : unit Alcotest.test_case list =
       >>> Action.count 1;
 
       "X" =?= "fun (x:term->term). f_ho x"
-      >>> Action.count 1;
-
-      "fun (x:term->term) (y:term). X x" =?= 
-      "fun (x:term->term) (y:term). f (f_ho x) (Y y) "
       >>> Action.count 1;
 
       "fun (x:term) (y:term). X y x" =?= "fun (x:term). f x"
@@ -792,13 +781,13 @@ let suite_pv_unif : unit Alcotest.test_case list =
       "X a b" =?= "f b Y"
       |> Task.add_var_type "X" "term -> term -> term"
       |> Task.add_var_type "Y" "term"
-      >>> Action.count 8;
+      >>> Action.count 2;
 
       "F b (g D)" =?= "f (g a) C"
       |> Task.add_var_type "F" "term -> term -> term"
       |> Task.add_var_type "D" "term"
       |> Task.add_var_type "C" "term"
-      >>> Action.count 8;
+      >>> Action.count 2;
 
       ("fun (ms: term->term) (mz:term). M " ^
       "(fun (s:term->term) (z:term). s (s z)) " ^ 
