@@ -7,6 +7,8 @@ let prof_whnf = Util.mk_profiler "term.whnf"
 let prof_snf = Util.mk_profiler "term.snf"
 let prof_eta_expand = Util.mk_profiler "term.eta_expand"
 let prof_eta_reduce = Util.mk_profiler "term.eta_reduce"
+let prof_eta_qreduce = Util.mk_profiler "term.eta_qreduce"
+
 
 module OptionSet = Set.Make(
    struct 
@@ -185,7 +187,7 @@ module Inner = struct
     in
     aux t
 
-    let eta_quick_reduce t =      
+    let eta_qreduce_aux t =      
       let q_reduce t =
         let hd, args = T.as_app t in
         let n = List.length args in
@@ -200,17 +202,18 @@ module Inner = struct
           ) args (0, []) in
         if redundant = -1 then 0, t
         else (
-          let non_redundant = CCList.take (n-redundant) args in
+          let non_redundant = hd :: CCList.take (n-redundant) args in
           let _, m = List.fold_right (fun arg (idx, m) ->
             if idx = -1 then (idx, m)
             else (
-              if T.Seq.subterms hd |> Sequence.mem ~eq:T.equal arg &&
-               not @@ List.exists (fun tt -> T.Seq.subterms tt |> Sequence.mem ~eq:T.equal arg) non_redundant then
+              if not @@ List.exists (fun tt -> 
+                  T.Seq.subterms tt 
+                  |> Sequence.mem ~eq:T.equal arg) non_redundant then
                (idx+1, m+1) 
               else (-1, m))
           ) r_bvars (0, 0) in
           if m > 0 then (
-            let args = CCList.drop (n-m) args in 
+            let args = CCList.take (n-m) args in 
             let ty = Type.apply_unsafe (Type.of_term_unsafe @@ T.ty_exn hd) args in
             m, T.DB.unshift m (T.app ~ty:(ty :> T.t) hd args)
           ) else 0, t
@@ -226,7 +229,7 @@ module Inner = struct
               let n, reduced = q_reduce body in
               if n = 0 then t
               else (
-                T.fun_l (CCList.take (List.length pref - n) pref)  reduced 
+                T.fun_l (CCList.take (List.length pref - n) pref) reduced
               )
             | T.Bind(_,_,_) -> t
             | T.App (_,[]) -> assert false
@@ -269,6 +272,9 @@ module Inner = struct
   let eta_expand t = Util.with_prof prof_eta_expand eta_expand_rec t
 
   let eta_reduce t = Util.with_prof prof_eta_reduce eta_reduce_rec t
+  
+  let eta_quick_reduce t = Util.with_prof prof_eta_qreduce eta_qreduce_aux t
+
 end
 
 module T = Term

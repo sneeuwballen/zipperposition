@@ -51,9 +51,20 @@ let eta_expand_otf pref1 pref2 t1 t2 =
     )
   )
 
+let rec eligible_arg t =
+  match T.view t with
+  | T.AppBuiltin _ | T.Const _ | T.Var _ -> false
+  | T.DB _ -> true
+  | T.Fun (_, body) -> eligible_arg body
+  | T.App (f, l) -> eligible_arg f &&
+                    List.for_all eligible_arg l
+
 let get_bvars args =
   let reduced = 
-    List.map (fun t -> Lambda.eta_quick_reduce @@ t) args in
+    List.map (fun t -> 
+      if(eligible_arg t) then (
+        Lambda.eta_quick_reduce t) 
+      else t ) args in
   let n = List.length reduced in
   if List.for_all T.is_bvar reduced then (
     let res = List.mapi (fun i a -> 
