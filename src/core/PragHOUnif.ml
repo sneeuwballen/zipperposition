@@ -12,7 +12,7 @@ module S = struct
 
 end
 
-let max_depth = 13
+let max_depth = 15
 
 let _conservative_elim = ref true
 let _imit_first = ref false
@@ -248,12 +248,13 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
     if depth >= max_depth then
       OSeq.empty
     else 
-      if (depth > 0 && depth mod 6 = 0) then
+      if (depth > 0 && depth mod 4 = 0) then
           OSeq.append 
             (OSeq.take 50 (OSeq.repeat None))
             (unify ~depth:(depth+1) ~scope ~fresh_var_ ~subst l)
       else  
         let s', t' = nfapply subst (s, scope), nfapply subst (t, scope) in
+        if not (Term.equal s' t') then (
         match unif_simple ~subst:(US.subst subst) ~scope (T.of_ty (T.ty s')) (T.of_ty (T.ty t')) with
         | Some ty_unif -> (
           let s' = nfapply ty_unif (s', scope) in
@@ -287,17 +288,8 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
                 flex_same ~depth ~subst:merged ~fresh_var_ ~scope hd_s args_s args_t rest l
               )
               else (
-                let exp_arg_s = List.length @@ Type.expected_args (Term.ty hd_s) in
-                let exp_arg_t = List.length @@ Type.expected_args (Term.ty hd_t) in
-                if ban_id || exp_arg_s = 0 || exp_arg_t = 0 then
-                  OSeq.append
+                if ban_id then
                     (flex_proj_imit ~depth ~subst:merged ~fresh_var_ ~scope  body_s' body_t' rest)
-                    ( if not !_cons_ff then 
-                        OSeq.append
-                          (eliminate_subs ~depth ~subst ~fresh_var_ ~scope body_s' l)
-                          (eliminate_subs ~depth ~subst ~fresh_var_ ~scope body_t' l)
-                      else OSeq.empty
-                    )
                 else (
                   OSeq.append
                   (identify  ~depth ~subst:merged ~fresh_var_ ~scope body_s' body_t' rest)
@@ -321,8 +313,10 @@ let rec unify ~depth ~scope ~fresh_var_ ~subst = function
                   (build_constraints ~ban_id args_s args_t rest)  
             | _ -> OSeq.empty
           )
-        (* ) *)
         | None -> OSeq.empty)
+        else (
+          unify ~depth ~scope ~fresh_var_ ~subst rest
+        ))
 
 and identify ~depth ~subst ~fresh_var_ ~scope s t rest =
   (* Format.printf "Getting identification subst for %a and %a!\n" T.pp s T.pp t; *)
