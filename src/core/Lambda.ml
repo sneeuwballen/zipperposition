@@ -314,7 +314,7 @@ let eta_reduce t =
 (*|> CCFun.tap (fun t' ->
   if t != t' then Format.printf "@[eta_reduce `%a`@ into `%a`@]@." T.pp t T.pp t')*)
 
-let eta_quick_reduce ?(full=true) t =
+let eta_quick_reduce ?(full=false) t =
   let res = 
     Inner.eta_quick_reduce ~full (t:T.t :> IT.t) |> T.of_term_unsafe in
   res

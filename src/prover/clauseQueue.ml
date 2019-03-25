@@ -93,7 +93,7 @@ module Make(C : Clause_intf.S) = struct
       | Lit.Prop (head,sign) -> (calc_tweight head sg v w c_mul, sign)
       | _ -> (0,false)
 
-    let conj_relative ?(distinct_vars_mul=0) c =
+    let conj_relative ?(distinct_vars_mul=(-1.0)) c =
       let sgn = C.Ctx.signature () in
       let pos_mul = 1.3 in
       let max_mul = 1.3 in
@@ -107,13 +107,13 @@ module Make(C : Clause_intf.S) = struct
                             ( if C.is_maxlit (c,0) Subst.empty ~idx:i then max_mul else 1.0)*. 
                             float_of_int l_w ) 0.0) 
         |> (fun res -> 
-              if distinct_vars_mul=0 then int_of_float res
+              if distinct_vars_mul < 0.0 then int_of_float res
               else
                 let dist_vars = 
                  Literals.vars (C.lits c)
                  |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))  in
                 let n_vars = List.length dist_vars in
-                 (n_vars*n_vars) * distinct_vars_mul + (int_of_float res))
+                int_of_float ((distinct_vars_mul ** (float_of_int n_vars)) +. res)) 
 
 
     let penalty = C.penalty
@@ -328,7 +328,7 @@ module Make(C : Clause_intf.S) = struct
     make ~ratio:5 ~weight:WeightFun.conj_relative "conj_relative"
 
   let conj_var_relative_mk () : t =
-    make ~ratio:5 ~weight:(WeightFun.conj_relative ~distinct_vars_mul:2) 
+    make ~ratio:5 ~weight:(WeightFun.conj_relative ~distinct_vars_mul:1.05) 
          "conj_relative_var"
 
   let of_profile p =
