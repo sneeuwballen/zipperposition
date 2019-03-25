@@ -62,7 +62,7 @@ let rec eligible_arg t =
 let get_bvars args =
   let reduced = 
     List.map 
-      (fun t -> if(eligible_arg t) then (Lambda.eta_quick_reduce t) else t )
+      (fun t -> if (eligible_arg t) then (Lambda.eta_quick_reduce t) else t )
     args in
   let n = List.length reduced in
   if List.for_all T.is_bvar reduced then (
@@ -73,9 +73,8 @@ let get_bvars args =
     let no_dup = CCList.sort_uniq ~cmp res in
     if List.length no_dup = List.length res 
     then Some (CCArray.of_list no_dup) 
-    else None
-  ) 
-  else None 
+    else None) 
+  else None
 
 let rec norm_deref subst (t,sc) =
   let pref, tt = T.open_fun t in
@@ -226,6 +225,7 @@ let rec unify ~scope ~fresh_var_ ~subst = function
       assert (List.length args_s = List.length args_t);
       unify ~subst ~fresh_var_ ~scope @@ (List.combine args_s args_t) @ rest
     | _ -> raise NotUnifiable)
+
 and flex_same ~fresh_var_ ~scope ~subst var args_s args_t =
   let bvar_s, bvar_t = get_bvars args_s, get_bvars args_t in
   if CCOpt.is_none bvar_s || CCOpt.is_none bvar_t then
