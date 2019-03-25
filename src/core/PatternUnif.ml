@@ -189,40 +189,42 @@ let rec build_term ?(depth=0) ~subst ~scope ~fv_ var bvar_map t =
 let rec unify ~scope ~fresh_var_ ~subst = function
   | [] -> subst
   | (s,t) :: rest -> (
-    let ty_unif = unif_simple ~subst:(US.subst subst) ~scope (T.of_ty (T.ty s)) (T.of_ty (T.ty t)) in
-    let subst = US.merge subst ty_unif in
-    let s', t' = norm_deref subst (s,scope), norm_deref subst (t,scope) in
-    let pref_s, body_s = T.open_fun s' in
-    let pref_t, body_t = T.open_fun t' in 
-    let body_s', body_t', _ = eta_expand_otf pref_s pref_t body_s body_t in
-    let hd_s, args_s = T.as_app body_s' in
-    let hd_t, args_t = T.as_app body_t' in
+    try 
+      let ty_unif = unif_simple ~subst:(US.subst subst) ~scope (T.of_ty (T.ty s)) (T.of_ty (T.ty t)) in
+      let subst = US.merge subst ty_unif in
+      let s', t' = norm_deref subst (s,scope), norm_deref subst (t,scope) in
+      let pref_s, body_s = T.open_fun s' in
+      let pref_t, body_t = T.open_fun t' in 
+      let body_s', body_t', _ = eta_expand_otf pref_s pref_t body_s body_t in
+      let hd_s, args_s = T.as_app body_s' in
+      let hd_t, args_t = T.as_app body_t' in
 
-    match T.view hd_s, T.view hd_t with 
-    | (T.Var _, T.Var _) ->
-      let subst =
-        (if T.equal hd_s hd_t then
-          flex_same ~fresh_var_ ~scope ~subst hd_s args_s args_t
-        else
-          flex_diff ~fresh_var_ ~scope ~subst hd_s hd_t args_s args_t) in
-      unify ~scope ~fresh_var_ ~subst rest
-    | (T.Var _, T.Const _) | (T.Var _, T.DB _) ->
-      let subst = flex_rigid ~subst ~fresh_var_ ~scope  body_s' body_t' in
-      unify ~scope ~fresh_var_ ~subst rest
-    | (T.Const _, T.Var _) | (T.DB _, T.Var _) ->
-      (* Format.printf "Const var/DB var!\n"; *)
-      let subst = flex_rigid ~subst ~fresh_var_ ~scope  body_t' body_s' in
-      unify ~scope ~fresh_var_ ~subst rest
-    | T.Const f , T.Const g when ID.equal f g ->
-      (* Format.printf "Same fun symb heads.\n"; *)
-      assert(List.length args_s = List.length args_t);
-      (*  depth stays the same for the decomposition steps   *)
-      unify ~subst ~fresh_var_ ~scope @@ (List.combine args_s args_t) @ rest
-    | T.DB i, T.DB j when i = j ->
-      (* Format.printf "Same DB heads.\n"; *)
-      assert (List.length args_s = List.length args_t);
-      unify ~subst ~fresh_var_ ~scope @@ (List.combine args_s args_t) @ rest
-    | _ -> raise NotUnifiable)
+      match T.view hd_s, T.view hd_t with 
+      | (T.Var _, T.Var _) ->
+        let subst =
+          (if T.equal hd_s hd_t then
+            flex_same ~fresh_var_ ~scope ~subst hd_s args_s args_t
+          else
+            flex_diff ~fresh_var_ ~scope ~subst hd_s hd_t args_s args_t) in
+        unify ~scope ~fresh_var_ ~subst rest
+      | (T.Var _, T.Const _) | (T.Var _, T.DB _) ->
+        let subst = flex_rigid ~subst ~fresh_var_ ~scope  body_s' body_t' in
+        unify ~scope ~fresh_var_ ~subst rest
+      | (T.Const _, T.Var _) | (T.DB _, T.Var _) ->
+        (* Format.printf "Const var/DB var!\n"; *)
+        let subst = flex_rigid ~subst ~fresh_var_ ~scope  body_t' body_s' in
+        unify ~scope ~fresh_var_ ~subst rest
+      | T.Const f , T.Const g when ID.equal f g ->
+        (* Format.printf "Same fun symb heads.\n"; *)
+        assert(List.length args_s = List.length args_t);
+        (*  depth stays the same for the decomposition steps   *)
+        unify ~subst ~fresh_var_ ~scope @@ (List.combine args_s args_t) @ rest
+      | T.DB i, T.DB j when i = j ->
+        (* Format.printf "Same DB heads.\n"; *)
+        assert (List.length args_s = List.length args_t);
+        unify ~subst ~fresh_var_ ~scope @@ (List.combine args_s args_t) @ rest
+      | _ -> raise NotUnifiable
+    with Unif.Fail -> raise NotUnifiable)
 
 and flex_same ~fresh_var_ ~scope ~subst var args_s args_t =
   let bvar_s, bvar_t = get_bvars args_s, get_bvars args_t in

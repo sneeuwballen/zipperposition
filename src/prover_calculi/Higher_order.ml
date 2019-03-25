@@ -499,7 +499,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* rule for eta-expansion *)
   let eta_reduce t =
     assert (T.DB.is_closed t);
-    let t' = Lambda.eta_reduce t in
+    let t' = Lambda.eta_quick_reduce t in
     if (T.equal t t') then None
     else (
       Util.debugf ~section 50 "(@[eta_reduce `%a`@ :into `%a`@])"

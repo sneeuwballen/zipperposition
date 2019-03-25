@@ -188,14 +188,14 @@ module Inner = struct
     aux t
 
     let eta_qreduce_aux t =      
-      let q_reduce t =
+      let q_reduce ~pref_len t =
         let hd, args = T.as_app t in
         let n = List.length args in
         let _, r_bvars = 
           List.fold_right (fun arg (idx, vars) -> 
             if idx = -1 then (idx, vars)
             else (
-              if T.is_bvar_i idx arg then 
+              if idx < pref_len && T.is_bvar_i idx arg then 
                 (idx+1, arg :: vars)
               else (-1, vars)
             )
@@ -208,8 +208,7 @@ module Inner = struct
             if idx = -1 then (idx, m)
             else (
               if not @@ List.exists (fun tt -> 
-                  T.Seq.subterms tt 
-                  |> Sequence.mem ~eq:T.equal arg) non_redundant then
+                  T.DB.contains tt (T.as_bvar_exn arg)) non_redundant then
                (idx+1, m+1) 
               else (-1, m))
           ) r_bvars (0, 0) in
@@ -228,8 +227,8 @@ module Inner = struct
             | T.Bind(Binder.Lambda,_,_) ->
               let pref, body = T.open_bind Binder.Lambda t in
               let body' = aux body in
-              let n, reduced = q_reduce body' in
-              Format.printf "Got @[%a@];\nrecursively:@[%a@];\nreduced %d @[%a@];\n" T.pp body T.pp body' n T.pp reduced;
+              let n, reduced = q_reduce ~pref_len:(List.length pref) body' in
+              assert(Type.equal (Type.of_term_unsafe @@ T.ty_exn body) (Type.of_term_unsafe @@ T.ty_exn body'));
               if n = 0 && T.equal body body' then t
               else (
                 T.fun_l (CCList.take (List.length pref - n) pref) reduced
@@ -246,8 +245,8 @@ module Inner = struct
               T.app_builtin ~ty b (List.map aux l)
           end
       in
-      Format.printf "=== Starting %a.\n" T.pp t;
-      aux t
+      let t' = aux t in
+      t'
 
 
 
@@ -277,7 +276,13 @@ module Inner = struct
 
   let eta_reduce t = Util.with_prof prof_eta_reduce eta_reduce_rec t
   
-  let eta_quick_reduce t = Util.with_prof prof_eta_qreduce eta_qreduce_aux t
+  let eta_quick_reduce t = let res = Util.with_prof prof_eta_qreduce eta_qreduce_aux t in
+  let old_res = eta_reduce t in
+  if (not @@ T.equal res old_res) then (
+    Format.printf "%a <> %a\n" T.pp res T.pp old_res;
+    assert false;
+  );
+  res
 
 end
 
