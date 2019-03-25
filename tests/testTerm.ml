@@ -133,6 +133,20 @@ let test_eta_reduce = "eta reduce", `Quick, fun () ->
   let reduced = k f_fun in
   Alcotest.(check t_test) "eta reduce" (Lambda.eta_reduce unreduced) reduced
 
+let test_eta_qreduce = "eta qreduce", `Quick, fun () ->
+  (* (λx. (λy. f x y)) -> f *)
+  let t1 = T.fun_of_fvars [HVar.make ~ty 0; HVar.make ~ty 1] (T.app f_fun [T.var_of_int ~ty 0; T.var_of_int ~ty 1]) in
+  let t2 = f_fun in
+  Alcotest.(check t_test) "eta qreduce" (Lambda.eta_quick_reduce t1) t2;
+  (* (λx. (λy. g y) x) -> g *)
+  let t1 = T.fun_of_fvars [HVar.make ~ty 0] (T.app (T.fun_of_fvars [HVar.make ~ty 1] (g (T.var_of_int ~ty 1))) [T.var_of_int ~ty 0]) in
+  let t2 = g_fun in
+  Alcotest.(check t_test) "eta qreduce" (Lambda.eta_quick_reduce t1) t2;
+
+  let subterm =  T.fun_of_fvars [HVar.make ~ty 0; HVar.make ~ty 1] (T.app f_fun [T.var_of_int ~ty 0; T.var_of_int ~ty 1]) in
+  let unreduced = T.fun_of_fvars [HVar.make ~ty 0] (T.app l_fun [subterm; T.var_of_int ~ty 0]) in
+  Alcotest.(check t_test) "eta qreduce" (T.app l_fun [f_fun]) (Lambda.eta_quick_reduce unreduced) 
+
 let test_eta_expand = "eta expand", `Quick, fun () ->
   (* f -> (λx. (λy. f x y)) *)
   let t1 = T.fun_of_fvars [HVar.make ~ty 0; HVar.make ~ty 1] (T.app f_fun [T.var_of_int ~ty 0; T.var_of_int ~ty 1]) in
@@ -158,6 +172,7 @@ let suite : unit Alcotest.test_case list =
     test_whnf2;
     test_polymorphic_app;
     test_eta_reduce;
+    test_eta_qreduce;
     test_eta_expand;
   ]
 

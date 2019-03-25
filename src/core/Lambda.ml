@@ -191,7 +191,7 @@ module Inner = struct
       let q_reduce t =
         let hd, args = T.as_app t in
         let n = List.length args in
-        let redundant, r_bvars = 
+        let _, r_bvars = 
           List.fold_right (fun arg (idx, vars) -> 
             if idx = -1 then (idx, vars)
             else (
@@ -200,6 +200,7 @@ module Inner = struct
               else (-1, vars)
             )
           ) args (0, []) in
+        let redundant = List.length r_bvars in
         if redundant = -1 then 0, t
         else (
           let non_redundant = hd :: CCList.take (n-redundant) args in
@@ -226,8 +227,10 @@ module Inner = struct
             | T.Var _ | T.DB _ | T.Const _ -> t
             | T.Bind(Binder.Lambda,_,_) ->
               let pref, body = T.open_bind Binder.Lambda t in
-              let n, reduced = q_reduce body in
-              if n = 0 then t
+              let body' = aux body in
+              let n, reduced = q_reduce body' in
+              Format.printf "Got @[%a@];\nrecursively:@[%a@];\nreduced %d @[%a@];\n" T.pp body T.pp body' n T.pp reduced;
+              if n = 0 && T.equal body body' then t
               else (
                 T.fun_l (CCList.take (List.length pref - n) pref) reduced
               )
@@ -243,6 +246,7 @@ module Inner = struct
               T.app_builtin ~ty b (List.map aux l)
           end
       in
+      Format.printf "=== Starting %a.\n" T.pp t;
       aux t
 
 

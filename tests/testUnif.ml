@@ -694,6 +694,10 @@ let suite_pv_unif : unit Alcotest.test_case list =
 
       "X a" <?> "g (X a)" >-> "term";
 
+      "fun (x:term->term) (y:term). X x" =?= 
+      "fun (x:term->term) (y:term). f (f_ho x) (Y y) "
+      >>> Action.count 2;
+
 
       "X" =?= "Y Z" >-> "term"
       |> Task.add_var_type "X" "term"
