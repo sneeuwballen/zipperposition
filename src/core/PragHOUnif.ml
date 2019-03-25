@@ -318,7 +318,7 @@ let unify_scoped (t0, scope0) (t1, scope1) =
     (* Format.printf "Problem : %a =?= %a.\n" T.pp t0' T.pp t1'; *)
     unify ~depth:0 ~nr_iter:0 ~scope:unifscope ~fresh_var_ ~subst [t0', t1', false]
     |> OSeq.map (CCOpt.map (fun sub ->       
-      let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t0, scope0) in 
+      (*let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t0, scope0) in 
       let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t1, scope1) in
       assert(Type.equal (Term.ty l) (Term.ty r));
       if not (Unif.Ty.equal ~subst:(US.subst sub)
@@ -340,5 +340,5 @@ let unify_scoped (t0, scope0) (t1, scope1) =
          Format.printf "Unequal subst: %a =?= %a, res %a.\n" T.pp t0 T.pp t1 T.pp l; 
          assert(false); 
       );
-      assert (T.equal l r);
+      assert (T.equal l r);*)
       sub))

@@ -226,10 +226,9 @@ module Inner = struct
             | T.Var _ | T.DB _ | T.Const _ -> t
             | T.Bind(Binder.Lambda,_,_) ->
               let pref, body = T.open_bind Binder.Lambda t in
-              let body' = aux body in
-              let n, reduced = q_reduce ~pref_len:(List.length pref) body' in
-              assert(Type.equal (Type.of_term_unsafe @@ T.ty_exn body) (Type.of_term_unsafe @@ T.ty_exn body'));
-              if n = 0 && T.equal body body' then t
+              let n, reduced = q_reduce ~pref_len:(List.length pref) body in
+              assert(Type.equal (Type.of_term_unsafe @@ T.ty_exn body) (Type.of_term_unsafe @@ T.ty_exn body));
+              if n = 0 then t
               else (
                 T.fun_l (CCList.take (List.length pref - n) pref) reduced
               )

@@ -61,7 +61,7 @@ let rec eligible_arg t =
 
 let get_bvars args =
   let reduced = 
-    List.map (fun t -> 
+    List.map (fun t ->
       if(eligible_arg t) then (
         Lambda.eta_quick_reduce t) 
       else t ) args in
