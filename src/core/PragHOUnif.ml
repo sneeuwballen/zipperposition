@@ -14,10 +14,9 @@ end
 
 let max_depth = 17
 
-let _conservative_elim = ref true
+let _cons_e = ref true
 let _imit_first = ref false
 let _cons_ff = ref true
-let _compose = ref false
 let _solve_var = ref false
 
 
@@ -30,7 +29,7 @@ let make_fresh_var fresh_var_ ~ty () =
 let nfapply s u = Lambda.beta_red_head (S.apply s u)
 
 let disable_conservative_elim () =
-  _conservative_elim := false
+  _cons_e := false
 
 let set_imit_first () = 
   _imit_first := true
@@ -38,16 +37,11 @@ let set_imit_first () =
 let disable_cons_ff () = 
   _cons_ff := true
 
-let set_compose () = 
-  _compose := true
-
 let set_solve_var () = 
   _solve_var := true
 
-
-let compose_sub ~scope s1 s2 =
-  if !_compose then US.compose ~scope s1 s2
-  else US.merge s1 s2
+let compose_sub s1 s2 =
+  US.merge s1 s2
 
 let build_constraints ~ban_id args1 args2 rest = 
   let zipped = List.map (fun (x,y) -> (x,y,ban_id)) (List.combine args1 args2) in
@@ -233,7 +227,7 @@ and identify ~depth ~nr_iter ~subst ~fresh_var_ ~scope s t rest =
   (* Format.printf "Getting identification subst for %a and %a!\n" T.pp s T.pp t; *)
   let id_subs = OSeq.nth 0 (JP_unif.identify ~scope ~fresh_var_ s t []) in
   (* Format.printf "Merging id \n"; *)
-  let subs_res = compose_sub ~scope subst id_subs in
+  let subs_res = compose_sub subst id_subs in
   unify ~depth:(depth+1) ~nr_iter ~scope ~fresh_var_ ~subst:subs_res 
     ((s, t, true)::rest)
 
@@ -242,7 +236,7 @@ and flex_rigid ~depth ~nr_iter ~subst ~fresh_var_ ~scope ~ban_id s t rest =
   assert (not @@ T.is_var @@ T.head_term t);  
   let bindings = proj_imit_bindings ~nr_iter ~subst ~scope ~fresh_var_ s t in
   let substs = List.map (fun (s, n_args) -> 
-    compose_sub ~scope subst s, n_args) bindings in
+    compose_sub subst s, n_args) bindings in
   OSeq.of_list substs
   |> OSeq.flat_map (fun (subst,n_args) -> 
     unify ~depth:(depth+1) ~scope  ~fresh_var_ ~subst 
@@ -258,7 +252,7 @@ and flex_same ~depth ~subst ~nr_iter ~fresh_var_ ~scope hd_s args_s args_t rest 
     let all_vars = CCList.range 0 ((List.length args_s) -1 ) in
     let all_args_unif = unify ~depth ~nr_iter ~subst ~fresh_var_ ~scope new_cstrs in
     let first_unif = OSeq.take 1 all_args_unif |> OSeq.to_list in
-    if !_conservative_elim && CCList.exists CCOpt.is_some first_unif  then (
+    if !_cons_e && CCList.exists CCOpt.is_some first_unif  then (
         OSeq.of_list first_unif
     ) 
     else (
@@ -274,7 +268,7 @@ and flex_same ~depth ~subst ~nr_iter ~fresh_var_ ~scope hd_s args_s args_t rest 
           else None) 
         |>  
           (OSeq.flat_map (fun subst' -> 
-          let new_subst = compose_sub ~scope  subst subst' in
+          let new_subst = compose_sub subst subst' in
             unify ~depth:(depth+1) ~nr_iter ~scope  ~fresh_var_ ~subst:new_subst all)))))
   else 
     unify ~depth ~subst ~nr_iter ~fresh_var_ ~scope rest
@@ -286,14 +280,14 @@ and eliminate_subs ~depth ~nr_iter ~subst ~fresh_var_ ~scope t constraints =
       OSeq.of_list all_vars
       |> OSeq.map (eliminate_at_idx ~scope ~fresh_var_ (T.as_var_exn hd))
       |> OSeq.flat_map (fun subst' -> 
-          let new_subst = compose_sub ~scope  subst subst' in
+          let new_subst = compose_sub subst subst' in
           unify ~depth:(depth+1) ~nr_iter ~scope  ~fresh_var_ ~subst:new_subst constraints))
   else OSeq.empty
 
 and flex_proj_imit  ~depth ~subst ~nr_iter ~fresh_var_ ~scope s t rest = 
   let bindings = proj_imit_bindings ~subst ~nr_iter  ~scope ~fresh_var_ s t in
   let bindings = proj_imit_bindings ~subst ~nr_iter ~scope ~fresh_var_ t s @ bindings in
-  let substs = List.map (fun (s,num_args) -> compose_sub ~scope subst s, num_args) bindings in
+  let substs = List.map (fun (s,num_args) -> compose_sub subst s, num_args) bindings in
   OSeq.of_list substs
   |> OSeq.flat_map (fun (subst,num_args) -> 
       unify ~depth:(depth+1) ~scope  ~fresh_var_ ~subst

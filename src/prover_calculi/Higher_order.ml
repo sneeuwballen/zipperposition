@@ -722,10 +722,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       if (not !_cons_ff) then
         PragHOUnif.disable_cons_ff ();
 
-      if (!_compose_subs) then (
-        PragHOUnif.set_compose ();
-      );
-
       if (!_var_solve) then (
         PragHOUnif.set_solve_var ();
       );

@@ -14,7 +14,6 @@ end
 
 val disable_conservative_elim : unit -> unit
 val set_imit_first : unit -> unit
-val set_compose : unit -> unit
 val set_solve_var : unit -> unit
 val disable_cons_ff : unit -> unit
 
