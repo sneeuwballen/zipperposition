@@ -187,7 +187,7 @@ module Inner = struct
     in
     aux t
 
-    let eta_qreduce_aux t =      
+    let eta_qreduce_aux ?(full=false) t =      
       let q_reduce ~pref_len t =
         let hd, args = T.as_app t in
         let n = List.length args in
@@ -226,7 +226,7 @@ module Inner = struct
             | T.Var _ | T.DB _ | T.Const _ -> t
             | T.Bind(Binder.Lambda,_,_) ->
               let pref, body = T.open_bind Binder.Lambda t in
-              let body' = aux body in
+              let body' = if full then aux body else body in
               let n, reduced = q_reduce ~pref_len:(List.length pref) body' in
               assert(Type.equal (Type.of_term_unsafe @@ T.ty_exn body) (Type.of_term_unsafe @@ T.ty_exn body'));
               if n = 0 && T.equal body body' then t
@@ -276,7 +276,7 @@ module Inner = struct
 
   let eta_reduce t = Util.with_prof prof_eta_reduce eta_reduce_rec t
   
-  let eta_quick_reduce t = Util.with_prof prof_eta_qreduce eta_qreduce_aux t
+  let eta_quick_reduce ?(full=false) t = Util.with_prof prof_eta_qreduce (eta_qreduce_aux ~full) t
 
 end
 
@@ -314,9 +314,9 @@ let eta_reduce t =
 (*|> CCFun.tap (fun t' ->
   if t != t' then Format.printf "@[eta_reduce `%a`@ into `%a`@]@." T.pp t T.pp t')*)
 
-let eta_quick_reduce t =
+let eta_quick_reduce ?(full=true) t =
   let res = 
-    Inner.eta_quick_reduce (t:T.t :> IT.t) |> T.of_term_unsafe in
+    Inner.eta_quick_reduce ~full (t:T.t :> IT.t) |> T.of_term_unsafe in
   res
 
 

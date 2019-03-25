@@ -113,8 +113,7 @@ module Make(C : Clause_intf.S) = struct
                  Literals.vars (C.lits c)
                  |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))  in
                 let n_vars = List.length dist_vars in
-                int_of_float ((float_of_int (n_vars*n_vars)) /. 5.0) * distinct_vars_mul 
-                + (int_of_float res) )
+                 (n_vars*n_vars) * distinct_vars_mul + (int_of_float res))
 
 
     let penalty = C.penalty
@@ -329,7 +328,7 @@ module Make(C : Clause_intf.S) = struct
     make ~ratio:5 ~weight:WeightFun.conj_relative "conj_relative"
 
   let conj_var_relative_mk () : t =
-    make ~ratio:5 ~weight:(WeightFun.conj_relative ~distinct_vars_mul:20) 
+    make ~ratio:5 ~weight:(WeightFun.conj_relative ~distinct_vars_mul:2) 
          "conj_relative_var"
 
   let of_profile p =

@@ -29,7 +29,7 @@ val eta_reduce : term -> term
 (** Traverse the term, eta-reducing all sub-terms.
     A term [fun x. t x] where [x ∉ vars(t)] becomes [t] *)
 
-val eta_quick_reduce : term -> term
+val eta_quick_reduce : ?full:bool -> term -> term
 
 val is_lambda_pattern : term -> bool
 

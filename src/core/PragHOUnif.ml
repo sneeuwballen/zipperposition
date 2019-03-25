@@ -14,7 +14,7 @@ module S = struct
 
 end
 
-let max_depth = 17
+let max_depth = 13
 
 let _cons_e = ref true
 let _imit_first = ref false
@@ -129,7 +129,7 @@ let rec unify ~depth ~nr_iter ~scope ~fresh_var_ ~subst = function
     if depth >= max_depth then
       OSeq.empty
     else 
-      if (depth > 0 && depth mod 6 = 0) then
+      if (depth > 0 && depth mod 4 = 0) then
           OSeq.append 
             (OSeq.take 50 (OSeq.repeat None))
             (unify ~depth:(depth+1) ~nr_iter ~scope ~fresh_var_ ~subst l)
@@ -287,3 +287,15 @@ let unify_scoped (t0, scope0) (t1, scope1) =
     let t0', t1' = S.apply subst (t0, scope0), S.apply subst (t1, scope1) in
     (* Format.printf "Problem : %a =?= %a.\n" T.pp t0' T.pp t1'; *)
     unify ~depth:0 ~nr_iter:0 ~scope:unifscope ~fresh_var_ ~subst [t0', t1', false]
+    |> OSeq.map (CCOpt.map (fun sub ->       
+      (* let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t0, scope0) in 
+      let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t1, scope1) in
+      
+      if not (T.equal l r) then (
+        Format.printf "For problem: %a =?= %a\n" T.pp t0' T.pp t1';
+        Format.printf "Subst: @[%a@]\n" S.pp sub;
+        Format.printf "%a <> %a\n" T.pp l T.pp r;
+        assert(false);
+      ); *)
+      
+      sub))

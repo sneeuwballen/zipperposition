@@ -791,7 +791,7 @@ let suite_pv_unif : unit Alcotest.test_case list =
       |> Task.add_var_type "F" "term -> term -> term"
       |> Task.add_var_type "D" "term"
       |> Task.add_var_type "C" "term"
-      >>> Action.count 2;
+      >>> Action.count 4;
 
       ("fun (ms: term->term) (mz:term). M " ^
       "(fun (s:term->term) (z:term). s (s z)) " ^ 
