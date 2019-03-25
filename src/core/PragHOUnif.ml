@@ -1,5 +1,7 @@
 module T = Term
 module US = Unif_subst
+module P = PatternUnif
+
 
 type subst = US.t
 
@@ -46,35 +48,9 @@ let compose_sub s1 s2 =
 let build_constraints ~ban_id args1 args2 rest = 
   let zipped = List.map (fun (x,y) -> (x,y,ban_id)) (List.combine args1 args2) in
   let rigid, non_rigid = List.partition (fun (s,t,_) ->
-    T.is_const (T.head_term s) || T.is_const (T.head_term t)) zipped in
+    T.is_const (T.head_term s) && T.is_const (T.head_term t)) zipped in
   assert(List.length rigid + List.length non_rigid = List.length zipped);
   rigid @ rest @ non_rigid
-
-let unif_simple ?(subst=Subst.empty) ~scope t s = 
-  try 
-    let type_unifier = Unif.FO.unify_syn ~subst (t, scope) (s, scope) in
-    Some (US.of_subst type_unifier)
-  with Unif.Fail -> None
-
-let eta_expand_otf pref1 pref2 t1 t2 =
-  let do_exp_otf n types t = 
-    let remaining = CCList.drop n types in
-    assert(List.length remaining != 0);
-    let num_vars = List.length remaining in
-    let vars = List.mapi (fun i ty -> T.bvar ~ty (num_vars-1-i)) remaining in
-    let shifted = T.DB.shift num_vars t in
-    T.app shifted vars in 
-
-  if List.length pref1 = List.length pref2 then (t1, t2, pref1)
-  else (
-    let n1, n2 = List.length pref1, List.length pref2 in 
-    if n1 < n2 then (
-      (do_exp_otf n1 pref2 t1,t2,pref2)
-    ) else (
-      assert(n1 > n2);
-      (t1,do_exp_otf n2 pref1 t2,pref1)
-    )
-  )
 
 let eliminate_at_idx ~scope ~fresh_var_ v k =  
   (* create substitution: v |-> λ u1 ... um. x u1 ... u{k-1} u{k+1} ... um *)
@@ -124,7 +100,7 @@ let proj_imit_bindings ~nr_iter ~subst ~scope ~fresh_var_  s t =
           List.filter (fun (_, ty) -> List.length @@ Type.expected_args ty = 0) l)
       |> List.map (fun (i, ty) ->
           let _, arg_ret_ty = Type.open_fun ty in
-          match unif_simple ~scope ~subst:(US.subst subst) (T.of_ty arg_ret_ty) (T.of_ty var_ret_ty) with
+          match P.unif_simple ~scope ~subst:(US.subst subst) (T.of_ty arg_ret_ty) (T.of_ty var_ret_ty) with
           | Some ty_unif ->
             let pr_bind =
               project_hs_one ~fresh_var_ 
@@ -160,7 +136,7 @@ let rec unify ~depth ~nr_iter ~scope ~fresh_var_ ~subst = function
       else  
         let s', t' = nfapply subst (s, scope), nfapply subst (t, scope) in
         if not (Term.equal s' t') then (
-        match unif_simple ~subst:(US.subst subst) ~scope (T.of_ty (T.ty s')) (T.of_ty (T.ty t')) with
+        match P.unif_simple ~subst:(US.subst subst) ~scope (T.of_ty (T.ty s')) (T.of_ty (T.ty t')) with
         | Some ty_unif -> (
           let s' = nfapply ty_unif (s', scope) in
           let t' = nfapply ty_unif (t', scope) in
@@ -172,7 +148,7 @@ let rec unify ~depth ~nr_iter ~scope ~fresh_var_ ~subst = function
               unify ~depth ~nr_iter ~scope ~fresh_var_ ~subst rest 
             ) else 
             (if Term.is_fo_term s' && Term.is_fo_term t' then
-              let subst = unif_simple  ~scope ~subst:(US.subst merged) s' t' in
+              let subst = P.unif_simple  ~scope ~subst:(US.subst merged) s' t' in
               if CCOpt.is_some subst then 
                 unify ~depth ~nr_iter ~scope ~fresh_var_ ~subst:(CCOpt.get_exn subst) rest
               else raise PatternUnif.NotUnifiable
@@ -183,7 +159,7 @@ let rec unify ~depth ~nr_iter ~scope ~fresh_var_ ~subst = function
           |PatternUnif.NotInFragment ->
             let pref_s, body_s = T.open_fun s' in
             let pref_t, body_t = T.open_fun t' in 
-            let body_s', body_t', _ = eta_expand_otf pref_s pref_t body_s body_t in
+            let body_s', body_t', _ = P.eta_expand_otf pref_s pref_t body_s body_t in
             let hd_s, args_s = T.as_app body_s' in
             let hd_t, args_t = T.as_app body_t' in
 
@@ -311,28 +287,3 @@ let unify_scoped (t0, scope0) (t1, scope1) =
     let t0', t1' = S.apply subst (t0, scope0), S.apply subst (t1, scope1) in
     (* Format.printf "Problem : %a =?= %a.\n" T.pp t0' T.pp t1'; *)
     unify ~depth:0 ~nr_iter:0 ~scope:unifscope ~fresh_var_ ~subst [t0', t1', false]
-    |> OSeq.map (CCOpt.map (fun sub ->       
-      (*let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t0, scope0) in 
-      let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t1, scope1) in
-      assert(Type.equal (Term.ty l) (Term.ty r));
-      if not (Unif.Ty.equal ~subst:(US.subst sub)
-              (T.ty t0, scope0) (T.ty t1, scope1)) then (
-        Format.printf "For problem: %a =?= %a\n" T.pp t0' T.pp t1';
-        Format.printf "Types are %a, %a\n" Type.pp (T.ty t0) Type.pp (T.ty t1);
-        Format.printf "Of actual types %a, %a\n" Type.pp (T.ty l) Type.pp (T.ty r);
-        Format.printf "Subst: @[%a@]\n" S.pp sub;
-        assert(false);
-      );
-      if not (T.equal l r) then (
-        Format.printf "For problem: %a =?= %a\n" T.pp t0' T.pp t1';
-        Format.printf "Subst: @[%a@]\n" S.pp sub;
-        Format.printf "%a <> %a\n" T.pp l T.pp r;
-        assert(false);
-      );
-      if not (T.Seq.subterms l |> Sequence.append (T.Seq.subterms r) |> 
-         Sequence.for_all (fun st -> List.for_all T.DB.is_closed @@ T.get_mand_args st)) then ( 
-         Format.printf "Unequal subst: %a =?= %a, res %a.\n" T.pp t0 T.pp t1 T.pp l; 
-         assert(false); 
-      );
-      assert (T.equal l r);*)
-      sub))
