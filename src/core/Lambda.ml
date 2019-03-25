@@ -276,7 +276,7 @@ module Inner = struct
 
   let eta_reduce t = Util.with_prof prof_eta_reduce eta_reduce_rec t
   
-  let eta_quick_reduce t = Util.with_prof prof_eta_qreduce eta_qreduce_aux t in
+  let eta_quick_reduce t = Util.with_prof prof_eta_qreduce eta_qreduce_aux t
 
 end
 
