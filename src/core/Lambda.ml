@@ -276,13 +276,7 @@ module Inner = struct
 
   let eta_reduce t = Util.with_prof prof_eta_reduce eta_reduce_rec t
   
-  let eta_quick_reduce t = let res = Util.with_prof prof_eta_qreduce eta_qreduce_aux t in
-  let old_res = eta_reduce t in
-  if (not @@ T.equal res old_res) then (
-    Format.printf "%a <> %a\n" T.pp res T.pp old_res;
-    assert false;
-  );
-  res
+  let eta_quick_reduce t = Util.with_prof prof_eta_qreduce eta_qreduce_aux t in
 
 end
 
