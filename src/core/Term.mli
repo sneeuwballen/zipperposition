@@ -1,10 +1,10 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Lambda-free Terms} *)
+(** {1 Terms} *)
 
-(** Those terms provide a first-order presentation of higher-order terms (without
-    functions), in the sense that they make currying possible (as well as applying
+(** Those terms provide a direct presentation of higher-order terms with lambdas
+    in the sense that they make currying possible (as well as applying
     functions to other terms).
 
     This is as if terms had an `apply` symbol everywhere, but more lightweight.
@@ -34,7 +34,10 @@ type view = private
 val view : t -> view
 
 
-(** {2 Classic view} *)
+(** {2 Classic view}
+
+    This module provides a first-order view on terms, for code
+    that focuses on first-order logic. *)
 module Classic : sig
   type view = private
     | Var of var

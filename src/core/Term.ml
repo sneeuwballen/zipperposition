@@ -1,7 +1,7 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Lambda-free Terms} *)
+(** {1 Terms} *)
 
 module PB = Position.Build
 module PW = Position.With
