@@ -89,42 +89,53 @@ let imitate_one ~scope ~counter  s t =
   with Not_found ->  raise Not_found
 
 (* Create all possible projection and imitation bindings. *)
-let proj_imit_bindings ~nr_iter ~subst ~scope ~counter  s t = 
-  let hd_s = T.as_var_exn @@ T.head_term s in
-    let pref_tys, var_ret_ty = Type.open_fun (HVar.ty hd_s) in
-    let proj_bindings = 
-      pref_tys
-      |> List.mapi (fun i ty -> i, ty)
-      |> (fun l ->
-          (* if we performed more than N projections that applied the
-             bound variable we back off *)
-          if nr_iter <= max_app_projections then l
-          else
-            List.filter (fun (_, ty) -> 
-              List.length (Type.expected_args ty) = 0) l)
-      |> List.map (fun (i, ty) ->
-          let _, arg_ret_ty = Type.open_fun ty in
-          match P.unif_simple ~scope ~subst:(US.subst subst) 
-                  (T.of_ty arg_ret_ty) (T.of_ty var_ret_ty) with
-          | Some ty_unif ->
-            (* we project only to arguments whose type can be unified
-               with head's return type *)
-            let pr_bind =
-              project_hs_one ~counter 
-                (List.map (fun ty -> S.apply_ty ty_unif (ty, scope)) pref_tys) i
-                (S.apply_ty ty_unif (ty, scope)) in
-            let hd_s = HVar.cast hd_s ~ty:(S.apply_ty ty_unif (HVar.ty hd_s, scope)) in
-              Some (US.FO.bind ty_unif (hd_s, scope) (pr_bind, scope),
-                    List.length @@ Type.expected_args ty)
-          | None -> None)
-      |> CCList.filter_map (fun x -> x) in
-      let imit_binding =
-        let hd_s = T.head_term_mono s in 
-        let hd_t = T.head_term_with_mandatory_args t in
-        if (not @@ T.is_bvar @@ T.head_term t && 
-            not (T.var_occurs ~var:(T.as_var_exn hd_s) hd_t)) 
-          then [(imitate_one ~scope ~counter s t,0)] 
-        else [] in
+let proj_imit_bindings ~nr_iter ~subst ~scope ~counter  s t =
+  let hd_s, args_s = CCPair.map1 (fun x -> T.as_var_exn x) (T.as_app s) in
+  let _, args_t = T.as_app t in
+  let pref_tys, var_ret_ty = Type.open_fun (HVar.ty hd_s) in
+  let proj_bindings = 
+    pref_tys
+    |> List.mapi (fun i ty -> i, ty)
+    |> (fun l ->
+        (* if we performed more than N projections that applied the
+           bound variable we back off *)
+        if nr_iter <= max_app_projections then l
+        else
+          List.filter (fun (_, ty) -> 
+            List.length (Type.expected_args ty) = 0) l)
+    (* If heads are different constants, do not project to those subterms *)
+    |> CCList.filter_map (fun ((i, _) as p) -> 
+        if i < List.length args_s && i < List.length args_t then (
+          let s_i, t_i = List.nth args_s i, List.nth args_t i in
+          let (_,s_i), (_,t_i) = CCPair.map_same (fun x -> T.open_fun x) (s_i, t_i) in
+          let s_i,t_i = CCPair.map_same (fun x-> T.head_term x) (s_i,t_i) in
+          if (T.is_const s_i && T.is_const t_i && (not (T.equal s_i t_i))) then None 
+          else Some p
+        ) else Some p
+    )
+    |> List.map (fun (i, ty) ->
+        let _, arg_ret_ty = Type.open_fun ty in
+        match P.unif_simple ~scope ~subst:(US.subst subst) 
+                (T.of_ty arg_ret_ty) (T.of_ty var_ret_ty) with
+        | Some ty_unif ->
+          (* we project only to arguments whose type can be unified
+             with head's return type *)
+          let pr_bind =
+            project_hs_one ~counter 
+              (List.map (fun ty -> S.apply_ty ty_unif (ty, scope)) pref_tys) i
+              (S.apply_ty ty_unif (ty, scope)) in
+          let hd_s = HVar.cast hd_s ~ty:(S.apply_ty ty_unif (HVar.ty hd_s, scope)) in
+            Some (US.FO.bind ty_unif (hd_s, scope) (pr_bind, scope),
+                  List.length @@ Type.expected_args ty)
+        | None -> None)
+    |> CCList.filter_map (fun x -> x) in
+       let imit_binding =
+       let hd_s = T.head_term_mono s in 
+       let hd_t = T.head_term_with_mandatory_args t in
+       if (not @@ T.is_bvar @@ T.head_term t && 
+           not (T.var_occurs ~var:(T.as_var_exn hd_s) hd_t)) then 
+         [(imitate_one ~scope ~counter s t,0)]
+       else [] in
   let first, second = 
     if !_imit_first then imit_binding, proj_bindings
     else proj_bindings, imit_binding in 
