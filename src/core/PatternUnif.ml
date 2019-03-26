@@ -253,10 +253,10 @@ let rec unify ~scope ~counter ~subst = function
         unify ~scope ~counter ~subst rest
       | T.Const f , T.Const g when ID.equal f g ->
         assert(List.length args_s = List.length args_t);
-        unify ~subst ~counter ~scope @@ (List.combine args_s args_t) @ rest
+        unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest
       | T.DB i, T.DB j when i = j ->
         assert (List.length args_s = List.length args_t);
-        unify ~subst ~counter ~scope @@ (List.combine args_s args_t) @ rest
+        unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest
       | _ -> raise NotUnifiable) 
     else (
       unify ~subst ~counter ~scope rest

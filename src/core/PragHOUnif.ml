@@ -13,7 +13,7 @@ module S = struct
   let pp = US.pp
 end
 
-let max_depth = 17
+let max_depth = 15
 let max_app_projections = 4
 let back_off_interval = 6
 
@@ -277,22 +277,24 @@ and flex_same ~depth ~subst ~nr_iter ~counter ~scope hd_s args_s args_t rest all
     let new_cstrs = build_constraints ~ban_id:true args_s args_t rest in
     let all_vars = CCList.range 0 ((List.length args_s) -1 ) in
     let all_args_unif = unify ~depth ~nr_iter ~subst ~counter ~scope new_cstrs in
-    assert(List.length all_vars != 0); 
-    let res = 
+    let first_unif = OSeq.take 1 all_args_unif |> OSeq.to_list in
+    if !_cons_e && CCList.exists CCOpt.is_some first_unif  then (
+        OSeq.of_list first_unif
+    ) 
+    else (
+      assert(List.length all_vars != 0);
       OSeq.append
         all_args_unif
         (OSeq.of_list all_vars
-          |> OSeq.filter_map (fun idx -> 
+        |> OSeq.filter_map (fun idx -> 
             assert(idx >= 0);
             if not (T.equal (List.nth args_s idx) (List.nth args_t idx)) then
               Some (eliminate_at_idx ~scope ~counter (T.as_var_exn hd_s) idx)
             else None) 
-           |> (OSeq.flat_map (fun subst' -> 
-                let subst = compose_sub subst subst' in
-                unify ~depth:(depth+1) ~nr_iter ~scope  ~counter ~subst all))) in
-    if !_cons_e then (
-      OSeq.take 1 (OSeq.filter_map (fun x-> if CCOpt.is_some x then Some x else None) res)
-    ) else res
+        |> (OSeq.flat_map (fun subst' -> 
+            let subst = compose_sub subst subst' in
+              unify ~depth:(depth+1) ~nr_iter ~scope  ~counter ~subst all)))
+    )
   )
   else unify ~depth ~subst ~nr_iter ~counter ~scope rest
 
@@ -322,14 +324,3 @@ let unify_scoped t0_s t1_s =
   let counter = ref 0 in
   let t0',t1',unifscope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
   unify ~depth:0 ~nr_iter:0 ~scope:unifscope ~counter ~subst [t0', t1', false]
-  |> OSeq.map (CCOpt.map (fun sub ->       
-    let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t0_s in 
-    let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t1_s in
-    
-    if not (T.equal l r) then (
-      Format.printf "For problem: %a =?= %a\n" T.pp t0' T.pp t1';
-      Format.printf "Subst: @[%a@]\n" S.pp sub;
-      Format.printf "%a <> %a\n" T.pp l T.pp r;
-      assert(false);
-    );
-    sub))
