@@ -26,13 +26,13 @@ let nfapply s u = Lambda.beta_red_head (S.apply s u)
 let disable_conservative_elim () =
   _cons_e := false
 
-let set_imit_first () = 
+let disable_cons_ff () = 
+  _cons_ff := false
+
+let enable_imit_first () = 
   _imit_first := true
 
-let disable_cons_ff () = 
-  _cons_ff := true
-
-let set_solve_var () = 
+let enable_solve_var () = 
   _solve_var := true
 
 let compose_sub s1 s2 =

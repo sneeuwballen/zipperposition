@@ -717,13 +717,13 @@ module Make(E : Env.S) : S with module Env = E = struct
         PragHOUnif.disable_conservative_elim ();
 
       if (!_imit_first) then
-        PragHOUnif.set_imit_first ();
+        PragHOUnif.enable_imit_first ();
 
       if (not !_cons_ff) then
         PragHOUnif.disable_cons_ff ();
 
       if (!_var_solve) then (
-        PragHOUnif.set_solve_var ();
+        PragHOUnif.enable_solve_var ();
       );
 
       if Env.flex_get k_enable_ho_unif then (

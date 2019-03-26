@@ -12,12 +12,16 @@ module S : sig
 
 end
 
+(* Disable getting only the first solution for unifying arguments
+   after performing identification *)
 val disable_conservative_elim : unit -> unit
-val set_imit_first : unit -> unit
-val set_solve_var : unit -> unit
+(* Apply imitation and projection rules for flex-flex pairs *)
 val disable_cons_ff : unit -> unit
-
-
+(* Apply imitation before projection *)
+val enable_imit_first : unit -> unit
+(* Solve pairs that have exactly one unifier directly using 
+   an extension of pattern unification algorithm. *)
+val enable_solve_var : unit -> unit
 
 (* Unify terms of the same scope. Assumes that terms are in eta-long form. *)
 val unify : depth:int ->
