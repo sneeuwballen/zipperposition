@@ -42,4 +42,9 @@ let[@inline] fresh ~ty () =
   decr fresh_;
   v
 
+let fresh_w_counter ~counter ~ty () = 
+  let var = make ~ty !counter in 
+  incr counter; 
+  var
+
 let[@inline] is_fresh v = id v < 0

@@ -23,7 +23,7 @@ val disable_cons_ff : unit -> unit
 val unify : depth:int ->
             nr_iter:int ->
             scope:Scoped.scope ->
-            fresh_var_:int ref ->
+            counter:int ref ->
             subst:US.t -> (T.t * T.t * bool) CCList.t -> US.t option OSeq.t
 
 val unify_scoped : T.t Scoped.t -> T.t Scoped.t -> subst option OSeq.t

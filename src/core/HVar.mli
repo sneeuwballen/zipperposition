@@ -43,6 +43,8 @@ val fresh : ty:'a -> unit -> 'a t
 (** Magic: create a variable with a negative index, mostly for
     unification purpose *)
 
+val fresh_w_counter : counter:int ref -> ty:'a -> unit -> 'a t
+
 val is_fresh : _ t -> bool
 (** Magic: check if the variable is a fresh one (with negative index) *)
 

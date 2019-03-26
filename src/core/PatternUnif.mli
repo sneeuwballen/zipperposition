@@ -26,4 +26,4 @@ val eta_expand_otf : Type.t list -> Type.t list -> T.t -> T.t -> T.t * T.t * Typ
    exception in case of non-unifiability *)
 val unif_simple : ?subst:Subst.t -> scope:int -> T.t -> T.t -> US.t option
 
-val unify_scoped : ?subst:subst -> ?fresh_var_:int ref -> T.t Scoped.t -> T.t Scoped.t -> subst
+val unify_scoped : ?subst:subst -> ?counter:int ref -> T.t Scoped.t -> T.t Scoped.t -> subst
