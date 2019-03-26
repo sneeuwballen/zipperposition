@@ -267,23 +267,22 @@ and flex_same ~depth ~subst ~nr_iter ~counter ~scope hd_s args_s args_t rest all
     let new_cstrs = build_constraints ~ban_id:true args_s args_t rest in
     let all_vars = CCList.range 0 ((List.length args_s) -1 ) in
     let all_args_unif = unify ~depth ~nr_iter ~subst ~counter ~scope new_cstrs in
-    let first_unif = OSeq.take 1 all_args_unif |> OSeq.to_list in
-    if !_cons_e && CCList.exists CCOpt.is_some first_unif  then (
-        OSeq.of_list first_unif
-    ) 
-    else (
-      assert(List.length all_vars != 0); 
+    assert(List.length all_vars != 0); 
+    let res = 
       OSeq.append
         all_args_unif
         (OSeq.of_list all_vars
-         |> OSeq.filter_map (fun idx -> 
+          |> OSeq.filter_map (fun idx -> 
             assert(idx >= 0);
             if not (T.equal (List.nth args_s idx) (List.nth args_t idx)) then
               Some (eliminate_at_idx ~scope ~counter (T.as_var_exn hd_s) idx)
             else None) 
-        |> (OSeq.flat_map (fun subst' -> 
-            let subst = compose_sub subst subst' in
-              unify ~depth:(depth+1) ~nr_iter ~scope  ~counter ~subst all))))
+           |> (OSeq.flat_map (fun subst' -> 
+                let subst = compose_sub subst subst' in
+                unify ~depth:(depth+1) ~nr_iter ~scope  ~counter ~subst all))) in
+    if !_cons_e then (
+      OSeq.take 1 (OSeq.filter_map (fun x-> Some x) res)
+    ) else res
   )
   else unify ~depth ~subst ~nr_iter ~counter ~scope rest
 
