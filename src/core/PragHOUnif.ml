@@ -13,9 +13,9 @@ module S = struct
   let pp = US.pp
 end
 
-let max_depth = 15
+let max_depth = 17
 let max_app_projections = 4
-let back_off_interval = 4
+let back_off_interval = 6
 
 let _cons_e = ref true
 let _imit_first = ref false
@@ -91,7 +91,7 @@ let imitate_one ~scope ~counter  s t =
 (* Create all possible projection and imitation bindings. *)
 let proj_imit_bindings ~nr_iter ~subst ~scope ~counter  s t =
   let hd_s, args_s = CCPair.map1 (fun x -> T.as_var_exn x) (T.as_app s) in
-  let _, args_t = T.as_app t in
+  let hd_t,_ = T.as_app (snd (T.open_fun t)) in
   let pref_tys, var_ret_ty = Type.open_fun (HVar.ty hd_s) in
   let proj_bindings = 
     pref_tys
@@ -105,11 +105,10 @@ let proj_imit_bindings ~nr_iter ~subst ~scope ~counter  s t =
             List.length (Type.expected_args ty) = 0) l)
     (* If heads are different constants, do not project to those subterms *)
     |> CCList.filter_map (fun ((i, _) as p) -> 
-        if i < List.length args_s && i < List.length args_t then (
-          let s_i, t_i = List.nth args_s i, List.nth args_t i in
-          let (_,s_i), (_,t_i) = CCPair.map_same (fun x -> T.open_fun x) (s_i, t_i) in
-          let s_i,t_i = CCPair.map_same (fun x-> T.head_term x) (s_i,t_i) in
-          if (T.is_const s_i && T.is_const t_i && (not (T.equal s_i t_i))) then None 
+        if i < List.length args_s then (
+          let s_i = List.nth args_s i in
+          let s_i = T.head_term (snd (T.open_fun s_i)) in
+          if (T.is_const s_i && T.is_const hd_t && (not (T.equal s_i hd_t))) then None 
           else Some p
         ) else Some p
     )
@@ -292,7 +291,7 @@ and flex_same ~depth ~subst ~nr_iter ~counter ~scope hd_s args_s args_t rest all
                 let subst = compose_sub subst subst' in
                 unify ~depth:(depth+1) ~nr_iter ~scope  ~counter ~subst all))) in
     if !_cons_e then (
-      OSeq.take 1 (OSeq.filter_map (fun x-> Some x) res)
+      OSeq.take 1 (OSeq.filter_map (fun x-> if CCOpt.is_some x then Some x else None) res)
     ) else res
   )
   else unify ~depth ~subst ~nr_iter ~counter ~scope rest
@@ -324,13 +323,13 @@ let unify_scoped t0_s t1_s =
   let t0',t1',unifscope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
   unify ~depth:0 ~nr_iter:0 ~scope:unifscope ~counter ~subst [t0', t1', false]
   |> OSeq.map (CCOpt.map (fun sub ->       
-    (* let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t0, scope0) in 
-    let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t1, scope1) in
+    let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t0_s in 
+    let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t1_s in
     
     if not (T.equal l r) then (
       Format.printf "For problem: %a =?= %a\n" T.pp t0' T.pp t1';
       Format.printf "Subst: @[%a@]\n" S.pp sub;
       Format.printf "%a <> %a\n" T.pp l T.pp r;
       assert(false);
-    ); *)
+    );
     sub))

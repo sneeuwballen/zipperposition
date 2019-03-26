@@ -78,7 +78,8 @@ let rec eligible_arg t =
 let get_bvars args =
   let reduced = 
     List.map 
-      (fun t -> if (eligible_arg t) then (Lambda.eta_quick_reduce t) else t)
+      (fun t -> if (eligible_arg t) then (Lambda.eta_quick_reduce t) else t) 
+                (*Lambda.eta_quick_reduce t*)
     args in
   let n = List.length reduced in
   if List.for_all T.is_bvar reduced then (

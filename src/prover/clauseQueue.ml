@@ -328,7 +328,7 @@ module Make(C : Clause_intf.S) = struct
     make ~ratio:5 ~weight:WeightFun.conj_relative "conj_relative"
 
   let conj_var_relative_mk () : t =
-    make ~ratio:5 ~weight:(WeightFun.conj_relative ~distinct_vars_mul:1.05) 
+    make ~ratio:5 ~weight:(WeightFun.conj_relative ~distinct_vars_mul:1.06) 
          "conj_relative_var"
 
   let of_profile p =
