@@ -22,7 +22,7 @@ let _imit_first = ref false
 let _cons_ff = ref true
 let _solve_var = ref false
 
-(* apply a substitution and reduce to normal form *)
+(* apply a substitution and reduce to whnf *)
 let nfapply s u = Lambda.beta_red_head (S.apply s u)
 
 let disable_conservative_elim () =
@@ -56,7 +56,7 @@ let eliminate_at_idx ~scope ~counter v k =
   let prefix_types' = CCList.remove_at_idx k prefix_types in
   let new_ty = Type.arrow prefix_types' return_type in
   let bvars' = CCList.remove_at_idx k bvars in
-  let matrix_head = T.var (H.fresh_w_counter ~counter ~ty:new_ty ()) in
+  let matrix_head = T.var (H.fresh_cnt ~counter ~ty:new_ty ()) in
   let matrix = T.app matrix_head bvars' in
   let subst_value = T.fun_l prefix_types matrix in
   let subst = US.FO.singleton (v, scope) (subst_value, scope) in
@@ -73,7 +73,7 @@ let project_hs_one ~counter pref_types i type_ui =
   let new_vars = 
     List.map (fun ty ->
       let new_ty =  (Type.arrow pref_types ty) in
-      T.var (H.fresh_w_counter ~counter ~ty:new_ty ()))
+      T.var (H.fresh_cnt ~counter ~ty:new_ty ()))
     pref_types_ui  in
   let new_vars_applied = List.map (fun nv -> T.app nv pref_args) new_vars in
   let matrix_hd = T.bvar ~ty:type_ui (n_args_free-i-1) in

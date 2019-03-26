@@ -16,10 +16,6 @@ exception NotUnifiable
 exception NotInFragment
 
 
-
-(* Given two terms and their lambda prefixes, expands one of the terms
-   ,if necessary, to have the same size of the lambda prefix as the other
-   term *)
 val eta_expand_otf : Type.t list -> Type.t list -> T.t -> T.t -> T.t * T.t * Type.t list
 
 (* Does unification on types (or other simple constructs) and catches

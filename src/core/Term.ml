@@ -221,6 +221,7 @@ let as_var_exn t = match T.view t with
 let as_var t = try Some (as_var_exn t) with Invalid_argument _ -> None
 
 let as_app = T.as_app
+let as_bvar_exn = T.as_bvar_exn
 
 let rec as_fun t = match view t with
   | Fun (ty_arg, bod) ->

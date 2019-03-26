@@ -57,7 +57,7 @@ let project_hs_one ~counter pref_types i type_ui =
   let pref_types_ui, _ = Type.open_fun type_ui in
   let n_args_free = List.length pref_types in
   let pref_args = pref_types |> List.mapi (fun i ty -> T.bvar ~ty (n_args_free-i-1)) in
-  let new_vars = pref_types_ui |> List.map (fun ty -> T.var (H.fresh_w_counter ~counter ~ty:(Type.arrow pref_types ty) () )) in
+  let new_vars = pref_types_ui |> List.map (fun ty -> T.var (H.fresh_cnt ~counter ~ty:(Type.arrow pref_types ty) () )) in
   let new_vars_applied = new_vars |> List.map (fun nv -> T.app nv pref_args) in
   let matrix_hd = T.bvar ~ty:type_ui (n_args_free-i-1) in
   let matrix = T.app matrix_hd new_vars_applied in
@@ -112,7 +112,7 @@ let project_huet_style ~scope ~counter u v l =
         (* To get a complete polymorphic algorithm, we need to consider the case that a type variable could be instantiated as a function. *)
         match Type.view type_ul with
           | Type.Var alpha when not @@ Type.equal type_ul var_ret_type -> 
-            let beta = (H.fresh_w_counter ~counter ~ty:Type.tType ()) in
+            let beta = (H.fresh_cnt ~counter ~ty:Type.tType ()) in
             let alpha' = (Type.arrow [Type.var beta] var_ret_type) in
             let ty_subst = US.FO.singleton (alpha, scope) (Term.of_ty alpha', scope) in
             let v' = HVar.cast ~ty:(S.apply_ty ty_subst (HVar.ty v, scope)) v in
@@ -144,7 +144,7 @@ let imitate_onesided ~scope ~counter u v =
       prefix_types_v 
       |> List.map (fun prefix_type_v ->
         let ty = Type.arrow prefix_types_u prefix_type_v in
-        let var = T.var (H.fresh_w_counter ~counter ~ty ()) in
+        let var = T.var (H.fresh_cnt ~counter ~ty ()) in
         T.app var bvars) 
     in
     let matrix = T.app head_v matrix_args in
@@ -177,17 +177,17 @@ let identify ~scope ~counter u v (_ : (T.var * int) list) =
       prefix_types_v 
       |> List.map (fun prefix_type_v ->
         let ty = Type.arrow prefix_types_u prefix_type_v in
-        let var = T.var (H.fresh_w_counter ~counter ~ty ()) in
+        let var = T.var (H.fresh_cnt ~counter ~ty ()) in
         T.app var bvars_u) 
     in
     let matrix_args_v = 
       prefix_types_u
       |> List.map (fun prefix_type_u ->
         let ty = Type.arrow prefix_types_v prefix_type_u in
-        let var = T.var (H.fresh_w_counter ~counter ~ty ()) in
+        let var = T.var (H.fresh_cnt ~counter ~ty ()) in
         T.app var bvars_v) 
     in
-    let matrix_head = T.var (H.fresh_w_counter ~counter ~ty:(Type.arrow (prefix_types_u @ prefix_types_v) return_type) ()) in
+    let matrix_head = T.var (H.fresh_cnt ~counter ~ty:(Type.arrow (prefix_types_u @ prefix_types_v) return_type) ()) in
     let matrix_u = T.app matrix_head (bvars_u @ matrix_args_u) in
     let matrix_v = T.app matrix_head (matrix_args_v @ bvars_v) in
     let subst_value_u = T.fun_l prefix_types_u matrix_u in 
@@ -207,7 +207,7 @@ let eliminate ~scope ~counter _ _ l =
     let bvars = prefix_types |> List.rev |> List.mapi (fun i ty -> T.bvar ~ty i) |> List.rev in
     let prefix_types' = CCList.remove_at_idx k prefix_types in
     let bvars' = CCList.remove_at_idx k bvars in
-    let matrix_head = T.var (H.fresh_w_counter ~counter ~ty:(Type.arrow prefix_types' return_type) ()) in
+    let matrix_head = T.var (H.fresh_cnt ~counter ~ty:(Type.arrow prefix_types' return_type) ()) in
     let matrix = T.app matrix_head bvars' in
     let subst_value = T.fun_l prefix_types matrix in
     let subst = US.FO.singleton (v, scope) (subst_value, scope) in
@@ -227,12 +227,12 @@ let iterate_one ~counter types_w prefix_types return_type i type_ul =
     let bvars_u_under_w = prefix_types |> List.rev |> List.mapi (fun i ty -> T.bvar ~ty (i + List.length types_w)) |> List.rev in
     let bvars_w = types_w |> List.rev |> List.mapi (fun i ty -> T.bvar ~ty i) |> List.rev in
     let bvar_ul_under_w = T.bvar ~ty:type_ul (List.length prefix_types - 1 - i + List.length types_w) in
-    let vars_y = prefix_types_ul |> List.map (fun ty -> T.var (H.fresh_w_counter ~counter ~ty:(Type.arrow (prefix_types @ types_w) ty) ())) in
+    let vars_y = prefix_types_ul |> List.map (fun ty -> T.var (H.fresh_cnt ~counter ~ty:(Type.arrow (prefix_types @ types_w) ty) ())) in
     let matrix = T.app bvar_ul_under_w (vars_y |> List.map (fun y -> T.app y (bvars_u_under_w @ bvars_w))) in
     T.fun_l types_w matrix
   in
   let bvars_u = prefix_types |> List.rev |> List.mapi (fun i ty -> T.bvar ~ty i) |> List.rev in
-  let var_x = T.var (H.fresh_w_counter ~counter ~ty:(Type.arrow (prefix_types @ [Type.arrow types_w return_type_ul]) return_type) ()) in
+  let var_x = T.var (H.fresh_cnt ~counter ~ty:(Type.arrow (prefix_types @ [Type.arrow types_w return_type_ul]) return_type) ()) in
   let matrix = T.app var_x (bvars_u @ [inner_lambda_expr]) in
   let subst_value = T.fun_l prefix_types matrix in
   subst_value
@@ -264,7 +264,7 @@ let iterate ~scope ~counter u v l =
       )
   in
   (* The tuple `w` can be of any length. Hence we use the sequence [[alpha], [alpha, beta], [alpha, beta, gamma], ...] *)
-  let types_w_seq = OSeq.iterate [] (fun types_w -> Type.var (H.fresh_w_counter ~counter ~ty:Type.tType ()) :: types_w) in
+  let types_w_seq = OSeq.iterate [] (fun types_w -> Type.var (H.fresh_cnt ~counter ~ty:Type.tType ()) :: types_w) in
   if OSeq.is_empty positions 
   then OSeq.empty
   else 
@@ -280,8 +280,8 @@ let iterate ~scope ~counter u v l =
               (* To get a complete polymorphic algorithm, we need to consider the case that a type variable could be instantiated as a function. *)
               match Type.view type_ul with
                 | Type.Var alpha -> 
-                  let beta = (H.fresh_w_counter ~counter ~ty:Type.tType ()) in
-                  let gamma = (H.fresh_w_counter ~counter ~ty:Type.tType ()) in
+                  let beta = (H.fresh_cnt ~counter ~ty:Type.tType ()) in
+                  let gamma = (H.fresh_cnt ~counter ~ty:Type.tType ()) in
                   let alpha' = (Type.arrow [Type.var beta] (Type.var gamma)) in
                   let ty_subst = US.FO.singleton (alpha, scope) (Term.of_ty alpha', scope) in
                   let v' = HVar.cast ~ty:(S.apply_ty ty_subst (HVar.ty v, scope)) v in
@@ -447,7 +447,7 @@ let unify_scoped (t0, scope0) (t1, scope1) =
         if US.FO.mem subst (v,scope) 
         then subst
         else 
-          let newvar = T.var (H.fresh_w_counter ~counter ~ty:(S.apply_ty subst (HVar.ty v, scope)) ()) in
+          let newvar = T.var (H.fresh_cnt ~counter ~ty:(S.apply_ty subst (HVar.ty v, scope)) ()) in
           US.FO.bind subst (v,scope) (newvar, unifscope) 
       in
       let subst = US.empty in

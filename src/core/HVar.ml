@@ -42,7 +42,7 @@ let[@inline] fresh ~ty () =
   decr fresh_;
   v
 
-let fresh_w_counter ~counter ~ty () = 
+let fresh_cnt ~counter ~ty () = 
   let var = make ~ty !counter in 
   incr counter; 
   var

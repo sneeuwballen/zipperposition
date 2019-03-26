@@ -59,7 +59,7 @@ module FO = struct
     then subst
     else 
         let ty = apply_ty subst (HVar.ty v, scope) in
-        let newvar = Term.var (H.fresh_w_counter ~counter ~ty ()) in
+        let newvar = Term.var (H.fresh_cnt ~counter ~ty ()) in
         bind subst (v,scope) (newvar, new_scope) 
     in
     let subst = empty in
