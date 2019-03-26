@@ -9,6 +9,8 @@
     - delayed constraints
 *)
 
+module H = HVar
+
 type term = Subst.term
 type var = Subst.var
 
@@ -47,6 +49,24 @@ module FO = struct
     Subst.mem t.subst (v :> InnerTerm.t HVar.t Scoped.t)
   let deref s t = Subst.FO.deref s.subst t
   let singleton v t = bind empty v t
+  
+  let rename_to_new_scope ~counter (t0, scope0) (t1, scope1) =
+    let apply s t = Subst.FO.apply Subst.Renaming.none (subst s) t in
+    let apply_ty s ty = Subst.Ty.apply Subst.Renaming.none (subst s) ty in
+    let new_scope = if scope0 < scope1 then scope1 + 1 else scope0 + 1 in
+    let add_renaming scope subst v =
+    if mem subst (v,scope) 
+    then subst
+    else 
+        let ty = apply_ty subst (HVar.ty v, scope) in
+        let newvar = Term.var (H.fresh_w_counter ~counter ~ty ()) in
+        bind subst (v,scope) (newvar, new_scope) 
+    in
+    let subst = empty in
+    let subst = Term.Seq.vars t0 |> Sequence.fold (add_renaming scope0) subst in
+    let subst = Term.Seq.vars t1 |> Sequence.fold (add_renaming scope1) subst in
+    let t0', t1' = apply subst (t0, scope0), apply subst (t1, scope1) in
+    t0', t1', new_scope, subst
 end
 
 let has_constr t: bool = constr_l t <> []

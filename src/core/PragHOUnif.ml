@@ -309,31 +309,18 @@ and flex_proj_imit  ~depth ~subst ~nr_iter ~counter ~scope s t rest =
       ~nr_iter:((if num_args == 0 then 0 else 1) + nr_iter) 
         ((s, t, true) :: rest))
 
-let unify_scoped (t0, scope0) (t1, scope1) =
-    let unifscope = if scope0 < scope1 then scope1 + 1 else scope0 + 1 in
-    let counter = ref 0 in
-    let add_renaming scope subst v =
-    if US.FO.mem subst (v,scope) 
-    then subst
-    else 
-        let ty = S.apply_ty subst (HVar.ty v, scope) in
-        let newvar = T.var (H.fresh_w_counter ~counter ~ty ()) in
-        US.FO.bind subst (v,scope) (newvar, unifscope) 
-    in
-    let subst = US.empty in
-    let subst = T.Seq.vars t0 |> Sequence.fold (add_renaming scope0) subst in
-    let subst = T.Seq.vars t1 |> Sequence.fold (add_renaming scope1) subst in
-    let t0', t1' = S.apply subst (t0, scope0), S.apply subst (t1, scope1) in
-    unify ~depth:0 ~nr_iter:0 ~scope:unifscope ~counter ~subst [t0', t1', false]
-    |> OSeq.map (CCOpt.map (fun sub ->       
-      (* let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t0, scope0) in 
-      let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t1, scope1) in
-      
-      if not (T.equal l r) then (
-        Format.printf "For problem: %a =?= %a\n" T.pp t0' T.pp t1';
-        Format.printf "Subst: @[%a@]\n" S.pp sub;
-        Format.printf "%a <> %a\n" T.pp l T.pp r;
-        assert(false);
-      ); *)
-      
-      sub))
+let unify_scoped t0_s t1_s =
+  let counter = ref 0 in
+  let t0',t1',unifscope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
+  unify ~depth:0 ~nr_iter:0 ~scope:unifscope ~counter ~subst [t0', t1', false]
+  |> OSeq.map (CCOpt.map (fun sub ->       
+    (* let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t0, scope0) in 
+    let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub (t1, scope1) in
+    
+    if not (T.equal l r) then (
+      Format.printf "For problem: %a =?= %a\n" T.pp t0' T.pp t1';
+      Format.printf "Subst: @[%a@]\n" S.pp sub;
+      Format.printf "%a <> %a\n" T.pp l T.pp r;
+      assert(false);
+    ); *)
+    sub))

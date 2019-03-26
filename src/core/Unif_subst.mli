@@ -60,6 +60,10 @@ module FO : sig
   val mem : t -> Type.t HVar.t Scoped.t -> bool
   val deref : t -> Term.t Scoped.t -> Term.t Scoped.t
   val singleton : Type.t HVar.t Scoped.t -> Term.t Scoped.t -> t
+  val rename_to_new_scope : counter:int ref -> 
+                            Term.t Scoped.t -> 
+                            Term.t Scoped.t ->
+                            Term.t * Term.t * Scoped.scope * t
 end
 
 include Interfaces.HASH with type t := t
