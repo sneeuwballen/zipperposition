@@ -324,3 +324,14 @@ let unify_scoped t0_s t1_s =
   let counter = ref 0 in
   let t0',t1',unifscope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
   unify ~depth:0 ~nr_iter:0 ~scope:unifscope ~counter ~subst [t0', t1', false]
+  |> OSeq.map (CCOpt.map (fun sub ->       
+    let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t0_s in 
+    let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t1_s in
+    
+    if not (T.equal l r) then (
+      Format.printf "For problem: %a =?= %a\n" T.pp t0' T.pp t1';
+      Format.printf "Subst: @[%a@]\n" S.pp sub;
+      Format.printf "%a <> %a\n" T.pp l T.pp r;
+      assert(false);
+    );
+    sub))
