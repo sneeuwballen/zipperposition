@@ -431,8 +431,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
       Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
-      (* assert(List.for_all (Lit.for_all Term.DB.is_closed) new_lits); *)
+      assert(List.for_all (Lit.for_all Term.DB.is_closed) new_lits);
       (* C.check_types new_clause; *)
+      (* assert(C.Seq.terms new_clause 
+             |> Sequence.for_all (fun t ->
+                  T.Seq.subterms t
+                  |> Sequence.for_all (fun st -> 
+                        List.for_all T.DB.is_closed (T.get_mand_args st))
+      )); *)
       Some new_clause
     with ExitSuperposition reason ->
       Util.debugf ~section 3 "... cancel, %s" (fun k->k reason);
@@ -1087,7 +1093,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                  (fun k->k T.pp t 0 T.pp l cur_sc T.pp r cur_sc S.pp subst);
                (* sanity checks *)
                assert (Type.equal (T.ty l) (T.ty r));
-               assert (Unif.FO.equal ~subst (l,cur_sc) (t,0));
+               if not (Unif.FO.equal ~subst (l,cur_sc) (t,0)) then (
+                 let l1,l2 = Subst.FO.apply Subst.Renaming.none subst (l,cur_sc), Subst.FO.apply Subst.Renaming.none subst (t,0) in
+                 let l1,l2 = Lambda.snf l1, Lambda.snf l2 in
+                 if (Term.equal l1 l2) then Format.printf "EQUAL!\n"
+                 else (
+                  Format.printf "DIFF:\n@[%a@]\n<>\n@[%a@]\n" Term.pp l1 Term.pp l2;
+                  Format.printf "ORIG:\n@[%a@]\n<>\n@[%a@]\n" Term.pp l Term.pp t;
+                  Format.printf "Subst: @[%a@]" S.pp subst);
+                 assert false;
+               );
                st.demod_clauses <-
                  (unit_clause,subst,cur_sc) :: st.demod_clauses;
                st.demod_sc <- 1 + st.demod_sc; (* allocate new scope *)

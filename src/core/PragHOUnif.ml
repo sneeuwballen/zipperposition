@@ -13,9 +13,9 @@ module S = struct
   let pp = US.pp
 end
 
-let max_depth = 15
-let max_app_projections = 4
-let back_off_interval = 6
+let max_depth = 13
+let max_app_projections = 2
+let back_off_interval = 4
 
 let _cons_e = ref true
 let _imit_first = ref false
@@ -45,7 +45,6 @@ let build_constraints ~ban_id args1 args2 rest =
   let zipped = List.map (fun (x,y) -> (x,y,ban_id)) (List.combine args1 args2) in
   let rigid, non_rigid = List.partition (fun (s,t,_) ->
     T.is_const (T.head_term s) && T.is_const (T.head_term t)) zipped in
-  assert(List.length rigid + List.length non_rigid = List.length zipped);
   rigid @ rest @ non_rigid
 
 (* Create substitution: v |-> λ u1 ... um. x u1 ... u{k-1} u{k+1} ... um *)
@@ -64,7 +63,7 @@ let eliminate_at_idx ~scope ~counter v k =
 
 (* Create substitution: v |-> λ u1 ... um. u_i (H1 u1 ... um) ... (Hn u1 ... um)
    where type of u_i is τ1 -> ... τn -> τ where τ is atomic and H_i have correct
-   type. This substitution is called an imitation. *)
+   type. This substitution is called a projection. *)
 let project_hs_one ~counter pref_types i type_ui =
   let pref_types_ui, _ = Type.open_fun type_ui in
   let n_args_free = List.length pref_types in
@@ -145,8 +144,7 @@ let rec unify ~depth ~nr_iter ~scope ~counter ~subst = function
       (* all constraints solved for the initial problem *)
       OSeq.return (Some subst)
   | (s,t,ban_id) :: rest as l -> (
-    if depth >= max_depth then
-      OSeq.empty
+    if depth >= max_depth then OSeq.empty
     else (
       if (depth > 0 && depth mod back_off_interval = 0) then (
         (* Every once in a while we fill up the stream with Nones
@@ -175,7 +173,7 @@ let rec unify ~depth ~nr_iter ~scope ~counter ~subst = function
                   let subst = P.unif_simple ~scope ~subst:(US.subst subst) s' t' in
                   if CCOpt.is_some subst then (
                     let subst = CCOpt.get_exn subst in
-                    unify ~depth ~nr_iter ~scope ~counter ~subst rest
+                    unify ~depth:(depth+1) ~nr_iter ~scope ~counter ~subst rest
                   )
                   else raise P.NotUnifiable
                 )
@@ -325,13 +323,19 @@ let unify_scoped t0_s t1_s =
   let t0',t1',unifscope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
   unify ~depth:0 ~nr_iter:0 ~scope:unifscope ~counter ~subst [t0', t1', false]
   |> OSeq.map (CCOpt.map (fun sub ->       
-    let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t0_s in 
-    let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t1_s in
-    
-    if not (T.equal l r) then (
-      Format.printf "For problem: %a =?= %a\n" T.pp t0' T.pp t1';
-      Format.printf "Subst: @[%a@]\n" S.pp sub;
-      Format.printf "%a <> %a\n" T.pp l T.pp r;
-      assert(false);
-    );
+      let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t0_s in 
+      let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t1_s in
+      assert(Type.equal (Term.ty l) (Term.ty r));
+      if not (T.equal l r) then (
+        Format.printf "For problem: %a =?= %a\n" T.pp t0' T.pp t1';
+        Format.printf "Subst: @[%a@]\n" S.pp sub;
+        Format.printf "%a <> %a\n" T.pp l T.pp r;
+        assert(false);
+      );
+      (* if not (T.Seq.subterms l |> Sequence.append (T.Seq.subterms r) |> 
+          Sequence.for_all (fun st -> List.for_all T.DB.is_closed @@ T.get_mand_args st)) then ( 
+          Format.printf "Mand args not closed: %a =?= %a, res %a.\n" T.pp t0' T.pp t1' T.pp l; 
+          assert(false); 
+      );
+      assert (T.equal l r); *)
     sub))

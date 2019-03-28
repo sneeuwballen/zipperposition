@@ -311,7 +311,8 @@ module Inner = struct
 
   (* distinct ground terms *)
   let distinct_ground_l l : bool =
-    List.for_all T.is_ground l && distinct_term_l l
+    List.for_all (fun t -> T.is_ground t && List.length (T.DB.unbound t) =0) l 
+      && distinct_term_l l
 
   (* given [l], a list of distinct (ground) terms, and [rhs],
      replace [l] by distinct fresh variables indices in [rhs],
