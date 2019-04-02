@@ -13,7 +13,7 @@ module S = struct
   let pp = US.pp
 end
 
-let max_depth = 13
+let max_depth = ref 11
 let max_app_projections = 2
 let back_off_interval = 4
 
@@ -37,8 +37,12 @@ let enable_imit_first () =
 let enable_solve_var () = 
   _solve_var := true
 
+let set_max_depth d () =
+  max_depth := d 
+
 let compose_sub s1 s2 =
   US.merge s1 s2
+
 
 (* Make new list of constraints, prefering the rigid-rigid pairs *)
 let build_constraints ~ban_id args1 args2 rest = 
@@ -144,7 +148,7 @@ let rec unify ~depth ~nr_iter ~scope ~counter ~subst = function
       (* all constraints solved for the initial problem *)
       OSeq.return (Some subst)
   | (s,t,ban_id) :: rest as l -> (
-    if depth >= max_depth then OSeq.empty
+    if depth >= !max_depth then OSeq.empty
     else (
       if (depth > 0 && depth mod back_off_interval = 0) then (
         (* Every once in a while we fill up the stream with Nones
@@ -173,7 +177,7 @@ let rec unify ~depth ~nr_iter ~scope ~counter ~subst = function
                   let subst = P.unif_simple ~scope ~subst:(US.subst subst) s' t' in
                   if CCOpt.is_some subst then (
                     let subst = CCOpt.get_exn subst in
-                    unify ~depth:(depth+1) ~nr_iter ~scope ~counter ~subst rest
+                    unify ~depth ~nr_iter ~scope ~counter ~subst rest
                   )
                   else raise P.NotUnifiable
                 )
@@ -323,7 +327,7 @@ let unify_scoped t0_s t1_s =
   let t0',t1',unifscope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
   unify ~depth:0 ~nr_iter:0 ~scope:unifscope ~counter ~subst [t0', t1', false]
   |> OSeq.map (CCOpt.map (fun sub ->       
-      let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t0_s in 
+      (* let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t0_s in 
       let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t1_s in
       assert(Type.equal (Term.ty l) (Term.ty r));
       if not (T.equal l r) then (
@@ -331,7 +335,7 @@ let unify_scoped t0_s t1_s =
         Format.printf "Subst: @[%a@]\n" S.pp sub;
         Format.printf "%a <> %a\n" T.pp l T.pp r;
         assert(false);
-      );
+      ); *)
       (* if not (T.Seq.subterms l |> Sequence.append (T.Seq.subterms r) |> 
           Sequence.for_all (fun st -> List.for_all T.DB.is_closed @@ T.get_mand_args st)) then ( 
           Format.printf "Mand args not closed: %a =?= %a, res %a.\n" T.pp t0' T.pp t1' T.pp l; 

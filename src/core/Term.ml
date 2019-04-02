@@ -772,36 +772,35 @@ module DB = struct
   let unshift = T.DB.unshift
   let unbound = T.DB.unbound
   let skolemize_loosely_bound ?(already_sk=IntMap.empty) t =  
-   let rec aux skolemized depth subt =
-      match view subt with 
-      | Const _
-      | Var _ ->  (subt, skolemized)
-      | DB i -> if i >= depth then
-               (match IntMap.find_opt (i-depth) skolemized with 
-               | (Some sk) -> (if not (Type.equal (ty subt) (ty sk)) then 
-                              (Util.debugf 1 "Type mismatch: %a <> %a" 
-                              (fun k -> k Type.pp (ty subt) Type.pp (ty sk));
-                              assert false)); (sk, skolemized)
-               | None -> 
-                  let new_sk = mk_fresh_skolem [] (ty subt) in
-                  let skolemized = IntMap.add (i-depth) new_sk skolemized in
-                  new_sk,skolemized)
-               else subt, skolemized
-      | Fun (v_ty,body) -> let b', s' = aux skolemized (depth+1) body in
-                           fun_ v_ty b', s' 
-      | App (f, l) ->
-         let hd', s' = aux skolemized depth f in
-         let args, s'' = sk_args l s' depth  in   
-         app hd' args, s''
-      | AppBuiltin (hd,l) -> let args, s' = sk_args l skolemized depth in 
-                             app_builtin ~ty:(ty subt) hd args, s'
-   and sk_args l subst depth = List.fold_right (fun arg (acc, s) -> 
-                           let arg', s_new = aux s depth arg in
-                           arg'::acc, s_new) l ([], subst)
-   in Util.debugf 1 "skolemizing term: %a"
-      (fun k -> k pp t);
-      aux already_sk 0 t
-
+  let rec aux skolemized depth subt =
+    match view subt with 
+    | Const _
+    | Var _ ->  (subt, skolemized)
+    | DB i ->
+        if i >= depth then
+          (match IntMap.find_opt (i-depth) skolemized with 
+          | (Some sk) -> (sk, skolemized)
+          | None -> 
+             let new_sk = mk_fresh_skolem [] (ty subt) in
+             let skolemized = IntMap.add (i-depth) new_sk skolemized in
+             new_sk,skolemized)
+          else subt, skolemized
+    | Fun (v_ty,body) -> let b', s' = aux skolemized (depth+1) body in
+                         fun_ v_ty b', s' 
+    | App (f, l) ->
+       let hd', s' = aux skolemized depth f in
+       let args, s'' = sk_args l s' depth  in   
+       app hd' args, s''
+    | AppBuiltin (hd,l) -> let args, s' = sk_args l skolemized depth in 
+                           app_builtin ~ty:(ty subt) hd args, s'
+  and sk_args l subst depth = 
+      List.fold_right (fun arg (acc, s) -> 
+        let arg', s_new = aux s depth arg in
+        arg'::acc, s_new) 
+      l ([], subst)
+  in 
+    aux already_sk 0 t
+  
   let unskolemize sk_to_vars t = 
     let rec aux depth subt =
       match Map.find_opt subt sk_to_vars  with

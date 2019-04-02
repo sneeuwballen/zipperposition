@@ -1074,10 +1074,14 @@ module FO = struct
       let ta, sca = sc1 in 
       let tb, scb = sc2 in
       if(not (Term.DB.is_closed ta) || not (Term.DB.is_closed tb)) then (
-         Util.debugf ~section 1 "Skolemizing 1 %a" (fun k -> k Term.TPTP.pp ta);
          let sk_a, sk_a_subs = Term.DB.skolemize_loosely_bound ta in
-         Util.debugf ~section 1 "Skolemizing 2 %a" (fun k -> k Term.TPTP.pp tb);
          let sk_b, sk_b_subs = Term.DB.skolemize_loosely_bound tb in
+         (* Format.printf "Skolemized %a into %a.\n" Term.pp ta Term.pp sk_a;
+            Format.printf "Skolemized %a into %a.\n" Term.pp tb Term.pp sk_b;
+            Format.printf "Map a:\n";
+            Term.IntMap.iter (fun i t -> Format.printf "[%d:%a]\n" i Term.pp t) sk_a_subs;
+            Format.printf "Map b:\n";
+         Term.IntMap.iter (fun i t -> Format.printf "[%d:%a]\n" i Term.pp t) sk_b_subs; *)
          let res = (unify_full :> ?subst:unif_subst -> term Scoped.t -> term Scoped.t -> unif_subst)
                   ~subst (Scoped.make sk_a sca) (Scoped.make sk_b scb) in
          let sk_a_rev = Term.IntMap.fold (fun k v acc -> Term.Map.add v k acc) sk_a_subs Term.Map.empty in
@@ -1087,7 +1091,9 @@ module FO = struct
          let subst = Unif_subst.subst res in 
          let mapped = Subst.FO.map (fun t -> Term.DB.unskolemize sk_rev_union t) subst in
          let res' = Unif_subst.make mapped (Unif_subst.constr_l res) in
-         
+
+         (* Format.printf "Res: @[%a@]\n" Unif_subst.pp res'; *)
+
          res'  
       )
       else (
@@ -1103,14 +1109,22 @@ module FO = struct
       if(not (Term.DB.is_closed ta) || not (Term.DB.is_closed tb)) then (
         let sk_a, sk_a_subs = Term.DB.skolemize_loosely_bound ta in
         let sk_b, sk_b_subs = Term.DB.skolemize_loosely_bound tb in
+        (* Format.printf "Skolemized %a into %a.\n" Term.pp ta Term.pp sk_a;
+        Format.printf "Skolemized %a into %a.\n" Term.pp tb Term.pp sk_b;
+        Format.printf "Map a:\n";
+        Term.IntMap.iter (fun i t -> Format.printf "[%d:%a]\n" i Term.pp t) sk_a_subs;
+        Format.printf "Map b:\n";
+        Term.IntMap.iter (fun i t -> Format.printf "[%d:%a]\n" i Term.pp t) sk_b_subs; *)
         let res = (unify_syn :> ?subst:subst -> term Scoped.t -> term Scoped.t -> subst)
                   ~subst (Scoped.make sk_a sca) (Scoped.make sk_b scb) in
         let sk_a_rev = Term.IntMap.fold (fun k v -> Term.Map.add v k) sk_a_subs Term.Map.empty in
         let sk_b_rev = Term.IntMap.fold (fun k v -> Term.Map.add v k) sk_b_subs Term.Map.empty in
         let sk_rev_union = Term.Map.union (fun _ _ _ -> raise (Invalid_argument "keys must be unique "))
                           sk_a_rev sk_b_rev in
-        let res = Subst.FO.map (fun t -> Term.DB.unskolemize sk_rev_union t) res in
-        
+        let res = Subst.FO.map (Term.DB.unskolemize sk_rev_union) res in
+
+        (* Format.printf "Res: %@[%a@]\n" Subst.pp res; *)
+
         res
       )
       else (

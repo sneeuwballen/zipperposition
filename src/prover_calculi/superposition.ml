@@ -465,11 +465,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     assert (!_sup_at_var_headed || info.sup_kind = SupAV || not (T.is_var (T.head_term info.u_p)));
     let active_idx = Lits.Pos.idx info.active_pos in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
+    let shift_vars = if info.sup_kind = SupEXT then 0 else -1 in
     try
       let renaming = S.Renaming.create () in
       let us = info.subst in
       let subst = US.subst us in
-      let t' = S.FO.apply renaming subst (info.t, sc_a) in
+      let t' = S.FO.apply ~shift_vars renaming subst (info.t, sc_a) in
       begin match info.passive_lit, info.passive_pos with
         | Lit.Prop (_, true), P.Arg(_, P.Left P.Stop) ->
           if T.equal t' T.true_
@@ -478,7 +479,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | Lit.Equation (v, _, true), P.Arg(_, P.Right P.Stop) ->
           (* are we in the specific, but no that rare, case where we
              rewrite s=t using s=t (into a tautology t=t)? *)
-          let v' = S.FO.apply renaming subst (v, sc_p) in
+          let v' = S.FO.apply ~shift_vars renaming subst (v, sc_p) in
           if T.equal t' v'
           then raise (ExitSuperposition "will yield a tautology");
         | _ -> ()
@@ -488,7 +489,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       let new_trail = C.trail_l [info.active; info.passive] in
       if Env.is_trivial_trail new_trail then raise (ExitSuperposition "trivial trail");
-      let s' = S.FO.apply renaming subst (info.s, sc_a) in
+      let s' = S.FO.apply ~shift_vars renaming subst (info.s, sc_a) in
       if (
         O.compare ord s' t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
@@ -504,7 +505,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let lits_a = CCArray.except_idx (C.lits info.active) active_idx in
       let lits_a = Lit.apply_subst_list renaming subst (lits_a, sc_a) in
       (* build passive literals and replace u|p\sigma with t\sigma *)
-      let u' = S.FO.apply renaming subst (info.u_p, sc_p) in
+      let u' = S.FO.apply ~shift_vars renaming subst (info.u_p, sc_p) in
       assert (Type.equal (T.ty u') (T.ty t'));
       let lits_p = Array.to_list (C.lits info.passive) in
       let lits_p = Lit.apply_subst_list renaming subst (lits_p, sc_p) in
@@ -1093,16 +1094,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                  (fun k->k T.pp t 0 T.pp l cur_sc T.pp r cur_sc S.pp subst);
                (* sanity checks *)
                assert (Type.equal (T.ty l) (T.ty r));
-               if not (Unif.FO.equal ~subst (l,cur_sc) (t,0)) then (
-                 let l1,l2 = Subst.FO.apply Subst.Renaming.none subst (l,cur_sc), Subst.FO.apply Subst.Renaming.none subst (t,0) in
-                 let l1,l2 = Lambda.snf l1, Lambda.snf l2 in
-                 if (Term.equal l1 l2) then Format.printf "EQUAL!\n"
-                 else (
-                  Format.printf "DIFF:\n@[%a@]\n<>\n@[%a@]\n" Term.pp l1 Term.pp l2;
-                  Format.printf "ORIG:\n@[%a@]\n<>\n@[%a@]\n" Term.pp l Term.pp t;
-                  Format.printf "Subst: @[%a@]" S.pp subst);
-                 assert false;
-               );
+               assert (Unif.FO.equal ~subst (l,cur_sc) (t,0));
                st.demod_clauses <-
                  (unit_clause,subst,cur_sc) :: st.demod_clauses;
                st.demod_sc <- 1 + st.demod_sc; (* allocate new scope *)

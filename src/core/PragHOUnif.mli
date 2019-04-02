@@ -23,6 +23,8 @@ val enable_imit_first : unit -> unit
    an extension of pattern unification algorithm. *)
 val enable_solve_var : unit -> unit
 
+val set_max_depth : int -> unit -> unit
+
 (* Unify terms of the same scope. Assumes that terms are in eta-long form. *)
 val unify : depth:int ->
             nr_iter:int ->

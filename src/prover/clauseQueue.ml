@@ -13,6 +13,9 @@ module type S = ClauseQueue_intf.S
 
 type profile = ClauseQueue_intf.profile
 
+let cr_var_ratio = ref 5
+let cr_var_mul   = ref 1.1
+
 let profiles_ =
   let open ClauseQueue_intf in
   [ "default", P_default
@@ -27,7 +30,28 @@ let profiles_ =
 
 let profile_of_string s =
   let s = s |> String.trim |> CCString.lowercase_ascii in
-  try List.assoc s profiles_
+  try
+    match CCString.chop_prefix ~pre:"conjecture-relative-var" s with
+    | Some suffix -> 
+        let err_msg = "conjecutre-relative-var(ratio:int,var_mul:float)" in
+        let args = List.map (fun s -> 
+                    String.trim (CCString.replace ~sub:")" ~by:"" 
+                                  (CCString.replace ~sub:"(" ~by:"" s))) 
+                  (CCString.split ~by:"," suffix) in
+        if List.length args != 2 then (invalid_arg err_msg)
+        else (
+          let ratio = CCInt.of_string (List.nth args 0) in
+          let var_mul = Pervasives.float_of_string_opt (List.nth args 1) in
+          if CCOpt.is_none ratio || CCOpt.is_none var_mul then (
+            invalid_arg err_msg;
+          )
+          else (
+            cr_var_ratio := CCOpt.get_exn ratio;
+            cr_var_mul := CCOpt.get_exn var_mul;
+            ClauseQueue_intf.P_conj_rel_var
+          )
+        )
+    | None ->  List.assoc s profiles_
   with Not_found -> invalid_arg ("unknown queue profile: " ^ s)
 
 let _profile = ref ClauseQueue_intf.P_default
@@ -36,7 +60,7 @@ let set_profile p = _profile := p
 let parse_profile s = _profile := (profile_of_string s)
 
 let () =
-  let o = Arg.Symbol (List.map fst profiles_, parse_profile) in
+  let o = Arg.String (parse_profile) in
   Params.add_opts
     [ "--clause-queue", o,
       " choose which set of clause queues to use (for selecting next active clause)";
@@ -328,7 +352,7 @@ module Make(C : Clause_intf.S) = struct
     make ~ratio:6 ~weight:WeightFun.conj_relative "conj_relative"
 
   let conj_var_relative_mk () : t =
-    make ~ratio:7 ~weight:(WeightFun.conj_relative ~distinct_vars_mul:1.04)
+    make ~ratio:!cr_var_ratio ~weight:(WeightFun.conj_relative ~distinct_vars_mul:!cr_var_mul)
          "conj_relative_var"
 
   let of_profile p =

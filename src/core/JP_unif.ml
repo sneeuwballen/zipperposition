@@ -252,13 +252,7 @@ let iterate ~scope ~counter u v l =
         let prefix_types, return_type = Type.open_fun (HVar.ty v) in
         prefix_types 
         |> List.mapi
-          (fun i type_ul ->
-            if Type.is_fun type_ul || Type.is_var type_ul
-            then 
-              Some (v, prefix_types, return_type, i, type_ul)
-            else 
-              None
-          ) 
+          (fun i type_ul -> Some (v, prefix_types, return_type, i, type_ul))
         |> CCList.filter_map (fun x -> x)
         |> OSeq.of_list
       )
@@ -271,14 +265,17 @@ let iterate ~scope ~counter u v l =
     types_w_seq
     |> OSeq.flat_map 
       (fun types_w -> 
-        positions
-        |> OSeq.map
-          (fun (v, prefix_types, return_type, i, type_ul) -> 
-            if Type.is_fun type_ul 
-            then Some (US.FO.singleton (v, scope) (iterate_one ~counter types_w prefix_types return_type i type_ul, scope))
-            else 
-              (* To get a complete polymorphic algorithm, we need to consider the case that a type variable could be instantiated as a function. *)
-              match Type.view type_ul with
+        (* Taking all the prefix variables *)
+        OSeq.append 
+          (positions
+          |> OSeq.map 
+              (fun (v,prefix_types, return_type, i, type_ul) -> 
+                Some (US.FO.singleton (v, scope) (iterate_one ~counter types_w prefix_types return_type i type_ul, scope))))
+          (* + expanding all polymorphic variables into arrow types *)
+          (positions
+          |> OSeq.map 
+              (fun (v,prefix_types, return_type, i, type_ul) -> 
+                match Type.view type_ul with
                 | Type.Var alpha -> 
                   let beta = (H.fresh_cnt ~counter ~ty:Type.tType ()) in
                   let gamma = (H.fresh_cnt ~counter ~ty:Type.tType ()) in
@@ -288,11 +285,9 @@ let iterate ~scope ~counter u v l =
                   let prefix_types' = prefix_types |> CCList.map (fun ty -> S.apply_ty ty_subst (ty, scope)) in
                   let return_type' = S.apply_ty ty_subst (return_type, scope) in
                   Some (US.FO.bind ty_subst (v', scope) (iterate_one ~counter types_w prefix_types' return_type' i alpha', scope))
-                | _ -> None
-          )
+                | _ -> None)))
         (* Append some "None"s to delay the substitutions containing long w tuples *)
         |> (fun seq -> OSeq.append seq (OSeq.take 50 (OSeq.repeat None)))
-      )
   
 (* TODO: use OSeq directly? *)
 
