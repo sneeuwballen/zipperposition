@@ -137,17 +137,11 @@ let app f l = match l with
   | _::_ ->
     Util.enter_prof prof_app;
     (* first; compute type *)
-    try
-      let ty_result = Type.apply_unsafe (ty f) l in
-      (* apply constant to type args and args *)
-      let res = T.app ~ty:(ty_result : Type.t :> T.t) f l in
-      Util.exit_prof prof_app;
-      res
-    
-    with Type.ApplyError _ ->
-      let err_msg = CCFormat.sprintf "Error applying %a (of type %a) to %a"
-                    T.pp f Type.pp (ty f) (CCList.pp T.pp) l in
-      raise (Type.ApplyError err_msg)
+    let ty_result = Type.apply_unsafe (ty f) l in
+    (* apply constant to type args and args *)
+    let res = T.app ~ty:(ty_result : Type.t :> T.t) f l in
+    Util.exit_prof prof_app;
+    res
     
 
 let app_full f tyargs l =
