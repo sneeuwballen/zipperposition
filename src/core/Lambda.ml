@@ -65,7 +65,7 @@ module Inner = struct
         (* beta-reduce *)
         Util.debugf 50 "(@[<2>beta-reduce@ @[%a@ %a@]@])"
           (fun k->k T.pp st.head T.pp a);
-        assert (T.equal ty_var (T.ty_exn a));
+        assert (not (T.is_ground ty_var) || not (T.is_ground (T.ty_exn a)) || T.equal ty_var (T.ty_exn a));
         let st' =
           { head=body;
             env=DBEnv.push st.env a;

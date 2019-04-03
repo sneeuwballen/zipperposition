@@ -24,6 +24,16 @@ let unif_simple ?(subst=Subst.empty) ~scope t s =
     Some (US.of_subst type_unifier)
   with Unif.Fail -> None
 
+let cast_var v subst sc =
+  let ty = Term.ty v in
+  if Type.is_ground ty then v
+  else (
+    match T.view v with
+    | T.Var x -> T.var (HVar.cast x ~ty:(S.apply_ty subst (ty, sc)))
+    | T.DB i  -> T.bvar ~ty:(S.apply_ty subst (ty, sc)) i
+    | _ -> v
+  )
+
 (* Make new list of constraints, prefering the rigid-rigid pairs *)
 let build_constraints args1 args2 rest = 
   let zipped = List.combine args1 args2 in
@@ -124,17 +134,29 @@ let rec norm_deref subst (t,sc) =
   variables). The target term can be any term.  
    *)
 let rec build_term ?(depth=0) ~subst ~scope ~counter var bvar_map t =
+  let args_same args new_args = 
+    List.for_all2 (fun s t -> 
+      try 
+        let t = CCOpt.get_exn t in
+        Term.equal s t
+      with Invalid_argument _ -> false
+    ) args new_args in
+
   let t = Lambda.whnf t in
   match T.view t with
-  | T.Var _ -> let t' = fst @@ US.FO.deref subst (t,scope) in
-               if T.equal t' t then (
-                 if T.equal var t then raise (Failure "occurs check")
-                 else (t, subst)
-               ) 
-               else build_term ~depth ~subst ~scope ~counter var bvar_map t'  
+  | T.Var _ -> 
+    let t = cast_var t subst scope in 
+    let t' = fst @@ US.FO.deref subst (t,scope) in
+    if T.equal t' t then (
+      if T.equal var t then raise (Failure "occurs check")
+      else (cast_var t subst scope, subst)
+    ) 
+    else build_term ~depth ~subst ~scope ~counter var bvar_map t'  
   | T.Const _ -> (t, subst)
   | T.App (hd, args) ->
       if T.is_var hd then (
+        let old_hd = hd in
+        let hd = cast_var hd subst scope in
         if (T.equal var hd) then
             raise (Failure "Occurs check!");
         (* If the variable is not yet bound, try to bind to target subterm.
@@ -154,9 +176,10 @@ let rec build_term ?(depth=0) ~subst ~scope ~counter var bvar_map t =
              to dereference and try again. If we have not then we prune
              away the arguments that cound not be unified.*)
           if not (US.FO.mem subst (Term.as_var_exn hd, scope)) then (
-            let pref_types = List.map Term.ty args in
+            let pref_types = List.map (fun t-> S.apply_ty subst (Term.ty t, scope)) args in
             let n = List.length pref_types in
-            let ret_type = Type.apply_unsafe (Term.ty hd) (args :> InnerTerm.t list) in
+            let ret_type = Type.apply_unsafe (Term.ty old_hd) (args :> InnerTerm.t list) in
+            let ret_type = S.apply_ty subst (ret_type, scope) in
             let matrix = 
               CCList.filter_map (fun x->x) (List.mapi (fun i opt_arg -> 
                 (match opt_arg with
@@ -171,7 +194,8 @@ let rec build_term ?(depth=0) ~subst ~scope ~counter var bvar_map t =
               res_term, subst
             ) 
             else (
-              T.app hd (CCList.filter_map (fun x->x) new_args), subst)
+              if T.equal hd old_hd && args_same args new_args then (t,subst)
+              else T.app hd (CCList.filter_map (fun x->x) new_args), subst)
           )
           else (
             let hd',_ =  US.FO.deref subst (hd, scope) in
@@ -191,13 +215,16 @@ let rec build_term ?(depth=0) ~subst ~scope ~counter var bvar_map t =
           let arg', subst = build_term ~depth ~subst ~scope ~counter var bvar_map arg in
           arg' :: l, subst 
         ) args ([], subst) in
-        T.app new_hd new_args, subst
+        if T.equal new_hd hd && List.for_all2 T.equal args new_args then t,subst
+        else T.app new_hd new_args, subst
       )
   | T.Fun(ty, body) -> 
     let b', subst = build_term ~depth:(depth+1) ~subst ~scope ~counter var bvar_map body in
-    T.fun_ ty b', subst
+    let new_ty = S.apply_ty subst (ty,scope) in
+    if T.equal b' body && Type.equal new_ty ty then t,subst
+    else T.fun_ new_ty  b', subst
   | T.DB i -> 
-    if i < depth then t,subst
+    if i < depth then cast_var t subst scope,subst
     else (
       (* Check which argument of the applied variable a
          given bound variable correspodns to.  *)
@@ -206,16 +233,11 @@ let rec build_term ?(depth=0) ~subst ~scope ~counter var bvar_map t =
         let val_,bvar = CCArray.get bvar_map idx in
         assert(val_ = (i-depth));
         assert(Type.equal (Term.ty bvar) (Term.ty t));
-        T.DB.shift depth bvar, subst
+        T.DB.shift depth (cast_var bvar subst scope), subst
       | _ -> raise (Failure "Bound variable not argument to head")
     )
-  | T.AppBuiltin(hd,args) -> 
-    let new_args, subst =
-      List.fold_right (fun arg (l, subst) ->
-        let arg', subst = build_term ~depth ~subst ~scope ~counter var bvar_map arg in
-        arg' :: l, subst 
-      ) args ([], subst) in
-      T.app_builtin ~ty:(Term.ty t) hd new_args, subst
+  | T.AppBuiltin(_,_) -> 
+      raise (Failure "Trying to bind to a predicate")
 
 let rec unify ~scope ~counter ~subst = function
   | [] -> subst
@@ -236,6 +258,7 @@ let rec unify ~scope ~counter ~subst = function
       let body_s', body_t', _ = eta_expand_otf pref_s pref_t body_s body_t in
       let hd_s, args_s = T.as_app body_s' in
       let hd_t, args_t = T.as_app body_t' in
+      let hd_s, hd_t = CCPair.map_same (fun t -> cast_var t subst scope) (hd_s, hd_t) in
 
       match T.view hd_s, T.view hd_t with 
       | (T.Var _, T.Var _) ->
@@ -251,11 +274,11 @@ let rec unify ~scope ~counter ~subst = function
       | (T.Const _, T.Var _) | (T.DB _, T.Var _) ->
         let subst = flex_rigid ~subst ~counter ~scope  body_t' body_s' in
         unify ~scope ~counter ~subst rest
-      | T.Const f , T.Const g when ID.equal f g ->
-        assert(List.length args_s = List.length args_t);
+      | T.Const f , T.Const g when ID.equal f g && List.length args_s = List.length args_t ->
+        (* assert(List.length args_s = List.length args_t); *)
         unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest
-      | T.DB i, T.DB j when i = j ->
-        assert (List.length args_s = List.length args_t);
+      | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->
+        (* assert (List.length args_s = List.length args_t); *)
         unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest
       | _ -> raise NotUnifiable) 
     else (
@@ -343,7 +366,7 @@ and flex_rigid ~subst ~counter ~scope flex rigid =
   let bvars = CCOpt.get_exn bvars in
   try
     let matrix, subst = 
-      build_term ~subst ~scope ~counter hd bvars rigid in
+      build_term ~subst ~scope ~counter (cast_var hd subst scope) bvars rigid in
     let new_subs_val = T.fun_l (List.map Term.ty args) matrix in
     US.FO.bind subst (T.as_var_exn hd, scope) (new_subs_val, scope)
   with Failure _ -> raise NotUnifiable

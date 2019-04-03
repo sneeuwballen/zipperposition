@@ -397,6 +397,13 @@ module FO = struct
       s
 
 
+  let iter f s =
+    iter (fun (v, sc_v) (t,sc_t) -> 
+      let v = HVar.update_ty ~f:Type.of_term_unsafe v in
+      let t = Term.of_term_unsafe t in
+      f (v, sc_v) (t, sc_t)
+    ) s 
+
   let unleak_variables subs =
    let subs_l = to_list subs in
    let unleaked_l, new_sk = List.fold_right 

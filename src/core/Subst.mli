@@ -189,6 +189,7 @@ module FO : sig
   val apply_l : ?shift_vars:int -> Renaming.t -> t -> term list Scoped.t -> term list
   val of_list' : ?init:t -> (Type.t HVar.t Scoped.t * term Scoped.t) list -> t
   val map : (term -> term) -> t -> t
+  val iter : (Type.t HVar.t Scoped.t -> term Scoped.t -> unit) -> t -> unit
   val filter : (Type.t HVar.t Scoped.t -> term Scoped.t -> bool) -> t -> t
   val compose:  scope:int -> t -> t -> t
   (* (* Takes a substitution that might map a variable x to a term *)

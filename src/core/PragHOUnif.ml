@@ -234,12 +234,10 @@ let rec unify ~depth ~nr_iter ~scope ~counter ~subst = function
               | (T.Const _, T.Var _) | (T.DB _, T.Var _) ->
                   flex_rigid ~depth ~nr_iter ~subst ~counter ~scope ~ban_id 
                             body_t' body_s' rest
-              | T.Const f , T.Const g when ID.equal f g ->
-                  assert(List.length args_s = List.length args_t);
+              | T.Const f , T.Const g when ID.equal f g && List.length args_s = List.length args_t ->
                   unify ~depth ~nr_iter ~subst ~counter ~scope 
                     (build_constraints ~ban_id args_s args_t rest)
-              | T.DB i, T.DB j when i = j ->
-                  assert (List.length args_s = List.length args_t);
+              | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->
                   unify ~depth ~nr_iter ~subst ~counter ~scope  
                     (build_constraints ~ban_id args_s args_t rest)  
               | _ -> OSeq.empty
@@ -327,7 +325,7 @@ let unify_scoped t0_s t1_s =
   let t0',t1',unifscope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
   unify ~depth:0 ~nr_iter:0 ~scope:unifscope ~counter ~subst [t0', t1', false]
   |> OSeq.map (CCOpt.map (fun sub ->       
-      (* let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t0_s in 
+      let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t0_s in 
       let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t1_s in
       assert(Type.equal (Term.ty l) (Term.ty r));
       if not (T.equal l r) then (
@@ -335,11 +333,6 @@ let unify_scoped t0_s t1_s =
         Format.printf "Subst: @[%a@]\n" S.pp sub;
         Format.printf "%a <> %a\n" T.pp l T.pp r;
         assert(false);
-      ); *)
-      (* if not (T.Seq.subterms l |> Sequence.append (T.Seq.subterms r) |> 
-          Sequence.for_all (fun st -> List.for_all T.DB.is_closed @@ T.get_mand_args st)) then ( 
-          Format.printf "Mand args not closed: %a =?= %a, res %a.\n" T.pp t0' T.pp t1' T.pp l; 
-          assert(false); 
       );
-      assert (T.equal l r); *)
+      assert (T.equal l r);
     sub))
