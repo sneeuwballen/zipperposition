@@ -34,6 +34,8 @@ let cast_var v subst sc =
     | _ -> v
   )
 
+let vars_equal x y = HVar.equal (fun _ _ -> false) x y
+
 (* Make new list of constraints, prefering the rigid-rigid pairs *)
 let build_constraints args1 args2 rest = 
   let zipped = List.combine args1 args2 in
@@ -231,9 +233,9 @@ let rec build_term ?(depth=0) ~subst ~scope ~counter var bvar_map t =
       match CCArray.bsearch ~cmp (i-depth, Term.true_) bvar_map with
       | `At idx -> 
         let val_,bvar = CCArray.get bvar_map idx in
+        let bvar = cast_var bvar subst scope in
         assert(val_ = (i-depth));
-        assert(Type.equal (Term.ty bvar) (Term.ty t));
-        T.DB.shift depth (cast_var bvar subst scope), subst
+        T.DB.shift depth bvar, subst
       | _ -> raise (Failure "Bound variable not argument to head")
     )
   | T.AppBuiltin(_,_) -> 
@@ -261,9 +263,9 @@ let rec unify ~scope ~counter ~subst = function
       let hd_s, hd_t = CCPair.map_same (fun t -> cast_var t subst scope) (hd_s, hd_t) in
 
       match T.view hd_s, T.view hd_t with 
-      | (T.Var _, T.Var _) ->
+      | (T.Var x, T.Var y) ->
         let subst =
-          (if T.equal hd_s hd_t then
+          (if vars_equal x y then
             flex_same ~counter ~scope ~subst hd_s args_s args_t
           else
             flex_diff ~counter ~scope ~subst hd_s hd_t args_s args_t) in
@@ -331,13 +333,17 @@ and flex_diff ~counter ~scope ~subst var_s var_t args_s args_t =
     CCArray.filter_map (fun x->x) (
       CCArray.map (fun si -> 
         match CCArray.bsearch ~cmp (fst si, Term.true_) bvar_t  with
-        | `At idx -> Some (snd si, snd @@ CCArray.get bvar_t idx)
+        | `At idx -> Some (cast_var (snd si) subst scope, 
+                           cast_var (snd @@ CCArray.get bvar_t idx) subst scope)
         | _ -> None
       ) bvar_s
     ) 
     |> CCArray.to_list in
   let arg_types = List.map (fun (b1, _) -> Term.ty b1) new_bvars in
-  let ret_ty = Type.apply_unsafe (Term.ty var_s) (args_s :> InnerTerm.t list) in
+  let ret_ty = 
+    Type.apply_unsafe (Term.ty var_s) 
+      (List.map (fun t -> 
+        cast_var (Lambda.eta_quick_reduce t) subst scope) args_s :> InnerTerm.t list) in
   let new_var_ty = Type.arrow arg_types ret_ty in
   let new_var = Term.var @@ H.fresh_cnt ~counter ~ty:new_var_ty () in
   let matrix_s = Term.app new_var (List.map fst new_bvars) in
