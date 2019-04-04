@@ -34,8 +34,6 @@ let cast_var v subst sc =
     | _ -> v
   ) 
 
-let vars_equal x y = HVar.equal (fun _ _ -> false) x y
-
 (* Make new list of constraints, prefering the rigid-rigid pairs *)
 let build_constraints args1 args2 rest = 
   let zipped = List.combine args1 args2 in
@@ -179,7 +177,10 @@ let rec build_term ?(depth=0) ~subst ~scope ~counter var bvar_map t =
           if not (US.FO.mem subst (Term.as_var_exn hd, scope)) then (
             let pref_types = List.map (fun t-> S.apply_ty subst (Term.ty t, scope)) args in
             let n = List.length pref_types in
-            let ret_type = Type.apply_unsafe (Term.ty old_hd) (args :> InnerTerm.t list) in
+            let ret_type = Type.apply_unsafe (Term.ty hd) 
+              ((List.mapi (fun i x -> match x with 
+                            | Some t -> t
+                            | None   -> cast_var (List.nth args i) subst scope) new_args) :> InnerTerm.t list) in
             let ret_type = S.apply_ty subst (ret_type, scope) in
             let matrix = 
               CCList.filter_map (fun x->x) (List.mapi (fun i opt_arg -> 
@@ -262,9 +263,9 @@ let rec unify ~scope ~counter ~subst = function
       let hd_s, hd_t = CCPair.map_same (fun t -> cast_var t subst scope) (hd_s, hd_t) in
 
       match T.view hd_s, T.view hd_t with 
-      | (T.Var x, T.Var y) ->
+      | (T.Var _, T.Var _) ->
         let subst =
-          (if vars_equal x y then
+          (if T.equal hd_s hd_t then
             flex_same ~counter ~scope ~subst hd_s args_s args_t
           else
             flex_diff ~counter ~scope ~subst hd_s hd_t args_s args_t) in
@@ -301,7 +302,9 @@ and flex_same ~counter ~scope ~subst var args_s args_t =
   
   let bvar_s, bvar_t = CCOpt.get_exn bvar_s, CCOpt.get_exn bvar_t in
   let v = Term.as_var_exn var in
-  let ret_ty = Type.apply_unsafe (Term.ty var) (args_s :> InnerTerm.t list) in
+  let ret_ty = Type.apply_unsafe (Term.ty var) 
+    ((List.map (fun t -> 
+        cast_var (Lambda.eta_quick_reduce t) subst scope) args_s :> InnerTerm.t list)) in
   let bvars = 
     CCList.filter_map (fun x->x)
     (CCArray.mapi (fun i si ->
@@ -326,7 +329,6 @@ and flex_diff ~counter ~scope ~subst var_s var_t args_s args_t =
   let bvar_s, bvar_t = get_bvars args_s, get_bvars args_t in
   if CCOpt.is_none bvar_s || CCOpt.is_none bvar_t then
     raise NotInFragment;
-  
   let bvar_s, bvar_t = CCOpt.get_exn bvar_s, CCOpt.get_exn bvar_t in
   let new_bvars = 
     CCArray.filter_map (fun x->x) (
