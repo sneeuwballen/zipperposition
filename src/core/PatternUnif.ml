@@ -24,7 +24,7 @@ let unif_simple ?(subst=Subst.empty) ~scope t s =
     Some (US.of_subst type_unifier)
   with Unif.Fail -> None
 
-(* let cast_var v subst sc =
+let cast_var v subst sc =
   let ty = Term.ty v in
   if Type.is_ground ty then v
   else (
@@ -34,9 +34,7 @@ let unif_simple ?(subst=Subst.empty) ~scope t s =
     | _ -> v
   ) 
 
-let ty_app_s ty subst scope =
-  if Type.is_ground ty then ty
-  else S.apply_ty subst (ty,scope) *)
+let vars_equal x y = HVar.equal (fun _ _ -> false) x y
 
 (* Make new list of constraints, prefering the rigid-rigid pairs *)
 let build_constraints args1 args2 rest = 
@@ -148,10 +146,10 @@ let rec build_term ?(depth=0) ~subst ~scope ~counter var bvar_map t =
 
   let t = Lambda.whnf t in
   match T.view t with
-  | T.Var _ -> 
+  | T.Var y -> 
     let t' = fst @@ US.FO.deref subst (t,scope) in
     if T.equal t' t then (
-      if T.equal var t then raise (Failure "occurs check")
+      if vars_equal (T.as_var_exn t) y then raise (Failure "occurs check")
       else (t, subst)
     ) 
     else build_term ~depth ~subst ~scope ~counter var bvar_map t'  
@@ -159,7 +157,7 @@ let rec build_term ?(depth=0) ~subst ~scope ~counter var bvar_map t =
   | T.App (hd, args) ->
       if T.is_var hd then (
         let old_hd = hd in
-        if (T.equal var hd) then
+        if (vars_equal (T.as_var_exn var) (T.as_var_exn hd)) then
             raise (Failure "Occurs check!");
         (* If the variable is not yet bound, try to bind to target subterm.
            If it is bound then dereference and try again. *)
@@ -230,8 +228,8 @@ let rec build_term ?(depth=0) ~subst ~scope ~counter var bvar_map t =
       match CCArray.bsearch ~cmp (i-depth, Term.true_) bvar_map with
       | `At idx -> 
         let val_,bvar = CCArray.get bvar_map idx in
+        let bvar = cast_var bvar subst scope in
         assert(val_ = (i-depth));
-        assert(Type.equal (Term.ty bvar) (Term.ty t));
         T.DB.shift depth bvar, subst
       | _ -> raise (Failure "Bound variable not argument to head")
     )
@@ -261,7 +259,7 @@ let rec unify ~scope ~counter ~subst = function
       match T.view hd_s, T.view hd_t with 
       | (T.Var x, T.Var y) ->
         let subst =
-          (if HVar.equal (fun _ _ -> false) x y then
+          (if vars_equal x y then
             flex_same ~counter ~scope ~subst hd_s args_s args_t
           else
             flex_diff ~counter ~scope ~subst hd_s hd_t args_s args_t) in
@@ -331,13 +329,17 @@ and flex_diff ~counter ~scope ~subst var_s var_t args_s args_t =
     CCArray.filter_map (fun x->x) (
       CCArray.map (fun si -> 
         match CCArray.bsearch ~cmp (fst si, Term.true_) bvar_t  with
-        | `At idx -> Some (snd si, snd @@ CCArray.get bvar_t idx)
+        | `At idx -> Some (cast_var (snd si) subst scope, 
+                           cast_var (snd @@ CCArray.get bvar_t idx) subst scope)
         | _ -> None
       ) bvar_s
     ) 
     |> CCArray.to_list in
-  let arg_types = List.map (fun (b1, _) ->  Term.ty b1) new_bvars in
-  let ret_ty = Type.apply_unsafe (Term.ty var_s) (args_s :> InnerTerm.t list) in
+  let arg_types = List.map (fun (b1, _) -> Term.ty b1) new_bvars in
+  let ret_ty = 
+    Type.apply_unsafe (Term.ty var_s) 
+      (List.map (fun t -> 
+        cast_var (Lambda.eta_quick_reduce t) subst scope) args_s :> InnerTerm.t list) in
   let new_var_ty = Type.arrow arg_types ret_ty in
   let new_var = Term.var @@ H.fresh_cnt ~counter ~ty:new_var_ty () in
   let matrix_s = Term.app new_var (List.map fst new_bvars) in
