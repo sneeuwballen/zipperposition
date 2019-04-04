@@ -331,7 +331,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let subst = US.subst us in
       let supext_vars = 
         if (info.sup_kind = SupEXT) then (
-          Term.Seq.subterms info.t |> Sequence.filter Term.is_var |> Term.Set.of_seq)
+          Term.Seq.subterms info.u_p |> Sequence.filter Term.is_var |> Term.Set.of_seq)
         else Term.Set.empty in
       let t' = S.FO.apply ~shift_vars renaming subst (info.t, sc_a) in
       if info.sup_kind = SupEXT then
