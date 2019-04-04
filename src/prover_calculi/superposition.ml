@@ -323,16 +323,22 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     assert (not(T.is_var info.u_p) || T.is_ho_var info.u_p);
     assert (!_sup_at_var_headed || info.sup_kind = SupAV || not (T.is_var (T.head_term info.u_p)));
     let active_idx = Lits.Pos.idx info.active_pos in
+    let shift_vars = if info.sup_kind = SupEXT then 0 else -1 in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
     try
       let renaming = S.Renaming.create () in
       let us = info.subst in
       let subst = US.subst us in
-      let t' = S.FO.apply ~shift_vars:0 renaming subst (info.t, sc_a) in
+      let supext_vars = 
+        if (info.sup_kind = SupEXT) then (
+          Term.Seq.subterms info.t |> Sequence.filter Term.is_var |> Term.Set.of_seq)
+        else Term.Set.empty in
+      let t' = S.FO.apply ~shift_vars renaming subst (info.t, sc_a) in
+      if info.sup_kind = SupEXT then
        Util.debugf ~section 1
-      "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
+      "@[<2>sup, kind %s(%d)@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
        (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
-      (fun k->k (kind_to_str info.sup_kind) C.pp info.active sc_a T.pp info.s T.pp info.t
+      (fun k->k (kind_to_str info.sup_kind) (Term.Set.cardinal supext_vars) C.pp info.active sc_a T.pp info.s T.pp info.t
           T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
           Position.pp info.passive_pos US.pp info.subst);
 
@@ -342,6 +348,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               List.exists (fun arg -> not @@ T.DB.is_closed arg) 
               (T.get_mand_args st))) then
         raise @@ ExitSuperposition("SupEXT sneaks in bound variables under the skolem");
+      
+      if(info.sup_kind = SupEXT && 
+         T.Set.exists (fun v -> 
+          let t = Lambda.eta_reduce @@ fst @@ Subst.FO.deref subst (v,info.scope_passive) in
+          T.is_bvar t) supext_vars) then
+        raise @@ ExitSuperposition("SupEXT -- an into free variable sneaks in bound variable");
   
       begin match info.passive_lit, info.passive_pos with
         | Lit.Prop (_, true), P.Arg(_, P.Left P.Stop) ->
@@ -363,7 +375,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let passive_lit' = Lit.apply_subst_no_simp renaming subst' (info.passive_lit, sc_p) in
       let new_trail = C.trail_l [info.active; info.passive] in
       if Env.is_trivial_trail new_trail then raise (ExitSuperposition "trivial trail");
-      let s' = S.FO.apply renaming subst (info.s, sc_a) in
+      let s' = S.FO.apply ~shift_vars renaming subst (info.s, sc_a) in
       if(info.sup_kind = SupEXT &&
          T.Seq.subterms s'
          |> Sequence.exists (fun st -> 
@@ -400,11 +412,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           Lit.apply_subst_list renaming subst' (lits_a, sc_a) @
           Lit.apply_subst_list renaming subst' (lits_p, sc_p)
       in
-      let vars = if info.sup_kind = SupEXT then 
-                  Literals.Seq.vars (Array.of_list new_lits) |> Sequence.to_list
-                 else []  in 
       (* For some reason type comparison does not work. *)
-      let vars = List.sort_uniq (HVar.compare (fun _ _ -> 0)) vars in
+      let vars = List.map T.as_var_exn (Term.Set.to_list supext_vars) in
       let sk_with_vars = 
         List.fold_left (fun acc t -> 
             let new_sk_vars = Term.mk_fresh_skolem vars (Term.ty t) in 
