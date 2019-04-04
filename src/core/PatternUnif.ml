@@ -157,8 +157,8 @@ let rec build_term ?(depth=0) ~subst ~scope ~counter var bvar_map t =
   | T.Const _ -> (t, subst)
   | T.App (hd, args) ->
       if T.is_var hd then (
-        let hd = cast_var hd subst scope in
         let old_hd = hd in
+        let hd = cast_var hd subst scope in
         if T.equal hd var then
             raise (Failure "Occurs check!");
         (* If the variable is not yet bound, try to bind to target subterm.
