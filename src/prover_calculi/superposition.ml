@@ -351,8 +351,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       
       if(info.sup_kind = SupEXT && 
          T.Set.exists (fun v -> 
-          let t = Lambda.eta_reduce @@ fst @@ Subst.FO.deref subst (v,info.scope_passive) in
-          T.is_bvar t) supext_vars) then
+          let t = fst @@ Subst.FO.deref subst (v,info.scope_passive) in
+          T.DB.is_closed t) supext_vars) then
         raise @@ ExitSuperposition("SupEXT -- an into free variable sneaks in bound variable");
   
       begin match info.passive_lit, info.passive_pos with
@@ -417,13 +417,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let sk_with_vars = 
         List.fold_left (fun acc t -> 
             let new_sk_vars = Term.mk_fresh_skolem vars (Term.ty t) in 
-            Term.Map.add t new_sk_vars acc) 
+            Term.Map.add t (S.FO.apply renaming subst' (new_sk_vars, sc_p)) acc) 
          Term.Map.empty new_sk in 
       let new_lits = 
         List.map (fun lit -> 
           Lit.map (fun t ->
             Term.Map.fold 
-              (fun sk sk_v acc -> Term.replace ~old:sk ~by:sk_v acc) 
+              (fun sk sk_v acc -> 
+                let sk = S.FO.apply renaming subst (sk, sc_p) in
+                Term.replace ~old:sk ~by:sk_v acc) 
               sk_with_vars t ) lit) new_lits in
       let rule =
         let r = kind_to_str info.sup_kind in
@@ -442,12 +444,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       assert(List.for_all (Lit.for_all Term.DB.is_closed) new_lits);
       (* C.check_types new_clause; *)
-      (* assert(C.Seq.terms new_clause 
-             |> Sequence.for_all (fun t ->
-                  T.Seq.subterms t
-                  |> Sequence.for_all (fun st -> 
-                        List.for_all T.DB.is_closed (T.get_mand_args st))
-      )); *)
       Some new_clause
     with ExitSuperposition reason ->
       Util.debugf ~section 3 "... cancel, %s" (fun k->k reason);
