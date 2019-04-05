@@ -351,8 +351,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       
       if(info.sup_kind = SupEXT && 
          T.Set.exists (fun v -> 
-          let t = fst @@ Subst.FO.deref subst (v,info.scope_passive) in
-          T.DB.is_closed t) supext_vars) then
+          let t = fst @@ Subst.FO.deref subst (v,sc_p) in
+          not @@ T.DB.is_closed t) supext_vars) then
         raise @@ ExitSuperposition("SupEXT -- an into free variable sneaks in bound variable");
   
       begin match info.passive_lit, info.passive_pos with
