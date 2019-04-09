@@ -5,9 +5,11 @@ RUN sudo apk update
 RUN sudo chown opam: /zipper/build
 # deps
 RUN eval `opam config env` && \
+    cd /home/opam/opam-repository && \
+    git pull && \
     opam update && \
     opam depext -i zarith && \
-    opam install dune zarith containers sequence msat menhir
+    opam install dune zarith containers iter msat menhir
 # main build
 COPY --chown=opam:nogroup src *.opam Makefile dune-project ./
 RUN eval `opam config env` && \
