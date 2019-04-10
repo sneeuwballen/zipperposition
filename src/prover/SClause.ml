@@ -21,13 +21,13 @@ let make ~trail lits =
   incr id_count_;
   { lits; trail; id; flags=0; }
 
-let equal c1 c2 = c1.id = c2.id
-let compare c1 c2 = Pervasives.compare c1.id c2.id
-let id c = c.id
-let hash c = Hashtbl.hash c.id
-let lits c = c.lits
-let trail c = c.trail
-let length c = Array.length c.lits
+let[@inline] equal c1 c2 = c1.id = c2.id
+let[@inline] compare c1 c2 = Pervasives.compare c1.id c2.id
+let[@inline] id c = c.id
+let[@inline] hash c = Hash.int c.id
+let[@inline] lits c = c.lits
+let[@inline] trail c = c.trail
+let[@inline] length c = Array.length c.lits
 let is_empty c = length c = 0 && Trail.is_empty c.trail
 
 let update_trail f c = make ~trail:(f c.trail) c.lits
@@ -60,12 +60,12 @@ let set_flag flag c truth =
   then c.flags <- c.flags lor flag
   else c.flags <- c.flags land (lnot flag)
 
-let get_flag flag c = (c.flags land flag) != 0
+let[@inline] get_flag flag c = (c.flags land flag) != 0
 
 let mark_redundant c = set_flag flag_redundant c true
-let is_redundant c = get_flag flag_redundant c
+let[@inline] is_redundant c = get_flag flag_redundant c
 let mark_backward_simplified c = set_flag flag_backward_simplified c true
-let is_backward_simplified c = get_flag flag_backward_simplified c
+let[@inline] is_backward_simplified c = get_flag flag_backward_simplified c
 
 (** {2 IO} *)
 
