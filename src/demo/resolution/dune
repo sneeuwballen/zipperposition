@@ -2,5 +2,5 @@
 (executable
   (name resolution1)
   (flags :standard -w -50)
-  (libraries logtk logtk.parsers containers sequence))
+  (libraries logtk logtk.parsers containers iter))
 
