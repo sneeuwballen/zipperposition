@@ -23,9 +23,10 @@ type iterator = {
   cur_char : character;
   cur_term : T.t;
   stack : T.t list list; (* skip: drop head, next: first of head *)
+  stack_len: int;
 }
 
-let char_to_int_ = function
+let[@inline] char_to_int_ = function
   | Symbol _ -> 0
   | Variable _ -> 2
   | Subterm _ -> 3
@@ -40,57 +41,59 @@ let compare_char c1 c2 =
     | Symbol s1, Symbol s2 -> ID.compare s1 s2
     | Variable v1, Variable v2 -> compare_vars v1 v2
     | Subterm t1, Subterm t2 -> T.compare t1 t2
-    | _ -> char_to_int_ c1 - char_to_int_ c2
+    | _ -> Pervasives.compare (char_to_int_ c1) (char_to_int_ c2)
 
-let eq_char c1 c2 = compare_char c1 c2 = 0
+let[@inline] eq_char c1 c2 = compare_char c1 c2 = 0
 
 (** first symbol of t, or variable *)
 let term_to_char t : character * T.t list =
-  match T.Classic.view t with
-    | T.Classic.Var v -> Variable v, []
+  match (T.view [@inlined]) t with
+    | T.Var v -> Variable v, []
     | _ when Type.is_fun (T.ty t) -> Subterm t, [] (* partial app *)
-    | T.Classic.App (f, l) -> Symbol f, l
-    | T.Classic.DB _
-    | T.Classic.AppBuiltin _
-    | T.Classic.NonFO -> Subterm t, []
+    | T.Const s -> Symbol s, []
+    | T.App (f, l) ->
+      begin match T.view f with
+        | T.Const s -> Symbol s, l
+        | _ -> Subterm t, []
+      end
+    | T.AppBuiltin _ | T.DB _ | T.Fun _ -> Subterm t, []
 
 let pp_char out = function
   | Variable v -> Type.pp_typed_var out v
   | Symbol f -> ID.pp out f
   | Subterm t -> CCFormat.hbox T.pp out t
 
-(* parameter: maximum depth before we start using Subterm *)
+(* parameter: maximum depth before we start using {!Subterm} *)
 let max_depth_ = ref 3
 
-let open_term ~stack t =
-  if List.length stack > !max_depth_
-  then (
+let open_term ~stack ~len t =
+  if len > !max_depth_ then (
     (* opaque. Do not enter the term. *)
     let cur_char = Subterm t in
-    {cur_char; cur_term=t; stack=[]::stack}
+    {cur_char; cur_term=t; stack=[]::stack; stack_len=len+1}
   ) else (
-    let cur_char, l = term_to_char t in
-    {cur_char; cur_term=t; stack=l::stack;}
+    let cur_char, l = (term_to_char [@inlined]) t in
+    {cur_char; cur_term=t; stack=l::stack; stack_len=len+1}
   )
 
-let rec next_rec stack = match stack with
+let rec next_rec stack len = match stack with
   | [] -> None
-  | []::stack' -> next_rec stack'
+  | []::stack' -> next_rec stack' (len-1)
   | (t::next')::stack' ->
-    Some (open_term ~stack:(next'::stack') t)
+    Some (open_term ~stack:(next'::stack') ~len t)
 
 let skip iter = match iter.stack with
   | [] -> None
-  | _next::stack' -> next_rec stack'
+  | _next::stack' -> next_rec stack' (iter.stack_len-1)
 
-let next iter = next_rec iter.stack
+let[@inline] next iter = next_rec iter.stack iter.stack_len
 
 (* Iterate on a term *)
-let iterate term = Some (open_term ~stack:[] term)
+let[@inline] iterate term = Some (open_term ~stack:[] ~len:0 term)
 
 (* convert term to list of var/symbol *)
-let to_list t =
-  let rec getnext acc iter =
+let to_list t : _ list =
+  let rec getnext acc iter : _ list =
     let acc' = iter.cur_char :: acc in
     match next iter with
       | None -> List.rev acc'
