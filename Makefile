@@ -3,8 +3,10 @@ J?=3
 
 all: build test-cached
 
+DUNE_OPTS= -j $(J) --profile=release
+
 build:
-	@dune build @install -j $J --profile=release
+	@dune build @install $(DUNE_OPTS)
 
 clean:
 	@dune clean
@@ -13,16 +15,16 @@ doc:
 	@dune build @doc
 
 test:
-	@dune runtest --no-buffer -j $J -f
+	@dune runtest --no-buffer -f $(DUNE_OPTS)
 
-install:
-	@dune build @install && dune install
+install: build
+	@dune install
 
 uninstall:
 	@ocamlfind remove zipperposition libzipperposition logtk || true
 
 test-cached:
-	@dune runtest --no-buffer -j $J
+	@dune runtest --no-buffer $(DUNE_OPTS)
 # ./tests/quick/all.sh # FIXME?
 
 test-qcheck:
@@ -118,12 +120,9 @@ package: clean
 	oasis setup
 	tar cavf $(TARBALL) Makefile pelletier_problems README.md src/ tests/ utils/
 
-WATCH?=all
+WATCH?=@all
 watch:
-	while find src/ tests/ -print0 | xargs -0 inotifywait -e delete_self -e modify ; do \
-		echo "============ at `date` ==========" ; \
-		make $(WATCH); \
-	done
+	dune build $(WATCH) -w $(DUNE_OPTS)
 
 ocp-indent:
 	@which ocp-indent > /dev/null || { \
