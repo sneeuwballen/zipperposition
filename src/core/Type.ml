@@ -77,7 +77,7 @@ let builtin = function
   | Int -> int
   | Rat -> rat
 
-let var v = T.var v
+let var = T.var
 
 let var_of_int i = T.var (HVar.make ~ty:tType i)
 
@@ -112,9 +112,9 @@ let forall_fvars vars ty =
 
 let (==>) = arrow
 
-let of_term_unsafe t = t
-let of_terms_unsafe l = l
-let cast_var_unsafe v = v
+let[@inline] of_term_unsafe t = t
+let[@inline] of_terms_unsafe l = l
+let[@inline] cast_var_unsafe v = v
 
 (** {2 Definitions} *)
 
@@ -201,7 +201,6 @@ let order ty: int =
   max 1 (aux ty)  (* never less than 1 *)
 
 let is_ground = T.is_ground
-
 let size = T.size
 
 let rec depth ty = match view ty with

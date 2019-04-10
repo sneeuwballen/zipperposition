@@ -215,14 +215,14 @@ let to_string = CCFormat.to_string pp
 
 (** {2 Applying a substitution} *)
 
-let[@inline] apply_aux subst ~f_rename t =
-  let rec aux (t,sc_t) =
+let apply_aux subst ~f_rename t =
+  let rec aux t sc_t : T.t =
     match T.ty t with
       | T.NoType ->
         assert(T.equal T.tType t);
         t
       | T.HasType ty ->
-        let ty' = aux (ty,sc_t) in
+        let ty' = aux ty sc_t in
         begin match T.view t with
           | T.Const id ->
             (* regular constant *)
@@ -237,24 +237,24 @@ let[@inline] apply_aux subst ~f_rename t =
             (* the most interesting cases!
                switch depending on whether [t] is bound by [subst] or not *)
             begin match find_exn subst (v,sc_t) with
-              | term' ->
+              | (t',sc') ->
                 (* NOTE: if [t'] is not closed, we assume that it
                    is always replaced in a context where variables
                    are properly bound. Typically, that means only
                    in rewriting. *)
                 (* also apply [subst] to [t'] *)
-                aux term'
+                aux t' sc'
               | exception Not_found ->
                 (* rename the variable using [f_rename] *)
                 let v' = f_rename (v,sc_t) ty' in
                 T.var v'
             end
           | T.Bind (s, varty, sub_t) ->
-            let varty' = aux (varty,sc_t) in
-            let sub_t' = aux (sub_t,sc_t) in
+            let varty' = aux varty sc_t in
+            let sub_t' = aux sub_t sc_t in
             T.bind ~varty:varty' ~ty:ty' s sub_t'
           | T.App (hd, l) ->
-            let hd' = aux (hd,sc_t) in
+            let hd' = aux hd sc_t in
             let l' = aux_list l sc_t in
             if T.equal ty ty' && T.equal hd hd' && T.same_l l l'
             then t
@@ -267,16 +267,17 @@ let[@inline] apply_aux subst ~f_rename t =
         end
   and aux_list l sc = match l with
     | [] -> []
-    | t::l' ->
-      aux (t,sc) :: aux_list l' sc
+    | [t1] -> [aux t1 sc]
+    | t1::t2::l' ->
+      aux t1 sc :: aux t2 sc :: aux_list l' sc
   in
   aux t
 
 (* Apply substitution to a term and rename variables not bound by [subst]*)
-let apply renaming subst t =
-  if is_empty subst && Renaming.is_none renaming then fst t
+let apply renaming subst (t,sc) =
+  if is_empty subst && Renaming.is_none renaming then t
   else (
-    apply_aux subst ~f_rename:(Renaming.rename_with_type renaming) t
+    apply_aux subst ~f_rename:(Renaming.rename_with_type renaming) t sc
   )
 
 (** {2 Specializations} *)
