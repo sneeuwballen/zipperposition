@@ -81,7 +81,24 @@ let hash_mod_alpha t : int =
   in
   aux 2 t
 
-let rec _eq_norec t1 t2 =
+let _eq_ty t1 t2 = match t1.ty, t2.ty with
+  | NoType, NoType -> true
+  | HasType ty1, HasType ty2 -> equal ty1 ty2
+  | _ -> false
+
+let rec _eq_norec_list l1 l2 = match l1, l2 with
+  | [], [] -> true
+  | [], _
+  | _, [] -> false
+  | t1::l1', t2::l2' -> equal t1 t2 && _eq_norec_list l1' l2'
+
+let rec _eq_record_list l1 l2 = match l1, l2 with
+  | [], [] -> true
+  | [], _
+  | _, [] -> false
+  | (n1,t1)::l1', (n2,t2)::l2' -> n1=n2 && equal t1 t2 && _eq_record_list l1' l2'
+
+let _eq_norec t1 t2 =
   _eq_ty t1 t2 &&
   match t1.term, t2.term with
     | Var i, Var j -> HVar.equal equal i j
@@ -90,24 +107,10 @@ let rec _eq_norec t1 t2 =
     | Bind (b1, varty1, t1'), Bind (b2, varty2, t2') ->
       Binder.equal b1 b2 && equal varty1 varty2 && equal t1' t2'
     | App (f1, l1), App (f2, l2) ->
-      equal f1 f2 && _eq_list l1 l2
+      equal f1 f2 && _eq_norec_list l1 l2
     | AppBuiltin (b1, l1), AppBuiltin (b2, l2) ->
-      Builtin.equal b1 b2 && _eq_list l1 l2
+      Builtin.equal b1 b2 && _eq_norec_list l1 l2
     | _ -> false
-and _eq_ty t1 t2 = match t1.ty, t2.ty with
-  | NoType, NoType -> true
-  | HasType ty1, HasType ty2 -> equal ty1 ty2
-  | _ -> false
-and _eq_list l1 l2 = match l1, l2 with
-  | [], [] -> true
-  | [], _
-  | _, [] -> false
-  | t1::l1', t2::l2' -> equal t1 t2 && _eq_list l1' l2'
-and _eq_record_list l1 l2 = match l1, l2 with
-  | [], [] -> true
-  | [], _
-  | _, [] -> false
-  | (n1,t1)::l1', (n2,t2)::l2' -> n1=n2 && equal t1 t2 && _eq_record_list l1' l2'
 
 (** {3 Constructors} *)
 

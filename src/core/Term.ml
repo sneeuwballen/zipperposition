@@ -51,7 +51,7 @@ let subterm ~sub t =
 let equal = T.equal
 let hash = T.hash
 let compare = T.compare
-let ty t = match T.ty t with
+let[@inline] ty t = match T.ty t with
   | T.NoType -> assert false
   | T.HasType ty -> Type.of_term_unsafe ty
 

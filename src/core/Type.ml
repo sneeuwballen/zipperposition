@@ -55,14 +55,14 @@ let compare = T.compare
 
 let hash_mod_alpha = T.hash_mod_alpha
 
-let is_tType ty = match view ty with | Builtin TType -> true | _ -> false
-let is_var ty = match view ty with | Var _ -> true | _ -> false
-let is_bvar ty = match view ty with | DB _ -> true | _ -> false
-let is_app ty = match view ty with App _ -> true | _ -> false
-let is_const ty = match view ty with App (_, []) -> true | _ -> false
-let is_fun ty = match view ty with | Fun _ -> true | _ -> false
-let is_forall ty = match view ty with | Forall _ -> true | _ -> false
-let is_prop ty = match view ty with | Builtin Prop -> true | _ -> false
+let[@inline] is_tType ty = match view ty with | Builtin TType -> true | _ -> false
+let[@inline] is_var ty = match view ty with | Var _ -> true | _ -> false
+let[@inline] is_bvar ty = match view ty with | DB _ -> true | _ -> false
+let[@inline] is_app ty = match view ty with App _ -> true | _ -> false
+let[@inline] is_const ty = match view ty with App (_, []) -> true | _ -> false
+let[@inline] is_fun ty = match view ty with | Fun _ -> true | _ -> false
+let[@inline] is_forall ty = match view ty with | Forall _ -> true | _ -> false
+let[@inline] is_prop ty = match view ty with | Builtin Prop -> true | _ -> false
 
 let tType = T.tType
 let prop = T.builtin ~ty:tType Builtin.Prop
