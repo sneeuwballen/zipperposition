@@ -46,17 +46,17 @@ let compare_char c1 c2 =
 let[@inline] eq_char c1 c2 = compare_char c1 c2 = 0
 
 (** first symbol of t, or variable *)
-let term_to_char t : character * T.t list =
-  match (T.view [@inlined]) t with
-    | T.Var v -> Variable v, []
+let term_to_char (t:T.t) : character * T.t list =
+  match ST.view (t:>ST.t) with
+    | ST.Var v -> Variable (Type.cast_var_unsafe v), []
     | _ when Type.is_fun (T.ty t) -> Subterm t, [] (* partial app *)
-    | T.Const s -> Symbol s, []
-    | T.App (f, l) ->
-      begin match T.view f with
-        | T.Const s -> Symbol s, l
+    | ST.Const s -> Symbol s, []
+    | ST.App (f, l) ->
+      begin match ST.view f with
+        | ST.Const s -> Symbol s, (T.of_term_unsafe_l l)
         | _ -> Subterm t, []
       end
-    | T.AppBuiltin _ | T.DB _ | T.Fun _ -> Subterm t, []
+    | ST.AppBuiltin _ | ST.DB _ | ST.Bind _ -> Subterm t, []
 
 let pp_char out = function
   | Variable v -> Type.pp_typed_var out v
