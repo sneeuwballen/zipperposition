@@ -66,7 +66,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module C = Env.C
   module Ctx = Env.Ctx
 
-  
+
   (* index for ext-neg, to ensure α-equivalent negative equations have the same skolems *)
   module FV_ext_neg = FV_tree.Make(struct
       type t = Literal.t * T.t list (* lit -> skolems *)
@@ -209,11 +209,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Iter.flat_map_l
         (fun (lit_idx,lit) -> match lit with
            | Literal.Equation (t, u, true) when Type.is_fun (T.ty t) ->
-             aux (C.lits c) lit_idx t u 
+             aux (C.lits c) lit_idx t u
            | Literal.Equation (t, u, true) when Type.is_var (T.ty t) ->
              (* A polymorphic variable might be functional on the ground level *)
              let var = Type.as_var_exn (T.ty t) in
-             let funty = T.of_ty (Type.arrow [Type.var (HVar.fresh ~ty:Type.tType ())] 
+             let funty = T.of_ty (Type.arrow [Type.var (HVar.fresh ~ty:Type.tType ())]
                                              (Type.var (HVar.fresh ~ty:Type.tType ()))) in
              let subst = Unif_subst.FO.singleton (var,0) (funty,0) in
              let renaming, subst = Subst.Renaming.none, Unif_subst.subst subst in
@@ -472,7 +472,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     assert (T.DB.is_closed t);
     let t' = Lambda.snf t in
     if (T.equal t t') then (
-       Util.debugf ~section 50 "(@[beta_reduce `%a`@ failed `@])" (fun k->k T.pp t ); 
+       Util.debugf ~section 50 "(@[beta_reduce `%a`@ failed `@])" (fun k->k T.pp t );
        None)
     else (
       Util.debugf ~section 50 "(@[beta_reduce `%a`@ :into `%a`@])"
@@ -487,7 +487,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     assert (T.DB.is_closed t);
     let t' = Lambda.eta_expand t in
     if (T.equal t t') then (
-       Util.debugf ~section 50 "(@[eta_expand `%a`@ failed `@])" (fun k->k T.pp t ); 
+       Util.debugf ~section 50 "(@[eta_expand `%a`@ failed `@])" (fun k->k T.pp t );
        None)
     else (
       Util.debugf ~section 50 "(@[eta_expand `%a`@ :into `%a`@])"
@@ -537,14 +537,14 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.C.create ~penalty:!_ext_axiom_penalty ~trail:Trail.empty lits Proof.Step.trivial
 
 
-  type fixed_arg_status = 
+  type fixed_arg_status =
     | Always of T.t (* This argument is always the given term in all occurences *)
     | Varies        (* This argument contains different terms in differen occurrences *)
 
-  type dupl_arg_status = 
+  type dupl_arg_status =
     | AlwaysSameAs of int (* This argument is always the same as some other argument across occurences (links to the next arg with this property) *)
     | Unique              (* This argument is not always the same as some other argument across occurences *)
-  
+
   (** Removal of fixed/duplicate arguments of variables.
     - If within a clause, there exists a variable F that's always applied
       to at least i arguments and the ith argument is always the same DB-free term,
@@ -554,32 +554,32 @@ module Make(E : Env.S) : S with module Env = E = struct
       ith argument is syntactically same as the jth argument, we can
       systematically remove the ith argument (and repair F's type accordingly).
   *)
-  let remove_var_args c = 
+  let remove_var_args c =
     let status : (fixed_arg_status * dupl_arg_status) list VTbl.t = VTbl.create 8 in
-    C.lits c 
-    |> Literals.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord:Ordering.none ~subterms:true ~eligible:(fun _ _ -> true) 
-    |> Iter.iter 
-      (fun (t,_) -> 
+    C.lits c
+    |> Literals.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord:Ordering.none ~subterms:true ~eligible:(fun _ _ -> true)
+    |> Iter.iter
+      (fun (t,_) ->
         let head, args = T.as_app t in
         match T.as_var head with
           | Some var ->
             begin match VTbl.get status var with
-            | Some var_status -> 
+            | Some var_status ->
               (* We have seen this var before *)
               let update_fas fas arg =
-                match fas with 
+                match fas with
                   | Always u -> if T.equal u arg then Always u else Varies
                   | Varies -> Varies
               in
               let rec update_das das arg =
-                match das with 
-                | AlwaysSameAs j -> 
-                  begin 
+                match das with
+                | AlwaysSameAs j ->
+                  begin
                     try
-                      if T.equal (List.nth args j) arg 
-                      then AlwaysSameAs j 
+                      if T.equal (List.nth args j) arg
+                      then AlwaysSameAs j
                       else update_das (snd (List.nth var_status j)) (List.nth args j)
-                    with Failure _ -> Unique 
+                    with Failure _ -> Unique
                   end
                 | Unique -> Unique
               in
@@ -588,20 +588,20 @@ module Make(E : Env.S) : S with module Env = E = struct
               let args = CCList.take minlen args in
               let var_status = CCList.take minlen var_status in
               VTbl.replace status var (CCList.map (fun ((fas, das), arg) -> update_fas fas arg, update_das das arg) (List.combine var_status args))
-            | None -> 
+            | None ->
               (* First time to encounter this var *)
               let rec create_var_status ?(i=0) args : (fixed_arg_status * dupl_arg_status) list =
-                match args with 
+                match args with
                 | [] -> []
-                | arg :: args' -> 
-                  let fas = 
+                | arg :: args' ->
+                  let fas =
                     if T.DB.is_closed arg then Always arg else Varies
                   in
                   (* Find next identical argument *)
                   let das = match CCList.find_idx ((=) arg) args' with
                     | Some (j, _) -> AlwaysSameAs (i + j + 1)
                     | None -> Unique
-                  in 
+                  in
                   (fas, das) :: create_var_status ~i:(i+1) args'
               in
               VTbl.add status var (create_var_status args)
@@ -610,14 +610,14 @@ module Make(E : Env.S) : S with module Env = E = struct
           ;
         ()
       );
-    let subst = 
+    let subst =
       VTbl.to_list status
       |> CCList.filter_map (
-        fun (var, var_status) -> 
+        fun (var, var_status) ->
           assert (not (Type.is_tType (HVar.ty var)));
           let ty_args, ty_return = Type.open_fun (HVar.ty var) in
-          let keep = var_status |> CCList.map 
-            (fun (fas, das) -> 
+          let keep = var_status |> CCList.map
+            (fun (fas, das) ->
                 (* Keep argument if this is true: *)
                 fas == Varies && das == Unique
             )
@@ -629,12 +629,12 @@ module Make(E : Env.S) : S with module Env = E = struct
             let keep = CCList.(append keep (replicate (length ty_args - length keep) true)) in
             (* Create substitution: *)
             let ty_args' = ty_args
-              |> CCList.combine keep 
+              |> CCList.combine keep
               |> CCList.filter fst
               |> CCList.map snd
             in
             let var' = HVar.cast var ~ty:(Type.arrow ty_args' ty_return) in
-            let bvars = 
+            let bvars =
               CCList.combine keep ty_args
               |> List.mapi (fun i (k, ty) -> k, T.bvar ~ty (List.length ty_args - i - 1))
               |> CCList.filter fst
@@ -680,29 +680,29 @@ module Make(E : Env.S) : S with module Env = E = struct
       );
 
       (* removing unfolded clauses *)
-      if Env.flex_get k_enable_def_unfold then ( 
-         Env.add_clause_conversion (  
+      if Env.flex_get k_enable_def_unfold then (
+         Env.add_clause_conversion (
             fun c ->  match Statement.get_rw_rule c with
-                        | Some _ -> E.CR_drop 
+                        | Some _ -> E.CR_drop
                         | None -> E.CR_skip ));
 
 
       if !_var_arg_remove then
         Env.add_unary_simplify remove_var_args;
-      
-      let ho_norm  = 
+
+      let ho_norm  =
       begin match Env.flex_get k_eta with
         | `Expand -> (fun t -> t |> beta_reduce |> (
-                        fun opt -> match opt with 
-                                    None -> eta_expand t 
-                                    | Some t' -> 
+                        fun opt -> match opt with
+                                    None -> eta_expand t
+                                    | Some t' ->
                                        match eta_expand t' with
                                           None -> Some t'
                                           | Some tt -> Some tt))
         | `Reduce -> (fun t -> t |> beta_reduce |> (
-                        fun opt -> match opt with 
-                                    None -> eta_reduce t 
-                                    | Some t' -> 
+                        fun opt -> match opt with
+                                    None -> eta_reduce t
+                                    | Some t' ->
                                        match eta_reduce t' with
                                           None -> Some t'
                                           | Some tt -> Some tt))
@@ -805,7 +805,7 @@ let extension =
 
     if !def_unfold_enabled_ then (
        (* let new_vec = *)
-       CCVector.iter (fun c -> match Statement.get_rw_rule c with 
+       CCVector.iter (fun c -> match Statement.get_rw_rule c with
                                   Some (sym, r) -> Util.debugf ~section 1
                                           "@[<2> Adding constant def rule: `@[%a@]`@]"
                                           (fun k->k Rewrite.Rule.pp r);
@@ -847,7 +847,7 @@ let () =
       "--ho-ext-axiom", Arg.Set _ext_axiom, " enable extensionality axiom";
       "--no-ho-ext-axiom", Arg.Clear _ext_axiom, " disable extensionality axiom";
       "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule";
-      "--ho-no-ext-neg", Arg.Clear _ext_neg, " enable negative extensionality rule"; 
+      "--ho-no-ext-neg", Arg.Clear _ext_neg, " enable negative extensionality rule";
       "--ho-def-unfold", Arg.Set def_unfold_enabled_, " enable ho definition unfolding";
       "--ho-huet-style-unif", Arg.Set _huet_style, " enable Huet style projection";
       "--ho-no-conservative-elim", Arg.Clear _cons_elim, "Disables conservative elimination rule in pragmatic unification";
@@ -859,7 +859,7 @@ let () =
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom";
       "--ho-unif-max-depth", Arg.Set_int _unif_max_depth, "set pragmatic unification max depth";
     ];
-  Params.add_to_mode "ho-complete-basic" (fun () -> 
+  Params.add_to_mode "ho-complete-basic" (fun () ->
     enabled_ := true;
     def_unfold_enabled_ := false;
     force_enabled_ := true;
@@ -870,7 +870,7 @@ let () =
     _elim_pred_var := false;
     enable_unif_ := false
   );
-  Params.add_to_mode "fo-complete-basic" (fun () -> 
+  Params.add_to_mode "fo-complete-basic" (fun () ->
     enabled_ := false;
   );
   Extensions.register extension;

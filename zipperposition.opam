@@ -5,11 +5,10 @@ homepage: "https://github.com/c-cube/zipperposition"
 version: "1.5"
 synopsis: "A fully automatic theorem prover for typed first-order and beyond"
 build: [
-  ["jbuilder" "build" "-p" name]
-  ["jbuilder" "build" "@doc" "-p" name] {with-doc}
+  ["dune" "build" "-p" name]
+  ["dune" "build" "@doc" "-p" name] {with-doc}
 ]
 depends: [
-  "ocamlfind" { build }
   "base-unix"
   "zarith"
   "logtk" { >= "1.5" }
@@ -17,8 +16,8 @@ depends: [
   "containers" { >= "1.0" }
   "iter" { >= "1.2" }
   "oseq"
-  "jbuilder" { build }
-  "msat" { >= "0.5" < "1.0" }
+  "dune" { build }
+  "msat" { >= "0.8" < "0.9" }
   "menhir" {build}
   "ocaml" {>= "4.03"}
 ]

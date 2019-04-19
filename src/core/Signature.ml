@@ -83,11 +83,11 @@ let well_founded s =
        | _ -> false)
     s
 
-let sym_in_conj s signature = 
-   snd (ID.Map.get_or s signature ~default:(Type.int, false))    
+let sym_in_conj s signature =
+   snd (ID.Map.get_or s signature ~default:(Type.int, false))
 
 let set_sym_in_conj s signature =
-   let t = find_exn signature s in 
+   let t = find_exn signature s in
       ID.Map.add s (t, true) signature
 
 module Seq = struct

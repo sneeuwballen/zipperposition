@@ -114,7 +114,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let idx_sup_from () = !_idx_sup_from
   let idx_fv () = !_idx_fv
 
-  let ord = 
+  let ord =
     (* TODO: This option only makes sense in combination with the beta and eta rules in Higher_order.ml.
        They should be connected to each other. Note that the Clause module calls Ctx.ord () independently.
       *)
@@ -134,7 +134,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             not (T.is_var t) || T.is_ho_var t)
       (* TODO: could exclude more variables from the index:
          they are not needed if they occur with the same args everywhere in the clause *)
-      |> Iter.filter (fun (t, _) -> 
+      |> Iter.filter (fun (t, _) ->
          (* Util.debugf ~section 5 "@[ Filtering vars %a,2  @]" (fun k-> k T.pp t); *)
          !_sup_at_var_headed || not (T.is_var (T.head_term t)))
       |> Iter.fold
@@ -159,20 +159,20 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* index subterms that can be rewritten by SupEXT --
        the ones that can rewrite those are actually the ones
        already indexed by _idx_sup_from*)
-    if !_supext then 
-      _idx_supext_into := 
-        Lits.fold_terms ~vars:!_sup_at_vars ~var_args:!_sup_in_var_args 
-                        ~fun_bodies:true ~ty_args:false ~ord 
+    if !_supext then
+      _idx_supext_into :=
+        Lits.fold_terms ~vars:!_sup_at_vars ~var_args:!_sup_in_var_args
+                        ~fun_bodies:true ~ty_args:false ~ord
                         ~which:`Max ~subterms:true
                         ~eligible:(C.Eligible.res c) (C.lits c)
         (* We are going only under lambdas *)
-        |> Iter.filter_map (fun (t, p) -> 
-              if not (T.is_fun t) then None 
-              else (let tyargs, body = T.open_fun t in 
+        |> Iter.filter_map (fun (t, p) ->
+              if not (T.is_fun t) then None
+              else (let tyargs, body = T.open_fun t in
                     let new_pos = List.fold_left (fun p _ -> P.(append p (body stop))) p tyargs in
                     let hd = T.head_term body in
                     if (not (T.is_var body) || T.is_ho_var body) &&
-                       (not (T.is_const hd) || not (ID.is_skolem (T.as_const_exn hd))) && 
+                       (not (T.is_const hd) || not (ID.is_skolem (T.as_const_exn hd))) &&
                        (!_sup_at_var_headed || not (T.is_var (T.head_term body))) then
                     Some (body, new_pos) else None))
         |> Iter.fold
@@ -249,12 +249,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
    * Superposition rule
    * ---------------------------------------------------------------------- *)
 
-  type supkind = 
-   | Classic 
-   | SupAV 
+  type supkind =
+   | Classic
+   | SupAV
    | SupEXT
 
-  let kind_to_str = function 
+  let kind_to_str = function
    | Classic -> "sup"
    | SupAV -> "supAV"
    | SupEXT -> "supEXT"
@@ -329,7 +329,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let renaming = S.Renaming.create () in
       let us = info.subst in
       let subst = US.subst us in
-      let supext_vars = 
+      let supext_vars =
         if (info.sup_kind = SupEXT) then (
           Term.Seq.subterms info.u_p |> Iter.filter Term.is_var |> Term.Set.of_seq)
         else Term.Set.empty in
@@ -344,17 +344,17 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
       if(info.sup_kind = SupEXT &&
          T.Seq.subterms t'
-         |> Iter.exists (fun st -> 
-              List.exists (fun arg -> not @@ T.DB.is_closed arg) 
+         |> Iter.exists (fun st ->
+              List.exists (fun arg -> not @@ T.DB.is_closed arg)
               (T.get_mand_args st))) then
         raise @@ ExitSuperposition("SupEXT sneaks in bound variables under the skolem");
-      
-      if(info.sup_kind = SupEXT && 
-         T.Set.exists (fun v -> 
+
+      if(info.sup_kind = SupEXT &&
+         T.Set.exists (fun v ->
           let t = fst @@ Subst.FO.deref subst (v,sc_p) in
           not @@ T.DB.is_closed t) supext_vars) then
         raise @@ ExitSuperposition("SupEXT -- an into free variable sneaks in bound variable");
-  
+
       begin match info.passive_lit, info.passive_pos with
         | Lit.Prop (_, true), P.Arg(_, P.Left P.Stop) ->
           if T.equal t' T.true_
@@ -369,8 +369,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           then raise (ExitSuperposition "will yield a tautology");
         | _ -> ()
       end;
-      let subst', new_sk = 
-        if info.sup_kind = SupEXT then 
+      let subst', new_sk =
+        if info.sup_kind = SupEXT then
         S.FO.unleak_variables subst else subst, [] in
       let passive_lit' = Lit.apply_subst_no_simp renaming subst' (info.passive_lit, sc_p) in
       let new_trail = C.trail_l [info.active; info.passive] in
@@ -378,8 +378,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let s' = S.FO.apply ~shift_vars renaming subst (info.s, sc_a) in
       if(info.sup_kind = SupEXT &&
          T.Seq.subterms s'
-         |> Iter.exists (fun st -> 
-              List.exists (fun arg -> not @@ T.DB.is_closed arg) 
+         |> Iter.exists (fun st ->
+              List.exists (fun arg -> not @@ T.DB.is_closed arg)
               (T.get_mand_args st))) then
         raise @@ ExitSuperposition("SupEXT sneaks in bound variables under the skolem");
       if (
@@ -402,7 +402,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Lit.Pos.replace passive_lit'
           ~at:passive_lit_pos ~by:t' in
       let c_guard = Literal.of_unif_subst renaming us in
-      let tags = Unif_subst.tags us in 
+      let tags = Unif_subst.tags us in
       (* apply substitution to other literals *)
        (* Util.debugf 1 "Before unleak: %a, after unleak: %a"
       (fun k -> k Subst.pp subst Subst.pp subst'); *)
@@ -414,18 +414,18 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       (* For some reason type comparison does not work. *)
       let vars = List.map T.as_var_exn (Term.Set.to_list supext_vars) in
-      let sk_with_vars = 
-        List.fold_left (fun acc t -> 
-            let new_sk_vars = Term.mk_fresh_skolem vars (Term.ty t) in 
-            Term.Map.add t (S.FO.apply renaming subst' (new_sk_vars, sc_p)) acc) 
-         Term.Map.empty new_sk in 
-      let new_lits = 
-        List.map (fun lit -> 
+      let sk_with_vars =
+        List.fold_left (fun acc t ->
+            let new_sk_vars = Term.mk_fresh_skolem vars (Term.ty t) in
+            Term.Map.add t (S.FO.apply renaming subst' (new_sk_vars, sc_p)) acc)
+         Term.Map.empty new_sk in
+      let new_lits =
+        List.map (fun lit ->
           Lit.map (fun t ->
-            Term.Map.fold 
-              (fun sk sk_v acc -> 
+            Term.Map.fold
+              (fun sk sk_v acc ->
                 let sk = S.FO.apply renaming subst (sk, sc_p) in
-                Term.replace ~old:sk ~by:sk_v acc) 
+                Term.replace ~old:sk ~by:sk_v acc)
               sk_with_vars t ) lit) new_lits in
       let rule =
         let r = kind_to_str info.sup_kind in
@@ -630,7 +630,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       ~process_retrieved:(fun do_sup (u_p, with_pos, subst) -> do_sup u_p with_pos subst)
       clause
 
-  let infer_supext_from clause = 
+  let infer_supext_from clause =
     (* no literal can be eligible for paramodulation if some are selected.
        This checks if inferences with i-th literal are needed? *)
     let eligible = C.Eligible.param clause in
@@ -647,7 +647,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           let passive_lit, _ = Lits.Pos.lit_at (C.lits passive) passive_pos in
           let info = SupInfo.( {
               s; t; active=clause; active_pos=s_pos; scope_active=0;
-              u_p; passive; passive_lit; passive_pos; scope_passive=1; 
+              u_p; passive; passive_lit; passive_pos; scope_passive=1;
               subst; sup_kind=SupEXT
             }) in
           Util.debugf ~section 10 "[Trying supext from %a into %a with term %a into term %a]"
@@ -671,20 +671,20 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* do the inferences in which clause is passive (rewritten),
        so we consider both negative and positive literals *)
     let new_clauses =
-      Lits.fold_terms ~vars:!_sup_at_vars ~var_args:!_sup_in_var_args 
+      Lits.fold_terms ~vars:!_sup_at_vars ~var_args:!_sup_in_var_args
                       ~fun_bodies:true ~subterms:true ~ord
                       ~which:`Max ~eligible ~ty_args:false (C.lits clause)
       |> Iter.filter_map (fun (u_p, p) ->
           (* we rewrite only under lambdas  *)
           if not (T.is_fun u_p) then None
-          else (let tyargs, body = T.open_fun u_p in 
+          else (let tyargs, body = T.open_fun u_p in
                 let hd = T.head_term body in
                 let new_pos = List.fold_left (fun p _ -> P.(append p (body stop)) ) p tyargs in
                 (* we check normal superposition conditions  *)
                 if (not (T.is_var body) || T.is_ho_var body) &&
-                   (not (T.is_const hd) || not (ID.is_skolem (T.as_const_exn hd))) && 
+                   (not (T.is_const hd) || not (ID.is_skolem (T.as_const_exn hd))) &&
                    (!_sup_at_var_headed || not (T.is_var (T.head_term body))) then
-                  Some (body, new_pos) 
+                  Some (body, new_pos)
                 else None) )
       |> Iter.flat_map
         (fun (u_p, passive_pos) ->
@@ -696,7 +696,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               | Some (s, t, true) ->
                 let info = SupInfo.({
                     s; t; active; active_pos=s_pos; scope_active=1; subst;
-                    u_p; passive=clause; passive_lit; passive_pos; 
+                    u_p; passive=clause; passive_lit; passive_pos;
                     scope_passive=0; sup_kind=SupEXT
                   }) in
                 Util.debugf ~section 10 "[Trying supext from %a into %a with term %a into term %a]"
@@ -1684,7 +1684,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let subsumes_with a b =
     Util.enter_prof prof_subsumption;
     Util.incr_stat stat_subsumption_call;
-    let (c_a, _), (c_b, _) = a,b in 
+    let (c_a, _), (c_b, _) = a,b in
     let w_a = CCArray.fold (fun acc l -> acc + Lit.weight l) 0 c_a in
     let w_b = CCArray.fold (fun acc l -> acc + Lit.weight l) 0 c_b in
     let res = if w_a <= w_b then subsumes_with_ a b else None in
@@ -1886,7 +1886,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     res
 
   let inject_destruct lit =
-    let rec destruct l r = (try 
+    let rec destruct l r = (try
         let l_hd, l_args = T.as_app l in
         let r_hd, r_args = T.as_app r in
         let s_sym, t_sym = T.as_const_exn l_hd, T.as_const_exn r_hd in
@@ -1895,8 +1895,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           let zipped_args = List.combine l_args r_args in
           let zipped_idx = List.combine idxs zipped_args in
           let diffs = CCList.filter_map (fun (i, (s_i, t_i)) ->
-               if not (T.equal s_i t_i) then Some (i, s_i, t_i) 
-               else None) zipped_idx in 
+               if not (T.equal s_i t_i) then Some (i, s_i, t_i)
+               else None) zipped_idx in
           if CCList.length diffs = 1 then (
             let (i, s_i, t_i) = CCList.hd diffs in
             if (Env.Ctx.is_injective_for_arg s_sym i)
@@ -1904,9 +1904,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             else destruct s_i t_i
           ) else None
         ) else None
-      with Invalid_argument _ -> None) in  
+      with Invalid_argument _ -> None) in
     match Literal.View.as_eqn lit with
-    | Some (l, r, false) -> 
+    | Some (l, r, false) ->
        destruct l r
     | _ -> None
 
@@ -2032,7 +2032,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and is_trivial = is_tautology in
     if !_complete_ho_unification
     then (
-      
+
       Env.add_binary_inf "superposition_passive" infer_passive_complete_ho;
       Env.add_binary_inf "superposition_active" infer_active_complete_ho;
       Env.add_unary_inf "equality_factoring" infer_equality_factoring_complete_ho;
@@ -2157,7 +2157,7 @@ let () =
     , Arg.Set _supext
     , " enable SupEXT inferences";
       "--ho-unif-level",
-      Arg.Symbol (["full"; "pragmatic"], (fun str ->  
+      Arg.Symbol (["full"; "pragmatic"], (fun str ->
         _unif_alg := if (String.equal "full" str) then JP_unif.unify_scoped
                      else PragHOUnif.unify_scoped)),
       "set the level of HO unification"

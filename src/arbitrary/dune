@@ -1,0 +1,13 @@
+
+; main lib
+(library
+  (name logtk_arbitrary)
+  (public_name logtk.arbitrary)
+  (synopsis "random generators for logtk")
+  (optional)
+  (libraries containers logtk qcheck)
+  )
+
+
+
+

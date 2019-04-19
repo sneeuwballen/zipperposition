@@ -32,7 +32,7 @@ let psterm, pstmt, pstmt_l, clear_scope, unif_ty, pstyctx =
     let l = Parse_zf.parse_statement_list Lex_zf.token (Lexing.from_string s) in
     let l = TypeInference.infer_statements_exn
         ~on_var:`Default ~ctx:tyctx ~implicit_ty_args:false
-        (Sequence.of_list l) in
+        (Iter.of_list l) in
     (* TypeInference.Ctx.exit_scope tyctx; *)
     CCVector.to_list l
   and unif_ty t u =
@@ -1091,8 +1091,8 @@ let check_ho_unify_gives_unifiers =
   let name = "ho_unify_gives_unifiers" in
   let prop (t1, t2) =
     let offset =
-      Sequence.doubleton t1 t2
-      |> Sequence.flat_map T.Seq.vars
+      Iter.doubleton t1 t2
+      |> Iter.flat_map T.Seq.vars
       |> T.Seq.max_var |> succ
     in
     (* only keep proper solutions *)

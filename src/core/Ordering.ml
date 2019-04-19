@@ -103,7 +103,7 @@ module Head = struct
       | T.App (_,ss) -> ss
       | T.AppBuiltin (_,ss) -> ss
       (* The orderings treat lambda-expressions like a "LAM" symbol applied to the body of the lambda-expression *)
-      | T.Fun (_,t) -> [t] 
+      | T.Fun (_,t) -> [t]
       | _ -> []
 
   let to_string = CCFormat.to_string pp
@@ -134,13 +134,13 @@ let prec_compare prec a b = match a,b with
   | Head.LAM,  Head.LAM  -> Eq
   | Head.I _,  Head.B _  -> Gt (* lam > db > id > builtin *)
   | Head.B _,  Head.I _  -> Lt
-  | Head.DB _, Head.I _  -> Gt 
+  | Head.DB _, Head.I _  -> Gt
   | Head.I _,  Head.DB _ -> Lt
-  | Head.DB _, Head.B _  -> Gt 
+  | Head.DB _, Head.B _  -> Gt
   | Head.B _,  Head.DB _ -> Lt
-  | Head.LAM,  Head.DB _ -> Gt 
+  | Head.LAM,  Head.DB _ -> Gt
   | Head.DB _, Head.LAM  -> Lt
-  | Head.LAM,  Head.I _  -> Gt 
+  | Head.LAM,  Head.I _  -> Gt
   | Head.I _,  Head.LAM  -> Lt
   | Head.LAM,  Head.B _  -> Gt
   | Head.B _,  Head.LAM  -> Lt
@@ -178,7 +178,7 @@ module KBO : ORD = struct
     else (
       if n = -1 then balance.neg_counter <- balance.neg_counter - 1
     );
-    Term.Tbl.add balance.balance var (n + 1) 
+    Term.Tbl.add balance.balance var (n + 1)
 
   (** add a negative variable *)
   let add_neg_var balance var =
@@ -188,7 +188,7 @@ module KBO : ORD = struct
     else (
       if n = 1 then balance.pos_counter <- balance.pos_counter - 1
     );
-    Term.Tbl.add balance.balance var (n - 1) 
+    Term.Tbl.add balance.balance var (n - 1)
 
   let weight_var_headed = W.one
 
@@ -213,9 +213,9 @@ module KBO : ORD = struct
         | T.App (f, _) when (T.is_var f) ->
           balance_weight_var wb t s ~pos
         | T.DB i ->
-          let wb' = 
-          if pos 
-          then W.(wb + weight prec (Head.DB i)) 
+          let wb' =
+          if pos
+          then W.(wb + weight prec (Head.DB i))
           else W.(wb - weight prec (Head.DB i)) in
           wb', false
         | T.Const c ->
@@ -235,7 +235,7 @@ module KBO : ORD = struct
             else wb - weight prec (Head.B b)
           in
           balance_weight_rec wb' l s ~pos false
-        | T.Fun (_, body) -> 
+        | T.Fun (_, body) ->
           let open W.Infix in
           let wb' =
             if pos
@@ -300,7 +300,7 @@ module KBO : ORD = struct
     and tckbo (wb:W.t) t1 t2 =
       if T.equal t1 t2
       then (wb, Eq) (* do not update weight or var balance *)
-      else 
+      else
         match Head.term_to_head t1, Head.term_to_head t2 with
           | Head.V _, Head.V _ ->
             add_pos_var balance t1;
@@ -509,7 +509,7 @@ let subterm =
   let might_flip _ _ _ = false in
   { cache_compare=dummy_cache_; compare; prec=Prec.default []; name="subterm"; might_flip; cache_might_flip=dummy_cache_ }
 
-let map f { cache_compare=_; compare; prec; name; might_flip; cache_might_flip=_ } = 
+let map f { cache_compare=_; compare; prec; name; might_flip; cache_might_flip=_ } =
   let cache_compare = mk_cache 256 in
   let cache_might_flip = mk_cache 256 in
   let compare prec a b = CCCache.with_cache cache_compare (fun (a, b) -> compare prec (f a) (f b)) (a,b) in

@@ -5,25 +5,24 @@ homepage: "https://github.com/c-cube/zipperposition"
 version: "1.5"
 synopsis: "Core types and algorithms for logic"
 build: [
-  ["jbuilder" "build" "-p" name]
-  ["jbuilder" "build" "@doc" "-p" name] {with-doc}
-  ["jbuilder" "runtest" "-p" name] {with-test}
+  ["dune" "build" "-p" name]
+  ["dune" "build" "@doc" "-p" name] {with-doc}
+  ["dune" "runtest" "-p" name] {with-test}
 ]
 depends: [
-  "ocamlfind" { build }
   "base-bytes"
   "base-unix"
   "zarith"
   "containers" { >= "1.0" }
   "iter" { >= "1.2" }
-  "jbuilder" { build }
+  "menhir" {build}
+  "dune" { build }
   "alcotest" {with-test}
   "qcheck" {with-test & >= "0.9"}
   "ocaml" {>= "4.03"}
 ]
 depopts: [
-  "msat" { >= "0.5" < "1.0" }
-  "menhir" {build}
+  "msat" { >= "0.8" < "0.9" }
 ]
 tags: [ "logic" "unification" "term" ]
 bug-reports: "https://github.com/c-cube/zipperposition/issues"

@@ -1,7 +1,7 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Lambda-free Terms} *)
+(** {1 Terms} *)
 
 module PB = Position.Build
 module PW = Position.With
@@ -51,7 +51,7 @@ let subterm ~sub t =
 let equal = T.equal
 let hash = T.hash
 let compare = T.compare
-let ty t = match T.ty t with
+let[@inline] ty t = match T.ty t with
   | T.NoType -> assert false
   | T.HasType ty -> Type.of_term_unsafe ty
 
@@ -90,8 +90,8 @@ module Classic = struct
 end
 
 (** {2 Containers} *)
-module IntMap = Map.Make(struct type t = int 
-                                let compare : int -> int -> int = Pervasives.compare 
+module IntMap = Map.Make(struct type t = int
+                                let compare : int -> int -> int = Pervasives.compare
                          end)
 
 module Tbl = T.Tbl
@@ -142,7 +142,7 @@ let app f l = match l with
     let res = T.app ~ty:(ty_result : Type.t :> T.t) f l in
     Util.exit_prof prof_app;
     res
-    
+
 
 let app_full f tyargs l =
   let l = (tyargs : Type.t list :> T.t list) @ l in
@@ -235,29 +235,29 @@ let head_term_mono t = match view t with
     app f l1 (* re-apply to type parameters *)
   | _ -> t
 
-let get_mand_args t = 
+let get_mand_args t =
   match view t with
     | App (f,l) ->
-      let num_mand_args = 
+      let num_mand_args =
         begin match as_const f with
           | Some id -> ID.num_mandatory_args id
           | None -> 0
-        end 
+        end
       in
       let _, other_args = CCList.take_drop_while is_type l in
       let mand_args, _ = CCList.take_drop num_mand_args other_args in
-      mand_args 
+      mand_args
     | _ -> []
 
 
-let as_app_with_mandatory_args t = 
+let as_app_with_mandatory_args t =
   match view t with
     | App (f,l) ->
-      let num_mand_args = 
+      let num_mand_args =
         begin match as_const f with
           | Some id -> ID.num_mandatory_args id
           | None -> 0
-        end 
+        end
       in
       let ty_args, other_args = CCList.take_drop_while is_type l in
       let mand_args, other_args = CCList.take_drop num_mand_args other_args in
@@ -391,39 +391,39 @@ let rec in_pfho_fragment t =
                  else (raise (Failure (CCFormat.sprintf "Constant has wrong type [%a] " ID.pp sym)))
     | AppBuiltin( _, l)
     | App (_, l) -> let hd = head_term t in
-                    let hd_is_skolem = match as_const hd with 
+                    let hd_is_skolem = match as_const hd with
                                     | Some sym -> ID.is_skolem sym
-                                    | None -> false in  
+                                    | None -> false in
                     if((not (is_var hd || hd_is_skolem) || type_ok (ty t)) &&
                       List.map ty l |> List.for_all type_ok
                     && List.for_all in_pfho_fragment l) then true
-                    else (raise (Failure (CCFormat.sprintf "Arugment of a term has wrong type [%a]" T.pp t)))  
-    | Fun (var_t, body) -> if(type_ok (var_t) && 
+                    else (raise (Failure (CCFormat.sprintf "Arugment of a term has wrong type [%a]" T.pp t)))
+    | Fun (var_t, body) -> if(type_ok (var_t) &&
                            type_ok (ty body) &&
                            in_pfho_fragment body) then true
                            else (raise (Failure (CCFormat.sprintf "Lambda body has wrong type [%a]" T.pp t)))
     | DB _ -> if(type_ok (ty t)) then true
-              else (raise (Failure "Bound variable has wrong type")) 
-   and type_ok ty_ = 
+              else (raise (Failure "Bound variable has wrong type"))
+   and type_ok ty_ =
     not (Type.Seq.sub ty_ |> Iter.mem ~eq:Type.equal (Type.prop)) &&
     not (Type.Seq.sub ty_ |> Iter.mem ~eq:Type.equal (Type.tType))
 
 let in_lfho_fragment t =
-   in_pfho_fragment t && 
-      (Seq.subterms t) |> 
-      (fun subts -> 
-         if Iter.for_all (fun subt -> not (is_fun subt)) subts 
+   in_pfho_fragment t &&
+      (Seq.subterms t) |>
+      (fun subts ->
+         if Iter.for_all (fun subt -> not (is_fun subt)) subts
          then true
          else raise (Failure "has lambda"))
 
-let rec is_fo_term t = 
+let rec is_fo_term t =
   match view t with
-  | Var _ -> not @@ Type.is_fun @@ ty t 
+  | Var _ -> not @@ Type.is_fun @@ ty t
   | AppBuiltin (_,l) -> List.for_all is_fo_term l
   | App (hd, l) -> let expected_args = List.length @@ Type.expected_args @@ ty hd in
                    let actual_args = List.length l in
                    expected_args = actual_args &&
-                     List.for_all is_fo_term (hd :: l)   
+                     List.for_all is_fo_term (hd :: l)
   | Const _ -> true
   | _ -> false
 
@@ -517,8 +517,8 @@ let all_positions ?(vars=false) ?(ty_args=true) ?(var_args=true) ?(fun_bodies=tr
       if ty_args || not (Type.is_tType (ty t))
       then f (PW.make t (PB.to_pos pb))
     | Fun (_, u) ->
-      f (PW.make t (PB.to_pos pb)); 
-      if fun_bodies 
+      f (PW.make t (PB.to_pos pb));
+      if fun_bodies
       then aux (PB.body pb) u
     | App (head, _) when not var_args && T.is_var head ->
       f (PW.make t (PB.to_pos pb))
@@ -765,60 +765,60 @@ module DB = struct
   let eval = T.DB.eval
   let unshift = T.DB.unshift
   let unbound = T.DB.unbound
-  let skolemize_loosely_bound ?(already_sk=IntMap.empty) t =  
+  let skolemize_loosely_bound ?(already_sk=IntMap.empty) t =
   let rec aux skolemized depth subt =
-    match view subt with 
+    match view subt with
     | Const _
     | Var _ ->  (subt, skolemized)
     | DB i ->
         if i >= depth then
-          (match IntMap.find_opt (i-depth) skolemized with 
+          (match IntMap.find_opt (i-depth) skolemized with
           | (Some sk) -> (sk, skolemized)
-          | None -> 
+          | None ->
              let new_sk = mk_fresh_skolem [] (ty subt) in
              let skolemized = IntMap.add (i-depth) new_sk skolemized in
              new_sk,skolemized)
           else subt, skolemized
     | Fun (v_ty,body) -> let b', s' = aux skolemized (depth+1) body in
-                         fun_ v_ty b', s' 
+                         fun_ v_ty b', s'
     | App (f, l) ->
        let hd', s' = aux skolemized depth f in
-       let args, s'' = sk_args l s' depth  in   
+       let args, s'' = sk_args l s' depth  in
        app hd' args, s''
-    | AppBuiltin (hd,l) -> let args, s' = sk_args l skolemized depth in 
+    | AppBuiltin (hd,l) -> let args, s' = sk_args l skolemized depth in
                            app_builtin ~ty:(ty subt) hd args, s'
-  and sk_args l subst depth = 
-      List.fold_right (fun arg (acc, s) -> 
+  and sk_args l subst depth =
+      List.fold_right (fun arg (acc, s) ->
         let arg', s_new = aux s depth arg in
-        arg'::acc, s_new) 
+        arg'::acc, s_new)
       l ([], subst)
-  in 
+  in
     aux already_sk 0 t
-  
-  let unskolemize sk_to_vars t = 
+
+  let unskolemize sk_to_vars t =
     let rec aux depth subt =
       match Map.find_opt subt sk_to_vars  with
         Some i -> bvar ~ty:(ty subt) (depth+i)
-        | None -> 
+        | None ->
           (match view subt with
           | Const _  | Var _  | DB _ -> subt
-          | Fun (v_ty,body) -> fun_ v_ty (aux (depth+1) body) 
+          | Fun (v_ty,body) -> fun_ v_ty (aux (depth+1) body)
           | App (f, l) -> let f' = aux depth f in
                           app f' (List.map (aux depth) l)
           | AppBuiltin (hd,l) -> app_builtin ~ty:(ty subt) hd (List.map (aux depth) l))
    in aux 0 t
 
-  let rec map_vars_shift ?(depth=0) var_map t =   
-   match view t with 
+  let rec map_vars_shift ?(depth=0) var_map t =
+   match view t with
    | Const _  | DB _ -> t
-   | Var _ -> (match Map.find_opt t var_map with 
+   | Var _ -> (match Map.find_opt t var_map with
               | Some i -> bvar ~ty:(ty t) (i + depth)
-              | None -> t) 
-   | Fun (v_ty,body) -> let depth = depth+1 in 
-                        fun_ v_ty (map_vars_shift ~depth var_map body) 
+              | None -> t)
+   | Fun (v_ty,body) -> let depth = depth+1 in
+                        fun_ v_ty (map_vars_shift ~depth var_map body)
    | App (f, l) -> let f' = map_vars_shift ~depth var_map f in
                    app f' (List.map (map_vars_shift ~depth var_map) l)
-   | AppBuiltin (hd,l) -> app_builtin ~ty:(ty t) hd 
+   | AppBuiltin (hd,l) -> app_builtin ~ty:(ty t) hd
                           (List.map (map_vars_shift ~depth var_map) l)
 
 end

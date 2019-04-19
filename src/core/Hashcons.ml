@@ -31,7 +31,7 @@ module Make(X : HashedType) = struct
   type elt = X.t
 
   let count_ = ref 0
-  let tbl : H.t = H.create 1024
+  let tbl : H.t = H.create 4_096
 
   let hashcons x =
     let x' = H.merge tbl x in
@@ -41,7 +41,7 @@ module Make(X : HashedType) = struct
     );
     x'
 
-  let mem x = H.mem tbl x
+  let[@inline] mem x = H.mem tbl x
 
   let fresh_unique_id () =
     let x = !count_ in
@@ -49,7 +49,7 @@ module Make(X : HashedType) = struct
     x
 
   let stats () = H.stats tbl
-end
+end[@@inline]
 
 module MakeNonWeak(X : HashedType) = struct
   module H = Hashtbl.Make(X)

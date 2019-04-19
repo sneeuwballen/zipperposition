@@ -146,17 +146,13 @@ module Make(X : sig
       (fun c -> if C.is_empty c then add_empty c) cs;
     ()
 
-  let add_simpl cs =
-    ProofState.SimplSet.add cs
+  let add_simpl = ProofState.SimplSet.add
 
-  let remove_active cs =
-    ProofState.ActiveSet.remove cs
+  let remove_active = ProofState.ActiveSet.remove
 
-  let remove_passive cs =
-    ProofState.PassiveSet.remove cs
+  let remove_passive = ProofState.PassiveSet.remove
 
-  let remove_simpl cs =
-    ProofState.SimplSet.remove cs
+  let remove_simpl = ProofState.SimplSet.remove
 
   let get_passive () =
     ProofState.PassiveSet.clauses () |> C.ClauseSet.to_seq
@@ -230,7 +226,7 @@ module Make(X : sig
 
   let params = X.params
 
-  let get_empty_clauses () =
+  let[@inline] get_empty_clauses () =
     !_empty_clauses
 
   let get_some_empty_clause () =
@@ -240,9 +236,9 @@ module Make(X : sig
   let has_empty_clause () =
     not (C.ClauseSet.is_empty !_empty_clauses)
 
-  let ord () = Ctx.ord ()
+  let ord = Ctx.ord
   let precedence () = Ordering.precedence (ord ())
-  let signature () = Ctx.signature ()
+  let signature = Ctx.signature
 
   let pp out () = CCFormat.string out "env"
 
@@ -253,10 +249,9 @@ module Make(X : sig
 
   type stats = int * int * int
 
-  let stats () = ProofState.stats ()
+  let stats = ProofState.stats
 
-  let next_passive () =
-    ProofState.PassiveSet.next ()
+  let next_passive = ProofState.PassiveSet.next
 
   (** do binary inferences that involve the given clause *)
   let do_binary_inferences c =
@@ -303,8 +298,7 @@ module Make(X : sig
   let is_trivial_trail trail = match !_is_trivial_trail with
     | [] -> false
     | [f] -> f trail
-    | [f1;f2] -> f1 trail || f2 trail
-    | l -> List.exists (fun f -> f trail) l
+    | f1 :: f2 :: tl -> f1 trail || f2 trail || List.exists (fun f -> f trail) tl
 
   let is_trivial c =
     if C.get_flag SClause.flag_persistent c then false
@@ -315,8 +309,7 @@ module Make(X : sig
         || begin match !_is_trivial with
           | [] -> false
           | [f] -> f c
-          | [f;g] -> f c || g c
-          | l -> List.exists (fun f -> f c) l
+          | f :: g :: tl -> f c || g c || List.exists (fun f -> f c) tl
         end
       in
       if res then C.mark_redundant c;

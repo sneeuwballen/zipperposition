@@ -17,8 +17,8 @@ end
 
 module H = Hashtbl.Make(VarInt)
 module M = CCMap.Make(VarInt)
-module IntMap = Map.Make(struct type t = int 
-                                let compare : int -> int -> int = Pervasives.compare 
+module IntMap = Map.Make(struct type t = int
+                                let compare : int -> int -> int = Pervasives.compare
                          end)
 
 
@@ -219,15 +219,15 @@ let to_string = CCFormat.to_string pp
 
 (** {2 Applying a substitution} *)
 
-let[@inline] apply_aux ~sv subst ~f_rename t =
-  let rec aux (t,sc_t) depth =
+let apply_aux ~sv subst ~f_rename t =
+  let rec aux  t sc_t depth =
     match T.ty t with
       | T.NoType ->
         assert(T.equal T.tType t);
         t
       | T.HasType ty ->
-        let ty' = aux (ty,sc_t) depth in
-        let res = 
+        let ty' = aux ty sc_t depth in
+        let res =
           begin match T.view t with
             | T.Const id ->
               (* regular constant *)
@@ -240,31 +240,30 @@ let[@inline] apply_aux ~sv subst ~f_rename t =
               else T.bvar ~ty:ty' i
             | T.Var v ->
               (* the most interesting cases!
-                switch depending on whether [t] is bound by [subst] or not *)
+                 switch depending on whether [t] is bound by [subst] or not *)
               begin match find_exn subst (v,sc_t) with
-                | term' ->
+                | (t',sc') ->
                   (* NOTE: if [t'] is not closed, we assume that it
-                    is always replaced in a context where variables
-                    are properly bound. Typically, that means only
-                    in rewriting. *)
+                     is always replaced in a context where variables
+                     are properly bound. Typically, that means only
+                     in rewriting. *)
                   (* also apply [subst] to [t'] *)
-                  let t',sc = term' in
-                  let shifted = if sv != -1 then T.DB.shift depth t' else t' in 
-                  aux (shifted, sc) depth
+                  let shifted = if sv != -1 then T.DB.shift depth t' else t' in
+                  aux shifted sc' depth
                 | exception Not_found ->
                   (* rename the variable using [f_rename] *)
                   let v' = f_rename (v,sc_t) ty' in
                   T.var v'
               end
             | T.Bind (s, varty, sub_t) ->
-              let varty' = aux (varty,sc_t) (depth+1) in
-              let sub_t' = aux (sub_t,sc_t) (depth+1) in
+              let varty' = aux varty sc_t (depth+1) in
+              let sub_t' = aux sub_t sc_t (depth+1) in
               let res = T.bind ~varty:varty' ~ty:ty' s sub_t' in
               (* Util.debugf 1 ("Before body: %a, after body: %a") *)
               (* (fun k -> k T.pp t T.pp res); res *)
               res
             | T.App (hd, l) ->
-              let hd' = aux (hd,sc_t) depth in
+              let hd' = aux hd sc_t depth in
               let l' = aux_list l sc_t depth in
               if T.equal ty ty' && T.equal hd hd' && T.same_l l l'
               then t
@@ -278,16 +277,17 @@ let[@inline] apply_aux ~sv subst ~f_rename t =
         res
   and aux_list l sc depth = match l with
     | [] -> []
-    | t::l' ->
-      aux (t,sc) depth :: aux_list l' sc depth
+    | [t1] -> [aux t1 sc depth]
+    | t1::t2::l' ->
+      aux t1 sc depth :: aux t2 sc depth :: aux_list l' sc depth
   in
   aux t sv
 
 (* Apply substitution to a term and rename variables not bound by [subst]*)
-let apply ?(shift_vars=(-1)) renaming subst t =
-  if is_empty subst && Renaming.is_none renaming then fst t
+let apply ?(shift_vars=(-1)) renaming subst (t,sc) =
+  if is_empty subst && Renaming.is_none renaming then t
   else (
-    apply_aux ~sv:shift_vars subst ~f_rename:(Renaming.rename_with_type renaming) t
+    apply_aux ~sv:shift_vars subst ~f_rename:(Renaming.rename_with_type renaming) t sc
   )
 
 (** {2 Specializations} *)
@@ -367,11 +367,11 @@ module FO = struct
     List.map (fun t -> apply ~shift_vars renaming subst (t,sc)) l
 
 
-  let compose ~scope s1 s2 = 
+  let compose ~scope s1 s2 =
     (* Format.printf "Composing: @[ %a = %a @]\n" pp s1 pp s2; *)
     let subs_l1 = to_list s1 in
     let subs_as_map =
-    (List.map (fun ((v,sc_v), (t,sc_t)) -> 
+    (List.map (fun ((v,sc_v), (t,sc_t)) ->
       ((v,sc_v), (( (Lambda.snf (apply Renaming.none s2 (Term.of_term_unsafe t,sc_t))) : term :> T.t), scope)))
     subs_l1) @ (to_list s2) in
     (of_list subs_as_map)
@@ -387,7 +387,7 @@ module FO = struct
 
 
   let map f s = map (fun t -> (f (Term.of_term_unsafe t) : term :> T.t)) s
-  
+
   let filter f s =
     filter
       (fun (v,sc_v) (t,sc_t) ->
@@ -398,24 +398,24 @@ module FO = struct
 
 
   let iter f s =
-    iter (fun (v, sc_v) (t,sc_t) -> 
+    iter (fun (v, sc_v) (t,sc_t) ->
       let v = HVar.update_ty ~f:Type.of_term_unsafe v in
       let t = Term.of_term_unsafe t in
       f (v, sc_v) (t, sc_t)
-    ) s 
+    ) s
 
   let unleak_variables subs =
    let subs_l = to_list subs in
-   let unleaked_l, new_sk = List.fold_right 
+   let unleaked_l, new_sk = List.fold_right
     (fun ((v,sc_v), (t,sc_t)) (l, sk_map) ->
-      let t = Term.of_term_unsafe t in  
-      Util.debugf 1 " unleaking in unleak_vars : %a" (fun k -> k Term.pp t); 
+      let t = Term.of_term_unsafe t in
+      Util.debugf 1 " unleaking in unleak_vars : %a" (fun k -> k Term.pp t);
       let t', sk_map = Term.DB.skolemize_loosely_bound ~already_sk:sk_map t in
-      let v' = (HVar.update_ty ~f:Type.of_term_unsafe v,sc_v) in  
+      let v' = (HVar.update_ty ~f:Type.of_term_unsafe v,sc_v) in
           (v', (t',sc_t))::l, sk_map) subs_l ([],Term.IntMap.empty) in
    of_list' unleaked_l, List.map snd (Term.IntMap.bindings new_sk)
 
-   
+
 end
 
 (** {2 Projections for proofs} *)

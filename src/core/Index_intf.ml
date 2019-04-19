@@ -69,7 +69,7 @@ module type TERM_IDX = sig
     t Scoped.t -> term Scoped.t ->
     (term * elt * Unif_subst.t) Iter.t
 
-  (** Retrieves all unifiables. The set of unifiers is potentially infinite. 
+  (** Retrieves all unifiables. The set of unifiers is potentially infinite.
       Because HO unification is undecidable, the sequence is intersperced with `None`s to ensure termination for each element of the sequence. *)
   val retrieve_unifiables_complete :
     ?unif_alg:(Term.t Scoped.t -> Term.t Scoped.t -> Unif_subst.t option OSeq.t)->

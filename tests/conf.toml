@@ -14,8 +14,8 @@ default_expect = "unsat"
 
 [zipperposition]
 
-binary = "./zipperposition.native"
-cmd = "./zipperposition.native $file --timeout $timeout --mem-limit $memory --output none"
+binary = "./zipperposition.exe"
+cmd = "./zipperposition.exe $file --timeout $timeout --mem-limit $memory --output none"
 unsat = "SZS status (Theorem|Unsatisfiable)"
 sat = "SZS status (CounterSatisfiable|Satisfiable)"
 timeout = "SZS status ResourceOut"
@@ -23,8 +23,8 @@ version = "git:."
 
 [zipperposition-check]
 
-binary = "./zipperposition.native"
-cmd = "./zipperposition.native $file --timeout $timeout --mem-limit $memory --output none --check"
+binary = "./zipperposition.exe"
+cmd = "./zipperposition.exe $file --timeout $timeout --mem-limit $memory --output none --check"
 unsat = "SZS status (Theorem|Unsatisfiable)"
 sat = "SZS status (CounterSatisfiable|Satisfiable)"
 timeout = "SZS status ResourceOut"
@@ -33,8 +33,8 @@ version = "git:."
 
 [zipperposition-avatar]
 
-binary = "./zipperposition.native"
-cmd = "./zipperposition.native $file --timeout $timeout --mem-limit $memory --output none --avatar"
+binary = "./zipperposition.exe"
+cmd = "./zipperposition.exe $file --timeout $timeout --mem-limit $memory --output none --avatar"
 unsat = "SZS status (Theorem|Unsatisfiable)"
 sat = "SZS status (CounterSatisfiable|Satisfiable)"
 timeout = "SZS status ResourceOut"

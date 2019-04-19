@@ -25,15 +25,15 @@ and type_result =
 
 type term = t
 
-let view t = t.term
-let ty t = t.ty
-let ty_exn t = match t.ty with
+let[@inline] view t = t.term
+let[@inline] ty t = t.ty
+let[@inline] ty_exn t = match t.ty with
   | NoType -> invalid_arg "InnerTerm.ty_exn"
   | HasType ty -> ty
 
-let hash t = Hash.int t.id
-let equal : t -> t -> bool = fun t1 t2 -> t1 == t2
-let compare t1 t2 = Pervasives.compare t1.id t2.id
+let[@inline] hash t = Hash.int t.id
+let[@inline] equal : t -> t -> bool = fun t1 t2 -> t1 == t2
+let[@inline] compare t1 t2 = Pervasives.compare t1.id t2.id
 
 let rec same_l_rec l1 l2 = match l1, l2 with
   | [], [] -> true
@@ -81,7 +81,24 @@ let hash_mod_alpha t : int =
   in
   aux 2 t
 
-let rec _eq_norec t1 t2 =
+let _eq_ty t1 t2 = match t1.ty, t2.ty with
+  | NoType, NoType -> true
+  | HasType ty1, HasType ty2 -> equal ty1 ty2
+  | _ -> false
+
+let rec _eq_norec_list l1 l2 = match l1, l2 with
+  | [], [] -> true
+  | [], _
+  | _, [] -> false
+  | t1::l1', t2::l2' -> equal t1 t2 && _eq_norec_list l1' l2'
+
+let rec _eq_record_list l1 l2 = match l1, l2 with
+  | [], [] -> true
+  | [], _
+  | _, [] -> false
+  | (n1,t1)::l1', (n2,t2)::l2' -> n1=n2 && equal t1 t2 && _eq_record_list l1' l2'
+
+let _eq_norec t1 t2 =
   _eq_ty t1 t2 &&
   match t1.term, t2.term with
     | Var i, Var j -> HVar.equal equal i j
@@ -90,24 +107,10 @@ let rec _eq_norec t1 t2 =
     | Bind (b1, varty1, t1'), Bind (b2, varty2, t2') ->
       Binder.equal b1 b2 && equal varty1 varty2 && equal t1' t2'
     | App (f1, l1), App (f2, l2) ->
-      equal f1 f2 && _eq_list l1 l2
+      equal f1 f2 && _eq_norec_list l1 l2
     | AppBuiltin (b1, l1), AppBuiltin (b2, l2) ->
-      Builtin.equal b1 b2 && _eq_list l1 l2
+      Builtin.equal b1 b2 && _eq_norec_list l1 l2
     | _ -> false
-and _eq_ty t1 t2 = match t1.ty, t2.ty with
-  | NoType, NoType -> true
-  | HasType ty1, HasType ty2 -> equal ty1 ty2
-  | _ -> false
-and _eq_list l1 l2 = match l1, l2 with
-  | [], [] -> true
-  | [], _
-  | _, [] -> false
-  | t1::l1', t2::l2' -> equal t1 t2 && _eq_list l1' l2'
-and _eq_record_list l1 l2 = match l1, l2 with
-  | [], [] -> true
-  | [], _
-  | _, [] -> false
-  | (n1,t1)::l1', (n2,t2)::l2' -> n1=n2 && equal t1 t2 && _eq_record_list l1' l2'
 
 (** {3 Constructors} *)
 
@@ -118,7 +121,7 @@ module H = Hashcons.Make(struct
     type t = term
     let equal = _eq_norec
     let hash = _hash_norec
-    let tag i t = assert (t.id = ~-1); t.id <- i
+    let[@inline] tag i t = assert (t.id = ~-1); t.id <- i
   end)
 
 let hashcons_stats () = H.stats ()
@@ -188,14 +191,14 @@ let cast ~ty old = match old.term with
   | App (f,l) -> app ~ty f l
   | AppBuiltin (s,l) -> app_builtin ~ty s l
 
-let is_var t = match view t with | Var _ -> true | _ -> false
-let is_bvar t = match view t with | DB _ -> true | _ -> false
-let is_const t = match view t with | Const _ -> true | _ -> false
-let is_bind t = match view t with | Bind _ -> true | _ -> false
-let is_app t = match view t with | App _ -> true | _ -> false
-let is_tType t = match view t with AppBuiltin (Builtin.TType, _) -> true | _ -> false
+let[@inline] is_var t = match view t with | Var _ -> true | _ -> false
+let[@inline] is_bvar t = match view t with | DB _ -> true | _ -> false
+let[@inline] is_const t = match view t with | Const _ -> true | _ -> false
+let[@inline] is_bind t = match view t with | Bind _ -> true | _ -> false
+let[@inline] is_app t = match view t with | App _ -> true | _ -> false
+let[@inline] is_tType t = match view t with AppBuiltin (Builtin.TType, _) -> true | _ -> false
 
-let is_lambda t = match view t with Bind (Binder.Lambda, _, _) -> true | _ -> false
+let[@inline] is_lambda t = match view t with Bind (Binder.Lambda, _, _) -> true | _ -> false
 
 (** {3 Payload} *)
 
@@ -272,7 +275,7 @@ module DB = struct
         _to_seq ~depth f k;
         List.iter (fun t -> _to_seq ~depth t k) l
 
-  let _id x = x
+  let[@inline] _id x = x
 
   let closed t =
     _to_seq ~depth:0 t
@@ -287,7 +290,7 @@ module DB = struct
 
   let unbound t =
     _to_seq ~depth:0 t
-    |> Iter.filter_map 
+    |> Iter.filter_map
       (fun (bvar,depth) -> if bvar >= depth then Some (bvar - depth) else None)
     |> Iter.to_rev_list
 
@@ -752,30 +755,30 @@ let type_non_unifiable_tags (ty:t): _ list = match view ty with
 
 let type_is_prop t = match view t with AppBuiltin (Builtin.Prop, _) -> true | _ -> false
 
-let is_a_type t = match ty t with
+let[@inline] is_a_type t = match ty t with
   | HasType ty -> equal ty tType
   | NoType -> assert false
 
-let as_app t = match view t with
+let[@inline] as_app t = match view t with
   | App (f,l) -> f, l
   | _ -> t, []
 
-let as_var t = match view t with Var v -> Some v | _ -> None
-let as_var_exn t = match view t with Var v -> v | _ -> invalid_arg "as_var_exn"
+let[@inline] as_var t = match view t with Var v -> Some v | _ -> None
+let[@inline] as_var_exn t = match view t with Var v -> v | _ -> invalid_arg "as_var_exn"
 
 let as_const t = match view t with Const v -> Some v | _ -> None
 let as_const_exn t = match view t with Const v -> v | _ -> invalid_arg "as_const_exn"
 
-let as_bvar_exn t = match view t with DB i -> i | _ -> invalid_arg "as_bvar_exn"
-let is_bvar_i i t = match view t with DB j -> i=j | _ -> false
+let[@inline] as_bvar_exn t = match view t with DB i -> i | _ -> invalid_arg "as_bvar_exn"
+let[@inline] is_bvar_i i t = match view t with DB j -> i=j | _ -> false
 
 let respects_mandatory_args t =
   let rec aux t =
     match view t with
-      | App (f,l) -> 
+      | App (f,l) ->
         begin match view f with
         | Const id ->
-          let ok_here = 
+          let ok_here =
             let num_mand_args = ID.num_mandatory_args id in
             let other_args = CCList.drop_while is_a_type l in
             let mand_args = CCList.take num_mand_args other_args in

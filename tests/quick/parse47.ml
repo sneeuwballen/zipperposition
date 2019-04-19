@@ -9,8 +9,8 @@ let () =
     >>= TypeInference.infer_statements ?ctx:None
     >|= CCVector.to_seq
     >|= fun s' ->
-    let forms = Sequence.flat_map Statement.Seq.forms s' in
-    Sequence.for_all TT.closed forms
+    let forms = Iter.flat_map Statement.Seq.forms s' in
+    Iter.for_all TT.closed forms
   ) in
   match res with
   | E.Ok true -> ok ()

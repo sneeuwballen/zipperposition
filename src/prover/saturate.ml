@@ -91,7 +91,7 @@ module Make(E : Env.S) = struct
                let c, _ = Env.unary_simplify c in
                if Env.is_trivial c || Env.is_active c || Env.is_passive c
                then None
-               else Some c) 
+               else Some c)
           |> Iter.to_list in
           Util.debugf 2 ~section "@[<2>inferred @{<green>new clauses@}@ @[<v>%a@]@]"
             (fun k->k (CCFormat.list Env.C.pp) clauses);
@@ -112,13 +112,13 @@ module Make(E : Env.S) = struct
             let proof = Env.C.proof (List.find Env.C.is_empty l) in
             Unsat proof
           | c :: l', _ ->
-            (* put clauses of [l'] back in passive set *)            
+            (* put clauses of [l'] back in passive set *)
             Env.add_passive (Iter.of_list l');
             (* process the clause [c] *)
             let new_clauses = CCVector.create () in
             assert (not (Env.is_redundant c));
             (* process the given clause! *)
-            (* (match Env.C.is_inj_axiom c with 
+            (* (match Env.C.is_inj_axiom c with
                | Some (sym,i) -> Env.Ctx.set_injective_for_arg sym i
                | None -> ()); *)
             Util.incr_stat stat_processed_given;

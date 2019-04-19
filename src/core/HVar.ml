@@ -20,7 +20,7 @@ let[@inline] cast v ~ty = {v with ty; }
 let[@inline] update_ty v ~f = {v with ty=f v.ty; }
 
 let[@inline] compare cmp a b =
-  let c = CCOrd.int a.id b.id  in
+  let c = Pervasives.compare a.id b.id  in
   if c<>0 then c else cmp a.ty b.ty
 let[@inline] equal eq a b = a.id = b.id && eq a.ty b.ty
 let[@inline] hash a = Hash.int a.id

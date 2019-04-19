@@ -28,8 +28,8 @@ let gen low high =
     let t = (1 -- 7) >>= ArTerm.default_ho_fuel in
     list_size (low -- high) t >>= fun l ->
     let seq = List.map Lambda.snf l |> T.Set.of_list |> T.Set.to_seq in
-    let seq = Sequence.mapi (fun i t -> t, i) seq in
-    return (Sequence.to_list seq)
+    let seq = Iter.mapi (fun i t -> t, i) seq in
+    return (Iter.to_list seq)
   )
 
 let pp l =
@@ -57,8 +57,8 @@ module TestUnit(I : UnitIndex) = struct
   (* list of (term,int) that generalize [t] *)
   let find_all idx t =
     I.retrieve ~sign:true (idx,1) (t,0)
-    |> Sequence.map (fun (t',i,_,_) -> t', i)
-    |> Sequence.to_rev_list
+    |> Iter.map (fun (t',i,_,_) -> t', i)
+    |> Iter.to_rev_list
 
   (* check that at least the terms are retrieved *)
   let check_gen_retrieved_member =
@@ -140,7 +140,7 @@ module TestTerm(I : TermIndex) = struct
   (* list of (term,int) that can be retrieved using [retrieve] in [t] *)
   let find_all retrieve idx s_idx t s_t =
     retrieve (idx,s_idx) (t,s_t)
-    |> Sequence.fold
+    |> Iter.fold
       (fun acc (t',i,_) -> (t', i) :: acc)
       []
 
@@ -194,7 +194,7 @@ module TestTerm(I : TermIndex) = struct
   let _match_flip ?subst t1 t2 =
     Unif.FO.matching ?subst ~pattern:t2 t1
 
-  let size = Sequence.length
+  let size = Iter.length
   let pp l =
     CCFormat.to_string
       (fun out l ->

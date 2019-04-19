@@ -6,21 +6,20 @@
 type scope = int
 type +'a t = 'a * scope
 
-let make x i = x, i
+let[@inline] make x i : _ t = x, i
 
-let get = fst
-let scope = snd
+let[@inline] get ((x,_): _ t) = x
+let[@inline] scope ((_,sc):_ t) = sc
 
-let set (_,s) x = x, s
+let[@inline] set (_,s) x : _ t = x, s
 
-let same_scope v1 v2 = scope v1 = scope v2
+let[@inline] same_scope (v1:_ t) (v2:_ t) : bool = scope v1 = scope v2
 
 let on f v = f (get v)
 let on2 f v1 v2 = f (get v1) (get v2)
+let map f (v,i) : _ t = (f v, i)
 
-let map f (v,i) = (f v, i)
-
-let equal eq v1 v2 = scope v1 = scope v2 && eq (get v1) (get v2)
+let[@inline] equal eq (v1:_ t) (v2:_ t) : bool = scope v1 = scope v2 && eq (get v1) (get v2)
 let compare c v1 v2 =
   if scope v1 = scope v2 then c (get v1) (get v2)
   else Pervasives.compare (scope v1) (scope v2)

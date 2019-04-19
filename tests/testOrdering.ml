@@ -45,8 +45,8 @@ let check_ordering_inv_by_subst ord =
   let gen = QCheck.Gen.(
     (pair gen_t gen_t)
     >>= fun (t1, t2) ->
-    let vars = Sequence.of_list [t1; t2]
-      |> Sequence.flat_map T.Seq.vars
+    let vars = Iter.of_list [t1; t2]
+      |> Iter.flat_map T.Seq.vars
       |> T.VarSet.of_seq
     in
     (* grounding substitution *)
@@ -69,8 +69,8 @@ let check_ordering_inv_by_subst ord =
   let ord = ref ord in
   let prop (t1, t2, subst) =
     (* declare symbols *)
-    Sequence.of_list [t1;t2]
-      |> Sequence.flat_map T.Seq.symbols
+    Iter.of_list [t1;t2]
+      |> Iter.flat_map T.Seq.symbols
       |> ID.Set.of_seq |> ID.Set.to_seq
       |> O.add_seq !ord;
     let t1' = S.apply Subst.Renaming.none subst (t1,0) in
@@ -88,8 +88,8 @@ let check_ordering_trans ord =
   let ord = ref ord in
   let prop (t1, t2, t3) =
     (* declare symbols *)
-    Sequence.of_list [t1;t2;t3]
-      |> Sequence.flat_map T.Seq.symbols
+    Iter.of_list [t1;t2;t3]
+      |> Iter.flat_map T.Seq.symbols
       |> ID.Set.of_seq |> ID.Set.to_seq
       |> O.add_seq !ord;
     (* check that instantiating variables preserves ordering *)
@@ -109,8 +109,8 @@ let check_ordering_swap_args ord =
   let ord = ref ord in
   let prop (t1, t2) =
     (* declare symbols *)
-    Sequence.of_list [t1;t2]
-      |> Sequence.flat_map T.Seq.symbols
+    Iter.of_list [t1;t2]
+      |> Iter.flat_map T.Seq.symbols
       |> ID.Set.of_seq |> ID.Set.to_seq
       |> O.add_seq !ord;
     (* check that instantiating variables preserves ordering *)
@@ -129,7 +129,7 @@ let check_ordering_swap_args ord =
 
 let contains_ho t =
   T.Seq.subterms t
-  |> Sequence.exists
+  |> Iter.exists
     (fun t -> T.is_ho_at_root t || T.is_fun t)
 
 let check_ordering_subterm ord =
@@ -139,13 +139,13 @@ let check_ordering_subterm ord =
   let prop t =
     if contains_ho t then QCheck.assume_fail() else
     (* declare symbols *)
-    Sequence.of_list [t]
-      |> Sequence.flat_map T.Seq.symbols
+    Iter.of_list [t]
+      |> Iter.flat_map T.Seq.symbols
       |> ID.Set.of_seq |> ID.Set.to_seq
       |> O.add_seq !ord;
     T.Seq.subterms_depth t
-    |> Sequence.filter_map (fun (t,i) -> if i>0 then Some t else None)
-    |> Sequence.for_all
+    |> Iter.filter_map (fun (t,i) -> if i>0 then Some t else None)
+    |> Iter.for_all
       (fun sub ->
          O.compare !ord t sub = Comparison.Gt)
   in

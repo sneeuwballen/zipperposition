@@ -4,7 +4,7 @@
 (** {1 Statement} *)
 
 module OptionSet = Set.Make(
-   struct 
+   struct
       let compare x y = Pervasives.compare x y
       type t = int option
    end)
@@ -348,14 +348,14 @@ module Seq = struct
         | `Ty ty -> Type.Seq.symbols ty)
 end
 
-let signature ?(init=Signature.empty) ?(conj_syms=Iter.empty) seq = 
-  let signtr = 
+let signature ?(init=Signature.empty) ?(conj_syms=Iter.empty) seq =
+  let signtr =
    seq
     |> Iter.flat_map Seq.ty_decls
     |> Iter.fold (fun sigma (id,ty) -> Signature.declare sigma id ty) init in
    conj_syms
    |> Iter.fold (fun sigma symb -> Signature.set_sym_in_conj symb sigma) signtr
-   
+
 let conv_attrs =
   let module A = UntypedAST in
   CCList.filter_map
@@ -778,69 +778,69 @@ let def_sym = ref IdMap.empty;;
 
 let get_rw_rule ?weight_incr:(w_i=20) c  =
   let distinct_free_vars l =
-    l |> List.map (fun t -> Term.as_var t |> 
+    l |> List.map (fun t -> Term.as_var t |>
                     (fun v -> match v with
                                | Some x -> Some (HVar.id x)
                                | None -> None) )
     |> OptionSet.of_list
     |> (fun set -> not (OptionSet.mem None set) && OptionSet.cardinal set = List.length l) in
-  
+
   let make_rw sym vars rhs =
     let ty_vars = List.filter (fun v -> Type.is_tType (Term.ty v)) vars in
-    let vars = List.filter (fun v -> not (Type.is_tType (Term.ty v))) vars in 
+    let vars = List.filter (fun v -> not (Type.is_tType (Term.ty v))) vars in
     let n_new = List.length vars in
-    let var_db_map = 
+    let var_db_map =
       CCList.foldi (fun acc i v -> Term.Map.add v (n_new-i-1) acc) Term.Map.empty vars in
     let vars_to_db = Term.DB.map_vars_shift var_db_map rhs in
     let abs_rhs =  (Term.fun_l ((CCList.map Term.ty vars)) vars_to_db) in
     let r = Rewrite.Term.Rule.make ~proof:(as_proof_c c) sym (Type.close_forall (Term.ty abs_rhs)) ty_vars abs_rhs in
-    let rule = Rewrite.T_rule r in 
-    Util.debugf 1 "[ Declared rule %a out of symbol %a and rhs %a ]" 
+    let rule = Rewrite.T_rule r in
+    Util.debugf 1 "[ Declared rule %a out of symbol %a and rhs %a ]"
     (fun k -> k Rewrite.Rule.pp rule ID.pp sym Term.pp rhs);
     rule in
 
   let build_from_head sym vars rhs =
     let rhs = Lambda.snf (fst (Rewrite.Term.normalize_term rhs)) in
-    if not (Term.symbols rhs |> ID.Set.mem sym) && 
-        Term.VarSet.cardinal 
-          (Term.VarSet.diff (Term.vars rhs) 
-                            ((List.fold_left (fun acc t -> 
-                                  match Term.as_var t with 
-                                    None -> acc 
+    if not (Term.symbols rhs |> ID.Set.mem sym) &&
+        Term.VarSet.cardinal
+          (Term.VarSet.diff (Term.vars rhs)
+                            ((List.fold_left (fun acc t ->
+                                  match Term.as_var t with
+                                    None -> acc
                                     | Some v -> v :: acc) [] vars)
                               |> Term.VarSet.of_list)) = 0 then
       (* Here I skipped proof object creation *)
-      let res_rw =  Some (sym, make_rw sym vars rhs) in 
+      let res_rw =  Some (sym, make_rw sym vars rhs) in
       (def_sym := IdMap.add sym (rhs, res_rw) !def_sym;
        res_rw)
     else
       None in
-                                         
-  let conv_terms_rw t1 t2 = 
+
+  let conv_terms_rw t1 t2 =
     let reduced = Lambda.eta_reduce t1 in
       match Term.view reduced with
         Term.App (hd, l) when Term.is_const hd && distinct_free_vars l
-                              && (let real_vars = 
+                              && (let real_vars =
                                     List.filter (fun v -> not (Type.is_tType (Term.ty v))) l in
                                  List.length (real_vars) >= 1) ->
             let sym = (Term.as_const_exn hd) in
             (match IdMap.find_opt sym !def_sym with
             | Some (rhs, rw_rule) ->  (
                if  not (Term.equal rhs t2) then (
-               Util.debugf 1 "Rejected definition %a of %a " (fun k-> k Term.pp t2 ID.pp sym) ; 
+               Util.debugf 1 "Rejected definition %a of %a " (fun k-> k Term.pp t2 ID.pp sym) ;
                None)
-               else rw_rule ) 
+               else rw_rule )
             | _ -> build_from_head sym l t2)
         | _ -> None in
-   
+
    let all_lits =  Seq.lits c in
    if Iter.length all_lits = 1 then
-      match Iter.head_exn all_lits with 
-      | SLiteral.Eq (t1,t2) -> 
+      match Iter.head_exn all_lits with
+      | SLiteral.Eq (t1,t2) ->
          if (Term.weight t2 - Term.weight t1 <= w_i) then (
             match conv_terms_rw t1 t2 with
-            | Some rhs -> Some rhs 
-            | None -> if Term.weight t1 - Term.weight t2 <= w_i then 
+            | Some rhs -> Some rhs
+            | None -> if Term.weight t1 - Term.weight t2 <= w_i then
                       conv_terms_rw t2 t1 else None)
          else (if Term.weight t1 - Term.weight t2 <= w_i then
                conv_terms_rw t2 t1 else None)

@@ -19,6 +19,7 @@ type term = TypedSTerm.t
 type ty = term
 type form = term
 type inst = term list (** Instantiate some binder with the following terms. Order matters. *)
+
 type tag = Proof.tag
 
 type name = string

@@ -5,16 +5,15 @@ homepage: "https://github.com/c-cube/zipperposition"
 version: "1.5"
 synopsis: "Support tools for Zipperposition"
 build: [
-  ["jbuilder" "build" "-p" name]
-  ["jbuilder" "build" "@doc" "-p" name] {with-doc}
+  ["dune" "build" "-p" name]
+  ["dune" "build" "@doc" "-p" name] {with-doc}
 ]
 depends: [
-  "ocamlfind" { build }
-  "jbuilder" { build }
+  "dune" { build }
   "containers" { >= "1.0" }
   "iter" { >= "1.2" }
   "oseq" { >= "0.2" }
-  "msat" { >= "0.5" < "1.0" }
+  "msat" { >= "0.8" < "0.9" }
   "zarith"
   "logtk" { >= "1.5" }
   "libzipperposition" { >= "1.5" }

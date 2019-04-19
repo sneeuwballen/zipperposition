@@ -5,7 +5,6 @@
 
 open Logtk
 
-module FI = Msat.Formula_intf
 module SI = Msat.Solver_intf
 
 let section = Util.Section.make ~parent:Const.section "msat"
@@ -32,10 +31,22 @@ let sat_pp_model_ = ref false
 
 module type S = Sat_solver_intf.S
 
-module Make(Dummy : sig end)
-  : Sat_solver_intf.S
+(* Instantiate solver *)
+module Solver = Msat.Make_pure_sat(struct
+    module Formula = struct
+      include BBox.Lit
+      let norm (l:t) : t * _ =
+        let l', b = norm l in
+        l', if b then SI.Negated else SI.Same_sign
+    end
+    type proof = Sat_solver_intf.proof_step
+end)
+
+module Make() 
+(*   : Sat_solver_intf.S *)
 = struct
   module Lit = BBox.Lit
+  let solver = Solver.create ~size:`Big ()
 
   type clause = Lit.t list
 
@@ -60,21 +71,13 @@ module Make(Dummy : sig end)
       List.iter (pp_c out) l;
       flush out
 
-  let fresh_tag_ =
-    let n = ref 0 in
-    fun () ->
-      let x = !n in
-      incr n;
-      x
-
   module ClauseTbl = CCHashtbl.Make(struct
       type t = Lit.t list
       let equal = CCList.equal Lit.equal
       let hash = (Hash.list Lit.hash)
     end)
 
-  let clause_tbl_ : (int * proof_step) ClauseTbl.t = ClauseTbl.create 32
-  let tag_to_proof_ : (int, proof_step) Hashtbl.t = Hashtbl.create 32
+  let clause_tbl_ : unit ClauseTbl.t = ClauseTbl.create 32
   let lit_tbl_ : unit Lit.Tbl.t = Lit.Tbl.create 32
 
   (* add clause, if not added already *)
@@ -83,11 +86,9 @@ module Make(Dummy : sig end)
       Util.incr_stat stat_num_clauses;
       (* add new clause -> check again *)
       must_check := true;
-      let tag = fresh_tag_() in
-      ClauseTbl.add clause_tbl_ c (tag,proof);
-      Hashtbl.add tag_to_proof_ tag proof;
+      ClauseTbl.add clause_tbl_ c ();
       List.iter (fun lit -> Lit.Tbl.replace lit_tbl_ (Lit.abs lit) ()) c;
-      Queue.push ([c], proof, tag) queue_
+      Queue.push ([c], proof) queue_
     )
 
   let add_clause ~proof (c:clause) =
@@ -125,8 +126,8 @@ module Make(Dummy : sig end)
 
   let pp_form_simpl out l = Util.pp_list ~sep:"" pp_clause out l
 
-  let pp_form fmt (f,tag) =
-    Format.fprintf fmt "[@[<hv>%a@]]/%d" pp_form_simpl f tag
+  let pp_form fmt f : unit =
+    Format.fprintf fmt "[@[<hv>%a@]]" pp_form_simpl f
 
   let last_result () = !result_
   let valuation l = !eval_ l
@@ -139,22 +140,6 @@ module Make(Dummy : sig end)
 
   let get_proof_opt () = !proof_
 
-  module SatForm = struct
-    include Lit
-    let norm l =
-      let l', b = norm l in
-      l', if b then FI.Negated else FI.Same_sign
-    type proof = Proof.Step.t
-    let print = Lit.pp
-  end
-
-  (* Instantiate solver *)
-  module S =
-    Msat.Solver.Make
-      (SatForm)
-      (Msat.Solver.DummyTheory(SatForm))
-      (struct end)
-
   let () =
     if !sat_log_file <> "" then (
       let oc = open_out !sat_log_file in
@@ -164,83 +149,75 @@ module Make(Dummy : sig end)
       at_exit (fun () -> Format.pp_print_flush fmt (); close_out_noerr oc);
     )
 
-  exception UndecidedLit = S.UndecidedLit
+  exception UndecidedLit = Solver.UndecidedLit
 
   type sat_clause = Lit.t list
 
-  let bool_clause_of_sat c : sat_clause =
-    S.Proof.to_list c |> List.map (fun a -> a.S.St.lit)
+  let bool_clause_of_sat (c:Solver.Clause.t) : sat_clause =
+    Solver.Clause.atoms_l c |> List.map Solver.Atom.formula
 
   (* (clause * proof * proof) -> 'a *)
   module ResTbl = CCHashtbl.Make(struct
-      type t = sat_clause * Proof.t * Proof.t
-      let equal (c,a1,a2)(c',b1,b2) =
+      type t = sat_clause * Proof.t list
+      let equal (c,l1)(c',l2) =
         CCList.equal Lit.equal c c' &&
-        Proof.S.equal a1 b1 && Proof.S.equal a2 b2
-      let hash (c,a,b) =
-        Hashtbl.hash
-          [List.length c; Proof.S.hash a; Proof.S.hash b]
+        CCList.equal Proof.S.equal l1 l2
+      let hash (c,l) =
+        CCHash.combine2
+          (CCHash.int @@ List.length c)
+          (CCHash.list Proof.S.hash l)
     end)
 
   let tbl_res = ResTbl.create 16
 
-  let proof_of_leaf c =
-    (* leaf of the proof *)
-    let tag = match S.get_tag c with
-      | None ->
-        errorf "no tag in leaf of SAT proof (clause %a)" S.St.pp_clause c
-      | Some id -> id
-    in
-    begin match CCHashtbl.get tag_to_proof_ tag with
-      | Some step ->
-        let c = bool_clause_of_sat c in
-        Proof.S.mk step (Bool_clause.mk_proof_res c)
-      | None -> errorf "no proof for tag %d" tag
-    end
+  let proof_of_leaf c step : proof =
+    let c = bool_clause_of_sat c in
+    Proof.S.mk step (Bool_clause.mk_proof_res c)
 
   (* convert a SAT proof into a tree of ProofStep *)
   let conv_proof_atomic_ p : proof =
     let rec aux p =
-      let open S.Proof in
-      match S.Proof.expand p with
-        | { step = S.Proof.Lemma _; _ } ->
-          errorf "SAT proof involves a lemma"
-        | { conclusion=c; step = S.Proof.Resolution (p1,p2,_) } ->
+      let module P = Solver.Proof in
+      match P.expand p with
+        | {P. step = P.Lemma _; _ } -> errorf "SAT proof involves a lemma"
+        | {P. step = P.Assumption; _ } -> errorf "SAT proof involves an assumption"
+        | {P. step = P.Duplicate (c',_); _} -> aux c'
+        | {P. conclusion=c; step = P.Hyper_res {P.hr_init; hr_steps} } ->
           let c = bool_clause_of_sat c in
           (* atomic resolution step *)
-          let q1 = aux p1 in
-          let q2 = aux p2 in
-          begin match ResTbl.get tbl_res (c,q1,q2) with
+          let q1 = aux hr_init in
+          let q2 = List.map (fun (_,p) -> aux p) hr_steps in
+          begin match ResTbl.get tbl_res (c,q1::q2) with
             | Some s -> s
             | None ->
-              let parents = [Proof.Parent.from q1; Proof.Parent.from q2] in
+              let parents = Proof.Parent.from q1 :: List.map Proof.Parent.from q2 in
               let step =
                 Proof.Step.inference parents
                   ~rule:(Proof.Rule.mk "sat_resolution") in
               let s = Proof.S.mk step (Bool_clause.mk_proof_res c) in
-              ResTbl.add tbl_res (c,q1,q2) s;
-              ResTbl.add tbl_res (c,q2,q1) s;
+              ResTbl.add tbl_res (c,q1::q2) s;
               s
           end
-        | { conclusion=c; step = _ } -> proof_of_leaf c
+        | {P. conclusion=c; step = P.Hypothesis step; _ } ->
+          proof_of_leaf c step
     in
-    S.Proof.check p;
+    Solver.Proof.check p;
     aux p
 
   let conv_proof_compact_ p : proof =
-    let open S.Proof in
+    let module P = Solver.Proof in
     let leaves =
-      S.Proof.fold
+      P.fold
         (fun acc pnode -> match pnode with
-           | { step = S.Proof.Lemma _; _ } ->
-             errorf "SAT proof involves a lemma"
-           | { step = S.Proof.Resolution (_,_,_); _ } ->
+           | {P. step = P.Lemma _; _ } -> errorf "SAT proof involves a lemma"
+           | {P. step = P.Assumption; _ } -> errorf "SAT proof involves an assumption"
+           | {P. step = (P.Hyper_res _ | P.Duplicate _); _ } ->
              acc (* ignore, intermediate node *)
-           | { conclusion=c; step = _ } ->
-             Proof.Parent.from (proof_of_leaf c) :: acc)
+           | {P. conclusion=c; step = P.Hypothesis step; _ } ->
+             Proof.Parent.from (proof_of_leaf c step) :: acc)
         [] p
     in
-    let {conclusion=c;_} = S.Proof.expand p in
+    let {P.conclusion=c;_} = P.expand p in
     let c = bool_clause_of_sat c in
     let step =
       Proof.Step.inference leaves
@@ -253,16 +230,18 @@ module Make(Dummy : sig end)
     else conv_proof_atomic_ p
 
   let get_proof_of_lit lit =
+    let module P = Solver.Proof in
     let b, l = valuation_level lit in
     if not b || l <> 0 then invalid_arg "get_proof_of_lit";
-    let a = S.St.add_atom lit in
-    match S.Proof.prove_atom a with
+    let a = Solver.make_atom solver lit in
+    match P.prove_atom a with
       | Some p -> conv_proof_ p
       | None -> assert false
 
   let proved_at_0 lit =
-    if S.true_at_level0 lit then Some true
-    else if S.true_at_level0 (Lit.neg lit) then Some false
+    let a = Solver.make_atom solver lit in
+    if Solver.true_at_level0 solver a then Some true
+    else if Solver.true_at_level0 solver (Solver.Atom.neg a) then Some false
     else None
 
   let get_proved_lits (): Lit.Set.t =
@@ -294,19 +273,19 @@ module Make(Dummy : sig end)
     Util.incr_stat stat_num_calls;
     (* add pending clauses *)
     while not (Queue.is_empty queue_) do
-      let c, proof, tag = Queue.pop queue_ in
+      let c, proof = Queue.pop queue_ in
       Util.debugf ~section 4 "@[<hv2>assume@ @[%a@]@ proof: %a@]"
-        (fun k->k pp_form (c,tag) Proof.Step.pp proof);
-      S.assume ~tag c
+        (fun k->k pp_form c Proof.Step.pp proof);
+      Solver.assume solver c proof
     done;
     (* solve *)
-    begin match S.solve () with
-      | S.Sat s ->
+    begin match Solver.solve solver with
+      | Solver.Sat s ->
         eval_ := s.SI.eval;
         eval_level_ := s.SI.eval_level;
         proved_lits_ := lazy (get_proved_lits ());
         result_ := Sat;
-      | S.Unsat us ->
+      | Solver.Unsat us ->
         let p = us.SI.get_proof ()  |> conv_proof_ in
         result_ := Unsat p;
         proof_ := Some p;

@@ -129,25 +129,25 @@ let max_goal ~strict ~ord lits =
         BV.empty ()  (* empty one *)
     end)
 
-let ho_sel_driver lits f = 
+let ho_sel_driver lits f =
   let neg_max = CCArray.mapi (fun i l -> i,l)  lits
                   |> CCArray.filter (fun (_,l) -> Lit.is_neg l) in
     if CCArray.length neg_max = 0 then BV.empty ()
     else (
-      CCArray.fast_sort (fun (i, _) (j, _) -> compare (f i) (f j)) neg_max; 
+      CCArray.fast_sort (fun (i, _) (j, _) -> compare (f i) (f j)) neg_max;
       let idx, _ = CCArray.get neg_max 0 in
       let res = BV.empty () in
-      BV.set res idx; 
-      res 
+      BV.set res idx;
+      res
     )
 
 let avoid_app_var ~ord lits =
   mk_ ~ord lits ~f:(fun lits ->
     let avoid_av_feature i  =
-      let l = lits.(i) in 
+      let l = lits.(i) in
         (Lit.is_app_var_eq l,
          not (Lits.is_max ~ord lits i),
-        Lit.Seq.terms l |> Iter.fold (fun acc t -> 
+        Lit.Seq.terms l |> Iter.fold (fun acc t ->
           if (T.is_app_var t) then (acc+1) else acc) 0,
         Lit.weight l) in
     ho_sel_driver lits avoid_av_feature
@@ -156,10 +156,10 @@ let avoid_app_var ~ord lits =
 let prefer_app_var ~ord lits =
   mk_ ~ord lits ~f:(fun lits ->
     let prefer_av_feature i  =
-      let l = lits.(i) in 
+      let l = lits.(i) in
         (not (Lit.is_app_var_eq l),
          not (Lits.is_max ~ord lits i),
-         - (Lit.Seq.terms l |> Iter.fold (fun acc t -> 
+         - (Lit.Seq.terms l |> Iter.fold (fun acc t ->
           if (T.is_app_var t) then (acc+1) else acc) 0),
         -Lit.weight l) in
     ho_sel_driver lits prefer_av_feature

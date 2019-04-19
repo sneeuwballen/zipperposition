@@ -1,0 +1,13 @@
+
+val u : type.
+
+# type of cardinality one
+assert forall (x y : u). x = y.
+
+# functional update axiom
+assert forall (f: u->u) (d r : u).
+  exists (g: u -> u).
+    (forall x. g x = (if x = d then r else f x)).
+
+# goal: all functions are the same
+goal forall (a b: u -> u). a = b.

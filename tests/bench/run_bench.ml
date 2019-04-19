@@ -95,7 +95,7 @@ module MakeBench(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E
   let bench_random n =
     let terms = QCheck.Arbitrary.generate ~rand ~n ArTerm.default in
     let idx = Idx2.add_seq (Idx2.empty ())
-      (Sequence.map (fun t -> t,()) (Sequence.of_list terms)) in
+      (Iter.map (fun t -> t,()) (Iter.of_list terms)) in
     List.iter
       (fun t ->
         Idx2.retrieve ~sign:true idx 1 t 0 () (fun _ _ _ _ _ -> ()))
