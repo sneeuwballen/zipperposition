@@ -40,9 +40,9 @@ module Make(E : Env.S) = struct
 
   let _depth_types lits =
     Literals.Seq.terms lits
-    |> Sequence.map T.ty
-    |> Sequence.map (fun t -> InnerTerm.depth (t : Type.t :> InnerTerm.t))
-    |> Sequence.max ?lt:None
+    |> Iter.map T.ty
+    |> Iter.map (fun t -> InnerTerm.depth (t : Type.t :> InnerTerm.t))
+    |> Iter.max ?lt:None
     |> CCOpt.map_or ~default:0 CCFun.id
 
   let is_too_deep c =

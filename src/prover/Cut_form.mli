@@ -74,8 +74,8 @@ module Pos : sig
 end
 
 module Seq : sig
-  val terms : t -> term Sequence.t
-  val terms_with_pos : ?subterms:bool -> t -> term Position.With.t Sequence.t
+  val terms : t -> term Iter.t
+  val terms_with_pos : ?subterms:bool -> t -> term Position.With.t Iter.t
 end
 
 (** {2 Structure for Sets of cut forms, indexed modulo α-eq} *)
@@ -91,5 +91,5 @@ module FV_tbl(X : Map.OrderedType) : sig
 
   val get : t -> cut_form -> value option
 
-  val to_seq : t -> (cut_form * X.t) Sequence.t
+  val to_seq : t -> (cut_form * X.t) Iter.t
 end

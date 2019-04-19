@@ -9,11 +9,11 @@ module E = CCResult
 module A = UntypedAST
 module T = STerm
 
-type parser_res = (UntypedAST.statement Sequence.t, string) CCResult.t
+type parser_res = (UntypedAST.statement Iter.t, string) CCResult.t
 type 'a parser_ = 'a -> parser_res
 
 let parse_lexbuf_ lex =
-  Parse_dk.file Lex_dk.token lex |> Sequence.of_list
+  Parse_dk.file Lex_dk.token lex |> Iter.of_list
 
 let parse_lexbuf file : parser_res =
   try parse_lexbuf_ file |> E.return

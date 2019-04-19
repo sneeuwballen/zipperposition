@@ -70,11 +70,11 @@ module type S = sig
   (** replace each element by a multiset in its own *)
 
   module Seq : sig
-    val of_seq : t -> elt Sequence.t -> t
-    val to_seq : t -> elt Sequence.t
+    val of_seq : t -> elt Iter.t -> t
+    val to_seq : t -> elt Iter.t
 
-    val of_coeffs : t -> (elt * Z.t) Sequence.t -> t
-    val to_coeffs : t -> (elt * Z.t) Sequence.t
+    val of_coeffs : t -> (elt * Z.t) Iter.t -> t
+    val to_coeffs : t -> (elt * Z.t) Iter.t
   end
 
   val iter : (elt -> unit) -> t -> unit
@@ -140,7 +140,7 @@ module type S = sig
   val max : (elt -> elt -> Comparison.t) -> t -> t
   (** Maximal elements of the multiset, w.r.t the given ordering. *)
 
-  val max_seq : (elt -> elt -> Comparison.t) -> t -> (elt * Z.t) Sequence.t
+  val max_seq : (elt -> elt -> Comparison.t) -> t -> (elt * Z.t) Iter.t
   (** Fold on maximal elements *)
 
   val max_l : (elt -> elt -> Comparison.t) -> elt list -> elt list

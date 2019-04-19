@@ -164,7 +164,7 @@ end = struct
          end)
       (cs g);
     let all_clusters =
-      (UF_clauses.to_seq uf |> Sequence.map snd |> Sequence.to_rev_list)
+      (UF_clauses.to_seq uf |> Iter.map snd |> Iter.to_rev_list)
       @ !ground_
     in
     let new_goals = List.rev_map of_form all_clusters in
@@ -246,12 +246,12 @@ end = struct
              if needed *)
           if !n + 2 < max_steps_ then (
             let new_c =
-              Sequence.append
+              Iter.append
                 (E.do_binary_inferences c)
                 (E.do_unary_inferences c)
             in
             new_c
-            |> Sequence.filter_map
+            |> Iter.filter_map
               (fun new_c ->
                  let new_c, _ = E.unary_simplify new_c in
                  (* discard trivial/conditional clauses, or clauses coming
@@ -263,7 +263,7 @@ end = struct
                  else if E.is_trivial new_c then None
                  else if C.is_empty new_c then raise (Yield_false new_c)
                  else Some new_c)
-            |> Sequence.iter push_c
+            |> Iter.iter push_c
           )
         )
       done;
@@ -318,7 +318,7 @@ module T_view : sig
 
   val view : term -> term t
 
-  val active_subterms : term -> term Sequence.t
+  val active_subterms : term -> term Iter.t
   (** Visit all active subterms in the given term.
       A subterm is active if it's under a cstor, uninterpreted symbol,
       builtin, or under a defined function at an active position *)
@@ -455,10 +455,10 @@ module Make
       v
 
   (* scan terms for inductive skolems. *)
-  let scan_terms ~mode (seq:term Sequence.t) : Ind_cst.ind_skolem list =
+  let scan_terms ~mode (seq:term Iter.t) : Ind_cst.ind_skolem list =
     seq
-    |> Sequence.flat_map Ind_cst.find_ind_skolems
-    |> Sequence.filter
+    |> Iter.flat_map Ind_cst.find_ind_skolems
+    |> Iter.filter
       (fun (id,_) ->
          begin match Ind_cst.id_as_cst id, mode with
            | None, _ -> true
@@ -468,7 +468,7 @@ module Make
                 there are induction hypothesis on them that we will need *)
              not (Ind_cst.is_sub c)
          end)
-    |> Sequence.to_rev_list
+    |> Iter.to_rev_list
     |> CCList.sort_uniq ~cmp:Ind_cst.ind_skolem_compare
 
   (* scan clauses for ground terms of an inductive type,
@@ -496,7 +496,7 @@ module Make
       "@[<2>declare coverset@ `%a`@]" (fun k->k Cover_set.pp set);
     begin
       Cover_set.declarations set
-      |> Sequence.iter (fun (id,ty) -> Ctx.declare id ty)
+      |> Iter.iter (fun (id,ty) -> Ctx.declare id ty)
     end
 
   (* induction on the given variables *)
@@ -550,7 +550,7 @@ module Make
       Util.map_product c_sets
         ~f:(fun (v,set) ->
           Cover_set.cases ~which:`All set
-          |> Sequence.to_list
+          |> Iter.to_list
           |> List.map (fun case -> [v,case]))
       |> CCList.flat_map
         (fun (cases:(T.var * Cover_set.case) list) ->
@@ -571,7 +571,7 @@ module Make
                         let t = Ind_cst.to_term sub_cst in
                         Some (v,t)
                       ) else None))
-             |> Sequence.flat_map_l
+             |> Iter.flat_map_l
                (fun v_and_t_list ->
                   let subst =
                     v_and_t_list
@@ -589,7 +589,7 @@ module Make
                          ] |> Trail.of_list
                        in
                        C.create_a lits proof ~trail ~penalty:1))
-             |> Sequence.to_list
+             |> Iter.to_list
            in
            (* clauses [CNF[¬goal[case]) <- b_lit(case), ¬cut.blit] with
               other variables being replaced by skolem symbols *)
@@ -667,9 +667,9 @@ module Make
 
   let subterms_with_pos
       (f:Cut_form.t)
-    : (defined_path * Position.t * term) Sequence.t =
+    : (defined_path * Position.t * term) Iter.t =
     (* true if [x] occurs in active positions somewhere in [t] *)
-    let rec aux (dp:defined_path) (p:Position.t) (t:term) : _ Sequence.t = fun k ->
+    let rec aux (dp:defined_path) (p:Position.t) (t:term) : _ Iter.t = fun k ->
       k (dp,p,t);
       begin match T_view.view t with
         | T_view.T_app_defined (_, c, l) ->
@@ -708,7 +708,7 @@ module Make
       end
     in
     Cut_form.Seq.terms_with_pos ~subterms:false f
-    |> Sequence.flat_map
+    |> Iter.flat_map
       (fun (t, pos) -> aux P_root pos t)
 
   let term_is_var x t: bool = match T.view t with
@@ -716,9 +716,9 @@ module Make
     | _ -> false
 
   (* active occurrences of [x] in [f] *)
-  let var_active_pos_seq (f:Cut_form.t)(x:T.var): _ Sequence.t =
+  let var_active_pos_seq (f:Cut_form.t)(x:T.var): _ Iter.t =
     subterms_with_pos f
-    |> Sequence.filter
+    |> Iter.filter
       (function
         | P_active, _, t -> term_is_var x t
         | _ -> false)
@@ -726,27 +726,27 @@ module Make
   (* does the variable occur in an active position in [f],
      or under some uninterpreted position? *)
   let var_occurs_under_active_pos (f:Cut_form.t)(x:T.var): bool =
-    not (Sequence.is_empty @@ var_active_pos_seq f x)
+    not (Iter.is_empty @@ var_active_pos_seq f x)
 
-  let var_invariant_pos_seq f x: _ Sequence.t =
+  let var_invariant_pos_seq f x: _ Iter.t =
     subterms_with_pos f
-    |> Sequence.filter
+    |> Iter.filter
       (function
         | P_inactive, _, t -> term_is_var x t
         | _ -> false)
 
   (* does the variable occur in a position that is invariant? *)
   let var_occurs_under_invariant_pos (f:Cut_form.t)(x:T.var): bool =
-    not (Sequence.is_empty @@ var_invariant_pos_seq f x)
+    not (Iter.is_empty @@ var_invariant_pos_seq f x)
 
   (* variable appears only naked, i.e. directly under [=] *)
   let var_always_naked (f:Cut_form.t)(x:T.var): bool =
     let check_t t = T.is_var t || not (T.var_occurs ~var:x t) in
     begin
       Cut_form.cs f
-      |> Sequence.of_list
-      |> Sequence.flat_map Sequence.of_array
-      |> Sequence.for_all
+      |> Iter.of_list
+      |> Iter.flat_map Iter.of_array
+      |> Iter.for_all
         (function
           | Literal.Equation (l,r,_) ->
             let check_t t = T.is_var t || not (T.var_occurs ~var:x t) in
@@ -756,12 +756,12 @@ module Make
           | Literal.True | Literal.False -> true)
     end
 
-  let active_subterms_form (f:Cut_form.t): T.t Sequence.t =
+  let active_subterms_form (f:Cut_form.t): T.t Iter.t =
     Cut_form.cs f
-    |> Sequence.of_list
-    |> Sequence.flat_map Sequence.of_array
-    |> Sequence.flat_map Literal.Seq.terms
-    |> Sequence.flat_map T_view.active_subterms
+    |> Iter.of_list
+    |> Iter.flat_map Iter.of_array
+    |> Iter.flat_map Literal.Seq.terms
+    |> Iter.flat_map T_view.active_subterms
 
   module Generalize : sig
     type form = Cut_form.t
@@ -798,8 +798,8 @@ module Make
         |> List.filter
           (fun v ->
              not (Type.is_tType (HVar.ty v)) &&
-             (Sequence.length @@ var_active_pos_seq f v >= 2) &&
-             (Sequence.length @@ var_invariant_pos_seq f v >= 2))
+             (Iter.length @@ var_active_pos_seq f v >= 2) &&
+             (Iter.length @@ var_invariant_pos_seq f v >= 2))
       in
       begin match vars with
         | [] -> []
@@ -810,14 +810,14 @@ module Make
             let offset =
               Cut_form.vars f
               |> T.VarSet.to_seq
-              |> Sequence.map HVar.id
-              |> Sequence.max |> CCOpt.get_or ~default:0 |> succ
+              |> Iter.map HVar.id
+              |> Iter.max |> CCOpt.get_or ~default:0 |> succ
             in
             CCList.foldi
               (fun m i v ->
                  let v' = HVar.make ~ty:(HVar.ty v) (i+offset) in
                  subterms_with_pos f
-                 |> Sequence.filter_map
+                 |> Iter.filter_map
                    (function
                      | P_active, pos, t when term_is_var v t -> Some (pos, T.var v')
                      | _ -> None)
@@ -843,7 +843,7 @@ module Make
     let terms_at_active_pos (f:form): generalization list =
       let relevant_subterms =
         subterms_with_pos f
-        |> Sequence.filter_map
+        |> Iter.filter_map
           (function
             | P_active, pos, t ->
               begin match T_view.view t with
@@ -859,13 +859,13 @@ module Make
             | _ -> None)
       in
       let subterms =
-        relevant_subterms |> Sequence.map snd
-        |> Sequence.group_by ~hash:T.hash ~eq:T.equal
-        |> Sequence.filter_map
+        relevant_subterms |> Iter.map snd
+        |> Iter.group_by ~hash:T.hash ~eq:T.equal
+        |> Iter.filter_map
           (function
             | t :: _ :: _ -> Some t (* at least 2 *)
             | _ -> None)
-        |> Sequence.to_rev_list
+        |> Iter.to_rev_list
       in
       begin
         subterms
@@ -875,13 +875,13 @@ module Make
              let v =
                Cut_form.vars f
                |> T.VarSet.to_seq
-               |> Sequence.map HVar.id
-               |> Sequence.max |> CCOpt.get_or ~default:0 |> succ
+               |> Iter.map HVar.id
+               |> Iter.max |> CCOpt.get_or ~default:0 |> succ
                |> HVar.make ~ty:(T.ty t)
              in
              let m =
                relevant_subterms
-               |> Sequence.filter_map
+               |> Iter.filter_map
                  (function
                    | pos, u when T.equal t u -> Some (pos, T.var v)
                    | _ -> None)
@@ -950,9 +950,9 @@ module Make
     (* group variables naked in same (dis)equations *)
     begin
       Cut_form.cs f
-      |> Sequence.of_list
-      |> Sequence.flat_map Sequence.of_array
-      |> Sequence.iter
+      |> Iter.of_list
+      |> Iter.flat_map Iter.of_array
+      |> Iter.iter
         (function
           | Literal.Equation (l,r,_) ->
             begin match T.view l, T.view r with
@@ -964,14 +964,14 @@ module Make
     (* other variables grouped by occurring at active pos in same subterm *)
     begin
       active_subterms_form f
-      |> Sequence.iter
+      |> Iter.iter
         (fun t -> match T_view.view t with
            | T_view.T_app_defined (_,c,l) ->
              let pos = RW.Defined_cst.defined_positions c in
-             Sequence.of_list l
+             Iter.of_list l
              |> Util.seq_zipi
-             |> Sequence.diagonal
-             |> Sequence.filter_map
+             |> Iter.diagonal
+             |> Iter.filter_map
                (fun ((i1,t1),(i2,t2)) ->
                   match T.as_var t1, T.as_var t2 with
                     | Some x, Some y
@@ -985,7 +985,7 @@ module Make
                       ->
                       Some (x,y)
                     | _ -> None)
-             |> Sequence.iter
+             |> Iter.iter
                (fun (x,y) ->
                   assert (not (eq_var x y));
                   UF_vars.union uf x y)
@@ -993,15 +993,15 @@ module Make
     end;
     let res =
       UF_vars.to_seq uf
-      |> Sequence.map snd
-      |> Sequence.filter_map
+      |> Iter.map snd
+      |> Iter.filter_map
         (fun vars ->
            (* eliminate non-inductive variables *)
            let vars =
              List.filter (fun v -> Ind_ty.is_inductive_type @@ HVar.ty v) vars
            in
            if vars=[] then None else Some vars)
-      |> Sequence.to_rev_list
+      |> Iter.to_rev_list
     in
     Util.debugf ~section 3
       "(@[<hv2>induction_clusters@ :in %a@ :clusters (@[<hv>%a@])@])"
@@ -1087,8 +1087,8 @@ module Make
     else (
       (* offset to allocate new variables *)
       let offset =
-        Sequence.of_list cs
-        |> Sequence.flat_map Lits.Seq.vars
+        Iter.of_list cs
+        |> Iter.flat_map Lits.Seq.vars
         |> T.Seq.max_var
         |> succ
       in
@@ -1147,18 +1147,18 @@ module Make
        :clauses [@[%a@]]@ :generalize_on (@[%a@])@]"
       (fun k->k (Util.pp_list C.pp) clauses pp_csts generalize_on);
     let depth =
-      Sequence.of_list generalize_on
-      |> Sequence.map (fun (id,_) -> Ind_cst.ind_skolem_depth id)
-      |> Sequence.max
+      Iter.of_list generalize_on
+      |> Iter.map (fun (id,_) -> Ind_cst.ind_skolem_depth id)
+      |> Iter.max
       |> CCOpt.get_or ~default:0
     (* the trail should not contain a positive "lemma" atom.
        We accept negative lemma atoms because the induction can be used to
        prove the lemma *)
     and no_pos_lemma_in_trail () =
-      Sequence.of_list clauses
-      |> Sequence.map C.trail
-      |> Sequence.flat_map Trail.to_seq
-      |> Sequence.for_all
+      Iter.of_list clauses
+      |> Iter.map C.trail
+      |> Iter.flat_map Trail.to_seq
+      |> Iter.for_all
         (fun lit -> not (BoolLit.sign lit && BBox.is_lemma lit))
     in
     if (ignore_depth || depth < max_depth) && no_pos_lemma_in_trail () then (
@@ -1246,10 +1246,10 @@ module Make
   let trail_is_trivial_cases trail =
     let seq = Trail.to_seq trail in
     (* all boolean literals that express paths *)
-    let relevant_cases = Sequence.filter_map BoolBox.as_case seq in
+    let relevant_cases = Iter.filter_map BoolBox.as_case seq in
     (* are there two distinct incompatible cases in the trail? *)
-    Sequence.diagonal relevant_cases
-    |> Sequence.exists
+    Iter.diagonal relevant_cases
+    |> Iter.exists
       (fun (c1, c2) ->
          let res =
            not (List.length c1 = List.length c2) ||
@@ -1272,14 +1272,14 @@ module Make
     (* all boolean literals that express paths *)
     let relevant_cases =
       seq
-      |> Sequence.filter_map
+      |> Iter.filter_map
         (fun lit ->
            BoolBox.as_lemma lit
            |> CCOpt.map (fun lemma -> lemma, BoolLit.sign lit))
     in
     (* are there two distinct positive lemma literals in the trail? *)
-    Sequence.diagonal relevant_cases
-    |> Sequence.exists
+    Iter.diagonal relevant_cases
+    |> Iter.exists
       (fun ((c1,sign1), (c2,sign2)) ->
          let res = sign1 && sign2 && not (Cut_form.equal c1 c2) in
          if res then (

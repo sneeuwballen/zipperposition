@@ -120,7 +120,7 @@ module U = struct
   let pp out (t:state): unit =
     Format.fprintf out
       "(@[<hv2>ho_unif_pb@ %a@])"
-      (Util.pp_seq ~sep:" " pp_pb) (Sequence.of_queue t.queue)
+      (Util.pp_seq ~sep:" " pp_pb) (Iter.of_queue t.queue)
 
   (** {6 normalization of pairs} *)
 
@@ -243,7 +243,7 @@ module U = struct
     Unif_constr.FO.make ~tags (t1,sc)(t2,sc)
 
   (* unify [v args = t], where [t] is rigid *)
-  let unif_rigid ~sc ~subst ~offset env v args t : (pair list * _ * _ * _) Sequence.t =
+  let unif_rigid ~sc ~subst ~offset env v args t : (pair list * _ * _ * _) Iter.t =
     assert (args<>[]);
     (* eta-expand locally *)
     let n_params, ty_args, ty_ret = Type.open_poly_fun (T.ty t) in
@@ -269,8 +269,8 @@ module U = struct
        where the [F] are fresh,
        and return the pair [arg_k (F1 x1…xn)…(Fm x1…xn) = t args] *)
     let proj =
-      Sequence.of_list all_ty_args |> Util.seq_zipi
-      |> Sequence.filter_map
+      Iter.of_list all_ty_args |> Util.seq_zipi
+      |> Iter.filter_map
         (fun (i,ty_arg_i) ->
            let ty_args_i, ty_ret_i = Type.open_fun ty_arg_i in
            try
@@ -328,7 +328,7 @@ module U = struct
         in
         (* imitate constant *)
         let subst = US.FO.bind subst (v,sc) (lambda,sc) in
-        Sequence.return ([ty_args@env, lhs, rhs],subst,offset,"imitate_b")
+        Iter.return ([ty_args@env, lhs, rhs],subst,offset,"imitate_b")
       | T.Const _ ->
         (* now make fresh variables as arguments of [id]. Each variable
            is parametrized by [all_vars] and returns the type of the k-th arg *)
@@ -355,11 +355,11 @@ module U = struct
           T.app t_mono f_vars_applied
         in
         let subst = US.FO.bind subst (v,sc) (lambda,sc) in
-        Sequence.return ([ty_args@env,lhs,rhs],subst,offset,"imitate")
+        Iter.return ([ty_args@env,lhs,rhs],subst,offset,"imitate")
       | _ ->
-        Sequence.empty
+        Iter.empty
     in
-    Sequence.append imitate proj
+    Iter.append imitate proj
 
   (* TODO: flex/flex (if they remain, then it means there are only flex/flex
      and we can bind to [λx1…xn. A] where [A] is fresh *)
@@ -533,7 +533,7 @@ module U = struct
              in
              not (is_fvar (v,sc_v)) ||
              (T.Seq.vars t
-              |> Sequence.exists (fun v' -> not (is_fvar (v',sc_t)))))
+              |> Iter.exists (fun v' -> not (is_fvar (v',sc_t)))))
         |> Subst.FO.map Lambda.snf
       )
 
@@ -562,12 +562,12 @@ module U = struct
       |> List.rev_map (fun (subst,p) -> [], norm_subst st.offset0 st.sc subst, p, Subst.Renaming.create())
     and sols2 =
       st.queue
-      |> Sequence.of_queue
-      |> Sequence.map
+      |> Iter.of_queue
+      |> Iter.map
         (fun pb ->
            let pairs, renaming = apply_subst pb.pairs pb.subst in
            pairs, norm_subst st.offset0 st.sc pb.subst, pb.penalty, renaming)
-      |> Sequence.to_rev_list
+      |> Iter.to_rev_list
     in
     List.rev_append sols1 sols2
 end

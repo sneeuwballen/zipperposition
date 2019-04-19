@@ -61,5 +61,5 @@ module Make(P : PAIR) : sig
   val iter : t -> (key -> value -> unit) -> unit
   (** Iterate on representative and their value *)
 
-  val to_seq : t -> (key * value) Sequence.t
+  val to_seq : t -> (key * value) Iter.t
 end

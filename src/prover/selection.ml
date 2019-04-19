@@ -37,9 +37,9 @@ let can_select_lit ~ord (lits:Lits.t) (i:int) : bool =
         fun vars lit ->
           let new_vars =
             Lit.fold_terms ~vars:true ~ty_args:false ~which ~ord ~subterms:false lit
-            |> Sequence.map (fun (t,_) -> T.as_app t)
-            |> Sequence.filter (fun (head,_) -> T.is_var head)
-            |> Sequence.to_list
+            |> Iter.map (fun (t,_) -> T.as_app t)
+            |> Iter.filter (fun (head,_) -> T.is_var head)
+            |> Iter.to_list
           in
           CCList.append new_vars vars
       ) [] in
@@ -47,7 +47,7 @@ let can_select_lit ~ord (lits:Lits.t) (i:int) : bool =
        one of those variables, but with different arguments. *)
     let occur_with_other_args vars_args =
         Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
-        |> Sequence.exists (fun (t,_) ->
+        |> Iter.exists (fun (t,_) ->
             let t_head, t_args = T.as_app t in
             vars_args |> CCList.exists (fun (head, args) -> head = t_head && t_args != args)
           )
@@ -69,14 +69,14 @@ let can_select_lit ~ord (lits:Lits.t) (i:int) : bool =
            occurs applied in the clause *)
         let vars_args = var_headed_subterms `All in
         Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
-        |> Sequence.exists (fun (t,_) ->
+        |> Iter.exists (fun (t,_) ->
             vars_args |> CCList.exists (fun (head, args) -> head = t && not (CCList.is_empty args))
           )
       | `NoHigherOrderVariables ->
         (* We cannot select literals containing a HO variable: *)
         not (
           Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
-          |> Sequence.exists (fun (t,_) -> T.is_ho_var (fst (T.as_app t)))
+          |> Iter.exists (fun (t,_) -> T.is_ho_var (fst (T.as_app t)))
         )
   )
   else false
@@ -86,8 +86,8 @@ let can_select_lit ~ord (lits:Lits.t) (i:int) : bool =
 let validate_fun_ ~ord lits bv =
   if BV.is_empty bv then true
   else (
-    Sequence.of_array_i lits
-    |> Sequence.exists
+    Iter.of_array_i lits
+    |> Iter.exists
       (fun (i,_) -> not (BV.get bv i) || can_select_lit ~ord lits i)
   )
 
@@ -108,7 +108,7 @@ let mk_ ~ord ~(f:Lits.t -> BV.t) (lits:Lits.t) : BV.t =
     )
   )
 
-let bv_first_ bv = BV.iter_true bv |> Sequence.head
+let bv_first_ bv = BV.iter_true bv |> Iter.head
 
 let max_goal ~strict ~ord lits =
   mk_ ~ord lits ~f:(fun lits ->
@@ -147,7 +147,7 @@ let avoid_app_var ~ord lits =
       let l = lits.(i) in 
         (Lit.is_app_var_eq l,
          not (Lits.is_max ~ord lits i),
-        Lit.Seq.terms l |> Sequence.fold (fun acc t -> 
+        Lit.Seq.terms l |> Iter.fold (fun acc t -> 
           if (T.is_app_var t) then (acc+1) else acc) 0,
         Lit.weight l) in
     ho_sel_driver lits avoid_av_feature
@@ -159,7 +159,7 @@ let prefer_app_var ~ord lits =
       let l = lits.(i) in 
         (not (Lit.is_app_var_eq l),
          not (Lits.is_max ~ord lits i),
-         - (Lit.Seq.terms l |> Sequence.fold (fun acc t -> 
+         - (Lit.Seq.terms l |> Iter.fold (fun acc t -> 
           if (T.is_app_var t) then (acc+1) else acc) 0),
         -Lit.weight l) in
     ho_sel_driver lits prefer_av_feature

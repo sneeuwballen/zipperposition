@@ -12,7 +12,7 @@ depends: [
   "ocamlfind" { build }
   "jbuilder" { build }
   "containers" { >= "1.0" }
-  "sequence" { >= "0.4" }
+  "iter" { >= "1.2" }
   "oseq" { >= "0.2" }
   "msat" { >= "0.5" < "1.0" }
   "zarith"

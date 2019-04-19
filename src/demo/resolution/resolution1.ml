@@ -268,7 +268,7 @@ let _resolve_with c =
        (** Retrieve within the index, mappings [term -> (clause,index)]
            such that [term] unifies with [t]. 0 and 1 are again scopes. *)
        Index.retrieve_unifiables (!_idx,0) (t,1)
-       |> Sequence.iter
+       |> Iter.iter
          (fun (_t', (d,j), subst) ->
             let (_,b') = List.nth d j in
             (** We have found [_t'], and a pair [(d, j)] such
@@ -362,9 +362,9 @@ let process_file f =
         CCVector.to_seq decls
         |> Cnf.convert
         |> CCVector.to_seq
-        |> Sequence.flat_map Statement.Seq.forms
-        |> Sequence.map Clause._of_forms
-        |> Sequence.to_rev_list
+        |> Iter.flat_map Statement.Seq.forms
+        |> Iter.map Clause._of_forms
+        |> Iter.to_rev_list
       in
       (** Perform saturation (solve the problem) *)
       E.return (_saturate clauses)

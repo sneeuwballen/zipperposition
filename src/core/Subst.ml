@@ -145,7 +145,7 @@ let codomain s k = M.iter (fun _ t -> k t) s
 let is_renaming subst =
   let rev =
     codomain subst
-    |> Sequence.filter_map
+    |> Iter.filter_map
       (fun (t,sc_t) -> match T.view t with
          | T.Var v -> Some ((v,sc_t),())
          | _ -> None)
@@ -193,7 +193,7 @@ let[@inline] to_seq subst k = M.iter (fun v t -> k (v,t)) subst
 let[@inline] to_list subst = M.fold (fun v t acc -> (v,t)::acc) subst []
 
 let of_seq ?(init=empty) seq =
-  Sequence.fold (fun subst (v,t) -> bind subst v t) init seq
+  Iter.fold (fun subst (v,t) -> bind subst v t) init seq
 
 let of_list ?(init=empty) l = match l with
   | [] -> init

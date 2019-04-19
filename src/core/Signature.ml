@@ -92,10 +92,10 @@ let set_sym_in_conj s signature =
 
 module Seq = struct
   let symbols s =
-    ID.Map.to_seq s |> Sequence.map fst
+    ID.Map.to_seq s |> Iter.map fst
 
   let types s =
-    ID.Map.to_seq s |> Sequence.map snd |> Sequence.map fst
+    ID.Map.to_seq s |> Iter.map snd |> Iter.map fst
 
   let to_seq = ID.Map.to_seq
   let add_seq = ID.Map.add_seq

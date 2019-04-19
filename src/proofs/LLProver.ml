@@ -28,8 +28,8 @@ module CC = Congruence.Make(struct
       | T.AppBuiltin (_,l) -> l
       | T.Ite (a,b,c) -> [a;b;c]
       | T.Bind {body;_} -> [body]
-      | Int_pred (l,_) -> T.Linexp_int.subterms l |> Sequence.to_list
-      | Rat_pred (l,_) -> T.Linexp_rat.subterms l |> Sequence.to_list
+      | Int_pred (l,_) -> T.Linexp_int.subterms l |> Iter.to_list
+      | Rat_pred (l,_) -> T.Linexp_rat.subterms l |> Iter.to_list
       | T.Const _ | T.Var _ | T.Type
         -> []
 
@@ -43,13 +43,13 @@ module CC = Congruence.Make(struct
       | (T.Const _ | T.Var _), [] -> t
       | T.Ite (_,_,_), [a;b;c] -> T.ite a b c
       | Int_pred (le,op), l ->
-        let l' = T.Linexp_int.subterms le |> Sequence.to_list in
+        let l' = T.Linexp_int.subterms le |> Iter.to_list in
         assert (List.length l = List.length l');
         let map = List.combine l' l in
         let le' = T.Linexp_int.map (fun t -> CCList.Assoc.get_exn ~eq:T.equal t map) le in
         T.int_pred le' op
       | Rat_pred (le,op), l ->
-        let l' = T.Linexp_rat.subterms le |> Sequence.to_list in
+        let l' = T.Linexp_rat.subterms le |> Iter.to_list in
         assert (List.length l = List.length l');
         let map = List.combine l' l in
         let le' = T.Linexp_rat.map (fun t -> CCList.Assoc.get_exn ~eq:T.equal t map) le in
@@ -87,12 +87,12 @@ module Branch : sig
     | C_closed_by_diseq of T.t * T.t
     | C_closed_by_theory of string
 
-  val to_expand : t -> T.t Sequence.t
+  val to_expand : t -> T.t Iter.t
   val form : t -> F.t option
   val closed : t -> closed
   val id : t -> int
   val parent : t -> t option
-  val diseq : t -> (T.t * T.t) Sequence.t
+  val diseq : t -> (T.t * T.t) Iter.t
 
   val debug : t CCFormat.printer
 end = struct
@@ -117,7 +117,7 @@ end = struct
   let[@inline] to_expand t = T_set.to_seq t.to_expand
   let[@inline] parent t = t.parent
   let[@inline] id t = t.id
-  let[@inline] diseq t = Sequence.of_list t.diseq
+  let[@inline] diseq t = Iter.of_list t.diseq
   let[@inline] form t = t.form
 
   let root () : t = {
@@ -384,11 +384,11 @@ let pp_dot out (s:final_state) : unit =
   let module ISet = Util.Int_set in
   let as_graph =
     CCGraph.make
-      (fun b -> Branch.parent b |> Sequence.of_opt |> Sequence.map (fun v->(),v))
+      (fun b -> Branch.parent b |> Iter.of_opt |> Iter.map (fun v->(),v))
   in
   let saturated_set =
-    Sequence.of_opt s.saturated |>
-    Sequence.fold (fun s b -> ISet.add (Branch.id b) s) ISet.empty
+    Iter.of_opt s.saturated |>
+    Iter.fold (fun s b -> ISet.add (Branch.id b) s) ISet.empty
   in
   let br_eq b1 b2 = CCInt.equal (Branch.id b1) (Branch.id b2) in
   let br_hash b = Hash.int @@ Branch.id b in
@@ -401,7 +401,7 @@ let pp_dot out (s:final_state) : unit =
     in
     let pp_closed out b = match Branch.closed b with
       | Branch.C_not_closed ->
-        Fmt.fprintf out "<not closed> (%d to expand)" (Branch.to_expand b |> Sequence.length)
+        Fmt.fprintf out "<not closed> (%d to expand)" (Branch.to_expand b |> Iter.length)
       | Branch.C_closed_by_diseq (t,u) ->
         Fmt.fprintf out "<closed by `@[<1>%a ≠@ %a@]`>" T.pp t T.pp u
       | Branch.C_closed_by_theory s ->
@@ -415,9 +415,9 @@ let pp_dot out (s:final_state) : unit =
     [`Label label; `Shape "box"; `Style "filled"] @ color
   in
   let all_branches =
-    Sequence.append
-      (Sequence.of_list s.open_branches)
-      (Sequence.of_list s.closed_branches)
+    Iter.append
+      (Iter.of_list s.open_branches)
+      (Iter.of_list s.closed_branches)
   in
   CCGraph.Dot.pp_seq
     ~tbl

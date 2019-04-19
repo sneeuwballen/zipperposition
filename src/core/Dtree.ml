@@ -184,11 +184,11 @@ module Make(E : Index.EQUATION) = struct
     let tree = goto_leaf dt chars k in
     tree
 
-  let add_seq = Sequence.fold add
+  let add_seq = Iter.fold add
   let add_list = List.fold_left add
 
   let remove_seq dt seq =
-    Sequence.fold remove dt seq
+    Iter.fold remove dt seq
 
   let retrieve ?(subst=S.empty) ~sign dt t k =
     Util.enter_prof prof_dtree_retrieve;

@@ -86,21 +86,21 @@ val mk_constraint : term -> term -> t
     on how [t] and [u] look. *)
 
 val matching : ?subst:Subst.t -> pattern:t Scoped.t -> t Scoped.t ->
-  (Subst.t * Builtin.Tag.t list) Sequence.t
+  (Subst.t * Builtin.Tag.t list) Iter.t
 (** checks whether subst(lit_a) matches lit_b. Returns alternative
     substitutions s such that s(lit_a) = lit_b and s contains subst. *)
 
 val subsumes : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
-  (Subst.t * Builtin.Tag.t list) Sequence.t
+  (Subst.t * Builtin.Tag.t list) Iter.t
 (** More general version of {!matching}, yields [subst]
     such that [subst(lit_a) => lit_b]. *)
 
 val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
-  (Subst.t * Builtin.Tag.t list) Sequence.t
+  (Subst.t * Builtin.Tag.t list) Iter.t
 
 val unify :
   ?subst:Unif_subst.t -> t Scoped.t -> t Scoped.t ->
-  (Unif_subst.t * Builtin.Tag.t list) Sequence.t
+  (Unif_subst.t * Builtin.Tag.t list) Iter.t
 
 val are_variant : t -> t -> bool
 
@@ -161,7 +161,7 @@ val fold_terms :
   ?ord:Ordering.t ->
   subterms:bool ->
   t ->
-  term Position.With.t Sequence.t
+  term Position.With.t Iter.t
 (** Iterate on terms, maybe subterms, of the literal.
     Variables are ignored if [vars] is [false].
 
@@ -186,9 +186,9 @@ module Comp : sig
 end
 
 module Seq : sig
-  val terms : t -> term Sequence.t
-  val vars : t -> Type.t HVar.t Sequence.t
-  val symbols : t -> ID.t Sequence.t
+  val terms : t -> term Iter.t
+  val vars : t -> Type.t HVar.t Iter.t
+  val symbols : t -> ID.t Iter.t
 end
 
 (** {2 Positions} *)

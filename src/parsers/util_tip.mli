@@ -7,7 +7,7 @@ open Logtk
 
 module A = Tip_ast
 
-type parser_res = (A.statement Sequence.t, string) CCResult.t
+type parser_res = (A.statement Iter.t, string) CCResult.t
 type 'a parser_ = 'a -> parser_res
 
 val parse_lexbuf : Lexing.lexbuf parser_
@@ -26,6 +26,6 @@ val parse_file : string parser_
 val convert : A.statement -> UntypedAST.statement list
 (** Translation to the native format, removing matching, if, etc. *)
 
-val convert_seq : A.statement Sequence.t -> UntypedAST.statement Sequence.t
+val convert_seq : A.statement Iter.t -> UntypedAST.statement Iter.t
 
 

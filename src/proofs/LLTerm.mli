@@ -62,7 +62,7 @@ module type LINEXP = sig
   val monomial1 : term -> t
   val equal : t -> t -> bool
   val map : (term -> term) -> t -> t
-  val subterms : t -> term Sequence.t
+  val subterms : t -> term Iter.t
   val pp : term CCFormat.printer -> t CCFormat.printer
 end
 

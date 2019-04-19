@@ -167,7 +167,7 @@ module KBO : ORD = struct
 
   (** create a balance for the two terms *)
   let mk_balance t1 t2 =
-    let numvars = Sequence.length (T.Seq.vars t1) + Sequence.length (T.Seq.vars t2) in
+    let numvars = Iter.length (T.Seq.vars t1) + Iter.length (T.Seq.vars t2) in
     { offset = 0; pos_counter = 0; neg_counter = 0; balance = Term.Tbl.create numvars; }
 
   (** add a positive variable *)

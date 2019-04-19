@@ -12,7 +12,7 @@ let section = Util.Section.(make ~parent:root) "compute_prec"
 let _alpha_precedence = ref false
 let _custom_weights = ref ""
 
-type 'a parametrized = Statement.clause_t Sequence.t -> 'a
+type 'a parametrized = Statement.clause_t Iter.t -> 'a
 
 type t = {
   constrs : (int * [`partial] Precedence.Constr.t) list;
@@ -73,7 +73,7 @@ let mk_precedence ~db_w ~lmb_w t seq =
   (* set of symbols *)
   let symbols =
     seq
-    |> Sequence.flat_map Statement.Seq.symbols
+    |> Iter.flat_map Statement.Seq.symbols
     |> ID.Set.of_seq
     |> ID.Set.to_list
   in

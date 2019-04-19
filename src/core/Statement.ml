@@ -202,18 +202,18 @@ let conv_rules (l:_ def_rule list) proof : definition =
   List.map (conv_rule ~proof) l
   |> Rewrite.Rule_set.of_list
 
-let terms_of_rule (d:_ def_rule): _ Sequence.t = match d with
+let terms_of_rule (d:_ def_rule): _ Iter.t = match d with
   | Def_term {args;rhs;_} ->
-    Sequence.of_list (rhs::args)
+    Iter.of_list (rhs::args)
   | Def_form {lhs;rhs;_} ->
-    Sequence.cons lhs (Sequence.of_list rhs |> Sequence.flat_map Sequence.of_list)
-    |> Sequence.flat_map SLiteral.to_seq
+    Iter.cons lhs (Iter.of_list rhs |> Iter.flat_map Iter.of_list)
+    |> Iter.flat_map SLiteral.to_seq
 
 let level_of_rule (d:_ def_rule): int =
   terms_of_rule d
-  |> Sequence.flat_map Term.Seq.symbols
-  |> Sequence.filter_map as_defined_cst_level
-  |> Sequence.max
+  |> Iter.flat_map Term.Seq.symbols
+  |> Iter.filter_map as_defined_cst_level
+  |> Iter.max
   |> CCOpt.get_or ~default:0
 
 (** {2 Inductive Types} *)
@@ -240,15 +240,15 @@ module Seq = struct
   let mk_term t = `Term t
   let mk_form f = `Form f
 
-  let seq_of_rule (d:_ def_rule): _ Sequence.t = fun k -> match d with
+  let seq_of_rule (d:_ def_rule): _ Iter.t = fun k -> match d with
     | Def_term {vars; ty; args; rhs; _} ->
       k (`Ty ty);
       List.iter (fun v->k (`Ty (Var.ty v))) vars;
       List.iter (fun t->k (`Term t)) (rhs::args);
     | Def_form {vars;lhs;rhs;_} ->
       List.iter (fun v->k (`Ty (Var.ty v))) vars;
-      SLiteral.to_seq lhs |> Sequence.map mk_term |> Sequence.iter k;
-      Sequence.of_list rhs |> Sequence.map mk_form |> Sequence.iter k
+      SLiteral.to_seq lhs |> Iter.map mk_term |> Iter.iter k;
+      Iter.of_list rhs |> Iter.map mk_form |> Iter.iter k
 
   let to_seq st k =
     let decl id ty = k (`ID id); k (`Ty ty) in
@@ -258,8 +258,8 @@ module Seq = struct
         List.iter
           (fun {def_id; def_ty; def_rules; _} ->
              decl def_id def_ty;
-             Sequence.of_list def_rules
-             |> Sequence.flat_map seq_of_rule |> Sequence.iter k)
+             Iter.of_list def_rules
+             |> Iter.flat_map seq_of_rule |> Iter.iter k)
           l
       | Rewrite d ->
         begin match d with
@@ -315,46 +315,46 @@ module Seq = struct
       | Def_form {as_form;_} -> as_form
     in
     begin match view st with
-      | Rewrite d -> Sequence.of_list (forms_def d)
+      | Rewrite d -> Iter.of_list (forms_def d)
       | Def l ->
-        Sequence.of_list l
-        |> Sequence.flat_map_l (fun d -> d.def_rules)
-        |> Sequence.flat_map_l forms_def
+        Iter.of_list l
+        |> Iter.flat_map_l (fun d -> d.def_rules)
+        |> Iter.flat_map_l forms_def
       | _ ->
         to_seq st
-        |> Sequence.filter_map (function `Form f -> Some f | _ -> None)
+        |> Iter.filter_map (function `Form f -> Some f | _ -> None)
     end
 
-  let lits st = forms st |> Sequence.flat_map Sequence.of_list
+  let lits st = forms st |> Iter.flat_map Iter.of_list
 
   let terms st =
     to_seq st
-    |> Sequence.flat_map
+    |> Iter.flat_map
       (function
-        | `Form f -> Sequence.of_list f |> Sequence.flat_map SLiteral.to_seq
-        | `Term t -> Sequence.return t
-        | _ -> Sequence.empty)
+        | `Form f -> Iter.of_list f |> Iter.flat_map SLiteral.to_seq
+        | `Term t -> Iter.return t
+        | _ -> Iter.empty)
 
   let symbols st =
     to_seq st
-    |> Sequence.flat_map
+    |> Iter.flat_map
       (function
-        | `ID id -> Sequence.return id
+        | `ID id -> Iter.return id
         | `Form f ->
-          Sequence.of_list f
-          |> Sequence.flat_map SLiteral.to_seq
-          |> Sequence.flat_map Term.Seq.symbols
+          Iter.of_list f
+          |> Iter.flat_map SLiteral.to_seq
+          |> Iter.flat_map Term.Seq.symbols
         | `Term t -> Term.Seq.symbols t
         | `Ty ty -> Type.Seq.symbols ty)
 end
 
-let signature ?(init=Signature.empty) ?(conj_syms=Sequence.empty) seq = 
+let signature ?(init=Signature.empty) ?(conj_syms=Iter.empty) seq = 
   let signtr = 
    seq
-    |> Sequence.flat_map Seq.ty_decls
-    |> Sequence.fold (fun sigma (id,ty) -> Signature.declare sigma id ty) init in
+    |> Iter.flat_map Seq.ty_decls
+    |> Iter.fold (fun sigma (id,ty) -> Signature.declare sigma id ty) init in
    conj_syms
-   |> Sequence.fold (fun sigma symb -> Signature.set_sym_in_conj symb sigma) signtr
+   |> Iter.fold (fun sigma symb -> Signature.set_sym_in_conj symb sigma) signtr
    
 let conv_attrs =
   let module A = UntypedAST in
@@ -645,7 +645,7 @@ let res_tc_i : input_t Proof.result_tc =
     ~is_stmt:true
     ~name
     ~to_form:(fun ~ctx:_ st ->
-      Seq.forms st |> Sequence.to_list |> TypedSTerm.Form.and_)
+      Seq.forms st |> Iter.to_list |> TypedSTerm.Form.and_)
     ()
 
 let res_tc_c : clause_t Proof.result_tc =
@@ -668,8 +668,8 @@ let res_tc_c : clause_t Proof.result_tc =
         |> F.close_forall
       in
       Seq.forms st
-      |> Sequence.map conv_c
-      |> Sequence.to_list
+      |> Iter.map conv_c
+      |> Iter.to_list
       |> F.and_)
     ()
 
@@ -693,9 +693,9 @@ let scan_stmt_for_defined_cst (st:(clause,Term.t,Type.t) t): unit = match view s
       |> List.map
         (fun {def_id; def_rules; _} ->
            let lev =
-             Sequence.of_list def_rules
-             |> Sequence.map level_of_rule
-             |> Sequence.max
+             Iter.of_list def_rules
+             |> Iter.map level_of_rule
+             |> Iter.max
              |> CCOpt.get_or ~default:0
            and def =
              conv_rules def_rules proof
@@ -703,9 +703,9 @@ let scan_stmt_for_defined_cst (st:(clause,Term.t,Type.t) t): unit = match view s
            def_id, lev, def)
     in
     let level =
-      Sequence.of_list ids_and_levels
-      |> Sequence.map (fun (_,l,_) -> l)
-      |> Sequence.max |> CCOpt.map_or ~default:0 succ
+      Iter.of_list ids_and_levels
+      |> Iter.map (fun (_,l,_) -> l)
+      |> Iter.max |> CCOpt.map_or ~default:0 succ
     in
     List.iter
       (fun (id,_,def) ->
@@ -834,8 +834,8 @@ let get_rw_rule ?weight_incr:(w_i=20) c  =
         | _ -> None in
    
    let all_lits =  Seq.lits c in
-   if Sequence.length all_lits = 1 then
-      match Sequence.head_exn all_lits with 
+   if Iter.length all_lits = 1 then
+      match Iter.head_exn all_lits with 
       | SLiteral.Eq (t1,t2) -> 
          if (Term.weight t2 - Term.weight t1 <= w_i) then (
             match conv_terms_rw t1 t2 with

@@ -69,7 +69,7 @@ module Make(E : Env.S) = struct
 
   let[@inline] check_clause_ c = if !_check_types then Env.C.check_types c
   let[@inline] check_clauses_ seq =
-    if !_check_types then Sequence.iter Env.C.check_types seq
+    if !_check_types then Iter.iter Env.C.check_types seq
 
   (** One iteration of the main loop ("given clause loop") *)
   let given_clause_step ?(generating=true) num =
@@ -81,21 +81,21 @@ module Make(E : Env.S) = struct
         let clauses =
           Env.do_generate ~full:true ()
         in
-        if Sequence.is_empty clauses
+        if Iter.is_empty clauses
         then Sat
         else (
           let clauses = clauses
-          |> Sequence.filter_map
+          |> Iter.filter_map
             (fun c ->
                check_clause_ c;
                let c, _ = Env.unary_simplify c in
                if Env.is_trivial c || Env.is_active c || Env.is_passive c
                then None
                else Some c) 
-          |> Sequence.to_list in
+          |> Iter.to_list in
           Util.debugf 2 ~section "@[<2>inferred @{<green>new clauses@}@ @[<v>%a@]@]"
             (fun k->k (CCFormat.list Env.C.pp) clauses);
-          Env.add_passive (Sequence.of_list clauses);
+          Env.add_passive (Iter.of_list clauses);
           Unknown
         )
       | Some c ->
@@ -113,7 +113,7 @@ module Make(E : Env.S) = struct
             Unsat proof
           | c :: l', _ ->
             (* put clauses of [l'] back in passive set *)            
-            Env.add_passive (Sequence.of_list l');
+            Env.add_passive (Iter.of_list l');
             (* process the clause [c] *)
             let new_clauses = CCVector.create () in
             assert (not (Env.is_redundant c));
@@ -130,7 +130,7 @@ module Make(E : Env.S) = struct
             Env.remove_active subsumed_active;
             Env.remove_simpl subsumed_active;
             (* add given clause to simpl_set *)
-            Env.add_simpl (Sequence.singleton c);
+            Env.add_simpl (Iter.singleton c);
             (* simplify active set using c *)
             let simplified_actives, newly_simplified = Env.backward_simplify c in
             let simplified_actives = Env.C.ClauseSet.to_seq simplified_actives in
@@ -143,16 +143,16 @@ module Make(E : Env.S) = struct
             Env.remove_simpl simplified_actives;
             CCVector.append_seq new_clauses newly_simplified;
             (* add given clause to active set *)
-            Env.add_active (Sequence.singleton c);
+            Env.add_active (Iter.singleton c);
             (* do inferences between c and the active set (including c),
                if [generate] is set to true *)
             let inferred_clauses = if generating
               then Env.generate c
-              else Sequence.empty in
+              else Iter.empty in
             (* simplification of inferred clauses w.r.t active set; only the non-trivial ones
                are kept (by list-simplify) *)
             let inferred_clauses =
-              Sequence.filter_map
+              Iter.filter_map
                 (fun c ->
                    check_clause_ c;
                    let c, _ = Env.forward_simplify c in

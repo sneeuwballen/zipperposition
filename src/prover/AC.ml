@@ -111,10 +111,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   (* does [l ?= r] have at least one AC symbol in it? *)
   let has_ac_ids_ l r =
     let seq =
-      Sequence.doubleton l r
-      |> Sequence.flat_map A.seq_symbols
+      Iter.doubleton l r
+      |> Iter.flat_map A.seq_symbols
     in
-    not (Sequence.is_empty seq)
+    not (Iter.is_empty seq)
 
   let is_trivial_lit lit =
     exists_ac ()
@@ -204,9 +204,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     then (
       (* the only active clauses are other AC axioms, we miss no
          inference by adding the axioms to active set directly *)
-      Env.add_active (Sequence.of_list cell.axioms)
+      Env.add_active (Iter.of_list cell.axioms)
     ) else (
-      Env.add_passive (Sequence.of_list cell.axioms);
+      Env.add_passive (Iter.of_list cell.axioms);
     );
     ()
 

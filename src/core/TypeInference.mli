@@ -176,7 +176,7 @@ val infer_statements_exn :
   ?ctx:Ctx.t ->
   ?file:string ->
   implicit_ty_args:bool ->
-  UntypedAST.statement Sequence.t ->
+  UntypedAST.statement Iter.t ->
   typed_statement CCVector.ro_vector
 (** Infer all statements
     @param def_as_rewrite if true, definitions becomes rewrite rules *)
@@ -189,5 +189,5 @@ val infer_statements :
   ?ctx:Ctx.t ->
   ?file:string ->
   implicit_ty_args:bool ->
-  UntypedAST.statement Sequence.t ->
+  UntypedAST.statement Iter.t ->
   typed_statement CCVector.ro_vector or_error

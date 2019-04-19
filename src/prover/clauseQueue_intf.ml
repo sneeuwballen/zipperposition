@@ -56,7 +56,7 @@ module type S = sig
   val add : t -> C.t -> unit
   (** Add a clause to the Queue *)
 
-  val add_seq : t -> C.t Sequence.t -> unit
+  val add_seq : t -> C.t Iter.t -> unit
   (** Add clauses to the queue *)
 
   val length : t -> int

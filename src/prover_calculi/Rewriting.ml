@@ -55,10 +55,10 @@ module Make(E : Env_intf.S) = struct
     let sc_c = 0 in
     Literals.fold_terms ~vars:false ~subterms:true ~ty_args:false ~ord:(C.Ctx.ord())
       ~which:`All ~eligible (C.lits c)
-    |> Sequence.flat_map
+    |> Iter.flat_map
       (fun (u_p, passive_pos) ->
          RW.Term.narrow_term ~scope_rules:sc_rule (u_p,sc_c)
-         |> Sequence.map
+         |> Iter.map
            (fun (rule,us) ->
               let i, _ = Literals.Pos.cut passive_pos in
               let renaming = Subst.Renaming.create() in
@@ -98,7 +98,7 @@ module Make(E : Env_intf.S) = struct
               c'
            )
       )
-    |> Sequence.to_rev_list
+    |> Iter.to_rev_list
 
   let narrow_term_passive = Util.with_prof prof_narrowing_term narrow_term_passive_
 
@@ -129,10 +129,10 @@ module Make(E : Env_intf.S) = struct
     let eligible = C.Eligible.res c in
     let lits = C.lits c in
     Literals.fold_lits ~eligible lits
-    |> Sequence.fold
+    |> Iter.fold
       (fun acc (lit,i) ->
          RW.Lit.narrow_lit ~scope_rules:1 (lit,0)
-         |> Sequence.fold
+         |> Iter.fold
            (fun acc (rule,us,tags) ->
               let subst = Unif_subst.subst us in
               let renaming = Subst.Renaming.create () in
@@ -170,17 +170,17 @@ module Make(E : Env_intf.S) = struct
     Util.with_prof prof_narrowing_lit narrow_lits_ lits
 
   (* find positions in rules' LHS *)
-  let ctx_narrow_find (s,sc_a) sc_p : (RW.Rule.t * Position.t * Unif_subst.t) Sequence.t =
+  let ctx_narrow_find (s,sc_a) sc_p : (RW.Rule.t * Position.t * Unif_subst.t) Iter.t =
     let find_term (r:RW.Term.rule) =
       let t = RW.Term.Rule.lhs r in
       T.all_positions ~vars:false ~pos:P.stop ~ty_args:false t
-      |> Sequence.filter (fun (_,p) -> not (P.equal p P.stop)) (* not root *)
-      |> Sequence.filter
+      |> Iter.filter (fun (_,p) -> not (P.equal p P.stop)) (* not root *)
+      |> Iter.filter
         (fun (t,_) -> match T.Classic.view t with
            | T.Classic.App (id,_) -> not (Ind_ty.is_constructor id)
            | T.Classic.Var _ | T.Classic.DB _
            | T.Classic.AppBuiltin (_,_) | T.Classic.NonFO -> false)
-      |> Sequence.filter_map
+      |> Iter.filter_map
         (fun (t,p) ->
            try
              let subst = Unif.FO.unify_full (s,sc_a) (t,sc_p) in
@@ -191,7 +191,7 @@ module Make(E : Env_intf.S) = struct
       Literal.fold_terms lit
         ~position:P.stop ~vars:false ~ty_args:false
         ~which:`All ~ord:(E.Ctx.ord()) ~subterms:true
-      |> Sequence.filter_map
+      |> Iter.filter_map
         (fun (t,p) -> match p with
            | P.Left P.Stop -> None (* not root *)
            | _ ->
@@ -201,7 +201,7 @@ module Make(E : Env_intf.S) = struct
              with Unif.Fail -> None)
     in
     Rewrite.all_rules
-    |> Sequence.flat_map
+    |> Iter.flat_map
       (function
         | RW.T_rule r -> find_term r
         | RW.L_rule r -> find_lit r)
@@ -261,7 +261,7 @@ module Make(E : Env_intf.S) = struct
       ) else None
     in
     ctx_narrow_find (s,sc_a) sc_p
-    |> Sequence.fold
+    |> Iter.fold
       (fun acc (rule,rule_pos,subst) ->
          match do_narrowing rule rule_pos subst with
            | None -> acc
@@ -278,7 +278,7 @@ module Make(E : Env_intf.S) = struct
        non-minimal sides of every positive literal *)
     let new_clauses =
       Literals.fold_eqn ~sign:true ~ord ~both:true ~eligible (C.lits c)
-      |> Sequence.fold
+      |> Iter.fold
         (fun acc (s, t, _, s_pos) ->
            (* rewrite clauses using s *)
            ctx_narrow_with ~ord s t s_pos c acc)
@@ -309,7 +309,7 @@ let post_cnf stmts st =
   (* check if there are rewrite rules *)
   let has_rw =
     CCVector.to_seq stmts
-    |> Sequence.exists
+    |> Iter.exists
       (fun st -> match Statement.view st with
          | Statement.Rewrite _
          | Statement.Def _ -> true

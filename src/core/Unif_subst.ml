@@ -63,8 +63,8 @@ module FO = struct
         bind subst (v,scope) (newvar, new_scope) 
     in
     let subst = empty in
-    let subst = Term.Seq.vars t0 |> Sequence.fold (add_renaming scope0) subst in
-    let subst = Term.Seq.vars t1 |> Sequence.fold (add_renaming scope1) subst in
+    let subst = Term.Seq.vars t0 |> Iter.fold (add_renaming scope0) subst in
+    let subst = Term.Seq.vars t1 |> Iter.fold (add_renaming scope1) subst in
     let t0', t1' = apply subst (t0, scope0), apply subst (t1, scope1) in
     t0', t1', new_scope, subst
 end

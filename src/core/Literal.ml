@@ -108,12 +108,12 @@ let heuristic_weight weight = function
   | Int alit ->
     (* sum of weights of terms, without the (naked) variables *)
     AL.Seq.terms alit
-    |> Sequence.filter (fun t -> not (T.is_var t))
-    |> Sequence.fold (fun acc t -> acc + weight t) 0
+    |> Iter.filter (fun t -> not (T.is_var t))
+    |> Iter.fold (fun acc t -> acc + weight t) 0
   | Rat alit ->
     Rat_lit.Seq.terms alit
-    |> Sequence.filter (fun t -> not (T.is_var t))
-    |> Sequence.fold (fun acc t -> acc + weight t) 0
+    |> Iter.filter (fun t -> not (T.is_var t))
+    |> Iter.fold (fun acc t -> acc + weight t) 0
 
 let depth lit =
   fold (fun acc t -> max acc (T.depth t)) 0 lit
@@ -338,10 +338,10 @@ module Seq = struct
     | True
     | False -> ()
 
-  let vars lit = Sequence.flat_map T.Seq.vars (terms lit)
+  let vars lit = Iter.flat_map T.Seq.vars (terms lit)
 
   let symbols lit =
-    Sequence.flat_map T.Seq.symbols (terms lit)
+    Iter.flat_map T.Seq.symbols (terms lit)
 
   (* used to represent arithmetic lits... *)
   let _arith_term =
@@ -355,9 +355,9 @@ let symbols lit = Seq.symbols lit |> ID.Set.of_seq
 module UnifOp = struct
   type 'subst op = {
     term : subst:'subst -> term Scoped.t -> term Scoped.t ->
-      'subst Sequence.t;
+      'subst Iter.t;
     monomes : 'a. subst:'subst -> 'a Monome.t Scoped.t -> 'a Monome.t
-        Scoped.t -> 'subst Sequence.t;
+        Scoped.t -> 'subst Iter.t;
   }
 end
 
@@ -399,7 +399,7 @@ let variant ?(subst=S.empty) lit1 lit2 k =
     (fun (subst,tags) -> if Subst.is_renaming subst then k (subst,tags))
 
 let are_variant lit1 lit2 =
-  not (Sequence.is_empty (variant (Scoped.make lit1 0) (Scoped.make lit2 1)))
+  not (Iter.is_empty (variant (Scoped.make lit1 0) (Scoped.make lit2 1)))
 
 let matching ?(subst=Subst.empty) ~pattern:lit1 lit2 k =
   let op = UnifOp.({
@@ -558,7 +558,7 @@ let var_occurs v lit = match lit with
   | Prop (p,_) -> T.var_occurs ~var:v p
   | Equation (l,r,_) -> T.var_occurs ~var:v l || T.var_occurs ~var:v r
   | Int _
-  | Rat _ -> Sequence.exists (T.var_occurs ~var:v) (Seq.terms lit)
+  | Rat _ -> Iter.exists (T.var_occurs ~var:v) (Seq.terms lit)
   | True
   | False -> false
 
@@ -566,12 +566,12 @@ let is_ground lit = match lit with
   | Equation (l,r,_) -> T.is_ground l && T.is_ground r
   | Prop (p, _) -> T.is_ground p
   | Int _
-  | Rat _ -> Sequence.for_all T.is_ground (Seq.terms lit)
+  | Rat _ -> Iter.for_all T.is_ground (Seq.terms lit)
   | True
   | False -> true
 
 let root_terms l =
-  Seq.terms l |> Sequence.to_rev_list
+  Seq.terms l |> Iter.to_rev_list
 
 let to_multiset lit = match lit with
   | Prop (p,_) -> Multisets.MT.singleton p
@@ -582,7 +582,7 @@ let to_multiset lit = match lit with
     AL.Seq.to_multiset alit
     |> Multisets.MT.Seq.of_coeffs Multisets.MT.empty
   | Rat o ->
-    Rat_lit.Seq.to_multiset o |> Sequence.map fst
+    Rat_lit.Seq.to_multiset o |> Iter.map fst
     |> Multisets.MT.Seq.of_seq Multisets.MT.empty
 
 let is_trivial lit = match lit with
@@ -609,8 +609,8 @@ let rec cannot_be_eq (t1:term)(t2:term): Builtin.Tag.t list option =
          don't have the same constructor *)
       if ID.equal c1 c2 && List.length l1=List.length l2 then (
         List.combine l1 l2
-        |> Sequence.of_list
-        |> Sequence.find_map (fun (a,b) -> cannot_be_eq a b)
+        |> Iter.of_list
+        |> Iter.find_map (fun (a,b) -> cannot_be_eq a b)
       ) else Some [Builtin.Tag.T_data]
     | _ -> None
   end
@@ -1000,17 +1000,17 @@ module Pos = struct
       | Int (AL.Binary(_, _m1, _m2)), _ ->
         (* [t] dominates all atomic terms? *)
         let t = root_term lit pos in
-        Sequence.for_all
+        Iter.for_all
           (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
           (Seq.terms lit)
       | Int (AL.Divides d), _ ->
         let t = root_term lit pos in
-        Sequence.for_all
+        Iter.for_all
           (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
           (Monome.Seq.terms d.AL.monome)
       | Rat _, _ ->
         let t = root_term lit pos in
-        Sequence.for_all
+        Iter.for_all
           (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
           (Seq.terms lit)
       | True, _

@@ -36,7 +36,7 @@ val precedence : t -> Precedence.t
 val add_list : t -> ID.t list -> unit
 (** Update precedence with symbols *)
 
-val add_seq : t -> ID.t Sequence.t -> unit
+val add_seq : t -> ID.t Iter.t -> unit
 (** Update precedence with signature *)
 
 val name : t -> string

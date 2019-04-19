@@ -14,7 +14,7 @@ depends: [
   "zarith"
   "logtk" { >= "1.5" }
   "containers" { >= "1.0" }
-  "sequence" { >= "0.4" }
+  "iter" { >= "1.2" }
   "oseq"
   "jbuilder" { build }
   "msat" { >= "0.5" < "1.0" }

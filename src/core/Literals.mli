@@ -28,7 +28,7 @@ include Interfaces.HASH with type t := t
 
 val variant :
   ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
-  (Subst.t * Builtin.Tag.t list) Sequence.t
+  (Subst.t * Builtin.Tag.t list) Iter.t
 (** Variant checking (alpha-equivalence). It can reorder literals to do its
     check, so that might be computationnally expensive (a bit
     like subsumption). *)
@@ -38,7 +38,7 @@ val are_variant : t -> t -> bool
 
 val matching :
   ?subst:Subst.t -> pattern:t Scoped.t -> t Scoped.t ->
-  (Subst.t * Builtin.Tag.t list) Sequence.t
+  (Subst.t * Builtin.Tag.t list) Iter.t
 
 val matches : t -> t -> bool
 
@@ -77,9 +77,9 @@ val is_absurd : t -> bool
 val apply_subst : Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
 
 module Seq : sig
-  val vars : t -> Type.t HVar.t Sequence.t
-  val terms : t -> term Sequence.t
-  val to_form : t -> term SLiteral.t Sequence.t
+  val vars : t -> Type.t HVar.t Iter.t
+  val terms : t -> term Iter.t
+  val to_form : t -> term SLiteral.t Iter.t
 end
 
 (** {3 High order combinators} *)
@@ -145,13 +145,13 @@ module View : sig
 end
 
 val fold_lits : eligible:(int -> Literal.t -> bool) ->
-  t -> (Literal.t * int) Sequence.t
+  t -> (Literal.t * int) Iter.t
 (** Fold over literals who satisfy [eligible]. The folded function
     is given the literal and its index. *)
 
 val fold_eqn : ?both:bool -> ?sign:bool -> ord:Ordering.t ->
   eligible:(int -> Literal.t -> bool) ->
-  t -> (term * term * bool * Position.t) Sequence.t
+  t -> (term * term * bool * Position.t) Iter.t
 (** fold f over all literals sides, with their positions.
     f is given [(left side, right side, sign, position of left side)]
     if [ord] is present, then only the max side of an oriented
@@ -163,30 +163,30 @@ val fold_eqn : ?both:bool -> ?sign:bool -> ord:Ordering.t ->
 
 val fold_arith :
   eligible:(int -> Literal.t -> bool) ->
-  t -> Int_lit.t Position.With.t Sequence.t
+  t -> Int_lit.t Position.With.t Iter.t
 (** Fold over eligible arithmetic literals *)
 
 val fold_arith_terms : eligible:(int -> Literal.t -> bool) ->
   which:[<`Max|`All] -> ord:Ordering.t ->
-  t -> (term * Int_lit.Focus.t * Position.t) Sequence.t
+  t -> (term * Int_lit.Focus.t * Position.t) Iter.t
 (** Fold on terms under arithmetic literals, with the focus on
     the current term *)
 
 val fold_rat :
   eligible:(int -> Literal.t -> bool) ->
-  t -> Rat_lit.t Position.With.t Sequence.t
+  t -> Rat_lit.t Position.With.t Iter.t
 (** Fold over eligible arithmetic literals *)
 
 val fold_rat_terms : eligible:(int -> Literal.t -> bool) ->
   which:[<`Max|`All] -> ord:Ordering.t ->
-  t -> (term * Rat_lit.Focus.t * Position.t) Sequence.t
+  t -> (term * Rat_lit.Focus.t * Position.t) Iter.t
 (** Fold on terms under arithmetic literals, with the focus on
     the current term *)
 
 val fold_terms : ?vars:bool -> ?var_args:bool -> ?fun_bodies:bool -> ?ty_args:bool -> which:[<`Max|`All] ->
   ord:Ordering.t -> subterms:bool ->
   eligible:(int -> Literal.t -> bool) ->
-  t -> term Position.With.t Sequence.t
+  t -> term Position.With.t Iter.t
 (** See {!Literal.fold_terms}, which is the same but for the
     [eligible] argument *)
 

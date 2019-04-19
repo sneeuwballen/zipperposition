@@ -83,7 +83,7 @@ module Term : sig
     ?subst:Unif_subst.t ->
     scope_rules:Scoped.scope ->
     term Scoped.t ->
-    (rule * Unif_subst.t) Sequence.t
+    (rule * Unif_subst.t) Iter.t
     (** [narrow_term ~scope_rule t] finds the set of rules [(l --> r)]
         in IDs and substitutions [sigma] such that [sigma(l) = sigma(t)]
         @param scope_rules used for rules (LEFT) *)
@@ -118,7 +118,7 @@ module Lit : sig
     ?subst:Unif_subst.t ->
     scope_rules:Scoped.scope ->
     Literal.t Scoped.t ->
-    (rule * Unif_subst.t * Proof.tag list) Sequence.t
+    (rule * Unif_subst.t * Proof.tag list) Iter.t
     (** [narrow_term rules lit] finds the set of rules [(l --> clauses) in rules]
         and substitutions [sigma] such that [sigma(l) = sigma(lit)]
         @param scope_rules used for rules (LEFT) *)
@@ -164,11 +164,11 @@ module Defined_cst : sig
 
   val rules : t -> rule_set
 
-  val rules_seq : t -> rule Sequence.t
+  val rules_seq : t -> rule Iter.t
 
-  val rules_term_seq : t -> Term.rule Sequence.t
+  val rules_term_seq : t -> Term.rule Iter.t
 
-  val rules_lit_seq : t -> Lit.rule Sequence.t
+  val rules_lit_seq : t -> Lit.rule Iter.t
 
   val defined_positions : t -> Defined_pos.Arr.t
 
@@ -208,8 +208,8 @@ val as_defined_cst : ID.t -> defined_cst option
 
 val is_defined_cst : ID.t -> bool
 
-val all_cst : Defined_cst.t Sequence.t
-val all_rules : Rule.t Sequence.t
+val all_cst : Defined_cst.t Iter.t
+val all_rules : Rule.t Iter.t
 
 (**/**)
 exception Payload_defined_cst of defined_cst

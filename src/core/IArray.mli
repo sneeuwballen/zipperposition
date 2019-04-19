@@ -77,6 +77,6 @@ val hash : 'a Hash.t -> 'a t Hash.t
 val hash_comm : 'a Hash.t -> 'a t Hash.t
 (** Commutative hash *)
 
-val to_seq : 'a t -> 'a Sequence.t
-val to_seqi : 'a t -> (int * 'a) Sequence.t
-val of_seq : 'a Sequence.t -> 'a t
+val to_seq : 'a t -> 'a Iter.t
+val to_seqi : 'a t -> (int * 'a) Iter.t
+val of_seq : 'a Iter.t -> 'a t

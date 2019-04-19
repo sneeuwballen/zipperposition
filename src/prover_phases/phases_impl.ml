@@ -79,7 +79,7 @@ let parse_prelude (params:Params.t) =
   let prelude_files = params.Params.prelude in
   let res =
     if CCVector.is_empty prelude_files
-    then CCResult.return Sequence.empty
+    then CCResult.return Iter.empty
     else (
       CCVector.to_list prelude_files
       |> CCResult.map_l
@@ -88,8 +88,8 @@ let parse_prelude (params:Params.t) =
              (fun k->k file);
            let fmt = Parsing_utils.guess_input file in
            Parsing_utils.parse_file fmt file)
-      |> CCResult.map Sequence.of_list
-      |> CCResult.map Sequence.flatten
+      |> CCResult.map Iter.of_list
+      |> CCResult.map Iter.flatten
     )
   in
   Phases.return_phase_err res
@@ -112,7 +112,7 @@ let typing ~file prelude (input,stmts) =
     ~on_shadow:(Input_format.on_shadow input)
     ~implicit_ty_args:(Input_format.implicit_ty_args input)
     ~def_as_rewrite ?ctx:None ~file
-    (Sequence.append prelude stmts)
+    (Iter.append prelude stmts)
   >>?= fun stmts ->
   Util.debugf ~section 3 "@[<hv2>@{<green>typed statements@}@ %a@]"
     (fun k->k (Util.pp_seq Statement.pp_input) (CCVector.to_seq stmts));
@@ -151,16 +151,16 @@ let compute_prec stmts =
        fun stmts -> 
         Precedence.weight_invfreq (
          stmts
-         |> Sequence.flat_map Statement.Seq.terms
-         |> Sequence.flat_map Term.Seq.symbols))
+         |> Iter.flat_map Statement.Seq.terms
+         |> Iter.flat_map Term.Seq.symbols))
     (* |> Compute_prec.set_weight_rule (fun _ -> Classify_cst.weight_fun) *)
 
     (* use "invfreq", with low priority *)
     |> Compute_prec.add_constr_rule 90
       (fun seq ->
          seq
-         |> Sequence.flat_map Statement.Seq.terms
-         |> Sequence.flat_map Term.Seq.symbols
+         |> Iter.flat_map Statement.Seq.terms
+         |> Iter.flat_map Term.Seq.symbols
          |> Precedence.Constr.invfreq)
   in
   let prec = Compute_prec.mk_precedence ~db_w:!_db_w ~lmb_w:!_lmb_w cp stmts in
@@ -329,20 +329,20 @@ let print_dots (type c)
       let proof =
         if Env.params.Params.dot_all_roots
         then
-          Env.(Sequence.append (get_active()) (get_passive()))
-          |> Sequence.filter_map
+          Env.(Iter.append (get_active()) (get_passive()))
+          |> Iter.filter_map
             (fun c ->
                if Literals.is_absurd (Env.C.lits c)
                then Some (Env.C.proof c)
                else None)
-        else Sequence.singleton proof
+        else Iter.singleton proof
       in
       Proof.S.pp_dot_seq_file ~name dot_f proof
     | Some dot_f, (Saturate.Sat | Saturate.Unknown) when Env.params.Params.dot_sat ->
       (* print saturated set *)
       let name = "sat_set" in
-      let seq = Sequence.append (Env.get_active ()) (Env.get_passive ()) in
-      let seq = Sequence.map Env.C.proof seq in
+      let seq = Iter.append (Env.get_active ()) (Env.get_passive ()) in
+      let seq = Iter.map Env.C.proof seq in
       Proof.S.pp_dot_seq_file ~name dot_f seq
     | _ -> ()
   end;
@@ -414,7 +414,7 @@ let parse_cli =
   Phases.return_phase (files, params)
 
 let syms_in_lit cl =
-   let open Sequence in 
+   let open Iter in 
       List.fold_left (<+>) empty 
                      (List.map (fun lit -> match lit with 
                                     | SLiteral.Atom (t, _) -> Term.Seq.symbols t
@@ -425,7 +425,7 @@ let syms_in_lit cl =
                                  cl)
 
 let syms_in_conj decls =
-   let open Sequence in
+   let open Iter in
       decls 
       |> CCVector.to_seq
       |> flat_map (fun st -> match Statement.view st with
@@ -435,7 +435,7 @@ let syms_in_conj decls =
          | _ -> empty)
 
 (* Process the given file (try to solve it) *)
-let process_file ?(prelude=Sequence.empty) file =
+let process_file ?(prelude=Iter.empty) file =
   start_file file >>= fun () ->
   parse_file file >>= fun stmts ->
   typing ~file prelude stmts >>= fun decls ->

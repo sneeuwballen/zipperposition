@@ -123,7 +123,7 @@ val goal : ?attrs:attrs -> proof:proof -> 'f -> ('f, _, _) t
 val neg_goal :
   ?attrs:attrs -> proof:proof -> skolems:'ty skolem list -> 'f list -> ('f, _, 'ty) t
 
-val signature : ?init:Signature.t -> ?conj_syms: ID.t Sequence.t -> (_, _, Type.t) t Sequence.t -> Signature.t
+val signature : ?init:Signature.t -> ?conj_syms: ID.t Iter.t -> (_, _, Type.t) t Iter.t -> Signature.t
 (** Compute signature when the types are using {!Type} *)
 
 val conv_attrs : UntypedAST.attrs -> attrs
@@ -181,12 +181,12 @@ val get_rw_rule:  ?weight_incr:int -> clause_t -> (ID.Set.elt * Rewrite.rule) op
 
 module Seq : sig
   val to_seq : ('f,'t,'ty) t ->
-    [`Term of 't | `Form of 'f | `Ty of 'ty | `ID of ID.t] Sequence.t
-  val ty_decls : (_, _, 'ty) t -> (ID.t * 'ty) Sequence.t
-  val forms : ('f, _, _) t -> 'f Sequence.t
-  val lits : (clause, _, _) t -> Term.t SLiteral.t Sequence.t
-  val terms : (clause, Term.t, _) t -> Term.t Sequence.t
-  val symbols : (clause, Term.t, Type.t) t -> ID.t Sequence.t
+    [`Term of 't | `Form of 'f | `Ty of 'ty | `ID of ID.t] Iter.t
+  val ty_decls : (_, _, 'ty) t -> (ID.t * 'ty) Iter.t
+  val forms : ('f, _, _) t -> 'f Iter.t
+  val lits : (clause, _, _) t -> Term.t SLiteral.t Iter.t
+  val terms : (clause, Term.t, _) t -> Term.t Iter.t
+  val symbols : (clause, Term.t, Type.t) t -> ID.t Iter.t
 end
 
 (** {2 IO} *)

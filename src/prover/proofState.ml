@@ -50,7 +50,7 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
   module SubsumptionIndex = FV_tree.Make(struct
       type t = C.t
       let compare = C.compare
-      let to_lits c = C.to_forms c |> Sequence.of_list
+      let to_lits c = C.to_forms c |> Iter.of_list
       let labels c = C.trail c |> Trail.labels
     end)
 
@@ -74,10 +74,10 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
     val on_remove_clause : C.t Signal.t
     (** signal triggered when a clause is removed from the set *)
 
-    val add : C.t Sequence.t -> unit
+    val add : C.t Iter.t -> unit
     (** Add clauses to the set *)
 
-    val remove : C.t Sequence.t -> unit
+    val remove : C.t Iter.t -> unit
     (** Remove clauses from the set *)
   end
 

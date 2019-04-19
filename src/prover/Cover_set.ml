@@ -58,12 +58,12 @@ end
 let top t = t.cs_top
 let ty t = Ind_cst.ty (top t)
 
-let cases ?(which=`All) (set:t): case Sequence.t =
-  let seq = Sequence.of_list set.cs_cases in
+let cases ?(which=`All) (set:t): case Iter.t =
+  let seq = Iter.of_list set.cs_cases in
   begin match which with
     | `All -> seq
-    | `Base -> Sequence.filter Case.is_base seq
-    | `Rec -> Sequence.filter Case.is_rec seq
+    | `Base -> Iter.filter Case.is_base seq
+    | `Rec -> Iter.filter Case.is_rec seq
   end
 
 let pp out (set:t): unit =
@@ -73,21 +73,21 @@ let pp out (set:t): unit =
     (Util.pp_list Case.pp) set.cs_cases
 
 let skolems (c:t) =
-  Sequence.of_list c.cs_cases
-  |> Sequence.flat_map_l Case.skolems
+  Iter.of_list c.cs_cases
+  |> Iter.flat_map_l Case.skolems
 
 let sub_constants (set:t) =
-  Sequence.of_list set.cs_cases
-  |> Sequence.flat_map_l Case.sub_constants
+  Iter.of_list set.cs_cases
+  |> Iter.flat_map_l Case.sub_constants
 
 (* type declarations required by [c] *)
 let declarations (set:t) =
   let decl_of_cst c = Ind_cst.id c, Ind_cst.ty c in
   let seq1 =
-    sub_constants set |> Sequence.map decl_of_cst
+    sub_constants set |> Iter.map decl_of_cst
   and seq2 = skolems set
   and top = decl_of_cst set.cs_top in
-  Sequence.cons top (Sequence.append seq1 seq2)
+  Iter.cons top (Iter.append seq1 seq2)
 
 module State_ = struct
   (* state for creating coverset *)

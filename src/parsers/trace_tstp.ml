@@ -166,7 +166,7 @@ let traverse ?(traversed=StepTbl.create 11) proof k =
     end
   done
 
-let to_seq proof = Sequence.from_iter (fun k -> traverse proof k)
+let to_seq proof = Iter.from_iter (fun k -> traverse proof k)
 
 (** Depth of a proof, ie max distance between the root and any axiom *)
 let depth proof =
@@ -189,7 +189,7 @@ let depth proof =
   done;
   !depth
 
-let size proof = Sequence.length (to_seq proof)
+let size proof = Iter.length (to_seq proof)
 
 (** {2 IO} *)
 
@@ -250,7 +250,7 @@ let of_decls decls =
     | Theory _ -> ()
   in
   (* traverse declarations *)
-  Sequence.iter
+  Iter.iter
     begin fun decl -> match decl with
       | A.CNF (_name, _role, _c, info :: _) ->
         Util.debugf 3 "@[<2>convert step@ @[%a@]@]" (fun k->k (A.pp T.pp) decl);

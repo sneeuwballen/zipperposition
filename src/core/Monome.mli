@@ -46,10 +46,10 @@ val map : (term -> term) -> 'a t -> 'a t
 val map_num : ('a -> 'a) -> 'a t -> 'a t
 
 module Seq : sig
-  val terms : _ t -> term Sequence.t
-  val vars : _ t -> Term.var Sequence.t
-  val coeffs : 'a t -> ('a * term) Sequence.t
-  val coeffs_swap : 'a t -> (term * 'a) Sequence.t
+  val terms : _ t -> term Iter.t
+  val vars : _ t -> Term.var Iter.t
+  val coeffs : 'a t -> ('a * term) Iter.t
+  val coeffs_swap : 'a t -> (term * 'a) Iter.t
 end
 
 val is_const : _ t -> bool
@@ -115,7 +115,7 @@ val apply_subst_no_simp : Subst.Renaming.t -> Subst.t -> 'a t Scoped.t -> 'a t
 (** Apply a substitution to the monome's terms, without renormalizing.
     This preserves positions. *)
 
-val variant : ?subst:Subst.t -> 'a t Scoped.t -> 'a t Scoped.t -> Subst.t Sequence.t
+val variant : ?subst:Subst.t -> 'a t Scoped.t -> 'a t Scoped.t -> Subst.t Iter.t
 
 (** Matching and unification aren't complete in the presence of variables
     occurring directly under the sum, for this would require the variable
@@ -124,10 +124,10 @@ val variant : ?subst:Subst.t -> 'a t Scoped.t -> 'a t Scoped.t -> Subst.t Sequen
     constants (ie X+1 = a+1 will bind X to a without problem, but
     will X+a=a+1 will fail to bind X to 1) *)
 
-val matching : ?subst:Subst.t -> 'a t Scoped.t -> 'a t Scoped.t -> Subst.t Sequence.t
+val matching : ?subst:Subst.t -> 'a t Scoped.t -> 'a t Scoped.t -> Subst.t Iter.t
 
 val unify : ?subst:Unif_subst.t -> 'a t Scoped.t -> 'a t Scoped.t ->
-  Unif_subst.t Sequence.t
+  Unif_subst.t Iter.t
 
 val is_ground : _ t -> bool
 (** Are there no variables in the monome? *)
@@ -210,7 +210,7 @@ module Focus : sig
 
   val unify_ff : ?subst:Unif_subst.t ->
     'a t Scoped.t -> 'a t Scoped.t ->
-    ('a t * 'a t * Unif_subst.t) Sequence.t
+    ('a t * 'a t * Unif_subst.t) Iter.t
   (** Unify two focused monomes. All returned unifiers are unifiers
       of the focused terms, but maybe also of other unfocused terms;
       Focused monomes are modified by unification because several terms
@@ -219,25 +219,25 @@ module Focus : sig
 
   val unify_mm : ?subst:Unif_subst.t ->
     'a monome Scoped.t -> 'a monome Scoped.t ->
-    ('a t * 'a t * Unif_subst.t) Sequence.t
+    ('a t * 'a t * Unif_subst.t) Iter.t
   (** Unify parts of two monomes [m1] and [m2]. For each such unifier we
       return the versions of [m1] and [m2] where the unified terms
       are focused. *)
 
   val unify_self : ?subst:Unif_subst.t ->
-    'a t Scoped.t -> ('a t * Unif_subst.t) Sequence.t
+    'a t Scoped.t -> ('a t * Unif_subst.t) Iter.t
   (** Extend the substitution to other terms within the focused monome,
       if possible. For instance it might return
       [2f(x)+a, {x=y}] for the monome [f(x)+f(y)+a] where [f(x)] is focused. *)
 
   val unify_self_monome : ?subst:Unif_subst.t ->
-    'a monome Scoped.t -> ('a t * Unif_subst.t) Sequence.t
+    'a monome Scoped.t -> ('a t * Unif_subst.t) Iter.t
   (** Unify at least two terms of the monome together *)
 
   (* TODO
      val unify_fm : ?subst:Subst.t ->
                  'a t Scoped.t -> 'a monome Scoped.t ->
-                 ('a * 'a t * Subst.t) Sequence.t
+                 ('a * 'a t * Subst.t) Iter.t
      (** Unify a focused monome and an unfocused monome. All unifiers
         are unifiers of the focused term and of at least one of the
         terms of the opposite monome. Each result is the coeff of the

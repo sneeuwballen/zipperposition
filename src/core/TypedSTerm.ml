@@ -399,8 +399,8 @@ let is_meta t = match view t with Meta _ -> true | _ -> false
 let is_const = function {term=Const _; _} -> true | _ -> false
 let is_fun = function {term=Bind (Binder.Lambda, _, _); _} -> true | _ -> false
 
-module Set = Sequence.Set.Make(struct type t = term let compare = compare end)
-module Map = Sequence.Map.Make(struct type t = term let compare = compare end)
+module Set = Iter.Set.Make(struct type t = term let compare = compare end)
+module Map = Iter.Map.Make(struct type t = term let compare = compare end)
 module Tbl = Hashtbl.Make(struct type t = term let equal = equal let hash = hash end)
 
 module Seq = struct
@@ -428,14 +428,14 @@ module Seq = struct
 
   let vars t =
     subterms t
-    |> Sequence.filter_map
+    |> Iter.filter_map
       (fun t -> match view t with
          | Var v -> Some v
          | _ -> None)
 
   let metas t =
     subterms t
-    |> Sequence.filter_map
+    |> Iter.filter_map
       (fun t -> match view t with
          | Meta (a,r,k) ->
            assert (!r=None);
@@ -479,7 +479,7 @@ module Seq = struct
 
   let free_vars t =
     subterms_with_bound t
-    |> Sequence.filter_map
+    |> Iter.filter_map
       (fun (t,set) -> match view t with
          | Var v when not (Var.Set.mem set v) -> Some v
          | _ -> None)
@@ -511,7 +511,7 @@ let rec is_ground t =
 
 let var_occurs ~var t =
   Seq.vars t
-  |> Sequence.mem ~eq:Var.equal var
+  |> Iter.mem ~eq:Var.equal var
 
 let as_id_app t = match view t with
   | Const id -> Some (id, ty_exn t, [])
@@ -524,11 +524,11 @@ let free_vars_set t = Seq.free_vars t |> Var.Set.of_seq
 let free_vars t = Seq.free_vars t |> Var.Set.of_seq |> Var.Set.to_list
 
 let free_vars_l l =
-  Sequence.of_list l
-  |> Sequence.flat_map Seq.free_vars
+  Iter.of_list l
+  |> Iter.flat_map Seq.free_vars
   |> Var.Set.of_seq |> Var.Set.to_list
 
-let closed t = Seq.free_vars t |> Sequence.is_empty
+let closed t = Seq.free_vars t |> Iter.is_empty
 
 let close_all ~ty s t =
   let vars = free_vars t in
@@ -888,13 +888,13 @@ end
 
 let is_monomorphic t =
   Seq.subterms t
-  |> Sequence.for_all (fun t -> Ty.is_mono (ty_exn t))
+  |> Iter.for_all (fun t -> Ty.is_mono (ty_exn t))
 
 let is_subterm ~strict a ~of_:b =
   let subs = Seq.subterms b in
   (* drop the first element ([b]) if [strict] *)
-  let subs = if strict then Sequence.drop 1 subs else subs in
-  Sequence.exists (equal a) subs
+  let subs = if strict then Iter.drop 1 subs else subs in
+  Iter.exists (equal a) subs
 
 (** {2 IO} *)
 

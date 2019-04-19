@@ -266,9 +266,9 @@ module Ctx = struct
 
   let find_close_names ctx (s:string): string list =
     CCHashtbl.keys ctx.env
-    |> Sequence.filter
+    |> Iter.filter
       (fun s' -> CCString.edit_distance s s' < 2)
-    |> Sequence.to_rev_list
+    |> Iter.to_rev_list
     |> CCList.sort_uniq ~cmp:String.compare
 
   let pp_names out = function
@@ -871,8 +871,8 @@ let rec as_def ?loc ?of_ bound t =
     error_ ?loc "expected `forall <vars>. <lhs> =/<=> <rhs>`"
   and yield_term id ty args rhs =
     let vars =
-      Sequence.of_list args
-      |> Sequence.flat_map T.Seq.free_vars
+      Iter.of_list args
+      |> Iter.flat_map T.Seq.free_vars
       |> Var.Set.add_seq bound
       |> Var.Set.to_list
       |> T.sort_ty_vars_first
@@ -895,7 +895,7 @@ let rec as_def ?loc ?of_ bound t =
   and yield_prop lhs rhs pol =
     let vars =
       SLiteral.to_seq lhs
-      |> Sequence.flat_map T.Seq.free_vars
+      |> Iter.flat_map T.Seq.free_vars
       |> Var.Set.add_seq bound
       |> Var.Set.to_list
       |> T.sort_ty_vars_first
@@ -1126,7 +1126,7 @@ let infer_statements_exn
     | Some c -> c
   in
   let res = CCVector.create () in
-  Sequence.iter
+  Iter.iter
     (fun st ->
        (* add declarations first *)
        let st, aux = infer_statement_exn ?file ctx st in

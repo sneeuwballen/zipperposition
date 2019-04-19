@@ -52,9 +52,9 @@ module Set : sig
   val find : 'a t -> ID.t -> 'a var option
   val find_exn : 'a t -> ID.t -> 'a var
   val diff : 'a t -> 'a t -> 'a t
-  val of_seq : 'a var Sequence.t -> 'a t
-  val to_seq : 'a t -> 'a var Sequence.t
-  val add_seq : 'a t -> 'a var Sequence.t -> 'a t
+  val of_seq : 'a var Iter.t -> 'a t
+  val to_seq : 'a t -> 'a var Iter.t
+  val add_seq : 'a t -> 'a var Iter.t -> 'a t
   val add_list : 'a t -> 'a var list -> 'a t
   val to_list : 'a t -> 'a var list
   val of_list : 'a var list -> 'a t
@@ -74,9 +74,9 @@ module Subst : sig
   val find_exn : ('a,'b) t -> 'a var -> 'b
   val merge : ('a,'b) t -> ('a,'b) t -> ('a,'b) t
   val of_list : ('a var * 'b) list -> ('a,'b) t
-  val of_seq : ('a var * 'b) Sequence.t -> ('a,'b) t
+  val of_seq : ('a var * 'b) Iter.t -> ('a,'b) t
   val to_list : ('a,'b) t -> ('a var * 'b) list
-  val to_seq: ('a,'b) t -> ('a var * 'b) Sequence.t
+  val to_seq: ('a,'b) t -> ('a var * 'b) Iter.t
   val pp : 'b CCFormat.printer -> (_, 'b) t CCFormat.printer
 end
 

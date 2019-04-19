@@ -52,7 +52,7 @@ module Constr : sig
   val arity : (ID.t -> int) -> [`partial] t
   (** decreasing arity constraint (big arity => high in precedence) *)
 
-  val invfreq : ID.t Sequence.t -> [`partial] t
+  val invfreq : ID.t Iter.t -> [`partial] t
   (** symbols with high frequency are smaller. Elements of unknown
       frequency are assumed to have a frequency of 0. *)
 
@@ -117,14 +117,14 @@ val arg_coeff : t -> ID.t -> int -> int
 val add_list : t -> ID.t list -> unit
 (** Update the precedence with the given symbols *)
 
-val add_seq : t -> ID.t Sequence.t -> unit
+val add_seq : t -> ID.t Iter.t -> unit
 
 val declare_status : t -> ID.t -> symbol_status -> unit
 (** Change the status of the given precedence
     @raise Error if the symbol is not in the the precedence already *)
 
 module Seq : sig
-  val symbols : t -> ID.t Sequence.t
+  val symbols : t -> ID.t Iter.t
 end
 
 val pp_snapshot : ID.t list CCFormat.printer
@@ -138,7 +138,7 @@ val weight_modarity : arity:(ID.t -> int) -> weight_fun
 
 val weight_constant : weight_fun
 
-val weight_invfreq : ID.t Sequence.t -> weight_fun
+val weight_invfreq : ID.t Iter.t -> weight_fun
 
 val set_weight : t -> weight_fun -> unit
 (** Change the weight function of the precedence
@@ -155,7 +155,7 @@ val create : ?weight:weight_fun -> ?arg_coeff:arg_coeff_fun -> ?db_w:int -> ?lmb
 val default : ID.t list -> t
 (** default precedence. Default status for symbols is {!Lexicographic}. *)
 
-val default_seq : ID.t Sequence.t -> t
+val default_seq : ID.t Iter.t -> t
 (** default precedence on the given sequence of symbols *)
 
 val constr : t -> [`total] Constr.t

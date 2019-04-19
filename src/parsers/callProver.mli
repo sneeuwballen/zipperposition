@@ -92,7 +92,7 @@ module Eprover : sig
   type result = {
     answer : szs_answer;
     output : string;
-    decls : untyped A.t Sequence.t option;
+    decls : untyped A.t Iter.t option;
     proof : Trace_tstp.t option;
   }
   and szs_answer =
@@ -113,13 +113,13 @@ module Eprover : sig
       given to E. *)
 
   val discover : ?opts:string list -> steps:int ->
-    untyped A.t Sequence.t ->
-    untyped A.t Sequence.t or_error
+    untyped A.t Iter.t ->
+    untyped A.t Iter.t or_error
   (** explore the surrounding of this list of declarations, returning the
       TPTP output of E *)
 
   val cnf : ?opts:string list ->
-    untyped A.t Sequence.t ->
-    untyped A.t Sequence.t or_error
+    untyped A.t Iter.t ->
+    untyped A.t Iter.t or_error
     (** Use E to convert a set of statements into CNF *)
 end

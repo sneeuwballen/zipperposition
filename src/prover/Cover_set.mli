@@ -52,14 +52,14 @@ val ty : t -> Type.t
 val top : t -> cst
 (** top constant of the coverset *)
 
-val declarations : t -> (ID.t * Type.t) Sequence.t
+val declarations : t -> (ID.t * Type.t) Iter.t
 (** [declarations set] returns a list of type declarations that should
     be made if [set] is new (declare the top cst and its subcases) *)
 
-val cases : ?which:[`Rec|`Base|`All] -> t -> case Sequence.t
+val cases : ?which:[`Rec|`Base|`All] -> t -> case Iter.t
 (** Cases of the cover set *)
 
-val sub_constants : t -> cst Sequence.t
+val sub_constants : t -> cst Iter.t
 (** All sub-constants of a given inductive constant *)
 
 val make : ?cover_set_depth:int -> depth:int -> Type.t -> t

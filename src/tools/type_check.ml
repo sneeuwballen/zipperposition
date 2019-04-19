@@ -58,8 +58,8 @@ let check file =
     |> Cnf.cnf_of_seq
     |> CCVector.to_seq
     |> Cnf.convert
-    |> CCResult.return) >>= (fun stmts -> CCVector.to_seq stmts |> Sequence.flat_map Statement.Seq.terms |>
-                            (fun trm -> try ignore(Sequence.for_all Term.in_pfho_fragment trm); ""
+    |> CCResult.return) >>= (fun stmts -> CCVector.to_seq stmts |> Iter.flat_map Statement.Seq.terms |>
+                            (fun trm -> try ignore(Iter.for_all Term.in_pfho_fragment trm); ""
                                         with Failure msg -> msg) |> 
                             fun x -> if (x = "") then CCResult.return () 
                                      else CCResult.fail ("FAIL: " ^ x))

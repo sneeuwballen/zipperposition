@@ -120,22 +120,22 @@ module Make(C: Index_intf.CLAUSE) = struct
     let size_plus =
       make "size+"
         (fun lits _ ->
-           Sequence.filter SLiteral.is_pos lits |> Sequence.length |> mk_n)
+           Iter.filter SLiteral.is_pos lits |> Iter.length |> mk_n)
 
     let size_minus =
       make "size-"
         (fun lits _ ->
-           Sequence.filter SLiteral.is_neg lits |> Sequence.length |> mk_n)
+           Iter.filter SLiteral.is_neg lits |> Iter.length |> mk_n)
 
     let weight_lit lit =
-      SLiteral.to_seq lit |> Sequence.map T.weight |> Sequence.fold (+) 0
+      SLiteral.to_seq lit |> Iter.map T.weight |> Iter.fold (+) 0
 
     let weight_ name filter =
       make name
         (fun lits _ ->
-           Sequence.filter filter lits
-           |> Sequence.map weight_lit
-           |> Sequence.fold (+) 0
+           Iter.filter filter lits
+           |> Iter.map weight_lit
+           |> Iter.fold (+) 0
            |> mk_n)
 
     let weight_plus = weight_ "weight+" SLiteral.is_pos
@@ -144,11 +144,11 @@ module Make(C: Index_intf.CLAUSE) = struct
     let labels = make "labels" (fun _ labels -> mk_l labels)
 
     (* sequence of symbols of clause, of given sign *)
-    let symbols_ filter lits : ID.t Sequence.t =
+    let symbols_ filter lits : ID.t Iter.t =
       lits
-      |> Sequence.filter filter
-      |> Sequence.flat_map SLiteral.to_seq
-      |> Sequence.flat_map T.Seq.symbols
+      |> Iter.filter filter
+      |> Iter.flat_map SLiteral.to_seq
+      |> Iter.flat_map T.Seq.symbols
 
     let set_sym_ filter lits _ =
       symbols_ filter lits
@@ -163,7 +163,7 @@ module Make(C: Index_intf.CLAUSE) = struct
 
     let multiset_sym_ filter lits _ =
       symbols_ filter lits
-      |> Sequence.fold
+      |> Iter.fold
         (fun m id ->
            let n = ID.Map.get_or ~default:0 id m in
            ID.Map.add id (n+1) m)
@@ -177,19 +177,19 @@ module Make(C: Index_intf.CLAUSE) = struct
       make "mset_symb-" (multiset_sym_ SLiteral.is_neg)
 
     (* sequence of symbols of clause with their depth *)
-    let symbols_depth_ filter lits : (ID.t * int) Sequence.t =
+    let symbols_depth_ filter lits : (ID.t * int) Iter.t =
       lits
-      |> Sequence.filter filter
-      |> Sequence.flat_map SLiteral.to_seq
-      |> Sequence.flat_map T.Seq.subterms_depth
-      |> Sequence.filter_map
+      |> Iter.filter filter
+      |> Iter.flat_map SLiteral.to_seq
+      |> Iter.flat_map T.Seq.subterms_depth
+      |> Iter.filter_map
         (fun (t,d) -> match T.view t with
            | T.Const id -> Some (id,d)
            | _ -> None)
 
     let depth_sym_ filter lits _ =
       symbols_depth_ filter lits
-      |> Sequence.fold
+      |> Iter.fold
         (fun m (id, d) ->
            let d' = ID.Map.get_or ~default:0 id m in
            ID.Map.add id (max d d') m)
@@ -313,7 +313,7 @@ module Make(C: Index_intf.CLAUSE) = struct
     let trie' = goto_leaf idx.trie fv k in
     { idx with trie=trie'; }
 
-  let add_seq = Sequence.fold add
+  let add_seq = Iter.fold add
   let add_list = List.fold_left add
 
   let remove idx c =
@@ -323,7 +323,7 @@ module Make(C: Index_intf.CLAUSE) = struct
     let trie' = goto_leaf idx.trie fv k in
     { idx with trie=trie'; }
 
-  let remove_seq idx seq = Sequence.fold remove idx seq
+  let remove_seq idx seq = Iter.fold remove idx seq
 
   (* retrieve all clauses which have a feature vector [fv] such that
      [check (compute c).(i) fv.(i) = true] *)

@@ -80,7 +80,7 @@ type defined_cst = {
 let pp_term_rule out r =
   Fmt.fprintf out "@[<2>@[%a@] :=@ @[%a@]@]" T.pp r.term_lhs T.pp r.term_rhs
 
-let pp_term_rules out (s:term_rule Sequence.t): unit =
+let pp_term_rules out (s:term_rule Iter.t): unit =
   Fmt.(within "{" "}" @@ hvbox @@ Util.pp_seq pp_term_rule) out s
 
 let pp_lit_rule out r =
@@ -88,7 +88,7 @@ let pp_lit_rule out r =
   Format.fprintf out "@[<2>@[%a@] :=@ [@[<v>%a@]]@]"
     Literal.pp r.lit_lhs (Util.pp_list ~sep:"∧" pp_c) r.lit_rhs
 
-let pp_lit_rules out (s:lit_rule Sequence.t): unit =
+let pp_lit_rules out (s:lit_rule Iter.t): unit =
   Format.fprintf out "{@[<hv>%a@]}" (Util.pp_seq pp_lit_rule) s
 
 let pp_rule out = function
@@ -115,14 +115,14 @@ module Cst_ = struct
   let rules t = t.defined_rules
   let rules_seq t = Rule_set.to_seq (rules t)
 
-  let rules_term_seq t : term_rule Sequence.t =
+  let rules_term_seq t : term_rule Iter.t =
     rules_seq t
-    |> Sequence.filter_map
+    |> Iter.filter_map
       (function T_rule t -> Some t | _ -> None)
 
-  let rules_lit_seq t : lit_rule Sequence.t =
+  let rules_lit_seq t : lit_rule Iter.t =
     rules_seq t
-    |> Sequence.filter_map
+    |> Iter.filter_map
       (function L_rule t -> Some t | _ -> None)
 
   let defined_positions t = Lazy.force t.defined_positions
@@ -137,7 +137,7 @@ module Cst_ = struct
   let to_string = Fmt.to_string pp
 end
 
-type pseudo_rule = ID.t * term list * term list Sequence.t
+type pseudo_rule = ID.t * term list * term list Iter.t
 (* LHS id, LHS args, sequence of occurrences of same ID's arguments on RHS *)
 
 (* compute position roles for a set of rules with the given terms as LHS *)
@@ -153,11 +153,11 @@ let compute_pos_gen (l:pseudo_rule list): defined_positions =
   (* now compute position roles *)
   let pos = Array.make n Defined_pos.P_invariant in
   begin
-    Sequence.of_list l
-    |> Sequence.flat_map
+    Iter.of_list l
+    |> Iter.flat_map
       (fun (_,args,rhs) ->
          fun yield -> List.iteri (fun i sub -> yield (rhs,i,sub)) args)
-    |> Sequence.iter
+    |> Iter.iter
       (fun (rhs,i,arg) ->
          begin match T.view arg with
            | T.Var x ->
@@ -166,13 +166,13 @@ let compute_pos_gen (l:pseudo_rule list): defined_positions =
                 it is an accumulator *)
              let is_invariant =
                rhs
-               |> Sequence.filter_map
+               |> Iter.filter_map
                  (fun args' ->
                     let len = List.length args' in
                     if len > i
                     then Some (List.nth args' (len-i-1))
                     else None)
-               |> Sequence.for_all
+               |> Iter.for_all
                  (fun sub -> match T.view sub with
                     | T.Var y -> HVar.equal Type.equal x y
                     | _ -> false)
@@ -262,9 +262,9 @@ module Term = struct
   type rule_set = Set.t
 
   (* term rules for this ID, if any *)
-  let rules_of_id id: rule Sequence.t =
+  let rules_of_id id: rule Iter.t =
     begin match as_defined_cst id with
-      | None -> Sequence.empty
+      | None -> Iter.empty
       | Some dcst -> Cst_.rules_term_seq dcst
     end
 
@@ -306,7 +306,7 @@ module Term = struct
       | _ when !fuel = 0 -> k t
       | T.Const id ->
         (* pick a constant rule *)
-        begin match rules_of_id id |> Sequence.head with
+        begin match rules_of_id id |> Iter.head with
           | Some r when T.is_const r.term_lhs ->
             (* reduce [rhs], but no variable can be bound *)
             assert (T.equal t r.term_lhs);
@@ -333,7 +333,7 @@ module Term = struct
                | T.Const id ->
                  let find_rule =
                    rules_of_id id
-                   |> Sequence.find_map
+                   |> Iter.find_map
                      (fun r ->
                         try
                           let n_r = Rule.arity r in
@@ -405,24 +405,24 @@ module Term = struct
 
   let normalize_term_fst ?max_steps t = fst (normalize_term ?max_steps t)
 
-  let narrow_term ?(subst=Unif_subst.empty) ~scope_rules:sc_r (t,sc_t): _ Sequence.t =
+  let narrow_term ?(subst=Unif_subst.empty) ~scope_rules:sc_r (t,sc_t): _ Iter.t =
     begin match T.view t with
-      | T.Const _ -> Sequence.empty (* already normal form *)
+      | T.Const _ -> Iter.empty (* already normal form *)
       | T.App (f, _) ->
         begin match T.view f with
           | T.Const id ->
             (* try to match the rules of [id] *)
             rules_of_id id
-            |> Sequence.filter_map
+            |> Iter.filter_map
               (fun r ->
                  try Some (r, Unif.FO.unify_full ~subst (r.term_lhs,sc_r) (t,sc_t))
                  with Unif.Fail -> None)
-          | _ -> Sequence.empty
+          | _ -> Iter.empty
         end
       | T.Fun _
       | T.Var _
       | T.DB _
-      | T.AppBuiltin _ -> Sequence.empty
+      | T.AppBuiltin _ -> Iter.empty
     end
 end
 
@@ -497,9 +497,9 @@ module Lit = struct
     let to_form ~ctx r = conv_ ~ctx (lhs r) (rhs r)
 
     let vars r =
-      Sequence.cons (lhs r)
-        (Sequence.of_list (rhs r) |> Sequence.flat_map_l CCFun.id)
-      |> Sequence.flat_map Literal.Seq.vars
+      Iter.cons (lhs r)
+        (Iter.of_list (rhs r) |> Iter.flat_map_l CCFun.id)
+      |> Iter.flat_map Literal.Seq.vars
       |> T.VarSet.of_seq |> T.VarSet.to_list
 
     let compare r1 r2: int = compare_lr r1 r2
@@ -538,28 +538,28 @@ module Lit = struct
         "Rewrite.Lit.add_eq_rule:@ non-equational rule `%a`" Rule.pp r
 
   (* term rules for this ID, if any *)
-  let rules_of_id id: rule Sequence.t =
+  let rules_of_id id: rule Iter.t =
     begin match as_defined_cst id with
-      | None -> Sequence.empty
+      | None -> Iter.empty
       | Some dcst -> Cst_.rules_lit_seq dcst
     end
 
-  let rules_of_lit lit: rule Sequence.t = match lit with
+  let rules_of_lit lit: rule Iter.t = match lit with
     | Literal.Prop (t, _) ->
       begin match T.Classic.view t with
         | T.Classic.App (id, _) -> rules_of_id id
-        | _ -> Sequence.empty
+        | _ -> Iter.empty
       end
     | Literal.Equation _ -> Set.to_seq !eq_rules_
-    | _ -> Sequence.empty
+    | _ -> Iter.empty
 
   (* find rules that can apply to this literal *)
   let step_lit (lit:Literal.t) =
     rules_of_lit lit
-    |> Sequence.find_map
+    |> Iter.find_map
       (fun r ->
          let substs = Literal.matching ~pattern:(r.lit_lhs,1) (lit,0) in
-         begin match Sequence.head substs with
+         begin match Iter.head substs with
            | None -> None
            | Some (subst,tags) -> Some (r, subst, tags)
          end)
@@ -610,10 +610,10 @@ module Lit = struct
 
   let narrow_lit ?(subst=Unif_subst.empty) ~scope_rules:sc_r (lit,sc_lit) =
     rules_of_lit lit
-    |> Sequence.flat_map
+    |> Iter.flat_map
       (fun r ->
          Literal.unify ~subst (r.lit_lhs,sc_r) (lit,sc_lit)
-         |> Sequence.map (fun (subst,tags) -> r, subst, tags))
+         |> Iter.map (fun (subst,tags) -> r, subst, tags))
 end
 
 let pseudo_rule_of_rule (r:rule): pseudo_rule = match r with
@@ -623,7 +623,7 @@ let pseudo_rule_of_rule (r:rule): pseudo_rule = match r with
     let rhs =
       Term.Rule.rhs r
       |> T.Seq.subterms
-      |> Sequence.filter_map
+      |> Iter.filter_map
         (fun sub -> match T.Classic.view sub with
            | T.Classic.App (id', args') when ID.equal id' id ->
              Some args'
@@ -649,9 +649,9 @@ let pseudo_rule_of_rule (r:rule): pseudo_rule = match r with
             (* occurrences of literals with same [id] on RHS *)
             let rhs =
               Lit.Rule.rhs r
-              |> Sequence.of_list
-              |> Sequence.flat_map Sequence.of_list
-              |> Sequence.filter_map (view_lit id)
+              |> Iter.of_list
+              |> Iter.flat_map Iter.of_list
+              |> Iter.filter_map (view_lit id)
             in
             id, args, rhs
           | _ -> fail()
@@ -707,7 +707,7 @@ module Rule = struct
 
   let contains_skolems (t:term): bool =
     T.Seq.symbols t
-    |> Sequence.exists ID.is_skolem
+    |> Iter.exists ID.is_skolem
 
   let make_lit ~proof lit_lhs lit_rhs =
     L_rule (Lit.Rule.make ~proof lit_lhs lit_rhs)
@@ -741,13 +741,13 @@ module Rule = struct
 
   let set_as_proof_parents (s:Term.Rule_inst_set.t) : Proof.parent list =
     Term.Rule_inst_set.to_seq s
-    |> Sequence.map
+    |> Iter.map
       (fun (r,subst,sc) ->
          let proof =
            Proof.S.mk (Term.Rule.proof r) (Proof.Result.make res_tc (T_rule r))
          in
          Proof.Parent.from_subst Subst.Renaming.none (proof,sc) subst)
-    |> Sequence.to_rev_list
+    |> Iter.to_rev_list
 end
 
 let allcst_ : Cst_.t list ref = ref []
@@ -766,8 +766,8 @@ module Defined_cst = struct
   let compute_pos id (s:rule_set) =
     let pos =
       Rule_set.to_seq s
-      |> Sequence.map pseudo_rule_of_rule
-      |> Sequence.to_rev_list
+      |> Iter.map pseudo_rule_of_rule
+      |> Iter.to_rev_list
       |> compute_pos_gen
     in
     Util.debugf ~section 3
@@ -924,7 +924,7 @@ let all_cst k = List.iter k !allcst_
 
 let all_rules =
   all_cst
-  |> Sequence.flat_map Defined_cst.rules_seq
+  |> Iter.flat_map Defined_cst.rules_seq
 
 let () =
   Options.add_opts

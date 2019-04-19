@@ -151,10 +151,10 @@ module Make(E : Index.EQUATION) = struct
     let k leaf = Leaf.remove leaf t eqn in
     goto_leaf trie t k
 
-  let add_seq dt seq = Sequence.fold add dt seq
+  let add_seq dt seq = Iter.fold add dt seq
   let add_list dt = List.fold_left add dt
 
-  let remove_seq dt seq = Sequence.fold remove dt seq
+  let remove_seq dt seq = Iter.fold remove dt seq
 
   let retrieve ?(subst=S.empty) ~sign dt t k =
     Util.enter_prof prof_npdtree_retrieve;
@@ -216,9 +216,9 @@ module Make(E : Index.EQUATION) = struct
       (fun t ->
          let prefix s = match t.star with
            | None -> s
-           | Some t' -> Sequence.cons ("*", t') s
+           | Some t' -> Iter.cons ("*", t') s
          and s2 = ID.Map.to_seq t.map
-                  |> Sequence.map (fun (sym, t') -> ID.to_string sym, t')
+                  |> Iter.map (fun (sym, t') -> ID.to_string sym, t')
          in
          prefix s2)
 
@@ -239,7 +239,7 @@ end
 
 (** {2 General purpose index} *)
 
-module SIMap = Sequence.Map.Make(struct
+module SIMap = Iter.Map.Make(struct
     type t = ID.t * int
     let compare (s1,i1) (s2,i2) =
       if i1 = i2 then ID.compare s1 s2 else i1-i2
@@ -313,7 +313,7 @@ module MakeTerm(X : Set.OrderedType) = struct
     goto_leaf trie t k
 
   let add_ trie = CCFun.uncurry (add trie)
-  let add_seq = Sequence.fold add_
+  let add_seq = Iter.fold add_
   let add_list = List.fold_left add_
 
   let remove trie t data =
@@ -321,7 +321,7 @@ module MakeTerm(X : Set.OrderedType) = struct
     goto_leaf trie t k
 
   let remove_ trie = CCFun.uncurry (remove trie)
-  let remove_seq dt seq = Sequence.fold remove_ dt seq
+  let remove_seq dt seq = Iter.fold remove_ dt seq
   let remove_list dt seq = List.fold_left remove_ dt seq
 
   (* skip one term in the tree. Calls [k] with [acc] on corresponding
@@ -476,9 +476,9 @@ module MakeTerm(X : Set.OrderedType) = struct
       (fun t ->
          let prefix s = match t.star with
            | None -> s
-           | Some t' -> Sequence.cons ("*", t') s
+           | Some t' -> Iter.cons ("*", t') s
          and s2 = SIMap.to_seq t.map
-                  |> Sequence.map
+                  |> Iter.map
                     (fun ((sym,i), t') ->
                        let label = CCFormat.sprintf "%a/%d" ID.pp sym i in
                        label, t')

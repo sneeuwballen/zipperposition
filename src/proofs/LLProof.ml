@@ -198,8 +198,8 @@ module Dot = struct
          let descr = Fmt.sprintf "@[<h>%s%a@]" descr pp_tags (tags p) in
          begin
            parents p
-           |> Sequence.of_list
-           |> Sequence.map
+           |> Iter.of_list
+           |> Iter.map
              (fun p' -> (descr,inst p), p'.p_proof)
          end)
 
@@ -250,7 +250,7 @@ module Dot = struct
     Format.pp_print_newline out ();
     ()
 
-  let pp_dot ~name out proof = pp_dot_seq ~name out (Sequence.singleton proof)
+  let pp_dot ~name out proof = pp_dot_seq ~name out (Iter.singleton proof)
 
   let pp_dot_seq_file ?(name="llproof") filename seq =
     (* print graph on file *)
@@ -261,5 +261,5 @@ module Dot = struct
          Format.fprintf out "%a@." (pp_dot_seq ~name) seq)
 
   let pp_dot_file ?name filename proof =
-    pp_dot_seq_file ?name filename (Sequence.singleton proof)
+    pp_dot_seq_file ?name filename (Iter.singleton proof)
 end

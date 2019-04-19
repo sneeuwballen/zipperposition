@@ -92,11 +92,11 @@ let to_string = CCFormat.to_string pp_tstp
 let map f m = make m.op (M.map f m.left)(M.map f m.right)
 
 let fold f acc m =
-  let acc = Sequence.fold f acc (Monome.Seq.terms m.left) in
-  Sequence.fold f acc (Monome.Seq.terms m.right)
+  let acc = Iter.fold f acc (Monome.Seq.terms m.left) in
+  Iter.fold f acc (Monome.Seq.terms m.right)
 
 type ('subst,'a) unif =
-  subst:'subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Sequence.t
+  subst:'subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Iter.t
 
 (* match {x1,y1} in scope 1, with {x2,y2} with scope2 *)
 let unif4 op ~subst x1 y1 sc1 x2 y2 sc2 k =
@@ -241,7 +241,7 @@ module Subsumption = struct
 
   (* match l1 with l2, and r1 with r2, with the same scaling coefficient *)
   let matching2 ~subst l1 r1 sc1 l2 r2 sc2 k =
-    let protect = Sequence.append (M.Seq.vars l2) (M.Seq.vars r2) in
+    let protect = Iter.append (M.Seq.vars l2) (M.Seq.vars r2) in
     if M.is_const l1 && M.is_const l2 then
       (* only one problem *)
       matching ~protect ~subst r1 sc1 r2 sc2 k
@@ -303,7 +303,7 @@ let subsumes ?(subst=Subst.empty) (lit1,sc1) (lit2, sc2) k =
   Subsumption.check ~subst lit1 sc1 lit2 sc2 k
 
 let are_variant lit1 lit2 =
-  not (Sequence.is_empty (variant (lit1, 0)(lit2, 1)))
+  not (Iter.is_empty (variant (lit1, 0)(lit2, 1)))
 
 let apply_subst renaming subst (lit,scope) =
   make lit.op
@@ -346,12 +346,12 @@ let fold_terms ?(pos=P.stop) ?(vars=false) ?(var_args=true) ?(fun_bodies=true) ?
   ()
 
 let _to_coeffs lit =
-  Sequence.append (M.Seq.coeffs_swap lit.left) (M.Seq.coeffs_swap lit.right)
+  Iter.append (M.Seq.coeffs_swap lit.left) (M.Seq.coeffs_swap lit.right)
 
 (* FIXME: ignore multiplicities, for now, but would need to
    bring everything to same numerator? *)
 let to_multiset lit =
-  _to_coeffs lit |> Sequence.map fst
+  _to_coeffs lit |> Iter.map fst
   |> Multisets.MT.Seq.of_seq Multisets.MT.empty
 
 let max_terms ~ord lit =
@@ -382,7 +382,7 @@ let to_term m: term =
 
 module Seq = struct
   let terms lit k = M.Seq.terms lit.left k; M.Seq.terms lit.right k
-  let vars lit = terms lit |> Sequence.flat_map T.Seq.vars
+  let vars lit = terms lit |> Iter.flat_map T.Seq.vars
   let to_multiset = _to_coeffs
 end
 
@@ -451,8 +451,8 @@ module Focus = struct
     | Left (_, mf, m)
     | Right (_, m, mf) ->
       let t = MF.term mf in
-      let terms = Sequence.append (M.Seq.terms m) (MF.rest mf |> M.Seq.terms) in
-      Sequence.for_all
+      let terms = Iter.append (M.Seq.terms m) (MF.rest mf |> M.Seq.terms) in
+      Iter.for_all
         (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
         terms
 
@@ -461,11 +461,11 @@ module Focus = struct
     | Left (_, mf, m)
     | Right (_, m, mf) ->
       let t = MF.term mf in
-      Sequence.for_all
+      Iter.for_all
         (fun t' -> Ordering.compare ord t t' = Comparison.Gt)
         (M.Seq.terms m)
       &&
-      Sequence.for_all
+      Iter.for_all
         (fun t' -> Ordering.compare ord t t' = Comparison.Gt)
         (MF.rest mf |> M.Seq.terms)
 

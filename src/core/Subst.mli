@@ -94,13 +94,13 @@ val filter_scope : t -> Scoped.scope -> t
 
 (** {2 Set operations} *)
 
-val domain : t -> (var Scoped.t) Sequence.t
+val domain : t -> (var Scoped.t) Iter.t
 (** Domain of substitution *)
 
-val codomain : t -> (term Scoped.t) Sequence.t
+val codomain : t -> (term Scoped.t) Iter.t
 (** Codomain (image terms) of substitution *)
 
-val introduced : t -> (var Scoped.t) Sequence.t
+val introduced : t -> (var Scoped.t) Iter.t
 (** Variables introduced by the substitution (ie vars of codomain) *)
 
 val normalize : t -> t
@@ -137,9 +137,9 @@ val pp_bindings : t CCFormat.printer
 val fold : ('a -> var Scoped.t -> term Scoped.t -> 'a) -> 'a -> t -> 'a
 val iter : (var Scoped.t -> term Scoped.t -> unit) -> t -> unit
 
-val to_seq : t -> (var Scoped.t * term Scoped.t) Sequence.t
+val to_seq : t -> (var Scoped.t * term Scoped.t) Iter.t
 val to_list : t -> (var Scoped.t * term Scoped.t) list
-val of_seq : ?init:t -> (var Scoped.t * term Scoped.t) Sequence.t -> t
+val of_seq : ?init:t -> (var Scoped.t * term Scoped.t) Iter.t -> t
 val of_list : ?init:t -> (var Scoped.t * term Scoped.t) list -> t
 
 (** {2 Applying a substitution} *)

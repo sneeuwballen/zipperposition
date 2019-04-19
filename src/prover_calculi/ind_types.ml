@@ -37,18 +37,18 @@ module Make(Env : Env_intf.S) = struct
   let is_cstor_app t = CCOpt.is_some (as_cstor_app t)
 
   (* traverse all the sub-terms under at least one constructor *)
-  let walk_cstor_args (t:term): term Sequence.t =
+  let walk_cstor_args (t:term): term Iter.t =
     let rec aux t = match as_cstor_app t with
       | Some (_, l) ->
-        Sequence.of_list l
-        |> Sequence.flat_map (fun u -> Sequence.cons u (aux u))
-      | None -> Sequence.empty
+        Iter.of_list l
+        |> Iter.flat_map (fun u -> Iter.cons u (aux u))
+      | None -> Iter.empty
     in
     aux t
 
   let acyclicity lit: [`Absurd | `Trivial | `Neither] =
     let occurs_in_ t ~sub =
-      walk_cstor_args t |> Sequence.exists (T.equal sub)
+      walk_cstor_args t |> Iter.exists (T.equal sub)
     in
     begin match lit with
       | Literal.Equation (l, r, b) ->
@@ -63,7 +63,7 @@ module Make(Env : Env_intf.S) = struct
   let acyclicity_trivial c: bool =
     let res =
       C.Seq.lits c
-      |> Sequence.exists
+      |> Iter.exists
         (fun lit -> match acyclicity lit with
            | `Neither
            | `Absurd -> false
@@ -79,13 +79,13 @@ module Make(Env : Env_intf.S) = struct
   let acyclicity_simplify c: C.t SimplM.t =
     let lits' =
       C.Seq.lits c
-      |> Sequence.filter
+      |> Iter.filter
         (fun lit -> match acyclicity lit with
            | `Neither
            | `Trivial -> true
            | `Absurd -> false (* remove lit *)
         )
-      |> Sequence.to_array
+      |> Iter.to_array
     in
     if Array.length lits' = Array.length (C.lits c)
     then SimplM.return_same c
@@ -104,31 +104,31 @@ module Make(Env : Env_intf.S) = struct
     (* unify [sub] with cstor-prefixed subterms of [t] *)
     let unify_sub t ~sub =
       walk_cstor_args t
-      |> Sequence.filter_map
+      |> Iter.filter_map
         (fun t' ->
            try Some (Unif.FO.unify_full (t',0) (sub,0))
            with Unif.Fail -> None)
     in
     (* try to kill a [t=u] if there is [sigma] s.t. acyclicity applies
        to [t\sigma = u\sigma] *)
-    let kill_lit lit: Unif_subst.t Sequence.t =
+    let kill_lit lit: Unif_subst.t Iter.t =
       begin match lit with
         | Literal.Equation (l, r, true) ->
           begin match as_cstor_app l, as_cstor_app r with
             | Some _, None -> unify_sub l ~sub:r
             | None, Some _ -> unify_sub r ~sub:l
             | Some _, Some _
-            | None, None -> Sequence.empty
+            | None, None -> Iter.empty
           end
-        | _ -> Sequence.empty
+        | _ -> Iter.empty
       end
     in
     begin
-      Sequence.of_array_i (C.lits c)
-      |> Sequence.flat_map
+      Iter.of_array_i (C.lits c)
+      |> Iter.flat_map
         (fun (i, lit) ->
-           kill_lit lit |> Sequence.map (fun subst -> i, subst))
-      |> Sequence.map
+           kill_lit lit |> Iter.map (fun subst -> i, subst))
+      |> Iter.map
         (fun (i,us) ->
            let subst = Unif_subst.subst us in
            (* delete i-th literal and build new clause *)
@@ -153,14 +153,14 @@ module Make(Env : Env_intf.S) = struct
              (fun k->k C.pp c C.pp new_c Subst.pp subst);
            new_c)
 
-      |> Sequence.to_rev_list
+      |> Iter.to_rev_list
     end
 
   (* find, in [c], a literal which a (dis)equation of given sign
      between two constructors *)
   let find_cstor_pair ~sign ~eligible c =
     Lits.fold_lits ~eligible (C.lits c)
-    |> Sequence.find
+    |> Iter.find
       (fun (lit, i) -> match lit with
          | Literal.Equation (l, r, sign') when sign=sign' ->
            begin match T.Classic.view l, T.Classic.view r with
@@ -304,9 +304,9 @@ module Make(Env : Env_intf.S) = struct
       new_c
     in
     (* find candidate subterms that are candidate for exhaustiveness *)
-    let find_terms (t:term): term Sequence.t =
+    let find_terms (t:term): term Iter.t =
       T.Seq.subterms t
-      |> Sequence.filter
+      |> Iter.filter
         (fun t ->
            T.is_ground t &&
            begin match Ind_ty.as_inductive_type (T.ty t) with
@@ -321,13 +321,13 @@ module Make(Env : Env_intf.S) = struct
     begin
       let eligible = C.Eligible.(res c ** neg) in
       C.lits c
-      |> Sequence.of_array_i
-      |> Sequence.filter_map
+      |> Iter.of_array_i
+      |> Iter.filter_map
         (fun (i,lit) -> if eligible i lit then Some lit else None)
-      |> Sequence.flat_map Literal.Seq.terms
-      |> Sequence.flat_map find_terms
+      |> Iter.flat_map Literal.Seq.terms
+      |> Iter.flat_map find_terms
       (* remove cstor-headed terms *)
-      |> Sequence.filter
+      |> Iter.filter
         (fun t ->
            not (is_cstor_app t) &&
            not (T.Tbl.mem exhaustiveness_tbl_ t))

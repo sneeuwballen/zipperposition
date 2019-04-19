@@ -62,11 +62,11 @@ val well_founded : t -> bool
       non empty  *)
 
 module Seq : sig
-  val symbols : t -> ID.t Sequence.t
-  val types : t -> Type.t Sequence.t
-  val to_seq : t -> (ID.t * (Type.t*bool)) Sequence.t
-  val of_seq : (ID.t * (Type.t*bool)) Sequence.t -> t
-  val add_seq : t -> (ID.t * (Type.t*bool)) Sequence.t -> t
+  val symbols : t -> ID.t Iter.t
+  val types : t -> Type.t Iter.t
+  val to_seq : t -> (ID.t * (Type.t*bool)) Iter.t
+  val of_seq : (ID.t * (Type.t*bool)) Iter.t -> t
+  val add_seq : t -> (ID.t * (Type.t*bool)) Iter.t -> t
 end
 
 val to_set : t -> ID.Set.t

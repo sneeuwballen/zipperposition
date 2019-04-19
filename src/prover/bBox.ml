@@ -70,7 +70,7 @@ module FV_components = FV_tree.Make(struct
       CCOrd.(Lits.compare l1 l2
         <?> (compare_payload, i1, i2)
         <?> (Lit.compare, j1, j2))
-    let to_lits (l,_,_) = Lits.to_form l |> Sequence.of_list
+    let to_lits (l,_,_) = Lits.to_form l |> Iter.of_list
     let labels _ = Util.Int_set.empty
   end)
 
@@ -133,7 +133,7 @@ let inject_lits_ lits  =
   (* retrieve clause. the index doesn't matter for retrieval *)
   let old_lit =
     _retrieve_alpha_equiv lits
-    |> Sequence.find_map
+    |> Iter.find_map
       (function
         | lits', Clause_component _, blit
           when Lits.are_variant lits lits' ->

@@ -163,15 +163,15 @@ end
 (** {3 Iterators} *)
 
 module Seq : sig
-  val vars : t -> t HVar.t Sequence.t
-  val subterms : t -> t Sequence.t
-  val subterms_depth : t -> (t * int) Sequence.t  (* subterms with their depth *)
-  val symbols : t -> ID.t Sequence.t
-  val types : t -> t Sequence.t
-  val max_var : t HVar.t Sequence.t -> int
-  val min_var : t HVar.t Sequence.t -> int
-  val add_set : Set.t -> t Sequence.t -> Set.t
-  val add_tbl : unit Tbl.t -> t Sequence.t -> unit
+  val vars : t -> t HVar.t Iter.t
+  val subterms : t -> t Iter.t
+  val subterms_depth : t -> (t * int) Iter.t  (* subterms with their depth *)
+  val symbols : t -> ID.t Iter.t
+  val types : t -> t Iter.t
+  val max_var : t HVar.t Iter.t -> int
+  val min_var : t HVar.t Iter.t -> int
+  val add_set : Set.t -> t Iter.t -> Set.t
+  val add_tbl : unit Tbl.t -> t Iter.t -> unit
 end
 
 (** {3 Positions} *)

@@ -75,9 +75,9 @@ let normalize_form (f:form): form =
     end
   in
   (* fixpoint of rewriting *)
-  let rec normalize_up_to fuel (c:clause): clause Sequence.t =
+  let rec normalize_up_to fuel (c:clause): clause Iter.t =
     assert (fuel>=0);
-    if fuel=0 then Sequence.return c
+    if fuel=0 then Iter.return c
     else normalize_step (fuel-1) c
   and normalize_step fuel c =
     let progress=ref false in
@@ -101,12 +101,12 @@ let normalize_form (f:form): form =
     then normalize_form fuel cs (* normalize each result recursively *)
     else (
       (* done, just simplify *)
-      Sequence.of_list cs |> Sequence.map simplify
+      Iter.of_list cs |> Iter.map simplify
     )
-  and normalize_form fuel (f:form): clause Sequence.t =
-    Sequence.of_list f |> Sequence.flat_map (normalize_up_to fuel)
+  and normalize_form fuel (f:form): clause Iter.t =
+    Iter.of_list f |> Iter.flat_map (normalize_up_to fuel)
   in
-  normalize_form 3 f |> Sequence.to_rev_list
+  normalize_form 3 f |> Iter.to_rev_list
 
 module Narrow : sig
   val default_limit: int
@@ -132,29 +132,29 @@ end = struct
 
   (* free variables of the form *)
   let vars_of_form (f:form): var list =
-    Sequence.of_list f
-    |> Sequence.flat_map Literals.Seq.vars
+    Iter.of_list f
+    |> Iter.flat_map Literals.Seq.vars
     |> T.VarSet.of_seq |> T.VarSet.to_list
 
   (* perform term narrowing in [f] *)
-  let narrow_term (acc:subst_acc) (f:form): (subst_acc*form) Sequence.t =
+  let narrow_term (acc:subst_acc) (f:form): (subst_acc*form) Iter.t =
     let sc_rule = 1 in
     let sc_c = 0 in
     (* find the various pairs (rule,subst) that can apply *)
     let subst_rule_l =
-      Sequence.of_list f
-      |> Sequence.flat_map Literals.Seq.terms
-      |> Sequence.flat_map T.Seq.subterms
-      |> Sequence.flat_map
+      Iter.of_list f
+      |> Iter.flat_map Literals.Seq.terms
+      |> Iter.flat_map T.Seq.subterms
+      |> Iter.flat_map
         (fun t -> RW.Term.narrow_term ~scope_rules:sc_rule (t,sc_c))
-      |> Sequence.to_rev_list
+      |> Iter.to_rev_list
       |> CCList.sort_uniq
         ~cmp:CCOrd.(pair RW.Term.Rule.compare Unif_subst.compare)
     in
     (* now do one step for each *)
     begin
-      Sequence.of_list subst_rule_l
-      |> Sequence.map
+      Iter.of_list subst_rule_l
+      |> Iter.map
         (fun (rule,us) ->
            let renaming = Subst.Renaming.create() in
            let subst = Unif_subst.subst us in
@@ -178,23 +178,23 @@ end = struct
     end
 
   (* perform lit narrowing in [f] *)
-  let narrow_lit (acc:subst_acc) (f:form): (subst_acc*form) Sequence.t =
+  let narrow_lit (acc:subst_acc) (f:form): (subst_acc*form) Iter.t =
     let sc_rule = 1 in
     let sc_c = 0 in
     (* find the various pairs (rule,subst) that can apply *)
     let subst_rule_l =
-      Sequence.of_list f
-      |> Sequence.flat_map Sequence.of_array
-      |> Sequence.flat_map
+      Iter.of_list f
+      |> Iter.flat_map Iter.of_array
+      |> Iter.flat_map
         (fun lit -> RW.Lit.narrow_lit ~scope_rules:sc_rule (lit,sc_c))
-      |> Sequence.to_rev_list
+      |> Iter.to_rev_list
       |> CCList.sort_uniq
         ~cmp:CCOrd.(triple RW.Lit.Rule.compare Unif_subst.compare (list compare))
     in
     (* now do one step for each *)
     begin
-      Sequence.of_list subst_rule_l
-      |> Sequence.map
+      Iter.of_list subst_rule_l
+      |> Iter.map
         (fun (rule,us,_) ->
            let renaming = Subst.Renaming.create() in
            let subst = Unif_subst.subst us in
@@ -234,9 +234,9 @@ end = struct
         decr n;
         let subst, f = Queue.pop q in
         let new_f_l =
-          Sequence.append (narrow_term subst f) (narrow_lit subst f)
+          Iter.append (narrow_term subst f) (narrow_lit subst f)
         in
-        Sequence.iter
+        Iter.iter
           (fun (acc,f') ->
              if form_is_false f' then (
                let subst = subst_of_acc acc in

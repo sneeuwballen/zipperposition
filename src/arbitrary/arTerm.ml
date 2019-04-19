@@ -18,7 +18,7 @@ module PT = struct
   (* strict subterms *)
   let rec shrink t =
     QA.Iter.append
-      (TypedSTerm.Seq.subterms t |> Sequence.drop 1)
+      (TypedSTerm.Seq.subterms t |> Iter.drop 1)
       (shrink_sub t)
   (* shrink immediate subterms *)
   and shrink_sub t =
@@ -27,7 +27,7 @@ module PT = struct
       | PT.App (f, l) ->
         append
           (shrink f >|= fun f' -> PT.app ~ty:(PT.ty_exn t) f' l)
-          (Sequence.(0 -- (List.length l-1)) >>= fun i ->
+          (Iter.(0 -- (List.length l-1)) >>= fun i ->
            let sub = List.nth l i in
            shrink_sub sub >|= fun sub' ->
            let l' = CCList.set_at_idx i sub' l in
@@ -162,8 +162,8 @@ end
 let rec shrink t =
   let subterms_same_ty =
     T.Seq.subterms t
-    |> Sequence.drop 1
-    |> Sequence.filter
+    |> Iter.drop 1
+    |> Iter.filter
       (fun t' -> Type.equal (T.ty t) (T.ty t') && T.DB.is_closed t')
   in
   QA.Iter.append subterms_same_ty (shrink_sub t)
@@ -174,7 +174,7 @@ and shrink_sub t =
     | T.App (f, l) ->
       append
         (shrink f >|= fun f' -> T.app f' l)
-        (Sequence.(0 -- (List.length l-1)) >>= fun i ->
+        (Iter.(0 -- (List.length l-1)) >>= fun i ->
          let sub = List.nth l i in
          shrink_sub sub >|= fun sub' ->
          let l' = CCList.set_at_idx i sub' l in

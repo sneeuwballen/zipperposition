@@ -276,20 +276,20 @@ module DB = struct
 
   let closed t =
     _to_seq ~depth:0 t
-    |> Sequence.map (fun (bvar,depth) -> bvar < depth)
-    |> Sequence.for_all _id
+    |> Iter.map (fun (bvar,depth) -> bvar < depth)
+    |> Iter.for_all _id
 
   (* check whether t contains the De Bruijn symbol n *)
   let contains t n =
     _to_seq ~depth:0 t
-    |> Sequence.map (fun (bvar,depth) -> bvar=n+depth)
-    |> Sequence.exists _id
+    |> Iter.map (fun (bvar,depth) -> bvar=n+depth)
+    |> Iter.exists _id
 
   let unbound t =
     _to_seq ~depth:0 t
-    |> Sequence.filter_map 
+    |> Iter.filter_map 
       (fun (bvar,depth) -> if bvar >= depth then Some (bvar - depth) else None)
-    |> Sequence.to_rev_list
+    |> Iter.to_rev_list
 
   (* maps the term to another term, calling [on_binder acc t]
      when it meets a binder, and [on_bvar acc t] when it meets a
@@ -549,9 +549,9 @@ module Seq = struct
     seq (fun i -> r := min (HVar.id i) !r);
     !r
 
-  let add_set = Sequence.fold (fun set t -> Set.add t set)
+  let add_set = Iter.fold (fun set t -> Set.add t set)
 
-  let add_tbl tbl = Sequence.iter (fun t -> Tbl.replace tbl t ())
+  let add_tbl tbl = Iter.iter (fun t -> Tbl.replace tbl t ())
 end
 
 (** {3 Positions} *)
@@ -716,7 +716,7 @@ let rec expected_ty_vars ty = match view ty with
   | Bind (Binder.ForallTy, _, ty') -> 1 + expected_ty_vars ty'
   | _ -> 0
 
-let is_ground t = Sequence.is_empty (Seq.vars t)
+let is_ground t = Iter.is_empty (Seq.vars t)
 
 (** {3 Misc} *)
 
@@ -732,7 +732,7 @@ and _size_list acc l = match l with
   | t::l' -> _size_list (acc + size t) l'
 
 let depth t =
-  Seq.subterms_depth t |> Sequence.map snd |> Sequence.fold max 0
+  Seq.subterms_depth t |> Iter.map snd |> Iter.fold max 0
 
 let rec head t = match view t with
   | Const s -> Some s
@@ -856,7 +856,7 @@ let rec pp_depth ?(hooks=[]) depth out t =
       Format.fprintf out "@[<1>%a@ @[%a@].@ %a@]"
         Binder.pp b
         (Util.pp_seq ~sep:" " pp_tyvar)
-        (Sequence.of_array_i (Array.of_list varty_l))
+        (Iter.of_array_i (Array.of_list varty_l))
         (_pp_surrounded (depth+List.length varty_l)) t'
     | AppBuiltin (Builtin.Arrow, ([] | [_])) -> assert false
     | AppBuiltin (Builtin.Arrow, ret::args) ->
@@ -930,7 +930,7 @@ let rec pp_zf out t =
       Format.fprintf out "@[<1>%a@ @[%a@].@ %a@]"
         Binder.ZF.pp b
         (Util.pp_seq ~sep:" " pp_tyvar)
-        (Sequence.of_array_i (Array.of_list varty_l))
+        (Iter.of_array_i (Array.of_list varty_l))
         (_pp_surrounded (depth+List.length varty_l)) t'
     | AppBuiltin (Builtin.Arrow, ([] | [_])) -> assert false
     | AppBuiltin (Builtin.Arrow, ret::args) ->

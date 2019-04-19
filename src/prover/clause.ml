@@ -296,7 +296,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       | _ -> false
 
   let symbols ?(init=ID.Set.empty) seq =
-    Sequence.fold
+    Iter.fold
       (fun set c -> Lits.symbols ~init:set c.sclause.lits)
       init seq
 
@@ -327,9 +327,9 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     ) else None
 
   module Seq = struct
-    let lits c = Sequence.of_array c.sclause.lits
-    let terms c = lits c |> Sequence.flat_map Lit.Seq.terms
-    let vars c = terms c |> Sequence.flat_map T.Seq.vars
+    let lits c = Iter.of_array c.sclause.lits
+    let terms c = lits c |> Iter.flat_map Lit.Seq.terms
+    let vars c = terms c |> Iter.flat_map T.Seq.vars
   end
 
   (** {2 Filter literals} *)
@@ -431,7 +431,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
         in
         Format.fprintf out "[@[%a@]]"
           (Util.pp_seq ~sep:" ∨ " pp_lit)
-          (Sequence.of_array_i lits)
+          (Iter.of_array_i lits)
       )
     in
     Format.fprintf out "@[%a@[<2>%a%a@]@]/%d"
@@ -460,6 +460,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     Util.debugf 5 "(@[check_types@ %a@])" (fun k->k pp c);
     lits c
     |> Literals.Seq.terms
-    |> Sequence.iter
+    |> Iter.iter
       (fun t -> ignore (Term.rebuild_rec t))
 end

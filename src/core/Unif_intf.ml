@@ -42,7 +42,7 @@ module type S = sig
       @raise Invalid_argument if the two scopes are equal *)
 
   val matching_same_scope :
-    ?protect:(ty HVar.t Sequence.t) -> ?subst:subst ->
+    ?protect:(ty HVar.t Iter.t) -> ?subst:subst ->
     scope:int -> pattern:term -> term -> subst
   (** matches [pattern] (more general) with the other term.
       The two terms live in the same scope, which is passed as the
@@ -54,7 +54,7 @@ module type S = sig
         are automatically protected. *)
 
   val matching_adapt_scope :
-    ?protect:(ty HVar.t Sequence.t) -> ?subst:subst ->
+    ?protect:(ty HVar.t Iter.t) -> ?subst:subst ->
     pattern:term Scoped.t -> term Scoped.t -> subst
   (** Call either {!matching} or {!matching_same_scope} depending on
       whether the given scopes are the same or not.
