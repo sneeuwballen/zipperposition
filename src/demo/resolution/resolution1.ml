@@ -332,7 +332,7 @@ let process_file f =
       _signature :=
         CCVector.to_seq decls
         |> Cnf.type_declarations
-        |> ID.Map.map conv_ty;
+        |> ID.Map.map (fun ty -> conv_ty ty, false);
       let clauses =
         CCVector.to_seq decls
         |> Cnf.convert
