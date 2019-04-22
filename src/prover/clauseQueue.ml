@@ -41,13 +41,15 @@ let profile_of_string s =
         if List.length args != 2 then (invalid_arg err_msg)
         else (
           let ratio = CCInt.of_string (List.nth args 0) in
-          let var_mul = Pervasives.float_of_string_opt (List.nth args 1) in
-          if CCOpt.is_none ratio || CCOpt.is_none var_mul then (
+          let var_mul =
+            try float_of_string (List.nth args 1)
+            with _ -> invalid_arg err_msg
+          in
+          if CCOpt.is_none ratio then (
             invalid_arg err_msg;
-          )
-          else (
+          ) else (
             cr_var_ratio := CCOpt.get_exn ratio;
-            cr_var_mul := CCOpt.get_exn var_mul;
+            cr_var_mul := var_mul;
             ClauseQueue_intf.P_conj_rel_var
           )
         )
