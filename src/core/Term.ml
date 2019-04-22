@@ -90,9 +90,7 @@ module Classic = struct
 end
 
 (** {2 Containers} *)
-module IntMap = Map.Make(struct type t = int
-                                let compare : int -> int -> int = Pervasives.compare
-                         end)
+module IntMap = Util.Int_map
 
 module Tbl = T.Tbl
 module Set = T.Set
