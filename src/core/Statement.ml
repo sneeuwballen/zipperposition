@@ -9,8 +9,7 @@ module OptionSet = Set.Make(
       type t = int option
    end)
 
-module IdMap = Map.Make(struct type t = ID.t let compare = compare end)
-
+module IdMap = ID.Map
 module US = Unif_subst
 
 (** A datatype declaration *)
