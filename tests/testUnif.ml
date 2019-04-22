@@ -218,19 +218,19 @@ end = struct
 
   let set_with_ty ty = function
     | TUnif r -> TUnif {r with with_ty=Some ty}
-    | TMatch r -> assert false
+    | TMatch _ -> assert false
 
   let set_unif_types b = function
     | TUnif r -> TUnif {r with unif_types=b}
-    | TMatch r -> assert false
+    | TMatch _ -> assert false
 
   let is_negated = function
     | TUnif {negated; _} -> negated
     | TMatch {negated; _} -> negated
 
   let op = function
-    | TUnif {negated; _} -> Unif
-    | TMatch {negated; _} -> Match
+    | TUnif _ -> Unif
+    | TMatch _ -> Match
 
   let pp out = function
     | TUnif {t1; t2; with_ty=None; _} -> Format.fprintf out "Unif (%s, %s)" t1 t2
