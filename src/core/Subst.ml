@@ -219,8 +219,8 @@ let to_string = CCFormat.to_string pp
 
 (** {2 Applying a substitution} *)
 
-let apply_aux ~sv subst ~f_rename t =
-  let rec aux  t sc_t depth =
+let apply_aux ~sv subst ~f_rename t sc =
+  let rec aux t sc_t depth =
     match T.ty t with
       | T.NoType ->
         assert(T.equal T.tType t);
@@ -281,7 +281,7 @@ let apply_aux ~sv subst ~f_rename t =
     | t1::t2::l' ->
       aux t1 sc depth :: aux t2 sc depth :: aux_list l' sc depth
   in
-  aux t sv
+  aux t sc sv
 
 (* Apply substitution to a term and rename variables not bound by [subst]*)
 let apply ?(shift_vars=(-1)) renaming subst (t,sc) =
