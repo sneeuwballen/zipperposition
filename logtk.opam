@@ -18,7 +18,7 @@ depends: [
   "menhir" {build}
   "dune" { build }
   "alcotest" {with-test}
-  "qcheck" {with-test & >= "0.9"}
+  "qcheck-core" {with-test & >= "0.9"}
   "ocaml" {>= "4.03"}
 ]
 depopts: [
