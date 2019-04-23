@@ -34,7 +34,7 @@ let rec gfpf ?(depth=0) pos t =
   | [] -> gfpf_root ~depth body
   | i::is ->
       let hd, args = T.as_app body in
-      if T.is_var hd then B
+      if T.is_var hd then (if CCList.is_empty args then B else Ignore)
       else (
         if List.length args >= i then (
           gfpf ~depth:(depth + (List.length pref_vars)) is (List.nth args @@  i-1 )
@@ -47,13 +47,13 @@ let rec gfpf ?(depth=0) pos t =
 and gfpf_root ~depth t =
   match T.view t with 
   | T.AppBuiltin(_, _) -> Ignore
-  | T.DB i -> if (i < depth) then DB i else B
+  | T.DB i -> if (i < depth) then DB i else Ignore
   | T.Var _ -> A
   | T.Const c -> S c 
-  | T.App (hd, _) -> (match T.view hd with
-                     T.Var _ -> B
+  | T.App (hd, args) -> (match T.view hd with
+                     T.Var _ -> assert (not @@ CCList.is_empty args); Ignore 
                      | T.Const s -> S s
-                     | T.DB i    -> if (i < depth) then DB i else B
+                     | T.DB i    -> if (i < depth) then DB i else Ignore
                      | _ -> assert false)
   | T.Fun (_, _) -> assert false 
 

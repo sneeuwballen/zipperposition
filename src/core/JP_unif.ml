@@ -252,7 +252,13 @@ let iterate ~scope ~counter u v l =
         let prefix_types, return_type = Type.open_fun (HVar.ty v) in
         prefix_types 
         |> List.mapi
-          (fun i type_ul -> Some (v, prefix_types, return_type, i, type_ul))
+          (fun i type_ul ->
+            if Type.is_fun type_ul || Type.is_var type_ul
+            then 
+              Some (v, prefix_types, return_type, i, type_ul)
+            else 
+              None
+          ) 
         |> CCList.filter_map (fun x -> x)
         |> OSeq.of_list
       )
@@ -265,17 +271,14 @@ let iterate ~scope ~counter u v l =
     types_w_seq
     |> OSeq.flat_map 
       (fun types_w -> 
-        (* Taking all the prefix variables *)
-        OSeq.append 
-          (positions
-          |> OSeq.map 
-              (fun (v,prefix_types, return_type, i, type_ul) -> 
-                Some (US.FO.singleton (v, scope) (iterate_one ~counter types_w prefix_types return_type i type_ul, scope))))
-          (* + expanding all polymorphic variables into arrow types *)
-          (positions
-          |> OSeq.map 
-              (fun (v,prefix_types, return_type, i, type_ul) -> 
-                match Type.view type_ul with
+        positions
+        |> OSeq.map
+          (fun (v, prefix_types, return_type, i, type_ul) -> 
+            if Type.is_fun type_ul 
+            then Some (US.FO.singleton (v, scope) (iterate_one ~counter types_w prefix_types return_type i type_ul, scope))
+            else 
+              (* To get a complete polymorphic algorithm, we need to consider the case that a type variable could be instantiated as a function. *)
+              match Type.view type_ul with
                 | Type.Var alpha -> 
                   let beta = (H.fresh_cnt ~counter ~ty:Type.tType ()) in
                   let gamma = (H.fresh_cnt ~counter ~ty:Type.tType ()) in
@@ -285,9 +288,11 @@ let iterate ~scope ~counter u v l =
                   let prefix_types' = prefix_types |> CCList.map (fun ty -> S.apply_ty ty_subst (ty, scope)) in
                   let return_type' = S.apply_ty ty_subst (return_type, scope) in
                   Some (US.FO.bind ty_subst (v', scope) (iterate_one ~counter types_w prefix_types' return_type' i alpha', scope))
-                | _ -> None)))
+                | _ -> None
+          )
         (* Append some "None"s to delay the substitutions containing long w tuples *)
         |> (fun seq -> OSeq.append seq (OSeq.take 50 (OSeq.repeat None)))
+      )
   
 (* TODO: use OSeq directly? *)
 
@@ -302,10 +307,6 @@ let nfapply s u = Lambda.snf (S.apply s u)
 let find_disagreement s t = 
   (* TODO: preferably one that is not below a variable (to get preunification if possible) *)
   let rec find_disagreement_l ?(applied_var = None) ?(argindex=0) ss tt = 
-    (* if (List.length ss != List.length tt) then (
-      Format.printf("%a <> %a") T.pp s T.pp t;
-      assert false;
-    ); *)
     match ss, tt with
       | [], [] -> OSeq.empty
       | s' :: ss', t' :: tt' -> 
@@ -403,8 +404,8 @@ let unify ~scope ~counter t0 s0 =
               let t_subst = nfapply subst (t, scope) in
               let s_subst = nfapply subst (s, scope) in
               Util.debugf 1 "@[sigma(s): %a @] \n  @[sigma(t): %a @]" (fun k-> k T.pp s_subst T.pp t_subst);
-              let unifiers = if (*Lambda.is_lambda_pattern t_subst && 
-                                Lambda.is_lambda_pattern s_subst*) false then
+              let unifiers = if Lambda.is_lambda_pattern t_subst && 
+                                Lambda.is_lambda_pattern s_subst then
                              OSeq.return (unif_simple ~scope t_subst s_subst)  else
                              unify_terms t_subst s_subst ~rules:(rules @ [rulename]) in
               unifiers 
@@ -425,7 +426,7 @@ let unify ~scope ~counter t0 s0 =
       let t' = nfapply type_unifier (t0, scope) in
       let s' = nfapply type_unifier (s0, scope) in
       (* ... then terms. *)
-      let term_unifiers = if (*Lambda.is_lambda_pattern t' && Lambda.is_lambda_pattern s'*) false then
+      let term_unifiers = if Lambda.is_lambda_pattern t' && Lambda.is_lambda_pattern s' then
                           (Util.debugf 1 "Doing pattern unif %a = %a" (fun k -> k T.pp t0 T.pp s0);
                           OSeq.return (unif_simple ~scope t' s'))
                           else  (Util.debugf 1 "Doing JP unif %a = %a" (fun k -> k T.pp t0 T.pp s0); 

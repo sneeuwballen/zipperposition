@@ -411,7 +411,7 @@ let suite_unif1 : unit Alcotest.test_case list =
       (*( "(f_ho (X a))" =?=> "(f_ho (fun (x:term). f_ho (fun (y:term). g (Y y))))" ), [
         Action.eq "X" 0 "fun (z:term). fun (x:term). f_ho (fun (y:term). g (Y y))" 1;
       ],["X","term->term->term"];*)
-      ( "F a" =?=> "fun (x : term). f_ho2 (fun (y:term). y) (fun (y:term). y)") |> Task.add_var_type "F" "term -> term -> term"
+      (* ( "F a" =?=> "fun (x : term). f_ho2 (fun (y:term). y) (fun (y:term). y)") |> Task.add_var_type "F" "term -> term -> term" *)
     ]
 
 let jp_check_count t u count : unit Alcotest.test_case =
@@ -688,7 +688,7 @@ let suite_pv_unif : unit Alcotest.test_case list =
 
       "fun (x:term->term) (y:term). X x" =?= 
       "fun (x:term->term) (y:term). f (f_ho x) (Y y) "
-      >>> Action.count 1;
+      >>> Action.count 2;
 
 
       "X" =?= "Y Z" >-> "term"
@@ -783,7 +783,7 @@ let suite_pv_unif : unit Alcotest.test_case list =
       |> Task.add_var_type "F" "term -> term -> term"
       |> Task.add_var_type "D" "term"
       |> Task.add_var_type "C" "term"
-      >>> Action.count 2;
+      >>> Action.count 4;
 
       (* ("fun (ms: term->term) (mz:term). M " ^
       "(fun (s:term->term) (z:term). s (s z)) " ^ 
@@ -799,7 +799,7 @@ let suite_pv_unif : unit Alcotest.test_case list =
          ]; *)
 
       "F a b c" =?= "F a d X" >-> "term"
-      >>> Action.count 1;
+      >>> Action.count 2;
 
       "fun (x:term) (y:term). X x b" <?> "fun (x:term) (y:term). f (g y) b";
 
@@ -1099,8 +1099,8 @@ let check_ho_unify_gives_unifiers =
         (fun (_,us,_,_) ->
            let subst = Unif_subst.subst us in
            let renaming = Subst.Renaming.create() in
-           let u1 = Subst.FO.apply renaming subst (t1,0) |> Lambda.snf |> Lambda.eta_reduce in
-           let u2 = Subst.FO.apply renaming subst (t2,0) |> Lambda.snf |> Lambda.eta_reduce in
+           let u1 = Subst.FO.apply ~shift_vars:0 renaming subst (t1,0) |> Lambda.snf |> Lambda.eta_reduce in
+           let u2 = Subst.FO.apply ~shift_vars:0 renaming subst (t2,0) |> Lambda.snf |> Lambda.eta_reduce in
            if not (T.equal u1 u2) then (
              QCheck.Test.fail_reportf
                "(@[<hv2>bad solution@ t1'=`%a`@ t2'=`%a`@ :subst %a@])"
@@ -1127,5 +1127,7 @@ let props =
     check_matching;
     check_matching_variant;
     check_matching_variant_same_scope;
-    check_ho_unify_gives_unifiers;
+    (* 
+    REMOVED BECAUSE IT IS NOT USED OTHERWISE!
+    check_ho_unify_gives_unifiers; *)
   ]
