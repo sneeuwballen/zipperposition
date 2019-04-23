@@ -557,8 +557,11 @@ let suite_jp_unif : unit Alcotest.test_case list =
 
   CCList.flat_map mk_tests
     [ 
+      (* 
+        Because of the iteration rule, which was not complete before,
+        now we have infinitely many unifiers!
       "X a" =?= "Y b" >-> "term"
-      >>> Action.count 17;
+      >>> Action.count 17; *)
 
       "X a" <?> "g (X a)" >-> "term";
 
@@ -601,18 +604,7 @@ let suite_jp_unif : unit Alcotest.test_case list =
       >>> Action.eqs [
          "X", "fun (x : term) (y : term). f y y ", None;
          "Y", "b", None;
-      ]
-      >>> Action.count 22;
-
-      "F b (g D)" =?= "f (g a) C"
-      |> Task.add_var_type "F" "term -> term -> term"
-      |> Task.add_var_type "D" "term"
-      |> Task.add_var_type "C" "term"
-      >>> Action.count 38;
-
-      "F a b c" =?= "F a d X" >-> "term"
-      >>> Action.count 2;
-
+      ];
 
       (* Polymorphism *)
 

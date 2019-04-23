@@ -334,7 +334,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           Term.Seq.subterms info.u_p |> Sequence.filter Term.is_var |> Term.Set.of_seq)
         else Term.Set.empty in
       let t' = S.FO.apply ~shift_vars renaming subst (info.t, sc_a) in
-      if info.sup_kind = SupEXT then
+      if info.sup_kind = SupEXT && T.Set.cardinal supext_vars = 1 then
        Util.debugf ~section 1
       "@[<2>sup, kind %s(%d)@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
        (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
@@ -351,8 +351,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       
       if(info.sup_kind = SupEXT && 
          T.Set.exists (fun v -> 
-          let t = fst @@ Subst.FO.deref subst (v,sc_p) in
-          not @@ T.DB.is_closed t) supext_vars) then
+          let t = Subst.FO.apply renaming subst (v,sc_p) in
+          List.length (T.DB.unbound t) != 0) supext_vars) then
         raise @@ ExitSuperposition("SupEXT -- an into free variable sneaks in bound variable");
   
       begin match info.passive_lit, info.passive_pos with
@@ -424,6 +424,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           Lit.map (fun t ->
             Term.Map.fold 
               (fun sk sk_v acc -> 
+                (* For polymorphism -- will apply type substitution.  *)
                 let sk = S.FO.apply renaming subst (sk, sc_p) in
                 Term.replace ~old:sk ~by:sk_v acc) 
               sk_with_vars t ) lit) new_lits in
@@ -441,7 +442,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         + (if T.is_var s' then 2 else 0) (* superposition from var = bad *)
       in
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
-      Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
+      if info.sup_kind = SupEXT && T.Set.cardinal supext_vars = 1 then 
+        Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       assert(List.for_all (Lit.for_all Term.DB.is_closed) new_lits);
       (* C.check_types new_clause; *)
       Some new_clause
