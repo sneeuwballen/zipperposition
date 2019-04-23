@@ -34,7 +34,7 @@ let rec gfpf ?(depth=0) pos t =
   | [] -> gfpf_root ~depth body
   | i::is ->
       let hd, args = T.as_app body in
-      if T.is_var hd then (if CCList.is_empty args then B else Ignore)
+      if T.is_var hd then B
       else (
         if List.length args >= i then (
           gfpf ~depth:(depth + (List.length pref_vars)) is (List.nth args @@  i-1 )
@@ -50,11 +50,11 @@ and gfpf_root ~depth t =
   | T.DB i -> if (i < depth) then DB i else Ignore
   | T.Var _ -> A
   | T.Const c -> S c 
-  | T.App (hd, args) -> (match T.view hd with
-                     T.Var _ -> assert (not @@ CCList.is_empty args); Ignore 
-                     | T.Const s -> S s
-                     | T.DB i    -> if (i < depth) then DB i else Ignore
-                     | _ -> assert false)
+  | T.App (hd,_) -> (match T.view hd with
+                         T.Var _ -> A 
+                         | T.Const s -> S s
+                         | T.DB i    -> if (i < depth) then DB i else Ignore
+                         | _ -> assert false)
   | T.Fun (_, _) -> assert false 
 
 (* TODO more efficient way to compute a vector of features: if the fingerprint

@@ -252,14 +252,9 @@ let iterate ~scope ~counter u v l =
         let prefix_types, return_type = Type.open_fun (HVar.ty v) in
         prefix_types 
         |> List.mapi
-          (fun i type_ul ->
-            if Type.is_fun type_ul || Type.is_var type_ul
-            then 
-              Some (v, prefix_types, return_type, i, type_ul)
-            else 
-              None
-          ) 
-        |> CCList.filter_map (fun x -> x)
+            (fun i type_ul -> (v, prefix_types, return_type, i, type_ul))
+        |> List.fast_sort (fun (_,_,_,_,x) (_,_,_,_,y) -> 
+            List.length (Type.expected_args y) - List.length (Type.expected_args x))
         |> OSeq.of_list
       )
   in
@@ -272,23 +267,30 @@ let iterate ~scope ~counter u v l =
     |> OSeq.flat_map 
       (fun types_w -> 
         positions
-        |> OSeq.map
+        |> OSeq.flat_map
           (fun (v, prefix_types, return_type, i, type_ul) -> 
             if Type.is_fun type_ul 
-            then Some (US.FO.singleton (v, scope) (iterate_one ~counter types_w prefix_types return_type i type_ul, scope))
-            else 
-              (* To get a complete polymorphic algorithm, we need to consider the case that a type variable could be instantiated as a function. *)
-              match Type.view type_ul with
-                | Type.Var alpha -> 
-                  let beta = (H.fresh_cnt ~counter ~ty:Type.tType ()) in
-                  let gamma = (H.fresh_cnt ~counter ~ty:Type.tType ()) in
-                  let alpha' = (Type.arrow [Type.var beta] (Type.var gamma)) in
-                  let ty_subst = US.FO.singleton (alpha, scope) (Term.of_ty alpha', scope) in
-                  let v' = HVar.cast ~ty:(S.apply_ty ty_subst (HVar.ty v, scope)) v in
-                  let prefix_types' = prefix_types |> CCList.map (fun ty -> S.apply_ty ty_subst (ty, scope)) in
-                  let return_type' = S.apply_ty ty_subst (return_type, scope) in
-                  Some (US.FO.bind ty_subst (v', scope) (iterate_one ~counter types_w prefix_types' return_type' i alpha', scope))
-                | _ -> None
+            then OSeq.return @@
+                  Some (US.FO.singleton (v, scope) (iterate_one ~counter types_w prefix_types return_type i type_ul, scope))
+            else
+              OSeq.append
+                (if CCList.is_empty types_w then 
+                    OSeq.return @@
+                      Some (US.FO.singleton (v, scope) (iterate_one ~counter types_w prefix_types return_type i type_ul, scope))
+                  else OSeq.return None ) 
+                (* To get a complete polymorphic algorithm, we need to consider the case that a type variable could be instantiated as a function. *)              
+                (match Type.view type_ul with
+                  | Type.Var alpha -> 
+                    let beta = (H.fresh_cnt ~counter ~ty:Type.tType ()) in
+                    let gamma = (H.fresh_cnt ~counter ~ty:Type.tType ()) in
+                    let alpha' = (Type.arrow [Type.var beta] (Type.var gamma)) in
+                    let ty_subst = US.FO.singleton (alpha, scope) (Term.of_ty alpha', scope) in
+                    let v' = HVar.cast ~ty:(S.apply_ty ty_subst (HVar.ty v, scope)) v in
+                    let prefix_types' = prefix_types |> CCList.map (fun ty -> S.apply_ty ty_subst (ty, scope)) in
+                    let return_type' = S.apply_ty ty_subst (return_type, scope) in
+                    OSeq.return @@
+                      Some (US.FO.bind ty_subst (v', scope) (iterate_one ~counter types_w prefix_types' return_type' i alpha', scope))
+                  | _ -> OSeq.return None)
           )
         (* Append some "None"s to delay the substitutions containing long w tuples *)
         |> (fun seq -> OSeq.append seq (OSeq.take 50 (OSeq.repeat None)))
@@ -373,9 +375,9 @@ let unify ~scope ~counter t0 s0 =
             then (
               let add_some f u v l = f ~scope ~counter u v l |> OSeq.map (fun s -> Some s) in
               [add_some project,"proj"; 
+               add_some eliminate,"elim";
                add_some imitate,"imit"; 
                add_some identify,"id"; 
-               add_some eliminate,"elim";
                (if !_huet_style 
                then project_huet_style 
                else iterate)

@@ -187,9 +187,6 @@ module TestTerm(I : TermIndex) = struct
               let res = List.exists
                         (fun (_,i'') -> i' = i'')
                         retrieved in
-              if not res then (
-                CCFormat.eprintf "Failed on: %a =?>= %a\n" T.pp t T.pp t';
-              );
               res
             with Unif.Fail -> true)
           l)

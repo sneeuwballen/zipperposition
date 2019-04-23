@@ -311,7 +311,7 @@ module Inner = struct
 
   (* distinct ground terms *)
   let distinct_ground_l l : bool =
-    List.for_all (fun t -> T.is_ground t && CCList.is_empty @@ T.DB.unbound t) l 
+    List.for_all (fun t -> T.is_ground t (*&& CCList.is_empty @@ T.DB.unbound t*)) l 
       && distinct_term_l l
 
   (* given [l], a list of distinct (ground) terms, and [rhs],

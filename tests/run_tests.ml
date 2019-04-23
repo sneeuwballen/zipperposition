@@ -4,15 +4,15 @@
 let props =
   List.flatten
     [ 
-      (* TestOrdinal.props;
+      TestOrdinal.props;
       TestTerm.props;
       TestUnif.props;
       TestCNF.props;
-      TestCongruence.props; *)
+      TestCongruence.props;
       TestIndex.props;
-      (* TestType.props;
+      TestType.props;
       TestOrdering.props;
-      TestMultiset.props; *)
+      TestMultiset.props;
     ]
 
 let props = "qcheck", List.map QCheck_alcotest.to_alcotest props
