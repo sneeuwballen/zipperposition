@@ -3,7 +3,8 @@
 
 let props =
   List.flatten
-    [ TestOrdinal.props;
+    [ 
+      TestOrdinal.props;
       TestTerm.props;
       TestUnif.props;
       TestCNF.props;

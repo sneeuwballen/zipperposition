@@ -47,14 +47,14 @@ let rec gfpf ?(depth=0) pos t =
 and gfpf_root ~depth t =
   match T.view t with 
   | T.AppBuiltin(_, _) -> Ignore
-  | T.DB i -> if (i < depth) then DB i else B
+  | T.DB i -> if (i < depth) then DB i else Ignore
   | T.Var _ -> A
   | T.Const c -> S c 
-  | T.App (hd, _) -> (match T.view hd with
-                     T.Var _ -> B
-                     | T.Const s -> S s
-                     | T.DB i    -> if (i < depth) then DB i else B
-                     | _ -> assert false)
+  | T.App (hd,_) -> (match T.view hd with
+                         T.Var _ -> A 
+                         | T.Const s -> S s
+                         | T.DB i    -> if (i < depth) then DB i else Ignore
+                         | _ -> assert false)
   | T.Fun (_, _) -> assert false 
 
 (* TODO more efficient way to compute a vector of features: if the fingerprint

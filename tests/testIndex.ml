@@ -184,9 +184,10 @@ module TestTerm(I : TermIndex) = struct
           (fun (t',i') ->
             try
               let _ = check (t,0) (t',1) in
-              List.exists
-                (fun (_,i'') -> i' = i'')
-                retrieved
+              let res = List.exists
+                        (fun (_,i'') -> i' = i'')
+                        retrieved in
+              res
             with Unif.Fail -> true)
           l)
       l
@@ -229,18 +230,18 @@ module TestTerm(I : TermIndex) = struct
 
   let check_retrieve_all_unify =
     let prop = _check_all_satisfying_are_retrieved I.retrieve_unifiables Unif.FO.unify_syn in
-    let name = CCFormat.sprintf "index(%s)_retrieve_imply_unify" I.name in
+    let name = CCFormat.sprintf "index(%s)_retrieve_imply_all_unify" I.name in
     QCheck.Test.make ~name ~count:_count ~max_gen:_limit (arb arb_low_ arb_high_) prop
 
   let check_retrieve_all_specializations =
     let prop = _check_all_satisfying_are_retrieved I.retrieve_specializations
       (fun t1 t2 -> Unif.FO.matching ~pattern:t1 t2) in
-    let name = CCFormat.sprintf "index(%s)_retrieve_imply_specializations" I.name in
+    let name = CCFormat.sprintf "index(%s)_retrieve_imply_all_specializations" I.name in
     QCheck.Test.make ~name ~count:_count ~max_gen:_limit (arb arb_low_ arb_high_) prop
 
   let check_retrieve_all_generalizations =
     let prop = _check_all_satisfying_are_retrieved I.retrieve_generalizations _match_flip in
-    let name = CCFormat.sprintf "index(%s)_retrieve_imply_generalizations" I.name in
+    let name = CCFormat.sprintf "index(%s)_retrieve_imply_all_generalizations" I.name in
     QCheck.Test.make ~name ~count:_count ~max_gen:_limit (arb arb_low_ arb_high_) prop
 
   (* check the matching of generalization *)
