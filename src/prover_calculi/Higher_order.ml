@@ -41,6 +41,7 @@ let _imit_first = ref false
 let _cons_ff = ref true
 let _compose_subs = ref false
 let _var_solve = ref false
+let _neg_cong_fun = ref false
 let _unif_max_depth = ref 11
 
 module type S = sig
@@ -776,6 +777,10 @@ module Make(E : Env.S) : S with module Env = E = struct
         PragHOUnif.enable_solve_var ();
       );
 
+      if(!_neg_cong_fun) then (
+        Env.add_unary_inf "neg_cong_fun" neg_cong_fun 
+      );
+
       PragHOUnif.set_max_depth !_unif_max_depth ();
 
       if Env.flex_get k_enable_ho_unif then (
@@ -888,6 +893,7 @@ let () =
       "--force-ho", Arg.Set force_enabled_, " enable HO reasoning even if the problem is first-order";
       "--no-ho", Arg.Clear enabled_, " disable HO reasoning";
       "--ho-unif", Arg.Set enable_unif_, " enable full HO unification";
+      "--ho-neg-cong-fun", Arg.Set _neg_cong_fun, "enable NegCongFun";
       "--no-ho-unif", Arg.Clear enable_unif_, " disable full HO unification";
       "--no-ho-elim-pred-var", Arg.Clear _elim_pred_var, " disable predicate variable elimination";
       "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";
@@ -917,6 +923,7 @@ let () =
     eta_ := `Expand;
     prim_mode_ := `None;
     _elim_pred_var := false;
+    _neg_cong_fun := false;
     enable_unif_ := false
   );
   Params.add_to_mode "fo-complete-basic" (fun () ->
