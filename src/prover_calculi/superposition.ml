@@ -68,7 +68,7 @@ let _sup_at_vars = ref false
 let _sup_at_var_headed = ref true
 let _sup_in_var_args = ref true
 let _sup_under_lambdas = ref true
-let _demod_under_lambdas = ref true
+let _lambda_demod_ext = ref false
 let _demod_in_var_args = ref true
 let _dot_demod_into = ref None
 let _complete_ho_unification = ref false
@@ -194,7 +194,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* terms that can be demodulated: all subterms (but vars) *)
     _idx_back_demod :=
       (* TODO: allow demod under lambdas under certain conditions (DemodExt) *)
-      Lits.fold_terms ~vars:false ~var_args:!_demod_in_var_args ~fun_bodies:!_demod_under_lambdas  ~ty_args:false ~ord ~subterms:true ~which:`All
+      Lits.fold_terms ~vars:false ~var_args:(!_demod_in_var_args) ~fun_bodies:!_lambda_demod_ext  
+                      ~ty_args:false ~ord ~subterms:true ~which:`All
         ~eligible:C.Eligible.always (C.lits c)
       |> Iter.fold
         (fun tree (t, pos) ->
@@ -1145,9 +1146,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           else reduce_at_root ~restrict t k
         | T.Fun (ty_arg, body) ->
           (* reduce under lambdas *)
-          Util.debugf ~section 10 "[Trying to rewrite under lambda %B ]"
-          (fun k-> k !_demod_under_lambdas);
-          if !_demod_under_lambdas
+          if !_lambda_demod_ext
           then
             normal_form ~restrict:lazy_false body
               (fun body' ->
@@ -2134,8 +2133,8 @@ let () =
     ; "--no-sup-under-lambdas"
     , Arg.Clear _sup_under_lambdas
     , " disable superposition in bodies of lambda-expressions"
-    ; "--demod-under-lambdas"
-    , Arg.Set _demod_under_lambdas
+    ; "--lambda-demod-ext"
+    , Arg.Set _lambda_demod_ext
     , " enable demodulation in bodies of lambda-expressions"
     ; "--demod-in-var-args"
     , Arg.Set _demod_in_var_args
@@ -2169,7 +2168,7 @@ let () =
       _sup_at_vars := true;
       _sup_in_var_args := false;
       _sup_under_lambdas := false;
-      _demod_under_lambdas := false;
+      _lambda_demod_ext := false;
       _demod_in_var_args := false;
       _complete_ho_unification := true;
       _ord_in_normal_form := true;
