@@ -554,7 +554,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       ith argument is syntactically same as the jth argument, we can
       systematically remove the ith argument (and repair F's type accordingly).
   *)
-  let remove_var_args c =
+  let prune_arg c =
     let status : (fixed_arg_status * dupl_arg_status) list VTbl.t = VTbl.create 8 in
     C.lits c
     |> Literals.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord:Ordering.none ~subterms:true ~eligible:(fun _ _ -> true)
@@ -654,11 +654,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       let new_lits = Lits.apply_subst renaming subst (C.lits c, 0) in
       let proof =
           Proof.Step.simp
-            ~rule:(Proof.Rule.mk "remove_var_args")
+            ~rule:(Proof.Rule.mk "prune_arg")
             [C.proof_parent_subst renaming (c,0) subst] in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
       Util.debugf ~section 3
-          "@[<>@[%a@]@ @[<2>remove_var_args into@ @[%a@]@]@ with @[%a@]@]"
+          "@[<>@[%a@]@ @[<2>prune_arg into@ @[%a@]@]@ with @[%a@]@]"
           (fun k->k C.pp c C.pp c' Subst.pp subst);
       SimplM.return_new c'
     )
@@ -688,7 +688,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
       if !_var_arg_remove then
-        Env.add_unary_simplify remove_var_args;
+        Env.add_unary_simplify prune_arg;
 
       let ho_norm  =
       begin match Env.flex_get k_eta with

@@ -1152,7 +1152,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             normal_form ~restrict:lazy_false body
               (fun body' ->
                 let u = if T.equal body body' then t else T.fun_ ty_arg body' in
-                k u)
+                reduce_at_root ~restrict u k)
           else reduce_at_root ~restrict t k (* TODO: DemodExt *)
         | T.Var _ | T.DB _ -> k t
         | T.AppBuiltin (b, l) ->
