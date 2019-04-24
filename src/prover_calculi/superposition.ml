@@ -53,8 +53,8 @@ let prof_subsumption_set = Util.mk_profiler "sup.forward_subsumption"
 let prof_subsumption_in_set = Util.mk_profiler "sup.backward_subsumption"
 let prof_infer_active = Util.mk_profiler "sup.infer_active"
 let prof_infer_passive = Util.mk_profiler "sup.infer_passive"
-let prof_infer_supav_active = Util.mk_profiler "sup.infer_supav_active"
-let prof_infer_supav_passive = Util.mk_profiler "sup.infer_supav_passive"
+let prof_infer_fluidsup_active = Util.mk_profiler "sup.infer_fluidsup_active"
+let prof_infer_fluidsup_passive = Util.mk_profiler "sup.infer_fluidsup_passive"
 let prof_infer_equality_resolution = Util.mk_profiler "sup.infer_equality_resolution"
 let prof_infer_equality_factoring = Util.mk_profiler "sup.infer_equality_factoring"
 
@@ -74,9 +74,9 @@ let _dot_demod_into = ref None
 let _complete_ho_unification = ref false
 let _switch_stream_extraction = ref false
 let _ord_in_normal_form = ref false
-let _supav_penalty = ref 0
-let _supav = ref true
-let _supext = ref false
+let _fluidsup_penalty = ref 0
+let _fluidsup = ref true
+let _lambdasup = ref false
 let _unif_alg = ref JP_unif.unify_scoped
 
 module Make(Env : Env.S) : S with module Env = Env = struct
@@ -103,8 +103,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   (** {6 Index Management} *)
 
   let _idx_sup_into = ref (TermIndex.empty ())
-  let _idx_supext_into = ref (TermIndex.empty ())
-  let _idx_supav_into = ref (TermIndex.empty ())
+  let _idx_lambdasup_into = ref (TermIndex.empty ())
+  let _idx_fluidsup_into = ref (TermIndex.empty ())
   let _idx_sup_from = ref (TermIndex.empty ())
   let _idx_back_demod = ref (TermIndex.empty ())
   let _idx_fv = ref (SubsumIdx.empty ())
@@ -144,9 +144,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            f tree t with_pos)
         !_idx_sup_into;
 
-    (* index subterms that can be rewritten by SupAV *)
-    if !_supav then
-      _idx_supav_into :=
+    (* index subterms that can be rewritten by FluidSup *)
+    if !_fluidsup then
+      _idx_fluidsup_into :=
         Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false ~ord ~which:`Max ~subterms:true
           ~eligible:(C.Eligible.res c) (C.lits c)
         |> Iter.filter (fun (t, _) -> T.is_var (T.head_term t)) (* Only applied variables *)
@@ -154,13 +154,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           (fun tree (t, pos) ->
             let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
             f tree t with_pos)
-          !_idx_supav_into;
+          !_idx_fluidsup_into;
 
-    (* index subterms that can be rewritten by SupEXT --
+    (* index subterms that can be rewritten by LambdaSup --
        the ones that can rewrite those are actually the ones
        already indexed by _idx_sup_from*)
-    if !_supext then
-      _idx_supext_into :=
+    if !_lambdasup then
+      _idx_lambdasup_into :=
         Lits.fold_terms ~vars:!_sup_at_vars ~var_args:!_sup_in_var_args
                         ~fun_bodies:true ~ty_args:false ~ord
                         ~which:`Max ~subterms:true
@@ -179,7 +179,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           (fun tree (t, pos) ->
             let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
             f tree t with_pos)
-          !_idx_supext_into;
+          !_idx_lambdasup_into;
 
     (* index terms that can rewrite into other clauses *)
     _idx_sup_from :=
@@ -251,13 +251,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   type supkind =
    | Classic
-   | SupAV
-   | SupEXT
+   | FluidSup
+   | LambdaSup
 
   let kind_to_str = function
    | Classic -> "sup"
-   | SupAV -> "supAV"
-   | SupEXT -> "supEXT"
+   | FluidSup -> "FluidSup"
+   | LambdaSup -> "supEXT"
 
   (* all the information needed for a superposition inference *)
   module SupInfo = struct
@@ -319,41 +319,41 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let sc_a = info.scope_active in
     let sc_p = info.scope_passive in
     assert (InnerTerm.DB.closed (info.s:>InnerTerm.t));
-    assert (info.sup_kind == SupEXT || InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
+    assert (info.sup_kind == LambdaSup || InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
     assert (not(T.is_var info.u_p) || T.is_ho_var info.u_p);
-    assert (!_sup_at_var_headed || info.sup_kind = SupAV || not (T.is_var (T.head_term info.u_p)));
+    assert (!_sup_at_var_headed || info.sup_kind = FluidSup || not (T.is_var (T.head_term info.u_p)));
     let active_idx = Lits.Pos.idx info.active_pos in
-    let shift_vars = if info.sup_kind = SupEXT then 0 else -1 in
+    let shift_vars = if info.sup_kind = LambdaSup then 0 else -1 in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
     try
       let renaming = S.Renaming.create () in
       let us = info.subst in
       let subst = US.subst us in
-      let supext_vars =
-        if (info.sup_kind = SupEXT) then (
+      let lambdasup_vars =
+        if (info.sup_kind = LambdaSup) then (
           Term.Seq.subterms info.u_p |> Iter.filter Term.is_var |> Term.Set.of_seq)
         else Term.Set.empty in
       let t' = S.FO.apply ~shift_vars renaming subst (info.t, sc_a) in
-      if info.sup_kind = SupEXT && T.Set.cardinal supext_vars = 1 then
+      if info.sup_kind = LambdaSup && T.Set.cardinal lambdasup_vars = 1 then
        Util.debugf ~section 1
       "@[<2>sup, kind %s(%d)@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
        (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
-      (fun k->k (kind_to_str info.sup_kind) (Term.Set.cardinal supext_vars) C.pp info.active sc_a T.pp info.s T.pp info.t
+      (fun k->k (kind_to_str info.sup_kind) (Term.Set.cardinal lambdasup_vars) C.pp info.active sc_a T.pp info.s T.pp info.t
           T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
           Position.pp info.passive_pos US.pp info.subst);
 
-      if(info.sup_kind = SupEXT &&
+      if(info.sup_kind = LambdaSup &&
          T.Seq.subterms t'
          |> Iter.exists (fun st ->
               List.exists (fun arg -> not @@ T.DB.is_closed arg)
               (T.get_mand_args st))) then
-        raise @@ ExitSuperposition("SupEXT sneaks in bound variables under the skolem");
+        raise @@ ExitSuperposition("LambdaSup sneaks in bound variables under the skolem");
       
-      if(info.sup_kind = SupEXT && 
+      if(info.sup_kind = LambdaSup && 
          T.Set.exists (fun v -> 
           let t = Subst.FO.apply renaming subst (v,sc_p) in
-          List.length (T.DB.unbound t) != 0) supext_vars) then
-        raise @@ ExitSuperposition("SupEXT -- an into free variable sneaks in bound variable");
+          List.length (T.DB.unbound t) != 0) lambdasup_vars) then
+        raise @@ ExitSuperposition("LambdaSup -- an into free variable sneaks in bound variable");
 
       begin match info.passive_lit, info.passive_pos with
         | Lit.Prop (_, true), P.Arg(_, P.Left P.Stop) ->
@@ -370,18 +370,18 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | _ -> ()
       end;
       let subst', new_sk =
-        if info.sup_kind = SupEXT then
+        if info.sup_kind = LambdaSup then
         S.FO.unleak_variables subst else subst, [] in
       let passive_lit' = Lit.apply_subst_no_simp renaming subst' (info.passive_lit, sc_p) in
       let new_trail = C.trail_l [info.active; info.passive] in
       if Env.is_trivial_trail new_trail then raise (ExitSuperposition "trivial trail");
       let s' = S.FO.apply ~shift_vars renaming subst (info.s, sc_a) in
-      if(info.sup_kind = SupEXT &&
+      if(info.sup_kind = LambdaSup &&
          T.Seq.subterms s'
          |> Iter.exists (fun st ->
               List.exists (fun arg -> not @@ T.DB.is_closed arg)
               (T.get_mand_args st))) then
-        raise @@ ExitSuperposition("SupEXT sneaks in bound variables under the skolem");
+        raise @@ ExitSuperposition("LambdaSup sneaks in bound variables under the skolem");
       if (
         O.compare ord s' t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
@@ -413,7 +413,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           Lit.apply_subst_list renaming subst' (lits_p, sc_p)
       in
       (* For some reason type comparison does not work. *)
-      let vars = List.map T.as_var_exn (Term.Set.to_list supext_vars) in
+      let vars = List.map T.as_var_exn (Term.Set.to_list lambdasup_vars) in
       let sk_with_vars =
         List.fold_left (fun acc t ->
             let new_sk_vars = Term.mk_fresh_skolem vars (Term.ty t) in
@@ -442,7 +442,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         + (if T.is_var s' then 2 else 0) (* superposition from var = bad *)
       in
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
-      if info.sup_kind = SupEXT && T.Set.cardinal supext_vars = 1 then 
+      if info.sup_kind = LambdaSup && T.Set.cardinal lambdasup_vars = 1 then 
         Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       assert(List.for_all (Lit.for_all Term.DB.is_closed) new_lits);
       (* C.check_types new_clause; *)
@@ -467,12 +467,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           C.pp info.passive sc_p Lit.pp info.passive_lit
           Position.pp info.passive_pos US.pp info.subst);
     assert (InnerTerm.DB.closed (info.s:>InnerTerm.t));
-    assert (info.sup_kind == SupEXT || InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
+    assert (info.sup_kind == LambdaSup || InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
     assert (not(T.is_var info.u_p) || T.is_ho_var info.u_p);
-    assert (!_sup_at_var_headed || info.sup_kind = SupAV || not (T.is_var (T.head_term info.u_p)));
+    assert (!_sup_at_var_headed || info.sup_kind = FluidSup || not (T.is_var (T.head_term info.u_p)));
     let active_idx = Lits.Pos.idx info.active_pos in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
-    let shift_vars = if info.sup_kind = SupEXT then 0 else -1 in
+    let shift_vars = if info.sup_kind = LambdaSup then 0 else -1 in
     try
       let renaming = S.Renaming.create () in
       let us = info.subst in
@@ -548,7 +548,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     assert (Type.equal (T.ty info.s) (T.ty info.t));
     assert (Unif.Ty.equal ~subst:(US.subst info.subst)
         (T.ty info.s, info.scope_active) (T.ty info.u_p, info.scope_passive));
-    if !_use_simultaneous_sup && info.sup_kind != SupEXT
+    if !_use_simultaneous_sup && info.sup_kind != LambdaSup
     then do_simultaneous_superposition info
     else do_classic_superposition info
 
@@ -632,7 +632,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       ~process_retrieved:(fun do_sup (u_p, with_pos, subst) -> do_sup u_p with_pos subst)
       clause
 
-  let infer_supext_from clause =
+  let infer_lambdasup_from clause =
     (* no literal can be eligible for paramodulation if some are selected.
        This checks if inferences with i-th literal are needed? *)
     let eligible = C.Eligible.param clause in
@@ -642,7 +642,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Lits.fold_eqn ~sign:true ~ord  ~both:true ~eligible (C.lits clause)
     |> Iter.flat_map
       (fun (s, t, _, s_pos) ->
-        let do_supext u_p with_pos subst =
+        let do_lambdasup u_p with_pos subst =
           (* rewrite u_p with s *)
           let passive = with_pos.C.WithPos.clause in
           let passive_pos = with_pos.C.WithPos.pos in
@@ -650,15 +650,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           let info = SupInfo.( {
               s; t; active=clause; active_pos=s_pos; scope_active=0;
               u_p; passive; passive_lit; passive_pos; scope_passive=1;
-              subst; sup_kind=SupEXT
+              subst; sup_kind=LambdaSup
             }) in
-          Util.debugf ~section 10 "[Trying supext from %a into %a with term %a into term %a]"
+          Util.debugf ~section 10 "[Trying lambdasup from %a into %a with term %a into term %a]"
           (fun k -> k C.pp clause C.pp passive T.pp s T.pp u_p);
 
           do_superposition info
         in
-        I.retrieve_unifiables (!_idx_supext_into, 1) (s, 0)
-        |> Iter.filter_map (fun (u_p, with_pos, subst) -> do_supext u_p with_pos subst))
+        I.retrieve_unifiables (!_idx_lambdasup_into, 1) (s, 0)
+        |> Iter.filter_map (fun (u_p, with_pos, subst) -> do_lambdasup u_p with_pos subst))
     |> Iter.to_rev_list
 
   let infer_passive clause =
@@ -667,7 +667,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       ~process_retrieved:(fun do_sup (u_p, with_pos, subst) -> do_sup u_p with_pos subst)
       clause
 
-  let infer_supext_into clause =
+  let infer_lambdasup_into clause =
     (* perform inference on this lit? *)
     let eligible = C.Eligible.(res clause) in
     (* do the inferences in which clause is passive (rewritten),
@@ -699,9 +699,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                 let info = SupInfo.({
                     s; t; active; active_pos=s_pos; scope_active=1; subst;
                     u_p; passive=clause; passive_lit; passive_pos;
-                    scope_passive=0; sup_kind=SupEXT
+                    scope_passive=0; sup_kind=LambdaSup
                   }) in
-                Util.debugf ~section 10 "[Trying supext from %a into %a with term %a into term %a]"
+                Util.debugf ~section 10 "[Trying lambdasup from %a into %a with term %a into term %a]"
                 (fun k -> k C.pp active C.pp clause T.pp s T.pp u_p);
                 do_superposition info
               | _ -> None
@@ -740,11 +740,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       StmQ.add_lst _stmq.q stm_res; []
 
   (* ----------------------------------------------------------------------
-   * SupAV rule (Superposition at applied variables)
+   * FluidSup rule (Superposition at applied variables)
    * ---------------------------------------------------------------------- *)
 
-  let infer_supav_active clause =
-    Util.enter_prof prof_infer_supav_active;
+  let infer_fluidsup_active clause =
+    Util.enter_prof prof_infer_fluidsup_active;
     (* no literal can be eligible for paramodulation if some are selected.
       This checks if inferences with i-th literal are needed? *)
     let eligible = C.Eligible.param clause in
@@ -755,7 +755,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Lits.fold_eqn ~sign:true ~ord ~both:true ~eligible (C.lits clause)
       |> Iter.flat_map
         (fun (s, t, _, s_pos) ->
-          I.fold !_idx_supav_into
+          I.fold !_idx_fluidsup_into
             (fun acc u_p with_pos ->
               assert (T.is_var (T.head_term u_p));
               assert (T.DB.is_closed u_p);
@@ -772,13 +772,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                         let passive_lit, _ = Lits.Pos.lit_at (C.lits passive) passive_pos in
                         let info = SupInfo.({
                             s=hs; t=ht; active=clause; active_pos=s_pos; scope_active=0;
-                            u_p; passive; passive_lit; passive_pos; scope_passive=1; subst; sup_kind=SupAV
+                            u_p; passive; passive_lit; passive_pos; scope_passive=1; subst; sup_kind=FluidSup
                           }) in
                         do_superposition info
                     )
                 )
               in
-              let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) + !_supav_penalty in
+              let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) + !_fluidsup_penalty in
               (* /!\ may differ from the actual penalty (by -2) *)
               Iter.cons (penalty,res) acc
             )
@@ -788,11 +788,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) new_clauses in
       StmQ.add_lst _stmq.q stm_res;
-    Util.exit_prof prof_infer_supav_active;
+    Util.exit_prof prof_infer_fluidsup_active;
     []
 
-  let infer_supav_passive clause =
-    Util.enter_prof prof_infer_supav_passive;
+  let infer_fluidsup_passive clause =
+    Util.enter_prof prof_infer_fluidsup_passive;
     (* perform inference on this lit? *)
     let eligible = C.Eligible.(res clause) in
     (* do the inferences in which clause is passive (rewritten),
@@ -820,14 +820,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                     osubst |> CCOpt.flat_map (fun subst ->
                       let info = SupInfo.({
                           s = hs; t = ht; active; active_pos=s_pos; scope_active=1; subst;
-                          u_p; passive=clause; passive_lit; passive_pos; scope_passive=0; sup_kind=SupAV
+                          u_p; passive=clause; passive_lit; passive_pos; scope_passive=0; sup_kind=FluidSup
                         }) in
                       do_superposition info
                     )
                   )
                 | _ -> assert false
               in
-              let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) + !_supav_penalty in
+              let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) + !_fluidsup_penalty in
               (* /!\ may differ from the actual penalty (by -2) *)
               Iter.cons (penalty,res) acc
             )
@@ -837,7 +837,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) new_clauses in
       StmQ.add_lst _stmq.q stm_res;
-    Util.exit_prof prof_infer_supav_passive;
+    Util.exit_prof prof_infer_fluidsup_passive;
     []
 
 
@@ -2039,13 +2039,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Env.add_binary_inf "superposition_active" infer_active_complete_ho;
       Env.add_unary_inf "equality_factoring" infer_equality_factoring_complete_ho;
       Env.add_unary_inf "equality_resolution" infer_equality_resolution_complete_ho;
-      if !_supav then (
-        Env.add_binary_inf "supav_passive" infer_supav_passive;
-        Env.add_binary_inf "supav_active" infer_supav_active;
+      if !_fluidsup then (
+        Env.add_binary_inf "fluidsup_passive" infer_fluidsup_passive;
+        Env.add_binary_inf "fluidsup_active" infer_fluidsup_active;
       );
-      if !_supext then (
-        Env.add_binary_inf "supext_active(from)" infer_supext_from;
-        Env.add_binary_inf "supext_passive(into)" infer_supext_into;
+      if !_lambdasup then (
+        Env.add_binary_inf "lambdasup_active(from)" infer_lambdasup_from;
+        Env.add_binary_inf "lambdasup_passive(into)" infer_lambdasup_into;
       );
       if !_switch_stream_extraction then
         Env.add_generate "stream_queue_extraction" extract_from_stream_queue_fix_stm
@@ -2149,15 +2149,15 @@ let () =
     ; "--ord-in-normal-form"
     , Arg.Set _ord_in_normal_form
     , " compare intermediate terms in calculus rules in beta-normal-eta-long form"
-    ; "--supav-penalty"
-    , Arg.Int (fun p -> _supav_penalty := p)
-    , " penalty for SupAV inferences"
-    ; "--no-supav"
-    , Arg.Clear _supav
-    , " disable SupAV inferences (only effective when complete higher-order unification is enabled)"
-    ; "--supext"
-    , Arg.Set _supext
-    , " enable SupEXT inferences";
+    ; "--fluidsup-penalty"
+    , Arg.Int (fun p -> _fluidsup_penalty := p)
+    , " penalty for FluidSup inferences"
+    ; "--no-fluidsup"
+    , Arg.Clear _fluidsup
+    , " disable FluidSup inferences (only effective when complete higher-order unification is enabled)"
+    ; "--lambdasup"
+    , Arg.Set _lambdasup
+    , " enable LambdaSup inferences";
       "--ho-unif-level",
       Arg.Symbol (["full"; "pragmatic"], (fun str ->
         _unif_alg := if (String.equal "full" str) then JP_unif.unify_scoped
@@ -2174,7 +2174,7 @@ let () =
       _complete_ho_unification := true;
       _ord_in_normal_form := true;
       _sup_at_var_headed := false;
-      _supext := false
+      _lambdasup := false
     );
     Params.add_to_mode "fo-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
