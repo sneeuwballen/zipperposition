@@ -256,6 +256,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     
 
     let is_eligible = C.Eligible.res c in
+    let free_vars = C.Seq.vars c |> T.VarSet.of_seq |> T.VarSet.to_list in 
     C.lits c
     |> CCArray.mapi (fun i l -> 
         match l with 
@@ -264,10 +265,13 @@ module Make(E : Env.S) : S with module Env = E = struct
           if not (CCList.is_empty subterms) &&
              List.exists (fun (l,_) -> Type.is_fun (T.ty l)) subterms then
              let subterms_lit = CCList.map (fun (l,r) -> 
-               let new_lit = Literal.mk_neq l r in
-               match ext_neg new_lit with
-                 | Some (nl', _, _) -> nl'
-                 | None -> new_lit) subterms in
+               let arg_types = Type.expected_args  @@ T.ty l in
+               if CCList.is_empty arg_types then Literal.mk_neq l r
+               else (
+                 let skolems = List.map (fun ty -> T.mk_fresh_skolem free_vars ty) arg_types in
+                 Literal.mk_neq (T.app l skolems) (T.app r skolems)
+               )
+              ) subterms in
              let new_lits = CCList.flat_map (fun (j,x) -> 
               if i!=j then [x]
               else subterms_lit) 
@@ -276,6 +280,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               Proof.Step.inference [C.proof_parent c] ~rule:(Proof.Rule.mk "neg_cong_fun") in
              let new_c =
                C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
+             Format.printf "@[%a@] => @[%a@].\n" C.pp c C.pp new_c;
              Some new_c
           else None
         | _ -> None)
