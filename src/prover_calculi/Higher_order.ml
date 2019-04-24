@@ -232,6 +232,55 @@ module Make(E : Env.S) : S with module Env = E = struct
     );
     new_c
 
+  let neg_cong_fun (c:C.t) : C.t list =
+    let find_diffs s t = 
+      let rec loop s t =
+        let (hd_s, args_s), (hd_t, args_t) = T.as_app s , T.as_app t in
+        if T.is_const hd_s && T.is_const hd_t then (
+          if T.equal hd_s hd_t then (
+            let zipped = CCList.combine args_s args_t in
+            let zipped = List.filter (fun (a_s, a_t) -> not (T.equal a_s a_t)) zipped in
+            if List.length zipped = 1 then (
+              let s,t = List.hd zipped in loop s t 
+            ) else zipped) 
+          else [(s,t)]) 
+        else []
+      in
+
+      let (hd_s,_), (hd_t,_) = T.as_app s, T.as_app t in
+      if T.is_const hd_s && T.is_const hd_t && T.equal hd_s hd_t then (
+        loop s t
+      ) else [] 
+    in
+    
+
+    let is_eligible = C.Eligible.res c in
+    C.lits c
+    |> CCArray.mapi (fun i l -> 
+        match l with 
+        | Literal.Equation (lhs,rhs,false) when is_eligible i l ->
+          let subterms = find_diffs lhs rhs in
+          if not (CCList.is_empty subterms) &&
+             List.exists (fun (l,_) -> Type.is_fun (T.ty l)) subterms then
+             let subterms_lit = CCList.map (fun (l,r) -> 
+               let new_lit = Literal.mk_neq l r in
+               match ext_neg new_lit with
+                 | Some (nl', _, _) -> nl'
+                 | None -> new_lit) subterms in
+             let new_lits = CCList.flat_map (fun (j,x) -> 
+              if i!=j then [x]
+              else subterms_lit) 
+              (C.lits c |> Array.mapi (fun j x -> (j,x)) |> Array.to_list) in
+             let proof =
+              Proof.Step.inference [C.proof_parent c] ~rule:(Proof.Rule.mk "neg_cong_fun") in
+             let new_c =
+               C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
+             Some new_c
+          else None
+        | _ -> None)
+    |> CCArray.filter_map (fun x -> x)
+    |> CCArray.to_list
+
   (* try to eliminate a predicate variable in one fell swoop *)
   let elim_pred_variable (c:C.t) : C.t list =
     (* find unshielded predicate vars *)
