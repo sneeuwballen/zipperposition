@@ -14,7 +14,7 @@ let section = Util.Section.make ~parent:Const.section "ho"
 
 let stat_eq_res = Util.mk_stat "ho.eq_res.steps"
 let stat_eq_res_syntactic = Util.mk_stat "ho.eq_res_syntactic.steps"
-let stat_ext_neg = Util.mk_stat "ho.extensionality-.steps"
+let stat_ext_neg_lit = Util.mk_stat "ho.extensionality-.steps"
 let stat_ext_pos = Util.mk_stat "ho.extensionality+.steps"
 let stat_complete_eq = Util.mk_stat "ho.complete_eq.steps"
 let stat_beta = Util.mk_stat "ho.beta_reduce.steps"
@@ -32,7 +32,8 @@ let prof_ho_unif = Util.mk_profiler "ho.unif"
 let _ext_pos = ref true
 let _ext_axiom = ref false
 let _elim_pred_var = ref true
-let _ext_neg = ref true
+let _ext_neg_lit = ref false
+let _neg_ext = ref true
 let _ext_axiom_penalty = ref 5
 let _var_arg_remove = ref true
 let _huet_style = ref false
@@ -69,18 +70,18 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
   (* index for ext-neg, to ensure α-equivalent negative equations have the same skolems *)
-  module FV_ext_neg = FV_tree.Make(struct
+  module FV_ext_neg_lit = FV_tree.Make(struct
       type t = Literal.t * T.t list (* lit -> skolems *)
       let compare = CCOrd.(pair Literal.compare (list T.compare))
       let to_lits (l,_) = Iter.return (Literal.Conv.to_form l)
       let labels _ = Util.Int_set.empty
     end)
 
-  let idx_ext_neg_ : FV_ext_neg.t ref = ref (FV_ext_neg.empty())
+  let idx_ext_neg_lit_ : FV_ext_neg_lit.t ref = ref (FV_ext_neg_lit.empty())
 
   (* retrieve skolems for this literal, if any *)
   let find_skolems_ (lit:Literal.t) : T.t list option =
-    FV_ext_neg.retrieve_alpha_equiv_c !idx_ext_neg_ (lit, [])
+    FV_ext_neg_lit.retrieve_alpha_equiv_c !idx_ext_neg_lit_ (lit, [])
     |> Iter.find_map
       (fun (lit',skolems) ->
          let subst = Literal.variant (lit',0) (lit,1) |> Iter.head in
@@ -97,7 +98,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* negative extensionality rule:
      [f != g] where [f : a -> b] becomes [f k != g k] for a fresh parameter [k] *)
-  let ext_neg (lit:Literal.t) : _ option = match lit with
+  let ext_neg_lit (lit:Literal.t) : _ option = match lit with
     | Literal.Equation (f, g, false)
       when Type.is_fun (T.ty f) &&
            not (T.is_var f) &&
@@ -112,7 +113,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           let vars = Literal.vars lit in
           let l = List.map (T.mk_fresh_skolem vars) ty_args in
           (* save list *)
-          idx_ext_neg_ := FV_ext_neg.add !idx_ext_neg_ (lit,l);
+          idx_ext_neg_lit_ := FV_ext_neg_lit.add !idx_ext_neg_lit_ (lit,l);
           l
       in
       let new_lit =
@@ -120,12 +121,13 @@ module Make(E : Env.S) : S with module Env = E = struct
           (T.app f params)
           (T.app g params)
       in
-      Util.incr_stat stat_ext_neg;
+      Util.incr_stat stat_ext_neg_lit;
       Util.debugf ~section 4
-        "(@[ho_ext_neg@ :old `%a`@ :new `%a`@])"
+        "(@[ho_ext_neg_lit@ :old `%a`@ :new `%a`@])"
         (fun k->k Literal.pp lit Literal.pp new_lit);
       Some (new_lit,[],[Proof.Tag.T_ho; Proof.Tag.T_ext])
     | _ -> None
+
 
   (* positive extensionality `m x = n x --> m = n` *)
   let ext_pos (c:C.t): C.t list =
@@ -280,9 +282,32 @@ module Make(E : Env.S) : S with module Env = E = struct
               Proof.Step.inference [C.proof_parent c] ~rule:(Proof.Rule.mk "neg_cong_fun") in
              let new_c =
                C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
-             Format.printf "@[%a@] => @[%a@].\n" C.pp c C.pp new_c;
              Some new_c
           else None
+        | _ -> None)
+    |> CCArray.filter_map (fun x -> x)
+    |> CCArray.to_list
+
+  let neg_ext (c:C.t) : C.t list =
+    let is_eligible = C.Eligible.res c in
+    let free_vars = C.Seq.vars c |> T.VarSet.of_seq |> T.VarSet.to_list in 
+    C.lits c
+    |> CCArray.mapi (fun i l -> 
+        match l with 
+        | Literal.Equation (lhs,rhs,false) 
+            when is_eligible i l && Type.is_fun @@ T.ty lhs ->
+          let arg_types = Type.expected_args @@ T.ty lhs in
+          let new_lits = CCList.map (fun (j,x) -> 
+              if i!=j then x
+              else (
+                let skolems = List.map (fun ty -> T.mk_fresh_skolem free_vars ty) arg_types in
+                Literal.mk_neq (T.app lhs skolems) (T.app rhs skolems))
+            ) (C.lits c |> Array.mapi (fun j x -> (j,x)) |> Array.to_list) in
+          let proof =
+           Proof.Step.inference [C.proof_parent c] ~rule:(Proof.Rule.mk "neg_ext") in
+          let new_c =
+            C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
+           Some new_c
         | _ -> None)
     |> CCArray.filter_map (fun x -> x)
     |> CCArray.to_list
@@ -728,8 +753,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       Env.add_unary_inf "ho_complete_eq" complete_eq_args;
       if !_elim_pred_var then
         Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
-      if !_ext_neg then
-        Env.add_lit_rule "ho_ext_neg" ext_neg;
+      if !_ext_neg_lit then
+        Env.add_lit_rule "ho_ext_neg_lit" ext_neg_lit;
       if !_ext_pos then (
         Env.add_unary_inf "ho_ext_pos" ext_pos
       );
@@ -784,6 +809,10 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       if(!_neg_cong_fun) then (
         Env.add_unary_inf "neg_cong_fun" neg_cong_fun 
+      );
+
+      if(!_neg_ext) then (
+        Env.add_unary_inf "neg_ext" neg_ext 
       );
 
       PragHOUnif.set_max_depth !_unif_max_depth ();
@@ -907,7 +936,8 @@ let () =
       "--ho-ext-axiom", Arg.Set _ext_axiom, " enable extensionality axiom";
       "--no-ho-ext-axiom", Arg.Clear _ext_axiom, " disable extensionality axiom";
       "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule";
-      "--ho-no-ext-neg", Arg.Clear _ext_neg, " enable negative extensionality rule";
+      "--ho-neg-ext", Arg.Bool (fun v -> _neg_ext := v), "turn NegExt on or off";
+      "--ho-no-ext-neg-lit", Arg.Clear _ext_neg_lit, " enable negative extensionality rule on literal level [?]";
       "--ho-def-unfold", Arg.Set def_unfold_enabled_, " enable ho definition unfolding";
       "--ho-huet-style-unif", Arg.Set _huet_style, " enable Huet style projection";
       "--ho-no-conservative-elim", Arg.Clear _cons_elim, "Disables conservative elimination rule in pragmatic unification";
@@ -924,7 +954,7 @@ let () =
     def_unfold_enabled_ := false;
     force_enabled_ := true;
     _ext_axiom := true;
-    _ext_neg := true;
+    _ext_neg_lit := true;
     eta_ := `Expand;
     prim_mode_ := `None;
     _elim_pred_var := false;
