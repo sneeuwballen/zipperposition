@@ -24,6 +24,9 @@ let stat_prim_enum = Util.mk_stat "ho.prim_enum.steps"
 let stat_elim_pred = Util.mk_stat "ho.elim_pred.steps"
 let stat_ho_unif = Util.mk_stat "ho.unif.calls"
 let stat_ho_unif_steps = Util.mk_stat "ho.unif.steps"
+let stat_neg_ext = Util.mk_stat "ho.neg_ext_success"
+let stat_neg_cong_fun = Util.mk_stat "ho.neg_cong_fun_success"
+
 
 let prof_eq_res = Util.mk_profiler "ho.eq_res"
 let prof_eq_res_syn = Util.mk_profiler "ho.eq_res_syntactic"
@@ -282,7 +285,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               Proof.Step.inference [C.proof_parent c] ~rule:(Proof.Rule.mk "neg_cong_fun") in
              let new_c =
                C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
-             (* Format.printf "NegCongFun: @[%a@] :> @[%a@].\n" C.pp c C.pp new_c; *)
+             Util.incr_stat stat_neg_cong_fun;
              Some new_c
           else None
         | _ -> None)
@@ -308,8 +311,8 @@ module Make(E : Env.S) : S with module Env = E = struct
            Proof.Step.inference [C.proof_parent c] ~rule:(Proof.Rule.mk "neg_ext") in
           let new_c =
             C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
-           Util.debugf 1 ~section "@[%a@] => @[%a@].\n" (fun k -> k C.pp c C.pp new_c);
-           (* Format.printf "NegExt: @[%a@] :> @[%a@].\n" C.pp c C.pp new_c; *)
+           Util.debugf 1 ~section "NegExt: @[%a@] => @[%a@].\n" (fun k -> k C.pp c C.pp new_c);
+           Util.incr_stat stat_neg_ext;
            Some new_c
         | _ -> None)
     |> CCArray.filter_map (fun x -> x)

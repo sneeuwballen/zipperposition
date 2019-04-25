@@ -254,11 +254,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
    | Classic
    | FluidSup
    | LambdaSup
+   | DupSup
 
   let kind_to_str = function
    | Classic -> "sup"
-   | FluidSup -> "FluidSup"
-   | LambdaSup -> "supEXT"
+   | FluidSup -> "fluidSup"
+   | LambdaSup -> "lambdaSup"
+   | DupSup -> "dupSup"
 
   (* all the information needed for a superposition inference *)
   module SupInfo = struct
@@ -831,6 +833,123 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) + !_fluidsup_penalty in
               (* /!\ may differ from the actual penalty (by -2) *)
               Iter.cons (penalty,res) acc
+            )
+            Iter.empty
+        )
+      |> Iter.to_rev_list
+    in
+    let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) new_clauses in
+      StmQ.add_lst _stmq.q stm_res;
+    Util.exit_prof prof_infer_fluidsup_passive;
+    []
+
+    (* ----------------------------------------------------------------------
+   * DupSup rule (Superposition at applied variables)
+   * ---------------------------------------------------------------------- *)
+
+  (* let infer_dupsup_active clause =
+    Util.enter_prof prof_infer_fluidsup_active;
+    (* no literal can be eligible for paramodulation if some are selected.
+      This checks if inferences with i-th literal are needed? *)
+    let eligible = C.Eligible.param clause in
+    (* do the inferences where clause is active; for this,
+      we try to rewrite conditionally other clauses using
+      non-minimal sides of every positive literal *)
+    let new_clauses =
+      Lits.fold_eqn ~sign:true ~ord ~both:true ~eligible (C.lits clause)
+      |> Iter.flat_map
+        (fun (s, t, _, s_pos) ->
+          I.fold !_idx_fluidsup_into
+            (fun acc u_p with_pos ->
+              assert (T.is_var (T.head_term u_p));
+              assert (T.DB.is_closed u_p);
+              (* Create prefix variable H and use H s = H t for superposition *)
+              let var_h = T.var (HVar.fresh ~ty:(Type.arrow [T.ty s] (Type.var (HVar.fresh ~ty:Type.tType ()))) ()) in
+              let hs = T.app var_h [s] in
+              let ht = T.app var_h [t] in
+              let res = !_unif_alg (u_p,1) (hs,0) |> OSeq.map (
+                  fun osubst ->
+                    osubst |> CCOpt.flat_map (
+                      fun subst ->Subst.FO.bind
+                        let passive = with_pos.C.WithPos.clause in
+                        let passive_pos = with_pos.C.WithPos.pos in
+                        let passive_lit, _ = Lits.Pos.lit_at (C.lits passive) passive_pos in
+                        let info = SupInfo.({
+                            s=hs; t=ht; active=clause; active_pos=s_pos; scope_active=0;
+                            u_p; passive; passive_lit; passive_pos; scope_passive=1; subst; sup_kind=FluidSup
+                          }) in
+                        do_superposition info
+                    )
+                )
+              in
+              let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) + !_fluidsup_penalty in
+              (* /!\ may differ from the actual penalty (by -2) *)
+              Iter.cons (penalty,res) acc
+            )
+          Iter.empty
+        )
+      |> Iter.to_rev_list
+    in
+    let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) new_clauses in
+      StmQ.add_lst _stmq.q stm_res;
+    Util.exit_prof prof_infer_fluidsup_active;
+    [] *)
+
+  let infer_dupsup_passive clause =
+    Util.enter_prof prof_infer_fluidsup_passive;
+    (* perform inference on this lit? *)
+    let eligible = C.Eligible.(res clause) in
+    (* do the inferences in which clause is passive (rewritten),
+      so we consider both negative and positive literals *)
+    let new_clauses =
+      Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~subterms:true ~ord
+        ~which:`Max ~eligible ~ty_args:false (C.lits clause)
+      |> Iter.filter (fun (u_p, _) -> 
+          (T.is_var (T.head_term u_p) && not (CCList.is_empty @@ T.args u_p)))
+      |> Iter.flat_map
+        (fun (u_p, passive_pos) ->
+          let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
+          I.fold !_idx_sup_from
+            (fun acc _ with_pos ->
+              let active = with_pos.C.WithPos.clause in
+              let s_pos = with_pos.C.WithPos.pos in
+              let res = match Lits.View.get_eqn (C.lits active) s_pos with
+                | Some (s, t, true) ->
+                    let scope_passive, scope_active = 0, 1 in
+                    let hd_up, args_up = T.as_app u_p in
+                    let arg_types = List.map T.ty args_up in
+                    let n = List.length args_up in
+                    let var_up = T.as_var_exn hd_up in
+                    let type_var = Type.var (HVar.fresh ~ty:Type.tType ()) in
+                    let var_w = HVar.fresh ~ty:(Type.arrow arg_types type_var) () in
+                    let var_z = HVar.fresh ~ty:(Type.arrow (List.append arg_types [type_var]) (T.ty u_p)) () in
+                    let db_args = List.mapi (fun i ty -> T.bvar ~ty (n-1-i)) arg_types in
+                    let term_w,term_z = T.var var_w, T.var var_z in
+                    let w_db = T.app term_w db_args in
+                    let z_db = T.app term_z (List.append db_args [w_db]) in
+                    let y_subst_val = T.fun_l arg_types z_db in
+                    assert (T.DB.is_closed y_subst_val);
+                    let subst_y = US.FO.bind (US.empty) (var_up, scope_passive) (y_subst_val, scope_passive) in
+                    let w_args = T.app term_w args_up in
+                    let w_args = Subst.FO.apply Subst.Renaming.none (US.subst subst_y) (w_args,scope_passive) in
+                    let z_args = T.app term_z (List.append args_up [t]) in
+                    let res = !_unif_alg (w_args,scope_passive) (s,scope_active) |> OSeq.map (
+                      fun osubst ->
+                        osubst |> CCOpt.flat_map (
+                          fun subst ->
+                            let subst = US.merge subst subst_y in
+                            let info = SupInfo.({
+                                s; t=z_args; active; active_pos=s_pos; scope_active;
+                                u_p; passive=clause; passive_lit; passive_pos; scope_passive; subst; sup_kind=DupSup
+                              }) in
+                            do_superposition info
+                    ))
+              in
+              let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) + !_fluidsup_penalty in
+              (* /!\ may differ from the actual penalty (by -2) *)
+              Iter.cons (penalty,res) acc
+                | _ -> assert false in
+               res
             )
             Iter.empty
         )
