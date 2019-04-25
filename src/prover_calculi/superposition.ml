@@ -359,16 +359,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
           Position.pp info.passive_pos US.pp info.subst);
 
-      if (info.sup_kind = DupSup) then (
-        Format.printf
-        "@[<2>sup, kind %s(%d)@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
-        (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
-        (kind_to_str info.sup_kind) (Term.Set.cardinal lambdasup_vars) C.pp info.active sc_a T.pp info.s T.pp info.t
-            T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
-            Position.pp info.passive_pos US.pp info.subst
-      );
-
-
       if(info.sup_kind = LambdaSup &&
          T.Seq.subterms t'
          |> Iter.exists (fun st ->
@@ -473,6 +463,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       assert(List.for_all (Lit.for_all Term.DB.is_closed) new_lits);
       (* C.check_types new_clause; *)
+      (* if (info.sup_kind = DupSup) then (
+        Format.printf
+        "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
+        (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
+        (kind_to_str info.sup_kind) C.pp info.active sc_a T.pp info.s T.pp info.t
+            T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
+            Position.pp info.passive_pos US.pp info.subst;
+        Format.printf "@[res = %a@].\n" C.pp new_clause;
+      ); *)
       Some new_clause
     with ExitSuperposition reason ->
       Util.debugf ~section 3 "... cancel, %s" (fun k->k reason);
@@ -573,9 +572,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   (* choose between regular and simultaneous superposition *)
   let do_superposition info =
     let open SupInfo in
-    assert (Type.equal (T.ty info.s) (T.ty info.t));
-    assert (Unif.Ty.equal ~subst:(US.subst info.subst)
-        (T.ty info.s, info.scope_active) (T.ty info.u_p, info.scope_passive));
+    assert (info.sup_kind=DupSup || Type.equal (T.ty info.s) (T.ty info.t));
+    assert (info.sup_kind=DupSup || 
+            Unif.Ty.equal ~subst:(US.subst info.subst)
+              (T.ty info.s, info.scope_active) (T.ty info.u_p, info.scope_passive));
     if !_use_simultaneous_sup && info.sup_kind != LambdaSup
     then do_simultaneous_superposition info
     else do_classic_superposition info
