@@ -954,9 +954,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                     let arg_types = List.map T.ty args_up in
                     let n = List.length args_up in
                     let var_up = T.as_var_exn hd_up in
-                    let type_var = Type.var (HVar.fresh ~ty:Type.tType ()) in
-                    let var_w = HVar.fresh ~ty:(Type.arrow arg_types type_var) () in
-                    let var_z = HVar.fresh ~ty:(Type.arrow (List.append arg_types [type_var]) (T.ty u_p)) () in
+                    let var_w = HVar.fresh ~ty:(Type.arrow arg_types (T.ty t)) () in
+                    let var_z = HVar.fresh ~ty:(Type.arrow (List.append arg_types [(T.ty t)]) (T.ty u_p)) () in
                     let db_args = List.mapi (fun i ty -> T.bvar ~ty (n-1-i)) arg_types in
                     let term_w,term_z = T.var var_w, T.var var_z in
                     let w_db = T.app term_w db_args in
