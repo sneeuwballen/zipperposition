@@ -105,6 +105,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let _idx_sup_into = ref (TermIndex.empty ())
   let _idx_lambdasup_into = ref (TermIndex.empty ())
   let _idx_fluidsup_into = ref (TermIndex.empty ())
+  let _idx_dupsup_into = ref (TermIndex.empty ())
   let _idx_sup_from = ref (TermIndex.empty ())
   let _idx_back_demod = ref (TermIndex.empty ())
   let _idx_fv = ref (SubsumIdx.empty ())
@@ -155,6 +156,17 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
             f tree t with_pos)
           !_idx_fluidsup_into;
+    
+    _idx_dupsup_into :=
+      Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false ~ord ~which:`Max ~subterms:true
+        ~eligible:(C.Eligible.res c) (C.lits c)
+      |> Iter.filter (fun (t, _) -> 
+          T.is_var (T.head_term t) && not (CCList.is_empty @@ T.args t)) (* Only applied variables *)
+      |> Iter.fold
+        (fun tree (t, pos) ->
+          let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
+          f tree t with_pos)
+        !_idx_dupsup_into;
 
     (* index subterms that can be rewritten by LambdaSup --
        the ones that can rewrite those are actually the ones
@@ -844,39 +856,49 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     []
 
     (* ----------------------------------------------------------------------
-   * DupSup rule (Superposition at applied variables)
+   * DupSup rule (Lightweight superposition at applied variables)
    * ---------------------------------------------------------------------- *)
 
-  (* let infer_dupsup_active clause =
-    Util.enter_prof prof_infer_fluidsup_active;
-    (* no literal can be eligible for paramodulation if some are selected.
-      This checks if inferences with i-th literal are needed? *)
+  let infer_dupsup_active clause =
     let eligible = C.Eligible.param clause in
-    (* do the inferences where clause is active; for this,
-      we try to rewrite conditionally other clauses using
-      non-minimal sides of every positive literal *)
     let new_clauses =
       Lits.fold_eqn ~sign:true ~ord ~both:true ~eligible (C.lits clause)
       |> Iter.flat_map
         (fun (s, t, _, s_pos) ->
-          I.fold !_idx_fluidsup_into
+          I.fold !_idx_dupsup_into
             (fun acc u_p with_pos ->
               assert (T.is_var (T.head_term u_p));
               assert (T.DB.is_closed u_p);
               (* Create prefix variable H and use H s = H t for superposition *)
-              let var_h = T.var (HVar.fresh ~ty:(Type.arrow [T.ty s] (Type.var (HVar.fresh ~ty:Type.tType ()))) ()) in
-              let hs = T.app var_h [s] in
-              let ht = T.app var_h [t] in
-              let res = !_unif_alg (u_p,1) (hs,0) |> OSeq.map (
+              let scope_passive, scope_active = 0, 1 in
+              let hd_up, args_up = T.as_app u_p in
+              let arg_types = List.map T.ty args_up in
+              let n = List.length args_up in
+              let var_up = T.as_var_exn hd_up in
+              let type_var = Type.var (HVar.fresh ~ty:Type.tType ()) in
+              let var_w = HVar.fresh ~ty:(Type.arrow arg_types type_var) () in
+              let var_z = HVar.fresh ~ty:(Type.arrow (List.append arg_types [type_var]) (T.ty u_p)) () in
+              let db_args = List.mapi (fun i ty -> T.bvar ~ty (n-1-i)) arg_types in
+              let term_w,term_z = T.var var_w, T.var var_z in
+              let w_db = T.app term_w db_args in
+              let z_db = T.app term_z (List.append db_args [w_db]) in
+              let y_subst_val = T.fun_l arg_types z_db in
+              assert (T.DB.is_closed y_subst_val);
+              let subst_y = US.FO.bind (US.empty) (var_up, scope_passive) (y_subst_val, scope_passive) in
+              let w_args = T.app term_w args_up in
+              let w_args = Subst.FO.apply Subst.Renaming.none (US.subst subst_y) (w_args,scope_passive) in
+              let z_args = T.app term_z (List.append args_up [t]) in
+              let res = !_unif_alg (s,scope_active) (w_args,scope_passive) |> OSeq.map (
                   fun osubst ->
                     osubst |> CCOpt.flat_map (
-                      fun subst ->Subst.FO.bind
+                      fun subst ->
+                        let subst = US.merge subst subst_y in
                         let passive = with_pos.C.WithPos.clause in
                         let passive_pos = with_pos.C.WithPos.pos in
                         let passive_lit, _ = Lits.Pos.lit_at (C.lits passive) passive_pos in
                         let info = SupInfo.({
-                            s=hs; t=ht; active=clause; active_pos=s_pos; scope_active=0;
-                            u_p; passive; passive_lit; passive_pos; scope_passive=1; subst; sup_kind=FluidSup
+                            s; t=z_args; active=clause; active_pos=s_pos; scope_active=0;
+                            u_p; passive; passive_lit; passive_pos; scope_passive=1; subst; sup_kind=DupSup
                           }) in
                         do_superposition info
                     )
@@ -893,7 +915,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) new_clauses in
       StmQ.add_lst _stmq.q stm_res;
     Util.exit_prof prof_infer_fluidsup_active;
-    [] *)
+    []
 
   let infer_dupsup_passive clause =
     Util.enter_prof prof_infer_fluidsup_passive;
