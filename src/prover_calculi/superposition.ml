@@ -76,6 +76,7 @@ let _switch_stream_extraction = ref false
 let _ord_in_normal_form = ref false
 let _fluidsup_penalty = ref 0
 let _fluidsup = ref true
+let _dupsup = ref true
 let _lambdasup = ref false
 let _unif_alg = ref JP_unif.unify_scoped
 
@@ -157,6 +158,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             f tree t with_pos)
           !_idx_fluidsup_into;
     
+    if !_dupsup then 
     _idx_dupsup_into :=
       Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false ~ord ~which:`Max ~subterms:true
         ~eligible:(C.Eligible.res c) (C.lits c)
@@ -336,7 +338,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     assert (InnerTerm.DB.closed (info.s:>InnerTerm.t));
     assert (info.sup_kind == LambdaSup || InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
     assert (not(T.is_var info.u_p) || T.is_ho_var info.u_p);
-    assert (!_sup_at_var_headed || info.sup_kind = FluidSup || not (T.is_var (T.head_term info.u_p)));
+    assert (!_sup_at_var_headed || info.sup_kind = FluidSup || 
+            info.sup_kind = DupSup || not (T.is_var (T.head_term info.u_p)));
     let active_idx = Lits.Pos.idx info.active_pos in
     let shift_vars = if info.sup_kind = LambdaSup then 0 else -1 in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
@@ -349,13 +352,22 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           Term.Seq.subterms info.u_p |> Iter.filter Term.is_var |> Term.Set.of_seq)
         else Term.Set.empty in
       let t' = S.FO.apply ~shift_vars renaming subst (info.t, sc_a) in
-      if info.sup_kind = LambdaSup && T.Set.cardinal lambdasup_vars = 1 then
-       Util.debugf ~section 1
+      Util.debugf ~section 1
       "@[<2>sup, kind %s(%d)@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
        (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
       (fun k->k (kind_to_str info.sup_kind) (Term.Set.cardinal lambdasup_vars) C.pp info.active sc_a T.pp info.s T.pp info.t
           T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
           Position.pp info.passive_pos US.pp info.subst);
+
+      if (info.sup_kind = DupSup) then (
+        Format.printf
+        "@[<2>sup, kind %s(%d)@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
+        (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
+        (kind_to_str info.sup_kind) (Term.Set.cardinal lambdasup_vars) C.pp info.active sc_a T.pp info.s T.pp info.t
+            T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
+            Position.pp info.passive_pos US.pp info.subst
+      );
+
 
       if(info.sup_kind = LambdaSup &&
          T.Seq.subterms t'
@@ -484,7 +496,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     assert (InnerTerm.DB.closed (info.s:>InnerTerm.t));
     assert (info.sup_kind == LambdaSup || InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
     assert (not(T.is_var info.u_p) || T.is_ho_var info.u_p);
-    assert (!_sup_at_var_headed || info.sup_kind = FluidSup || not (T.is_var (T.head_term info.u_p)));
+    assert (!_sup_at_var_headed || info.sup_kind = FluidSup || 
+            info.sup_kind = DupSup || not (T.is_var (T.head_term info.u_p)));
     let active_idx = Lits.Pos.idx info.active_pos in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
     let shift_vars = if info.sup_kind = LambdaSup then 0 else -1 in
@@ -875,9 +888,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               let arg_types = List.map T.ty args_up in
               let n = List.length args_up in
               let var_up = T.as_var_exn hd_up in
-              let type_var = Type.var (HVar.fresh ~ty:Type.tType ()) in
-              let var_w = HVar.fresh ~ty:(Type.arrow arg_types type_var) () in
-              let var_z = HVar.fresh ~ty:(Type.arrow (List.append arg_types [type_var]) (T.ty u_p)) () in
+              let var_w = HVar.fresh ~ty:(Type.arrow arg_types (T.ty t)) () in
+              let var_z = HVar.fresh ~ty:(Type.arrow (List.append arg_types [T.ty t]) (T.ty u_p)) () in
               let db_args = List.mapi (fun i ty -> T.bvar ~ty (n-1-i)) arg_types in
               let term_w,term_z = T.var var_w, T.var var_z in
               let w_db = T.app term_w db_args in
@@ -2183,6 +2195,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Env.add_binary_inf "fluidsup_passive" infer_fluidsup_passive;
         Env.add_binary_inf "fluidsup_active" infer_fluidsup_active;
       );
+      if !_dupsup then (
+        Env.add_binary_inf "dupsup_passive(into)" infer_dupsup_passive;
+        Env.add_binary_inf "dupsup_active(from)" infer_dupsup_active;
+      );
       if !_lambdasup then (
         Env.add_binary_inf "lambdasup_active(from)" infer_lambdasup_from;
         Env.add_binary_inf "lambdasup_passive(into)" infer_lambdasup_into;
@@ -2298,6 +2314,9 @@ let () =
     ; "--lambdasup"
     , Arg.Set _lambdasup
     , " enable LambdaSup inferences";
+    "--dupsup"
+    , Arg.Set _dupsup
+    , " enable DupSup inferences";
       "--ho-unif-level",
       Arg.Symbol (["full"; "pragmatic"], (fun str ->
         _unif_alg := if (String.equal "full" str) then JP_unif.unify_scoped
@@ -2314,7 +2333,8 @@ let () =
       _complete_ho_unification := true;
       _ord_in_normal_form := true;
       _sup_at_var_headed := false;
-      _lambdasup := false
+      _lambdasup := false;
+      _dupsup := false;
     );
     Params.add_to_mode "fo-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
