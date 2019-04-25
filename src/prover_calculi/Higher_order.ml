@@ -258,7 +258,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     
 
     let is_eligible = C.Eligible.res c in
-    let free_vars = C.Seq.vars c |> T.VarSet.of_seq |> T.VarSet.to_list in 
     C.lits c
     |> CCArray.mapi (fun i l -> 
         match l with 
@@ -266,7 +265,8 @@ module Make(E : Env.S) : S with module Env = E = struct
           let subterms = find_diffs lhs rhs in
           if not (CCList.is_empty subterms) &&
              List.exists (fun (l,_) -> Type.is_fun (T.ty l)) subterms then
-             let subterms_lit = CCList.map (fun (l,r) -> 
+             let subterms_lit = CCList.map (fun (l,r) ->
+               let free_vars = T.VarSet.union (T.vars l) (T.vars r) |> T.VarSet.to_list in 
                let arg_types = Type.expected_args  @@ T.ty l in
                if CCList.is_empty arg_types then Literal.mk_neq l r
                else (
@@ -282,6 +282,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               Proof.Step.inference [C.proof_parent c] ~rule:(Proof.Rule.mk "neg_cong_fun") in
              let new_c =
                C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
+             (* Format.printf "NegCongFun: @[%a@] :> @[%a@].\n" C.pp c C.pp new_c; *)
              Some new_c
           else None
         | _ -> None)
@@ -289,14 +290,14 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> CCArray.to_list
 
   let neg_ext (c:C.t) : C.t list =
-    let is_eligible = C.Eligible.res c in
-    let free_vars = C.Seq.vars c |> T.VarSet.of_seq |> T.VarSet.to_list in 
+    let is_eligible = C.Eligible.res c in 
     C.lits c
     |> CCArray.mapi (fun i l -> 
         match l with 
         | Literal.Equation (lhs,rhs,false) 
             when is_eligible i l && Type.is_fun @@ T.ty lhs ->
           let arg_types = Type.expected_args @@ T.ty lhs in
+          let free_vars = Literal.vars l |> T.VarSet.of_list |> T.VarSet.to_list in
           let new_lits = CCList.map (fun (j,x) -> 
               if i!=j then x
               else (
@@ -307,6 +308,8 @@ module Make(E : Env.S) : S with module Env = E = struct
            Proof.Step.inference [C.proof_parent c] ~rule:(Proof.Rule.mk "neg_ext") in
           let new_c =
             C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
+           Util.debugf 1 ~section "@[%a@] => @[%a@].\n" (fun k -> k C.pp c C.pp new_c);
+           (* Format.printf "NegExt: @[%a@] :> @[%a@].\n" C.pp c C.pp new_c; *)
            Some new_c
         | _ -> None)
     |> CCArray.filter_map (fun x -> x)
@@ -954,7 +957,8 @@ let () =
     def_unfold_enabled_ := false;
     force_enabled_ := true;
     _ext_axiom := true;
-    _ext_neg_lit := true;
+    _ext_neg_lit := false;
+    _neg_ext := false;
     eta_ := `Expand;
     prim_mode_ := `None;
     _elim_pred_var := false;
