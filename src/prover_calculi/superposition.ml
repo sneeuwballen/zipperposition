@@ -475,7 +475,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       assert(List.for_all (Lit.for_all Term.DB.is_closed) new_lits);
       (* C.check_types new_clause; *)
-      if (info.sup_kind = DupSup) then (
+      (* if (info.sup_kind = DupSup) then (
         Format.printf
         "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
         (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
@@ -483,7 +483,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
             Position.pp info.passive_pos US.pp info.subst;
         Format.printf "@[res = %a@].\n" C.pp new_clause;
-      );
+      ); *)
       Some new_clause
     with ExitSuperposition reason ->
       Util.debugf ~section 3 "... cancel, %s" (fun k->k reason);
