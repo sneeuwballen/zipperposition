@@ -644,7 +644,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let status : (fixed_arg_status * dupl_arg_status) list VTbl.t = VTbl.create 8 in
     C.lits c
     |> Literals.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord:Ordering.none 
-                           ~subterms:true ~fun_bodies:false ~eligible:(fun _ _ -> true)
+                           ~subterms:true  ~eligible:(fun _ _ -> true)
     |> Iter.iter
       (fun (t,_) ->
         let head, args = T.as_app t in
