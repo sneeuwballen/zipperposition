@@ -58,6 +58,14 @@ let test_db_unshift = "db unshift", `Quick, fun () ->
   Alcotest.(check t_test) "db_unshift" t1 t';
   ()
 
+let test_covers = "cover_correct", `Quick, fun () ->
+  let t = h y b (h x b x) in
+  let coverings = T.cover_with_terms t [b;y;a] in
+  let str = CCFormat.sprintf "%a.\n" (CCList.pp T.pp) coverings in
+  Alcotest.(check int) str (List.length coverings) 8;
+  ()
+
+
 let test_whnf1 = "whnf1", `Quick, fun () ->
   (* eta expansion of [g] *)
   let g_eta = T.fun_ ty (g (T.bvar ~ty 0)) in
@@ -174,6 +182,7 @@ let suite : unit Alcotest.test_case list =
     test_eta_reduce;
     test_eta_qreduce;
     test_eta_expand;
+    test_covers;
   ]
 
 (** Properties *)

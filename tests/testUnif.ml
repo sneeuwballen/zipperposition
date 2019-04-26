@@ -337,7 +337,7 @@ let check_matchable ?(negated=false) t u actions : unit Alcotest.test_case =
 let suite_unif1 : unit Alcotest.test_case list =
   let (=?=) a b = Task.mk_unif a b in (* unif pair *)
   let (<?>) a b = Task.mk_unif ~negated:true a b in (* unif pair *)
-  let (=?=>) a b = Task.mk_match a b in (* matching pair *)
+  (* let (=?=>) a b = Task.mk_match a b in matching pair *)
   let (>->) a b = Task.set_with_ty b a in (* specify return type *)
   let (>?->) a b = Action.set_with_ty b a in (* specify return type *)
   let (>>>) a b = Task.add_action b a in (* specify return type *)

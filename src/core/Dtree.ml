@@ -72,7 +72,7 @@ let open_term ~stack ~len t =
     let cur_char = Subterm t in
     {cur_char; cur_term=t; stack=[]::stack; stack_len=len+1}
   ) else (
-    let cur_char, l = (term_to_char [@inlined]) t in
+    let cur_char, l = (term_to_char) t in
     {cur_char; cur_term=t; stack=l::stack; stack_len=len+1}
   )
 

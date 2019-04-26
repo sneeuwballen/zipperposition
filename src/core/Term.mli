@@ -206,6 +206,9 @@ val head : t -> ID.t option (** head ID.t *)
 val head_exn : t -> ID.t (** head ID.t (or Invalid_argument) *)
 val size : t -> int (** Size (number of nodes) *)
 
+(* all the ways in which term can be covered (built) using the arguments given *)
+val cover_with_terms : t -> t list -> t list
+
 val weight : ?var:int -> ?sym:(ID.t -> int) -> t -> int
 (** Compute the weight of a term, given a weight for variables
     and one for ID.ts.

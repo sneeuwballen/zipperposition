@@ -283,6 +283,36 @@ let is_ho_pred t = is_ho_app t && Type.is_prop (ty t)
 
 let is_ho_at_root t = is_ho_var t || is_ho_app t
 
+let rec all_combs = function 
+  | [] -> []
+  | x::xs ->
+      let rest_combs = all_combs xs in
+      if CCList.is_empty rest_combs then CCList.map (fun t->[t]) x 
+      else CCList.flat_map 
+            (fun i -> CCList.map (fun comb -> i::comb) rest_combs) 
+           x
+
+let rec cover_with_terms t ts =
+  let idx = CCList.find_idx (equal t) ts in
+  let db = match idx with 
+    | Some (i,_) -> [bvar ~ty:(ty t) (List.length ts - 1 - i)]
+    | None -> [] in
+  let rest = 
+    begin match view t with 
+      | AppBuiltin (hd,args) -> 
+          let args' = List.map (fun a -> cover_with_terms a ts) args in
+          let args_combined = all_combs args' in
+          List.map (fun args -> app_builtin ~ty:(ty t) hd args) args_combined
+      | App (hd,args) -> 
+          let hd' = cover_with_terms hd ts in
+          let args' = List.map (fun a -> cover_with_terms a ts) args in
+          let args_combined = all_combs (hd'::args') in
+          List.map (fun hd_arg -> let hd,args = List.hd hd_arg, List.tl hd_arg in
+                                  app hd args) args_combined
+      | DB _ | Var _  | Const _ | Fun(_,_) -> [t]
+    end in
+  db @ rest
+
 module Seq = struct
   let vars t k =
     let rec aux t =
