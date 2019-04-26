@@ -481,7 +481,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
         (kind_to_str info.sup_kind) C.pp info.active sc_a T.pp info.s T.pp info.t
             T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
-            Position.pp info.passive_pos US.pp info.subst;
+            Position.pp info.passive_pos Subst.pp subst';
         Format.printf "@[res = %a@].\n" C.pp new_clause;
       ); *)
       Some new_clause
@@ -588,7 +588,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     assert (info.sup_kind=DupSup || 
             Unif.Ty.equal ~subst:(US.subst info.subst)
               (T.ty info.s, info.scope_active) (T.ty info.u_p, info.scope_passive));
-    if !_use_simultaneous_sup && info.sup_kind != LambdaSup
+    if !_use_simultaneous_sup && info.sup_kind != LambdaSup && info.sup_kind != DupSup
     then do_simultaneous_superposition info
     else do_classic_superposition info
 
@@ -921,8 +921,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                         let passive_pos = with_pos.C.WithPos.pos in
                         let passive_lit, _ = Lits.Pos.lit_at (C.lits passive) passive_pos in
                         let info = SupInfo.({
-                            s; t=z_args; active=clause; active_pos=s_pos; scope_active=0;
-                            u_p=w_args; passive; passive_lit; passive_pos; scope_passive=1; subst; 
+                            s; t=z_args; active=clause; active_pos=s_pos; scope_active;
+                            u_p=w_args; passive; passive_lit; passive_pos; scope_passive; subst; 
                             sup_kind=DupSup
                           }) in
                         do_superposition info
