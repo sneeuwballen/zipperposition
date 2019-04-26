@@ -327,6 +327,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     )
 
 
+  let dup_sup_apply_subst t sc_a sc_p subst renaming =
+    let z, args = T.as_app t in
+    assert(T.is_var z);
+    assert(CCList.length args >= 2);
+    let u_n, t' = CCList.take_drop (List.length args - 1) args in
+    let in_passive = S.FO.apply renaming subst (T.app z u_n, sc_p) in
+    let t' = S.FO.apply renaming subst (List.hd t', sc_a) in
+    T.app in_passive [t']
+
+
   (* Helper that does one or zero superposition inference, with all
      the given parameters. Clauses have a scope. *)
   let do_classic_superposition info =
@@ -351,7 +361,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         if (info.sup_kind = LambdaSup) then (
           Term.Seq.subterms info.u_p |> Iter.filter Term.is_var |> Term.Set.of_seq)
         else Term.Set.empty in
-      let t' = S.FO.apply ~shift_vars renaming subst (info.t, sc_a) in
+      let t' = if info.sup_kind != DupSup then 
+                S.FO.apply ~shift_vars renaming subst (info.t, sc_a)
+               else dup_sup_apply_subst info.t sc_a sc_p subst renaming in
       Util.debugf ~section 1
       "@[<2>sup, kind %s(%d)@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
        (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
@@ -463,7 +475,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       assert(List.for_all (Lit.for_all Term.DB.is_closed) new_lits);
       (* C.check_types new_clause; *)
-      (* if (info.sup_kind = DupSup) then (
+      if (info.sup_kind = DupSup) then (
         Format.printf
         "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
         (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
@@ -471,7 +483,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
             Position.pp info.passive_pos US.pp info.subst;
         Format.printf "@[res = %a@].\n" C.pp new_clause;
-      ); *)
+      );
       Some new_clause
     with ExitSuperposition reason ->
       Util.debugf ~section 3 "... cancel, %s" (fun k->k reason);
@@ -910,7 +922,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                         let passive_lit, _ = Lits.Pos.lit_at (C.lits passive) passive_pos in
                         let info = SupInfo.({
                             s; t=z_args; active=clause; active_pos=s_pos; scope_active=0;
-                            u_p; passive; passive_lit; passive_pos; scope_passive=1; subst; sup_kind=DupSup
+                            u_p=w_args; passive; passive_lit; passive_pos; scope_passive=1; subst; 
+                            sup_kind=DupSup
                           }) in
                         do_superposition info
                     )
@@ -973,7 +986,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                             let subst = US.merge subst subst_y in
                             let info = SupInfo.({
                                 s; t=z_args; active; active_pos=s_pos; scope_active;
-                                u_p; passive=clause; passive_lit; passive_pos; scope_passive; subst; sup_kind=DupSup
+                                u_p=w_args; passive=clause; passive_lit; passive_pos; scope_passive; subst; 
+                                sup_kind=DupSup
                               }) in
                             do_superposition info
                     ))
