@@ -327,12 +327,13 @@ let max_cover t ts =
         app_builtin ~ty:(ty t) hd args'
       | App (hd,args) -> 
         let args' = List.map (fun arg -> aux depth arg) args in
-        app hd args'
+        app (aux depth hd) args'
       | Fun (ty_var, body) -> 
         let body' = aux (depth+1) body in
         fun_ ty_var body'
       | DB _ | Var _  | Const _ -> t
-      end in
+      end
+  in
   aux 0 t
 
 
