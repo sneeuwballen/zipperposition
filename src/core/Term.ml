@@ -292,11 +292,12 @@ let rec all_combs = function
             (fun i -> CCList.map (fun comb -> i::comb) rest_combs) 
            x
 
-let rec cover_with_terms t ts =
-  let idx = CCList.find_idx (equal t) ts in
-  let db = match idx with 
-    | Some (i,_) -> [bvar ~ty:(ty t) (List.length ts - 1 - i)]
-    | None -> [] in
+let rec cover_with_terms ?(depth=0) t ts =
+  let n = List.length ts in
+  let db = CCList.mapi (fun i x -> (i,x)) ts
+           |> CCList.filter_map (fun (i,x) -> 
+                if equal x t then Some (bvar ~ty:(ty t) (n-1-i+depth)) 
+                else None) in
   let rest = 
     begin match view t with 
       | AppBuiltin (hd,args) -> 
@@ -307,9 +308,11 @@ let rec cover_with_terms t ts =
           let hd' = cover_with_terms hd ts in
           let args' = List.map (fun a -> cover_with_terms a ts) args in
           let args_combined = all_combs (hd'::args') in
-          List.map (fun hd_arg -> let hd,args = List.hd hd_arg, List.tl hd_arg in
-                                  app hd args) args_combined
-      | DB _ | Var _  | Const _ | Fun(_,_) -> [t]
+          List.map (fun l ->  app (List.hd l) (List.tl l)) args_combined
+      | Fun (ty_var, body) -> 
+          let bodies = cover_with_terms ~depth:(depth+1) body ts in
+          List.map (fun b -> fun_ ty_var b) bodies
+      | DB _ | Var _  | Const _ -> [t]
     end in
   db @ rest
 
