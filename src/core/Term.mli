@@ -209,6 +209,9 @@ val size : t -> int (** Size (number of nodes) *)
 (* all the ways in which term can be covered (built) using the arguments given *)
 val cover_with_terms : ?depth:int -> t -> t list -> t list
 
+(* cover the term in a maximal way looked top-down *)
+val max_cover : t -> t list -> t
+
 val weight : ?var:int -> ?sym:(ID.t -> int) -> t -> int
 (** Compute the weight of a term, given a weight for variables
     and one for ID.ts.

@@ -316,6 +316,26 @@ let rec cover_with_terms ?(depth=0) t ts =
     end in
   db @ rest
 
+let max_cover t ts =
+  let rec aux depth t ts = 
+    match CCList.find_idx (equal t) ts with
+    | Some (idx,_) -> bvar (ty t) (List.length ts - 1 - idx + depth)
+    | None -> 
+      begin match view t with
+      | AppBuiltin (hd,args) -> 
+        let args' = List.map (fun arg -> aux depth arg ts) args in
+        app_builtin ~ty:(ty t) hd args'
+      | App (hd,args) -> 
+        let args' = List.map (fun arg -> aux depth arg ts) args in
+        app hd args'
+      | Fun (ty_var, body) -> 
+        let body' = aux (depth+1) body ts in
+        fun_ ty_var body'
+      | DB _ | Var _  | Const _ -> t
+      end in
+  aux 0 t ts
+
+
 module Seq = struct
   let vars t k =
     let rec aux t =
