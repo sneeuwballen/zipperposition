@@ -59,8 +59,8 @@ let test_db_unshift = "db unshift", `Quick, fun () ->
   ()
 
 let test_covers = "cover_correct", `Quick, fun () ->
-  let t = h y b (h x b x) in
-  let coverings = T.cover_with_terms t [b;y;a] in
+  let t = T.fun_ ty (h y b (h x b x)) in
+  let coverings = T.cover_with_terms t [b;y;a;y] in
   let str = CCFormat.sprintf "%a.\n" (CCList.pp T.pp) coverings in
   Alcotest.(check int) str (List.length coverings) 8;
   ()

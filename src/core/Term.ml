@@ -301,12 +301,12 @@ let rec cover_with_terms ?(depth=0) t ts =
   let rest = 
     begin match view t with 
       | AppBuiltin (hd,args) -> 
-          let args' = List.map (fun a -> cover_with_terms a ts) args in
+          let args' = List.map (fun a -> cover_with_terms ~depth a ts) args in
           let args_combined = all_combs args' in
           List.map (fun args -> app_builtin ~ty:(ty t) hd args) args_combined
       | App (hd,args) -> 
           let hd' = cover_with_terms hd ts in
-          let args' = List.map (fun a -> cover_with_terms a ts) args in
+          let args' = List.map (fun a -> cover_with_terms ~depth a ts) args in
           let args_combined = all_combs (hd'::args') in
           List.map (fun l ->  app (List.hd l) (List.tl l)) args_combined
       | Fun (ty_var, body) -> 
@@ -317,23 +317,23 @@ let rec cover_with_terms ?(depth=0) t ts =
   db @ rest
 
 let max_cover t ts =
-  let rec aux depth t ts = 
+  let rec aux depth t = 
     match CCList.find_idx (equal t) ts with
-    | Some (idx,_) -> bvar (ty t) (List.length ts - 1 - idx + depth)
+    | Some (idx,_) -> bvar ~ty:(ty t) (List.length ts - 1 - idx + depth)
     | None -> 
       begin match view t with
       | AppBuiltin (hd,args) -> 
-        let args' = List.map (fun arg -> aux depth arg ts) args in
+        let args' = List.map (fun arg -> aux depth arg) args in
         app_builtin ~ty:(ty t) hd args'
       | App (hd,args) -> 
-        let args' = List.map (fun arg -> aux depth arg ts) args in
+        let args' = List.map (fun arg -> aux depth arg) args in
         app hd args'
       | Fun (ty_var, body) -> 
-        let body' = aux (depth+1) body ts in
+        let body' = aux (depth+1) body in
         fun_ ty_var body'
       | DB _ | Var _  | Const _ -> t
       end in
-  aux 0 t ts
+  aux 0 t
 
 
 module Seq = struct
