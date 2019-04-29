@@ -50,6 +50,10 @@ let _var_solve = ref false
 let _neg_cong_fun = ref false
 let _unif_max_depth = ref 11
 
+type prune_kind = [`NoPrune | `PruneAllCovers | `PruneMaxCover]
+
+let _prune_arg_fun = ref `NoPrune
+
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C
@@ -753,7 +757,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
     (* TODO: Simplified flag like in first-order? Profiler?*)
 
-  let prune_arg_fun ?(all_covers=true) c =
+  let prune_arg_fun ~all_covers c =
     let get_covers head args = 
       let ty_args, _ = Type.open_fun (T.ty head) in
       let missing = CCList.replicate (List.length ty_args - List.length args) None in 
@@ -831,11 +835,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       let new_lits = Lits.apply_subst renaming subst (C.lits c, 0) in
       let proof =
           Proof.Step.simp
-            ~rule:(Proof.Rule.mk "prune_arg")
+            ~rule:(Proof.Rule.mk "prune_arg_fun")
             [C.proof_parent_subst renaming (c,0) subst] in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
       Util.debugf ~section 3
-          "@[<>@[%a@]@ @[<2>prune_arg into@ @[%a@]@]@ with @[%a@]@]"
+          "@[<>@[%a@]@ @[<2>prune_arg_fun into@ @[%a@]@]@ with @[%a@]@]"
           (fun k->k C.pp c C.pp c' Subst.pp subst);
       SimplM.return_new c'
     )
@@ -863,9 +867,15 @@ module Make(E : Env.S) : S with module Env = E = struct
                         | Some _ -> E.CR_drop
                         | None -> E.CR_skip ));
 
-
+(* 
       if !_var_arg_remove then
-        Env.add_unary_simplify prune_arg;
+        Env.add_unary_simplify prune_arg; *)
+
+      begin match !_prune_arg_fun with
+      | `PruneMaxCover -> Env.add_unary_simplify (prune_arg_fun ~all_covers:false);
+      | `PruneAllCovers -> Env.add_unary_simplify (prune_arg_fun ~all_covers:true);
+      | `NoPrune -> ();
+      end;
 
       let ho_norm  =
       begin match Env.flex_get k_eta with
@@ -1034,6 +1044,10 @@ let () =
       "--no-ho-ext-axiom", Arg.Clear _ext_axiom, " disable extensionality axiom";
       "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule";
       "--ho-neg-ext", Arg.Bool (fun v -> _neg_ext := v), "turn NegExt on or off";
+      "--ho-prune-arg", Arg.Symbol (["all-covers"; "max-covers"; "off"], (fun s -> 
+          if s == "all-covers" then _prune_arg_fun := `PruneAllCovers
+          else if s == "max-covers" then _prune_arg_fun := `PruneMaxCover
+          else _prune_arg_fun := `NoPrune)), "choose arg prune mode";
       "--ho-no-ext-neg-lit", Arg.Clear _ext_neg_lit, " enable negative extensionality rule on literal level [?]";
       "--ho-def-unfold", Arg.Set def_unfold_enabled_, " enable ho definition unfolding";
       "--ho-huet-style-unif", Arg.Set _huet_style, " enable Huet style projection";
