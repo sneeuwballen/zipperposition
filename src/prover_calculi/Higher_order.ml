@@ -761,10 +761,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     let get_covers head args = 
       let ty_args, _ = Type.open_fun (T.ty head) in
       let missing = CCList.replicate (List.length ty_args - List.length args) None in 
-      let args_opt = List.mapi (fun i _ -> 
-        Some (List.mapi (fun j a -> 
-          if i = j then None else Some a) (* ignoring onself *) 
-        args)) args @ missing in
+      let args_opt = List.mapi (fun i a_i ->
+          if T.DB.is_closed a_i then  
+            Some (List.mapi (fun j a_j -> 
+              if i = j then None else Some a_j) args) (* ignoring onself *)
+          else None) 
+        args @ missing in
       let res = List.mapi (fun i arg_opt ->
         let t = List.nth args i in 
         match arg_opt with 
@@ -838,6 +840,10 @@ module Make(E : Env.S) : S with module Env = E = struct
             ~rule:(Proof.Rule.mk "prune_arg_fun")
             [C.proof_parent_subst renaming (c,0) subst] in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
+
+      let lits' = Lits.map (fun x -> Lambda.eta_reduce @@ Lambda.snf x) (C.lits c) in
+      Format.printf "[PAF]: [%a] => [%a].\n" Lits.pp (C.lits c) Lits.pp lits';
+
       Util.debugf ~section 3
           "@[<>@[%a@]@ @[<2>prune_arg_fun into@ @[%a@]@]@ with @[%a@]@]"
           (fun k->k C.pp c C.pp c' Subst.pp subst);
