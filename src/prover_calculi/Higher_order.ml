@@ -793,13 +793,14 @@ module Make(E : Env.S) : S with module Env = E = struct
               assert(List.length all_args = List.length covers);
               let paired = CCList.combine all_args covers in
               let res = List.map (fun (o,n) -> Term.Set.inter o n) paired in
-              VTbl.add status var res;
+              VTbl.replace status var res;
             | None ->
               VTbl.add status var (get_covers head args);
             end
           | None -> ();
         ()
       );
+
     let subst =
       VTbl.to_list status
       |> CCList.filter_map (fun (var, args) ->
@@ -843,8 +844,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             [C.proof_parent_subst renaming (c,0) subst] in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
 
-      let lits' = Lits.map (fun x -> Lambda.eta_reduce @@ Lambda.snf x) (C.lits c) in
-      Format.printf "[PAF]: [%a] => [%a].\n" Lits.pp (C.lits c) Lits.pp lits';
+      let lits' = Lits.map (fun x -> Lambda.eta_reduce @@ Lambda.snf x) (C.lits c') in
+      
+      Format.printf "[PAF]: %a => %a.\n" Lits.pp (C.lits c) Lits.pp lits';
 
       Util.debugf ~section 3
           "@[<>@[%a@]@ @[<2>prune_arg_fun into@ @[%a@]@]@ with @[%a@]@]"
@@ -1052,9 +1054,9 @@ let () =
       "--no-ho-ext-axiom", Arg.Clear _ext_axiom, " disable extensionality axiom";
       "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule";
       "--ho-neg-ext", Arg.Bool (fun v -> _neg_ext := v), "turn NegExt on or off";
-      "--ho-prune-arg", Arg.Symbol (["all-covers"; "max-covers"; "off"], (fun s -> 
-          if s == "all-covers" then _prune_arg_fun := `PruneAllCovers
-          else if s == "max-covers" then _prune_arg_fun := `PruneMaxCover
+      "--ho-prune-arg", Arg.Symbol (["all-covers"; "max-covers"; "off"], (fun s ->
+          if s = "all-covers" then _prune_arg_fun := `PruneAllCovers
+          else if s = "max-covers" then _prune_arg_fun := `PruneMaxCover
           else _prune_arg_fun := `NoPrune)), "choose arg prune mode";
       "--ho-no-ext-neg-lit", Arg.Clear _ext_neg_lit, " enable negative extensionality rule on literal level [?]";
       "--ho-def-unfold", Arg.Set def_unfold_enabled_, " enable ho definition unfolding";
