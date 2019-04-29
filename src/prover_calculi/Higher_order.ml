@@ -801,9 +801,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         ()
       );
     let subst =
-      let removed = ref IntSet.empty in
       VTbl.to_list status
       |> CCList.filter_map (fun (var, args) ->
+          let removed = ref IntSet.empty in
           let n = List.length args in 
           let keep = List.mapi (fun i arg_set -> 
             let arg_l = Term.Set.to_list arg_set in
@@ -814,19 +814,21 @@ module Make(E : Env.S) : S with module Env = E = struct
             let res = CCList.is_empty arg_l in
             if not res then removed := IntSet.add (n-i-1) !removed;
             res) args in
-          let ty_args, ty_return = Type.open_fun (HVar.ty var) in
-          let ty_args' = 
-            CCList.combine keep ty_args
-            |> CCList.filter fst |> CCList.map snd
-          in
-          let var' = HVar.cast var ~ty:(Type.arrow ty_args' ty_return) in
-          let bvars =
-            CCList.combine keep ty_args
-            |> List.mapi (fun i (k, ty) -> k, T.bvar ~ty (List.length ty_args - i - 1))
-            |> CCList.filter fst|> CCList.map snd
-          in
-          let replacement = T.fun_l ty_args (T.app (T.var var') bvars) in
-          Some ((var,0), (replacement,1)))
+          if CCList.for_all ((=) true) keep then None
+          else (
+            let ty_args, ty_return = Type.open_fun (HVar.ty var) in
+            let ty_args' = 
+              CCList.combine keep ty_args
+              |> CCList.filter fst |> CCList.map snd
+            in
+            let var' = HVar.cast var ~ty:(Type.arrow ty_args' ty_return) in
+            let bvars =
+              CCList.combine keep ty_args
+              |> List.mapi (fun i (k, ty) -> k, T.bvar ~ty (List.length ty_args - i - 1))
+              |> CCList.filter fst|> CCList.map snd
+            in
+            let replacement = T.fun_l ty_args (T.app (T.var var') bvars) in
+            Some ((var,0), (replacement,1))))
       |> Subst.FO.of_list'
     in
 
