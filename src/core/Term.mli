@@ -207,10 +207,10 @@ val head_exn : t -> ID.t (** head ID.t (or Invalid_argument) *)
 val size : t -> int (** Size (number of nodes) *)
 
 (* all the ways in which term can be covered (built) using the arguments given *)
-val cover_with_terms : ?depth:int -> t -> t list -> t list
+val cover_with_terms : ?depth:int -> t -> t option list -> t list
 
 (* cover the term in a maximal way looked top-down *)
-val max_cover : t -> t list -> t
+val max_cover : t -> t option list -> t
 
 val weight : ?var:int -> ?sym:(ID.t -> int) -> t -> int
 (** Compute the weight of a term, given a weight for variables

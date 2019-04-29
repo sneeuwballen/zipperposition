@@ -10,6 +10,8 @@ module BV = CCBV
 module T = Term
 module Lits = Literals
 
+module IntSet = Set.Make(CCInt)
+
 let section = Util.Section.make ~parent:Const.section "ho"
 
 let stat_eq_res = Util.mk_stat "ho.eq_res.steps"
@@ -731,6 +733,94 @@ module Make(E : Env.S) : S with module Env = E = struct
             Some ((var,0), (replacement,1))
           )
       )
+      |> Subst.FO.of_list'
+    in
+
+    if Subst.is_empty subst
+    then SimplM.return_same c
+    else (
+      let renaming = Subst.Renaming.none in
+      let new_lits = Lits.apply_subst renaming subst (C.lits c, 0) in
+      let proof =
+          Proof.Step.simp
+            ~rule:(Proof.Rule.mk "prune_arg")
+            [C.proof_parent_subst renaming (c,0) subst] in
+      let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
+      Util.debugf ~section 3
+          "@[<>@[%a@]@ @[<2>prune_arg into@ @[%a@]@]@ with @[%a@]@]"
+          (fun k->k C.pp c C.pp c' Subst.pp subst);
+      SimplM.return_new c'
+    )
+    (* TODO: Simplified flag like in first-order? Profiler?*)
+
+  let prune_arg_fun ?(all_covers=true) c =
+    let get_covers head args = 
+      let ty_args, _ = Type.open_fun (T.ty head) in
+      let missing = CCList.replicate (List.length ty_args - List.length args) None in 
+      let args_opt = List.mapi (fun i _ -> 
+        Some (List.mapi (fun j a -> 
+          if i = j then None else Some a) (* ignoring onself *) 
+        args)) args @ missing in
+      let res = List.mapi (fun i arg_opt ->
+        let t = List.nth args i in 
+        match arg_opt with 
+        | Some arg_l -> 
+          let res_l = if all_covers then T.cover_with_terms t arg_l 
+                      else [t; T.max_cover t arg_l] in
+          T.Set.of_list res_l 
+        | None -> Term.Set.empty ) args_opt in
+      res
+      in
+
+    let status : Term.Set.t list VTbl.t = VTbl.create 8 in
+    C.lits c
+    |> Literals.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord:Ordering.none 
+                           ~subterms:true  ~eligible:(fun _ _ -> true)
+    |> Iter.iter
+      (fun (t,_) ->
+        let head, args = T.as_app t in
+        match T.as_var head with
+          | Some var ->
+            begin match VTbl.get status var with
+            | Some all_args ->
+              let covers = get_covers head args in
+              assert(List.length all_args = List.length covers);
+              let paired = CCList.combine all_args covers in
+              let res = List.map (fun (o,n) -> Term.Set.inter o n) paired in
+              VTbl.add status var res;
+            | None ->
+              VTbl.add status var (get_covers head args);
+            end
+          | None -> ();
+        ()
+      );
+    let subst =
+      let removed = ref IntSet.empty in
+      VTbl.to_list status
+      |> CCList.filter_map (fun (var, args) ->
+          let n = List.length args in 
+          let keep = List.mapi (fun i arg_set -> 
+            let arg_l = Term.Set.to_list arg_set in
+            let arg_l = List.filter (fun t -> 
+              List.for_all (fun idx -> 
+                not @@ IntSet.mem idx !removed) (T.DB.unbound t)) 
+              arg_l in
+            let res = CCList.is_empty arg_l in
+            if not res then removed := IntSet.add (n-i-1) !removed;
+            res) args in
+          let ty_args, ty_return = Type.open_fun (HVar.ty var) in
+          let ty_args' = 
+            CCList.combine keep ty_args
+            |> CCList.filter fst |> CCList.map snd
+          in
+          let var' = HVar.cast var ~ty:(Type.arrow ty_args' ty_return) in
+          let bvars =
+            CCList.combine keep ty_args
+            |> List.mapi (fun i (k, ty) -> k, T.bvar ~ty (List.length ty_args - i - 1))
+            |> CCList.filter fst|> CCList.map snd
+          in
+          let replacement = T.fun_l ty_args (T.app (T.var var') bvars) in
+          Some ((var,0), (replacement,1)))
       |> Subst.FO.of_list'
     in
 

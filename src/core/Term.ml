@@ -294,9 +294,11 @@ let rec all_combs = function
 
 let rec cover_with_terms ?(depth=0) t ts =
   let n = List.length ts in
-  let db = CCList.mapi (fun i x -> (i,x)) ts
+  let db = CCList.mapi (fun i x -> 
+              if CCOpt.is_some x then (i, CCOpt.get_exn x) else (-1, false_)) 
+           ts
            |> CCList.filter_map (fun (i,x) -> 
-                if equal x t then Some (bvar ~ty:(ty t) (n-1-i+depth)) 
+                if i!=(-1) && equal x t then Some (bvar ~ty:(ty t) (n-1-i+depth)) 
                 else None) in
   let rest = 
     begin match view t with 
@@ -317,9 +319,13 @@ let rec cover_with_terms ?(depth=0) t ts =
   db @ rest
 
 let max_cover t ts =
-  let rec aux depth t = 
-    match CCList.find_idx (equal t) ts with
-    | Some (idx,_) -> bvar ~ty:(ty t) (List.length ts - 1 - idx + depth)
+  let rec aux depth t =
+    let hit = CCList.find_mapi (fun i x -> 
+        match x with
+        | Some t' when equal t t' -> Some i
+        | _ -> None) ts in 
+    match hit with
+    | Some idx -> bvar ~ty:(ty t) (List.length ts - 1 - idx + depth)
     | None -> 
       begin match view t with
       | AppBuiltin (hd,args) -> 
