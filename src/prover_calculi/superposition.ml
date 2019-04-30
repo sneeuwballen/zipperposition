@@ -68,7 +68,7 @@ let _sup_at_vars = ref false
 let _sup_at_var_headed = ref true
 let _sup_in_var_args = ref true
 let _sup_under_lambdas = ref true
-let _lambda_demod_ext = ref false
+let _lambda_demod = ref false
 let _demod_in_var_args = ref true
 let _dot_demod_into = ref None
 let _complete_ho_unification = ref false
@@ -208,7 +208,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* terms that can be demodulated: all subterms (but vars) *)
     _idx_back_demod :=
       (* TODO: allow demod under lambdas under certain conditions (DemodExt) *)
-      Lits.fold_terms ~vars:false ~var_args:(!_demod_in_var_args) ~fun_bodies:!_lambda_demod_ext  
+      Lits.fold_terms ~vars:false ~var_args:(!_demod_in_var_args) ~fun_bodies:!_lambda_demod  
                       ~ty_args:false ~ord ~subterms:true ~which:`All
         ~eligible:C.Eligible.always (C.lits c)
       |> Iter.fold
@@ -1312,7 +1312,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           else reduce_at_root ~restrict t k
         | T.Fun (ty_arg, body) ->
           (* reduce under lambdas *)
-          if !_lambda_demod_ext
+          if !_lambda_demod
           then
             normal_form ~restrict:lazy_false body
               (fun body' ->
@@ -2303,8 +2303,8 @@ let () =
     ; "--no-sup-under-lambdas"
     , Arg.Clear _sup_under_lambdas
     , " disable superposition in bodies of lambda-expressions"
-    ; "--lambda-demod-ext"
-    , Arg.Set _lambda_demod_ext
+    ; "--lambda-demod"
+    , Arg.Set _lambda_demod
     , " enable demodulation in bodies of lambda-expressions"
     ; "--demod-in-var-args"
     , Arg.Set _demod_in_var_args
@@ -2341,7 +2341,7 @@ let () =
       _sup_at_vars := true;
       _sup_in_var_args := false;
       _sup_under_lambdas := false;
-      _lambda_demod_ext := false;
+      _lambda_demod := false;
       _demod_in_var_args := false;
       _complete_ho_unification := true;
       _ord_in_normal_form := true;
