@@ -37,6 +37,7 @@ let prof_eq_res_syn = Util.mk_profiler "ho.eq_res_syntactic"
 let prof_ho_unif = Util.mk_profiler "ho.unif"
 
 let _ext_pos = ref true
+let _ext_pos_non_unit = ref false
 let _ext_axiom = ref false
 let _elim_pred_var = ref true
 let _ext_neg_lit = ref false
@@ -901,7 +902,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if !_ext_neg_lit then
         Env.add_lit_rule "ho_ext_neg_lit" ext_neg_lit;
       if !_ext_pos then (
-        Env.add_unary_inf "ho_ext_pos" ext_pos
+        Env.add_unary_inf "ho_ext_pos" (ext_pos ~only_unit:(not !_ext_pos_non_unit))
       );
 
       (* removing unfolded clauses *)
@@ -1090,6 +1091,7 @@ let () =
       "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule";
       "--ho-neg-ext", Arg.Bool (fun v -> _neg_ext := v), " turn NegExt on or off";
       "--ho-neg-ext-simpl", Arg.Bool (fun v -> _neg_ext_as_simpl := v), " turn NegExt as simplification rule on or off";
+      "--ho-ext-pos-non-unit", Arg.Bool (fun v -> _ext_pos_non_unit := v), " turn ExtPos on or off for non-unit equations";
       "--ho-prune-arg", Arg.Symbol (["all-covers"; "max-covers"; "old-prune"; "off"], (fun s ->
           if s = "all-covers" then _prune_arg_fun := `PruneAllCovers
           else if s = "max-covers" then _prune_arg_fun := `PruneMaxCover
@@ -1116,6 +1118,7 @@ let () =
     _neg_ext := false;
     _neg_ext_as_simpl := false;
     eta_ := `Expand;
+    _ext_pos_non_unit := false;
     prim_mode_ := `None;
     _elim_pred_var := false;
     _neg_cong_fun := false;
