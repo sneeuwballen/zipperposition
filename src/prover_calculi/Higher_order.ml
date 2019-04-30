@@ -11,6 +11,8 @@ module T = Term
 module Lits = Literals
 
 module IntSet = Set.Make(CCInt)
+module IntMap = Util.Int_map
+
 
 let section = Util.Section.make ~parent:Const.section "ho"
 
@@ -50,7 +52,7 @@ let _var_solve = ref false
 let _neg_cong_fun = ref false
 let _unif_max_depth = ref 11
 
-type prune_kind = [`NoPrune | `PruneAllCovers | `PruneMaxCover]
+type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
 
 let _prune_arg_fun = ref `NoPrune
 
@@ -778,24 +780,27 @@ module Make(E : Env.S) : S with module Env = E = struct
       res
       in
 
-    let status : Term.Set.t list VTbl.t = VTbl.create 8 in
+    let status = VTbl.create 8 in
     C.lits c
+    |> Literals.map (fun t -> Lambda.eta_expand t) (* to make sure that DB indices are everywhere the same *)
     |> Literals.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord:Ordering.none 
                            ~subterms:true  ~eligible:(fun _ _ -> true)
     |> Iter.iter
       (fun (t,_) ->
-        let head, args = T.as_app t in
+        let head, _ = T.as_app t in
         match T.as_var head with
           | Some var ->
             begin match VTbl.get status var with
-            | Some all_args ->
-              let covers = get_covers head args in
+            | Some (all_args, already_sk) ->
+              let t, aleady_sk = T.DB.skolemize_loosely_bound ~already_sk t in
+              let covers = get_covers head (T.args t) in
               assert(List.length all_args = List.length covers);
               let paired = CCList.combine all_args covers in
               let res = List.map (fun (o,n) -> Term.Set.inter o n) paired in
-              VTbl.replace status var res;
+              VTbl.replace status var (res, already_sk);
             | None ->
-              VTbl.add status var (get_covers head args);
+              let t, already_sk = T.DB.skolemize_loosely_bound t in
+              VTbl.add status var (get_covers head (T.args t), already_sk);
             end
           | None -> ();
         ()
@@ -803,14 +808,16 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let subst =
       VTbl.to_list status
-      |> CCList.filter_map (fun (var, args) ->
+      |> CCList.filter_map (fun (var, (args, sk_map)) ->
+          let sk_consts = List.map snd @@ Term.IntMap.bindings sk_map in
           let removed = ref IntSet.empty in
           let n = List.length args in 
           let keep = List.mapi (fun i arg_set -> 
             let arg_l = Term.Set.to_list arg_set in
             let arg_l = List.filter (fun t -> 
               List.for_all (fun idx -> 
-                not @@ IntSet.mem idx !removed) (T.DB.unbound t)) 
+                not @@ IntSet.mem idx !removed) (T.DB.unbound t) &&
+              List.for_all (fun sk_c -> not (T.subterm ~sub:sk_c t)) sk_consts) 
               arg_l in
             let res = CCList.is_empty arg_l in
             if not res then removed := IntSet.add (n-i-1) !removed;
@@ -843,10 +850,6 @@ module Make(E : Env.S) : S with module Env = E = struct
             ~rule:(Proof.Rule.mk "prune_arg_fun")
             [C.proof_parent_subst renaming (c,0) subst] in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
-
-      let lits' = Lits.map (fun x -> Lambda.eta_reduce @@ Lambda.snf x) (C.lits c') in
-      
-      Format.printf "[PAF]: %a => %a.\n" Lits.pp (C.lits c) Lits.pp lits';
 
       Util.debugf ~section 3
           "@[<>@[%a@]@ @[<2>prune_arg_fun into@ @[%a@]@]@ with @[%a@]@]"
@@ -884,6 +887,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       begin match !_prune_arg_fun with
       | `PruneMaxCover -> Env.add_unary_simplify (prune_arg_fun ~all_covers:false);
       | `PruneAllCovers -> Env.add_unary_simplify (prune_arg_fun ~all_covers:true);
+      | `OldPrune -> Env.add_unary_simplify prune_arg;
       | `NoPrune -> ();
       end;
 
@@ -1054,9 +1058,10 @@ let () =
       "--no-ho-ext-axiom", Arg.Clear _ext_axiom, " disable extensionality axiom";
       "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule";
       "--ho-neg-ext", Arg.Bool (fun v -> _neg_ext := v), "turn NegExt on or off";
-      "--ho-prune-arg", Arg.Symbol (["all-covers"; "max-covers"; "off"], (fun s ->
+      "--ho-prune-arg", Arg.Symbol (["all-covers"; "max-covers"; "old-prune"; "off"], (fun s ->
           if s = "all-covers" then _prune_arg_fun := `PruneAllCovers
           else if s = "max-covers" then _prune_arg_fun := `PruneMaxCover
+          else if s = "old-prune" then _prune_arg_fun := `OldPrune 
           else _prune_arg_fun := `NoPrune)), "choose arg prune mode";
       "--ho-no-ext-neg-lit", Arg.Clear _ext_neg_lit, " enable negative extensionality rule on literal level [?]";
       "--ho-def-unfold", Arg.Set def_unfold_enabled_, " enable ho definition unfolding";
