@@ -41,6 +41,7 @@ let _ext_axiom = ref false
 let _elim_pred_var = ref true
 let _ext_neg_lit = ref false
 let _neg_ext = ref true
+let _neg_ext_as_simpl = ref false
 let _ext_axiom_penalty = ref 5
 let _var_arg_remove = ref true
 let _huet_style = ref false
@@ -325,6 +326,28 @@ module Make(E : Env.S) : S with module Env = E = struct
         | _ -> None)
     |> CCArray.filter_map (fun x -> x)
     |> CCArray.to_list
+
+  let neg_ext_simpl (c:C.t) : C.t SimplM.t =
+    let is_eligible = C.Eligible.res c in 
+    let applied_neg_ext = ref false in
+    let new_lits = 
+      C.lits c
+      |> CCArray.mapi (fun i l -> 
+          match l with 
+          | Literal.Equation (lhs,rhs,false) 
+              when is_eligible i l && Type.is_fun @@ T.ty lhs ->
+            let arg_types = Type.expected_args @@ T.ty lhs in
+            let free_vars = Literal.vars l |> T.VarSet.of_list |> T.VarSet.to_list in
+            let skolems = List.map (fun ty -> T.mk_fresh_skolem free_vars ty) arg_types in
+            applied_neg_ext := true;
+            Literal.mk_neq (T.app lhs skolems) (T.app rhs skolems)
+          | _ -> l) in
+    if not !applied_neg_ext then SimplM.return_same c
+    else (
+      let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "prune_arg_fun") [C.proof_parent c] in
+      let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
+      SimplM.return_new c'
+    )
 
   (* try to eliminate a predicate variable in one fell swoop *)
   let elim_pred_variable (c:C.t) : C.t list =
@@ -880,10 +903,6 @@ module Make(E : Env.S) : S with module Env = E = struct
                         | Some _ -> E.CR_drop
                         | None -> E.CR_skip ));
 
-(* 
-      if !_var_arg_remove then
-        Env.add_unary_simplify prune_arg; *)
-
       begin match !_prune_arg_fun with
       | `PruneMaxCover -> Env.add_unary_simplify (prune_arg_fun ~all_covers:false);
       | `PruneAllCovers -> Env.add_unary_simplify (prune_arg_fun ~all_covers:true);
@@ -934,6 +953,10 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       if(!_neg_ext) then (
         Env.add_unary_inf "neg_ext" neg_ext 
+      );
+
+      if(!_neg_ext_as_simpl) then (
+        Env.add_unary_simplify neg_ext_simpl;
       );
 
       PragHOUnif.set_max_depth !_unif_max_depth ();
@@ -1057,23 +1080,24 @@ let () =
       "--ho-ext-axiom", Arg.Set _ext_axiom, " enable extensionality axiom";
       "--no-ho-ext-axiom", Arg.Clear _ext_axiom, " disable extensionality axiom";
       "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule";
-      "--ho-neg-ext", Arg.Bool (fun v -> _neg_ext := v), "turn NegExt on or off";
+      "--ho-neg-ext", Arg.Bool (fun v -> _neg_ext := v), " turn NegExt on or off";
+      "--ho-neg-ext-simpl", Arg.Bool (fun v -> _neg_ext_as_simpl := v), " turn NegExt as simplification rule on or off";
       "--ho-prune-arg", Arg.Symbol (["all-covers"; "max-covers"; "old-prune"; "off"], (fun s ->
           if s = "all-covers" then _prune_arg_fun := `PruneAllCovers
           else if s = "max-covers" then _prune_arg_fun := `PruneMaxCover
           else if s = "old-prune" then _prune_arg_fun := `OldPrune 
-          else _prune_arg_fun := `NoPrune)), "choose arg prune mode";
+          else _prune_arg_fun := `NoPrune)), " choose arg prune mode";
       "--ho-no-ext-neg-lit", Arg.Clear _ext_neg_lit, " enable negative extensionality rule on literal level [?]";
       "--ho-def-unfold", Arg.Set def_unfold_enabled_, " enable ho definition unfolding";
       "--ho-huet-style-unif", Arg.Set _huet_style, " enable Huet style projection";
-      "--ho-no-conservative-elim", Arg.Clear _cons_elim, "Disables conservative elimination rule in pragmatic unification";
-      "--ho-imitation-first",Arg.Set _imit_first, "Use imitation rule before projection rule";
-      "--ho-no-conservative-flexflex", Arg.Clear _cons_ff, "Disable conservative dealing with flex-flex pairs";
-      "--ho-solve-vars", Arg.Set _var_solve, "Enable solving variables.";
-      "--ho-composition", Arg.Set _compose_subs, "Enable composition instead of merging substitutions";
-      "--ho-disable-var-arg-removal", Arg.Clear _var_arg_remove, "disable removal of arguments of applied variables";
+      "--ho-no-conservative-elim", Arg.Clear _cons_elim, " Disables conservative elimination rule in pragmatic unification";
+      "--ho-imitation-first",Arg.Set _imit_first, " Use imitation rule before projection rule";
+      "--ho-no-conservative-flexflex", Arg.Clear _cons_ff, " Disable conservative dealing with flex-flex pairs";
+      "--ho-solve-vars", Arg.Set _var_solve, " Enable solving variables.";
+      "--ho-composition", Arg.Set _compose_subs, " Enable composition instead of merging substitutions";
+      "--ho-disable-var-arg-removal", Arg.Clear _var_arg_remove, " disable removal of arguments of applied variables";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom";
-      "--ho-unif-max-depth", Arg.Set_int _unif_max_depth, "set pragmatic unification max depth";
+      "--ho-unif-max-depth", Arg.Set_int _unif_max_depth, " set pragmatic unification max depth";
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
     enabled_ := true;
@@ -1082,6 +1106,7 @@ let () =
     _ext_axiom := true;
     _ext_neg_lit := false;
     _neg_ext := false;
+    _neg_ext_as_simpl := false;
     eta_ := `Expand;
     prim_mode_ := `None;
     _elim_pred_var := false;
