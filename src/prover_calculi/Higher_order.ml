@@ -142,52 +142,59 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
   (* positive extensionality `m x = n x --> m = n` *)
-  let ext_pos (c:C.t): C.t list =
-    begin match C.lits c with
-      | [| Literal.Equation (t1, t2, true) |] ->
-        let f1, l1 = T.as_app_with_mandatory_args t1 in
-        let f2, l2 = T.as_app_with_mandatory_args t2 in
-        begin match List.rev l1, List.rev l2 with
-          | last1 :: l1, last2 :: l2 ->
-            begin match T.view last1, T.view last2 with
-              | T.Var x, T.Var y
-                when HVar.equal Type.equal x y &&
-                     not (Type.is_tType (HVar.ty x)) &&
-                     begin
-                       Iter.of_list
-                         [Iter.doubleton f1 f2;
-                          Iter.of_list l1;
-                          Iter.of_list l2]
-                       |> Iter.flatten
-                       |> Iter.flat_map T.Seq.vars
-                       |> Iter.for_all
-                         (fun v' -> not (HVar.equal Type.equal v' x))
-                     end ->
-                (* it works! *)
-                let new_lit =
-                  Literal.mk_eq
-                    (T.app f1 (List.rev l1))
-                    (T.app f2 (List.rev l2))
-                in
-                let proof =
-                  Proof.Step.inference [C.proof_parent c]
-                    ~rule:(Proof.Rule.mk "ho_ext_pos")
-                    ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext]
-                in
-                let new_c =
-                  C.create [new_lit] proof ~penalty:(C.penalty c) ~trail:(C.trail c)
-                in
-                Util.incr_stat stat_ext_pos;
-                Util.debugf ~section 4
-                  "(@[ext_pos@ :clause %a@ :yields %a@])"
-                  (fun k->k C.pp c C.pp new_c);
-                [new_c]
-              | _ -> []
-            end
-          | _ -> []
+  let ext_pos ?(only_unit=true) (c:C.t): C.t list =
+    let is_eligible = C.Eligible.param c in
+    if not only_unit || C.lits c |> CCArray.length = 1 then 
+      C.lits c
+      |> CCArray.mapi (fun i l -> 
+        match l with 
+        | Literal.Equation (t1,t2,true) 
+            when is_eligible i l && Type.is_fun @@ T.ty t1 ->
+          let f1, l1 = T.as_app_with_mandatory_args t1 in
+          let f2, l2 = T.as_app_with_mandatory_args t2 in
+          begin match List.rev l1, List.rev l2 with
+            | last1 :: l1, last2 :: l2 ->
+              begin match T.view last1, T.view last2 with
+                | T.Var x, T.Var y
+                  when HVar.equal Type.equal x y &&
+                      not (Type.is_tType (HVar.ty x)) &&
+                        Iter.of_list
+                          [Iter.doubleton f1 f2;
+                            Iter.of_list l1;
+                            Iter.of_list l2]
+                        |> Iter.flatten
+                        |> Iter.flat_map T.Seq.vars
+                        |> Iter.for_all
+                          (fun v' -> not (HVar.equal Type.equal v' x)) ->
+                  (* it works! *)
+                  let new_lit =
+                    Literal.mk_eq
+                      (T.app f1 (List.rev l1))
+                      (T.app f2 (List.rev l2))
+                  in
+                  let new_lits = C.lits c |> CCArray.to_list |>
+                                List.mapi (fun j l -> if i = j then new_lit else l) in
+                  let proof =
+                    Proof.Step.inference [C.proof_parent c]
+                      ~rule:(Proof.Rule.mk "ho_ext_pos")
+                      ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext]
+                  in
+                  let new_c =
+                    C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
+                  in
+                  Util.incr_stat stat_ext_pos;
+                  Util.debugf ~section 4
+                    "(@[ext_pos@ :clause %a@ :yields %a@])"
+                    (fun k->k C.pp c C.pp new_c);
+                  Some new_c
+                | _,_ -> None
+              end
+            | _ -> None
         end
-      | _ -> []
-    end
+      | _ -> None)
+    |> CCArray.filter_map (fun x -> x)
+    |> CCArray.to_list
+  else []
 
   (* complete [f = g] into [f x1…xn = g x1…xn] for each [n ≥ 1] *)
   let complete_eq_args (c:C.t) : C.t list =
@@ -346,6 +353,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     else (
       let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "prune_arg_fun") [C.proof_parent c] in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
+      CCFormat.printf "[NE_simpl]: @[%a@] => @[%a@].\n" C.pp c C.pp c';
       SimplM.return_new c'
     )
 
