@@ -380,8 +380,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       
       if(info.sup_kind = LambdaSup && 
          T.Set.exists (fun v -> 
-          let t = Subst.FO.apply renaming subst (v,sc_p) in
-          List.length (T.DB.unbound t) != 0) lambdasup_vars) then
+            not @@ T.DB.is_closed @@  Subst.FO.apply renaming subst (v,sc_p)) 
+         lambdasup_vars) then
         raise @@ ExitSuperposition("LambdaSup -- an into free variable sneaks in bound variable");
 
       begin match info.passive_lit, info.passive_pos with
@@ -442,7 +442,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           Lit.apply_subst_list renaming subst' (lits_p, sc_p)
       in
       (* For some reason type comparison does not work. *)
-      let vars = List.map T.as_var_exn (Term.Set.to_list lambdasup_vars) in
+      
+      let pos_enclosing_up = Position.until_first_fun passive_lit_pos in
+      let around_up =  Subst.FO.apply renaming subst' 
+        (Lit.Pos.at info.passive_lit pos_enclosing_up, sc_p) in
+      let vars = Iter.union (T.Seq.vars around_up) (T.Seq.vars t')
+                 |> Term.VarSet.of_seq
+                 |> Term.VarSet.to_list in
       let sk_with_vars =
         List.fold_left (fun acc t ->
             let new_sk_vars = Term.mk_fresh_skolem vars (Term.ty t) in

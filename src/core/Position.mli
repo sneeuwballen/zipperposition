@@ -54,6 +54,8 @@ val hash : t -> int
 
 val num_of_funs : t -> int
 
+val until_first_fun : t -> t
+
 include Interfaces.PRINT with type t := t
 
 module Map : sig
