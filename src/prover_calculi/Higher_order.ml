@@ -792,13 +792,17 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* TODO: Simplified flag like in first-order? Profiler?*)
 
   let prune_arg ~all_covers c =
-    let get_covers head args = 
+    let get_covers ?(current_sets=[]) head args = 
       let ty_args, _ = Type.open_fun (T.ty head) in
       let missing = CCList.replicate (List.length ty_args - List.length args) None in 
       let args_opt = List.mapi (fun i a_i ->
             assert(Term.DB.is_closed a_i);
-            Some (List.mapi (fun j a_j -> 
-              if i = j then None else Some a_j) args) (* ignoring onself *)) 
+            if i < List.length current_sets &&
+               not (Term.Set.is_empty (List.nth current_sets i)) then 
+              (assert(List.length current_sets = List.length args);
+              Some (List.mapi (fun j a_j -> 
+                if i = j then None else Some a_j) args))
+            else None (* ignoring onself *))
         args @ missing in
       let res = List.mapi (fun i arg_opt ->
         let t = List.nth args i in 
