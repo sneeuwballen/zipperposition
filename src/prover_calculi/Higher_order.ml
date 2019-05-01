@@ -826,13 +826,13 @@ module Make(E : Env.S) : S with module Env = E = struct
         match T.as_var head with
           | Some var ->
             begin match VTbl.get status var with
-            | Some (all_args, created_sk) ->
+            | Some (current_sets, created_sk) ->
               let t, new_sk = T.DB.skolemize_loosely_bound t in
               let new_skolems = T.IntMap.bindings new_sk 
                                 |> List.map snd |> Term.Set.of_list in
-              let covers = get_covers head (T.args t) in
-              assert(List.length all_args = List.length covers);
-              let paired = CCList.combine all_args covers in
+              let covers = get_covers ~current_sets head (T.args t) in
+              assert(List.length current_sets = List.length covers);
+              let paired = CCList.combine current_sets covers in
               let res = List.map (fun (o,n) -> Term.Set.inter o n) paired in
               VTbl.replace status var (res, Term.Set.union created_sk new_skolems);
             | None ->
