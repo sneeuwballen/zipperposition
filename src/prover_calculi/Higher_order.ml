@@ -797,10 +797,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       let missing = CCList.replicate (List.length ty_args - List.length args) None in 
       let args_opt = List.mapi (fun i a_i ->
             assert(Term.DB.is_closed a_i);
-            if i < List.length current_sets &&
+            assert(CCList.is_empty current_sets ||
+                   List.length current_sets = List.length args);
+            if CCList.is_empty current_sets ||
                not (Term.Set.is_empty (List.nth current_sets i)) then 
-              (assert(List.length current_sets = List.length args);
-              Some (List.mapi (fun j a_j -> 
+              (Some (List.mapi (fun j a_j -> 
                 if i = j then None else Some a_j) args))
             else None (* ignoring onself *))
         args @ missing in
