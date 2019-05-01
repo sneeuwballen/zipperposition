@@ -452,7 +452,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let sk_with_vars =
         List.fold_left (fun acc t ->
             let new_sk_vars = Term.mk_fresh_skolem vars (Term.ty t) in
-            Term.Map.add t (S.FO.apply renaming subst' (new_sk_vars, sc_p)) acc)
+            Term.Map.add t new_sk_vars acc)
          Term.Map.empty new_sk in
       let new_lits =
         List.map (fun lit ->
@@ -480,16 +480,20 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       if info.sup_kind = LambdaSup && T.Set.cardinal lambdasup_vars = 1 then 
         Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       assert(List.for_all (Lit.for_all Term.DB.is_closed) new_lits);
-      (* C.check_types new_clause; *)
-      (* if (info.sup_kind = DupSup) then (
+      
+      
+      (try
+        ignore (C.check_types new_clause);
+        ()
+      with Type.ApplyError _ ->
         Format.printf
         "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
         (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
         (kind_to_str info.sup_kind) C.pp info.active sc_a T.pp info.s T.pp info.t
             T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
             Position.pp info.passive_pos Subst.pp subst';
-        Format.printf "@[res = %a@].\n" C.pp new_clause;
-      ); *)
+        Format.printf "@[res = %a@].\n" C.pp new_clause);
+      
       Some new_clause
     with ExitSuperposition reason ->
       Util.debugf ~section 3 "... cancel, %s" (fun k->k reason);
