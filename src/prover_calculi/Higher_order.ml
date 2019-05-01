@@ -352,9 +352,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           | _ -> l) in
     if not !applied_neg_ext then SimplM.return_same c
     else (
-      let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "prune_arg_fun") [C.proof_parent c] in
+      let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "neg_ext_simpl") [C.proof_parent c] in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
-      CCFormat.printf "[NE_simpl]: @[%a@] => @[%a@].\n" C.pp c C.pp c';
+      (* CCFormat.printf "[NE_simpl]: @[%a@] => @[%a@].\n" C.pp c C.pp c'; *)
       SimplM.return_new c'
     )
 
