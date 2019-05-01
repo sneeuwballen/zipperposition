@@ -1266,6 +1266,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                Util.debugf ~section 5
                  "@[<hv2>demod:@ @[<hv>t=%a[%d],@ l=%a[%d],@ r=%a[%d]@],@ subst=@[%a@]@]"
                  (fun k->k T.pp t 0 T.pp l cur_sc T.pp r cur_sc S.pp subst);
+
                (* sanity checks *)
                assert (Type.equal (T.ty l) (T.ty r));
                assert (Unif.FO.equal ~subst (l,cur_sc) (t,0));
@@ -1312,7 +1313,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           else reduce_at_root ~restrict t k
         | T.Fun (ty_arg, body) ->
           (* reduce under lambdas *)
-          if !_lambda_demod_ext
+          if !_lambda_demod_ext && T.DB.is_closed body
           then
             normal_form ~restrict:lazy_false body
               (fun body' ->

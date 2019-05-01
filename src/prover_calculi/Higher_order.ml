@@ -648,7 +648,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       ith argument is syntactically same as the jth argument, we can
       systematically remove the ith argument (and repair F's type accordingly).
   *)
-  let prune_arg c =
+  let prune_arg_old c =
     let status : (fixed_arg_status * dupl_arg_status) list VTbl.t = VTbl.create 8 in
     C.lits c
     |> Literals.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord:Ordering.none 
@@ -759,15 +759,14 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
     (* TODO: Simplified flag like in first-order? Profiler?*)
 
-  let prune_arg_fun ~all_covers c =
+  let prune_arg ~all_covers c =
     let get_covers head args = 
       let ty_args, _ = Type.open_fun (T.ty head) in
       let missing = CCList.replicate (List.length ty_args - List.length args) None in 
       let args_opt = List.mapi (fun i a_i ->
-          if T.DB.is_closed a_i then  
+            assert(Term.DB.is_closed a_i);
             Some (List.mapi (fun j a_j -> 
-              if i = j then None else Some a_j) args) (* ignoring onself *)
-          else None) 
+              if i = j then None else Some a_j) args) (* ignoring onself *)) 
         args @ missing in
       let res = List.mapi (fun i arg_opt ->
         let t = List.nth args i in 
@@ -791,16 +790,20 @@ module Make(E : Env.S) : S with module Env = E = struct
         match T.as_var head with
           | Some var ->
             begin match VTbl.get status var with
-            | Some (all_args, already_sk) ->
-              let t, aleady_sk = T.DB.skolemize_loosely_bound ~already_sk t in
+            | Some (all_args, created_sk) ->
+              let t, new_sk = T.DB.skolemize_loosely_bound t in
+              let new_skolems = T.IntMap.bindings new_sk 
+                                |> List.map snd |> Term.Set.of_list in
               let covers = get_covers head (T.args t) in
               assert(List.length all_args = List.length covers);
               let paired = CCList.combine all_args covers in
               let res = List.map (fun (o,n) -> Term.Set.inter o n) paired in
-              VTbl.replace status var (res, already_sk);
+              VTbl.replace status var (res, Term.Set.union created_sk new_skolems);
             | None ->
-              let t, already_sk = T.DB.skolemize_loosely_bound t in
-              VTbl.add status var (get_covers head (T.args t), already_sk);
+              let t', created_sk = T.DB.skolemize_loosely_bound t in
+              let created_sk = T.IntMap.bindings created_sk
+                                |> List.map snd |> Term.Set.of_list in
+              VTbl.add status var (get_covers head (T.args t'), created_sk);
             end
           | None -> ();
         ()
@@ -808,8 +811,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let subst =
       VTbl.to_list status
-      |> CCList.filter_map (fun (var, (args, sk_map)) ->
-          let sk_consts = List.map snd @@ Term.IntMap.bindings sk_map in
+      |> CCList.filter_map (fun (var, (args, skolems)) ->
           let removed = ref IntSet.empty in
           let n = List.length args in 
           let keep = List.mapi (fun i arg_set -> 
@@ -817,7 +819,8 @@ module Make(E : Env.S) : S with module Env = E = struct
             let arg_l = List.filter (fun t -> 
               List.for_all (fun idx -> 
                 not @@ IntSet.mem idx !removed) (T.DB.unbound t) &&
-              List.for_all (fun sk_c -> not (T.subterm ~sub:sk_c t)) sk_consts) 
+              T.Seq.subterms t
+              |> Iter.for_all (fun subt -> not @@ Term.Set.mem subt skolems)) 
               arg_l in
             let res = CCList.is_empty arg_l in
             if not res then removed := IntSet.add (n-i-1) !removed;
@@ -885,9 +888,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_unary_simplify prune_arg; *)
 
       begin match !_prune_arg_fun with
-      | `PruneMaxCover -> Env.add_unary_simplify (prune_arg_fun ~all_covers:false);
-      | `PruneAllCovers -> Env.add_unary_simplify (prune_arg_fun ~all_covers:true);
-      | `OldPrune -> Env.add_unary_simplify prune_arg;
+      | `PruneMaxCover -> Env.add_unary_simplify (prune_arg ~all_covers:false);
+      | `PruneAllCovers -> Env.add_unary_simplify (prune_arg ~all_covers:true);
+      | `OldPrune -> Env.add_unary_simplify prune_arg_old;
       | `NoPrune -> ();
       end;
 
