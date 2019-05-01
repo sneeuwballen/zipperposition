@@ -37,10 +37,12 @@ let prof_eq_res_syn = Util.mk_profiler "ho.eq_res_syntactic"
 let prof_ho_unif = Util.mk_profiler "ho.unif"
 
 let _ext_pos = ref true
+let _ext_pos_non_unit = ref false
 let _ext_axiom = ref false
 let _elim_pred_var = ref true
 let _ext_neg_lit = ref false
 let _neg_ext = ref true
+let _neg_ext_as_simpl = ref false
 let _ext_axiom_penalty = ref 5
 let _var_arg_remove = ref true
 let _huet_style = ref false
@@ -141,52 +143,59 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
   (* positive extensionality `m x = n x --> m = n` *)
-  let ext_pos (c:C.t): C.t list =
-    begin match C.lits c with
-      | [| Literal.Equation (t1, t2, true) |] ->
-        let f1, l1 = T.as_app_with_mandatory_args t1 in
-        let f2, l2 = T.as_app_with_mandatory_args t2 in
-        begin match List.rev l1, List.rev l2 with
-          | last1 :: l1, last2 :: l2 ->
-            begin match T.view last1, T.view last2 with
-              | T.Var x, T.Var y
-                when HVar.equal Type.equal x y &&
-                     not (Type.is_tType (HVar.ty x)) &&
-                     begin
-                       Iter.of_list
-                         [Iter.doubleton f1 f2;
-                          Iter.of_list l1;
-                          Iter.of_list l2]
-                       |> Iter.flatten
-                       |> Iter.flat_map T.Seq.vars
-                       |> Iter.for_all
-                         (fun v' -> not (HVar.equal Type.equal v' x))
-                     end ->
-                (* it works! *)
-                let new_lit =
-                  Literal.mk_eq
-                    (T.app f1 (List.rev l1))
-                    (T.app f2 (List.rev l2))
-                in
-                let proof =
-                  Proof.Step.inference [C.proof_parent c]
-                    ~rule:(Proof.Rule.mk "ho_ext_pos")
-                    ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext]
-                in
-                let new_c =
-                  C.create [new_lit] proof ~penalty:(C.penalty c) ~trail:(C.trail c)
-                in
-                Util.incr_stat stat_ext_pos;
-                Util.debugf ~section 4
-                  "(@[ext_pos@ :clause %a@ :yields %a@])"
-                  (fun k->k C.pp c C.pp new_c);
-                [new_c]
-              | _ -> []
-            end
-          | _ -> []
+  let ext_pos ?(only_unit=true) (c:C.t): C.t list =
+    let is_eligible = C.Eligible.param c in
+    if not only_unit || C.lits c |> CCArray.length = 1 then 
+      C.lits c
+      |> CCArray.mapi (fun i l -> 
+        match l with 
+        | Literal.Equation (t1,t2,true) 
+            when is_eligible i l && Type.is_fun @@ T.ty t1 ->
+          let f1, l1 = T.as_app_with_mandatory_args t1 in
+          let f2, l2 = T.as_app_with_mandatory_args t2 in
+          begin match List.rev l1, List.rev l2 with
+            | last1 :: l1, last2 :: l2 ->
+              begin match T.view last1, T.view last2 with
+                | T.Var x, T.Var y
+                  when HVar.equal Type.equal x y &&
+                      not (Type.is_tType (HVar.ty x)) &&
+                        Iter.of_list
+                          [Iter.doubleton f1 f2;
+                            Iter.of_list l1;
+                            Iter.of_list l2]
+                        |> Iter.flatten
+                        |> Iter.flat_map T.Seq.vars
+                        |> Iter.for_all
+                          (fun v' -> not (HVar.equal Type.equal v' x)) ->
+                  (* it works! *)
+                  let new_lit =
+                    Literal.mk_eq
+                      (T.app f1 (List.rev l1))
+                      (T.app f2 (List.rev l2))
+                  in
+                  let new_lits = C.lits c |> CCArray.to_list |>
+                                List.mapi (fun j l -> if i = j then new_lit else l) in
+                  let proof =
+                    Proof.Step.inference [C.proof_parent c]
+                      ~rule:(Proof.Rule.mk "ho_ext_pos")
+                      ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext]
+                  in
+                  let new_c =
+                    C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
+                  in
+                  Util.incr_stat stat_ext_pos;
+                  Util.debugf ~section 4
+                    "(@[ext_pos@ :clause %a@ :yields %a@])"
+                    (fun k->k C.pp c C.pp new_c);
+                  Some new_c
+                | _,_ -> None
+              end
+            | _ -> None
         end
-      | _ -> []
-    end
+      | _ -> None)
+    |> CCArray.filter_map (fun x -> x)
+    |> CCArray.to_list
+  else []
 
   (* complete [f = g] into [f x1…xn = g x1…xn] for each [n ≥ 1] *)
   let complete_eq_args (c:C.t) : C.t list =
@@ -325,6 +334,29 @@ module Make(E : Env.S) : S with module Env = E = struct
         | _ -> None)
     |> CCArray.filter_map (fun x -> x)
     |> CCArray.to_list
+
+  let neg_ext_simpl (c:C.t) : C.t SimplM.t =
+    let is_eligible = C.Eligible.res c in 
+    let applied_neg_ext = ref false in
+    let new_lits = 
+      C.lits c
+      |> CCArray.mapi (fun i l -> 
+          match l with 
+          | Literal.Equation (lhs,rhs,false) 
+              when is_eligible i l && Type.is_fun @@ T.ty lhs ->
+            let arg_types = Type.expected_args @@ T.ty lhs in
+            let free_vars = Literal.vars l |> T.VarSet.of_list |> T.VarSet.to_list in
+            let skolems = List.map (fun ty -> T.mk_fresh_skolem free_vars ty) arg_types in
+            applied_neg_ext := true;
+            Literal.mk_neq (T.app lhs skolems) (T.app rhs skolems)
+          | _ -> l) in
+    if not !applied_neg_ext then SimplM.return_same c
+    else (
+      let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "prune_arg_fun") [C.proof_parent c] in
+      let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
+      CCFormat.printf "[NE_simpl]: @[%a@] => @[%a@].\n" C.pp c C.pp c';
+      SimplM.return_new c'
+    )
 
   (* try to eliminate a predicate variable in one fell swoop *)
   let elim_pred_variable (c:C.t) : C.t list =
@@ -873,7 +905,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if !_ext_neg_lit then
         Env.add_lit_rule "ho_ext_neg_lit" ext_neg_lit;
       if !_ext_pos then (
-        Env.add_unary_inf "ho_ext_pos" ext_pos
+        Env.add_unary_inf "ho_ext_pos" (ext_pos ~only_unit:(not !_ext_pos_non_unit))
       );
 
       (* removing unfolded clauses *)
@@ -882,10 +914,6 @@ module Make(E : Env.S) : S with module Env = E = struct
             fun c ->  match Statement.get_rw_rule c with
                         | Some _ -> E.CR_drop
                         | None -> E.CR_skip ));
-
-(* 
-      if !_var_arg_remove then
-        Env.add_unary_simplify prune_arg; *)
 
       begin match !_prune_arg_fun with
       | `PruneMaxCover -> Env.add_unary_simplify (prune_arg ~all_covers:false);
@@ -937,6 +965,10 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       if(!_neg_ext) then (
         Env.add_unary_inf "neg_ext" neg_ext 
+      );
+
+      if(!_neg_ext_as_simpl) then (
+        Env.add_unary_simplify neg_ext_simpl;
       );
 
       PragHOUnif.set_max_depth !_unif_max_depth ();
@@ -1060,23 +1092,25 @@ let () =
       "--ho-ext-axiom", Arg.Set _ext_axiom, " enable extensionality axiom";
       "--no-ho-ext-axiom", Arg.Clear _ext_axiom, " disable extensionality axiom";
       "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule";
-      "--ho-neg-ext", Arg.Bool (fun v -> _neg_ext := v), "turn NegExt on or off";
+      "--ho-neg-ext", Arg.Bool (fun v -> _neg_ext := v), " turn NegExt on or off";
+      "--ho-neg-ext-simpl", Arg.Bool (fun v -> _neg_ext_as_simpl := v), " turn NegExt as simplification rule on or off";
+      "--ho-ext-pos-non-unit", Arg.Bool (fun v -> _ext_pos_non_unit := v), " turn ExtPos on or off for non-unit equations";
       "--ho-prune-arg", Arg.Symbol (["all-covers"; "max-covers"; "old-prune"; "off"], (fun s ->
           if s = "all-covers" then _prune_arg_fun := `PruneAllCovers
           else if s = "max-covers" then _prune_arg_fun := `PruneMaxCover
           else if s = "old-prune" then _prune_arg_fun := `OldPrune 
-          else _prune_arg_fun := `NoPrune)), "choose arg prune mode";
+          else _prune_arg_fun := `NoPrune)), " choose arg prune mode";
       "--ho-no-ext-neg-lit", Arg.Clear _ext_neg_lit, " enable negative extensionality rule on literal level [?]";
       "--ho-def-unfold", Arg.Set def_unfold_enabled_, " enable ho definition unfolding";
       "--ho-huet-style-unif", Arg.Set _huet_style, " enable Huet style projection";
-      "--ho-no-conservative-elim", Arg.Clear _cons_elim, "Disables conservative elimination rule in pragmatic unification";
-      "--ho-imitation-first",Arg.Set _imit_first, "Use imitation rule before projection rule";
-      "--ho-no-conservative-flexflex", Arg.Clear _cons_ff, "Disable conservative dealing with flex-flex pairs";
-      "--ho-solve-vars", Arg.Set _var_solve, "Enable solving variables.";
-      "--ho-composition", Arg.Set _compose_subs, "Enable composition instead of merging substitutions";
-      "--ho-disable-var-arg-removal", Arg.Clear _var_arg_remove, "disable removal of arguments of applied variables";
+      "--ho-no-conservative-elim", Arg.Clear _cons_elim, " Disables conservative elimination rule in pragmatic unification";
+      "--ho-imitation-first",Arg.Set _imit_first, " Use imitation rule before projection rule";
+      "--ho-no-conservative-flexflex", Arg.Clear _cons_ff, " Disable conservative dealing with flex-flex pairs";
+      "--ho-solve-vars", Arg.Set _var_solve, " Enable solving variables.";
+      "--ho-composition", Arg.Set _compose_subs, " Enable composition instead of merging substitutions";
+      "--ho-disable-var-arg-removal", Arg.Clear _var_arg_remove, " disable removal of arguments of applied variables";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom";
-      "--ho-unif-max-depth", Arg.Set_int _unif_max_depth, "set pragmatic unification max depth";
+      "--ho-unif-max-depth", Arg.Set_int _unif_max_depth, " set pragmatic unification max depth";
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
     enabled_ := true;
@@ -1085,7 +1119,9 @@ let () =
     _ext_axiom := true;
     _ext_neg_lit := false;
     _neg_ext := false;
+    _neg_ext_as_simpl := false;
     eta_ := `Expand;
+    _ext_pos_non_unit := false;
     prim_mode_ := `None;
     _elim_pred_var := false;
     _neg_cong_fun := false;
