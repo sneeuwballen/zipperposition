@@ -37,7 +37,7 @@ let prof_eq_res_syn = Util.mk_profiler "ho.eq_res_syntactic"
 let prof_ho_unif = Util.mk_profiler "ho.unif"
 
 let _ext_pos = ref true
-let _ext_pos_non_unit = ref false
+let _ext_pos_all_lits = ref false
 let _ext_axiom = ref false
 let _elim_pred_var = ref true
 let _ext_neg_lit = ref false
@@ -142,58 +142,14 @@ module Make(E : Env.S) : S with module Env = E = struct
     | _ -> None
 
 
-  let ext_pos_old c =
-    begin match C.lits c with
-    | [| Literal.Equation (t1, t2, true) |] ->
-      let f1, l1 = T.as_app_with_mandatory_args t1 in
-      let f2, l2 = T.as_app_with_mandatory_args t2 in
-      begin match List.rev l1, List.rev l2 with
-        | last1 :: l1, last2 :: l2 ->
-          begin match T.view last1, T.view last2 with
-            | T.Var x, T.Var y
-              when HVar.equal Type.equal x y &&
-                  not (Type.is_tType (HVar.ty x)) &&
-                  Iter.of_list
-                      [Iter.doubleton f1 f2;
-                        Iter.of_list l1;
-                        Iter.of_list l2]
-                    |> Iter.flatten
-                    |> Iter.flat_map T.Seq.vars
-                    |> Iter.for_all
-                      (fun v' -> not (HVar.equal Type.equal v' x)) ->
-              (* it works! *)
-              let new_lit =
-                Literal.mk_eq
-                  (T.app f1 (List.rev l1))
-                  (T.app f2 (List.rev l2))
-              in
-              let proof =
-                Proof.Step.inference [C.proof_parent c]
-                  ~rule:(Proof.Rule.mk "ho_ext_pos")
-                  ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext]
-              in
-              let new_c =
-                C.create [new_lit] proof ~penalty:(C.penalty c) ~trail:(C.trail c)
-              in
-              Util.incr_stat stat_ext_pos;
-              Util.debugf ~section 4
-                "(@[ext_pos@ :clause %a@ :yields %a@])"
-                (fun k->k C.pp c C.pp new_c);
-              [new_c]
-            | _ -> []
-          end
-        | _ -> []
-        end
-    | _ -> []
-    end
-
   (* positive extensionality `m x = n x --> m = n` *)
   let ext_pos ?(only_unit=true) (c:C.t): C.t list =
     (* CCFormat.printf "EP: %b\n" only_unit; *)
     let is_eligible = C.Eligible.always in
     if not only_unit || C.lits c |> CCArray.length = 1 then 
       C.lits c
-      |> CCArray.mapi (fun i l -> 
+      |> CCArray.mapi (fun i l ->
+        let l = Literal.map (fun t -> Lambda.eta_quick_reduce ~full:true t) l in
         match l with 
         | Literal.Equation (t1,t2,true) 
             when is_eligible i l ->
@@ -244,6 +200,73 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> CCArray.filter_map (fun x -> x)
     |> CCArray.to_list
   else []
+
+  let ext_pos_general ?(all_lits = false) (c:C.t) : C.t list =
+    let eligible = if all_lits then C.Eligible.always else C.Eligible.param c in
+    (* Remove recursively variables at the end of the literal t = s if possible.
+       e.g. ext_pos_lit (f X Y) (g X Y) other_lits = [f X = g X, f = g]
+       if X and Y do not appear in other_lits *)
+    let rec ext_pos_lit t s other_lits =
+      let f, tt = T.as_app t in
+      let g, ss = T.as_app s in
+      begin match List.rev tt, List.rev ss with
+        | last_t :: tl_rev_t, last_s :: tl_rev_s ->
+          if last_t = last_s && not (T.is_type last_t) then
+            match T.as_var last_t with
+              | Some v ->
+                if not (T.var_occurs ~var:v f)
+                && not (T.var_occurs ~var:v g)
+                && not (List.exists (T.var_occurs ~var:v) tl_rev_t)
+                && not (List.exists (T.var_occurs ~var:v) tl_rev_s)
+                && not (List.exists (Literal.var_occurs v) other_lits)
+                then (
+                  let butlast = (fun l -> CCList.take (List.length l - 1) l) in
+                  let t' = T.app f (butlast tt) in
+                  let s' = T.app g (butlast ss) in
+                  Literal.mk_eq t' s'
+                  :: ext_pos_lit t' s' other_lits
+                )
+                else
+                  []
+              | None -> []
+          else []
+        | _ -> []
+      end
+    in
+    let new_clauses =
+      (* iterate over all literals eligible for paramodulation *)
+      C.lits c
+      |> Iter.of_array |> Util.seq_zipi
+      |> Iter.filter (fun (idx,lit) -> eligible idx lit)
+      |> Iter.flat_map_l
+        (fun (lit_idx,lit) ->
+        let lit = Literal.map (fun t -> Lambda.eta_quick_reduce t) lit in
+        match lit with
+           | Literal.Equation (t, s, true) ->
+             ext_pos_lit t s (CCArray.except_idx (C.lits c) lit_idx)
+             |> Iter.of_list
+             |> Iter.flat_map_l
+               (fun new_lit ->
+                  (* create a clause with new_lit instead of lit *)
+                  let new_lits = new_lit :: CCArray.except_idx (C.lits c) lit_idx in
+                  let proof =
+                    Proof.Step.inference [C.proof_parent c]
+                      ~rule:(Proof.Rule.mk "ho_ext_pos_general")
+                  in
+                  let new_c =
+                    C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
+                  in
+                  [new_c])
+             |> Iter.to_list
+           | _ -> [])
+      |> Iter.to_rev_list
+    in
+    if new_clauses<>[] then (
+      Util.debugf ~section 4
+        "(@[ext-pos-general-eq@ :clause %a@ :yields (@[<hv>%a@])@])"
+        (fun k->k C.pp c (Util.pp_list ~sep:" " C.pp) new_clauses);
+    );
+    new_clauses
 
   (* complete [f = g] into [f x1…xn = g x1…xn] for each [n ≥ 1] *)
   let complete_eq_args (c:C.t) : C.t list =
@@ -960,8 +983,9 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
       if !_ext_pos then (
-        Env.add_unary_inf "ho_ext_pos" (ext_pos ~only_unit:(not !_ext_pos_non_unit))
+        (* Env.add_unary_inf "ho_ext_pos" (ext_pos ~only_unit:(not !_ext_pos_non_unit)) *)
         (* Env.add_unary_inf "ho_ext_pos_old" ext_pos_old; *)
+        Env.add_unary_inf "ho_ext_pos" (ext_pos_general ~all_lits:!_ext_pos_all_lits);
       );
 
       (* removing unfolded clauses *)
@@ -1150,7 +1174,7 @@ let () =
       "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule";
       "--ho-neg-ext", Arg.Bool (fun v -> _neg_ext := v), " turn NegExt on or off";
       "--ho-neg-ext-simpl", Arg.Bool (fun v -> _neg_ext_as_simpl := v), " turn NegExt as simplification rule on or off";
-      "--ho-ext-pos-non-unit", Arg.Bool (fun v -> _ext_pos_non_unit := v), " turn ExtPos on or off for non-unit equations";
+      "--ho-ext-pos-all-lits", Arg.Bool (fun v -> _ext_pos_all_lits := v), " turn ExtPos on for all or only eligible literals";
       "--ho-prune-arg", Arg.Symbol (["all-covers"; "max-covers"; "old-prune"; "off"], (fun s ->
           if s = "all-covers" then _prune_arg_fun := `PruneAllCovers
           else if s = "max-covers" then _prune_arg_fun := `PruneMaxCover
@@ -1178,7 +1202,7 @@ let () =
     _neg_ext_as_simpl := false;
     eta_ := `Expand;
     _ext_pos := true;
-    _ext_pos_non_unit := false;
+    _ext_pos_all_lits := false;
     prim_mode_ := `None;
     _elim_pred_var := false;
     _neg_cong_fun := false;
