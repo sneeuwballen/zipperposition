@@ -207,8 +207,8 @@ module Make(E : Env.S) : S with module Env = E = struct
        e.g. ext_pos_lit (f X Y) (g X Y) other_lits = [f X = g X, f = g]
        if X and Y do not appear in other_lits *)
     let rec ext_pos_lit t s other_lits =
-      let f, tt = T.as_app t in
-      let g, ss = T.as_app s in
+      let f, tt = T.as_app_with_mandatory_args t in
+      let g, ss = T.as_app_with_mandatory_args s in
       begin match List.rev tt, List.rev ss with
         | last_t :: tl_rev_t, last_s :: tl_rev_s ->
           if last_t = last_s && not (T.is_type last_t) then
