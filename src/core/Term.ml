@@ -90,7 +90,7 @@ module Classic = struct
 end
 
 (** {2 Containers} *)
-module IntMap = Util.Int_map
+module IntMap = Map.Make(CCInt)
 
 module Tbl = T.Tbl
 module Set = T.Set

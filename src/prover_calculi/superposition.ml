@@ -398,6 +398,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           then raise (ExitSuperposition "will yield a tautology");
         | _ -> ()
       end;
+
+      (* if (info.sup_kind = LambdaSup) then (
+        let active_vars = CCArray.except_idx (C.lits info.active) active_idx
+                          |> Literals.vars 
+      );      *)
+
       let subst', new_sk =
         if info.sup_kind = LambdaSup then
         S.FO.unleak_variables subst else subst, [] in
@@ -479,10 +485,22 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
       if info.sup_kind = LambdaSup && T.Set.cardinal lambdasup_vars = 1 then 
         Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
-      assert(List.for_all (Lit.for_all Term.DB.is_closed) new_lits);
+      (* assert(List.for_all (Lit.for_all Term.DB.is_closed) new_lits); *)
+
+      if info.sup_kind = LambdaSup then 
+        Format.printf "@[LS: @[%a@] @]\n" C.pp new_clause;
+
+      assert(
+        C.lits new_clause
+        |> CCArray.for_all (fun l -> not @@ List.exists (fun t -> 
+            T.Seq.subterms t
+         |> Iter.exists (fun st ->
+              List.exists (fun arg -> not @@ T.DB.is_closed arg)
+              (T.get_mand_args st)))
+         (Lit.root_terms l))
+      );
       
-      
-      (try
+      (* (try
         ignore (C.check_types new_clause);
         ()
       with Type.ApplyError _ ->
@@ -492,7 +510,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (kind_to_str info.sup_kind) C.pp info.active sc_a T.pp info.s T.pp info.t
             T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
             Position.pp info.passive_pos Subst.pp subst';
-        Format.printf "@[res = %a@].\n" C.pp new_clause);
+        Format.printf "@[res = %a@].\n" C.pp new_clause); *)
       
       Some new_clause
     with ExitSuperposition reason ->
