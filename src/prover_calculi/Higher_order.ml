@@ -149,7 +149,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     if not only_unit || C.lits c |> CCArray.length = 1 then 
       C.lits c
       |> CCArray.mapi (fun i l ->
-        let l = Literal.map (fun t -> Lambda.eta_quick_reduce ~full:true t) l in
+        let l = Literal.map (fun t -> Lambda.eta_reduce ~full:true t) l in
         match l with 
         | Literal.Equation (t1,t2,true) 
             when is_eligible i l ->
@@ -240,7 +240,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Iter.filter (fun (idx,lit) -> eligible idx lit)
       |> Iter.flat_map_l
         (fun (lit_idx,lit) ->
-        let lit = Literal.map (fun t -> Lambda.eta_quick_reduce t) lit in
+        let lit = Literal.map (fun t -> Lambda.eta_reduce t) lit in
         match lit with
            | Literal.Equation (t, s, true) ->
              ext_pos_lit t s (CCArray.except_idx (C.lits c) lit_idx)

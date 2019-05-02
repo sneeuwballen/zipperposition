@@ -7,7 +7,6 @@ let prof_whnf = Util.mk_profiler "term.whnf"
 let prof_snf = Util.mk_profiler "term.snf"
 let prof_eta_expand = Util.mk_profiler "term.eta_expand"
 let prof_eta_reduce = Util.mk_profiler "term.eta_reduce"
-let prof_eta_qreduce = Util.mk_profiler "term.eta_qreduce"
 
 
 module OptionSet = Set.Make(
@@ -152,29 +151,53 @@ module Inner = struct
     aux t
 
   (* compute eta-reduced normal form *)
-  let eta_reduce_rec t =
+  let eta_reduce_aux ?(full=true) t =      
+    let q_reduce ~pref_len t =
+      let hd, args = T.as_app t in
+      let n = List.length args in
+      let _, r_bvars = 
+        List.fold_right (fun arg (idx, vars) -> 
+          if idx = -1 then (idx, vars)
+          else (
+            if idx < pref_len && T.is_bvar_i idx arg then 
+              (idx+1, arg :: vars)
+            else (-1, vars)
+          )
+        ) args (0, []) in
+      let redundant = List.length r_bvars in
+      if redundant = -1 then 0, t
+      else (
+        let non_redundant = hd :: CCList.take (n-redundant) args in
+        let _, m = List.fold_right (fun arg (idx, m) ->
+          if idx = -1 then (idx, m)
+          else (
+            if not @@ List.exists (fun tt -> 
+                T.DB.contains tt (T.as_bvar_exn arg)) non_redundant then
+              (idx+1, m+1) 
+            else (-1, m))
+        ) r_bvars (0, 0) in
+        if m > 0 then (
+          let args = CCList.take (n-m) args in 
+          let ty = Type.apply_unsafe (Type.of_term_unsafe @@ T.ty_exn hd) args in
+          m, T.DB.unshift m (T.app ~ty:(ty :> T.t) hd args)
+        ) else 0, t
+      ) in
+
     let rec aux t =  match T.ty t with
       | T.NoType -> t
       | T.HasType ty ->
         begin match T.view t with
           | T.Var _ | T.DB _ | T.Const _ -> t
-          | T.Bind (b, varty, body) ->
-            let body' = aux body in
-            let eta_reduced =
-              (* Check whether the term is of an eta-reducible shape *)
-              match b, body' with
-                | Binder.Lambda, {T.term=T.App (f, l); _} -> 
-                  begin match List.rev l with
-                    | {T.term=T.DB 0; _} :: rev_butlast when List.for_all (fun arg -> not (T.DB.contains arg 0)) (f :: rev_butlast) ->
-                      Some (T.DB.unshift 1 (T.app ~ty f (List.rev rev_butlast)))
-                    | _ -> None
-                  end
-                | _ -> None
-            in
-            begin match eta_reduced with
-              | Some eta_reduced -> eta_reduced
-              | None -> T.bind ~ty ~varty b body'
-            end
+          | T.Bind(Binder.Lambda,_,_) ->
+            let pref, body = T.open_bind Binder.Lambda t in
+            let body' = if full then aux body else body in
+            let n, reduced = q_reduce ~pref_len:(List.length pref) body' in
+            assert(Type.equal (Type.of_term_unsafe @@ T.ty_exn body) (Type.of_term_unsafe @@ T.ty_exn body'));
+            if n = 0 && T.equal body body' then t
+            else (
+              T.fun_l (CCList.take (List.length pref - n) pref) reduced
+            )
+          | T.Bind(_,_,_) -> t
           | T.App (_,[]) -> assert false
           | T.App (f, l) ->
             let f' = aux f in
@@ -186,70 +209,8 @@ module Inner = struct
             T.app_builtin ~ty b (List.map aux l)
         end
     in
-    aux t
-
-    let eta_qreduce_aux ?(full=true) t =      
-      let q_reduce ~pref_len t =
-        let hd, args = T.as_app t in
-        let n = List.length args in
-        let _, r_bvars = 
-          List.fold_right (fun arg (idx, vars) -> 
-            if idx = -1 then (idx, vars)
-            else (
-              if idx < pref_len && T.is_bvar_i idx arg then 
-                (idx+1, arg :: vars)
-              else (-1, vars)
-            )
-          ) args (0, []) in
-        let redundant = List.length r_bvars in
-        if redundant = -1 then 0, t
-        else (
-          let non_redundant = hd :: CCList.take (n-redundant) args in
-          let _, m = List.fold_right (fun arg (idx, m) ->
-            if idx = -1 then (idx, m)
-            else (
-              if not @@ List.exists (fun tt -> 
-                  T.DB.contains tt (T.as_bvar_exn arg)) non_redundant then
-               (idx+1, m+1) 
-              else (-1, m))
-          ) r_bvars (0, 0) in
-          if m > 0 then (
-            let args = CCList.take (n-m) args in 
-            let ty = Type.apply_unsafe (Type.of_term_unsafe @@ T.ty_exn hd) args in
-            m, T.DB.unshift m (T.app ~ty:(ty :> T.t) hd args)
-          ) else 0, t
-        ) in
-
-      let rec aux t =  match T.ty t with
-        | T.NoType -> t
-        | T.HasType ty ->
-          begin match T.view t with
-            | T.Var _ | T.DB _ | T.Const _ -> t
-            | T.Bind(Binder.Lambda,_,_) ->
-              let pref, body = T.open_bind Binder.Lambda t in
-              let body' = if full then aux body else body in
-              let n, reduced = q_reduce ~pref_len:(List.length pref) body' in
-              assert(Type.equal (Type.of_term_unsafe @@ T.ty_exn body) (Type.of_term_unsafe @@ T.ty_exn body'));
-              if n = 0 && T.equal body body' then t
-              else (
-                T.fun_l (CCList.take (List.length pref - n) pref) reduced
-              )
-            | T.Bind(_,_,_) -> t
-            | T.App (_,[]) -> assert false
-            | T.App (f, l) ->
-              let f' = aux f in
-              let l' = List.map aux l in
-              if T.equal f f' && T.same_l l l'
-              then t
-              else T.app ~ty (aux f) (List.map aux l)
-            | T.AppBuiltin (b,l) ->
-              T.app_builtin ~ty b (List.map aux l)
-          end
-      in
-      let t' = aux t in
-      t'
-
-
+    let t' = aux t in
+    t'
 
   let whnf t = match T.view t with
     | T.App (f, _) when T.is_lambda f ->
@@ -275,9 +236,7 @@ module Inner = struct
 
   let eta_expand t = Util.with_prof prof_eta_expand eta_expand_rec t
 
-  let eta_reduce t = Util.with_prof prof_eta_reduce eta_reduce_rec t
-  
-  let eta_quick_reduce ?(full=true) t = Util.with_prof prof_eta_qreduce (eta_qreduce_aux ~full) t
+  let eta_reduce ?(full=true) t = Util.with_prof prof_eta_reduce (eta_reduce_aux ~full) t
 
 end
 
@@ -310,16 +269,10 @@ let eta_expand t =
 (*|> CCFun.tap (fun t' ->
   if t != t' then Format.printf "@[eta_expand `%a`@ into `%a`@]@." T.pp t T.pp t')*)
 
-let eta_reduce t =
-  Inner.eta_reduce (t:T.t :> IT.t) |> T.of_term_unsafe
+let eta_reduce ?(full=true) t =
+  Inner.eta_reduce ~full (t:T.t :> IT.t) |> T.of_term_unsafe
 (*|> CCFun.tap (fun t' ->
   if t != t' then Format.printf "@[eta_reduce `%a`@ into `%a`@]@." T.pp t T.pp t')*)
-
-let eta_quick_reduce ?(full=true) t =
-  let res = 
-    Inner.eta_quick_reduce ~full (t:T.t :> IT.t) |> T.of_term_unsafe in
-  res
-
 
 let beta_red_head t =
   Inner.beta_red_head (t:T.t :> IT.t) |> T.of_term_unsafe
