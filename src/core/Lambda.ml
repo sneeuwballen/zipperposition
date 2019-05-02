@@ -239,12 +239,6 @@ module Inner = struct
 
   let eta_reduce ?(full=true) t = Util.with_prof prof_eta_reduce (eta_reduce_aux ~full) t
 
-  let eta_normalize = 
-    match !Options._eta with
-    | `Reduce -> eta_reduce ~full:true
-    | `Expand -> eta_expand
-    | `None -> fun x -> x
-
 end
 
 module T = Term
@@ -280,11 +274,6 @@ let eta_reduce ?(full=true) t =
   Inner.eta_reduce ~full (t:T.t :> IT.t) |> T.of_term_unsafe
 (*|> CCFun.tap (fun t' ->
   if t != t' then Format.printf "@[eta_reduce `%a`@ into `%a`@]@." T.pp t T.pp t')*)
-
-let eta_normalize t =
-  Inner.eta_normalize (t:T.t :> IT.t) |> T.of_term_unsafe
-(*|> CCFun.tap (fun t' ->
-  if t != t' then Format.printf "@[eta_normalize `%a`@ into `%a`@]@." T.pp t T.pp t')*)
 
 let beta_red_head t =
   Inner.beta_red_head (t:T.t :> IT.t) |> T.of_term_unsafe

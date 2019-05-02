@@ -121,7 +121,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     independently by simplification rules. *) 
   let ord =
     if !_ord_in_normal_form
-    then Ordering.map (fun t -> t |> Lambda.eta_normalize |> Lambda.snf ) (Ctx.ord ())
+    then Ordering.map (fun t -> t |> Ctx.eta_normalize |> Lambda.snf) (Ctx.ord ())
     else Ctx.ord ()
 
   (* apply operation [f] to some parts of the clause [c] just added/removed

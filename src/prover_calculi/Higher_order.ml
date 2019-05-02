@@ -680,7 +680,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* rule for eta-expansion *)
   let eta_normalize t =
     assert (T.DB.is_closed t);
-    let t' = Lambda.eta_normalize t in
+    let t' = Ctx.eta_normalize t in
     if (T.equal t t') then (
        Util.debugf ~section 50 "(@[eta_normalize `%a`@ failed `@])" (fun k->k T.pp t );
        None)

@@ -11,9 +11,6 @@
 val _stats : bool ref
 (** Enable printing of statistics? *)
 
-val _eta : [ `Reduce | `Expand | `None ] ref
-(** Eta-conversion *)
-
 type input_format =
   | I_tptp
   | I_zf
