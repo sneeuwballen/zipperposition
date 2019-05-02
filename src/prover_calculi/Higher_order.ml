@@ -22,8 +22,7 @@ let stat_ext_neg_lit = Util.mk_stat "ho.extensionality-.steps"
 let stat_ext_pos = Util.mk_stat "ho.extensionality+.steps"
 let stat_complete_eq = Util.mk_stat "ho.complete_eq.steps"
 let stat_beta = Util.mk_stat "ho.beta_reduce.steps"
-let stat_eta_expand = Util.mk_stat "ho.eta_expand.steps"
-let stat_eta_reduce = Util.mk_stat "ho.eta_reduce.steps"
+let stat_eta_normalize = Util.mk_stat "ho.eta_normalize.steps"
 let stat_prim_enum = Util.mk_stat "ho.prim_enum.steps"
 let stat_elim_pred = Util.mk_stat "ho.elim_pred.steps"
 let stat_ho_unif = Util.mk_stat "ho.unif.calls"
@@ -74,7 +73,6 @@ let k_enable_def_unfold : bool Flex_state.key = Flex_state.create_key()
 let k_enable_ho_unif : bool Flex_state.key = Flex_state.create_key()
 let k_ho_prim_mode : _ Flex_state.key = Flex_state.create_key()
 let k_ho_prim_max_penalty : int Flex_state.key = Flex_state.create_key()
-let k_eta : [`Reduce | `Expand | `None] Flex_state.key = Flex_state.create_key()
 
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
@@ -680,29 +678,16 @@ module Make(E : Env.S) : S with module Env = E = struct
    )
 
   (* rule for eta-expansion *)
-  let eta_expand t =
+  let eta_normalize t =
     assert (T.DB.is_closed t);
-    let t' = Lambda.eta_expand t in
+    let t' = Lambda.eta_normalize t in
     if (T.equal t t') then (
-       Util.debugf ~section 50 "(@[eta_expand `%a`@ failed `@])" (fun k->k T.pp t );
+       Util.debugf ~section 50 "(@[eta_normalize `%a`@ failed `@])" (fun k->k T.pp t );
        None)
     else (
-      Util.debugf ~section 50 "(@[eta_expand `%a`@ :into `%a`@])"
+      Util.debugf ~section 50 "(@[eta_normalize `%a`@ :into `%a`@])"
         (fun k->k T.pp t T.pp t');
-      Util.incr_stat stat_eta_expand;
-      assert (T.DB.is_closed t');
-      Some t'
-    )
-
-  (* rule for eta-expansion *)
-  let eta_reduce t =
-    assert (T.DB.is_closed t);
-    let t' = Lambda.eta_reduce t in
-    if (T.equal t t') then None
-    else (
-      Util.debugf ~section 50 "(@[eta_reduce `%a`@ :into `%a`@])"
-        (fun k->k T.pp t T.pp t');
-      Util.incr_stat stat_eta_reduce;
+      Util.incr_stat stat_eta_normalize;
       assert (T.DB.is_closed t');
       Some t'
     )
@@ -1002,24 +987,13 @@ module Make(E : Env.S) : S with module Env = E = struct
       | `NoPrune -> ();
       end;
 
-      let ho_norm  =
-      begin match Env.flex_get k_eta with
-        | `Expand -> (fun t -> t |> beta_reduce |> (
+      let ho_norm = (fun t -> t |> beta_reduce |> (
                         fun opt -> match opt with
-                                    None -> eta_expand t
+                                    None -> eta_normalize t
                                     | Some t' ->
-                                       match eta_expand t' with
+                                       match eta_normalize t' with
                                           None -> Some t'
                                           | Some tt -> Some tt))
-        | `Reduce -> (fun t -> t |> beta_reduce |> (
-                        fun opt -> match opt with
-                                    None -> eta_reduce t
-                                    | Some t' ->
-                                       match eta_reduce t' with
-                                          None -> Some t'
-                                          | Some tt -> Some tt))
-        | `None -> beta_reduce
-      end;
       in
       Env.set_ho_normalization_rule ho_norm;
 
@@ -1073,7 +1047,6 @@ let force_enabled_ = ref false
 let enable_unif_ = ref true
 let prim_mode_ = ref `Neg
 let prim_max_penalty = ref 15 (* FUDGE *)
-let eta_ = ref `Reduce
 
 let set_prim_mode_ =
   let l = [
@@ -1144,7 +1117,6 @@ let extension =
     |> Flex_state.add k_enable_ho_unif (!enabled_ && !enable_unif_)
     |> Flex_state.add k_ho_prim_mode (if !enabled_ then !prim_mode_ else `None)
     |> Flex_state.add k_ho_prim_max_penalty !prim_max_penalty
-    |> Flex_state.add k_eta !eta_
   in
   { Extensions.default with
       Extensions.name = "ho";
@@ -1152,10 +1124,6 @@ let extension =
       env_actions=[register];
   }
 
-let eta_opt =
-  let set_ n = eta_ := n in
-  let l = [ "reduce", `Reduce; "expand", `Expand; "none", `None] in
-  Arg.Symbol (List.map fst l, fun s -> set_ (List.assoc s l))
 
 let () =
   Options.add_opts
@@ -1168,7 +1136,6 @@ let () =
       "--no-ho-elim-pred-var", Arg.Clear _elim_pred_var, " disable predicate variable elimination";
       "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";
       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
-      "--ho-eta", eta_opt, " eta-expansion/reduction";
       "--ho-ext-axiom", Arg.Set _ext_axiom, " enable extensionality axiom";
       "--no-ho-ext-axiom", Arg.Clear _ext_axiom, " disable extensionality axiom";
       "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule";
@@ -1200,7 +1167,6 @@ let () =
     _ext_neg_lit := false;
     _neg_ext := false;
     _neg_ext_as_simpl := false;
-    eta_ := `Expand;
     _ext_pos := true;
     _ext_pos_all_lits := false;
     prim_mode_ := `None;

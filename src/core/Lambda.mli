@@ -30,6 +30,10 @@ val eta_reduce : ?full:bool -> term -> term
     A term [fun x. t x] where [x ∉ vars(t)] becomes [t].
     If full is false, it eta-reduces only at the top level (default: true) *)
 
+val eta_normalize : term -> term
+(** Traverse the term, eta-normalizing all sub-terms.
+    Eta-reduces or expands depending on Option._eta *)
+
 val is_lambda_pattern : term -> bool
 
 (** Low level interface *)
@@ -43,6 +47,8 @@ module Inner : sig
   val eta_expand : term -> term
 
   val eta_reduce : ?full:bool -> term -> term
+
+  val eta_normalize : term -> term
   
   val beta_red_head : term -> term
 end

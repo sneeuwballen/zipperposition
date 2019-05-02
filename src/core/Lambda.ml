@@ -143,7 +143,8 @@ module Inner = struct
               if T.same_l l l' then body else T.app_builtin ~ty b l'
             | T.Bind (b, varty, body') ->
               assert (b <> Binder.Lambda);
-              T.bind ~ty ~varty b (aux body')
+              let body_reduced = aux body' in
+              if body' = body_reduced then body else T.bind ~ty ~varty b body_reduced
           in
           T.fun_l ty_args body
         )
@@ -238,6 +239,12 @@ module Inner = struct
 
   let eta_reduce ?(full=true) t = Util.with_prof prof_eta_reduce (eta_reduce_aux ~full) t
 
+  let eta_normalize = 
+    match !Options._eta with
+    | `Reduce -> eta_reduce ~full:true
+    | `Expand -> eta_expand
+    | `None -> fun x -> x
+
 end
 
 module T = Term
@@ -274,9 +281,13 @@ let eta_reduce ?(full=true) t =
 (*|> CCFun.tap (fun t' ->
   if t != t' then Format.printf "@[eta_reduce `%a`@ into `%a`@]@." T.pp t T.pp t')*)
 
+let eta_normalize t =
+  Inner.eta_normalize (t:T.t :> IT.t) |> T.of_term_unsafe
+(*|> CCFun.tap (fun t' ->
+  if t != t' then Format.printf "@[eta_normalize `%a`@ into `%a`@]@." T.pp t T.pp t')*)
+
 let beta_red_head t =
   Inner.beta_red_head (t:T.t :> IT.t) |> T.of_term_unsafe
-
 
 let rec is_lambda_pattern t = match T.view (whnf t) with
   | T.AppBuiltin (_, ts) -> List.for_all is_lambda_pattern ts

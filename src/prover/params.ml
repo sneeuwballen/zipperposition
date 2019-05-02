@@ -39,7 +39,7 @@ let default : t = {
   prelude= CCVector.create() |> CCVector.freeze;
   files = CCVector.create() |> CCVector.freeze;
   select = "default";
-  stats= !Options.stats;
+  stats= !Options._stats;
   def_as_rewrite= true;
   presaturate = false;
   dot_all_roots= false;
@@ -125,7 +125,7 @@ let parse_args () =
   { ord= !ord; seed = !seed; steps = !steps;
     version= !version; timeout = !timeout; prelude= prelude;
     files = files; select = !select;
-    stats= ! Options.stats; def_as_rewrite= !def_as_rewrite;
+    stats= ! Options._stats; def_as_rewrite= !def_as_rewrite;
     presaturate = !presaturate; dot_all_roots= !dot_all_roots;
     dot_file = !dot_file; dot_llproof= !dot_llproof;
     dot_check= !dot_check;
