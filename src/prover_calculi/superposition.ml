@@ -399,10 +399,20 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | _ -> ()
       end;
 
-      (* if (info.sup_kind = LambdaSup) then (
-        let active_vars = CCArray.except_idx (C.lits info.active) active_idx
-                          |> Literals.vars 
-      );      *)
+      if (info.sup_kind = LambdaSup) then (
+        let vars_a = CCArray.except_idx (C.lits info.active) active_idx
+                     |> CCArray.of_list |> Literals.vars |> T.VarSet.of_list in
+        let vars_p = C.lits info.passive |> Literals.vars |> T.VarSet.of_list in
+        let vars_bound_to_closed_terms var_set scope =
+          T.VarSet.for_all (fun v -> 
+            match Subst.FO.get_var subst ((v :> InnerTerm.t HVar.t),scope) with
+            | Some (t,_) -> T.DB.is_closed t
+            | None -> true) var_set in
+        if not (vars_bound_to_closed_terms vars_a sc_a) 
+          || not (vars_bound_to_closed_terms vars_p sc_p) then (
+            raise (ExitSuperposition "Skolems will be introduced for LambdaSup.");
+          )
+      );     
 
       let subst', new_sk =
         if info.sup_kind = LambdaSup then
@@ -485,10 +495,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
       if info.sup_kind = LambdaSup && T.Set.cardinal lambdasup_vars = 1 then 
         Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
-      (* assert(List.for_all (Lit.for_all Term.DB.is_closed) new_lits); *)
-
-      if info.sup_kind = LambdaSup then 
-        Format.printf "@[LS: @[%a@] @]\n" C.pp new_clause;
+      assert(List.for_all (Lit.for_all Term.DB.is_closed) new_lits);
 
       assert(
         C.lits new_clause
