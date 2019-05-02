@@ -116,12 +116,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let idx_sup_from () = !_idx_sup_from
   let idx_fv () = !_idx_fv
 
+  (* Beta-Eta-Normalizes terms before comparing them. Note that the Clause
+    module calls Ctx.ord () independently, but clauses should be normalized
+    independently by simplification rules. *) 
   let ord =
-    (* TODO: This option only makes sense in combination with the beta and eta rules in Higher_order.ml.
-       They should be connected to each other. Note that the Clause module calls Ctx.ord () independently.
-      *)
     if !_ord_in_normal_form
-    then Ordering.map (fun t -> Lambda.snf t) (Ctx.ord ())
+    then Ordering.map (fun t -> t |> Lambda.eta_normalize |> Lambda.snf ) (Ctx.ord ())
     else Ctx.ord ()
 
   (* apply operation [f] to some parts of the clause [c] just added/removed

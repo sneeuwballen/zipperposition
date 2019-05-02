@@ -8,7 +8,9 @@
     global parameters, and return a parameter type for other options.
 *)
 
-let stats = ref false
+let _stats = ref false
+
+let _eta = ref `Reduce
 
 type input_format =
   | I_tptp
@@ -72,6 +74,11 @@ let other_opts = ref []
 let add_opt o = other_opts := o :: !other_opts
 let add_opts l = other_opts := l @ !other_opts
 
+let eta_opt =
+  let set_ n = _eta := n in
+  let l = [ "reduce", `Reduce; "expand", `Expand; "none", `None] in
+  Arg.Symbol (List.map fst l, fun s -> set_ (List.assoc s l))
+
 let make () =
   List.rev_append
     [ "--debug", Arg.Int Util.set_debug, " debug level (int)"
@@ -87,7 +94,7 @@ let make () =
     ; "--no-color", switch_opt false CCFormat.set_color_default, " disable colors"
     ; "-nc", switch_opt false CCFormat.set_color_default, " alias to --no-color"
     ; "--mem-limit", Arg.Int Util.set_memory_limit, " memory limit (in MB)"
-    ; "--stats", Arg.Set stats, " gather and print statistics"
+    ; "--stats", Arg.Set _stats, " gather and print statistics"
     ; "--input", Arg.String set_in, " set input format (zf or tptp)"
     ; "-i", Arg.String set_in, " alias for --input"
     ; "--output" , Arg.String set_out , " choose printing format (zf, tptp, default, none)"
@@ -95,5 +102,6 @@ let make () =
     ; "--break", Arg.Set Util.break_on_debug, " wait for user input after each debug message"
     ; "--show-ty-args", Arg.Set InnerTerm.show_type_arguments, " show type arguments in terms"
     ; "--hide-ty-args", Arg.Clear InnerTerm.show_type_arguments, " hide type arguments in terms"
+    ; "--ho-eta", eta_opt, " eta-expansion/reduction"
     ]
     (List.rev_append !other_opts (mk_debug_opts ()))

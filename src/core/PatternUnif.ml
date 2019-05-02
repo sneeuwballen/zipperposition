@@ -88,8 +88,8 @@ let rec eligible_arg t =
 let get_bvars args =
   let reduced = 
     List.map 
-      (fun t -> if (eligible_arg t) then (Lambda.eta_quick_reduce t) else t) 
-                (*Lambda.eta_quick_reduce t*)
+      (fun t -> if (eligible_arg t) then (Lambda.eta_reduce t) else t) 
+                (*Lambda.eta_reduce t*)
     args in
   let n = List.length reduced in
   if List.for_all T.is_bvar reduced then (
@@ -304,7 +304,7 @@ and flex_same ~counter ~scope ~subst var args_s args_t =
   let v = Term.as_var_exn var in
   let ret_ty = Type.apply_unsafe (Term.ty var) 
     ((List.map (fun t -> 
-        cast_var (Lambda.eta_quick_reduce t) subst scope) args_s :> InnerTerm.t list)) in
+        cast_var (Lambda.eta_reduce t) subst scope) args_s :> InnerTerm.t list)) in
   let bvars = 
     CCList.filter_map (fun x->x)
     (CCArray.mapi (fun i si ->
@@ -344,7 +344,7 @@ and flex_diff ~counter ~scope ~subst var_s var_t args_s args_t =
   let ret_ty = 
     Type.apply_unsafe (Term.ty var_s) 
       (List.map (fun t -> 
-        cast_var (Lambda.eta_quick_reduce t) subst scope) args_s :> InnerTerm.t list) in
+        cast_var (Lambda.eta_reduce t) subst scope) args_s :> InnerTerm.t list) in
   let new_var_ty = Type.arrow arg_types ret_ty in
   let new_var = Term.var @@ H.fresh_cnt ~counter ~ty:new_var_ty () in
   let matrix_s = Term.app new_var (List.map fst new_bvars) in

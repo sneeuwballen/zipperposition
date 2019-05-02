@@ -301,10 +301,8 @@ let iterate ~scope ~counter u v l =
 
 (** {6 Unification procedure} *)
 
-(* apply a substitution and reduce to normal form *)
-let nfapply s u = Lambda.snf (S.apply s u)
-
-(* TODO: comparison form is actually slightly different, but eta_expand also works *)
+(* Apply a substitution and reduce to normal form. Comparison form is actually slightly different, but eta_expand also works. *)
+let nfapply s u = S.apply s u |> Lambda.snf |> Lambda.eta_expand
 
 let find_disagreement s t = 
   (* TODO: preferably one that is not below a variable (to get preunification if possible) *)
