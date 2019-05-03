@@ -792,10 +792,12 @@ let get_rw_rule ?weight_incr:(w_i=20) c  =
       CCList.foldi (fun acc i v -> Term.Map.add v (n_new-i-1) acc) Term.Map.empty vars in
     let vars_to_db = Term.DB.map_vars_shift var_db_map rhs in
     let abs_rhs =  (Term.fun_l ((CCList.map Term.ty vars)) vars_to_db) in
+    assert(Term.DB.is_closed abs_rhs);
     let r = Rewrite.Term.Rule.make ~proof:(as_proof_c c) sym (Type.close_forall (Term.ty abs_rhs)) ty_vars abs_rhs in
     let rule = Rewrite.T_rule r in
-    Util.debugf 1 "[ Declared rule %a out of symbol %a and rhs %a ]"
-    (fun k -> k Rewrite.Rule.pp rule ID.pp sym Term.pp rhs);
+    (* Util.debugf 1 "[ Declared rule %a out of symbol %a and rhs %a ]"
+    (fun k -> k Rewrite.Rule.pp rule ID.pp sym Term.pp rhs); *)
+    (* Format.printf "[RULE: %a SYM: %a RHS: %a]\n" Rewrite.Rule.pp rule ID.pp sym Term.pp rhs; *)
     rule in
 
   let build_from_head sym vars rhs =
@@ -836,6 +838,10 @@ let get_rw_rule ?weight_incr:(w_i=20) c  =
    if Iter.length all_lits = 1 then
       match Iter.head_exn all_lits with
       | SLiteral.Eq (t1,t2) ->
+         assert(Term.ty t1 = Term.ty t2);
+         let ty = Term.ty t1 in
+         let fresh_vars = List.map (fun ty -> Term.var (HVar.fresh ~ty ())) (Type.expected_args ty) in
+         let t1, t2 = Lambda.snf @@ Term.app t1 fresh_vars, Lambda.snf @@ Term.app t2 fresh_vars in
          if (Term.weight t2 - Term.weight t1 <= w_i) then (
             match conv_terms_rw t1 t2 with
             | Some rhs -> Some rhs

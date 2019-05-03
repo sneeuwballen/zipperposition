@@ -690,7 +690,7 @@ let suite_pv_unif : unit Alcotest.test_case list =
 
       "fun (x:term->term) (y:term). X x" =?= 
       "fun (x:term->term) (y:term). f (f_ho x) (Y y) "
-      >>> Action.count 2;
+      >>> Action.count 1;
 
 
       "X" =?= "Y Z" >-> "term"

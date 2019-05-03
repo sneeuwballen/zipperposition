@@ -13,14 +13,14 @@ module S = struct
   let pp = US.pp
 end
 
-let max_depth = ref 11
+let max_depth = ref 7
 let max_app_projections = 2
 let back_off_interval = 4
 
 let _cons_e = ref true
 let _imit_first = ref false
 let _cons_ff = ref true
-let _solve_var = ref false
+let _solve_var = ref true
 
 (* apply a substitution and reduce to whnf *)
 let nfapply s u = Lambda.beta_red_head (S.apply s u)
@@ -264,9 +264,10 @@ and flex_rigid ~depth ~nr_iter ~subst ~counter ~scope ~ban_id s t rest =
   let substs = List.map (fun (s, n_args) -> 
     compose_sub subst s, n_args) bindings in
   OSeq.of_list substs
-  |> OSeq.flat_map (fun (subst,n_args) -> 
+  |> OSeq.flat_map (fun (subst,n_args) ->
+    let iter = (if n_args == 0 then 0 else 1) in 
     unify ~depth:(depth+1) ~scope  ~counter ~subst 
-          ~nr_iter:((if n_args == 0 then 0 else 1) + nr_iter)
+          ~nr_iter:(iter + nr_iter)
           ((s, t,ban_id) :: rest))
 
 and flex_same ~depth ~subst ~nr_iter ~counter ~scope hd_s args_s args_t rest all =
