@@ -435,7 +435,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         vars_bound_to_closed_terms vars_a sc_a;
         vars_bound_to_closed_terms vars_p sc_p;
 
-        if List.length !dbs  <= !_lambdasup   then (
+        if Util.Int_set.cardinal (Util.Int_set.of_list !dbs)  > !_lambdasup   then (
             raise (ExitSuperposition "Too many skolems will be introduced for LambdaSup.");
         )
       );     
@@ -521,7 +521,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
       if info.sup_kind = LambdaSup then
-        Format.printf "LS: %a\n" C.pp new_clause; 
+        (* Format.printf "LS: %a\n" C.pp new_clause;  *)
         Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       assert(List.for_all (Lit.for_all Term.DB.is_closed) new_lits);
 
