@@ -520,7 +520,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         + (if T.is_var s' then 2 else 0) (* superposition from var = bad *)
       in
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
-      if info.sup_kind = LambdaSup && T.Set.cardinal lambdasup_vars = 1 then 
+      if info.sup_kind = LambdaSup then
+        Format.printf "LS: %a\n" C.pp new_clause; 
         Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       assert(List.for_all (Lit.for_all Term.DB.is_closed) new_lits);
 
@@ -2394,7 +2395,8 @@ let () =
     ; "--lambdasup"
     , Arg.Int (fun l -> 
                   if l < 0 then 
-                    raise (Util.Error ("lambdaSup argument should be non-negative", ""));
+                    raise (Util.Error ("argument parsing", 
+                                       "lambdaSup argument should be non-negative"));
               _lambdasup := l)
     , " enable LambdaSup -- argument is the maximum number of skolems introduced in an inference";
     "--dupsup"
