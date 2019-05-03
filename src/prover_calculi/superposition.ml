@@ -124,6 +124,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     then Ordering.map (fun t -> t |> Ctx.eta_normalize |> Lambda.snf) (Ctx.ord ())
     else Ctx.ord ()
 
+  (* Syntactic overapproximation of fluid terms *)
+  let is_fluid t = 
+    T.is_var (T.head_term t) && not (CCList.is_empty @@ T.args t) 
+    (* Applied variables *)
+    || T.is_fun t && not (T.is_ground t)                          
+    (* or a lambda-expression that might eta-reduce to a non-lambda-expression after substitution (overapproximated) *)
+
   (* apply operation [f] to some parts of the clause [c] just added/removed
      from the active set *)
   let _update_active f c =
@@ -151,7 +158,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       _idx_fluidsup_into :=
         Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false ~ord ~which:`Max ~subterms:true
           ~eligible:(C.Eligible.res c) (C.lits c)
-        |> Iter.filter (fun (t, _) -> T.is_var (T.head_term t)) (* Only applied variables *)
+        |> Iter.filter (fun (t, _) -> is_fluid t) 
         |> Iter.fold
           (fun tree (t, pos) ->
             let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
@@ -832,7 +839,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun (s, t, _, s_pos) ->
           I.fold !_idx_fluidsup_into
             (fun acc u_p with_pos ->
-              assert (T.is_var (T.head_term u_p));
+              assert (is_fluid u_p);
               assert (T.DB.is_closed u_p);
               (* Create prefix variable H and use H s = H t for superposition *)
               let var_h = T.var (HVar.fresh ~ty:(Type.arrow [T.ty s] (Type.var (HVar.fresh ~ty:Type.tType ()))) ()) in
@@ -875,7 +882,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let new_clauses =
       Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~subterms:true ~ord
         ~which:`Max ~eligible ~ty_args:false (C.lits clause)
-      |> Iter.filter (fun (u_p, _) -> (T.is_var (T.head_term u_p)))
+      |> Iter.filter (fun (u_p, _) -> is_fluid u_p)
       |> Iter.flat_map
         (fun (u_p, passive_pos) ->
           let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
@@ -915,7 +922,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.exit_prof prof_infer_fluidsup_passive;
     []
 
-    (* ----------------------------------------------------------------------
+  (* ----------------------------------------------------------------------
    * DupSup rule (Lightweight superposition at applied variables)
    * ---------------------------------------------------------------------- *)
 
