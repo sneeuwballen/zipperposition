@@ -124,12 +124,24 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     then Ordering.map (fun t -> t |> Ctx.eta_normalize |> Lambda.snf) (Ctx.ord ())
     else Ctx.ord ()
 
-  (* Syntactic overapproximation of fluid terms *)
-  let is_fluid t = 
+  (* Syntactic overapproximation of fluid or deep terms *)
+  let is_fluid_or_deep c t = 
+    (* Fluid (1): Applied variables *)
     T.is_var (T.head_term t) && not (CCList.is_empty @@ T.args t) 
-    (* Applied variables *)
+    (* Fluid (2): A lambda-expression that might eta-reduce to a non-lambda-expression after substitution (overapproximated) *)
     || T.is_fun t && not (T.is_ground t)                          
-    (* or a lambda-expression that might eta-reduce to a non-lambda-expression after substitution (overapproximated) *)
+    (* Deep: A variable also occurring in a lambda-expression or in an argument of a variable in the same clause*)
+    || match T.as_var t with
+      | Some v -> Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false ~which:`All ~ord ~subterms:true ~eligible:(fun _ _ -> true) (C.lits c)
+        |> Iter.exists 
+          (fun (t, _) -> 
+            match T.view t with
+              | App (head, args) when T.is_var head -> 
+                Iter.exists (HVar.equal Type.equal v) (args |> Iter.of_list |> Iter.flat_map T.Seq.vars)
+              | Fun (_, body) -> 
+                Iter.exists (HVar.equal Type.equal v) (T.Seq.vars body)
+              | _ -> false)
+      | None -> false
 
   (* apply operation [f] to some parts of the clause [c] just added/removed
      from the active set *)
@@ -156,9 +168,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* index subterms that can be rewritten by FluidSup *)
     if !_fluidsup then
       _idx_fluidsup_into :=
-        Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false ~ord ~which:`Max ~subterms:true
+        Lits.fold_terms ~vars:true ~var_args:false ~fun_bodies:false ~ty_args:false ~ord ~which:`Max ~subterms:true
           ~eligible:(C.Eligible.res c) (C.lits c)
-        |> Iter.filter (fun (t, _) -> is_fluid t) 
+        |> Iter.filter (fun (t, _) -> is_fluid_or_deep c t) 
         |> Iter.fold
           (fun tree (t, pos) ->
             let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
@@ -354,7 +366,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let sc_p = info.scope_passive in
     assert (InnerTerm.DB.closed (info.s:>InnerTerm.t));
     assert (info.sup_kind == LambdaSup || InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
-    assert (not(T.is_var info.u_p) || T.is_ho_var info.u_p);
+    assert (not(T.is_var info.u_p) || T.is_ho_var info.u_p || info.sup_kind = FluidSup);
     assert (!_sup_at_var_headed || info.sup_kind = FluidSup || 
             info.sup_kind = DupSup || not (T.is_var (T.head_term info.u_p)));
     let active_idx = Lits.Pos.idx info.active_pos in
@@ -441,10 +453,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
       ) then raise (ExitSuperposition "bad ordering conditions");
       (* Check for superposition at a variable *)
-      if not !_sup_at_vars then
-        assert (not (T.is_var info.u_p))
-      else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then
-        raise (ExitSuperposition "superposition at variable");
+      if info.sup_kind != FluidSup then
+        if not !_sup_at_vars then
+          assert (not (T.is_var info.u_p))
+        else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then
+          raise (ExitSuperposition "superposition at variable");
 
       (* ordering constraints are ok *)
       let lits_a = CCArray.except_idx (C.lits info.active) active_idx in
@@ -548,7 +561,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           Position.pp info.passive_pos US.pp info.subst);
     assert (InnerTerm.DB.closed (info.s:>InnerTerm.t));
     assert (info.sup_kind == LambdaSup || InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
-    assert (not(T.is_var info.u_p) || T.is_ho_var info.u_p);
+    assert (not(T.is_var info.u_p) || T.is_ho_var info.u_p || info.sup_kind = FluidSup);
     assert (!_sup_at_var_headed || info.sup_kind = FluidSup || 
             info.sup_kind = DupSup || not (T.is_var (T.head_term info.u_p)));
     let active_idx = Lits.Pos.idx info.active_pos in
@@ -585,10 +598,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
       ) then raise (ExitSuperposition "bad ordering conditions");
       (* Check for superposition at a variable *)
-      if not !_sup_at_vars then
-        assert (not (T.is_var info.u_p))
-      else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then
-        raise (ExitSuperposition "superposition at variable");
+      if info.sup_kind != FluidSup then
+        if not !_sup_at_vars then
+          assert (not (T.is_var info.u_p))
+        else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then
+          raise (ExitSuperposition "superposition at variable");
       (* ordering constraints are ok, build new active lits (excepted s=t) *)
       let lits_a = CCArray.except_idx (C.lits info.active) active_idx in
       let lits_a = Lit.apply_subst_list renaming subst (lits_a, sc_a) in
@@ -839,7 +853,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun (s, t, _, s_pos) ->
           I.fold !_idx_fluidsup_into
             (fun acc u_p with_pos ->
-              assert (is_fluid u_p);
+              assert (is_fluid_or_deep with_pos.C.WithPos.clause u_p);
               assert (T.DB.is_closed u_p);
               (* Create prefix variable H and use H s = H t for superposition *)
               let var_h = T.var (HVar.fresh ~ty:(Type.arrow [T.ty s] (Type.var (HVar.fresh ~ty:Type.tType ()))) ()) in
@@ -880,9 +894,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* do the inferences in which clause is passive (rewritten),
       so we consider both negative and positive literals *)
     let new_clauses =
-      Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~subterms:true ~ord
+      Lits.fold_terms ~vars:true ~var_args:false ~fun_bodies:false ~subterms:true ~ord
         ~which:`Max ~eligible ~ty_args:false (C.lits clause)
-      |> Iter.filter (fun (u_p, _) -> is_fluid u_p)
+      |> Iter.filter (fun (u_p, _) -> is_fluid_or_deep clause u_p)
       |> Iter.flat_map
         (fun (u_p, passive_pos) ->
           let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
