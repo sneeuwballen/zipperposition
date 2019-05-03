@@ -77,8 +77,11 @@ let _ord_in_normal_form = ref false
 let _fluidsup_penalty = ref 0
 let _fluidsup = ref true
 let _dupsup = ref true
-let _lambdasup = ref false
+
+let _NO_LAMSUP = -1
+let _lambdasup = ref (-1)
 let _unif_alg = ref JP_unif.unify_scoped
+
 
 module Make(Env : Env.S) : S with module Env = Env = struct
   module Env = Env
@@ -192,7 +195,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* index subterms that can be rewritten by LambdaSup --
        the ones that can rewrite those are actually the ones
        already indexed by _idx_sup_from*)
-    if !_lambdasup then
+    if !_lambdasup != _NO_LAMSUP then
       _idx_lambdasup_into :=
         Lits.fold_terms ~vars:!_sup_at_vars ~var_args:!_sup_in_var_args
                         ~fun_bodies:true ~ty_args:false ~ord
@@ -422,15 +425,19 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         let vars_a = CCArray.except_idx (C.lits info.active) active_idx
                      |> CCArray.of_list |> Literals.vars |> T.VarSet.of_list in
         let vars_p = C.lits info.passive |> Literals.vars |> T.VarSet.of_list in
+        let dbs = ref [] in
         let vars_bound_to_closed_terms var_set scope =
-          T.VarSet.for_all (fun v -> 
+          T.VarSet.iter (fun v -> 
             match Subst.FO.get_var subst ((v :> InnerTerm.t HVar.t),scope) with
-            | Some (t,_) -> T.DB.is_closed t
-            | None -> true) var_set in
-        if not (vars_bound_to_closed_terms vars_a sc_a) 
-          || not (vars_bound_to_closed_terms vars_p sc_p) then (
-            raise (ExitSuperposition "Skolems will be introduced for LambdaSup.");
-          )
+            | Some (t,_) -> dbs := T.DB.unbound t @ !dbs (* hack *)
+            | None -> ()) var_set in
+        (* I am going crazy from different castings  *)
+        vars_bound_to_closed_terms vars_a sc_a;
+        vars_bound_to_closed_terms vars_p sc_p;
+
+        if List.length !dbs  <= !_lambdasup   then (
+            raise (ExitSuperposition "Too many skolems will be introduced for LambdaSup.");
+        )
       );     
 
       let subst', new_sk =
@@ -2272,7 +2279,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Env.add_binary_inf "dupsup_passive(into)" infer_dupsup_passive;
         Env.add_binary_inf "dupsup_active(from)" infer_dupsup_active;
       );
-      if !_lambdasup then (
+      if !_lambdasup != -1 then (
         Env.add_binary_inf "lambdasup_active(from)" infer_lambdasup_from;
         Env.add_binary_inf "lambdasup_passive(into)" infer_lambdasup_into;
       );
@@ -2385,8 +2392,11 @@ let () =
     , Arg.Clear _fluidsup
     , " disable FluidSup inferences (only effective when complete higher-order unification is enabled)"
     ; "--lambdasup"
-    , Arg.Set _lambdasup
-    , " enable LambdaSup inferences";
+    , Arg.Int (fun l -> 
+                  if l < 0 then 
+                    raise (Util.Error ("lambdaSup argument should be non-negative", ""));
+              _lambdasup := l)
+    , " enable LambdaSup -- argument is the maximum number of skolems introduced in an inference";
     "--dupsup"
     , Arg.Set _dupsup
     , " enable DupSup inferences";
@@ -2406,7 +2416,7 @@ let () =
       _complete_ho_unification := true;
       _ord_in_normal_form := true;
       _sup_at_var_headed := false;
-      _lambdasup := false;
+      _lambdasup := -1;
       _dupsup := false;
     );
     Params.add_to_mode "fo-complete-basic" (fun () ->
