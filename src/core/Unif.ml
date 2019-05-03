@@ -205,7 +205,7 @@ module Inner = struct
       NOTE: terrible hack starts here:
        rename variables of [t'] to fresh variables that will
        live in [scope] *)
-  let restrict_to_scope subst (t,sc_t) ~into:scope : Unif_subst.t * term =
+  let restrict_to_scope subst(t,sc_t) ~into:scope =
     let rec aux sc_t subst t : US.t * term = match T.ty t with
       | T.NoType -> subst, t
       | T.HasType ty ->
@@ -367,11 +367,10 @@ module Inner = struct
     |> T.fun_l (List.map T.ty_exn l)
 
   let restrict_fun1
-    : unif_subst -> ty:T.t -> to_:T.t DBEnv.t -> scope:Scoped.scope ->
-    (_ HVar.t * T.t list) -> unif_subst
-    = fun subst ~ty ~to_:subset ~scope (v,args) ->
+    = fun subst ~op ~ty ~to_:subset ~scope (v,args) ->
       assert (not (US.mem subst (v,scope)));
       (* only keep bound args *)
+      let n_old = List.length args in
       let args =
         List.filter
           (fun t -> match T.view t with
@@ -380,17 +379,23 @@ module Inner = struct
           args
       in
       let n = List.length args in
-      (* fresh variable *)
-      let ty_fun = T.arrow (List.map T.ty_exn args) ty in
-      let f = HVar.fresh ~ty:ty_fun () in
-      (* new function *)
-      let rhs =
-        T.app ~ty
-          (T.var f)
-          (List.mapi (fun i a -> T.bvar ~ty:(T.ty_exn a) (n-i-1)) args)
-        |> T.fun_l (List.map T.ty_exn args)
-      in
-      US.bind subst (v,scope) (rhs,scope)
+
+      match op with 
+      | O_match_protect _ ->
+        if n = n_old then subst
+        else fail() 
+      | _ -> 
+        (* fresh variable *)
+        let ty_fun = T.arrow (List.map T.ty_exn args) ty in
+        let f = HVar.fresh ~ty:ty_fun () in
+        (* new function *)
+        let rhs =
+          T.app ~ty
+            (T.var f)
+            (List.mapi (fun i a -> T.bvar ~ty:(T.ty_exn a) (n-i-1)) args)
+          |> T.fun_l (List.map T.ty_exn args)
+        in
+        US.bind subst (v,scope) (rhs,scope)
 
   let is_match_op = function O_match_protect _ -> true | _ -> false
 
@@ -735,7 +740,7 @@ module Inner = struct
           && CCList.subset ~eq:(=) (T.DB.unbound t2) (List.map T.as_bvar_exn l1) 
         then (
           (* flex/rigid pattern unif *)
-          flex_rigid ~bvars:bvars.B_vars.left subst f1 l1 t2 ~scope
+          flex_rigid ~op ~bvars:bvars.B_vars.left subst f1 l1 t2 ~scope
         ) else if distinct_ground_l l1 then (
           (* [v t = t2] becomes [v = λx. t2[x/t]] *)
           let t2 = lift_terms l1 t2 in
@@ -759,7 +764,7 @@ module Inner = struct
           && op=O_unify 
         then (
           (* flex/rigid pattern unif *)
-          flex_rigid ~bvars:bvars.B_vars.right subst f2 l2 t1 ~scope
+          flex_rigid ~op ~bvars:bvars.B_vars.right subst f2 l2 t1 ~scope
         ) else if distinct_ground_l l2 && op=O_unify then (
           (* [t1 = v t] becomes [v = λx. t1[x/t]] *)
           let t1 = lift_terms l2 t1 in
@@ -795,7 +800,7 @@ module Inner = struct
     end
 
   (* flex/rigid pair *)
-  and flex_rigid ~bvars subst f1 l1 t2 ~scope : unif_subst =
+  and flex_rigid ~bvars ~op subst f1 l1 t2 ~scope : unif_subst =
     Util.debugf ~section 5
       "(@[flex_rigid@ :subst %a@ `@[%a %a@]`@ :rhs `%a`@ :bvars %a@])"
       (fun k->k US.pp subst T.pp f1 (Util.pp_list T.pp) l1 T.pp t2
@@ -806,44 +811,44 @@ module Inner = struct
     (* bind [v1 := λl1. t2], then traverse [t2] *)
     let rhs = fun_of_bvars ~bvars l1 t2 in
     let subst =
-      unif_rec ~op:O_unify ~root:true ~bvars:B_vars.empty
+      unif_rec ~op ~root:true ~bvars:B_vars.empty
         subst (f1,scope) (rhs,scope)
     in
     Util.debugf ~section 5 "(@[flex_rigid_bind@ :subst %a@])" (fun k->k US.pp subst);
     (* now ensure that RHS is consistent with assignment *)
     Util.debugf ~section 5 "(@[proj@ :bvars %a@ :in `%a`@])"
       (fun k->k (DBEnv.pp T.pp) bvars T.pp t2);
-    proj_fun ~bvars subst (t2,scope)
+    proj_fun ~bvars ~op subst (t2,scope)
 
   (* project on a set of DB indices in [vars] *)
-  and proj_fun ~bvars subst (t,sc_t) : unif_subst =
+  and proj_fun ~op ~bvars subst (t,sc_t) : unif_subst =
     let subst, t = whnf_deref subst (t,sc_t) in
     let f, l = T.as_app t in
     begin match T.view f with
-      | T.Const _ -> proj_fun_l ~bvars subst (l,sc_t)
+      | T.Const _ -> proj_fun_l ~ op ~bvars subst (l,sc_t)
       | T.Bind (b, _, _) ->
         assert (l=[]);
         let new_vars, body = T.open_bind b f in
-        proj_fun ~bvars:(DBEnv.push_l_rev bvars new_vars) subst (body,sc_t)
+        proj_fun ~op ~bvars:(DBEnv.push_l_rev bvars new_vars) subst (body,sc_t)
       | T.App _ -> assert false
       | T.AppBuiltin (_, l2) ->
         assert (l=[]);
-        proj_fun_l ~bvars subst (l2,sc_t)
+        proj_fun_l ~op ~bvars subst (l2,sc_t)
       | T.DB i ->
         if DBEnv.mem bvars i
-        then proj_fun_l ~bvars subst (l,sc_t)
+        then proj_fun_l ~op ~bvars subst (l,sc_t)
         else fail() (* this variable is not in scope anymore *)
       | T.Var v ->
         if l=[] then subst
         else if List.for_all T.is_bvar l then (
           (* retrict [v] on [bvars], as a pattern. *)
-          restrict_fun1 subst ~ty:(T.ty_exn t) ~to_:bvars ~scope:sc_t (v,l)
+          restrict_fun1 ~op subst ~ty:(T.ty_exn t) ~to_:bvars ~scope:sc_t (v,l)
         ) else fail()
     end
 
-  and proj_fun_l ~bvars subst (l,sc) : unif_subst =
+  and proj_fun_l ~op ~bvars subst (l,sc) : unif_subst =
     List.fold_left
-      (fun subst t -> proj_fun ~bvars subst (t,sc))
+      (fun subst t -> proj_fun ~op ~bvars subst (t,sc))
       subst l
 
   (* flex/flex unif pair: find common subset of arguments, introduce

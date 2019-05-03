@@ -1302,9 +1302,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                  "@[<hv2>demod:@ @[<hv>t=%a[%d],@ l=%a[%d],@ r=%a[%d]@],@ subst=@[%a@]@]"
                  (fun k->k T.pp t 0 T.pp l cur_sc T.pp r cur_sc S.pp subst);
 
+               let rename = Subst.Renaming.none in
+               let t' = Lambda.eta_reduce @@ Lambda.snf t in
+               let l' = Lambda.eta_reduce @@ Lambda.snf @@  Subst.FO.apply rename subst (l,cur_sc) in
                (* sanity checks *)
                assert (Type.equal (T.ty l) (T.ty r));
-               assert (Unif.FO.equal ~subst (l,cur_sc) (t,0));
+               assert (T.equal l' t');
                st.demod_clauses <-
                  (unit_clause,subst,cur_sc) :: st.demod_clauses;
                st.demod_sc <- 1 + st.demod_sc; (* allocate new scope *)
