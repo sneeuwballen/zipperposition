@@ -44,14 +44,19 @@ let build_constraints args1 args2 rest =
 
 (* Given two terms and their lambda prefixes, η-expands one of the terms, if 
    necessary, to have the same size of the lambda prefix as the other term *)
-let eta_expand_otf pref1 pref2 t1 t2 =
+let eta_expand_otf ~subst ~scope pref1 pref2 t1 t2 =
   let do_exp_otf n types t = 
     let remaining = CCList.drop n types in
     assert(List.length remaining != 0);
     let num_vars = List.length remaining in
-    let vars = List.mapi (fun i ty -> T.bvar ~ty (num_vars-1-i)) remaining in
+    let vars = List.mapi (fun i ty -> 
+      let ty = S.apply_ty subst (ty,scope) in
+      T.bvar ~ty (num_vars-1-i)) remaining in
     let shifted = T.DB.shift num_vars t in
-    T.app shifted vars in 
+    T.app_w_ty shifted vars ~ty:(S.apply_ty subst (T.ty shifted, scope)) in 
+
+  let pref1 = List.map (fun ty -> S.apply_ty subst (ty,scope)) pref1 in
+  let pref2 = List.map (fun ty -> S.apply_ty subst (ty,scope)) pref2 in
 
   if List.length pref1 = List.length pref2 then (t1, t2, pref1)
   else (
@@ -257,7 +262,7 @@ let rec unify ~scope ~counter ~subst = function
     if not (Term.equal s' t') then (
       let pref_s, body_s = T.open_fun s' in
       let pref_t, body_t = T.open_fun t' in 
-      let body_s', body_t', _ = eta_expand_otf pref_s pref_t body_s body_t in
+      let body_s', body_t', _ = eta_expand_otf ~subst ~scope pref_s pref_t body_s body_t in
       let hd_s, args_s = T.as_app body_s' in
       let hd_t, args_t = T.as_app body_t' in
       let hd_s, hd_t = CCPair.map_same (fun t -> cast_var t subst scope) (hd_s, hd_t) in

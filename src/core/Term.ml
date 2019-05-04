@@ -141,6 +141,17 @@ let app f l = match l with
     Util.exit_prof prof_app;
     res
 
+let app_w_ty ~ty f l  = match l with
+  | [] -> f
+  | _::_ ->
+    Util.enter_prof prof_app;
+    (* first; compute type *)
+    let ty_result = Type.apply_unsafe ty l in
+    (* apply constant to type args and args *)
+    let res = T.app ~ty:(ty_result : Type.t :> T.t) f l in
+    Util.exit_prof prof_app;
+    res
+
 
 let app_full f tyargs l =
   let l = (tyargs : Type.t list :> T.t list) @ l in

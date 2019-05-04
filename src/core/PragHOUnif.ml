@@ -191,7 +191,7 @@ let rec unify ~depth ~nr_iter ~scope ~counter ~subst = function
               (* A weaker unification procedure gave up *)
               let pref_s, body_s = T.open_fun s' in
               let pref_t, body_t = T.open_fun t' in 
-              let body_s', body_t', _ = P.eta_expand_otf pref_s pref_t body_s body_t in
+              let body_s', body_t', _ = P.eta_expand_otf ~subst ~scope pref_s pref_t body_s body_t in
               let hd_s, args_s = T.as_app body_s' in
               let hd_t, args_t = T.as_app body_t' in
 

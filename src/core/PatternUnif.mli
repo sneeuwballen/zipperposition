@@ -16,7 +16,7 @@ exception NotUnifiable
 exception NotInFragment
 
 
-val eta_expand_otf : Type.t list -> Type.t list -> T.t -> T.t -> T.t * T.t * Type.t list
+val eta_expand_otf : subst:subst -> scope:Scoped.scope -> Type.t list -> Type.t list -> T.t -> T.t -> T.t * T.t * Type.t list
 
 (* Does unification on types (or other simple constructs) and catches
    exception in case of non-unifiability *)

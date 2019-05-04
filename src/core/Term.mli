@@ -99,6 +99,10 @@ val app : t -> t list -> t
 (** Apply a term to a list of terms
     @raise Type.ApplyError if types do not match. *)
 
+val app_w_ty : ty:Type.t -> t -> t list -> t
+(** Apply a term to a list of terms
+    @raise Type.ApplyError if types do not match. *)
+
 val app_full : t -> Type.t list -> t list -> t
 (** Apply the term to types, then to terms *)
 
