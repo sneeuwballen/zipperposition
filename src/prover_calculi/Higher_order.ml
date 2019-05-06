@@ -1019,9 +1019,8 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       if(!_neg_ext) then (
         Env.add_unary_inf "neg_ext" neg_ext 
-      );
-
-      if(!_neg_ext_as_simpl) then (
+      )
+      else if(!_neg_ext_as_simpl) then (
         Env.add_unary_simplify neg_ext_simpl;
       );
 
