@@ -185,7 +185,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false ~ord ~which:`Max ~subterms:true
         ~eligible:(C.Eligible.res c) (C.lits c)
       |> Iter.filter (fun (t, _) -> 
-          T.is_var (T.head_term t) && not (CCList.is_empty @@ T.args t)) (* Only applied variables *)
+          T.is_var (T.head_term t) && not (CCList.is_empty @@ T.args t)
+          && Type.is_ground (T.ty t)) (* Only applied variables *)
       |> Iter.fold
         (fun tree (t, pos) ->
           let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
@@ -526,16 +527,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       if info.sup_kind = LambdaSup then
         (* Format.printf "LS: %a\n" C.pp new_clause;  *)
         Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
-      assert(List.for_all (Lit.for_all Term.DB.is_closed) new_lits);
-
-      assert(
-        C.lits new_clause
-        |> CCArray.for_all (fun l -> not @@ List.exists (fun t -> 
-            T.Seq.subterms t
-         |> Iter.exists (fun st ->
-              List.exists (fun arg -> not @@ T.DB.is_closed arg)
-              (T.get_mand_args st)))
-         (Lit.root_terms l))
+      if not (List.for_all (Lit.for_all Term.DB.is_closed) new_lits) then (
+        Format.eprintf
+        "@[<2>sup, kind %s(%d)@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
+        (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
+        (kind_to_str info.sup_kind) (Term.Set.cardinal lambdasup_vars) C.pp info.active sc_a T.pp info.s T.pp info.t
+            T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
+            Position.pp info.passive_pos US.pp info.subst;
+        assert(false);
       );
       
       (* (try
@@ -962,44 +961,49 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               assert (T.is_var (T.head_term u_p));
               assert (T.DB.is_closed u_p);
               (* Create prefix variable H and use H s = H t for superposition *)
-              let scope_passive, scope_active = 0, 1 in
-              let hd_up, args_up = T.as_app u_p in
-              let arg_types = List.map T.ty args_up in
-              let n = List.length args_up in
-              let var_up = T.as_var_exn hd_up in
-              let var_w = HVar.fresh ~ty:(Type.arrow arg_types (T.ty t)) () in
-              let var_z = HVar.fresh ~ty:(Type.arrow (List.append arg_types [T.ty t]) (T.ty u_p)) () in
-              let db_args = List.mapi (fun i ty -> T.bvar ~ty (n-1-i)) arg_types in
-              let term_w,term_z = T.var var_w, T.var var_z in
-              let w_db = T.app term_w db_args in
-              let z_db = T.app term_z (List.append db_args [w_db]) in
-              let y_subst_val = T.fun_l arg_types z_db in
-              assert (T.DB.is_closed y_subst_val);
-              let subst_y = US.FO.bind (US.empty) (var_up, scope_passive) (y_subst_val, scope_passive) in
-              let w_args = T.app term_w args_up in
-              let w_args = Subst.FO.apply Subst.Renaming.none (US.subst subst_y) (w_args,scope_passive) in
-              let z_args = T.app term_z (List.append args_up [t]) in
-              let res = !_unif_alg (s,scope_active) (w_args,scope_passive) |> OSeq.map (
-                  fun osubst ->
-                    osubst |> CCOpt.flat_map (
-                      fun subst ->
-                        let subst = US.merge subst subst_y in
-                        let passive = with_pos.C.WithPos.clause in
-                        let passive_pos = with_pos.C.WithPos.pos in
-                        let passive_lit, _ = Lits.Pos.lit_at (C.lits passive) passive_pos in
-                        let info = SupInfo.({
-                            s; t=z_args; active=clause; active_pos=s_pos; scope_active;
-                            u_p=w_args; passive; passive_lit; passive_pos; scope_passive; subst; 
-                            sup_kind=DupSup
-                          }) in
-                        do_superposition info
-                    )
-                )
-              in
-              let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) + !_fluidsup_penalty in
-              (* /!\ may differ from the actual penalty (by -2) *)
-              Iter.cons (penalty,res) acc
-            )
+              if (T.Seq.vars s |> Iter.union (T.Seq.vars t)
+                  |> Iter.exists (fun v -> Type.is_tType (HVar.ty v))) then (
+                acc
+              )
+              else (
+                let scope_passive, scope_active = 0, 1 in
+                let hd_up, args_up = T.as_app u_p in
+                let arg_types = List.map T.ty args_up in
+                let n = List.length args_up in
+                let var_up = T.as_var_exn hd_up in
+                let var_w = HVar.fresh ~ty:(Type.arrow arg_types (T.ty t)) () in
+                let var_z = HVar.fresh ~ty:(Type.arrow (List.append arg_types [T.ty t]) (T.ty u_p)) () in
+                let db_args = List.mapi (fun i ty -> T.bvar ~ty (n-1-i)) arg_types in
+                let term_w,term_z = T.var var_w, T.var var_z in
+                let w_db = T.app term_w db_args in
+                let z_db = T.app term_z (List.append db_args [w_db]) in
+                let y_subst_val = T.fun_l arg_types z_db in
+                assert (T.DB.is_closed y_subst_val);
+                let subst_y = US.FO.bind (US.empty) (var_up, scope_passive) (y_subst_val, scope_passive) in
+                let w_args = T.app term_w args_up in
+                let w_args = Subst.FO.apply Subst.Renaming.none (US.subst subst_y) (w_args,scope_passive) in
+                let z_args = T.app term_z (List.append args_up [t]) in
+                let res = !_unif_alg (s,scope_active) (w_args,scope_passive) |> OSeq.map (
+                    fun osubst ->
+                      osubst |> CCOpt.flat_map (
+                        fun subst ->
+                          let subst = US.merge subst subst_y in
+                          let passive = with_pos.C.WithPos.clause in
+                          let passive_pos = with_pos.C.WithPos.pos in
+                          let passive_lit, _ = Lits.Pos.lit_at (C.lits passive) passive_pos in
+                          let info = SupInfo.({
+                              s; t=z_args; active=clause; active_pos=s_pos; scope_active;
+                              u_p=w_args; passive; passive_lit; passive_pos; scope_passive; subst; 
+                              sup_kind=DupSup
+                            }) in
+                          do_superposition info
+                      )
+                  )
+                in
+                let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) + !_fluidsup_penalty in
+                (* /!\ may differ from the actual penalty (by -2) *)
+                Iter.cons (penalty,res) acc
+            ))
           Iter.empty
         )
       |> Iter.to_rev_list
@@ -1019,7 +1023,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~subterms:true ~ord
         ~which:`Max ~eligible ~ty_args:false (C.lits clause)
       |> Iter.filter (fun (u_p, _) -> 
-          (T.is_var (T.head_term u_p) && not (CCList.is_empty @@ T.args u_p)))
+          (T.is_var (T.head_term u_p) && not (CCList.is_empty @@ T.args u_p)
+          && Type.is_ground (T.ty u_p)))
       |> Iter.flat_map
         (fun (u_p, passive_pos) ->
           let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
@@ -1027,44 +1032,48 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             (fun acc _ with_pos ->
               let active = with_pos.C.WithPos.clause in
               let s_pos = with_pos.C.WithPos.pos in
-              let res = match Lits.View.get_eqn (C.lits active) s_pos with
-                | Some (s, t, true) ->
-                    let scope_passive, scope_active = 0, 1 in
-                    let hd_up, args_up = T.as_app u_p in
-                    let arg_types = List.map T.ty args_up in
-                    let n = List.length args_up in
-                    let var_up = T.as_var_exn hd_up in
-                    let var_w = HVar.fresh ~ty:(Type.arrow arg_types (T.ty t)) () in
-                    let var_z = HVar.fresh ~ty:(Type.arrow (List.append arg_types [(T.ty t)]) (T.ty u_p)) () in
-                    let db_args = List.mapi (fun i ty -> T.bvar ~ty (n-1-i)) arg_types in
-                    let term_w,term_z = T.var var_w, T.var var_z in
-                    let w_db = T.app term_w db_args in
-                    let z_db = T.app term_z (List.append db_args [w_db]) in
-                    let y_subst_val = T.fun_l arg_types z_db in
-                    assert (T.DB.is_closed y_subst_val);
-                    let subst_y = US.FO.bind (US.empty) (var_up, scope_passive) (y_subst_val, scope_passive) in
-                    let w_args = T.app term_w args_up in
-                    let w_args = Subst.FO.apply Subst.Renaming.none (US.subst subst_y) (w_args,scope_passive) in
-                    let z_args = T.app term_z (List.append args_up [t]) in
-                    let res = !_unif_alg (w_args,scope_passive) (s,scope_active) |> OSeq.map (
-                      fun osubst ->
-                        osubst |> CCOpt.flat_map (
-                          fun subst ->
-                            let subst = US.merge subst subst_y in
-                            let info = SupInfo.({
-                                s; t=z_args; active; active_pos=s_pos; scope_active;
-                                u_p=w_args; passive=clause; passive_lit; passive_pos; scope_passive; subst; 
-                                sup_kind=DupSup
-                              }) in
-                            do_superposition info
-                    ))
-              in
-              let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) + !_fluidsup_penalty in
-              (* /!\ may differ from the actual penalty (by -2) *)
-              Iter.cons (penalty,res) acc
-                | _ -> assert false in
-               res
-            )
+              match Lits.View.get_eqn (C.lits active) s_pos with
+                | Some (s, t, true) -> (
+                    if (T.Seq.vars s |> Iter.union (T.Seq.vars t)
+                       |> Iter.exists (fun v -> Type.is_tType (HVar.ty v))) then (
+                        acc
+                    )
+                    else (
+
+                      let scope_passive, scope_active = 0, 1 in
+                      let hd_up, args_up = T.as_app u_p in
+                      let arg_types = List.map T.ty args_up in
+                      let n = List.length args_up in
+                      let var_up = T.as_var_exn hd_up in
+                      let var_w = HVar.fresh ~ty:(Type.arrow arg_types (T.ty t)) () in
+                      let var_z = HVar.fresh ~ty:(Type.arrow (List.append arg_types [(T.ty t)]) (T.ty u_p)) () in
+                      let db_args = List.mapi (fun i ty -> T.bvar ~ty (n-1-i)) arg_types in
+                      let term_w,term_z = T.var var_w, T.var var_z in
+                      let w_db = T.app term_w db_args in
+                      let z_db = T.app term_z (List.append db_args [w_db]) in
+                      let y_subst_val = T.fun_l arg_types z_db in
+                      assert (T.DB.is_closed y_subst_val);
+                      let subst_y = US.FO.bind (US.empty) (var_up, scope_passive) (y_subst_val, scope_passive) in
+                      let w_args = T.app term_w args_up in
+                      let w_args = Subst.FO.apply Subst.Renaming.none (US.subst subst_y) (w_args,scope_passive) in
+                      let z_args = T.app term_z (List.append args_up [t]) in
+                      let res = !_unif_alg (w_args,scope_passive) (s,scope_active) |> OSeq.map (
+                        fun osubst ->
+                          osubst |> CCOpt.flat_map (
+                            fun subst ->
+                              let subst = US.merge subst subst_y in
+                              let info = SupInfo.({
+                                  s; t=z_args; active; active_pos=s_pos; scope_active;
+                                  u_p=w_args; passive=clause; passive_lit; passive_pos; scope_passive; subst; 
+                                  sup_kind=DupSup
+                                }) in
+                              do_superposition info
+                      ))
+                  in
+                  let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) + !_fluidsup_penalty in
+                  (* /!\ may differ from the actual penalty (by -2) *)
+                  Iter.cons (penalty,res) acc))
+              | _ -> acc)
             Iter.empty
         )
       |> Iter.to_rev_list
