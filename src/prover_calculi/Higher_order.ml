@@ -865,7 +865,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         let t = List.nth args i in 
         match arg_opt with 
         | Some arg_l ->
-          CCFormat.printf "New cover %a.\n" T.pp t;
           let res_l = if all_covers then T.cover_with_terms t arg_l 
                       else [t; T.max_cover t arg_l] in
           T.Set.of_list res_l 
