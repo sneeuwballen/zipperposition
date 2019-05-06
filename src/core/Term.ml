@@ -303,30 +303,36 @@ let rec all_combs = function
             (fun i -> CCList.map (fun comb -> i::comb) rest_combs) 
            x
 
-let rec cover_with_terms ?(depth=0) t ts =
+let rec cover_with_terms ?(depth=0) ?(recurse=true) t ts =
   let n = List.length ts in
   let db = CCList.mapi (fun i x -> 
               if CCOpt.is_some x then (i, CCOpt.get_exn x) else (-1, false_)) 
            ts
-           |> CCList.filter_map (fun (i,x) -> 
-                if i!=(-1) && equal x t then Some (bvar ~ty:(ty t) (n-1-i+depth)) 
+           |> CCList.filter_map (fun (i,x) ->
+                if i!=(-1) && equal x t then 
+                (assert (Type.equal (ty x) (ty t));
+                Some (bvar ~ty:(ty t) (n-1-i+depth))) 
                 else None) in
-  let rest = 
-    begin match view t with 
-      | AppBuiltin (hd,args) -> 
-          let args' = List.map (fun a -> cover_with_terms ~depth a ts) args in
-          let args_combined = all_combs args' in
-          List.map (fun args -> app_builtin ~ty:(ty t) hd args) args_combined
-      | App (hd,args) -> 
-          let hd' = cover_with_terms hd ts in
-          let args' = List.map (fun a -> cover_with_terms ~depth a ts) args in
-          let args_combined = all_combs (hd'::args') in
-          List.map (fun l ->  app (List.hd l) (List.tl l)) args_combined
-      | Fun (ty_var, body) -> 
-          let bodies = cover_with_terms ~depth:(depth+1) body ts in
-          List.map (fun b -> fun_ ty_var b) bodies
-      | DB _ | Var _  | Const _ -> [t]
-    end in
+  let rest =
+    if recurse then 
+      begin match view t with 
+        | AppBuiltin (hd,args) -> 
+            let args' = List.map (fun a -> cover_with_terms ~depth a ts) args in
+            let args_combined = all_combs args' in
+            List.map (fun args -> app_builtin ~ty:(ty t) hd args) args_combined
+        | App (hd,args) ->
+            let hd, args = head_term_mono t, CCList.drop_while is_type args in
+            let hd' = cover_with_terms ~recurse:false hd ts in
+            let args' = List.map (fun a -> cover_with_terms ~depth a ts) args in
+            let args_combined = all_combs (hd'::args') in
+            List.map (fun l ->  app (List.hd l) (List.tl l)) args_combined
+        | Fun (ty_var, body) -> 
+            let bodies = cover_with_terms ~depth:(depth+1) body ts in
+            assert(List.length bodies > 0);
+            List.map (fun b -> fun_ ty_var b) bodies
+        | DB _ | Var _  | Const _ -> [t]
+      end
+    else [t] in
   db @ rest
 
 let max_cover t ts =
