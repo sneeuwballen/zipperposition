@@ -22,8 +22,6 @@ let prof_matching = Util.mk_profiler "matching"
 
 let fail () = raise Fail
 
-let _allow_partial_skolem_application = ref false
-
 (** {2 Signatures} *)
 
 module type S = Unif_intf.S
@@ -334,7 +332,7 @@ module Inner = struct
     (* If the resulting term does not respect mandatory arguments, use rhs instead to be safe *)
     (* TODO: it would be better to avoid this in the first place *)
     let res = 
-      if !_allow_partial_skolem_application || T.respects_mandatory_args res 
+      if T.respects_mandatory_args res 
       then res 
       else T.fun_of_fvars vars rhs 
     in
@@ -459,7 +457,6 @@ module Inner = struct
   let partial_skolem_fail f l1 l2 =
     Util.debugf ~section 50 "[Sym %a, l1_len = %d, l2_len = %d, ty_vars = %d, num_mandatory = %d]"
     (fun k -> k T.pp f (List.length l1) (List.length l2) (T.expected_ty_vars (T.ty_exn f)) (ID.num_mandatory_args (T.as_const_exn f)));
-    not !_allow_partial_skolem_application &&
     List.length l1 - List.length l2 < T.expected_ty_vars (T.ty_exn f) + ID.num_mandatory_args (T.as_const_exn f)
 
   (* @param op which operation to perform (unification,matching,alpha-eq)
@@ -1201,11 +1198,3 @@ module FO = struct
     let l1, l2 = pair_lists_ f1 l1 f2 l2 in
     Term.of_term_unsafe_l l1, Term.of_term_unsafe_l l2
 end
-
-
-let () =
-  Options.add_opts
-    [  "--partial-skolem",
-       Arg.Set _allow_partial_skolem_application,
-       " allow partial application of skolem constants (sound only assuming the axiom of choice)";
-    ]

@@ -529,7 +529,7 @@ let mk_fresh_skolem =
    let i = CCRef.incr_then_get n in
    (** fresh skolem **)
    let id = ID.makef "#fsk%d" i in
-   ID.set_payload id (ID.Attr_parameter i);
+   ID.set_payload id (ID.Attr_skolem (ID.K_normal, i));
    let ty_vars, vars =
       List.partition (fun v -> Type.is_tType (HVar.ty v)) vars
    in

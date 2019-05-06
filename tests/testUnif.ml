@@ -877,21 +877,6 @@ let test_jp_unif_aux = "JP unification", `Quick, fun () ->
 
   clear_scope ();
 
-  (* constant with one mandatory argument *)
-  let skolem_id = ID.make("skolem") in
-  ID.set_payload skolem_id (ID.Attr_skolem (ID.K_normal, 1));
-  let skolem = T.const ~ty:(Type.Conv.of_simple_term_exn tyctx (psterm "term -> term -> term")) skolem_id in
-  let term1 = pterm ~ty:"term" "X a b" in
-  let term2 = T.app skolem [pterm "c"; pterm "d"] in
-  let results = 
-    JP_unif.imitate ~scope ~counter:(ref 1000) term1 term2 []
-    |> OSeq.map (fun subst -> Lambda.snf (JP_unif.S.apply subst (term1,scope)))
-    |> OSeq.to_array in
-  OUnit.assert_equal 1 (Array.length results);
-  check_variant (results.(0)) (T.app skolem [pterm "c"; pterm ~ty:"term" "X a b"]);
-
-  clear_scope ();
-
   let term1 = pterm ~ty:"term" "X a b" in
   let term2 = pterm ~ty:"term" "Y c d" in
   let substs = JP_unif.identify ~scope ~counter:(ref 1000) term1 term2 [] in
