@@ -864,7 +864,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let res = List.mapi (fun i arg_opt ->
         let t = List.nth args i in 
         match arg_opt with 
-        | Some arg_l -> 
+        | Some arg_l ->
           let res_l = if all_covers then T.cover_with_terms t arg_l 
                       else [t; T.max_cover t arg_l] in
           T.Set.of_list res_l 
@@ -1019,9 +1019,8 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       if(!_neg_ext) then (
         Env.add_unary_inf "neg_ext" neg_ext 
-      );
-
-      if(!_neg_ext_as_simpl) then (
+      )
+      else if(!_neg_ext_as_simpl) then (
         Env.add_unary_simplify neg_ext_simpl;
       );
 
