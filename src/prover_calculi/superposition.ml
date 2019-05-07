@@ -507,7 +507,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                 let scope = if i < (List.length c_guard + List.length lits_a) 
                             then sc_a else sc_p in
                 let sk = S.FO.apply renaming subst (sk, scope) in
-                let sk_v = S.FO.apply renaming subst (sk_v, scope) in
                 Term.replace ~old:sk ~by:sk_v acc)
               sk_with_vars t ) lit) new_lits in
       let rule =
@@ -528,13 +527,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (* Format.printf "LS: %a\n" C.pp new_clause;  *)
         Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       if not (List.for_all (Lit.for_all Term.DB.is_closed) new_lits) then (
-        Format.eprintf
+        Format.printf
         "@[<2>sup, kind %s(%d)@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
-        (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
+        (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
         (kind_to_str info.sup_kind) (Term.Set.cardinal lambdasup_vars) C.pp info.active sc_a T.pp info.s T.pp info.t
             T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
             Position.pp info.passive_pos US.pp info.subst;
-        assert(false);
+        Format.printf "Res: %a.\n" C.pp new_clause;
+         assert(false);
       );
       
       (* (try
