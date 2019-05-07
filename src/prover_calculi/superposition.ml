@@ -77,6 +77,7 @@ let _ord_in_normal_form = ref false
 let _fluidsup_penalty = ref 0
 let _fluidsup = ref true
 let _dupsup = ref true
+let _restrict_hidden_sup_at_vars = ref false
 
 let _NO_LAMSUP = -1
 let _lambdasup = ref (-1)
@@ -335,20 +336,92 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       false (* If the lhs vs rhs cannot flip, we don't need a sup at var *)
     )
     else (
-      (* Check whether Cσ is >= C[var -> replacement]σ *)
-      let passive'_lits = Lits.apply_subst renaming subst (C.lits info.passive, info.scope_passive) in
-      let subst_t = Unif.FO.update subst (T.as_var_exn var, info.scope_passive) (replacement, info.scope_active) in
-      let passive_t'_lits = Lits.apply_subst renaming subst_t (C.lits info.passive, info.scope_passive) in
-      if Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt
-      then (
-        Util.debugf ~section 5
-          "Sup at var condition is not fulfilled because: %a >= %a"
-          (fun k->k Lits.pp passive'_lits Lits.pp passive_t'_lits);
-        false
-      )
-      else true (* If Cσ is either <= or incomparable to C[var -> replacement]σ, we need sup at var.*)
+            (* Check whether var occurs only with the same arguments everywhere. *)
+      let unique_args_of_var =
+        C.lits info.passive
+        |> Lits.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord ~subterms:true ~eligible:(fun _ _ -> true)
+        |> Iter.fold_while
+          (fun unique_args (t,_) ->
+             if Term.equal (fst (T.as_app t)) var
+             then (
+               if unique_args == Some (snd (T.as_app t))
+               then (unique_args, `Continue) (* found the same arguments of var again *)
+               else (None, `Stop) (* different arguments of var found *)
+             ) else (unique_args, `Continue) (* this term doesn't have var as head *)
+          )
+          None
+      in
+      match unique_args_of_var with
+        | Some _ ->
+          Util.debugf ~section 5
+            "Variable %a has same args everywhere in %a"
+            (fun k->k T.pp var C.pp info.passive);
+          false (* If var occurs with the same arguments everywhere, we don't need sup at vars *)
+        | None ->
+          (* Check whether Cσ is >= C[var -> replacement]σ *)
+          let passive'_lits = Lits.apply_subst renaming subst (C.lits info.passive, info.scope_passive) in
+          let subst_t = Unif.FO.update subst (T.as_var_exn var, info.scope_passive) (replacement, info.scope_active) in
+          let passive_t'_lits = Lits.apply_subst renaming subst_t (C.lits info.passive, info.scope_passive) in
+          if Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt
+          then (
+            Util.debugf ~section 5
+              "Sup at var condition is not fulfilled because: %a >= %a"
+              (fun k->k Lits.pp passive'_lits Lits.pp passive_t'_lits);
+            false
+          )
+          else true (* If Cσ is either <= or incomparable to C[var -> replacement]σ, we need sup at var.*)
     )
 
+  (* check for hidden superposition at variables,	
+     e.g. superposing g x = f x into h (x b) = a to give h (f b) = a.	
+     Returns a term only containing the concerned variable	
+     and a term consisting of the part of info.t that unifies with the variable,	
+     e.g. (x, f) in the example above. *)	
+  let is_hidden_sup_at_var info =	
+    let open SupInfo in	
+    let active_idx = Lits.Pos.idx info.active_pos in	
+    begin match T.view info.u_p with	
+      | T.App (head, args) ->	
+        begin match T.as_var head with	
+          | Some _ ->	
+            (* rewritten term is variable-headed *)	
+            begin match T.view info.s, T.view info.t  with	
+              | T.App (f, ss), T.App (g, tt) ->	
+                let s_args = Array.of_list ss in	
+                let t_args = Array.of_list tt in	
+                if	
+                  Array.length s_args >= List.length args	
+                  && Array.length t_args >= List.length args	
+                  (* Check whether the last argument(s) of s and t are equal *)	
+                  && Array.sub s_args (Array.length s_args - List.length args) (List.length args) =	
+                  Array.sub t_args (Array.length t_args - List.length args) (List.length args)	
+                  (* Check whether they are all variables that occur nowhere else *)	
+                  && CCList.(Array.length s_args - List.length args --^ Array.length s_args)	
+                     |> List.for_all (fun idx ->	
+                       match T.as_var (Array.get s_args idx) with	
+                         | Some v ->	
+                           (* Check whether variable occurs in previous arguments: *)	
+                           not (CCArray.exists (T.var_occurs ~var:v) (Array.sub s_args 0 idx))	
+                           && not (CCArray.exists (T.var_occurs ~var:v) (Array.sub t_args 0 (Array.length t_args - List.length args))	
+                                   (* Check whether variable occurs in heads: *)	
+                                   && not (T.var_occurs ~var:v f)	
+                                   && not (T.var_occurs ~var:v g)	
+                                   (* Check whether variable occurs in other literals: *)	
+                                   && not (List.exists (Literal.var_occurs v) (CCArray.except_idx (C.lits info.active) active_idx)))	
+                         | None -> false	
+                     )	
+                then	
+                  (* Calculate the part of t that unifies with the variable *)	
+                  let t_prefix = T.app g (Array.to_list (Array.sub t_args 0 (Array.length t_args - List.length args))) in	
+                  Some (head, t_prefix)	
+                else	
+                  None	
+              | _ -> None	
+            end	
+          | None -> None	
+        end	
+      | _ -> None	
+    end
 
   let dup_sup_apply_subst t sc_a sc_p subst renaming =
     let z, args = T.as_app t in
@@ -466,6 +539,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           assert (not (T.is_var info.u_p))
         else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then
           raise (ExitSuperposition "superposition at variable");
+
+      (* Check for hidden superposition at a variable *)	
+      if !_restrict_hidden_sup_at_vars then (	
+        match is_hidden_sup_at_var info with	
+          | Some (var,replacement) when not (!_sup_at_vars && sup_at_var_condition info var replacement)	
+            -> raise (ExitSuperposition "hidden superposition at variable")	
+          | _ -> ()	
+      );
 
       (* ordering constraints are ok *)
       let lits_a = CCArray.except_idx (C.lits info.active) active_idx in
@@ -613,36 +694,41 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           assert (not (T.is_var info.u_p))
         else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then
           raise (ExitSuperposition "superposition at variable");
-      (* ordering constraints are ok, build new active lits (excepted s=t) *)
-      let lits_a = CCArray.except_idx (C.lits info.active) active_idx in
-      let lits_a = Lit.apply_subst_list renaming subst (lits_a, sc_a) in
-      (* build passive literals and replace u|p\sigma with t\sigma *)
-      let u' = S.FO.apply ~shift_vars renaming subst (info.u_p, sc_p) in
-      assert (Type.equal (T.ty u') (T.ty t'));
-      let lits_p = Array.to_list (C.lits info.passive) in
-      let lits_p = Lit.apply_subst_list renaming subst (lits_p, sc_p) in
-      (* assert (T.equal (Lits.Pos.at (Array.of_list lits_p) info.passive_pos) u'); *)
-      let lits_p = List.map (Lit.map (fun t-> T.replace t ~old:u' ~by:t')) lits_p in
-      let c_guard = Literal.of_unif_subst renaming us in
-      let tags = Unif_subst.tags us in
-      (* build clause *)
-      let new_lits = c_guard @ lits_a @ lits_p in
-      let rule =
-        let r = kind_to_str info.sup_kind in
-        let sign = if Lit.sign passive_lit' then "+" else "-" in
-        Proof.Rule.mk ("s_" ^ r ^ sign)
-      in
-      let proof =
-        Proof.Step.inference ~rule ~tags
-          [C.proof_parent_subst renaming (info.active,sc_a) subst;
-            C.proof_parent_subst renaming (info.passive,sc_p) subst]
-      and penalty =
-        max (C.penalty info.active) (C.penalty info.passive)
-        + (if T.is_var s' then 2 else 0) (* superposition from var = bad *)
-      in
-      let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
-      Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
-      Some new_clause
+      (* Check for hidden superposition at a variable *)
+      match is_hidden_sup_at_var info with
+        | Some (var,replacement) when not (!_sup_at_vars && sup_at_var_condition info var replacement)
+          -> raise (ExitSuperposition "hidden superposition at variable")
+        | _ -> ();
+          (* ordering constraints are ok, build new active lits (excepted s=t) *)
+          let lits_a = CCArray.except_idx (C.lits info.active) active_idx in
+          let lits_a = Lit.apply_subst_list renaming subst (lits_a, sc_a) in
+          (* build passive literals and replace u|p\sigma with t\sigma *)
+          let u' = S.FO.apply ~shift_vars renaming subst (info.u_p, sc_p) in
+          assert (Type.equal (T.ty u') (T.ty t'));
+          let lits_p = Array.to_list (C.lits info.passive) in
+          let lits_p = Lit.apply_subst_list renaming subst (lits_p, sc_p) in
+          (* assert (T.equal (Lits.Pos.at (Array.of_list lits_p) info.passive_pos) u'); *)
+          let lits_p = List.map (Lit.map (fun t-> T.replace t ~old:u' ~by:t')) lits_p in
+          let c_guard = Literal.of_unif_subst renaming us in
+          let tags = Unif_subst.tags us in
+          (* build clause *)
+          let new_lits = c_guard @ lits_a @ lits_p in
+          let rule =
+            let r = kind_to_str info.sup_kind in
+            let sign = if Lit.sign passive_lit' then "+" else "-" in
+            Proof.Rule.mk ("s_" ^ r ^ sign)
+          in
+          let proof =
+            Proof.Step.inference ~rule ~tags
+              [C.proof_parent_subst renaming (info.active,sc_a) subst;
+                C.proof_parent_subst renaming (info.passive,sc_p) subst]
+          and penalty =
+            max (C.penalty info.active) (C.penalty info.passive)
+            + (if T.is_var s' then 2 else 0) (* superposition from var = bad *)
+          in
+          let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
+          Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
+          Some new_clause
     with ExitSuperposition reason ->
       Util.debugf ~section 3 "@[... cancel, %s@]" (fun k->k reason);
       None
@@ -1376,20 +1462,29 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       match T.view t with
         | T.Const _ -> reduce_at_root ~restrict t k
         | T.App (hd, l) ->
-          (* rewrite subterms in call by value. *)
-          let rewrite_args = !_demod_in_var_args || not (T.is_var hd) in
-          if rewrite_args
-          then
-            normal_form_l l
-              (fun l' ->
-                let t' =
-                  if T.same_l l l'
-                  then t
-                  else T.app hd l'
-                in
-                (* rewrite term at root *)
-                reduce_at_root ~restrict t' k)
-          else reduce_at_root ~restrict t k
+          (* rewrite subterms in call by value.
+             Note that we keep restrictions for the head, so as
+             not to rewrite [f x=g x] into ⊤ after equality completion
+             of [f=g] *)
+          let rewrite_head =
+            (* Don't rewrite heads in the following situations: *)
+            (List.length l = 0 || not (T.is_type (List.hd l)))
+            && not (Ordering.monotonic ord)
+          in
+          let rewrite_args =
+            !_sup_in_var_args || not (T.is_var hd)
+          in
+          (if rewrite_head then normal_form ~restrict hd else (fun k -> k hd))
+            (fun hd' ->
+               (if rewrite_args then normal_form_l l else (fun k -> k l))
+                 (fun l' ->
+                    let t' =
+                      if T.equal hd hd' && T.same_l l l'
+                      then t
+                      else T.app hd' l'
+                    in
+                    (* rewrite term at root *)
+                    reduce_at_root ~restrict t' k))
         | T.Fun (ty_arg, body) ->
           (* reduce under lambdas *)
           if !_lambda_demod
@@ -2419,6 +2514,9 @@ let () =
         _unif_alg := if (String.equal "full" str) then JP_unif.unify_scoped
                      else PragHOUnif.unify_scoped)),
       "set the level of HO unification"
+    ; "--restrict-hidden-sup-at-vars"	
+    , Arg.Bool (fun b -> _restrict_hidden_sup_at_vars :=	b)
+    , " enable/disable hidden superposition at variables only under certain ordering conditions"
     ];
     Params.add_to_mode "ho-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
@@ -2435,4 +2533,13 @@ let () =
     );
     Params.add_to_mode "fo-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
+    );
+    Params.add_to_mode "lambda-free" (fun () ->
+      Unif._allow_pattern_unif := false;
+      _use_simultaneous_sup := false;
+      _sup_at_vars := true;
+      _sup_in_var_args := true;
+      _demod_in_var_args := false;
+      _dupsup := false;
+      _restrict_hidden_sup_at_vars := true;
     )

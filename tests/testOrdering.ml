@@ -258,5 +258,6 @@ let props =
        ])
     [
       O.kbo (Precedence.default []);
-      O.rpo6 (Precedence.default []);
+      O.rpo6 (Precedence.default []); 
+      O.lfhokbo_arg_coeff (Precedence.default []);
     ]

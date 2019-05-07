@@ -110,4 +110,7 @@ let () =
   Params.add_to_mode "fo-complete-basic" (fun () ->
     no_max_vars := true
   );
+  Params.add_to_mode "lambda-sup" (fun () ->
+    no_max_vars := true
+  );
   ()

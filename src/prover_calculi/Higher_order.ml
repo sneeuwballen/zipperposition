@@ -1176,4 +1176,16 @@ let () =
   Params.add_to_mode "fo-complete-basic" (fun () ->
     enabled_ := false;
   );
+  Params.add_to_mode "lambda-free" (fun () ->
+    enabled_ := true;
+    force_enabled_ := true;
+    _ext_axiom := true;
+    _elim_pred_var := false;
+    _ext_pos := true;
+    _ext_pos_all_lits := true;
+    _neg_ext := true;
+    _neg_ext_as_simpl := false;
+    _prune_arg_fun := `NoPrune;
+    prim_mode_ := `None;
+  );
   Extensions.register extension;
