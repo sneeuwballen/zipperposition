@@ -316,11 +316,15 @@ let rec cover_with_terms ?(depth=0) ?(recurse=true) t ts =
   let rest =
     if recurse then 
       begin match view t with 
-        | AppBuiltin (hd,args) -> 
-            let args' = List.map (fun a -> cover_with_terms ~depth a ts) args in
-            let args_combined = all_combs args' in
-            List.map (fun args -> app_builtin ~ty:(ty t) hd args) args_combined
+        | AppBuiltin (hd,args) ->
+            if CCList.is_empty args then [app_builtin ~ty:(ty t) hd []]
+            else (
+              let args' = List.map (fun a -> cover_with_terms ~depth a ts) args in
+              let args_combined = all_combs args' in
+              List.map (fun args -> app_builtin ~ty:(ty t) hd args) args_combined
+            )
         | App (hd,args) ->
+            assert(not (CCList.is_empty args));
             let hd, args = head_term_mono t, CCList.drop_while is_type args in
             let hd' = cover_with_terms ~recurse:false hd ts in
             let args' = List.map (fun a -> cover_with_terms ~depth a ts) args in
@@ -328,9 +332,9 @@ let rec cover_with_terms ?(depth=0) ?(recurse=true) t ts =
             List.map (fun l ->  app (List.hd l) (List.tl l)) args_combined
         | Fun (ty_var, body) -> 
             let bodies = cover_with_terms ~depth:(depth+1) body ts in
-            assert(List.length bodies > 0);
+            assert(not (CCList.is_empty bodies));
             List.map (fun b -> fun_ ty_var b) bodies
-        | DB _ | Var _  | Const _ -> [t]
+        | _ -> [t]
       end
     else [t] in
   db @ rest
