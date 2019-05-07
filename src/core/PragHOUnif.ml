@@ -14,7 +14,7 @@ module S = struct
 end
 
 let max_depth = ref 7
-let max_app_projections = 2
+let max_app_projections = 3
 let back_off_interval = 4
 
 let _cons_e = ref true
