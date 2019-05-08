@@ -517,6 +517,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let subst', new_sk =
         if info.sup_kind = LambdaSup then
         S.FO.unleak_variables subst else subst, [] in
+
+      
+      S.FO.iter (fun (v,_) (t,_) ->
+        assert(Type.equal (HVar.ty v) (T.ty t)); 
+        assert(T.Seq.subterms t
+               |> Iter.for_all (fun st -> not @@ T.is_fun t))) subst;
+
+
       let passive_lit' = Lit.apply_subst_no_simp renaming subst' (info.passive_lit, sc_p) in
       let new_trail = C.trail_l [info.active; info.passive] in
       if Env.is_trivial_trail new_trail then raise (ExitSuperposition "trivial trail");
@@ -618,17 +626,18 @@ module Make(Env : Env.S) : S with module Env = Env = struct
          assert(false);
       );
       
-      (* (try
+      (try
         ignore (C.check_types new_clause);
         ()
       with Type.ApplyError _ ->
-        Format.printf
+        (Format.printf
         "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
         (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
         (kind_to_str info.sup_kind) C.pp info.active sc_a T.pp info.s T.pp info.t
             T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
             Position.pp info.passive_pos Subst.pp subst';
-        Format.printf "@[res = %a@].\n" C.pp new_clause); *)
+        Format.printf "@[res = %a@].\n" C.pp new_clause);
+        assert false);
       
       Some new_clause
     with ExitSuperposition reason ->
@@ -2545,4 +2554,5 @@ let () =
       _lambdasup := -1;
       _fluidsup := false;
       _dupsup := false;
+      _ord_in_normal_form := false;
     )

@@ -100,6 +100,14 @@ module Make(E : Env.S) = struct
         )
       | Some c ->
         check_clause_ c;
+        if not (Env.C.lits c
+               |> CCArray.for_all (fun l ->
+                  Literal.Seq.terms l 
+                  |> Iter.for_all (fun t -> Term.Seq.subterms t
+                                            |> Iter.for_all (fun st -> not @@ Term.is_fun st)))) then (
+          Format.printf "[L:] %a[%a].\n" Env.C.pp c Proof.Step.pp (Env.C.proof_step c);
+          assert (false);
+        );
         Util.incr_stat stat_steps;
         begin match Env.all_simplify c with
           | [], _ ->
