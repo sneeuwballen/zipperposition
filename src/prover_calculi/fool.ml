@@ -208,4 +208,7 @@ let () =
   Params.add_to_mode "fo-complete-basic" (fun () ->
     enabled_ := false
   );
+  Params.add_to_mode "lambda-free" (fun () ->
+    enabled_ := false
+  );
   Extensions.register extension
