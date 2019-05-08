@@ -54,7 +54,7 @@ and gfpf_root ~depth t =
                          T.Var _ -> A 
                          | T.Const s -> S s
                          | T.DB i    -> if (i < depth) then DB i else Ignore
-                         | _ -> assert false)
+                         | _ -> Format.printf "%a\n" T.pp t; assert false)
   | T.Fun (_, _) -> assert false 
 
 (* TODO more efficient way to compute a vector of features: if the fingerprint
@@ -215,7 +215,7 @@ module Make(X : Set.OrderedType) = struct
         | Node _, [] | Leaf _, _::_ ->
           failwith "different feature length in fingerprint trie"
     in
-    let features = idx.fp (Lambda.eta_expand t) in  (* features of term *)
+    let features = idx.fp (t) in  (* features of term *)
     { idx with trie = recurse idx.trie features; }
 
   let add_ trie = CCFun.uncurry (add trie)
@@ -252,7 +252,7 @@ module Make(X : Set.OrderedType) = struct
         | Node _, [] | Leaf _, _::_ ->
           failwith "different feature length in fingerprint trie"
     in
-    let features = idx.fp (Lambda.eta_expand t) in  (* features of term *)
+    let features = idx.fp (t) in  (* features of term *)
     { idx with trie = recurse idx.trie features; }
 
   let remove_ trie = CCFun.uncurry (remove trie)
@@ -307,7 +307,7 @@ module Make(X : Set.OrderedType) = struct
       raise e
 
   let retrieve_unifiables_aux fold_unify (idx,sc_idx) t k =
-    let features = idx.fp (Lambda.eta_expand @@ fst t) in
+    let features = idx.fp (fst t) in
     let compatible = compatible_features_unif in
     traverse ~compatible idx features
       (fun leaf -> fold_unify (leaf,sc_idx) t k)
@@ -318,14 +318,14 @@ module Make(X : Set.OrderedType) = struct
     retrieve_unifiables_aux (Leaf.fold_unify_complete ~unif_alg)
 
   let retrieve_generalizations ?(subst=S.empty) (idx,sc_idx) t k =
-    let features = idx.fp (Lambda.eta_expand @@ fst t) in
+    let features = idx.fp (fst t) in
     (* compatible t1 t2 if t2 can match t1 *)
     let compatible f1 f2 = compatible_features_match f2 f1 in
     traverse ~compatible idx features
       (fun leaf -> Leaf.fold_match ~subst (leaf,sc_idx) t k)
 
   let retrieve_specializations ?(subst=S.empty) (idx,sc_idx) t k =
-    let features = idx.fp (Lambda.eta_expand @@ fst t) in
+    let features = idx.fp (fst t) in
     let compatible = compatible_features_match in
     traverse ~compatible idx features
       (fun leaf -> Leaf.fold_matched ~subst (leaf,sc_idx) t k)

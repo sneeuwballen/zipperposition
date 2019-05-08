@@ -43,7 +43,6 @@ let _ext_neg_lit = ref false
 let _neg_ext = ref true
 let _neg_ext_as_simpl = ref false
 let _ext_axiom_penalty = ref 5
-let _var_arg_remove = ref true
 let _huet_style = ref false
 let _cons_elim = ref true
 let _imit_first = ref false
@@ -986,7 +985,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       | `OldPrune -> Env.add_unary_simplify prune_arg_old;
       | `NoPrune -> ();
       end;
-
+(* 
       let ho_norm = (fun t -> t |> beta_reduce |> (
                         fun opt -> match opt with
                                     None -> eta_normalize t
@@ -995,7 +994,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                                           None -> Some t'
                                           | Some tt -> Some tt))
       in
-      Env.set_ho_normalization_rule ho_norm;
+      Env.set_ho_normalization_rule ho_norm; *)
 
       if (!_huet_style) then
         JP_unif.set_huet_style ();
@@ -1154,7 +1153,6 @@ let () =
       "--ho-no-conservative-flexflex", Arg.Clear _cons_ff, " Disable conservative dealing with flex-flex pairs";
       "--ho-solve-vars", Arg.Set _var_solve, " Enable solving variables.";
       "--ho-composition", Arg.Set _compose_subs, " Enable composition instead of merging substitutions";
-      "--ho-disable-var-arg-removal", Arg.Clear _var_arg_remove, " disable removal of arguments of applied variables";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom";
       "--ho-unif-max-depth", Arg.Set_int _unif_max_depth, " set pragmatic unification max depth";
     ];
@@ -1178,6 +1176,7 @@ let () =
   );
   Params.add_to_mode "lambda-free" (fun () ->
     enabled_ := true;
+    enable_unif_ := false;
     force_enabled_ := true;
     _ext_axiom := true;
     _elim_pred_var := false;
@@ -1187,5 +1186,6 @@ let () =
     _neg_ext_as_simpl := false;
     _prune_arg_fun := `NoPrune;
     prim_mode_ := `None;
+    Unif._allow_pattern_unif := false;
   );
   Extensions.register extension;

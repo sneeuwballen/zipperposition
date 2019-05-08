@@ -83,7 +83,7 @@ let parse_args () =
   and prelude = CCVector.create()
   and files = CCVector.create ()
   and check = ref default.check
-  and eta = ref `Reduce
+  and eta = ref `None
   in
   let eta_opt =
     let set_ n = eta := n in

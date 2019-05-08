@@ -75,8 +75,8 @@ let _complete_ho_unification = ref false
 let _switch_stream_extraction = ref false
 let _ord_in_normal_form = ref false
 let _fluidsup_penalty = ref 0
-let _fluidsup = ref true
-let _dupsup = ref true
+let _fluidsup = ref false
+let _dupsup = ref false
 let _restrict_hidden_sup_at_vars = ref false
 
 let _NO_LAMSUP = -1
@@ -2374,7 +2374,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and is_trivial = is_tautology in
     if !_complete_ho_unification
     then (
-
       Env.add_binary_inf "superposition_passive" infer_passive_complete_ho;
       Env.add_binary_inf "superposition_active" infer_active_complete_ho;
       Env.add_unary_inf "equality_factoring" infer_equality_factoring_complete_ho;
@@ -2542,4 +2541,8 @@ let () =
       _demod_in_var_args := false;
       _dupsup := false;
       _restrict_hidden_sup_at_vars := true;
+      _complete_ho_unification := false;
+      _lambdasup := -1;
+      _fluidsup := false;
+      _dupsup := false;
     )

@@ -369,32 +369,6 @@ module Make(X : sig
       SimplM.return_new c'
     )
 
-   let ho_normalize c =
-    let did_reduce = ref false in
-    let lits' =
-      Array.map
-        (fun lit -> Lit.map (fun t -> match !_norm_rule t with 
-                                       | None -> t
-                                       | Some t' -> did_reduce := true; t' ) lit)
-        (C.lits c)
-    in
-    if not !did_reduce
-    then SimplM.return_same c (* no simplification *)
-    else (
-      C.mark_redundant c;
-      (* FIXME: put the rules as parameters *)
-      let rule = Proof.Rule.mk "lambda-normalize" in
-      let proof =
-        Proof.Step.simp ~rule
-          ([C.proof_parent c])
-      in
-      let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
-      assert (not (C.equal c c'));
-      Util.debugf ~section 3 "@[lambda rewritten clause `@[%a@]`@ into `@[%a@]`"
-        (fun k->k C.pp c C.pp c');
-      SimplM.return_new c'
-    )
-
   (** Apply literal rewrite rules *)
   let rewrite_lits c =
     let applied_rules = ref StrSet.empty in
@@ -466,7 +440,6 @@ module Make(X : sig
       ~f:(fun c ->
         basic_simplify c >>= fun c ->
         (* first, rewrite terms *)
-        ho_normalize c >>= fun c ->
         rewrite c >>= fun c ->
         (* rewrite literals (if needed) *)
         begin match !_lit_rules with
@@ -516,7 +489,6 @@ module Make(X : sig
           let old_c = c in
           basic_simplify c >>=
           (* simplify with unit clauses, then all active clauses *)
-          ho_normalize >>=
           rewrite >>=
           rw_simplify >>=
           unary_simplify >>=
@@ -588,7 +560,6 @@ module Make(X : sig
           let old_c = c in
           basic_simplify c >>=
           (* simplify with unit clauses, then all active clauses *)
-          ho_normalize >>=
           rewrite >>=
           rw_simplify >>=
           unary_simplify >|= fun c ->
@@ -656,7 +627,7 @@ module Make(X : sig
   (** Simplify the clause w.r.t to the active set *)
   let forward_simplify c =
     let open SimplM.Infix in
-    ho_normalize c >>= rewrite >>= rw_simplify >>= unary_simplify
+    rewrite c >>= rw_simplify >>= unary_simplify
 
   (** generate all clauses from inferences *)
   let generate given =
