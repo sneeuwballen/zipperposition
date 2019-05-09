@@ -387,13 +387,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let t' = if info.sup_kind != DupSup then 
                 S.FO.apply ~shift_vars renaming subst (info.t, sc_a)
                else dup_sup_apply_subst info.t sc_a sc_p subst renaming in
-      Util.debugf ~section 1
-      "@[<2>sup, kind %s(%d)@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
-       (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
-      (fun k->k (kind_to_str info.sup_kind) (Term.Set.cardinal lambdasup_vars) C.pp info.active sc_a T.pp info.s T.pp info.t
-          T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
-          Position.pp info.passive_pos US.pp info.subst);
-
       if(info.sup_kind = LambdaSup &&
          T.Seq.subterms t'
          |> Iter.exists (fun st ->
@@ -536,6 +529,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Format.printf "Res: %a.\n" C.pp new_clause;
          assert(false);
       );
+
+      Util.debugf ~section 1 
+      "@[<2>sup, kind %s(%d)@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
+        (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
+      (fun k -> k
+        (kind_to_str info.sup_kind) (Term.Set.cardinal lambdasup_vars) C.pp info.active sc_a T.pp info.s T.pp info.t
+            T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
+            Position.pp info.passive_pos US.pp info.subst);
+      Util.debugf ~section 1  "Res: %a.\n" (fun k -> k C.pp new_clause);
       
       (* (try
         ignore (C.check_types new_clause);

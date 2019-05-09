@@ -47,6 +47,10 @@ module Make(E : Env.S) : S with module Env = E = struct
   let or_ a b = [Builtin.Or @: [a;b] 
                     =~  imply (imply a T.false_) b] 
 
+  let and_true a  = [Builtin.And @: [T.true_; a] =~ a]
+  let and_false a  = [Builtin.And @: [T.false_; a] =~ a]
+  
+  
   let not = [T.app_builtin ~ty:(Type.arrow [Type.prop] Type.prop) Builtin.Not [] =~ 
              T.fun_ Type.prop (imply (T.bvar ~ty:Type.prop 0) T.false_)]
   let exists t = 
@@ -65,11 +69,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     let x = T.var (HVar.make ~ty:alpha 1) in
     let y = T.var (HVar.make ~ty:alpha 2) in
     let cls = [
-      true_not_false; true_or_false a; imp_true1 a b;
+      true_not_false; true_or_false a; 
+      (* imp_true1 a b;
       imp_true2 a b; imp_false a b; all_true p; 
       all_false p  ; eq_true x y  ; eq_false x y; 
-      not          ; exists alpha;
-      and_ a b     ; or_ a b; 
+      not          ; exists alpha; *)
+      (* and_ a b     ; or_ a b;  *)
+      and_false a; and_true a;
     ] in
     Iter.of_list (List.map as_clause cls)
 
