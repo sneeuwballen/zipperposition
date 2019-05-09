@@ -42,11 +42,16 @@ module Make(E : Env.S) : S with module Env = E = struct
   let all_false p = [no(Builtin.ForallConst@:[p]); p =~ const_true p]
   let eq_true x y = [x/~y; yes(Builtin.Eq@:[x;y])]
   let eq_false x y = [no(Builtin.Eq@:[x;y]); x=~y]
+  let and_ a b = [Builtin.And @: [a;b] 
+                    =~  imply (imply a (imply b T.false_)) T.false_]
+  let or_ a b = [Builtin.Or @: [a;b] 
+                    =~  imply (imply a T.false_) b] 
 
-  let not = [Builtin.Not @: [] =~ T.fun_ Type.prop (imply (T.bvar ~ty:Type.prop 0) T.false_)]
+  let not = [T.app_builtin ~ty:(Type.arrow [Type.prop] Type.prop) Builtin.Not [] =~ 
+             T.fun_ Type.prop (imply (T.bvar ~ty:Type.prop 0) T.false_)]
   let exists t = 
     let t2bool = Type.arrow [t] Type.prop in
-    [Builtin.ExistsConst @:[] =~ T.fun_ t2bool
+    [T.app_builtin ~ty:(Type.arrow [t2bool] Type.prop) Builtin.ExistsConst [] =~ T.fun_ t2bool
       (Builtin.Not @:[Builtin.ForallConst @:[T.fun_ t (Builtin.Not @:[T.app (T.bvar t2bool 1) [T.bvar t 0]])]])]
   
   let as_clause c = Env.C.create ~penalty:1 ~trail:Trail.empty c Proof.Step.trivial
@@ -58,12 +63,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     let b = T.var (HVar.make ~ty:Type.prop 1) in
     let p = T.var (HVar.make ~ty:(Type.arrow [alpha] Type.prop) 1) in
     let x = T.var (HVar.make ~ty:alpha 1) in
-    let y = T.var (HVar.make ~ty:alpha 1) in
+    let y = T.var (HVar.make ~ty:alpha 2) in
     let cls = [
       true_not_false; true_or_false a; imp_true1 a b;
       imp_true2 a b; imp_false a b; all_true p; 
       all_false p  ; eq_true x y  ; eq_false x y; 
-      not          ; exists alpha 
+      not          ; exists alpha;
+      and_ a b     ; or_ a b; 
     ] in
     Iter.of_list (List.map as_clause cls)
 
@@ -86,7 +92,7 @@ let extension =
 
 let () =
   Options.add_opts
-    [ "boolean-axioms", Arg.Bool (fun b -> _axioms_enabled := b), 
+    [ "--boolean-axioms", Arg.Bool (fun b -> _axioms_enabled := b), 
       " enable/disable boolean axioms"  ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
     _axioms_enabled := false
