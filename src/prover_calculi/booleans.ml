@@ -8,7 +8,7 @@ open Libzipperposition
 
 module T = Term
 
-let enabled_ = ref true
+let _axioms_enabled = ref false
 
 module type S = sig
   module Env : Env.S
@@ -80,6 +80,18 @@ let extension =
     ET.setup ()
   in
   { Extensions.default with
-      Extensions.name = "ho";
+      Extensions.name = "bool";
       env_actions=[register];
   }
+
+let () =
+  Options.add_opts
+    [ "boolean-axioms", Arg.Bool (fun b -> _axioms_enabled := b), 
+      " enable/disable boolean axioms"  ];
+  Params.add_to_mode "ho-complete-basic" (fun () ->
+    _axioms_enabled := false
+  );
+  Params.add_to_mode "fo-complete-basic" (fun () ->
+    _axioms_enabled := false
+  );
+  Extensions.register extension
