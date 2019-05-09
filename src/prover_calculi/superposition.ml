@@ -540,11 +540,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (* (try
         ignore (C.check_types new_clause);
         ()
-      with Type.ApplyError _ ->
-        Format.printf
-        "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
+      with Type.ApplyError error_msg ->
+        (Format.printf
+        "@[<2>sup, kind %s, error: %s @ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
         (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
-        (kind_to_str info.sup_kind) C.pp info.active sc_a T.pp info.s T.pp info.t
+        (kind_to_str info.sup_kind) error_msg C.pp info.active sc_a T.pp info.s T.pp info.t
             T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
             Position.pp info.passive_pos Subst.pp subst';
         Format.printf "@[res = %a@].\n" C.pp new_clause); *)
@@ -1329,23 +1329,23 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         UnitIdx.retrieve ~sign:true (!_idx_simpl, cur_sc) (t, 0)
         |> Iter.find_map
           (fun (l, r, (_,_,sign,unit_clause), subst) ->
+             let rename = Subst.Renaming.create () in
              (* r is the term subterm is going to be rewritten into *)
              assert (C.is_unit_clause unit_clause);
              if sign &&
                 (not (Lazy.force restrict) || not (S.is_renaming subst)) &&
                 C.trail_subsumes unit_clause c &&
                 (O.compare ord
-                   (S.FO.apply Subst.Renaming.none subst (l,cur_sc))
-                   (S.FO.apply Subst.Renaming.none subst (r,cur_sc)) = Comp.Gt)
+                   (S.FO.apply rename subst (l,cur_sc))
+                   (S.FO.apply rename subst (r,cur_sc)) = Comp.Gt)
                 (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
              then (
                Util.debugf ~section 5
                  "@[<hv2>demod:@ @[<hv>t=%a[%d],@ l=%a[%d],@ r=%a[%d]@],@ subst=@[%a@]@]"
                  (fun k->k T.pp t 0 T.pp l cur_sc T.pp r cur_sc S.pp subst);
 
-               let rename = Subst.Renaming.none in
                let t' = Lambda.eta_reduce @@ Lambda.snf t in
-               let l' = Lambda.eta_reduce @@ Lambda.snf @@  Subst.FO.apply rename subst (l,cur_sc) in
+               let l' = Lambda.eta_reduce @@ Lambda.snf @@  Subst.FO.apply Subst.Renaming.none subst (l,cur_sc) in
                (* sanity checks *)
                assert (Type.equal (T.ty l) (T.ty r));
                assert (T.equal l' t');
@@ -1484,6 +1484,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            let pp_c_s out (c,s,sc) =
              Format.fprintf out "(@[%a@ :subst %a[%d]@])" C.pp c Subst.pp s sc in
            k C.pp c C.pp new_c (Util.pp_list pp_c_s) st.demod_clauses);
+      (* Assertion against variable clashes *)
+      Lits.vars (C.lits new_c) 
+        |> CCList.map (fun v -> (HVar.id v))
+        |> (fun vars -> assert (CCList.length (CCList.uniq ~eq:CCInt.equal vars) == CCList.length vars));
       (* return simplified clause *)
       SimplM.return_new new_c
     )
