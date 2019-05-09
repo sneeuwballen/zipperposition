@@ -132,6 +132,7 @@ let cnf decls =
   in
   do_extensions ~field:(fun e -> e.Extensions.post_cnf_actions)
     ~x:stmts >>= fun () ->
+  CCFormat.printf "Statements: %a\n" (CCVector.pp Statement.pp_clause) stmts;
   Phases.return_phase stmts
 
 (* compute a precedence *)

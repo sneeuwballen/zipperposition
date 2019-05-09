@@ -372,7 +372,7 @@ module Flatten = struct
         aux pos vars t'
       | T.AppBuiltin (Builtin.Eq, [a;b]) ->
         (F.eq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
-        >|= aux_maybe_define pos
+        (* >|= aux_maybe_define pos *)
       | T.AppBuiltin (Builtin.Neq, [a;b]) when  (*T.is_fun a || T.is_fun b*)  false ->
         (* turn [f ≠ λx. t] into [∃x. f x≠t] *)
         let vars_exist, a, b = complete_eq a b in
@@ -383,28 +383,28 @@ module Flatten = struct
         aux pos vars t'
       | T.AppBuiltin (Builtin.Neq, [a;b]) ->
         (F.neq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
-        >|= aux_maybe_define pos
+        (* >|= aux_maybe_define pos *)
       | T.AppBuiltin (Builtin.Imply, [a;b]) ->
         (F.imply <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
-        >|= aux_maybe_define pos
+        (* >|= aux_maybe_define pos *)
       | T.AppBuiltin (Builtin.Equiv, [a;b]) ->
         (F.equiv <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
-        >|= aux_maybe_define pos
+        (* >|= aux_maybe_define pos *)
       | T.AppBuiltin (Builtin.Xor, [a;b]) ->
         (F.xor <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
-        >|= aux_maybe_define pos
+        (* >|= aux_maybe_define pos *)
       | T.AppBuiltin (Builtin.And, l) ->
-        (F.and_ <$> map_m (aux Pos_toplevel vars) l) >|= aux_maybe_define pos
+        (F.and_ <$> map_m (aux Pos_toplevel vars) l) (*>|= aux_maybe_define pos*)
       | T.AppBuiltin (Builtin.Or, l) ->
-        (F.or_ <$> map_m (aux Pos_toplevel vars) l) >|= aux_maybe_define pos
+        (F.or_ <$> map_m (aux Pos_toplevel vars) l) (*>|= aux_maybe_define pos*)
       | T.AppBuiltin (Builtin.Not, [a]) ->
-        (F.not_ <$> aux Pos_toplevel vars a) >|= aux_maybe_define pos
+        (F.not_ <$> aux Pos_toplevel vars a) (*>|= aux_maybe_define pos*)
       | T.AppBuiltin (b, l) ->
         return (T.app_builtin ~ty:(T.ty_exn t) b) <*> map_m (aux Pos_inner vars) l
       | T.Bind (Binder.Forall,var,body) ->
-        (aux Pos_toplevel vars body >|= F.forall var) >|= aux_maybe_define pos
+        (aux Pos_toplevel vars body >|= F.forall var) (*>|= aux_maybe_define pos*)
       | T.Bind (Binder.Exists,var,body) ->
-        (aux Pos_toplevel vars body >|= F.exists var) >|= aux_maybe_define pos
+        (aux Pos_toplevel vars body >|= F.exists var) (*>|= aux_maybe_define pos*)
       | T.Bind (Binder.Lambda, _, _) ->
         (* lambda-lifting *)
         let fun_vars, body = T.unfold_fun t in
