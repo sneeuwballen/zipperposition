@@ -520,7 +520,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
       
       S.FO.iter (fun (v,_) (t,_) ->
-        assert(Type.equal (HVar.ty v) (T.ty t)); 
         assert(T.Seq.subterms t
                |> Iter.for_all (fun st -> not @@ T.is_fun t))) subst;
 
