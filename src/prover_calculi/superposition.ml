@@ -536,7 +536,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (fun k -> k
         (kind_to_str info.sup_kind) (Term.Set.cardinal lambdasup_vars) C.pp info.active sc_a T.pp info.s T.pp info.t
             T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
-            Position.pp info.passive_pos US.pp info.subst);
+            Position.pp info.passive_pos US.pp info.subst); 
       Util.debugf ~section 1  "Res: %a.\n" (fun k -> k C.pp new_clause);
       
       (* (try
