@@ -179,6 +179,7 @@ module Make(E : Env.S) = struct
 
   let given_clause ?(generating=true) ?steps ?timeout () =
     (* num: number of steps done so far *)
+    CCFormat.printf "[START OF GIVEN CLAUSE passive:] %a.\n" (Env.C.ClauseSet.pp Env.C.pp)  (Env.ProofState.PassiveSet.clauses ());
     let rec do_step num =
       if check_timeout timeout then Timeout, num
       else match steps with
