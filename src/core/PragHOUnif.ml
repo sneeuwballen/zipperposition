@@ -237,6 +237,12 @@ let rec unify ~depth ~nr_iter ~scope ~counter ~subst = function
               | T.Const f , T.Const g when ID.equal f g && List.length args_s = List.length args_t ->
                   unify ~depth ~nr_iter ~subst ~counter ~scope 
                     (build_constraints ~ban_id args_s args_t rest)
+              | T.AppBuiltin(hd_s, args_s'), T.AppBuiltin(hd_t, args_t') when
+                Builtin.equal hd_s hd_t && 
+                  List.length args_s' + List.length args_s = 
+                  List.length args_t' + List.length args_t ->
+                  unify ~depth ~nr_iter ~subst ~counter ~scope 
+                    (build_constraints ~ban_id (args_s'@args_s) (args_t'@args_t) rest)
               | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->
                   unify ~depth ~nr_iter ~subst ~counter ~scope  
                     (build_constraints ~ban_id args_s args_t rest)  

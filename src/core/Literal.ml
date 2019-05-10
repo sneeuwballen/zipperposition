@@ -203,10 +203,10 @@ let rec mk_lit a b sign =
   match T.view a, T.view b with
     | T.AppBuiltin (Builtin.True, []), T.AppBuiltin (Builtin.False, []) -> if sign then False else True
     | T.AppBuiltin (Builtin.False, []), T.AppBuiltin (Builtin.True, []) -> if sign then False else True
-    | T.AppBuiltin (Builtin.True, []), _ -> Prop (b, sign)
+    (* | T.AppBuiltin (Builtin.True, []), _ -> Prop (b, sign)
     | _, T.AppBuiltin (Builtin.True, []) -> Prop (a, sign)
     | T.AppBuiltin (Builtin.False, []), _ -> Prop (b, not sign)
-    | _, T.AppBuiltin (Builtin.False, []) -> Prop (a, not sign)
+    | _, T.AppBuiltin (Builtin.False, []) -> Prop (a, not sign) *)
     (* NOTE: keep negation for higher-order unification constraints
        | T.AppBuiltin (Builtin.Not, [a']), _ -> mk_lit a' b (not sign)
        | _, T.AppBuiltin (Builtin.Not, [b']) -> mk_lit a b' (not sign)
@@ -245,12 +245,12 @@ and mk_prop p sign = match T.view p with
        [_; t; u]) when has_num_ty t ->
     (* arith conversion *)
     begin match mk_num_prop b t u sign with
-      | None -> Prop (p, sign)
+      | None -> Equation(p, T.true_, sign)
       | Some lit -> lit
     end
   | _ ->
     if not (Type.equal (T.ty p) Type.prop) then ty_error_ p T.true_;
-    Prop (p, sign)
+    Equation(p, T.true_, sign)
 
 (* [sign (builtin t u)] *)
 and mk_num_prop builtin t u sign: t option =

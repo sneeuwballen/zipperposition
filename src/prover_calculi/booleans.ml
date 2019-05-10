@@ -28,12 +28,12 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let (=~),(/~) = Literal.mk_eq, Literal.mk_neq
   let (@:) = T.app_builtin ~ty:Type.prop
-  let no a = a /~ T.true_
+  let no a = a =~ T.false_
   let yes a = a =~ T.true_
   let imply a b = Builtin.Imply @: [a;b]
   let const_true p = T.fun_ (List.hd @@ fst @@ Type.open_fun (T.ty p)) T.true_
 
-  let true_not_false = [no T.false_]
+  let true_not_false = [T.true_ /~ T.false_]
   let true_or_false a = [yes a; a =~ T.false_]
   let imp_true1 a b = [yes a; yes(imply a b)]
   let imp_true2 a b = [no b; yes(imply a b)]
@@ -48,7 +48,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     =~  imply (imply a T.false_) b] 
 
   let and_true a  = [Builtin.And @: [T.true_; a] =~ a]
-  let and_false a  = [Builtin.And @: [T.false_; a] =~ a]
+  let and_false a  = [Builtin.And @: [T.false_; a] =~ T.false_]
   
   
   let not = [T.app_builtin ~ty:(Type.arrow [Type.prop] Type.prop) Builtin.Not [] =~ 
@@ -69,18 +69,27 @@ module Make(E : Env.S) : S with module Env = E = struct
     let x = T.var (HVar.make ~ty:alpha 1) in
     let y = T.var (HVar.make ~ty:alpha 2) in
     let cls = [
-      true_not_false; true_or_false a; 
+      (* true_not_false;  *)
+      true_or_false a; 
       (* imp_true1 a b;
-      imp_true2 a b; imp_false a b; all_true p; 
+      imp_true2 a b; imp_false a b; 
+       all_true p; 
       all_false p  ; eq_true x y  ; eq_false x y; 
-      not          ; exists alpha; *)
-      (* and_ a b     ; or_ a b;  *)
-      and_false a; and_true a;
+      not          ; exists alpha;
+      and_ a b     
+       ; or_ a b;  *)
+      (* and_false a; and_true a; *)
     ] in
-    Iter.of_list (List.map as_clause cls)
+    let res = List.map as_clause cls in
+
+
+    CCFormat.printf "CREATED CLAUSES: %a\n" (CCList.pp Env.C.pp) res;
+
+
+    Iter.of_list res
 
   let setup () =
-    Env.add_passive (create_clauses () );
+    Env.ProofState.PassiveSet.add (create_clauses () );
     ()
 end
 
