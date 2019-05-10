@@ -328,7 +328,9 @@ let unify_scoped t0_s t1_s =
   let res = 
     OSeq.append 
       (OSeq.cons lfho_unif (OSeq.take 50 @@ OSeq.repeat None))
-      (unify ~depth:0 ~nr_iter:0 ~scope:unifscope ~counter ~subst [t0', t1', false]) in
+      (* (unify ~depth:0 ~nr_iter:0 ~scope:unifscope ~counter ~subst [t0', t1', false])  *)
+      OSeq.empty
+  in
   res
   |> OSeq.map (CCOpt.map (fun sub ->       
       let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t0_s in 
