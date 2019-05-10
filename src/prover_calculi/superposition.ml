@@ -80,6 +80,7 @@ let _dupsup = ref true
 
 let _NO_LAMSUP = -1
 let _lambdasup = ref (-1)
+let _max_infs = ref (-1)
 let _unif_alg = ref JP_unif.unify_scoped
 
 
@@ -845,6 +846,34 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) inf_res in
       StmQ.add_lst _stmq.q stm_res; []
 
+  let infer_active_pragmatic_ho max_unifs clause =
+    let inf_res = infer_active_aux
+      ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:!_unif_alg)
+      ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
+        let all_substs = 
+          OSeq.take max_unifs (OSeq.filter CCOpt.is_some substs) 
+          |> OSeq.to_list  in
+        let res = List.map (fun subst -> do_sup u_p with_pos (CCOpt.get_exn subst)) all_substs in
+        Some res
+      )
+      clause
+    in
+    inf_res |> CCList.flatten |> List.filter CCOpt.is_some  |> List.map CCOpt.get_exn
+
+  let infer_passive_pragmatic_ho max_unifs clause =
+    let inf_res = infer_passive_aux
+      ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:!_unif_alg)
+      ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
+        let all_substs = 
+          OSeq.take max_unifs (OSeq.filter CCOpt.is_some substs) 
+          |> OSeq.to_list  in
+        let res = List.map (fun subst -> do_sup u_p with_pos (CCOpt.get_exn subst)) all_substs in
+        Some res   
+      )
+      clause
+    in
+    inf_res |> CCList.flatten |> List.filter CCOpt.is_some  |> List.map CCOpt.get_exn
+  
   (* ----------------------------------------------------------------------
    * FluidSup rule (Superposition at applied variables)
    * ---------------------------------------------------------------------- *)
@@ -1142,6 +1171,20 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let stm_res = List.map (Stm.make ~penalty:penalty) inf_res in
     StmQ.add_lst _stmq.q stm_res; []
 
+  let infer_equality_resolution_pragmatic_ho max_unifs clause =
+    let inf_res = infer_equality_resolution_aux
+        ~unify:!_unif_alg
+        ~iterate_substs:(fun substs do_eq_res ->
+           (* Some (OSeq.map (CCOpt.flat_map do_eq_res) substs) *)
+           let all_substs = 
+            OSeq.take max_unifs (OSeq.filter CCOpt.is_some substs) 
+            |> OSeq.to_list in
+           let res = List.map (fun subst -> do_eq_res (CCOpt.get_exn subst)) all_substs in
+           Some res)
+        clause
+    in
+    inf_res |> CCList.flatten |> List.filter CCOpt.is_some  |> List.map CCOpt.get_exn
+
   (* ----------------------------------------------------------------------
    * Equality Factoring rule
    * ---------------------------------------------------------------------- *)
@@ -1256,6 +1299,20 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let penalty = C.penalty clause in
     let stm_res = List.map (Stm.make ~penalty:penalty) inf_res in
     StmQ.add_lst _stmq.q stm_res; []
+
+   let infer_equality_factoring_pragmatic_ho max_unifs clause =
+    let inf_res = infer_equality_factoring_aux
+        ~unify:!_unif_alg
+        ~iterate_substs:(fun substs do_eq_fact ->
+           (* Some (OSeq.map (CCOpt.flat_map do_eq_fact) substs) *)
+           let all_substs = 
+            OSeq.take max_unifs (OSeq.filter CCOpt.is_some substs) 
+            |> OSeq.to_list in
+           let res = List.map (fun subst -> do_eq_fact (CCOpt.get_exn subst)) all_substs in
+           Some res)
+        clause
+    in
+    inf_res |> CCList.flatten |> List.filter CCOpt.is_some  |> List.map CCOpt.get_exn
 
   (* ----------------------------------------------------------------------
    * extraction of a clause from the stream queue (HO feature)
@@ -2283,27 +2340,35 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and is_trivial = is_tautology in
     if !_complete_ho_unification
     then (
-
-      Env.add_binary_inf "superposition_passive" infer_passive_complete_ho;
-      Env.add_binary_inf "superposition_active" infer_active_complete_ho;
-      Env.add_unary_inf "equality_factoring" infer_equality_factoring_complete_ho;
-      Env.add_unary_inf "equality_resolution" infer_equality_resolution_complete_ho;
-      if !_fluidsup then (
+      if !_max_infs = -1 then (
+        Env.add_binary_inf "superposition_passive" infer_passive_complete_ho;
+        Env.add_binary_inf "superposition_active" infer_active_complete_ho;
+        Env.add_unary_inf "equality_factoring" infer_equality_factoring_complete_ho;
+        Env.add_unary_inf "equality_resolution" infer_equality_resolution_complete_ho;
+        if !_fluidsup then (
         Env.add_binary_inf "fluidsup_passive" infer_fluidsup_passive;
         Env.add_binary_inf "fluidsup_active" infer_fluidsup_active;
+        );
+        if !_dupsup then (
+          Env.add_binary_inf "dupsup_passive(into)" infer_dupsup_passive;
+          Env.add_binary_inf "dupsup_active(from)" infer_dupsup_active;
+        );
+        if !_lambdasup != -1 then (
+          Env.add_binary_inf "lambdasup_active(from)" infer_lambdasup_from;
+          Env.add_binary_inf "lambdasup_passive(into)" infer_lambdasup_into;
+        );
+        if !_switch_stream_extraction then
+          Env.add_generate "stream_queue_extraction" extract_from_stream_queue_fix_stm
+        else
+          Env.add_generate "stream_queue_extraction" extract_from_stream_queue;
+      )
+      else (
+        assert(!_max_infs > 0);
+        Env.add_binary_inf "superposition_passive" (infer_passive_pragmatic_ho !_max_infs);
+        Env.add_binary_inf "superposition_active" (infer_active_pragmatic_ho !_max_infs);
+        Env.add_unary_inf "equality_factoring" (infer_equality_factoring_pragmatic_ho !_max_infs);
+        Env.add_unary_inf "equality_resolution" (infer_equality_resolution_pragmatic_ho !_max_infs);
       );
-      if !_dupsup then (
-        Env.add_binary_inf "dupsup_passive(into)" infer_dupsup_passive;
-        Env.add_binary_inf "dupsup_active(from)" infer_dupsup_active;
-      );
-      if !_lambdasup != -1 then (
-        Env.add_binary_inf "lambdasup_active(from)" infer_lambdasup_from;
-        Env.add_binary_inf "lambdasup_passive(into)" infer_lambdasup_into;
-      );
-      if !_switch_stream_extraction then
-        Env.add_generate "stream_queue_extraction" extract_from_stream_queue_fix_stm
-      else
-        Env.add_generate "stream_queue_extraction" extract_from_stream_queue;
     )
     else (
       Env.add_binary_inf "superposition_passive" infer_passive;
@@ -2423,6 +2488,9 @@ let () =
         _unif_alg := if (String.equal "full" str) then JP_unif.unify_scoped
                      else PragHOUnif.unify_scoped)),
       "set the level of HO unification"
+      ; "--max-inferences"
+      , Arg.Int (fun p -> _max_infs := p)
+      , " set maximal number of inferences"
     ];
     Params.add_to_mode "ho-complete-basic" (fun () ->
       _use_simultaneous_sup := false;

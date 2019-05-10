@@ -326,11 +326,11 @@ let unify_scoped t0_s t1_s =
   let t0',t1',unifscope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
   let lfho_unif = P.unif_simple ~scope:unifscope ~subst:(US.subst subst) t0' t1' in
   let res = 
-    OSeq.append 
-      (OSeq.cons lfho_unif (OSeq.take 50 @@ OSeq.repeat None))
-      (* (unify ~depth:0 ~nr_iter:0 ~scope:unifscope ~counter ~subst [t0', t1', false])  *)
-      OSeq.empty
+      OSeq.cons lfho_unif 
+      (unify ~depth:0 ~nr_iter:0 ~scope:unifscope ~counter ~subst [t0', t1', false]) 
+      (* OSeq.empty *)
   in
+
   res
   |> OSeq.map (CCOpt.map (fun sub ->       
       let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t0_s in 
