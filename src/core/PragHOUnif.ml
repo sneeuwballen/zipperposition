@@ -22,9 +22,9 @@ module S = struct
 end
 
 let max_depth = ref 7
-let max_app_projections = 3
-let max_var_imitations = 1
-let max_identifications = 0
+let max_app_projections = ref 3
+let max_var_imitations = ref 1
+let max_identifications = ref 0
 
 let _cons_e = ref true
 let _imit_first = ref false
@@ -109,7 +109,7 @@ let proj_imit_bindings ~state ~subst ~scope ~counter  s t =
     |> (fun l ->
         (* if we performed more than N projections that applied the
            bound variable we back off *)
-        if state.num_app_projections <= max_app_projections then l
+        if state.num_app_projections <= !max_app_projections then l
         else
           List.filter (fun (_, ty) -> 
             List.length (Type.expected_args ty) = 0) l)
@@ -206,9 +206,15 @@ let rec unify ~state ~scope ~counter ~subst = function
                   Constraints on which iteration rule has not been applied
                   have the ban_id value of false.                    
                   *)
-                  OSeq.append
-                    (flex_proj_imit  ~state ~subst ~counter ~scope body_s' body_t' rest)
-                    (identify ~state ~subst ~counter ~scope body_s' body_t' rest)
+                  if !_imit_first then (
+                    OSeq.append
+                      (flex_proj_imit  ~state ~subst ~counter ~scope body_s' body_t' rest)
+                      (identify ~state ~subst ~counter ~scope body_s' body_t' rest))
+                  else (
+                    OSeq.append
+                      (identify ~state ~subst ~counter ~scope body_s' body_t' rest)
+                      (flex_proj_imit  ~state ~subst ~counter ~scope body_s' body_t' rest)
+                  )
               )
             | (T.Var _, T.Const _) | (T.Var _, T.DB _) ->
                 flex_rigid ~state ~subst ~counter ~scope ~ban_id body_s' body_t' rest
@@ -232,7 +238,7 @@ and identify ~state ~subst ~counter ~scope s t rest =
   let state = {state with 
                   num_identifications = state.num_identifications + 1;
                   depth               = state.depth + 1} in
-  if state.num_identifications <= max_identifications then ( 
+  if state.num_identifications <= !max_identifications then ( 
     let id_subs = OSeq.nth 0 (JP_unif.identify ~scope ~counter s t []) in
     let subst = compose_sub subst id_subs in
     unify ~state ~scope ~counter ~subst ((s, t, true)::rest)
@@ -252,7 +258,7 @@ and flex_rigid ~state ~subst ~counter ~scope ~ban_id s t rest =
           depth               = state.depth + 1;
           num_app_projections = state.num_app_projections + 
                                 if n_args > 0 then 1 else 0;} in
-    if state.num_app_projections <= max_app_projections then (
+    if state.num_app_projections <= !max_app_projections then (
       unify ~state ~scope  ~counter ~subst ((s, t,ban_id) :: rest)
     ) else OSeq.empty
   )
@@ -313,8 +319,8 @@ and flex_proj_imit ~subst ~state ~counter ~scope s t rest =
           num_var_imitations  = state.num_var_imitations + imit_dif;
           depth               = state.depth + 1
       } in
-      if state.num_app_projections <= max_app_projections && 
-         state.num_var_imitations <= max_var_imitations then (
+      if state.num_app_projections <= !max_app_projections && 
+         state.num_var_imitations <= !max_var_imitations then (
         unify ~scope ~state ~counter ~subst ((s, t, true) :: rest)
       ) 
       else OSeq.empty

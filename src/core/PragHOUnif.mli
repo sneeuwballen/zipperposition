@@ -20,6 +20,11 @@ module S : sig
 
 end
 
+
+val max_app_projections : int ref
+val max_var_imitations : int ref
+val max_identifications : int ref
+
 (* Disable getting only the first solution for unifying arguments
    after performing identification *)
 val disable_conservative_elim : unit -> unit
