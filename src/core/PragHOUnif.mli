@@ -5,6 +5,14 @@ module US = Unif_subst
 
 type subst = US.t
 
+type unif_state =
+{
+  num_identifications : int;
+  num_var_imitations  : int;
+  num_app_projections : int;
+  depth               : int
+}
+
 module S : sig
 
   val apply : subst -> T.t Scoped.t -> T.t
@@ -16,8 +24,6 @@ end
    after performing identification *)
 val disable_conservative_elim : unit -> unit
 (* Apply imitation and projection rules for flex-flex pairs *)
-val disable_cons_ff : unit -> unit
-(* Apply imitation before projection *)
 val enable_imit_first : unit -> unit
 (* Solve pairs that have exactly one unifier directly using 
    an extension of pattern unification algorithm. *)
@@ -25,9 +31,7 @@ val enable_solve_var : unit -> unit
 
 val set_max_depth : int -> unit -> unit
 
-(* Unify terms of the same scope. Assumes that terms are in eta-long form. *)
-val unify : depth:int ->
-            nr_iter:int ->
+val unify : state:unif_state ->
             scope:Scoped.scope ->
             counter:int ref ->
             subst:US.t -> (T.t * T.t * bool) CCList.t -> US.t option OSeq.t

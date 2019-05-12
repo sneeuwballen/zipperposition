@@ -47,7 +47,6 @@ let _var_arg_remove = ref true
 let _huet_style = ref false
 let _cons_elim = ref true
 let _imit_first = ref false
-let _cons_ff = ref true
 let _compose_subs = ref false
 let _var_solve = ref false
 let _neg_cong_fun = ref false
@@ -1006,9 +1005,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       if (!_imit_first) then
         PragHOUnif.enable_imit_first ();
 
-      if (not !_cons_ff) then
-        PragHOUnif.disable_cons_ff ();
-
       if (!_var_solve) then (
         PragHOUnif.enable_solve_var ();
       );
@@ -1151,7 +1147,6 @@ let () =
       "--ho-huet-style-unif", Arg.Set _huet_style, " enable Huet style projection";
       "--ho-no-conservative-elim", Arg.Clear _cons_elim, " Disables conservative elimination rule in pragmatic unification";
       "--ho-imitation-first",Arg.Set _imit_first, " Use imitation rule before projection rule";
-      "--ho-no-conservative-flexflex", Arg.Clear _cons_ff, " Disable conservative dealing with flex-flex pairs";
       "--ho-solve-vars", Arg.Set _var_solve, " Enable solving variables.";
       "--ho-composition", Arg.Set _compose_subs, " Enable composition instead of merging substitutions";
       "--ho-disable-var-arg-removal", Arg.Clear _var_arg_remove, " disable removal of arguments of applied variables";
