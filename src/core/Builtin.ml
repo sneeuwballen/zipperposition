@@ -63,17 +63,18 @@ type t =
 type t_ = t
 
 let to_int_ = function
-  | Not -> 0
-  | And -> 1
-  | Or -> 2
-  | Imply -> 3
-  | Equiv -> 4
-  | Xor -> 5
-  | Eq -> 6
-  | Neq -> 7
-  | HasType -> 8
-  | False -> 10
-  | True -> 11 (* bigger than false *)
+  (* True < false for the completeness of (HO case) FOOL paramodulation: C[b] ⟹ b ∨ C[false]. The opposite way required b=false would simplify b≠true (aka ¬b) which doesn't rewrite. *)
+  | True -> 0
+  | False -> 1
+  | Not -> 2
+  | And -> 3
+  | Or -> 4
+  | Imply -> 5
+  | Equiv -> 6
+  | Xor -> 7
+  | Eq -> 8
+  | Neq -> 9
+  | HasType -> 10
   | Arrow -> 12
   | Wildcard -> 13
   | Multiset -> 14

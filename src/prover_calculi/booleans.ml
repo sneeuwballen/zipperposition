@@ -70,26 +70,52 @@ module Make(E : Env.S) : S with module Env = E = struct
     let y = T.var (HVar.make ~ty:alpha 2) in
     let cls = [
       (* true_not_false;  *)
-      true_or_false a; 
-      (* imp_true1 a b;
+      (* true_or_false a; *)
+      (*imp_true1 a b;
       imp_true2 a b; imp_false a b; 
-       all_true p; 
+      and_ a b     *)
+      (* all_true p; 
       all_false p  ; eq_true x y  ; eq_false x y; 
-      not          ; exists alpha;
-      and_ a b     
-       ; or_ a b;  *)
-      (* and_false a; and_true a; *)
+      not          ; exists alpha; *)
+      (* ; or_ a b;  *)
+      and_false a; and_true a; 
     ] in
     let res = List.map as_clause cls in
-
-
     CCFormat.printf "CREATED CLAUSES: %a\n" (CCList.pp Env.C.pp) res;
-
-
     Iter.of_list res
 
+  let bool_cases c : C.t list =
+    let sub_terms =
+      C.Seq.terms c
+      |> Iter.flat_map(fun t ->
+           T.Seq.subterms_depth t
+           |> Iter.filter_map (fun (t,d) -> if d>0  then Some t else None))
+      |> Iter.filter(fun t ->
+           Type.is_prop(T.ty t) &&
+           T.DB.is_closed t &&
+           begin match T.view t with
+             | T.Const _ | T.App _ -> true
+             | T.AppBuiltin ((Builtin.True | Builtin.False | Builtin.And), _) -> false
+			 | T.AppBuiltin (_, _) -> true
+             | T.Var _ | T.DB _ -> false
+             | T.Fun _ -> assert false (* by typing *)
+           end)
+      |> T.Set.of_seq
+    in
+	T.Set.to_list sub_terms |> List.map(fun b ->
+		let proof = Proof.Step.inference [C.proof_parent c]
+			~rule:(Proof.Rule.mk"bool_cases")
+		in
+		C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+			(Literal.mk_eq b T.true_ :: (C.lits c |> Literals.map(T.replace ~old:b ~by:T.false_) |> Array.to_list)) proof
+	)
+
+
   let setup () =
-    Env.ProofState.PassiveSet.add (create_clauses () );
+	if !_axioms_enabled then(
+		Env.ProofState.PassiveSet.add (create_clauses () );
+		Env.add_unary_inf "bool_cases" bool_cases;
+	);
     ()
 end
 

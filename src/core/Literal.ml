@@ -203,10 +203,10 @@ let rec mk_lit a b sign =
   match T.view a, T.view b with
     | T.AppBuiltin (Builtin.True, []), T.AppBuiltin (Builtin.False, []) -> if sign then False else True
     | T.AppBuiltin (Builtin.False, []), T.AppBuiltin (Builtin.True, []) -> if sign then False else True
-    (* | T.AppBuiltin (Builtin.True, []), _ -> Prop (b, sign)
+    | T.AppBuiltin (Builtin.True, []), _ -> Prop (b, sign)
     | _, T.AppBuiltin (Builtin.True, []) -> Prop (a, sign)
     | T.AppBuiltin (Builtin.False, []), _ -> Prop (b, not sign)
-    | _, T.AppBuiltin (Builtin.False, []) -> Prop (a, not sign) *)
+    | _, T.AppBuiltin (Builtin.False, []) -> Prop (a, not sign)
     (* NOTE: keep negation for higher-order unification constraints
        | T.AppBuiltin (Builtin.Not, [a']), _ -> mk_lit a' b (not sign)
        | _, T.AppBuiltin (Builtin.Not, [b']) -> mk_lit a b' (not sign)
