@@ -323,7 +323,7 @@ let rec cover_with_terms ?(depth=0) ?(recurse=true) t ts =
               let args_combined = all_combs args' in
               List.map (fun args -> app_builtin ~ty:(ty t) hd args) args_combined
             )
-        | App (hd,args) ->
+        | App (_,args) ->
             assert(not (CCList.is_empty args));
             let hd, args = head_term_mono t, CCList.drop_while is_type args in
             let hd' = cover_with_terms ~recurse:false hd ts in
