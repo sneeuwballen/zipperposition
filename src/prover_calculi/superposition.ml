@@ -2438,6 +2438,9 @@ let () =
     ; "--no-sup-at-var-headed"
     , Arg.Clear _sup_at_var_headed
     , " disable superposition at variable headed terms"
+    ; "--sup-at-var-headed"
+    , Arg.Set _sup_at_var_headed
+    , " disable superposition at variable headed terms"
     ; "--no-sup-in-var-args"
     , Arg.Clear _sup_in_var_args
     , " disable superposition in arguments of applied variables"
