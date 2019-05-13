@@ -227,12 +227,12 @@ and mk_prop p sign = match T.view p with
        [_; t; u]) when has_num_ty t ->
     (* arith conversion *)
     begin match mk_num_prop b t u sign with
-      | None -> Equation(p, T.true_, sign)
+      | None -> mk_lit p T.true_ sign
       | Some lit -> lit
     end
   | _ ->
     if not (Type.equal (T.ty p) Type.prop) then ty_error_ p T.true_;
-    Equation(p, T.true_, sign)
+    mk_lit p T.true_ sign
 
 (* [sign (builtin t u)] *)
 and mk_num_prop builtin t u sign: t option =
@@ -313,7 +313,12 @@ let mk_constraint l r = mk_neq l r
 
 let diff_f_t t = not (T.equal t T.true_) && not (T.equal t T.false_)
 let no_prop_invariant = function 
-  | Equation (lhs,rhs,sign) -> diff_f_t lhs && (diff_f_t rhs || sign = true)  
+  | Equation (lhs,rhs,sign) -> 
+      let res = diff_f_t lhs && (diff_f_t rhs || sign = true) in
+      if not res then (
+          CCFormat.printf "NO PROP INVARIANT BROKEN: %a,%a,%b.\n" T.pp lhs T.pp rhs sign;
+      );
+      res
   | _ -> true
 
 module Seq = struct
@@ -460,20 +465,17 @@ let unify ?(subst=US.empty) lit1 lit2 k =
   in
   unif_lits op ~subst lit1 lit2 k
 
-let map_ ~simp f = function
+let map_ f = function
   | Equation (left, right, sign) ->
     let new_left = f left
     and new_right = f right in
-    if simp
-    then mk_lit new_left new_right sign
-    else Equation (new_left, new_right, sign)
+    mk_lit new_left new_right sign
   | Int o -> Int (Int_lit.map f o)
   | Rat o -> Rat (Rat_lit.map f o)
   | True -> True
   | False -> False
 
-let map f lit = map_ ~simp:true f lit
-let map_no_simp f lit = map_ ~simp:false f lit
+let map f lit = map_ f lit
 
 let apply_subst_ ~f_term ~f_arith_lit ~f_rat subst (lit,sc) =
   match lit with
@@ -497,8 +499,7 @@ let apply_subst_no_simp renaming subst (lit,sc) =
     | Int o -> Int (Int_lit.apply_subst_no_simp renaming subst (o,sc))
     | Rat o -> Rat (Rat_lit.apply_subst_no_simp renaming subst (o,sc))
     | Equation (l,r,sign) ->
-      Equation (S.FO.apply renaming subst (l,sc),
-        S.FO.apply renaming subst (r,sc), sign)
+      mk_lit (S.FO.apply renaming subst (l,sc)) (S.FO.apply renaming subst (r,sc)) sign
     | True
     | False -> lit
 

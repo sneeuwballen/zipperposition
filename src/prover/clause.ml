@@ -146,7 +146,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let of_statement st =
     let of_lits lits =
       (* convert literals *)
-      let lits = List.map Ctx.Lit.of_form lits in
+    let lits = List.map Ctx.Lit.of_form lits in
       let proof = Stmt.proof_step st in
       let c = create ~trail:Trail.empty ~penalty:1 lits proof in
       c

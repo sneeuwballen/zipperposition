@@ -1446,7 +1446,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (* restrict max terms in positive literals eligible for resolution *)
         CCList.mem ~eq:T.equal t (Lazy.force strictly_max)
       ) in
-      Lit.map_no_simp
+      Lit.map
         (fun t -> demod_nf ~restrict:(restrict_term t) st c t)
         lit
     in

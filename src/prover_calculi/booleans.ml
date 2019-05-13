@@ -81,7 +81,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       and_false a; and_true a; 
     ] in
     let res = List.map as_clause cls in
-    CCFormat.printf "CREATED CLAUSES: %a\n" (CCList.pp Env.C.pp) res;
     Iter.of_list res
 
   let bool_cases c : C.t list =

@@ -80,6 +80,8 @@ val mk_rat_op : Rat_lit.op -> Q.t Monome.t -> Q.t Monome.t -> t
 val mk_rat_eq : Q.t Monome.t -> Q.t Monome.t -> t
 val mk_rat_less : Q.t Monome.t -> Q.t Monome.t -> t
 
+val no_prop_invariant : t -> bool
+
 val mk_constraint : term -> term -> t
 (** [mk_constraint t u] makes a disequation or a HO constraint depending
     on how [t] and [u] look. *)
@@ -124,7 +126,6 @@ val of_unif_subst: Subst.Renaming.t -> Unif_subst.t -> t list
     contained in this substitution. *)
 
 val map : (term -> term) -> t -> t (** functor *)
-val map_no_simp : (term -> term) -> t -> t (** functor *)
 val fold : ('a -> term -> 'a) -> 'a -> t -> 'a  (** basic fold *)
 val for_all : (term -> bool) -> t -> bool  (** for the term or both terms of the literal *)
 val vars : t -> Type.t HVar.t list (** gather variables *)
