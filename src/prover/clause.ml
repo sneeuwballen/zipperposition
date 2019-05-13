@@ -292,7 +292,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
           | Comparison.Eq
           | Comparison.Incomparable -> false
         end
-      | [| Lit.Prop (_, true) |] -> true
       | _ -> false
 
   let symbols ?(init=ID.Set.empty) seq =

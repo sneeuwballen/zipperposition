@@ -444,8 +444,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         Array.fold_left
           (fun (others,set) lit ->
              begin match lit with
-               | Literal.Prop (t, sign) ->
-                 let f, args = T.as_app t in
+               | Literal.Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
+                 let f, args = T.as_app lhs in
+                 let sign = T.equal rhs T.true_ in
                  begin match T.view f with
                    | T.Var q when HVar.equal Type.equal v q ->
                      (* found an occurrence *)

@@ -116,7 +116,6 @@ module Make(C : Clause_intf.S) = struct
       match l with 
       | Lit.Equation (lhs,rhs,sign) -> (calc_tweight lhs sg v w c_mul + 
                                         calc_tweight rhs sg v w c_mul, sign)
-      | Lit.Prop (head,sign) -> (calc_tweight head sg v w c_mul, sign)
       | _ -> (0,false)
 
     let conj_relative ?(distinct_vars_mul=(-1.0)) c =

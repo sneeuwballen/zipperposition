@@ -165,11 +165,11 @@ let is_trivial lits =
     if i = Array.length lits then false
     else
       let triv = match lits.(i) with
-        | Lit.Prop (p, sign) ->
+        | Lit.Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
           CCArray.exists
             (function
-              | Lit.Prop (p', sign') when sign = not sign' ->
-                T.equal p p'  (* p  \/  ~p *)
+              | Lit.Equation (lhs', rhs', true) when T.equal rhs' T.true_ || T.equal rhs' T.false_ ->
+                T.equal lhs lhs' && not @@ T.equal rhs rhs'
               | _ -> false)
             lits
         | Lit.Equation (l, r, true) when T.equal l r -> true
@@ -325,9 +325,6 @@ let fold_eqn ?(both=true) ?sign ~ord ~eligible lits k =
                 (* only one side *)
                 k (l, r, sign, Position.(arg i @@ left @@ stop))
           end
-        | Lit.Prop (p, sign) when sign_ok sign ->
-          k (p, T.true_, sign, Position.(arg i @@ left @@ stop))
-        | Lit.Prop _
         | Lit.Equation _
         | Lit.Int _
         | Lit.Rat _
@@ -492,7 +489,6 @@ let is_horn lits =
 let is_pos_eq lits =
   match lits with
     | [| Lit.Equation (l,r,true) |] -> Some (l,r)
-    | [| Lit.Prop(p,true) |] -> Some (p, T.true_)
     | [| Lit.True |] -> Some (T.true_, T.true_)
     | _ -> None
 

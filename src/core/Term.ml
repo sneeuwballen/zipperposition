@@ -203,7 +203,6 @@ let is_fun t = match T.view t with
   | T.Bind (Binder.Lambda, _, _) -> true
   | _ -> false
 
-
 let is_app t = match T.view t with
   | T.Const _
   | T.App _ -> true

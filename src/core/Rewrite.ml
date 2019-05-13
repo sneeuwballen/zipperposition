@@ -452,8 +452,8 @@ module Lit = struct
         (rhs c)
 
     let head_id c = match lhs c with
-      | Literal.Prop (t, _) ->
-        begin match T.view t with
+      | Literal.Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
+        begin match T.view lhs with
           | T.Const id -> Some id
           | T.App (f, _) ->
             begin match T.view f with
@@ -545,8 +545,8 @@ module Lit = struct
     end
 
   let rules_of_lit lit: rule Iter.t = match lit with
-    | Literal.Prop (t, _) ->
-      begin match T.Classic.view t with
+    | Literal.Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
+      begin match T.Classic.view lhs with
         | T.Classic.App (id, _) -> rules_of_id id
         | _ -> Iter.empty
       end
@@ -636,15 +636,16 @@ let pseudo_rule_of_rule (r:rule): pseudo_rule = match r with
       | _ -> None
     in
     let view_lit id (lit:Literal.t) = match lit with
-      | Literal.Prop (t, _) -> view_atom id t
+      | Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
+          view_atom id lhs
       | _ -> None
     in
     let fail() =
       Util.invalid_argf "cannot compute position for rule %a" Lit.Rule.pp r
     in
     begin match Lit.Rule.lhs r with
-      | Literal.Prop (t, _) ->
-        begin match T.Classic.view t with
+      | Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
+        begin match T.Classic.view lhs with
           | T.Classic.App (id, args) ->
             (* occurrences of literals with same [id] on RHS *)
             let rhs =

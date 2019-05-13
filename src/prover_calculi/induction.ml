@@ -751,7 +751,6 @@ module Make
           | Literal.Equation (l,r,_) ->
             let check_t t = T.is_var t || not (T.var_occurs ~var:x t) in
             check_t l && check_t r
-          | Literal.Prop (t,_) -> check_t t
           | Literal.Int _ | Literal.Rat _ -> false
           | Literal.True | Literal.False -> true)
     end

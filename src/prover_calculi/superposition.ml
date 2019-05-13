@@ -259,8 +259,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         end
       | [| Lit.Equation (l,r,false) |] ->
         f idx (l,r,false,c)
-      | [| Lit.Prop (p, sign) |] ->
-        f idx (p,T.true_,sign,c)
       | _ -> idx
     in
     _idx_simpl := idx';
@@ -401,9 +399,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         raise @@ ExitSuperposition("LambdaSup -- an into free variable sneaks in bound variable");
 
       begin match info.passive_lit, info.passive_pos with
-        | Lit.Prop (_, true), P.Arg(_, P.Left P.Stop) ->
-          if T.equal t' T.true_
-          then raise (ExitSuperposition "will yield a bool tautology")
         | Lit.Equation (_, v, true), P.Arg(_, P.Left P.Stop)
         | Lit.Equation (v, _, true), P.Arg(_, P.Right P.Stop) ->
           (* are we in the specific, but no that rare, case where we
@@ -585,9 +580,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let subst = US.subst us in
       let t' = S.FO.apply ~shift_vars renaming subst (info.t, sc_a) in
       begin match info.passive_lit, info.passive_pos with
-        | Lit.Prop (_, true), P.Arg(_, P.Left P.Stop) ->
-          if T.equal t' T.true_
-          then raise (ExitSuperposition "will yield a bool tautology")
         | Lit.Equation (_, v, true), P.Arg(_, P.Left P.Stop)
         | Lit.Equation (v, _, true), P.Arg(_, P.Right P.Stop) ->
           (* are we in the specific, but no that rare, case where we
@@ -1210,9 +1202,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun i lit ->
            match lit with
              | _ when i = idx -> () (* same index *)
-             | Lit.Prop (p, true) ->
-               (* positive proposition *)
-               k (p, T.true_, unify (s,0) (p,0));
              | Lit.Equation (u, v, true) ->
                (* positive equation *)
                k (u, v, unify (s,0) (u,0));
@@ -1441,7 +1430,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             begin match O.compare ord t1 t2 with
               | Comp.Gt -> [t1] | Comp.Lt -> [t2] | _ -> []
             end
-          | Lit.Prop (t,true) -> [t]
           | _ -> []
         end
       ) in
@@ -1544,18 +1532,19 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun cc lit -> match lit with
            | Lit.Equation (l, r, false) ->
              Congruence.FO.mk_eq cc l r
-           | Lit.Prop (p, false) ->
+          (* registering equations of the form ~ P as negative equations P = true *)
+           | Lit.Equation (p, t, true) when T.equal t T.false_ ->
              Congruence.FO.mk_eq cc p T.true_
            | _ -> cc)
         cc (C.lits c)
     in
     let res = CCArray.exists
         (function
-          | Lit.Equation (l, r, true) ->
+          (* making sure we do not catch equations of the form P = false
+            that are interpreted as negative equations P = true *)
+          | Lit.Equation (l, r, true) when not (T.equal r T.false_) ->
             (* if l=r is implied by the congruence, then the clause is redundant *)
             Congruence.FO.is_eq cc l r
-          | Lit.Prop (p, true) ->
-            Congruence.FO.is_eq cc p T.true_
           | _ -> false)
         (C.lits c)
     in

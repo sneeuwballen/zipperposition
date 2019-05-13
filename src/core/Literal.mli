@@ -20,7 +20,6 @@ type t = private
   | True
   | False
   | Equation of term * term * bool
-  | Prop of term * bool
   | Int of Int_lit.t
   | Rat of Rat_lit.t
 
