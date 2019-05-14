@@ -56,8 +56,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   let and_false a  = [Builtin.And @: [T.false_; a] =~ T.false_]
   
   
-  let not = [T.app_builtin ~ty:(Type.arrow [Type.prop] Type.prop) Builtin.Not [] =~ 
-             T.fun_ Type.prop (imply (T.bvar ~ty:Type.prop 0) T.false_)]
+  (*let not = [T.app_builtin ~ty:(Type.arrow [Type.prop] Type.prop) Builtin.Not [] =~ 
+             T.fun_ Type.prop (imply (T.bvar ~ty:Type.prop 0) T.false_)]*)
   let exists t = 
     let t2bool = Type.arrow [t] Type.prop in
     [T.app_builtin ~ty:(Type.arrow [t2bool] Type.prop) Builtin.ExistsConst [] =~ T.fun_ t2bool
@@ -95,17 +95,17 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let bool_cases(c: C.t) : C.t list =
     let assume = Hashtbl.create 8 in
-	let rec find_bools t =
-		let ok = Type.is_prop(T.ty t) && T.DB.is_closed t in
+	let rec find_bools top t =
+		let ok = Type.is_prop(T.ty t) && T.DB.is_closed t && not top in
 		(* Add only propositions. *)
 		let add = if ok then Hashtbl.add assume else fun _ _ -> () in
 		let yes = if ok then yes else fun _ -> yes T.true_ in
 		(* Stop recursion in combination of certain settings. *)
-		let inner f x = if ok && !cased_term_selection = 2 then () else List.iter f x in
+		let inner f x = if ok && !cased_term_selection = 2 then () else List.iter(f false) x in
 		match T.view t with
 			| DB _ | Var _ -> ()
 			| Const _ -> add t (yes t)
-			| Fun(_,b) -> find_bools b
+			| Fun(_,b) -> find_bools false b
 			| App(f,ps) -> add t (yes t); inner find_bools (f::ps)
 			| AppBuiltin(f,ps) ->
 				inner find_bools ps;
@@ -138,9 +138,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         end)
       |> T.Set.of_seq
     in*)
-	Literals.Seq.terms(C.lits c) |> Iter.iter find_bools;
+	Literals.Seq.terms(C.lits c) |> Iter.iter(find_bools true);
 	Hashtbl.fold(fun b b_true clauses ->
-		(*CCFormat.printf "Prop inside %a is e.g.: %a\n" Env.C.pp c Term.pp b;*)
 		let proof = Proof.Step.inference[C.proof_parent c]
 			~rule:(Proof.Rule.mk"bool_cases")
 		in
@@ -148,7 +147,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 			(b_true :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:T.false_)))
 		proof
 		in
-		CCFormat.printf "NEW clause: %a\n" Env.C.pp new';
+		(*CCFormat.printf "NEW clause: %a\n" Env.C.pp new';*)
 		new' :: clauses
 	) assume []
 
