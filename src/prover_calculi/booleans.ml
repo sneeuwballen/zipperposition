@@ -55,9 +55,6 @@ module Make(E : Env.S) : S with module Env = E = struct
   let and_true a  = [Builtin.And @: [T.true_; a] =~ a]
   let and_false a  = [Builtin.And @: [T.false_; a] =~ T.false_]
   
-  
-  let not = [T.app_builtin ~ty:(Type.arrow [Type.prop] Type.prop) Builtin.Not [] =~ 
-             T.fun_ Type.prop (imply (T.bvar ~ty:Type.prop 0) T.false_)]
   let exists t = 
     let t2bool = Type.arrow [t] Type.prop in
     [T.app_builtin ~ty:(Type.arrow [t2bool] Type.prop) Builtin.ExistsConst [] =~ T.fun_ t2bool
@@ -119,25 +116,6 @@ module Make(E : Env.S) : S with module Env = E = struct
 						if !cased_term_selection!=1 then add t (yes t) else()
 					| _ -> add t (yes t)
 	in
-        (*let sub_terms =
-      C.Seq.terms c
-      |> Iter.flat_map(fun t ->
-           T.Seq.subterms_depth t
-           |> Iter.filter_map (fun (t,d) -> if d>0 then Some t else None))
-      |> Iter.filter(fun t ->
-           Type.is_prop(T.ty t) &&
-           T.DB.is_closed t &&
-           begin match T.view t with
-             | T.Const _ | T.App _ -> Some(t =~ T.true_)
-             (*| T.AppBuiltin ((Builtin.True | Builtin.False | Builtin.And), _) -> false*)
-			 | T.Var _ | T.DB _ -> None
-             | T.Fun _ -> assert false (* by typing *)
-           	 | T.AppBuiltin (op, ps) -> match op with
-				| Builtin.True | Builtin.False -> None
-				| Builtin.Eq | Builtin.Neq | Builtin.Equiv | Builtin.Xor -> if Type.is_prop(T.ty(List.hd ps)) then mk_lit 
-        end)
-      |> T.Set.of_seq
-    in*)
 	Literals.Seq.terms(C.lits c) |> Iter.iter find_bools;
 	Hashtbl.fold(fun b b_true clauses ->
 		(*CCFormat.printf "Prop inside %a is e.g.: %a\n" Env.C.pp c Term.pp b;*)
@@ -151,11 +129,37 @@ module Make(E : Env.S) : S with module Env = E = struct
 		new' :: clauses
 	) assume []
 
+  let simpl_eq_subterms c =
+    let simplified = ref false in
+    let new_lits = 
+      C.Seq.terms c |>
+      Iter.flat_map T.Seq.subterms
+      |> Iter.fold (fun acc t -> 
+        match T.view t with
+        | T.AppBuiltin(hd, [lhs;rhs]) when T.equal lhs rhs -> 
+            if Builtin.equal hd Builtin.Eq  || Builtin.equal hd Builtin.Equiv then (
+              simplified := true;
+              Literals.map (T.replace ~old:t ~by:T.true_) acc
+            ) else if Builtin.equal hd Builtin.Neq  || Builtin.equal hd Builtin.Xor then (
+              simplified := true;
+              Literals.map (T.replace ~old:t ~by:T.false_) acc
+            ) else  acc
+        | _ -> acc) (C.lits c)
+       in
+    if not (!simplified) then (
+      SimplM.return_same c
+    ) else (
+      let proof = Proof.Step.inference [C.proof_parent c] ~rule:(Proof.Rule.mk "simplify trivial (in)equalities") in
+      let new_ = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) (Array.to_list new_lits) proof in
+      SimplM.return_new new_
+    )
+
 
   let setup () =
 	if !_axioms_enabled then(
 		Env.ProofState.PassiveSet.add (create_clauses () );
 		Env.add_unary_inf "bool_cases" bool_cases;
+    Env.add_basic_simplify simpl_eq_subterms;
 	)
 end
 
