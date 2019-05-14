@@ -249,6 +249,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   let proof =
                     Proof.Step.inference [C.proof_parent c]
                       ~rule:(Proof.Rule.mk "ho_ext_pos_general")
+                      ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext]
                   in
                   let new_c =
                     C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
@@ -287,6 +288,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           let proof =
             Proof.Step.inference [C.proof_parent c]
               ~rule:(Proof.Rule.mk "ho_complete_eq")
+              ~tags:[Proof.Tag.T_ho]
           in
           let new_c =
             C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
@@ -343,8 +345,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         loop s t
       ) else [] 
     in
-    
-
     let is_eligible = C.Eligible.res c in
     C.lits c
     |> CCArray.mapi (fun i l -> 
@@ -367,7 +367,10 @@ module Make(E : Env.S) : S with module Env = E = struct
               else subterms_lit) 
               (C.lits c |> Array.mapi (fun j x -> (j,x)) |> Array.to_list) in
              let proof =
-              Proof.Step.inference [C.proof_parent c] ~rule:(Proof.Rule.mk "neg_cong_fun") in
+              Proof.Step.inference [C.proof_parent c] 
+                ~rule:(Proof.Rule.mk "neg_cong_fun") 
+                ~tags:[Proof.Tag.T_ho]
+              in
              let new_c =
                C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
              Util.incr_stat stat_neg_cong_fun;
@@ -393,7 +396,10 @@ module Make(E : Env.S) : S with module Env = E = struct
                 Literal.mk_neq (T.app lhs skolems) (T.app rhs skolems))
             ) (C.lits c |> Array.mapi (fun j x -> (j,x)) |> Array.to_list) in
           let proof =
-           Proof.Step.inference [C.proof_parent c] ~rule:(Proof.Rule.mk "neg_ext") in
+            Proof.Step.inference [C.proof_parent c] 
+              ~rule:(Proof.Rule.mk "neg_ext")
+              ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext]
+          in
           let new_c =
             C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
            Util.debugf 1 ~section "NegExt: @[%a@] => @[%a@].\n" (fun k -> k C.pp c C.pp new_c);
@@ -420,7 +426,10 @@ module Make(E : Env.S) : S with module Env = E = struct
           | _ -> l) in
     if not !applied_neg_ext then SimplM.return_same c
     else (
-      let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "neg_ext_simpl") [C.proof_parent c] in
+      let proof = 
+        Proof.Step.simp [C.proof_parent c]
+          ~rule:(Proof.Rule.mk "neg_ext_simpl") 
+          ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext] in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
       (* CCFormat.printf "[NE_simpl]: @[%a@] => @[%a@].\n" C.pp c C.pp c'; *)
       SimplM.return_new c'
@@ -837,6 +846,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let proof =
           Proof.Step.simp
             ~rule:(Proof.Rule.mk "prune_arg")
+            ~tags:[Proof.Tag.T_ho]
             [C.proof_parent_subst renaming (c,0) subst] in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
       Util.debugf ~section 3
@@ -943,6 +953,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let proof =
           Proof.Step.simp
             ~rule:(Proof.Rule.mk "prune_arg_fun")
+            ~tags:[Proof.Tag.T_ho]
             [C.proof_parent_subst renaming (c,0) subst] in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
 
