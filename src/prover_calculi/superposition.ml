@@ -2337,22 +2337,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Env.add_binary_inf "superposition_active" infer_active_complete_ho;
         Env.add_unary_inf "equality_factoring" infer_equality_factoring_complete_ho;
         Env.add_unary_inf "equality_resolution" infer_equality_resolution_complete_ho;
-        if !_fluidsup then (
-        Env.add_binary_inf "fluidsup_passive" infer_fluidsup_passive;
-        Env.add_binary_inf "fluidsup_active" infer_fluidsup_active;
-        );
-        if !_dupsup then (
-          Env.add_binary_inf "dupsup_passive(into)" infer_dupsup_passive;
-          Env.add_binary_inf "dupsup_active(from)" infer_dupsup_active;
-        );
-        if !_lambdasup != -1 then (
-          Env.add_binary_inf "lambdasup_active(from)" infer_lambdasup_from;
-          Env.add_binary_inf "lambdasup_passive(into)" infer_lambdasup_into;
-        );
-        if !_switch_stream_extraction then
-          Env.add_generate "stream_queue_extraction" extract_from_stream_queue_fix_stm
-        else
-          Env.add_generate "stream_queue_extraction" extract_from_stream_queue;
       )
       else (
         assert(!_max_infs > 0);
@@ -2361,6 +2345,25 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Env.add_unary_inf "equality_factoring" (infer_equality_factoring_pragmatic_ho !_max_infs);
         Env.add_unary_inf "equality_resolution" (infer_equality_resolution_pragmatic_ho !_max_infs);
       );
+
+      if !_fluidsup then (
+        Env.add_binary_inf "fluidsup_passive" infer_fluidsup_passive;
+        Env.add_binary_inf "fluidsup_active" infer_fluidsup_active;
+        );
+      if !_dupsup then (
+        Env.add_binary_inf "dupsup_passive(into)" infer_dupsup_passive;
+        Env.add_binary_inf "dupsup_active(from)" infer_dupsup_active;
+      );
+      if !_lambdasup != -1 then (
+        Env.add_binary_inf "lambdasup_active(from)" infer_lambdasup_from;
+        Env.add_binary_inf "lambdasup_passive(into)" infer_lambdasup_into;
+      );
+      if (List.exists CCFun.id [!_fluidsup; !_dupsup; !_lambdasup != -1]) then (
+        if !_switch_stream_extraction then
+          Env.add_generate "stream_queue_extraction" extract_from_stream_queue_fix_stm
+        else
+          Env.add_generate "stream_queue_extraction" extract_from_stream_queue;
+      )
     )
     else (
       Env.add_binary_inf "superposition_passive" infer_passive;
