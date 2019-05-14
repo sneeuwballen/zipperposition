@@ -338,7 +338,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     else (
       (* Check whether Cσ is >= C[var -> replacement]σ *)
       let passive'_lits = Lits.apply_subst renaming subst (C.lits info.passive, info.scope_passive) in
-      let subst_t = Unif.FO.update subst (T.as_var_exn var, info.scope_passive) (replacement, info.scope_active) in
+      let subst_t = Unif.FO.bind_or_update subst (T.as_var_exn var, info.scope_passive) (replacement, info.scope_active) in
       let passive_t'_lits = Lits.apply_subst renaming subst_t (C.lits info.passive, info.scope_passive) in
       if Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt
       then (
@@ -1321,7 +1321,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     match opt_res with
       | None -> []
-      | Some l -> l
+      | Some l ->  l
 
   let extract_from_stream_queue_fix_stm ~full () =
     let cl =

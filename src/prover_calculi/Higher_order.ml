@@ -1163,12 +1163,10 @@ let () =
       "--ho-disable-var-arg-removal", Arg.Clear _var_arg_remove, " disable removal of arguments of applied variables";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom";
       "--ho-unif-max-depth", Arg.Set_int _unif_max_depth, " set pragmatic unification max depth";
-      (* val max_app_projections : int ref
-        val max_var_imitations : int ref
-        val max_identifications : int ref *)
       "--ho-max-app-projections", Arg.Set_int PragHOUnif.max_app_projections, " set maximal number of functional type projections";
       "--ho-max-var-imitations", Arg.Set_int PragHOUnif.max_var_imitations, " set maximal number of flex-flex imitations";
       "--ho-max-identifications", Arg.Set_int PragHOUnif.max_identifications, " set maximal number of flex-flex identifications";
+      "--ho-max-elims", Arg.Set_int PragHOUnif.max_elims, " set maximal number of eliminations";
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
     enabled_ := true;

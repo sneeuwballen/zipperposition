@@ -10,6 +10,7 @@ type unif_state =
   num_identifications : int;
   num_var_imitations  : int;
   num_app_projections : int;
+  num_elims           : int;
   depth               : int
 }
 
@@ -25,6 +26,7 @@ let max_depth = ref 7
 let max_app_projections = ref 3
 let max_var_imitations = ref 1
 let max_identifications = ref 0
+let max_elims           = ref 2
 
 let _cons_e = ref true
 let _imit_first = ref false
@@ -273,22 +275,25 @@ and flex_same ~subst ~state ~counter ~scope hd_s args_s args_t rest all =
     let all_vars = CCList.range 0 ((List.length args_s) -1 ) in
     let all_args_unif = unify ~state ~subst ~counter ~scope new_cstrs in
     let first_unif = OSeq.take 1 all_args_unif in
-    if !_cons_e && OSeq.is_empty first_unif  then (
+    if !_cons_e && not (OSeq.is_empty first_unif)  then (
       first_unif
     ) 
     else (
-      assert(List.length all_vars != 0);
-      OSeq.append
-        all_args_unif
-        (OSeq.of_list all_vars
-        |> OSeq.filter_map (fun idx -> 
-            assert(idx >= 0);
-            if not (T.equal (List.nth args_s idx) (List.nth args_t idx)) then
-              Some (eliminate_at_idx ~scope ~counter (T.as_var_exn hd_s) idx)
-            else None) 
-        |> (OSeq.flat_map (fun subst' -> 
-            let subst = compose_sub subst subst' in
-              unify ~state ~scope  ~counter ~subst all)))
+      if state.num_elims < !max_elims then (
+        assert(List.length all_vars != 0);
+        OSeq.append
+          all_args_unif
+          (OSeq.of_list all_vars
+          |> OSeq.filter_map (fun idx -> 
+              assert(idx >= 0);
+              if not (T.equal (List.nth args_s idx) (List.nth args_t idx)) then
+                Some (eliminate_at_idx ~scope ~counter (T.as_var_exn hd_s) idx)
+              else None) 
+          |> (OSeq.flat_map (fun subst' -> 
+              let subst = compose_sub subst subst' in
+                unify ~state:{state with num_elims=state.num_elims+1} 
+                      ~scope  ~counter ~subst all))))
+      else all_args_unif
     )
   )
   else unify ~subst ~state ~counter ~scope rest
@@ -340,6 +345,7 @@ let unify_scoped t0_s t1_s =
     num_identifications = 0;
     num_var_imitations  = 0;
     num_app_projections = 0;
+    num_elims           = 0;
     depth               = 0
   } in
   let res =

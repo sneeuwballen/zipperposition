@@ -1071,6 +1071,10 @@ module FO = struct
   let update =
     (update :> ?check:bool -> subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst)
 
+  let bind_or_update ?(check=true) (subst:subst) (var:ty HVar.t Scoped.t) t =
+    if S.mem subst (var :> InnerTerm.t HVar.t Scoped.t) then update ~check subst var t
+    else bind ~check subst var t
+
   let unify_full ?(subst=US.empty) =
     fun sc1 sc2 -> 
       let ta, sca = sc1 in 

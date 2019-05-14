@@ -10,6 +10,7 @@ type unif_state =
   num_identifications : int;
   num_var_imitations  : int;
   num_app_projections : int;
+  num_elims           : int;
   depth               : int
 }
 
@@ -22,8 +23,9 @@ end
 
 
 val max_app_projections : int ref
-val max_var_imitations : int ref
+val max_var_imitations  : int ref
 val max_identifications : int ref
+val max_elims           : int ref
 
 (* Disable getting only the first solution for unifying arguments
    after performing identification *)
