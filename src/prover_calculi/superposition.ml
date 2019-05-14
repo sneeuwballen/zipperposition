@@ -2358,7 +2358,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Env.add_binary_inf "lambdasup_active(from)" infer_lambdasup_from;
         Env.add_binary_inf "lambdasup_passive(into)" infer_lambdasup_into;
       );
-      if (List.exists CCFun.id [!_fluidsup; !_dupsup; !_lambdasup != -1]) then (
+      if (List.exists CCFun.id [!_fluidsup; !_dupsup; !_lambdasup != -1; !_max_infs = -1]) then (
         if !_switch_stream_extraction then
           Env.add_generate "stream_queue_extraction" extract_from_stream_queue_fix_stm
         else
