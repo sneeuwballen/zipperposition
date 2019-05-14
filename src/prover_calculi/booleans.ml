@@ -8,12 +8,9 @@ open Libzipperposition
 
 module T = Term
 
+type selection_setting = Any | NotConnective | Large
 let _axioms_enabled = ref false
-(* Controls allowed shape of b in boolean case paramodulation C[b] ⟹ b ∨ C[⊥].
-0: b is any non-variable boolean term
-1: b is not a connective
-2: b does not occure only inside other boolean terms *)
-let cased_term_selection = ref 0
+let cased_term_selection = ref Any
 
 module type S = sig
   module Env : Env.S
@@ -94,14 +91,14 @@ module Make(E : Env.S) : S with module Env = E = struct
     ] |> List.map as_clause |> Iter.of_list
 
   let bool_cases(c: C.t) : C.t list =
-    let assume = Hashtbl.create 8 in
+    let term_as_true = Hashtbl.create 8 in
 	let rec find_bools top t =
-		let ok = Type.is_prop(T.ty t) && T.DB.is_closed t && not top in
+		let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && not top in
 		(* Add only propositions. *)
-		let add = if ok then Hashtbl.add assume else fun _ _ -> () in
-		let yes = if ok then yes else fun _ -> yes T.true_ in
+		let add = if can_be_cased then Hashtbl.add term_as_true else fun _ _ -> () in
+		let yes = if can_be_cased then yes else fun _ -> yes T.true_ in
 		(* Stop recursion in combination of certain settings. *)
-		let inner f x = if ok && !cased_term_selection = 2 then () else List.iter(f false) x in
+		let inner f x = if can_be_cased && !cased_term_selection = Large then () else List.iter(f false) x in
 		match T.view t with
 			| DB _ | Var _ -> ()
 			| Const _ -> add t (yes t)
@@ -112,11 +109,11 @@ module Make(E : Env.S) : S with module Env = E = struct
 				match f with
 					| Builtin.True | Builtin.False -> ()
 					| Builtin.Eq | Builtin.Neq | Builtin.Equiv | Builtin.Xor ->
-						(match ps with [x;y] when Type.is_prop(T.ty x) && !cased_term_selection!=1 ->
+						(match ps with [x;y] when Type.is_prop(T.ty x) && !cased_term_selection != NotConnective ->
 							add t (Literal.mk_lit x y (f = Builtin.Eq || f = Builtin.Equiv))
 						|_->())
 					| Builtin.And | Builtin.Or | Builtin.Imply | Builtin.Not ->
-						if !cased_term_selection!=1 then add t (yes t) else()
+						if !cased_term_selection != NotConnective then add t (yes t) else()
 					| _ -> add t (yes t)
 	in
         (*let sub_terms =
@@ -148,7 +145,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 		proof
 		in
 		new' :: clauses
-	) assume []
+	) term_as_true []
 
 
   let setup () =
