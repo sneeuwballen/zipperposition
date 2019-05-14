@@ -9,6 +9,11 @@ open Libzipperposition
 module T = Term
 
 let _axioms_enabled = ref false
+(* Controls allowed shape of b in boolean case paramodulation C[b] ⟹ b ∨ C[⊥].
+0: b is any non-variable boolean term
+1: b is not a connective
+2: b does not occure only inside other boolean terms *)
+let cased_term_selection = ref 0
 
 module type S = sig
   module Env : Env.S
@@ -61,61 +66,98 @@ module Make(E : Env.S) : S with module Env = E = struct
   let as_clause c = Env.C.create ~penalty:1 ~trail:Trail.empty c Proof.Step.trivial
 
   let create_clauses () = 
-    let alpha_var = HVar.make ~ty:Type.tType 0 in
+    (*let alpha_var = HVar.make ~ty:Type.tType 0 in
     let alpha = Type.var alpha_var in
-    let a = T.var (HVar.make ~ty:Type.prop 0) in
     let b = T.var (HVar.make ~ty:Type.prop 1) in
     let p = T.var (HVar.make ~ty:(Type.arrow [alpha] Type.prop) 1) in
     let x = T.var (HVar.make ~ty:alpha 1) in
-    let y = T.var (HVar.make ~ty:alpha 2) in
-    let cls = [
-      (* true_not_false;  *)
-      (* true_or_false a; *)
-      (*imp_true1 a b;
-      imp_true2 a b; imp_false a b; 
-      and_ a b     *)
-      (* all_true p; 
-      all_false p  ; eq_true x y  ; eq_false x y; 
-      not          ; exists alpha; *)
-      (* ; or_ a b;  *)
-      and_false a; and_true a; 
-    ] in
-    let res = List.map as_clause cls in
-    Iter.of_list res
+    let y = T.var (HVar.make ~ty:alpha 2) in*)
+    let a = T.var (HVar.make ~ty:Type.prop 0) in
+    [
+      [Builtin.And @:[T.true_; a] =~ a];
+	  [Builtin.And @:[T.false_; a] =~ T.false_];
+	  [Builtin.Or @:[T.true_; a] =~ T.true_];
+	  [Builtin.Or @:[T.false_; a] =~ a];
+	  [Builtin.Imply @:[T.true_; a] =~ a];
+	  [Builtin.Imply @:[T.false_; a] =~ T.true_];
+	  [Builtin.Not @:[T.true_] =~ T.false_];
+	  [Builtin.Not @:[T.false_] =~ T.true_];
+	  (*
+	  imp_true1 a b; imp_true2 a b; imp_false a b; 
+      and_ a b;
+      all_true p; all_false p;
+	  eq_true x y; eq_false x y; 
+      (*not; exists alpha;*)
+      or_ a b;
+      (*and_false a; and_true a;*)
+	  *)
+    ] |> List.map as_clause |> Iter.of_list
 
-  let bool_cases c : C.t list =
-    let sub_terms =
+  let bool_cases(c: C.t) : C.t list =
+    let assume = Hashtbl.create 8 in
+	let rec find_bools t =
+		let ok = Type.is_prop(T.ty t) && T.DB.is_closed t in
+		(* Add only propositions. *)
+		let add = if ok then Hashtbl.add assume else fun _ _ -> () in
+		let yes = if ok then yes else fun _ -> yes T.true_ in
+		(* Stop recursion in combination of certain settings. *)
+		let inner f x = if ok && !cased_term_selection = 2 then () else List.iter f x in
+		match T.view t with
+			| DB _ | Var _ -> ()
+			| Const _ -> add t (yes t)
+			| Fun(_,b) -> find_bools b
+			| App(f,ps) -> add t (yes t); inner find_bools (f::ps)
+			| AppBuiltin(f,ps) ->
+				inner find_bools ps;
+				match f with
+					| Builtin.True | Builtin.False -> ()
+					| Builtin.Eq | Builtin.Neq | Builtin.Equiv | Builtin.Xor ->
+						(match ps with [x;y] when Type.is_prop(T.ty x) && !cased_term_selection!=1 ->
+							add t (Literal.mk_lit x y (f = Builtin.Eq || f = Builtin.Equiv))
+						|_->())
+					| Builtin.And | Builtin.Or | Builtin.Imply | Builtin.Not ->
+						if !cased_term_selection!=1 then add t (yes t) else()
+					| _ -> add t (yes t)
+	in
+        (*let sub_terms =
       C.Seq.terms c
       |> Iter.flat_map(fun t ->
            T.Seq.subterms_depth t
-           |> Iter.filter_map (fun (t,d) -> if d>0  then Some t else None))
+           |> Iter.filter_map (fun (t,d) -> if d>0 then Some t else None))
       |> Iter.filter(fun t ->
            Type.is_prop(T.ty t) &&
            T.DB.is_closed t &&
            begin match T.view t with
-             | T.Const _ | T.App _ -> true
-             | T.AppBuiltin ((Builtin.True | Builtin.False | Builtin.And), _) -> false
-			 | T.AppBuiltin (_, _) -> true
-             | T.Var _ | T.DB _ -> false
+             | T.Const _ | T.App _ -> Some(t =~ T.true_)
+             (*| T.AppBuiltin ((Builtin.True | Builtin.False | Builtin.And), _) -> false*)
+			 | T.Var _ | T.DB _ -> None
              | T.Fun _ -> assert false (* by typing *)
-           end)
+           	 | T.AppBuiltin (op, ps) -> match op with
+				| Builtin.True | Builtin.False -> None
+				| Builtin.Eq | Builtin.Neq | Builtin.Equiv | Builtin.Xor -> if Type.is_prop(T.ty(List.hd ps)) then mk_lit 
+        end)
       |> T.Set.of_seq
-    in
-	T.Set.to_list sub_terms |> List.map(fun b ->
-		let proof = Proof.Step.inference [C.proof_parent c]
+    in*)
+	Literals.Seq.terms(C.lits c) |> Iter.iter find_bools;
+	Hashtbl.fold(fun b b_true clauses ->
+		(*CCFormat.printf "Prop inside %a is e.g.: %a\n" Env.C.pp c Term.pp b;*)
+		let proof = Proof.Step.inference[C.proof_parent c]
 			~rule:(Proof.Rule.mk"bool_cases")
 		in
-		C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-			(Literal.mk_eq b T.true_ :: (C.lits c |> Literals.map(T.replace ~old:b ~by:T.false_) |> Array.to_list)) proof
-	)
+		let new' = C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+			(b_true :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:T.false_)))
+		proof
+		in
+		CCFormat.printf "NEW clause: %a\n" Env.C.pp new';
+		new' :: clauses
+	) assume []
 
 
   let setup () =
 	if !_axioms_enabled then(
 		Env.ProofState.PassiveSet.add (create_clauses () );
 		Env.add_unary_inf "bool_cases" bool_cases;
-	);
-    ()
+	)
 end
 
 
