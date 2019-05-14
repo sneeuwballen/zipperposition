@@ -1397,7 +1397,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                let u =
                  if T.same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l'
                in
-               k u)
+               reduce_at_root ~restrict u k)
     and normal_form_l l k = match l with
       | [] -> k []
       | t :: tail ->

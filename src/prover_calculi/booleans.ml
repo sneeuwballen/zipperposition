@@ -74,7 +74,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let y = T.var (HVar.make ~ty:alpha 2) in*)
     let a = T.var (HVar.make ~ty:Type.prop 0) in
     [
-      [Builtin.And @:[T.true_; a] =~ a];
+    [Builtin.And @:[T.true_; a] =~ a];
 	  [Builtin.And @:[T.false_; a] =~ T.false_];
 	  [Builtin.Or @:[T.true_; a] =~ T.true_];
 	  [Builtin.Or @:[T.false_; a] =~ a];
@@ -147,7 +147,6 @@ module Make(E : Env.S) : S with module Env = E = struct
 			(b_true :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:T.false_)))
 		proof
 		in
-		(*CCFormat.printf "NEW clause: %a\n" Env.C.pp new';*)
 		new' :: clauses
 	) assume []
 
