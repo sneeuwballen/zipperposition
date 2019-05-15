@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 open Logtk
@@ -17,6 +16,7 @@ module type S = sig
   type flag = SClause.flag
 
   val set_flag : flag -> t -> bool -> unit (** set boolean flag *)
+
   val get_flag : flag -> t -> bool (** get value of boolean flag *)
 
   val mark_redundant : t -> unit

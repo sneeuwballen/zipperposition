@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Polynomes of order 1, over several variables}. *)
@@ -22,22 +21,30 @@ type 'a t
 
 type 'a monome = 'a t
 
-val equal : 'n t -> 'n t -> bool       (* structural equality *)
-val compare : 'n t -> 'n t -> int   (* arbitrary total order on monomes *)
+val equal : 'n t -> 'n t -> bool       (** structural equality *)
+
+val compare : 'n t -> 'n t -> int   (** arbitrary total order on monomes *)
+
 val hash : _ t -> int
 
 val ty : _ t -> Type.t   (** type of the monome (int or rat) *)
 
 val const : 'a t -> 'a   (** constant *)
+
 val coeffs : 'a t -> ('a * term) list  (** coefficients *)
 
 val find : 'a t -> term -> 'a option
+
 val find_exn : 'a t -> term -> 'a (** @raise Not_found if not present *)
+
 val mem : _ t -> term -> bool     (** Is the term in the monome? *)
 
 val add : 'a t -> 'a -> term -> 'a t  (** Add term with coefficient. Sums coeffs. *)
+
 val add_const : 'a t -> 'a -> 'a t    (** Add given number to constant *)
+
 val remove : 'a t -> term -> 'a t     (** Remove the term *)
+
 val remove_const : 'a t -> 'a t       (** Remove the constant *)
 
 val add_list : 'a t -> ('a * term) list -> 'a t
@@ -75,7 +82,9 @@ val sum : 'a t -> 'a t -> 'a t
 val difference : 'a t -> 'a t -> 'a t
 val uminus : 'a t -> 'a t
 val product : 'a t -> 'a -> 'a t  (** Product with constant *)
+
 val succ : 'a t -> 'a t           (** +1 *)
+
 val pred : 'a t -> 'a t           (** -1 *)
 
 val sum_list : 'a t list -> 'a t
@@ -259,7 +268,9 @@ module Int : sig
   type t = Z.t monome
 
   val const : Z.t -> t (** Empty monomial, from constant (decides type) *)
+
   val singleton : Z.t -> term -> t  (** One term. *)
+
   val of_list : Z.t -> (Z.t * term) list -> t
 
   val of_term : term -> t option
@@ -393,7 +404,9 @@ module Rat : sig
   type t = Q.t monome
 
   val const : Q.t -> t (** Empty monomial, from constant (decides type) *)
+
   val singleton : Q.t -> term -> t  (** One term. *)
+
   val of_list : Q.t -> (Q.t * term) list -> t
 
   val divide : t -> Q.t -> t

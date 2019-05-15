@@ -9,6 +9,6 @@
   (modes native)
   (libraries logtk logtk.parsers)
   (package zipperposition-tools)
-  (flags :standard -w -32-50)
+  (flags :standard -w -32)
   (ocamlopt_flags :standard -Oclassic)
 )

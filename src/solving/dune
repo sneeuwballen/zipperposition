@@ -5,4 +5,4 @@
   (synopsis "solving constraints")
   (optional)
   (libraries containers logtk msat msat.tseitin iter)
-  (flags :standard -w -32-50))
+  (flags :standard -w -32))

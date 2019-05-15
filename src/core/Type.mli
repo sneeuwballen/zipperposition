@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Types} *)
@@ -131,6 +130,7 @@ module Tbl : CCHashtbl.S with type key = t
 module Seq : sig
   val vars : t -> t HVar.t Iter.t
   val sub : t -> t Iter.t (** Subterms *)
+
   val symbols : t -> ID.t Iter.t
   val add_set : Set.t -> t Iter.t -> Set.t
   val max_var : t HVar.t Iter.t -> int
@@ -250,10 +250,13 @@ module TPTP : sig
   (** {2 Basic types} *)
 
   val i : t       (** individuals *)
+
   val o : t       (** propositions *)
 
   val int : t     (** integers *)
+
   val rat : t     (** rationals *)
+
   val real : t    (** reals *)
 end
 
@@ -303,5 +306,6 @@ end
 
 (**/**)
 val rebuild_rec : ?env:t list -> t -> t (** rebuild recursively and checks *)
+
 val unsafe_eval_db : t list -> t -> t
 (**/**)

@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Type Inference}
@@ -31,8 +30,11 @@
 type 'a or_error = ('a, string) CCResult.t
 
 type type_ = TypedSTerm.t
+
 type untyped = STerm.t (** untyped term *)
+
 type typed = TypedSTerm.t (** typed term *)
+
 type loc = ParseLocation.t
 
 exception Error of string

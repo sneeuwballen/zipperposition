@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Feature Vector indexing} *)
@@ -35,15 +34,25 @@ module Make(C:Index_intf.CLAUSE) : sig
     include Interfaces.PRINT with type t := t
 
     val size_plus : t (** size of positive clause *)
+
     val size_minus : t (** size of negative clause *)
+
     val labels : t
+
     val weight_plus : t
+
     val weight_minus : t
+
     val set_sym_plus : t (** set of positive symbols *)
+
     val set_sym_minus : t (** set of negative symbols *)
+
     val depth_sym_plus : t (** max depth of positive symbols *)
+
     val depth_sym_minus : t (** max depth of negative symbols *)
+
     val multiset_sym_plus : t (** multiset of positive symbols *)
+
     val multiset_sym_minus : t (** multiset of negative symbols *)
   end
 

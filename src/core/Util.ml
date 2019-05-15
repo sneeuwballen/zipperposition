@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Some helpers} *)
@@ -327,6 +326,7 @@ let mk_stat, print_global_stats =
        stats)
 
 let incr_stat (_, count) = count := Int64.add !count Int64.one  (** increment given statistics *)
+
 let add_stat (_, count) num = count := Int64.add !count (Int64.of_int num) (** add to stat *)
 
 (** {Flags as integers} *)

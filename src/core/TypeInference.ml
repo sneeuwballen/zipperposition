@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (* {1 Type inference} *)
@@ -20,8 +19,8 @@ let section = Util.Section.(make "ty-infer")
 type 'a or_error = ('a, string) CCResult.t
 
 type type_ = TypedSTerm.t
-type untyped = STerm.t (** untyped term *)
-type typed = TypedSTerm.t (** typed term *)
+type untyped = STerm.t
+type typed = TypedSTerm.t
 type loc = ParseLocation.t
 
 exception Error of string

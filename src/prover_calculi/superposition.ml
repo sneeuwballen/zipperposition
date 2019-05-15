@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 open Logtk
@@ -1129,8 +1128,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             iterate_lits acc lits' new_clauses
         end
       | lit::lits' -> iterate_lits (lit::acc) lits' clauses
-    (** try to make the terms equal using some positive unit clauses
-        from active_set *)
+    (* try to make the terms equal using some positive unit clauses
+       from active_set *)
     and equatable_terms clauses t1 t2 =
       match T.Classic.view t1, T.Classic.view t2 with
         | _ when T.equal t1 t2 -> Some clauses  (* trivial *)
@@ -1152,7 +1151,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             | Some clauses -> Some clauses
           end
         | _ -> equate_root clauses t1 t2 (* try to solve it with a unit equality *)
-    (** try to equate terms with a positive unit clause that match them *)
+    (* try to equate terms with a positive unit clause that match them *)
     and equate_root clauses t1 t2 =
       try
         UnitIdx.retrieve ~sign:true (!_idx_simpl,1)(t1,0)
@@ -1205,7 +1204,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             iterate_lits acc lits' (new_clause :: clauses)
         end
       | lit::lits' -> iterate_lits (lit::acc) lits' clauses
-    (** try to remove the literal using a negative unit clause *)
+    (* try to remove the literal using a negative unit clause *)
     and can_refute s t =
       try
         UnitIdx.retrieve ~sign:false (!_idx_simpl,1) (s,0)

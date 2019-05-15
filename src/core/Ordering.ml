@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Term Orderings} *)
@@ -171,8 +170,8 @@ module KBO : ORD = struct
   (** Blanchette's higher-order KBO *)
   let rec kbo ~prec t1 t2 =
     let balance = mk_balance t1 t2 in
-    (** variable balance, weight balance, t contains variable y. pos
-        stands for positive (is t the left term) *)
+    (* variable balance, weight balance, t contains variable y. pos
+       stands for positive (is t the left term) *)
     let rec balance_weight (wb:W.t) t y ~pos : W.t * bool =
       match T.view t with
         | T.Var x ->
@@ -205,13 +204,13 @@ module KBO : ORD = struct
           in
           balance_weight_rec wb' l y ~pos false
         | T.Fun _ -> raise Has_lambda
-    (** list version of the previous one, threaded with the check result *)
+    (* list version of the previous one, threaded with the check result *)
     and balance_weight_rec wb terms y ~pos res = match terms with
       | [] -> (wb, res)
       | t::terms' ->
         let wb', res' = balance_weight wb t y ~pos in
         balance_weight_rec wb' terms' y ~pos (res || res')
-    (** lexicographic comparison *)
+    (* lexicographic comparison *)
     and tckbolex wb terms1 terms2 =
       match terms1, terms2 with
         | [], [] -> wb, Eq
@@ -229,7 +228,7 @@ module KBO : ORD = struct
         | _, [] ->
           let wb, _ = balance_weight_rec wb terms1 0 ~pos:true false in
           wb, Gt
-    (** length-lexicographic comparison *)
+    (* length-lexicographic comparison *)
     and tckbolenlex wb terms1 terms2 =
       if List.length terms1 = List.length terms2
       then tckbolex wb terms1 terms2
@@ -240,8 +239,8 @@ module KBO : ORD = struct
         let res = if List.length terms1 > List.length terms2 then Gt else Lt in
         wb'', res
       )
-    (** commutative comparison. Not linear, must call kbo to
-        avoid breaking the weight computing invariants *)
+    (* commutative comparison. Not linear, must call kbo to
+       avoid breaking the weight computing invariants *)
     and tckbocommute wb ss ts =
       (* multiset comparison *)
       let res = MT.compare_partial_l (kbo ~prec) ss ts in
@@ -249,7 +248,7 @@ module KBO : ORD = struct
       let wb', _ = balance_weight_rec wb ss 0 ~pos:true false in
       let wb'', _ = balance_weight_rec wb' ts 0 ~pos:false false in
       wb'', res
-    (** tupled version of kbo (kbo_5 of the paper) *)
+    (* tupled version of kbo (kbo_5 of the paper) *)
     and tckbo (wb:W.t) t1 t2 =
       match T.view t1, T.view t2 with
         | _ when T.equal t1 t2 -> (wb, Eq) (* do not update weight or var balance *)
@@ -271,8 +270,8 @@ module KBO : ORD = struct
             | Some f, Some g -> tckbo_composite wb f g (Head.term_to_args t1) (Head.term_to_args t2)
             | _ -> (wb, Incomparable)
           end
-    (** tckbo, for composite terms (ie non variables). It takes a ID.t
-        and a list of subterms. *)
+    (* tckbo, for composite terms (ie non variables). It takes a ID.t
+       and a list of subterms. *)
     and tckbo_composite wb f g ss ts =
       (* do the recursive computation of kbo *)
       let wb', res = tckbo_rec wb f g ss ts in
@@ -300,7 +299,7 @@ module KBO : ORD = struct
           else if res = Gt then wb'', g_or_n
           else wb'', Incomparable
         | Incomparable -> wb'', Incomparable
-    (** recursive comparison *)
+    (* recursive comparison *)
     and tckbo_rec wb f g ss ts =
       if prec_compare prec f g = Eq
       then match prec_status prec f with
@@ -507,7 +506,7 @@ end
 module RPO6 : ORD = struct
   let name = "rpo6"
 
-  (** recursive path ordering *)
+  (* recursive path ordering *)
   let rec rpo6 ~prec s t =
     if T.equal s t then Eq else  (* equality test is cheap *)
       match T.view s, T.view t with
@@ -534,8 +533,8 @@ module RPO6 : ORD = struct
       | Lt -> Comparison.opp (cMA ~prec t ss)
       | Incomparable -> cAA ~prec s t ss ts
     end
-  (** try to dominate all the terms in ts by s; but by subterm property
-      if some t' in ts is >= s then s < t=g(ts) *)
+  (* try to dominate all the terms in ts by s; but by subterm property
+     if some t' in ts is >= s then s < t=g(ts) *)
   and cMA ~prec s ts = match ts with
     | [] -> Gt
     | t::ts' ->
@@ -543,7 +542,7 @@ module RPO6 : ORD = struct
         | Gt -> cMA ~prec s ts'
         | Eq | Lt -> Lt
         | Incomparable -> Comparison.opp (alpha ~prec ts' s))
-  (** lexicographic comparison of s=f(ss), and t=f(ts) *)
+  (* lexicographic comparison of s=f(ss), and t=f(ts) *)
   and cLMA ~prec s t ss ts = match ss, ts with
     | si::ss', ti::ts' ->
       begin match rpo6 ~prec si ti with
@@ -555,7 +554,7 @@ module RPO6 : ORD = struct
     | [], [] -> Eq
     | [], _::_ -> Lt
     | _::_, [] -> Gt
-  (** length-lexicographic comparison of s=f(ss), and t=f(ts) *)
+  (* length-lexicographic comparison of s=f(ss), and t=f(ts) *)
   and cLLMA ~prec s t ss ts =
     if List.length ss = List.length ts then
       cLMA ~prec s t ss ts
@@ -563,19 +562,19 @@ module RPO6 : ORD = struct
       cMA ~prec s ts
     else
       Comparison.opp (cMA ~prec t ss)
-  (** multiset comparison of subterms (not optimized) *)
+  (* multiset comparison of subterms (not optimized) *)
   and cMultiset ~prec s t ss ts =
     match MT.compare_partial_l (rpo6 ~prec) ss ts with
       | Eq | Incomparable -> Incomparable
       | Gt -> cMA ~prec s ts
       | Lt -> Comparison.opp (cMA ~prec t ss)
-  (** bidirectional comparison by subterm property (bidirectional alpha) *)
+  (* bidirectional comparison by subterm property (bidirectional alpha) *)
   and cAA ~prec s t ss ts =
     match alpha ~prec ss t with
       | Gt -> Gt
       | Incomparable -> Comparison.opp (alpha ~prec ts s)
       | _ -> assert false
-  (** if some s in ss is >= t, then s > t by subterm property and transitivity *)
+  (* if some s in ss is >= t, then s > t by subterm property and transitivity *)
   and alpha ~prec ss t = match ss with
     | [] -> Incomparable
     | s::ss' ->

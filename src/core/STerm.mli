@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Simple Terms}. *)
@@ -54,6 +53,7 @@ include Interfaces.ORD with type t := t
 
 val var : ?loc:location -> string -> t
 val v_wild : t (** wildcard *)
+
 val mk_var : ?loc:location -> var -> t
 val app : ?loc:location -> t -> t list -> t
 val app_const : ?loc:location -> string -> t list -> t
@@ -122,7 +122,9 @@ module Seq : sig
 end
 
 val ground : t -> bool
+
 val close_all : Binder.t -> t -> t  (** Bind all free vars with the symbol *)
+
 val subterm : strict:bool -> t -> sub:t -> bool
 (** is [sub] a (strict?) subterm of the other arg? *)
 
