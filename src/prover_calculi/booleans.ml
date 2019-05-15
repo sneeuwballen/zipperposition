@@ -88,7 +88,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     ] |> List.map as_clause |> Iter.of_list
 
   let bool_cases(c: C.t) : C.t list =
-    let term_as_true = Hashtbl.create 8 in
+  let term_as_true = Hashtbl.create 8 in
 	let rec find_bools top t =
 		let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && not top in
 		(* Add only propositions. *)
@@ -106,7 +106,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 				match f with
 					| Builtin.True | Builtin.False -> ()
 					| Builtin.Eq | Builtin.Neq | Builtin.Equiv | Builtin.Xor ->
-						(match ps with [x;y] when Type.is_prop(T.ty x) && !cased_term_selection != NotConnective ->
+						(match ps with [x;y] when (!cased_term_selection != NotConnective || not (Type.is_prop (T.ty x)))  ->
 							add t (Literal.mk_lit x y (f = Builtin.Eq || f = Builtin.Equiv))
 						|_->())
 					| Builtin.And | Builtin.Or | Builtin.Imply | Builtin.Not ->
