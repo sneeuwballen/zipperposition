@@ -153,7 +153,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let setup () =
 	if !_axioms_enabled then(
-		Env.ProofState.PassiveSet.add (create_clauses () );
+		Env.ProofState.ActiveSet.add (create_clauses () );
 		Env.add_unary_inf "bool_cases" bool_cases;
     Env.add_basic_simplify simpl_eq_subterms;
 	)
@@ -174,7 +174,13 @@ let extension =
 let () =
   Options.add_opts
     [ "--boolean-axioms", Arg.Bool (fun b -> _axioms_enabled := b), 
-      " enable/disable boolean axioms"  ];
+      " enable/disable boolean axioms";
+      "--bool-subterm-selection", 
+      Arg.Symbol(["A"; "N"; "L"], (fun opt -> if opt = "A" then cased_term_selection := Any
+                                            else if opt = "N" then cased_term_selection := NotConnective
+                                            else cased_term_selection := Large)), 
+      " select boolean subterm selection criterion: A for any, N for not a connective and L for large"
+        ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
     _axioms_enabled := false
   );
