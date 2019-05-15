@@ -131,6 +131,48 @@ module Make(E : Env.S) : S with module Env = E = struct
 	Hashtbl.fold(case T.false_) term_as_true [] @
 	Hashtbl.fold(case T.true_) term_as_false []
 
+
+  let bool_case_simp(c: C.t) : C.t list =
+  let term_to_equations = Hashtbl.create 8 in
+	let rec find_bools top t =
+		let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && not top in
+		(* Add only propositions. *)
+		let add t x y = if can_be_cased then Hashtbl.add term_to_equations t (x=~y, x/~y) in
+		(* Stop recursion in combination of certain settings. *)
+		let inner f x = if can_be_cased && !cased_term_selection = Large then () else List.iter(f false) x in
+		match T.view t with
+			| DB _ | Var _ -> ()
+			| Const _ -> add t t T.true_
+			| Fun(_,b) -> find_bools false b
+			| App(f,ps) -> add t t T.true_; inner find_bools (f::ps)
+			| AppBuiltin(f,ps) ->
+				inner find_bools ps;
+				match f with
+					| Builtin.True | Builtin.False -> ()
+					| Builtin.Eq | Builtin.Neq | Builtin.Equiv | Builtin.Xor ->
+						(match ps with 
+              | [x;y] when (!cased_term_selection != NotConnective || Type.is_prop(T.ty x)) ->
+                add t x y;
+                if f = Builtin.Neq || f = Builtin.Xor then
+                  Hashtbl.replace term_to_equations t (Hashtbl.find term_to_equations t)
+              | _ -> ())
+					| Builtin.And | Builtin.Or | Builtin.Imply | Builtin.Not ->
+						if !cased_term_selection != NotConnective then add t t T.true_ else()
+					| _ -> add t t T.true_
+	in
+	Literals.Seq.terms(C.lits c) |> Iter.iter(find_bools true);
+	Hashtbl.fold(fun b (b_true, b_false) clauses ->
+		let proof = Proof.Step.inference[C.proof_parent c]
+			~rule:(Proof.Rule.mk"bool_case_simp")
+		in
+		C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+			(b_true :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:T.false_)))
+		proof ::
+    C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+			(b_false :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:T.true_)))
+		proof ::
+    clauses) term_to_equations []
+
   let simpl_eq_subterms c =
     let simplified = ref false in
     let new_lits = 
