@@ -68,7 +68,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let y = T.var (HVar.make ~ty:alpha 2) in*)
     let a = T.var (HVar.make ~ty:Type.prop 0) in
     [
-    [Builtin.And @:[T.true_; a] =~ a];
+      [Builtin.And @:[T.true_; a] =~ a];
 	  [Builtin.And @:[T.false_; a] =~ T.false_];
 	  [Builtin.Or @:[T.true_; a] =~ T.true_];
 	  [Builtin.Or @:[T.false_; a] =~ a];
@@ -89,6 +89,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let bool_cases(c: C.t) : C.t list =
     let term_as_true = Hashtbl.create 8 in
+    let term_as_false = Hashtbl.create 4 in
 	let rec find_bools top t =
 		let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && not top in
 		(* Add only propositions. *)
@@ -106,24 +107,28 @@ module Make(E : Env.S) : S with module Env = E = struct
 				match f with
 					| Builtin.True | Builtin.False -> ()
 					| Builtin.Eq | Builtin.Neq | Builtin.Equiv | Builtin.Xor ->
-						(match ps with [x;y] when Type.is_prop(T.ty x) && !cased_term_selection != NotConnective ->
-							add t (Literal.mk_lit x y (f = Builtin.Eq || f = Builtin.Equiv))
+						(match ps with [x;y] when (!cased_term_selection != NotConnective || Type.is_prop(T.ty x)) ->
+							if f = Builtin.Neq || f = Builtin.Xor then(
+								if can_be_cased then Hashtbl.add term_as_false t (x =~ y);
+								add t (x /~ y)
+							)else
+								add t (x =~ y)
 						|_->())
 					| Builtin.And | Builtin.Or | Builtin.Imply | Builtin.Not ->
 						if !cased_term_selection != NotConnective then add t (yes t) else()
 					| _ -> add t (yes t)
 	in
 	Literals.Seq.terms(C.lits c) |> Iter.iter(find_bools true);
-	Hashtbl.fold(fun b b_true clauses ->
+	let case polarity b b_lit clauses =
 		let proof = Proof.Step.inference[C.proof_parent c]
 			~rule:(Proof.Rule.mk"bool_cases")
 		in
-		let new' = C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-			(b_true :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:T.false_)))
-		proof
-		in
-		new' :: clauses
-	) term_as_true []
+		C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+			(b_lit :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:polarity)))
+		proof :: clauses
+	in
+	Hashtbl.fold(case T.false_) term_as_true [] @
+	Hashtbl.fold(case T.true_) term_as_false []
 
   let simpl_eq_subterms c =
     let simplified = ref false in
@@ -153,9 +158,9 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let setup () =
 	if !_axioms_enabled then(
-		Env.ProofState.PassiveSet.add (create_clauses () );
+		Env.ProofState.ActiveSet.add (create_clauses () );
 		Env.add_unary_inf "bool_cases" bool_cases;
-    Env.add_basic_simplify simpl_eq_subterms;
+    	Env.add_basic_simplify simpl_eq_subterms;
 	)
 end
 
