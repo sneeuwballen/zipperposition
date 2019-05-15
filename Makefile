@@ -124,6 +124,9 @@ WATCH?=@all
 watch:
 	dune build $(WATCH) -w $(DUNE_OPTS)
 
+fmt:
+	dune build @fmt --auto-promote
+
 ocp-indent:
 	@which ocp-indent > /dev/null || { \
 	  	echo 'ocp-indent not found; please run `opam install ocp-indent`'; \
@@ -137,5 +140,5 @@ reindent: ocp-indent
 gallery.svg:
 	for i in gallery/*.dot ; do dot -Tsvg "$$i" > "gallery/`basename $${i} .dot`.svg" ; done
 
-.PHONY: doc push_doc dot package tags test-all
+.PHONY: doc push_doc dot package tags test-all fmt
 
