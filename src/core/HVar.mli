@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Hashconsed Variable}
@@ -11,9 +10,10 @@
 *)
 
 type +'a t = private {
-  id: int;
-  ty: 'a;
+  id : int;
+  ty : 'a
 }
+
 type 'a hvar = 'a t
 
 val make : ty:'a -> int -> 'a t
@@ -36,6 +36,7 @@ val to_string : _ t -> string
 val to_string_tstp : _ t -> string
 
 (**/**)
+
 val make_unsafe : ty:'a -> int -> 'a t
 (** skip checks *)
 
@@ -46,6 +47,4 @@ val fresh : ty:'a -> unit -> 'a t
 val is_fresh : _ t -> bool
 (** Magic: check if the variable is a fresh one (with negative index) *)
 
-
 (**/**)
-

@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Basic Splitting à la Avatar}
@@ -23,12 +22,8 @@ val flag_cut_introduced : SClause.flag
 
 module type S = Avatar_intf.S
 
-module Make
-    (E : Env.S)
-    (Sat : Sat_solver.S)
-  : S
-    with module E = E
-     and module Solver = Sat
+module Make (E : Env.S) (Sat : Sat_solver.S) :
+  S with module E = E and module Solver = Sat
 
 val k_avatar : (module S) Flex_state.key
 val k_simplify_trail : bool Flex_state.key

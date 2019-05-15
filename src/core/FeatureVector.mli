@@ -20,35 +20,43 @@ type lits = Index_intf.lits
     features. See paper.
 *)
 
-module Make(C : Index.CLAUSE) : sig
-  type feature_vector = int list
+module Make (C : Index.CLAUSE) : sig
   (** a vector of feature *)
+  type feature_vector = int list
 
   (** {2 Features} *)
 
   module Feature : sig
+    (** a function that computes a given feature on clauses *)
     type t = {
       name : string;
-      f : lits -> int;
-    } (** a function that computes a given feature on clauses *)
+      f : lits -> int
+    }
 
     val name : t -> string
     val compute : t -> lits -> int
     include Interfaces.PRINT with type t := t
 
-    val sum_of_depths : t                 (** sum of depths of symbols *)
+    val sum_of_depths : t
+    (** sum of depths of symbols *)
 
-    val size_plus : t                     (** size of positive clause *)
+    val size_plus : t
+    (** size of positive clause *)
 
-    val size_minus : t                    (** size of negative clause *)
+    val size_minus : t
+    (** size of negative clause *)
 
-    val count_symb_plus : ID.t -> t   (** occurrences of ID.t in positive clause *)
+    val count_symb_plus : ID.t -> t
+    (** occurrences of ID.t in positive clause *)
 
-    val count_symb_minus : ID.t -> t  (** occurrences of ID.t in negative clause *)
+    val count_symb_minus : ID.t -> t
+    (** occurrences of ID.t in negative clause *)
 
-    val max_depth_plus : ID.t -> t    (** maximal depth of symb in positive clause *)
+    val max_depth_plus : ID.t -> t
+    (** maximal depth of symb in positive clause *)
 
-    val max_depth_minus : ID.t -> t   (** maximal depth of symb in negative clause *)
+    val max_depth_minus : ID.t -> t
+    (** maximal depth of symb in negative clause *)
   end
 
   val compute_fv : Feature.t list -> lits -> feature_vector
@@ -61,8 +69,8 @@ module Make(C : Index.CLAUSE) : sig
 
   val default_features : Feature.t list
 
-  val features_of_signature : ?ignore:(ID.t -> bool) ->
-    Signature.t -> Feature.t list
+  val features_of_signature :
+    ?ignore:(ID.t -> bool) -> Signature.t -> Feature.t list
   (** Build a set of features from the given signature. IDs
       that satisfy [ignore] are not considered (default ignores
       connectives) *)

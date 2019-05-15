@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Utils related to TPTP} *)
@@ -15,8 +14,8 @@ exception Error of string
 
 (** {2 Printing/Parsing} *)
 
-type parse_cache
 (** Cache that remembers the set of files that have been parsed so far *)
+type parse_cache
 
 val create_parse_cache : unit -> parse_cache
 
@@ -26,16 +25,12 @@ val find_file : string -> string -> string option
     It also looks in the "TPTP" environment variable. *)
 
 val parse_lexbuf :
-  ?names:A.name list ->
-  Lexing.lexbuf ->
-  untyped A.t Iter.t or_error
+  ?names:A.name list -> Lexing.lexbuf -> untyped A.t Iter.t or_error
 (** Given a lexbuf, try to parse its content into a sequence of untyped
     declarations *)
 
 val parse_file :
-  ?cache:parse_cache ->
-  recursive:bool -> string ->
-  untyped A.t Iter.t or_error
+  ?cache:parse_cache -> recursive:bool -> string -> untyped A.t Iter.t or_error
 (** Parsing a TPTP file is here presented with a [recursive] option
     that, if true, will make "include" directives to be recursively
     parsed. It uses {!find_file} for included files.

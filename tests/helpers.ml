@@ -28,14 +28,17 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 module R = Random
 
-let seed = 42   (* use a fixed seed for random, for repeatable tests *)
+let seed = 42 (* use a fixed seed for random, for repeatable tests *)
 
 let random_in lower higher =
   assert (lower <= higher);
-  (R.int (higher - lower)) + lower
+  R.int (higher - lower) + lower
 
 (** a test result on 'a *)
-type 'a test_result = TestOk | TestFail of 'a | TestPreconditionFalse
+type 'a test_result =
+  | TestOk
+  | TestFail of 'a
+  | TestPreconditionFalse
 
 let choose l =
   let len = List.length l in
@@ -44,13 +47,14 @@ let choose l =
 
 let random_list _size mk_elem =
   let rec aux acc = function
-  | 0 -> acc
-  | size -> aux ((mk_elem ())::acc) (size-1)
-  in aux []
+    | 0 -> acc
+    | size -> aux (mk_elem () :: acc) (size - 1)
+  in
+  aux []
 
 (** check the property on elements from the given generator, num times.
     Returns (num, number of success, list of failures, number of no preconditions) *)
-let check_prop prop generator num = 
+let check_prop prop generator num =
   let failures = ref []
   and success_count = ref 0
   and noprecond_count = ref 0 in
@@ -60,24 +64,29 @@ let check_prop prop generator num =
     | TestPreconditionFalse -> incr noprecond_count
     | TestFail _ as r -> failures := r :: !failures
   done;
-  (num, !success_count, !failures, !noprecond_count)
+  num, !success_count, !failures, !noprecond_count
 
 (** print results *)
-let print_results ~name (num, success_count, failures, noprecond_count) pp_element =
-  let print_failure formater res = match res with
-  | TestFail a -> pp_element formater a
-  | _ -> assert false
+let print_results ~name (num, success_count, failures, noprecond_count)
+    pp_element =
+  let print_failure formater res =
+    match res with
+    | TestFail a -> pp_element formater a
+    | _ -> assert false
   in
-  Format.printf "%d tests for %s : %d success, %d failures, %d preconditions failed@."
-    num name success_count (List.length failures) noprecond_count;
-  if failures <> []
-    then Format.printf "failures @[%a@]@." (Util.pp_list ~sep:"" print_failure) failures
-    else ()
+  Format.printf
+    "%d tests for %s : %d success, %d failures, %d preconditions failed@." num
+    name success_count (List.length failures) noprecond_count;
+  if failures <> [] then
+    Format.printf "failures @[%a@]@."
+      (Util.pp_list ~sep:"" print_failure)
+      failures
+  else
+    ()
 
 (** check property and then print results *)
 let check_and_print ~name prop generator pp_element num =
   let res = check_prop prop generator num in
   print_results ~name res pp_element
 
-let () =
-  R.init seed
+let () = R.init seed

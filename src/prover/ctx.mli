@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Basic context for literals, clauses...} *)
@@ -19,4 +18,4 @@ module type PARAMETERS = sig
 end
 
 (** {2 Create a new context} *)
-module Make(X : PARAMETERS) : S
+module Make (X : PARAMETERS) : S

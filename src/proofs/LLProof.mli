@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Low Level Proofs} *)
@@ -18,7 +17,9 @@ val section : Util.Section.t
 type term = TypedSTerm.t
 type ty = term
 type form = term
-type inst = term list (** Instantiate some binder with the following terms. Order matters. *)
+
+(** Instantiate some binder with the following terms. Order matters. *)
+type inst = term list
 
 type tag = Proof.tag
 
@@ -33,23 +34,20 @@ type step =
   | Trivial
   | By_def of ID.t
   | Define of ID.t
-  | Instantiate of {
-      form: t;
-      inst: inst;
-      tags: tag list;
-    }
+  | Instantiate of {form : t; inst : inst; tags : tag list}
   | Esa of name * t list
-  | Inference of {
-      intros: term list; (* local renaming for the conclusion's foralls, with fresh constants *)
-      local_intros: term list; (* variables introduced between hypothesis, not in conclusion *)
-      name: name;
-      parents: parent list;
-      tags: tag list;
-    }
+  | Inference of
+      { intros : term list;
+        (* local renaming for the conclusion's foralls, with fresh constants *)
+      local_intros : term list;
+        (* variables introduced between hypothesis, not in conclusion *)
+      name : name;
+        parents : parent list;
+        tags : tag list }
 
 and parent = {
-  p_proof: t;
-  p_inst: inst; (* instantiate [forall] variables *)
+  p_proof : t;
+  p_inst : inst (* instantiate [forall] variables *)
 }
 
 val id : t -> int
@@ -86,14 +84,17 @@ val trivial : form -> t
 val by_def : ID.t -> form -> t
 val define : ID.t -> form -> t
 val instantiate : ?tags:tag list -> form -> t -> inst -> t
-val esa :
-  form -> name -> t list -> t
+
+val esa : form -> name -> t list -> t
+
 val inference :
   intros:term list ->
   local_intros:term list ->
   tags:tag list ->
-  form -> name -> parent list -> t
-
+  form ->
+  name ->
+  parent list ->
+  t
 
 (** {2 Checking steps} *)
 

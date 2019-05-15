@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Skolem symbols} *)
@@ -14,11 +13,12 @@ type type_ = TypedSTerm.t
 type term = TypedSTerm.t
 type form = TypedSTerm.t
 
-type ctx
 (** Context needed to create new symbols *)
+type ctx
 
 val create :
-  ?prefix:string -> ?prop_prefix:string ->
+  ?prefix:string ->
+  ?prop_prefix:string ->
   ?on_new:(ID.t -> type_ -> unit) ->
   unit ->
   ctx
@@ -32,7 +32,8 @@ val fresh_skolem : ctx:ctx -> ty:type_ -> vars_count:int -> ID.t
 (** Just obtain a fresh skolem symbol. It is also declared
     in the inner signature. *)
 
-val fresh_skolem_prefix : ctx:ctx -> ty:type_ -> vars_count:int -> string -> ID.t
+val fresh_skolem_prefix :
+  ctx:ctx -> ty:type_ -> vars_count:int -> string -> ID.t
 (** Fresh symbol with a different name *)
 
 val pop_new_skolem_symbols : ctx:ctx -> (ID.t * type_) list
@@ -43,7 +44,8 @@ val counter : ctx -> int
 
 (** {2 Skolemization} *)
 
-val skolem_form : ctx:ctx -> (type_, term) Var.Subst.t -> type_ Var.t -> form -> term
+val skolem_form :
+  ctx:ctx -> (type_, term) Var.Subst.t -> type_ Var.t -> form -> term
 (** [skolem_form ~ctx subst var f] returns a term [t] made of a new symbol
     applied to the free variables of [f] that do not occur in [subst].
     This term should replace the variable [var], occurring free in [f].
@@ -57,27 +59,27 @@ val skolem_form : ctx:ctx -> (type_, term) Var.Subst.t -> type_ Var.t -> form ->
 type polarity =
   [ `Pos
   | `Neg
-  | `Both
-  ]
+  | `Both ]
 
 val pp_polarity : polarity CCFormat.printer
 
 type form_definition = private {
-  form: form;
-  proxy_id: ID.t; (* name *)
+  form : form;
+  proxy_id : ID.t;
+  (* name *)
   (* the defined object *)
   proxy : term;
   (* atom/term standing for the defined object *)
   proxy_ty : type_;
   (* type of [proxy_id] *)
-  rw_rules: bool;
+  rw_rules : bool;
   (* do we add rewrite rules (instead of an axiom)?
      [proxy -> true if form]
      [proxy -> false if not form] (depending on polarity) *)
   polarity : polarity;
-  proof: Proof.step;
+  proof : Proof.step;
   (* source for this definition *)
-  as_stmt: Statement.input_t list lazy_t;
+  as_stmt : Statement.input_t list lazy_t
 }
 
 val pp_form_definition : form_definition CCFormat.printer
@@ -96,12 +98,12 @@ val define_form :
     @return the atomic formula that stands for [f]. *)
 
 type term_definition = private {
-  td_id: ID.t;
-  td_ty: type_;
-  td_rules: (form, term, type_) Statement.def_rule list;
-  td_as_def: (form,term,type_) Statement.def;
-  td_proof: Proof.step;
-  td_stmt: Statement.input_t list lazy_t;
+  td_id : ID.t;
+  td_ty : type_;
+  td_rules : (form, term, type_) Statement.def_rule list;
+  td_as_def : (form, term, type_) Statement.def;
+  td_proof : Proof.step;
+  td_stmt : Statement.input_t list lazy_t
 }
 
 val define_term :

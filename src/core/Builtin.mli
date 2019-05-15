@@ -24,13 +24,13 @@ type t =
   | False
   | Arrow
   | Wildcard
-  | Multiset  (* type of multisets *)
+  | Multiset (* type of multisets *)
   | TType (* type of types *)
   | Prop
   | Term
-  | ForallConst (** constant for simulating forall *)
-  | ExistsConst (** constant for simulating exists *)
-  | Grounding (** used for inst-gen *)
+  | ForallConst  (** constant for simulating forall *)
+  | ExistsConst  (** constant for simulating exists *)
+  | Grounding  (** used for inst-gen *)
   | TyInt
   | TyRat
   | TyReal
@@ -62,9 +62,9 @@ type t =
   | Lesseq
   | Greater
   | Greatereq
-  | Box_opaque (** hint not to open this formula *)
-  | Pseudo_de_bruijn of int (** magic to embed De Bruijn indices in normal terms *)
-
+  | Box_opaque  (** hint not to open this formula *)
+  | Pseudo_de_bruijn of int
+      (** magic to embed De Bruijn indices in normal terms *)
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 include Interfaces.PRINT with type t := t
@@ -84,7 +84,7 @@ val is_infix : t -> bool
 (** [is_infix s] returns [true] if the way the symbol is printed should
     be used in an infix way if applied to two arguments *)
 
-val ty : t -> [ `Int | `Rat | `Other ]
+val ty : t -> [`Int | `Rat | `Other]
 
 val mk_int : Z.t -> t
 val of_int : int -> t
@@ -121,9 +121,11 @@ val ty_int : t
 val ty_rat : t
 val has_type : t
 
-val wildcard : t    (** $_ for type inference *)
+val wildcard : t
+(** $_ for type inference *)
 
-val multiset : t    (** type of multisets *)
+val multiset : t
+(** type of multisets *)
 
 val grounding : t
 
@@ -166,15 +168,14 @@ module Tbl : Hashtbl.S with type key = t
 (** Each tag describes an extension of FO logic *)
 module Tag : sig
   type t =
-    | T_lia (** integer arith *)
-    | T_lra (** rational arith *)
-    | T_ho (** higher order *)
-    | T_ext (** extensionality *)
-    | T_ind (** induction *)
-    | T_data (** datatypes *)
-    | T_distinct (** distinct constants *)
-    | T_ac of ID.t (** AC symbol *)
-
+    | T_lia  (** integer arith *)
+    | T_lra  (** rational arith *)
+    | T_ho  (** higher order *)
+    | T_ext  (** extensionality *)
+    | T_ind  (** induction *)
+    | T_data  (** datatypes *)
+    | T_distinct  (** distinct constants *)
+    | T_ac of ID.t  (** AC symbol *)
   val compare : t -> t -> int
   val pp : t CCFormat.printer
 end
@@ -194,8 +195,8 @@ module TPTP : sig
   val of_string : string -> t option
   (** Parse a $word into a builtin *)
 
-  include Interfaces.PRINT with type t := t
   (** printer for TPTP *)
+  include Interfaces.PRINT with type t := t
 end
 
 (** The module {!ArithOp} deals only with numeric constants, i.e., all symbols
@@ -205,30 +206,29 @@ end
 *)
 
 module ArithOp : sig
-  exception TypeMismatch of string
   (** This exception is raised when Arith functions are called
       on non-numeric values *)
+  exception TypeMismatch of string
 
   type arith_view =
     [ `Int of Z.t
     | `Rat of Q.t
-    | `Other of t
-    ]
+    | `Other of t ]
 
   val view : t -> arith_view
   (** Arith centered view of symbols *)
 
   val parse_num : string -> t
 
-  val sign : t -> int   (* -1, 0 or 1 *)
+  val sign : t -> int (* -1, 0 or 1 *)
 
   val one_i : t
   val zero_i : t
   val one_rat : t
   val zero_rat : t
 
-  val zero_of_ty : [<`Int | `Rat ] -> t
-  val one_of_ty : [<`Int | `Rat ] -> t
+  val zero_of_ty : [< `Int | `Rat] -> t
+  val one_of_ty : [< `Int | `Rat] -> t
 
   val is_zero : t -> bool
   val is_one : t -> bool
@@ -259,9 +259,14 @@ module ArithOp : sig
   val to_rat : t -> t
 
   val abs : t -> t (* absolute value *)
-  val divides : t -> t -> bool (* [divides a b] returns true if [a] divides [b] *)
-  val gcd : t -> t -> t  (* gcd of two ints, 1 for other types *)
-  val lcm : t -> t -> t   (* lcm of two ints, 1 for other types *)
+
+  val divides : t -> t -> bool
+
+  (* [divides a b] returns true if [a] divides [b] *)
+
+  val gcd : t -> t -> t (* gcd of two ints, 1 for other types *)
+
+  val lcm : t -> t -> t (* lcm of two ints, 1 for other types *)
 
   val less : t -> t -> bool
   val lesseq : t -> t -> bool

@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Inductive Constants and Cases}
@@ -8,11 +7,11 @@
 
 open Logtk
 
-type t
 (** A ground term of an inductive type. It must correspond to a
     term built with the corresponding {!t} only.
     For instance, a constant of type [nat] should be equal to
     [s^n(0)] in any model. *)
+type t
 
 exception InvalidDecl of string
 
@@ -59,8 +58,8 @@ val dominates : t -> t -> bool
 (** [dominates c1 c2] if [depth c1 < depth c2]. This way, in coversets,
     the top constant dominates all sub-constants *)
 
-module Cst_set : CCSet.S with type elt = t
 (** Set of constants *)
+module Cst_set : CCSet.S with type elt = t
 
 (** {2 Inductive Skolems} *)
 
@@ -85,4 +84,5 @@ val ind_skolem_depth : ID.t -> int
 (**/**)
 
 exception Payload_cst of t
+
 (**/**)

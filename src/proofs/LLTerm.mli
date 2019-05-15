@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Terms For Proofs} *)
@@ -10,7 +9,16 @@ type t
 type var = t HVar.t
 
 module Int_op : sig
-  type t = Leq0 | Geq0 | Lt0 | Gt0 | Eq0 | Neq0 | Divisible_by of Z.t | Not_div_by of Z.t
+  type t =
+    | Leq0
+    | Geq0
+    | Lt0
+    | Gt0
+    | Eq0
+    | Neq0
+    | Divisible_by of Z.t
+    | Not_div_by of Z.t
+
   val not : t -> t
   val equal : t -> t -> bool
   val hash : t -> int
@@ -18,7 +26,14 @@ module Int_op : sig
 end
 
 module Rat_op : sig
-  type t = Leq0 | Geq0 | Lt0 | Gt0 | Eq0 | Neq0
+  type t =
+    | Leq0
+    | Geq0
+    | Lt0
+    | Gt0
+    | Eq0
+    | Neq0
+
   val not : t -> t
   val equal : t -> t -> bool
   val hash : t -> int
@@ -28,20 +43,17 @@ end
 type view =
   | Type
   | Const of ID.t
-  | App of t * t (** curried application *)
-  | Arrow of t * t (** functional arrow *)
-  | Var of var (** bound var *)
-  | Bind of {
-      binder: Binder.t;
-      ty_var: t;
-      body: t;
-    }
+  | App of t * t  (** curried application *)
+  | Arrow of t * t  (** functional arrow *)
+  | Var of var  (** bound var *)
+  | Bind of {binder : Binder.t; ty_var : t; body : t}
   | AppBuiltin of Builtin.t * t list
   | Ite of t * t * t
   | Int_pred of Z.t linexp * Int_op.t
   | Rat_pred of Q.t linexp * Rat_op.t
 
-and 'a linexp (** linear expression with coeffs of type 'a *)
+(** linear expression with coeffs of type 'a *)
+and 'a linexp
 
 type term = t
 type ty = t
@@ -104,6 +116,7 @@ val pp_inner : t CCFormat.printer
 
 module Form : sig
   type t = term
+
   type view = private
     | True
     | False
@@ -118,8 +131,8 @@ module Form : sig
     | Neq of t * t
     | Int_pred of Z.t linexp * Int_op.t
     | Rat_pred of Q.t linexp * Rat_op.t
-    | Forall of {ty_var: ty; body: t}
-    | Exists of {ty_var: ty; body: t}
+    | Forall of {ty_var : ty; body : t}
+    | Exists of {ty_var : ty; body : t}
 
   val view : t -> view
   val pp : t CCFormat.printer

@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 open Logtk
@@ -8,63 +7,65 @@ module type S = sig
   module C : Clause.S with module Ctx = Ctx
   module ProofState : ProofState.S with module C = C and module Ctx = Ctx
 
-  type inf_rule = C.t -> C.t list
   (** An inference returns a list of conclusions *)
+  type inf_rule = C.t -> C.t list
 
-  type generate_rule = full:bool -> unit -> C.t list
   (** Generation of clauses regardless of current clause.
       @param full if true, perform more thorough checks *)
+  type generate_rule = full:bool -> unit -> C.t list
 
   type binary_inf_rule = inf_rule
   type unary_inf_rule = inf_rule
 
-  type simplify_rule = C.t -> C.t SimplM.t
   (** Simplify the clause structurally (basic simplifications),
       in the simplification monad.
       [(c, `Same)] means the clause has not been simplified;
       [(c, `New)] means the clause has been simplified at least once *)
+  type simplify_rule = C.t -> C.t SimplM.t
 
   type active_simplify_rule = simplify_rule
   type rw_simplify_rule = simplify_rule
 
-  type backward_simplify_rule = C.t -> C.ClauseSet.t
   (** backward simplification by a unit clause. It returns a set of
       active clauses that can potentially be simplified by the given clause.
       [backward_simplify c] therefore returns a subset of
       [ProofState.ActiveSet.clauses ()] *)
+  type backward_simplify_rule = C.t -> C.ClauseSet.t
 
-  type redundant_rule = C.t -> bool
   (** check whether the clause is redundant w.r.t the set *)
+  type redundant_rule = C.t -> bool
 
-  type backward_redundant_rule = C.ClauseSet.t -> C.t -> C.ClauseSet.t
   (** find redundant clauses in [ProofState.ActiveSet] w.r.t the clause.
        first param is the set of already known redundant clause, the rule
        should add clauses to it *)
+  type backward_redundant_rule = C.ClauseSet.t -> C.t -> C.ClauseSet.t
 
-  type is_trivial_trail_rule = Trail.t -> bool
   (** Rule that checks whether the trail is trivial (a tautology) *)
+  type is_trivial_trail_rule = Trail.t -> bool
 
-  type is_trivial_rule = C.t -> bool
   (** Rule that checks whether the clause is trivial (a tautology) *)
+  type is_trivial_rule = C.t -> bool
 
-  type term_rewrite_rule = Term.t -> (Term.t * Proof.parent list) option
   (** Rewrite rule on terms *)
+  type term_rewrite_rule = Term.t -> (Term.t * Proof.parent list) option
 
-  type lit_rewrite_rule = Literal.t -> (Literal.t * Proof.parent list * Proof.tag list) option
   (** Rewrite rule on literals *)
+  type lit_rewrite_rule =
+    Literal.t -> (Literal.t * Proof.parent list * Proof.tag list) option
 
-  type multi_simpl_rule = C.t -> C.t list option
   (** (maybe) rewrite a clause to a set of clauses.
       Must return [None] if the clause is unmodified *)
+  type multi_simpl_rule = C.t -> C.t list option
 
   type 'a conversion_result =
-    | CR_skip (** rule didn't fire *)
-    | CR_add of 'a (** add this to the result *)
-    | CR_return of 'a (** shortcut the remaining rules, return this *)
+    | CR_skip  (** rule didn't fire *)
+    | CR_add of 'a  (** add this to the result *)
+    | CR_return of 'a  (** shortcut the remaining rules, return this *)
 
-  type clause_conversion_rule = Statement.clause_t -> C.t list conversion_result
   (** A hook to convert a particular statement into a list
       of clauses *)
+  type clause_conversion_rule =
+    Statement.clause_t -> C.t list conversion_result
 
   (** {2 Modify the Env} *)
 
@@ -83,7 +84,7 @@ module type S = sig
   val remove_active : C.t Iter.t -> unit
   (** Remove active clauses *)
 
-  val remove_simpl  : C.t Iter.t -> unit
+  val remove_simpl : C.t Iter.t -> unit
   (** Remove simplification clauses *)
 
   val get_passive : unit -> C.t Iter.t
@@ -184,13 +185,13 @@ module type S = sig
 
   (** {2 High level operations} *)
 
-  type stats = int * int * int
   (** statistics on clauses : num active, num passive, num simplification *)
+  type stats = int * int * int
 
   val stats : unit -> stats
   (** Compute stats *)
 
-  val next_passive : unit  -> C.t option
+  val next_passive : unit -> C.t option
   (** Extract next passive clause *)
 
   val do_binary_inferences : C.t -> C.t Iter.t

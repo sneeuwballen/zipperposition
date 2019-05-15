@@ -16,12 +16,12 @@
 (** A position is a path in a tree *)
 type t =
   | Stop
-  | Type of t (** Switch to type *)
-  | Left of t (** Left term in curried application *)
-  | Right of t (** Right term in curried application, and subterm of binder *)
-  | Head of t (** Head of uncurried term *)
-  | Arg of int * t (** argument term in uncurried term, or in multiset *)
-  | Body of t (** Body of binder or horn clause *)
+  | Type of t  (** Switch to type *)
+  | Left of t  (** Left term in curried application *)
+  | Right of t  (** Right term in curried application, and subterm of binder *)
+  | Head of t  (** Head of uncurried term *)
+  | Arg of int * t  (** argument term in uncurried term, or in multiset *)
+  | Body of t  (** Body of binder or horn clause *)
 
 type position = t
 
@@ -110,8 +110,8 @@ end
     nicely and designat paths in objects *)
 
 module With : sig
-  type 'a t = 'a * position
   (** A pair of ['a] and position (builder). *)
+  type 'a t = 'a * position
 
   val get : 'a t -> 'a
   val pos : _ t -> position
@@ -124,8 +124,9 @@ module With : sig
   val map : ('a -> 'b) -> 'a t -> 'b t
 
   module Infix : sig
-    val (>|=) : 'a t -> ('a -> 'b) -> 'b t
+    val ( >|= ) : 'a t -> ('a -> 'b) -> 'b t
   end
+
   include module type of Infix
 
   val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool

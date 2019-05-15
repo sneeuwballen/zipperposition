@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Arbitrary generation of Identifiers} *)
@@ -14,6 +13,6 @@ let default_g =
 
 let default = QCheck.make ~print:ID.to_string default_g
 
-let set_g =
-  QCheck.Gen.(list default_g >|= ID.Set.of_list)
+let set_g = QCheck.Gen.(list default_g >|= ID.Set.of_list)
+
 let set = QCheck.make set_g

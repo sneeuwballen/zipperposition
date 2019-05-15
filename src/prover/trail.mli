@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Boolean Trail} *)
@@ -50,8 +49,8 @@ val merge_l : t list -> t
 val filter : (bool_lit -> bool) -> t -> t
 (** Only keep a subset of boolean literals *)
 
-type valuation = bool_lit -> bool
 (** A boolean valuation *)
+type valuation = bool_lit -> bool
 
 val is_active : t -> v:valuation -> bool
 (** [Trail.is_active t ~v] is true iff all boolean literals

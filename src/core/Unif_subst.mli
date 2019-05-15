@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Unification Substitution} *)
@@ -26,7 +25,7 @@ val subst : t -> Subst.t
 val constr_l : t -> Unif_constr.t list
 (** Constraints *)
 
-val constr_l_subst : Subst.Renaming.t -> t -> (term*term) list
+val constr_l_subst : Subst.Renaming.t -> t -> (term * term) list
 (** Apply the substitution to the constraint *)
 
 val tags : t -> Proof.tag list

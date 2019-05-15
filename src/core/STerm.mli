@@ -22,7 +22,7 @@ type var =
 
 type t = private {
   term : view;
-  loc : location option;
+  loc : location option
 }
 
 and match_branch =
@@ -30,16 +30,16 @@ and match_branch =
   | Match_default of t
 
 and view =
-  | Var of var (** variable *)
-  | Const of string (** constant *)
+  | Var of var  (** variable *)
+  | Const of string  (** constant *)
   | AppBuiltin of Builtin.t * t list
-  | App of t * t list (** apply term *)
+  | App of t * t list  (** apply term *)
   | Ite of t * t * t
   | Match of t * match_branch list
   | Let of (var * t) list * t
-  | Bind of Binder.t * typed_var list * t (** bind n variables *)
-  | List of t list (** special constructor for lists *)
-  | Record of (string * t) list * var option (** extensible record *)
+  | Bind of Binder.t * typed_var list * t  (** bind n variables *)
+  | List of t list  (** special constructor for lists *)
+  | Record of (string * t) list * var option  (** extensible record *)
 
 and typed_var = var * t option
 
@@ -52,7 +52,9 @@ include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 
 val var : ?loc:location -> string -> t
-val v_wild : t (** wildcard *)
+
+val v_wild : t
+(** wildcard *)
 
 val mk_var : ?loc:location -> var -> t
 val app : ?loc:location -> t -> t list -> t
@@ -66,7 +68,7 @@ val match_ : ?loc:location -> t -> match_branch list -> t
 val let_ : ?loc:location -> (var * t) list -> t -> t
 val list_ : ?loc:location -> t list -> t
 val nil : t
-val record : ?loc:location -> (string*t) list -> rest:var option -> t
+val record : ?loc:location -> (string * t) list -> rest:var option -> t
 val at_loc : loc:location -> t -> t
 
 val wildcard : t
@@ -103,7 +105,7 @@ val fun_ty : ?loc:location -> t list -> t -> t
 val forall_ty : ?loc:location -> typed_var list -> t -> t
 
 val ty_unfold : t -> t list * t
-val unfold_bind: Binder.t -> t -> typed_var list * t
+val unfold_bind : Binder.t -> t -> typed_var list * t
 
 module Set : CCSet.S with type elt = term
 module Map : CCMap.S with type key = term
@@ -115,6 +117,7 @@ module Seq : sig
   val vars : t -> var Iter.t
   val free_vars : t -> string Iter.t
   val subterms : t -> t Iter.t
+
   val subterms_with_bound : t -> (t * StringSet.t) Iter.t
   (** subterm and variables bound at this subterm *)
 
@@ -123,7 +126,8 @@ end
 
 val ground : t -> bool
 
-val close_all : Binder.t -> t -> t  (** Bind all free vars with the symbol *)
+val close_all : Binder.t -> t -> t
+(** Bind all free vars with the symbol *)
 
 val subterm : strict:bool -> t -> sub:t -> bool
 (** is [sub] a (strict?) subterm of the other arg? *)

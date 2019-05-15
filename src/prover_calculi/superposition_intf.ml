@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 open Logtk
@@ -22,15 +21,15 @@ module type S = sig
 
   (** {6 Inference Rules} *)
 
-  val infer_active: Env.binary_inf_rule
+  val infer_active : Env.binary_inf_rule
   (** superposition where given clause is active *)
 
-  val infer_passive: Env.binary_inf_rule
+  val infer_passive : Env.binary_inf_rule
   (** superposition where given clause is passive *)
 
-  val infer_equality_resolution: Env.unary_inf_rule
+  val infer_equality_resolution : Env.unary_inf_rule
 
-  val infer_equality_factoring: Env.unary_inf_rule
+  val infer_equality_factoring : Env.unary_inf_rule
 
   (** {6 Simplifications rules} *)
 

@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Constraint Solving for LPO} *)
@@ -17,8 +16,10 @@ module Constraint : sig
     | And of t list
     | Or of t list
     | Not of t
-    | True   (* tautology *)
-    | False  (* impossible constraint *)
+    | True (* tautology *)
+    | False
+
+  (* impossible constraint *)
 
   val eq : expr -> expr -> t
   val neq : expr -> expr -> t
@@ -47,9 +48,9 @@ end
 (** {2 Solutions to constraint problems} *)
 
 module Solution : sig
-  type t = (ID.t * ID.t) list
   (** A precedence on symbol. Each pair means that thG
       first symbol is bigger than the second one. *)
+  type t = (ID.t * ID.t) list
 
   val neg_to_constraint : t -> Constraint.t
   (** Constraint that explicitely eliminate this solution *)

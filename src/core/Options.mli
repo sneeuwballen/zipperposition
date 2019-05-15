@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Global CLI options} *)
@@ -16,7 +15,9 @@ type input_format =
   | I_zf
   | I_tip
   | I_dk
-  | I_guess (* based on the file extension *)
+  | I_guess
+
+(* based on the file extension *)
 
 val input_format_of_string : string -> input_format
 
@@ -47,7 +48,7 @@ val switch_opt : 'a -> ('a -> unit) -> Arg.spec
 val switch_set : 'a -> 'a ref -> Arg.spec
 (** [switch_set x r] is the option that, enabled, calls [r := x] *)
 
-val add_opt : (string * Arg.spec * string) -> unit
+val add_opt : string * Arg.spec * string -> unit
 (** Add a new command line option *)
 
 val add_opts : (string * Arg.spec * string) list -> unit
@@ -56,4 +57,3 @@ val add_opts : (string * Arg.spec * string) list -> unit
 val make : unit -> (string * Arg.spec * string) list
 (** Produce of list of options suitable for {!Arg.parse}, that may
     modify global parameters and the given option reference. *)
-

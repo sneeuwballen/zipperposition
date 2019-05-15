@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Inference and simplification rules for the superposition calculus} *)
@@ -21,7 +20,7 @@ val register : sup:(module S) -> unit
 (** Register the superposition module to its Environment's
     mixtbl. Done automatically by the {!extension}. *)
 
-module Make(Env : Env.S) : S with module Env = Env
+module Make (Env : Env.S) : S with module Env = Env
 
 (** {2 As Extension}
     Extension named "superposition" *)

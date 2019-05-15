@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Trace of a TSTP prover} *)
@@ -21,7 +20,7 @@ and step = {
   id : id;
   rule : string;
   parents : t array;
-  esa : bool; (** Equisatisfiable step? *)
+  esa : bool  (** Equisatisfiable step? *)
 }
 
 val equal : t -> t -> bool
@@ -76,8 +75,8 @@ val of_decls : form Ast_tptp.t Iter.t -> t or_error
 val parse : ?recursive:bool -> string -> t or_error
 (** Try to parse a proof from a file. *)
 
-include Interfaces.PRINT with type t := t
 (** Debug printing, non recursive *)
+include Interfaces.PRINT with type t := t
 
 val pp1 : t CCFormat.printer
 (** Print proof step, and its parents *)

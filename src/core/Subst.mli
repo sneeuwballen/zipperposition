@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Substitutions} *)
@@ -31,14 +30,14 @@ module Renaming : sig
   (** Make a fresh renaming. It can only grow, so it is safe to use
       it as a value. *)
 
-  val none: t
+  val none : t
   (** Renaming that doesn't actually rename(!) *)
 end
 
 (** {3 Basics} *)
 
-type t
 (** A substitution that binds term variables to other terms *)
+type t
 
 type subst = t
 
@@ -94,13 +93,13 @@ val filter_scope : t -> Scoped.scope -> t
 
 (** {2 Set operations} *)
 
-val domain : t -> (var Scoped.t) Iter.t
+val domain : t -> var Scoped.t Iter.t
 (** Domain of substitution *)
 
-val codomain : t -> (term Scoped.t) Iter.t
+val codomain : t -> term Scoped.t Iter.t
 (** Codomain (image terms) of substitution *)
 
-val introduced : t -> (var Scoped.t) Iter.t
+val introduced : t -> var Scoped.t Iter.t
 (** Variables introduced by the substitution (ie vars of codomain) *)
 
 val normalize : t -> t
@@ -195,13 +194,13 @@ end
 (** {2 Projections for proofs} *)
 
 module Projection : sig
-  type t = private {
-    scope: Scoped.scope;
-    subst: subst;
-    renaming: Renaming.t;
-  }
   (** A representation of the substitution for a given scope, after applying
       the renaming. *)
+  type t = private {
+    scope : Scoped.scope;
+    subst : subst;
+    renaming : Renaming.t
+  }
 
   val subst : t -> subst
   val scope : t -> Scoped.scope
@@ -217,7 +216,7 @@ module Projection : sig
     ctx:Term.Conv.ctx ->
     t ->
     Type.t HVar.t list ->
-    (TypedSTerm.t,TypedSTerm.t) Var.Subst.t
+    (TypedSTerm.t, TypedSTerm.t) Var.Subst.t
   (** Convert into an instantiation on the given variables *)
 
   val is_empty : t -> bool

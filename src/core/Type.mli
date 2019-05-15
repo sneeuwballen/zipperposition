@@ -18,14 +18,19 @@
     TODO: think of a good way of representating AC operators (+, ...)
 *)
 
-type t = private InnerTerm.t
 (** Type is a subtype of the term structure
     (itself a subtype of InnerTerm.t),
     with explicit conversion *)
+type t = private InnerTerm.t
 
 type ty = t
 
-type builtin = TType | Prop | Term | Rat | Int
+type builtin =
+  | TType
+  | Prop
+  | Term
+  | Rat
+  | Int
 
 val pp_builtin : builtin CCFormat.printer
 val builtin_conv : builtin -> Builtin.t
@@ -34,9 +39,9 @@ type view = private
   | Builtin of builtin
   | Var of t HVar.t
   | DB of int
-  | App of ID.t * t list (** parametrized type *)
-  | Fun of t list * t (** Function type (left to right, no left-nesting) *)
-  | Forall of t (** explicit quantification using De Bruijn index *)
+  | App of ID.t * t list  (** parametrized type *)
+  | Fun of t list * t  (** Function type (left to right, no left-nesting) *)
+  | Forall of t  (** explicit quantification using De Bruijn index *)
 
 val view : t -> view
 (** Type-centric view of the head of this type.
@@ -94,7 +99,7 @@ val forall_fvars : t HVar.t list -> t -> t
 val bvar : int -> t
 (** bound variable *)
 
-val (==>) : t list -> t -> t
+val ( ==> ) : t list -> t -> t
 (** General function type. [l ==> x] is the same as [x] if [l]
     is empty. Invariant: the return type is never a function type. *)
 
@@ -109,7 +114,9 @@ val cast_var_unsafe : InnerTerm.t HVar.t -> t HVar.t
 
 type def =
   | Def_unin of int (* number of type variables *)
-  | Def_data of int * ty list (* data type with number of variables and cstors *)
+  | Def_data of int * ty list
+
+(* data type with number of variables and cstors *)
 
 val def : ID.t -> def option
 (** Access the definition of a type *)
@@ -129,7 +136,9 @@ module Tbl : CCHashtbl.S with type key = t
 
 module Seq : sig
   val vars : t -> t HVar.t Iter.t
-  val sub : t -> t Iter.t (** Subterms *)
+
+  val sub : t -> t Iter.t
+  (** Subterms *)
 
   val symbols : t -> ID.t Iter.t
   val add_set : Set.t -> t Iter.t -> Set.t
@@ -208,8 +217,8 @@ val returns : t -> t
 val returns_prop : t -> bool
 val returns_tType : t -> bool
 
-exception ApplyError of string
 (** Error raised when {!apply} fails *)
+exception ApplyError of string
 
 val apply : t -> t list -> t
 (** Given a function/forall type, and arguments, return the
@@ -249,15 +258,20 @@ module TPTP : sig
 
   (** {2 Basic types} *)
 
-  val i : t       (** individuals *)
+  val i : t
+  (** individuals *)
 
-  val o : t       (** propositions *)
+  val o : t
+  (** propositions *)
 
-  val int : t     (** integers *)
+  val int : t
+  (** integers *)
 
-  val rat : t     (** rationals *)
+  val rat : t
+  (** rationals *)
 
-  val real : t    (** reals *)
+  val real : t
+  (** reals *)
 end
 
 module ZF : sig
@@ -287,7 +301,8 @@ module Conv : sig
   val fresh_ty_var : ctx -> t HVar.t
   (** Fresh type variable *)
 
-  val var_to_simple_var : ?prefix:string -> ctx -> t HVar.t -> TypedSTerm.t Var.t
+  val var_to_simple_var :
+    ?prefix:string -> ctx -> t HVar.t -> TypedSTerm.t Var.t
 
   exception Error of TypedSTerm.t
 
@@ -295,17 +310,16 @@ module Conv : sig
   (** @raise Invalid_argument if conversion is impossible *)
 
   val to_simple_term :
-    ?env:TypedSTerm.t Var.t DBEnv.t ->
-    ctx ->
-    t ->
-    TypedSTerm.t
-    (** convert a type to a prolog term.
+    ?env:TypedSTerm.t Var.t DBEnv.t -> ctx -> t -> TypedSTerm.t
+  (** convert a type to a prolog term.
         @param env the current environement for De Bruijn indices *)
 end
 
-
 (**/**)
-val rebuild_rec : ?env:t list -> t -> t (** rebuild recursively and checks *)
+
+val rebuild_rec : ?env:t list -> t -> t
+(** rebuild recursively and checks *)
 
 val unsafe_eval_db : t list -> t -> t
+
 (**/**)

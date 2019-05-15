@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Array of literals} *)
@@ -16,18 +15,20 @@
 
 type term = Term.t
 
-type t = Literal.t array
 (** Array of literals *)
+type t = Literal.t array
 
 val equal_com : t -> t -> bool
 val compare : t -> t -> int
 
-val compare_multiset :  ord:Ordering.t -> t -> t -> Comparison.t
+val compare_multiset : ord:Ordering.t -> t -> t -> Comparison.t
 
 include Interfaces.HASH with type t := t
 
 val variant :
-  ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
+  ?subst:Subst.t ->
+  t Scoped.t ->
+  t Scoped.t ->
   (Subst.t * Builtin.Tag.t list) Iter.t
 (** Variant checking (alpha-equivalence). It can reorder literals to do its
     check, so that might be computationnally expensive (a bit
@@ -37,7 +38,9 @@ val are_variant : t -> t -> bool
 (** Simple interface on top of {!variant} with distinc scopes *)
 
 val matching :
-  ?subst:Subst.t -> pattern:t Scoped.t -> t Scoped.t ->
+  ?subst:Subst.t ->
+  pattern:t Scoped.t ->
+  t Scoped.t ->
   (Subst.t * Builtin.Tag.t list) Iter.t
 
 val matches : t -> t -> bool
@@ -45,7 +48,9 @@ val matches : t -> t -> bool
 val weight : t -> int
 val depth : t -> int
 val vars : t -> Type.t HVar.t list
-val is_ground : t -> bool       (** all the literals are ground? *)
+
+val is_ground : t -> bool
+(** all the literals are ground? *)
 
 val to_form : t -> term SLiteral.t list
 (** Make a 'or' formula from literals *)
@@ -112,7 +117,8 @@ module Pos : sig
 end
 
 module Conv : sig
-  val of_forms : ?hooks:Literal.Conv.hook_from list -> term SLiteral.t list -> t
+  val of_forms :
+    ?hooks:Literal.Conv.hook_from list -> term SLiteral.t list -> t
   (** Convert a list of atoms into literals *)
 
   val to_forms : ?hooks:Literal.Conv.hook_to list -> t -> term SLiteral.t list
@@ -139,19 +145,23 @@ module View : sig
   (** The following functions will raise [Invalid_argument] if the
       position is not valid or if the literal isn't what's asked for *)
 
-  val get_eqn_exn : t -> Position.t -> (term * term * bool)
+  val get_eqn_exn : t -> Position.t -> term * term * bool
   val get_arith_exn : t -> Position.t -> Int_lit.Focus.t
   val get_rat_exn : t -> Position.t -> Rat_lit.Focus.t
 end
 
-val fold_lits : eligible:(int -> Literal.t -> bool) ->
-  t -> (Literal.t * int) Iter.t
+val fold_lits :
+  eligible:(int -> Literal.t -> bool) -> t -> (Literal.t * int) Iter.t
 (** Fold over literals who satisfy [eligible]. The folded function
     is given the literal and its index. *)
 
-val fold_eqn : ?both:bool -> ?sign:bool -> ord:Ordering.t ->
+val fold_eqn :
+  ?both:bool ->
+  ?sign:bool ->
+  ord:Ordering.t ->
   eligible:(int -> Literal.t -> bool) ->
-  t -> (term * term * bool * Position.t) Iter.t
+  t ->
+  (term * term * bool * Position.t) Iter.t
 (** fold f over all literals sides, with their positions.
     f is given [(left side, right side, sign, position of left side)]
     if [ord] is present, then only the max side of an oriented
@@ -162,31 +172,40 @@ val fold_eqn : ?both:bool -> ?sign:bool -> ord:Ordering.t ->
       [false], only negative ones; if it's not defined, both. *)
 
 val fold_arith :
-  eligible:(int -> Literal.t -> bool) ->
-  t -> Int_lit.t Position.With.t Iter.t
+  eligible:(int -> Literal.t -> bool) -> t -> Int_lit.t Position.With.t Iter.t
 (** Fold over eligible arithmetic literals *)
 
-val fold_arith_terms : eligible:(int -> Literal.t -> bool) ->
-  which:[<`Max|`All] -> ord:Ordering.t ->
-  t -> (term * Int_lit.Focus.t * Position.t) Iter.t
+val fold_arith_terms :
+  eligible:(int -> Literal.t -> bool) ->
+  which:[< `Max | `All] ->
+  ord:Ordering.t ->
+  t ->
+  (term * Int_lit.Focus.t * Position.t) Iter.t
 (** Fold on terms under arithmetic literals, with the focus on
     the current term *)
 
 val fold_rat :
-  eligible:(int -> Literal.t -> bool) ->
-  t -> Rat_lit.t Position.With.t Iter.t
+  eligible:(int -> Literal.t -> bool) -> t -> Rat_lit.t Position.With.t Iter.t
 (** Fold over eligible arithmetic literals *)
 
-val fold_rat_terms : eligible:(int -> Literal.t -> bool) ->
-  which:[<`Max|`All] -> ord:Ordering.t ->
-  t -> (term * Rat_lit.Focus.t * Position.t) Iter.t
+val fold_rat_terms :
+  eligible:(int -> Literal.t -> bool) ->
+  which:[< `Max | `All] ->
+  ord:Ordering.t ->
+  t ->
+  (term * Rat_lit.Focus.t * Position.t) Iter.t
 (** Fold on terms under arithmetic literals, with the focus on
     the current term *)
 
-val fold_terms : ?vars:bool -> ?ty_args:bool -> which:[<`Max|`All] ->
-  ord:Ordering.t -> subterms:bool ->
+val fold_terms :
+  ?vars:bool ->
+  ?ty_args:bool ->
+  which:[< `Max | `All] ->
+  ord:Ordering.t ->
+  subterms:bool ->
   eligible:(int -> Literal.t -> bool) ->
-  t -> term Position.With.t Iter.t
+  t ->
+  term Position.With.t Iter.t
 (** See {!Literal.fold_terms}, which is the same but for the
     [eligible] argument *)
 

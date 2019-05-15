@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Basic context for literals, clauses...} *)
@@ -13,7 +12,7 @@ module Unif = Logtk.Unif
 module type S = Ctx_intf.S
 
 let prof_add_signature = Util.mk_profiler "ctx.add_signature"
-let prof_declare_sym= Util.mk_profiler "ctx.declare"
+let prof_declare_sym = Util.mk_profiler "ctx.declare"
 
 module type PARAMETERS = sig
   val signature : Signature.t
@@ -22,10 +21,10 @@ module type PARAMETERS = sig
 end
 
 module Key = struct
-  let lost_completeness = Flex_state.create_key()
+  let lost_completeness = Flex_state.create_key ()
 end
 
-module Make(X : PARAMETERS) = struct
+module Make (X : PARAMETERS) = struct
   let _ord = ref X.ord
   let _select = ref X.select
   let _signature = ref X.signature
@@ -38,8 +37,8 @@ module Make(X : PARAMETERS) = struct
   let set_selection_fun s = _select := s
   let signature () = !_signature
 
-  let on_new_symbol = Signal.create()
-  let on_signature_update = Signal.create()
+  let on_new_symbol = Signal.create ()
+  let on_signature_update = Signal.create ()
 
   let find_signature s = Signature.find !_signature s
   let find_signature_exn s = Signature.find_exn !_signature s
@@ -49,18 +48,20 @@ module Make(X : PARAMETERS) = struct
   let select lits = !_select lits
 
   let lost_completeness () =
-    if !_complete then Util.debug ~section:Const.section 1 "completeness is lost";
+    if !_complete then
+      Util.debug ~section:Const.section 1 "completeness is lost";
     _complete := false
 
   let is_completeness_preserved () = !_complete
 
   (* declare [symb : ty], with precondition that [symb] is not declared yet *)
   let declare_new_ symb ty =
-    Util.debugf ~section:Const.section 2 "@[<2>@{<cyan>declare new symbol@}@ `@[%a:%a@]`@]"
-      (fun k->k ID.pp symb Type.pp ty);
+    Util.debugf ~section:Const.section 2
+      "@[<2>@{<cyan>declare new symbol@}@ `@[%a:%a@]`@]" (fun k ->
+        k ID.pp symb Type.pp ty );
     _signature := Signature.declare !_signature symb ty;
     Signal.send on_signature_update !_signature;
-    Signal.send on_new_symbol (symb,ty);
+    Signal.send on_new_symbol (symb, ty);
     Ordering.add_list (ord ()) [symb];
     ()
 

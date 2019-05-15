@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Boolean Literal}
@@ -12,4 +11,4 @@ module type PAYLOAD = sig
   val dummy : t
 end
 
-module Make(Payload : PAYLOAD) : S with type payload = Payload.t
+module Make (Payload : PAYLOAD) : S with type payload = Payload.t

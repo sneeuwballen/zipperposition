@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Cancellative Inferences on Integer Arithmetic}
@@ -23,17 +22,17 @@ module type S = sig
 
   (** {3 Equations and Inequations} *)
 
-  val canc_sup_active: Env.binary_inf_rule
+  val canc_sup_active : Env.binary_inf_rule
   (** cancellative superposition where given clause is active *)
 
-  val canc_sup_passive: Env.binary_inf_rule
+  val canc_sup_passive : Env.binary_inf_rule
   (** cancellative superposition where given clause is passive *)
 
-  val cancellation: Env.unary_inf_rule
+  val cancellation : Env.unary_inf_rule
   (** cancellation (unifies some terms on both sides of a
       comparison operator) *)
 
-  val canc_equality_factoring: Env.unary_inf_rule
+  val canc_equality_factoring : Env.unary_inf_rule
   (** cancellative equality factoring *)
 
   val canc_ineq_chaining : Env.binary_inf_rule
@@ -86,6 +85,6 @@ module type S = sig
   val register : unit -> unit
 end
 
-module Make(E : Env.S) : S with module Env = E
+module Make (E : Env.S) : S with module Env = E
 
 val extension : Extensions.t

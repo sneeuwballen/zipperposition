@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** The congruence stores a finite representation of a set of (ground)
@@ -9,8 +8,8 @@
 module type S = sig
   type term
 
-  type t
   (** Represents a congruence *)
+  type t
 
   val create : ?size:int -> unit -> t
   (** New congruence.

@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Call external provers with TSTP (Old)} *)
@@ -22,16 +21,17 @@ module A = Ast_tptp
 (** {2 Description of provers} *)
 
 module Prover : sig
-  type t = {
-    name : string;                (** name of the prover *)
-    command : string;             (** command to call prover*)
-    unsat : string list;          (** prover returned unsat (possible outputs)*)
-    sat : string list;            (** prover returned sat (possible outputs)*)
-  } (** data useful to invoke a prover. The prover must read from
+  (** data useful to invoke a prover. The prover must read from
         stdin. The command is interpolated using {! Buffer.add_substitude}, with
         the given patterns:
 
         - "timeout" is the timeout in seconds *)
+  type t = {
+    name : string;  (** name of the prover *)
+    command : string;  (** command to call prover*)
+    unsat : string list;  (** prover returned unsat (possible outputs)*)
+    sat : string list  (** prover returned sat (possible outputs)*)
+  }
 
   val lookup : string -> t
   (** Lookup a prover by its name.
@@ -66,21 +66,27 @@ type result =
   | Unknown
   | Error of string
 
-val call : ?timeout:int -> ?args:string list ->
+val call :
+  ?timeout:int ->
+  ?args:string list ->
   prover:Prover.t ->
   untyped A.t list ->
   result or_error
 (** Call the prover (if present) on the given problem, and
     return a result. Default timeout is 30. *)
 
-val call_proof : ?timeout:int -> ?args:string list ->
+val call_proof :
+  ?timeout:int ->
+  ?args:string list ->
   prover:Prover.t ->
   untyped A.t list ->
   (result * Trace_tstp.t) or_error
 (** Call the prover, and also tries to parse a TSTP derivation,
     if the prover succeeded *)
 
-val call_with_out : ?timeout:int -> ?args:string list ->
+val call_with_out :
+  ?timeout:int ->
+  ?args:string list ->
   prover:Prover.t ->
   untyped A.t list ->
   (result * string) or_error
@@ -93,8 +99,9 @@ module Eprover : sig
     answer : szs_answer;
     output : string;
     decls : untyped A.t Iter.t option;
-    proof : Trace_tstp.t option;
+    proof : Trace_tstp.t option
   }
+
   and szs_answer =
     | Theorem
     | CounterSatisfiable
@@ -105,21 +112,27 @@ module Eprover : sig
   val run_eproof : steps:int -> input:string -> result or_error
   (** Run Eproof_ram, and tries to read a proof back. *)
 
-  val run_eprover : ?opts:string list -> ?level:int ->
-    steps:int -> input:string -> unit -> result or_error
+  val run_eprover :
+    ?opts:string list ->
+    ?level:int ->
+    steps:int ->
+    input:string ->
+    unit ->
+    result or_error
   (** Runs E with the given input (optional verbosity level). The returned
       result will not contain a proof.
       [opts] is an additional list of command line options that will be
       given to E. *)
 
-  val discover : ?opts:string list -> steps:int ->
+  val discover :
+    ?opts:string list ->
+    steps:int ->
     untyped A.t Iter.t ->
     untyped A.t Iter.t or_error
   (** explore the surrounding of this list of declarations, returning the
       TPTP output of E *)
 
-  val cnf : ?opts:string list ->
-    untyped A.t Iter.t ->
-    untyped A.t Iter.t or_error
-    (** Use E to convert a set of statements into CNF *)
+  val cnf :
+    ?opts:string list -> untyped A.t Iter.t -> untyped A.t Iter.t or_error
+  (** Use E to convert a set of statements into CNF *)
 end

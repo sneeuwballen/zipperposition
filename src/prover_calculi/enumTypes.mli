@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Inference and simplification rules for "Enum Types"} *)
@@ -91,7 +90,7 @@ module type S = sig
   (** Register rules in the environment *)
 end
 
-module Make(E : Env.S) : S with module Env = E
+module Make (E : Env.S) : S with module Env = E
 
 (** {2 As Extension} *)
 

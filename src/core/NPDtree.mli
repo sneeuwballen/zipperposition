@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Non-Perfect Discrimination Tree} *)
@@ -9,6 +8,6 @@
     in memory than {!Dtree}, and maybe more optimized too.
 *)
 
-module Make(E : Index.EQUATION) : Index.UNIT_IDX with module E = E
+module Make (E : Index.EQUATION) : Index.UNIT_IDX with module E = E
 
-module MakeTerm(X : Set.OrderedType) : Index.TERM_IDX with type elt = X.t
+module MakeTerm (X : Set.OrderedType) : Index.TERM_IDX with type elt = X.t

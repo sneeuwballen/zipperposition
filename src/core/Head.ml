@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Head} *)
@@ -19,21 +18,20 @@ let pp out = function
 
 let term_to_head s =
   match T.view s with
-    | T.App (f,_) ->
-      begin match T.view f with
-        | T.Const fid -> Some (I fid)
-        | T.Var x ->     Some (V x)
-        | _ -> None
-      end
-    | T.AppBuiltin (fid,_) -> Some (B fid)
+  | T.App (f, _) ->
+    ( match T.view f with
     | T.Const fid -> Some (I fid)
-    | T.Var x ->     Some (V x)
-    | _ -> None
+    | T.Var x -> Some (V x)
+    | _ -> None )
+  | T.AppBuiltin (fid, _) -> Some (B fid)
+  | T.Const fid -> Some (I fid)
+  | T.Var x -> Some (V x)
+  | _ -> None
 
 let term_to_args s =
   match T.view s with
-    | T.App (_,ss) -> ss
-    | T.AppBuiltin (_,ss) -> ss
-    | _ -> []
+  | T.App (_, ss) -> ss
+  | T.AppBuiltin (_, ss) -> ss
+  | _ -> []
 
 let to_string = CCFormat.to_string pp

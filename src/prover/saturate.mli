@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Main saturation algorithm.}
@@ -25,9 +24,12 @@ module type S = sig
       It performs generating inferences only if [generating] is true (default);
       other parameters are the iteration number and the environment *)
 
-  val given_clause:
-    ?generating:bool -> ?steps:int -> ?timeout:float ->
-    unit -> szs_status * int
+  val given_clause :
+    ?generating:bool ->
+    ?steps:int ->
+    ?timeout:float ->
+    unit ->
+    szs_status * int
   (** run the given clause until a timeout occurs or a result
       is found. It returns a tuple (new state, result, number of steps done).
       It performs generating inferences only if [generating] is true (default) *)
@@ -37,4 +39,4 @@ module type S = sig
       the number of steps done for presaturation, with status of the set. *)
 end
 
-module Make(E : Env.S) : S with module Env = E
+module Make (E : Env.S) : S with module Env = E

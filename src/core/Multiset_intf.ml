@@ -1,12 +1,11 @@
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 module type S = sig
-  type elt
   (** Elements of the multiset *)
+  type elt
 
-  type t
   (** A multiset of elements of type 'a *)
+  type t
 
   val size : t -> int
   (** Number of distinct elements. *)
@@ -147,8 +146,7 @@ module type S = sig
   (** Maximal elements of a list *)
 
   val compare_partial_l :
-    (elt -> elt -> Comparison.t) ->
-    elt list -> elt list -> Comparison.t
+    (elt -> elt -> Comparison.t) -> elt list -> elt list -> Comparison.t
   (** Compare two multisets represented as list of elements *)
 
   val pp : elt CCFormat.printer -> t CCFormat.printer

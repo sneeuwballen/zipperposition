@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 De Bruijn environments} *)
@@ -10,9 +9,9 @@
     at hand.
 *)
 
-type +'a t
 (** An environment that maps De Bruijn indices to values of
     type 'a. *)
+type +'a t
 
 val empty : 'a t
 (** Empty environment *)

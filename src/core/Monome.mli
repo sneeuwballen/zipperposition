@@ -16,36 +16,47 @@
 
 type term = Term.t
 
-type 'a t
 (** A monome over terms, with coefficient of type 'a *)
+type 'a t
 
 type 'a monome = 'a t
 
-val equal : 'n t -> 'n t -> bool       (** structural equality *)
+val equal : 'n t -> 'n t -> bool
+(** structural equality *)
 
-val compare : 'n t -> 'n t -> int   (** arbitrary total order on monomes *)
+val compare : 'n t -> 'n t -> int
+(** arbitrary total order on monomes *)
 
 val hash : _ t -> int
 
-val ty : _ t -> Type.t   (** type of the monome (int or rat) *)
+val ty : _ t -> Type.t
+(** type of the monome (int or rat) *)
 
-val const : 'a t -> 'a   (** constant *)
+val const : 'a t -> 'a
+(** constant *)
 
-val coeffs : 'a t -> ('a * term) list  (** coefficients *)
+val coeffs : 'a t -> ('a * term) list
+(** coefficients *)
 
 val find : 'a t -> term -> 'a option
 
-val find_exn : 'a t -> term -> 'a (** @raise Not_found if not present *)
+val find_exn : 'a t -> term -> 'a
+(** @raise Not_found if not present *)
 
-val mem : _ t -> term -> bool     (** Is the term in the monome? *)
+val mem : _ t -> term -> bool
+(** Is the term in the monome? *)
 
-val add : 'a t -> 'a -> term -> 'a t  (** Add term with coefficient. Sums coeffs. *)
+val add : 'a t -> 'a -> term -> 'a t
+(** Add term with coefficient. Sums coeffs. *)
 
-val add_const : 'a t -> 'a -> 'a t    (** Add given number to constant *)
+val add_const : 'a t -> 'a -> 'a t
+(** Add given number to constant *)
 
-val remove : 'a t -> term -> 'a t     (** Remove the term *)
+val remove : 'a t -> term -> 'a t
+(** Remove the term *)
 
-val remove_const : 'a t -> 'a t       (** Remove the constant *)
+val remove_const : 'a t -> 'a t
+(** Remove the constant *)
 
 val add_list : 'a t -> ('a * term) list -> 'a t
 
@@ -75,17 +86,21 @@ val size : _ t -> int
 val terms : _ t -> term list
 (** List of terms that occur in the monome with non-nul coefficients *)
 
-val var_occurs : var:Term.var ->  _ t -> bool
+val var_occurs : var:Term.var -> _ t -> bool
 (** Does the variable occur in the monome? *)
 
 val sum : 'a t -> 'a t -> 'a t
 val difference : 'a t -> 'a t -> 'a t
 val uminus : 'a t -> 'a t
-val product : 'a t -> 'a -> 'a t  (** Product with constant *)
 
-val succ : 'a t -> 'a t           (** +1 *)
+val product : 'a t -> 'a -> 'a t
+(** Product with constant *)
 
-val pred : 'a t -> 'a t           (** -1 *)
+val succ : 'a t -> 'a t
+(** +1 *)
+
+val pred : 'a t -> 'a t
+(** -1 *)
 
 val sum_list : 'a t list -> 'a t
 (** Sum of a list.
@@ -124,7 +139,8 @@ val apply_subst_no_simp : Subst.Renaming.t -> Subst.t -> 'a t Scoped.t -> 'a t
 (** Apply a substitution to the monome's terms, without renormalizing.
     This preserves positions. *)
 
-val variant : ?subst:Subst.t -> 'a t Scoped.t -> 'a t Scoped.t -> Subst.t Iter.t
+val variant :
+  ?subst:Subst.t -> 'a t Scoped.t -> 'a t Scoped.t -> Subst.t Iter.t
 
 (** Matching and unification aren't complete in the presence of variables
     occurring directly under the sum, for this would require the variable
@@ -133,10 +149,11 @@ val variant : ?subst:Subst.t -> 'a t Scoped.t -> 'a t Scoped.t -> Subst.t Iter.t
     constants (ie X+1 = a+1 will bind X to a without problem, but
     will X+a=a+1 will fail to bind X to 1) *)
 
-val matching : ?subst:Subst.t -> 'a t Scoped.t -> 'a t Scoped.t -> Subst.t Iter.t
+val matching :
+  ?subst:Subst.t -> 'a t Scoped.t -> 'a t Scoped.t -> Subst.t Iter.t
 
-val unify : ?subst:Unif_subst.t -> 'a t Scoped.t -> 'a t Scoped.t ->
-  Unif_subst.t Iter.t
+val unify :
+  ?subst:Unif_subst.t -> 'a t Scoped.t -> 'a t Scoped.t -> Unif_subst.t Iter.t
 
 val is_ground : _ t -> bool
 (** Are there no variables in the monome? *)
@@ -144,14 +161,14 @@ val is_ground : _ t -> bool
 val fold : ('a -> int -> 'b -> term -> 'a) -> 'a -> 'b t -> 'a
 (** Fold over terms *)
 
-val fold_max : ord:Ordering.t ->
-  ('a -> int -> 'b -> term -> 'a) -> 'a -> 'b t -> 'a
+val fold_max :
+  ord:Ordering.t -> ('a -> int -> 'b -> term -> 'a) -> 'a -> 'b t -> 'a
 (** Fold over terms that are maximal in the given ordering. *)
 
-val nth : 'a t -> int -> ('a * term)
+val nth : 'a t -> int -> 'a * term
 (** @raise Invalid_argument if the index is invalid *)
 
-val set : 'a t -> int -> ('a * term) -> 'a t
+val set : 'a t -> int -> 'a * term -> 'a t
 (** @raise Invalid_argument if the index is invalid *)
 
 val set_term : 'a t -> int -> term -> 'a t
@@ -162,7 +179,7 @@ module Focus : sig
   type 'a t = {
     term : term;
     coeff : 'a;  (** Never 0 *)
-    rest : 'a monome;
+    rest : 'a monome
   }
 
   val get : 'a monome -> int -> 'a t
@@ -190,8 +207,12 @@ module Focus : sig
   val product : 'a t -> 'a -> 'a t
   (** @raise Invalid_argument if the number is 0 *)
 
-  val map : ?term:(term->term) -> ?coeff:('a -> 'a) ->
-    ?rest:('a monome -> 'a monome) -> 'a t -> 'a t
+  val map :
+    ?term:(term -> term) ->
+    ?coeff:('a -> 'a) ->
+    ?rest:('a monome -> 'a monome) ->
+    'a t ->
+    'a t
 
   val scale : 'a t -> 'a t -> 'a t * 'a t
   (** Scale to the same coefficient *)
@@ -199,8 +220,8 @@ module Focus : sig
   val is_max : ord:Ordering.t -> _ t -> bool
   (** Is the focused term maximal in the monome? *)
 
-  val fold_m : pos:Position.t -> 'a monome -> 'b ->
-    ('b -> 'a t -> Position.t -> 'b) -> 'b
+  val fold_m :
+    pos:Position.t -> 'a monome -> 'b -> ('b -> 'a t -> Position.t -> 'b) -> 'b
   (** Fold on terms of the given monome, focusing on them one by one,
       along with the position of the focused term *)
 
@@ -217,8 +238,10 @@ module Focus : sig
 
       Again, arith constants are not unifiable with unshielded variables. *)
 
-  val unify_ff : ?subst:Unif_subst.t ->
-    'a t Scoped.t -> 'a t Scoped.t ->
+  val unify_ff :
+    ?subst:Unif_subst.t ->
+    'a t Scoped.t ->
+    'a t Scoped.t ->
     ('a t * 'a t * Unif_subst.t) Iter.t
   (** Unify two focused monomes. All returned unifiers are unifiers
       of the focused terms, but maybe also of other unfocused terms;
@@ -226,21 +249,23 @@ module Focus : sig
       might merge with the focused term, so the new ones are
       returned with the unifier itself *)
 
-  val unify_mm : ?subst:Unif_subst.t ->
-    'a monome Scoped.t -> 'a monome Scoped.t ->
+  val unify_mm :
+    ?subst:Unif_subst.t ->
+    'a monome Scoped.t ->
+    'a monome Scoped.t ->
     ('a t * 'a t * Unif_subst.t) Iter.t
   (** Unify parts of two monomes [m1] and [m2]. For each such unifier we
       return the versions of [m1] and [m2] where the unified terms
       are focused. *)
 
-  val unify_self : ?subst:Unif_subst.t ->
-    'a t Scoped.t -> ('a t * Unif_subst.t) Iter.t
+  val unify_self :
+    ?subst:Unif_subst.t -> 'a t Scoped.t -> ('a t * Unif_subst.t) Iter.t
   (** Extend the substitution to other terms within the focused monome,
       if possible. For instance it might return
       [2f(x)+a, {x=y}] for the monome [f(x)+f(y)+a] where [f(x)] is focused. *)
 
-  val unify_self_monome : ?subst:Unif_subst.t ->
-    'a monome Scoped.t -> ('a t * Unif_subst.t) Iter.t
+  val unify_self_monome :
+    ?subst:Unif_subst.t -> 'a monome Scoped.t -> ('a t * Unif_subst.t) Iter.t
   (** Unify at least two terms of the monome together *)
 
   (* TODO
@@ -267,9 +292,11 @@ exception NotLinear
 module Int : sig
   type t = Z.t monome
 
-  val const : Z.t -> t (** Empty monomial, from constant (decides type) *)
+  val const : Z.t -> t
+  (** Empty monomial, from constant (decides type) *)
 
-  val singleton : Z.t -> term -> t  (** One term. *)
+  val singleton : Z.t -> term -> t
+  (** One term. *)
 
   val of_list : Z.t -> (Z.t * term) list -> t
 
@@ -338,10 +365,10 @@ module Int : sig
   (** {2 Find Solutions} *)
 
   module Solve : sig
-    type solution = (term * t) list
     (** List of constraints (term = monome). It means that
         if all those constraints are satisfied, then a solution
         to the given problem has been found *)
+    type solution = (term * t) list
 
     val split_solution : solution -> Subst.t * solution
     (** Split the solution into a variable substitution, and a
@@ -360,7 +387,7 @@ module Int : sig
           GCD of the input list, or fails
         @raise Failure if the equation is not solvable *)
 
-    val coeffs_n : Z.t list -> Z.t -> (term list -> t list)
+    val coeffs_n : Z.t list -> Z.t -> term list -> t list
     (** [coeffs_n l gcd], if [length l = n], returns a function that
         takes a list of [n-1] terms [k1, ..., k(n-1)] and returns a list of
         monomes [m1, ..., mn] that depend on [k1, ..., k(n-1)] such that the sum
@@ -381,8 +408,8 @@ module Int : sig
         For instance, on the monome 2X + 3Y - 7, it may generate a new variable
         Z and return the substitution  [X -> 3Z - 7, Y -> 2Z + 7] *)
 
-    val lower_zero : ?fresh_var:(Type.t -> term) -> strict:bool ->
-      t -> solution list
+    val lower_zero :
+      ?fresh_var:(Type.t -> term) -> strict:bool -> t -> solution list
     (** Solve for the monome to be always lower than zero ([strict] determines
         whether the inequality is strict or not). This
         may not return all solutions, but a subspace of it
@@ -403,9 +430,11 @@ end
 module Rat : sig
   type t = Q.t monome
 
-  val const : Q.t -> t (** Empty monomial, from constant (decides type) *)
+  val const : Q.t -> t
+  (** Empty monomial, from constant (decides type) *)
 
-  val singleton : Q.t -> term -> t  (** One term. *)
+  val singleton : Q.t -> term -> t
+  (** One term. *)
 
   val of_list : Q.t -> (Q.t * term) list -> t
 

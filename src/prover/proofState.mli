@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 The state of a proof, contains a set of active clauses (processed),
@@ -9,4 +8,4 @@ module type S = ProofState_intf.S
 
 (** {2 Create a Proof State} *)
 
-module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx
+module Make (C : Clause.S) : S with module C = C and module Ctx = C.Ctx

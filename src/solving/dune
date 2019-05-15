@@ -1,8 +1,7 @@
-
 (library
-  (name logtk_solving)
-  (public_name logtk.solving)
-  (synopsis "solving constraints")
-  (optional)
-  (libraries containers logtk msat msat.tseitin iter)
-  (flags :standard -w -32))
+ (name logtk_solving)
+ (public_name logtk.solving)
+ (synopsis "solving constraints")
+ (optional)
+ (libraries containers logtk msat msat.tseitin iter)
+ (flags :standard -w -32))

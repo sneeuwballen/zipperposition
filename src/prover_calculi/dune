@@ -1,7 +1,6 @@
 (library
-  (name libzipperposition_calculi)
-  (public_name libzipperposition.calculi)
-  (synopsis "calculi for the Zipperposition theorem prover")
-  (libraries libzipperposition)
-  (flags :standard -w -32)
-)
+ (name libzipperposition_calculi)
+ (public_name libzipperposition.calculi)
+ (synopsis "calculi for the Zipperposition theorem prover")
+ (libraries libzipperposition)
+ (flags :standard -w -32))

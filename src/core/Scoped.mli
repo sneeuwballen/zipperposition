@@ -1,5 +1,3 @@
-
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Scoped Value} *)
@@ -38,7 +36,3 @@ val on2 : ('a -> 'b -> 'c) -> 'a t -> 'b t -> 'c
 
 val pp : 'a CCFormat.printer -> 'a t CCFormat.printer
 val to_string : 'a CCFormat.printer -> 'a t -> string
-
-
-
-

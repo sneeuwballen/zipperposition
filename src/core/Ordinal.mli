@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Syntactic Ordinals} *)
@@ -36,7 +35,8 @@ val pp : t CCFormat.printer
 
 val to_string : t -> string
 
-
 (**/**)
+
 val check_inv_ : t -> bool
+
 (**/**)

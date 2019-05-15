@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Term Orderings} *)
@@ -17,8 +16,8 @@
 
 type term = Term.t
 
-type t
 (** Partial ordering on terms *)
+type t
 
 type ordering = t
 

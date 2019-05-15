@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Lazy List} *)
@@ -12,6 +11,7 @@
 type 'a node =
   | Nil
   | Cons of 'a * 'a t
+
 and 'a t = 'a node Lazy.t
 
 val nil : 'a t

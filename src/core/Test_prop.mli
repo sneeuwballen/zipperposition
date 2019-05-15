@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Test Properties} *)
@@ -17,7 +16,9 @@ type form = Literals.t list
 
 type res =
   | R_ok
-  | R_fail of Subst.t (* counter-example *)
+  | R_fail of Subst.t
+
+(* counter-example *)
 
 val normalize_form : form -> form
 (** Use rewriting to normalize the formula *)
@@ -29,4 +30,4 @@ val check_form : ?limit:int -> form -> res
     @param limit a limit on how many "steps" are done (for some notion of steps).
     The higher, the more expensive, but also the more accurate this is. *)
 
-val default_limit: int
+val default_limit : int

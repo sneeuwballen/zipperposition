@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Immutable Arrays} *)
@@ -12,8 +11,8 @@
 type 'a equal = 'a -> 'a -> bool
 type 'a ord = 'a -> 'a -> int
 
-type 'a t
 (** Array of values of type 'a *)
+type 'a t
 
 val of_list : 'a list -> 'a t
 

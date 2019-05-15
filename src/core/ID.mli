@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Unique Identifiers} *)
@@ -23,9 +22,10 @@
 *)
 
 type t = private {
-  id: int;
-  name: string;
-  mutable payload: exn list; (** Use [exn] as an open type for user-defined payload *)
+  id : int;
+  name : string;
+  mutable payload : exn list
+      (** Use [exn] as an open type for user-defined payload *)
 }
 
 val make : string -> t
@@ -40,9 +40,9 @@ val id : t -> int
 val name : t -> string
 val payload : t -> exn list
 
-val payload_find: f:(exn -> 'a option) -> t -> 'a option
+val payload_find : f:(exn -> 'a option) -> t -> 'a option
 
-val payload_pred: f:(exn -> bool) -> t -> bool
+val payload_pred : f:(exn -> bool) -> t -> bool
 
 val set_payload : ?can_erase:(exn -> bool) -> t -> exn -> unit
 (** Set given exception as payload.
@@ -72,17 +72,20 @@ module Map : CCMap.S with type key = t
 module Set : CCSet.S with type elt = t
 module Tbl : CCHashtbl.S with type key = t
 
-
-exception Attr_infix of string
 (** Infix name for pretty-printing *)
+exception Attr_infix of string
 
-exception Attr_prefix of string
 (** Prefix name for pretty-printing *)
+exception Attr_prefix of string
 
-exception Attr_parameter of int
 (** Parameter, used for HO unif *)
+exception Attr_parameter of int
 
-type skolem_kind = K_normal | K_ind (* inductive *)
+type skolem_kind =
+  | K_normal
+  | K_ind
+
+(* inductive *)
 
 exception Attr_skolem of skolem_kind * int
 

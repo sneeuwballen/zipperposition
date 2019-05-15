@@ -23,40 +23,56 @@ type t = private
   | Int of Int_lit.t
   | Rat of Rat_lit.t
 
-val equal_com : t -> t -> bool     (** commutative equality of lits *)
+val equal_com : t -> t -> bool
+(** commutative equality of lits *)
 
-val compare : t -> t -> int     (** lexicographic comparison of literals *)
+val compare : t -> t -> int
+(** lexicographic comparison of literals *)
 
 include Interfaces.HASH with type t := t
 
-val hash : t -> int               (** hashing of literal *)
+val hash : t -> int
+(** hashing of literal *)
 
-val weight : t -> int             (** weight of the lit (sum of weights of terms) *)
+val weight : t -> int
+(** weight of the lit (sum of weights of terms) *)
 
-val heuristic_weight : (term -> int) -> t -> int   (** heuristic difficulty to eliminate lit *)
+val heuristic_weight : (term -> int) -> t -> int
+(** heuristic difficulty to eliminate lit *)
 
-val depth : t -> int              (** depth of literal *)
+val depth : t -> int
+(** depth of literal *)
 
 val sign : t -> bool
 
-val is_pos : t -> bool            (** is the literal positive? *)
+val is_pos : t -> bool
+(** is the literal positive? *)
 
-val is_neg : t -> bool            (** is the literal negative? *)
+val is_neg : t -> bool
+(** is the literal negative? *)
 
-val is_eqn : t -> bool            (** is the literal a proper (in)equation or prop? *)
+val is_eqn : t -> bool
+(** is the literal a proper (in)equation or prop? *)
 
-val is_prop : t -> bool           (** is the literal a boolean proposition? *)
+val is_prop : t -> bool
+(** is the literal a boolean proposition? *)
 
-val is_eq : t -> bool             (** is the literal of the form a = b? *)
+val is_eq : t -> bool
+(** is the literal of the form a = b? *)
 
-val is_neq : t -> bool            (** is the literal of the form a != b? *)
+val is_neq : t -> bool
+(** is the literal of the form a != b? *)
 
 val is_arith : t -> bool
-val is_arith_eqn : t -> bool    (** = or != *)
+
+val is_arith_eqn : t -> bool
+(** = or != *)
 
 val is_arith_eq : t -> bool
 val is_arith_neq : t -> bool
-val is_arith_ineq : t -> bool   (** < or <= *)
+
+val is_arith_ineq : t -> bool
+(** < or <= *)
 
 val is_arith_less : t -> bool
 val is_arith_lesseq : t -> bool
@@ -74,15 +90,20 @@ val mk_neq : term -> term -> t
 
 val mk_lit : term -> term -> bool -> t
 
-val mk_prop : term -> bool -> t   (** proposition *)
+val mk_prop : term -> bool -> t
+(** proposition *)
 
-val mk_true : term -> t     (** true proposition *)
+val mk_true : term -> t
+(** true proposition *)
 
-val mk_false : term -> t    (** false proposition *)
+val mk_false : term -> t
+(** false proposition *)
 
-val mk_tauto : t (** tautological literal *)
+val mk_tauto : t
+(** tautological literal *)
 
-val mk_absurd : t (** absurd literal, like ~ true *)
+val mk_absurd : t
+(** absurd literal, like ~ true *)
 
 val mk_arith : Int_lit.t -> t
 val mk_arith_op : Int_lit.op -> Z.t Monome.t -> Z.t Monome.t -> t
@@ -103,21 +124,32 @@ val mk_constraint : term -> term -> t
 (** [mk_constraint t u] makes a disequation or a HO constraint depending
     on how [t] and [u] look. *)
 
-val matching : ?subst:Subst.t -> pattern:t Scoped.t -> t Scoped.t ->
+val matching :
+  ?subst:Subst.t ->
+  pattern:t Scoped.t ->
+  t Scoped.t ->
   (Subst.t * Builtin.Tag.t list) Iter.t
 (** checks whether subst(lit_a) matches lit_b. Returns alternative
     substitutions s such that s(lit_a) = lit_b and s contains subst. *)
 
-val subsumes : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
+val subsumes :
+  ?subst:Subst.t ->
+  t Scoped.t ->
+  t Scoped.t ->
   (Subst.t * Builtin.Tag.t list) Iter.t
 (** More general version of {!matching}, yields [subst]
     such that [subst(lit_a) => lit_b]. *)
 
-val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
+val variant :
+  ?subst:Subst.t ->
+  t Scoped.t ->
+  t Scoped.t ->
   (Subst.t * Builtin.Tag.t list) Iter.t
 
 val unify :
-  ?subst:Unif_subst.t -> t Scoped.t -> t Scoped.t ->
+  ?subst:Unif_subst.t ->
+  t Scoped.t ->
+  t Scoped.t ->
   (Unif_subst.t * Builtin.Tag.t list) Iter.t
 
 val are_variant : t -> t -> bool
@@ -138,19 +170,24 @@ val is_constraint : t -> bool
 
 val is_ho_constraint : t -> bool
 
-val of_unif_subst: Subst.Renaming.t -> Unif_subst.t -> t list
+val of_unif_subst : Subst.Renaming.t -> Unif_subst.t -> t list
 (** Make a list of (negative) literals out of the unification constraints
     contained in this substitution. *)
 
-val map : (term -> term) -> t -> t (** functor *)
+val map : (term -> term) -> t -> t
+(** functor *)
 
-val map_no_simp : (term -> term) -> t -> t (** functor, does not simplify *)
+val map_no_simp : (term -> term) -> t -> t
+(** functor, does not simplify *)
 
-val fold : ('a -> term -> 'a) -> 'a -> t -> 'a  (** basic fold *)
+val fold : ('a -> term -> 'a) -> 'a -> t -> 'a
+(** basic fold *)
 
-val for_all : (term -> bool) -> t -> bool  (** for the term or both terms of the literal *)
+val for_all : (term -> bool) -> t -> bool
+(** for the term or both terms of the literal *)
 
-val vars : t -> Type.t HVar.t list (** gather variables *)
+val vars : t -> Type.t HVar.t list
+(** gather variables *)
 
 val var_occurs : Type.t HVar.t -> t -> bool
 
@@ -158,7 +195,8 @@ val is_ground : t -> bool
 
 val symbols : t -> ID.Set.t
 
-val root_terms : t -> term list (** all the terms immediatly under the lit *)
+val root_terms : t -> term list
+(** all the terms immediatly under the lit *)
 
 val to_ho_term : t -> term option
 (** Conversion to higher-order term using {!Term.Form} *)
@@ -177,11 +215,14 @@ val is_trivial : t -> bool
 
 val is_absurd : t -> bool
 
-val is_absurd_tags : t -> Proof.tag list (** if [is_absurd lit], return why *)
+val is_absurd_tags : t -> Proof.tag list
+(** if [is_absurd lit], return why *)
 
 val fold_terms :
-  ?position:Position.t -> ?vars:bool -> ?ty_args:bool ->
-  which:[<`Max|`All] ->
+  ?position:Position.t ->
+  ?vars:bool ->
+  ?ty_args:bool ->
+  which:[< `Max | `All] ->
   ?ord:Ordering.t ->
   subterms:bool ->
   t ->
@@ -214,17 +255,17 @@ end
 
 (** {2 Positions} *)
 module Pos : sig
-  type split = {
-    lit_pos : Position.t;
-    term_pos : Position.t;
-    term : term;
-  }
   (** Full description of a position in a literal. It contains:
       - [lit_pos]: the literal-prefix of the position
       - [term_pos]: the suffix that describes a subterm position
       - [term]: the term root, just under the literal itself.
       given this, applying T.Pos.at to the subterm position and
       the root term we obtain the sub-term itself. *)
+  type split = {
+    lit_pos : Position.t;
+    term_pos : Position.t;
+    term : term
+  }
 
   val split : t -> Position.t -> split
   (** @raise Invalid_argument if the position is incorrect *)
@@ -305,15 +346,18 @@ module Conv : sig
   val to_form : ?hooks:hook_to list -> t -> term SLiteral.t
 
   val to_s_form :
-    ?allow_free_db:bool -> ?ctx:Term.Conv.ctx -> ?hooks:hook_to list ->
-    t -> TypedSTerm.Form.t
+    ?allow_free_db:bool ->
+    ?ctx:Term.Conv.ctx ->
+    ?hooks:hook_to list ->
+    t ->
+    TypedSTerm.Form.t
 end
 
 (** {2 IO} *)
 
-type print_hook = CCFormat.t -> t -> bool
 (** might print the literal on the given buffer.
     @return true if it printed, false otherwise *)
+type print_hook = CCFormat.t -> t -> bool
 
 val add_default_hook : print_hook -> unit
 

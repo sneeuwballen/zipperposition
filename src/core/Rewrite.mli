@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Rewriting on Terms and Literals} *)
@@ -18,8 +17,8 @@
 
 type term = Term.t
 
-type defined_cst
 (** Payload of a defined function symbol or type *)
+type defined_cst
 
 type proof = Proof.step
 
@@ -84,7 +83,7 @@ module Term : sig
     scope_rules:Scoped.scope ->
     term Scoped.t ->
     (rule * Unif_subst.t) Iter.t
-    (** [narrow_term ~scope_rule t] finds the set of rules [(l --> r)]
+  (** [narrow_term ~scope_rule t] finds the set of rules [(l --> r)]
         in IDs and substitutions [sigma] such that [sigma(l) = sigma(t)]
         @param scope_rules used for rules (LEFT) *)
 end
@@ -109,8 +108,13 @@ module Lit : sig
 
   val normalize_clause :
     Literals.t ->
-    (Literals.t list * rule * Subst.t * Scoped.scope *
-       Subst.Renaming.t * Proof.tag list) option
+    ( Literals.t list
+    * rule
+    * Subst.t
+    * Scoped.scope
+    * Subst.Renaming.t
+    * Proof.tag list )
+    option
   (** normalize literals of the clause w.r.t. rules, or return [None]
       if no rule applies. The input clause lives in scope 0. *)
 
@@ -119,7 +123,7 @@ module Lit : sig
     scope_rules:Scoped.scope ->
     Literal.t Scoped.t ->
     (rule * Unif_subst.t * Proof.tag list) Iter.t
-    (** [narrow_term rules lit] finds the set of rules [(l --> clauses) in rules]
+  (** [narrow_term rules lit] finds the set of rules [(l --> clauses) in rules]
         and substitutions [sigma] such that [sigma(l) = sigma(lit)]
         @param scope_rules used for rules (LEFT) *)
 end
@@ -212,5 +216,7 @@ val all_cst : Defined_cst.t Iter.t
 val all_rules : Rule.t Iter.t
 
 (**/**)
+
 exception Payload_defined_cst of defined_cst
+
 (**/**)

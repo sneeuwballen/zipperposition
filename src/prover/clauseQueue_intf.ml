@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 type profile =
@@ -15,10 +14,10 @@ module type S = sig
 
   (** {6 Weight functions} *)
   module WeightFun : sig
-    type t = C.t -> int
     (** attribute a weight to a clause. The smaller, the better (lightweight
         clauses will be favored). A weight must always be positive;
         the weight of the empty clause should alwyays be 0. *)
+    type t = C.t -> int
 
     val default : t
     (** Use {!Literal.heuristic_weight} *)
@@ -46,8 +45,8 @@ module type S = sig
         of weights. *)
   end
 
-  type t
   (** A priority queue. *)
+  type t
 
   val add : t -> C.t -> unit
   (** Add a clause to the Queue *)
@@ -103,4 +102,3 @@ module type S = sig
   val pp : t CCFormat.printer
   val to_string : t -> string
 end
-

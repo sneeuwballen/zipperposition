@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Heuristics} *)
@@ -22,6 +21,6 @@ module type S = sig
   val register : unit -> unit
 end
 
-module Make(E : Env.S) : S with module Env = E
+module Make (E : Env.S) : S with module Env = E
 
 val extension : Extensions.t

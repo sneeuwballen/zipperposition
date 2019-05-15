@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Compute Precedence} *)
@@ -21,9 +20,7 @@ val add_constrs : (int * [`partial] Precedence.Constr.t) list -> t -> t
 type 'a parametrized = Statement.clause_t Iter.t -> 'a
 
 val add_constr_rule :
-  int ->
-  [`partial] Precedence.Constr.t parametrized ->
-  t -> t
+  int -> [`partial] Precedence.Constr.t parametrized -> t -> t
 (** Add a precedence constraint rule *)
 
 val set_weight_rule : Precedence.weight_fun parametrized -> t -> t
@@ -32,8 +29,5 @@ val set_weight_rule : Precedence.weight_fun parametrized -> t -> t
 val add_status : (ID.t * Precedence.symbol_status) list -> t -> t
 (** Specify explicitely the status of some symbols *)
 
-val mk_precedence :
-  t ->
-  Statement.clause_t Iter.t ->
-  Precedence.t
+val mk_precedence : t -> Statement.clause_t Iter.t -> Precedence.t
 (** Make a precedence *)

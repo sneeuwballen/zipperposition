@@ -1,4 +1,3 @@
-
 (** {1 Low Level Prover} *)
 
 (** A small theorem prover that checks entailment of ground formulas,
@@ -21,4 +20,3 @@ val prove : form list -> form -> res * final_state
 val pp_stats : final_state CCFormat.printer
 
 val pp_dot : final_state CCFormat.printer
-

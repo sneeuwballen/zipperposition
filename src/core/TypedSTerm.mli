@@ -19,25 +19,25 @@ type ty = t
 
 (** a constructor of given type, applied to a list of type argumentss *)
 type match_cstor = {
-  cstor_id: ID.t;
-  cstor_ty: ty;
-  cstor_args: ty list;
+  cstor_id : ID.t;
+  cstor_ty : ty;
+  cstor_args : ty list
 }
 
-type match_branch = match_cstor  * t Var.t list * t
+type match_branch = match_cstor * t Var.t list * t
 
 type view = private
-  | Var of t Var.t (** variable *)
-  | Const of ID.t (** constant *)
-  | App of t * t list (** apply term *)
+  | Var of t Var.t  (** variable *)
+  | Const of ID.t  (** constant *)
+  | App of t * t list  (** apply term *)
   | Ite of t * t * t
   | Match of t * match_branch list
   | Let of (t Var.t * t) list * t
-  | Bind of Binder.t * t Var.t * t (** bind variable in term *)
+  | Bind of Binder.t * t Var.t * t  (** bind variable in term *)
   | AppBuiltin of Builtin.t * t list
   | Multiset of t list
-  | Record of (string * t) list * t option (** extensible record *)
-  | Meta of meta_var (** Unification variable *)
+  | Record of (string * t) list * t option  (** extensible record *)
+  | Meta of meta_var  (** Unification variable *)
 
 (* a variable with a one-shot binding, and some annotation about
    whether it can be generalized *)
@@ -48,7 +48,9 @@ val loc : t -> location option
 val ty : t -> t option
 val ty_exn : t -> t
 val head : t -> ID.t option
-val head_exn : t -> ID.t (** @raise Not_found if not an application/const *)
+
+val head_exn : t -> ID.t
+(** @raise Not_found if not an application/const *)
 
 val deref : t -> t
 (** While [t] is a bound [Meta] variable, follow its link *)
@@ -66,7 +68,9 @@ val prop : t
 val var : ?loc:location -> t Var.t -> t
 val var_of_string : ?loc:location -> ty:t -> string -> t
 val app : ?loc:location -> ty:t -> t -> t list -> t
-val app_whnf : ?loc:location -> ty:t -> t -> t list -> t (** application + WHNF *)
+
+val app_whnf : ?loc:location -> ty:t -> t -> t list -> t
+(** application + WHNF *)
 
 val const : ?loc:location -> ty:t -> ID.t -> t
 val const_of_cstor : ?loc:location -> match_cstor -> t
@@ -79,8 +83,12 @@ val bind : ?loc:location -> ty:t -> Binder.t -> t Var.t -> t -> t
 val bind_list : ?loc:location -> ty:t -> Binder.t -> t Var.t list -> t -> t
 val multiset : ?loc:location -> ty:t -> t list -> t
 val meta : ?loc:location -> meta_var -> t
-val record : ?loc:location -> ty:t -> (string*t) list -> rest:t Var.t option -> t
-val record_flatten : ?loc:location -> ty:t -> (string*t) list -> rest:t option -> t
+
+val record :
+  ?loc:location -> ty:t -> (string * t) list -> rest:t Var.t option -> t
+
+val record_flatten :
+  ?loc:location -> ty:t -> (string * t) list -> rest:t option -> t
 (** Build a record with possibly a row variable.
     @raise IllFormedTerm if the [rest] is not either a record or a variable. *)
 
@@ -105,7 +113,12 @@ val box_opaque : t -> t
 module Ty : sig
   type t = term
 
-  type builtin = Prop | TType | Term | Int | Rat
+  type builtin =
+    | Prop
+    | TType
+    | Term
+    | Int
+    | Rat
 
   type view =
     | Ty_builtin of builtin
@@ -141,7 +154,7 @@ module Ty : sig
   val real : t
   val term : t
 
-  val (==>) : t list -> t -> t
+  val ( ==> ) : t list -> t -> t
   (** Alias to {!fun_} *)
 
   val close_forall : t -> t
@@ -171,6 +184,7 @@ val sort_ty_vars_first : t Var.t list -> t Var.t list
 
 module Form : sig
   type t = term
+
   type view =
     | True
     | False
@@ -259,13 +273,9 @@ val free_vars_set : t -> t Var.Set.t
 val close_all : ty:t -> Binder.t -> t -> t
 (** Bind all free vars with the symbol *)
 
-(** Generic non-recursive map *)
 val map :
-  f:('a -> t -> t) ->
-  bind:('a -> ty Var.t -> 'a * ty Var.t) ->
-  'a ->
-  t ->
-  t
+  f:('a -> t -> t) -> bind:('a -> ty Var.t -> 'a * ty Var.t) -> 'a -> t -> t
+(** Generic non-recursive map *)
 
 include Interfaces.PRINT with type t := t
 
@@ -334,13 +344,13 @@ exception UnifyFailure of string * (term * term) list * location option
 val pp_stack : (term * term) list CCFormat.printer
 
 module UStack : sig
-  type t
   (** Unification stack, for backtracking purposes *)
+  type t
 
   val create : unit -> t
 
-  type snapshot
   (** A snapshot of bindings at a given moment *)
+  type snapshot
 
   val snapshot : st:t -> snapshot
   (** Save current state *)
@@ -351,8 +361,13 @@ module UStack : sig
 end
 
 val unify :
-  ?allow_open:bool -> ?loc:location -> ?st:UStack.t -> ?subst:Subst.t ->
-  term -> term -> unit
+  ?allow_open:bool ->
+  ?loc:location ->
+  ?st:UStack.t ->
+  ?subst:Subst.t ->
+  term ->
+  term ->
+  unit
 (** unifies destructively the two given terms, by modifying references
       that occur under {!Meta}. Regular variables are not modified.
     @param allow_open if true, metas can be unified to terms
@@ -363,16 +378,19 @@ val unify :
 
 val apply_unify :
   ?gen_fresh_meta:(unit -> meta_var) ->
-  ?allow_open:bool -> ?loc:location -> ?st:UStack.t -> ?subst:Subst.t ->
-  t -> t list -> t
+  ?allow_open:bool ->
+  ?loc:location ->
+  ?st:UStack.t ->
+  ?subst:Subst.t ->
+  t ->
+  t list ->
+  t
 (** [apply_unify f_ty args] compute the type of a function of type [f_ty],
     when applied to parameters [args]. The first elements of [args] might
     be interpreted as types, the other ones as terms (whose types are unified
     against expected types). *)
 
-val app_infer :
-  ?st:UStack.t -> ?subst:Subst.t ->
-  t -> t list -> t
+val app_infer : ?st:UStack.t -> ?subst:Subst.t -> t -> t list -> t
 (** [app_infer f l] computes the type [ty] of [f l], and return [app ~ty f l]
     @raise UnifyFailure if types do not correspond *)
 
@@ -390,4 +408,3 @@ module ZF : sig
   include Interfaces.PRINT with type t := t
   val pp_inner : t CCFormat.printer
 end
-

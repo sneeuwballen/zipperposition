@@ -1,5 +1,3 @@
-
 (executable
-  (name resolution1)
-  (libraries logtk logtk.parsers containers iter))
-
+ (name resolution1)
+ (libraries logtk logtk.parsers containers iter))

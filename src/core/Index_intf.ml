@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 type term = Term.t
@@ -17,20 +16,18 @@ module type LEAF = sig
   val size : t -> int
 
   val fold_unify :
-    ?subst:Unif_subst.t -> t Scoped.t -> term Scoped.t ->
+    ?subst:Unif_subst.t ->
+    t Scoped.t ->
+    term Scoped.t ->
     (term * elt * Unif_subst.t) Iter.t
 
   val fold_match :
-    ?subst:subst ->
-    t Scoped.t -> term Scoped.t ->
-    (term * elt * subst) Iter.t
+    ?subst:subst -> t Scoped.t -> term Scoped.t -> (term * elt * subst) Iter.t
   (** Match the indexed terms against the given query term *)
 
   val fold_matched :
-    ?subst:subst ->
-    t Scoped.t -> term Scoped.t ->
-    (term * elt * subst) Iter.t
-    (** Match the query term against the indexed terms *)
+    ?subst:subst -> t Scoped.t -> term Scoped.t -> (term * elt * subst) Iter.t
+  (** Match the query term against the indexed terms *)
 end
 
 module type TERM_IDX = sig
@@ -59,24 +56,24 @@ module type TERM_IDX = sig
 
   val fold : t -> ('a -> term -> elt -> 'a) -> 'a -> 'a
 
-  val retrieve_unifiables : ?subst:Unif_subst.t ->
-    t Scoped.t -> term Scoped.t ->
+  val retrieve_unifiables :
+    ?subst:Unif_subst.t ->
+    t Scoped.t ->
+    term Scoped.t ->
     (term * elt * Unif_subst.t) Iter.t
 
-  val retrieve_generalizations : ?subst:subst ->
-    t Scoped.t -> term Scoped.t ->
-    (term * elt * subst) Iter.t
+  val retrieve_generalizations :
+    ?subst:subst -> t Scoped.t -> term Scoped.t -> (term * elt * subst) Iter.t
 
-  val retrieve_specializations : ?subst:subst ->
-    t Scoped.t -> term Scoped.t ->
-    (term * elt * subst) Iter.t
+  val retrieve_specializations :
+    ?subst:subst -> t Scoped.t -> term Scoped.t -> (term * elt * subst) Iter.t
 
   val to_dot : elt CCFormat.printer -> t CCFormat.printer
   (** print oneself in DOT into the given file *)
 end
 
-type lits = term SLiteral.t Iter.t
 (** Iter of literals, as a cheap abstraction on query clauses *)
+type lits = term SLiteral.t Iter.t
 
 type labels = Util.Int_set.t
 
@@ -141,14 +138,14 @@ end
 module type EQUATION = sig
   type t
 
-  type rhs
   (** An equation can have something other than a term as a right-hand
       side, for instance a formula. *)
+  type rhs
 
   val compare : t -> t -> int
   (** Total order on equations *)
 
-  val extract : t -> (term * rhs * bool)
+  val extract : t -> term * rhs * bool
   (** Obtain a representation of the (in)equation. The sign indicates
       whether it is an equation [l = r] (if true) or an inequation
       [l != r] (if false) *)
@@ -161,11 +158,11 @@ end
 module type UNIT_IDX = sig
   type t
 
-  module E : EQUATION
   (** Module that describes indexed equations *)
+  module E : EQUATION
 
-  type rhs = E.rhs
   (** Right hand side of equation *)
+  type rhs = E.rhs
 
   val empty : unit -> t
 
@@ -188,8 +185,10 @@ module type UNIT_IDX = sig
   (** Iterate on indexed equations *)
 
   val retrieve :
-    ?subst:subst -> sign:bool ->
-    t Scoped.t -> term Scoped.t ->
+    ?subst:subst ->
+    sign:bool ->
+    t Scoped.t ->
+    term Scoped.t ->
     (term * rhs * E.t * subst) Iter.t
   (** [retrieve ~sign (idx,si) (t,st) acc] iterates on
       (in)equations l ?= r of given [sign] and substitutions [subst],

@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Main AST before Typing} *)
@@ -19,10 +18,10 @@ type form = T.t
 
 (** Basic definition of inductive types *)
 type data = {
-  data_name: string;
-  data_vars: string list;
-  data_cstors: (string * (string option * ty) list) list;
-  (* list of constructor. Each constructor is paired with a list of
+  data_name : string;
+  data_vars : string list;
+  data_cstors : (string * (string option * ty) list) list
+      (* list of constructor. Each constructor is paired with a list of
      arguments, that is, an optional projector + the type *)
 }
 
@@ -35,9 +34,9 @@ type attr =
 type attrs = attr list
 
 type def = {
-  def_id: string;
-  def_ty: ty;
-  def_rules: term list;
+  def_id : string;
+  def_ty : ty;
+  def_rules : term list
 }
 
 (** Statement *)
@@ -52,9 +51,9 @@ type statement_view =
   | Goal of form
 
 type statement = {
-  stmt: statement_view;
-  attrs: attrs;
-  loc: Loc.t option;
+  stmt : statement_view;
+  attrs : attrs;
+  loc : Loc.t option
 }
 
 val default_attrs : attrs

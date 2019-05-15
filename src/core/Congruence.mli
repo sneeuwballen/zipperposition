@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Simple and Lightweight Congruence and order} *)
@@ -31,7 +30,7 @@ module type TERM = sig
   val pp : t CCFormat.printer
 end
 
-module Make(T : TERM) : S with type term = T.t
+module Make (T : TERM) : S with type term = T.t
 
 (** {2 Common implementations} *)
 

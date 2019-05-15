@@ -20,18 +20,17 @@ type op =
   | Less
   | Lesseq
 
+(** [num^power divides monome] or not. *)
 type 'm divides = {
   num : Z.t;
   power : int;
   monome : 'm;
-  sign : bool;
-} (** [num^power divides monome] or not. *)
+  sign : bool
+}
 
 type t = private
   | Binary of op * Z.t Monome.t * Z.t Monome.t
-  | Divides of Z.t Monome.t divides
-  (** Arithmetic literal (on integers) *)
-
+  | Divides of Z.t Monome.t divides  (** Arithmetic literal (on integers) *)
 type lit = t
 
 (** {2 Basics} *)
@@ -56,16 +55,21 @@ val mk_not_divides : Z.t -> power:int -> Z.t Monome.t -> t
 val negate : t -> t
 
 val sign : t -> bool
-val polarity : t -> bool  (** Used for the literal ordering *)
+
+val polarity : t -> bool
+(** Used for the literal ordering *)
 
 val is_pos : t -> bool
 val is_neg : t -> bool
 
 val is_eq : t -> bool
 val is_neq : t -> bool
-val is_eqn : t -> bool   (** = or != *)
 
-val is_ineq : t -> bool   (** < or <= *)
+val is_eqn : t -> bool
+(** = or != *)
+
+val is_ineq : t -> bool
+(** < or <= *)
 
 val is_less : t -> bool
 val is_lesseq : t -> bool
@@ -80,12 +84,13 @@ val to_string : t -> string
 
 val fold : ('a -> term -> 'a) -> 'a -> t -> 'a
 
-val map : (term -> term) -> t -> t (** functor *)
+val map : (term -> term) -> t -> t
+(** functor *)
 
-type ('subst,'a) unif =
+type ('subst, 'a) unif =
   subst:'subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Iter.t
 
-val generic_unif: ('subst,Z.t Monome.t) unif -> ('subst,t) unif
+val generic_unif : ('subst, Z.t Monome.t) unif -> ('subst, t) unif
 (** Generic unification/matching/variant, given such an operation on monomes *)
 
 val apply_subst : Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
@@ -94,15 +99,14 @@ val apply_subst_no_simp : Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
 (** Same as {!apply_subst} but takes care {B NOT} simplifying the
     literal. In practice, mostly useful for comparison purpose. *)
 
-val matching : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
-  Subst.t Iter.t
+val matching : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> Subst.t Iter.t
 (** checks whether subst(lit_a) is equal to lit_b. Returns alternative
     substitutions s such that s(lit_a) = lit_b and s contains subst. *)
 
-val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
-  Subst.t Iter.t
+val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> Subst.t Iter.t
 
-val unify : ?subst:Unif_subst.t -> t Scoped.t -> t Scoped.t -> Unif_subst.t Iter.t
+val unify :
+  ?subst:Unif_subst.t -> t Scoped.t -> t Scoped.t -> Unif_subst.t Iter.t
 
 val subsumes : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> Subst.t Iter.t
 (** Find substitutions such that [subst(lit_a)] implies [lit_b]. This is
@@ -113,10 +117,15 @@ val are_variant : t -> t -> bool
 val is_trivial : t -> bool
 val is_absurd : t -> bool
 
-val fold_terms : ?pos:Position.t -> ?vars:bool -> ?ty_args:bool ->
-  which:[<`Max|`All] ->
-  ord:Ordering.t -> subterms:bool ->
-  t -> (term * Position.t) Iter.t
+val fold_terms :
+  ?pos:Position.t ->
+  ?vars:bool ->
+  ?ty_args:bool ->
+  which:[< `Max | `All] ->
+  ord:Ordering.t ->
+  subterms:bool ->
+  t ->
+  (term * Position.t) Iter.t
 
 val max_terms : ord:Ordering.t -> t -> term list
 (** Maximal terms of the literal *)
@@ -183,7 +192,8 @@ module Focus : sig
   val map_lit :
     f_m:(Z.t Monome.t -> Z.t Monome.t) ->
     f_mf:(Z.t Monome.Focus.t -> Z.t Monome.Focus.t) ->
-    t -> t
+    t ->
+    t
   (** Apply a function to the monomes and focused monomes *)
 
   val product : t -> Z.t -> t
@@ -202,18 +212,20 @@ module Focus : sig
   val apply_subst : Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
   (** Apply a substitution *)
 
-  val unify : ?subst:Unif_subst.t -> t Scoped.t -> t Scoped.t ->
+  val unify :
+    ?subst:Unif_subst.t ->
+    t Scoped.t ->
+    t Scoped.t ->
     (t * t * Unif_subst.t) Iter.t
   (** Unify the two focused terms, and possibly other terms of their
       respective focused monomes; yield the new literals accounting for
       the unification along with the unifier *)
 
-  val fold_terms :
-    ?pos:Position.t -> lit -> (t * Position.t) Iter.t
+  val fold_terms : ?pos:Position.t -> lit -> (t * Position.t) Iter.t
   (** Fold on focused terms in the literal, one by one, with
       the position of the focused term *)
 
-  val op : t -> [ `Binary of op | `Divides ]
+  val op : t -> [`Binary of op | `Divides]
 
   val unfocus : t -> lit
   (** Conversion back to a literal *)
@@ -226,7 +238,7 @@ end
 module Util : sig
   type divisor = {
     prime : Z.t;
-    power : int;
+    power : int
   }
 
   val is_prime : Z.t -> bool

@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Simple Cache for Allocating Arrays} *)
@@ -12,10 +11,10 @@
 *)
 
 module Arr : sig
-  type 'a t
   (** Cache for 'a arrays *)
+  type 'a t
 
-  val create: ?buck_size:int -> int -> 'a t
+  val create : ?buck_size:int -> int -> 'a t
   (** [create n] makes a new cache of arrays up to length [n]
       @param buck_size number of arrays cached for each array length
       @param n maximum size of arrays put in cache *)

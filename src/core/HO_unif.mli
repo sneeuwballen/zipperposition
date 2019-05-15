@@ -1,12 +1,11 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Higher-Order Unification} *)
 
 type term = Term.t
 
-type penalty = int
 (** penalty on the search space *)
+type penalty = int
 
 val enum_prop :
   ?mode:[`Full | `Neg | `None] ->
@@ -21,8 +20,8 @@ val enum_prop :
       otherwise do all connectives
 *)
 
-type pair = Type.t list * term * term
 (** unification pair *)
+type pair = Type.t list * term * term
 
 val pp_pair : pair CCFormat.printer
 

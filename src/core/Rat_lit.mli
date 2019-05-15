@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Arithmetic Rational Literal} *)
@@ -16,9 +15,9 @@ type op =
 
 (** Arithmetic literal (on rationals) *)
 type t = private {
-  op: op;
-  left: Q.t Monome.t;
-  right: Q.t Monome.t;
+  op : op;
+  left : Q.t Monome.t;
+  right : Q.t Monome.t
 }
 
 type lit = t
@@ -50,12 +49,13 @@ val to_string : t -> string
 
 val fold : ('a -> term -> 'a) -> 'a -> t -> 'a
 
-val map : (term -> term) -> t -> t (** functor *)
+val map : (term -> term) -> t -> t
+(** functor *)
 
-type ('subst,'a) unif =
+type ('subst, 'a) unif =
   subst:'subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Iter.t
 
-val generic_unif: ('subst, Q.t Monome.t) unif -> ('subst,t) unif
+val generic_unif : ('subst, Q.t Monome.t) unif -> ('subst, t) unif
 (** Generic unification/matching/variant, given such an operation on monomes *)
 
 val apply_subst : Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
@@ -64,15 +64,14 @@ val apply_subst_no_simp : Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
 (** Same as {!apply_subst} but takes care {B NOT} simplifying the
     literal. In practice, mostly useful for comparison purpose. *)
 
-val matching : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
-  Subst.t Iter.t
+val matching : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> Subst.t Iter.t
 (** checks whether subst(lit_a) is equal to lit_b. Returns alternative
     substitutions s such that s(lit_a) = lit_b and s contains subst. *)
 
-val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
-  Subst.t Iter.t
+val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> Subst.t Iter.t
 
-val unify : ?subst:Unif_subst.t -> t Scoped.t -> t Scoped.t -> Unif_subst.t Iter.t
+val unify :
+  ?subst:Unif_subst.t -> t Scoped.t -> t Scoped.t -> Unif_subst.t Iter.t
 
 val subsumes : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> Subst.t Iter.t
 (** Find substitutions such that [subst(lit_a)] implies [lit_b]. This is
@@ -83,10 +82,15 @@ val are_variant : t -> t -> bool
 val is_trivial : t -> bool
 val is_absurd : t -> bool
 
-val fold_terms : ?pos:Position.t -> ?vars:bool -> ?ty_args:bool ->
-  which:[<`Max|`All] ->
-  ord:Ordering.t -> subterms:bool ->
-  t -> (term * Position.t) Iter.t
+val fold_terms :
+  ?pos:Position.t ->
+  ?vars:bool ->
+  ?ty_args:bool ->
+  which:[< `Max | `All] ->
+  ord:Ordering.t ->
+  subterms:bool ->
+  t ->
+  (term * Position.t) Iter.t
 
 val max_terms : ord:Ordering.t -> t -> term list
 (** Maximal terms of the literal *)
@@ -147,7 +151,8 @@ module Focus : sig
   val map_lit :
     f_m:(Q.t Monome.t -> Q.t Monome.t) ->
     f_mf:(Q.t Monome.Focus.t -> Q.t Monome.Focus.t) ->
-    t -> t
+    t ->
+    t
   (** Apply a function to the monomes and focused monomes *)
 
   val product : t -> Q.t -> t
@@ -160,14 +165,16 @@ module Focus : sig
   val apply_subst : Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
   (** Apply a substitution *)
 
-  val unify : ?subst:Unif_subst.t -> t Scoped.t -> t Scoped.t ->
+  val unify :
+    ?subst:Unif_subst.t ->
+    t Scoped.t ->
+    t Scoped.t ->
     (t * t * Unif_subst.t) Iter.t
   (** Unify the two focused terms, and possibly other terms of their
       respective focused monomes; yield the new literals accounting for
       the unification along with the unifier *)
 
-  val fold_terms :
-    ?pos:Position.t -> lit -> (t * Position.t) Iter.t
+  val fold_terms : ?pos:Position.t -> lit -> (t * Position.t) Iter.t
   (** Fold on focused terms in the literal, one by one, with
       the position of the focused term *)
 

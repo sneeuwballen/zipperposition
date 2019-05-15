@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 open Logtk
@@ -27,15 +26,6 @@ module type S = sig
   val check_satisfiability : E.generate_rule
   (** Checks that the SAT context is still valid *)
 
-  type cut_res = private {
-    cut_form: Cut_form.t; (** the lemma itself *)
-    cut_pos: E.C.t list; (** clauses true if lemma is true *)
-    cut_lit: BLit.t; (** lit that is true if lemma is true *)
-    cut_depth: int; (** if the lemma is used to prove another lemma *)
-    cut_proof: Proof.Step.t; (** where does the lemma come from? *)
-    cut_proof_parent: Proof.Parent.t; (** how to justify sth from the lemma *)
-    cut_reason: unit CCFormat.printer option; (** Informal reason why the lemma was added *)
-  }
   (** This represents a cut on a formula, where we obtain a list
       of clauses [cut_pos] representing the formula itself with the
       trail [lemma], and a boolean literal [cut_lit] that is true iff
@@ -44,6 +34,17 @@ module type S = sig
       Other modules, when a cut is introduced, will try to disprove
       the lemma (e.g. by induction or theory reasoning).
   *)
+  type cut_res = private {
+    cut_form : Cut_form.t;  (** the lemma itself *)
+    cut_pos : E.C.t list;  (** clauses true if lemma is true *)
+    cut_lit : BLit.t;  (** lit that is true if lemma is true *)
+    cut_depth : int;  (** if the lemma is used to prove another lemma *)
+    cut_proof : Proof.Step.t;  (** where does the lemma come from? *)
+    cut_proof_parent : Proof.Parent.t;
+        (** how to justify sth from the lemma *)
+    cut_reason : unit CCFormat.printer option
+        (** Informal reason why the lemma was added *)
+  }
 
   val cut_form : cut_res -> Cut_form.t
   val cut_pos : cut_res -> E.C.t list
@@ -53,7 +54,7 @@ module type S = sig
   val cut_proof_parent : cut_res -> Proof.Parent.t
 
   val pp_cut_res : cut_res CCFormat.printer
-  val cut_res_clauses: cut_res -> E.C.t Iter.t
+  val cut_res_clauses : cut_res -> E.C.t Iter.t
 
   val print_lemmas : unit CCFormat.printer
   (** print the current list of lemmas, and their status *)

@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Boolean Clause} *)
@@ -29,19 +28,18 @@ exception E_proof of t
 
 let proof_tc =
   Proof.Result.make_tc
-    ~of_exn:(function | E_proof c -> Some c | _ -> None)
+    ~of_exn:(function
+      | E_proof c -> Some c
+      | _ -> None )
     ~to_exn:(fun c -> E_proof c)
-    ~compare:compare
+    ~compare
     ~flavor:(fun _ -> `Pure_bool)
-    ~to_form
-    ~pp_in
-    ()
+    ~to_form ~pp_in ()
 
 let mk_proof_res = Proof.Result.make proof_tc
 
 let proof_res_as_bc r =
   let module P = Proof in
-  begin match r with
-    | P.Res (_, E_proof p) -> Some p
-    | _ -> None
-  end
+  match r with
+  | P.Res (_, E_proof p) -> Some p
+  | _ -> None

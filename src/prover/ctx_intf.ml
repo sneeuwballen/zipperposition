@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 open Logtk
@@ -63,4 +62,3 @@ module type S = sig
     val to_form : Literal.t -> Term.t SLiteral.t
   end
 end
-

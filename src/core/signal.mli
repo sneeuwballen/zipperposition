@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Basic signal for multiple-callbacks Observer} *)
@@ -9,8 +8,8 @@
     then, observers can register to the signal and be notified every
     time an event (a value) is emitted through the signal. *)
 
-type 'a t
 (** Signal of type 'a *)
+type 'a t
 
 val create : unit -> 'a t
 (** New signal *)

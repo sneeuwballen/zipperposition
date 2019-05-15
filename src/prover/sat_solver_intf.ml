@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 open Logtk
@@ -51,7 +50,7 @@ module type S = sig
       return its value (which does not depend on the model).
       Otherwise return [None] *)
 
-  val all_proved: unit -> Lit.Set.t
+  val all_proved : unit -> Lit.Set.t
   (** Set of (signed) proved literals *)
 
   val set_printer : Lit.t CCFormat.printer -> unit
@@ -71,5 +70,5 @@ module type S = sig
       proved true at level 0 (see {!valuation_level})
       @raise Invalid_argument if the literal is not at level 0 *)
 
-  val setup: unit -> unit
+  val setup : unit -> unit
 end

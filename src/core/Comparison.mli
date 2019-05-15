@@ -1,11 +1,12 @@
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Partial Ordering values} *)
 
-type t = Lt | Eq | Gt | Incomparable
-(** partial order *)
-
+type t =
+  | Lt
+  | Eq
+  | Gt
+  | Incomparable  (** partial order *)
 type comparison = t
 
 val equal : t -> t -> bool
@@ -32,22 +33,23 @@ val lexico : t -> t -> t
 (** Lexicographic combination (the second is used only if the first
     is [Incomparable] *)
 
-val (++) : t -> t -> t
+val ( ++ ) : t -> t -> t
 (** Infix version of {!lexico} *)
 
 type 'a comparator = 'a -> 'a -> t
 
-val (@>>) : 'a comparator -> 'a comparator -> 'a comparator
+val ( @>> ) : 'a comparator -> 'a comparator -> 'a comparator
 (** Combination of comparators that work on the same values.
     Its behavior is the following:
     [(f1 @>> f2) x y] is the same as [f1 x y] if
     [f1 x y] is not [Eq]; otherwise it is the same as [f2 x y] *)
 
-type ('a, 'b) combination
 (** Lexicographic combination of comparators. It is, roughly,
     equivalent to ['a -> 'a -> 'b] *)
+type ('a, 'b) combination
 
-val (>>>) : 'a comparator -> ('b, 'c) combination -> ('a, 'b -> 'b -> 'c) combination
+val ( >>> ) :
+  'a comparator -> ('b, 'c) combination -> ('a, 'b -> 'b -> 'c) combination
 (** Lexicographic combination starting with the given function *)
 
 val last : 'a comparator -> ('a, t) combination

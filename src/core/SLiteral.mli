@@ -19,7 +19,8 @@ type +'t t =
 
 type 'a lit = 'a t
 
-val of_form : form -> term t (** @raise NotALit if the form is not a literal *)
+val of_form : form -> term t
+(** @raise NotALit if the form is not a literal *)
 
 val to_form : term t -> form
 

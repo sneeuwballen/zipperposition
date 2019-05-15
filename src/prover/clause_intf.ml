@@ -15,9 +15,11 @@ module type S = sig
 
   type flag = SClause.flag
 
-  val set_flag : flag -> t -> bool -> unit (** set boolean flag *)
+  val set_flag : flag -> t -> bool -> unit
+  (** set boolean flag *)
 
-  val get_flag : flag -> t -> bool (** get value of boolean flag *)
+  val get_flag : flag -> t -> bool
+  (** get value of boolean flag *)
 
   val mark_redundant : t -> unit
   val is_redundant : t -> bool
@@ -75,11 +77,7 @@ module type S = sig
   (** {2 Constructors} *)
 
   val create :
-    penalty:int ->
-    trail:Trail.t ->
-    Literal.t list ->
-    proof_step ->
-    t
+    penalty:int -> trail:Trail.t -> Literal.t list -> proof_step -> t
   (** Build a new clause from the given literals.
       @param trail boolean trail
       @param penalty heuristic penalty due to history of the clause
@@ -87,31 +85,17 @@ module type S = sig
       also takes a list of literals and a proof builder *)
 
   val create_a :
-    penalty:int ->
-    trail:Trail.t ->
-    Literal.t array ->
-    proof_step ->
-    t
+    penalty:int -> trail:Trail.t -> Literal.t array -> proof_step -> t
   (** Build a new clause from the given literals. *)
 
-  val of_sclause :
-    ?penalty:int ->
-    SClause.t ->
-    proof_step ->
-    t
+  val of_sclause : ?penalty:int -> SClause.t -> proof_step -> t
 
   val of_forms :
-    ?penalty:int ->
-    trail:Trail.t ->
-    Term.t SLiteral.t list ->
-    proof_step ->
-    t
+    ?penalty:int -> trail:Trail.t -> Term.t SLiteral.t list -> proof_step -> t
   (** Directly from list of formulas *)
 
   val of_forms_axiom :
-    ?penalty:int ->
-    file:string -> name:string ->
-    Term.t SLiteral.t list -> t
+    ?penalty:int -> file:string -> name:string -> Term.t SLiteral.t list -> t
   (** Construction from formulas as axiom (initial clause) *)
 
   val of_statement : Statement.clause_t -> t list
@@ -125,7 +109,8 @@ module type S = sig
 
   val proof_parent : t -> Proof.Parent.t
 
-  val proof_parent_subst : Subst.Renaming.t -> t Scoped.t -> Subst.t -> Proof.Parent.t
+  val proof_parent_subst :
+    Subst.Renaming.t -> t Scoped.t -> Subst.t -> Proof.Parent.t
 
   val update_proof : t -> (proof_step -> proof_step) -> t
   (** [update_proof c f] creates a new clause that is
@@ -201,8 +186,8 @@ module type S = sig
   (** {2 Filter literals} *)
 
   module Eligible : sig
-    type t = int -> Literal.t -> bool
     (** Eligibility criterion for a literal *)
+    type t = int -> Literal.t -> bool
 
     val res : clause -> t
     (** Only literals that are eligible for resolution *)
@@ -261,7 +246,7 @@ module type S = sig
     type t = {
       clause : clause;
       pos : Position.t;
-      term : Term.t;
+      term : Term.t
     }
 
     val compare : t -> t -> int
@@ -272,15 +257,19 @@ module type S = sig
 
   val pp : t CCFormat.printer
   val pp_tstp : t CCFormat.printer
-  val pp_tstp_full : t CCFormat.printer  (** Print in a cnf() statement *)
 
-  val to_string : t -> string (** Debug printing to a  string *)
+  val pp_tstp_full : t CCFormat.printer
+  (** Print in a cnf() statement *)
+
+  val to_string : t -> string
+  (** Debug printing to a  string *)
 
   val pp_set : ClauseSet.t CCFormat.printer
   val pp_set_tstp : ClauseSet.t CCFormat.printer
 
   (**/**)
+
   val check_types : t -> unit
+
   (**/**)
 end
-

@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Imperative Union-Find structure} *)
@@ -17,29 +16,29 @@ module type PAIR = sig
 end
 
 (** Build a union-find module from a key/value specification *)
-module Make(P : PAIR) = struct
-  type key = P.key
+module Make (P : PAIR) = struct
   (** Elements that can be compared *)
+  type key = P.key
 
-  type value = P.value
   (** Values associated with elements *)
+  type value = P.value
 
   type node = {
-    n_key: key;
-    mutable n_repr : node option; (* representative *)
-    mutable n_value : value; (* value (only up-to-date for representative) *)
+    n_key : key;
+    mutable n_repr : node option;
+    (* representative *)
+    mutable n_value : value (* value (only up-to-date for representative) *)
   }
 
-  module H = CCHashtbl.Make(struct include P type t = P.key end)
+  module H = CCHashtbl.Make (struct
+    include P
+    type t = P.key
+  end)
 
   (** The union-find imperative structure itself*)
   type t = node H.t
 
-  let mk_node key = {
-    n_repr = None;
-    n_key=key;
-    n_value = P.zero;
-  }
+  let mk_node key = {n_repr = None; n_key = key; n_value = P.zero}
 
   (** Elements that can be compared *)
   let create keys =
@@ -54,7 +53,8 @@ module Make(P : PAIR) = struct
   let n_key n = n.n_key
   let n_value n = n.n_value
 
-  let rec find_root (node:node): node = match node.n_repr with
+  let rec find_root (node : node) : node =
+    match node.n_repr with
     | None -> node
     | Some node' ->
       (* path compression *)
@@ -75,8 +75,7 @@ module Make(P : PAIR) = struct
     if n1 != n2 then (
       (* k2 points to k1, and k1 points to the new value *)
       n1.n_value <- P.merge n1.n_value n2.n_value;
-      n2.n_repr <- Some n1;
-    )
+      n2.n_repr <- Some n1 )
 
   (** Merge two representatives *)
   let union t k1 k2 =
@@ -98,9 +97,9 @@ module Make(P : PAIR) = struct
   let iter t f =
     H.iter
       (fun key node ->
-         if P.equal key node.n_key && node.n_repr=None then f key node.n_value)
+        if P.equal key node.n_key && node.n_repr = None then f key node.n_value
+        )
       t
 
-  let to_seq t f =
-    iter t (fun x y -> f (x,y))
+  let to_seq t f = iter t (fun x y -> f (x, y))
 end

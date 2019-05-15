@@ -1,11 +1,10 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 module type S = sig
   type t
 
-  type payload
   (** Additional data carried in the literal *)
+  type payload
 
   val compare : t -> t -> int
   val equal : t -> t -> bool

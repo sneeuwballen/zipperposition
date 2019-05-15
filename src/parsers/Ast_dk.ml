@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 AST utils for dedukti} *)
@@ -13,7 +12,7 @@ include T
 type statement = UntypedAST.statement
 type ty = T.t
 
-let cast t ty : term = T.app_builtin Builtin.has_type [t;ty]
+let cast t ty : term = T.app_builtin Builtin.has_type [t; ty]
 let const s = T.const s
 let mk_const s ty : term = cast (const s) ty
 let mk_const_t s = mk_const s T.tType
@@ -25,12 +24,11 @@ let v v = V v
 (* Global list of type aliases *)
 let ty_aliases : (string, ty) Hashtbl.t = Hashtbl.create 16
 
-let find_alias ~or_else(s:string) : ty =
-  try Hashtbl.find ty_aliases s
-  with Not_found -> or_else
+let find_alias ~or_else (s : string) : ty =
+  try Hashtbl.find ty_aliases s with Not_found -> or_else
 
 let add_alias s ty : unit =
-  Util.debugf 2 "Registering alias %s := %a" (fun k->k s T.pp ty);
+  Util.debugf 2 "Registering alias %s := %a" (fun k -> k s T.pp ty);
   Hashtbl.replace ty_aliases s ty
 
 (* Needed for parsing number literals *)
@@ -53,6 +51,8 @@ let ty_prop = T.prop
 let mk_ty_decl ?loc id ty = A.decl ?loc id ty
 let mk_assert ?loc ~name t = A.assert_ ?loc ~attrs:[A.attr_name name] t
 let mk_goal ?loc ~name t = A.goal ?loc ~attrs:[A.attr_name name] t
-let mk_def ?loc id ty body = A.def ?loc [A.mk_def id ty [T.eq (mk_const id ty) body]]
-let mk_rewrite ?loc t = A.rewrite ?loc t
 
+let mk_def ?loc id ty body =
+  A.def ?loc [A.mk_def id ty [T.eq (mk_const id ty) body]]
+
+let mk_rewrite ?loc t = A.rewrite ?loc t

@@ -19,19 +19,18 @@ type t = private InnerTerm.t
 
 type term = t
 
-type var = Type.t HVar.t
 (** Variables are typed with {!Type.t} *)
+type var = Type.t HVar.t
 
 type view = private
   | AppBuiltin of Builtin.t * t list
-  | DB of int (** Bound variable (De Bruijn index) *)
-  | Var of var (** Term variable *)
-  | Const of ID.t (** Typed constant *)
-  | App of t * t list (** Application to a list of terms (cannot be left-nested) *)
-  | Fun of Type.t * t (** Lambda abstraction *)
-
+  | DB of int  (** Bound variable (De Bruijn index) *)
+  | Var of var  (** Term variable *)
+  | Const of ID.t  (** Typed constant *)
+  | App of t * t list
+      (** Application to a list of terms (cannot be left-nested) *)
+  | Fun of Type.t * t  (** Lambda abstraction *)
 val view : t -> view
-
 
 (** {2 Classic view}
 
@@ -41,13 +40,12 @@ module Classic : sig
   type view = private
     | Var of var
     | DB of int
-    | App of ID.t * t list (** covers Const and App *)
+    | App of ID.t * t list  (** covers Const and App *)
     | AppBuiltin of Builtin.t * t list
-    | NonFO (** any other case *)
-
+    | NonFO  (** any other case *)
   val view : t -> view
 end
-(** {2 Comparison, equality, containers} *)
+ (** {2 Comparison, equality, containers} *)
 
 val subterm : sub:t -> t -> bool
 (** checks whether [sub] is a (non-strict) subterm of [t] *)
@@ -55,7 +53,8 @@ val subterm : sub:t -> t -> bool
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 
-val ty : t -> Type.t                (** Obtain the type of a term.. *)
+val ty : t -> Type.t
+(** Obtain the type of a term.. *)
 
 module Set : CCSet.S with type elt = t
 module Map : CCMap.S with type key = t
@@ -102,7 +101,7 @@ val app_full : t -> Type.t list -> t list -> t
 val true_ : t
 val false_ : t
 
-val fun_: Type.t -> t -> t
+val fun_ : Type.t -> t -> t
 val fun_l : Type.t list -> t -> t
 
 val fun_of_fvars : var list -> t -> t
@@ -123,7 +122,9 @@ val is_bvar : t -> bool
 val is_app : t -> bool
 val is_const : t -> bool
 val is_fun : t -> bool
-val is_type : t -> bool (** Does it have type [tType]? *)
+
+val is_type : t -> bool
+(** Does it have type [tType]? *)
 
 val as_const : t -> ID.t option
 val as_const_exn : t -> ID.t
@@ -164,41 +165,58 @@ module VarTbl : CCHashtbl.S with type key = var
 module Seq : sig
   val vars : t -> var Iter.t
   val subterms : t -> t Iter.t
-  val subterms_depth : t -> (t * int) Iter.t  (** subterms with their depth *)
+
+  val subterms_depth : t -> (t * int) Iter.t
+  (** subterms with their depth *)
 
   val symbols : t -> ID.t Iter.t
-  val max_var : var Iter.t -> int (** max var *)
 
-  val min_var : var Iter.t -> int (** min var *)
+  val max_var : var Iter.t -> int
+  (** max var *)
+
+  val min_var : var Iter.t -> int
+  (** min var *)
 
   val ty_vars : t -> var Iter.t
   val typed_symbols : t -> (ID.t * Type.t) Iter.t
   val add_set : Set.t -> t Iter.t -> Set.t
 end
 
-val var_occurs : var:var -> t -> bool (** [var_occurs ~var t] true iff [var] in t *)
+val var_occurs : var:var -> t -> bool
+(** [var_occurs ~var t] true iff [var] in t *)
 
-val is_ground : t -> bool (** is the term ground? (no free vars) *)
+val is_ground : t -> bool
+(** is the term ground? (no free vars) *)
 
-val monomorphic : t -> bool (** true if the term contains no type var *)
+val monomorphic : t -> bool
+(** true if the term contains no type var *)
 
-val max_var : VarSet.t -> int (** find the maximum variable *)
+val max_var : VarSet.t -> int
+(** find the maximum variable *)
 
-val min_var : VarSet.t -> int (** minimum variable *)
+val min_var : VarSet.t -> int
+(** minimum variable *)
 
-val add_vars : unit VarTbl.t -> t -> unit (** add variables of the term to the set *)
+val add_vars : unit VarTbl.t -> t -> unit
+(** add variables of the term to the set *)
 
-val vars : t -> VarSet.t (** compute variables of the terms *)
+val vars : t -> VarSet.t
+(** compute variables of the terms *)
 
-val vars_prefix_order : t -> var list (** variables in prefix traversal order *)
+val vars_prefix_order : t -> var list
+(** variables in prefix traversal order *)
 
-val depth : t -> int (** depth of the term *)
+val depth : t -> int
+(** depth of the term *)
 
-val head : t -> ID.t option (** head ID.t *)
+val head : t -> ID.t option
+(** head ID.t *)
 
-val head_exn : t -> ID.t (** head ID.t (or Invalid_argument) *)
+val head_exn : t -> ID.t
+(** head ID.t (or Invalid_argument) *)
 
-val size : t -> int (** Size (number of nodes) *)
+val size : t -> int
+(** Size (number of nodes) *)
 
 val weight : ?var:int -> ?sym:(ID.t -> int) -> t -> int
 (** Compute the weight of a term, given a weight for variables
@@ -259,8 +277,11 @@ val contains_symbol : ID.t -> t -> bool
 (** High level fold-like combinators *)
 
 val all_positions :
-  ?vars:bool -> ?ty_args:bool -> ?pos:Position.t ->
-  t -> t Position.With.t Iter.t
+  ?vars:bool ->
+  ?ty_args:bool ->
+  ?pos:Position.t ->
+  t ->
+  t Position.With.t Iter.t
 (** Iterate on all sub-terms with their position.
     @param vars specifies whether variables are folded on (default false).
     @param ty_args specifies whether type arguments are folded on (default true).
@@ -273,7 +294,7 @@ module type AC_SPEC = sig
   val is_comm : ID.t -> bool
 end
 
-module AC(A : AC_SPEC) : sig
+module AC (A : AC_SPEC) : sig
   val flatten : ID.t -> t list -> t list
   (** [flatten_ac f l] flattens the list of terms [l] by deconstructing all its
       elements that have [f] as head ID.t. For instance, if l=[1+2; 3+(4+5)]
@@ -300,8 +321,8 @@ val print_all_types : bool ref
 (** If true, {!pp} will print the types of all annotated terms *)
 
 include Interfaces.PRINT with type t := t
-include Interfaces.PRINT_DE_BRUIJN with type t := t
-                                    and type term := t
+
+include Interfaces.PRINT_DE_BRUIJN with type t := t and type term := t
 
 val pp_var : Type.t HVar.t CCFormat.printer
 
@@ -375,7 +396,9 @@ end
 
 module TPTP : sig
   include Interfaces.PRINT with type t := t
-  include Interfaces.PRINT_DE_BRUIJN
+
+  include
+    Interfaces.PRINT_DE_BRUIJN
     with type t := t
      and type term := t
      and type print_hook := print_hook
@@ -394,7 +417,8 @@ module Conv : sig
 
   val of_simple_term : ctx -> TypedSTerm.t -> t option
 
-  val of_simple_term_exn : ctx -> TypedSTerm.t -> t (** @raise Type.Conv.Error on failure *)
+  val of_simple_term_exn : ctx -> TypedSTerm.t -> t
+  (** @raise Type.Conv.Error on failure *)
 
   val to_simple_term :
     ?allow_free_db:bool ->
@@ -402,9 +426,12 @@ module Conv : sig
     ctx ->
     t ->
     TypedSTerm.t
+
   val var_to_simple_var : ?prefix:string -> ctx -> var -> TypedSTerm.t Var.t
 end
 
 (**/**)
+
 val rebuild_rec : t -> t (* rebuild term fully, checking types *)
+
 (**/**)

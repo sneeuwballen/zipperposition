@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Manipulate proofs} *)
@@ -25,15 +24,16 @@ type kind =
   | Inference of rule * tag list
   | Simplification of rule * tag list
   | Esa of rule
-  | Trivial (** trivial, or trivial within theories *)
-  | Define of ID.t * source (** definition *)
-  | By_def of ID.t (** following from the def of ID *)
+  | Trivial  (** trivial, or trivial within theories *)
+  | Define of ID.t * source  (** definition *)
+  | By_def of ID.t  (** following from the def of ID *)
 
 (** Source of leaves (from some input problem, or internal def) *)
 and source = private {
-  src_id: int;
-  src_view: source_view;
+  src_id : int;
+  src_view : source_view
 }
+
 and source_view =
   | From_file of from_file * attrs
   | Internal of attrs
@@ -50,7 +50,7 @@ and role =
 and from_file = {
   file : string;
   name : string option;
-  loc: ParseLocation.t option;
+  loc : ParseLocation.t option
 }
 
 (** Typeclass for the result of a proof step *)
@@ -85,11 +85,11 @@ module Tag = Builtin.Tag
 module Rule : sig
   type t = rule
 
-  val pp: t CCFormat.printer
+  val pp : t CCFormat.printer
 
   val name : t -> string
 
-  val mk: string -> t
+  val mk : string -> t
 
   val mkf : ('a, Format.formatter, unit, t) format4 -> 'a
 end
@@ -129,6 +129,7 @@ module Src : sig
   val internal : attrs -> t
 
   val pp_from_file : from_file CCFormat.printer
+
   (* include Interfaces.PRINT with type t := t *)
 
   val pp_role : role CCFormat.printer
@@ -153,8 +154,7 @@ module Result : sig
     | `Absurd_lits
     | `Proof_of_false
     | `Vanilla
-    | `Def
-    ]
+    | `Def ]
 
   (** A mapping used during instantiation, to map pre-instantiation
       variables to post-instantiation terms *)
@@ -165,7 +165,10 @@ module Result : sig
     to_exn:('a -> exn) ->
     compare:('a -> 'a -> int) ->
     to_form:(ctx:Term.Conv.ctx -> 'a -> form) ->
-    ?to_form_subst:(ctx:Term.Conv.ctx -> Subst.Projection.t -> 'a -> form * inst_subst) ->
+    ?to_form_subst:(ctx:Term.Conv.ctx ->
+                    Subst.Projection.t ->
+                    'a ->
+                    form * inst_subst) ->
     pp_in:(Output_format.t -> 'a CCFormat.printer) ->
     ?name:('a -> string) ->
     ?is_stmt:bool ->
@@ -195,7 +198,8 @@ module Result : sig
   val is_stmt : t -> bool
   val to_form : ?ctx:Term.Conv.ctx -> t -> form
 
-  val to_form_subst : ?ctx:Term.Conv.ctx -> Subst.Projection.t -> t -> form * inst_subst
+  val to_form_subst :
+    ?ctx:Term.Conv.ctx -> Subst.Projection.t -> t -> form * inst_subst
   (** instantiated form + bindings for vars *)
 
   val flavor : t -> flavor
@@ -239,7 +243,8 @@ module Step : sig
   val goal : source -> t
   val goal' : ?loc:Loc.t -> file:string -> name:string -> unit -> t
 
-  val inference : ?infos:infos -> ?tags:tag list -> rule:rule -> parent list -> t
+  val inference :
+    ?infos:infos -> ?tags:tag list -> rule:rule -> parent list -> t
 
   val simp : ?infos:infos -> ?tags:tag list -> rule:rule -> parent list -> t
 
@@ -301,9 +306,9 @@ module S : sig
   val result : t -> result
   val step : t -> step
 
-  val compare: t -> t -> int
-  val equal: t -> t -> bool
-  val hash: t -> int
+  val compare : t -> t -> int
+  val equal : t -> t -> bool
+  val hash : t -> int
 
   val compare_by_result : t -> t -> int
   (** Compare proofs by their result *)
@@ -339,15 +344,12 @@ module S : sig
   val as_graph : (t, rule * Subst.Projection.t option * infos) CCGraph.t
   (** Get a graph of the proof *)
 
-  val traverse :
-    ?traversed:unit Tbl.t ->
-    order:[`BFS | `DFS] ->
-    t ->
-    t Iter.t
+  val traverse : ?traversed:unit Tbl.t -> order:[`BFS | `DFS] -> t -> t Iter.t
 
   (** {6 IO} *)
 
   val pp_result_of : t CCFormat.printer
+
   val pp_notrec : t CCFormat.printer
   (** Non recursive printing on formatter *)
 
@@ -357,6 +359,7 @@ module S : sig
   val pp_tstp : t CCFormat.printer
   val pp_normal : t CCFormat.printer
   val pp_zf : t CCFormat.printer
+
   val pp_in : Options.print_format -> t CCFormat.printer
   (** Prints the proof according to the given input switch *)
 
@@ -372,4 +375,3 @@ module S : sig
   val pp_dot_seq_file : ?name:string -> string -> t Iter.t -> unit
   (** same as {!pp_dot_seq} but into a file *)
 end
-

@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Precedence (total ordering) on symbols} *)
@@ -28,6 +27,7 @@ module Weight : sig
     val ( + ) : t -> t -> t
     val ( - ) : t -> t -> t
   end
+
   include module type of Infix
 
   include Interfaces.ORD with type t := t
@@ -36,14 +36,13 @@ end
 
 (** {2 Constraints} *)
 module Constr : sig
-  type 'a t = private ID.t -> ID.t -> int
-    constraint 'a = [< `partial | `total]
   (** A partial order on symbols, used to make the precedence more
       precise.
       ['a] encodes the kind of ordering: partial or total
       {b NOTE}: the ordering must partition the set of ALL symbols into
         equivalence classes, within which all symbols are equal, but
         symbols of distinct equivalence classes are always ordered. *)
+  type 'a t = private ID.t -> ID.t -> int constraint 'a = [< `partial | `total]
 
   (* TODO: sth based on order of the type. Higher-order functions should
      be bigger than first-order functions, so that ghd() works fine
@@ -65,7 +64,7 @@ module Constr : sig
   val alpha : [`total] t
   (** alphabetic ordering on symbols, themselves bigger than builtin *)
 
-  val compose : [`partial] t -> ([<`partial | `total] as 'a) t -> 'a t
+  val compose : [`partial] t -> ([< `partial | `total] as 'a) t -> 'a t
   (** [compose a b] uses [a] to compare symbols; if [a] cannot decide,
       then we use [b]. *)
 
@@ -79,9 +78,9 @@ module Constr : sig
       {b CAUTION}, this order must respect some properties (see {!'a t}) *)
 end
 
-type t
 (** Total Ordering on a finite number of symbols, plus a few more
     data (weight for KBO, status for RPC) *)
+type t
 
 type precedence = t
 
@@ -141,7 +140,12 @@ val set_weight : t -> weight_fun -> unit
 
 (** {2 Creation of a precedence from constraints} *)
 
-val create : ?weight:weight_fun -> ?arg_coeff:arg_coeff_fun -> [`total] Constr.t -> ID.t list -> t
+val create :
+  ?weight:weight_fun ->
+  ?arg_coeff:arg_coeff_fun ->
+  [`total] Constr.t ->
+  ID.t list ->
+  t
 (** make a precedence from the given constraints. Constraints near
     the head of the list are {b more important} than constraints close
     to the tail. Only the very first constraint is assured to be totally

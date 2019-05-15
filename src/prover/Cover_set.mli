@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Cover Set} *)
@@ -56,7 +55,7 @@ val declarations : t -> (ID.t * Type.t) Iter.t
 (** [declarations set] returns a list of type declarations that should
     be made if [set] is new (declare the top cst and its subcases) *)
 
-val cases : ?which:[`Rec|`Base|`All] -> t -> case Iter.t
+val cases : ?which:[`Rec | `Base | `All] -> t -> case Iter.t
 (** Cases of the cover set *)
 
 val sub_constants : t -> cst Iter.t

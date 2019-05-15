@@ -7,10 +7,10 @@ open Logtk
 type flag
 
 type t = private {
-  id : int; (** unique ID of the clause *)
-  lits : Literal.t array; (** the literals *)
-  trail : Trail.t; (** boolean trail *)
-  mutable flags : flag; (** boolean flags for the clause *)
+  id : int;  (** unique ID of the clause *)
+  lits : Literal.t array;  (** the literals *)
+  trail : Trail.t;  (** boolean trail *)
+  mutable flags : flag  (** boolean flags for the clause *)
 }
 
 (** {2 Basics} *)
@@ -31,24 +31,30 @@ val length : t -> int
 val update_trail : (Trail.t -> Trail.t) -> t -> t
 
 val to_s_form :
-  ?allow_free_db:bool -> ?ctx:Term.Conv.ctx ->
-  t -> TypedSTerm.Form.t
+  ?allow_free_db:bool -> ?ctx:Term.Conv.ctx -> t -> TypedSTerm.Form.t
 
 (** {2 Flags} *)
 
-val flag_lemma : flag (** clause is a lemma *)
+val flag_lemma : flag
+(** clause is a lemma *)
 
-val flag_persistent : flag (** clause cannot be redundant *)
+val flag_persistent : flag
+(** clause cannot be redundant *)
 
-val flag_redundant : flag (** clause has been shown to be redundant *)
+val flag_redundant : flag
+(** clause has been shown to be redundant *)
 
-val flag_backward_simplified : flag (** clause has been backward simplified *)
+val flag_backward_simplified : flag
+(** clause has been backward simplified *)
 
-val set_flag : flag -> t -> bool -> unit (** set boolean flag *)
+val set_flag : flag -> t -> bool -> unit
+(** set boolean flag *)
 
-val get_flag : flag -> t -> bool (** get value of boolean flag *)
+val get_flag : flag -> t -> bool
+(** get value of boolean flag *)
 
-val new_flag : unit -> flag (** new flag that can be used on clauses *)
+val new_flag : unit -> flag
+(** new flag that can be used on clauses *)
 
 val mark_redundant : t -> unit
 val is_redundant : t -> bool
@@ -62,7 +68,9 @@ val pp_vars : t CCFormat.printer
 val pp : t CCFormat.printer
 val pp_zf : t CCFormat.printer
 val pp_tstp : t CCFormat.printer
-val pp_tstp_full : t CCFormat.printer  (** Print in a toplevel TPTP statement *)
+
+val pp_tstp_full : t CCFormat.printer
+(** Print in a toplevel TPTP statement *)
 
 val pp_trail : Trail.t CCFormat.printer
 val pp_trail_tstp : Trail.t CCFormat.printer

@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Boolean Literal} *)
@@ -14,18 +13,18 @@ end
 
 let stat_num_lit = Util.mk_stat "msat.num_lits"
 
-module Make(Payload : PAYLOAD)
-  : S with type payload = Payload.t
-= struct
+module Make (Payload : PAYLOAD) : S with type payload = Payload.t = struct
   type t = {
-    id: int; (* sign = sign of literal *)
-    payload: Payload.t;
-    neg: t; (* negation *)
+    id : int;
+    (* sign = sign of literal *)
+    payload : Payload.t;
+    neg : t (* negation *)
   }
+
   type lit = t
   type payload = Payload.t
 
-  let rec dummy = { id=0; neg=dummy; payload=Payload.dummy; }
+  let rec dummy = {id = 0; neg = dummy; payload = Payload.dummy}
 
   let fresh_id =
     let n = ref 1 in
@@ -36,19 +35,11 @@ module Make(Payload : PAYLOAD)
       id
 
   (* factory for literals *)
-  let make =
-    fun payload ->
-      let id = fresh_id () in
-      let rec pos = {
-        id;
-        payload;
-        neg;
-      } and neg = {
-          id= -id;
-          payload;
-          neg=pos;
-        } in
-      pos
+  let make payload =
+    let id = fresh_id () in
+    let rec pos = {id; payload; neg}
+    and neg = {id = -id; payload; neg = pos} in
+    pos
 
   let hash i = Hash.int i.id
   let equal i j = i.id = j.id
@@ -70,6 +61,6 @@ module Make(Payload : PAYLOAD)
     let equal = equal
   end
 
-  module Set = CCSet.Make(AsKey)
-  module Tbl = CCHashtbl.Make(AsKey)
+  module Set = CCSet.Make (AsKey)
+  module Tbl = CCHashtbl.Make (AsKey)
 end

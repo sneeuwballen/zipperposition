@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Arbitrary Typed Terms and Formulas} *)
@@ -42,14 +41,17 @@ module PT : sig
 
   val default_fuel : int -> TypedSTerm.t gen
   val default_g : TypedSTerm.t gen
+
   val default : TypedSTerm.t arbitrary
   (** Default polymorphic term *)
 
   val ground_g : TypedSTerm.t gen
+
   val ground : TypedSTerm.t arbitrary
   (** Default ground monomorphic term *)
 
   val pred_g : TypedSTerm.t gen
+
   val pred : TypedSTerm.t arbitrary
   (** predicates (type "prop") *)
 end

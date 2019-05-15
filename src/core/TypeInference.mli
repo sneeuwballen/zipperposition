@@ -31,9 +31,11 @@ type 'a or_error = ('a, string) CCResult.t
 
 type type_ = TypedSTerm.t
 
-type untyped = STerm.t (** untyped term *)
+(** untyped term *)
+type untyped = STerm.t
 
-type typed = TypedSTerm.t (** typed term *)
+(** typed term *)
+type typed = TypedSTerm.t
 
 type loc = ParseLocation.t
 
@@ -145,10 +147,12 @@ val constrain_term_type_exn : ?loc:loc -> Ctx.t -> untyped -> type_ -> unit
 (** Force the term's type and the given type to be the same.
     @raise Error if an inconsistency is detected *)
 
-val constrain_term_term : ?loc:loc -> Ctx.t -> untyped -> untyped -> unit or_error
+val constrain_term_term :
+  ?loc:loc -> Ctx.t -> untyped -> untyped -> unit or_error
 (** Safe version of {!constrain_term_term_exn} *)
 
-val constrain_term_type : ?loc:loc -> Ctx.t -> untyped -> type_ -> unit or_error
+val constrain_term_type :
+  ?loc:loc -> Ctx.t -> untyped -> type_ -> unit or_error
 (** Safe version of {!constrain_term_type_exn} *)
 
 (** {2 Statements} *)

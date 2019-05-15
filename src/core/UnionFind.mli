@@ -18,21 +18,23 @@ module type PAIR = sig
   val hash : key -> int
   val equal : key -> key -> bool
 
-  val merge : value -> value -> value   (** Should be associative commutative *)
+  val merge : value -> value -> value
+  (** Should be associative commutative *)
 
-  val zero : value  (** Neutral element of {!merge} *)
+  val zero : value
+  (** Neutral element of {!merge} *)
 end
 
 (** Build a union-find module from a key/value specification *)
-module Make(P : PAIR) : sig
-  type key = P.key
+module Make (P : PAIR) : sig
   (** Elements that can be compared *)
+  type key = P.key
 
-  type value = P.value
   (** Values associated with elements *)
+  type value = P.value
 
-  type t
   (** The union-find imperative structure itself *)
+  type t
 
   val create : key list -> t
   (** Create a union-find for the given elements. Elements are mapped

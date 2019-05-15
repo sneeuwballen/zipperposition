@@ -33,7 +33,6 @@
     phase (as in closure conversion).
 *)
 
-
 type term = TypedSTerm.t
 type form = TypedSTerm.t
 type type_ = TypedSTerm.t
@@ -54,44 +53,38 @@ val miniscope : ?distribute_exists:bool -> form -> form
 (** Options are used to tune the behavior of the CNF conversion. *)
 type options =
   | DistributeExists
-  (** if enabled, will distribute existential quantifiers over
+      (** if enabled, will distribute existential quantifiers over
       disjunctions. This can make skolem symbols smaller (smaller arity) but
       introduce more of them. *)
-
   | DisableRenaming
-  (** disables formula renaming. Can re-introduce the worst-case
+      (** disables formula renaming. Can re-introduce the worst-case
       exponential behavior of CNF. *)
-
   | InitialProcessing of (form -> form)
-  (** any processing, at the beginning, before CNF starts  *)
-
+      (** any processing, at the beginning, before CNF starts  *)
   | PostNNF of (form -> form)
-  (** any processing that keeps negation at leaves,
+      (** any processing that keeps negation at leaves,
       just after reduction to NNF. Its output
       must not break the NNF form (negation at root only). *)
-
   | PostSkolem of (form -> form)
-  (** transformation applied just after skolemization. It must not
+      (** transformation applied just after skolemization. It must not
       break skolemization nor NNF (no quantifier, no non-leaf negation). *)
 
-type clause = lit list
 (** Basic clause representation, as list of literals *)
+type clause = lit list
 
-val clause_to_fo :
-  ?ctx:Term.Conv.ctx ->
-  clause ->
-  Term.t SLiteral.t list
+val clause_to_fo : ?ctx:Term.Conv.ctx -> clause -> Term.t SLiteral.t list
 
-type f_statement = (term, term, type_) Statement.t
 (** A statement before CNF *)
+type f_statement = (term, term, type_) Statement.t
 
-type c_statement = (clause, term, type_) Statement.t
 (** A statement after CNF *)
+type c_statement = (clause, term, type_) Statement.t
 
 val pp_f_statement : f_statement CCFormat.printer
 val pp_c_statement : c_statement CCFormat.printer
-val pp_fo_c_statement : (Term.t SLiteral.t list, Term.t, Type.t) Statement.t CCFormat.printer
 
+val pp_fo_c_statement :
+  (Term.t SLiteral.t list, Term.t, Type.t) Statement.t CCFormat.printer
 
 val is_clause : form -> bool
 val is_cnf : form -> bool
@@ -113,15 +106,11 @@ val cnf_of_seq :
   f_statement Iter.t ->
   c_statement CCVector.ro_vector
 
-val type_declarations :
-  c_statement Iter.t ->
-  type_ ID.Map.t
+val type_declarations : c_statement Iter.t -> type_ ID.Map.t
 (** Compute the types declared in the statement sequence *)
 
 (** {2 Conversions} *)
 
-val convert :
-  c_statement Iter.t ->
-  Statement.clause_t CCVector.ro_vector
+val convert : c_statement Iter.t -> Statement.clause_t CCVector.ro_vector
 (** Converts statements based on {!TypedSTerm} into statements
     based on {!Term} and {!Type} *)

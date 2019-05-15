@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Output Format} *)
@@ -15,7 +14,8 @@ let zf : t = O_zf
 let none : t = O_none
 let default : t = normal
 
-let pp out (i:t) = match i with
+let pp out (i : t) =
+  match i with
   | O_tptp -> CCFormat.string out "tptp"
   | O_zf -> CCFormat.string out "zf"
   | O_none -> CCFormat.string out "none"
@@ -24,6 +24,5 @@ let pp out (i:t) = match i with
 (** Prefix to use for line comments *)
 let comment_prefix = function
   | O_tptp -> "% "
-  | O_normal
-  | O_zf -> "# "
+  | O_normal | O_zf -> "# "
   | O_none -> ""

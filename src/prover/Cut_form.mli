@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Universally Quantified Conjunction of Clauses} *)
@@ -13,9 +12,10 @@ type form = clause list
 (** A formula of the form [forall vars. \bigand_i C_i].
     The [C_i] are clauses with free variables in [vars] *)
 type t = private {
-  vars: Term.VarSet.t;
-  cs: form;
+  vars : Term.VarSet.t;
+  cs : form
 }
+
 type cut_form = t
 
 val make : Literals.t list -> t
@@ -79,7 +79,7 @@ module Seq : sig
 end
 
 (** {2 Structure for Sets of cut forms, indexed modulo α-eq} *)
-module FV_tbl(X : Map.OrderedType) : sig
+module FV_tbl (X : Map.OrderedType) : sig
   type value = X.t
   type t
 
