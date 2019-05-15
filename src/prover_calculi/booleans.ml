@@ -179,7 +179,13 @@ let extension =
 let () =
   Options.add_opts
     [ "--boolean-axioms", Arg.Bool (fun b -> _axioms_enabled := b), 
-      " enable/disable boolean axioms"  ];
+      " enable/disable boolean axioms";
+      "--bool-subterm-selection", 
+      Arg.Symbol(["A"; "N"; "L"], (fun opt -> if opt = "A" then cased_term_selection := Any
+                                            else if opt = "N" then cased_term_selection := NotConnective
+                                            else cased_term_selection := Large)), 
+      " select boolean subterm selection criterion: A for any, N for not a connective and L for large"
+        ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
     _axioms_enabled := false
   );
