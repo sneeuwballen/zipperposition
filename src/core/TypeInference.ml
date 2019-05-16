@@ -613,11 +613,11 @@ let rec infer_rec ?loc ctx t =
       then error_ ?loc "(in)equation @[%a@] ?= @[%a@] between types is forbidden" T.pp a T.pp b;
       begin match conn with
         | Builtin.Eq ->
-          if T.Ty.is_prop (T.ty_exn a) && (CCOpt.is_none (T.head a) || CCOpt.is_none (T.head b)) 
+          if T.Ty.is_prop (T.ty_exn a) && (CCOpt.is_none (T.head a) || CCOpt.is_none (T.head b))
           then T.Form.equiv a b 
           else T.Form.eq a b
         | Builtin.Neq ->
-          if T.Ty.is_prop (T.ty_exn a) && (CCOpt.is_none (T.head a) || CCOpt.is_none (T.head b)) 
+          if T.Ty.is_prop (T.ty_exn a) && (CCOpt.is_none (T.head a) || CCOpt.is_none (T.head b))
           then T.Form.xor a b 
           else T.Form.neq a b
         | _ -> assert false

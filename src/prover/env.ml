@@ -118,6 +118,7 @@ module Make(X : sig
   let _is_trivial : is_trivial_rule list ref = ref []
   let _empty_clauses = ref C.ClauseSet.empty
   let _multi_simpl_rule : multi_simpl_rule list ref = ref []
+  let _ss_multi_simpl_rule : multi_simpl_rule ref = ref (fun _ -> None)
   let _generate_rules : (string * generate_rule) list ref = ref []
   let _clause_conversion_rules : clause_conversion_rule list ref = ref []
   let _step_init = ref []
@@ -214,6 +215,9 @@ module Make(X : sig
 
   let add_multi_simpl_rule rule =
     _multi_simpl_rule := rule :: !_multi_simpl_rule
+
+  let set_single_step_multi_simpl_rule rule =
+    _ss_multi_simpl_rule := rule
 
   let cr_skip = CR_skip
   let cr_add x = CR_add x
@@ -731,7 +735,13 @@ module Make(X : sig
     let did_simplify = ref false in
     let set = ref C.ClauseSet.empty in
     let q = Queue.create () in
-    Queue.push c q;
+    let single_step_simplified = !_ss_multi_simpl_rule c in
+    begin
+      match single_step_simplified with
+      | None -> Queue.push c q;
+      | Some l -> did_simplify := true;
+                  List.iter (fun c -> Queue.push c q) l
+    end;
     while not (Queue.is_empty q) do
       let c = Queue.pop q in
       let c, st = simplify c in

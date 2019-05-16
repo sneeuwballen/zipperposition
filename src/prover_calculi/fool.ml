@@ -23,6 +23,8 @@ module type S = sig
   (** {6 Registration} *)
 
   val setup : unit -> unit
+  val rw_bool_lits : Env.multi_simpl_rule
+
   (** Register rules in the environment *)
 end
 
@@ -141,7 +143,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
     (* how to build a new clause *)
     let mk_c lits =
-      let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "fool_simp")
+      let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "cnf_otf")
           [Proof.Parent.from @@ C.proof c]
       in
       C.create lits proof

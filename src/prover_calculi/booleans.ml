@@ -8,8 +8,9 @@ open Libzipperposition
 
 module T = Term
 
-type selection_setting = Any | NotConnective | Large
-let _axioms_enabled = ref false
+type selection_setting = Any | Minimal | Large
+type reasoning_kind    = BoolReasoningDisabled | BoolCasesInference | BoolCasesSimplification
+let _bool_reasoning = ref BoolReasoningDisabled
 let cased_term_selection = ref Any
 
 module type S = sig
@@ -27,6 +28,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
   module C = Env.C
   module Ctx = Env.Ctx
+  module Fool = Fool.Make(Env)
 
   let (=~),(/~) = Literal.mk_eq, Literal.mk_neq
   let (@:) = T.app_builtin ~ty:Type.prop
@@ -108,7 +110,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 					| Builtin.True | Builtin.False -> ()
 					| Builtin.Eq | Builtin.Neq | Builtin.Equiv | Builtin.Xor ->
 						(match ps with 
-              | [x;y] when (!cased_term_selection != NotConnective || Type.is_prop(T.ty x)) ->
+              | [x;y] when (!cased_term_selection != Minimal || Type.is_prop(T.ty x)) ->
                 if f = Builtin.Neq || f = Builtin.Xor then(
                   if can_be_cased then Hashtbl.add term_as_false t (x =~ y);
                   add t (x /~ y)
@@ -116,7 +118,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   add t (x =~ y)
               | _ -> ())
 					| Builtin.And | Builtin.Or | Builtin.Imply | Builtin.Not ->
-						if !cased_term_selection != NotConnective then add t (yes t) else()
+						if !cased_term_selection != Minimal then add t (yes t) else()
 					| _ -> add t (yes t)
 	in
 	Literals.Seq.terms(C.lits c) |> Iter.iter(find_bools true);
@@ -132,7 +134,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 	Hashtbl.fold(case T.true_) term_as_false []
 
 
-  let bool_case_simp(c: C.t) : C.t list =
+  let bool_case_simp(c: C.t) : C.t list option =
   let term_to_equations = Hashtbl.create 8 in
 	let rec find_bools top t =
 		let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && not top in
@@ -151,27 +153,35 @@ module Make(E : Env.S) : S with module Env = E = struct
 					| Builtin.True | Builtin.False -> ()
 					| Builtin.Eq | Builtin.Neq | Builtin.Equiv | Builtin.Xor ->
 						(match ps with 
-              | [x;y] when (!cased_term_selection != NotConnective || Type.is_prop(T.ty x)) ->
+              | [x;y] when (!cased_term_selection != Minimal || Type.is_prop(T.ty x)) ->
                 add t x y;
                 if f = Builtin.Neq || f = Builtin.Xor then
                   Hashtbl.replace term_to_equations t (Hashtbl.find term_to_equations t)
               | _ -> ())
 					| Builtin.And | Builtin.Or | Builtin.Imply | Builtin.Not ->
-						if !cased_term_selection != NotConnective then add t t T.true_ else()
+						if !cased_term_selection != Minimal then add t t T.true_ else()
 					| _ -> add t t T.true_
 	in
 	Literals.Seq.terms(C.lits c) |> Iter.iter(find_bools true);
-	Hashtbl.fold(fun b (b_true, b_false) clauses ->
-		let proof = Proof.Step.inference[C.proof_parent c]
-			~rule:(Proof.Rule.mk"bool_case_simp")
-		in
-		C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-			(b_true :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:T.false_)))
-		proof ::
-    C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-			(b_false :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:T.true_)))
-		proof ::
-    clauses) term_to_equations []
+  let res = 
+    Hashtbl.fold(fun b (b_true, b_false) clauses ->
+      if !cased_term_selection != Minimal ||
+         Term.Seq.subterms b |> 
+         Iter.for_all (fun st -> T.equal b st || 
+                                 not (Type.is_prop (T.ty st))) then (
+        let proof = Proof.Step.inference[C.proof_parent c]
+          ~rule:(Proof.Rule.mk"bool_case_simp")
+        in
+        C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+          (b_true :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:T.false_)))
+        proof ::
+        C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+          (b_false :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:T.true_)))
+        proof ::
+        clauses)
+      else clauses) term_to_equations [] in
+  if CCList.is_empty res then None
+  else (Some res)
 
   let simpl_eq_subterms c =
     let simplified = ref false in
@@ -200,11 +210,23 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
   let setup () =
-	if !_axioms_enabled then(
+	(* if !_bool_reasoning then(
 		Env.ProofState.ActiveSet.add (create_clauses () );
 		Env.add_unary_inf "bool_cases" bool_cases;
-    	Env.add_basic_simplify simpl_eq_subterms;
-	)
+    Env.add_basic_simplify simpl_eq_subterms;
+	) *)
+  match !_bool_reasoning with 
+  | BoolReasoningDisabled -> ()
+  | _ ->
+    Env.ProofState.ActiveSet.add (create_clauses ());
+    Env.add_basic_simplify simpl_eq_subterms;
+    Env.add_multi_simpl_rule Fool.rw_bool_lits;
+    if !_bool_reasoning = BoolCasesInference then (
+      Env.add_unary_inf "bool_cases" bool_cases;
+    )
+    else (
+      Env.set_single_step_multi_simpl_rule bool_case_simp;
+    )
 end
 
 
@@ -221,18 +243,24 @@ let extension =
 
 let () =
   Options.add_opts
-    [ "--boolean-axioms", Arg.Bool (fun b -> _axioms_enabled := b), 
+    [ "--boolean-reasoning", Arg.Symbol (["off"; "cases-inf"; "cases-simpl"], 
+        fun s -> _bool_reasoning := 
+                    match s with 
+                    | "off" -> BoolReasoningDisabled
+                    | "cases-inf" -> BoolCasesInference
+                    | "cases-simpl" -> BoolCasesSimplification
+                    | _ -> assert false), 
       " enable/disable boolean axioms";
       "--bool-subterm-selection", 
-      Arg.Symbol(["A"; "N"; "L"], (fun opt -> if opt = "A" then cased_term_selection := Any
-                                            else if opt = "N" then cased_term_selection := NotConnective
+      Arg.Symbol(["A"; "M"; "L"], (fun opt -> if opt = "A" then cased_term_selection := Any
+                                            else if opt = "N" then cased_term_selection := Minimal
                                             else cased_term_selection := Large)), 
-      " select boolean subterm selection criterion: A for any, N for not a connective and L for large"
+      " select boolean subterm selection criterion: A for any, M for minimal and L for large"
         ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
-    _axioms_enabled := false
+    _bool_reasoning := BoolReasoningDisabled
   );
   Params.add_to_mode "fo-complete-basic" (fun () ->
-    _axioms_enabled := false
+    _bool_reasoning := BoolReasoningDisabled
   );
   Extensions.register extension
