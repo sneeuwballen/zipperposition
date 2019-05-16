@@ -219,3 +219,9 @@ let () =
   Params.add_to_mode "ho-complete-basic" (fun () ->
     _ho_restriction := `NoHigherOrderVariables
   );
+  Params.add_to_mode "ho-competitive" (fun () ->
+    _ho_restriction := `NoHigherOrderVariables
+  );
+  Params.add_to_mode "ho-pragmatic" (fun () ->
+    _ho_restriction := `NoHigherOrderVariables
+  );

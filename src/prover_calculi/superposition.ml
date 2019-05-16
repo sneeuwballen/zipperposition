@@ -2503,6 +2503,48 @@ let () =
       _lambdasup := -1;
       _dupsup := false;
     );
+    Params.add_to_mode "ho-pragmatic" (fun () ->
+      _use_simultaneous_sup := false;
+      _sup_at_vars := true;
+      _sup_in_var_args := false;
+      _sup_under_lambdas := false;
+      _lambda_demod := false;
+      _demod_in_var_args := false;
+      _complete_ho_unification := true;
+      _unif_alg := PragHOUnif.unify_scoped;
+      _ord_in_normal_form := true;
+      _sup_at_var_headed := true;
+      _lambdasup := -1;
+      _dupsup := false;
+      _max_infs := 5;
+      PragHOUnif.max_depth := 3;
+      PragHOUnif.max_app_projections := 0;
+      PragHOUnif.max_var_imitations := 0;
+      PragHOUnif.max_identifications := 1;
+      PragHOUnif.max_elims := 1;
+      _fluidsup := false;
+    );
+    Params.add_to_mode "ho-competitive" (fun () ->
+      _use_simultaneous_sup := false;
+      _sup_at_vars := true;
+      _sup_in_var_args := false;
+      _sup_under_lambdas := false;
+      _lambda_demod := false;
+      _demod_in_var_args := false;
+      _complete_ho_unification := true;
+      _unif_alg := PragHOUnif.unify_scoped;
+      _ord_in_normal_form := true;
+      _sup_at_var_headed := true;
+      _lambdasup := -1;
+      _dupsup := false;
+      _max_infs := 100;
+      PragHOUnif.max_depth := 8;
+      PragHOUnif.max_app_projections := 4;
+      PragHOUnif.max_var_imitations := 4;
+      PragHOUnif.max_identifications := 4;
+      PragHOUnif.max_elims := 4;
+      _fluidsup := false;
+    );
     Params.add_to_mode "fo-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
     )

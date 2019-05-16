@@ -44,9 +44,6 @@ let enable_imit_first () =
 let enable_solve_var () = 
   _solve_var := true
 
-let set_max_depth d () =
-  max_depth := d 
-
 let compose_sub s1 s2 =
   US.merge s1 s2
 

@@ -26,6 +26,7 @@ val max_app_projections : int ref
 val max_var_imitations  : int ref
 val max_identifications : int ref
 val max_elims           : int ref
+val max_depth           : int ref
 
 (* Disable getting only the first solution for unifying arguments
    after performing identification *)
@@ -36,7 +37,6 @@ val enable_imit_first : unit -> unit
    an extension of pattern unification algorithm. *)
 val enable_solve_var : unit -> unit
 
-val set_max_depth : int -> unit -> unit
 
 val unify : state:unif_state ->
             scope:Scoped.scope ->

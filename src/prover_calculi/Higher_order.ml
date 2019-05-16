@@ -1031,7 +1031,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_unary_simplify neg_ext_simpl;
       );
 
-      PragHOUnif.set_max_depth !_unif_max_depth ();
+      PragHOUnif.max_depth := !_unif_max_depth;
 
       if Env.flex_get k_enable_ho_unif then (
         Env.add_unary_inf "ho_unif" ho_unif;
@@ -1181,7 +1181,40 @@ let () =
     prim_mode_ := `None;
     _elim_pred_var := false;
     _neg_cong_fun := false;
-    enable_unif_ := false
+    enable_unif_ := false;
+    _prune_arg_fun := `PruneMaxCover;
+  );
+  Params.add_to_mode "ho-pragmatic" (fun () ->
+    enabled_ := true;
+    def_unfold_enabled_ := false;
+    force_enabled_ := true;
+    _ext_axiom := false;
+    _ext_neg_lit := false;
+    _neg_ext := true;
+    _neg_ext_as_simpl := false;
+    _ext_pos := true;
+    _ext_pos_all_lits := true;
+    prim_mode_ := `None;
+    _elim_pred_var := false;
+    _neg_cong_fun := false;
+    enable_unif_ := false;
+    _prune_arg_fun := `PruneMaxCover;
+  );
+  Params.add_to_mode "ho-competitive" (fun () ->
+    enabled_ := true;
+    def_unfold_enabled_ := true;
+    force_enabled_ := true;
+    _ext_axiom := false;
+    _ext_neg_lit := false;
+    _neg_ext := false;
+    _neg_ext_as_simpl := false;
+    _ext_pos := true;
+    _ext_pos_all_lits := true;
+    prim_mode_ := `None;
+    _elim_pred_var := false;
+    _neg_cong_fun := false;
+    enable_unif_ := false;
+    _prune_arg_fun := `PruneMaxCover;
   );
   Params.add_to_mode "fo-complete-basic" (fun () ->
     enabled_ := false;
