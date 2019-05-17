@@ -20,3 +20,5 @@ module Make(E : Env.S) : S with module Env = E
 
 val extension : Extensions.t
 
+val name_quantifiers : Logtk.TypeInference.typed_statement CCVector.ro_vector -> Logtk.TypeInference.typed_statement CCVector.ro_vector
+

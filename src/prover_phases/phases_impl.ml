@@ -7,6 +7,7 @@ open Logtk
 open Logtk_parsers
 open Logtk_proofs
 open Libzipperposition
+open Libzipperposition_calculi
 
 open Phases.Infix
 
@@ -446,7 +447,8 @@ let process_file ?(prelude=Iter.empty) file =
   let has_goal = has_goal_decls_ decls in
   Util.debugf ~section 1 "parsed %d declarations (%s goal(s))"
     (fun k->k (CCVector.length decls) (if has_goal then "some" else "no"));
-  cnf decls >>= fun stmts ->
+  (* Hooks exist but they can't be used to add statements. Hence naming quantifiers inside terms is done directly here. Without this Type.Conv.Error occures so the naming is done unconditionally. *)
+  cnf(Booleans.name_quantifiers decls) >>= fun stmts ->
   (* compute signature, precedence, ordering *)
   let conj_syms = syms_in_conj stmts in
   let signature = Statement.signature ~conj_syms:conj_syms (CCVector.to_seq stmts) in

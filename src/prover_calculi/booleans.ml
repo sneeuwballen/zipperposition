@@ -208,7 +208,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       SimplM.return_new new_
     )
 
-
   let setup () =
 	(* if !_bool_reasoning then(
 		Env.ProofState.ActiveSet.add (create_clauses () );
@@ -230,6 +229,83 @@ module Make(E : Env.S) : S with module Env = E = struct
 end
 
 
+open TypedSTerm
+open List
+
+let rec replaceTST f top t =
+  let re = replaceTST f in
+  let ty = match ty t with
+    | Some ty -> ty
+    | None -> assert false (* These are typed terms so they must have a type. *)
+  in
+  let transformer = if top then CCFun.id else f in
+  transformer 
+    (match view t with
+      | App(t,ts) -> app_whnf ~ty (re false t) (map (re false) ts)
+      | Ite(c,x,y) -> ite (re false c) (re false x) (re false y)
+      | Match(t, cases) -> match_ (re false t) (map (fun (c,vs,e) -> (c,vs, re false e)) cases)
+      | Let(binds, expr) -> let_ (map(CCPair.map2 (re false)) binds) (re false expr)
+      | Bind(binder,x,t) -> bind ~ty binder x (re (binder = Binder.Forall || binder = Binder.Exists) t)
+      | AppBuiltin(b,ts) ->
+          let logical = List.for_all(fun t -> 
+            match TypedSTerm.ty t with
+              | Some typ -> typ = prop
+              | None -> false) ts
+          in
+          app_builtin ~ty b (map (re(top && logical)) ts)
+      | Multiset ts -> multiset ~ty (map (re false) ts)
+      (* | Record(fs,x) -> 
+          let fs' = map(CCPair.map2 re) fs in
+          let x' = match x with Some x -> Some(re x) | _ -> None in
+          if fs' == fs && x' == x then t else(
+          raise(Failure "Unimplemented: record handling");
+          record ~ty fs' ~rest:None) *)
+      | _ -> t)
+  
+
+open Statement
+
+let name_quantifiers (stmts: TypeInference.typed_statement CCVector.ro_vector) =
+  CCFormat.printf "---stmts--- %a\n" (CCVector.pp Statement.pp_input) stmts;
+  let proof s = Proof.Step.esa [Proof.Parent.from(Statement.as_proof_i s)]
+          ~rule:(Proof.Rule.mk "Quantifier naming")
+  in
+  let new_stmts = CCVector.create() in
+  let changed = ref false in
+  let if_changed (mk: ?attrs:Logtk.Statement.attrs -> 'r) s r = 
+    if !changed then (changed := false; mk ~proof:(proof s) r) else s in
+  let if_changed_list (mk: ?attrs:Logtk.Statement.attrs -> 'l) s r = 
+    if !changed then (changed := false; mk ~proof:(proof s) r) else s in
+  let name_prop_Qs s = replaceTST(fun t -> match TypedSTerm.view t with
+    | Bind(Binder.Forall,_,_) | Bind(Binder.Exists, _, _) ->
+        changed := true;
+        let vars = Var.Set.of_seq (TypedSTerm.Seq.free_vars t) |> Var.Set.to_list in
+        let qid = ID.gensym() in
+        let q = const ~ty:(app_builtin ~ty:tType Builtin.Arrow (prop :: List.map Var.ty vars)) qid in
+        let proof = Proof.Step.define_internal qid [Proof.Parent.from(Statement.as_proof_i s)] in
+        let definition = 
+          (* ∀ vars: q[vars] ⇐⇒ t *)
+          bind_list ~ty:prop Binder.Forall vars 
+            (app_builtin ~ty:prop Builtin.Equiv 
+              [app ~ty:prop q (List.map var vars); t]) 
+        in 
+        CCVector.push new_stmts (assert_ ~proof definition);
+        q
+    | _ -> t) true
+  in
+  stmts |> CCVector.map(fun s ->
+    match Statement.view s with
+    | TyDecl(id,t)	-> s
+    | Data ts	-> s
+    | Def defs	-> s
+    | Rewrite _	-> s
+    | Assert p	-> if_changed assert_ s (name_prop_Qs s p)
+    | Lemma ps	-> if_changed_list lemma s (List.map (name_prop_Qs s) ps)
+    | Goal p	-> if_changed goal s (name_prop_Qs s p)
+    | NegatedGoal(ts, ps)	-> if_changed_list (neg_goal ~skolems:ts) s (List.map (name_prop_Qs s) ps)
+  ) |> CCVector.append new_stmts;
+  CCVector.freeze new_stmts
+
 let extension =
   let register env =
     let module E = (val env : Env.S) in
@@ -238,6 +314,7 @@ let extension =
   in
   { Extensions.default with
       Extensions.name = "bool";
+      (* post_parse_actions=[name_quantifiers]; *)
       env_actions=[register];
   }
 
