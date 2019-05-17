@@ -239,27 +239,30 @@ let rec replaceTST f top t =
     | None -> assert false (* These are typed terms so they must have a type. *)
   in
   let transformer = if top then CCFun.id else f in
+
+  CCFormat.printf "[T:%b,F:%a].\n" top TypedSTerm.pp t;
   transformer 
     (match view t with
-      | App(t,ts) -> app_whnf ~ty (re false t) (map (re false) ts)
-      | Ite(c,x,y) -> ite (re false c) (re false x) (re false y)
-      | Match(t, cases) -> match_ (re false t) (map (fun (c,vs,e) -> (c,vs, re false e)) cases)
-      | Let(binds, expr) -> let_ (map(CCPair.map2 (re false)) binds) (re false expr)
-      | Bind(binder,x,t) -> bind ~ty binder x (re (binder = Binder.Forall || binder = Binder.Exists) t)
+      | App(t,ts) -> 
+        app_whnf ~ty (re false t) (map (re false) ts)
+      | Ite(c,x,y) -> 
+        ite (re false c) (re false x) (re false y)
+      | Match(t, cases) -> 
+        match_ (re false t) (map (fun (c,vs,e) -> (c,vs, re false e)) cases)
+      | Let(binds, expr) -> 
+        let_ (map(CCPair.map2 (re false)) binds) (re false expr)
+      | Bind(b,x,t) -> 
+        let top = Binder.equal b Binder.Forall || Binder.equal b Binder.Exists in
+        bind ~ty b x (re top t)
       | AppBuiltin(b,ts) ->
           let logical = List.for_all(fun t -> 
             match TypedSTerm.ty t with
-              | Some typ -> typ = prop
+              | Some typ -> TypedSTerm.equal typ prop
               | None -> false) ts
           in
           app_builtin ~ty b (map (re(top && logical)) ts)
-      | Multiset ts -> multiset ~ty (map (re false) ts)
-      (* | Record(fs,x) -> 
-          let fs' = map(CCPair.map2 re) fs in
-          let x' = match x with Some x -> Some(re x) | _ -> None in
-          if fs' == fs && x' == x then t else(
-          raise(Failure "Unimplemented: record handling");
-          record ~ty fs' ~rest:None) *)
+      | Multiset ts -> 
+        multiset ~ty (map (re false) ts)
       | _ -> t)
   
 
@@ -292,6 +295,7 @@ let name_quantifiers (stmts: TypeInference.typed_statement CCVector.ro_vector) =
         in 
         CCVector.push new_stmts q_typedecl;
         CCVector.push new_stmts (assert_ ~proof definition);
+        (* CCFormat.printf "[DEF:] %a.\n" Statement.pp_input (assert_ ~proof definition); *)
         q
     | _ -> t) true
   in
