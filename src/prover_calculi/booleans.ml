@@ -266,7 +266,6 @@ let rec replaceTST f top t =
 open Statement
 
 let name_quantifiers (stmts: TypeInference.typed_statement CCVector.ro_vector) =
-  CCFormat.printf "---stmts--- %a\n" (CCVector.pp Statement.pp_input) stmts;
   let proof s = Proof.Step.esa [Proof.Parent.from(Statement.as_proof_i s)]
           ~rule:(Proof.Rule.mk "Quantifier naming")
   in
