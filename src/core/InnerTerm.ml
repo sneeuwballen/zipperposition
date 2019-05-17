@@ -145,6 +145,10 @@ let app ~ty f l = match f.term, l with
     (* flatten *)
     let my_t = make_ ~ty:(HasType ty) (App (f1,l1 @ l)) in
     H.hashcons my_t
+  | AppBuiltin (f1, l1), _::_ ->
+    (* flatten *)
+    let my_t = make_ ~ty:(HasType ty) (AppBuiltin (f1,l1 @ l)) in
+    H.hashcons my_t
   | _ ->
     let my_t = make_ ~ty:(HasType ty) (App (f,l)) in
     H.hashcons my_t

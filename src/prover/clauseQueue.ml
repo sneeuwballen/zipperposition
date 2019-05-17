@@ -67,7 +67,28 @@ let () =
     [ "--clause-queue", o,
       " choose which set of clause queues to use (for selecting next active clause)";
       "-cq", o, " alias to --clause-queue"
-    ]
+    ];
+
+  Params.add_to_mode "ho-pragmatic" (fun () ->
+      _profile := P_conj_rel_var;
+      cr_var_ratio := 10;
+      cr_var_mul   := 1.1;
+  );
+  Params.add_to_mode "ho-competitive" (fun () ->
+      _profile := P_conj_rel_var;
+      cr_var_ratio := 10;
+      cr_var_mul   := 1.1;
+  );
+  Params.add_to_mode "ho-complete-basic" (fun () ->
+      _profile := P_conj_rel_var;
+      cr_var_ratio := 10;
+      cr_var_mul   := 1.1;
+  );
+  Params.add_to_mode "fo-complete-basic" (fun () ->
+      _profile := P_conj_rel_var;
+      cr_var_ratio := 10;
+      cr_var_mul   := 1.1;
+  );
 
 module Make(C : Clause_intf.S) = struct
   module C = C
@@ -110,7 +131,7 @@ module Make(C : Clause_intf.S) = struct
               List.fold_left (fun acc t -> acc + calc_tweight t sg v w c_mul) 0 l
          
          | Term.Const id -> (int_of_float ((if Signature.sym_in_conj id sg then c_mul else 1.0)*.float_of_int w))
-         | Term.Fun (_, t) -> calc_tweight t sg v w c_mul
+         | Term.Fun (_, t) -> 2*w + calc_tweight t sg v w c_mul
 
      let calc_lweight l sg v w c_mul =
       match l with 

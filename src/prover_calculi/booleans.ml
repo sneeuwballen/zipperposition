@@ -240,7 +240,6 @@ let rec replaceTST f top t =
   in
   let transformer = if top then CCFun.id else f in
 
-  CCFormat.printf "[T:%b,F:%a].\n" top TypedSTerm.pp t;
   transformer 
     (match view t with
       | App(t,ts) -> 
@@ -285,18 +284,18 @@ let name_quantifiers (stmts: TypeInference.typed_statement CCVector.ro_vector) =
         let qid = ID.gensym() in
         let ty = app_builtin ~ty:tType Builtin.Arrow (prop :: List.map Var.ty vars) in
         let q = const ~ty qid in
+        let q_vars = app ~ty:prop q (List.map var vars) in
         let proof = Proof.Step.define_internal qid [Proof.Parent.from(Statement.as_proof_i s)] in
         let q_typedecl = ty_decl ~proof qid ty in
         let definition = 
           (* ∀ vars: q[vars] ⇐⇒ t *)
           bind_list ~ty:prop Binder.Forall vars 
-            (app_builtin ~ty:prop Builtin.Equiv 
-              [app ~ty:prop q (List.map var vars); t]) 
+            (app_builtin ~ty:prop Builtin.Equiv [q_vars; t]) 
         in 
         CCVector.push new_stmts q_typedecl;
         CCVector.push new_stmts (assert_ ~proof definition);
         (* CCFormat.printf "[DEF:] %a.\n" Statement.pp_input (assert_ ~proof definition); *)
-        q
+        q_vars
     | _ -> t) true
   in
   stmts |> CCVector.map(fun s ->

@@ -80,6 +80,7 @@ let _dupsup = ref true
 
 let _NO_LAMSUP = -1
 let _lambdasup = ref (-1)
+let _max_infs = ref (-1)
 let _unif_alg = ref JP_unif.unify_scoped
 
 
@@ -335,7 +336,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     else (
       (* Check whether Cσ is >= C[var -> replacement]σ *)
       let passive'_lits = Lits.apply_subst renaming subst (C.lits info.passive, info.scope_passive) in
-      let subst_t = Unif.FO.update subst (T.as_var_exn var, info.scope_passive) (replacement, info.scope_active) in
+      let subst_t = Unif.FO.bind_or_update subst (T.as_var_exn var, info.scope_passive) (replacement, info.scope_active) in
       let passive_t'_lits = Lits.apply_subst renaming subst_t (C.lits info.passive, info.scope_passive) in
       if Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt
       then (
@@ -537,11 +538,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (* (try
         ignore (C.check_types new_clause);
         ()
-      with Type.ApplyError _ ->
-        Format.printf
-        "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
+      with Type.ApplyError error_msg ->
+        (Format.printf
+        "@[<2>sup, kind %s, error: %s @ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
         (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
-        (kind_to_str info.sup_kind) C.pp info.active sc_a T.pp info.s T.pp info.t
+        (kind_to_str info.sup_kind) error_msg C.pp info.active sc_a T.pp info.s T.pp info.t
             T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
             Position.pp info.passive_pos Subst.pp subst';
         Format.printf "@[res = %a@].\n" C.pp new_clause); *)
@@ -839,6 +840,30 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) inf_res in
       StmQ.add_lst _stmq.q stm_res; []
 
+  let infer_active_pragmatic_ho max_unifs clause =
+    let inf_res = infer_active_aux
+      ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:!_unif_alg)
+      ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
+        let all_substs = OSeq.to_list @@ OSeq.take max_unifs substs   in
+        let res = List.map (fun subst -> do_sup u_p with_pos (CCOpt.get_exn subst)) all_substs in
+        Some res
+      )
+      clause
+    in
+    inf_res |> CCList.flatten |> List.filter CCOpt.is_some  |> List.map CCOpt.get_exn
+
+  let infer_passive_pragmatic_ho max_unifs clause =
+    let inf_res = infer_passive_aux
+      ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:!_unif_alg)
+      ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
+        let all_substs = OSeq.to_list @@ OSeq.take max_unifs substs in
+        let res = List.map (fun subst -> do_sup u_p with_pos (CCOpt.get_exn subst)) all_substs in
+        Some res   
+      )
+      clause
+    in
+    inf_res |> CCList.flatten |> List.filter CCOpt.is_some  |> List.map CCOpt.get_exn
+  
   (* ----------------------------------------------------------------------
    * FluidSup rule (Superposition at applied variables)
    * ---------------------------------------------------------------------- *)
@@ -1136,6 +1161,18 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let stm_res = List.map (Stm.make ~penalty:penalty) inf_res in
     StmQ.add_lst _stmq.q stm_res; []
 
+  let infer_equality_resolution_pragmatic_ho max_unifs clause =
+    let inf_res = infer_equality_resolution_aux
+        ~unify:!_unif_alg
+        ~iterate_substs:(fun substs do_eq_res ->
+           (* Some (OSeq.map (CCOpt.flat_map do_eq_res) substs) *)
+           let all_substs = OSeq.to_list @@ OSeq.take max_unifs substs in
+           let res = List.map (fun subst -> do_eq_res (CCOpt.get_exn subst)) all_substs in
+           Some res)
+        clause
+    in
+    inf_res |> CCList.flatten |> List.filter CCOpt.is_some  |> List.map CCOpt.get_exn
+
   (* ----------------------------------------------------------------------
    * Equality Factoring rule
    * ---------------------------------------------------------------------- *)
@@ -1248,6 +1285,18 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let stm_res = List.map (Stm.make ~penalty:penalty) inf_res in
     StmQ.add_lst _stmq.q stm_res; []
 
+   let infer_equality_factoring_pragmatic_ho max_unifs clause =
+    let inf_res = infer_equality_factoring_aux
+        ~unify:!_unif_alg
+        ~iterate_substs:(fun substs do_eq_fact ->
+           (* Some (OSeq.map (CCOpt.flat_map do_eq_fact) substs) *)
+           let all_substs = OSeq.to_list @@ OSeq.take max_unifs substs  in
+           let res = List.map (fun subst -> do_eq_fact (CCOpt.get_exn subst)) all_substs in
+           Some res)
+        clause
+    in
+    inf_res |> CCList.flatten |> List.filter CCOpt.is_some  |> List.map CCOpt.get_exn
+
   (* ----------------------------------------------------------------------
    * extraction of a clause from the stream queue (HO feature)
    * ---------------------------------------------------------------------- *)
@@ -1263,7 +1312,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     match opt_res with
       | None -> []
-      | Some l -> l
+      | Some l ->  l
 
   let extract_from_stream_queue_fix_stm ~full () =
     let cl =
@@ -1320,23 +1369,23 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         UnitIdx.retrieve ~sign:true (!_idx_simpl, cur_sc) (t, 0)
         |> Iter.find_map
           (fun (l, r, (_,_,sign,unit_clause), subst) ->
+             let rename = Subst.Renaming.create () in
              (* r is the term subterm is going to be rewritten into *)
              assert (C.is_unit_clause unit_clause);
              if sign &&
                 (not (Lazy.force restrict) || not (S.is_renaming subst)) &&
                 C.trail_subsumes unit_clause c &&
                 (O.compare ord
-                   (S.FO.apply Subst.Renaming.none subst (l,cur_sc))
-                   (S.FO.apply Subst.Renaming.none subst (r,cur_sc)) = Comp.Gt)
+                   (S.FO.apply rename subst (l,cur_sc))
+                   (S.FO.apply rename subst (r,cur_sc)) = Comp.Gt)
                 (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
              then (
                Util.debugf ~section 5
                  "@[<hv2>demod:@ @[<hv>t=%a[%d],@ l=%a[%d],@ r=%a[%d]@],@ subst=@[%a@]@]"
                  (fun k->k T.pp t 0 T.pp l cur_sc T.pp r cur_sc S.pp subst);
 
-               let rename = Subst.Renaming.none in
                let t' = Lambda.eta_reduce @@ Lambda.snf t in
-               let l' = Lambda.eta_reduce @@ Lambda.snf @@  Subst.FO.apply rename subst (l,cur_sc) in
+               let l' = Lambda.eta_reduce @@ Lambda.snf @@  Subst.FO.apply Subst.Renaming.none subst (l,cur_sc) in
                (* sanity checks *)
                assert (Type.equal (T.ty l) (T.ty r));
                assert (T.equal l' t');
@@ -1474,6 +1523,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            let pp_c_s out (c,s,sc) =
              Format.fprintf out "(@[%a@ :subst %a[%d]@])" C.pp c Subst.pp s sc in
            k C.pp c C.pp new_c (Util.pp_list pp_c_s) st.demod_clauses);
+      (* Assertion against variable clashes *)
+      Lits.vars (C.lits new_c) 
+        |> CCList.map (fun v -> (HVar.id v))
+        |> (fun vars -> assert (CCList.length (CCList.uniq ~eq:CCInt.equal vars) == CCList.length vars));
       (* return simplified clause *)
       SimplM.return_new new_c
     )
@@ -2270,15 +2323,24 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and is_trivial = is_tautology in
     if !_complete_ho_unification
     then (
+      if !_max_infs = -1 then (
+        Env.add_binary_inf "superposition_passive" infer_passive_complete_ho;
+        Env.add_binary_inf "superposition_active" infer_active_complete_ho;
+        Env.add_unary_inf "equality_factoring" infer_equality_factoring_complete_ho;
+        Env.add_unary_inf "equality_resolution" infer_equality_resolution_complete_ho;
+      )
+      else (
+        assert(!_max_infs > 0);
+        Env.add_binary_inf "superposition_passive" (infer_passive_pragmatic_ho !_max_infs);
+        Env.add_binary_inf "superposition_active" (infer_active_pragmatic_ho !_max_infs);
+        Env.add_unary_inf "equality_factoring" (infer_equality_factoring_pragmatic_ho !_max_infs);
+        Env.add_unary_inf "equality_resolution" (infer_equality_resolution_pragmatic_ho !_max_infs);
+      );
 
-      Env.add_binary_inf "superposition_passive" infer_passive_complete_ho;
-      Env.add_binary_inf "superposition_active" infer_active_complete_ho;
-      Env.add_unary_inf "equality_factoring" infer_equality_factoring_complete_ho;
-      Env.add_unary_inf "equality_resolution" infer_equality_resolution_complete_ho;
       if !_fluidsup then (
         Env.add_binary_inf "fluidsup_passive" infer_fluidsup_passive;
         Env.add_binary_inf "fluidsup_active" infer_fluidsup_active;
-      );
+        );
       if !_dupsup then (
         Env.add_binary_inf "dupsup_passive(into)" infer_dupsup_passive;
         Env.add_binary_inf "dupsup_active(from)" infer_dupsup_active;
@@ -2287,10 +2349,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Env.add_binary_inf "lambdasup_active(from)" infer_lambdasup_from;
         Env.add_binary_inf "lambdasup_passive(into)" infer_lambdasup_into;
       );
-      if !_switch_stream_extraction then
-        Env.add_generate "stream_queue_extraction" extract_from_stream_queue_fix_stm
-      else
-        Env.add_generate "stream_queue_extraction" extract_from_stream_queue;
+      if (List.exists CCFun.id [!_fluidsup; !_dupsup; !_lambdasup != -1; !_max_infs = -1]) then (
+        if !_switch_stream_extraction then
+          Env.add_generate "stream_queue_extraction" extract_from_stream_queue_fix_stm
+        else
+          Env.add_generate "stream_queue_extraction" extract_from_stream_queue;
+      )
     )
     else (
       Env.add_binary_inf "superposition_passive" infer_passive;
@@ -2368,6 +2432,9 @@ let () =
     ; "--no-sup-at-var-headed"
     , Arg.Clear _sup_at_var_headed
     , " disable superposition at variable headed terms"
+    ; "--sup-at-var-headed"
+    , Arg.Set _sup_at_var_headed
+    , " disable superposition at variable headed terms"
     ; "--no-sup-in-var-args"
     , Arg.Clear _sup_in_var_args
     , " disable superposition in arguments of applied variables"
@@ -2410,6 +2477,9 @@ let () =
         _unif_alg := if (String.equal "full" str) then JP_unif.unify_scoped
                      else PragHOUnif.unify_scoped)),
       "set the level of HO unification"
+      ; "--max-inferences"
+      , Arg.Int (fun p -> _max_infs := p)
+      , " set maximal number of inferences"
     ];
     Params.add_to_mode "ho-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
@@ -2423,6 +2493,48 @@ let () =
       _sup_at_var_headed := false;
       _lambdasup := -1;
       _dupsup := false;
+    );
+    Params.add_to_mode "ho-pragmatic" (fun () ->
+      _use_simultaneous_sup := false;
+      _sup_at_vars := true;
+      _sup_in_var_args := false;
+      _sup_under_lambdas := false;
+      _lambda_demod := false;
+      _demod_in_var_args := false;
+      _complete_ho_unification := true;
+      _unif_alg := PragHOUnif.unify_scoped;
+      _ord_in_normal_form := true;
+      _sup_at_var_headed := true;
+      _lambdasup := -1;
+      _dupsup := false;
+      _max_infs := 5;
+      PragHOUnif.max_depth := 3;
+      PragHOUnif.max_app_projections := 0;
+      PragHOUnif.max_var_imitations := 0;
+      PragHOUnif.max_identifications := 1;
+      PragHOUnif.max_elims := 1;
+      _fluidsup := false;
+    );
+    Params.add_to_mode "ho-competitive" (fun () ->
+      _use_simultaneous_sup := false;
+      _sup_at_vars := true;
+      _sup_in_var_args := false;
+      _sup_under_lambdas := false;
+      _lambda_demod := false;
+      _demod_in_var_args := false;
+      _complete_ho_unification := true;
+      _unif_alg := PragHOUnif.unify_scoped;
+      _ord_in_normal_form := true;
+      _sup_at_var_headed := true;
+      _lambdasup := -1;
+      _dupsup := false;
+      _max_infs := 100;
+      PragHOUnif.max_depth := 8;
+      PragHOUnif.max_app_projections := 4;
+      PragHOUnif.max_var_imitations := 4;
+      PragHOUnif.max_identifications := 4;
+      PragHOUnif.max_elims := 4;
+      _fluidsup := false;
     );
     Params.add_to_mode "fo-complete-basic" (fun () ->
       _use_simultaneous_sup := false;

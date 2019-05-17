@@ -5,6 +5,15 @@ module H = HVar
 
 
 type subst = US.t
+type unif_state =
+{
+  num_identifications : int;
+  num_var_imitations  : int;
+  num_app_projections : int;
+  num_elims           : int;
+  depth               : int
+}
+
 
 module S = struct
   let apply s t = Subst.FO.apply Subst.Renaming.none (US.subst s) t
@@ -14,12 +23,13 @@ module S = struct
 end
 
 let max_depth = ref 7
-let max_app_projections = 3
-let back_off_interval = 4
+let max_app_projections = ref 3
+let max_var_imitations = ref 1
+let max_identifications = ref 0
+let max_elims           = ref 2
 
 let _cons_e = ref true
 let _imit_first = ref false
-let _cons_ff = ref true
 let _solve_var = ref true
 
 (* apply a substitution and reduce to whnf *)
@@ -28,21 +38,17 @@ let nfapply s u = Lambda.beta_red_head (S.apply s u)
 let disable_conservative_elim () =
   _cons_e := false
 
-let disable_cons_ff () = 
-  _cons_ff := false
-
 let enable_imit_first () = 
   _imit_first := true
 
 let enable_solve_var () = 
   _solve_var := true
 
-let set_max_depth d () =
-  max_depth := d 
-
 let compose_sub s1 s2 =
   US.merge s1 s2
 
+let continue_unification state =
+  state.depth <= !max_depth
 
 (* Make new list of constraints, prefering the rigid-rigid pairs *)
 let build_constraints ~ban_id args1 args2 rest = 
@@ -92,7 +98,7 @@ let imitate_one ~scope ~counter  s t =
   with Not_found ->  raise Not_found
 
 (* Create all possible projection and imitation bindings. *)
-let proj_imit_bindings ~nr_iter ~subst ~scope ~counter  s t =
+let proj_imit_bindings ~state ~subst ~scope ~counter  s t =
   let hd_s, args_s = CCPair.map1 (fun x -> T.as_var_exn x) (T.as_app s) in
   let hd_t,_ = T.as_app (snd (T.open_fun t)) in
   let pref_tys, var_ret_ty = Type.open_fun (HVar.ty hd_s) in
@@ -102,7 +108,7 @@ let proj_imit_bindings ~nr_iter ~subst ~scope ~counter  s t =
     |> (fun l ->
         (* if we performed more than N projections that applied the
            bound variable we back off *)
-        if nr_iter <= max_app_projections then l
+        if state.num_app_projections <= !max_app_projections then l
         else
           List.filter (fun (_, ty) -> 
             List.length (Type.expected_args ty) = 0) l)
@@ -136,177 +142,166 @@ let proj_imit_bindings ~nr_iter ~subst ~scope ~counter  s t =
        let hd_t = T.head_term_with_mandatory_args t in
        if (not @@ T.is_bvar @@ T.head_term t && 
            not (T.var_occurs ~var:(T.as_var_exn hd_s) hd_t)) then 
-         [(imitate_one ~scope ~counter s t,0)]
+         [(imitate_one ~scope ~counter s t,-1)]
        else [] in
   let first, second = 
     if !_imit_first then imit_binding, proj_bindings
     else proj_bindings, imit_binding in 
   first @ second
 
-let rec unify ~depth ~nr_iter ~scope ~counter ~subst = function
+let rec unify ~state ~scope ~counter ~subst = function
   | [] -> 
       (* all constraints solved for the initial problem *)
       OSeq.return (Some subst)
   | (s,t,ban_id) :: rest as l -> (
-    if depth >= !max_depth then OSeq.empty
+    if not @@ continue_unification state then OSeq.empty
     else (
-      if (depth > 0 && depth mod back_off_interval = 0) then (
-        (* Every once in a while we fill up the stream with Nones
-           to defer solving constraints in this stream *)
-        OSeq.append 
-          (OSeq.take 50 (OSeq.repeat None))
-          (unify ~depth:(depth+1) ~nr_iter ~scope ~counter ~subst l)
-      )
-      else (
-        let s', t' = nfapply subst (s, scope), nfapply subst (t, scope) in
-        if not (Term.equal s' t') then (
-          match P.unif_simple ~subst:(US.subst subst) ~scope 
-                  (T.of_ty (T.ty s')) (T.of_ty (T.ty t')) with
-          | Some ty_unif -> (
-            let s' = nfapply ty_unif (s', scope) in
-            let t' = nfapply ty_unif (t', scope) in
-            let subst = ty_unif in
-            try
-              if !_solve_var then (
-                (* trying pattern unification *)
-                let subst = P.unify_scoped ~counter ~subst (s',scope) (t',scope) in
-                unify ~depth ~nr_iter ~scope ~counter ~subst rest 
-              ) 
-              else (
-                if Term.is_fo_term s' && Term.is_fo_term t' then (
-                  let subst = P.unif_simple ~scope ~subst:(US.subst subst) s' t' in
-                  if CCOpt.is_some subst then (
-                    let subst = CCOpt.get_exn subst in
-                    unify ~depth ~nr_iter ~scope ~counter ~subst rest
-                  )
-                  else raise P.NotUnifiable
-                )
-                else raise P.NotInFragment
+      let s', t' = nfapply subst (s, scope), nfapply subst (t, scope) in
+      if not (Term.equal s' t') then (
+        match P.unif_simple ~subst:(US.subst subst) ~scope 
+                (T.of_ty (T.ty s')) (T.of_ty (T.ty t')) with
+        | Some ty_unif -> (
+          let s', t' = nfapply ty_unif (s', scope), nfapply ty_unif (t', scope) in
+          let subst = ty_unif in
+          try
+            if !_solve_var then (
+              (* trying pattern unification *)
+              let subst = P.unify_scoped ~counter ~subst (s',scope) (t',scope) in
+              unify ~state ~scope ~counter ~subst rest 
+            ) 
+            else (
+              if Term.is_fo_term s' && Term.is_fo_term t' then (
+                let subst = P.unif_simple ~scope ~subst:(US.subst subst) s' t' in
+                if CCOpt.is_some subst then (
+                  let subst = CCOpt.get_exn subst in
+                  unify ~state ~scope ~counter ~subst rest
+                ) else raise P.NotUnifiable
+              ) else raise P.NotInFragment
+            )
+          with
+          |P.NotUnifiable -> 
+            (* A weaker unification procedure determined the constraint is unsolvable *)
+            OSeq.empty 
+          |P.NotInFragment ->
+            (* A weaker unification procedure gave up *)
+            let (pref_s, body_s), (pref_t, body_t) = T.open_fun s', T.open_fun t' in
+            let body_s', body_t', _ = P.eta_expand_otf ~subst ~scope pref_s pref_t body_s body_t in
+            let (hd_s, args_s), (hd_t, args_t) = T.as_app body_s', T.as_app body_t' in
+            match T.view hd_s, T.view hd_t with 
+            | (T.Var _, T.Var _) -> 
+              if T.equal hd_s hd_t then (
+                flex_same ~state ~subst ~counter ~scope hd_s args_s args_t rest l
               )
-            with
-            |P.NotUnifiable -> 
-              (* A weaker unification procedure determined the constraint is unsolvable *)
-              OSeq.empty 
-            |P.NotInFragment ->
-              (* A weaker unification procedure gave up *)
-              let pref_s, body_s = T.open_fun s' in
-              let pref_t, body_t = T.open_fun t' in 
-              let body_s', body_t', _ = P.eta_expand_otf ~subst ~scope pref_s pref_t body_s body_t in
-              let hd_s, args_s = T.as_app body_s' in
-              let hd_t, args_t = T.as_app body_t' in
-
-              match T.view hd_s, T.view hd_t with 
-              | (T.Var _, T.Var _) -> 
-                if T.equal hd_s hd_t then (
-                  flex_same ~depth ~nr_iter ~subst ~counter ~scope 
-                            hd_s args_s args_t rest l
-                )
-                else (
-                  (* Flex-flex pairs are solved as follows: 
-                      -The flex-flex pairs from the original problem with
-                      different heads are solved using identification rule (and
-                      possibly other rules if cons_ff is true)
-                      -For flex-flex pairs that are created inside the algorithm
-                      we disallow application of identification (since you can play this
-                      game quite long) and in many practical cases you get the
-                      MGU with just one level of identification  
-                    
-                    Constraints on which iteration rule has not been applied
-                    have the ban_id value of false.                    
-                    *)
-                  if ban_id then (
-                    flex_proj_imit ~depth ~nr_iter ~subst ~counter ~scope 
-                                  body_s' body_t' rest
-                  )
+              else (
+                (* Flex-flex pairs with different heads are solved as follows: 
+                    -The flex-flex pairs from the original problem with
+                    different heads are solved using identification rule (and
+                    possibly other rules if cons_ff is true)
+                    -For flex-flex pairs that are created inside the algorithm
+                    we disallow application of identification (since you can play this
+                    game quite long) and in many practical cases you get the
+                    MGU with just one level of identification  
+                  
+                  Constraints on which iteration rule has not been applied
+                  have the ban_id value of false.                    
+                  *)
+                  if !_imit_first then (
+                    OSeq.append
+                      (flex_proj_imit  ~state ~subst ~counter ~scope body_s' body_t' rest)
+                      (identify ~state ~subst ~counter ~scope body_s' body_t' rest))
                   else (
                     OSeq.append
-                      (identify ~depth ~nr_iter ~subst ~counter ~scope 
-                                body_s' body_t' rest)
-                      (if not !_cons_ff then 
-                        flex_proj_imit  ~depth ~nr_iter ~subst ~counter ~scope  
-                                        body_s' body_t' rest
-                      else OSeq.empty)
+                      (identify ~state ~subst ~counter ~scope body_s' body_t' rest)
+                      (flex_proj_imit  ~state ~subst ~counter ~scope body_s' body_t' rest)
                   )
-                ) 
-              | (T.Var _, T.Const _) | (T.Var _, T.DB _) ->
-                  flex_rigid ~depth ~nr_iter ~subst ~counter ~scope ~ban_id 
-                            body_s' body_t' rest
-              | (T.Const _, T.Var _) | (T.DB _, T.Var _) ->
-                  flex_rigid ~depth ~nr_iter ~subst ~counter ~scope ~ban_id 
-                            body_t' body_s' rest
-              | T.Const f , T.Const g when ID.equal f g && List.length args_s = List.length args_t ->
-                  unify ~depth ~nr_iter ~subst ~counter ~scope 
-                    (build_constraints ~ban_id args_s args_t rest)
-              | T.AppBuiltin(hd_s, args_s'), T.AppBuiltin(hd_t, args_t') when
+              )
+            | (T.Var _, T.Const _) | (T.Var _, T.DB _) ->
+                flex_rigid ~state ~subst ~counter ~scope ~ban_id body_s' body_t' rest
+            | (T.Const _, T.Var _) | (T.DB _, T.Var _) ->
+                flex_rigid ~state ~subst ~counter ~scope ~ban_id body_t' body_s' rest
+            | T.Const f , T.Const g when ID.equal f g && List.length args_s = List.length args_t ->
+                unify ~state ~subst ~counter ~scope (build_constraints ~ban_id args_s args_t rest)
+            | T.AppBuiltin(hd_s, args_s'), T.AppBuiltin(hd_t, args_t') when
                 Builtin.equal hd_s hd_t && 
                   List.length args_s' + List.length args_s = 
                   List.length args_t' + List.length args_t ->
-                  unify ~depth ~nr_iter ~subst ~counter ~scope 
-                    (build_constraints ~ban_id (args_s'@args_s) (args_t'@args_t) rest)
-              | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->
-                  unify ~depth ~nr_iter ~subst ~counter ~scope  
-                    (build_constraints ~ban_id args_s args_t rest)  
-              | _ -> OSeq.empty
-            )
-          | None -> OSeq.empty)
-          else (
-            unify ~depth ~nr_iter ~scope ~counter ~subst rest
+                unify ~state ~subst ~counter ~scope (build_constraints ~ban_id (args_s'@args_s) (args_t'@args_t) rest)
+            | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->
+                unify ~state ~subst ~counter ~scope (build_constraints ~ban_id args_s args_t rest)  
+            | _ -> OSeq.empty
           )
-      )
+        | None -> OSeq.empty)
+        else (
+          unify ~state ~scope ~counter ~subst rest
+        )
     )
   )
 
 (* Create identification substitution, apply it and continue solving the problem *)
-and identify ~depth ~nr_iter ~subst ~counter ~scope s t rest =
-  let id_subs = OSeq.nth 0 (JP_unif.identify ~scope ~counter s t []) in
-  let subst = compose_sub subst id_subs in
-  unify ~depth:(depth+1) ~nr_iter ~scope ~counter ~subst
-    ((s, t, true)::rest)
+and identify ~state ~subst ~counter ~scope s t rest =
+  let state = {state with 
+                  num_identifications = state.num_identifications + 1;
+                  depth               = state.depth + 1} in
+  if state.num_identifications <= !max_identifications then ( 
+    let id_subs = OSeq.nth 0 (JP_unif.identify ~scope ~counter s t []) in
+    let subst = compose_sub subst id_subs in
+    unify ~state ~scope ~counter ~subst ((s, t, true)::rest)
+  ) 
+  else OSeq.empty
 
-and flex_rigid ~depth ~nr_iter ~subst ~counter ~scope ~ban_id s t rest =
+and flex_rigid ~state ~subst ~counter ~scope ~ban_id s t rest =
   assert (T.is_var @@ T.head_term s);
   assert (not @@ T.is_var @@ T.head_term t);  
-  let bindings = proj_imit_bindings ~nr_iter ~subst ~scope ~counter s t in
+  let bindings = proj_imit_bindings ~state ~subst ~scope ~counter s t in
   let substs = List.map (fun (s, n_args) -> 
     compose_sub subst s, n_args) bindings in
   OSeq.of_list substs
   |> OSeq.flat_map (fun (subst,n_args) ->
-    let iter = (if n_args == 0 then 0 else 1) in 
-    unify ~depth:(depth+1) ~scope  ~counter ~subst 
-          ~nr_iter:(iter + nr_iter)
-          ((s, t,ban_id) :: rest))
+    let state = 
+      {state with 
+          depth               = state.depth + 1;
+          num_app_projections = state.num_app_projections + 
+                                if n_args > 0 then 1 else 0;} in
+    if state.num_app_projections <= !max_app_projections then (
+      unify ~state ~scope  ~counter ~subst ((s, t,ban_id) :: rest)
+    ) else OSeq.empty
+  )
 
-and flex_same ~depth ~subst ~nr_iter ~counter ~scope hd_s args_s args_t rest all =
+and flex_same ~subst ~state ~counter ~scope hd_s args_s args_t rest all =
   assert(T.is_var hd_s);
   assert(List.length args_s = List.length args_t);
   assert(List.length args_s <= List.length @@ fst @@ Type.open_fun (T.ty hd_s));
   if List.length args_s > 0 then (
+    let state = {state with depth = state.depth + 1} in
     let new_cstrs = build_constraints ~ban_id:true args_s args_t rest in
     let all_vars = CCList.range 0 ((List.length args_s) -1 ) in
-    let all_args_unif = unify ~depth ~nr_iter ~subst ~counter ~scope new_cstrs in
-    let first_unif = OSeq.take 1 all_args_unif |> OSeq.to_list in
-    if !_cons_e && CCList.exists CCOpt.is_some first_unif  then (
-        OSeq.of_list first_unif
+    let all_args_unif = unify ~state ~subst ~counter ~scope new_cstrs in
+    let first_unif = OSeq.take 1 all_args_unif in
+    if !_cons_e && not (OSeq.is_empty first_unif)  then (
+      first_unif
     ) 
     else (
-      assert(List.length all_vars != 0);
-      OSeq.append
-        all_args_unif
-        (OSeq.of_list all_vars
-        |> OSeq.filter_map (fun idx -> 
-            assert(idx >= 0);
-            if not (T.equal (List.nth args_s idx) (List.nth args_t idx)) then
-              Some (eliminate_at_idx ~scope ~counter (T.as_var_exn hd_s) idx)
-            else None) 
-        |> (OSeq.flat_map (fun subst' -> 
-            let subst = compose_sub subst subst' in
-              unify ~depth:(depth+1) ~nr_iter ~scope  ~counter ~subst all)))
+      if state.num_elims < !max_elims then (
+        assert(List.length all_vars != 0);
+        OSeq.append
+          all_args_unif
+          (OSeq.of_list all_vars
+          |> OSeq.filter_map (fun idx -> 
+              assert(idx >= 0);
+              if not (T.equal (List.nth args_s idx) (List.nth args_t idx)) then
+                Some (eliminate_at_idx ~scope ~counter (T.as_var_exn hd_s) idx)
+              else None) 
+          |> (OSeq.flat_map (fun subst' -> 
+              let subst = compose_sub subst subst' in
+                unify ~state:{state with num_elims=state.num_elims+1} 
+                      ~scope  ~counter ~subst all))))
+      else all_args_unif
     )
   )
-  else unify ~depth ~subst ~nr_iter ~counter ~scope rest
+  else unify ~subst ~state ~counter ~scope rest
 
 (* Create all possible elimination substitutions, apply them and continue solving *)
-and eliminate_subs ~depth ~nr_iter ~subst ~counter ~scope t constraints = 
+and eliminate_subs ~state ~subst ~counter ~scope t constraints = 
   let hd, args = T.as_app t in
   if T.is_var hd && List.length args > 0 then (
     let all_vars = CCList.range 0 ((List.length args)-1) in
@@ -314,25 +309,56 @@ and eliminate_subs ~depth ~nr_iter ~subst ~counter ~scope t constraints =
       |> OSeq.map (eliminate_at_idx ~scope ~counter (T.as_var_exn hd))
       |> OSeq.flat_map (fun subst' -> 
           let new_subst = compose_sub subst subst' in
-          unify ~depth:(depth+1) ~nr_iter ~scope  ~counter ~subst:new_subst constraints))
+          unify ~state:{state with depth=state.depth+1} ~scope  ~counter ~subst:new_subst constraints))
   else OSeq.empty
 
-and flex_proj_imit  ~depth ~subst ~nr_iter ~counter ~scope s t rest = 
-  let bindings = proj_imit_bindings ~subst ~nr_iter  ~scope ~counter s t in
-  let bindings = proj_imit_bindings ~subst ~nr_iter ~scope ~counter t s @ bindings in
+and flex_proj_imit ~subst ~state ~counter ~scope s t rest = 
+  let bindings = proj_imit_bindings ~subst ~state  ~scope ~counter s t in
+  let bindings = proj_imit_bindings ~subst ~state ~scope ~counter t s @ bindings in
   let substs = List.map (fun (s,num_args) -> compose_sub subst s, num_args) bindings in
   OSeq.of_list substs
-  |> OSeq.flat_map (fun (subst,num_args) -> 
-      unify ~depth:(depth+1) ~scope  ~counter ~subst
-      ~nr_iter:((if num_args == 0 then 0 else 1) + nr_iter) 
-        ((s, t, true) :: rest))
+  |> OSeq.flat_map (fun (subst,num_args) ->
+      let proj_dif = if num_args > 0 then 1 else 0 in
+      let imit_dif = if num_args = -1 then 1 else 0 in
+      let state = {
+        state with 
+          num_app_projections = state.num_app_projections + proj_dif;
+          num_var_imitations  = state.num_var_imitations + imit_dif;
+          depth               = state.depth + 1
+      } in
+      if state.num_app_projections <= !max_app_projections && 
+         state.num_var_imitations <= !max_var_imitations then (
+        unify ~scope ~state ~counter ~subst ((s, t, true) :: rest)
+      ) 
+      else OSeq.empty
+  )
 
 let unify_scoped t0_s t1_s =
   let counter = ref 0 in
+  let lfho_unif = 
+    try 
+      let unif = Unif.FO.unify_syn ~subst:(Subst.empty) t0_s t1_s in
+      Some (US.of_subst unif)
+    with Unif.Fail -> None in
   let t0',t1',unifscope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
-  unify ~depth:0 ~nr_iter:0 ~scope:unifscope ~counter ~subst [t0', t1', false]
+  let prefix = if (CCOpt.is_some lfho_unif) then OSeq.cons lfho_unif else (fun x -> x) in
+  let state = 
+  {
+    num_identifications = 0;
+    num_var_imitations  = 0;
+    num_app_projections = 0;
+    num_elims           = 0;
+    depth               = 0
+  } in
+  let res =
+      prefix
+      (unify ~state ~scope:unifscope ~counter ~subst [t0', t1', false]) 
+      (* OSeq.empty *)
+  in
+
+  res
   |> OSeq.map (CCOpt.map (fun sub ->       
-      let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t0_s in 
+      (* let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t0_s in 
       let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t1_s in
       assert(Type.equal (Term.ty l) (Term.ty r));
       if not (T.equal l r) then (
@@ -341,5 +367,5 @@ let unify_scoped t0_s t1_s =
         Format.printf "%a <> %a\n" T.pp l T.pp r;
         assert(false);
       );
-      assert (T.equal l r);
+      assert (T.equal l r); *)
     sub))

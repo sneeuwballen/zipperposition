@@ -166,7 +166,7 @@ module Inner = struct
           )
         ) args (0, []) in
       let redundant = List.length r_bvars in
-      if redundant = -1 then 0, t
+      if redundant = 0 then 0, t
       else (
         let non_redundant = hd :: CCList.take (n-redundant) args in
         let _, m = List.fold_right (fun arg (idx, m) ->
@@ -183,7 +183,6 @@ module Inner = struct
           m, T.DB.unshift m (T.app ~ty:(ty :> T.t) hd args)
         ) else 0, t
       ) in
-
     let rec aux t =  match T.ty t with
       | T.NoType -> t
       | T.HasType ty ->

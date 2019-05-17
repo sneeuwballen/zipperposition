@@ -574,3 +574,18 @@ let () =
     , Arg.Set_int _lmb_w
     , " Set weight of lambda symbol for KBO";
   ];
+
+   Params.add_to_mode "ho-pragmatic" (fun () ->
+      _lmb_w := 20;
+      _db_w  := 10;
+   );
+   
+   Params.add_to_mode "ho-complete-basic" (fun () ->
+      _lmb_w := 20;
+      _db_w  := 10;
+   );
+
+   Params.add_to_mode "ho-competitive" (fun () ->
+      _lmb_w := 20;
+      _db_w  := 10;
+   );

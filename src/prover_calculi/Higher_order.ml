@@ -47,7 +47,6 @@ let _var_arg_remove = ref true
 let _huet_style = ref false
 let _cons_elim = ref true
 let _imit_first = ref false
-let _cons_ff = ref true
 let _compose_subs = ref false
 let _var_solve = ref false
 let _neg_cong_fun = ref false
@@ -250,6 +249,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   let proof =
                     Proof.Step.inference [C.proof_parent c]
                       ~rule:(Proof.Rule.mk "ho_ext_pos_general")
+                      ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext]
                   in
                   let new_c =
                     C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
@@ -288,6 +288,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           let proof =
             Proof.Step.inference [C.proof_parent c]
               ~rule:(Proof.Rule.mk "ho_complete_eq")
+              ~tags:[Proof.Tag.T_ho]
           in
           let new_c =
             C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
@@ -344,8 +345,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         loop s t
       ) else [] 
     in
-    
-
     let is_eligible = C.Eligible.res c in
     C.lits c
     |> CCArray.mapi (fun i l -> 
@@ -368,7 +367,10 @@ module Make(E : Env.S) : S with module Env = E = struct
               else subterms_lit) 
               (C.lits c |> Array.mapi (fun j x -> (j,x)) |> Array.to_list) in
              let proof =
-              Proof.Step.inference [C.proof_parent c] ~rule:(Proof.Rule.mk "neg_cong_fun") in
+              Proof.Step.inference [C.proof_parent c] 
+                ~rule:(Proof.Rule.mk "neg_cong_fun") 
+                ~tags:[Proof.Tag.T_ho]
+              in
              let new_c =
                C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
              Util.incr_stat stat_neg_cong_fun;
@@ -394,7 +396,10 @@ module Make(E : Env.S) : S with module Env = E = struct
                 Literal.mk_neq (T.app lhs skolems) (T.app rhs skolems))
             ) (C.lits c |> Array.mapi (fun j x -> (j,x)) |> Array.to_list) in
           let proof =
-           Proof.Step.inference [C.proof_parent c] ~rule:(Proof.Rule.mk "neg_ext") in
+            Proof.Step.inference [C.proof_parent c] 
+              ~rule:(Proof.Rule.mk "neg_ext")
+              ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext]
+          in
           let new_c =
             C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
            Util.debugf 1 ~section "NegExt: @[%a@] => @[%a@].\n" (fun k -> k C.pp c C.pp new_c);
@@ -421,7 +426,10 @@ module Make(E : Env.S) : S with module Env = E = struct
           | _ -> l) in
     if not !applied_neg_ext then SimplM.return_same c
     else (
-      let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "neg_ext_simpl") [C.proof_parent c] in
+      let proof = 
+        Proof.Step.simp [C.proof_parent c]
+          ~rule:(Proof.Rule.mk "neg_ext_simpl") 
+          ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext] in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
       (* CCFormat.printf "[NE_simpl]: @[%a@] => @[%a@].\n" C.pp c C.pp c'; *)
       SimplM.return_new c'
@@ -839,6 +847,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let proof =
           Proof.Step.simp
             ~rule:(Proof.Rule.mk "prune_arg")
+            ~tags:[Proof.Tag.T_ho]
             [C.proof_parent_subst renaming (c,0) subst] in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
       Util.debugf ~section 3
@@ -945,6 +954,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let proof =
           Proof.Step.simp
             ~rule:(Proof.Rule.mk "prune_arg_fun")
+            ~tags:[Proof.Tag.T_ho]
             [C.proof_parent_subst renaming (c,0) subst] in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
 
@@ -1007,9 +1017,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       if (!_imit_first) then
         PragHOUnif.enable_imit_first ();
 
-      if (not !_cons_ff) then
-        PragHOUnif.disable_cons_ff ();
-
       if (!_var_solve) then (
         PragHOUnif.enable_solve_var ();
       );
@@ -1025,7 +1032,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_unary_simplify neg_ext_simpl;
       );
 
-      PragHOUnif.set_max_depth !_unif_max_depth ();
+      PragHOUnif.max_depth := !_unif_max_depth;
 
       if Env.flex_get k_enable_ho_unif then (
         Env.add_unary_inf "ho_unif" ho_unif;
@@ -1152,12 +1159,15 @@ let () =
       "--ho-huet-style-unif", Arg.Set _huet_style, " enable Huet style projection";
       "--ho-no-conservative-elim", Arg.Clear _cons_elim, " Disables conservative elimination rule in pragmatic unification";
       "--ho-imitation-first",Arg.Set _imit_first, " Use imitation rule before projection rule";
-      "--ho-no-conservative-flexflex", Arg.Clear _cons_ff, " Disable conservative dealing with flex-flex pairs";
       "--ho-solve-vars", Arg.Set _var_solve, " Enable solving variables.";
       "--ho-composition", Arg.Set _compose_subs, " Enable composition instead of merging substitutions";
       "--ho-disable-var-arg-removal", Arg.Clear _var_arg_remove, " disable removal of arguments of applied variables";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom";
       "--ho-unif-max-depth", Arg.Set_int _unif_max_depth, " set pragmatic unification max depth";
+      "--ho-max-app-projections", Arg.Set_int PragHOUnif.max_app_projections, " set maximal number of functional type projections";
+      "--ho-max-var-imitations", Arg.Set_int PragHOUnif.max_var_imitations, " set maximal number of flex-flex imitations";
+      "--ho-max-identifications", Arg.Set_int PragHOUnif.max_identifications, " set maximal number of flex-flex identifications";
+      "--ho-max-elims", Arg.Set_int PragHOUnif.max_elims, " set maximal number of eliminations";
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
     enabled_ := true;
@@ -1172,7 +1182,40 @@ let () =
     prim_mode_ := `None;
     _elim_pred_var := false;
     _neg_cong_fun := false;
-    enable_unif_ := false
+    enable_unif_ := false;
+    _prune_arg_fun := `PruneMaxCover;
+  );
+  Params.add_to_mode "ho-pragmatic" (fun () ->
+    enabled_ := true;
+    def_unfold_enabled_ := false;
+    force_enabled_ := true;
+    _ext_axiom := false;
+    _ext_neg_lit := false;
+    _neg_ext := true;
+    _neg_ext_as_simpl := false;
+    _ext_pos := true;
+    _ext_pos_all_lits := true;
+    prim_mode_ := `None;
+    _elim_pred_var := false;
+    _neg_cong_fun := false;
+    enable_unif_ := false;
+    _prune_arg_fun := `PruneMaxCover;
+  );
+  Params.add_to_mode "ho-competitive" (fun () ->
+    enabled_ := true;
+    def_unfold_enabled_ := true;
+    force_enabled_ := true;
+    _ext_axiom := false;
+    _ext_neg_lit := false;
+    _neg_ext := false;
+    _neg_ext_as_simpl := false;
+    _ext_pos := true;
+    _ext_pos_all_lits := true;
+    prim_mode_ := `None;
+    _elim_pred_var := false;
+    _neg_cong_fun := false;
+    enable_unif_ := false;
+    _prune_arg_fun := `PruneMaxCover;
   );
   Params.add_to_mode "fo-complete-basic" (fun () ->
     enabled_ := false;
