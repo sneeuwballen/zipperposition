@@ -88,7 +88,7 @@ let sym_in_conj s signature =
 
 let set_sym_in_conj s signature =
    let t = find_exn signature s in
-      ID.Map.add s (t, true) signature
+   ID.Map.add s (t, true) signature
 
 module Seq = struct
   let symbols s =

@@ -281,14 +281,17 @@ let name_quantifiers (stmts: TypeInference.typed_statement CCVector.ro_vector) =
         changed := true;
         let vars = Var.Set.of_seq (TypedSTerm.Seq.free_vars t) |> Var.Set.to_list in
         let qid = ID.gensym() in
-        let q = const ~ty:(app_builtin ~ty:tType Builtin.Arrow (prop :: List.map Var.ty vars)) qid in
+        let ty = app_builtin ~ty:tType Builtin.Arrow (prop :: List.map Var.ty vars) in
+        let q = const ~ty qid in
         let proof = Proof.Step.define_internal qid [Proof.Parent.from(Statement.as_proof_i s)] in
+        let q_typedecl = ty_decl ~proof qid ty in
         let definition = 
           (* ∀ vars: q[vars] ⇐⇒ t *)
           bind_list ~ty:prop Binder.Forall vars 
             (app_builtin ~ty:prop Builtin.Equiv 
               [app ~ty:prop q (List.map var vars); t]) 
         in 
+        CCVector.push new_stmts q_typedecl;
         CCVector.push new_stmts (assert_ ~proof definition);
         q
     | _ -> t) true
