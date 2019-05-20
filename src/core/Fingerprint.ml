@@ -54,6 +54,7 @@ and gfpf_root ~depth t =
                          T.Var _ -> A 
                          | T.Const s -> S s
                          | T.DB i    -> if (i < depth) then DB i else Ignore
+                         | T.AppBuiltin(_,_) -> Ignore
                          | _ -> assert false)
   | T.Fun (_, _) -> assert false 
 
