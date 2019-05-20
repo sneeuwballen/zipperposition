@@ -1031,8 +1031,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_unary_simplify neg_ext_simpl;
       );
 
-      PragHOUnif.max_depth := !_unif_max_depth;
-
       if Env.flex_get k_enable_ho_unif then (
         Env.add_unary_inf "ho_unif" ho_unif;
       );
@@ -1162,7 +1160,7 @@ let () =
       "--ho-composition", Arg.Set _compose_subs, " Enable composition instead of merging substitutions";
       "--ho-disable-var-arg-removal", Arg.Clear _var_arg_remove, " disable removal of arguments of applied variables";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom";
-      "--ho-unif-max-depth", Arg.Set_int _unif_max_depth, " set pragmatic unification max depth";
+      "--ho-unif-max-depth", Arg.Set_int PragHOUnif.max_depth, " set pragmatic unification max depth";
       "--ho-max-app-projections", Arg.Set_int PragHOUnif.max_app_projections, " set maximal number of functional type projections";
       "--ho-max-var-imitations", Arg.Set_int PragHOUnif.max_var_imitations, " set maximal number of flex-flex imitations";
       "--ho-max-identifications", Arg.Set_int PragHOUnif.max_identifications, " set maximal number of flex-flex identifications";
