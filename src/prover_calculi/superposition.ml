@@ -2459,9 +2459,9 @@ let () =
     ; "--fluidsup-penalty"
     , Arg.Int (fun p -> _fluidsup_penalty := p)
     , " penalty for FluidSup inferences"
-    ; "--no-fluidsup"
-    , Arg.Clear _fluidsup
-    , " disable FluidSup inferences (only effective when complete higher-order unification is enabled)"
+    ; "--fluidsup"
+    , Arg.Bool (fun b -> _fluidsup :=b)
+    , " enable/disable FluidSup inferences (only effective when complete higher-order unification is enabled)"
     ; "--lambdasup"
     , Arg.Int (fun l -> 
                   if l < 0 then 
