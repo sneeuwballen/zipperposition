@@ -125,12 +125,12 @@ let typing ~file prelude (input,stmts) =
   Phases.return_phase stmts
 
 (* obtain clauses  *)
-let cnf decls =
+let cnf ~sk_ctx decls =
   Phases.start_phase Phases.CNF >>= fun () ->
   let stmts =
     decls
     |> CCVector.to_seq
-    |> Cnf.cnf_of_seq
+    |> Cnf.cnf_of_seq ~ctx:sk_ctx
     |> CCVector.to_seq
     |> Cnf.convert
   in
@@ -181,13 +181,14 @@ let compute_ord_select precedence =
   Util.debugf ~section 2 "@[<2>selection function:@ %s@]" (fun k->k params.Params.select);
   Phases.return_phase (ord, select)
 
-let make_ctx ~signature ~ord ~select ~eta () =
+let make_ctx ~signature ~ord ~select ~eta ~sk_ctx () =
   Phases.start_phase Phases.MakeCtx >>= fun () ->
   let module Res = struct
     let signature = signature
     let ord = ord
     let select = select
     let eta = eta
+    let sk_ctx = sk_ctx
   end in
   let module MyCtx = Ctx.Make(Res) in
   let ctx = (module MyCtx : Ctx_intf.S) in
@@ -452,8 +453,9 @@ let process_file ?(prelude=Iter.empty) file =
   (* Hooks exist but they can't be used to add statements. 
      Hence naming quantifiers inside terms is done directly here. 
      Without this Type.Conv.Error occures so the naming is done unconditionally. *)
-  let quant_transformer = if !_quant_rename then Booleans.name_quantifiers else CCFun.id in 
-  cnf(quant_transformer decls) >>= fun stmts ->
+  let quant_transformer = if !_quant_rename then Booleans.name_quantifiers else CCFun.id in
+  let sk_ctx = Skolem.create () in 
+  cnf ~sk_ctx (quant_transformer decls) >>= fun stmts ->
   (* compute signature, precedence, ordering *)
   let conj_syms = syms_in_conj stmts in
   let signature = Statement.signature ~conj_syms:conj_syms (CCVector.to_seq stmts) in
@@ -464,7 +466,7 @@ let process_file ?(prelude=Iter.empty) file =
   Phases.get_key Params.key >>= fun params ->
   let eta = params.Params.eta in
   (* build the context and env *)
-  make_ctx ~signature ~ord ~select ~eta () >>= fun ctx ->
+  make_ctx ~signature ~ord ~select ~eta ~sk_ctx () >>= fun ctx ->
   make_env ~params ~ctx stmts >>= fun (Phases.Env_clauses (env,clauses)) ->
   (* main workload *)
   has_goal_ := has_goal; (* FIXME: should be computed at Env initialization *)

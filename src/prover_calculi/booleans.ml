@@ -209,6 +209,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
 
   let cnf_otf c : C.t list option =
+    CCFormat.printf "[CTF_OTF:] %a\n" C.pp c;
+    
     let idx = CCArray.find_idx (fun l -> 
       let eq = Literal.View.as_eqn l in
       match eq with 
@@ -222,17 +224,15 @@ module Make(E : Env.S) : S with module Env = E = struct
     | Some (i,l) ->
       let f = Literal.Conv.atom_to_tst_exn (Literal.Conv.to_form l) in
       let proof = Proof.Step.esa ~rule:(Proof.Rule.mk "cnf_otf") [C.proof_parent c] in
-      let stmt = Statement.lemma ~proof [f] in
-      let cnf_vec = Cnf.convert @@ CCVector.to_seq @@ Cnf.cnf_of stmt in
+      let stmt = Statement.assert_ ~proof f in
+      let cnf_vec = Cnf.convert @@ CCVector.to_seq @@ Cnf.cnf_of ~ctx:(Ctx.sk_ctx ()) stmt in
       let sets = Env.convert_input_statements cnf_vec in
       let clauses = sets.Clause.c_set |> CCVector.to_list in
       let other_lits = CCArray.except_idx (C.lits c) i in
       let res =
         List.map (fun new_c -> 
           let new_lits = CCArray.to_list (C.lits new_c) @ other_lits in
-          let proof = Proof.Step.esa ~rule:(Proof.Rule.mk "cnf_otf") 
-                      [C.proof_parent new_c; C.proof_parent c] in
-          C.create ~trail:(C.trail_l [new_c; c]) ~penalty:1 new_lits proof
+          C.create ~trail:(C.trail c) ~penalty:1 new_lits (C.proof_step new_c)
         ) clauses in
       Some res
     | None       -> None
@@ -248,7 +248,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   | _ ->
     Env.ProofState.ActiveSet.add (create_clauses ());
     Env.add_basic_simplify simpl_eq_subterms;
-    Env.add_multi_simpl_rule Fool.rw_bool_lits;
+    (* Env.add_multi_simpl_rule Fool.rw_bool_lits; *)
+    Env.add_multi_simpl_rule cnf_otf;
     if !_bool_reasoning = BoolCasesInference then (
       Env.add_unary_inf "bool_cases" bool_cases;
     )

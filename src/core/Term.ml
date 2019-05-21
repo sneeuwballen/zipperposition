@@ -1072,7 +1072,9 @@ module Conv = struct
           let v =
             (match view v with
             | Var i -> (aux_var i)
-            | _ -> raise (Type.Conv.Error dummy)) in
+            | _ -> 
+            let v = aux_t env v in
+            raise (Type.Conv.Error v)) in
           ST.bind ~ty:(aux_ty (ty t)) b v (aux_t env body) 
         | AppBuiltin (b,l) ->
           ST.app_builtin ~ty:(aux_ty (ty t))
