@@ -286,6 +286,8 @@ module Conv : sig
   val to_s_form :
     ?allow_free_db:bool -> ?ctx:Term.Conv.ctx -> ?hooks:hook_to list ->
     t -> TypedSTerm.Form.t
+
+  val atom_to_tst_exn : term SLiteral.t -> TypedSTerm.t
 end
 
 (** {2 IO} *)

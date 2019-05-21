@@ -1031,6 +1031,14 @@ module Conv = struct
         end
     end
 
+  let atom_to_tst_exn lit =
+    begin match lit with
+      | SLiteral.Atom (p,s) ->
+        let p = if s then p else T.Form.not_ p in
+        T.Conv.to_simple_term (T.Conv.create ()) p
+      | _ -> raise (invalid_arg "not an atom")
+    end
+
   let to_s_form ?allow_free_db ?(ctx=T.Conv.create()) ?hooks lit =
     to_form ?hooks lit
     |> SLiteral.map ~f:(T.Conv.to_simple_term ?allow_free_db ctx)

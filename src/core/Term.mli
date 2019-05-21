@@ -127,6 +127,7 @@ val grounding : Type.t -> t
 
 val is_var : t -> bool
 val is_bvar : t -> bool
+val is_formula : t -> bool
 val is_app : t -> bool
 val is_const : t -> bool
 val is_fun : t -> bool

@@ -187,6 +187,14 @@ let false_ = builtin ~ty:Type.prop Builtin.False
 
 let grounding ty = builtin ~ty Builtin.Grounding
 
+let is_formula t = match T.view t with
+  | T.AppBuiltin(hd,_) ->
+    List.mem hd [Builtin.And; Builtin.Or; Builtin.Not; 
+                 Builtin.Imply; Builtin.Equiv; 
+                 Builtin.Xor; Builtin.ForallConst;
+                 Builtin.ExistsConst]
+  | _ -> false
+
 let is_var t = match T.view t with
   | T.Var _ -> true
   | _ -> false
