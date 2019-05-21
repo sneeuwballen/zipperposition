@@ -230,7 +230,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       let res =
         List.map (fun new_c -> 
           let new_lits = CCArray.to_list (C.lits new_c) @ other_lits in
-          C.create ~trail:(C.trail c) ~penalty:1 new_lits (C.proof_step new_c)
+          let proof = Proof.Step.esa ~rule:(Proof.Rule.mk "cnf_otf") 
+                      [C.proof_parent c; C.proof_parent new_c] in
+          C.create ~trail:(C.trail c) ~penalty:1 new_lits proof
         ) clauses in
       Some res
     | None       -> None
