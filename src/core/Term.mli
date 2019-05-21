@@ -382,6 +382,8 @@ module Arith : sig
   (** hook to print arithmetic expressions *)
 end
 
+val vars_under_quant : t -> VarSet.t
+
 (** {2 De Bruijn} *)
 module DB : sig
   val is_closed : t -> bool

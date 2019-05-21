@@ -445,6 +445,15 @@ module Seq = struct
          | _ -> None)
 end
 
+let vars_under_quant t = VarSet.of_seq @@ Iter.fold (fun acc st -> 
+  match view st with 
+  | AppBuiltin(Builtin.ForallConst, [x;_]) 
+  | AppBuiltin(Builtin.ExistsConst, [x;_]) when is_var x  ->
+    Iter.union acc (Seq.vars x)
+  | _ -> acc
+) Iter.empty (Seq.subterms t)
+
+
 let var_occurs ~var t =
   Iter.exists (HVar.equal Type.equal var) (Seq.vars t)
 
