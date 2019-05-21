@@ -229,8 +229,16 @@ module Term = struct
       Util.debugf ~section 1 "Making rule for %a"
          (fun k -> k ID.pp id);
       let lhs = T.app (T.const ~ty id) args in
+      let vars_under_forall = Term.VarSet.of_seq @@ Iter.fold (fun acc st -> 
+        match Term.view st with 
+        | Term.AppBuiltin(Builtin.ForallConst, [x;_]) 
+        | Term.AppBuiltin(Builtin.ExistsConst, [x;_]) when Term.is_var x  ->
+          Iter.union acc (Term.Seq.vars x)
+        | _ -> acc
+      ) Iter.empty (Term.Seq.subterms rhs) in
+      let rhs_vars = Term.VarSet.diff (T.vars rhs) vars_under_forall in
       assert (Type.equal (T.ty lhs) (T.ty rhs));
-      if not (T.VarSet.subset (T.vars rhs) (T.vars lhs)) then (
+      if not (T.VarSet.subset rhs_vars (T.vars lhs)) then (
         Util.invalid_argf
           "Rule.make_const %a %a:@ invalid rule, RHS contains variables"
           ID.pp id T.pp rhs
