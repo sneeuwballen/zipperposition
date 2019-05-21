@@ -208,9 +208,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       SimplM.return_new new_
     )
 
-  let cnf_otf c : C.t list option =
-    CCFormat.printf "[CTF_OTF:] %a\n" C.pp c;
-    
+  let cnf_otf c : C.t list option =   
     let idx = CCArray.find_idx (fun l -> 
       let eq = Literal.View.as_eqn l in
       match eq with 
