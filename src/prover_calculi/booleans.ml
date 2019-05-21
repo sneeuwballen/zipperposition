@@ -94,11 +94,18 @@ module Make(E : Env.S) : S with module Env = E = struct
   let term_as_false = Hashtbl.create 4 in
 	let rec find_bools top t =
 		let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && not top in
+    let is_quant = match T.view t with 
+      | AppBuiltin(b,_) -> 
+        Builtin.equal b Builtin.ForallConst || Builtin.equal b Builtin.ExistsConst
+      | _ -> false in
 		(* Add only propositions. *)
 		let add = if can_be_cased then Hashtbl.add term_as_true else fun _ _ -> () in
 		let yes = if can_be_cased then yes else fun _ -> yes T.true_ in
 		(* Stop recursion in combination of certain settings. *)
-		let inner f x = if can_be_cased && !cased_term_selection = Large then () else List.iter(f false) x in
+		let inner f x = 
+      if is_quant || can_be_cased && !cased_term_selection = Large 
+      then () 
+      else List.iter(f false) x in
 		match T.view t with
 			| DB _ | Var _ -> ()
 			| Const _ -> add t (yes t)
@@ -137,11 +144,19 @@ module Make(E : Env.S) : S with module Env = E = struct
   let bool_case_simp(c: C.t) : C.t list option =
   let term_to_equations = Hashtbl.create 8 in
 	let rec find_bools top t =
-		let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && not top in
+    let is_quant = match T.view t with 
+      | AppBuiltin(b,_) -> 
+        Builtin.equal b Builtin.ForallConst || Builtin.equal b Builtin.ExistsConst
+      | _ -> false in
+		let can_be_cased =  
+      Type.is_prop(T.ty t) && T.DB.is_closed t && not top in
 		(* Add only propositions. *)
 		let add t x y = if can_be_cased then Hashtbl.add term_to_equations t (x=~y, x/~y) in
 		(* Stop recursion in combination of certain settings. *)
-		let inner f x = if can_be_cased && !cased_term_selection = Large then () else List.iter(f false) x in
+		let inner f x = 
+      if is_quant || (can_be_cased && !cased_term_selection = Large) 
+      then () 
+      else List.iter(f false) x in
 		match T.view t with
 			| DB _ | Var _ -> ()
 			| Const _ -> add t t T.true_

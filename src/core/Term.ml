@@ -1048,7 +1048,6 @@ module Conv = struct
   let to_simple_term ?(allow_free_db=false) ?(env=DBEnv.empty) ctx t =
     let module ST = TypedSTerm in
     let n = ref 0 in
-    let dummy = ST.app_builtin ~ty:ST.Ty.prop Builtin.true_ [] in
     let rec aux_t env t =
       match view t with
         | Var i -> ST.var (aux_var i)
