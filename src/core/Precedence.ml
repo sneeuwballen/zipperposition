@@ -7,6 +7,7 @@ type symbol_status =
   | Multiset
   | Lexicographic
   | LengthLexicographic
+  | LengthLexicographicRTL
 
 let section = Util.Section.(make "precedence")
 
