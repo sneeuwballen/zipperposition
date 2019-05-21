@@ -1015,13 +1015,21 @@ module Conv = struct
         decr depth;
         PT.Var_tbl.remove tbl v;
         fun_ ty_arg body
-      | PT.Bind _
+      | PT.Bind(b, v, body) when Binder.equal b Binder.Forall 
+                                 || Binder.equal b Binder.Exists ->
+        let b = if Binder.equal b Binder.Forall 
+                then Builtin.ForallConst else Builtin.ExistsConst in
+        let v = var (Type.Conv.var_of_simple_term ctx v) in
+        let ty = Type.Conv.of_simple_term_exn ctx (PT.ty_exn body) in
+        let body = aux body in
+        app_builtin ~ty b [v; body]
       | PT.Meta _
       | PT.Record _
       | PT.Ite _
       | PT.Let _
       | PT.Match _
-      | PT.Multiset _ -> raise (Type.Conv.Error t)
+      | PT.Multiset _ 
+      | _ -> raise (Type.Conv.Error t)
     in
     aux t
 
@@ -1032,6 +1040,7 @@ module Conv = struct
   let to_simple_term ?(allow_free_db=false) ?(env=DBEnv.empty) ctx t =
     let module ST = TypedSTerm in
     let n = ref 0 in
+    let dummy = ST.app_builtin ~ty:ST.Ty.prop Builtin.true_ [] in
     let rec aux_t env t =
       match view t with
         | Var i -> ST.var (aux_var i)
@@ -1048,6 +1057,15 @@ module Conv = struct
         | App (f,l) ->
           ST.app ~ty:(aux_ty (ty t))
             (aux_t env f) (List.map (aux_t env) l)
+        | AppBuiltin (b,[v;body]) when Builtin.equal b Builtin.ForallConst ||
+                                Builtin.equal b Builtin.ExistsConst ->
+          let b = if Builtin.equal b Builtin.ForallConst 
+                  then Binder.Forall else Binder.Exists in
+          let v =
+            (match view v with
+            | Var i -> (aux_var i)
+            | _ -> raise (Type.Conv.Error dummy)) in
+          ST.bind ~ty:(aux_ty (ty t)) b v (aux_t env body) 
         | AppBuiltin (b,l) ->
           ST.app_builtin ~ty:(aux_ty (ty t))
             b (List.map (aux_t env) l)

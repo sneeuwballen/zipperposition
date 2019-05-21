@@ -19,6 +19,8 @@ let section = Const.section
 
 let _db_w = ref 1
 let _lmb_w = ref 1
+let _quant_rename = ref false
+
 
 (* setup an alarm for abrupt stop *)
 let setup_alarm timeout =
@@ -447,8 +449,11 @@ let process_file ?(prelude=Iter.empty) file =
   let has_goal = has_goal_decls_ decls in
   Util.debugf ~section 1 "parsed %d declarations (%s goal(s))"
     (fun k->k (CCVector.length decls) (if has_goal then "some" else "no"));
-  (* Hooks exist but they can't be used to add statements. Hence naming quantifiers inside terms is done directly here. Without this Type.Conv.Error occures so the naming is done unconditionally. *)
-  cnf(Booleans.name_quantifiers decls) >>= fun stmts ->
+  (* Hooks exist but they can't be used to add statements. 
+     Hence naming quantifiers inside terms is done directly here. 
+     Without this Type.Conv.Error occures so the naming is done unconditionally. *)
+  let quant_transformer = if !_quant_rename then Booleans.name_quantifiers else CCFun.id in 
+  cnf(quant_transformer decls) >>= fun stmts ->
   (* compute signature, precedence, ordering *)
   let conj_syms = syms_in_conj stmts in
   let signature = Statement.signature ~conj_syms:conj_syms (CCVector.to_seq stmts) in
@@ -573,6 +578,9 @@ let () =
     "--lambda-weight"
     , Arg.Set_int _lmb_w
     , " Set weight of lambda symbol for KBO";
+    "--quantifier-renaming"
+    , Arg.Set _quant_rename
+    , " turn on quantifier renaming"
   ];
 
    Params.add_to_mode "ho-pragmatic" (fun () ->

@@ -1140,7 +1140,7 @@ let () =
       "--ho-unif", Arg.Set enable_unif_, " enable full HO unification";
       "--ho-neg-cong-fun", Arg.Set _neg_cong_fun, "enable NegCongFun";
       "--no-ho-unif", Arg.Clear enable_unif_, " disable full HO unification";
-      "--no-ho-elim-pred-var", Arg.Clear _elim_pred_var, " disable predicate variable elimination";
+      "--ho-elim-pred-var", Arg.Bool (fun b -> _elim_pred_var := b), " disable predicate variable elimination";
       "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";
       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
       "--ho-ext-axiom", Arg.Set _ext_axiom, " enable extensionality axiom";
