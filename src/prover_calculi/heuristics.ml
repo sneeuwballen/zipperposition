@@ -107,6 +107,14 @@ let () =
   Params.add_to_mode "ho-complete-basic" (fun () ->
     no_max_vars := true
   );
+  Params.add_to_mode "ho-pragmatic" (fun () ->
+    no_max_vars := false;
+    max_vars    := 10;
+  );
+  Params.add_to_mode "ho-competitive" (fun () ->
+    no_max_vars := false;
+    max_vars    := 10;
+  );
   Params.add_to_mode "fo-complete-basic" (fun () ->
     no_max_vars := true
   );

@@ -596,6 +596,12 @@ let () =
   Params.add_to_mode "ho-complete-basic" (fun () ->
     enabled_ := false
   );
+  Params.add_to_mode "ho-pragmatic" (fun () ->
+    enabled_ := false
+  );
+  Params.add_to_mode "ho-competitive" (fun () ->
+    enabled_ := false
+  );
   Params.add_to_mode "fo-complete-basic" (fun () ->
     enabled_ := false
   );

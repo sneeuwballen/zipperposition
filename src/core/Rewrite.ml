@@ -229,7 +229,6 @@ module Term = struct
       Util.debugf ~section 1 "Making rule for %a"
          (fun k -> k ID.pp id);
       let lhs = T.app (T.const ~ty id) args in
-      assert (Type.equal (T.ty lhs) (T.ty rhs));
       if not (T.VarSet.subset (T.vars rhs) (T.vars lhs)) then (
         Util.invalid_argf
           "Rule.make_const %a %a:@ invalid rule, RHS contains variables"

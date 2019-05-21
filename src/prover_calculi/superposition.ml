@@ -81,6 +81,7 @@ let _restrict_hidden_sup_at_vars = ref false
 
 let _NO_LAMSUP = -1
 let _lambdasup = ref (-1)
+let _max_infs = ref (-1)
 let _unif_alg = ref JP_unif.unify_scoped
 
 
@@ -336,7 +337,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       false (* If the lhs vs rhs cannot flip, we don't need a sup at var *)
     )
     else (
-            (* Check whether var occurs only with the same arguments everywhere. *)
+      (* Check whether var occurs only with the same arguments everywhere. *)
       let unique_args_of_var =
         C.lits info.passive
         |> Lits.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord ~subterms:true ~eligible:(fun _ _ -> true)
@@ -360,7 +361,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | None ->
           (* Check whether Cσ is >= C[var -> replacement]σ *)
           let passive'_lits = Lits.apply_subst renaming subst (C.lits info.passive, info.scope_passive) in
-          let subst_t = Unif.FO.update subst (T.as_var_exn var, info.scope_passive) (replacement, info.scope_active) in
+          let subst_t = Unif.FO.bind_or_update subst (T.as_var_exn var, info.scope_passive) (replacement, info.scope_active) in
           let passive_t'_lits = Lits.apply_subst renaming subst_t (C.lits info.passive, info.scope_passive) in
           if Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt
           then (
@@ -939,6 +940,30 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) inf_res in
       StmQ.add_lst _stmq.q stm_res; []
 
+  let infer_active_pragmatic_ho max_unifs clause =
+    let inf_res = infer_active_aux
+      ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:!_unif_alg)
+      ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
+        let all_substs = OSeq.to_list @@ OSeq.take max_unifs substs   in
+        let res = List.map (fun subst -> do_sup u_p with_pos (CCOpt.get_exn subst)) all_substs in
+        Some res
+      )
+      clause
+    in
+    inf_res |> CCList.flatten |> List.filter CCOpt.is_some  |> List.map CCOpt.get_exn
+
+  let infer_passive_pragmatic_ho max_unifs clause =
+    let inf_res = infer_passive_aux
+      ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:!_unif_alg)
+      ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
+        let all_substs = OSeq.to_list @@ OSeq.take max_unifs substs in
+        let res = List.map (fun subst -> do_sup u_p with_pos (CCOpt.get_exn subst)) all_substs in
+        Some res   
+      )
+      clause
+    in
+    inf_res |> CCList.flatten |> List.filter CCOpt.is_some  |> List.map CCOpt.get_exn
+  
   (* ----------------------------------------------------------------------
    * FluidSup rule (Superposition at applied variables)
    * ---------------------------------------------------------------------- *)
@@ -1236,6 +1261,18 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let stm_res = List.map (Stm.make ~penalty:penalty) inf_res in
     StmQ.add_lst _stmq.q stm_res; []
 
+  let infer_equality_resolution_pragmatic_ho max_unifs clause =
+    let inf_res = infer_equality_resolution_aux
+        ~unify:!_unif_alg
+        ~iterate_substs:(fun substs do_eq_res ->
+           (* Some (OSeq.map (CCOpt.flat_map do_eq_res) substs) *)
+           let all_substs = OSeq.to_list @@ OSeq.take max_unifs substs in
+           let res = List.map (fun subst -> do_eq_res (CCOpt.get_exn subst)) all_substs in
+           Some res)
+        clause
+    in
+    inf_res |> CCList.flatten |> List.filter CCOpt.is_some  |> List.map CCOpt.get_exn
+
   (* ----------------------------------------------------------------------
    * Equality Factoring rule
    * ---------------------------------------------------------------------- *)
@@ -1351,6 +1388,18 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let stm_res = List.map (Stm.make ~penalty:penalty) inf_res in
     StmQ.add_lst _stmq.q stm_res; []
 
+   let infer_equality_factoring_pragmatic_ho max_unifs clause =
+    let inf_res = infer_equality_factoring_aux
+        ~unify:!_unif_alg
+        ~iterate_substs:(fun substs do_eq_fact ->
+           (* Some (OSeq.map (CCOpt.flat_map do_eq_fact) substs) *)
+           let all_substs = OSeq.to_list @@ OSeq.take max_unifs substs  in
+           let res = List.map (fun subst -> do_eq_fact (CCOpt.get_exn subst)) all_substs in
+           Some res)
+        clause
+    in
+    inf_res |> CCList.flatten |> List.filter CCOpt.is_some  |> List.map CCOpt.get_exn
+
   (* ----------------------------------------------------------------------
    * extraction of a clause from the stream queue (HO feature)
    * ---------------------------------------------------------------------- *)
@@ -1366,7 +1415,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     match opt_res with
       | None -> []
-      | Some l -> l
+      | Some l ->  l
 
   let extract_from_stream_queue_fix_stm ~full () =
     let cl =
@@ -2386,14 +2435,24 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and is_trivial = is_tautology in
     if !_complete_ho_unification
     then (
-      Env.add_binary_inf "superposition_passive" infer_passive_complete_ho;
-      Env.add_binary_inf "superposition_active" infer_active_complete_ho;
-      Env.add_unary_inf "equality_factoring" infer_equality_factoring_complete_ho;
-      Env.add_unary_inf "equality_resolution" infer_equality_resolution_complete_ho;
+      if !_max_infs = -1 then (
+        Env.add_binary_inf "superposition_passive" infer_passive_complete_ho;
+        Env.add_binary_inf "superposition_active" infer_active_complete_ho;
+        Env.add_unary_inf "equality_factoring" infer_equality_factoring_complete_ho;
+        Env.add_unary_inf "equality_resolution" infer_equality_resolution_complete_ho;
+      )
+      else (
+        assert(!_max_infs > 0);
+        Env.add_binary_inf "superposition_passive" (infer_passive_pragmatic_ho !_max_infs);
+        Env.add_binary_inf "superposition_active" (infer_active_pragmatic_ho !_max_infs);
+        Env.add_unary_inf "equality_factoring" (infer_equality_factoring_pragmatic_ho !_max_infs);
+        Env.add_unary_inf "equality_resolution" (infer_equality_resolution_pragmatic_ho !_max_infs);
+      );
+
       if !_fluidsup then (
         Env.add_binary_inf "fluidsup_passive" infer_fluidsup_passive;
         Env.add_binary_inf "fluidsup_active" infer_fluidsup_active;
-      );
+        );
       if !_dupsup then (
         Env.add_binary_inf "dupsup_passive(into)" infer_dupsup_passive;
         Env.add_binary_inf "dupsup_active(from)" infer_dupsup_active;
@@ -2402,10 +2461,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Env.add_binary_inf "lambdasup_active(from)" infer_lambdasup_from;
         Env.add_binary_inf "lambdasup_passive(into)" infer_lambdasup_into;
       );
-      if !_switch_stream_extraction then
-        Env.add_generate "stream_queue_extraction" extract_from_stream_queue_fix_stm
-      else
-        Env.add_generate "stream_queue_extraction" extract_from_stream_queue;
+      if (List.exists CCFun.id [!_fluidsup; !_dupsup; !_lambdasup != -1; !_max_infs = -1]) then (
+        if !_switch_stream_extraction then
+          Env.add_generate "stream_queue_extraction" extract_from_stream_queue_fix_stm
+        else
+          Env.add_generate "stream_queue_extraction" extract_from_stream_queue;
+      )
     )
     else (
       Env.add_binary_inf "superposition_passive" infer_passive;
@@ -2480,9 +2541,9 @@ let () =
     ; "--sup-at-vars"
     , Arg.Set _sup_at_vars
     , " enable superposition at variables under certain ordering conditions"
-    ; "--no-sup-at-var-headed"
-    , Arg.Clear _sup_at_var_headed
-    , " disable superposition at variable headed terms"
+    ; "--sup-at-var-headed"
+    , Arg.Bool (fun b -> _sup_at_var_headed := b)
+    , " enable/disable superposition at variable headed terms"
     ; "--no-sup-in-var-args"
     , Arg.Clear _sup_in_var_args
     , " disable superposition in arguments of applied variables"
@@ -2528,7 +2589,10 @@ let () =
     ; "--restrict-hidden-sup-at-vars"	
     , Arg.Bool (fun b -> _restrict_hidden_sup_at_vars :=	b)
     , " enable/disable hidden superposition at variables only under certain ordering conditions"
-    ];
+      ; "--max-inferences"
+      , Arg.Int (fun p -> _max_infs := p)
+      , " set maximal number of inferences"];
+
     Params.add_to_mode "ho-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
       _sup_at_vars := true;
@@ -2541,6 +2605,48 @@ let () =
       _sup_at_var_headed := false;
       _lambdasup := -1;
       _dupsup := false;
+    );
+    Params.add_to_mode "ho-pragmatic" (fun () ->
+      _use_simultaneous_sup := false;
+      _sup_at_vars := true;
+      _sup_in_var_args := false;
+      _sup_under_lambdas := false;
+      _lambda_demod := false;
+      _demod_in_var_args := false;
+      _complete_ho_unification := true;
+      _unif_alg := PragHOUnif.unify_scoped;
+      _ord_in_normal_form := true;
+      _sup_at_var_headed := true;
+      _lambdasup := -1;
+      _dupsup := false;
+      _max_infs := 5;
+      PragHOUnif.max_depth := 3;
+      PragHOUnif.max_app_projections := 0;
+      PragHOUnif.max_var_imitations := 0;
+      PragHOUnif.max_identifications := 1;
+      PragHOUnif.max_elims := 1;
+      _fluidsup := false;
+    );
+    Params.add_to_mode "ho-competitive" (fun () ->
+      _use_simultaneous_sup := false;
+      _sup_at_vars := true;
+      _sup_in_var_args := false;
+      _sup_under_lambdas := false;
+      _lambda_demod := false;
+      _demod_in_var_args := false;
+      _complete_ho_unification := true;
+      _unif_alg := PragHOUnif.unify_scoped;
+      _ord_in_normal_form := true;
+      _sup_at_var_headed := true;
+      _lambdasup := -1;
+      _dupsup := false;
+      _max_infs := 100;
+      PragHOUnif.max_depth := 8;
+      PragHOUnif.max_app_projections := 4;
+      PragHOUnif.max_var_imitations := 4;
+      PragHOUnif.max_identifications := 4;
+      PragHOUnif.max_elims := 4;
+      _fluidsup := false;
     );
     Params.add_to_mode "fo-complete-basic" (fun () ->
       _use_simultaneous_sup := false;

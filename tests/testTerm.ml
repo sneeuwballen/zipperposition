@@ -27,6 +27,7 @@ let f x y = T.app f_fun [x; y]
 let g_fun = T.const ~ty:Type.([ty] ==> ty) g_
 let g x = T.app g_fun [x]
 let h x y z = T.app (T.const ~ty:Type.([ty;ty;ty] ==> ty) h_) [x;y;z]
+let h_fun = T.const ~ty:Type.([ty;ty;ty] ==> ty) h_
 let k_fun = (T.const ~ty:Type.([[ty;ty] ==> ty] ==> ty) k_)
 let k x = T.app k_fun [x]
 let l_fun = (T.const ~ty:Type.([[ty;ty] ==> ty;ty] ==> ty) l_)
@@ -137,6 +138,15 @@ let test_eta_reduce = "eta reduce", `Quick, fun () ->
   (* (λx. (λy. g y) x) -> g *)
   let t1 = T.fun_of_fvars [HVar.make ~ty 0] (T.app (T.fun_of_fvars [HVar.make ~ty 1] (g (T.var_of_int ~ty 1))) [T.var_of_int ~ty 0]) in
   let t2 = g_fun in
+  Alcotest.(check t_test) "eta reduce" (Lambda.eta_reduce t1) t2;
+  Alcotest.(check t_test) "eta reduce" (Lambda.eta_reduce t1) t2;
+  (* (λx y. f y x) -> does not reduce *)
+  let t1 = T.fun_of_fvars [HVar.make ~ty 0; HVar.make ~ty 1] (f (T.var_of_int ~ty 1) (T.var_of_int ~ty 0)) in
+  let t2 = t1 in
+  Alcotest.(check t_test) "eta reduce" (Lambda.eta_reduce t1) t2;
+  (* (λx y. h (g x) x y) -> (λx. h (g x) x) *)
+  let t1 = T.fun_of_fvars [HVar.make ~ty 0; HVar.make ~ty 1] (h (g (T.var_of_int ~ty 0)) (T.var_of_int ~ty 0) (T.var_of_int ~ty 1)) in
+  let t2 = T.fun_of_fvars [HVar.make ~ty 0] (T.app h_fun [g (T.var_of_int ~ty 0); (T.var_of_int ~ty 0)]) in
   Alcotest.(check t_test) "eta reduce" (Lambda.eta_reduce t1) t2;
 
   let subterm =  T.fun_of_fvars [HVar.make ~ty 0; HVar.make ~ty 1] (T.app f_fun [T.var_of_int ~ty 0; T.var_of_int ~ty 1]) in

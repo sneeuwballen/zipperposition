@@ -75,6 +75,8 @@ end
 module FO : sig
   include S with type term = Term.t and type ty = Type.t
 
+  val bind_or_update : ?check:bool -> subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst
+
   val anti_unify : ?cut:int -> term -> term -> (term * term) list option
   (** anti-unification of the two terms, returning disagreement pairs
       @param cut if [cut=n], then the returned list will have length

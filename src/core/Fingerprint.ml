@@ -54,7 +54,8 @@ and gfpf_root ~depth t =
                          T.Var _ -> A 
                          | T.Const s -> S s
                          | T.DB i    -> if (i < depth) then DB i else Ignore
-                         | _ -> Format.printf "%a\n" T.pp t; assert false)
+                         | T.AppBuiltin(_,_) -> Ignore
+                         | _ -> assert false)
   | T.Fun (_, _) -> assert false 
 
 (* TODO more efficient way to compute a vector of features: if the fingerprint
