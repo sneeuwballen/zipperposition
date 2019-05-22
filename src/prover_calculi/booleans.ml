@@ -234,22 +234,14 @@ module Make(E : Env.S) : S with module Env = E = struct
       | None            -> false 
     ) (C.lits c) in
     match idx with 
-    | Some (i,l) ->
-      let f = Literal.Conv.atom_to_tst_exn (Literal.Conv.to_form l) in
+    | Some _ ->
+      let f = Literals.Conv.to_tst (C.lits c) in
       let proof = Proof.Step.esa ~rule:(Proof.Rule.mk "cnf_otf") [C.proof_parent c] in
       let stmt = Statement.assert_ ~proof f in
       let cnf_vec = Cnf.convert @@ CCVector.to_seq @@ Cnf.cnf_of ~ctx:(Ctx.sk_ctx ()) stmt in
       let sets = Env.convert_input_statements cnf_vec in
       let clauses = sets.Clause.c_set |> CCVector.to_list in
-      let other_lits = CCArray.except_idx (C.lits c) i in
-      let res =
-        List.map (fun new_c -> 
-          let new_lits = CCArray.to_list (C.lits new_c) @ other_lits in
-          let proof = Proof.Step.esa ~rule:(Proof.Rule.mk "cnf_otf") 
-                      [C.proof_parent c; C.proof_parent new_c] in
-          C.create ~trail:(C.trail c) ~penalty:1 new_lits proof
-        ) clauses in
-      Some res
+      Some clauses
     | None       -> None
 
   let setup () =

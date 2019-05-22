@@ -287,7 +287,7 @@ module Conv : sig
     ?allow_free_db:bool -> ?ctx:Term.Conv.ctx -> ?hooks:hook_to list ->
     t -> TypedSTerm.Form.t
 
-  val atom_to_tst_exn : term SLiteral.t -> TypedSTerm.t
+  val lit_to_tst : ?ctx:Term.Conv.ctx -> term SLiteral.t  -> TypedSTerm.t
 end
 
 (** {2 IO} *)

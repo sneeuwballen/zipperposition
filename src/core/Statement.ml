@@ -795,8 +795,7 @@ let get_rw_rule ?weight_incr:(w_i=1000000) c  =
     assert(Term.DB.is_closed abs_rhs);
     let r = Rewrite.Term.Rule.make ~proof:(as_proof_c c) sym (Type.close_forall (Term.ty abs_rhs)) ty_vars abs_rhs in
     let rule = Rewrite.T_rule r in
-    Util.debugf 1 "[ Declared rule %a out of symbol %a and rhs %a ]"
-    (fun k -> k Rewrite.Rule.pp rule ID.pp sym Term.pp rhs);
+    (* CCFormat.printf "[ Declared rule %a out of symbol %a and rhs %a ]\n" Rewrite.Rule.pp rule ID.pp sym Term.pp rhs; *)
     (* Format.printf "[RULE: %a SYM: %a RHS: %a]\n" Rewrite.Rule.pp rule ID.pp sym Term.pp rhs; *)
     rule in
 
@@ -805,14 +804,7 @@ let get_rw_rule ?weight_incr:(w_i=1000000) c  =
     let vars_lhs = Term.VarSet.of_seq (Iter.fold (fun acc v -> 
         Iter.union acc (Term.Seq.vars v)) 
       Iter.empty (Iter.of_list vars)) in
-    let vars_under_quant = Term.VarSet.of_seq @@ Iter.fold (fun acc st -> 
-      match Term.view st with 
-      | Term.AppBuiltin(Builtin.ForallConst, [x;_]) 
-      | Term.AppBuiltin(Builtin.ExistsConst, [x;_]) when Term.is_var x  ->
-        Iter.union acc (Term.Seq.vars x)
-      | _ -> acc
-    ) Iter.empty (Term.Seq.subterms rhs) in
-    let vars_lhs = Term.VarSet.union vars_lhs vars_under_quant in
+    let vars_lhs = Term.VarSet.union vars_lhs (Term.vars_under_quant rhs) in
     if not (Term.symbols rhs |> ID.Set.mem sym) &&
         Term.VarSet.cardinal
           (Term.VarSet.diff (Term.vars rhs) vars_lhs) = 0 then
@@ -820,20 +812,16 @@ let get_rw_rule ?weight_incr:(w_i=1000000) c  =
       let res_rw =  Some (sym, make_rw sym vars rhs) in
       (def_sym := IdMap.add sym (rhs, res_rw) !def_sym;
        res_rw)
-    else (
-      Util.debugf 1 "[ Rejected because the symbol appears on the rhs or there are new variables ]" (fun k->k);
-      None) in
+    else None in
 
   let conv_terms_rw t1 t2 =
     let reduced = Lambda.eta_reduce t1 in
     let hd, l = Term.as_app reduced in
-    Util.debugf 1 "Trying to convert %a : %a.\n" (fun k-> k Term.pp hd Type.pp (Term.ty hd));
     if (Term.is_const hd && distinct_free_vars l && Type.is_fun (Term.ty hd)) then (
       let sym = (Term.as_const_exn hd) in
       (match IdMap.find_opt sym !def_sym with
       | Some (rhs, rw_rule) ->  (
           if  not (Term.equal rhs t2) then (
-          Util.debugf 1 "Rejected definition %a of %a " (fun k-> k Term.pp t2 ID.pp sym) ;
           None)
           else rw_rule )
       | _ -> build_from_head sym l t2)

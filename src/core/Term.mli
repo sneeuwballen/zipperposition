@@ -188,7 +188,7 @@ module VarTbl : CCHashtbl.S with type key = var
 
 module Seq : sig
   val vars : t -> var Iter.t
-  val subterms : t -> t Iter.t
+  val subterms : ?include_builtin:bool -> t -> t Iter.t
   val subterms_depth : t -> (t * int) Iter.t  (* subterms with their depth *)
   val symbols : t -> ID.t Iter.t
   val max_var : var Iter.t -> int (** max var *)

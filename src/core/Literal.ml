@@ -1031,12 +1031,18 @@ module Conv = struct
         end
     end
 
-  let atom_to_tst_exn lit =
+  let lit_to_tst ?(ctx=T.Conv.create ()) lit =
     begin match lit with
       | SLiteral.Atom (p,s) ->
         let p = if s then p else T.Form.not_ p in
-        T.Conv.to_simple_term (T.Conv.create ()) p
-      | _ -> raise (invalid_arg "not an atom")
+        T.Conv.to_simple_term ctx p
+      | SLiteral.Eq(l,r) ->
+        let l,r = CCPair.map_same (T.Conv.to_simple_term ctx) (l,r) in
+        TypedSTerm.app_builtin ~ty:TypedSTerm.Ty.prop Builtin.Eq [l;r]
+      | SLiteral.Neq(l,r) ->
+        let l,r = CCPair.map_same (T.Conv.to_simple_term ctx) (l,r) in
+        TypedSTerm.app_builtin ~ty:TypedSTerm.Ty.prop Builtin.Neq [l;r]
+      | _ -> raise (invalid_arg "not implemented")
     end
 
   let to_s_form ?allow_free_db ?(ctx=T.Conv.create()) ?hooks lit =

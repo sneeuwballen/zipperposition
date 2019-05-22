@@ -388,11 +388,11 @@ module Seq = struct
     in
     aux t
 
-  let subterms t k =
+  let subterms ?(include_builtin=false) t k =
     let rec aux t =
       k t;
       match view t with
-        | AppBuiltin _
+        | AppBuiltin (_, l) -> if include_builtin then List.iter aux l;
         | Const _
         | Var _
         | DB _ -> ()
@@ -451,7 +451,7 @@ let vars_under_quant t = VarSet.of_seq @@ Iter.fold (fun acc st ->
   | AppBuiltin(Builtin.ExistsConst, [x;_]) when is_var x  ->
     Iter.union acc (Seq.vars x)
   | _ -> acc
-) Iter.empty (Seq.subterms t)
+) Iter.empty (Seq.subterms ~include_builtin:true t)
 
 
 let var_occurs ~var t =

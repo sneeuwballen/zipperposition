@@ -251,6 +251,14 @@ module Conv = struct
   let to_forms ?hooks lits =
     Array.to_list (Array.map (Lit.Conv.to_form ?hooks) lits)
 
+  let to_tst lits = 
+    let ctx = Type.Conv.create () in
+    Array.map (fun t -> Lit.Conv.lit_to_tst ~ctx (Lit.Conv.to_form t)) lits 
+    |> Array.to_list
+    |> (fun or_args -> 
+          let ty = TypedSTerm.Ty.prop in
+          TypedSTerm.app_builtin ~ty Builtin.or_ or_args)
+
   let to_s_form ?allow_free_db ?(ctx=T.Conv.create()) ?hooks lits =
     Array.to_list lits
     |> List.map (Literal.Conv.to_s_form ?hooks ?allow_free_db ~ctx)

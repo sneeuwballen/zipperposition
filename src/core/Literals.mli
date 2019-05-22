@@ -124,6 +124,8 @@ module Conv : sig
     ?hooks:Literal.Conv.hook_to list ->
     t ->
     TypedSTerm.Form.t
+
+  val to_tst : t -> TypedSTerm.t
 end
 
 module View : sig
