@@ -237,6 +237,8 @@ val is_ho_app : t -> bool
 val as_ho_app : t -> (Type.t HVar.t * t list) option
 (** [as_ho_app (F t1…tn) = Some (F, [t1…tn])] *)
 
+val get_quantified_var : t -> t option
+
 val is_ho_pred : t -> bool
 (** [is_ho_pred (F t1…tn)] is true, when [F] is a predicate variable *)
 

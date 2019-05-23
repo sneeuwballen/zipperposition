@@ -118,7 +118,17 @@ module Cst_ = struct
   let rules_term_seq t : term_rule Iter.t =
     rules_seq t
     |> Iter.filter_map
-      (function T_rule t -> Some t | _ -> None)
+      (function 
+        | T_rule t -> 
+          let rhs = t.term_rhs in
+          let quant_vars = T.vars_under_quant rhs in
+          let q_var_renaming = T.VarSet.fold (fun v subst ->
+            let ty = HVar.ty v in
+            let fresh = HVar.fresh ~ty () in
+            Subst.FO.bind' subst (v,0) (T.var fresh, 0)  
+          ) quant_vars Subst.empty in
+          Some {t with term_rhs = Subst.FO.apply Subst.Renaming.none q_var_renaming (rhs,0)} 
+        | _ -> None)
 
   let rules_lit_seq t : lit_rule Iter.t =
     rules_seq t
@@ -328,14 +338,14 @@ module Term = struct
         (* first, reduce subterms *)
         reduce_l l
           (fun l' ->
-             let t' = if T.same_l l l' then t else T.app f l' in
-             let n_l = List.length l' in
-             begin match T.view f with
-               | T.Const id ->
-                 let find_rule =
-                   rules_of_id id
-                   |> Iter.find_map
-                     (fun r ->
+            let t' = if T.same_l l l' then t else T.app f l' in
+            let n_l = List.length l' in
+            begin match T.view f with
+              | T.Const id ->
+                let find_rule =
+                  rules_of_id id
+                  |> Iter.find_map
+                    (fun r ->
                         try
                           let n_r = Rule.arity r in
                           let t', l_rest =
@@ -348,49 +358,50 @@ module Term = struct
                             )
                           in
                           let subst' =
-                             Unif.FO.matching ~pattern:(r.term_lhs,sc_r) (t',sc_t)
+                            Unif.FO.matching ~pattern:(r.term_lhs,sc_r) (t',sc_t)
                           in
                           let cur_sc_r = sc_r in
                           Some (r, subst', cur_sc_r, l_rest)
                         with Unif.Fail | Exit ->  None)
-                 in
-                 begin match find_rule with
-                   | None -> k t'
-                   | Some (r, subst, sc_r, l_rest) ->
-                     (* rewrite [t = r.lhs\sigma] into [rhs] (and normalize [rhs],
+                in
+                begin match find_rule with
+                  | None -> k t'
+                  | Some (r, subst, sc_r, l_rest) ->
+                    (* rewrite [t = r.lhs\sigma] into [rhs] (and normalize [rhs],
                         which contain variables bound by [subst]) *)
-                     Util.debugf ~section 5
-                       "(@[<2>rewrite `@[%a@]`@ :using `@[%a@]`@ \
+                    Util.debugf ~section 5
+                      "(@[<2>rewrite `@[%a@]`@ :using `@[%a@]`@ \
                         :with `@[%a@]`[%d]@ :rest [@[%a@]]@])"
-                       (fun k->k T.pp t' Rule.pp r Subst.pp subst sc_r
-                           (Util.pp_list ~sep:"," T.pp) l_rest);
-                     set := Rule_inst_set.add (r,subst,sc_r) !set;
-                     Util.incr_stat stat_term_rw;
-                     decr fuel;
-                     (* NOTE: not efficient, will traverse [t'] fully *)
-                     let rhs = Subst.FO.apply Subst.Renaming.none subst (r.term_rhs,sc_r) in
-                     (* add leftover arguments *)
-                     let rhs = T.app rhs l_rest in
-                     reduce rhs k
-                 end
-               | _ -> k t'
-             end)
+                      (fun k->k T.pp t' Rule.pp r Subst.pp subst sc_r
+                          (Util.pp_list ~sep:"," T.pp) l_rest);
+                    set := Rule_inst_set.add (r,subst,sc_r) !set;
+                    Util.incr_stat stat_term_rw;
+                    decr fuel;
+                    (* NOTE: not efficient, will traverse [t'] fully *)
+                    let rhs = Subst.FO.apply Subst.Renaming.none subst (r.term_rhs,sc_r) in
+                    (* add leftover arguments *)
+                    let rhs = T.app rhs l_rest in
+                    reduce rhs k
+                end
+              | _ -> k t'
+            end)
       | T.Fun (arg, body) ->
         (* term rewrite rules, because [vars(rhs)⊆vars(lhs)], map
-           closed terms to closed terms, so we can safely rewrite under λ *)
+          closed terms to closed terms, so we can safely rewrite under λ *)
         reduce body
           (fun body' ->
-             let t =
-               if T.equal body body' then t else (T.fun_ arg body')
-             in k t)
+            let t =
+              if T.equal body body' then t else (T.fun_ arg body')
+            in k t)
       | T.Var _
       | T.DB _ -> k t
       | T.AppBuiltin (_,[]) -> k t
       | T.AppBuiltin (b,l) ->
         reduce_l l
           (fun l' ->
-             let t' = if T.same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l' in
-             k t')
+            let t' = if T.same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l' in
+            k t')
+
     (* reduce list *)
     and reduce_l (l:_ list) k = match l with
       | [] -> k []

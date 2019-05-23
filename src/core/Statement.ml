@@ -800,7 +800,7 @@ let get_rw_rule ?weight_incr:(w_i=1000000) c  =
     rule in
 
   let build_from_head sym vars rhs =
-    let rhs = Lambda.snf (fst (Rewrite.Term.normalize_term rhs)) in
+    let rhs = Lambda.eta_reduce @@ Lambda.snf (fst (Rewrite.Term.normalize_term rhs)) in
     let vars_lhs = Term.VarSet.of_seq (Iter.fold (fun acc v -> 
         Iter.union acc (Term.Seq.vars v)) 
       Iter.empty (Iter.of_list vars)) in

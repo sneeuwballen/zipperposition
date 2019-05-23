@@ -216,6 +216,12 @@ let is_app t = match T.view t with
   | T.App _ -> true
   | _ -> false
 
+let get_quantified_var t = match T.view t with
+  | T.AppBuiltin(Builtin.ForallConst, [x;_])
+  | T.AppBuiltin(Builtin.ExistsConst, [x;_]) when is_var x ->
+      Some x
+  | _ -> None
+
 let is_type t = Type.equal Type.tType (ty t)
 
 let as_const_exn t = match T.view t with
