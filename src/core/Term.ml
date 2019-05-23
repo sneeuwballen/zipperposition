@@ -370,6 +370,10 @@ let max_cover t ts =
   in
   aux 0 t
 
+  let mk_forall vars body = 
+    let ty = ty body in
+    VarSet.fold (fun v t -> app_builtin ~ty Builtin.ForallConst [var v; t]) vars body
+
 
 module Seq = struct
   let vars t k =

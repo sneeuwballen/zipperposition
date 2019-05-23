@@ -217,6 +217,8 @@ val cover_with_terms : ?depth:int -> ?recurse:bool -> t -> t option list -> t li
 (* cover the term in a maximal way looked top-down *)
 val max_cover : t -> t option list -> t
 
+val mk_forall : VarSet.t -> t -> t
+
 val weight : ?var:int -> ?sym:(ID.t -> int) -> t -> int
 (** Compute the weight of a term, given a weight for variables
     and one for ID.ts.
