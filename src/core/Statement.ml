@@ -816,13 +816,14 @@ let get_rw_rule ?weight_incr:(w_i=1000000) c  =
 
   let conv_terms_rw t1 t2 =
     let reduced = Lambda.eta_reduce t1 in
+    let t2' = Lambda.snf (fst (Rewrite.Term.normalize_term t2)) in
     let hd, l = Term.as_app reduced in
     if (Term.is_const hd && distinct_free_vars l && Type.is_fun (Term.ty hd)) then (
       let sym = (Term.as_const_exn hd) in
       (match IdMap.find_opt sym !def_sym with
       | Some (rhs, rw_rule) ->  (
-          if  not (Unif.FO.are_variant rhs t2) &&
-              not (Term.equal rhs t2) then (
+          let rhs = Lambda.eta_reduce rhs in
+          if  not (Unif.FO.are_variant rhs t2') then (
           None)
           else rw_rule )
       | _ -> build_from_head sym l t2)

@@ -384,7 +384,7 @@ let unify_scoped t0_s t1_s =
 
   res
   |> OSeq.map (CCOpt.map (fun sub ->       
-      (* let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t0_s in 
+      let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t0_s in 
       let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t1_s in
       assert(Type.equal (Term.ty l) (Term.ty r));
       if not (T.equal l r) then (
@@ -393,5 +393,5 @@ let unify_scoped t0_s t1_s =
         Format.printf "%a <> %a\n" T.pp l T.pp r;
         assert(false);
       );
-      assert (T.equal l r); *)
+      assert (T.equal l r);
     sub))

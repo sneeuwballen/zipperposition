@@ -2521,9 +2521,9 @@ let () =
       _max_infs := 5;
       PragHOUnif.max_depth := 3;
       PragHOUnif.max_app_projections := 0;
-      PragHOUnif.max_var_imitations := 0;
-      PragHOUnif.max_identifications := 1;
-      PragHOUnif.max_elims := 1;
+      PragHOUnif.max_var_imitations := 2;
+      PragHOUnif.max_identifications := 2;
+      PragHOUnif.max_elims := 2;
       _fluidsup := false;
     );
     Params.add_to_mode "ho-competitive" (fun () ->

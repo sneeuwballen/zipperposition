@@ -82,8 +82,8 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) l
            assert (T.DB.is_closed t);
            let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
            Some (subst, penalty))
-      [ l_not, 2;
-        l_and, 3;
+      [ l_not, 7;
+        l_and, 7;
         l_eq,  5;
       ]
   )
