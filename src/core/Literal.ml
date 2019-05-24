@@ -680,6 +680,18 @@ let of_unif_subst renaming (s:Unif_subst.t) : t list =
        let u = T.of_term_unsafe u in
        mk_constraint t u)
 
+let normalize_eq lit = 
+  match lit with
+  | Equation(lhs, rhs, true) 
+      when T.equal rhs T.false_ || T.equal rhs T.true_ ->
+        begin match T.view lhs with 
+        | T.AppBuiltin(Builtin.Eq, [l;r]) ->
+          let eq_cons = if T.equal rhs T.true_ then mk_eq else mk_neq in
+          Some (eq_cons l r) 
+        | _ -> None
+        end
+  | _ -> None
+
 (** {2 IO} *)
 
 let pp_debug ?(hooks=[]) out lit =

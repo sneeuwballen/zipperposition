@@ -176,6 +176,8 @@ val fold_terms :
     - if [which] is [`Max], only the maximal terms are explored
     - if [which] is [`All], all root terms are explored *)
 
+val normalize_eq : t -> t option
+
 (** {2 Comparisons} *)
 module Comp : sig
   val max_terms : ord:Ordering.t -> t -> term list
