@@ -240,7 +240,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
       SimplM.return_new new_c
     ) 
-    else SimplM.return_same c 
+    else (
+      SimplM.return_same c 
+    )
 
   let cnf_otf c : C.t list option =   
     let idx = CCArray.find_idx (fun l -> 

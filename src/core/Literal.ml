@@ -685,6 +685,7 @@ let normalize_eq lit =
   | Equation(lhs, rhs, true) 
       when T.equal rhs T.false_ || T.equal rhs T.true_ ->
         begin match T.view lhs with 
+        | T.AppBuiltin(Builtin.Eq, [_;l;r]) (* first arg can be type variable *)
         | T.AppBuiltin(Builtin.Eq, [l;r]) ->
           let eq_cons = if T.equal rhs T.true_ then mk_eq else mk_neq in
           Some (eq_cons l r) 

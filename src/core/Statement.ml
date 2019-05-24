@@ -821,7 +821,8 @@ let get_rw_rule ?weight_incr:(w_i=1000000) c  =
       let sym = (Term.as_const_exn hd) in
       (match IdMap.find_opt sym !def_sym with
       | Some (rhs, rw_rule) ->  (
-          if  not (Term.equal rhs t2) then (
+          if  not (Unif.FO.are_variant rhs t2) &&
+              not (Term.equal rhs t2) then (
           None)
           else rw_rule )
       | _ -> build_from_head sym l t2)

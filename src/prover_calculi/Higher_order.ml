@@ -593,6 +593,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              C.create_a lits proof
                ~penalty:(C.penalty c + penalty) ~trail:(C.trail c)
            in
+           (* CCFormat.printf "[Prim_enum:] @[%a@]\n=>\n@[%a@].\n" C.pp c C.pp new_c;  *)
            Util.debugf ~section 3
              "(@[<hv2>ho.refine@ :from %a@ :subst %a@ :yields %a@])"
              (fun k->k C.pp c Subst.pp subst C.pp new_c);
@@ -1051,7 +1052,7 @@ let def_unfold_enabled_ = ref false
 let force_enabled_ = ref false
 let enable_unif_ = ref true
 let prim_mode_ = ref `Neg
-let prim_max_penalty = ref 15 (* FUDGE *)
+let prim_max_penalty = ref 16 (* FUDGE *)
 
 let set_prim_mode_ =
   let l = [
@@ -1089,6 +1090,12 @@ let st_contains_ho (st:(_,_,_) Statement.t): bool =
   has_ho_sym () || has_ho_var () || has_ho_eq()
 
 let extension =
+  (* let env_action env =
+    let module E = (val env : Env.S) in
+    if E.flex_get k_enable_def_unfold then (
+      let clauses = E.
+    )  *)
+
   let register env =
     let module E = (val env : Env.S) in
     if E.flex_get k_some_ho || !force_enabled_ then (

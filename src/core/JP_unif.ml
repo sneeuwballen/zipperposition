@@ -133,7 +133,7 @@ let imitate_onesided ~scope ~counter u v =
   let head_v = T.head_term_with_mandatory_args v in
   let prefix_types_u, ret1 = Type.open_fun (T.ty head_u) in
   let prefix_types_v, ret2 = Type.open_fun (T.ty head_v) in
-  assert (Type.equal ret1 ret2);
+  (* assert (Type.equal ret1 ret2); *)
   if T.is_var head_u                                        (* u has a varaible head *)
     && not (T.is_bvar head_v) && not (T.is_fun head_v)      (* the head of v is not a bound variable or a lambda-expression *)
     && not (T.var_occurs ~var:(T.as_var_exn head_u) head_v) (* the head of u does not occur in the mandatory args of v *)
@@ -166,7 +166,7 @@ let identify ~scope ~counter u v (_ : (T.var * int) list) =
   let head_v = T.head_term_mono v in
   let prefix_types_u, return_type = Type.open_fun (T.ty head_u) in
   let prefix_types_v, return_type2 = Type.open_fun (T.ty head_v) in
-  assert (Type.equal return_type return_type2);
+  (* assert (Type.equal return_type return_type2); *)
   if T.is_var head_u && T.is_var head_v (* TODO: necessary when args_u or args_v is empty? *)
   then
     (* create substitution: head_u |-> λ u1 ... um. x u1 ... um (y1 u1 ... um) ... (yn u1 ... um) 
