@@ -187,6 +187,14 @@ let false_ = builtin ~ty:Type.prop Builtin.False
 
 let grounding ty = builtin ~ty Builtin.Grounding
 
+let is_formula t = match T.view t with
+  | T.AppBuiltin(hd,_) ->
+    List.mem hd [Builtin.And; Builtin.Or; Builtin.Not; 
+                 Builtin.Imply; Builtin.Equiv; 
+                 Builtin.Xor; Builtin.ForallConst;
+                 Builtin.ExistsConst]
+  | _ -> false
+
 let is_var t = match T.view t with
   | T.Var _ -> true
   | _ -> false
@@ -207,6 +215,12 @@ let is_app t = match T.view t with
   | T.Const _
   | T.App _ -> true
   | _ -> false
+
+let get_quantified_var t = match T.view t with
+  | T.AppBuiltin(Builtin.ForallConst, [x;_])
+  | T.AppBuiltin(Builtin.ExistsConst, [x;_]) when is_var x ->
+      Some x
+  | _ -> None
 
 let is_type t = Type.equal Type.tType (ty t)
 
@@ -362,6 +376,10 @@ let max_cover t ts =
   in
   aux 0 t
 
+  let mk_forall vars body = 
+    let ty = ty body in
+    VarSet.fold (fun v t -> app_builtin ~ty Builtin.ForallConst [var v; t]) vars body
+
 
 module Seq = struct
   let vars t k =
@@ -380,11 +398,11 @@ module Seq = struct
     in
     aux t
 
-  let subterms t k =
+  let subterms ?(include_builtin=false) t k =
     let rec aux t =
       k t;
       match view t with
-        | AppBuiltin _
+        | AppBuiltin (_, l) -> if include_builtin then List.iter aux l;
         | Const _
         | Var _
         | DB _ -> ()
@@ -436,6 +454,15 @@ module Seq = struct
          | T.Const s -> Some (s, ty t)
          | _ -> None)
 end
+
+let vars_under_quant t = VarSet.of_seq @@ Iter.fold (fun acc st -> 
+  match view st with 
+  | AppBuiltin(Builtin.ForallConst, [x;_]) 
+  | AppBuiltin(Builtin.ExistsConst, [x;_]) when is_var x  ->
+    Iter.union acc (Seq.vars x)
+  | _ -> acc
+) Iter.empty (Seq.subterms ~include_builtin:true t)
+
 
 let var_occurs ~var t =
   Iter.exists (HVar.equal Type.equal var) (Seq.vars t)
@@ -1015,13 +1042,21 @@ module Conv = struct
         decr depth;
         PT.Var_tbl.remove tbl v;
         fun_ ty_arg body
-      | PT.Bind _
+      | PT.Bind(b, v, body) when Binder.equal b Binder.Forall 
+                                 || Binder.equal b Binder.Exists ->
+        let b = if Binder.equal b Binder.Forall 
+                then Builtin.ForallConst else Builtin.ExistsConst in
+        let v = var (Type.Conv.var_of_simple_term ctx v) in
+        let ty = Type.Conv.of_simple_term_exn ctx (PT.ty_exn body) in
+        let body = aux body in
+        app_builtin ~ty b [v; body]
       | PT.Meta _
       | PT.Record _
       | PT.Ite _
       | PT.Let _
       | PT.Match _
-      | PT.Multiset _ -> raise (Type.Conv.Error t)
+      | PT.Multiset _ 
+      | _ -> raise (Type.Conv.Error t)
     in
     aux t
 
@@ -1048,6 +1083,17 @@ module Conv = struct
         | App (f,l) ->
           ST.app ~ty:(aux_ty (ty t))
             (aux_t env f) (List.map (aux_t env) l)
+        | AppBuiltin (b,[v;body]) when Builtin.equal b Builtin.ForallConst ||
+                                Builtin.equal b Builtin.ExistsConst ->
+          let b = if Builtin.equal b Builtin.ForallConst 
+                  then Binder.Forall else Binder.Exists in
+          let v =
+            (match view v with
+            | Var i -> (aux_var i)
+            | _ -> 
+            let v = aux_t env v in
+            raise (Type.Conv.Error v)) in
+          ST.bind ~ty:(aux_ty (ty t)) b v (aux_t env body) 
         | AppBuiltin (b,l) ->
           ST.app_builtin ~ty:(aux_ty (ty t))
             b (List.map (aux_t env) l)

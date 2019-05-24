@@ -251,6 +251,23 @@ module Conv = struct
   let to_forms ?hooks lits =
     Array.to_list (Array.map (Lit.Conv.to_form ?hooks) lits)
 
+  let to_tst lits = 
+    let ctx = Type.Conv.create () in
+    Array.map (fun t -> Lit.Conv.lit_to_tst ~ctx (Lit.Conv.to_form t)) lits 
+    |> Array.to_list
+    |> (fun or_args ->
+          let ty = TypedSTerm.Ty.prop in
+          let quant_vars = Iter.fold (fun set t -> 
+              T.VarSet.union set (T.vars_under_quant t)) 
+            T.VarSet.empty (Seq.terms lits) in
+          let clause_vars = T.VarSet.of_seq (Seq.vars lits) in
+          let vars = T.VarSet.diff clause_vars quant_vars
+                     |> T.VarSet.to_list 
+                     |> CCList.map (fun v -> T.Conv.to_simple_term ctx (T.var v))  in
+          let disjuncts =  TypedSTerm.app_builtin ~ty Builtin.or_ or_args in
+          TypedSTerm.close_with_vars vars disjuncts
+      )
+
   let to_s_form ?allow_free_db ?(ctx=T.Conv.create()) ?hooks lits =
     Array.to_list lits
     |> List.map (Literal.Conv.to_s_form ?hooks ?allow_free_db ~ctx)

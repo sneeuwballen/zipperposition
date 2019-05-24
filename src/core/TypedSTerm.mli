@@ -259,6 +259,8 @@ val free_vars_set : t -> t Var.Set.t
 val close_all : ty:t -> Binder.t -> t -> t
 (** Bind all free vars with the symbol *)
 
+val close_with_vars : t list -> t -> t
+
 (** Generic non-recursive map *)
 val map :
   f:('a -> t -> t) ->

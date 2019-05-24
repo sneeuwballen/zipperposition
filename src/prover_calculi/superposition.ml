@@ -379,6 +379,20 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let renaming = S.Renaming.create () in
       let us = info.subst in
       let subst = US.subst us in
+
+      let vars_under_quant cl = 
+        C.Seq.terms cl |> Iter.fold (fun acc st -> 
+          Term.VarSet.union acc (Term.vars_under_quant st)) 
+          Term.VarSet.empty in
+      let set_in_subs subst set sc =
+        Term.VarSet.exists 
+          (fun v -> CCOpt.is_some (S.find subst ((v :> InnerTerm.t HVar.t), sc))) set in
+      if set_in_subs subst (vars_under_quant info.active) sc_a || 
+         set_in_subs subst (vars_under_quant info.passive) sc_p then (
+        raise (ExitSuperposition "Trying to paramodulate with quantificator.");
+      );
+ 
+
       let lambdasup_vars =
         if (info.sup_kind = LambdaSup) then (
           Term.Seq.subterms info.u_p |> Iter.filter Term.is_var |> Term.Set.of_seq)
@@ -527,10 +541,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       );
 
       Util.debugf ~section 1 
-      "@[<2>sup, kind %s(%d)@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
+      "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
         (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
       (fun k -> k
-        (kind_to_str info.sup_kind) (Term.Set.cardinal lambdasup_vars) C.pp info.active sc_a T.pp info.s T.pp info.t
+        (kind_to_str info.sup_kind) C.pp info.active sc_a T.pp info.s T.pp info.t
             T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
             Position.pp info.passive_pos US.pp info.subst); 
       Util.debugf ~section 1  "Res: %a.\n" (fun k -> k C.pp new_clause);
@@ -2459,9 +2473,9 @@ let () =
     ; "--fluidsup-penalty"
     , Arg.Int (fun p -> _fluidsup_penalty := p)
     , " penalty for FluidSup inferences"
-    ; "--no-fluidsup"
-    , Arg.Clear _fluidsup
-    , " disable FluidSup inferences (only effective when complete higher-order unification is enabled)"
+    ; "--fluidsup"
+    , Arg.Bool (fun b -> _fluidsup :=b)
+    , " enable/disable FluidSup inferences (only effective when complete higher-order unification is enabled)"
     ; "--lambdasup"
     , Arg.Int (fun l -> 
                   if l < 0 then 

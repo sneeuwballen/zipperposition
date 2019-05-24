@@ -775,7 +775,7 @@ let scan_simple_stmt_for_ind_ty st = match view st with
 (** TODO: Ask Simon how to hide this in the fun *)
 let def_sym = ref IdMap.empty;;
 
-let get_rw_rule ?weight_incr:(w_i=20) c  =
+let get_rw_rule ?weight_incr:(w_i=1000000) c  =
   let distinct_free_vars l =
     l |> List.map (fun t -> Term.as_var t |>
                     (fun v -> match v with
@@ -795,45 +795,39 @@ let get_rw_rule ?weight_incr:(w_i=20) c  =
     assert(Term.DB.is_closed abs_rhs);
     let r = Rewrite.Term.Rule.make ~proof:(as_proof_c c) sym (Type.close_forall (Term.ty abs_rhs)) ty_vars abs_rhs in
     let rule = Rewrite.T_rule r in
-    (* Util.debugf 1 "[ Declared rule %a out of symbol %a and rhs %a ]"
-    (fun k -> k Rewrite.Rule.pp rule ID.pp sym Term.pp rhs); *)
+    (* CCFormat.printf "[ Declared rule %a out of symbol %a and rhs %a ]\n" Rewrite.Rule.pp rule ID.pp sym Term.pp rhs; *)
     (* Format.printf "[RULE: %a SYM: %a RHS: %a]\n" Rewrite.Rule.pp rule ID.pp sym Term.pp rhs; *)
     rule in
 
   let build_from_head sym vars rhs =
-    let rhs = Lambda.snf (fst (Rewrite.Term.normalize_term rhs)) in
+    let rhs = Lambda.eta_reduce @@ Lambda.snf (fst (Rewrite.Term.normalize_term rhs)) in
+    let vars_lhs = Term.VarSet.of_seq (Iter.fold (fun acc v -> 
+        Iter.union acc (Term.Seq.vars v)) 
+      Iter.empty (Iter.of_list vars)) in
+    let vars_lhs = Term.VarSet.union vars_lhs (Term.vars_under_quant rhs) in
     if not (Term.symbols rhs |> ID.Set.mem sym) &&
         Term.VarSet.cardinal
-          (Term.VarSet.diff (Term.vars rhs)
-                            ((List.fold_left (fun acc t ->
-                                  match Term.as_var t with
-                                    None -> acc
-                                    | Some v -> v :: acc) [] vars)
-                              |> Term.VarSet.of_list)) = 0 then
+          (Term.VarSet.diff (Term.vars rhs) vars_lhs) = 0 then
       (* Here I skipped proof object creation *)
       let res_rw =  Some (sym, make_rw sym vars rhs) in
       (def_sym := IdMap.add sym (rhs, res_rw) !def_sym;
        res_rw)
-    else
-      None in
+    else None in
 
   let conv_terms_rw t1 t2 =
     let reduced = Lambda.eta_reduce t1 in
-      match Term.view reduced with
-        Term.App (hd, l) when Term.is_const hd && distinct_free_vars l
-                              && (let real_vars =
-                                    List.filter (fun v -> not (Type.is_tType (Term.ty v))) l in
-                                 List.length (real_vars) >= 1) ->
-            let sym = (Term.as_const_exn hd) in
-            (match IdMap.find_opt sym !def_sym with
-            | Some (rhs, rw_rule) ->  (
-               if  not (Term.equal rhs t2) then (
-               Util.debugf 1 "Rejected definition %a of %a " (fun k-> k Term.pp t2 ID.pp sym) ;
-               None)
-               else rw_rule )
-            | _ -> build_from_head sym l t2)
-        | _ -> None in
-
+    let hd, l = Term.as_app reduced in
+    if (Term.is_const hd && distinct_free_vars l && Type.is_fun (Term.ty hd)) then (
+      let sym = (Term.as_const_exn hd) in
+      (match IdMap.find_opt sym !def_sym with
+      | Some (rhs, rw_rule) ->  (
+          if  not (Term.equal rhs t2) then (
+          None)
+          else rw_rule )
+      | _ -> build_from_head sym l t2)
+    ) 
+    else None in
+      
    let all_lits =  Seq.lits c in
    if Iter.length all_lits = 1 then
       match Iter.head_exn all_lits with

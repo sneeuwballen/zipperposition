@@ -1006,13 +1006,43 @@ module Conv = struct
       | Some f -> f
       | None ->
         begin match lit with
-          | Equation (l, r, true) -> SLiteral.eq l r
-          | Equation (l, r, false) -> SLiteral.neq l r
+          | Equation (l, r, true) -> 
+            if Type.is_prop (Term.ty l) then (
+              if Term.equal r T.true_ then (
+                SLiteral.atom l true
+              ) else if Term.equal r T.false_ then (
+                SLiteral.atom l false
+              ) else (
+                SLiteral.atom (T.app_builtin ~ty:Type.prop (Builtin.Equiv) [l;r]) true
+              )
+            ) else SLiteral.eq l r
+          | Equation (l, r, false) -> 
+            if Type.is_prop (Term.ty l) then (
+              if Term.equal Term.true_ r || Term.equal Term.false_ r then (
+                raise (invalid_arg "negative equation cannot be with fale or true");
+              );
+              SLiteral.atom (T.app_builtin ~ty:Type.prop (Builtin.Xor) [l;r]) true
+            )
+            else SLiteral.neq l r
           | True -> SLiteral.true_
           | False -> SLiteral.false_
           | Int o -> Int_lit.to_form o
           | Rat o -> Rat_lit.to_form o
         end
+    end
+
+  let lit_to_tst ?(ctx=T.Conv.create ()) lit =
+    begin match lit with
+      | SLiteral.Atom (p,s) ->
+        let p = if s then p else T.Form.not_ p in
+        T.Conv.to_simple_term ctx p
+      | SLiteral.Eq(l,r) ->
+        let l,r = CCPair.map_same (T.Conv.to_simple_term ctx) (l,r) in
+        TypedSTerm.app_builtin ~ty:TypedSTerm.Ty.prop Builtin.Eq [l;r]
+      | SLiteral.Neq(l,r) ->
+        let l,r = CCPair.map_same (T.Conv.to_simple_term ctx) (l,r) in
+        TypedSTerm.app_builtin ~ty:TypedSTerm.Ty.prop Builtin.Neq [l;r]
+      | _ -> raise (invalid_arg "not implemented")
     end
 
   let to_s_form ?allow_free_db ?(ctx=T.Conv.create()) ?hooks lit =

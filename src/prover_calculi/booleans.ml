@@ -94,11 +94,18 @@ module Make(E : Env.S) : S with module Env = E = struct
   let term_as_false = Hashtbl.create 4 in
 	let rec find_bools top t =
 		let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && not top in
+    let is_quant = match T.view t with 
+      | AppBuiltin(b,_) -> 
+        Builtin.equal b Builtin.ForallConst || Builtin.equal b Builtin.ExistsConst
+      | _ -> false in
 		(* Add only propositions. *)
 		let add = if can_be_cased then Hashtbl.add term_as_true else fun _ _ -> () in
 		let yes = if can_be_cased then yes else fun _ -> yes T.true_ in
 		(* Stop recursion in combination of certain settings. *)
-		let inner f x = if can_be_cased && !cased_term_selection = Large then () else List.iter(f false) x in
+		let inner f x = 
+      if is_quant || can_be_cased && !cased_term_selection = Large 
+      then () 
+      else List.iter(f false) x in
 		match T.view t with
 			| DB _ | Var _ -> ()
 			| Const _ -> add t (yes t)
@@ -140,10 +147,17 @@ module Make(E : Env.S) : S with module Env = E = struct
 		let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && (not top ||
       (* It is useful to case top level equality like 𝘵𝘦𝘳𝘮𝘴 because these are simplified into 𝘭𝘪𝘵𝘦𝘳𝘢𝘭𝘴. *)
       match T.view t with AppBuiltin((Eq|Neq|Equiv|Xor),_) -> true | _ -> false) in
+    let is_quant = match T.view t with 
+      | AppBuiltin(b,_) -> 
+        Builtin.equal b Builtin.ForallConst || Builtin.equal b Builtin.ExistsConst
+      | _ -> false in
 		(* Add only propositions. *)
 		let add t x y = if can_be_cased then Hashtbl.add term_to_equations t (x=~y, x/~y) in
 		(* Stop recursion in combination of certain settings. *)
-		let inner f x = if can_be_cased && !cased_term_selection = Large then () else List.iter(f false) x in
+		let inner f x = 
+      if is_quant || (can_be_cased && !cased_term_selection = Large) 
+      then () 
+      else List.iter(f false) x in
 		match T.view t with
 			| DB _ | Var _ -> ()
 			| Const _ -> add t t T.true_
@@ -211,6 +225,27 @@ module Make(E : Env.S) : S with module Env = E = struct
       SimplM.return_new new_
     )
 
+  let cnf_otf c : C.t list option =   
+    let idx = CCArray.find_idx (fun l -> 
+      let eq = Literal.View.as_eqn l in
+      match eq with 
+      | Some (l,r,sign) -> 
+          Type.is_prop (T.ty l) && 
+            ((not (T.equal r T.true_) && not (T.equal r T.false_))
+              || T.is_formula l || T.is_formula r)
+      | None            -> false 
+    ) (C.lits c) in
+    match idx with 
+    | Some _ ->
+      let f = Literals.Conv.to_tst (C.lits c) in
+      let proof = Proof.Step.esa ~rule:(Proof.Rule.mk "cnf_otf") [C.proof_parent c] in
+      let stmt = Statement.assert_ ~proof f in
+      let cnf_vec = Cnf.convert @@ CCVector.to_seq @@ Cnf.cnf_of ~ctx:(Ctx.sk_ctx ()) stmt in
+      let sets = Env.convert_input_statements cnf_vec in
+      let clauses = sets.Clause.c_set |> CCVector.to_list in
+      Some clauses
+    | None       -> None
+
   let setup () =
 	(* if !_bool_reasoning then(
 		Env.ProofState.ActiveSet.add (create_clauses () );
@@ -222,7 +257,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   | _ ->
     Env.ProofState.PassiveSet.add (create_clauses ());
     Env.add_basic_simplify simpl_eq_subterms;
-    Env.add_multi_simpl_rule Fool.rw_bool_lits;
+    (* Env.add_multi_simpl_rule Fool.rw_bool_lits; *)
+    Env.add_multi_simpl_rule cnf_otf;
     if !_bool_reasoning = BoolCasesInference then (
       Env.add_unary_inf "bool_cases" bool_cases;
     )

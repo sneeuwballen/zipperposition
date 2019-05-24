@@ -127,6 +127,7 @@ val grounding : Type.t -> t
 
 val is_var : t -> bool
 val is_bvar : t -> bool
+val is_formula : t -> bool
 val is_app : t -> bool
 val is_const : t -> bool
 val is_fun : t -> bool
@@ -187,7 +188,7 @@ module VarTbl : CCHashtbl.S with type key = var
 
 module Seq : sig
   val vars : t -> var Iter.t
-  val subterms : t -> t Iter.t
+  val subterms : ?include_builtin:bool -> t -> t Iter.t
   val subterms_depth : t -> (t * int) Iter.t  (* subterms with their depth *)
   val symbols : t -> ID.t Iter.t
   val max_var : var Iter.t -> int (** max var *)
@@ -216,6 +217,8 @@ val cover_with_terms : ?depth:int -> ?recurse:bool -> t -> t option list -> t li
 (* cover the term in a maximal way looked top-down *)
 val max_cover : t -> t option list -> t
 
+val mk_forall : VarSet.t -> t -> t
+
 val weight : ?var:int -> ?sym:(ID.t -> int) -> t -> int
 (** Compute the weight of a term, given a weight for variables
     and one for ID.ts.
@@ -233,6 +236,8 @@ val is_ho_app : t -> bool
 
 val as_ho_app : t -> (Type.t HVar.t * t list) option
 (** [as_ho_app (F t1…tn) = Some (F, [t1…tn])] *)
+
+val get_quantified_var : t -> t option
 
 val is_ho_pred : t -> bool
 (** [is_ho_pred (F t1…tn)] is true, when [F] is a predicate variable *)
@@ -380,6 +385,8 @@ module Arith : sig
   val pp_hook : print_hook
   (** hook to print arithmetic expressions *)
 end
+
+val vars_under_quant : t -> VarSet.t
 
 (** {2 De Bruijn} *)
 module DB : sig
