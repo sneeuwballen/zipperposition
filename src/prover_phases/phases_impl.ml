@@ -448,7 +448,7 @@ let process_file ?(prelude=Iter.empty) file =
   Util.debugf ~section 1 "parsed %d declarations (%s goal(s))"
     (fun k->k (CCVector.length decls) (if has_goal then "some" else "no"));
   (* Hooks exist but they can't be used to add statements. Hence naming quantifiers inside terms is done directly here. Without this Type.Conv.Error occures so the naming is done unconditionally. *)
-  cnf(Booleans.name_quantifiers decls) >>= fun stmts ->
+  cnf(Booleans.preprocess_booleans decls) >>= fun stmts ->
   (* compute signature, precedence, ordering *)
   let conj_syms = syms_in_conj stmts in
   let signature = Statement.signature ~conj_syms:conj_syms (CCVector.to_seq stmts) in
