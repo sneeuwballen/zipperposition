@@ -7,6 +7,7 @@ type subst = US.t
 
 type unif_state =
 {
+  norm_deref          : US.t -> T.t Scoped.t -> T.t;
   num_identifications : int;
   num_var_imitations  : int;
   num_app_projections : int;

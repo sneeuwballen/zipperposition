@@ -2443,12 +2443,9 @@ let () =
     ; "--sup-at-vars"
     , Arg.Set _sup_at_vars
     , " enable superposition at variables under certain ordering conditions"
-    ; "--no-sup-at-var-headed"
-    , Arg.Clear _sup_at_var_headed
-    , " disable superposition at variable headed terms"
     ; "--sup-at-var-headed"
-    , Arg.Set _sup_at_var_headed
-    , " disable superposition at variable headed terms"
+    , Arg.Bool (fun b -> _sup_at_var_headed := b)
+    , " enable/disable superposition at variable headed terms"
     ; "--no-sup-in-var-args"
     , Arg.Clear _sup_in_var_args
     , " disable superposition in arguments of applied variables"

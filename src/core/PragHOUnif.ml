@@ -7,6 +7,7 @@ module H = HVar
 type subst = US.t
 type unif_state =
 {
+  norm_deref          : US.t -> T.t Scoped.t -> T.t;
   num_identifications : int;
   num_var_imitations  : int;
   num_app_projections : int;
@@ -34,6 +35,28 @@ let _solve_var = ref true
 
 (* apply a substitution and reduce to whnf *)
 let nfapply s u = Lambda.beta_red_head (S.apply s u)
+
+(* Dereference and normalize the head of the term *)
+let rec nfapply_mono subst (t,sc) =
+  let pref, tt = T.open_fun t in
+  let t' =  
+    begin match T.view tt with
+      | T.Var _ ->
+        let u, _ = US.FO.deref subst (tt,sc) in
+        if T.equal tt u then u
+        else nfapply_mono subst (u,sc)
+      | T.App (f0, l) ->
+        let f = nfapply_mono subst (f0, sc) in
+        let t =
+          if T.equal f0 f then tt else T.app f l in
+        let u = Lambda.whnf t in
+        if T.equal t u
+        then t
+        else nfapply_mono subst (u,sc)
+      | _ -> tt
+    end in
+  if T.equal tt t' then t
+  else T.fun_l pref t'
 
 let disable_conservative_elim () =
   _cons_e := false
@@ -156,12 +179,13 @@ let rec unify ~state ~scope ~counter ~subst = function
   | (s,t,ban_id) :: rest as l -> (
     if not @@ continue_unification state then OSeq.empty
     else (
-      let s', t' = nfapply subst (s, scope), nfapply subst (t, scope) in
+      let apply_subst = state.norm_deref in
+      let s', t' = apply_subst subst (s, scope), apply_subst subst (t, scope) in
       if not (Term.equal s' t') then (
         match P.unif_simple ~subst:(US.subst subst) ~scope 
                 (T.of_ty (T.ty s')) (T.of_ty (T.ty t')) with
         | Some ty_unif -> (
-          let s', t' = nfapply ty_unif (s', scope), nfapply ty_unif (t', scope) in
+          let s', t' = apply_subst ty_unif (s', scope), apply_subst ty_unif (t', scope) in
           let subst = ty_unif in
           try
             if !_solve_var then (
@@ -344,6 +368,8 @@ let unify_scoped t0_s t1_s =
   let prefix = if (CCOpt.is_some lfho_unif) then OSeq.cons lfho_unif else (fun x -> x) in
   let state = 
   {
+    norm_deref          = if Iter.is_empty @@ Iter.union (Term.Seq.ty_vars t0') (Term.Seq.ty_vars t1')
+                          then nfapply_mono else nfapply;
     num_identifications = 0;
     num_var_imitations  = 0;
     num_app_projections = 0;
