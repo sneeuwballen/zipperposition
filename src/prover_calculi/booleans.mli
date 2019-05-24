@@ -4,6 +4,8 @@
 (** {1 Booleans} *)
 open Libzipperposition
 
+val quant_rename : bool ref
+
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C

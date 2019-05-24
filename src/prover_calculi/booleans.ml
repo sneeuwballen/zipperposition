@@ -10,8 +10,10 @@ module T = Term
 
 type selection_setting = Any | Minimal | Large
 type reasoning_kind    = BoolReasoningDisabled | BoolCasesInference | BoolCasesSimplification | BoolCasesEager
+
 let _bool_reasoning = ref BoolReasoningDisabled
 let cased_term_selection = ref Any
+let quant_rename = ref false
 
 module type S = sig
   module Env : Env.S
@@ -454,8 +456,10 @@ let () =
       Arg.Symbol(["A"; "M"; "L"], (fun opt -> if opt = "A" then cased_term_selection := Any
                                             else if opt = "N" then cased_term_selection := Minimal
                                             else cased_term_selection := Large)), 
-      " select boolean subterm selection criterion: A for any, M for minimal and L for large"
-        ];
+      " select boolean subterm selection criterion: A for any, M for minimal and L for large";
+      "--quantifier-renaming"
+      , Arg.Bool (fun v -> quant_rename := v)
+      , " turn the quantifier renaming on or off"];
   Params.add_to_mode "ho-complete-basic" (fun () ->
     _bool_reasoning := BoolReasoningDisabled
   );

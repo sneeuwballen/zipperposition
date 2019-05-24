@@ -19,8 +19,6 @@ let section = Const.section
 
 let _db_w = ref 1
 let _lmb_w = ref 1
-let _quant_rename = ref false
-
 
 (* setup an alarm for abrupt stop *)
 let setup_alarm timeout =
@@ -453,7 +451,7 @@ let process_file ?(prelude=Iter.empty) file =
   (* Hooks exist but they can't be used to add statements. 
      Hence naming quantifiers inside terms is done directly here. 
      Without this Type.Conv.Error occures so the naming is done unconditionally. *)
-  let quant_transformer = if !_quant_rename then Booleans.preprocess_booleans else CCFun.id in
+  let quant_transformer = if !Booleans.quant_rename then Booleans.preprocess_booleans else CCFun.id in
   let sk_ctx = Skolem.create () in 
   cnf ~sk_ctx (quant_transformer decls) >>= fun stmts ->
   (* compute signature, precedence, ordering *)
@@ -580,9 +578,6 @@ let () =
     "--lambda-weight"
     , Arg.Set_int _lmb_w
     , " Set weight of lambda symbol for KBO";
-    "--quantifier-renaming"
-    , Arg.Set _quant_rename
-    , " turn on quantifier renaming"
   ];
 
    Params.add_to_mode "ho-pragmatic" (fun () ->
