@@ -223,7 +223,7 @@ module Inner = struct
                   subst, T.var v
                 else if T.is_var u && sc_u = scope
                 then
-                  (* We already have a corresponging variable in [scope]. Use that one.*)
+                  (* We already have a corresponding variable in [scope]. Use that one.*)
                   subst, u
                 else (
                   (* Create a corresponding variable v' in [scope]. *)
@@ -834,7 +834,7 @@ module Inner = struct
       | T.Var v ->
         if l=[] then subst
         else if List.for_all T.is_bvar l then (
-          (* retrict [v] on [bvars], as a pattern. *)
+          (* restrict [v] on [bvars], as a pattern. *)
           restrict_fun1 subst ~ty:(T.ty_exn t) ~to_:bvars ~scope:sc_t (v,l)
         ) else fail()
     end

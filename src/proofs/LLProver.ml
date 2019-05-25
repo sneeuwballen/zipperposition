@@ -258,7 +258,7 @@ module Rule : sig
   type t
 
   val apply : t list -> F.t -> F.t list list
-  (** Return a disjunctive list of conjuctions *)
+  (** Return a disjunctive list of conjunctions *)
 
   val all : t list
 end = struct

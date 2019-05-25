@@ -83,7 +83,7 @@
 - get rid of dependency on `tip-parser`
 - bugfix: prevent superposition on non-closed terms (from Geoff)
 - Rename `--purify` to `--ho-purify`
-- dont do sup at vars by default
+- don't do sup at vars by default
 - Replace kbo and rpo6 by their lambda-free counter-parts
   * Length-Lexicographic symbol status; Merge redundant term_to_head definitions
   * length-lexicographic comparison for lfhokbo
@@ -314,7 +314,7 @@
 - `Skolem`: at creation, now possible to specify prefix for Tseitin atoms
 - `Util`: removed a String.create deprecation warning
 - `FeatureVector.Make.retrieve_alpha_equiv`
-- opam file (for easy developement version)
+- opam file (for easy development version)
 
 ## 0.5.4
 
@@ -391,7 +391,7 @@
 - `ForallTy` constructor
 - function `Comparison.dominates`
 - bugfixes:
-    * do not rename variables for skolemized formulas (otherwise variables wont match)
+    * do not rename variables for skolemized formulas (otherwise variables won't match)
     * `Formula.simplify`
     * `Unif.Unary.eq`
     * `Comparison.@>>`
@@ -403,7 +403,7 @@
 - in `NPDTree`, do not capture `Not_found` that could be raised by the user callback
 - lexicographic combinators in `Comparison`
 - module `lib/IArray` for immutable arrays (previously used in Multiset)
-- more abtract requirement for Clause index (feature vector...)
+- more abstract requirement for Clause index (feature vector...)
 - cli flag to disable ordering generation in hysteresis
 - hooks for `Cnf`
 

@@ -1130,8 +1130,8 @@ module Make
       end
     )
 
-  (* try to prove theses clauses by turning the given constants into
-     variables, negating the clauses, adn introducing the result
+  (* try to prove these clauses by turning the given constants into
+     variables, negating the clauses, and introducing the result
      as a lemma to be proved by induction.
 
       @param generalize_on the set of (skolem) constants that are replaced

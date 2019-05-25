@@ -20,7 +20,7 @@ Only declared constants can be polymorphic, because when we meet
 a new symbol (or a variable) that is applied to arguments, there is no
 **syntactic** way to know which arguments are terms and which are types.
 Therefore they are all assumed to be terms unless the signature specifies
-the converse explicitely.
+the converse explicitly.
 
 For ``HOTerm`` inference, application is left-parenthesed, so when a symbol
 requires ``n`` type arguments and ``m`` term arguments, we assume the ``n`` first

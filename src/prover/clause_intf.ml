@@ -256,7 +256,7 @@ module type S = sig
 
   (** {2 Clauses with more data} *)
 
-  (** Clause within which a subterm (and its position) are hilighted *)
+  (** Clause within which a subterm (and its position) are highlighted *)
   module WithPos : sig
     type t = {
       clause : clause;
