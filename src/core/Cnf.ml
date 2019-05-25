@@ -363,8 +363,7 @@ module Flatten = struct
             ]
         in aux_maybe_define pos f
       | T.AppBuiltin (Builtin.Eq, [a;b]) 
-          when  (T.is_fun a || T.is_fun b) &&
-                not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a))) (* false *) ->
+          when  (T.is_fun a || T.is_fun b) (* false *) ->
         (* turn [f = λx. t] into [∀x. f x=t] *)
         let vars_forall, a, b = complete_eq a b in
         let t' = F.forall_l vars_forall (F.eq_or_equiv a b) in
@@ -376,8 +375,7 @@ module Flatten = struct
         (F.eq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
         >|= aux_maybe_define pos
       | T.AppBuiltin (Builtin.Neq, [a;b]) 
-        when  (T.is_fun a || T.is_fun b) &&
-              not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a)))  (*false*) ->
+        when  (T.is_fun a || T.is_fun b)  (*false*) ->
         (* turn [f ≠ λx. t] into [∃x. f x≠t] *)
         let vars_exist, a, b = complete_eq a b in
         let t' = F.exists_l vars_exist (F.neq_or_xor a b) in
