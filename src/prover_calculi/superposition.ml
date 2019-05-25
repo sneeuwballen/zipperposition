@@ -375,6 +375,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let active_idx = Lits.Pos.idx info.active_pos in
     let shift_vars = if info.sup_kind = LambdaSup then 0 else -1 in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
+    assert(Array.for_all Literal.no_prop_invariant (C.lits info.passive));
+    assert(Array.for_all Literal.no_prop_invariant (C.lits info.passive));
     try
       let renaming = S.Renaming.create () in
       let us = info.subst in
@@ -560,7 +562,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
             Position.pp info.passive_pos Subst.pp subst';
         Format.printf "@[res = %a@].\n" C.pp new_clause); *)
-      
+      assert(Array.for_all Literal.no_prop_invariant (C.lits new_clause));
       Some new_clause
     with ExitSuperposition reason ->
       Util.debugf ~section 3 "... cancel, %s" (fun k->k reason);

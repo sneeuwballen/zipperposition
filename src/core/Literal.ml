@@ -108,6 +108,8 @@ let depth lit =
   fold (fun acc t -> max acc (T.depth t)) 0 lit
 
 let sign = function
+  | Equation (lhs,rhs,true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
+    T.equal rhs T.true_
   | Equation (_, _, sign) -> sign
   | False -> false
   | Int o -> Int_lit.sign o
