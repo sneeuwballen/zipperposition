@@ -160,7 +160,7 @@ val infer_statement_exn :
   typed_statement * typed_statement list
 (** [infer_statement ctx ~f st] checks and convert [st] into a
     typed statements, and a list of auxiliary type declarations for symbols
-    that were inferred implicitely. *)
+    that were inferred implicitly. *)
 
 val infer_statements_exn :
   ?def_as_rewrite:bool ->

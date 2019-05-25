@@ -4,7 +4,7 @@ Term representations
 Rationale
 ---------
 
-The new version of Logtk attemps to reduce code duplication by using a single
+The new version of Logtk attempts to reduce code duplication by using a single
 core representation for scoped terms, which is ``ScopedTerm``. A second representation,
 ``PrologTerm``, is used for simple AST representation and manipulation, and
 is a bit the dual of ``ScopedTerm``.

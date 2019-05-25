@@ -583,7 +583,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* Purify variables
      - if they occur applied and unapplied ("int" mode).
-     - if they occur with differen argumetns ("ext" mode).
+     - if they occur with different arguments ("ext" mode).
      Example: g X = X a \/ X a = b becomes g X = Y a \/ Y a = b \/ X != Y.
      Literals with only a variable on both sides are not affected. *)
   let purify_applied_variable c =
@@ -668,10 +668,10 @@ module Make(E : Env.S) : S with module Env = E = struct
             assert (Type.equal (HVar.ty v) (T.ty v'));
             T.app v' (List.map purify_term args)
           ) else (
-            (* dont purify *)
+            (* don't purify *)
             T.app head (List.map purify_term args)
           )
-        | None -> (* dont purify *)
+        | None -> (* don't purify *)
           T.app head (List.map purify_term args)
       in
       assert (Type.equal (T.ty res) (T.ty t));
