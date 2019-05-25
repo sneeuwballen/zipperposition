@@ -125,15 +125,21 @@ module Make(C : Clause_intf.S) = struct
          | Term.Var _ -> v
          | Term.DB _ -> w
          | Term.App (f, l) ->
-            let var_weight    = if not @@ Term.is_var f then v / 2 else 2*v in 
+            let non_bvars_num = List.length @@ List.filter (fun t -> not @@ Term.is_bvar t)  l in
+            let var_weight    = if not @@ Term.is_var f || non_bvars_num = 0 then v / 2 else v in 
             calc_tweight f sg (var_weight) w c_mul +
-              List.fold_left (fun acc t -> acc + calc_tweight t sg var_weight w c_mul) 0 l
+              List.fold_left (fun acc t -> acc + calc_tweight t sg v w c_mul) 0 l
          
          | Term.Const id -> (int_of_float ((if Signature.sym_in_conj id sg then c_mul else 1.0)*.float_of_int w))
          | Term.Fun (_, t) -> 2*w + calc_tweight t sg v w c_mul
 
      let calc_lweight l sg v w c_mul =
+      assert (Literal.no_prop_invariant l);
       match l with 
+      (* Special treatment of propositions *)
+      | Lit.Equation (lhs,rhs,true) when Term.equal rhs Term.true_ 
+                                          || Term.equal rhs Term.false_ ->
+        calc_tweight lhs sg v w c_mul, Term.equal rhs Term.true_
       | Lit.Equation (lhs,rhs,sign) -> (calc_tweight lhs sg v w c_mul + 
                                         calc_tweight rhs sg v w c_mul, sign)
       | _ -> (0,false)
