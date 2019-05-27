@@ -48,7 +48,20 @@ let equal_com l1 l2 =
     | Int o1, Int o2 -> Int_lit.equal_com o1 o2
     | _ -> equal l1 l2  (* regular comparison *)
 
+let no_prop_invariant = 
+  let diff_f_t t = not (T.equal t T.true_) && not (T.equal t T.false_) in
+  function 
+  | Equation (lhs,rhs,sign) -> 
+      let res = diff_f_t lhs && (diff_f_t rhs || sign = true) in
+      if not res then (
+          CCFormat.printf "NO PROP INVARIANT BROKEN: %a,%a,%b.\n" T.pp lhs T.pp rhs sign;
+      );
+      res
+  | _ -> true
+
+
 let compare l1 l2 =
+  assert(List.for_all no_prop_invariant [l1;l2]);
   let __to_int = function
     | False -> 0
     | True -> 1
@@ -91,6 +104,8 @@ let weight lit =
   fold (fun acc t -> acc + T.size t) 0 lit
 
 let heuristic_weight weight = function
+  | Equation (l, r, true) 
+      when Term.equal r Term.true_ || Term.equal r Term.false_ -> weight l
   | Equation (l, r, _) -> weight l + weight r
   | True
   | False -> 0
@@ -313,16 +328,6 @@ let mk_not_divides n ~power m = mk_divides ~sign:false n ~power m
 
 let mk_constraint l r = mk_neq l r
 
-let diff_f_t t = not (T.equal t T.true_) && not (T.equal t T.false_)
-let no_prop_invariant = function 
-  | Equation (lhs,rhs,sign) -> 
-      let res = diff_f_t lhs && (diff_f_t rhs || sign = true) in
-      if not res then (
-          CCFormat.printf "NO PROP INVARIANT BROKEN: %a,%a,%b.\n" T.pp lhs T.pp rhs sign;
-      );
-      res
-  | _ -> true
-
 module Seq = struct
   let terms lit k = match lit with
     | Equation(l, r, _) -> k l; k r
@@ -523,6 +528,8 @@ let is_constraint = function
 let negate lit = 
   assert(no_prop_invariant lit);
   match lit with
+  | Equation (l,r,true) when T.equal r T.true_ || T.equal r T.false_ ->
+    Equation (l, (if T.equal r T.true_ then T.false_ else T.true_), true)
   | Equation (l,r,sign) ->  mk_lit l r (not sign)
   | True -> False
   | False -> True
@@ -550,6 +557,8 @@ let root_terms l =
   Seq.terms l |> Iter.to_rev_list
 
 let to_multiset lit = match lit with
+  | Equation (l,r,true) when T.equal r T.true_ || T.equal r T.false_ ->
+    Multisets.MT.singleton l
   | Equation (l, r, _) -> Multisets.MT.doubleton l r
   | True
   | False -> Multisets.MT.singleton T.true_
@@ -612,6 +621,7 @@ let is_absurd_tags lit =
 
 
 let fold_terms ?(position=Position.stop) ?(vars=false) ?(var_args=true) ?(fun_bodies=true) ?ty_args ~which ?(ord=Ordering.none) ~subterms lit k =
+  assert(no_prop_invariant lit);
   (* function to call at terms *)
   let at_term ~pos t =
     if subterms
@@ -650,6 +660,8 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ?(var_args=true) ?(fun_bo
 let to_ho_term (lit:t): T.t option = match lit with
   | True -> Some T.true_
   | False -> Some T.false_
+  | Equation (t, u, true) when T.equal u T.true_ || T.equal u T.false_ ->
+    Some  ((if T.equal u T.false_ then T.Form.not_ else CCFun.id) t)
   | Equation (t, u, sign) ->
     Some (if sign then T.Form.eq t u else T.Form.neq t u)
   | Int _
@@ -754,14 +766,19 @@ module Comp = struct
   let _maxterms2 ~ord l r =
     match O.compare ord l r with
       | C.Gt -> [l]
-      | C.Lt -> [r]
+      | C.Lt -> assert (not (T.equal r T.true_) && not (T.equal r T.false_)); [r]
       | C.Eq -> [l]
-      | C.Incomparable -> [l; r]
+      | C.Incomparable -> assert (not (T.equal r T.true_) && not (T.equal r T.false_)); [l; r]
 
   (* maximal terms of the literal *)
   let max_terms ~ord lit =
+    assert(no_prop_invariant lit);
     match lit with
-      | Equation (l, r, _) -> _maxterms2 ~ord l r
+      | Equation (l, r, s) -> 
+        let res = _maxterms2 ~ord l r in
+        assert(not (s && (T.equal r T.true_ || T.equal r T.false_)) ||
+               CCList.equal T.equal res [l]);
+        res 
       | Int a -> Int_lit.max_terms ~ord a
       | Rat a -> Rat_lit.max_terms ~ord a
       | True
@@ -1067,7 +1084,9 @@ module Conv = struct
 end
 
 module View = struct
-  let as_eqn lit = match lit with
+  let as_eqn lit = 
+    assert(no_prop_invariant lit);
+    match lit with
     | Equation (l,r,sign) -> Some (l, r, sign)
     | True
     | False
