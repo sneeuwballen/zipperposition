@@ -532,6 +532,10 @@ let rec is_fo_term t =
   | Const _ -> true
   | _ -> false
 
+let is_true_or_false t = match view t with
+  | AppBuiltin(b, []) -> 
+    CCList.mem ~eq:Builtin.equal b [Builtin.ForallConst; Builtin.ExistsConst];
+  | _ -> false
 
 let monomorphic t = Iter.is_empty (Seq.ty_vars t)
 
