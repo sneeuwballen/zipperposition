@@ -1392,6 +1392,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
              (* r is the term subterm is going to be rewritten into *)
              assert (C.is_unit_clause unit_clause);
              if sign &&
+                not (C.equal unit_clause c) &&
                 (not (Lazy.force restrict) || not (S.is_renaming subst)) &&
                 C.trail_subsumes unit_clause c &&
                 (O.compare ord
