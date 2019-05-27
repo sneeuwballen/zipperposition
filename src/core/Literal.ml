@@ -766,9 +766,9 @@ module Comp = struct
   let _maxterms2 ~ord l r =
     match O.compare ord l r with
       | C.Gt -> [l]
-      | C.Lt -> [r]
+      | C.Lt -> assert (not (T.equal r T.true_) && not (T.equal r T.false_)); [r]
       | C.Eq -> [l]
-      | C.Incomparable -> [l; r]
+      | C.Incomparable -> assert (not (T.equal r T.true_) && not (T.equal r T.false_)); [l; r]
 
   (* maximal terms of the literal *)
   let max_terms ~ord lit =
@@ -776,8 +776,8 @@ module Comp = struct
     match lit with
       | Equation (l, r, s) -> 
         let res = _maxterms2 ~ord l r in
-        assert(not (s && (T.equal r T.true_ || T.equal r T.false_) 
-                || CCList.equal T.equal res [l]));
+        assert(not (s && (T.equal r T.true_ || T.equal r T.false_)) ||
+               CCList.equal T.equal res [l]);
         res 
       | Int a -> Int_lit.max_terms ~ord a
       | Rat a -> Rat_lit.max_terms ~ord a
