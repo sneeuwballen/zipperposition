@@ -273,11 +273,11 @@ module Make(E : Env.S) : S with module Env = E = struct
 	) *)
   match !_bool_reasoning with 
   | BoolReasoningDisabled -> ()
-  | _ ->
-    Env.ProofState.PassiveSet.add (create_clauses ());
+  | _ -> 
+    (* Env.ProofState.PassiveSet.add (create_clauses ()); *)
     Env.add_basic_simplify simpl_eq_subterms;
     Env.add_basic_simplify normalize_equalities;
-    (* Env.add_multi_simpl_rule Fool.rw_bool_lits; *)
+    Env.add_multi_simpl_rule Fool.rw_bool_lits;
     Env.add_multi_simpl_rule cnf_otf;
     if !_bool_reasoning = BoolCasesInference then (
       Env.add_unary_inf "bool_cases" bool_cases;
