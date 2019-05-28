@@ -98,6 +98,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       module C = C
     end)
   module StmQ = StreamQueue.Make(Stm)
+  module Bools = Booleans.Make(Env)
 
   (** {6 Stream queue} *)
 
@@ -1408,13 +1409,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                let t' = Lambda.eta_reduce @@ Lambda.snf t in
                let l' = Lambda.eta_reduce @@ Lambda.snf @@  Subst.FO.apply Subst.Renaming.none subst (l,cur_sc) in
                (* sanity checks *)
-               if not (Type.equal (T.ty l) (T.ty r)) then (
-                 CCFormat.printf "[Types not equal:] [l: %a(%a)] [r:%a(%a)]" T.pp l Type.pp (T.ty l) T.pp r Type.pp (T.ty r);
-               );
-               if not (T.equal l' t') then (
-                 CCFormat.printf "[Terms not equal:] %a -> %a : %a. \n[Diff:] %a <> %a \n[Subst:] %a.\n" T.pp l T.pp r T.pp t T.pp l' T.pp t' Subst.pp subst;
-               );
-               assert (Type.equal (T.ty l) (T.ty r) && T.equal l' t');
+               assert (Type.equal (T.ty l) (T.ty r));
+               assert (T.equal l' t');
                st.demod_clauses <-
                  (unit_clause,subst,cur_sc) :: st.demod_clauses;
                st.demod_sc <- 1 + st.demod_sc; (* allocate new scope *)
@@ -1561,7 +1557,37 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       SimplM.return_new new_c
     )
 
-  let demodulate c = Util.with_prof prof_demodulate demodulate_ c
+  let demodulate c = 
+    assert (Term.VarSet.for_all (fun v -> HVar.id v >= 0) (Literals.vars (C.lits c) |> Term.VarSet.of_list));
+    Util.with_prof prof_demodulate demodulate_ c
+
+  let canonize_variables c =
+    let all_vars = Literals.vars (C.lits c) |> T.VarSet.of_list in
+    let max_id   = T.VarSet.max_elt_opt all_vars in
+    match max_id with 
+    | Some id ->
+      let max_id = ref (CCInt.max (HVar.id id) 0) in
+      let neg_vars_renaming = T.VarSet.fold (fun v subst -> 
+        let v_id = HVar.id v in
+          if v_id < 0 then (
+            match Subst.FO.get_var subst ((v :> InnerTerm.t HVar.t),0) with
+            | Some _ -> subst 
+            | None -> (
+              incr max_id;
+              let renamed_var = T.var (HVar.make ~ty:(HVar.ty v) !max_id) in
+              Subst.FO.bind subst ((v :> InnerTerm.t HVar.t), 0) (renamed_var, 0)))
+          else subst) 
+        all_vars Subst.empty 
+      in
+      if Subst.is_empty neg_vars_renaming then SimplM.return_same c
+      else (
+        let new_lits = Literals.apply_subst Subst.Renaming.none neg_vars_renaming (C.lits c, 0)
+                      |> CCArray.to_list in
+        let proof = Proof.Step.inference [C.proof_parent c] ~rule:(Proof.Rule.mk "cannonize vars") in
+        let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
+        SimplM.return_new new_c)
+    | None -> SimplM.return_same c
+
 
   (** Find clauses that [given] may demodulate, add them to set *)
   let backward_demodulate set given =
@@ -2338,7 +2364,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let register () =
     let open SimplM.Infix in
     let rw_simplify c =
-      demodulate c
+      canonize_variables c
+      >>= demodulate
       >>= basic_simplify
       >>= positive_simplify_reflect
       >>= negative_simplify_reflect
@@ -2394,6 +2421,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     );
     if not (!_dont_simplify) then (
       Env.add_rw_simplify rw_simplify;
+      Env.add_basic_simplify canonize_variables;
       Env.add_basic_simplify basic_simplify;
       Env.add_active_simplify active_simplify;
       Env.add_backward_simplify backward_simplify
