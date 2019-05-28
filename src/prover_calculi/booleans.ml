@@ -249,7 +249,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let max_id   = T.VarSet.max_elt_opt all_vars in
     match max_id with 
     | Some id ->
-      let max_id = ref (HVar.id id) in
+      let max_id = ref (CCInt.max (HVar.id id) 0) in
       let neg_vars_renaming = T.VarSet.fold (fun v subst -> 
         let v_id = HVar.id v in
           if v_id < 0 then (
