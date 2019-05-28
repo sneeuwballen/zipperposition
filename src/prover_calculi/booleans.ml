@@ -255,7 +255,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           if v_id < 0 then (
             match Subst.FO.get_var subst ((v :> InnerTerm.t HVar.t),0) with
             | Some _ -> subst 
-            | _ -> (
+            | None -> (
               incr max_id;
               let renamed_var = T.var (HVar.make ~ty:(HVar.ty v) !max_id) in
               Subst.FO.bind subst ((v :> InnerTerm.t HVar.t), 0) (renamed_var, 0)))
