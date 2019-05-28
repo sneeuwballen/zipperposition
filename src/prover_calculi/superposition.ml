@@ -1497,14 +1497,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (* strictly maximal terms might be blocked *)
       let strictly_max = lazy (
         begin match lit with
-          | Lit.Equation (t1,t2,true) ->
-            let res = 
+          | Lit.Equation (t1,t2,true) -> 
               begin match O.compare ord t1 t2 with
                 | Comp.Gt -> [t1] | Comp.Lt -> [t2] | _ -> []
               end 
-            in
-            assert ((not (T.equal t2 T.true_ || T.equal t2 T.false_)) || CCList.equal T.equal res [t1]);
-            res
           | _ -> []
         end
       ) in
