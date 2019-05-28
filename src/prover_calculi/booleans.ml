@@ -144,63 +144,63 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
   let bool_case_simp(c: C.t) : C.t list option =
-  let term_to_equations = Hashtbl.create 8 in
-	let rec find_bools top t =
-		let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && (not top ||
-      (* It is useful to case top level equality like 𝘵𝘦𝘳𝘮𝘴 because these are simplified into 𝘭𝘪𝘵𝘦𝘳𝘢𝘭𝘴. *)
-      match T.view t with AppBuiltin((Eq|Neq|Equiv|Xor),_) -> true | _ -> false) in
-    let is_quant = match T.view t with 
-      | AppBuiltin(b,_) -> 
-        Builtin.equal b Builtin.ForallConst || Builtin.equal b Builtin.ExistsConst
-      | _ -> false in
-		(* Add only propositions. *)
-		let add t x y = if can_be_cased then Hashtbl.add term_to_equations t (x=~y, x/~y) in
-		(* Stop recursion in combination of certain settings. *)
-		let inner f x = 
-      if is_quant || (can_be_cased && !cased_term_selection = Large) 
-      then () 
-      else List.iter(f false) x in
-		match T.view t with
-			| DB _ | Var _ -> ()
-			| Const _ -> add t t T.true_
-			| Fun(_,b) -> find_bools false b
-			| App(f,ps) -> add t t T.true_; inner find_bools (f::ps)
-			| AppBuiltin(f,ps) ->
-				inner find_bools ps;
-				match f with
-					| Builtin.True | Builtin.False -> ()
-					| Builtin.Eq | Builtin.Neq | Builtin.Equiv | Builtin.Xor ->
-						(* Format.printf "Equality like: %b %b (%a) %a\n" (!cased_term_selection != Minimal) (Type.is_prop(T.ty(List.hd ps))) (CCList.pp T.pp) ps C.pp c; *)
-            (match ps with 
-              | [x;y] when (!cased_term_selection != Minimal || Type.is_prop(T.ty x)) ->
-                add t x y;
-                if f = Builtin.Neq || f = Builtin.Xor then
-                  Hashtbl.replace term_to_equations t (Hashtbl.find term_to_equations t |> CCPair.swap)
-              | _ -> ())
-					| Builtin.And | Builtin.Or | Builtin.Imply | Builtin.Not ->
-						if !cased_term_selection != Minimal then add t t T.true_ else()
-					| _ -> add t t T.true_
-	in
-	Literals.Seq.terms(C.lits c) |> Iter.iter(find_bools true);
-  let res = 
-    Hashtbl.fold(fun b (b_true, b_false) clauses ->
-      if !cased_term_selection != Minimal ||
-         Term.Seq.subterms b |> 
-         Iter.for_all (fun st -> T.equal b st || 
-                                 not (Type.is_prop (T.ty st))) then (
-        let proof = Proof.Step.inference[C.proof_parent c]
-          ~rule:(Proof.Rule.mk"bool_case_simp")
-        in
-        C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-          (b_true :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:T.false_)))
-        proof ::
-        C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-          (b_false :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:T.true_)))
-        proof ::
-        clauses)
-      else clauses) term_to_equations [] in
-  if CCList.is_empty res then None
-  else (Some res)
+    let term_to_equations = Hashtbl.create 8 in
+    let rec find_bools top t =
+      let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && (not top ||
+        (* It is useful to case top level equality like 𝘵𝘦𝘳𝘮𝘴 because these are simplified into 𝘭𝘪𝘵𝘦𝘳𝘢𝘭𝘴. *)
+        match T.view t with AppBuiltin((Eq|Neq|Equiv|Xor),_) -> true | _ -> false) in
+      let is_quant = match T.view t with 
+        | AppBuiltin(b,_) -> 
+          Builtin.equal b Builtin.ForallConst || Builtin.equal b Builtin.ExistsConst
+        | _ -> false in
+      (* Add only propositions. *)
+      let add t x y = if can_be_cased then Hashtbl.add term_to_equations t (x=~y, x/~y) in
+      (* Stop recursion in combination of certain settings. *)
+      let inner f x = 
+        if is_quant || (can_be_cased && !cased_term_selection = Large) 
+        then () 
+        else List.iter(f false) x in
+      match T.view t with
+        | DB _ | Var _ -> ()
+        | Const _ -> add t t T.true_
+        | Fun(_,b) -> find_bools false b
+        | App(f,ps) -> add t t T.true_; inner find_bools (f::ps)
+        | AppBuiltin(f,ps) ->
+          inner find_bools ps;
+          match f with
+            | Builtin.True | Builtin.False -> ()
+            | Builtin.Eq | Builtin.Neq | Builtin.Equiv | Builtin.Xor ->
+              (* Format.printf "Equality like: %b %b (%a) %a\n" (!cased_term_selection != Minimal) (Type.is_prop(T.ty(List.hd ps))) (CCList.pp T.pp) ps C.pp c; *)
+              (match ps with 
+                | [x;y] when (!cased_term_selection != Minimal || Type.is_prop(T.ty x)) ->
+                  add t x y;
+                  if (f = Builtin.Neq || f = Builtin.Xor) && can_be_cased then
+                    Hashtbl.replace term_to_equations t (Hashtbl.find term_to_equations t |> CCPair.swap)
+                | _ -> ())
+            | Builtin.And | Builtin.Or | Builtin.Imply | Builtin.Not ->
+              if !cased_term_selection != Minimal then add t t T.true_ else()
+            | _ -> add t t T.true_
+      in
+      Literals.Seq.terms(C.lits c) |> Iter.iter(find_bools true);
+      let res = 
+        Hashtbl.fold(fun b (b_true, b_false) clauses ->
+          if !cased_term_selection != Minimal ||
+            Term.Seq.subterms b |> 
+            Iter.for_all (fun st -> T.equal b st || 
+                                    not (Type.is_prop (T.ty st))) then (
+            let proof = Proof.Step.inference[C.proof_parent c]
+              ~rule:(Proof.Rule.mk"bool_case_simp")
+            in
+            C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+              (b_true :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:T.false_)))
+            proof ::
+            C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+              (b_false :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:T.true_)))
+            proof ::
+            clauses)
+          else clauses) term_to_equations [] in
+      if CCList.is_empty res then None
+      else (Some res)
 
   let simpl_eq_subterms c =
     let simplified = ref false in

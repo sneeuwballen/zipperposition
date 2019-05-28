@@ -245,6 +245,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   (* update simpl. index using the clause [c] just added or removed to
      the simplification set *)
   let _update_simpl f c =
+    assert (CCArray.for_all Lit.no_prop_invariant (C.lits c));
     let idx = !_idx_simpl in
     let idx' = match C.lits c with
       | [| Lit.Equation (l,r,true) |] ->
@@ -252,10 +253,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           | Comparison.Gt ->
             f idx (l,r,true,c)
           | Comparison.Lt ->
-            assert(not (T.equal r T.true_ || T.equal r T.false_));
+            assert(not (T.is_true_or_false r));
             f idx (r,l,true,c)
           | Comparison.Incomparable ->
-            assert(not (T.equal r T.true_ || T.equal r T.false_));
+            assert(T.is_var (T.head_term l) || not (T.is_true_or_false l));
             let idx = f idx (l,r,true,c) in
             f idx (r,l,true,c)
           | Comparison.Eq -> idx  (* no modif *)
