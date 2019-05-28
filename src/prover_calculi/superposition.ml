@@ -1408,8 +1408,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                let t' = Lambda.eta_reduce @@ Lambda.snf t in
                let l' = Lambda.eta_reduce @@ Lambda.snf @@  Subst.FO.apply Subst.Renaming.none subst (l,cur_sc) in
                (* sanity checks *)
-               assert (Type.equal (T.ty l) (T.ty r));
-               assert (T.equal l' t');
+               if not (Type.equal (T.ty l) (T.ty r)) then (
+                 CCFormat.printf "[Types not equal:] [l: %a(%a)] [r:%a(%a)]" T.pp l Type.pp (T.ty l) T.pp r Type.pp (T.ty r);
+               );
+               if not (T.equal l' t') then (
+                 CCFormat.printf "[Terms not equal:] %a -> %a : %a. \n[Diff:] %a <> %a \n[Subst:] %a.\n" T.pp l T.pp r T.pp t T.pp l' T.pp t' Subst.pp subst;
+               );
+               assert (Type.equal (T.ty l) (T.ty r) && T.equal l' t');
                st.demod_clauses <-
                  (unit_clause,subst,cur_sc) :: st.demod_clauses;
                st.demod_sc <- 1 + st.demod_sc; (* allocate new scope *)

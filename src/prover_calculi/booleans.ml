@@ -243,6 +243,33 @@ module Make(E : Env.S) : S with module Env = E = struct
     else (
       SimplM.return_same c 
     )
+  
+  let canonize_variables c =
+    let all_vars = Literals.vars (C.lits c) |> T.VarSet.of_list in
+    let max_id   = T.VarSet.max_elt_opt all_vars in
+    match max_id with 
+    | Some id ->
+      let max_id = ref (HVar.id id) in
+      let neg_vars_renaming = T.VarSet.fold (fun v subst -> 
+        let v_id = HVar.id v in
+          if v_id < 0 then (
+            match Subst.FO.get_var subst ((v :> InnerTerm.t HVar.t),0) with
+            | Some _ -> subst 
+            | _ -> (
+              incr max_id;
+              let renamed_var = T.var (HVar.make ~ty:(HVar.ty v) !max_id) in
+              Subst.FO.bind subst ((v :> InnerTerm.t HVar.t), 0) (renamed_var, 0)))
+          else subst) 
+        all_vars Subst.empty 
+      in
+      if Subst.is_empty neg_vars_renaming then SimplM.return_same c
+      else (
+        let new_lits = Literals.apply_subst Subst.Renaming.none neg_vars_renaming (C.lits c, 0)
+                      |> CCArray.to_list in
+        let proof = Proof.Step.inference [C.proof_parent c] ~rule:(Proof.Rule.mk "cannonize vars") in
+        let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
+        SimplM.return_new new_c)
+    | None -> SimplM.return_same c
 
   let cnf_otf c : C.t list option =   
     let idx = CCArray.find_idx (fun l -> 
@@ -276,6 +303,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   | _ -> 
     (* Env.ProofState.PassiveSet.add (create_clauses ()); *)
     Env.add_basic_simplify simpl_eq_subterms;
+    Env.add_basic_simplify canonize_variables;
     Env.add_basic_simplify normalize_equalities;
     Env.add_multi_simpl_rule Fool.rw_bool_lits;
     Env.add_multi_simpl_rule cnf_otf;
