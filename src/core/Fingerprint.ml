@@ -31,7 +31,7 @@ type fingerprint_fun = T.t -> feature list
 let rec gfpf ?(depth=0) pos t =
   let pref_vars, body =  T.open_fun t in 
   match pos with 
-  | [] -> gfpf_root ~depth body
+  | [] -> gfpf_root ~depth:(depth+List.length pref_vars) body
   | i::is ->
       let hd, args = T.as_app body in
       if T.is_var hd then B
@@ -47,27 +47,35 @@ let rec gfpf ?(depth=0) pos t =
 and gfpf_root ~depth t =
   match T.view t with 
   | T.AppBuiltin(_, _) -> Ignore
-  | T.DB i -> if (i < depth) then DB i else Ignore
+  | T.DB i -> Ignore
   | T.Var _ -> A
-  | T.Const c -> S c 
+  | T.Const c -> S c
   | T.App (hd,_) -> (match T.view hd with
                          T.Var _ -> A 
                          | T.Const s -> S s
-                         | T.DB i    -> if (i < depth) then DB i else Ignore
+                         | T.DB i    -> Ignore
                          | T.AppBuiltin(_,_) -> Ignore
                          | _ -> assert false)
-  | T.Fun (_, _) -> assert false 
+  | T.Fun (_, _) -> assert false
 
 (* TODO more efficient way to compute a vector of features: if the fingerprint
    is in BFS, compute features during only one traversal of the term? *)
+
+let pp_feature out = function 
+  | A -> CCFormat.fprintf out "A"
+  | B -> CCFormat.fprintf out "B" 
+  | DB i -> CCFormat.fprintf out "DB %d" i 
+  | N -> CCFormat.fprintf out "N" 
+  | S id -> CCFormat.fprintf out "S %a" ID.pp id
+  | Ignore -> CCFormat.fprintf out "I"
 
 (** compute a feature vector for some positions *)
 let fp positions =
   (* list of fingerprint feature functions *)
   let fpfs = List.map gfpf positions in
   fun t ->
-    (* Format.printf "@[Fingerprinting: @[%a@].@]\n" T.pp t; *)
     List.map (fun fpf -> fpf t) fpfs
+    (* Format.printf "@[Fingerprinting(%a): @[%a@] = %a.@]\n" (CCList.pp (CCList.pp ~start:"[" ~stop:"]" CCInt.pp)) positions T.pp t (CCList.pp pp_feature) res; *)
 
 (** {2 Fingerprint functions} *)
 
@@ -110,7 +118,7 @@ let compatible_features_unif f1 f2 =
              | S s2 -> ID.equal s1 s2 
              | A | B | Ignore -> true
              | N | DB _ -> false)
-  | Ignore 
+  | Ignore -> true
   | B    -> true
   | A    -> (match f2 with
              | DB _ | N  -> false

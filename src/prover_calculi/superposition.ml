@@ -213,7 +213,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                     if (not (T.is_var body) || T.is_ho_var body) &&
                        (not (T.is_const hd) || not (ID.is_skolem (T.as_const_exn hd))) &&
                        (!_sup_at_var_headed || not (T.is_var (T.head_term body))) then
-                    Some (body, new_pos) else None))
+                    (CCFormat.printf "Adding %a to LS index.\n" T.pp body;
+                    Some (body, new_pos)) else None))
         |> Iter.fold
           (fun tree (t, pos) ->
             let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
@@ -383,6 +384,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     assert(Array.for_all Literal.no_prop_invariant (C.lits info.passive));
     assert(Array.for_all Literal.no_prop_invariant (C.lits info.passive));
     try
+      Util.debugf ~section 1 
+      "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a@]@])@ \
+        (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
+      (fun k -> k
+        (kind_to_str info.sup_kind) C.pp info.active sc_a T.pp info.s T.pp info.t
+            C.pp info.passive sc_p Lit.pp info.passive_lit
+            Position.pp info.passive_pos US.pp info.subst);
+
       let renaming = S.Renaming.create () in
       let us = info.subst in
       let subst = US.subst us in
@@ -396,6 +405,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           (fun v -> CCOpt.is_some (S.find subst ((v :> InnerTerm.t HVar.t), sc))) set in
       if set_in_subs subst (vars_under_quant info.active) sc_a || 
          set_in_subs subst (vars_under_quant info.passive) sc_p then (
+        Util.debugf ~section 1 "Trying to paramodulate with quantificator." (fun k->k);
         raise (ExitSuperposition "Trying to paramodulate with quantificator.");
       );
  
@@ -411,14 +421,17 @@ module Make(Env : Env.S) : S with module Env = Env = struct
          T.Seq.subterms t'
          |> Iter.exists (fun st ->
               List.exists (fun arg -> not @@ T.DB.is_closed arg)
-              (T.get_mand_args st))) then
+              (T.get_mand_args st))) then (
+        Util.debugf ~section 1 "LambdaSup sneaks in bound variables under the skolem" (fun k->k);
         raise @@ ExitSuperposition("LambdaSup sneaks in bound variables under the skolem");
-      
+      );
       if(info.sup_kind = LambdaSup && 
          T.Set.exists (fun v -> 
             not @@ T.DB.is_closed @@  Subst.FO.apply renaming subst (v,sc_p)) 
-         lambdasup_vars) then
+         lambdasup_vars) then (
+        Util.debugf ~section 1 "LambdaSup -- an into free variable sneaks in bound variable" (fun k->k);
         raise @@ ExitSuperposition("LambdaSup -- an into free variable sneaks in bound variable");
+      );
 
       begin match info.passive_lit, info.passive_pos with
         | Lit.Equation (_, v, true), P.Arg(_, P.Left P.Stop)
@@ -428,7 +441,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           (* TODO: use Unif.FO.eq? *)
           let v' = S.FO.apply ~shift_vars:0 renaming subst (v, sc_p) in
           if T.equal t' v'
-          then raise (ExitSuperposition "will yield a tautology");
+          then (
+            Util.debugf ~section 1 "will yield a tautology" (fun k->k);
+            raise (ExitSuperposition "will yield a tautology");)
         | _ -> ()
       end;
 
@@ -447,7 +462,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         vars_bound_to_closed_terms vars_p sc_p;
 
         if Util.Int_set.cardinal (Util.Int_set.of_list !dbs)  > !_lambdasup   then (
-            raise (ExitSuperposition "Too many skolems will be introduced for LambdaSup.");
+          Util.debugf ~section 1 "Too many skolems will be introduced for LambdaSup." (fun k->k);
+          raise (ExitSuperposition "Too many skolems will be introduced for LambdaSup.");
         )
       );     
 
@@ -462,8 +478,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
          T.Seq.subterms s'
          |> Iter.exists (fun st ->
               List.exists (fun arg -> not @@ T.DB.is_closed arg)
-              (T.get_mand_args st))) then
+              (T.get_mand_args st))) then (
+        Util.debugf ~section 1 "LambdaSup sneaks in bound variables under the skolem" (fun k->k);
         raise @@ ExitSuperposition("LambdaSup sneaks in bound variables under the skolem");
+      );
       if (
         O.compare ord s' t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
@@ -474,8 +492,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       if info.sup_kind != FluidSup then
         if not !_sup_at_vars then
           assert (not (T.is_var info.u_p))
-        else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then
+        else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then (
+          Util.debugf ~section 1 "superposition at variable" (fun k->k);
           raise (ExitSuperposition "superposition at variable");
+        );
 
       (* ordering constraints are ok *)
       let lits_a = CCArray.except_idx (C.lits info.active) active_idx in
@@ -536,37 +556,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       if info.sup_kind = LambdaSup then
         (* Format.printf "LS: %a\n" C.pp new_clause;  *)
         Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
-      if not (List.for_all (Lit.for_all Term.DB.is_closed) new_lits) then (
-        Format.printf
-        "@[<2>sup, kind %s(%d)@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
-        (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
-        (kind_to_str info.sup_kind) (Term.Set.cardinal lambdasup_vars) C.pp info.active sc_a T.pp info.s T.pp info.t
-            T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
-            Position.pp info.passive_pos US.pp info.subst;
-        Format.printf "Res: %a.\n" C.pp new_clause;
-         assert(false);
-      );
-
-      Util.debugf ~section 1 
-      "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
-        (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
-      (fun k -> k
-        (kind_to_str info.sup_kind) C.pp info.active sc_a T.pp info.s T.pp info.t
-            T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
-            Position.pp info.passive_pos US.pp info.subst); 
+      assert (List.for_all (Lit.for_all Term.DB.is_closed) new_lits); 
       Util.debugf ~section 1  "Res: %a.\n" (fun k -> k C.pp new_clause);
-      
-      (* (try
-        ignore (C.check_types new_clause);
-        ()
-      with Type.ApplyError error_msg ->
-        (Format.printf
-        "@[<2>sup, kind %s, error: %s @ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
-        (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
-        (kind_to_str info.sup_kind) error_msg C.pp info.active sc_a T.pp info.s T.pp info.t
-            T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
-            Position.pp info.passive_pos Subst.pp subst';
-        Format.printf "@[res = %a@].\n" C.pp new_clause); *)
+
       assert(Array.for_all Literal.no_prop_invariant (C.lits new_clause));
       Some new_clause
     with ExitSuperposition reason ->
@@ -1584,7 +1576,67 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         SimplM.return_new new_c)
     | None -> SimplM.return_same c
 
+  (* Given a "from"-clause C \/ f t1 ... tn = s  and 
+     "into"-clause D \/ f u1 .. un (~)= v, where some of the t_i 
+     (and consequently u_i) are of functional type, construct
+     a clause C \/ D \/ t1 ~= u1 \/ ... tn ~= un \/ s (~)= v.
+     
+     Intuitively, we are waiting for efficient extensionality rules
+     to kick in and fix the problem of not being able to paramodulate
+     with this equation.
+     
+     Currently with no restrictions or indexing. After initial evaluation,
+     will find ways to restrict it somehow. *)
+  let ext_decompose from_c into_c =
+    let get_positions ?(only_pos=true) c =
+      let eligible = if only_pos then C.Eligible.pos else C.Eligible.always in
+      Literals.fold_terms (C.lits c) 
+        ~vars:false ~subterms:false ~which:`All ~ord ~eligible
+      |> Iter.filter (fun (t,pos) -> 
+          let hd, args = T.as_app t in
+          T.is_const hd && List.exists (fun t -> Type.is_fun (Term.ty t)) args)
+      |> Iter.to_list in
 
+    let from_positions = get_positions from_c in
+    let into_positions = get_positions into_c ~only_pos:false in
+
+    let sc_f, sc_i = 0, 1 in
+    let renaming = Subst.Renaming.create () in
+    if CCList.is_empty from_positions || CCList.is_empty into_positions then []
+    else (
+      CCList.flat_map (fun (from_t, from_p) -> 
+        CCList.filter_map (fun (into_t, into_p) -> 
+          let (hd_f, args_f), (hd_i,args_i) = Term.as_app from_t, Term.as_app into_t in
+          if T.equal hd_f hd_i && T.is_const hd_f && List.length args_f = List.length args_i then (
+            (* Renaming variables apart *)
+            let args_f = List.map (fun t -> Subst.FO.apply renaming Subst.empty (t,sc_f)) args_f in
+            let args_i = List.map (fun t -> Subst.FO.apply renaming Subst.empty (t,sc_i)) args_i in
+            let lits_f = Lits.apply_subst renaming Subst.empty (C.lits from_c, sc_f) in
+            let lits_i = Lits.apply_subst renaming Subst.empty (C.lits into_c, sc_i) in
+            
+            let new_neq_lits = 
+              CCList.combine args_f args_i 
+              |> List.map (fun (arg_f, arg_i) -> Lit.mk_neq arg_f arg_i) in
+
+            let (i, pos_f) = Lits.Pos.cut from_p in
+            (* same literal, the other side of the equation *)
+            let from_s = Lits.Pos.at lits_f (Position.arg i (Position.opp pos_f)) in
+            Lits.Pos.replace lits_i ~at:into_p ~by:from_s;
+            let new_lits = new_neq_lits @ CCArray.except_idx lits_f i  @ CCArray.to_list lits_i in
+            let trail = C.trail_l [from_c; into_c] in
+            let penalty = max (C.penalty from_c) (C.penalty into_c) in
+            let proof =
+                Proof.Step.inference
+                    [C.proof_parent_subst renaming (from_c, sc_f) Subst.empty;
+                    C.proof_parent_subst renaming  (into_c, sc_i) Subst.empty] 
+                  ~rule:(Proof.Rule.mk "ext_decompose") in
+            let new_c = C.create ~trail ~penalty new_lits proof in
+            Some new_c
+          ) else None
+        ) into_positions 
+      ) from_positions
+    )
+ 
   (** Find clauses that [given] may demodulate, add them to set *)
   let backward_demodulate set given =
     Util.enter_prof prof_back_demodulate;
@@ -2402,7 +2454,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Env.add_binary_inf "lambdasup_active(from)" infer_lambdasup_from;
         Env.add_binary_inf "lambdasup_passive(into)" infer_lambdasup_into;
       );
+      CCFormat.printf "LSUP_val: %d\n" !_lambdasup;
       if (List.exists CCFun.id [!_fluidsup; !_dupsup; !_lambdasup != -1; !_max_infs = -1]) then (
+        CCFormat.printf "ADDING QUEUE EXTRACTION.\n";
         if !_switch_stream_extraction then
           Env.add_generate "stream_queue_extraction" extract_from_stream_queue_fix_stm
         else
