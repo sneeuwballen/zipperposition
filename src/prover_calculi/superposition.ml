@@ -2460,7 +2460,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Env.add_unary_inf "equality_resolution" (infer_equality_resolution_pragmatic_ho !_max_infs);
       );
 
-      if !max_lits_ext_dec !=0 then (
+      if !max_lits_ext_dec != 0 then (
         Env.add_binary_inf "ext_dec" ext_decompose_act;
         Env.add_binary_inf "ext_dec" ext_decompose_pas;
       );
@@ -2477,9 +2477,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Env.add_binary_inf "lambdasup_active(from)" infer_lambdasup_from;
         Env.add_binary_inf "lambdasup_passive(into)" infer_lambdasup_into;
       );
-      CCFormat.printf "LSUP_val: %d\n" !_lambdasup;
       if (List.exists CCFun.id [!_fluidsup; !_dupsup; !_lambdasup != -1; !_max_infs = -1]) then (
-        CCFormat.printf "ADDING QUEUE EXTRACTION.\n";
         if !_switch_stream_extraction then
           Env.add_generate "stream_queue_extraction" extract_from_stream_queue_fix_stm
         else
