@@ -37,6 +37,7 @@ let stat_demodulate_call = Util.mk_stat "sup.demodulate calls"
 let stat_demodulate_step = Util.mk_stat "sup.demodulate steps"
 let stat_semantic_tautology = Util.mk_stat "sup.semantic_tautologies"
 let stat_condensation = Util.mk_stat "sup.condensation"
+let stat_ext_dec = Util.mk_stat "sup.ext_dec calls"
 let stat_clc = Util.mk_stat "sup.clc"
 
 let prof_demodulate = Util.mk_profiler "sup.demodulate"
@@ -53,6 +54,7 @@ let prof_subsumption_set = Util.mk_profiler "sup.forward_subsumption"
 let prof_subsumption_in_set = Util.mk_profiler "sup.backward_subsumption"
 let prof_infer_active = Util.mk_profiler "sup.infer_active"
 let prof_infer_passive = Util.mk_profiler "sup.infer_passive"
+let prof_ext_dec = Util.mk_profiler "sup.ext_dec"
 let prof_infer_fluidsup_active = Util.mk_profiler "sup.infer_fluidsup_active"
 let prof_infer_fluidsup_passive = Util.mk_profiler "sup.infer_fluidsup_passive"
 let prof_infer_equality_resolution = Util.mk_profiler "sup.infer_equality_resolution"
@@ -1589,6 +1591,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
      Currently with no restrictions or indexing. After initial evaluation,
      will find ways to restrict it somehow. *)
   let ext_decompose from_c into_c =
+    Util.incr_stat stat_ext_dec;
+
     let get_positions ?(only_pos=true) c =
       let eligible = if only_pos then C.Eligible.pos else C.Eligible.always in
       Literals.fold_terms (C.lits c) 
@@ -1631,6 +1635,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                     C.proof_parent_subst renaming  (into_c, sc_i) Subst.empty] 
                   ~rule:(Proof.Rule.mk "ext_decompose") in
             let new_c = C.create ~trail ~penalty new_lits proof in
+
+            Util.debugf ~section 5 "[ext_dec(%a,%a):%a].\n" (fun k -> k C.pp from_c C.pp into_c C.pp new_c);
+
             Some new_c
           ) else None
         ) into_positions 
@@ -1642,7 +1649,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Env.ProofState.ActiveSet.clauses ()
       |> C.ClauseSet.filter (fun cl -> C.length cl <= !max_lits_ext_dec)
       |> C.ClauseSet.to_list
-      |> CCList.flat_map (ext_decompose given)
+      |> CCList.flat_map (fun cl -> 
+        Util.with_prof prof_ext_dec (ext_decompose given) cl)
     ) 
     else []
 
@@ -1651,7 +1659,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Env.ProofState.ActiveSet.clauses ()
       |> C.ClauseSet.filter (fun cl -> C.length cl <= !max_lits_ext_dec)
       |> C.ClauseSet.to_list
-      |> CCList.flat_map (fun cl -> ext_decompose cl given)
+      |> CCList.flat_map (fun cl -> 
+        Util.with_prof prof_ext_dec (fun cl' -> ext_decompose cl' given ) cl)
     ) 
     else []
  

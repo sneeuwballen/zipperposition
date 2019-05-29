@@ -950,9 +950,11 @@ module Pos = struct
     let module AL = Int_lit in
     match lit, at with
       | Equation (l, r, sign), P.Left pos' ->
-        Equation (T.Pos.replace l pos' ~by, r, sign)
+        let cons = if sign then mk_eq else mk_neq in
+        cons (T.Pos.replace l pos' ~by) r
       | Equation (l, r, sign), P.Right pos' ->
-        Equation (l, T.Pos.replace r pos' ~by, sign)
+        let cons = if sign then mk_eq else mk_neq in
+        cons l (T.Pos.replace r pos' ~by)
       | True, _
       | False, _ -> lit  (* flexible, lit can be the result of a simplification *)
       | Int (AL.Binary (op, m1, m2)), P.Left (P.Arg(i,pos')) ->
