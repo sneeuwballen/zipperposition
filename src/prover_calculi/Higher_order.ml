@@ -388,7 +388,13 @@ module Make(E : Env.S) : S with module Env = E = struct
         | Literal.Equation (lhs,rhs,false) 
             when is_eligible i l && Type.is_fun @@ T.ty lhs ->
           let arg_types = Type.expected_args @@ T.ty lhs in
-          let free_vars = Literal.vars l |> T.VarSet.of_list |> T.VarSet.to_list in
+          let vars_under_quant = 
+            Literal.root_terms l
+            |> List.fold_left (fun acc t -> 
+                  Term.VarSet.union acc (T.vars_under_quant t)) 
+               T.VarSet.empty in
+          let free_vars = Literal.vars l |> T.VarSet.of_list |> T.VarSet.diff vars_under_quant
+                          |> T.VarSet.to_list in
           let new_lits = CCList.map (fun (j,x) -> 
               if i!=j then x
               else (
