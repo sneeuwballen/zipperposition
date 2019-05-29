@@ -873,15 +873,18 @@ module Make(E : Env.S) : S with module Env = E = struct
             else None (* ignoring onself *))
         args @ missing in
       let res = List.mapi (fun i arg_opt ->
-        let t = List.nth args i in 
-        match arg_opt with 
-        | Some arg_l ->
-          let res_l = if all_covers then T.cover_with_terms t arg_l 
-                      else [t; T.max_cover t arg_l] in
-          T.Set.of_list res_l 
-        | None -> Term.Set.empty ) args_opt in
+        if i < List.length args then (
+          let t = List.nth args i in 
+          begin match arg_opt with 
+          | Some arg_l ->
+            let res_l = if all_covers then T.cover_with_terms t arg_l 
+                        else [t; T.max_cover t arg_l] in
+            T.Set.of_list res_l 
+          | None -> Term.Set.empty 
+          end)
+        else Term.Set.empty) args_opt in
       res
-      in
+    in
 
     let status = VTbl.create 8 in
     C.lits c

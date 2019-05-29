@@ -1088,13 +1088,14 @@ module Conv = struct
           ST.app ~ty:(aux_ty (ty t))
             (aux_t env f) (List.map (aux_t env) l)
         | AppBuiltin (b,[v;body]) when Builtin.equal b Builtin.ForallConst ||
-                                Builtin.equal b Builtin.ExistsConst ->
+                                       Builtin.equal b Builtin.ExistsConst ->
           let b = if Builtin.equal b Builtin.ForallConst 
                   then Binder.Forall else Binder.Exists in
           let v =
             (match view v with
             | Var i -> (aux_var i)
             | _ -> 
+            CCFormat.printf "Failed converting %a.\n" (pp_in Output_format.O_tptp) t ;
             let v = aux_t env v in
             raise (Type.Conv.Error v)) in
           ST.bind ~ty:(aux_ty (ty t)) b v (aux_t env body) 
