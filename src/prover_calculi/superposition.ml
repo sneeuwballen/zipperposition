@@ -1671,26 +1671,34 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     else []
 
   let ext_eqres_decompose_aux c =
-    Util.incr_stat stat_ext_dec;
     let eligible = C.Eligible.neg in
-    Literals.fold_eqn (C.lits c) ~eligible ~ord ~both:false ~sign:false
-    |> Iter.filter_map (fun (lhs,rhs,sign,pos) ->
-        let (l_hd, l_args), (r_hd, r_args) = CCPair.map_same T.as_app (lhs,rhs) in
-        if not (T.equal l_hd r_hd) && List.length l_args = List.length r_args &&
-           List.exists (fun t -> T.is_fun t || Type.is_prop (T.ty t)) l_args then (
-          let new_neq_lits = 
-              ((l_hd,r_hd) :: CCList.combine l_args r_args) 
-              |> CCList.filter_map (fun (arg_f, arg_i) -> 
-                  if not (T.equal arg_f arg_i) then Some (Lit.mk_neq arg_f arg_i)
-                  else None) in
-          let i, _ = Literals.Pos.cut pos in
-          let new_lits = new_neq_lits @ CCArray.except_idx (C.lits c) i in
-          let proof =
-              Proof.Step.inference [C.proof_parent c] 
-                ~rule:(Proof.Rule.mk "ext_eqres_decompose") in
-          let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
-          Some new_c) 
-        else None)
+    if Proof.Step.inferences_perfomed (C.proof_step c) < !max_lits_ext_dec then (
+      let res = 
+        Literals.fold_eqn (C.lits c) ~eligible ~ord ~both:false ~sign:false
+        |> Iter.to_list
+        |> CCList.filter_map (fun (lhs,rhs,sign,pos) ->
+            assert(sign = false);
+            let (l_hd, l_args), (r_hd, r_args) = CCPair.map_same T.as_app (lhs,rhs) in
+            if not (T.equal l_hd r_hd) && List.length l_args = List.length r_args &&
+              List.for_all (fun (s, t) -> Type.equal (Term.ty s) (Term.ty t)) (CCList.combine l_args r_args) &&
+              List.exists (fun t -> T.is_fun t || Type.is_prop (T.ty t)) l_args then (
+              let new_neq_lits = 
+                  ((l_hd,r_hd) :: CCList.combine l_args r_args) 
+                  |> CCList.filter_map (fun (arg_f, arg_i) -> 
+                      if not (T.equal arg_f arg_i) then Some (Lit.mk_neq arg_f arg_i)
+                      else None) in
+              let i, _ = Literals.Pos.cut pos in
+              let new_lits = new_neq_lits @ CCArray.except_idx (C.lits c) i in
+              let proof =
+                  Proof.Step.inference [C.proof_parent c] 
+                    ~rule:(Proof.Rule.mk "ext_eqres_decompose") in
+              let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
+              CCFormat.printf "ext_eqres: %a => %a.\n" C.pp c C.pp new_c;
+              Some new_c) 
+            else None) in
+        Util.incr_stat stat_ext_dec;
+        res
+    ) else []
 
   let ext_eqres_decompose given = 
     Util.with_prof prof_ext_dec ext_eqres_decompose_aux given
@@ -2501,8 +2509,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       );
 
       if !max_lits_ext_dec != 0 then (
-        Env.add_binary_inf "ext_dec" ext_decompose_act;
-        Env.add_binary_inf "ext_dec" ext_decompose_pas;
+        Env.add_binary_inf "ext_dec_act" ext_decompose_act;
+        Env.add_binary_inf "ext_dec_pas" ext_decompose_pas;
+        Env.add_unary_inf "ext_eqres_dec" ext_eqres_decompose;
       );
 
       if !_fluidsup then (
