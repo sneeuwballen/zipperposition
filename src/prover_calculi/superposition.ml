@@ -81,6 +81,7 @@ let _dupsup = ref true
 let _NO_LAMSUP = -1
 let _lambdasup = ref (-1)
 let _max_infs = ref (-1)
+let max_lits_ext_dec = ref 0
 let _unif_alg = ref JP_unif.unify_scoped
 
 
@@ -1619,7 +1620,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               |> List.map (fun (arg_f, arg_i) -> Lit.mk_neq arg_f arg_i) in
 
             let (i, pos_f) = Lits.Pos.cut from_p in
-            (* same literal, the other side of the equation *)
             let from_s = Lits.Pos.at lits_f (Position.arg i (Position.opp pos_f)) in
             Lits.Pos.replace lits_i ~at:into_p ~by:from_s;
             let new_lits = new_neq_lits @ CCArray.except_idx lits_f i  @ CCArray.to_list lits_i in
@@ -1636,6 +1636,24 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ) into_positions 
       ) from_positions
     )
+
+  let ext_decompose_act given = 
+    if C.length given <= !max_lits_ext_dec then (
+      Env.ProofState.ActiveSet.clauses ()
+      |> C.ClauseSet.filter (fun cl -> C.length cl <= !max_lits_ext_dec)
+      |> C.ClauseSet.to_list
+      |> CCList.flat_map (ext_decompose given)
+    ) 
+    else []
+
+  let ext_decompose_pas given = 
+    if C.length given <= !max_lits_ext_dec then (
+      Env.ProofState.ActiveSet.clauses ()
+      |> C.ClauseSet.filter (fun cl -> C.length cl <= !max_lits_ext_dec)
+      |> C.ClauseSet.to_list
+      |> CCList.flat_map (fun cl -> ext_decompose cl given)
+    ) 
+    else []
  
   (** Find clauses that [given] may demodulate, add them to set *)
   let backward_demodulate set given =
@@ -2442,6 +2460,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Env.add_unary_inf "equality_resolution" (infer_equality_resolution_pragmatic_ho !_max_infs);
       );
 
+      if !max_lits_ext_dec !=0 then (
+        Env.add_binary_inf "ext_dec" ext_decompose_act;
+        Env.add_binary_inf "ext_dec" ext_decompose_pas;
+      );
+
       if !_fluidsup then (
         Env.add_binary_inf "fluidsup_passive" infer_fluidsup_passive;
         Env.add_binary_inf "fluidsup_active" infer_fluidsup_active;
@@ -2561,6 +2584,9 @@ let () =
     ; "--ord-in-normal-form"
     , Arg.Set _ord_in_normal_form
     , " compare intermediate terms in calculus rules in beta-normal-eta-long form"
+    ; "--ext-decompose"
+    , Arg.Set_int max_lits_ext_dec
+    , " Sets the maximal number of literals clause can have for ExtDec inference."
     ; "--fluidsup-penalty"
     , Arg.Int (fun p -> _fluidsup_penalty := p)
     , " penalty for FluidSup inferences"
