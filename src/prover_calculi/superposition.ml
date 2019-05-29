@@ -1640,6 +1640,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   ~rule:(Proof.Rule.mk "ext_decompose") in
             let new_c = C.create ~trail ~penalty new_lits proof in
 
+            Format.printf "[ext_dec(%a:%d,%a:%d):%a:%d].\n" C.pp from_c 
+              (Proof.Step.inferences_perfomed (C.proof_step from_c)) C.pp into_c 
+              (Proof.Step.inferences_perfomed (C.proof_step into_c)) C.pp new_c
+              (Proof.Step.inferences_perfomed (C.proof_step new_c));
             Util.debugf ~section 5 "[ext_dec(%a,%a):%a].\n" (fun k -> k C.pp from_c C.pp into_c C.pp new_c);
 
             Some new_c
@@ -1651,7 +1655,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let ext_decompose_act given = 
     if C.length given <= !max_lits_ext_dec then (
       Env.ProofState.ActiveSet.clauses ()
-      |> C.ClauseSet.filter (fun cl -> C.length cl <= !max_lits_ext_dec)
+      |> C.ClauseSet.filter (fun cl -> 
+          Proof.Step.inferences_perfomed (C.proof_step cl)  <= !max_lits_ext_dec)
       |> C.ClauseSet.to_list
       |> CCList.flat_map (fun cl -> 
         Util.with_prof prof_ext_dec (ext_decompose given) cl)
@@ -1661,7 +1666,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let ext_decompose_pas given = 
     if C.length given <= !max_lits_ext_dec then (
       Env.ProofState.ActiveSet.clauses ()
-      |> C.ClauseSet.filter (fun cl -> C.length cl <= !max_lits_ext_dec)
+      |> C.ClauseSet.filter (fun cl -> 
+        Proof.Step.inferences_perfomed (C.proof_step cl) <= !max_lits_ext_dec)
       |> C.ClauseSet.to_list
       |> CCList.flat_map (fun cl -> 
         Util.with_prof prof_ext_dec (fun cl' -> ext_decompose cl' given ) cl)

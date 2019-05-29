@@ -417,6 +417,14 @@ module Step = struct
     | None, (Some _ as res) -> res
     | Some x, Some y -> Some (min x y)
 
+  let inferences_perfomed p =
+    let rec aux p = match p.kind with 
+    | Inference(r,_) -> List.fold_left (fun acc par -> 
+        acc + aux ((Parent.proof par).step)) 0 p.parents + 1 
+    | _ -> 0 in
+  aux p
+
+
   let step_ ?(infos=[]) kind parents =
     (* distance to goal (0 if a goal itself) *)
     let dist_to_goal = match kind with
