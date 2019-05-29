@@ -610,7 +610,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     end
 
   let prim_enum ~mode c =
-    if C.penalty c < max_penalty_prim_
+    if (*C.penalty c < max_penalty_prim_*) Proof.Step.inferences_perfomed (C.proof_step c) < max_penalty_prim_ 
     then prim_enum_ ~mode c
     else []
 
@@ -1062,7 +1062,7 @@ let def_unfold_enabled_ = ref false
 let force_enabled_ = ref false
 let enable_unif_ = ref true
 let prim_mode_ = ref `Neg
-let prim_max_penalty = ref 13 (* FUDGE *)
+let prim_max_penalty = ref 1 (* FUDGE *)
 
 let set_prim_mode_ =
   let l = [

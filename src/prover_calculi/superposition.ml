@@ -216,7 +216,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                     if (not (T.is_var body) || T.is_ho_var body) &&
                        (not (T.is_const hd) || not (ID.is_skolem (T.as_const_exn hd))) &&
                        (!_sup_at_var_headed || not (T.is_var (T.head_term body))) then
-                    (CCFormat.printf "Adding %a to LS index.\n" T.pp body;
+                    ( (*CCFormat.printf "Adding %a to LS index.\n" T.pp body; *)
                     Some (body, new_pos)) else None))
         |> Iter.fold
           (fun tree (t, pos) ->
@@ -1640,10 +1640,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   ~rule:(Proof.Rule.mk "ext_decompose") in
             let new_c = C.create ~trail ~penalty new_lits proof in
 
-            Format.printf "[ext_dec(%a:%d,%a:%d):%a:%d].\n" C.pp from_c 
-              (Proof.Step.inferences_perfomed (C.proof_step from_c)) C.pp into_c 
-              (Proof.Step.inferences_perfomed (C.proof_step into_c)) C.pp new_c
-              (Proof.Step.inferences_perfomed (C.proof_step new_c));
             Util.debugf ~section 5 "[ext_dec(%a,%a):%a].\n" (fun k -> k C.pp from_c C.pp into_c C.pp new_c);
 
             Some new_c
@@ -1673,6 +1669,31 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Util.with_prof prof_ext_dec (fun cl' -> ext_decompose cl' given ) cl)
     ) 
     else []
+
+  let ext_eqres_decompose_aux c =
+    Util.incr_stat stat_ext_dec;
+    let eligible = C.Eligible.neg in
+    Literals.fold_eqn (C.lits c) ~eligible ~ord ~both:false ~sign:false
+    |> Iter.filter_map (fun (lhs,rhs,sign,pos) ->
+        let (l_hd, l_args), (r_hd, r_args) = CCPair.map_same T.as_app (lhs,rhs) in
+        if not (T.equal l_hd r_hd) && List.length l_args = List.length r_args &&
+           List.exists (fun t -> T.is_fun t || Type.is_prop (T.ty t)) l_args then (
+          let new_neq_lits = 
+              ((l_hd,r_hd) :: CCList.combine l_args r_args) 
+              |> CCList.filter_map (fun (arg_f, arg_i) -> 
+                  if not (T.equal arg_f arg_i) then Some (Lit.mk_neq arg_f arg_i)
+                  else None) in
+          let i, _ = Literals.Pos.cut pos in
+          let new_lits = new_neq_lits @ CCArray.except_idx (C.lits c) i in
+          let proof =
+              Proof.Step.inference [C.proof_parent c] 
+                ~rule:(Proof.Rule.mk "ext_eqres_decompose") in
+          let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
+          Some new_c) 
+        else None)
+
+  let ext_eqres_decompose given = 
+    Util.with_prof prof_ext_dec ext_eqres_decompose_aux given
  
   (** Find clauses that [given] may demodulate, add them to set *)
   let backward_demodulate set given =
