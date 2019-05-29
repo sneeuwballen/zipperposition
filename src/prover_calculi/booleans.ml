@@ -257,11 +257,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     match idx with 
     | Some _ ->
       let f = Literals.Conv.to_tst (C.lits c) in
-      let proof = Proof.Step.esa ~rule:(Proof.Rule.mk "cnf_otf") [C.proof_parent c] in
+      let proof = Proof.Step.inference ~rule:(Proof.Rule.mk "cnf_otf") [C.proof_parent c] in
       let stmt = Statement.assert_ ~proof f in
       let cnf_vec = Cnf.convert @@ CCVector.to_seq @@ Cnf.cnf_of ~ctx:(Ctx.sk_ctx ()) stmt in
       let sets = Env.convert_input_statements cnf_vec in
-      let clauses = sets.Clause.c_set |> CCVector.to_list in
+      let clauses = sets.Clause.c_set 
+                    |> CCVector.to_list
+                    |> CCList.map (C.update_trail (fun _ -> C.trail c)) in
       Some clauses
     | None       -> None
 

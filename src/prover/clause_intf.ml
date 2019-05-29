@@ -227,6 +227,9 @@ module type S = sig
     val pos : t
     (** Only positive literals *)
 
+    val pos_eq : t
+    (** Only positive equational literals *)
+
     val neg : t
     (** Only negative literals *)
 

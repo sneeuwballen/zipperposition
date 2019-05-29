@@ -1594,12 +1594,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.incr_stat stat_ext_dec;
 
     let get_positions ?(only_pos=true) c =
-      let eligible = if only_pos then C.Eligible.pos else C.Eligible.always in
+      let eligible = if only_pos then C.Eligible.pos_eq else C.Eligible.always in
       Literals.fold_terms (C.lits c) 
         ~vars:false ~subterms:false ~which:`All ~ord ~eligible
       |> Iter.filter (fun (t,pos) -> 
           let hd, args = T.as_app t in
-          T.is_const hd && List.exists (fun t -> Type.is_fun (Term.ty t)) args)
+          T.is_const hd && List.exists (fun t -> 
+            let ty = Term.ty t in
+            Type.is_fun ty || Type.is_prop ty) args)
       |> Iter.to_list in
 
     let from_positions = get_positions from_c in
@@ -1607,7 +1609,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
     let sc_f, sc_i = 0, 1 in
     let renaming = Subst.Renaming.create () in
-    if CCList.is_empty from_positions || CCList.is_empty into_positions then []
+    if CCList.is_empty from_positions || CCList.is_empty into_positions then (
+      []
+    )
     else (
       CCList.flat_map (fun (from_t, from_p) -> 
         CCList.filter_map (fun (into_t, into_p) -> 

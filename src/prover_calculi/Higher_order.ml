@@ -393,7 +393,8 @@ module Make(E : Env.S) : S with module Env = E = struct
             |> List.fold_left (fun acc t -> 
                   Term.VarSet.union acc (T.vars_under_quant t)) 
                T.VarSet.empty in
-          let free_vars = Literal.vars l |> T.VarSet.of_list |> T.VarSet.diff vars_under_quant
+          let free_vars = Literal.vars l |> T.VarSet.of_list 
+                          |> (fun f_vars -> T.VarSet.diff f_vars vars_under_quant)
                           |> T.VarSet.to_list in
           let new_lits = CCList.map (fun (j,x) -> 
               if i!=j then x
