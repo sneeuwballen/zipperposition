@@ -158,7 +158,7 @@ val is_ground : t -> bool
 
 val symbols : t -> ID.Set.t
 
-val root_terms : t -> term list (** all the terms immediatly under the lit *)
+val root_terms : t -> term list (** all the terms immediately under the lit *)
 
 val to_ho_term : t -> term option
 (** Conversion to higher-order term using {!Term.Form} *)

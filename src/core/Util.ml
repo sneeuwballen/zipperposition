@@ -445,7 +445,7 @@ let popen ~cmd ~input : _ or_error =
     (* send input to the subprocess *)
     output_string into input;
     close_out into;
-    (* read ouput from the subprocess *)
+    (* read output from the subprocess *)
     let output = CCIO.read_all from in
     (* wait for subprocess to terminate *)
     ignore (Unix.close_process (from, into));

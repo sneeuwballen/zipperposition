@@ -15,7 +15,7 @@
     See {!TypeInference} for inferring types from terms and formulas,
     and {!Signature} to associate types with symbols.
 
-    TODO: think of a good way of representating AC operators (+, ...)
+    TODO: think of a good way of representing AC operators (+, ...)
 *)
 
 type t = private InnerTerm.t
@@ -300,7 +300,7 @@ module Conv : sig
     t ->
     TypedSTerm.t
     (** convert a type to a prolog term.
-        @param env the current environement for De Bruijn indices *)
+        @param env the current environment for De Bruijn indices *)
 end
 
 

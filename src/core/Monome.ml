@@ -1090,7 +1090,7 @@ module Int = struct
             let n = Z.div (Z.neg m.const) c in
             [ [t, const n] ]
           | _::_::_ as l when List.exists _is_one_abs l ->
-            (* at leat one of the coefficients is +/- 1. Extract
+            (* at least one of the coefficients is +/- 1. Extract
                 the corresponding terms *)
             let unit_terms = List.filter _is_one_abs l in
             List.map

@@ -57,7 +57,7 @@ module type S = sig
   (** [add_eq s (x, eq)] returns a system containing the same constraints as [s], plus the equation (x = eq). *)
   val add_eq      : t -> var * (Q.t * var) list -> t
 
-  (** [add_bounds (x, lower, upper)] returns a system containing the same contraints as [s], plus
+  (** [add_bounds (x, lower, upper)] returns a system containing the same constraints as [s], plus
       the bounds [lower] and [upper] for the given variable [x]. If the bound is loose on one side (no upper bounds for instance),
       the values [Zarith.Q.inf] and [Zarith.Q.minus_inf] can be used. By default, in a system, all variables have no bounds,
       i.e have lower bound [Zarith.Q.minus_inf] and upper bound [Zarith.Q.inf]. *)
@@ -65,7 +65,7 @@ module type S = sig
 
   (** {3 Simplex solving} *)
 
-  (** [ksolve s] solves the system [s] and returns a solution, if one exists. This function may chnge
+  (** [ksolve s] solves the system [s] and returns a solution, if one exists. This function may change
       the internal representation of the system to that of an equivalent one (permutation of basic and
       non basic variables and pivot operation on the tableaux).
       @param debug An optional debug option can be given, and will be applied to all systems encountered
@@ -97,10 +97,10 @@ module type S = sig
 
   (** [normalize int_vars s], normalizes the system [s] (in place), and returns the list of optimizations performed on it.
       [int_vars] is the list of variable that should be assigned an integer.
-      A normalized system has only integer coeficients in his tableaux. Furthermore, in any line (i.e in the expression of a basic variable [x]),
-      the gcd of all coeficients is [1]. This includes the bounds of [x], except in the following case.
-      If all pertinent variables (have a non-zero coeficient) in the expression of [x] are in [int_vars], then the bounds are divided by the gcd
-      of the coeficients in the expression, and then rounded (since we can deduce that [x] must be an integer as well). *)
+      A normalized system has only integer coefficients in his tableaux. Furthermore, in any line (i.e in the expression of a basic variable [x]),
+      the gcd of all coefficients is [1]. This includes the bounds of [x], except in the following case.
+      If all pertinent variables (have a non-zero coefficient) in the expression of [x] are in [int_vars], then the bounds are divided by the gcd
+      of the coefficients in the expression, and then rounded (since we can deduce that [x] must be an integer as well). *)
   val normalize : var list -> t -> optim list
 
   (** Apply all optimizations to a simplex. *)

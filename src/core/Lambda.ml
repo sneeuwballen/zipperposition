@@ -114,7 +114,7 @@ module Inner = struct
             (fun k->k T.pp t n_missing (CCFormat.Dump.list T.pp) ty_args);
           (* missing args: suffix of length [n_missing] *)
           let missing_args = CCList.drop (n_args-n_missing) ty_args in
-          (* shift body to accomodate for new binders *)
+          (* shift body to accommodate for new binders *)
           let body = T.DB.shift n_missing body in
           (* build the fully-abstracted term *)
           let dbvars =

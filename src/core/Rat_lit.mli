@@ -142,7 +142,7 @@ module Focus : sig
 
   val is_strictly_max : ord:Ordering.t -> t -> bool
   (** Is the focused term maximal in the literal, ie is it greater
-      than all the othe terms? *)
+      than all the other terms? *)
 
   val map_lit :
     f_m:(Q.t Monome.t -> Q.t Monome.t) ->
