@@ -348,6 +348,9 @@ module Seq = struct
 end
 
 let symbols lit = Seq.symbols lit |> ID.Set.of_seq
+let free_vars lit = 
+  Seq.terms lit
+  |> Iter.fold (fun acc t -> Term.VarSet.union acc (Term.free_vars t)) Term.VarSet.empty
 
 (** Unification-like operation on components of a literal. *)
 module UnifOp = struct

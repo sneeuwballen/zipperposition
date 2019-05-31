@@ -463,6 +463,8 @@ let vars_under_quant t = VarSet.of_seq @@ Iter.fold (fun acc st ->
   | _ -> acc
 ) Iter.empty (Seq.subterms ~include_builtin:true t)
 
+let free_vars t = VarSet.diff (VarSet.of_seq (Seq.vars t)) (vars_under_quant t) 
+
 
 let var_occurs ~var t =
   Iter.exists (HVar.equal Type.equal var) (Seq.vars t)

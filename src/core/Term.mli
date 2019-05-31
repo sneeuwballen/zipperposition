@@ -388,6 +388,7 @@ module Arith : sig
 end
 
 val vars_under_quant : t -> VarSet.t
+val free_vars        : t -> VarSet.t
 
 (** {2 De Bruijn} *)
 module DB : sig

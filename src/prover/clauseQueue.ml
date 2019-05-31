@@ -161,10 +161,10 @@ module Make(C : Clause_intf.S) = struct
               if distinct_vars_mul < 0.0 then int_of_float res
               else
                 let dist_vars = 
-                 Literals.vars (C.lits c)
-                 |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))  in
-                let n_vars = List.length dist_vars in
-                int_of_float ((distinct_vars_mul ** (float_of_int n_vars)) +. res)) 
+                 Literals.free_vars (C.lits c)
+                 |> Term.VarSet.filter (fun v -> not (Type.is_tType (HVar.ty v)))  in
+                let n_vars = Term.VarSet.cardinal dist_vars in
+                int_of_float ((distinct_vars_mul ** (float_of_int n_vars)) *. res)) 
 
 
     let penalty = C.penalty

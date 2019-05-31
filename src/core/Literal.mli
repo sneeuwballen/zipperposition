@@ -132,6 +132,7 @@ val vars : t -> Type.t HVar.t list (** gather variables *)
 val var_occurs : Type.t HVar.t -> t -> bool
 val is_ground : t -> bool
 val symbols : t -> ID.Set.t
+val free_vars : t -> Term.VarSet.t
 val root_terms : t -> term list (** all the terms immediatly under the lit *)
 
 val to_ho_term : t -> term option
