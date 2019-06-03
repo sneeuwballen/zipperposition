@@ -164,8 +164,11 @@ module Make(C : Clause_intf.S) = struct
                  Literals.free_vars (C.lits c)
                  |> Term.VarSet.filter (fun v -> not (Type.is_tType (HVar.ty v)))  in
                 let n_vars = Term.VarSet.cardinal dist_vars in
-                let proof_penalty = 1.02 ** float_of_int (Proof.Step.inferences_perfomed (C.proof_step c)) in
-                int_of_float (proof_penalty *. (distinct_vars_mul ** (float_of_int n_vars)) *. res)) 
+                let dist_var_penalty = distinct_vars_mul ** (float_of_int n_vars) in
+                let proof_depth_penalty = 
+                  (* max (0.9999 ** (float_of_int (Proof.Step.inferences_perfomed (C.proof_step c)))) 0.75 in *)
+                  1.0 in
+                int_of_float (proof_depth_penalty *. dist_var_penalty *. res)) 
 
 
     let penalty = C.penalty

@@ -136,7 +136,8 @@ let proj_imit_bindings ~state ~subst ~scope ~counter  s t =
            bound variable we back off *)
         if state.num_app_projections <= !max_app_projections then l
         else
-          List.filter (fun (_, ty) -> 
+          List.filter (fun (_, ty) ->
+            (List.length args_s <= 1) ||  
             List.length (Type.expected_args ty) = 0) l)
     (* If heads are different constants, do not project to those subterms *)
     |> CCList.filter_map (fun ((i, _) as p) -> 
@@ -158,9 +159,10 @@ let proj_imit_bindings ~state ~subst ~scope ~counter  s t =
             project_hs_one ~counter 
               (List.map (fun ty -> S.apply_ty ty_unif (ty, scope)) pref_tys) i
               (S.apply_ty ty_unif (ty, scope)) in
+          let max_num_of_apps = 
+            if List.length args_s <= 1 then 0  else List.length @@ Type.expected_args ty in
           let hd_s = HVar.cast hd_s ~ty:(S.apply_ty ty_unif (HVar.ty hd_s, scope)) in
-            Some (US.FO.bind ty_unif (hd_s, scope) (pr_bind, scope),
-                  List.length @@ Type.expected_args ty)
+            Some (US.FO.bind ty_unif (hd_s, scope) (pr_bind, scope), max_num_of_apps)
         | None -> None)
     |> CCList.filter_map (fun x -> x) in
        let imit_binding =
