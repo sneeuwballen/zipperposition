@@ -2710,7 +2710,7 @@ let () =
       PragHOUnif.max_app_projections := 4;
       PragHOUnif.max_var_imitations := 4;
       PragHOUnif.max_identifications := 4;
-      PragHOUnif.max_elims := 4;
+      PragHOUnif.max_elims := 2;
       _fluidsup := false;
     );
     Params.add_to_mode "fo-complete-basic" (fun () ->

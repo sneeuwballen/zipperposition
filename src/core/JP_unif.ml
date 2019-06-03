@@ -130,7 +130,7 @@ let project_huet_style ~scope ~counter u v l =
 
 let imitate_onesided ~scope ~counter u v = 
   let head_u = T.head_term_mono u in
-  let head_v = T.head_term_with_mandatory_args v in
+  let head_v = T.head_term_mono v in
   let prefix_types_u, ret1 = Type.open_fun (T.ty head_u) in
   let prefix_types_v, ret2 = Type.open_fun (T.ty head_v) in
   (* assert (Type.equal ret1 ret2); *)

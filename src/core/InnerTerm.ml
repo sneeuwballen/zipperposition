@@ -764,7 +764,11 @@ let[@inline] is_a_type t = match ty t with
   | NoType -> assert false
 
 let[@inline] as_app t = match view t with
-  | App (f,l) -> f, l
+  | App (f,l) -> 
+    begin match view f with 
+    | AppBuiltin(b, l') -> app_builtin b ~ty:(ty_exn t) (l'@l), []
+    | _ -> f, l 
+    end
   | _ -> t, []
 
 let[@inline] as_var t = match view t with Var v -> Some v | _ -> None

@@ -15,6 +15,9 @@ type unif_state =
   depth               : int
 }
 
+let state_pp out st =
+  Format.fprintf out "|[ids: %d, var_imits:%d, app_projs: %d, elims: %d, depth: %d|]" 
+                    st.num_identifications st.num_var_imitations st.num_app_projections st.num_elims st.depth
 
 module S = struct
   let apply s t = Subst.FO.apply Subst.Renaming.none (US.subst s) t
@@ -162,7 +165,7 @@ let proj_imit_bindings ~state ~subst ~scope ~counter  s t =
     |> CCList.filter_map (fun x -> x) in
        let imit_binding =
        let hd_s = T.head_term_mono s in 
-       let hd_t = T.head_term_with_mandatory_args t in
+       let hd_t = T.head_term_mono t in
        if (not @@ T.is_bvar @@ T.head_term t && 
            not (T.var_occurs ~var:(T.as_var_exn hd_s) hd_t)) then 
          [(imitate_one ~scope ~counter s t,-1)]
@@ -239,9 +242,9 @@ let rec unify ~state ~scope ~counter ~subst = function
                       (flex_proj_imit  ~state ~subst ~counter ~scope body_s' body_t' rest)
                   )
               )
-            | (T.Var _, T.Const _) | (T.Var _, T.DB _) ->
+            | (T.Var _, T.Const _) | (T.Var _, T.DB _) | (T.Var _, T.AppBuiltin _) ->
                 flex_rigid ~state ~subst ~counter ~scope ~ban_id body_s' body_t' rest
-            | (T.Const _, T.Var _) | (T.DB _, T.Var _) ->
+            | (T.Const _, T.Var _) | (T.DB _, T.Var _) | (T.AppBuiltin _, T.Var _) ->
                 flex_rigid ~state ~subst ~counter ~scope ~ban_id body_t' body_s' rest
             | T.Const f , T.Const g when ID.equal f g && List.length args_s = List.length args_t ->
                 unify ~state ~subst ~counter ~scope (build_constraints ~ban_id args_s args_t rest)
@@ -377,13 +380,15 @@ let unify_scoped t0_s t1_s =
     depth               = 0
   } in
   let res =
-      prefix
+      (* prefix *)
       (unify ~state ~scope:unifscope ~counter ~subst [t0', t1', false]) 
       (* OSeq.empty *)
   in
 
   res
   |> OSeq.map (CCOpt.map (fun sub ->       
+      Format.printf "%a =?= %a | RES: %a.\n" (Scoped.pp T.pp) t0_s (Scoped.pp T.pp) t1_s S.pp sub;
+
       let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t0_s in 
       let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t1_s in
       assert(Type.equal (Term.ty l) (Term.ty r));

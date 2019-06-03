@@ -255,6 +255,10 @@ let head_term_mono t = match view t with
   | App (f,l) ->
     let l1 = CCList.take_while is_type l in
     app f l1 (* re-apply to type parameters *)
+  | AppBuiltin(b, l) ->
+    let ty_args, args = CCList.partition is_type l in
+    let ty = Type.arrow (List.map ty args) (ty t) in 
+    app_builtin ~ty b ty_args
   | _ -> t
 
 let get_mand_args t =
@@ -281,10 +285,9 @@ let as_app_with_mandatory_args t =
           | None -> 0
         end
       in
+      assert(num_mand_args = 0);
       let ty_args, other_args = CCList.take_drop_while is_type l in
-      let mand_args, other_args = CCList.take_drop num_mand_args other_args in
-      assert (List.for_all T.DB.closed mand_args);
-      let head = app f (ty_args @ mand_args) in (* re-apply to type & mandatory args *)
+      let head = app f (ty_args) in (* re-apply to type & mandatory args *)
       head, other_args
     | _ -> t, []
 
