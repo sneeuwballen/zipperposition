@@ -665,6 +665,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     assert (info.sup_kind=DupSup || 
             Unif.Ty.equal ~subst:(US.subst info.subst)
               (T.ty info.s, info.scope_active) (T.ty info.u_p, info.scope_passive));
+    assert(Unif.FO.equal ~subst:(US.subst info.subst) (info.s, info.scope_active) (info.u_p, info.scope_passive));
     if !_use_simultaneous_sup && info.sup_kind != LambdaSup && info.sup_kind != DupSup
     then do_simultaneous_superposition info
     else do_classic_superposition info
@@ -1593,10 +1594,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let ext_decompose from_c into_c =
     Util.incr_stat stat_ext_dec;
 
-    let get_positions ?(only_pos=true) c =
-      let eligible = if only_pos then C.Eligible.pos_eq else C.Eligible.always in
+    let get_positions ?(from=true) c =
+      let eligible = if from then C.Eligible.pos_eq else C.Eligible.always in
       Literals.fold_terms (C.lits c) 
-        ~vars:false ~subterms:false ~which:`All ~ord ~eligible
+        ~vars:false ~subterms:(not from) ~which:`All ~ord ~eligible
       |> Iter.filter (fun (t,pos) -> 
           let hd, args = T.as_app t in
           T.is_const hd && List.exists (fun t -> 
@@ -1605,7 +1606,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       |> Iter.to_list in
 
     let from_positions = get_positions from_c in
-    let into_positions = get_positions into_c ~only_pos:false in
+    let into_positions = get_positions into_c ~from:false in
 
     let sc_f, sc_i = 0, 1 in
     let renaming = Subst.Renaming.create () in
