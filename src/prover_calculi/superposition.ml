@@ -1615,7 +1615,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     else (
       CCList.flat_map (fun (from_t, from_p) -> 
         CCList.filter_map (fun (into_t, into_p) -> 
-          let (hd_f, args_f), (hd_i,args_i) = Term.as_app from_t, Term.as_app into_t in
+          let (hd_f, args_f), (hd_i,args_i) = Term.as_app_with_mandatory_args from_t, Term.as_app_with_mandatory_args into_t in
           if T.equal hd_f hd_i && T.is_const hd_f && List.length args_f = List.length args_i then (
             (* Renaming variables apart *)
             let args_f = List.map (fun t -> Subst.FO.apply renaming Subst.empty (t,sc_f)) args_f in
