@@ -380,15 +380,13 @@ let unify_scoped t0_s t1_s =
     depth               = 0
   } in
   let res =
-      (* prefix *)
+      prefix
       (unify ~state ~scope:unifscope ~counter ~subst [t0', t1', false]) 
       (* OSeq.empty *)
   in
 
   res
   |> OSeq.map (CCOpt.map (fun sub ->       
-      Format.printf "%a =?= %a | RES: %a.\n" (Scoped.pp T.pp) t0_s (Scoped.pp T.pp) t1_s S.pp sub;
-
       let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t0_s in 
       let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t1_s in
       assert(Type.equal (Term.ty l) (Term.ty r));

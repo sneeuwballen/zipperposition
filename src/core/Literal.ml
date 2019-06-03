@@ -706,6 +706,10 @@ let normalize_eq lit =
         | T.AppBuiltin(Builtin.Eq, [l;r]) ->
           let eq_cons = if T.equal rhs T.true_ then mk_eq else mk_neq in
           Some (eq_cons l r) 
+        | T.AppBuiltin(Builtin.Neq, [_;l;r])
+        | T.AppBuiltin(Builtin.Neq, [l;r]) ->
+          let eq_cons = if T.equal rhs T.true_ then mk_neq else mk_eq in
+          Some (eq_cons l r)
         | _ -> None
         end
   | _ -> None
