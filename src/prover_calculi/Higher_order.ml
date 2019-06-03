@@ -70,7 +70,7 @@ let k_some_ho : bool Flex_state.key = Flex_state.create_key()
 let k_enabled : bool Flex_state.key = Flex_state.create_key()
 let k_enable_def_unfold : bool Flex_state.key = Flex_state.create_key()
 let k_enable_ho_unif : bool Flex_state.key = Flex_state.create_key()
-let k_ho_prim_mode : _ Flex_state.key = Flex_state.create_key()
+let k_ho_prim_mode : [`Full | `Neg | `None | `Pragmatic ] Flex_state.key = Flex_state.create_key()
 let k_ho_prim_max_penalty : int Flex_state.key = Flex_state.create_key()
 
 module Make(E : Env.S) : S with module Env = E = struct
@@ -558,7 +558,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* rule for primitive enumeration of predicates [P t1…tn]
      (using ¬ and ∧ and =) *)
-  let prim_enum_ ~mode (c:C.t) : C.t list =
+  let prim_enum_ ~(mode) (c:C.t) : C.t list =
     (* set of variables to refine (only those occurring in "interesting" lits) *)
     let vars =
       Literals.fold_lits ~eligible:C.Eligible.always (C.lits c)
@@ -609,8 +609,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Iter.to_rev_list
     end
 
-  let prim_enum ~mode c =
-    if (*C.penalty c < max_penalty_prim_*) Proof.Step.inferences_perfomed (C.proof_step c) < max_penalty_prim_ 
+  let prim_enum ~(mode) c =
+    if Proof.Step.inferences_perfomed (C.proof_step c) < max_penalty_prim_ 
     then prim_enum_ ~mode c
     else []
 
@@ -1068,6 +1068,7 @@ let set_prim_mode_ =
   let l = [
     "neg", `Neg;
     "full", `Full;
+    "pragmatic", `Pragmatic;
     "none", `None;
   ] in
   let set_ s = prim_mode_ := List.assoc s l in
@@ -1211,7 +1212,7 @@ let () =
     _ext_pos := true;
     _ext_pos_all_lits := true;
     prim_mode_ := `None;
-    _elim_pred_var := false;
+    _elim_pred_var := true;
     _neg_cong_fun := false;
     enable_unif_ := false;
     _prune_arg_fun := `PruneMaxCover;

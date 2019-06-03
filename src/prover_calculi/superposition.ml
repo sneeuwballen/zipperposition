@@ -1693,7 +1693,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   Proof.Step.inference [C.proof_parent c] 
                     ~rule:(Proof.Rule.mk "ext_eqres_decompose") in
               let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
-              CCFormat.printf "ext_eqres: %a => %a.\n" C.pp c C.pp new_c;
               Some new_c) 
             else None) in
         Util.incr_stat stat_ext_dec;
