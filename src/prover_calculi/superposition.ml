@@ -1679,10 +1679,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         |> Iter.to_list
         |> CCList.filter_map (fun (lhs,rhs,sign,pos) ->
             assert(sign = false);
-            let (l_hd, l_args), (r_hd, r_args) = CCPair.map_same T.as_app (lhs,rhs) in
+            let (l_hd, l_args), (r_hd, r_args) = CCPair.map_same T.as_app_with_mandatory_args (lhs,rhs) in
             if not (T.equal l_hd r_hd) && List.length l_args = List.length r_args &&
               List.for_all (fun (s, t) -> Type.equal (Term.ty s) (Term.ty t)) (CCList.combine l_args r_args) &&
-              List.exists (fun t -> T.is_fun t || Type.is_prop (T.ty t)) l_args then (
+              (List.exists (fun t -> T.is_fun t || Type.is_prop (T.ty t)) l_args
+              || List.for_all (fun (s, t) -> Term.equal s t) (CCList.combine l_args r_args) ) then (
               let new_neq_lits = 
                   ((l_hd,r_hd) :: CCList.combine l_args r_args) 
                   |> CCList.filter_map (fun (arg_f, arg_i) -> 
