@@ -1284,7 +1284,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let ext_eqfact_decompose given =
     if Proof.Step.inferences_perfomed (C.proof_step given) <= !max_lits_ext_dec then  
-    Util.with_prof prof_ext_dec ext_eqfact_decompose_aux given
+      Util.with_prof prof_ext_dec ext_eqfact_decompose_aux given
 
   let infer_equality_factoring_aux ~unify ~iterate_substs clause =
     Util.enter_prof prof_infer_equality_factoring;
@@ -2552,6 +2552,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Env.add_binary_inf "ext_dec_act" ext_decompose_act;
         Env.add_binary_inf "ext_dec_pas" ext_decompose_pas;
         Env.add_unary_inf "ext_eqres_dec" ext_eqres_decompose;
+        Env.add_unary_inf "ext_eqfact_dec" ext_eqfact_decompose;
       );
 
       if !_fluidsup then (
