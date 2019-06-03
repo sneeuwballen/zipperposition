@@ -1249,9 +1249,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let ext_eqfact_decompose_aux cl =
     let try_ext_eq_fact (s,t) (u,v) idx =
     let (s_hd, s_args), (u_hd, u_args) = CCPair.map_same T.as_app_with_mandatory_args (s,u) in
-    let combined = CCList.combine s_args u_args in
     if not (T.equal s_hd u_hd) && List.length s_args = List.length u_args &&
-      List.for_all (fun (s, t) -> Term.equal s t) combined then (
+      List.for_all (fun (s, t) -> Term.equal s t) (CCList.combine s_args u_args) then (
       let new_lits = 
        Lit.mk_neq s_hd u_hd
        :: Lit.mk_neq t v
