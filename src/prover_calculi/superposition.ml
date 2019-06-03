@@ -2706,10 +2706,10 @@ let () =
       _lambdasup := -1;
       _dupsup := false;
       _max_infs := 100;
-      PragHOUnif.max_depth := 8;
-      PragHOUnif.max_app_projections := 4;
-      PragHOUnif.max_var_imitations := 4;
-      PragHOUnif.max_identifications := 4;
+      PragHOUnif.max_depth := 6;
+      PragHOUnif.max_app_projections := 3;
+      PragHOUnif.max_var_imitations := 2;
+      PragHOUnif.max_identifications := 2;
       PragHOUnif.max_elims := 2;
       _fluidsup := false;
     );
