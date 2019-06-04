@@ -43,8 +43,8 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) l
     let vars = List.mapi (fun i ty -> HVar.make ~ty i) ty_args in
     (* projection with "¬": [λvars. ¬ (F vars)] *)
     let l_not = match mode with
-      | `None | `Pragmatic -> []
-      | `Neg | `Full ->
+      | `None -> []
+      | `Neg | `Full | `Pragmatic ->
         let f = HVar.make offset ~ty:ty_v in
         [T.fun_of_fvars vars
           (T.Form.not_ (T.app (T.var f) (List.map T.var vars)))]
@@ -87,10 +87,12 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) l
           CCList.mapi (fun j db_j ->
             if i < j && Type.equal (T.ty db_i) (T.ty db_j) then (
               Format.print_flush ();
-              Some (T.fun_l ty_args (T.Form.eq db_i db_j))
-            ) else None) 
+              [T.fun_l ty_args (T.Form.eq db_i db_j);
+               T.fun_l ty_args (T.Form.and_ db_i db_j);
+               T.fun_l ty_args (T.Form.or_ db_i db_j)]
+            ) else []) 
           db_vars
-          |> CCList.filter_map CCFun.id) 
+          |> CCList.flatten) 
         db_vars
         |> CCList.flatten
       | _ -> []
