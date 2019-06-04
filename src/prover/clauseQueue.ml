@@ -168,7 +168,7 @@ module Make(C : Clause_intf.S) = struct
                 let proof_depth_penalty = 
                   (* max (0.9999 ** (float_of_int (Proof.Step.inferences_perfomed (C.proof_step c)))) 0.75 in *)
                   1.0 in
-                int_of_float (proof_depth_penalty *. dist_var_penalty *. res)) 
+                int_of_float (proof_depth_penalty *. dist_var_penalty +. res)) 
 
 
     let penalty = C.penalty

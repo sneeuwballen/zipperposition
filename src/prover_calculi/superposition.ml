@@ -79,6 +79,7 @@ let _ord_in_normal_form = ref false
 let _fluidsup_penalty = ref 0
 let _fluidsup = ref true
 let _dupsup = ref true
+let _trigger_bool_inst = ref (-1)
 
 let _NO_LAMSUP = -1
 let _lambdasup = ref (-1)
@@ -119,6 +120,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let _idx_back_demod = ref (TermIndex.empty ())
   let _idx_fv = ref (SubsumIdx.empty ())
   let _idx_simpl = ref (UnitIdx.empty ())
+  let _cls_w_pred_vars = ref (C.ClauseSet.empty)
+  let _trigger_bools   = ref (Term.Set.empty)
 
   let idx_sup_into () = !_idx_sup_into
   let idx_sup_from () = !_idx_sup_from
@@ -131,6 +134,32 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     if !_ord_in_normal_form
     then Ordering.map (fun t -> t |> Ctx.eta_normalize |> Lambda.snf) (Ctx.ord ())
     else Ctx.ord ()
+
+  let pred_vars c = 
+    C.Seq.vars c
+    |> Iter.filter (fun v -> 
+        let ty = HVar.ty v in
+        Type.is_fun ty && Type.returns_prop ty)
+    |> Iter.to_list
+
+  let get_triggers c =
+    Literals.fold_terms ~ord ~subterms:true ~eligible:C.Eligible.always 
+                        ~which:`All (C.lits c) 
+    |> Iter.filter_map (fun (t,_) -> 
+      let ty = Term.ty t and hd = Term.head_term t in
+      if Type.is_fun ty && Type.returns_prop ty && not (Term.is_var hd) then (
+        Some t
+      ) else None
+    )
+
+  let handle_pred_var_inst c =
+    if Proof.Step.inferences_perfomed (C.proof_step c) <= !_trigger_bool_inst then (
+      if not (CCList.is_empty (pred_vars c)) then (
+        _cls_w_pred_vars := C.ClauseSet.add c !_cls_w_pred_vars;
+      );
+      _trigger_bools := Term.Set.add_seq !_trigger_bools (get_triggers c);
+    );
+    Signal.ContinueListening
 
   (* Syntactic overapproximation of fluid or deep terms *)
   let is_fluid_or_deep c t = 
@@ -278,7 +307,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Signal.on PS.ActiveSet.on_add_clause
       (fun c ->
          _idx_fv := SubsumIdx.add !_idx_fv c;
-         _update_active TermIndex.add c);
+         ignore(_update_active TermIndex.add c);
+         handle_pred_var_inst c);
     Signal.on PS.ActiveSet.on_remove_clause
       (fun c ->
          _idx_fv := SubsumIdx.remove !_idx_fv c;
@@ -665,7 +695,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     assert (info.sup_kind=DupSup || 
             Unif.Ty.equal ~subst:(US.subst info.subst)
               (T.ty info.s, info.scope_active) (T.ty info.u_p, info.scope_passive));
-    assert(Unif.FO.equal ~subst:(US.subst info.subst) (info.s, info.scope_active) (info.u_p, info.scope_passive));
+    let renaming = Subst.Renaming.create () in
+    let s = Subst.FO.apply renaming (US.subst info.subst) (info.s, info.scope_active) in
+    let u_p = Subst.FO.apply renaming (US.subst info.subst) (info.u_p, info.scope_passive) in
+    assert(Term.equal (Lambda.eta_reduce @@ Lambda.snf @@ s) (Lambda.eta_reduce @@ Lambda.snf @@ u_p));
     if !_use_simultaneous_sup && info.sup_kind != LambdaSup && info.sup_kind != DupSup
     then do_simultaneous_superposition info
     else do_classic_superposition info
@@ -1249,7 +1282,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let ext_eqfact_decompose_aux cl =
     let try_ext_eq_fact (s,t) (u,v) idx =
     let (s_hd, s_args), (u_hd, u_args) = CCPair.map_same T.as_app_with_mandatory_args (s,u) in
-    if not (T.equal s_hd u_hd) && List.length s_args = List.length u_args &&
+    if not (T.equal s_hd u_hd) && Type.equal (T.ty s) (T.ty u) && 
+      List.length s_args = List.length u_args &&
       List.for_all (fun (s, t) -> Term.equal s t) (CCList.combine s_args u_args) then (
       let new_lits = 
        Lit.mk_neq s_hd u_hd
@@ -1280,6 +1314,44 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         aux_eq_rest (s,t) i lits
       | _ -> []) lits
     |> CCList.flatten
+
+  let pred_var_instantiation c trigger_set =
+    let p_vars = pred_vars c in
+    let substs = CCList.flat_map (fun v ->
+      let res = ref [] in (* no really efficient way without turning set to list *) 
+      Term.Set.iter (fun t -> 
+        if Type.equal (HVar.ty v) (Term.ty t) then (
+          let subst = Subst.FO.bind' Subst.empty (v,0) (t,1) in
+          res := subst :: !res;
+        )) trigger_set;
+      !res
+    ) p_vars in
+    Iter.of_list substs
+    |> Iter.map (fun sub ->
+      let new_lits = Lits.apply_subst (Subst.Renaming.create()) sub (C.lits c, 0) in
+      let trail = C.trail c in 
+      let penalty = C.penalty c in
+      let rule  = Proof.Rule.mk "instantiate_w_trigger" in
+      let proof = Proof.Step.inference ~rule [C.proof_parent c] in
+      let new_clause = C.create ~trail ~penalty (CCArray.to_list new_lits) proof in
+      new_clause)
+    |> Iter.to_list
+  
+  let instantiate_with_triggers c =
+    if Proof.Step.inferences_perfomed (C.proof_step c) <= !_trigger_bool_inst then ( 
+      pred_var_instantiation c !_trigger_bools)
+    else []
+  
+  let trigger_insantiation c =
+    if Proof.Step.inferences_perfomed (C.proof_step c) <= !_trigger_bool_inst then (
+      let triggers = Term.Set.of_seq @@ get_triggers c in
+      let res = ref [] in
+      C.ClauseSet.iter (fun old_c -> 
+        res := pred_var_instantiation old_c triggers @ !res
+      ) !_cls_w_pred_vars;
+      !res)
+    else []
+
 
   let ext_eqfact_decompose given =
     if Proof.Step.inferences_perfomed (C.proof_step given) <= !max_lits_ext_dec then  
@@ -2691,6 +2763,9 @@ let () =
     "--dupsup"
     , Arg.Set _dupsup
     , " enable DupSup inferences";
+    "--trigger-bool-inst"
+    , Arg.Set_int _trigger_bool_inst
+    , " instantiate predicate variables with boolean terms already in the proof state. Argument is the maximal proof depth of predicate variable";
       "--ho-unif-level",
       Arg.Symbol (["full"; "pragmatic"], (fun str ->
         _unif_alg := if (String.equal "full" str) then JP_unif.unify_scoped
