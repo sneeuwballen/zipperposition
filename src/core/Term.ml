@@ -560,18 +560,18 @@ let vars_prefix_order t =
 let depth t = Seq.subterms_depth t |> Iter.map snd |> Iter.fold max 0
 
 let simplify_bools t =
-  let simplify_and_or b l =
+  let simplify_and_or t b l =
     assert(b = Builtin.And || b = Builtin.Or);
     let when_empty, neutral_el = 
       if b = Builtin.And then true_,false_ else (false_,true_) in
-    if List.mem neutral_el l then neutral_el
+    if List.exists (T.equal neutral_el) l then neutral_el
     else (
-      let l' = List.filter (fun s -> not (T.equal s true_)) l in
+      let l' = List.filter (fun s -> not (T.equal s when_empty)) l in
       if List.length l = List.length l' then t
       else (
         if CCList.is_empty l' then when_empty
         else (if List.length l' = 1 then List.hd l'
-              else app_builtin ~ty:(ty t) Builtin.And l')
+              else app_builtin ~ty:(Type.prop) b l')
       )
     ) in
 
@@ -591,9 +591,18 @@ let simplify_bools t =
         t
       ) else app hd' args'
     | AppBuiltin(Builtin.And, l) ->
-      simplify_and_or Builtin.And l
+      simplify_and_or t Builtin.And l
     | AppBuiltin(Builtin.Or, l) ->
-      simplify_and_or Builtin.Or l
+      simplify_and_or t Builtin.Or l
+    | AppBuiltin(Builtin.Not, [s]) ->
+      if equal s true_ then false_
+      else 
+        if equal s false_ then true_
+        else (
+          let s' = aux s in
+          if equal s s' then t else
+          app_builtin ~ty:(Type.prop) Builtin.Not [s'] 
+        )
     | AppBuiltin(hd, [a;b]) 
         when hd = Builtin.Eq || hd = Builtin.Equiv ->
       if T.equal a b then true_ else (
@@ -612,8 +621,7 @@ let simplify_bools t =
       let args' = List.map aux args in
       if List.for_all (fun (a,a') -> T.equal a a') (List.combine args args') then (
         t
-      ) else app_builtin ~ty:(ty t) hd args' in
-  
+      ) else app_builtin ~ty:(ty t) hd args' in  
   aux t
 
 

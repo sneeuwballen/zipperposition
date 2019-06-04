@@ -254,10 +254,10 @@ module Make(E : Env.S) : S with module Env = E = struct
                       let lits = CCArray.to_list (C.lits c) in
                       C.create ~penalty ~trail lits proof
                     ) in
-      CCFormat.printf "cnf_otf(%a):\n" C.pp c;
-      Format.printf "res: ";
+      (* CCFormat.printf "cnf_otf(%a):\n" C.pp c; *)
+      (* Format.printf "res: "; *)
       List.iter (fun new_c -> 
-        Format.printf "%a; \n" C.pp new_c;
+        (* Format.printf "%a; \n" C.pp new_c; *)
         assert(Proof.Step.inferences_perfomed (C.proof_step c) <
                Proof.Step.inferences_perfomed (C.proof_step new_c));) clauses;
       Some clauses
