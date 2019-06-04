@@ -417,7 +417,7 @@ module Step = struct
     | None, (Some _ as res) -> res
     | Some x, Some y -> Some (min x y)
 
-  let inferences_perfomed p =
+  let inferences_perfomed ?(count_cnf=false) p =
     let rec aux p = match p.kind with 
     | Inference(r,_) -> List.fold_left (fun acc par -> 
         acc + aux ((Parent.proof par).step)) 0 p.parents + 1

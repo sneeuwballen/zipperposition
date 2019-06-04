@@ -145,7 +145,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let get_triggers c =
     Literals.fold_terms ~ord ~subterms:true ~eligible:C.Eligible.always 
-                        ~which:`All (C.lits c) 
+                        ~which:`All (C.lits c) ~fun_bodies:false 
     |> Iter.filter_map (fun (t,_) -> 
       let ty = Term.ty t and hd = Term.head_term t in
       if Type.is_fun ty && Type.returns_prop ty && not (Term.is_var hd) then (
@@ -154,7 +154,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     )
 
   let handle_pred_var_inst c =
-    if Proof.Step.inferences_perfomed (C.proof_step c) <= !_trigger_bool_inst then (
+    if Proof.Step.inferences_perfomed (C.proof_step c) < !_trigger_bool_inst then (
       if not (CCList.is_empty (pred_vars c)) then (
         _cls_w_pred_vars := C.ClauseSet.add c !_cls_w_pred_vars;
       );
@@ -313,6 +313,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Signal.on PS.ActiveSet.on_remove_clause
       (fun c ->
          _idx_fv := SubsumIdx.remove !_idx_fv c;
+         _cls_w_pred_vars := C.ClauseSet.remove c !_cls_w_pred_vars;
          _update_active TermIndex.remove c);
     Signal.on PS.SimplSet.on_add_clause
       (_update_simpl UnitIdx.add);
@@ -1335,16 +1336,18 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let rule  = Proof.Rule.mk "instantiate_w_trigger" in
       let proof = Proof.Step.inference ~rule [C.proof_parent c] in
       let new_clause = C.create ~trail ~penalty (CCArray.to_list new_lits) proof in
+      assert (C.Seq.terms c |> Iter.for_all T.DB.is_closed);
+      assert (C.Seq.terms new_clause |> Iter.for_all T.DB.is_closed);
       new_clause)
     |> Iter.to_list
   
   let instantiate_with_triggers c =
-    if Proof.Step.inferences_perfomed (C.proof_step c) <= !_trigger_bool_inst then ( 
+    if Proof.Step.inferences_perfomed (C.proof_step c) < !_trigger_bool_inst then ( 
       pred_var_instantiation c !_trigger_bools)
     else []
   
   let trigger_insantiation c =
-    if Proof.Step.inferences_perfomed (C.proof_step c) <= !_trigger_bool_inst then (
+    if Proof.Step.inferences_perfomed (C.proof_step c) < !_trigger_bool_inst then (
       let triggers = Term.Set.of_seq @@ get_triggers c in
       let res = ref [] in
       C.ClauseSet.iter (fun old_c -> 
@@ -1355,7 +1358,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
 
   let ext_eqfact_decompose given =
-    if Proof.Step.inferences_perfomed (C.proof_step given) <= !max_lits_ext_dec then  
+    if Proof.Step.inferences_perfomed (C.proof_step given) < !max_lits_ext_dec then  
       Util.with_prof prof_ext_dec ext_eqfact_decompose_aux given
     else []
 
@@ -1710,7 +1713,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let get_positions ?(from=true) c =
       let eligible = if from then C.Eligible.pos_eq else C.Eligible.always in
       Literals.fold_terms (C.lits c) 
-        ~vars:false ~subterms:(not from) ~which:`All ~ord ~eligible
+        ~vars:false ~subterms:(not from) ~which:`All ~ord ~eligible ~fun_bodies:false
       |> Iter.filter (fun (t,pos) -> 
           let hd, args = T.as_app t in
           T.is_const hd && List.exists (fun t -> 
@@ -2554,7 +2557,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let condensation c =
     Util.with_prof prof_condensation condensation_rec c
 
-  let recognize_injetivity c =
+  let recognize_injectivity c =
     if C.length c == 2 then (
       let pos_lit = CCArray.find_idx Lit.is_pos (C.lits c) in
       let neg_lit = CCArray.find_idx Lit.is_neg (C.lits c) in
@@ -2658,8 +2661,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       if !max_lits_ext_dec != 0 then (
         Env.add_binary_inf "ext_dec_act" ext_decompose_act;
         Env.add_binary_inf "ext_dec_pas" ext_decompose_pas;
-        Env.add_unary_inf "ext_eqres_dec" ext_eqres_decompose;
-        Env.add_unary_inf "ext_eqfact_dec" ext_eqfact_decompose;
+        (* Env.add_unary_inf "ext_eqres_dec" ext_eqres_decompose; *)
+        (* Env.add_unary_inf "ext_eqfact_dec" ext_eqfact_decompose; *)
       );
 
       if !_fluidsup then (
@@ -2677,6 +2680,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       if !_trigger_bool_inst > 0 then (
         Env.add_unary_inf "trigger_pred_var active" trigger_insantiation;
         Env.add_unary_inf "trigger_pred_var passive" instantiate_with_triggers;
+      );
+      if !_recognize_injectivity then (
+        Env.add_unary_inf "recognize injectivity" recognize_injectivity;
       );
 
       if (List.exists CCFun.id [!_fluidsup; !_dupsup; !_lambdasup != -1; !_max_infs = -1]) then (

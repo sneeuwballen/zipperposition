@@ -258,14 +258,27 @@ module Make(E : Env.S) : S with module Env = E = struct
     | Some _ ->
       let f = Literals.Conv.to_tst (C.lits c) in
       let proof = Proof.Step.inference ~rule:(Proof.Rule.mk "cnf_otf") [C.proof_parent c] in
+      let trail = C.trail c and penalty = C.penalty c in
       let stmt = Statement.assert_ ~proof f in
-      let cnf_vec = Cnf.convert @@ CCVector.to_seq @@ Cnf.cnf_of ~ctx:(Ctx.sk_ctx ()) stmt in
+      let cnf_vec = Cnf.convert @@ CCVector.to_seq @@ 
+                    Cnf.cnf_of ~opts:([Cnf.DisableRenaming])~ctx:(Ctx.sk_ctx ()) stmt in
       let sets = Env.convert_input_statements cnf_vec in
       let clauses = sets.Clause.c_set 
                     |> CCVector.to_list
-                    |> CCList.map (C.update_trail (fun _ -> C.trail c)) in
+                    |> CCList.map (fun c -> 
+                      let lits = CCArray.to_list (C.lits c) in
+                      C.create ~penalty ~trail lits proof
+                    ) in
+      CCFormat.printf "cnf_otf(%a):\n" C.pp c;
+      Format.printf "res: ";
+      List.iter (fun new_c -> 
+        Format.printf "%a; \n" C.pp new_c;
+        assert(Proof.Step.inferences_perfomed (C.proof_step c) <
+               Proof.Step.inferences_perfomed (C.proof_step new_c));) clauses;
       Some clauses
-    | None       -> None
+    | None       -> 
+      (* Format.printf "res:none.\n"; *)
+      None
 
   let setup () =
 	(* if !_bool_reasoning then(

@@ -90,9 +90,9 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) l
               if Type.is_prop (T.ty db_i) then
                res @
                 [T.fun_l ty_args (T.Form.and_ db_i db_j);
-                  T.fun_l ty_args (T.Form.or_ db_i db_j);
-                  T.fun_l ty_args (T.Form.or_ (T.Form.not_ db_i) db_j);
-                  T.fun_l ty_args (T.Form.or_ (T.Form.not_ db_j) db_i)]
+                 T.fun_l ty_args (T.Form.or_ db_i db_j);
+                 T.fun_l ty_args (T.Form.or_ (T.Form.not_ db_i) db_j);
+                 T.fun_l ty_args (T.Form.or_ (T.Form.not_ db_j) db_i)]
                else res
             )
             else []) 

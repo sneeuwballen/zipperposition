@@ -69,10 +69,11 @@ module Make(E : Env.S) = struct
 
   let[@inline] check_clause_ c = 
     if !_check_types then Env.C.check_types c;
+    assert (Env.C.Seq.terms c |> Iter.for_all Term.DB.is_closed);
     CCArray.iter (fun t -> assert(Literal.no_prop_invariant t)) (Env.C.lits c)
 
   let[@inline] check_clauses_ seq =
-    if !_check_types then Iter.iter check_clause_ seq
+    Iter.iter check_clause_ seq
 
   (** One iteration of the main loop ("given clause loop") *)
   let given_clause_step ?(generating=true) num =
