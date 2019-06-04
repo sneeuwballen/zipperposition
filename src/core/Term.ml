@@ -559,6 +559,63 @@ let vars_prefix_order t =
 
 let depth t = Seq.subterms_depth t |> Iter.map snd |> Iter.fold max 0
 
+let simplify_bools t =
+  let simplify_and_or b l =
+    assert(b = Builtin.And || b = Builtin.Or);
+    let when_empty, neutral_el = 
+      if b = Builtin.And then true_,false_ else (false_,true_) in
+    if List.mem neutral_el l then neutral_el
+    else (
+      let l' = List.filter (fun s -> not (T.equal s true_)) l in
+      if List.length l = List.length l' then t
+      else (
+        if CCList.is_empty l' then when_empty
+        else (if List.length l' = 1 then List.hd l'
+              else app_builtin ~ty:(ty t) Builtin.And l')
+      )
+    ) in
+
+
+  let rec aux t =
+    match view t with 
+    | DB _ | Const _ | Var _ -> t
+    | Fun(ty, body) ->
+      let body' = aux body in
+      if T.equal body body' then t
+      else fun_ ty body'
+    | App(hd, args) ->
+      let hd' = aux hd in
+      let args' = List.map aux args in
+      if T.equal hd hd' && 
+         List.for_all (fun (a,a') -> T.equal a a') (List.combine args args') then (
+        t
+      ) else app hd' args'
+    | AppBuiltin(Builtin.And, l) ->
+      simplify_and_or Builtin.And l
+    | AppBuiltin(Builtin.Or, l) ->
+      simplify_and_or Builtin.Or l
+    | AppBuiltin(hd, [a;b]) 
+        when hd = Builtin.Eq || hd = Builtin.Equiv ->
+      if T.equal a b then true_ else (
+        let a',b' = aux a, aux b in
+        if T.equal a a' && T.equal b b' then t 
+        else app_builtin ~ty:(ty t) hd [a';b']
+      )
+    | AppBuiltin(hd, [a;b])
+        when hd = Builtin.Neq || hd = Builtin.Xor ->
+      if T.equal a b then false_ else (
+        let a',b' = aux a, aux b in
+        if T.equal a a' && T.equal b b' then t 
+        else app_builtin ~ty:(ty t) hd [a';b']
+      )
+    | AppBuiltin(hd, args) ->
+      let args' = List.map aux args in
+      if List.for_all (fun (a,a') -> T.equal a a') (List.combine args args') then (
+        t
+      ) else app_builtin ~ty:(ty t) hd args' in
+  
+  aux t
+
 
 (* @param vars the free variables the parameter must depend upon
    @param ty_ret the return type *)

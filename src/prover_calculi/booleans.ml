@@ -72,7 +72,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let y = T.var (HVar.make ~ty:alpha 2) in*)
     let a = T.var (HVar.make ~ty:Type.prop 0) in
     [
-      [Builtin.And @:[T.true_; a] =~ a];
+    [Builtin.And @:[T.true_; a] =~ a];
 	  [Builtin.And @:[T.false_; a] =~ T.false_];
 	  [Builtin.Or @:[T.true_; a] =~ T.true_];
 	  [Builtin.Or @:[T.false_; a] =~ a];
@@ -202,28 +202,13 @@ module Make(E : Env.S) : S with module Env = E = struct
       if CCList.is_empty res then None
       else (Some res)
 
-  let simpl_eq_subterms c =
-    let simplified = ref false in
-    let new_lits = 
-      C.Seq.terms c |>
-      Iter.flat_map T.Seq.subterms
-      |> Iter.fold (fun acc t -> 
-        match T.view t with
-        | T.AppBuiltin(hd, [lhs;rhs]) when T.equal lhs rhs -> 
-            if Builtin.equal hd Builtin.Eq  || Builtin.equal hd Builtin.Equiv then (
-              simplified := true;
-              Literals.map (T.replace ~old:t ~by:T.true_) acc
-            ) else if Builtin.equal hd Builtin.Neq  || Builtin.equal hd Builtin.Xor then (
-              simplified := true;
-              Literals.map (T.replace ~old:t ~by:T.false_) acc
-            ) else  acc
-        | _ -> acc) (C.lits c)
-       in
-    if not (!simplified) then (
+  let simpl_bool_subterms c =
+    let new_lits = Literals.map T.simplify_bools (C.lits c) in
+    if Literals.equal (C.lits c) new_lits then (
       SimplM.return_same c
     ) else (
       let proof = Proof.Step.inference [C.proof_parent c] 
-                    ~rule:(Proof.Rule.mk "simplify trivial (in)equalities") in
+                    ~rule:(Proof.Rule.mk "simplify boolean subterms") in
       let new_ = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
                   (Array.to_list new_lits) proof in
       SimplM.return_new new_
@@ -284,13 +269,13 @@ module Make(E : Env.S) : S with module Env = E = struct
 	(* if !_bool_reasoning then(
 		Env.ProofState.ActiveSet.add (create_clauses () );
 		Env.add_unary_inf "bool_cases" bool_cases;
-    Env.add_basic_simplify simpl_eq_subterms;
+    Env.add_basic_simplify simpl_bool_subterms;
 	) *)
   match !_bool_reasoning with 
   | BoolReasoningDisabled -> ()
   | _ -> 
     (* Env.ProofState.PassiveSet.add (create_clauses ()); *)
-    Env.add_basic_simplify simpl_eq_subterms;
+    Env.add_basic_simplify simpl_bool_subterms;
     Env.add_basic_simplify normalize_equalities;
     Env.add_multi_simpl_rule Fool.rw_bool_lits;
     Env.add_multi_simpl_rule cnf_otf;

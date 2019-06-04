@@ -212,6 +212,8 @@ val head : t -> ID.t option (** head ID.t *)
 val head_exn : t -> ID.t (** head ID.t (or Invalid_argument) *)
 val size : t -> int (** Size (number of nodes) *)
 
+val simplify_bools : t -> t
+
 (* all the ways in which term can be covered (built) using the arguments given *)
 val cover_with_terms : ?depth:int -> ?recurse:bool -> t -> t option list -> t list
 
