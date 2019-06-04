@@ -85,12 +85,17 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) l
         let db_vars = List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) ty_args in
         CCList.mapi (fun i db_i -> 
           CCList.mapi (fun j db_j ->
-            if i < j && Type.equal (T.ty db_i) (T.ty db_j) then (
-              Format.print_flush ();
-              [T.fun_l ty_args (T.Form.eq db_i db_j);
-               T.fun_l ty_args (T.Form.and_ db_i db_j);
-               T.fun_l ty_args (T.Form.or_ db_i db_j)]
-            ) else []) 
+            if i < j && Type.equal (T.ty db_i) (T.ty db_j) then ( 
+              let res = [T.fun_l ty_args (T.Form.eq db_i db_j)] in
+              if Type.is_prop (T.ty db_i) then
+               res @
+                [T.fun_l ty_args (T.Form.and_ db_i db_j);
+                  T.fun_l ty_args (T.Form.or_ db_i db_j);
+                  T.fun_l ty_args (T.Form.or_ (T.Form.not_ db_i) db_j);
+                  T.fun_l ty_args (T.Form.or_ (T.Form.not_ db_j) db_i)]
+               else res
+            )
+            else []) 
           db_vars
           |> CCList.flatten) 
         db_vars
