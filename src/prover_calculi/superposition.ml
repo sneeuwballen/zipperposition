@@ -2553,6 +2553,39 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let condensation c =
     Util.with_prof prof_condensation condensation_rec c
 
+  let recognize_injetivity c =
+    if C.length c == 2 then (
+      let pos_lit = CCArray.find_idx Lit.is_pos (C.lits c) in
+      let neg_lit = CCArray.find_idx Lit.is_neg (C.lits c) in
+      try 
+        let _,pos_lit = CCOpt.get_exn pos_lit in
+        let _,neg_lit = CCOpt.get_exn neg_lit in
+        match pos_lit with 
+        | Equation(x, y, true) ->
+          if Term.is_var x && Term.is_var y && not (Term.equal x y) then (
+            match neg_lit with 
+            | Equation(l,r,false) ->
+              let hd_l,hd_r = CCPair.map_same Term.head_term (l,r) in
+              if Term.is_const hd_l && Term.is_const hd_r 
+                  && Term.equal hd_l hd_r then (
+                let covered_l = Term.max_cover l [Some x] in 
+                let covered_r = Term.max_cover r [Some y] in
+                if Term.equal covered_l covered_r then (
+                  let ty = Type.arrow [Term.ty l] (Term.ty x) in
+                  let inverse_x = Term.app (Term.mk_fresh_skolem [] ty) [l] in
+                  let inverse_lit = [Lit.mk_eq inverse_x x] in
+                  let proof = Proof.Step.inference ~rule:(Proof.Rule.mk "inverse") [C.proof_parent c] in
+                  let new_clause = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) inverse_lit proof in
+                  Util.debugf ~section 5 "Injectivity recognized: %a |---| %a" (fun k -> k C.pp c C.pp new_clause);
+                  [new_clause]
+                ) else []
+              ) else []
+            | _ -> assert false
+          ) else []
+        | _ -> assert false
+      with Invalid_argument _ -> []
+    ) else []
+
   (** {2 Registration} *)
 
   (* print index into file *)
@@ -2639,6 +2672,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Env.add_binary_inf "lambdasup_active(from)" infer_lambdasup_from;
         Env.add_binary_inf "lambdasup_passive(into)" infer_lambdasup_into;
       );
+      if !_trigger_bool_inst > 0 then (
+        Env.add_unary_inf "trigger_pred_var active" trigger_insantiation;
+        Env.add_unary_inf "trigger_pred_var passive" instantiate_with_triggers;
+      );
+
       if (List.exists CCFun.id [!_fluidsup; !_dupsup; !_lambdasup != -1; !_max_infs = -1]) then (
         if !_switch_stream_extraction then
           Env.add_generate "stream_queue_extraction" extract_from_stream_queue_fix_stm
