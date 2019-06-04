@@ -80,6 +80,7 @@ let _fluidsup_penalty = ref 0
 let _fluidsup = ref true
 let _dupsup = ref true
 let _trigger_bool_inst = ref (-1)
+let _recognize_injectivity = ref false
 
 let _NO_LAMSUP = -1
 let _lambdasup = ref (-1)
@@ -2574,9 +2575,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   let ty = Type.arrow [Term.ty l] (Term.ty x) in
                   let inverse_x = Term.app (Term.mk_fresh_skolem [] ty) [l] in
                   let inverse_lit = [Lit.mk_eq inverse_x x] in
-                  let proof = Proof.Step.inference ~rule:(Proof.Rule.mk "inverse") [C.proof_parent c] in
+                  let proof = Proof.Step.inference ~rule:(Proof.Rule.mk "inverse recognition") 
+                              [C.proof_parent c] in
                   let new_clause = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) inverse_lit proof in
-                  Util.debugf ~section 5 "Injectivity recognized: %a |---| %a" (fun k -> k C.pp c C.pp new_clause);
+                  Util.debugf ~section 1 "Injectivity recognized: %a |---| %a" (fun k -> k C.pp c C.pp new_clause);
                   [new_clause]
                 ) else []
               ) else []
@@ -2801,6 +2803,9 @@ let () =
     "--dupsup"
     , Arg.Set _dupsup
     , " enable DupSup inferences";
+    "--recognize-injectivity"
+    , Arg.Bool (fun v -> _recognize_injectivity := v)
+    , " recognize injectivity axiom and axiomatize corresponding inverse";
     "--trigger-bool-inst"
     , Arg.Set_int _trigger_bool_inst
     , " instantiate predicate variables with boolean terms already in the proof state. Argument is the maximal proof depth of predicate variable";
