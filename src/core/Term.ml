@@ -624,11 +624,7 @@ let simplify_bools t =
       if List.for_all (fun (a,a') -> equal a a') (List.combine args args') then (
         t
       ) else app_builtin ~ty:(ty t) hd args' in  
-  let t' = aux t in 
-  if not (equal t t') then (
-    CCFormat.printf "bool_simpl(%a) = %a.\n" T.pp t T.pp t';
-  );
-  t'
+  aux t
 
 
 

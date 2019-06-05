@@ -38,6 +38,7 @@ let prof_ho_unif = Util.mk_profiler "ho.unif"
 let _ext_pos = ref true
 let _ext_pos_all_lits = ref false
 let _ext_axiom = ref false
+let _choice_axiom = ref false
 let _elim_pred_var = ref true
 let _ext_neg_lit = ref false
 let _neg_ext = ref true
@@ -735,6 +736,21 @@ module Make(E : Env.S) : S with module Env = E = struct
     let lits = [Literal.mk_eq x y; Literal.mk_neq x_diff y_diff] in
     Env.C.create ~penalty:!_ext_axiom_penalty ~trail:Trail.empty lits Proof.Step.trivial
 
+  let choice_clause =
+    let choice_id = ID.make("zf_choice") in
+    let alpha_var = HVar.make ~ty:Type.tType 0 in
+    let alpha = Type.var alpha_var in
+    let alpha_to_prop = Type.arrow [alpha] Type.prop in
+    let choice_type = Type.arrow [alpha_to_prop] alpha in
+    let choice = Term.const ~ty:choice_type choice_id in
+    let p = Term.var (HVar.make ~ty:alpha_to_prop 1) in
+    let x = Term.var (HVar.make ~ty:alpha 2) in
+    let px = Term.app p [x] in (* p x *)
+    let p_choice = Term.app p [Term.app choice [p]] (* p (choice p) *) in
+    (* ~ (p x) | p (choice p) *)
+    let lits = [Literal.mk_prop px false; Literal.mk_prop p_choice true] in
+    Env.C.create ~penalty:1 ~trail:Trail.empty lits Proof.Step.trivial
+
 
   type fixed_arg_status =
     | Always of T.t (* This argument is always the given term in all occurences *)
@@ -1053,6 +1069,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       end;
       if !_ext_axiom then
         Env.ProofState.PassiveSet.add (Iter.singleton extensionality_clause);
+      if !_choice_axiom then
+        Env.ProofState.PassiveSet.add (Iter.singleton choice_clause);
     );
     ()
 end
@@ -1160,6 +1178,7 @@ let () =
       "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";
       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
       "--ho-ext-axiom", Arg.Set _ext_axiom, " enable extensionality axiom";
+      "--ho-choice-axiom", Arg.Bool (fun v -> _choice_axiom := v), " enable choice axiom";
       "--no-ho-ext-axiom", Arg.Clear _ext_axiom, " disable extensionality axiom";
       "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule";
       "--ho-neg-ext", Arg.Bool (fun v -> _neg_ext := v), " turn NegExt on or off";

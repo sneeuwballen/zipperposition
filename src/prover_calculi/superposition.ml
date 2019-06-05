@@ -1321,8 +1321,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let p_vars = pred_vars c in
     let substs = CCList.flat_map (fun v ->
       let res = ref [] in (* no really efficient way without turning set to list *) 
-      Term.Set.iter (fun t -> 
-        if Type.equal (HVar.ty v) (Term.ty t) then (
+      Term.Set.iter (fun t ->
+        let var_ty = HVar.ty v and t_ty = Term.ty t in
+        if Type.is_ground var_ty && Type.is_ground t_ty && Type.equal var_ty t_ty then (
           let subst = Subst.FO.bind' Subst.empty (v,0) (t,1) in
           res := subst :: !res;
         )) trigger_set;
