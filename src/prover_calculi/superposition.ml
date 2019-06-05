@@ -1330,11 +1330,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ) p_vars in
     Iter.of_list substs
     |> Iter.map (fun sub ->
-      let new_lits = Lits.apply_subst (Subst.Renaming.create()) sub (C.lits c, 0) in
+      let renaming = Subst.Renaming.create() in
+      let new_lits = Lits.apply_subst renaming sub (C.lits c, 0) in
       let trail = C.trail c in 
       let penalty = C.penalty c in
       let rule  = Proof.Rule.mk "instantiate_w_trigger" in
-      let proof = Proof.Step.inference ~rule [C.proof_parent c] in
+      let proof = Proof.Step.inference ~rule [C.proof_parent_subst renaming (c, 0) sub] in
       let new_clause = C.create ~trail ~penalty (CCArray.to_list new_lits) proof in
       assert (C.Seq.terms c |> Iter.for_all T.DB.is_closed);
       assert (C.Seq.terms new_clause |> Iter.for_all T.DB.is_closed);
