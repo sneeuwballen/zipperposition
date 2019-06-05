@@ -601,9 +601,12 @@ let simplify_bools t =
       else 
         if equal s false_ then true_
         else (
-          let s' = aux s in
-          if equal s s' then t else
-          app_builtin ~ty:(Type.prop) Builtin.Not [s'] 
+          match view s with 
+          | AppBuiltin(Builtin.Not, [s']) -> aux s'
+          | _ ->  
+            let s' = aux s in
+            if equal s s' then t else
+            app_builtin ~ty:(Type.prop) Builtin.Not [s'] 
         )
     | AppBuiltin(hd, [a;b]) 
         when hd = Builtin.Eq || hd = Builtin.Equiv ->
