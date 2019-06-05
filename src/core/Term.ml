@@ -564,36 +564,38 @@ let simplify_bools t =
     assert(b = Builtin.And || b = Builtin.Or);
     let when_empty, neutral_el = 
       if b = Builtin.And then true_,false_ else (false_,true_) in
-    if List.exists (T.equal neutral_el) l then neutral_el
+    if List.exists (equal neutral_el) l then neutral_el
     else (
-      let l' = List.filter (fun s -> not (T.equal s when_empty)) l in
+      let l' = List.filter (fun s -> not (equal s when_empty)) l in
       if List.length l = List.length l' then t
       else (
         if CCList.is_empty l' then when_empty
         else (if List.length l' = 1 then List.hd l'
               else app_builtin ~ty:(Type.prop) b l')
-      )
-    ) in
-
+      )) 
+    in
 
   let rec aux t =
     match view t with 
     | DB _ | Const _ | Var _ -> t
     | Fun(ty, body) ->
       let body' = aux body in
-      if T.equal body body' then t
+      if equal body body' then t
       else fun_ ty body'
     | App(hd, args) ->
-      let hd' = aux hd in
-      let args' = List.map aux args in
-      if T.equal hd hd' && 
-         List.for_all (fun (a,a') -> T.equal a a') (List.combine args args') then (
-        t
-      ) else app hd' args'
+      let hd' = aux hd and  args' = List.map aux args in
+      if equal hd hd' && same_l args args' then t
+      else app hd' args'
     | AppBuiltin(Builtin.And, l) ->
-      simplify_and_or t Builtin.And l
+      let l' = List.map aux l in
+      let t = if same_l l l' then t 
+              else app_builtin ~ty:(Type.prop) Builtin.And l' in
+      simplify_and_or t Builtin.And l'
     | AppBuiltin(Builtin.Or, l) ->
-      simplify_and_or t Builtin.Or l
+      let l' = List.map aux l in
+      let t = if same_l l l' then t 
+              else app_builtin ~ty:(Type.prop) Builtin.Or l' in
+      simplify_and_or t Builtin.Or l'
     | AppBuiltin(Builtin.Not, [s]) ->
       if equal s true_ then false_
       else 
@@ -605,24 +607,29 @@ let simplify_bools t =
         )
     | AppBuiltin(hd, [a;b]) 
         when hd = Builtin.Eq || hd = Builtin.Equiv ->
-      if T.equal a b then true_ else (
+      if equal a b then true_ else (
         let a',b' = aux a, aux b in
-        if T.equal a a' && T.equal b b' then t 
+        if equal a a' && equal b b' then t 
         else app_builtin ~ty:(ty t) hd [a';b']
       )
     | AppBuiltin(hd, [a;b])
         when hd = Builtin.Neq || hd = Builtin.Xor ->
-      if T.equal a b then false_ else (
+      if equal a b then false_ else (
         let a',b' = aux a, aux b in
-        if T.equal a a' && T.equal b b' then t 
+        if equal a a' && equal b b' then t 
         else app_builtin ~ty:(ty t) hd [a';b']
       )
     | AppBuiltin(hd, args) ->
       let args' = List.map aux args in
-      if List.for_all (fun (a,a') -> T.equal a a') (List.combine args args') then (
+      if List.for_all (fun (a,a') -> equal a a') (List.combine args args') then (
         t
       ) else app_builtin ~ty:(ty t) hd args' in  
-  aux t
+  let t' = aux t in 
+  if not (equal t t') then (
+    CCFormat.printf "bool_simpl(%a) = %a.\n" T.pp t T.pp t';
+  );
+  t'
+
 
 
 (* @param vars the free variables the parameter must depend upon
