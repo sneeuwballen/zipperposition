@@ -9,7 +9,7 @@ open Libzipperposition
 module T = Term
 
 type selection_setting = Any | Minimal | Large
-type reasoning_kind    = BoolReasoningDisabled | BoolCasesInference | BoolCasesSimplification | BoolCasesEager
+type reasoning_kind    = BoolReasoningDisabled | BoolCasesInference | BoolCasesSimplification | BoolCasesEagerFar | BoolCasesEagerNear
 
 let _bool_reasoning = ref BoolReasoningDisabled
 let cased_term_selection = ref Any
@@ -170,7 +170,6 @@ module Make(E : Env.S) : S with module Env = E = struct
 				match f with
 					| Builtin.True | Builtin.False -> ()
 					| Builtin.Eq | Builtin.Neq | Builtin.Equiv | Builtin.Xor ->
-						(* Format.printf "Equality like: %b %b (%a) %a\n" (!cased_term_selection != Minimal) (Type.is_prop(T.ty(List.hd ps))) (CCList.pp T.pp) ps C.pp c; *)
             (match ps with 
               | [x;y] when (!cased_term_selection != Minimal || Type.is_prop(T.ty x)) ->
                 add t x y;
@@ -293,7 +292,7 @@ let map_propositions ~proof f =
   )
 
 
-let is_bool t = Ty.equal prop (ty_exn t)
+let is_bool t = CCOpt.equal Ty.equal (Some prop) (ty t)
 let is_T_F t = match view t with AppBuiltin((True|False),[]) -> true | _ -> false
 
 (* Modify every subterm of t by f except those at the "top". Here top is true if subterm occures under a quantifier Æ in a context where it could participate to the clausification if the surrounding context of Æ was ignored. *)
@@ -318,7 +317,7 @@ let rec replaceTST f top t =
         let top = Binder.equal b Binder.Forall || Binder.equal b Binder.Exists in
         bind ~ty b x (re top t)
       | AppBuiltin(b,ts) ->
-          let logical = List.for_all is_bool ts in
+          let logical = for_all is_bool ts in
           app_builtin ~ty b (map (re(top && logical)) ts)
       | Multiset ts -> 
         multiset ~ty (map (re false) ts)
@@ -340,9 +339,9 @@ let name_quantifiers stmts =
         changed := true;
         let vars = Var.Set.of_seq (TypedSTerm.Seq.free_vars t) |> Var.Set.to_list in
         let qid = ID.gensym() in
-        let ty = app_builtin ~ty:tType Builtin.Arrow (prop :: List.map Var.ty vars) in
+        let ty = app_builtin ~ty:tType Arrow (prop :: map Var.ty vars) in
         let q = const ~ty qid in
-        let q_vars = app ~ty:prop q (List.map var vars) in
+        let q_vars = app ~ty:prop q (map var vars) in
         let proof = Proof.Step.define_internal qid [Proof.Parent.from(Statement.as_proof_i s)] in
         let q_typedecl = ty_decl ~proof qid ty in
         let definition = 
@@ -362,9 +361,9 @@ let name_quantifiers stmts =
     | Def defs	-> s
     | Rewrite _	-> s
     | Assert p	-> if_changed assert_ s (name_prop_Qs s p)
-    | Lemma ps	-> if_changed_list lemma s (List.map (name_prop_Qs s) ps)
+    | Lemma ps	-> if_changed_list lemma s (map (name_prop_Qs s) ps)
     | Goal p	-> if_changed goal s (name_prop_Qs s p)
-    | NegatedGoal(ts, ps)	-> if_changed_list (neg_goal ~skolems:ts) s (List.map (name_prop_Qs s) ps)
+    | NegatedGoal(ts, ps)	-> if_changed_list (neg_goal ~skolems:ts) s (map (name_prop_Qs s) ps)
   ) |> CCVector.append new_stmts;
   CCVector.freeze new_stmts
 
@@ -393,28 +392,30 @@ let with_subterm_or_id t f = try
   with Return r -> r
 
 
+(* If p is non-constant subproposition closed wrt variables vs, then (p ⇒ c[p:=⊤]) ∧ (p ∨ c[p:=⊥]) or else c unmodified. *)
+let case_bool vs c p =
+  if is_bool p && not(is_T_F p) && p!=c && Var.Set.is_empty(Var.Set.diff (free_vars_set p) vs) then
+    let ty = prop in
+    app_builtin ~ty And [
+      app_builtin ~ty Imply [p; replace p Form.true_ c];
+      app_builtin ~ty Or [p; replace p Form.false_ c];
+    ]
+  else c
+
+
 (* Apply repeatedly the transformation t[p] ↦ (p ⇒ t[⊤]) ∧ (¬p ⇒ t[⊥]) for each boolean parameter p≠⊤,⊥ that is closed in context where variables vs are bound. *)
 let rec case_bools_wrt vs t =
-  let ty = prop in
   with_subterm_or_id t (fun _ s -> 
-  match view s with
+    match view s with
     | App(f,ps) ->
-        let t' = List.fold_left(fun t' p ->
-          if is_bool p && not(is_T_F p) && Var.Set.is_empty(Var.Set.diff (free_vars_set s) vs)
-          then
-            app_builtin ~ty And [
-              app_builtin ~ty Imply [p; replace p Form.true_ t'];
-              app_builtin ~ty Or [p; replace p Form.false_ t'];
-            ]
-          else t') t ps
-        in
+        let t' = fold_left (case_bool vs) t ps in
         if t==t' then None else Some(case_bools_wrt vs t')
     | _ -> None
   )
 
-let eager_bool_cases x =
+let eager_cases_far =
   let proof s = Proof.Step.esa [Proof.Parent.from(Statement.as_proof_i s)]
-          ~rule:(Proof.Rule.mk "eager_bool_cases")
+          ~rule:(Proof.Rule.mk "eager_cases_far")
   in
   map_propositions ~proof (fun _ t ->
     with_subterm_or_id t (fun vs s -> match view s with
@@ -422,12 +423,32 @@ let eager_bool_cases x =
           let b' = case_bools_wrt (Var.Set.add vs v) b in
           if b==b' then None else Some(replace s (bind ~ty:prop q v b') t)
       | _ -> None)
-    |> case_bools_wrt Var.Set.empty)x
+    |> case_bools_wrt Var.Set.empty)
+
+
+let eager_cases_near =
+  let proof s = Proof.Step.esa [Proof.Parent.from(Statement.as_proof_i s)]
+          ~rule:(Proof.Rule.mk "eager_cases_near")
+  in
+  let rec case_near t =
+    with_subterm_or_id t (fun vs s ->
+    match view s with
+      | AppBuiltin((And|Or|Imply|Not|Equiv|Xor|ForallConst|ExistsConst),_)
+      | Bind((Forall|Exists),_,_) -> None
+      | AppBuiltin((Eq|Neq), [x;y]) when is_bool x -> None
+      | _ when is_bool s ->
+          let s' = case_bool vs s (with_subterm_or_id s (fun _ -> CCOpt.if_(fun x -> x!=s && is_bool x))) in
+          if s==s' then None else Some(case_near(replace s s' t))
+      | _ -> None)
+  in
+  map_propositions ~proof (fun _ -> case_near)
+
 
 
 let preprocess_booleans stmts = name_quantifiers(match !_bool_reasoning with
   | BoolReasoningDisabled -> stmts
-  | BoolCasesEager -> eager_bool_cases stmts
+  | BoolCasesEagerFar -> eager_cases_far stmts
+  | BoolCasesEagerNear -> eager_cases_near stmts
   | _ -> stmts)
 
 let extension =
@@ -443,19 +464,20 @@ let extension =
 
 let () =
   Options.add_opts
-    [ "--boolean-reasoning", Arg.Symbol (["off"; "cases-inf"; "cases-simpl"; "cases-eager"], 
+    [ "--boolean-reasoning", Arg.Symbol (["off"; "cases-inf"; "cases-simpl"; "cases-eager"; "cases-eager-near"], 
         fun s -> _bool_reasoning := 
                     match s with 
                     | "off" -> BoolReasoningDisabled
                     | "cases-inf" -> BoolCasesInference
                     | "cases-simpl" -> BoolCasesSimplification
-                    | "cases-eager" -> BoolCasesEager
+                    | "cases-eager" -> BoolCasesEagerFar
+                    | "cases-eager-near" -> BoolCasesEagerNear
                     | _ -> assert false), 
       " enable/disable boolean axioms";
       "--bool-subterm-selection", 
-      Arg.Symbol(["A"; "M"; "L"], (fun opt -> if opt = "A" then cased_term_selection := Any
-                                            else if opt = "N" then cased_term_selection := Minimal
-                                            else cased_term_selection := Large)), 
+      Arg.Symbol(["A"; "M"; "L"], (fun opt -> cased_term_selection := 
+        match opt with "A"->Any | "M"->Minimal | "L"->Large
+        | _ -> assert false)), 
       " select boolean subterm selection criterion: A for any, M for minimal and L for large";
       "--quantifier-renaming"
       , Arg.Bool (fun v -> quant_rename := v)
