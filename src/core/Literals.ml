@@ -71,6 +71,11 @@ let vars lits =
   |> T.VarSet.of_seq
   |> T.VarSet.to_list
 
+let free_vars lits = 
+   CCArray.fold (fun acc lit -> 
+      T.VarSet.union acc (Lit.free_vars lit)) 
+   T.VarSet.empty lits
+
 let is_ground lits =
   CCArray.for_all Lit.is_ground lits
 

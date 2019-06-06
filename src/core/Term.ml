@@ -255,6 +255,10 @@ let head_term_mono t = match view t with
   | App (f,l) ->
     let l1 = CCList.take_while is_type l in
     app f l1 (* re-apply to type parameters *)
+  | AppBuiltin(b, l) ->
+    let ty_args, args = CCList.partition is_type l in
+    let ty = Type.arrow (List.map ty args) (ty t) in 
+    app_builtin ~ty b ty_args
   | _ -> t
 
 let get_mand_args t =
@@ -281,10 +285,9 @@ let as_app_with_mandatory_args t =
           | None -> 0
         end
       in
+      assert(num_mand_args = 0);
       let ty_args, other_args = CCList.take_drop_while is_type l in
-      let mand_args, other_args = CCList.take_drop num_mand_args other_args in
-      assert (List.for_all T.DB.closed mand_args);
-      let head = app f (ty_args @ mand_args) in (* re-apply to type & mandatory args *)
+      let head = app f (ty_args) in (* re-apply to type & mandatory args *)
       head, other_args
     | _ -> t, []
 
@@ -463,6 +466,8 @@ let vars_under_quant t = VarSet.of_seq @@ Iter.fold (fun acc st ->
   | _ -> acc
 ) Iter.empty (Seq.subterms ~include_builtin:true t)
 
+let free_vars t = VarSet.diff (VarSet.of_seq (Seq.vars t)) (vars_under_quant t) 
+
 
 let var_occurs ~var t =
   Iter.exists (HVar.equal Type.equal var) (Seq.vars t)
@@ -532,6 +537,10 @@ let rec is_fo_term t =
   | Const _ -> true
   | _ -> false
 
+let is_true_or_false t = match view t with
+  | AppBuiltin(b, []) -> 
+    CCList.mem ~eq:Builtin.equal b [Builtin.ForallConst; Builtin.ExistsConst];
+  | _ -> false
 
 let monomorphic t = Iter.is_empty (Seq.ty_vars t)
 
@@ -549,6 +558,77 @@ let vars_prefix_order t =
   |> List.rev
 
 let depth t = Seq.subterms_depth t |> Iter.map snd |> Iter.fold max 0
+
+let simplify_bools t =
+  let simplify_and_or t b l =
+    assert(b = Builtin.And || b = Builtin.Or);
+    let when_empty, neutral_el = 
+      if b = Builtin.And then true_,false_ else (false_,true_) in
+    if List.exists (equal neutral_el) l then neutral_el
+    else (
+      let l' = List.filter (fun s -> not (equal s when_empty)) l in
+      if List.length l = List.length l' then t
+      else (
+        if CCList.is_empty l' then when_empty
+        else (if List.length l' = 1 then List.hd l'
+              else app_builtin ~ty:(Type.prop) b l')
+      )) 
+    in
+
+  let rec aux t =
+    match view t with 
+    | DB _ | Const _ | Var _ -> t
+    | Fun(ty, body) ->
+      let body' = aux body in
+      if equal body body' then t
+      else fun_ ty body'
+    | App(hd, args) ->
+      let hd' = aux hd and  args' = List.map aux args in
+      if equal hd hd' && same_l args args' then t
+      else app hd' args'
+    | AppBuiltin(Builtin.And, l) ->
+      let l' = List.map aux l in
+      let t = if same_l l l' then t 
+              else app_builtin ~ty:(Type.prop) Builtin.And l' in
+      simplify_and_or t Builtin.And l'
+    | AppBuiltin(Builtin.Or, l) ->
+      let l' = List.map aux l in
+      let t = if same_l l l' then t 
+              else app_builtin ~ty:(Type.prop) Builtin.Or l' in
+      simplify_and_or t Builtin.Or l'
+    | AppBuiltin(Builtin.Not, [s]) ->
+      if equal s true_ then false_
+      else 
+        if equal s false_ then true_
+        else (
+          match view s with 
+          | AppBuiltin(Builtin.Not, [s']) -> aux s'
+          | _ ->  
+            let s' = aux s in
+            if equal s s' then t else
+            app_builtin ~ty:(Type.prop) Builtin.Not [s'] 
+        )
+    | AppBuiltin(hd, [a;b]) 
+        when hd = Builtin.Eq || hd = Builtin.Equiv ->
+      if equal a b then true_ else (
+        let a',b' = aux a, aux b in
+        if equal a a' && equal b b' then t 
+        else app_builtin ~ty:(ty t) hd [a';b']
+      )
+    | AppBuiltin(hd, [a;b])
+        when hd = Builtin.Neq || hd = Builtin.Xor ->
+      if equal a b then false_ else (
+        let a',b' = aux a, aux b in
+        if equal a a' && equal b b' then t 
+        else app_builtin ~ty:(ty t) hd [a';b']
+      )
+    | AppBuiltin(hd, args) ->
+      let args' = List.map aux args in
+      if List.for_all (fun (a,a') -> equal a a') (List.combine args args') then (
+        t
+      ) else app_builtin ~ty:(ty t) hd args' in  
+  aux t
+
 
 
 (* @param vars the free variables the parameter must depend upon
@@ -1084,13 +1164,14 @@ module Conv = struct
           ST.app ~ty:(aux_ty (ty t))
             (aux_t env f) (List.map (aux_t env) l)
         | AppBuiltin (b,[v;body]) when Builtin.equal b Builtin.ForallConst ||
-                                Builtin.equal b Builtin.ExistsConst ->
+                                       Builtin.equal b Builtin.ExistsConst ->
           let b = if Builtin.equal b Builtin.ForallConst 
                   then Binder.Forall else Binder.Exists in
           let v =
             (match view v with
             | Var i -> (aux_var i)
             | _ -> 
+            CCFormat.printf "Failed converting %a.\n" (pp_in Output_format.O_tptp) t ;
             let v = aux_t env v in
             raise (Type.Conv.Error v)) in
           ST.bind ~ty:(aux_ty (ty t)) b v (aux_t env body) 

@@ -795,8 +795,7 @@ let get_rw_rule ?weight_incr:(w_i=1000000) c  =
     assert(Term.DB.is_closed abs_rhs);
     let r = Rewrite.Term.Rule.make ~proof:(as_proof_c c) sym (Type.close_forall (Term.ty abs_rhs)) ty_vars abs_rhs in
     let rule = Rewrite.T_rule r in
-    (* CCFormat.printf "[ Declared rule %a out of symbol %a and rhs %a ]\n" Rewrite.Rule.pp rule ID.pp sym Term.pp rhs; *)
-    (* Format.printf "[RULE: %a SYM: %a RHS: %a]\n" Rewrite.Rule.pp rule ID.pp sym Term.pp rhs; *)
+    Util.debugf 5 "Defined %a with %a" (fun k -> k ID.pp sym Rewrite.Term.Rule.pp r);
     rule in
 
   let build_from_head sym vars rhs =
@@ -816,12 +815,14 @@ let get_rw_rule ?weight_incr:(w_i=1000000) c  =
 
   let conv_terms_rw t1 t2 =
     let reduced = Lambda.eta_reduce t1 in
+    let t2' = Lambda.snf (fst (Rewrite.Term.normalize_term t2)) in
     let hd, l = Term.as_app reduced in
     if (Term.is_const hd && distinct_free_vars l && Type.is_fun (Term.ty hd)) then (
       let sym = (Term.as_const_exn hd) in
       (match IdMap.find_opt sym !def_sym with
       | Some (rhs, rw_rule) ->  (
-          if  not (Term.equal rhs t2) then (
+          let rhs = Lambda.eta_reduce rhs in
+          if  not (Unif.FO.are_variant rhs t2') then (
           None)
           else rw_rule )
       | _ -> build_from_head sym l t2)
@@ -831,7 +832,8 @@ let get_rw_rule ?weight_incr:(w_i=1000000) c  =
    let all_lits =  Seq.lits c in
    if Iter.length all_lits = 1 then
       match Iter.head_exn all_lits with
-      | SLiteral.Eq (t1,t2) ->
+      | SLiteral.Eq (t1,t2) when not (List.mem t1 [Term.true_; Term.false_]) &&
+                                 not (List.mem t2 [Term.true_; Term.false_]) ->
          assert(Term.ty t1 = Term.ty t2);
          let ty = Term.ty t1 in
          let fresh_vars = List.map (fun ty -> Term.var (HVar.fresh ~ty ())) (Type.expected_args ty) in

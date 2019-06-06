@@ -43,48 +43,78 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) l
     let vars = List.mapi (fun i ty -> HVar.make ~ty i) ty_args in
     (* projection with "¬": [λvars. ¬ (F vars)] *)
     let l_not = match mode with
-      | `None -> None
-      | `Neg | `Full ->
+      | `None -> []
+      | `Neg | `Full | `Pragmatic ->
         let f = HVar.make offset ~ty:ty_v in
-        T.fun_of_fvars vars
-          (T.Form.not_ (T.app (T.var f) (List.map T.var vars)))
-        |> CCOpt.return
+        [T.fun_of_fvars vars
+          (T.Form.not_ (T.app (T.var f) (List.map T.var vars)))]
     (* projection with "∧": [λvars. (F1 vars) ∧ (F2 vars)] *)
     and l_and = match mode with
-      | `Neg | `None -> None
+      | `Neg | `None | `Pragmatic-> []
       | `Full ->
         let f = HVar.make offset ~ty:ty_v in
         let g = HVar.make (offset+1) ~ty:ty_v in
-        T.fun_of_fvars vars
+        [T.fun_of_fvars vars
           (T.Form.and_
              (T.app (T.var f) (List.map T.var vars))
-             (T.app (T.var g) (List.map T.var vars)))
-        |> CCOpt.return
+             (T.app (T.var g) (List.map T.var vars)))]
     (* projection with "=": [λvars. (F1 vars) = (F2 vars)]
        where [F1 : Πa. ty_args -> a] *)
     and l_eq = match mode with
-      | `Neg | `None -> None
+      | `Neg | `Pragmatic | `None -> []
       | `Full ->
         let a = HVar.make offset ~ty:Type.tType in
         let ty_fun = Type.arrow ty_args (Type.var a) in
         let f = HVar.make (offset+1) ~ty:ty_fun in
         let g = HVar.make (offset+2) ~ty:ty_fun in
-        T.fun_of_fvars vars
+        [T.fun_of_fvars vars
           (T.Form.eq
              (T.app (T.var f) (List.map T.var vars))
-             (T.app (T.var g) (List.map T.var vars)))
-        |> CCOpt.return
+             (T.app (T.var g) (List.map T.var vars)))]
+    and l_false = match mode with
+      | `None -> []
+      | `Neg | `Pragmatic | `Full ->
+        [T.fun_of_fvars vars T.false_]
+    and l_true = match mode with
+      | `None -> []
+      | `Neg | `Pragmatic | `Full ->
+        [T.fun_of_fvars vars T.true_]
+    and l_simpl_eq = match mode with
+      | `Pragmatic -> 
+        let n = List.length vars in
+        let db_vars = List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) ty_args in
+        CCList.mapi (fun i db_i -> 
+          CCList.mapi (fun j db_j ->
+            if i < j && Type.equal (T.ty db_i) (T.ty db_j) then ( 
+              let res = [T.fun_l ty_args (T.Form.eq db_i db_j)] in
+              if Type.is_prop (T.ty db_i) then
+               res @
+                [T.fun_l ty_args (T.Form.and_ db_i db_j);
+                 T.fun_l ty_args (T.Form.or_ db_i db_j);
+                 T.fun_l ty_args (T.Form.or_ (T.Form.not_ db_i) db_j);
+                 T.fun_l ty_args (T.Form.or_ (T.Form.not_ db_j) db_i)]
+               else res
+            )
+            else []) 
+          db_vars
+          |> CCList.flatten) 
+        db_vars
+        |> CCList.flatten
+      | _ -> []
+
     in
-    CCList.filter_map
-      (fun (o,penalty) -> match o with
-         | None -> None
-         | Some t ->
-           assert (T.DB.is_closed t);
-           let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
-           Some (subst, penalty))
-      [ l_not, 2;
-        l_and, 5;
-        l_eq, 10;
+    CCList.flat_map
+      (fun (ts,penalty) -> 
+          List.map (fun t -> 
+          assert (T.DB.is_closed t);
+          let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
+          (subst, penalty) )ts ) 
+      [ l_not, 10;
+        l_and, 10;
+        l_eq,  10;
+        l_false, 5;
+        l_true, 5;
+        l_simpl_eq, 10;
       ]
   )
 

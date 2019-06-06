@@ -243,9 +243,14 @@ let rec build_term ?(depth=0) ~subst ~scope ~counter var bvar_map t =
         T.DB.shift depth bvar, subst
       | _ -> raise (Failure "Bound variable not argument to head")
     )
-  | T.AppBuiltin(_,_) -> 
-      raise (Failure "Trying to bind to a predicate")
-
+  | T.AppBuiltin(b,args) ->
+    let new_args, subst =
+    List.fold_right (fun arg (l, subst) ->
+      let arg', subst = build_term ~depth ~subst ~scope ~counter var bvar_map arg in
+      arg' :: l, subst 
+    ) args ([], subst) in
+    if List.for_all2 T.equal args new_args then t,subst
+    else T.app_builtin ~ty:(Term.ty t) b new_args, subst
 let rec unify ~scope ~counter ~subst = function
   | [] -> subst
   | (s,t) :: rest -> (
@@ -275,10 +280,10 @@ let rec unify ~scope ~counter ~subst = function
           else
             flex_diff ~counter ~scope ~subst hd_s hd_t args_s args_t) in
         unify ~scope ~counter ~subst rest
-      | (T.Var _, T.Const _) | (T.Var _, T.DB _) ->
+      | (T.Var _, T.Const _) | (T.Var _, T.DB _) | (T.Var _, T.AppBuiltin _) ->
         let subst = flex_rigid ~subst ~counter ~scope  body_s' body_t' in
         unify ~scope ~counter ~subst rest
-      | (T.Const _, T.Var _) | (T.DB _, T.Var _) ->
+      | (T.Const _, T.Var _) | (T.DB _, T.Var _) | (T.AppBuiltin _, T.Var _) ->
         let subst = flex_rigid ~subst ~counter ~scope  body_t' body_s' in
         unify ~scope ~counter ~subst rest
       | T.Const f , T.Const g when ID.equal f g && List.length args_s = List.length args_t ->

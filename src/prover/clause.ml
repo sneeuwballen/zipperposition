@@ -358,6 +358,10 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
     let pos _ lit = Lit.is_pos lit
 
+    let pos_eq _ lit = match lit with
+    | Lit.Equation(l,r,s) -> s
+    | _ -> false
+
     let neg _ lit = Lit.is_neg lit
 
     let always _ _ = true
@@ -433,9 +437,10 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
           (Iter.of_array_i lits)
       )
     in
-    Format.fprintf out "@[%a@[<2>%a%a@]@]/%d"
+    Format.fprintf out "@[%a@[<2>%a%a@]@]/id:%d/depth:%d"
       SClause.pp_vars c.sclause pp_lits c.sclause.lits
-      SClause.pp_trail c.sclause.trail c.sclause.id;
+      SClause.pp_trail c.sclause.trail c.sclause.id
+      (Proof.Step.inferences_perfomed (proof_step c));
     ()
 
   let pp_tstp out c = SClause.pp_tstp out c.sclause

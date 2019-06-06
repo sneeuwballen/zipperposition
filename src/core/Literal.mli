@@ -132,6 +132,7 @@ val vars : t -> Type.t HVar.t list (** gather variables *)
 val var_occurs : Type.t HVar.t -> t -> bool
 val is_ground : t -> bool
 val symbols : t -> ID.Set.t
+val free_vars : t -> Term.VarSet.t
 val root_terms : t -> term list (** all the terms immediatly under the lit *)
 
 val to_ho_term : t -> term option
@@ -175,6 +176,8 @@ val fold_terms :
     [which] is used to decide which terms to visit:
     - if [which] is [`Max], only the maximal terms are explored
     - if [which] is [`All], all root terms are explored *)
+
+val normalize_eq : t -> t option
 
 (** {2 Comparisons} *)
 module Comp : sig

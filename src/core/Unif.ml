@@ -551,7 +551,7 @@ module Inner = struct
             )
           | O_match_protect (P_vars _) | O_variant (P_vars _) | O_equal ->
             (* rename in [t1] but not [t2] *)
-            Util.debug ~section 4 "protected with set *";
+            Util.debug ~section 40 "protected with set *";
             let subst, t1 = restrict_to_scope subst (t1,sc1) ~into:sc2 in
             unif_ho ~op ~root ~bvars subst t1 t2 ~scope:sc2
           | O_unify ->
@@ -1079,6 +1079,7 @@ module FO = struct
     fun sc1 sc2 -> 
       let ta, sca = sc1 in 
       let tb, scb = sc2 in
+
       if(not (Term.DB.is_closed ta) || not (Term.DB.is_closed tb)) then (
          let sk_a, sk_a_subs = Term.DB.skolemize_loosely_bound ta in
          let sk_b, sk_b_subs = Term.DB.skolemize_loosely_bound tb in

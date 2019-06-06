@@ -38,6 +38,7 @@ let prof_ho_unif = Util.mk_profiler "ho.unif"
 let _ext_pos = ref true
 let _ext_pos_all_lits = ref false
 let _ext_axiom = ref false
+let _choice_axiom = ref false
 let _elim_pred_var = ref true
 let _ext_neg_lit = ref false
 let _neg_ext = ref true
@@ -70,7 +71,7 @@ let k_some_ho : bool Flex_state.key = Flex_state.create_key()
 let k_enabled : bool Flex_state.key = Flex_state.create_key()
 let k_enable_def_unfold : bool Flex_state.key = Flex_state.create_key()
 let k_enable_ho_unif : bool Flex_state.key = Flex_state.create_key()
-let k_ho_prim_mode : _ Flex_state.key = Flex_state.create_key()
+let k_ho_prim_mode : [`Full | `Neg | `None | `Pragmatic ] Flex_state.key = Flex_state.create_key()
 let k_ho_prim_max_penalty : int Flex_state.key = Flex_state.create_key()
 
 module Make(E : Env.S) : S with module Env = E = struct
@@ -388,7 +389,14 @@ module Make(E : Env.S) : S with module Env = E = struct
         | Literal.Equation (lhs,rhs,false) 
             when is_eligible i l && Type.is_fun @@ T.ty lhs ->
           let arg_types = Type.expected_args @@ T.ty lhs in
-          let free_vars = Literal.vars l |> T.VarSet.of_list |> T.VarSet.to_list in
+          let vars_under_quant = 
+            Literal.root_terms l
+            |> List.fold_left (fun acc t -> 
+                  Term.VarSet.union acc (T.vars_under_quant t)) 
+               T.VarSet.empty in
+          let free_vars = Literal.vars l |> T.VarSet.of_list 
+                          |> (fun f_vars -> T.VarSet.diff f_vars vars_under_quant)
+                          |> T.VarSet.to_list in
           let new_lits = CCList.map (fun (j,x) -> 
               if i!=j then x
               else (
@@ -551,7 +559,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* rule for primitive enumeration of predicates [P t1…tn]
      (using ¬ and ∧ and =) *)
-  let prim_enum_ ~mode (c:C.t) : C.t list =
+  let prim_enum_ ~(mode) (c:C.t) : C.t list =
     (* set of variables to refine (only those occurring in "interesting" lits) *)
     let vars =
       Literals.fold_lits ~eligible:C.Eligible.always (C.lits c)
@@ -593,6 +601,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              C.create_a lits proof
                ~penalty:(C.penalty c + penalty) ~trail:(C.trail c)
            in
+           (* CCFormat.printf "[Prim_enum:] @[%a@]\n=>\n@[%a@].\n" C.pp c C.pp new_c;  *)
            Util.debugf ~section 3
              "(@[<hv2>ho.refine@ :from %a@ :subst %a@ :yields %a@])"
              (fun k->k C.pp c Subst.pp subst C.pp new_c);
@@ -601,8 +610,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Iter.to_rev_list
     end
 
-  let prim_enum ~mode c =
-    if C.penalty c < max_penalty_prim_
+  let prim_enum ~(mode) c =
+    if Proof.Step.inferences_perfomed (C.proof_step c) < max_penalty_prim_ 
     then prim_enum_ ~mode c
     else []
 
@@ -726,6 +735,21 @@ module Make(E : Env.S) : S with module Env = E = struct
     let y_diff = Term.app y [Term.app diff [T.of_ty alpha; T.of_ty beta; x; y]] in
     let lits = [Literal.mk_eq x y; Literal.mk_neq x_diff y_diff] in
     Env.C.create ~penalty:!_ext_axiom_penalty ~trail:Trail.empty lits Proof.Step.trivial
+
+  let choice_clause =
+    let choice_id = ID.make("zf_choice") in
+    let alpha_var = HVar.make ~ty:Type.tType 0 in
+    let alpha = Type.var alpha_var in
+    let alpha_to_prop = Type.arrow [alpha] Type.prop in
+    let choice_type = Type.arrow [alpha_to_prop] alpha in
+    let choice = Term.const ~ty:choice_type choice_id in
+    let p = Term.var (HVar.make ~ty:alpha_to_prop 1) in
+    let x = Term.var (HVar.make ~ty:alpha 2) in
+    let px = Term.app p [x] in (* p x *)
+    let p_choice = Term.app p [Term.app choice [p]] (* p (choice p) *) in
+    (* ~ (p x) | p (choice p) *)
+    let lits = [Literal.mk_prop px false; Literal.mk_prop p_choice true] in
+    Env.C.create ~penalty:1 ~trail:Trail.empty lits Proof.Step.trivial
 
 
   type fixed_arg_status =
@@ -872,15 +896,18 @@ module Make(E : Env.S) : S with module Env = E = struct
             else None (* ignoring onself *))
         args @ missing in
       let res = List.mapi (fun i arg_opt ->
-        let t = List.nth args i in 
-        match arg_opt with 
-        | Some arg_l ->
-          let res_l = if all_covers then T.cover_with_terms t arg_l 
-                      else [t; T.max_cover t arg_l] in
-          T.Set.of_list res_l 
-        | None -> Term.Set.empty ) args_opt in
+        if i < List.length args then (
+          let t = List.nth args i in 
+          begin match arg_opt with 
+          | Some arg_l ->
+            let res_l = if all_covers then T.cover_with_terms t arg_l 
+                        else [t; T.max_cover t arg_l] in
+            T.Set.of_list res_l 
+          | None -> Term.Set.empty 
+          end)
+        else Term.Set.empty) args_opt in
       res
-      in
+    in
 
     let status = VTbl.create 8 in
     C.lits c
@@ -1042,6 +1069,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       end;
       if !_ext_axiom then
         Env.ProofState.PassiveSet.add (Iter.singleton extensionality_clause);
+      if !_choice_axiom then
+        Env.ProofState.PassiveSet.add (Iter.singleton choice_clause);
     );
     ()
 end
@@ -1051,12 +1080,13 @@ let def_unfold_enabled_ = ref false
 let force_enabled_ = ref false
 let enable_unif_ = ref true
 let prim_mode_ = ref `Neg
-let prim_max_penalty = ref 15 (* FUDGE *)
+let prim_max_penalty = ref 1 (* FUDGE *)
 
 let set_prim_mode_ =
   let l = [
     "neg", `Neg;
     "full", `Full;
+    "pragmatic", `Pragmatic;
     "none", `None;
   ] in
   let set_ s = prim_mode_ := List.assoc s l in
@@ -1089,6 +1119,12 @@ let st_contains_ho (st:(_,_,_) Statement.t): bool =
   has_ho_sym () || has_ho_var () || has_ho_eq()
 
 let extension =
+  (* let env_action env =
+    let module E = (val env : Env.S) in
+    if E.flex_get k_enable_def_unfold then (
+      let clauses = E.
+    )  *)
+
   let register env =
     let module E = (val env : Env.S) in
     if E.flex_get k_some_ho || !force_enabled_ then (
@@ -1142,6 +1178,7 @@ let () =
       "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";
       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
       "--ho-ext-axiom", Arg.Set _ext_axiom, " enable extensionality axiom";
+      "--ho-choice-axiom", Arg.Bool (fun v -> _choice_axiom := v), " enable choice axiom";
       "--no-ho-ext-axiom", Arg.Clear _ext_axiom, " disable extensionality axiom";
       "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule";
       "--ho-neg-ext", Arg.Bool (fun v -> _neg_ext := v), " turn NegExt on or off";
@@ -1194,7 +1231,7 @@ let () =
     _ext_pos := true;
     _ext_pos_all_lits := true;
     prim_mode_ := `None;
-    _elim_pred_var := false;
+    _elim_pred_var := true;
     _neg_cong_fun := false;
     enable_unif_ := false;
     _prune_arg_fun := `PruneMaxCover;
@@ -1205,7 +1242,7 @@ let () =
     force_enabled_ := true;
     _ext_axiom := false;
     _ext_neg_lit := false;
-    _neg_ext := false;
+    _neg_ext := true;
     _neg_ext_as_simpl := false;
     _ext_pos := true;
     _ext_pos_all_lits := true;

@@ -193,6 +193,7 @@ val fold_terms : ?vars:bool -> ?var_args:bool -> ?fun_bodies:bool -> ?ty_args:bo
     [eligible] argument *)
 
 val symbols : ?init:ID.Set.t -> t -> ID.Set.t
+val free_vars : t -> Term.VarSet.t
 
 (** {2 IO} *)
 

@@ -137,6 +137,7 @@ val is_type : t -> bool (** Does it have type [tType]? *)
 val in_pfho_fragment : t -> bool
 val in_lfho_fragment : t -> bool
 val is_fo_term : t -> bool
+val is_true_or_false : t -> bool
 
 val mk_fresh_skolem : var list -> Type.t -> t
 
@@ -210,6 +211,8 @@ val depth : t -> int (** depth of the term *)
 val head : t -> ID.t option (** head ID.t *)
 val head_exn : t -> ID.t (** head ID.t (or Invalid_argument) *)
 val size : t -> int (** Size (number of nodes) *)
+
+val simplify_bools : t -> t
 
 (* all the ways in which term can be covered (built) using the arguments given *)
 val cover_with_terms : ?depth:int -> ?recurse:bool -> t -> t option list -> t list
@@ -387,6 +390,7 @@ module Arith : sig
 end
 
 val vars_under_quant : t -> VarSet.t
+val free_vars        : t -> VarSet.t
 
 (** {2 De Bruijn} *)
 module DB : sig

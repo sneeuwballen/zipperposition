@@ -182,6 +182,14 @@ module Make(E : Env.S) : S with module Env = E = struct
                Some [mk_c (lit::lits)]
              | _ -> None
            end
+          | Literal.Equation (a, b, true)
+           when Type.is_prop (T.ty a) &&
+                not (is_bool_val a) &&
+                not (is_bool_val b) ->
+           let lits = CCArray.except_idx (C.lits c) i in
+           let c_a_imp_b = Literal.mk_false a :: Literal.mk_true b :: lits |> mk_c in
+           let c_b_imp_a = Literal.mk_false b :: Literal.mk_true a :: lits |> mk_c in
+           Some [c_a_imp_b; c_b_imp_a]
          | _ -> None)
 
   let setup () =
