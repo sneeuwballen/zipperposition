@@ -161,8 +161,10 @@ let rec build_term ?(depth=0) ~subst ~scope ~counter var bvar_map t =
       if T.is_var hd then (
         let old_hd = hd in
         let hd = cast_var hd subst scope in
-        if T.equal hd var then
+        if T.equal hd var && CCList.is_empty args then
             raise (Failure "Occurs check!");
+        if T.equal hd var then
+            raise NotInFragment;
         (* If the variable is not yet bound, try to bind to target subterm.
            If it is bound then dereference and try again. *)
         if not (US.FO.mem subst (Term.as_var_exn hd, scope)) then (
@@ -269,8 +271,7 @@ let rec unify ~scope ~counter ~subst = function
       let body_s', body_t', _ = eta_expand_otf ~subst ~scope pref_s pref_t body_s body_t in
       let hd_s, args_s = T.as_app body_s' in
       let hd_t, args_t = T.as_app body_t' in
-      let hd_s, hd_t = CCPair.map_same (fun t -> cast_var t subst scope) (hd_s, hd_t) in
-
+      let hd_s, hd_t = CCPair.map_same (fun t -> cast_var t subst scope) (hd_s, hd_t) in                                       
       match T.view hd_s, T.view hd_t with 
       | (T.Var _, T.Var _) ->
         let subst =
@@ -396,10 +397,9 @@ and flex_rigid ~subst ~counter ~scope flex rigid =
  
   
 let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
-  let tptp_pp = T.pp_in Output_format.O_tptp in
+  (* let tptp_pp = T.pp_in Output_format.O_tptp in *)
   if US.is_empty subst then (
     let t0',t1',scope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
-    CCFormat.printf "[PU_new: %a:%a =?= %a:%a].\n" tptp_pp t0' Type.pp (Term.ty t0') tptp_pp t1' Type.pp (Term.ty t1');
     unify ~scope ~counter ~subst [(t0', t1')]
   )
   else (
