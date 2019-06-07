@@ -196,7 +196,7 @@ let rec unify ~state ~scope ~counter ~subst = function
             if !solve_var then (
               (* trying pattern unification *)
               let subst = P.unify_scoped ~counter ~subst (s',scope) (t',scope) in
-              CCFormat.printf "Weaker unification suceeded: %a.\n" S.pp subst;
+              (* CCFormat.printf "Weaker unification suceeded: %a.\n" S.pp subst; *)
               (* let subst = US.map_subst (fun s -> Subst.FO.map (fun t -> Lambda.eta_expand t) s) subst in *)
               unify ~state ~scope ~counter ~subst rest 
             ) 
@@ -212,11 +212,11 @@ let rec unify ~state ~scope ~counter ~subst = function
           with
           |P.NotUnifiable -> 
             (* A weaker unification procedure determined the constraint is unsolvable *)
-            CCFormat.printf "Weaker unification failed.\n";
+            (* CCFormat.printf "Weaker unification failed.\n"; *)
             OSeq.empty 
           |P.NotInFragment ->
             (* A weaker unification procedure gave up *)
-            CCFormat.printf "Weaker unification gave up.\n";
+            (* CCFormat.printf "Weaker unification gave up.\n"; *)
             let (pref_s, body_s), (pref_t, body_t) = T.open_fun s', T.open_fun t' in
             let body_s', body_t', _ = P.eta_expand_otf ~subst ~scope pref_s pref_t body_s body_t in
             let (hd_s, args_s), (hd_t, args_t) = T.as_app body_s', T.as_app body_t' in
