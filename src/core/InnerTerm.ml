@@ -139,28 +139,6 @@ let const ~ty s =
   let my_t = make_ ~ty:(HasType ty) (Const s) in
   H.hashcons my_t
 
-let app ~ty f l = match f.term, l with
-  | _, [] -> f
-  | App (f1, l1), _::_ ->
-    (* flatten *)
-    let my_t = make_ ~ty:(HasType ty) (App (f1,l1 @ l)) in
-    H.hashcons my_t
-  | AppBuiltin (f1, l1), _::_ ->
-    (* flatten *)
-    let my_t = make_ ~ty:(HasType ty) (AppBuiltin (f1,l1 @ l)) in
-    H.hashcons my_t
-  | _ ->
-    let my_t = make_ ~ty:(HasType ty) (App (f,l)) in
-    H.hashcons my_t
-
-let var v = H.hashcons (make_ ~ty:(HasType (HVar.ty v)) (Var v))
-
-let bvar ~ty i =
-  if i<0 then raise (IllFormedTerm "bvar");
-  H.hashcons (make_ ~ty:(HasType ty) (DB i))
-
-let bind ~ty ~varty s t' =
-  H.hashcons (make_ ~ty:(HasType ty) (Bind (s, varty, t')))
 
 let builtin ~ty b =
   let my_t = make_ ~ty:(HasType ty) (AppBuiltin (b,[])) in
@@ -186,6 +164,42 @@ let tType =
   H.hashcons my_t
 
 let arrow l r = app_builtin ~ty:tType Builtin.arrow (r :: l)
+
+let app ~ty f l = match f.term, l with
+  | _, [] -> f
+  | App (f1, l1), _::_ ->
+    (* flatten *)
+    let my_t = make_ ~ty:(HasType ty) (App (f1,l1 @ l)) in
+    H.hashcons my_t
+  | AppBuiltin (f1, l1), _::_ ->
+    (* flatten *)
+    let flattened = l1 @ l in
+    let ty = if Builtin.is_logical_op f1 && not (Builtin.is_quantifier f1) then (
+      let prop = builtin ~ty:tType Builtin.Prop in
+      if Builtin.is_logical_binop f1 then (
+        if List.length flattened >= 2 then prop
+        else (if List.length flattened = 1 then arrow [prop] prop
+              else arrow [prop;prop] prop)
+      ) else (
+        if List.length flattened = 1 then prop
+        else arrow [prop] prop
+      ))
+     else ty in
+    let my_t = make_ ~ty:(HasType ty) (AppBuiltin (f1,flattened)) in
+    H.hashcons my_t
+  | _ ->
+    let my_t = make_ ~ty:(HasType ty) (App (f,l)) in
+    H.hashcons my_t
+
+let var v = H.hashcons (make_ ~ty:(HasType (HVar.ty v)) (Var v))
+
+let bvar ~ty i =
+  if i<0 then raise (IllFormedTerm "bvar");
+  H.hashcons (make_ ~ty:(HasType ty) (DB i))
+
+let bind ~ty ~varty s t' =
+  H.hashcons (make_ ~ty:(HasType ty) (Bind (s, varty, t')))
+
 
 let cast ~ty old = match old.term with
   | Var v -> var (HVar.cast v ~ty)
@@ -769,6 +783,10 @@ let[@inline] as_app t = match view t with
     | AppBuiltin(b, l') -> app_builtin b ~ty:(ty_exn t) (l'@l), []
     | _ -> f, l 
     end
+  | AppBuiltin(b, l ) when Builtin.is_logical_op b && not (Builtin.is_quantifier b) ->
+    let prop = builtin ~ty:tType Builtin.Prop in
+    let args = if (Builtin.is_logical_binop b) then [prop;prop] else [prop] in
+    app_builtin b ~ty:(arrow args prop) [], l 
   | _ -> t, []
 
 let[@inline] as_var t = match view t with Var v -> Some v | _ -> None

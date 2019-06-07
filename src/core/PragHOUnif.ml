@@ -393,11 +393,10 @@ let unify_scoped t0_s t1_s =
   |> OSeq.map (CCOpt.map (fun sub ->       
       let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub t0_s in 
       let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub t1_s in
-      assert(Type.equal (Term.ty l) (Term.ty r));
-      if not (T.equal l r) then (
-        Format.printf "For problem: %a =?= %a\n" (T.pp_in Output_format.O_tptp) t0' (T.pp_in Output_format.O_tptp) t1';
+      if not (T.equal l r) || not (Type.equal (Term.ty l) (Term.ty r)) then (
+        Format.printf "For problem: %a:%a=?= %a:%a\n" (T.pp_in Output_format.O_tptp) t0' Type.pp (Term.ty t0') (T.pp_in Output_format.O_tptp) t1' Type.pp (Term.ty t1');
         Format.printf "Subst: @[%a@]\n" S.pp sub;
-        Format.printf "%a <> %a\n" (T.pp_in Output_format.O_tptp) l (T.pp_in Output_format.O_tptp) r;
+        Format.printf "%a:%a <> %a:%a\n" (T.pp_in Output_format.O_tptp) l Type.pp (Term.ty l) (T.pp_in Output_format.O_tptp) r Type.pp (Term.ty r);
         assert(false);
       );
       assert (T.equal l r);
