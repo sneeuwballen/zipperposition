@@ -133,9 +133,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     module calls Ctx.ord () independently, but clauses should be normalized
     independently by simplification rules. *) 
   let ord =
-    if !_ord_in_normal_form
-    then Ordering.map (fun t -> t |> Ctx.eta_normalize |> Lambda.snf) (Ctx.ord ())
-    else Ctx.ord ()
+    Ctx.ord ()
 
   let pred_vars c = 
     T.VarSet.to_seq (Literals.free_vars (C.lits c)) 

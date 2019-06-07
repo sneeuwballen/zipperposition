@@ -252,7 +252,7 @@ let rec build_term ?(depth=0) ~subst ~scope ~counter var bvar_map t =
     else T.app_builtin ~ty:(Term.ty t) b new_args, subst
 let rec unify ~scope ~counter ~subst = function
   | [] -> subst
-  | (s,t) :: rest -> (
+  | (s,t) :: rest -> ( 
     let ty_unif = unif_simple ~subst:(US.subst subst) ~scope 
                   (T.of_ty (T.ty s)) (T.of_ty (T.ty t)) in
     
@@ -396,8 +396,10 @@ and flex_rigid ~subst ~counter ~scope flex rigid =
  
   
 let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
+  let tptp_pp = T.pp_in Output_format.O_tptp in
   if US.is_empty subst then (
     let t0',t1',scope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
+    CCFormat.printf "[PU_new: %a:%a =?= %a:%a].\n" tptp_pp t0' Type.pp (Term.ty t0') tptp_pp t1' Type.pp (Term.ty t1');
     unify ~scope ~counter ~subst [(t0', t1')]
   )
   else (
@@ -406,6 +408,7 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
     )
     else (
       let t0', t1' = S.apply subst t0_s, S.apply subst t1_s in
+      (* CCFormat.printf "[PU: %a:%a =?= %a:%a].\n" tptp_pp t0' Type.pp (Term.ty t0') tptp_pp t1' Type.pp (Term.ty t1'); *)
       unify ~scope:(Scoped.scope t0_s) ~counter ~subst [(t0', t1')]
     )
   )

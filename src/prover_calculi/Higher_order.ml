@@ -1036,6 +1036,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                                           | Some tt -> Some tt))
       in
       Env.set_ho_normalization_rule ho_norm;
+      Ordering.normalize := (fun t -> CCOpt.get_or ~default:t (ho_norm t));
 
       if (!_huet_style) then
         JP_unif.set_huet_style ();
