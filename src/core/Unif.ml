@@ -587,7 +587,10 @@ module Inner = struct
       | _ when op=O_unify && not root && has_non_unifiable_type_or_is_prop t1 ->
         let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
         delay ~tags () (* push pair as a constraint, because of typing. *)
-      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Builtin.equal s1 s2 ->
+      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when 
+        Builtin.equal s1 s2 && 
+        not (Builtin.equal Builtin.ForallConst s1) && 
+        not (Builtin.equal Builtin.ExistsConst s1) ->
         (* try to unify/match builtins pairwise *)
         unif_list ~op ~bvars subst l1 sc1 l2 sc2
       | _, _ -> raise Fail

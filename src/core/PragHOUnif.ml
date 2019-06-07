@@ -251,9 +251,11 @@ let rec unify ~state ~scope ~counter ~subst = function
             | T.Const f , T.Const g when ID.equal f g && List.length args_s = List.length args_t ->
                 unify ~state ~subst ~counter ~scope (build_constraints ~ban_id args_s args_t rest)
             | T.AppBuiltin(hd_s, args_s'), T.AppBuiltin(hd_t, args_t') when
-                Builtin.equal hd_s hd_t && 
-                  List.length args_s' + List.length args_s = 
-                  List.length args_t' + List.length args_t ->
+                Builtin.equal hd_s hd_t &&
+                not (Builtin.equal Builtin.ForallConst hd_s) &&
+                not (Builtin.equal Builtin.ExistsConst hd_s) && 
+                List.length args_s' + List.length args_s = 
+                List.length args_t' + List.length args_t ->
                 unify ~state ~subst ~counter ~scope (build_constraints ~ban_id (args_s'@args_s) (args_t'@args_t) rest)
             | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->
                 unify ~state ~subst ~counter ~scope (build_constraints ~ban_id args_s args_t rest)  
@@ -389,13 +391,13 @@ let unify_scoped t0_s t1_s =
 
   res
   |> OSeq.map (CCOpt.map (fun sub ->       
-      let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t0_s in 
-      let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t1_s in
+      let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub t0_s in 
+      let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub t1_s in
       assert(Type.equal (Term.ty l) (Term.ty r));
       if not (T.equal l r) then (
-        Format.printf "For problem: %a =?= %a\n" T.pp t0' T.pp t1';
+        Format.printf "For problem: %a =?= %a\n" (T.pp_in Output_format.O_tptp) t0' (T.pp_in Output_format.O_tptp) t1';
         Format.printf "Subst: @[%a@]\n" S.pp sub;
-        Format.printf "%a <> %a\n" T.pp l T.pp r;
+        Format.printf "%a <> %a\n" (T.pp_in Output_format.O_tptp) l (T.pp_in Output_format.O_tptp) r;
         assert(false);
       );
       assert (T.equal l r);

@@ -447,8 +447,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   let elim_pred_variable (c:C.t) : C.t list =
     (* find unshielded predicate vars *)
     let find_vars(): _ HVar.t Iter.t =
-      C.Seq.vars c
-      |> T.VarSet.of_seq |> T.VarSet.to_seq
+      Literals.free_vars (C.lits c)
+      |> T.VarSet.to_seq
       |> Iter.filter
         (fun v ->
            (Type.is_prop @@ Type.returns @@ HVar.ty v) &&
@@ -911,6 +911,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
 
     let status = VTbl.create 8 in
+    let free_vars = Literals.free_vars (C.lits c) in
     C.lits c
     |> Literals.map (fun t -> Lambda.eta_expand t) (* to make sure that DB indices are everywhere the same *)
     |> Literals.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord:Ordering.none 
@@ -919,7 +920,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       (fun (t,_) ->
         let head, _ = T.as_app t in
         match T.as_var head with
-          | Some var ->
+          | Some var when T.VarSet.mem var free_vars ->
             begin match VTbl.get status var with
             | Some (current_sets, created_sk) ->
               let t, new_sk = T.DB.skolemize_loosely_bound t in
@@ -936,7 +937,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                                 |> List.map snd |> Term.Set.of_list in
               VTbl.add status var (get_covers head (T.args t'), created_sk);
             end
-          | None -> ();
+          | _ -> ();
         ()
       );
 
