@@ -1661,9 +1661,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
              Format.fprintf out "(@[%a@ :subst %a[%d]@])" C.pp c Subst.pp s sc in
            k C.pp c C.pp new_c (Util.pp_list pp_c_s) st.demod_clauses);
       (* Assertion against variable clashes *)
-      Lits.vars (C.lits new_c) 
+      (* Not sure if this assertion is in place -- maybe Zip renames the vars afterwards
+         TODO: INVESTIGATE!!!
+       *)
+      (* Lits.vars (C.lits new_c) 
         |> CCList.map (fun v -> (HVar.id v))
-        |> (fun vars -> assert (CCList.length (CCList.uniq ~eq:CCInt.equal vars) == CCList.length vars));
+        |> (fun vars -> assert (CCList.length (CCList.uniq ~eq:CCInt.equal vars) == CCList.length vars)); *)
       (* return simplified clause *)
       SimplM.return_new new_c
     )
