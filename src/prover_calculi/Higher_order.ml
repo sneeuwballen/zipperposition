@@ -560,6 +560,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* rule for primitive enumeration of predicates [P t1…tn]
      (using ¬ and ∧ and =) *)
   let prim_enum_ ~(mode) (c:C.t) : C.t list =
+    let free_vars = Literals.free_vars (C.lits c) in
     (* set of variables to refine (only those occurring in "interesting" lits) *)
     let vars =
       Literals.fold_lits ~eligible:C.Eligible.always (C.lits c)
@@ -572,7 +573,7 @@ module Make(E : Env.S) : S with module Env = E = struct
            let hd = T.head_term t in
            begin match T.as_var hd, Type.arity (T.ty hd) with
              | Some v, Type.Arity (0, n)
-               when n>0 && Type.returns_prop (T.ty hd) ->
+               when n>0 && Type.returns_prop (T.ty hd) && T.VarSet.mem v free_vars ->
                Some v
              | _ -> None
            end)
@@ -888,7 +889,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let args_opt = List.mapi (fun i a_i ->
             assert(Term.DB.is_closed a_i);
             assert(CCList.is_empty current_sets ||
-                   List.length current_sets = List.length args);
+                   List.length current_sets = (List.length args + List.length missing));
             if CCList.is_empty current_sets ||
                not (Term.Set.is_empty (List.nth current_sets i)) then 
               (Some (List.mapi (fun j a_j -> 
@@ -1194,7 +1195,7 @@ let () =
       "--ho-huet-style-unif", Arg.Set _huet_style, " enable Huet style projection";
       "--ho-no-conservative-elim", Arg.Clear _cons_elim, " Disables conservative elimination rule in pragmatic unification";
       "--ho-imitation-first",Arg.Set _imit_first, " Use imitation rule before projection rule";
-      "--ho-solve-vars", Arg.Set _var_solve, " Enable solving variables.";
+      "--ho-solve-vars", Arg.Bool (fun v -> PragHOUnif.solve_var := v), " Enable solving variables.";
       "--ho-composition", Arg.Set _compose_subs, " Enable composition instead of merging substitutions";
       "--ho-disable-var-arg-removal", Arg.Clear _var_arg_remove, " disable removal of arguments of applied variables";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom";
@@ -1247,7 +1248,7 @@ let () =
     _ext_pos := true;
     _ext_pos_all_lits := true;
     prim_mode_ := `None;
-    _elim_pred_var := false;
+    _elim_pred_var := true;
     _neg_cong_fun := false;
     enable_unif_ := false;
     _prune_arg_fun := `PruneMaxCover;

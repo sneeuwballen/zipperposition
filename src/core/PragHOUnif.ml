@@ -34,7 +34,7 @@ let max_elims           = ref 2
 
 let _cons_e = ref true
 let _imit_first = ref false
-let _solve_var = ref true
+let solve_var = ref true
 
 (* apply a substitution and reduce to whnf *)
 let nfapply s u = Lambda.beta_red_head (S.apply s u)
@@ -68,7 +68,7 @@ let enable_imit_first () =
   _imit_first := true
 
 let enable_solve_var () = 
-  _solve_var := true
+  solve_var := true
 
 let compose_sub s1 s2 =
   US.merge s1 s2
@@ -193,7 +193,7 @@ let rec unify ~state ~scope ~counter ~subst = function
           let s', t' = apply_subst ty_unif (s', scope), apply_subst ty_unif (t', scope) in
           let subst = ty_unif in
           try
-            if !_solve_var then (
+            if !solve_var then (
               (* trying pattern unification *)
               let subst = P.unify_scoped ~counter ~subst (s',scope) (t',scope) in
               unify ~state ~scope ~counter ~subst rest 

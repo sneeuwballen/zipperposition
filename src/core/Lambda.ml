@@ -140,7 +140,6 @@ module Inner = struct
               if T.same_l l l' then body else T.app ~ty f l'
             | T.AppBuiltin (b, [v;q_body]) when Builtin.equal b Builtin.ForallConst ||
                                               Builtin.equal b Builtin.ExistsConst ->
-              assert(T.is_var v);
               (* Disable eta-expanding the variable that is quantified *)
               let q_body' = aux q_body in
               if T.equal q_body q_body' then body else T.app_builtin ~ty b [v;q_body']

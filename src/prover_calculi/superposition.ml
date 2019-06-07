@@ -87,6 +87,7 @@ let _lambdasup = ref (-1)
 let _max_infs = ref (-1)
 let max_lits_ext_dec = ref 0
 let _unif_alg = ref JP_unif.unify_scoped
+let _unif_level = ref `Full
 
 
 module Make(Env : Env.S) : S with module Env = Env = struct
@@ -137,7 +138,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     else Ctx.ord ()
 
   let pred_vars c = 
-    C.Seq.vars c
+    T.VarSet.to_seq (Literals.free_vars (C.lits c)) 
     |> Iter.filter (fun v -> 
         let ty = HVar.ty v in
         Type.is_fun ty && Type.returns_prop ty)
@@ -2587,7 +2588,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   [new_clause]
                 ) else []
               ) else []
-            | _ -> assert false
+            | _ -> [] (* predicate *)
           ) else []
         | _ -> assert false
       with Invalid_argument _ -> []
@@ -2873,7 +2874,7 @@ let () =
       _sup_at_var_headed := true;
       _lambdasup := -1;
       _dupsup := false;
-      _max_infs := 100;
+      _max_infs := 50;
       PragHOUnif.max_depth := 6;
       PragHOUnif.max_app_projections := 3;
       PragHOUnif.max_var_imitations := 2;

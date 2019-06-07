@@ -78,8 +78,7 @@ let rec eligible_arg t =
   | T.AppBuiltin _ | T.Const _ | T.Var _ -> false
   | T.DB _ -> true
   | T.Fun (_, body) -> eligible_arg body
-  | T.App (f, l) -> eligible_arg f &&
-                    List.for_all eligible_arg l
+  | T.App (f, l) -> List.for_all eligible_arg (f :: l)
 
 (* If all arguments can be reduced to distinct bound variables we convert
    them to `Some map` where map is the sorted association list that maps de
@@ -94,7 +93,7 @@ let get_bvars args =
   let reduced = 
     List.map 
       (fun t -> if (eligible_arg t) then (Lambda.eta_reduce t) else t) 
-                (*Lambda.eta_reduce t*)
+                (*Lambda.eta_reduce ~full:false t*)
     args in
   let n = List.length reduced in
   if List.for_all T.is_bvar reduced then (

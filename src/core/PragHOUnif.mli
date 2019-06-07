@@ -28,6 +28,7 @@ val max_var_imitations  : int ref
 val max_identifications : int ref
 val max_elims           : int ref
 val max_depth           : int ref
+val solve_var           : bool ref
 
 (* Disable getting only the first solution for unifying arguments
    after performing identification *)
