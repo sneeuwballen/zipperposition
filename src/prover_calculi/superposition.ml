@@ -430,20 +430,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let us = info.subst in
       let subst = US.subst us in
 
-      let vars_under_quant cl = 
-        C.Seq.terms cl |> Iter.fold (fun acc st -> 
-          Term.VarSet.union acc (Term.vars_under_quant st)) 
-          Term.VarSet.empty in
-      let set_in_subs subst set sc =
-        Term.VarSet.exists 
-          (fun v -> CCOpt.is_some (S.find subst ((v :> InnerTerm.t HVar.t), sc))) set in
-      if set_in_subs subst (vars_under_quant info.active) sc_a || 
-         set_in_subs subst (vars_under_quant info.passive) sc_p then (
-        Util.debugf ~section 1 "Trying to paramodulate with quantificator." (fun k->k);
-        raise (ExitSuperposition "Trying to paramodulate with quantificator.");
-      );
- 
-
       let lambdasup_vars =
         if (info.sup_kind = LambdaSup) then (
           Term.Seq.subterms info.u_p |> Iter.filter Term.is_var |> Term.Set.of_seq)
@@ -2580,7 +2566,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                 let covered_r = Term.max_cover r [Some y] in
                 if Term.equal covered_l covered_r then (
                   let ty = Type.arrow [Term.ty l] (Term.ty x) in
-                  let inverse_x = Term.app (Term.mk_fresh_skolem [] ty) [l] in
+                  let sk_vars = Term.free_vars covered_l |> Term.VarSet.to_list in
+                  let inverse_x = Term.app (Term.mk_fresh_skolem sk_vars ty) [l] in
                   let inverse_lit = [Lit.mk_eq inverse_x x] in
                   let proof = Proof.Step.inference ~rule:(Proof.Rule.mk "inverse recognition") 
                               [C.proof_parent c] in

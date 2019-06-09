@@ -79,14 +79,33 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) l
       | `None -> []
       | `Neg | `Pragmatic | `Full ->
         [T.fun_of_fvars vars T.true_]
+    and l_quants = match mode with
+      | `Pragmatic | `Full ->
+        let n = List.length ty_args in
+        CCList.mapi (fun i ty -> 
+          if Type.is_fun ty && Type.returns_prop ty then (
+            let arg_typeargs,_ = Type.open_fun ty in
+            let new_vars = List.map (fun ty -> HVar.fresh ~ty ()) arg_typeargs in
+            let form_body = T.app (T.bvar ~ty (n-i-1)) (List.map T.var new_vars) in
+            let forall = T.close_quantifier Builtin.ForallConst new_vars form_body in
+            let exists = T.close_quantifier Builtin.ExistsConst new_vars form_body in
+            Some ((T.fun_l ty_args forall, T.fun_l ty_args exists)))
+          else None) ty_args
+        |> CCList.fold_left (fun acc opt -> match opt with 
+          | Some (x,y) -> x :: y :: acc 
+          | None -> acc) [] 
+      | _ -> []
     and l_simpl_eq = match mode with
       | `Pragmatic -> 
         let n = List.length vars in
         let db_vars = List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) ty_args in
         CCList.mapi (fun i db_i -> 
           CCList.mapi (fun j db_j ->
-            if i < j && Type.equal (T.ty db_i) (T.ty db_j) then ( 
-              let res = [T.fun_l ty_args (T.Form.eq db_i db_j)] in
+            if i < j && Type.equal (T.ty db_i) (T.ty db_j) then (
+              let x = T.var (HVar.fresh ~ty:(T.ty db_i) ()) in 
+              let res = [T.fun_l ty_args (T.Form.eq db_i db_j);
+                         T.fun_l ty_args (T.Form.eq x db_j);
+                         T.fun_l ty_args (T.Form.eq db_i x)] in
               if Type.is_prop (T.ty db_i) then
                res @
                 [T.fun_l ty_args (T.Form.and_ db_i db_j);
@@ -115,6 +134,7 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) l
         l_false, 5;
         l_true, 5;
         l_simpl_eq, 10;
+        l_quants, 10;
       ]
   )
 
