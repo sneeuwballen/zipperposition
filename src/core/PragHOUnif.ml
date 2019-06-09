@@ -193,7 +193,7 @@ let rec unify ~state ~scope ~counter ~subst = function
           let s', t' = apply_subst ty_unif (s', scope), apply_subst ty_unif (t', scope) in
           let subst = ty_unif in
           try
-            if !solve_var then (
+            if !solve_var && state.depth <= 4  then (
               (* trying pattern unification *)
               let subst = P.unify_scoped ~counter ~subst (s',scope) (t',scope) in
               (* CCFormat.printf "Weaker unification suceeded: %a.\n" S.pp subst; *)
