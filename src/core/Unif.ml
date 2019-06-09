@@ -832,8 +832,8 @@ module Inner = struct
         proj_fun ~op ~bvars:(DBEnv.push_l_rev bvars new_vars) subst (body,sc_t)
       | T.App _ -> assert false
       | T.AppBuiltin (_, l2) ->
-        assert (l=[]);
-        proj_fun_l ~op ~bvars subst (l2,sc_t)
+        (* assert (l=[]); *)
+        proj_fun_l ~op ~bvars subst (l@l2,sc_t)
       | T.DB i ->
         if DBEnv.mem bvars i
         then proj_fun_l ~op ~bvars subst (l,sc_t)
