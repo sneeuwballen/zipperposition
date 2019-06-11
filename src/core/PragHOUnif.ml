@@ -7,12 +7,12 @@ module H = HVar
 type subst = US.t
 type unif_state =
 {
-  norm_deref          : US.t -> T.t Scoped.t -> T.t;
   num_identifications : int;
   num_var_imitations  : int;
   num_app_projections : int;
   num_elims           : int;
-  depth               : int
+  depth               : int;
+  monomorphic         : bool;
 }
 
 let state_pp out st =
@@ -60,6 +60,8 @@ let rec nfapply_mono subst (t,sc) =
     end in
   if T.equal tt t' then t
   else T.fun_l pref t'
+
+let normalize ~mono = if mono then nfapply_mono else nfapply
 
 let disable_conservative_elim () =
   _cons_e := false
@@ -184,16 +186,18 @@ let rec unify ~state ~scope ~counter ~subst = function
   | (s,t,ban_id) :: rest as l -> (
     if not @@ continue_unification state then OSeq.empty
     else (
-      let apply_subst = state.norm_deref in
-      let s', t' = apply_subst subst (s, scope), apply_subst subst (t, scope) in
+      let s', t' = normalize ~mono:(state.monomorphic) subst (s, scope), 
+                   normalize ~mono:(state.monomorphic) subst (t, scope) in
       if not (Term.equal s' t') then (
         match P.unif_simple ~subst:(US.subst subst) ~scope 
                 (T.of_ty (T.ty s')) (T.of_ty (T.ty t')) with
         | Some ty_unif -> (
-          let s', t' = apply_subst ty_unif (s', scope), apply_subst ty_unif (t', scope) in
+          let s', t' = normalize ~mono:state.monomorphic ty_unif (s', scope), 
+                       normalize ~mono:state.monomorphic ty_unif (t', scope) in
           let subst = ty_unif in
           try
-            if !solve_var then (
+            (* Deep pattern unifications are inefficient *)
+            if !solve_var && state.monomorphic && state.depth <= 4 then (
               (* trying pattern unification *)
               let subst = P.unify_scoped ~counter ~subst (s',scope) (t',scope) in
               (* CCFormat.printf "Weaker unification suceeded: %a.\n" S.pp subst; *)
@@ -377,15 +381,15 @@ let unify_scoped t0_s t1_s =
     with Unif.Fail -> None in
   let t0',t1',unifscope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
   let prefix = if (CCOpt.is_some lfho_unif) then OSeq.cons lfho_unif else (fun x -> x) in
+  let monomorphic = Iter.is_empty @@ Iter.union (Term.Seq.ty_vars t0') (Term.Seq.ty_vars t1') in
   let state = 
   {
-    norm_deref          = if Iter.is_empty @@ Iter.union (Term.Seq.ty_vars t0') (Term.Seq.ty_vars t1')
-                          then nfapply_mono else nfapply;
     num_identifications = 0;
     num_var_imitations  = 0;
     num_app_projections = 0;
     num_elims           = 0;
-    depth               = 0
+    depth               = 0;
+    monomorphic
   } in
   let res =
       prefix
