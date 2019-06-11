@@ -32,6 +32,8 @@ val eta_reduce : ?full:bool -> term -> term
 
 val is_lambda_pattern : term -> bool
 
+val is_properly_encoded : term -> bool
+
 (** Low level interface *)
 module Inner : sig
   type term = InnerTerm.t

@@ -375,17 +375,19 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     )
     else (
       (* Check whether Cσ is >= C[var -> replacement]σ *)
-      let passive'_lits = Lits.apply_subst renaming subst (C.lits info.passive, info.scope_passive) in
-      let subst_t = Unif.FO.bind_or_update subst (T.as_var_exn var, info.scope_passive) (replacement, info.scope_active) in
-      let passive_t'_lits = Lits.apply_subst renaming subst_t (C.lits info.passive, info.scope_passive) in
-      if Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt
-      then (
-        Util.debugf ~section 5
-          "Sup at var condition is not fulfilled because: %a >= %a"
-          (fun k->k Lits.pp passive'_lits Lits.pp passive_t'_lits);
-        false
-      )
-      else true (* If Cσ is either <= or incomparable to C[var -> replacement]σ, we need sup at var.*)
+      try
+        let passive'_lits = Lits.apply_subst renaming subst (C.lits info.passive, info.scope_passive) in
+        let subst_t = Unif.FO.bind_or_update subst (T.as_var_exn var, info.scope_passive) (replacement, info.scope_active) in
+        let passive_t'_lits = Lits.apply_subst renaming subst_t (C.lits info.passive, info.scope_passive) in
+        if Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt
+        then (
+          Util.debugf ~section 5
+            "Sup at var condition is not fulfilled because: %a >= %a"
+            (fun k->k Lits.pp passive'_lits Lits.pp passive_t'_lits);
+          false
+        )
+        else true (* If Cσ is either <= or incomparable to C[var -> replacement]σ, we need sup at var.*)
+      with Unif.Fail -> true (* occurs check failed, do the inference -- check with Alex.*)
     )
 
 
@@ -429,6 +431,20 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let renaming = S.Renaming.create () in
       let us = info.subst in
       let subst = US.subst us in
+
+      let vars_under_quant cl sc = 
+        C.Seq.terms cl 
+        |> Iter.fold (fun acc st -> 
+            Term.VarSet.union acc (Term.vars_under_quant st)) 
+            Term.VarSet.empty 
+        |> Term.VarSet.to_list
+        |> List.map (fun v -> T.var v, sc)  in
+      let subset = vars_under_quant info.active info.scope_active 
+                   @ (vars_under_quant info.passive info.scope_passive) in  
+      if not (Subst.FO.subset_is_renaming ~subset subst) then (
+        Util.debugf ~section 1 "Trying to paramodulate with quantificator." (fun k->k);
+        raise (ExitSuperposition "Trying to paramodulate with quantificator.");
+      );
 
       let lambdasup_vars =
         if (info.sup_kind = LambdaSup) then (
@@ -559,6 +575,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                 let sk = S.FO.apply renaming subst (sk, scope) in
                 Term.replace ~old:sk ~by:sk_v acc)
               sk_with_vars t ) lit) new_lits in
+      
+      if List.exists (fun lit -> 
+          Lit.Seq.terms lit 
+          |> Iter.exists (fun t ->
+                not (Lambda.is_properly_encoded t))) 
+             new_lits then (
+        raise (ExitSuperposition "improperly formed quantified expressions.");
+      );
+
       let rule =
         let r = kind_to_str info.sup_kind in
         let sign = if Lit.sign passive_lit' then "+" else "-" in
@@ -577,8 +602,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (* Format.printf "LS: %a\n" C.pp new_clause;  *)
         Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       assert (List.for_all (Lit.for_all Term.DB.is_closed) new_lits); 
-      Util.debugf ~section 1  "Res: %a.\n" (fun k -> k C.pp new_clause);
-
       assert(Array.for_all Literal.no_prop_invariant (C.lits new_clause));
       Some new_clause
     with ExitSuperposition reason ->
@@ -1664,7 +1687,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let max_id   = T.VarSet.max_elt_opt all_vars in
     match max_id with 
     | Some id ->
-      let max_id = ref (CCInt.max (HVar.id id) 0) in
+      let max_id = ref (CCInt.max (HVar.id id + 1) 0) in
       let neg_vars_renaming = T.VarSet.fold (fun v subst -> 
         let v_id = HVar.id v in
           if v_id < 0 then (
@@ -1989,6 +2012,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         let proof =
           Proof.Step.simp [parent]
             ~tags:!tags ~rule:(Proof.Rule.mk "simplify") in
+        let new_lits = if List.exists Lit.is_trivial new_lits then [Lit.mk_tauto] else new_lits in
         let new_clause =
           C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof
         in

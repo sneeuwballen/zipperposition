@@ -415,6 +415,19 @@ module FO = struct
           (v', (t',sc_t))::l, sk_map) subs_l ([],Term.IntMap.empty) in
    of_list' unleaked_l, List.map snd (Term.IntMap.bindings new_sk)
 
+  let subset_is_renaming ~subset subst =
+    try 
+      let derefed_vars = List.map (fun v ->
+        let derefed = deref subst v in
+        if not (Term.is_var (fst derefed)) then (
+          raise (invalid_arg "found a non-variable")
+        ) else derefed
+      ) subset 
+      |> CCList.sort_uniq ~cmp:(Scoped.compare Term.compare) in
+      List.length derefed_vars = List.length subset
+    with Invalid_argument _ -> false
+ 
+
 
 end
 
