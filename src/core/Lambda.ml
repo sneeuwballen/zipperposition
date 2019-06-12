@@ -294,3 +294,14 @@ let rec is_lambda_pattern t = match T.view (whnf t) with
     |> OptionSet.of_list
     |> (fun set -> not (OptionSet.mem None set) && OptionSet.cardinal set = List.length args)
 
+let rec is_properly_encoded t = match T.view t with
+| Var _ | DB _ | Const _ -> true
+| AppBuiltin (hd,l) when Builtin.equal hd Builtin.ForallConst 
+                         || Builtin.equal hd Builtin.ExistsConst ->
+    begin match l with
+    | [x;body] -> T.is_var (eta_reduce @@ snf x)
+    | _ -> false end
+| AppBuiltin(hd,l) -> List.for_all is_properly_encoded l
+| App (hd, l) -> List.for_all is_properly_encoded (hd::l)
+| Fun (_,u) -> is_properly_encoded u 
+ 
