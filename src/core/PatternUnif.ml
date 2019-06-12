@@ -291,8 +291,8 @@ let rec unify ~scope ~counter ~subst = function
         unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest
       | T.AppBuiltin(hd_s, args_s'), T.AppBuiltin(hd_t, args_t') when
           Builtin.equal hd_s hd_t &&
-          not (Builtin.equal Builtin.ForallConst hd_s) &&
-          not (Builtin.equal Builtin.ExistsConst hd_s) &&  
+          (* not (Builtin.equal Builtin.ForallConst hd_s) &&
+          not (Builtin.equal Builtin.ExistsConst hd_s) &&   *)
           List.length args_s' + List.length args_s = 
           List.length args_t' + List.length args_t ->
         unify ~subst ~counter ~scope @@ build_constraints (args_s'@args_s)  (args_t'@args_t) rest

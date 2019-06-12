@@ -545,3 +545,9 @@ let unshielded_vars ?(filter=fun _->true) lits: _ list =
     (fun var ->
        filter var &&
        not (is_shielded var lits))
+
+let vars_distinct lits = 
+  let dif_vars = vars lits in
+  let dif_ids  = 
+    List.sort_uniq CCOrd.int @@ List.map HVar.id dif_vars in
+  List.length dif_ids = List.length dif_vars

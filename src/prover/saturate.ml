@@ -70,6 +70,7 @@ module Make(E : Env.S) = struct
   let[@inline] check_clause_ c = 
     if !_check_types then Env.C.check_types c;
     assert (Env.C.Seq.terms c |> Iter.for_all Term.DB.is_closed);
+    assert (Env.C.lits c |> Literals.vars_distinct);
     CCArray.iter (fun t -> assert(Literal.no_prop_invariant t)) (Env.C.lits c)
 
   let[@inline] check_clauses_ seq =
