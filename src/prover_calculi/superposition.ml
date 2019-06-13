@@ -432,15 +432,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let us = info.subst in
       let subst = US.subst us in
 
-      let vars_under_quant cl sc = 
-        C.Seq.terms cl 
-        |> Iter.fold (fun acc st -> 
-            Term.VarSet.union acc (Term.vars_under_quant st)) 
-            Term.VarSet.empty 
-        |> Term.VarSet.to_list
-        |> List.map (fun v -> T.var v, sc)  in
-      let subset = vars_under_quant info.active info.scope_active 
-                   @ (vars_under_quant info.passive info.scope_passive) in  
+      let v_under_quant cl sc = 
+        List.map (fun v -> T.var v, sc) (C.vars_under_quant cl) in
+      let subset = v_under_quant info.active info.scope_active 
+                   @ (v_under_quant info.passive info.scope_passive) in  
       if not (Subst.FO.subset_is_renaming ~subset subst) then (
         Util.debugf ~section 1 "Trying to paramodulate with quantificator." (fun k->k);
         raise (ExitSuperposition "Trying to paramodulate with quantificator.");
@@ -1184,18 +1179,22 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               Util.incr_stat stat_equality_resolution_call;
               let renaming = Subst.Renaming.create () in
               let subst = US.subst us in
-              let rule = Proof.Rule.mk "eq_res" in
-              let new_lits = CCArray.except_idx (C.lits clause) pos in
-              let new_lits = Lit.apply_subst_list renaming subst (new_lits,0) in
-              let c_guard = Literal.of_unif_subst renaming us in
-              let tags = Unif_subst.tags us in
-              let trail = C.trail clause and penalty = C.penalty clause in
-              let proof = Proof.Step.inference ~rule ~tags
-                  [C.proof_parent_subst renaming (clause,0) subst] in
-              let new_clause = C.create ~trail ~penalty (c_guard@new_lits) proof in
-              Util.debugf ~section 1 "@[<hv2>equality resolution on@ @[%a@]@ yields @[%a@],\n subst @[%a@]@]"
-                (fun k->k C.pp clause C.pp new_clause US.pp us);
-              Some new_clause
+              let subset = C.vars_under_quant clause |> List.map (fun t -> T.var t, 0) in  
+              if not (Subst.FO.subset_is_renaming ~subset subst) then (
+                None
+              ) else (
+                let rule = Proof.Rule.mk "eq_res" in
+                let new_lits = CCArray.except_idx (C.lits clause) pos in
+                let new_lits = Lit.apply_subst_list renaming subst (new_lits,0) in
+                let c_guard = Literal.of_unif_subst renaming us in
+                let tags = Unif_subst.tags us in
+                let trail = C.trail clause and penalty = C.penalty clause in
+                let proof = Proof.Step.inference ~rule ~tags
+                    [C.proof_parent_subst renaming (clause,0) subst] in
+                let new_clause = C.create ~trail ~penalty (c_guard@new_lits) proof in
+                Util.debugf ~section 1 "@[<hv2>equality resolution on@ @[%a@]@ yields @[%a@],\n subst @[%a@]@]"
+                  (fun k->k C.pp clause C.pp new_clause US.pp us);
+                Some new_clause)
             ) else None
           in
           let substs = unify (l, 0) (r, 0) in
@@ -1258,7 +1257,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* check whether subst(lit) is maximal, and not (subst(s) < subst(t)) *)
     let renaming = S.Renaming.create () in
     let subst = US.subst us in
-    if O.compare ord (S.FO.apply renaming subst (s, info.scope))
+    let subset = C.vars_under_quant info.clause |> List.map (fun t -> T.var t, info.scope) in  
+    
+    if Subst.FO.subset_is_renaming ~subset subst &&
+       O.compare ord (S.FO.apply renaming subst (s, info.scope))
         (S.FO.apply renaming subst (t, info.scope)) <> Comp.Lt
        &&
        C.is_eligible_param (info.clause,info.scope) subst ~idx:info.active_idx

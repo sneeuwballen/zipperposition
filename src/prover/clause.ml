@@ -299,6 +299,14 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       (fun set c -> Lits.symbols ~init:set c.sclause.lits)
       init seq
 
+  let vars_under_quant cl = 
+    Literals.Seq.terms (lits cl) 
+    |> Iter.fold (fun acc st -> 
+        Term.VarSet.union acc (Term.vars_under_quant st)) 
+        Term.VarSet.empty 
+    |> Term.VarSet.to_list
+    
+
   let to_forms c = Lits.Conv.to_forms c.sclause.lits
   let to_sclause c = c.sclause
 
