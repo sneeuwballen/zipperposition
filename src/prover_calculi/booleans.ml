@@ -241,9 +241,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) (C.lits c) in
     match idx with 
     | Some _ ->
-      CCFormat.printf "[cnf conv arg:]: %a\n" C.pp_tstp c;
       let f = Literals.Conv.to_tst (C.lits c) in
-      CCFormat.printf "[cnf conv res:]: %a\n" (TypedSTerm.pp_in Output_format.tptp) f;
       let proof = Proof.Step.inference ~rule:(Proof.Rule.mk "cnf_otf") [C.proof_parent c] in
       let trail = C.trail c and penalty = C.penalty c in
       let stmt = Statement.assert_ ~proof f in

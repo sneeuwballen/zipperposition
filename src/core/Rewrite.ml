@@ -336,6 +336,7 @@ module Term = struct
         end
       | T.App (f, l) ->
         (* first, reduce subterms *)
+        (* assert(l != 0) *)
         reduce_l l
           (fun l' ->
             let t' = if T.same_l l l' then t else T.app f l' in

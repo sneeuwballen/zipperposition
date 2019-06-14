@@ -99,7 +99,11 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) l
       | `Pragmatic -> 
         let n = List.length vars in
         let db_vars = List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) ty_args in
-        CCList.mapi (fun i db_i -> 
+        CCList.mapi (fun i db_i ->
+          let projs = if Type.is_prop (Term.ty db_i) then (
+            [T.fun_l ty_args db_i]
+          ) else [] in
+          let log_ops = 
           CCList.mapi (fun j db_j ->
             if i < j && Type.equal (T.ty db_i) (T.ty db_j) then (
               let x = T.var (HVar.fresh ~ty:(T.ty db_i) ()) in 
@@ -116,7 +120,8 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) l
             )
             else []) 
           db_vars
-          |> CCList.flatten) 
+          |> CCList.flatten in
+          projs @ log_ops) 
         db_vars
         |> CCList.flatten
       | _ -> []
