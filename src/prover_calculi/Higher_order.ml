@@ -353,9 +353,10 @@ module Make(E : Env.S) : S with module Env = E = struct
         | Literal.Equation (lhs,rhs,false) when is_eligible i l ->
           let subterms = find_diffs lhs rhs in
           if not (CCList.is_empty subterms) &&
-             List.exists (fun (l,_) -> Type.is_fun (T.ty l)) subterms then
+             List.exists (fun (l,_) -> 
+                Type.is_fun (T.ty l) || Type.is_prop (T.ty l)) subterms then
              let subterms_lit = CCList.map (fun (l,r) ->
-               let free_vars = T.VarSet.union (T.vars l) (T.vars r) |> T.VarSet.to_list in 
+               let free_vars = T.VarSet.union (T.free_vars l) (T.free_vars r) |> T.VarSet.to_list in 
                let arg_types = Type.expected_args  @@ T.ty l in
                if CCList.is_empty arg_types then Literal.mk_neq l r
                else (
