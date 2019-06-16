@@ -337,14 +337,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       |> Iter.filter (fun (t, _) ->
             not (T.is_var t) || T.is_ho_var t)
       |> Iter.filter (fun (t, _) ->
-          (* Util.debugf ~section 5 "@[ Filtering vars %a,2  @]" (fun k-> k T.pp t); *)
-          !_sup_at_var_headed || not (T.is_var (T.head_term t)) &&
+          not (T.is_var (T.head_term t)) &&
           let args = T.args t in
-          T.is_const (T.head_term t) && List.exists (fun arg -> 
-            Type.is_fun (T.ty arg) && not (T.is_var (T.head_term arg))) args)
+          T.is_const (T.head_term t) && List.exists (fun arg ->
+            let ty = T.ty arg in 
+            (Type.is_fun ty || Type.is_prop ty) && 
+              not (T.is_var (T.head_term arg))) args)
       |> Iter.iter
         (fun (t, pos) ->
-          f _ext_dec_into_idx (c,pos, t));
+          f _ext_dec_into_idx (c,pos,t));
       
       let eligible = if !_ext_dec_lits = `OnlyMax then C.Eligible.param c 
                      else C.Eligible.always in
@@ -353,8 +354,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun (l, _, sign, pos) ->
           assert sign;
           let hd,args = T.as_app l in
-          if not (T.is_var hd) && List.exists (fun arg -> 
-            Type.is_fun (T.ty arg) && not (T.is_var (T.head_term arg))) args then (
+          if T.is_const hd && List.exists (fun arg ->
+            let ty = T.ty arg in 
+            (Type.is_fun ty || Type.is_prop ty) && 
+              not (T.is_var (T.head_term arg))) args then (
               f _ext_dec_from_idx (c,pos,l)
         )));
     Signal.ContinueListening
@@ -1870,7 +1873,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       |> Iter.flat_map (fun (l,_,sign,pos) -> 
           let hd,args = T.as_app l in
           if T.is_const hd && List.exists (fun arg -> 
-              Type.is_fun (T.ty arg) && not (T.is_var (T.head_term arg))) args then (
+              (Type.is_prop (T.ty arg) || Type.is_fun (T.ty arg)) && 
+              not (T.is_var (T.head_term arg))) args then (
             let inf_partners = retrieve_from_extdec_idx !_ext_dec_into_idx (T.as_const_exn hd) in
             Iter.map (fun (into_c,into_t, into_p) -> 
               do_ext_dec given pos l into_c into_p into_t) inf_partners) 
@@ -1881,14 +1885,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let ext_decompose_pas given = 
     if C.length given <= !max_lits_ext_dec then ( 
-      let which, eligible = if !_ext_dec_lits = `OnlyMax 
-                          then `Max, C.Eligible.res given else `All, C.Eligible.always in
+      let which, eligible =
+        if !_ext_dec_lits = `OnlyMax then `Max, C.Eligible.res given 
+        else `All, C.Eligible.always in
       Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false 
         ~ord ~which ~subterms:true ~eligible (C.lits given)
       |> Iter.flat_map (fun (t,p) -> 
           let hd, args = T.as_app t in
-          if T.is_const hd && List.exists (fun arg -> 
-            Type.is_fun (T.ty arg) && not (T.is_var (T.head_term arg))) args then (
+          if T.is_const hd && List.exists (fun arg ->
+              (Type.is_prop (T.ty arg) || Type.is_fun (T.ty arg)) && 
+              not (T.is_var (T.head_term arg))) args then (
               let inf_partners = retrieve_from_extdec_idx !_ext_dec_from_idx (T.as_const_exn hd) in
               Iter.map (fun (from_c,from_t, from_p) -> 
                 do_ext_dec from_c from_p from_t given p t) inf_partners) 
