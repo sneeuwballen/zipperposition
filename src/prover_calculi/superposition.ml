@@ -347,12 +347,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           f _ext_dec_into_idx (c,pos, t));
       
       let eligible = if !_ext_dec_lits = `OnlyMax then C.Eligible.param c 
-                    else C.Eligible.always in
+                     else C.Eligible.always in
       Lits.fold_eqn ~ord ~both:true ~sign:true ~eligible (C.lits c)
       |> Iter.iter
         (fun (l, _, sign, pos) ->
           assert sign;
-          f _ext_dec_from_idx (c,pos,l)));
+          let hd,args = T.as_app l in
+          if not (T.is_var hd) && List.exists (fun arg -> 
+            Type.is_fun (T.ty arg) && not (T.is_var (T.head_term arg))) args then (
+              f _ext_dec_from_idx (c,pos,l)
+        )));
     Signal.ContinueListening
 
 
@@ -1775,29 +1779,38 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (* Renaming variables apart *)
       let args_f = List.map (fun t -> Subst.FO.apply renaming Subst.empty (t,sc_f)) args_f in
       let args_i = List.map (fun t -> Subst.FO.apply renaming Subst.empty (t,sc_i)) args_i in
-      let lits_f = Lits.apply_subst renaming Subst.empty (C.lits from_c, sc_f) in
-      let lits_i = Lits.apply_subst renaming Subst.empty (C.lits into_c, sc_i) in
-      
-      let new_neq_lits = 
-        CCList.combine args_f args_i 
-        |> List.map (fun (arg_f, arg_i) -> Lit.mk_neq arg_f arg_i) in
+      let combined = CCList.combine args_f args_i in
 
-      let (i, pos_f) = Lits.Pos.cut from_p in
-      let from_s = Lits.Pos.at lits_f (Position.arg i (Position.opp pos_f)) in
-      Lits.Pos.replace lits_i ~at:into_p ~by:from_s;
-      let new_lits = new_neq_lits @ CCArray.except_idx lits_f i  @ CCArray.to_list lits_i in
-      let trail = C.trail_l [from_c; into_c] in
-      let penalty = max (C.penalty from_c) (C.penalty into_c) in
-      let proof =
-          Proof.Step.inference
-              [C.proof_parent_subst renaming (from_c, sc_f) Subst.empty;
-              C.proof_parent_subst renaming  (into_c, sc_i) Subst.empty] 
-            ~rule:(Proof.Rule.mk "ext_decompose") in
-      let new_c = C.create ~trail ~penalty new_lits proof in
+      if List.exists (fun (s,t) ->
+        (* otherwise they would be unifyible *)
+        not (T.is_var (T.head_term s)) && not (T.is_var (T.head_term t))) 
+        combined then (
+          None
+      )
+      else (
+        let lits_f = Lits.apply_subst renaming Subst.empty (C.lits from_c, sc_f) in
+        let lits_i = Lits.apply_subst renaming Subst.empty (C.lits into_c, sc_i) in
 
-      Util.debugf ~section 5 "[ext_dec(%a,%a):%a].\n" (fun k -> k C.pp from_c C.pp into_c C.pp new_c);
+        let new_neq_lits = 
+          List.map (fun (arg_f, arg_i) -> Lit.mk_neq arg_f arg_i) combined  in
 
-      Some new_c
+        let (i, pos_f) = Lits.Pos.cut from_p in
+        let from_s = Lits.Pos.at lits_f (Position.arg i (Position.opp pos_f)) in
+        Lits.Pos.replace lits_i ~at:into_p ~by:from_s;
+        let new_lits = new_neq_lits @ CCArray.except_idx lits_f i  @ CCArray.to_list lits_i in
+        let trail = C.trail_l [from_c; into_c] in
+        let penalty = max (C.penalty from_c) (C.penalty into_c) in
+        let proof =
+            Proof.Step.inference
+                [C.proof_parent_subst renaming (from_c, sc_f) Subst.empty;
+                C.proof_parent_subst renaming  (into_c, sc_i) Subst.empty] 
+              ~rule:(Proof.Rule.mk "ext_decompose") in
+        let new_c = C.create ~trail ~penalty new_lits proof in
+
+        Util.debugf ~section 5 "[ext_dec(%a,%a):%a].\n" (fun k -> k C.pp from_c C.pp into_c C.pp new_c);
+
+        Some new_c
+      )
     ) else None
 
   (* Given a "from"-clause C \/ f t1 ... tn = s  and 
@@ -1839,26 +1852,49 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       ) from_positions
     )
 
+  let retrieve_from_extdec_idx idx id = 
+    let cl_map = ID.Map.find_opt id idx in
+    match cl_map with
+    | None -> Iter.empty
+    | Some cl_map -> 
+        C.Tbl.to_seq cl_map 
+        |> Iter.flat_map (fun (c, l) -> 
+              Iter.of_list l
+              |> Iter.map (fun (t,p) -> (c,t,p)))
+
   let ext_decompose_act given = 
     if C.length given <= !max_lits_ext_dec then (
-      Env.ProofState.ActiveSet.clauses ()
-      |> C.ClauseSet.filter (fun cl -> 
-          Proof.Step.inferences_perfomed (C.proof_step cl)  <= !max_lits_ext_dec)
-      |> C.ClauseSet.to_list
-      |> CCList.flat_map (fun cl -> 
-        Util.with_prof prof_ext_dec (ext_decompose given) cl)
-    ) 
+      let eligible = if !_ext_dec_lits = `OnlyMax then C.Eligible.param given
+                     else C.Eligible.always in
+      Lits.fold_eqn ~ord ~both:true ~sign:true ~eligible (C.lits given)
+      |> Iter.flat_map (fun (l,_,sign,pos) -> 
+          let hd,args = T.as_app l in
+          if T.is_const hd && List.exists (fun arg -> 
+              Type.is_fun (T.ty arg) && not (T.is_var (T.head_term arg))) args then (
+            let inf_partners = retrieve_from_extdec_idx !_ext_dec_into_idx (T.as_const_exn hd) in
+            Iter.map (fun (into_c,into_t, into_p) -> 
+              do_ext_dec given pos l into_c into_p into_t) inf_partners) 
+          else Iter.empty)
+      |> Iter.filter_map CCFun.id
+      |> Iter.to_list)
     else []
 
   let ext_decompose_pas given = 
-    if C.length given <= !max_lits_ext_dec then (
-      Env.ProofState.ActiveSet.clauses ()
-      |> C.ClauseSet.filter (fun cl -> 
-        Proof.Step.inferences_perfomed (C.proof_step cl) <= !max_lits_ext_dec)
-      |> C.ClauseSet.to_list
-      |> CCList.flat_map (fun cl -> 
-        Util.with_prof prof_ext_dec (fun cl' -> ext_decompose cl' given ) cl)
-    ) 
+    if C.length given <= !max_lits_ext_dec then ( 
+      let which, eligible = if !_ext_dec_lits = `OnlyMax 
+                          then `Max, C.Eligible.res given else `All, C.Eligible.always in
+      Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false 
+        ~ord ~which ~subterms:true ~eligible (C.lits given)
+      |> Iter.flat_map (fun (t,p) -> 
+          let hd, args = T.as_app t in
+          if T.is_const hd && List.exists (fun arg -> 
+            Type.is_fun (T.ty arg) && not (T.is_var (T.head_term arg))) args then (
+              let inf_partners = retrieve_from_extdec_idx !_ext_dec_from_idx (T.as_const_exn hd) in
+              Iter.map (fun (from_c,from_t, from_p) -> 
+                do_ext_dec from_c from_p from_t given p t) inf_partners) 
+           else Iter.empty))
+      |> Iter.filter_map CCFun.id
+      |> Iter.to_list
     else []
 
   let ext_eqres_decompose_aux c =
