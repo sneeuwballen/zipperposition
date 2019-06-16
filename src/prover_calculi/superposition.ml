@@ -1810,7 +1810,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               ~rule:(Proof.Rule.mk "ext_decompose") in
         let new_c = C.create ~trail ~penalty new_lits proof in
 
-        Util.debugf ~section 5 "[ext_dec(%a,%a):%a].\n" (fun k -> k C.pp from_c C.pp into_c C.pp new_c);
+        Format.printf "[ext_dec(%a,%a):%a].\n" C.pp from_c C.pp into_c C.pp new_c;
 
         Some new_c
       )
@@ -1827,34 +1827,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
      
      Currently with no restrictions or indexing. After initial evaluation,
      will find ways to restrict it somehow. *)
-  let ext_decompose from_c into_c =
-    Util.incr_stat stat_ext_dec;
-
-    let get_positions ?(from=true) c =
-      let eligible = if from then C.Eligible.pos_eq else C.Eligible.always in
-      Literals.fold_terms (C.lits c) 
-        ~vars:false ~subterms:(not from) ~which:`All ~ord ~eligible ~fun_bodies:false
-      |> Iter.filter (fun (t,pos) -> 
-          let hd, args = T.as_app t in
-          T.is_const hd && List.exists (fun t -> 
-            let ty = Term.ty t in
-            Type.is_fun ty || Type.is_prop ty) args)
-      |> Iter.to_list in
-
-    let from_positions = get_positions from_c in
-    let into_positions = get_positions into_c ~from:false in
-
-    if CCList.is_empty from_positions || CCList.is_empty into_positions then (
-      []
-    )
-    else (
-      CCList.flat_map (fun (from_t, from_p) -> 
-        CCList.filter_map (fun (into_t, into_p) -> 
-          do_ext_dec from_c from_p from_t  into_c into_p into_t
-        ) into_positions 
-      ) from_positions
-    )
-
   let retrieve_from_extdec_idx idx id = 
     let cl_map = ID.Map.find_opt id idx in
     match cl_map with
