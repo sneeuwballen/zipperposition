@@ -447,7 +447,7 @@ module Seq = struct
     Iter.fold (fun set x -> Set.add x set) set xs
 
   let ty_vars t =
-    subterms t
+    subterms ~include_builtin:true t
     |> Iter.flat_map (fun t -> Type.Seq.vars (ty t))
 
   let typed_symbols t =
@@ -1176,12 +1176,12 @@ let simplify_bools t =
       let hd' = aux hd and  args' = List.map aux args in
       if equal hd hd' && same_l args args' then t
       else app hd' args'
-    | AppBuiltin(Builtin.And, l) when not @@ CCList.is_empty l ->
+    | AppBuiltin(Builtin.And, l) when List.length l > 1 ->
       let l' = List.map aux l in
       let t = if same_l l l' then t 
               else app_builtin ~ty:(Type.prop) Builtin.And l' in
       simplify_and_or t Builtin.And l'
-    | AppBuiltin(Builtin.Or, l) when not @@ CCList.is_empty l ->
+    | AppBuiltin(Builtin.Or, l) when List.length l > 1 ->
       let l' = List.map aux l in
       let t = if same_l l l' then t 
               else app_builtin ~ty:(Type.prop) Builtin.Or l' in

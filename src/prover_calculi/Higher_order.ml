@@ -343,7 +343,11 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       let (hd_s,_), (hd_t,_) = T.as_app s, T.as_app t in
       if T.is_const hd_s && T.is_const hd_t && T.equal hd_s hd_t then (
-        loop s t
+        let diffs = loop s t in
+        if List.for_all (fun (s,t) -> Type.equal (T.ty s) (T.ty t)) diffs 
+        then diffs else [] (* because of polymorphism, it might be possible 
+                              that terms will not be of the same type,
+                              and that will give rise to wrong term applications*)
       ) else [] 
     in
     let is_eligible = C.Eligible.res c in
@@ -352,12 +356,13 @@ module Make(E : Env.S) : S with module Env = E = struct
         match l with 
         | Literal.Equation (lhs,rhs,false) when is_eligible i l ->
           let subterms = find_diffs lhs rhs in
+          assert(List.for_all (fun (s,t) -> Type.equal (T.ty s) (T.ty t)) subterms);
           if not (CCList.is_empty subterms) &&
              List.exists (fun (l,_) -> 
                 Type.is_fun (T.ty l) || Type.is_prop (T.ty l)) subterms then
              let subterms_lit = CCList.map (fun (l,r) ->
                let free_vars = T.VarSet.union (T.free_vars l) (T.free_vars r) |> T.VarSet.to_list in 
-               let arg_types = Type.expected_args  @@ T.ty l in
+               let arg_types = Type.expected_args @@ T.ty l in
                if CCList.is_empty arg_types then Literal.mk_neq l r
                else (
                  let skolems = List.map (fun ty -> T.mk_fresh_skolem free_vars ty) arg_types in
