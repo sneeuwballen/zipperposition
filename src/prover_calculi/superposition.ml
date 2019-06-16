@@ -1786,11 +1786,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
       if List.exists (fun (s,t) ->
         (* otherwise they would be unifyible *)
-        not (T.is_var (T.head_term s)) && not (T.is_var (T.head_term t))) 
-        combined then (
-          None
-      )
-      else (
+            not (T.is_var (T.head_term s)) && not (T.is_var (T.head_term t))) 
+          combined then (
         let lits_f = Lits.apply_subst renaming Subst.empty (C.lits from_c, sc_f) in
         let lits_i = Lits.apply_subst renaming Subst.empty (C.lits into_c, sc_i) in
 
@@ -1809,10 +1806,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                 C.proof_parent_subst renaming  (into_c, sc_i) Subst.empty] 
               ~rule:(Proof.Rule.mk "ext_decompose") in
         let new_c = C.create ~trail ~penalty new_lits proof in
-
-        Format.printf "[ext_dec(%a,%a):%a].\n" C.pp from_c C.pp into_c C.pp new_c;
-
+        (* Format.printf "{ext_dec(%a,%a):%a}.\n" C.pp from_c C.pp into_c C.pp new_c; *)
         Some new_c
+      )
+      else (
+        None
       )
     ) else None
 
