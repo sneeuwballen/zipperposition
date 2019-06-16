@@ -1711,6 +1711,40 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         SimplM.return_new new_c)
     | None -> SimplM.return_same c
 
+  let do_ext_dec from_c from_p from_t into_c into_p into_t = 
+    let sc_f, sc_i = 0, 1 in
+    let renaming = Subst.Renaming.create () in
+    
+    let (hd_f, args_f), (hd_i,args_i) = Term.as_app_with_mandatory_args from_t, Term.as_app_with_mandatory_args into_t in
+    if T.equal hd_f hd_i && T.is_const hd_f && List.length args_f = List.length args_i then (
+      (* Renaming variables apart *)
+      let args_f = List.map (fun t -> Subst.FO.apply renaming Subst.empty (t,sc_f)) args_f in
+      let args_i = List.map (fun t -> Subst.FO.apply renaming Subst.empty (t,sc_i)) args_i in
+      let lits_f = Lits.apply_subst renaming Subst.empty (C.lits from_c, sc_f) in
+      let lits_i = Lits.apply_subst renaming Subst.empty (C.lits into_c, sc_i) in
+      
+      let new_neq_lits = 
+        CCList.combine args_f args_i 
+        |> List.map (fun (arg_f, arg_i) -> Lit.mk_neq arg_f arg_i) in
+
+      let (i, pos_f) = Lits.Pos.cut from_p in
+      let from_s = Lits.Pos.at lits_f (Position.arg i (Position.opp pos_f)) in
+      Lits.Pos.replace lits_i ~at:into_p ~by:from_s;
+      let new_lits = new_neq_lits @ CCArray.except_idx lits_f i  @ CCArray.to_list lits_i in
+      let trail = C.trail_l [from_c; into_c] in
+      let penalty = max (C.penalty from_c) (C.penalty into_c) in
+      let proof =
+          Proof.Step.inference
+              [C.proof_parent_subst renaming (from_c, sc_f) Subst.empty;
+              C.proof_parent_subst renaming  (into_c, sc_i) Subst.empty] 
+            ~rule:(Proof.Rule.mk "ext_decompose") in
+      let new_c = C.create ~trail ~penalty new_lits proof in
+
+      Util.debugf ~section 5 "[ext_dec(%a,%a):%a].\n" (fun k -> k C.pp from_c C.pp into_c C.pp new_c);
+
+      Some new_c
+    ) else None
+
   (* Given a "from"-clause C \/ f t1 ... tn = s  and 
      "into"-clause D \/ f u1 .. un (~)= v, where some of the t_i 
      (and consequently u_i) are of functional type, construct
@@ -1739,43 +1773,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let from_positions = get_positions from_c in
     let into_positions = get_positions into_c ~from:false in
 
-    let sc_f, sc_i = 0, 1 in
-    let renaming = Subst.Renaming.create () in
     if CCList.is_empty from_positions || CCList.is_empty into_positions then (
       []
     )
     else (
       CCList.flat_map (fun (from_t, from_p) -> 
         CCList.filter_map (fun (into_t, into_p) -> 
-          let (hd_f, args_f), (hd_i,args_i) = Term.as_app_with_mandatory_args from_t, Term.as_app_with_mandatory_args into_t in
-          if T.equal hd_f hd_i && T.is_const hd_f && List.length args_f = List.length args_i then (
-            (* Renaming variables apart *)
-            let args_f = List.map (fun t -> Subst.FO.apply renaming Subst.empty (t,sc_f)) args_f in
-            let args_i = List.map (fun t -> Subst.FO.apply renaming Subst.empty (t,sc_i)) args_i in
-            let lits_f = Lits.apply_subst renaming Subst.empty (C.lits from_c, sc_f) in
-            let lits_i = Lits.apply_subst renaming Subst.empty (C.lits into_c, sc_i) in
-            
-            let new_neq_lits = 
-              CCList.combine args_f args_i 
-              |> List.map (fun (arg_f, arg_i) -> Lit.mk_neq arg_f arg_i) in
-
-            let (i, pos_f) = Lits.Pos.cut from_p in
-            let from_s = Lits.Pos.at lits_f (Position.arg i (Position.opp pos_f)) in
-            Lits.Pos.replace lits_i ~at:into_p ~by:from_s;
-            let new_lits = new_neq_lits @ CCArray.except_idx lits_f i  @ CCArray.to_list lits_i in
-            let trail = C.trail_l [from_c; into_c] in
-            let penalty = max (C.penalty from_c) (C.penalty into_c) in
-            let proof =
-                Proof.Step.inference
-                    [C.proof_parent_subst renaming (from_c, sc_f) Subst.empty;
-                    C.proof_parent_subst renaming  (into_c, sc_i) Subst.empty] 
-                  ~rule:(Proof.Rule.mk "ext_decompose") in
-            let new_c = C.create ~trail ~penalty new_lits proof in
-
-            Util.debugf ~section 5 "[ext_dec(%a,%a):%a].\n" (fun k -> k C.pp from_c C.pp into_c C.pp new_c);
-
-            Some new_c
-          ) else None
+          do_ext_dec from_c from_p from_t  into_c into_p into_t
         ) into_positions 
       ) from_positions
     )
