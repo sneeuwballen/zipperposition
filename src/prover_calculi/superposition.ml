@@ -86,6 +86,7 @@ let _NO_LAMSUP = -1
 let _lambdasup = ref (-1)
 let _max_infs = ref (-1)
 let max_lits_ext_dec = ref 0
+let _ext_dec_lits = ref `OnlyMax
 let _unif_alg = ref JP_unif.unify_scoped
 let _unif_level = ref `Full
 
@@ -124,6 +125,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let _idx_simpl = ref (UnitIdx.empty ())
   let _cls_w_pred_vars = ref (C.ClauseSet.empty)
   let _trigger_bools   = ref (Term.Set.empty)
+  let _ext_dec_from_idx = ref (ID.Map.empty)
+  let _ext_dec_into_idx = ref (ID.Map.empty)
 
   let idx_sup_into () = !_idx_sup_into
   let idx_sup_from () = !_idx_sup_from
@@ -303,16 +306,68 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     _idx_simpl := idx';
     Signal.ContinueListening
 
+  let insert_into_ext_dec_index index (c,pos,t) =
+    let key = T.head_exn t in
+    let clause_map = ID.Map.find_opt key !index in
+    let clause_map = match clause_map with 
+      | None -> C.Tbl.create 8
+      | Some res -> res in
+    let all_pos = match C.Tbl.find_opt clause_map c with 
+      | None -> [(t,pos)]
+      | Some res -> (t,pos) :: res in
+    C.Tbl.replace clause_map c all_pos;
+    index := ID.Map.add key clause_map !index
+
+  let remove_from_ext_dec_index index (c,_,t) =
+    let key = T.head_exn t in
+    let clause_map = ID.Map.find_opt key !index in
+    match clause_map with
+    | None -> Util.debugf ~section 1 "all clauses allready deleted." CCFun.id
+    | Some res -> (
+      C.Tbl.remove res c;
+      index := ID.Map.add key res !index
+    )
+
+  let update_ext_dec_indices f c =
+    let which, eligible = if !_ext_dec_lits = `OnlyMax 
+                          then `Max, C.Eligible.res c else `All, C.Eligible.always in
+    if Proof.Step.inferences_perfomed (C.proof_step c) <= !max_lits_ext_dec then (
+      Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false 
+        ~ord ~which ~subterms:true ~eligible (C.lits c)
+      |> Iter.filter (fun (t, _) ->
+            not (T.is_var t) || T.is_ho_var t)
+      |> Iter.filter (fun (t, _) ->
+          (* Util.debugf ~section 5 "@[ Filtering vars %a,2  @]" (fun k-> k T.pp t); *)
+          !_sup_at_var_headed || not (T.is_var (T.head_term t)) &&
+          let args = T.args t in
+          T.is_const (T.head_term t) && List.exists (fun arg -> 
+            Type.is_fun (T.ty arg) && not (T.is_var (T.head_term arg))) args)
+      |> Iter.iter
+        (fun (t, pos) ->
+          f _ext_dec_into_idx (c,pos, t));
+      
+      let eligible = if !_ext_dec_lits = `OnlyMax then C.Eligible.param c 
+                    else C.Eligible.always in
+      Lits.fold_eqn ~ord ~both:true ~sign:true ~eligible (C.lits c)
+      |> Iter.iter
+        (fun (l, _, sign, pos) ->
+          assert sign;
+          f _ext_dec_from_idx (c,pos,l)));
+    Signal.ContinueListening
+
+
   let () =
     Signal.on PS.ActiveSet.on_add_clause
       (fun c ->
          _idx_fv := SubsumIdx.add !_idx_fv c;
          ignore(_update_active TermIndex.add c);
-         handle_pred_var_inst c);
+         ignore(handle_pred_var_inst c);
+         update_ext_dec_indices insert_into_ext_dec_index c);
     Signal.on PS.ActiveSet.on_remove_clause
       (fun c ->
          _idx_fv := SubsumIdx.remove !_idx_fv c;
          _cls_w_pred_vars := C.ClauseSet.remove c !_cls_w_pred_vars;
+         ignore(update_ext_dec_indices remove_from_ext_dec_index c);
          _update_active TermIndex.remove c);
     Signal.on PS.SimplSet.on_add_clause
       (_update_simpl UnitIdx.add);
@@ -2813,6 +2868,10 @@ let () =
     , " compare intermediate terms in calculus rules in beta-normal-eta-long form"
     ; "--ext-decompose"
     , Arg.Set_int max_lits_ext_dec
+    , " Sets the maximal number of literals clause can have for ExtDec inference."
+    ; "--ext-decompose-lits"
+    , Arg.Symbol (["all";"max"], (fun str -> 
+        _ext_dec_lits := if String.equal str "all" then `All else `OnlyMax))
     , " Sets the maximal number of literals clause can have for ExtDec inference."
     ; "--fluidsup-penalty"
     , Arg.Int (fun p -> _fluidsup_penalty := p)
