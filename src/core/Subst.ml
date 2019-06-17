@@ -415,9 +415,17 @@ module FO = struct
           (v', (t',sc_t))::l, sk_map) subs_l ([],Term.IntMap.empty) in
    of_list' unleaked_l, List.map snd (Term.IntMap.bindings new_sk)
 
-  let subset_is_renaming ~subset subst =
+  let subset_is_renaming ~subset ~res_scope subst =
     try 
-      let derefed_vars = List.map (fun v ->
+      let subset = List.filter (fun v ->
+        let der_t, der_sc = deref subst v in
+        if der_sc != snd v then (
+          der_sc = res_scope
+        ) else (
+          der_sc = res_scope && not (Term.equal (fst v) der_t)
+        )
+      ) subset in
+      let derefed_vars = CCList.map (fun v ->
         let derefed = deref subst v in
         if not (Term.is_var (fst derefed)) then (
           raise (invalid_arg "found a non-variable")

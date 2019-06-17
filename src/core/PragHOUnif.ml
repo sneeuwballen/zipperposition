@@ -256,7 +256,13 @@ let rec unify ~state ~scope ~counter ~subst = function
               not (Builtin.equal Builtin.ExistsConst hd_s) &&  *)
               List.length args_s' + List.length args_s = 
               List.length args_t' + List.length args_t ->
-              unify ~state ~subst ~counter ~scope (build_constraints ~ban_id (args_s'@args_s) (args_t'@args_t) rest)
+              if Builtin.is_quantifier hd_s then (
+                let zipped = List.map (fun (x,y) -> (x,y,ban_id)) (List.combine (args_s'@args_s) (args_t'@args_t)) in
+                unify ~state ~subst ~counter ~scope zipped
+              )
+              else (
+                unify ~state ~subst ~counter ~scope (build_constraints ~ban_id (args_s'@args_s) (args_t'@args_t) rest)
+              )
           | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->
               unify ~state ~subst ~counter ~scope (build_constraints ~ban_id args_s args_t rest)  
           | _ -> OSeq.empty
@@ -396,7 +402,6 @@ let unify_scoped t0_s t1_s =
       let unif = Unif.FO.unify_syn ~subst:(Subst.empty) t0_s t1_s in
       Some (US.of_subst unif)
     with Unif.Fail -> None in
-  (* Format.printf "[init:] %a = %a" (Scoped.pp T.pp) t0_s (Scoped.pp T.pp) t1_s;  *)
   let t0',t1',unifscope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
   let prefix = if (CCOpt.is_some lfho_unif) then OSeq.cons lfho_unif else (fun x -> x) in
   let monomorphic = Iter.is_empty @@ Iter.union (Term.Seq.ty_vars t0') (Term.Seq.ty_vars t1') in

@@ -493,12 +493,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let renaming = S.Renaming.create () in
       let us = info.subst in
       let subst = US.subst us in
+      let res_scope = Subst.codomain subst 
+                      |> Iter.map snd
+                      |> Iter.max
+                      |> CCOpt.get_or ~default:0 in
 
       let v_under_quant cl sc = 
         List.map (fun v -> T.var v, sc) (C.vars_under_quant cl) in
       let subset = v_under_quant info.active info.scope_active 
                    @ (v_under_quant info.passive info.scope_passive) in  
-      if not (Subst.FO.subset_is_renaming ~subset subst) then (
+      if not (Subst.FO.subset_is_renaming ~subset ~res_scope subst) then (
         Util.debugf ~section 1 "Trying to paramodulate with quantificator." (fun k->k);
         raise (ExitSuperposition "Trying to paramodulate with quantificator.");
       );
@@ -1242,7 +1246,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               let renaming = Subst.Renaming.create () in
               let subst = US.subst us in
               let subset = C.vars_under_quant clause |> List.map (fun t -> T.var t, 0) in  
-              if not (Subst.FO.subset_is_renaming ~subset subst) then (
+              if not (Subst.FO.subset_is_renaming ~res_scope:0 ~subset subst) then (
                 None
               ) else (
                 let rule = Proof.Rule.mk "eq_res" in
@@ -1321,7 +1325,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let subst = US.subst us in
     let subset = C.vars_under_quant info.clause |> List.map (fun t -> T.var t, info.scope) in  
     
-    if Subst.FO.subset_is_renaming ~subset subst &&
+    if Subst.FO.subset_is_renaming ~subset ~res_scope:0 subst &&
        O.compare ord (S.FO.apply renaming subst (s, info.scope))
         (S.FO.apply renaming subst (t, info.scope)) <> Comp.Lt
        &&

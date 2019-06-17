@@ -295,7 +295,12 @@ let rec unify ~scope ~counter ~subst = function
           not (Builtin.equal Builtin.ExistsConst hd_s) &&   *)
           List.length args_s' + List.length args_s = 
           List.length args_t' + List.length args_t ->
-        unify ~subst ~counter ~scope @@ build_constraints (args_s'@args_s)  (args_t'@args_t) rest
+        if Builtin.is_quantifier hd_s then (
+          unify ~subst ~counter ~scope @@ (CCList.combine (args_s'@args_s)  (args_t'@args_t)) @ rest
+        ) else (
+          unify ~subst ~counter ~scope @@ build_constraints (args_s'@args_s)  (args_t'@args_t) rest
+        )
+        
       | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->
         (* assert (List.length args_s = List.length args_t); *)
         unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest
@@ -343,35 +348,41 @@ and flex_same ~counter ~scope ~subst var args_s args_t =
    For example, X 0 3 1 =?= Y 1 3 2 5 is solved by 
     {X -> λλλ. Z 1 0, Y -> λλλλ. Z 2 0 } *)
 and flex_diff ~counter ~scope ~subst var_s var_t args_s args_t =
-  let bvar_s, bvar_t = get_bvars args_s, get_bvars args_t in
-  if CCOpt.is_none bvar_s || CCOpt.is_none bvar_t then
-    raise NotInFragment;
-  let bvar_s, bvar_t = CCOpt.get_exn bvar_s, CCOpt.get_exn bvar_t in
-  let new_bvars = 
-    CCArray.filter_map (fun x->x) (
-      CCArray.map (fun si -> 
-        match CCArray.bsearch ~cmp (fst si, Term.true_) bvar_t  with
-        | `At idx -> Some (cast_var (snd si) subst scope, 
-                           cast_var (snd @@ CCArray.get bvar_t idx) subst scope)
-        | _ -> None
-      ) bvar_s
-    ) 
-    |> CCArray.to_list in
-  let arg_types = List.map (fun (b1, _) -> Term.ty b1) new_bvars in
-  let ret_ty = 
-    Type.apply_unsafe (Term.ty var_s) 
-      (List.map (fun t -> 
-        cast_var (Lambda.eta_reduce t) subst scope) args_s :> InnerTerm.t list) in
-  let new_var_ty = Type.arrow arg_types ret_ty in
-  let new_var = Term.var @@ H.fresh_cnt ~counter ~ty:new_var_ty () in
-  let matrix_s = Term.app new_var (List.map fst new_bvars) in
-  let matrix_t = Term.app new_var (List.map snd new_bvars) in
-  let subs_s = Term.fun_l (List.map Term.ty args_s) matrix_s in
-  let subs_t = Term.fun_l (List.map Term.ty args_t) matrix_t in
-  let v_s, v_t = Term.as_var_exn var_s, Term.as_var_exn var_t in
-  let subst = US.FO.bind subst (v_s, scope) (subs_s, scope) in
-  let subst = US.FO.bind subst (v_t, scope) (subs_t, scope) in
-  subst  
+  if CCList.is_empty args_s && CCList.is_empty args_t then (
+    US.FO.bind subst (Term.as_var_exn var_s,scope) (var_t,scope)
+  ) else (
+      let bvar_s, bvar_t = get_bvars args_s, get_bvars args_t in
+      if CCOpt.is_none bvar_s || CCOpt.is_none bvar_t then
+        raise NotInFragment;
+      let bvar_s, bvar_t = CCOpt.get_exn bvar_s, CCOpt.get_exn bvar_t in
+      let new_bvars = 
+        CCArray.filter_map (fun x->x) (
+          CCArray.map (fun si -> 
+            match CCArray.bsearch ~cmp (fst si, Term.true_) bvar_t  with
+            | `At idx -> Some (cast_var (snd si) subst scope, 
+                              cast_var (snd @@ CCArray.get bvar_t idx) subst scope)
+            | _ -> None
+          ) bvar_s
+        ) 
+        |> CCArray.to_list in
+      let arg_types = List.map (fun (b1, _) -> Term.ty b1) new_bvars in
+      let ret_ty = 
+        Type.apply_unsafe (Term.ty var_s) 
+          (List.map (fun t -> 
+            cast_var (Lambda.eta_reduce t) subst scope) args_s :> InnerTerm.t list) in
+      let new_var_ty = Type.arrow arg_types ret_ty in
+      let new_var = Term.var @@ H.fresh_cnt ~counter ~ty:new_var_ty () in
+      let matrix_s = Term.app new_var (List.map fst new_bvars) in
+      let matrix_t = Term.app new_var (List.map snd new_bvars) in
+      let subs_s = Term.fun_l (List.map Term.ty args_s) matrix_s in
+      let subs_t = Term.fun_l (List.map Term.ty args_t) matrix_t in
+      let v_s, v_t = Term.as_var_exn var_s, Term.as_var_exn var_t in
+      let subst = US.FO.bind subst (v_s, scope) (subs_s, scope) in
+      let subst = US.FO.bind subst (v_t, scope) (subs_t, scope) in
+      subst
+  )
+
+    
 
 (* Flex-rigid pairs can be solved if variable is applied to a sequence
    of distinct bound variables. IMPORTANT: Such a requirement is NOT
