@@ -1146,18 +1146,29 @@ let rebuild_rec t =
   in
   aux [] t
 
+let compl_in_l l =
+  let pos, neg = 
+    CCList.partition_map (fun t -> 
+      match view t with 
+        | AppBuiltin(Builtin.Not, [s]) -> `Right s
+        | _ -> `Left t) l
+    |> CCPair.map_same Set.of_list in
+  not (Set.is_empty (Set.inter pos neg))
+  
+
 let simplify_bools t =
   let simplify_and_or t b l =
     let res = 
       assert(b = Builtin.And || b = Builtin.Or);
-      let when_empty, neutral_el = 
+      let netural_el, absorbing_el = 
         if b = Builtin.And then true_,false_ else (false_,true_) in
-      if List.exists (equal neutral_el) l then neutral_el
+
+      if compl_in_l l || List.exists (equal absorbing_el) l then absorbing_el
       else (
-        let l' = List.filter (fun s -> not (equal s when_empty)) l in
+        let l' = List.filter (fun s -> not (equal s netural_el)) l in
         if List.length l = List.length l' then t
         else (
-          if CCList.is_empty l' then when_empty
+          if CCList.is_empty l' then netural_el
           else (if List.length l' = 1 then List.hd l'
                 else app_builtin ~ty:(Type.prop) b l')
         )) 

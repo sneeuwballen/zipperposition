@@ -735,6 +735,8 @@ module Make(X : sig
     let did_simplify = ref false in
     let set = ref C.ClauseSet.empty in
     let q = Queue.create () in
+    let c, st = simplify c in
+    if st=`New then did_simplify := true;
     let single_step_simplified = !_ss_multi_simpl_rule c in
     begin
       match single_step_simplified with
