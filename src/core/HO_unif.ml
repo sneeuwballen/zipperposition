@@ -131,7 +131,14 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
       (fun (ts,penalty) -> 
           List.map (fun t -> 
           assert (T.DB.is_closed t);
-          enum_cache := Term.Set.add t !enum_cache;
+          
+          (* Caching of primitive enumeration terms, so that trigger-based instantiation
+             does not catch them. *)
+          let var_set = InnerTerm.Seq.vars (t:>InnerTerm.t) |> InnerTerm.VarSet.of_seq in
+          let cannonize_subst = Subst.FO.canonize_vars ~var_set in
+          let cached_t = Subst.FO.apply Subst.Renaming.none cannonize_subst (t,0) in
+          enum_cache := Term.Set.add cached_t !enum_cache;
+          
           let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
           (subst, penalty) )ts ) 
       [ l_not, 10;
