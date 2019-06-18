@@ -58,6 +58,15 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
           (T.Form.and_
              (T.app (T.var f) (List.map T.var vars))
              (T.app (T.var g) (List.map T.var vars)))]
+    and l_or = match mode with
+      | `Neg | `None | `Pragmatic-> []
+      | `Full ->
+        let f = HVar.make offset ~ty:ty_v in
+        let g = HVar.make (offset+1) ~ty:ty_v in
+        [T.fun_of_fvars vars
+          (T.Form.or_
+             (T.app (T.var f) (List.map T.var vars))
+             (T.app (T.var g) (List.map T.var vars)))]
     (* projection with "=": [λvars. (F1 vars) = (F2 vars)]
        where [F1 : Πa. ty_args -> a] *)
     and l_eq = match mode with
@@ -138,11 +147,11 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
           let cannonize_subst = Subst.FO.canonize_vars ~var_set in
           let cached_t = Subst.FO.apply Subst.Renaming.none cannonize_subst (t,0) in
           enum_cache := Term.Set.add cached_t !enum_cache;
-          
           let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
           (subst, penalty) )ts ) 
       [ l_not, 10;
         l_and, 10;
+        l_or, 10;
         l_eq,  10;
         l_false, 5;
         l_true, 5;

@@ -152,6 +152,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let ty = Term.ty t and hd = Term.head_term t in
       if not (Term.Set.mem t !Higher_order.prim_enum_terms) &&
          Type.is_fun ty && Type.returns_prop ty && not (Term.is_var hd) then (
+
+        (* CCFormat.printf "[trigger:%a:%a]\n" T.pp t Type.pp (Term.ty t);  *)
+
         Some t
       ) else None
     )

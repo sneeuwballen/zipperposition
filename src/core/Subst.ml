@@ -381,7 +381,7 @@ module FO = struct
     let max_id   = T.VarSet.max_elt_opt var_set in
       match max_id with 
       | Some id ->
-        let max_id = ref (CCInt.max (HVar.id id + 1) 0) in
+        let max_id = ref (CCInt.max (HVar.id id) (-1)) in
         T.VarSet.fold (fun v subst -> 
           let v_id = HVar.id v in
             if v_id < 0 then (
