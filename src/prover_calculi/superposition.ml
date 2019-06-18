@@ -150,7 +150,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                         ~which:`All (C.lits c) ~fun_bodies:false 
     |> Iter.filter_map (fun (t,_) -> 
       let ty = Term.ty t and hd = Term.head_term t in
-      if Type.is_fun ty && Type.returns_prop ty && not (Term.is_var hd) then (
+      if not (Term.Set.mem t !Higher_order.prim_enum_terms) &&
+         Type.is_fun ty && Type.returns_prop ty && not (Term.is_var hd) then (
         Some t
       ) else None
     )
@@ -1414,6 +1415,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let rule  = Proof.Rule.mk "instantiate_w_trigger" in
       let proof = Proof.Step.inference ~rule [C.proof_parent_subst renaming (c, 0) sub] in
       let new_clause = C.create ~trail ~penalty (CCArray.to_list new_lits) proof in
+
+      (* CCFormat.printf "[BOOL_INST: %a, %a => %a].\n" C.pp c Subst.pp sub C.pp new_clause; *)
+
       assert (C.Seq.terms c |> Iter.for_all T.DB.is_closed);
       assert (C.Seq.terms new_clause |> Iter.for_all T.DB.is_closed);
       new_clause)
@@ -1751,31 +1755,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.with_prof prof_demodulate demodulate_ c
 
   let canonize_variables c =
-    let all_vars = Literals.vars (C.lits c) |> T.VarSet.of_list in
-    let max_id   = T.VarSet.max_elt_opt all_vars in
-    match max_id with 
-    | Some id ->
-      let max_id = ref (CCInt.max (HVar.id id + 1) 0) in
-      let neg_vars_renaming = T.VarSet.fold (fun v subst -> 
-        let v_id = HVar.id v in
-          if v_id < 0 then (
-            match Subst.FO.get_var subst ((v :> InnerTerm.t HVar.t),0) with
-            | Some _ -> subst 
-            | None -> (
-              incr max_id;
-              let renamed_var = T.var (HVar.make ~ty:(HVar.ty v) !max_id) in
-              Subst.FO.bind subst ((v :> InnerTerm.t HVar.t), 0) (renamed_var, 0)))
-          else subst) 
-        all_vars Subst.empty 
-      in
-      if Subst.is_empty neg_vars_renaming then SimplM.return_same c
-      else (
-        let new_lits = Literals.apply_subst Subst.Renaming.none neg_vars_renaming (C.lits c, 0)
-                      |> CCArray.to_list in
-        let proof = Proof.Step.inference [C.proof_parent c] ~rule:(Proof.Rule.mk "cannonize vars") in
-        let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
-        SimplM.return_new new_c)
-    | None -> SimplM.return_same c
+    let all_vars = Literals.vars (C.lits c) 
+                   |> (fun v -> InnerTerm.VarSet.of_list (v:>InnerTerm.t HVar.t list)) in
+    let neg_vars_renaming = Subst.FO.canonize_vars ~var_set:all_vars in 
+    if Subst.is_empty neg_vars_renaming then SimplM.return_same c
+    else (
+      let new_lits = Literals.apply_subst Subst.Renaming.none neg_vars_renaming (C.lits c, 0)
+                    |> CCArray.to_list in
+      let proof = Proof.Step.inference [C.proof_parent c] ~rule:(Proof.Rule.mk "cannonize vars") in
+      let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
+      SimplM.return_new new_c)
 
   let do_ext_dec from_c from_p from_t into_c into_p into_t = 
     let sc_f, sc_i = 0, 1 in

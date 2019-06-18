@@ -11,6 +11,7 @@ type penalty = int
 val enum_prop :
   ?mode:[`Full | `Pragmatic | `Neg | `None] ->
   Term.var Scoped.t ->
+  enum_cache: Term.Set.t ref ->
   offset:int ->
   (Subst.t * penalty) list
 (** Given a variable of type [τ1…τn -> prop], enumerate possible shapes

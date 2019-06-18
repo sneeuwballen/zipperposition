@@ -57,6 +57,8 @@ type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
 
 let _prune_arg_fun = ref `NoPrune
 
+let prim_enum_terms = ref Term.Set.empty
+
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C
@@ -595,7 +597,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       vars
       |> T.VarSet.to_seq
       |> Iter.flat_map_l
-        (fun v -> HO_unif.enum_prop ~mode (v,sc_c) ~offset)
+        (fun v -> HO_unif.enum_prop ~mode ~enum_cache:prim_enum_terms (v,sc_c) ~offset)
       |> Iter.map
         (fun (subst,penalty) ->
            let renaming = Subst.Renaming.create() in

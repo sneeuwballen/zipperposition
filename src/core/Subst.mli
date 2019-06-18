@@ -197,6 +197,7 @@ module FO : sig
      so that all such variables are remaped to a fresh skolem *)
   val unleak_variables : t -> t * (Term.t list)
   val subset_is_renaming : subset:(term Scoped.t list) -> res_scope:int -> t -> bool
+  val canonize_vars : var_set:(InnerTerm.VarSet.t) -> t
 end
 
 (** {2 Projections for proofs} *)

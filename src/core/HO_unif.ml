@@ -33,7 +33,7 @@ let term_arity args =
   |> Util.take_drop_while (fun t -> T.is_type t)
   |> CCPair.map List.length List.length
 
-let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) list =
+let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t * penalty) list =
   let ty_v = HVar.ty v in
   let n, ty_args, ty_ret = Type.open_poly_fun ty_v in
   assert (Type.is_prop ty_ret);
@@ -131,6 +131,7 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) l
       (fun (ts,penalty) -> 
           List.map (fun t -> 
           assert (T.DB.is_closed t);
+          enum_cache := Term.Set.add t !enum_cache;
           let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
           (subst, penalty) )ts ) 
       [ l_not, 10;
