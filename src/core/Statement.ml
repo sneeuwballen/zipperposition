@@ -803,7 +803,6 @@ let get_rw_rule ?weight_incr:(w_i=1000000) c  =
     let vars_lhs = Term.VarSet.of_seq (Iter.fold (fun acc v -> 
         Iter.union acc (Term.Seq.vars v)) 
       Iter.empty (Iter.of_list vars)) in
-    let vars_lhs = Term.VarSet.union vars_lhs (Term.vars_under_quant rhs) in
     if not (Term.symbols rhs |> ID.Set.mem sym) &&
         Term.VarSet.cardinal
           (Term.VarSet.diff (Term.vars rhs) vars_lhs) = 0 then

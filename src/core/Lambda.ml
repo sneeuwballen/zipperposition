@@ -138,11 +138,6 @@ module Inner = struct
             | T.App (f, l) ->
               let l' = List.map aux l in
               if T.same_l l l' then body else T.app ~ty f l'
-            | T.AppBuiltin (b, [v;q_body]) when Builtin.equal b Builtin.ForallConst ||
-                                              Builtin.equal b Builtin.ExistsConst ->
-              (* Disable eta-expanding the variable that is quantified *)
-              let q_body' = aux q_body in
-              if T.equal q_body q_body' then body else T.app_builtin ~ty b [v;q_body']
             | T.AppBuiltin (b, l) ->
               let l' = List.map aux l in
               if T.same_l l l' then body else T.app_builtin ~ty b l'
@@ -299,7 +294,8 @@ let rec is_properly_encoded t = match T.view t with
 | AppBuiltin (hd,l) when Builtin.equal hd Builtin.ForallConst 
                          || Builtin.equal hd Builtin.ExistsConst ->
     begin match l with
-    | [x;body] -> T.is_var (eta_reduce @@ snf x)
+    | [body] -> let args, body = Term.open_fun body in
+      List.length args = 1 && Type.is_prop (Term.ty body)
     | _ -> false end
 | AppBuiltin(hd,l) -> List.for_all is_properly_encoded l
 | App (hd, l) -> List.for_all is_properly_encoded (hd::l)

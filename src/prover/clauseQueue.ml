@@ -161,9 +161,9 @@ module Make(C : Clause_intf.S) = struct
               if distinct_vars_mul < 0.0 then int_of_float res
               else
                 let dist_vars = 
-                 Literals.free_vars (C.lits c)
-                 |> Term.VarSet.filter (fun v -> not (Type.is_tType (HVar.ty v)))  in
-                let n_vars = Term.VarSet.cardinal dist_vars in
+                 Literals.vars (C.lits c)
+                 |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))  in
+                let n_vars = List.length dist_vars in
                 let dist_var_penalty = distinct_vars_mul ** (float_of_int n_vars) in
                 let proof_depth_penalty = 
                   (* max (0.9999 ** (float_of_int (Proof.Step.inferences_perfomed (C.proof_step c)))) 0.75 in *)

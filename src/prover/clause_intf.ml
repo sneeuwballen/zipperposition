@@ -187,8 +187,6 @@ module type S = sig
   val symbols : ?init:ID.Set.t -> t Iter.t -> ID.Set.t
   (** symbols that occur in the clause *)
 
-  val vars_under_quant : t -> Type.t HVar.t list 
-
   val to_sclause : t -> SClause.t
 
   val to_forms : t -> Term.t SLiteral.t list

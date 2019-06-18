@@ -216,12 +216,6 @@ let is_app t = match T.view t with
   | T.App _ -> true
   | _ -> false
 
-let get_quantified_var t = match T.view t with
-  | T.AppBuiltin(Builtin.ForallConst, [x;_])
-  | T.AppBuiltin(Builtin.ExistsConst, [x;_]) when is_var x ->
-      Some x
-  | _ -> None
-
 let is_type t = Type.equal Type.tType (ty t)
 
 let as_const_exn t = match T.view t with
@@ -379,11 +373,6 @@ let max_cover t ts =
   in
   aux 0 t
 
-  let mk_forall vars body = 
-    let ty = ty body in
-    VarSet.fold (fun v t -> app_builtin ~ty Builtin.ForallConst [var v; t]) vars body
-
-
 module Seq = struct
   let vars t k =
     let rec aux t =
@@ -457,16 +446,6 @@ module Seq = struct
          | T.Const s -> Some (s, ty t)
          | _ -> None)
 end
-
-let vars_under_quant t = VarSet.of_seq @@ Iter.fold (fun acc st -> 
-  match view st with 
-  | AppBuiltin(Builtin.ForallConst, [x;_]) 
-  | AppBuiltin(Builtin.ExistsConst, [x;_]) when is_var x  ->
-    Iter.union acc (Seq.vars x)
-  | _ -> acc
-) Iter.empty (Seq.subterms ~include_builtin:true t)
-
-let free_vars t = VarSet.diff (VarSet.of_seq (Seq.vars t)) (vars_under_quant t) 
 
 let close_quantifier b ty_args body =
   CCList.fold_right (fun ty acc -> 
@@ -544,7 +523,7 @@ let rec is_fo_term t =
 
 let is_true_or_false t = match view t with
   | AppBuiltin(b, []) -> 
-    CCList.mem ~eq:Builtin.equal b [Builtin.ForallConst; Builtin.ExistsConst];
+    CCList.mem ~eq:Builtin.equal b [Builtin.True; Builtin.False];
   | _ -> false
 
 let monomorphic t = Iter.is_empty (Seq.ty_vars t)
