@@ -94,10 +94,11 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
         CCList.mapi (fun i ty -> 
           if Type.is_fun ty && Type.returns_prop ty then (
             let arg_typeargs,_ = Type.open_fun ty in
-            let new_vars = List.map (fun ty -> HVar.fresh ~ty ()) arg_typeargs in
-            let form_body = T.app (T.bvar ~ty (n-i-1)) (List.map T.var new_vars) in
-            let forall = T.close_quantifier Builtin.ForallConst new_vars form_body in
-            let exists = T.close_quantifier Builtin.ExistsConst new_vars form_body in
+            let m = List.length arg_typeargs in
+            let form_body = T.app (T.bvar ~ty (m+n-i-1)) 
+                                  (List.mapi (fun j ty -> T.bvar ~ty (m-j-1)) arg_typeargs) in
+            let forall = T.close_quantifier Builtin.ForallConst arg_typeargs form_body in
+            let exists = T.close_quantifier Builtin.ExistsConst arg_typeargs form_body in
             Some ((T.fun_l ty_args forall, T.fun_l ty_args exists)))
           else None) ty_args
         |> CCList.fold_left (fun acc opt -> match opt with 
