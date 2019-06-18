@@ -242,7 +242,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     match idx with 
     | Some _ ->
       let f = Literals.Conv.to_tst (C.lits c) in
-      let proof = Proof.Step.inference ~rule:(Proof.Rule.mk "cnf_otf") [C.proof_parent c] in
+      let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "cnf_otf") [C.proof_parent c] in
       let trail = C.trail c and penalty = C.penalty c in
       let stmt = Statement.assert_ ~proof f in
       let cnf_vec = Cnf.convert @@ CCVector.to_seq @@ 
@@ -258,7 +258,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* Format.printf "res: "; *)
       List.iter (fun new_c -> 
         (* Format.printf "%a; \n" C.pp new_c; *)
-        assert(Proof.Step.inferences_perfomed (C.proof_step c) <
+        assert(Proof.Step.inferences_perfomed (C.proof_step c) <=
                Proof.Step.inferences_perfomed (C.proof_step new_c));) clauses;
       Some clauses
     | None       -> 
