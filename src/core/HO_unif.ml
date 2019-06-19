@@ -99,7 +99,11 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
                                   (List.mapi (fun j ty -> T.bvar ~ty (m-j-1)) arg_typeargs) in
             let forall = T.close_quantifier Builtin.ForallConst arg_typeargs form_body in
             let exists = T.close_quantifier Builtin.ExistsConst arg_typeargs form_body in
-            Some ((T.fun_l ty_args forall, T.fun_l ty_args exists)))
+            let forall, exists = CCPair.map_same (T.fun_l ty_args) (forall, exists) in
+            assert(T.DB.is_closed forall && T.DB.is_closed exists);
+            assert(Lambda.is_properly_encoded forall);
+            assert(Lambda.is_properly_encoded exists);
+            Some (forall, exists))
           else None) ty_args
         |> CCList.fold_left (fun acc opt -> match opt with 
           | Some (x,y) -> x :: y :: acc 

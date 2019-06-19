@@ -156,6 +156,9 @@ let rec app_builtin ~ty b l = match b, l with
   | Builtin.Not, [{term=AppBuiltin(Builtin.False,[]); _}] ->
     app_builtin ~ty Builtin.True []
   | _ ->
+    (* if Builtin.is_quantifier b  && CCList.length l != 1 then (
+      invalid_arg "wrong encoding of quantifiers.";
+    ); *)
     let my_t = make_ ~ty:(HasType ty) (AppBuiltin (b,l)) in
     H.hashcons my_t
 
@@ -171,7 +174,7 @@ let app ~ty f l = match f.term, l with
     (* flatten *)
     let my_t = make_ ~ty:(HasType ty) (App (f1,l1 @ l)) in
     H.hashcons my_t
-  | AppBuiltin (f1, l1), _::_ ->
+  | AppBuiltin (f1, l1), _ ->
     (* flatten *)
     let flattened = l1 @ l in
     let ty = if Builtin.is_logical_op f1 then (

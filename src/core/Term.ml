@@ -454,7 +454,7 @@ let has_ho_subterm t =
 
 let close_quantifier b ty_args body =
   CCList.fold_right (fun ty acc -> 
-    fun_ ty (app_builtin ~ty:Type.prop b [acc])) 
+    app_builtin ~ty:Type.prop b [fun_ ty acc])
   ty_args body
 
 
