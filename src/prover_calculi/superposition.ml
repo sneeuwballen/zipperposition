@@ -765,7 +765,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let renaming = Subst.Renaming.create () in
     let s = Subst.FO.apply renaming (US.subst info.subst) (info.s, info.scope_active) in
     let u_p = Subst.FO.apply renaming (US.subst info.subst) (info.u_p, info.scope_passive) in
-    assert(Term.equal (Lambda.eta_reduce @@ Lambda.snf @@ s) (Lambda.eta_reduce @@ Lambda.snf @@ u_p));
+    assert(Term.equal (Lambda.eta_reduce @@ Lambda.snf @@ s) (Lambda.eta_reduce @@ Lambda.snf @@ u_p) || US.has_constr info.subst);
     if !_use_simultaneous_sup && info.sup_kind != LambdaSup && info.sup_kind != DupSup
     then do_simultaneous_superposition info
     else do_classic_superposition info

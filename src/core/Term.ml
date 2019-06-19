@@ -1065,6 +1065,7 @@ module Conv = struct
     let module ST = TypedSTerm in
     let n = ref 0 in
     let max_var = ref ((Seq.vars t |> Seq.max_var) + 1) in
+    let orig_term = t in
     let rec aux_t env t =
       match view t with
         | Var i -> ST.var (aux_var i)
@@ -1085,17 +1086,24 @@ module Conv = struct
                                      Builtin.equal b Builtin.ExistsConst ->
           let b = if Builtin.equal b Builtin.ForallConst 
                   then Binder.Forall else Binder.Exists in
-          let ty_args, fun_body = open_fun body in
-          if List.length ty_args != 1 || not (Type.is_prop (ty fun_body)) then (
-            Util.error ~where:"Term" "quantifier wrongly encoded";
+          let ty_args, fun_body = open_fun body in 
+          
+          if not (Type.returns_prop (ty fun_body)) then (
+            let err_msg = CCFormat.sprintf "quantifier wrongly encoded: %a(%a)" T.pp t T.pp orig_term in
+            Util.error ~where:"Term" err_msg;
           ) else (
-            let ty = List.hd ty_args in
-            incr max_var;
-            let var = (var_of_int ~ty !max_var) in
-            let var_converted = convert_var var in
-            let replacement = DBEnv.push DBEnv.empty var  in
-            let body = DB.eval replacement fun_body in
-            ST.bind ~ty:(aux_ty Type.prop) b var_converted (aux_t env body) 
+            let fresh_vars = List.map (fun ty -> 
+              incr max_var;
+              var_of_int ~ty !max_var) ty_args in
+            let replacement = DBEnv.push_l_rev DBEnv.empty fresh_vars in
+            let body  = DB.eval replacement fun_body in
+            let remaining_vars = List.map (fun ty ->
+              incr max_var;
+              var_of_int ~ty !max_var) (Type.expected_args (ty fun_body)) in
+            let body = app body remaining_vars in
+            let vars_converted = List.map convert_var fresh_vars in
+            List.fold_right (fun v acc ->
+              ST.bind ~ty:(aux_ty Type.prop) b v acc) vars_converted (aux_t env body) 
           )
         | AppBuiltin (b,l) ->
           ST.app_builtin ~ty:(aux_ty (ty t))
