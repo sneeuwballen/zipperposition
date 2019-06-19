@@ -204,6 +204,9 @@ let rec unify ~state ~scope ~counter ~subst = function
         | Some ty_unif -> (
           let s', t' = normalize ~mono:state.monomorphic ty_unif (s', scope), 
                        normalize ~mono:state.monomorphic ty_unif (t', scope) in
+        (*CCFormat.printf "[hds : %a=?=%a].\n" T.pp s' T.pp t'; 
+          CCFormat.printf "[constrs: %a].\n" (CCList.pp ~sep:";" (CCPair.pp T.pp T.pp)) (List.map (fun (a,b,_) -> (a,b)) l) ;
+          CCFormat.printf "[subst: %a].\n" US.pp ty_unif; *)
           let subst = ty_unif in
             (* A weaker unification procedure gave up *)
             (* CCFormat.printf "Weaker unification gave up.\n"; *)
@@ -251,18 +254,10 @@ let rec unify ~state ~scope ~counter ~subst = function
           | T.Const f , T.Const g when ID.equal f g && List.length args_s = List.length args_t ->
             unify ~state ~subst ~counter ~scope (build_constraints ~ban_id args_s args_t rest)
           | T.AppBuiltin(hd_s, args_s'), T.AppBuiltin(hd_t, args_t') when
-              Builtin.equal hd_s hd_t &&
-              (* not (Builtin.equal Builtin.ForallConst hd_s) &&
-              not (Builtin.equal Builtin.ExistsConst hd_s) &&  *)
-              List.length args_s' + List.length args_s = 
-              List.length args_t' + List.length args_t ->
-              if Builtin.is_quantifier hd_s then (
-                let zipped = List.map (fun (x,y) -> (x,y,ban_id)) (List.combine (args_s'@args_s) (args_t'@args_t)) in
-                unify ~state ~subst ~counter ~scope zipped
-              )
-              else (
-                unify ~state ~subst ~counter ~scope (build_constraints ~ban_id (args_s'@args_s) (args_t'@args_t) rest)
-              )
+                Builtin.equal hd_s hd_t &&
+                List.length args_s' + List.length args_s = 
+                List.length args_t' + List.length args_t ->
+              unify ~state ~subst ~counter ~scope (build_constraints ~ban_id (args_s'@args_s) (args_t'@args_t) rest)
           | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->
               unify ~state ~subst ~counter ~scope (build_constraints ~ban_id args_s args_t rest)  
           | _ -> OSeq.empty

@@ -294,8 +294,8 @@ let rec is_properly_encoded t = match T.view t with
 | AppBuiltin (hd,l) when Builtin.equal hd Builtin.ForallConst 
                          || Builtin.equal hd Builtin.ExistsConst ->
     begin match l with
-    | [body] -> let args, body = Term.open_fun body in
-      List.length args = 1 && Type.is_prop (Term.ty body)
+    | [body] -> let ty = Term.ty body in
+      Type.is_fun ty && Type.returns_prop ty
     | _ -> false end
 | AppBuiltin(hd,l) -> List.for_all is_properly_encoded l
 | App (hd, l) -> List.for_all is_properly_encoded (hd::l)
