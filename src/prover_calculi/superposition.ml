@@ -150,10 +150,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                         ~which:`All (C.lits c) ~fun_bodies:false 
     |> Iter.filter_map (fun (t,_) -> 
       let ty = Term.ty t and hd = Term.head_term t in
-      if not (Term.Set.mem t !Higher_order.prim_enum_terms) &&
+      let var_set = InnerTerm.Seq.vars (t:>InnerTerm.t) |> InnerTerm.VarSet.of_seq in
+      let cannonize_subst = Subst.FO.canonize_vars ~var_set in
+      let cached_t = Subst.FO.apply Subst.Renaming.none cannonize_subst (t,0) in
+      if not (Term.Set.mem cached_t !Higher_order.prim_enum_terms) &&
          Type.is_fun ty && Type.returns_prop ty && not (Term.is_var hd) then (
+        
+        (* CCFormat.printf "[trigger:%a:%a]\n" T.pp t Type.pp (Term.ty t);
+        CCFormat.printf "[set:%a]\n" (Term.Set.pp T.pp) !Higher_order.prim_enum_terms; *)
 
-        (* CCFormat.printf "[trigger:%a:%a]\n" T.pp t Type.pp (Term.ty t);  *)
 
         Some t
       ) else None

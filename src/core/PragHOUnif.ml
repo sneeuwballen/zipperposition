@@ -395,12 +395,25 @@ and try_weaker_unif ~subst ~state ~counter ~scope ~s ~t ~rest ~continuation =
   | P.NotUnifiable -> OSeq.empty
   | P.NotInFragment -> continuation ()
 
+(* If it is an applied variable that is applied to
+   itself somewhere, then we need to consider lfho unifier *)
+let is_lfho_candidate t = 
+  let rec aux t = match T.view t with
+  | App(hd, args) -> 
+    T.is_var hd && (List.exists (T.subterm ~sub:hd) args) 
+  | _ -> false
+  in
+  T.Seq.subterms ~include_builtin:true t
+  |> Iter.exists aux
+
 let unify_scoped t0_s t1_s =
   let counter = ref 0 in
   let lfho_unif = 
-    try 
-      let unif = Unif.FO.unify_syn ~subst:(Subst.empty) t0_s t1_s in
-      Some (US.of_subst unif)
+    try
+      if is_lfho_candidate (fst t0_s) || is_lfho_candidate (fst t1_s) then (
+        let unif = Unif.FO.unify_syn ~subst:(Subst.empty) t0_s t1_s in
+        Some (US.of_subst unif))
+      else None
     with Unif.Fail -> None in
   let t0',t1',unifscope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
   let prefix = if (CCOpt.is_some lfho_unif) then OSeq.cons lfho_unif else (fun x -> x) in

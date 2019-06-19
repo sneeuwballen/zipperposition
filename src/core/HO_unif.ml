@@ -81,12 +81,12 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
              (T.app (T.var f) (List.map T.var vars))
              (T.app (T.var g) (List.map T.var vars)))]
     and l_false = match mode with
-      | `None -> []
-      | `Neg | `Pragmatic | `Full ->
+      | `None  -> []
+      | `Neg | `Pragmatic | `Full  ->
         [T.fun_of_fvars vars T.false_]
     and l_true = match mode with
       | `None -> []
-      | `Neg | `Pragmatic | `Full ->
+      | `Neg | `Pragmatic | `Full  ->
         [T.fun_of_fvars vars T.true_]
     and l_quants = match mode with
       | `Pragmatic | `Full ->

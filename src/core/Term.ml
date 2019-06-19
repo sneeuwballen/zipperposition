@@ -1094,7 +1094,7 @@ module Conv = struct
             let var = (var_of_int ~ty !max_var) in
             let var_converted = convert_var var in
             let replacement = DBEnv.push DBEnv.empty var  in
-            let body = DB.eval replacement body in
+            let body = DB.eval replacement fun_body in
             ST.bind ~ty:(aux_ty Type.prop) b var_converted (aux_t env body) 
           )
         | AppBuiltin (b,l) ->
