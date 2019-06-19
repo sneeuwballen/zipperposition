@@ -352,7 +352,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                               and that will give rise to wrong term applications*)
       ) else [] 
     in
-    let is_eligible = C.Eligible.res c in
+    let is_eligible = C.Eligible.always in
     C.lits c
     |> CCArray.mapi (fun i l -> 
         match l with 

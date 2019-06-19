@@ -387,6 +387,7 @@ end
 
 
 val close_quantifier : Builtin.t -> Type.t list -> t -> t
+val has_ho_subterm : t -> bool
 
 (** {2 De Bruijn} *)
 module DB : sig

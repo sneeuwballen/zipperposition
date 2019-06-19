@@ -447,6 +447,11 @@ module Seq = struct
          | _ -> None)
 end
 
+
+let has_ho_subterm t = 
+  Seq.subterms ~include_builtin:true t
+  |> Iter.exists (fun st -> Type.is_fun (ty st) || Type.is_prop (ty st))
+
 let close_quantifier b ty_args body =
   CCList.fold_right (fun ty acc -> 
     fun_ ty (app_builtin ~ty:Type.prop b [acc])) 

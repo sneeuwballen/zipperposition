@@ -246,7 +246,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let trail = C.trail c and penalty = C.penalty c in
       let stmt = Statement.assert_ ~proof f in
       let cnf_vec = Cnf.convert @@ CCVector.to_seq @@ 
-                    Cnf.cnf_of ~opts:([Cnf.DisableRenaming])~ctx:(Ctx.sk_ctx ()) stmt in
+                    Cnf.cnf_of ~opts:([Cnf.DisableRenaming]) ~ctx:(Ctx.sk_ctx ()) stmt in
       let sets = Env.convert_input_statements cnf_vec in
       let clauses = sets.Clause.c_set 
                     |> CCVector.to_list

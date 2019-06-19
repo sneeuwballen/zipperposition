@@ -347,11 +347,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             not (T.is_var t) || T.is_ho_var t)
       |> Iter.filter (fun (t, _) ->
           not (T.is_var (T.head_term t)) &&
-          let args = T.args t in
-          T.is_const (T.head_term t) && List.exists (fun arg ->
-            let ty = T.ty arg in 
-            (Type.is_fun ty || Type.is_prop ty) && 
-              not (T.is_var (T.head_term arg))) args)
+          T.is_const (T.head_term t) && Term.has_ho_subterm t)
       |> Iter.iter
         (fun (t, pos) ->
           f _ext_dec_into_idx (c,pos,t));
@@ -362,12 +358,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       |> Iter.iter
         (fun (l, _, sign, pos) ->
           assert sign;
-          let hd,args = T.as_app l in
-          if T.is_const hd && List.exists (fun arg ->
-            let ty = T.ty arg in 
-            (Type.is_fun ty || Type.is_prop ty) && 
-              not (T.is_var (T.head_term arg))) args then (
-              f _ext_dec_from_idx (c,pos,l)
+          let hd,_ = T.as_app l in
+          if T.is_const hd && Term.has_ho_subterm l then (
+            (* CCFormat.printf "adding %a to ext_dec index.\n" T.pp l; *)
+            f _ext_dec_from_idx (c,pos,l)
         )));
     Signal.ContinueListening
 
@@ -1759,14 +1753,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let sc_f, sc_i = 0, 1 in
     let renaming = Subst.Renaming.create () in
     let (hd_f, args_f), (hd_i,args_i) = Term.as_app_with_mandatory_args from_t, Term.as_app_with_mandatory_args into_t in
-    if Type.equal (Term.ty from_t) (Term.ty into_t) && List.length args_f = List.length args_i then (
+    if Type.equal (Term.ty from_t) (Term.ty into_t) && List.length args_f = List.length args_i  &&
+       not (C.id from_c = C.id into_c && Position.equal from_p into_p) then (
       (* Renaming variables apart *)
       let args_f = List.map (fun t -> Subst.FO.apply renaming Subst.empty (t,sc_f)) args_f in
       let args_i = List.map (fun t -> Subst.FO.apply renaming Subst.empty (t,sc_i)) args_i in
       let combined = CCList.combine args_f args_i in
       if T.equal hd_f hd_i && T.is_const hd_f 
-         && List.for_all (fun (s,t) -> Type.equal (T.ty s) (T.ty t)) combined
-          then (
+         && List.for_all (fun (s,t) -> Type.equal (T.ty s) (T.ty t)) combined then (
         if List.exists (fun (s,t) ->
             (* otherwise they would be unifyible *)
             not (T.is_var (T.head_term s)) && not (T.is_var (T.head_term t))) combined then (
@@ -1788,12 +1782,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   C.proof_parent_subst renaming  (into_c, sc_i) Subst.empty] 
                 ~rule:(Proof.Rule.mk "ext_decompose") in
           let new_c = C.create ~trail ~penalty new_lits proof in
-          (* Format.printf "{ext_dec(%a,%a):%a}.\n" C.pp from_c C.pp into_c C.pp new_c; *)
           Some new_c
-        )
-        else (
-          None
-        )
+        ) else None
       ) else None
     ) else None
     
@@ -1822,14 +1812,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let ext_decompose_act given = 
     if C.length given <= !max_lits_ext_dec then (
-      let eligible = if !_ext_dec_lits = `OnlyMax then C.Eligible.param given
-                     else C.Eligible.always in
+      let eligible = 
+        if !_ext_dec_lits = `OnlyMax then C.Eligible.param given else C.Eligible.always in
       Lits.fold_eqn ~ord ~both:true ~sign:true ~eligible (C.lits given)
-      |> Iter.flat_map (fun (l,_,sign,pos) -> 
+      |> Iter.flat_map (fun (l,_,sign,pos) ->
           let hd,args = T.as_app l in
-          if T.is_const hd && List.exists (fun arg -> 
-              (Type.is_prop (T.ty arg) || Type.is_fun (T.ty arg)) && 
-              not (T.is_var (T.head_term arg))) args then (
+          if T.is_const hd && T.has_ho_subterm l then (
             let inf_partners = retrieve_from_extdec_idx !_ext_dec_into_idx (T.as_const_exn hd) in
             Iter.map (fun (into_c,into_t, into_p) -> 
               do_ext_dec given pos l into_c into_p into_t) inf_partners) 
@@ -1845,11 +1833,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         else `All, C.Eligible.always in
       Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false 
         ~ord ~which ~subterms:true ~eligible (C.lits given)
-      |> Iter.flat_map (fun (t,p) -> 
+      |> Iter.flat_map (fun (t,p) ->
           let hd, args = T.as_app t in
-          if T.is_const hd && List.exists (fun arg ->
-              (Type.is_prop (T.ty arg) || Type.is_fun (T.ty arg)) && 
-              not (T.is_var (T.head_term arg))) args then (
+          if T.is_const hd && T.has_ho_subterm t  then (
               let inf_partners = retrieve_from_extdec_idx !_ext_dec_from_idx (T.as_const_exn hd) in
               Iter.map (fun (from_c,from_t, from_p) -> 
                 do_ext_dec from_c from_p from_t given p t) inf_partners) 
