@@ -405,10 +405,10 @@ let unify_scoped t0_s t1_s =
   let counter = ref 0 in
   let lfho_unif = 
     try
-      if is_lfho_candidate (fst t0_s) || is_lfho_candidate (fst t1_s) then (
+      (* if is_lfho_candidate (fst t0_s) || is_lfho_candidate (fst t1_s) then ( *)
         let unif = Unif.FO.unify_syn ~subst:(Subst.empty) t0_s t1_s in
-        Some (US.of_subst unif))
-      else None
+        Some (US.of_subst unif)
+      (* else None *)
     with Unif.Fail -> None in
   let t0',t1',unifscope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
   let prefix = if (CCOpt.is_some lfho_unif) then OSeq.cons lfho_unif else (fun x -> x) in
@@ -424,18 +424,27 @@ let unify_scoped t0_s t1_s =
   } in
   let res =
       prefix
-      (unify ~state ~scope:unifscope ~counter ~subst [t0', t1', false]) 
-      (* OSeq.empty *)
+      (* (unify ~state ~scope:unifscope ~counter ~subst [t0', t1', false])  *)
+      OSeq.empty
   in
 
   res
   |> OSeq.map (CCOpt.map (fun sub ->       
-      let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub t0_s in 
-      let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub t1_s in
-      if not (T.equal l r) || not (Type.equal (Term.ty l) (Term.ty r)) then (
-        Format.printf "For problem: %a:%a=?= %a:%a\n" (T.pp_in Output_format.O_tptp) (fst t0_s) Type.pp (Term.ty (fst t0_s)) (T.pp_in Output_format.O_tptp) (fst t1_s) Type.pp (Term.ty (fst t1_s));
-        Format.printf "Subst: @[%a@]\n" S.pp sub;
-        Format.printf "%a:%a <> %a:%a\n" (T.pp_in Output_format.O_tptp) l Type.pp (Term.ty l) (T.pp_in Output_format.O_tptp) r Type.pp (Term.ty r);
-        assert(false);
-      );
+      if not (Unif_subst.has_constr sub) then (
+        let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub t0_s in 
+        let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub t1_s in
+        if not (T.equal l r) || not (Type.equal (Term.ty l) (Term.ty r)) then (
+          Format.printf "For problem: %a:%a=?= %a:%a\n" 
+            (T.pp_in Output_format.O_tptp) (fst t0_s) 
+            Type.pp (Term.ty (fst t0_s)) 
+            (T.pp_in Output_format.O_tptp) (fst t1_s) 
+            Type.pp (Term.ty (fst t1_s));
+          Format.printf "Subst: @[%a@]\n" S.pp sub;
+          Format.printf "%a:%a <> %a:%a\n" 
+            (T.pp_in Output_format.O_tptp) l 
+            Type.pp (Term.ty l)
+            (T.pp_in Output_format.O_tptp) r 
+            Type.pp (Term.ty r);
+          assert(false);
+        ););
     sub))

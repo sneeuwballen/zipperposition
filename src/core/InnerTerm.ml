@@ -156,9 +156,9 @@ let rec app_builtin ~ty b l = match b, l with
   | Builtin.Not, [{term=AppBuiltin(Builtin.False,[]); _}] ->
     app_builtin ~ty Builtin.True []
   | _ ->
-    (* if Builtin.is_quantifier b  && CCList.length l != 1 then (
+    if Builtin.is_quantifier b  && CCList.length l != 1 then (
       invalid_arg "wrong encoding of quantifiers.";
-    ); *)
+    );
     let my_t = make_ ~ty:(HasType ty) (AppBuiltin (b,l)) in
     H.hashcons my_t
 
@@ -790,13 +790,10 @@ let[@inline] as_app t = match view t with
     | AppBuiltin(b, l') -> app_builtin b ~ty:(ty_exn t) (l'@l), []
     | _ -> f, l 
     end
-  | AppBuiltin(b, l ) when Builtin.is_logical_op b ->
+  | AppBuiltin(b, l ) when Builtin.is_logical_op b && not (Builtin.is_quantifier b) ->
     let prop = builtin ~ty:tType Builtin.Prop in
     let args = if (Builtin.is_logical_binop b) then [prop;prop]
-               else if (Builtin.is_quantifier b) then (
-                 if List.length l != 1 then invalid_arg "quantifier wrongly encoded"
-                 else [get_type (List.hd l)]
-               ) else [prop] in
+               else [prop] in
     app_builtin b ~ty:(arrow args prop) [], l 
   | _ -> t, []
 

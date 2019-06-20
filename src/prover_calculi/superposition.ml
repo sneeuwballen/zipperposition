@@ -2847,7 +2847,7 @@ let () =
     , Arg.Set _switch_stream_extraction
     , " in ho mode, switches heuristic of clause extraction from the stream queue"
     ; "--ord-in-normal-form"
-    , Arg.Set _ord_in_normal_form
+    , Arg.Bool (fun v -> _ord_in_normal_form := v)
     , " compare intermediate terms in calculus rules in beta-normal-eta-long form"
     ; "--ext-decompose"
     , Arg.Set_int max_lits_ext_dec
