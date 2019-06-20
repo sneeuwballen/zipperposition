@@ -57,13 +57,13 @@ let rec app_encode_ty ty =
       T.app_builtin ~ty:T.tType f (CCList.map app_encode_ty args)
     | T.Const _ -> ty
     | T.Var _ -> ty
-    | T.Meta _ -> failwith "Not implemented"
+    | T.Meta _ -> failwith "Not implemented: Meta"
     | T.Bind (b,v,t) -> T.bind ~ty:T.tType b v (app_encode_ty t)
-    | T.Ite (_,_,_) -> failwith "Not implemented"
-    | T.Let _ -> failwith "Not implemented"
-    | T.Match (_,_) -> failwith "Not implemented"
-    | T.Multiset _ -> failwith "Not implemented"
-    | T.Record (_,_) -> failwith "Not implemented"
+    | T.Ite (_,_,_) -> failwith "Not implemented: Ite"
+    | T.Let _ -> failwith "Not implemented: Let"
+    | T.Match (_,_) -> failwith "Not implemented: Match"
+    | T.Multiset _ -> failwith "Not implemented: Multiset"
+    | T.Record (_,_) -> failwith "Not implemented: Record"
 
 (** Is a term a type? i.e. is a term of type tType? *)
 let is_type a =
@@ -101,7 +101,7 @@ let rec app_encode_term toplevel t  =
                let arg' = app_encode_ty arg in
                let t' = T.Subst.eval (Var.Subst.singleton var arg') t in
                T.app ~ty:t' term [arg']
-             | _ -> failwith "Not implemented"
+             | _ -> failwith "Not implemented 001"
         )
         (app_encode_term false f)
         args
@@ -132,17 +132,18 @@ let rec app_encode_term toplevel t  =
     | T.Bind (Binder.Forall | Binder.Exists as b, v, u) ->
       if not toplevel then failwith "requires FOOL";
       T.bind ~ty b (app_encode_var v) (app_encode_term true u)
-    | _ -> failwith "Not implemented"
+    | T.Bind (Binder.Lambda as b, v, u) -> failwith "Not implemented: Lambda"
+    | _ -> failwith "Not implemented 002"
 
 (** encode a statement *)
 let app_encode stmt =
   match Statement.view stmt with
-    | Statement.Def _ -> failwith "Not implemented"
-    | Statement.Rewrite _ -> failwith "Not implemented"
-    | Statement.Data _ -> failwith "Not implemented"
-    | Statement.Lemma _ -> failwith "Not implemented"
+    | Statement.Def _ -> failwith "Not implemented: Def"
+    | Statement.Rewrite _ -> failwith "Not implemented: Rewrite"
+    | Statement.Data _ -> failwith "Not implemented: Data"
+    | Statement.Lemma _ -> failwith "Not implemented: Lemma"
     | Statement.Goal f -> Statement.goal ~proof:Proof.Step.trivial (app_encode_term true f)
-    | Statement.NegatedGoal (_,_) -> failwith "Not implemented"
+    | Statement.NegatedGoal (_,_) -> failwith "Not implemented: Negated Goal"
     | Statement.Assert f -> Statement.assert_ ~proof:Proof.Step.trivial (app_encode_term true f)
     | Statement.TyDecl (id, ty) ->
       Statement.ty_decl ~proof:Proof.Step.trivial id (app_encode_ty ty)
