@@ -486,7 +486,7 @@ let rec in_pfho_fragment t =
     | DB _ -> if(type_ok (ty t)) then true
               else (raise (Failure "Bound variable has wrong type"))
    and type_ok ty_ =
-    not (Type.Seq.sub ty_ |> Iter.mem ~eq:Type.equal (Type.prop))
+    not (Type.Seq.sub ty_ |> Iter.exists (fun t -> Type.equal t (Type.prop) || Type.equal t (Type.rat) || Type.equal t (Type.int)))
 
 let in_lfho_fragment t =
    in_pfho_fragment t &&
