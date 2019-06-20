@@ -383,9 +383,6 @@ module Make(E : Env.S) : S with module Env = E = struct
              let new_c =
                C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
              Util.incr_stat stat_neg_cong_fun;
-
-            CCFormat.printf "neg_cong_fun: %a.\n" C.pp new_c;
-
              Some new_c
           else None
         | _ -> None)
