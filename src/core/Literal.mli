@@ -35,6 +35,8 @@ val depth : t -> int              (** depth of literal *)
 val sign : t -> bool
 
 val is_pos : t -> bool            (** is the literal positive? *)
+val is_pos_eq : t -> bool         (** is the literal positive equation (includes encoded predicates of both polaritites)? *)
+
 val is_neg : t -> bool            (** is the literal negative? *)
 val is_eqn : t -> bool            (** is the literal a proper (in)equation or prop? *)
 val is_prop : t -> bool           (** is the literal a boolean proposition? *)

@@ -139,7 +139,9 @@ let polarity = function
   | lit -> sign lit
 
 let is_pos = sign
-(* let is_pos_eq = fun t -> sign t *)
+let is_pos_eq = function
+  | Equation (_, _, sign) -> sign
+  | _ -> true
 
 let is_neg lit = not (is_pos lit)
 
@@ -207,10 +209,9 @@ let rec mk_lit a b sign =
     | _, T.AppBuiltin (Builtin.True, []) -> Equation (a, (if sign then T.true_ else T.false_), true)
     | T.AppBuiltin (Builtin.False, []), _ -> Equation (b, (if not sign then T.true_ else T.false_), true)
     | _, T.AppBuiltin (Builtin.False, []) -> Equation (a, (if not sign then T.true_ else T.false_), true)
-    (* NOTE: keep negation for higher-order unification constraints
-       | T.AppBuiltin (Builtin.Not, [a']), _ -> mk_lit a' b (not sign)
-       | _, T.AppBuiltin (Builtin.Not, [b']) -> mk_lit a b' (not sign)
-    *)
+    | T.AppBuiltin (Builtin.Not, [a']), _ -> mk_lit a' b (not sign)
+    | _, T.AppBuiltin (Builtin.Not, [b']) -> mk_lit a b' (not sign)
+   
     | _ when has_num_ty a ->
       begin match mk_num_eq a b sign with
         | None -> Equation (a,b,sign)

@@ -1309,11 +1309,25 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* check whether subst(lit) is maximal, and not (subst(s) < subst(t)) *)
     let renaming = S.Renaming.create () in
     let subst = US.subst us in
-    
+
+    CCFormat.printf "[eq_f: %a.]\n" C.pp info.clause;
+    CCFormat.printf "[terms: s=%a;;t=%a;;u=%a;;v=%a]\n" T.pp s T.pp t T.pp info.u T.pp v;
+    CCFormat.printf "[subst: %a]\n" Subst.pp subst;
+
+    CCFormat.printf "[conds: %b %b].\n" 
+      (O.compare ord (S.FO.apply renaming subst (s, info.scope)) 
+      (S.FO.apply renaming subst (t, info.scope)) <> Comp.Lt)
+      (C.is_eligible_param (info.clause,info.scope) subst ~idx:info.active_idx);
+
+    let new_lits = Lits.apply_subst (Subst.Renaming.create()) subst (C.lits info.clause,info.scope) |> CCArray.to_list in
+    let test_clause =
+        C.create ~trail:(C.trail info.clause) ~penalty:(C.penalty info.clause)
+          new_lits (C.proof_step info.clause) in
+
     if O.compare ord (S.FO.apply renaming subst (s, info.scope))
         (S.FO.apply renaming subst (t, info.scope)) <> Comp.Lt
        &&
-       C.is_eligible_param (info.clause,info.scope) subst ~idx:info.active_idx
+       C.is_eligible_param (test_clause,info.scope+1) subst ~idx:info.active_idx
     then (
       Util.incr_stat stat_equality_factoring_call;
       let tags = Unif_subst.tags us in
@@ -1337,6 +1351,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       Util.debugf ~section 3 "@[<hv2>equality factoring on@ @[%a@]@ yields @[%a@]@]"
         (fun k->k C.pp info.clause C.pp new_clause);
+
+      CCFormat.printf "[eq_fact parent: %a].\n" C.pp info.clause;
+      CCFormat.printf "[eq_fact res: %a].\n" C.pp new_clause;
+
       Some new_clause
     ) else
       None
@@ -1429,18 +1447,31 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let infer_equality_factoring_aux ~unify ~iterate_substs clause =
     Util.enter_prof prof_infer_equality_factoring;
-    let eligible = C.Eligible.(filter Lit.is_pos) in
+    let eligible = C.Eligible.(filter Lit.is_pos_eq) in
     (* find root terms that are unifiable with s and are not in the
        literal at s_pos. Calls [k] with a position and substitution *)
-    let find_unifiable_lits idx s _s_pos k =
+    let find_unifiable_lits ~var_pred_status idx s _s_pos k =
+      let is_pred_var, pred_var_sign = var_pred_status in
       Array.iteri
         (fun i lit ->
            match lit with
              | _ when i = idx -> () (* same index *)
              | Lit.Equation (u, v, true) ->
                (* positive equation *)
-               k (u, v, unify (s,0) (u,0));
-               k (v, u, unify (s,0) (v,0));
+               if T.equal v T.false_ && not is_pred_var then ()
+               else (
+                  if is_pred_var then (
+                    if T.equal v pred_var_sign then (
+                      k (u, v, unify (s,0) (u,0))
+                    ) else (
+                      let u = T.Form.not_ u in
+                      k (u, pred_var_sign, unify (s,0) (u,0))
+                    )
+                  ) else (
+                    k (u, v, unify (s,0) (u,0));
+                    k (v, u, unify (s,0) (v,0))
+                  );
+               )
              | _ -> () (* ignore other literals *)
         ) (C.lits clause)
     in
@@ -1451,7 +1482,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       |> Iter.flat_map
         (fun (s, t, _, s_pos) -> (* try with s=t *)
            let active_idx = Lits.Pos.idx s_pos in
-           find_unifiable_lits active_idx s s_pos
+           let is_var_pred = 
+            T.is_var (T.head_term s) && Type.is_prop (T.ty s) in
+           if T.equal t T.false_ && not is_var_pred then Iter.empty 
+           else (
+             find_unifiable_lits ~var_pred_status:(is_var_pred, t) active_idx s s_pos
+           )
            |> Iter.filter_map
              (fun (u,v,substs) ->
                 iterate_substs substs
@@ -2711,10 +2747,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       )
       else (
         assert(!_max_infs > 0);
-        Env.add_binary_inf "superposition_passive" (infer_passive_pragmatic_ho !_max_infs);
-        Env.add_binary_inf "superposition_active" (infer_active_pragmatic_ho !_max_infs);
+        (* Env.add_binary_inf "superposition_passive" (infer_passive_pragmatic_ho !_max_infs); *)
+        (* Env.add_binary_inf "superposition_active" (infer_active_pragmatic_ho !_max_infs); *)
         Env.add_unary_inf "equality_factoring" (infer_equality_factoring_pragmatic_ho !_max_infs);
-        Env.add_unary_inf "equality_resolution" (infer_equality_resolution_pragmatic_ho !_max_infs);
+        (* Env.add_unary_inf "equality_resolution" (infer_equality_resolution_pragmatic_ho !_max_infs); *)
       );
 
       if !max_lits_ext_dec != 0 then (
