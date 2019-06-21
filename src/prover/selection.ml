@@ -220,7 +220,7 @@ let () =
     _ho_restriction := `NoVarHeadingMaxTerm
   );
   Params.add_to_mode "ho-competitive" (fun () ->
-    _ho_restriction := `NoHigherOrderVariables
+    _ho_restriction := `NoVarHeadingMaxTerm
   );
   Params.add_to_mode "ho-pragmatic" (fun () ->
     _ho_restriction := `NoVarHeadingMaxTerm

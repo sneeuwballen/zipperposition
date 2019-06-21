@@ -122,26 +122,18 @@ let heuristic_weight weight = function
 let depth lit =
   fold (fun acc t -> max acc (T.depth t)) 0 lit
 
-let sign = function
-  | Equation (lhs,rhs,true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
-    T.equal rhs T.true_
-  | Equation (_, _, sign) -> sign
-  | False -> false
-  | Int o -> Int_lit.sign o
-  | Rat _ -> true
-  | True -> true
-
 module Set = CCSet.Make(struct type t = lit let compare = compare end)
 
+let is_pos = function
+  | Equation (_, _, sign) -> sign
+  | Int o -> Int_lit.sign o
+  | False -> false
+  | _ -> true
 (* specific: for the term comparison *)
 let polarity = function
   | Int o -> Int_lit.polarity o
-  | lit -> sign lit
+  | lit -> is_pos lit
 
-let is_pos = sign
-let is_pos_eq = function
-  | Equation (_, _, sign) -> sign
-  | _ -> true
 
 let is_neg lit = not (is_pos lit)
 
@@ -200,6 +192,7 @@ let has_num_ty t =
 (* primary constructor for equations and predicates *)
 let rec mk_lit a b sign =
   if not (Type.equal (T.ty a) (T.ty b)) then ty_error_ a b;
+  (* Maybe the sign will flip, so we have to beta reduce. *)
   match T.view a, T.view b with
     | T.AppBuiltin (Builtin.True, []), T.AppBuiltin (Builtin.False, []) -> if sign then False else True
     | T.AppBuiltin (Builtin.False, []), T.AppBuiltin (Builtin.True, []) -> if sign then False else True
@@ -209,8 +202,8 @@ let rec mk_lit a b sign =
     | _, T.AppBuiltin (Builtin.True, []) -> Equation (a, (if sign then T.true_ else T.false_), true)
     | T.AppBuiltin (Builtin.False, []), _ -> Equation (b, (if not sign then T.true_ else T.false_), true)
     | _, T.AppBuiltin (Builtin.False, []) -> Equation (a, (if not sign then T.true_ else T.false_), true)
-    | T.AppBuiltin (Builtin.Not, [a']), _ -> mk_lit a' b (not sign)
-    | _, T.AppBuiltin (Builtin.Not, [b']) -> mk_lit a b' (not sign)
+    | T.AppBuiltin (Builtin.Not, [a']), _ when Term.is_true_or_false b -> mk_lit a' b (not sign)
+    (* | _, T.AppBuiltin (Builtin.Not, [b']) -> mk_lit a b' (not sign) *)
    
     | _ when has_num_ty a ->
       begin match mk_num_eq a b sign with
