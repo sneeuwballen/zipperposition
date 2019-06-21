@@ -9,7 +9,9 @@ open Libzipperposition
 module T = Term
 
 type selection_setting = Any | Minimal | Large
-type reasoning_kind    = BoolReasoningDisabled | BoolCasesInference | BoolCasesSimplification | BoolCasesEagerFar | BoolCasesEagerNear
+type reasoning_kind    = 
+  BoolReasoningDisabled | BoolCasesInference | BoolCasesSimplification | BoolCasesKeepParent
+  | BoolCasesEagerFar | BoolCasesEagerNear
 
 let _bool_reasoning = ref BoolReasoningDisabled
 let cased_term_selection = ref Any
@@ -284,6 +286,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
     else if !_bool_reasoning = BoolCasesSimplification then (
       Env.set_single_step_multi_simpl_rule bool_case_simp;
+    ) else if !_bool_reasoning = BoolCasesKeepParent then (
+      let keep_parent c  = CCOpt.get_or ~default:[] (bool_case_simp c) in
+      Env.add_unary_inf "bool_cases_keep_parent" keep_parent;
     )
 end
 
@@ -483,12 +488,13 @@ let extension =
 
 let () =
   Options.add_opts
-    [ "--boolean-reasoning", Arg.Symbol (["off"; "cases-inf"; "cases-simpl"; "cases-eager"; "cases-eager-near"], 
+    [ "--boolean-reasoning", Arg.Symbol (["off"; "cases-inf"; "cases-simpl"; "cases-simpl-kp"; "cases-eager"; "cases-eager-near"], 
         fun s -> _bool_reasoning := 
                     match s with 
                     | "off" -> BoolReasoningDisabled
                     | "cases-inf" -> BoolCasesInference
                     | "cases-simpl" -> BoolCasesSimplification
+                    | "cases-simpl-kp" -> BoolCasesKeepParent
                     | "cases-eager" -> BoolCasesEagerFar
                     | "cases-eager-near" -> BoolCasesEagerNear
                     | _ -> assert false), 
