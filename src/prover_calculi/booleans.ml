@@ -170,7 +170,6 @@ module Make(E : Env.S) : S with module Env = E = struct
           match f with
             | Builtin.True | Builtin.False -> ()
             | Builtin.Eq | Builtin.Neq | Builtin.Equiv | Builtin.Xor ->
-              (* Format.printf "Equality like: %b %b (%a) %a\n" (!cased_term_selection != Minimal) (Type.is_prop(T.ty(List.hd ps))) (CCList.pp T.pp) ps C.pp c; *)
               (match ps with 
                 | [x;y] when (!cased_term_selection != Minimal || Type.is_prop(T.ty x)) ->
                   add t x y;
@@ -288,26 +287,24 @@ module Make(E : Env.S) : S with module Env = E = struct
 end
 
 
+open CCFun
 open Builtin
 open Statement
 open TypedSTerm
-open List
+open CCList
 
 
-let if_changed proof (mk: ?attrs:Logtk.Statement.attrs -> 'r) s f' p =
-  let fp = f' p in
-  if fp = p then s else mk ~proof:(proof s) fp
+let if_changed proof (mk: ?attrs:Logtk.Statement.attrs -> 'r) s f p =
+  let fp = f s p in
+  if fp = [p] then [s] else map(fun x -> mk ~proof:(proof s) x) fp
 
 let map_propositions ~proof f =
-  CCVector.map(fun s -> match Statement.view s with
-    | TyDecl(id,t)	-> s
-    | Data ts	-> s
-    | Def defs	-> s
-    | Rewrite _	-> s
-    | Assert p	-> if_changed proof assert_ s (f s) p
-    | Lemma ps	-> if_changed proof lemma s (map(f s)) ps
-    | Goal p	-> if_changed proof goal s (f s) p
-    | NegatedGoal(ts, ps)	-> if_changed proof (neg_goal ~skolems:ts) s (map(f s)) ps
+  CCVector.flat_map_list(fun s -> match Statement.view s with
+    | Assert p	-> if_changed proof assert_ s f p
+    | Lemma ps	-> if_changed proof lemma s (map%f) ps
+    | Goal p	-> if_changed proof goal s f p
+    | NegatedGoal(ts, ps)	-> if_changed proof (neg_goal ~skolems:ts) s (map%f) ps
+    | _ -> [s]
   )
 
 
@@ -317,11 +314,8 @@ let is_T_F t = match view t with AppBuiltin((True|False),[]) -> true | _ -> fals
 (* Modify every subterm of t by f except those at the "top". Here top is true if subterm occures under a quantifier Æ in a context where it could participate to the clausification if the surrounding context of Æ was ignored. *)
 let rec replaceTST f top t =
   let re = replaceTST f in
-  let ty = match ty t with
-    | Some ty -> ty
-    | None -> assert false (* These are typed terms so they must have a type. *)
-  in
-  let transformer = if top then CCFun.id else f in
+  let ty = ty_exn t in
+  let transformer = if top then id else f in
   transformer 
     (match view t with
       | App(t,ts) -> 
@@ -437,12 +431,12 @@ let eager_cases_far =
           ~rule:(Proof.Rule.mk "eager_cases_far")
   in
   map_propositions ~proof (fun _ t ->
-    with_subterm_or_id t (fun vs s -> match view s with
+    [with_subterm_or_id t (fun vs s -> match view s with
       | Bind((Forall|Exists) as q, v, b) ->
           let b' = case_bools_wrt (Var.Set.add vs v) b in
           if b==b' then None else Some(replace s (bind ~ty:prop q v b') t)
       | _ -> None)
-    |> case_bools_wrt Var.Set.empty)
+    |> case_bools_wrt Var.Set.empty])
 
 
 let eager_cases_near =
@@ -456,19 +450,47 @@ let eager_cases_near =
       | Bind((Forall|Exists),_,_) -> None
       | AppBuiltin((Eq|Neq), [x;y]) when is_bool x -> None
       | _ when is_bool s ->
-          let s' = case_bool vs s (with_subterm_or_id s (fun _ -> CCOpt.if_(fun x -> x!=s && is_bool x))) in
+          let s' = case_bool vs s (with_subterm_or_id s (fun _ -> CCOpt.if_(fun x -> x!=s && is_bool x && not(is_T_F x)))) in
           if s==s' then None else Some(case_near(replace s s' t))
       | _ -> None)
   in
-  map_propositions ~proof (fun _ -> case_near)
+  map_propositions ~proof (fun _ p -> [case_near p])
 
 
+open Term
 
-let preprocess_booleans stmts = name_quantifiers(match !_bool_reasoning with
-  | BoolReasoningDisabled -> stmts
-  | BoolCasesEagerFar -> eager_cases_far stmts
-  | BoolCasesEagerNear -> eager_cases_near stmts
-  | _ -> stmts)
+let post_eager_cases =
+  let proof s = Proof.Step.esa [Proof.Parent.from(Statement.as_proof_c s)]
+          ~rule:(Proof.Rule.mk "post_eager_cases")
+  in
+  map_propositions ~proof (fun _ c ->
+    let cased = ref Set.empty in
+    fold_left(SLiteral.fold(fun res -> (* Loop over subterms of terms of literals of a clause. *)
+      Seq.subterms_depth %> Iter.fold(fun res (s,d) ->
+        if d = 0 || not(Type.is_prop(ty s)) || is_true_or_false s || is_var s || Set.mem s !cased
+        then
+          res
+        else(
+          cased := Set.add s !cased;
+          let replace_s_by by = map(SLiteral.map ~f:(replace ~old:s ~by)) in
+          flatten(map(fun c -> [
+            SLiteral.atom_true s :: replace_s_by false_ c; 
+            SLiteral.atom_false s :: replace_s_by true_ c
+          ]) res))
+      ) res
+    )) [c] c)
+
+
+let preprocess_booleans stmts = (match !_bool_reasoning with
+  | BoolCasesEagerFar -> eager_cases_far
+  | BoolCasesEagerNear -> eager_cases_near
+  | _ -> id
+  ) (if !quant_rename then name_quantifiers stmts else stmts)
+
+let preprocess_cnf_booleans stmts = match !_bool_reasoning with
+  | BoolCasesEagerFar | BoolCasesEagerNear -> post_eager_cases stmts
+  | _ -> stmts
+
 
 let extension =
   let register env =

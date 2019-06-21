@@ -25,3 +25,5 @@ val extension : Extensions.t
 val name_quantifiers : Logtk.TypeInference.typed_statement CCVector.ro_vector -> Logtk.TypeInference.typed_statement CCVector.ro_vector
 
 val preprocess_booleans : Logtk.TypeInference.typed_statement CCVector.ro_vector -> Logtk.TypeInference.typed_statement CCVector.ro_vector
+
+val preprocess_cnf_booleans : Logtk.Statement.clause_t CCVector.ro_vector -> Logtk.Statement.clause_t CCVector.ro_vector

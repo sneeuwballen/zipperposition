@@ -448,12 +448,10 @@ let process_file ?(prelude=Iter.empty) file =
   let has_goal = has_goal_decls_ decls in
   Util.debugf ~section 1 "parsed %d declarations (%s goal(s))"
     (fun k->k (CCVector.length decls) (if has_goal then "some" else "no"));
-  (* Hooks exist but they can't be used to add statements. 
-     Hence naming quantifiers inside terms is done directly here. 
-     Without this Type.Conv.Error occures so the naming is done unconditionally. *)
-  let quant_transformer = if !Booleans.quant_rename then Booleans.preprocess_booleans else CCFun.id in
+  (* Hooks exist but currently they can't be used to add statements. Hence here are direct calls to such preprocessing as renaming quantifiers and casing boolean terms. Default does nothing. *)
   let sk_ctx = Skolem.create () in 
-  cnf ~sk_ctx (quant_transformer decls) >>= fun stmts ->
+  cnf ~sk_ctx (Booleans.preprocess_booleans decls) >>= fun stmts ->
+  let stmts = Booleans.preprocess_cnf_booleans stmts in
   (* compute signature, precedence, ordering *)
   let conj_syms = syms_in_conj stmts in
   let signature = Statement.signature ~conj_syms:conj_syms (CCVector.to_seq stmts) in
