@@ -57,6 +57,8 @@ type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
 
 let _prune_arg_fun = ref `NoPrune
 
+let prim_enum_terms = ref Term.Set.empty
+
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C
@@ -343,7 +345,11 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       let (hd_s,_), (hd_t,_) = T.as_app s, T.as_app t in
       if T.is_const hd_s && T.is_const hd_t && T.equal hd_s hd_t then (
-        loop s t
+        let diffs = loop s t in
+        if List.for_all (fun (s,t) -> Type.equal (T.ty s) (T.ty t)) diffs 
+        then diffs else [] (* because of polymorphism, it might be possible 
+                              that terms will not be of the same type,
+                              and that will give rise to wrong term applications*)
       ) else [] 
     in
     let is_eligible = C.Eligible.res c in
@@ -352,11 +358,13 @@ module Make(E : Env.S) : S with module Env = E = struct
         match l with 
         | Literal.Equation (lhs,rhs,false) when is_eligible i l ->
           let subterms = find_diffs lhs rhs in
+          assert(List.for_all (fun (s,t) -> Type.equal (T.ty s) (T.ty t)) subterms);
           if not (CCList.is_empty subterms) &&
-             List.exists (fun (l,_) -> Type.is_fun (T.ty l)) subterms then
+             List.exists (fun (l,_) -> 
+                Type.is_fun (T.ty l) || Type.is_prop (T.ty l)) subterms then
              let subterms_lit = CCList.map (fun (l,r) ->
-               let free_vars = T.VarSet.union (T.vars l) (T.vars r) |> T.VarSet.to_list in 
-               let arg_types = Type.expected_args  @@ T.ty l in
+               let free_vars = T.VarSet.union (T.free_vars l) (T.free_vars r) |> T.VarSet.to_list in 
+               let arg_types = Type.expected_args @@ T.ty l in
                if CCList.is_empty arg_types then Literal.mk_neq l r
                else (
                  let skolems = List.map (fun ty -> T.mk_fresh_skolem free_vars ty) arg_types in
@@ -447,8 +455,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   let elim_pred_variable (c:C.t) : C.t list =
     (* find unshielded predicate vars *)
     let find_vars(): _ HVar.t Iter.t =
-      C.Seq.vars c
-      |> T.VarSet.of_seq |> T.VarSet.to_seq
+      Literals.free_vars (C.lits c)
+      |> T.VarSet.to_seq
       |> Iter.filter
         (fun v ->
            (Type.is_prop @@ Type.returns @@ HVar.ty v) &&
@@ -560,6 +568,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* rule for primitive enumeration of predicates [P t1…tn]
      (using ¬ and ∧ and =) *)
   let prim_enum_ ~(mode) (c:C.t) : C.t list =
+    let free_vars = Literals.free_vars (C.lits c) in
     (* set of variables to refine (only those occurring in "interesting" lits) *)
     let vars =
       Literals.fold_lits ~eligible:C.Eligible.always (C.lits c)
@@ -572,7 +581,7 @@ module Make(E : Env.S) : S with module Env = E = struct
            let hd = T.head_term t in
            begin match T.as_var hd, Type.arity (T.ty hd) with
              | Some v, Type.Arity (0, n)
-               when n>0 && Type.returns_prop (T.ty hd) ->
+               when n>0 && Type.returns_prop (T.ty hd) && T.VarSet.mem v free_vars ->
                Some v
              | _ -> None
            end)
@@ -588,7 +597,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       vars
       |> T.VarSet.to_seq
       |> Iter.flat_map_l
-        (fun v -> HO_unif.enum_prop ~mode (v,sc_c) ~offset)
+        (fun v -> HO_unif.enum_prop ~mode ~enum_cache:prim_enum_terms (v,sc_c) ~offset)
       |> Iter.map
         (fun (subst,penalty) ->
            let renaming = Subst.Renaming.create() in
@@ -888,7 +897,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let args_opt = List.mapi (fun i a_i ->
             assert(Term.DB.is_closed a_i);
             assert(CCList.is_empty current_sets ||
-                   List.length current_sets = List.length args);
+                   List.length current_sets = (List.length args + List.length missing));
             if CCList.is_empty current_sets ||
                not (Term.Set.is_empty (List.nth current_sets i)) then 
               (Some (List.mapi (fun j a_j -> 
@@ -910,6 +919,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
 
     let status = VTbl.create 8 in
+    let free_vars = Literals.free_vars (C.lits c) in
     C.lits c
     |> Literals.map (fun t -> Lambda.eta_expand t) (* to make sure that DB indices are everywhere the same *)
     |> Literals.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord:Ordering.none 
@@ -918,7 +928,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       (fun (t,_) ->
         let head, _ = T.as_app t in
         match T.as_var head with
-          | Some var ->
+          | Some var when T.VarSet.mem var free_vars ->
             begin match VTbl.get status var with
             | Some (current_sets, created_sk) ->
               let t, new_sk = T.DB.skolemize_loosely_bound t in
@@ -935,7 +945,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                                 |> List.map snd |> Term.Set.of_list in
               VTbl.add status var (get_covers head (T.args t'), created_sk);
             end
-          | None -> ();
+          | _ -> ();
         ()
       );
 
@@ -1034,6 +1044,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                                           | Some tt -> Some tt))
       in
       Env.set_ho_normalization_rule ho_norm;
+      Ordering.normalize := (fun t -> CCOpt.get_or ~default:t (ho_norm t));
 
       if (!_huet_style) then
         JP_unif.set_huet_style ();
@@ -1194,7 +1205,7 @@ let () =
       "--ho-huet-style-unif", Arg.Set _huet_style, " enable Huet style projection";
       "--ho-no-conservative-elim", Arg.Clear _cons_elim, " Disables conservative elimination rule in pragmatic unification";
       "--ho-imitation-first",Arg.Set _imit_first, " Use imitation rule before projection rule";
-      "--ho-solve-vars", Arg.Set _var_solve, " Enable solving variables.";
+      "--ho-solve-vars", Arg.Bool (fun v -> PragHOUnif.solve_var := v), " Enable solving variables.";
       "--ho-composition", Arg.Set _compose_subs, " Enable composition instead of merging substitutions";
       "--ho-disable-var-arg-removal", Arg.Clear _var_arg_remove, " disable removal of arguments of applied variables";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom";
@@ -1247,7 +1258,7 @@ let () =
     _ext_pos := true;
     _ext_pos_all_lits := true;
     prim_mode_ := `None;
-    _elim_pred_var := false;
+    _elim_pred_var := true;
     _neg_cong_fun := false;
     enable_unif_ := false;
     _prune_arg_fun := `PruneMaxCover;

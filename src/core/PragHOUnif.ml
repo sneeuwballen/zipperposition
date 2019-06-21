@@ -7,12 +7,12 @@ module H = HVar
 type subst = US.t
 type unif_state =
 {
-  norm_deref          : US.t -> T.t Scoped.t -> T.t;
   num_identifications : int;
   num_var_imitations  : int;
   num_app_projections : int;
   num_elims           : int;
-  depth               : int
+  depth               : int;
+  monomorphic         : bool;
 }
 
 let state_pp out st =
@@ -34,7 +34,7 @@ let max_elims           = ref 2
 
 let _cons_e = ref true
 let _imit_first = ref false
-let _solve_var = ref true
+let solve_var = ref true
 
 (* apply a substitution and reduce to whnf *)
 let nfapply s u = Lambda.beta_red_head (S.apply s u)
@@ -61,6 +61,8 @@ let rec nfapply_mono subst (t,sc) =
   if T.equal tt t' then t
   else T.fun_l pref t'
 
+let normalize ~mono = if mono then nfapply_mono else nfapply
+
 let disable_conservative_elim () =
   _cons_e := false
 
@@ -68,7 +70,7 @@ let enable_imit_first () =
   _imit_first := true
 
 let enable_solve_var () = 
-  _solve_var := true
+  solve_var := true
 
 let compose_sub s1 s2 =
   US.merge s1 s2
@@ -94,6 +96,16 @@ let eliminate_at_idx ~scope ~counter v k =
   let matrix_head = T.var (H.fresh_cnt ~counter ~ty:new_ty ()) in
   let matrix = T.app matrix_head bvars' in
   let subst_value = T.fun_l prefix_types matrix in
+  let subst = US.FO.singleton (v, scope) (subst_value, scope) in
+  subst
+
+(* removes all arguments of an applied variable
+   v |-> λ u1 ... um. x
+ *)
+let elim_trivial ~scope ~counter v =  
+  let prefix_types, return_type = Type.open_fun (HVar.ty v) in
+  let matrix_head = T.var (H.fresh_cnt ~counter ~ty:return_type ()) in
+  let subst_value = T.fun_l prefix_types matrix_head in
   let subst = US.FO.singleton (v, scope) (subst_value, scope) in
   subst
 
@@ -125,7 +137,7 @@ let imitate_one ~scope ~counter  s t =
 
 (* Create all possible projection and imitation bindings. *)
 let proj_imit_bindings ~state ~subst ~scope ~counter  s t =
-  let hd_s, args_s = CCPair.map1 (fun x -> T.as_var_exn x) (T.as_app s) in
+  let hd_s, args_s = CCPair.map1 T.as_var_exn (T.as_app s) in
   let hd_t,_ = T.as_app (snd (T.open_fun t)) in
   let pref_tys, var_ret_ty = Type.open_fun (HVar.ty hd_s) in
   let proj_bindings = 
@@ -184,40 +196,23 @@ let rec unify ~state ~scope ~counter ~subst = function
   | (s,t,ban_id) :: rest as l -> (
     if not @@ continue_unification state then OSeq.empty
     else (
-      let apply_subst = state.norm_deref in
-      let s', t' = apply_subst subst (s, scope), apply_subst subst (t, scope) in
+      let s', t' = normalize ~mono:(state.monomorphic) subst (s, scope), 
+                   normalize ~mono:(state.monomorphic) subst (t, scope) in
       if not (Term.equal s' t') then (
         match P.unif_simple ~subst:(US.subst subst) ~scope 
                 (T.of_ty (T.ty s')) (T.of_ty (T.ty t')) with
         | Some ty_unif -> (
-          let s', t' = apply_subst ty_unif (s', scope), apply_subst ty_unif (t', scope) in
+          let s', t' = normalize ~mono:state.monomorphic ty_unif (s', scope), 
+                       normalize ~mono:state.monomorphic ty_unif (t', scope) in
           let subst = ty_unif in
-          try
-            if !_solve_var then (
-              (* trying pattern unification *)
-              let subst = P.unify_scoped ~counter ~subst (s',scope) (t',scope) in
-              unify ~state ~scope ~counter ~subst rest 
-            ) 
-            else (
-              if Term.is_fo_term s' && Term.is_fo_term t' then (
-                let subst = P.unif_simple ~scope ~subst:(US.subst subst) s' t' in
-                if CCOpt.is_some subst then (
-                  let subst = CCOpt.get_exn subst in
-                  unify ~state ~scope ~counter ~subst rest
-                ) else raise P.NotUnifiable
-              ) else raise P.NotInFragment
-            )
-          with
-          |P.NotUnifiable -> 
-            (* A weaker unification procedure determined the constraint is unsolvable *)
-            OSeq.empty 
-          |P.NotInFragment ->
             (* A weaker unification procedure gave up *)
-            let (pref_s, body_s), (pref_t, body_t) = T.open_fun s', T.open_fun t' in
-            let body_s', body_t', _ = P.eta_expand_otf ~subst ~scope pref_s pref_t body_s body_t in
-            let (hd_s, args_s), (hd_t, args_t) = T.as_app body_s', T.as_app body_t' in
-            match T.view hd_s, T.view hd_t with 
-            | (T.Var _, T.Var _) -> 
+            (* CCFormat.printf "Weaker unification gave up.\n"; *)
+          let (pref_s, body_s), (pref_t, body_t) = T.open_fun s', T.open_fun t' in
+          let body_s', body_t', _ = P.eta_expand_otf ~subst ~scope pref_s pref_t body_s body_t in
+          let (hd_s, args_s), (hd_t, args_t) = T.as_app body_s', T.as_app body_t' in
+          match T.view hd_s, T.view hd_t with 
+          | (T.Var _, T.Var _) ->
+            let continuation () =  
               if T.equal hd_s hd_t then (
                 flex_same ~state ~subst ~counter ~scope hd_s args_s args_t rest l
               )
@@ -243,21 +238,34 @@ let rec unify ~state ~scope ~counter ~subst = function
                       (identify ~state ~subst ~counter ~scope body_s' body_t' rest)
                       (flex_proj_imit  ~state ~subst ~counter ~scope body_s' body_t' rest)
                   )
+              ) in
+            try_weaker_unif ~subst ~state ~counter ~scope ~s:s' ~t:t' ~rest ~continuation
+          | (T.Var _, T.Const _) | (T.Var _, T.DB _) | (T.Var _, T.AppBuiltin _) ->
+            let continuation () = 
+              flex_rigid ~state ~subst ~counter ~scope ~ban_id body_s' body_t' rest in
+            try_weaker_unif ~subst ~state ~counter ~scope ~s:s' ~t:t' ~rest ~continuation
+          | (T.Const _, T.Var _) | (T.DB _, T.Var _) | (T.AppBuiltin _, T.Var _) ->
+            let continuation () = 
+              flex_rigid ~state ~subst ~counter ~scope ~ban_id body_t' body_s' rest in
+            try_weaker_unif ~subst ~state ~counter ~scope ~s:t' ~t:s' ~rest ~continuation
+          | T.Const f , T.Const g when ID.equal f g && List.length args_s = List.length args_t ->
+            unify ~state ~subst ~counter ~scope (build_constraints ~ban_id args_s args_t rest)
+          | T.AppBuiltin(hd_s, args_s'), T.AppBuiltin(hd_t, args_t') when
+              Builtin.equal hd_s hd_t &&
+              (* not (Builtin.equal Builtin.ForallConst hd_s) &&
+              not (Builtin.equal Builtin.ExistsConst hd_s) &&  *)
+              List.length args_s' + List.length args_s = 
+              List.length args_t' + List.length args_t ->
+              if Builtin.is_quantifier hd_s then (
+                let zipped = List.map (fun (x,y) -> (x,y,ban_id)) (List.combine (args_s'@args_s) (args_t'@args_t)) in
+                unify ~state ~subst ~counter ~scope zipped
               )
-            | (T.Var _, T.Const _) | (T.Var _, T.DB _) | (T.Var _, T.AppBuiltin _) ->
-                flex_rigid ~state ~subst ~counter ~scope ~ban_id body_s' body_t' rest
-            | (T.Const _, T.Var _) | (T.DB _, T.Var _) | (T.AppBuiltin _, T.Var _) ->
-                flex_rigid ~state ~subst ~counter ~scope ~ban_id body_t' body_s' rest
-            | T.Const f , T.Const g when ID.equal f g && List.length args_s = List.length args_t ->
-                unify ~state ~subst ~counter ~scope (build_constraints ~ban_id args_s args_t rest)
-            | T.AppBuiltin(hd_s, args_s'), T.AppBuiltin(hd_t, args_t') when
-                Builtin.equal hd_s hd_t && 
-                  List.length args_s' + List.length args_s = 
-                  List.length args_t' + List.length args_t ->
+              else (
                 unify ~state ~subst ~counter ~scope (build_constraints ~ban_id (args_s'@args_s) (args_t'@args_t) rest)
-            | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->
-                unify ~state ~subst ~counter ~scope (build_constraints ~ban_id args_s args_t rest)  
-            | _ -> OSeq.empty
+              )
+          | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->
+              unify ~state ~subst ~counter ~scope (build_constraints ~ban_id args_s args_t rest)  
+          | _ -> OSeq.empty
           )
         | None -> OSeq.empty)
         else (
@@ -324,9 +332,12 @@ and flex_same ~subst ~state ~counter ~scope hd_s args_s args_t rest all =
               let subst = compose_sub subst subst' in
                 unify ~state:{state with num_elims=state.num_elims+1} 
                       ~scope  ~counter ~subst all))))
-      else all_args_unif
-    )
-  )
+      else (
+        let trivial_subst = elim_trivial ~scope ~counter (T.as_var_exn hd_s) in
+        let subst = compose_sub subst trivial_subst in
+        let unif_res = unify ~state:{state with num_elims=state.num_elims+1} 
+                      ~scope  ~counter ~subst all in
+        OSeq.append unif_res  all_args_unif)))
   else unify ~subst ~state ~counter ~scope rest
 
 (* Create all possible elimination substitutions, apply them and continue solving *)
@@ -362,6 +373,28 @@ and flex_proj_imit ~subst ~state ~counter ~scope s t rest =
       else OSeq.empty
   )
 
+and try_weaker_unif ~subst ~state ~counter ~scope ~s ~t ~rest ~continuation =
+  try
+    if !solve_var && state.depth <= 4 && state.monomorphic  then (
+      (* trying pattern unification *)
+      let subst = P.unify_scoped ~counter ~subst (s,scope) (t,scope) in
+      (* CCFormat.printf "Weaker unification suceeded: %a.\n" S.pp subst; *)
+      (* let subst = US.map_subst (fun s -> Subst.FO.map (fun t -> Lambda.eta_expand t) s) subst in *)
+      unify ~state ~scope ~counter ~subst rest 
+    ) 
+    else (
+      if Term.is_fo_term s && Term.is_fo_term t then (
+        let subst = P.unif_simple ~scope ~subst:(US.subst subst) s t in
+        if CCOpt.is_some subst then (
+          let subst = CCOpt.get_exn subst in
+          unify ~state ~scope ~counter ~subst rest
+        ) else raise P.NotUnifiable
+      ) else raise P.NotInFragment
+    )
+  with
+  | P.NotUnifiable -> OSeq.empty
+  | P.NotInFragment -> continuation ()
+
 let unify_scoped t0_s t1_s =
   let counter = ref 0 in
   let lfho_unif = 
@@ -371,15 +404,15 @@ let unify_scoped t0_s t1_s =
     with Unif.Fail -> None in
   let t0',t1',unifscope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
   let prefix = if (CCOpt.is_some lfho_unif) then OSeq.cons lfho_unif else (fun x -> x) in
+  let monomorphic = Iter.is_empty @@ Iter.union (Term.Seq.ty_vars t0') (Term.Seq.ty_vars t1') in
   let state = 
   {
-    norm_deref          = if Iter.is_empty @@ Iter.union (Term.Seq.ty_vars t0') (Term.Seq.ty_vars t1')
-                          then nfapply_mono else nfapply;
     num_identifications = 0;
     num_var_imitations  = 0;
     num_app_projections = 0;
     num_elims           = 0;
-    depth               = 0
+    depth               = 0;
+    monomorphic
   } in
   let res =
       prefix
@@ -389,14 +422,12 @@ let unify_scoped t0_s t1_s =
 
   res
   |> OSeq.map (CCOpt.map (fun sub ->       
-      let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t0_s in 
-      let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t1_s in
-      assert(Type.equal (Term.ty l) (Term.ty r));
-      if not (T.equal l r) then (
-        Format.printf "For problem: %a =?= %a\n" T.pp t0' T.pp t1';
+      let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub t0_s in 
+      let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub t1_s in
+      if not (T.equal l r) || not (Type.equal (Term.ty l) (Term.ty r)) then (
+        Format.printf "For problem: %a:%a=?= %a:%a\n" (T.pp_in Output_format.O_tptp) (fst t0_s) Type.pp (Term.ty (fst t0_s)) (T.pp_in Output_format.O_tptp) (fst t1_s) Type.pp (Term.ty (fst t1_s));
         Format.printf "Subst: @[%a@]\n" S.pp sub;
-        Format.printf "%a <> %a\n" T.pp l T.pp r;
+        Format.printf "%a:%a <> %a:%a\n" (T.pp_in Output_format.O_tptp) l Type.pp (Term.ty l) (T.pp_in Output_format.O_tptp) r Type.pp (Term.ty r);
         assert(false);
       );
-      assert (T.equal l r);
     sub))

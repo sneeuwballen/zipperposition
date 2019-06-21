@@ -411,9 +411,11 @@ module TPTP = struct
       Format.fprintf out "[@[<hv>%a@]]"
         (Util.pp_list ~sep:"," pp) l;
     | AppBuiltin (Builtin.And, l) ->
-      Util.pp_list ~sep:" & " pp_surrounded out l
+      if CCList.is_empty l then Format.fprintf out "%s" "(&)"
+      else  Util.pp_list ~sep:" & " pp_surrounded out l
     | AppBuiltin (Builtin.Or, l) ->
-      Util.pp_list ~sep:" | " pp_surrounded out l
+      if CCList.is_empty l then Format.fprintf out "%s" "(|)"
+      else  Util.pp_list ~sep:" | " pp_surrounded out l
     | AppBuiltin (Builtin.Not, [a]) ->
       Format.fprintf out "@[<1>~@,@[%a@]@]" pp_surrounded a
     | AppBuiltin (Builtin.Imply, [a;b]) ->

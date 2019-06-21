@@ -587,7 +587,10 @@ module Inner = struct
       | _ when op=O_unify && not root && has_non_unifiable_type_or_is_prop t1 ->
         let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
         delay ~tags () (* push pair as a constraint, because of typing. *)
-      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Builtin.equal s1 s2 ->
+      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when 
+        Builtin.equal s1 s2 ->
+        (* && not (Builtin.equal Builtin.ForallConst s1) && 
+        not (Builtin.equal Builtin.ExistsConst s1) -> *)
         (* try to unify/match builtins pairwise *)
         unif_list ~op ~bvars subst l1 sc1 l2 sc2
       | _, _ -> raise Fail
@@ -829,8 +832,8 @@ module Inner = struct
         proj_fun ~op ~bvars:(DBEnv.push_l_rev bvars new_vars) subst (body,sc_t)
       | T.App _ -> assert false
       | T.AppBuiltin (_, l2) ->
-        assert (l=[]);
-        proj_fun_l ~op ~bvars subst (l2,sc_t)
+        (* assert (l=[]); *)
+        proj_fun_l ~op ~bvars subst (l@l2,sc_t)
       | T.DB i ->
         if DBEnv.mem bvars i
         then proj_fun_l ~op ~bvars subst (l,sc_t)

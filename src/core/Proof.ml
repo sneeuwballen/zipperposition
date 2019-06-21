@@ -419,10 +419,10 @@ module Step = struct
 
   let inferences_perfomed ?(count_cnf=false) p =
     let rec aux p = match p.kind with 
-    | Inference(r,_) -> List.fold_left (fun acc par -> 
-        acc + aux ((Parent.proof par).step)) 0 p.parents + 1
     | Simplification(r,_) -> List.fold_left (fun acc par -> 
-        acc + aux ((Parent.proof par).step)) 0 p.parents + 1
+        acc + aux ((Parent.proof par).step)) 0 p.parents 
+    | Inference(r,_) -> List.fold_left (fun acc par -> 
+        acc + aux ((Parent.proof par).step)) 0 p.parents + 1 
     | _ -> 0 in
   aux p
 

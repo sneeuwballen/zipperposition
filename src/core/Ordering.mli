@@ -44,6 +44,8 @@ val name : t -> string
 
 val clear_cache : t -> unit
 
+val normalize : (Lambda.term -> Lambda.term) ref
+
 include Interfaces.PRINT with type t := t
 
 (** {2 Ordering implementations}

@@ -139,28 +139,6 @@ let const ~ty s =
   let my_t = make_ ~ty:(HasType ty) (Const s) in
   H.hashcons my_t
 
-let app ~ty f l = match f.term, l with
-  | _, [] -> f
-  | App (f1, l1), _::_ ->
-    (* flatten *)
-    let my_t = make_ ~ty:(HasType ty) (App (f1,l1 @ l)) in
-    H.hashcons my_t
-  | AppBuiltin (f1, l1), _::_ ->
-    (* flatten *)
-    let my_t = make_ ~ty:(HasType ty) (AppBuiltin (f1,l1 @ l)) in
-    H.hashcons my_t
-  | _ ->
-    let my_t = make_ ~ty:(HasType ty) (App (f,l)) in
-    H.hashcons my_t
-
-let var v = H.hashcons (make_ ~ty:(HasType (HVar.ty v)) (Var v))
-
-let bvar ~ty i =
-  if i<0 then raise (IllFormedTerm "bvar");
-  H.hashcons (make_ ~ty:(HasType ty) (DB i))
-
-let bind ~ty ~varty s t' =
-  H.hashcons (make_ ~ty:(HasType ty) (Bind (s, varty, t')))
 
 let builtin ~ty b =
   let my_t = make_ ~ty:(HasType ty) (AppBuiltin (b,[])) in
@@ -186,6 +164,42 @@ let tType =
   H.hashcons my_t
 
 let arrow l r = app_builtin ~ty:tType Builtin.arrow (r :: l)
+
+let app ~ty f l = match f.term, l with
+  | _, [] -> f
+  | App (f1, l1), _::_ ->
+    (* flatten *)
+    let my_t = make_ ~ty:(HasType ty) (App (f1,l1 @ l)) in
+    H.hashcons my_t
+  | AppBuiltin (f1, l1), _::_ ->
+    (* flatten *)
+    let flattened = l1 @ l in
+    let ty = if Builtin.is_logical_op f1 && not (Builtin.is_quantifier f1) then (
+      let prop = builtin ~ty:tType Builtin.Prop in
+      if Builtin.is_logical_binop f1 then (
+        if List.length flattened >= 2 then prop
+        else (if List.length flattened = 1 then arrow [prop] prop
+              else arrow [prop;prop] prop)
+      ) else (
+        if List.length flattened = 1 then prop
+        else arrow [prop] prop
+      ))
+     else ty in
+    let my_t = make_ ~ty:(HasType ty) (AppBuiltin (f1,flattened)) in
+    H.hashcons my_t
+  | _ ->
+    let my_t = make_ ~ty:(HasType ty) (App (f,l)) in
+    H.hashcons my_t
+
+let var v = H.hashcons (make_ ~ty:(HasType (HVar.ty v)) (Var v))
+
+let bvar ~ty i =
+  if i<0 then raise (IllFormedTerm "bvar");
+  H.hashcons (make_ ~ty:(HasType ty) (DB i))
+
+let bind ~ty ~varty s t' =
+  H.hashcons (make_ ~ty:(HasType ty) (Bind (s, varty, t')))
+
 
 let cast ~ty old = match old.term with
   | Var v -> var (HVar.cast v ~ty)
@@ -769,6 +783,10 @@ let[@inline] as_app t = match view t with
     | AppBuiltin(b, l') -> app_builtin b ~ty:(ty_exn t) (l'@l), []
     | _ -> f, l 
     end
+  | AppBuiltin(b, l ) when Builtin.is_logical_op b && not (Builtin.is_quantifier b) ->
+    let prop = builtin ~ty:tType Builtin.Prop in
+    let args = if (Builtin.is_logical_binop b) then [prop;prop] else [prop] in
+    app_builtin b ~ty:(arrow args prop) [], l 
   | _ -> t, []
 
 let[@inline] as_var t = match view t with Var v -> Some v | _ -> None
@@ -874,10 +892,14 @@ let rec pp_depth ?(hooks=[]) depth out t =
       Format.fprintf out "@[%a@ → %a@]"
         (Util.pp_list ~sep:" → " (_pp_surrounded depth)) args
         (_pp_surrounded depth) ret
+    | AppBuiltin(b, [x;body]) when Builtin.equal b Builtin.ExistsConst ||
+                                   Builtin.equal b Builtin.ForallConst ->
+      Format.fprintf out "%a %a. %a" Builtin.pp b (_pp depth) x (_pp depth) body;
     | AppBuiltin (b, ([_;a] | [a])) when Builtin.is_prefix b ->
       Format.fprintf out "@[<1>%a %a@]" Builtin.pp b (_pp depth) a
-    | AppBuiltin (b, ([_;t1;t2] | [t1;t2])) when Builtin.is_infix b ->
-      Format.fprintf out "(@[<1>%a@ %a@ %a@])" (_pp depth) t1 Builtin.pp b (_pp depth) t2
+    | AppBuiltin (b, l) when Builtin.is_infix b && List.length l >= 2 ->
+      let sep = CCFormat.sprintf " %s " (Builtin.TPTP.to_string b) in
+      Format.fprintf out "(@[%a@])" (Util.pp_list ~sep (_pp depth)) l
     | AppBuiltin (b, []) -> Builtin.pp out b
     | AppBuiltin (b, l) ->
       Format.fprintf out "@[%a(%a)@]" Builtin.pp b (Util.pp_list (_pp depth)) l
@@ -948,10 +970,14 @@ let rec pp_zf out t =
       Format.fprintf out "@[%a@ -> %a@]"
         (Util.pp_list ~sep:" -> " (_pp_surrounded depth)) args
         (_pp_surrounded depth) ret
+    | AppBuiltin(b, [x;body]) when Builtin.equal b Builtin.ExistsConst ||
+                                   Builtin.equal b Builtin.ForallConst ->
+      Format.printf "%a %a. %a" Builtin.pp b pp_zf x pp_zf body;
     | AppBuiltin (b, ([_;a] | [a])) when Builtin.is_prefix b ->
       Format.fprintf out "@[<1>%a %a@]" Builtin.ZF.pp b (pp_ depth) a
-    | AppBuiltin (b, ([_;t1;t2] | [t1;t2])) when Builtin.is_infix b ->
-      Format.fprintf out "(@[<1>%a@ %a@ %a@])" (pp_ depth) t1 Builtin.ZF.pp b (pp_ depth) t2
+    | AppBuiltin (b, l) when List.length l >= 2 && Builtin.is_infix b ->
+      let sep = CCFormat.sprintf " %s " (Builtin.TPTP.to_string b) in
+      Format.fprintf out "(@[%a@])" (Util.pp_list ~sep pp_zf) l
     | AppBuiltin (b, []) -> Builtin.ZF.pp out b
     | AppBuiltin (b, l) ->
       Format.fprintf out "@[%a(%a)@]" Builtin.ZF.pp b (Util.pp_list (pp_ depth)) l

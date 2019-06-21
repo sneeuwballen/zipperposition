@@ -447,7 +447,7 @@ module Seq = struct
     Iter.fold (fun set x -> Set.add x set) set xs
 
   let ty_vars t =
-    subterms t
+    subterms ~include_builtin:true t
     |> Iter.flat_map (fun t -> Type.Seq.vars (ty t))
 
   let typed_symbols t =
@@ -467,6 +467,9 @@ let vars_under_quant t = VarSet.of_seq @@ Iter.fold (fun acc st ->
 ) Iter.empty (Seq.subterms ~include_builtin:true t)
 
 let free_vars t = VarSet.diff (VarSet.of_seq (Seq.vars t)) (vars_under_quant t) 
+
+let close_quantifier b vars body =
+  List.fold_right (fun v acc -> app_builtin ~ty:Type.prop b [var v; acc]) vars body
 
 
 let var_occurs ~var t =
@@ -558,78 +561,6 @@ let vars_prefix_order t =
   |> List.rev
 
 let depth t = Seq.subterms_depth t |> Iter.map snd |> Iter.fold max 0
-
-let simplify_bools t =
-  let simplify_and_or t b l =
-    assert(b = Builtin.And || b = Builtin.Or);
-    let when_empty, neutral_el = 
-      if b = Builtin.And then true_,false_ else (false_,true_) in
-    if List.exists (equal neutral_el) l then neutral_el
-    else (
-      let l' = List.filter (fun s -> not (equal s when_empty)) l in
-      if List.length l = List.length l' then t
-      else (
-        if CCList.is_empty l' then when_empty
-        else (if List.length l' = 1 then List.hd l'
-              else app_builtin ~ty:(Type.prop) b l')
-      )) 
-    in
-
-  let rec aux t =
-    match view t with 
-    | DB _ | Const _ | Var _ -> t
-    | Fun(ty, body) ->
-      let body' = aux body in
-      if equal body body' then t
-      else fun_ ty body'
-    | App(hd, args) ->
-      let hd' = aux hd and  args' = List.map aux args in
-      if equal hd hd' && same_l args args' then t
-      else app hd' args'
-    | AppBuiltin(Builtin.And, l) ->
-      let l' = List.map aux l in
-      let t = if same_l l l' then t 
-              else app_builtin ~ty:(Type.prop) Builtin.And l' in
-      simplify_and_or t Builtin.And l'
-    | AppBuiltin(Builtin.Or, l) ->
-      let l' = List.map aux l in
-      let t = if same_l l l' then t 
-              else app_builtin ~ty:(Type.prop) Builtin.Or l' in
-      simplify_and_or t Builtin.Or l'
-    | AppBuiltin(Builtin.Not, [s]) ->
-      if equal s true_ then false_
-      else 
-        if equal s false_ then true_
-        else (
-          match view s with 
-          | AppBuiltin(Builtin.Not, [s']) -> aux s'
-          | _ ->  
-            let s' = aux s in
-            if equal s s' then t else
-            app_builtin ~ty:(Type.prop) Builtin.Not [s'] 
-        )
-    | AppBuiltin(hd, [a;b]) 
-        when hd = Builtin.Eq || hd = Builtin.Equiv ->
-      if equal a b then true_ else (
-        let a',b' = aux a, aux b in
-        if equal a a' && equal b b' then t 
-        else app_builtin ~ty:(ty t) hd [a';b']
-      )
-    | AppBuiltin(hd, [a;b])
-        when hd = Builtin.Neq || hd = Builtin.Xor ->
-      if equal a b then false_ else (
-        let a',b' = aux a, aux b in
-        if equal a a' && equal b b' then t 
-        else app_builtin ~ty:(ty t) hd [a';b']
-      )
-    | AppBuiltin(hd, args) ->
-      let args' = List.map aux args in
-      if List.for_all (fun (a,a') -> equal a a') (List.combine args args') then (
-        t
-      ) else app_builtin ~ty:(ty t) hd args' in  
-  aux t
-
-
 
 (* @param vars the free variables the parameter must depend upon
    @param ty_ret the return type *)
@@ -901,7 +832,7 @@ module Arith = struct
   let less = builtin ~ty:ty2o Builtin.Arith.less
   let lesseq = builtin ~ty:ty2o Builtin.Arith.lesseq
   let greater = builtin ~ty:ty2o Builtin.Arith.greater
-  let greatereq = builtin ~ty:ty2o Builtin.Arith.greatereq
+  let greatereq = builtin ~ty:ty2o Builtin.Arith.greatereq   
 
   (* hook that prints arithmetic expressions *)
   let pp_hook _depth pp_rec out t =
@@ -1023,7 +954,7 @@ module TPTP = struct
         if !print_all_types && not (Type.equal (ty t) Type.TPTP.i)
         then Format.fprintf out ":%a" (Type.TPTP.pp_depth !depth) (ty t)
       | AppBuiltin (b,[]) -> Builtin.TPTP.pp out b
-      | AppBuiltin (b, ([t;u] | [_;t;u])) when Builtin.TPTP.is_infix b ->
+      | AppBuiltin (b, ([t;u])) when Builtin.TPTP.is_infix b ->
         Format.fprintf out "(@[%a %a@ %a@])" pp_rec t Builtin.TPTP.pp b pp_rec u
       | AppBuiltin (b, l) when Builtin.TPTP.fixity b = Builtin.Infix_nary ->
         Format.fprintf out "(@[%a@])"
@@ -1214,3 +1145,87 @@ let rebuild_rec t =
     end
   in
   aux [] t
+
+let compl_in_l l =
+  let pos, neg = 
+    CCList.partition_map (fun t -> 
+      match view t with 
+        | AppBuiltin(Builtin.Not, [s]) -> `Right s
+        | _ -> `Left t) l
+    |> CCPair.map_same Set.of_list in
+  not (Set.is_empty (Set.inter pos neg))
+  
+
+let simplify_bools t =
+  let simplify_and_or t b l =
+    let res = 
+      assert(b = Builtin.And || b = Builtin.Or);
+      let netural_el, absorbing_el = 
+        if b = Builtin.And then true_,false_ else (false_,true_) in
+
+      if compl_in_l l || List.exists (equal absorbing_el) l then absorbing_el
+      else (
+        let l' = List.filter (fun s -> not (equal s netural_el)) l in
+        if List.length l = List.length l' then t
+        else (
+          if CCList.is_empty l' then netural_el
+          else (if List.length l' = 1 then List.hd l'
+                else app_builtin ~ty:(Type.prop) b l')
+        )) 
+      in
+    res 
+    in
+ 
+  let rec aux t =
+    match view t with 
+    | DB _ | Const _ | Var _ -> t
+    | Fun(ty, body) ->
+      let body' = aux body in
+      if equal body body' then t
+      else fun_ ty body'
+    | App(hd, args) ->
+      let hd' = aux hd and  args' = List.map aux args in
+      if equal hd hd' && same_l args args' then t
+      else app hd' args'
+    | AppBuiltin(Builtin.And, l) when List.length l > 1 ->
+      let l' = List.map aux l in
+      let t = if same_l l l' then t 
+              else app_builtin ~ty:(Type.prop) Builtin.And l' in
+      simplify_and_or t Builtin.And l'
+    | AppBuiltin(Builtin.Or, l) when List.length l > 1 ->
+      let l' = List.map aux l in
+      let t = if same_l l l' then t 
+              else app_builtin ~ty:(Type.prop) Builtin.Or l' in
+      simplify_and_or t Builtin.Or l'
+    | AppBuiltin(Builtin.Not, [s]) ->
+      if equal s true_ then false_
+      else 
+        if equal s false_ then true_
+        else (
+          match view s with 
+          | AppBuiltin(Builtin.Not, [s']) -> aux s'
+          | _ ->  
+            let s' = aux s in
+            if equal s s' then t else
+            app_builtin ~ty:(Type.prop) Builtin.Not [s'] 
+        )
+    | AppBuiltin(hd, [a;b]) 
+        when hd = Builtin.Eq || hd = Builtin.Equiv ->
+      if equal a b then true_ else (
+        let a',b' = aux a, aux b in
+        if equal a a' && equal b b' then t 
+        else app_builtin ~ty:(ty t) hd [a';b']
+      )
+    | AppBuiltin(hd, [a;b])
+        when hd = Builtin.Neq || hd = Builtin.Xor ->
+      if equal a b then false_ else (
+        let a',b' = aux a, aux b in
+        if equal a a' && equal b b' then t 
+        else app_builtin ~ty:(ty t) hd [a';b']
+      )
+    | AppBuiltin(hd, args) ->
+      let args' = List.map aux args in
+      if same_l args args' then t
+      else app_builtin ~ty:(ty t) hd args' in  
+  aux t
+

@@ -376,6 +376,26 @@ module FO = struct
     subs_l1) @ (to_list s2) in
     (of_list subs_as_map)
 
+
+  let canonize_vars ~var_set = 
+    let max_id   = T.VarSet.max_elt_opt var_set in
+      match max_id with 
+      | Some id ->
+        let max_id = ref (CCInt.max (HVar.id id) (-1)) in
+        T.VarSet.fold (fun v subst -> 
+          let v_id = HVar.id v in
+            if v_id < 0 then (
+              match get_var subst ((v :> InnerTerm.t HVar.t),0) with
+              | Some _ -> subst 
+              | None -> (
+                incr max_id;
+                let renamed_var = T.var (HVar.make ~ty:(HVar.ty v) !max_id) in
+                bind subst ((v :> InnerTerm.t HVar.t), 0) (renamed_var, 0)))
+            else subst) 
+          var_set empty 
+      | None -> empty
+
+
   let bind = (bind :> t -> var Scoped.t -> term Scoped.t -> t)
   let update = (update :> t -> var Scoped.t -> term Scoped.t -> t)
   let of_list = (of_list :> ?init:t -> (var Scoped.t * term Scoped.t) list -> t)
@@ -414,6 +434,27 @@ module FO = struct
       let v' = (HVar.update_ty ~f:Type.of_term_unsafe v,sc_v) in
           (v', (t',sc_t))::l, sk_map) subs_l ([],Term.IntMap.empty) in
    of_list' unleaked_l, List.map snd (Term.IntMap.bindings new_sk)
+
+  let subset_is_renaming ~subset ~res_scope subst =
+    try 
+      let subset = List.filter (fun v ->
+        let der_t, der_sc = deref subst v in
+        if der_sc != snd v then (
+          der_sc = res_scope
+        ) else (
+          der_sc = res_scope && not (Term.equal (fst v) der_t)
+        )
+      ) subset in
+      let derefed_vars = CCList.map (fun v ->
+        let derefed = deref subst v in
+        if not (Term.is_var (fst derefed)) then (
+          raise (invalid_arg "found a non-variable")
+        ) else derefed
+      ) subset 
+      |> CCList.sort_uniq ~cmp:(Scoped.compare Term.compare) in
+      List.length derefed_vars = List.length subset
+    with Invalid_argument _ -> false
+ 
 
 
 end

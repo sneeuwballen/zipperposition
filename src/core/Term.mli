@@ -392,6 +392,8 @@ end
 val vars_under_quant : t -> VarSet.t
 val free_vars        : t -> VarSet.t
 
+val close_quantifier : Builtin.t -> var list -> t -> t
+
 (** {2 De Bruijn} *)
 module DB : sig
   val is_closed : t -> bool

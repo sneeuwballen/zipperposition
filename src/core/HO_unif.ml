@@ -33,7 +33,7 @@ let term_arity args =
   |> Util.take_drop_while (fun t -> T.is_type t)
   |> CCPair.map List.length List.length
 
-let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) list =
+let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t * penalty) list =
   let ty_v = HVar.ty v in
   let n, ty_args, ty_ret = Type.open_poly_fun ty_v in
   assert (Type.is_prop ty_ret);
@@ -58,6 +58,15 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) l
           (T.Form.and_
              (T.app (T.var f) (List.map T.var vars))
              (T.app (T.var g) (List.map T.var vars)))]
+    and l_or = match mode with
+      | `Neg | `None | `Pragmatic-> []
+      | `Full ->
+        let f = HVar.make offset ~ty:ty_v in
+        let g = HVar.make (offset+1) ~ty:ty_v in
+        [T.fun_of_fvars vars
+          (T.Form.or_
+             (T.app (T.var f) (List.map T.var vars))
+             (T.app (T.var g) (List.map T.var vars)))]
     (* projection with "=": [λvars. (F1 vars) = (F2 vars)]
        where [F1 : Πa. ty_args -> a] *)
     and l_eq = match mode with
@@ -79,14 +88,37 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) l
       | `None -> []
       | `Neg | `Pragmatic | `Full ->
         [T.fun_of_fvars vars T.true_]
+    and l_quants = match mode with
+      | `Pragmatic | `Full ->
+        let n = List.length ty_args in
+        CCList.mapi (fun i ty -> 
+          if Type.is_fun ty && Type.returns_prop ty then (
+            let arg_typeargs,_ = Type.open_fun ty in
+            let new_vars = List.map (fun ty -> HVar.fresh ~ty ()) arg_typeargs in
+            let form_body = T.app (T.bvar ~ty (n-i-1)) (List.map T.var new_vars) in
+            let forall = T.close_quantifier Builtin.ForallConst new_vars form_body in
+            let exists = T.close_quantifier Builtin.ExistsConst new_vars form_body in
+            Some ((T.fun_l ty_args forall, T.fun_l ty_args exists)))
+          else None) ty_args
+        |> CCList.fold_left (fun acc opt -> match opt with 
+          | Some (x,y) -> x :: y :: acc 
+          | None -> acc) [] 
+      | _ -> []
     and l_simpl_eq = match mode with
       | `Pragmatic -> 
         let n = List.length vars in
         let db_vars = List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) ty_args in
-        CCList.mapi (fun i db_i -> 
+        CCList.mapi (fun i db_i ->
+          let projs = if Type.is_prop (Term.ty db_i) then (
+            [T.fun_l ty_args db_i]
+          ) else [] in
+          let log_ops = 
           CCList.mapi (fun j db_j ->
-            if i < j && Type.equal (T.ty db_i) (T.ty db_j) then ( 
-              let res = [T.fun_l ty_args (T.Form.eq db_i db_j)] in
+            if i < j && Type.equal (T.ty db_i) (T.ty db_j) then (
+              let x = T.var (HVar.fresh ~ty:(T.ty db_i) ()) in 
+              let res = [T.fun_l ty_args (T.Form.eq db_i db_j);
+                         T.fun_l ty_args (T.Form.eq x db_j);
+                         T.fun_l ty_args (T.Form.eq db_i x)] in
               if Type.is_prop (T.ty db_i) then
                res @
                 [T.fun_l ty_args (T.Form.and_ db_i db_j);
@@ -97,7 +129,8 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) l
             )
             else []) 
           db_vars
-          |> CCList.flatten) 
+          |> CCList.flatten in
+          projs @ log_ops) 
         db_vars
         |> CCList.flatten
       | _ -> []
@@ -107,14 +140,23 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) l
       (fun (ts,penalty) -> 
           List.map (fun t -> 
           assert (T.DB.is_closed t);
+          
+          (* Caching of primitive enumeration terms, so that trigger-based instantiation
+             does not catch them. *)
+          let var_set = InnerTerm.Seq.vars (t:>InnerTerm.t) |> InnerTerm.VarSet.of_seq in
+          let cannonize_subst = Subst.FO.canonize_vars ~var_set in
+          let cached_t = Subst.FO.apply Subst.Renaming.none cannonize_subst (t,0) in
+          enum_cache := Term.Set.add cached_t !enum_cache;
           let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
           (subst, penalty) )ts ) 
       [ l_not, 10;
         l_and, 10;
+        l_or, 10;
         l_eq,  10;
         l_false, 5;
         l_true, 5;
         l_simpl_eq, 10;
+        l_quants, 10;
       ]
   )
 

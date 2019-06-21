@@ -139,6 +139,7 @@ let polarity = function
   | lit -> sign lit
 
 let is_pos = sign
+(* let is_pos_eq = fun t -> sign t *)
 
 let is_neg lit = not (is_pos lit)
 
