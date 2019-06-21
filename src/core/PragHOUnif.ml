@@ -191,6 +191,7 @@ let proj_imit_bindings ~state ~subst ~scope ~counter  s t =
        let hd_s = T.head_term_mono s in 
        let hd_t = handle_quants ~subst ~scope (T.head_term_mono t) in
        if (not @@ T.is_bvar @@ T.head_term t && 
+           T.DB.is_closed hd_t &&
            not (T.var_occurs ~var:(T.as_var_exn hd_s) hd_t)) then 
          [(imitate_one ~scope ~counter s t,-1)]
        else [] in

@@ -1106,9 +1106,9 @@ module Conv = struct
               incr max_var;
               var_of_int ~ty !max_var) (Type.expected_args (ty fun_body)) in
             let body = app body remaining_vars in
-            let vars_converted = List.map convert_var fresh_vars in
+            let vars_converted = List.map convert_var (fresh_vars @ remaining_vars) in
             List.fold_right (fun v acc ->
-              ST.bind ~ty:(aux_ty Type.prop) b v acc) vars_converted (aux_t env body) 
+              ST.bind ~ty:(aux_ty Type.prop) b v acc) (vars_converted) (aux_t env body) 
           )
         | AppBuiltin (b,l) ->
           ST.app_builtin ~ty:(aux_ty (ty t))
