@@ -587,10 +587,11 @@ module Make(E : Env.S) : S with module Env = E = struct
     let sc_c = 0 in
     let offset = C.Seq.vars c |> T.Seq.max_var |> succ in
     begin
-      vars
+      let enum_prop = vars
       |> T.VarSet.to_seq
       |> Iter.flat_map_l
-        (fun v -> HO_unif.enum_prop ~mode ~enum_cache:prim_enum_terms (v,sc_c) ~offset)
+        (fun v -> HO_unif.enum_prop ~mode ~enum_cache:prim_enum_terms (v,sc_c) ~offset) in
+      enum_prop
       |> Iter.map
         (fun (subst,penalty) ->
            let renaming = Subst.Renaming.create() in

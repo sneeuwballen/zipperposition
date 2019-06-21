@@ -109,7 +109,7 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
           | Some (x,y) -> x :: y :: acc 
           | None -> acc) [] 
       | _ -> []
-    and l_simpl_eq = match mode with
+    and l_simpl_op = match mode with
       | `Pragmatic -> 
         let n = List.length vars in
         let db_vars = List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) ty_args in
@@ -160,7 +160,8 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
         l_eq,  10;
         l_false, 5;
         l_true, 5;
-        l_simpl_eq, 10;
+        l_simpl_op
+  , 10;
         l_quants, 10;
       ]
   )

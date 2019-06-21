@@ -127,6 +127,16 @@ let project_hs_one ~counter pref_types i type_ui =
   let matrix = T.app matrix_hd new_vars_applied in
   T.fun_l pref_types matrix
 
+(* Sometimes the head of the term can be a quantifier. Inside
+   the quantifier body, we can have some variables that have
+   to be dereferenced. *)
+let [@inline] handle_quants ~subst ~scope s =
+  let _, body = Term.open_fun s in
+  match Term.view body with
+  | AppBuiltin(b,[_]) when Builtin.is_quantifier b ->
+      S.apply subst (s,scope)
+  | _ -> s
+
 (* Create substitution: v |-> λ u1 ... um. f (H1 u1 ... um) ... (Hn u1 ... um)
    where type of f is τ1 -> ... τn -> τ where τ is atomic, H_i have correct
    type and f is a constant. This substitution is called an imitation.*)
@@ -179,7 +189,7 @@ let proj_imit_bindings ~state ~subst ~scope ~counter  s t =
     |> CCList.filter_map (fun x -> x) in
        let imit_binding =
        let hd_s = T.head_term_mono s in 
-       let hd_t = T.head_term_mono t in
+       let hd_t = handle_quants ~subst ~scope (T.head_term_mono t) in
        if (not @@ T.is_bvar @@ T.head_term t && 
            not (T.var_occurs ~var:(T.as_var_exn hd_s) hd_t)) then 
          [(imitate_one ~scope ~counter s t,-1)]
@@ -204,12 +214,8 @@ let rec unify ~state ~scope ~counter ~subst = function
         | Some ty_unif -> (
           let s', t' = normalize ~mono:state.monomorphic ty_unif (s', scope), 
                        normalize ~mono:state.monomorphic ty_unif (t', scope) in
-        (*CCFormat.printf "[hds : %a=?=%a].\n" T.pp s' T.pp t'; 
-          CCFormat.printf "[constrs: %a].\n" (CCList.pp ~sep:";" (CCPair.pp T.pp T.pp)) (List.map (fun (a,b,_) -> (a,b)) l) ;
-          CCFormat.printf "[subst: %a].\n" US.pp ty_unif; *)
           let subst = ty_unif in
             (* A weaker unification procedure gave up *)
-            (* CCFormat.printf "Weaker unification gave up.\n"; *)
           let (pref_s, body_s), (pref_t, body_t) = T.open_fun s', T.open_fun t' in
           let body_s', body_t', _ = P.eta_expand_otf ~subst ~scope pref_s pref_t body_s body_t in
           let (hd_s, args_s), (hd_t, args_t) = T.as_app body_s', T.as_app body_t' in

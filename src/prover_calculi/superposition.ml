@@ -1443,7 +1443,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                (* positive equation *)
                if T.equal v T.false_ && not is_pred_var then ()
                else (
-                  if is_pred_var then (
+                  if is_pred_var && T.is_true_or_false v then (
                     if T.equal v pred_var_sign then (
                       k (u, v, unify (s,0) (u,0))
                     ) else (
