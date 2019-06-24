@@ -294,10 +294,6 @@ val as_bvar_exn : t -> int
 val is_bvar_i : int -> t -> bool
 (** [is_bvar_i n t] is [true] iff [t = bvar i] *)
 
-val respects_mandatory_args : t -> bool
-(** Does the term contain DB indices inside mandatory args or does it even 
-    miss mandatory args? *)
-
 (** {2 IO} *)
 
 val print_hashconsing_ids : bool ref

@@ -74,9 +74,6 @@ let () =
      val f_poly : pi a b. (a -> b) -> (a -> b) -> a.
      val sk : term -> term.
    ");
-   (* Set mandatory arg of skolem: *)
-   let id_sk, _, _ = CCOpt.get_exn (TypedSTerm.as_id_app (psterm "sk")) in
-   ID.set_payload id_sk (ID.Attr_skolem (ID.K_normal, 1))
 
 let tyctx = T.Conv.create()
 

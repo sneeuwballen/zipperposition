@@ -244,39 +244,6 @@ let head_term_mono t = match view t with
     app f l1 (* re-apply to type parameters *)
   | _ -> t
 
-let get_mand_args t =
-  match view t with
-    | App (f,l) ->
-      let num_mand_args =
-        begin match as_const f with
-          | Some id -> ID.num_mandatory_args id
-          | None -> 0
-        end
-      in
-      let _, other_args = CCList.take_drop_while is_type l in
-      let mand_args, _ = CCList.take_drop num_mand_args other_args in
-      mand_args
-    | _ -> []
-
-
-let as_app_with_mandatory_args t =
-  match view t with
-    | App (f,l) ->
-      let num_mand_args =
-        begin match as_const f with
-          | Some id -> ID.num_mandatory_args id
-          | None -> 0
-        end
-      in
-      let ty_args, other_args = CCList.take_drop_while is_type l in
-      let mand_args, other_args = CCList.take_drop num_mand_args other_args in
-      assert (List.for_all T.DB.closed mand_args);
-      let head = app f (ty_args @ mand_args) in (* re-apply to type & mandatory args *)
-      head, other_args
-    | _ -> t, []
-
-let head_term_with_mandatory_args t = fst (as_app_with_mandatory_args t)
-
 let is_ho_var t = match view t with
   | Var v -> Type.needs_args (HVar.ty v)
   | _ -> false
@@ -534,7 +501,7 @@ let mk_fresh_skolem =
    let i = CCRef.incr_then_get n in
    (** fresh skolem **)
    let id = ID.makef "#fsk%d" i in
-   ID.set_payload id (ID.Attr_skolem (ID.K_normal, i));
+   ID.set_payload id (ID.Attr_skolem ID.K_normal);
    let ty_vars, vars =
       List.partition (fun v -> Type.is_tType (HVar.ty v)) vars
    in

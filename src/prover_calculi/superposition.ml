@@ -467,13 +467,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (fun k->k (kind_to_str info.sup_kind) (Term.Set.cardinal lambdasup_vars) C.pp info.active sc_a T.pp info.s T.pp info.t
           T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
           Position.pp info.passive_pos US.pp info.subst);
-
-      if(info.sup_kind = LambdaSup &&
-         T.Seq.subterms t'
-         |> Iter.exists (fun st ->
-              List.exists (fun arg -> not @@ T.DB.is_closed arg)
-              (T.get_mand_args st))) then
-        raise @@ ExitSuperposition("LambdaSup sneaks in bound variables under the skolem");
       
       if(info.sup_kind = LambdaSup && 
          T.Set.exists (fun v -> 
@@ -529,12 +522,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let new_trail = C.trail_l [info.active; info.passive] in
       if Env.is_trivial_trail new_trail then raise (ExitSuperposition "trivial trail");
       let s' = S.FO.apply ~shift_vars renaming subst (info.s, sc_a) in
-      if(info.sup_kind = LambdaSup &&
-         T.Seq.subterms s'
-         |> Iter.exists (fun st ->
-              List.exists (fun arg -> not @@ T.DB.is_closed arg)
-              (T.get_mand_args st))) then
-        raise @@ ExitSuperposition("LambdaSup sneaks in bound variables under the skolem");
       if (
         O.compare ord s' t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
