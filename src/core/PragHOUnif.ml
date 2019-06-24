@@ -162,9 +162,8 @@ let proj_imit_bindings ~state ~subst ~scope ~counter  s t =
     |> CCList.filter_map (fun x -> x) in
        let imit_binding =
        let hd_s = T.head_term_mono s in 
-       let hd_t = T.head_term_with_mandatory_args t in
-       if (not @@ T.is_bvar @@ T.head_term t && 
-           not (T.var_occurs ~var:(T.as_var_exn hd_s) hd_t)) then 
+       let hd_t = T.head_term_mono t in
+       if (not @@ T.is_bvar @@ T.head_term t) then 
          [(imitate_one ~scope ~counter s t,-1)]
        else [] in
   let first, second = 
