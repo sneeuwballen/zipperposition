@@ -108,7 +108,8 @@ exception Attr_parameter of int
 
 type skolem_kind = K_normal | K_ind (* inductive *)
 
-exception Attr_skolem of skolem_kind
+exception Attr_skolem of skolem_kind  * int
+(* int for number of mandatoy arguments *)
 
 exception Attr_distinct
 
@@ -128,10 +129,19 @@ let is_skolem id =
 let as_skolem id =
   payload_find id
     ~f:(function
-      | Attr_skolem a -> Some a
+      | Attr_skolem (a, _) -> Some a
       | _ -> None)
 
-(* Note: If you want to reinsert mandatory arguments: They were here. (let num_mandatory_args _ =) *)
+let num_mandatory_args id =
+  let n_option =
+    payload_find id
+      ~f:(function
+        | Attr_skolem (_, n) -> Some n
+        | _ -> None)
+  in
+  match n_option with
+    | Some n -> n
+    | None -> 0
 
 let is_distinct_object id =
   payload_pred id

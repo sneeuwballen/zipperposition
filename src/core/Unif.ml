@@ -23,6 +23,7 @@ let prof_matching = Util.mk_profiler "matching"
 let fail () = raise Fail
 
 let _allow_pattern_unif = ref true
+let _allow_partial_skolem_application = ref true
 
 (** {2 Signatures} *)
 
@@ -449,6 +450,12 @@ module Inner = struct
       )
     )
 
+  let partial_skolem_fail f l1 l2 =
+    Util.debugf ~section 50 "[Sym %a, l1_len = %d, l2_len = %d, ty_vars = %d, num_mandatory = %d]"
+    (fun k -> k T.pp f (List.length l1) (List.length l2) (T.expected_ty_vars (T.ty_exn f)) (ID.num_mandatory_args (T.as_const_exn f)));
+    not !_allow_partial_skolem_application &&
+    List.length l1 - List.length l2 < T.expected_ty_vars (T.ty_exn f) + ID.num_mandatory_args (T.as_const_exn f)
+
   (* @param op which operation to perform (unification,matching,alpha-eq)
      @param root if we are at the root of the original problem. This is
      @param env typing environment for binders
@@ -705,6 +712,12 @@ module Inner = struct
       | _, T.Var _ when l2=[] ->
         (* Format.printf "** Unif rec, var right no args **"; *)
         unif_rec ~op ~bvars ~root subst (t1,scope) (t2, scope) (* to bind *)
+      | T.Const _, T.Var _  when (not (distinct_bvar_l ~bvars:bvars.B_vars.right l2)) && partial_skolem_fail f1 l1 l2 ->
+        (* Format.printf "** skolem FAILING **"; *)
+        fail()
+      | T.Var _, T.Const _ when (not (distinct_bvar_l ~bvars:bvars.B_vars.left l1)) && partial_skolem_fail f2 l2 l1 ->
+        (* Format.printf "** skolem FAILING2 **"; *)
+        fail()
       | T.Var v1, T.Const _ ->
         begin match op with
           | O_match_protect (P_scope sc2')
@@ -1192,5 +1205,5 @@ end
 
 let () =
   Options.add_opts
-    [  "--unif-pattern", Arg.Bool (fun b -> _allow_pattern_unif := b), " enable/disable pattern unification";
-    ];
+    [ "--unif-pattern", Arg.Bool (fun b -> _allow_pattern_unif := b), " enable/disable pattern unification"
+    ; "--partial-skolem", Arg.Bool (fun b -> _allow_partial_skolem_application := b), " allow partial application of skolem constants (sound only assuming the axiom of choice)"]

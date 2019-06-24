@@ -150,8 +150,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         match l with 
         | Literal.Equation (t1,t2,true) 
             when is_eligible i l ->
-          let f1, l1 = T.as_app t1 in
-          let f2, l2 = T.as_app t2 in
+          let f1, l1 = T.as_app_with_mandatory_args t1 in
+          let f2, l2 = T.as_app_with_mandatory_args t2 in
           begin match List.rev l1, List.rev l2 with
             | last1 :: l1, last2 :: l2 ->
               begin match T.view last1, T.view last2 with
@@ -204,8 +204,8 @@ module Make(E : Env.S) : S with module Env = E = struct
        e.g. ext_pos_lit (f X Y) (g X Y) other_lits = [f X = g X, f = g]
        if X and Y do not appear in other_lits *)
     let rec ext_pos_lit t s other_lits =
-      let f, tt = T.as_app t in
-      let g, ss = T.as_app s in
+      let f, tt = T.as_app_with_mandatory_args t in
+      let g, ss = T.as_app_with_mandatory_args s in
       begin match List.rev tt, List.rev ss with
         | last_t :: tl_rev_t, last_s :: tl_rev_s ->
           if last_t = last_s && not (T.is_type last_t) then
@@ -833,7 +833,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let extensionality_clause =
     let diff_id = ID.make("zf_ext_diff") in
-    ID.set_payload diff_id (ID.Attr_skolem ID.K_normal); (* make the arguments of diff mandatory *)
+    ID.set_payload diff_id (ID.Attr_skolem (ID.K_normal, 2)); (* make the arguments of diff mandatory *)
     let alpha_var = HVar.make ~ty:Type.tType 0 in
     let alpha = Type.var alpha_var in
     let beta_var = HVar.make ~ty:Type.tType 1 in
@@ -1344,6 +1344,8 @@ let () =
   );
   Params.add_to_mode "fo-complete-basic" (fun () ->
     enabled_ := false;
+    Unif._allow_pattern_unif := false;
+    Unif._allow_partial_skolem_application := false;
   );
   Params.add_to_mode "lambda-free" (fun () ->
     enabled_ := true;
@@ -1358,5 +1360,6 @@ let () =
     _prune_arg_fun := `NoPrune;
     prim_mode_ := `None;
     Unif._allow_pattern_unif := false;
+    Unif._allow_partial_skolem_application := false;
   );
   Extensions.register extension;
