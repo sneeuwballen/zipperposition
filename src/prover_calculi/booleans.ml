@@ -190,7 +190,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             Term.Seq.subterms b |> 
             Iter.for_all (fun st -> T.equal b st || 
                                     not (Type.is_prop (T.ty st))) then (
-            let proof = Proof.Step.inference[C.proof_parent c]
+            let proof = Proof.Step.simp[C.proof_parent c]
               ~rule:(Proof.Rule.mk"bool_case_simp")
             in
             C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
@@ -209,7 +209,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     if Literals.equal (C.lits c) new_lits then (
       SimplM.return_same c
     ) else (
-      let proof = Proof.Step.inference [C.proof_parent c] 
+      let proof = Proof.Step.simp [C.proof_parent c] 
                     ~rule:(Proof.Rule.mk "simplify boolean subterms") in
       let new_ = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
                   (Array.to_list new_lits) proof in

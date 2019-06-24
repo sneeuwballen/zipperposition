@@ -120,10 +120,8 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
           let log_ops = 
           CCList.mapi (fun j db_j ->
             if i < j && Type.equal (T.ty db_i) (T.ty db_j) then (
-              let x = T.var (HVar.fresh ~ty:(T.ty db_i) ()) in 
               let res = [T.fun_l ty_args (T.Form.eq db_i db_j);
-                         T.fun_l ty_args (T.Form.eq x db_j);
-                         T.fun_l ty_args (T.Form.eq db_i x)] in
+                         T.fun_l ty_args (T.Form.neq db_i db_j);] in
               if Type.is_prop (T.ty db_i) then
                res @
                 [T.fun_l ty_args (T.Form.and_ db_i db_j);

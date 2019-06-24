@@ -614,7 +614,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     end
 
   let prim_enum ~(mode) c =
-    if Proof.Step.inferences_perfomed (C.proof_step c) < max_penalty_prim_ 
+    if Proof.Step.inferences_perfomed (C.proof_step c) <= max_penalty_prim_ 
     then prim_enum_ ~mode c
     else []
 

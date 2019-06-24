@@ -485,7 +485,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     assert(Array.for_all Literal.no_prop_invariant (C.lits info.passive));
     assert(Array.for_all Literal.no_prop_invariant (C.lits info.passive));
     try
-      Util.debugf ~section 1 
+      Util.debugf ~section 10 
       "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a@]@])@ \
         (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
       (fun k -> k
@@ -509,14 +509,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
          |> Iter.exists (fun st ->
               List.exists (fun arg -> not @@ T.DB.is_closed arg)
               (T.get_mand_args st))) then (
-        Util.debugf ~section 1 "LambdaSup sneaks in bound variables under the skolem" (fun k->k);
+        Util.debugf ~section 5 "LambdaSup sneaks in bound variables under the skolem" (fun k->k);
         raise @@ ExitSuperposition("LambdaSup sneaks in bound variables under the skolem");
       );
       if(info.sup_kind = LambdaSup && 
          T.Set.exists (fun v -> 
             not @@ T.DB.is_closed @@  Subst.FO.apply renaming subst (v,sc_p)) 
          lambdasup_vars) then (
-        Util.debugf ~section 1 "LambdaSup -- an into free variable sneaks in bound variable" (fun k->k);
+        Util.debugf ~section 5 "LambdaSup -- an into free variable sneaks in bound variable" (fun k->k);
         raise @@ ExitSuperposition("LambdaSup -- an into free variable sneaks in bound variable");
       );
 
@@ -529,7 +529,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           let v' = S.FO.apply ~shift_vars:0 renaming subst (v, sc_p) in
           if T.equal t' v'
           then (
-            Util.debugf ~section 1 "will yield a tautology" (fun k->k);
+            Util.debugf ~section 5 "will yield a tautology" (fun k->k);
             raise (ExitSuperposition "will yield a tautology");)
         | _ -> ()
       end;
@@ -549,7 +549,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         vars_bound_to_closed_terms vars_p sc_p;
 
         if Util.Int_set.cardinal (Util.Int_set.of_list !dbs)  > !_lambdasup   then (
-          Util.debugf ~section 1 "Too many skolems will be introduced for LambdaSup." (fun k->k);
+          Util.debugf ~section 5 "Too many skolems will be introduced for LambdaSup." (fun k->k);
           raise (ExitSuperposition "Too many skolems will be introduced for LambdaSup.");
         )
       );     
@@ -566,7 +566,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
          |> Iter.exists (fun st ->
               List.exists (fun arg -> not @@ T.DB.is_closed arg)
               (T.get_mand_args st))) then (
-        Util.debugf ~section 1 "LambdaSup sneaks in bound variables under the skolem" (fun k->k);
+        Util.debugf ~section 5 "LambdaSup sneaks in bound variables under the skolem" (fun k->k);
         raise @@ ExitSuperposition("LambdaSup sneaks in bound variables under the skolem");
       );
       if (
@@ -580,7 +580,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         if not !_sup_at_vars then
           assert (not (T.is_var info.u_p))
         else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then (
-          Util.debugf ~section 1 "superposition at variable" (fun k->k);
+          Util.debugf ~section 5 "superposition at variable" (fun k->k);
           raise (ExitSuperposition "superposition at variable");
         );
 
@@ -651,7 +651,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
       if info.sup_kind = LambdaSup then
         (* Format.printf "LS: %a\n" C.pp new_clause;  *)
-        Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
+        Util.debugf ~section 5 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       assert (List.for_all (Lit.for_all Term.DB.is_closed) new_lits); 
       assert(Array.for_all Literal.no_prop_invariant (C.lits new_clause));
       Some new_clause
@@ -2421,7 +2421,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     Util.exit_prof prof_subsumption_set;
     if res then (
-      Util.debugf ~section 3 "@[<2>@[%a@]@ subsumed by active set@]" (fun k->k C.pp c);
+      Util.debugf ~section 1 "@[<2>@[%a@]@ subsumed by active set@]" (fun k->k C.pp c);
       Util.incr_stat stat_clauses_subsumed;
     );
     res

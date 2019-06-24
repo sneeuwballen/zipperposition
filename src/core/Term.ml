@@ -1218,6 +1218,10 @@ let simplify_bools t =
             if equal s s' then t else
             app_builtin ~ty:(Type.prop) Builtin.Not [s'] 
         )
+    | AppBuiltin(Builtin.Imply, [p;c]) ->
+      if T.equal p true_ then c
+      else if T.equal p false_ then true_
+      else t
     | AppBuiltin(hd, [a;b]) 
         when hd = Builtin.Eq || hd = Builtin.Equiv ->
       if equal a b then true_ else (
