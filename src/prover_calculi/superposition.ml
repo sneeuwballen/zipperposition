@@ -1444,6 +1444,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                if T.equal v T.false_ && not is_pred_var then ()
                else (
                   if is_pred_var && T.is_true_or_false v then (
+                    assert(T.is_true_or_false pred_var_sign);
                     if T.equal v pred_var_sign then (
                       k (u, v, unify (s,0) (u,0))
                     ) else (
@@ -1466,7 +1467,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun (s, t, _, s_pos) -> (* try with s=t *)
            let active_idx = Lits.Pos.idx s_pos in
            let is_var_pred = 
-            T.is_var (T.head_term s) && Type.is_prop (T.ty s) in
+            T.is_var (T.head_term s) && Type.is_prop (T.ty s) && T.is_true_or_false t in
            if T.equal t T.false_ && not is_var_pred then Iter.empty 
            else (
               let var_pred_status = (is_var_pred, t) in
