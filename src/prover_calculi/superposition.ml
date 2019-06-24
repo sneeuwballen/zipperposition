@@ -2951,12 +2951,12 @@ let () =
       _sup_at_var_headed := true;
       _lambdasup := -1;
       _dupsup := false;
-      _max_infs := 7;
+      _max_infs := 10;
       PragHOUnif.max_depth := 6;
-      PragHOUnif.max_app_projections := 3;
-      PragHOUnif.max_var_imitations := 2;
-      PragHOUnif.max_identifications := 2;
-      PragHOUnif.max_elims := 2;
+      PragHOUnif.max_app_projections := 1;
+      PragHOUnif.max_var_imitations := 1;
+      PragHOUnif.max_identifications := 1;
+      PragHOUnif.max_elims := 1;
       _fluidsup := false;
     );
     Params.add_to_mode "fo-complete-basic" (fun () ->
