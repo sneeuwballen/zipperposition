@@ -38,8 +38,8 @@ let pp_res out = function
   | R_fail -> Fmt.fprintf out "@{<Red>FAIL@}"
 
 let pp_stats out (s:stats) =
-  Fmt.fprintf out "(@[<hv>:ok %d@ :fail %d@ :skip %d (:esa %d@ :tags %d)@])"
-    s.n_ok s.n_fail s.n_skip s.n_skip_esa s.n_skip_tags
+  Fmt.fprintf out "(@[<hv>:ok %d@ :fail %d@ :skip %d (:esa %d@ :tags %d :trivial %d)@])"
+    s.n_ok s.n_fail s.n_skip s.n_skip_esa s.n_skip_tags s.n_skip_trivial
 
 exception Error of string
 
@@ -130,7 +130,7 @@ let check_step_ ?dot_prefix (p:proof): check_step_res =
     | P.Negated_goal p' ->
       (* [p'] should prove [not concl] *)
       CS_check (prove ~dot_prefix [P.concl p'] (F.not_ concl))
-    | P.Trivial -> CS_skip `Other (* axiom of the theory *)
+    | P.Trivial -> CS_skip `Trivial (* axiom of the theory *)
     | P.Instantiate {tags;_} when not (LLProver.can_check tags) -> CS_skip `Tags
     | P.Instantiate {form=p';inst;_} ->
       (* re-instantiate and check we get the same thing *)

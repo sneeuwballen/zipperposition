@@ -64,6 +64,7 @@ type t =
   | Greater
   | Greatereq
   | Box_opaque (** hint not to open this formula *)
+  | FunDiff (* Skolem of the extensionality axiom *)
   | Pseudo_de_bruijn of int (** magic to embed De Bruijn indices in normal terms *)
 
 include Interfaces.HASH with type t := t

@@ -106,6 +106,45 @@ module Make(E : Env.S) : S with module Env = E = struct
            | None -> None
          end)
 
+  let extensionality_clause_diff t1 t2 = 
+    let alpha = Type.bvar 1 in
+    let beta = Type.bvar 0 in
+    let alpha_to_beta = Type.arrow [alpha] beta in
+    let diff_type = Type.forall (Type.forall (Type.arrow [alpha_to_beta; alpha_to_beta] alpha)) in
+    let diff = T.builtin ~ty:diff_type Builtin.FunDiff in
+    assert (Type.equal (T.ty t1) (T.ty t2));
+    match Type.open_fun (T.ty t1) with
+      | (in_ty :: rest_ty, return_ty) -> 
+        let out_ty = Type.arrow rest_ty return_ty in
+        T.app diff [T.of_ty in_ty; T.of_ty out_ty; t1; t2]
+      | _ -> assert false
+
+  let extensionality_clause =
+    let alpha_var = HVar.make ~ty:Type.tType 0 in
+    let alpha = Type.var alpha_var in
+    let beta_var = HVar.make ~ty:Type.tType 1 in
+    let beta = Type.var beta_var in
+    let alpha_to_beta = Type.arrow [alpha] beta in
+    let x = Term.var (HVar.make ~ty:alpha_to_beta 2) in
+    let y = Term.var (HVar.make ~ty:alpha_to_beta 3) in
+    let x_diff = Term.app x [extensionality_clause_diff x y] in
+    let y_diff = Term.app y [extensionality_clause_diff x y] in
+    let lits = [Literal.mk_eq x y; Literal.mk_neq x_diff y_diff] in
+    Env.C.create ~penalty:!_ext_axiom_penalty ~trail:Trail.empty lits Proof.Step.trivial
+
+  let extensionality_clause_subst scope t1 t2 =
+    assert (Type.equal (T.ty t1) (T.ty t2));
+    match Type.open_fun (T.ty t1) with
+      | (in_ty :: rest_ty, return_ty) -> 
+        let out_ty = Type.arrow rest_ty return_ty in
+        Subst.of_list [
+          (HVar.make ~ty:InnerTerm.tType 0, scope), ((in_ty :> InnerTerm.t), scope);
+          (HVar.make ~ty:InnerTerm.tType 1, scope), ((out_ty :> InnerTerm.t), scope);
+          (HVar.make ~ty:InnerTerm.tType 2, scope), ((t1 :> InnerTerm.t), scope);
+          (HVar.make ~ty:InnerTerm.tType 3, scope), ((t2 :> InnerTerm.t), scope);
+        ]
+      | _ -> assert false
+
   (* negative extensionality rule:
      [f != g] where [f : a -> b] becomes [f k != g k] for a fresh parameter [k] *)
   let ext_neg_lit (lit:Literal.t) : _ option = match lit with
@@ -389,16 +428,27 @@ module Make(E : Env.S) : S with module Env = E = struct
             when is_eligible i l && Type.is_fun @@ T.ty lhs ->
           let arg_types = Type.expected_args @@ T.ty lhs in
           let free_vars = Literal.vars l |> T.VarSet.of_list |> T.VarSet.to_list in
+          let skolems = List.map (fun ty -> T.mk_fresh_skolem free_vars ty) arg_types in
           let new_lits = CCList.map (fun (j,x) -> 
               if i!=j then x
-              else (
-                let skolems = List.map (fun ty -> T.mk_fresh_skolem free_vars ty) arg_types in
-                Literal.mk_neq (T.app lhs skolems) (T.app rhs skolems))
+              else (Literal.mk_neq (T.app lhs skolems) (T.app rhs skolems))
             ) (C.lits c |> Array.mapi (fun j x -> (j,x)) |> Array.to_list) in
+          let _, skolem_def_clauses, ext_instances = skolems |> CCList.fold_left 
+            (fun (previous_skolems, def_clauses, ext_instances) skolem -> 
+              let represented_term = extensionality_clause_diff 
+                (T.app lhs previous_skolems) (T.app rhs previous_skolems) in
+              let ext_instance = extensionality_clause_subst 0 (* TODO: scope??? *)
+                (T.app lhs previous_skolems) (T.app rhs previous_skolems) in
+              let def_clause = C.create 
+                ~penalty:0 ~trail:Trail.empty [Literal.mk_eq skolem represented_term] 
+                Proof.Step.trivial in
+              (previous_skolems @ [skolem], def_clause :: def_clauses, ext_instance :: ext_instances)) 
+            ([], [], []) in
           let proof =
-            Proof.Step.inference [C.proof_parent c] 
+            Proof.Step.inference (CCList.map C.proof_parent (c :: skolem_def_clauses) 
+              @ CCList.map (C.proof_parent_subst Subst.Renaming.none (extensionality_clause, 0)) ext_instances)
               ~rule:(Proof.Rule.mk "neg_ext")
-              ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext]
+              ~tags:[Proof.Tag.T_ho; (* TODO: reinsert Proof.Tag.T_ext *)]
           in
           let new_c =
             C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
@@ -708,24 +758,6 @@ module Make(E : Env.S) : S with module Env = E = struct
   end
   module VarTermMultiMap = CCMultiMap.Make (TVar) (Term)
   module VTbl = CCHashtbl.Make(TVar)
-
-  let extensionality_clause =
-    let diff_id = ID.make("zf_ext_diff") in
-    ID.set_payload diff_id (ID.Attr_skolem ID.K_normal); (* make the arguments of diff mandatory *)
-    let alpha_var = HVar.make ~ty:Type.tType 0 in
-    let alpha = Type.var alpha_var in
-    let beta_var = HVar.make ~ty:Type.tType 1 in
-    let beta = Type.var beta_var in
-    let alpha_to_beta = Type.arrow [alpha] beta in
-    let diff_type = Type.forall_fvars [alpha_var;beta_var] (Type.arrow [alpha_to_beta; alpha_to_beta] alpha) in
-    let diff = Term.const ~ty:diff_type diff_id in
-    let x = Term.var (HVar.make ~ty:alpha_to_beta 2) in
-    let y = Term.var (HVar.make ~ty:alpha_to_beta 3) in
-    let x_diff = Term.app x [Term.app diff [T.of_ty alpha; T.of_ty beta; x; y]] in
-    let y_diff = Term.app y [Term.app diff [T.of_ty alpha; T.of_ty beta; x; y]] in
-    let lits = [Literal.mk_eq x y; Literal.mk_neq x_diff y_diff] in
-    Env.C.create ~penalty:!_ext_axiom_penalty ~trail:Trail.empty lits Proof.Step.trivial
-
 
   type fixed_arg_status =
     | Always of T.t (* This argument is always the given term in all occurences *)
