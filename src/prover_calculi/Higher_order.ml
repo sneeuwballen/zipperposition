@@ -437,7 +437,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             (fun (previous_skolems, def_clauses, ext_instances) skolem -> 
               let represented_term = extensionality_clause_diff 
                 (T.app lhs previous_skolems) (T.app rhs previous_skolems) in
-              let ext_instance = extensionality_clause_subst 0 (* TODO: scope??? *)
+              let ext_instance = extensionality_clause_subst 0
                 (T.app lhs previous_skolems) (T.app rhs previous_skolems) in
               let def_clause = C.create 
                 ~penalty:0 ~trail:Trail.empty [Literal.mk_eq skolem represented_term] 
@@ -448,7 +448,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             Proof.Step.inference (CCList.map C.proof_parent (c :: skolem_def_clauses) 
               @ CCList.map (C.proof_parent_subst Subst.Renaming.none (extensionality_clause, 0)) ext_instances)
               ~rule:(Proof.Rule.mk "neg_ext")
-              ~tags:[Proof.Tag.T_ho; (* TODO: reinsert Proof.Tag.T_ext *)]
+              ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext]
           in
           let new_c =
             C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in

@@ -351,9 +351,9 @@ let solve_ (tab:t) : res =
 let can_check : LLProof.tag list -> bool =
   let open Builtin.Tag in
   let f = function
-    | T_ho -> true
+    | T_ho | T_ext -> true
     | T_lra | T_lia | T_ind | T_data
-    | T_distinct | T_ac _ | T_ext -> false
+    | T_distinct | T_ac _ -> false
   in
   List.for_all f
 
