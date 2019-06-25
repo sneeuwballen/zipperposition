@@ -144,10 +144,10 @@ module Make(C : Clause_intf.S) = struct
 
     let conj_relative ?(distinct_vars_mul=(-1.0)) c =
       let sgn = C.Ctx.signature () in
-      let pos_mul = 1.3 in
-      let max_mul = 1.3 in
-      let v,f = 15, 15 in 
-      let conj_mul = 0.4 in
+      let pos_mul = 1.5 in
+      let max_mul = 1.5 in
+      let v,f = 100, 100 in 
+      let conj_mul = 0.5 in
         Array.mapi (fun i xx -> i,xx) (C.lits c)
         |> 
         (Array.fold_left (fun acc (i,l) -> acc +. 

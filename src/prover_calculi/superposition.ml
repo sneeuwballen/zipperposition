@@ -199,16 +199,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Lits.fold_terms ~vars:!_sup_at_vars ~var_args:!_sup_in_var_args ~fun_bodies:!_sup_under_lambdas ~ty_args:false ~ord ~which:`Max ~subterms:true
         ~eligible:(C.Eligible.res c) (C.lits c)
       |> Iter.filter (fun (t, _) ->
-            (* Util.debugf ~section 5 "@[ Filtering vars %a,1  @]" (fun k-> k T.pp t); *)
+            (* Util.debugf ~section 3 "@[ Filtering vars %a,1  @]" (fun k-> k T.pp t); *)
             not (T.is_var t) || T.is_ho_var t)
       (* TODO: could exclude more variables from the index:
          they are not needed if they occur with the same args everywhere in the clause *)
       |> Iter.filter (fun (t, _) ->
-         (* Util.debugf ~section 5 "@[ Filtering vars %a,2  @]" (fun k-> k T.pp t); *)
+         (* Util.debugf ~section 3 "@[ Filtering vars %a,2  @]" (fun k-> k T.pp t); *)
          !_sup_at_var_headed || not (T.is_var (T.head_term t)))
       |> Iter.fold
         (fun tree (t, pos) ->
-           (* Util.debugf ~section 5 "@[ Adding %a to into index %B @]" (fun k-> k T.pp t !_sup_under_lambdas); *)
+           (* Util.debugf ~section 3 "@[ Adding %a to into index %B @]" (fun k-> k T.pp t !_sup_under_lambdas); *)
            let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
            f tree t with_pos)
         !_idx_sup_into;
@@ -432,7 +432,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let var' = S.FO.apply renaming subst (var, info.scope_passive) in
     if (not (Type.is_fun (Term.ty var')) || not (O.might_flip ord var' replacement'))
     then (
-      Util.debugf ~section 5
+      Util.debugf ~section 3
         "Cannot flip: %a = %a"
         (fun k->k T.pp var' T.pp replacement');
       false (* If the lhs vs rhs cannot flip, we don't need a sup at var *)
@@ -445,7 +445,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         let passive_t'_lits = Lits.apply_subst renaming subst_t (C.lits info.passive, info.scope_passive) in
         if Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt
         then (
-          Util.debugf ~section 5
+          Util.debugf ~section 3
             "Sup at var condition is not fulfilled because: %a >= %a"
             (fun k->k Lits.pp passive'_lits Lits.pp passive_t'_lits);
           false
@@ -484,7 +484,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     assert(Array.for_all Literal.no_prop_invariant (C.lits info.passive));
     assert(Array.for_all Literal.no_prop_invariant (C.lits info.passive));
     try
-      Util.debugf ~section 10 
+      Util.debugf ~section 3 
       "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a@]@])@ \
         (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
       (fun k -> k
@@ -508,14 +508,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
          |> Iter.exists (fun st ->
               List.exists (fun arg -> not @@ T.DB.is_closed arg)
               (T.get_mand_args st))) then (
-        Util.debugf ~section 5 "LambdaSup sneaks in bound variables under the skolem" (fun k->k);
+        Util.debugf ~section 3 "LambdaSup sneaks in bound variables under the skolem" (fun k->k);
         raise @@ ExitSuperposition("LambdaSup sneaks in bound variables under the skolem");
       );
       if(info.sup_kind = LambdaSup && 
          T.Set.exists (fun v -> 
             not @@ T.DB.is_closed @@  Subst.FO.apply renaming subst (v,sc_p)) 
          lambdasup_vars) then (
-        Util.debugf ~section 5 "LambdaSup -- an into free variable sneaks in bound variable" (fun k->k);
+        Util.debugf ~section 3 "LambdaSup -- an into free variable sneaks in bound variable" (fun k->k);
         raise @@ ExitSuperposition("LambdaSup -- an into free variable sneaks in bound variable");
       );
 
@@ -528,7 +528,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           let v' = S.FO.apply ~shift_vars:0 renaming subst (v, sc_p) in
           if T.equal t' v'
           then (
-            Util.debugf ~section 5 "will yield a tautology" (fun k->k);
+            Util.debugf ~section 3 "will yield a tautology" (fun k->k);
             raise (ExitSuperposition "will yield a tautology");)
         | _ -> ()
       end;
@@ -548,7 +548,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         vars_bound_to_closed_terms vars_p sc_p;
 
         if Util.Int_set.cardinal (Util.Int_set.of_list !dbs)  > !_lambdasup   then (
-          Util.debugf ~section 5 "Too many skolems will be introduced for LambdaSup." (fun k->k);
+          Util.debugf ~section 3 "Too many skolems will be introduced for LambdaSup." (fun k->k);
           raise (ExitSuperposition "Too many skolems will be introduced for LambdaSup.");
         )
       );     
@@ -565,7 +565,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
          |> Iter.exists (fun st ->
               List.exists (fun arg -> not @@ T.DB.is_closed arg)
               (T.get_mand_args st))) then (
-        Util.debugf ~section 5 "LambdaSup sneaks in bound variables under the skolem" (fun k->k);
+        Util.debugf ~section 3 "LambdaSup sneaks in bound variables under the skolem" (fun k->k);
         raise @@ ExitSuperposition("LambdaSup sneaks in bound variables under the skolem");
       );
       if (
@@ -579,7 +579,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         if not !_sup_at_vars then
           assert (not (T.is_var info.u_p))
         else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then (
-          Util.debugf ~section 5 "superposition at variable" (fun k->k);
+          Util.debugf ~section 3 "superposition at variable" (fun k->k);
           raise (ExitSuperposition "superposition at variable");
         );
 
@@ -647,10 +647,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         max (C.penalty info.active) (C.penalty info.passive)
         + (if T.is_var s' then 2 else 0) (* superposition from var = bad *)
       in
+      let new_lits = List.fast_sort (fun l1 l2 -> -CCInt.compare (Lit.hash l1) (Lit.hash l2)) new_lits in
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
-      if info.sup_kind = LambdaSup then
-        (* Format.printf "LS: %a\n" C.pp new_clause;  *)
-        Util.debugf ~section 5 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
+      (* Format.printf "LS: %a\n" C.pp new_clause;  *)
+      Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       assert (List.for_all (Lit.for_all Term.DB.is_closed) new_lits); 
       assert(Array.for_all Literal.no_prop_invariant (C.lits new_clause));
       Some new_clause
@@ -1593,7 +1593,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                    (S.FO.apply rename subst (r,cur_sc)) = Comp.Gt)
                 (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
              then (
-               Util.debugf ~section 5
+               Util.debugf ~section 3
                  "@[<hv2>demod:@ @[<hv>t=%a[%d],@ l=%a[%d],@ r=%a[%d]@],@ subst=@[%a@]@]"
                  (fun k->k T.pp t 0 T.pp l cur_sc T.pp r cur_sc S.pp subst);
 
@@ -1614,7 +1614,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | Some (rhs,subst,cur_sc) ->
           (* reduce [rhs] in current scope [cur_sc] *)
           assert (cur_sc < st.demod_sc);
-          Util.debugf ~section 5
+          Util.debugf ~section 3
             "@[<2>demod:@ rewrite `@[%a@]`@ into `@[%a@]`@ using %a[%d]@]"
             (fun k->k T.pp t T.pp rhs Subst.pp subst cur_sc);
           (* NOTE: we retraverse the term several times, but this is simpler *)

@@ -125,7 +125,11 @@ let depth lit =
 module Set = CCSet.Make(struct type t = lit let compare = compare end)
 
 let is_pos = function
-  | Equation (_, _, sign) -> sign
+  | Equation (l, r, sign) ->
+    let hd_l = Term.head_term l in  
+    if sign && T.is_true_or_false r && T.is_const hd_l then (
+      T.equal r T.true_ 
+    ) else sign
   | Int o -> Int_lit.sign o
   | False -> false
   | _ -> true
