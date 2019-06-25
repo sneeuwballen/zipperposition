@@ -1387,18 +1387,15 @@ let () =
     ; "--no-ind-gen-var", Arg.Clear gen_var, " do not generalize on variables"
     ; "--no-ind-gen-term", Arg.Clear gen_term, " do not generalize on terms"
     ];
-  Params.add_to_mode "ho-complete-basic" (fun () ->
-    enabled_ := false
-  );
-  Params.add_to_mode "ho-pragmatic" (fun () ->
-    enabled_ := false
-  );
-  Params.add_to_mode "ho-competitive" (fun () ->
-    enabled_ := false
-  );
-  Params.add_to_mode "fo-complete-basic" (fun () ->
-    enabled_ := false
-  );
-  Params.add_to_mode "lambda-free" (fun () ->
-    enabled_ := false
-  );
+  Params.add_to_modes 
+    [ "ho-complete-basic"
+    ; "ho-pragmatic"
+    ; "ho-competitive"
+    ; "fo-complete-basic"
+    ; "lambda-free-intensional"
+    ; "lambda-free-extensional"
+    ; "lambda-free-purify-intensional"
+    ; "lambda-free-purify-extensional"] 
+    (fun () ->
+      enabled_ := false
+    );

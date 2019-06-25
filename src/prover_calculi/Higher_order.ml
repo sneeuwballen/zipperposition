@@ -1347,19 +1347,41 @@ let () =
     Unif._allow_pattern_unif := false;
     Unif._allow_partial_skolem_application := false;
   );
-  Params.add_to_mode "lambda-free" (fun () ->
+  Params.add_to_modes 
+    [ "lambda-free-intensional"
+    ; "lambda-free-extensional"
+    ; "lambda-free-purify-intensional"
+    ; "lambda-free-purify-extensional"] (fun () ->
     enabled_ := true;
     enable_unif_ := false;
     force_enabled_ := true;
-    _ext_axiom := true;
     _elim_pred_var := false;
-    _ext_pos := true;
-    _ext_pos_all_lits := true;
-    _neg_ext := true;
     _neg_ext_as_simpl := false;
     _prune_arg_fun := `NoPrune;
     prim_mode_ := `None;
     Unif._allow_pattern_unif := false;
     Unif._allow_partial_skolem_application := false;
+  );
+  Params.add_to_modes 
+    [ "lambda-free-extensional"
+    ; "lambda-free-purify-extensional"] (fun () ->
+    _ext_axiom := true;
+    _neg_ext := true;
+    _ext_pos := true;
+    _ext_pos_all_lits := true;
+  );
+  Params.add_to_modes 
+    [ "lambda-free-intensional"
+    ; "lambda-free-purify-intensional"] (fun () ->
+    _ext_axiom := false;
+    _neg_ext := false;
+    _ext_pos := false;
+    _ext_pos_all_lits := false;
+  );
+  Params.add_to_mode "lambda-free-purify-intensional" (fun () ->
+    _purify_applied_vars := `Int
+  );
+  Params.add_to_mode "lambda-free-purify-extensional" (fun () ->
+    _purify_applied_vars := `Ext
   );
   Extensions.register extension;

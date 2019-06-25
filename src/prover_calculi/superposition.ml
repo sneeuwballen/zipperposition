@@ -2638,17 +2638,40 @@ let () =
     Params.add_to_mode "fo-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
     );
-    Params.add_to_mode "lambda-free" (fun () ->
-      Unif._allow_pattern_unif := false;
-      _use_simultaneous_sup := false;
+
+  Params.add_to_modes 
+    [ "lambda-free-intensional"
+    ; "lambda-free-extensional"
+    ; "lambda-free-purify-intensional"
+    ; "lambda-free-purify-extensional"] (fun () ->
+    Unif._allow_pattern_unif := false;
+    _use_simultaneous_sup := false;
+    _sup_in_var_args := true;
+    _demod_in_var_args := true;
+    _dupsup := false;
+    _complete_ho_unification := false;
+    _lambdasup := -1;
+    _fluidsup := false;
+    _dupsup := false;
+    _ord_in_normal_form := false;
+  );
+  Params.add_to_modes 
+    [ "lambda-free-extensional"
+    ; "lambda-free-purify-extensional"] (fun () ->
+    _restrict_hidden_sup_at_vars := true;
+  );
+  Params.add_to_modes 
+    [ "lambda-free-intensional"
+    ; "lambda-free-purify-intensional"] (fun () ->
+    _restrict_hidden_sup_at_vars := false;
+  );
+  Params.add_to_modes
+    [ "lambda-free-intensional"
+    ; "lambda-free-extensional"] (fun () ->
       _sup_at_vars := true;
-      _sup_in_var_args := true;
-      _demod_in_var_args := false;
-      _dupsup := false;
-      _restrict_hidden_sup_at_vars := true;
-      _complete_ho_unification := false;
-      _lambdasup := -1;
-      _fluidsup := false;
-      _dupsup := false;
-      _ord_in_normal_form := false;
-    )
+  );
+  Params.add_to_modes
+    [ "lambda-free-purify-intensional"
+    ; "lambda-free-purify-extensional"] (fun () ->
+      _sup_at_vars := false;
+  );

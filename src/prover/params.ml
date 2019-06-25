@@ -63,6 +63,8 @@ let mode_spec () =
     fun s -> List.iter (fun f -> f ()) (Hashtbl.find_all _modes s))
 let add_to_mode mode f = 
   Hashtbl.add _modes mode f
+let add_to_modes modes f = 
+  List.iter (fun m -> add_to_mode m f) modes
 
 (** parse_args returns parameters *)
 let parse_args () =

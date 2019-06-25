@@ -32,6 +32,7 @@ val add_opt : (string * Arg.spec * string) -> unit
 val add_opts : (string * Arg.spec * string) list -> unit
 
 val add_to_mode : string -> (unit -> unit) -> unit
+val add_to_modes : string list -> (unit -> unit) -> unit
 
 val key : t Flex_state.key
 

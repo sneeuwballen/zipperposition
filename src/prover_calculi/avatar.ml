@@ -593,18 +593,15 @@ let () =
     ; "--avatar-backward-simp-trail", Arg.Set back_simplify_trail_, " backward-simplify boolean trails in Avatar"
     ; "--no-avatar-backward-simp-trail", Arg.Clear back_simplify_trail_, " do not backward-simplify boolean trails in Avatar"
     ];
-  Params.add_to_mode "ho-complete-basic" (fun () ->
-    enabled_ := false
-  );
-  Params.add_to_mode "ho-pragmatic" (fun () ->
-    enabled_ := false
-  );
-  Params.add_to_mode "ho-competitive" (fun () ->
-    enabled_ := false
-  );
-  Params.add_to_mode "fo-complete-basic" (fun () ->
-    enabled_ := false
-  );
-  Params.add_to_mode "lambda-free" (fun () ->
-    enabled_ := false
-  );
+  Params.add_to_modes 
+    [ "ho-complete-basic"
+    ; "ho-pragmatic"
+    ; "ho-competitive"
+    ; "fo-complete-basic"
+    ; "lambda-free-intensional"
+    ; "lambda-free-extensional"
+    ; "lambda-free-purify-intensional"
+    ; "lambda-free-purify-extensional"] 
+    (fun () ->
+      enabled_ := false
+    );

@@ -216,15 +216,13 @@ let () =
     [ "--select", Arg.Symbol (all(), set_select), " set literal selection function";
       "--ho-selection-restriction", ho_restriction_opt, " selection restrictions for lambda-free higher-order terms (none/no-var-heading-max-term/no-var-different-args/no-unapplied-var-occurring-applied/no-ho-vars)"
     ];
-  Params.add_to_mode "ho-complete-basic" (fun () ->
-    _ho_restriction := `NoHigherOrderVariables
-  );
-  Params.add_to_mode "lambda-free" (fun () ->
-    _ho_restriction := `NoHigherOrderVariables
-  );
-  Params.add_to_mode "ho-competitive" (fun () ->
-    _ho_restriction := `NoHigherOrderVariables
-  );
-  Params.add_to_mode "ho-pragmatic" (fun () ->
-    _ho_restriction := `NoHigherOrderVariables
-  );
+  Params.add_to_modes 
+    [ "ho-complete-basic"
+    ; "lambda-sup"
+    ; "lambda-free-intensional"
+    ; "lambda-free-extensional"
+    ; "lambda-free-purify-intensional"
+    ; "lambda-free-purify-extensional"] 
+    (fun () ->
+      _ho_restriction := `NoHigherOrderVariables
+    );
