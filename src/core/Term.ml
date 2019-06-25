@@ -782,6 +782,14 @@ module Form = struct
     | [] -> false_
     | [t] -> t
     | a :: tail -> List.fold_left or_ a tail
+
+  let forall t =
+    assert(Type.is_fun (ty t) && Type.returns_prop (ty t));
+    app_builtin ~ty:Type.prop Builtin.ForallConst [t]
+  
+  let exists t =
+    assert(Type.is_fun (ty t) && Type.returns_prop (ty t));
+    app_builtin ~ty:Type.prop Builtin.ForallConst [t]
 end
 
 (** {2 Arith} *)

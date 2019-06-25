@@ -16,6 +16,7 @@ type reasoning_kind    =
 let _bool_reasoning = ref BoolReasoningDisabled
 let cased_term_selection = ref Any
 let quant_rename = ref false
+let interpret_bool_funs = ref false
 
 module type S = sig
   module Env : Env.S
@@ -267,6 +268,52 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* Format.printf "res:none.\n"; *)
       None
 
+  let interpret_boolean_functions c =
+    (* Collects boolean functions only at top level, 
+       and not the ones that are already a part of the quantifier *)
+    let collect_tl_bool_funcs t k = 
+      let rec aux t =
+        match T.view t with
+        | Var _  | Const _  | DB _ -> ()
+        | Fun _ -> if Type.returns_prop (Term.ty t) then k t
+        | App (f, l) ->
+          k f;
+          List.iter aux l
+        | AppBuiltin (b,l) -> 
+          if not @@ Builtin.is_quantifier b then List.iter aux l 
+      in
+      aux t in
+    let interpret t i = 
+      let ty_args, body = T.open_fun t in
+      assert(Type.is_prop (Term.ty body));
+      T.fun_l ty_args i 
+    in
+    let negate_bool_fun bool_fun =
+      let ty_args, body = T.open_fun bool_fun in
+      assert(Type.is_prop (Term.ty body));
+      T.fun_l ty_args (T.Form.not_ body)
+    in
+
+    Iter.flat_map collect_tl_bool_funcs (C.Seq.terms c)
+    |> Iter.sort_uniq ~cmp:Term.compare
+    |> Iter.fold (fun res t -> 
+        assert(T.DB.is_closed t);
+        let proof = Proof.Step.inference[C.proof_parent c]
+          ~rule:(Proof.Rule.mk"interpret boolean function")
+        in
+        let as_forall = Literal.mk_prop (T.Form.forall t) false in
+        let as_neg_forall = Literal.mk_prop (T.Form.forall (negate_bool_fun t)) false in
+        let forall_cl = 
+          C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+            (as_forall :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:t ~by:(interpret t T.true_))))
+          proof in
+        let forall_neg_cl = 
+          C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+            (as_neg_forall :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:t ~by:(interpret t T.false_))))
+          proof in
+        forall_cl :: forall_neg_cl :: res
+    ) []
+
   let setup () =
 	(* if !_bool_reasoning then(
 		Env.ProofState.ActiveSet.add (create_clauses () );
@@ -281,6 +328,11 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_basic_simplify normalize_equalities;
     Env.add_multi_simpl_rule Fool.rw_bool_lits;
     Env.add_multi_simpl_rule cnf_otf;
+
+    if (!interpret_bool_funs) then (
+      Env.add_unary_inf "interpret boolean functions" interpret_boolean_functions;
+    );
+
     if !_bool_reasoning = BoolCasesInference then (
       Env.add_unary_inf "bool_cases" bool_cases;
     )
@@ -506,7 +558,11 @@ let () =
       " select boolean subterm selection criterion: A for any, M for minimal and L for large";
       "--quantifier-renaming"
       , Arg.Bool (fun v -> quant_rename := v)
-      , " turn the quantifier renaming on or off"];
+      , " turn the quantifier renaming on or off";
+      "--interpret-bool-funs"
+      , Arg.Bool (fun v -> interpret_bool_funs := v)
+      , "turn interpretation of boolean functions as forall or negation of forall on or off"
+      ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
     _bool_reasoning := BoolReasoningDisabled
   );

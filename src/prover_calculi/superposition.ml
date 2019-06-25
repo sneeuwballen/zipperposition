@@ -647,7 +647,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         max (C.penalty info.active) (C.penalty info.passive)
         + (if T.is_var s' then 2 else 0) (* superposition from var = bad *)
       in
-      let new_lits = List.fast_sort (fun l1 l2 -> -CCInt.compare (Lit.hash l1) (Lit.hash l2)) new_lits in
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
       (* Format.printf "LS: %a\n" C.pp new_clause;  *)
       Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
