@@ -275,9 +275,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       let rec aux t =
         match T.view t with
         | Var _  | Const _  | DB _ -> ()
-        | Fun _ -> if Type.returns_prop (Term.ty t) then k t
+        | Fun _ -> if Type.is_prop (Term.ty (snd @@ Term.open_fun t)) then k t
         | App (f, l) ->
-          k f;
+          aux f;
           List.iter aux l
         | AppBuiltin (b,l) -> 
           if not @@ Builtin.is_quantifier b then List.iter aux l 
@@ -294,8 +294,13 @@ module Make(E : Env.S) : S with module Env = E = struct
       T.fun_l ty_args (T.Form.not_ body)
     in
 
-    Iter.flat_map collect_tl_bool_funcs (C.Seq.terms c)
+    Iter.flat_map collect_tl_bool_funcs 
+      (C.Seq.terms c
+       |> Iter.filter (fun t -> not @@ T.is_fun t))
     |> Iter.sort_uniq ~cmp:Term.compare
+    |> Iter.filter (fun t ->  
+        let cached_t = Subst.FO.canonize_all_vars t in
+        not (Term.Set.mem cached_t !Higher_order.prim_enum_terms))
     |> Iter.fold (fun res t -> 
         assert(T.DB.is_closed t);
         let proof = Proof.Step.inference[C.proof_parent c]
@@ -311,6 +316,10 @@ module Make(E : Env.S) : S with module Env = E = struct
           C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
             (as_neg_forall :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:t ~by:(interpret t T.false_))))
           proof in
+
+        Util.debugf 10 "interpret bool: %a !!> %a.\n"  (fun k -> k C.pp c C.pp forall_cl);
+        Util.debugf 10 "interpret bool: %a !!~> %a.\n" (fun k -> k C.pp c C.pp forall_neg_cl);
+
         forall_cl :: forall_neg_cl :: res
     ) []
 
