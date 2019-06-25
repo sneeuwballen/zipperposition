@@ -377,7 +377,7 @@ module FO = struct
     (of_list subs_as_map)
 
 
-  let canonize_vars ~var_set = 
+  let canonize_neg_vars ~var_set = 
     let max_id   = T.VarSet.max_elt_opt var_set in
       match max_id with 
       | Some id ->
@@ -394,6 +394,9 @@ module FO = struct
             else subst) 
           var_set empty 
       | None -> empty
+
+  let canonize_all_vars t =
+    apply (Renaming.create()) empty (t,0) 
 
 
   let bind = (bind :> t -> var Scoped.t -> term Scoped.t -> t)

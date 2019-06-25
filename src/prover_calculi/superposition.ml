@@ -146,20 +146,19 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     |> Iter.to_list
 
   let get_triggers c =
+    let trivial_trigger t =
+      T.is_const (T.head_term t) ||
+      T.is_var (snd @@ T.open_fun t) in
+
+
     Literals.fold_terms ~ord ~subterms:true ~eligible:C.Eligible.always 
                         ~which:`All (C.lits c) ~fun_bodies:false 
-    |> Iter.filter_map (fun (t,_) -> 
+    |> Iter.filter_map (fun (t,p) -> 
       let ty = Term.ty t and hd = Term.head_term t in
-      let var_set = InnerTerm.Seq.vars (t:>InnerTerm.t) |> InnerTerm.VarSet.of_seq in
-      let cannonize_subst = Subst.FO.canonize_vars ~var_set in
-      let cached_t = Subst.FO.apply Subst.Renaming.none cannonize_subst (t,0) in
+      let cached_t = Subst.FO.canonize_all_vars t in
       if not (Term.Set.mem cached_t !Higher_order.prim_enum_terms) &&
-         Type.is_fun ty && Type.returns_prop ty && not (Term.is_var hd) then (
-        
-        (* CCFormat.printf "[trigger:%a:%a]\n" T.pp t Type.pp (Term.ty t);
-        CCFormat.printf "[set:%a]\n" (Term.Set.pp T.pp) !Higher_order.prim_enum_terms; *)
-
-
+         Type.is_fun ty && Type.returns_prop ty && not (Term.is_var hd) &&
+         not (trivial_trigger t) then (        
         Some t
       ) else None
     )
@@ -1399,9 +1398,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let rule  = Proof.Rule.mk "instantiate_w_trigger" in
       let proof = Proof.Step.inference ~rule [C.proof_parent_subst renaming (c, 0) sub] in
       let new_clause = C.create ~trail ~penalty (CCArray.to_list new_lits) proof in
-
       (* CCFormat.printf "[BOOL_INST: %a, %a => %a].\n" C.pp c Subst.pp sub C.pp new_clause; *)
-
       assert (C.Seq.terms c |> Iter.for_all T.DB.is_closed);
       assert (C.Seq.terms new_clause |> Iter.for_all T.DB.is_closed);
       new_clause)
@@ -1757,7 +1754,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let canonize_variables c =
     let all_vars = Literals.vars (C.lits c) 
                    |> (fun v -> InnerTerm.VarSet.of_list (v:>InnerTerm.t HVar.t list)) in
-    let neg_vars_renaming = Subst.FO.canonize_vars ~var_set:all_vars in 
+    let neg_vars_renaming = Subst.FO.canonize_neg_vars ~var_set:all_vars in 
     if Subst.is_empty neg_vars_renaming then SimplM.return_same c
     else (
       let new_lits = Literals.apply_subst Subst.Renaming.none neg_vars_renaming (C.lits c, 0)
