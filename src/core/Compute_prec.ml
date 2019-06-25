@@ -11,6 +11,7 @@ let section = Util.Section.(make ~parent:root) "compute_prec"
 
 let _alpha_precedence = ref false
 let _custom_weights = ref ""
+let _default_symbol_status = ref Precedence.default_symbol_status
 
 type 'a parametrized = Statement.clause_t Iter.t -> 'a
 
@@ -89,13 +90,22 @@ let mk_precedence ~db_w ~lmb_w t seq =
   let constr = Precedence.Constr.compose_sort constrs in
   let constr = Precedence.Constr.compose constr t.last_constr in
   let constr = (if !_alpha_precedence then Precedence.Constr.alpha else constr) in
-  let p = Precedence.create ~weight ~arg_coeff ~db_w ~lmb_w constr symbols in
+  let p = Precedence.create ~weight ~arg_coeff ~db_w ~lmb_w ~default_symbol_status:!_default_symbol_status constr symbols in
   (* multiset status *)
   List.iter
     (fun (s,status) -> Precedence.declare_status p s status)
     t.status;
   Util.exit_prof prof_mk_prec;
   p
+
+let default_symbol_status =
+  let set_ n = _default_symbol_status := n in
+  let l = [
+    "multiset", Precedence.Multiset;
+    "lexicographic", Precedence.Lexicographic;
+    "lengthlexicographic", Precedence.LengthLexicographic;
+    "lengthlexicographicrtl", Precedence.LengthLexicographicRTL] in
+  Arg.Symbol (List.map fst l, fun s -> set_ (List.assoc s l))
 
 let () =
   Options.add_opts
@@ -105,4 +115,6 @@ let () =
     ;  "--weights"
      , Arg.Set_string _custom_weights
      , " set weights, e.g. f=2,g=3,h=1, or weights and argument coefficients, e.g. f=2:3:4,g=3:2"
-    ]
+    ; "--default-symbol-status"
+    , default_symbol_status
+    , " default symbol status" ]

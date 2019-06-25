@@ -156,7 +156,7 @@ let prec_compare prec a b = match a,b with
 let prec_status prec = function
   | Head.I s -> Prec.status prec s
   | Head.B Builtin.Eq -> Prec.Multiset
-  | _ -> Prec.LengthLexicographic
+  | _ -> Prec.default_symbol_status
 
 module KBO : ORD = struct
   let name = "kbo"
