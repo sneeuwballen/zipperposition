@@ -311,7 +311,6 @@ and flex_same ~subst ~state ~counter ~scope hd_s args_s args_t rest all =
   assert(List.length args_s = List.length args_t);
   assert(List.length args_s <= List.length @@ fst @@ Type.open_fun (T.ty hd_s));
   if List.length args_s > 0 then (
-    let state = {state with depth = state.depth + 1} in
     let new_cstrs = build_constraints ~ban_id:true args_s args_t rest in
     let all_vars = CCList.range 0 ((List.length args_s) -1 ) in
     let all_args_unif = unify ~state ~subst ~counter ~scope new_cstrs in
@@ -320,6 +319,7 @@ and flex_same ~subst ~state ~counter ~scope hd_s args_s args_t rest all =
       first_unif
     ) 
     else (
+      let state = {state with depth = state.depth + 1} in
       if state.num_elims < !max_elims then (
         assert(List.length all_vars != 0);
         OSeq.append
@@ -430,7 +430,7 @@ let unify_scoped t0_s t1_s =
     monomorphic
   } in
   let res =
-      prefix
+      (* prefix *)
       (unify ~state ~scope:unifscope ~counter ~subst [t0', t1', false]) 
       (* OSeq.empty *)
   in

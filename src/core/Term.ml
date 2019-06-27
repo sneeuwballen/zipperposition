@@ -1106,8 +1106,11 @@ module Conv = struct
           let b = if Builtin.equal b Builtin.ForallConst 
                   then Binder.Forall else Binder.Exists in
           let ty_args, fun_body = open_fun body in 
-          
-          if not (Type.returns_prop (ty fun_body)) then (
+
+          if is_true_or_false fun_body then (
+            if T.equal fun_body true_ then ST.app_builtin ~ty:(aux_ty Type.prop) Builtin.True []
+            else ST.app_builtin ~ty:(aux_ty Type.prop) Builtin.False []
+          ) else if not (Type.returns_prop (ty fun_body)) then (
             let err_msg = CCFormat.sprintf "quantifier wrongly encoded: %a(%a)" T.pp t T.pp orig_term in
             Util.error ~where:"Term" err_msg;
           ) else (

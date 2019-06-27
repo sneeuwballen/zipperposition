@@ -139,8 +139,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let ord =
     Ctx.ord ()
 
-  let pred_vars c = 
-    CCList.to_seq (Literals.vars (C.lits c)) 
+  let pred_vars c =
+    (* instantiate only variables in eligible lits *)
+    let eligible = C.Eligible.res c in
+    let lits = 
+      CCArray.mapi (fun i lit -> (i, lit)) (C.lits c)
+      |> CCArray.filter_map (fun (i,lit) -> 
+          if eligible i lit then Some lit else None) in
+    CCList.to_seq (Literals.vars lits) 
     |> Iter.filter (fun v -> 
         let ty = HVar.ty v in
         Type.is_fun ty && Type.returns_prop ty)
