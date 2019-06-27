@@ -89,6 +89,7 @@ let max_lits_ext_dec = ref 0
 let _ext_dec_lits = ref `OnlyMax
 let _unif_alg = ref JP_unif.unify_scoped
 let _unif_level = ref `Full
+let _ground_subs_check = ref 0
 
 
 module Make(Env : Env.S) : S with module Env = Env = struct
@@ -2411,6 +2412,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* if there is an equation in c, try equality subsumption *)
     let try_eq_subsumption = CCArray.exists Lit.is_eqn (C.lits c) in
     (* use feature vector indexing *)
+    let c = if !_ground_subs_check > 0 then  C.ground_clause c else c in
     let res =
       SubsumIdx.retrieve_subsuming_c !_idx_fv c
       |> Iter.exists
@@ -2443,6 +2445,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun res c' ->
            if C.trail_subsumes c c'
            then
+            let c' = if !_ground_subs_check > 1 then  C.ground_clause c' else c' in
              let redundant =
                (try_eq_subsumption && eq_subsumes (C.lits c) (C.lits c'))
                || subsumes (C.lits c) (C.lits c')
@@ -2897,6 +2900,9 @@ let () =
     "--dupsup"
     , Arg.Set _dupsup
     , " enable DupSup inferences";
+    "--ground-before-subst"
+    , Arg.Set_int _ground_subs_check
+    , " set the level of grounding before substitution. 0 - no grounding. 1 - only active. 2 - both.";
     "--recognize-injectivity"
     , Arg.Bool (fun v -> _recognize_injectivity := v)
     , " recognize injectivity axiom and axiomatize corresponding inverse";

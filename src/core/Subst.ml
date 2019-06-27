@@ -396,7 +396,7 @@ module FO = struct
       | None -> empty
 
   let canonize_all_vars t =
-    apply (Renaming.create()) empty (t,0) 
+    apply (Renaming.create()) empty (t,0)
 
 
   let bind = (bind :> t -> var Scoped.t -> term Scoped.t -> t)

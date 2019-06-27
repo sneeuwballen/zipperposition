@@ -335,6 +335,23 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let vars c = terms c |> Iter.flat_map T.Seq.vars
   end
 
+  let apply_subst (c,sc) subst =
+    let lits = lits c in
+    let new_lits = _apply_subst_no_simpl subst (lits, sc) in
+    create ~trail:(trail c) ~penalty:(penalty c) (CCArray.to_list new_lits) (proof_step c)
+
+
+  let ground_clause c =
+    let counter = ref 0 in
+    let all_vars = T.VarSet.of_seq @@ Seq.vars c in
+    let gr_subst = T.VarSet.fold (fun v subst -> 
+      let ty = HVar.ty v in
+      Subst.FO.bind subst ((v :> InnerTerm.t HVar.t),0) (T.mk_tmp_cst ~counter ~ty,0)
+    ) all_vars Subst.empty in
+    let res = apply_subst (c,0) gr_subst in
+    assert(Iter.for_all T.is_ground @@ Seq.terms res);
+    res
+
   (** {2 Filter literals} *)
 
   module Eligible = struct

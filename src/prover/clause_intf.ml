@@ -194,6 +194,8 @@ module type S = sig
 
   val to_s_form : t -> TypedSTerm.Form.t
 
+  val ground_clause : t -> t
+
   (** {2 Iterators} *)
 
   module Seq : sig

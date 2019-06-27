@@ -568,6 +568,12 @@ let mk_fresh_skolem =
       (List.map Type.var ty_vars)
       (List.map var vars)
 
+let mk_tmp_cst ~counter ~ty =
+  let idx = CCRef.get_then_incr counter in
+  let id = ID.makef "#tmp%d" idx in
+  const id ~ty
+
+
 let rec head_exn t = match T.view t with
   | T.Const s -> s
   | T.App (hd,_) -> head_exn hd
