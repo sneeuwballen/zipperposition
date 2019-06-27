@@ -444,7 +444,7 @@ let process_file ?(prelude=Iter.empty) file =
     if !Booleans.quant_rename then Booleans.preprocess_booleans 
     else CCFun.id in
   let sk_ctx = Skolem.create () in 
-  cnf ~sk_ctx (Booleans.preprocess_booleans decls) >>= fun stmts ->
+  cnf ~sk_ctx (quant_transformer decls) >>= fun stmts ->
   let stmts = Booleans.preprocess_cnf_booleans stmts in
   (* compute signature, precedence, ordering *)
   let conj_syms = syms_in_conj stmts in
