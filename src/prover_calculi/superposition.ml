@@ -1444,6 +1444,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                if T.equal v T.false_ && not is_pred_var then ()
                else (
                   if is_pred_var && T.is_true_or_false v then (
+                    assert(T.is_true_or_false pred_var_sign);
                     if T.equal v pred_var_sign then (
                       k (u, v, unify (s,0) (u,0))
                     ) else (
@@ -1466,7 +1467,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun (s, t, _, s_pos) -> (* try with s=t *)
            let active_idx = Lits.Pos.idx s_pos in
            let is_var_pred = 
-            T.is_var (T.head_term s) && Type.is_prop (T.ty s) in
+            T.is_var (T.head_term s) && Type.is_prop (T.ty s) && T.is_true_or_false t in
            if T.equal t T.false_ && not is_var_pred then Iter.empty 
            else (
               let var_pred_status = (is_var_pred, t) in
@@ -1826,7 +1827,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               Iter.of_list l
               |> Iter.map (fun (t,p) -> (c,t,p)))
 
-  let ext_decompose_act given = 
+  let ext_decompose_act given =
     if C.length given <= !max_lits_ext_dec then (
       let eligible = 
         if !_ext_dec_lits = `OnlyMax then C.Eligible.param given else C.Eligible.always in
@@ -1842,7 +1843,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       |> Iter.to_list)
     else []
 
-  let ext_decompose_pas given = 
+  let ext_decompose_pas given =
     if C.length given <= !max_lits_ext_dec then ( 
       let which, eligible =
         if !_ext_dec_lits = `OnlyMax then `Max, C.Eligible.res given 
@@ -2717,6 +2718,18 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and redundant = subsumed_by_active_set
     and backward_redundant = subsumed_in_active_set
     and is_trivial = is_tautology in
+
+    if !_recognize_injectivity then (
+        Env.add_unary_inf "recognize injectivity" recognize_injectivity;
+    );
+
+    if !max_lits_ext_dec != 0 then (
+        Env.add_binary_inf "ext_dec_act" ext_decompose_act;
+        Env.add_binary_inf "ext_dec_pas" ext_decompose_pas;
+        Env.add_unary_inf "ext_eqres_dec" ext_eqres_decompose;
+        Env.add_unary_inf "ext_eqfact_dec" ext_eqfact_decompose;
+    );
+
     if !_complete_ho_unification
     then (
       if !_max_infs = -1 then (
@@ -2733,12 +2746,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Env.add_unary_inf "equality_resolution" (infer_equality_resolution_pragmatic_ho !_max_infs);
       );
 
-      if !max_lits_ext_dec != 0 then (
-        Env.add_binary_inf "ext_dec_act" ext_decompose_act;
-        Env.add_binary_inf "ext_dec_pas" ext_decompose_pas;
-        (* Env.add_unary_inf "ext_eqres_dec" ext_eqres_decompose; *)
-        (* Env.add_unary_inf "ext_eqfact_dec" ext_eqfact_decompose; *)
-      );
+      
 
       if !_fluidsup then (
         Env.add_binary_inf "fluidsup_passive" infer_fluidsup_passive;
@@ -2756,9 +2764,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Env.add_unary_inf "trigger_pred_var active" trigger_insantiation;
         Env.add_unary_inf "trigger_pred_var passive" instantiate_with_triggers;
       );
-      if !_recognize_injectivity then (
-        Env.add_unary_inf "recognize injectivity" recognize_injectivity;
-      );
+      
 
       if (List.exists CCFun.id [!_fluidsup; !_dupsup; !_lambdasup != -1; !_max_infs = -1]) then (
         if !_switch_stream_extraction then
@@ -2844,12 +2850,12 @@ let () =
     ; "--sup-at-var-headed"
     , Arg.Bool (fun b -> _sup_at_var_headed := b)
     , " enable/disable superposition at variable headed terms"
-    ; "--no-sup-in-var-args"
-    , Arg.Clear _sup_in_var_args
-    , " disable superposition in arguments of applied variables"
-    ; "--no-sup-under-lambdas"
-    , Arg.Clear _sup_under_lambdas
-    , " disable superposition in bodies of lambda-expressions"
+    ; "--sup-in-var-args"
+    , Arg.Bool (fun b -> _sup_in_var_args := b)
+    , " enable/disable superposition in arguments of applied variables"
+    ; "--sup-under-lambdas"
+    , Arg.Bool (fun b -> _sup_under_lambdas := b)
+    , " enable/disable superposition in bodies of lambda-expressions"
     ; "--lambda-demod"
     , Arg.Set _lambda_demod
     , " enable demodulation in bodies of lambda-expressions"

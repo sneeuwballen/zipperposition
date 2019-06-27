@@ -202,7 +202,7 @@ let rec mk_lit a b sign =
     | _, T.AppBuiltin (Builtin.True, []) -> Equation (a, (if sign then T.true_ else T.false_), true)
     | T.AppBuiltin (Builtin.False, []), _ -> Equation (b, (if not sign then T.true_ else T.false_), true)
     | _, T.AppBuiltin (Builtin.False, []) -> Equation (a, (if not sign then T.true_ else T.false_), true)
-    | T.AppBuiltin (Builtin.Not, [a']), _ when Term.is_true_or_false b -> mk_lit a' b (not sign)
+    (* | T.AppBuiltin (Builtin.Not, [a']), _ when Term.is_true_or_false b -> mk_lit a' b (not sign) *)
     (* | _, T.AppBuiltin (Builtin.Not, [b']) -> mk_lit a b' (not sign) *)
    
     | _ when has_num_ty a ->

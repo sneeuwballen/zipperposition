@@ -1174,7 +1174,7 @@ let extension =
 let () =
   Options.add_opts
     [ "--ho", Arg.Set enabled_, " enable HO reasoning";
-      "--force-ho", Arg.Set force_enabled_, " enable HO reasoning even if the problem is first-order";
+      "--force-ho", Arg.Bool  (fun b -> force_enabled_ := false), " enable/disable HO reasoning even if the problem is first-order";
       "--no-ho", Arg.Clear enabled_, " disable HO reasoning";
       "--ho-unif", Arg.Set enable_unif_, " enable full HO unification";
       "--ho-neg-cong-fun", Arg.Set _neg_cong_fun, "enable NegCongFun";
