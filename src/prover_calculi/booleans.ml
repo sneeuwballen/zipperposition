@@ -248,6 +248,18 @@ module Make(E : Env.S) : S with module Env = E = struct
               || T.is_formula l || T.is_formula r)
       | None            -> false 
     ) (C.lits c) in
+
+    let renaming_weight = 60 in
+    let max_formula_weight = 
+      C.Seq.terms c 
+      |> Iter.filter T.is_formula
+      |> Iter.map T.size
+      |> Iter.max in
+    let opts = 
+      match max_formula_weight with
+      | None -> [Cnf.DisableRenaming]
+      | Some m -> if m < renaming_weight then [Cnf.DisableRenaming] else [] in
+
     match idx with 
     | Some _ ->
       let f = Literals.Conv.to_tst (C.lits c) in
@@ -255,7 +267,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let trail = C.trail c and penalty = C.penalty c in
       let stmt = Statement.assert_ ~proof f in
       let cnf_vec = Cnf.convert @@ CCVector.to_seq @@ 
-                    Cnf.cnf_of ~ctx:(Ctx.sk_ctx ()) stmt in
+                    Cnf.cnf_of ~opts ~ctx:(Ctx.sk_ctx ()) stmt in
       let clauses = CCVector.map (C.of_statement ~convert_defs:true) cnf_vec
                     |> CCVector.to_list 
                     |> CCList.flatten

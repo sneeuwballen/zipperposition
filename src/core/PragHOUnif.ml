@@ -430,7 +430,7 @@ let unify_scoped t0_s t1_s =
     monomorphic
   } in
   let res =
-      (* prefix *)
+      prefix
       (unify ~state ~scope:unifscope ~counter ~subst [t0', t1', false]) 
       (* OSeq.empty *)
   in

@@ -2906,7 +2906,7 @@ let () =
     "--dupsup"
     , Arg.Set _dupsup
     , " enable DupSup inferences";
-    "--ground-before-subst"
+    "--ground-before-subs"
     , Arg.Set_int _ground_subs_check
     , " set the level of grounding before substitution. 0 - no grounding. 1 - only active. 2 - both.";
     "--recognize-injectivity"
