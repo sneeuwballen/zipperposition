@@ -1,0 +1,2498 @@
+diff --git a/src/arbitrary/arLiteral.ml b/src/arbitrary/arLiteral.ml
+index f2a1655e..94f889c7 100644
+--- a/src/arbitrary/arLiteral.ml
++++ b/src/arbitrary/arLiteral.ml
+@@ -18,6 +18,8 @@ type clause = Literals.t
+ let shrink_lit (lit:lit) =
+   let open Q.Iter in
+   begin match lit with
++    | Literal.Prop (t, sign) ->
++      AT.shrink t >|= fun t -> Literal.mk_prop t sign
+     | Literal.Equation (t,u,sign) ->
+       (AT.shrink t >|= fun t -> Literal.mk_lit t u sign)
+       <+> (AT.shrink u >|= fun u -> Literal.mk_lit t u sign)
+diff --git a/src/core/Builtin.ml b/src/core/Builtin.ml
+index ce2b393a..ccbc3dd6 100644
+--- a/src/core/Builtin.ml
++++ b/src/core/Builtin.ml
+@@ -63,18 +63,17 @@ type t =
+ type t_ = t
+ 
+ let to_int_ = function
+-  (* True < false for the completeness of (HO case) FOOL paramodulation: C[b] ⟹ b ∨ C[false]. The opposite way required b=false would simplify b≠true (aka ¬b) which doesn't rewrite. *)
+-  | True -> 0
+-  | False -> 1
+-  | Not -> 2
+-  | And -> 3
+-  | Or -> 4
+-  | Imply -> 5
+-  | Equiv -> 6
+-  | Xor -> 7
+-  | Eq -> 8
+-  | Neq -> 9
+-  | HasType -> 10
++  | Not -> 0
++  | And -> 1
++  | Or -> 2
++  | Imply -> 3
++  | Equiv -> 4
++  | Xor -> 5
++  | Eq -> 6
++  | Neq -> 7
++  | HasType -> 8
++  | False -> 10
++  | True -> 11 (* bigger than false *)
+   | Arrow -> 12
+   | Wildcard -> 13
+   | Multiset -> 14
+diff --git a/src/core/Cnf.ml b/src/core/Cnf.ml
+index 2e4c811d..f9b1b9d4 100644
+--- a/src/core/Cnf.ml
++++ b/src/core/Cnf.ml
+@@ -362,9 +362,7 @@ module Flatten = struct
+               T.app_builtin ~ty:T.Ty.prop Builtin.Less [b; a];
+             ]
+         in aux_maybe_define pos f
+-      | T.AppBuiltin (Builtin.Eq, [a;b]) 
+-          when  (T.is_fun a || T.is_fun b)
+-                &&  not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a)))  (* false *) ->
++      | T.AppBuiltin (Builtin.Eq, [a;b]) when  T.is_fun a || T.is_fun b (* false *) ->
+         (* turn [f = λx. t] into [∀x. f x=t] *)
+         let vars_forall, a, b = complete_eq a b in
+         let t' = F.forall_l vars_forall (F.eq_or_equiv a b) in
+@@ -375,9 +373,7 @@ module Flatten = struct
+       | T.AppBuiltin (Builtin.Eq, [a;b]) ->
+         (F.eq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
+         >|= aux_maybe_define pos
+-      | T.AppBuiltin (Builtin.Neq, [a;b]) 
+-        when  (T.is_fun a || T.is_fun b) 
+-              &&  not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a)))   (*false*) ->
++      | T.AppBuiltin (Builtin.Neq, [a;b]) when  T.is_fun a || T.is_fun b  (*false*) ->
+         (* turn [f ≠ λx. t] into [∃x. f x≠t] *)
+         let vars_exist, a, b = complete_eq a b in
+         let t' = F.exists_l vars_exist (F.neq_or_xor a b) in
+@@ -387,28 +383,28 @@ module Flatten = struct
+         aux pos vars t'
+       | T.AppBuiltin (Builtin.Neq, [a;b]) ->
+         (F.neq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
+-        (* >|= aux_maybe_define pos *)
++        >|= aux_maybe_define pos
+       | T.AppBuiltin (Builtin.Imply, [a;b]) ->
+         (F.imply <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
+-        (* >|= aux_maybe_define pos *)
++        >|= aux_maybe_define pos
+       | T.AppBuiltin (Builtin.Equiv, [a;b]) ->
+         (F.equiv <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
+-        (* >|= aux_maybe_define pos *)
++        >|= aux_maybe_define pos
+       | T.AppBuiltin (Builtin.Xor, [a;b]) ->
+         (F.xor <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
+-        (* >|= aux_maybe_define pos *)
++        >|= aux_maybe_define pos
+       | T.AppBuiltin (Builtin.And, l) ->
+-        (F.and_ <$> map_m (aux Pos_toplevel vars) l) (*>|= aux_maybe_define pos*)
++        (F.and_ <$> map_m (aux Pos_toplevel vars) l) >|= aux_maybe_define pos
+       | T.AppBuiltin (Builtin.Or, l) ->
+-        (F.or_ <$> map_m (aux Pos_toplevel vars) l) (*>|= aux_maybe_define pos*)
++        (F.or_ <$> map_m (aux Pos_toplevel vars) l) >|= aux_maybe_define pos
+       | T.AppBuiltin (Builtin.Not, [a]) ->
+-        (F.not_ <$> aux Pos_toplevel vars a) (*>|= aux_maybe_define pos*)
++        (F.not_ <$> aux Pos_toplevel vars a) >|= aux_maybe_define pos
+       | T.AppBuiltin (b, l) ->
+         return (T.app_builtin ~ty:(T.ty_exn t) b) <*> map_m (aux Pos_inner vars) l
+       | T.Bind (Binder.Forall,var,body) ->
+-        (aux Pos_toplevel vars body >|= F.forall var) (*>|= aux_maybe_define pos*)
++        (aux Pos_toplevel vars body >|= F.forall var) >|= aux_maybe_define pos
+       | T.Bind (Binder.Exists,var,body) ->
+-        (aux Pos_toplevel vars body >|= F.exists var) (*>|= aux_maybe_define pos*)
++        (aux Pos_toplevel vars body >|= F.exists var) >|= aux_maybe_define pos
+       | T.Bind (Binder.Lambda, _, _) ->
+         (* lambda-lifting *)
+         let fun_vars, body = T.unfold_fun t in
+diff --git a/src/core/HO_unif.ml b/src/core/HO_unif.ml
+index 18389583..e9f2d061 100644
+--- a/src/core/HO_unif.ml
++++ b/src/core/HO_unif.ml
+@@ -82,9 +82,9 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~offset : (Subst.t * penalty) l
+            assert (T.DB.is_closed t);
+            let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
+            Some (subst, penalty))
+-      [ l_not, 7;
+-        l_and, 7;
+-        l_eq,  5;
++      [ l_not, 2;
++        l_and, 5;
++        l_eq, 10;
+       ]
+   )
+ 
+diff --git a/src/core/JP_unif.ml b/src/core/JP_unif.ml
+index 7684eda2..aa96808a 100644
+--- a/src/core/JP_unif.ml
++++ b/src/core/JP_unif.ml
+@@ -133,7 +133,7 @@ let imitate_onesided ~scope ~counter u v =
+   let head_v = T.head_term_with_mandatory_args v in
+   let prefix_types_u, ret1 = Type.open_fun (T.ty head_u) in
+   let prefix_types_v, ret2 = Type.open_fun (T.ty head_v) in
+-  (* assert (Type.equal ret1 ret2); *)
++  assert (Type.equal ret1 ret2);
+   if T.is_var head_u                                        (* u has a varaible head *)
+     && not (T.is_bvar head_v) && not (T.is_fun head_v)      (* the head of v is not a bound variable or a lambda-expression *)
+     && not (T.var_occurs ~var:(T.as_var_exn head_u) head_v) (* the head of u does not occur in the mandatory args of v *)
+@@ -166,7 +166,7 @@ let identify ~scope ~counter u v (_ : (T.var * int) list) =
+   let head_v = T.head_term_mono v in
+   let prefix_types_u, return_type = Type.open_fun (T.ty head_u) in
+   let prefix_types_v, return_type2 = Type.open_fun (T.ty head_v) in
+-  (* assert (Type.equal return_type return_type2); *)
++  assert (Type.equal return_type return_type2);
+   if T.is_var head_u && T.is_var head_v (* TODO: necessary when args_u or args_v is empty? *)
+   then
+     (* create substitution: head_u |-> λ u1 ... um. x u1 ... um (y1 u1 ... um) ... (yn u1 ... um) 
+diff --git a/src/core/Literal.ml b/src/core/Literal.ml
+index 2595d82f..944865f5 100644
+--- a/src/core/Literal.ml
++++ b/src/core/Literal.ml
+@@ -17,6 +17,7 @@ type t =
+   | True
+   | False
+   | Equation of term * term * bool
++  | Prop of term * bool
+   | Int of Int_lit.t
+   | Rat of Rat_lit.t
+ 
+@@ -26,11 +27,13 @@ let equal l1 l2 =
+   match l1, l2 with
+     | Equation (l1,r1,sign1), Equation (l2,r2,sign2) ->
+       sign1 = sign2 && l1 == l2 && r1 == r2
++    | Prop (p1, sign1), Prop(p2, sign2) -> sign1 = sign2 && T.equal p1 p2
+     | True, True
+     | False, False -> true
+     | Int o1, Int o2 -> Int_lit.equal o1 o2
+     | Rat o1, Rat o2 -> Rat_lit.equal o1 o2
+     | Equation _, _
++    | Prop _, _
+     | True, _
+     | False, _
+     | Int _, _
+@@ -43,6 +46,7 @@ let equal_com l1 l2 =
+       sign1 = sign2 &&
+       ((T.equal l1 l2 && T.equal r1 r2) ||
+        (T.equal l1 r2 && T.equal r1 l2))
++    | Prop (p1, sign1), Prop(p2, sign2) -> sign1 = sign2 && T.equal p1 p2
+     | True, True
+     | False, False -> true
+     | Int o1, Int o2 -> Int_lit.equal_com o1 o2
+@@ -53,6 +57,7 @@ let compare l1 l2 =
+     | False -> 0
+     | True -> 1
+     | Equation _ -> 2
++    | Prop _ -> 3
+     | Int _ -> 5
+     | Rat _ -> 6
+   in
+@@ -63,6 +68,9 @@ let compare l1 l2 =
+         let c = T.compare r1 r2 in
+         if c <> 0 then c else
+           Pervasives.compare sign1 sign2
++    | Prop (p1, sign1), Prop(p2, sign2) ->
++      let c = T.compare p1 p2 in
++      if c <> 0 then c else Pervasives.compare sign1 sign2
+     | True, True
+     | False, False -> 0
+     | Int o1, Int o2 -> Int_lit.compare o1 o2
+@@ -71,6 +79,7 @@ let compare l1 l2 =
+ 
+ let fold f acc lit = match lit with
+   | Equation (l, r, _) -> f (f acc l) r
++  | Prop (p, _) -> f acc p
+   | Int o -> Int_lit.fold f acc o
+   | Rat o -> Rat_lit.fold f acc o
+   | True
+@@ -82,6 +91,7 @@ let hash lit =
+   match lit with
+     | Int o -> Int_lit.hash o
+     | Rat o -> Rat_lit.hash o
++    | Prop (p, sign) -> Hash.combine3 20 (Hash.bool sign) (T.hash p)
+     | Equation (l, r, sign) ->
+       Hash.combine4 30 (Hash.bool sign) (T.hash l) (T.hash r)
+     | True -> 40
+@@ -91,6 +101,7 @@ let weight lit =
+   fold (fun acc t -> acc + T.size t) 0 lit
+ 
+ let heuristic_weight weight = function
++  | Prop (p, _) -> weight p
+   | Equation (l, r, _) -> weight l + weight r
+   | True
+   | False -> 0
+@@ -108,8 +119,7 @@ let depth lit =
+   fold (fun acc t -> max acc (T.depth t)) 0 lit
+ 
+ let sign = function
+-  | Equation (lhs,rhs,true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
+-    T.equal rhs T.true_
++  | Prop (_, sign)
+   | Equation (_, _, sign) -> sign
+   | False -> false
+   | Int o -> Int_lit.sign o
+@@ -128,8 +138,12 @@ let is_pos = sign
+ let is_neg lit = not (is_pos lit)
+ 
+ let is_eqn = function
+-  | Equation _ -> true
+-  | _ -> false
++  | Equation _
++  | Prop _ -> true
++  | Int _
++  | Rat _
++  | True
++  | False -> false
+ 
+ let is_eq lit = is_eqn lit && is_pos lit
+ let is_neq lit = is_eqn lit && is_neg lit
+@@ -139,8 +153,12 @@ let is_app_var_eq = function
+    | _ -> false
+ 
+ let is_prop = function
+-  | True | False -> true
+-  | _ -> false
++  | Prop _
++  | True
++  | False -> true
++  | Int _
++  | Rat _
++  | Equation _ -> false
+ 
+ let is_arith = function
+   | Int _ -> true
+@@ -185,12 +203,10 @@ let rec mk_lit a b sign =
+   match T.view a, T.view b with
+     | T.AppBuiltin (Builtin.True, []), T.AppBuiltin (Builtin.False, []) -> if sign then False else True
+     | T.AppBuiltin (Builtin.False, []), T.AppBuiltin (Builtin.True, []) -> if sign then False else True
+-    | T.AppBuiltin (Builtin.True, []), T.AppBuiltin (Builtin.True, []) -> if sign then True else False
+-    | T.AppBuiltin (Builtin.False, []), T.AppBuiltin (Builtin.False, []) -> if sign then True else False
+-    | T.AppBuiltin (Builtin.True, []), _ -> Equation (b, (if sign then T.true_ else T.false_), true)
+-    | _, T.AppBuiltin (Builtin.True, []) -> Equation (a, (if sign then T.true_ else T.false_), true)
+-    | T.AppBuiltin (Builtin.False, []), _ -> Equation (b, (if not sign then T.true_ else T.false_), true)
+-    | _, T.AppBuiltin (Builtin.False, []) -> Equation (a, (if not sign then T.true_ else T.false_), true)
++    | T.AppBuiltin (Builtin.True, []), _ -> Prop (b, sign)
++    | _, T.AppBuiltin (Builtin.True, []) -> Prop (a, sign)
++    | T.AppBuiltin (Builtin.False, []), _ -> Prop (b, not sign)
++    | _, T.AppBuiltin (Builtin.False, []) -> Prop (a, not sign)
+     (* NOTE: keep negation for higher-order unification constraints
+        | T.AppBuiltin (Builtin.Not, [a']), _ -> mk_lit a' b (not sign)
+        | _, T.AppBuiltin (Builtin.Not, [b']) -> mk_lit a b' (not sign)
+@@ -229,12 +245,12 @@ and mk_prop p sign = match T.view p with
+        [_; t; u]) when has_num_ty t ->
+     (* arith conversion *)
+     begin match mk_num_prop b t u sign with
+-      | None -> mk_lit p T.true_ sign
++      | None -> Prop (p, sign)
+       | Some lit -> lit
+     end
+   | _ ->
+     if not (Type.equal (T.ty p) Type.prop) then ty_error_ p T.true_;
+-    mk_lit p T.true_ sign
++    Prop (p, sign)
+ 
+ (* [sign (builtin t u)] *)
+ and mk_num_prop builtin t u sign: t option =
+@@ -313,19 +329,10 @@ let mk_not_divides n ~power m = mk_divides ~sign:false n ~power m
+ 
+ let mk_constraint l r = mk_neq l r
+ 
+-let diff_f_t t = not (T.equal t T.true_) && not (T.equal t T.false_)
+-let no_prop_invariant = function 
+-  | Equation (lhs,rhs,sign) -> 
+-      let res = diff_f_t lhs && (diff_f_t rhs || sign = true) in
+-      if not res then (
+-          CCFormat.printf "NO PROP INVARIANT BROKEN: %a,%a,%b.\n" T.pp lhs T.pp rhs sign;
+-      );
+-      res
+-  | _ -> true
+-
+ module Seq = struct
+   let terms lit k = match lit with
+     | Equation(l, r, _) -> k l; k r
++    | Prop(p, _) -> k p
+     | Int o -> Int_lit.Seq.terms o k
+     | Rat o -> Rat_lit.Seq.terms o k
+     | True
+@@ -366,6 +373,8 @@ let unif4 op ~subst x1 y1 sc1 x2 y2 sc2 k =
+ let unif_lits op ~subst (lit1,sc1) (lit2,sc2) k =
+   let open UnifOp in
+   match lit1, lit2 with
++    | Prop (p1, sign1), Prop (p2, sign2) when sign1 = sign2 ->
++      op.term ~subst (p1,sc1) (p2,sc2) (fun s -> k (s,[]))
+     | True, True
+     | False, False -> k (subst,[])
+     | Equation (l1, r1, sign1), Equation (l2, r2, sign2) when sign1 = sign2 ->
+@@ -467,17 +476,25 @@ let unify ?(subst=US.empty) lit1 lit2 k =
+   in
+   unif_lits op ~subst lit1 lit2 k
+ 
+-let map_ f = function
++let map_ ~simp f = function
+   | Equation (left, right, sign) ->
+     let new_left = f left
+     and new_right = f right in
+-    mk_lit new_left new_right sign
++    if simp
++    then mk_lit new_left new_right sign
++    else Equation (new_left, new_right, sign)
++  | Prop (p, sign) ->
++    let p' = f p in
++    if simp
++    then mk_prop p' sign
++    else Prop (p', sign)
+   | Int o -> Int (Int_lit.map f o)
+   | Rat o -> Rat (Rat_lit.map f o)
+   | True -> True
+   | False -> False
+ 
+-let map f lit = map_ f lit
++let map f lit = map_ ~simp:true f lit
++let map_no_simp f lit = map_ ~simp:false f lit
+ 
+ let apply_subst_ ~f_term ~f_arith_lit ~f_rat subst (lit,sc) =
+   match lit with
+@@ -485,6 +502,9 @@ let apply_subst_ ~f_term ~f_arith_lit ~f_rat subst (lit,sc) =
+       let new_l = f_term subst (l,sc)
+       and new_r = f_term subst (r,sc) in
+       mk_lit new_l new_r sign
++    | Prop (p, sign) ->
++      let p' = f_term subst (p,sc) in
++      mk_prop p' sign
+     | Int o -> Int (f_arith_lit subst (o,sc))
+     | Rat o -> Rat (f_rat subst (o,sc))
+     | True
+@@ -501,7 +521,10 @@ let apply_subst_no_simp renaming subst (lit,sc) =
+     | Int o -> Int (Int_lit.apply_subst_no_simp renaming subst (o,sc))
+     | Rat o -> Rat (Rat_lit.apply_subst_no_simp renaming subst (o,sc))
+     | Equation (l,r,sign) ->
+-      mk_lit (S.FO.apply renaming subst (l,sc)) (S.FO.apply renaming subst (r,sc)) sign
++      Equation (S.FO.apply renaming subst (l,sc),
++        S.FO.apply renaming subst (r,sc), sign)
++    | Prop (p, sign) ->
++      Prop (S.FO.apply renaming subst (p,sc), sign)
+     | True
+     | False -> lit
+ 
+@@ -520,10 +543,9 @@ let is_constraint = function
+   | Equation (t, u, false) -> T.is_var t || T.is_var u
+   | _ -> false
+ 
+-let negate lit = 
+-  assert(no_prop_invariant lit);
+-  match lit with
+-  | Equation (l,r,sign) ->  mk_lit l r (not sign)
++let negate lit = match lit with
++  | Equation (l,r,sign) -> Equation (l,r,not sign)
++  | Prop (p, sign) -> Prop (p, not sign)
+   | True -> False
+   | False -> True
+   | Int o -> Int (Int_lit.negate o)
+@@ -533,6 +555,7 @@ let vars lit =
+   Seq.vars lit |> T.VarSet.of_seq |> T.VarSet.to_list
+ 
+ let var_occurs v lit = match lit with
++  | Prop (p,_) -> T.var_occurs ~var:v p
+   | Equation (l,r,_) -> T.var_occurs ~var:v l || T.var_occurs ~var:v r
+   | Int _
+   | Rat _ -> Iter.exists (T.var_occurs ~var:v) (Seq.terms lit)
+@@ -541,6 +564,7 @@ let var_occurs v lit = match lit with
+ 
+ let is_ground lit = match lit with
+   | Equation (l,r,_) -> T.is_ground l && T.is_ground r
++  | Prop (p, _) -> T.is_ground p
+   | Int _
+   | Rat _ -> Iter.for_all T.is_ground (Seq.terms lit)
+   | True
+@@ -550,6 +574,7 @@ let root_terms l =
+   Seq.terms l |> Iter.to_rev_list
+ 
+ let to_multiset lit = match lit with
++  | Prop (p,_) -> Multisets.MT.singleton p
+   | Equation (l, r, _) -> Multisets.MT.doubleton l r
+   | True
+   | False -> Multisets.MT.singleton T.true_
+@@ -560,15 +585,14 @@ let to_multiset lit = match lit with
+     Rat_lit.Seq.to_multiset o |> Iter.map fst
+     |> Multisets.MT.Seq.of_seq Multisets.MT.empty
+ 
+-let is_trivial lit = 
+-  assert(no_prop_invariant lit);
+-  match lit with
++let is_trivial lit = match lit with
+   | True -> true
+   | False -> false
+   | Equation (l, r, true) -> T.equal l r
+   | Equation (_, _, false) -> false
+   | Int o -> Int_lit.is_trivial o
+   | Rat o -> Rat_lit.is_trivial o
++  | Prop (_, _) -> false
+ 
+ (* is it impossible for these terms to be equal? check if a cstor-only
+      path leads to distinct constructors/constants *)
+@@ -591,21 +615,19 @@ let rec cannot_be_eq (t1:term)(t2:term): Builtin.Tag.t list option =
+     | _ -> None
+   end
+ 
+-let is_absurd lit = 
+-  assert(no_prop_invariant lit);
+-  match lit with
++let is_absurd lit = match lit with
+   | Equation (l, r, false) when T.equal l r -> true
+   | Equation (l, r, true) -> CCOpt.is_some (cannot_be_eq l r)
++  | Prop (p, false) when T.equal p T.true_ -> true
++  | Prop (p, true) when T.equal p T.false_ -> true
+   | False -> true
+   | Int o -> Int_lit.is_absurd o
+   | Rat o -> Rat_lit.is_absurd o
+-  | Equation _ | True -> false
++  | Equation _ | Prop _ | True -> false
+ 
+-let is_absurd_tags lit = 
+-  assert(no_prop_invariant lit);
+-  match lit with
++let is_absurd_tags lit = match lit with
+   | Equation (l,r,true) -> cannot_be_eq l r |> CCOpt.get_or ~default:[]
+-  | Equation _  | False -> []
++  | Equation _ | Prop _ | False -> []
+   | True -> assert false
+   | Int _ -> [Builtin.Tag.T_lia]
+   | Rat _ -> [Builtin.Tag.T_lra]
+@@ -638,6 +660,9 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ?(var_args=true) ?(fun_bo
+               at_term ~pos:P.(append position (right stop)) r
+           end
+       end
++    | Prop (p, _) ->
++      (* p is the only term, and it's maximal *)
++      at_term ~pos:P.(append position (left stop)) p
+     | Int o ->
+       Int_lit.fold_terms ~pos:position ?ty_args ~vars ~var_args ~fun_bodies ~which ~ord ~subterms o k
+     | Rat o  ->
+@@ -648,6 +673,8 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ?(var_args=true) ?(fun_bo
+ 
+ (* try to convert a literal into a term *)
+ let to_ho_term (lit:t): T.t option = match lit with
++  | Prop (t, true) -> Some t
++  | Prop (t, false) -> Some (T.Form.not_ t)
+   | True -> Some T.true_
+   | False -> Some T.false_
+   | Equation (t, u, sign) ->
+@@ -655,12 +682,9 @@ let to_ho_term (lit:t): T.t option = match lit with
+   | Int _
+   | Rat _ -> None
+ 
+-let as_ho_predicate (lit:t) : _ option = 
+-  assert(no_prop_invariant lit);
+-  match lit with
+-  | Equation(lhs,rhs,true) when (T.equal rhs T.true_ || T.equal rhs T.false_) ->
+-    let hd_t, args_t = T.as_app lhs in
+-    let sign = T.equal rhs T.true_ in
++let as_ho_predicate (lit:t) : _ option = match lit with
++  | Prop (t, sign) ->
++    let hd_t, args_t = T.as_app t in
+     begin match T.view hd_t, args_t with
+       | T.Var v, _::_ -> Some (v, hd_t, args_t, sign)
+       | _ -> None
+@@ -682,27 +706,13 @@ let of_unif_subst renaming (s:Unif_subst.t) : t list =
+        let u = T.of_term_unsafe u in
+        mk_constraint t u)
+ 
+-let normalize_eq lit = 
+-  match lit with
+-  | Equation(lhs, rhs, true) 
+-      when T.equal rhs T.false_ || T.equal rhs T.true_ ->
+-        begin match T.view lhs with 
+-        | T.AppBuiltin(Builtin.Eq, [_;l;r]) (* first arg can be type variable *)
+-        | T.AppBuiltin(Builtin.Eq, [l;r]) ->
+-          let eq_cons = if T.equal rhs T.true_ then mk_eq else mk_neq in
+-          Some (eq_cons l r) 
+-        | _ -> None
+-        end
+-  | _ -> None
+-
+ (** {2 IO} *)
+ 
+ let pp_debug ?(hooks=[]) out lit =
+-  (* assert(no_prop_invariant lit); *)
+   if List.for_all (fun h -> not (h out lit)) hooks
+-  then (begin match lit with
+-    | Equation (p, t, true) when T.equal t T.true_ -> Format.fprintf out "@[%a@]" T.pp p
+-    | Equation (p, t, true) when T.equal t T.false_ -> Format.fprintf out "¬@[%a@]" T.pp p
++  then match lit with
++    | Prop (p, true) -> Format.fprintf out "@[%a@]" T.pp p
++    | Prop (p, false) -> Format.fprintf out "¬@[%a@]" T.pp p
+     | True -> CCFormat.string out "Τ"
+     | False -> CCFormat.string out "⊥"
+     | Equation (l, r, true) ->
+@@ -711,11 +721,11 @@ let pp_debug ?(hooks=[]) out lit =
+       Format.fprintf out "@[<1>%a@ ≠ %a@]" T.pp l T.pp r
+     | Int o -> CCFormat.within "(" ")" Int_lit.pp out o
+     | Rat o -> CCFormat.within "(" ")" Rat_lit.pp out o
+-  end)
++
+ let pp_tstp out lit =
+   match lit with
+-    | Equation (p, t, true) when T.equal t T.true_  -> T.TPTP.pp out p
+-    | Equation (p, t, true) when T.equal t T.false_ -> Format.fprintf out "~ %a" T.TPTP.pp p
++    | Prop (p, true) -> T.TPTP.pp out p
++    | Prop (p, false) -> Format.fprintf out "~ %a" T.TPTP.pp p
+     | True -> CCFormat.string out "$true"
+     | False -> CCFormat.string out "$false"
+     | Equation (l, r, true) ->
+@@ -727,8 +737,8 @@ let pp_tstp out lit =
+ 
+ let pp_zf out lit =
+   match lit with
+-    | Equation (p, t, true) when T.equal t T.true_ -> T.ZF.pp out p
+-    | Equation (p, t, true) when T.equal t T.false_ -> Format.fprintf out "~ %a" T.ZF.pp p
++    | Prop (p, true) -> T.ZF.pp out p
++    | Prop (p, false) -> Format.fprintf out "~ %a" T.ZF.pp p
+     | True -> CCFormat.string out "true"
+     | False -> CCFormat.string out "false"
+     | Equation (l, r, true) ->
+@@ -761,6 +771,7 @@ module Comp = struct
+   (* maximal terms of the literal *)
+   let max_terms ~ord lit =
+     match lit with
++      | Prop (p, _) -> [p]
+       | Equation (l, r, _) -> _maxterms2 ~ord l r
+       | Int a -> Int_lit.max_terms ~ord a
+       | Rat a -> Rat_lit.max_terms ~ord a
+@@ -783,18 +794,21 @@ module Comp = struct
+       l1
+ 
+   let _cmp_by_maxterms ~ord l1 l2 =
+-    let t1 = max_terms ~ord l1 and t2 = max_terms ~ord l2 in
+-    let f = Ordering.compare ord in
+-    match _some_term_dominates f t1 t2, _some_term_dominates f t2 t1 with
+-      | false, false ->
+-        let t1' = CCList.fold_right T.Set.add t1 T.Set.empty
+-        and t2' = CCList.fold_right T.Set.add t2 T.Set.empty in
+-        if T.Set.equal t1' t2'
+-        then C.Eq (* next criterion *)
+-        else C.Incomparable
+-      | true, true -> assert false
+-      | true, false -> C.Gt
+-      | false, true -> C.Lt
++    match l1, l2 with
++      | Prop (p1, _), Prop (p2, _) -> Ordering.compare ord p1 p2
++      | _ ->
++        let t1 = max_terms ~ord l1 and t2 = max_terms ~ord l2 in
++        let f = Ordering.compare ord in
++        match _some_term_dominates f t1 t2, _some_term_dominates f t2 t1 with
++          | false, false ->
++            let t1' = CCList.fold_right T.Set.add t1 T.Set.empty
++            and t2' = CCList.fold_right T.Set.add t2 T.Set.empty in
++            if T.Set.equal t1' t2'
++            then C.Eq (* next criterion *)
++            else C.Incomparable
++          | true, true -> assert false
++          | true, false -> C.Gt
++          | false, true -> C.Lt
+ 
+   (* negative literals dominate *)
+   let _cmp_by_polarity l1 l2 =
+@@ -818,7 +832,8 @@ module Comp = struct
+       | Int (Divides _) -> 17
+       | Rat {Rat_lit.op=Rat_lit.Equal; _} -> 20
+       | Rat {Rat_lit.op=Rat_lit.Less; _} -> 21
+-      | Equation _ -> 30
++      | Equation _
++      | Prop _ -> 30  (* eqn and prop are really the same thing *)
+     in
+     C.of_total (Pervasives.compare (_to_int l1) (_to_int l2))
+ 
+@@ -831,11 +846,18 @@ module Comp = struct
+     match l1, l2 with
+       | True, True
+       | True, False
++      | True, Prop _
+       | True, Equation _
+       | False, False
+       | False, True
++      | False, Prop _
+       | False, Equation _
++      | Prop _, Prop _
++      | Prop _, Equation _
++      | Prop _, True
++      | Prop _, False
+       | Equation _, Equation _
++      | Equation _, Prop _
+       | Equation _, True
+       | Equation _, False ->
+         _cmp_by_term_multiset ~ord l1 l2
+@@ -902,6 +924,8 @@ module Pos = struct
+         {lit_pos=P.(left stop); term_pos=pos'; term=l; }
+       | Equation (_,r,_), P.Right pos' ->
+         {lit_pos=P.(right stop); term_pos=pos'; term=r; }
++      | Prop (p,_), P.Left pos' ->
++        {lit_pos=P.(left stop); term_pos=pos'; term=p; }
+       | Int(AL.Divides d), P.Arg (i, pos') ->
+         let term = try snd(Monome.nth d.AL.monome i) with _ -> _fail_lit lit pos in
+         {lit_pos=P.(arg i stop); term_pos= pos'; term; }
+@@ -934,6 +958,8 @@ module Pos = struct
+         Equation (T.Pos.replace l pos' ~by, r, sign)
+       | Equation (l, r, sign), P.Right pos' ->
+         Equation (l, T.Pos.replace r pos' ~by, sign)
++      | Prop (p, sign), P.Left pos' ->
++        Prop (T.Pos.replace p pos' ~by, sign)
+       | True, _
+       | False, _ -> lit  (* flexible, lit can be the result of a simplification *)
+       | Int (AL.Binary (op, m1, m2)), P.Left (P.Arg(i,pos')) ->
+@@ -970,6 +996,7 @@ module Pos = struct
+         Ordering.compare ord l r <> Comparison.Lt
+       | Equation (l, r, _), P.Right _ ->
+         Ordering.compare ord r l <> Comparison.Lt
++      | Prop _, _ -> true
+       | Int (AL.Binary(_, _m1, _m2)), _ ->
+         (* [t] dominates all atomic terms? *)
+         let t = root_term lit pos in
+@@ -1021,24 +1048,9 @@ module Conv = struct
+       | Some f -> f
+       | None ->
+         begin match lit with
+-          | Equation (l, r, true) -> 
+-            if Type.is_prop (Term.ty l) then (
+-              if Term.equal r T.true_ then (
+-                SLiteral.atom l true
+-              ) else if Term.equal r T.false_ then (
+-                SLiteral.atom l false
+-              ) else (
+-                SLiteral.atom (T.app_builtin ~ty:Type.prop (Builtin.Equiv) [l;r]) true
+-              )
+-            ) else SLiteral.eq l r
+-          | Equation (l, r, false) -> 
+-            if Type.is_prop (Term.ty l) then (
+-              if Term.equal Term.true_ r || Term.equal Term.false_ r then (
+-                raise (invalid_arg "negative equation cannot be with fale or true");
+-              );
+-              SLiteral.atom (T.app_builtin ~ty:Type.prop (Builtin.Xor) [l;r]) true
+-            )
+-            else SLiteral.neq l r
++          | Equation (l, r, true) -> SLiteral.eq l r
++          | Equation (l, r, false) -> SLiteral.neq l r
++          | Prop (p, sign) -> SLiteral.atom p sign
+           | True -> SLiteral.true_
+           | False -> SLiteral.false_
+           | Int o -> Int_lit.to_form o
+@@ -1046,20 +1058,6 @@ module Conv = struct
+         end
+     end
+ 
+-  let lit_to_tst ?(ctx=T.Conv.create ()) lit =
+-    begin match lit with
+-      | SLiteral.Atom (p,s) ->
+-        let p = if s then p else T.Form.not_ p in
+-        T.Conv.to_simple_term ctx p
+-      | SLiteral.Eq(l,r) ->
+-        let l,r = CCPair.map_same (T.Conv.to_simple_term ctx) (l,r) in
+-        TypedSTerm.app_builtin ~ty:TypedSTerm.Ty.prop Builtin.Eq [l;r]
+-      | SLiteral.Neq(l,r) ->
+-        let l,r = CCPair.map_same (T.Conv.to_simple_term ctx) (l,r) in
+-        TypedSTerm.app_builtin ~ty:TypedSTerm.Ty.prop Builtin.Neq [l;r]
+-      | _ -> raise (invalid_arg "not implemented")
+-    end
+-
+   let to_s_form ?allow_free_db ?(ctx=T.Conv.create()) ?hooks lit =
+     to_form ?hooks lit
+     |> SLiteral.map ~f:(T.Conv.to_simple_term ?allow_free_db ctx)
+@@ -1069,6 +1067,7 @@ end
+ module View = struct
+   let as_eqn lit = match lit with
+     | Equation (l,r,sign) -> Some (l, r, sign)
++    | Prop (p, sign) -> Some (p, T.true_, sign)
+     | True
+     | False
+     | Rat _
+@@ -1078,6 +1077,7 @@ module View = struct
+     match lit, position with
+       | Equation (l,r,sign), P.Left _ -> Some (l, r, sign)
+       | Equation (l,r,sign), P.Right _ -> Some (r, l, sign)
++      | Prop (p, sign), P.Left _ -> Some (p, T.true_, sign)
+       | True, _
+       | False, _
+       | Int _, _
+diff --git a/src/core/Literal.mli b/src/core/Literal.mli
+index ddf6cdc5..13a0abdc 100644
+--- a/src/core/Literal.mli
++++ b/src/core/Literal.mli
+@@ -20,6 +20,7 @@ type t = private
+   | True
+   | False
+   | Equation of term * term * bool
++  | Prop of term * bool
+   | Int of Int_lit.t
+   | Rat of Rat_lit.t
+ 
+@@ -80,8 +81,6 @@ val mk_rat_op : Rat_lit.op -> Q.t Monome.t -> Q.t Monome.t -> t
+ val mk_rat_eq : Q.t Monome.t -> Q.t Monome.t -> t
+ val mk_rat_less : Q.t Monome.t -> Q.t Monome.t -> t
+ 
+-val no_prop_invariant : t -> bool
+-
+ val mk_constraint : term -> term -> t
+ (** [mk_constraint t u] makes a disequation or a HO constraint depending
+     on how [t] and [u] look. *)
+@@ -126,6 +125,7 @@ val of_unif_subst: Subst.Renaming.t -> Unif_subst.t -> t list
+     contained in this substitution. *)
+ 
+ val map : (term -> term) -> t -> t (** functor *)
++val map_no_simp : (term -> term) -> t -> t (** functor *)
+ val fold : ('a -> term -> 'a) -> 'a -> t -> 'a  (** basic fold *)
+ val for_all : (term -> bool) -> t -> bool  (** for the term or both terms of the literal *)
+ val vars : t -> Type.t HVar.t list (** gather variables *)
+@@ -176,8 +176,6 @@ val fold_terms :
+     - if [which] is [`Max], only the maximal terms are explored
+     - if [which] is [`All], all root terms are explored *)
+ 
+-val normalize_eq : t -> t option
+-
+ (** {2 Comparisons} *)
+ module Comp : sig
+   val max_terms : ord:Ordering.t -> t -> term list
+@@ -288,8 +286,6 @@ module Conv : sig
+   val to_s_form :
+     ?allow_free_db:bool -> ?ctx:Term.Conv.ctx -> ?hooks:hook_to list ->
+     t -> TypedSTerm.Form.t
+-
+-  val lit_to_tst : ?ctx:Term.Conv.ctx -> term SLiteral.t  -> TypedSTerm.t
+ end
+ 
+ (** {2 IO} *)
+diff --git a/src/core/Literals.ml b/src/core/Literals.ml
+index 7fd8faf7..44d052d1 100644
+--- a/src/core/Literals.ml
++++ b/src/core/Literals.ml
+@@ -165,11 +165,11 @@ let is_trivial lits =
+     if i = Array.length lits then false
+     else
+       let triv = match lits.(i) with
+-        | Lit.Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
++        | Lit.Prop (p, sign) ->
+           CCArray.exists
+             (function
+-              | Lit.Equation (lhs', rhs', true) when T.equal rhs' T.true_ || T.equal rhs' T.false_ ->
+-                T.equal lhs lhs' && not @@ T.equal rhs rhs'
++              | Lit.Prop (p', sign') when sign = not sign' ->
++                T.equal p p'  (* p  \/  ~p *)
+               | _ -> false)
+             lits
+         | Lit.Equation (l, r, true) when T.equal l r -> true
+@@ -251,23 +251,6 @@ module Conv = struct
+   let to_forms ?hooks lits =
+     Array.to_list (Array.map (Lit.Conv.to_form ?hooks) lits)
+ 
+-  let to_tst lits = 
+-    let ctx = Type.Conv.create () in
+-    Array.map (fun t -> Lit.Conv.lit_to_tst ~ctx (Lit.Conv.to_form t)) lits 
+-    |> Array.to_list
+-    |> (fun or_args ->
+-          let ty = TypedSTerm.Ty.prop in
+-          let quant_vars = Iter.fold (fun set t -> 
+-              T.VarSet.union set (T.vars_under_quant t)) 
+-            T.VarSet.empty (Seq.terms lits) in
+-          let clause_vars = T.VarSet.of_seq (Seq.vars lits) in
+-          let vars = T.VarSet.diff clause_vars quant_vars
+-                     |> T.VarSet.to_list 
+-                     |> CCList.map (fun v -> T.Conv.to_simple_term ctx (T.var v))  in
+-          let disjuncts =  TypedSTerm.app_builtin ~ty Builtin.or_ or_args in
+-          TypedSTerm.close_with_vars vars disjuncts
+-      )
+-
+   let to_s_form ?allow_free_db ?(ctx=T.Conv.create()) ?hooks lits =
+     Array.to_list lits
+     |> List.map (Literal.Conv.to_s_form ?hooks ?allow_free_db ~ctx)
+@@ -342,6 +325,9 @@ let fold_eqn ?(both=true) ?sign ~ord ~eligible lits k =
+                 (* only one side *)
+                 k (l, r, sign, Position.(arg i @@ left @@ stop))
+           end
++        | Lit.Prop (p, sign) when sign_ok sign ->
++          k (p, T.true_, sign, Position.(arg i @@ left @@ stop))
++        | Lit.Prop _
+         | Lit.Equation _
+         | Lit.Int _
+         | Lit.Rat _
+@@ -506,6 +492,7 @@ let is_horn lits =
+ let is_pos_eq lits =
+   match lits with
+     | [| Lit.Equation (l,r,true) |] -> Some (l,r)
++    | [| Lit.Prop(p,true) |] -> Some (p, T.true_)
+     | [| Lit.True |] -> Some (T.true_, T.true_)
+     | _ -> None
+ 
+diff --git a/src/core/Literals.mli b/src/core/Literals.mli
+index af186849..ce7fd49f 100644
+--- a/src/core/Literals.mli
++++ b/src/core/Literals.mli
+@@ -124,8 +124,6 @@ module Conv : sig
+     ?hooks:Literal.Conv.hook_to list ->
+     t ->
+     TypedSTerm.Form.t
+-
+-  val to_tst : t -> TypedSTerm.t
+ end
+ 
+ module View : sig
+diff --git a/src/core/PatternUnif.ml b/src/core/PatternUnif.ml
+index 15131205..a26dae70 100644
+--- a/src/core/PatternUnif.ml
++++ b/src/core/PatternUnif.ml
+@@ -284,11 +284,6 @@ let rec unify ~scope ~counter ~subst = function
+       | T.Const f , T.Const g when ID.equal f g && List.length args_s = List.length args_t ->
+         (* assert(List.length args_s = List.length args_t); *)
+         unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest
+-      | T.AppBuiltin(hd_s, args_s'), T.AppBuiltin(hd_t, args_t') when
+-          Builtin.equal hd_s hd_t && 
+-            List.length args_s' + List.length args_s = 
+-            List.length args_t' + List.length args_t ->
+-        unify ~subst ~counter ~scope @@ build_constraints (args_s'@args_s)  (args_t'@args_t) rest
+       | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->
+         (* assert (List.length args_s = List.length args_t); *)
+         unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest
+diff --git a/src/core/PragHOUnif.ml b/src/core/PragHOUnif.ml
+index 77703ff8..712ae2bc 100644
+--- a/src/core/PragHOUnif.ml
++++ b/src/core/PragHOUnif.ml
+@@ -245,11 +245,6 @@ let rec unify ~state ~scope ~counter ~subst = function
+                 flex_rigid ~state ~subst ~counter ~scope ~ban_id body_t' body_s' rest
+             | T.Const f , T.Const g when ID.equal f g && List.length args_s = List.length args_t ->
+                 unify ~state ~subst ~counter ~scope (build_constraints ~ban_id args_s args_t rest)
+-            | T.AppBuiltin(hd_s, args_s'), T.AppBuiltin(hd_t, args_t') when
+-                Builtin.equal hd_s hd_t && 
+-                  List.length args_s' + List.length args_s = 
+-                  List.length args_t' + List.length args_t ->
+-                unify ~state ~subst ~counter ~scope (build_constraints ~ban_id (args_s'@args_s) (args_t'@args_t) rest)
+             | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->
+                 unify ~state ~subst ~counter ~scope (build_constraints ~ban_id args_s args_t rest)  
+             | _ -> OSeq.empty
+@@ -384,7 +379,7 @@ let unify_scoped t0_s t1_s =
+ 
+   res
+   |> OSeq.map (CCOpt.map (fun sub ->       
+-      let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t0_s in 
++      (* let l = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t0_s in 
+       let r = Lambda.eta_expand @@ Lambda.snf @@ S.apply sub t1_s in
+       assert(Type.equal (Term.ty l) (Term.ty r));
+       if not (T.equal l r) then (
+@@ -393,5 +388,5 @@ let unify_scoped t0_s t1_s =
+         Format.printf "%a <> %a\n" T.pp l T.pp r;
+         assert(false);
+       );
+-      assert (T.equal l r);
++      assert (T.equal l r); *)
+     sub))
+\ No newline at end of file
+diff --git a/src/core/Rewrite.ml b/src/core/Rewrite.ml
+index 8adb25b5..54ab1fa2 100644
+--- a/src/core/Rewrite.ml
++++ b/src/core/Rewrite.ml
+@@ -118,17 +118,7 @@ module Cst_ = struct
+   let rules_term_seq t : term_rule Iter.t =
+     rules_seq t
+     |> Iter.filter_map
+-      (function 
+-        | T_rule t -> 
+-          let rhs = t.term_rhs in
+-          let quant_vars = T.vars_under_quant rhs in
+-          let q_var_renaming = T.VarSet.fold (fun v subst ->
+-            let ty = HVar.ty v in
+-            let fresh = HVar.fresh ~ty () in
+-            Subst.FO.bind' subst (v,0) (T.var fresh, 0)  
+-          ) quant_vars Subst.empty in
+-          Some {t with term_rhs = Subst.FO.apply Subst.Renaming.none q_var_renaming (rhs,0)} 
+-        | _ -> None)
++      (function T_rule t -> Some t | _ -> None)
+ 
+   let rules_lit_seq t : lit_rule Iter.t =
+     rules_seq t
+@@ -239,9 +229,7 @@ module Term = struct
+       Util.debugf ~section 1 "Making rule for %a"
+          (fun k -> k ID.pp id);
+       let lhs = T.app (T.const ~ty id) args in
+-      let rhs_vars = Term.VarSet.diff (T.vars rhs) (Term.vars_under_quant rhs) in
+-      assert (Type.equal (T.ty lhs) (T.ty rhs));
+-      if not (T.VarSet.subset rhs_vars (T.vars lhs)) then (
++      if not (T.VarSet.subset (T.vars rhs) (T.vars lhs)) then (
+         Util.invalid_argf
+           "Rule.make_const %a %a:@ invalid rule, RHS contains variables"
+           ID.pp id T.pp rhs
+@@ -338,14 +326,14 @@ module Term = struct
+         (* first, reduce subterms *)
+         reduce_l l
+           (fun l' ->
+-            let t' = if T.same_l l l' then t else T.app f l' in
+-            let n_l = List.length l' in
+-            begin match T.view f with
+-              | T.Const id ->
+-                let find_rule =
+-                  rules_of_id id
+-                  |> Iter.find_map
+-                    (fun r ->
++             let t' = if T.same_l l l' then t else T.app f l' in
++             let n_l = List.length l' in
++             begin match T.view f with
++               | T.Const id ->
++                 let find_rule =
++                   rules_of_id id
++                   |> Iter.find_map
++                     (fun r ->
+                         try
+                           let n_r = Rule.arity r in
+                           let t', l_rest =
+@@ -358,50 +346,49 @@ module Term = struct
+                             )
+                           in
+                           let subst' =
+-                            Unif.FO.matching ~pattern:(r.term_lhs,sc_r) (t',sc_t)
++                             Unif.FO.matching ~pattern:(r.term_lhs,sc_r) (t',sc_t)
+                           in
+                           let cur_sc_r = sc_r in
+                           Some (r, subst', cur_sc_r, l_rest)
+                         with Unif.Fail | Exit ->  None)
+-                in
+-                begin match find_rule with
+-                  | None -> k t'
+-                  | Some (r, subst, sc_r, l_rest) ->
+-                    (* rewrite [t = r.lhs\sigma] into [rhs] (and normalize [rhs],
++                 in
++                 begin match find_rule with
++                   | None -> k t'
++                   | Some (r, subst, sc_r, l_rest) ->
++                     (* rewrite [t = r.lhs\sigma] into [rhs] (and normalize [rhs],
+                         which contain variables bound by [subst]) *)
+-                    Util.debugf ~section 5
+-                      "(@[<2>rewrite `@[%a@]`@ :using `@[%a@]`@ \
++                     Util.debugf ~section 5
++                       "(@[<2>rewrite `@[%a@]`@ :using `@[%a@]`@ \
+                         :with `@[%a@]`[%d]@ :rest [@[%a@]]@])"
+-                      (fun k->k T.pp t' Rule.pp r Subst.pp subst sc_r
+-                          (Util.pp_list ~sep:"," T.pp) l_rest);
+-                    set := Rule_inst_set.add (r,subst,sc_r) !set;
+-                    Util.incr_stat stat_term_rw;
+-                    decr fuel;
+-                    (* NOTE: not efficient, will traverse [t'] fully *)
+-                    let rhs = Subst.FO.apply Subst.Renaming.none subst (r.term_rhs,sc_r) in
+-                    (* add leftover arguments *)
+-                    let rhs = T.app rhs l_rest in
+-                    reduce rhs k
+-                end
+-              | _ -> k t'
+-            end)
++                       (fun k->k T.pp t' Rule.pp r Subst.pp subst sc_r
++                           (Util.pp_list ~sep:"," T.pp) l_rest);
++                     set := Rule_inst_set.add (r,subst,sc_r) !set;
++                     Util.incr_stat stat_term_rw;
++                     decr fuel;
++                     (* NOTE: not efficient, will traverse [t'] fully *)
++                     let rhs = Subst.FO.apply Subst.Renaming.none subst (r.term_rhs,sc_r) in
++                     (* add leftover arguments *)
++                     let rhs = T.app rhs l_rest in
++                     reduce rhs k
++                 end
++               | _ -> k t'
++             end)
+       | T.Fun (arg, body) ->
+         (* term rewrite rules, because [vars(rhs)⊆vars(lhs)], map
+-          closed terms to closed terms, so we can safely rewrite under λ *)
++           closed terms to closed terms, so we can safely rewrite under λ *)
+         reduce body
+           (fun body' ->
+-            let t =
+-              if T.equal body body' then t else (T.fun_ arg body')
+-            in k t)
++             let t =
++               if T.equal body body' then t else (T.fun_ arg body')
++             in k t)
+       | T.Var _
+       | T.DB _ -> k t
+       | T.AppBuiltin (_,[]) -> k t
+       | T.AppBuiltin (b,l) ->
+         reduce_l l
+           (fun l' ->
+-            let t' = if T.same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l' in
+-            k t')
+-
++             let t' = if T.same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l' in
++             k t')
+     (* reduce list *)
+     and reduce_l (l:_ list) k = match l with
+       | [] -> k []
+@@ -464,8 +451,8 @@ module Lit = struct
+         (rhs c)
+ 
+     let head_id c = match lhs c with
+-      | Literal.Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
+-        begin match T.view lhs with
++      | Literal.Prop (t, _) ->
++        begin match T.view t with
+           | T.Const id -> Some id
+           | T.App (f, _) ->
+             begin match T.view f with
+@@ -557,8 +544,8 @@ module Lit = struct
+     end
+ 
+   let rules_of_lit lit: rule Iter.t = match lit with
+-    | Literal.Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
+-      begin match T.Classic.view lhs with
++    | Literal.Prop (t, _) ->
++      begin match T.Classic.view t with
+         | T.Classic.App (id, _) -> rules_of_id id
+         | _ -> Iter.empty
+       end
+@@ -648,16 +635,15 @@ let pseudo_rule_of_rule (r:rule): pseudo_rule = match r with
+       | _ -> None
+     in
+     let view_lit id (lit:Literal.t) = match lit with
+-      | Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
+-          view_atom id lhs
++      | Literal.Prop (t, _) -> view_atom id t
+       | _ -> None
+     in
+     let fail() =
+       Util.invalid_argf "cannot compute position for rule %a" Lit.Rule.pp r
+     in
+     begin match Lit.Rule.lhs r with
+-      | Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
+-        begin match T.Classic.view lhs with
++      | Literal.Prop (t, _) ->
++        begin match T.Classic.view t with
+           | T.Classic.App (id, args) ->
+             (* occurrences of literals with same [id] on RHS *)
+             let rhs =
+diff --git a/src/core/Signature.ml b/src/core/Signature.ml
+index 5f55aead..73a4e578 100644
+--- a/src/core/Signature.ml
++++ b/src/core/Signature.ml
+@@ -88,7 +88,7 @@ let sym_in_conj s signature =
+ 
+ let set_sym_in_conj s signature =
+    let t = find_exn signature s in
+-   ID.Map.add s (t, true) signature
++      ID.Map.add s (t, true) signature
+ 
+ module Seq = struct
+   let symbols s =
+diff --git a/src/core/Statement.ml b/src/core/Statement.ml
+index 9df2ccd0..c7e04748 100644
+--- a/src/core/Statement.ml
++++ b/src/core/Statement.ml
+@@ -775,7 +775,7 @@ let scan_simple_stmt_for_ind_ty st = match view st with
+ (** TODO: Ask Simon how to hide this in the fun *)
+ let def_sym = ref IdMap.empty;;
+ 
+-let get_rw_rule ?weight_incr:(w_i=1000000) c  =
++let get_rw_rule ?weight_incr:(w_i=20) c  =
+   let distinct_free_vars l =
+     l |> List.map (fun t -> Term.as_var t |>
+                     (fun v -> match v with
+@@ -795,41 +795,45 @@ let get_rw_rule ?weight_incr:(w_i=1000000) c  =
+     assert(Term.DB.is_closed abs_rhs);
+     let r = Rewrite.Term.Rule.make ~proof:(as_proof_c c) sym (Type.close_forall (Term.ty abs_rhs)) ty_vars abs_rhs in
+     let rule = Rewrite.T_rule r in
+-    (* CCFormat.printf "[ Declared rule %a out of symbol %a and rhs %a ]\n" Rewrite.Rule.pp rule ID.pp sym Term.pp rhs; *)
++    (* Util.debugf 1 "[ Declared rule %a out of symbol %a and rhs %a ]"
++    (fun k -> k Rewrite.Rule.pp rule ID.pp sym Term.pp rhs); *)
+     (* Format.printf "[RULE: %a SYM: %a RHS: %a]\n" Rewrite.Rule.pp rule ID.pp sym Term.pp rhs; *)
+     rule in
+ 
+   let build_from_head sym vars rhs =
+-    let rhs = Lambda.eta_reduce @@ Lambda.snf (fst (Rewrite.Term.normalize_term rhs)) in
+-    let vars_lhs = Term.VarSet.of_seq (Iter.fold (fun acc v -> 
+-        Iter.union acc (Term.Seq.vars v)) 
+-      Iter.empty (Iter.of_list vars)) in
+-    let vars_lhs = Term.VarSet.union vars_lhs (Term.vars_under_quant rhs) in
++    let rhs = Lambda.snf (fst (Rewrite.Term.normalize_term rhs)) in
+     if not (Term.symbols rhs |> ID.Set.mem sym) &&
+         Term.VarSet.cardinal
+-          (Term.VarSet.diff (Term.vars rhs) vars_lhs) = 0 then
++          (Term.VarSet.diff (Term.vars rhs)
++                            ((List.fold_left (fun acc t ->
++                                  match Term.as_var t with
++                                    None -> acc
++                                    | Some v -> v :: acc) [] vars)
++                              |> Term.VarSet.of_list)) = 0 then
+       (* Here I skipped proof object creation *)
+       let res_rw =  Some (sym, make_rw sym vars rhs) in
+       (def_sym := IdMap.add sym (rhs, res_rw) !def_sym;
+        res_rw)
+-    else None in
++    else
++      None in
+ 
+   let conv_terms_rw t1 t2 =
+     let reduced = Lambda.eta_reduce t1 in
+-    let t2' = Lambda.snf (fst (Rewrite.Term.normalize_term t2)) in
+-    let hd, l = Term.as_app reduced in
+-    if (Term.is_const hd && distinct_free_vars l && Type.is_fun (Term.ty hd)) then (
+-      let sym = (Term.as_const_exn hd) in
+-      (match IdMap.find_opt sym !def_sym with
+-      | Some (rhs, rw_rule) ->  (
+-          let rhs = Lambda.eta_reduce rhs in
+-          if  not (Unif.FO.are_variant rhs t2') then (
+-          None)
+-          else rw_rule )
+-      | _ -> build_from_head sym l t2)
+-    ) 
+-    else None in
+-      
++      match Term.view reduced with
++        Term.App (hd, l) when Term.is_const hd && distinct_free_vars l
++                              && (let real_vars =
++                                    List.filter (fun v -> not (Type.is_tType (Term.ty v))) l in
++                                 List.length (real_vars) >= 1) ->
++            let sym = (Term.as_const_exn hd) in
++            (match IdMap.find_opt sym !def_sym with
++            | Some (rhs, rw_rule) ->  (
++               if  not (Term.equal rhs t2) then (
++               Util.debugf 1 "Rejected definition %a of %a " (fun k-> k Term.pp t2 ID.pp sym) ;
++               None)
++               else rw_rule )
++            | _ -> build_from_head sym l t2)
++        | _ -> None in
++
+    let all_lits =  Seq.lits c in
+    if Iter.length all_lits = 1 then
+       match Iter.head_exn all_lits with
+diff --git a/src/core/Term.ml b/src/core/Term.ml
+index 04c65744..2a16bf63 100644
+--- a/src/core/Term.ml
++++ b/src/core/Term.ml
+@@ -187,14 +187,6 @@ let false_ = builtin ~ty:Type.prop Builtin.False
+ 
+ let grounding ty = builtin ~ty Builtin.Grounding
+ 
+-let is_formula t = match T.view t with
+-  | T.AppBuiltin(hd,_) ->
+-    List.mem hd [Builtin.And; Builtin.Or; Builtin.Not; 
+-                 Builtin.Imply; Builtin.Equiv; 
+-                 Builtin.Xor; Builtin.ForallConst;
+-                 Builtin.ExistsConst]
+-  | _ -> false
+-
+ let is_var t = match T.view t with
+   | T.Var _ -> true
+   | _ -> false
+@@ -211,17 +203,12 @@ let is_fun t = match T.view t with
+   | T.Bind (Binder.Lambda, _, _) -> true
+   | _ -> false
+ 
++
+ let is_app t = match T.view t with
+   | T.Const _
+   | T.App _ -> true
+   | _ -> false
+ 
+-let get_quantified_var t = match T.view t with
+-  | T.AppBuiltin(Builtin.ForallConst, [x;_])
+-  | T.AppBuiltin(Builtin.ExistsConst, [x;_]) when is_var x ->
+-      Some x
+-  | _ -> None
+-
+ let is_type t = Type.equal Type.tType (ty t)
+ 
+ let as_const_exn t = match T.view t with
+@@ -376,10 +363,6 @@ let max_cover t ts =
+   in
+   aux 0 t
+ 
+-  let mk_forall vars body = 
+-    let ty = ty body in
+-    VarSet.fold (fun v t -> app_builtin ~ty Builtin.ForallConst [var v; t]) vars body
+-
+ 
+ module Seq = struct
+   let vars t k =
+@@ -398,11 +381,11 @@ module Seq = struct
+     in
+     aux t
+ 
+-  let subterms ?(include_builtin=false) t k =
++  let subterms t k =
+     let rec aux t =
+       k t;
+       match view t with
+-        | AppBuiltin (_, l) -> if include_builtin then List.iter aux l;
++        | AppBuiltin _
+         | Const _
+         | Var _
+         | DB _ -> ()
+@@ -455,15 +438,6 @@ module Seq = struct
+          | _ -> None)
+ end
+ 
+-let vars_under_quant t = VarSet.of_seq @@ Iter.fold (fun acc st -> 
+-  match view st with 
+-  | AppBuiltin(Builtin.ForallConst, [x;_]) 
+-  | AppBuiltin(Builtin.ExistsConst, [x;_]) when is_var x  ->
+-    Iter.union acc (Seq.vars x)
+-  | _ -> acc
+-) Iter.empty (Seq.subterms ~include_builtin:true t)
+-
+-
+ let var_occurs ~var t =
+   Iter.exists (HVar.equal Type.equal var) (Seq.vars t)
+ 
+@@ -1042,21 +1016,13 @@ module Conv = struct
+         decr depth;
+         PT.Var_tbl.remove tbl v;
+         fun_ ty_arg body
+-      | PT.Bind(b, v, body) when Binder.equal b Binder.Forall 
+-                                 || Binder.equal b Binder.Exists ->
+-        let b = if Binder.equal b Binder.Forall 
+-                then Builtin.ForallConst else Builtin.ExistsConst in
+-        let v = var (Type.Conv.var_of_simple_term ctx v) in
+-        let ty = Type.Conv.of_simple_term_exn ctx (PT.ty_exn body) in
+-        let body = aux body in
+-        app_builtin ~ty b [v; body]
++      | PT.Bind _
+       | PT.Meta _
+       | PT.Record _
+       | PT.Ite _
+       | PT.Let _
+       | PT.Match _
+-      | PT.Multiset _ 
+-      | _ -> raise (Type.Conv.Error t)
++      | PT.Multiset _ -> raise (Type.Conv.Error t)
+     in
+     aux t
+ 
+@@ -1083,17 +1049,6 @@ module Conv = struct
+         | App (f,l) ->
+           ST.app ~ty:(aux_ty (ty t))
+             (aux_t env f) (List.map (aux_t env) l)
+-        | AppBuiltin (b,[v;body]) when Builtin.equal b Builtin.ForallConst ||
+-                                Builtin.equal b Builtin.ExistsConst ->
+-          let b = if Builtin.equal b Builtin.ForallConst 
+-                  then Binder.Forall else Binder.Exists in
+-          let v =
+-            (match view v with
+-            | Var i -> (aux_var i)
+-            | _ -> 
+-            let v = aux_t env v in
+-            raise (Type.Conv.Error v)) in
+-          ST.bind ~ty:(aux_ty (ty t)) b v (aux_t env body) 
+         | AppBuiltin (b,l) ->
+           ST.app_builtin ~ty:(aux_ty (ty t))
+             b (List.map (aux_t env) l)
+diff --git a/src/core/Term.mli b/src/core/Term.mli
+index a2836088..e2c679fb 100644
+--- a/src/core/Term.mli
++++ b/src/core/Term.mli
+@@ -127,7 +127,6 @@ val grounding : Type.t -> t
+ 
+ val is_var : t -> bool
+ val is_bvar : t -> bool
+-val is_formula : t -> bool
+ val is_app : t -> bool
+ val is_const : t -> bool
+ val is_fun : t -> bool
+@@ -188,7 +187,7 @@ module VarTbl : CCHashtbl.S with type key = var
+ 
+ module Seq : sig
+   val vars : t -> var Iter.t
+-  val subterms : ?include_builtin:bool -> t -> t Iter.t
++  val subterms : t -> t Iter.t
+   val subterms_depth : t -> (t * int) Iter.t  (* subterms with their depth *)
+   val symbols : t -> ID.t Iter.t
+   val max_var : var Iter.t -> int (** max var *)
+@@ -217,8 +216,6 @@ val cover_with_terms : ?depth:int -> ?recurse:bool -> t -> t option list -> t li
+ (* cover the term in a maximal way looked top-down *)
+ val max_cover : t -> t option list -> t
+ 
+-val mk_forall : VarSet.t -> t -> t
+-
+ val weight : ?var:int -> ?sym:(ID.t -> int) -> t -> int
+ (** Compute the weight of a term, given a weight for variables
+     and one for ID.ts.
+@@ -237,8 +234,6 @@ val is_ho_app : t -> bool
+ val as_ho_app : t -> (Type.t HVar.t * t list) option
+ (** [as_ho_app (F t1…tn) = Some (F, [t1…tn])] *)
+ 
+-val get_quantified_var : t -> t option
+-
+ val is_ho_pred : t -> bool
+ (** [is_ho_pred (F t1…tn)] is true, when [F] is a predicate variable *)
+ 
+@@ -386,8 +381,6 @@ module Arith : sig
+   (** hook to print arithmetic expressions *)
+ end
+ 
+-val vars_under_quant : t -> VarSet.t
+-
+ (** {2 De Bruijn} *)
+ module DB : sig
+   val is_closed : t -> bool
+diff --git a/src/core/TypeInference.ml b/src/core/TypeInference.ml
+index 721bb8b6..05066bf0 100644
+--- a/src/core/TypeInference.ml
++++ b/src/core/TypeInference.ml
+@@ -613,13 +613,9 @@ let rec infer_rec ?loc ctx t =
+       then error_ ?loc "(in)equation @[%a@] ?= @[%a@] between types is forbidden" T.pp a T.pp b;
+       begin match conn with
+         | Builtin.Eq ->
+-          if T.Ty.is_prop (T.ty_exn a) && (CCOpt.is_none (T.head a) || CCOpt.is_none (T.head b))
+-          then T.Form.equiv a b 
+-          else T.Form.eq a b
++          if T.Ty.is_prop (T.ty_exn a) then T.Form.equiv a b else T.Form.eq a b
+         | Builtin.Neq ->
+-          if T.Ty.is_prop (T.ty_exn a) && (CCOpt.is_none (T.head a) || CCOpt.is_none (T.head b))
+-          then T.Form.xor a b 
+-          else T.Form.neq a b
++          if T.Ty.is_prop (T.ty_exn a) then T.Form.xor a b else T.Form.neq a b
+         | _ -> assert false
+       end
+     | PT.Bind(((Binder.Forall | Binder.Exists) as binder), vars, f') ->
+diff --git a/src/core/TypedSTerm.ml b/src/core/TypedSTerm.ml
+index 2a6facbf..37fd3ae3 100644
+--- a/src/core/TypedSTerm.ml
++++ b/src/core/TypedSTerm.ml
+@@ -534,13 +534,6 @@ let close_all ~ty s t =
+   let vars = free_vars t in
+   bind_list ~ty s vars t
+ 
+-let close_with_vars vars t =
+-  let vars = List.map (fun v -> match view v with
+-      | Var v -> v
+-      | _ -> invalid_arg "has to be a variable" ) 
+-    vars in
+-  bind_list Binder.Forall vars t ~ty:prop
+-
+ let unfold_fun = unfold_binder Binder.Lambda
+ 
+ (* non recursive map *)
+diff --git a/src/core/TypedSTerm.mli b/src/core/TypedSTerm.mli
+index 09fcda2c..9aee7fe4 100644
+--- a/src/core/TypedSTerm.mli
++++ b/src/core/TypedSTerm.mli
+@@ -259,8 +259,6 @@ val free_vars_set : t -> t Var.Set.t
+ val close_all : ty:t -> Binder.t -> t -> t
+ (** Bind all free vars with the symbol *)
+ 
+-val close_with_vars : t list -> t -> t
+-
+ (** Generic non-recursive map *)
+ val map :
+   f:('a -> t -> t) ->
+diff --git a/src/prover/clause.ml b/src/prover/clause.ml
+index a06bd89d..bc8cbf65 100644
+--- a/src/prover/clause.ml
++++ b/src/prover/clause.ml
+@@ -146,7 +146,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
+   let of_statement st =
+     let of_lits lits =
+       (* convert literals *)
+-    let lits = List.map Ctx.Lit.of_form lits in
++      let lits = List.map Ctx.Lit.of_form lits in
+       let proof = Stmt.proof_step st in
+       let c = create ~trail:Trail.empty ~penalty:1 lits proof in
+       c
+@@ -292,6 +292,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
+           | Comparison.Eq
+           | Comparison.Incomparable -> false
+         end
++      | [| Lit.Prop (_, true) |] -> true
+       | _ -> false
+ 
+   let symbols ?(init=ID.Set.empty) seq =
+diff --git a/src/prover/clauseQueue.ml b/src/prover/clauseQueue.ml
+index 175ba172..8e602984 100644
+--- a/src/prover/clauseQueue.ml
++++ b/src/prover/clauseQueue.ml
+@@ -134,14 +134,10 @@ module Make(C : Clause_intf.S) = struct
+          | Term.Fun (_, t) -> 2*w + calc_tweight t sg v w c_mul
+ 
+      let calc_lweight l sg v w c_mul =
+-      assert (Literal.no_prop_invariant l);
+       match l with 
+-      (* Special treatment of propositions *)
+-      | Lit.Equation (lhs,rhs,true) when Term.equal rhs Term.true_ 
+-                                          || Term.equal rhs Term.false_ ->
+-        calc_tweight lhs sg v w c_mul, Term.equal rhs Term.true_
+       | Lit.Equation (lhs,rhs,sign) -> (calc_tweight lhs sg v w c_mul + 
+                                         calc_tweight rhs sg v w c_mul, sign)
++      | Lit.Prop (head,sign) -> (calc_tweight head sg v w c_mul, sign)
+       | _ -> (0,false)
+ 
+     let conj_relative ?(distinct_vars_mul=(-1.0)) c =
+diff --git a/src/prover/ctx.ml b/src/prover/ctx.ml
+index 200f48d4..8f552d88 100644
+--- a/src/prover/ctx.ml
++++ b/src/prover/ctx.ml
+@@ -20,8 +20,6 @@ module type PARAMETERS = sig
+   val ord : Ordering.t
+   val select : Selection.t
+   val eta : [`Reduce | `Expand | `None]
+-  val sk_ctx : Skolem.ctx
+-
+ end
+ 
+ module Key = struct
+@@ -34,13 +32,11 @@ module Make(X : PARAMETERS) = struct
+   let _eta = ref X.eta
+   let _signature = ref X.signature
+   let _complete = ref true
+-  let _sk_ctx = ref X.sk_ctx
+ 
+   let _inj_syms = ref ID.Map.empty
+ 
+   let renaming = S.Renaming.create ()
+   let ord () = !_ord
+-  let sk_ctx () = !_sk_ctx
+   let set_ord o = _ord := o
+   let selection_fun () = !_select
+   let set_selection_fun s = _select := s
+diff --git a/src/prover/ctx.mli b/src/prover/ctx.mli
+index bca4f2bf..a59fae93 100644
+--- a/src/prover/ctx.mli
++++ b/src/prover/ctx.mli
+@@ -17,7 +17,6 @@ module type PARAMETERS = sig
+   val ord : Ordering.t
+   val select : Selection.t
+   val eta : [`Reduce | `Expand | `None]
+-  val sk_ctx : Skolem.ctx
+ end
+ 
+ (** {2 Create a new context} *)
+diff --git a/src/prover/ctx_intf.ml b/src/prover/ctx_intf.ml
+index 42dc9ea7..51b90539 100644
+--- a/src/prover/ctx_intf.ml
++++ b/src/prover/ctx_intf.ml
+@@ -4,8 +4,6 @@
+ open Logtk
+ 
+ module type S = sig
+-  val sk_ctx : unit -> Skolem.ctx
+-
+   val ord : unit -> Ordering.t
+   (** current ordering on terms *)
+ 
+diff --git a/src/prover/env.ml b/src/prover/env.ml
+index 55cb3b66..bdd6481a 100644
+--- a/src/prover/env.ml
++++ b/src/prover/env.ml
+@@ -118,7 +118,6 @@ module Make(X : sig
+   let _is_trivial : is_trivial_rule list ref = ref []
+   let _empty_clauses = ref C.ClauseSet.empty
+   let _multi_simpl_rule : multi_simpl_rule list ref = ref []
+-  let _ss_multi_simpl_rule : multi_simpl_rule ref = ref (fun _ -> None)
+   let _generate_rules : (string * generate_rule) list ref = ref []
+   let _clause_conversion_rules : clause_conversion_rule list ref = ref []
+   let _step_init = ref []
+@@ -216,9 +215,6 @@ module Make(X : sig
+   let add_multi_simpl_rule rule =
+     _multi_simpl_rule := rule :: !_multi_simpl_rule
+ 
+-  let set_single_step_multi_simpl_rule rule =
+-    _ss_multi_simpl_rule := rule
+-
+   let cr_skip = CR_skip
+   let cr_add x = CR_add x
+   let cr_return x = CR_return x
+@@ -735,13 +731,7 @@ module Make(X : sig
+     let did_simplify = ref false in
+     let set = ref C.ClauseSet.empty in
+     let q = Queue.create () in
+-    let single_step_simplified = !_ss_multi_simpl_rule c in
+-    begin
+-      match single_step_simplified with
+-      | None -> Queue.push c q;
+-      | Some l -> did_simplify := true;
+-                  List.iter (fun c -> Queue.push c q) l
+-    end;
++    Queue.push c q;
+     while not (Queue.is_empty q) do
+       let c = Queue.pop q in
+       let c, st = simplify c in
+diff --git a/src/prover/env_intf.ml b/src/prover/env_intf.ml
+index 9e26213d..c5a4c09e 100644
+--- a/src/prover/env_intf.ml
++++ b/src/prover/env_intf.ml
+@@ -126,10 +126,6 @@ module type S = sig
+   val add_multi_simpl_rule : multi_simpl_rule -> unit
+   (** Add a multi-clause simplification rule *)
+ 
+-  val set_single_step_multi_simpl_rule : multi_simpl_rule -> unit
+-  (** Add a multi-clause simplification rule, that is going to be applied
+-      only once, not in a fixed-point manner *)
+-
+   val add_is_trivial_trail : is_trivial_trail_rule -> unit
+   (** Add tautology detection rule *)
+ 
+diff --git a/src/prover/saturate.ml b/src/prover/saturate.ml
+index 5a2cdd2f..e3804702 100644
+--- a/src/prover/saturate.ml
++++ b/src/prover/saturate.ml
+@@ -67,12 +67,9 @@ end
+ module Make(E : Env.S) = struct
+   module Env = E
+ 
+-  let[@inline] check_clause_ c = 
+-    if !_check_types then Env.C.check_types c;
+-    CCArray.iter (fun t -> assert(Literal.no_prop_invariant t)) (Env.C.lits c)
+-
++  let[@inline] check_clause_ c = if !_check_types then Env.C.check_types c
+   let[@inline] check_clauses_ seq =
+-    if !_check_types then Iter.iter check_clause_ seq
++    if !_check_types then Iter.iter Env.C.check_types seq
+ 
+   (** One iteration of the main loop ("given clause loop") *)
+   let given_clause_step ?(generating=true) num =
+diff --git a/src/prover_calculi/Arith_rat.ml b/src/prover_calculi/Arith_rat.ml
+index 6accee3f..2c95cb92 100644
+--- a/src/prover_calculi/Arith_rat.ml
++++ b/src/prover_calculi/Arith_rat.ml
+@@ -1188,8 +1188,8 @@ module Make(E : Env.S) : S with module Env = E = struct
+         Monome.Rat.of_term l >>= fun m1 ->
+         Monome.Rat.of_term r >|= fun m2 ->
+         i, [Lit.mk_rat_less m1 m2; Lit.mk_rat_less m2 m1]
+-      | Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
+-        begin match T.view lhs, T.equal rhs T.true_ with
++      | Lit.Prop (f,sign) ->
++        begin match T.view f, sign with
+           | T.AppBuiltin (Builtin.Less, [_; l; r]), false when type_ok l ->
+             Monome.Rat.of_term l >>= fun m1 ->
+             Monome.Rat.of_term r >|= fun m2 ->
+diff --git a/src/prover_calculi/Higher_order.ml b/src/prover_calculi/Higher_order.ml
+index b8547134..635a9630 100644
+--- a/src/prover_calculi/Higher_order.ml
++++ b/src/prover_calculi/Higher_order.ml
+@@ -452,9 +452,8 @@ module Make(E : Env.S) : S with module Env = E = struct
+         Array.fold_left
+           (fun (others,set) lit ->
+              begin match lit with
+-               | Literal.Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
+-                 let f, args = T.as_app lhs in
+-                 let sign = T.equal rhs T.true_ in
++               | Literal.Prop (t, sign) ->
++                 let f, args = T.as_app t in
+                  begin match T.view f with
+                    | T.Var q when HVar.equal Type.equal v q ->
+                      (* found an occurrence *)
+@@ -593,7 +592,6 @@ module Make(E : Env.S) : S with module Env = E = struct
+              C.create_a lits proof
+                ~penalty:(C.penalty c + penalty) ~trail:(C.trail c)
+            in
+-           (* CCFormat.printf "[Prim_enum:] @[%a@]\n=>\n@[%a@].\n" C.pp c C.pp new_c;  *)
+            Util.debugf ~section 3
+              "(@[<hv2>ho.refine@ :from %a@ :subst %a@ :yields %a@])"
+              (fun k->k C.pp c Subst.pp subst C.pp new_c);
+@@ -1052,7 +1050,7 @@ let def_unfold_enabled_ = ref false
+ let force_enabled_ = ref false
+ let enable_unif_ = ref true
+ let prim_mode_ = ref `Neg
+-let prim_max_penalty = ref 13 (* FUDGE *)
++let prim_max_penalty = ref 15 (* FUDGE *)
+ 
+ let set_prim_mode_ =
+   let l = [
+@@ -1090,12 +1088,6 @@ let st_contains_ho (st:(_,_,_) Statement.t): bool =
+   has_ho_sym () || has_ho_var () || has_ho_eq()
+ 
+ let extension =
+-  (* let env_action env =
+-    let module E = (val env : Env.S) in
+-    if E.flex_get k_enable_def_unfold then (
+-      let clauses = E.
+-    )  *)
+-
+   let register env =
+     let module E = (val env : Env.S) in
+     if E.flex_get k_some_ho || !force_enabled_ then (
+@@ -1145,7 +1137,7 @@ let () =
+       "--ho-unif", Arg.Set enable_unif_, " enable full HO unification";
+       "--ho-neg-cong-fun", Arg.Set _neg_cong_fun, "enable NegCongFun";
+       "--no-ho-unif", Arg.Clear enable_unif_, " disable full HO unification";
+-      "--ho-elim-pred-var", Arg.Bool (fun b -> _elim_pred_var := b), " disable predicate variable elimination";
++      "--no-ho-elim-pred-var", Arg.Clear _elim_pred_var, " disable predicate variable elimination";
+       "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";
+       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
+       "--ho-ext-axiom", Arg.Set _ext_axiom, " enable extensionality axiom";
+diff --git a/src/prover_calculi/booleans.ml b/src/prover_calculi/booleans.ml
+deleted file mode 100644
+index da71fe9d..00000000
+--- a/src/prover_calculi/booleans.ml
++++ /dev/null
+@@ -1,487 +0,0 @@
+-
+-(* This file is free software, part of Zipperposition. See file "license" for more details. *)
+-
+-(** {1 boolean subterms} *)
+-
+-open Logtk
+-open Libzipperposition
+-
+-module T = Term
+-
+-type selection_setting = Any | Minimal | Large
+-type reasoning_kind    = BoolReasoningDisabled | BoolCasesInference | BoolCasesSimplification | BoolCasesEager
+-
+-let _bool_reasoning = ref BoolReasoningDisabled
+-let cased_term_selection = ref Any
+-let quant_rename = ref false
+-
+-module type S = sig
+-  module Env : Env.S
+-  module C : module type of Env.C
+-
+-  (** {6 Registration} *)
+-
+-  val setup : unit -> unit
+-  (** Register rules in the environment *)
+-end
+-
+-
+-module Make(E : Env.S) : S with module Env = E = struct
+-  module Env = E
+-  module C = Env.C
+-  module Ctx = Env.Ctx
+-  module Fool = Fool.Make(Env)
+-
+-  let (=~),(/~) = Literal.mk_eq, Literal.mk_neq
+-  let (@:) = T.app_builtin ~ty:Type.prop
+-  let no a = a =~ T.false_
+-  let yes a = a =~ T.true_
+-  let imply a b = Builtin.Imply @: [a;b]
+-  let const_true p = T.fun_ (List.hd @@ fst @@ Type.open_fun (T.ty p)) T.true_
+-
+-  let true_not_false = [T.true_ /~ T.false_]
+-  let true_or_false a = [yes a; a =~ T.false_]
+-  let imp_true1 a b = [yes a; yes(imply a b)]
+-  let imp_true2 a b = [no b; yes(imply a b)]
+-  let imp_false a b = [no(imply a b); no a; yes b]
+-  let all_true p = [p /~ const_true p; yes(Builtin.ForallConst@:[p])]
+-  let all_false p = [no(Builtin.ForallConst@:[p]); p =~ const_true p]
+-  let eq_true x y = [x/~y; yes(Builtin.Eq@:[x;y])]
+-  let eq_false x y = [no(Builtin.Eq@:[x;y]); x=~y]
+-  let and_ a b = [Builtin.And @: [a;b] 
+-                    =~  imply (imply a (imply b T.false_)) T.false_]
+-  let or_ a b = [Builtin.Or @: [a;b] 
+-                    =~  imply (imply a T.false_) b] 
+-
+-  let and_true a  = [Builtin.And @: [T.true_; a] =~ a]
+-  let and_false a  = [Builtin.And @: [T.false_; a] =~ T.false_]
+-  
+-  let exists t = 
+-    let t2bool = Type.arrow [t] Type.prop in
+-    [T.app_builtin ~ty:(Type.arrow [t2bool] Type.prop) Builtin.ExistsConst [] =~ T.fun_ t2bool
+-      (Builtin.Not @:[Builtin.ForallConst @:[T.fun_ t (Builtin.Not @:[T.app (T.bvar t2bool 1) [T.bvar t 0]])]])]
+-  
+-  let as_clause c = Env.C.create ~penalty:1 ~trail:Trail.empty c Proof.Step.trivial
+-
+-  let create_clauses () = 
+-    (*let alpha_var = HVar.make ~ty:Type.tType 0 in
+-    let alpha = Type.var alpha_var in
+-    let b = T.var (HVar.make ~ty:Type.prop 1) in
+-    let p = T.var (HVar.make ~ty:(Type.arrow [alpha] Type.prop) 1) in
+-    let x = T.var (HVar.make ~ty:alpha 1) in
+-    let y = T.var (HVar.make ~ty:alpha 2) in*)
+-    let a = T.var (HVar.make ~ty:Type.prop 0) in
+-    [
+-      [Builtin.And @:[T.true_; a] =~ a];
+-	  [Builtin.And @:[T.false_; a] =~ T.false_];
+-	  [Builtin.Or @:[T.true_; a] =~ T.true_];
+-	  [Builtin.Or @:[T.false_; a] =~ a];
+-	  [Builtin.Imply @:[T.true_; a] =~ a];
+-	  [Builtin.Imply @:[T.false_; a] =~ T.true_];
+-	  [Builtin.Not @:[T.true_] =~ T.false_];
+-	  [Builtin.Not @:[T.false_] =~ T.true_];
+-	  (*
+-	  imp_true1 a b; imp_true2 a b; imp_false a b; 
+-      and_ a b;
+-      all_true p; all_false p;
+-	  eq_true x y; eq_false x y; 
+-      (*not; exists alpha;*)
+-      or_ a b;
+-      (*and_false a; and_true a;*)
+-	  *)
+-    ] |> List.map as_clause |> Iter.of_list
+-
+-  let bool_cases(c: C.t) : C.t list =
+-  let term_as_true = Hashtbl.create 8 in
+-  let term_as_false = Hashtbl.create 4 in
+-	let rec find_bools top t =
+-		let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && not top in
+-    let is_quant = match T.view t with 
+-      | AppBuiltin(b,_) -> 
+-        Builtin.equal b Builtin.ForallConst || Builtin.equal b Builtin.ExistsConst
+-      | _ -> false in
+-		(* Add only propositions. *)
+-		let add = if can_be_cased then Hashtbl.add term_as_true else fun _ _ -> () in
+-		let yes = if can_be_cased then yes else fun _ -> yes T.true_ in
+-		(* Stop recursion in combination of certain settings. *)
+-		let inner f x = 
+-      if is_quant || can_be_cased && !cased_term_selection = Large 
+-      then () 
+-      else List.iter(f false) x in
+-		match T.view t with
+-			| DB _ | Var _ -> ()
+-			| Const _ -> add t (yes t)
+-			| Fun(_,b) -> find_bools false b
+-			| App(f,ps) -> add t (yes t); inner find_bools (f::ps)
+-			| AppBuiltin(f,ps) ->
+-				inner find_bools ps;
+-				match f with
+-					| Builtin.True | Builtin.False -> ()
+-					| Builtin.Eq | Builtin.Neq | Builtin.Equiv | Builtin.Xor ->
+-						(match ps with 
+-              | [x;y] when (!cased_term_selection != Minimal || Type.is_prop(T.ty x)) ->
+-                if f = Builtin.Neq || f = Builtin.Xor then(
+-                  if can_be_cased then Hashtbl.add term_as_false t (x =~ y);
+-                  add t (x /~ y)
+-                )else
+-                  add t (x =~ y)
+-              | _ -> ())
+-					| Builtin.And | Builtin.Or | Builtin.Imply | Builtin.Not ->
+-						if !cased_term_selection != Minimal then add t (yes t) else()
+-					| _ -> add t (yes t)
+-	in
+-	Literals.Seq.terms(C.lits c) |> Iter.iter(find_bools true);
+-	let case polarity b b_lit clauses =
+-		let proof = Proof.Step.inference[C.proof_parent c]
+-			~rule:(Proof.Rule.mk"bool_cases")
+-		in
+-		C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+-			(b_lit :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:polarity)))
+-		proof :: clauses
+-	in
+-	Hashtbl.fold(case T.false_) term_as_true [] @
+-	Hashtbl.fold(case T.true_) term_as_false []
+-
+-
+-  let bool_case_simp(c: C.t) : C.t list option =
+-  let term_to_equations = Hashtbl.create 8 in
+-	let rec find_bools top t =
+-		let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && (not top ||
+-      (* It is useful to case top level equality like 𝘵𝘦𝘳𝘮𝘴 because these are simplified into 𝘭𝘪𝘵𝘦𝘳𝘢𝘭𝘴. *)
+-      match T.view t with AppBuiltin((Eq|Neq|Equiv|Xor),_) -> true | _ -> false) in
+-    let is_quant = match T.view t with 
+-      | AppBuiltin(b,_) -> 
+-        Builtin.equal b Builtin.ForallConst || Builtin.equal b Builtin.ExistsConst
+-      | _ -> false in
+-		(* Add only propositions. *)
+-		let add t x y = if can_be_cased then Hashtbl.add term_to_equations t (x=~y, x/~y) in
+-		(* Stop recursion in combination of certain settings. *)
+-		let inner f x = 
+-      if is_quant || (can_be_cased && !cased_term_selection = Large) 
+-      then () 
+-      else List.iter(f false) x in
+-		match T.view t with
+-			| DB _ | Var _ -> ()
+-			| Const _ -> add t t T.true_
+-			| Fun(_,b) -> find_bools false b
+-			| App(f,ps) -> add t t T.true_; inner find_bools (f::ps)
+-			| AppBuiltin(f,ps) ->
+-				inner find_bools ps;
+-				match f with
+-					| Builtin.True | Builtin.False -> ()
+-					| Builtin.Eq | Builtin.Neq | Builtin.Equiv | Builtin.Xor ->
+-						(* Format.printf "Equality like: %b %b (%a) %a\n" (!cased_term_selection != Minimal) (Type.is_prop(T.ty(List.hd ps))) (CCList.pp T.pp) ps C.pp c; *)
+-            (match ps with 
+-              | [x;y] when (!cased_term_selection != Minimal || Type.is_prop(T.ty x)) ->
+-                add t x y;
+-                if f = Builtin.Neq || f = Builtin.Xor then
+-                  Hashtbl.replace term_to_equations t (Hashtbl.find term_to_equations t |> CCPair.swap)
+-              | _ -> ())
+-					| Builtin.And | Builtin.Or | Builtin.Imply | Builtin.Not ->
+-						if !cased_term_selection != Minimal then add t t T.true_ else()
+-					| _ -> add t t T.true_
+-	in
+-	Literals.Seq.terms(C.lits c) |> Iter.iter(find_bools true);
+-  let res = 
+-    Hashtbl.fold(fun b (b_true, b_false) clauses ->
+-      if !cased_term_selection != Minimal ||
+-         Term.Seq.subterms b |> 
+-         Iter.for_all (fun st -> T.equal b st || 
+-                                 not (Type.is_prop (T.ty st))) then (
+-        let proof = Proof.Step.inference[C.proof_parent c]
+-          ~rule:(Proof.Rule.mk"bool_case_simp")
+-        in
+-        C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+-          (b_true :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:T.false_)))
+-        proof ::
+-        C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+-          (b_false :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:T.true_)))
+-        proof ::
+-        clauses)
+-      else clauses) term_to_equations [] in
+-  if CCList.is_empty res then None
+-  else (Some res)
+-
+-  let simpl_eq_subterms c =
+-    let simplified = ref false in
+-    let new_lits = 
+-      C.Seq.terms c |>
+-      Iter.flat_map T.Seq.subterms
+-      |> Iter.fold (fun acc t -> 
+-        match T.view t with
+-        | T.AppBuiltin(hd, [lhs;rhs]) when T.equal lhs rhs -> 
+-            if Builtin.equal hd Builtin.Eq  || Builtin.equal hd Builtin.Equiv then (
+-              simplified := true;
+-              Literals.map (T.replace ~old:t ~by:T.true_) acc
+-            ) else if Builtin.equal hd Builtin.Neq  || Builtin.equal hd Builtin.Xor then (
+-              simplified := true;
+-              Literals.map (T.replace ~old:t ~by:T.false_) acc
+-            ) else  acc
+-        | _ -> acc) (C.lits c)
+-       in
+-    if not (!simplified) then (
+-      SimplM.return_same c
+-    ) else (
+-      let proof = Proof.Step.inference [C.proof_parent c] 
+-                    ~rule:(Proof.Rule.mk "simplify trivial (in)equalities") in
+-      let new_ = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
+-                  (Array.to_list new_lits) proof in
+-      SimplM.return_new new_
+-    )
+-
+-  let normalize_equalities c =
+-    let lits = Array.to_list (C.lits c) in
+-    let normalized = List.map Literal.normalize_eq lits in
+-    if List.exists CCOpt.is_some normalized then (
+-      let new_lits = List.mapi (fun i l_opt -> 
+-        CCOpt.get_or ~default:(Array.get (C.lits c) i) l_opt) normalized in
+-      let proof = Proof.Step.inference [C.proof_parent c] 
+-                    ~rule:(Proof.Rule.mk "simplify nested equalities") in
+-      let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
+-      SimplM.return_new new_c
+-    ) 
+-    else (
+-      SimplM.return_same c 
+-    )
+-
+-  let cnf_otf c : C.t list option =   
+-    let idx = CCArray.find_idx (fun l -> 
+-      let eq = Literal.View.as_eqn l in
+-      match eq with 
+-      | Some (l,r,sign) -> 
+-          Type.is_prop (T.ty l) && 
+-            ((not (T.equal r T.true_) && not (T.equal r T.false_))
+-              || T.is_formula l || T.is_formula r)
+-      | None            -> false 
+-    ) (C.lits c) in
+-    match idx with 
+-    | Some _ ->
+-      let f = Literals.Conv.to_tst (C.lits c) in
+-      let proof = Proof.Step.esa ~rule:(Proof.Rule.mk "cnf_otf") [C.proof_parent c] in
+-      let stmt = Statement.assert_ ~proof f in
+-      let cnf_vec = Cnf.convert @@ CCVector.to_seq @@ Cnf.cnf_of ~ctx:(Ctx.sk_ctx ()) stmt in
+-      let sets = Env.convert_input_statements cnf_vec in
+-      let clauses = sets.Clause.c_set |> CCVector.to_list in
+-      Some clauses
+-    | None       -> None
+-
+-  let setup () =
+-	(* if !_bool_reasoning then(
+-		Env.ProofState.ActiveSet.add (create_clauses () );
+-		Env.add_unary_inf "bool_cases" bool_cases;
+-    Env.add_basic_simplify simpl_eq_subterms;
+-	) *)
+-  match !_bool_reasoning with 
+-  | BoolReasoningDisabled -> ()
+-  | _ -> 
+-    (* Env.ProofState.PassiveSet.add (create_clauses ()); *)
+-    Env.add_basic_simplify simpl_eq_subterms;
+-    Env.add_basic_simplify normalize_equalities;
+-    Env.add_multi_simpl_rule Fool.rw_bool_lits;
+-    Env.add_multi_simpl_rule cnf_otf;
+-    if !_bool_reasoning = BoolCasesInference then (
+-      Env.add_unary_inf "bool_cases" bool_cases;
+-    )
+-    else if !_bool_reasoning = BoolCasesSimplification then (
+-      Env.set_single_step_multi_simpl_rule bool_case_simp;
+-    )
+-end
+-
+-
+-open Builtin
+-open Statement
+-open TypedSTerm
+-open List
+-
+-
+-let if_changed proof (mk: ?attrs:Logtk.Statement.attrs -> 'r) s f' p =
+-  let fp = f' p in
+-  if fp = p then s else mk ~proof:(proof s) fp
+-
+-let map_propositions ~proof f =
+-  CCVector.map(fun s -> match Statement.view s with
+-    | TyDecl(id,t)	-> s
+-    | Data ts	-> s
+-    | Def defs	-> s
+-    | Rewrite _	-> s
+-    | Assert p	-> if_changed proof assert_ s (f s) p
+-    | Lemma ps	-> if_changed proof lemma s (map(f s)) ps
+-    | Goal p	-> if_changed proof goal s (f s) p
+-    | NegatedGoal(ts, ps)	-> if_changed proof (neg_goal ~skolems:ts) s (map(f s)) ps
+-  )
+-
+-
+-let is_bool t = Ty.equal prop (ty_exn t)
+-let is_T_F t = match view t with AppBuiltin((True|False),[]) -> true | _ -> false
+-
+-(* Modify every subterm of t by f except those at the "top". Here top is true if subterm occures under a quantifier Æ in a context where it could participate to the clausification if the surrounding context of Æ was ignored. *)
+-let rec replaceTST f top t =
+-  let re = replaceTST f in
+-  let ty = match ty t with
+-    | Some ty -> ty
+-    | None -> assert false (* These are typed terms so they must have a type. *)
+-  in
+-  let transformer = if top then CCFun.id else f in
+-  transformer 
+-    (match view t with
+-      | App(t,ts) -> 
+-        app_whnf ~ty (re false t) (map (re false) ts)
+-      | Ite(c,x,y) -> 
+-        ite (re false c) (re false x) (re false y)
+-      | Match(t, cases) -> 
+-        match_ (re false t) (map (fun (c,vs,e) -> (c,vs, re false e)) cases)
+-      | Let(binds, expr) -> 
+-        let_ (map(CCPair.map2 (re false)) binds) (re false expr)
+-      | Bind(b,x,t) -> 
+-        let top = Binder.equal b Binder.Forall || Binder.equal b Binder.Exists in
+-        bind ~ty b x (re top t)
+-      | AppBuiltin(b,ts) ->
+-          let logical = List.for_all is_bool ts in
+-          app_builtin ~ty b (map (re(top && logical)) ts)
+-      | Multiset ts -> 
+-        multiset ~ty (map (re false) ts)
+-      | _ -> t)
+-
+-
+-let name_quantifiers stmts =
+-  let proof s = Proof.Step.esa [Proof.Parent.from(Statement.as_proof_i s)]
+-          ~rule:(Proof.Rule.mk "Quantifier naming")
+-  in
+-  let new_stmts = CCVector.create() in
+-  let changed = ref false in
+-  let if_changed (mk: ?attrs:Logtk.Statement.attrs -> 'r) s r = 
+-    if !changed then (changed := false; mk ~proof:(proof s) r) else s in
+-  let if_changed_list (mk: ?attrs:Logtk.Statement.attrs -> 'l) s r = 
+-    if !changed then (changed := false; mk ~proof:(proof s) r) else s in
+-  let name_prop_Qs s = replaceTST(fun t -> match TypedSTerm.view t with
+-    | Bind(Binder.Forall,_,_) | Bind(Binder.Exists, _, _) ->
+-        changed := true;
+-        let vars = Var.Set.of_seq (TypedSTerm.Seq.free_vars t) |> Var.Set.to_list in
+-        let qid = ID.gensym() in
+-        let ty = app_builtin ~ty:tType Builtin.Arrow (prop :: List.map Var.ty vars) in
+-        let q = const ~ty qid in
+-        let q_vars = app ~ty:prop q (List.map var vars) in
+-        let proof = Proof.Step.define_internal qid [Proof.Parent.from(Statement.as_proof_i s)] in
+-        let q_typedecl = ty_decl ~proof qid ty in
+-        let definition = 
+-          (* ∀ vars: q[vars] ⇔ t, where t is a quantifier formula and q is a new name for it. *)
+-          bind_list ~ty:prop Binder.Forall vars 
+-            (app_builtin ~ty:prop Builtin.Equiv [q_vars; t]) 
+-        in
+-        CCVector.push new_stmts q_typedecl;
+-        CCVector.push new_stmts (assert_ ~proof definition);
+-        q_vars
+-    | _ -> t) true
+-  in
+-  stmts |> CCVector.map(fun s ->
+-    match Statement.view s with
+-    | TyDecl(id,t)	-> s
+-    | Data ts	-> s
+-    | Def defs	-> s
+-    | Rewrite _	-> s
+-    | Assert p	-> if_changed assert_ s (name_prop_Qs s p)
+-    | Lemma ps	-> if_changed_list lemma s (List.map (name_prop_Qs s) ps)
+-    | Goal p	-> if_changed goal s (name_prop_Qs s p)
+-    | NegatedGoal(ts, ps)	-> if_changed_list (neg_goal ~skolems:ts) s (List.map (name_prop_Qs s) ps)
+-  ) |> CCVector.append new_stmts;
+-  CCVector.freeze new_stmts
+-
+-
+-let rec replace old by t =
+-  let r = replace old by in
+-  let ty = ty_exn t in
+-  if TypedSTerm.equal t old then by
+-  else match view t with
+-    | App(f,ps) -> app_whnf ~ty (r f) (map r ps)
+-    | AppBuiltin(f,ps) -> app_builtin ~ty f (map r ps)
+-    | Ite(c,x,y) -> ite (r c) (r x) (r y)
+-    | Let(bs,e) -> let_ (map (CCPair.map2 r) bs) (r e)
+-    | Bind(b,v,e) -> bind ~ty b v (r e)
+-    | _ -> t
+-
+-
+-exception Return of TypedSTerm.t
+-(* If f _ s = Some r for a subterm s of t, then r else t. *)
+-let with_subterm_or_id t f = try
+-  (Seq.subterms_with_bound t (fun(s, var_ctx) ->
+-    match f var_ctx s with
+-    | None -> ()
+-    | Some r -> raise(Return r)));
+-  t
+-  with Return r -> r
+-
+-
+-(* Apply repeatedly the transformation t[p] ↦ (p ⇒ t[⊤]) ∧ (¬p ⇒ t[⊥]) for each boolean parameter p≠⊤,⊥ that is closed in context where variables vs are bound. *)
+-let rec case_bools_wrt vs t =
+-  let ty = prop in
+-  with_subterm_or_id t (fun _ s -> 
+-  match view s with
+-    | App(f,ps) ->
+-        let t' = List.fold_left(fun t' p ->
+-          if is_bool p && not(is_T_F p) && Var.Set.is_empty(Var.Set.diff (free_vars_set s) vs)
+-          then
+-            app_builtin ~ty And [
+-              app_builtin ~ty Imply [p; replace p Form.true_ t'];
+-              app_builtin ~ty Or [p; replace p Form.false_ t'];
+-            ]
+-          else t') t ps
+-        in
+-        if t==t' then None else Some(case_bools_wrt vs t')
+-    | _ -> None
+-  )
+-
+-let eager_bool_cases x =
+-  let proof s = Proof.Step.esa [Proof.Parent.from(Statement.as_proof_i s)]
+-          ~rule:(Proof.Rule.mk "eager_bool_cases")
+-  in
+-  map_propositions ~proof (fun _ t ->
+-    with_subterm_or_id t (fun vs s -> match view s with
+-      | Bind((Forall|Exists) as q, v, b) ->
+-          let b' = case_bools_wrt (Var.Set.add vs v) b in
+-          if b==b' then None else Some(replace s (bind ~ty:prop q v b') t)
+-      | _ -> None)
+-    |> case_bools_wrt Var.Set.empty)x
+-
+-
+-let preprocess_booleans stmts = name_quantifiers(match !_bool_reasoning with
+-  | BoolReasoningDisabled -> stmts
+-  | BoolCasesEager -> eager_bool_cases stmts
+-  | _ -> stmts)
+-
+-let extension =
+-  let register env =
+-    let module E = (val env : Env.S) in
+-    let module ET = Make(E) in
+-    ET.setup ()
+-  in
+-  { Extensions.default with
+-      Extensions.name = "bool";
+-      env_actions=[register];
+-  }
+-
+-let () =
+-  Options.add_opts
+-    [ "--boolean-reasoning", Arg.Symbol (["off"; "cases-inf"; "cases-simpl"; "cases-eager"], 
+-        fun s -> _bool_reasoning := 
+-                    match s with 
+-                    | "off" -> BoolReasoningDisabled
+-                    | "cases-inf" -> BoolCasesInference
+-                    | "cases-simpl" -> BoolCasesSimplification
+-                    | "cases-eager" -> BoolCasesEager
+-                    | _ -> assert false), 
+-      " enable/disable boolean axioms";
+-      "--bool-subterm-selection", 
+-      Arg.Symbol(["A"; "M"; "L"], (fun opt -> if opt = "A" then cased_term_selection := Any
+-                                            else if opt = "N" then cased_term_selection := Minimal
+-                                            else cased_term_selection := Large)), 
+-      " select boolean subterm selection criterion: A for any, M for minimal and L for large";
+-      "--quantifier-renaming"
+-      , Arg.Bool (fun v -> quant_rename := v)
+-      , " turn the quantifier renaming on or off"];
+-  Params.add_to_mode "ho-complete-basic" (fun () ->
+-    _bool_reasoning := BoolReasoningDisabled
+-  );
+-  Params.add_to_mode "fo-complete-basic" (fun () ->
+-    _bool_reasoning := BoolReasoningDisabled
+-  );
+-  Extensions.register extension
+\ No newline at end of file
+diff --git a/src/prover_calculi/booleans.mli b/src/prover_calculi/booleans.mli
+deleted file mode 100644
+index 307c0c9f..00000000
+--- a/src/prover_calculi/booleans.mli
++++ /dev/null
+@@ -1,27 +0,0 @@
+-
+-(* This file is free software, part of Zipperposition. See file "license" for more details. *)
+-
+-(** {1 Booleans} *)
+-open Libzipperposition
+-
+-val quant_rename : bool ref
+-
+-module type S = sig
+-  module Env : Env.S
+-  module C : module type of Env.C
+-
+-  (** {6 Registration} *)
+-
+-  val setup : unit -> unit
+-  (** Register rules in the environment *)
+-
+-  
+-end
+-
+-module Make(E : Env.S) : S with module Env = E
+-
+-val extension : Extensions.t
+-
+-val name_quantifiers : Logtk.TypeInference.typed_statement CCVector.ro_vector -> Logtk.TypeInference.typed_statement CCVector.ro_vector
+-
+-val preprocess_booleans : Logtk.TypeInference.typed_statement CCVector.ro_vector -> Logtk.TypeInference.typed_statement CCVector.ro_vector
+\ No newline at end of file
+diff --git a/src/prover_calculi/fool.ml b/src/prover_calculi/fool.ml
+index 063bcab9..9653c8af 100644
+--- a/src/prover_calculi/fool.ml
++++ b/src/prover_calculi/fool.ml
+@@ -23,8 +23,6 @@ module type S = sig
+   (** {6 Registration} *)
+ 
+   val setup : unit -> unit
+-  val rw_bool_lits : Env.multi_simpl_rule
+-
+   (** Register rules in the environment *)
+ end
+ 
+@@ -99,10 +97,9 @@ module Make(E : Env.S) : S with module Env = E = struct
+     |> Iter.of_array_i
+     |> Iter.filter_map
+       (fun (idx,lit) -> match lit with
+-         | Literal.Equation (lhs, rhs, true) when  (T.equal rhs T.true_) || (T.equal rhs T.false_) ->
+-           begin match T.as_var lhs with
++         | Literal.Prop (t, sign) ->
++           begin match T.as_var t with
+              | Some v -> 
+-               let sign = T.equal rhs T.true_ in
+                (* found var, replace it with [not sign] *)
+                let t = if sign then T.false_ else T.true_ in
+                let subst =
+@@ -143,7 +140,7 @@ module Make(E : Env.S) : S with module Env = E = struct
+     in
+     (* how to build a new clause *)
+     let mk_c lits =
+-      let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "cnf_otf")
++      let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "fool_simp")
+           [Proof.Parent.from @@ C.proof c]
+       in
+       C.create lits proof
+@@ -160,11 +157,9 @@ module Make(E : Env.S) : S with module Env = E = struct
+            let c_pos = Literal.mk_true a :: Literal.mk_true b :: lits |> mk_c in
+            let c_neg = Literal.mk_false a :: Literal.mk_false b :: lits |> mk_c in
+            Some [c_pos; c_neg]
+-         | Literal.Equation (lhs, rhs, true) 
+-            when  (T.equal rhs T.true_) || (T.equal rhs T.false_) ->
++         | Literal.Prop (t, sign) ->
+            (* see if there is some CNF to do here *)
+-           let sign = T.equal rhs T.true_ in
+-           begin match T.view lhs, sign with
++           begin match T.view t, sign with
+              | T.AppBuiltin (Builtin.And, l), true
+              | T.AppBuiltin (Builtin.Or, l), false ->
+                let lits = CCArray.except_idx (C.lits c) i in
+diff --git a/src/prover_calculi/fool.mli b/src/prover_calculi/fool.mli
+index 5bb4a461..11b6fdcd 100644
+--- a/src/prover_calculi/fool.mli
++++ b/src/prover_calculi/fool.mli
+@@ -26,13 +26,10 @@ module type S = sig
+   (** {6 Registration} *)
+ 
+   val setup : unit -> unit
+-  val rw_bool_lits : Env.multi_simpl_rule
+   (** Register rules in the environment *)
+-
+ end
+ 
+ module Make(E : Env.S) : S with module Env = E
+-(* let f = Make(e) in f.ppaarra *)
+ 
+ (** {2 As Extension} *)
+ 
+diff --git a/src/prover_calculi/induction.ml b/src/prover_calculi/induction.ml
+index 4114cd33..1f5dec20 100644
+--- a/src/prover_calculi/induction.ml
++++ b/src/prover_calculi/induction.ml
+@@ -741,6 +741,8 @@ module Make
+ 
+   (* variable appears only naked, i.e. directly under [=] *)
+   let var_always_naked (f:Cut_form.t)(x:T.var): bool =
++    let check_t t = T.is_var t || not (T.var_occurs ~var:x t) in
++    begin
+       Cut_form.cs f
+       |> Iter.of_list
+       |> Iter.flat_map Iter.of_array
+@@ -749,9 +751,11 @@ module Make
+           | Literal.Equation (l,r,_) ->
+             let check_t t = T.is_var t || not (T.var_occurs ~var:x t) in
+             check_t l && check_t r
++          | Literal.Prop (t,_) -> check_t t
+           | Literal.Int _ | Literal.Rat _ -> false
+           | Literal.True | Literal.False -> true)
+- 
++    end
++
+   let active_subterms_form (f:Cut_form.t): T.t Iter.t =
+     Cut_form.cs f
+     |> Iter.of_list
+diff --git a/src/prover_calculi/superposition.ml b/src/prover_calculi/superposition.ml
+index 085c099c..47315bd0 100644
+--- a/src/prover_calculi/superposition.ml
++++ b/src/prover_calculi/superposition.ml
+@@ -260,6 +260,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
+         end
+       | [| Lit.Equation (l,r,false) |] ->
+         f idx (l,r,false,c)
++      | [| Lit.Prop (p, sign) |] ->
++        f idx (p,T.true_,sign,c)
+       | _ -> idx
+     in
+     _idx_simpl := idx';
+@@ -375,26 +377,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
+     let active_idx = Lits.Pos.idx info.active_pos in
+     let shift_vars = if info.sup_kind = LambdaSup then 0 else -1 in
+     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
+-    assert(Array.for_all Literal.no_prop_invariant (C.lits info.passive));
+-    assert(Array.for_all Literal.no_prop_invariant (C.lits info.passive));
+     try
+       let renaming = S.Renaming.create () in
+       let us = info.subst in
+       let subst = US.subst us in
+-
+-      let vars_under_quant cl = 
+-        C.Seq.terms cl |> Iter.fold (fun acc st -> 
+-          Term.VarSet.union acc (Term.vars_under_quant st)) 
+-          Term.VarSet.empty in
+-      let set_in_subs subst set sc =
+-        Term.VarSet.exists 
+-          (fun v -> CCOpt.is_some (S.find subst ((v :> InnerTerm.t HVar.t), sc))) set in
+-      if set_in_subs subst (vars_under_quant info.active) sc_a || 
+-         set_in_subs subst (vars_under_quant info.passive) sc_p then (
+-        raise (ExitSuperposition "Trying to paramodulate with quantificator.");
+-      );
+- 
+-
+       let lambdasup_vars =
+         if (info.sup_kind = LambdaSup) then (
+           Term.Seq.subterms info.u_p |> Iter.filter Term.is_var |> Term.Set.of_seq)
+@@ -402,6 +388,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
+       let t' = if info.sup_kind != DupSup then 
+                 S.FO.apply ~shift_vars renaming subst (info.t, sc_a)
+                else dup_sup_apply_subst info.t sc_a sc_p subst renaming in
++      Util.debugf ~section 1
++      "@[<2>sup, kind %s(%d)@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
++       (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
++      (fun k->k (kind_to_str info.sup_kind) (Term.Set.cardinal lambdasup_vars) C.pp info.active sc_a T.pp info.s T.pp info.t
++          T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
++          Position.pp info.passive_pos US.pp info.subst);
++
+       if(info.sup_kind = LambdaSup &&
+          T.Seq.subterms t'
+          |> Iter.exists (fun st ->
+@@ -416,6 +409,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
+         raise @@ ExitSuperposition("LambdaSup -- an into free variable sneaks in bound variable");
+ 
+       begin match info.passive_lit, info.passive_pos with
++        | Lit.Prop (_, true), P.Arg(_, P.Left P.Stop) ->
++          if T.equal t' T.true_
++          then raise (ExitSuperposition "will yield a bool tautology")
+         | Lit.Equation (_, v, true), P.Arg(_, P.Left P.Stop)
+         | Lit.Equation (v, _, true), P.Arg(_, P.Right P.Stop) ->
+           (* are we in the specific, but no that rare, case where we
+@@ -541,15 +537,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
+         Format.printf "Res: %a.\n" C.pp new_clause;
+          assert(false);
+       );
+-
+-      Util.debugf ~section 1 
+-      "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
+-        (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
+-      (fun k -> k
+-        (kind_to_str info.sup_kind) C.pp info.active sc_a T.pp info.s T.pp info.t
+-            T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
+-            Position.pp info.passive_pos US.pp info.subst); 
+-      Util.debugf ~section 1  "Res: %a.\n" (fun k -> k C.pp new_clause);
+       
+       (* (try
+         ignore (C.check_types new_clause);
+@@ -562,7 +549,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
+             T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
+             Position.pp info.passive_pos Subst.pp subst';
+         Format.printf "@[res = %a@].\n" C.pp new_clause); *)
+-      assert(Array.for_all Literal.no_prop_invariant (C.lits new_clause));
++      
+       Some new_clause
+     with ExitSuperposition reason ->
+       Util.debugf ~section 3 "... cancel, %s" (fun k->k reason);
+@@ -597,6 +584,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
+       let subst = US.subst us in
+       let t' = S.FO.apply ~shift_vars renaming subst (info.t, sc_a) in
+       begin match info.passive_lit, info.passive_pos with
++        | Lit.Prop (_, true), P.Arg(_, P.Left P.Stop) ->
++          if T.equal t' T.true_
++          then raise (ExitSuperposition "will yield a bool tautology")
+         | Lit.Equation (_, v, true), P.Arg(_, P.Left P.Stop)
+         | Lit.Equation (v, _, true), P.Arg(_, P.Right P.Stop) ->
+           (* are we in the specific, but no that rare, case where we
+@@ -1255,6 +1245,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
+         (fun i lit ->
+            match lit with
+              | _ when i = idx -> () (* same index *)
++             | Lit.Prop (p, true) ->
++               (* positive proposition *)
++               k (p, T.true_, unify (s,0) (p,0));
+              | Lit.Equation (u, v, true) ->
+                (* positive equation *)
+                k (u, v, unify (s,0) (u,0));
+@@ -1462,7 +1455,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
+                let u =
+                  if T.same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l'
+                in
+-               reduce_at_root ~restrict u k)
++               k u)
+     and normal_form_l l k = match l with
+       | [] -> k []
+       | t :: tail ->
+@@ -1495,6 +1488,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
+             begin match O.compare ord t1 t2 with
+               | Comp.Gt -> [t1] | Comp.Lt -> [t2] | _ -> []
+             end
++          | Lit.Prop (t,true) -> [t]
+           | _ -> []
+         end
+       ) in
+@@ -1511,7 +1505,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
+         (* restrict max terms in positive literals eligible for resolution *)
+         CCList.mem ~eq:T.equal t (Lazy.force strictly_max)
+       ) in
+-      Lit.map
++      Lit.map_no_simp
+         (fun t -> demod_nf ~restrict:(restrict_term t) st c t)
+         lit
+     in
+@@ -1601,19 +1595,18 @@ module Make(Env : Env.S) : S with module Env = Env = struct
+         (fun cc lit -> match lit with
+            | Lit.Equation (l, r, false) ->
+              Congruence.FO.mk_eq cc l r
+-          (* registering equations of the form ~ P as negative equations P = true *)
+-           | Lit.Equation (p, t, true) when T.equal t T.false_ ->
++           | Lit.Prop (p, false) ->
+              Congruence.FO.mk_eq cc p T.true_
+            | _ -> cc)
+         cc (C.lits c)
+     in
+     let res = CCArray.exists
+         (function
+-          (* making sure we do not catch equations of the form P = false
+-            that are interpreted as negative equations P = true *)
+-          | Lit.Equation (l, r, true) when not (T.equal r T.false_) ->
++          | Lit.Equation (l, r, true) ->
+             (* if l=r is implied by the congruence, then the clause is redundant *)
+             Congruence.FO.is_eq cc l r
++          | Lit.Prop (p, true) ->
++            Congruence.FO.is_eq cc p T.true_
+           | _ -> false)
+         (C.lits c)
+     in
+@@ -2472,9 +2465,9 @@ let () =
+     ; "--fluidsup-penalty"
+     , Arg.Int (fun p -> _fluidsup_penalty := p)
+     , " penalty for FluidSup inferences"
+-    ; "--fluidsup"
+-    , Arg.Bool (fun b -> _fluidsup :=b)
+-    , " enable/disable FluidSup inferences (only effective when complete higher-order unification is enabled)"
++    ; "--no-fluidsup"
++    , Arg.Clear _fluidsup
++    , " disable FluidSup inferences (only effective when complete higher-order unification is enabled)"
+     ; "--lambdasup"
+     , Arg.Int (fun l -> 
+                   if l < 0 then 
+@@ -2523,9 +2516,9 @@ let () =
+       _max_infs := 5;
+       PragHOUnif.max_depth := 3;
+       PragHOUnif.max_app_projections := 0;
+-      PragHOUnif.max_var_imitations := 2;
+-      PragHOUnif.max_identifications := 2;
+-      PragHOUnif.max_elims := 2;
++      PragHOUnif.max_var_imitations := 0;
++      PragHOUnif.max_identifications := 1;
++      PragHOUnif.max_elims := 1;
+       _fluidsup := false;
+     );
+     Params.add_to_mode "ho-competitive" (fun () ->
+diff --git a/src/prover_phases/phases_impl.ml b/src/prover_phases/phases_impl.ml
+index 3942eb51..f062d2a6 100644
+--- a/src/prover_phases/phases_impl.ml
++++ b/src/prover_phases/phases_impl.ml
+@@ -7,7 +7,6 @@ open Logtk
+ open Logtk_parsers
+ open Logtk_proofs
+ open Libzipperposition
+-open Libzipperposition_calculi
+ 
+ open Phases.Infix
+ 
+@@ -54,7 +53,6 @@ let load_extensions =
+   Extensions.register Arith_rat.extension;
+   Extensions.register Ind_types.extension;
+   Extensions.register Fool.extension;
+-  Extensions.register Booleans.extension;
+   Extensions.register Higher_order.extension;
+   let l = Extensions.extensions () in
+   Phases.return_phase l
+@@ -123,12 +121,12 @@ let typing ~file prelude (input,stmts) =
+   Phases.return_phase stmts
+ 
+ (* obtain clauses  *)
+-let cnf ~sk_ctx decls =
++let cnf decls =
+   Phases.start_phase Phases.CNF >>= fun () ->
+   let stmts =
+     decls
+     |> CCVector.to_seq
+-    |> Cnf.cnf_of_seq ~ctx:sk_ctx
++    |> Cnf.cnf_of_seq
+     |> CCVector.to_seq
+     |> Cnf.convert
+   in
+@@ -179,14 +177,13 @@ let compute_ord_select precedence =
+   Util.debugf ~section 2 "@[<2>selection function:@ %s@]" (fun k->k params.Params.select);
+   Phases.return_phase (ord, select)
+ 
+-let make_ctx ~signature ~ord ~select ~eta ~sk_ctx () =
++let make_ctx ~signature ~ord ~select ~eta () =
+   Phases.start_phase Phases.MakeCtx >>= fun () ->
+   let module Res = struct
+     let signature = signature
+     let ord = ord
+     let select = select
+     let eta = eta
+-    let sk_ctx = sk_ctx
+   end in
+   let module MyCtx = Ctx.Make(Res) in
+   let ctx = (module MyCtx : Ctx_intf.S) in
+@@ -448,15 +445,13 @@ let process_file ?(prelude=Iter.empty) file =
+   let has_goal = has_goal_decls_ decls in
+   Util.debugf ~section 1 "parsed %d declarations (%s goal(s))"
+     (fun k->k (CCVector.length decls) (if has_goal then "some" else "no"));
+-  (* Hooks exist but they can't be used to add statements. 
+-     Hence naming quantifiers inside terms is done directly here. 
+-     Without this Type.Conv.Error occures so the naming is done unconditionally. *)
+-  let quant_transformer = if !Booleans.quant_rename then Booleans.preprocess_booleans else CCFun.id in
+-  let sk_ctx = Skolem.create () in 
+-  cnf ~sk_ctx (quant_transformer decls) >>= fun stmts ->
++  cnf decls >>= fun stmts ->
+   (* compute signature, precedence, ordering *)
+   let conj_syms = syms_in_conj stmts in
+   let signature = Statement.signature ~conj_syms:conj_syms (CCVector.to_seq stmts) in
++  Util.debugf ~section 1 "@[<2>signature:@ @[<hv>%a@]@]" (fun k->k Signature.pp signature);
++  Util.debugf ~section 2 "(@[classification:@ %a@])"
++    (fun k->k Classify_cst.pp_signature signature);
+   compute_prec (CCVector.to_seq stmts) >>= fun precedence ->
+   Util.debugf ~section 1 "@[<2>precedence:@ @[%a@]@]" (fun k->k Precedence.pp precedence);
+   compute_ord_select precedence >>= fun (ord, select) ->
+@@ -464,7 +459,7 @@ let process_file ?(prelude=Iter.empty) file =
+   Phases.get_key Params.key >>= fun params ->
+   let eta = params.Params.eta in
+   (* build the context and env *)
+-  make_ctx ~signature ~ord ~select ~eta ~sk_ctx () >>= fun ctx ->
++  make_ctx ~signature ~ord ~select ~eta () >>= fun ctx ->
+   make_env ~params ~ctx stmts >>= fun (Phases.Env_clauses (env,clauses)) ->
+   (* main workload *)
+   has_goal_ := has_goal; (* FIXME: should be computed at Env initialization *)

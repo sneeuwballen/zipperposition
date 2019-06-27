@@ -144,7 +144,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let proof = Proof.Step.assert' ~file ~name () in
     create ~penalty ~trail:Trail.empty lits proof
 
-  let of_statement st =
+  let of_statement ?(convert_defs=false) st =
     let of_lits lits =
       (* convert literals *)
     let lits = List.map Ctx.Lit.of_form lits in
@@ -156,7 +156,10 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       | Stmt.Data _
       | Stmt.TyDecl _ -> []
       | Stmt.Def _
-      | Stmt.Rewrite _ -> [] (* dealt with by rewriting *)
+      | Stmt.Rewrite _ -> 
+        if not convert_defs then [] (*dealt with by rewriting *)
+        (* dealt with  *)
+        else List.map of_lits (Stmt.get_formulas_from_defs st)
       | Stmt.Assert lits -> [of_lits lits]
       | Stmt.Goal lits -> [of_lits lits]
       | Stmt.Lemma l

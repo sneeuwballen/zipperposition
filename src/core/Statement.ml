@@ -233,6 +233,18 @@ let decl_data_functions ity proof : unit =
        );)
     ity.Ind_ty.ty_constructors
 
+let get_formulas_from_defs st =
+  let get_from_rule rule =
+    match rule with
+    | Def_term {vars;id;ty;args;rhs;as_form} -> [as_form]
+    | Def_form {vars;lhs;rhs;polarity;as_form} -> as_form in
+
+
+  match view st with 
+  | Def defs -> CCList.flat_map (fun d -> CCList.flat_map get_from_rule d.def_rules) defs
+  | Rewrite def_rule  -> get_from_rule def_rule
+  | _ -> []
+
 (** {2 Iterators} *)
 
 module Seq = struct

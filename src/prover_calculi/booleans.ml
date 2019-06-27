@@ -256,13 +256,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       let stmt = Statement.assert_ ~proof f in
       let cnf_vec = Cnf.convert @@ CCVector.to_seq @@ 
                     Cnf.cnf_of ~ctx:(Ctx.sk_ctx ()) stmt in
-      let sets = Env.convert_input_statements cnf_vec in
-      let clauses = sets.Clause.c_set 
-                    |> CCVector.to_list
-                    |> CCList.map (fun c -> 
-                      let lits = CCArray.to_list (C.lits c) in
-                      C.create ~penalty ~trail lits proof
-                    ) in
+      let clauses = CCVector.map (C.of_statement ~convert_defs:true) cnf_vec
+                    |> CCVector.to_list 
+                    |> CCList.flatten
+                    |> List.map (fun c -> 
+                        C.create ~penalty  ~trail (CCArray.to_list (C.lits c)) proof) in
       List.iter (fun new_c -> 
         assert(Proof.Step.inferences_perfomed (C.proof_step c) <=
                Proof.Step.inferences_perfomed (C.proof_step new_c));) clauses;

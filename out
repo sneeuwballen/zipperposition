@@ -1,0 +1,3307 @@
+0.016[zip.saturate] ### step     0 ###
+0.016[zip.saturate]
+    given (0 steps, penalty 1):
+      `forall (F0:((ι → prop) → prop) → prop) X1.
+       [F0 sk_Xx* ∨ ¬F0 (λ (Y0:ι → prop). (¬ Y0 X1))* ∨ 
+        F0 (sk_X4 F0)*]/id:10/depth:0`
+NEW UNIF!
+[hds : F0 sk_Xx=?=true].
+[constrs: F0 sk_Xx, 
+true].
+[subst: {F0[1] → F0[2]}].
+[hds : sk_Xx (F1 sk_Xx)=?=true].
+[constrs: 
+F0 sk_Xx, 
+true].
+[subst: {F0[1] → F0[2], 
+                F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F1 Y0))[2]}].
+NEW UNIF!
+[hds : 
+F0 (λ (Y0:ι → prop). (¬ Y0 X1))=?=true].
+[constrs: F0
+                                                         (λ
+                                                           (Y0:ι → prop).
+                                                           (¬ Y0 X1)), 
+true].
+[subst: {F0[1] → F0[2], X1[1] → X1[2]}].
+[hds : ¬ F2
+                                                           (λ
+                                                             (Y0:ι → prop).
+                                                             (¬ Y0 X1)) 
+                                                           X1=?=true].
+[constrs: 
+F0 (λ (Y0:ι → prop). (¬ Y0 X1)), 
+true].
+[subst: {F0[1] → F0[2], 
+                X1[1] → X1[2], 
+                F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F2 Y0))[2]}].
+NEW UNIF!
+[hds : 
+F0 (sk_X4 F0)=?=true].
+[constrs: F0 (sk_X4 F0), 
+true].
+[subst: {F0[1] → F0[2]}].
+[hds : sk_X4 F0 (F1 (sk_X4 F0))=?=true].
+[constrs: 
+F0 (sk_X4 F0), 
+true].
+[subst: {F0[1] → F0[2], 
+                F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F1 Y0))[2]}].
+NEW UNIF!
+NEW UNIF!
+[hds : false=?=true].
+[constrs: false, 
+true].
+[subst: {}].
+NEW UNIF!
+[hds : F0 sk_Xx=?=F1 sk_Xx].
+[constrs: 
+F0 sk_Xx, 
+F1 sk_Xx].
+[subst: {F0[0] → F1[2], F0[1] → F0[2]}].
+[hds : F8 sk_Xx 
+                                                            (F6 sk_Xx)=?=
+F8 (F7 sk_Xx) sk_Xx].
+[constrs: F0 sk_Xx, 
+F1 sk_Xx].
+[subst: {F0[0] → F1[2], 
+                    F0[1] → F0[2], 
+                    F0[2] →
+                      λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+                    F1[2] →
+                      λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2]}].
+[hds : sk_Xx=?=
+F7 sk_Xx].
+[constrs: sk_Xx, F7 sk_Xx;F6 sk_Xx, 
+sk_Xx].
+[subst: {F0[0] → F1[2], 
+                 F0[1] → F0[2], 
+                 F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+                 F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2]}].
+[hds : 
+λ (Y0:ι → prop). (sk_Xx (F9 sk_Xx Y0))=?=sk_Xx].
+[constrs: F7 sk_Xx, 
+sk_Xx;F6 sk_Xx, 
+sk_Xx].
+[subst: {F0[0] → F1[2], 
+                 F0[1] → F0[2], 
+                 F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+                 F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+                 F7[2] →
+                   λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                    (Y0 (F9 Y0 Y1))[2]}].
+[hds : F6 sk_Xx=?=sk_Xx].
+[constrs: 
+F6 sk_Xx, sk_Xx;F9 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2]}].
+[hds : λ (Y0:ι → prop).
+                                                (sk_Xx (F12 sk_Xx Y0))=?=sk_Xx].
+[constrs: 
+F6 sk_Xx, sk_Xx;F9 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F12 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2]}].
+[hds : F9 sk_Xx Y-1=?=Y-1].
+[constrs: 
+F9 sk_Xx Y-1, Y-1;F12 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F12 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2]}].
+[hds : λ (Y0:ι).
+                                                (sk_Xx (F15 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F9 sk_Xx Y-1, Y-1;F12 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F12 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2], 
+               F9[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y0 (F15 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (Y-1 (F16 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F9 sk_Xx Y-1, Y-1;F12 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F12 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2], 
+               F9[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F16 Y0 Y1 Y2))[2]}].
+[hds : F12 sk_Xx Y-1=?=Y-1].
+[constrs: 
+F12 sk_Xx Y-1, Y-1;F16 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F12 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2], 
+               F9[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F16 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (sk_Xx (F17 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F12 sk_Xx Y-1, Y-1;F16 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F12 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2], 
+               F9[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F16 Y0 Y1 Y2))[2], 
+               F12[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y0 (F17 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (Y-1 (F18 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F12 sk_Xx Y-1, Y-1;F16 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F12 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2], 
+               F9[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F16 Y0 Y1 Y2))[2], 
+               F12[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F18 Y0 Y1 Y2))[2]}].
+[hds : F16 sk_Xx Y-2 Y-1=?=Y-1].
+[constrs: 
+F16 sk_Xx Y-2 Y-1, Y-1;F18 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F12 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2], 
+               F9[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F16 Y0 Y1 Y2))[2], 
+               F12[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F18 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι → prop).
+                                                    (Y0 (F13 sk_Xx Y0))=?=sk_Xx].
+[constrs: 
+F6 sk_Xx, sk_Xx;F9 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y1 (F13 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2]}].
+[hds : λ (Y0:ι → prop).
+                                                (sk_Xx (F14 sk_Xx Y0))=?=sk_Xx].
+[constrs: 
+F6 sk_Xx, sk_Xx;F9 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F14 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2]}].
+[hds : F9 sk_Xx Y-1=?=Y-1].
+[constrs: 
+F9 sk_Xx Y-1, Y-1;F14 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F14 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2]}].
+[hds : λ (Y0:ι).
+                                                (sk_Xx (F19 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F9 sk_Xx Y-1, Y-1;F14 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F14 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2], 
+               F9[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y0 (F19 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (Y-1 (F20 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F9 sk_Xx Y-1, Y-1;F14 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F14 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2], 
+               F9[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F20 Y0 Y1 Y2))[2]}].
+[hds : F14 sk_Xx Y-1=?=Y-1].
+[constrs: 
+F14 sk_Xx Y-1, Y-1;F20 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F14 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2], 
+               F9[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F20 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (sk_Xx (F21 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F14 sk_Xx Y-1, Y-1;F20 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F14 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2], 
+               F9[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F20 Y0 Y1 Y2))[2], 
+               F14[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y0 (F21 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (Y-1 (F22 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F14 sk_Xx Y-1, Y-1;F20 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F14 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2], 
+               F9[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F20 Y0 Y1 Y2))[2], 
+               F14[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F22 Y0 Y1 Y2))[2]}].
+[hds : F20 sk_Xx Y-2 Y-1=?=Y-1].
+[constrs: 
+F20 sk_Xx Y-2 Y-1, Y-1;F22 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F14 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2], 
+               F9[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F20 Y0 Y1 Y2))[2], 
+               F14[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F22 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι → prop).
+                                                    (Y0 (F10 sk_Xx Y0))=?=sk_Xx].
+[constrs: 
+F7 sk_Xx, sk_Xx;F6 sk_Xx, 
+sk_Xx].
+[subst: {F0[0] → F1[2], 
+                 F0[1] → F0[2], 
+                 F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+                 F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+                 F7[2] →
+                   λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                    (Y1 (F10 Y0 Y1))[2]}].
+[hds : λ (Y0:ι → prop).
+                                                   (sk_Xx (F11 sk_Xx Y0))=?=sk_Xx].
+[constrs: 
+F7 sk_Xx, sk_Xx;F6 sk_Xx, 
+sk_Xx].
+[subst: {F0[0] → F1[2], 
+                 F0[1] → F0[2], 
+                 F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+                 F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+                 F7[2] →
+                   λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                    (sk_Xx (F11 Y0 Y1))[2]}].
+[hds : F6 sk_Xx=?=sk_Xx].
+[constrs: 
+F6 sk_Xx, sk_Xx;F11 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2]}].
+[hds : λ (Y0:ι → prop).
+                                                    (sk_Xx (F23 sk_Xx Y0))=?=sk_Xx].
+[constrs: 
+F6 sk_Xx, sk_Xx;F11 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F23 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2]}].
+[hds : F11 sk_Xx Y-1=?=Y-1].
+[constrs: 
+F11 sk_Xx Y-1, Y-1;F23 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F23 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2]}].
+[hds : λ (Y0:ι).
+                                                    (sk_Xx (F26 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F11 sk_Xx Y-1, Y-1;F23 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F23 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2], 
+               F11[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y0 (F26 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (Y-1 (F27 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F11 sk_Xx Y-1, Y-1;F23 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F23 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2], 
+               F11[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F27 Y0 Y1 Y2))[2]}].
+[hds : F23 sk_Xx Y-1=?=Y-1].
+[constrs: 
+F23 sk_Xx Y-1, Y-1;F27 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F23 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2], 
+               F11[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F27 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (sk_Xx (F28 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F23 sk_Xx Y-1, Y-1;F27 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F23 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2], 
+               F11[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F27 Y0 Y1 Y2))[2], 
+               F23[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y0 (F28 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (Y-1 (F29 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F23 sk_Xx Y-1, Y-1;F27 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F23 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2], 
+               F11[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F27 Y0 Y1 Y2))[2], 
+               F23[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F29 Y0 Y1 Y2))[2]}].
+[hds : F27 sk_Xx Y-2 Y-1=?=Y-1].
+[constrs: 
+F27 sk_Xx Y-2 Y-1, Y-1;F29 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F23 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2], 
+               F11[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F27 Y0 Y1 Y2))[2], 
+               F23[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F29 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι → prop).
+                                                    (Y0 (F24 sk_Xx Y0))=?=sk_Xx].
+[constrs: 
+F6 sk_Xx, sk_Xx;F11 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y1 (F24 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2]}].
+[hds : λ (Y0:ι → prop).
+                                                    (sk_Xx (F25 sk_Xx Y0))=?=sk_Xx].
+[constrs: 
+F6 sk_Xx, sk_Xx;F11 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F25 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2]}].
+[hds : F11 sk_Xx Y-1=?=Y-1].
+[constrs: 
+F11 sk_Xx Y-1, Y-1;F25 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F25 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2]}].
+[hds : λ (Y0:ι).
+                                                    (sk_Xx (F30 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F11 sk_Xx Y-1, Y-1;F25 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F25 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2], 
+               F11[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y0 (F30 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (Y-1 (F31 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F11 sk_Xx Y-1, Y-1;F25 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F25 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2], 
+               F11[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F31 Y0 Y1 Y2))[2]}].
+[hds : F25 sk_Xx Y-1=?=Y-1].
+[constrs: 
+F25 sk_Xx Y-1, Y-1;F31 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F25 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2], 
+               F11[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F31 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (sk_Xx (F32 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F25 sk_Xx Y-1, Y-1;F31 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F25 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2], 
+               F11[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F31 Y0 Y1 Y2))[2], 
+               F25[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y0 (F32 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (Y-1 (F33 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F25 sk_Xx Y-1, Y-1;F31 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F25 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2], 
+               F11[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F31 Y0 Y1 Y2))[2], 
+               F25[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F33 Y0 Y1 Y2))[2]}].
+[hds : F31 sk_Xx Y-2 Y-1=?=Y-1].
+[constrs: 
+F31 sk_Xx Y-2 Y-1, Y-1;F33 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F25 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2], 
+               F11[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F31 Y0 Y1 Y2))[2], 
+               F25[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F33 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι → prop).
+                                                    (sk_Xx (F9 sk_Xx Y0))=?=sk_Xx].
+[constrs: 
+F7 sk_Xx, sk_Xx;F6 sk_Xx, 
+sk_Xx].
+[subst: {F0[0] → F1[2], 
+                 F0[1] → F0[2], 
+                 F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+                 F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+                 F7[2] →
+                   λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                    (Y0 (F9 Y0 Y1))[2]}].
+[hds : F6 sk_Xx=?=sk_Xx].
+[constrs: 
+F6 sk_Xx, sk_Xx;F9 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2]}].
+[hds : λ (Y0:ι → prop).
+                                                (sk_Xx (F34 sk_Xx Y0))=?=sk_Xx].
+[constrs: 
+F6 sk_Xx, sk_Xx;F9 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F34 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2]}].
+[hds : F9 sk_Xx Y-1=?=Y-1].
+[constrs: 
+F9 sk_Xx Y-1, Y-1;F34 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F34 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2]}].
+[hds : λ (Y0:ι).
+                                                (sk_Xx (F37 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F9 sk_Xx Y-1, Y-1;F34 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F34 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2], 
+               F9[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y0 (F37 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (Y-1 (F38 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F9 sk_Xx Y-1, Y-1;F34 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F34 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2], 
+               F9[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F38 Y0 Y1 Y2))[2]}].
+[hds : F34 sk_Xx Y-1=?=Y-1].
+[constrs: 
+F34 sk_Xx Y-1, Y-1;F38 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F34 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2], 
+               F9[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F38 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (sk_Xx (F39 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F34 sk_Xx Y-1, Y-1;F38 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F34 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2], 
+               F9[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F38 Y0 Y1 Y2))[2], 
+               F34[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y0 (F39 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (Y-1 (F40 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F34 sk_Xx Y-1, Y-1;F38 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F34 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2], 
+               F9[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F38 Y0 Y1 Y2))[2], 
+               F34[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F40 Y0 Y1 Y2))[2]}].
+[hds : F38 sk_Xx Y-2 Y-1=?=Y-1].
+[constrs: 
+F38 sk_Xx Y-2 Y-1, Y-1;F40 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F34 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2], 
+               F9[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F38 Y0 Y1 Y2))[2], 
+               F34[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F40 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι → prop).
+                                                    (Y0 (F35 sk_Xx Y0))=?=sk_Xx].
+[constrs: 
+F6 sk_Xx, sk_Xx;F9 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y1 (F35 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2]}].
+[hds : λ (Y0:ι → prop).
+                                                (sk_Xx (F36 sk_Xx Y0))=?=sk_Xx].
+[constrs: 
+F6 sk_Xx, sk_Xx;F9 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F36 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2]}].
+[hds : F9 sk_Xx Y-1=?=Y-1].
+[constrs: 
+F9 sk_Xx Y-1, Y-1;F36 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F36 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2]}].
+[hds : λ (Y0:ι).
+                                                (sk_Xx (F41 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F9 sk_Xx Y-1, Y-1;F36 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F36 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2], 
+               F9[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y0 (F41 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (Y-1 (F42 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F9 sk_Xx Y-1, Y-1;F36 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F36 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2], 
+               F9[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F42 Y0 Y1 Y2))[2]}].
+[hds : F36 sk_Xx Y-1=?=Y-1].
+[constrs: 
+F36 sk_Xx Y-1, Y-1;F42 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F36 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2], 
+               F9[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F42 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (sk_Xx (F43 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F36 sk_Xx Y-1, Y-1;F42 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F36 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2], 
+               F9[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F42 Y0 Y1 Y2))[2], 
+               F36[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y0 (F43 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (Y-1 (F44 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F36 sk_Xx Y-1, Y-1;F42 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F36 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2], 
+               F9[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F42 Y0 Y1 Y2))[2], 
+               F36[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F44 Y0 Y1 Y2))[2]}].
+[hds : F42 sk_Xx Y-2 Y-1=?=Y-1].
+[constrs: 
+F42 sk_Xx Y-2 Y-1, Y-1;F44 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F36 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F9 Y0 Y1))[2], 
+               F9[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F42 Y0 Y1 Y2))[2], 
+               F36[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F44 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι → prop).
+                                                    (Y0 (F10 sk_Xx Y0))=?=sk_Xx].
+[constrs: 
+F7 sk_Xx, sk_Xx;F6 sk_Xx, 
+sk_Xx].
+[subst: {F0[0] → F1[2], 
+                 F0[1] → F0[2], 
+                 F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+                 F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+                 F7[2] →
+                   λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                    (Y1 (F10 Y0 Y1))[2]}].
+[hds : λ (Y0:ι → prop).
+                                                   (sk_Xx (F11 sk_Xx Y0))=?=sk_Xx].
+[constrs: 
+F7 sk_Xx, sk_Xx;F6 sk_Xx, 
+sk_Xx].
+[subst: {F0[0] → F1[2], 
+                 F0[1] → F0[2], 
+                 F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+                 F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+                 F7[2] →
+                   λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                    (sk_Xx (F11 Y0 Y1))[2]}].
+[hds : F6 sk_Xx=?=sk_Xx].
+[constrs: 
+F6 sk_Xx, sk_Xx;F11 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2]}].
+[hds : λ (Y0:ι → prop).
+                                                    (sk_Xx (F45 sk_Xx Y0))=?=sk_Xx].
+[constrs: 
+F6 sk_Xx, sk_Xx;F11 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F45 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2]}].
+[hds : F11 sk_Xx Y-1=?=Y-1].
+[constrs: 
+F11 sk_Xx Y-1, Y-1;F45 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F45 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2]}].
+[hds : λ (Y0:ι).
+                                                    (sk_Xx (F48 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F11 sk_Xx Y-1, Y-1;F45 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F45 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2], 
+               F11[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y0 (F48 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (Y-1 (F49 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F11 sk_Xx Y-1, Y-1;F45 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F45 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2], 
+               F11[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F49 Y0 Y1 Y2))[2]}].
+[hds : F45 sk_Xx Y-1=?=Y-1].
+[constrs: 
+F45 sk_Xx Y-1, Y-1;F49 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F45 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2], 
+               F11[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F49 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (sk_Xx (F50 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F45 sk_Xx Y-1, Y-1;F49 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F45 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2], 
+               F11[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F49 Y0 Y1 Y2))[2], 
+               F45[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y0 (F50 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (Y-1 (F51 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F45 sk_Xx Y-1, Y-1;F49 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F45 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2], 
+               F11[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F49 Y0 Y1 Y2))[2], 
+               F45[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F51 Y0 Y1 Y2))[2]}].
+[hds : F49 sk_Xx Y-2 Y-1=?=Y-1].
+[constrs: 
+F49 sk_Xx Y-2 Y-1, Y-1;F51 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F45 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2], 
+               F11[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F49 Y0 Y1 Y2))[2], 
+               F45[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F51 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι → prop).
+                                                    (Y0 (F46 sk_Xx Y0))=?=sk_Xx].
+[constrs: 
+F6 sk_Xx, sk_Xx;F11 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y1 (F46 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2]}].
+[hds : λ (Y0:ι → prop).
+                                                    (sk_Xx (F47 sk_Xx Y0))=?=sk_Xx].
+[constrs: 
+F6 sk_Xx, sk_Xx;F11 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F47 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2]}].
+[hds : F11 sk_Xx Y-1=?=Y-1].
+[constrs: 
+F11 sk_Xx Y-1, Y-1;F47 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F47 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2]}].
+[hds : λ (Y0:ι).
+                                                    (sk_Xx (F52 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F11 sk_Xx Y-1, Y-1;F47 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F47 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2], 
+               F11[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y0 (F52 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (Y-1 (F53 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F11 sk_Xx Y-1, Y-1;F47 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F47 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2], 
+               F11[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F53 Y0 Y1 Y2))[2]}].
+[hds : F47 sk_Xx Y-1=?=Y-1].
+[constrs: 
+F47 sk_Xx Y-1, Y-1;F53 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F47 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2], 
+               F11[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F53 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (sk_Xx (F54 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F47 sk_Xx Y-1, Y-1;F53 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F47 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2], 
+               F11[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F53 Y0 Y1 Y2))[2], 
+               F47[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y0 (F54 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (Y-1 (F55 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F47 sk_Xx Y-1, Y-1;F53 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F47 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2], 
+               F11[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F53 Y0 Y1 Y2))[2], 
+               F47[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F55 Y0 Y1 Y2))[2]}].
+[hds : F53 sk_Xx Y-2 Y-1=?=Y-1].
+[constrs: 
+F53 sk_Xx Y-2 Y-1, Y-1;F55 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F47 Y0 Y1))[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (sk_Xx (F11 Y0 Y1))[2], 
+               F11[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F53 Y0 Y1 Y2))[2], 
+               F47[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F55 Y0 Y1 Y2))[2]}].
+[hds : F56 (F6 sk_Xx)=?=F56 sk_Xx].
+[constrs: 
+F0 sk_Xx, 
+F1 sk_Xx].
+[subst: {F0[0] → F1[2], 
+                    F0[1] → F0[2], 
+                    F0[2] →
+                      λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+                    F1[2] →
+                      λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+                    F8[2] →
+                      λ
+                       (Y0:(ι → prop) → prop) 
+                       (Y1:(ι → prop) → prop). (F56 Y1)[2]}].
+[hds : 
+F6 sk_Xx=?=sk_Xx].
+[constrs: F6 sk_Xx, 
+sk_Xx].
+[subst: {F0[0] → F1[2], 
+                 F0[1] → F0[2], 
+                 F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+                 F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+                 F8[2] →
+                   λ
+                    (Y0:(ι → prop) → prop) (Y1:(ι → prop) → prop).
+                    (F56 Y1)[2]}].
+[hds : λ (Y0:ι → prop).
+                                           (sk_Xx (F57 sk_Xx Y0))=?=sk_Xx].
+[constrs: 
+F6 sk_Xx, 
+sk_Xx].
+[subst: {F0[0] → F1[2], 
+                 F0[1] → F0[2], 
+                 F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+                 F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+                 F6[2] →
+                   λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                    (Y0 (F57 Y0 Y1))[2], 
+                 F8[2] →
+                   λ
+                    (Y0:(ι → prop) → prop) (Y1:(ι → prop) → prop).
+                    (F56 Y1)[2]}].
+[hds : F57 sk_Xx Y-1=?=Y-1].
+[constrs: 
+F57 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F57 Y0 Y1))[2], 
+               F8[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:(ι → prop) → prop).
+                  (F56 Y1)[2]}].
+[hds : λ (Y0:ι).
+                                         (sk_Xx (F60 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F57 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F57 Y0 Y1))[2], 
+               F8[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:(ι → prop) → prop).
+                  (F56 Y1)[2], 
+               F57[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y0 (F60 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (Y-1 (F61 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F57 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F57 Y0 Y1))[2], 
+               F8[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:(ι → prop) → prop).
+                  (F56 Y1)[2], 
+               F57[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F61 Y0 Y1 Y2))[2]}].
+[hds : F61 sk_Xx Y-2 Y-1=?=Y-1].
+[constrs: 
+F61 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F57 Y0 Y1))[2], 
+               F8[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:(ι → prop) → prop).
+                  (F56 Y1)[2], 
+               F57[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F61 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι → prop).
+                                                    (sk_Xx (F57 sk_Xx Y0))=?=sk_Xx].
+[constrs: 
+F6 sk_Xx, 
+sk_Xx].
+[subst: {F0[0] → F1[2], 
+                 F0[1] → F0[2], 
+                 F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+                 F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+                 F6[2] →
+                   λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                    (Y0 (F57 Y0 Y1))[2], 
+                 F8[2] →
+                   λ
+                    (Y0:(ι → prop) → prop) (Y1:(ι → prop) → prop).
+                    (F56 Y1)[2]}].
+[hds : F57 sk_Xx Y-1=?=Y-1].
+[constrs: 
+F57 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F57 Y0 Y1))[2], 
+               F8[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:(ι → prop) → prop).
+                  (F56 Y1)[2]}].
+[hds : λ (Y0:ι).
+                                         (sk_Xx (F62 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F57 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F57 Y0 Y1))[2], 
+               F8[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:(ι → prop) → prop).
+                  (F56 Y1)[2], 
+               F57[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y0 (F62 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (Y-1 (F63 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F57 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F57 Y0 Y1))[2], 
+               F8[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:(ι → prop) → prop).
+                  (F56 Y1)[2], 
+               F57[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F63 Y0 Y1 Y2))[2]}].
+[hds : F63 sk_Xx Y-2 Y-1=?=Y-1].
+[constrs: 
+F63 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F6[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F57 Y0 Y1))[2], 
+               F8[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:(ι → prop) → prop).
+                  (F56 Y1)[2], 
+               F57[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F63 Y0 Y1 Y2))[2]}].
+[hds : F64 sk_Xx=?=F64 (F7 sk_Xx)].
+[constrs: 
+F0 sk_Xx, 
+F1 sk_Xx].
+[subst: {F0[0] → F1[2], 
+                    F0[1] → F0[2], 
+                    F0[2] →
+                      λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+                    F1[2] →
+                      λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+                    F8[2] →
+                      λ
+                       (Y0:(ι → prop) → prop) 
+                       (Y1:(ι → prop) → prop). (F64 Y0)[2]}].
+[hds : sk_Xx=?=
+F7 sk_Xx].
+[constrs: sk_Xx, 
+F7 sk_Xx].
+[subst: {F0[0] → F1[2], 
+                    F0[1] → F0[2], 
+                    F0[2] →
+                      λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+                    F1[2] →
+                      λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+                    F8[2] →
+                      λ
+                       (Y0:(ι → prop) → prop) 
+                       (Y1:(ι → prop) → prop). (F64 Y0)[2]}].
+[hds : 
+λ (Y0:ι → prop). (sk_Xx (F65 sk_Xx Y0))=?=sk_Xx].
+[constrs: F7 sk_Xx, 
+sk_Xx].
+[subst: {F0[0] → F1[2], 
+                 F0[1] → F0[2], 
+                 F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+                 F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+                 F7[2] →
+                   λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                    (Y0 (F65 Y0 Y1))[2], 
+                 F8[2] →
+                   λ
+                    (Y0:(ι → prop) → prop) (Y1:(ι → prop) → prop).
+                    (F64 Y0)[2]}].
+[hds : F65 sk_Xx Y-1=?=Y-1].
+[constrs: 
+F65 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F65 Y0 Y1))[2], 
+               F8[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:(ι → prop) → prop).
+                  (F64 Y0)[2]}].
+[hds : λ (Y0:ι).
+                                         (sk_Xx (F68 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F65 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F65 Y0 Y1))[2], 
+               F8[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:(ι → prop) → prop).
+                  (F64 Y0)[2], 
+               F65[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y0 (F68 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (Y-1 (F69 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F65 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F65 Y0 Y1))[2], 
+               F8[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:(ι → prop) → prop).
+                  (F64 Y0)[2], 
+               F65[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F69 Y0 Y1 Y2))[2]}].
+[hds : F69 sk_Xx Y-2 Y-1=?=Y-1].
+[constrs: 
+F69 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F65 Y0 Y1))[2], 
+               F8[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:(ι → prop) → prop).
+                  (F64 Y0)[2], 
+               F65[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F69 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι → prop).
+                                                    (sk_Xx (F65 sk_Xx Y0))=?=sk_Xx].
+[constrs: 
+F7 sk_Xx, 
+sk_Xx].
+[subst: {F0[0] → F1[2], 
+                 F0[1] → F0[2], 
+                 F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+                 F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+                 F7[2] →
+                   λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                    (Y0 (F65 Y0 Y1))[2], 
+                 F8[2] →
+                   λ
+                    (Y0:(ι → prop) → prop) (Y1:(ι → prop) → prop).
+                    (F64 Y0)[2]}].
+[hds : F65 sk_Xx Y-1=?=Y-1].
+[constrs: 
+F65 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F65 Y0 Y1))[2], 
+               F8[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:(ι → prop) → prop).
+                  (F64 Y0)[2]}].
+[hds : λ (Y0:ι).
+                                         (sk_Xx (F70 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F65 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F65 Y0 Y1))[2], 
+               F8[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:(ι → prop) → prop).
+                  (F64 Y0)[2], 
+               F65[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y0 (F70 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι).
+                                                    (Y-1 (F71 sk_Xx Y-1 Y0))=?=Y-1].
+[constrs: 
+F65 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F65 Y0 Y1))[2], 
+               F8[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:(ι → prop) → prop).
+                  (F64 Y0)[2], 
+               F65[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F71 Y0 Y1 Y2))[2]}].
+[hds : F71 sk_Xx Y-2 Y-1=?=Y-1].
+[constrs: 
+F71 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F8 Y0 (F6 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (F8 (F7 Y0) Y0)[2], 
+               F7[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y0 (F65 Y0 Y1))[2], 
+               F8[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:(ι → prop) → prop).
+                  (F64 Y0)[2], 
+               F65[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop) (Y2:ι).
+                  (Y1 (F71 Y0 Y1 Y2))[2]}].
+[hds : F0 sk_Xx=?=sk_Xx
+                                                               (F4 sk_Xx)].
+[constrs: 
+F0 sk_Xx, 
+F1 sk_Xx].
+[subst: {F0[0] → F1[2], 
+                    F0[1] → F0[2], 
+                    F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2]}].
+[hds : 
+sk_Xx (F72 sk_Xx)=?=sk_Xx (F4 sk_Xx)].
+[constrs: F0 sk_Xx, 
+sk_Xx (F4 sk_Xx)].
+[subst: {F0[0] → F1[2], 
+                            F0[1] → F0[2], 
+                            F0[2] →
+                              λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+                            F1[2] →
+                              λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2]}].
+[hds : 
+F72 sk_Xx=?=F4 sk_Xx].
+[constrs: F72 sk_Xx, 
+F4 sk_Xx].
+[subst: {F0[0] → F1[2], 
+                    F0[1] → F0[2], 
+                    F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+                    F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2]}].
+[hds : 
+λ (Y0:ι). (F84 sk_Xx Y0 (F80 sk_Xx Y0) (F81 sk_Xx Y0))=?=λ (Y0:ι).
+                                                            (F84
+                                                              (F82 sk_Xx Y0) 
+                                                              (F83 sk_Xx Y0) 
+                                                              sk_Xx Y0)].
+[constrs: 
+F72 sk_Xx, 
+F4 sk_Xx].
+[subst: {F0[0] → F1[2], 
+                    F0[1] → F0[2], 
+                    F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+                    F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+                    F4[2] →
+                      λ (Y0:(ι → prop) → prop) (Y1:ι).
+                       (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+                    F72[2] →
+                      λ (Y0:(ι → prop) → prop) (Y1:ι).
+                       (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2]}].
+[hds : sk_Xx=?=
+F82 sk_Xx Y-1].
+[constrs: sk_Xx, F82 sk_Xx Y-1;Y-1, F83 sk_Xx Y-1;
+F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2]}].
+[hds : λ
+                                                                    (
+                                                                    Y0:
+                                                                    ι
+                                                                    → prop).
+                                                                    (
+                                                                    sk_Xx
+                                                                    (F85
+                                                                    sk_Xx 
+                                                                    Y-1 Y0))=?=sk_Xx].
+[constrs: 
+F82 sk_Xx Y-1, sk_Xx;Y-1, F83 sk_Xx Y-1;F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F82[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι) (Y2:ι → prop).
+                  (Y0 (F85 Y0 Y1 Y2))[2]}].
+[hds : Y-1=?=F83 sk_Xx Y-1].
+[constrs: Y-1, 
+F83 sk_Xx Y-1;F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, Y-1;F85 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F82[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι) (Y2:ι → prop).
+                  (Y0 (F85 Y0 Y1 Y2))[2]}].
+[hds : F80 sk_Xx Y-1=?=sk_Xx].
+[constrs: 
+F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, Y-1;F85 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F82[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι) (Y2:ι → prop).
+                  (Y0 (F85 Y0 Y1 Y2))[2], 
+               F83[2] → λ (Y0:(ι → prop) → prop) (Y1:ι). Y1[2]}].
+[hds : 
+λ (Y0:ι → prop). (Y0 (F86 sk_Xx Y-1 Y0))=?=sk_Xx].
+[constrs: F82 sk_Xx 
+                                                                  Y-1, sk_Xx;
+Y-1, F83 sk_Xx Y-1;F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F82[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι) (Y2:ι → prop).
+                  (Y2 (F86 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι → prop).
+                                                    (sk_Xx (F87 sk_Xx Y-1 Y0))=?=sk_Xx].
+[constrs: 
+F82 sk_Xx Y-1, sk_Xx;Y-1, F83 sk_Xx Y-1;F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F82[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι) (Y2:ι → prop).
+                  (sk_Xx (F87 Y0 Y1 Y2))[2]}].
+[hds : Y-1=?=F83 sk_Xx Y-1].
+[constrs: Y-1, 
+F83 sk_Xx Y-1;F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, Y-1;F87 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F82[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι) (Y2:ι → prop).
+                  (sk_Xx (F87 Y0 Y1 Y2))[2]}].
+[hds : F80 sk_Xx Y-1=?=sk_Xx].
+[constrs: 
+F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, Y-1;F87 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F82[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι) (Y2:ι → prop).
+                  (sk_Xx (F87 Y0 Y1 Y2))[2], 
+               F83[2] → λ (Y0:(ι → prop) → prop) (Y1:ι). Y1[2]}].
+[hds : 
+λ (Y0:ι → prop). (sk_Xx (F85 sk_Xx Y-1 Y0))=?=sk_Xx].
+[constrs: F82
+                                                                    sk_Xx Y-1, 
+sk_Xx;Y-1, F83 sk_Xx Y-1;F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F82[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι) (Y2:ι → prop).
+                  (Y0 (F85 Y0 Y1 Y2))[2]}].
+[hds : Y-1=?=F83 sk_Xx Y-1].
+[constrs: Y-1, 
+F83 sk_Xx Y-1;F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, Y-1;F85 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F82[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι) (Y2:ι → prop).
+                  (Y0 (F85 Y0 Y1 Y2))[2]}].
+[hds : F80 sk_Xx Y-1=?=sk_Xx].
+[constrs: 
+F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, Y-1;F85 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F82[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι) (Y2:ι → prop).
+                  (Y0 (F85 Y0 Y1 Y2))[2], 
+               F83[2] → λ (Y0:(ι → prop) → prop) (Y1:ι). Y1[2]}].
+[hds : 
+λ (Y0:ι → prop). (Y0 (F86 sk_Xx Y-1 Y0))=?=sk_Xx].
+[constrs: F82 sk_Xx 
+                                                                  Y-1, sk_Xx;
+Y-1, F83 sk_Xx Y-1;F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F82[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι) (Y2:ι → prop).
+                  (Y2 (F86 Y0 Y1 Y2))[2]}].
+[hds : λ (Y0:ι → prop).
+                                                    (sk_Xx (F87 sk_Xx Y-1 Y0))=?=sk_Xx].
+[constrs: 
+F82 sk_Xx Y-1, sk_Xx;Y-1, F83 sk_Xx Y-1;F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F82[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι) (Y2:ι → prop).
+                  (sk_Xx (F87 Y0 Y1 Y2))[2]}].
+[hds : Y-1=?=F83 sk_Xx Y-1].
+[constrs: Y-1, 
+F83 sk_Xx Y-1;F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, Y-1;F87 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F82[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι) (Y2:ι → prop).
+                  (sk_Xx (F87 Y0 Y1 Y2))[2]}].
+[hds : F80 sk_Xx Y-1=?=sk_Xx].
+[constrs: 
+F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, Y-1;F87 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F82[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι) (Y2:ι → prop).
+                  (sk_Xx (F87 Y0 Y1 Y2))[2], 
+               F83[2] → λ (Y0:(ι → prop) → prop) (Y1:ι). Y1[2]}].
+[hds : 
+λ (Y0:ι). (F100 Y0 (F80 sk_Xx Y0) (F81 sk_Xx Y0))=?=λ (Y0:ι).
+                                                       (F100 (F83 sk_Xx Y0) 
+                                                         sk_Xx Y0)].
+[constrs: 
+F72 sk_Xx, 
+F4 sk_Xx].
+[subst: {F0[0] → F1[2], 
+                    F0[1] → F0[2], 
+                    F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+                    F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+                    F4[2] →
+                      λ (Y0:(ι → prop) → prop) (Y1:ι).
+                       (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+                    F72[2] →
+                      λ (Y0:(ι → prop) → prop) (Y1:ι).
+                       (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+                    F84[2] →
+                      λ
+                       (Y0:(ι → prop) → prop) (Y1:ι) 
+                       (Y2:(ι → prop) → prop) (Y3:ι). (F100 Y1 Y2 Y3)[2]}].
+[hds : Y-1=?=
+F83 sk_Xx Y-1].
+[constrs: Y-1, F83 sk_Xx Y-1;F80 sk_Xx Y-1, sk_Xx;
+F81 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F84[2] →
+                 λ
+                  (Y0:(ι → prop) → prop) (Y1:ι) 
+                  (Y2:(ι → prop) → prop) (Y3:ι). (F100 Y1 Y2 Y3)[2]}].
+[hds : 
+F80 sk_Xx Y-1=?=sk_Xx].
+[constrs: F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F83[2] → λ (Y0:(ι → prop) → prop) (Y1:ι). Y1[2], 
+               F84[2] →
+                 λ
+                  (Y0:(ι → prop) → prop) (Y1:ι) 
+                  (Y2:(ι → prop) → prop) (Y3:ι). (F100 Y1 Y2 Y3)[2]}].
+[hds : 
+F80 sk_Xx Y-1=?=sk_Xx].
+[constrs: F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F83[2] → λ (Y0:(ι → prop) → prop) (Y1:ι). Y1[2], 
+               F84[2] →
+                 λ
+                  (Y0:(ι → prop) → prop) (Y1:ι) 
+                  (Y2:(ι → prop) → prop) (Y3:ι). (F100 Y1 Y2 Y3)[2]}].
+[hds : 
+λ (Y0:ι). (F107 (F80 sk_Xx Y0) (F81 sk_Xx Y0))=?=λ (Y0:ι).
+                                                    (F107 sk_Xx Y0)].
+[constrs: 
+F72 sk_Xx, 
+F4 sk_Xx].
+[subst: {F0[0] → F1[2], 
+                    F0[1] → F0[2], 
+                    F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+                    F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+                    F4[2] →
+                      λ (Y0:(ι → prop) → prop) (Y1:ι).
+                       (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+                    F72[2] →
+                      λ (Y0:(ι → prop) → prop) (Y1:ι).
+                       (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+                    F84[2] →
+                      λ
+                       (Y0:(ι → prop) → prop) (Y1:ι) 
+                       (Y2:(ι → prop) → prop) (Y3:ι). (F100 Y1 Y2 Y3)[2], 
+                    F100[2] →
+                      λ (Y0:ι) (Y1:(ι → prop) → prop) (Y2:ι).
+                       (F107 Y1 Y2)[2]}].
+[hds : F80 sk_Xx Y-1=?=sk_Xx].
+[constrs: 
+F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F84[2] →
+                 λ
+                  (Y0:(ι → prop) → prop) (Y1:ι) 
+                  (Y2:(ι → prop) → prop) (Y3:ι). (F100 Y1 Y2 Y3)[2], 
+               F100[2] →
+                 λ (Y0:ι) (Y1:(ι → prop) → prop) (Y2:ι). (F107 Y1 Y2)[2]}].
+[hds : 
+λ (Y0:ι). (F112 Y0 (F81 sk_Xx Y0))=?=λ (Y0:ι). (F112 (F83 sk_Xx Y0) Y0)].
+[constrs: 
+F72 sk_Xx, 
+F4 sk_Xx].
+[subst: {F0[0] → F1[2], 
+                    F0[1] → F0[2], 
+                    F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+                    F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+                    F4[2] →
+                      λ (Y0:(ι → prop) → prop) (Y1:ι).
+                       (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+                    F72[2] →
+                      λ (Y0:(ι → prop) → prop) (Y1:ι).
+                       (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+                    F84[2] →
+                      λ
+                       (Y0:(ι → prop) → prop) (Y1:ι) 
+                       (Y2:(ι → prop) → prop) (Y3:ι). (F100 Y1 Y2 Y3)[2], 
+                    F100[2] →
+                      λ (Y0:ι) (Y1:(ι → prop) → prop) (Y2:ι).
+                       (F112 Y0 Y2)[2]}].
+[hds : Y-1=?=F83 sk_Xx Y-1].
+[constrs: Y-1, 
+F83 sk_Xx Y-1;F81 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F84[2] →
+                 λ
+                  (Y0:(ι → prop) → prop) (Y1:ι) 
+                  (Y2:(ι → prop) → prop) (Y3:ι). (F100 Y1 Y2 Y3)[2], 
+               F100[2] →
+                 λ (Y0:ι) (Y1:(ι → prop) → prop) (Y2:ι). (F112 Y0 Y2)[2]}].
+[hds : 
+λ (Y0:ι). (F114 Y0 (F80 sk_Xx Y0))=?=λ (Y0:ι).
+                                        (F114 (F83 sk_Xx Y0) sk_Xx)].
+[constrs: 
+F72 sk_Xx, 
+F4 sk_Xx].
+[subst: {F0[0] → F1[2], 
+                    F0[1] → F0[2], 
+                    F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+                    F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+                    F4[2] →
+                      λ (Y0:(ι → prop) → prop) (Y1:ι).
+                       (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+                    F72[2] →
+                      λ (Y0:(ι → prop) → prop) (Y1:ι).
+                       (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+                    F84[2] →
+                      λ
+                       (Y0:(ι → prop) → prop) (Y1:ι) 
+                       (Y2:(ι → prop) → prop) (Y3:ι). (F100 Y1 Y2 Y3)[2], 
+                    F100[2] →
+                      λ (Y0:ι) (Y1:(ι → prop) → prop) (Y2:ι).
+                       (F114 Y0 Y1)[2]}].
+[hds : Y-1=?=F83 sk_Xx Y-1].
+[constrs: Y-1, 
+F83 sk_Xx Y-1;F80 sk_Xx Y-1, 
+sk_Xx].
+[subst: {F0[0] → F1[2], 
+                 F0[1] → F0[2], 
+                 F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+                 F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+                 F4[2] →
+                   λ (Y0:(ι → prop) → prop) (Y1:ι).
+                    (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+                 F72[2] →
+                   λ (Y0:(ι → prop) → prop) (Y1:ι).
+                    (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+                 F84[2] →
+                   λ
+                    (Y0:(ι → prop) → prop) (Y1:ι) 
+                    (Y2:(ι → prop) → prop) (Y3:ι). (F100 Y1 Y2 Y3)[2], 
+                 F100[2] →
+                   λ (Y0:ι) (Y1:(ι → prop) → prop) (Y2:ι).
+                    (F114 Y0 Y1)[2]}].
+[hds : λ (Y0:ι).
+                                               (F116 sk_Xx (F80 sk_Xx Y0) 
+                                                 (F81 sk_Xx Y0))=?=λ
+                                                                    (Y0:ι).
+                                                                    (
+                                                                    F116
+                                                                    (F82
+                                                                    sk_Xx Y0) 
+                                                                    sk_Xx Y0)].
+[constrs: 
+F72 sk_Xx, 
+F4 sk_Xx].
+[subst: {F0[0] → F1[2], 
+                    F0[1] → F0[2], 
+                    F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+                    F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+                    F4[2] →
+                      λ (Y0:(ι → prop) → prop) (Y1:ι).
+                       (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+                    F72[2] →
+                      λ (Y0:(ι → prop) → prop) (Y1:ι).
+                       (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+                    F84[2] →
+                      λ
+                       (Y0:(ι → prop) → prop) (Y1:ι) 
+                       (Y2:(ι → prop) → prop) (Y3:ι). (F116 Y0 Y2 Y3)[2]}].
+[hds : sk_Xx=?=
+F82 sk_Xx Y-1].
+[constrs: sk_Xx, F82 sk_Xx Y-1;F80 sk_Xx Y-1, sk_Xx;
+F81 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F84[2] →
+                 λ
+                  (Y0:(ι → prop) → prop) (Y1:ι) 
+                  (Y2:(ι → prop) → prop) (Y3:ι). (F116 Y0 Y2 Y3)[2]}].
+[hds : 
+λ (Y0:ι → prop). (sk_Xx (F117 sk_Xx Y-1 Y0))=?=sk_Xx].
+[constrs: 
+F82 sk_Xx Y-1, sk_Xx;F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F82[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι) (Y2:ι → prop).
+                  (Y0 (F117 Y0 Y1 Y2))[2], 
+               F84[2] →
+                 λ
+                  (Y0:(ι → prop) → prop) (Y1:ι) 
+                  (Y2:(ι → prop) → prop) (Y3:ι). (F116 Y0 Y2 Y3)[2]}].
+[hds : 
+F80 sk_Xx Y-1=?=sk_Xx].
+[constrs: F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, Y-1;
+F117 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F82[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι) (Y2:ι → prop).
+                  (Y0 (F117 Y0 Y1 Y2))[2], 
+               F84[2] →
+                 λ
+                  (Y0:(ι → prop) → prop) (Y1:ι) 
+                  (Y2:(ι → prop) → prop) (Y3:ι). (F116 Y0 Y2 Y3)[2]}].
+[hds : 
+λ (Y0:ι → prop). (Y0 (F118 sk_Xx Y-1 Y0))=?=sk_Xx].
+[constrs: F82 sk_Xx 
+                                                                   Y-1, 
+sk_Xx;F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F82[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι) (Y2:ι → prop).
+                  (Y2 (F118 Y0 Y1 Y2))[2], 
+               F84[2] →
+                 λ
+                  (Y0:(ι → prop) → prop) (Y1:ι) 
+                  (Y2:(ι → prop) → prop) (Y3:ι). (F116 Y0 Y2 Y3)[2]}].
+[hds : 
+λ (Y0:ι → prop). (sk_Xx (F119 sk_Xx Y-1 Y0))=?=sk_Xx].
+[constrs: 
+F82 sk_Xx Y-1, sk_Xx;F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F82[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι) (Y2:ι → prop).
+                  (sk_Xx (F119 Y0 Y1 Y2))[2], 
+               F84[2] →
+                 λ
+                  (Y0:(ι → prop) → prop) (Y1:ι) 
+                  (Y2:(ι → prop) → prop) (Y3:ι). (F116 Y0 Y2 Y3)[2]}].
+[hds : 
+F80 sk_Xx Y-1=?=sk_Xx].
+[constrs: F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, Y-1;
+F119 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F82[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι) (Y2:ι → prop).
+                  (sk_Xx (F119 Y0 Y1 Y2))[2], 
+               F84[2] →
+                 λ
+                  (Y0:(ι → prop) → prop) (Y1:ι) 
+                  (Y2:(ι → prop) → prop) (Y3:ι). (F116 Y0 Y2 Y3)[2]}].
+[hds : 
+λ (Y0:ι → prop). (sk_Xx (F117 sk_Xx Y-1 Y0))=?=sk_Xx].
+[constrs: 
+F82 sk_Xx Y-1, sk_Xx;F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F82[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι) (Y2:ι → prop).
+                  (Y0 (F117 Y0 Y1 Y2))[2], 
+               F84[2] →
+                 λ
+                  (Y0:(ι → prop) → prop) (Y1:ι) 
+                  (Y2:(ι → prop) → prop) (Y3:ι). (F116 Y0 Y2 Y3)[2]}].
+[hds : 
+F80 sk_Xx Y-1=?=sk_Xx].
+[constrs: F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, Y-1;
+F117 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F82[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι) (Y2:ι → prop).
+                  (Y0 (F117 Y0 Y1 Y2))[2], 
+               F84[2] →
+                 λ
+                  (Y0:(ι → prop) → prop) (Y1:ι) 
+                  (Y2:(ι → prop) → prop) (Y3:ι). (F116 Y0 Y2 Y3)[2]}].
+[hds : 
+λ (Y0:ι → prop). (Y0 (F118 sk_Xx Y-1 Y0))=?=sk_Xx].
+[constrs: F82 sk_Xx 
+                                                                   Y-1, 
+sk_Xx;F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F82[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι) (Y2:ι → prop).
+                  (Y2 (F118 Y0 Y1 Y2))[2], 
+               F84[2] →
+                 λ
+                  (Y0:(ι → prop) → prop) (Y1:ι) 
+                  (Y2:(ι → prop) → prop) (Y3:ι). (F116 Y0 Y2 Y3)[2]}].
+[hds : 
+λ (Y0:ι → prop). (sk_Xx (F119 sk_Xx Y-1 Y0))=?=sk_Xx].
+[constrs: 
+F82 sk_Xx Y-1, sk_Xx;F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F82[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι) (Y2:ι → prop).
+                  (sk_Xx (F119 Y0 Y1 Y2))[2], 
+               F84[2] →
+                 λ
+                  (Y0:(ι → prop) → prop) (Y1:ι) 
+                  (Y2:(ι → prop) → prop) (Y3:ι). (F116 Y0 Y2 Y3)[2]}].
+[hds : 
+F80 sk_Xx Y-1=?=sk_Xx].
+[constrs: F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, Y-1;
+F119 sk_Xx Y-2 Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F82[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι) (Y2:ι → prop).
+                  (sk_Xx (F119 Y0 Y1 Y2))[2], 
+               F84[2] →
+                 λ
+                  (Y0:(ι → prop) → prop) (Y1:ι) 
+                  (Y2:(ι → prop) → prop) (Y3:ι). (F116 Y0 Y2 Y3)[2]}].
+[hds : 
+λ (Y0:ι). (F132 (F80 sk_Xx Y0) (F81 sk_Xx Y0))=?=λ (Y0:ι).
+                                                    (F132 sk_Xx Y0)].
+[constrs: 
+F72 sk_Xx, 
+F4 sk_Xx].
+[subst: {F0[0] → F1[2], 
+                    F0[1] → F0[2], 
+                    F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+                    F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+                    F4[2] →
+                      λ (Y0:(ι → prop) → prop) (Y1:ι).
+                       (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+                    F72[2] →
+                      λ (Y0:(ι → prop) → prop) (Y1:ι).
+                       (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+                    F84[2] →
+                      λ
+                       (Y0:(ι → prop) → prop) (Y1:ι) 
+                       (Y2:(ι → prop) → prop) (Y3:ι). (F116 Y0 Y2 Y3)[2], 
+                    F116[2] →
+                      λ
+                       (Y0:(ι → prop) → prop) 
+                       (Y1:(ι → prop) → prop) (Y2:ι). (F132 Y1 Y2)[2]}].
+[hds : 
+F80 sk_Xx Y-1=?=sk_Xx].
+[constrs: F80 sk_Xx Y-1, sk_Xx;F81 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F84[2] →
+                 λ
+                  (Y0:(ι → prop) → prop) (Y1:ι) 
+                  (Y2:(ι → prop) → prop) (Y3:ι). (F116 Y0 Y2 Y3)[2], 
+               F116[2] →
+                 λ
+                  (Y0:(ι → prop) → prop) (Y1:(ι → prop) → prop) 
+                  (Y2:ι). (F132 Y1 Y2)[2]}].
+[hds : λ (Y0:ι).
+                                                      (F137 sk_Xx 
+                                                        (F81 sk_Xx Y0))=?=
+λ (Y0:ι). (F137 (F82 sk_Xx Y0) Y0)].
+[constrs: F72 sk_Xx, 
+F4 sk_Xx].
+[subst: {F0[0] → F1[2], 
+                    F0[1] → F0[2], 
+                    F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+                    F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+                    F4[2] →
+                      λ (Y0:(ι → prop) → prop) (Y1:ι).
+                       (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+                    F72[2] →
+                      λ (Y0:(ι → prop) → prop) (Y1:ι).
+                       (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+                    F84[2] →
+                      λ
+                       (Y0:(ι → prop) → prop) (Y1:ι) 
+                       (Y2:(ι → prop) → prop) (Y3:ι). (F116 Y0 Y2 Y3)[2], 
+                    F116[2] →
+                      λ
+                       (Y0:(ι → prop) → prop) 
+                       (Y1:(ι → prop) → prop) (Y2:ι). (F137 Y0 Y2)[2]}].
+[hds : sk_Xx=?=
+F82 sk_Xx Y-1].
+[constrs: sk_Xx, F82 sk_Xx Y-1;F81 sk_Xx Y-1, 
+Y-1].
+[subst: {F0[0] → F1[2], 
+               F0[1] → F0[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (Y0 (F72 Y0))[2], 
+               F1[2] → λ (Y0:(ι → prop) → prop). (Y0 (F4 Y0))[2], 
+               F4[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 (F82 Y0 Y1) (F83 Y0 Y1) Y0 Y1)[2], 
+               F72[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι).
+                  (F84 Y0 Y1 (F80 Y0 Y1) (F81 Y0 Y1))[2], 
+               F84[2] →
+                 λ
+                  (Y0:(ι → prop) → prop) (Y1:ι) 
+                  (Y2:(ι → prop) → prop) (Y3:ι). (F116 Y0 Y2 Y3)[2], 
+               F116[2] →
+                 λ
+                  (Y0:(ι → prop) → prop) (Y1:(ι → prop) → prop) 
+                  (Y2:ι). (F137 Y0 Y2)[2]}].
+NEW UNIF!
+[hds : F0
+                                                                (λ
+                                                                  (Y0:
+                                                                   ι
+                                                                   → prop).
+                                                                  (¬ Y0 X1))=?=
+F2 sk_Xx].
+[constrs: F0 (λ (Y0:ι → prop). (¬ Y0 X1)), 
+F2 sk_Xx].
+[subst: {F0[0] → F2[2], F0[1] → F0[2], X1[1] → X1[2]}].
+[hds : 
+F9 (λ (Y0:ι → prop). (¬ Y0 X1)) (F7 (λ (Y0:ι → prop). (¬ Y0 X1)))=?=
+F9 (F8 sk_Xx) sk_Xx].
+[constrs: F0 (λ (Y0:ι → prop). (¬ Y0 X1)), 
+F2 sk_Xx].
+[subst: {F0[0] → F2[2], 
+                    F0[1] → F0[2], 
+                    X1[1] → X1[2], 
+                    F0[2] →
+                      λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+                    F2[2] →
+                      λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2]}].
+[hds : 
+λ (Y0:ι → prop). (¬ Y0 X1)=?=F8 sk_Xx].
+[constrs: λ (Y0:ι → prop).
+                                                        (¬ Y0 X1), F8 sk_Xx;
+F7 (λ (Y0:ι → prop). (¬ Y0 X1)), 
+sk_Xx].
+[subst: {F0[0] → F2[2], 
+                 F0[1] → F0[2], 
+                 X1[1] → X1[2], 
+                 F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+                 F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2]}].
+[hds : 
+sk_Xx (F10 sk_Xx Y-1)=?=¬ Y-1 X1].
+[constrs: F8 sk_Xx Y-1, ¬ Y-1 X1;
+F7 (λ (Y0:ι → prop). (¬ Y0 X1)), 
+sk_Xx].
+[subst: {F0[0] → F2[2], 
+                 F0[1] → F0[2], 
+                 X1[1] → X1[2], 
+                 F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+                 F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+                 F8[2] →
+                   λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                    (Y0 (F10 Y0 Y1))[2]}].
+[hds : Y-1 (F11 sk_Xx Y-1)=?=
+¬ Y-1 X1].
+[constrs: F8 sk_Xx Y-1, ¬ Y-1 X1;
+F7 (λ (Y0:ι → prop). (¬ Y0 X1)), 
+sk_Xx].
+[subst: {F0[0] → F2[2], 
+                 F0[1] → F0[2], 
+                 X1[1] → X1[2], 
+                 F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+                 F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+                 F8[2] →
+                   λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                    (Y1 (F11 Y0 Y1))[2]}].
+[hds : ¬ F12 sk_Xx Y-1=?=
+¬ Y-1 X1].
+[constrs: F8 sk_Xx Y-1, ¬ Y-1 X1;
+F7 (λ (Y0:ι → prop). (¬ Y0 X1)), 
+sk_Xx].
+[subst: {F0[0] → F2[2], 
+                 F0[1] → F0[2], 
+                 X1[1] → X1[2], 
+                 F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+                 F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+                 F8[2] →
+                   λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                    ((¬ F12 Y0 Y1))[2]}].
+[hds : F12 sk_Xx Y-1=?=Y-1 X1].
+[constrs: 
+F12 sk_Xx Y-1, 
+Y-1 X1].
+[subst: {F0[0] → F2[2], 
+                  F0[1] → F0[2], 
+                  X1[1] → X1[2], 
+                  F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+                  F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+                  F8[2] →
+                    λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                     ((¬ F12 Y0 Y1))[2]}].
+[hds : sk_Xx (F13 sk_Xx Y-1)=?=
+Y-1 X1].
+[constrs: F12 sk_Xx Y-1, 
+Y-1 X1].
+[subst: {F0[0] → F2[2], 
+                  F0[1] → F0[2], 
+                  X1[1] → X1[2], 
+                  F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+                  F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+                  F8[2] →
+                    λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                     ((¬ F12 Y0 Y1))[2], 
+                  F12[2] →
+                    λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                     (Y0 (F13 Y0 Y1))[2]}].
+[hds : Y-1 (F14 sk_Xx Y-1)=?=
+Y-1 X1].
+[constrs: F12 sk_Xx Y-1, 
+Y-1 X1].
+[subst: {F0[0] → F2[2], 
+                  F0[1] → F0[2], 
+                  X1[1] → X1[2], 
+                  F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+                  F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+                  F8[2] →
+                    λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                     ((¬ F12 Y0 Y1))[2], 
+                  F12[2] →
+                    λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                     (Y1 (F14 Y0 Y1))[2]}].
+[hds : F14 sk_Xx Y-1=?=X1].
+[constrs: 
+F14 sk_Xx Y-1, 
+X1].
+[subst: {F0[0] → F2[2], 
+              F0[1] → F0[2], 
+              X1[1] → X1[2], 
+              F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+              F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+              F8[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 ((¬ F12 Y0 Y1))[2], 
+              F12[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 (Y1 (F14 Y0 Y1))[2]}].
+[hds : F19 sk_Xx Y-1=?=F19 F17 F18].
+[constrs: 
+F14 sk_Xx Y-1, 
+X1].
+[subst: {F0[0] → F2[2], 
+              F0[1] → F0[2], 
+              X1[1] → X1[2], 
+              F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+              X1[2] → F19 F17 F18[2], 
+              F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+              F8[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 ((¬ F12 Y0 Y1))[2], 
+              F12[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 (Y1 (F14 Y0 Y1))[2], 
+              F14[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop). (F19 Y0 Y1)[2]}].
+[hds : sk_Xx=?=F17].
+[constrs: sk_Xx, 
+F17;Y-1, 
+F18].
+[subst: {F0[0] → F2[2], 
+               F0[1] → F0[2], 
+               X1[1] → X1[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+               X1[2] → F19 F17 F18[2], 
+               F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+               F8[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  ((¬ F12 Y0 Y1))[2], 
+               F12[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y1 (F14 Y0 Y1))[2], 
+               F14[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop). (F19 Y0 Y1)[2]}].
+[hds : 
+F22 Y-1=?=F22 F18].
+[constrs: F14 sk_Xx Y-1, 
+X1].
+[subst: {F0[0] → F2[2], 
+              F0[1] → F0[2], 
+              X1[1] → X1[2], 
+              F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+              X1[2] → F19 F17 F18[2], 
+              F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+              F8[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 ((¬ F12 Y0 Y1))[2], 
+              F12[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 (Y1 (F14 Y0 Y1))[2], 
+              F14[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop). (F19 Y0 Y1)[2], 
+              F19[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop). (F22 Y1)[2]}].
+[hds : 
+F24 sk_Xx=?=F24 F17].
+[constrs: F14 sk_Xx Y-1, 
+X1].
+[subst: {F0[0] → F2[2], 
+              F0[1] → F0[2], 
+              X1[1] → X1[2], 
+              F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+              X1[2] → F19 F17 F18[2], 
+              F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+              F8[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 ((¬ F12 Y0 Y1))[2], 
+              F12[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 (Y1 (F14 Y0 Y1))[2], 
+              F14[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop). (F19 Y0 Y1)[2], 
+              F19[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop). (F24 Y0)[2]}].
+[hds : 
+F14 sk_Xx Y-1=?=F14 F15 F16].
+[constrs: F14 sk_Xx Y-1, 
+X1].
+[subst: {F0[0] → F2[2], 
+              F0[1] → F0[2], 
+              X1[1] → X1[2], 
+              F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+              X1[2] → F14 F15 F16[2], 
+              F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+              F8[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 ((¬ F12 Y0 Y1))[2], 
+              F12[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 (Y1 (F14 Y0 Y1))[2]}].
+[hds : sk_Xx=?=F15].
+[constrs: sk_Xx, 
+F15;Y-1, 
+F16].
+[subst: {F0[0] → F2[2], 
+               F0[1] → F0[2], 
+               X1[1] → X1[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+               X1[2] → F14 F15 F16[2], 
+               F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+               F8[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  ((¬ F12 Y0 Y1))[2], 
+               F12[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y1 (F14 Y0 Y1))[2]}].
+[hds : F28 Y-1=?=F28 F16].
+[constrs: 
+F14 sk_Xx Y-1, 
+X1].
+[subst: {F0[0] → F2[2], 
+              F0[1] → F0[2], 
+              X1[1] → X1[2], 
+              F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+              X1[2] → F14 F15 F16[2], 
+              F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+              F8[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 ((¬ F12 Y0 Y1))[2], 
+              F12[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 (Y1 (F14 Y0 Y1))[2], 
+              F14[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop). (F28 Y1)[2]}].
+[hds : 
+F30 sk_Xx=?=F30 F15].
+[constrs: F14 sk_Xx Y-1, 
+X1].
+[subst: {F0[0] → F2[2], 
+              F0[1] → F0[2], 
+              X1[1] → X1[2], 
+              F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+              X1[2] → F14 F15 F16[2], 
+              F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+              F8[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 ((¬ F12 Y0 Y1))[2], 
+              F12[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 (Y1 (F14 Y0 Y1))[2], 
+              F14[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop). (F30 Y0)[2]}].
+[hds : 
+sk_Xx (F10 sk_Xx Y-1)=?=¬ Y-1 X1].
+[constrs: F8 sk_Xx Y-1, ¬ Y-1 X1;
+F7 (λ (Y0:ι → prop). (¬ Y0 X1)), 
+sk_Xx].
+[subst: {F0[0] → F2[2], 
+                 F0[1] → F0[2], 
+                 X1[1] → X1[2], 
+                 F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+                 F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+                 F8[2] →
+                   λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                    (Y0 (F10 Y0 Y1))[2]}].
+[hds : Y-1 (F11 sk_Xx Y-1)=?=
+¬ Y-1 X1].
+[constrs: F8 sk_Xx Y-1, ¬ Y-1 X1;
+F7 (λ (Y0:ι → prop). (¬ Y0 X1)), 
+sk_Xx].
+[subst: {F0[0] → F2[2], 
+                 F0[1] → F0[2], 
+                 X1[1] → X1[2], 
+                 F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+                 F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+                 F8[2] →
+                   λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                    (Y1 (F11 Y0 Y1))[2]}].
+[hds : ¬ F12 sk_Xx Y-1=?=
+¬ Y-1 X1].
+[constrs: F8 sk_Xx Y-1, ¬ Y-1 X1;
+F7 (λ (Y0:ι → prop). (¬ Y0 X1)), 
+sk_Xx].
+[subst: {F0[0] → F2[2], 
+                 F0[1] → F0[2], 
+                 X1[1] → X1[2], 
+                 F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+                 F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+                 F8[2] →
+                   λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                    ((¬ F12 Y0 Y1))[2]}].
+[hds : F12 sk_Xx Y-1=?=Y-1 X1].
+[constrs: 
+F12 sk_Xx Y-1, 
+Y-1 X1].
+[subst: {F0[0] → F2[2], 
+                  F0[1] → F0[2], 
+                  X1[1] → X1[2], 
+                  F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+                  F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+                  F8[2] →
+                    λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                     ((¬ F12 Y0 Y1))[2]}].
+[hds : sk_Xx (F32 sk_Xx Y-1)=?=
+Y-1 X1].
+[constrs: F12 sk_Xx Y-1, 
+Y-1 X1].
+[subst: {F0[0] → F2[2], 
+                  F0[1] → F0[2], 
+                  X1[1] → X1[2], 
+                  F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+                  F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+                  F8[2] →
+                    λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                     ((¬ F12 Y0 Y1))[2], 
+                  F12[2] →
+                    λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                     (Y0 (F32 Y0 Y1))[2]}].
+[hds : Y-1 (F33 sk_Xx Y-1)=?=
+Y-1 X1].
+[constrs: F12 sk_Xx Y-1, 
+Y-1 X1].
+[subst: {F0[0] → F2[2], 
+                  F0[1] → F0[2], 
+                  X1[1] → X1[2], 
+                  F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+                  F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+                  F8[2] →
+                    λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                     ((¬ F12 Y0 Y1))[2], 
+                  F12[2] →
+                    λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                     (Y1 (F33 Y0 Y1))[2]}].
+[hds : F33 sk_Xx Y-1=?=X1].
+[constrs: 
+F33 sk_Xx Y-1, 
+X1].
+[subst: {F0[0] → F2[2], 
+              F0[1] → F0[2], 
+              X1[1] → X1[2], 
+              F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+              F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+              F8[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 ((¬ F12 Y0 Y1))[2], 
+              F12[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 (Y1 (F33 Y0 Y1))[2]}].
+[hds : F38 sk_Xx Y-1=?=F38 F36 F37].
+[constrs: 
+F33 sk_Xx Y-1, 
+X1].
+[subst: {F0[0] → F2[2], 
+              F0[1] → F0[2], 
+              X1[1] → X1[2], 
+              F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+              X1[2] → F38 F36 F37[2], 
+              F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+              F8[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 ((¬ F12 Y0 Y1))[2], 
+              F12[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 (Y1 (F33 Y0 Y1))[2], 
+              F33[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop). (F38 Y0 Y1)[2]}].
+[hds : sk_Xx=?=F36].
+[constrs: sk_Xx, 
+F36;Y-1, 
+F37].
+[subst: {F0[0] → F2[2], 
+               F0[1] → F0[2], 
+               X1[1] → X1[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+               X1[2] → F38 F36 F37[2], 
+               F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+               F8[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  ((¬ F12 Y0 Y1))[2], 
+               F12[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y1 (F33 Y0 Y1))[2], 
+               F33[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop). (F38 Y0 Y1)[2]}].
+[hds : 
+F41 Y-1=?=F41 F37].
+[constrs: F33 sk_Xx Y-1, 
+X1].
+[subst: {F0[0] → F2[2], 
+              F0[1] → F0[2], 
+              X1[1] → X1[2], 
+              F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+              X1[2] → F38 F36 F37[2], 
+              F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+              F8[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 ((¬ F12 Y0 Y1))[2], 
+              F12[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 (Y1 (F33 Y0 Y1))[2], 
+              F33[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop). (F38 Y0 Y1)[2], 
+              F38[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop). (F41 Y1)[2]}].
+[hds : 
+F43 sk_Xx=?=F43 F36].
+[constrs: F33 sk_Xx Y-1, 
+X1].
+[subst: {F0[0] → F2[2], 
+              F0[1] → F0[2], 
+              X1[1] → X1[2], 
+              F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+              X1[2] → F38 F36 F37[2], 
+              F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+              F8[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 ((¬ F12 Y0 Y1))[2], 
+              F12[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 (Y1 (F33 Y0 Y1))[2], 
+              F33[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop). (F38 Y0 Y1)[2], 
+              F38[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop). (F43 Y0)[2]}].
+[hds : 
+F33 sk_Xx Y-1=?=F33 F34 F35].
+[constrs: F33 sk_Xx Y-1, 
+X1].
+[subst: {F0[0] → F2[2], 
+              F0[1] → F0[2], 
+              X1[1] → X1[2], 
+              F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+              X1[2] → F33 F34 F35[2], 
+              F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+              F8[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 ((¬ F12 Y0 Y1))[2], 
+              F12[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 (Y1 (F33 Y0 Y1))[2]}].
+[hds : sk_Xx=?=F34].
+[constrs: sk_Xx, 
+F34;Y-1, 
+F35].
+[subst: {F0[0] → F2[2], 
+               F0[1] → F0[2], 
+               X1[1] → X1[2], 
+               F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+               X1[2] → F33 F34 F35[2], 
+               F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+               F8[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  ((¬ F12 Y0 Y1))[2], 
+               F12[2] →
+                 λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                  (Y1 (F33 Y0 Y1))[2]}].
+[hds : F47 Y-1=?=F47 F35].
+[constrs: 
+F33 sk_Xx Y-1, 
+X1].
+[subst: {F0[0] → F2[2], 
+              F0[1] → F0[2], 
+              X1[1] → X1[2], 
+              F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+              X1[2] → F33 F34 F35[2], 
+              F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+              F8[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 ((¬ F12 Y0 Y1))[2], 
+              F12[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 (Y1 (F33 Y0 Y1))[2], 
+              F33[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop). (F47 Y1)[2]}].
+[hds : 
+F49 sk_Xx=?=F49 F34].
+[constrs: F33 sk_Xx Y-1, 
+X1].
+[subst: {F0[0] → F2[2], 
+              F0[1] → F0[2], 
+              X1[1] → X1[2], 
+              F0[2] → λ (Y0:(ι → prop) → prop). (F9 Y0 (F7 Y0))[2], 
+              X1[2] → F33 F34 F35[2], 
+              F2[2] → λ (Y0:(ι → prop) → prop). (F9 (F8 Y0) Y0)[2], 
+              F8[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 ((¬ F12 Y0 Y1))[2], 
+              F12[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop).
+                 (Y1 (F33 Y0 Y1))[2], 
+              F33[2] →
+                λ (Y0:(ι → prop) → prop) (Y1:ι → prop). (F49 Y0)[2]}].
+For problem: 
+X0((^[Y0 : $i > $o]: (~ Y0(X1)))):prop=?= X0(sk_Xx):prop
+Subst: {F0[0] →
+                                                                   F2[2], 
+                                                                 F0[1] →
+                                                                   F0[2], 
+                                                                 X1[1] →
+                                                                   X1[2], 
+                                                                 F0[2] →
+                                                                   λ
+                                                                    (
+                                                                    Y0:
+                                                                    (
+                                                                    ι
+                                                                    → prop)
+                                                                    → prop).
+                                                                    (
+                                                                    F9 Y0 
+                                                                    (F7 Y0))[2], 
+                                                                 F2[2] →
+                                                                   λ
+                                                                    (
+                                                                    Y0:
+                                                                    (
+                                                                    ι
+                                                                    → prop)
+                                                                    → prop).
+                                                                    (
+                                                                    F9
+                                                                    (F8 Y0) 
+                                                                    Y0)[2], 
+                                                                 F8[2] →
+                                                                   λ
+                                                                    (
+                                                                    Y0:
+                                                                    (
+                                                                    ι
+                                                                    → prop)
+                                                                    → prop) 
+                                                                    (
+                                                                    Y1:
+                                                                    ι
+                                                                    → prop).
+                                                                    (
+                                                                    (
+                                                                    ¬
+                                                                    F12 Y0 Y1))[2], 
+                                                                 F12[2] →
+                                                                   λ
+                                                                    (
+                                                                    Y0:
+                                                                    (
+                                                                    ι
+                                                                    → prop)
+                                                                    → prop) 
+                                                                    (
+                                                                    Y1:
+                                                                    ι
+                                                                    → prop).
+                                                                    (
+                                                                    Y1
+                                                                    (F33 Y0 
+                                                                    Y1))[2], 
+                                                                 F33[2] →
+                                                                   λ
+                                                                    (
+                                                                    Y0:
+                                                                    (
+                                                                    ι
+                                                                    → prop)
+                                                                    → prop) 
+                                                                    (
+                                                                    Y1:
+                                                                    ι
+                                                                    → prop).
+                                                                    X1[2]}
+
+X9((^[Y0 : $i > $o]: (~ Y0(X1))), X7((^[Y0 : $i > $o]: (~ Y0(X1))))):prop <> 
+X9((^[Y0 : $i > $o]: (~ Y0(X1))), sk_Xx):prop
+File "src/core/PragHOUnif.ml", line 443, characters 8-14: Assertion failed
+Raised at file "src/core/PragHOUnif.ml", line 443, characters 8-21
+Called from file "src/core/CCOpt.ml", line 10, characters 19-24
+Called from file "src/OSeq.ml", line 71, characters 27-30
+Called from file "src/OSeq.ml", line 435, characters 13-17
+Called from file "src/OSeq.ml", line 918, characters 36-40
+Called from file "src/prover_calculi/superposition.ml", line 958, characters 25-67
+Called from file "src/Iter.ml", line 200, characters 20-23
+Called from file "set.ml", line 343, characters 35-38
+Called from file "map.ml", line 295, characters 20-25
+Called from file "map.ml", line 295, characters 20-25
+Called from file "map.ml", line 295, characters 20-25
+Called from file "map.ml", line 295, characters 20-25
+Called from file "map.ml", line 295, characters 20-25
+Called from file "map.ml", line 295, characters 20-25
+Called from file "map.ml", line 295, characters 20-25
+Called from file "map.ml", line 295, characters 20-25
+Called from file "src/core/Fingerprint.ml", line 312, characters 6-31
+Re-raised at file "src/core/Fingerprint.ml", line 316, characters 6-13
+Called from file "src/core/Literals.ml", line 337, characters 16-64
+Called from file "src/Iter.ml", line 85, characters 2-32
+Called from file "src/prover_calculi/superposition.ml", line 776, characters 6-955
+Called from file "src/prover_calculi/superposition.ml", line 955, characters 18-388
+Called from file "src/prover/env.ml", line 270, characters 29-35
+Called from file "list.ml", line 117, characters 24-34
+Called from file "src/prover/env.ml", line 267, characters 6-236
+Called from file "src/prover/env.ml", line 669, characters 25-51
+Called from file "src/prover/saturate.ml", line 161, characters 19-33
+Called from file "src/prover/saturate.ml", line 200, characters 23-56
+Called from file "src/prover_phases/phases_impl.ml", line 314, characters 11-63
+Called from file "src/prover_phases/phases.ml", line 116, characters 8-12
+Called from file "src/prover_phases/phases.ml", line 116, characters 8-12
+Called from file "src/prover_phases/phases.ml", line 116, characters 8-12
+Called from file "src/prover_phases/phases.ml", line 116, characters 8-12
+Called from file "src/prover_phases/phases.ml", line 208, characters 4-8
+
