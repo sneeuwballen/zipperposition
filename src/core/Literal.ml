@@ -436,8 +436,12 @@ let _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 k =
             ~subst ~pattern:(Scoped.make l1 sc1) (Scoped.make l2 sc2) in
         let subst = Unif.FO.matching_adapt_scope
             ~subst ~pattern:(Scoped.make r1 sc1) (Scoped.make r2 sc2) in
+
+        (* CCFormat.printf "%a = %a;\n%a = %a;\n%a.\n" T.pp l1 T.pp l2 T.pp r1 T.pp r2 Subst.pp subst; *)
         k subst
-      with Unif.Fail -> ()
+      with Unif.Fail -> 
+        (* CCFormat.printf "FAILED: %a = %a;\n%a = %a;\n%a.\n" T.pp l1 T.pp l2 T.pp r1 T.pp r2 Subst.pp subst; *)
+        ()
     end;
     begin try
         let subst = Unif.FO.matching_adapt_scope
@@ -445,7 +449,9 @@ let _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 k =
         let subst = Unif.FO.matching_adapt_scope
             ~subst ~pattern:(Scoped.make r1 sc1) (Scoped.make l2 sc2) in
         k subst
-      with Unif.Fail -> ()
+      with Unif.Fail -> 
+        (* CCFormat.printf "FAILED: %a = %a;\n%a = %a;\n%a.\n" T.pp l1 T.pp l2 T.pp r1 T.pp r2 Subst.pp subst; *)
+        ()
     end;
     ()
   in

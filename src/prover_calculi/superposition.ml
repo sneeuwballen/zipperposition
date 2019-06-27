@@ -200,6 +200,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~eligible:(C.Eligible.res c) (C.lits c)
       |> Iter.filter (fun (t, _) ->
             (* Util.debugf ~section 3 "@[ Filtering vars %a,1  @]" (fun k-> k T.pp t); *)
+            not (T.equal t T.false_) && (* disabling paramodulation false *)
             not (T.is_var t) || T.is_ho_var t)
       (* TODO: could exclude more variables from the index:
          they are not needed if they occur with the same args everywhere in the clause *)
@@ -268,6 +269,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     _idx_sup_from :=
       Lits.fold_eqn ~ord ~both:true ~sign:true
         ~eligible:(C.Eligible.param c) (C.lits c)
+      |> Iter.filter((fun (l, _, _, _) -> not (T.equal T.false_ l)))
       |> Iter.fold
         (fun tree (l, _, sign, pos) ->
            assert sign;
@@ -1464,7 +1466,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            let active_idx = Lits.Pos.idx s_pos in
            let is_var_pred = 
             T.is_var (T.head_term s) && Type.is_prop (T.ty s) && T.is_true_or_false t in
-           if T.equal t T.false_ && not is_var_pred then Iter.empty 
+           if T.equal s T.false_ then Iter.empty (* disable factoring from false*)
+           else if T.equal t T.false_ && not is_var_pred then Iter.empty 
            else (
               let var_pred_status = (is_var_pred, t) in
               find_unifiable_lits ~var_pred_status active_idx s s_pos)
@@ -2335,9 +2338,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let (c_a, _), (c_b, _) = a,b in
     let w_a = CCArray.fold (fun acc l -> acc + Lit.weight l) 0 c_a in
     let w_b = CCArray.fold (fun acc l -> acc + Lit.weight l) 0 c_b in
-    let res = if w_a <= w_b then subsumes_with_ a b else None in
-    Util.exit_prof prof_subsumption;
-    res
+
+    if w_a = w_b && Literals.equal_com c_a c_b then Some (Subst.empty, [])
+    else (
+      let res = if w_a <= w_b then subsumes_with_ a b else None in
+      Util.exit_prof prof_subsumption;
+      res
+    )
 
   let subsumes a b = match subsumes_with (a,0) (b,1) with
     | None -> false

@@ -14,7 +14,7 @@ type reasoning_kind    =
   | BoolCasesEagerFar | BoolCasesEagerNear
 
 let _bool_reasoning = ref BoolReasoningDisabled
-let cased_term_selection = ref Any
+let cased_term_selection = ref Minimal
 let quant_rename = ref false
 let interpret_bool_funs = ref false
 
@@ -184,7 +184,10 @@ module Make(E : Env.S) : S with module Env = E = struct
               if !cased_term_selection != Minimal then add t t T.true_ else()
             | _ -> add t t T.true_
       in
-      Literals.Seq.terms(C.lits c) |> Iter.iter(find_bools true);
+      if not @@ Iter.exists T.is_formula (C.Seq.terms c) then (
+        (* first clausify, then get bool subterms *)
+        Literals.Seq.terms(C.lits c) 
+        |> Iter.iter(find_bools true));
       let res = 
         Hashtbl.fold(fun b (b_true, b_false) clauses ->
           if !cased_term_selection != Minimal ||
@@ -203,7 +206,10 @@ module Make(E : Env.S) : S with module Env = E = struct
             clauses)
           else clauses) term_to_equations [] in
       if CCList.is_empty res then None
-      else (Some res)
+      else (
+        (* CCFormat.printf "bool case simp: %a.\n" C.pp c; *)
+        (* CCList.iteri (fun i nc -> CCFormat.printf "@[%d: @[%a@]@].\n" i C.pp nc) res; *)
+        Some res)
 
   let simpl_bool_subterms c =
     let new_lits = Literals.map T.simplify_bools (C.lits c) in
@@ -249,7 +255,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let trail = C.trail c and penalty = C.penalty c in
       let stmt = Statement.assert_ ~proof f in
       let cnf_vec = Cnf.convert @@ CCVector.to_seq @@ 
-                    Cnf.cnf_of ~opts:([Cnf.DisableRenaming]) ~ctx:(Ctx.sk_ctx ()) stmt in
+                    Cnf.cnf_of ~ctx:(Ctx.sk_ctx ()) stmt in
       let sets = Env.convert_input_statements cnf_vec in
       let clauses = sets.Clause.c_set 
                     |> CCVector.to_list
@@ -257,10 +263,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                       let lits = CCArray.to_list (C.lits c) in
                       C.create ~penalty ~trail lits proof
                     ) in
-      (* CCFormat.printf "cnf_otf(%a):\n" C.pp c; *)
-      (* Format.printf "res: "; *)
       List.iter (fun new_c -> 
-        (* Format.printf "%a; \n" C.pp new_c; *)
         assert(Proof.Step.inferences_perfomed (C.proof_step c) <=
                Proof.Step.inferences_perfomed (C.proof_step new_c));) clauses;
       Some clauses
