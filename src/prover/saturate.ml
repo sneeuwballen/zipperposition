@@ -114,7 +114,7 @@ module Make(E : Env.S) = struct
         begin match Env.all_simplify c with
           | [], _ ->
             Util.incr_stat stat_redundant_given;
-            Util.debugf ~section 2 "@[<2>given clause @[%a@]@ is redundant@]"
+            Util.debugf ~section 2 "@[<2>given clause dropped @[%a@]@@]"
               (fun k->k Env.C.pp c);
             Unknown
           | l, _ when List.exists Env.C.is_empty l ->
@@ -123,7 +123,13 @@ module Make(E : Env.S) = struct
             Unsat proof
           | c :: l', _ ->
             (* put clauses of [l'] back in passive set *)
-            assert(List.for_all (fun c -> Env.C.Seq.terms c |> Iter.for_all  Lambda.is_properly_encoded) (c::l'));
+            assert(List.for_all (fun c -> 
+              let is_prop_encoded = 
+                Env.C.Seq.terms c |> Iter.for_all  Lambda.is_properly_encoded in
+              if not is_prop_encoded then (
+                CCFormat.printf "IMPROPERLY ENCODED: %a" Env.C.pp c;
+              );
+              is_prop_encoded) (c::l'));
             Env.add_passive (Iter.of_list l');
             (* process the clause [c] *)
             let new_clauses = CCVector.create () in
@@ -134,8 +140,8 @@ module Make(E : Env.S) = struct
                | None -> ()); *)
             Util.incr_stat stat_processed_given;
             Util.debugf ~section 1 "@[@{<Yellow>### step %5d ###@}@]"(fun k->k num);
-            Util.debugf ~section 1 "@[<2>@{<green>given@} (%d steps, penalty %d):@ `@[%a@]`@]"
-              (fun k->k num (Env.C.penalty c) Env.C.pp c);
+            Util.debugf ~section 1 "@[<2>@{<green>given@} (%d steps, penalty %d):@ `@[%a@]\nproof @[%a@]`@]"
+              (fun k->k num (Env.C.penalty c) Env.C.pp c Proof.S.pp_zf (Env.C.proof c));
             (* find clauses that are subsumed by given in active_set *)
             let subsumed_active = Env.C.ClauseSet.to_seq (Env.subsumed_by c) in
             Env.remove_active subsumed_active;

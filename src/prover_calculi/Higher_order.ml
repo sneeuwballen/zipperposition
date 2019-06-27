@@ -340,7 +340,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               let s,t = List.hd zipped in loop s t 
             ) else zipped) 
           else [(s,t)]) 
-        else []
+        else [(s,t)]
       in
 
       let (hd_s,_), (hd_t,_) = T.as_app s, T.as_app t in
@@ -352,7 +352,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                               and that will give rise to wrong term applications*)
       ) else [] 
     in
-    let is_eligible = C.Eligible.res c in
+    let is_eligible = C.Eligible.always in
     C.lits c
     |> CCArray.mapi (fun i l -> 
         match l with 
@@ -363,7 +363,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              List.exists (fun (l,_) -> 
                 Type.is_fun (T.ty l) || Type.is_prop (T.ty l)) subterms then
              let subterms_lit = CCList.map (fun (l,r) ->
-               let free_vars = T.VarSet.union (T.free_vars l) (T.free_vars r) |> T.VarSet.to_list in 
+               let free_vars = T.VarSet.union (T.vars l) (T.vars r) |> T.VarSet.to_list in 
                let arg_types = Type.expected_args @@ T.ty l in
                if CCList.is_empty arg_types then Literal.mk_neq l r
                else (
@@ -397,14 +397,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         | Literal.Equation (lhs,rhs,false) 
             when is_eligible i l && Type.is_fun @@ T.ty lhs ->
           let arg_types = Type.expected_args @@ T.ty lhs in
-          let vars_under_quant = 
-            Literal.root_terms l
-            |> List.fold_left (fun acc t -> 
-                  Term.VarSet.union acc (T.vars_under_quant t)) 
-               T.VarSet.empty in
-          let free_vars = Literal.vars l |> T.VarSet.of_list 
-                          |> (fun f_vars -> T.VarSet.diff f_vars vars_under_quant)
-                          |> T.VarSet.to_list in
+          let free_vars = Literal.vars l in
           let new_lits = CCList.map (fun (j,x) -> 
               if i!=j then x
               else (
@@ -455,8 +448,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   let elim_pred_variable (c:C.t) : C.t list =
     (* find unshielded predicate vars *)
     let find_vars(): _ HVar.t Iter.t =
-      Literals.free_vars (C.lits c)
-      |> T.VarSet.to_seq
+      Literals.vars (C.lits c)
+      |> CCList.to_seq
       |> Iter.filter
         (fun v ->
            (Type.is_prop @@ Type.returns @@ HVar.ty v) &&
@@ -568,7 +561,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* rule for primitive enumeration of predicates [P t1…tn]
      (using ¬ and ∧ and =) *)
   let prim_enum_ ~(mode) (c:C.t) : C.t list =
-    let free_vars = Literals.free_vars (C.lits c) in
+    let free_vars = Literals.vars (C.lits c) |> T.VarSet.of_list in
     (* set of variables to refine (only those occurring in "interesting" lits) *)
     let vars =
       Literals.fold_lits ~eligible:C.Eligible.always (C.lits c)
@@ -594,10 +587,11 @@ module Make(E : Env.S) : S with module Env = E = struct
     let sc_c = 0 in
     let offset = C.Seq.vars c |> T.Seq.max_var |> succ in
     begin
-      vars
+      let enum_prop = vars
       |> T.VarSet.to_seq
       |> Iter.flat_map_l
-        (fun v -> HO_unif.enum_prop ~mode ~enum_cache:prim_enum_terms (v,sc_c) ~offset)
+        (fun v -> HO_unif.enum_prop ~mode ~enum_cache:prim_enum_terms (v,sc_c) ~offset) in
+      enum_prop
       |> Iter.map
         (fun (subst,penalty) ->
            let renaming = Subst.Renaming.create() in
@@ -620,7 +614,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     end
 
   let prim_enum ~(mode) c =
-    if Proof.Step.inferences_perfomed (C.proof_step c) < max_penalty_prim_ 
+    if Proof.Step.inferences_perfomed (C.proof_step c) <= max_penalty_prim_ 
     then prim_enum_ ~mode c
     else []
 
@@ -919,7 +913,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
 
     let status = VTbl.create 8 in
-    let free_vars = Literals.free_vars (C.lits c) in
+    let free_vars = Literals.vars (C.lits c) |> T.VarSet.of_list in
     C.lits c
     |> Literals.map (fun t -> Lambda.eta_expand t) (* to make sure that DB indices are everywhere the same *)
     |> Literals.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord:Ordering.none 
@@ -1180,7 +1174,7 @@ let extension =
 let () =
   Options.add_opts
     [ "--ho", Arg.Set enabled_, " enable HO reasoning";
-      "--force-ho", Arg.Set force_enabled_, " enable HO reasoning even if the problem is first-order";
+      "--force-ho", Arg.Bool  (fun b -> force_enabled_ := false), " enable/disable HO reasoning even if the problem is first-order";
       "--no-ho", Arg.Clear enabled_, " disable HO reasoning";
       "--ho-unif", Arg.Set enable_unif_, " enable full HO unification";
       "--ho-neg-cong-fun", Arg.Set _neg_cong_fun, "enable NegCongFun";

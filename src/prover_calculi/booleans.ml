@@ -9,11 +9,14 @@ open Libzipperposition
 module T = Term
 
 type selection_setting = Any | Minimal | Large
-type reasoning_kind    = BoolReasoningDisabled | BoolCasesInference | BoolCasesSimplification | BoolCasesEagerFar | BoolCasesEagerNear
+type reasoning_kind    = 
+  BoolReasoningDisabled | BoolCasesInference | BoolCasesSimplification | BoolCasesKeepParent
+  | BoolCasesEagerFar | BoolCasesEagerNear
 
 let _bool_reasoning = ref BoolReasoningDisabled
-let cased_term_selection = ref Any
+let cased_term_selection = ref Minimal
 let quant_rename = ref false
+let interpret_bool_funs = ref false
 
 module type S = sig
   module Env : Env.S
@@ -180,14 +183,17 @@ module Make(E : Env.S) : S with module Env = E = struct
               if !cased_term_selection != Minimal then add t t T.true_ else()
             | _ -> add t t T.true_
       in
-      Literals.Seq.terms(C.lits c) |> Iter.iter(find_bools true);
+      if not @@ Iter.exists T.is_formula (C.Seq.terms c) then (
+        (* first clausify, then get bool subterms *)
+        Literals.Seq.terms(C.lits c) 
+        |> Iter.iter(find_bools true));
       let res = 
         Hashtbl.fold(fun b (b_true, b_false) clauses ->
           if !cased_term_selection != Minimal ||
             Term.Seq.subterms b |> 
             Iter.for_all (fun st -> T.equal b st || 
                                     not (Type.is_prop (T.ty st))) then (
-            let proof = Proof.Step.inference[C.proof_parent c]
+            let proof = Proof.Step.simp[C.proof_parent c]
               ~rule:(Proof.Rule.mk"bool_case_simp")
             in
             C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
@@ -199,14 +205,17 @@ module Make(E : Env.S) : S with module Env = E = struct
             clauses)
           else clauses) term_to_equations [] in
       if CCList.is_empty res then None
-      else (Some res)
+      else (
+        (* CCFormat.printf "bool case simp: %a.\n" C.pp c; *)
+        (* CCList.iteri (fun i nc -> CCFormat.printf "@[%d: @[%a@]@].\n" i C.pp nc) res; *)
+        Some res)
 
   let simpl_bool_subterms c =
     let new_lits = Literals.map T.simplify_bools (C.lits c) in
     if Literals.equal (C.lits c) new_lits then (
       SimplM.return_same c
     ) else (
-      let proof = Proof.Step.inference [C.proof_parent c] 
+      let proof = Proof.Step.simp [C.proof_parent c] 
                     ~rule:(Proof.Rule.mk "simplify boolean subterms") in
       let new_ = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
                   (Array.to_list new_lits) proof in
@@ -238,6 +247,18 @@ module Make(E : Env.S) : S with module Env = E = struct
               || T.is_formula l || T.is_formula r)
       | None            -> false 
     ) (C.lits c) in
+
+    let renaming_weight = 60 in
+    let max_formula_weight = 
+      C.Seq.terms c 
+      |> Iter.filter T.is_formula
+      |> Iter.map T.size
+      |> Iter.max in
+    let opts = 
+      match max_formula_weight with
+      | None -> [Cnf.DisableRenaming]
+      | Some m -> if m < renaming_weight then [Cnf.DisableRenaming] else [] in
+
     match idx with 
     | Some _ ->
       let f = Literals.Conv.to_tst (C.lits c) in
@@ -245,24 +266,74 @@ module Make(E : Env.S) : S with module Env = E = struct
       let trail = C.trail c and penalty = C.penalty c in
       let stmt = Statement.assert_ ~proof f in
       let cnf_vec = Cnf.convert @@ CCVector.to_seq @@ 
-                    Cnf.cnf_of ~opts:([Cnf.DisableRenaming])~ctx:(Ctx.sk_ctx ()) stmt in
-      let sets = Env.convert_input_statements cnf_vec in
-      let clauses = sets.Clause.c_set 
-                    |> CCVector.to_list
-                    |> CCList.map (fun c -> 
-                      let lits = CCArray.to_list (C.lits c) in
-                      C.create ~penalty ~trail lits proof
-                    ) in
-      (* CCFormat.printf "cnf_otf(%a):\n" C.pp c; *)
-      (* Format.printf "res: "; *)
+                    Cnf.cnf_of ~opts ~ctx:(Ctx.sk_ctx ()) stmt in
+      let clauses = CCVector.map (C.of_statement ~convert_defs:true) cnf_vec
+                    |> CCVector.to_list 
+                    |> CCList.flatten
+                    |> List.map (fun c -> 
+                        C.create ~penalty  ~trail (CCArray.to_list (C.lits c)) proof) in
       List.iter (fun new_c -> 
-        (* Format.printf "%a; \n" C.pp new_c; *)
         assert(Proof.Step.inferences_perfomed (C.proof_step c) <=
                Proof.Step.inferences_perfomed (C.proof_step new_c));) clauses;
       Some clauses
     | None       -> 
       (* Format.printf "res:none.\n"; *)
       None
+
+  let interpret_boolean_functions c =
+    (* Collects boolean functions only at top level, 
+       and not the ones that are already a part of the quantifier *)
+    let collect_tl_bool_funcs t k = 
+      let rec aux t =
+        match T.view t with
+        | Var _  | Const _  | DB _ -> ()
+        | Fun _ -> if Type.is_prop (Term.ty (snd @@ Term.open_fun t)) then k t
+        | App (f, l) ->
+          aux f;
+          List.iter aux l
+        | AppBuiltin (b,l) -> 
+          if not @@ Builtin.is_quantifier b then List.iter aux l 
+      in
+      aux t in
+    let interpret t i = 
+      let ty_args, body = T.open_fun t in
+      assert(Type.is_prop (Term.ty body));
+      T.fun_l ty_args i 
+    in
+    let negate_bool_fun bool_fun =
+      let ty_args, body = T.open_fun bool_fun in
+      assert(Type.is_prop (Term.ty body));
+      T.fun_l ty_args (T.Form.not_ body)
+    in
+
+    Iter.flat_map collect_tl_bool_funcs 
+      (C.Seq.terms c
+       |> Iter.filter (fun t -> not @@ T.is_fun t))
+    |> Iter.sort_uniq ~cmp:Term.compare
+    |> Iter.filter (fun t ->  
+        let cached_t = Subst.FO.canonize_all_vars t in
+        not (Term.Set.mem cached_t !Higher_order.prim_enum_terms))
+    |> Iter.fold (fun res t -> 
+        assert(T.DB.is_closed t);
+        let proof = Proof.Step.inference[C.proof_parent c]
+          ~rule:(Proof.Rule.mk"interpret boolean function")
+        in
+        let as_forall = Literal.mk_prop (T.Form.forall t) false in
+        let as_neg_forall = Literal.mk_prop (T.Form.forall (negate_bool_fun t)) false in
+        let forall_cl = 
+          C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+            (as_forall :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:t ~by:(interpret t T.true_))))
+          proof in
+        let forall_neg_cl = 
+          C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+            (as_neg_forall :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:t ~by:(interpret t T.false_))))
+          proof in
+
+        Util.debugf 10 "interpret bool: %a !!> %a.\n"  (fun k -> k C.pp c C.pp forall_cl);
+        Util.debugf 10 "interpret bool: %a !!~> %a.\n" (fun k -> k C.pp c C.pp forall_neg_cl);
+
+        forall_cl :: forall_neg_cl :: res
+    ) []
 
   let setup () =
 	(* if !_bool_reasoning then(
@@ -278,11 +349,19 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_basic_simplify normalize_equalities;
     Env.add_multi_simpl_rule Fool.rw_bool_lits;
     Env.add_multi_simpl_rule cnf_otf;
+
+    if (!interpret_bool_funs) then (
+      Env.add_unary_inf "interpret boolean functions" interpret_boolean_functions;
+    );
+
     if !_bool_reasoning = BoolCasesInference then (
       Env.add_unary_inf "bool_cases" bool_cases;
     )
     else if !_bool_reasoning = BoolCasesSimplification then (
       Env.set_single_step_multi_simpl_rule bool_case_simp;
+    ) else if !_bool_reasoning = BoolCasesKeepParent then (
+      let keep_parent c  = CCOpt.get_or ~default:[] (bool_case_simp c) in
+      Env.add_unary_inf "bool_cases_keep_parent" keep_parent;
     )
 end
 
@@ -505,12 +584,13 @@ let extension =
 
 let () =
   Options.add_opts
-    [ "--boolean-reasoning", Arg.Symbol (["off"; "cases-inf"; "cases-simpl"; "cases-eager"; "cases-eager-near"], 
+    [ "--boolean-reasoning", Arg.Symbol (["off"; "cases-inf"; "cases-simpl"; "cases-simpl-kp"; "cases-eager"; "cases-eager-near"], 
         fun s -> _bool_reasoning := 
                     match s with 
                     | "off" -> BoolReasoningDisabled
                     | "cases-inf" -> BoolCasesInference
                     | "cases-simpl" -> BoolCasesSimplification
+                    | "cases-simpl-kp" -> BoolCasesKeepParent
                     | "cases-eager" -> BoolCasesEagerFar
                     | "cases-eager-near" -> BoolCasesEagerNear
                     | _ -> assert false), 
@@ -522,7 +602,11 @@ let () =
       " select boolean subterm selection criterion: A for any, M for minimal and L for large";
       "--quantifier-renaming"
       , Arg.Bool (fun v -> quant_rename := v)
-      , " turn the quantifier renaming on or off"];
+      , " turn the quantifier renaming on or off";
+      "--interpret-bool-funs"
+      , Arg.Bool (fun v -> interpret_bool_funs := v)
+      , "turn interpretation of boolean functions as forall or negation of forall on or off"
+      ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
     _bool_reasoning := BoolReasoningDisabled
   );

@@ -120,14 +120,7 @@ module Cst_ = struct
     |> Iter.filter_map
       (function 
         | T_rule t -> 
-          let rhs = t.term_rhs in
-          let quant_vars = T.vars_under_quant rhs in
-          let q_var_renaming = T.VarSet.fold (fun v subst ->
-            let ty = HVar.ty v in
-            let fresh = HVar.fresh ~ty () in
-            Subst.FO.bind' subst (v,0) (T.var fresh, 0)  
-          ) quant_vars Subst.empty in
-          Some {t with term_rhs = Subst.FO.apply Subst.Renaming.none q_var_renaming (rhs,0)} 
+          Some t
         | _ -> None)
 
   let rules_lit_seq t : lit_rule Iter.t =
@@ -239,7 +232,7 @@ module Term = struct
       Util.debugf ~section 1 "Making rule for %a"
          (fun k -> k ID.pp id);
       let lhs = T.app (T.const ~ty id) args in
-      let rhs_vars = Term.VarSet.diff (T.vars rhs) (Term.vars_under_quant rhs) in
+      let rhs_vars = T.vars rhs in 
       assert (Type.equal (T.ty lhs) (T.ty rhs));
       if not (T.VarSet.subset rhs_vars (T.vars lhs)) then (
         Util.invalid_argf

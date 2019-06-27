@@ -177,6 +177,8 @@ val scan_simple_stmt_for_ind_ty : input_t -> unit
 
 val get_rw_rule:  ?weight_incr:int -> clause_t -> (ID.Set.elt * Rewrite.rule) option
 
+val get_formulas_from_defs: ('a, _, _) t -> 'a CCList.t
+
 (** {2 Iterators} *)
 
 module Seq : sig

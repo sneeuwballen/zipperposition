@@ -103,7 +103,6 @@ class Configuration:
     elif res == Configuration.RunResult.GAVE_UP:
       if self._if_gave_up is not None:
         return self._if_gave_up.run(prob_path)
-
     return Configuration.RunResult.TIMEOUT 
     
 

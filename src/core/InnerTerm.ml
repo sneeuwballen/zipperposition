@@ -156,6 +156,9 @@ let rec app_builtin ~ty b l = match b, l with
   | Builtin.Not, [{term=AppBuiltin(Builtin.False,[]); _}] ->
     app_builtin ~ty Builtin.True []
   | _ ->
+    if Builtin.is_quantifier b  && CCList.length l != 1 then (
+      invalid_arg "wrong encoding of quantifiers.";
+    );
     let my_t = make_ ~ty:(HasType ty) (AppBuiltin (b,l)) in
     H.hashcons my_t
 
@@ -171,10 +174,10 @@ let app ~ty f l = match f.term, l with
     (* flatten *)
     let my_t = make_ ~ty:(HasType ty) (App (f1,l1 @ l)) in
     H.hashcons my_t
-  | AppBuiltin (f1, l1), _::_ ->
+  | AppBuiltin (f1, l1), _ ->
     (* flatten *)
     let flattened = l1 @ l in
-    let ty = if Builtin.is_logical_op f1 && not (Builtin.is_quantifier f1) then (
+    let ty = if Builtin.is_logical_op f1 then (
       let prop = builtin ~ty:tType Builtin.Prop in
       if Builtin.is_logical_binop f1 then (
         if List.length flattened >= 2 then prop
@@ -777,6 +780,10 @@ let[@inline] is_a_type t = match ty t with
   | HasType ty -> equal ty tType
   | NoType -> assert false
 
+let [@inline] get_type t = match ty t with
+  | HasType ty -> ty
+  | NoType -> invalid_arg "must have type!"
+
 let[@inline] as_app t = match view t with
   | App (f,l) -> 
     begin match view f with 
@@ -785,7 +792,8 @@ let[@inline] as_app t = match view t with
     end
   | AppBuiltin(b, l ) when Builtin.is_logical_op b && not (Builtin.is_quantifier b) ->
     let prop = builtin ~ty:tType Builtin.Prop in
-    let args = if (Builtin.is_logical_binop b) then [prop;prop] else [prop] in
+    let args = if (Builtin.is_logical_binop b) then [prop;prop]
+               else [prop] in
     app_builtin b ~ty:(arrow args prop) [], l 
   | _ -> t, []
 

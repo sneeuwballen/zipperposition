@@ -181,6 +181,8 @@ val of_term_unsafe_l : InnerTerm.t list -> t list
 val of_ty : Type.t -> t
 (** Upcast from type *)
 
+val mk_tmp_cst : counter:int ref -> ty:Type.t -> t
+
 module VarSet : CCSet.S with type elt = var
 module VarMap : CCMap.S with type key = var
 module VarTbl : CCHashtbl.S with type key = var
@@ -220,8 +222,6 @@ val cover_with_terms : ?depth:int -> ?recurse:bool -> t -> t option list -> t li
 (* cover the term in a maximal way looked top-down *)
 val max_cover : t -> t option list -> t
 
-val mk_forall : VarSet.t -> t -> t
-
 val weight : ?var:int -> ?sym:(ID.t -> int) -> t -> int
 (** Compute the weight of a term, given a weight for variables
     and one for ID.ts.
@@ -239,8 +239,6 @@ val is_ho_app : t -> bool
 
 val as_ho_app : t -> (Type.t HVar.t * t list) option
 (** [as_ho_app (F t1…tn) = Some (F, [t1…tn])] *)
-
-val get_quantified_var : t -> t option
 
 val is_ho_pred : t -> bool
 (** [is_ho_pred (F t1…tn)] is true, when [F] is a predicate variable *)
@@ -354,6 +352,8 @@ module Form : sig
   val or_ : t -> t -> t
   val and_l : t list -> t
   val or_l : t list -> t
+  val forall : t -> t
+  val exists : t -> t
 end
 
 (** {2 Arith} *)
@@ -389,10 +389,9 @@ module Arith : sig
   (** hook to print arithmetic expressions *)
 end
 
-val vars_under_quant : t -> VarSet.t
-val free_vars        : t -> VarSet.t
 
-val close_quantifier : Builtin.t -> var list -> t -> t
+val close_quantifier : Builtin.t -> Type.t list -> t -> t
+val has_ho_subterm : t -> bool
 
 (** {2 De Bruijn} *)
 module DB : sig

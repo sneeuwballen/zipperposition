@@ -118,7 +118,7 @@ module type S = sig
     Term.t SLiteral.t list -> t
   (** Construction from formulas as axiom (initial clause) *)
 
-  val of_statement : Statement.clause_t -> t list
+  val of_statement : ?convert_defs:bool -> Statement.clause_t -> t list
   (** Extract a clause from a statement, if any *)
 
   val proof_step : t -> proof_step
@@ -187,14 +187,14 @@ module type S = sig
   val symbols : ?init:ID.Set.t -> t Iter.t -> ID.Set.t
   (** symbols that occur in the clause *)
 
-  val vars_under_quant : t -> Type.t HVar.t list 
-
   val to_sclause : t -> SClause.t
 
   val to_forms : t -> Term.t SLiteral.t list
   (** Easy iteration on an abstract view of literals *)
 
   val to_s_form : t -> TypedSTerm.Form.t
+
+  val ground_clause : t -> t
 
   (** {2 Iterators} *)
 

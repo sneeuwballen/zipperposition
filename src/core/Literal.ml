@@ -122,24 +122,22 @@ let heuristic_weight weight = function
 let depth lit =
   fold (fun acc t -> max acc (T.depth t)) 0 lit
 
-let sign = function
-  | Equation (lhs,rhs,true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
-    T.equal rhs T.true_
-  | Equation (_, _, sign) -> sign
-  | False -> false
-  | Int o -> Int_lit.sign o
-  | Rat _ -> true
-  | True -> true
-
 module Set = CCSet.Make(struct type t = lit let compare = compare end)
 
+let is_pos = function
+  | Equation (l, r, sign) ->
+    let hd_l = Term.head_term l in  
+    if sign && T.is_true_or_false r && T.is_const hd_l then (
+      T.equal r T.true_ 
+    ) else sign
+  | Int o -> Int_lit.sign o
+  | False -> false
+  | _ -> true
 (* specific: for the term comparison *)
 let polarity = function
   | Int o -> Int_lit.polarity o
-  | lit -> sign lit
+  | lit -> is_pos lit
 
-let is_pos = sign
-(* let is_pos_eq = fun t -> sign t *)
 
 let is_neg lit = not (is_pos lit)
 
@@ -198,6 +196,7 @@ let has_num_ty t =
 (* primary constructor for equations and predicates *)
 let rec mk_lit a b sign =
   if not (Type.equal (T.ty a) (T.ty b)) then ty_error_ a b;
+  (* Maybe the sign will flip, so we have to beta reduce. *)
   match T.view a, T.view b with
     | T.AppBuiltin (Builtin.True, []), T.AppBuiltin (Builtin.False, []) -> if sign then False else True
     | T.AppBuiltin (Builtin.False, []), T.AppBuiltin (Builtin.True, []) -> if sign then False else True
@@ -207,10 +206,9 @@ let rec mk_lit a b sign =
     | _, T.AppBuiltin (Builtin.True, []) -> Equation (a, (if sign then T.true_ else T.false_), true)
     | T.AppBuiltin (Builtin.False, []), _ -> Equation (b, (if not sign then T.true_ else T.false_), true)
     | _, T.AppBuiltin (Builtin.False, []) -> Equation (a, (if not sign then T.true_ else T.false_), true)
-    (* NOTE: keep negation for higher-order unification constraints
-       | T.AppBuiltin (Builtin.Not, [a']), _ -> mk_lit a' b (not sign)
-       | _, T.AppBuiltin (Builtin.Not, [b']) -> mk_lit a b' (not sign)
-    *)
+    (* | T.AppBuiltin (Builtin.Not, [a']), _ when Term.is_true_or_false b -> mk_lit a' b (not sign) *)
+    (* | _, T.AppBuiltin (Builtin.Not, [b']) -> mk_lit a b' (not sign) *)
+   
     | _ when has_num_ty a ->
       begin match mk_num_eq a b sign with
         | None -> Equation (a,b,sign)
@@ -349,9 +347,6 @@ module Seq = struct
 end
 
 let symbols lit = Seq.symbols lit |> ID.Set.of_seq
-let free_vars lit = 
-  Seq.terms lit
-  |> Iter.fold (fun acc t -> Term.VarSet.union acc (Term.free_vars t)) Term.VarSet.empty
 
 (** Unification-like operation on components of a literal. *)
 module UnifOp = struct
@@ -441,8 +436,12 @@ let _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 k =
             ~subst ~pattern:(Scoped.make l1 sc1) (Scoped.make l2 sc2) in
         let subst = Unif.FO.matching_adapt_scope
             ~subst ~pattern:(Scoped.make r1 sc1) (Scoped.make r2 sc2) in
+
+        (* CCFormat.printf "%a = %a;\n%a = %a;\n%a.\n" T.pp l1 T.pp l2 T.pp r1 T.pp r2 Subst.pp subst; *)
         k subst
-      with Unif.Fail -> ()
+      with Unif.Fail -> 
+        (* CCFormat.printf "FAILED: %a = %a;\n%a = %a;\n%a.\n" T.pp l1 T.pp l2 T.pp r1 T.pp r2 Subst.pp subst; *)
+        ()
     end;
     begin try
         let subst = Unif.FO.matching_adapt_scope
@@ -450,7 +449,9 @@ let _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 k =
         let subst = Unif.FO.matching_adapt_scope
             ~subst ~pattern:(Scoped.make r1 sc1) (Scoped.make l2 sc2) in
         k subst
-      with Unif.Fail -> ()
+      with Unif.Fail -> 
+        (* CCFormat.printf "FAILED: %a = %a;\n%a = %a;\n%a.\n" T.pp l1 T.pp l2 T.pp r1 T.pp r2 Subst.pp subst; *)
+        ()
     end;
     ()
   in
@@ -774,10 +775,9 @@ module Comp = struct
   let _maxterms2 ~ord l r =
     match O.compare ord l r with
       | C.Gt -> [l]
-      | C.Lt -> assert (not @@ Term.is_true_or_false l); [r]
+      | C.Lt -> [r]
       | C.Eq -> [l]
       | C.Incomparable -> 
-        assert(Term.is_var @@ Term.head_term l || not @@ Term.is_true_or_false r);
         [l; r]
 
   (* maximal terms of the literal *)
@@ -785,10 +785,7 @@ module Comp = struct
     assert(no_prop_invariant lit);
     match lit with
       | Equation (l, r, s) -> 
-        let res = _maxterms2 ~ord l r in
-        assert(not (s && not @@ Term.is_var @@ Term.head_term l && Term.is_true_or_false r) ||
-               CCList.equal T.equal res [l]);
-        res 
+        _maxterms2 ~ord l r
       | Int a -> Int_lit.max_terms ~ord a
       | Rat a -> Rat_lit.max_terms ~ord a
       | True

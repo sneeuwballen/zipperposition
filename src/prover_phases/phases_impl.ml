@@ -417,26 +417,15 @@ let parse_cli =
   print_version ~params;
   Phases.return_phase (files, params)
 
-let syms_in_lit cl =
-   let open Iter in 
-      List.fold_left (<+>) empty 
-                     (List.map (fun lit -> match lit with 
-                                    | SLiteral.Atom (t, _) -> Term.Seq.symbols t
-                                    | SLiteral.Eq (l,r) 
-                                    | SLiteral.Neq (l,r) -> Term.Seq.symbols l <+> 
-                                                            Term.Seq.symbols r
-                                    | _ -> empty) 
-                                 cl)
-
 let syms_in_conj decls =
    let open Iter in
-      decls 
-      |> CCVector.to_seq
-      |> flat_map (fun st -> match Statement.view st with
-         | Statement.NegatedGoal (_, gl) ->
-            flatten (of_list (List.map syms_in_lit gl))
-         | Statement.Goal g -> syms_in_lit g
-         | _ -> empty)
+    decls 
+    |> CCVector.to_seq
+    |> flat_map (fun st -> 
+        let pr = Statement.proof_step st in
+        if CCOpt.is_some (Proof.Step.distance_to_goal pr) then (
+          Statement.Seq.symbols st
+        ) else empty)
 
 (* Process the given file (try to solve it) *)
 let process_file ?(prelude=Iter.empty) file =
@@ -448,7 +437,12 @@ let process_file ?(prelude=Iter.empty) file =
   let has_goal = has_goal_decls_ decls in
   Util.debugf ~section 1 "parsed %d declarations (%s goal(s))"
     (fun k->k (CCVector.length decls) (if has_goal then "some" else "no"));
-  (* Hooks exist but currently they can't be used to add statements. Hence here are direct calls to such preprocessing as renaming quantifiers and casing boolean terms. Default does nothing. *)
+  (* Hooks exist but they can't be used to add statements. 
+     Hence naming quantifiers inside terms is done directly here. 
+     Without this Type.Conv.Error occures so the naming is done unconditionally. *)
+  let quant_transformer = 
+    if !Booleans.quant_rename then Booleans.preprocess_booleans 
+    else CCFun.id in
   let sk_ctx = Skolem.create () in 
   cnf ~sk_ctx (Booleans.preprocess_booleans decls) >>= fun stmts ->
   let stmts = Booleans.preprocess_cnf_booleans stmts in

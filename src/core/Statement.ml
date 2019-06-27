@@ -233,6 +233,18 @@ let decl_data_functions ity proof : unit =
        );)
     ity.Ind_ty.ty_constructors
 
+let get_formulas_from_defs st =
+  let get_from_rule rule =
+    match rule with
+    | Def_term {vars;id;ty;args;rhs;as_form} -> [as_form]
+    | Def_form {vars;lhs;rhs;polarity;as_form} -> as_form in
+
+
+  match view st with 
+  | Def defs -> CCList.flat_map (fun d -> CCList.flat_map get_from_rule d.def_rules) defs
+  | Rewrite def_rule  -> get_from_rule def_rule
+  | _ -> []
+
 (** {2 Iterators} *)
 
 module Seq = struct
@@ -803,7 +815,6 @@ let get_rw_rule ?weight_incr:(w_i=1000000) c  =
     let vars_lhs = Term.VarSet.of_seq (Iter.fold (fun acc v -> 
         Iter.union acc (Term.Seq.vars v)) 
       Iter.empty (Iter.of_list vars)) in
-    let vars_lhs = Term.VarSet.union vars_lhs (Term.vars_under_quant rhs) in
     if not (Term.symbols rhs |> ID.Set.mem sym) &&
         Term.VarSet.cardinal
           (Term.VarSet.diff (Term.vars rhs) vars_lhs) = 0 then

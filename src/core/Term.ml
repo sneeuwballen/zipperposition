@@ -216,12 +216,6 @@ let is_app t = match T.view t with
   | T.App _ -> true
   | _ -> false
 
-let get_quantified_var t = match T.view t with
-  | T.AppBuiltin(Builtin.ForallConst, [x;_])
-  | T.AppBuiltin(Builtin.ExistsConst, [x;_]) when is_var x ->
-      Some x
-  | _ -> None
-
 let is_type t = Type.equal Type.tType (ty t)
 
 let as_const_exn t = match T.view t with
@@ -255,7 +249,7 @@ let head_term_mono t = match view t with
   | App (f,l) ->
     let l1 = CCList.take_while is_type l in
     app f l1 (* re-apply to type parameters *)
-  | AppBuiltin(b, l) ->
+  | AppBuiltin(b, l) when not (Builtin.is_quantifier b) ->
     let ty_args, args = CCList.partition is_type l in
     let ty = Type.arrow (List.map ty args) (ty t) in 
     app_builtin ~ty b ty_args
@@ -379,11 +373,6 @@ let max_cover t ts =
   in
   aux 0 t
 
-  let mk_forall vars body = 
-    let ty = ty body in
-    VarSet.fold (fun v t -> app_builtin ~ty Builtin.ForallConst [var v; t]) vars body
-
-
 module Seq = struct
   let vars t k =
     let rec aux t =
@@ -458,18 +447,15 @@ module Seq = struct
          | _ -> None)
 end
 
-let vars_under_quant t = VarSet.of_seq @@ Iter.fold (fun acc st -> 
-  match view st with 
-  | AppBuiltin(Builtin.ForallConst, [x;_]) 
-  | AppBuiltin(Builtin.ExistsConst, [x;_]) when is_var x  ->
-    Iter.union acc (Seq.vars x)
-  | _ -> acc
-) Iter.empty (Seq.subterms ~include_builtin:true t)
 
-let free_vars t = VarSet.diff (VarSet.of_seq (Seq.vars t)) (vars_under_quant t) 
+let has_ho_subterm t = 
+  Seq.subterms ~include_builtin:true t
+  |> Iter.exists (fun st -> Type.is_fun (ty st) || Type.is_prop (ty st))
 
-let close_quantifier b vars body =
-  List.fold_right (fun v acc -> app_builtin ~ty:Type.prop b [var v; acc]) vars body
+let close_quantifier b ty_args body =
+  CCList.fold_right (fun ty acc -> 
+    app_builtin ~ty:Type.prop b [fun_ ty acc])
+  ty_args body
 
 
 let var_occurs ~var t =
@@ -542,7 +528,7 @@ let rec is_fo_term t =
 
 let is_true_or_false t = match view t with
   | AppBuiltin(b, []) -> 
-    CCList.mem ~eq:Builtin.equal b [Builtin.ForallConst; Builtin.ExistsConst];
+    CCList.mem ~eq:Builtin.equal b [Builtin.True; Builtin.False];
   | _ -> false
 
 let monomorphic t = Iter.is_empty (Seq.ty_vars t)
@@ -581,6 +567,12 @@ let mk_fresh_skolem =
    app_full (const id ~ty)
       (List.map Type.var ty_vars)
       (List.map var vars)
+
+let mk_tmp_cst ~counter ~ty =
+  let idx = CCRef.get_then_incr counter in
+  let id = ID.makef "#tmp%d" idx in
+  const id ~ty
+
 
 let rec head_exn t = match T.view t with
   | T.Const s -> s
@@ -796,6 +788,14 @@ module Form = struct
     | [] -> false_
     | [t] -> t
     | a :: tail -> List.fold_left or_ a tail
+
+  let forall t =
+    assert(Type.is_fun (ty t) && Type.returns_prop (ty t));
+    app_builtin ~ty:Type.prop Builtin.ForallConst [t]
+  
+  let exists t =
+    assert(Type.is_fun (ty t) && Type.returns_prop (ty t));
+    app_builtin ~ty:Type.prop Builtin.ForallConst [t]
 end
 
 (** {2 Arith} *)
@@ -936,7 +936,6 @@ module DB = struct
                    app f' (List.map (map_vars_shift ~depth var_map) l)
    | AppBuiltin (hd,l) -> app_builtin ~ty:(ty t) hd
                           (List.map (map_vars_shift ~depth var_map) l)
-
 end
 
 let debugf = pp
@@ -1057,10 +1056,16 @@ module Conv = struct
                                  || Binder.equal b Binder.Exists ->
         let b = if Binder.equal b Binder.Forall 
                 then Builtin.ForallConst else Builtin.ExistsConst in
-        let v = var (Type.Conv.var_of_simple_term ctx v) in
-        let ty = Type.Conv.of_simple_term_exn ctx (PT.ty_exn body) in
-        let body = aux body in
-        app_builtin ~ty b [v; body]
+        let ty_arg = Type.Conv.of_simple_term_exn ctx (Var.ty v) in
+        let previous = PT.Var_tbl.find_opt tbl v in
+        PT.Var_tbl.replace tbl v (!depth,ty_arg);
+        incr depth;
+        let ty_b = Type.Conv.of_simple_term_exn ctx (PT.ty_exn body) in
+        let body = fun_ ty_arg (aux body) in
+        decr depth;
+        if CCOpt.is_some previous then PT.Var_tbl.replace tbl v (CCOpt.get_exn previous)
+        else PT.Var_tbl.remove tbl v;
+        app_builtin ~ty:ty_b b [body]
       | PT.Meta _
       | PT.Record _
       | PT.Ite _
@@ -1078,6 +1083,8 @@ module Conv = struct
   let to_simple_term ?(allow_free_db=false) ?(env=DBEnv.empty) ctx t =
     let module ST = TypedSTerm in
     let n = ref 0 in
+    let max_var = ref ((Seq.vars t |> Seq.max_var) + 1) in
+    let orig_term = t in
     let rec aux_t env t =
       match view t with
         | Var i -> ST.var (aux_var i)
@@ -1094,18 +1101,32 @@ module Conv = struct
         | App (f,l) ->
           ST.app ~ty:(aux_ty (ty t))
             (aux_t env f) (List.map (aux_t env) l)
-        | AppBuiltin (b,[v;body]) when Builtin.equal b Builtin.ForallConst ||
-                                       Builtin.equal b Builtin.ExistsConst ->
+        | AppBuiltin (b,[body]) when Builtin.equal b Builtin.ForallConst ||
+                                     Builtin.equal b Builtin.ExistsConst ->
           let b = if Builtin.equal b Builtin.ForallConst 
                   then Binder.Forall else Binder.Exists in
-          let v =
-            (match view v with
-            | Var i -> (aux_var i)
-            | _ -> 
-            CCFormat.printf "Failed converting %a.\n" (pp_in Output_format.O_tptp) t ;
-            let v = aux_t env v in
-            raise (Type.Conv.Error v)) in
-          ST.bind ~ty:(aux_ty (ty t)) b v (aux_t env body) 
+          let ty_args, fun_body = open_fun body in 
+
+          if is_true_or_false fun_body then (
+            if T.equal fun_body true_ then ST.app_builtin ~ty:(aux_ty Type.prop) Builtin.True []
+            else ST.app_builtin ~ty:(aux_ty Type.prop) Builtin.False []
+          ) else if not (Type.returns_prop (ty fun_body)) then (
+            let err_msg = CCFormat.sprintf "quantifier wrongly encoded: %a(%a)" T.pp t T.pp orig_term in
+            Util.error ~where:"Term" err_msg;
+          ) else (
+            let fresh_vars = List.map (fun ty -> 
+              incr max_var;
+              var_of_int ~ty !max_var) ty_args in
+            let replacement = DBEnv.push_l_rev DBEnv.empty fresh_vars in
+            let body  = DB.eval replacement fun_body in
+            let remaining_vars = List.map (fun ty ->
+              incr max_var;
+              var_of_int ~ty !max_var) (Type.expected_args (ty fun_body)) in
+            let body = app body remaining_vars in
+            let vars_converted = List.map convert_var (fresh_vars @ remaining_vars) in
+            List.fold_right (fun v acc ->
+              ST.bind ~ty:(aux_ty Type.prop) b v acc) (vars_converted) (aux_t env body) 
+          )
         | AppBuiltin (b,l) ->
           ST.app_builtin ~ty:(aux_ty (ty t))
             b (List.map (aux_t env) l)
@@ -1117,6 +1138,11 @@ module Conv = struct
       Type.Conv.var_to_simple_var ~prefix:"X" ctx v
     and aux_ty ty =
       Type.Conv.to_simple_term ~env ctx ty
+    and convert_var v =
+      match view v with 
+      | Var v -> aux_var v
+      | _ -> invalid_arg "expected variable" 
+
     in
     aux_t env t
 end
@@ -1209,6 +1235,10 @@ let simplify_bools t =
             if equal s s' then t else
             app_builtin ~ty:(Type.prop) Builtin.Not [s'] 
         )
+    | AppBuiltin(Builtin.Imply, [p;c]) ->
+      if T.equal p true_ then c
+      else if T.equal p false_ then true_
+      else t
     | AppBuiltin(hd, [a;b]) 
         when hd = Builtin.Eq || hd = Builtin.Equiv ->
       if equal a b then true_ else (

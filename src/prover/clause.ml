@@ -132,6 +132,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     create_inner ~penalty ~selected (SClause.make ~trail lits) proof
 
   let create ~penalty ~trail lits proof =
+    let lits = List.fast_sort (fun l1 l2 -> -CCInt.compare (Lit.hash l1) (Lit.hash l2)) lits in
     create_a ~penalty ~trail (Array.of_list lits) proof
 
   let of_forms ?(penalty=1) ~trail forms proof =
@@ -143,7 +144,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let proof = Proof.Step.assert' ~file ~name () in
     create ~penalty ~trail:Trail.empty lits proof
 
-  let of_statement st =
+  let of_statement ?(convert_defs=false) st =
     let of_lits lits =
       (* convert literals *)
     let lits = List.map Ctx.Lit.of_form lits in
@@ -155,7 +156,10 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       | Stmt.Data _
       | Stmt.TyDecl _ -> []
       | Stmt.Def _
-      | Stmt.Rewrite _ -> [] (* dealt with by rewriting *)
+      | Stmt.Rewrite _ -> 
+        if not convert_defs then [] (*dealt with by rewriting *)
+        (* dealt with  *)
+        else List.map of_lits (Stmt.get_formulas_from_defs st)
       | Stmt.Assert lits -> [of_lits lits]
       | Stmt.Goal lits -> [of_lits lits]
       | Stmt.Lemma l
@@ -299,14 +303,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       (fun set c -> Lits.symbols ~init:set c.sclause.lits)
       init seq
 
-  let vars_under_quant cl = 
-    Literals.Seq.terms (lits cl) 
-    |> Iter.fold (fun acc st -> 
-        Term.VarSet.union acc (Term.vars_under_quant st)) 
-        Term.VarSet.empty 
-    |> Term.VarSet.to_list
-    
-
   let to_forms c = Lits.Conv.to_forms c.sclause.lits
   let to_sclause c = c.sclause
 
@@ -338,6 +334,23 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let terms c = lits c |> Iter.flat_map Lit.Seq.terms
     let vars c = terms c |> Iter.flat_map T.Seq.vars
   end
+
+  let apply_subst (c,sc) subst =
+    let lits = lits c in
+    let new_lits = _apply_subst_no_simpl subst (lits, sc) in
+    create ~trail:(trail c) ~penalty:(penalty c) (CCArray.to_list new_lits) (proof_step c)
+
+
+  let ground_clause c =
+    let counter = ref 0 in
+    let all_vars = T.VarSet.of_seq @@ Seq.vars c in
+    let gr_subst = T.VarSet.fold (fun v subst -> 
+      let ty = HVar.ty v in
+      Subst.FO.bind subst ((v :> InnerTerm.t HVar.t),0) (T.mk_tmp_cst ~counter ~ty,0)
+    ) all_vars Subst.empty in
+    let res = apply_subst (c,0) gr_subst in
+    assert(Iter.for_all T.is_ground @@ Seq.terms res);
+    res
 
   (** {2 Filter literals} *)
 

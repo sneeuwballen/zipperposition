@@ -93,7 +93,6 @@ let get_bvars args =
   let reduced = 
     List.map 
       (fun t -> if (eligible_arg t) then (Lambda.eta_reduce t) else t) 
-                (* (Lambda.eta_reduce ~full:false) *)
     args in
   let n = List.length reduced in
   if List.for_all T.is_bvar reduced then (
@@ -275,10 +274,8 @@ let rec unify ~scope ~counter ~subst = function
       match T.view hd_s, T.view hd_t with 
       | (T.Var _, T.Var _) ->
         let subst =
-          (if T.equal hd_s hd_t then
-            flex_same ~counter ~scope ~subst hd_s args_s args_t
-          else
-            flex_diff ~counter ~scope ~subst hd_s hd_t args_s args_t) in
+          (if T.equal hd_s hd_t then flex_same ~counter ~scope ~subst hd_s args_s args_t
+          else flex_diff ~counter ~scope ~subst hd_s hd_t args_s args_t) in
         unify ~scope ~counter ~subst rest
       | (T.Var _, T.Const _) | (T.Var _, T.DB _) | (T.Var _, T.AppBuiltin _) ->
         let subst = flex_rigid ~subst ~counter ~scope  body_s' body_t' in
@@ -287,7 +284,6 @@ let rec unify ~scope ~counter ~subst = function
         let subst = flex_rigid ~subst ~counter ~scope  body_t' body_s' in
         unify ~scope ~counter ~subst rest
       | T.Const f , T.Const g when ID.equal f g && List.length args_s = List.length args_t ->
-        (* assert(List.length args_s = List.length args_t); *)
         unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest
       | T.AppBuiltin(hd_s, args_s'), T.AppBuiltin(hd_t, args_t') when
           Builtin.equal hd_s hd_t &&
@@ -295,12 +291,7 @@ let rec unify ~scope ~counter ~subst = function
           not (Builtin.equal Builtin.ExistsConst hd_s) &&   *)
           List.length args_s' + List.length args_s = 
           List.length args_t' + List.length args_t ->
-        if Builtin.is_quantifier hd_s then (
-          unify ~subst ~counter ~scope @@ (CCList.combine (args_s'@args_s)  (args_t'@args_t)) @ rest
-        ) else (
           unify ~subst ~counter ~scope @@ build_constraints (args_s'@args_s)  (args_t'@args_t) rest
-        )
-        
       | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->
         (* assert (List.length args_s = List.length args_t); *)
         unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest

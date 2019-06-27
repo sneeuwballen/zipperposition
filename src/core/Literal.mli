@@ -32,9 +32,9 @@ val hash : t -> int               (** hashing of literal *)
 val weight : t -> int             (** weight of the lit (sum of weights of terms) *)
 val heuristic_weight : (term -> int) -> t -> int   (** heuristic difficulty to eliminate lit *)
 val depth : t -> int              (** depth of literal *)
-val sign : t -> bool
 
 val is_pos : t -> bool            (** is the literal positive? *)
+
 val is_neg : t -> bool            (** is the literal negative? *)
 val is_eqn : t -> bool            (** is the literal a proper (in)equation or prop? *)
 val is_prop : t -> bool           (** is the literal a boolean proposition? *)
@@ -132,7 +132,6 @@ val vars : t -> Type.t HVar.t list (** gather variables *)
 val var_occurs : Type.t HVar.t -> t -> bool
 val is_ground : t -> bool
 val symbols : t -> ID.Set.t
-val free_vars : t -> Term.VarSet.t
 val root_terms : t -> term list (** all the terms immediatly under the lit *)
 
 val to_ho_term : t -> term option

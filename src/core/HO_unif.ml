@@ -81,12 +81,12 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
              (T.app (T.var f) (List.map T.var vars))
              (T.app (T.var g) (List.map T.var vars)))]
     and l_false = match mode with
-      | `None -> []
-      | `Neg | `Pragmatic | `Full ->
+      | `None  -> []
+      | `Neg | `Pragmatic | `Full  ->
         [T.fun_of_fvars vars T.false_]
     and l_true = match mode with
       | `None -> []
-      | `Neg | `Pragmatic | `Full ->
+      | `Neg | `Pragmatic | `Full  ->
         [T.fun_of_fvars vars T.true_]
     and l_quants = match mode with
       | `Pragmatic | `Full ->
@@ -94,17 +94,22 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
         CCList.mapi (fun i ty -> 
           if Type.is_fun ty && Type.returns_prop ty then (
             let arg_typeargs,_ = Type.open_fun ty in
-            let new_vars = List.map (fun ty -> HVar.fresh ~ty ()) arg_typeargs in
-            let form_body = T.app (T.bvar ~ty (n-i-1)) (List.map T.var new_vars) in
-            let forall = T.close_quantifier Builtin.ForallConst new_vars form_body in
-            let exists = T.close_quantifier Builtin.ExistsConst new_vars form_body in
-            Some ((T.fun_l ty_args forall, T.fun_l ty_args exists)))
+            let m = List.length arg_typeargs in
+            let form_body = T.app (T.bvar ~ty (m+n-i-1)) 
+                                  (List.mapi (fun j ty -> T.bvar ~ty (m-j-1)) arg_typeargs) in
+            let forall = T.close_quantifier Builtin.ForallConst arg_typeargs form_body in
+            let exists = T.close_quantifier Builtin.ExistsConst arg_typeargs form_body in
+            let forall, exists = CCPair.map_same (T.fun_l ty_args) (forall, exists) in
+            assert(T.DB.is_closed forall && T.DB.is_closed exists);
+            assert(Lambda.is_properly_encoded forall);
+            assert(Lambda.is_properly_encoded exists);
+            Some (forall, exists))
           else None) ty_args
         |> CCList.fold_left (fun acc opt -> match opt with 
           | Some (x,y) -> x :: y :: acc 
           | None -> acc) [] 
       | _ -> []
-    and l_simpl_eq = match mode with
+    and l_simpl_op = match mode with
       | `Pragmatic -> 
         let n = List.length vars in
         let db_vars = List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) ty_args in
@@ -115,16 +120,12 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
           let log_ops = 
           CCList.mapi (fun j db_j ->
             if i < j && Type.equal (T.ty db_i) (T.ty db_j) then (
-              let x = T.var (HVar.fresh ~ty:(T.ty db_i) ()) in 
               let res = [T.fun_l ty_args (T.Form.eq db_i db_j);
-                         T.fun_l ty_args (T.Form.eq x db_j);
-                         T.fun_l ty_args (T.Form.eq db_i x)] in
+                         T.fun_l ty_args (T.Form.neq db_i db_j);] in
               if Type.is_prop (T.ty db_i) then
                res @
                 [T.fun_l ty_args (T.Form.and_ db_i db_j);
-                 T.fun_l ty_args (T.Form.or_ db_i db_j);
-                 T.fun_l ty_args (T.Form.or_ (T.Form.not_ db_i) db_j);
-                 T.fun_l ty_args (T.Form.or_ (T.Form.not_ db_j) db_i)]
+                 T.fun_l ty_args (T.Form.or_ db_i db_j);]
                else res
             )
             else []) 
@@ -143,9 +144,7 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
           
           (* Caching of primitive enumeration terms, so that trigger-based instantiation
              does not catch them. *)
-          let var_set = InnerTerm.Seq.vars (t:>InnerTerm.t) |> InnerTerm.VarSet.of_seq in
-          let cannonize_subst = Subst.FO.canonize_vars ~var_set in
-          let cached_t = Subst.FO.apply Subst.Renaming.none cannonize_subst (t,0) in
+          let cached_t = Subst.FO.canonize_all_vars t in
           enum_cache := Term.Set.add cached_t !enum_cache;
           let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
           (subst, penalty) )ts ) 
@@ -155,7 +154,8 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
         l_eq,  10;
         l_false, 5;
         l_true, 5;
-        l_simpl_eq, 10;
+        l_simpl_op
+  , 10;
         l_quants, 10;
       ]
   )

@@ -274,6 +274,11 @@ module Conv : sig
   val copy : ctx -> ctx
   val clear : ctx -> unit
 
+  val enter_bvar : ctx -> VarMap.key -> int option
+  val exit_bvar  : handle:int CCOpt.t -> ctx -> VarMap.key -> unit
+  val find_bvar  : ctx -> VarMap.key -> int option
+
+
   val of_simple_term : ctx -> TypedSTerm.t -> t option
   (** convert a simple typed term into a type. The term is assumed to be
         closed.

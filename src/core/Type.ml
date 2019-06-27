@@ -436,9 +436,29 @@ module Conv = struct
     mutable vars: (PT.t, t HVar.t) Var.Subst.t;
     mutable n: int;  (* counter for free vars *)
     mutable hvars: PT.t Var.t VarMap.t;
+    mutable bvars_to_db: int VarMap.t ;
   }
 
-  let create () = { vars=Var.Subst.empty; n=0; hvars=VarMap.empty; }
+  let create () = { vars=Var.Subst.empty; n=0; hvars=VarMap.empty;
+                    bvars_to_db=VarMap.empty }
+
+  let enter_bvar ctx v =
+    let ret_handle = VarMap.find_opt v ctx.bvars_to_db in
+    let new_map = VarMap.map (fun x-> x+1) ctx.bvars_to_db in
+    ctx.bvars_to_db <- VarMap.add v 0 new_map;
+
+    ret_handle
+
+  let exit_bvar ~handle ctx v =
+    let new_map = VarMap.map (fun x-> x-1) ctx.bvars_to_db in
+    if CCOpt.is_some handle then (
+      ctx.bvars_to_db <- VarMap.add v (CCOpt.get_exn handle) new_map
+    )
+    else ctx.bvars_to_db <- new_map
+
+  let find_bvar ctx v =
+    VarMap.find_opt v ctx.bvars_to_db
+
 
   let copy t = {t with vars=t.vars; }
 

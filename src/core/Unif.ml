@@ -598,6 +598,7 @@ module Inner = struct
 
   and unif_vars ~op subst t1 sc1 t2 sc2 : unif_subst =
    (* Util.debugf ~section 4 "var_binidng: %a =?= %a" (fun k-> k T.pp t1 T.pp t2); *)
+    let t1,t2 = CCPair.map_same (fun t -> ((Lambda.eta_reduce t) :> InnerTerm.t)) (Term.of_term_unsafe t1,Term.of_term_unsafe t2) in
     begin match T.view t1, T.view t2, op with
       | T.Var v1, T.Var v2, O_equal ->
         if HVar.equal T.equal v1 v2 && sc1=sc2
@@ -609,11 +610,18 @@ module Inner = struct
         fail() (* blocked variable *)
       | T.Var v1, _, O_match_protect (P_scope sc)
         when sc1 = sc && not (HVar.is_fresh v1) ->
+        (* CCFormat.printf "failed matching %a %a.\n" T.pp t1 T.pp t2; *)
         fail() (* variable belongs to the protected scope and is not fresh *)
       | T.Var v1, _, (O_unify | O_match_protect _) ->
         if occurs_check ~depth:0 (US.subst subst) (v1,sc1) (t2,sc2)
         then fail () (* occur check or t2 is open *)
-        else US.bind subst (v1,sc1) (t2,sc2)
+        else (
+          if US.mem subst (v1,sc1) then (
+            let derefed = CCOpt.get_exn @@ Subst.get_var (US.subst subst) (v1,sc1) in 
+            let derefed = Scoped.map ((fun t -> ((Lambda.eta_reduce (Term.of_term_unsafe t)) :> InnerTerm.t))) derefed in
+            if snd @@ derefed == sc2 && T.equal (fst @@ derefed) t2 then subst else fail()
+          ) else US.bind subst (v1,sc1) (t2,sc2)
+        )
       | T.Var v1, T.Var _, O_variant (P_vars s) when not (T.VarSet.mem v1 s) ->
         US.bind subst (v1,sc1) (t2,sc2)
       | T.Var v1, T.Var _, O_variant (P_scope sc')
@@ -622,8 +630,16 @@ module Inner = struct
       | _, T.Var v2, O_unify ->
         if occurs_check ~depth:0 (US.subst subst) (v2,sc2) (t1,sc1)
         then fail() (* occur check *)
-        else US.bind subst (v2,sc2) (t1,sc1)
-      | _ -> fail ()  (* fail *)
+        else (
+          if US.mem subst (v2,sc2) then (
+            let derefed = CCOpt.get_exn @@ Subst.get_var (US.subst subst) (v2,sc2) in 
+            let derefed = Scoped.map ((fun t -> ((Lambda.eta_reduce (Term.of_term_unsafe t)) :> InnerTerm.t))) derefed in
+            if snd @@ derefed == sc1 && T.equal (fst @@ derefed) t1 then subst else fail()
+          ) else US.bind subst (v2,sc2) (t1,sc1)
+        )
+      | _ -> 
+        (* CCFormat.printf "failed unknown l %a:%d|%a:%d|%a.\n" T.pp t1 sc1 T.pp t2 sc2 pp_op op; *)
+        fail ()  (* fail *)
     end
 
   (* unify lists pairwise *)

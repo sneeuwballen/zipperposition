@@ -125,13 +125,11 @@ module Make(C : Clause_intf.S) = struct
          | Term.Var _ -> v
          | Term.DB _ -> w
          | Term.App (f, l) ->
-            let non_bvars_num = List.length @@ List.filter (fun t -> not @@ Term.is_bvar t)  l in
-            let var_weight    = if not @@ Term.is_var f || non_bvars_num = 0 then v / 2 else v in 
-            calc_tweight f sg (var_weight) w c_mul +
+            calc_tweight f sg v w c_mul +
               List.fold_left (fun acc t -> acc + calc_tweight t sg v w c_mul) 0 l
          
          | Term.Const id -> (int_of_float ((if Signature.sym_in_conj id sg then c_mul else 1.0)*.float_of_int w))
-         | Term.Fun (_, t) -> 2*w + calc_tweight t sg v w c_mul
+         | Term.Fun (_, t) -> calc_tweight t sg v w c_mul
 
      let calc_lweight l sg v w c_mul =
       assert (Literal.no_prop_invariant l);
@@ -146,10 +144,10 @@ module Make(C : Clause_intf.S) = struct
 
     let conj_relative ?(distinct_vars_mul=(-1.0)) c =
       let sgn = C.Ctx.signature () in
-      let pos_mul = 1.3 in
-      let max_mul = 1.3 in
-      let v,f = 20, 20 in 
-      let conj_mul = 0.16 in
+      let pos_mul = 1.5 in
+      let max_mul = 1.5 in
+      let v,f = 100, 100 in 
+      let conj_mul = 0.5 in
         Array.mapi (fun i xx -> i,xx) (C.lits c)
         |> 
         (Array.fold_left (fun acc (i,l) -> acc +. 
@@ -161,9 +159,9 @@ module Make(C : Clause_intf.S) = struct
               if distinct_vars_mul < 0.0 then int_of_float res
               else
                 let dist_vars = 
-                 Literals.free_vars (C.lits c)
-                 |> Term.VarSet.filter (fun v -> not (Type.is_tType (HVar.ty v)))  in
-                let n_vars = Term.VarSet.cardinal dist_vars in
+                 Literals.vars (C.lits c)
+                 |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))  in
+                let n_vars = List.length dist_vars in
                 let dist_var_penalty = distinct_vars_mul ** (float_of_int n_vars) in
                 let proof_depth_penalty = 
                   (* max (0.9999 ** (float_of_int (Proof.Step.inferences_perfomed (C.proof_step c)))) 0.75 in *)

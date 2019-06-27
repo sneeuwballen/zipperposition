@@ -1,0 +1,3609 @@
+0.054[zip.saturate] ### step     1 ###
+0.054[zip.saturate]
+    given (1 steps, penalty 1): `[zero_zero_a ≠ one_one_a*]/418`
+0.055[zip.saturate] ### step     2 ###
+0.055[zip.saturate]
+    given (2 steps, penalty 1): `[zero_zero_poly_a ≠ one_one_poly_a*]/419`
+0.055[zip.saturate] ### step     3 ###
+0.055[zip.saturate]
+    given (3 steps, penalty 1): `[zero_zero_nat ≠ one_one_nat*]/420`
+0.055[zip.saturate] ### step     4 ###
+0.055[zip.saturate]
+    given (4 steps, penalty 1):
+      `[zero_zero_poly_nat ≠ one_one_poly_nat*]/421`
+0.055[zip.saturate] ### step     5 ###
+0.055[zip.saturate]
+    given (5 steps, penalty 1):
+      `[zero_z2096148049poly_a ≠ one_one_poly_poly_a*]/422`
+0.055[zip.saturate] ### step     6 ###
+0.055[zip.saturate] given (6 steps, penalty 1): `[¬pp fFalse*]/541`
+0.055[zip.saturate] ### step     7 ###
+0.055[zip.saturate] given (7 steps, penalty 1): `[pp fTrue*]/540`
+0.056[zip.saturate] ### step     8 ###
+0.056[zip.saturate]
+    given (8 steps, penalty 1): `[¬fundam396953934nt_a_a (poly_a2 p)*]/1`
+0.056[zip.saturate] ### step     9 ###
+0.056[zip.saturate]
+    given (9 steps, penalty 1):
+      `[¬pp (pos_poly_nat zero_zero_poly_nat)*]/451`
+0.056[zip.saturate] ### step    10 ###
+0.056[zip.saturate]
+    given (10 steps, penalty 1):
+      `[c ≠ zero_zero_a+* ∨ cs ≠ zero_zero_poly_a]/6`
+0.056[zip.saturate] ### step    11 ###
+0.056[zip.saturate]
+    given (11 steps, penalty 1):
+      `[reflect_poly_a zero_zero_poly_a = zero_zero_poly_a*]/59`
+0.056[zip.saturate] ### step    12 ###
+0.056[zip.saturate]
+    given (12 steps, penalty 1):
+      `[reflect_poly_nat zero_zero_poly_nat = zero_zero_poly_nat*]/60`
+0.056[zip.saturate] ### step    13 ###
+0.056[zip.saturate]
+    given (13 steps, penalty 1):
+      `[reflect_poly_poly_a zero_z2096148049poly_a = zero_z2096148049poly_a*]/61`
+0.057[zip.saturate] ### step    14 ###
+0.057[zip.saturate]
+    given (14 steps, penalty 1):
+      `[degree_a zero_zero_poly_a = zero_zero_nat*]/306`
+0.057[zip.saturate] ### step    15 ###
+0.057[zip.saturate]
+    given (15 steps, penalty 1):
+      `[degree_nat zero_zero_poly_nat = zero_zero_nat*]/307`
+0.057[zip.saturate] ### step    16 ###
+0.057[zip.saturate]
+    given (16 steps, penalty 1):
+      `[degree_poly_a zero_z2096148049poly_a = zero_zero_nat*]/308`
+0.057[zip.saturate] ### step    17 ###
+0.057[zip.saturate]
+    given (17 steps, penalty 1):
+      `[zero_z1059985641ly_nat = abs_poly_poly_nat aTP_Lamm_ae*]/452`
+0.058[zip.saturate] ### step    18 ###
+0.058[zip.saturate]
+    given (18 steps, penalty 1):
+      `[zero_z2064990175poly_a = abs_poly_poly_poly_a aTP_Lamm_af*]/453`
+0.058[zip.saturate] ### step    19 ###
+0.058[zip.saturate]
+    given (19 steps, penalty 1):
+      `[zero_zero_poly_a = abs_poly_a aTP_Lamm_ag*]/454`
+0.058[zip.saturate] ### step    20 ###
+0.058[zip.saturate]
+    given (20 steps, penalty 1):
+      `forall (F0:a → a) (X1:a) (X2:a).
+       [F0 X2 = F0 X1* ∨ ¬fundam396953934nt_a_a F0*]/2`
+0.059[zip.saturate] ### step    21 ###
+0.059[zip.saturate]
+    given (21 steps, penalty 1):
+      `[zero_zero_poly_nat = abs_poly_nat aTP_Lamm_ah*]/455`
+0.060[zip.saturate] ### step    22 ###
+0.060[zip.saturate]
+    given (22 steps, penalty 1):
+      `[zero_z2096148049poly_a = abs_poly_poly_a aTP_Lamm_ai*]/456`
+0.060[zip.saturate] ### step    23 ###
+0.060[zip.saturate]
+    given (23 steps, penalty 1):
+      `[neg_nu976519853_inc_a zero_zero_a = one_one_a*]/466`
+0.060[zip.saturate] ### step    24 ###
+0.060[zip.saturate]
+    given (24 steps, penalty 1):
+      `[neg_nu1855370811poly_a zero_zero_poly_a = one_one_poly_a*]/467`
+0.061[zip.saturate] ### step    25 ###
+0.061[zip.saturate]
+    given (25 steps, penalty 1):
+      `[neg_nu1613852873poly_a zero_z2096148049poly_a = one_one_poly_poly_a*]/468`
+0.061[zip.saturate] ### step    26 ###
+0.061[zip.saturate]
+    given (26 steps, penalty 1):
+      `forall (X660:nat). [aTP_Lamm_af X660 = zero_z2096148049poly_a*]/535`
+0.061[zip.saturate] ### step    27 ###
+0.061[zip.saturate]
+    given (27 steps, penalty 1):
+      `forall (X661:nat). [aTP_Lamm_ae X661 = zero_zero_poly_nat*]/536`
+0.062[zip.saturate] ### step    28 ###
+0.062[zip.saturate]
+    given (28 steps, penalty 1):
+      `forall (X662:nat). [aTP_Lamm_ai X662 = zero_zero_poly_a*]/537`
+0.062[zip.saturate] ### step    29 ###
+0.062[zip.saturate]
+    given (29 steps, penalty 1):
+      `forall (X663:nat). [aTP_Lamm_ah X663 = zero_zero_nat*]/538`
+0.062[zip.saturate] ### step    30 ###
+0.062[zip.saturate]
+    given (30 steps, penalty 1):
+      `forall (X664:nat). [aTP_Lamm_ag X664 = zero_zero_a*]/539`
+0.063[zip.saturate] ### step    31 ###
+0.063[zip.saturate]
+    given (31 steps, penalty 1):
+      `forall (F3:a → a).
+       [fundam396953934nt_a_a F3* ∨ F3 (sk_X F3) ≠ F3 (sk_Y F3)*]/3`
+0.064[zip.saturate] ### step    42 ###
+0.064[zip.saturate]
+    given (42 steps, penalty 1):
+      `forall (X4:a). [poly_a2 cs X4 = zero_zero_a* ∨ X4 = zero_zero_a]/4`
+0.065[zip.saturate] ### step    45 ###
+0.065[zip.saturate]
+    given (45 steps, penalty 1):
+      `forall (X430:nat). [¬pp (ord_less_nat X430 zero_zero_nat)*]/370`
+0.065[zip.saturate] ### step    48 ###
+0.065[zip.saturate]
+    given (48 steps, penalty 1):
+      `forall (X478:nat). [¬pp (ord_less_nat X478 X478)*]/408`
+0.066[zip.saturate] ### step    53 ###
+0.066[zip.saturate]
+    given (53 steps, penalty 1):
+      `forall (X5:a) (X6:a).
+       [poly_a2 (pCons_a c cs) X6 = poly_a2 (pCons_a c cs) X5*]/5`
+0.068[zip.saturate] ### step    56 ###
+0.068[zip.saturate]
+    given (56 steps, penalty 1):
+      `[¬pp (rsquarefree_a zero_zero_poly_a)*]/585`
+0.068[zip.saturate] ### step    57 ###
+0.068[zip.saturate]
+    given (57 steps, penalty 1):
+      `[¬pp (rsquarefree_poly_a zero_z2096148049poly_a)*]/586`
+0.068[zip.saturate] ### step    58 ###
+0.068[zip.saturate]
+    given (58 steps, penalty 1):
+      `[¬fundam396953934nt_a_a (poly_a2 (pCons_a c cs))*]/12`
+0.069[zip.saturate] ### step    59 ###
+0.069[zip.saturate]
+    given (59 steps, penalty 1):
+      `forall (X115:poly_a).
+       [X115 = zero_zero_poly_a ∨ 
+        fundam758496022size_a X115 ≠ zero_zero_nat+*]/115`
+0.069[zip.saturate] ### step    60 ###
+0.069[zip.saturate]
+    given (60 steps, penalty 1):
+      `forall (X117:poly_nat).
+       [X117 = zero_zero_poly_nat ∨ 
+        fundam164439480ze_nat X117 ≠ zero_zero_nat+*]/117`
+0.069[zip.saturate] ### step    61 ###
+0.069[zip.saturate]
+    given (61 steps, penalty 1):
+      `forall (X119:poly_poly_a).
+       [X119 = zero_z2096148049poly_a ∨ 
+        fundam283162788poly_a X119 ≠ zero_zero_nat+*]/119`
+0.070[zip.saturate] ### step    62 ###
+0.070[zip.saturate]
+    given (62 steps, penalty 1):
+      `forall (X130:poly_a).
+       [X130 = zero_zero_poly_a ∨ ¬pp (is_zero_a X130)+*]/124`
+0.070[zip.saturate] ### step    63 ###
+0.070[zip.saturate]
+    given (63 steps, penalty 1):
+      `forall (X132:poly_nat).
+       [X132 = zero_zero_poly_nat ∨ ¬pp (is_zero_nat X132)+*]/126`
+0.071[zip.saturate] ### step    64 ###
+0.071[zip.saturate]
+    given (64 steps, penalty 1):
+      `forall (X134:poly_poly_a).
+       [X134 = zero_z2096148049poly_a ∨ ¬pp (is_zero_poly_a X134)+*]/128`
+0.071[zip.saturate] ### step    65 ###
+0.071[zip.saturate]
+    given (65 steps, penalty 1):
+      `forall (X7:poly_nat).
+       [poly_poly_nat2 zero_z1059985641ly_nat X7 = zero_zero_poly_nat*]/7`
+0.072[zip.saturate] ### step    66 ###
+0.072[zip.saturate]
+    given (66 steps, penalty 1):
+      `forall (X8:poly_poly_a).
+       [poly_poly_poly_a2 zero_z2064990175poly_a X8 = zero_z2096148049poly_a*]/8`
+0.072[zip.saturate] ### step    67 ###
+0.072[zip.saturate]
+    given (67 steps, penalty 1):
+      `forall (X9:poly_a).
+       [poly_poly_a2 zero_z2096148049poly_a X9 = zero_zero_poly_a*]/9`
+0.072[zip.saturate] ### step    68 ###
+0.072[zip.saturate]
+    given (68 steps, penalty 1):
+      `forall (X10:nat). [poly_nat2 zero_zero_poly_nat X10 = zero_zero_nat*]/10`
+0.073[zip.saturate] ### step    69 ###
+0.073[zip.saturate]
+    given (69 steps, penalty 1):
+      `forall (X11:a). [poly_a2 zero_zero_poly_a X11 = zero_zero_a*]/11`
+0.073[zip.saturate] ### step    70 ###
+0.073[zip.saturate]
+    given (70 steps, penalty 1):
+      `[pCons_a zero_zero_a zero_zero_poly_a = zero_zero_poly_a*]/23`
+0.074[zip.saturate] ### step    71 ###
+0.074[zip.saturate]
+    given (71 steps, penalty 1):
+      `[pCons_poly_a zero_zero_poly_a zero_z2096148049poly_a
+         = zero_z2096148049poly_a*]/24`
+0.074[zip.saturate] ### step    72 ###
+0.074[zip.saturate]
+    given (72 steps, penalty 1):
+      `[pCons_nat zero_zero_nat zero_zero_poly_nat = zero_zero_poly_nat*]/25`
+0.075[zip.saturate] ### step    73 ###
+0.075[zip.saturate]
+    given (73 steps, penalty 1):
+      `[pCons_poly_nat zero_zero_poly_nat zero_z1059985641ly_nat
+         = zero_z1059985641ly_nat*]/26`
+0.075[zip.saturate] ### step    74 ###
+0.075[zip.saturate]
+    given (74 steps, penalty 1):
+      `[pCons_poly_poly_a zero_z2096148049poly_a zero_z2064990175poly_a
+         = zero_z2064990175poly_a*]/27`
+0.075[zip.saturate] ### step    75 ###
+0.075[zip.saturate]
+    given (75 steps, penalty 1):
+      `forall (X136:nat).
+       [poly_cutoff_a X136 zero_zero_poly_a = zero_zero_poly_a*]/130`
+0.076[zip.saturate] ### step    76 ###
+0.076[zip.saturate]
+    given (76 steps, penalty 1):
+      `forall (X137:nat).
+       [poly_cutoff_nat X137 zero_zero_poly_nat = zero_zero_poly_nat*]/131`
+0.076[zip.saturate] ### step    77 ###
+0.076[zip.saturate]
+    given (77 steps, penalty 1):
+      `forall (X138:nat).
+       [poly_cutoff_poly_a X138 zero_z2096148049poly_a
+         = zero_z2096148049poly_a*]/132`
+0.076[zip.saturate] ### step    78 ###
+0.077[zip.saturate]
+    given (78 steps, penalty 1):
+      `forall (X155:nat).
+       [poly_shift_a X155 zero_zero_poly_a = zero_zero_poly_a*]/146`
+0.077[zip.saturate] ### step    79 ###
+0.077[zip.saturate]
+    given (79 steps, penalty 1):
+      `forall (X156:nat).
+       [poly_shift_nat X156 zero_zero_poly_nat = zero_zero_poly_nat*]/147`
+0.077[zip.saturate] ### step    80 ###
+0.077[zip.saturate]
+    given (80 steps, penalty 1):
+      `forall (X157:nat).
+       [poly_shift_poly_a X157 zero_z2096148049poly_a
+         = zero_z2096148049poly_a*]/148`
+0.078[zip.saturate] ### step    81 ###
+0.078[zip.saturate]
+    given (81 steps, penalty 1):
+      `forall (X178:a).
+       [synthetic_div_a zero_zero_poly_a X178 = zero_zero_poly_a*]/169`
+0.078[zip.saturate] ### step    82 ###
+0.078[zip.saturate]
+    given (82 steps, penalty 1):
+      `forall (X179:nat).
+       [synthetic_div_nat zero_zero_poly_nat X179 = zero_zero_poly_nat*]/170`
+0.078[zip.saturate] ### step    83 ###
+0.078[zip.saturate]
+    given (83 steps, penalty 1):
+      `forall (X180:poly_a).
+       [synthetic_div_poly_a zero_z2096148049poly_a X180
+         = zero_z2096148049poly_a*]/171`
+0.079[zip.saturate] ### step    84 ###
+0.079[zip.saturate]
+    given (84 steps, penalty 1):
+      `forall (X181:nat).
+       [coeff_poly_nat zero_z1059985641ly_nat X181 = zero_zero_poly_nat*]/172`
+0.079[zip.saturate] ### step    85 ###
+0.079[zip.saturate]
+    given (85 steps, penalty 1):
+      `forall (X182:nat).
+       [coeff_poly_poly_a zero_z2064990175poly_a X182
+         = zero_z2096148049poly_a*]/173`
+0.079[zip.saturate] ### step    86 ###
+0.079[zip.saturate]
+    given (86 steps, penalty 1):
+      `forall (X183:nat). [coeff_a zero_zero_poly_a X183 = zero_zero_a*]/174`
+0.080[zip.saturate] ### step    87 ###
+0.080[zip.saturate]
+    given (87 steps, penalty 1):
+      `forall (X184:nat).
+       [coeff_nat zero_zero_poly_nat X184 = zero_zero_nat*]/175`
+0.080[zip.saturate] ### step    88 ###
+0.080[zip.saturate]
+    given (88 steps, penalty 1):
+      `forall (X185:nat).
+       [coeff_poly_a zero_z2096148049poly_a X185 = zero_zero_poly_a*]/176`
+0.081[zip.saturate] ### step    89 ###
+0.081[zip.saturate]
+    given (89 steps, penalty 1):
+      `forall (X188:nat). [monom_a zero_zero_a X188 = zero_zero_poly_a*]/178`
+0.081[zip.saturate] ### step    90 ###
+0.081[zip.saturate]
+    given (90 steps, penalty 1):
+      `forall (X189:nat).
+       [monom_poly_a zero_zero_poly_a X189 = zero_z2096148049poly_a*]/179`
+0.082[zip.saturate] ### step    91 ###
+0.082[zip.saturate]
+    given (91 steps, penalty 1):
+      `forall (X190:nat).
+       [monom_nat zero_zero_nat X190 = zero_zero_poly_nat*]/180`
+0.082[zip.saturate] ### step    92 ###
+0.082[zip.saturate]
+    given (92 steps, penalty 1):
+      `forall (X191:nat).
+       [monom_poly_nat zero_zero_poly_nat X191 = zero_z1059985641ly_nat*]/181`
+0.082[zip.saturate] ### step    93 ###
+0.082[zip.saturate]
+    given (93 steps, penalty 1):
+      `forall (X192:nat).
+       [monom_poly_poly_a zero_z2096148049poly_a X192
+         = zero_z2064990175poly_a*]/182`
+0.083[zip.saturate] ### step    99 ###
+0.083[zip.saturate]
+    given (99 steps, penalty 1):
+      `forall (X298:a).
+       [fundam2103719732poly_a zero_zero_poly_a X298 = zero_zero_poly_a*]/252`
+0.083[zip.saturate] ### step   100 ###
+0.083[zip.saturate]
+    given (100 steps, penalty 1):
+      `forall (X299:nat).
+       [fundam1481276954ly_nat zero_zero_poly_nat X299 = zero_zero_poly_nat*]/253`
+0.084[zip.saturate] ### step   101 ###
+0.084[zip.saturate]
+    given (101 steps, penalty 1):
+      `forall (X300:poly_a).
+       [fundam932970690poly_a zero_z2096148049poly_a X300
+         = zero_z2096148049poly_a*]/254`
+0.084[zip.saturate] ### step   102 ###
+0.084[zip.saturate]
+    given (102 steps, penalty 1):
+      `forall (X362:poly_a).
+       [pcompose_a zero_zero_poly_a X362 = zero_zero_poly_a*]/303`
+0.085[zip.saturate] ### step   103 ###
+0.085[zip.saturate]
+    given (103 steps, penalty 1):
+      `forall (X363:poly_nat).
+       [pcompose_nat zero_zero_poly_nat X363 = zero_zero_poly_nat*]/304`
+0.085[zip.saturate] ### step   104 ###
+0.085[zip.saturate]
+    given (104 steps, penalty 1):
+      `forall (X364:poly_poly_a).
+       [pcompose_poly_a zero_z2096148049poly_a X364 = zero_z2096148049poly_a*]/305`
+0.085[zip.saturate] ### step   105 ###
+0.085[zip.saturate]
+    given (105 steps, penalty 1):
+      `forall (X365:a). [poly_a2 one_one_poly_a X365 = one_one_a*]/309`
+0.086[zip.saturate] ### step   106 ###
+0.086[zip.saturate]
+    given (106 steps, penalty 1):
+      `forall (X366:poly_a).
+       [poly_poly_a2 one_one_poly_poly_a X366 = one_one_poly_a*]/310`
+0.086[zip.saturate] ### step   107 ###
+0.086[zip.saturate]
+    given (107 steps, penalty 1):
+      `forall (X367:nat). [poly_nat2 one_one_poly_nat X367 = one_one_nat*]/311`
+0.087[zip.saturate] ### step   108 ###
+0.087[zip.saturate]
+    given (108 steps, penalty 1):
+      `[pCons_a one_one_a zero_zero_poly_a = one_one_poly_a*]/328`
+0.087[zip.saturate] ### step   109 ###
+0.087[zip.saturate]
+    given (109 steps, penalty 1):
+      `[pCons_nat one_one_nat zero_zero_poly_nat = one_one_poly_nat*]/329`
+0.088[zip.saturate] ### step   110 ###
+0.088[zip.saturate]
+    given (110 steps, penalty 1):
+      `[pCons_poly_a one_one_poly_a zero_z2096148049poly_a
+         = one_one_poly_poly_a*]/330`
+0.088[zip.saturate] ### step   114 ###
+0.088[zip.saturate]
+    given (114 steps, penalty 1):
+      `[monom_nat one_one_nat zero_zero_nat = one_one_poly_nat*]/335`
+0.088[zip.saturate] ### step   118 ###
+0.089[zip.saturate]
+    given (118 steps, penalty 1):
+      `[pp (ord_less_nat zero_zero_nat one_one_nat)*]/400`
+0.089[zip.saturate] ### step   120 ###
+0.089[zip.saturate]
+    given (120 steps, penalty 1):
+      `forall (X538:nat). [pp (ord_less_eq_nat zero_zero_nat X538)*]/469`
+0.089[zip.saturate] ### step   121 ###
+0.089[zip.saturate]
+    given (121 steps, penalty 1):
+      `forall (X539:nat). [minus_minus_nat X539 X539 = zero_zero_nat*]/470`
+0.090[zip.saturate] ### step   122 ###
+0.090[zip.saturate]
+    given (122 steps, penalty 1):
+      `forall (X540:nat).
+       [minus_minus_nat zero_zero_nat X540 = zero_zero_nat*]/471`
+0.090[zip.saturate] ### step   123 ###
+0.090[zip.saturate]
+    given (123 steps, penalty 1):
+      `forall (X551:nat). [minus_minus_nat X551 zero_zero_nat = X551*]/478`
+0.091[zip.saturate] ### step   125 ###
+0.091[zip.saturate]
+    given (125 steps, penalty 1):
+      `forall (X597:nat). [pp (ord_less_eq_nat X597 X597)*]/503`
+0.091[zip.saturate] ### step   126 ###
+0.091[zip.saturate]
+    given (126 steps, penalty 1):
+      `forall (X685:bool). [X685 = fFalse* ∨ X685 = fTrue*]/552`
+0.094[zip.saturate] ### step   127 ###
+0.095[zip.saturate]
+    given (127 steps, penalty 1):
+      `[rsquarefree_a zero_zero_poly_a = fFalse*]/609`
+0.096[zip.saturate] ### step   129 ###
+0.096[zip.saturate]
+    given (129 steps, penalty 1):
+      `[rsquarefree_poly_a zero_z2096148049poly_a = fFalse*]/611`
+0.098[zip.saturate] ### step   131 ###
+0.098[zip.saturate]
+    given (131 steps, penalty 1):
+      `[pos_poly_nat zero_zero_poly_nat = fFalse*]/613`
+0.098[zip.saturate] ### step   134 ###
+0.098[zip.saturate]
+    given (134 steps, penalty 1):
+      `forall (X0:bool). [¬pp X0+* ∨ X0 = fTrue*]/633`
+0.099[zip.saturate] ### step   135 ###
+0.099[zip.saturate]
+    given (135 steps, penalty 1):
+      `forall (X0:bool). [fTrue ≠ fFalse+* ∨ X0 = fFalse*]/637`
+0.100[zip.saturate] ### step   136 ###
+0.100[zip.saturate]
+    given (136 steps, penalty 1):
+      `forall (X0:bool). [fFalse ≠ fTrue+* ∨ X0 = fTrue*]/639`
+0.101[zip.saturate] ### step   137 ###
+0.101[zip.saturate]
+    given (137 steps, penalty 1):
+      `forall (X0:nat). [ord_less_nat X0 zero_zero_nat = fFalse*]/623`
+0.102[zip.saturate] ### step   140 ###
+0.102[zip.saturate]
+    given (140 steps, penalty 1):
+      `forall (X0:nat). [ord_less_nat X0 X0 = fFalse*]/625`
+0.103[zip.saturate] ### step   143 ###
+0.103[zip.saturate]
+    given (143 steps, penalty 1):
+      `forall (X0:bool). [pp X0* ∨ X0 = fFalse*]/628`
+0.106[zip.saturate] ### step   144 ###
+0.106[zip.saturate]
+    given (144 steps, penalty 1):
+      `forall (X0:nat). [ord_less_eq_nat zero_zero_nat X0 = fTrue*]/646`
+0.108[zip.saturate] ### step   147 ###
+0.109[zip.saturate]
+    given (147 steps, penalty 1):
+      `forall (X0:nat). [ord_less_eq_nat X0 X0 = fTrue*]/647`
+0.110[zip.saturate] ### step   149 ###
+0.110[zip.saturate]
+    given (149 steps, penalty 1):
+      `[ord_less_nat zero_zero_nat one_one_nat = fTrue*]/648`
+0.111[zip.saturate] ### step   154 ###
+0.111[zip.saturate]
+    given (154 steps, penalty 1):
+      `[fundam758496022size_a zero_zero_poly_a = zero_zero_nat*]/694`
+0.112[zip.saturate] ### step   155 ###
+0.112[zip.saturate]
+    given (155 steps, penalty 1):
+      `[fundam164439480ze_nat zero_zero_poly_nat = zero_zero_nat*]/697`
+0.113[zip.saturate] ### step   156 ###
+0.113[zip.saturate]
+    given (156 steps, penalty 1):
+      `[fundam283162788poly_a zero_z2096148049poly_a = zero_zero_nat*]/700`
+0.113[zip.saturate] ### step   157 ###
+0.113[zip.saturate]
+    given (157 steps, penalty 1): `[pp (is_zero_a zero_zero_poly_a)*]/703`
+0.114[zip.saturate] ### step   158 ###
+0.114[zip.saturate]
+    given (158 steps, penalty 1): `[is_zero_a zero_zero_poly_a = fTrue*]/705`
+0.116[zip.saturate] ### step   160 ###
+0.116[zip.saturate]
+    given (160 steps, penalty 1):
+      `[true ∨ is_zero_a zero_zero_poly_a = fFalse*]/707`
+0.117[zip.saturate] ### step   161 ###
+0.117[zip.saturate]
+    given (161 steps, penalty 1):
+      `[pp (is_zero_nat zero_zero_poly_nat)*]/716`
+0.118[zip.saturate] ### step   162 ###
+0.118[zip.saturate]
+    given (162 steps, penalty 1):
+      `[is_zero_nat zero_zero_poly_nat = fTrue*]/718`
+0.118[zip.saturate] ### step   164 ###
+0.118[zip.saturate]
+    given (164 steps, penalty 1):
+      `[true ∨ is_zero_nat zero_zero_poly_nat = fFalse*]/720`
+0.119[zip.saturate] ### step   165 ###
+0.119[zip.saturate]
+    given (165 steps, penalty 1):
+      `[pp (is_zero_poly_a zero_z2096148049poly_a)*]/729`
+0.120[zip.saturate] ### step   166 ###
+0.120[zip.saturate]
+    given (166 steps, penalty 1):
+      `[is_zero_poly_a zero_z2096148049poly_a = fTrue*]/731`
+0.121[zip.saturate] ### step   168 ###
+0.121[zip.saturate]
+    given (168 steps, penalty 1):
+      `[true ∨ is_zero_poly_a zero_z2096148049poly_a = fFalse*]/733`
+0.123[zip.saturate] ### step   180 ###
+0.123[zip.saturate]
+    given (180 steps, penalty 1):
+      `forall (X0:a).
+       [neg_nu976519853_inc_a X0 = one_one_a* ∨ 
+        ¬fundam396953934nt_a_a neg_nu976519853_inc_a+*]/556`
+0.125[zip.saturate] ### step   182 ###
+0.125[zip.saturate]
+    given (182 steps, penalty 1):
+      `forall (X0:poly_a). [X0 = zero_zero_poly_a ∨ is_zero_a X0 = fFalse*]/615`
+0.126[zip.saturate] ### step   184 ###
+0.126[zip.saturate]
+    given (184 steps, penalty 1):
+      `forall (X0:poly_poly_a).
+       [X0 = zero_z2096148049poly_a ∨ is_zero_poly_a X0 = fFalse*]/617`
+0.128[zip.saturate] ### step   186 ###
+0.128[zip.saturate]
+    given (186 steps, penalty 1):
+      `forall (X0:poly_nat).
+       [X0 = zero_zero_poly_nat ∨ is_zero_nat X0 = fFalse*]/619`
+0.129[zip.saturate] ### step   194 ###
+0.129[zip.saturate]
+    given (194 steps, penalty 1):
+      `forall (X22:poly_poly_nat) (X23:poly_nat).
+       [X22 = zero_z1059985641ly_nat ∨ 
+        pCons_poly_nat X23 X22 ≠ zero_z1059985641ly_nat+*]/28`
+0.130[zip.saturate] ### step   195 ###
+0.130[zip.saturate]
+    given (195 steps, penalty 1):
+      `forall (X22:poly_poly_nat) (X23:poly_nat).
+       [X23 = zero_zero_poly_nat ∨ 
+        pCons_poly_nat X23 X22 ≠ zero_z1059985641ly_nat+*]/29`
+0.131[zip.saturate] ### step   196 ###
+0.131[zip.saturate]
+    given (196 steps, penalty 1):
+      `forall (X25:poly_poly_poly_a) (X26:poly_poly_a).
+       [X25 = zero_z2064990175poly_a ∨ 
+        pCons_poly_poly_a X26 X25 ≠ zero_z2064990175poly_a+*]/31`
+0.132[zip.saturate] ### step   197 ###
+0.132[zip.saturate]
+    given (197 steps, penalty 1):
+      `forall (X25:poly_poly_poly_a) (X26:poly_poly_a).
+       [X26 = zero_z2096148049poly_a ∨ 
+        pCons_poly_poly_a X26 X25 ≠ zero_z2064990175poly_a+*]/32`
+0.132[zip.saturate] ### step   198 ###
+0.132[zip.saturate]
+    given (198 steps, penalty 1):
+      `forall (X28:poly_a) (X29:a).
+       [X28 = zero_zero_poly_a ∨ pCons_a X29 X28 ≠ zero_zero_poly_a+*]/34`
+0.133[zip.saturate] ### step   199 ###
+0.133[zip.saturate]
+    given (199 steps, penalty 1):
+      `forall (X28:poly_a) (X29:a).
+       [X29 = zero_zero_a ∨ pCons_a X29 X28 ≠ zero_zero_poly_a+*]/35`
+0.134[zip.saturate] ### step   201 ###
+0.134[zip.saturate]
+    given (201 steps, penalty 1):
+      `forall (X31:poly_nat) (X32:nat).
+       [X31 = zero_zero_poly_nat ∨ 
+        pCons_nat X32 X31 ≠ zero_zero_poly_nat+*]/37`
+0.135[zip.saturate] ### step   202 ###
+0.135[zip.saturate]
+    given (202 steps, penalty 1):
+      `forall (X31:poly_nat) (X32:nat).
+       [X32 = zero_zero_nat ∨ pCons_nat X32 X31 ≠ zero_zero_poly_nat+*]/38`
+0.136[zip.saturate] ### step   204 ###
+0.136[zip.saturate]
+    given (204 steps, penalty 1):
+      `forall (X34:poly_poly_a) (X35:poly_a).
+       [X34 = zero_z2096148049poly_a ∨ 
+        pCons_poly_a X35 X34 ≠ zero_z2096148049poly_a+*]/40`
+0.137[zip.saturate] ### step   205 ###
+0.137[zip.saturate]
+    given (205 steps, penalty 1):
+      `forall (X34:poly_poly_a) (X35:poly_a).
+       [X35 = zero_zero_poly_a ∨ 
+        pCons_poly_a X35 X34 ≠ zero_z2096148049poly_a+*]/41`
+0.138[zip.saturate] ### step   207 ###
+0.138[zip.saturate]
+    given (207 steps, penalty 1):
+      `forall (X193:poly_nat) (X194:nat).
+       [X193 = zero_zero_poly_nat ∨ 
+        monom_poly_nat X193 X194 ≠ zero_z1059985641ly_nat+*]/183`
+0.138[zip.saturate] ### step   208 ###
+0.138[zip.saturate]
+    given (208 steps, penalty 1):
+      `forall (X196:poly_poly_a) (X197:nat).
+       [X196 = zero_z2096148049poly_a ∨ 
+        monom_poly_poly_a X196 X197 ≠ zero_z2064990175poly_a+*]/185`
+0.139[zip.saturate] ### step   209 ###
+0.139[zip.saturate]
+    given (209 steps, penalty 1):
+      `forall (X199:a) (X200:nat).
+       [X199 = zero_zero_a ∨ monom_a X199 X200 ≠ zero_zero_poly_a+*]/187`
+0.140[zip.saturate] ### step   210 ###
+0.140[zip.saturate]
+    given (210 steps, penalty 1):
+      `forall (X202:nat) (X203:nat).
+       [X202 = zero_zero_nat ∨ monom_nat X202 X203 ≠ zero_zero_poly_nat+*]/189`
+0.141[zip.saturate] ### step   212 ###
+0.141[zip.saturate]
+    given (212 steps, penalty 1):
+      `forall (X205:poly_a) (X206:nat).
+       [X205 = zero_zero_poly_a ∨ 
+        monom_poly_a X205 X206 ≠ zero_z2096148049poly_a+*]/191`
+0.142[zip.saturate] ### step   213 ###
+0.142[zip.saturate]
+    given (213 steps, penalty 1):
+      `forall (X289:poly_a) (X290:a).
+       [X289 = zero_zero_poly_a ∨ 
+        fundam2103719732poly_a X289 X290 ≠ zero_zero_poly_a+*]/246`
+0.142[zip.saturate] ### step   214 ###
+0.142[zip.saturate]
+    given (214 steps, penalty 1):
+      `forall (X292:poly_nat) (X293:nat).
+       [X292 = zero_zero_poly_nat ∨ 
+        fundam1481276954ly_nat X292 X293 ≠ zero_zero_poly_nat+*]/248`
+0.143[zip.saturate] ### step   215 ###
+0.143[zip.saturate]
+    given (215 steps, penalty 1):
+      `forall (X295:poly_poly_a) (X296:poly_a).
+       [X295 = zero_z2096148049poly_a ∨ 
+        fundam932970690poly_a X295 X296 ≠ zero_z2096148049poly_a+*]/250`
+0.145[zip.saturate] ### step   216 ###
+0.145[zip.saturate]
+    given (216 steps, penalty 1):
+      `forall (X423:nat) (X424:nat).
+       [X423 = zero_zero_nat ∨ monom_nat X424 X423 ≠ one_one_poly_nat+*]/364`
+0.147[zip.saturate] ### step   218 ###
+0.147[zip.saturate]
+    given (218 steps, penalty 1):
+      `forall (X423:nat) (X424:nat).
+       [X424 = one_one_nat ∨ monom_nat X424 X423 ≠ one_one_poly_nat+*]/365`
+0.147[zip.saturate] ### step   220 ###
+0.147[zip.saturate]
+    given (220 steps, penalty 1):
+      `forall (X473:nat).
+       [X473 = zero_zero_nat ∨ ¬pp (ord_less_nat X473 one_one_nat)+*]/403`
+0.150[zip.saturate] ### step   222 ###
+0.150[zip.saturate]
+    given (222 steps, penalty 1):
+      `forall (X554:nat).
+       [X554 = zero_zero_nat ∨ ¬pp (ord_less_eq_nat X554 zero_zero_nat)+*]/480`
+0.152[zip.saturate] ### step   223 ###
+0.152[zip.saturate]
+    given (223 steps, penalty 1):
+      `forall (X675:nat) (X676:nat).
+       [X676 = X675 ∨ ¬pp (fequal_nat X676 X675)+*]/547`
+0.153[zip.saturate] ### step   224 ###
+0.153[zip.saturate]
+    given (224 steps, penalty 1):
+      `forall (X0:nat). [true ∨ ord_less_eq_nat zero_zero_nat X0 = fFalse*]/620`
+0.155[zip.saturate] ### step   225 ###
+0.155[zip.saturate]
+    given (225 steps, penalty 1):
+      `[true ∨ ord_less_nat zero_zero_nat one_one_nat = fFalse*]/621`
+0.156[zip.saturate] ### step   226 ###
+0.156[zip.saturate]
+    given (226 steps, penalty 1):
+      `[coeff_nat one_one_poly_nat (degree_nat one_one_poly_nat)
+         = one_one_nat*]/334`
+0.156[zip.saturate] ### step   227 ###
+0.156[zip.saturate]
+    given (227 steps, penalty 1):
+      `forall (X456:a).
+       [degree_a (pCons_a X456 zero_zero_poly_a) = zero_zero_nat*]/385`
+0.157[zip.saturate] ### step   229 ###
+0.157[zip.saturate]
+    given (229 steps, penalty 1):
+      `[degree_a one_one_poly_a = zero_zero_nat*]/871`
+0.158[zip.saturate] ### step   230 ###
+0.158[zip.saturate]
+    given (230 steps, penalty 1):
+      `forall (X457:nat).
+       [degree_nat (pCons_nat X457 zero_zero_poly_nat) = zero_zero_nat*]/386`
+0.159[zip.saturate] ### step   232 ###
+0.159[zip.saturate]
+    given (232 steps, penalty 1):
+      `[degree_nat one_one_poly_nat = zero_zero_nat*]/873`
+0.159[zip.saturate] ### step   233 ###
+0.160[zip.saturate]
+    given (233 steps, penalty 1):
+      `[coeff_nat one_one_poly_nat zero_zero_nat = one_one_nat*]/874`
+0.160[zip.saturate] ### step   234 ###
+0.160[zip.saturate]
+    given (234 steps, penalty 1):
+      `forall (X458:poly_a).
+       [degree_poly_a (pCons_poly_a X458 zero_z2096148049poly_a)
+         = zero_zero_nat*]/387`
+0.161[zip.saturate] ### step   236 ###
+0.161[zip.saturate]
+    given (236 steps, penalty 1):
+      `[degree_poly_a one_one_poly_poly_a = zero_zero_nat*]/876`
+0.162[zip.saturate] ### step   237 ###
+0.162[zip.saturate]
+    given (237 steps, penalty 1):
+      `forall (X665:a) (X666:a). [if_a fFalse X666 X665 = X665*]/542`
+0.163[zip.saturate] ### step   238 ###
+0.163[zip.saturate]
+    given (238 steps, penalty 1):
+      `forall (X667:a) (X668:a). [if_a fTrue X667 X668 = X667*]/543`
+0.165[zip.saturate] ### step   239 ###
+0.165[zip.saturate]
+    given (239 steps, penalty 1):
+      `forall (X669:nat) (X670:nat). [if_nat fFalse X670 X669 = X669*]/544`
+0.165[zip.saturate] ### step   240 ###
+0.166[zip.saturate]
+    given (240 steps, penalty 1):
+      `forall (X671:nat) (X672:nat). [if_nat fTrue X671 X672 = X671*]/545`
+0.168[zip.saturate] ### step   241 ###
+0.168[zip.saturate]
+    given (241 steps, penalty 1):
+      `forall (X677:poly_a) (X678:poly_a).
+       [if_poly_a fFalse X678 X677 = X677*]/548`
+0.169[zip.saturate] ### step   242 ###
+0.169[zip.saturate]
+    given (242 steps, penalty 1):
+      `forall (X679:poly_a) (X680:poly_a).
+       [if_poly_a fTrue X679 X680 = X679*]/549`
+0.170[zip.saturate] ### step   243 ###
+0.170[zip.saturate]
+    given (243 steps, penalty 1):
+      `forall (X681:poly_nat) (X682:poly_nat).
+       [if_poly_nat fFalse X682 X681 = X681*]/550`
+0.174[zip.saturate] ### step   244 ###
+0.175[zip.saturate]
+    given (244 steps, penalty 1):
+      `forall (X683:poly_nat) (X684:poly_nat).
+       [if_poly_nat fTrue X683 X684 = X683*]/551`
+0.179[zip.saturate] ### step   245 ###
+0.179[zip.saturate]
+    given (245 steps, penalty 1):
+      `forall (X686:poly_poly_a) (X687:poly_poly_a).
+       [if_poly_poly_a fFalse X687 X686 = X686*]/553`
+0.181[zip.saturate] ### step   246 ###
+0.181[zip.saturate]
+    given (246 steps, penalty 1):
+      `forall (X688:poly_poly_a) (X689:poly_poly_a).
+       [if_poly_poly_a fTrue X688 X689 = X688*]/554`
+0.182[zip.saturate] ### step   247 ###
+0.183[zip.saturate]
+    given (247 steps, penalty 1):
+      `forall (X0:nat) (X1:bool).
+       [fFalse ≠ ord_less_eq_nat X0 X0+* ∨ X1 = fTrue*]/684`
+0.184[zip.saturate] ### step   250 ###
+0.184[zip.saturate]
+    given (250 steps, penalty 1):
+      `forall (X0:nat) (X1:bool).
+       [ord_less_eq_nat X0 X0 ≠ fFalse+* ∨ X1 = fFalse*]/685`
+0.186[zip.saturate] ### step   251 ###
+0.186[zip.saturate]
+    given (251 steps, penalty 1):
+      `forall (X1:bool). [X1 = fFalse* ∨ true]/942`
+0.191[zip.saturate] ### step   254 ###
+0.191[zip.saturate]
+    given (254 steps, penalty 1):
+      `forall (X0:a) (X1:a) (X2:a).
+       [X1 = X2* ∨ ¬fundam396953934nt_a_a (if_a fFalse X0)+*]/882`
+0.194[zip.saturate] ### step   267 ###
+0.194[zip.saturate]
+    given (267 steps, penalty 1):
+      `[poly_cutoff_a zero_zero_nat one_one_poly_a = zero_zero_poly_a*]/1026`
+0.195[zip.saturate] ### step   268 ###
+0.195[zip.saturate]
+    given (268 steps, penalty 1):
+      `[poly_cutoff_nat zero_zero_nat one_one_poly_nat = zero_zero_poly_nat*]/1027`
+0.196[zip.saturate] ### step   269 ###
+0.196[zip.saturate]
+    given (269 steps, penalty 1):
+      `[poly_cutoff_poly_a zero_zero_nat one_one_poly_poly_a
+         = zero_z2096148049poly_a*]/1028`
+0.196[zip.saturate] ### step   270 ###
+0.196[zip.saturate]
+    given (270 steps, penalty 1):
+      `[poly_shift_a zero_zero_nat one_one_poly_a = one_one_poly_a*]/1029`
+0.197[zip.saturate] ### step   271 ###
+0.197[zip.saturate]
+    given (271 steps, penalty 1):
+      `[poly_shift_nat zero_zero_nat one_one_poly_nat = one_one_poly_nat*]/1030`
+0.197[zip.saturate] ### step   272 ###
+0.197[zip.saturate]
+    given (272 steps, penalty 1):
+      `[poly_shift_poly_a zero_zero_nat one_one_poly_poly_a
+         = one_one_poly_poly_a*]/1031`
+0.198[zip.saturate] ### step   278 ###
+0.199[zip.saturate]
+    given (278 steps, penalty 1):
+      `forall (X674:nat). [pp (fequal_nat X674 X674)*]/1039`
+0.200[zip.saturate] ### step   279 ###
+0.200[zip.saturate]
+    given (279 steps, penalty 1):
+      `forall (X0:nat). [fequal_nat X0 X0 = fTrue*]/1041`
+0.202[zip.saturate] ### step   281 ###
+0.202[zip.saturate]
+    given (281 steps, penalty 1):
+      `forall (F559:nat → bool) (X561:nat).
+       [pp (F559 X561)* ∨ ¬zip_tseitin1 X561 F559*]/486`
+0.204[zip.saturate] ### step   282 ###
+0.204[zip.saturate]
+    given (282 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat).
+       [¬zip_tseitin1 X1 F0* ∨ F0 X1 = fTrue*]/1049`
+0.207[zip.saturate] ### step   283 ###
+0.207[zip.saturate]
+    given (283 steps, penalty 1):
+      `forall (X37:poly_a).
+       [X37 = zero_zero_poly_a ∨ 
+        poly_a2 (reflect_poly_a X37) zero_zero_a ≠ zero_zero_a+*]/43`
+0.208[zip.saturate] ### step   284 ###
+0.208[zip.saturate]
+    given (284 steps, penalty 1):
+      `forall (X39:poly_poly_a).
+       [X39 = zero_z2096148049poly_a ∨ 
+        poly_poly_a2 (reflect_poly_poly_a X39) zero_zero_poly_a
+         ≠ zero_zero_poly_a+*]/45`
+0.209[zip.saturate] ### step   285 ###
+0.209[zip.saturate]
+    given (285 steps, penalty 1):
+      `forall (X41:poly_nat).
+       [X41 = zero_zero_poly_nat ∨ 
+        poly_nat2 (reflect_poly_nat X41) zero_zero_nat ≠ zero_zero_nat+*]/47`
+0.213[zip.saturate] ### step   287 ###
+0.213[zip.saturate]
+    given (287 steps, penalty 1):
+      `forall (X43:poly_poly_nat).
+       [X43 = zero_z1059985641ly_nat ∨ 
+        poly_poly_nat2 (reflec781175074ly_nat X43) zero_zero_poly_nat
+         ≠ zero_zero_poly_nat+*]/49`
+0.213[zip.saturate] ### step   288 ###
+0.214[zip.saturate]
+    given (288 steps, penalty 1):
+      `forall (X45:poly_poly_poly_a).
+       [X45 = zero_z2064990175poly_a ∨ 
+        poly_poly_poly_a2 (reflec581648976poly_a X45) zero_z2096148049poly_a
+         ≠ zero_z2096148049poly_a+*]/51`
+0.214[zip.saturate] ### step   289 ###
+0.214[zip.saturate]
+    given (289 steps, penalty 1):
+      `forall (X139:poly_a).
+       [X139 = zero_zero_poly_a ∨ 
+        coeff_a (reflect_poly_a X139) zero_zero_nat ≠ zero_zero_a+*]/133`
+0.215[zip.saturate] ### step   290 ###
+0.215[zip.saturate]
+    given (290 steps, penalty 1):
+      `forall (X141:poly_poly_a).
+       [X141 = zero_z2096148049poly_a ∨ 
+        coeff_poly_a (reflect_poly_poly_a X141) zero_zero_nat
+         ≠ zero_zero_poly_a+*]/135`
+0.216[zip.saturate] ### step   291 ###
+0.216[zip.saturate]
+    given (291 steps, penalty 1):
+      `forall (X143:poly_nat).
+       [X143 = zero_zero_poly_nat ∨ 
+        coeff_nat (reflect_poly_nat X143) zero_zero_nat ≠ zero_zero_nat+*]/137`
+0.217[zip.saturate] ### step   292 ###
+0.217[zip.saturate]
+    given (292 steps, penalty 1):
+      `forall (X145:poly_poly_nat).
+       [X145 = zero_z1059985641ly_nat ∨ 
+        coeff_poly_nat (reflec781175074ly_nat X145) zero_zero_nat
+         ≠ zero_zero_poly_nat+*]/139`
+0.218[zip.saturate] ### step   293 ###
+0.218[zip.saturate]
+    given (293 steps, penalty 1):
+      `forall (X147:poly_poly_poly_a).
+       [X147 = zero_z2064990175poly_a ∨ 
+        coeff_poly_poly_a (reflec581648976poly_a X147) zero_zero_nat
+         ≠ zero_z2096148049poly_a+*]/141`
+0.219[zip.saturate] ### step   294 ###
+0.219[zip.saturate]
+    given (294 steps, penalty 1):
+      `forall (X374:poly_a).
+       [X374 = zero_zero_poly_a ∨ 
+        coeff_a X374 (degree_a X374) ≠ zero_zero_a+*]/315`
+0.220[zip.saturate] ### step   295 ###
+0.220[zip.saturate]
+    given (295 steps, penalty 1):
+      `[coeff_a one_one_poly_a zero_zero_nat ≠ zero_zero_a*]/1092`
+0.221[zip.saturate] ### step   296 ###
+0.221[zip.saturate]
+    given (296 steps, penalty 1):
+      `forall (X376:poly_poly_a).
+       [X376 = zero_z2096148049poly_a ∨ 
+        coeff_poly_a X376 (degree_poly_a X376) ≠ zero_zero_poly_a+*]/317`
+0.222[zip.saturate] ### step   297 ###
+0.222[zip.saturate]
+    given (297 steps, penalty 1):
+      `[coeff_poly_a one_one_poly_poly_a zero_zero_nat ≠ zero_zero_poly_a*]/1100`
+0.223[zip.saturate] ### step   298 ###
+0.223[zip.saturate]
+    given (298 steps, penalty 1):
+      `forall (X378:poly_nat).
+       [X378 = zero_zero_poly_nat ∨ 
+        coeff_nat X378 (degree_nat X378) ≠ zero_zero_nat+*]/319`
+0.224[zip.saturate] ### step   300 ###
+0.224[zip.saturate]
+    given (300 steps, penalty 1):
+      `forall (X380:poly_poly_nat).
+       [X380 = zero_z1059985641ly_nat ∨ 
+        coeff_poly_nat X380 (degree_poly_nat X380) ≠ zero_zero_poly_nat+*]/321`
+0.226[zip.saturate] ### step   301 ###
+0.226[zip.saturate]
+    given (301 steps, penalty 1):
+      `forall (X382:poly_poly_poly_a).
+       [X382 = zero_z2064990175poly_a ∨ 
+        coeff_poly_poly_a X382 (degree_poly_poly_a X382)
+         ≠ zero_z2096148049poly_a+*]/323`
+0.228[zip.saturate] ### step   308 ###
+0.228[zip.saturate]
+    given (308 steps, penalty 1):
+      `forall (X462:poly_a) (X463:a).
+       [degree_a X462 = zero_zero_nat ∨ 
+        synthetic_div_a X462 X463 ≠ zero_zero_poly_a+*]/391`
+0.228[zip.saturate] ### step   310 ###
+0.228[zip.saturate]
+    given (310 steps, penalty 1):
+      `forall (X465:poly_nat) (X466:nat).
+       [degree_nat X465 = zero_zero_nat ∨ 
+        synthetic_div_nat X465 X466 ≠ zero_zero_poly_nat+*]/393`
+0.230[zip.saturate] ### step   312 ###
+0.230[zip.saturate]
+    given (312 steps, penalty 1):
+      `forall (X468:poly_poly_a) (X469:poly_a).
+       [degree_poly_a X468 = zero_zero_nat ∨ 
+        synthetic_div_poly_a X468 X469 ≠ zero_z2096148049poly_a+*]/395`
+0.231[zip.saturate] ### step   314 ###
+0.231[zip.saturate]
+    given (314 steps, penalty 1):
+      `forall (X318:nat).
+       [poly_cutoff_a X318 one_one_poly_a = one_one_poly_a* ∨ 
+        X318 = zero_zero_nat]/272`
+0.232[zip.saturate] ### step   315 ###
+0.232[zip.saturate]
+    given (315 steps, penalty 1):
+      `forall (X320:nat).
+       [poly_cutoff_nat X320 one_one_poly_nat = one_one_poly_nat* ∨ 
+        X320 = zero_zero_nat]/274`
+0.233[zip.saturate] ### step   316 ###
+0.233[zip.saturate]
+    given (316 steps, penalty 1):
+      `forall (X322:nat).
+       [poly_cutoff_poly_a X322 one_one_poly_poly_a = one_one_poly_poly_a* ∨ 
+        X322 = zero_zero_nat]/276`
+0.234[zip.saturate] ### step   317 ###
+0.234[zip.saturate]
+    given (317 steps, penalty 1):
+      `forall (X329:nat).
+       [poly_shift_a X329 one_one_poly_a = zero_zero_poly_a* ∨ 
+        X329 = zero_zero_nat]/283`
+0.235[zip.saturate] ### step   318 ###
+0.235[zip.saturate]
+    given (318 steps, penalty 1):
+      `forall (X331:nat).
+       [poly_shift_nat X331 one_one_poly_nat = zero_zero_poly_nat* ∨ 
+        X331 = zero_zero_nat]/285`
+0.237[zip.saturate] ### step   319 ###
+0.237[zip.saturate]
+    given (319 steps, penalty 1):
+      `forall (X333:nat).
+       [poly_shift_poly_a X333 one_one_poly_poly_a = zero_z2096148049poly_a* ∨ 
+        X333 = zero_zero_nat]/287`
+0.237[zip.saturate] ### step   320 ###
+0.237[zip.saturate]
+    given (320 steps, penalty 1):
+      `forall (X360:nat).
+       [X360 = zero_zero_nat ∨ pp (ord_less_nat zero_zero_nat X360)*]/301`
+0.240[zip.saturate] ### step   330 ###
+0.240[zip.saturate]
+    given (330 steps, penalty 1):
+      `forall (X0:nat).
+       [ord_less_nat X0 one_one_nat = fFalse* ∨ X0 = zero_zero_nat]/838`
+0.242[zip.saturate] ### step   335 ###
+0.242[zip.saturate]
+    given (335 steps, penalty 1):
+      `forall (X0:nat).
+       [ord_less_eq_nat X0 zero_zero_nat = fFalse* ∨ X0 = zero_zero_nat]/848`
+0.244[zip.saturate] ### step   338 ###
+0.244[zip.saturate]
+    given (338 steps, penalty 1):
+      `forall (X0:nat) (X1:nat). [fequal_nat X1 X0 = fFalse* ∨ X1 = X0]/856`
+0.246[zip.saturate] ### step   341 ###
+0.246[zip.saturate]
+    given (341 steps, penalty 1):
+      `forall (X0:nat).
+       [X0 = zero_zero_nat ∨ ord_less_nat zero_zero_nat X0 = fTrue*]/1148`
+0.248[zip.saturate] ### step   343 ###
+0.248[zip.saturate]
+    given (343 steps, penalty 1):
+      `forall (X462:poly_a) (X464:a).
+       [synthetic_div_a X462 X464 = zero_zero_poly_a* ∨ 
+        degree_a X462 ≠ zero_zero_nat]/392`
+0.250[zip.saturate] ### step   344 ###
+0.250[zip.saturate]
+    given (344 steps, penalty 1):
+      `forall (X465:poly_nat) (X467:nat).
+       [synthetic_div_nat X465 X467 = zero_zero_poly_nat* ∨ 
+        degree_nat X465 ≠ zero_zero_nat]/394`
+0.251[zip.saturate] ### step   345 ###
+0.251[zip.saturate]
+    given (345 steps, penalty 1):
+      `forall (X468:poly_poly_a) (X470:poly_a).
+       [synthetic_div_poly_a X468 X470 = zero_z2096148049poly_a* ∨ 
+        degree_poly_a X468 ≠ zero_zero_nat]/396`
+0.252[zip.saturate] ### step   346 ###
+0.252[zip.saturate]
+    given (346 steps, penalty 1):
+      `forall (X94:poly_a). [X94 = pCons_a (sk_A212 X94) (sk_P312 X94)*]/89`
+0.253[zip.saturate] ### step   347 ###
+0.253[zip.saturate]
+    given (347 steps, penalty 1):
+      `[sk_A212 zero_zero_poly_a = zero_zero_a*]/1217`
+0.254[zip.saturate] ### step   348 ###
+0.254[zip.saturate]
+    given (348 steps, penalty 1):
+      `[sk_P312 zero_zero_poly_a = zero_zero_poly_a*]/1218`
+0.255[zip.saturate] ### step   351 ###
+0.255[zip.saturate]
+    given (351 steps, penalty 1):
+      `forall (X95:poly_a). [X95 = pCons_a (sk_A213 X95) (sk_Q29 X95)*]/90`
+0.256[zip.saturate] ### step   352 ###
+0.256[zip.saturate]
+    given (352 steps, penalty 1):
+      `[sk_A213 zero_zero_poly_a = zero_zero_a*]/1225`
+0.257[zip.saturate] ### step   353 ###
+0.257[zip.saturate]
+    given (353 steps, penalty 1):
+      `[sk_Q29 zero_zero_poly_a = zero_zero_poly_a*]/1226`
+0.259[zip.saturate] ### step   356 ###
+0.259[zip.saturate]
+    given (356 steps, penalty 1):
+      `forall (X301:poly_a).
+       [poly_a2 X301 zero_zero_a = coeff_a X301 zero_zero_nat*]/255`
+0.261[zip.saturate] ### step   357 ###
+0.261[zip.saturate]
+    given (357 steps, penalty 1):
+      `[coeff_a one_one_poly_a zero_zero_nat = one_one_a*]/1236`
+0.262[zip.saturate] ### step   361 ###
+0.262[zip.saturate]
+    given (361 steps, penalty 1):
+      `forall (X302:poly_poly_a).
+       [poly_poly_a2 X302 zero_zero_poly_a = coeff_poly_a X302 zero_zero_nat*]/256`
+0.264[zip.saturate] ### step   362 ###
+0.264[zip.saturate]
+    given (362 steps, penalty 1):
+      `[coeff_poly_a one_one_poly_poly_a zero_zero_nat = one_one_poly_a*]/1249`
+0.265[zip.saturate] ### step   367 ###
+0.265[zip.saturate]
+    given (367 steps, penalty 1):
+      `forall (X303:poly_nat).
+       [poly_nat2 X303 zero_zero_nat = coeff_nat X303 zero_zero_nat*]/257`
+0.266[zip.saturate] ### step   371 ###
+0.266[zip.saturate]
+    given (371 steps, penalty 1):
+      `forall (X304:poly_poly_nat).
+       [poly_poly_nat2 X304 zero_zero_poly_nat
+         = coeff_poly_nat X304 zero_zero_nat*]/258`
+0.267[zip.saturate] ### step   373 ###
+0.267[zip.saturate]
+    given (373 steps, penalty 1):
+      `forall (X305:poly_poly_poly_a).
+       [poly_poly_poly_a2 X305 zero_z2096148049poly_a
+         = coeff_poly_poly_a X305 zero_zero_nat*]/259`
+0.270[zip.saturate] ### step   375 ###
+0.270[zip.saturate]
+    given (375 steps, penalty 1):
+      `forall (X306:a).
+       [monom_a X306 zero_zero_nat = pCons_a X306 zero_zero_poly_a*]/260`
+0.275[zip.saturate] ### step   377 ###
+0.275[zip.saturate]
+    given (377 steps, penalty 1):
+      `[monom_a one_one_a zero_zero_nat = one_one_poly_a*]/1274`
+0.279[zip.saturate] ### step   380 ###
+0.280[zip.saturate]
+    given (380 steps, penalty 1):
+      `forall (X456:a).
+       [degree_a (monom_a X456 zero_zero_nat) = zero_zero_nat*]/1275`
+0.282[zip.saturate] ### step   383 ###
+0.282[zip.saturate]
+    given (383 steps, penalty 1):
+      `forall (X307:nat).
+       [monom_nat X307 zero_zero_nat = pCons_nat X307 zero_zero_poly_nat*]/261`
+0.284[zip.saturate] ### step   387 ###
+0.284[zip.saturate]
+    given (387 steps, penalty 1):
+      `forall (X457:nat).
+       [degree_nat (monom_nat X457 zero_zero_nat) = zero_zero_nat*]/1285`
+0.286[zip.saturate] ### step   390 ###
+0.286[zip.saturate]
+    given (390 steps, penalty 1):
+      `forall (X308:poly_a).
+       [monom_poly_a X308 zero_zero_nat
+         = pCons_poly_a X308 zero_z2096148049poly_a*]/262`
+0.288[zip.saturate] ### step   392 ###
+0.288[zip.saturate]
+    given (392 steps, penalty 1):
+      `[monom_poly_a one_one_poly_a zero_zero_nat = one_one_poly_poly_a*]/1292`
+0.289[zip.saturate] ### step   396 ###
+0.289[zip.saturate]
+    given (396 steps, penalty 1):
+      `forall (X458:poly_a).
+       [degree_poly_a (monom_poly_a X458 zero_zero_nat) = zero_zero_nat*]/1293`
+0.293[zip.saturate] ### step   409 ###
+0.293[zip.saturate]
+    given (409 steps, penalty 1):
+      `forall (X186:a) (X187:poly_a).
+       [coeff_a (pCons_a X186 X187) zero_zero_nat = X186*]/177`
+0.294[zip.saturate] ### step   410 ###
+0.294[zip.saturate]
+    given (410 steps, penalty 1):
+      `forall (X0:poly_a). [coeff_a X0 zero_zero_nat = sk_A213 X0*]/1313`
+0.296[zip.saturate] ### step   411 ###
+0.296[zip.saturate]
+    given (411 steps, penalty 1):
+      `[sk_A213 one_one_poly_a = one_one_a*]/1319`
+0.297[zip.saturate] ### step   414 ###
+0.297[zip.saturate]
+    given (414 steps, penalty 1):
+      `forall (X139:poly_a).
+       [X139 = zero_zero_poly_a ∨ 
+        sk_A213 (reflect_poly_a X139) ≠ zero_zero_a+*]/1316`
+0.297[zip.saturate] ### step   415 ###
+0.297[zip.saturate]
+    given (415 steps, penalty 1):
+      `forall (X0:poly_a). [coeff_a X0 zero_zero_nat = sk_A212 X0*]/1314`
+0.301[zip.saturate] ### step   418 ###
+0.301[zip.saturate]
+    given (418 steps, penalty 1):
+      `forall (X0:poly_a). [sk_A212 X0 = sk_A213 X0*]/1327`
+0.304[zip.saturate] ### step   419 ###
+0.304[zip.saturate] given (419 steps, penalty 1): `[sk_A212 = sk_A213*]/1335`
+0.307[zip.saturate] ### step   421 ###
+0.307[zip.saturate]
+    given (421 steps, penalty 1):
+      `[sk_A212 one_one_poly_a = one_one_a*]/1334`
+0.311[zip.saturate] ### step   424 ###
+0.311[zip.saturate]
+    given (424 steps, penalty 1):
+      `forall (X139:poly_a).
+       [X139 = zero_zero_poly_a ∨ 
+        sk_A212 (reflect_poly_a X139) ≠ zero_zero_a+*]/1333`
+0.315[zip.saturate] ### step   425 ###
+0.315[zip.saturate]
+    given (425 steps, penalty 1):
+      `forall (X186:a) (X187:poly_a). [sk_A212 (pCons_a X186 X187) = X186*]/1341`
+0.318[zip.saturate] ### step   427 ###
+0.319[zip.saturate]
+    given (427 steps, penalty 1):
+      `forall (X301:poly_a). [poly_a2 X301 zero_zero_a = sk_A212 X301*]/1347`
+0.323[zip.saturate] ### step   432 ###
+0.323[zip.saturate]
+    given (432 steps, penalty 1):
+      `[one_one_poly_a = pCons_a one_one_a (sk_Q29 one_one_poly_a)*]/1322`
+0.324[zip.saturate] ### step   437 ###
+0.324[zip.saturate]
+    given (437 steps, penalty 1):
+      `[one_one_poly_a = pCons_a one_one_a (sk_P312 one_one_poly_a)*]/1337`
+0.326[zip.saturate] ### step   441 ###
+0.326[zip.saturate]
+    given (441 steps, penalty 1):
+      `forall (X0:a). [sk_A212 (monom_a X0 zero_zero_nat) = X0*]/1344`
+0.327[zip.saturate] ### step   445 ###
+0.327[zip.saturate]
+    given (445 steps, penalty 1):
+      `forall (X95:poly_a). [X95 = pCons_a (sk_A212 X95) (sk_Q29 X95)*]/1330`
+0.330[zip.saturate] ### step   450 ###
+0.330[zip.saturate]
+    given (450 steps, penalty 1):
+      `forall (X0:a). [c = poly_a2 (pCons_a c cs) X0*]/1360`
+0.333[zip.saturate] ### step   455 ###
+0.333[zip.saturate]
+    given (455 steps, penalty 1):
+      `forall (X573:nat) (X574:nat).
+       [pp (ord_less_eq_nat (minus_minus_nat X573 X574) X573)*]/492`
+0.336[zip.saturate] ### step   461 ###
+0.336[zip.saturate]
+    given (461 steps, penalty 1):
+      `forall (X0:bool) (X1:bool).
+       [X1 = X0* ∨ X0 = fFalse* ∨ X1 = fFalse*]/627`
+0.390[zip.saturate] ### step   465 ###
+0.390[zip.saturate]
+    given (465 steps, penalty 1):
+      `forall (X0:bool) (X1:bool). [X1 = X0* ∨ X0 = fTrue* ∨ X1 = fTrue*]/632`
+0.421[zip.saturate] ### step   474 ###
+0.421[zip.saturate]
+    given (474 steps, penalty 1):
+      `forall (X0:nat) (X1:nat). [ord_less_nat X1 X1 = ord_less_nat X0 X0*]/659`
+0.431[zip.saturate] ### step   476 ###
+0.431[zip.saturate]
+    given (476 steps, penalty 1):
+      `forall (X0:bool) (X1:bool). [¬pp X0+* ∨ X1 = fFalse* ∨ X0 = X1*]/1509`
+0.440[zip.saturate] ### step   484 ###
+0.440[zip.saturate]
+    given (484 steps, penalty 1):
+      `forall (X0:nat) (X1:bool). [X1 = ord_less_nat X0 X0* ∨ X1 = fTrue*]/660`
+0.461[zip.saturate] ### step   493 ###
+0.461[zip.saturate]
+    given (493 steps, penalty 1):
+      `forall (X0:bool) (X1:bool). [X1 = X0* ∨ pp X0* ∨ pp X1*]/668`
+0.477[zip.saturate] ### step   494 ###
+0.477[zip.saturate]
+    given (494 steps, penalty 1):
+      `forall (X0:bool) (X1:nat). [ord_less_nat X1 X1 = X0* ∨ pp X0*]/669`
+0.482[zip.saturate] ### step   495 ###
+0.482[zip.saturate]
+    given (495 steps, penalty 1):
+      `forall (X0:bool) (X1:bool). [X1 = X0* ∨ pp X0* ∨ X1 = fTrue*]/670`
+0.494[zip.saturate] ### step   503 ###
+0.494[zip.saturate]
+    given (503 steps, penalty 1):
+      `forall (X0:nat) (X1:nat).
+       [ord_less_eq_nat X1 X1 = ord_less_eq_nat X0 X0*]/683`
+0.500[zip.saturate] ### step   504 ###
+0.500[zip.saturate]
+    given (504 steps, penalty 1):
+      `forall (X0:nat) (X1:bool).
+       [X1 = ord_less_eq_nat X0 X0* ∨ X1 = fFalse*]/686`
+0.533[zip.saturate] ### step   510 ###
+0.533[zip.saturate]
+    given (510 steps, penalty 1):
+      `[coeff_poly_nat (reflec781175074ly_nat zero_z1059985641ly_nat) 
+         zero_zero_nat = zero_zero_poly_nat*]/1883`
+0.542[zip.saturate] ### step   522 ###
+0.542[zip.saturate]
+    given (522 steps, penalty 1):
+      `forall (X0:nat) (X1:nat).
+       [ord_less_eq_nat (minus_minus_nat X0 X1) X0 = fTrue*]/1402`
+0.552[zip.saturate] ### step   531 ###
+0.552[zip.saturate]
+    given (531 steps, penalty 1):
+      `[coeff_poly_poly_a (reflec581648976poly_a zero_z2064990175poly_a) 
+         zero_zero_nat = zero_z2096148049poly_a*]/1986`
+0.566[zip.saturate] ### step   532 ###
+0.566[zip.saturate]
+    given (532 steps, penalty 1):
+      `forall (X2:bool). [X2 = fTrue* ∨ true]/2012`
+0.580[zip.saturate] ### step   542 ###
+0.580[zip.saturate]
+    given (542 steps, penalty 1):
+      `forall (X47:a) (X48:poly_a).
+       [order_a X47 X48 = zero_zero_nat* ∨ poly_a2 X48 X47 = zero_zero_a]/53`
+0.596[zip.saturate] ### step   553 ###
+0.596[zip.saturate]
+    given (553 steps, penalty 1):
+      `forall (X49:poly_a) (X50:poly_poly_a).
+       [order_poly_a X49 X50 = zero_zero_nat* ∨ 
+        poly_poly_a2 X50 X49 = zero_zero_poly_a]/54`
+0.600[zip.saturate] ### step   564 ###
+0.600[zip.saturate]
+    given (564 steps, penalty 1):
+      `forall (X51:poly_poly_a) (X52:poly_poly_poly_a).
+       [order_poly_poly_a X51 X52 = zero_zero_nat* ∨ 
+        poly_poly_poly_a2 X52 X51 = zero_z2096148049poly_a]/55`
+0.608[zip.saturate] ### step   574 ###
+0.608[zip.saturate]
+    given (574 steps, penalty 1):
+      `forall (F484:nat → bool) (X485:nat).
+       [¬pp (F484 (sk_N2 F484))* ∨ pp (F484 X485)*]/412`
+0.615[zip.saturate] ### step   575 ###
+0.615[zip.saturate]
+    given (575 steps, penalty 1):
+      `forall (X53:poly_a) (X54:poly_a) (X55:a) (X56:a).
+       [X54 = X53* ∨ pCons_a X56 X54 ≠ pCons_a X55 X53+*]/56`
+0.637[zip.saturate] ### step   586 ###
+0.637[zip.saturate]
+    given (586 steps, penalty 1):
+      `forall (X53:poly_a) (X54:poly_a) (X55:a) (X56:a).
+       [X56 = X55* ∨ pCons_a X56 X54 ≠ pCons_a X55 X53+*]/57`
+0.646[zip.saturate] ### step   619 ###
+0.646[zip.saturate]
+    given (619 steps, penalty 1):
+      `forall (F488:nat → bool) (X489:nat).
+       [¬pp (F488 (sk_N21 F488))* ∨ pp (F488 X489)*]/415`
+0.665[zip.saturate] ### step   627 ###
+0.665[zip.saturate]
+    given (627 steps, penalty 1):
+      `forall (X548:nat) (X549:nat).
+       [pp (ord_less_eq_nat X548 X549) ∨ 
+        minus_minus_nat X548 X549 ≠ zero_zero_nat+*]/476`
+0.670[zip.saturate] ### step   633 ###
+0.670[zip.saturate]
+    given (633 steps, penalty 1):
+      `forall (X58:a).
+       [reflect_poly_a (monom_a X58 zero_zero_nat)
+         = monom_a X58 zero_zero_nat*]/2533`
+0.699[zip.saturate] ### step   644 ###
+0.699[zip.saturate]
+    given (644 steps, penalty 1):
+      `forall (X59:nat).
+       [reflect_poly_nat (monom_nat X59 zero_zero_nat)
+         = monom_nat X59 zero_zero_nat*]/2672`
+0.705[zip.saturate] ### step   647 ###
+0.705[zip.saturate]
+    given (647 steps, penalty 1):
+      `forall (X0:nat) (X1:bool).
+       [ord_less_nat X0 X0 ≠ fTrue+* ∨ X1 = fTrue*]/2587`
+0.707[zip.saturate] ### step   655 ###
+0.707[zip.saturate]
+    given (655 steps, penalty 1):
+      `forall (X60:poly_a).
+       [reflect_poly_poly_a (monom_poly_a X60 zero_zero_nat)
+         = monom_poly_a X60 zero_zero_nat*]/2728`
+0.716[zip.saturate] ### step   666 ###
+0.716[zip.saturate]
+    given (666 steps, penalty 1):
+      `forall (F61:poly_a → poly_a → bool) (X62:poly_a) (X63:poly_a).
+       [¬pp
+           (F61 (pCons_a (sk_A2 F61) (sk_P3 F61)) 
+             (pCons_a (sk_B2 F61) (sk_Q2 F61)))* ∨ 
+        ¬pp (F61 zero_zero_poly_a zero_zero_poly_a)* ∨ pp (F61 X62 X63)*]/65`
+0.728[zip.saturate] ### step   677 ###
+0.728[zip.saturate]
+    given (677 steps, penalty 1):
+      `forall (F0:poly_a → poly_a → bool).
+       [pp (F0 (sk_P3 F0) (sk_Q2 F0))* ∨ 
+        ¬pp (F0 zero_zero_poly_a zero_zero_poly_a)*]/2846`
+0.734[zip.saturate] ### step   688 ###
+0.734[zip.saturate]
+    given (688 steps, penalty 1):
+      `forall (F64:poly_a → poly_nat → bool) (X65:poly_a) (X66:poly_nat).
+       [¬pp
+           (F64 (pCons_a (sk_A21 F64) (sk_P31 F64)) 
+             (pCons_nat (sk_B21 F64) (sk_Q21 F64)))* ∨ 
+        ¬pp (F64 zero_zero_poly_a zero_zero_poly_nat)* ∨ pp (F64 X65 X66)*]/67`
+0.753[zip.saturate] ### step   699 ###
+0.753[zip.saturate]
+    given (699 steps, penalty 1):
+      `forall (F0:poly_a → poly_nat → bool).
+       [pp (F0 (sk_P31 F0) (sk_Q21 F0))* ∨ 
+        ¬pp (F0 zero_zero_poly_a zero_zero_poly_nat)*]/2934`
+0.772[zip.saturate] ### step   710 ###
+0.772[zip.saturate]
+    given (710 steps, penalty 1):
+      `forall (F67:poly_a → poly_poly_a → bool) (X68:poly_a) 
+              (X69:poly_poly_a).
+       [¬pp
+           (F67 (pCons_a (sk_A22 F67) (sk_P32 F67)) 
+             (pCons_poly_a (sk_B22 F67) (sk_Q22 F67)))* ∨ 
+        ¬pp (F67 zero_zero_poly_a zero_z2096148049poly_a)* ∨ 
+        pp (F67 X68 X69)*]/69`
+0.777[zip.saturate] ### step   721 ###
+0.777[zip.saturate]
+    given (721 steps, penalty 1):
+      `forall (F0:poly_a → poly_poly_a → bool).
+       [pp (F0 (sk_P32 F0) (sk_Q22 F0))* ∨ 
+        ¬pp (F0 zero_zero_poly_a zero_z2096148049poly_a)*]/2991`
+0.789[zip.saturate] ### step   732 ###
+0.789[zip.saturate]
+    given (732 steps, penalty 1):
+      `forall (F70:poly_nat → poly_a → bool) (X71:poly_nat) (X72:poly_a).
+       [¬pp
+           (F70 (pCons_nat (sk_A23 F70) (sk_P33 F70)) 
+             (pCons_a (sk_B23 F70) (sk_Q23 F70)))* ∨ 
+        ¬pp (F70 zero_zero_poly_nat zero_zero_poly_a)* ∨ pp (F70 X71 X72)*]/71`
+0.808[zip.saturate] ### step   738 ###
+0.808[zip.saturate]
+    given (738 steps, penalty 1):
+      `forall (F0:poly_nat → poly_a → bool).
+       [pp (F0 (sk_P33 F0) (sk_Q23 F0))* ∨ 
+        ¬pp (F0 zero_zero_poly_nat zero_zero_poly_a)*]/3089`
+0.822[zip.saturate] ### step   745 ###
+0.822[zip.saturate]
+    given (745 steps, penalty 1):
+      `forall (X546:nat) (X547:nat).
+       [minus_minus_nat X546 X547 = zero_zero_nat* ∨ 
+        ¬pp (ord_less_eq_nat X546 X547)]/475`
+0.837[zip.saturate] ### step   748 ###
+0.837[zip.saturate]
+    given (748 steps, penalty 1):
+      `forall (X557:nat) (X558:nat) (F559:nat → bool).
+       [zip_tseitin0 X557 X558 F559* ∨ ¬pp (ord_less_eq_nat X557 X558)]/483`
+0.839[zip.saturate] ### step   749 ###
+0.839[zip.saturate]
+    given (749 steps, penalty 1):
+      `forall (F73:poly_nat → poly_nat → bool) (X74:poly_nat) 
+              (X75:poly_nat).
+       [¬pp
+           (F73 (pCons_nat (sk_A24 F73) (sk_P34 F73)) 
+             (pCons_nat (sk_B24 F73) (sk_Q24 F73)))* ∨ 
+        ¬pp (F73 zero_zero_poly_nat zero_zero_poly_nat)* ∨ 
+        pp (F73 X74 X75)*]/73`
+0.853[zip.saturate] ### step   756 ###
+0.853[zip.saturate]
+    given (756 steps, penalty 1):
+      `forall (X598:nat) (X599:nat).
+       [pp (ord_less_eq_nat X599 X598)* ∨ ¬pp (ord_less_nat X599 X598)]/505`
+0.870[zip.saturate] ### step   760 ###
+0.870[zip.saturate]
+    given (760 steps, penalty 1):
+      `forall (F0:poly_nat → poly_nat → bool).
+       [pp (F0 (sk_P34 F0) (sk_Q24 F0))* ∨ 
+        ¬pp (F0 zero_zero_poly_nat zero_zero_poly_nat)*]/3305`
+0.915[zip.saturate] ### step   771 ###
+0.915[zip.saturate]
+    given (771 steps, penalty 1):
+      `forall (F76:poly_nat → poly_poly_a → bool) (X77:poly_nat) 
+              (X78:poly_poly_a).
+       [¬pp
+           (F76 (pCons_nat (sk_A25 F76) (sk_P35 F76)) 
+             (pCons_poly_a (sk_B25 F76) (sk_Q25 F76)))* ∨ 
+        ¬pp (F76 zero_zero_poly_nat zero_z2096148049poly_a)* ∨ 
+        pp (F76 X77 X78)*]/75`
+0.932[zip.saturate] ### step   782 ###
+0.932[zip.saturate]
+    given (782 steps, penalty 1):
+      `forall (F0:poly_nat → poly_poly_a → bool).
+       [pp (F0 (sk_P35 F0) (sk_Q25 F0))* ∨ 
+        ¬pp (F0 zero_zero_poly_nat zero_z2096148049poly_a)*]/3496`
+0.950[zip.saturate] ### step   784 ###
+0.950[zip.saturate]
+    given (784 steps, penalty 1):
+      `forall (X0:bool) (X1:nat). [¬pp X0+* ∨ X0 = ord_less_eq_nat X1 X1*]/3512`
+0.969[zip.saturate] ### step   793 ###
+0.970[zip.saturate]
+    given (793 steps, penalty 1):
+      `forall (F79:poly_poly_a → poly_a → bool) (X80:poly_poly_a) 
+              (X81:poly_a).
+       [¬pp
+           (F79 (pCons_poly_a (sk_A26 F79) (sk_P36 F79)) 
+             (pCons_a (sk_B26 F79) (sk_Q26 F79)))* ∨ 
+        ¬pp (F79 zero_z2096148049poly_a zero_zero_poly_a)* ∨ 
+        pp (F79 X80 X81)*]/77`
+1.006[zip.saturate] ### step   804 ###
+1.006[zip.saturate]
+    given (804 steps, penalty 1):
+      `forall (F0:poly_poly_a → poly_a → bool).
+       [pp (F0 (sk_P36 F0) (sk_Q26 F0))* ∨ 
+        ¬pp (F0 zero_z2096148049poly_a zero_zero_poly_a)*]/3687`
+1.020[zip.saturate] ### step   815 ###
+1.020[zip.saturate]
+    given (815 steps, penalty 1):
+      `forall (F82:poly_poly_a → poly_nat → bool) (X83:poly_poly_a) 
+              (X84:poly_nat).
+       [¬pp
+           (F82 (pCons_poly_a (sk_A27 F82) (sk_P37 F82)) 
+             (pCons_nat (sk_B27 F82) (sk_Q27 F82)))* ∨ 
+        ¬pp (F82 zero_z2096148049poly_a zero_zero_poly_nat)* ∨ 
+        pp (F82 X83 X84)*]/79`
+1.041[zip.saturate] ### step   826 ###
+1.042[zip.saturate]
+    given (826 steps, penalty 1):
+      `forall (F0:poly_poly_a → poly_nat → bool).
+       [pp (F0 (sk_P37 F0) (sk_Q27 F0))* ∨ 
+        ¬pp (F0 zero_z2096148049poly_a zero_zero_poly_nat)*]/3766`
+1.053[zip.saturate] ### step   837 ###
+1.053[zip.saturate]
+    given (837 steps, penalty 1):
+      `forall (F85:poly_poly_a → poly_poly_a → bool) (X86:poly_poly_a) 
+              (X87:poly_poly_a).
+       [¬pp
+           (F85 (pCons_poly_a (sk_A28 F85) (sk_P38 F85)) 
+             (pCons_poly_a (sk_B28 F85) (sk_Q28 F85)))* ∨ 
+        ¬pp (F85 zero_z2096148049poly_a zero_z2096148049poly_a)* ∨ 
+        pp (F85 X86 X87)*]/81`
+1.076[zip.saturate] ### step   848 ###
+1.076[zip.saturate]
+    given (848 steps, penalty 1):
+      `forall (F0:poly_poly_a → poly_poly_a → bool).
+       [pp (F0 (sk_P38 F0) (sk_Q28 F0))* ∨ 
+        ¬pp (F0 zero_z2096148049poly_a zero_z2096148049poly_a)*]/3862`
+1.166[zip.saturate] ### step   859 ###
+1.166[zip.saturate]
+    given (859 steps, penalty 1):
+      `forall (F88:poly_a → bool) (X89:poly_a).
+       [¬pp (F88 (pCons_a (sk_A29 F88) (sk_P39 F88)))* ∨ pp (F88 X89)*]/83`
+1.198[zip.saturate] ### step   861 ###
+1.198[zip.saturate]
+    given (861 steps, penalty 1):
+      `[reflect_poly_a one_one_poly_a = monom_a one_one_a zero_zero_nat*]/3912`
+1.207[zip.saturate] ### step   862 ###
+1.207[zip.saturate]
+    given (862 steps, penalty 1):
+      `[reflect_poly_nat one_one_poly_nat
+         = monom_nat one_one_nat zero_zero_nat*]/3915`
+1.210[zip.saturate] ### step   863 ###
+1.210[zip.saturate]
+    given (863 steps, penalty 1):
+      `[reflect_poly_poly_a one_one_poly_poly_a
+         = monom_poly_a one_one_poly_a zero_zero_nat*]/3978`
+1.232[zip.saturate] ### step   864 ###
+1.232[zip.saturate]
+    given (864 steps, penalty 1):
+      `[reflect_poly_a one_one_poly_a ≠ zero_zero_poly_a*]/4336`
+1.232[zip.saturate] ### step   865 ###
+1.232[zip.saturate]
+    given (865 steps, penalty 1):
+      `[reflect_poly_nat one_one_poly_nat ≠ zero_zero_poly_nat*]/4338`
+1.233[zip.saturate] ### step   866 ###
+1.233[zip.saturate]
+    given (866 steps, penalty 1):
+      `[reflect_poly_poly_a one_one_poly_poly_a ≠ zero_z2096148049poly_a*]/4340`
+1.233[zip.saturate] ### step   867 ###
+1.233[zip.saturate]
+    given (867 steps, penalty 1):
+      `[reflect_poly_a one_one_poly_a = one_one_poly_a*]/4317`
+1.236[zip.saturate] ### step   870 ###
+1.236[zip.saturate]
+    given (870 steps, penalty 1):
+      `forall (F0:poly_a → bool).
+       [sk_P39 F0 = zero_zero_poly_a* ∨ pp (F0 (sk_P39 F0))*]/4346`
+1.246[zip.saturate] ### step   872 ###
+1.246[zip.saturate]
+    given (872 steps, penalty 1):
+      `[reflect_poly_nat one_one_poly_nat = one_one_poly_nat*]/4323`
+1.247[zip.saturate] ### step   876 ###
+1.247[zip.saturate]
+    given (876 steps, penalty 1):
+      `[reflect_poly_poly_a one_one_poly_poly_a = one_one_poly_poly_a*]/4330`
+1.249[zip.saturate] ### step   880 ###
+1.249[zip.saturate]
+    given (880 steps, penalty 1):
+      `[sk_P39 is_zero_a = zero_zero_poly_a*]/4351`
+1.250[zip.saturate] ### step   881 ###
+1.250[zip.saturate]
+    given (881 steps, penalty 1):
+      `forall (F90:poly_nat → bool) (X91:poly_nat).
+       [¬pp (F90 (pCons_nat (sk_A210 F90) (sk_P310 F90)))* ∨ pp (F90 X91)*]/85`
+1.273[zip.saturate] ### step   889 ###
+1.273[zip.saturate]
+    given (889 steps, penalty 1):
+      `forall (X1:poly_a) (X2:a). [X1 = sk_Q29 (pCons_a X2 X1)*]/4113`
+1.274[zip.saturate] ### step   890 ###
+1.274[zip.saturate]
+    given (890 steps, penalty 1):
+      `forall (X0:poly_a). [sk_P312 X0 = sk_Q29 X0*]/4389`
+1.276[zip.saturate] ### step   891 ###
+1.276[zip.saturate] given (891 steps, penalty 1): `[sk_P312 = sk_Q29*]/4398`
+1.277[zip.saturate] ### step   892 ###
+1.277[zip.saturate]
+    given (892 steps, penalty 1):
+      `forall (F0:poly_nat → bool).
+       [sk_P310 F0 = zero_zero_poly_nat* ∨ pp (F0 (sk_P310 F0))*]/4400`
+1.291[zip.saturate] ### step   894 ###
+1.292[zip.saturate]
+    given (894 steps, penalty 1):
+      `[sk_P310 is_zero_nat = zero_zero_poly_nat*]/4405`
+1.292[zip.saturate] ### step   897 ###
+1.292[zip.saturate]
+    given (897 steps, penalty 1):
+      `forall (X1:poly_a) (X2:a). [X1 = sk_P312 (pCons_a X2 X1)*]/4114`
+1.294[zip.saturate] ### step   903 ###
+1.294[zip.saturate]
+    given (903 steps, penalty 1):
+      `forall (F92:poly_poly_a → bool) (X93:poly_poly_a).
+       [¬pp (F92 (pCons_poly_a (sk_A211 F92) (sk_P311 F92)))* ∨ 
+        pp (F92 X93)*]/87`
+1.308[zip.saturate] ### step   908 ###
+1.308[zip.saturate]
+    given (908 steps, penalty 1):
+      `forall (X0:a).
+       [zero_zero_poly_a = sk_P312 (monom_a X0 zero_zero_nat)*]/4437`
+1.309[zip.saturate] ### step   910 ###
+1.309[zip.saturate]
+    given (910 steps, penalty 1):
+      `[zero_zero_poly_a = sk_P312 one_one_poly_a*]/4440`
+1.311[zip.saturate] ### step   914 ###
+1.311[zip.saturate]
+    given (914 steps, penalty 1):
+      `forall (F0:poly_poly_a → bool).
+       [sk_P311 F0 = zero_z2096148049poly_a* ∨ pp (F0 (sk_P311 F0))*]/4446`
+1.318[zip.saturate] ### step   915 ###
+1.318[zip.saturate]
+    given (915 steps, penalty 1):
+      `[sk_P311 is_zero_poly_a = zero_z2096148049poly_a*]/4451`
+1.319[zip.saturate] ### step   918 ###
+1.319[zip.saturate]
+    given (918 steps, penalty 1):
+      `forall (X0:poly_a) (X1:a).
+       [pCons_a X1 X0 ≠ one_one_poly_a+* ∨ X1 = one_one_a*]/3886`
+1.320[zip.saturate] ### step   920 ###
+1.320[zip.saturate]
+    given (920 steps, penalty 1):
+      `forall (X0:a).
+       [monom_a X0 zero_zero_nat ≠ one_one_poly_a+* ∨ X0 = one_one_a]/4453`
+1.323[zip.saturate] ### step   937 ###
+1.323[zip.saturate]
+    given (937 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat).
+       [¬pp (F0 (sk_N2 F0))* ∨ F0 X1 = fTrue*]/3865`
+1.330[zip.saturate] ### step   938 ###
+1.330[zip.saturate]
+    given (938 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat).
+       [¬zip_tseitin1 (sk_N2 F0) F0* ∨ pp (F0 X1)*]/3872`
+1.337[zip.saturate] ### step   939 ###
+1.337[zip.saturate]
+    given (939 steps, penalty 1):
+      `forall (X0:poly_a) (X1:a).
+       [pCons_a X1 X0 ≠ one_one_poly_a+* ∨ X0 = zero_zero_poly_a]/4469`
+1.339[zip.saturate] ### step   943 ###
+1.339[zip.saturate]
+    given (943 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat).
+       [¬pp (F0 (sk_N21 F0))* ∨ F0 X1 = fTrue*]/3897`
+1.351[zip.saturate] ### step   945 ###
+1.351[zip.saturate]
+    given (945 steps, penalty 1):
+      `forall (F0:poly_poly_nat → bool).
+       [pp (F0 (sk_P313 F0))* ∨ ¬pp (F0 zero_z1059985641ly_nat)*]/4477`
+1.378[zip.saturate] ### step   946 ###
+1.378[zip.saturate]
+    given (946 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat).
+       [¬zip_tseitin1 (sk_N21 F0) F0* ∨ pp (F0 X1)*]/3905`
+1.383[zip.saturate] ### step   950 ###
+1.384[zip.saturate]
+    given (950 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat).
+       [¬zip_tseitin1 (sk_N2 F0) F0* ∨ F0 X1 = fTrue*]/4533`
+1.392[zip.saturate] ### step   956 ###
+1.392[zip.saturate]
+    given (956 steps, penalty 1):
+      `forall (F96:poly_poly_nat → bool) (X97:poly_poly_nat).
+       [¬pp (F96 (pCons_poly_nat (sk_A214 F96) (sk_P313 F96)))* ∨ 
+        ¬pp (F96 zero_z1059985641ly_nat)* ∨ pp (F96 X97)*]/92`
+1.398[zip.saturate] ### step   957 ###
+1.398[zip.saturate]
+    given (957 steps, penalty 1):
+      `forall (X0:a) (X1:poly_a) (X2:a).
+       [pCons_a X2 X1 ≠ monom_a X0 zero_zero_nat+* ∨ 
+        X1 = zero_zero_poly_a]/3877`
+1.402[zip.saturate] ### step   960 ###
+1.402[zip.saturate]
+    given (960 steps, penalty 1):
+      `forall (X0:nat) (X1:nat).
+       [¬pp (ord_less_nat X1 X0) ∨ ord_less_eq_nat X1 X0 = fTrue*]/4073`
+1.424[zip.saturate] ### step   963 ###
+1.425[zip.saturate]
+    given (963 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat).
+       [¬zip_tseitin1 (sk_N21 F0) F0* ∨ F0 X1 = fTrue*]/4613`
+1.434[zip.saturate] ### step   967 ###
+1.434[zip.saturate]
+    given (967 steps, penalty 1):
+      `forall (F96:poly_poly_nat → bool) (X97:poly_poly_nat).
+       [sk_A214 F96 ≠ zero_zero_poly_nat* ∨ 
+        sk_P313 F96 ≠ zero_z1059985641ly_nat ∨ 
+        ¬pp (F96 zero_z1059985641ly_nat)* ∨ pp (F96 X97)*]/93`
+1.444[zip.saturate] ### step   971 ###
+1.444[zip.saturate]
+    given (971 steps, penalty 1):
+      `forall (F0:poly_poly_nat → bool).
+       [¬pp (F0 zero_z1059985641ly_nat)* ∨ F0 (sk_P313 F0) = fTrue*]/4617`
+1.452[zip.saturate] ### step   972 ###
+1.452[zip.saturate]
+    given (972 steps, penalty 1):
+      `forall (X441:a) (X442:nat).
+       [X441 = zero_zero_a ∨ degree_a (monom_a X441 X442) = X442*]/375`
+1.452[zip.saturate] ### step   973 ###
+1.452[zip.saturate]
+    given (973 steps, penalty 1):
+      `forall (X443:poly_a) (X444:nat).
+       [X443 = zero_zero_poly_a ∨ 
+        degree_poly_a (monom_poly_a X443 X444) = X444*]/376`
+1.456[zip.saturate] ### step   974 ###
+1.456[zip.saturate]
+    given (974 steps, penalty 1):
+      `forall (X445:nat) (X446:nat).
+       [X445 = zero_zero_nat ∨ degree_nat (monom_nat X445 X446) = X446*]/377`
+1.470[zip.saturate] ### step   976 ###
+1.470[zip.saturate]
+    given (976 steps, penalty 1):
+      `forall (X447:poly_nat) (X448:nat).
+       [X447 = zero_zero_poly_nat ∨ 
+        degree_poly_nat (monom_poly_nat X447 X448) = X448*]/378`
+1.472[zip.saturate] ### step   977 ###
+1.472[zip.saturate]
+    given (977 steps, penalty 1):
+      `forall (X449:poly_poly_a) (X450:nat).
+       [X449 = zero_z2096148049poly_a ∨ 
+        degree_poly_poly_a (monom_poly_poly_a X449 X450) = X450*]/379`
+1.486[zip.saturate] ### step   978 ###
+1.486[zip.saturate]
+    given (978 steps, penalty 1):
+      `forall (F0:poly_poly_poly_a → bool).
+       [pp (F0 (sk_P314 F0))* ∨ ¬pp (F0 zero_z2064990175poly_a)*]/4813`
+1.493[zip.saturate] ### step   986 ###
+1.493[zip.saturate]
+    given (986 steps, penalty 1):
+      `forall (X0:bool) (X1:a) (X2:a). [if_a X0 X2 X1 = X1* ∨ pp X0]/877`
+1.494[zip.saturate] ### step   987 ###
+1.494[zip.saturate]
+    given (987 steps, penalty 1):
+      `forall (X0:bool) (X1:a) (X2:a). [if_a X0 X2 X1 = X1* ∨ X0 = fTrue]/879`
+1.497[zip.saturate] ### step   988 ###
+1.497[zip.saturate]
+    given (988 steps, penalty 1):
+      `forall (X0:bool) (X1:a) (X2:a). [if_a X0 X1 X2 = X1* ∨ X0 = fFalse]/885`
+1.498[zip.saturate] ### step   989 ###
+1.498[zip.saturate]
+    given (989 steps, penalty 1):
+      `forall (F98:poly_poly_poly_a → bool) (X99:poly_poly_poly_a).
+       [¬pp (F98 (pCons_poly_poly_a (sk_A215 F98) (sk_P314 F98)))* ∨ 
+        ¬pp (F98 zero_z2064990175poly_a)* ∨ pp (F98 X99)*]/95`
+1.512[zip.saturate] ### step   992 ###
+1.512[zip.saturate]
+    given (992 steps, penalty 1):
+      `forall (X0:bool) (X1:nat) (X2:nat). [if_nat X0 X2 X1 = X1* ∨ pp X0]/891`
+1.514[zip.saturate] ### step   993 ###
+1.514[zip.saturate]
+    given (993 steps, penalty 1):
+      `forall (X0:bool) (X1:nat) (X2:nat).
+       [if_nat X0 X2 X1 = X1* ∨ X0 = fTrue]/893`
+1.518[zip.saturate] ### step   994 ###
+1.518[zip.saturate]
+    given (994 steps, penalty 1):
+      `forall (X0:bool) (X1:nat) (X2:nat).
+       [if_nat X0 X1 X2 = X1* ∨ X0 = fFalse]/895`
+1.519[zip.saturate] ### step   996 ###
+1.519[zip.saturate]
+    given (996 steps, penalty 1):
+      `forall (X0:bool) (X1:poly_a) (X2:poly_a).
+       [if_poly_a X0 X2 X1 = X1* ∨ pp X0]/897`
+1.522[zip.saturate] ### step   997 ###
+1.522[zip.saturate]
+    given (997 steps, penalty 1):
+      `forall (X0:bool) (X1:poly_a) (X2:poly_a).
+       [if_poly_a X0 X2 X1 = X1* ∨ X0 = fTrue]/899`
+1.526[zip.saturate] ### step   998 ###
+1.526[zip.saturate]
+    given (998 steps, penalty 1):
+      `forall (X0:bool) (X1:poly_a) (X2:poly_a).
+       [if_poly_a X0 X1 X2 = X1* ∨ X0 = fFalse]/901`
+1.531[zip.saturate] ### step  1000 ###
+1.531[zip.saturate]
+    given (1000 steps, penalty 1):
+      `forall (F98:poly_poly_poly_a → bool) (X99:poly_poly_poly_a).
+       [sk_A215 F98 ≠ zero_z2096148049poly_a* ∨ 
+        sk_P314 F98 ≠ zero_z2064990175poly_a ∨ 
+        ¬pp (F98 zero_z2064990175poly_a)* ∨ pp (F98 X99)*]/96`
+1.538[zip.saturate] ### step  1001 ###
+1.538[zip.saturate]
+    given (1001 steps, penalty 1):
+      `forall (X0:bool) (X1:poly_nat) (X2:poly_nat).
+       [if_poly_nat X0 X2 X1 = X1* ∨ pp X0]/903`
+1.552[zip.saturate] ### step  1006 ###
+1.552[zip.saturate]
+    given (1006 steps, penalty 1):
+      `forall (X0:bool) (X1:poly_nat) (X2:poly_nat).
+       [if_poly_nat X0 X2 X1 = X1* ∨ X0 = fTrue]/905`
+1.555[zip.saturate] ### step  1007 ###
+1.555[zip.saturate]
+    given (1007 steps, penalty 1):
+      `forall (F0:poly_poly_poly_a → bool).
+       [¬pp (F0 zero_z2064990175poly_a)* ∨ F0 (sk_P314 F0) = fTrue*]/4988`
+1.583[zip.saturate] ### step  1011 ###
+1.583[zip.saturate]
+    given (1011 steps, penalty 1):
+      `forall (F0:poly_a → bool).
+       [pp (F0 (sk_P315 F0))* ∨ ¬pp (F0 zero_zero_poly_a)*]/5016`
+1.606[zip.saturate] ### step  1022 ###
+1.607[zip.saturate]
+    given (1022 steps, penalty 1):
+      `forall (F100:poly_a → bool) (X101:poly_a).
+       [¬pp (F100 (pCons_a (sk_A216 F100) (sk_P315 F100)))* ∨ 
+        ¬pp (F100 zero_zero_poly_a)* ∨ pp (F100 X101)*]/98`
+1.628[zip.saturate] ### step  1030 ###
+1.628[zip.saturate]
+    given (1030 steps, penalty 1):
+      `forall (X0:bool) (X1:poly_nat) (X2:poly_nat).
+       [if_poly_nat X0 X1 X2 = X1* ∨ X0 = fFalse]/907`
+1.629[zip.saturate] ### step  1032 ###
+1.629[zip.saturate]
+    given (1032 steps, penalty 1):
+      `forall (X0:bool) (X1:poly_poly_a) (X2:poly_poly_a).
+       [if_poly_poly_a X0 X2 X1 = X1* ∨ pp X0]/909`
+1.631[zip.saturate] ### step  1033 ###
+1.631[zip.saturate]
+    given (1033 steps, penalty 1):
+      `forall (F100:poly_a → bool) (X101:poly_a).
+       [sk_A216 F100 ≠ zero_zero_a* ∨ 
+        sk_P315 F100 ≠ zero_zero_poly_a ∨ 
+        ¬pp (F100 zero_zero_poly_a)* ∨ pp (F100 X101)*]/99`
+1.641[zip.saturate] ### step  1034 ###
+1.641[zip.saturate]
+    given (1034 steps, penalty 1):
+      `forall (X0:bool) (X1:poly_poly_a) (X2:poly_poly_a).
+       [if_poly_poly_a X0 X2 X1 = X1* ∨ X0 = fTrue]/911`
+1.643[zip.saturate] ### step  1035 ###
+1.643[zip.saturate]
+    given (1035 steps, penalty 1):
+      `forall (X0:bool) (X1:poly_poly_a) (X2:poly_poly_a).
+       [if_poly_poly_a X0 X1 X2 = X1* ∨ X0 = fFalse]/913`
+1.647[zip.saturate] ### step  1043 ###
+1.647[zip.saturate]
+    given (1043 steps, penalty 1):
+      `forall (X0:poly_a) (X1:bool).
+       [X0 = zero_zero_poly_a ∨ is_zero_a X0 = X1* ∨ X1 = fTrue*]/1903`
+1.678[zip.saturate] ### step  1044 ###
+1.678[zip.saturate]
+    given (1044 steps, penalty 1):
+      `forall (F0:poly_nat → bool).
+       [pp (F0 (sk_P316 F0))* ∨ ¬pp (F0 zero_zero_poly_nat)*]/5168`
+1.704[zip.saturate] ### step  1045 ###
+1.704[zip.saturate]
+    given (1045 steps, penalty 1):
+      `[sk_P315 is_zero_a = zero_zero_poly_a*]/5167`
+1.710[zip.saturate] ### step  1055 ###
+1.710[zip.saturate]
+    given (1055 steps, penalty 1):
+      `forall (F102:poly_nat → bool) (X103:poly_nat).
+       [¬pp (F102 (pCons_nat (sk_A217 F102) (sk_P316 F102)))* ∨ 
+        ¬pp (F102 zero_zero_poly_nat)* ∨ pp (F102 X103)*]/101`
+1.724[zip.saturate] ### step  1057 ###
+1.724[zip.saturate]
+    given (1057 steps, penalty 1):
+      `forall (X0:poly_a).
+       [sk_A216 is_zero_a ≠ zero_zero_a+* ∨ X0 = zero_zero_poly_a*]/5255`
+1.736[zip.saturate] ### step  1063 ###
+1.736[zip.saturate]
+    given (1063 steps, penalty 1):
+      `forall (F0:poly_a → bool).
+       [¬pp (F0 zero_zero_poly_a)* ∨ F0 (sk_P315 F0) = fTrue*]/5154`
+1.748[zip.saturate] ### step  1064 ###
+1.748[zip.saturate]
+    given (1064 steps, penalty 1):
+      `forall (X0:poly_poly_a) (X1:bool).
+       [X0 = zero_z2096148049poly_a ∨ is_zero_poly_a X0 = X1* ∨ 
+        X1 = fTrue*]/1905`
+1.772[zip.saturate] ### step  1066 ###
+1.772[zip.saturate]
+    given (1066 steps, penalty 1):
+      `forall (F102:poly_nat → bool) (X103:poly_nat).
+       [sk_A217 F102 ≠ zero_zero_nat* ∨ 
+        sk_P316 F102 ≠ zero_zero_poly_nat ∨ 
+        ¬pp (F102 zero_zero_poly_nat)* ∨ pp (F102 X103)*]/102`
+1.784[zip.saturate] ### step  1068 ###
+1.784[zip.saturate]
+    given (1068 steps, penalty 1):
+      `forall (X0:poly_nat) (X1:bool).
+       [X0 = zero_zero_poly_nat ∨ is_zero_nat X0 = X1* ∨ X1 = fTrue*]/1907`
+1.803[zip.saturate] ### step  1072 ###
+1.803[zip.saturate]
+    given (1072 steps, penalty 1):
+      `forall (X0:poly_a) (X1:nat).
+       [X0 = zero_zero_poly_a ∨ is_zero_a X0 = ord_less_nat X1 X1*]/2411`
+1.806[zip.saturate] ### step  1073 ###
+1.807[zip.saturate]
+    given (1073 steps, penalty 1):
+      `forall (X0:poly_poly_a) (X1:nat).
+       [X0 = zero_z2096148049poly_a ∨ 
+        is_zero_poly_a X0 = ord_less_nat X1 X1*]/2413`
+1.827[zip.saturate] ### step  1074 ###
+1.827[zip.saturate]
+    given (1074 steps, penalty 1):
+      `[sk_P316 is_zero_nat = zero_zero_poly_nat*]/5482`
+1.835[zip.saturate] ### step  1075 ###
+1.835[zip.saturate]
+    given (1075 steps, penalty 1):
+      `forall (X0:poly_a) (X1:bool).
+       [is_zero_a X0 ≠ fTrue+* ∨ X1 = fTrue* ∨ X0 = zero_zero_poly_a]/5451`
+1.844[zip.saturate] ### step  1077 ###
+1.844[zip.saturate]
+    given (1077 steps, penalty 1):
+      `forall (F0:poly_poly_a → bool).
+       [pp (F0 (sk_P317 F0))* ∨ ¬pp (F0 zero_z2096148049poly_a)*]/5512`
+1.860[zip.saturate] ### step  1078 ###
+1.860[zip.saturate]
+    given (1078 steps, penalty 1):
+      `forall (F0:poly_nat → bool).
+       [¬pp (F0 zero_zero_poly_nat)* ∨ F0 (sk_P316 F0) = fTrue*]/5455`
+1.873[zip.saturate] ### step  1079 ###
+1.873[zip.saturate]
+    given (1079 steps, penalty 1):
+      `forall (X0:poly_nat) (X1:nat).
+       [X0 = zero_zero_poly_nat ∨ is_zero_nat X0 = ord_less_nat X1 X1*]/2415`
+1.875[zip.saturate] ### step  1080 ###
+1.875[zip.saturate]
+    given (1080 steps, penalty 1):
+      `forall (X0:poly_a) (X1:bool).
+       [pp X1* ∨ is_zero_a X0 = X1* ∨ X0 = zero_zero_poly_a]/2591`
+1.884[zip.saturate] ### step  1084 ###
+1.885[zip.saturate]
+    given (1084 steps, penalty 1):
+      `forall (X0:poly_poly_a) (X1:bool).
+       [pp X1* ∨ is_zero_poly_a X0 = X1* ∨ X0 = zero_z2096148049poly_a]/2592`
+1.905[zip.saturate] ### step  1085 ###
+1.905[zip.saturate]
+    given (1085 steps, penalty 1):
+      `forall (X0:poly_nat) (X1:bool).
+       [pp X1* ∨ is_zero_nat X0 = X1* ∨ X0 = zero_zero_poly_nat]/2593`
+1.927[zip.saturate] ### step  1088 ###
+1.927[zip.saturate]
+    given (1088 steps, penalty 1):
+      `forall (F104:poly_poly_a → bool) (X105:poly_poly_a).
+       [¬pp (F104 (pCons_poly_a (sk_A218 F104) (sk_P317 F104)))* ∨ 
+        ¬pp (F104 zero_z2096148049poly_a)* ∨ pp (F104 X105)*]/104`
+1.942[zip.saturate] ### step  1099 ###
+1.942[zip.saturate]
+    given (1099 steps, penalty 1):
+      `forall (F104:poly_poly_a → bool) (X105:poly_poly_a).
+       [sk_A218 F104 ≠ zero_zero_poly_a* ∨ 
+        sk_P317 F104 ≠ zero_z2096148049poly_a ∨ 
+        ¬pp (F104 zero_z2096148049poly_a)* ∨ pp (F104 X105)*]/105`
+1.967[zip.saturate] ### step  1110 ###
+1.967[zip.saturate]
+    given (1110 steps, penalty 1):
+      `forall (X106:poly_a) (X107:a).
+       [X106 = zero_zero_poly_a ∨ 
+        order_a X107 X106 ≠ zero_zero_nat+* ∨ 
+        poly_a2 X106 X107 ≠ zero_zero_a]/106`
+1.968[zip.saturate] ### step  1112 ###
+1.968[zip.saturate]
+    given (1112 steps, penalty 1):
+      `forall (X158:poly_nat) (X159:nat) (X160:poly_nat).
+       [X158 = X160* ∨ 
+        monom_poly_nat X158 X159
+         ≠ pCons_poly_nat X160 zero_z1059985641ly_nat+*]/150`
+1.976[zip.saturate] ### step  1118 ###
+1.976[zip.saturate]
+    given (1118 steps, penalty 1):
+      `forall (X162:poly_poly_a) (X163:nat) (X164:poly_poly_a).
+       [X162 = X164* ∨ 
+        monom_poly_poly_a X162 X163
+         ≠ pCons_poly_poly_a X164 zero_z2064990175poly_a+*]/154`
+1.979[zip.saturate] ### step  1119 ###
+1.980[zip.saturate]
+    given (1119 steps, penalty 1):
+      `forall (X166:a) (X167:nat) (X168:a).
+       [X166 = X168* ∨ monom_a X166 X167 ≠ monom_a X168 zero_zero_nat+*]/5712`
+1.988[zip.saturate] ### step  1121 ###
+1.988[zip.saturate]
+    given (1121 steps, penalty 1):
+      `forall (X170:nat) (X171:nat) (X172:nat).
+       [X170 = X172* ∨ 
+        monom_nat X170 X171 ≠ monom_nat X172 zero_zero_nat+*]/5750`
+1.989[zip.saturate] ### step  1122 ###
+1.989[zip.saturate]
+    given (1122 steps, penalty 1):
+      `forall (X174:poly_a) (X175:nat) (X176:poly_a).
+       [X174 = X176* ∨ 
+        monom_poly_a X174 X175 ≠ monom_poly_a X176 zero_zero_nat+*]/5751`
+2.006[zip.saturate] ### step  1123 ###
+2.006[zip.saturate]
+    given (1123 steps, penalty 1):
+      `forall (X0:poly_nat).
+       [X0 = zero_zero_poly_nat* ∨ sk_A217 is_zero_nat ≠ zero_zero_nat+*]/5849`
+2.018[zip.saturate] ### step  1124 ###
+2.018[zip.saturate]
+    given (1124 steps, penalty 1):
+      `forall (X0:poly_poly_a) (X1:bool).
+       [is_zero_poly_a X0 ≠ fTrue+* ∨ X1 = fTrue* ∨ 
+        X0 = zero_z2096148049poly_a]/5821`
+2.020[zip.saturate] ### step  1127 ###
+2.020[zip.saturate]
+    given (1127 steps, penalty 1):
+      `forall (X0:nat) (X1:nat) (X2:bool).
+       [ord_less_nat X0 X0 ≠ ord_less_eq_nat X1 X1+* ∨ X2 = fTrue*]/922`
+2.024[zip.saturate] ### step  1131 ###
+2.024[zip.saturate]
+    given (1131 steps, penalty 1):
+      `forall (X0:nat) (X1:nat) (X2:bool).
+       [ord_less_eq_nat X1 X1 ≠ ord_less_nat X0 X0+* ∨ X2 = fFalse*]/930`
+2.034[zip.saturate] ### step  1134 ###
+2.034[zip.saturate]
+    given (1134 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:bool).
+       [fFalse ≠ F0 X1* ∨ ¬zip_tseitin1 X1 F0* ∨ X2 = fTrue*]/1052`
+2.039[zip.saturate] ### step  1135 ###
+2.039[zip.saturate]
+    given (1135 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:bool).
+       [F0 X1 ≠ fFalse* ∨ ¬zip_tseitin1 X1 F0* ∨ X2 = fFalse*]/1053`
+2.048[zip.saturate] ### step  1141 ###
+2.048[zip.saturate]
+    given (1141 steps, penalty 1):
+      `forall (X109:poly_poly_a) (X110:poly_a).
+       [X109 = zero_z2096148049poly_a ∨ 
+        order_poly_a X110 X109 ≠ zero_zero_nat+* ∨ 
+        poly_poly_a2 X109 X110 ≠ zero_zero_poly_a]/109`
+2.052[zip.saturate] ### step  1142 ###
+2.052[zip.saturate]
+    given (1142 steps, penalty 1):
+      `forall (X0:nat) (X1:nat).
+       [¬pp (fequal_nat X1 (sk_N2 (fequal_nat X1)))+* ∨ X1 = X0*]/3863`
+2.068[zip.saturate] ### step  1143 ###
+2.068[zip.saturate]
+    given (1143 steps, penalty 1):
+      `forall (X0:a) (X1:poly_a) (X2:a).
+       [pCons_a X2 X1 ≠ monom_a X0 zero_zero_nat+* ∨ X2 = X0*]/3888`
+2.070[zip.saturate] ### step  1145 ###
+2.070[zip.saturate]
+    given (1145 steps, penalty 1):
+      `forall (X0:nat) (X1:nat).
+       [¬pp (fequal_nat X1 (sk_N21 (fequal_nat X1)))+* ∨ X1 = X0*]/3895`
+2.120[zip.saturate] ### step  1146 ###
+2.120[zip.saturate]
+    given (1146 steps, penalty 1):
+      `[sk_P317 is_zero_poly_a = zero_z2096148049poly_a*]/6376`
+2.123[zip.saturate] ### step  1168 ###
+2.123[zip.saturate]
+    given (1168 steps, penalty 1):
+      `forall (X0:poly_nat) (X1:bool).
+       [is_zero_nat X0 ≠ fTrue+* ∨ X1 = fTrue* ∨ 
+        X0 = zero_zero_poly_nat]/6085`
+2.125[zip.saturate] ### step  1173 ###
+2.125[zip.saturate]
+    given (1173 steps, penalty 1):
+      `forall (X112:poly_poly_poly_a) (X113:poly_poly_a).
+       [X112 = zero_z2064990175poly_a ∨ 
+        order_poly_poly_a X113 X112 ≠ zero_zero_nat+* ∨ 
+        poly_poly_poly_a2 X112 X113 ≠ zero_z2096148049poly_a]/112`
+2.127[zip.saturate] ### step  1177 ###
+2.127[zip.saturate]
+    given (1177 steps, penalty 1):
+      `forall (F0:poly_poly_a → bool).
+       [¬pp (F0 zero_z2096148049poly_a)* ∨ F0 (sk_P317 F0) = fTrue*]/6298`
+2.143[zip.saturate] ### step  1200 ###
+2.143[zip.saturate]
+    given (1200 steps, penalty 1):
+      `forall (X0:nat) (X1:nat).
+       [¬zip_tseitin1 (sk_N2 (fequal_nat X1)) (fequal_nat X1)+* ∨ X1 = X0*]/4535`
+2.146[zip.saturate] ### step  1205 ###
+2.146[zip.saturate]
+    given (1205 steps, penalty 1):
+      `forall (X0:nat) (X1:nat).
+       [¬zip_tseitin1 (sk_N21 (fequal_nat X1)) (fequal_nat X1)+* ∨ 
+        X1 = X0*]/4625`
+2.148[zip.saturate] ### step  1210 ###
+2.148[zip.saturate]
+    given (1210 steps, penalty 1):
+      `forall (X0:poly_nat).
+       [X0 = zero_zero_poly_nat* ∨ 
+        ¬pp (is_zero_nat (monom_nat (sk_A217 is_zero_nat) zero_zero_nat))+*]/5492`
+2.200[zip.saturate] ### step  1234 ###
+2.200[zip.saturate]
+    given (1234 steps, penalty 1):
+      `forall (X259:a) (X260:nat) (X261:nat) (X262:a).
+       [X259 = X262* ∨ monom_a X259 X261 ≠ monom_a X262 X260+*]/222`
+2.205[zip.saturate] ### step  1239 ###
+2.205[zip.saturate]
+    given (1239 steps, penalty 1):
+      `forall (X264:poly_a) (X265:nat) (X266:nat) (X267:poly_a).
+       [X264 = X267* ∨ monom_poly_a X264 X266 ≠ monom_poly_a X267 X265+*]/226`
+2.214[zip.saturate] ### step  1247 ###
+2.214[zip.saturate]
+    given (1247 steps, penalty 1):
+      `forall (X269:nat) (X270:nat) (X271:nat) (X272:nat).
+       [X269 = X272* ∨ monom_nat X269 X271 ≠ monom_nat X272 X270+*]/230`
+2.215[zip.saturate] ### step  1248 ###
+2.215[zip.saturate]
+    given (1248 steps, penalty 1):
+      `forall (X274:poly_nat) (X275:nat) (X276:nat) (X277:poly_nat).
+       [X274 = X277* ∨ 
+        monom_poly_nat X274 X276 ≠ monom_poly_nat X277 X275+*]/234`
+2.250[zip.saturate] ### step  1252 ###
+2.250[zip.saturate]
+    given (1252 steps, penalty 1):
+      `forall (X279:poly_poly_a) (X280:nat) (X281:nat) (X282:poly_poly_a).
+       [X279 = X282* ∨ 
+        monom_poly_poly_a X279 X281 ≠ monom_poly_poly_a X282 X280+*]/238`
+2.253[zip.saturate] ### step  1254 ###
+2.253[zip.saturate]
+    given (1254 steps, penalty 1):
+      `forall (X0:bool) (X1:a) (X2:a) (X3:a).
+       [¬fundam396953934nt_a_a (if_a X0 X1)+* ∨ pp X0 ∨ X2 = X3*]/1006`
+2.262[zip.saturate] ### step  1259 ###
+2.263[zip.saturate]
+    given (1259 steps, penalty 1):
+      `forall (X0:nat) (X1:a) (X2:a) (X3:a).
+       [¬fundam396953934nt_a_a (if_a (ord_less_nat X0 X0) X1)+* ∨ X2 = X3*]/1007`
+2.281[zip.saturate] ### step  1263 ###
+2.281[zip.saturate]
+    given (1263 steps, penalty 1):
+      `forall (X121:poly_nat) (X122:nat) (X123:nat).
+       [synthetic_div_nat (pCons_nat X123 X121) X122
+         = pCons_nat (poly_nat2 X121 X122) (synthetic_div_nat X121 X122)*]/121`
+2.285[zip.saturate] ### step  1268 ###
+2.285[zip.saturate]
+    given (1268 steps, penalty 1):
+      `forall (X0:bool) (X1:a) (X2:a) (X3:a).
+       [¬fundam396953934nt_a_a (if_a X0 X1)+* ∨ X0 = fTrue ∨ X2 = X3*]/1008`
+2.324[zip.saturate] ### step  1272 ###
+2.324[zip.saturate]
+    given (1272 steps, penalty 1):
+      `forall (X459:poly_a).
+       [X459 = monom_a (sk_A219 X459) zero_zero_nat* ∨ 
+        degree_a X459 ≠ zero_zero_nat]/6997`
+2.326[zip.saturate] ### step  1274 ###
+2.326[zip.saturate]
+    given (1274 steps, penalty 1):
+      `forall (X124:poly_poly_a) (X125:poly_a) (X126:poly_a).
+       [synthetic_div_poly_a (pCons_poly_a X126 X124) X125
+         = pCons_poly_a (poly_poly_a2 X124 X125) 
+            (synthetic_div_poly_a X124 X125)*]/122`
+2.336[zip.saturate] ### step  1279 ###
+2.336[zip.saturate]
+    given (1279 steps, penalty 1):
+      `forall (X460:poly_nat).
+       [X460 = monom_nat (sk_A220 X460) zero_zero_nat* ∨ 
+        degree_nat X460 ≠ zero_zero_nat]/7025`
+2.349[zip.saturate] ### step  1285 ###
+2.349[zip.saturate]
+    given (1285 steps, penalty 1):
+      `forall (X127:poly_a) (X128:a) (X129:a).
+       [synthetic_div_a (pCons_a X129 X127) X128
+         = pCons_a (poly_a2 X127 X128) (synthetic_div_a X127 X128)*]/123`
+2.353[zip.saturate] ### step  1288 ###
+2.353[zip.saturate]
+    given (1288 steps, penalty 1):
+      `forall (X461:poly_poly_a).
+       [X461 = monom_poly_a (sk_A221 X461) zero_zero_nat* ∨ 
+        degree_poly_a X461 ≠ zero_zero_nat]/7096`
+2.386[zip.saturate] ### step  1292 ###
+2.386[zip.saturate]
+    given (1292 steps, penalty 1):
+      `forall (X536:nat) (X537:poly_nat).
+       [pp (pos_poly_nat (pCons_nat X536 X537))* ∨ ¬pp (pos_poly_nat X537)]/465`
+2.402[zip.saturate] ### step  1293 ###
+2.402[zip.saturate]
+    given (1293 steps, penalty 1):
+      `forall (X0:poly_poly_a).
+       [X0 = zero_z2096148049poly_a* ∨ 
+        ¬pp
+           (is_zero_poly_a
+             (monom_poly_a (sk_A218 is_zero_poly_a) zero_zero_nat))+*]/7214`
+2.436[zip.saturate] ### step  1294 ###
+2.436[zip.saturate]
+    given (1294 steps, penalty 1):
+      `forall (X0:poly_poly_a).
+       [X0 = zero_z2096148049poly_a* ∨ 
+        sk_A218 is_zero_poly_a ≠ zero_zero_poly_a+*]/7249`
+2.507[zip.saturate] ### step  1309 ###
+2.507[zip.saturate]
+    given (1309 steps, penalty 1):
+      `forall (X0:poly_a).
+       [one_one_poly_poly_a ≠ monom_poly_a X0 zero_zero_nat+* ∨ 
+        one_one_poly_a = X0]/7281`
+2.509[zip.saturate] ### step  1310 ###
+2.509[zip.saturate]
+    given (1310 steps, penalty 1):
+      `forall (X0:nat) (X1:a).
+       [monom_a X1 X0 ≠ one_one_poly_a+* ∨ X1 = one_one_a*]/7269`
+2.519[zip.saturate] ### step  1311 ###
+2.519[zip.saturate]
+    given (1311 steps, penalty 1):
+      `forall (F1:nat → bool) (X2:nat).
+       [fFalse ≠ F1 X2* ∨ ¬zip_tseitin1 X2 F1*]/7655`
+2.520[zip.saturate] ### step  1312 ###
+2.520[zip.saturate]
+    given (1312 steps, penalty 1):
+      `forall (X0:nat) (X1:poly_a).
+       [monom_poly_a X1 X0 ≠ one_one_poly_poly_a+* ∨ X1 = one_one_poly_a*]/7279`
+2.535[zip.saturate] ### step  1319 ###
+2.536[zip.saturate]
+    given (1319 steps, penalty 1):
+      `forall (X0:nat) (X1:bool).
+       [fTrue ≠ ord_less_nat X0 X0+* ∨ X1 = fFalse*]/7443`
+2.549[zip.saturate] ### step  1364 ###
+2.549[zip.saturate]
+    given (1364 steps, penalty 1):
+      `forall (X0:bool) (X1:poly_a).
+       [fTrue ≠ is_zero_a X1+* ∨ is_zero_a X1 = X0* ∨ 
+        X1 = zero_zero_poly_a]/5449`
+2.550[zip.saturate] ### step  1365 ###
+2.550[zip.saturate]
+    given (1365 steps, penalty 1):
+      `forall (X0:bool) (X1:poly_poly_a).
+       [fTrue ≠ is_zero_poly_a X1+* ∨ is_zero_poly_a X1 = X0* ∨ 
+        X1 = zero_z2096148049poly_a]/5819`
+2.571[zip.saturate] ### step  1379 ###
+2.571[zip.saturate]
+    given (1379 steps, penalty 1):
+      `forall (X0:bool) (X1:poly_nat).
+       [fTrue ≠ is_zero_nat X1+* ∨ is_zero_nat X1 = X0* ∨ 
+        X1 = zero_zero_poly_nat]/6083`
+2.572[zip.saturate] ### step  1380 ###
+2.572[zip.saturate]
+    given (1380 steps, penalty 1):
+      `forall (X413:poly_a) (X414:nat).
+       [coeff_a X413 X414 = zero_zero_a ∨ 
+        ¬pp (ord_less_nat (degree_a X413) X414)+*]/356`
+2.591[zip.saturate] ### step  1384 ###
+2.591[zip.saturate]
+    given (1384 steps, penalty 1):
+      `forall (X415:poly_poly_a) (X416:nat).
+       [coeff_poly_a X415 X416 = zero_zero_poly_a ∨ 
+        ¬pp (ord_less_nat (degree_poly_a X415) X416)+*]/357`
+2.603[zip.saturate] ### step  1386 ###
+2.603[zip.saturate]
+    given (1386 steps, penalty 1):
+      `forall (X417:poly_nat) (X418:nat).
+       [coeff_nat X417 X418 = zero_zero_nat ∨ 
+        ¬pp (ord_less_nat (degree_nat X417) X418)+*]/358`
+2.614[zip.saturate] ### step  1391 ###
+2.614[zip.saturate]
+    given (1391 steps, penalty 1):
+      `forall (X419:poly_poly_nat) (X420:nat).
+       [coeff_poly_nat X419 X420 = zero_zero_poly_nat ∨ 
+        ¬pp (ord_less_nat (degree_poly_nat X419) X420)+*]/359`
+2.627[zip.saturate] ### step  1394 ###
+2.627[zip.saturate]
+    given (1394 steps, penalty 1):
+      `forall (X421:poly_poly_poly_a) (X422:nat).
+       [coeff_poly_poly_a X421 X422 = zero_z2096148049poly_a ∨ 
+        ¬pp (ord_less_nat (degree_poly_poly_a X421) X422)+*]/360`
+2.643[zip.saturate] ### step  1400 ###
+2.643[zip.saturate]
+    given (1400 steps, penalty 1):
+      `forall (X513:nat) (X514:poly_a).
+       [poly_cutoff_a X513 X514 = abs_poly_a (aTP_Lamm_a X513 X514)*]/444`
+2.644[zip.saturate] ### step  1401 ###
+2.645[zip.saturate]
+    given (1401 steps, penalty 1):
+      `forall (X515:nat) (X516:poly_poly_a).
+       [poly_cutoff_poly_a X515 X516
+         = abs_poly_poly_a (aTP_Lamm_aa X515 X516)*]/445`
+2.646[zip.saturate] ### step  1402 ###
+2.646[zip.saturate]
+    given (1402 steps, penalty 1):
+      `forall (X517:nat) (X518:poly_nat).
+       [poly_cutoff_nat X517 X518 = abs_poly_nat (aTP_Lamm_ab X517 X518)*]/446`
+2.649[zip.saturate] ### step  1403 ###
+2.649[zip.saturate]
+    given (1403 steps, penalty 1):
+      `forall (X519:nat) (X520:poly_poly_nat).
+       [poly_cutoff_poly_nat X519 X520
+         = abs_poly_poly_nat (aTP_Lamm_ac X519 X520)*]/447`
+2.655[zip.saturate] ### step  1408 ###
+2.656[zip.saturate]
+    given (1408 steps, penalty 1):
+      `forall (X521:nat) (X522:poly_poly_poly_a).
+       [poly_c1841332160poly_a X521 X522
+         = abs_poly_poly_poly_a (aTP_Lamm_ad X521 X522)*]/448`
+2.662[zip.saturate] ### step  1409 ###
+2.662[zip.saturate]
+    given (1409 steps, penalty 1):
+      `forall (X525:a) (X526:nat).
+       [monom_a X525 X526 = abs_poly_a (aTP_Lamm_aj X525 X526)*]/457`
+2.692[zip.saturate] ### step  1411 ###
+2.692[zip.saturate]
+    given (1411 steps, penalty 1):
+      `forall (X527:poly_a) (X528:nat).
+       [monom_poly_a X527 X528 = abs_poly_poly_a (aTP_Lamm_ak X527 X528)*]/458`
+2.693[zip.saturate] ### step  1412 ###
+2.693[zip.saturate]
+    given (1412 steps, penalty 1):
+      `forall (X529:nat) (X530:nat).
+       [monom_nat X529 X530 = abs_poly_nat (aTP_Lamm_al X529 X530)*]/459`
+2.694[zip.saturate] ### step  1413 ###
+2.694[zip.saturate]
+    given (1413 steps, penalty 1):
+      `forall (X531:poly_nat) (X532:nat).
+       [monom_poly_nat X531 X532 = abs_poly_poly_nat (aTP_Lamm_am X531 X532)*]/460`
+2.696[zip.saturate] ### step  1414 ###
+2.696[zip.saturate]
+    given (1414 steps, penalty 1):
+      `forall (X533:poly_poly_a) (X534:nat).
+       [monom_poly_poly_a X533 X534
+         = abs_poly_poly_poly_a (aTP_Lamm_an X533 X534)*]/461`
+2.698[zip.saturate] ### step  1415 ###
+2.698[zip.saturate]
+    given (1415 steps, penalty 1):
+      `forall (X557:nat) (X558:nat) (F559:nat → bool).
+       [zip_tseitin0 X557 X558 F559* ∨ pp (F559 X557)*]/484`
+2.705[zip.saturate] ### step  1416 ###
+2.705[zip.saturate]
+    given (1416 steps, penalty 1):
+      `forall (X0:nat) (X1:a) (X2:a). [if_a (ord_less_nat X0 X0) X2 X1 = X1*]/878`
+2.752[zip.saturate] ### step  1437 ###
+2.752[zip.saturate]
+    given (1437 steps, penalty 1):
+      `forall (X0:nat) (X1:nat).
+       [synthetic_div_nat (monom_nat X1 zero_zero_nat) X0
+         = zero_zero_poly_nat*]/8435`
+2.755[zip.saturate] ### step  1438 ###
+2.755[zip.saturate]
+    given (1438 steps, penalty 1):
+      `[sk_A219 one_one_poly_a = one_one_a*]/8451`
+2.770[zip.saturate] ### step  1439 ###
+2.770[zip.saturate]
+    given (1439 steps, penalty 1):
+      `[sk_A219 zero_zero_poly_a = zero_zero_a*]/8457`
+2.782[zip.saturate] ### step  1440 ###
+2.782[zip.saturate]
+    given (1440 steps, penalty 1):
+      `[sk_A220 one_one_poly_nat = one_one_nat*]/8486`
+2.799[zip.saturate] ### step  1441 ###
+2.799[zip.saturate]
+    given (1441 steps, penalty 1):
+      `[sk_A220 zero_zero_poly_nat = zero_zero_nat*]/8492`
+2.800[zip.saturate] ### step  1442 ###
+2.800[zip.saturate]
+    given (1442 steps, penalty 1):
+      `[sk_A221 zero_z2096148049poly_a = zero_zero_poly_a*]/8535`
+2.809[zip.saturate] ### step  1444 ###
+2.809[zip.saturate]
+    given (1444 steps, penalty 1):
+      `forall (X0:poly_a).
+       [zero_zero_poly_a = sk_P312 X0* ∨ degree_a X0 ≠ zero_zero_nat]/8441`
+2.810[zip.saturate] ### step  1445 ###
+2.810[zip.saturate]
+    given (1445 steps, penalty 1):
+      `forall (X1:poly_a) (X2:a).
+       [X1 = zero_zero_poly_a ∨ 
+        degree_a (pCons_a X2 X1) ≠ zero_zero_nat+*]/8453`
+2.916[zip.saturate] ### step  1449 ###
+2.916[zip.saturate]
+    given (1449 steps, penalty 1):
+      `[one_one_poly_a = sk_A221 one_one_poly_poly_a*]/9178`
+2.918[zip.saturate] ### step  1465 ###
+2.918[zip.saturate]
+    given (1465 steps, penalty 1):
+      `forall (X1:poly_a) (X2:bool).
+       [is_zero_a X1 = X2* ∨ true ∨ X1 = zero_zero_poly_a]/9252`
+2.922[zip.saturate] ### step  1466 ###
+2.922[zip.saturate]
+    given (1466 steps, penalty 1):
+      `forall (X1:poly_poly_a) (X2:bool).
+       [is_zero_poly_a X1 = X2* ∨ true ∨ X1 = zero_z2096148049poly_a]/9281`
+2.928[zip.saturate] ### step  1467 ###
+2.928[zip.saturate]
+    given (1467 steps, penalty 1):
+      `forall (X1:poly_nat) (X2:bool).
+       [is_zero_nat X1 = X2* ∨ true ∨ X1 = zero_zero_poly_nat]/9310`
+2.934[zip.saturate] ### step  1468 ###
+2.934[zip.saturate]
+    given (1468 steps, penalty 1):
+      `forall (X0:poly_a) (X1:bool).
+       [is_zero_a X0 = X1* ∨ X0 = zero_zero_poly_a ∨ fTrue ≠ fFalse]/9255`
+2.939[zip.saturate] ### step  1469 ###
+2.939[zip.saturate]
+    given (1469 steps, penalty 1):
+      `forall (X0:poly_poly_a) (X1:bool).
+       [is_zero_poly_a X0 = X1* ∨ X0 = zero_z2096148049poly_a ∨ 
+        fTrue ≠ fFalse]/9284`
+2.945[zip.saturate] ### step  1470 ###
+2.946[zip.saturate]
+    given (1470 steps, penalty 1):
+      `forall (X0:poly_nat) (X1:bool).
+       [is_zero_nat X0 = X1* ∨ X0 = zero_zero_poly_nat ∨ fTrue ≠ fFalse]/9313`
+2.952[zip.saturate] ### step  1471 ###
+2.952[zip.saturate]
+    given (1471 steps, penalty 1):
+      `forall (X0:poly_a).
+       [sk_A212 X0 = sk_A219 X0* ∨ degree_a X0 ≠ zero_zero_nat]/8444`
+2.953[zip.saturate] ### step  1472 ###
+2.953[zip.saturate]
+    given (1472 steps, penalty 1):
+      `forall (X0:poly_nat) (X2:bool).
+       [fTrue ≠ is_zero_nat X0+* ∨ X0 = zero_zero_poly_nat ∨ 
+        X2 = fFalse*]/8693`
+2.957[zip.saturate] ### step  1473 ###
+2.957[zip.saturate]
+    given (1473 steps, penalty 1):
+      `forall (X0:poly_poly_a) (X2:bool).
+       [fTrue ≠ is_zero_poly_a X0+* ∨ X0 = zero_z2096148049poly_a ∨ 
+        X2 = fFalse*]/8694`
+2.965[zip.saturate] ### step  1474 ###
+2.965[zip.saturate]
+    given (1474 steps, penalty 1):
+      `forall (X0:poly_a) (X2:bool).
+       [fTrue ≠ is_zero_a X0+* ∨ X0 = zero_zero_poly_a ∨ X2 = fFalse*]/8695`
+2.966[zip.saturate] ### step  1477 ###
+2.966[zip.saturate]
+    given (1477 steps, penalty 1):
+      `forall (X0:poly_a) (X1:poly_a).
+       [synthetic_div_poly_a (monom_poly_a X1 zero_zero_nat) X0
+         = zero_z2096148049poly_a*]/8481`
+2.978[zip.saturate] ### step  1479 ###
+2.978[zip.saturate]
+    given (1479 steps, penalty 1):
+      `forall (X0:nat).
+       [synthetic_div_nat one_one_poly_nat X0 = zero_zero_poly_nat*]/9540`
+2.979[zip.saturate] ### step  1480 ###
+2.979[zip.saturate]
+    given (1480 steps, penalty 1):
+      `forall (X149:a) (X150:a).
+       [fundam2103719732poly_a (monom_a X149 zero_zero_nat) X150
+         = monom_a X149 zero_zero_nat*]/9590`
+2.983[zip.saturate] ### step  1491 ###
+2.983[zip.saturate]
+    given (1491 steps, penalty 1):
+      `forall (X151:nat) (X152:nat).
+       [fundam1481276954ly_nat (monom_nat X151 zero_zero_nat) X152
+         = monom_nat X151 zero_zero_nat*]/9600`
+2.993[zip.saturate] ### step  1495 ###
+2.993[zip.saturate]
+    given (1495 steps, penalty 1):
+      `forall (X0:a) (X1:a).
+       [synthetic_div_a (monom_a X1 zero_zero_nat) X0 = zero_zero_poly_a*]/8528`
+2.995[zip.saturate] ### step  1502 ###
+2.995[zip.saturate]
+    given (1502 steps, penalty 1):
+      `forall (X153:poly_a) (X154:poly_a).
+       [fundam932970690poly_a (monom_poly_a X153 zero_zero_nat) X154
+         = monom_poly_a X153 zero_zero_nat*]/9674`
+3.002[zip.saturate] ### step  1503 ###
+3.003[zip.saturate]
+    given (1503 steps, penalty 1):
+      `forall (X0:poly_nat).
+       [¬pp (pos_poly_nat (sk_P310 pos_poly_nat))+* ∨ 
+        pp (pos_poly_nat X0)*]/8540`
+3.009[zip.saturate] ### step  1504 ###
+3.009[zip.saturate]
+    given (1504 steps, penalty 1):
+      `forall (X0:nat) (F1:nat → bool) (X2:nat).
+       [ord_less_nat X0 X0 ≠ F1 X2* ∨ ¬zip_tseitin1 X2 F1*]/8670`
+3.016[zip.saturate] ### step  1512 ###
+3.016[zip.saturate]
+    given (1512 steps, penalty 1):
+      `forall (X0:nat).
+       [¬pp (ord_less_nat zero_zero_nat X0) ∨ 
+        coeff_a one_one_poly_a X0 = zero_zero_a*]/8886`
+3.023[zip.saturate] ### step  1514 ###
+3.023[zip.saturate]
+    given (1514 steps, penalty 1):
+      `forall (X0:nat).
+       [¬pp (ord_less_nat zero_zero_nat X0) ∨ 
+        coeff_poly_a one_one_poly_poly_a X0 = zero_zero_poly_a*]/8946`
+3.024[zip.saturate] ### step  1516 ###
+3.024[zip.saturate]
+    given (1516 steps, penalty 1):
+      `forall (X0:nat).
+       [¬pp (ord_less_nat zero_zero_nat X0) ∨ 
+        coeff_nat one_one_poly_nat X0 = zero_zero_nat*]/9006`
+3.033[zip.saturate] ### step  1530 ###
+3.033[zip.saturate]
+    given (1530 steps, penalty 1):
+      `forall (X0:poly_nat) (X1:nat).
+       [¬pp (pos_poly_nat X0) ∨ pos_poly_nat (pCons_nat X1 X0) = fTrue*]/8538`
+3.034[zip.saturate] ### step  1531 ###
+3.034[zip.saturate]
+    given (1531 steps, penalty 1):
+      `forall (X0:poly_a).
+       [X0 = monom_a (sk_A212 X0) zero_zero_nat* ∨ 
+        degree_a X0 ≠ zero_zero_nat]/9577`
+3.040[zip.saturate] ### step  1538 ###
+3.040[zip.saturate]
+    given (1538 steps, penalty 1):
+      `forall (X0:nat) (X1:a) (X2:a).
+       [if_a (ord_less_eq_nat X0 X0) X1 X2 = X1*]/884`
+3.050[zip.saturate] ### step  1539 ###
+3.050[zip.saturate]
+    given (1539 steps, penalty 1):
+      `forall (X0:nat) (X1:nat) (X2:nat).
+       [if_nat (ord_less_nat X0 X0) X2 X1 = X1*]/892`
+3.052[zip.saturate] ### step  1540 ###
+3.052[zip.saturate]
+    given (1540 steps, penalty 1):
+      `forall (X0:nat) (X1:nat) (X2:nat).
+       [if_nat (ord_less_eq_nat X0 X0) X1 X2 = X1*]/894`
+3.069[zip.saturate] ### step  1541 ###
+3.070[zip.saturate]
+    given (1541 steps, penalty 1):
+      `forall (X0:bool) (X1:poly_a).
+       [X1 = zero_zero_poly_a* ∨ fTrue ≠ fFalse+* ∨ ¬pp X0*]/10060`
+3.070[zip.saturate] ### step  1542 ###
+3.070[zip.saturate]
+    given (1542 steps, penalty 1):
+      `forall (X0:bool) (X1:bool) (X2:poly_a).
+       [X2 = zero_zero_poly_a* ∨ fTrue ≠ fFalse+* ∨ X0 = X1*]/10054`
+3.074[zip.saturate] ### step  1543 ###
+3.074[zip.saturate]
+    given (1543 steps, penalty 1):
+      `forall (X158:poly_nat) (X159:nat) (X160:poly_nat).
+       [X158 = zero_zero_poly_nat ∨ X159 = zero_zero_nat ∨ 
+        monom_poly_nat X158 X159
+         ≠ pCons_poly_nat X160 zero_z1059985641ly_nat+*]/149`
+3.101[zip.saturate] ### step  1558 ###
+3.101[zip.saturate]
+    given (1558 steps, penalty 1):
+      `forall (X0:poly_a). [X0 = zero_zero_poly_a* ∨ fTrue ≠ fFalse+*]/10155`
+3.102[zip.saturate] ### step  1562 ###
+3.102[zip.saturate]
+    given (1562 steps, penalty 1):
+      `forall (X0:nat) (X1:poly_a) (X2:poly_a).
+       [if_poly_a (ord_less_nat X0 X0) X2 X1 = X1*]/898`
+3.111[zip.saturate] ### step  1563 ###
+3.112[zip.saturate]
+    given (1563 steps, penalty 1):
+      `forall (X0:bool) (X1:poly_poly_a).
+       [X1 = zero_z2096148049poly_a* ∨ fTrue ≠ fFalse+* ∨ ¬pp X0*]/10229`
+3.113[zip.saturate] ### step  1567 ###
+3.113[zip.saturate]
+    given (1567 steps, penalty 1):
+      `forall (X0:bool) (X1:bool) (X2:poly_poly_a).
+       [X2 = zero_z2096148049poly_a* ∨ fTrue ≠ fFalse+* ∨ X0 = X1*]/10223`
+3.118[zip.saturate] ### step  1575 ###
+3.118[zip.saturate]
+    given (1575 steps, penalty 1):
+      `forall (X161:poly_nat).
+       [monom_poly_nat X161 zero_zero_nat
+         = pCons_poly_nat X161 zero_z1059985641ly_nat*]/10250`
+3.132[zip.saturate] ### step  1584 ###
+3.132[zip.saturate]
+    given (1584 steps, penalty 1):
+      `forall (X0:poly_poly_a).
+       [X0 = zero_z2096148049poly_a* ∨ fTrue ≠ fFalse+*]/10335`
+3.135[zip.saturate] ### step  1586 ###
+3.135[zip.saturate]
+    given (1586 steps, penalty 1):
+      `forall (X162:poly_poly_a) (X163:nat) (X164:poly_poly_a).
+       [X162 = zero_z2096148049poly_a ∨ X163 = zero_zero_nat ∨ 
+        monom_poly_poly_a X162 X163
+         ≠ pCons_poly_poly_a X164 zero_z2064990175poly_a+*]/153`
+3.153[zip.saturate] ### step  1587 ###
+3.153[zip.saturate]
+    given (1587 steps, penalty 1):
+      `forall (X0:bool) (X1:poly_nat).
+       [X1 = zero_zero_poly_nat* ∨ fTrue ≠ fFalse+* ∨ ¬pp X0*]/10409`
+3.156[zip.saturate] ### step  1590 ###
+3.156[zip.saturate]
+    given (1590 steps, penalty 1):
+      `forall (X0:bool) (X1:bool) (X2:poly_nat).
+       [X2 = zero_zero_poly_nat* ∨ fTrue ≠ fFalse+* ∨ X0 = X1*]/10403`
+3.161[zip.saturate] ### step  1603 ###
+3.161[zip.saturate]
+    given (1603 steps, penalty 1):
+      `forall (X0:nat) (X1:poly_a) (X2:poly_a).
+       [if_poly_a (ord_less_eq_nat X0 X0) X1 X2 = X1*]/900`
+3.181[zip.saturate] ### step  1612 ###
+3.182[zip.saturate]
+    given (1612 steps, penalty 1):
+      `forall (X0:poly_nat).
+       [X0 = zero_zero_poly_nat* ∨ fTrue ≠ fFalse+*]/10517`
+3.185[zip.saturate] ### step  1616 ###
+3.185[zip.saturate]
+    given (1616 steps, penalty 1):
+      `forall (X0:nat) (X1:poly_nat) (X2:poly_nat).
+       [if_poly_nat (ord_less_nat X0 X0) X2 X1 = X1*]/904`
+3.240[zip.saturate] ### step  1618 ###
+3.240[zip.saturate]
+    given (1618 steps, penalty 1):
+      `forall (X165:poly_poly_a).
+       [monom_poly_poly_a X165 zero_zero_nat
+         = pCons_poly_poly_a X165 zero_z2064990175poly_a*]/10816`
+3.243[zip.saturate] ### step  1625 ###
+3.243[zip.saturate]
+    given (1625 steps, penalty 1):
+      `forall (X0:poly_a).
+       [synthetic_div_poly_a one_one_poly_poly_a X0 = zero_z2096148049poly_a*]/10706`
+3.246[zip.saturate] ### step  1626 ###
+3.246[zip.saturate]
+    given (1626 steps, penalty 1):
+      `forall (X0:a).
+       [fundam2103719732poly_a one_one_poly_a X0 = one_one_poly_a*]/10829`
+3.248[zip.saturate] ### step  1627 ###
+3.248[zip.saturate]
+    given (1627 steps, penalty 1):
+      `forall (X0:nat).
+       [fundam1481276954ly_nat one_one_poly_nat X0 = one_one_poly_nat*]/10835`
+3.253[zip.saturate] ### step  1629 ###
+3.253[zip.saturate]
+    given (1629 steps, penalty 1):
+      `forall (X166:a) (X167:nat) (X168:a).
+       [X166 = zero_zero_a ∨ X167 = zero_zero_nat ∨ 
+        monom_a X166 X167 ≠ monom_a X168 zero_zero_nat+*]/10843`
+3.256[zip.saturate] ### step  1630 ###
+3.256[zip.saturate]
+    given (1630 steps, penalty 1):
+      `forall (X0:a). [synthetic_div_a one_one_poly_a X0 = zero_zero_poly_a*]/10840`
+3.257[zip.saturate] ### step  1631 ###
+3.257[zip.saturate]
+    given (1631 steps, penalty 1):
+      `forall (X0:poly_a).
+       [fundam932970690poly_a one_one_poly_poly_a X0 = one_one_poly_poly_a*]/10849`
+3.268[zip.saturate] ### step  1647 ###
+3.269[zip.saturate]
+    given (1647 steps, penalty 1):
+      `forall (X0:poly_nat).
+       [sk_P310 pos_poly_nat = zero_zero_poly_nat* ∨ pp (pos_poly_nat X0)*]/10886`
+3.294[zip.saturate] ### step  1658 ###
+3.294[zip.saturate]
+    given (1658 steps, penalty 1):
+      `forall (X0:nat). [¬zip_tseitin1 X0 (ord_less_nat X0)*]/10977`
+3.403[zip.saturate] ### step  1662 ###
+3.403[zip.saturate]
+    given (1662 steps, penalty 1):
+      `forall (X1:poly_a). [true ∨ X1 = zero_zero_poly_a*]/11849`
+3.426[zip.saturate] ### step  1664 ###
+3.426[zip.saturate]
+    given (1664 steps, penalty 1):
+      `forall (X1:poly_poly_a). [true ∨ X1 = zero_z2096148049poly_a*]/11937`
+3.432[zip.saturate] ### step  1665 ###
+3.432[zip.saturate]
+    given (1665 steps, penalty 1):
+      `forall (X1:poly_nat). [true ∨ X1 = zero_zero_poly_nat*]/12026`
+3.454[zip.saturate] ### step  1672 ###
+3.454[zip.saturate]
+    given (1672 steps, penalty 1):
+      `forall (X170:nat) (X171:nat) (X172:nat).
+       [X170 = zero_zero_nat ∨ X171 = zero_zero_nat ∨ 
+        monom_nat X170 X171 ≠ monom_nat X172 zero_zero_nat+*]/12132`
+3.465[zip.saturate] ### step  1697 ###
+3.466[zip.saturate]
+    given (1697 steps, penalty 1):
+      `forall (X0:nat) (X1:poly_a).
+       [ord_less_eq_nat X0 X0 ≠ fFalse+* ∨ X1 = zero_zero_poly_a*]/11342`
+3.467[zip.saturate] ### step  1698 ###
+3.468[zip.saturate]
+    given (1698 steps, penalty 1):
+      `forall (X0:nat) (X1:poly_poly_a).
+       [ord_less_eq_nat X0 X0 ≠ fFalse+* ∨ X1 = zero_z2096148049poly_a*]/11520`
+3.486[zip.saturate] ### step  1699 ###
+3.486[zip.saturate]
+    given (1699 steps, penalty 1):
+      `forall (X0:nat) (X1:poly_nat).
+       [ord_less_eq_nat X0 X0 ≠ fFalse+* ∨ X1 = zero_zero_poly_nat*]/11694`
+3.496[zip.saturate] ### step  1712 ###
+3.496[zip.saturate]
+    given (1712 steps, penalty 1):
+      `forall (X0:poly_nat).
+       [sk_P310 pos_poly_nat = zero_zero_poly_nat* ∨ 
+        pos_poly_nat X0 = fTrue*]/12064`
+3.507[zip.saturate] ### step  1715 ###
+3.507[zip.saturate]
+    given (1715 steps, penalty 1):
+      `forall (X174:poly_a) (X175:nat) (X176:poly_a).
+       [X174 = zero_zero_poly_a ∨ X175 = zero_zero_nat ∨ 
+        monom_poly_a X174 X175 ≠ monom_poly_a X176 zero_zero_nat+*]/12333`
+3.518[zip.saturate] ### step  1718 ###
+3.518[zip.saturate]
+    given (1718 steps, penalty 1):
+      `forall (X0:nat) (X1:nat).
+       [synthetic_div_nat (pCons_nat X1 one_one_poly_nat) X0
+         = one_one_poly_nat*]/10823`
+3.548[zip.saturate] ### step  1760 ###
+3.548[zip.saturate]
+    given (1760 steps, penalty 1):
+      `forall (X0:poly_a) (X1:poly_a).
+       [synthetic_div_poly_a (pCons_poly_a X1 one_one_poly_poly_a) X0
+         = one_one_poly_poly_a*]/12045`
+3.550[zip.saturate] ### step  1761 ###
+3.550[zip.saturate]
+    given (1761 steps, penalty 1):
+      `forall (X0:a) (X1:a).
+       [synthetic_div_a (pCons_a X1 one_one_poly_a) X0 = one_one_poly_a*]/12112`
+3.563[zip.saturate] ### step  1767 ###
+3.563[zip.saturate]
+    given (1767 steps, penalty 1):
+      `forall (X0:nat) (X1:a).
+       [monom_a X1 X0 ≠ one_one_poly_a+* ∨ X0 = zero_zero_nat ∨ 
+        X1 = zero_zero_a]/12052`
+3.733[zip.saturate] ### step  1833 ###
+3.733[zip.saturate]
+    given (1833 steps, penalty 1):
+      `forall (X0:nat) (X1:nat) (X2:poly_a).
+       [ord_less_eq_nat X1 X1 ≠ ord_less_nat X0 X0+* ∨ 
+        X2 = zero_zero_poly_a*]/12640`
+3.779[zip.saturate] ### step  1834 ###
+3.779[zip.saturate]
+    given (1834 steps, penalty 1):
+      `forall (X1:nat).
+       [degree_nat (pCons_nat X1 one_one_poly_nat) ≠ zero_zero_nat*]/13244`
+3.781[zip.saturate] ### step  1836 ###
+3.781[zip.saturate]
+    given (1836 steps, penalty 1):
+      `forall (X1:poly_a).
+       [degree_poly_a (pCons_poly_a X1 one_one_poly_poly_a) ≠ zero_zero_nat*]/13250`
+3.782[zip.saturate] ### step  1838 ###
+3.782[zip.saturate]
+    given (1838 steps, penalty 1):
+      `forall (X1:a).
+       [degree_a (pCons_a X1 one_one_poly_a) ≠ zero_zero_nat*]/13256`
+3.786[zip.saturate] ### step  1848 ###
+3.786[zip.saturate]
+    given (1848 steps, penalty 1):
+      `forall (X0:nat) (X1:poly_a).
+       [fTrue ≠ ord_less_nat X0 X0+* ∨ X1 = zero_zero_poly_a*]/13200`
+3.811[zip.saturate] ### step  1857 ###
+3.811[zip.saturate]
+    given (1857 steps, penalty 1):
+      `forall (X0:poly_nat) (X2:poly_a).
+       [fTrue ≠ is_zero_nat X0+* ∨ X0 = zero_zero_poly_nat ∨ 
+        X2 = zero_zero_poly_a*]/13326`
+3.825[zip.saturate] ### step  1860 ###
+3.825[zip.saturate]
+    given (1860 steps, penalty 1):
+      `forall (X0:poly_poly_a) (X2:poly_a).
+       [fTrue ≠ is_zero_poly_a X0+* ∨ X0 = zero_z2096148049poly_a ∨ 
+        X2 = zero_zero_poly_a*]/13327`
+3.835[zip.saturate] ### step  1863 ###
+3.835[zip.saturate]
+    given (1863 steps, penalty 1):
+      `forall (X0:poly_a).
+       [fTrue ≠ is_zero_a X0+* ∨ X0 = zero_zero_poly_a]/13584`
+3.850[zip.saturate] ### step  1883 ###
+3.850[zip.saturate]
+    given (1883 steps, penalty 1):
+      `forall (X0:nat) (X1:poly_a).
+       [monom_poly_a X1 X0 ≠ one_one_poly_poly_a+* ∨ 
+        X0 = zero_zero_nat ∨ X1 = zero_zero_poly_a]/13117`
+3.855[zip.saturate] ### step  1894 ###
+3.855[zip.saturate]
+    given (1894 steps, penalty 1):
+      `forall (X0:nat) (X1:nat) (X2:poly_poly_a).
+       [ord_less_eq_nat X1 X1 ≠ ord_less_nat X0 X0+* ∨ 
+        X2 = zero_z2096148049poly_a*]/12701`
+3.878[zip.saturate] ### step  1897 ###
+3.878[zip.saturate]
+    given (1897 steps, penalty 1):
+      `forall (X0:nat) (X1:poly_poly_a).
+       [fTrue ≠ ord_less_nat X0 X0+* ∨ X1 = zero_z2096148049poly_a*]/13724`
+3.909[zip.saturate] ### step  1906 ###
+3.909[zip.saturate]
+    given (1906 steps, penalty 1):
+      `forall (X0:poly_nat) (X2:poly_poly_a).
+       [fTrue ≠ is_zero_nat X0+* ∨ X0 = zero_zero_poly_nat ∨ 
+        X2 = zero_z2096148049poly_a*]/13804`
+3.920[zip.saturate] ### step  1909 ###
+3.920[zip.saturate]
+    given (1909 steps, penalty 1):
+      `forall (X0:poly_poly_a).
+       [fTrue ≠ is_zero_poly_a X0+* ∨ X0 = zero_z2096148049poly_a]/13997`
+3.934[zip.saturate] ### step  1934 ###
+3.934[zip.saturate]
+    given (1934 steps, penalty 1):
+      `forall (X0:nat) (X1:nat) (X2:poly_nat).
+       [ord_less_eq_nat X1 X1 ≠ ord_less_nat X0 X0+* ∨ 
+        X2 = zero_zero_poly_nat*]/12762`
+3.959[zip.saturate] ### step  1937 ###
+3.959[zip.saturate]
+    given (1937 steps, penalty 1):
+      `forall (X0:nat) (X1:poly_nat).
+       [fTrue ≠ ord_less_nat X0 X0+* ∨ X1 = zero_zero_poly_nat*]/14122`
+3.993[zip.saturate] ### step  1946 ###
+3.993[zip.saturate]
+    given (1946 steps, penalty 1):
+      `forall (X0:poly_nat).
+       [fTrue ≠ is_zero_nat X0+* ∨ X0 = zero_zero_poly_nat]/14330`
+4.019[zip.saturate] ### step  1987 ###
+4.019[zip.saturate]
+    given (1987 steps, penalty 1):
+      `forall (X0:poly_nat) (F1:nat → bool) (X2:nat).
+       [is_zero_nat X0 ≠ F1 X2* ∨ X0 = zero_zero_poly_nat ∨ 
+        ¬zip_tseitin1 X2 F1*]/10931`
+4.035[zip.saturate] ### step  1989 ###
+4.035[zip.saturate]
+    given (1989 steps, penalty 1):
+      `forall (X0:poly_poly_a) (F1:nat → bool) (X2:nat).
+       [is_zero_poly_a X0 ≠ F1 X2* ∨ X0 = zero_z2096148049poly_a ∨ 
+        ¬zip_tseitin1 X2 F1*]/10932`
+4.048[zip.saturate] ### step  1991 ###
+4.048[zip.saturate]
+    given (1991 steps, penalty 1):
+      `forall (X0:poly_a) (F1:nat → bool) (X2:nat).
+       [is_zero_a X0 ≠ F1 X2* ∨ X0 = zero_zero_poly_a ∨ 
+        ¬zip_tseitin1 X2 F1*]/10933`
+4.064[zip.saturate] ### step  1993 ###
+4.064[zip.saturate]
+    given (1993 steps, penalty 1):
+      `forall (X1:nat) (X2:a).
+       [X2 = zero_zero_a ∨ X1 = zero_zero_nat ∨ 
+        degree_a (monom_a X2 X1) ≠ zero_zero_nat+*]/12104`
+4.068[zip.saturate] ### step  1995 ###
+4.068[zip.saturate]
+    given (1995 steps, penalty 1):
+      `forall (X1:nat) (X2:nat).
+       [X2 = zero_zero_nat ∨ X1 = zero_zero_nat ∨ 
+        degree_nat (monom_nat X2 X1) ≠ zero_zero_nat+*]/12934`
+4.075[zip.saturate] ### step  1996 ###
+4.075[zip.saturate]
+    given (1996 steps, penalty 1):
+      `forall (X1:nat) (X2:poly_a).
+       [X2 = zero_zero_poly_a ∨ X1 = zero_zero_nat ∨ 
+        degree_poly_a (monom_poly_a X2 X1) ≠ zero_zero_nat+*]/13239`
+4.084[zip.saturate] ### step  1997 ###
+4.084[zip.saturate]
+    given (1997 steps, penalty 1):
+      `forall (X0:nat) (X1:poly_nat) (X2:poly_nat).
+       [if_poly_nat (ord_less_eq_nat X0 X0) X1 X2 = X1*]/906`
+4.097[zip.saturate] ### step  1998 ###
+4.097[zip.saturate]
+    given (1998 steps, penalty 1):
+      `forall (X208:a) (X210:nat). [coeff_a (monom_a X208 X210) X210 = X208*]/14659`
+4.102[zip.saturate] ### step  2009 ###
+4.102[zip.saturate]
+    given (2009 steps, penalty 1):
+      `forall (X209:nat) (X210:nat) (X211:a).
+       [coeff_a (monom_a X211 X209) X210 = zero_zero_a* ∨ X209 = X210]/194`
+4.112[zip.saturate] ### step  2010 ###
+4.113[zip.saturate]
+    given (2010 steps, penalty 1):
+      `forall (X0:nat).
+       [coeff_a one_one_poly_a X0 = zero_zero_a* ∨ zero_zero_nat = X0]/14679`
+4.119[zip.saturate] ### step  2014 ###
+4.119[zip.saturate]
+    given (2014 steps, penalty 1):
+      `forall (X0:nat) (X1:a).
+       [zero_zero_a = sk_A212 (monom_a X1 X0)* ∨ X0 = zero_zero_nat]/14675`
+4.123[zip.saturate] ### step  2017 ###
+4.123[zip.saturate]
+    given (2017 steps, penalty 1):
+      `forall (X0:poly_a).
+       [coeff_a X0 zero_zero_nat = sk_A219 X0* ∨ 
+        degree_a X0 ≠ zero_zero_nat]/14661`
+4.128[zip.saturate] ### step  2020 ###
+4.128[zip.saturate]
+    given (2020 steps, penalty 1):
+      `forall (X212:poly_a) (X214:nat).
+       [coeff_poly_a (monom_poly_a X212 X214) X214 = X212*]/14730`
+4.132[zip.saturate] ### step  2025 ###
+4.132[zip.saturate]
+    given (2025 steps, penalty 1):
+      `forall (X0:a). [sk_A219 (monom_a X0 zero_zero_nat) = X0*]/14715`
+4.137[zip.saturate] ### step  2031 ###
+4.137[zip.saturate]
+    given (2031 steps, penalty 1):
+      `forall (X213:nat) (X214:nat) (X215:poly_a).
+       [coeff_poly_a (monom_poly_a X215 X213) X214 = zero_zero_poly_a* ∨ 
+        X213 = X214]/196`
+4.142[zip.saturate] ### step  2032 ###
+4.142[zip.saturate]
+    given (2032 steps, penalty 1):
+      `forall (X0:nat).
+       [coeff_poly_a one_one_poly_poly_a X0 = zero_zero_poly_a* ∨ 
+        zero_zero_nat = X0]/14758`
+4.145[zip.saturate] ### step  2039 ###
+4.145[zip.saturate]
+    given (2039 steps, penalty 1):
+      `forall (X0:poly_poly_a).
+       [coeff_poly_a X0 zero_zero_nat = sk_A221 X0* ∨ 
+        degree_poly_a X0 ≠ zero_zero_nat]/14731`
+4.150[zip.saturate] ### step  2042 ###
+4.150[zip.saturate]
+    given (2042 steps, penalty 1):
+      `forall (X216:nat) (X218:nat).
+       [coeff_nat (monom_nat X216 X218) X218 = X216*]/14806`
+4.153[zip.saturate] ### step  2049 ###
+4.153[zip.saturate]
+    given (2049 steps, penalty 1):
+      `forall (X0:poly_a). [sk_A221 (monom_poly_a X0 zero_zero_nat) = X0*]/14787`
+4.159[zip.saturate] ### step  2053 ###
+4.159[zip.saturate]
+    given (2053 steps, penalty 1):
+      `forall (X217:nat) (X218:nat) (X219:nat).
+       [coeff_nat (monom_nat X219 X217) X218 = zero_zero_nat* ∨ X217 = X218]/198`
+4.164[zip.saturate] ### step  2054 ###
+4.164[zip.saturate]
+    given (2054 steps, penalty 1):
+      `forall (X0:nat).
+       [coeff_nat one_one_poly_nat X0 = zero_zero_nat* ∨ zero_zero_nat = X0]/14827`
+4.166[zip.saturate] ### step  2057 ###
+4.166[zip.saturate]
+    given (2057 steps, penalty 1):
+      `forall (X0:poly_nat).
+       [coeff_nat X0 zero_zero_nat = sk_A220 X0* ∨ 
+        degree_nat X0 ≠ zero_zero_nat]/14807`
+4.175[zip.saturate] ### step  2064 ###
+4.175[zip.saturate]
+    given (2064 steps, penalty 1):
+      `forall (X220:poly_nat) (X222:nat).
+       [coeff_poly_nat (monom_poly_nat X220 X222) X222 = X220*]/14875`
+4.182[zip.saturate] ### step  2066 ###
+4.182[zip.saturate]
+    given (2066 steps, penalty 1):
+      `forall (X0:nat). [sk_A220 (monom_nat X0 zero_zero_nat) = X0*]/14854`
+4.184[zip.saturate] ### step  2070 ###
+4.185[zip.saturate]
+    given (2070 steps, penalty 1):
+      `forall (X0:nat) (X1:poly_poly_a) (X2:poly_poly_a).
+       [if_poly_poly_a (ord_less_nat X0 X0) X2 X1 = X1*]/910`
+4.197[zip.saturate] ### step  2075 ###
+4.197[zip.saturate]
+    given (2075 steps, penalty 1):
+      `forall (X221:nat) (X222:nat) (X223:poly_nat).
+       [coeff_poly_nat (monom_poly_nat X223 X221) X222 = zero_zero_poly_nat* ∨ 
+        X221 = X222]/200`
+4.202[zip.saturate] ### step  2080 ###
+4.202[zip.saturate]
+    given (2080 steps, penalty 1):
+      `forall (X0:nat) (X1:poly_poly_a) (X2:poly_poly_a).
+       [if_poly_poly_a (ord_less_eq_nat X0 X0) X1 X2 = X1*]/912`
+4.213[zip.saturate] ### step  2086 ###
+4.213[zip.saturate]
+    given (2086 steps, penalty 1):
+      `forall (X224:poly_poly_a) (X226:nat).
+       [coeff_poly_poly_a (monom_poly_poly_a X224 X226) X226 = X224*]/14989`
+4.219[zip.saturate] ### step  2097 ###
+4.219[zip.saturate]
+    given (2097 steps, penalty 1):
+      `forall (X225:nat) (X226:nat) (X227:poly_poly_a).
+       [coeff_poly_poly_a (monom_poly_poly_a X227 X225) X226
+         = zero_z2096148049poly_a* ∨ 
+        X225 = X226]/202`
+4.235[zip.saturate] ### step  2108 ###
+4.235[zip.saturate]
+    given (2108 steps, penalty 1):
+      `forall (X228:a) (X229:nat).
+       [X228 = zero_zero_a ∨ 
+        order_a zero_zero_a (monom_a X228 X229) = X229*]/203`
+4.238[zip.saturate] ### step  2109 ###
+4.238[zip.saturate]
+    given (2109 steps, penalty 1):
+      `[order_a zero_zero_a one_one_poly_a = zero_zero_nat*]/15029`
+4.242[zip.saturate] ### step  2119 ###
+4.242[zip.saturate]
+    given (2119 steps, penalty 1):
+      `forall (X230:poly_a) (X231:nat).
+       [X230 = zero_zero_poly_a ∨ 
+        order_poly_a zero_zero_poly_a (monom_poly_a X230 X231) = X231*]/204`
+4.246[zip.saturate] ### step  2120 ###
+4.246[zip.saturate]
+    given (2120 steps, penalty 1):
+      `[order_poly_a zero_zero_poly_a one_one_poly_poly_a = zero_zero_nat*]/15059`
+4.253[zip.saturate] ### step  2130 ###
+4.253[zip.saturate]
+    given (2130 steps, penalty 1):
+      `forall (X232:poly_poly_a) (X233:nat).
+       [X232 = zero_z2096148049poly_a ∨ 
+        order_poly_poly_a zero_z2096148049poly_a 
+         (monom_poly_poly_a X232 X233) = X233*]/205`
+4.262[zip.saturate] ### step  2141 ###
+4.262[zip.saturate]
+    given (2141 steps, penalty 1):
+      `forall (X234:poly_a).
+       [reflect_poly_a (reflect_poly_a X234) = X234* ∨ 
+        sk_A212 X234 = zero_zero_a]/15100`
+4.267[zip.saturate] ### step  2150 ###
+4.267[zip.saturate]
+    given (2150 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat).
+       [F0 (sk_N2 F0) = fFalse* ∨ pp (F0 X1)*]/3871`
+4.300[zip.saturate] ### step  2151 ###
+4.300[zip.saturate]
+    given (2151 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat).
+       [F0 (sk_N21 F0) = fFalse* ∨ pp (F0 X1)*]/3904`
+4.347[zip.saturate] ### step  2152 ###
+4.347[zip.saturate]
+    given (2152 steps, penalty 1):
+      `forall (X235:poly_poly_a).
+       [reflect_poly_poly_a (reflect_poly_poly_a X235) = X235* ∨ 
+        coeff_poly_a X235 zero_zero_nat = zero_zero_poly_a]/207`
+4.350[zip.saturate] ### step  2153 ###
+4.350[zip.saturate]
+    given (2153 steps, penalty 1):
+      `forall (F0:poly_a → bool).
+       [sk_P39 F0 = zero_zero_poly_a* ∨ F0 (sk_P39 F0) = fTrue*]/4350`
+4.365[zip.saturate] ### step  2154 ###
+4.365[zip.saturate]
+    given (2154 steps, penalty 1):
+      `forall (F0:poly_nat → bool).
+       [sk_P310 F0 = zero_zero_poly_nat* ∨ F0 (sk_P310 F0) = fTrue*]/4404`
+4.385[zip.saturate] ### step  2155 ###
+4.385[zip.saturate]
+    given (2155 steps, penalty 1):
+      `forall (F0:poly_poly_a → bool).
+       [sk_P311 F0 = zero_z2096148049poly_a* ∨ F0 (sk_P311 F0) = fTrue*]/4450`
+4.394[zip.saturate] ### step  2156 ###
+4.395[zip.saturate]
+    given (2156 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat).
+       [F0 (sk_N2 F0) = fFalse* ∨ F0 X1 = fTrue*]/4532`
+4.425[zip.saturate] ### step  2158 ###
+4.425[zip.saturate]
+    given (2158 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat).
+       [F0 (sk_N21 F0) = fFalse* ∨ F0 X1 = fTrue*]/4612`
+4.446[zip.saturate] ### step  2159 ###
+4.446[zip.saturate]
+    given (2159 steps, penalty 1):
+      `forall (F0:poly_poly_nat → bool).
+       [F0 zero_z1059985641ly_nat = fFalse* ∨ pp (F0 (sk_P313 F0))*]/4622`
+4.464[zip.saturate] ### step  2160 ###
+4.464[zip.saturate]
+    given (2160 steps, penalty 1):
+      `forall (F0:poly_poly_nat → bool).
+       [F0 zero_z1059985641ly_nat = fFalse* ∨ F0 (sk_P313 F0) = fTrue*]/4964`
+4.494[zip.saturate] ### step  2162 ###
+4.494[zip.saturate]
+    given (2162 steps, penalty 1):
+      `forall (F0:poly_poly_poly_a → bool).
+       [F0 zero_z2064990175poly_a = fFalse* ∨ pp (F0 (sk_P314 F0))*]/4993`
+4.531[zip.saturate] ### step  2163 ###
+4.531[zip.saturate]
+    given (2163 steps, penalty 1):
+      `forall (X236:poly_nat).
+       [reflect_poly_nat (reflect_poly_nat X236) = X236* ∨ 
+        coeff_nat X236 zero_zero_nat = zero_zero_nat]/208`
+4.535[zip.saturate] ### step  2164 ###
+4.535[zip.saturate]
+    given (2164 steps, penalty 1):
+      `forall (F0:poly_poly_poly_a → bool).
+       [F0 zero_z2064990175poly_a = fFalse* ∨ F0 (sk_P314 F0) = fTrue*]/5150`
+4.569[zip.saturate] ### step  2165 ###
+4.569[zip.saturate]
+    given (2165 steps, penalty 1):
+      `forall (F0:poly_a → bool).
+       [F0 zero_zero_poly_a = fFalse* ∨ pp (F0 (sk_P315 F0))*]/5159`
+4.602[zip.saturate] ### step  2166 ###
+4.602[zip.saturate]
+    given (2166 steps, penalty 1):
+      `forall (F0:poly_nat → bool).
+       [F0 zero_zero_poly_nat = fFalse* ∨ pp (F0 (sk_P316 F0))*]/5460`
+4.632[zip.saturate] ### step  2167 ###
+4.632[zip.saturate]
+    given (2167 steps, penalty 1):
+      `forall (F0:poly_a → bool).
+       [F0 zero_zero_poly_a = fFalse* ∨ F0 (sk_P315 F0) = fTrue*]/5592`
+4.670[zip.saturate] ### step  2168 ###
+4.670[zip.saturate]
+    given (2168 steps, penalty 1):
+      `forall (F0:poly_poly_a → bool).
+       [F0 zero_z2096148049poly_a = fFalse* ∨ pp (F0 (sk_P317 F0))*]/6303`
+4.706[zip.saturate] ### step  2171 ###
+4.706[zip.saturate]
+    given (2171 steps, penalty 1):
+      `forall (F0:poly_nat → bool).
+       [F0 zero_zero_poly_nat = fFalse* ∨ F0 (sk_P316 F0) = fTrue*]/6478`
+4.757[zip.saturate] ### step  2174 ###
+4.757[zip.saturate]
+    given (2174 steps, penalty 1):
+      `forall (X237:poly_poly_nat).
+       [reflec781175074ly_nat (reflec781175074ly_nat X237) = X237* ∨ 
+        coeff_poly_nat X237 zero_zero_nat = zero_zero_poly_nat]/209`
+4.760[zip.saturate] ### step  2178 ###
+4.760[zip.saturate]
+    given (2178 steps, penalty 1):
+      `forall (F0:poly_poly_a → bool).
+       [F0 zero_z2096148049poly_a = fFalse* ∨ F0 (sk_P317 F0) = fTrue*]/8277`
+4.798[zip.saturate] ### step  2180 ###
+4.798[zip.saturate]
+    given (2180 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:nat).
+       [zip_tseitin0 X1 X2 F0* ∨ F0 X1 = fTrue*]/9486`
+4.826[zip.saturate] ### step  2183 ###
+4.826[zip.saturate]
+    given (2183 steps, penalty 1):
+      `forall (X0:poly_nat).
+       [pos_poly_nat (sk_P310 pos_poly_nat) = fFalse* ∨ 
+        pp (pos_poly_nat X0)*]/10894`
+4.835[zip.saturate] ### step  2185 ###
+4.835[zip.saturate]
+    given (2185 steps, penalty 1):
+      `forall (X238:poly_poly_poly_a).
+       [reflec581648976poly_a (reflec581648976poly_a X238) = X238* ∨ 
+        coeff_poly_poly_a X238 zero_zero_nat = zero_z2096148049poly_a]/210`
+4.840[zip.saturate] ### step  2200 ###
+4.840[zip.saturate]
+    given (2200 steps, penalty 1):
+      `forall (X0:poly_nat) (X1:poly_nat).
+       [sk_P310 pos_poly_nat = zero_zero_poly_nat* ∨ 
+        pos_poly_nat X1 = pos_poly_nat X0*]/13069`
+4.843[zip.saturate] ### step  2204 ###
+4.843[zip.saturate]
+    given (2204 steps, penalty 1):
+      `forall (X0:poly_poly_a).
+       [sk_A221 (reflect_poly_poly_a X0) ≠ zero_zero_poly_a+* ∨ 
+        degree_poly_a (reflect_poly_poly_a X0) ≠ zero_zero_nat ∨ 
+        X0 = zero_z2096148049poly_a]/14772`
+4.846[zip.saturate] ### step  2205 ###
+4.846[zip.saturate]
+    given (2205 steps, penalty 1):
+      `forall (X0:poly_nat).
+       [sk_A220 (reflect_poly_nat X0) ≠ zero_zero_nat+* ∨ 
+        degree_nat (reflect_poly_nat X0) ≠ zero_zero_nat ∨ 
+        X0 = zero_zero_poly_nat]/14840`
+4.891[zip.saturate] ### step  2287 ###
+4.891[zip.saturate]
+    given (2287 steps, penalty 1):
+      `forall (X0:bool) (X1:nat).
+       [fTrue ≠ ord_less_nat X1 X1+* ∨ X0 = ord_less_nat X1 X1*]/2584`
+4.896[zip.saturate] ### step  2291 ###
+4.896[zip.saturate]
+    given (2291 steps, penalty 1):
+      `forall (X0:bool) (X1:nat).
+       [fFalse ≠ ord_less_eq_nat X1 X1+* ∨ X0 = ord_less_eq_nat X1 X1*]/3664`
+4.900[zip.saturate] ### step  2295 ###
+4.900[zip.saturate]
+    given (2295 steps, penalty 1):
+      `forall (X259:a) (X260:nat) (X261:nat) (X262:a).
+       [X259 = zero_zero_a ∨ X261 = X260* ∨ 
+        monom_a X259 X261 ≠ monom_a X262 X260+*]/221`
+4.914[zip.saturate] ### step  2303 ###
+4.914[zip.saturate]
+    given (2303 steps, penalty 1):
+      `forall (X0:poly_a) (X1:poly_a).
+       [X0 = zero_zero_poly_a ∨ X1 = zero_zero_poly_a ∨ 
+        is_zero_a X1 = is_zero_a X0*]/5285`
+4.943[zip.saturate] ### step  2305 ###
+4.943[zip.saturate]
+    given (2305 steps, penalty 1):
+      `forall (X0:poly_poly_a) (X1:poly_a).
+       [X0 = zero_z2096148049poly_a ∨ X1 = zero_zero_poly_a ∨ 
+        is_zero_a X1 = is_zero_poly_a X0*]/5287`
+4.947[zip.saturate] ### step  2306 ###
+4.948[zip.saturate]
+    given (2306 steps, penalty 1):
+      `forall (X0:poly_nat) (X1:poly_a).
+       [X0 = zero_zero_poly_nat ∨ X1 = zero_zero_poly_a ∨ 
+        is_zero_a X1 = is_zero_nat X0*]/5289`
+4.953[zip.saturate] ### step  2308 ###
+4.953[zip.saturate]
+    given (2308 steps, penalty 1):
+      `forall (X0:poly_poly_a) (X1:poly_poly_a).
+       [X0 = zero_z2096148049poly_a ∨ X1 = zero_z2096148049poly_a ∨ 
+        is_zero_poly_a X1 = is_zero_poly_a X0*]/5645`
+4.957[zip.saturate] ### step  2309 ###
+4.957[zip.saturate]
+    given (2309 steps, penalty 1):
+      `forall (X0:poly_nat) (X1:poly_poly_a).
+       [X0 = zero_zero_poly_nat ∨ X1 = zero_z2096148049poly_a ∨ 
+        is_zero_poly_a X1 = is_zero_nat X0*]/5647`
+4.972[zip.saturate] ### step  2314 ###
+4.972[zip.saturate]
+    given (2314 steps, penalty 1):
+      `forall (X0:poly_nat) (X1:poly_nat).
+       [X0 = zero_zero_poly_nat ∨ X1 = zero_zero_poly_nat ∨ 
+        is_zero_nat X1 = is_zero_nat X0*]/5912`
+4.986[zip.saturate] ### step  2338 ###
+4.986[zip.saturate]
+    given (2338 steps, penalty 1):
+      `forall (X264:poly_a) (X265:nat) (X266:nat) (X267:poly_a).
+       [X264 = zero_zero_poly_a ∨ X266 = X265* ∨ 
+        monom_poly_a X264 X266 ≠ monom_poly_a X267 X265+*]/225`
+5.020[zip.saturate] ### step  2381 ###
+5.020[zip.saturate]
+    given (2381 steps, penalty 1):
+      `forall (X269:nat) (X270:nat) (X271:nat) (X272:nat).
+       [X269 = zero_zero_nat ∨ X271 = X270* ∨ 
+        monom_nat X269 X271 ≠ monom_nat X272 X270+*]/229`
+5.029[zip.saturate] ### step  2404 ###
+5.029[zip.saturate]
+    given (2404 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:nat).
+       [ord_less_eq_nat X2 X2 = F0 X1* ∨ ¬zip_tseitin1 X1 F0*]/1051`
+5.054[zip.saturate] ### step  2405 ###
+5.054[zip.saturate]
+    given (2405 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:bool).
+       [X2 = F0 X1* ∨ ¬zip_tseitin1 X1 F0* ∨ X2 = fFalse*]/1055`
+5.157[zip.saturate] ### step  2409 ###
+5.157[zip.saturate]
+    given (2409 steps, penalty 1):
+      `forall (X0:poly_a) (X1:a).
+       [poly_a2 X0 X1 = sk_A212 X0* ∨ 
+        ¬fundam396953934nt_a_a (poly_a2 X0)+*]/1358`
+5.170[zip.saturate] ### step  2414 ###
+5.170[zip.saturate]
+    given (2414 steps, penalty 1):
+      `forall (X274:poly_nat) (X275:nat) (X276:nat) (X277:poly_nat).
+       [X274 = zero_zero_poly_nat ∨ X276 = X275* ∨ 
+        monom_poly_nat X274 X276 ≠ monom_poly_nat X277 X275+*]/233`
+5.173[zip.saturate] ### step  2415 ###
+5.173[zip.saturate]
+    given (2415 steps, penalty 1):
+      `forall (X0:bool) (X1:poly_poly_a) (X2:poly_poly_a).
+       [if_poly_poly_a X0 X1 X2 = X1* ∨ true ∨ pp X0]/2661`
+5.176[zip.saturate] ### step  2416 ###
+5.176[zip.saturate]
+    given (2416 steps, penalty 1):
+      `forall (X0:bool) (X1:poly_nat) (X2:poly_nat).
+       [if_poly_nat X0 X1 X2 = X1* ∨ true ∨ pp X0]/2662`
+5.178[zip.saturate] ### step  2417 ###
+5.178[zip.saturate]
+    given (2417 steps, penalty 1):
+      `forall (X0:bool) (X1:poly_a) (X2:poly_a).
+       [if_poly_a X0 X1 X2 = X1* ∨ true ∨ pp X0]/2663`
+5.181[zip.saturate] ### step  2418 ###
+5.181[zip.saturate]
+    given (2418 steps, penalty 1):
+      `forall (X0:bool) (X1:nat) (X2:nat).
+       [if_nat X0 X1 X2 = X1* ∨ true ∨ pp X0]/2664`
+5.190[zip.saturate] ### step  2425 ###
+5.190[zip.saturate]
+    given (2425 steps, penalty 1):
+      `forall (X0:bool) (X1:a) (X2:a).
+       [if_a X0 X1 X2 = X1* ∨ true ∨ pp X0]/2665`
+5.203[zip.saturate] ### step  2457 ###
+5.204[zip.saturate]
+    given (2457 steps, penalty 1):
+      `forall (X279:poly_poly_a) (X280:nat) (X281:nat) (X282:poly_poly_a).
+       [X279 = zero_z2096148049poly_a ∨ X281 = X280* ∨ 
+        monom_poly_poly_a X279 X281 ≠ monom_poly_poly_a X282 X280+*]/237`
+5.217[zip.saturate] ### step  2468 ###
+5.217[zip.saturate]
+    given (2468 steps, penalty 1):
+      `forall (X0:poly_nat).
+       [pos_poly_nat X0 ≠ fFalse+* ∨ 
+        sk_P310 pos_poly_nat = zero_zero_poly_nat*]/15756`
+5.229[zip.saturate] ### step  2490 ###
+5.229[zip.saturate]
+    given (2490 steps, penalty 1):
+      `forall (X0:poly_a).
+       [¬pp (is_zero_a (monom_a (sk_A29 is_zero_a) zero_zero_nat))+* ∨ 
+        X0 = zero_zero_poly_a*]/15789`
+5.257[zip.saturate] ### step  2492 ###
+5.257[zip.saturate]
+    given (2492 steps, penalty 1):
+      `forall (X0:poly_nat).
+       [¬pp (is_zero_nat (monom_nat (sk_A210 is_zero_nat) zero_zero_nat))+* ∨ 
+        X0 = zero_zero_poly_nat*]/15883`
+5.263[zip.saturate] ### step  2493 ###
+5.263[zip.saturate]
+    given (2493 steps, penalty 1):
+      `forall (X0:poly_poly_a).
+       [¬pp
+           (is_zero_poly_a
+             (monom_poly_a (sk_A211 is_zero_poly_a) zero_zero_nat))+* ∨ 
+        X0 = zero_z2096148049poly_a*]/15884`
+5.275[zip.saturate] ### step  2494 ###
+5.275[zip.saturate]
+    given (2494 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:bool).
+       [fFalse ≠ F0 X1* ∨ ¬pp (F0 (sk_N2 F0))* ∨ X2 = fTrue*]/4485`
+5.303[zip.saturate] ### step  2495 ###
+5.303[zip.saturate]
+    given (2495 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:bool).
+       [F0 X1 ≠ fFalse* ∨ ¬pp (F0 (sk_N2 F0))* ∨ X2 = fFalse*]/4486`
+5.334[zip.saturate] ### step  2496 ###
+5.334[zip.saturate]
+    given (2496 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:bool).
+       [fFalse ≠ F0 X1* ∨ ¬pp (F0 (sk_N21 F0))* ∨ X2 = fTrue*]/4563`
+5.359[zip.saturate] ### step  2497 ###
+5.359[zip.saturate]
+    given (2497 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:bool).
+       [F0 X1 ≠ fFalse* ∨ ¬pp (F0 (sk_N21 F0))* ∨ X2 = fFalse*]/4564`
+5.402[zip.saturate] ### step  2498 ###
+5.402[zip.saturate]
+    given (2498 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:bool).
+       [fFalse ≠ F0 X1* ∨ ¬zip_tseitin1 (sk_N2 F0) F0* ∨ X2 = fTrue*]/4650`
+5.430[zip.saturate] ### step  2499 ###
+5.430[zip.saturate]
+    given (2499 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:bool).
+       [F0 X1 ≠ fFalse* ∨ ¬zip_tseitin1 (sk_N2 F0) F0* ∨ X2 = fFalse*]/4651`
+5.460[zip.saturate] ### step  2500 ###
+5.460[zip.saturate]
+    given (2500 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:bool).
+       [fFalse ≠ F0 X1* ∨ ¬zip_tseitin1 (sk_N21 F0) F0* ∨ X2 = fTrue*]/4838`
+5.504[zip.saturate] ### step  2502 ###
+5.504[zip.saturate]
+    given (2502 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:bool).
+       [F0 X1 ≠ fFalse* ∨ ¬zip_tseitin1 (sk_N21 F0) F0* ∨ X2 = fFalse*]/4839`
+5.523[zip.saturate] ### step  2503 ###
+5.523[zip.saturate]
+    given (2503 steps, penalty 1):
+      `forall (F0:poly_poly_nat → bool) (X1:bool).
+       [fFalse ≠ F0 (sk_P313 F0)* ∨ 
+        ¬pp (F0 zero_z1059985641ly_nat)* ∨ X1 = fTrue*]/4914`
+5.553[zip.saturate] ### step  2504 ###
+5.553[zip.saturate]
+    given (2504 steps, penalty 1):
+      `forall (F0:poly_poly_nat → bool) (X1:bool).
+       [F0 (sk_P313 F0) ≠ fFalse* ∨ 
+        ¬pp (F0 zero_z1059985641ly_nat)* ∨ X1 = fFalse*]/4915`
+5.571[zip.saturate] ### step  2505 ###
+5.571[zip.saturate]
+    given (2505 steps, penalty 1):
+      `forall (F0:poly_poly_poly_a → bool) (X1:bool).
+       [fFalse ≠ F0 (sk_P314 F0)* ∨ 
+        ¬pp (F0 zero_z2064990175poly_a)* ∨ X1 = fTrue*]/5099`
+5.625[zip.saturate] ### step  2506 ###
+5.625[zip.saturate]
+    given (2506 steps, penalty 1):
+      `forall (F0:poly_poly_poly_a → bool) (X1:bool).
+       [F0 (sk_P314 F0) ≠ fFalse* ∨ 
+        ¬pp (F0 zero_z2064990175poly_a)* ∨ X1 = fFalse*]/5100`
+5.649[zip.saturate] ### step  2507 ###
+5.649[zip.saturate]
+    given (2507 steps, penalty 1):
+      `forall (X0:poly_a).
+       [X0 = zero_zero_poly_a* ∨ 
+        ¬pp (is_zero_a (monom_a (sk_A216 is_zero_a) zero_zero_nat))+*]/15958`
+5.661[zip.saturate] ### step  2509 ###
+5.661[zip.saturate]
+    given (2509 steps, penalty 1):
+      `forall (F0:poly_a → bool) (X1:bool).
+       [fFalse ≠ F0 (sk_P315 F0)* ∨ ¬pp (F0 zero_zero_poly_a)* ∨ 
+        X1 = fTrue*]/5539`
+5.680[zip.saturate] ### step  2510 ###
+5.680[zip.saturate]
+    given (2510 steps, penalty 1):
+      `forall (F0:poly_a → bool) (X1:bool).
+       [F0 (sk_P315 F0) ≠ fFalse* ∨ ¬pp (F0 zero_zero_poly_a)* ∨ 
+        X1 = fFalse*]/5540`
+5.704[zip.saturate] ### step  2511 ###
+5.704[zip.saturate]
+    given (2511 steps, penalty 1):
+      `forall (F0:poly_nat → bool) (X1:bool).
+       [fFalse ≠ F0 (sk_P316 F0)* ∨ ¬pp (F0 zero_zero_poly_nat)* ∨ 
+        X1 = fTrue*]/6422`
+5.742[zip.saturate] ### step  2515 ###
+5.742[zip.saturate]
+    given (2515 steps, penalty 1):
+      `forall (F0:poly_nat → bool) (X1:bool).
+       [F0 (sk_P316 F0) ≠ fFalse* ∨ ¬pp (F0 zero_zero_poly_nat)* ∨ 
+        X1 = fFalse*]/6423`
+5.757[zip.saturate] ### step  2516 ###
+5.757[zip.saturate]
+    given (2516 steps, penalty 1):
+      `forall (X0:poly_nat) (X1:nat) (X3:bool).
+       [is_zero_nat X0 ≠ ord_less_eq_nat X1 X1+* ∨ 
+        X0 = zero_zero_poly_nat ∨ X3 = fTrue*]/7360`
+5.764[zip.saturate] ### step  2517 ###
+5.764[zip.saturate]
+    given (2517 steps, penalty 1):
+      `forall (X0:poly_poly_a) (X1:nat) (X3:bool).
+       [is_zero_poly_a X0 ≠ ord_less_eq_nat X1 X1+* ∨ 
+        X0 = zero_z2096148049poly_a ∨ X3 = fTrue*]/7361`
+5.767[zip.saturate] ### step  2518 ###
+5.767[zip.saturate]
+    given (2518 steps, penalty 1):
+      `forall (X0:poly_a) (X1:nat) (X3:bool).
+       [is_zero_a X0 ≠ ord_less_eq_nat X1 X1+* ∨ 
+        X0 = zero_zero_poly_a ∨ X3 = fTrue*]/7362`
+5.771[zip.saturate] ### step  2519 ###
+5.771[zip.saturate]
+    given (2519 steps, penalty 1):
+      `forall (X0:poly_nat) (X2:nat) (X3:bool).
+       [ord_less_eq_nat X2 X2 ≠ is_zero_nat X0+* ∨ 
+        X0 = zero_zero_poly_nat ∨ X3 = fFalse*]/7403`
+5.777[zip.saturate] ### step  2520 ###
+5.777[zip.saturate]
+    given (2520 steps, penalty 1):
+      `forall (X0:poly_poly_a) (X2:nat) (X3:bool).
+       [ord_less_eq_nat X2 X2 ≠ is_zero_poly_a X0+* ∨ 
+        X0 = zero_z2096148049poly_a ∨ X3 = fFalse*]/7404`
+5.788[zip.saturate] ### step  2521 ###
+5.788[zip.saturate]
+    given (2521 steps, penalty 1):
+      `forall (X0:poly_a) (X2:nat) (X3:bool).
+       [ord_less_eq_nat X2 X2 ≠ is_zero_a X0+* ∨ 
+        X0 = zero_zero_poly_a ∨ X3 = fFalse*]/7405`
+5.799[zip.saturate] ### step  2522 ###
+5.799[zip.saturate]
+    given (2522 steps, penalty 1):
+      `forall (F0:poly_poly_a → bool) (X1:bool).
+       [fFalse ≠ F0 (sk_P317 F0)* ∨ 
+        ¬pp (F0 zero_z2096148049poly_a)* ∨ X1 = fTrue*]/8216`
+5.816[zip.saturate] ### step  2523 ###
+5.816[zip.saturate]
+    given (2523 steps, penalty 1):
+      `forall (F0:poly_poly_a → bool) (X1:bool).
+       [F0 (sk_P317 F0) ≠ fFalse* ∨ 
+        ¬pp (F0 zero_z2096148049poly_a)* ∨ X1 = fFalse*]/8217`
+5.850[zip.saturate] ### step  2525 ###
+5.850[zip.saturate]
+    given (2525 steps, penalty 1):
+      `forall (F0:poly_poly_a → bool) (X1:poly_a).
+       [F0 (sk_P317 F0) ≠ fFalse* ∨ 
+        ¬pp (F0 zero_z2096148049poly_a)* ∨ X1 = zero_zero_poly_a*]/11325`
+5.874[zip.saturate] ### step  2526 ###
+5.874[zip.saturate]
+    given (2526 steps, penalty 1):
+      `forall (F0:poly_nat → bool) (X1:poly_a).
+       [F0 (sk_P316 F0) ≠ fFalse* ∨ ¬pp (F0 zero_zero_poly_nat)* ∨ 
+        X1 = zero_zero_poly_a*]/11326`
+5.896[zip.saturate] ### step  2527 ###
+5.896[zip.saturate]
+    given (2527 steps, penalty 1):
+      `forall (F0:poly_a → bool) (X1:poly_a).
+       [F0 (sk_P315 F0) ≠ fFalse* ∨ ¬pp (F0 zero_zero_poly_a)* ∨ 
+        X1 = zero_zero_poly_a*]/11327`
+5.909[zip.saturate] ### step  2528 ###
+5.909[zip.saturate]
+    given (2528 steps, penalty 1):
+      `forall (F0:poly_poly_poly_a → bool) (X1:poly_a).
+       [F0 (sk_P314 F0) ≠ fFalse* ∨ 
+        ¬pp (F0 zero_z2064990175poly_a)* ∨ X1 = zero_zero_poly_a*]/11328`
+5.923[zip.saturate] ### step  2529 ###
+5.923[zip.saturate]
+    given (2529 steps, penalty 1):
+      `forall (F0:poly_poly_nat → bool) (X1:poly_a).
+       [F0 (sk_P313 F0) ≠ fFalse* ∨ 
+        ¬pp (F0 zero_z1059985641ly_nat)* ∨ X1 = zero_zero_poly_a*]/11329`
+5.939[zip.saturate] ### step  2530 ###
+5.940[zip.saturate]
+    given (2530 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:poly_a).
+       [F0 X1 ≠ fFalse* ∨ ¬zip_tseitin1 (sk_N21 F0) F0* ∨ 
+        X2 = zero_zero_poly_a*]/11330`
+5.955[zip.saturate] ### step  2532 ###
+5.955[zip.saturate]
+    given (2532 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:poly_a).
+       [F0 X1 ≠ fFalse* ∨ ¬zip_tseitin1 (sk_N2 F0) F0* ∨ 
+        X2 = zero_zero_poly_a*]/11331`
+5.998[zip.saturate] ### step  2533 ###
+5.998[zip.saturate]
+    given (2533 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:poly_a).
+       [F0 X1 ≠ fFalse* ∨ ¬pp (F0 (sk_N21 F0))* ∨ 
+        X2 = zero_zero_poly_a*]/11333`
+6.017[zip.saturate] ### step  2534 ###
+6.018[zip.saturate]
+    given (2534 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:poly_a).
+       [F0 X1 ≠ fFalse* ∨ ¬pp (F0 (sk_N2 F0))* ∨ 
+        X2 = zero_zero_poly_a*]/11334`
+6.044[zip.saturate] ### step  2539 ###
+6.044[zip.saturate]
+    given (2539 steps, penalty 1):
+      `forall (F0:poly_poly_a → bool) (X1:poly_poly_a).
+       [F0 (sk_P317 F0) ≠ fFalse* ∨ 
+        ¬pp (F0 zero_z2096148049poly_a)* ∨ X1 = zero_z2096148049poly_a*]/11503`
+6.057[zip.saturate] ### step  2540 ###
+6.057[zip.saturate]
+    given (2540 steps, penalty 1):
+      `forall (F0:poly_nat → bool) (X1:poly_poly_a).
+       [F0 (sk_P316 F0) ≠ fFalse* ∨ ¬pp (F0 zero_zero_poly_nat)* ∨ 
+        X1 = zero_z2096148049poly_a*]/11504`
+6.070[zip.saturate] ### step  2541 ###
+6.070[zip.saturate]
+    given (2541 steps, penalty 1):
+      `forall (F0:poly_a → bool) (X1:poly_poly_a).
+       [F0 (sk_P315 F0) ≠ fFalse* ∨ ¬pp (F0 zero_zero_poly_a)* ∨ 
+        X1 = zero_z2096148049poly_a*]/11505`
+6.092[zip.saturate] ### step  2542 ###
+6.092[zip.saturate]
+    given (2542 steps, penalty 1):
+      `forall (F0:poly_poly_poly_a → bool) (X1:poly_poly_a).
+       [F0 (sk_P314 F0) ≠ fFalse* ∨ 
+        ¬pp (F0 zero_z2064990175poly_a)* ∨ X1 = zero_z2096148049poly_a*]/11506`
+6.105[zip.saturate] ### step  2543 ###
+6.105[zip.saturate]
+    given (2543 steps, penalty 1):
+      `forall (F0:poly_poly_nat → bool) (X1:poly_poly_a).
+       [F0 (sk_P313 F0) ≠ fFalse* ∨ 
+        ¬pp (F0 zero_z1059985641ly_nat)* ∨ X1 = zero_z2096148049poly_a*]/11507`
+6.126[zip.saturate] ### step  2544 ###
+6.126[zip.saturate]
+    given (2544 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:poly_poly_a).
+       [F0 X1 ≠ fFalse* ∨ ¬zip_tseitin1 (sk_N21 F0) F0* ∨ 
+        X2 = zero_z2096148049poly_a*]/11508`
+6.144[zip.saturate] ### step  2545 ###
+6.144[zip.saturate]
+    given (2545 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:poly_poly_a).
+       [F0 X1 ≠ fFalse* ∨ ¬zip_tseitin1 (sk_N2 F0) F0* ∨ 
+        X2 = zero_z2096148049poly_a*]/11509`
+6.167[zip.saturate] ### step  2546 ###
+6.167[zip.saturate]
+    given (2546 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:poly_poly_a).
+       [F0 X1 ≠ fFalse* ∨ ¬pp (F0 (sk_N21 F0))* ∨ 
+        X2 = zero_z2096148049poly_a*]/11511`
+6.182[zip.saturate] ### step  2547 ###
+6.182[zip.saturate]
+    given (2547 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:poly_poly_a).
+       [F0 X1 ≠ fFalse* ∨ ¬pp (F0 (sk_N2 F0))* ∨ 
+        X2 = zero_z2096148049poly_a*]/11512`
+6.212[zip.saturate] ### step  2548 ###
+6.212[zip.saturate]
+    given (2548 steps, penalty 1):
+      `forall (F0:poly_poly_a → bool) (X1:poly_nat).
+       [F0 (sk_P317 F0) ≠ fFalse* ∨ 
+        ¬pp (F0 zero_z2096148049poly_a)* ∨ X1 = zero_zero_poly_nat*]/11677`
+6.245[zip.saturate] ### step  2550 ###
+6.245[zip.saturate]
+    given (2550 steps, penalty 1):
+      `forall (F0:poly_nat → bool) (X1:poly_nat).
+       [F0 (sk_P316 F0) ≠ fFalse* ∨ ¬pp (F0 zero_zero_poly_nat)* ∨ 
+        X1 = zero_zero_poly_nat*]/11678`
+6.278[zip.saturate] ### step  2551 ###
+6.278[zip.saturate]
+    given (2551 steps, penalty 1):
+      `forall (F0:poly_a → bool) (X1:poly_nat).
+       [F0 (sk_P315 F0) ≠ fFalse* ∨ ¬pp (F0 zero_zero_poly_a)* ∨ 
+        X1 = zero_zero_poly_nat*]/11679`
+6.301[zip.saturate] ### step  2552 ###
+6.301[zip.saturate]
+    given (2552 steps, penalty 1):
+      `forall (F0:poly_poly_poly_a → bool) (X1:poly_nat).
+       [F0 (sk_P314 F0) ≠ fFalse* ∨ 
+        ¬pp (F0 zero_z2064990175poly_a)* ∨ X1 = zero_zero_poly_nat*]/11680`
+6.316[zip.saturate] ### step  2553 ###
+6.316[zip.saturate]
+    given (2553 steps, penalty 1):
+      `forall (F0:poly_poly_nat → bool) (X1:poly_nat).
+       [F0 (sk_P313 F0) ≠ fFalse* ∨ 
+        ¬pp (F0 zero_z1059985641ly_nat)* ∨ X1 = zero_zero_poly_nat*]/11681`
+6.341[zip.saturate] ### step  2554 ###
+6.341[zip.saturate]
+    given (2554 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:poly_nat).
+       [F0 X1 ≠ fFalse* ∨ ¬zip_tseitin1 (sk_N21 F0) F0* ∨ 
+        X2 = zero_zero_poly_nat*]/11682`
+6.352[zip.saturate] ### step  2555 ###
+6.352[zip.saturate]
+    given (2555 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:poly_nat).
+       [F0 X1 ≠ fFalse* ∨ ¬zip_tseitin1 (sk_N2 F0) F0* ∨ 
+        X2 = zero_zero_poly_nat*]/11683`
+6.370[zip.saturate] ### step  2556 ###
+6.370[zip.saturate]
+    given (2556 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:poly_nat).
+       [F0 X1 ≠ fFalse* ∨ ¬pp (F0 (sk_N21 F0))* ∨ 
+        X2 = zero_zero_poly_nat*]/11685`
+6.386[zip.saturate] ### step  2557 ###
+6.386[zip.saturate]
+    given (2557 steps, penalty 1):
+      `forall (F0:nat → bool) (X1:nat) (X2:poly_nat).
+       [F0 X1 ≠ fFalse* ∨ ¬pp (F0 (sk_N2 F0))* ∨ 
+        X2 = zero_zero_poly_nat*]/11686`
+6.408[zip.saturate] ### step  2558 ###
+6.408[zip.saturate]
+    given (2558 steps, penalty 1):
+      `forall (X0:poly_nat) (X2:nat) (X3:poly_a).
+       [ord_less_eq_nat X2 X2 ≠ is_zero_nat X0+* ∨ 
+        X0 = zero_zero_poly_nat ∨ X3 = zero_zero_poly_a*]/13160`
+6.413[zip.saturate] ### step  2559 ###
+6.413[zip.saturate]
+    given (2559 steps, penalty 1):
+      `forall (X0:poly_poly_a) (X2:nat) (X3:poly_a).
+       [ord_less_eq_nat X2 X2 ≠ is_zero_poly_a X0+* ∨ 
+        X0 = zero_z2096148049poly_a ∨ X3 = zero_zero_poly_a*]/13161`
+6.419[zip.saturate] ### step  2560 ###
+6.419[zip.saturate]
+    given (2560 steps, penalty 1):
+      `forall (X0:nat) (X1:poly_a).
+       [ord_less_eq_nat X0 X0 ≠ is_zero_a X1+* ∨ X1 = zero_zero_poly_a]/16314`
+6.437[zip.saturate] ### step  2562 ###
+6.437[zip.saturate]
+    given (2562 steps, penalty 1):
+      `forall (X0:poly_nat) (X2:nat) (X3:poly_poly_a).
+       [ord_less_eq_nat X2 X2 ≠ is_zero_nat X0+* ∨ 
+        X0 = zero_zero_poly_nat ∨ X3 = zero_z2096148049poly_a*]/13684`
+6.440[zip.saturate] ### step  2563 ###
+6.440[zip.saturate]
+    given (2563 steps, penalty 1):
+      `forall (X0:nat) (X1:poly_poly_a).
+       [ord_less_eq_nat X0 X0 ≠ is_zero_poly_a X1+* ∨ 
+        X1 = zero_z2096148049poly_a]/16359`
+6.444[zip.saturate] ### step  2565 ###
+6.444[zip.saturate]
+    given (2565 steps, penalty 1):
+      `forall (X0:nat) (X1:poly_nat).
+       [ord_less_eq_nat X0 X0 ≠ is_zero_nat X1+* ∨ 
+        X1 = zero_zero_poly_nat]/16361`
+6.448[zip.saturate] ### step  2568 ###
+6.448[zip.saturate]
+    given (2568 steps, penalty 1):
+      `forall (X0:poly_nat) (X1:a) (X3:a) (X4:a).
+       [¬fundam396953934nt_a_a (if_a (is_zero_nat X0) X1)+* ∨ 
+        X0 = zero_zero_poly_nat ∨ X3 = X4*]/8353`
+6.452[zip.saturate] ### step  2569 ###
+6.452[zip.saturate]
+    given (2569 steps, penalty 1):
+      `forall (X0:poly_poly_a) (X1:a) (X3:a) (X4:a).
+       [¬fundam396953934nt_a_a (if_a (is_zero_poly_a X0) X1)+* ∨ 
+        X0 = zero_z2096148049poly_a ∨ X3 = X4*]/8354`
+6.455[zip.saturate] ### step  2570 ###
+6.455[zip.saturate]
+    given (2570 steps, penalty 1):
+      `forall (X0:poly_a) (X1:a) (X3:a) (X4:a).
+       [¬fundam396953934nt_a_a (if_a (is_zero_a X0) X1)+* ∨ 
+        X0 = zero_zero_poly_a ∨ X3 = X4*]/8355`
+6.462[zip.saturate] ### step  2571 ###
+6.462[zip.saturate]
+    given (2571 steps, penalty 1):
+      `forall (X0:nat) (X1:nat) (X2:bool).
+       [fFalse ≠ ord_less_eq_nat X1 X0+* ∨ ¬pp (ord_less_nat X1 X0) ∨ 
+        X2 = fTrue*]/4735`
+6.466[zip.saturate] ### step  2572 ###
+6.466[zip.saturate]
+    given (2572 steps, penalty 1):
+      `forall (X0:nat) (X1:nat) (X2:bool).
+       [ord_less_eq_nat X1 X0 ≠ fFalse+* ∨ ¬pp (ord_less_nat X1 X0) ∨ 
+        X2 = fFalse*]/4736`
+6.469[zip.saturate] ### step  2573 ###
+6.469[zip.saturate]
+    given (2573 steps, penalty 1):
+      `forall (X0:nat) (X1:nat) (X2:poly_a).
+       [ord_less_eq_nat X1 X0 ≠ fFalse+* ∨ ¬pp (ord_less_nat X1 X0) ∨ 
+        X2 = zero_zero_poly_a*]/11332`
+6.473[zip.saturate] ### step  2574 ###
+6.473[zip.saturate]
+    given (2574 steps, penalty 1):
+      `forall (X0:nat) (X1:nat) (X2:poly_poly_a).
+       [ord_less_eq_nat X1 X0 ≠ fFalse+* ∨ ¬pp (ord_less_nat X1 X0) ∨ 
+        X2 = zero_z2096148049poly_a*]/11510`
+6.505[zip.saturate] ### step  2577 ###
+6.505[zip.saturate]
+    given (2577 steps, penalty 1):
+      `forall (X0:nat) (X1:nat) (X2:poly_nat).
+       [ord_less_eq_nat X1 X0 ≠ fFalse+* ∨ ¬pp (ord_less_nat X1 X0) ∨ 
+        X2 = zero_zero_poly_nat*]/11684`
+6.521[zip.saturate] ### step  2616 ###
+6.521[zip.saturate]
+    given (2616 steps, penalty 1):
+      `forall (X0:nat) (X1:nat) (X2:bool).
+       [X1 = X0 ∨ fequal_nat X1 X0 = X2* ∨ X2 = fTrue*]/1860`
+6.554[zip.saturate] ### step  2617 ###
+6.554[zip.saturate]
+    given (2617 steps, penalty 1):
+      `forall (X0:nat) (X1:bool).
+       [X0 = zero_zero_nat ∨ ord_less_eq_nat X0 zero_zero_nat = X1* ∨ 
+        X1 = fTrue*]/1910`
+6.613[zip.saturate] ### step  2618 ###
+6.613[zip.saturate]
+    given (2618 steps, penalty 1):
+      `forall (X0:nat) (X1:bool).
+       [X0 = zero_zero_nat ∨ ord_less_nat X0 one_one_nat = X1* ∨ 
+        X1 = fTrue*]/1914`
+6.653[zip.saturate] ### step  2626 ###
+6.653[zip.saturate]
+    given (2626 steps, penalty 1):
+      `forall (X0:nat) (X1:bool).
+       [X0 = zero_zero_nat ∨ ord_less_nat zero_zero_nat X0 = X1* ∨ 
+        X1 = fFalse*]/2327`
