@@ -146,20 +146,19 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     |> Iter.to_list
 
   let get_triggers c =
+    let trivial_trigger t =
+      T.is_const (T.head_term t) ||
+      T.is_var (snd @@ T.open_fun t) in
+
+
     Literals.fold_terms ~ord ~subterms:true ~eligible:C.Eligible.always 
                         ~which:`All (C.lits c) ~fun_bodies:false 
-    |> Iter.filter_map (fun (t,_) -> 
+    |> Iter.filter_map (fun (t,p) -> 
       let ty = Term.ty t and hd = Term.head_term t in
-      let var_set = InnerTerm.Seq.vars (t:>InnerTerm.t) |> InnerTerm.VarSet.of_seq in
-      let cannonize_subst = Subst.FO.canonize_vars ~var_set in
-      let cached_t = Subst.FO.apply Subst.Renaming.none cannonize_subst (t,0) in
+      let cached_t = Subst.FO.canonize_all_vars t in
       if not (Term.Set.mem cached_t !Higher_order.prim_enum_terms) &&
-         Type.is_fun ty && Type.returns_prop ty && not (Term.is_var hd) then (
-        
-        (* CCFormat.printf "[trigger:%a:%a]\n" T.pp t Type.pp (Term.ty t);
-        CCFormat.printf "[set:%a]\n" (Term.Set.pp T.pp) !Higher_order.prim_enum_terms; *)
-
-
+         Type.is_fun ty && Type.returns_prop ty && not (Term.is_var hd) &&
+         not (trivial_trigger t) then (        
         Some t
       ) else None
     )
@@ -200,16 +199,17 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Lits.fold_terms ~vars:!_sup_at_vars ~var_args:!_sup_in_var_args ~fun_bodies:!_sup_under_lambdas ~ty_args:false ~ord ~which:`Max ~subterms:true
         ~eligible:(C.Eligible.res c) (C.lits c)
       |> Iter.filter (fun (t, _) ->
-            (* Util.debugf ~section 5 "@[ Filtering vars %a,1  @]" (fun k-> k T.pp t); *)
+            (* Util.debugf ~section 3 "@[ Filtering vars %a,1  @]" (fun k-> k T.pp t); *)
+            not (T.equal t T.false_) && (* disabling paramodulation false *)
             not (T.is_var t) || T.is_ho_var t)
       (* TODO: could exclude more variables from the index:
          they are not needed if they occur with the same args everywhere in the clause *)
       |> Iter.filter (fun (t, _) ->
-         (* Util.debugf ~section 5 "@[ Filtering vars %a,2  @]" (fun k-> k T.pp t); *)
+         (* Util.debugf ~section 3 "@[ Filtering vars %a,2  @]" (fun k-> k T.pp t); *)
          !_sup_at_var_headed || not (T.is_var (T.head_term t)))
       |> Iter.fold
         (fun tree (t, pos) ->
-           (* Util.debugf ~section 5 "@[ Adding %a to into index %B @]" (fun k-> k T.pp t !_sup_under_lambdas); *)
+           (* Util.debugf ~section 3 "@[ Adding %a to into index %B @]" (fun k-> k T.pp t !_sup_under_lambdas); *)
            let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
            f tree t with_pos)
         !_idx_sup_into;
@@ -269,6 +269,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     _idx_sup_from :=
       Lits.fold_eqn ~ord ~both:true ~sign:true
         ~eligible:(C.Eligible.param c) (C.lits c)
+      |> Iter.filter((fun (l, _, _, _) -> not (T.equal T.false_ l)))
       |> Iter.fold
         (fun tree (l, _, sign, pos) ->
            assert sign;
@@ -433,7 +434,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let var' = S.FO.apply renaming subst (var, info.scope_passive) in
     if (not (Type.is_fun (Term.ty var')) || not (O.might_flip ord var' replacement'))
     then (
-      Util.debugf ~section 5
+      Util.debugf ~section 3
         "Cannot flip: %a = %a"
         (fun k->k T.pp var' T.pp replacement');
       false (* If the lhs vs rhs cannot flip, we don't need a sup at var *)
@@ -446,7 +447,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         let passive_t'_lits = Lits.apply_subst renaming subst_t (C.lits info.passive, info.scope_passive) in
         if Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt
         then (
-          Util.debugf ~section 5
+          Util.debugf ~section 3
             "Sup at var condition is not fulfilled because: %a >= %a"
             (fun k->k Lits.pp passive'_lits Lits.pp passive_t'_lits);
           false
@@ -485,7 +486,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     assert(Array.for_all Literal.no_prop_invariant (C.lits info.passive));
     assert(Array.for_all Literal.no_prop_invariant (C.lits info.passive));
     try
-      Util.debugf ~section 1 
+      Util.debugf ~section 3 
       "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a@]@])@ \
         (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
       (fun k -> k
@@ -509,14 +510,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
          |> Iter.exists (fun st ->
               List.exists (fun arg -> not @@ T.DB.is_closed arg)
               (T.get_mand_args st))) then (
-        Util.debugf ~section 1 "LambdaSup sneaks in bound variables under the skolem" (fun k->k);
+        Util.debugf ~section 3 "LambdaSup sneaks in bound variables under the skolem" (fun k->k);
         raise @@ ExitSuperposition("LambdaSup sneaks in bound variables under the skolem");
       );
       if(info.sup_kind = LambdaSup && 
          T.Set.exists (fun v -> 
             not @@ T.DB.is_closed @@  Subst.FO.apply renaming subst (v,sc_p)) 
          lambdasup_vars) then (
-        Util.debugf ~section 1 "LambdaSup -- an into free variable sneaks in bound variable" (fun k->k);
+        Util.debugf ~section 3 "LambdaSup -- an into free variable sneaks in bound variable" (fun k->k);
         raise @@ ExitSuperposition("LambdaSup -- an into free variable sneaks in bound variable");
       );
 
@@ -529,7 +530,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           let v' = S.FO.apply ~shift_vars:0 renaming subst (v, sc_p) in
           if T.equal t' v'
           then (
-            Util.debugf ~section 1 "will yield a tautology" (fun k->k);
+            Util.debugf ~section 3 "will yield a tautology" (fun k->k);
             raise (ExitSuperposition "will yield a tautology");)
         | _ -> ()
       end;
@@ -549,7 +550,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         vars_bound_to_closed_terms vars_p sc_p;
 
         if Util.Int_set.cardinal (Util.Int_set.of_list !dbs)  > !_lambdasup   then (
-          Util.debugf ~section 1 "Too many skolems will be introduced for LambdaSup." (fun k->k);
+          Util.debugf ~section 3 "Too many skolems will be introduced for LambdaSup." (fun k->k);
           raise (ExitSuperposition "Too many skolems will be introduced for LambdaSup.");
         )
       );     
@@ -566,7 +567,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
          |> Iter.exists (fun st ->
               List.exists (fun arg -> not @@ T.DB.is_closed arg)
               (T.get_mand_args st))) then (
-        Util.debugf ~section 1 "LambdaSup sneaks in bound variables under the skolem" (fun k->k);
+        Util.debugf ~section 3 "LambdaSup sneaks in bound variables under the skolem" (fun k->k);
         raise @@ ExitSuperposition("LambdaSup sneaks in bound variables under the skolem");
       );
       if (
@@ -580,7 +581,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         if not !_sup_at_vars then
           assert (not (T.is_var info.u_p))
         else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then (
-          Util.debugf ~section 1 "superposition at variable" (fun k->k);
+          Util.debugf ~section 3 "superposition at variable" (fun k->k);
           raise (ExitSuperposition "superposition at variable");
         );
 
@@ -649,9 +650,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         + (if T.is_var s' then 2 else 0) (* superposition from var = bad *)
       in
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
-      if info.sup_kind = LambdaSup then
-        (* Format.printf "LS: %a\n" C.pp new_clause;  *)
-        Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
+      (* Format.printf "LS: %a\n" C.pp new_clause;  *)
+      Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       assert (List.for_all (Lit.for_all Term.DB.is_closed) new_lits); 
       assert(Array.for_all Literal.no_prop_invariant (C.lits new_clause));
       Some new_clause
@@ -1399,9 +1399,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let rule  = Proof.Rule.mk "instantiate_w_trigger" in
       let proof = Proof.Step.inference ~rule [C.proof_parent_subst renaming (c, 0) sub] in
       let new_clause = C.create ~trail ~penalty (CCArray.to_list new_lits) proof in
-
       (* CCFormat.printf "[BOOL_INST: %a, %a => %a].\n" C.pp c Subst.pp sub C.pp new_clause; *)
-
       assert (C.Seq.terms c |> Iter.for_all T.DB.is_closed);
       assert (C.Seq.terms new_clause |> Iter.for_all T.DB.is_closed);
       new_clause)
@@ -1468,7 +1466,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            let active_idx = Lits.Pos.idx s_pos in
            let is_var_pred = 
             T.is_var (T.head_term s) && Type.is_prop (T.ty s) && T.is_true_or_false t in
-           if T.equal t T.false_ && not is_var_pred then Iter.empty 
+           if T.equal s T.false_ then Iter.empty (* disable factoring from false*)
+           else if T.equal t T.false_ && not is_var_pred then Iter.empty 
            else (
               let var_pred_status = (is_var_pred, t) in
               find_unifiable_lits ~var_pred_status active_idx s s_pos)
@@ -1596,7 +1595,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                    (S.FO.apply rename subst (r,cur_sc)) = Comp.Gt)
                 (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
              then (
-               Util.debugf ~section 5
+               Util.debugf ~section 3
                  "@[<hv2>demod:@ @[<hv>t=%a[%d],@ l=%a[%d],@ r=%a[%d]@],@ subst=@[%a@]@]"
                  (fun k->k T.pp t 0 T.pp l cur_sc T.pp r cur_sc S.pp subst);
 
@@ -1617,7 +1616,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | Some (rhs,subst,cur_sc) ->
           (* reduce [rhs] in current scope [cur_sc] *)
           assert (cur_sc < st.demod_sc);
-          Util.debugf ~section 5
+          Util.debugf ~section 3
             "@[<2>demod:@ rewrite `@[%a@]`@ into `@[%a@]`@ using %a[%d]@]"
             (fun k->k T.pp t T.pp rhs Subst.pp subst cur_sc);
           (* NOTE: we retraverse the term several times, but this is simpler *)
@@ -1757,7 +1756,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let canonize_variables c =
     let all_vars = Literals.vars (C.lits c) 
                    |> (fun v -> InnerTerm.VarSet.of_list (v:>InnerTerm.t HVar.t list)) in
-    let neg_vars_renaming = Subst.FO.canonize_vars ~var_set:all_vars in 
+    let neg_vars_renaming = Subst.FO.canonize_neg_vars ~var_set:all_vars in 
     if Subst.is_empty neg_vars_renaming then SimplM.return_same c
     else (
       let new_lits = Literals.apply_subst Subst.Renaming.none neg_vars_renaming (C.lits c, 0)
@@ -2339,9 +2338,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let (c_a, _), (c_b, _) = a,b in
     let w_a = CCArray.fold (fun acc l -> acc + Lit.weight l) 0 c_a in
     let w_b = CCArray.fold (fun acc l -> acc + Lit.weight l) 0 c_b in
-    let res = if w_a <= w_b then subsumes_with_ a b else None in
-    Util.exit_prof prof_subsumption;
-    res
+
+    if w_a = w_b && Literals.equal_com c_a c_b then Some (Subst.empty, [])
+    else (
+      let res = if w_a <= w_b then subsumes_with_ a b else None in
+      Util.exit_prof prof_subsumption;
+      res
+    )
 
   let subsumes a b = match subsumes_with (a,0) (b,1) with
     | None -> false
@@ -2421,7 +2424,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     Util.exit_prof prof_subsumption_set;
     if res then (
-      Util.debugf ~section 3 "@[<2>@[%a@]@ subsumed by active set@]" (fun k->k C.pp c);
+      Util.debugf ~section 1 "@[<2>@[%a@]@ subsumed by active set@]" (fun k->k C.pp c);
       Util.incr_stat stat_clauses_subsumed;
     );
     res
@@ -2956,12 +2959,12 @@ let () =
       _sup_at_var_headed := true;
       _lambdasup := -1;
       _dupsup := false;
-      _max_infs := 7;
+      _max_infs := 10;
       PragHOUnif.max_depth := 6;
-      PragHOUnif.max_app_projections := 3;
-      PragHOUnif.max_var_imitations := 2;
-      PragHOUnif.max_identifications := 2;
-      PragHOUnif.max_elims := 2;
+      PragHOUnif.max_app_projections := 1;
+      PragHOUnif.max_var_imitations := 1;
+      PragHOUnif.max_identifications := 1;
+      PragHOUnif.max_elims := 1;
       _fluidsup := false;
     );
     Params.add_to_mode "fo-complete-basic" (fun () ->

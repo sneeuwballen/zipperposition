@@ -782,6 +782,14 @@ module Form = struct
     | [] -> false_
     | [t] -> t
     | a :: tail -> List.fold_left or_ a tail
+
+  let forall t =
+    assert(Type.is_fun (ty t) && Type.returns_prop (ty t));
+    app_builtin ~ty:Type.prop Builtin.ForallConst [t]
+  
+  let exists t =
+    assert(Type.is_fun (ty t) && Type.returns_prop (ty t));
+    app_builtin ~ty:Type.prop Builtin.ForallConst [t]
 end
 
 (** {2 Arith} *)
@@ -1218,6 +1226,10 @@ let simplify_bools t =
             if equal s s' then t else
             app_builtin ~ty:(Type.prop) Builtin.Not [s'] 
         )
+    | AppBuiltin(Builtin.Imply, [p;c]) ->
+      if T.equal p true_ then c
+      else if T.equal p false_ then true_
+      else t
     | AppBuiltin(hd, [a;b]) 
         when hd = Builtin.Eq || hd = Builtin.Equiv ->
       if equal a b then true_ else (

@@ -350,6 +350,8 @@ module Form : sig
   val or_ : t -> t -> t
   val and_l : t list -> t
   val or_l : t list -> t
+  val forall : t -> t
+  val exists : t -> t
 end
 
 (** {2 Arith} *)

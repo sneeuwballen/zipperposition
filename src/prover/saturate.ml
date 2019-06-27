@@ -114,7 +114,7 @@ module Make(E : Env.S) = struct
         begin match Env.all_simplify c with
           | [], _ ->
             Util.incr_stat stat_redundant_given;
-            Util.debugf ~section 2 "@[<2>given clause @[%a@]@ is redundant@]"
+            Util.debugf ~section 2 "@[<2>given clause dropped @[%a@]@@]"
               (fun k->k Env.C.pp c);
             Unknown
           | l, _ when List.exists Env.C.is_empty l ->

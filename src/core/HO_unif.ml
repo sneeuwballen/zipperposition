@@ -120,7 +120,8 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
           let log_ops = 
           CCList.mapi (fun j db_j ->
             if i < j && Type.equal (T.ty db_i) (T.ty db_j) then (
-              let res = [T.fun_l ty_args (T.Form.eq db_i db_j);] in
+              let res = [T.fun_l ty_args (T.Form.eq db_i db_j);
+                         T.fun_l ty_args (T.Form.neq db_i db_j);] in
               if Type.is_prop (T.ty db_i) then
                res @
                 [T.fun_l ty_args (T.Form.and_ db_i db_j);
@@ -143,9 +144,7 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
           
           (* Caching of primitive enumeration terms, so that trigger-based instantiation
              does not catch them. *)
-          let var_set = InnerTerm.Seq.vars (t:>InnerTerm.t) |> InnerTerm.VarSet.of_seq in
-          let cannonize_subst = Subst.FO.canonize_vars ~var_set in
-          let cached_t = Subst.FO.apply Subst.Renaming.none cannonize_subst (t,0) in
+          let cached_t = Subst.FO.canonize_all_vars t in
           enum_cache := Term.Set.add cached_t !enum_cache;
           let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
           (subst, penalty) )ts ) 
