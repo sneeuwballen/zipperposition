@@ -43,10 +43,10 @@ module Term : sig
 
     val as_lit : t -> Literal.t
 
-    val make_const : proof:Proof.t -> ID.t -> Type.t -> term -> t
+    val make_const : ?proof:Proof.t -> ID.t -> Type.t -> term -> t
     (** [make_const id ty rhs] is the same as [T.const id ty --> rhs] *)
 
-    val make : proof:Proof.t -> ID.t -> Type.t -> term list -> term -> t
+    val make : ?proof:Proof.t -> ID.t -> Type.t -> term list -> term -> t
     (** [make id ty args rhs] is the same as [T.app (T.const id ty) args --> rhs] *)
 
     include Interfaces.HASH with type t := t

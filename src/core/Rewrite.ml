@@ -206,15 +206,15 @@ module Term = struct
     let vars r = T.vars (lhs r)
     let vars_l r = vars r |> T.VarSet.to_list
 
-    let make_ head args term_lhs term_rhs proof =
+    let make_ ?proof head args term_lhs term_rhs =
       let term_proof =
-        Proof.Step.define head (Proof.Src.internal[]) [Proof.Parent.from proof]
+        Proof.Step.define head (Proof.Src.internal[]) (List.map Proof.Parent.from (CCOpt.to_list proof))
       in
       { term_head=head; term_args=args; term_arity=List.length args;
         term_lhs; term_rhs; term_proof }
 
     (* constant rule [id := rhs] *)
-    let make_const ~proof id ty rhs : t =
+    let make_const ?proof id ty rhs : t =
       let lhs = T.const ~ty id in
       assert (Type.equal (T.ty rhs) (T.ty lhs));
       if not (T.VarSet.is_empty @@ T.vars rhs) then (
@@ -222,10 +222,10 @@ module Term = struct
           "Rule.make_const %a %a:@ invalid rule, RHS contains variables"
           ID.pp id T.pp rhs
       );
-      make_ id [] lhs rhs proof
+      make_ ?proof id [] lhs rhs 
 
     (* [id args := rhs] *)
-    let make ~proof id ty args rhs : t =
+    let make ?proof id ty args rhs : t =
       Util.debugf ~section 1 "Making rule for %a"
          (fun k -> k ID.pp id);
       let lhs = T.app (T.const ~ty id) args in
@@ -234,7 +234,7 @@ module Term = struct
           "Rule.make_const %a %a:@ invalid rule, RHS contains variables"
           ID.pp id T.pp rhs
       );
-      make_ id args lhs rhs proof
+      make_ ?proof id args lhs rhs 
 
     let pp out r = pp_term_rule out r
 

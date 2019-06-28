@@ -160,7 +160,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         | None ->
           (* create new skolems, parametrized by free variables *)
           let vars = Literal.vars lit in
-          let l = List.map (T.mk_fresh_skolem vars) ty_args in
+          let l = List.map (T.mk_fresh_skolem_term vars) ty_args in
           (* save list *)
           idx_ext_neg_lit_ := FV_ext_neg_lit.add !idx_ext_neg_lit_ (lit,l);
           l
@@ -397,7 +397,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                let arg_types = Type.expected_args  @@ T.ty l in
                if CCList.is_empty arg_types then Literal.mk_neq l r
                else (
-                 let skolems = List.map (fun ty -> T.mk_fresh_skolem free_vars ty) arg_types in
+                 let skolems = List.map (fun ty -> T.mk_fresh_skolem_term free_vars ty) arg_types in
                  Literal.mk_neq (T.app l skolems) (T.app r skolems)
                )
               ) subterms in
@@ -419,6 +419,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> CCArray.filter_map (fun x -> x)
     |> CCArray.to_list
 
+  let mk_def_proof id ty vars represents =
+    let rw_rule = Rewrite.Term.Rule.make id ty (List.map T.var vars) represents in
+    Proof.Parent.from (Rewrite.Rule.as_proof (Rewrite.Rule.of_term rw_rule))
+
   let neg_ext (c:C.t) : C.t list =
     let is_eligible = C.Eligible.res c in 
     C.lits c
@@ -428,24 +432,22 @@ module Make(E : Env.S) : S with module Env = E = struct
             when is_eligible i l && Type.is_fun @@ T.ty lhs ->
           let arg_types = Type.expected_args @@ T.ty lhs in
           let free_vars = Literal.vars l |> T.VarSet.of_list |> T.VarSet.to_list in
-          let skolems = List.map (fun ty -> T.mk_fresh_skolem free_vars ty) arg_types in
-          let new_lits = CCList.map (fun (j,x) -> 
-              if i!=j then x
-              else (Literal.mk_neq (T.app lhs skolems) (T.app rhs skolems))
-            ) (C.lits c |> Array.mapi (fun j x -> (j,x)) |> Array.to_list) in
-          let _, skolem_def_clauses, ext_instances = skolems |> CCList.fold_left 
-            (fun (previous_skolems, def_clauses, ext_instances) skolem -> 
+          let skolem_terms, def_proofs, ext_instances = arg_types |> CCList.fold_left 
+            (fun (previous_skolems, def_proofs, ext_instances) ty -> 
               let represented_term = extensionality_clause_diff 
                 (T.app lhs previous_skolems) (T.app rhs previous_skolems) in
+              let skolem_id, skolem_ty, skolem_vars, skolem_term = T.mk_fresh_skolem free_vars ty in
+              let def_proof = mk_def_proof skolem_id skolem_ty skolem_vars represented_term in
               let ext_instance = extensionality_clause_subst 0
                 (T.app lhs previous_skolems) (T.app rhs previous_skolems) in
-              let def_clause = C.create 
-                ~penalty:0 ~trail:Trail.empty [Literal.mk_eq skolem represented_term] 
-                Proof.Step.trivial in
-              (previous_skolems @ [skolem], def_clause :: def_clauses, ext_instance :: ext_instances)) 
+              (previous_skolems @ [skolem_term], def_proof :: def_proofs, ext_instance :: ext_instances)) 
             ([], [], []) in
+          let new_lits = CCList.map (fun (j,x) -> 
+              if i!=j then x
+              else (Literal.mk_neq (T.app lhs skolem_terms) (T.app rhs skolem_terms))
+            ) (C.lits c |> Array.mapi (fun j x -> (j,x)) |> Array.to_list) in
           let proof =
-            Proof.Step.inference (CCList.map C.proof_parent (c :: skolem_def_clauses) 
+            Proof.Step.inference (C.proof_parent c :: def_proofs
               @ CCList.map (C.proof_parent_subst Subst.Renaming.none (extensionality_clause, 0)) ext_instances)
               ~rule:(Proof.Rule.mk "neg_ext")
               ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext]
@@ -470,7 +472,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               when is_eligible i l && Type.is_fun @@ T.ty lhs ->
             let arg_types = Type.expected_args @@ T.ty lhs in
             let free_vars = Literal.vars l |> T.VarSet.of_list |> T.VarSet.to_list in
-            let skolems = List.map (fun ty -> T.mk_fresh_skolem free_vars ty) arg_types in
+            let skolems = List.map (fun ty -> T.mk_fresh_skolem_term free_vars ty) arg_types in
             applied_neg_ext := true;
             Literal.mk_neq (T.app lhs skolems) (T.app rhs skolems)
           | _ -> l) in

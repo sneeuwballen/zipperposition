@@ -483,7 +483,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                  |> Term.VarSet.to_list in
       let sk_with_vars =
         List.fold_left (fun acc t ->
-            let new_sk_vars = Term.mk_fresh_skolem vars (Term.ty t) in
+            let new_sk_vars = Term.mk_fresh_skolem_term vars (Term.ty t) in
             Term.Map.add t new_sk_vars acc)
          Term.Map.empty new_sk in
       let new_lits =

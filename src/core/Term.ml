@@ -492,7 +492,6 @@ let vars_prefix_order t =
 
 let depth t = Seq.subterms_depth t |> Iter.map snd |> Iter.fold max 0
 
-
 (* @param vars the free variables the parameter must depend upon
    @param ty_ret the return type *)
 let mk_fresh_skolem =
@@ -509,9 +508,15 @@ let mk_fresh_skolem =
       Type.forall_fvars ty_vars
          (Type.arrow (List.map HVar.ty vars) ty_ret)
    in
+   id,
+   ty,
+   ty_vars @ vars,
    app_full (const id ~ty)
       (List.map Type.var ty_vars)
       (List.map var vars)
+
+let mk_fresh_skolem_term vars ty_ret =
+  let _, _, _, t = mk_fresh_skolem vars ty_ret in t
 
 let rec head_exn t = match T.view t with
   | T.Const s -> s
@@ -822,7 +827,7 @@ module DB = struct
           (match IntMap.find_opt (i-depth) skolemized with
           | (Some sk) -> (sk, skolemized)
           | None ->
-             let new_sk = mk_fresh_skolem [] (ty subt) in
+             let new_sk = mk_fresh_skolem_term [] (ty subt) in
              let skolemized = IntMap.add (i-depth) new_sk skolemized in
              new_sk,skolemized)
           else subt, skolemized
