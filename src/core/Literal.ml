@@ -1156,13 +1156,18 @@ let as_inj_def lit =
      with Invalid_argument _ -> None)
   | _ -> None
 
+let is_pure_var lit =
+  match lit with 
+  | Equation(l,r,_) -> 
+      begin 
+        try
+          ignore(_as_var l, _as_var r);
+          true
+        with Invalid_argument _ -> false
+      end
+  | _ -> false
+
 let as_pos_pure_var lit =
    match View.as_eqn lit with 
-   | Some (l, r, true) ->
-      (try
-        let val_l, val_r = _as_var l, _as_var r in
-        if (HVar.equal Type.equal val_l val_r) then None
-        else Some (val_l, val_r)  
-       with Invalid_argument _ -> None)
-
+   | Some (l, r, true) when is_pure_var lit && is_pos lit -> Some(_as_var l,_as_var r)
    | _ -> None

@@ -165,6 +165,60 @@ let prefer_app_var ~ord lits =
     ho_sel_driver lits prefer_av_feature
   )
 
+let weight_based_sel_driver ~ord lits f =
+  let min_lit = 
+    CCArray.to_seq lits
+    |> Iter.mapi (fun i el -> f (i,el), i) 
+    |> Iter.min in
+  match min_lit with
+  | None -> BV.empty ()
+  | Some (_, idx) -> 
+    if can_select_lit ~ord lits idx then (
+      let res = BV.empty () in
+      BV.set res idx;
+      res
+    ) else BV.empty ()
+
+let e_sel ~ord lits = 
+  let pred_freq lits = 
+    Literals.fold_eqn ~both:false ~ord ~eligible:(fun _ _ -> true) lits
+    |> Iter.fold (fun acc (l,r,sign,_) -> 
+        if sign && T.equal T.true_ r then (
+          (* positive predicate *)
+            let hd = T.head l in
+            match hd with 
+            | None -> acc
+            | Some id -> 
+                let current_val = ID.Map.get_or id acc ~default:0 in
+                ID.Map.add id (current_val+1) acc
+        ) else acc
+    ) ID.Map.empty in
+  let lit_sel_diff_w l =
+    match l with
+    | Lit.Equation(lhs,rhs,_) ->
+      let lhs_w,rhs_w = CCPair.map_same T.size (lhs,rhs) in
+      100*((max lhs_w rhs_w) - (min lhs_w rhs_w)) + lhs_w + rhs_w
+    | _ -> 0 in
+  let get_pred_freq ~freq_tbl l =
+    match l with
+    | Lit.Equation(l,r,true) when T.is_true_or_false r ->
+      begin 
+        match T.head l with
+        | Some id -> ID.Map.get_or id freq_tbl ~default:0
+        | None -> max_int
+      end
+    | _ -> max_int in
+  let chooser ~freq_tbl (i,l) = 
+    ((if Lit.is_pos l then 1 else 0),
+     (if Lits.is_max ~ord lits i then 100 else 0 +
+      if Lit.is_pure_var l then 10 else 0 +
+        if Lit.is_ground l then 1 else 0),
+     - (lit_sel_diff_w l),
+      get_pred_freq ~freq_tbl l) in
+  let freq_tbl = pred_freq lits in
+  weight_based_sel_driver ~ord lits (chooser ~freq_tbl)
+    
+
 let except_RR_horn (p:parametrized) ~strict ~ord lits =
   if Lits.is_RR_horn_clause lits
   then BV.empty () (* do not select (conditional rewrite rule) *)
@@ -180,6 +234,7 @@ let l =
       "default", default;
       "avoid_app_var", avoid_app_var;
       "prefer_app_var", prefer_app_var;
+      "e-selection", e_sel;
     ]
   and by_ord =
     CCList.flat_map

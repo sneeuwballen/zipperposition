@@ -34,6 +34,10 @@ val except_RR_horn : parametrized -> parametrized
 val default : ord:Ordering.t -> t
 (** Default selection function *)
 
+val e_sel  : ord:Ordering.t -> t
+(** Selection function  identical to E's 
+    SelectMaxLComplexAvoidPosPred  *)
+
 val from_string : ord:Ordering.t -> string -> t
 (** selection function from string (may fail) *)
 

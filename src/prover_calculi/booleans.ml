@@ -248,7 +248,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       | None            -> false 
     ) (C.lits c) in
 
-    let renaming_weight = 60 in
+    let renaming_weight = 120 in
     let max_formula_weight = 
       C.Seq.terms c 
       |> Iter.filter T.is_formula
