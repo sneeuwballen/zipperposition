@@ -132,7 +132,7 @@ let rec app_encode_term toplevel t  =
     | T.Bind (Binder.Forall | Binder.Exists as b, v, u) ->
       if not toplevel then failwith "requires FOOL";
       T.bind ~ty b (app_encode_var v) (app_encode_term true u)
-    | T.Bind (Binder.Lambda as b, v, u) -> failwith "Not implemented: Lambda"
+    | T.Bind (Binder.Lambda, _, _) -> failwith "Not implemented: Lambda"
     | _ -> failwith "Not implemented 002"
 
 (** encode a statement *)

@@ -140,10 +140,7 @@ let pp_clause_in o =
   pp_in (Util.pp_list ~sep:" ∨ " (SLiteral.pp_in o pp_t)) pp_t pp_t o
 
 
-(** TODO: cleanup and check dot output *)
-(** encode a statement *)
-let app_encode_stmt stmt =
-  let res_tc =
+let result_tc =
   Proof.Result.make_tc
     ~of_exn:(function E_i c -> Some c | _ -> None)
     ~to_exn:(fun i -> E_i i)
@@ -162,8 +159,10 @@ let app_encode_stmt stmt =
       |> Iter.to_list
       |> T.Form.and_)
     ()
-  in
-  let as_proof = Proof.S.mk (Statement.proof_step stmt) (Proof.Result.make res_tc stmt) in
+
+(** encode a statement *)
+let app_encode_stmt stmt =
+  let as_proof = Proof.S.mk (Statement.proof_step stmt) (Proof.Result.make result_tc stmt) in
   let proof = Proof.Step.esa ~rule:(Proof.Rule.mk "app_encode") [as_proof |> Proof.Parent.from] in
    match Statement.view stmt with
     | Statement.Def _ -> failwith "Not implemented: Def"
