@@ -149,6 +149,11 @@ let equal p1 p2 =
 
 let snapshot p = p.snapshot
 
+(* Precedence weight for E-like selection functions *)
+let sel_prec_weight p s1 =
+  let lazy tbl = p.tbl in
+  ID.Tbl.get_or ~default:100 tbl s1
+
 let compare_by_tbl p s1 s2 =
   let lazy tbl = p.tbl in
   let i1 = ID.Tbl.get_or ~default:~-1 tbl s1 in

@@ -16,6 +16,7 @@ type profile = ClauseQueue_intf.profile
 let cr_var_ratio = ref 5
 let cr_var_mul   = ref 1.1
 let parameters_magnitude = ref `Large
+let goal_penalty = ref false
 
 let profiles_ =
   let open ClauseQueue_intf in
@@ -34,12 +35,12 @@ let profile_of_string s =
   try
     match CCString.chop_prefix ~pre:"conjecture-relative-var" s with
     | Some suffix -> 
-        let err_msg = "conjecutre-relative-var(ratio:int,var_mul:float,par:[L,S])" in
+        let err_msg = "conjecutre-relative-var(ratio:int,var_mul:float,par:[L,S],goal_penalty:[true,false])" in
         let args = List.map (fun s -> 
                     String.trim (CCString.replace ~sub:")" ~by:"" 
                                   (CCString.replace ~sub:"(" ~by:"" s))) 
                   (CCString.split ~by:"," suffix) in
-        if List.length args != 3 then (invalid_arg err_msg)
+        if List.length args != 4 then (invalid_arg err_msg)
         else (
           let ratio = CCInt.of_string (List.nth args 0) in
           let var_mul =
@@ -47,6 +48,7 @@ let profile_of_string s =
             with _ -> invalid_arg err_msg
           in
           let par_mag = List.nth args 2 in
+          let goal_pen = List.nth args 3 in
           if CCOpt.is_none ratio then (
             invalid_arg err_msg;
           ) else (
@@ -54,7 +56,10 @@ let profile_of_string s =
             cr_var_mul := var_mul;
             parameters_magnitude := if CCString.equal par_mag "l" then `Large
                                     else if CCString.equal par_mag "s" then `Small
-                                    else invalid_arg par_mag;
+                                    else invalid_arg err_msg;
+            goal_penalty         := if CCString.prefix ~pre:"t" goal_pen then true
+                                    else if CCString.prefix ~pre:"f" goal_pen then false
+                                    else invalid_arg err_msg;
             ClauseQueue_intf.P_conj_rel_var
           )
         )
@@ -168,12 +173,19 @@ module Make(C : Clause_intf.S) = struct
                 let dist_vars = 
                  Literals.vars (C.lits c)
                  |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))  in
-                let n_vars = List.length dist_vars in
+                let n_vars = List.length dist_vars + 1  in
                 let dist_var_penalty = distinct_vars_mul ** (float_of_int n_vars) in
-                let proof_depth_penalty = 
-                  (* max (0.9999 ** (float_of_int (Proof.Step.inferences_perfomed (C.proof_step c)))) 0.75 in *)
-                  1.0 in
-                int_of_float (proof_depth_penalty *. dist_var_penalty +. res)) 
+                let goal_dist_penalty = 
+                  if !goal_penalty then (
+                    let divider = 
+                      match C.distance_to_goal c with
+                      | Some d -> 2.0 ** (1.0 /. (1.0 +. (float_of_int @@ d)))
+                      | None -> 1.0 in
+                    1.0 /. divider
+                  ) else 1.0 in
+                let val_ = int_of_float (goal_dist_penalty *. dist_var_penalty *. res) in
+                (Util.debugf  1 "cl: %a, w:%d\n" (fun k -> k C.pp c val_);
+                val_))
 
 
     let penalty = C.penalty

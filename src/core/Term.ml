@@ -390,7 +390,7 @@ module Seq = struct
     in
     aux t
 
-  let subterms ?(include_builtin=false) t k =
+  let subterms ?(include_builtin=false) ?(ignore_head=false) t k =
     let rec aux t =
       k t;
       match view t with
@@ -399,7 +399,7 @@ module Seq = struct
         | Var _
         | DB _ -> ()
         | Fun (_, u) -> aux u
-        | App (f, l) -> aux f; List.iter aux l
+        | App (f, l) -> if not ignore_head then aux f; List.iter aux l
     in
     aux t
 
@@ -448,9 +448,10 @@ module Seq = struct
 end
 
 
-let has_ho_subterm t = 
-  Seq.subterms ~include_builtin:true t
-  |> Iter.exists (fun st -> Type.is_fun (ty st) || Type.is_prop (ty st))
+let has_ho_subterm t =
+  Seq.subterms ~include_builtin:true ~ignore_head:true t
+  |> Iter.exists (fun st -> 
+      Type.is_fun (ty st) || Type.is_prop (ty st))
 
 let close_quantifier b ty_args body =
   CCList.fold_right (fun ty acc -> 

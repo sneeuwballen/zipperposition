@@ -152,6 +152,9 @@ val is_absurd : t -> bool
 val is_absurd_tags : t -> Proof.tag list (** if [is_absurd lit], return why *)
 val is_app_var_eq : t -> bool
 
+val is_type_pred : t -> bool
+val is_propositional : t -> bool
+
 val as_inj_def : t -> (ID.t * (Term.var * Term.var) list) option
 val is_pure_var : t -> bool
 val as_pos_pure_var : t -> (Term.var * Term.var) option

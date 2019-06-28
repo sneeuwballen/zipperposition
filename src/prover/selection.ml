@@ -165,7 +165,7 @@ let prefer_app_var ~ord lits =
     ho_sel_driver lits prefer_av_feature
   )
 
-let weight_based_sel_driver ~ord lits f =
+let weight_based_sel_driver ?(blocker=(fun _ -> false)) ~ord lits f =
   let min_lit = 
     CCArray.to_seq lits
     |> Iter.mapi (fun i el -> f (i,el), i) 
@@ -173,12 +173,19 @@ let weight_based_sel_driver ~ord lits f =
   match min_lit with
   | None -> BV.empty ()
   | Some (_, idx) -> 
-    if can_select_lit ~ord lits idx then (
+    if can_select_lit ~ord lits idx && not @@ blocker (CCArray.get lits idx) then (
       let res = BV.empty () in
       (* CCFormat.printf "Selected %d: %a.\n" idx Lits.pp lits; *)
       BV.set res idx;
       res
     ) else BV.empty ()
+
+let lit_sel_diff_w l =
+  match l with
+  | Lit.Equation(lhs,rhs,_) ->
+    let lhs_w,rhs_w = CCPair.map_same T.size (lhs,rhs) in
+    100*((max lhs_w rhs_w) - (min lhs_w rhs_w)) + lhs_w + rhs_w
+  | _ -> 0
 
 let e_sel ~ord lits = 
   let pred_freq lits = 
@@ -194,12 +201,6 @@ let e_sel ~ord lits =
                 ID.Map.add id (current_val+1) acc
         ) else acc
     ) ID.Map.empty in
-  let lit_sel_diff_w l =
-    match l with
-    | Lit.Equation(lhs,rhs,_) ->
-      let lhs_w,rhs_w = CCPair.map_same T.size (lhs,rhs) in
-      100*((max lhs_w rhs_w) - (min lhs_w rhs_w)) + lhs_w + rhs_w
-    | _ -> 0 in
   let get_pred_freq ~freq_tbl l =
     match l with
     | Lit.Equation(l,r,true) when T.is_true_or_false r ->
@@ -218,7 +219,38 @@ let e_sel ~ord lits =
       get_pred_freq ~freq_tbl l) in
   let freq_tbl = pred_freq lits in
   weight_based_sel_driver ~ord lits (chooser ~freq_tbl)
-    
+
+let e_sel2 ~ord lits = 
+  let symbols = Lits.symbols lits 
+                |> ID.Set.to_seq 
+                |> Iter.sort ~cmp:ID.compare 
+                |> Iter.to_array in
+  let blocker l = Lit.is_type_pred l || Lit.is_propositional l in
+  let chooser (_,l) = 
+    let sign_val = if Lit.is_pos l then 1 else 0 in 
+    let diff_val = -(lit_sel_diff_w l) in
+    let prec = Ordering.precedence ord in
+    match l with 
+    | Equation(lhs,rhs,sign) when not @@ blocker l ->
+        if T.is_var (T.head_term lhs) then (
+          (sign_val, 0, 0, diff_val)
+        ) else (
+          let hd_is_cst = T.is_const (T.head_term lhs) in
+          let prec_weight = 
+            if not hd_is_cst then 0
+            else Precedence.sel_prec_weight prec (T.head_exn lhs) in
+          let alpha_rank = 
+            if not hd_is_cst then max_int
+            else (
+              match CCArray.bsearch ~cmp:ID.compare (T.head_exn lhs) symbols with
+              | `At idx -> idx
+              | _       -> max_int
+            ) in
+
+          (sign_val, -prec_weight, alpha_rank, diff_val)
+        )
+    | _ -> (sign_val,max_int,max_int,diff_val) (* won't be chosen *) in
+  weight_based_sel_driver ~ord ~blocker lits chooser
 
 let except_RR_horn (p:parametrized) ~strict ~ord lits =
   if Lits.is_RR_horn_clause lits
@@ -236,6 +268,7 @@ let l =
       "avoid_app_var", avoid_app_var;
       "prefer_app_var", prefer_app_var;
       "e-selection", e_sel;
+      "e-selection2", e_sel2;
     ]
   and by_ord =
     CCList.flat_map

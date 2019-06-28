@@ -164,6 +164,18 @@ let _on_arith p lit = match lit with
   | Int o -> p o
   | _ -> false
 
+let is_type_pred = function
+  | Equation(lhs,rhs,true) when T.is_true_or_false rhs ->
+    begin match Term.view lhs with
+    | App(f, [x]) -> T.is_var x && T.is_const f
+    | _ -> false end
+  | _ -> false
+
+let is_propositional = function
+  | Equation(lhs,rhs,true) when T.is_true_or_false rhs ->
+    T.is_const lhs
+  | _ -> false
+
 let is_arith_eqn = _on_arith Int_lit.is_eqn
 let is_arith_eq = _on_arith Int_lit.is_eq
 let is_arith_neq = _on_arith Int_lit.is_neq

@@ -38,6 +38,10 @@ val e_sel  : ord:Ordering.t -> t
 (** Selection function  identical to E's 
     SelectMaxLComplexAvoidPosPred  *)
 
+val e_sel2  : ord:Ordering.t -> t
+(** Selection function  identical to E's 
+    SelectCQIPrecWNTNp  *)
+
 val from_string : ord:Ordering.t -> string -> t
 (** selection function from string (may fail) *)
 

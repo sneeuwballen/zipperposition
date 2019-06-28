@@ -108,6 +108,8 @@ val status : t -> ID.t -> symbol_status
 val weight : t -> ID.t -> Weight.t
 (** Weight of a symbol (for KBO). *)
 
+val sel_prec_weight : t -> ID.t -> int
+
 val db_weight : t -> Weight.t
 val lam_weight : t -> Weight.t
 
