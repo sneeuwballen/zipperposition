@@ -175,6 +175,7 @@ let weight_based_sel_driver ~ord lits f =
   | Some (_, idx) -> 
     if can_select_lit ~ord lits idx then (
       let res = BV.empty () in
+      (* CCFormat.printf "Selected %d: %a.\n" idx Lits.pp lits; *)
       BV.set res idx;
       res
     ) else BV.empty ()
@@ -210,10 +211,10 @@ let e_sel ~ord lits =
     | _ -> max_int in
   let chooser ~freq_tbl (i,l) = 
     ((if Lit.is_pos l then 1 else 0),
-     (if Lits.is_max ~ord lits i then 100 else 0 +
-      if Lit.is_pure_var l then 10 else 0 +
-        if Lit.is_ground l then 1 else 0),
-     - (lit_sel_diff_w l),
+     (if Lits.is_max ~ord lits i then 0 else 100 +
+      if Lit.is_pure_var l then 0 else 10 +
+        if Lit.is_ground l then 0 else 1),
+     -(lit_sel_diff_w l),
       get_pred_freq ~freq_tbl l) in
   let freq_tbl = pred_freq lits in
   weight_based_sel_driver ~ord lits (chooser ~freq_tbl)

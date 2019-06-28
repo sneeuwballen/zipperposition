@@ -15,6 +15,7 @@ type profile = ClauseQueue_intf.profile
 
 let cr_var_ratio = ref 5
 let cr_var_mul   = ref 1.1
+let parameters_magnitude = ref `Large
 
 let profiles_ =
   let open ClauseQueue_intf in
@@ -33,23 +34,27 @@ let profile_of_string s =
   try
     match CCString.chop_prefix ~pre:"conjecture-relative-var" s with
     | Some suffix -> 
-        let err_msg = "conjecutre-relative-var(ratio:int,var_mul:float)" in
+        let err_msg = "conjecutre-relative-var(ratio:int,var_mul:float,par:[L,S])" in
         let args = List.map (fun s -> 
                     String.trim (CCString.replace ~sub:")" ~by:"" 
                                   (CCString.replace ~sub:"(" ~by:"" s))) 
                   (CCString.split ~by:"," suffix) in
-        if List.length args != 2 then (invalid_arg err_msg)
+        if List.length args != 3 then (invalid_arg err_msg)
         else (
           let ratio = CCInt.of_string (List.nth args 0) in
           let var_mul =
             try float_of_string (List.nth args 1)
             with _ -> invalid_arg err_msg
           in
+          let par_mag = List.nth args 2 in
           if CCOpt.is_none ratio then (
             invalid_arg err_msg;
           ) else (
             cr_var_ratio := CCOpt.get_exn ratio;
             cr_var_mul := var_mul;
+            parameters_magnitude := if CCString.equal par_mag "l" then `Large
+                                    else if CCString.equal par_mag "s" then `Small
+                                    else invalid_arg par_mag;
             ClauseQueue_intf.P_conj_rel_var
           )
         )
@@ -71,23 +76,23 @@ let () =
 
   Params.add_to_mode "ho-pragmatic" (fun () ->
       _profile := P_conj_rel_var;
-      cr_var_ratio := 10;
-      cr_var_mul   := 1.1;
+      cr_var_ratio := 8;
+      cr_var_mul   := 1.05;
   );
   Params.add_to_mode "ho-competitive" (fun () ->
       _profile := P_conj_rel_var;
-      cr_var_ratio := 10;
-      cr_var_mul   := 1.1;
+      cr_var_ratio := 8;
+      cr_var_mul   := 1.05;
   );
   Params.add_to_mode "ho-complete-basic" (fun () ->
       _profile := P_conj_rel_var;
-      cr_var_ratio := 10;
-      cr_var_mul   := 1.1;
+      cr_var_ratio := 8;
+      cr_var_mul   := 1.05;
   );
   Params.add_to_mode "fo-complete-basic" (fun () ->
       _profile := P_conj_rel_var;
-      cr_var_ratio := 10;
-      cr_var_mul   := 1.1;
+      cr_var_ratio := 8;
+      cr_var_mul   := 1.05;
   );
 
 module Make(C : Clause_intf.S) = struct
@@ -144,9 +149,11 @@ module Make(C : Clause_intf.S) = struct
 
     let conj_relative ?(distinct_vars_mul=(-1.0)) c =
       let sgn = C.Ctx.signature () in
-      let pos_mul = 1.5 in
-      let max_mul = 1.5 in
-      let v,f = 100, 100 in 
+      let pos_mul, max_mul, v,f =
+        match !parameters_magnitude with 
+        |`Large -> (1.5,1.5,100,100)
+        |`Small -> (2.0,1.5,2,3)
+      in
       let conj_mul = 0.5 in
         Array.mapi (fun i xx -> i,xx) (C.lits c)
         |> 

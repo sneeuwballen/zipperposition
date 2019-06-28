@@ -248,7 +248,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       | None            -> false 
     ) (C.lits c) in
 
-    let renaming_weight = 120 in
+    let renaming_weight = 300 in
     let max_formula_weight = 
       C.Seq.terms c 
       |> Iter.filter T.is_formula
@@ -258,6 +258,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       match max_formula_weight with
       | None -> [Cnf.DisableRenaming]
       | Some m -> if m < renaming_weight then [Cnf.DisableRenaming] else [] in
+
+    (* if (CCList.is_empty opts) then (
+      CCFormat.printf "weight: %d.\n" (CCOpt.get_exn max_formula_weight);
+    ); *)
 
     match idx with 
     | Some _ ->
@@ -272,7 +276,9 @@ module Make(E : Env.S) : S with module Env = E = struct
                     |> CCList.flatten
                     |> List.map (fun c -> 
                         C.create ~penalty  ~trail (CCArray.to_list (C.lits c)) proof) in
-      List.iter (fun new_c -> 
+      (* CCFormat.printf "cnf [%a].\n" TypedSTerm.pp f; *)
+      List.iteri (fun i new_c -> 
+        (* CCFormat.printf "%d: [%a].\n" i C.pp new_c; *)
         assert(Proof.Step.inferences_perfomed (C.proof_step c) <=
                Proof.Step.inferences_perfomed (C.proof_step new_c));) clauses;
       Some clauses
