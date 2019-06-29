@@ -394,8 +394,14 @@ and try_weaker_unif ~subst ~state ~counter ~scope ~s ~t ~rest ~continuation =
       ) else raise P.NotInFragment
     )
   with
-  | P.NotUnifiable -> OSeq.empty
-  | P.NotInFragment -> continuation ()
+  | P.NotUnifiable -> 
+    (* if !solve_var && state.depth <= 4 && state.monomorphic then ( *)
+      (* CCFormat.printf "NU: %a: %d: %a <> %a.\n" S.pp subst scope T.pp s T.pp t ; *)
+    (* ); *)
+    OSeq.empty
+  | P.NotInFragment -> 
+    (* CCFormat.printf "NIF: %a: %d: %a <> %a.\n" S.pp subst scope T.pp s T.pp t ; *)
+    continuation ()
 
 (* If it is an applied variable that is applied to
    itself somewhere, then we need to consider lfho unifier *)

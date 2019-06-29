@@ -2670,6 +2670,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                               [C.proof_parent c] in
                   let new_clause = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) inverse_lit proof in
                   Util.debugf ~section 1 "Injectivity recognized: %a |---| %a" (fun k -> k C.pp c C.pp new_clause);
+                  (* Format.printf "Injectivity recognized: %a |---| %a" C.pp c C.pp new_clause; *)
+
                   [new_clause]
                 ) else []
               ) else []

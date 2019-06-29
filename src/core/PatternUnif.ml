@@ -263,6 +263,7 @@ let rec unify ~scope ~counter ~subst = function
     let ty_unif = CCOpt.get_exn ty_unif in
     let subst = US.merge subst ty_unif in
     let s', t' = norm_deref subst (s,scope), norm_deref subst (t,scope) in
+    (* rotating to get naked variables on the lhs *)
 
     if not (Term.equal s' t') then (
       let pref_s, body_s = T.open_fun s' in
@@ -343,34 +344,39 @@ and flex_diff ~counter ~scope ~subst var_s var_t args_s args_t =
     US.FO.bind subst (Term.as_var_exn var_s,scope) (var_t,scope)
   ) else (
       let bvar_s, bvar_t = get_bvars args_s, get_bvars args_t in
-      if CCOpt.is_none bvar_s || CCOpt.is_none bvar_t then
-        raise NotInFragment;
-      let bvar_s, bvar_t = CCOpt.get_exn bvar_s, CCOpt.get_exn bvar_t in
-      let new_bvars = 
-        CCArray.filter_map (fun x->x) (
-          CCArray.map (fun si -> 
-            match CCArray.bsearch ~cmp (fst si, Term.true_) bvar_t  with
-            | `At idx -> Some (cast_var (snd si) subst scope, 
-                              cast_var (snd @@ CCArray.get bvar_t idx) subst scope)
-            | _ -> None
-          ) bvar_s
-        ) 
-        |> CCArray.to_list in
-      let arg_types = List.map (fun (b1, _) -> Term.ty b1) new_bvars in
-      let ret_ty = 
-        Type.apply_unsafe (Term.ty var_s) 
-          (List.map (fun t -> 
-            cast_var (Lambda.eta_reduce t) subst scope) args_s :> InnerTerm.t list) in
-      let new_var_ty = Type.arrow arg_types ret_ty in
-      let new_var = Term.var @@ H.fresh_cnt ~counter ~ty:new_var_ty () in
-      let matrix_s = Term.app new_var (List.map fst new_bvars) in
-      let matrix_t = Term.app new_var (List.map snd new_bvars) in
-      let subs_s = Term.fun_l (List.map Term.ty args_s) matrix_s in
-      let subs_t = Term.fun_l (List.map Term.ty args_t) matrix_t in
-      let v_s, v_t = Term.as_var_exn var_s, Term.as_var_exn var_t in
-      let subst = US.FO.bind subst (v_s, scope) (subs_s, scope) in
-      let subst = US.FO.bind subst (v_t, scope) (subs_t, scope) in
-      subst
+      if CCOpt.is_none bvar_s || CCOpt.is_none bvar_t then (
+        let s,t =
+          if CCOpt.is_some bvar_s then  (T.app var_s args_s, T.app var_t args_t)
+          else if CCOpt.is_some bvar_t then (T.app var_t args_t, T.app var_s args_s)
+          else raise NotInFragment in
+        flex_rigid ~subst ~counter ~scope  s t
+      ) else (
+        let bvar_s, bvar_t = CCOpt.get_exn bvar_s, CCOpt.get_exn bvar_t in
+        let new_bvars = 
+          CCArray.filter_map (fun x->x) (
+            CCArray.map (fun si -> 
+              match CCArray.bsearch ~cmp (fst si, Term.true_) bvar_t  with
+              | `At idx -> Some (cast_var (snd si) subst scope, 
+                                cast_var (snd @@ CCArray.get bvar_t idx) subst scope)
+              | _ -> None
+            ) bvar_s
+          ) 
+          |> CCArray.to_list in
+        let arg_types = List.map (fun (b1, _) -> Term.ty b1) new_bvars in
+        let ret_ty = 
+          Type.apply_unsafe (Term.ty var_s) 
+            (List.map (fun t -> 
+              cast_var (Lambda.eta_reduce t) subst scope) args_s :> InnerTerm.t list) in
+        let new_var_ty = Type.arrow arg_types ret_ty in
+        let new_var = Term.var @@ H.fresh_cnt ~counter ~ty:new_var_ty () in
+        let matrix_s = Term.app new_var (List.map fst new_bvars) in
+        let matrix_t = Term.app new_var (List.map snd new_bvars) in
+        let subs_s = Term.fun_l (List.map Term.ty args_s) matrix_s in
+        let subs_t = Term.fun_l (List.map Term.ty args_t) matrix_t in
+        let v_s, v_t = Term.as_var_exn var_s, Term.as_var_exn var_t in
+        let subst = US.FO.bind subst (v_s, scope) (subs_s, scope) in
+        let subst = US.FO.bind subst (v_t, scope) (subs_t, scope) in
+        subst)
   )
 
     
@@ -400,17 +406,23 @@ and flex_rigid ~subst ~counter ~scope flex rigid =
   
 let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
   (* let tptp_pp = T.pp_in Output_format.O_tptp in *)
-  if US.is_empty subst then (
-    let t0',t1',scope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
-    unify ~scope ~counter ~subst [(t0', t1')]
-  )
-  else (
-    if Scoped.scope t0_s != Scoped.scope t1_s then (
-      raise (Invalid_argument "scopes should be the same")
+  let res = 
+    if US.is_empty subst then (
+      let t0',t1',scope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
+      unify ~scope ~counter ~subst [(t0', t1')]
     )
     else (
-      let t0', t1' = S.apply subst t0_s, S.apply subst t1_s in
-      (* CCFormat.printf "[PU: %a:%a =?= %a:%a].\n" tptp_pp t0' Type.pp (Term.ty t0') tptp_pp t1' Type.pp (Term.ty t1'); *)
-      unify ~scope:(Scoped.scope t0_s) ~counter ~subst [(t0', t1')]
-    )
-  )
+      if Scoped.scope t0_s != Scoped.scope t1_s then (
+        raise (Invalid_argument "scopes should be the same")
+      )
+      else (
+        let t0', t1' = S.apply subst t0_s, S.apply subst t1_s in
+        (* CCFormat.printf "[PU: %a:%a =?= %a:%a].\n" tptp_pp t0' Type.pp (Term.ty t0') tptp_pp t1' Type.pp (Term.ty t1'); *)
+        unify ~scope:(Scoped.scope t0_s) ~counter ~subst [(t0', t1')]
+      )
+    ) 
+  in
+  let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply res t0_s in 
+  let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply res t1_s in
+  assert ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r)));
+  res
