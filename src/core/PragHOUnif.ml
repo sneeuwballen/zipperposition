@@ -443,7 +443,7 @@ let unify_scoped t0_s t1_s =
 
   res
   |> OSeq.map (CCOpt.map (fun sub ->       
-      if not (Unif_subst.has_constr sub) then (
+      (* if not (Unif_subst.has_constr sub) then (
         let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub t0_s in 
         let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub t1_s in
         if not (T.equal l r) || not (Type.equal (Term.ty l) (Term.ty r)) then (
@@ -459,5 +459,5 @@ let unify_scoped t0_s t1_s =
             (T.pp_in Output_format.O_tptp) r 
             Type.pp (Term.ty r);
           assert(false);
-        ););
+        );); *)
     sub))

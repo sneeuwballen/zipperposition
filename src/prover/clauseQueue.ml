@@ -179,7 +179,7 @@ module Make(C : Clause_intf.S) = struct
                   if !goal_penalty then (
                     let divider = 
                       match C.distance_to_goal c with
-                      | Some d -> 2.0 ** (1.0 /. (1.0 +. (float_of_int @@ d)))
+                      | Some d -> 1.5 ** (1.0 /. (1.0 +. (float_of_int @@ d)))
                       | None -> 1.0 in
                     1.0 /. divider
                   ) else 1.0 in
