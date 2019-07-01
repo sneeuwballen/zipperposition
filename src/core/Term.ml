@@ -569,9 +569,9 @@ let mk_fresh_skolem =
       Type.forall_fvars ty_vars
          (Type.arrow (List.map HVar.ty vars) ty_ret)
    in
-   app_full (const id ~ty)
+   ((id,ty), app_full (const id ~ty)
       (List.map Type.var ty_vars)
-      (List.map var vars)
+      (List.map var vars) )
 
 let mk_tmp_cst ~counter ~ty =
   let idx = CCRef.get_then_incr counter in
@@ -896,7 +896,7 @@ module DB = struct
           (match IntMap.find_opt (i-depth) skolemized with
           | (Some sk) -> (sk, skolemized)
           | None ->
-             let new_sk = mk_fresh_skolem [] (ty subt) in
+             let new_sk = snd @@ mk_fresh_skolem [] (ty subt) in
              let skolemized = IntMap.add (i-depth) new_sk skolemized in
              new_sk,skolemized)
           else subt, skolemized

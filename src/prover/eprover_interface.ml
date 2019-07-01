@@ -35,7 +35,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Format.fprintf out "@[thf(cl_%d,axiom,@[%a@]).@]@\n" (C.id clause) TypedSTerm.TPTP_THF.pp lits_converted
 
   let output_symdecl ~out sym ty =
-    Format.fprintf out "@[thf(@[%a_type,type,@[%a@]:@ @[%a@]@]).@]@\n" 
+    Format.fprintf out "@[thf(@['%a_type',type,@['%a'@]:@ @[%a@]@]).@]@\n" 
       ID.pp sym ID.pp sym (Type.TPTP.pp_ho) ty
 
   let output_all ~out cl_set =
@@ -75,17 +75,20 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
   let try_e active_set passive_set =
-    let max_from_set = 500 in
+    let max_from_set = 800 in
 
-    let take_from_set set = 
+    let take_from_set set =
+    let res = 
       set
       |> Iter.map (fun c -> CCOpt.get_or ~default:c (C.eta_reduce c))
       |> Iter.filter (fun c -> 
-          Proof.Step.inferences_perfomed (C.proof_step c) < 5 && 
+          Proof.Step.inferences_perfomed (C.proof_step c) < 10 && 
           C.Seq.terms c |>
-          Iter.for_all (fun t -> Term.Seq.subterms t 
-                                 |> Iter.for_all (fun st -> not (Term.is_fun st))))
-      |> Iter.take max_from_set 
+          Iter.for_all (fun t -> Term.Seq.subterms ~include_builtin:true t 
+                                  |> Iter.for_all (fun st -> not (Term.is_fun st))))
+      |> Iter.take max_from_set in
+
+      res
       |> Iter.to_list  in
 
     let prob_name, prob_channel = Filename.open_temp_file "e_input" "" in

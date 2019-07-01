@@ -351,7 +351,7 @@ module TPTP = struct
     | _ -> pp_ho_depth depth out t
   and pp_l depth out l = match l with
     | [] -> assert false
-    | [ty] -> pp_ho_depth depth out ty
+    | [ty] -> pp_inner depth out ty
     | _ ->
       Format.fprintf out "@[%a@]"
         (Util.pp_list ~sep:" > " (pp_inner depth)) l

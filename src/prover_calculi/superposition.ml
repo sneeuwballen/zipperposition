@@ -618,9 +618,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let vars = Iter.union (T.Seq.vars around_up) (T.Seq.vars t')
                  |> Term.VarSet.of_seq
                  |> Term.VarSet.to_list in
+      let skolem_decls = ref [] in
       let sk_with_vars =
         List.fold_left (fun acc t ->
-            let new_sk_vars = Term.mk_fresh_skolem vars (Term.ty t) in
+            let sk_decl, new_sk_vars = Term.mk_fresh_skolem vars (Term.ty t) in
+            skolem_decls := sk_decl :: !skolem_decls;
             Term.Map.add t new_sk_vars acc)
          Term.Map.empty new_sk in
       let new_lits =
@@ -648,6 +650,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         let sign = if Lit.is_pos passive_lit' then "+" else "-" in
         Proof.Rule.mk (r ^ sign)
       in
+      CCList.iter (fun (sym,ty) -> Ctx.declare sym ty) !skolem_decls;
       let proof =
         Proof.Step.inference ~rule ~tags
           [C.proof_parent_subst renaming (info.active,sc_a) subst';
@@ -2664,10 +2667,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                 if Term.equal covered_l covered_r then (
                   let ty = Type.arrow [Term.ty l] (Term.ty x) in
                   let sk_vars = Term.vars covered_l |> Term.VarSet.to_list in
-                  let inverse_x = Term.app (Term.mk_fresh_skolem sk_vars ty) [l] in
+                  let (sk_id, sk_ty), sk_term = Term.mk_fresh_skolem sk_vars ty in
+                  let inverse_x = Term.app sk_term [l] in
                   let inverse_lit = [Lit.mk_eq inverse_x x] in
                   let proof = Proof.Step.inference ~rule:(Proof.Rule.mk "inverse recognition") 
                               [C.proof_parent c] in
+                  Ctx.declare sk_id sk_ty;
                   let new_clause = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) inverse_lit proof in
                   Util.debugf ~section 1 "Injectivity recognized: %a |---| %a" (fun k -> k C.pp c C.pp new_clause);
                   (* Format.printf "Injectivity recognized: %a |---| %a" C.pp c C.pp new_clause; *)

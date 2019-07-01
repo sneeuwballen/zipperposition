@@ -206,7 +206,7 @@ module Make(E : Env.S) = struct
           (* do one step *)
           if !_progress then print_progress num ~steps;
 
-          if num > 0 && num mod 400 = 0 then (
+          if num > 0 && num mod 2000 = 0 then (
             EInterface.try_e (Env.get_active ()) (Env.get_passive ());
           );
 

@@ -109,6 +109,10 @@ module Make(E : Env.S) : S with module Env = E = struct
            | None -> None
          end)
 
+  let rec declare_skolems = function
+  | [] -> ()
+  | (sym,id) :: rest -> Ctx.declare sym id
+
   (* negative extensionality rule:
      [f != g] where [f : a -> b] becomes [f k != g k] for a fresh parameter [k] *)
   let ext_neg_lit (lit:Literal.t) : _ option = match lit with
@@ -124,8 +128,13 @@ module Make(E : Env.S) : S with module Env = E = struct
         | None ->
           (* create new skolems, parametrized by free variables *)
           let vars = Literal.vars lit in
-          let l = List.map (T.mk_fresh_skolem vars) ty_args in
+          let skolems = ref [] in
+          let l = List.map (fun ty -> 
+            let sk, res =  T.mk_fresh_skolem vars ty in
+            skolems := sk :: !skolems;
+            res) ty_args in
           (* save list *)
+          declare_skolems !skolems;
           idx_ext_neg_lit_ := FV_ext_neg_lit.add !idx_ext_neg_lit_ (lit,l);
           l
       in
@@ -367,7 +376,12 @@ module Make(E : Env.S) : S with module Env = E = struct
                let arg_types = Type.expected_args @@ T.ty l in
                if CCList.is_empty arg_types then Literal.mk_neq l r
                else (
-                 let skolems = List.map (fun ty -> T.mk_fresh_skolem free_vars ty) arg_types in
+                 let skolem_decls = ref [] in
+                 let skolems = List.map (fun ty -> 
+                  let sk, res =  T.mk_fresh_skolem free_vars ty in
+                  skolem_decls := sk :: !skolem_decls;
+                  res) arg_types in
+                 declare_skolems !skolem_decls;
                  Literal.mk_neq (T.app l skolems) (T.app r skolems)
                )
               ) subterms in
@@ -398,12 +412,17 @@ module Make(E : Env.S) : S with module Env = E = struct
             when is_eligible i l && Type.is_fun @@ T.ty lhs ->
           let arg_types = Type.expected_args @@ T.ty lhs in
           let free_vars = Literal.vars l in
+          let skolem_decls = ref [] in
           let new_lits = CCList.map (fun (j,x) -> 
               if i!=j then x
               else (
-                let skolems = List.map (fun ty -> T.mk_fresh_skolem free_vars ty) arg_types in
+                let skolems = List.map (fun ty -> 
+                  let sk, res =  T.mk_fresh_skolem free_vars ty in
+                  skolem_decls := sk :: !skolem_decls;
+                  res) arg_types in
                 Literal.mk_neq (T.app lhs skolems) (T.app rhs skolems))
             ) (C.lits c |> Array.mapi (fun j x -> (j,x)) |> Array.to_list) in
+          declare_skolems !skolem_decls;
           let proof =
             Proof.Step.inference [C.proof_parent c] 
               ~rule:(Proof.Rule.mk "neg_ext")
@@ -429,8 +448,13 @@ module Make(E : Env.S) : S with module Env = E = struct
               when is_eligible i l && Type.is_fun @@ T.ty lhs ->
             let arg_types = Type.expected_args @@ T.ty lhs in
             let free_vars = Literal.vars l |> T.VarSet.of_list |> T.VarSet.to_list in
-            let skolems = List.map (fun ty -> T.mk_fresh_skolem free_vars ty) arg_types in
+            let skolem_decls = ref [] in
+            let skolems = List.map (fun ty -> 
+              let sk, res =  T.mk_fresh_skolem free_vars ty in
+              skolem_decls := sk :: !skolem_decls;
+              res) arg_types in
             applied_neg_ext := true;
+            declare_skolems !skolem_decls;
             Literal.mk_neq (T.app lhs skolems) (T.app rhs skolems)
           | _ -> l) in
     if not !applied_neg_ext then SimplM.return_same c

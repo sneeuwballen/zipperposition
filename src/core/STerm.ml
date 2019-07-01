@@ -493,7 +493,7 @@ module TPTP_THF = struct
     | AppBuiltin (Builtin.Arrow, [ret;a]) ->
       Format.fprintf out "@[<2>%a >@ %a@]" pp a pp ret
     | AppBuiltin (Builtin.Arrow, ret::l) ->
-      Format.fprintf out "@[<2>(@[%a@]) >@ %a@]" (Util.pp_list~sep:" > " pp) l pp_surrounded ret
+      Format.fprintf out "@[<2>@[%a@] >@ %a@]" (Util.pp_list~sep:" > " pp_surrounded) l pp_surrounded ret
     | AppBuiltin (s, []) -> Builtin.TPTP.pp out s
     | AppBuiltin (s, l) ->
       (* Format.fprintf out "@[%a(@[%a@])@]" Builtin.TPTP.pp s (Util.pp_list ~sep:", " pp_surrounded) l *)
@@ -514,8 +514,6 @@ module TPTP_THF = struct
     
   and pp_typed_var out (v,o) = match o with
     | None -> pp_var out v
-    | Some {term=AppBuiltin (Builtin.Term,[]); _} ->
-      pp_var out v (* implicit type *)
     | Some ty -> Format.fprintf out "%a:%a" pp_var v pp_surrounded ty
   and pp_surrounded out t = match t.term with
     | AppBuiltin (_, _::_)

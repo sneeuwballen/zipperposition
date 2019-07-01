@@ -139,7 +139,7 @@ val in_lfho_fragment : t -> bool
 val is_fo_term : t -> bool
 val is_true_or_false : t -> bool
 
-val mk_fresh_skolem : var list -> Type.t -> t
+val mk_fresh_skolem : var list -> Type.t -> (ID.t*Type.t) * t
 
 val as_const : t -> ID.t option
 val as_const_exn : t -> ID.t
