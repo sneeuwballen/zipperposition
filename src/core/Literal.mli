@@ -131,7 +131,7 @@ val for_all : (term -> bool) -> t -> bool  (** for the term or both terms of the
 val vars : t -> Type.t HVar.t list (** gather variables *)
 val var_occurs : Type.t HVar.t -> t -> bool
 val is_ground : t -> bool
-val symbols : t -> ID.Set.t
+val symbols : ?include_types:bool -> t -> ID.Set.t
 val root_terms : t -> term list (** all the terms immediatly under the lit *)
 
 val to_ho_term : t -> term option
@@ -193,8 +193,8 @@ end
 
 module Seq : sig
   val terms : t -> term Iter.t
-  val vars : t -> Type.t HVar.t Iter.t
-  val symbols : t -> ID.t Iter.t
+  val vars :  t -> Type.t HVar.t Iter.t
+  val symbols : ?include_types:bool -> t -> ID.t Iter.t
 end
 
 (** {2 Positions} *)

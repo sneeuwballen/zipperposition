@@ -418,7 +418,11 @@ module Seq = struct
     in
     recurse 0 t
 
-  let symbols t k =
+  let symbols ?(include_types = false) t k =
+    if include_types then (
+      Type.Seq.symbols (ty t) k
+    );
+    
     let rec aux t = match view t with
       | AppBuiltin (_,l) -> List.iter aux l
       | Const s -> k s

@@ -10,6 +10,7 @@ module C = Clause
 module O = Ordering
 module PS = ProofState
 module Sel = Selection
+module EIntf = Eprover_interface
 
 let stat_redundant_given = Util.mk_stat "saturate.redundant given clauses"
 let stat_processed_given = Util.mk_stat "saturate.processed given clauses"
@@ -66,6 +67,7 @@ end
 
 module Make(E : Env.S) = struct
   module Env = E
+  module EInterface = EIntf.Make(E)
 
   let[@inline] check_clause_ c = 
     if !_check_types then Env.C.check_types c;
@@ -203,6 +205,11 @@ module Make(E : Env.S) = struct
         | _ ->
           (* do one step *)
           if !_progress then print_progress num ~steps;
+
+          if num > 0 && num mod 400 = 0 then (
+            EInterface.try_e (Env.get_active ()) (Env.get_passive ());
+          );
+
           let status = given_clause_step ~generating num in
           match status with
             | Sat | Unsat _ | Error _ -> status, num (* finished *)

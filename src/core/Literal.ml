@@ -349,8 +349,8 @@ module Seq = struct
 
   let vars lit = Iter.flat_map T.Seq.vars (terms lit)
 
-  let symbols lit =
-    Iter.flat_map T.Seq.symbols (terms lit)
+  let symbols ?(include_types=false) lit =
+    Iter.flat_map (T.Seq.symbols ~include_types) (terms lit)
 
   (* used to represent arithmetic lits... *)
   let _arith_term =
@@ -358,7 +358,7 @@ module Seq = struct
     T.const ~ty:Type.(const s) s
 end
 
-let symbols lit = Seq.symbols lit |> ID.Set.of_seq
+let symbols ?(include_types=false) lit = Seq.symbols ~include_types lit |> ID.Set.of_seq
 
 (** Unification-like operation on components of a literal. *)
 module UnifOp = struct

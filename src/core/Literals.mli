@@ -192,7 +192,7 @@ val fold_terms : ?vars:bool -> ?var_args:bool -> ?fun_bodies:bool -> ?ty_args:bo
 (** See {!Literal.fold_terms}, which is the same but for the
     [eligible] argument *)
 
-val symbols : ?init:ID.Set.t -> t -> ID.Set.t
+val symbols : ?init:ID.Set.t -> ?include_types:bool -> t -> ID.Set.t
 
 (** {2 IO} *)
 

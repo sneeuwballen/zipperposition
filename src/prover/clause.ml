@@ -298,9 +298,9 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
         end
       | _ -> false
 
-  let symbols ?(init=ID.Set.empty) seq =
+  let symbols ?(init=ID.Set.empty) ?(include_types=false) seq =
     Iter.fold
-      (fun set c -> Lits.symbols ~init:set c.sclause.lits)
+      (fun set c -> Lits.symbols ~include_types ~init:set c.sclause.lits)
       init seq
 
   let to_forms c = Lits.Conv.to_forms c.sclause.lits

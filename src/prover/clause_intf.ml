@@ -184,7 +184,7 @@ module type S = sig
   val is_oriented_rule : t -> bool
   (** Is the clause a positive oriented clause? *)
 
-  val symbols : ?init:ID.Set.t -> t Iter.t -> ID.Set.t
+  val symbols : ?init:ID.Set.t -> ?include_types:bool -> t Iter.t -> ID.Set.t
   (** symbols that occur in the clause *)
 
   val to_sclause : t -> SClause.t
