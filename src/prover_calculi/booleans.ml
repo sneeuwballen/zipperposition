@@ -271,6 +271,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       let stmt = Statement.assert_ ~proof f in
       let cnf_vec = Cnf.convert @@ CCVector.to_seq @@ 
                     Cnf.cnf_of ~opts ~ctx:(Ctx.sk_ctx ()) stmt in
+      CCVector.iter (fun cl -> 
+        Statement.Seq.ty_decls cl
+        |> Iter.iter (fun (id,ty) -> Ctx.declare id ty)) cnf_vec;
+
       let clauses = CCVector.map (C.of_statement ~convert_defs:true) cnf_vec
                     |> CCVector.to_list 
                     |> CCList.flatten

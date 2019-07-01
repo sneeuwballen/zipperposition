@@ -493,13 +493,13 @@ module TPTP_THF = struct
     | AppBuiltin (Builtin.Arrow, [ret;a]) ->
       Format.fprintf out "@[<2>%a >@ %a@]" pp a pp ret
     | AppBuiltin (Builtin.Arrow, ret::l) ->
-      Format.fprintf out "@[<2>(@[%a@]) >@ %a@]" (Util.pp_list~sep:" * " pp) l pp_surrounded ret
+      Format.fprintf out "@[<2>(@[%a@]) >@ %a@]" (Util.pp_list~sep:" > " pp) l pp_surrounded ret
     | AppBuiltin (s, []) -> Builtin.TPTP.pp out s
     | AppBuiltin (s, l) ->
       (* Format.fprintf out "@[%a(@[%a@])@]" Builtin.TPTP.pp s (Util.pp_list ~sep:", " pp_surrounded) l *)
-      Format.fprintf out "@[%a @@ @[ %a @] @]" Builtin.TPTP.pp s (Util.pp_list ~sep:" @ " pp_surrounded) l
+      Format.fprintf out "@[%a@ @@@[%a@]@]" Builtin.TPTP.pp s (Util.pp_list ~sep:" @ " pp_surrounded) l
     | App (s, l) ->
-      Format.fprintf out "@[%a @@ @[%a@]@]"
+      Format.fprintf out "@[%a@ @@@ @[%a@]@]"
         pp s (Util.pp_list ~sep:" @ " pp_surrounded) l
     | Bind (s, vars, t') ->
       Format.fprintf out "@[%a[@[%a@]]:@ %a@]"
@@ -520,10 +520,10 @@ module TPTP_THF = struct
   and pp_surrounded out t = match t.term with
     | AppBuiltin (_, _::_)
     | App(_,_)
-    | Bind _ -> Format.fprintf out "(@[%a@])" pp t
+    | Bind _ -> Format.fprintf out "( @[%a@] )" pp t
     | _ -> pp out t
   and pp_force_surrounded out t =
-    Format.fprintf out "( %a )" pp t
+    Format.fprintf out "( @[%a@] )" pp t
   and pp_var out = function
     | Wildcard -> CCFormat.string out "$_"
     | V s -> Util.pp_var_tstp out s

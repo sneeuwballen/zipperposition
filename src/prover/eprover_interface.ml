@@ -32,11 +32,11 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let output_cl ~out clause =
     let lits_converted = Literals.Conv.to_tst (C.lits clause) in
-    Format.fprintf out "thf(cl_%d,axiom,%a).\n" (C.id clause) TypedSTerm.TPTP_THF.pp lits_converted
+    Format.fprintf out "@[thf(cl_%d,axiom,@[%a@]).@]@\n" (C.id clause) TypedSTerm.TPTP_THF.pp lits_converted
 
   let output_symdecl ~out sym ty =
-    Format.fprintf out "thf(%a_type, type, %a: %a).\n" 
-      ID.pp sym ID.pp sym (Type.pp_in Output_format.O_tptp) ty
+    Format.fprintf out "@[thf(@[%a_type,type,@[%a@]:@ @[%a@]@]).@]@\n" 
+      ID.pp sym ID.pp sym (Type.TPTP.pp_ho) ty
 
   let output_all ~out cl_set =
     let cl_iter = Iter.of_list cl_set in
@@ -79,12 +79,12 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let take_from_set set = 
       set
+      |> Iter.map (fun c -> CCOpt.get_or ~default:c (C.eta_reduce c))
       |> Iter.filter (fun c -> 
           Proof.Step.inferences_perfomed (C.proof_step c) < 5 && 
           C.Seq.terms c |>
           Iter.for_all (fun t -> Term.Seq.subterms t 
-                                 |> Iter.for_all (fun st -> not (Term.is_fun t)))
-           )
+                                 |> Iter.for_all (fun st -> not (Term.is_fun st))))
       |> Iter.take max_from_set 
       |> Iter.to_list  in
 

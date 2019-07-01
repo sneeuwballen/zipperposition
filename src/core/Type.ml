@@ -330,6 +330,34 @@ module TPTP = struct
 
   let pp_depth ?hooks:_ depth out t = pp_tstp_rec depth out t
 
+  let rec pp_ho_depth depth out t = match view t with
+    | Builtin Prop -> CCFormat.string out "$o"
+    | Builtin TType -> CCFormat.string out "$tType"
+    | Builtin Term -> CCFormat.string out "$i"
+    | Builtin Int -> CCFormat.string out "$int"
+    | Builtin Rat -> CCFormat.string out "$rat"
+    | Var v -> Format.fprintf out "X%d" (HVar.id v)
+    | DB i -> Format.fprintf out "Tb%d" (depth-i-1)
+    | App (p, []) -> ID.pp_tstp out p
+    | App (p, args) ->
+      Format.fprintf out "@[<2>%a(%a)@]" ID.pp_tstp p
+        (Util.pp_list (pp_ho_depth depth)) args
+    | Fun (args, ret) ->
+      Format.fprintf out "%a > %a" (pp_l depth) args (pp_inner depth) ret
+    | Forall ty' ->
+      Format.fprintf out "!>[Tb%d:$tType]: %a" depth (pp_inner (depth+1)) ty'
+  and pp_inner depth out t = match view t with
+    | Fun _ -> Format.fprintf out "(@[%a@])" (pp_ho_depth depth) t
+    | _ -> pp_ho_depth depth out t
+  and pp_l depth out l = match l with
+    | [] -> assert false
+    | [ty] -> pp_ho_depth depth out ty
+    | _ ->
+      Format.fprintf out "@[%a@]"
+        (Util.pp_list ~sep:" > " (pp_inner depth)) l
+
+  let pp_ho out t = pp_ho_depth 0 out t
+
   let pp_typed_var out v = match view (HVar.ty v) with
     | Builtin Term -> HVar.pp out v (* implicit *)
     | _ -> Format.fprintf out "@[%a : %a@]" HVar.pp_tstp v pp (HVar.ty v)

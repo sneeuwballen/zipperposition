@@ -251,6 +251,18 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
         bv
     end
 
+  let eta_reduce c =
+    let lit_arr = lits c in
+    let changed = ref false in
+    let new_lits = Literals.map (fun t -> 
+      let reduced = Lambda.eta_reduce (Lambda.snf t) in
+      if not (Term.equal t reduced) then changed := true;
+      reduced) lit_arr in
+    if !changed then (
+      let penalty = penalty c and trail = trail c and proof = proof_step c in
+      Some (create ~penalty ~trail (CCArray.to_list new_lits) proof)
+    ) else None
+
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for paramodulation. *)
   let eligible_param (c,sc) subst =

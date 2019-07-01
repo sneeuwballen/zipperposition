@@ -196,6 +196,8 @@ module type S = sig
 
   val ground_clause : t -> t
 
+  val eta_reduce : t -> t option
+
   (** {2 Iterators} *)
 
   module Seq : sig
