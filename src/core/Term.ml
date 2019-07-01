@@ -428,7 +428,7 @@ module Seq = struct
       | Const s -> k s
       | Var _
       | DB _ -> ()
-      | Fun (_,u) -> aux u
+      | Fun (ty,u) -> if (include_types) then Type.Seq.symbols ty k; aux u
       | App (f, l) -> aux f; List.iter aux l
     in
     aux t

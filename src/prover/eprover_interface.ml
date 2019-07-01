@@ -35,8 +35,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     Format.fprintf out "@[thf(cl_%d,axiom,@[%a@]).@]@\n" (C.id clause) TypedSTerm.TPTP_THF.pp lits_converted
 
   let output_symdecl ~out sym ty =
-    Format.fprintf out "@[thf(@['%a_type',type,@['%a'@]:@ @[%a@]@]).@]@\n" 
-      ID.pp sym ID.pp sym (Type.TPTP.pp_ho) ty
+    Format.fprintf out "@[thf(@['%a_type',type,@[%a@]:@ @[%a@]@]).@]@\n" 
+      ID.pp sym ID.pp_tstp sym (Type.TPTP.pp_ho) ty
 
   let output_all ~out cl_set =
     let cl_iter = Iter.of_list cl_set in
@@ -75,14 +75,14 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
   let try_e active_set passive_set =
-    let max_from_set = 800 in
+    let max_from_set = 512 in
 
     let take_from_set set =
     let res = 
       set
       |> Iter.map (fun c -> CCOpt.get_or ~default:c (C.eta_reduce c))
       |> Iter.filter (fun c -> 
-          Proof.Step.inferences_perfomed (C.proof_step c) < 10 && 
+          Proof.Step.inferences_perfomed (C.proof_step c) < 6 && 
           C.Seq.terms c |>
           Iter.for_all (fun t -> Term.Seq.subterms ~include_builtin:true t 
                                   |> Iter.for_all (fun st -> not (Term.is_fun st))))
@@ -96,8 +96,11 @@ module Make(E : Env.S) : S with module Env = E = struct
     let cl_set = take_from_set active_set @ (take_from_set passive_set) in
     output_all ~out cl_set;
 
-    Format.printf "[CHECK_E: %s].\n" prob_name; 
-    raise (Invalid_argument "done")
+    Format.printf "[CHECK_E: %s].\n" prob_name;
+    Format.print_flush ();
+    close_out prob_channel
+
+    (* raise (Invalid_argument "done") *)
 
     (* let e_name = Filename.temp_file "e_output" "" in *)
     (* let res = run_e e_name in *)
