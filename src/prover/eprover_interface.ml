@@ -32,6 +32,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let output_cl ~out clause =
     let lits_converted = Literals.Conv.to_tst (C.lits clause) in
+    Format.fprintf out "%% %d:\n" (Proof.Step.inferences_perfomed (C.proof_step clause));
     Format.fprintf out "@[thf(cl_%d,axiom,@[%a@]).@]@\n" (C.id clause) TypedSTerm.TPTP_THF.pp lits_converted
 
   let output_symdecl ~out sym ty =
@@ -75,21 +76,26 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
   let try_e active_set passive_set =
-    let max_from_set = 512 in
+    let max_others = 300 in
 
     let take_from_set set =
-    let res = 
-      set
-      |> Iter.map (fun c -> CCOpt.get_or ~default:c (C.eta_reduce c))
-      |> Iter.filter (fun c -> 
-          Proof.Step.inferences_perfomed (C.proof_step c) < 6 && 
-          C.Seq.terms c |>
-          Iter.for_all (fun t -> Term.Seq.subterms ~include_builtin:true t 
-                                  |> Iter.for_all (fun st -> not (Term.is_fun st))))
-      |> Iter.take max_from_set in
+      let clause_no_lams cl =
+        C.Seq.terms cl |>
+        Iter.for_all (fun t -> Term.Seq.subterms ~include_builtin:true t 
+                                |> Iter.for_all (fun st -> not (Term.is_fun st))) in
 
-      res
-      |> Iter.to_list  in
+      let reduced = 
+        Iter.map (fun c -> CCOpt.get_or ~default:c (C.eta_reduce c)) set in
+      let init_clauses = 
+        Iter.filter (fun c -> Proof.Step.inferences_perfomed (C.proof_step c) <= 3 && clause_no_lams c) reduced in
+    Iter.append init_clauses (
+      reduced
+      |> Iter.filter (fun c ->
+          let proof_depth = Proof.Step.inferences_perfomed (C.proof_step c) in
+          proof_depth > 3 && proof_depth < 6 && clause_no_lams c)
+      |> Iter.take max_others)
+    |> Iter.to_list in
+
 
     let prob_name, prob_channel = Filename.open_temp_file "e_input" "" in
     let out = Format.formatter_of_out_channel prob_channel in

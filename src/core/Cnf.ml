@@ -1085,7 +1085,7 @@ let proof_neg stmt =
     [Stmt.as_proof_i stmt |> Proof.Parent.from]
 
 (* Transform the clauses into proper CNF; returns a list of clauses *)
-let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
+let cnf_of_seq ~ctx ?(opts=[])  seq =
   (* read options *)
   let disable_renaming = List.mem DisableRenaming opts in
   let preprocess =
@@ -1247,8 +1247,8 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
   (* return final vector of clauses *)
   CCVector.freeze res
 
-let cnf_of ?opts ?ctx st =
-  cnf_of_seq ?opts ?ctx (Iter.return st)
+let cnf_of ~ctx ?opts  st =
+  cnf_of_seq ~ctx ?opts  (Iter.return st)
 
 let pp_f_statement out st = Statement.pp T.pp T.pp T.pp out st
 

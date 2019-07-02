@@ -135,7 +135,7 @@ let skolem_form ~ctx subst var form =
   (* type of the symbol: quantify over type vars, apply to vars' types *)
   let ty_var = T.Subst.eval subst (Var.ty var) in
   let ty = ty_forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) ty_var) in
-  let prefix = "sk_" ^ Var.to_string var in
+  let prefix = "sk_" ^ Var.to_string var ^ "_" in
   let vars_count = List.length vars in
   let f = fresh_skolem_prefix ~ctx ~ty ~vars_count prefix in
   let skolem_t = T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t) in
