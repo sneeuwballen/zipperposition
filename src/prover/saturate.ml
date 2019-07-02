@@ -22,6 +22,17 @@ let check_timeout = function
   | None -> false
   | Some timeout -> Util.total_time_s () > timeout
 
+let e_path = ref (None : string option)
+let tried_e = ref false 
+let should_try_e = function
+  | Some timeout when CCOpt.is_some !e_path -> 
+      let passed = Util.total_time_s () in
+      if not !tried_e && passed > timeout /. 2.0 then (
+        tried_e := true;
+        true
+      ) else false
+  | _ -> false
+
 let _progress = ref false (* progress bar? *)
 let _check_types = ref false
 
@@ -197,6 +208,10 @@ module Make(E : Env.S) = struct
         end
 
   let given_clause ?(generating=true) ?steps ?timeout () =
+      if CCOpt.is_some !e_path then (
+        EInterface.set_e_bin (CCOpt.get_exn !e_path)
+      );
+
     (* num: number of steps done so far *)
     let rec do_step num =
       if check_timeout timeout then Timeout, num
@@ -206,8 +221,11 @@ module Make(E : Env.S) = struct
           (* do one step *)
           if !_progress then print_progress num ~steps;
 
-          if num > 0 && num mod 300 = 0 then (
-            EInterface.try_e (Env.get_active ()) (Env.get_passive ());
+          if should_try_e timeout then (
+            let res = EInterface.try_e (Env.get_active ()) (Env.get_passive ()) in
+            match res with 
+            | Some c -> Env.add_passive (Iter.singleton c);
+            | _ -> ()
           );
 
           let status = given_clause_step ~generating num in
@@ -227,4 +245,5 @@ let () =
     [ "--progress", Arg.Set _progress, " progress bar";
       "-p", Arg.Set _progress, " alias to --progress";
       "--check-types", Arg.Set _check_types, " check types in new clauses";
+      "--try-e", Arg.String (fun path -> e_path := Some path), " try the given eprover binary on the problem"
     ]

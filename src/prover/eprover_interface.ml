@@ -12,15 +12,19 @@ module type S = sig
 
 
   val set_e_bin : string -> unit
-  val try_e : Env.C.t Iter.t -> Env.C.t Iter.t -> unit
+  val try_e : Env.C.t Iter.t -> Env.C.t Iter.t -> Env.C.t option
 
   val setup : unit -> unit
   (** Register rules in the environment *)
 end
 
-let _timeout = 10 
+let _timeout = 2
 
 let e_bin = ref (None : string option)
+
+let regex_refutation = Str.regexp ".*SZS output start CNFRefutation.*" 
+let reg_thf_clause = Str.regexp "thf(zip_cl_\\([0-9]+\\),.*"
+
 
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
@@ -64,19 +68,41 @@ module Make(E : Env.S) : S with module Env = E = struct
   let run_e prob_path =
     match !e_bin with 
     | Some e_path -> 
-      (*let cmd = CCFormat.sprintf "%s %s --auto -s -p --cpu-limit %d"  
-                  e_path prob_path _timeout in
-        Sys.command cmd 
-      
-        ... test the output and get which clauses have been used in the proof.
-       *)
-       ()
+      let timeout = 2 in
+      let cmd = CCFormat.sprintf "timeout %d %s %s --cpu-limit=%d --auto -s -p" timeout e_path prob_path timeout in
+      let process_channel = Unix.open_process_in cmd in
+      let _,status = Unix.wait () in
+      begin match status with
+      | WEXITED status ->
+        let refutation_found = ref false in
+        (try 
+          while not !refutation_found do 
+            let line = input_line process_channel in
+            flush_all ();
+            if Str.string_match regex_refutation line 0 then 
+              refutation_found := true;
+          done;
+          if !refutation_found then (
+            let clause_ids = ref [] in
+            (try 
+              while true do 
+                let line = input_line process_channel in
+                flush_all ();
+                if Str.string_match reg_thf_clause line 0 then (
+                  let id = CCInt.of_string (Str.matched_group 1 line) in
+                  clause_ids := CCOpt.get_exn id :: !clause_ids;)
+              done;
+              Some !clause_ids
+             with End_of_file -> Some !clause_ids)
+          ) else None
+        with End_of_file -> CCFormat.printf "EOF!.\n"; None;)
+      | _ -> None end
     | None ->
-        invalid_arg "cannot run E if E binary is not set up"
+      invalid_arg "cannot run E if E binary is not set up"
 
 
   let try_e active_set passive_set =
-    let max_others = 300 in
+    let max_others = 256 in
 
     let rec can_be_translated t =
       let can_translate_ty ty =
@@ -101,37 +127,38 @@ module Make(E : Env.S) : S with module Env = E = struct
       let reduced = 
         Iter.map (fun c -> CCOpt.get_or ~default:c (C.eta_reduce c)) set in
       let init_clauses = 
-        Iter.filter (fun c -> Proof.Step.inferences_perfomed (C.proof_step c) = 0 && clause_no_lams c) reduced in
+        Iter.filter (fun c -> Proof.Step.inferences_perfomed (C.proof_step c) <= 1 && clause_no_lams c) reduced in
     Iter.append init_clauses (
       reduced
       |> Iter.filter (fun c -> 
         let proof_d = Proof.Step.inferences_perfomed (C.proof_step c) in
-        0 < proof_d  && proof_d < 6 && clause_no_lams c)
+        proof_d  > 6 && clause_no_lams c)
       |> Iter.sort ~cmp:(fun c1 c2 ->
           let pd1 = Proof.Step.inferences_perfomed (C.proof_step c1) in
           let pd2 = Proof.Step.inferences_perfomed (C.proof_step c1) in
-          CCInt.compare pd1 pd2)
+          -CCInt.compare pd1 pd2)
       |> Iter.take max_others)
     |> Iter.to_list in
-
 
     let prob_name, prob_channel = Filename.open_temp_file "e_input" "" in
     let out = Format.formatter_of_out_channel prob_channel in
     let cl_set = take_from_set active_set @ (take_from_set passive_set) in
     output_all ~out cl_set;
+    close_out prob_channel;
 
-    Format.printf "[CHECK_E: %s].\n" prob_name;
-    Format.print_flush ();
-    close_out prob_channel
-
-    (* raise (Invalid_argument "done") *)
-
-    (* let e_name = Filename.temp_file "e_output" "" in *)
-    (* let res = run_e e_name in *)
+    match run_e prob_name with
+    | Some ids ->
+      assert(not (CCList.is_empty ids));
+      
+      let clauses = List.map (fun id -> 
+        List.find (fun cl -> (C.id cl) = id) cl_set) ids in
+      let rule = Proof.Rule.mk "eprover" in
+      let proof = Proof.Step.inference  ~rule (List.map C.proof_parent clauses) in
+      let penalty = CCOpt.get_exn @@ Iter.max (Iter.map C.penalty (Iter.of_list clauses)) in
+      let trail = C.trail_l clauses in
+      Some (C.create ~penalty ~trail [] proof)
+    | _ -> None
+    
   let setup () =
     ()
 end
-
-let () =
-  Options.add_opts
-    [];

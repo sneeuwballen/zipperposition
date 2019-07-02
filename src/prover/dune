@@ -12,7 +12,7 @@
   (name libzipperposition)
   (public_name libzipperposition)
   (synopsis "library for the Zipperposition theorem prover")
-  (libraries containers zarith msat logtk logtk.proofs logtk.parsers)
+  (libraries containers zarith msat logtk logtk.proofs logtk.parsers str)
   (flags :standard -w -32-50)
 )
 

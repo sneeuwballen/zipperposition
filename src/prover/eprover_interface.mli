@@ -9,7 +9,7 @@ module type S = sig
   (** {6 Registration} *)
 
   val set_e_bin : string -> unit
-  val try_e : Env.C.t Iter.t -> Env.C.t Iter.t -> unit
+  val try_e : Env.C.t Iter.t -> Env.C.t Iter.t -> Env.C.t option
 
 
   val setup : unit -> unit
