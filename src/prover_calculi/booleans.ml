@@ -17,6 +17,7 @@ let _bool_reasoning = ref BoolReasoningDisabled
 let cased_term_selection = ref Minimal
 let quant_rename = ref false
 let interpret_bool_funs = ref false
+let cnf_non_simpl = ref false
 
 module type S = sig
   module Env : Env.S
@@ -357,7 +358,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_basic_simplify simpl_bool_subterms;
     Env.add_basic_simplify normalize_equalities;
     Env.add_multi_simpl_rule Fool.rw_bool_lits;
-    Env.add_multi_simpl_rule cnf_otf;
+    if !cnf_non_simpl then (
+      Env.add_unary_inf "cnf otf inf" cnf_infer;
+    ) else  Env.add_multi_simpl_rule cnf_otf;
 
     if (!interpret_bool_funs) then (
       Env.add_unary_inf "interpret boolean functions" interpret_boolean_functions;
@@ -612,6 +615,9 @@ let () =
       "--quantifier-renaming"
       , Arg.Bool (fun v -> quant_rename := v)
       , " turn the quantifier renaming on or off";
+      "--disable-simplifying-cnf",
+      Arg.Set cnf_non_simpl,
+      "implement cnf on-the-fly as an inference rule";
       "--interpret-bool-funs"
       , Arg.Bool (fun v -> interpret_bool_funs := v)
       , "turn interpretation of boolean functions as forall or negation of forall on or off"

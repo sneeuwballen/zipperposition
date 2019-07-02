@@ -5,6 +5,8 @@
 
 open Logtk
 
+let _tmp_dir = ref "/tmp"
+
 module type S = sig
   module Env : Env.S
 
@@ -69,7 +71,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     match !e_bin with 
     | Some e_path -> 
       let cmd = CCFormat.sprintf "timeout %d %s %s --cpu-limit=%d --auto -s -p" _timeout e_path prob_path _timeout in
-      CCFormat.printf "Running : %s.\n" cmd;
+      CCFormat.printf "%% Running : %s.\n" cmd;
       let process_channel = Unix.open_process_in cmd in
       let _,status = Unix.wait () in
       begin match status with
@@ -102,7 +104,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
   let try_e active_set passive_set =
-    let max_others = 512 in
+    let max_others = 400 in
 
     let rec can_be_translated t =
       let can_translate_ty ty =
@@ -141,25 +143,33 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Iter.take max_others)
     |> Iter.to_list in
 
-    let prob_name, prob_channel = Filename.open_temp_file "e_input" "" in
+    let prob_name, prob_channel = Filename.open_temp_file ~temp_dir:!_tmp_dir "e_input" "" in
     let out = Format.formatter_of_out_channel prob_channel in
     let cl_set = take_from_set active_set @ (take_from_set passive_set) in
     output_all ~out cl_set;
     close_out prob_channel;
 
-    match run_e prob_name with
-    | Some ids ->
-      assert(not (CCList.is_empty ids));
-      
-      let clauses = List.map (fun id -> 
-        List.find (fun cl -> (C.id cl) = id) cl_set) ids in
-      let rule = Proof.Rule.mk "eprover" in
-      let proof = Proof.Step.inference  ~rule (List.map C.proof_parent clauses) in
-      let penalty = CCOpt.get_exn @@ Iter.max (Iter.map C.penalty (Iter.of_list clauses)) in
-      let trail = C.trail_l clauses in
-      Some (C.create ~penalty ~trail [] proof)
-    | _ -> None
+    let res = 
+      match run_e prob_name with
+      | Some ids ->
+        assert(not (CCList.is_empty ids));
+        
+        let clauses = List.map (fun id -> 
+          List.find (fun cl -> (C.id cl) = id) cl_set) ids in
+        let rule = Proof.Rule.mk "eprover" in
+        let proof = Proof.Step.inference  ~rule (List.map C.proof_parent clauses) in
+        let penalty = CCOpt.get_exn @@ Iter.max (Iter.map C.penalty (Iter.of_list clauses)) in
+        let trail = C.trail_l clauses in
+        Some (C.create ~penalty ~trail [] proof)
+      | _ -> None 
+    in
+    (* Sys.remove prob_name; *)
+    res
     
-  let setup () =
+  let setup () = 
     ()
 end
+
+let () =
+   Options.add_opts
+    [ "--tmp-dir", Arg.String (fun v -> _tmp_dir := v), " scratch directory for running E" ]
