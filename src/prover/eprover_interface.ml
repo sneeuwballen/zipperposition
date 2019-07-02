@@ -33,7 +33,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let output_cl ~out clause =
     let lits_converted = Literals.Conv.to_tst (C.lits clause) in
     Format.fprintf out "%% %d:\n" (Proof.Step.inferences_perfomed (C.proof_step clause));
-    Format.fprintf out "@[thf(cl_%d,axiom,@[%a@]).@]@\n" (C.id clause) TypedSTerm.TPTP_THF.pp lits_converted
+    Format.fprintf out "@[thf(zip_cl_%d,axiom,@[%a@]).@]@\n" (C.id clause) TypedSTerm.TPTP_THF.pp lits_converted
 
   let output_symdecl ~out sym ty =
     Format.fprintf out "@[thf(@['%a_type',type,@[%a@]:@ @[%a@]@]).@]@\n" 
@@ -78,21 +78,39 @@ module Make(E : Env.S) : S with module Env = E = struct
   let try_e active_set passive_set =
     let max_others = 300 in
 
+    let rec can_be_translated t =
+      let can_translate_ty ty =
+        Type.is_ground ty in
+
+      can_translate_ty (Term.ty t) &&
+      match Term.view t with
+      | AppBuiltin(b, [body]) when Builtin.is_quantifier b && Type.is_fun (Term.ty body) -> 
+        let _, fun_body = Term.open_fun body in
+        can_be_translated fun_body
+      | AppBuiltin(_, l) -> List.for_all can_be_translated l
+      | DB _ -> false
+      | Var _ | Const _ -> true
+      | App(hd,args) -> can_be_translated hd && List.for_all can_be_translated args
+      | Fun _ -> false in
+
+
     let take_from_set set =
       let clause_no_lams cl =
-        C.Seq.terms cl |>
-        Iter.for_all (fun t -> Term.Seq.subterms ~include_builtin:true t 
-                                |> Iter.for_all (fun st -> not (Term.is_fun st))) in
+        Iter.for_all can_be_translated (C.Seq.terms cl) in
 
       let reduced = 
         Iter.map (fun c -> CCOpt.get_or ~default:c (C.eta_reduce c)) set in
       let init_clauses = 
-        Iter.filter (fun c -> Proof.Step.inferences_perfomed (C.proof_step c) <= 3 && clause_no_lams c) reduced in
+        Iter.filter (fun c -> Proof.Step.inferences_perfomed (C.proof_step c) = 0 && clause_no_lams c) reduced in
     Iter.append init_clauses (
       reduced
-      |> Iter.filter (fun c ->
-          let proof_depth = Proof.Step.inferences_perfomed (C.proof_step c) in
-          proof_depth > 3 && proof_depth < 6 && clause_no_lams c)
+      |> Iter.filter (fun c -> 
+        let proof_d = Proof.Step.inferences_perfomed (C.proof_step c) in
+        0 < proof_d  && proof_d < 6 && clause_no_lams c)
+      |> Iter.sort ~cmp:(fun c1 c2 ->
+          let pd1 = Proof.Step.inferences_perfomed (C.proof_step c1) in
+          let pd2 = Proof.Step.inferences_perfomed (C.proof_step c1) in
+          CCInt.compare pd1 pd2)
       |> Iter.take max_others)
     |> Iter.to_list in
 

@@ -1095,7 +1095,8 @@ module Conv = struct
       | SLiteral.Neq(l,r) ->
         let l,r = CCPair.map_same (T.Conv.to_simple_term ctx) (l,r) in
         TypedSTerm.app_builtin ~ty:TypedSTerm.Ty.prop Builtin.Neq [l;r]
-      | _ -> raise (invalid_arg "not implemented")
+      | SLiteral.True -> TypedSTerm.Form.true_
+      | SLiteral.False -> TypedSTerm.Form.false_
     end
 
   let to_s_form ?allow_free_db ?(ctx=T.Conv.create()) ?hooks lit =

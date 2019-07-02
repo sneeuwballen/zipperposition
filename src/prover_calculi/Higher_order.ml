@@ -111,7 +111,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let rec declare_skolems = function
   | [] -> ()
-  | (sym,id) :: rest -> Ctx.declare sym id
+  | (sym,id) :: rest -> Ctx.declare sym id; declare_skolems rest
 
   (* negative extensionality rule:
      [f != g] where [f : a -> b] becomes [f k != g k] for a fresh parameter [k] *)

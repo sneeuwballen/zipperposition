@@ -54,7 +54,12 @@ module Make(X : PARAMETERS) = struct
   let on_signature_update = Signal.create()
 
   let find_signature s = Signature.find !_signature s
-  let find_signature_exn s = Signature.find_exn !_signature s
+  let find_signature_exn s = 
+    try 
+      Signature.find_exn !_signature s
+    with Not_found ->
+      invalid_arg (CCFormat.sprintf "%a not found in signature" ID.pp s)
+      
 
   let compare t1 t2 = Ordering.compare !_ord t1 t2
 
