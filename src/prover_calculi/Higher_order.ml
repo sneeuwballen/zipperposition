@@ -132,16 +132,19 @@ module Make(E : Env.S) : S with module Env = E = struct
     let lits = [Literal.mk_eq x y; Literal.mk_neq x_diff y_diff] in
     Env.C.create ~penalty:!_ext_axiom_penalty ~trail:Trail.empty lits Proof.Step.trivial
 
-  let extensionality_clause_subst scope t1 t2 =
+  let ext_scope = 0
+  let nonext_scope = 1
+
+  let extensionality_clause_subst t1 t2 =
     assert (Type.equal (T.ty t1) (T.ty t2));
     match Type.open_fun (T.ty t1) with
       | (in_ty :: rest_ty, return_ty) -> 
         let out_ty = Type.arrow rest_ty return_ty in
         Subst.of_list [
-          (HVar.make ~ty:InnerTerm.tType 0, scope), ((in_ty :> InnerTerm.t), scope);
-          (HVar.make ~ty:InnerTerm.tType 1, scope), ((out_ty :> InnerTerm.t), scope);
-          (HVar.make ~ty:InnerTerm.tType 2, scope), ((t1 :> InnerTerm.t), scope);
-          (HVar.make ~ty:InnerTerm.tType 3, scope), ((t2 :> InnerTerm.t), scope);
+          (HVar.make ~ty:InnerTerm.tType 0, ext_scope), ((in_ty :> InnerTerm.t), nonext_scope);
+          (HVar.make ~ty:InnerTerm.tType 1, ext_scope), ((out_ty :> InnerTerm.t), nonext_scope);
+          (HVar.make ~ty:InnerTerm.tType 2, ext_scope), ((t1 :> InnerTerm.t), nonext_scope);
+          (HVar.make ~ty:InnerTerm.tType 3, ext_scope), ((t2 :> InnerTerm.t), nonext_scope);
         ]
       | _ -> assert false
 
@@ -174,7 +177,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debugf ~section 4
         "(@[ho_ext_neg_lit@ :old `%a`@ :new `%a`@])"
         (fun k->k Literal.pp lit Literal.pp new_lit);
-      Some (new_lit,[],[Proof.Tag.T_ho; Proof.Tag.T_ext])
+      Some (new_lit,[],[Proof.Tag.T_ho; Proof.Tag.T_ext]) 
+      (* TODO: Add skolem definition for proof checking *)
     | _ -> None
 
 
@@ -240,9 +244,9 @@ module Make(E : Env.S) : S with module Env = E = struct
   let ext_pos_general ?(all_lits = false) (c:C.t) : C.t list =
     let eligible = if all_lits then C.Eligible.always else C.Eligible.param c in
     (* Remove recursively variables at the end of the literal t = s if possible.
-       e.g. ext_pos_lit (f X Y) (g X Y) other_lits = [f X = g X, f = g]
+       e.g. ext_pos_lit (f X Y) (g X Y) other_lits = [f X = g X, Y; f = g, X]
        if X and Y do not appear in other_lits *)
-    let rec ext_pos_lit t s other_lits =
+    let rec ext_pos_lit t s other_lits parent_subst parent_ext_substs =
       let f, tt = T.as_app t in
       let g, ss = T.as_app s in
       begin match List.rev tt, List.rev ss with
@@ -259,8 +263,21 @@ module Make(E : Env.S) : S with module Env = E = struct
                   let butlast = (fun l -> CCList.take (List.length l - 1) l) in
                   let t' = T.app f (butlast tt) in
                   let s' = T.app g (butlast ss) in
-                  Literal.mk_eq t' s'
-                  :: ext_pos_lit t' s' other_lits
+                  let parent_subst = Unif_subst.FO.bind parent_subst 
+                    (v, nonext_scope) ((extensionality_clause_diff t' s'), nonext_scope) in
+                  let parent_ext_substs = extensionality_clause_subst t' s' :: 
+                    List.map (Subst.merge (Unif_subst.subst parent_subst)) parent_ext_substs in
+                  let parent_exts = 
+                    List.map (C.proof_parent_subst Subst.Renaming.none (extensionality_clause, ext_scope)) parent_ext_substs in
+                  let parent_c = 
+                    C.proof_parent_subst Subst.Renaming.none (c, nonext_scope) (Unif_subst.subst parent_subst) in
+                  let proof =
+                    Proof.Step.inference (parent_c :: parent_exts)
+                      ~rule:(Proof.Rule.mk "ho_ext_pos_general")
+                      ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext]
+                  in
+                  (Literal.mk_eq t' s', proof)
+                  :: ext_pos_lit t' s' other_lits parent_subst parent_ext_substs
                 )
                 else
                   []
@@ -279,17 +296,12 @@ module Make(E : Env.S) : S with module Env = E = struct
         let lit = Literal.map (fun t -> Lambda.eta_reduce t) lit in
         match lit with
            | Literal.Equation (t, s, true) ->
-             ext_pos_lit t s (CCArray.except_idx (C.lits c) lit_idx)
+             ext_pos_lit t s (CCArray.except_idx (C.lits c) lit_idx) Unif_subst.empty []
              |> Iter.of_list
              |> Iter.flat_map_l
-               (fun new_lit ->
+               (fun (new_lit, proof) ->
                   (* create a clause with new_lit instead of lit *)
                   let new_lits = new_lit :: CCArray.except_idx (C.lits c) lit_idx in
-                  let proof =
-                    Proof.Step.inference [C.proof_parent c]
-                      ~rule:(Proof.Rule.mk "ho_ext_pos_general")
-                      ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext]
-                  in
                   let new_c =
                     C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
                   in
@@ -419,6 +431,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> CCArray.filter_map (fun x -> x)
     |> CCArray.to_list
 
+
   let mk_def_proof id ty vars represents =
     let rw_rule = Rewrite.Term.Rule.make id ty (List.map T.var vars) represents in
     Proof.Parent.from (Rewrite.Rule.as_proof (Rewrite.Rule.of_term rw_rule))
@@ -438,7 +451,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                 (T.app lhs previous_skolems) (T.app rhs previous_skolems) in
               let skolem_id, skolem_ty, skolem_vars, skolem_term = T.mk_fresh_skolem free_vars ty in
               let def_proof = mk_def_proof skolem_id skolem_ty skolem_vars represented_term in
-              let ext_instance = extensionality_clause_subst 0
+              let ext_instance = extensionality_clause_subst
                 (T.app lhs previous_skolems) (T.app rhs previous_skolems) in
               (previous_skolems @ [skolem_term], def_proof :: def_proofs, ext_instance :: ext_instances)) 
             ([], [], []) in
@@ -448,7 +461,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             ) (C.lits c |> Array.mapi (fun j x -> (j,x)) |> Array.to_list) in
           let proof =
             Proof.Step.inference (C.proof_parent c :: def_proofs
-              @ CCList.map (C.proof_parent_subst Subst.Renaming.none (extensionality_clause, 0)) ext_instances)
+              @ CCList.map (C.proof_parent_subst Subst.Renaming.none (extensionality_clause, ext_scope)) ext_instances)
               ~rule:(Proof.Rule.mk "neg_ext")
               ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext]
           in

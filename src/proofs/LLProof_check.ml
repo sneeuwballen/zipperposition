@@ -125,8 +125,13 @@ let check_step_ ?dot_prefix (p:proof): check_step_res =
     | P.Goal
     | P.Assert
     | P.By_def _
-    | P.Define _
       -> CS_check R_ok
+    | P.Define id
+      -> if ID.is_skolem id
+         then CS_skip `ESA  
+         (* TODO: check whether the Skolem was only defined once 
+            and does not occur in the original problem *)
+         else CS_check R_ok
     | P.Negated_goal p' ->
       (* [p'] should prove [not concl] *)
       CS_check (prove ~dot_prefix [P.concl p'] (F.not_ concl))
