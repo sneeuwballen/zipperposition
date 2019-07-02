@@ -18,7 +18,7 @@ module type S = sig
   (** Register rules in the environment *)
 end
 
-let _timeout = 2
+let _timeout = 4
 
 let e_bin = ref (None : string option)
 
@@ -68,12 +68,12 @@ module Make(E : Env.S) : S with module Env = E = struct
   let run_e prob_path =
     match !e_bin with 
     | Some e_path -> 
-      let timeout = 2 in
-      let cmd = CCFormat.sprintf "timeout %d %s %s --cpu-limit=%d --auto -s -p" timeout e_path prob_path timeout in
+      let cmd = CCFormat.sprintf "timeout %d %s %s --cpu-limit=%d --auto -s -p" _timeout e_path prob_path _timeout in
+      CCFormat.printf "Running : %s.\n" cmd;
       let process_channel = Unix.open_process_in cmd in
       let _,status = Unix.wait () in
       begin match status with
-      | WEXITED status ->
+      | WEXITED _ ->
         let refutation_found = ref false in
         (try 
           while not !refutation_found do 
@@ -95,14 +95,14 @@ module Make(E : Env.S) : S with module Env = E = struct
               Some !clause_ids
              with End_of_file -> Some !clause_ids)
           ) else None
-        with End_of_file -> CCFormat.printf "EOF!.\n"; None;)
+        with End_of_file -> None;)
       | _ -> None end
     | None ->
       invalid_arg "cannot run E if E binary is not set up"
 
 
   let try_e active_set passive_set =
-    let max_others = 256 in
+    let max_others = 512 in
 
     let rec can_be_translated t =
       let can_translate_ty ty =
@@ -127,16 +127,17 @@ module Make(E : Env.S) : S with module Env = E = struct
       let reduced = 
         Iter.map (fun c -> CCOpt.get_or ~default:c (C.eta_reduce c)) set in
       let init_clauses = 
-        Iter.filter (fun c -> Proof.Step.inferences_perfomed (C.proof_step c) <= 1 && clause_no_lams c) reduced in
+        Iter.filter (fun c -> Proof.Step.inferences_perfomed (C.proof_step c) = 0 && clause_no_lams c) reduced in
+    
     Iter.append init_clauses (
       reduced
       |> Iter.filter (fun c -> 
         let proof_d = Proof.Step.inferences_perfomed (C.proof_step c) in
-        proof_d  > 6 && clause_no_lams c)
+        proof_d  > 0 && clause_no_lams c)
       |> Iter.sort ~cmp:(fun c1 c2 ->
           let pd1 = Proof.Step.inferences_perfomed (C.proof_step c1) in
-          let pd2 = Proof.Step.inferences_perfomed (C.proof_step c1) in
-          -CCInt.compare pd1 pd2)
+          let pd2 = Proof.Step.inferences_perfomed (C.proof_step c2) in
+          CCInt.compare pd1 pd2)
       |> Iter.take max_others)
     |> Iter.to_list in
 

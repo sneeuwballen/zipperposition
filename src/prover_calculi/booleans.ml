@@ -248,7 +248,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       | None            -> false 
     ) (C.lits c) in
 
-    let renaming_weight = 300 in
+    let renaming_weight = 200 in
     let max_formula_weight = 
       C.Seq.terms c 
       |> Iter.filter T.is_formula
@@ -258,10 +258,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       match max_formula_weight with
       | None -> [Cnf.DisableRenaming]
       | Some m -> if m < renaming_weight then [Cnf.DisableRenaming] else [] in
-
-    (* if (CCList.is_empty opts) then (
-      CCFormat.printf "weight: %d.\n" (CCOpt.get_exn max_formula_weight);
-    ); *)
 
     match idx with 
     | Some _ ->
@@ -289,6 +285,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     | None       -> 
       (* Format.printf "res:none.\n"; *)
       None
+
+  let cnf_infer cl = 
+    CCOpt.get_or ~default:[] (cnf_otf cl )
 
   let interpret_boolean_functions c =
     (* Collects boolean functions only at top level, 

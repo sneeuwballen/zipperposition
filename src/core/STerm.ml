@@ -491,9 +491,9 @@ module TPTP_THF = struct
     | AppBuiltin (Builtin.Neq, ([_;a;b] | [a;b])) ->
       Format.fprintf out "@[%a !=@ %a@]" pp_force_surrounded a pp_force_surrounded b
     | AppBuiltin (Builtin.Arrow, [ret;a]) ->
-      Format.fprintf out "@[<2>%a >@ %a@]" pp a pp ret
+      Format.fprintf out "@[%a >@ %a@]" pp_surrounded a pp ret
     | AppBuiltin (Builtin.Arrow, ret::l) ->
-      Format.fprintf out "@[<2>@[%a@] >@ %a@]" (Util.pp_list~sep:" > " pp_surrounded) l pp_surrounded ret
+      Format.fprintf out "@[@[%a@] >@ %a@]" (Util.pp_list ~sep:" > " pp_surrounded) l pp_surrounded ret
     | AppBuiltin (s, []) -> Builtin.TPTP.pp out s
     | AppBuiltin (s, l) ->
       (* Format.fprintf out "@[%a(@[%a@])@]" Builtin.TPTP.pp s (Util.pp_list ~sep:", " pp_surrounded) l *)
