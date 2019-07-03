@@ -370,8 +370,6 @@ let unfold_def_before_cnf stmts =
     CCVector.map rewrite_tst_stmt stmts
   ) else stmts
 
-
-
 let post_tying stmts st =
   if !rewrite_before_cnf then (
     CCVector.iter Statement.scan_tst_rewrite stmts;
@@ -379,8 +377,7 @@ let post_tying stmts st =
       CCVector.to_seq stmts
       |> Iter.exists
         (fun st -> match Statement.view st with
-            | Statement.Rewrite _
-            | Statement.Def _ -> true
+            | Statement.Rewrite _ -> true
             | _ -> false)  in
     Flex_state.add Key.has_rw has_rw st
   ) else st
