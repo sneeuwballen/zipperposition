@@ -165,6 +165,8 @@ val declare_defined_cst : ID.t -> level:int -> definition -> unit
 val scan_stmt_for_defined_cst : clause_t -> unit
 (** Try and declare defined constants in the given statement *)
 
+val scan_tst_rewrite : input_t -> unit
+
 (** {2 Inductive Types} *)
 
 val scan_stmt_for_ind_ty : clause_t -> unit

@@ -21,33 +21,35 @@ let prof_narrowing_lit = Util.mk_profiler "narrow.lit"
 let prof_ctx_narrowing = Util.mk_profiler "narrow.ctx_narrow"
 
 let max_steps = 500
+let rewrite_before_cnf = ref false
+
 
 module Key = struct
   let has_rw = Flex_state.create_key()
   let ctx_narrow = Flex_state.create_key()
 end
 
+let simpl_term t =
+  let t', rules = RW.Term.normalize_term ~max_steps t in
+  if T.equal t t' then (
+    assert (RW.Term.Rule_inst_set.is_empty rules);
+    None
+  ) else (
+    let proof =
+      RW.Rule.set_as_proof_parents rules
+    in
+
+    Util.debugf ~section 2
+      "@[<2>@{<green> simpl rewrite@} `@[%a@]`@ :into `@[%a@]`@ :using %a@]"
+      (fun k->k T.pp t T.pp t' RW.Term.Rule_inst_set.pp rules);
+    Some (t',proof)
+  )
+
 module Make(E : Env_intf.S) = struct
   module Env = E
   module C = E.C
 
   (* simplification rule *)
-  let simpl_term t =
-    let t', rules = RW.Term.normalize_term ~max_steps t in
-    if T.equal t t' then (
-      assert (RW.Term.Rule_inst_set.is_empty rules);
-      None
-    ) else (
-      let proof =
-        RW.Rule.set_as_proof_parents rules
-      in
-
-      Util.debugf ~section 2
-        "@[<2>@{<green> simpl rewrite@} `@[%a@]`@ :into `@[%a@]`@ :using %a@]"
-        (fun k->k T.pp t T.pp t' RW.Term.Rule_inst_set.pp rules);
-      Some (t',proof)
-    )
-
   (* perform term narrowing in [c] *)
   let narrow_term_passive_ c: C.t list =
     let eligible = C.Eligible.(res c) in
@@ -305,18 +307,83 @@ end
 let ctx_narrow_ = ref true
 
 let post_cnf stmts st =
-  CCVector.iter Statement.scan_stmt_for_defined_cst stmts;
+  CCVector.iter Statement.scan_stmt_for_defined_cst 
+    (if not !rewrite_before_cnf then stmts
+    else (
+      CCVector.filter (fun st -> match Statement.view st with
+        | Statement.Rewrite _ -> false
+        | _ -> false) stmts));
   (* check if there are rewrite rules *)
   let has_rw =
     CCVector.to_seq stmts
     |> Iter.exists
       (fun st -> match Statement.view st with
-         | Statement.Rewrite _
-         | Statement.Def _ -> true
-         | _ -> false)
-  in
+          | Statement.Rewrite _
+          | Statement.Def _ -> true
+          | _ -> false)  in
   st
   |> Flex_state.add Key.has_rw has_rw
+
+(* let post_typing stmts state = 
+   *)
+
+let rewrite_tst_stmt stmt = 
+    let aux f =
+      let ctx = Type.Conv.create () in
+      let t = Term.Conv.of_simple_term_exn ctx f in
+      CCOpt.map (fun (t',p) ->  (Term.Conv.to_simple_term ctx t, p)) (simpl_term t) in
+
+    let aux_l fs =
+      let ts = List.map aux fs in
+      if List.for_all CCOpt.is_none ts then None
+      else (
+        let proof = ref [] in
+        let combined = CCList.combine fs ts in
+        let res = 
+          List.map (fun (f,res) -> 
+            let f', p_list = CCOpt.get_or ~default:(f,[]) res in
+            proof := p_list @ !proof;
+            f') combined in
+        Some (res, !proof)) in
+
+  let build_stmt f'_opt f mk =
+    match f'_opt with 
+    | Some (f', parent_list) -> 
+      let rule = Proof.Rule.mk "definition expansion" in
+      let proof = Proof.Step.inference  ~rule parent_list in
+      mk ~proof f' 
+    | None -> f in
+  
+  match Statement.view stmt with
+  | Assert f -> 
+    build_stmt (aux f) stmt (Statement.assert_  ~attrs:(Statement.attrs stmt))
+  | Lemma fs -> 
+    build_stmt (aux_l fs) stmt (Statement.lemma ~attrs:(Statement.attrs stmt))
+  | Goal g ->
+    build_stmt (aux g) stmt (Statement.goal ~attrs:(Statement.attrs stmt))
+  | NegatedGoal (skolems, ngs) -> 
+    build_stmt (aux_l ngs) stmt (Statement.neg_goal ~attrs:(Statement.attrs stmt) ~skolems)
+  | _ -> stmt
+
+let unfold_def_before_cnf stmts =
+  if !rewrite_before_cnf then (
+    CCVector.map rewrite_tst_stmt stmts
+  ) else stmts
+
+
+
+let post_tying stmts st =
+  if !rewrite_before_cnf then (
+    CCVector.iter Statement.scan_tst_rewrite stmts;
+    let has_rw =
+      CCVector.to_seq stmts
+      |> Iter.exists
+        (fun st -> match Statement.view st with
+            | Statement.Rewrite _
+            | Statement.Def _ -> true
+            | _ -> false)  in
+    Flex_state.add Key.has_rw has_rw st
+  ) else st
 
 (* add a term simplification that normalizes terms w.r.t the set of rules *)
 let normalize_simpl (module E : Env_intf.S) =
@@ -329,6 +396,7 @@ let extension =
   let open Extensions in
   { default with
       name = "rewriting";
+      post_typing_actions=[post_tying];
       post_cnf_actions=[post_cnf];
       env_actions=[normalize_simpl];
   }
@@ -336,4 +404,5 @@ let extension =
 let () = Options.add_opts
     [ "--rw-ctx-narrow", Arg.Set ctx_narrow_, " enable contextual narrowing";
       "--no-rw-ctx-narrow", Arg.Clear ctx_narrow_, " disable contextual narrowing";
+      "--rewrite-before-cnf", Arg.Bool (fun v -> rewrite_before_cnf := v), " enable/disable rewriting before CNF"
     ]

@@ -195,6 +195,26 @@ let conv_rule ~proof (r:_ def_rule) : Rewrite.rule = match r with
     let rhs = List.map (List.map Literal.Conv.of_form) rhs in
     Rewrite.Rule.make_lit lhs rhs ~proof
 
+let conv_rule_i ~proof (r:_ def_rule) = match r with
+  | Def_term {id;ty;args;rhs;_} ->
+    (* let rhs = Lambda.snf rhs in
+    Rewrite.T_rule (Rewrite.Term.Rule.make id ty args rhs ~proof) *)
+    let ctx = Type.Conv.create () in
+    let ty = Type.Conv.of_simple_term_exn ctx ty in
+    let args = List.map (Term.Conv.of_simple_term_exn ctx) args in
+    let rhs = Lambda.snf (Term.Conv.of_simple_term_exn ctx rhs) in
+    Rewrite.T_rule (Rewrite.Term.Rule.make id ty args rhs ~proof)
+  | Def_form {lhs;rhs;_} ->
+    (* returns either a term or a lit rule (depending on whether RHS is atomic) *)
+    (* let lhs = Literal.Conv.of_form lhs in
+    let rhs = List.map (List.map Literal.Conv.of_form) rhs in
+    Rewrite.Rule.make_lit lhs rhs ~proof *)
+    let ctx = Type.Conv.create () in
+    let conv_t = Term.Conv.of_simple_term_exn ctx in
+    let lhs = Literal.Conv.of_form @@ SLiteral.map conv_t lhs in
+    let rhs = List.map (fun f -> [Literal.mk_prop (conv_t f) true]) rhs in
+    Rewrite.Rule.make_lit lhs rhs ~proof
+
 (* convert rules *)
 let conv_rules (l:_ def_rule list) proof : definition =
   assert (l <> []);
@@ -689,6 +709,21 @@ let as_proof_c t = Proof.S.mk t.proof (Proof.Result.make res_tc_c t)
 
 (** {2 Scanning} *)
 
+let define_rw_rule ~proof r = 
+  begin match r with
+    | Rewrite.T_rule r ->
+      let id = Rewrite.Term.Rule.head_id r in
+      Rewrite.Defined_cst.declare_or_add id (Rewrite.T_rule r)
+    | Rewrite.L_rule lr ->
+      begin match Rewrite.Lit.Rule.head_id lr with
+        | Some id ->
+          Rewrite.Defined_cst.declare_or_add id r
+        | None ->
+          assert (Rewrite.Lit.Rule.is_equational lr);
+          Rewrite.Defined_cst.add_eq_rule lr
+      end
+  end
+
 let scan_stmt_for_defined_cst (st:(clause,Term.t,Type.t) t): unit = match view st with
   | Def [] -> assert false
   | Def l ->
@@ -723,23 +758,18 @@ let scan_stmt_for_defined_cst (st:(clause,Term.t,Type.t) t): unit = match view s
          let _ = Rewrite.Defined_cst.declare ~level id def in
          ())
       ids_and_levels
-  | Rewrite d ->
+  | Rewrite d  ->
     let proof = as_proof_c st in
-    let r = conv_rule ~proof d in
-    begin match r with
-      | Rewrite.T_rule r ->
-        let id = Rewrite.Term.Rule.head_id r in
-        Rewrite.Defined_cst.declare_or_add id (Rewrite.T_rule r)
-      | Rewrite.L_rule lr ->
-        begin match Rewrite.Lit.Rule.head_id lr with
-          | Some id ->
-            Rewrite.Defined_cst.declare_or_add id r
-          | None ->
-            assert (Rewrite.Lit.Rule.is_equational lr);
-            Rewrite.Defined_cst.add_eq_rule lr
-        end
-    end
+    define_rw_rule ~proof (conv_rule ~proof d)
   | _ -> ()
+
+let scan_tst_rewrite (st:(TypedSTerm.t,TypedSTerm.t,TypedSTerm.t) t): unit = match view st with
+  | Rewrite d  ->
+    let proof = as_proof_i st in
+    define_rw_rule ~proof (conv_rule_i ~proof d)
+  | _ -> ()
+
+
 
 let scan_stmt_for_ind_ty st = match view st with
   | Data l ->
