@@ -32,11 +32,29 @@ let ty_ae_app =
   )
 let const_ae_app = T.const ~ty:ty_ae_app id_ae_app
 
+(* skolem for the extensionality axiom: *)
+let id_ext_diff = ID.make "app_encode_ext_diff"
+let ty_ext_diff =
+  let alpha = Var.make ~ty:T.tType (ID.make "alpha") in
+  let beta = Var.make ~ty:T.tType (ID.make "beta") in
+  T.bind ~ty:T.tType Binder.ForallTy alpha (
+    T.bind ~ty:T.tType Binder.ForallTy beta (
+      T.app_builtin ~ty:T.tType Builtin.Arrow
+        [T.var alpha;
+         T.app ~ty:T.tType (function_type) [T.var alpha; T.var beta];
+         T.app ~ty:T.tType (function_type) [T.var alpha; T.var beta]]
+    )
+  )
+let const_ext_diff = T.const ~ty:ty_ext_diff id_ext_diff
+
 (** Type declarations for these new symbols *)
 let ty_decls = 
   let ae_fun_decl = Statement.ty_decl ~proof:Proof.Step.trivial id_ae_fun ty_ae_fun in
   let ae_app_decl = Statement.ty_decl ~proof:Proof.Step.trivial id_ae_app ty_ae_app in
   Iter.of_list [ae_fun_decl; ae_app_decl]
+
+let ty_decl_ext_diff = 
+  Statement.ty_decl ~proof:Proof.Step.trivial id_ext_diff ty_ext_diff
 
 (** Encode a type *)
 let rec app_encode_ty ?(missing_mandatory_args=0) ty =
@@ -163,11 +181,7 @@ let pp_clause_in o =
   let pp_t = T.pp_in o in
   pp_in (Util.pp_list ~sep:" ∨ " (SLiteral.pp_in o pp_t)) pp_t pp_t o
 
-
-(** TODO: cleanup and check dot output *)
-(** encode a statement *)
-let app_encode_stmt stmt =
-  let res_tc =
+let res_tc =
   Proof.Result.make_tc
     ~of_exn:(function E_i c -> Some c | _ -> None)
     ~to_exn:(fun i -> E_i i)
@@ -186,7 +200,9 @@ let app_encode_stmt stmt =
       |> Iter.to_list
       |> T.Form.and_)
     ()
-  in
+
+(** encode a statement *)
+let app_encode_stmt stmt =
   let as_proof = Proof.S.mk (Statement.proof_step stmt) (Proof.Result.make res_tc stmt) in
   let proof = Proof.Step.esa ~rule:(Proof.Rule.mk "app_encode") [as_proof |> Proof.Parent.from] in
    match Statement.view stmt with
@@ -202,18 +218,17 @@ let app_encode_stmt stmt =
     | Statement.TyDecl (id, ty) ->
       Statement.ty_decl ~proof:Proof.Step.trivial id (app_encode_ty ty)
 
-(* TODO: fix, add diff (+ ty_decl) *)
 let extensionality_axiom =
   let alpha = Var.make ~ty:T.tType (ID.make "alpha") in
   let beta = Var.make ~ty:T.tType (ID.make "beta") in
   let fun_alpha_beta = T.app ~ty:T.tType (function_type) [T.var alpha; T.var beta] in
   let x = Var.make ~ty:fun_alpha_beta (ID.make "x") in
   let y = Var.make ~ty:fun_alpha_beta (ID.make "y") in
-  let z = Var.make ~ty:(T.var alpha) (ID.make "z") in
-  let xz = T.app ~ty:(T.var beta) const_ae_app [T.var alpha; T.var beta; T.var x; T.var z] in
-  let yz = T.app ~ty:(T.var beta) const_ae_app [T.var alpha; T.var beta; T.var y; T.var z] in
+  let diff = T.app ~ty:(T.var alpha) const_ext_diff [T.var alpha; T.var beta; T.var x; T.var y] in
+  let xdiff = T.app ~ty:(T.var beta) const_ae_app [T.var alpha; T.var beta; T.var x; diff] in
+  let ydiff = T.app ~ty:(T.var beta) const_ae_app [T.var alpha; T.var beta; T.var y; diff] in
   Statement.assert_ ~proof:Proof.Step.trivial
-    [SLiteral.neq xz yz; SLiteral.eq (T.var x) (T.var y)]
+    [SLiteral.neq xdiff ydiff; SLiteral.eq (T.var x) (T.var y)]
 
 let extension =
   let modifier seq =
@@ -226,7 +241,7 @@ let extension =
       (* Add extensionality axiom *)
       let seq = 
         if !mode_ = `Extensional 
-        then Iter.append seq (Iter.singleton extensionality_axiom) 
+        then Iter.append seq (Iter.of_list [ty_decl_ext_diff; extensionality_axiom])
         else seq in
       Util.debug ~section 2 "Finished applicative encoding"; 
       seq
