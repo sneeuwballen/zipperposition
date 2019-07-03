@@ -39,31 +39,36 @@ let ty_decls =
   Iter.of_list [ae_fun_decl; ae_app_decl]
 
 (** Encode a type *)
-let rec app_encode_ty ty =
+let rec app_encode_ty ?(missing_mandatory_args=0) ty =
   let ty' = match T.view ty with
     | T.App (f, args) ->
       assert (not (T.equal f function_type));
       T.app ~ty:T.tType (app_encode_ty f) (CCList.map app_encode_ty args)
     | T.AppBuiltin (Builtin.Arrow, ret::args) when (not (T.Ty.is_tType ret)) ->
-      CCList.fold_right
+      let ret_ty = CCList.fold_right
         (fun arg t ->
            T.app ~ty:T.tType function_type [app_encode_ty arg;t]
         )
-        args
-        (app_encode_ty ret)
+        (CCList.drop missing_mandatory_args args)
+        (app_encode_ty ~missing_mandatory_args ret)
+      in
+      if (missing_mandatory_args > 0)
+      then T.app_builtin ~ty:T.tType Builtin.Arrow
+          (ret_ty :: List.map app_encode_ty (CCList.take missing_mandatory_args args))
+      else ret_ty
     | T.AppBuiltin (f,args) ->
       T.app_builtin ~ty:T.tType f (CCList.map app_encode_ty args)
     | T.Const _ -> ty
     | T.Var _ -> ty
     | T.Meta _ -> failwith "Not implemented: Meta"
-    | T.Bind (b,v,t) -> T.bind ~ty:T.tType b v (app_encode_ty t)
+    | T.Bind (b,v,t) -> T.bind ~ty:T.tType b v (app_encode_ty ~missing_mandatory_args t)
     | T.Ite (_,_,_) -> failwith "Not implemented: Ite"
     | T.Let _ -> failwith "Not implemented: Let"
     | T.Match (_,_) -> failwith "Not implemented: Match"
     | T.Multiset _ -> failwith "Not implemented: Multiset"
     | T.Record (_,_) -> failwith "Not implemented: Record"
   in
-  Util.debugf 5 "Encoded type @[%a@] into @[%a@]" (fun k -> k T.pp ty T.pp ty');
+  Util.debugf ~section 5 "Encoded type @[%a@] into @[%a@]" (fun k -> k T.pp ty T.pp ty');
   ty'
 
 (** Is a term a type? i.e. is a term of type tType? *)
@@ -78,14 +83,21 @@ let app_encode_var var =
 (** Encode a term *)
 let rec app_encode_term toplevel t  =
   if toplevel then Util.debugf ~section 3 "Encoding toplevel term @[%a@]" (fun k -> k T.pp t);
-  let ty = app_encode_ty (CCOpt.get_exn (T.ty t)) in
+  let missing_mandatory_args = 
+    match T.as_id_app t with
+      | Some (id, idty, args) -> 
+        let num_term_args = List.length (List.filter (fun u -> not (is_type u)) args) in
+        max 0 (ID.num_mandatory_args id - num_term_args)
+      | None -> 0
+  in
+  let ty = app_encode_ty ~missing_mandatory_args (CCOpt.get_exn (T.ty t)) in
   let t' = match T.view t with
     | T.App (f, []) -> app_encode_term false f
     | T.App (f, args) ->
-      Util.debugf 5 "Attempting to encode application: %a" (fun k -> k T.pp_with_ty t);
+      Util.debugf ~section 5 "Attempting to encode application: %a" (fun k -> k T.pp_with_ty t);
       CCList.fold_left
         (fun term arg ->
-           Util.debugf 5 "Encoding application of %a to %a" (fun k -> k T.pp_with_ty term T.pp arg);
+           Util.debugf ~section 5 "Encoding application of %a to %a" (fun k -> k T.pp_with_ty term T.pp arg);
            match T.view (T.ty_exn term) with
              | T.App (f, types) ->
                assert (T.equal f function_type);
@@ -101,12 +113,23 @@ let rec app_encode_term toplevel t  =
                let arg' = app_encode_ty arg in
                let t' = T.Subst.eval (Var.Subst.singleton var arg') t in
                T.app ~ty:t' term [arg']
+             | T.AppBuiltin (Builtin.Arrow, ret_ty::arg_tys) ->
+              (* mandatory arguments *)
+              let arg' = app_encode_term false arg in
+              let ty' = begin match arg_tys with
+                | [] -> assert false
+                | _ :: [] -> ret_ty
+                | _ :: arg_tys_head :: arg_tys_tail -> 
+                  T.app_builtin ~ty:T.tType Builtin.Arrow 
+                    (ret_ty :: arg_tys_head :: arg_tys_tail)
+              end in
+              T.app ~ty:ty' term [arg']
              | _ -> failwith "Expected quantified or function type"
         )
         (app_encode_term false f)
         args
     | T.AppBuiltin (f, ts) ->
-      Util.debugf 5 "AppBuiltin-Term: %a" (fun k -> k T.pp t); 
+      Util.debugf ~section 5 "AppBuiltin-Term: %a" (fun k -> k T.pp t); 
       failwith "Not implemented: AppBuiltin"
     | T.Const c -> T.const ~ty c
     | T.Var v -> T.var (app_encode_var v)
@@ -115,11 +138,12 @@ let rec app_encode_term toplevel t  =
     | T.Bind (Binder.Lambda, _, _) -> failwith "Not implemented: Lambda"
     | _ -> failwith "Not implemented: Other kind of term"
   in
-  Util.debugf 5 "Encoded term @[%a@] into @[%a@]" (fun k -> k T.pp t T.pp t');
+  Util.debugf ~section 5 "Encoded term @[%a@] into @[%a@]" (fun k -> k T.pp t T.pp t');
   t'
 
 (** Encode a literal *)
 let app_encode_lit lit = 
+  Util.debugf ~section 2 "# Encoding Literal %a" (fun k -> k (SLiteral.pp T.pp) lit);
   SLiteral.map (app_encode_term true) lit
 
 (** Encode a clause *)

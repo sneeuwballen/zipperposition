@@ -1345,6 +1345,7 @@ let () =
   Params.add_to_mode "fo-complete-basic" (fun () ->
     enabled_ := false;
     Unif._allow_pattern_unif := false;
+    Unif._allow_partial_skolem_application := false;
   );
   Params.add_to_modes 
     [ "lambda-free-intensional"
@@ -1359,6 +1360,7 @@ let () =
     _prune_arg_fun := `NoPrune;
     prim_mode_ := `None;
     Unif._allow_pattern_unif := false;
+    Unif._allow_partial_skolem_application := false;
   );
   Params.add_to_modes 
     [ "lambda-free-extensional"
