@@ -197,18 +197,12 @@ let conv_rule ~proof (r:_ def_rule) : Rewrite.rule = match r with
 
 let conv_rule_i ~proof (r:_ def_rule) = match r with
   | Def_term {id;ty;args;rhs;_} ->
-    (* let rhs = Lambda.snf rhs in
-    Rewrite.T_rule (Rewrite.Term.Rule.make id ty args rhs ~proof) *)
     let ctx = Type.Conv.create () in
     let ty = Type.Conv.of_simple_term_exn ctx ty in
     let args = List.map (Term.Conv.of_simple_term_exn ctx) args in
     let rhs = Lambda.snf (Term.Conv.of_simple_term_exn ctx rhs) in
     Rewrite.T_rule (Rewrite.Term.Rule.make id ty args rhs ~proof)
   | Def_form {lhs;rhs;_} ->
-    (* returns either a term or a lit rule (depending on whether RHS is atomic) *)
-    (* let lhs = Literal.Conv.of_form lhs in
-    let rhs = List.map (List.map Literal.Conv.of_form) rhs in
-    Rewrite.Rule.make_lit lhs rhs ~proof *)
     let ctx = Type.Conv.create () in
     let conv_t = Term.Conv.of_simple_term_exn ctx in
     let lhs = Literal.Conv.of_form @@ SLiteral.map conv_t lhs in
