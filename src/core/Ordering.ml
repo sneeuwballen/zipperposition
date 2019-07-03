@@ -780,8 +780,11 @@ let rpo6 prec =
   { cache_compare; compare; name=RPO6.name; prec; might_flip; cache_might_flip; monotonic=false}
 
 let epo prec =
-  let cache_compare = dummy_cache_ in (* TODO: make internal EPO cache accessible here **)
-  let compare prec a b = EPO.compare_terms ~prec a b in
+  let cache_compare = mk_cache 256 in
+  (* TODO: make internal EPO cache accessible here ? **)
+  let compare prec a b = CCCache.with_cache cache_compare
+      (fun (a, b) -> EPO.compare_terms ~prec a b) (a,b)
+  in
   let cache_might_flip = dummy_cache_ in
   let might_flip = EPO.might_flip in
   { cache_compare; compare; name=EPO.name; prec; might_flip; cache_might_flip; monotonic=true }
