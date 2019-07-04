@@ -646,15 +646,15 @@ module Make(E : Env.S) : S with module Env = E = struct
     let ord = Env.ord () in
     let eligible = C.Eligible.always in
     let pos_pred_vars, neg_pred_vars, occurences = 
-      Lits.fold_eqn ~both:false ~ord  ~eligible (C.lits c)
+      Lits.fold_eqn ~both:false ~ord ~eligible (C.lits c)
       |> Iter.fold (fun (pos_vs,neg_vs,occ) (lhs,rhs,sign,_) -> 
         if Type.is_prop (Term.ty lhs) && Term.is_app_var lhs && sign
             && Term.is_true_or_false rhs then (
           let var_hd = Term.as_var_exn (Term.head_term lhs) in
           if Term.equal T.true_ rhs then (Term.VarSet.add var_hd pos_vs, neg_vs,occ)
-          else (pos_vs, Term.VarSet.add var_hd neg_vs, lhs :: occ)
+          else (pos_vs, Term.VarSet.add var_hd neg_vs, Term.Set.add lhs occ)
         ) else (pos_vs, neg_vs, occ)
-      ) (Term.VarSet.empty,Term.VarSet.empty,[]) in
+      ) (Term.VarSet.empty,Term.VarSet.empty,Term.Set.empty) in
     let pos_neg_vars = Term.VarSet.inter pos_pred_vars neg_pred_vars in
     if Term.VarSet.is_empty pos_neg_vars then []
     else (
@@ -670,10 +670,12 @@ module Make(E : Env.S) : S with module Env = E = struct
               let body = T.Form.eq arg (T.bvar ~ty:(T.ty arg) (n-i-1)) in
               let subs_term = T.fun_l tyargs body in 
               let subst = Subst.FO.bind' (Subst.empty) (var_hd, 0) (subs_term, 0) in
-              Some (C.apply_subst (c,0) subst))
+              let rule = Proof.Rule.mk "elim_leibniz_eq" in
+              let proof = Some (Proof.Step.inference ~rule [C.proof_parent c]) in
+              Some (C.apply_subst ~proof (c,0) subst))
           ) (CCList.mapi (fun i arg -> (i, arg)) args)
         ) else []
-      ) occurences
+      ) (Term.Set.to_list occurences)
     ) 
 
   let pp_pairs_ out =

@@ -206,7 +206,7 @@ module type S = sig
     val vars : t -> Type.t HVar.t Iter.t
   end
 
-  val apply_subst : t Scoped.t -> Subst.FO.t -> t
+  val apply_subst : ?proof:Proof.Step.t option -> t Scoped.t -> Subst.FO.t -> t
 
   (** {2 Filter literals} *)
 
