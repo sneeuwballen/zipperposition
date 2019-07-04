@@ -331,7 +331,8 @@ let rewrite_tst_stmt stmt =
     let aux f =
       let ctx = Type.Conv.create () in
       let t = Term.Conv.of_simple_term_exn ctx f in
-      CCOpt.map (fun (t',p) ->  (Term.Conv.to_simple_term ctx  t', p)) (simpl_term t) in
+      let snf = Lambda.snf in
+      CCOpt.map (fun (t',p) ->  (Term.Conv.to_simple_term ctx (snf t'), p)) (simpl_term t) in
 
     let aux_l fs =
       let ts = List.map aux fs in

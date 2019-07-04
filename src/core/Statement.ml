@@ -205,11 +205,17 @@ let conv_rule_i ~proof (r:_ def_rule) = match r with
     Rewrite.T_rule rule
   | Def_form {lhs;rhs;_} ->
     let ctx = Type.Conv.create () in
-    let conv_t = Term.Conv.of_simple_term_exn ctx in
-    let lhs = Literal.Conv.of_form @@ SLiteral.map conv_t lhs in
-    let rhs = List.map (fun f -> [Literal.mk_prop (conv_t f) true]) rhs in
-    let res = Rewrite.Rule.make_lit lhs rhs ~proof in
-    res
+    match lhs with 
+    | SLiteral.Atom(lhs, true) -> 
+      let lhs = Term.Conv.of_simple_term_exn ctx lhs in
+      let hd, args = Term.as_app lhs in
+      let ty = Term.ty hd in
+      if List.length rhs = 1 then (
+        let rhs = Term.Conv.of_simple_term_exn ctx (List.hd rhs) in
+        let rule = Rewrite.Term.Rule.make (Term.as_const_exn hd) ty args rhs ~proof in
+        Rewrite.T_rule rule
+      ) else invalid_arg "rhs must be a singleton list."
+    | _ -> invalid_arg "only positive polarity is supported."
 
 (* convert rules *)
 let conv_rules (l:_ def_rule list) proof : definition =

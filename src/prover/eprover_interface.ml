@@ -104,18 +104,21 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
   let try_e active_set passive_set =
-    let max_others = 256 in
+    let max_others = 200 in
 
     let rec can_be_translated t =
       let can_translate_ty ty =
         Type.is_ground ty in
 
-      can_translate_ty (Term.ty t) &&
+      let ty = Term.ty t in
+      can_translate_ty ty &&
       match Term.view t with
       | AppBuiltin(b, [body]) when Builtin.is_quantifier b && Type.is_fun (Term.ty body) -> 
         let _, fun_body = Term.open_fun body in
         can_be_translated fun_body
-      | AppBuiltin(_, l) -> List.for_all can_be_translated l
+      | AppBuiltin(b, l) -> (not (Builtin.is_logical_binop b) || List.length l >= 2) && 
+                            (b != Builtin.Not || List.length l = 1) &&
+                            List.for_all can_be_translated l
       | DB _ -> false
       | Var _ | Const _ -> true
       | App(hd,args) -> can_be_translated hd && List.for_all can_be_translated args
