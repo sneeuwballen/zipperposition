@@ -443,9 +443,7 @@ let process_file ?(prelude=Iter.empty) file =
   let quant_transformer = 
     if !Booleans.quant_rename then Booleans.preprocess_booleans 
     else CCFun.id in
-  CCFormat.printf "@[Before rewriting:\n@[%a@]@]" (CCVector.pp ~sep:";;\n" Statement.pp_input) decls;
   let transformed = Rewriting.unfold_def_before_cnf (quant_transformer decls) in
-  CCFormat.printf "@[After rewriting:\n@[%a@]@]" (CCVector.pp ~sep:"\n" Statement.pp_input) transformed;
   let sk_ctx = Skolem.create () in 
   cnf ~sk_ctx transformed >>= fun stmts ->
   let stmts = Booleans.preprocess_cnf_booleans stmts in

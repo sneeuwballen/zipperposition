@@ -641,6 +641,40 @@ module Make(E : Env.S) : S with module Env = E = struct
     if Proof.Step.inferences_perfomed (C.proof_step c) <= max_penalty_prim_ 
     then prim_enum_ ~mode c
     else []
+  
+  let elim_leibniz_equality c =
+    let ord = Env.ord () in
+    let eligible = C.Eligible.always in
+    let pos_pred_vars, neg_pred_vars, occurences = 
+      Lits.fold_eqn ~both:false ~ord  ~eligible (C.lits c)
+      |> Iter.fold (fun (pos_vs,neg_vs,occ) (lhs,rhs,sign,_) -> 
+        if Type.is_prop (Term.ty lhs) && Term.is_app_var lhs && sign
+            && Term.is_true_or_false rhs then (
+          let var_hd = Term.as_var_exn (Term.head_term lhs) in
+          if Term.equal T.true_ rhs then (Term.VarSet.add var_hd pos_vs, neg_vs,occ)
+          else (pos_vs, Term.VarSet.add var_hd neg_vs, lhs :: occ)
+        ) else (pos_vs, neg_vs, occ)
+      ) (Term.VarSet.empty,Term.VarSet.empty,[]) in
+    let pos_neg_vars = Term.VarSet.inter pos_pred_vars neg_pred_vars in
+    if Term.VarSet.is_empty pos_neg_vars then []
+    else (
+      CCList.flat_map (fun t -> 
+        let hd, args = T.as_app t in
+        let var_hd = T.as_var_exn hd in
+        if Term.VarSet.mem (Term.as_var_exn hd) pos_neg_vars then (
+          let tyargs, _ = Type.open_fun (Term.ty hd) in
+          let n = List.length tyargs in
+          CCList.filter_map (fun (i,arg) ->
+            if T.var_occurs ~var:var_hd arg then None 
+            else (
+              let body = T.Form.eq arg (T.bvar ~ty:(T.ty arg) (n-i-1)) in
+              let subs_term = T.fun_l tyargs body in 
+              let subst = Subst.FO.bind' (Subst.empty) (var_hd, 0) (subs_term, 0) in
+              Some (C.apply_subst (c,0) subst))
+          ) (CCList.mapi (fun i arg -> (i, arg)) args)
+        ) else []
+      ) occurences
+    ) 
 
   let pp_pairs_ out =
     let open CCFormat in

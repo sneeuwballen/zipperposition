@@ -201,13 +201,15 @@ let conv_rule_i ~proof (r:_ def_rule) = match r with
     let ty = Type.Conv.of_simple_term_exn ctx ty in
     let args = List.map (Term.Conv.of_simple_term_exn ctx) args in
     let rhs = Lambda.snf (Term.Conv.of_simple_term_exn ctx rhs) in
-    Rewrite.T_rule (Rewrite.Term.Rule.make id ty args rhs ~proof)
+    let rule = Rewrite.Term.Rule.make id ty args rhs ~proof in
+    Rewrite.T_rule rule
   | Def_form {lhs;rhs;_} ->
     let ctx = Type.Conv.create () in
     let conv_t = Term.Conv.of_simple_term_exn ctx in
     let lhs = Literal.Conv.of_form @@ SLiteral.map conv_t lhs in
     let rhs = List.map (fun f -> [Literal.mk_prop (conv_t f) true]) rhs in
-    Rewrite.Rule.make_lit lhs rhs ~proof
+    let res = Rewrite.Rule.make_lit lhs rhs ~proof in
+    res
 
 (* convert rules *)
 let conv_rules (l:_ def_rule list) proof : definition =
@@ -762,8 +764,6 @@ let scan_tst_rewrite (st:(TypedSTerm.t,TypedSTerm.t,TypedSTerm.t) t): unit = mat
     let proof = as_proof_i st in
     define_rw_rule ~proof (conv_rule_i ~proof d)
   | _ -> ()
-
-
 
 let scan_stmt_for_ind_ty st = match view st with
   | Data l ->

@@ -70,7 +70,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let run_e prob_path =
     match !e_bin with 
     | Some e_path -> 
-      let cmd = CCFormat.sprintf "timeout %d %s %s --cpu-limit=%d --delete-bad-limit=2000000000  --definitional-cnf=24 -s  --proof-object=0  --auto  --split-clauses=4  --split-reuse-defs  --simul-paramod  --forward-context-sr  --destructive-er-aggressive  --destructive-er  --presat-simplify  --prefer-initial-clauses  --term-ordering=KBO6  -WSelectMaxLComplexAvoidPosPred  -winvfreqrank  -c1  -Ginvfreqconjmax  -F1 " _timeout e_path prob_path _timeout in
+      let cmd = CCFormat.sprintf "timeout %d %s %s --cpu-limit=%d --delete-bad-limit=2000000000  --definitional-cnf=24 -s  --proof-object=1  --auto  --split-clauses=4  --split-reuse-defs  --simul-paramod  --forward-context-sr  --destructive-er-aggressive  --destructive-er  --presat-simplify  --prefer-initial-clauses  --term-ordering=KBO6  -WSelectMaxLComplexAvoidPosPred  -winvfreqrank  -c1  -Ginvfreqconjmax  -F1 " _timeout e_path prob_path _timeout in
       CCFormat.printf "%% Running : %s.\n" cmd;
       let process_channel = Unix.open_process_in cmd in
       let _,status = Unix.wait () in
@@ -104,7 +104,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
   let try_e active_set passive_set =
-    let max_others = 100 in
+    let max_others = 256 in
 
     let rec can_be_translated t =
       let can_translate_ty ty =

@@ -331,7 +331,7 @@ let rewrite_tst_stmt stmt =
     let aux f =
       let ctx = Type.Conv.create () in
       let t = Term.Conv.of_simple_term_exn ctx f in
-      CCOpt.map (fun (t',p) ->  (Term.Conv.to_simple_term ctx t, p)) (simpl_term t) in
+      CCOpt.map (fun (t',p) ->  (Term.Conv.to_simple_term ctx  t', p)) (simpl_term t) in
 
     let aux_l fs =
       let ts = List.map aux fs in
@@ -350,7 +350,8 @@ let rewrite_tst_stmt stmt =
     match f'_opt with 
     | Some (f', parent_list) -> 
       let rule = Proof.Rule.mk "definition expansion" in
-      let proof = Proof.Step.inference  ~rule parent_list in
+      let formula_parent = Proof.Step.parents (Statement.proof_step f) in
+      let proof = Proof.Step.inference ~rule (formula_parent @ parent_list) in
       mk ~proof f' 
     | None -> f in
   

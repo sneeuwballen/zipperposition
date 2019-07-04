@@ -206,6 +206,8 @@ module type S = sig
     val vars : t -> Type.t HVar.t Iter.t
   end
 
+  val apply_subst : t Scoped.t -> Subst.FO.t -> t
+
   (** {2 Filter literals} *)
 
   module Eligible : sig
