@@ -51,6 +51,7 @@ let _imit_first = ref false
 let _compose_subs = ref false
 let _var_solve = ref false
 let _neg_cong_fun = ref false
+let _elim_leibniz_eq = ref false
 let _unif_max_depth = ref 11
 
 type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
@@ -1255,6 +1256,7 @@ let () =
           else if s = "old-prune" then _prune_arg_fun := `OldPrune 
           else _prune_arg_fun := `NoPrune)), " choose arg prune mode";
       "--ho-no-ext-neg-lit", Arg.Clear _ext_neg_lit, " enable negative extensionality rule on literal level [?]";
+      "--ho-elim-leibniz", Arg.Bool (fun v -> _elim_leibniz_eq := v), " enable/disable treatment of Leibniz equality";
       "--ho-def-unfold", Arg.Set def_unfold_enabled_, " enable ho definition unfolding";
       "--ho-huet-style-unif", Arg.Set _huet_style, " enable Huet style projection";
       "--ho-no-conservative-elim", Arg.Clear _cons_elim, " Disables conservative elimination rule in pragmatic unification";
