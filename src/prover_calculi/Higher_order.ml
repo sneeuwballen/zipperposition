@@ -1069,6 +1069,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       if !_ext_neg_lit then
         Env.add_lit_rule "ho_ext_neg_lit" ext_neg_lit;
 
+      if !_elim_leibniz_eq then (
+        Env.add_unary_inf "ho_elim_leibniz_eq" elim_leibniz_equality
+      );
+
 
       if !_ext_pos then (
         (* Env.add_unary_inf "ho_ext_pos" (ext_pos ~only_unit:(not !_ext_pos_non_unit)) *)
