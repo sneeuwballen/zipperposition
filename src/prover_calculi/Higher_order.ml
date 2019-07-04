@@ -51,7 +51,7 @@ let _imit_first = ref false
 let _compose_subs = ref false
 let _var_solve = ref false
 let _neg_cong_fun = ref false
-let _elim_leibniz_eq = ref false
+let _elim_leibniz_eq = ref (-1)
 let _unif_max_depth = ref 11
 
 type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
@@ -644,40 +644,46 @@ module Make(E : Env.S) : S with module Env = E = struct
     else []
   
   let elim_leibniz_equality c =
-    let ord = Env.ord () in
-    let eligible = C.Eligible.always in
-    let pos_pred_vars, neg_pred_vars, occurences = 
-      Lits.fold_eqn ~both:false ~ord ~eligible (C.lits c)
-      |> Iter.fold (fun (pos_vs,neg_vs,occ) (lhs,rhs,sign,_) -> 
-        if Type.is_prop (Term.ty lhs) && Term.is_app_var lhs && sign
-            && Term.is_true_or_false rhs then (
-          let var_hd = Term.as_var_exn (Term.head_term lhs) in
-          if Term.equal T.true_ rhs then (Term.VarSet.add var_hd pos_vs, neg_vs,occ)
-          else (pos_vs, Term.VarSet.add var_hd neg_vs, Term.Set.add lhs occ)
-        ) else (pos_vs, neg_vs, occ)
-      ) (Term.VarSet.empty,Term.VarSet.empty,Term.Set.empty) in
-    let pos_neg_vars = Term.VarSet.inter pos_pred_vars neg_pred_vars in
-    if Term.VarSet.is_empty pos_neg_vars then []
-    else (
-      CCList.flat_map (fun t -> 
-        let hd, args = T.as_app t in
-        let var_hd = T.as_var_exn hd in
-        if Term.VarSet.mem (Term.as_var_exn hd) pos_neg_vars then (
-          let tyargs, _ = Type.open_fun (Term.ty hd) in
-          let n = List.length tyargs in
-          CCList.filter_map (fun (i,arg) ->
-            if T.var_occurs ~var:var_hd arg then None 
-            else (
-              let body = T.Form.eq arg (T.bvar ~ty:(T.ty arg) (n-i-1)) in
-              let subs_term = T.fun_l tyargs body in 
-              let subst = Subst.FO.bind' (Subst.empty) (var_hd, 0) (subs_term, 0) in
-              let rule = Proof.Rule.mk "elim_leibniz_eq" in
-              let proof = Some (Proof.Step.inference ~rule [C.proof_parent c]) in
-              Some (C.apply_subst ~proof (c,0) subst))
-          ) (CCList.mapi (fun i arg -> (i, arg)) args)
-        ) else []
-      ) (Term.Set.to_list occurences)
-    ) 
+    if Proof.Step.inferences_perfomed (C.proof_step c) < !_elim_leibniz_eq then (
+      let ord = Env.ord () in
+      let eligible = C.Eligible.always in
+      let pos_pred_vars, neg_pred_vars, occurences = 
+        Lits.fold_eqn ~both:false ~ord ~eligible (C.lits c)
+        |> Iter.fold (fun (pos_vs,neg_vs,occ) (lhs,rhs,sign,_) -> 
+          if Type.is_prop (Term.ty lhs) && Term.is_app_var lhs && sign
+              && Term.is_true_or_false rhs then (
+            let var_hd = Term.as_var_exn (Term.head_term lhs) in
+            if Term.equal T.true_ rhs then (Term.VarSet.add var_hd pos_vs, neg_vs,occ)
+            else (pos_vs, Term.VarSet.add var_hd neg_vs, Term.Set.add lhs occ)
+          ) else (pos_vs, neg_vs, occ)
+        ) (Term.VarSet.empty,Term.VarSet.empty,Term.Set.empty) in
+      let pos_neg_vars = Term.VarSet.inter pos_pred_vars neg_pred_vars in
+      let res = 
+        if Term.VarSet.is_empty pos_neg_vars then []
+        else (
+          CCList.flat_map (fun t -> 
+            let hd, args = T.as_app t in
+            let var_hd = T.as_var_exn hd in
+            if Term.VarSet.mem (Term.as_var_exn hd) pos_neg_vars then (
+              let tyargs, _ = Type.open_fun (Term.ty hd) in
+              let n = List.length tyargs in
+              CCList.filter_map (fun (i,arg) ->
+                if T.var_occurs ~var:var_hd arg then None 
+                else (
+                  let body = T.Form.eq arg (T.bvar ~ty:(T.ty arg) (n-i-1)) in
+                  let subs_term = T.fun_l tyargs body in 
+                  let subst = Subst.FO.bind' (Subst.empty) (var_hd, 0) (subs_term, 0) in
+                  let rule = Proof.Rule.mk "elim_leibniz_eq" in
+                  let proof = Some (Proof.Step.inference ~rule [C.proof_parent c]) in
+                  Some (C.apply_subst ~proof (c,0) subst))
+              ) (CCList.mapi (fun i arg -> (i, arg)) args)
+            ) else []
+          ) (Term.Set.to_list occurences)) in
+      (* CCFormat.printf "Elim Leibniz eq:@ @[%a@].\n" C.pp c; *)
+      (* CCFormat.printf "Res:@ @[%a@].\n" (CCList.pp C.pp) res; *)
+      res
+    ) else []
+    
 
   let pp_pairs_ out =
     let open CCFormat in
@@ -1069,7 +1075,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if !_ext_neg_lit then
         Env.add_lit_rule "ho_ext_neg_lit" ext_neg_lit;
 
-      if !_elim_leibniz_eq then (
+      if !_elim_leibniz_eq > 0 then (
         Env.add_unary_inf "ho_elim_leibniz_eq" elim_leibniz_equality
       );
 
@@ -1260,7 +1266,7 @@ let () =
           else if s = "old-prune" then _prune_arg_fun := `OldPrune 
           else _prune_arg_fun := `NoPrune)), " choose arg prune mode";
       "--ho-no-ext-neg-lit", Arg.Clear _ext_neg_lit, " enable negative extensionality rule on literal level [?]";
-      "--ho-elim-leibniz", Arg.Bool (fun v -> _elim_leibniz_eq := v), " enable/disable treatment of Leibniz equality";
+      "--ho-elim-leibniz", Arg.Int (fun v -> _elim_leibniz_eq := v), " enable/disable treatment of Leibniz equality";
       "--ho-def-unfold", Arg.Set def_unfold_enabled_, " enable ho definition unfolding";
       "--ho-huet-style-unif", Arg.Set _huet_style, " enable Huet style projection";
       "--ho-no-conservative-elim", Arg.Clear _cons_elim, " Disables conservative elimination rule in pragmatic unification";
