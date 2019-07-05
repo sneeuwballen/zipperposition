@@ -137,7 +137,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 	Literals.Seq.terms(C.lits c) |> Iter.iter(find_bools true);
 	let case polarity b b_lit clauses =
 		let proof = Proof.Step.inference[C.proof_parent c]
-			~rule:(Proof.Rule.mk"bool_cases")
+			~rule:(Proof.Rule.mk"bool_cases") ~tags:[Proof.Tag.T_ho]
 		in
 		C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
 			(b_lit :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:polarity)))
@@ -195,7 +195,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             Iter.for_all (fun st -> T.equal b st || 
                                     not (Type.is_prop (T.ty st))) then (
             let proof = Proof.Step.simp[C.proof_parent c]
-              ~rule:(Proof.Rule.mk"bool_case_simp")
+              ~rule:(Proof.Rule.mk"bool_case_simp") ~tags:[Proof.Tag.T_ho]
             in
             C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
               (b_true :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:T.false_)))
@@ -230,7 +230,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let new_lits = List.mapi (fun i l_opt -> 
         CCOpt.get_or ~default:(Array.get (C.lits c) i) l_opt) normalized in
       let proof = Proof.Step.inference [C.proof_parent c] 
-                    ~rule:(Proof.Rule.mk "simplify nested equalities") in
+                    ~rule:(Proof.Rule.mk "simplify nested equalities")  in
       let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
       SimplM.return_new new_c
     ) 
@@ -263,7 +263,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     match idx with 
     | Some _ ->
       let f = Literals.Conv.to_tst (C.lits c) in
-      let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "cnf_otf") [C.proof_parent c] in
+      let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "cnf_otf") ~tags:[Proof.Tag.T_ho] [C.proof_parent c] in
       let trail = C.trail c and penalty = C.penalty c in
       let stmt = Statement.assert_ ~proof f in
       let cnf_vec = Cnf.convert @@ CCVector.to_seq @@ 
@@ -325,7 +325,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> Iter.fold (fun res t -> 
         assert(T.DB.is_closed t);
         let proof = Proof.Step.inference[C.proof_parent c]
-          ~rule:(Proof.Rule.mk"interpret boolean function")
+          ~rule:(Proof.Rule.mk"interpret boolean function") ~tags:[Proof.Tag.T_ho]
         in
         let as_forall = Literal.mk_prop (T.Form.forall t) false in
         let as_neg_forall = Literal.mk_prop (T.Form.forall (negate_bool_fun t)) false in

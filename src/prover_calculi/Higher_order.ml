@@ -675,7 +675,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                   let subs_term = T.fun_l tyargs body in 
                   let subst = Subst.FO.bind' (Subst.empty) (var_hd, 0) (subs_term, 0) in
                   let rule = Proof.Rule.mk ("elim_leibniz_eq_" ^ (if sign then "+" else "-")) in
-                  let proof = Some (Proof.Step.inference ~rule [C.proof_parent c]) in
+                  let tags = [Proof.Tag.T_ho] in
+                  let proof = Some (Proof.Step.inference ~rule ~tags [C.proof_parent c]) in
                   Some (C.apply_subst ~proof (c,0) subst))
               ) (CCList.mapi (fun i arg -> (i, arg)) args)
             ) else [] 

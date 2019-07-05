@@ -105,6 +105,7 @@ type t = proof
 
 module Tag = Builtin.Tag
 
+
 module Rule = struct
   type t = rule
   let pp out r = Format.fprintf out "'%s'" r
