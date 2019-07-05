@@ -27,6 +27,7 @@ let e_bin = ref (None : string option)
 let regex_refutation = Str.regexp ".*SZS output start CNFRefutation.*" 
 let reg_thf_clause = Str.regexp "thf(zip_cl_\\([0-9]+\\),.*"
 
+module IntSet = CCSet.Make(CCInt)
 
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
@@ -125,17 +126,18 @@ module Make(E : Env.S) : S with module Env = E = struct
       | Fun _ -> false in
 
 
-    let take_from_set set =
+    let take_from_set ?(ignore_ids=IntSet.empty) set =
       let clause_no_lams cl =
         Iter.for_all can_be_translated (C.Seq.terms cl) in
 
-      let reduced = 
-        Iter.map (fun c -> CCOpt.get_or ~default:c (C.eta_reduce c)) set in
-      let init_clauses = 
-        Iter.filter (fun c -> C.proof_depth c = 0 && clause_no_lams c) reduced in
+      let reduced s = 
+        Iter.map (fun c -> CCOpt.get_or ~default:c (C.eta_reduce c)) s in
+      let init_clauses s = 
+        Iter.filter (fun c -> C.proof_depth c = 0 && clause_no_lams c) (reduced s) in
     
-    Iter.append init_clauses (
-      reduced
+    let set = Iter.filter (fun c -> not (IntSet.mem (C.id c) ignore_ids)) set in
+    Iter.append (init_clauses set) (
+      (reduced set)
       |> Iter.filter (fun c -> 
         let proof_d = C.proof_depth c in
         let has_ho_step = Proof.Step.has_ho_step (C.proof_step c) in
@@ -148,7 +150,10 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let prob_name, prob_channel = Filename.open_temp_file ~temp_dir:!_tmp_dir "e_input" "" in
     let out = Format.formatter_of_out_channel prob_channel in
-    let cl_set = take_from_set active_set @ (take_from_set passive_set) in
+
+    let active_set = take_from_set active_set in
+    let ignore_ids = IntSet.of_list (List.map C.id active_set) in
+    let cl_set =  active_set @ (take_from_set ~ignore_ids passive_set) in
     output_all ~out cl_set;
     close_out prob_channel;
 

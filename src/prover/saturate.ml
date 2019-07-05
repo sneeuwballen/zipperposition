@@ -146,7 +146,8 @@ module Make(E : Env.S) = struct
             Env.add_passive (Iter.of_list l');
             (* process the clause [c] *)
             let new_clauses = CCVector.create () in
-            assert (not (Env.is_redundant c));
+            (* very expensive assert *)
+            (* assert (not (Env.is_redundant c)); *)
             (* process the given clause! *)
             (* (match Env.C.is_inj_axiom c with
                | Some (sym,i) -> Env.Ctx.set_injective_for_arg sym i

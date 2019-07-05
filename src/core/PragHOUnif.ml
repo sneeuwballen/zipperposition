@@ -415,6 +415,7 @@ let is_lfho_candidate t =
   |> Iter.exists aux
 
 let unify_scoped t0_s t1_s =
+  (* let start = Util.total_time_s () in *)
   let counter = ref 0 in
   let lfho_unif = 
     try
@@ -442,7 +443,9 @@ let unify_scoped t0_s t1_s =
   in
 
   res
-  |> OSeq.map (CCOpt.map (fun sub ->       
+  |> OSeq.map (CCOpt.map (fun sub -> 
+      (* let total = Util.total_time_s () -. start in *)
+      (* CCFormat.printf "unif: %g.\n" total;       *)
       (* if not (Unif_subst.has_constr sub) then (
         let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub t0_s in 
         let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply sub t1_s in

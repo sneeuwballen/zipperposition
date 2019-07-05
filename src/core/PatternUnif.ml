@@ -416,6 +416,7 @@ and flex_rigid ~subst ~counter ~scope flex rigid =
   
 let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
   (* let tptp_pp = T.pp_in Output_format.O_tptp in *)
+  (* let start = Util.total_time_s () in *)
   let res = 
     if US.is_empty subst then (
       let t0',t1',scope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
@@ -432,6 +433,8 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
       )
     ) 
   in
+  (* let finish = Util.total_time_s () in *)
+  (* CCFormat.printf "%g\n" (finish -. start); *)
   (* let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply res t0_s in 
   let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply res t1_s in
   assert ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r))); *)

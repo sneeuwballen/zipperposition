@@ -43,14 +43,14 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
     let vars = List.mapi (fun i ty -> HVar.make ~ty i) ty_args in
     (* projection with "¬": [λvars. ¬ (F vars)] *)
     let l_not = match mode with
-      | `None -> []
+      | `None | `TF -> []
       | `Neg | `Full | `Pragmatic ->
         let f = HVar.make offset ~ty:ty_v in
         [T.fun_of_fvars vars
           (T.Form.not_ (T.app (T.var f) (List.map T.var vars)))]
     (* projection with "∧": [λvars. (F1 vars) ∧ (F2 vars)] *)
     and l_and = match mode with
-      | `Neg | `None | `Pragmatic-> []
+      | `Neg | `None | `Pragmatic | `TF -> []
       | `Full ->
         let f = HVar.make offset ~ty:ty_v in
         let g = HVar.make (offset+1) ~ty:ty_v in
@@ -59,7 +59,7 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
              (T.app (T.var f) (List.map T.var vars))
              (T.app (T.var g) (List.map T.var vars)))]
     and l_or = match mode with
-      | `Neg | `None | `Pragmatic-> []
+      | `Neg | `None | `Pragmatic | `TF -> []
       | `Full ->
         let f = HVar.make offset ~ty:ty_v in
         let g = HVar.make (offset+1) ~ty:ty_v in
@@ -70,7 +70,7 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
     (* projection with "=": [λvars. (F1 vars) = (F2 vars)]
        where [F1 : Πa. ty_args -> a] *)
     and l_eq = match mode with
-      | `Neg | `Pragmatic | `None -> []
+      | `Neg | `Pragmatic | `None | `TF -> []
       | `Full ->
         let a = HVar.make offset ~ty:Type.tType in
         let ty_fun = Type.arrow ty_args (Type.var a) in
@@ -82,11 +82,11 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
              (T.app (T.var g) (List.map T.var vars)))]
     and l_false = match mode with
       | `None  -> []
-      | `Neg | `Pragmatic | `Full  ->
+      | `Neg | `Pragmatic | `Full | `TF  ->
         [T.fun_of_fvars vars T.false_]
     and l_true = match mode with
       | `None -> []
-      | `Neg | `Pragmatic | `Full  ->
+      | `Neg | `Pragmatic | `Full | `TF ->
         [T.fun_of_fvars vars T.true_]
     and l_quants = match mode with
       | `Pragmatic | `Full ->
@@ -154,8 +154,7 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
         l_eq,  10;
         l_false, 5;
         l_true, 5;
-        l_simpl_op
-  , 10;
+        l_simpl_op, 10;
         l_quants, 10;
       ]
   )

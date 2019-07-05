@@ -9,7 +9,7 @@ type penalty = int
 (** penalty on the search space *)
 
 val enum_prop :
-  ?mode:[`Full | `Pragmatic | `Neg | `None] ->
+  ?mode:[`Full | `Pragmatic | `Neg | `None | `TF] ->
   Term.var Scoped.t ->
   enum_cache: Term.Set.t ref ->
   offset:int ->

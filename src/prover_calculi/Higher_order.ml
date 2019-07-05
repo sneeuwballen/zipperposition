@@ -74,7 +74,7 @@ let k_some_ho : bool Flex_state.key = Flex_state.create_key()
 let k_enabled : bool Flex_state.key = Flex_state.create_key()
 let k_enable_def_unfold : bool Flex_state.key = Flex_state.create_key()
 let k_enable_ho_unif : bool Flex_state.key = Flex_state.create_key()
-let k_ho_prim_mode : [`Full | `Neg | `None | `Pragmatic ] Flex_state.key = Flex_state.create_key()
+let k_ho_prim_mode : [`Full | `Neg | `None | `Pragmatic | `TF ] Flex_state.key = Flex_state.create_key()
 let k_ho_prim_max_penalty : int Flex_state.key = Flex_state.create_key()
 
 module Make(E : Env.S) : S with module Env = E = struct
@@ -1166,6 +1166,7 @@ let set_prim_mode_ =
     "neg", `Neg;
     "full", `Full;
     "pragmatic", `Pragmatic;
+    "tf", `TF;
     "none", `None;
   ] in
   let set_ s = prim_mode_ := List.assoc s l in

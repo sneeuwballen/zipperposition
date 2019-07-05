@@ -29,6 +29,7 @@ let profiles_ =
   ; "conjecture-relative", P_conj_rel
   ; "conjecture-relative-var", P_conj_rel_var
   ; "ho-weight", P_ho_weight
+  ; "ho-weight-init", P_ho_weight_init
   ]
 
 let profile_of_string s =
@@ -141,14 +142,29 @@ module Make(C : Clause_intf.S) = struct
       let formulas_num c =
         float_of_int @@
         Iter.fold (fun acc t -> 
-          acc + (if Term.is_formula t then 1 else 0 )) 0 (all_terms c) in
+          acc + (if Term.is_formula t then 1 else 0 )) 0 (C.Seq.terms c) in
       
-      let depth c = float_of_int (C.proof_depth c) in
+      let p_depth c = float_of_int (C.proof_depth c) in
+
+      let t_depth c = C.Seq.terms c 
+                      |> Iter.map Term.depth
+                      |> Iter.max
+                      |> CCOpt.get_or ~default:0
+                      |> float_of_int in
 
       let weight c = float_of_int (weight_lits_ (C.lits c)) in
 
-      int_of_float (weight c *. (1.2 ** (app_var_num c *. (1.2 ** depth c)))
-                             *. (0.6 ** formulas_num c))
+      let res = 
+        int_of_float (weight c *. (1.25 ** (app_var_num c *. (1.35 ** p_depth c)))
+                               *. (0.85 ** formulas_num c)
+                               *. 1.05 ** t_depth c) in
+      Util.debugf 1 "[C_W:]@ @[%a@]@ :@ %d(%g, %g, %g).\n"
+        (fun k -> k C.pp c res (app_var_num c) (formulas_num c) (p_depth c));
+      res
+
+    let ho_weight_initial c =
+      if C.proof_depth c  = 0 then 1
+      else ho_weight_calc c
 
     let rec calc_tweight t sg v w c_mul =
       match Term.view t with 
@@ -427,7 +443,10 @@ module Make(C : Clause_intf.S) = struct
          "conj_relative_var"
 
   let ho_weight () =
-      make ~ratio:6 ~weight:WeightFun.ho_weight_calc "ho_weight"
+      make ~ratio:3 ~weight:WeightFun.ho_weight_calc "ho-weight"
+
+  let ho_weight_init () =
+      make ~ratio:100000 ~weight:WeightFun.ho_weight_initial "ho-weight-init"
 
   let of_profile p =
     let open ClauseQueue_intf in
@@ -441,6 +460,7 @@ module Make(C : Clause_intf.S) = struct
       | P_conj_rel ->  conj_relative_mk ()
       | P_conj_rel_var -> conj_var_relative_mk ()
       | P_ho_weight -> ho_weight ()
+      | P_ho_weight_init -> ho_weight_init ()
 
   let pp out q = CCFormat.fprintf out "queue %s" (name q)
   let to_string = CCFormat.to_string pp

@@ -742,7 +742,7 @@ module Make(X : sig
       match single_step_simplified with
       | None -> Queue.push c q;
       | Some l -> did_simplify := true;
-                  List.iter (fun c -> Queue.push c q) l
+                  List.iter (fun res -> Queue.push res q) l
     end;
     while not (Queue.is_empty q) do
       let c = Queue.pop q in
