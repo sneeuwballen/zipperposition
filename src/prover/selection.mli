@@ -42,6 +42,17 @@ val e_sel2  : ord:Ordering.t -> t
 (** Selection function  identical to E's 
     SelectCQIPrecWNTNp  *)
 
+val e_sel3  : ord:Ordering.t -> t
+(** Selection function  identical to E's 
+    SelectComplexG *)
+
+val ho_sel  : ord:Ordering.t -> t
+(** Selection function that tries to take 
+    into account the number of nested applied variables.
+    
+    The assumption is that they are hard for unification.
+     *)
+
 val from_string : ord:Ordering.t -> string -> t
 (** selection function from string (may fail) *)
 

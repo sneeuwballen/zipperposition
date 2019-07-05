@@ -252,6 +252,32 @@ let e_sel2 ~ord lits =
     | _ -> (sign_val,max_int,max_int,diff_val) (* won't be chosen *) in
   weight_based_sel_driver ~ord ~blocker lits chooser
 
+let e_sel3 ~ord lits = 
+  let chooser (i,l) = 
+    let sign = (if Lit.is_pos l then 1 else 0) in
+    if Lit.is_pure_var l then (
+      (sign, 0, 0, 0)
+    ) else if (Lit.is_ground l) then (
+      (sign, 10, Lit.weight l, 0)
+    ) else (
+      (sign, 20, - (lit_sel_diff_w l) , 0)
+    ) in
+  weight_based_sel_driver ~ord lits chooser
+
+let ho_sel ~ord lits = 
+  let chooser (i,l) = 
+    let sign = (if Lit.is_pos l then 1 else 0) in
+    let ground = if Lit.is_ground l then 1.0 else 1.5 in
+    let app_var_num = 
+      Lit.Seq.terms l
+      |> Iter.flat_map (Term.Seq.subterms ~include_builtin:true)
+      |> Iter.map (fun t -> if Term.is_app_var t then 1 else 0) 
+      |> Iter.sum 
+      |> float_of_int in
+    let weight = float_of_int (Lit.weight l) in
+    (sign, int_of_float (weight *. ((1.2) ** app_var_num) /. ground), 0, 0)  in
+  weight_based_sel_driver ~ord lits chooser
+
 let except_RR_horn (p:parametrized) ~strict ~ord lits =
   if Lits.is_RR_horn_clause lits
   then BV.empty () (* do not select (conditional rewrite rule) *)
@@ -269,6 +295,8 @@ let l =
       "prefer_app_var", prefer_app_var;
       "e-selection", e_sel;
       "e-selection2", e_sel2;
+      "e-selection3", e_sel3;
+      "ho-selection", ho_sel;
     ]
   and by_ord =
     CCList.flat_map

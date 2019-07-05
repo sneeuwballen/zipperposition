@@ -681,9 +681,9 @@ module Make(E : Env.S) : S with module Env = E = struct
               ) (CCList.mapi (fun i arg -> (i, arg)) args)
             ) else [] 
           ) (Term.Map.to_list occurences)) in
-      (* CCFormat.printf "Elim Leibniz eq:@ @[%a@].\n" C.pp c; *)
-      (* CCFormat.printf "Pos/neg vars:@ @[%a@].\n" (Term.VarSet.pp HVar.pp) pos_neg_vars; *)
-      (* CCFormat.printf "Res:@ @[%a@].\n" (CCList.pp C.pp) res; *)
+      (* CCFormat.printf "Elim Leibniz eq:@ @[%a@].\n" C.pp c;
+      CCFormat.printf "Pos/neg vars:@ @[%a@].\n" (Term.VarSet.pp HVar.pp) pos_neg_vars;
+      CCFormat.printf "Res:@ @[%a@].\n" (CCList.pp C.pp) res); *)
       res
     ) else []
     
