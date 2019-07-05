@@ -241,6 +241,8 @@ module Step : sig
 
   val inferences_perfomed : ?count_cnf:bool -> t -> int
 
+  val has_ho_step : t -> bool
+
   val inference : ?infos:infos -> ?tags:tag list -> rule:rule -> parent list -> t
 
   val simp : ?infos:infos -> ?tags:tag list -> rule:rule -> parent list -> t

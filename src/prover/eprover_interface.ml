@@ -104,7 +104,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
   let try_e active_set passive_set =
-    let max_others = 0 in
+    let max_others = 64 in
 
     let rec can_be_translated t =
       let can_translate_ty ty =
@@ -138,7 +138,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       reduced
       |> Iter.filter (fun c -> 
         let proof_d = C.proof_depth c in
-        proof_d  > 0 && clause_no_lams c)
+        let has_ho_step = Proof.Step.has_ho_step (C.proof_step c) in
+        has_ho_step && proof_d  > 0 && clause_no_lams c)
       |> Iter.sort ~cmp:(fun c1 c2 ->
           let pd1 = C.proof_depth c1 and pd2 = C.proof_depth c2 in
           CCInt.compare pd1 pd2)

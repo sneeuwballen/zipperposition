@@ -420,12 +420,23 @@ module Step = struct
 
   let inferences_perfomed ?(count_cnf=false) p =
     let rec aux p = match p.kind with 
-    | Simplification(r,_) -> List.fold_left (fun acc par -> 
-        acc + aux ((Parent.proof par).step)) 0 p.parents 
-    | Inference(r,_) -> List.fold_left (fun acc par -> 
-        acc + aux ((Parent.proof par).step)) 0 p.parents + 1 
+    | Simplification(r,_) -> (*List.fold_left (fun acc par -> 
+        acc + aux ((Parent.proof par).step)) 0 p.parents *)
+        let parents = List.map (fun par -> aux ((Parent.proof par).step)) p.parents in
+        CCOpt.get_or ~default:0 (Iter.max (Iter.of_list parents))
+    | Inference(r,_) -> (*List.fold_left (fun acc par -> 
+        acc + aux ((Parent.proof par).step)) 0 p.parents + 1 *)
+        let parents = List.map (fun par -> aux ((Parent.proof par).step)) p.parents in
+        CCOpt.get_or ~default:0 (Iter.max (Iter.of_list parents)) + 1 
     | _ -> 0 in
   aux p
+
+  let rec has_ho_step p = match p.kind with
+  | Simplification(_,tags)
+  | Inference(_,tags) -> 
+      List.mem Tag.T_ho tags ||
+      List.exists has_ho_step (List.map (fun par -> (Parent.proof par).step) p.parents)
+  | _ -> false
 
 
   let step_ ?(infos=[]) kind parents =
