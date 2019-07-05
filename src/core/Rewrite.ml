@@ -306,6 +306,7 @@ module Term = struct
        @param k the continuation
        @return [t'] where [t'] is the normal form of [t] *)
     let rec reduce t k = 
+    let t = Lambda.snf t in
     match T.view t with
       | _ when !fuel = 0 -> k t
       | T.Const id ->

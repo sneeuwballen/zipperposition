@@ -653,15 +653,15 @@ module Make(E : Env.S) : S with module Env = E = struct
           if Type.is_prop (Term.ty lhs) && Term.is_app_var lhs && sign
               && Term.is_true_or_false rhs then (
             let var_hd = Term.as_var_exn (Term.head_term lhs) in
-            if Term.equal T.true_ rhs then (Term.VarSet.add var_hd pos_vs, neg_vs,occ)
-            else (pos_vs, Term.VarSet.add var_hd neg_vs, Term.Set.add lhs occ)
+            if Term.equal T.true_ rhs then (Term.VarSet.add var_hd pos_vs, neg_vs, Term.Map.add lhs true occ)
+            else (pos_vs, Term.VarSet.add var_hd neg_vs, Term.Map.add lhs false occ)
           ) else (pos_vs, neg_vs, occ)
-        ) (Term.VarSet.empty,Term.VarSet.empty,Term.Set.empty) in
+        ) (Term.VarSet.empty,Term.VarSet.empty,Term.Map.empty) in
       let pos_neg_vars = Term.VarSet.inter pos_pred_vars neg_pred_vars in
       let res = 
         if Term.VarSet.is_empty pos_neg_vars then []
         else (
-          CCList.flat_map (fun t -> 
+          CCList.flat_map (fun (t,sign) -> 
             let hd, args = T.as_app t in
             let var_hd = T.as_var_exn hd in
             if Term.VarSet.mem (Term.as_var_exn hd) pos_neg_vars then (
@@ -670,15 +670,16 @@ module Make(E : Env.S) : S with module Env = E = struct
               CCList.filter_map (fun (i,arg) ->
                 if T.var_occurs ~var:var_hd arg then None 
                 else (
-                  let body = T.Form.eq arg (T.bvar ~ty:(T.ty arg) (n-i-1)) in
+                  let body = (if sign then T.Form.neq else T.Form.eq) 
+                                arg (T.bvar ~ty:(T.ty arg) (n-i-1)) in
                   let subs_term = T.fun_l tyargs body in 
                   let subst = Subst.FO.bind' (Subst.empty) (var_hd, 0) (subs_term, 0) in
-                  let rule = Proof.Rule.mk "elim_leibniz_eq" in
+                  let rule = Proof.Rule.mk ("elim_leibniz_eq_" ^ (if sign then "+" else "-")) in
                   let proof = Some (Proof.Step.inference ~rule [C.proof_parent c]) in
                   Some (C.apply_subst ~proof (c,0) subst))
               ) (CCList.mapi (fun i arg -> (i, arg)) args)
             ) else [] 
-          ) (Term.Set.to_list occurences)) in
+          ) (Term.Map.to_list occurences)) in
       (* CCFormat.printf "Elim Leibniz eq:@ @[%a@].\n" C.pp c; *)
       (* CCFormat.printf "Pos/neg vars:@ @[%a@].\n" (Term.VarSet.pp HVar.pp) pos_neg_vars; *)
       (* CCFormat.printf "Res:@ @[%a@].\n" (CCList.pp C.pp) res; *)

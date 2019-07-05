@@ -77,12 +77,15 @@ module Inner = struct
       | T.AppBuiltin _, _ | T.Bind _, _ -> st
     end
 
-  let whnf_term ?(env=DBEnv.empty) t = match T.ty t with
-    | T.NoType -> t
-    | T.HasType ty ->
+  let whnf_term ?(env=DBEnv.empty) t = 
+    let is_reducible t =
+      T.is_lambda (fst @@ T.as_app t) in
+    match T.ty t with
+    | T.HasType ty when is_reducible t ->
       let st = st_of_term ~ty ~env t in
       let st = whnf_rec st in
       term_of_st st
+    | _ -> t
 
   let rec snf_rec t =
     let t = whnf_term t in
