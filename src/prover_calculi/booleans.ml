@@ -19,6 +19,9 @@ let quant_rename = ref false
 let interpret_bool_funs = ref false
 let cnf_non_simpl = ref false
 
+let section = Util.Section.make ~parent:Const.section "booleans"
+
+
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C
@@ -338,8 +341,8 @@ module Make(E : Env.S) : S with module Env = E = struct
             (as_neg_forall :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:t ~by:(interpret t T.false_))))
           proof in
 
-        Util.debugf 10 "interpret bool: %a !!> %a.\n"  (fun k -> k C.pp c C.pp forall_cl);
-        Util.debugf 10 "interpret bool: %a !!~> %a.\n" (fun k -> k C.pp c C.pp forall_neg_cl);
+        Util.debugf ~section  1 "interpret bool: %a !!> %a.\n"  (fun k -> k C.pp c C.pp forall_cl);
+        Util.debugf ~section  1 "interpret bool: %a !!~> %a.\n" (fun k -> k C.pp c C.pp forall_neg_cl);
 
         forall_cl :: forall_neg_cl :: res
     ) []

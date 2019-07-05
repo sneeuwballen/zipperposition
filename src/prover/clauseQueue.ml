@@ -28,6 +28,7 @@ let profiles_ =
   ; "goal", P_goal
   ; "conjecture-relative", P_conj_rel
   ; "conjecture-relative-var", P_conj_rel_var
+  ; "ho-weight", P_ho_weight
   ]
 
 let profile_of_string s =
@@ -126,6 +127,28 @@ module Make(C : Clause_intf.S) = struct
       in
       let w_lits = weight_lits_ (C.lits c) in
       w_lits * Array.length (C.lits c) + _depth_ty
+
+    let ho_weight_calc c = 
+      let all_terms c =
+        C.Seq.terms c 
+        |> Iter.flat_map (Term.Seq.subterms ~include_builtin:true) in
+
+      let app_var_num c = 
+        float_of_int @@ 
+        Iter.fold (fun acc t -> 
+          acc + (if Term.is_app_var t then 1 else 0 )) 0 (all_terms c) in
+      
+      let formulas_num c =
+        float_of_int @@
+        Iter.fold (fun acc t -> 
+          acc + (if Term.is_formula t then 1 else 0 )) 0 (all_terms c) in
+      
+      let depth c = float_of_int (C.proof_depth c) in
+
+      let weight c = float_of_int (weight_lits_ (C.lits c)) in
+
+      int_of_float (weight c *. (1.2 ** (app_var_num c *. (1.2 ** depth c)))
+                             *. (0.6 ** formulas_num c))
 
     let rec calc_tweight t sg v w c_mul =
       match Term.view t with 
@@ -403,6 +426,9 @@ module Make(C : Clause_intf.S) = struct
     make ~ratio:!cr_var_ratio ~weight:(WeightFun.conj_relative ~distinct_vars_mul:!cr_var_mul)
          "conj_relative_var"
 
+  let ho_weight () =
+      make ~ratio:6 ~weight:WeightFun.ho_weight_calc "ho_weight"
+
   let of_profile p =
     let open ClauseQueue_intf in
     match p with
@@ -414,6 +440,7 @@ module Make(C : Clause_intf.S) = struct
       | P_goal -> goal_oriented ()
       | P_conj_rel ->  conj_relative_mk ()
       | P_conj_rel_var -> conj_var_relative_mk ()
+      | P_ho_weight -> ho_weight ()
 
   let pp out q = CCFormat.fprintf out "queue %s" (name q)
   let to_string = CCFormat.to_string pp

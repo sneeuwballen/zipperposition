@@ -10,6 +10,7 @@ type profile =
   | P_goal
   | P_conj_rel
   | P_conj_rel_var
+  | P_ho_weight
 
 (** {1 A priority queue of clauses, purely functional} *)
 module type S = sig

@@ -268,6 +268,7 @@ let ho_sel ~ord lits =
   let chooser (i,l) = 
     let sign = (if Lit.is_pos l then 1 else 0) in
     let ground = if Lit.is_ground l then 1.0 else 1.5 in
+    let has_formula = Iter.exists T.is_formula @@ Lit.Seq.terms l in
     let app_var_num = 
       Lit.Seq.terms l
       |> Iter.flat_map (Term.Seq.subterms ~include_builtin:true)
@@ -275,7 +276,9 @@ let ho_sel ~ord lits =
       |> Iter.sum 
       |> float_of_int in
     let weight = float_of_int (Lit.weight l) in
-    (sign, int_of_float (weight *. ((1.2) ** app_var_num) /. ground), 0, 0)  in
+    (sign, 
+     (if has_formula then 1 else 0),
+     int_of_float (weight *. ((1.2) ** app_var_num) /. ground),  0)  in
   weight_based_sel_driver ~ord lits chooser
 
 let except_RR_horn (p:parametrized) ~strict ~ord lits =
