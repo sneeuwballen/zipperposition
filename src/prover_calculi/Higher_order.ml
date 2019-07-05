@@ -677,9 +677,10 @@ module Make(E : Env.S) : S with module Env = E = struct
                   let proof = Some (Proof.Step.inference ~rule [C.proof_parent c]) in
                   Some (C.apply_subst ~proof (c,0) subst))
               ) (CCList.mapi (fun i arg -> (i, arg)) args)
-            ) else []
+            ) else [] 
           ) (Term.Set.to_list occurences)) in
       (* CCFormat.printf "Elim Leibniz eq:@ @[%a@].\n" C.pp c; *)
+      (* CCFormat.printf "Pos/neg vars:@ @[%a@].\n" (Term.VarSet.pp HVar.pp) pos_neg_vars; *)
       (* CCFormat.printf "Res:@ @[%a@].\n" (CCList.pp C.pp) res; *)
       res
     ) else []
