@@ -639,12 +639,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     end
 
   let prim_enum ~(mode) c =
-    if Proof.Step.inferences_perfomed (C.proof_step c) <= max_penalty_prim_ 
+    if C.proof_depth c <= max_penalty_prim_ 
     then prim_enum_ ~mode c
     else []
   
   let elim_leibniz_equality c =
-    if Proof.Step.inferences_perfomed (C.proof_step c) < !_elim_leibniz_eq then (
+    if C.proof_depth c < !_elim_leibniz_eq then (
       let ord = Env.ord () in
       let eligible = C.Eligible.always in
       let pos_pred_vars, neg_pred_vars, occurences = 

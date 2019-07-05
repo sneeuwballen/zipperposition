@@ -104,7 +104,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
   let try_e active_set passive_set =
-    let max_others = 192 in
+    let max_others = 0 in
 
     let rec can_be_translated t =
       let can_translate_ty ty =
@@ -132,16 +132,15 @@ module Make(E : Env.S) : S with module Env = E = struct
       let reduced = 
         Iter.map (fun c -> CCOpt.get_or ~default:c (C.eta_reduce c)) set in
       let init_clauses = 
-        Iter.filter (fun c -> Proof.Step.inferences_perfomed (C.proof_step c) = 0 && clause_no_lams c) reduced in
+        Iter.filter (fun c -> C.proof_depth c = 0 && clause_no_lams c) reduced in
     
     Iter.append init_clauses (
       reduced
       |> Iter.filter (fun c -> 
-        let proof_d = Proof.Step.inferences_perfomed (C.proof_step c) in
+        let proof_d = C.proof_depth c in
         proof_d  > 0 && clause_no_lams c)
       |> Iter.sort ~cmp:(fun c1 c2 ->
-          let pd1 = Proof.Step.inferences_perfomed (C.proof_step c1) in
-          let pd2 = Proof.Step.inferences_perfomed (C.proof_step c2) in
+          let pd1 = C.proof_depth c1 and pd2 = C.proof_depth c2 in
           CCInt.compare pd1 pd2)
       |> Iter.take max_others)
     |> Iter.to_list in

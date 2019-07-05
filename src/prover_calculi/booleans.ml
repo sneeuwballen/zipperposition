@@ -280,8 +280,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* CCFormat.printf "cnf [%a].\n" TypedSTerm.pp f; *)
       List.iteri (fun i new_c -> 
         (* CCFormat.printf "%d: [%a].\n" i C.pp new_c; *)
-        assert(Proof.Step.inferences_perfomed (C.proof_step c) <=
-               Proof.Step.inferences_perfomed (C.proof_step new_c));) clauses;
+        assert((C.proof_depth c) <= C.proof_depth new_c);) clauses;
       Some clauses
     | None       -> 
       (* Format.printf "res:none.\n"; *)

@@ -171,7 +171,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     )
 
   let handle_pred_var_inst c =
-    if Proof.Step.inferences_perfomed (C.proof_step c) < !_trigger_bool_inst then (
+    if C.proof_depth c < !_trigger_bool_inst then (
       if not (CCList.is_empty (pred_vars c)) then (
         _cls_w_pred_vars := C.ClauseSet.add c !_cls_w_pred_vars;
       );
@@ -348,7 +348,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let update_ext_dec_indices f c =
     let which, eligible = if !_ext_dec_lits = `OnlyMax 
                           then `Max, C.Eligible.res c else `All, C.Eligible.always in
-    if Proof.Step.inferences_perfomed (C.proof_step c) <= !max_lits_ext_dec then (
+    if C.proof_depth c <= !max_lits_ext_dec then (
       Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false 
         ~ord ~which ~subterms:true ~eligible (C.lits c)
       |> Iter.filter (fun (t, _) ->
@@ -1416,12 +1416,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     |> Iter.to_list
   
   let instantiate_with_triggers c =
-    if Proof.Step.inferences_perfomed (C.proof_step c) < !_trigger_bool_inst then ( 
+    if C.proof_depth c < !_trigger_bool_inst then ( 
       pred_var_instantiation c !_trigger_bools)
     else []
   
   let trigger_insantiation c =
-    if Proof.Step.inferences_perfomed (C.proof_step c) < !_trigger_bool_inst then (
+    if C.proof_depth c < !_trigger_bool_inst then (
       let triggers = Term.Set.of_seq @@ get_triggers c in
       let res = ref [] in
       C.ClauseSet.iter (fun old_c -> 
@@ -1872,7 +1872,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let ext_eqres_decompose_aux c =
     let eligible = C.Eligible.neg in
-    if Proof.Step.inferences_perfomed (C.proof_step c) < !max_lits_ext_dec then (
+    if C.proof_depth c < !max_lits_ext_dec then (
       let res = 
         Literals.fold_eqn (C.lits c) ~eligible ~ord ~both:false ~sign:false
         |> Iter.to_list

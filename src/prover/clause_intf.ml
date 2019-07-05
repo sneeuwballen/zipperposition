@@ -136,6 +136,8 @@ module type S = sig
       similar to [c] in all aspects, but with
       the proof [f (proof_step c)] *)
 
+  val proof_depth : t -> int
+
   val is_empty : t -> bool
   (** Is the clause an empty clause? *)
 

@@ -341,6 +341,9 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       )
     ) else None
 
+  let proof_depth c =
+    Proof.Step.inferences_perfomed (proof_step c)
+
   module Seq = struct
     let lits c = Iter.of_array c.sclause.lits
     let terms c = lits c |> Iter.flat_map Lit.Seq.terms
@@ -474,7 +477,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     Format.fprintf out "@[%a@[<2>%a%a@]@]/id:%d/depth:%d"
       SClause.pp_vars c.sclause pp_lits c.sclause.lits
       SClause.pp_trail c.sclause.trail c.sclause.id
-      (Proof.Step.inferences_perfomed (proof_step c));
+      (proof_depth c);
     ()
 
   let pp_tstp out c = SClause.pp_tstp out c.sclause

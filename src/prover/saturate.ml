@@ -85,7 +85,7 @@ module Make(E : Env.S) = struct
     assert (Env.C.Seq.terms c |> Iter.for_all Term.DB.is_closed);
     assert (Env.C.lits c |> Literals.vars_distinct);
     if not (Env.C.Seq.terms c |> Iter.for_all Lambda.is_properly_encoded) then (
-      CCFormat.printf "ENCODED WRONGLY: %a:%d.\n" Env.C.pp_tstp c (Proof.Step.inferences_perfomed (Env.C.proof_step c));
+      CCFormat.printf "ENCODED WRONGLY: %a:%d.\n" Env.C.pp_tstp c (Env.C.proof_depth c);
       CCFormat.printf "proof : %a.\n" Proof.S.pp_normal (Env.C.proof c);
       assert(false);
     );
