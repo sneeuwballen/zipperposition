@@ -158,7 +158,7 @@ module Make(C : Clause_intf.S) = struct
         int_of_float (weight c *. (1.25 ** (app_var_num c *. (1.35 ** p_depth c)))
                                *. (0.85 ** formulas_num c)
                                *. 1.05 ** t_depth c) in
-      Util.debugf 1 "[C_W:]@ @[%a@]@ :@ %d(%g, %g, %g).\n"
+      Util.debugf 5 "[C_W:]@ @[%a@]@ :@ %d(%g, %g, %g).\n"
         (fun k -> k C.pp c res (app_var_num c) (formulas_num c) (p_depth c));
       res
 
@@ -355,24 +355,32 @@ module Make(C : Clause_intf.S) = struct
 
   let rec take_first_mixed q =
     if is_empty_mixed q then raise Not_found;
+    let taken_from_fifo = ref true in
     (* find next clause *)
     let c =
       if q.time_before_fifo = 0
       then (
-        q.time_before_fifo <- q.ratio;
-        Queue.pop q.queue
+        (* q.time_before_fifo <- q.ratio; *)
+        let res = Queue.pop q.queue in
+        Util.debugf 1 "taking from fifo: %a.\n" (fun k -> k C.pp res);
+        res
       ) else (
         assert (q.time_before_fifo > 0);
-        q.time_before_fifo <- q.time_before_fifo - 1;
-        let new_h, (_, c) = H.take_exn q.heap in
+        (* q.time_before_fifo <- q.time_before_fifo - 1; *)
+        taken_from_fifo := false;
+        let new_h, (w, c) = H.take_exn q.heap in
+        Util.debugf 1 "taken from heap: %a/h_weight:%d.\n" (fun k -> k C.pp c w);
         q.heap <- new_h;
         c
       )
     in
     if C.Tbl.mem q.tbl c then (
+      if !taken_from_fifo then q.time_before_fifo <- q.ratio 
+      else q.time_before_fifo <- q.time_before_fifo-1;
       C.Tbl.remove q.tbl c;
+      Util.debugf 1 "accepted.\n" CCFun.id;
       c
-    ) else take_first_mixed q (* spurious *)
+    ) else (Util.debugf 1 "in q.tbl. rejected.\n" CCFun.id; take_first_mixed q (* spurious *))
 
   let take_first = function
     | FIFO q ->
@@ -446,7 +454,7 @@ module Make(C : Clause_intf.S) = struct
       make ~ratio:3 ~weight:WeightFun.ho_weight_calc "ho-weight"
 
   let ho_weight_init () =
-      make ~ratio:100000 ~weight:WeightFun.ho_weight_initial "ho-weight-init"
+      make ~ratio:5 ~weight:WeightFun.ho_weight_initial "ho-weight-init"
 
   let of_profile p =
     let open ClauseQueue_intf in
