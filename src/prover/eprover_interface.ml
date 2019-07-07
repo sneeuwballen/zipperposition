@@ -46,9 +46,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     Format.fprintf out "@[thf(@['%a_type',type,@[%a@]:@ @[%a@]@]).@]@\n" 
       ID.pp sym ID.pp_tstp sym (Type.TPTP.pp_ho) ty
 
-  let output_all ~out cl_set =
+  let output_all ?(already_defined=ID.Set.empty) ~out cl_set =
     let cl_iter = Iter.of_list cl_set in
-    let syms = ID.Set.to_list @@ C.symbols ~include_types:true cl_iter in
+    let syms = C.symbols ~include_types:true cl_iter
+               |> (fun syms -> ID.Set.diff syms already_defined)
+               |> ID.Set.to_list
+               in
     (* first printing type declarations, and only then the types *)
     CCList.fold_right (fun sym acc -> 
       let ty = Ctx.find_signature_exn sym in
@@ -63,7 +66,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> Iter.iter (fun (sym, ty) -> output_symdecl ~out sym ty);
 
     Iter.iter (output_cl ~out) cl_iter;
-    output_empty_conj ~out
+    output_empty_conj ~out;
+    ID.Set.of_list syms
 
   let set_e_bin path =
     e_bin := Some path 
@@ -105,7 +109,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
   let try_e active_set passive_set =
-    let max_others = 100 in
+    let max_others = 48 in
 
     let rec can_be_translated t =
       let can_translate_ty ty =
@@ -153,9 +157,12 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let active_set = take_from_set active_set in
     let ignore_ids = IntSet.of_list (List.map C.id active_set) in
-    let cl_set =  active_set @ (take_from_set ~ignore_ids passive_set) in
-    output_all ~out cl_set;
+    let passive_set =  take_from_set ~ignore_ids passive_set in
+    let already_defined = output_all ~out active_set in
+    Format.fprintf out "%% -- PASSIVE -- \n";
+    ignore(output_all  ~already_defined ~out passive_set);
     close_out prob_channel;
+    let cl_set = active_set @ passive_set in
 
     let res = 
       match run_e prob_name with

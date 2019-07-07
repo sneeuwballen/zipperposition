@@ -359,7 +359,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* Env.ProofState.PassiveSet.add (create_clauses ()); *)
     Env.add_basic_simplify simpl_bool_subterms;
     Env.add_basic_simplify normalize_equalities;
-    Env.add_multi_simpl_rule Fool.rw_bool_lits;
+    (* Env.add_multi_simpl_rule Fool.rw_bool_lits; *)
     if !cnf_non_simpl then (
       Env.add_unary_inf "cnf otf inf" cnf_infer;
     ) else  Env.add_multi_simpl_rule cnf_otf;

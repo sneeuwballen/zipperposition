@@ -143,7 +143,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
     (* how to build a new clause *)
     let mk_c lits =
-      let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "cnf_otf")
+      let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "cnf_fool")
           [Proof.Parent.from @@ C.proof c]
       in
       C.create lits proof
