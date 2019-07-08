@@ -30,6 +30,8 @@ let profiles_ =
   ; "conjecture-relative-var", P_conj_rel_var
   ; "ho-weight", P_ho_weight
   ; "ho-weight-init", P_ho_weight_init
+  ; "avoid-expensive", P_avoid_expensive
+
   ]
 
 let profile_of_string s =
@@ -162,6 +164,25 @@ module Make(C : Clause_intf.S) = struct
         (fun k -> k C.pp c res (app_var_num c) (formulas_num c) (p_depth c));
       res
 
+    let avoid_expensive c =
+      let max_lits = C.maxlits (c,0) Subst.empty in
+      let signature = C.Ctx.signature () in
+      CCArray.foldi (fun acc i l -> 
+        let max_terms = 
+          if CCBV.get max_lits i then Literal.Comp.max_terms ~ord:(C.Ctx.ord ()) l else [] in
+        let lit_weight = 
+          Literal.Seq.terms l
+          |> Iter.map (fun t -> 
+            let var,f_nc,f_c = if List.mem t max_terms then (2,6,3) else (1,2,1) in
+            let sym id_ = if Signature.sym_in_conj id_ signature then f_c else f_nc in
+            Term.weight ~var ~sym t * (if Term.is_app_var t then 2 else 1)
+          ) |> Iter.sum in
+        let multiplier = (if Literal.is_typex_pred l then 1.2 else 1.0) *.
+                         (if Literal.is_type_pred l then 1.8 else 1.0) *.
+                         (if Literal.is_ground l then 0.5 else 1.0) in
+        int_of_float (multiplier *. (float_of_int lit_weight)) + acc
+      ) 0 (C.lits c)
+
     let ho_weight_initial c =
       if C.proof_depth c  = 0 then 1
       else ho_weight_calc c
@@ -193,6 +214,7 @@ module Make(C : Clause_intf.S) = struct
 
     let conj_relative ?(distinct_vars_mul=(-1.0)) c =
       let sgn = C.Ctx.signature () in
+      let max_lits = C.maxlits (c,0) Subst.empty in
       let pos_mul, max_mul, v,f =
         match !parameters_magnitude with 
         |`Large -> (1.5,1.5,100,100)
@@ -204,7 +226,7 @@ module Make(C : Clause_intf.S) = struct
         (Array.fold_left (fun acc (i,l) -> acc +. 
                           let l_w, l_s = (calc_lweight l sgn v f conj_mul) in 
                             ( if l_s then pos_mul else 1.0 )*.
-                            ( if C.is_maxlit (c,0) Subst.empty ~idx:i then max_mul else 1.0)*. 
+                            ( if CCBV.get max_lits i then max_mul else 1.0)*. 
                             float_of_int l_w ) 0.0) 
         |> (fun res -> 
               if distinct_vars_mul < 0.0 then int_of_float res
@@ -456,6 +478,10 @@ module Make(C : Clause_intf.S) = struct
   let ho_weight_init () =
       make ~ratio:5 ~weight:WeightFun.ho_weight_initial "ho-weight-init"
 
+  let avoid_expensive_mk () : t =
+    make ~ratio:20 ~weight:WeightFun.avoid_expensive "avoid-expensive"
+
+
   let of_profile p =
     let open ClauseQueue_intf in
     match p with
@@ -469,6 +495,7 @@ module Make(C : Clause_intf.S) = struct
       | P_conj_rel_var -> conj_var_relative_mk ()
       | P_ho_weight -> ho_weight ()
       | P_ho_weight_init -> ho_weight_init ()
+      | P_avoid_expensive -> avoid_expensive_mk ()
 
   let pp out q = CCFormat.fprintf out "queue %s" (name q)
   let to_string = CCFormat.to_string pp

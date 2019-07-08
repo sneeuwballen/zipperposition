@@ -128,7 +128,17 @@ module Make(C: Index_intf.CLAUSE) = struct
            Iter.filter SLiteral.is_neg lits |> Iter.length |> mk_n)
 
     let weight_lit lit =
-      SLiteral.to_seq lit |> Iter.map T.weight |> Iter.fold (+) 0
+      let rec t_weight t = 
+        let pref,t = T.open_fun t in
+        match T.view t with
+        | T.Const _ | T.Var _ | T.DB _ -> 1
+        | T.Fun(_,t) -> assert false
+        | T.AppBuiltin(_,l)
+        | T.App(_,l) ->
+          if Term.is_app_var t then List.length pref + 1
+          else (List.fold_left (fun acc s -> acc + t_weight s) (List.length pref+1) l) in
+
+      SLiteral.to_seq lit |> Iter.map t_weight |> Iter.fold (+) 0
 
     let weight_ name filter =
       make name
@@ -143,12 +153,14 @@ module Make(C: Index_intf.CLAUSE) = struct
 
     let labels = make "labels" (fun _ labels -> mk_l labels)
 
+    let not_app_var t = not (T.is_app_var t)
+
     (* sequence of symbols of clause, of given sign *)
     let symbols_ filter lits : ID.t Iter.t =
       lits
       |> Iter.filter filter
       |> Iter.flat_map SLiteral.to_seq
-      |> Iter.flat_map T.Seq.symbols
+      |> Iter.flat_map (T.Seq.symbols ~filter_term:not_app_var)
 
     let set_sym_ filter lits _ =
       symbols_ filter lits
@@ -181,7 +193,7 @@ module Make(C: Index_intf.CLAUSE) = struct
       lits
       |> Iter.filter filter
       |> Iter.flat_map SLiteral.to_seq
-      |> Iter.flat_map T.Seq.subterms_depth
+      |> Iter.flat_map (T.Seq.subterms_depth ~filter_term:not_app_var)
       |> Iter.filter_map
         (fun (t,d) -> match T.view t with
            | T.Const id -> Some (id,d)

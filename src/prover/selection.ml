@@ -187,8 +187,7 @@ let lit_sel_diff_w l =
     100*((max lhs_w rhs_w) - (min lhs_w rhs_w)) + lhs_w + rhs_w
   | _ -> 0
 
-let e_sel ~ord lits = 
-  let pred_freq lits = 
+let pred_freq ~ord lits = 
     Literals.fold_eqn ~both:false ~ord ~eligible:(fun _ _ -> true) lits
     |> Iter.fold (fun acc (l,r,sign,_) -> 
         if sign && T.equal T.true_ r then (
@@ -200,16 +199,19 @@ let e_sel ~ord lits =
                 let current_val = ID.Map.get_or id acc ~default:0 in
                 ID.Map.add id (current_val+1) acc
         ) else acc
-    ) ID.Map.empty in
+    ) ID.Map.empty
+
   let get_pred_freq ~freq_tbl l =
-    match l with
-    | Lit.Equation(l,r,true) when T.is_true_or_false r ->
-      begin 
-        match T.head l with
-        | Some id -> ID.Map.get_or id freq_tbl ~default:0
-        | None -> max_int
-      end
-    | _ -> max_int in
+  match l with
+  | Lit.Equation(l,r,true) when T.is_true_or_false r ->
+    begin 
+      match T.head l with
+      | Some id -> ID.Map.get_or id freq_tbl ~default:0
+      | None -> max_int
+    end
+  | _ -> max_int
+
+let e_sel ~ord lits = 
   let chooser ~freq_tbl (i,l) = 
     ((if Lit.is_pos l then 1 else 0),
      (if Lits.is_max ~ord lits i then 0 else 100 +
@@ -217,7 +219,7 @@ let e_sel ~ord lits =
         if Lit.is_ground l then 0 else 1),
      -(lit_sel_diff_w l),
       get_pred_freq ~freq_tbl l) in
-  let freq_tbl = pred_freq lits in
+  let freq_tbl = pred_freq ~ord lits in
   weight_based_sel_driver ~ord lits (chooser ~freq_tbl)
 
 let e_sel2 ~ord lits = 
@@ -264,6 +266,30 @@ let e_sel3 ~ord lits =
     ) in
   weight_based_sel_driver ~ord lits chooser
 
+let e_sel4 ~ord lits =
+  let chooser (i,l) = 
+    let lhs = match l with
+              | Lit.Equation(lhs_t,rhs_t,_) -> lhs_t
+              | _ -> T.true_ (* a term to fill in *) in
+    let sign = if Lit.is_pos l then 1 else 0 in
+    let freq_tbl = pred_freq ~ord lits in
+    let hd_freq = get_pred_freq ~freq_tbl l in
+    if Lit.is_ground l then (
+      (sign, 0, -(Term.weight lhs), hd_freq) 
+    ) else if not @@ Lit.is_typex_pred l then (
+      let max_term_weight = 
+        Iter.of_list (Lit.Comp.max_terms ~ord l)
+        |> Iter.map (T.weight ~var:0)
+        |> Iter.sum in
+      (sign, 10, -max_term_weight, hd_freq)
+    ) else if not @@ Lit.is_type_pred l then (
+      (sign, 20, -(Term.weight lhs), hd_freq)
+    ) else (sign, max_int, max_int, max_int) in
+  let blocker = Lit.is_type_pred in
+  weight_based_sel_driver ~ord ~blocker lits chooser 
+
+
+
 let ho_sel ~ord lits = 
   let chooser (i,l) = 
     let sign = (if Lit.is_pos l then 1 else 0) in
@@ -299,6 +325,7 @@ let l =
       "e-selection", e_sel;
       "e-selection2", e_sel2;
       "e-selection3", e_sel3;
+      "e-selection4", e_sel4;
       "ho-selection", ho_sel;
     ]
   and by_ord =

@@ -417,15 +417,15 @@ let is_lfho_candidate t =
 let unify_scoped t0_s t1_s =
   (* let start = Util.total_time_s () in *)
   let counter = ref 0 in
-  let lfho_unif = 
+  (* let lfho_unif = 
     try
       if is_lfho_candidate (fst t0_s) || is_lfho_candidate (fst t1_s) then (
         let unif = Unif.FO.unify_syn ~subst:(Subst.empty) t0_s t1_s in
         Some (US.of_subst unif))
       else None
-    with Unif.Fail -> None in
+    with Unif.Fail -> None in *)
   let t0',t1',unifscope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
-  let prefix = if (CCOpt.is_some lfho_unif) then OSeq.cons lfho_unif else (fun x -> x) in
+  (* let prefix = if (CCOpt.is_some lfho_unif) then OSeq.cons lfho_unif else (fun x -> x) in *)
   let monomorphic = Iter.is_empty @@ Iter.union (Term.Seq.ty_vars t0') (Term.Seq.ty_vars t1') in
   let state = 
   {
@@ -437,7 +437,7 @@ let unify_scoped t0_s t1_s =
     monomorphic
   } in
   let res =
-      prefix
+      (* prefix *)
       (unify ~state ~scope:unifscope ~counter ~subst [t0', t1', false]) 
       (* OSeq.empty *)
   in

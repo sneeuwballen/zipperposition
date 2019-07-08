@@ -403,34 +403,37 @@ module Seq = struct
     in
     aux t
 
-  let subterms_depth t k =
+  let subterms_depth ?(filter_term = (fun _ -> true)) t k =
     let rec recurse depth t =
-      k (t, depth);
-      match view t with
-        | Const _
-        | DB _
-        | Var _ -> ()
-        | Fun (_,u) -> recurse (depth+1) u
-        | AppBuiltin (_, l) -> List.iter (recurse (depth+1)) l
-        | App (_, l) ->
-          let depth' = depth + 1 in
-          List.iter (recurse depth') l
+      if filter_term t then  (
+        k (t, depth);
+        match view t with
+          | Const _
+          | DB _
+          | Var _ -> ()
+          | Fun (_,u) -> recurse (depth+1) u
+          | AppBuiltin (_, l) -> List.iter (recurse (depth+1)) l
+          | App (_, l) ->
+            let depth' = depth + 1 in
+            List.iter (recurse depth') l)
     in
     recurse 0 t
 
-  let symbols ?(include_types = false) t k =
+  let symbols ?(include_types = false) ?(filter_term=(fun _ -> true)) t k =
     if include_types then (
       Type.Seq.symbols (ty t) k
     );
     
-    let rec aux t = match view t with
-      | AppBuiltin (_,l) -> List.iter aux l
-      | Const s -> k s
-      | Var _
-      | DB _ -> ()
-      | Fun (ty,u) -> if (include_types) then Type.Seq.symbols ty k; aux u
-      | App (f, l) -> aux f; List.iter aux l
-    in
+    let rec aux t = 
+    if filter_term t then (
+      match view t with
+        | AppBuiltin (_,l) -> List.iter aux l
+        | Const s -> k s
+        | Var _
+        | DB _ -> ()
+        | Fun (ty,u) -> if (include_types) then Type.Seq.symbols ty k; aux u
+        | App (f, l) -> aux f; List.iter aux l
+    ) in
     aux t
 
   let max_var = Type.Seq.max_var

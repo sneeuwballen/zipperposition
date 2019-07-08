@@ -171,6 +171,14 @@ let is_type_pred = function
     | _ -> false end
   | _ -> false
 
+let is_typex_pred = function
+  | Equation(lhs,rhs,true) when T.is_true_or_false rhs ->
+    begin match Term.view lhs with
+    | App(f, xs) when not (CCList.is_empty xs) -> 
+        T.is_const f && List.for_all T.is_var xs
+    | _ -> false end
+  | _ -> false
+
 let is_propositional = function
   | Equation(lhs,rhs,true) when T.is_true_or_false rhs ->
     T.is_const lhs

@@ -123,6 +123,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let _idx_sup_from = ref (TermIndex.empty ())
   let _idx_back_demod = ref (TermIndex.empty ())
   let _idx_fv = ref (SubsumIdx.empty ())
+  (* let _idx_fv = ref (SubsumIdx.of_signature (Ctx.signature()) ()) *)
+
   let _idx_simpl = ref (UnitIdx.empty ())
   let _cls_w_pred_vars = ref (C.ClauseSet.empty)
   let _trigger_bools   = ref (Term.Set.empty)
