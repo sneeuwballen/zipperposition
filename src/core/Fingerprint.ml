@@ -31,12 +31,12 @@ type fingerprint_fun = T.t -> feature list
 let rec gfpf ?(depth=0) pos t =
   let depth_inc = List.length (Type.expected_args (Term.ty t)) in
   let pref_vars, body =  T.open_fun t in
-  let exp_args = Type.expected_args (Term.ty body) in
-  let num_exp_args = List.length exp_args in
   match pos with 
   | [] -> gfpf_root ~depth:(depth + depth_inc) body
   | i::is ->
       let hd, args = T.as_app body in
+      let exp_args = Type.expected_args (Term.ty hd) in
+      let num_exp_args = List.length exp_args in
       if T.is_var hd then B
       else (
         let num_acutal_args = List.length args in
