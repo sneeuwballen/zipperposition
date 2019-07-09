@@ -132,7 +132,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     create_inner ~penalty ~selected (SClause.make ~trail lits) proof
 
   let create ~penalty ~trail lits proof =
-    (* let lits = List.fast_sort (fun l1 l2 -> -CCInt.compare (Lit.hash l1) (Lit.hash l2)) lits in *)
+    let lits = List.fast_sort (fun l1 l2 -> -CCInt.compare (Lit.hash l1) (Lit.hash l2)) lits in
     create_a ~penalty ~trail (Array.of_list lits) proof
 
   let of_forms ?(penalty=1) ~trail forms proof =

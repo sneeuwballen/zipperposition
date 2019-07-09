@@ -27,12 +27,22 @@ type fingerprint_fun = T.t -> feature list
 (* TODO: more efficient implem of traversal, only following branches that
    are useful instead of folding and filtering *)
 
+let expand_otf_ body = 
+  let extra_args = Type.expected_args (Term.ty body) in
+  if CCList.is_empty extra_args then body else (
+    let n = List.length extra_args in
+    T.app (T.DB.shift n body) 
+          (List.mapi (fun i ty -> T.bvar ~ty (n-1-i)) extra_args)
+  )
+
 (* compute a feature for a given position *)
 let rec gfpf ?(depth=0) pos t =
   let depth_inc = List.length (Type.expected_args (Term.ty t)) in
   let pref_vars, body =  T.open_fun t in
   match pos with 
-  | [] -> gfpf_root ~depth:(depth + depth_inc) body
+  | [] -> 
+    let body = expand_otf_ body in
+    gfpf_root ~depth:(depth + depth_inc) body
   | i::is ->
       let hd, args = T.as_app body in
       let exp_args = Type.expected_args (Term.ty hd) in
