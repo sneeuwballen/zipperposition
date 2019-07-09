@@ -299,7 +299,7 @@ module Make(C : Clause_intf.S) = struct
       )
 
     let parse_crv s = 
-      let crv_regex = Str.regexp "conjecture-relative-var(\\([0-9]+[.][0-9]*.*\\),\\([lsLS]\\),\\([tfTF]\\))" in
+      let crv_regex = Str.regexp "conjecture-relative-var(\\([0-9]+[.]?[0-9]*\\),\\([lsLS]\\),\\([tfTF]\\))" in
       try
         ignore(Str.search_forward crv_regex s 0);
         let distinct_vars_mul = CCOpt.get_exn (Float.of_string_opt (Str.matched_group 1 s)) in
@@ -315,7 +315,9 @@ module Make(C : Clause_intf.S) = struct
           "expected conjecture-relative-var(dist_var_mul:float,parameters_magnitude:l/s,goal_penalty:t/f)"
 
     let parsers = 
-      ["default", (fun _ -> default_fun);
+      [
+      "fifo", (fun _ c -> C.id c);
+      "default", (fun _ -> default_fun);
       "explore",  (fun _ -> explore_fun);
       "conjecture-relative", (fun _ -> conj_relative ~distinct_vars_mul:1.0 
                                                      ~parameters_magnitude:`Large 
@@ -328,7 +330,8 @@ module Make(C : Clause_intf.S) = struct
       let splitted = CCString.split ~by:"(" s in
       let name = List.hd splitted in
       List.assoc name parsers s
-    with Not_found | Failure _ -> invalid_arg "unknown weight function"
+    with Not_found | Failure _ -> 
+      invalid_arg (CCFormat.sprintf "unknown weight function %s" s)
     
   end
 
@@ -338,9 +341,12 @@ module Make(C : Clause_intf.S) = struct
     let const_prio c = 1
 
     let parsers = 
-      ["const_prio", (fun _ -> const_prio)]
+      ["const", (fun _ -> const_prio)]
 
-    let of_string s = List.assoc s parsers s
+    let of_string s = 
+      try 
+        List.assoc s parsers s
+      with Not_found -> invalid_arg "unknown priority"
   end
 
   module H = CCHeap.Make(struct
@@ -566,8 +572,9 @@ module Make(C : Clause_intf.S) = struct
         | P_avoid_expensive -> avoid_expensive_mk ())
     else (
       List.fold_left (fun _ (ratio, prio, weight) -> 
-        let weight_fun c = (PriorityFun.of_string prio c, WeightFun.of_string prio c) in
-        add_to_mixed_eval ~ratio ~weight_fun
+        let prio_fun = PriorityFun.of_string prio in
+        let weight_fun = WeightFun.of_string weight in
+        add_to_mixed_eval ~ratio ~weight_fun:(fun c -> prio_fun c, weight_fun c)
       ) (Mixed mixed_eval) !funs_to_parse
     )
 
@@ -583,7 +590,7 @@ let parse_wf_with_priority s =
     ignore(Str.search_forward wf_with_prio_regex s 0);
     let ratio = CCOpt.get_exn (CCInt.of_string (Str.matched_group 1 s)) in
     let priority_str = CCString.trim (Str.matched_group 2 s) in
-    let weight_fun = CCString.trim (Str.matched_group 2 s) in
+    let weight_fun = CCString.trim (Str.matched_group 3 s) in
     funs_to_parse := (ratio, priority_str, weight_fun) :: !funs_to_parse
   with Not_found | Invalid_argument _ -> 
     invalid_arg 
