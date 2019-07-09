@@ -340,12 +340,15 @@ module Make(C : Clause_intf.S) = struct
 
     let const_prio c = 1
 
+    let prefer_ho_steps c = if Proof.Step.has_ho_step (C.proof_step c) then 1 else 0
+
     let parsers = 
-      ["const", (fun _ -> const_prio)]
+      ["const", (fun _ -> const_prio);
+      "prefer-ho-steps", (fun _ -> prefer_ho_steps)]
 
     let of_string s = 
       try 
-        List.assoc s parsers s
+        List.assoc (String.lowercase_ascii s) parsers s
       with Not_found -> invalid_arg "unknown priority"
   end
 
