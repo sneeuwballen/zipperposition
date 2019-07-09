@@ -83,7 +83,7 @@ and gfpf_root ~depth t =
                          | _ -> assert false)
   | T.Fun (_, _) -> assert false
 
-(* TODO more efficient way to compute a vector of features: if the fingerprint
+(* TODO more efficient way to compute a vector of s: if the fingerprint
    is in BFS, compute features during only one traversal of the term? *)
 
 let pp_feature out = function 

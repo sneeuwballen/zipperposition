@@ -25,6 +25,9 @@ module type S = sig
         clauses will be favored). A weight must always be positive;
         the weight of the empty clause should alwyays be 0. *)
 
+    val of_string : string -> t
+    (** parse string description of weight function and return it  *)
+
     val default : t
     (** Use {!Literal.heuristic_weight} *)
 
@@ -45,12 +48,22 @@ module type S = sig
     (** The closest a clause is from the initial goal, the lowest its weight.
         Some threshold is used for clauses that are too far away *)
 
-   val conj_relative : ?distinct_vars_mul:float -> t
+   val conj_relative : ?distinct_vars_mul:float -> 
+                       ?parameters_magnitude:[< `Large | `Small > `Large ] ->
+                       ?goal_penalty:bool -> t
 
-    val combine : (t * int) list -> t
+   val combine : (t * int) list -> t
     (** Combine a list of pairs [w, coeff] where [w] is a weight function,
         and [coeff] a strictly positive number. This is a weighted sum
         of weights. *)
+  end
+
+  module PriorityFun : sig
+    type t = C.t -> int
+
+    val of_string : string -> t
+    (** parse string description of weight function and return it  *)
+
   end
 
   type t
@@ -76,12 +89,15 @@ module type S = sig
 
   (** {6 Available Queues} *)
 
-  val make : ratio:int -> weight:(C.t -> int) -> string -> t
+  (* val make : ratio:int -> weight:(C.t -> int) -> string -> t
   (** Bring your own implementation of queue.
       @param ratio pick-given ratio. One in [ratio] calls to {!take_first},
         the returned clause comes from a FIFO; the other times it comes
         from a priority queue that uses [weight] to sort clauses
-      @param name the name of this clause queue *)
+      @param name the name of this clause queue *) *)
+
+  val add_to_mixed_eval: ratio:int -> weight_fun:(C.t -> int * int) -> t
+
 
   val bfs : unit -> t
   (** FIFO *)

@@ -31,7 +31,6 @@ let profiles_ =
   ; "ho-weight", P_ho_weight
   ; "ho-weight-init", P_ho_weight_init
   ; "avoid-expensive", P_avoid_expensive
-
   ]
 
 let profile_of_string s =
@@ -74,35 +73,8 @@ let _profile = ref ClauseQueue_intf.P_default
 let get_profile () = !_profile
 let set_profile p = _profile := p
 let parse_profile s = _profile := (profile_of_string s)
+let funs_to_parse = ref [] 
 
-let () =
-  let o = Arg.String (parse_profile) in
-  Params.add_opts
-    [ "--clause-queue", o,
-      " choose which set of clause queues to use (for selecting next active clause)";
-      "-cq", o, " alias to --clause-queue"
-    ];
-
-  Params.add_to_mode "ho-pragmatic" (fun () ->
-      _profile := P_conj_rel_var;
-      cr_var_ratio := 8;
-      cr_var_mul   := 1.05;
-  );
-  Params.add_to_mode "ho-competitive" (fun () ->
-      _profile := P_conj_rel_var;
-      cr_var_ratio := 8;
-      cr_var_mul   := 1.05;
-  );
-  Params.add_to_mode "ho-complete-basic" (fun () ->
-      _profile := P_conj_rel_var;
-      cr_var_ratio := 8;
-      cr_var_mul   := 1.05;
-  );
-  Params.add_to_mode "fo-complete-basic" (fun () ->
-      _profile := P_conj_rel_var;
-      cr_var_ratio := 8;
-      cr_var_mul   := 1.05;
-  );
 
 module Make(C : Clause_intf.S) = struct
   module C = C
@@ -212,11 +184,11 @@ module Make(C : Clause_intf.S) = struct
                                         calc_tweight rhs sg v w c_mul, sign)
       | _ -> (0,false)
 
-    let conj_relative ?(distinct_vars_mul=(-1.0)) c =
+    let conj_relative ?(distinct_vars_mul=(-1.0)) ?(parameters_magnitude=`Large) ?(goal_penalty=false) c =
       let sgn = C.Ctx.signature () in
       let max_lits = C.maxlits (c,0) Subst.empty in
       let pos_mul, max_mul, v,f =
-        match !parameters_magnitude with 
+        match parameters_magnitude with 
         |`Large -> (1.5,1.5,100,100)
         |`Small -> (2.0,1.5,2,3)
       in
@@ -237,7 +209,7 @@ module Make(C : Clause_intf.S) = struct
                 let n_vars = List.length dist_vars + 1  in
                 let dist_var_penalty = distinct_vars_mul ** (float_of_int n_vars) in
                 let goal_dist_penalty = 
-                  if !goal_penalty then (
+                  if goal_penalty then (
                     let divider = 
                       match C.distance_to_goal c with
                       | Some d -> 1.5 ** (1.0 /. (1.0 +. (float_of_int @@ d)))
@@ -311,14 +283,77 @@ module Make(C : Clause_intf.S) = struct
         List.fold_left
           (fun sum (w,coeff) -> sum + coeff * w c)
           0 ws
+
+    let explore_fun = 
+      penalize (
+        combine
+          [default, 4; favor_small_num_vars, 1;
+          favor_all_neg, 1 ]
+      )
+
+    let default_fun =
+      penalize (
+        combine
+          [ default, 3; favor_all_neg, 1; favor_small_num_vars, 2
+          ; favor_goal, 1; favor_pos_unit, 1; ]
+      )
+
+    let parse_crv s = 
+      let crv_regex = Str.regexp "conjecture-relative-var(\\([0-9]+[.][0-9]*.*\\),\\([lsLS]\\),\\([tfTF]\\))" in
+      try
+        ignore(Str.search_forward crv_regex s 0);
+        let distinct_vars_mul = CCOpt.get_exn (Float.of_string_opt (Str.matched_group 1 s)) in
+        let parameters_magnitude = 
+          Str.matched_group 2 s |> CCString.trim |> String.lowercase_ascii
+          |> (fun s -> if CCString.prefix ~pre:"l" s then `Large else `Small) in
+        let goal_penalty = 
+          Str.matched_group 3 s |> CCString.trim |> String.lowercase_ascii
+          |> CCString.prefix ~pre:"t" in
+        conj_relative ~distinct_vars_mul ~parameters_magnitude ~goal_penalty
+      with Not_found | Invalid_argument _ -> 
+        invalid_arg 
+          "expected conjecture-relative-var(dist_var_mul:float,parameters_magnitude:l/s,goal_penalty:t/f)"
+
+    let parsers = 
+      ["default", (fun _ -> default_fun);
+      "explore",  (fun _ -> explore_fun);
+      "conjecture-relative", (fun _ -> conj_relative ~distinct_vars_mul:1.0 
+                                                     ~parameters_magnitude:`Large 
+                                                     ~goal_penalty:false );
+      "conjecture-relative-var", parse_crv]
+
+
+    let of_string s =
+    try
+      let splitted = CCString.split ~by:"(" s in
+      let name = List.hd splitted in
+      List.assoc name parsers s
+    with Not_found | Failure _ -> invalid_arg "unknown weight function"
+    
+  end
+
+  module PriorityFun = struct
+    type t = C.t -> int
+
+    let const_prio c = 1
+
+    let parsers = 
+      ["const_prio", (fun _ -> const_prio)]
+
+    let of_string s = List.assoc s parsers s
   end
 
   module H = CCHeap.Make(struct
       (* heap ordered by [weight, real age(id)] *)
-      type t = (int * C.t)
-      let leq (i1, c1) (i2, c2) =
-        i1 < i2 ||
-        (i1 = i2 && C.compare c1 c2 <= 0)
+      type t = (int * int * C.t)
+      let leq (i10, i11, c1) (i20, i21, c2) =
+        if i10 < i20 then true
+        else if (i10 = i20) then (
+          if i11 < i21 then true 
+          else if i11 = i21 then (
+            C.compare c1 c2 < 0
+          ) else false
+        ) else false
     end)
 
   (** A priority queue of clauses + FIFO queue *)
@@ -327,31 +362,17 @@ module Make(C : Clause_intf.S) = struct
     | Mixed of mixed
 
   and mixed = {
-    mutable heap : H.t;
-    mutable queue: C.t Queue.t;
+    mutable heaps : H.t array;
+    mutable weight_funs : (C.t -> (int * int)) array;
     tbl: unit C.Tbl.t;
-    mutable time_before_fifo: int;
-    (* cycles from 0 to ratio, changed at every [take_first].
-       when 0, pick in fifo; other pick from heap and decrease *)
-    ratio: int;
-    weight: C.t -> int;
-    name: string;
+    mutable ratios: int array;
+    mutable ratios_limit: int;
+    mutable current_step: int;
+    mutable current_heap_idx: int;
   }
 
   (** generic clause queue based on some ordering on clauses, given
       by a weight function *)
-  let make ~ratio ~weight name =
-    if ratio <= 0 then invalid_arg "ClauseQueue.make: ratio must be >0";
-    Mixed {
-      weight;
-      name;
-      ratio;
-      time_before_fifo=ratio;
-      heap = H.empty;
-      queue=Queue.create();
-      tbl=C.Tbl.create 256;
-    }
-
   let is_empty_mixed q = C.Tbl.length q.tbl = 0
 
   let is_empty (q:t) = match q with
@@ -367,42 +388,67 @@ module Make(C : Clause_intf.S) = struct
     | Mixed q ->
       if not (C.Tbl.mem q.tbl c) then (
         C.Tbl.add q.tbl c ();
-        let w = q.weight c in
-        let heap = H.insert (w, c) q.heap in
-        q.heap <- heap;
-        Queue.push c q.queue;
-      )
+        let weights = Array.map (fun f -> f c) q.weight_funs in
+        let heaps = Array.mapi (fun i (prio,weight) ->  
+          let heap = Array.get q.heaps i in
+          H.insert (prio,weight,c) heap) weights in
+        q.heaps <- heaps)
 
   let add_seq q hcs = Iter.iter (add q) hcs
 
   let rec take_first_mixed q =
+    let move_queue q =
+      if q.current_step < q.ratios_limit then (
+        (* we still have to pick from current heap *)
+        q.current_step <- q.current_step + 1;
+      ) else ( 
+        (* we have to choose the next heap *)
+        
+        if (q.current_heap_idx + 1 = Array.length (q.heaps)) then (
+          (* cycled through all the heaps, starting over  *)
+          q.current_heap_idx <- 0;
+          q.current_step <- 0;
+          q.ratios_limit <- Array.get q.ratios 0;
+        ) else (
+          (* moving to the next heap  *)
+          q.current_step <- q.current_step + 1;
+          q.current_heap_idx <- q.current_heap_idx + 1;
+          q.ratios_limit <- q.ratios_limit + (Array.get q.ratios q.current_heap_idx)
+        )
+      ) in
+
     if is_empty_mixed q then raise Not_found;
-    let taken_from_fifo = ref true in
     (* find next clause *)
-    let c =
-      if q.time_before_fifo = 0
-      then (
-        (* q.time_before_fifo <- q.ratio; *)
-        let res = Queue.pop q.queue in
-        Util.debugf 1 "taking from fifo: %a.\n" (fun k -> k C.pp res);
-        res
-      ) else (
-        assert (q.time_before_fifo > 0);
-        (* q.time_before_fifo <- q.time_before_fifo - 1; *)
-        taken_from_fifo := false;
-        let new_h, (w, c) = H.take_exn q.heap in
-        Util.debugf 1 "taken from heap: %a/h_weight:%d.\n" (fun k -> k C.pp c w);
-        q.heap <- new_h;
-        c
-      )
-    in
-    if C.Tbl.mem q.tbl c then (
-      if !taken_from_fifo then q.time_before_fifo <- q.ratio 
-      else q.time_before_fifo <- q.time_before_fifo-1;
+    let current_heap = Array.get q.heaps q.current_heap_idx in
+    let current_heap, (_,_,c) =  H.take_exn current_heap in
+    Array.set q.heaps q.current_heap_idx current_heap;
+
+    if not (C.Tbl.mem q.tbl c) then take_first_mixed q
+    else (
       C.Tbl.remove q.tbl c;
-      Util.debugf 1 "accepted.\n" CCFun.id;
+      move_queue q;
       c
-    ) else (Util.debugf 1 "in q.tbl. rejected.\n" CCFun.id; take_first_mixed q (* spurious *))
+    )
+
+  let mixed_eval = {
+    heaps=CCArray.empty;
+    weight_funs=CCArray.empty;
+    tbl=C.Tbl.create 16;
+    ratios = CCArray.empty;
+    ratios_limit=0;
+    current_step=0;
+    current_heap_idx=0;
+  }
+
+  let add_to_mixed_eval ~ratio ~weight_fun =
+    let was_empty = CCArray.length mixed_eval.heaps = 0 in
+    mixed_eval.heaps <- Array.append mixed_eval.heaps ([| H.empty |]);
+    mixed_eval.weight_funs <- Array.append mixed_eval.weight_funs ([| weight_fun |]);
+    mixed_eval.ratios <- Array.append mixed_eval.ratios ([| ratio |]);
+    if was_empty then (
+      mixed_eval.ratios_limit <- ratio
+    );
+    Mixed mixed_eval
 
   let take_first = function
     | FIFO q ->
@@ -411,9 +457,14 @@ module Make(C : Clause_intf.S) = struct
 
   let name q = match q with
     | FIFO _ -> "bfs"
-    | Mixed q -> q.name
+    | Mixed q -> "mixed"
 
   (** {6 Combination of queues} *)
+
+  let const_prioritize_fun wf =
+    (fun c -> wf c, 1)
+
+  let fifo_wf c = C.id c, 1
 
   let goal_oriented () : t =
     let open WeightFun in
@@ -422,8 +473,10 @@ module Make(C : Clause_intf.S) = struct
         combine [default, 4; favor_small_num_vars, 2;
                 favor_goal, 1; favor_all_neg, 1; ]
       ) in
-    let name = "goal_oriented" in
-    make ~ratio:6 ~weight name
+    (* make ~ratio:6 ~weight name *)
+    let weight_fun = const_prioritize_fun weight in
+    ignore(add_to_mixed_eval ~ratio:5 ~weight_fun);
+    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf
 
   let bfs () : t = FIFO (Queue.create ())
 
@@ -431,18 +484,17 @@ module Make(C : Clause_intf.S) = struct
     let open WeightFun in
     let weight = 
       penalize ( combine [ default, 3; ] ) in
-    make ~ratio:1 ~weight "almost_bfs"
+    (* make ~ratio:1 ~weight "almost_bfs" *)
+    let weight_fun = const_prioritize_fun weight in
+    ignore(add_to_mixed_eval ~ratio:1 ~weight_fun);
+    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf
 
   let explore () : t =
     let open WeightFun in
-    let weight =
-      penalize (
-        combine
-          [default, 4; favor_small_num_vars, 1;
-          favor_all_neg, 1 ]
-      )
-    in
-    make ~ratio:6 ~weight "explore"
+    (* make ~ratio:6 ~weight "explore" *)
+    let weight_fun = const_prioritize_fun explore_fun in
+    ignore(add_to_mixed_eval ~ratio:5 ~weight_fun);
+    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf
 
   let ground () : t =
     let open WeightFun in
@@ -452,51 +504,121 @@ module Make(C : Clause_intf.S) = struct
                 favor_small_num_vars, 10; ]
       )
     in
-    make ~ratio:6 ~weight "ground"
+    (* make ~ratio:6 ~weight "ground" *)
+    let weight_fun = const_prioritize_fun weight in
+    ignore(add_to_mixed_eval ~ratio:5 ~weight_fun);
+    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf
 
   let default () : t =
     let open WeightFun in
-    let weight =
-      penalize (
-        combine
-          [ default, 3; favor_all_neg, 1; favor_small_num_vars, 2
-          ; favor_goal, 1; favor_pos_unit, 1; ]
-      )
-    in
-    make ~ratio:6 ~weight "default"
+    (* make ~ratio:6 ~weight "default" *)
+    let weight_fun = const_prioritize_fun default_fun in
+    ignore(add_to_mixed_eval ~ratio:5 ~weight_fun);
+    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf
 
   let conj_relative_mk () : t =
-    make ~ratio:6 ~weight:WeightFun.conj_relative "conj_relative"
+    (* make ~ratio:6 ~weight:WeightFun.conj_relative "conj_relative" *)
+    let weight_fun = const_prioritize_fun WeightFun.conj_relative in
+    ignore(add_to_mixed_eval ~ratio:5 ~weight_fun);
+    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf
 
   let conj_var_relative_mk () : t =
-    make ~ratio:!cr_var_ratio ~weight:(WeightFun.conj_relative ~distinct_vars_mul:!cr_var_mul)
-         "conj_relative_var"
+    (* make ~ratio:!cr_var_ratio ~weight:(WeightFun.conj_relative ~distinct_vars_mul:!cr_var_mul)
+         "conj_relative_var" *)
+    let weight_fun = const_prioritize_fun 
+      (WeightFun.conj_relative ~distinct_vars_mul:!cr_var_mul 
+                                ~parameters_magnitude:!parameters_magnitude ~goal_penalty:!goal_penalty) in
+    ignore(add_to_mixed_eval ~ratio:!cr_var_ratio ~weight_fun);
+    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf
 
   let ho_weight () =
-      make ~ratio:3 ~weight:WeightFun.ho_weight_calc "ho-weight"
+    (* make ~ratio:4 ~weight:WeightFun.ho_weight_calc "ho-weight" *)
+    let weight_fun = const_prioritize_fun WeightFun.ho_weight_calc in
+    ignore(add_to_mixed_eval ~ratio:3 ~weight_fun);
+    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf
 
   let ho_weight_init () =
-      make ~ratio:5 ~weight:WeightFun.ho_weight_initial "ho-weight-init"
+    (* make ~ratio:5 ~weight:WeightFun.ho_weight_initial "ho-weight-init" *)
+    let weight_fun = const_prioritize_fun WeightFun.ho_weight_initial in
+    ignore(add_to_mixed_eval ~ratio:4 ~weight_fun);
+    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf
 
   let avoid_expensive_mk () : t =
-    make ~ratio:20 ~weight:WeightFun.avoid_expensive "avoid-expensive"
-
+    (* make ~ratio:20 ~weight:WeightFun.avoid_expensive "avoid-expensive" *)
+    let weight_fun = const_prioritize_fun WeightFun.avoid_expensive in
+    ignore(add_to_mixed_eval ~ratio:10 ~weight_fun);
+    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf
 
   let of_profile p =
     let open ClauseQueue_intf in
-    match p with
-      | P_default -> default ()
-      | P_bfs -> bfs ()
-      | P_almost_bfs -> almost_bfs ()
-      | P_explore -> explore ()
-      | P_ground -> ground ()
-      | P_goal -> goal_oriented ()
-      | P_conj_rel ->  conj_relative_mk ()
-      | P_conj_rel_var -> conj_var_relative_mk ()
-      | P_ho_weight -> ho_weight ()
-      | P_ho_weight_init -> ho_weight_init ()
-      | P_avoid_expensive -> avoid_expensive_mk ()
+    if CCList.is_empty !funs_to_parse then (
+      match p with
+        | P_default -> default ()
+        | P_bfs -> bfs ()
+        | P_almost_bfs -> almost_bfs ()
+        | P_explore -> explore ()
+        | P_ground -> ground ()
+        | P_goal -> goal_oriented ()
+        | P_conj_rel ->  conj_relative_mk ()
+        | P_conj_rel_var -> conj_var_relative_mk ()
+        | P_ho_weight -> ho_weight ()
+        | P_ho_weight_init -> ho_weight_init ()
+        | P_avoid_expensive -> avoid_expensive_mk ())
+    else (
+      List.fold_left (fun _ (ratio, prio, weight) -> 
+        let weight_fun c = (PriorityFun.of_string prio c, WeightFun.of_string prio c) in
+        add_to_mixed_eval ~ratio ~weight_fun
+      ) (Mixed mixed_eval) !funs_to_parse
+    )
 
   let pp out q = CCFormat.fprintf out "queue %s" (name q)
   let to_string = CCFormat.to_string pp
 end
+
+
+
+let parse_wf_with_priority s = 
+  let wf_with_prio_regex = Str.regexp "\\([0-9]+\\)|\\(.+\\)|\\(.+\\)" in
+  try
+    ignore(Str.search_forward wf_with_prio_regex s 0);
+    let ratio = CCOpt.get_exn (CCInt.of_string (Str.matched_group 1 s)) in
+    let priority_str = CCString.trim (Str.matched_group 2 s) in
+    let weight_fun = CCString.trim (Str.matched_group 2 s) in
+    funs_to_parse := (ratio, priority_str, weight_fun) :: !funs_to_parse
+  with Not_found | Invalid_argument _ -> 
+    invalid_arg 
+      "weight funciton is of the form \"ratio:int|priority:name|weight:name(options..)\""
+
+let () =
+  let o = Arg.String (parse_profile) in
+  let add_queue = Arg.String parse_wf_with_priority in
+  Params.add_opts
+    [ "--clause-queue", o,
+      " choose which set of clause queues to use (for selecting next active clause)";
+      "-cq", o, " alias to --clause-queue";
+      "--add-queue", add_queue, " create a new clause evaluation queue. Its description is of the form" ^ 
+                                " RATIO|PRIORITY_FUN|WEIGHT_FUN";
+      "-q", add_queue, "alias to --add-queue"
+    ];
+
+  Params.add_to_mode "ho-pragmatic" (fun () ->
+      _profile := P_conj_rel_var;
+      cr_var_ratio := 8;
+      cr_var_mul   := 1.05;
+  );
+  Params.add_to_mode "ho-competitive" (fun () ->
+      _profile := P_conj_rel_var;
+      cr_var_ratio := 8;
+      cr_var_mul   := 1.05;
+  );
+  Params.add_to_mode "ho-complete-basic" (fun () ->
+      _profile := P_conj_rel_var;
+      cr_var_ratio := 8;
+      cr_var_mul   := 1.05;
+  );
+  Params.add_to_mode "fo-complete-basic" (fun () ->
+      _profile := P_conj_rel_var;
+      cr_var_ratio := 8;
+      cr_var_mul   := 1.05;
+  );
+

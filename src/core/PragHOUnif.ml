@@ -464,3 +464,22 @@ let unify_scoped t0_s t1_s =
           assert(false);
         );); *)
     sub))
+
+let single_unif t0_s t1_s =
+  let counter = ref 0 in
+  let t0',t1',unifscope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
+  let monomorphic = Iter.is_empty @@ Iter.union (Term.Seq.ty_vars t0') (Term.Seq.ty_vars t1') in
+  let state = 
+  {
+    num_identifications = 0;
+    num_var_imitations  = 0;
+    num_app_projections = 0;
+    num_elims           = 0;
+    depth               = 0;
+    monomorphic
+  } in
+  let res = unify ~state ~scope:unifscope ~counter ~subst [t0', t1', false] in
+  try 
+    let subs = OSeq.nth 0 res in
+    CCOpt.get_exn subs
+  with Not_found -> raise Unif.Fail

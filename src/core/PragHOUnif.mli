@@ -46,3 +46,5 @@ val unify : state:unif_state ->
             subst:US.t -> (T.t * T.t * bool) CCList.t -> US.t option OSeq.t
 
 val unify_scoped : T.t Scoped.t -> T.t Scoped.t -> subst option OSeq.t
+
+val single_unif : Term.t Scoped.t -> Term.t Scoped.t -> US.t
