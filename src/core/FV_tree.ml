@@ -131,12 +131,12 @@ module Make(C: Index_intf.CLAUSE) = struct
       let rec t_weight t = 
         let pref,t = T.open_fun t in
         match T.view t with
-        | T.Const _ | T.Var _ | T.DB _ -> 1
+        | T.Const _ | T.Var _ | T.DB _ -> List.length pref + 1
         | T.Fun(_,t) -> assert false
         | T.AppBuiltin(_,l)
         | T.App(_,l) ->
           if Term.is_app_var t then List.length pref + 1
-          else (List.fold_left (fun acc s -> acc + t_weight s) (List.length pref+1) l) in
+          else (List.fold_left (fun acc s -> acc + t_weight s) (List.length pref + 1) l) in
 
       SLiteral.to_seq lit |> Iter.map t_weight |> Iter.fold (+) 0
 
@@ -190,10 +190,28 @@ module Make(C: Index_intf.CLAUSE) = struct
 
     (* sequence of symbols of clause with their depth *)
     let symbols_depth_ filter lits : (ID.t * int) Iter.t =
+      (* ignores app vars and does not count opening the functions *)
+      let subterms_depth t k =
+      let rec recurse depth t =
+        if not (T.is_app_var t) then  (
+          k (t, depth);
+          match T.view t with
+            | Const _
+            | DB _
+            | Var _ -> ()
+            | Fun (_,u) -> recurse depth u (* not increasing the depth when we go under a fun 
+                                                -- no need to eta expand *)
+            | AppBuiltin (_, l) -> List.iter (recurse (depth+1)) l
+            | App (hd, l) ->
+              recurse depth hd;
+              List.iter (recurse (depth+1)) l)
+      in
+      recurse 0 t in
+    
       lits
       |> Iter.filter filter
       |> Iter.flat_map SLiteral.to_seq
-      |> Iter.flat_map (T.Seq.subterms_depth ~filter_term:not_app_var)
+      |> Iter.flat_map (subterms_depth)
       |> Iter.filter_map
         (fun (t,d) -> match T.view t with
            | T.Const id -> Some (id,d)
