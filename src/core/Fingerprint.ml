@@ -46,10 +46,13 @@ let rec gfpf ?(depth=0) pos t =
   | i::is ->
       let hd, args = T.as_app body in
       let exp_args = Type.expected_args (Term.ty hd) in
-      let num_exp_args = List.length exp_args in
       if T.is_var hd then B
       else (
         let num_acutal_args = List.length args in
+        (* formulas can potentially support variable number of arguments *)
+        let num_exp_args = 
+          if T.is_formula body then num_acutal_args else List.length exp_args in
+
         let idx = i-1 in (* zero-based i *)
         if num_acutal_args >= i then (
           let arg = T.DB.shift (num_exp_args - num_acutal_args) (List.nth args idx) in
@@ -67,7 +70,9 @@ let rec gfpf ?(depth=0) pos t =
 and gfpf_root ~depth t =
   match T.view t with 
   | T.AppBuiltin(_, _) -> Ignore
-  | T.DB i -> if (i < depth) then DB i else Ignore (* for losely bound variables and LambdaSup *)
+  (* if we are sampling under a function, it can happen that there are
+     loosely bound variables that can be unified inside LambdaSup. *)
+  | T.DB i -> if (i < depth) then DB i else Ignore 
   | T.Var _ -> A
   | T.Const c -> S c
   | T.App (hd,_) -> (match T.view hd with
