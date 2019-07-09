@@ -211,7 +211,7 @@ module Make(C: Index_intf.CLAUSE) = struct
       lits
       |> Iter.filter filter
       |> Iter.flat_map SLiteral.to_seq
-      |> Iter.flat_map (subterms_depth)
+      |> Iter.flat_map subterms_depth
       |> Iter.filter_map
         (fun (t,d) -> match T.view t with
            | T.Const id -> Some (id,d)

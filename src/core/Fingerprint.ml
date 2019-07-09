@@ -29,17 +29,27 @@ type fingerprint_fun = T.t -> feature list
 
 (* compute a feature for a given position *)
 let rec gfpf ?(depth=0) pos t =
-  let pref_vars, body =  T.open_fun t in 
+  let depth_inc = List.length (Type.expected_args (Term.ty t)) in
+  let pref_vars, body =  T.open_fun t in
+  let exp_args = Type.expected_args (Term.ty body) in
+  let num_exp_args = List.length exp_args in
   match pos with 
-  | [] -> gfpf_root ~depth:(depth+List.length pref_vars) body
+  | [] -> gfpf_root ~depth:(depth + depth_inc) body
   | i::is ->
       let hd, args = T.as_app body in
       if T.is_var hd then B
       else (
-        if List.length args >= i then (
-          gfpf ~depth:(depth + (List.length pref_vars)) is (List.nth args @@  i-1 )
+        let num_acutal_args = List.length args in
+        let idx = i-1 in (* zero-based i *)
+        if num_acutal_args >= i then (
+          let arg = T.DB.shift (num_exp_args - num_acutal_args) (List.nth args idx) in
+          gfpf ~depth:(depth + depth_inc) is arg
         ) 
-        else (
+        else if num_exp_args >= i then (
+          let arg = T.bvar (num_exp_args - i) ~ty:(List.nth exp_args idx) in
+          gfpf ~depth:(depth + depth_inc) is arg
+        ) else (
+          (* eta-expanding on the fly *)
           let _, ret = Type.open_fun (Term.ty body) in
           if (Type.is_var ret) then B else N
         ) 
@@ -47,13 +57,13 @@ let rec gfpf ?(depth=0) pos t =
 and gfpf_root ~depth t =
   match T.view t with 
   | T.AppBuiltin(_, _) -> Ignore
-  | T.DB i -> Ignore
+  | T.DB i -> if (i < depth) then DB i else Ignore (* for losely bound variables and LambdaSup *)
   | T.Var _ -> A
   | T.Const c -> S c
   | T.App (hd,_) -> (match T.view hd with
                          T.Var _ -> A 
                          | T.Const s -> S s
-                         | T.DB i    -> Ignore
+                         | T.DB i    -> if (i < depth) then DB i else Ignore
                          | T.AppBuiltin(_,_) -> Ignore
                          | _ -> assert false)
   | T.Fun (_, _) -> assert false
@@ -224,7 +234,7 @@ module Make(X : Set.OrderedType) = struct
         | Node _, [] | Leaf _, _::_ ->
           failwith "different feature length in fingerprint trie"
     in
-    let features = idx.fp (Lambda.eta_expand t) in  (* features of term *)
+    let features = idx.fp t in  (* features of term *)
     { idx with trie = recurse idx.trie features; }
 
   let add_ trie = CCFun.uncurry (add trie)
@@ -261,7 +271,7 @@ module Make(X : Set.OrderedType) = struct
         | Node _, [] | Leaf _, _::_ ->
           failwith "different feature length in fingerprint trie"
     in
-    let features = idx.fp (Lambda.eta_expand t) in  (* features of term *)
+    let features = idx.fp t in  (* features of term *)
     { idx with trie = recurse idx.trie features; }
 
   let remove_ trie = CCFun.uncurry (remove trie)
@@ -316,7 +326,7 @@ module Make(X : Set.OrderedType) = struct
       raise e
 
   let retrieve_unifiables_aux fold_unify (idx,sc_idx) t k =
-    let features = idx.fp (Lambda.eta_expand @@ fst t) in
+    let features = idx.fp (fst t) in
     let compatible = compatible_features_unif in
     traverse ~compatible idx features
       (fun leaf -> fold_unify (leaf,sc_idx) t k)
@@ -327,14 +337,14 @@ module Make(X : Set.OrderedType) = struct
     retrieve_unifiables_aux (Leaf.fold_unify_complete ~unif_alg)
 
   let retrieve_generalizations ?(subst=S.empty) (idx,sc_idx) t k =
-    let features = idx.fp (Lambda.eta_expand @@ fst t) in
+    let features = idx.fp (fst t) in
     (* compatible t1 t2 if t2 can match t1 *)
     let compatible f1 f2 = compatible_features_match f2 f1 in
     traverse ~compatible idx features
       (fun leaf -> Leaf.fold_match ~subst (leaf,sc_idx) t k)
 
   let retrieve_specializations ?(subst=S.empty) (idx,sc_idx) t k =
-    let features = idx.fp (Lambda.eta_expand @@ fst t) in
+    let features = idx.fp (fst t) in
     let compatible = compatible_features_match in
     traverse ~compatible idx features
       (fun leaf -> Leaf.fold_matched ~subst (leaf,sc_idx) t k)
