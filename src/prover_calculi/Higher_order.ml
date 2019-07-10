@@ -639,7 +639,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     end
 
   let prim_enum ~(mode) c =
-    if C.proof_depth c <= max_penalty_prim_ 
+    if C.proof_depth c < max_penalty_prim_ 
     then prim_enum_ ~mode c
     else []
   

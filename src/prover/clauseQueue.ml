@@ -371,13 +371,16 @@ module Make(C : Clause_intf.S) = struct
 
     let defer_ground c =
       if C.is_ground c then 1 else 0
-      
+
+    let defer_sos c = 
+       if C.proof_depth c = 0 || CCOpt.is_some (C.distance_to_goal c) then 1 else 0
 
     let parsers = 
       ["const", (fun _ -> const_prio);
       "prefer-ho-steps", (fun _ -> prefer_ho_steps);
       "prefer-sos", (fun _ -> prefer_sos);
-      "prefer-non-goals", (fun _ -> prefer_non_goals);
+      "defer-sos", (fun _ -> defer_sos);
+      "prefer-non-goals", (fun _ -> prefer_non_goals);      
       "prefer-processed", (fun _ -> prefer_processed);
       "prefer-lambdas", (fun _ -> prefer_lambdas);
       "defer-lambdas", (fun _ -> defer_lambdas);
