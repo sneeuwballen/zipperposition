@@ -343,10 +343,7 @@ module Make(C : Clause_intf.S) = struct
     let prefer_ho_steps c = if Proof.Step.has_ho_step (C.proof_step c) then 0 else 1
 
     let prefer_sos c = 
-      if C.proof_depth c = 0 then 0
-      else (match C.distance_to_goal c with
-            | Some d -> 0
-            | _ -> 1)
+      if C.proof_depth c = 0 || CCOpt.is_some (C.distance_to_goal c) then 0 else 1
 
     let prefer_non_goals c = 
       if Iter.exists Literal.is_pos (C.Seq.lits c) then 0 else 1

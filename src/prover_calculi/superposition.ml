@@ -1408,8 +1408,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let new_lits = Lits.apply_subst renaming sub (C.lits c, 0) in
       let trail = C.trail c in 
       let penalty = C.penalty c in
-      let rule  = Proof.Rule.mk "instantiate_w_trigger" in
-      let proof = Proof.Step.inference ~rule [C.proof_parent_subst renaming (c, 0) sub] in
+      let rule = Proof.Rule.mk "instantiate_w_trigger" in
+      let tags = [Proof.Tag.T_ho] in
+      let proof = Proof.Step.inference ~tags ~rule [C.proof_parent_subst renaming (c, 0) sub] in
       let new_clause = C.create ~trail ~penalty (CCArray.to_list new_lits) proof in
       (* CCFormat.printf "[BOOL_INST: %a, %a => %a].\n" C.pp c Subst.pp sub C.pp new_clause; *)
       assert (C.Seq.terms c |> Iter.for_all T.DB.is_closed);
@@ -1804,11 +1805,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           let new_lits = new_neq_lits @ CCArray.except_idx lits_f i  @ CCArray.to_list lits_i in
           let trail = C.trail_l [from_c; into_c] in
           let penalty = max (C.penalty from_c) (C.penalty into_c) in
+          let tags = [Proof.Tag.T_ho] in
           let proof =
               Proof.Step.inference
                   [C.proof_parent_subst renaming (from_c, sc_f) Subst.empty;
                   C.proof_parent_subst renaming  (into_c, sc_i) Subst.empty] 
-                ~rule:(Proof.Rule.mk "ext_decompose") in
+                ~rule:(Proof.Rule.mk "ext_decompose") ~tags in
           let new_c = C.create ~trail ~penalty new_lits proof in
           Some new_c
         ) else None
