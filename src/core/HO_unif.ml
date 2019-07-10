@@ -90,7 +90,7 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
         [T.fun_of_fvars vars T.true_]
     and l_quants = match mode with
       | `Pragmatic | `Full ->
-        let n = List.length ty_args in
+        (* let n = List.length ty_args in
         CCList.mapi (fun i ty -> 
           if Type.is_fun ty && Type.returns_prop ty then (
             let arg_typeargs,_ = Type.open_fun ty in
@@ -107,7 +107,8 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
           else None) ty_args
         |> CCList.fold_left (fun acc opt -> match opt with 
           | Some (x,y) -> x :: y :: acc 
-          | None -> acc) [] 
+          | None -> acc) []  *)
+          []
       | _ -> []
     and l_simpl_op = match mode with
       | `Pragmatic -> 

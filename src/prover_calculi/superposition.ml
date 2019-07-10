@@ -506,7 +506,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let renaming = S.Renaming.create () in
       let us = info.subst in
       let subst = US.subst us in
-
       let lambdasup_vars =
         if (info.sup_kind = LambdaSup) then (
           Term.Seq.subterms info.u_p |> Iter.filter Term.is_var |> Term.Set.of_seq)
@@ -602,7 +601,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Lit.Pos.replace passive_lit'
           ~at:passive_lit_pos ~by:t' in
       let c_guard = Literal.of_unif_subst renaming us in
-      let tags = Unif_subst.tags us in
       (* apply substitution to other literals *)
        (* Util.debugf 1 "Before unleak: %a, after unleak: %a"
       (fun k -> k Subst.pp subst Subst.pp subst'); *)
@@ -647,12 +645,18 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         raise (ExitSuperposition "improperly formed quantified expressions.");
       );
 
+      let subst_has_lams = 
+        Subst.codomain subst
+        |> Iter.exists (fun (t,_) -> 
+            Iter.exists T.is_fun (T.Seq.subterms (T.of_term_unsafe t))) in
+
       let rule =
         let r = kind_to_str info.sup_kind in
         let sign = if Lit.is_pos passive_lit' then "+" else "-" in
         Proof.Rule.mk (r ^ sign)
       in
       CCList.iter (fun (sym,ty) -> Ctx.declare sym ty) !skolem_decls;
+      let tags = (if subst_has_lams then [Proof.Tag.T_ho] else []) @ Unif_subst.tags us in
       let proof =
         Proof.Step.inference ~rule ~tags
           [C.proof_parent_subst renaming (info.active,sc_a) subst';
@@ -738,7 +742,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (* assert (T.equal (Lits.Pos.at (Array.of_list lits_p) info.passive_pos) u'); *)
       let lits_p = List.map (Lit.map (fun t-> T.replace t ~old:u' ~by:t')) lits_p in
       let c_guard = Literal.of_unif_subst renaming us in
-      let tags = Unif_subst.tags us in
       (* build clause *)
       let new_lits = c_guard @ lits_a @ lits_p in
       let rule =
@@ -746,6 +749,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         let sign = if Lit.is_pos passive_lit' then "+" else "-" in
         Proof.Rule.mk ("s_" ^ r ^ sign)
       in
+      let subst_has_lams = 
+        Subst.codomain subst
+        |> Iter.exists (fun (t,_) -> 
+            Iter.exists T.is_fun (T.Seq.subterms (T.of_term_unsafe t))) in
+      let tags = (if subst_has_lams then [Proof.Tag.T_ho] else []) @ Unif_subst.tags us in
       let proof =
         Proof.Step.inference ~rule ~tags
           [C.proof_parent_subst renaming (info.active,sc_a) subst;
@@ -1251,7 +1259,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               let new_lits = CCArray.except_idx (C.lits clause) pos in
               let new_lits = Lit.apply_subst_list renaming subst (new_lits,0) in
               let c_guard = Literal.of_unif_subst renaming us in
-              let tags = Unif_subst.tags us in
+              let subst_has_lams = 
+                  Subst.codomain subst
+                  |> Iter.exists (fun (t,_) -> 
+                      Iter.exists T.is_fun (T.Seq.subterms (T.of_term_unsafe t))) in
+                let tags = (if subst_has_lams then [Proof.Tag.T_ho] else []) @ Unif_subst.tags us in
               let trail = C.trail clause and penalty = C.penalty clause in
               let proof = Proof.Step.inference ~rule ~tags
                   [C.proof_parent_subst renaming (clause,0) subst] in
@@ -1327,8 +1339,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
        &&
        C.is_eligible_param (info.clause,info.scope) subst ~idx:info.active_idx
     then (
+      let subst_has_lams = 
+        Subst.codomain subst
+        |> Iter.exists (fun (t,_) -> 
+            Iter.exists T.is_fun (T.Seq.subterms (T.of_term_unsafe t))) in
+      let tags = (if subst_has_lams then [Proof.Tag.T_ho] else []) @ Unif_subst.tags us in
       Util.incr_stat stat_equality_factoring_call;
-      let tags = Unif_subst.tags us in
       let proof =
         Proof.Step.inference
           ~rule:(Proof.Rule.mk"eq_fact") ~tags

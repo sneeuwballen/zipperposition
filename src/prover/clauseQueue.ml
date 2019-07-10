@@ -351,12 +351,40 @@ module Make(C : Clause_intf.S) = struct
     let prefer_processed c =
       if C.is_backward_simplified c then 0 else 1
 
+    let prefer_lambdas c = 
+        -(C.Seq.terms c
+          |> Iter.fold (fun acc t -> 
+              acc + Iter.fold (fun acc st -> 
+                acc + if Term.is_fun st then 1 else 0) 0 (Term.Seq.subterms t)) 0)
+    
+    let defer_lambdas c =
+      - (prefer_lambdas c)
+
+    let prefer_fo c = 
+      if Iter.for_all Term.is_fo_term (C.Seq.terms c) then 0 else 1
+
+    let defer_fo c = 
+      if Iter.for_all Term.is_fo_term (C.Seq.terms c) then 0 else 1
+
+    let prefer_ground c =
+      if C.is_ground c then 0 else 1
+
+    let defer_ground c =
+      if C.is_ground c then 1 else 0
+      
+
     let parsers = 
       ["const", (fun _ -> const_prio);
       "prefer-ho-steps", (fun _ -> prefer_ho_steps);
       "prefer-sos", (fun _ -> prefer_sos);
       "prefer-non-goals", (fun _ -> prefer_non_goals);
-      "prefer-processed", (fun _ -> prefer_processed);]
+      "prefer-processed", (fun _ -> prefer_processed);
+      "prefer-lambdas", (fun _ -> prefer_lambdas);
+      "defer-lambdas", (fun _ -> defer_lambdas);
+      "prefer-ground", (fun _ -> prefer_ground);
+      "defer-ground", (fun _ -> defer_ground);
+      "defer-fo", (fun _ -> defer_fo);
+      "prefer-fo", (fun _ -> prefer_fo);]
 
     let of_string s = 
       try 
