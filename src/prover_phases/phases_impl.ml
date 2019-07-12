@@ -19,6 +19,7 @@ let section = Const.section
 
 let _db_w = ref 1
 let _lmb_w = ref 1
+let _kbo_wf = ref "invfreqrank"
 
 (* setup an alarm for abrupt stop *)
 let setup_alarm timeout =
@@ -137,7 +138,7 @@ let cnf ~sk_ctx decls =
   Phases.return_phase stmts
 
 (* compute a precedence *)
-let compute_prec stmts =
+let compute_prec ~signature stmts =
   Phases.start_phase Phases.Compute_prec >>= fun () ->
   (* use extensions *)
   Phases.get >>= fun state ->
@@ -151,10 +152,8 @@ let compute_prec stmts =
     |> Compute_prec.add_constr 10 Classify_cst.prec_constr
     |> Compute_prec.set_weight_rule (
        fun stmts -> 
-        Precedence.weight_invfreq (
-         stmts
-         |> Iter.flat_map Statement.Seq.terms
-         |> Iter.flat_map Term.Seq.symbols))
+        let all_syms = stmts |> Iter.flat_map Statement.Seq.terms |> Iter.flat_map Term.Seq.symbols in
+        Precedence.weight_fun_of_string ~signature !_kbo_wf all_syms)
     (* |> Compute_prec.set_weight_rule (fun _ -> Classify_cst.weight_fun) *)
 
     (* use "invfreq", with low priority *)
@@ -450,7 +449,7 @@ let process_file ?(prelude=Iter.empty) file =
   (* compute signature, precedence, ordering *)
   let conj_syms = syms_in_conj stmts in
   let signature = Statement.signature ~conj_syms:conj_syms (CCVector.to_seq stmts) in
-  compute_prec (CCVector.to_seq stmts) >>= fun precedence ->
+  compute_prec ~signature (CCVector.to_seq stmts) >>= fun precedence ->
   Util.debugf ~section 1 "@[<2>precedence:@ @[%a@]@]" (fun k->k Precedence.pp precedence);
   compute_ord_select precedence >>= fun (ord, select) ->
   (* HO *)
@@ -571,6 +570,9 @@ let () =
     "--lambda-weight"
     , Arg.Set_int _lmb_w
     , " Set weight of lambda symbol for KBO";
+    "--kbo-weight-fun"
+    , Arg.Set_string _kbo_wf
+    , " Set the function for symbol weight calculation.";
   ];
 
    Params.add_to_mode "ho-pragmatic" (fun () ->

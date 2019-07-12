@@ -288,6 +288,17 @@ let e_sel4 ~ord lits =
   let blocker = Lit.is_type_pred in
   weight_based_sel_driver ~ord ~blocker lits chooser 
 
+let e_sel5 ~ord lits =
+  let chooser (i,l) =
+    (if Lit.is_pos l then 1 else 0), 
+    (if Lit.is_ground l then 0 else 1),
+    (- (lit_sel_diff_w l)),
+    0 in
+  if CCArray.exists (fun l -> Lit.is_neg l && Lit.depth l <= 2) lits then (
+    weight_based_sel_driver ~ord lits chooser 
+  ) else BV.empty ()
+  
+
 
 
 let ho_sel ~ord lits = 
@@ -326,6 +337,7 @@ let l =
       "e-selection2", e_sel2;
       "e-selection3", e_sel3;
       "e-selection4", e_sel4;
+      "e-selection5", e_sel5;
       "ho-selection", ho_sel;
     ]
   and by_ord =

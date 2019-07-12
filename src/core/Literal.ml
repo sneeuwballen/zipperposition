@@ -130,6 +130,7 @@ let is_pos = function
     if sign && T.is_true_or_false r && T.is_const hd_l then (
       T.equal r T.true_ 
     ) else sign
+    (* sign *)
   | Int o -> Int_lit.sign o
   | False -> false
   | _ -> true

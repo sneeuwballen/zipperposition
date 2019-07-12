@@ -136,11 +136,15 @@ include Interfaces.PRINT with type t := t
 type weight_fun = ID.t -> Weight.t
 type arg_coeff_fun = ID.t -> int list
 
-val weight_modarity : arity:(ID.t -> int) -> weight_fun
+val weight_modarity : signature:Signature.t -> weight_fun
 
 val weight_constant : weight_fun
-
 val weight_invfreq : ID.t Iter.t -> weight_fun
+val weight_freq : ID.t Iter.t -> weight_fun
+val weight_invfreqrank : ID.t Iter.t -> weight_fun
+val weight_freqrank : ID.t Iter.t -> weight_fun
+
+val weight_fun_of_string : signature:Signature.t -> string ->  ID.t Iter.t -> weight_fun
 
 val set_weight : t -> weight_fun -> unit
 (** Change the weight function of the precedence

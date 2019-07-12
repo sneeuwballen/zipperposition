@@ -230,16 +230,72 @@ type weight_fun = ID.t -> Weight.t
 type arg_coeff_fun = ID.t -> int list
 
 (* weight of f = arity of f + 4 *)
-let weight_modarity ~arity a = Weight.int (arity a + 4)
+let weight_modarity ~signature a = 
+  let arity =  try snd @@ Signature.arity signature a with _ -> 10 in
+  Weight.int (arity + 4)
+
+let weight_invarity ~signature = 
+  let max_arity = 
+    Signature.Seq.symbols signature
+    |> Iter.map (fun sym -> snd @@ Signature.arity signature sym)
+    |> Iter.max |> CCOpt.get_or ~default:max_int in
+  
+  (fun a ->
+    let arity =  try snd @@ Signature.arity signature a with _ -> 0 in
+    Weight.int (max_arity - arity + 3))
+
 
 (* constant weight *)
 let weight_constant _ = Weight.int 4
 
-let weight_invfreq symbs = 
+let weight_invfreq (symbs : ID.t Iter.t) : ID.t -> Weight.t =
   let tbl = ID.Tbl.create 16 in
-    Iter.iter (ID.Tbl.incr tbl) symbs;
-    let max_freq = List.fold_left (max) 0 (ID.Tbl.values_list tbl) in
-    fun sym ->Weight.int (max_freq - (ID.Tbl.get_or ~default:1 tbl sym) + 5) 
+  Iter.iter (ID.Tbl.incr tbl) symbs;
+  let max_freq = List.fold_left (max) 0 (ID.Tbl.values_list tbl) in
+  fun sym ->Weight.int (max_freq - (ID.Tbl.get_or ~default:1 tbl sym) + 5) 
+
+let weight_freq (symbs : ID.t Iter.t) : ID.t -> Weight.t =
+  let tbl = ID.Tbl.create 16 in
+  Iter.iter (ID.Tbl.incr tbl) symbs;
+  fun sym ->Weight.int ((ID.Tbl.get_or ~default:10 tbl sym) + 5) 
+
+let weight_invfreqrank (symbs : ID.t Iter.t) : ID.t -> Weight.t =
+  let tbl = ID.Tbl.create 16 in
+  Iter.iter (ID.Tbl.incr tbl) symbs;
+  let sorted = 
+    Iter.sort ~cmp:(fun s1 s2 -> 
+      CCInt.compare (ID.Tbl.get_or tbl ~default:0 s1) 
+                    (ID.Tbl.get_or tbl ~default:0 s2)) symbs in
+  ID.Tbl.clear tbl;
+  let tbl = ID.Tbl.create 16 in
+  Iter.iteri (fun i (sym:ID.t) -> ID.Tbl.add tbl sym (i+1)) sorted;
+  (fun sym -> Weight.int (ID.Tbl.get_or ~default:10 tbl sym))
+
+
+let weight_freqrank (symbs : ID.t Iter.t) : ID.t -> Weight.t =
+  let tbl = ID.Tbl.create 16 in
+  Iter.iter (ID.Tbl.incr tbl) symbs;
+  let sorted = 
+    Iter.sort ~cmp:(fun s1 s2 -> 
+      CCInt.compare (ID.Tbl.get_or tbl ~default:0 s2) 
+                    (ID.Tbl.get_or tbl ~default:0 s1)) symbs in
+  ID.Tbl.clear tbl;
+  Iter.iteri (fun i sym -> ID.Tbl.add tbl sym (i+1)) sorted;
+  (fun sym -> Weight.int (ID.Tbl.get_or ~default:10 tbl sym))
+
+
+let weight_fun_of_string ~signature s = 
+  let wf_map = 
+    ["invfreq", weight_invfreq; 
+    "freq", weight_freq; 
+    "invfreqrank", weight_invfreqrank;
+    "freqrank", weight_freqrank;
+    "modarity", (fun _ -> weight_modarity ~signature);
+    "invarity", (fun _ -> weight_invarity ~signature);
+    "const", (fun _ -> weight_constant)] in
+  try
+    List.assoc s wf_map
+  with Not_found -> invalid_arg "KBO weight function not found"
 
 (* default argument coefficients *)
 let arg_coeff_default _ = []

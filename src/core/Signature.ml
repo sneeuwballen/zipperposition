@@ -49,7 +49,7 @@ let arity signature s =
   let ty = find_exn signature s in
   match Type.arity ty with
     | Type.NoArity ->
-      failwith (CCFormat.sprintf "symbol %a has ill-formed type %a" ID.pp s Type.pp ty)
+      failwith (CCFormat.sprintf "symbol %a has ill-formed type %a" ID.pp s Type.TPTP.pp ty)
     | Type.Arity (a,b) -> a, b
 
 let is_ground signature =

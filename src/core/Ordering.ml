@@ -41,8 +41,8 @@ type ordering = t
 let normalize = ref (fun t -> Lambda.eta_reduce t |> Lambda.snf)
 
 let compare ord t1 t2 = 
-  (* ord.compare ord.prec (!normalize t1) (!normalize t2) *)
-  Comparison.Incomparable
+  ord.compare ord.prec (!normalize t1) (!normalize t2)
+  (* Comparison.Incomparable *)
 
 let might_flip ord t1 t2 = ord.might_flip ord.prec (!normalize t1) (!normalize t2)
 

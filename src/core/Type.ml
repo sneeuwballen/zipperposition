@@ -180,7 +180,8 @@ let arity ty =
       Arity (n_forall, List.length l)
     | Forall ty' ->
       traverse (n_forall+1) ty'
-    | Var _ | Builtin _ -> NoArity
+    | Var _ -> NoArity
+    | Builtin _ -> Arity (n_forall, 0)
     | DB _
     | App _ -> Arity (n_forall, 0)
   in traverse 0 ty
