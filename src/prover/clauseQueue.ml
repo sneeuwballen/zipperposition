@@ -484,7 +484,7 @@ module Make(C : Clause_intf.S) = struct
       "prefer-ho-steps", (fun _ -> prefer_ho_steps);
       "prefer-sos", (fun _ -> prefer_sos);
       "defer-sos", (fun _ -> defer_sos);
-      "prefer-goals", (fun _ -> prefer_non_goals);
+      "prefer-goals", (fun _ -> prefer_goals);
       "prefer-non-goals", (fun _ -> prefer_non_goals);
       "prefer-unit-ground-non-goals", (fun _ -> prefer_unit_ground_non_goals);            
       "prefer-processed", (fun _ -> prefer_processed);
