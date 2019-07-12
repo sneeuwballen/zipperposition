@@ -381,7 +381,7 @@ module Make(C : Clause_intf.S) = struct
     let parse_pnrefine s = 
       let or_lmax_regex = 
         Str.regexp 
-          ("orient-lmax(\\([0-9]+[.]?[0-9]*\\)," 
+          ("pnrefined(\\([0-9]+[.]?[0-9]*\\)," 
             ^ "\\([0-9]+[.]?[0-9]*\\),"
             ^ "\\([0-9]+[.]?[0-9]*\\),"
             ^ "\\([0-9]+[.]?[0-9]*\\),"
@@ -400,8 +400,9 @@ module Make(C : Clause_intf.S) = struct
         pn_refined_weight ~pv_w ~pf_w ~nv_w ~nf_w ~pos_m ~max_t_m ~max_l_m
       with Not_found | Invalid_argument _ -> 
         invalid_arg @@
-          "expected orient-lmax(var_weight:int,fun_weight:int" ^
-          "pos_lit_mult:float, unorderable_lit_mul:float, max_lit_mul:float)"
+          "expected pnrefined(+var_weight:int,+fun_weight:int" ^
+          "-var_weight:int,-fun_weight:int" ^
+          "pos_lit_mult:float, max_t_mult:float, max_lit_mul:float)"
 
     let parsers = 
       [
@@ -412,7 +413,7 @@ module Make(C : Clause_intf.S) = struct
                                                      ~parameters_magnitude:`Large 
                                                      ~goal_penalty:false );
       "conjecture-relative-var", parse_crv;
-      "pnrefine", parse_pnrefine;
+      "pnrefined", parse_pnrefine;
       "orient-lmax", parse_orient_lmax]
 
 
@@ -438,8 +439,12 @@ module Make(C : Clause_intf.S) = struct
 
     let prefer_non_goals c = 
       if Iter.exists Literal.is_pos (C.Seq.lits c) then 0 else 1
+
+    let prefer_unit_ground_non_goals c = 
+      if Iter.exists Literal.is_pos (C.Seq.lits c) &&
+         C.is_unit_clause c && C.is_ground c then 0 else 1
     
-    let prefer_non_goals c = 
+    let prefer_goals c = 
       - (prefer_non_goals c)
 
     let prefer_processed c =
@@ -480,7 +485,8 @@ module Make(C : Clause_intf.S) = struct
       "prefer-sos", (fun _ -> prefer_sos);
       "defer-sos", (fun _ -> defer_sos);
       "prefer-goals", (fun _ -> prefer_non_goals);
-      "prefer-non-goals", (fun _ -> prefer_non_goals);      
+      "prefer-non-goals", (fun _ -> prefer_non_goals);
+      "prefer-unit-ground-non-goals", (fun _ -> prefer_unit_ground_non_goals);            
       "prefer-processed", (fun _ -> prefer_processed);
       "prefer-lambdas", (fun _ -> prefer_lambdas);
       "defer-lambdas", (fun _ -> defer_lambdas);
@@ -494,7 +500,11 @@ module Make(C : Clause_intf.S) = struct
     let of_string s = 
       try 
         List.assoc (String.lowercase_ascii s) parsers s
-      with Not_found -> invalid_arg "unknown priority"
+      with Not_found -> 
+        let err_msg = 
+          CCFormat.sprintf "unknown priortity: %s.\noptions:@[%a@]"
+          s (CCList.pp ~start:"{" ~stop:"}" CCString.pp) (List.map fst parsers) in
+        invalid_arg err_msg
   end
 
   module H = CCHeap.Make(struct

@@ -50,6 +50,14 @@ val e_sel5  : ord:Ordering.t -> t
 (** Selection function  identical to E's 
     SelectNDepth2OptimalLiteral *)
 
+val e_sel6  : ord:Ordering.t -> t
+(** Selection function  identical to E's 
+    SelectLargestOrientable *)
+
+val e_sel7  : ord:Ordering.t -> t
+(** Selection function  identical to E's 
+    SelectComplexExceptRRHorn *)
+
 val ho_sel  : ord:Ordering.t -> t
 (** Selection function that tries to take 
     into account the number of nested applied variables.

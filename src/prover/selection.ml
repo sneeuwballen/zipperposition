@@ -298,8 +298,26 @@ let e_sel5 ~ord lits =
     weight_based_sel_driver ~ord lits chooser 
   ) else BV.empty ()
   
+let e_sel6 ~ord lits =
+  (* SelectLargestOrientable *)
+  let is_oriented lit = 
+    match lit with
+    | Lit.Equation(l,r,_) ->
+        Ordering.compare ord l r != Comparison.Incomparable
+    | _ -> true in
+  let chooser (i,l) =
+    (if Lit.is_pos l then 1 else 0),
+    (if is_oriented l then 0 else 1),
+    (- (Lit.weight l)),
+    0 in
+  let blocker t = not @@ is_oriented t in
+  weight_based_sel_driver ~ord lits chooser ~blocker
 
-
+  let e_sel7 ~ord lits = 
+    (* SelectComplexExceptRRHorn *)
+    if Lits.is_RR_horn_clause lits
+    then BV.empty () (* do not select (conditional rewrite rule) *)
+    else e_sel3 ~ord lits
 
 let ho_sel ~ord lits = 
   let chooser (i,l) = 
@@ -338,6 +356,8 @@ let l =
       "e-selection3", e_sel3;
       "e-selection4", e_sel4;
       "e-selection5", e_sel5;
+      "e-selection6", e_sel6;
+      "e-selection7", e_sel7;
       "ho-selection", ho_sel;
     ]
   and by_ord =
