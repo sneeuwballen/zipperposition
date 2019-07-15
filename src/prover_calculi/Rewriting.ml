@@ -347,24 +347,39 @@ let rewrite_tst_stmt stmt =
             f') combined in
         Some (res, !proof)) in
 
-  let build_stmt f'_opt f mk =
-    match f'_opt with 
-    | Some (f', parent_list) -> 
-      let rule = Proof.Rule.mk "definition expansion" in
-      let formula_parent = Proof.Step.parents (Statement.proof_step f) in
-      let proof = Proof.Step.inference ~rule (formula_parent @ parent_list) in
-      mk ~proof f' 
-    | None -> f in
+  let mk_proof f_opt orig =
+    CCOpt.map (fun (f', parent_list) -> 
+       let rule = Proof.Rule.mk "definition expansion" in
+       f', Proof.S.mk_f_simp ~rule orig parent_list) f_opt in
   
+  let stmt_parents = Proof.Step.parents (Statement.proof_step stmt) in
   match Statement.view stmt with
   | Assert f -> 
-    build_stmt (aux f) stmt (Statement.assert_  ~attrs:(Statement.attrs stmt))
+    (match mk_proof (aux f) f with
+    | Some (f', proof) -> Statement.assert_ ~proof:(Proof.S.step proof) f'
+    | None -> stmt)
   | Lemma fs -> 
-    build_stmt (aux_l fs) stmt (Statement.lemma ~attrs:(Statement.attrs stmt))
+    begin match aux_l fs with 
+    | Some (fs', parents) ->
+      let rule = Proof.Rule.mk "definition expansion" in
+      let fs_parents = (List.map (fun f -> Proof.Parent.from (Proof.S.mk_f_esa ~rule f stmt_parents)) fs)
+                        @ parents in
+      let proof = Proof.Step.simp ~rule fs_parents in
+      Statement.lemma ~proof fs'
+    | None -> stmt end
   | Goal g ->
-    build_stmt (aux g) stmt (Statement.goal ~attrs:(Statement.attrs stmt))
+    (match mk_proof (aux g) g with
+    | Some (g', proof) -> Statement.goal ~proof:(Proof.S.step proof) g'
+    | None -> stmt)
   | NegatedGoal (skolems, ngs) -> 
-    build_stmt (aux_l ngs) stmt (Statement.neg_goal ~attrs:(Statement.attrs stmt) ~skolems)
+    begin match aux_l ngs with 
+    | Some (ng', parents) ->
+      let rule = Proof.Rule.mk "definition expansion" in
+      let ng_parents = (List.map (fun f -> Proof.Parent.from (Proof.S.mk_f_esa ~rule f stmt_parents)) ngs)
+                        @ parents in
+      let proof = Proof.Step.simp ~rule ng_parents in
+      Statement.neg_goal ~skolems ~proof ng'
+    | None -> stmt end
   | _ -> stmt
 
 let unfold_def_before_cnf stmts =

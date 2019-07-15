@@ -893,6 +893,64 @@ module Form = struct
     forall_l ?loc tyvars (forall_l ?loc vars f)
 end
 
+let _l_counter = ref 0 
+let define_lambda_of ~bound ~free body = 
+  let lam_id = CCRef.get_then_incr _l_counter in
+  let lam_name = "#ll_" ^ CCInt.to_string lam_id in
+  let body_ty = ty_exn body in
+  let args = List.map (fun v -> var v) (free @ bound) in
+  let new_id = ID.make lam_name in
+  let ll_sym_ty = Ty.mk_fun_ (List.map ty_exn args) body_ty in
+  let lam_const = const ~ty:ll_sym_ty new_id in
+  let new_pred = app ~ty:body_ty lam_const args in
+  let def_form = Form.eq_or_equiv new_pred body in
+  let replacement_ty =  Ty.mk_fun_ (List.map Var.ty free) body_ty in
+  let replacement = 
+    app ~ty:replacement_ty lam_const (List.map (fun v -> var v) free) in
+  replacement, def_form
+
+
+let rec lift_lambdas  f =
+  let aux = lift_lambdas  in
+  let ty = ty_exn f in
+  match view f with 
+  | Var _ | Const _ -> (f,[])
+  | App (hd, fs) -> 
+    let hd', hd_def = aux hd in
+    let fs', all_defs = 
+      List.fold_right (fun f (args, defs) -> 
+        let f', new_defs = aux f in
+        (f'::args, new_defs @ defs)) fs ([],hd_def) in
+    if not (CCList.is_empty all_defs) then (
+      app ~ty hd' fs', all_defs
+    ) else f, []
+  | Bind(Binder.Lambda, _, body) ->  
+    let vars, body = unfold_binder Binder.Lambda f in
+    assert(not @@ CCList.is_empty vars);
+    let body', new_defs = aux body in
+    let var_set = Var.Set.of_list vars in
+    let free_vars = 
+      Var.Set.diff (Var.Set.of_seq (Seq.free_vars body')) var_set
+      |> Var.Set.to_list in
+    let replacement, def = 
+      define_lambda_of  ~bound:vars ~free:free_vars body' in
+    replacement, def :: new_defs
+  | Bind(b, v, body) ->  
+    let body', new_defs = aux body in
+    if not (CCList.is_empty new_defs) then (
+      bind ~ty b v body', new_defs
+    ) else f,[]
+  | AppBuiltin(b, fs) ->
+    let fs', all_defs = 
+      List.fold_right (fun f (args, defs) -> 
+        let f', new_defs = aux f in
+        (f'::args, new_defs @ defs)) fs ([],[]) in
+    if not (CCList.is_empty all_defs) then (
+      app_builtin ~ty b fs', all_defs
+    ) else f, []
+  | _ -> invalid_arg "not implemented yet"
+
+
 let is_monomorphic t =
   Seq.subterms t
   |> Iter.for_all (fun t -> Ty.is_mono (ty_exn t))

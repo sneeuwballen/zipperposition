@@ -11,6 +11,7 @@ module OptionSet = Set.Make(
 
 module IdMap = ID.Map
 module US = Unif_subst
+module TST = TypedSTerm
 
 (** A datatype declaration *)
 type 'ty data = {
@@ -266,6 +267,44 @@ let get_formulas_from_defs st =
   | Def defs -> CCList.flat_map (fun d -> CCList.flat_map get_from_rule d.def_rules) defs
   | Rewrite def_rule  -> get_from_rule def_rule
   | _ -> []
+
+let lift_lambdas st = 
+  let ll_proof_step st f = 
+    let rule = Proof.Rule.mk "lift_lambdas" in
+    let parents  = Proof.Step.parents (proof_step st) in
+    (* Proof.Step.simp ~tags ~rule (Proof.Step.parents (proof_step st))  *)
+    let step = Proof.S.mk_f_simp ~rule f parents in
+    Proof.S.step step in
+
+  let stmt_parents = Proof.Step.parents (proof_step st) in
+  match view st with
+  | Assert f -> 
+    let f', new_defs =  TST.lift_lambdas f in
+    if CCList.is_empty new_defs then st, []
+    else (assert_ (ll_proof_step st f) f', new_defs )
+  | Lemma fs ->
+    let fs', defs = List.fold_right (fun f (ffs, ddefs) -> 
+      let f', new_defs = TST.lift_lambdas f in
+      f' :: ffs, new_defs @ ddefs
+    ) fs ([], []) in
+    let rule = Proof.Rule.mk "lift_lambdas" in
+    let fs_parents = (List.map (fun f -> Proof.Parent.from (Proof.S.mk_f_esa ~rule f stmt_parents)) fs) in
+    let proof = Proof.Step.simp ~rule fs_parents in
+    lemma ~proof fs', defs
+  | Goal f ->
+    let f', new_defs =  TST.lift_lambdas f in
+    if CCList.is_empty new_defs then st, []
+    else (goal (ll_proof_step st f) f', new_defs )
+  | NegatedGoal (skolems,fs) ->
+    let fs', defs = List.fold_right (fun f (ffs, ddefs) -> 
+      let f', new_defs = TST.lift_lambdas f in
+      f' :: ffs, new_defs @ ddefs
+    ) fs ([], []) in
+    let rule = Proof.Rule.mk "lift_lambdas" in
+    let fs_parents = (List.map (fun f -> Proof.Parent.from (Proof.S.mk_f_esa ~rule f stmt_parents)) fs) in
+    let proof = Proof.Step.simp ~rule fs_parents in
+    neg_goal ~proof ~skolems fs', defs
+  | _ -> st, []
 
 (** {2 Iterators} *)
 
