@@ -81,6 +81,7 @@ let _fluidsup = ref true
 let _dupsup = ref true
 let _trigger_bool_inst = ref (-1)
 let _recognize_injectivity = ref false
+let _sup_with_pure_vars = ref true
 
 let _NO_LAMSUP = -1
 let _lambdasup = ref (-1)
@@ -278,7 +279,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     _idx_sup_from :=
       Lits.fold_eqn ~ord ~both:true ~sign:true
         ~eligible:(C.Eligible.param c) (C.lits c)
-      |> Iter.filter((fun (l, _, _, _) -> not (T.is_true_or_false l)))
+      |> Iter.filter (fun (l,r,_,_) -> 
+          !_sup_with_pure_vars || not (Term.is_var l) || not (Term.is_var r))
+      |> Iter.filter((fun (l, _, _, _) -> not (T.equal l T.false_)))
       |> Iter.fold
         (fun tree (l, _, sign, pos) ->
            assert sign;
@@ -795,6 +798,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let new_clauses =
       Lits.fold_eqn ~sign:true ~ord
         ~both:true ~eligible (C.lits clause)
+      |> Iter.filter (fun (l,r,_,_) -> 
+          !_sup_with_pure_vars || not (Term.is_var l) || not (Term.is_var r))
       |> Iter.flat_map
         (fun (s, t, _, s_pos) ->
           let do_sup u_p with_pos subst =
@@ -2758,6 +2763,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and backward_redundant = subsumed_in_active_set
     and is_trivial = is_tautology in
 
+    if not !_sup_with_pure_vars then (
+      Env.Ctx.lost_completeness ()
+    );
+
     if !_recognize_injectivity then (
         Env.add_unary_inf "recognize injectivity" recognize_injectivity;
     );
@@ -2884,8 +2893,8 @@ let () =
     , Arg.Set _dont_simplify
     , " disable simplification rules"
     ; "--sup-at-vars"
-    , Arg.Set _sup_at_vars
-    , " enable superposition at variables under certain ordering conditions"
+    , Arg.Bool (fun v -> _sup_at_vars := v)
+    , " enable/disable superposition at variables under certain ordering conditions"
     ; "--sup-at-var-headed"
     , Arg.Bool (fun b -> _sup_at_var_headed := b)
     , " enable/disable superposition at variable headed terms"
@@ -2939,6 +2948,9 @@ let () =
     "--recognize-injectivity"
     , Arg.Bool (fun v -> _recognize_injectivity := v)
     , " recognize injectivity axiom and axiomatize corresponding inverse";
+    "--sup-with-pure-vars"
+    , Arg.Bool (fun v -> _sup_with_pure_vars := v)
+    , " enable/disable superposition to and from pure variable equations";
     "--trigger-bool-inst"
     , Arg.Set_int _trigger_bool_inst
     , " instantiate predicate variables with boolean terms already in the proof state. Argument is the maximal proof depth of predicate variable";

@@ -58,6 +58,10 @@ val e_sel7  : ord:Ordering.t -> t
 (** Selection function  identical to E's 
     SelectComplexExceptRRHorn *)
 
+val e_sel8 : ord:Ordering.t -> t
+(** Selection function  identical to E's 
+    SelectCQArNTNpEqFirst *)
+
 val ho_sel  : ord:Ordering.t -> t
 (** Selection function that tries to take 
     into account the number of nested applied variables.

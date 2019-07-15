@@ -319,6 +319,40 @@ let e_sel6 ~ord lits =
     then BV.empty () (* do not select (conditional rewrite rule) *)
     else e_sel3 ~ord lits
 
+   let e_sel8 ~ord lits = 
+    let symbols = Lits.symbols lits 
+                |> ID.Set.to_seq 
+                |> Iter.sort ~cmp:ID.compare 
+                |> Iter.to_array in
+    let is_truly_equational = function 
+    | Lit.Equation(l,r,sign) -> 
+      not (Term.is_true_or_false r)
+    | _ -> false  in
+    let get_arity = function 
+    | Lit.Equation(l,r,sign) when sign && Term.is_true_or_false r -> 
+      List.length (Type.expected_args (Term.ty (T.head_term l)))
+    | _ -> 0  in
+    let alpha_rank = function 
+    | Lit.Equation(l,r,sign) when sign && Term.is_true_or_false r 
+                                       && T.is_const (T.head_term l) -> 
+      let hd = T.head_exn l in
+      (match CCArray.bsearch ~cmp:ID.compare hd symbols with
+              | `At idx -> idx
+              | _       -> max_int)
+    | _ -> max_int  in
+    let blocker l = Lit.is_type_pred l || Lit.is_propositional l in
+    let chooser (i,l) =
+      if is_truly_equational l then (
+        (if Lit.is_pos l then 1 else 0),
+        min_int, 0, lit_sel_diff_w l
+      ) else (
+        (if Lit.is_pos l then 1 else 0),
+        (if not (blocker l) then -(get_arity l) else max_int), 
+        alpha_rank l, lit_sel_diff_w l
+      )
+      in
+    weight_based_sel_driver ~ord lits chooser ~blocker
+
 let ho_sel ~ord lits = 
   let chooser (i,l) = 
     let sign = (if Lit.is_pos l then 1 else 0) in
@@ -358,6 +392,7 @@ let l =
       "e-selection5", e_sel5;
       "e-selection6", e_sel6;
       "e-selection7", e_sel7;
+      "e-selection8", e_sel8;
       "ho-selection", ho_sel;
     ]
   and by_ord =
