@@ -573,8 +573,8 @@ let lift_lambdas st =
       (neg_goal ~proof ~skolems fs' :: (List.map assert_defs defs))
       |> Iter.of_list)
   | _ -> Iter.singleton st end in
-  CCFormat.printf "[LAMBDA_LIFT:@ @[%a@]]\n" pp_input st;
-  CCFormat.printf "[RES:@ @[%a@]]\n" (CCList.pp pp_input) (Iter.to_list res);
+  Util.debugf 1 "Lambda lifted:@ @[%a@]\n" (fun k -> k pp_input st);
+  Util.debugf 1 "into @ @[%a@]\n" (fun k -> k (CCList.pp pp_input) (Iter.to_list res));
   res
 
 module ZF = struct
