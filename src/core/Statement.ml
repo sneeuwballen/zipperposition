@@ -268,58 +268,8 @@ let get_formulas_from_defs st =
   | Rewrite def_rule  -> get_from_rule def_rule
   | _ -> []
 
-let lift_lambdas st = 
-  let ll_proof_step st f = 
-    let rule = Proof.Rule.mk "lift_lambdas" in
-    let parents  = Proof.Step.parents (proof_step st) in
-    (* Proof.Step.simp ~tags ~rule (Proof.Step.parents (proof_step st))  *)
-    let step = Proof.S.mk_f_simp ~rule f parents in
-    Proof.S.step step in
 
-  let assert_defs def = 
-    let step = Proof.Step.intro (Proof.Src.internal []) Proof.R_assert in
-    let proof = Proof.S.step (Proof.S.mk_f step def) in
-    assert_ ~proof def in
 
-  let stmt_parents = Proof.Step.parents (proof_step st) in
-  match view st with
-  | Assert f -> 
-    let f', new_defs =  TST.lift_lambdas f in
-    (if CCList.is_empty new_defs then Iter.singleton st
-    else (assert_ (ll_proof_step st f) f') :: (List.map assert_defs new_defs)
-          |> Iter.of_list)
-  | Lemma fs ->
-    let fs', defs = List.fold_right (fun f (ffs, ddefs) -> 
-      let f', new_defs = TST.lift_lambdas f in
-      f' :: ffs, new_defs @ ddefs
-    ) fs ([], []) in
-    if CCList.is_empty defs then Iter.singleton st
-    else (
-      let rule = Proof.Rule.mk "lift_lambdas" in
-      let fs_parents = (List.map (fun f ->
-         Proof.Parent.from (Proof.S.mk_f_esa ~rule f stmt_parents)) fs) in
-      let proof = Proof.Step.simp ~rule fs_parents in
-      (lemma ~proof fs') :: (List.map assert_defs defs)
-      |> Iter.of_list)
-  | Goal f ->
-    let f', new_defs =  TST.lift_lambdas f in
-    if CCList.is_empty new_defs then Iter.singleton st
-    else ((goal (ll_proof_step st f) f') ::  (List.map assert_defs new_defs)
-          |> Iter.of_list)
-  | NegatedGoal (skolems,fs) ->
-    let fs', defs = List.fold_right (fun f (ffs, ddefs) -> 
-      let f', new_defs = TST.lift_lambdas f in
-      f' :: ffs, new_defs @ ddefs
-    ) fs ([], []) in
-    if CCList.is_empty defs then Iter.singleton st
-    else (
-      let rule = Proof.Rule.mk "lift_lambdas" in
-      let fs_parents = (List.map (fun f -> 
-        Proof.Parent.from (Proof.S.mk_f_esa ~rule f stmt_parents)) fs) in
-      let proof = Proof.Step.simp ~rule fs_parents in
-      (neg_goal ~proof ~skolems fs' :: (List.map assert_defs defs))
-      |> Iter.of_list)
-  | _ -> Iter.singleton st
 
 (** {2 Iterators} *)
 
@@ -570,6 +520,62 @@ let name (st:(_,_,_)t) : string =
       st.name <- Some s;
       s
   end
+
+let lift_lambdas st = 
+  let ll_proof_step st f = 
+    let rule = Proof.Rule.mk "lift_lambdas" in
+    let parents  = Proof.Step.parents (proof_step st) in
+    (* Proof.Step.simp ~tags ~rule (Proof.Step.parents (proof_step st))  *)
+    let step = Proof.S.mk_f_simp ~rule f parents in
+    Proof.S.step step in
+
+  let assert_defs def = 
+    let step = Proof.Step.intro (Proof.Src.internal []) Proof.R_assert in
+    let proof = Proof.S.step (Proof.S.mk_f step def) in
+    assert_ ~proof def in
+
+  let stmt_parents = Proof.Step.parents (proof_step st) in
+  let res = begin match view st with
+  | Assert f -> 
+    let f', new_defs =  TST.lift_lambdas f in
+    (if CCList.is_empty new_defs then Iter.singleton st
+    else (assert_ (ll_proof_step st f) f') :: (List.map assert_defs new_defs)
+          |> Iter.of_list)
+  | Lemma fs ->
+    let fs', defs = List.fold_right (fun f (ffs, ddefs) -> 
+      let f', new_defs = TST.lift_lambdas f in
+      f' :: ffs, new_defs @ ddefs
+    ) fs ([], []) in
+    if CCList.is_empty defs then Iter.singleton st
+    else (
+      let rule = Proof.Rule.mk "lift_lambdas" in
+      let fs_parents = (List.map (fun f ->
+         Proof.Parent.from (Proof.S.mk_f_esa ~rule f stmt_parents)) fs) in
+      let proof = Proof.Step.simp ~rule fs_parents in
+      (lemma ~proof fs') :: (List.map assert_defs defs)
+      |> Iter.of_list)
+  | Goal f ->
+    let f', new_defs =  TST.lift_lambdas f in
+    if CCList.is_empty new_defs then Iter.singleton st
+    else ((goal (ll_proof_step st f) f') ::  (List.map assert_defs new_defs)
+          |> Iter.of_list)
+  | NegatedGoal (skolems,fs) ->
+    let fs', defs = List.fold_right (fun f (ffs, ddefs) -> 
+      let f', new_defs = TST.lift_lambdas f in
+      f' :: ffs, new_defs @ ddefs
+    ) fs ([], []) in
+    if CCList.is_empty defs then Iter.singleton st
+    else (
+      let rule = Proof.Rule.mk "lift_lambdas" in
+      let fs_parents = (List.map (fun f -> 
+        Proof.Parent.from (Proof.S.mk_f_esa ~rule f stmt_parents)) fs) in
+      let proof = Proof.Step.simp ~rule fs_parents in
+      (neg_goal ~proof ~skolems fs' :: (List.map assert_defs defs))
+      |> Iter.of_list)
+  | _ -> Iter.singleton st end in
+  CCFormat.printf "[LAMBDA_LIFT:@ @[%a@]]\n" pp_input st;
+  CCFormat.printf "[RES:@ @[%a@]]\n" (CCList.pp pp_input) (Iter.to_list res);
+  res
 
 module ZF = struct
   module UA = UntypedAST.A

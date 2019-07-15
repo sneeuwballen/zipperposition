@@ -903,7 +903,7 @@ let define_lambda_of ~bound ~free body =
   let ll_sym_ty = Ty.mk_fun_ (List.map ty_exn args) body_ty in
   let lam_const = const ~ty:ll_sym_ty new_id in
   let new_pred = app ~ty:body_ty lam_const args in
-  let def_form = Form.eq_or_equiv new_pred body in
+  let def_form = Form.forall_l (free @ bound) (Form.eq_or_equiv new_pred body) in
   let replacement_ty =  Ty.mk_fun_ (List.map Var.ty free) body_ty in
   let replacement = 
     app ~ty:replacement_ty lam_const (List.map (fun v -> var v) free) in
