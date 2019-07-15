@@ -285,37 +285,41 @@ let lift_lambdas st =
   match view st with
   | Assert f -> 
     let f', new_defs =  TST.lift_lambdas f in
-    if CCList.is_empty new_defs then [st]
+    (if CCList.is_empty new_defs then Iter.singleton st
     else (assert_ (ll_proof_step st f) f') :: (List.map assert_defs new_defs)
+          |> Iter.of_list)
   | Lemma fs ->
     let fs', defs = List.fold_right (fun f (ffs, ddefs) -> 
       let f', new_defs = TST.lift_lambdas f in
       f' :: ffs, new_defs @ ddefs
     ) fs ([], []) in
-    if CCList.is_empty defs then [st]
+    if CCList.is_empty defs then Iter.singleton st
     else (
       let rule = Proof.Rule.mk "lift_lambdas" in
       let fs_parents = (List.map (fun f ->
          Proof.Parent.from (Proof.S.mk_f_esa ~rule f stmt_parents)) fs) in
       let proof = Proof.Step.simp ~rule fs_parents in
-      (lemma ~proof fs') :: (List.map assert_defs defs))
+      (lemma ~proof fs') :: (List.map assert_defs defs)
+      |> Iter.of_list)
   | Goal f ->
     let f', new_defs =  TST.lift_lambdas f in
-    if CCList.is_empty new_defs then [st]
-    else ( (goal (ll_proof_step st f) f') ::  (List.map assert_defs new_defs))
+    if CCList.is_empty new_defs then Iter.singleton st
+    else ((goal (ll_proof_step st f) f') ::  (List.map assert_defs new_defs)
+          |> Iter.of_list)
   | NegatedGoal (skolems,fs) ->
     let fs', defs = List.fold_right (fun f (ffs, ddefs) -> 
       let f', new_defs = TST.lift_lambdas f in
       f' :: ffs, new_defs @ ddefs
     ) fs ([], []) in
-    if CCList.is_empty defs then [st]
+    if CCList.is_empty defs then Iter.singleton st
     else (
       let rule = Proof.Rule.mk "lift_lambdas" in
       let fs_parents = (List.map (fun f -> 
         Proof.Parent.from (Proof.S.mk_f_esa ~rule f stmt_parents)) fs) in
       let proof = Proof.Step.simp ~rule fs_parents in
-      neg_goal ~proof ~skolems fs' :: (List.map assert_defs defs))
-  | _ -> [st]
+      (neg_goal ~proof ~skolems fs' :: (List.map assert_defs defs))
+      |> Iter.of_list)
+  | _ -> Iter.singleton st
 
 (** {2 Iterators} *)
 

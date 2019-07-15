@@ -183,6 +183,8 @@ val get_formulas_from_defs: ('a, _, _) t -> 'a CCList.t
 
 (** {2 Iterators} *)
 
+val lift_lambdas: input_t -> input_t Iter.t
+
 module Seq : sig
   val to_seq : ('f,'t,'ty) t ->
     [`Term of 't | `Form of 'f | `Ty of 'ty | `ID of ID.t] Iter.t
