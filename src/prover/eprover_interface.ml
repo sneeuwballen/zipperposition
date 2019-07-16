@@ -85,7 +85,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         (try 
           while not !refutation_found do 
             let line = input_line process_channel in
-            flush_all ();
             if Str.string_match regex_refutation line 0 then 
               refutation_found := true;
           done;
