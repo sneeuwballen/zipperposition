@@ -1159,7 +1159,7 @@ end
 let enabled_ = ref true
 let def_unfold_enabled_ = ref false
 let force_enabled_ = ref false
-let enable_unif_ = ref true
+let enable_unif_ = ref false (* this unification seems very buggy, had to turn it off *)
 let prim_mode_ = ref `Neg
 let prim_max_penalty = ref 1 (* FUDGE *)
 
@@ -1253,7 +1253,7 @@ let () =
     [ "--ho", Arg.Set enabled_, " enable HO reasoning";
       "--force-ho", Arg.Bool  (fun b -> force_enabled_ := false), " enable/disable HO reasoning even if the problem is first-order";
       "--no-ho", Arg.Clear enabled_, " disable HO reasoning";
-      "--ho-unif", Arg.Set enable_unif_, " enable full HO unification";
+      "--ho-unif", Arg.Bool (fun v -> enable_unif_ := v), " enable full HO unification";
       "--ho-neg-cong-fun", Arg.Set _neg_cong_fun, "enable NegCongFun";
       "--no-ho-unif", Arg.Clear enable_unif_, " disable full HO unification";
       "--ho-elim-pred-var", Arg.Bool (fun b -> _elim_pred_var := b), " disable predicate variable elimination";
