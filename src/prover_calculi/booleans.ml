@@ -103,7 +103,9 @@ module Make(E : Env.S) : S with module Env = E = struct
   let term_as_true = Hashtbl.create 8 in
   let term_as_false = Hashtbl.create 4 in
 	let rec find_bools top t =
-		let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && not top in
+		let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && (not top ||
+        (* It is useful to case top level equality like 𝘵𝘦𝘳𝘮𝘴 because these are simplified into 𝘭𝘪𝘵𝘦𝘳𝘢𝘭𝘴. *)
+        match T.view t with AppBuiltin((Eq|Neq|Equiv|Xor),_) -> true | _ -> false) in
     let is_quant = match T.view t with 
       | AppBuiltin(b,_) -> 
         Builtin.equal b Builtin.ForallConst || Builtin.equal b Builtin.ExistsConst
