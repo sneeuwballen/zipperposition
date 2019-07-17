@@ -91,7 +91,7 @@ let _ext_dec_lits = ref `OnlyMax
 let _unif_alg = ref JP_unif.unify_scoped
 let _unif_level = ref `Full
 let _ground_subs_check = ref 0
-
+let _sup_t_f = ref true
 
 module Make(Env : Env.S) : S with module Env = Env = struct
   module Env = Env
@@ -160,7 +160,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       T.is_const (T.head_term t) ||
       T.is_var (snd @@ T.open_fun t) in
 
-
     Literals.fold_terms ~ord ~subterms:true ~eligible:C.Eligible.always 
                         ~which:`All (C.lits c) ~fun_bodies:false 
     |> Iter.filter_map (fun (t,p) -> 
@@ -210,8 +209,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~eligible:(C.Eligible.res c) (C.lits c)
       |> Iter.filter (fun (t, _) ->
             (* Util.debugf ~section 3 "@[ Filtering vars %a,1  @]" (fun k-> k T.pp t); *)
-            not (T.is_true_or_false t) && (* disabling paramodulation false *)
-            not (T.is_var t) || T.is_ho_var t)
+            (!_sup_t_f || not (Term.is_true_or_false t)) &&
+            (not (T.is_var t) || T.is_ho_var t))
       (* TODO: could exclude more variables from the index:
          they are not needed if they occur with the same args everywhere in the clause *)
       |> Iter.filter (fun (t, _) ->
@@ -280,7 +279,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Lits.fold_eqn ~ord ~both:true ~sign:true
         ~eligible:(C.Eligible.param c) (C.lits c)
       |> Iter.filter (fun (l,r,_,_) -> 
-          !_sup_with_pure_vars || not (Term.is_var l) || not (Term.is_var r))
+          (!_sup_with_pure_vars || not (Term.is_var l) || not (Term.is_var r))
+          && (!_sup_t_f || not (Term.is_true_or_false l)))
       |> Iter.filter((fun (l, _, _, _) -> not (T.equal l T.false_)))
       |> Iter.fold
         (fun tree (l, _, sign, pos) ->
@@ -799,7 +799,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Lits.fold_eqn ~sign:true ~ord
         ~both:true ~eligible (C.lits clause)
       |> Iter.filter (fun (l,r,_,_) -> 
-          !_sup_with_pure_vars || not (Term.is_var l) || not (Term.is_var r))
+          (!_sup_with_pure_vars || not (Term.is_var l) || not (Term.is_var r))
+          && (!_sup_t_f || not (Term.is_true_or_false l)))
       |> Iter.flat_map
         (fun (s, t, _, s_pos) ->
           let do_sup u_p with_pos subst =
@@ -1500,7 +1501,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            let active_idx = Lits.Pos.idx s_pos in
            let is_var_pred = 
             T.is_var (T.head_term s) && Type.is_prop (T.ty s) && T.is_true_or_false t in
-           if T.is_true_or_false s then Iter.empty (* disable factoring from false*)
+           if not !_sup_t_f && T.is_true_or_false s then Iter.empty (* disable factoring from false*)
            else if T.equal t T.false_ && not is_var_pred then Iter.empty 
            else (
               let var_pred_status = (is_var_pred, t) in
@@ -2951,6 +2952,9 @@ let () =
     "--sup-with-pure-vars"
     , Arg.Bool (fun v -> _sup_with_pure_vars := v)
     , " enable/disable superposition to and from pure variable equations";
+    ("--sup-with-true-false")
+    , Arg.Bool (fun v ->( _sup_t_f := v))
+    , " enable/disable superposition, eq-res and eq-fact with true/false";
     "--trigger-bool-inst"
     , Arg.Set_int _trigger_bool_inst
     , " instantiate predicate variables with boolean terms already in the proof state. Argument is the maximal proof depth of predicate variable";

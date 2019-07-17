@@ -45,6 +45,7 @@ let rec gfpf ?(depth=0) pos t =
     gfpf_root ~depth:(depth + depth_inc) body
   | i::is ->
       let hd, args = T.as_app body in
+      let args = List.filter (fun x -> not @@ T.is_type x) args in
       (* TODO: not ready for polymorphism *)
       (* let args = List.filter (fun t -> not (Term.is_type t)) args in *)
       let exp_args = Type.expected_args (Term.ty hd) in
