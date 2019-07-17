@@ -1268,3 +1268,39 @@ let simplify_bools t =
       else app_builtin ~ty:(ty t) hd args' in  
   aux t
 
+let rec normalize_bools t =
+  match view t with 
+    | DB _ | Const _ | Var _ -> t
+    | Fun(ty, body) ->
+      let body' = normalize_bools body in
+      if equal body body' then t
+      else fun_ ty body'
+    | App(hd, args) ->
+      let hd' = normalize_bools hd and  args' = List.map normalize_bools args in
+      if equal hd hd' && same_l args args' then t
+      else app hd' args'
+    | AppBuiltin((Builtin.And|Builtin.Or) as b, l) -> 
+      let l' = List.map normalize_bools l in
+      let sorted = 
+        List.combine l' (List.map T.size l')
+        |> List.fast_sort (fun x y -> CCInt.compare (snd x) (snd y))
+        |> List.map fst in
+      if same_l l l' && same_l l' sorted then t
+      else app_builtin ~ty:Type.prop b sorted
+    | AppBuiltin((Builtin.Eq|Builtin.Neq|Builtin.Xor|Builtin.Equiv) as b, ([_;x;y] as l) )
+    | AppBuiltin((Builtin.Eq|Builtin.Neq|Builtin.Xor|Builtin.Equiv) as b, ([x;y] as l)) -> 
+        let rec swap_last_two l = match l with
+          | [] | [_] -> l
+          | [x;y] -> [y;x]
+          | x :: xs -> x :: swap_last_two xs in
+        let x', y' = normalize_bools x, normalize_bools y in
+        let l = if List.length l = 3 then List.hd l :: x' :: [y'] else x' :: [y'] in
+        if T.size x' > T.size y' then (
+          app_builtin ~ty:Type.prop b (swap_last_two l)
+        ) else if T.equal x x' && T.equal y y' then t 
+        else app_builtin ~ty:Type.prop b l
+    | AppBuiltin(hd, l) -> 
+      let l' = List.map normalize_bools l in
+      if same_l l' l then t
+      else app_builtin ~ty:(ty t) hd l'
+

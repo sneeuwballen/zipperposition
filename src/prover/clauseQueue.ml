@@ -458,9 +458,20 @@ module Make(C : Clause_intf.S) = struct
       - (prefer_lambdas c)
 
     let prefer_formulas c =
-      if (C.Seq.terms c |> Iter.exists (fun t -> Iter.exists Term.is_fun (Term.Seq.subterms t)))
+      if (C.Seq.terms c |> Iter.exists (fun t -> Iter.exists Term.is_formula (Term.Seq.subterms t)))
         then 0 else 1
-
+    
+    let prefer_easy_ho c =
+      let has_lam_eq c =
+        C.Seq.lits c
+        |> Iter.exists (fun l -> 
+            match l with
+            | Literal.Equation(lhs,_,_) -> Type.is_fun (Term.ty lhs)
+            | _ -> false) in
+      if has_lam_eq c || prefer_formulas c = 1 then 0 
+      else if prefer_lambdas c = 1 then 1
+      else 2
+    
     let defer_formulas c =
       - (prefer_formulas c)
 
@@ -492,6 +503,7 @@ module Make(C : Clause_intf.S) = struct
       "defer-lambdas", (fun _ -> defer_lambdas);
       "prefer-formulas", (fun _ -> prefer_formulas);
       "defer-formulas", (fun _ -> defer_formulas);
+      "prefer-easy-ho", (fun _ -> prefer_easy_ho);
       "prefer-ground", (fun _ -> prefer_ground);
       "defer-ground", (fun _ -> defer_ground);
       "defer-fo", (fun _ -> defer_fo);
@@ -502,7 +514,7 @@ module Make(C : Clause_intf.S) = struct
         List.assoc (String.lowercase_ascii s) parsers s
       with Not_found -> 
         let err_msg = 
-          CCFormat.sprintf "unknown priortity: %s.\noptions:@[%a@]"
+          CCFormat.sprintf "unknown priortity: %s.\noptions:@ %a"
           s (CCList.pp ~start:"{" ~stop:"}" CCString.pp) (List.map fst parsers) in
         invalid_arg err_msg
   end

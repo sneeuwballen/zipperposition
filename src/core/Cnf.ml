@@ -416,7 +416,7 @@ module Flatten = struct
         let fun_vars, body = T.unfold_fun t in
         assert (fun_vars <> []);
         (* flatten body (but [fun_vars] are protected) *)
-        aux Pos_inner vars body >|= fun body ->
+        aux Pos_toplevel vars body >|= fun body ->
         T.fun_l fun_vars body
       | T.Bind (Binder.ForallTy,_,_)
       | T.Multiset _

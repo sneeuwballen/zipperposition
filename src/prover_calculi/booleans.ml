@@ -14,10 +14,11 @@ type reasoning_kind    =
   | BoolCasesEagerFar | BoolCasesEagerNear
 
 let _bool_reasoning = ref BoolReasoningDisabled
-let cased_term_selection = ref Minimal
+let cased_term_selection = ref Large
 let quant_rename = ref false
 let interpret_bool_funs = ref false
 let cnf_non_simpl = ref false
+let _norm_bools = ref false 
 
 let section = Util.Section.make ~parent:Const.section "booleans"
 
@@ -178,6 +179,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             | Builtin.True | Builtin.False -> ()
             | Builtin.Eq | Builtin.Neq | Builtin.Equiv | Builtin.Xor ->
               (match ps with 
+                | [_;x;y]
                 | [x;y] when (!cased_term_selection != Minimal || Type.is_prop(T.ty x)) ->
                   add t x y;
                   if (f = Builtin.Neq || f = Builtin.Xor) && can_be_cased then
@@ -221,6 +223,18 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) else (
       let proof = Proof.Step.simp [C.proof_parent c] 
                     ~rule:(Proof.Rule.mk "simplify boolean subterms") in
+      let new_ = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
+                  (Array.to_list new_lits) proof in
+      SimplM.return_new new_
+    )
+
+  let normalize_bool_terms c =
+    let new_lits = Literals.map T.normalize_bools (C.lits c) in
+    if Literals.equal (C.lits c) new_lits then (
+      SimplM.return_same c
+    ) else (
+      let proof = Proof.Step.simp [C.proof_parent c] 
+                    ~rule:(Proof.Rule.mk "normalize subterms") in
       let new_ = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
                   (Array.to_list new_lits) proof in
       SimplM.return_new new_
@@ -359,7 +373,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* Env.ProofState.PassiveSet.add (create_clauses ()); *)
     Env.add_basic_simplify simpl_bool_subterms;
     Env.add_basic_simplify normalize_equalities;
-    (* Env.add_multi_simpl_rule Fool.rw_bool_lits; *)
+    Env.add_multi_simpl_rule Fool.rw_bool_lits;
     if !cnf_non_simpl then (
       Env.add_unary_inf "cnf otf inf" cnf_infer;
     ) else  Env.add_multi_simpl_rule cnf_otf;
@@ -622,7 +636,9 @@ let () =
       "implement cnf on-the-fly as an inference rule";
       "--interpret-bool-funs"
       , Arg.Bool (fun v -> interpret_bool_funs := v)
-      , "turn interpretation of boolean functions as forall or negation of forall on or off"
+      , " turn interpretation of boolean functions as forall or negation of forall on or off";
+      "--normalize-bool-terms", Arg.Bool((fun v -> _norm_bools := v)),
+      " normalize boolean subterms using their weight."
       ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
     _bool_reasoning := BoolReasoningDisabled
