@@ -698,7 +698,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let new_lits = [Literal.mk_prop choice_x false;
                       Literal.mk_prop choice_arg false] in
       let proof = Proof.Step.intro (Proof.Src.internal []) Proof.R_assert in
-      C.create ~penalty:0 ~trail:Trail.empty new_lits proof in
+      C.create ~penalty:1 ~trail:Trail.empty new_lits proof in
 
 
     let new_choice_op ty =
