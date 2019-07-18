@@ -51,6 +51,7 @@ let _imit_first = ref false
 let _compose_subs = ref false
 let _var_solve = ref false
 let _neg_cong_fun = ref false
+let _instantiate_choice_ax = ref false
 let _elim_leibniz_eq = ref (-1)
 let _unif_max_depth = ref 11
 
@@ -642,6 +643,95 @@ module Make(E : Env.S) : S with module Env = E = struct
     if C.proof_depth c < max_penalty_prim_ 
     then prim_enum_ ~mode c
     else []
+
+  let choice_ops = ref Term.Set.empty
+  
+  let recognize_choice_ops c =
+    let extract_not_p_x l = match l with
+    | Literal.Equation(lhs,rhs,true) when T.equal T.false_ rhs && T.is_app_var lhs ->
+      begin match T.view lhs with
+      | T.App(hd, [var]) when T.is_var var -> Some hd
+      | _ -> None end
+    | _ -> None in
+    
+    let extract_p_choice_p p l = match l with 
+    | Literal.Equation(lhs,rhs,true) when T.equal T.true_ rhs && T.is_app_var lhs ->
+      begin match T.view lhs with
+      | T.App(hd, [ch_p]) when T.equal hd p ->
+        begin match T.view ch_p with 
+        | T.App(sym, [var]) when T.is_const sym && T.equal var p -> Some sym
+        | _ -> None end
+      | _ -> None end
+    | _ -> None in
+
+    if C.length c == 2 then (
+      let px = CCArray.find_map extract_not_p_x (C.lits c) in
+      match px with 
+      | Some p ->
+        let p_ch_p = CCArray.find_map (extract_p_choice_p p) (C.lits c) in
+        begin match p_ch_p with
+        | Some sym ->
+          choice_ops := Term.Set.add sym !choice_ops;
+          C.mark_redundant c;
+          true
+        | None -> false end
+      | None -> false
+    ) else false
+
+  let new_choice_counter = ref 0
+  let insantiate_choice c =
+    let is_choice_subterm t = 
+      match T.view t with
+      | T.App(hd, [arg]) when T.is_var hd || Term.Set.mem hd !choice_ops ->
+        let ty = T.ty arg in
+        Type.is_fun ty && List.length (Type.expected_args ty) = 1 &&
+        Type.equal (Term.ty t) (List.hd (Type.expected_args ty)) &&
+        Type.returns_prop ty && T.DB.is_closed t
+      | _ -> false in
+
+    let choice_inst_of_hd hd arg =
+      let arg_ty = Term.ty arg in
+      let ty = List.hd (Type.expected_args arg_ty) in
+      let x = T.var_of_int ~ty 0 in
+      let choice_x = Lambda.whnf (T.app arg [x]) in
+      let choice_arg = Lambda.snf (T.app arg [T.app hd [arg]]) in
+      let new_lits = [Literal.mk_prop choice_x false;
+                      Literal.mk_prop choice_arg false] in
+      let proof = Proof.Step.intro (Proof.Src.internal []) Proof.R_assert in
+      C.create ~penalty:0 ~trail:Trail.empty new_lits proof in
+
+
+    let new_choice_op ty =
+      let choice_ty_name = "#_choice_" ^ 
+                           CCInt.to_string (CCRef.get_then_incr new_choice_counter) in
+      let new_ch_id = ID.make choice_ty_name in
+      let new_ch_const = T.const new_ch_id ~ty in
+      ignore(Signature.declare (C.Ctx.signature ()) new_ch_id ty);
+      choice_ops := Term.Set.add new_ch_const !choice_ops;
+      new_ch_const in
+
+    let build_choice_inst t =
+      match T.view t with
+      | T.App(hd, [arg]) ->
+        if Term.is_var hd then (
+          let arg_ty = Term.ty arg in
+          let choice_ops = 
+            Term.Set.filter (fun t -> Type.equal (Term.ty t) arg_ty) !choice_ops
+            |> Term.Set.to_list
+            |> (fun l -> if CCList.is_empty l then [new_choice_op (Term.ty hd)] else l) in
+          List.map (fun arg -> choice_inst_of_hd arg hd) choice_ops
+        ) else (
+          assert(Term.Set.mem hd !choice_ops);
+          [choice_inst_of_hd hd arg]
+        )
+      | _ -> assert (false) in
+
+    C.Seq.terms c 
+    |> Iter.flat_map Term.Seq.subterms
+    |> Iter.filter is_choice_subterm
+    |> Iter.flat_map_l build_choice_inst
+    |> Iter.to_list
+    
   
   let elim_leibniz_equality c =
     if C.proof_depth c < !_elim_leibniz_eq then (
@@ -1084,6 +1174,13 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_unary_inf "ho_elim_leibniz_eq" elim_leibniz_equality
       );
 
+      if !_instantiate_choice_ax then (
+        Env.add_redundant recognize_choice_ops;
+        Env.add_unary_inf "inst_choice" insantiate_choice;
+      );
+
+
+
 
       if !_ext_pos then (
         (* Env.add_unary_inf "ho_ext_pos" (ext_pos ~only_unit:(not !_ext_pos_non_unit)) *)
@@ -1274,6 +1371,7 @@ let () =
       "--ho-no-ext-neg-lit", Arg.Clear _ext_neg_lit, " enable negative extensionality rule on literal level [?]";
       "--ho-elim-leibniz", Arg.Int (fun v -> _elim_leibniz_eq := v), " enable/disable treatment of Leibniz equality";
       "--ho-def-unfold", Arg.Set def_unfold_enabled_, " enable ho definition unfolding";
+      "--ho-choice-inst", Arg.Bool (fun v -> _instantiate_choice_ax := v), " enable ho definition unfolding";
       "--ho-huet-style-unif", Arg.Set _huet_style, " enable Huet style projection";
       "--ho-no-conservative-elim", Arg.Clear _cons_elim, " Disables conservative elimination rule in pragmatic unification";
       "--ho-imitation-first",Arg.Set _imit_first, " Use imitation rule before projection rule";
