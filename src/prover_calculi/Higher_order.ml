@@ -645,8 +645,67 @@ module Make(E : Env.S) : S with module Env = E = struct
     else []
 
   let choice_ops = ref Term.Set.empty
-  
-  let recognize_choice_ops c =
+  let new_choice_counter = ref 0
+
+  let insantiate_choice ?(inst_vars=true) ?(choice_ops=choice_ops) c =
+    let max_var = C.Seq.vars c
+                  |> Iter.map HVar.id
+                  |> Iter.max
+                  |> CCOpt.get_or ~default: 0 in
+
+    let is_choice_subterm t = 
+      match T.view t with
+      | T.App(hd, [arg]) when T.is_var hd || Term.Set.mem hd !choice_ops ->
+        let ty = T.ty arg in
+        Type.is_fun ty && List.length (Type.expected_args ty) = 1 &&
+        Type.equal (Term.ty t) (List.hd (Type.expected_args ty)) &&
+        Type.returns_prop ty && T.DB.is_closed t
+      | _ -> false in
+
+    let choice_inst_of_hd hd arg =
+      let arg_ty = Term.ty arg in
+      let ty = List.hd (Type.expected_args arg_ty) in
+      let x = T.var_of_int ~ty (max_var+1) in
+      let choice_x = Lambda.whnf (T.app arg [x]) in
+      let choice_arg = Lambda.snf (T.app arg [T.app hd [arg]]) in
+      let new_lits = [Literal.mk_prop choice_x false;
+                      Literal.mk_prop choice_arg true] in
+      let arg_str = CCFormat.sprintf "%a" T.pp arg in
+      let proof = Proof.Step.inference ~rule:(Proof.Rule.mk ("inst_choice_" ^ arg_str)) [] in
+      C.create ~penalty:1 ~trail:Trail.empty new_lits proof in
+
+
+    let new_choice_op ty =
+      let choice_ty_name = "#_choice_" ^ 
+                           CCInt.to_string (CCRef.get_then_incr new_choice_counter) in
+      let new_ch_id = ID.make choice_ty_name in
+      let new_ch_const = T.const new_ch_id ~ty in
+      ignore(Signature.declare (C.Ctx.signature ()) new_ch_id ty);
+      choice_ops := Term.Set.add new_ch_const !choice_ops;
+      new_ch_const in
+
+    let build_choice_inst t =
+      match T.view t with
+      | T.App(hd, [arg]) ->
+        if Term.is_var hd && inst_vars then (
+          let arg_ty = Term.ty arg in
+          let choice_ops = 
+            Term.Set.filter (fun t -> Type.equal (Term.ty t) arg_ty) !choice_ops
+            |> Term.Set.to_list
+            |> (fun l -> if CCList.is_empty l then [new_choice_op (Term.ty hd)] else l) in
+          List.map (fun arg -> choice_inst_of_hd arg hd) choice_ops
+        ) else if Term.Set.mem hd !choice_ops then (
+          [choice_inst_of_hd hd arg]
+        ) else []
+      | _ -> assert (false) in
+
+    C.Seq.terms c 
+    |> Iter.flat_map Term.Seq.subterms
+    |> Iter.filter is_choice_subterm
+    |> Iter.flat_map_l build_choice_inst
+    |> Iter.to_list
+
+   let recognize_choice_ops c =
     let extract_not_p_x l = match l with
     | Literal.Equation(lhs,rhs,true) when T.equal T.false_ rhs && T.is_app_var lhs ->
       begin match T.view lhs with
@@ -672,65 +731,21 @@ module Make(E : Env.S) : S with module Env = E = struct
         begin match p_ch_p with
         | Some sym ->
           choice_ops := Term.Set.add sym !choice_ops;
+          let new_cls = 
+            Env.get_active ()
+            |> Iter.flat_map_l (fun pas_cl -> 
+                if C.id pas_cl = C.id c then []
+                else (
+                insantiate_choice ~inst_vars:false 
+                                  ~choice_ops:(ref (Term.Set.singleton sym)) 
+                                  pas_cl
+                )) in
+          Env.add_passive new_cls;
           C.mark_redundant c;
           true
         | None -> false end
       | None -> false
     ) else false
-
-  let new_choice_counter = ref 0
-  let insantiate_choice c =
-    let is_choice_subterm t = 
-      match T.view t with
-      | T.App(hd, [arg]) when T.is_var hd || Term.Set.mem hd !choice_ops ->
-        let ty = T.ty arg in
-        Type.is_fun ty && List.length (Type.expected_args ty) = 1 &&
-        Type.equal (Term.ty t) (List.hd (Type.expected_args ty)) &&
-        Type.returns_prop ty && T.DB.is_closed t
-      | _ -> false in
-
-    let choice_inst_of_hd hd arg =
-      let arg_ty = Term.ty arg in
-      let ty = List.hd (Type.expected_args arg_ty) in
-      let x = T.var_of_int ~ty 0 in
-      let choice_x = Lambda.whnf (T.app arg [x]) in
-      let choice_arg = Lambda.snf (T.app arg [T.app hd [arg]]) in
-      let new_lits = [Literal.mk_prop choice_x false;
-                      Literal.mk_prop choice_arg false] in
-      let proof = Proof.Step.intro (Proof.Src.internal []) Proof.R_assert in
-      C.create ~penalty:1 ~trail:Trail.empty new_lits proof in
-
-
-    let new_choice_op ty =
-      let choice_ty_name = "#_choice_" ^ 
-                           CCInt.to_string (CCRef.get_then_incr new_choice_counter) in
-      let new_ch_id = ID.make choice_ty_name in
-      let new_ch_const = T.const new_ch_id ~ty in
-      ignore(Signature.declare (C.Ctx.signature ()) new_ch_id ty);
-      choice_ops := Term.Set.add new_ch_const !choice_ops;
-      new_ch_const in
-
-    let build_choice_inst t =
-      match T.view t with
-      | T.App(hd, [arg]) ->
-        if Term.is_var hd then (
-          let arg_ty = Term.ty arg in
-          let choice_ops = 
-            Term.Set.filter (fun t -> Type.equal (Term.ty t) arg_ty) !choice_ops
-            |> Term.Set.to_list
-            |> (fun l -> if CCList.is_empty l then [new_choice_op (Term.ty hd)] else l) in
-          List.map (fun arg -> choice_inst_of_hd arg hd) choice_ops
-        ) else (
-          assert(Term.Set.mem hd !choice_ops);
-          [choice_inst_of_hd hd arg]
-        )
-      | _ -> assert (false) in
-
-    C.Seq.terms c 
-    |> Iter.flat_map Term.Seq.subterms
-    |> Iter.filter is_choice_subterm
-    |> Iter.flat_map_l build_choice_inst
-    |> Iter.to_list
     
   
   let elim_leibniz_equality c =
