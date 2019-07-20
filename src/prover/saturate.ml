@@ -27,7 +27,7 @@ let tried_e = ref false
 let should_try_e = function
   | Some timeout when CCOpt.is_some !e_path -> 
       let passed = Util.total_time_s () in
-      if not !tried_e && passed > timeout /. 2.0 then (
+      if not !tried_e && passed > timeout /. 5.0 then (
         tried_e := true;
         true
       ) else false

@@ -20,7 +20,7 @@ module type S = sig
   (** Register rules in the environment *)
 end
 
-let _timeout = 4
+let _timeout = ref 11
 
 let e_bin = ref (None : string option)
 
@@ -66,7 +66,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> Iter.iter (fun (sym, ty) -> output_symdecl ~out sym ty);
 
     Iter.iter (output_cl ~out) cl_iter;
-    output_empty_conj ~out;
+    if ID.Set.is_empty already_defined then(
+      output_empty_conj ~out);
     ID.Set.of_list syms
 
   let set_e_bin path =
@@ -74,8 +75,9 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let run_e prob_path =
     match !e_bin with 
-    | Some e_path -> 
-      let cmd = CCFormat.sprintf "timeout %d %s %s --cpu-limit=%d --delete-bad-limit=2000000000  --definitional-cnf=24 -s  --proof-object=1  --auto  --split-clauses=4  --split-reuse-defs  --simul-paramod  --forward-context-sr  --destructive-er-aggressive  --destructive-er  --presat-simplify  --prefer-initial-clauses  --term-ordering=KBO6  -WSelectMaxLComplexAvoidPosPred  -winvfreqrank  -c1  -Ginvfreqconjmax  -F1 " _timeout e_path prob_path _timeout in
+    | Some e_path ->
+      let to_ = !_timeout in
+      let cmd = CCFormat.sprintf "timeout %d %s %s --cpu-limit=%d --auto-schedule -s -p" (to_+2) e_path prob_path to_ in
       CCFormat.printf "%% Running : %s.\n" cmd;
       let process_channel = Unix.open_process_in cmd in
       let _,status = Unix.wait () in
@@ -108,7 +110,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
   let try_e active_set passive_set =
-    let max_others = 48 in
+    let max_others = 128 in
 
     let rec can_be_translated t =
       let can_translate_ty ty =
@@ -186,4 +188,5 @@ end
 
 let () =
    Options.add_opts
-    [ "--tmp-dir", Arg.String (fun v -> _tmp_dir := v), " scratch directory for running E" ]
+    [ "--tmp-dir", Arg.String (fun v -> _tmp_dir := v), " scratch directory for running E";
+      "--e-timeout", Arg.Set_int _timeout, "set E prover timeout." ]

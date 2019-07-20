@@ -37,7 +37,8 @@ let () = Printexc.register_printer
 let declare signature id ty =
   try
     let ty' = find_exn signature id in
-    raise (AlreadyDeclared (id, ty', ty))
+    if not (Type.equal ty ty') then raise (AlreadyDeclared (id, ty', ty))
+    else signature
   with Not_found ->
     if not (InnerTerm.DB.closed (ty : Type.t :> InnerTerm.t))
     then raise (Invalid_argument "Signature.declare: non-closed type");

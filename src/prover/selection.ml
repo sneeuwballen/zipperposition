@@ -372,17 +372,13 @@ let ho_sel ~ord lits =
 
 let ho_sel2 ~ord lits =
   let app_var_pen l =
-    let n = CCArray.length lits in
-
     match l with 
     | Lit.Equation(lhs,rhs,_) ->
       let num_app_var_sides = (if T.is_var @@ T.head_term lhs then 1 else 0) +
                               (if T.is_var @@ T.head_term rhs then 1 else 0) in
-      if n <= 4 then (
-        if num_app_var_sides = 1 then 0
-        else if num_app_var_sides = 0 then 1 
-        else 2
-      ) else num_app_var_sides
+      if num_app_var_sides = 1 then 0
+      else if num_app_var_sides = 2 then 1 
+      else 2
     | _ -> max_int in
 
   let chooser (i,l) = 

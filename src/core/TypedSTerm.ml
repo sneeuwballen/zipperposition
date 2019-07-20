@@ -893,21 +893,27 @@ module Form = struct
     forall_l ?loc tyvars (forall_l ?loc vars f)
 end
 
-let _l_counter = ref 0 
-let define_lambda_of ~bound ~free body = 
-  let lam_id = CCRef.get_then_incr _l_counter in
-  let lam_name = "#ll_" ^ CCInt.to_string lam_id in
-  let body_ty = ty_exn body in
-  let args = List.map (fun v -> var v) (free @ bound) in
-  let new_id = ID.make lam_name in
-  let ll_sym_ty = Ty.mk_fun_ (List.map ty_exn args) body_ty in
-  let lam_const = const ~ty:ll_sym_ty new_id in
-  let new_pred = app ~ty:body_ty lam_const args in
-  let def_form = Form.forall_l (free @ bound) (Form.eq_or_equiv new_pred body) in
-  let replacement_ty =  Ty.mk_fun_ (List.map Var.ty free) body_ty in
-  let replacement = 
-    app ~ty:replacement_ty lam_const (List.map (fun v -> var v) free) in
-  replacement, def_form
+let _l_counter = ref 0
+let _lam_ids = ref Map.empty
+
+let define_lambda_of ~bound ~free ~closed body =
+  match Map.find_opt closed !_lam_ids with 
+  | Some cache -> cache
+  | None ->
+    let lam_id = CCRef.get_then_incr _l_counter in
+    let lam_name = "#ll_" ^ CCInt.to_string lam_id in
+    let body_ty = ty_exn body in
+    let args = List.map (fun v -> var v) (free @ bound) in
+    let new_id = ID.make lam_name in
+    let ll_sym_ty = Ty.mk_fun_ (List.map ty_exn args) body_ty in
+    let lam_const = const ~ty:ll_sym_ty new_id in
+    let new_pred = app ~ty:body_ty lam_const args in
+    let def_form = Form.forall_l (free @ bound) (Form.eq_or_equiv new_pred body) in
+    let replacement_ty =  Ty.mk_fun_ (List.map Var.ty free) body_ty in
+    let replacement = 
+      app ~ty:replacement_ty lam_const (List.map (fun v -> var v) free) in
+    _lam_ids := Map.add closed (replacement,def_form) !_lam_ids;
+    replacement, def_form
 
 
 let rec lift_lambdas  f =
@@ -924,7 +930,7 @@ let rec lift_lambdas  f =
     if not (CCList.is_empty all_defs) then (
       app ~ty hd' fs', all_defs
     ) else f, []
-  | Bind(Binder.Lambda, _, body) ->  
+  | Bind(Binder.Lambda, _, _) ->  
     let vars, body = unfold_binder Binder.Lambda f in
     assert(not @@ CCList.is_empty vars);
     let body', new_defs = aux body in
@@ -933,7 +939,7 @@ let rec lift_lambdas  f =
       Var.Set.diff (Var.Set.of_seq (Seq.free_vars body')) var_set
       |> Var.Set.to_list in
     let replacement, def = 
-      define_lambda_of  ~bound:vars ~free:free_vars body' in
+      define_lambda_of  ~bound:vars ~free:free_vars ~closed:body body' in
     replacement, def :: new_defs
   | Bind(b, v, body) ->  
     let body', new_defs = aux body in

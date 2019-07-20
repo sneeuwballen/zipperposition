@@ -670,8 +670,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       let choice_arg = Lambda.snf (T.app arg [T.app hd [arg]]) in
       let new_lits = [Literal.mk_prop choice_x false;
                       Literal.mk_prop choice_arg true] in
-      let arg_str = CCFormat.sprintf "%a" T.pp arg in
-      let proof = Proof.Step.inference ~rule:(Proof.Rule.mk ("inst_choice_" ^ arg_str)) [] in
+      let arg_str = CCFormat.sprintf "%a" T.TPTP.pp arg in
+      let proof = Proof.Step.inference ~rule:(Proof.Rule.mk ("inst_choice" ^ arg_str)) [] in
       C.create ~penalty:1 ~trail:Trail.empty new_lits proof in
 
 
@@ -693,7 +693,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             Term.Set.filter (fun t -> Type.equal (Term.ty t) arg_ty) !choice_ops
             |> Term.Set.to_list
             |> (fun l -> if CCList.is_empty l then [new_choice_op (Term.ty hd)] else l) in
-          List.map (fun arg -> choice_inst_of_hd arg hd) choice_ops
+          List.map (fun hd -> choice_inst_of_hd hd arg) choice_ops
         ) else if Term.Set.mem hd !choice_ops then (
           [choice_inst_of_hd hd arg]
         ) else []
