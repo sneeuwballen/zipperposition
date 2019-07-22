@@ -70,6 +70,7 @@ module Subst : sig
   val size: (_,_) t -> int
   val add : ('a,'b) t -> 'a var -> 'b -> ('a,'b) t
   val mem : ('a,_) t -> 'a var -> bool
+  val remove : ('a,'b) t -> 'a var -> ('a,'b) t
   val find : ('a,'b) t -> 'a var -> 'b option
   val find_exn : ('a,'b) t -> 'a var -> 'b
   val merge : ('a,'b) t -> ('a,'b) t -> ('a,'b) t

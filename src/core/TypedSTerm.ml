@@ -896,67 +896,6 @@ end
 let _l_counter = ref 0
 let _lam_ids = ref Map.empty
 
-let define_lambda_of ~bound ~free ~closed body =
-  match Map.find_opt closed !_lam_ids with 
-  | Some cache -> cache
-  | None ->
-    let lam_id = CCRef.get_then_incr _l_counter in
-    let lam_name = "#ll_" ^ CCInt.to_string lam_id in
-    let body_ty = ty_exn body in
-    let args = List.map (fun v -> var v) (free @ bound) in
-    let new_id = ID.make lam_name in
-    let ll_sym_ty = Ty.mk_fun_ (List.map ty_exn args) body_ty in
-    let lam_const = const ~ty:ll_sym_ty new_id in
-    let new_pred = app ~ty:body_ty lam_const args in
-    let def_form = Form.forall_l (free @ bound) (Form.eq_or_equiv new_pred body) in
-    let replacement_ty =  Ty.mk_fun_ (List.map Var.ty free) body_ty in
-    let replacement = 
-      app ~ty:replacement_ty lam_const (List.map (fun v -> var v) free) in
-    _lam_ids := Map.add closed (replacement,def_form) !_lam_ids;
-    replacement, def_form
-
-
-let rec lift_lambdas  f =
-  let aux = lift_lambdas  in
-  let ty = ty_exn f in
-  match view f with 
-  | Var _ | Const _ -> (f,[])
-  | App (hd, fs) -> 
-    let hd', hd_def = aux hd in
-    let fs', all_defs = 
-      List.fold_right (fun f (args, defs) -> 
-        let f', new_defs = aux f in
-        (f'::args, new_defs @ defs)) fs ([],hd_def) in
-    if not (CCList.is_empty all_defs) then (
-      app ~ty hd' fs', all_defs
-    ) else f, []
-  | Bind(Binder.Lambda, _, _) ->  
-    let vars, body = unfold_binder Binder.Lambda f in
-    assert(not @@ CCList.is_empty vars);
-    let body', new_defs = aux body in
-    let var_set = Var.Set.of_list vars in
-    let free_vars = 
-      Var.Set.diff (Var.Set.of_seq (Seq.free_vars body')) var_set
-      |> Var.Set.to_list in
-    let replacement, def = 
-      define_lambda_of  ~bound:vars ~free:free_vars ~closed:body body' in
-    replacement, def :: new_defs
-  | Bind(b, v, body) ->  
-    let body', new_defs = aux body in
-    if not (CCList.is_empty new_defs) then (
-      bind ~ty b v body', new_defs
-    ) else f,[]
-  | AppBuiltin(b, fs) ->
-    let fs', all_defs = 
-      List.fold_right (fun f (args, defs) -> 
-        let f', new_defs = aux f in
-        (f'::args, new_defs @ defs)) fs ([],[]) in
-    if not (CCList.is_empty all_defs) then (
-      app_builtin ~ty b fs', all_defs
-    ) else f, []
-  | _ -> invalid_arg "not implemented yet"
-
-
 let is_monomorphic t =
   Seq.subterms t
   |> Iter.for_all (fun t -> Ty.is_mono (ty_exn t))
@@ -981,6 +920,7 @@ module Subst = struct
   let empty = Var.Subst.empty
   let is_empty = Var.Subst.is_empty
   let mem = Var.Subst.mem
+  let remove = Var.Subst.remove
 
   let pp = Var.Subst.pp _pp_term
 
@@ -1028,6 +968,7 @@ module Subst = struct
   let eval subst t = if is_empty subst then t else eval_ ~recursive:true subst t
 
   let eval_nonrec subst t = if is_empty subst then t else eval_ ~recursive:false subst t
+
 end
 
 let rec rename subst t = match view t with
@@ -1051,6 +992,108 @@ and bind_rename_var subst v =
   subst, v'
 
 let rename_all_vars t = rename Subst.empty t
+
+let rectify t = 
+  let rec aux ?(pref="v_") ~cnt ~subst t = 
+    let t_ty = ty_exn t in
+    match view t with
+    | Const _ -> (t, subst)
+    | Var v -> 
+      let (t,subst,_) = handle_var ~pref ~cnt ~subst v t_ty in (t,subst)
+    | App (hd, fs) -> 
+      let ts, subst = aux_l ~cnt ~subst (hd :: fs) in
+      let hd = List.hd ts and args = List.tl ts in
+      app ~ty:t_ty hd args, subst
+    | Bind(b, v, body) ->  
+      let old = Subst.find subst v in
+      let (_,subst,v') = handle_var ~pref ~cnt ~subst v t_ty in
+      let (body', subst) = aux ~cnt ~subst body in
+      bind ~ty:t_ty b v' body', (if CCOpt.is_none old then Subst.remove subst v
+                                else Subst.add subst v (CCOpt.get_exn old))
+    | AppBuiltin(b, fs) ->
+      let fs', subst = aux_l ~cnt ~subst (fs) in
+      app_builtin ~ty:t_ty b fs, subst
+    | _ -> t, subst
+    and aux_l ?(pref="v_") ~cnt ~subst args =
+      List.fold_right (fun arg (tmp,subst) -> 
+        let arg', subst' = aux ~subst ~cnt arg in
+        arg' :: tmp, subst'
+      ) args ([], subst)
+    and handle_var ~pref ?(rename=true) ~cnt ~subst v t_ty = 
+      if rename && Subst.mem subst v then (Subst.find_exn subst v, subst, v) else (
+        let v_name = pref ^ (CCInt.to_string (CCRef.get_then_incr cnt)) in
+        let v' = Var.of_string ~ty:t_ty v_name in
+        let res = var v' in
+        let subst = Subst.add subst v res in
+        (res, subst, v')
+      ) in
+  aux ~cnt:(ref 0) ~subst:(Subst.empty) t
+
+
+let rec lift_lambdas  f =
+  let aux = lift_lambdas  in
+  let ty = ty_exn f in
+  match view f with 
+  | Var _ | Const _ -> (f,[])
+  | App (hd, fs) -> 
+    let hd', hd_def = aux hd in
+    let fs', all_defs = 
+      List.fold_right (fun f (args, defs) -> 
+        let f', new_defs = aux f in
+        (f'::args, new_defs @ defs)) fs ([],hd_def) in
+    if not (CCList.is_empty all_defs) then (
+      app ~ty hd' fs', all_defs
+    ) else f, []
+  | Bind(Binder.Lambda, _, _) ->  
+    let vars, body = unfold_binder Binder.Lambda f in
+    assert(not @@ CCList.is_empty vars);
+    let body', new_defs = aux body in
+    let var_set = Var.Set.of_list vars in
+    let free_vars = 
+      Var.Set.diff (Var.Set.of_seq (Seq.free_vars body')) var_set
+      |> Var.Set.to_list in
+    let replacement, def = 
+      define_lambda_of  ~bound:vars ~free:free_vars body' in
+    replacement, def :: new_defs
+  | Bind(b, v, body) ->  
+    let body', new_defs = aux body in
+    if not (CCList.is_empty new_defs) then (
+      bind ~ty b v body', new_defs
+    ) else f,[]
+  | AppBuiltin(b, fs) ->
+    let fs', all_defs = 
+      List.fold_right (fun f (args, defs) -> 
+        let f', new_defs = aux f in
+        (f'::args, new_defs @ defs)) fs ([],[]) in
+    if not (CCList.is_empty all_defs) then (
+      app_builtin ~ty b fs', all_defs
+    ) else f, []
+  | _ -> invalid_arg "not implemented yet"
+and define_lambda_of ~bound ~free body =
+  let body, recitifier = rectify body in
+  let eval_vars vs  = List.map (fun v -> 
+    match view (CCOpt.get_or ~default:(var v) (Subst.find recitifier v)) with 
+    | Var v -> v
+    | _ -> assert false)  vs in
+  let bound = eval_vars bound and free = eval_vars free in
+  let closed  = fun_l bound body in
+  match Map.find_opt closed !_lam_ids with 
+  | Some cache -> cache
+  | None ->
+    let lam_id = CCRef.get_then_incr _l_counter in
+    let lam_name = "#ll_" ^ CCInt.to_string lam_id in
+    let body_ty = ty_exn body in
+    let args = List.map (fun v -> var v) (free @ bound) in
+    let new_id = ID.make lam_name in
+    let ll_sym_ty = Ty.mk_fun_ (List.map ty_exn args) body_ty in
+    let lam_const = const ~ty:ll_sym_ty new_id in
+    let new_pred = app ~ty:body_ty lam_const args in
+    let def_form = Form.forall_l (free @ bound) (Form.eq_or_equiv new_pred body) in
+    let replacement_ty =  Ty.mk_fun_ (List.map Var.ty free) body_ty in
+    let replacement = 
+      app ~ty:replacement_ty lam_const (List.map (fun v -> var v) free) in
+    _lam_ids := Map.add closed (replacement,def_form) !_lam_ids;
+    replacement, def_form
 
 (* apply and reduce *)
 let app_whnf ?loc ~ty f l =

@@ -66,6 +66,7 @@ module Subst = struct
   let add t v x = ID.Map.add v.id (v,x) t
   let singleton v x = add empty v x
   let mem t v = ID.Map.mem v.id t
+  let remove t v = ID.Map.remove v.id t
   let find_exn t v = snd (ID.Map.find v.id t)
   let find t v = try Some (find_exn t v) with Not_found -> None
   let of_list l = l |> List.map (fun (v,x)->v.id,(v,x)) |> ID.Map.of_list

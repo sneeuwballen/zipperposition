@@ -131,7 +131,7 @@ let cnf ~sk_ctx decls =
     decls
     |> CCVector.to_seq
     |> (if not !_lift_lambdas then CCFun.id
-       else Iter.flat_map Statement.lift_lambdas)
+        else Iter.flat_map Statement.lift_lambdas)
     |> Cnf.cnf_of_seq ~ctx:sk_ctx
     |> CCVector.to_seq
     |> Cnf.convert
