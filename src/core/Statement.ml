@@ -535,9 +535,10 @@ let lift_lambdas st =
       | _ -> invalid_arg "wrong encoding of def" end
     | _ -> invalid_arg "wrong encoding of def" in
 
-  let ll_proof_step st f = 
+  let ll_proof_step st f new_defs =
     let rule = Proof.Rule.mk "lift_lambdas" in
-    let parents  = Proof.Step.parents (proof_step st) in
+    let parents  = Proof.Step.parents (proof_step st) @ 
+                   CCList.flat_map (fun d -> Proof.Step.parents @@ Proof.S.step @@ Proof.S.mk_f_trivial d) new_defs in
     (* Proof.Step.simp ~tags ~rule (Proof.Step.parents (proof_step st))  *)
     let step = Proof.S.mk_f_simp ~rule f parents in
     Proof.S.step step in
@@ -551,8 +552,9 @@ let lift_lambdas st =
   let res = begin match view st with
   | Assert f -> 
     let f', new_defs =  TST.lift_lambdas f in
+
     (if CCList.is_empty new_defs then Iter.singleton st
-    else (assert_ (ll_proof_step st f) f') :: (CCList.flat_map assert_defs new_defs)
+    else (assert_ (ll_proof_step st f new_defs) f') :: (CCList.flat_map assert_defs new_defs)
           |> Iter.of_list)
   | Lemma fs ->
     let fs', defs = List.fold_right (fun f (ffs, ddefs) -> 
@@ -570,7 +572,7 @@ let lift_lambdas st =
   | Goal f ->
     let f', new_defs =  TST.lift_lambdas f in
     if CCList.is_empty new_defs then Iter.singleton st
-    else ((goal (ll_proof_step st f) f') ::  (CCList.flat_map assert_defs new_defs)
+    else ((goal (ll_proof_step st f new_defs) f') ::  (CCList.flat_map assert_defs new_defs)
           |> Iter.of_list)
   | NegatedGoal (skolems,fs) ->
     let fs', defs = List.fold_right (fun f (ffs, ddefs) -> 

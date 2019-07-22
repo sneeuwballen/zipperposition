@@ -994,7 +994,7 @@ and bind_rename_var subst v =
 let rename_all_vars t = rename Subst.empty t
 
 let rectify t = 
-  let rec aux ?(pref="v_") ~cnt ~subst t = 
+  let rec aux ?(pref="v_") ~cnt ~subst t =
     let t_ty = ty_exn t in
     match view t with
     | Const _ -> (t, subst)
@@ -1011,7 +1011,7 @@ let rectify t =
       bind ~ty:t_ty b v' body', (if CCOpt.is_none old then Subst.remove subst v
                                 else Subst.add subst v (CCOpt.get_exn old))
     | AppBuiltin(b, fs) ->
-      let fs', subst = aux_l ~cnt ~subst (fs) in
+      let fs', subst = aux_l ~cnt ~subst fs in
       app_builtin ~ty:t_ty b fs, subst
     | _ -> t, subst
     and aux_l ?(pref="v_") ~cnt ~subst args =
@@ -1074,7 +1074,7 @@ and define_lambda_of ~bound ~free body =
   let eval_vars vs  = List.map (fun v -> 
     match view (CCOpt.get_or ~default:(var v) (Subst.find recitifier v)) with 
     | Var v -> v
-    | _ -> assert false)  vs in
+    | _ -> invalid_arg "substitution is not a rectifier")  vs in
   let bound = eval_vars bound and free = eval_vars free in
   let closed  = fun_l bound body in
   match Map.find_opt closed !_lam_ids with 
