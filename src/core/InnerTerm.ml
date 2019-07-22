@@ -144,6 +144,10 @@ let builtin ~ty b =
   let my_t = make_ ~ty:(HasType ty) (AppBuiltin (b,[])) in
   H.hashcons my_t
 
+let tType =
+  let my_t = make_ ~ty:NoType (AppBuiltin(Builtin.TType, [])) in
+  H.hashcons my_t
+
 let rec app_builtin ~ty b l = match b, l with
   | Builtin.Arrow, [] -> assert false
   | Builtin.Arrow, [ret] -> ret
@@ -156,15 +160,14 @@ let rec app_builtin ~ty b l = match b, l with
   | Builtin.Not, [{term=AppBuiltin(Builtin.False,[]); _}] ->
     app_builtin ~ty Builtin.True []
   | _ ->
+    
+    let l = if Builtin.is_quantifier b then 
+          List.filter (fun t -> not @@ equal (ty_exn t) tType) l else l in
     if Builtin.is_quantifier b  && CCList.length l != 1 then (
       invalid_arg "wrong encoding of quantifiers.";
     );
     let my_t = make_ ~ty:(HasType ty) (AppBuiltin (b,l)) in
     H.hashcons my_t
-
-let tType =
-  let my_t = make_ ~ty:NoType (AppBuiltin(Builtin.TType, [])) in
-  H.hashcons my_t
 
 let arrow l r = app_builtin ~ty:tType Builtin.arrow (r :: l)
 

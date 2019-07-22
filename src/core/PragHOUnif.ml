@@ -368,8 +368,8 @@ and flex_proj_imit ~subst ~state ~counter ~scope s t rest =
           num_var_imitations  = state.num_var_imitations + imit_dif;
           depth               = state.depth + 1
       } in
-      if state.num_app_projections <= !max_app_projections && 
-         state.num_var_imitations <= !max_var_imitations then (
+      if proj_dif = 0 || state.num_app_projections <= !max_app_projections && 
+         imit_dif = 0 || state.num_var_imitations <= !max_var_imitations then (
         unify ~scope ~state ~counter ~subst ((s, t, true) :: rest)
       ) 
       else OSeq.empty
