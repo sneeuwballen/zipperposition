@@ -25,6 +25,9 @@ let id t = t.id
 let name t = t.name
 let payload t = t.payload
 
+(* for temporary purposes *)
+let dummy_of_int id =  {id; name=""; payload=[]}
+
 let set_payload ?(can_erase=fun _->false) t e =
   let rec aux = function
     | [] -> [e]

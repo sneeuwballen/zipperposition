@@ -175,9 +175,6 @@ let rec compare t1 t2 =
 and cmp_field x y = CCOrd.pair String.compare compare x y
 and cmp_fields x y = CCOrd.list cmp_field x y
 
-let equal t1 t2 = compare t1 t2 = 0
-
-
 let rec unfold_binder b f = match f.term with
   | Bind (b', v, f') when b=b' ->
     let vars, bod = unfold_binder b f' in
@@ -275,6 +272,10 @@ and pp_var_ty out v =
     | _ -> Format.fprintf out ":%a" pp_inner ty
 
 let pp_with_ty out t = Format.fprintf out "(@[%a@,:%a@])" pp t pp (ty_exn t)
+
+let equal t1 t2 = 
+  CCFormat.printf "cmp %a %a = %d.\n" pp t1 pp t2 (compare t1 t2);
+  compare t1 t2 = 0
 
 exception IllFormedTerm of string
 
@@ -894,7 +895,7 @@ module Form = struct
 end
 
 let _l_counter = ref 0
-let _lam_ids = ref Map.empty
+let _lam_ids = Tbl.create 16 
 
 let is_monomorphic t =
   Seq.subterms t
@@ -993,41 +994,45 @@ and bind_rename_var subst v =
 
 let rename_all_vars t = rename Subst.empty t
 
-let rectify t = 
-  let rec aux ?(pref="v_") ~cnt ~subst t =
+let rec rectify_aux ?(pref="v_") ~cnt ~subst t =
     let t_ty = ty_exn t in
     match view t with
     | Const _ -> (t, subst)
     | Var v -> 
       let (t,subst,_) = handle_var ~pref ~cnt ~subst v t_ty in (t,subst)
     | App (hd, fs) -> 
-      let ts, subst = aux_l ~cnt ~subst (hd :: fs) in
+      let ts, subst = rec_aux_l ~cnt ~subst (hd :: fs) in
       let hd = List.hd ts and args = List.tl ts in
       app ~ty:t_ty hd args, subst
     | Bind(b, v, body) ->  
       let old = Subst.find subst v in
-      let (_,subst,v') = handle_var ~pref ~cnt ~subst v t_ty in
-      let (body', subst) = aux ~cnt ~subst body in
-      bind ~ty:t_ty b v' body', (if CCOpt.is_none old then Subst.remove subst v
+      let (_,subst,v) = handle_var ~pref ~cnt ~subst v t_ty in
+      let (body, subst) = rectify_aux ~cnt ~subst body in
+      bind ~ty:t_ty b v body, (if CCOpt.is_none old then Subst.remove subst v
                                 else Subst.add subst v (CCOpt.get_exn old))
     | AppBuiltin(b, fs) ->
-      let fs', subst = aux_l ~cnt ~subst fs in
+      let fs, subst = rec_aux_l ~cnt ~subst fs in
       app_builtin ~ty:t_ty b fs, subst
     | _ -> t, subst
-    and aux_l ?(pref="v_") ~cnt ~subst args =
+and rec_aux_l ?(pref="v_") ~cnt ~subst args =
       List.fold_right (fun arg (tmp,subst) -> 
-        let arg', subst' = aux ~subst ~cnt arg in
+        let arg', subst' = rectify_aux ~subst ~cnt arg in
         arg' :: tmp, subst'
       ) args ([], subst)
-    and handle_var ~pref ?(rename=true) ~cnt ~subst v t_ty = 
+and handle_var ~pref ?(rename=true) ~cnt ~subst v t_ty = 
       if rename && Subst.mem subst v then (Subst.find_exn subst v, subst, v) else (
-        let v_name = pref ^ (CCInt.to_string (CCRef.get_then_incr cnt)) in
-        let v' = Var.of_string ~ty:t_ty v_name in
+        let id = CCRef.get_then_incr cnt in
+        let v' = Var.make ~ty:t_ty (ID.dummy_of_int id) in
         let res = var v' in
         let subst = Subst.add subst v res in
         (res, subst, v')
-      ) in
-  aux ~cnt:(ref 0) ~subst:(Subst.empty) t
+      )
+
+let rectify ?(cnt=ref 0) ?(subst=Subst.empty) t = 
+  rectify_aux ~cnt ~subst t
+
+let rectify_l ?(cnt=ref 0) ?(subst=Subst.empty)  ls =
+  rec_aux_l ~cnt ~subst ls
 
 
 let rec lift_lambdas  f =
@@ -1070,15 +1075,23 @@ let rec lift_lambdas  f =
     ) else f, []
   | _ -> invalid_arg "not implemented yet"
 and define_lambda_of ~bound ~free body =
-  let body, recitifier = rectify body in
+  Format.printf "lifting: %a (b:%a) (f:%a).\n" pp body (CCList.pp Var.pp_full) bound (CCList.pp Var.pp_full) free;
+  let cnt = ref 0 in
+  let free, rectifier = rectify_l ~cnt (List.rev_map var free) in
+  let bound, rectifier = rectify_l ~cnt ~subst:rectifier (List.rev_map var bound) in
+  let body, recitifier = rectify ~cnt ~subst:rectifier body in
   let eval_vars vs  = List.map (fun v -> 
-    match view (CCOpt.get_or ~default:(var v) (Subst.find recitifier v)) with 
+    match view (Subst.eval recitifier v) with 
     | Var v -> v
     | _ -> invalid_arg "substitution is not a rectifier")  vs in
   let bound = eval_vars bound and free = eval_vars free in
-  let closed  = fun_l bound body in
-  match Map.find_opt closed !_lam_ids with 
-  | Some cache -> cache
+  let closed  = fun_l (free @ bound) body in
+  Format.printf "rectified: %a (b:%a) (f:%a) (s:%a) (c:%a/%d).\n" pp body (CCList.pp Var.pp_full) bound (CCList.pp Var.pp_full) free Subst.pp recitifier pp closed (hash closed);
+  Format.printf "tbl_val: %a.\n" (CCList.pp pp) ( OSeq.to_list @@ (Tbl.to_seq_keys _lam_ids) );
+
+  (* Format.printf "lifted: %a (b:%a) (f:%a) (c:%a).\n" pp body (CCList.pp Var.pp) bound (CCList.pp Var.pp) free pp closed; *)
+  match Tbl.find_opt _lam_ids closed with 
+  | Some cache -> Format.printf " found in cache: %a.\n" pp (snd cache); cache
   | None ->
     let lam_id = CCRef.get_then_incr _l_counter in
     let lam_name = "#ll_" ^ CCInt.to_string lam_id in
@@ -1092,7 +1105,9 @@ and define_lambda_of ~bound ~free body =
     let replacement_ty =  Ty.mk_fun_ (List.map Var.ty free) body_ty in
     let replacement = 
       app ~ty:replacement_ty lam_const (List.map (fun v -> var v) free) in
-    _lam_ids := Map.add closed (replacement,def_form) !_lam_ids;
+    Tbl.add _lam_ids closed (replacement,def_form);
+
+    Format.printf " defined: %a.\n" pp def_form;
     replacement, def_form
 
 (* apply and reduce *)
