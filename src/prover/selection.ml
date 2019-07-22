@@ -370,6 +370,26 @@ let ho_sel ~ord lits =
      int_of_float (weight *. ((1.2) ** app_var_num) /. ground),  0)  in
   weight_based_sel_driver ~ord lits chooser
 
+let ho_sel2 ~ord lits =
+  let app_var_pen l =
+    let n = CCArray.length lits in
+
+    match l with 
+    | Lit.Equation(lhs,rhs,_) ->
+      let num_app_var_sides = (if T.is_var @@ T.head_term lhs then 1 else 0) +
+                              (if T.is_var @@ T.head_term rhs then 1 else 0) in
+      if n <= 4 then (
+        if num_app_var_sides = 1 then 0
+        else if num_app_var_sides = 0 then 1 
+        else 2
+      ) else num_app_var_sides
+    | _ -> max_int in
+
+  let chooser (i,l) = 
+    let sign = (if Lit.is_pos l then 1 else 0) in
+    (sign, app_var_pen l, Lit.weight l, (if not (Lit.is_ground l) then 0 else 1))  in
+  weight_based_sel_driver ~ord lits chooser
+
 let except_RR_horn (p:parametrized) ~strict ~ord lits =
   if Lits.is_RR_horn_clause lits
   then BV.empty () (* do not select (conditional rewrite rule) *)
@@ -394,6 +414,7 @@ let l =
       "e-selection7", e_sel7;
       "e-selection8", e_sel8;
       "ho-selection", ho_sel;
+      "ho-selection2", ho_sel2;
     ]
   and by_ord =
     CCList.flat_map

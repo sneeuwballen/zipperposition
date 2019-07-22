@@ -458,7 +458,8 @@ end
 let has_ho_subterm t =
   Seq.subterms ~include_builtin:true ~ignore_head:true t
   |> Iter.exists (fun st -> 
-      Type.is_fun (ty st) || Type.is_prop (ty st))
+      not (T.equal st t) &&
+      (Type.is_fun (ty st) || Type.is_prop (ty st)))
 
 let close_quantifier b ty_args body =
   CCList.fold_right (fun ty acc -> 

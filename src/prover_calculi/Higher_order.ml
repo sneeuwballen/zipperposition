@@ -673,6 +673,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                   let body = (if sign then T.Form.neq else T.Form.eq) 
                                 arg (T.bvar ~ty:(T.ty arg) (n-i-1)) in
                   let subs_term = T.fun_l tyargs body in 
+                  (let cached_t = Subst.FO.canonize_all_vars subs_term in
+                  prim_enum_terms := Term.Set.add cached_t !prim_enum_terms);
                   let subst = Subst.FO.bind' (Subst.empty) (var_hd, 0) (subs_term, 0) in
                   let rule = Proof.Rule.mk ("elim_leibniz_eq_" ^ (if sign then "+" else "-")) in
                   let tags = [Proof.Tag.T_ho] in
