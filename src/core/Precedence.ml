@@ -285,14 +285,19 @@ let weight_freqrank (symbs : ID.t Iter.t) : ID.t -> Weight.t =
 
 
 let weight_fun_of_string ~signature s = 
+  let syms_only sym_depth = 
+    Iter.map fst sym_depth in
+  let with_syms f sym_depth = f (syms_only sym_depth) in
+  let ignore_arg f _ = f in 
+
   let wf_map = 
-    ["invfreq", weight_invfreq; 
-    "freq", weight_freq; 
-    "invfreqrank", weight_invfreqrank;
-    "freqrank", weight_freqrank;
-    "modarity", (fun _ -> weight_modarity ~signature);
-    "invarity", (fun _ -> weight_invarity ~signature);
-    "const", (fun _ -> weight_constant)] in
+    ["invfreq", with_syms weight_invfreq; 
+    "freq", with_syms weight_freq; 
+    "invfreqrank", with_syms weight_invfreqrank;
+    "freqrank", with_syms weight_freqrank;
+    "modarity", ignore_arg @@ weight_modarity ~signature;
+    "invarity", ignore_arg @@ weight_invarity ~signature;
+    "const", ignore_arg weight_constant] in
   try
     List.assoc s wf_map
   with Not_found -> invalid_arg "KBO weight function not found"

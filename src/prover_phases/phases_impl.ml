@@ -155,8 +155,13 @@ let compute_prec ~signature stmts =
     |> Compute_prec.add_constr 10 Classify_cst.prec_constr
     |> Compute_prec.set_weight_rule (
        fun stmts -> 
-        let all_syms = stmts |> Iter.flat_map Statement.Seq.terms |> Iter.flat_map Term.Seq.symbols in
-        Precedence.weight_fun_of_string ~signature !_kbo_wf all_syms)
+        let sym_depth = 
+          stmts 
+          |> Iter.flat_map Statement.Seq.terms 
+          |> Iter.flat_map (fun t -> Term.Seq.subterms_depth t
+                                     |> Iter.filter_map (fun (st,d) -> 
+                                        CCOpt.map (fun id -> (id,d)) (Term.head st)))  in
+        Precedence.weight_fun_of_string ~signature !_kbo_wf sym_depth)
     (* |> Compute_prec.set_weight_rule (fun _ -> Classify_cst.weight_fun) *)
 
     (* use "invfreq", with low priority *)

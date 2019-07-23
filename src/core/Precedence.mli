@@ -144,7 +144,7 @@ val weight_freq : ID.t Iter.t -> weight_fun
 val weight_invfreqrank : ID.t Iter.t -> weight_fun
 val weight_freqrank : ID.t Iter.t -> weight_fun
 
-val weight_fun_of_string : signature:Signature.t -> string ->  ID.t Iter.t -> weight_fun
+val weight_fun_of_string : signature:Signature.t -> string -> (ID.t * int) Iter.t -> weight_fun
 
 val set_weight : t -> weight_fun -> unit
 (** Change the weight function of the precedence
