@@ -229,6 +229,39 @@ let mk_tbl_ l =
 type weight_fun = ID.t -> Weight.t
 type arg_coeff_fun = ID.t -> int list
 
+let depth_occ_driver ~flip stmt_d =
+  let tbl = ID.Tbl.create 16 in
+  Iter.iter (fun (sym,d) -> 
+    match ID.Tbl.find_opt tbl sym with
+    | Some l -> ID.Tbl.replace tbl sym (d :: l)
+    | None -> ID.Tbl.add tbl sym [d]
+  ) stmt_d;
+
+  let rec sum = function 
+  | [] -> 0
+  | x :: xs -> x + (sum xs) in
+
+  let sorted = 
+    ID.Tbl.to_list tbl 
+    |> List.map (fun (id, depths) -> 
+        let d_sum = sum depths and n = List.length depths in
+        (d_sum / n, n, id))
+    |> List.sort (fun (avg1, n1, id1) (avg2, n2, id2) -> 
+      let open CCOrd in
+      if flip then compare avg2 avg1 <?> (compare, n2, n1) <?> (ID.compare, id2, id1)
+      else compare avg1 avg2 <?> (compare, n1, n2) <?> (ID.compare, id1, id2)
+    ) in
+
+  ID.Tbl.clear tbl;
+  let tbl = ID.Tbl.create 16 in
+  List.iteri (fun i (_,_,sym) -> ID.Tbl.add tbl sym (Weight.int (i + 5))) sorted;
+  let default = Weight.int 10 in
+  fun sym -> (ID.Tbl.get_or ~default tbl sym)
+
+let inv_depth_occurence =  depth_occ_driver ~flip:false
+let depth_occurence =  depth_occ_driver ~flip:true
+
+
 (* weight of f = arity of f + 4 *)
 let weight_modarity ~signature a = 
   let arity =  try snd @@ Signature.arity signature a with _ -> 10 in
@@ -297,6 +330,8 @@ let weight_fun_of_string ~signature s =
     "freqrank", with_syms weight_freqrank;
     "modarity", ignore_arg @@ weight_modarity ~signature;
     "invarity", ignore_arg @@ weight_invarity ~signature;
+    "invdocc", inv_depth_occurence;
+    "docc", depth_occurence;
     "const", ignore_arg weight_constant] in
   try
     List.assoc s wf_map
