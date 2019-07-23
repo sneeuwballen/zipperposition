@@ -209,9 +209,9 @@ module Make(C : Clause_intf.S) = struct
          | Term.Var _ -> v
          | Term.DB _ -> w
          | Term.App (f, l) ->
+            let v = if Term.is_var f then 2*v else v in
             calc_tweight f sg v w c_mul +
               List.fold_left (fun acc t -> acc + calc_tweight t sg v w c_mul) 0 l
-         
          | Term.Const id -> (int_of_float ((if Signature.sym_in_conj id sg then c_mul else 1.0)*.float_of_int w))
          | Term.Fun (_, t) -> calc_tweight t sg v w c_mul
 
@@ -225,6 +225,16 @@ module Make(C : Clause_intf.S) = struct
       | Lit.Equation (lhs,rhs,sign) -> (calc_tweight lhs sg v w c_mul + 
                                         calc_tweight rhs sg v w c_mul, sign)
       | _ -> (0,false)
+
+    let conj_relative_cheap ~v ~f ~pos_mul ~conj_mul ~dist_var_mul c  =
+      let sgn = C.Ctx.signature () in
+      let res = 
+        Array.mapi (fun i xx -> i,xx) (C.lits c)
+        |> (Array.fold_left (fun acc (i,l) -> acc +. 
+              let l_w, l_s = (calc_lweight l sgn v f conj_mul) in 
+                ( if l_s then pos_mul else 1.0 )*. float_of_int l_w ) 0.0) in
+      let dist_vars =  List.length (Literals.vars (C.lits c)) in
+      int_of_float (dist_var_mul ** (float_of_int dist_vars) *. res)
 
     let conj_relative ?(distinct_vars_mul=(-1.0)) ?(parameters_magnitude=`Large) ?(goal_penalty=false) c =
       let sgn = C.Ctx.signature () in
@@ -404,18 +414,38 @@ module Make(C : Clause_intf.S) = struct
           "-var_weight:int,-fun_weight:int" ^
           "pos_lit_mult:float, max_t_mult:float, max_lit_mul:float)"
 
+    let parse_conj_relative_cheap s = 
+      let or_lmax_regex = 
+        Str.regexp 
+          ("conjecture-relative-cheap(\\([0-9]+\\)," 
+            ^ "\\([0-9]\\),"
+            ^ "\\([0-9]+[.]?[0-9]*\\),"
+            ^ "\\([0-9]+[.]?[0-9]*\\),"
+            ^ "\\([0-9]+[.]?[0-9]*\\))") in
+      try
+        ignore(Str.search_forward or_lmax_regex s 0);
+        let v = CCOpt.get_exn (CCInt.of_string (Str.matched_group 1 s)) in
+        let f = CCOpt.get_exn (CCInt.of_string (Str.matched_group 2 s)) in
+        let pos_mul = CCOpt.get_exn (Float.of_string_opt (Str.matched_group 3 s)) in
+        let conj_mul = CCOpt.get_exn (Float.of_string_opt (Str.matched_group 4 s)) in
+        let dist_var_mul = CCOpt.get_exn (Float.of_string_opt (Str.matched_group 5 s)) in
+        conj_relative_cheap ~v ~f ~pos_mul ~conj_mul ~dist_var_mul
+      with Not_found | Invalid_argument _ -> 
+        invalid_arg @@
+          invalid_arg 
+          "expected conjecture-relative-var(v:int,f:int,pos_mul:float,conj_mul:float,dist_var_mul:float)"
+
     let parsers = 
-      [
-      "fifo", (fun _ c -> C.id c);
-      "default", (fun _ -> default_fun);
-      "explore",  (fun _ -> explore_fun);
-      "conjecture-relative", (fun _ -> conj_relative ~distinct_vars_mul:1.0 
+      ["fifo", (fun _ c -> C.id c);
+       "default", (fun _ -> default_fun);
+       "explore",  (fun _ -> explore_fun);
+       "conjecture-relative", (fun _ -> conj_relative ~distinct_vars_mul:1.0 
                                                      ~parameters_magnitude:`Large 
                                                      ~goal_penalty:false );
-      "conjecture-relative-var", parse_crv;
-      "pnrefined", parse_pnrefine;
-      "orient-lmax", parse_orient_lmax]
-
+       "conjecture-relative-var", parse_crv;
+       "conjecture-relative-cheap", parse_conj_relative_cheap;
+       "pnrefined", parse_pnrefine;
+       "orient-lmax", parse_orient_lmax]
 
     let of_string s =
     try

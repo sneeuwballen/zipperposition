@@ -110,7 +110,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
   let try_e active_set passive_set =
-    let max_others = 64 in
+    let max_others = 16 in
 
     let rec can_be_translated t =
       let can_translate_ty ty =
