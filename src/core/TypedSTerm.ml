@@ -998,12 +998,12 @@ let rec rectify_aux ?(pref="v_") ~cnt ~subst t =
       let ts, subst = rec_aux_l ~cnt ~subst (hd :: fs) in
       let hd = List.hd ts and args = List.tl ts in
       app ~ty:t_ty hd args, subst
-    | Bind(b, v, body) ->  
-      let old = Subst.find subst v in
-      let (_,subst,v) = handle_var ~pref ~cnt ~subst v t_ty in
+    | Bind(b, v_old, body) ->  
+      let old = Subst.find subst v_old in
+      let (_,subst,v) = handle_var ~rename:false ~pref ~cnt ~subst v_old t_ty in
       let (body, subst) = rectify_aux ~cnt ~subst body in
-      bind ~ty:t_ty b v body, (if CCOpt.is_none old then Subst.remove subst v
-                                else Subst.add subst v (CCOpt.get_exn old))
+      bind ~ty:t_ty b v body, (if CCOpt.is_none old then Subst.remove subst v_old
+                               else Subst.add subst v_old (CCOpt.get_exn old))
     | AppBuiltin(b, fs) ->
       let fs, subst = rec_aux_l ~cnt ~subst fs in
       app_builtin ~ty:t_ty b fs, subst
@@ -1069,16 +1069,17 @@ let rec lift_lambdas  f =
     ) else f, []
   | _ -> invalid_arg "not implemented yet"
 and define_lambda_of ~bound ~free body =
-  let cnt = ref 0 in
-  let free, rectifier = rectify_l ~cnt (List.rev_map var free) in
-  let bound, rectifier = rectify_l ~cnt ~subst:rectifier (List.rev_map var bound) in
-  let body, recitifier = rectify ~cnt ~subst:rectifier body in
+  let cnt = ref 0 in  
+  let rec_free, rectifier = rectify_l ~cnt (List.rev_map var free) in
+  let rec_bound, rectifier = rectify_l ~cnt ~subst:rectifier (List.rev_map var bound) in
+  let rec_body, recitifier = rectify ~cnt ~subst:rectifier body in
+
   let eval_vars vs  = List.map (fun v -> 
     match view (Subst.eval recitifier v) with 
     | Var v -> v
     | _ -> invalid_arg "substitution is not a rectifier")  vs in
-  let bound = eval_vars bound and free = eval_vars free in
-  let closed  = fun_l (free @ bound) body in
+  let rec_bound = eval_vars rec_bound and rec_free = eval_vars rec_free in
+  let closed  = fun_l (rec_free @ rec_bound) rec_body in
   let args = List.map (fun v -> var v) (free @ bound) in
 
   match Tbl.find_opt _lam_ids closed with 
