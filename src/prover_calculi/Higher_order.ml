@@ -681,6 +681,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       let new_ch_id = ID.make choice_ty_name in
       let new_ch_const = T.const new_ch_id ~ty in
       ignore(Signature.declare (C.Ctx.signature ()) new_ch_id ty);
+      Util.debugf 1 "new choice for type %a: %a(%a).\n" 
+        (fun k -> k Type.pp ty T.pp new_ch_const Type.pp (T.ty new_ch_const));
       choice_ops := Term.Set.add new_ch_const !choice_ops;
       new_ch_const in
 
@@ -688,9 +690,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       match T.view t with
       | T.App(hd, [arg]) ->
         if Term.is_var hd && inst_vars then (
-          let arg_ty = Term.ty arg in
+          let hd_ty = Term.ty hd in
           let choice_ops = 
-            Term.Set.filter (fun t -> Type.equal (Term.ty t) arg_ty) !choice_ops
+            Term.Set.filter (fun t -> Type.equal (Term.ty t) hd_ty) !choice_ops
             |> Term.Set.to_list
             |> (fun l -> if CCList.is_empty l then [new_choice_op (Term.ty hd)] else l) in
           List.map (fun hd -> choice_inst_of_hd hd arg) choice_ops

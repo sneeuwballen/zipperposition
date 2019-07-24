@@ -102,9 +102,9 @@ let fp positions =
   (* list of fingerprint feature functions *)
   let fpfs = List.map gfpf positions in
   fun t ->
-    let res = List.map (fun fpf -> fpf t) fpfs in
-    Format.printf "@[Fingerprinting:@ @[%a@]=@[%a@].@]\n" T.pp t (CCList.pp pp_feature) res;
-    res
+    List.map (fun fpf -> fpf t) fpfs
+    (* Format.printf "@[Fingerprinting:@ @[%a@]=@[%a@].@]\n" T.pp t (CCList.pp pp_feature) res; *)
+
 
 (** {2 Fingerprint functions} *)
 
