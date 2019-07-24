@@ -662,6 +662,15 @@ module Make(E : Env.S) : S with module Env = E = struct
         Type.returns_prop ty && T.DB.is_closed t
       | _ -> false in
 
+    let neg_trigger t =
+      assert(T.DB.is_closed t);
+      let arg_ty = List.hd (Type.expected_args (T.ty t)) in
+      let applied_to_0 = T.Form.not_ (Lambda.whnf (T.app t [T.bvar ~ty:arg_ty 0])) in
+      let res = T.fun_ arg_ty applied_to_0 in
+      assert(T.DB.is_closed res);
+      res in
+
+
     let choice_inst_of_hd hd arg =
       let arg_ty = Term.ty arg in
       let ty = List.hd (Type.expected_args arg_ty) in
@@ -694,10 +703,12 @@ module Make(E : Env.S) : S with module Env = E = struct
           let choice_ops = 
             Term.Set.filter (fun t -> Type.equal (Term.ty t) hd_ty) !choice_ops
             |> Term.Set.to_list
-            |> (fun l -> if CCList.is_empty l then [new_choice_op (Term.ty hd)] else l) in
-          List.map (fun hd -> choice_inst_of_hd hd arg) choice_ops
+            |> (fun l -> if CCList.is_empty l then [new_choice_op hd_ty] else l) in
+          CCList.flat_map (fun hd -> 
+            [choice_inst_of_hd hd arg; choice_inst_of_hd hd (neg_trigger arg)]) 
+          choice_ops
         ) else if Term.Set.mem hd !choice_ops then (
-          [choice_inst_of_hd hd arg]
+          [choice_inst_of_hd hd arg; choice_inst_of_hd hd (neg_trigger arg)]
         ) else []
       | _ -> assert (false) in
 
