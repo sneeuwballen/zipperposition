@@ -418,7 +418,7 @@ module Make(C : Clause_intf.S) = struct
       let or_lmax_regex = 
         Str.regexp 
           ("conjecture-relative-cheap(\\([0-9]+\\)," 
-            ^ "\\([0-9]\\),"
+            ^ "\\([0-9]+\\),"
             ^ "\\([0-9]+[.]?[0-9]*\\),"
             ^ "\\([0-9]+[.]?[0-9]*\\),"
             ^ "\\([0-9]+[.]?[0-9]*\\))") in
@@ -432,8 +432,8 @@ module Make(C : Clause_intf.S) = struct
         conj_relative_cheap ~v ~f ~pos_mul ~conj_mul ~dist_var_mul
       with Not_found | Invalid_argument _ -> 
         invalid_arg @@
-          invalid_arg 
-          "expected conjecture-relative-var(v:int,f:int,pos_mul:float,conj_mul:float,dist_var_mul:float)"
+          ("expected conjecture-relative-cheap(v:int,f:int,pos_mul:float,conj_mul:float,dist_var_mul:float)"
+          ^ (CCFormat.sprintf "\ngot: %s" s))
 
     let parsers = 
       ["fifo", (fun _ c -> C.id c);
