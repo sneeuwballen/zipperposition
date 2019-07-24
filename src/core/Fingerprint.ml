@@ -79,7 +79,7 @@ and gfpf_root ~depth t =
   | T.Var _ -> A
   | T.Const c -> S c
   | T.App (hd,_) -> (match T.view hd with
-                         T.Var _ -> A 
+                         T.Var _ -> B
                          | T.Const s -> S s
                          | T.DB i    -> if (i < depth) then DB i else Ignore
                          | T.AppBuiltin(_,_) -> Ignore
@@ -102,8 +102,9 @@ let fp positions =
   (* list of fingerprint feature functions *)
   let fpfs = List.map gfpf positions in
   fun t ->
-    List.map (fun fpf -> fpf t) fpfs
-    (* Format.printf "@[Fingerprinting(%a): @[%a@] = %a.@]\n" (CCList.pp (CCList.pp ~start:"[" ~stop:"]" CCInt.pp)) positions T.pp t (CCList.pp pp_feature) res; *)
+    let res = List.map (fun fpf -> fpf t) fpfs in
+    Format.printf "@[Fingerprinting:@ @[%a@]=@[%a@].@]\n" T.pp t (CCList.pp pp_feature) res;
+    res
 
 (** {2 Fingerprint functions} *)
 

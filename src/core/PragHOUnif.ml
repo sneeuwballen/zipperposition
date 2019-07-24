@@ -83,7 +83,9 @@ let build_constraints ~ban_id args1 args2 rest =
   let zipped = List.map (fun (x,y) -> (x,y,ban_id)) (List.combine args1 args2) in
   let rigid, non_rigid = List.partition (fun (s,t,_) ->
     T.is_const (T.head_term s) && T.is_const (T.head_term t)) zipped in
-  rigid @ rest @ non_rigid
+  let pure_var, app_var = List.partition (fun (s,t,_) ->
+    T.is_var s && T.is_var t) non_rigid in
+  rigid @ pure_var @ rest @ app_var
 
 (* Create substitution: v |-> λ u1 ... um. x u1 ... u{k-1} u{k+1} ... um *)
 let eliminate_at_idx ~scope ~counter v k =  
@@ -205,6 +207,9 @@ let rec unify ~state ~scope ~counter ~subst = function
       (* all constraints solved for the initial problem *)
       OSeq.return (Some subst)
   | (s,t,ban_id) :: rest as l -> (
+
+    (* CCFormat.printf "Solving @[%a@] <?> @[%a@].\n" T.pp s T.pp t; *)
+
     if not @@ continue_unification state then OSeq.empty
     else (
       let s', t' = normalize ~mono:(state.monomorphic) subst (s, scope), 
