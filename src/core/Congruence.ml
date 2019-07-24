@@ -37,7 +37,7 @@ module Make(T : TERM) = struct
       representative *)
   type t = {
     parents: term list H.t; (* parent terms *)
-    mutable next: term H.t; (* pointer towards representative *)
+    next: term H.t; (* pointer towards representative *)
   }
 
   let create ?(size=64) () = {
@@ -61,15 +61,7 @@ module Make(T : TERM) = struct
     let next = next_ cc t in
     if T.equal t next
     then t  (* root *)
-    else (
-      let root = find_ cc next in
-      (* path compression. Can be done in place as it doesn't change
-         the semantics of the CC *)
-      if not (T.equal root next) then (
-        cc.next <- H.replace cc.next t root;
-      );
-      root
-    )
+    else find_ cc next
 
   (* are two nodes, with their subterm lists, congruent? To
       check this, we compute the representative of subnodes
