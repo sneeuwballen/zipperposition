@@ -191,32 +191,63 @@ let stmt_of_form rw_rules polarity proxy proxy_id proxy_ty form proof =
     ]
   )
 
+let find_def_in_ctx ~ctx form =
+  CCList.find_map (fun def ->
+    match def with
+    | Def_form def when not def.rw_rules -> 
+      let def_form = def.form in
+      CCOpt.map (fun subst -> def,subst) (TypedSTerm.try_alpha_renaming def_form form)
+    | _ -> None) 
+  ctx.sc_new_defs
+
 let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~parents form =
-  incr_counter ctx;
-  let tyvars, vars = collect_vars Var.Subst.empty form in
-  let vars_t = List.map (fun v->T.var v) vars in
-  let tyvars_t = List.map (fun v->T.Ty.var v) tyvars in
-  (* similar to {!skolem_form}, but always return [prop] *)
-  let ty = ty_forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) T.Ty.prop) in
-  (* not a skolem (but a defined term). Will be defined, not declared. *)
-  let f = fresh_id ~start0:true ~ctx pattern in
-  let proxy = T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t) in
-  let proof = Proof.Step.define_internal f parents in
-  (* register the new definition *)
-  let def = {
-    form;
-    proxy_id=f;
-    proxy_ty=ty;
-    rw_rules;
-    proxy;
-    polarity;
-    proof;
-    as_stmt=lazy (stmt_of_form rw_rules polarity proxy f ty form proof);
-  } in
-  ctx.sc_new_defs <- Def_form def :: ctx.sc_new_defs;
-  Util.debugf ~section 5 "@[<2>define_form@ %a@ :proof %a@]"
-    (fun k->k pp_form_definition def Proof.Step.pp proof);
-  def
+  let create_new ~ctx ~rw_rules ~polarity ~parents ~form = 
+    incr_counter ctx;
+    let tyvars, vars = collect_vars Var.Subst.empty form in
+    let vars_t = List.map (fun v->T.var v) vars in
+    let tyvars_t = List.map (fun v->T.Ty.var v) tyvars in
+    (* similar to {!skolem_form}, but always return [prop] *)
+    let ty = ty_forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) T.Ty.prop) in
+    (* not a skolem (but a defined term). Will be defined, not declared. *)
+    let f = fresh_id ~start0:true ~ctx pattern in
+    let proxy = T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t) in
+    let proof = Proof.Step.define_internal f parents in
+    (* register the new definition *)
+    let def = {
+      form;
+      proxy_id=f;
+      proxy_ty=ty;
+      rw_rules;
+      proxy;
+      polarity;
+      proof;
+      as_stmt=lazy (stmt_of_form rw_rules polarity proxy f ty form proof);
+    } in
+    ctx.sc_new_defs <- Def_form def :: ctx.sc_new_defs;
+    Util.debugf ~section 5 "@[<2>define_form@ %a@ :proof %a@]"
+      (fun k->k pp_form_definition def Proof.Step.pp proof);
+    def in
+  if not rw_rules then (
+    match find_def_in_ctx ~ctx form with
+    | Some (def, subst) ->
+      (* def.form is alpha renaming *)
+      assert(T.equal form (T.Subst.eval subst def.form));
+      (* nothing is bound in form *)
+      assert(T.equal form (T.Subst.eval subst form));
+      let proxy = T.Subst.eval subst def.proxy in
+      let proof = Proof.Step.define_internal def.proxy_id parents in
+      let res = {
+        def with 
+          form; proxy; proof; polarity;
+          as_stmt = lazy (stmt_of_form rw_rules polarity proxy
+                           def.proxy_id def.proxy_ty form proof);
+      }  in
+      if def.polarity != polarity then (
+        ctx.sc_new_defs <- Def_form res :: ctx.sc_new_defs
+      );
+      res
+    | None -> create_new ~ctx ~rw_rules ~polarity ~parents ~form
+  ) else (create_new ~ctx ~rw_rules ~polarity ~parents ~form)
 
 let pp_rules =
   Fmt.(Util.pp_list Dump.(pair (list T.pp_inner |> hovbox) T.pp) |> hovbox)
