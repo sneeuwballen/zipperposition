@@ -1,7 +1,7 @@
 opam-version: "2.0"
 maintainer: "simon.cruanes.2007@m4x.org"
 author: "Simon Cruanes"
-homepage: "https://github.com/c-cube/zipperposition"
+homepage: "https://github.com/sneeuwballen/zipperposition"
 version: "1.5"
 synopsis: "Core types and algorithms for logic"
 build: [
@@ -25,6 +25,6 @@ depopts: [
   "msat" { >= "0.8" < "0.9" }
 ]
 tags: [ "logic" "unification" "term" ]
-bug-reports: "https://github.com/c-cube/zipperposition/issues"
-dev-repo: "git+https://github.com/c-cube/zipperposition.git"
+bug-reports: "https://github.com/sneeuwballen/zipperposition/issues"
+dev-repo: "git+https://github.com/sneeuwballen/zipperposition.git"
 
