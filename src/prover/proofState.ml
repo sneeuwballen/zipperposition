@@ -37,7 +37,7 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
       type t = T.t * T.t * bool * C.t
       type rhs = T.t
       let compare (t11,t12,s1,c1) (t21,t22,s2,c2) =
-        let open CCOrd in
+        let open CCOrd.Infix in
         T.compare t11 t21
         <?> (T.compare, t12, t22)
         <?> (compare, s1, s2)
