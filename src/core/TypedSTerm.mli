@@ -380,6 +380,8 @@ val app_infer :
 (** [app_infer f l] computes the type [ty] of [f l], and return [app ~ty f l]
     @raise UnifyFailure if types do not correspond *)
 
+val try_alpha_renaming : t -> t -> Subst.t option
+
 (** {2 Conversion} *)
 
 val erase : t -> STerm.t

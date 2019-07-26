@@ -1513,6 +1513,39 @@ let app_infer ?st ?subst f l =
   let ty = apply_unify ?st ?subst (ty_exn f) l in
   app ~ty f l
 
+let try_alpha_renaming f1 f2 = 
+  let rec aux subst = function 
+    | [] -> subst
+    | (f1,f2) :: rest -> 
+      match view f1, view f2 with
+      | Var v, Var v' ->
+        begin match Subst.find subst v with 
+        | Some t -> begin match view t with
+            | Var v'' when Var.equal v' v'' -> aux subst rest
+            | _ -> raise (UnifyFailure ("double binding",[],None)) end
+        | None -> aux (Subst.add subst v f2) rest end
+      | Const x, Const y when ID.equal x y -> aux subst rest
+      | App(hd_x, xs), App (hd_y, ys) when List.length xs = List.length ys ->
+        (* head might be a lambda or a const, delegate solving it to
+          the same algorithm *)
+        let args = List.combine (hd_x :: xs) (hd_y :: ys) in
+        aux subst (args @ rest)
+      | AppBuiltin(hd_x, xs), AppBuiltin(hd_y, ys) 
+          when Builtin.equal hd_x hd_y && List.length xs = List.length ys ->
+        aux subst ((List.combine xs ys) @ rest)
+      | Bind(b, v, body), Bind(b', v', body') when Binder.equal b b' ->
+        assert(CCOpt.is_none (Subst.find subst v));
+        let subst = Subst.add subst v (var v') in
+        aux subst ((body, body') ::  rest)
+      | _ -> raise (UnifyFailure ("unknown constructors",[],None)) 
+  in
+  try
+    Some (aux Subst.empty [f1,f2])
+  with UnifyFailure (msg, _, _) ->
+    Util.debugf 1 "Alpha renaming failed: %s@." (fun k -> k msg);
+    None
+      
+
 (** {2 Conversion} *)
 
 let rec erase t = match view t with
