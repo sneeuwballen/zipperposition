@@ -228,6 +228,8 @@ let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~parents form 
       (fun k->k pp_form_definition def Proof.Step.pp proof);
     def in
   if not rw_rules then (
+    Format.printf "defining:@ @[%a@]\n" T.pp form;
+
     match find_def_in_ctx ~ctx form with
     | Some (def, subst) ->
       (* def.form is alpha renaming *)
@@ -243,11 +245,14 @@ let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~parents form 
                            def.proxy_id def.proxy_ty form proof);
       }  in
       if def.polarity != polarity then (
+        incr_counter ctx;
         ctx.sc_new_defs <- Def_form res :: ctx.sc_new_defs
       );
       res
     | None -> create_new ~ctx ~rw_rules ~polarity ~parents ~form
-  ) else (create_new ~ctx ~rw_rules ~polarity ~parents ~form)
+  ) else 
+    ( Format.printf "forcing create new:@ @[%a@]\n" T.pp form;
+      create_new ~ctx ~rw_rules ~polarity ~parents ~form)
 
 let pp_rules =
   Fmt.(Util.pp_list Dump.(pair (list T.pp_inner |> hovbox) T.pp) |> hovbox)
