@@ -201,6 +201,9 @@ let is_rat = function Rat _ -> true | _ -> false
 let is_rat_eq = _on_rat Rat_lit.is_eq
 let is_rat_less = _on_rat Rat_lit.is_less
 
+let is_essentially_prop = function 
+  | Equation (lhs, rhs, true) -> T.is_true_or_false rhs
+  | _ -> false
 
 let ty_error_ a b =
   let msg =
@@ -805,6 +808,10 @@ module Comp = struct
   let max_terms ~ord lit =
     assert(no_prop_invariant lit);
     match lit with
+      | Equation (l, r, s) when is_essentially_prop lit ->
+        let l = Lambda.whnf l in
+        if T.is_app_var l && T.equal T.true_ r then [l;r]
+        else [l]
       | Equation (l, r, s) -> 
         _maxterms2 ~ord l r
       | Int a -> Int_lit.max_terms ~ord a
