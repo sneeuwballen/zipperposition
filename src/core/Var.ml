@@ -49,6 +49,11 @@ module Set = struct
         | `Right _ -> None
         | `Both _ -> None)
   let cardinal t = ID.Map.cardinal t
+  let intersection_empty s t =  
+    ID.Set.is_empty @@ 
+    ID.Set.inter 
+      (ID.Set.of_seq (ID.Map.keys s))
+      (ID.Set.of_seq (ID.Map.keys t))
   let of_seq s = s |> Iter.map (fun v->v.id, v) |> ID.Map.of_seq
   let add_seq m s = s |> Iter.map (fun v->v.id, v) |> ID.Map.add_seq m
   let add_list m s = s |> List.map (fun v->v.id, v) |> ID.Map.add_list m

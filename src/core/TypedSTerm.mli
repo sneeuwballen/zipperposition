@@ -308,11 +308,11 @@ module Subst : sig
   val find_exn : t -> term Var.t -> term
   (** @raise Not_found if the variable is not present *)
 
-  val rename_var : t -> term Var.t -> t * term Var.t
+  val rename_var : rename_binders:bool -> t -> term Var.t -> t * term Var.t
 
   val merge : t -> t -> t
 
-  val eval : t -> term -> term
+  val eval : ?rename_binders:bool -> t -> term -> term
 
   val eval_nonrec : t -> term -> term
   (** Evaluate under substitution, but consider the substitution as

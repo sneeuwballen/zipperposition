@@ -196,7 +196,10 @@ let find_def_in_ctx ~ctx form =
     match def with
     | Def_form def when not def.rw_rules -> 
       let def_form = def.form in
-      CCOpt.map (fun subst -> def,subst) (TypedSTerm.try_alpha_renaming def_form form)
+      let df_vars, f_vars = 
+        CCPair.map_same (fun x -> Var.Set.of_seq (T.Seq.vars x)) (def_form,form) in
+      if not (Var.Set.intersection_empty df_vars f_vars) then None 
+      else CCOpt.map (fun subst -> def,subst) (TypedSTerm.try_alpha_renaming def_form form)
     | _ -> None) 
   ctx.sc_new_defs
 
@@ -227,15 +230,18 @@ let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~parents form 
     Util.debugf ~section 5 "@[<2>define_form@ %a@ :proof %a@]"
       (fun k->k pp_form_definition def Proof.Step.pp proof);
     def in
+  let res = 
   if not rw_rules then (
     (* Format.printf "defining:@ @[%a@]\n" T.pp form; *)
 
     match find_def_in_ctx ~ctx form with
     | Some (def, subst) ->
       (* def.form is alpha renaming *)
-      assert(T.equal form (T.Subst.eval subst def.form));
+      assert (T.equal form (T.Subst.eval ~rename_binders:false subst def.form));
       (* nothing is bound in form *)
-      assert(T.equal form (T.Subst.eval subst form));
+      assert(T.equal form (T.Subst.eval ~rename_binders:false subst form));
+      Util.debugf ~section 1 "@[Reusing definition %a. Old def: %a. New def: %a]"
+        (fun k -> k T.pp def.proxy T.pp def.form T.pp form);
       let proxy = T.Subst.eval subst def.proxy in
       let proof = Proof.Step.define_internal def.proxy_id parents in
       let res = {
@@ -250,9 +256,9 @@ let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~parents form 
       );
       res
     | None -> create_new ~ctx ~rw_rules ~polarity ~parents ~form
-  ) else 
-    ( Format.printf "forcing create new:@ @[%a@]\n" T.pp form;
-      create_new ~ctx ~rw_rules ~polarity ~parents ~form)
+  ) else (create_new ~ctx ~rw_rules ~polarity ~parents ~form)
+  in
+  res
 
 let pp_rules =
   Fmt.(Util.pp_list Dump.(pair (list T.pp_inner |> hovbox) T.pp) |> hovbox)

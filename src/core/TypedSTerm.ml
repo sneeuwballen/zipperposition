@@ -935,34 +935,39 @@ module Subst = struct
 
   let merge a b = Var.Subst.merge a b
 
-  let rec eval_ ~recursive subst t = match view t with
+  let rec eval_ ~rename_binders ~recursive subst t = match view t with
     | Var v ->
-      begin match Var.Subst.find subst v with
-        | None ->
-          var ?loc:t.loc (Var.update_ty v ~f:(eval_ ~recursive subst))
-        | Some t' ->
-          assert (t != t');
-          if recursive then (
-            eval_ ~recursive subst t'
-          ) else (
-            t'
-          )
-      end
+      eval_var ~rename_binders ~recursive ~t subst v
     | _ ->
       map subst t
-        ~bind:rename_var
-        ~f:(eval_ ~recursive)
+        ~bind:(if rename_binders then rename_var ~rename_binders else eval_binders ~recursive ~rename_binders ~t)
+        ~f:(eval_ ~rename_binders ~recursive)
 
   (* rename variable and evaluate its type. *)
-  and rename_var subst v =
-    let v' = Var.copy v |> Var.update_ty ~f:(eval_ ~recursive:true subst) in
+  and rename_var ~rename_binders subst v =
+    let v' = Var.copy v |> Var.update_ty ~f:(eval_ ~rename_binders ~recursive:true subst) in
     (* (re-)bind [v] to [v'] *)
     let subst = Var.Subst.add subst v (var v') in
     subst, v'
+  and eval_var ~rename_binders ~recursive ~t subst v =
+    begin match Var.Subst.find subst v with
+        | None ->
+          var ?loc:t.loc (Var.update_ty v ~f:(eval_ ~recursive ~rename_binders subst))
+        | Some t' ->
+          if not (t != t') then (
+            Format.printf "faulty subst:@ %a.\n" pp subst;
+            assert(false);
+          );
+          if recursive then (eval_ ~recursive ~rename_binders subst t') else (t')
+    end
+  and eval_binders ~rename_binders ~recursive ~t subst v =
+    subst, match view (eval_var ~recursive ~rename_binders ~t subst v) with
+           | Var v' -> v'
+           | _ -> invalid_arg "binder must be evaluated to a variable"
 
-  let eval subst t = if is_empty subst then t else eval_ ~recursive:true subst t
+  let eval ?(rename_binders=true) subst t = if is_empty subst then t else eval_ ~rename_binders ~recursive:true subst t
 
-  let eval_nonrec subst t = if is_empty subst then t else eval_ ~recursive:false subst t
+  let eval_nonrec subst t = if is_empty subst then t else eval_ ~rename_binders:true ~recursive:false subst t
 
 end
 
@@ -1523,7 +1528,8 @@ let try_alpha_renaming f1 f2 =
         | Some t -> begin match view t with
             | Var v'' when Var.equal v' v'' -> aux subst rest
             | _ -> raise (UnifyFailure ("double binding",[],None)) end
-        | None -> aux (Subst.add subst v f2) rest end
+        | None -> if not (Var.equal v v') then aux (Subst.add subst v f2) rest 
+                  else aux subst rest end
       | Const x, Const y when ID.equal x y -> aux subst rest
       | App(hd_x, xs), App (hd_y, ys) when List.length xs = List.length ys ->
         (* head might be a lambda or a const, delegate solving it to
@@ -1535,7 +1541,8 @@ let try_alpha_renaming f1 f2 =
         aux subst ((List.combine xs ys) @ rest)
       | Bind(b, v, body), Bind(b', v', body') when Binder.equal b b' ->
         assert(CCOpt.is_none (Subst.find subst v));
-        let subst = Subst.add subst v (var v') in
+        let subst = if not (Var.equal v v') then Subst.add subst v (var v') 
+                    else subst in
         aux subst ((body, body') ::  rest)
       | _ -> raise (UnifyFailure ("unknown constructors",[],None)) 
   in
