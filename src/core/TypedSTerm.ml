@@ -1540,7 +1540,9 @@ let try_alpha_renaming f1 f2 =
       | _ -> raise (UnifyFailure ("unknown constructors",[],None)) 
   in
   try
-    Some (aux Subst.empty [f1,f2])
+    if not @@ Iter.is_empty 
+        (Iter.inter ~eq:Var.equal ~hash:Var.hash (Seq.vars f1 ) (Seq.vars f2)) then None
+    else Some (aux Subst.empty [f1,f2])
   with UnifyFailure (msg, _, _) ->
     Util.debugf 1 "Alpha renaming failed: %s@." (fun k -> k msg);
     None

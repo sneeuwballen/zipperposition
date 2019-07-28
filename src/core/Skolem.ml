@@ -228,7 +228,7 @@ let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~parents form 
       (fun k->k pp_form_definition def Proof.Step.pp proof);
     def in
   if not rw_rules then (
-    Format.printf "defining:@ @[%a@]\n" T.pp form;
+    (* Format.printf "defining:@ @[%a@]\n" T.pp form; *)
 
     match find_def_in_ctx ~ctx form with
     | Some (def, subst) ->
