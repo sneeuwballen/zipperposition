@@ -1482,7 +1482,7 @@ let apply_unify ?gen_fresh_meta ?allow_open ?loc ?st ?(subst=Subst.empty) ty l =
       aux_l subst exp ret l
     | Ty.Ty_meta _, _ ->
       begin match gen_fresh_meta with
-        | None ->
+        | None -> 
           fail_uniff_ ?loc [] "cannot apply type `@[%a@]`@ to `@[%a@]`"
             pp ty (Util.pp_list pp) l
         | Some g ->

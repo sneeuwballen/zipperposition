@@ -347,15 +347,15 @@ let rewrite_tst_stmt stmt =
             f') combined in
         Some (res, !proof)) in
 
-  let mk_proof f_opt orig =
+  let mk_proof ~stmt_parents f_opt orig =
     CCOpt.map (fun (f', parent_list) -> 
        let rule = Proof.Rule.mk "definition expansion" in
-       f', Proof.S.mk_f_simp ~rule orig parent_list) f_opt in
+       f', Proof.S.mk_f_simp ~rule orig (parent_list @ stmt_parents)) f_opt in
   
-  let stmt_parents = Proof.Step.parents (Statement.proof_step stmt) in
+  let stmt_parents = [Proof.Parent.from @@ Statement.as_proof_i stmt] in
   match Statement.view stmt with
   | Assert f -> 
-    (match mk_proof (aux f) f with
+    (match mk_proof ~stmt_parents (aux f) f with
     | Some (f', proof) -> Statement.assert_ ~proof:(Proof.S.step proof) f'
     | None -> stmt)
   | Lemma fs -> 
@@ -368,7 +368,7 @@ let rewrite_tst_stmt stmt =
       Statement.lemma ~proof fs'
     | None -> stmt end
   | Goal g ->
-    (match mk_proof (aux g) g with
+    (match mk_proof ~stmt_parents (aux g) g with
     | Some (g', proof) -> Statement.goal ~proof:(Proof.S.step proof) g'
     | None -> stmt)
   | NegatedGoal (skolems, ngs) -> 

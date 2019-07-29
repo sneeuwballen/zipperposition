@@ -1248,9 +1248,9 @@ let simplify_bools t =
       if T.equal p true_ then aux c
       else if T.equal p false_ then true_
       else (
-        let p',t' = aux p, aux t in
-        if equal p p' && equal t t' then t 
-        else app_builtin ~ty:(ty t) Builtin.Imply [p';t'])
+        let p',c' = aux p, aux c in
+        if equal p p' && equal c c' then t 
+        else app_builtin ~ty:(ty t) Builtin.Imply [p';c'])
     | AppBuiltin(hd, [a;b]) 
         when hd = Builtin.Eq || hd = Builtin.Equiv ->
       if equal a b then true_ else (

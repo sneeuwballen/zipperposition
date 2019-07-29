@@ -79,7 +79,7 @@ and gfpf_root ~depth t =
   | T.Var _ -> A
   | T.Const c -> S c
   | T.App (hd,_) -> (match T.view hd with
-                         T.Var _ -> B
+                         T.Var _ -> A
                          | T.Const s -> S s
                          | T.DB i    -> if (i < depth) then DB i else Ignore
                          | T.AppBuiltin(_,_) -> Ignore
@@ -150,12 +150,12 @@ let compatible_features_unif f1 f2 =
   | Ignore -> true
   | B    -> true
   | A    -> (match f2 with
-             | DB _ | N  -> false
-             | Ignore | S _ | A | B  -> true)
+             | N  -> false
+             | Ignore | S _ | DB _ | A | B  -> true)
   | DB i -> (match f2 with 
              | DB j -> i = j
-             | B | Ignore -> true
-             | A | S _ | N -> false)
+             | B | A | Ignore -> true
+             | S _ | N -> false)
   | N ->    (match f2 with 
              | N | B | Ignore -> true
              | A | DB _ | S _ -> false)
@@ -170,7 +170,7 @@ let compatible_features_match f1 f2 =
   | Ignore 
   | B    -> true
   | A    -> (match f2 with
-             | A | S _ | Ignore -> true
+             | A | DB _ | S _ | Ignore -> true
              | _ -> false)
   | DB i -> (match f2 with 
              | DB j -> i = j

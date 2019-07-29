@@ -430,10 +430,10 @@ module Make(C : Clause_intf.S) = struct
         let conj_mul = CCOpt.get_exn (Float.of_string_opt (Str.matched_group 4 s)) in
         let dist_var_mul = CCOpt.get_exn (Float.of_string_opt (Str.matched_group 5 s)) in
         conj_relative_cheap ~v ~f ~pos_mul ~conj_mul ~dist_var_mul
-      with Not_found | Invalid_argument _ -> 
-        invalid_arg @@
-          ("expected conjecture-relative-cheap(v:int,f:int,pos_mul:float,conj_mul:float,dist_var_mul:float)"
-          ^ (CCFormat.sprintf "\ngot: %s" s))
+      with Not_found | Invalid_argument _ ->
+        Util.invalid_argf
+          "expected conjecture-relative-cheap(v:int,f:int,pos_mul:float,conj_mul:float,dist_var_mul:float\n\
+          got: %s" s
 
     let parsers = 
       ["fifo", (fun _ c -> C.id c);
