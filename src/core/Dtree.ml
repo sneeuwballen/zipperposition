@@ -65,22 +65,26 @@ let pp_char out = function
   | Subterm t -> CCFormat.hbox T.pp out t
 
 (* parameter: maximum depth before we start using {!Subterm} *)
-let max_depth_ = ref 3
+let max_depth_ = ref 5
 
 let open_term ~stack ~weight ~len t =
   let hd_w = T.ho_weight @@ T.head_term t in
   let t_w = T.ho_weight t in
   if len > !max_depth_ then (
     (* opaque. Do not enter the term. *)
+    assert(weight >= t_w);
     let cur_char = Subterm t in
     {cur_char; cur_term=t; cur_weight=weight-t_w; stack=[]::stack; stack_len=len+1}
   ) else (
     let cur_char, l = (term_to_char) t in
     let cur_weight = if CCList.is_empty l then weight-t_w else weight-hd_w in
+    assert(cur_weight >= 0);
     {cur_char; cur_term=t; cur_weight; stack=l::stack; stack_len=len+1}
   )
 
-let rec next_rec stack len weight = match stack with
+let rec next_rec stack len weight = 
+  assert(weight >= 0);
+  match stack with
   | [] -> None
   | []::stack' -> next_rec stack' (len-1) weight
   | (t::next')::stack' ->
@@ -88,7 +92,9 @@ let rec next_rec stack len weight = match stack with
 
 let skip iter = match iter.stack with
   | [] -> None
-  | _next::stack' -> next_rec stack' (iter.stack_len-1) iter.cur_weight
+  | _next::stack' -> 
+    let _next_w = List.fold_left (fun acc t -> acc + (T.ho_weight t)) 0 _next in
+    next_rec stack' (iter.stack_len-1) (iter.cur_weight-_next_w)
 
 let[@inline] next iter = next_rec iter.stack iter.stack_len iter.cur_weight
 
@@ -122,13 +128,25 @@ module Make(E : Index.EQUATION) = struct
 
   type trie = {
     map : trie CharMap.t; (** map atom -> trie *)
-    max_weight: int option;
+    min_weight: int;
     leaf : (T.t * E.t * int) list; (** leaf with (term, value, priority) list *)
   } (* The discrimination tree *)
 
-  let empty_trie = {map=CharMap.empty; max_weight=None; leaf=[]}
+  let empty_trie = {map=CharMap.empty; min_weight=0; leaf=[]}
 
   let is_empty n = n.leaf = [] && CharMap.is_empty n.map
+
+  let get_min_weight l =
+    Iter.of_list l
+    |> Iter.map (fun (t,_,_) -> T.ho_weight t)
+    |> Iter.min
+    |> CCOpt.get_or ~default:0 
+  
+  let min_weight_of_tries map =
+    CharMap.values map
+    |> Iter.map (fun trie -> trie.min_weight)
+    |> Iter.min
+    |> CCOpt.get_or ~default:0
 
   (** get/add/remove the leaf for the given flatterm. The
       continuation k takes the leaf, and returns a leaf option
@@ -143,22 +161,26 @@ module Make(E : Index.EQUATION) = struct
         | [] -> (* look at leaf *)
           begin match k trie.leaf with
             | new_leaf when trie.leaf == new_leaf -> root (* no change, return same tree *)
-            | new_leaf -> rebuild {trie with leaf=new_leaf} (* replace by new leaf *)
+            | new_leaf -> rebuild {trie with leaf=new_leaf; min_weight=get_min_weight new_leaf} (* replace by new leaf *)
           end
         | c::t' ->
           begin match CharMap.get c trie.map with
             | Some subtrie ->
               let rebuild' subtrie = match subtrie with
                 | _ when is_empty subtrie ->
-                  rebuild {trie with map=CharMap.remove c trie.map}
-                | _ -> rebuild {trie with map=CharMap.add c subtrie trie.map}
+                  let map = CharMap.remove c trie.map in
+                  rebuild {trie with map; min_weight=min_weight_of_tries map}
+                | _ -> 
+                  let map = CharMap.add c subtrie trie.map in
+                  rebuild {trie with map; min_weight=min_weight_of_tries map}
               in
               goto subtrie t' rebuild'
             | None ->
               let subtrie = empty_trie in
               let rebuild' subtrie = match subtrie with
                 | _ when is_empty subtrie -> root  (* same tree *)
-                | _ -> rebuild {trie with map=CharMap.add c subtrie trie.map}
+                | _ -> let map = CharMap.add c subtrie trie.map in
+                       rebuild {trie with map; min_weight=min_weight_of_tries map}
               in
               goto subtrie t' rebuild'
           end
@@ -215,46 +237,48 @@ module Make(E : Index.EQUATION) = struct
           let c1 = i.cur_char in
           CharMap.iter
             (fun c2 subtrie ->
-               match c2 with
-                 | Variable v2 ->
-                   (* deal with the variable branche in the trie *)
-                   begin match S.FO.get_var subst (Scoped.set dt (v2:>ST.t HVar.t)) with
-                     | None ->
-                       (* not bound: try to match types + bind, then continue *)
-                       begin
-                         try
-                           let subst =
-                             Unif.Ty.matching ~subst
-                               ~pattern:(Scoped.set dt (HVar.ty v2))
-                               (Scoped.set t (T.ty t_pos))
-                           in
-                           let subst =
-                             Unif.FO.bind ~check:false subst
-                               (Scoped.set dt v2) (Scoped.set t t_pos) in
-                           traverse subtrie (skip i) subst
-                         with Unif.Fail -> () (* incompatible binding, or occur check *)
-                       end
-                     | Some t' ->
-                       (* already bound, check consistency *)
-                       if Unif.FO.equal ~subst (Scoped.set t t_pos) t'
-                       then traverse subtrie (skip i) subst
-                   end
-                 | Subterm t2 ->
-                   (* fallback to matching *)
-                   begin
-                     try
-                       let subst =
-                         Unif.FO.matching
-                           ~subst ~pattern:(Scoped.set dt t2) (Scoped.set t t_pos)
-                       in
-                       traverse subtrie (skip i) subst
-                     with Unif.Fail -> ()
-                   end
-                 | _ when eq_char c2 c1 ->
-                   (* explore branch that has the same symbol, if any *)
-                   assert (not (T.is_var t_pos));
-                   traverse subtrie (next i) subst;
-                 | _ -> ())
+               if i.cur_weight >= subtrie.min_weight then
+                (match c2 with
+                  | Variable v2 ->
+                    (* deal with the variable branch in the trie *)
+                    begin match S.FO.get_var subst (Scoped.set dt (v2:>ST.t HVar.t)) with
+                      | None ->
+                        (* not bound: try to match types + bind, then continue *)
+                        begin
+                          try
+                            let subst =
+                              Unif.Ty.matching ~subst
+                                ~pattern:(Scoped.set dt (HVar.ty v2))
+                                (Scoped.set t (T.ty t_pos))
+                            in
+                            let subst =
+                              Unif.FO.bind ~check:false subst
+                                (Scoped.set dt v2) (Scoped.set t t_pos) in
+                            traverse subtrie (skip i) subst
+                          with Unif.Fail -> () (* incompatible binding, or occur check *)
+                        end
+                      | Some t' ->
+                        (* already bound, check consistency *)
+                        if Unif.FO.equal ~subst (Scoped.set t t_pos) t'
+                        then traverse subtrie (skip i) subst
+                    end
+                  | Subterm t2 ->
+                    (* fallback to matching *)
+                    begin
+                      try
+                        let subst =
+                          Unif.FO.matching
+                            ~subst ~pattern:(Scoped.set dt t2) (Scoped.set t t_pos)
+                        in
+                        traverse subtrie (skip i) subst
+                      with Unif.Fail -> ()
+                    end
+                  | _ when eq_char c2 c1 ->
+                    (* explore branch that has the same symbol, if any *)
+                    assert (not (T.is_var t_pos));
+                    traverse subtrie (next i) subst;
+                  | _ -> ())
+                else ())
             trie.map
     in
     traverse (fst dt) (iterate (fst t)) subst;
