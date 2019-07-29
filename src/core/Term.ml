@@ -479,7 +479,7 @@ let rec ho_weight t =
   | AppBuiltin (_,l) -> sum_l ~init_w:(init_w+1) l
   | Var _  | Const _   | DB _ -> 1
   | App (f, l) -> 
-    if is_var f then 1 + init_w
+    if is_var f then 1
     else (let init_w = ho_weight f + init_w in 
           sum_l ~init_w l)
   | Fun (_,u) -> assert(false) (* functions are unrolled *)
