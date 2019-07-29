@@ -487,6 +487,8 @@ let weight ?(var=1) ?(sym=fun _ -> 1) t =
     | Const s -> sym s
   in weight t
 
+let ho_weight = T.ho_weight
+
 let is_ground t = T.is_ground t
 
 let rec in_pfho_fragment t =

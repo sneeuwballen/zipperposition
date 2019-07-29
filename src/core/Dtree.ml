@@ -22,6 +22,7 @@ type character =
 type iterator = {
   cur_char : character;
   cur_term : T.t;
+  cur_weight : int;
   stack : T.t list list; (* skip: drop head, next: first of head *)
   stack_len: int;
 }
@@ -66,30 +67,33 @@ let pp_char out = function
 (* parameter: maximum depth before we start using {!Subterm} *)
 let max_depth_ = ref 3
 
-let open_term ~stack ~len t =
+let open_term ~stack ~weight ~len t =
+  let hd_w = T.ho_weight @@ T.head_term t in
+  let t_w = T.ho_weight t in
   if len > !max_depth_ then (
     (* opaque. Do not enter the term. *)
     let cur_char = Subterm t in
-    {cur_char; cur_term=t; stack=[]::stack; stack_len=len+1}
+    {cur_char; cur_term=t; cur_weight=weight-t_w; stack=[]::stack; stack_len=len+1}
   ) else (
     let cur_char, l = (term_to_char) t in
-    {cur_char; cur_term=t; stack=l::stack; stack_len=len+1}
+    let cur_weight = if CCList.is_empty l then weight-t_w else weight-hd_w in
+    {cur_char; cur_term=t; cur_weight; stack=l::stack; stack_len=len+1}
   )
 
-let rec next_rec stack len = match stack with
+let rec next_rec stack len weight = match stack with
   | [] -> None
-  | []::stack' -> next_rec stack' (len-1)
+  | []::stack' -> next_rec stack' (len-1) weight
   | (t::next')::stack' ->
-    Some (open_term ~stack:(next'::stack') ~len t)
+    Some (open_term ~stack:(next'::stack') ~len ~weight t)
 
 let skip iter = match iter.stack with
   | [] -> None
-  | _next::stack' -> next_rec stack' (iter.stack_len-1)
+  | _next::stack' -> next_rec stack' (iter.stack_len-1) iter.cur_weight
 
-let[@inline] next iter = next_rec iter.stack iter.stack_len
+let[@inline] next iter = next_rec iter.stack iter.stack_len iter.cur_weight
 
 (* Iterate on a term *)
-let[@inline] iterate term = Some (open_term ~stack:[] ~len:0 term)
+let[@inline] iterate term = Some (open_term ~stack:[] ~len:0 term ~weight:(T.ho_weight term))
 
 (* convert term to list of var/symbol *)
 let to_list t : _ list =
@@ -118,10 +122,11 @@ module Make(E : Index.EQUATION) = struct
 
   type trie = {
     map : trie CharMap.t; (** map atom -> trie *)
+    max_weight: int option;
     leaf : (T.t * E.t * int) list; (** leaf with (term, value, priority) list *)
   } (* The discrimination tree *)
 
-  let empty_trie = {map=CharMap.empty; leaf=[]}
+  let empty_trie = {map=CharMap.empty; max_weight=None; leaf=[]}
 
   let is_empty n = n.leaf = [] && CharMap.is_empty n.map
 
