@@ -8,6 +8,7 @@ type t = {
   ty : type_result;
   mutable id : int;
   mutable payload: exn;
+  ho_weight : int lazy_t;
 }
 
 (* head form *)
@@ -132,8 +133,44 @@ exception IllFormedTerm of string
 
 type nat = int
 
+let rec open_bind b t = match view t with
+  | Bind (b', ty, t') when b=b' ->
+    let args, ret = open_bind b t' in
+    ty :: args, ret
+  | _ -> [], t
+
+let[@inline] is_var t = match view t with | Var _ -> true | _ -> false
+
+let ho_weight_ t t_ty = 
+  let rec aux t t_ty = 
+    let init_w s_ty = match s_ty with 
+    | NoType -> 0
+    | HasType ty -> 
+        match view ty with 
+        | AppBuiltin (Builtin.Arrow, l) -> List.length l - 1
+        | _ -> 0 in
+    match t with 
+      | Var _  | DB _  | Const _ -> 1
+      | Bind (Binder.Lambda, _, t') ->
+        let _, t' = open_bind Binder.Lambda t' in
+        init_w (ty t') + aux (view t') (ty t')
+      | Bind (_,_, t') -> 
+        aux (view t') (ty t')
+      | App (f, l) ->
+        if is_var f then 1
+        else aux_l (aux (view f) (ty f)) l
+      | AppBuiltin (b, l) -> aux_l (1) l
+  and aux_l acc = function
+  | [] -> acc
+  | x :: xs -> aux_l (acc + aux (view x) (ty x))  xs 
+  in
+  aux t t_ty  
+
+let[@inline] ho_weight t = Lazy.force t.ho_weight
+
 let make_ ~ty term =
-  { term; ty; id = ~-1; payload=No_payload; }
+  { term; ty; id = ~-1; payload=No_payload;
+    ho_weight = lazy (ho_weight_ term ty) }
 
 let const ~ty s =
   let my_t = make_ ~ty:(HasType ty) (Const s) in
@@ -215,7 +252,6 @@ let cast ~ty old = match old.term with
   | App (f,l) -> app ~ty f l
   | AppBuiltin (s,l) -> app_builtin ~ty s l
 
-let[@inline] is_var t = match view t with | Var _ -> true | _ -> false
 let[@inline] is_bvar t = match view t with | DB _ -> true | _ -> false
 let[@inline] is_const t = match view t with | Const _ -> true | _ -> false
 let[@inline] is_bind t = match view t with | Bind _ -> true | _ -> false
@@ -848,12 +884,6 @@ let needs_args (t:t): bool = match view t with
   | _ -> false
 
 let show_type_arguments = ref false
-
-let rec open_bind b t = match view t with
-  | Bind (b', ty, t') when b=b' ->
-    let args, ret = open_bind b t' in
-    ty :: args, ret
-  | _ -> [], t
 
 let rec open_bind2 b t1 t2 = match view t1, view t2 with
   | Bind (b1', ty1, t1'), Bind (b2', ty2, t2') when b=b1' && b=b2' ->

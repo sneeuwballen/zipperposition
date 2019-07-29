@@ -22,6 +22,7 @@ type t = private {
   ty : type_result;
   mutable id : int;
   mutable payload: exn;
+  ho_weight : int lazy_t;
 }
 (** Abstract type of term *)
 
@@ -57,6 +58,8 @@ val hash_mod_alpha : t -> int
 
 val same_l : t list -> t list -> bool
 (** Physical equality on lists of terms, roughly the same as {!List.forall2 (==)} *)
+
+val ho_weight : t -> int
 
 (** {3 Constructors}
 
