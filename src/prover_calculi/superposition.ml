@@ -1255,9 +1255,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun (l, r, _, l_pos) ->
           let do_eq_res us =
             let pos = Lits.Pos.idx l_pos in
+            Format.printf "cl:@ @[%a@].\n@ pos: %d\nbv:@ %b\n" C.pp clause pos (BV.get (C.eligible_res_no_subst clause) pos);
             if BV.get (C.eligible_res_no_subst clause) pos
             (* subst(lit) is maximal, we can do the inference *)
             then (
+              Format.printf "succeeded.\n";
               Util.incr_stat stat_equality_resolution_call;
               let renaming = Subst.Renaming.create () in
               let subst = US.subst us in

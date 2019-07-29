@@ -41,8 +41,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   type t = {
     sclause : sclause;
     penalty: int; (** heuristic penalty *)
-    mutable selected : BV.t Lazy.t; (** bitvector for selected lits*)
-    mutable max_lits : BV.t Lazy.t; (** bitvector for maximal lits *)
+    selected : BV.t Lazy.t; (** bitvector for selected lits*)
+    max_lits : int list Lazy.t; (** bitvector for maximal lits *)
     mutable proof : proof_step; (** Proof of the clause *)
     mutable eligible_res: BV.t option; (* eligible for resolution? *)
   }
@@ -104,12 +104,13 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let create_inner ~penalty ~selected sclause proof =
     (* create the structure *)
     let ord = Ctx.ord () in
+    let max_lits = lazy ( BV.to_list @@ Lits.maxlits sclause.lits ~ord ) in
     let c = {
       sclause;
       penalty;
       selected;
       proof;
-      max_lits= lazy ( Lits.maxlits sclause.lits ~ord );
+      max_lits;
       eligible_res=None;
     } in
     (* return clause *)
@@ -205,7 +206,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     if not @@ Subst.is_empty subst then (
       let lits' = _apply_subst_no_simpl subst (lits c,sc) in
       Lits.maxlits ~ord lits')
-    else Lazy.force c.max_lits
+    else BV.of_list @@ Lazy.force c.max_lits
   
   (** Check whether the literal is maximal *)
   let is_maxlit (c,sc) subst ~idx =
@@ -213,7 +214,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       let ord = Ctx.ord () in
       let lits' = _apply_subst_no_simpl subst (lits c,sc) in
       Lits.is_max ~ord lits' idx
-    ) else (BV.get (Lazy.force c.max_lits) idx)
+    ) else (BV.get (BV.of_list @@ Lazy.force c.max_lits) idx)
     
 
   (** Bitvector that indicates which of the literals of [subst(clause)]
@@ -227,7 +228,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       if not @@ Subst.is_empty subst then (
         let lits' = _apply_subst_no_simpl subst (lits c,sc) in
         Lits.maxlits ~ord lits'
-      ) else (Lazy.force c.max_lits)
+      ) else (BV.of_list @@ Lazy.force c.max_lits)
     ) else (
       let lits' = _apply_subst_no_simpl subst (lits c,sc) in
       let bv = BV.copy selected in
@@ -284,7 +285,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
           let lits' = _apply_subst_no_simpl subst (lits c,sc) in
           (* maximal ones *)
           Lits.maxlits ~ord lits', lits')
-        else (Lazy.force c.max_lits, lits c) in
+        else (BV.of_list @@ Lazy.force c.max_lits, lits c) in
       (* only keep literals that are positive equations *)
       BV.filter bv (fun i -> Lit.is_pos lits'.(i));
       bv
@@ -404,7 +405,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let filter f _ lit = f lit
 
     let max c =
-      fun i _ -> BV.get (Lazy.force c.max_lits) i
+      fun i _ -> BV.get (BV.of_list @@ Lazy.force c.max_lits) i
 
     let pos _ lit = Lit.is_pos lit
 
