@@ -19,6 +19,7 @@ let quant_rename = ref false
 let interpret_bool_funs = ref false
 let cnf_non_simpl = ref false
 let _norm_bools = ref false 
+let _solve_formulas = ref false
 
 let section = Util.Section.make ~parent:Const.section "booleans"
 
@@ -268,7 +269,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       | None            -> false 
     ) (C.lits c) in
 
-    let renaming_weight = 150 in
+    let renaming_weight = 40 in
     let max_formula_weight = 
       C.Seq.terms c 
       |> Iter.filter T.is_formula
@@ -363,6 +364,20 @@ module Make(E : Env.S) : S with module Env = E = struct
         forall_cl :: forall_neg_cl :: res
     ) []
 
+  let solve_bool_formulas cl =
+    let unifiers = CCList.flat_map (fun literal -> 
+      match literal with 
+      | Literal.Equation(lhs, rhs, false) when Type.is_prop (Term.ty lhs) ->
+        PragHOUnif.unify_scoped (lhs,0) (rhs,0)
+        |> OSeq.filter_map CCFun.id
+        |> OSeq.to_list
+      | _ -> []
+    ) (CCArray.to_list (C.lits cl)) in
+    if CCList.is_empty unifiers then None
+    else Some (List.map (fun subst -> 
+                let subst = Unif_subst.subst subst in
+                C.apply_subst (cl,0) subst) unifiers)
+
   let setup () =
 	(* if !_bool_reasoning then(
 		Env.ProofState.ActiveSet.add (create_clauses () );
@@ -382,7 +397,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     if !cnf_non_simpl then (
       Env.add_unary_inf "cnf otf inf" cnf_infer;
     ) else  Env.add_multi_simpl_rule cnf_otf;
-
+    if !_solve_formulas then (
+      Env.add_multi_simpl_rule solve_bool_formulas
+    );
     if (!interpret_bool_funs) then (
       Env.add_unary_inf "interpret boolean functions" interpret_boolean_functions;
     );
@@ -643,7 +660,10 @@ let () =
       , Arg.Bool (fun v -> interpret_bool_funs := v)
       , " turn interpretation of boolean functions as forall or negation of forall on or off";
       "--normalize-bool-terms", Arg.Bool((fun v -> _norm_bools := v)),
-      " normalize boolean subterms using their weight."
+      " normalize boolean subterms using their weight.";
+      "--solve-formulas"
+      , Arg.Bool (fun v -> _solve_formulas := v)
+      , " solve phi != psi eagerly using unification, where phi and psi are formulas"
       ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
     _bool_reasoning := BoolReasoningDisabled

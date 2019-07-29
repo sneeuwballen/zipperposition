@@ -308,11 +308,11 @@ module Subst : sig
   val find_exn : t -> term Var.t -> term
   (** @raise Not_found if the variable is not present *)
 
-  val rename_var : t -> term Var.t -> t * term Var.t
+  val rename_var : rename_binders:bool -> t -> term Var.t -> t * term Var.t
 
   val merge : t -> t -> t
 
-  val eval : t -> term -> term
+  val eval : ?rename_binders:bool -> t -> term -> term
 
   val eval_nonrec : t -> term -> term
   (** Evaluate under substitution, but consider the substitution as
@@ -379,6 +379,8 @@ val app_infer :
   t -> t list -> t
 (** [app_infer f l] computes the type [ty] of [f l], and return [app ~ty f l]
     @raise UnifyFailure if types do not correspond *)
+
+val try_alpha_renaming : t -> t -> Subst.t option
 
 (** {2 Conversion} *)
 

@@ -151,7 +151,7 @@ let compatible_features_unif f1 f2 =
   | B    -> true
   | A    -> (match f2 with
              | N  -> false
-             | Ignore | S _ | DB _ | A | B  -> true)
+             | DB _ | Ignore | S _ | A | B  -> true)
   | DB i -> (match f2 with 
              | DB j -> i = j
              | B | A | Ignore -> true

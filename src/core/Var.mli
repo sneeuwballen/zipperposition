@@ -58,6 +58,7 @@ module Set : sig
   val add_list : 'a t -> 'a var list -> 'a t
   val to_list : 'a t -> 'a var list
   val of_list : 'a var list -> 'a t
+  val intersection_empty : 'a t -> 'a t -> bool
   val cardinal : _ t -> int
   val pp : _ t CCFormat.printer
 end

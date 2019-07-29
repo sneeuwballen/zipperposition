@@ -374,7 +374,7 @@ module Flatten = struct
         aux pos vars t'
       | T.AppBuiltin (Builtin.Eq, [a;b]) ->
         (F.eq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
-        >|= aux_maybe_define ~should_define pos
+        (* >|= aux_maybe_define ~should_define pos *)
       | T.AppBuiltin (Builtin.Neq, [a;b]) 
         when  (T.is_fun a || T.is_fun b) 
               &&  not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a)))   (*false*) ->
