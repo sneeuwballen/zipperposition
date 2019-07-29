@@ -466,6 +466,24 @@ let close_quantifier b ty_args body =
     app_builtin ~ty:Type.prop b [fun_ ty acc])
   ty_args body
 
+let rec ho_weight t =
+  let rec sum_l ~init_w = function 
+  | [] -> init_w
+  | s :: xs -> ho_weight s + (sum_l ~init_w xs) in
+
+  let _, t = open_fun t in
+  let init_w = List.length @@ Type.expected_args (ty t) in
+ 
+
+  match view t with 
+  | AppBuiltin (_,l) -> sum_l ~init_w:(init_w+1) l
+  | Var _  | Const _   | DB _ -> 1
+  | App (f, l) -> 
+    if is_var f then 1 + init_w
+    else (let init_w = ho_weight f + init_w in 
+          sum_l ~init_w l)
+  | Fun (_,u) -> assert(false) (* functions are unrolled *)
+
 
 let var_occurs ~var t =
   Iter.exists (HVar.equal Type.equal var) (Seq.vars t)
