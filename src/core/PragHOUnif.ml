@@ -431,7 +431,7 @@ let unify_scoped t0_s t1_s =
     with Unif.Fail -> None in
   let t0',t1',unifscope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
   let prefix = if (CCOpt.is_some lfho_unif) then OSeq.cons lfho_unif else (fun x -> x) in
-  let monomorphic = Iter.is_empty @@ Iter.union (Term.Seq.ty_vars t0') (Term.Seq.ty_vars t1') in
+  let monomorphic = Iter.is_empty @@ Iter.append (Term.Seq.ty_vars t0') (Term.Seq.ty_vars t1') in
   let state = 
   {
     num_identifications = 0;

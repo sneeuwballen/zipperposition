@@ -250,10 +250,10 @@ module KBO : ORD = struct
     and balance_weight_var (wb:W.t) t s ~pos : W.t * bool =
       if pos then (
         add_pos_var balance t;
-        W.(wb + weight_var_headed), Some t = s
+        W.(wb + weight_var_headed), CCOpt.is_some s && ( Term.equal (CCOpt.get_exn s) t)
       ) else (
         add_neg_var balance t;
-        W.(wb - weight_var_headed), Some t = s
+        W.(wb - weight_var_headed), CCOpt.is_some s && ( Term.equal (CCOpt.get_exn s) t)
       )
     (** list version of the previous one, threaded with the check result *)
     and balance_weight_rec wb terms s ~pos res = match terms with

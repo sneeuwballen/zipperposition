@@ -222,7 +222,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let g, ss = T.as_app_with_mandatory_args s in
       begin match List.rev tt, List.rev ss with
         | last_t :: tl_rev_t, last_s :: tl_rev_s ->
-          if last_t = last_s && not (T.is_type last_t) then
+          if T.equal last_t last_s && not (T.is_type last_t) then
             match T.as_var last_t with
               | Some v ->
                 if not (T.var_occurs ~var:v f)

@@ -32,6 +32,10 @@ let[@inline] char_to_int_ = function
   | Variable _ -> 2
   | Subterm _ -> 3
 
+let[@inline] char_weight_ = function 
+  | Symbol _ | Variable _ -> 1
+  | Subterm s -> T.ho_weight s 
+
 let compare_char c1 c2 =
   (* compare variables by index *)
   let compare_vars v1 v2 =
@@ -65,21 +69,17 @@ let pp_char out = function
   | Subterm t -> CCFormat.hbox T.pp out t
 
 (* parameter: maximum depth before we start using {!Subterm} *)
-let max_depth_ = ref 5
+let max_depth_ = ref 3
 
 let open_term ~stack ~weight ~len t =
-  let hd_w = T.ho_weight @@ T.head_term t in
-  let t_w = T.ho_weight t in
+  assert(weight >= 0);
   if len > !max_depth_ then (
     (* opaque. Do not enter the term. *)
-    assert(weight >= t_w);
     let cur_char = Subterm t in
-    {cur_char; cur_term=t; cur_weight=weight-t_w; stack=[]::stack; stack_len=len+1}
+    {cur_char; cur_term=t; cur_weight=weight; stack=[]::stack; stack_len=len+1}
   ) else (
     let cur_char, l = (term_to_char) t in
-    let cur_weight = if CCList.is_empty l then weight-t_w else weight-hd_w in
-    assert(cur_weight >= 0);
-    {cur_char; cur_term=t; cur_weight; stack=l::stack; stack_len=len+1}
+    {cur_char; cur_term=t; cur_weight=weight; stack=l::stack; stack_len=len+1}
   )
 
 let rec next_rec stack len weight = 
@@ -92,11 +92,13 @@ let rec next_rec stack len weight =
 
 let skip iter = match iter.stack with
   | [] -> None
-  | _next::stack' -> 
-    let _next_w = List.fold_left (fun acc t -> acc + (T.ho_weight t)) 0 _next in
-    next_rec stack' (iter.stack_len-1) (iter.cur_weight-_next_w)
+  | _next::stack' ->
+    let w = iter.cur_weight-(T.ho_weight iter.cur_term) in
+    next_rec stack' (iter.stack_len-1) w
 
-let[@inline] next iter = next_rec iter.stack iter.stack_len iter.cur_weight
+let[@inline] next iter = 
+  let w = char_weight_ iter.cur_char in
+  next_rec iter.stack iter.stack_len (iter.cur_weight - w)
 
 (* Iterate on a term *)
 let[@inline] iterate term = Some (open_term ~stack:[] ~len:0 term ~weight:(T.ho_weight term))

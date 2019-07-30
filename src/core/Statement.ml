@@ -918,7 +918,7 @@ let get_rw_rule ?weight_incr:(w_i=1000000) c  =
   let build_from_head sym vars rhs =
     let rhs = Lambda.eta_reduce @@ Lambda.snf (fst (Rewrite.Term.normalize_term rhs)) in
     let vars_lhs = Term.VarSet.of_seq (Iter.fold (fun acc v -> 
-        Iter.union acc (Term.Seq.vars v)) 
+        Iter.append acc (Term.Seq.vars v)) 
       Iter.empty (Iter.of_list vars)) in
     if not (Term.symbols rhs |> ID.Set.mem sym) &&
         Term.VarSet.cardinal
@@ -950,7 +950,7 @@ let get_rw_rule ?weight_incr:(w_i=1000000) c  =
       match Iter.head_exn all_lits with
       | SLiteral.Eq (t1,t2) when not (List.mem t1 [Term.true_; Term.false_]) &&
                                  not (List.mem t2 [Term.true_; Term.false_]) ->
-         assert(Term.ty t1 = Term.ty t2);
+         assert(Type.equal (Term.ty t1) (Term.ty t2));
          let ty = Term.ty t1 in
          let fresh_vars = List.map (fun ty -> Term.var (HVar.fresh ~ty ())) (Type.expected_args ty) in
          let t1, t2 = Lambda.snf @@ Term.app t1 fresh_vars, Lambda.snf @@ Term.app t2 fresh_vars in

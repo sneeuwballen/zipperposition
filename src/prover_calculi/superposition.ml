@@ -618,7 +618,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let pos_enclosing_up = Position.until_first_fun passive_lit_pos in
       let around_up =  Subst.FO.apply renaming subst' 
         (Lit.Pos.at info.passive_lit pos_enclosing_up, sc_p) in
-      let vars = Iter.union (T.Seq.vars around_up) (T.Seq.vars t')
+      let vars = Iter.append (T.Seq.vars around_up) (T.Seq.vars t')
                  |> Term.VarSet.of_seq
                  |> Term.VarSet.to_list in
       let skolem_decls = ref [] in
@@ -1117,7 +1117,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               assert (T.is_var (T.head_term u_p));
               assert (T.DB.is_closed u_p);
               (* Create prefix variable H and use H s = H t for superposition *)
-              if (T.Seq.vars s |> Iter.union (T.Seq.vars t)
+              if (T.Seq.vars s |> Iter.append (T.Seq.vars t)
                   |> Iter.exists (fun v -> Type.is_tType (HVar.ty v))) then (
                 acc
               )
@@ -1190,7 +1190,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               let s_pos = with_pos.C.WithPos.pos in
               match Lits.View.get_eqn (C.lits active) s_pos with
                 | Some (s, t, true) -> (
-                    if (T.Seq.vars s |> Iter.union (T.Seq.vars t)
+                    if (T.Seq.vars s |> Iter.append (T.Seq.vars t)
                        |> Iter.exists (fun v -> Type.is_tType (HVar.ty v))) then (
                         acc
                     )
