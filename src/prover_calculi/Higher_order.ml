@@ -689,7 +689,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                            CCInt.to_string (CCRef.get_then_incr new_choice_counter) in
       let new_ch_id = ID.make choice_ty_name in
       let new_ch_const = T.const new_ch_id ~ty in
-      ignore(Signature.declare (C.Ctx.signature ()) new_ch_id ty);
+      Ctx.add_signature (Signature.declare (C.Ctx.signature ()) new_ch_id ty);
       Util.debugf 1 "new choice for type %a: %a(%a).\n" 
         (fun k -> k Type.pp ty T.pp new_ch_const Type.pp (T.ty new_ch_const));
       choice_ops := Term.Set.add new_ch_const !choice_ops;

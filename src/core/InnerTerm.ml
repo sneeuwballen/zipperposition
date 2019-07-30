@@ -48,6 +48,9 @@ let same_l l1 l2 = match l1, l2 with
   | [t1;u1], [t2;u2] -> equal t1 t2 && equal u1 u2
   | _ -> same_l_rec l1 l2
 
+let same_l_gen l1 l2 =
+  List.length l1 == List.length l2 && same_l l1 l2
+
 let _hash_ty t = match t.ty with
   | NoType -> 1
   | HasType ty -> Hash.combine2 2 ty.id

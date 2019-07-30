@@ -57,6 +57,7 @@ let[@inline] ty t = match T.ty t with
 
 let hash_mod_alpha = T.hash_mod_alpha
 let same_l = T.same_l
+let same_l_gen = T.same_l_gen
 
 (* split list between types, terms.
    [ty] is the type of the function, [l] the arguments *)

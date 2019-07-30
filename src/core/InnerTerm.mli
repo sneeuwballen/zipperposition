@@ -59,6 +59,11 @@ val hash_mod_alpha : t -> int
 val same_l : t list -> t list -> bool
 (** Physical equality on lists of terms, roughly the same as {!List.forall2 (==)} *)
 
+val same_l_gen : t list -> t list -> bool
+(** Physical equality on lists of terms, roughly the same as {!List.forall2 (==),
+    tolerates different lengths} *)
+
+
 val ho_weight : t -> int
 
 (** {3 Constructors}

@@ -72,6 +72,7 @@ val same_l : t list -> t list -> bool
     equal, [false] otherwise.
     Precondition: both lists have the same length
     @raise Assert_failure if lists have not the same length *)
+val same_l_gen : t list -> t list -> bool
 
 (** {2 Constructors} *)
 

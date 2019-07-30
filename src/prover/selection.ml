@@ -49,7 +49,7 @@ let can_select_lit ~ord (lits:Lits.t) (i:int) : bool =
         Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
         |> Iter.exists (fun (t,_) ->
             let t_head, t_args = T.as_app t in
-            vars_args |> CCList.exists (fun (head, args) -> head = t_head && t_args != args)
+            vars_args |> CCList.exists (fun (head, args) -> T.equal head t_head && not @@ T.same_l_gen t_args args)
           )
       in
     match !_ho_restriction with
