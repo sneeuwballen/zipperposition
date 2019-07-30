@@ -398,10 +398,10 @@ module Flatten = struct
         (F.xor <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
         (* >|= aux_maybe_define pos *)
       | T.AppBuiltin (Builtin.And, l) ->
-        if pos = Pos_inner && CCList.is_empty l then return t
+        if pos = Pos_inner && CCList.length l <= 1 then return t
         else (F.and_ <$> map_m (aux Pos_toplevel vars) l) (*>|= aux_maybe_define pos*)
       | T.AppBuiltin (Builtin.Or, l) ->
-        if pos = Pos_inner && CCList.is_empty l then return t
+        if pos = Pos_inner && CCList.length l <= 1 then return t
         else (F.or_ <$> map_m (aux Pos_toplevel vars) l) (*>|= aux_maybe_define pos*)
       | T.AppBuiltin (Builtin.Not, [a]) ->
         (F.not_ <$> aux Pos_toplevel vars a) (*>|= aux_maybe_define pos*)

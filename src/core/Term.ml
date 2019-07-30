@@ -806,7 +806,7 @@ module Form = struct
   
   let exists t =
     assert(Type.is_fun (ty t) && Type.returns_prop (ty t));
-    app_builtin ~ty:Type.prop Builtin.ForallConst [t]
+    app_builtin ~ty:Type.prop Builtin.ExistsConst [t]
 end
 
 (** {2 Arith} *)
@@ -1139,8 +1139,19 @@ module Conv = struct
               ST.bind ~ty:(aux_ty Type.prop) b v acc) (vars_converted) (aux_t env body) 
           )
         | AppBuiltin (b,l) ->
-          ST.app_builtin ~ty:(aux_ty (ty t))
-            b (List.map (aux_t env) l)
+          let res = 
+            ST.app_builtin ~ty:(aux_ty (ty t))
+              b (List.map (aux_t env) l) in
+          begin match ST.view res with 
+          | ST.AppBuiltin(b', l') ->
+            assert(Builtin.equal b' Builtin.Equiv || Builtin.equal b' Builtin.Eq ||
+                   Builtin.equal b' Builtin.Xor || Builtin.equal b' Builtin.Neq ||
+                   Builtin.equal b b');
+            assert(Builtin.equal b' Builtin.Equiv || Builtin.equal b' Builtin.Eq ||
+                   Builtin.equal b' Builtin.Xor || Builtin.equal b' Builtin.Neq ||
+                   List.length l = List.length l');
+          | _ -> assert false end;
+          res
         | Fun (ty_arg, body) ->
           let v = Var.makef ~ty:(aux_ty ty_arg) "v_%d" (CCRef.incr_then_get n) in
           let body = aux_t (DBEnv.push env v) body in
