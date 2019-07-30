@@ -41,7 +41,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   type t = {
     sclause : sclause;
     penalty: int; (** heuristic penalty *)
-    mutable selected : BV.t Lazy.t; (** bitvector for selected lits*)
+    selected : BV.t Lazy.t; (** bitvector for selected lits*)
+    max_lits : int list Lazy.t; (** bitvector for maximal lits *)
     mutable proof : proof_step; (** Proof of the clause *)
     mutable eligible_res: BV.t option; (* eligible for resolution? *)
   }
@@ -102,11 +103,14 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   (* private function for building clauses *)
   let create_inner ~penalty ~selected sclause proof =
     (* create the structure *)
+    let ord = Ctx.ord () in
+    let max_lits = lazy ( BV.to_list @@ Lits.maxlits sclause.lits ~ord ) in
     let c = {
       sclause;
       penalty;
       selected;
       proof;
+      max_lits;
       eligible_res=None;
     } in
     (* return clause *)
@@ -199,26 +203,34 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       are maximal under [ord] *)
   let maxlits (c,sc) subst =
     let ord = Ctx.ord () in
-    let lits' = _apply_subst_no_simpl subst (lits c,sc) in
-    Lits.maxlits ~ord lits'
-
+    if not @@ Subst.is_empty subst then (
+      let lits' = _apply_subst_no_simpl subst (lits c,sc) in
+      Lits.maxlits ~ord lits')
+    else BV.of_list @@ Lazy.force c.max_lits
+  
   (** Check whether the literal is maximal *)
   let is_maxlit (c,sc) subst ~idx =
-    let ord = Ctx.ord () in
-    let lits' = _apply_subst_no_simpl subst (lits c,sc) in
-    Lits.is_max ~ord lits' idx
+    if not @@ Subst.is_empty subst then (
+      let ord = Ctx.ord () in
+      let lits' = _apply_subst_no_simpl subst (lits c,sc) in
+      Lits.is_max ~ord lits' idx
+    ) else (BV.get (BV.of_list @@ Lazy.force c.max_lits) idx)
+    
 
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for resolution. *)
   let eligible_res (c,sc) subst =
     let ord = Ctx.ord () in
-    let lits' = _apply_subst_no_simpl subst (lits c,sc) in
     let selected = Lazy.force c.selected in
     if BV.is_empty selected
     then (
       (* maximal literals *)
-      Lits.maxlits ~ord lits'
+      if not @@ Subst.is_empty subst then (
+        let lits' = _apply_subst_no_simpl subst (lits c,sc) in
+        Lits.maxlits ~ord lits'
+      ) else (BV.of_list @@ Lazy.force c.max_lits)
     ) else (
+      let lits' = _apply_subst_no_simpl subst (lits c,sc) in
       let bv = BV.copy selected in
       let n = Array.length lits' in
       (* Only keep literals that are maximal among selected literals of the
@@ -231,7 +243,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
             let lit' = lits'.(j) in
             (* check if both lits are still potentially eligible, and have the same
                sign if [check_sign] is true. *)
-            if Lit.is_pos lit = Lit.is_pos lit' &&  BV.get bv j
+            if Lit.is_pos lit = Lit.is_pos lit' && BV.get bv j
             then match Lit.Comp.compare ~ord lit lit' with
               | Comparison.Incomparable
               | Comparison.Eq -> ()     (* no further information about i-th and j-th *)
@@ -268,9 +280,12 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let eligible_param (c,sc) subst =
     let ord = Ctx.ord () in
     if BV.is_empty (Lazy.force c.selected) then (
-      let lits' = _apply_subst_no_simpl subst (lits c,sc) in
-      (* maximal ones *)
-      let bv = Lits.maxlits ~ord lits' in
+      let bv, lits' = 
+        if not @@ Subst.is_empty subst then (
+          let lits' = _apply_subst_no_simpl subst (lits c,sc) in
+          (* maximal ones *)
+          Lits.maxlits ~ord lits', lits')
+        else (BV.of_list @@ Lazy.force c.max_lits, lits c) in
       (* only keep literals that are positive equations *)
       BV.filter bv (fun i -> Lit.is_pos lits'.(i));
       bv
@@ -390,8 +405,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let filter f _ lit = f lit
 
     let max c =
-      let bv = lazy (Lits.maxlits ~ord:(Ctx.ord ()) c.sclause.lits) in
-      fun i _ -> BV.get (Lazy.force bv) i
+      fun i _ -> BV.get (BV.of_list @@ Lazy.force c.max_lits) i
 
     let pos _ lit = Lit.is_pos lit
 
