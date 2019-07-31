@@ -1153,6 +1153,10 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_unary_simplify neg_ext_simpl;
       );
 
+      if(!_purify_applied_vars != `None) then (
+        Env.add_unary_simplify purify_applied_variable
+      );
+
       if Env.flex_get k_enable_ho_unif then (
         Env.add_unary_inf "ho_unif" ho_unif;
       );
