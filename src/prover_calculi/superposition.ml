@@ -78,6 +78,7 @@ let _fluidsup_penalty = ref 0
 let _fluidsup = ref false
 let _dupsup = ref false
 let _restrict_hidden_sup_at_vars = ref false
+let _check_sup_at_var_cond = ref true
 
 let _NO_LAMSUP = -1
 let _lambdasup = ref (-1)
@@ -321,57 +322,59 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   exception ExitSuperposition of string
 
-  (* Checks whether we must allow superposition at variables to be complete. *)
+  (* Checks whether we must allow superposition at variable headed terms to be complete. *)
   let sup_at_var_condition info var replacement =
-    let open SupInfo in
-    let us = info.subst in
-    let subst = US.subst us in
-    let renaming = S.Renaming.create () in
-    let replacement' = S.FO.apply renaming subst (replacement, info.scope_active) in
-    let var' = S.FO.apply renaming subst (var, info.scope_passive) in
-    if (not (Type.is_fun (Term.ty var')) || not (O.might_flip ord var' replacement'))
-    then (
-      Util.debugf ~section 5
-        "Cannot flip: %a = %a"
-        (fun k->k T.pp var' T.pp replacement');
-      false (* If the lhs vs rhs cannot flip, we don't need a sup at var *)
-    )
-    else (
-      (* Check whether var occurs only with the same arguments everywhere. *)
-      let unique_args_of_var =
-        C.lits info.passive
-        |> Lits.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord ~subterms:true ~eligible:(fun _ _ -> true)
-        |> Iter.fold_while
-          (fun unique_args (t,_) ->
-             if Term.equal (fst (T.as_app t)) var
-             then (
-               if CCOpt.equal (CCList.equal T.equal) unique_args (Some (snd (T.as_app t)))
-               then (unique_args, `Continue) (* found the same arguments of var again *)
-               else (None, `Stop) (* different arguments of var found *)
-             ) else (unique_args, `Continue) (* this term doesn't have var as head *)
-          )
-          None
-      in
-      match unique_args_of_var with
-        | Some _ ->
-          Util.debugf ~section 5
-            "Variable %a has same args everywhere in %a"
-            (fun k->k T.pp var C.pp info.passive);
-          false (* If var occurs with the same arguments everywhere, we don't need sup at vars *)
-        | None ->
-          (* Check whether Cσ is >= C[var -> replacement]σ *)
-          let passive'_lits = Lits.apply_subst renaming subst (C.lits info.passive, info.scope_passive) in
-          let subst_t = Unif.FO.bind_or_update subst (T.as_var_exn var, info.scope_passive) (replacement, info.scope_active) in
-          let passive_t'_lits = Lits.apply_subst renaming subst_t (C.lits info.passive, info.scope_passive) in
-          if Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt
-          then (
+    if !_check_sup_at_var_cond then (
+      let open SupInfo in
+      let us = info.subst in
+      let subst = US.subst us in
+      let renaming = S.Renaming.create () in
+      let replacement' = S.FO.apply renaming subst (replacement, info.scope_active) in
+      let var' = S.FO.apply renaming subst (var, info.scope_passive) in
+      if (not (Type.is_fun (Term.ty var')) || not (O.might_flip ord var' replacement'))
+      then (
+        Util.debugf ~section 5
+          "Cannot flip: %a = %a"
+          (fun k->k T.pp var' T.pp replacement');
+        false (* If the lhs vs rhs cannot flip, we don't need a sup at var *)
+      )
+      else (
+        (* Check whether var occurs only with the same arguments everywhere. *)
+        let unique_args_of_var =
+          C.lits info.passive
+          |> Lits.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord ~subterms:true ~eligible:(fun _ _ -> true)
+          |> Iter.fold_while
+            (fun unique_args (t,_) ->
+              if Term.equal (fst (T.as_app t)) var
+              then (
+                if CCOpt.equal (CCList.equal T.equal) unique_args (Some (snd (T.as_app t)))
+                then (unique_args, `Continue) (* found the same arguments of var again *)
+                else (None, `Stop) (* different arguments of var found *)
+              ) else (unique_args, `Continue) (* this term doesn't have var as head *)
+            )
+            None
+        in
+        match unique_args_of_var with
+          | Some _ ->
             Util.debugf ~section 5
-              "Sup at var condition is not fulfilled because: %a >= %a"
-              (fun k->k Lits.pp passive'_lits Lits.pp passive_t'_lits);
-            false
-          )
-          else true (* If Cσ is either <= or incomparable to C[var -> replacement]σ, we need sup at var.*)
-    )
+              "Variable %a has same args everywhere in %a"
+              (fun k->k T.pp var C.pp info.passive);
+            false (* If var occurs with the same arguments everywhere, we don't need sup at vars *)
+          | None ->
+            (* Check whether Cσ is >= C[var -> replacement]σ *)
+            let passive'_lits = Lits.apply_subst renaming subst (C.lits info.passive, info.scope_passive) in
+            let subst_t = Unif.FO.bind_or_update subst (T.as_var_exn var, info.scope_passive) (replacement, info.scope_active) in
+            let passive_t'_lits = Lits.apply_subst renaming subst_t (C.lits info.passive, info.scope_passive) in
+            if Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt
+            then (
+              Util.debugf ~section 5
+                "Sup at var condition is not fulfilled because: %a >= %a"
+                (fun k->k Lits.pp passive'_lits Lits.pp passive_t'_lits);
+              false
+            )
+            else true (* If Cσ is either <= or incomparable to C[var -> replacement]σ, we need sup at var.*)
+      )
+    ) else false (* if !_check_sup_at_var_cond is false, never allow superposition at variable headed terms *)
 
   (* check for hidden superposition at variables,	
      e.g. superposing g x = f x into h (x b) = a to give h (f b) = a.	
@@ -538,7 +541,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (* Check for hidden superposition at a variable *)	
       if !_restrict_hidden_sup_at_vars then (	
         match is_hidden_sup_at_var info with	
-          | Some (var,replacement) when not (!_sup_at_vars && sup_at_var_condition info var replacement)	
+          | Some (var,replacement) when not (sup_at_var_condition info var replacement)	
             -> raise (ExitSuperposition "hidden superposition at variable")	
           | _ -> ()	
       );
@@ -692,7 +695,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           raise (ExitSuperposition "superposition at variable");
       (* Check for hidden superposition at a variable *)
       match is_hidden_sup_at_var info with
-        | Some (var,replacement) when not (!_sup_at_vars && sup_at_var_condition info var replacement)
+        | Some (var,replacement) when not (sup_at_var_condition info var replacement)
           -> raise (ExitSuperposition "hidden superposition at variable")
         | _ -> ();
           (* ordering constraints are ok, build new active lits (excepted s=t) *)
@@ -2526,11 +2529,14 @@ let () =
     , Arg.Set _dont_simplify
     , " disable simplification rules"
     ; "--sup-at-vars"
-    , Arg.Set _sup_at_vars
+    , Arg.Bool (fun b ->_sup_at_vars := b)
     , " enable superposition at variables under certain ordering conditions"
     ; "--sup-at-var-headed"
     , Arg.Bool (fun b -> _sup_at_var_headed := b)
     , " enable/disable superposition at variable headed terms"
+    ; "--check-sup-at-var-cond"
+    , Arg.Bool (fun b -> _check_sup_at_var_cond := b)
+    , " enable/disable superposition at variable monotonicity check"
     ; "--no-sup-in-var-args"
     , Arg.Clear _sup_in_var_args
     , " disable superposition in arguments of applied variables"
@@ -2674,4 +2680,5 @@ let () =
     [ "lambda-free-purify-intensional"
     ; "lambda-free-purify-extensional"] (fun () ->
       _sup_at_vars := false;
+      _check_sup_at_var_cond := false;
   );
