@@ -1,6 +1,6 @@
 # Zipperposition
 
-[Repository on github](https://github.com/c-cube/zipperposition/)
+[Repository on github](https://github.com/sneeuwballen/zipperposition/)
 
 ## Papers
 
@@ -14,7 +14,7 @@
 - [Superposition for Lambda-Free Higher-Order Logic](https://hal.inria.fr/hal-01904595)
   describes the newer improvements to the higher-order reasoning techniques.
 
-The slides of some of Simon Cruanes' talks are on [my page](https://simon.cedeela.fr/).
+The slides of some of Simon Cruanes' talks are on [his page](https://simon.cedeela.fr/).
 
 Some papers related to combinations of Superposition, higher-order logic, Induction, etc.
 can be found on [Matryoshka's website](http://matryoshka.gforge.inria.fr/).
