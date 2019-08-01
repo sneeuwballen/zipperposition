@@ -28,8 +28,8 @@ Zipperposition is written in the functional and imperative language
 functional data structure) and "superposition" (the calculus used by the
 prover), although the current implementation is written in quite an imperative style.
 Superposition-based theorem proving is an active field of research, so
-there is a lot of literature about it; for this implementation my main references
-are:
+there is a lot of literature about it; for this implementation the main references
+for the base calculus are:
 
 * the chapter _paramodulation-based theorem proving_ of the _handbook of automated reasoning_,
 * the paper _E: a brainiac theorem prover_ that describes the [E prover](http://eprover.org) by S.Schulz,
