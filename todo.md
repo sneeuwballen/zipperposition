@@ -2,6 +2,21 @@
 
 ## Now
 
+- release 1.5, with `dune` as main build system
+
+- wip: proof checking for arith ℚ
+  `./zipperposition.native --check -t 30 -o none --dot-llproof /tmp/truc.dot examples/GEG022=1_rat.p --debug.llproof 5`
+
+- proof checking for arith ℤ
+  `./zipperposition.native --check -t 30 -o none --dot-llproof /tmp/truc.dot examples/regression/gh_7.zf`
+
+- refactor Monome by making it a functor over terms?
+
+- arith:
+  * understand why GEG rational problems are much harder
+    (ordering? missing optim?)
+    → self paramod with, say, transitivity of `<`
+
 - FIX:
   `./zipperposition.native --check --dot /tmp/truc.dot --dot-sat -o none -t 30 examples/regression/ho_demod_partial_app.zf -d 5 |& less`
   completing `f=λx. t` into `f x=t` makes this problem unsolvable
@@ -620,6 +635,8 @@
 
 ## Done
 
+- proof checking: implement eta-reduction
+- when printing llproof, flag in red steps which failed (or red border)
 - proof format with rewrite rules + CNF-introduced defs
 - only do induction on active positions
   * [x] check that it fixes previous regression on `list10_easy.zf`, `nat2.zf`…)
