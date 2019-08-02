@@ -935,8 +935,8 @@ module Subst = struct
         | None ->
           var ?loc:t.loc (Var.update_ty v ~f:(eval_ ~recursive subst))
         | Some t' ->
-          assert (t != t');
           if recursive then (
+            assert (t != t');
             eval_ ~recursive subst t'
           ) else (
             t'
