@@ -21,7 +21,6 @@ type t = {
   dot_llproof: string option; (** file to print llproof *)
   dot_sat : bool; (** Print saturated set into DOT? *)
   dot_all_roots : bool;
-  dot_check: string option; (** prefix for printing checker proofs *)
   def_as_rewrite: bool;
   expand_def : bool; (** expand definitions *)
   stats : bool;
@@ -45,7 +44,6 @@ let default : t = {
   dot_all_roots= false;
   dot_file = None;
   dot_llproof= None;
-  dot_check=None;
   unary_depth= 1;
   dot_sat= false;
   expand_def= false;
@@ -66,7 +64,6 @@ let parse_args () =
   and dot_llproof = ref default.dot_llproof
   and dot_sat = ref default.dot_sat
   and dot_all_roots = ref default.dot_all_roots
-  and dot_check = ref default.dot_check
   and expand_def = ref default.expand_def
   and unary_depth = ref default.unary_depth
   and def_as_rewrite = ref default.def_as_rewrite
@@ -91,7 +88,6 @@ let parse_args () =
     ; "--dot-llproof", Arg.String (fun s -> dot_llproof := Some s) , " print LLProof to file in DOT"
     ; "--dot-sat", Arg.Set dot_sat, " print saturated set into DOT"
     ; "--dot-all-roots", Arg.Set dot_all_roots, " print all empty clauses into DOT"
-    ; "--dot-check-prefix", Arg.String (fun s-> dot_check :=Some s), " prefix for printing checker proofs in DOT"
     ; "--color", Arg.Bool CCFormat.set_color_default, " enable/disable ANSI color codes"
     ; "--seed", Arg.Set_int seed, " set random seed"
     ; "--unary-depth", Arg.Set_int unary_depth, " maximum depth for successive unary inferences"
@@ -119,7 +115,6 @@ let parse_args () =
     stats= ! Options.stats; def_as_rewrite= !def_as_rewrite;
     presaturate = !presaturate; dot_all_roots= !dot_all_roots;
     dot_file = !dot_file; dot_llproof= !dot_llproof;
-    dot_check= !dot_check;
     unary_depth= !unary_depth; dot_sat= !dot_sat;
     expand_def= !expand_def; check= !check; }
 

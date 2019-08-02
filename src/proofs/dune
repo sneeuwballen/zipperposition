@@ -3,7 +3,8 @@
   (name logtk_proofs)
   (public_name logtk.proofs)
   (synopsis "proofs for logtk")
-  (libraries containers logtk)
+  (libraries containers logtk
+  sidekick.msat-solver sidekick.core sidekick.th-bool-static)
   (flags :standard -w -32)
 )
 

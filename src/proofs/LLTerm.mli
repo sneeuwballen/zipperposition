@@ -96,6 +96,11 @@ val bool : ty
 val box_opaque : t -> t
 val lambda : ty_var:ty -> t -> t
 
+val subterms : t -> t Iter.t
+val iter_dag : t -> t Iter.t
+val as_bool : t -> bool option
+val map_shallow : (t -> t) -> t -> t
+
 val db_eval : sub:t -> t -> t
 (** [db_eval ~sub t] replaces De Bruijn 0 in [t] by [sub] *)
 
@@ -132,6 +137,7 @@ module Form : sig
   val and_ : t list -> t
   val or_ : t list -> t
   val imply : t -> t -> t
+  val imply_l : t list -> t -> t
   val equiv : t -> t -> t
   val xor : t -> t -> t
   val int_pred : Linexp_int.t -> Int_op.t -> t
@@ -141,6 +147,9 @@ module Form : sig
 end
 
 module Set : CCSet.S with type elt = t
+module Tbl : CCHashtbl.S with type key = t
+
+val abs : t -> t * bool
 
 module Conv : sig
   type ctx

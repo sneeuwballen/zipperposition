@@ -14,7 +14,6 @@ type t = {
   dot_llproof: string option; (** file to print llproof *)
   dot_sat : bool; (** Print saturated set into DOT? *)
   dot_all_roots : bool;
-  dot_check: string option; (** prefix for printing checker proofs *)
   def_as_rewrite: bool;
   expand_def : bool; (** expand definitions *)
   stats : bool;
