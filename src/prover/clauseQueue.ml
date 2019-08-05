@@ -103,7 +103,7 @@ module Make(C : Clause_intf.S) = struct
       let w_lits = weight_lits_ (C.lits c) in
       w_lits * Array.length (C.lits c) + _depth_ty
 
-    let ho_weight_calc c = 
+    let  ho_weight_calc c = 
       let all_terms c =
         C.Seq.terms c 
         |> Iter.flat_map (Term.Seq.subterms ~include_builtin:true) in
