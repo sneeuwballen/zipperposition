@@ -73,7 +73,8 @@ let concl_of_parent (p:LLProof.parent) : form = match p.LLProof.p_inst with
   | [] -> P.concl p.LLProof.p_proof
   | r ->
     let f = P.concl p.LLProof.p_proof in
-    instantiate f r
+    (*instantiate f r*) f
+    (* TODO: remove intros completely? *)
 
 let open_forall = T.unfold_binder Binder.Forall
 
@@ -148,14 +149,14 @@ let check_step_ ?dot_prefix (p:proof): check_step_res =
         |> Var.Subst.of_list
       in
       CS_check (prove ~dot_prefix [T.Subst.eval subst p'_inst] (T.Subst.eval subst body_concl))
-    | P.Esa (_,_) -> CS_skip `ESA (* TODO *)
     | P.Inference {parents;tags;intros;_} ->
       if LLProver.can_check tags then (
         (* within the fragment of {!Tab.prove} *)
         let all_premises =
           List.map concl_of_parent parents
-        and concl =
-          instantiate concl intros
+        (*and concl =
+          instantiate concl intros*)
+          (* TODO: remove intros completely? *)
         in
         CS_check (prove ~dot_prefix all_premises concl)
       ) else CS_skip `Tags

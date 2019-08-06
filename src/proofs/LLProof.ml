@@ -43,7 +43,6 @@ and step =
       inst: inst;
       tags: tag list;
     }
-  | Esa of name * t list
   | Inference of {
       intros: term list; (* local renaming, with fresh constants *)
       local_intros: term list; (* variables introduced between hypothesis, not in conclusion *)
@@ -77,14 +76,12 @@ let pp_step out (s:step): unit = match s with
   | Define id -> Fmt.fprintf out "(@[define@ %a@])" ID.pp id
   | Instantiate {inst;tags;_} ->
     Fmt.fprintf out "(@[instantiate %a%a@])" pp_inst inst pp_tags tags
-  | Esa (n,_) -> Fmt.fprintf out "(esa %s)" n
   | Inference {name=n;tags;_} -> Fmt.fprintf out "(inf %s%a)" n pp_tags tags
 
 let parents (p:t): parent list = match p.step with
   | Goal | Assert | Trivial | By_def _ | Define _ -> []
   | Negated_goal p2 -> [p_of p2]
   | Instantiate {form=p2;_} -> [p_of p2]
-  | Esa (_,l) -> List.map p_of l
   | Inference {parents=l;_} -> l
 
 let premises (p:t): t list =
@@ -166,8 +163,6 @@ let define id f = mk_ f (Define id)
 let instantiate ?(tags=[]) f p inst =
   mk_ f (Instantiate {form=p;inst;tags})
 
-let esa f name ps = mk_ f (Esa (name,ps))
-
 let inference ~intros ~local_intros ~tags f name ps : t =
   mk_ f (Inference
       {name;intros;local_intros;parents=ps;tags})
@@ -193,7 +188,6 @@ module Dot = struct
            | By_def id -> Fmt.sprintf "by_def(%a)" ID.pp id
            | Define id -> Fmt.sprintf "define(%a)" ID.pp id
            | Instantiate _ -> "instantiate"
-           | Esa (name,_) -> name
            | Inference {name;_} -> name
          in
          let descr = Fmt.sprintf "@[<h>%s%a@]" descr pp_tags (tags p) in

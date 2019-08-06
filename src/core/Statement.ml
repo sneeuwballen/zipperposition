@@ -92,6 +92,7 @@ type ('f, 't, 'ty) t = {
 and proof = Proof.Step.t
 and input_t = (TypedSTerm.t, TypedSTerm.t, TypedSTerm.t) t
 and clause_t = (clause, Term.t, Type.t) t
+and sclause_t = ((TypedSTerm.t SLiteral.t) list, TypedSTerm.t, TypedSTerm.t) t
 
 let compare a b = CCInt.compare a.id b.id
 let view t = t.view
@@ -630,10 +631,15 @@ let pp_input_in o =
   let pp_t = TypedSTerm.pp_in o in
   pp_in pp_t pp_t pp_t o
 
+let pp_sclause_in o =
+  let pp_t = TypedSTerm.pp_in o in
+  pp_in (Util.pp_list ~sep:" ∨ " (SLiteral.pp_in o pp_t)) pp_t pp_t o
+
 (** {2 Proofs} *)
 
 exception E_i of input_t
 exception E_c of clause_t
+exception E_sc of sclause_t
 
 let res_tc_i : input_t Proof.result_tc =
   Proof.Result.make_tc
@@ -672,8 +678,30 @@ let res_tc_c : clause_t Proof.result_tc =
       |> F.and_)
     ()
 
+let res_tc_sc =
+  Proof.Result.make_tc
+    ~of_exn:(function E_sc c -> Some c | _ -> None)
+    ~to_exn:(fun i -> E_sc i)
+    ~compare:compare
+    ~pp_in:pp_sclause_in
+    ~is_stmt:true
+    ~name
+    ~to_form:(fun ~ctx st ->
+      let conv_c (c:(TypedSTerm.t SLiteral.t) list) : _ =
+        c 
+        |> List.map SLiteral.to_form
+        |> TypedSTerm.Form.or_
+        |> TypedSTerm.Form.close_forall
+      in
+      Seq.forms st
+      |> Iter.map conv_c
+      |> Iter.to_list
+      |> TypedSTerm.Form.and_)
+    ()
+
 let as_proof_i t = Proof.S.mk t.proof (Proof.Result.make res_tc_i t)
 let as_proof_c t = Proof.S.mk t.proof (Proof.Result.make res_tc_c t)
+let as_proof_sc t = Proof.S.mk t.proof (Proof.Result.make res_tc_sc t)
 
 (** {2 Scanning} *)
 

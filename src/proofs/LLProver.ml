@@ -119,6 +119,7 @@ end = struct
   let[@inline] id t = t.id
   let[@inline] diseq t = Iter.of_list t.diseq
   let[@inline] form t = t.form
+  let cc t = t.cc
 
   let root () : t = {
     id=0;
@@ -199,7 +200,7 @@ end = struct
             let f = F.forall ~ty_var (F.not_ body) in
             br |> add_eq f F.true_
           | F.Forall _ ->
-            br |> add_eq f F.false_
+            br |> add_eq f' F.false_
         end
       | F.And _ | F.Or _ -> add_form_to_expand f br
       | F.Imply (a,b) -> add_form_to_expand (F.or_ [F.not_ a; b]) br
@@ -250,7 +251,7 @@ end = struct
         (Fmt.some T.pp) b.form
         (Util.pp_seq T.pp) (T_set.to_seq b.to_expand)
     in
-    Fmt.fprintf out "(@[<v>%a@])" (Util.pp_list pp_b) (unfold_parents b)
+    Fmt.fprintf out "(@[<v>%a@ :cc %a@])" (Util.pp_list pp_b) (unfold_parents b) CC.pp_debug b.cc
 end
 
 (** Rules for the Tableau calculus *)
@@ -336,7 +337,7 @@ let solve_ (tab:t) : res =
     | Some b ->
       (* found a branch that is not refutable *)
       assert (not (Branch.is_closed @@ Branch.check_closed b));
-      Util.debugf ~section 1 "(@[llprover.prove.failed@ :branch %a@])"
+      Util.debugf ~section 2 "(@[llprover.prove.failed@ :branch %a@])"
         (fun k->k Branch.debug b);
       R_fail
     | None ->
@@ -351,9 +352,9 @@ let solve_ (tab:t) : res =
 let can_check : LLProof.tag list -> bool =
   let open Builtin.Tag in
   let f = function
-    | T_ho | T_ext -> true
+    | T_ho | T_ext | T_quant -> true
     | T_lra | T_lia | T_ind | T_data
-    | T_distinct | T_ac _ -> false
+    | T_distinct | T_ac _ | T_neg -> false
   in
   List.for_all f
 

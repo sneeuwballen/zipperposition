@@ -560,10 +560,6 @@ let skolemize ~ctx f =
       let subst = Var.Subst.add subst var t in
       skolemize subst f'
     | F.Forall (var,f') ->
-      let var' = Var.copy var in
-      Util.debugf 5 ~section "@[<2>rename `%a` to@ `%a`@ :subst {%a}@]"
-        (fun k->k Var.pp_fullc var Var.pp_fullc var' T.Subst.pp subst);
-      let subst = Var.Subst.add subst var (T.var var') in
       skolemize subst f'
   in
   let res = skolemize f in
@@ -795,7 +791,7 @@ let introduce_defs ~ctx ~is_pos stmt f =
   let polarity = if is_pos then `Pos else `Neg in
   maybe_rename ~polarity (E.Exactly 1) (E.Exactly 0) f
 
-(* helper: reduction to cnf using De Morgan laws. Returns a list of list of
+(* helper: reduction to cnf using distributivity of OR over AND. Returns a list of list of
    atomic formulas *)
 let rec to_cnf_rec f = match F.view f with
   | F.Eq _
@@ -1067,14 +1063,19 @@ let id_ x = x
 
 let rule_cnf = Proof.Rule.mk "cnf"
 let rule_neg = Proof.Rule.mk "cnf.neg"
+let rule_conv = Proof.Rule.mk "cnf.conv"
 
 let proof_cnf stmt =
-  Proof.Step.esa ~rule:rule_cnf
+  Proof.Step.esa ~rule:rule_cnf ~tags:[T_quant]
     [Stmt.as_proof_i stmt |> Proof.Parent.from]
 
 let proof_neg stmt =
-  Proof.Step.esa ~rule:rule_neg
+  Proof.Step.esa ~rule:rule_neg ~tags:[T_neg]
     [Stmt.as_proof_i stmt |> Proof.Parent.from]
+
+let proof_conv stmt =
+  Proof.Step.esa ~rule:rule_conv
+    [Proof.S.mk (Stmt.proof_step stmt) (Proof.Result.make Statement.res_tc_sc stmt) |> Proof.Parent.from]
 
 (* Transform the clauses into proper CNF; returns a list of clauses *)
 let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
@@ -1282,7 +1283,7 @@ let convert seq =
     Util.debugf ~section 5
       "@[<2>@{<yellow>convert@}@ `@[%a@]`@]" (fun k->k pp_c_statement st);
     let attrs = Stmt.attrs st in
-    let proof = Stmt.proof_step st in
+    let proof = proof_conv st in
     let res = match Stmt.view st with
       | Stmt.Goal c ->
         let c = clause_to_fo ~ctx:t_ctx c in

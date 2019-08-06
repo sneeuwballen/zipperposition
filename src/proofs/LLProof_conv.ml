@@ -29,6 +29,36 @@ type state = {
 
 let open_forall = T.unfold_binder Binder.Forall
 
+let choice_axiom v t const = 
+  let t1 = T.Form.forall v t in
+  let t2 = T.Subst.eval (Var.Subst.singleton v const) t in
+  let t = T.Form.imply t1 t2 in
+  LLProof.trivial t
+
+let create_choice_axioms s skolem = 
+  T.Seq.subterms s
+  |> Iter.filter_map (fun t -> match T.view t with
+    | T.Bind(Binder.Forall, v, t) -> 
+      Some (LLProof.p_of (choice_axiom v t (T.const ~ty:(Var.ty v) skolem)))
+    | T.Bind(Binder.Exists, v, t) -> None (* TODO *)
+    | _ -> None) 
+  |> Iter.to_list 
+
+let instance_axiom v t const = 
+  let t1 = T.Subst.eval (Var.Subst.singleton v const) t in
+  let t2 = T.Form.forall v t in
+  let t = T.Form.imply t1 t2 in
+  LLProof.trivial t
+
+let create_instance_axioms s skolem = 
+  T.Seq.subterms s
+  |> Iter.filter_map (fun t -> match T.view t with
+    | T.Bind(Binder.Forall, v, t) -> 
+      Some (LLProof.p_of (instance_axiom v t (T.const ~ty:(Var.ty v) skolem)))
+    | T.Bind(Binder.Exists, v, t) -> None (* TODO *)
+    | _ -> None) 
+  |> Iter.to_list 
+
 let rec conv_proof st p: LLProof.t =
   begin match Proof.S.Tbl.get st.tbl p with
     | Some r -> r
@@ -39,6 +69,7 @@ let rec conv_proof st p: LLProof.t =
   end
 
 and conv_step st p =
+  let my_skolem = (ID.make "xxxx") in (* TODO: create proper skolems *)
   Util.debugf ~section 5 "(@[llproof.conv.step@ %a@])"
     (fun k->k Proof.S.pp_notrec1 p);
   let res = Proof.Result.to_form ~ctx:st.ctx (Proof.S.result p) in
@@ -46,7 +77,7 @@ and conv_step st p =
   (* introduce local symbols for making proof checking locally ground.
      Some variables are typed using other variables, so we
      need to substitute eagerly *)
-  let intros =
+  let intros = (* TODO: remove intros *)
     let l =
       List.mapi (fun i v -> v, T.const ~ty:(Var.ty v) (ID.makef "sk_%d" i)) vars
     in
@@ -56,24 +87,21 @@ and conv_step st p =
   (* convert result *)
   let res = match Proof.Step.kind @@ Proof.S.step p with
     | Proof.Inference (rule,tags)
-    | Proof.Simplification (rule,tags) ->
+    | Proof.Simplification (rule,tags)
+    | Proof.Esa (rule,tags) ->
       let local_intros = ref Var.Subst.empty in
       let parents =
         List.map (conv_parent st res intros local_intros tags)
           (Proof.Step.parents @@ Proof.S.step p)
       in
+      let parents = parents @ CCList.flat_map (fun p -> 
+        let p_res = LLProof.concl p.LLProof.p_proof in
+        create_choice_axioms p_res my_skolem) parents in
+      let parents = parents @ (create_instance_axioms res my_skolem) in
       let local_intros = Var.Subst.to_list !local_intros |> List.rev_map snd in
+      (* TODO: What is this for?  let res = T.rename_all_vars res in *)
       LLProof.inference ~intros ~local_intros ~tags
-        (T.rename_all_vars res) (Proof.Rule.name rule) parents
-    | Proof.Esa rule ->
-      let l =
-        List.map
-          (function
-            | Proof.P_of p -> conv_proof st p
-            | Proof.P_subst _ -> assert false)
-          (Proof.Step.parents @@ Proof.S.step p)
-      in
-      LLProof.esa (T.rename_all_vars res) (Proof.Rule.name rule) l
+        res (Proof.Rule.name rule) parents
     | Proof.Trivial -> LLProof.trivial res
     | Proof.By_def id -> LLProof.by_def id res
     | Proof.Define (id,_) -> LLProof.define id res

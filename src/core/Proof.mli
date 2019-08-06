@@ -24,7 +24,7 @@ type kind =
   | Intro of source * role
   | Inference of rule * tag list
   | Simplification of rule * tag list
-  | Esa of rule
+  | Esa of rule * tag list
   | Trivial (** trivial, or trivial within theories *)
   | Define of ID.t * source (** definition *)
   | By_def of ID.t (** following from the def of ID *)
@@ -243,7 +243,7 @@ module Step : sig
 
   val simp : ?infos:infos -> ?tags:tag list -> rule:rule -> parent list -> t
 
-  val esa : ?infos:infos -> rule:rule -> parent list -> t
+  val esa : ?infos:infos -> ?tags:tag list -> rule:rule -> parent list -> t
 
   val to_attrs : t -> UntypedAST.attrs
 

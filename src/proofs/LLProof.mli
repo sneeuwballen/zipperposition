@@ -38,7 +38,6 @@ type step =
       inst: inst;
       tags: tag list;
     }
-  | Esa of name * t list
   | Inference of {
       intros: term list; (* local renaming for the conclusion's foralls, with fresh constants *)
       local_intros: term list; (* variables introduced between hypothesis, not in conclusion *)
@@ -86,8 +85,6 @@ val trivial : form -> t
 val by_def : ID.t -> form -> t
 val define : ID.t -> form -> t
 val instantiate : ?tags:tag list -> form -> t -> inst -> t
-val esa :
-  form -> name -> t list -> t
 val inference :
   intros:term list ->
   local_intros:term list ->

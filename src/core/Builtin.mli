@@ -175,6 +175,8 @@ module Tag : sig
     | T_data (** datatypes *)
     | T_distinct (** distinct constants *)
     | T_ac of ID.t (** AC symbol *)
+    | T_neg (** negate a conjecture *)
+    | T_quant (** dealing with universal and existential quantifiers *)
 
   val compare : t -> t -> int
   val pp : t CCFormat.printer

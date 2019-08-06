@@ -91,6 +91,7 @@ type ('f, 't, 'ty) t = private {
 and proof = Proof.Step.t
 and input_t = (TypedSTerm.t, TypedSTerm.t, TypedSTerm.t) t
 and clause_t = (clause, Term.t, Type.t) t
+and sclause_t = ((TypedSTerm.t SLiteral.t) list, TypedSTerm.t, TypedSTerm.t) t
 
 val compare : (_, _, _) t -> (_, _, _) t -> int
 
@@ -105,6 +106,8 @@ val as_proof_i : input_t -> Proof.t
 val res_tc_i : input_t Proof.result_tc
 val as_proof_c : clause_t -> Proof.t
 val res_tc_c : clause_t Proof.result_tc
+val as_proof_sc : sclause_t -> Proof.t
+val res_tc_sc : sclause_t Proof.result_tc
 
 val mk_data : ID.t -> args:'ty Var.t list -> 'ty ->
   (ID.t * 'ty * ('ty * (ID.t * 'ty)) list) list -> 'ty data
