@@ -118,7 +118,7 @@ module type S = sig
     Term.t SLiteral.t list -> t
   (** Construction from formulas as axiom (initial clause) *)
 
-  val of_statement : Statement.clause_t -> t list
+  val of_statement : ?convert_defs:bool -> Statement.clause_t -> t list
   (** Extract a clause from a statement, if any *)
 
   val proof_step : t -> proof_step
@@ -135,6 +135,8 @@ module type S = sig
   (** [update_proof c f] creates a new clause that is
       similar to [c] in all aspects, but with
       the proof [f (proof_step c)] *)
+
+  val proof_depth : t -> int
 
   val is_empty : t -> bool
   (** Is the clause an empty clause? *)
@@ -184,7 +186,7 @@ module type S = sig
   val is_oriented_rule : t -> bool
   (** Is the clause a positive oriented clause? *)
 
-  val symbols : ?init:ID.Set.t -> t Iter.t -> ID.Set.t
+  val symbols : ?init:ID.Set.t -> ?include_types:bool -> t Iter.t -> ID.Set.t
   (** symbols that occur in the clause *)
 
   val to_sclause : t -> SClause.t
@@ -194,6 +196,10 @@ module type S = sig
 
   val to_s_form : t -> TypedSTerm.Form.t
 
+  val ground_clause : t -> t
+
+  val eta_reduce : t -> t option
+
   (** {2 Iterators} *)
 
   module Seq : sig
@@ -201,6 +207,8 @@ module type S = sig
     val terms : t -> Term.t Iter.t
     val vars : t -> Type.t HVar.t Iter.t
   end
+
+  val apply_subst : ?proof:Proof.Step.t option -> t Scoped.t -> Subst.FO.t -> t
 
   (** {2 Filter literals} *)
 
@@ -226,6 +234,9 @@ module type S = sig
 
     val pos : t
     (** Only positive literals *)
+
+    val pos_eq : t
+    (** Only positive equational literals *)
 
     val neg : t
     (** Only negative literals *)

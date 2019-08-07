@@ -741,8 +741,6 @@ module Make
 
   (* variable appears only naked, i.e. directly under [=] *)
   let var_always_naked (f:Cut_form.t)(x:T.var): bool =
-    let check_t t = T.is_var t || not (T.var_occurs ~var:x t) in
-    begin
       Cut_form.cs f
       |> Iter.of_list
       |> Iter.flat_map Iter.of_array
@@ -751,11 +749,9 @@ module Make
           | Literal.Equation (l,r,_) ->
             let check_t t = T.is_var t || not (T.var_occurs ~var:x t) in
             check_t l && check_t r
-          | Literal.Prop (t,_) -> check_t t
           | Literal.Int _ | Literal.Rat _ -> false
           | Literal.True | Literal.False -> true)
-    end
-
+ 
   let active_subterms_form (f:Cut_form.t): T.t Iter.t =
     Cut_form.cs f
     |> Iter.of_list

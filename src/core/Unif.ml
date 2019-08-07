@@ -539,7 +539,7 @@ module Inner = struct
             )
           | O_match_protect (P_vars _) | O_variant (P_vars _) | O_equal ->
             (* rename in [t1] but not [t2] *)
-            Util.debug ~section 4 "protected with set *";
+            Util.debug ~section 40 "protected with set *";
             let subst, t1 = restrict_to_scope subst (t1,sc1) ~into:sc2 in
             unif_ho ~op ~root ~bvars subst t1 t2 ~scope:sc2
           | O_unify ->
@@ -575,7 +575,10 @@ module Inner = struct
       | _ when op=O_unify && not root && has_non_unifiable_type_or_is_prop t1 ->
         let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
         delay ~tags () (* push pair as a constraint, because of typing. *)
-      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Builtin.equal s1 s2 ->
+      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when 
+        Builtin.equal s1 s2 ->
+        (* && not (Builtin.equal Builtin.ForallConst s1) && 
+        not (Builtin.equal Builtin.ExistsConst s1) -> *)
         (* try to unify/match builtins pairwise *)
         unif_list ~op ~bvars subst l1 sc1 l2 sc2
       | _, _ -> raise Fail
@@ -583,6 +586,7 @@ module Inner = struct
 
   and unif_vars ~op subst t1 sc1 t2 sc2 : unif_subst =
    (* Util.debugf ~section 4 "var_binidng: %a =?= %a" (fun k-> k T.pp t1 T.pp t2); *)
+    let t1,t2 = CCPair.map_same (fun t -> ((Lambda.eta_reduce t) :> InnerTerm.t)) (Term.of_term_unsafe t1,Term.of_term_unsafe t2) in
     begin match T.view t1, T.view t2, op with
       | T.Var v1, T.Var v2, O_equal ->
         if HVar.equal T.equal v1 v2 && sc1=sc2
@@ -594,11 +598,18 @@ module Inner = struct
         fail() (* blocked variable *)
       | T.Var v1, _, O_match_protect (P_scope sc)
         when sc1 = sc && not (HVar.is_fresh v1) ->
+        (* CCFormat.printf "failed matching %a %a.\n" T.pp t1 T.pp t2; *)
         fail() (* variable belongs to the protected scope and is not fresh *)
       | T.Var v1, _, (O_unify | O_match_protect _) ->
         if occurs_check ~depth:0 (US.subst subst) (v1,sc1) (t2,sc2)
         then fail () (* occur check or t2 is open *)
-        else US.bind subst (v1,sc1) (t2,sc2)
+        else (
+          if US.mem subst (v1,sc1) then (
+            let derefed = CCOpt.get_exn @@ Subst.get_var (US.subst subst) (v1,sc1) in 
+            let derefed = Scoped.map ((fun t -> ((Lambda.eta_reduce (Term.of_term_unsafe t)) :> InnerTerm.t))) derefed in
+            if snd @@ derefed == sc2 && T.equal (fst @@ derefed) t2 then subst else fail()
+          ) else US.bind subst (v1,sc1) (t2,sc2)
+        )
       | T.Var v1, T.Var _, O_variant (P_vars s) when not (T.VarSet.mem v1 s) ->
         US.bind subst (v1,sc1) (t2,sc2)
       | T.Var v1, T.Var _, O_variant (P_scope sc')
@@ -607,8 +618,16 @@ module Inner = struct
       | _, T.Var v2, O_unify ->
         if occurs_check ~depth:0 (US.subst subst) (v2,sc2) (t1,sc1)
         then fail() (* occur check *)
-        else US.bind subst (v2,sc2) (t1,sc1)
-      | _ -> fail ()  (* fail *)
+        else (
+          if US.mem subst (v2,sc2) then (
+            let derefed = CCOpt.get_exn @@ Subst.get_var (US.subst subst) (v2,sc2) in 
+            let derefed = Scoped.map ((fun t -> ((Lambda.eta_reduce (Term.of_term_unsafe t)) :> InnerTerm.t))) derefed in
+            if snd @@ derefed == sc1 && T.equal (fst @@ derefed) t1 then subst else fail()
+          ) else US.bind subst (v2,sc2) (t1,sc1)
+        )
+      | _ -> 
+        (* CCFormat.printf "failed unknown l %a:%d|%a:%d|%a.\n" T.pp t1 sc1 T.pp t2 sc2 pp_op op; *)
+        fail ()  (* fail *)
     end
 
   (* unify lists pairwise *)
@@ -811,8 +830,8 @@ module Inner = struct
         proj_fun ~op ~bvars:(DBEnv.push_l_rev bvars new_vars) subst (body,sc_t)
       | T.App _ -> assert false
       | T.AppBuiltin (_, l2) ->
-        assert (l=[]);
-        proj_fun_l ~op ~bvars subst (l2,sc_t)
+        (* assert (l=[]); *)
+        proj_fun_l ~op ~bvars subst (l@l2,sc_t)
       | T.DB i ->
         if DBEnv.mem bvars i
         then proj_fun_l ~op ~bvars subst (l,sc_t)
@@ -1061,6 +1080,7 @@ module FO = struct
     fun sc1 sc2 -> 
       let ta, sca = sc1 in 
       let tb, scb = sc2 in
+
       if(not (Term.DB.is_closed ta) || not (Term.DB.is_closed tb)) then (
          let sk_a, sk_a_subs = Term.DB.skolemize_loosely_bound ta in
          let sk_b, sk_b_subs = Term.DB.skolemize_loosely_bound tb in

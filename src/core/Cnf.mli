@@ -99,8 +99,8 @@ val is_cnf : form -> bool
 (** {2 Main Interface} *)
 
 val cnf_of :
+  ctx:Skolem.ctx ->
   ?opts:options list ->
-  ?ctx:Skolem.ctx ->
   f_statement ->
   c_statement CCVector.ro_vector
 (** Transform the statement into proper CNF; returns a list of statements,
@@ -108,8 +108,8 @@ val cnf_of :
     Options are used to tune the behavior. *)
 
 val cnf_of_seq :
+  ctx:Skolem.ctx ->
   ?opts:options list ->
-  ?ctx:Skolem.ctx ->
   f_statement Iter.t ->
   c_statement CCVector.ro_vector
 

@@ -34,6 +34,41 @@ val except_RR_horn : parametrized -> parametrized
 val default : ord:Ordering.t -> t
 (** Default selection function *)
 
+val e_sel  : ord:Ordering.t -> t
+(** Selection function  identical to E's 
+    SelectMaxLComplexAvoidPosPred  *)
+
+val e_sel2  : ord:Ordering.t -> t
+(** Selection function  identical to E's 
+    SelectCQIPrecWNTNp  *)
+
+val e_sel3  : ord:Ordering.t -> t
+(** Selection function  identical to E's 
+    SelectComplexG *)
+
+val e_sel5  : ord:Ordering.t -> t
+(** Selection function  identical to E's 
+    SelectNDepth2OptimalLiteral *)
+
+val e_sel6  : ord:Ordering.t -> t
+(** Selection function  identical to E's 
+    SelectLargestOrientable *)
+
+val e_sel7  : ord:Ordering.t -> t
+(** Selection function  identical to E's 
+    SelectComplexExceptRRHorn *)
+
+val e_sel8 : ord:Ordering.t -> t
+(** Selection function  identical to E's 
+    SelectCQArNTNpEqFirst *)
+
+val ho_sel  : ord:Ordering.t -> t
+(** Selection function that tries to take 
+    into account the number of nested applied variables.
+    
+    The assumption is that they are hard for unification.
+     *)
+
 val from_string : ord:Ordering.t -> string -> t
 (** selection function from string (may fail) *)
 

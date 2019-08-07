@@ -38,6 +38,7 @@ let prof_ho_unif = Util.mk_profiler "ho.unif"
 let _ext_pos = ref true
 let _ext_pos_all_lits = ref false
 let _ext_axiom = ref false
+let _choice_axiom = ref false
 let _elim_pred_var = ref true
 let _ext_neg_lit = ref false
 let _neg_ext = ref true
@@ -50,11 +51,15 @@ let _imit_first = ref false
 let _compose_subs = ref false
 let _var_solve = ref false
 let _neg_cong_fun = ref false
+let _instantiate_choice_ax = ref false
+let _elim_leibniz_eq = ref (-1)
 let _unif_max_depth = ref 11
 
 type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
 
 let _prune_arg_fun = ref `NoPrune
+
+let prim_enum_terms = ref Term.Set.empty
 
 module type S = sig
   module Env : Env.S
@@ -70,7 +75,7 @@ let k_some_ho : bool Flex_state.key = Flex_state.create_key()
 let k_enabled : bool Flex_state.key = Flex_state.create_key()
 let k_enable_def_unfold : bool Flex_state.key = Flex_state.create_key()
 let k_enable_ho_unif : bool Flex_state.key = Flex_state.create_key()
-let k_ho_prim_mode : _ Flex_state.key = Flex_state.create_key()
+let k_ho_prim_mode : [`Full | `Neg | `None | `Pragmatic | `TF ] Flex_state.key = Flex_state.create_key()
 let k_ho_prim_max_penalty : int Flex_state.key = Flex_state.create_key()
 
 module Make(E : Env.S) : S with module Env = E = struct
@@ -148,6 +153,10 @@ module Make(E : Env.S) : S with module Env = E = struct
         ]
       | _ -> assert false
 
+  let rec declare_skolems = function
+  | [] -> ()
+  | (sym,id) :: rest -> Ctx.declare sym id; declare_skolems rest
+
   (* negative extensionality rule:
      [f != g] where [f : a -> b] becomes [f k != g k] for a fresh parameter [k] *)
   let ext_neg_lit (lit:Literal.t) : _ option = match lit with
@@ -163,8 +172,13 @@ module Make(E : Env.S) : S with module Env = E = struct
         | None ->
           (* create new skolems, parametrized by free variables *)
           let vars = Literal.vars lit in
-          let l = List.map (T.mk_fresh_skolem_term vars) ty_args in
+          let skolems = ref [] in
+          let l = List.map (fun ty -> 
+            let sk, _, res =  T.mk_fresh_skolem vars ty in
+            skolems := sk :: !skolems;
+            res) ty_args in
           (* save list *)
+          declare_skolems !skolems;
           idx_ext_neg_lit_ := FV_ext_neg_lit.add !idx_ext_neg_lit_ (lit,l);
           l
       in
@@ -388,28 +402,39 @@ module Make(E : Env.S) : S with module Env = E = struct
               let s,t = List.hd zipped in loop s t 
             ) else zipped) 
           else [(s,t)]) 
-        else []
+        else [(s,t)]
       in
 
       let (hd_s,_), (hd_t,_) = T.as_app s, T.as_app t in
       if T.is_const hd_s && T.is_const hd_t && T.equal hd_s hd_t then (
-        loop s t
+        let diffs = loop s t in
+        if List.for_all (fun (s,t) -> Type.equal (T.ty s) (T.ty t)) diffs 
+        then diffs else [] (* because of polymorphism, it might be possible 
+                              that terms will not be of the same type,
+                              and that will give rise to wrong term applications*)
       ) else [] 
     in
-    let is_eligible = C.Eligible.res c in
+    let is_eligible = C.Eligible.always in
     C.lits c
     |> CCArray.mapi (fun i l -> 
         match l with 
         | Literal.Equation (lhs,rhs,false) when is_eligible i l ->
           let subterms = find_diffs lhs rhs in
+          assert(List.for_all (fun (s,t) -> Type.equal (T.ty s) (T.ty t)) subterms);
           if not (CCList.is_empty subterms) &&
-             List.exists (fun (l,_) -> Type.is_fun (T.ty l)) subterms then
+             List.exists (fun (l,_) -> 
+                Type.is_fun (T.ty l) || Type.is_prop (T.ty l)) subterms then
              let subterms_lit = CCList.map (fun (l,r) ->
                let free_vars = T.VarSet.union (T.vars l) (T.vars r) |> T.VarSet.to_list in 
-               let arg_types = Type.expected_args  @@ T.ty l in
+               let arg_types = Type.expected_args @@ T.ty l in
                if CCList.is_empty arg_types then Literal.mk_neq l r
                else (
-                 let skolems = List.map (fun ty -> T.mk_fresh_skolem_term free_vars ty) arg_types in
+                 let skolem_decls = ref [] in
+                 let skolems = List.map (fun ty -> 
+                  let sk, _, res =  T.mk_fresh_skolem free_vars ty in
+                  skolem_decls := sk :: !skolem_decls;
+                  res) arg_types in
+                 declare_skolems !skolem_decls;
                  Literal.mk_neq (T.app l skolems) (T.app r skolems)
                )
               ) subterms in
@@ -444,21 +469,25 @@ module Make(E : Env.S) : S with module Env = E = struct
         | Literal.Equation (lhs,rhs,false) 
             when is_eligible i l && Type.is_fun @@ T.ty lhs ->
           let arg_types = Type.expected_args @@ T.ty lhs in
-          let free_vars = Literal.vars l |> T.VarSet.of_list |> T.VarSet.to_list in
+          let free_vars = Literal.vars l in
+          let skolem_decls = ref [] in
           let skolem_terms, def_proofs, ext_instances = arg_types |> CCList.fold_left 
             (fun (previous_skolems, def_proofs, ext_instances) ty -> 
               let represented_term = extensionality_clause_diff 
                 (T.app lhs previous_skolems) (T.app rhs previous_skolems) in
-              let skolem_id, skolem_ty, skolem_vars, skolem_term = T.mk_fresh_skolem free_vars ty in
+              let (skolem_id, skolem_ty), skolem_vars, skolem_term = T.mk_fresh_skolem free_vars ty in
+              skolem_decls := (skolem_id, skolem_ty) :: !skolem_decls;
               let def_proof = mk_def_proof skolem_id skolem_ty skolem_vars represented_term in
               let ext_instance = extensionality_clause_subst
                 (T.app lhs previous_skolems) (T.app rhs previous_skolems) in
               (previous_skolems @ [skolem_term], def_proof :: def_proofs, ext_instance :: ext_instances)) 
             ([], [], []) in
+          let skolem_decls = ref [] in
           let new_lits = CCList.map (fun (j,x) -> 
               if i!=j then x
               else (Literal.mk_neq (T.app lhs skolem_terms) (T.app rhs skolem_terms))
             ) (C.lits c |> Array.mapi (fun j x -> (j,x)) |> Array.to_list) in
+          declare_skolems !skolem_decls;
           let proof =
             Proof.Step.inference (C.proof_parent c :: def_proofs
               @ CCList.map (C.proof_parent_subst Subst.Renaming.none (extensionality_clause, ext_scope)) ext_instances)
@@ -485,8 +514,13 @@ module Make(E : Env.S) : S with module Env = E = struct
               when is_eligible i l && Type.is_fun @@ T.ty lhs ->
             let arg_types = Type.expected_args @@ T.ty lhs in
             let free_vars = Literal.vars l |> T.VarSet.of_list |> T.VarSet.to_list in
-            let skolems = List.map (fun ty -> T.mk_fresh_skolem_term free_vars ty) arg_types in
+            let skolem_decls = ref [] in
+            let skolems = List.map (fun ty -> 
+              let sk, _, res =  T.mk_fresh_skolem free_vars ty in
+              skolem_decls := sk :: !skolem_decls;
+              res) arg_types in
             applied_neg_ext := true;
+            declare_skolems !skolem_decls;
             Literal.mk_neq (T.app lhs skolems) (T.app rhs skolems)
           | _ -> l) in
     if not !applied_neg_ext then SimplM.return_same c
@@ -504,8 +538,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   let elim_pred_variable (c:C.t) : C.t list =
     (* find unshielded predicate vars *)
     let find_vars(): _ HVar.t Iter.t =
-      C.Seq.vars c
-      |> T.VarSet.of_seq |> T.VarSet.to_seq
+      Literals.vars (C.lits c)
+      |> CCList.to_seq
       |> Iter.filter
         (fun v ->
            (Type.is_prop @@ Type.returns @@ HVar.ty v) &&
@@ -517,8 +551,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         Array.fold_left
           (fun (others,set) lit ->
              begin match lit with
-               | Literal.Prop (t, sign) ->
-                 let f, args = T.as_app t in
+               | Literal.Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
+                 let f, args = T.as_app lhs in
+                 let sign = T.equal rhs T.true_ in
                  begin match T.view f with
                    | T.Var q when HVar.equal Type.equal v q ->
                      (* found an occurrence *)
@@ -615,7 +650,8 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* rule for primitive enumeration of predicates [P t1…tn]
      (using ¬ and ∧ and =) *)
-  let prim_enum_ ~mode (c:C.t) : C.t list =
+  let prim_enum_ ~(mode) (c:C.t) : C.t list =
+    let free_vars = Literals.vars (C.lits c) |> T.VarSet.of_list in
     (* set of variables to refine (only those occurring in "interesting" lits) *)
     let vars =
       Literals.fold_lits ~eligible:C.Eligible.always (C.lits c)
@@ -628,7 +664,7 @@ module Make(E : Env.S) : S with module Env = E = struct
            let hd = T.head_term t in
            begin match T.as_var hd, Type.arity (T.ty hd) with
              | Some v, Type.Arity (0, n)
-               when n>0 && Type.returns_prop (T.ty hd) ->
+               when n>0 && Type.returns_prop (T.ty hd) && T.VarSet.mem v free_vars ->
                Some v
              | _ -> None
            end)
@@ -641,10 +677,11 @@ module Make(E : Env.S) : S with module Env = E = struct
     let sc_c = 0 in
     let offset = C.Seq.vars c |> T.Seq.max_var |> succ in
     begin
-      vars
+      let enum_prop = vars
       |> T.VarSet.to_seq
       |> Iter.flat_map_l
-        (fun v -> HO_unif.enum_prop ~mode (v,sc_c) ~offset)
+        (fun v -> HO_unif.enum_prop ~mode ~enum_cache:prim_enum_terms (v,sc_c) ~offset) in
+      enum_prop
       |> Iter.map
         (fun (subst,penalty) ->
            let renaming = Subst.Renaming.create() in
@@ -657,6 +694,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              C.create_a lits proof
                ~penalty:(C.penalty c + penalty) ~trail:(C.trail c)
            in
+           (* CCFormat.printf "[Prim_enum:] @[%a@]\n=>\n@[%a@].\n" C.pp c C.pp new_c;  *)
            Util.debugf ~section 3
              "(@[<hv2>ho.refine@ :from %a@ :subst %a@ :yields %a@])"
              (fun k->k C.pp c Subst.pp subst C.pp new_c);
@@ -665,10 +703,174 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Iter.to_rev_list
     end
 
-  let prim_enum ~mode c =
-    if C.penalty c < max_penalty_prim_
+  let prim_enum ~(mode) c =
+    if C.proof_depth c < max_penalty_prim_ 
     then prim_enum_ ~mode c
     else []
+
+  let choice_ops = ref Term.Set.empty
+  let new_choice_counter = ref 0
+
+  let insantiate_choice ?(inst_vars=true) ?(choice_ops=choice_ops) c =
+    let max_var = C.Seq.vars c
+                  |> Iter.map HVar.id
+                  |> Iter.max
+                  |> CCOpt.get_or ~default: 0 in
+
+    let is_choice_subterm t = 
+      match T.view t with
+      | T.App(hd, [arg]) when T.is_var hd || Term.Set.mem hd !choice_ops ->
+        let ty = T.ty arg in
+        Type.is_fun ty && List.length (Type.expected_args ty) = 1 &&
+        Type.equal (Term.ty t) (List.hd (Type.expected_args ty)) &&
+        Type.returns_prop ty && T.DB.is_closed t
+      | _ -> false in
+
+    let neg_trigger t =
+      assert(T.DB.is_closed t);
+      let arg_ty = List.hd (Type.expected_args (T.ty t)) in
+      let applied_to_0 = T.Form.not_ (Lambda.whnf (T.app t [T.bvar ~ty:arg_ty 0])) in
+      let res = T.fun_ arg_ty applied_to_0 in
+      assert(T.DB.is_closed res);
+      res in
+
+
+    let choice_inst_of_hd hd arg =
+      let arg_ty = Term.ty arg in
+      let ty = List.hd (Type.expected_args arg_ty) in
+      let x = T.var_of_int ~ty (max_var+1) in
+      let choice_x = Lambda.whnf (T.app arg [x]) in
+      let choice_arg = Lambda.snf (T.app arg [T.app hd [arg]]) in
+      let new_lits = [Literal.mk_prop choice_x false;
+                      Literal.mk_prop choice_arg true] in
+      let arg_str = CCFormat.sprintf "%a" T.TPTP.pp arg in
+      let proof = Proof.Step.inference ~rule:(Proof.Rule.mk ("inst_choice" ^ arg_str)) [] in
+      C.create ~penalty:1 ~trail:Trail.empty new_lits proof in
+
+
+    let new_choice_op ty =
+      let choice_ty_name = "#_choice_" ^ 
+                           CCInt.to_string (CCRef.get_then_incr new_choice_counter) in
+      let new_ch_id = ID.make choice_ty_name in
+      let new_ch_const = T.const new_ch_id ~ty in
+      ignore(Signature.declare (C.Ctx.signature ()) new_ch_id ty);
+      Util.debugf 1 "new choice for type %a: %a(%a).\n" 
+        (fun k -> k Type.pp ty T.pp new_ch_const Type.pp (T.ty new_ch_const));
+      choice_ops := Term.Set.add new_ch_const !choice_ops;
+      new_ch_const in
+
+    let build_choice_inst t =
+      match T.view t with
+      | T.App(hd, [arg]) ->
+        if Term.is_var hd && inst_vars then (
+          let hd_ty = Term.ty hd in
+          let choice_ops = 
+            Term.Set.filter (fun t -> Type.equal (Term.ty t) hd_ty) !choice_ops
+            |> Term.Set.to_list
+            |> (fun l -> if CCList.is_empty l then [new_choice_op hd_ty] else l) in
+          CCList.flat_map (fun hd -> 
+            [choice_inst_of_hd hd arg; choice_inst_of_hd hd (neg_trigger arg)]) 
+          choice_ops
+        ) else if Term.Set.mem hd !choice_ops then (
+          [choice_inst_of_hd hd arg; choice_inst_of_hd hd (neg_trigger arg)]
+        ) else []
+      | _ -> assert (false) in
+
+    C.Seq.terms c 
+    |> Iter.flat_map Term.Seq.subterms
+    |> Iter.filter is_choice_subterm
+    |> Iter.flat_map_l build_choice_inst
+    |> Iter.to_list
+
+   let recognize_choice_ops c =
+    let extract_not_p_x l = match l with
+    | Literal.Equation(lhs,rhs,true) when T.equal T.false_ rhs && T.is_app_var lhs ->
+      begin match T.view lhs with
+      | T.App(hd, [var]) when T.is_var var -> Some hd
+      | _ -> None end
+    | _ -> None in
+    
+    let extract_p_choice_p p l = match l with 
+    | Literal.Equation(lhs,rhs,true) when T.equal T.true_ rhs && T.is_app_var lhs ->
+      begin match T.view lhs with
+      | T.App(hd, [ch_p]) when T.equal hd p ->
+        begin match T.view ch_p with 
+        | T.App(sym, [var]) when T.is_const sym && T.equal var p -> Some sym
+        | _ -> None end
+      | _ -> None end
+    | _ -> None in
+
+    if C.length c == 2 then (
+      let px = CCArray.find_map extract_not_p_x (C.lits c) in
+      match px with 
+      | Some p ->
+        let p_ch_p = CCArray.find_map (extract_p_choice_p p) (C.lits c) in
+        begin match p_ch_p with
+        | Some sym ->
+          choice_ops := Term.Set.add sym !choice_ops;
+          let new_cls = 
+            Env.get_active ()
+            |> Iter.flat_map_l (fun pas_cl -> 
+                if C.id pas_cl = C.id c then []
+                else (
+                insantiate_choice ~inst_vars:false 
+                                  ~choice_ops:(ref (Term.Set.singleton sym)) 
+                                  pas_cl
+                )) in
+          Env.add_passive new_cls;
+          C.mark_redundant c;
+          true
+        | None -> false end
+      | None -> false
+    ) else false
+    
+  
+  let elim_leibniz_equality c =
+    if C.proof_depth c < !_elim_leibniz_eq then (
+      let ord = Env.ord () in
+      let eligible = C.Eligible.always in
+      let pos_pred_vars, neg_pred_vars, occurences = 
+        Lits.fold_eqn ~both:false ~ord ~eligible (C.lits c)
+        |> Iter.fold (fun (pos_vs,neg_vs,occ) (lhs,rhs,sign,_) -> 
+          if Type.is_prop (Term.ty lhs) && Term.is_app_var lhs && sign
+              && Term.is_true_or_false rhs then (
+            let var_hd = Term.as_var_exn (Term.head_term lhs) in
+            if Term.equal T.true_ rhs then (Term.VarSet.add var_hd pos_vs, neg_vs, Term.Map.add lhs true occ)
+            else (pos_vs, Term.VarSet.add var_hd neg_vs, Term.Map.add lhs false occ)
+          ) else (pos_vs, neg_vs, occ)
+        ) (Term.VarSet.empty,Term.VarSet.empty,Term.Map.empty) in
+      let pos_neg_vars = Term.VarSet.inter pos_pred_vars neg_pred_vars in
+      let res = 
+        if Term.VarSet.is_empty pos_neg_vars then []
+        else (
+          CCList.flat_map (fun (t,sign) -> 
+            let hd, args = T.as_app t in
+            let var_hd = T.as_var_exn hd in
+            if Term.VarSet.mem (Term.as_var_exn hd) pos_neg_vars then (
+              let tyargs, _ = Type.open_fun (Term.ty hd) in
+              let n = List.length tyargs in
+              CCList.filter_map (fun (i,arg) ->
+                if T.var_occurs ~var:var_hd arg then None 
+                else (
+                  let body = (if sign then T.Form.neq else T.Form.eq) 
+                                arg (T.bvar ~ty:(T.ty arg) (n-i-1)) in
+                  let subs_term = T.fun_l tyargs body in 
+                  (let cached_t = Subst.FO.canonize_all_vars subs_term in
+                  prim_enum_terms := Term.Set.add cached_t !prim_enum_terms);
+                  let subst = Subst.FO.bind' (Subst.empty) (var_hd, 0) (subs_term, 0) in
+                  let rule = Proof.Rule.mk ("elim_leibniz_eq_" ^ (if sign then "+" else "-")) in
+                  let tags = [Proof.Tag.T_ho] in
+                  let proof = Some (Proof.Step.inference ~rule ~tags [C.proof_parent c]) in
+                  Some (C.apply_subst ~proof (c,0) subst))
+              ) (CCList.mapi (fun i arg -> (i, arg)) args)
+            ) else [] 
+          ) (Term.Map.to_list occurences)) in
+      (* CCFormat.printf "Elim Leibniz eq:@ @[%a@].\n" C.pp c;
+      CCFormat.printf "Pos/neg vars:@ @[%a@].\n" (Term.VarSet.pp HVar.pp) pos_neg_vars;
+      CCFormat.printf "Res:@ @[%a@].\n" (CCList.pp C.pp) res); *)
+      res
+    ) else []
+    
 
   let pp_pairs_ out =
     let open CCFormat in
@@ -773,6 +975,21 @@ module Make(E : Env.S) : S with module Env = E = struct
   end
   module VarTermMultiMap = CCMultiMap.Make (TVar) (Term)
   module VTbl = CCHashtbl.Make(TVar)
+
+  let choice_clause =
+    let choice_id = ID.make("zf_choice") in
+    let alpha_var = HVar.make ~ty:Type.tType 0 in
+    let alpha = Type.var alpha_var in
+    let alpha_to_prop = Type.arrow [alpha] Type.prop in
+    let choice_type = Type.arrow [alpha_to_prop] alpha in
+    let choice = Term.const ~ty:choice_type choice_id in
+    let p = Term.var (HVar.make ~ty:alpha_to_prop 1) in
+    let x = Term.var (HVar.make ~ty:alpha 2) in
+    let px = Term.app p [x] in (* p x *)
+    let p_choice = Term.app p [Term.app choice [p]] (* p (choice p) *) in
+    (* ~ (p x) | p (choice p) *)
+    let lits = [Literal.mk_prop px false; Literal.mk_prop p_choice true] in
+    Env.C.create ~penalty:1 ~trail:Trail.empty lits Proof.Step.trivial
 
   type fixed_arg_status =
     | Always of T.t (* This argument is always the given term in all occurences *)
@@ -910,7 +1127,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let args_opt = List.mapi (fun i a_i ->
             assert(Term.DB.is_closed a_i);
             assert(CCList.is_empty current_sets ||
-                   List.length current_sets = List.length args);
+                   List.length current_sets = (List.length args + List.length missing));
             if CCList.is_empty current_sets ||
                not (Term.Set.is_empty (List.nth current_sets i)) then 
               (Some (List.mapi (fun j a_j -> 
@@ -918,17 +1135,21 @@ module Make(E : Env.S) : S with module Env = E = struct
             else None (* ignoring onself *))
         args @ missing in
       let res = List.mapi (fun i arg_opt ->
-        let t = List.nth args i in 
-        match arg_opt with 
-        | Some arg_l ->
-          let res_l = if all_covers then T.cover_with_terms t arg_l 
-                      else [t; T.max_cover t arg_l] in
-          T.Set.of_list res_l 
-        | None -> Term.Set.empty ) args_opt in
+        if i < List.length args then (
+          let t = List.nth args i in 
+          begin match arg_opt with 
+          | Some arg_l ->
+            let res_l = if all_covers then T.cover_with_terms t arg_l 
+                        else [t; T.max_cover t arg_l] in
+            T.Set.of_list res_l 
+          | None -> Term.Set.empty 
+          end)
+        else Term.Set.empty) args_opt in
       res
-      in
+    in
 
     let status = VTbl.create 8 in
+    let free_vars = Literals.vars (C.lits c) |> T.VarSet.of_list in
     C.lits c
     |> Literals.map (fun t -> Lambda.eta_expand t) (* to make sure that DB indices are everywhere the same *)
     |> Literals.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord:Ordering.none 
@@ -937,7 +1158,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       (fun (t,_) ->
         let head, _ = T.as_app t in
         match T.as_var head with
-          | Some var ->
+          | Some var when T.VarSet.mem var free_vars ->
             begin match VTbl.get status var with
             | Some (current_sets, created_sk) ->
               let t, new_sk = T.DB.skolemize_loosely_bound t in
@@ -954,7 +1175,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                                 |> List.map snd |> Term.Set.of_list in
               VTbl.add status var (get_covers head (T.args t'), created_sk);
             end
-          | None -> ();
+          | _ -> ();
         ()
       );
 
@@ -1023,6 +1244,17 @@ module Make(E : Env.S) : S with module Env = E = struct
       if !_ext_neg_lit then
         Env.add_lit_rule "ho_ext_neg_lit" ext_neg_lit;
 
+      if !_elim_leibniz_eq > 0 then (
+        Env.add_unary_inf "ho_elim_leibniz_eq" elim_leibniz_equality
+      );
+
+      if !_instantiate_choice_ax then (
+        Env.add_redundant recognize_choice_ops;
+        Env.add_unary_inf "inst_choice" insantiate_choice;
+      );
+
+
+
 
       if !_ext_pos then (
         (* Env.add_unary_inf "ho_ext_pos" (ext_pos ~only_unit:(not !_ext_pos_non_unit)) *)
@@ -1053,6 +1285,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                                           | Some tt -> Some tt))
       in
       Env.set_ho_normalization_rule ho_norm;
+      Ordering.normalize := (fun t -> CCOpt.get_or ~default:t (ho_norm t));
 
       if (!_huet_style) then
         JP_unif.set_huet_style ();
@@ -1088,6 +1321,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       end;
       if !_ext_axiom then
         Env.ProofState.PassiveSet.add (Iter.singleton extensionality_clause);
+      if !_choice_axiom then
+        Env.ProofState.PassiveSet.add (Iter.singleton choice_clause);
     );
     ()
 end
@@ -1095,14 +1330,16 @@ end
 let enabled_ = ref true
 let def_unfold_enabled_ = ref false
 let force_enabled_ = ref false
-let enable_unif_ = ref true
+let enable_unif_ = ref false (* this unification seems very buggy, had to turn it off *)
 let prim_mode_ = ref `Neg
-let prim_max_penalty = ref 15 (* FUDGE *)
+let prim_max_penalty = ref 1 (* FUDGE *)
 
 let set_prim_mode_ =
   let l = [
     "neg", `Neg;
     "full", `Full;
+    "pragmatic", `Pragmatic;
+    "tf", `TF;
     "none", `None;
   ] in
   let set_ s = prim_mode_ := List.assoc s l in
@@ -1135,6 +1372,12 @@ let st_contains_ho (st:(_,_,_) Statement.t): bool =
   has_ho_sym () || has_ho_var () || has_ho_eq()
 
 let extension =
+  (* let env_action env =
+    let module E = (val env : Env.S) in
+    if E.flex_get k_enable_def_unfold then (
+      let clauses = E.
+    )  *)
+
   let register env =
     let module E = (val env : Env.S) in
     if E.flex_get k_some_ho || !force_enabled_ then (
@@ -1179,15 +1422,16 @@ let extension =
 let () =
   Options.add_opts
     [ "--ho", Arg.Set enabled_, " enable HO reasoning";
-      "--force-ho", Arg.Set force_enabled_, " enable HO reasoning even if the problem is first-order";
+      "--force-ho", Arg.Bool  (fun b -> force_enabled_ := false), " enable/disable HO reasoning even if the problem is first-order";
       "--no-ho", Arg.Clear enabled_, " disable HO reasoning";
-      "--ho-unif", Arg.Set enable_unif_, " enable full HO unification";
+      "--ho-unif", Arg.Bool (fun v -> enable_unif_ := v), " enable full HO unification";
       "--ho-neg-cong-fun", Arg.Set _neg_cong_fun, "enable NegCongFun";
       "--no-ho-unif", Arg.Clear enable_unif_, " disable full HO unification";
-      "--no-ho-elim-pred-var", Arg.Clear _elim_pred_var, " disable predicate variable elimination";
+      "--ho-elim-pred-var", Arg.Bool (fun b -> _elim_pred_var := b), " disable predicate variable elimination";
       "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";
       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
       "--ho-ext-axiom", Arg.Set _ext_axiom, " enable extensionality axiom";
+      "--ho-choice-axiom", Arg.Bool (fun v -> _choice_axiom := v), " enable choice axiom";
       "--no-ho-ext-axiom", Arg.Clear _ext_axiom, " disable extensionality axiom";
       "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule";
       "--ho-neg-ext", Arg.Bool (fun v -> _neg_ext := v), " turn NegExt on or off";
@@ -1199,11 +1443,13 @@ let () =
           else if s = "old-prune" then _prune_arg_fun := `OldPrune 
           else _prune_arg_fun := `NoPrune)), " choose arg prune mode";
       "--ho-no-ext-neg-lit", Arg.Clear _ext_neg_lit, " enable negative extensionality rule on literal level [?]";
+      "--ho-elim-leibniz", Arg.Int (fun v -> _elim_leibniz_eq := v), " enable/disable treatment of Leibniz equality";
       "--ho-def-unfold", Arg.Set def_unfold_enabled_, " enable ho definition unfolding";
+      "--ho-choice-inst", Arg.Bool (fun v -> _instantiate_choice_ax := v), " enable ho definition unfolding";
       "--ho-huet-style-unif", Arg.Set _huet_style, " enable Huet style projection";
       "--ho-no-conservative-elim", Arg.Clear _cons_elim, " Disables conservative elimination rule in pragmatic unification";
       "--ho-imitation-first",Arg.Set _imit_first, " Use imitation rule before projection rule";
-      "--ho-solve-vars", Arg.Set _var_solve, " Enable solving variables.";
+      "--ho-solve-vars", Arg.Bool (fun v -> PragHOUnif.solve_var := v), " Enable solving variables.";
       "--ho-composition", Arg.Set _compose_subs, " Enable composition instead of merging substitutions";
       "--ho-disable-var-arg-removal", Arg.Clear _var_arg_remove, " disable removal of arguments of applied variables";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom";
@@ -1240,7 +1486,7 @@ let () =
     _ext_pos := true;
     _ext_pos_all_lits := true;
     prim_mode_ := `None;
-    _elim_pred_var := false;
+    _elim_pred_var := true;
     _neg_cong_fun := false;
     enable_unif_ := false;
     _prune_arg_fun := `PruneMaxCover;
@@ -1251,12 +1497,12 @@ let () =
     force_enabled_ := true;
     _ext_axiom := false;
     _ext_neg_lit := false;
-    _neg_ext := false;
+    _neg_ext := true;
     _neg_ext_as_simpl := false;
     _ext_pos := true;
     _ext_pos_all_lits := true;
     prim_mode_ := `None;
-    _elim_pred_var := false;
+    _elim_pred_var := true;
     _neg_cong_fun := false;
     enable_unif_ := false;
     _prune_arg_fun := `PruneMaxCover;

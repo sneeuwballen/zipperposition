@@ -168,6 +168,8 @@ val declare_defined_cst : ID.t -> level:int -> definition -> unit
 val scan_stmt_for_defined_cst : clause_t -> unit
 (** Try and declare defined constants in the given statement *)
 
+val scan_tst_rewrite : input_t -> unit
+
 (** {2 Inductive Types} *)
 
 val scan_stmt_for_ind_ty : clause_t -> unit
@@ -180,7 +182,11 @@ val scan_simple_stmt_for_ind_ty : input_t -> unit
 
 val get_rw_rule:  ?weight_incr:int -> clause_t -> (ID.Set.elt * Rewrite.rule) option
 
+val get_formulas_from_defs: ('a, _, _) t -> 'a CCList.t
+
 (** {2 Iterators} *)
+
+val lift_lambdas: input_t -> input_t Iter.t
 
 module Seq : sig
   val to_seq : ('f,'t,'ty) t ->

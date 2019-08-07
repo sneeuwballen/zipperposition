@@ -46,25 +46,32 @@ module Make(C : Index.CLAUSE) = struct
              Iter.filter SLiteral.is_neg lits |> Iter.length);
       }
 
-    let rec _depth_term depth t = match T.view t with
+    let rec _depth_term depth t = 
+      let pref,t = T.open_fun t in
+      let depth = depth + (List.length pref) in
+      match T.view t with
       | T.Var _
       | T.Const _
-      | T.DB _ -> 0
-      | T.Fun (_,u) -> _depth_term (depth+1) u
+      | T.DB _ -> depth
+      | T.Fun (_,u) -> assert false (* we just opened a function*)
       | T.AppBuiltin (_, l)
       | T.App (_, l) ->
-        let depth' = depth + 1 in
-        List.fold_left (fun acc t' -> acc + _depth_term depth' t') depth l
+        if CCList.is_empty l || T.is_var (T.head_term t)  then depth (* for logical operators*)
+        else (
+          let max_arg_depth = 
+            Iter.max_exn (Iter.map (_depth_term depth) (Iter.of_list l)) in
+          max_arg_depth + 1
+        )
 
     (* sum of depths at which symbols occur. Eg f(a, g(b)) will yield 4 (f
        is at depth 0) *)
     let sum_of_depths =
       { name = "sum_of_depths";
         f = (fun lits ->
-          Iter.fold
-            (fun acc lit ->
-               SLiteral.fold (fun acc t -> acc + _depth_term 0 t) acc lit
-            ) 0 lits);
+            Iter.fold
+              (fun acc lit ->
+                 SLiteral.fold (fun acc t -> acc + _depth_term 0 t) acc lit
+              ) 0 lits);
       }
 
     let _select_sign ~sign lits =
@@ -72,9 +79,11 @@ module Make(C : Index.CLAUSE) = struct
 
     (* sequence of symbols of clause, of given sign *)
     let _symbols ~sign lits =
+      let filter_term t = not (T.is_app_var t) in
+
       _select_sign ~sign lits
       |> Iter.flat_map SLiteral.to_seq
-      |> Iter.flat_map T.Seq.symbols
+      |> Iter.flat_map (T.Seq.symbols ~filter_term)
 
     let count_symb_plus symb =
       { name = CCFormat.sprintf "count+(%a)" ID.pp symb;
@@ -96,8 +105,8 @@ module Make(C : Index.CLAUSE) = struct
              | _ -> None)
       in
       match Iter.max symbs_depths with
-        | None -> 0
-        | Some m -> m
+      | None -> 0
+      | Some m -> m
 
     let _max_depth_lits ~sign symb lits =
       Iter.fold
@@ -154,29 +163,29 @@ module Make(C : Index.CLAUSE) = struct
     (* function to go to the given leaf, building it if needed *)
     let rec goto trie t rebuild =
       match trie, t with
-        | (TrieLeaf set) as leaf, [] -> (* found leaf *)
-          (match k set with
-            | new_leaf when leaf == new_leaf -> root  (* no change, return same tree *)
-            | new_leaf -> rebuild new_leaf)           (* replace by new leaf *)
-        | TrieNode m, c::t' ->
-          (try  (* insert in subtrie *)
-             let subtrie = IntMap.find c m in
-             let rebuild' subtrie = match subtrie with
-               | _ when empty_trie subtrie -> rebuild (TrieNode (IntMap.remove c m))
-               | _ -> rebuild (TrieNode (IntMap.add c subtrie m))
-             in
-             goto subtrie t' rebuild'
-           with Not_found -> (* no subtrie found *)
-             let subtrie = if t' = []
-               then TrieLeaf CSet.empty
-               else TrieNode IntMap.empty
-             and rebuild' subtrie = match subtrie with
-               | _ when empty_trie subtrie -> rebuild (TrieNode (IntMap.remove c m))
-               | _ -> rebuild (TrieNode (IntMap.add c subtrie m))
-             in
-             goto subtrie t' rebuild')
-        | TrieNode _, [] -> assert false (* ill-formed term *)
-        | TrieLeaf _, _ -> assert false  (* wrong arity *)
+      | (TrieLeaf set) as leaf, [] -> (* found leaf *)
+        (match k set with
+         | new_leaf when leaf == new_leaf -> root  (* no change, return same tree *)
+         | new_leaf -> rebuild new_leaf)           (* replace by new leaf *)
+      | TrieNode m, c::t' ->
+        (try  (* insert in subtrie *)
+           let subtrie = IntMap.find c m in
+           let rebuild' subtrie = match subtrie with
+             | _ when empty_trie subtrie -> rebuild (TrieNode (IntMap.remove c m))
+             | _ -> rebuild (TrieNode (IntMap.add c subtrie m))
+           in
+           goto subtrie t' rebuild'
+         with Not_found -> (* no subtrie found *)
+           let subtrie = if t' = []
+             then TrieLeaf CSet.empty
+             else TrieNode IntMap.empty
+           and rebuild' subtrie = match subtrie with
+             | _ when empty_trie subtrie -> rebuild (TrieNode (IntMap.remove c m))
+             | _ -> rebuild (TrieNode (IntMap.add c subtrie m))
+           in
+           goto subtrie t' rebuild')
+      | TrieNode _, [] -> assert false (* ill-formed term *)
+      | TrieLeaf _, _ -> assert false  (* wrong arity *)
     in
     goto trie t (fun t -> t)
 
@@ -200,8 +209,6 @@ module Make(C : Index.CLAUSE) = struct
     [ Feature.size_plus; Feature.size_minus;
       Feature.sum_of_depths ]
 
-  let empty () = empty_with default_features
-
   (** maximam number of features in addition to basic ones *)
   let max_features = 25
 
@@ -221,13 +228,13 @@ module Make(C : Index.CLAUSE) = struct
            if Type.equal ty Type.TPTP.o
            then features := [1 + arity, Feature.count_symb_plus s;
                              1 + arity, Feature.count_symb_minus s]
-               @ !features
+                            @ !features
            else
              features := [0, Feature.max_depth_plus s;
                           0, Feature.max_depth_minus s;
                           1 + arity, Feature.count_symb_plus s;
                           1 + arity, Feature.count_symb_minus s]
-               @ !features);
+                         @ !features);
     (* only take a limited number of features *)
     let features = List.sort (fun (s1,_) (s2,_) -> s2 - s1) !features in
     let features = CCList.take max_features features in
@@ -239,6 +246,8 @@ module Make(C : Index.CLAUSE) = struct
   let of_signature signature =
     let features = features_of_signature signature in
     empty_with features
+  let empty () = empty_with default_features
+
 
   let add idx c =
     (* feature vector of [c] *)

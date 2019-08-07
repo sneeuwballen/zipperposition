@@ -25,22 +25,23 @@ let unif_simple ?(subst=Subst.empty) ~scope t s =
   with Unif.Fail -> None
 
 let cast_var v subst sc =
-  let ty = Term.ty v in
+  (* let ty = Term.ty v in
   if Type.is_ground ty then v
   else (
     match T.view v with
     | T.Var x -> T.var (HVar.cast x ~ty:(S.apply_ty subst (ty, sc)))
     | T.DB i  -> T.bvar ~ty:(S.apply_ty subst (ty, sc)) i
     | _ -> v
-  ) 
+  )  *)
+  v
 
 (* Make new list of constraints, prefering the rigid-rigid pairs *)
-let build_constraints args1 args2 rest = 
-  let zipped = List.combine args1 args2 in
-  let rigid, non_rigid = List.partition (fun (s,t) ->
-    T.is_const (T.head_term s) && T.is_const (T.head_term t)) zipped in
-  rigid @ rest @ non_rigid
-
+let build_constraints args1 args2 rest =
+  let rf, other = 
+    CCList.combine args1 args2
+    |> CCList.partition (fun (s,t) -> T.is_const (T.head_term s) && T.is_const (T.head_term t)) in
+    rf @ rest @ other
+  
 
 (* Given two terms and their lambda prefixes, η-expands one of the terms, if 
    necessary, to have the same size of the lambda prefix as the other term *)
@@ -53,10 +54,11 @@ let eta_expand_otf ~subst ~scope pref1 pref2 t1 t2 =
       let ty = S.apply_ty subst (ty,scope) in
       T.bvar ~ty (num_vars-1-i)) remaining in
     let shifted = T.DB.shift num_vars t in
-    T.app_w_ty shifted vars ~ty:(S.apply_ty subst (T.ty shifted, scope)) in 
+    (* T.app_w_ty shifted vars ~ty:(S.apply_ty subst (T.ty shifted, scope)) in  *)
+    T.app shifted vars in
 
-  let pref1 = List.map (fun ty -> S.apply_ty subst (ty,scope)) pref1 in
-  let pref2 = List.map (fun ty -> S.apply_ty subst (ty,scope)) pref2 in
+  (* let pref1 = List.map (fun ty -> S.apply_ty subst (ty,scope)) pref1 in *)
+  (* let pref2 = List.map (fun ty -> S.apply_ty subst (ty,scope)) pref2 in *)
 
   if List.length pref1 = List.length pref2 then (t1, t2, pref1)
   else (
@@ -78,8 +80,7 @@ let rec eligible_arg t =
   | T.AppBuiltin _ | T.Const _ | T.Var _ -> false
   | T.DB _ -> true
   | T.Fun (_, body) -> eligible_arg body
-  | T.App (f, l) -> eligible_arg f &&
-                    List.for_all eligible_arg l
+  | T.App (f, l) -> List.for_all eligible_arg (f :: l)
 
 (* If all arguments can be reduced to distinct bound variables we convert
    them to `Some map` where map is the sorted association list that maps de
@@ -91,21 +92,25 @@ let rec eligible_arg t =
 
    If arguments are not all distinct bound variables -- None is returned *)
 let get_bvars args =
-  let reduced = 
+  (* let reduced = 
     List.map 
       (fun t -> if (eligible_arg t) then (Lambda.eta_reduce t) else t) 
-                (*Lambda.eta_reduce t*)
-    args in
-  let n = List.length reduced in
-  if List.for_all T.is_bvar reduced then (
+    args in *)
+  let n = List.length args in
+  if List.for_all T.is_bvar args then (
     let res = List.mapi 
       (fun i a -> (Term.as_bvar_exn a, T.bvar ~ty:(Term.ty a) (n-1-i))) 
-      reduced in
+      args in
     let no_dup = CCList.sort_uniq ~cmp res in
       if List.length no_dup = List.length res 
       then Some (CCArray.of_list no_dup)
       else None) 
   else None
+
+
+let norm t = 
+  if Term.is_fun (T.head_term t)
+  then Lambda.whnf t else t
 
 (* Dereference and normalize the head of the term *)
 let rec norm_deref subst (t,sc) =
@@ -120,7 +125,7 @@ let rec norm_deref subst (t,sc) =
         let f = norm_deref subst (f0, sc) in
         let t =
           if T.equal f0 f then tt else T.app f l in
-        let u = Lambda.whnf t in
+        let u = norm t in
         if T.equal t u
         then t
         else norm_deref subst (u,sc)
@@ -147,7 +152,8 @@ let rec build_term ?(depth=0) ~subst ~scope ~counter var bvar_map t =
       with Invalid_argument _ -> false
     ) args new_args in
 
-  let t = Lambda.whnf t in
+
+  let t = norm t in
   match T.view t with
   | T.Var _ ->
     let t = cast_var t subst scope in 
@@ -162,8 +168,10 @@ let rec build_term ?(depth=0) ~subst ~scope ~counter var bvar_map t =
       if T.is_var hd then (
         let old_hd = hd in
         let hd = cast_var hd subst scope in
-        if T.equal hd var then
+        if T.equal hd var && CCList.is_empty args then
             raise (Failure "Occurs check!");
+        if T.equal hd var then
+            raise NotInFragment;
         (* If the variable is not yet bound, try to bind to target subterm.
            If it is bound then dereference and try again. *)
         if not (US.FO.mem subst (Term.as_var_exn hd, scope)) then (
@@ -180,13 +188,13 @@ let rec build_term ?(depth=0) ~subst ~scope ~counter var bvar_map t =
              to dereference and try again. If we have not then we prune
              away the arguments that cound not be unified.*)
           if not (US.FO.mem subst (Term.as_var_exn hd, scope)) then (
-            let pref_types = List.map (fun t-> S.apply_ty subst (Term.ty t, scope)) args in
+            (* let pref_types = List.map (fun t-> S.apply_ty subst (Term.ty t, scope)) args in *)
+            let pref_types = List.map Term.ty args in
             let n = List.length pref_types in
             let ret_type = Type.apply_unsafe (Term.ty hd) 
               ((List.mapi (fun i x -> match x with 
                             | Some t -> t
                             | None   -> cast_var (List.nth args i) subst scope) new_args) :> InnerTerm.t list) in
-            let ret_type = S.apply_ty subst (ret_type, scope) in
             let matrix = 
               CCList.filter_map (fun x->x) (List.mapi (fun i opt_arg -> 
                 (match opt_arg with
@@ -198,8 +206,7 @@ let rec build_term ?(depth=0) ~subst ~scope ~counter var bvar_map t =
               let hd_subs = T.fun_l pref_types (T.app new_hd matrix) in
               let subst = US.FO.bind subst (T.as_var_exn hd, scope) (hd_subs, scope) in
               let res_term = T.app new_hd (CCList.filter_map (fun x->x) new_args) in
-              res_term, subst
-            ) 
+              res_term, subst)
             else (
               if T.equal hd old_hd && args_same args new_args then (t,subst)
               else T.app hd (CCList.filter_map (fun x->x) new_args), subst)
@@ -212,7 +219,7 @@ let rec build_term ?(depth=0) ~subst ~scope ~counter var bvar_map t =
         )
         else (
           let hd',_ =  US.FO.deref subst (hd, scope) in
-          let t' = T.app hd' args in
+          let t' = if T.equal hd hd' then t else T.app hd' args in
           build_term ~depth ~subst ~scope ~counter var bvar_map t' 
         )
       ) else (
@@ -227,9 +234,9 @@ let rec build_term ?(depth=0) ~subst ~scope ~counter var bvar_map t =
       )
   | T.Fun(ty, body) -> 
     let b', subst = build_term ~depth:(depth+1) ~subst ~scope ~counter var bvar_map body in
-    let new_ty = S.apply_ty subst (ty,scope) in
-    if T.equal b' body && Type.equal new_ty ty then t,subst
-    else T.fun_ new_ty  b', subst
+    (* let new_ty = S.apply_ty subst (ty,scope) in *)
+    if T.equal b' body (*&& Type.equal new_ty ty*) then t,subst
+    else T.fun_ ty  b', subst
   | T.DB i -> 
     if i < depth then cast_var t subst scope,subst
     else (
@@ -243,21 +250,30 @@ let rec build_term ?(depth=0) ~subst ~scope ~counter var bvar_map t =
         T.DB.shift depth bvar, subst
       | _ -> raise (Failure "Bound variable not argument to head")
     )
-  | T.AppBuiltin(_,_) -> 
-      raise (Failure "Trying to bind to a predicate")
-
+  | T.AppBuiltin(b,args) ->
+    let new_args, subst =
+    List.fold_right (fun arg (l, subst) ->
+      let arg', subst = build_term ~depth ~subst ~scope ~counter var bvar_map arg in
+      arg' :: l, subst 
+    ) args ([], subst) in
+    if List.for_all2 T.equal args new_args then t,subst
+    else T.app_builtin ~ty:(Term.ty t) b new_args, subst
 let rec unify ~scope ~counter ~subst = function
   | [] -> subst
-  | (s,t) :: rest -> (
-    let ty_unif = unif_simple ~subst:(US.subst subst) ~scope 
-                  (T.of_ty (T.ty s)) (T.of_ty (T.ty t)) in
-    
+  | (s,t) :: rest -> ( 
+    (* let ty_unif = unif_simple ~subst:(US.subst subst) ~scope 
+                  (T.of_ty (T.ty s)) (T.of_ty (T.ty t)) in *)
+(*  i
     if CCOpt.is_none ty_unif then
-      raise NotUnifiable;
+      raise NotUnifiable; *)
     
-    let ty_unif = CCOpt.get_exn ty_unif in
-    let subst = US.merge subst ty_unif in
+    if not (Type.equal (T.ty s) (T.ty t)) then (
+      raise NotUnifiable
+    );
+    (* let ty_unif = CCOpt.get_exn ty_unif in *)
+    (* let subst = US.merge subst ty_unif in *)
     let s', t' = norm_deref subst (s,scope), norm_deref subst (t,scope) in
+    (* rotating to get naked variables on the lhs *)
 
     if not (Term.equal s' t') then (
       let pref_s, body_s = T.open_fun s' in
@@ -265,25 +281,28 @@ let rec unify ~scope ~counter ~subst = function
       let body_s', body_t', _ = eta_expand_otf ~subst ~scope pref_s pref_t body_s body_t in
       let hd_s, args_s = T.as_app body_s' in
       let hd_t, args_t = T.as_app body_t' in
-      let hd_s, hd_t = CCPair.map_same (fun t -> cast_var t subst scope) (hd_s, hd_t) in
-
+      (* let hd_s, hd_t = CCPair.map_same (fun t -> cast_var t subst scope) (hd_s, hd_t) in                                        *)
       match T.view hd_s, T.view hd_t with 
       | (T.Var _, T.Var _) ->
         let subst =
-          (if T.equal hd_s hd_t then
-            flex_same ~counter ~scope ~subst hd_s args_s args_t
-          else
-            flex_diff ~counter ~scope ~subst hd_s hd_t args_s args_t) in
+          (if T.equal hd_s hd_t then flex_same ~counter ~scope ~subst hd_s args_s args_t
+          else flex_diff ~counter ~scope ~subst hd_s hd_t args_s args_t) in
         unify ~scope ~counter ~subst rest
-      | (T.Var _, T.Const _) | (T.Var _, T.DB _) ->
+      | (T.Var _, T.Const _) | (T.Var _, T.DB _) | (T.Var _, T.AppBuiltin _) ->
         let subst = flex_rigid ~subst ~counter ~scope  body_s' body_t' in
         unify ~scope ~counter ~subst rest
-      | (T.Const _, T.Var _) | (T.DB _, T.Var _) ->
+      | (T.Const _, T.Var _) | (T.DB _, T.Var _) | (T.AppBuiltin _, T.Var _) ->
         let subst = flex_rigid ~subst ~counter ~scope  body_t' body_s' in
         unify ~scope ~counter ~subst rest
       | T.Const f , T.Const g when ID.equal f g && List.length args_s = List.length args_t ->
-        (* assert(List.length args_s = List.length args_t); *)
         unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest
+      | T.AppBuiltin(hd_s, args_s'), T.AppBuiltin(hd_t, args_t') when
+          Builtin.equal hd_s hd_t &&
+          (* not (Builtin.equal Builtin.ForallConst hd_s) &&
+          not (Builtin.equal Builtin.ExistsConst hd_s) &&   *)
+          List.length args_s' + List.length args_s = 
+          List.length args_t' + List.length args_t ->
+          unify ~subst ~counter ~scope @@ build_constraints (args_s'@args_s)  (args_t'@args_t) rest
       | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->
         (* assert (List.length args_s = List.length args_t); *)
         unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest
@@ -309,7 +328,7 @@ and flex_same ~counter ~scope ~subst var args_s args_t =
   let v = Term.as_var_exn var in
   let ret_ty = Type.apply_unsafe (Term.ty var) 
     ((List.map (fun t -> 
-        cast_var (Lambda.eta_reduce t) subst scope) args_s :> InnerTerm.t list)) in
+        cast_var t subst scope) args_s :> InnerTerm.t list)) in
   let bvars = 
     CCList.filter_map (fun x->x)
     (CCArray.mapi (fun i si ->
@@ -331,35 +350,46 @@ and flex_same ~counter ~scope ~subst var args_s args_t =
    For example, X 0 3 1 =?= Y 1 3 2 5 is solved by 
     {X -> λλλ. Z 1 0, Y -> λλλλ. Z 2 0 } *)
 and flex_diff ~counter ~scope ~subst var_s var_t args_s args_t =
-  let bvar_s, bvar_t = get_bvars args_s, get_bvars args_t in
-  if CCOpt.is_none bvar_s || CCOpt.is_none bvar_t then
-    raise NotInFragment;
-  let bvar_s, bvar_t = CCOpt.get_exn bvar_s, CCOpt.get_exn bvar_t in
-  let new_bvars = 
-    CCArray.filter_map (fun x->x) (
-      CCArray.map (fun si -> 
-        match CCArray.bsearch ~cmp (fst si, Term.true_) bvar_t  with
-        | `At idx -> Some (cast_var (snd si) subst scope, 
-                           cast_var (snd @@ CCArray.get bvar_t idx) subst scope)
-        | _ -> None
-      ) bvar_s
-    ) 
-    |> CCArray.to_list in
-  let arg_types = List.map (fun (b1, _) -> Term.ty b1) new_bvars in
-  let ret_ty = 
-    Type.apply_unsafe (Term.ty var_s) 
-      (List.map (fun t -> 
-        cast_var (Lambda.eta_reduce t) subst scope) args_s :> InnerTerm.t list) in
-  let new_var_ty = Type.arrow arg_types ret_ty in
-  let new_var = Term.var @@ H.fresh_cnt ~counter ~ty:new_var_ty () in
-  let matrix_s = Term.app new_var (List.map fst new_bvars) in
-  let matrix_t = Term.app new_var (List.map snd new_bvars) in
-  let subs_s = Term.fun_l (List.map Term.ty args_s) matrix_s in
-  let subs_t = Term.fun_l (List.map Term.ty args_t) matrix_t in
-  let v_s, v_t = Term.as_var_exn var_s, Term.as_var_exn var_t in
-  let subst = US.FO.bind subst (v_s, scope) (subs_s, scope) in
-  let subst = US.FO.bind subst (v_t, scope) (subs_t, scope) in
-  subst  
+  if CCList.is_empty args_s && CCList.is_empty args_t then (
+    US.FO.bind subst (Term.as_var_exn var_s,scope) (var_t,scope)
+  ) else (
+      let bvar_s, bvar_t = get_bvars args_s, get_bvars args_t in
+      if CCOpt.is_none bvar_s || CCOpt.is_none bvar_t then (
+        let s,t =
+          if CCOpt.is_some bvar_s then  (T.app var_s args_s, T.app var_t args_t)
+          else if CCOpt.is_some bvar_t then (T.app var_t args_t, T.app var_s args_s)
+          else raise NotInFragment in
+        flex_rigid ~subst ~counter ~scope  s t
+      ) else (
+        let bvar_s, bvar_t = CCOpt.get_exn bvar_s, CCOpt.get_exn bvar_t in
+        let new_bvars = 
+          CCArray.filter_map (fun x->x) (
+            CCArray.map (fun si -> 
+              match CCArray.bsearch ~cmp (fst si, Term.true_) bvar_t  with
+              | `At idx -> Some (cast_var (snd si) subst scope, 
+                                cast_var (snd @@ CCArray.get bvar_t idx) subst scope)
+              | _ -> None
+            ) bvar_s
+          ) 
+          |> CCArray.to_list in
+        let arg_types = List.map (fun (b1, _) -> Term.ty b1) new_bvars in
+        let ret_ty = 
+          Type.apply_unsafe (Term.ty var_s) 
+            (List.map (fun t -> 
+              cast_var t subst scope) args_s :> InnerTerm.t list) in
+        let new_var_ty = Type.arrow arg_types ret_ty in
+        let new_var = Term.var @@ H.fresh_cnt ~counter ~ty:new_var_ty () in
+        let matrix_s = Term.app new_var (List.map fst new_bvars) in
+        let matrix_t = Term.app new_var (List.map snd new_bvars) in
+        let subs_s = Term.fun_l (List.map Term.ty args_s) matrix_s in
+        let subs_t = Term.fun_l (List.map Term.ty args_t) matrix_t in
+        let v_s, v_t = Term.as_var_exn var_s, Term.as_var_exn var_t in
+        let subst = US.FO.bind subst (v_s, scope) (subs_s, scope) in
+        let subst = US.FO.bind subst (v_t, scope) (subs_t, scope) in
+        subst)
+  )
+
+    
 
 (* Flex-rigid pairs can be solved if variable is applied to a sequence
    of distinct bound variables. IMPORTANT: Such a requirement is NOT
@@ -385,16 +415,27 @@ and flex_rigid ~subst ~counter ~scope flex rigid =
  
   
 let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
-  if US.is_empty subst then (
-    let t0',t1',scope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
-    unify ~scope ~counter ~subst [(t0', t1')]
-  )
-  else (
-    if Scoped.scope t0_s != Scoped.scope t1_s then (
-      raise (Invalid_argument "scopes should be the same")
+  (* let tptp_pp = T.pp_in Output_format.O_tptp in *)
+  (* let start = Util.total_time_s () in *)
+  let res = 
+    if US.is_empty subst then (
+      let t0',t1',scope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
+      unify ~scope ~counter ~subst [(t0', t1')]
     )
     else (
-      let t0', t1' = S.apply subst t0_s, S.apply subst t1_s in
-      unify ~scope:(Scoped.scope t0_s) ~counter ~subst [(t0', t1')]
-    )
-  )
+      if Scoped.scope t0_s != Scoped.scope t1_s then (
+        raise (Invalid_argument "scopes should be the same")
+      )
+      else (
+        let t0', t1' = S.apply subst t0_s, S.apply subst t1_s in
+        (* CCFormat.printf "[PU: %a:%a =?= %a:%a].\n" tptp_pp t0' Type.pp (Term.ty t0') tptp_pp t1' Type.pp (Term.ty t1'); *)
+        unify ~scope:(Scoped.scope t0_s) ~counter ~subst [(t0', t1')]
+      )
+    ) 
+  in
+  (* let finish = Util.total_time_s () in *)
+  (* CCFormat.printf "%g\n" (finish -. start); *)
+  (* let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply res t0_s in 
+  let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply res t1_s in
+  assert ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r))); *)
+  res

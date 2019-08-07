@@ -40,6 +40,8 @@ val id : t -> int
 val name : t -> string
 val payload : t -> exn list
 
+val dummy_of_int : int -> t
+
 val payload_find: f:(exn -> 'a option) -> t -> 'a option
 
 val payload_pred: f:(exn -> bool) -> t -> bool

@@ -230,7 +230,7 @@ module Flatten = struct
      @param vars the variables that can be replaced in the context
      @param of_ the ID being defined, if any
   *)
-  let flatten_rec ?of_ (ctx:Skolem.ctx) stmt (pos:position) (vars:type_ Var.t list)(t:term): T.t t =
+  let flatten_rec ?of_ ~should_define (ctx:Skolem.ctx) stmt (pos:position) (vars:type_ Var.t list)(t:term): T.t t =
     (* how to name intermediate subterms? *)
     let mk_pat what = match of_ with
       | None -> what ^  "_"
@@ -361,8 +361,10 @@ module Flatten = struct
             [ T.app_builtin ~ty:T.Ty.prop Builtin.Less [a; b];
               T.app_builtin ~ty:T.Ty.prop Builtin.Less [b; a];
             ]
-        in aux_maybe_define pos f
-      | T.AppBuiltin (Builtin.Eq, [a;b]) when  T.is_fun a || T.is_fun b (* false *) ->
+        in aux_maybe_define ~should_define pos f
+      | T.AppBuiltin (Builtin.Eq, [a;b]) 
+          when  (T.is_fun a || T.is_fun b)
+                &&  not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a)))  (* false *) ->
         (* turn [f = λx. t] into [∀x. f x=t] *)
         let vars_forall, a, b = complete_eq a b in
         let t' = F.forall_l vars_forall (F.eq_or_equiv a b) in
@@ -372,8 +374,10 @@ module Flatten = struct
         aux pos vars t'
       | T.AppBuiltin (Builtin.Eq, [a;b]) ->
         (F.eq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
-        >|= aux_maybe_define pos
-      | T.AppBuiltin (Builtin.Neq, [a;b]) when  T.is_fun a || T.is_fun b  (*false*) ->
+        (* >|= aux_maybe_define ~should_define pos *)
+      | T.AppBuiltin (Builtin.Neq, [a;b]) 
+        when  (T.is_fun a || T.is_fun b) 
+              &&  not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a)))   (*false*) ->
         (* turn [f ≠ λx. t] into [∃x. f x≠t] *)
         let vars_exist, a, b = complete_eq a b in
         let t' = F.exists_l vars_exist (F.neq_or_xor a b) in
@@ -383,42 +387,46 @@ module Flatten = struct
         aux pos vars t'
       | T.AppBuiltin (Builtin.Neq, [a;b]) ->
         (F.neq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
-        >|= aux_maybe_define pos
+        (* >|= aux_maybe_define pos *)
       | T.AppBuiltin (Builtin.Imply, [a;b]) ->
         (F.imply <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
-        >|= aux_maybe_define pos
+        (* >|= aux_maybe_define pos *)
       | T.AppBuiltin (Builtin.Equiv, [a;b]) ->
         (F.equiv <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
-        >|= aux_maybe_define pos
+        (* >|= aux_maybe_define pos *)
       | T.AppBuiltin (Builtin.Xor, [a;b]) ->
         (F.xor <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
-        >|= aux_maybe_define pos
+        (* >|= aux_maybe_define pos *)
       | T.AppBuiltin (Builtin.And, l) ->
-        (F.and_ <$> map_m (aux Pos_toplevel vars) l) >|= aux_maybe_define pos
+        if pos = Pos_inner && CCList.is_empty l then return t
+        else (F.and_ <$> map_m (aux Pos_toplevel vars) l) (*>|= aux_maybe_define pos*)
       | T.AppBuiltin (Builtin.Or, l) ->
-        (F.or_ <$> map_m (aux Pos_toplevel vars) l) >|= aux_maybe_define pos
+        if pos = Pos_inner && CCList.is_empty l then return t
+        else (F.or_ <$> map_m (aux Pos_toplevel vars) l) (*>|= aux_maybe_define pos*)
       | T.AppBuiltin (Builtin.Not, [a]) ->
-        (F.not_ <$> aux Pos_toplevel vars a) >|= aux_maybe_define pos
+        (F.not_ <$> aux Pos_toplevel vars a) (*>|= aux_maybe_define pos*)
       | T.AppBuiltin (b, l) ->
         return (T.app_builtin ~ty:(T.ty_exn t) b) <*> map_m (aux Pos_inner vars) l
       | T.Bind (Binder.Forall,var,body) ->
-        (aux Pos_toplevel vars body >|= F.forall var) >|= aux_maybe_define pos
+        (aux Pos_toplevel vars body >|= F.forall var) (*>|= aux_maybe_define pos*)
       | T.Bind (Binder.Exists,var,body) ->
-        (aux Pos_toplevel vars body >|= F.exists var) >|= aux_maybe_define pos
+        (aux Pos_toplevel vars body >|= F.exists var) (*>|= aux_maybe_define pos*)
       | T.Bind (Binder.Lambda, _, _) ->
         (* lambda-lifting *)
         let fun_vars, body = T.unfold_fun t in
         assert (fun_vars <> []);
         (* flatten body (but [fun_vars] are protected) *)
-        aux Pos_inner vars body >|= fun body ->
+        aux Pos_toplevel vars body >|= fun body ->
         T.fun_l fun_vars body
       | T.Bind (Binder.ForallTy,_,_)
       | T.Multiset _
       | T.Record _
       | T.Meta _ -> assert false
     (* if [pos = Pos_inner], introduce a name for formula [f] *)
-    and aux_maybe_define pos f =
+    and aux_maybe_define ~should_define pos f =
       assert (T.Ty.is_prop (T.ty_exn f));
+      if (not should_define) then f
+      else 
       begin match pos with
         | Pos_toplevel -> f
         | Pos_inner ->
@@ -434,8 +442,8 @@ module Flatten = struct
       (fun k->k T.pp t (Util.pp_list Var.pp_fullc) vars);
     aux pos vars t
 
-  let flatten_rec_l ?of_ ctx stmt pos vars l =
-    map_m (flatten_rec ?of_ ctx stmt pos vars) l
+  let flatten_rec_l ?of_ ~should_define ctx stmt pos vars l =
+    map_m (flatten_rec ?of_ ~should_define ctx stmt pos vars) l
 end
 
 (* miniscoping (push quantifiers as deep as possible in the formula) *)
@@ -854,12 +862,12 @@ let pp_stmt out st = Stmt.pp T.pp T.pp_inner T.pp_inner out st
 
 (* flatten definitions, removing some constructs such as if/match,
    introducing new definitions *)
-let flatten ~ctx seq : _ Iter.t =
+let flatten ~ctx ~should_define seq : _ Iter.t =
   let open Flatten in
   let flatten_axiom stmt f =
     begin
       let vars, body = F.unfold_forall f in
-      flatten_rec ctx stmt Pos_toplevel vars body >>= fun body ->
+      flatten_rec ~should_define ctx stmt Pos_toplevel vars body >>= fun body ->
       get_subst >|= fun subst ->
       let vars = List.map (Var.update_ty ~f:(T.Subst.eval subst)) vars in
       let body = T.Subst.eval subst body in
@@ -869,9 +877,9 @@ let flatten ~ctx seq : _ Iter.t =
   let flatten_def stmt d : _ Stmt.def_rule list = match d with
     | Stmt.Def_term {vars;id;ty;args;rhs;as_form} ->
       begin
-        flatten_rec_l ~of_:id ctx stmt Pos_inner vars args >>= fun args ->
-        flatten_rec_l ~of_:id ctx stmt Pos_toplevel vars args >>= fun args ->
-        flatten_rec ~of_:id ctx stmt Pos_toplevel vars rhs >>= fun rhs ->
+        flatten_rec_l ~of_:id ~should_define ctx stmt Pos_inner vars args >>= fun args ->
+        flatten_rec_l ~of_:id ~should_define ctx stmt Pos_toplevel vars args >>= fun args ->
+        flatten_rec ~of_:id ~should_define ctx stmt Pos_toplevel vars rhs >>= fun rhs ->
         get_subst >|= fun subst ->
         let args = List.map (T.Subst.eval subst) args in
         let rhs = T.Subst.eval subst rhs in
@@ -885,8 +893,8 @@ let flatten ~ctx seq : _ Iter.t =
           | SLiteral.Atom (t,_) -> T.head t
           | _ -> None
         in
-        map_sliteral (flatten_rec ?of_ ctx stmt Pos_inner vars) lhs >>= fun lhs ->
-        flatten_rec_l ?of_ ctx stmt Pos_toplevel vars rhs >>= fun rhs ->
+        map_sliteral (flatten_rec ~should_define ?of_ ctx stmt Pos_inner vars) lhs >>= fun lhs ->
+        flatten_rec_l ?of_ ~should_define ctx stmt Pos_toplevel vars rhs >>= fun rhs ->
         get_subst >|= fun subst ->
         let lhs = SLiteral.map ~f:(T.Subst.eval subst) lhs in
         let rhs = List.map (T.Subst.eval subst) rhs in
@@ -1078,7 +1086,7 @@ let proof_conv stmt =
     [Proof.S.mk (Stmt.proof_step stmt) (Proof.Result.make Statement.res_tc_sc stmt) |> Proof.Parent.from]
 
 (* Transform the clauses into proper CNF; returns a list of clauses *)
-let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
+let cnf_of_seq ~ctx ?(opts=[])  seq =
   (* read options *)
   let disable_renaming = List.mem DisableRenaming opts in
   let preprocess =
@@ -1096,7 +1104,7 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
   in
   (* simplify and introduce definitions *)
   let v =
-    flatten ~ctx seq
+    flatten ~should_define:(not disable_renaming) ~ctx seq
     |> simplify_and_rename ~ctx ~disable_renaming ~preprocess
   in
   (* reduce the new formulas to CNF *)
@@ -1240,8 +1248,8 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
   (* return final vector of clauses *)
   CCVector.freeze res
 
-let cnf_of ?opts ?ctx st =
-  cnf_of_seq ?opts ?ctx (Iter.return st)
+let cnf_of ~ctx ?opts  st =
+  cnf_of_seq ~ctx ?opts  (Iter.return st)
 
 let pp_f_statement out st = Statement.pp T.pp T.pp T.pp out st
 

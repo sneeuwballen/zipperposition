@@ -20,7 +20,6 @@ type t = private
   | True
   | False
   | Equation of term * term * bool
-  | Prop of term * bool
   | Int of Int_lit.t
   | Rat of Rat_lit.t
 
@@ -33,14 +32,15 @@ val hash : t -> int               (** hashing of literal *)
 val weight : t -> int             (** weight of the lit (sum of weights of terms) *)
 val heuristic_weight : (term -> int) -> t -> int   (** heuristic difficulty to eliminate lit *)
 val depth : t -> int              (** depth of literal *)
-val sign : t -> bool
 
 val is_pos : t -> bool            (** is the literal positive? *)
+
 val is_neg : t -> bool            (** is the literal negative? *)
 val is_eqn : t -> bool            (** is the literal a proper (in)equation or prop? *)
 val is_prop : t -> bool           (** is the literal a boolean proposition? *)
 val is_eq : t -> bool             (** is the literal of the form a = b? *)
 val is_neq : t -> bool            (** is the literal of the form a != b? *)
+val is_essentially_prop : t -> bool (** is the literal non-equational literal of type Prop *)
 
 val is_arith : t -> bool
 val is_arith_eqn : t -> bool    (** = or != *)
@@ -80,6 +80,8 @@ val mk_rat : Rat_lit.t -> t
 val mk_rat_op : Rat_lit.op -> Q.t Monome.t -> Q.t Monome.t -> t
 val mk_rat_eq : Q.t Monome.t -> Q.t Monome.t -> t
 val mk_rat_less : Q.t Monome.t -> Q.t Monome.t -> t
+
+val no_prop_invariant : t -> bool
 
 val mk_constraint : term -> term -> t
 (** [mk_constraint t u] makes a disequation or a HO constraint depending
@@ -125,13 +127,12 @@ val of_unif_subst: Subst.Renaming.t -> Unif_subst.t -> t list
     contained in this substitution. *)
 
 val map : (term -> term) -> t -> t (** functor *)
-val map_no_simp : (term -> term) -> t -> t (** functor *)
 val fold : ('a -> term -> 'a) -> 'a -> t -> 'a  (** basic fold *)
 val for_all : (term -> bool) -> t -> bool  (** for the term or both terms of the literal *)
 val vars : t -> Type.t HVar.t list (** gather variables *)
 val var_occurs : Type.t HVar.t -> t -> bool
 val is_ground : t -> bool
-val symbols : t -> ID.Set.t
+val symbols : ?include_types:bool -> t -> ID.Set.t
 val root_terms : t -> term list (** all the terms immediatly under the lit *)
 
 val to_ho_term : t -> term option
@@ -152,7 +153,13 @@ val is_absurd : t -> bool
 val is_absurd_tags : t -> Proof.tag list (** if [is_absurd lit], return why *)
 val is_app_var_eq : t -> bool
 
+val is_type_pred : t -> bool
+val is_typex_pred : t -> bool (* like in E, type predicate with multiple variables *)
+
+val is_propositional : t -> bool
+
 val as_inj_def : t -> (ID.t * (Term.var * Term.var) list) option
+val is_pure_var : t -> bool
 val as_pos_pure_var : t -> (Term.var * Term.var) option
 
 val fold_terms :
@@ -176,6 +183,8 @@ val fold_terms :
     - if [which] is [`Max], only the maximal terms are explored
     - if [which] is [`All], all root terms are explored *)
 
+val normalize_eq : t -> t option
+
 (** {2 Comparisons} *)
 module Comp : sig
   val max_terms : ord:Ordering.t -> t -> term list
@@ -187,8 +196,8 @@ end
 
 module Seq : sig
   val terms : t -> term Iter.t
-  val vars : t -> Type.t HVar.t Iter.t
-  val symbols : t -> ID.t Iter.t
+  val vars :  t -> Type.t HVar.t Iter.t
+  val symbols : ?include_types:bool -> t -> ID.t Iter.t
 end
 
 (** {2 Positions} *)
@@ -286,6 +295,8 @@ module Conv : sig
   val to_s_form :
     ?allow_free_db:bool -> ?ctx:Term.Conv.ctx -> ?hooks:hook_to list ->
     t -> TypedSTerm.Form.t
+
+  val lit_to_tst : ?ctx:Term.Conv.ctx -> term SLiteral.t  -> TypedSTerm.t
 end
 
 (** {2 IO} *)

@@ -4,6 +4,8 @@
 open Logtk
 
 module type S = sig
+  val sk_ctx : unit -> Skolem.ctx
+
   val ord : unit -> Ordering.t
   (** current ordering on terms *)
 

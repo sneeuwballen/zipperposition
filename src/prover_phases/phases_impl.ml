@@ -7,6 +7,7 @@ open Logtk
 open Logtk_parsers
 open Logtk_proofs
 open Libzipperposition
+open Libzipperposition_calculi
 
 open Phases.Infix
 
@@ -18,6 +19,8 @@ let section = Const.section
 
 let _db_w = ref 1
 let _lmb_w = ref 1
+let _kbo_wf = ref "invfreqrank"
+let _lift_lambdas = ref false
 
 (* setup an alarm for abrupt stop *)
 let setup_alarm timeout =
@@ -53,6 +56,7 @@ let load_extensions =
   Extensions.register Arith_rat.extension;
   Extensions.register Ind_types.extension;
   Extensions.register Fool.extension;
+  Extensions.register Booleans.extension;
   Extensions.register Higher_order.extension;
   Extensions.register App_encode.extension;
   let l = Extensions.extensions () in
@@ -126,12 +130,14 @@ let typing ~file prelude (input,stmts) =
   Phases.return_phase stmts
 
 (* obtain clauses  *)
-let cnf decls =
+let cnf ~sk_ctx decls =
   Phases.start_phase Phases.CNF >>= fun () ->
   let stmts =
     decls
     |> CCVector.to_seq
-    |> Cnf.cnf_of_seq
+    |> (if not !_lift_lambdas then CCFun.id
+        else Iter.flat_map Statement.lift_lambdas)
+    |> Cnf.cnf_of_seq ~ctx:sk_ctx
     |> CCVector.to_seq
     |> apply_modifiers ~field:(fun e -> e.Extensions.post_cnf_modifiers)
     |> Cnf.convert
@@ -141,7 +147,7 @@ let cnf decls =
   Phases.return_phase stmts
 
 (* compute a precedence *)
-let compute_prec stmts =
+let compute_prec ~signature stmts =
   Phases.start_phase Phases.Compute_prec >>= fun () ->
   (* use extensions *)
   Phases.get >>= fun state ->
@@ -155,10 +161,13 @@ let compute_prec stmts =
     |> Compute_prec.add_constr 10 Classify_cst.prec_constr
     |> Compute_prec.set_weight_rule (
        fun stmts -> 
-        Precedence.weight_invfreq (
-         stmts
-         |> Iter.flat_map Statement.Seq.terms
-         |> Iter.flat_map Term.Seq.symbols))
+        let sym_depth = 
+          stmts 
+          |> Iter.flat_map Statement.Seq.terms 
+          |> Iter.flat_map (fun t -> Term.Seq.subterms_depth t
+                                     |> Iter.filter_map (fun (st,d) -> 
+                                        CCOpt.map (fun id -> (id,d)) (Term.head st)))  in
+        Precedence.weight_fun_of_string ~signature !_kbo_wf sym_depth)
     (* |> Compute_prec.set_weight_rule (fun _ -> Classify_cst.weight_fun) *)
 
     (* use "invfreq", with low priority *)
@@ -183,13 +192,14 @@ let compute_ord_select precedence =
   Util.debugf ~section 2 "@[<2>selection function:@ %s@]" (fun k->k params.Params.select);
   Phases.return_phase (ord, select)
 
-let make_ctx ~signature ~ord ~select ~eta () =
+let make_ctx ~signature ~ord ~select ~eta ~sk_ctx () =
   Phases.start_phase Phases.MakeCtx >>= fun () ->
   let module Res = struct
     let signature = signature
     let ord = ord
     let select = select
     let eta = eta
+    let sk_ctx = sk_ctx
   end in
   let module MyCtx = Ctx.Make(Res) in
   let ctx = (module MyCtx : Ctx_intf.S) in
@@ -420,26 +430,15 @@ let parse_cli =
   print_version ~params;
   Phases.return_phase (files, params)
 
-let syms_in_lit cl =
-   let open Iter in 
-      List.fold_left (<+>) empty 
-                     (List.map (fun lit -> match lit with 
-                                    | SLiteral.Atom (t, _) -> Term.Seq.symbols t
-                                    | SLiteral.Eq (l,r) 
-                                    | SLiteral.Neq (l,r) -> Term.Seq.symbols l <+> 
-                                                            Term.Seq.symbols r
-                                    | _ -> empty) 
-                                 cl)
-
 let syms_in_conj decls =
    let open Iter in
-      decls 
-      |> CCVector.to_seq
-      |> flat_map (fun st -> match Statement.view st with
-         | Statement.NegatedGoal (_, gl) ->
-            flatten (of_list (List.map syms_in_lit gl))
-         | Statement.Goal g -> syms_in_lit g
-         | _ -> empty)
+    decls 
+    |> CCVector.to_seq
+    |> flat_map (fun st -> 
+        let pr = Statement.proof_step st in
+        if CCOpt.is_some (Proof.Step.distance_to_goal pr) then (
+          Statement.Seq.symbols st
+        ) else empty)
 
 (* Process the given file (try to solve it) *)
 let process_file ?(prelude=Iter.empty) file =
@@ -451,21 +450,27 @@ let process_file ?(prelude=Iter.empty) file =
   let has_goal = has_goal_decls_ decls in
   Util.debugf ~section 1 "parsed %d declarations (%s goal(s))"
     (fun k->k (CCVector.length decls) (if has_goal then "some" else "no"));
-  cnf decls >>= fun stmts ->
+  (* Hooks exist but they can't be used to add statements. 
+     Hence naming quantifiers inside terms is done directly here. 
+     Without this Type.Conv.Error occures so the naming is done unconditionally. *)
+  let quant_transformer = 
+    if !Booleans.quant_rename then Booleans.preprocess_booleans 
+    else CCFun.id in
+  let transformed = Rewriting.unfold_def_before_cnf (quant_transformer decls) in
+  let sk_ctx = Skolem.create () in 
+  cnf ~sk_ctx transformed >>= fun stmts ->
+  let stmts = Booleans.preprocess_cnf_booleans stmts in
   (* compute signature, precedence, ordering *)
   let conj_syms = syms_in_conj stmts in
   let signature = Statement.signature ~conj_syms:conj_syms (CCVector.to_seq stmts) in
-  Util.debugf ~section 1 "@[<2>signature:@ @[<hv>%a@]@]" (fun k->k Signature.pp signature);
-  Util.debugf ~section 2 "(@[classification:@ %a@])"
-    (fun k->k Classify_cst.pp_signature signature);
-  compute_prec (CCVector.to_seq stmts) >>= fun precedence ->
+  compute_prec ~signature (CCVector.to_seq stmts) >>= fun precedence ->
   Util.debugf ~section 1 "@[<2>precedence:@ @[%a@]@]" (fun k->k Precedence.pp precedence);
   compute_ord_select precedence >>= fun (ord, select) ->
   (* HO *)
   Phases.get_key Params.key >>= fun params ->
   let eta = params.Params.eta in
   (* build the context and env *)
-  make_ctx ~signature ~ord ~select ~eta () >>= fun ctx ->
+  make_ctx ~signature ~ord ~select ~eta ~sk_ctx () >>= fun ctx ->
   make_env ~params ~ctx stmts >>= fun (Phases.Env_clauses (env,clauses)) ->
   (* main workload *)
   has_goal_ := has_goal; (* FIXME: should be computed at Env initialization *)
@@ -576,9 +581,15 @@ let () =
     "--de-bruijn-weight"
     , Arg.Set_int _db_w
     , " Set weight of de Bruijn index for KBO";
+    "--lift-lambdas"
+    , Arg.Bool (fun v -> _lift_lambdas := v)
+    , " Turn lambda lifting on or off.";
     "--lambda-weight"
     , Arg.Set_int _lmb_w
     , " Set weight of lambda symbol for KBO";
+    "--kbo-weight-fun"
+    , Arg.Set_string _kbo_wf
+    , " Set the function for symbol weight calculation.";
   ];
 
    Params.add_to_mode "ho-pragmatic" (fun () ->

@@ -7,12 +7,12 @@ type subst = US.t
 
 type unif_state =
 {
-  norm_deref          : US.t -> T.t Scoped.t -> T.t;
   num_identifications : int;
   num_var_imitations  : int;
   num_app_projections : int;
   num_elims           : int;
-  depth               : int
+  depth               : int;
+  monomorphic         : bool;
 }
 
 module S : sig
@@ -28,6 +28,7 @@ val max_var_imitations  : int ref
 val max_identifications : int ref
 val max_elims           : int ref
 val max_depth           : int ref
+val solve_var           : bool ref
 
 (* Disable getting only the first solution for unifying arguments
    after performing identification *)
@@ -45,3 +46,5 @@ val unify : state:unif_state ->
             subst:US.t -> (T.t * T.t * bool) CCList.t -> US.t option OSeq.t
 
 val unify_scoped : T.t Scoped.t -> T.t Scoped.t -> subst option OSeq.t
+
+val single_unif : Term.t Scoped.t -> Term.t Scoped.t -> US.t

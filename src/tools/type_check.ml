@@ -55,7 +55,7 @@ let check file =
     ?ctx:None
   >>= (fun decls -> decls
     |> CCVector.to_seq
-    |> Cnf.cnf_of_seq
+    |> Cnf.cnf_of_seq ~ctx:(Skolem.create ())
     |> CCVector.to_seq
     |> Cnf.convert
     |> CCResult.return) >>= (fun stmts -> CCVector.to_seq stmts |> Iter.flat_map Statement.Seq.terms |>

@@ -165,11 +165,11 @@ let is_trivial lits =
     if i = Array.length lits then false
     else
       let triv = match lits.(i) with
-        | Lit.Prop (p, sign) ->
+        | Lit.Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
           CCArray.exists
             (function
-              | Lit.Prop (p', sign') when sign = not sign' ->
-                T.equal p p'  (* p  \/  ~p *)
+              | Lit.Equation (lhs', rhs', true) when T.equal rhs' T.true_ || T.equal rhs' T.false_ ->
+                T.equal lhs lhs' && not @@ T.equal rhs rhs'
               | _ -> false)
             lits
         | Lit.Equation (l, r, true) when T.equal l r -> true
@@ -251,6 +251,20 @@ module Conv = struct
   let to_forms ?hooks lits =
     Array.to_list (Array.map (Lit.Conv.to_form ?hooks) lits)
 
+  let to_tst lits = 
+    let ctx = Type.Conv.create () in
+    Array.map (fun t -> Lit.Conv.lit_to_tst ~ctx (Lit.Conv.to_form t)) lits 
+    |> Array.to_list
+    |> (fun or_args ->
+          let ty = TypedSTerm.Ty.prop in
+          let clause_vars = T.VarSet.of_seq (Seq.vars lits) in
+          let vars = clause_vars
+                     |> T.VarSet.to_list 
+                     |> CCList.map (fun v -> T.Conv.to_simple_term ctx (T.var v))  in
+          let disjuncts =  TypedSTerm.app_builtin ~ty Builtin.or_ or_args in
+          TypedSTerm.close_with_vars vars disjuncts
+      )
+
   let to_s_form ?allow_free_db ?(ctx=T.Conv.create()) ?hooks lits =
     Array.to_list lits
     |> List.map (Literal.Conv.to_s_form ?hooks ?allow_free_db ~ctx)
@@ -325,9 +339,6 @@ let fold_eqn ?(both=true) ?sign ~ord ~eligible lits k =
                 (* only one side *)
                 k (l, r, sign, Position.(arg i @@ left @@ stop))
           end
-        | Lit.Prop (p, sign) when sign_ok sign ->
-          k (p, T.true_, sign, Position.(arg i @@ left @@ stop))
-        | Lit.Prop _
         | Lit.Equation _
         | Lit.Int _
         | Lit.Rat _
@@ -421,9 +432,9 @@ let fold_terms ?(vars=false) ?(var_args=true) ?(fun_bodies=true) ?ty_args ~(whic
   in
   aux 0
 
-let symbols ?(init=ID.Set.empty) lits =
+let symbols ?(init=ID.Set.empty) ?(include_types=false) lits =
   Iter.of_array lits
-  |> Iter.flat_map Lit.Seq.symbols
+  |> Iter.flat_map (Lit.Seq.symbols ~include_types)
   |> ID.Set.add_seq init
 
 (** {3 IO} *)
@@ -492,7 +503,6 @@ let is_horn lits =
 let is_pos_eq lits =
   match lits with
     | [| Lit.Equation (l,r,true) |] -> Some (l,r)
-    | [| Lit.Prop(p,true) |] -> Some (p, T.true_)
     | [| Lit.True |] -> Some (T.true_, T.true_)
     | _ -> None
 
@@ -527,3 +537,9 @@ let unshielded_vars ?(filter=fun _->true) lits: _ list =
     (fun var ->
        filter var &&
        not (is_shielded var lits))
+
+let vars_distinct lits = 
+  let dif_vars = vars lits in
+  let dif_ids  = 
+    List.sort_uniq CCOrd.int @@ List.map HVar.id dif_vars in
+  List.length dif_ids = List.length dif_vars

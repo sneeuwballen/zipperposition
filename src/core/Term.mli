@@ -127,6 +127,7 @@ val grounding : Type.t -> t
 
 val is_var : t -> bool
 val is_bvar : t -> bool
+val is_formula : t -> bool
 val is_app : t -> bool
 val is_const : t -> bool
 val is_fun : t -> bool
@@ -136,8 +137,9 @@ val is_type : t -> bool (** Does it have type [tType]? *)
 val in_pfho_fragment : t -> bool
 val in_lfho_fragment : t -> bool
 val is_fo_term : t -> bool
+val is_true_or_false : t -> bool
 
-val mk_fresh_skolem : var list -> Type.t -> ID.t * Type.t * var list * t
+val mk_fresh_skolem : var list -> Type.t -> (ID.t * Type.t) * var list * t
 (** Creates a skolem constant that depends on a some variables.
     Returns the constant ID, its type, the reordered list of variables, 
     and the constant applied to those variables *)
@@ -177,6 +179,8 @@ val of_term_unsafe_l : InnerTerm.t list -> t list
 val of_ty : Type.t -> t
 (** Upcast from type *)
 
+val mk_tmp_cst : counter:int ref -> ty:Type.t -> t
+
 module VarSet : CCSet.S with type elt = var
 module VarMap : CCMap.S with type key = var
 module VarTbl : CCHashtbl.S with type key = var
@@ -185,9 +189,9 @@ module VarTbl : CCHashtbl.S with type key = var
 
 module Seq : sig
   val vars : t -> var Iter.t
-  val subterms : t -> t Iter.t
-  val subterms_depth : t -> (t * int) Iter.t  (* subterms with their depth *)
-  val symbols : t -> ID.t Iter.t
+  val subterms : ?include_builtin:bool -> ?ignore_head:bool -> t -> t Iter.t
+  val subterms_depth : ?filter_term:(t -> bool) -> t -> (t * int) Iter.t  (* subterms with their depth *)
+  val symbols : ?include_types:bool -> ?filter_term:(t -> bool) -> t -> ID.t Iter.t
   val max_var : var Iter.t -> int (** max var *)
   val min_var : var Iter.t -> int (** min var *)
   val ty_vars : t -> var Iter.t
@@ -207,6 +211,11 @@ val depth : t -> int (** depth of the term *)
 val head : t -> ID.t option (** head ID.t *)
 val head_exn : t -> ID.t (** head ID.t (or Invalid_argument) *)
 val size : t -> int (** Size (number of nodes) *)
+
+val simplify_bools : t -> t
+(* Sort the arguments to logical operators using their weights
+   in an attempt to make more terms unifiable. *)
+val normalize_bools : t -> t
 
 (* all the ways in which term can be covered (built) using the arguments given *)
 val cover_with_terms : ?depth:int -> ?recurse:bool -> t -> t option list -> t list
@@ -344,6 +353,8 @@ module Form : sig
   val or_ : t -> t -> t
   val and_l : t list -> t
   val or_l : t list -> t
+  val forall : t -> t
+  val exists : t -> t
 end
 
 (** {2 Arith} *)
@@ -378,6 +389,10 @@ module Arith : sig
   val pp_hook : print_hook
   (** hook to print arithmetic expressions *)
 end
+
+
+val close_quantifier : Builtin.t -> Type.t list -> t -> t
+val has_ho_subterm : t -> bool
 
 (** {2 De Bruijn} *)
 module DB : sig

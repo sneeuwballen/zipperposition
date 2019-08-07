@@ -27,19 +27,45 @@ type fingerprint_fun = T.t -> feature list
 (* TODO: more efficient implem of traversal, only following branches that
    are useful instead of folding and filtering *)
 
+let expand_otf_ body = 
+  let extra_args = Type.expected_args (Term.ty body) in
+  if CCList.is_empty extra_args then body else (
+    let n = List.length extra_args in
+    T.app (T.DB.shift n body) 
+          (List.mapi (fun i ty -> T.bvar ~ty (n-1-i)) extra_args)
+  )
+
 (* compute a feature for a given position *)
 let rec gfpf ?(depth=0) pos t =
-  let pref_vars, body =  T.open_fun t in 
+  let depth_inc = List.length (Type.expected_args (Term.ty t)) in
+  let pref_vars, body =  T.open_fun t in
   match pos with 
-  | [] -> gfpf_root ~depth body
+  | [] -> 
+    let body = expand_otf_ body in
+    gfpf_root ~depth:(depth + depth_inc) body
   | i::is ->
       let hd, args = T.as_app body in
+      let args = List.filter (fun x -> not @@ T.is_type x) args in
+      (* TODO: not ready for polymorphism *)
+      (* let args = List.filter (fun t -> not (Term.is_type t)) args in *)
+      let exp_args = Type.expected_args (Term.ty hd) in
       if T.is_var hd then B
       else (
-        if List.length args >= i then (
-          gfpf ~depth:(depth + (List.length pref_vars)) is (List.nth args @@  i-1 )
+        let num_acutal_args = List.length args in
+        (* formulas can potentially support variable number of arguments *)
+        let num_exp_args = 
+          if T.is_formula body then num_acutal_args else List.length exp_args in
+
+        let idx = i-1 in (* zero-based i *)
+        if num_acutal_args >= i then (
+          let arg = T.DB.shift (num_exp_args - num_acutal_args) (List.nth args idx) in
+          gfpf ~depth:(depth + depth_inc) is arg
         ) 
-        else (
+        else if num_exp_args >= i then (
+          let arg = T.bvar (num_exp_args - i) ~ty:(List.nth exp_args idx) in
+          gfpf ~depth:(depth + depth_inc) is arg
+        ) else (
+          (* eta-expanding on the fly *)
           let _, ret = Type.open_fun (Term.ty body) in
           if (Type.is_var ret) then B else N
         ) 
@@ -47,27 +73,38 @@ let rec gfpf ?(depth=0) pos t =
 and gfpf_root ~depth t =
   match T.view t with 
   | T.AppBuiltin(_, _) -> Ignore
-  | T.DB i -> if (i < depth) then DB i else Ignore
+  (* if we are sampling under a function, it can happen that there are
+     loosely bound variables that can be unified inside LambdaSup. *)
+  | T.DB i -> if (i < depth) then DB i else Ignore 
   | T.Var _ -> A
-  | T.Const c -> S c 
+  | T.Const c -> S c
   | T.App (hd,_) -> (match T.view hd with
-                         T.Var _ -> A 
+                         T.Var _ -> A
                          | T.Const s -> S s
                          | T.DB i    -> if (i < depth) then DB i else Ignore
                          | T.AppBuiltin(_,_) -> Ignore
                          | _ -> assert false)
-  | T.Fun (_, _) -> assert false 
+  | T.Fun (_, _) -> assert false
 
-(* TODO more efficient way to compute a vector of features: if the fingerprint
+(* TODO more efficient way to compute a vector of s: if the fingerprint
    is in BFS, compute features during only one traversal of the term? *)
+
+let pp_feature out = function 
+  | A -> CCFormat.fprintf out "A"
+  | B -> CCFormat.fprintf out "B" 
+  | DB i -> CCFormat.fprintf out "DB %d" i 
+  | N -> CCFormat.fprintf out "N" 
+  | S id -> CCFormat.fprintf out "S %a" ID.pp id
+  | Ignore -> CCFormat.fprintf out "I"
 
 (** compute a feature vector for some positions *)
 let fp positions =
   (* list of fingerprint feature functions *)
   let fpfs = List.map gfpf positions in
   fun t ->
-    (* Format.printf "@[Fingerprinting: @[%a@].@]\n" T.pp t; *)
     List.map (fun fpf -> fpf t) fpfs
+    (* Format.printf "@[Fingerprinting:@ @[%a@]=@[%a@].@]\n" T.pp t (CCList.pp pp_feature) res; *)
+
 
 (** {2 Fingerprint functions} *)
 
@@ -110,15 +147,15 @@ let compatible_features_unif f1 f2 =
              | S s2 -> ID.equal s1 s2 
              | A | B | Ignore -> true
              | N | DB _ -> false)
-  | Ignore 
+  | Ignore -> true
   | B    -> true
   | A    -> (match f2 with
-             | DB _ | N  -> false
-             | Ignore | S _ | A | B  -> true)
+             | N  -> false
+             | DB _ | Ignore | S _ | A | B  -> true)
   | DB i -> (match f2 with 
              | DB j -> i = j
-             | B | Ignore -> true
-             | A | S _ | N -> false)
+             | B | A | Ignore -> true
+             | S _ | N -> false)
   | N ->    (match f2 with 
              | N | B | Ignore -> true
              | A | DB _ | S _ -> false)
@@ -133,7 +170,7 @@ let compatible_features_match f1 f2 =
   | Ignore 
   | B    -> true
   | A    -> (match f2 with
-             | A | S _ | Ignore -> true
+             | A | DB _ | S _ | Ignore -> true
              | _ -> false)
   | DB i -> (match f2 with 
              | DB j -> i = j
@@ -216,7 +253,7 @@ module Make(X : Set.OrderedType) = struct
         | Node _, [] | Leaf _, _::_ ->
           failwith "different feature length in fingerprint trie"
     in
-    let features = idx.fp (Lambda.eta_expand t) in  (* features of term *)
+    let features = idx.fp t in  (* features of term *)
     { idx with trie = recurse idx.trie features; }
 
   let add_ trie = CCFun.uncurry (add trie)
@@ -253,7 +290,7 @@ module Make(X : Set.OrderedType) = struct
         | Node _, [] | Leaf _, _::_ ->
           failwith "different feature length in fingerprint trie"
     in
-    let features = idx.fp (Lambda.eta_expand t) in  (* features of term *)
+    let features = idx.fp t in  (* features of term *)
     { idx with trie = recurse idx.trie features; }
 
   let remove_ trie = CCFun.uncurry (remove trie)
@@ -308,7 +345,7 @@ module Make(X : Set.OrderedType) = struct
       raise e
 
   let retrieve_unifiables_aux fold_unify (idx,sc_idx) t k =
-    let features = idx.fp (Lambda.eta_expand @@ fst t) in
+    let features = idx.fp (fst t) in
     let compatible = compatible_features_unif in
     traverse ~compatible idx features
       (fun leaf -> fold_unify (leaf,sc_idx) t k)
@@ -319,14 +356,14 @@ module Make(X : Set.OrderedType) = struct
     retrieve_unifiables_aux (Leaf.fold_unify_complete ~unif_alg)
 
   let retrieve_generalizations ?(subst=S.empty) (idx,sc_idx) t k =
-    let features = idx.fp (Lambda.eta_expand @@ fst t) in
+    let features = idx.fp (fst t) in
     (* compatible t1 t2 if t2 can match t1 *)
     let compatible f1 f2 = compatible_features_match f2 f1 in
     traverse ~compatible idx features
       (fun leaf -> Leaf.fold_match ~subst (leaf,sc_idx) t k)
 
   let retrieve_specializations ?(subst=S.empty) (idx,sc_idx) t k =
-    let features = idx.fp (Lambda.eta_expand @@ fst t) in
+    let features = idx.fp (fst t) in
     let compatible = compatible_features_match in
     traverse ~compatible idx features
       (fun leaf -> Leaf.fold_matched ~subst (leaf,sc_idx) t k)

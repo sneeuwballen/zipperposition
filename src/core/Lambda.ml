@@ -77,12 +77,15 @@ module Inner = struct
       | T.AppBuiltin _, _ | T.Bind _, _ -> st
     end
 
-  let whnf_term ?(env=DBEnv.empty) t = match T.ty t with
-    | T.NoType -> t
-    | T.HasType ty ->
+  let whnf_term ?(env=DBEnv.empty) t = 
+    let is_reducible t =
+      T.is_lambda (fst @@ T.as_app t) in
+    match T.ty t with
+    | T.HasType ty when is_reducible t ->
       let st = st_of_term ~ty ~env t in
       let st = whnf_rec st in
       term_of_st st
+    | _ -> t
 
   let rec snf_rec t =
     let t = whnf_term t in
@@ -289,3 +292,17 @@ let rec is_lambda_pattern t = match T.view (whnf t) with
     |> OptionSet.of_list
     |> (fun set -> not (OptionSet.mem None set) && OptionSet.cardinal set = List.length args)
 
+let rec is_properly_encoded t = match T.view t with
+| Var _ | DB _ | Const _ -> true
+| AppBuiltin (hd,l) when Builtin.equal hd Builtin.ForallConst 
+                         || Builtin.equal hd Builtin.ExistsConst ->
+    let res = begin match l with
+    | [body] -> let ty = Term.ty body in
+      Type.is_fun ty && Type.returns_prop ty
+    | _ -> false end in
+    if not res then CCFormat.printf "Failed for %a.\n" T.pp t;
+    res
+| AppBuiltin(hd,l) -> List.for_all is_properly_encoded l
+| App (hd, l) -> List.for_all is_properly_encoded (hd::l)
+| Fun (_,u) -> is_properly_encoded u 
+ 

@@ -37,7 +37,8 @@ let () = Printexc.register_printer
 let declare signature id ty =
   try
     let ty' = find_exn signature id in
-    raise (AlreadyDeclared (id, ty', ty))
+    if not (Type.equal ty ty') then raise (AlreadyDeclared (id, ty', ty))
+    else signature
   with Not_found ->
     if not (InnerTerm.DB.closed (ty : Type.t :> InnerTerm.t))
     then raise (Invalid_argument "Signature.declare: non-closed type");
@@ -49,7 +50,7 @@ let arity signature s =
   let ty = find_exn signature s in
   match Type.arity ty with
     | Type.NoArity ->
-      failwith (CCFormat.sprintf "symbol %a has ill-formed type %a" ID.pp s Type.pp ty)
+      failwith (CCFormat.sprintf "symbol %a has ill-formed type %a" ID.pp s Type.TPTP.pp ty)
     | Type.Arity (a,b) -> a, b
 
 let is_ground signature =
@@ -88,7 +89,7 @@ let sym_in_conj s signature =
 
 let set_sym_in_conj s signature =
    let t = find_exn signature s in
-      ID.Map.add s (t, true) signature
+   ID.Map.add s (t, true) signature
 
 module Seq = struct
   let symbols s =

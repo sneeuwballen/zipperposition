@@ -58,6 +58,7 @@ module Set : sig
   val add_list : 'a t -> 'a var list -> 'a t
   val to_list : 'a t -> 'a var list
   val of_list : 'a var list -> 'a t
+  val intersection_empty : 'a t -> 'a t -> bool
   val cardinal : _ t -> int
   val pp : _ t CCFormat.printer
 end
@@ -70,6 +71,7 @@ module Subst : sig
   val size: (_,_) t -> int
   val add : ('a,'b) t -> 'a var -> 'b -> ('a,'b) t
   val mem : ('a,_) t -> 'a var -> bool
+  val remove : ('a,'b) t -> 'a var -> ('a,'b) t
   val find : ('a,'b) t -> 'a var -> 'b option
   val find_exn : ('a,'b) t -> 'a var -> 'b
   val merge : ('a,'b) t -> ('a,'b) t -> ('a,'b) t

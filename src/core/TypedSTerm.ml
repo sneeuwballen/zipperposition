@@ -119,26 +119,22 @@ and hash_rec_ t = match t.term with
 let rec compare t1 t2 =
   let h1 = hash t1 in
   let h2 = hash t2 in
+  let (<?>) = let open CCOrd in (<?>) in
+
   if h1<>h2 then CCInt.compare h1 h2 (* compare by hash, first *)
   else match view t1, view t2 with
     | Var s1, Var s2 -> Var.compare s1 s2
     | Const s1, Const s2 -> ID.compare s1 s2
     | App (s1,l1), App (s2, l2) ->
-      CCOrd.(
         compare s1 s2
         <?> (CCOrd.list compare, l1, l2)
-      )
     | Bind (s1, v1, t1), Bind (s2, v2, t2) ->
-      CCOrd.(
         Binder.compare s1 s2
-        <?> (compare, v1, v2)
+        <?> (Var.compare, v1, v2)
         <?> (compare, t1, t2)
-      )
     | AppBuiltin (b1,l1), AppBuiltin (b2,l2) ->
-      CCOrd.(
         Builtin.compare b1 b2
         <?> (CCOrd.list compare, l1, l2)
-      )
     | Multiset l1, Multiset l2 ->
       let l1 = List.sort compare l1 and l2 = List.sort compare l2 in
       CCOrd.list compare l1 l2
@@ -174,9 +170,6 @@ let rec compare t1 t2 =
     | Record _, _ -> to_int_ t1.term - to_int_ t2.term
 and cmp_field x y = CCOrd.pair String.compare compare x y
 and cmp_fields x y = CCOrd.list cmp_field x y
-
-let equal t1 t2 = compare t1 t2 = 0
-
 
 let rec unfold_binder b f = match f.term with
   | Bind (b', v, f') when b=b' ->
@@ -275,6 +268,8 @@ and pp_var_ty out v =
     | _ -> Format.fprintf out ":%a" pp_inner ty
 
 let pp_with_ty out t = Format.fprintf out "(@[%a@,:%a@])" pp t pp (ty_exn t)
+
+let equal t1 t2 =  compare t1 t2 = 0
 
 exception IllFormedTerm of string
 
@@ -533,6 +528,13 @@ let closed t = Seq.free_vars t |> Iter.is_empty
 let close_all ~ty s t =
   let vars = free_vars t in
   bind_list ~ty s vars t
+
+let close_with_vars vars t =
+  let vars = List.map (fun v -> match view v with
+      | Var v -> v
+      | _ -> invalid_arg "has to be a variable" ) 
+    vars in
+  bind_list Binder.Forall vars t ~ty:prop
 
 let unfold_fun = unfold_binder Binder.Lambda
 
@@ -886,6 +888,9 @@ module Form = struct
     forall_l ?loc tyvars (forall_l ?loc vars f)
 end
 
+let _l_counter = ref 0
+let _lam_ids = Tbl.create 16 
+
 let is_monomorphic t =
   Seq.subterms t
   |> Iter.for_all (fun t -> Ty.is_mono (ty_exn t))
@@ -910,6 +915,7 @@ module Subst = struct
   let empty = Var.Subst.empty
   let is_empty = Var.Subst.is_empty
   let mem = Var.Subst.mem
+  let remove = Var.Subst.remove
 
   let pp = Var.Subst.pp _pp_term
 
@@ -929,34 +935,40 @@ module Subst = struct
 
   let merge a b = Var.Subst.merge a b
 
-  let rec eval_ ~recursive subst t = match view t with
+  let rec eval_ ~rename_binders ~recursive subst t = match view t with
     | Var v ->
-      begin match Var.Subst.find subst v with
-        | None ->
-          var ?loc:t.loc (Var.update_ty v ~f:(eval_ ~recursive subst))
-        | Some t' ->
-          assert (t != t');
-          if recursive then (
-            eval_ ~recursive subst t'
-          ) else (
-            t'
-          )
-      end
+      eval_var ~rename_binders ~recursive ~t subst v
     | _ ->
       map subst t
-        ~bind:rename_var
-        ~f:(eval_ ~recursive)
+        ~bind:(if rename_binders then rename_var ~rename_binders else eval_binders ~recursive ~rename_binders ~t)
+        ~f:(eval_ ~rename_binders ~recursive)
 
   (* rename variable and evaluate its type. *)
-  and rename_var subst v =
-    let v' = Var.copy v |> Var.update_ty ~f:(eval_ ~recursive:true subst) in
+  and rename_var ~rename_binders subst v =
+    let v' = Var.copy v |> Var.update_ty ~f:(eval_ ~rename_binders ~recursive:true subst) in
     (* (re-)bind [v] to [v'] *)
     let subst = Var.Subst.add subst v (var v') in
     subst, v'
+  and eval_var ~rename_binders ~recursive ~t subst v =
+    begin match Var.Subst.find subst v with
+        | None ->
+          var ?loc:t.loc (Var.update_ty v ~f:(eval_ ~recursive ~rename_binders subst))
+        | Some t' ->
+          if not (t != t') then (
+            Format.printf "faulty subst:@ %a.\n" pp subst;
+            assert(false);
+          );
+          if recursive then (eval_ ~recursive ~rename_binders subst t') else (t')
+    end
+  and eval_binders ~rename_binders ~recursive ~t subst v =
+    subst, match view (eval_var ~recursive ~rename_binders ~t subst v) with
+           | Var v' -> v'
+           | _ -> invalid_arg "binder must be evaluated to a variable"
 
-  let eval subst t = if is_empty subst then t else eval_ ~recursive:true subst t
+  let eval ?(rename_binders=true) subst t = if is_empty subst then t else eval_ ~rename_binders ~recursive:true subst t
 
-  let eval_nonrec subst t = if is_empty subst then t else eval_ ~recursive:false subst t
+  let eval_nonrec subst t = if is_empty subst then t else eval_ ~rename_binders:true ~recursive:false subst t
+
 end
 
 let rec rename subst t = match view t with
@@ -980,6 +992,121 @@ and bind_rename_var subst v =
   subst, v'
 
 let rename_all_vars t = rename Subst.empty t
+
+let rec rectify_aux ?(pref="v_") ~cnt ~subst t =
+    let t_ty = ty_exn t in
+    match view t with
+    | Const _ -> (t, subst)
+    | Var v -> 
+      let (t,subst,_) = handle_var ~pref ~cnt ~subst v t_ty in (t,subst)
+    | App (hd, fs) -> 
+      let ts, subst = rec_aux_l ~cnt ~subst (hd :: fs) in
+      let hd = List.hd ts and args = List.tl ts in
+      app ~ty:t_ty hd args, subst
+    | Bind(b, v_old, body) ->  
+      let old = Subst.find subst v_old in
+      let (_,subst,v) = handle_var ~rename:false ~pref ~cnt ~subst v_old t_ty in
+      let (body, subst) = rectify_aux ~cnt ~subst body in
+      bind ~ty:t_ty b v body, (if CCOpt.is_none old then Subst.remove subst v_old
+                               else Subst.add subst v_old (CCOpt.get_exn old))
+    | AppBuiltin(b, fs) ->
+      let fs, subst = rec_aux_l ~cnt ~subst fs in
+      app_builtin ~ty:t_ty b fs, subst
+    | _ -> t, subst
+and rec_aux_l ?(pref="v_") ~cnt ~subst args =
+      List.fold_right (fun arg (tmp,subst) -> 
+        let arg', subst' = rectify_aux ~subst ~cnt arg in
+        arg' :: tmp, subst'
+      ) args ([], subst)
+and handle_var ~pref ?(rename=true) ~cnt ~subst v t_ty = 
+      if rename && Subst.mem subst v then (Subst.find_exn subst v, subst, v) else (
+        let id = CCRef.get_then_incr cnt in
+        let v' = Var.make ~ty:t_ty (ID.dummy_of_int id) in
+        let res = var v' in
+        let subst = Subst.add subst v res in
+        (res, subst, v')
+      )
+
+let rectify ?(cnt=ref 0) ?(subst=Subst.empty) t = 
+  rectify_aux ~cnt ~subst t
+
+let rectify_l ?(cnt=ref 0) ?(subst=Subst.empty)  ls =
+  rec_aux_l ~cnt ~subst ls
+
+
+let rec lift_lambdas  f =
+  let aux = lift_lambdas  in
+  let ty = ty_exn f in
+  match view f with 
+  | Var _ | Const _ -> (f,[])
+  | App (hd, fs) -> 
+    let hd', hd_def = aux hd in
+    let fs', all_defs = 
+      List.fold_right (fun f (args, defs) -> 
+        let f', new_defs = aux f in
+        (f'::args, new_defs @ defs)) fs ([],hd_def) in
+    if not (CCList.is_empty all_defs) then (
+      app ~ty hd' fs', all_defs
+    ) else f, []
+  | Bind(Binder.Lambda, _, _) ->  
+    let vars, body = unfold_binder Binder.Lambda f in
+    assert(not @@ CCList.is_empty vars);
+    let body', new_defs = aux body in
+    let var_set = Var.Set.of_list vars in
+    let free_vars = 
+      Var.Set.diff (Var.Set.of_seq (Seq.free_vars body')) var_set
+      |> Var.Set.to_list in
+    let replacement, def = 
+      define_lambda_of  ~bound:vars ~free:free_vars body' in
+    replacement, def :: new_defs
+  | Bind(b, v, body) ->  
+    let body', new_defs = aux body in
+    if not (CCList.is_empty new_defs) then (
+      bind ~ty b v body', new_defs
+    ) else f,[]
+  | AppBuiltin(b, fs) ->
+    let fs', all_defs = 
+      List.fold_right (fun f (args, defs) -> 
+        let f', new_defs = aux f in
+        (f'::args, new_defs @ defs)) fs ([],[]) in
+    if not (CCList.is_empty all_defs) then (
+      app_builtin ~ty b fs', all_defs
+    ) else f, []
+  | _ -> invalid_arg "not implemented yet"
+and define_lambda_of ~bound ~free body =
+  let cnt = ref 0 in  
+  let rec_free, rectifier = rectify_l ~cnt (List.rev_map var free) in
+  let rec_bound, rectifier = rectify_l ~cnt ~subst:rectifier (List.rev_map var bound) in
+  let rec_body, recitifier = rectify ~cnt ~subst:rectifier body in
+
+  let eval_vars vs  = List.map (fun v -> 
+    match view (Subst.eval recitifier v) with 
+    | Var v -> v
+    | _ -> invalid_arg "substitution is not a rectifier")  vs in
+  let rec_bound = eval_vars rec_bound and rec_free = eval_vars rec_free in
+  let closed  = fun_l (rec_free @ rec_bound) rec_body in
+  let args = List.map (fun v -> var v) (free @ bound) in
+
+  match Tbl.find_opt _lam_ids closed with 
+  | Some (id,def) ->
+    fst @@ apply_to_new_hd id free bound body args, def
+  | None ->
+    let lam_id = CCRef.get_then_incr _l_counter in
+    let lam_name = "#ll_" ^ CCInt.to_string lam_id in
+    let new_id = ID.make lam_name in
+    let (_, def) as res = apply_to_new_hd new_id free bound body args in
+    Tbl.add _lam_ids closed (new_id,def);
+    res
+  and apply_to_new_hd new_id free bound body args =
+    let body_ty = ty_exn body in
+    let ll_sym_ty = Ty.mk_fun_ (List.map ty_exn args) body_ty in
+    let lam_const = const ~ty:ll_sym_ty new_id in
+    let replacement_ty =  Ty.mk_fun_ (List.map Var.ty free) body_ty in
+    let replacement = app ~ty:replacement_ty lam_const (List.map (fun v -> var v) free) in
+    let new_pred = app ~ty:body_ty lam_const args in
+    let def_form = Form.forall_l (free @ bound) (Form.eq_or_equiv new_pred body) in
+    replacement,def_form
+
 
 (* apply and reduce *)
 let app_whnf ?loc ~ty f l =
@@ -1360,7 +1487,7 @@ let apply_unify ?gen_fresh_meta ?allow_open ?loc ?st ?(subst=Subst.empty) ty l =
       aux_l subst exp ret l
     | Ty.Ty_meta _, _ ->
       begin match gen_fresh_meta with
-        | None ->
+        | None -> 
           fail_uniff_ ?loc [] "cannot apply type `@[%a@]`@ to `@[%a@]`"
             pp ty (Util.pp_list pp) l
         | Some g ->
@@ -1390,6 +1517,43 @@ let apply_unify ?gen_fresh_meta ?allow_open ?loc ?st ?(subst=Subst.empty) ty l =
 let app_infer ?st ?subst f l =
   let ty = apply_unify ?st ?subst (ty_exn f) l in
   app ~ty f l
+
+let try_alpha_renaming f1 f2 = 
+  let rec aux subst = function 
+    | [] -> subst
+    | (f1,f2) :: rest -> 
+      match view f1, view f2 with
+      | Var v, Var v' ->
+        begin match Subst.find subst v with 
+        | Some t -> begin match view t with
+            | Var v'' when Var.equal v' v'' -> aux subst rest
+            | _ -> raise (UnifyFailure ("double binding",[],None)) end
+        | None -> if not (Var.equal v v') then aux (Subst.add subst v f2) rest 
+                  else aux subst rest end
+      | Const x, Const y when ID.equal x y -> aux subst rest
+      | App(hd_x, xs), App (hd_y, ys) when List.length xs = List.length ys ->
+        (* head might be a lambda or a const, delegate solving it to
+          the same algorithm *)
+        let args = List.combine (hd_x :: xs) (hd_y :: ys) in
+        aux subst (args @ rest)
+      | AppBuiltin(hd_x, xs), AppBuiltin(hd_y, ys) 
+          when Builtin.equal hd_x hd_y && List.length xs = List.length ys ->
+        aux subst ((List.combine xs ys) @ rest)
+      | Bind(b, v, body), Bind(b', v', body') when Binder.equal b b' ->
+        assert(CCOpt.is_none (Subst.find subst v));
+        let subst = if not (Var.equal v v') then Subst.add subst v (var v') 
+                    else subst in
+        aux subst ((body, body') ::  rest)
+      | _ -> raise (UnifyFailure ("unknown constructors",[],None)) 
+  in
+  try
+    if not @@ Iter.is_empty 
+        (Iter.inter ~eq:Var.equal ~hash:Var.hash (Seq.vars f1 ) (Seq.vars f2)) then None
+    else Some (aux Subst.empty [f1,f2])
+  with UnifyFailure (msg, _, _) ->
+    Util.debugf 1 "Alpha renaming failed: %s@." (fun k -> k msg);
+    None
+      
 
 (** {2 Conversion} *)
 
@@ -1436,6 +1600,11 @@ let rec erase t = match view t with
 module TPTP = struct
   let pp out t = STerm.TPTP.pp out (erase t)
   let to_string t = STerm.TPTP.to_string (erase t)
+end
+
+module TPTP_THF = struct
+  let pp out t = STerm.TPTP_THF.pp out (erase t)
+  let to_string t = STerm.TPTP_THF.to_string (erase t)
 end
 
 module ZF = struct

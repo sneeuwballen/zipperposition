@@ -26,10 +26,13 @@ module type S = sig
   (** {6 Registration} *)
 
   val setup : unit -> unit
+  val rw_bool_lits : Env.multi_simpl_rule
   (** Register rules in the environment *)
+
 end
 
 module Make(E : Env.S) : S with module Env = E
+(* let f = Make(e) in f.ppaarra *)
 
 (** {2 As Extension} *)
 

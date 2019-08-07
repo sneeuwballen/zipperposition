@@ -132,6 +132,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     create_inner ~penalty ~selected (SClause.make ~trail lits) proof
 
   let create ~penalty ~trail lits proof =
+    (* let lits = List.fast_sort (fun l1 l2 -> -CCInt.compare (Lit.hash l1) (Lit.hash l2)) lits in *)
     create_a ~penalty ~trail (Array.of_list lits) proof
 
   let of_forms ?(penalty=1) ~trail forms proof =
@@ -143,10 +144,10 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let proof = Proof.Step.assert' ~file ~name () in
     create ~penalty ~trail:Trail.empty lits proof
 
-  let of_statement st =
+  let of_statement ?(convert_defs=false) st =
     let of_lits lits =
       (* convert literals *)
-      let lits = List.map Ctx.Lit.of_form lits in
+    let lits = List.map Ctx.Lit.of_form lits in
       let proof = Stmt.proof_step st in
       let c = create ~trail:Trail.empty ~penalty:1 lits proof in
       c
@@ -155,7 +156,10 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       | Stmt.Data _
       | Stmt.TyDecl _ -> []
       | Stmt.Def _
-      | Stmt.Rewrite _ -> [] (* dealt with by rewriting *)
+      | Stmt.Rewrite _ -> 
+        if not convert_defs then [] (*dealt with by rewriting *)
+        (* dealt with  *)
+        else List.map of_lits (Stmt.get_formulas_from_defs st)
       | Stmt.Assert lits -> [of_lits lits]
       | Stmt.Goal lits -> [of_lits lits]
       | Stmt.Lemma l
@@ -247,6 +251,18 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
         bv
     end
 
+  let eta_reduce c =
+    let lit_arr = lits c in
+    let changed = ref false in
+    let new_lits = Literals.map (fun t -> 
+      let reduced = Lambda.eta_reduce (Lambda.snf t) in
+      if not (Term.equal t reduced) then changed := true;
+      reduced) lit_arr in
+    if !changed then (
+      let penalty = penalty c and trail = trail c and proof = proof_step c in
+      Some (create ~penalty ~trail (CCArray.to_list new_lits) proof)
+    ) else None
+
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for paramodulation. *)
   let eligible_param (c,sc) subst =
@@ -292,12 +308,11 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
           | Comparison.Eq
           | Comparison.Incomparable -> false
         end
-      | [| Lit.Prop (_, true) |] -> true
       | _ -> false
 
-  let symbols ?(init=ID.Set.empty) seq =
+  let symbols ?(init=ID.Set.empty) ?(include_types=false) seq =
     Iter.fold
-      (fun set c -> Lits.symbols ~init:set c.sclause.lits)
+      (fun set c -> Lits.symbols ~include_types ~init:set c.sclause.lits)
       init seq
 
   let to_forms c = Lits.Conv.to_forms c.sclause.lits
@@ -326,11 +341,32 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       )
     ) else None
 
+  let proof_depth c =
+    Proof.Step.inferences_perfomed (proof_step c)
+
   module Seq = struct
     let lits c = Iter.of_array c.sclause.lits
     let terms c = lits c |> Iter.flat_map Lit.Seq.terms
     let vars c = terms c |> Iter.flat_map T.Seq.vars
   end
+
+  let apply_subst ?(proof=None) (c,sc) subst =
+    let lits = lits c in
+    let new_lits = _apply_subst_no_simpl subst (lits, sc) in
+    let proof_step = CCOpt.get_or ~default:(proof_step c) proof in
+    create ~trail:(trail c) ~penalty:(penalty c) (CCArray.to_list new_lits) proof_step
+
+
+  let ground_clause c =
+    let counter = ref 0 in
+    let all_vars = T.VarSet.of_seq @@ Seq.vars c in
+    let gr_subst = T.VarSet.fold (fun v subst -> 
+      let ty = HVar.ty v in
+      Subst.FO.bind subst ((v :> InnerTerm.t HVar.t),0) (T.mk_tmp_cst ~counter ~ty,0)
+    ) all_vars Subst.empty in
+    let res = apply_subst (c,0) gr_subst in
+    assert(Iter.for_all T.is_ground @@ Seq.terms res);
+    res
 
   (** {2 Filter literals} *)
 
@@ -358,6 +394,10 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       fun i _ -> BV.get (Lazy.force bv) i
 
     let pos _ lit = Lit.is_pos lit
+
+    let pos_eq _ lit = match lit with
+    | Lit.Equation(l,r,s) -> s
+    | _ -> false
 
     let neg _ lit = Lit.is_neg lit
 
@@ -434,9 +474,10 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
           (Iter.of_array_i lits)
       )
     in
-    Format.fprintf out "@[%a@[<2>%a%a@]@]/%d"
+    Format.fprintf out "@[%a@[<2>%a%a@]@]/id:%d/depth:%d"
       SClause.pp_vars c.sclause pp_lits c.sclause.lits
-      SClause.pp_trail c.sclause.trail c.sclause.id;
+      SClause.pp_trail c.sclause.trail c.sclause.id
+      (proof_depth c);
     ()
 
   let pp_tstp out c = SClause.pp_tstp out c.sclause

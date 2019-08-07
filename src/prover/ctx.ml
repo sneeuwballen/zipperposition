@@ -20,6 +20,8 @@ module type PARAMETERS = sig
   val ord : Ordering.t
   val select : Selection.t
   val eta : [`Reduce | `Expand | `None]
+  val sk_ctx : Skolem.ctx
+
 end
 
 module Key = struct
@@ -32,11 +34,13 @@ module Make(X : PARAMETERS) = struct
   let _eta = ref X.eta
   let _signature = ref X.signature
   let _complete = ref true
+  let _sk_ctx = ref X.sk_ctx
 
   let _inj_syms = ref ID.Map.empty
 
   let renaming = S.Renaming.create ()
   let ord () = !_ord
+  let sk_ctx () = !_sk_ctx
   let set_ord o = _ord := o
   let selection_fun () = !_select
   let set_selection_fun s = _select := s
@@ -50,7 +54,12 @@ module Make(X : PARAMETERS) = struct
   let on_signature_update = Signal.create()
 
   let find_signature s = Signature.find !_signature s
-  let find_signature_exn s = Signature.find_exn !_signature s
+  let find_signature_exn s = 
+    try 
+      Signature.find_exn !_signature s
+    with Not_found ->
+      invalid_arg (CCFormat.sprintf "%a not found in signature" ID.pp s)
+      
 
   let compare t1 t2 = Ordering.compare !_ord t1 t2
 

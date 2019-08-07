@@ -10,6 +10,7 @@ module C = Clause
 module O = Ordering
 module PS = ProofState
 module Sel = Selection
+module EIntf = Eprover_interface
 
 let stat_redundant_given = Util.mk_stat "saturate.redundant given clauses"
 let stat_processed_given = Util.mk_stat "saturate.processed given clauses"
@@ -20,6 +21,17 @@ let section = Util.Section.make ~parent:Const.section "saturate"
 let check_timeout = function
   | None -> false
   | Some timeout -> Util.total_time_s () > timeout
+
+let e_path = ref (None : string option)
+let tried_e = ref false 
+let should_try_e = function
+  | Some timeout when CCOpt.is_some !e_path -> 
+      let passed = Util.total_time_s () in
+      if not !tried_e && passed > timeout /. 5.0 then (
+        tried_e := true;
+        true
+      ) else false
+  | _ -> false
 
 let _progress = ref false (* progress bar? *)
 let _check_types = ref false
@@ -66,10 +78,21 @@ end
 
 module Make(E : Env.S) = struct
   module Env = E
+  module EInterface = EIntf.Make(E)
 
-  let[@inline] check_clause_ c = if !_check_types then Env.C.check_types c
+  let[@inline] check_clause_ c = 
+    if !_check_types then Env.C.check_types c;
+    assert (Env.C.Seq.terms c |> Iter.for_all Term.DB.is_closed);
+    assert (Env.C.lits c |> Literals.vars_distinct);
+    if not (Env.C.Seq.terms c |> Iter.for_all Lambda.is_properly_encoded) then (
+      CCFormat.printf "ENCODED WRONGLY: %a:%d.\n" Env.C.pp_tstp c (Env.C.proof_depth c);
+      CCFormat.printf "proof : %a.\n" Proof.S.pp_normal (Env.C.proof c);
+      assert(false);
+    );
+    CCArray.iter (fun t -> assert(Literal.no_prop_invariant t)) (Env.C.lits c)
+
   let[@inline] check_clauses_ seq =
-    if !_check_types then Iter.iter Env.C.check_types seq
+    Iter.iter check_clause_ seq
 
   (** One iteration of the main loop ("given clause loop") *)
   let given_clause_step ?(generating=true) num =
@@ -104,7 +127,7 @@ module Make(E : Env.S) = struct
         begin match Env.all_simplify c with
           | [], _ ->
             Util.incr_stat stat_redundant_given;
-            Util.debugf ~section 2 "@[<2>given clause @[%a@]@ is redundant@]"
+            Util.debugf ~section 2 "@[<2>given clause dropped @[%a@]@@]"
               (fun k->k Env.C.pp c);
             Unknown
           | l, _ when List.exists Env.C.is_empty l ->
@@ -113,10 +136,18 @@ module Make(E : Env.S) = struct
             Unsat proof
           | c :: l', _ ->
             (* put clauses of [l'] back in passive set *)
+            assert(List.for_all (fun c -> 
+              let is_prop_encoded = 
+                Env.C.Seq.terms c |> Iter.for_all  Lambda.is_properly_encoded in
+              if not is_prop_encoded then (
+                CCFormat.printf "IMPROPERLY ENCODED: %a" Env.C.pp c;
+              );
+              is_prop_encoded) (c::l'));
             Env.add_passive (Iter.of_list l');
             (* process the clause [c] *)
             let new_clauses = CCVector.create () in
-            assert (not (Env.is_redundant c));
+            (* very expensive assert *)
+            (* assert (not (Env.is_redundant c)); *)
             (* process the given clause! *)
             (* (match Env.C.is_inj_axiom c with
                | Some (sym,i) -> Env.Ctx.set_injective_for_arg sym i
@@ -178,6 +209,10 @@ module Make(E : Env.S) = struct
         end
 
   let given_clause ?(generating=true) ?steps ?timeout () =
+      if CCOpt.is_some !e_path then (
+        EInterface.set_e_bin (CCOpt.get_exn !e_path)
+      );
+
     (* num: number of steps done so far *)
     let rec do_step num =
       if check_timeout timeout then Timeout, num
@@ -186,6 +221,14 @@ module Make(E : Env.S) = struct
         | _ ->
           (* do one step *)
           if !_progress then print_progress num ~steps;
+
+          if should_try_e timeout then (
+            let res = EInterface.try_e (Env.get_active ()) (Env.get_passive ()) in
+            match res with 
+            | Some c -> Env.add_passive (Iter.singleton c);
+            | _ -> ()
+          );
+
           let status = given_clause_step ~generating num in
           match status with
             | Sat | Unsat _ | Error _ -> status, num (* finished *)
@@ -203,4 +246,5 @@ let () =
     [ "--progress", Arg.Set _progress, " progress bar";
       "-p", Arg.Set _progress, " alias to --progress";
       "--check-types", Arg.Set _check_types, " check types in new clauses";
+      "--try-e", Arg.String (fun path -> e_path := Some path), " try the given eprover binary on the problem"
     ]

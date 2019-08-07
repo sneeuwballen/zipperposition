@@ -67,9 +67,9 @@ module Make(E : Env.S) = struct
       let lits = C.lits c in
       (* number of distinct term variables *)
       let n_vars =
-        Literals.vars lits
+        (Literals.vars lits
         |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))
-        |> List.length
+        |> List.length)
       in
       if n_vars > !max_vars then (
         Ctx.lost_completeness();
