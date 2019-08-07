@@ -29,27 +29,28 @@ type state = {
 
 let open_forall = T.unfold_binder Binder.Forall
 
-let axiom kind v t const = 
-  let t1 = T.Form.forall v t in
-  let t2 = T.Subst.eval (Var.Subst.singleton v const) t in
-  let t = match kind with
-    | `Instance -> T.Form.imply t1 t2 
-    | `Choice -> T.Form.imply t2 t1 
+let create_axioms kind t intro_subst k =
+  let rec iter t =
+    match T.view t with 
+      | Bind ((Binder.Forall|Binder.Exists as b), v, t) -> 
+        begin match Var.Subst.find intro_subst v with
+          | Some sk -> 
+            let t = if b = Binder.Exists then T.Form.not_ t else t in
+            let t1 = T.Form.forall v t in
+            let t2 = T.Subst.eval ~rename_binders:false (Var.Subst.singleton v sk) t in
+            let t = match kind with
+              | `Instance -> T.Form.imply t1 t2 
+              | `Choice -> T.Form.imply t2 t1 
+            in
+            let proof = (LLProof.p_of (LLProof.trivial t)) in
+            k proof; iter t2
+          | None -> ()
+        end
+      | AppBuiltin (_,l)
+      | App (_, l) -> List.iter iter l
+      | _ -> ()
   in
-  LLProof.trivial t
-
-let create_axioms kind s intro_subst = 
-  T.Seq.subterms s
-  |> Iter.filter_map (fun t -> match T.view t with
-    | T.Bind((Binder.Forall|Binder.Exists as b), v, t) ->
-      begin match Var.Subst.find intro_subst v with
-        | Some sk -> 
-          let t = if b = Binder.Exists then T.Form.not_ t else t in
-          Some (LLProof.p_of (axiom kind v t sk))
-        | None -> None
-      end
-    | _ -> None) 
-  |> Iter.to_list 
+  iter t
 
 let rec conv_proof st p: LLProof.t =
   begin match Proof.S.Tbl.get st.tbl p with
@@ -98,8 +99,8 @@ and conv_step st p =
         if is_cnf 
         then
           CCList.flat_map (fun p -> 
-            create_axioms `Instance (LLProof.concl p.LLProof.p_proof) intro_subst) parents
-          @ create_axioms `Choice res intro_subst
+            create_axioms `Instance (LLProof.concl p.LLProof.p_proof) intro_subst |> Iter.to_list) parents
+          @ (create_axioms `Choice res intro_subst |> Iter.to_list)
         else []
       in
       let local_intros = Var.Subst.to_list !local_intros |> List.rev_map snd in
