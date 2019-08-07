@@ -26,11 +26,13 @@ type info = UntypedAST.attr
 
 type infos = info list
 
+type skolems = ((ID.t * term) * term Var.t) list
+
 type kind =
   | Intro of source * role
   | Inference of rule * tag list
   | Simplification of rule * tag list
-  | Esa of rule * tag list
+  | Esa of rule * tag list * skolems
   | Trivial (** trivial, or trivial within theories *)
   | Define of ID.t * source (** definition *)
   | By_def of ID.t (** following from the def of ID *)
@@ -229,8 +231,8 @@ module Kind = struct
       Format.fprintf out "inf %a%a" Rule.pp rule pp_tags tags
     | Simplification (rule,tags) ->
       Format.fprintf out "simp %a%a" Rule.pp rule pp_tags tags
-    | Esa (rule,tags) ->
-      Format.fprintf out "esa %a%a" Rule.pp rule pp_tags tags
+    | Esa (rule,tags,skolems) ->
+      Format.fprintf out "esa %a%a" Rule.pp rule pp_tags tags 
     | Trivial -> CCFormat.string out "trivial"
     | By_def id -> Format.fprintf out "by_def(%a)" ID.pp id
     | Define (id,src) -> Format.fprintf out "define(@[%a@ %a@])" ID.pp id Src.pp src
@@ -248,7 +250,7 @@ module Kind = struct
       | Intro (src,(R_assert|R_goal|R_def|R_decl)) -> Src.pp_tstp out src
       | Inference (rule,_)
       | Simplification (rule,_) -> pp_step "thm" out (rule,parents)
-      | Esa (rule,_) -> pp_step "esa" out (rule,parents)
+      | Esa (rule,_,_) -> pp_step "esa" out (rule,parents)
       | Intro (_,R_lemma) -> Format.fprintf out "lemma"
       | Trivial -> assert(parents=[]); Format.fprintf out "trivial([status(thm)])"
       | By_def _ -> Format.fprintf out "by_def([status(thm)])"
@@ -382,7 +384,7 @@ module Step = struct
     | Trivial
     | By_def _
     | Define _ -> None
-    | Esa (rule, _)
+    | Esa (rule, _,_)
     | Simplification (rule,_)
     | Inference (rule,_)
       -> Some rule
@@ -481,8 +483,8 @@ module Step = struct
     let tags = dedup_tags tags in
     step_ ?infos (Simplification (rule,tags)) parents
 
-  let esa ?infos ?(tags=[]) ~rule parents =
-    step_ ?infos (Esa (rule, tags)) parents
+  let esa ?infos ?(tags=[]) ?(skolems=[]) ~rule  parents =
+    step_ ?infos (Esa (rule, tags, skolems)) parents
 
   let pp_infos out = function
     | [] -> ()

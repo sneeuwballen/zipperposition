@@ -1073,8 +1073,8 @@ let rule_cnf = Proof.Rule.mk "cnf"
 let rule_neg = Proof.Rule.mk "cnf.neg"
 let rule_conv = Proof.Rule.mk "cnf.conv"
 
-let proof_cnf stmt =
-  Proof.Step.esa ~rule:rule_cnf ~tags:[T_cnf]
+let proof_cnf stmt skolems =
+  Proof.Step.esa ~rule:rule_cnf ~tags:[T_cnf] ~skolems
     [Stmt.as_proof_i stmt |> Proof.Parent.from]
 
 let proof_neg stmt =
@@ -1110,7 +1110,7 @@ let cnf_of_seq ~ctx ?(opts=[])  seq =
   (* reduce the new formulas to CNF *)
   let res = CCVector.create () in
   (* convert formula into CNF, returning a list of clauses and a list of skolems *)
-  let conv_form_sk f : (ID.t * type_) list * clause list =
+  let conv_form_sk f : ((ID.t * type_) * type_ Var.t) list * clause list =
     Util.debugf ~section 4 "@[<2>reduce@ `@[%a@]`@ to CNF@]" (fun k->k T.pp f);
     let clauses =
       try as_cnf f
@@ -1134,7 +1134,7 @@ let cnf_of_seq ~ctx ?(opts=[])  seq =
     in
     let new_ids = Skolem.pop_new_skolem_symbols ~ctx in
     List.iter
-      (fun (id,ty) ->
+      (fun ((id,ty), _) ->
          let proof = Proof.Step.define_internal id [] in
          CCVector.push res (Stmt.ty_decl ~proof id ty))
       new_ids;
@@ -1196,10 +1196,11 @@ let cnf_of_seq ~ctx ?(opts=[])  seq =
        let attrs = Stmt.attrs stmt in
        match stmt.Stmt.view with
          | Stmt.Assert f ->
-           let proof = proof_cnf stmt in
+           let skolems, form = conv_form_sk f in
+           let proof = proof_cnf stmt skolems in
            List.iter
              (fun c -> CCVector.push res (Stmt.assert_ ~attrs ~proof c))
-             (conv_form f)
+             form
          | Stmt.Def l ->
            let l =
              List.map
@@ -1222,26 +1223,35 @@ let cnf_of_seq ~ctx ?(opts=[])  seq =
          | Stmt.TyDecl (id,ty) ->
            CCVector.push res (Stmt.ty_decl ~attrs ~proof id ty)
          | Stmt.Lemma l ->
-           let proof = proof_cnf stmt in
-           let l = CCList.flat_map conv_form l in
-           CCVector.push res (Stmt.lemma ~attrs ~proof l)
+           let skolems, forms = l 
+             |> CCList.fold_left 
+               (fun (skolems, forms) f -> 
+                 let skolem, form = conv_form_sk f in
+                 skolem :: skolems, form :: forms) 
+               ([],[])
+             |> CCPair.map List.flatten List.flatten 
+           in
+           let proof = proof_cnf stmt skolems in
+           CCVector.push res (Stmt.lemma ~attrs ~proof forms)
          | Stmt.Goal f ->
            (* intermediate statement to represent the negation step *)
            let not_f = F.not_ f in
            let stmt = Stmt.neg_goal ~proof:(proof_neg stmt) ~skolems:[] [not_f] in
            (* now take the CNF of negated goal *)
            let skolems, l = conv_form_sk not_f in
-           let proof = proof_cnf stmt in
+           let proof = proof_cnf stmt skolems in
+           let skolems = CCList.map fst skolems in
            CCVector.push res (Stmt.neg_goal ~attrs ~proof ~skolems l)
          | Stmt.NegatedGoal (sk1,l) ->
-           let proof = proof_cnf stmt in
            let skolems, l =
              CCList.fold_flat_map
                (fun sk f ->
                   let sk', clauses = conv_form_sk f in
                   List.rev_append sk' sk, clauses)
-               sk1 l
+                [] l
            in
+           let proof = proof_cnf stmt skolems in
+           let skolems = sk1 @ List.map fst skolems in
            CCVector.push res (Stmt.neg_goal ~attrs ~proof ~skolems l)
     )
     v;

@@ -42,6 +42,7 @@ let create_axioms kind t intro_subst k =
               | `Instance -> T.Form.imply t1 t2 
               | `Choice -> T.Form.imply t2 t1 
             in
+            assert (T.closed t);
             let proof = (LLProof.p_of (LLProof.trivial t)) in
             k proof; iter t2
           | None -> ()
@@ -65,48 +66,52 @@ and conv_step st p =
   Util.debugf ~section 5 "(@[llproof.conv.step@ %a@])"
     (fun k->k Proof.S.pp_notrec1 p);
   let res = Proof.Result.to_form ~ctx:st.ctx (Proof.S.result p) in
+  (* introduce local symbols for making proof checking locally ground.
+        Some variables are typed using other variables, so we
+        need to substitute eagerly *)
+  let mk_inference rule tags intros add_parents =
+    let intro_list = 
+      let vars, _ = open_forall res in
+      List.mapi (fun i v -> v, T.const ~ty:(Var.ty v) (ID.makef "sk_%d" i)) vars 
+    in
+    let intro_subst = Var.Subst.of_list intro_list 
+    in
+    let local_intros = ref Var.Subst.empty in
+    let parents =
+      List.map (conv_parent st res intro_subst local_intros tags)
+        (Proof.Step.parents @@ Proof.S.step p)
+    in
+    let parents = parents @ add_parents parents intro_subst in
+    let local_intros = Var.Subst.to_list !local_intros |> List.rev_map snd in
+    let intros = intros intro_subst intro_list in
+    (* TODO: What is this for?  let res = T.rename_all_vars res in *)
+    LLProof.inference ~intros ~local_intros ~tags
+      res (Proof.Rule.name rule) parents
+  in
   (* convert result *)
   let res = match Proof.Step.kind @@ Proof.S.step p with
-    | Proof.Esa (rule,tags) when CCList.memq Builtin.Tag.T_conv tags ->
+    | Proof.Esa (rule,tags,skolems) when CCList.memq Builtin.Tag.T_conv tags ->
       (* Omit term conversion steps in LLProof *)
       let parents = Proof.Step.parents (Proof.S.step p) in
       assert (List.length parents == 1);
       conv_proof st (Proof.Parent.proof (List.hd parents))
-    | Proof.Inference (rule,tags)
-    | Proof.Simplification (rule,tags)
-    | Proof.Esa (rule,tags) ->
-      let is_cnf = CCList.memq Builtin.Tag.T_cnf tags in
-      let vars, _ = open_forall res in
-      (* introduce local symbols for making proof checking locally ground.
-        Some variables are typed using other variables, so we
-        need to substitute eagerly *)
-      let l =
-        List.mapi (fun i v -> v, T.const ~ty:(Var.ty v) (ID.makef "sk_%d" i)) vars
-      in
-      let intro_subst = Var.Subst.of_list l in
-      let intros =
-        if is_cnf
-        then None
-        else Some (List.map (fun (_,c) -> T.Subst.eval intro_subst c) l)
-      in
-      let local_intros = ref Var.Subst.empty in
-      let parents =
-        List.map (conv_parent st res intro_subst local_intros tags)
-          (Proof.Step.parents @@ Proof.S.step p)
-      in
+    | Proof.Esa (rule,tags,skolems) ->
       (* For CNF-transformations, add instance and choice axioms: *)
-      let parents = parents @ 
-        if is_cnf 
-        then
+      let intros _ _ = None in
+      let sk_subst = Var.Subst.of_list (skolems |> List.map (fun ((sk, ty), var) -> var, T.const ~ty sk)) in
+      let add_parents parents intro_subst =
           CCList.flat_map (fun p -> 
             create_axioms `Instance (LLProof.concl p.LLProof.p_proof) intro_subst |> Iter.to_list) parents
+          @ CCList.flat_map (fun p -> 
+            create_axioms `Choice (LLProof.concl p.LLProof.p_proof) sk_subst |> Iter.to_list) parents
           @ (create_axioms `Choice res intro_subst |> Iter.to_list)
-        else []
       in
-      let local_intros = Var.Subst.to_list !local_intros |> List.rev_map snd in
-      (* TODO: What is this for?  let res = T.rename_all_vars res in *)
-      LLProof.inference ~intros ~local_intros ~tags
-        res (Proof.Rule.name rule) parents
+      mk_inference rule tags intros add_parents
+    | Proof.Inference (rule,tags)
+    | Proof.Simplification (rule,tags) ->
+      let intros intro_subst intro_list = Some (List.map (fun (_,c) -> T.Subst.eval intro_subst c) intro_list) in
+      let add_parents _ _ = [] in
+      mk_inference rule tags intros add_parents
     | Proof.Trivial -> LLProof.trivial res
     | Proof.By_def id -> LLProof.by_def id res
     | Proof.Define (id,_) -> LLProof.define id res
