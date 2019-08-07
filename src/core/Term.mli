@@ -144,9 +144,6 @@ val mk_fresh_skolem : var list -> Type.t -> (ID.t * Type.t) * var list * t
     Returns the constant ID, its type, the reordered list of variables, 
     and the constant applied to those variables *)
 
-val mk_fresh_skolem_term : var list -> Type.t -> t
-(** Like [mk_fresh_skolem], but returns only the last component. *)
-
 val as_const : t -> ID.t option
 val as_const_exn : t -> ID.t
 val as_var : t -> var option

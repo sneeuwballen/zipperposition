@@ -552,10 +552,6 @@ let mk_tmp_cst ~counter ~ty =
   let id = ID.makef "#tmp%d" idx in
   const id ~ty
 
-
-let mk_fresh_skolem_term vars ty_ret =
-  let _, _, t = mk_fresh_skolem vars ty_ret in t
-
 let rec head_exn t = match T.view t with
   | T.Const s -> s
   | T.App (hd,_) -> head_exn hd
@@ -873,7 +869,7 @@ module DB = struct
           (match IntMap.find_opt (i-depth) skolemized with
           | (Some sk) -> (sk, skolemized)
           | None ->
-             let new_sk = mk_fresh_skolem_term [] (ty subt) in
+             let _, _, new_sk = mk_fresh_skolem [] (ty subt) in
              let skolemized = IntMap.add (i-depth) new_sk skolemized in
              new_sk,skolemized)
           else subt, skolemized
