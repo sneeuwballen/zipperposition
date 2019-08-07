@@ -281,7 +281,8 @@ module Tag = struct
     | T_distinct (** distinct constants *)
     | T_ac of ID.t (** AC symbols *)
     | T_neg (** negating a conjecture *)
-    | T_quant (** dealing with universal and existential quantifiers *)
+    | T_cnf (** CNF transformation *)
+    | T_conv (** Term conversion *)
 
   let compare = Pervasives.compare
 
@@ -295,7 +296,8 @@ module Tag = struct
     | T_distinct -> Fmt.string out "distinct_constants"
     | T_ac id -> Fmt.fprintf out "(ac %a)" ID.pp_full id
     | T_neg -> Fmt.string out "neg"
-    | T_quant -> Fmt.string out "quant"
+    | T_cnf -> Fmt.string out "cnf"
+    | T_conv -> Fmt.string out "conv"
 end
 
 

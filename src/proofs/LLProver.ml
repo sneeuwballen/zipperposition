@@ -352,7 +352,7 @@ let solve_ (tab:t) : res =
 let can_check : LLProof.tag list -> bool =
   let open Builtin.Tag in
   let f = function
-    | T_ho | T_ext | T_quant -> true
+    | T_ho | T_ext | T_cnf -> true
     | T_lra | T_lia | T_ind | T_data
     | T_distinct | T_ac _ | T_neg -> false
   in

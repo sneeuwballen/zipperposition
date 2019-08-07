@@ -29,33 +29,25 @@ type state = {
 
 let open_forall = T.unfold_binder Binder.Forall
 
-let choice_axiom v t const = 
+let axiom kind v t const = 
   let t1 = T.Form.forall v t in
   let t2 = T.Subst.eval (Var.Subst.singleton v const) t in
-  let t = T.Form.imply t1 t2 in
+  let t = match kind with
+    | `Instance -> T.Form.imply t1 t2 
+    | `Choice -> T.Form.imply t2 t1 
+  in
   LLProof.trivial t
 
-let create_choice_axioms s skolem = 
+let create_axioms kind s intro_subst = 
   T.Seq.subterms s
   |> Iter.filter_map (fun t -> match T.view t with
-    | T.Bind(Binder.Forall, v, t) -> 
-      Some (LLProof.p_of (choice_axiom v t (T.const ~ty:(Var.ty v) skolem)))
-    | T.Bind(Binder.Exists, v, t) -> None (* TODO *)
-    | _ -> None) 
-  |> Iter.to_list 
-
-let instance_axiom v t const = 
-  let t1 = T.Subst.eval (Var.Subst.singleton v const) t in
-  let t2 = T.Form.forall v t in
-  let t = T.Form.imply t1 t2 in
-  LLProof.trivial t
-
-let create_instance_axioms s skolem = 
-  T.Seq.subterms s
-  |> Iter.filter_map (fun t -> match T.view t with
-    | T.Bind(Binder.Forall, v, t) -> 
-      Some (LLProof.p_of (instance_axiom v t (T.const ~ty:(Var.ty v) skolem)))
-    | T.Bind(Binder.Exists, v, t) -> None (* TODO *)
+    | T.Bind((Binder.Forall|Binder.Exists as b), v, t) ->
+      begin match Var.Subst.find intro_subst v with
+        | Some sk -> 
+          let t = if b = Binder.Exists then T.Form.not_ t else t in
+          Some (LLProof.p_of (axiom kind v t sk))
+        | None -> None
+      end
     | _ -> None) 
   |> Iter.to_list 
 
@@ -69,35 +61,47 @@ let rec conv_proof st p: LLProof.t =
   end
 
 and conv_step st p =
-  let my_skolem = (ID.make "xxxx") in (* TODO: create proper skolems *)
   Util.debugf ~section 5 "(@[llproof.conv.step@ %a@])"
     (fun k->k Proof.S.pp_notrec1 p);
   let res = Proof.Result.to_form ~ctx:st.ctx (Proof.S.result p) in
-  let vars, _ = open_forall res in
-  (* introduce local symbols for making proof checking locally ground.
-     Some variables are typed using other variables, so we
-     need to substitute eagerly *)
-  let intros = (* TODO: remove intros *)
-    let l =
-      List.mapi (fun i v -> v, T.const ~ty:(Var.ty v) (ID.makef "sk_%d" i)) vars
-    in
-    let subst = Var.Subst.of_list l in
-    List.map (fun (_,c) -> T.Subst.eval subst c) l
-  in
   (* convert result *)
   let res = match Proof.Step.kind @@ Proof.S.step p with
+    | Proof.Esa (rule,tags) when CCList.memq Builtin.Tag.T_conv tags ->
+      (* Omit term conversion steps in LLProof *)
+      let parents = Proof.Step.parents (Proof.S.step p) in
+      assert (List.length parents == 1);
+      conv_proof st (Proof.Parent.proof (List.hd parents))
     | Proof.Inference (rule,tags)
     | Proof.Simplification (rule,tags)
     | Proof.Esa (rule,tags) ->
+      let is_cnf = CCList.memq Builtin.Tag.T_cnf tags in
+      let vars, _ = open_forall res in
+      (* introduce local symbols for making proof checking locally ground.
+        Some variables are typed using other variables, so we
+        need to substitute eagerly *)
+      let l =
+        List.mapi (fun i v -> v, T.const ~ty:(Var.ty v) (ID.makef "sk_%d" i)) vars
+      in
+      let intro_subst = Var.Subst.of_list l in
+      let intros =
+        if is_cnf
+        then None
+        else Some (List.map (fun (_,c) -> T.Subst.eval intro_subst c) l)
+      in
       let local_intros = ref Var.Subst.empty in
       let parents =
-        List.map (conv_parent st res intros local_intros tags)
+        List.map (conv_parent st res intro_subst local_intros tags)
           (Proof.Step.parents @@ Proof.S.step p)
       in
-      let parents = parents @ CCList.flat_map (fun p -> 
-        let p_res = LLProof.concl p.LLProof.p_proof in
-        create_choice_axioms p_res my_skolem) parents in
-      let parents = parents @ (create_instance_axioms res my_skolem) in
+      (* For CNF-transformations, add instance and choice axioms: *)
+      let parents = parents @ 
+        if is_cnf 
+        then
+          CCList.flat_map (fun p -> 
+            create_axioms `Instance (LLProof.concl p.LLProof.p_proof) intro_subst) parents
+          @ create_axioms `Choice res intro_subst
+        else []
+      in
       let local_intros = Var.Subst.to_list !local_intros |> List.rev_map snd in
       (* TODO: What is this for?  let res = T.rename_all_vars res in *)
       LLProof.inference ~intros ~local_intros ~tags
@@ -117,19 +121,10 @@ and conv_step st p =
 (* convert parent of the given result formula. Also make instantiations
    explicit. *)
 and conv_parent
-    st step_res intros local_intros tags
+    st step_res intro_subst local_intros tags
     (parent:Proof.Parent.t) : LLProof.parent =
   Util.debugf ~section 5 "(@[llproof.conv_parent@ %a@])"
     (fun k->k Proof.pp_parent parent);
-  (* rename variables of result of inference *)
-  let vars_step_res, _ = open_forall step_res in
-  if List.length intros <> List.length vars_step_res then (
-    errorf "length mismatch, cannot do intros@ :res %a@ :with [@[%a@]]"
-      T.pp step_res (Util.pp_list ~sep:"," T.pp) intros
-  );
-  let intro_subst =
-    Var.Subst.of_list (List.combine vars_step_res intros)
-  in
   (* build an instantiation step, if needed *)
   let prev_proof, p_instantiated_res = match parent with
     | Proof.P_of p ->
@@ -156,10 +151,10 @@ and conv_parent
                | None ->
                  errorf "cannot find variable `%a`@ \
                          in inst-subst {%a}@ :inst-res %a@ :res %a@ \
-                         :parent %a@ :intros [@[%a@]]"
+                         :parent %a@ :intro_subst [@[%a@]]"
                    Var.pp_fullc v (Var.Subst.pp T.pp) inst_subst
                    T.pp p_instantiated_res T.pp step_res Proof.pp_parent parent
-                   (Util.pp_list ~sep:"," T.pp) intros
+                   (Var.Subst.pp T.pp) intro_subst
              end)
           vars_p
       in
@@ -180,7 +175,7 @@ and conv_parent
                  (* introduce local_intro *)
                  let c =
                    ID.makef "sk_%d"
-                     (List.length intros + Var.Subst.size !local_intros)
+                     (Var.Subst.size intro_subst + Var.Subst.size !local_intros)
                    |> T.const ~ty:(Var.ty v |> T.Subst.eval intro_subst)
                  in
                  local_intros := Var.Subst.add !local_intros v c;

@@ -73,8 +73,7 @@ let concl_of_parent (p:LLProof.parent) : form = match p.LLProof.p_inst with
   | [] -> P.concl p.LLProof.p_proof
   | r ->
     let f = P.concl p.LLProof.p_proof in
-    (*instantiate f r*) f
-    (* TODO: remove intros completely? *)
+    instantiate f r
 
 let open_forall = T.unfold_binder Binder.Forall
 
@@ -154,9 +153,9 @@ let check_step_ ?dot_prefix (p:proof): check_step_res =
         (* within the fragment of {!Tab.prove} *)
         let all_premises =
           List.map concl_of_parent parents
-        (*and concl =
-          instantiate concl intros*)
-          (* TODO: remove intros completely? *)
+        and concl = match intros with
+          | Some intros -> instantiate concl intros
+          | None -> concl
         in
         CS_check (prove ~dot_prefix all_premises concl)
       ) else CS_skip `Tags

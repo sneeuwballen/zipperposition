@@ -1074,7 +1074,7 @@ let rule_neg = Proof.Rule.mk "cnf.neg"
 let rule_conv = Proof.Rule.mk "cnf.conv"
 
 let proof_cnf stmt =
-  Proof.Step.esa ~rule:rule_cnf ~tags:[T_quant]
+  Proof.Step.esa ~rule:rule_cnf ~tags:[T_cnf]
     [Stmt.as_proof_i stmt |> Proof.Parent.from]
 
 let proof_neg stmt =
@@ -1082,7 +1082,7 @@ let proof_neg stmt =
     [Stmt.as_proof_i stmt |> Proof.Parent.from]
 
 let proof_conv stmt =
-  Proof.Step.esa ~rule:rule_conv
+  Proof.Step.esa ~rule:rule_conv ~tags:[T_conv]
     [Proof.S.mk (Stmt.proof_step stmt) (Proof.Result.make Statement.res_tc_sc stmt) |> Proof.Parent.from]
 
 (* Transform the clauses into proper CNF; returns a list of clauses *)

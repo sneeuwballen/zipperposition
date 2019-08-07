@@ -44,7 +44,7 @@ and step =
       tags: tag list;
     }
   | Inference of {
-      intros: term list; (* local renaming, with fresh constants *)
+      intros: term list option; (* local renaming, with fresh constants *)
       local_intros: term list; (* variables introduced between hypothesis, not in conclusion *)
       name: name;
       parents: parent list;
@@ -96,9 +96,9 @@ let tags (p:t) : tag list = match p.step with
   | Inference {tags;_} | Instantiate {tags;_} -> tags
   | _ -> []
 
-let intros (p:t) : inst = match p.step with
+let intros (p:t) : inst option = match p.step with
   | Inference {intros;_} -> intros
-  | _ -> []
+  | _ -> None
 
 let local_intros (p:t) : inst = match p.step with
   | Inference {local_intros;_} -> local_intros
@@ -124,7 +124,7 @@ let pp_parent out p = match p.p_inst with
     Format.fprintf out "@[(@[%a@])@,%a@]" pp_res p.p_proof pp_inst p.p_inst
 
 let pp_inst_some out = function [] -> () | l -> Fmt.fprintf out "@ :inst %a" pp_inst l
-let pp_intro_some out = function [] -> () | l -> Fmt.fprintf out "@ :intro %a" pp_inst l
+let pp_intro_some out = function None -> () | l -> Fmt.fprintf out "@ :intro %a" (CCOpt.pp pp_inst) l
 let pp_lintro_some out = function [] -> () | l -> Fmt.fprintf out "@ :local-intro %a" pp_inst l
 
 let pp out (p:t): unit =

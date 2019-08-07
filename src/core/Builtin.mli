@@ -178,7 +178,8 @@ module Tag : sig
     | T_distinct (** distinct constants *)
     | T_ac of ID.t (** AC symbol *)
     | T_neg (** negate a conjecture *)
-    | T_quant (** dealing with universal and existential quantifiers *)
+    | T_cnf (** CNF transformation *)
+    | T_conv (** Term conversion *)
 
   val compare : t -> t -> int
   val pp : t CCFormat.printer
