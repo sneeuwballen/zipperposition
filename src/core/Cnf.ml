@@ -1110,7 +1110,7 @@ let cnf_of_seq ~ctx ?(opts=[])  seq =
   (* reduce the new formulas to CNF *)
   let res = CCVector.create () in
   (* convert formula into CNF, returning a list of clauses and a list of skolems *)
-  let conv_form_sk f : ((ID.t * type_) * type_ Var.t) list * clause list =
+  let conv_form_sk f : Proof.skolem list * clause list =
     Util.debugf ~section 4 "@[<2>reduce@ `@[%a@]`@ to CNF@]" (fun k->k T.pp f);
     let clauses =
       try as_cnf f

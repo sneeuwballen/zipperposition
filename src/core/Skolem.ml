@@ -61,7 +61,8 @@ type ctx = {
   mutable sc_counter: int;
   mutable sc_gensym: (string,int) Hashtbl.t; (* prefix -> count *)
   mutable sc_new_defs : definition list; (* "new" definitions *)
-  mutable sc_new_ids: ((ID.t * type_) * type_ Var.t) list; (* "new" symbols *)
+  mutable sc_new_ids: ((ID.t * type_) * (type_ Var.t * term list)) list; 
+    (* "new" symbols, the variable they correspond to, and their arguments *)
   sc_on_new : ID.t -> type_ -> unit;
 }
 
@@ -86,20 +87,20 @@ let fresh_id ?(start0=false) ~ctx prefix =
   let name = if n=0 && not start0 then prefix else prefix ^ string_of_int n in
   ID.make name
 
-let fresh_skolem_prefix ~ctx ~ty ~var prefix =
+let fresh_skolem_prefix ~ctx ~ty ~var ~args prefix =
   incr_counter ctx;
   let s = fresh_id ~ctx prefix in
   let kind =
     if Ind_ty.is_inductive_simple_type ty then ID.K_ind else ID.K_normal
   in
   ID.set_payload s (ID.Attr_skolem kind);
-  ctx.sc_new_ids <- ((s,ty),var) :: ctx.sc_new_ids;
+  ctx.sc_new_ids <- ((s,ty),(var,args)) :: ctx.sc_new_ids;
   ctx.sc_on_new s ty;
   Util.debugf ~section 3 "@[<2>new skolem symbol `%a`@ with type `@[%a@]`@]"
     (fun k->k ID.pp s T.pp ty);
   s
 
-let fresh_skolem ~ctx ~ty ~var = fresh_skolem_prefix ~ctx ~ty ~var ctx.sc_prefix
+let fresh_skolem ~ctx ~ty ~var ~args = fresh_skolem_prefix ~ctx ~ty ~var ~args ctx.sc_prefix
 
 let collect_vars subst f =
   (* traverse [t] and return free variables, dereferencing on the fly *)
@@ -136,8 +137,9 @@ let skolem_form ~ctx subst var form =
   let ty_var = T.Subst.eval subst (Var.ty var) in
   let ty = ty_forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) ty_var) in
   let prefix = "sk_" ^ Var.to_string var ^ "_" in
-  let f = fresh_skolem_prefix ~ctx ~ty ~var prefix in
-  let skolem_t = T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t) in
+  let args = tyvars_t @ vars_t in
+  let f = fresh_skolem_prefix ~ctx ~ty ~var ~args prefix in
+  let skolem_t = T.app ~ty:T.Ty.prop (T.const ~ty f) args in
   T.Subst.eval subst skolem_t
 
 let pop_new_skolem_symbols ~ctx =
