@@ -174,7 +174,7 @@ end = struct
 
   (* add one formula to [b] *)
   let add1_ (br:t) (f:T.t): t =
-    let br = mk_child f @@ add_cc_ f br in
+    let br = mk_child f br in
     begin match F.view f with
       | F.Atom t -> add_eq t F.true_ br
       | F.True -> br
