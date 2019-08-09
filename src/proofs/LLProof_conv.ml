@@ -29,37 +29,55 @@ type state = {
 
 let open_forall = T.unfold_binder Binder.Forall
 
-let create_axioms kind t ?(aux_subst=Var.Subst.empty) intro_subst k =
-  let rec iter t =
+let find_skolem subst v =     
+  match Var.Subst.find !subst v with
+    | Some sk -> 
+        (* the skolem may have arguments that need to be instantiated: *)
+        let sk = T.Subst.eval !subst sk in
+        sk
+    | None -> 
+      (* introduce skolem *)
+      let sk =
+        ID.makef "sk_%d"
+          (Var.Subst.size !subst) 
+        |> T.const ~ty:(Var.ty v |> T.Subst.eval !subst)
+      in
+      let sk = T.Subst.eval !subst sk in
+      subst := Var.Subst.add !subst v sk; (* TODO: apply subst to args *)
+      sk
+
+let create_axiom t kind v sk =
+  (* Create choice/inst axiom *)
+  assert (T.equal (T.ty_exn t) (T.prop));
+  let t1 = match kind with
+    | `Instance -> T.Form.forall v t 
+    | `Choice -> T.Form.exists v t 
+  in
+  let t2 = T.Subst.eval ~rename_binders:false (Var.Subst.singleton v sk) t in
+  let t = T.Form.imply t1 t2 in
+  assert (T.closed t);
+  let proof = (LLProof.p_of (LLProof.trivial t)) in
+  proof, t2
+
+let iter_boolean_skeleton t ~on_exists ~on_forall (k : 'a -> unit) =
+  let rec iter ~pos t =
+    let n = if pos then (fun t -> t) else (fun t -> T.Form.not_ t) in
     match T.view t with 
-      | Bind ((Binder.Forall|Binder.Exists as b), v, t) -> 
-        begin match Var.Subst.find intro_subst v with
-          | Some sk -> 
-            (* Create choice/inst axiom *)
-            let t = if b = Binder.Exists then T.Form.not_ t else t in
-            let t1 = T.Form.forall v t in
-            let t2 = T.Subst.eval ~rename_binders:false (Var.Subst.singleton v sk) t in
-            let t = match kind with
-              | `Instance -> T.Form.imply t1 t2 
-              | `Choice -> T.Form.imply t2 t1 
-            in
-            assert (T.closed t);
-            let proof = (LLProof.p_of (LLProof.trivial t)) in
-            k proof; iter t2
-          | None -> 
-            (* If a skolem is available from aux_subst, use it to continue below the quantifier *)
-            begin match Var.Subst.find aux_subst v with
-              | Some sk -> 
-                let t = T.Subst.eval ~rename_binders:false (Var.Subst.singleton v sk) t in
-                iter t
-              | None -> ()
-            end
-        end
-      | AppBuiltin (_,l)
-      | App (_, l) -> List.iter iter l
+      | Bind (Binder.Forall|Binder.Exists as b, v, t) when (b = Binder.Forall) = pos ->
+        iter ~pos (n (on_forall v (n t) k))
+      | Bind (Binder.Forall|Binder.Exists as b, v, t) when (b = Binder.Exists) = pos -> 
+        iter ~pos (n (on_exists v (n t) k))
+      | AppBuiltin (Builtin.And,l)
+      | AppBuiltin (Builtin.Or,l) -> List.iter (iter ~pos) l
+      | AppBuiltin (Builtin.Not,l) -> List.iter (iter ~pos:(not pos)) l
+      | AppBuiltin (Builtin.Imply,[a;b]) -> iter ~pos:(not pos) a; iter ~pos b
+      | AppBuiltin (Builtin.Eq,l) 
+      | AppBuiltin (Builtin.Equiv,l) 
+      | AppBuiltin (Builtin.Xor,l)
+      | AppBuiltin (Builtin.Neq,l) -> List.iter (iter ~pos) l; List.iter (iter ~pos:(not pos)) l
       | _ -> ()
   in
-  iter t
+  iter ~pos:true t
 
 let rec conv_proof st p: LLProof.t =
   begin match Proof.S.Tbl.get st.tbl p with
@@ -89,7 +107,7 @@ and conv_step st p =
       List.map (conv_parent st res intro_subst ~intros local_intros tags)
         (Proof.Step.parents @@ Proof.S.step p)
     in
-    let parents = parents @ add_parents parents intro_subst in
+    let parents = parents @ add_parents parents in
     let local_intros = ref Var.Subst.empty in (* TODO: remove *)
     let local_intros = Var.Subst.to_list !local_intros |> List.rev_map snd in
     let intros = if intros 
@@ -102,29 +120,44 @@ and conv_step st p =
   in
   (* convert result *)
   let res = match Proof.Step.kind @@ Proof.S.step p with
-    | Proof.Esa (rule,tags,skolems) when CCList.memq Builtin.Tag.T_conv tags ->
-      let add_parents _ _ = [] in
+    | Proof.Esa (rule,tags,skolems) when CCList.memq Builtin.Tag.T_conv tags || CCList.memq Builtin.Tag.T_neg tags ->
+      let add_parents _ = [] in
       mk_inference rule tags ~intros:false add_parents
     | Proof.Esa (rule,tags,skolems) ->
       (* For CNF-transformations, add instance and choice axioms: *)
-      let add_parents parents intro_subst =
-        let sk_subst = skolems 
-          |> List.map (fun ((sk, ty), (var, args)) -> 
-              let args = List.map (T.Subst.eval intro_subst) args in
-              var, T.app ~ty:T.Ty.prop (T.const ~ty sk) args
-            )
-          |> Var.Subst.of_list 
+      let add_parents parents =
+        let subst = skolems |> 
+          List.fold_left (fun subst ((sk, ty), (var, args)) -> 
+            Var.Subst.add subst var (T.app_infer (T.const ~ty sk) args)
+          ) Var.Subst.empty
+          |> ref
         in
-        CCList.flat_map (fun p -> 
-          create_axioms `Instance (LLProof.concl p.LLProof.p_proof) intro_subst |> Iter.to_list) parents
-        @ CCList.flat_map (fun p -> 
-          create_axioms `Choice (LLProof.concl p.LLProof.p_proof) ~aux_subst:intro_subst sk_subst |> Iter.to_list) parents
-        @ (create_axioms `Choice res intro_subst |> Iter.to_list)
+        let from_concl = (iter_boolean_skeleton (T.Form.not_ res)
+          ~on_forall:(fun _ _ _ -> assert false)
+          ~on_exists:(fun v t k -> let ax, t' = create_axiom t `Choice v (find_skolem subst v) in k ax; t') 
+          |> Iter.to_list) in
+        let from_premises = CCList.flat_map (fun p -> 
+          (iter_boolean_skeleton (LLProof.concl p.LLProof.p_proof)
+            ~on_forall:(fun v t k -> let ax, t' = create_axiom t `Instance v (find_skolem subst v) in k ax; t') 
+            ~on_exists:(fun v t k -> let ax, t' = create_axiom t `Choice v (find_skolem subst v) in k ax; t') 
+          |> Iter.to_list)) parents in
+        (*let from_forall =
+          CCList.flat_map (fun p -> 
+            create_axioms `Instance (LLProof.concl p.LLProof.p_proof) subst |> Iter.to_list) parents
+        in
+        List.iter (fun ((sk, ty), (var, args)) -> 
+            let args = List.map (T.Subst.eval !subst) args in
+            subst := Var.Subst.add !subst var (T.app ~ty:T.Ty.prop (T.const ~ty sk) args)
+          ) skolems;
+        let from_exists = CCList.flat_map (fun p -> 
+          create_axioms `Choice (LLProof.concl p.LLProof.p_proof) subst |> Iter.to_list) parents
+        in*)
+        from_concl @ from_premises
       in
       mk_inference rule tags ~intros:false add_parents
     | Proof.Inference (rule,tags)
     | Proof.Simplification (rule,tags) ->
-      let add_parents _ _ = [] in
+      let add_parents _ = [] in
       mk_inference rule tags ~intros:true add_parents
     | Proof.Trivial -> LLProof.trivial res
     | Proof.By_def id -> LLProof.by_def id res
