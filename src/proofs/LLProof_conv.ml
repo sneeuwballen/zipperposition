@@ -141,17 +141,6 @@ and conv_step st p =
             ~on_forall:(fun v t k -> let ax, t' = create_axiom t `Instance v (find_skolem subst v) in k ax; t') 
             ~on_exists:(fun v t k -> let ax, t' = create_axiom t `Choice v (find_skolem subst v) in k ax; t') 
           |> Iter.to_list)) parents in
-        (*let from_forall =
-          CCList.flat_map (fun p -> 
-            create_axioms `Instance (LLProof.concl p.LLProof.p_proof) subst |> Iter.to_list) parents
-        in
-        List.iter (fun ((sk, ty), (var, args)) -> 
-            let args = List.map (T.Subst.eval !subst) args in
-            subst := Var.Subst.add !subst var (T.app ~ty:T.Ty.prop (T.const ~ty sk) args)
-          ) skolems;
-        let from_exists = CCList.flat_map (fun p -> 
-          create_axioms `Choice (LLProof.concl p.LLProof.p_proof) subst |> Iter.to_list) parents
-        in*)
         from_concl @ from_premises
       in
       mk_inference rule tags ~intros:false add_parents
