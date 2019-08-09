@@ -558,13 +558,13 @@ module Form = struct
 
   let true_ = true_
   let false_ = false_
-  let eq a b = app_builtin ~ty:(ty_exn a) Builtin.Eq [a;b]
+  let eq a b = app_builtin ~ty:bool Builtin.Eq [a;b]
   let neq a b = app_builtin ~ty:bool Builtin.Neq [a;b]
   let and_ a = app_builtin ~ty:bool Builtin.And a
   let or_ a = app_builtin ~ty:bool Builtin.Or a
-  let equiv a b = app_builtin ~ty:(ty_exn a) Builtin.Equiv [a;b]
-  let imply a b = app_builtin ~ty:(ty_exn a) Builtin.Imply [a;b]
-  let xor a b = app_builtin ~ty:(ty_exn a) Builtin.Xor [a;b]
+  let equiv a b = app_builtin ~ty:bool Builtin.Equiv [a;b]
+  let imply a b = app_builtin ~ty:bool Builtin.Imply [a;b]
+  let xor a b = app_builtin ~ty:bool Builtin.Xor [a;b]
   let int_pred = int_pred
   let rat_pred = rat_pred
   let forall ~ty_var body = bind Binder.Forall ~ty:bool ~ty_var body
