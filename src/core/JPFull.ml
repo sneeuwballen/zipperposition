@@ -96,8 +96,10 @@ let unify_scoped =
     let init_flag = (0:flag_type)
     let identify_scope = renamer ~counter
     let frag_algs = pattern_frag ~counter
-    let pb_oracle s t (f:flag_type) scope = enclose_with_flag init_flag (oracle ~counter ~scope s t f) 
+    let pb_oracle s t (f:flag_type) scope = 
+      enclose_with_flag init_flag (oracle ~counter ~scope s t f) 
   end in
   
   let module JPFull = UnifFramework.Make(JPFullParams) in
-  JPFull.unify_scoped
+  (fun x y -> 
+    OSeq.map (CCOpt.map Unif_subst.of_subst) (JPFull.unify_scoped x y))

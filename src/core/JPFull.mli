@@ -1,1 +1,1 @@
-val unify_scoped : Term.t Scoped.t -> Term.t Scoped.t -> Subst.FO.t option OSeq.t
+val unify_scoped : Term.t Scoped.t -> Term.t Scoped.t -> Unif_subst.t option OSeq.t
