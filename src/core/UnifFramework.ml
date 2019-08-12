@@ -10,7 +10,7 @@ module type PARAMETERS = sig
   val init_flag : flag_type
   val identify_scope : T.t Scoped.t -> T.t Scoped.t -> T.t * T.t * Scoped.scope * S.t
   val frag_algs : (T.t Scoped.t -> T.t Scoped.t -> S.t -> S.t) list
-  val pb_oracle : (T.t Scoped.t -> T.t Scoped.t -> flag_type -> (S.t * flag_type) option LL.t  )
+  val pb_oracle : (T.t Scoped.t -> T.t Scoped.t -> flag_type -> Scoped.scope -> (S.t * flag_type) option LL.t  )
 end
 
 module Make (P : PARAMETERS) = struct 
@@ -108,7 +108,7 @@ module Make (P : PARAMETERS) = struct
               lhs and rhs *)
            do_unif rest subst mono unifscope
         | None ->
-          let flagged_pb = P.pb_oracle (body_lhs, unifscope) (body_rhs, unifscope) flag in
+          let flagged_pb = P.pb_oracle (body_lhs, unifscope) (body_rhs, unifscope) flag unifscope in
           LL.fold_left (fun res pb_flag_opt ->
             match pb_flag_opt with 
             | Some (pb, flag') -> 
