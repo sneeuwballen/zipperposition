@@ -341,7 +341,7 @@ let find_disagreement s t =
           find_disagreement_l ~applied_var:(Some f) ss tt 
         | T.AppBuiltin (f, ss), T.AppBuiltin (g, tt) when Builtin.equal f g -> 
           find_disagreement_l ss tt 
-        | T.Var x, T.Var y when x = y -> OSeq.empty
+        | T.Var x, T.Var y when T.equal s t -> OSeq.empty
         | T.DB i, T.DB j when i = j -> OSeq.empty
         | T.Const a, T.Const b when ID.equal a b -> OSeq.empty
         | T.Fun (ty_s, s'), T.Fun (ty_t, t') -> 

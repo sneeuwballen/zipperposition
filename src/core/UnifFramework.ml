@@ -74,7 +74,6 @@ module Make (P : PARAMETERS) = struct
     match problem with 
     | [] -> OSeq.return (Some subst)
     | (lhs, rhs, flag) :: rest ->
-    
       let lhs = normalize ~mono subst (lhs, unifscope) 
         and rhs = normalize ~mono subst (rhs, unifscope) in
       let (pref_lhs, body_lhs) = T.open_fun lhs
@@ -114,7 +113,7 @@ module Make (P : PARAMETERS) = struct
             | Some (pb, flag') -> 
               let subst' = Subst.merge subst pb in
               let unif_for_pb = do_unif ((lhs,rhs,flag')::rest) subst' mono unifscope in
-              LL.interleave res unif_for_pb
+              LL.interleave unif_for_pb res
             | None -> LL.cons None res
           ) args_unif flagged_pb
 
