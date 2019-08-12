@@ -90,8 +90,8 @@ let unify_scoped =
   let counter = ref 0 in
 
   let module JPFullParams = struct
-    exception NotInFragment
-    exception NotUnifiable
+    exception NotInFragment = PatternUnif.NotInFragment
+    exception NotUnifiable = PatternUnif.NotUnifiable
     type flag_type = int
     let init_flag = (0:flag_type)
     let identify_scope = renamer ~counter

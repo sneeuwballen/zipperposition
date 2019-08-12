@@ -2795,8 +2795,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Env.add_unary_inf "equality_resolution" (infer_equality_resolution_pragmatic_ho !_max_infs);
       );
 
-      
-
       if !_fluidsup then (
         Env.add_binary_inf "fluidsup_passive" infer_fluidsup_passive;
         Env.add_binary_inf "fluidsup_active" infer_fluidsup_active;
