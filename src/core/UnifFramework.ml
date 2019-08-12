@@ -6,14 +6,16 @@ module U = Unif
 module type PARAMETERS = sig
   exception NotInFragment
   exception NotUnifiable
+  type flag_type
+  val init_flag : flag_type
+  val identify_scope : T.t Scoped.t -> T.t Scoped.t -> T.t * T.t * Scoped.scope * S.t
   val frag_algs : (T.t Scoped.t -> T.t Scoped.t -> S.t -> S.t) list
-  val pb_oracle : (T.t Scoped.t -> T.t Scoped.t -> 'a -> (S.t * 'a) LL.t  )
+  val pb_oracle : (T.t Scoped.t -> T.t Scoped.t -> flag_type -> (S.t * flag_type) option LL.t  )
 end
 
 module Make (P : PARAMETERS) = struct 
   (* apply a substitution and reduce to whnf *)
   let nfapply s u = Lambda.beta_red_head (S.FO.apply S.Renaming.none s u)
-
 
   let rec nfapply_mono subst (t,sc) =
     let pref, tt = T.open_fun t in
@@ -47,19 +49,13 @@ module Make (P : PARAMETERS) = struct
         let ty = S.Ty.apply S.Renaming.none subst (ty,scope) in
         T.bvar ~ty (num_vars-1-i)) remaining in
       let shifted = T.DB.shift num_vars t in
-      (* T.app_w_ty shifted vars ~ty:(S.apply_ty subst (T.ty shifted, scope)) in  *)
       T.app shifted vars in
 
     if List.length pref1 = List.length pref2 then (t1, t2, pref1)
     else (
       let n1, n2 = List.length pref1, List.length pref2 in 
-      if n1 < n2 then (
-        (do_exp_otf n1 pref2 t1,t2,pref2)
-      ) else (
-        assert(n1 > n2);
-        (t1,do_exp_otf n2 pref1 t2,pref1)
-      )
-    )
+      if n1 < n2 then (do_exp_otf n1 pref2 t1,t2,pref2)
+      else (t1,do_exp_otf n2 pref1 t2,pref1))
 
 
   let rec do_unif problem subst mono unifscope =
@@ -76,7 +72,7 @@ module Make (P : PARAMETERS) = struct
       do_unif new_prob subst mono unifscope in
     
     match problem with 
-    | [] -> OSeq.return subst
+    | [] -> OSeq.return (Some subst)
     | (lhs, rhs, flag) :: rest ->
     
       let lhs = normalize ~mono subst (lhs, unifscope) 
@@ -113,12 +109,18 @@ module Make (P : PARAMETERS) = struct
            do_unif rest subst mono unifscope
         | None ->
           let flagged_pb = P.pb_oracle (body_lhs, unifscope) (body_rhs, unifscope) flag in
-          LL.fold_left (fun res (pb, flag') -> 
-            let subst' = Subst.merge subst pb in
-            let unif_for_pb = do_unif ((lhs,rhs,flag')::rest) subst' mono unifscope in
-            LL.interleave res unif_for_pb
+          LL.fold_left (fun res pb_flag_opt ->
+            match pb_flag_opt with 
+            | Some (pb, flag') -> 
+              let subst' = Subst.merge subst pb in
+              let unif_for_pb = do_unif ((lhs,rhs,flag')::rest) subst' mono unifscope in
+              LL.interleave res unif_for_pb
+            | None -> LL.cons None res
           ) args_unif flagged_pb
-        
-        
 
+  let unify_scoped t0s t1s =
+    let lhs,rhs,unifscope,subst = P.identify_scope t0s t1s in
+    let mono = 
+      Iter.is_empty @@ Iter.append (Term.Seq.ty_vars lhs) (Term.Seq.ty_vars rhs) in
+    do_unif [lhs,rhs,P.init_flag] subst mono unifscope
 end
