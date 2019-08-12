@@ -50,14 +50,14 @@ let renamer ~counter t0s t1s =
   lhs,rhs,unifscope,U.subst us
 
 let pattern_frag ~counter =
-  [(fun s t subst -> PatternUnif.unify_scoped ~subst ~counter s t)]
+  [(fun s t sub -> U.subst @@  PatternUnif.unify_scoped ~subst:(U.of_subst sub) ~counter s t)]
 
 let head_classifier s =
   match T.view @@ T.head_term s with 
   | T.Var x -> `Flex x
   | _ -> `Rigid
 
-let oracle ~counter ~scope s t _ = 
+let oracle ~counter ~scope (s,_) (t,_) _ = 
   match head_classifier s, head_classifier t with 
   | `Flex x, `Flex y when HVar.equal (fun _ _ -> true) x y ->
     (* eliminate + iter *)
@@ -82,3 +82,22 @@ let oracle ~counter ~scope s t _ =
             (iter_rule ~counter ~scope s t)
             (imit_rule ~counter ~scope s t))
   | _ -> assert false
+
+let unify_scoped =
+  let enclose_with_flag flag =
+    OSeq.map (CCOpt.map (fun x -> x, flag)) in
+  
+  let counter = ref 0 in
+
+  let module JPFullParams = struct
+    exception NotInFragment
+    exception NotUnifiable
+    type flag_type = int
+    let init_flag = (0:flag_type)
+    let identify_scope = renamer ~counter
+    let frag_algs = pattern_frag ~counter
+    let pb_oracle s t (f:flag_type) scope = enclose_with_flag init_flag (oracle ~counter ~scope s t f) 
+  end in
+  
+  let module JPFull = UnifFramework.Make(JPFullParams) in
+  JPFull.unify_scoped
