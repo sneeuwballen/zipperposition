@@ -12,3 +12,4 @@ env:
   - PACKAGE="zipperposition" OCAML_VERSION="4.04"
   - PACKAGE="zipperposition" OCAML_VERSION="4.05"
   - PACKAGE="zipperposition" OCAML_VERSION="4.06"
+  - PACKAGE="zipperposition" OCAML_VERSION="4.08"
