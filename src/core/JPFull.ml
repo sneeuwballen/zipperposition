@@ -3,6 +3,15 @@ module T = Term
 module H = HVar
 module S = Subst
 
+
+let delay depth res =
+  (* CCFormat.printf "depth: %d@." depth; *)
+  if depth > 3 then
+    OSeq.append 
+      (OSeq.take 50 (OSeq.repeat None))
+      res 
+  else res
+
 let elim_rule ~counter ~scope t u depth = 
   let eliminate_at_idx v k =  
     let prefix_types, return_type = Type.open_fun (HVar.ty v) in
@@ -26,14 +35,6 @@ let elim_rule ~counter ~scope t u depth =
     else OSeq.empty in
   OSeq.append (eliminate_one t) (eliminate_one u)
   |> OSeq.map (fun x -> Some (x, depth))
-
-let delay depth res =
-  (* CCFormat.printf "depth: %d@." depth; *)
-  if depth > 3 then
-    OSeq.append 
-      (OSeq.take 50 (OSeq.repeat None))
-      res 
-  else res
 
 let iter_rule ~counter ~scope t u depth  =
   delay depth
