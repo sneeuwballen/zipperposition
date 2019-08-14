@@ -52,7 +52,7 @@ module Solution : sig
       first symbol is bigger than the second one. *)
 
   val neg_to_constraint : t -> Constraint.t
-  (** Constraint that explicitely eliminate this solution *)
+  (** Constraint that explicitly eliminate this solution *)
 
   include Interfaces.PRINT with type t := t
 end

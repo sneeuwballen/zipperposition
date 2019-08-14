@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Imperative Union-Find structure} *)
@@ -20,6 +19,7 @@ module type PAIR = sig
   val equal : key -> key -> bool
 
   val merge : value -> value -> value   (** Should be associative commutative *)
+
   val zero : value  (** Neutral element of {!merge} *)
 end
 

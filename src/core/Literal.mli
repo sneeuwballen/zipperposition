@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Literals} *)
@@ -24,29 +23,39 @@ type t = private
   | Rat of Rat_lit.t
 
 val equal_com : t -> t -> bool     (** commutative equality of lits *)
+
 val compare : t -> t -> int     (** lexicographic comparison of literals *)
 
 include Interfaces.HASH with type t := t
 
 val hash : t -> int               (** hashing of literal *)
+
 val weight : t -> int             (** weight of the lit (sum of weights of terms) *)
+
 val heuristic_weight : (term -> int) -> t -> int   (** heuristic difficulty to eliminate lit *)
+
 val depth : t -> int              (** depth of literal *)
 
 val is_pos : t -> bool            (** is the literal positive? *)
 
 val is_neg : t -> bool            (** is the literal negative? *)
+
 val is_eqn : t -> bool            (** is the literal a proper (in)equation or prop? *)
+
 val is_prop : t -> bool           (** is the literal a boolean proposition? *)
+
 val is_eq : t -> bool             (** is the literal of the form a = b? *)
+
 val is_neq : t -> bool            (** is the literal of the form a != b? *)
 val is_essentially_prop : t -> bool (** is the literal non-equational literal of type Prop *)
 
 val is_arith : t -> bool
 val is_arith_eqn : t -> bool    (** = or != *)
+
 val is_arith_eq : t -> bool
 val is_arith_neq : t -> bool
 val is_arith_ineq : t -> bool   (** < or <= *)
+
 val is_arith_less : t -> bool
 val is_arith_lesseq : t -> bool
 val is_arith_divides : t -> bool
@@ -55,16 +64,23 @@ val is_rat : t -> bool
 val is_rat_eq : t -> bool
 val is_rat_less : t -> bool
 
+val mk_eq : term -> term -> t
 (** build literals. If sides so not have the same sort,
     a SortError will be raised. An ordering must be provided *)
-val mk_eq : term -> term -> t
+
 val mk_neq : term -> term -> t
+
 val mk_lit : term -> term -> bool -> t
-val mk_prop : term -> bool -> t   (* proposition *)
-val mk_true : term -> t     (* true proposition *)
-val mk_false : term -> t    (* false proposition *)
-val mk_tauto : t (* tautological literal *)
-val mk_absurd : t (* absurd literal, like ~ true *)
+
+val mk_prop : term -> bool -> t   (** proposition *)
+
+val mk_true : term -> t     (** true proposition *)
+
+val mk_false : term -> t    (** false proposition *)
+
+val mk_tauto : t (** tautological literal *)
+
+val mk_absurd : t (** absurd literal, like ~ true *)
 
 val mk_arith : Int_lit.t -> t
 val mk_arith_op : Int_lit.op -> Z.t Monome.t -> Z.t Monome.t -> t
@@ -127,13 +143,20 @@ val of_unif_subst: Subst.Renaming.t -> Unif_subst.t -> t list
     contained in this substitution. *)
 
 val map : (term -> term) -> t -> t (** functor *)
+
 val fold : ('a -> term -> 'a) -> 'a -> t -> 'a  (** basic fold *)
+
 val for_all : (term -> bool) -> t -> bool  (** for the term or both terms of the literal *)
+
 val vars : t -> Type.t HVar.t list (** gather variables *)
+
 val var_occurs : Type.t HVar.t -> t -> bool
+
 val is_ground : t -> bool
+
 val symbols : ?include_types:bool -> t -> ID.Set.t
-val root_terms : t -> term list (** all the terms immediatly under the lit *)
+
+val root_terms : t -> term list (** all the terms immediately under the lit *)
 
 val to_ho_term : t -> term option
 (** Conversion to higher-order term using {!Term.Form} *)
@@ -149,7 +172,9 @@ module Set : CCSet.S with type elt = t
 (** {2 Basic semantic checks} *)
 
 val is_trivial : t -> bool
+
 val is_absurd : t -> bool
+
 val is_absurd_tags : t -> Proof.tag list (** if [is_absurd lit], return why *)
 val is_app_var_eq : t -> bool
 
@@ -163,7 +188,7 @@ val is_pure_var : t -> bool
 val as_pos_pure_var : t -> (Term.var * Term.var) option
 
 val fold_terms :
-  ?position:Position.t -> ?vars:bool -> ?var_args:bool -> ?fun_bodies:bool -> ?ty_args:bool -> 
+  ?position:Position.t -> ?vars:bool -> ?var_args:bool -> ?fun_bodies:bool -> ?ty_args:bool ->
   which:[<`Max|`All] ->
   ?ord:Ordering.t ->
   subterms:bool ->

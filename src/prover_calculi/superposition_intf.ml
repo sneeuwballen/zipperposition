@@ -81,7 +81,7 @@ module type S = sig
   (** list of clauses in the active set that are subsumed by the clause *)
 
   val contextual_literal_cutting : Env.simplify_rule
-  (** contexual Literal.t cutting of the given clause by the active set  *)
+  (** contextual Literal.t cutting of the given clause by the active set  *)
 
   val condensation : Env.simplify_rule
   (** condensation *)

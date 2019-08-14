@@ -299,22 +299,28 @@ and pp_infix_ depth b out l = match l with
 let pp = pp_rec 0
 let pp_inner = pp_rec_inner 0
 
-let subterms (t:t) (k:t -> unit) : unit =
+exception Iter_cut
+
+let iter_rec_ ~in_ty t k  =
   let rec aux t =
-    k t;
-    CCOpt.iter aux (ty t);
-    begin match view t with
-      | Type | Const _ | Var _ -> ()
-      | App (f,a) -> aux f; aux a
-      | Arrow (a,b) -> aux a; aux b
-      | Bind { body;_ } -> aux body
-      | AppBuiltin  (_,l) -> List.iter aux l
-      | Ite (a,b,c) -> aux a; aux b; aux c
-      | Int_pred (l,_) -> Linexp_int.subterms l k
-      | Rat_pred (l,_) -> Linexp_rat.subterms l k
-    end
+    match k t with
+    | exception Iter_cut -> () (* stop there *)
+    | () ->
+      if in_ty then CCOpt.iter aux (ty t);
+      begin match view t with
+        | Type | Const _ | Var _ -> ()
+        | App (f,a) -> aux f; aux a
+        | Arrow (a,b) -> aux a; aux b
+        | Bind { body;_ } -> aux body
+        | AppBuiltin  (_,l) -> List.iter aux l
+        | Ite (a,b,c) -> aux a; aux b; aux c
+        | Int_pred (l,_) -> Linexp_int.subterms l k
+        | Rat_pred (l,_) -> Linexp_rat.subterms l k
+      end
   in
   aux t
+
+let subterms t k = iter_rec_ ~in_ty:true t k
 
 let[@inline] mk_ view ty : t =
   let t = {view; ty; id= -1; } in
@@ -564,6 +570,7 @@ module Form = struct
   let or_ a = app_builtin ~ty:bool Builtin.Or a
   let equiv a b = app_builtin ~ty:bool Builtin.Equiv [a;b]
   let imply a b = app_builtin ~ty:bool Builtin.Imply [a;b]
+  let imply_l a b = List.fold_right imply a b
   let xor a b = app_builtin ~ty:bool Builtin.Xor [a;b]
   let int_pred = int_pred
   let rat_pred = rat_pred
@@ -579,12 +586,47 @@ module Form = struct
     | _ -> app_builtin ~ty:bool Builtin.Not [a]
 end
 
+let abs t = match Form.view t with
+  | Form.Not u -> u, false
+  | Form.Neq (a,b) -> Form.eq a b, false
+  | _ -> t, true
+
+let as_bool t =
+  if equal t true_ then Some true
+  else if equal t false_ then Some false
+  else None
+
 module As_key = struct
   type t = term
   let compare = compare
+  let equal = equal
+  let hash = hash
 end
 
 module Set = CCSet.Make(As_key)
+module Tbl = CCHashtbl.Make(As_key)
+
+let iter_dag t k =
+  let seen_ = Tbl.create 16 in
+  iter_rec_ ~in_ty:false t
+    (fun u ->
+       if Tbl.mem seen_ u then (
+         raise_notrace Iter_cut
+       ) else (
+         Tbl.add seen_ u ();
+         k u;
+       ))
+
+let map_shallow f t : t =
+  match view t with
+    | Type | Const _ | Var _ | Arrow _ -> t
+    | App (a, b) -> app (f a) (f b)
+    | Bind {binder; ty_var; body} ->
+      bind ~ty:(ty_exn t) binder ~ty_var (f body)
+    | AppBuiltin (b, l) -> app_builtin ~ty:(ty_exn t) b (List.map f l)
+    | Ite (a,b,c) -> ite (f a) (f b) (f c)
+    | Int_pred (le, op) -> int_pred (Linexp_int.map f le) op
+    | Rat_pred (le, op) -> rat_pred (Linexp_rat.map f le) op
 
 module Conv = struct
   module T = TypedSTerm

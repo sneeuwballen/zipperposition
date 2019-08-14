@@ -395,7 +395,7 @@ module Make(Var: OrderedType) = struct
 
   (* Imperative implementation of the Branch&Bound *)
 
-  (* Strangely here, using Queue instade of Stack leads to better perfomances *)
+  (* Strangely here, using Queue instead of Stack leads to better performances *)
   (* TODO: insert user functions between iterations ? + debug function for ksolve ? *)
   let nsolve_aux t int_vars =
     let f = fun _ -> () in

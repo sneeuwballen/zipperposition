@@ -95,7 +95,7 @@ let conv_res = function
 
 let n_proof = ref 0 (* proof counter *)
 
-let prove ~dot_prefix (a:form list) (b:form) =
+let prove (a:form list) (b:form) =
   let module TT = LLTerm in
   (* convert into {!LLTerm.t} *)
   let ctx = TT.Conv.create() in
@@ -105,20 +105,9 @@ let prove ~dot_prefix (a:form list) (b:form) =
   let res, final_state = LLProver.prove a b in
   Util.debugf ~section 5 "(@[proof-stats@ %a@])"(fun k->k LLProver.pp_stats final_state);
   (* print state, maybe *)
-  begin match dot_prefix with
-    | None -> ()
-    | Some prefix ->
-      let p_id = CCRef.incr_then_get n_proof in
-      let file = Printf.sprintf "%s_%d.dot" prefix p_id in
-      Util.debugf ~section 2 "print proof %d@ into `%s`" (fun k->k p_id file);
-      CCIO.with_out file
-        (fun oc ->
-           let out = Format.formatter_of_out_channel oc in
-           Fmt.fprintf out "%a@." LLProver.pp_dot final_state);
-  end;
   conv_res res
 
-let check_step_ ?dot_prefix (p:proof): check_step_res =
+let check_step_ (p:proof): check_step_res =
   let concl = P.concl p in
   Util.incr_stat stat_check;
   begin match P.step p with
@@ -128,13 +117,13 @@ let check_step_ ?dot_prefix (p:proof): check_step_res =
       -> CS_check R_ok
     | P.Define id
       -> if ID.is_skolem id
-         then CS_skip `ESA  
-         (* TODO: check whether the Skolem was only defined once 
+         then CS_skip `ESA
+         (* TODO: check whether the Skolem was only defined once
             and does not occur in the original problem *)
          else CS_check R_ok
     | P.Negated_goal p' ->
       (* [p'] should prove [not concl] *)
-      CS_check (prove ~dot_prefix [P.concl p'] (F.not_ concl))
+      CS_check (prove [P.concl p'] (F.not_ concl))
     | P.Trivial -> CS_skip `Trivial (* axiom of the theory *)
     | P.Instantiate {tags;_} when not (LLProver.can_check tags) -> CS_skip `Tags
     | P.Instantiate {form=p';inst;_} ->
@@ -147,7 +136,7 @@ let check_step_ ?dot_prefix (p:proof): check_step_res =
         |> List.mapi (fun i v -> v, T.const ~ty:(Var.ty v) (ID.makef "sk_%d" i))
         |> Var.Subst.of_list
       in
-      CS_check (prove ~dot_prefix [T.Subst.eval subst p'_inst] (T.Subst.eval subst body_concl))
+      CS_check (prove [T.Subst.eval subst p'_inst] (T.Subst.eval subst body_concl))
     | P.Inference {parents;tags;intros;_} ->
       if LLProver.can_check tags then (
         (* within the fragment of {!Tab.prove} *)
@@ -157,14 +146,13 @@ let check_step_ ?dot_prefix (p:proof): check_step_res =
           | Some intros -> instantiate concl intros
           | None -> concl
         in
-        CS_check (prove ~dot_prefix all_premises concl)
+        CS_check (prove all_premises concl)
       ) else CS_skip `Tags
   end
 
-let check_step ?dot_prefix p = Util.with_prof prof_check (check_step_ ?dot_prefix) p
+let check_step p = Util.with_prof prof_check check_step_ p
 
 let check
-    ?dot_prefix
     ?(before_check=fun _ -> ())
     ?(on_check=fun _ _ -> ())
     (p:proof) : res * stats
@@ -180,7 +168,7 @@ let check
       before_check p;
       Util.debugf ~section 3 "(@[@{<Yellow>start_checking_proof@}@ %a@])"
         (fun k->k P.pp p);
-      let res = check_step ?dot_prefix p in
+      let res = check_step p in
       P.Tbl.add tbl p res;
       Util.debugf ~section 3
         "(@[<hv>@{<Yellow>done_checking_proof@}@ :of %a@ :res %a@])"

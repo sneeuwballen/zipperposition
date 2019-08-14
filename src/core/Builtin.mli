@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Builtin Objects} *)
@@ -126,6 +125,7 @@ val ty_rat : t
 val has_type : t
 
 val wildcard : t    (** $_ for type inference *)
+
 val multiset : t    (** type of multisets *)
 
 val grounding : t

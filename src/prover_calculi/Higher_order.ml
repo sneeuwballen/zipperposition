@@ -111,7 +111,7 @@ module Make(E : Env.S) : S with module Env = E = struct
            | None -> None
          end)
 
-  let extensionality_clause_diff t1 t2 = 
+  let extensionality_clause_diff t1 t2 =
     let alpha = Type.bvar 1 in
     let beta = Type.bvar 0 in
     let alpha_to_beta = Type.arrow [alpha] beta in
@@ -119,7 +119,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let diff = T.builtin ~ty:diff_type Builtin.FunDiff in
     assert (Type.equal (T.ty t1) (T.ty t2));
     match Type.open_fun (T.ty t1) with
-      | (in_ty :: rest_ty, return_ty) -> 
+      | (in_ty :: rest_ty, return_ty) ->
         let out_ty = Type.arrow rest_ty return_ty in
         T.app diff [T.of_ty in_ty; T.of_ty out_ty; t1; t2]
       | _ -> assert false
@@ -143,7 +143,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let extensionality_clause_subst t1 t2 =
     assert (Type.equal (T.ty t1) (T.ty t2));
     match Type.open_fun (T.ty t1) with
-      | (in_ty :: rest_ty, return_ty) -> 
+      | (in_ty :: rest_ty, return_ty) ->
         let out_ty = Type.arrow rest_ty return_ty in
         Subst.of_list [
           (HVar.make ~ty:InnerTerm.tType 0, ext_scope), ((in_ty :> InnerTerm.t), nonext_scope);
@@ -173,7 +173,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           (* create new skolems, parametrized by free variables *)
           let vars = Literal.vars lit in
           let skolems = ref [] in
-          let l = List.map (fun ty -> 
+          let l = List.map (fun ty ->
             let sk, _, res =  T.mk_fresh_skolem vars ty in
             skolems := sk :: !skolems;
             res) ty_args in
@@ -191,7 +191,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debugf ~section 4
         "(@[ho_ext_neg_lit@ :old `%a`@ :new `%a`@])"
         (fun k->k Literal.pp lit Literal.pp new_lit);
-      Some (new_lit,[],[Proof.Tag.T_ho; Proof.Tag.T_ext]) 
+      Some (new_lit,[],[Proof.Tag.T_ho; Proof.Tag.T_ext])
       (* TODO: Add skolem definition for proof checking *)
     | _ -> None
 
@@ -200,12 +200,12 @@ module Make(E : Env.S) : S with module Env = E = struct
   let ext_pos ?(only_unit=true) (c:C.t): C.t list =
     (* CCFormat.printf "EP: %b\n" only_unit; *)
     let is_eligible = C.Eligible.always in
-    if not only_unit || C.lits c |> CCArray.length = 1 then 
+    if not only_unit || C.lits c |> CCArray.length = 1 then
       C.lits c
       |> CCArray.mapi (fun i l ->
         let l = Literal.map (fun t -> Lambda.eta_reduce ~full:true t) l in
-        match l with 
-        | Literal.Equation (t1,t2,true) 
+        match l with
+        | Literal.Equation (t1,t2,true)
             when is_eligible i l ->
           let f1, l1 = T.as_app t1 in
           let f2, l2 = T.as_app t2 in
@@ -277,13 +277,13 @@ module Make(E : Env.S) : S with module Env = E = struct
                   let butlast = (fun l -> CCList.take (List.length l - 1) l) in
                   let t' = T.app f (butlast tt) in
                   let s' = T.app g (butlast ss) in
-                  let parent_subst = Unif_subst.FO.bind parent_subst 
+                  let parent_subst = Unif_subst.FO.bind parent_subst
                     (v, nonext_scope) ((extensionality_clause_diff t' s'), nonext_scope) in
-                  let parent_ext_substs = extensionality_clause_subst t' s' :: 
+                  let parent_ext_substs = extensionality_clause_subst t' s' ::
                     List.map (Subst.merge (Unif_subst.subst parent_subst)) parent_ext_substs in
-                  let parent_exts = 
+                  let parent_exts =
                     List.map (C.proof_parent_subst Subst.Renaming.none (extensionality_clause, ext_scope)) parent_ext_substs in
-                  let parent_c = 
+                  let parent_c =
                     C.proof_parent_subst Subst.Renaming.none (c, nonext_scope) (Unif_subst.subst parent_subst) in
                   let proof =
                     Proof.Step.inference (parent_c :: parent_exts)
@@ -391,7 +391,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     new_c
 
   let neg_cong_fun (c:C.t) : C.t list =
-    let find_diffs s t = 
+    let find_diffs s t =
       let rec loop s t =
         let (hd_s, args_s), (hd_t, args_t) = T.as_app s , T.as_app t in
         if T.is_const hd_s && T.is_const hd_t then (
@@ -399,38 +399,38 @@ module Make(E : Env.S) : S with module Env = E = struct
             let zipped = CCList.combine args_s args_t in
             let zipped = List.filter (fun (a_s, a_t) -> not (T.equal a_s a_t)) zipped in
             if List.length zipped = 1 then (
-              let s,t = List.hd zipped in loop s t 
-            ) else zipped) 
-          else [(s,t)]) 
+              let s,t = List.hd zipped in loop s t
+            ) else zipped)
+          else [(s,t)])
         else [(s,t)]
       in
 
       let (hd_s,_), (hd_t,_) = T.as_app s, T.as_app t in
       if T.is_const hd_s && T.is_const hd_t && T.equal hd_s hd_t then (
         let diffs = loop s t in
-        if List.for_all (fun (s,t) -> Type.equal (T.ty s) (T.ty t)) diffs 
-        then diffs else [] (* because of polymorphism, it might be possible 
+        if List.for_all (fun (s,t) -> Type.equal (T.ty s) (T.ty t)) diffs
+        then diffs else [] (* because of polymorphism, it might be possible
                               that terms will not be of the same type,
                               and that will give rise to wrong term applications*)
-      ) else [] 
+      ) else []
     in
     let is_eligible = C.Eligible.always in
     C.lits c
-    |> CCArray.mapi (fun i l -> 
-        match l with 
+    |> CCArray.mapi (fun i l ->
+        match l with
         | Literal.Equation (lhs,rhs,false) when is_eligible i l ->
           let subterms = find_diffs lhs rhs in
           assert(List.for_all (fun (s,t) -> Type.equal (T.ty s) (T.ty t)) subterms);
           if not (CCList.is_empty subterms) &&
-             List.exists (fun (l,_) -> 
+             List.exists (fun (l,_) ->
                 Type.is_fun (T.ty l) || Type.is_prop (T.ty l)) subterms then
              let subterms_lit = CCList.map (fun (l,r) ->
-               let free_vars = T.VarSet.union (T.vars l) (T.vars r) |> T.VarSet.to_list in 
+               let free_vars = T.VarSet.union (T.vars l) (T.vars r) |> T.VarSet.to_list in
                let arg_types = Type.expected_args @@ T.ty l in
                if CCList.is_empty arg_types then Literal.mk_neq l r
                else (
                  let skolem_decls = ref [] in
-                 let skolems = List.map (fun ty -> 
+                 let skolems = List.map (fun ty ->
                   let sk, _, res =  T.mk_fresh_skolem free_vars ty in
                   skolem_decls := sk :: !skolem_decls;
                   res) arg_types in
@@ -438,13 +438,13 @@ module Make(E : Env.S) : S with module Env = E = struct
                  Literal.mk_neq (T.app l skolems) (T.app r skolems)
                )
               ) subterms in
-             let new_lits = CCList.flat_map (fun (j,x) -> 
+             let new_lits = CCList.flat_map (fun (j,x) ->
               if i!=j then [x]
-              else subterms_lit) 
+              else subterms_lit)
               (C.lits c |> Array.mapi (fun j x -> (j,x)) |> Array.to_list) in
              let proof =
-              Proof.Step.inference [C.proof_parent c] 
-                ~rule:(Proof.Rule.mk "neg_cong_fun") 
+              Proof.Step.inference [C.proof_parent c]
+                ~rule:(Proof.Rule.mk "neg_cong_fun")
                 ~tags:[Proof.Tag.T_ho]
               in
              let new_c =
@@ -462,28 +462,28 @@ module Make(E : Env.S) : S with module Env = E = struct
     Proof.Parent.from (Rewrite.Rule.as_proof (Rewrite.Rule.of_term rw_rule))
 
   let neg_ext (c:C.t) : C.t list =
-    let is_eligible = C.Eligible.res c in 
+    let is_eligible = C.Eligible.res c in
     C.lits c
-    |> CCArray.mapi (fun i l -> 
-        match l with 
-        | Literal.Equation (lhs,rhs,false) 
+    |> CCArray.mapi (fun i l ->
+        match l with
+        | Literal.Equation (lhs,rhs,false)
             when is_eligible i l && Type.is_fun @@ T.ty lhs ->
           let arg_types = Type.expected_args @@ T.ty lhs in
           let free_vars = Literal.vars l in
           let skolem_decls = ref [] in
-          let skolem_terms, def_proofs, ext_instances = arg_types |> CCList.fold_left 
-            (fun (previous_skolems, def_proofs, ext_instances) ty -> 
-              let represented_term = extensionality_clause_diff 
+          let skolem_terms, def_proofs, ext_instances = arg_types |> CCList.fold_left
+            (fun (previous_skolems, def_proofs, ext_instances) ty ->
+              let represented_term = extensionality_clause_diff
                 (T.app lhs previous_skolems) (T.app rhs previous_skolems) in
               let (skolem_id, skolem_ty), skolem_vars, skolem_term = T.mk_fresh_skolem free_vars ty in
               skolem_decls := (skolem_id, skolem_ty) :: !skolem_decls;
               let def_proof = mk_def_proof skolem_id skolem_ty skolem_vars represented_term in
               let ext_instance = extensionality_clause_subst
                 (T.app lhs previous_skolems) (T.app rhs previous_skolems) in
-              (previous_skolems @ [skolem_term], def_proof :: def_proofs, ext_instance :: ext_instances)) 
+              (previous_skolems @ [skolem_term], def_proof :: def_proofs, ext_instance :: ext_instances))
             ([], [], []) in
           let skolem_decls = ref [] in
-          let new_lits = CCList.map (fun (j,x) -> 
+          let new_lits = CCList.map (fun (j,x) ->
               if i!=j then x
               else (Literal.mk_neq (T.app lhs skolem_terms) (T.app rhs skolem_terms))
             ) (C.lits c |> Array.mapi (fun j x -> (j,x)) |> Array.to_list) in
@@ -504,18 +504,18 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> CCArray.to_list
 
   let neg_ext_simpl (c:C.t) : C.t SimplM.t =
-    let is_eligible = C.Eligible.res c in 
+    let is_eligible = C.Eligible.res c in
     let applied_neg_ext = ref false in
-    let new_lits = 
+    let new_lits =
       C.lits c
-      |> CCArray.mapi (fun i l -> 
-          match l with 
-          | Literal.Equation (lhs,rhs,false) 
+      |> CCArray.mapi (fun i l ->
+          match l with
+          | Literal.Equation (lhs,rhs,false)
               when is_eligible i l && Type.is_fun @@ T.ty lhs ->
             let arg_types = Type.expected_args @@ T.ty lhs in
             let free_vars = Literal.vars l |> T.VarSet.of_list |> T.VarSet.to_list in
             let skolem_decls = ref [] in
-            let skolems = List.map (fun ty -> 
+            let skolems = List.map (fun ty ->
               let sk, _, res =  T.mk_fresh_skolem free_vars ty in
               skolem_decls := sk :: !skolem_decls;
               res) arg_types in
@@ -525,9 +525,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           | _ -> l) in
     if not !applied_neg_ext then SimplM.return_same c
     else (
-      let proof = 
+      let proof =
         Proof.Step.simp [C.proof_parent c]
-          ~rule:(Proof.Rule.mk "neg_ext_simpl") 
+          ~rule:(Proof.Rule.mk "neg_ext_simpl")
           ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext] in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
       (* CCFormat.printf "[NE_simpl]: @[%a@] => @[%a@].\n" C.pp c C.pp c'; *)
@@ -704,7 +704,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     end
 
   let prim_enum ~(mode) c =
-    if C.proof_depth c < max_penalty_prim_ 
+    if C.proof_depth c < max_penalty_prim_
     then prim_enum_ ~mode c
     else []
 
@@ -717,7 +717,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   |> Iter.max
                   |> CCOpt.get_or ~default: 0 in
 
-    let is_choice_subterm t = 
+    let is_choice_subterm t =
       match T.view t with
       | T.App(hd, [arg]) when T.is_var hd || Term.Set.mem hd !choice_ops ->
         let ty = T.ty arg in
@@ -749,12 +749,12 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
     let new_choice_op ty =
-      let choice_ty_name = "#_choice_" ^ 
+      let choice_ty_name = "#_choice_" ^
                            CCInt.to_string (CCRef.get_then_incr new_choice_counter) in
       let new_ch_id = ID.make choice_ty_name in
       let new_ch_const = T.const new_ch_id ~ty in
       ignore(Signature.declare (C.Ctx.signature ()) new_ch_id ty);
-      Util.debugf 1 "new choice for type %a: %a(%a).\n" 
+      Util.debugf 1 "new choice for type %a: %a(%a).\n"
         (fun k -> k Type.pp ty T.pp new_ch_const Type.pp (T.ty new_ch_const));
       choice_ops := Term.Set.add new_ch_const !choice_ops;
       new_ch_const in
@@ -764,19 +764,19 @@ module Make(E : Env.S) : S with module Env = E = struct
       | T.App(hd, [arg]) ->
         if Term.is_var hd && inst_vars then (
           let hd_ty = Term.ty hd in
-          let choice_ops = 
+          let choice_ops =
             Term.Set.filter (fun t -> Type.equal (Term.ty t) hd_ty) !choice_ops
             |> Term.Set.to_list
             |> (fun l -> if CCList.is_empty l then [new_choice_op hd_ty] else l) in
-          CCList.flat_map (fun hd -> 
-            [choice_inst_of_hd hd arg; choice_inst_of_hd hd (neg_trigger arg)]) 
+          CCList.flat_map (fun hd ->
+            [choice_inst_of_hd hd arg; choice_inst_of_hd hd (neg_trigger arg)])
           choice_ops
         ) else if Term.Set.mem hd !choice_ops then (
           [choice_inst_of_hd hd arg; choice_inst_of_hd hd (neg_trigger arg)]
         ) else []
       | _ -> assert (false) in
 
-    C.Seq.terms c 
+    C.Seq.terms c
     |> Iter.flat_map Term.Seq.subterms
     |> Iter.filter is_choice_subterm
     |> Iter.flat_map_l build_choice_inst
@@ -789,12 +789,12 @@ module Make(E : Env.S) : S with module Env = E = struct
       | T.App(hd, [var]) when T.is_var var -> Some hd
       | _ -> None end
     | _ -> None in
-    
-    let extract_p_choice_p p l = match l with 
+
+    let extract_p_choice_p p l = match l with
     | Literal.Equation(lhs,rhs,true) when T.equal T.true_ rhs && T.is_app_var lhs ->
       begin match T.view lhs with
       | T.App(hd, [ch_p]) when T.equal hd p ->
-        begin match T.view ch_p with 
+        begin match T.view ch_p with
         | T.App(sym, [var]) when T.is_const sym && T.equal var p -> Some sym
         | _ -> None end
       | _ -> None end
@@ -802,19 +802,19 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     if C.length c == 2 then (
       let px = CCArray.find_map extract_not_p_x (C.lits c) in
-      match px with 
+      match px with
       | Some p ->
         let p_ch_p = CCArray.find_map (extract_p_choice_p p) (C.lits c) in
         begin match p_ch_p with
         | Some sym ->
           choice_ops := Term.Set.add sym !choice_ops;
-          let new_cls = 
+          let new_cls =
             Env.get_active ()
-            |> Iter.flat_map_l (fun pas_cl -> 
+            |> Iter.flat_map_l (fun pas_cl ->
                 if C.id pas_cl = C.id c then []
                 else (
-                insantiate_choice ~inst_vars:false 
-                                  ~choice_ops:(ref (Term.Set.singleton sym)) 
+                insantiate_choice ~inst_vars:false
+                                  ~choice_ops:(ref (Term.Set.singleton sym))
                                   pas_cl
                 )) in
           Env.add_passive new_cls;
@@ -823,15 +823,15 @@ module Make(E : Env.S) : S with module Env = E = struct
         | None -> false end
       | None -> false
     ) else false
-    
-  
+
+
   let elim_leibniz_equality c =
     if C.proof_depth c < !_elim_leibniz_eq then (
       let ord = Env.ord () in
       let eligible = C.Eligible.always in
-      let pos_pred_vars, neg_pred_vars, occurences = 
+      let pos_pred_vars, neg_pred_vars, occurences =
         Lits.fold_eqn ~both:false ~ord ~eligible (C.lits c)
-        |> Iter.fold (fun (pos_vs,neg_vs,occ) (lhs,rhs,sign,_) -> 
+        |> Iter.fold (fun (pos_vs,neg_vs,occ) (lhs,rhs,sign,_) ->
           if Type.is_prop (Term.ty lhs) && Term.is_app_var lhs && sign
               && Term.is_true_or_false rhs then (
             let var_hd = Term.as_var_exn (Term.head_term lhs) in
@@ -840,21 +840,21 @@ module Make(E : Env.S) : S with module Env = E = struct
           ) else (pos_vs, neg_vs, occ)
         ) (Term.VarSet.empty,Term.VarSet.empty,Term.Map.empty) in
       let pos_neg_vars = Term.VarSet.inter pos_pred_vars neg_pred_vars in
-      let res = 
+      let res =
         if Term.VarSet.is_empty pos_neg_vars then []
         else (
-          CCList.flat_map (fun (t,sign) -> 
+          CCList.flat_map (fun (t,sign) ->
             let hd, args = T.as_app t in
             let var_hd = T.as_var_exn hd in
             if Term.VarSet.mem (Term.as_var_exn hd) pos_neg_vars then (
               let tyargs, _ = Type.open_fun (Term.ty hd) in
               let n = List.length tyargs in
               CCList.filter_map (fun (i,arg) ->
-                if T.var_occurs ~var:var_hd arg then None 
+                if T.var_occurs ~var:var_hd arg then None
                 else (
-                  let body = (if sign then T.Form.neq else T.Form.eq) 
+                  let body = (if sign then T.Form.neq else T.Form.eq)
                                 arg (T.bvar ~ty:(T.ty arg) (n-i-1)) in
-                  let subs_term = T.fun_l tyargs body in 
+                  let subs_term = T.fun_l tyargs body in
                   (let cached_t = Subst.FO.canonize_all_vars subs_term in
                   prim_enum_terms := Term.Set.add cached_t !prim_enum_terms);
                   let subst = Subst.FO.bind' (Subst.empty) (var_hd, 0) (subs_term, 0) in
@@ -863,14 +863,14 @@ module Make(E : Env.S) : S with module Env = E = struct
                   let proof = Some (Proof.Step.inference ~rule ~tags [C.proof_parent c]) in
                   Some (C.apply_subst ~proof (c,0) subst))
               ) (CCList.mapi (fun i arg -> (i, arg)) args)
-            ) else [] 
+            ) else []
           ) (Term.Map.to_list occurences)) in
       (* CCFormat.printf "Elim Leibniz eq:@ @[%a@].\n" C.pp c;
       CCFormat.printf "Pos/neg vars:@ @[%a@].\n" (Term.VarSet.pp HVar.pp) pos_neg_vars;
       CCFormat.printf "Res:@ @[%a@].\n" (CCList.pp C.pp) res); *)
       res
     ) else []
-    
+
 
   let pp_pairs_ out =
     let open CCFormat in
@@ -1011,7 +1011,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let prune_arg_old c =
     let status : (fixed_arg_status * dupl_arg_status) list VTbl.t = VTbl.create 8 in
     C.lits c
-    |> Literals.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord:Ordering.none 
+    |> Literals.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord:Ordering.none
                            ~subterms:true  ~eligible:(fun _ _ -> true)
     |> Iter.iter
       (fun (t,_) ->
@@ -1121,28 +1121,28 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* TODO: Simplified flag like in first-order? Profiler?*)
 
   let prune_arg ~all_covers c =
-    let get_covers ?(current_sets=[]) head args = 
+    let get_covers ?(current_sets=[]) head args =
       let ty_args, _ = Type.open_fun (T.ty head) in
-      let missing = CCList.replicate (List.length ty_args - List.length args) None in 
+      let missing = CCList.replicate (List.length ty_args - List.length args) None in
       let args_opt = List.mapi (fun i a_i ->
             assert(Term.DB.is_closed a_i);
             assert(CCList.is_empty current_sets ||
                    List.length current_sets = (List.length args + List.length missing));
             if CCList.is_empty current_sets ||
-               not (Term.Set.is_empty (List.nth current_sets i)) then 
-              (Some (List.mapi (fun j a_j -> 
+               not (Term.Set.is_empty (List.nth current_sets i)) then
+              (Some (List.mapi (fun j a_j ->
                 if i = j then None else Some a_j) args))
             else None (* ignoring onself *))
         args @ missing in
       let res = List.mapi (fun i arg_opt ->
         if i < List.length args then (
-          let t = List.nth args i in 
-          begin match arg_opt with 
+          let t = List.nth args i in
+          begin match arg_opt with
           | Some arg_l ->
-            let res_l = if all_covers then T.cover_with_terms t arg_l 
+            let res_l = if all_covers then T.cover_with_terms t arg_l
                         else [t; T.max_cover t arg_l] in
-            T.Set.of_list res_l 
-          | None -> Term.Set.empty 
+            T.Set.of_list res_l
+          | None -> Term.Set.empty
           end)
         else Term.Set.empty) args_opt in
       res
@@ -1152,7 +1152,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let free_vars = Literals.vars (C.lits c) |> T.VarSet.of_list in
     C.lits c
     |> Literals.map (fun t -> Lambda.eta_expand t) (* to make sure that DB indices are everywhere the same *)
-    |> Literals.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord:Ordering.none 
+    |> Literals.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord:Ordering.none
                            ~subterms:true  ~eligible:(fun _ _ -> true)
     |> Iter.iter
       (fun (t,_) ->
@@ -1162,7 +1162,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             begin match VTbl.get status var with
             | Some (current_sets, created_sk) ->
               let t, new_sk = T.DB.skolemize_loosely_bound t in
-              let new_skolems = T.IntMap.bindings new_sk 
+              let new_skolems = T.IntMap.bindings new_sk
                                 |> List.map snd |> Term.Set.of_list in
               let covers = get_covers ~current_sets head (T.args t) in
               assert(List.length current_sets = List.length covers);
@@ -1183,14 +1183,14 @@ module Make(E : Env.S) : S with module Env = E = struct
       VTbl.to_list status
       |> CCList.filter_map (fun (var, (args, skolems)) ->
           let removed = ref IntSet.empty in
-          let n = List.length args in 
-          let keep = List.mapi (fun i arg_set -> 
+          let n = List.length args in
+          let keep = List.mapi (fun i arg_set ->
             let arg_l = Term.Set.to_list arg_set in
-            let arg_l = List.filter (fun t -> 
-              List.for_all (fun idx -> 
+            let arg_l = List.filter (fun t ->
+              List.for_all (fun idx ->
                 not @@ IntSet.mem idx !removed) (T.DB.unbound t) &&
               T.Seq.subterms t
-              |> Iter.for_all (fun subt -> not @@ Term.Set.mem subt skolems)) 
+              |> Iter.for_all (fun subt -> not @@ Term.Set.mem subt skolems))
               arg_l in
             let res = CCList.is_empty arg_l in
             if not res then removed := IntSet.add (n-i-1) !removed;
@@ -1198,7 +1198,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           if CCList.for_all ((=) true) keep then None
           else (
             let ty_args, ty_return = Type.open_fun (HVar.ty var) in
-            let ty_args' = 
+            let ty_args' =
               CCList.combine keep ty_args
               |> CCList.filter fst |> CCList.map snd
             in
@@ -1301,11 +1301,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       );
 
       if(!_neg_cong_fun) then (
-        Env.add_unary_inf "neg_cong_fun" neg_cong_fun 
+        Env.add_unary_inf "neg_cong_fun" neg_cong_fun
       );
 
       if(!_neg_ext) then (
-        Env.add_unary_inf "neg_ext" neg_ext 
+        Env.add_unary_inf "neg_ext" neg_ext
       )
       else if(!_neg_ext_as_simpl) then (
         Env.add_unary_simplify neg_ext_simpl;
@@ -1440,7 +1440,7 @@ let () =
       "--ho-prune-arg", Arg.Symbol (["all-covers"; "max-covers"; "old-prune"; "off"], (fun s ->
           if s = "all-covers" then _prune_arg_fun := `PruneAllCovers
           else if s = "max-covers" then _prune_arg_fun := `PruneMaxCover
-          else if s = "old-prune" then _prune_arg_fun := `OldPrune 
+          else if s = "old-prune" then _prune_arg_fun := `OldPrune
           else _prune_arg_fun := `NoPrune)), " choose arg prune mode";
       "--ho-no-ext-neg-lit", Arg.Clear _ext_neg_lit, " enable negative extensionality rule on literal level [?]";
       "--ho-elim-leibniz", Arg.Int (fun v -> _elim_leibniz_eq := v), " enable/disable treatment of Leibniz equality";

@@ -128,7 +128,7 @@ is defined, and a function ``view`` allows to pattern-match on
 the root of any instance of ``Type.t``. Types are built of variables,
 bound variables, symbol applications (including constants when
 the list of arguments is empty), function types, record types (a more
-advanced topic) and explicitely quantified types.
+advanced topic) and explicitly quantified types.
 
 In practice we can use ``view`` this way:
 

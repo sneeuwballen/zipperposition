@@ -497,8 +497,7 @@ let check res =
       let p' = LLProof_conv.conv p in
       (* check *)
       let start = Util.total_time_s () in
-      let dot_prefix = params.Params.dot_check in
-      let res, stats = LLProof_check.check ?dot_prefix p' in
+      let res, stats = LLProof_check.check p' in
       let stop = Util.total_time_s () in
       Format.printf "%s(@[<h>proof_check@ :res %a@ :stats %a :time %.3fs@])@."
         comment LLProof_check.pp_res res LLProof_check.pp_stats stats (stop-.start);

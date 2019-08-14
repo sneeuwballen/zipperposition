@@ -5,7 +5,7 @@
 
 (** An array of literals is one of the major components of a clause.
 
-    It defines (implicitely) a scope for its variables; applying a substitution
+    It defines (implicitly) a scope for its variables; applying a substitution
     should always be done with the same {!Subst.Renaming.t} for
     all literals in the array.
 

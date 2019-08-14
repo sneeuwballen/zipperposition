@@ -3,6 +3,5 @@
   (public_name libzipperposition.calculi)
   (synopsis "calculi for the Zipperposition theorem prover")
   (libraries libzipperposition)
-  (flags :standard -w -32-50)
+  (flags :standard -w -32)
 )
-

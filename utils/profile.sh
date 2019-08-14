@@ -7,6 +7,7 @@ perf script \
   | sed 's/caml//g;
          s/Libzipperposition_prover//g; 
          s/Libzipperposition_core//g;
-         s/Libzipperposition__//g' \
+         s/Libzipperposition__//g;
+         s/Logtk__//g' \
   | flamegraph > perf.svg
 

@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Perfect Discrimination Tree} *)
@@ -72,7 +71,7 @@ let open_term ~stack ~len t =
     let cur_char = Subterm t in
     {cur_char; cur_term=t; stack=[]::stack; stack_len=len+1}
   ) else (
-    let cur_char, l = (term_to_char) t in
+    let cur_char, l = term_to_char t in
     {cur_char; cur_term=t; stack=l::stack; stack_len=len+1}
   )
 

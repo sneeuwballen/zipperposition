@@ -309,7 +309,7 @@ module Inner = struct
 
   (* distinct ground terms *)
   let distinct_ground_l l : bool =
-    List.for_all (fun t -> T.is_ground t (*&& CCList.is_empty @@ T.DB.unbound t*)) l 
+    List.for_all (fun t -> T.is_ground t (*&& CCList.is_empty @@ T.DB.unbound t*)) l
       && distinct_term_l l
 
   (* given [l], a list of distinct (ground) terms, and [rhs],
@@ -371,11 +371,11 @@ module Inner = struct
       in
       let n = List.length args in
 
-      match op with 
+      match op with
       | O_match_protect _ ->
         if n = n_old then subst
-        else fail() 
-      | _ -> 
+        else fail()
+      | _ ->
         (* fresh variable *)
         let ty_fun = T.arrow (List.map T.ty_exn args) ty in
         let f = HVar.fresh ~ty:ty_fun () in
@@ -575,9 +575,9 @@ module Inner = struct
       | _ when op=O_unify && not root && has_non_unifiable_type_or_is_prop t1 ->
         let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
         delay ~tags () (* push pair as a constraint, because of typing. *)
-      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when 
+      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when
         Builtin.equal s1 s2 ->
-        (* && not (Builtin.equal Builtin.ForallConst s1) && 
+        (* && not (Builtin.equal Builtin.ForallConst s1) &&
         not (Builtin.equal Builtin.ExistsConst s1) -> *)
         (* try to unify/match builtins pairwise *)
         unif_list ~op ~bvars subst l1 sc1 l2 sc2
@@ -605,7 +605,7 @@ module Inner = struct
         then fail () (* occur check or t2 is open *)
         else (
           if US.mem subst (v1,sc1) then (
-            let derefed = CCOpt.get_exn @@ Subst.get_var (US.subst subst) (v1,sc1) in 
+            let derefed = CCOpt.get_exn @@ Subst.get_var (US.subst subst) (v1,sc1) in
             let derefed = Scoped.map ((fun t -> ((Lambda.eta_reduce (Term.of_term_unsafe t)) :> InnerTerm.t))) derefed in
             if snd @@ derefed == sc2 && T.equal (fst @@ derefed) t2 then subst else fail()
           ) else US.bind subst (v1,sc1) (t2,sc2)
@@ -620,12 +620,12 @@ module Inner = struct
         then fail() (* occur check *)
         else (
           if US.mem subst (v2,sc2) then (
-            let derefed = CCOpt.get_exn @@ Subst.get_var (US.subst subst) (v2,sc2) in 
+            let derefed = CCOpt.get_exn @@ Subst.get_var (US.subst subst) (v2,sc2) in
             let derefed = Scoped.map ((fun t -> ((Lambda.eta_reduce (Term.of_term_unsafe t)) :> InnerTerm.t))) derefed in
             if snd @@ derefed == sc1 && T.equal (fst @@ derefed) t1 then subst else fail()
           ) else US.bind subst (v2,sc2) (t1,sc1)
         )
-      | _ -> 
+      | _ ->
         (* CCFormat.printf "failed unknown l %a:%d|%a:%d|%a.\n" T.pp t1 sc1 T.pp t2 sc2 pp_op op; *)
         fail ()  (* fail *)
     end
@@ -650,8 +650,8 @@ module Inner = struct
       (fun k -> k T.pp t1_0 T.pp t1 T.pp t2_0 T.pp t2 scope US.pp subst pp_op op B_vars.pp bvars);
     let f1, l1 = T.as_app t1 in
     let f2, l2 = T.as_app t2 in
-    let delay() = 
-      Util.debug ~section 5 "delaying\n"; 
+    let delay() =
+      Util.debug ~section 5 "delaying\n";
       delay ~bvars subst t1 scope t2 scope in
     (* case where heads are the same *)
     let same_rigid_head() =
@@ -734,8 +734,8 @@ module Inner = struct
           "(@[unif_ho.flex_rigid, trying@ `@[:f1 %a :l1 %a@]`@ :t2 `%a`@ :subst %a@ :bvars %a@])@."
           (Scoped.pp T.pp) (f1,scope) (CCFormat.Dump.list T.pp) l1
           (Scoped.pp T.pp) (t2,scope) US.pp subst B_vars.pp bvars; *)
-        if distinct_bvar_l ~bvars:bvars.B_vars.left l1 
-          && CCList.subset ~eq:(=) (T.DB.unbound t2) (List.map T.as_bvar_exn l1) 
+        if distinct_bvar_l ~bvars:bvars.B_vars.left l1
+          && CCList.subset ~eq:(=) (T.DB.unbound t2) (List.map T.as_bvar_exn l1)
         then (
           (* flex/rigid pattern unif *)
           flex_rigid ~op ~bvars:bvars.B_vars.left subst f1 l1 t2 ~scope
@@ -757,9 +757,9 @@ module Inner = struct
           "(@[unif_ho.flex_rigid@ `@[:f2 %a :l2 %a@]`@ :t1 `%a`@ :subst %a@ :bvars %a@])@."
           (Scoped.pp T.pp) (f2,scope) (CCFormat.Dump.list T.pp) l2
           (Scoped.pp T.pp) (t1,scope) US.pp subst B_vars.pp bvars;*)
-        if distinct_bvar_l ~bvars:bvars.B_vars.right l2 
-          && CCList.subset ~eq:(=) (T.DB.unbound t1) (List.map T.as_bvar_exn l2) 
-          && op=O_unify 
+        if distinct_bvar_l ~bvars:bvars.B_vars.right l2
+          && CCList.subset ~eq:(=) (T.DB.unbound t1) (List.map T.as_bvar_exn l2)
+          && op=O_unify
         then (
           (* flex/rigid pattern unif *)
           flex_rigid ~op ~bvars:bvars.B_vars.right subst f2 l2 t1 ~scope
@@ -839,7 +839,7 @@ module Inner = struct
       | T.Var v ->
         if l=[] then subst
         else if List.for_all T.is_bvar l then (
-          (* retrict [v] on [bvars], as a pattern. *)
+          (* restrict [v] on [bvars], as a pattern. *)
           restrict_fun1 ~op subst ~ty:(T.ty_exn t) ~to_:bvars ~scope:sc_t (v,l)
         ) else fail()
     end
@@ -1077,8 +1077,8 @@ module FO = struct
     else bind ~check subst var t
 
   let unify_full ?(subst=US.empty) =
-    fun sc1 sc2 -> 
-      let ta, sca = sc1 in 
+    fun sc1 sc2 ->
+      let ta, sca = sc1 in
       let tb, scb = sc2 in
 
       if(not (Term.DB.is_closed ta) || not (Term.DB.is_closed tb)) then (
@@ -1096,24 +1096,24 @@ module FO = struct
          let sk_b_rev = Term.IntMap.fold (fun k v acc -> Term.Map.add v k acc) sk_b_subs Term.Map.empty in
          let sk_rev_union = Term.Map.union (fun _ _ _ -> raise (Invalid_argument "keys must be unique "))
                            sk_a_rev sk_b_rev in
-         let subst = Unif_subst.subst res in 
+         let subst = Unif_subst.subst res in
          let mapped = Subst.FO.map (fun t -> Term.DB.unskolemize sk_rev_union t) subst in
          let res' = Unif_subst.make mapped (Unif_subst.constr_l res) in
 
          (* Format.printf "Res: @[%a@]\n" Unif_subst.pp res'; *)
 
-         res'  
+         res'
       )
       else (
          (unify_full :> ?subst:unif_subst -> term Scoped.t -> term Scoped.t -> unif_subst)
          ~subst sc1 sc2
       )
-      
+
 
   let unify_syn ?(subst=Subst.empty) =
-    fun sc1 sc2 -> 
-      let ta, sca = sc1 in 
-      let tb, scb = sc2 in  
+    fun sc1 sc2 ->
+      let ta, sca = sc1 in
+      let tb, scb = sc2 in
       if(not (Term.DB.is_closed ta) || not (Term.DB.is_closed tb)) then (
         let sk_a, sk_a_subs = Term.DB.skolemize_loosely_bound ta in
         let sk_b, sk_b_subs = Term.DB.skolemize_loosely_bound tb in
@@ -1139,7 +1139,7 @@ module FO = struct
         (unify_syn :> ?subst:subst -> term Scoped.t -> term Scoped.t -> subst)
         ~subst sc1 sc2
       )
-     
+
 
   let matching =
     (matching :> ?subst:subst ->
