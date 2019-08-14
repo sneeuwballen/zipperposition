@@ -47,7 +47,7 @@ module Solver = Sidekick_msat_solver.Make(struct
 
     module V = Sidekick_core.CC_view
 
-    let rec cc_view (t:T.t) : _ V.t =
+    let cc_view (t:T.t) : _ V.t =
       match T.view t with
       | T.App (f, a) -> V.App_ho (f, Iter.return a)
       | T.AppBuiltin (Builtin.Box_opaque, _) -> V.Opaque t  (* simple equality *)
@@ -59,8 +59,6 @@ module Solver = Sidekick_msat_solver.Make(struct
             V.App_fun (Fun.Builtin b, Iter.of_list l)
         end
       | T.Ite (a,b,c) -> V.If (a,b,c)
-      | T.Bind {body;binder=Binder.Exists;ty_var} ->
-        cc_view (T.Form.not_ (T.bind ~ty:T.bool Binder.Forall ~ty_var (T.Form.not_ body)))
       | T.Bind {body;binder;ty_var} ->
         V.App_fun (Fun.Bind (binder,ty_var), Iter.return body)
       | Int_pred _ | Rat_pred _

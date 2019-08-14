@@ -669,6 +669,8 @@ module Conv = struct
       let b = of_term ctx b in
       let c = of_term ctx c in
       ite a b c
+    | T.Bind (Binder.Exists,var,body) ->
+      of_term ctx (T.Form.not_ (T.bind ~ty:T.prop Binder.Forall var (T.Form.not_ body)))
     | T.Bind (b,var,body) ->
       let ty = of_term ctx (T.ty_exn t) in
       let ty_var = of_term ctx (Var.ty var) in
