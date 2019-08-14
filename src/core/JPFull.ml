@@ -3,7 +3,7 @@ module T = Term
 module H = HVar
 module S = Subst
 
-let elim_rule ~counter ~scope t u = 
+let elim_rule ~counter ~scope t u depth = 
   let eliminate_at_idx v k =  
     let prefix_types, return_type = Type.open_fun (HVar.ty v) in
     let m = List.length prefix_types in
@@ -25,25 +25,37 @@ let elim_rule ~counter ~scope t u =
         |> OSeq.map (eliminate_at_idx (T.as_var_exn hd)))
     else OSeq.empty in
   OSeq.append (eliminate_one t) (eliminate_one u)
-  |> OSeq.map (fun x -> Some x)
+  |> OSeq.map (fun x -> Some (x, depth))
 
-let iter_rule ~counter ~scope t u  =
-  JP_unif.iterate ~scope ~counter t u []
-  |> OSeq.map (CCOpt.map (U.subst))
+let delay depth res =
+  (* CCFormat.printf "depth: %d@." depth; *)
+  if depth > 3 then
+    OSeq.append 
+      (OSeq.take 50 (OSeq.repeat None))
+      res 
+  else res
 
-let imit_rule ~counter ~scope t u =
-  JP_unif.imitate ~scope ~counter t u []
-  |> OSeq.map (fun x -> Some (U.subst x))
+let iter_rule ~counter ~scope t u depth  =
+  delay depth
+    (JP_unif.iterate ~scope ~counter t u []
+    |> OSeq.map (CCOpt.map (fun s -> U.subst s, depth+1)))
 
-let proj_rule ~counter ~scope s t =
-  OSeq.append
-    (JP_unif.project_onesided ~scope ~counter s)
-    (JP_unif.project_onesided ~scope ~counter t)
-  |> OSeq.map (fun x -> Some (U.subst x))
+let imit_rule ~counter ~scope t u depth =
+  delay depth
+    (JP_unif.imitate ~scope ~counter t u []
+    |> OSeq.map (fun x -> Some (U.subst x, depth+1)))
 
-let ident_rule ~counter ~scope t u = 
-  JP_unif.identify ~scope ~counter t u []
-  |> OSeq.map (fun x -> Some (U.subst x))
+let proj_rule ~counter ~scope s t depth =
+  delay depth
+    (OSeq.append
+      (JP_unif.project_onesided ~scope ~counter s)
+      (JP_unif.project_onesided ~scope ~counter t)
+    |> OSeq.map (fun x -> Some (U.subst x, depth)))
+
+let ident_rule ~counter ~scope t u depth = 
+  delay depth
+    (JP_unif.identify ~scope ~counter t u []
+    |> OSeq.map (fun x -> Some (U.subst x, depth+1)))
 
 let renamer ~counter t0s t1s = 
   let lhs,rhs, unifscope, us = U.FO.rename_to_new_scope ~counter t0s t1s in
@@ -57,36 +69,33 @@ let head_classifier s =
   | T.Var x -> `Flex x
   | _ -> `Rigid
 
-let oracle ~counter ~scope (s,_) (t,_) _ = 
+let oracle ~counter ~scope (s,_) (t,_) flag = 
   match head_classifier s, head_classifier t with 
   | `Flex x, `Flex y when HVar.equal (fun _ _ -> true) x y ->
     (* eliminate + iter *)
-    OSeq.interleave (elim_rule ~counter ~scope s t)
-                    (iter_rule ~counter ~scope s t)
+    OSeq.append (elim_rule ~counter ~scope s t flag)
+                (iter_rule ~counter ~scope s t flag)
   | `Flex x, `Flex y ->
     (* all rules  *)
     OSeq.append 
-      (elim_rule ~counter ~scope s t)
+      (elim_rule ~counter ~scope s t flag)
       (OSeq.append 
-        (proj_rule ~counter ~scope s t)
+        (proj_rule ~counter ~scope s t flag)
         (OSeq.append 
-          (ident_rule ~counter ~scope s t)
-          (OSeq.interleave 
-            (iter_rule ~counter ~scope s t)
-            (imit_rule ~counter ~scope s t))))
+          (imit_rule ~counter ~scope s t flag)
+          (OSeq.append 
+            (ident_rule ~counter ~scope s t flag)
+            (iter_rule ~counter ~scope s t flag))))
   | `Flex _, `Rigid
   | `Rigid, `Flex _ ->
     OSeq.append
-      (proj_rule ~counter ~scope s t)
-      (OSeq.interleave 
-            (iter_rule ~counter ~scope s t)
-            (imit_rule ~counter ~scope s t))
+      (proj_rule ~counter ~scope s t flag)
+      (OSeq.append 
+            (imit_rule ~counter ~scope s t flag)
+            (iter_rule ~counter ~scope s t flag))
   | _ -> assert false
 
-let unify_scoped =
-  let enclose_with_flag flag =
-    OSeq.map (CCOpt.map (fun x -> x, flag)) in
-  
+let unify_scoped =  
   let counter = ref 0 in
 
   let module JPFullParams = struct
@@ -97,7 +106,7 @@ let unify_scoped =
     let identify_scope = renamer ~counter
     let frag_algs = pattern_frag ~counter
     let pb_oracle s t (f:flag_type) scope = 
-      enclose_with_flag init_flag (oracle ~counter ~scope s t f) 
+      oracle ~counter ~scope s t f 
   end in
   
   let module JPFull = UnifFramework.Make(JPFullParams) in
