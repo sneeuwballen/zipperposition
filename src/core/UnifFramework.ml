@@ -128,6 +128,8 @@ module Make (P : PARAMETERS) = struct
     let mono = 
       Iter.is_empty @@ Iter.append (Term.Seq.ty_vars lhs) (Term.Seq.ty_vars rhs) in
     try
-      do_unif [lhs,rhs,P.init_flag] subst mono unifscope
+      if Type.equal (T.ty lhs) (T.ty rhs) then
+        do_unif [lhs,rhs,P.init_flag] subst mono unifscope
+      else OSeq.empty
     with Unif.Fail -> OSeq.empty
 end
