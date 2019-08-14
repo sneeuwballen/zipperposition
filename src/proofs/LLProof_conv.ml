@@ -43,7 +43,7 @@ let find_skolem subst v =
         |> T.const ~ty:(Var.ty v |> T.Subst.eval !subst)
       in
       let sk = T.Subst.eval !subst sk in
-      subst := Var.Subst.add !subst v sk; (* TODO: apply subst to args *)
+      subst := Var.Subst.add !subst v sk;
       sk
 
 let create_axiom t kind v sk =
