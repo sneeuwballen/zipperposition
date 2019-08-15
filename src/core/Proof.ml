@@ -34,6 +34,7 @@ type kind =
   | Inference of rule * tag list
   | Simplification of rule * tag list
   | Cnf of skolem list
+  | Conv (** Conversion of different term datatypes *)
   | Esa of rule * tag list
   | Trivial (** trivial, or trivial within theories *)
   | Define of ID.t * source (** definition *)
@@ -237,6 +238,8 @@ module Kind = struct
       Format.fprintf out "esa %a%a" Rule.pp rule pp_tags tags 
     | Cnf _ ->
       Format.fprintf out "cnf"
+    | Conv ->
+      Format.fprintf out "conv"
     | Trivial -> CCFormat.string out "trivial"
     | By_def id -> Format.fprintf out "by_def(%a)" ID.pp id
     | Define (id,src) -> Format.fprintf out "define(@[%a@ %a@])" ID.pp id Src.pp src
@@ -256,6 +259,7 @@ module Kind = struct
       | Simplification (rule,_) -> pp_step "thm" out (rule,parents)
       | Esa (rule,_) -> pp_step "esa" out (rule,parents)
       | Cnf _ -> Format.fprintf out "cnf"
+      | Conv -> Format.fprintf out "conv"
       | Intro (_,R_lemma) -> Format.fprintf out "lemma"
       | Trivial -> assert(parents=[]); Format.fprintf out "trivial([status(thm)])"
       | By_def _ -> Format.fprintf out "by_def([status(thm)])"
@@ -377,7 +381,7 @@ module Step = struct
 
   let src p = match p.kind with
     | Intro (src,_) | Define (_,src) -> Some src
-    | Trivial | By_def _ | Esa _ | Cnf _ | Inference _ | Simplification _
+    | Trivial | By_def _ | Esa _ | Cnf _ | Conv | Inference _ | Simplification _
       -> None
 
   let to_attrs p = match src p with
@@ -389,7 +393,8 @@ module Step = struct
     | Trivial
     | By_def _
     | Define _
-    | Cnf _ -> None
+    | Cnf _ 
+    | Conv -> None
     | Esa (rule, _)
     | Simplification (rule,_)
     | Inference (rule,_)
@@ -489,11 +494,14 @@ module Step = struct
     let tags = dedup_tags tags in
     step_ ?infos (Simplification (rule,tags)) parents
 
-  let esa ?infos ?(tags=[]) ~rule  parents =
+  let esa ?infos ?(tags=[]) ~rule parents =
     step_ ?infos (Esa (rule, tags)) parents
 
-  let cnf ?infos ?(skolems=[])  parents =
+  let cnf ?infos ?(skolems=[]) parents =
     step_ ?infos (Cnf skolems) parents
+
+  let conv ?infos parents =
+    step_ ?infos Conv parents
 
   let pp_infos out = function
     | [] -> ()
@@ -519,7 +527,8 @@ module Step = struct
     | Inference _
     | Simplification _
     | Esa _
-    | Cnf _ ->
+    | Cnf _
+    | Conv ->
       Format.fprintf out "@[<hv2>%a%a%a@]"
         Kind.pp (kind step) pp_parents (parents step) pp_infos step.infos
 end
@@ -574,6 +583,10 @@ module S = struct
 
   let mk_f_cnf ~skolems f parents =
     let step = Step.cnf ~skolems parents in
+    mk_f step f
+
+  let mk_f_conv f parents =
+    let step = Step.conv parents in
     mk_f step f
 
   let adapt p r = { p with result=r; }
@@ -732,6 +745,7 @@ module S = struct
            | Inference _ | Simplification _ -> [mk_status "inference"]
            | Esa _ -> [mk_status "equisatisfiable"]
            | Cnf _ -> [mk_status "cnf"]
+           | Conv -> [mk_status "conversion"]
            | Intro (src,R_lemma) -> mk_status "lemma" :: Src.to_attrs src
            | Intro (src,R_goal) -> mk_status "goal" :: Src.to_attrs src
            | Intro (src,R_assert) -> mk_status "assert" :: Src.to_attrs src

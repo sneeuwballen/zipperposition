@@ -28,6 +28,7 @@ type kind =
   | Inference of rule * tag list
   | Simplification of rule * tag list
   | Cnf of skolem list
+  | Conv (** Conversion of different term datatypes *)
   | Esa of rule * tag list
   | Trivial (** trivial, or trivial within theories *)
   | Define of ID.t * source (** definition *)
@@ -255,6 +256,8 @@ module Step : sig
 
   val cnf : ?infos:infos -> ?skolems:(skolem list) -> parent list -> t
 
+  val conv : ?infos:infos -> parent list -> t
+
   val to_attrs : t -> UntypedAST.attrs
 
   val is_trivial : t -> bool
@@ -339,6 +342,8 @@ module S : sig
   val mk_f_esa : rule:rule -> form -> parent list -> t
 
   val mk_f_cnf : skolems:skolem list -> form -> parent list -> t
+
+  val mk_f_conv : form -> parent list -> t
 
   val adapt : t -> Result.t -> t
 
