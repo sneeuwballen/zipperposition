@@ -79,6 +79,9 @@ let iter_boolean_skeleton t ~on_exists ~on_forall (k : 'a -> unit) =
   in
   iter ~pos:true t
 
+(** Introduce local symbols for making proof checking locally ground.
+    Some variables are typed using other variables, so we
+    need to substitute eagerly *)
 let intro_list ~intro_subst f =
   let vars, _ = T.unfold_binder Binder.forall f in
   let l = List.map
@@ -102,6 +105,25 @@ let intro_list ~intro_subst f =
   in
   l
 
+(** For CNF-transformations, generate instance and choice axioms: *)
+let quantifier_axioms skolems res parents =
+  let subst = skolems |> 
+    List.fold_left (fun subst ((sk, ty), (var, args)) -> 
+      Var.Subst.add subst var (T.app_infer (T.const ~ty sk) args)
+    ) Var.Subst.empty
+    |> ref
+  in
+  let from_concl = (iter_boolean_skeleton (T.Form.not_ res)
+    ~on_forall:(fun _ _ _ -> assert false)
+    ~on_exists:(fun v t k -> let ax, t' = create_axiom t `Choice v (find_skolem subst v) in k ax; t') 
+    |> Iter.to_list) in
+  let from_premises = CCList.flat_map (fun p -> 
+    (iter_boolean_skeleton (LLProof.concl p.LLProof.p_proof)
+      ~on_forall:(fun v t k -> let ax, t' = create_axiom t `Instance v (find_skolem subst v) in k ax; t') 
+      ~on_exists:(fun v t k -> let ax, t' = create_axiom t `Choice v (find_skolem subst v) in k ax; t') 
+    |> Iter.to_list)) parents in
+  from_concl @ from_premises
+
 let rec conv_proof st p: LLProof.t =
   begin match Proof.S.Tbl.get st.tbl p with
     | Some r -> r
@@ -115,50 +137,25 @@ and conv_step st p =
   Util.debugf ~section 5 "(@[llproof.conv.step@ %a@])"
     (fun k->k Proof.S.pp_notrec1 p);
   let res = Proof.Result.to_form ~ctx:st.ctx (Proof.S.result p) in
-  (* introduce local symbols for making proof checking locally ground.
-        Some variables are typed using other variables, so we
-        need to substitute eagerly *)
-  let mk_inference rule tags ~mode add_parents =
-    let intro_subst = ref Var.Subst.empty in
-    let intros = if mode = `Intros then Some (intro_list ~intro_subst res) else None in
-    let parents =
-      List.map (conv_parent st res intro_subst ~mode tags)
-        (Proof.Step.parents @@ Proof.S.step p)
-    in
-    let parents = parents @ add_parents parents in
-    LLProof.inference ~intros ~tags
-      res (Proof.Rule.name rule) parents
-  in
   (* convert result *)
   let res = match Proof.Step.kind @@ Proof.S.step p with
-    | Proof.Esa (rule,tags,skolems) when CCList.memq Builtin.Tag.T_conv tags || CCList.memq Builtin.Tag.T_neg tags ->
-      let add_parents _ = [] in
-      mk_inference rule tags ~mode:`Axioms add_parents
     | Proof.Esa (rule,tags,skolems) ->
-      (* For CNF-transformations, add instance and choice axioms: *)
-      let add_parents parents =
-        let subst = skolems |> 
-          List.fold_left (fun subst ((sk, ty), (var, args)) -> 
-            Var.Subst.add subst var (T.app_infer (T.const ~ty sk) args)
-          ) Var.Subst.empty
-          |> ref
-        in
-        let from_concl = (iter_boolean_skeleton (T.Form.not_ res)
-          ~on_forall:(fun _ _ _ -> assert false)
-          ~on_exists:(fun v t k -> let ax, t' = create_axiom t `Choice v (find_skolem subst v) in k ax; t') 
-          |> Iter.to_list) in
-        let from_premises = CCList.flat_map (fun p -> 
-          (iter_boolean_skeleton (LLProof.concl p.LLProof.p_proof)
-            ~on_forall:(fun v t k -> let ax, t' = create_axiom t `Instance v (find_skolem subst v) in k ax; t') 
-            ~on_exists:(fun v t k -> let ax, t' = create_axiom t `Choice v (find_skolem subst v) in k ax; t') 
-          |> Iter.to_list)) parents in
-        from_concl @ from_premises
+      let intro_subst = ref Var.Subst.empty in (* TODO: remove *)
+      let parents =
+        List.map (conv_parent st res ~intro_subst ~mode:`Axioms tags)
+          (Proof.Step.parents @@ Proof.S.step p)
       in
-      mk_inference rule tags ~mode:`Axioms add_parents
+      LLProof.inference ~intros:None ~tags
+        res (Proof.Rule.name rule) (parents @ quantifier_axioms skolems res parents)
     | Proof.Inference (rule,tags)
     | Proof.Simplification (rule,tags) ->
-      let add_parents _ = [] in
-      mk_inference rule tags ~mode:`Intros add_parents
+      let intro_subst = ref Var.Subst.empty in
+      let intros = Some (intro_list ~intro_subst res) in
+      let parents =
+        List.map (conv_parent st res ~intro_subst ~mode:`Intros tags)
+          (Proof.Step.parents @@ Proof.S.step p)
+      in
+      LLProof.inference ~intros ~tags res (Proof.Rule.name rule) parents
     | Proof.Trivial -> LLProof.trivial res
     | Proof.By_def id -> LLProof.by_def id res
     | Proof.Define (id,_) -> LLProof.define id res
@@ -174,7 +171,7 @@ and conv_step st p =
 (* convert parent of the given result formula. Also make instantiations
    explicit. *)
 and conv_parent
-    st step_res intro_subst ~mode tags
+    st step_res ~intro_subst ~mode tags
     (parent:Proof.Parent.t) : LLProof.parent =
   Util.debugf ~section 5 "(@[llproof.conv_parent@ %a@])"
     (fun k->k Proof.pp_parent parent);
