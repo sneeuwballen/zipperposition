@@ -1069,12 +1069,11 @@ type c_statement = (clause, term, type_) Statement.t
 
 let id_ x = x
 
-let rule_cnf = Proof.Rule.mk "cnf"
 let rule_neg = Proof.Rule.mk "cnf.neg"
 let rule_conv = Proof.Rule.mk "cnf.conv"
 
 let proof_cnf stmt skolems =
-  Proof.Step.esa ~rule:rule_cnf ~tags:[T_cnf] ~skolems
+  Proof.Step.cnf ~skolems
     [Stmt.as_proof_i stmt |> Proof.Parent.from]
 
 let proof_neg stmt =

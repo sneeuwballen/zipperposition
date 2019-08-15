@@ -150,19 +150,19 @@ and conv_step st p =
   (* convert result *)
   let res = match Proof.Step.kind @@ Proof.S.step p with
     (* TODO: introduce separate Proof constructors for cnf.conv and cnf.neg*)
-    | Proof.Esa (rule,tags,_) when CCList.memq Builtin.Tag.T_conv tags || CCList.memq Builtin.Tag.T_neg tags ->
+    | Proof.Esa (rule,tags) ->
       let parents = Proof.Step.parents (Proof.S.step p)
         |> List.map (conv_parent st res tags)
         |> List.map (fun (p_proof, _) -> LLProof.p_of p_proof)
       in
       LLProof.inference ~intros:None ~tags res (Proof.Rule.name rule) parents
-    | Proof.Esa (rule,tags,skolems) ->
+    | Proof.Cnf skolems ->
       let parents = Proof.Step.parents (Proof.S.step p)
-        |> List.map (conv_parent st res tags)
+        |> List.map (conv_parent st res [])
         |> List.map (fun (p_proof, _) -> LLProof.p_of p_proof)
       in
-      LLProof.inference ~intros:None ~tags
-        res (Proof.Rule.name rule) (parents @ quantifier_axioms skolems res parents) 
+      LLProof.inference ~intros:None ~tags:[]
+        res "cnf" (parents @ quantifier_axioms skolems res parents) 
     | Proof.Inference (rule,tags)
     | Proof.Simplification (rule,tags) ->
       let intro_subst = ref Var.Subst.empty in
