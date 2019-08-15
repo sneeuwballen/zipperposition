@@ -350,7 +350,7 @@ let rewrite_tst_stmt stmt =
   let mk_proof ~stmt_parents f_opt orig =
     CCOpt.map (fun (f', parent_list) -> 
        let rule = Proof.Rule.mk "definition expansion" in
-       f', Proof.S.mk_f_simp ~rule orig (parent_list @ stmt_parents)) f_opt in
+       f', Proof.S.mk_f_esa ~rule orig (parent_list @ stmt_parents)) f_opt in
   
   let stmt_parents = [Proof.Parent.from @@ Statement.as_proof_i stmt] in
   match Statement.view stmt with
