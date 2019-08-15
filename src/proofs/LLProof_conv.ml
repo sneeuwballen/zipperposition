@@ -88,13 +88,13 @@ let quantifier_axioms skolems res parents =
       sk
   in
   (* Create choice/inst axiom. *)
-  let quantifier_axiom t kind v sk =
+  let quantifier_axiom t kind v =
     assert (T.equal (T.ty_exn t) (T.prop));
     let t1 = match kind with
       | `Instance -> T.Form.forall v t 
       | `Choice -> T.Form.exists v t 
     in
-    let t2 = T.Subst.eval ~rename_binders:false (Var.Subst.singleton v sk) t in
+    let t2 = T.Subst.eval ~rename_binders:false (Var.Subst.singleton v (make_skolem v)) t in
     let t = T.Form.imply t1 t2 in
     assert (T.closed t);
     let proof = (LLProof.p_of (LLProof.trivial t)) in
@@ -123,12 +123,12 @@ let quantifier_axioms skolems res parents =
   in
   let axioms_from_res = (iter_boolean_skeleton (T.Form.not_ res)
     ~on_forall:(fun _ _ _ -> assert false)
-    ~on_exists:(fun v t k -> let ax, t' = quantifier_axiom t `Choice v (make_skolem v) in k ax; t') 
+    ~on_exists:(fun v t k -> let ax, t' = quantifier_axiom t `Choice v in k ax; t') 
     |> Iter.to_list) in
   let axioms_from_parents = CCList.flat_map (fun p -> 
     (iter_boolean_skeleton (LLProof.concl p.LLProof.p_proof)
-      ~on_forall:(fun v t k -> let ax, t' = quantifier_axiom t `Instance v (make_skolem v) in k ax; t') 
-      ~on_exists:(fun v t k -> let ax, t' = quantifier_axiom t `Choice v (make_skolem v) in k ax; t') 
+      ~on_forall:(fun v t k -> let ax, t' = quantifier_axiom t `Instance v in k ax; t') 
+      ~on_exists:(fun v t k -> let ax, t' = quantifier_axiom t `Choice v in k ax; t') 
     |> Iter.to_list)) parents in
   axioms_from_res @ axioms_from_parents
 
