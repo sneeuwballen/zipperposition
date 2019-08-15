@@ -79,6 +79,29 @@ let iter_boolean_skeleton t ~on_exists ~on_forall (k : 'a -> unit) =
   in
   iter ~pos:true t
 
+let intro_list ~intro_subst f =
+  let vars, _ = T.unfold_binder Binder.forall f in
+  let l = List.map
+    (fun v ->
+      begin match Var.Subst.find !intro_subst v with
+        | Some t -> t
+        | None ->
+          (* introduce new intro skolem *)
+          let c =
+            ID.makef "sk_%d"
+              (Var.Subst.size !intro_subst)
+            |> T.const ~ty:(Var.ty v |> T.Subst.eval !intro_subst)
+          in
+          intro_subst := Var.Subst.add !intro_subst v c;
+          Util.debugf ~section 5
+            "(@[llproof.conv.add_intro@ %a := %a@ :formula `%a`@])"
+            (fun k->k Var.pp_fullc v T.pp c T.pp f);
+          c
+      end)
+    vars
+  in
+  l
+
 let rec conv_proof st p: LLProof.t =
   begin match Proof.S.Tbl.get st.tbl p with
     | Some r -> r
@@ -95,34 +118,22 @@ and conv_step st p =
   (* introduce local symbols for making proof checking locally ground.
         Some variables are typed using other variables, so we
         need to substitute eagerly *)
-  let mk_inference rule tags ~intros add_parents =
-    let intro_list = 
-      let vars, _ = open_forall res in
-      List.mapi (fun i v -> v, T.const ~ty:(Var.ty v) (ID.makef "sk_%d" i)) vars 
-    in
-    let intro_subst = Var.Subst.of_list intro_list 
-    in
-    let local_intros = ref Var.Subst.empty in
+  let mk_inference rule tags ~mode add_parents =
+    let intro_subst = ref Var.Subst.empty in
+    let intros = if mode = `Intros then Some (intro_list ~intro_subst res) else None in
     let parents =
-      List.map (conv_parent st res intro_subst ~intros local_intros tags)
+      List.map (conv_parent st res intro_subst ~mode tags)
         (Proof.Step.parents @@ Proof.S.step p)
     in
     let parents = parents @ add_parents parents in
-    let local_intros = ref Var.Subst.empty in (* TODO: remove *)
-    let local_intros = Var.Subst.to_list !local_intros |> List.rev_map snd in
-    let intros = if intros 
-      then Some (List.map (fun (_,c) -> T.Subst.eval intro_subst c) intro_list)
-      else None 
-    in
-    (* TODO: What is this for?  let res = T.rename_all_vars res in *)
-    LLProof.inference ~intros ~local_intros ~tags
+    LLProof.inference ~intros ~tags
       res (Proof.Rule.name rule) parents
   in
   (* convert result *)
   let res = match Proof.Step.kind @@ Proof.S.step p with
     | Proof.Esa (rule,tags,skolems) when CCList.memq Builtin.Tag.T_conv tags || CCList.memq Builtin.Tag.T_neg tags ->
       let add_parents _ = [] in
-      mk_inference rule tags ~intros:false add_parents
+      mk_inference rule tags ~mode:`Axioms add_parents
     | Proof.Esa (rule,tags,skolems) ->
       (* For CNF-transformations, add instance and choice axioms: *)
       let add_parents parents =
@@ -143,11 +154,11 @@ and conv_step st p =
           |> Iter.to_list)) parents in
         from_concl @ from_premises
       in
-      mk_inference rule tags ~intros:false add_parents
+      mk_inference rule tags ~mode:`Axioms add_parents
     | Proof.Inference (rule,tags)
     | Proof.Simplification (rule,tags) ->
       let add_parents _ = [] in
-      mk_inference rule tags ~intros:true add_parents
+      mk_inference rule tags ~mode:`Intros add_parents
     | Proof.Trivial -> LLProof.trivial res
     | Proof.By_def id -> LLProof.by_def id res
     | Proof.Define (id,_) -> LLProof.define id res
@@ -163,7 +174,7 @@ and conv_step st p =
 (* convert parent of the given result formula. Also make instantiations
    explicit. *)
 and conv_parent
-    st step_res intro_subst ~intros local_intros tags
+    st step_res intro_subst ~mode tags
     (parent:Proof.Parent.t) : LLProof.parent =
   Util.debugf ~section 5 "(@[llproof.conv_parent@ %a@])"
     (fun k->k Proof.pp_parent parent);
@@ -196,7 +207,7 @@ and conv_parent
                          :parent %a@ :intro_subst [@[%a@]]"
                    Var.pp_fullc v (Var.Subst.pp T.pp) inst_subst
                    T.pp p_instantiated_res T.pp step_res Proof.pp_parent parent
-                   (Var.Subst.pp T.pp) intro_subst
+                   (Var.Subst.pp T.pp) !intro_subst
              end)
           vars_p
       in
@@ -205,36 +216,11 @@ and conv_parent
   (* now open foralls in [p_instantiated_res]
      and find which variable of [intros] they rename into *)
   let inst_intros : LLProof.inst =
-    if intros
-    then
-      let vars_instantiated, _ = T.unfold_binder Binder.forall p_instantiated_res in
-      let l = List.map
-        (fun v ->
-          begin match Var.Subst.find intro_subst v with
-            | Some t -> t
-            | None ->
-              begin match Var.Subst.find !local_intros v with
-                | Some t -> t
-                | None ->
-                  (* introduce local_intro *)
-                  let c =
-                    ID.makef "sk_%d"
-                      (Var.Subst.size intro_subst + Var.Subst.size !local_intros)
-                    |> T.const ~ty:(Var.ty v |> T.Subst.eval intro_subst)
-                  in
-                  local_intros := Var.Subst.add !local_intros v c;
-                  Util.debugf ~section 5
-                    "(@[llproof.conv.add_local_intro@ %a := %a@ :p-instantiated `%a`@])"
-                    (fun k->k Var.pp_fullc v T.pp c T.pp p_instantiated_res);
-                  c
-              end
-          end)
-        vars_instantiated
-      in
-      l
-      else []
+    if mode = `Intros
+    then intro_list ~intro_subst p_instantiated_res
+    else []
   in
-  LLProof.p_inst prev_proof inst_intros (*TODO: remove lacal_intros completely *)
+  LLProof.p_inst prev_proof inst_intros
 
 let conv (p:Proof.t) : LLProof.t =
   let st = {

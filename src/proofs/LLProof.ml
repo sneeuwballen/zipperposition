@@ -45,7 +45,6 @@ and step =
     }
   | Inference of {
       intros: term list option; (* local renaming, with fresh constants *)
-      local_intros: term list; (* variables introduced between hypothesis, not in conclusion *)
       name: name;
       parents: parent list;
       tags: tag list;
@@ -100,10 +99,6 @@ let intros (p:t) : inst option = match p.step with
   | Inference {intros;_} -> intros
   | _ -> None
 
-let local_intros (p:t) : inst = match p.step with
-  | Inference {local_intros;_} -> local_intros
-  | _ -> []
-
 let equal a b = a.id = b.id
 let compare a b = CCInt.compare a.id b.id
 let hash a = Hash.int a.id
@@ -125,16 +120,14 @@ let pp_parent out p = match p.p_inst with
 
 let pp_inst_some out = function [] -> () | l -> Fmt.fprintf out "@ :inst %a" pp_inst l
 let pp_intro_some out = function None -> () | l -> Fmt.fprintf out "@ :intro %a" (CCOpt.pp pp_inst) l
-let pp_lintro_some out = function [] -> () | l -> Fmt.fprintf out "@ :local-intro %a" pp_inst l
 
 let pp out (p:t): unit =
-  Fmt.fprintf out "(@[<hv2>proof/%d %a%a@ :res `%a`@ :from [@[<hv>%a@]]%a%a%a@])"
+  Fmt.fprintf out "(@[<hv2>proof/%d %a%a@ :res `%a`@ :from [@[<hv>%a@]]%a%a@])"
     p.id pp_step (step p) Proof.pp_tags (tags p)
     pp_res p
     (Util.pp_list pp_parent) (parents p)
     pp_inst_some (inst p)
     pp_intro_some (intros p)
-    pp_lintro_some (local_intros p)
 
 let pp_dag out (p:t): unit =
   let seen = Tbl.create 32 in
@@ -163,9 +156,9 @@ let define id f = mk_ f (Define id)
 let instantiate ?(tags=[]) f p inst =
   mk_ f (Instantiate {form=p;inst;tags})
 
-let inference ~intros ~local_intros ~tags f name ps : t =
+let inference ~intros ~tags f name ps : t =
   mk_ f (Inference
-      {name;intros;local_intros;parents=ps;tags})
+      {name;intros;parents=ps;tags})
 
 let get_check_res t = t.checked
 let set_check_res t r = t.checked <- Some r
