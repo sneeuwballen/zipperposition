@@ -432,7 +432,7 @@ let map_propositions ~proof f =
     | Assert p	-> if_changed proof assert_ s f p
     | Lemma ps	-> if_changed proof lemma s (map%f) ps
     | Goal p	-> if_changed proof goal s f p
-    | NegatedGoal(ts, ps)	-> if_changed proof (neg_goal ~skolems:ts) s (map%f) ps
+    | NegatedGoal(ts, ps)	-> if_changed proof (neg_goal ~skolems:ts) s f ps
     | _ -> [s]
   )
 
@@ -505,7 +505,7 @@ let name_quantifiers stmts =
     | Assert p	-> if_changed assert_ s (name_prop_Qs s p)
     | Lemma ps	-> if_changed_list lemma s (map (name_prop_Qs s) ps)
     | Goal p	-> if_changed goal s (name_prop_Qs s p)
-    | NegatedGoal(ts, ps)	-> if_changed_list (neg_goal ~skolems:ts) s (map (name_prop_Qs s) ps)
+    | NegatedGoal(skolems, p)	-> if_changed (neg_goal ~skolems) s (name_prop_Qs s p) 
   ) |> CCVector.append new_stmts;
   CCVector.freeze new_stmts
 

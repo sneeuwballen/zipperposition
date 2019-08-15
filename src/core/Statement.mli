@@ -73,7 +73,7 @@ type ('f, 't, 'ty) view =
   | Assert of 'f (** assert form *)
   | Lemma of 'f list (** lemma to prove and use, using Avatar cut *)
   | Goal of 'f (** goal to prove *)
-  | NegatedGoal of 'ty skolem list * 'f list (** goal after negation, with skolems *)
+  | NegatedGoal of 'ty skolem list * 'f (** goal after negation, with skolems *)
 
 type lit = Term.t SLiteral.t
 type formula = TypedSTerm.t
@@ -124,7 +124,7 @@ val assert_ : ?attrs:attrs -> proof:proof -> 'f -> ('f, _, _) t
 val lemma : ?attrs:attrs -> proof:proof -> 'f list -> ('f, _, _) t
 val goal : ?attrs:attrs -> proof:proof -> 'f -> ('f, _, _) t
 val neg_goal :
-  ?attrs:attrs -> proof:proof -> skolems:'ty skolem list -> 'f list -> ('f, _, 'ty) t
+  ?attrs:attrs -> proof:proof -> skolems:'ty skolem list -> 'f -> ('f, _, 'ty) t
 
 val signature : ?init:Signature.t -> ?conj_syms: ID.t Iter.t -> (_, _, Type.t) t Iter.t -> Signature.t
 (** Compute signature when the types are using {!Type} *)

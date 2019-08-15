@@ -75,7 +75,7 @@ type ('f, 't, 'ty) view =
   | Assert of 'f (** assert form *)
   | Lemma of 'f list (** lemma to prove and use, using Avatar cut *)
   | Goal of 'f (** goal to prove *)
-  | NegatedGoal of 'ty skolem list * 'f list (** goal after negation, with skolems *)
+  | NegatedGoal of 'ty skolem list * 'f (** goal after negation, with skolems *)
 
 type lit = Term.t SLiteral.t
 type formula = TypedSTerm.t
@@ -117,7 +117,7 @@ let data ?attrs ~proof l = mk_ ?attrs ~proof (Data l)
 let assert_ ?attrs ~proof c = mk_ ?attrs ~proof (Assert c)
 let lemma ?attrs ~proof l = mk_ ?attrs ~proof (Lemma l)
 let goal ?attrs ~proof c = mk_ ?attrs ~proof (Goal c)
-let neg_goal ?attrs ~proof ~skolems l = mk_ ?attrs ~proof (NegatedGoal (skolems, l))
+let neg_goal ?attrs ~proof ~skolems c = mk_ ?attrs ~proof (NegatedGoal (skolems, c))
 
 let map_data ~ty:fty d =
   { d with
@@ -160,9 +160,9 @@ let map ~form ~term ~ty st =
       Data l
     | Lemma l -> Lemma (List.map form l)
     | Goal f -> Goal (form f)
-    | NegatedGoal (sk,l) ->
+    | NegatedGoal (sk,c) ->
       let sk = List.map (fun (i,ty)->i, fty ty) sk in
-      NegatedGoal (sk,List.map form l)
+      NegatedGoal (sk, form c)
     | Assert f -> Assert (form f)
     | TyDecl (id, ty) -> TyDecl (id, fty ty)
   in
@@ -322,7 +322,7 @@ module Seq = struct
       | Lemma l -> List.iter (fun f -> k (`Form f)) l
       | Assert f
       | Goal f -> k (`Form f)
-      | NegatedGoal (_,l) -> List.iter (fun f -> k (`Form f)) l
+      | NegatedGoal (_,f) -> k (`Form f)
     end
 
   let ty_decls st k = match view st with
@@ -489,11 +489,11 @@ let pp ppf ppt ppty out st =
         pp_attrs attrs (Util.pp_list ~sep:" && " ppf) l
     | Goal f ->
       fpf out "@[<2>goal%a@ @[%a@]@]." pp_attrs attrs ppf f
-    | NegatedGoal (sk, l) ->
+    | NegatedGoal (sk, f) ->
       let pp_sk out (id,ty) = fpf out "(%a:%a)" ID.pp id ppty ty in
       fpf out "@[<hv2>negated_goal%a@ @[<hv>%a@]@ # skolems: [@[<hv>%a@]]@]."
         pp_attrs attrs
-        (Util.pp_list ~sep:", " (CCFormat.hovbox ppf)) l
+        (CCFormat.hovbox ppf) f
         (Util.pp_list pp_sk) sk
   end
 
@@ -575,19 +575,11 @@ let lift_lambdas st =
     if CCList.is_empty new_defs then Iter.singleton st
     else ((goal (ll_proof_step st f new_defs) f') ::  (CCList.flat_map assert_defs new_defs)
           |> Iter.of_list)
-  | NegatedGoal (skolems,fs) ->
-    let fs', defs = List.fold_right (fun f (ffs, ddefs) -> 
-      let f', new_defs = TST.lift_lambdas f in
-      f' :: ffs, new_defs @ ddefs
-    ) fs ([], []) in
-    if CCList.is_empty defs then Iter.singleton st
-    else (
-      let rule = Proof.Rule.mk "lift_lambdas" in
-      let fs_parents = (List.map (fun f -> 
-        Proof.Parent.from (Proof.S.mk_f_esa ~rule f stmt_parents)) fs) in
-      let proof = Proof.Step.simp ~rule fs_parents in
-      (neg_goal ~proof ~skolems fs' :: (CCList.flat_map assert_defs defs))
-      |> Iter.of_list)
+  | NegatedGoal (skolems,f) ->
+    let f', new_defs =  TST.lift_lambdas f in
+    if CCList.is_empty new_defs then Iter.singleton st
+    else ((neg_goal ~proof:(ll_proof_step st f new_defs) ~skolems f') ::  (CCList.flat_map assert_defs new_defs)
+          |> Iter.of_list)
   | _ -> Iter.singleton st end in
   Util.debugf 1 "Lambda lifted:@ @[%a@]\n" (fun k -> k pp_input st);
   Util.debugf 1 "into @ @[%a@]\n" (fun k -> k (CCList.pp pp_input) (Iter.to_list res));
@@ -638,8 +630,7 @@ module ZF = struct
         fpf out "@[<2>goal%a@ @[%a@]@]." pp_attrs attrs ppf f
       | NegatedGoal (_, l) ->
         fpf out "@[<hv2>goal%a@ ~(@[<hv>%a@])@]."
-          pp_attrs attrs
-          (Util.pp_list ~sep:", " (CCFormat.hovbox ppf)) l
+          pp_attrs attrs ppf l
 
   let to_string ppf ppt ppty = CCFormat.to_string (pp ppf ppt ppty)
 end
@@ -694,12 +685,9 @@ module TPTP = struct
       | Goal f ->
         let role = "conjecture" in
         fpf out "@[<2>tff(%a, %s,@ (@[%a@]))@]." pp_name name role ppf f
-      | NegatedGoal (_,l) ->
+      | NegatedGoal (_,f) ->
         let role = "negated_conjecture" in
-        List.iter
-          (fun f ->
-             fpf out "@[<2>tff(%a, %s,@ (@[%a@]))@]." pp_name name role ppf f)
-          l
+        fpf out "@[<2>tff(%a, %s,@ (@[%a@]))@]." pp_name name role ppf f
       | Def l ->
         Format.fprintf out "@[<v>";
         (* declare *)

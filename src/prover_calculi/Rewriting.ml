@@ -371,14 +371,9 @@ let rewrite_tst_stmt stmt =
     (match mk_proof ~stmt_parents (aux g) g with
     | Some (g', proof) -> Statement.goal ~proof:(Proof.S.step proof) g'
     | None -> stmt)
-  | NegatedGoal (skolems, ngs) -> 
-    begin match aux_l ngs with 
-    | Some (ng', parents) ->
-      let rule = Proof.Rule.mk "definition expansion" in
-      let ng_parents = (List.map (fun f -> Proof.Parent.from (Proof.S.mk_f_esa ~rule f stmt_parents)) ngs)
-                        @ parents in
-      let proof = Proof.Step.simp ~rule ng_parents in
-      Statement.neg_goal ~skolems ~proof ng'
+  | NegatedGoal (skolems, ng) -> 
+    begin match mk_proof ~stmt_parents (aux ng) ng with 
+    | Some (ng', proof) -> Statement.neg_goal ~skolems ~proof:(Proof.S.step proof) ng'
     | None -> stmt end
   | _ -> stmt
 

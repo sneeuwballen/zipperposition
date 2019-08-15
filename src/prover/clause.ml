@@ -160,10 +160,10 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
         if not convert_defs then [] (*dealt with by rewriting *)
         (* dealt with  *)
         else List.map of_lits (Stmt.get_formulas_from_defs st)
-      | Stmt.Assert lits -> [of_lits lits]
+      | Stmt.Assert lits 
+      | Stmt.NegatedGoal (_,lits)
       | Stmt.Goal lits -> [of_lits lits]
-      | Stmt.Lemma l
-      | Stmt.NegatedGoal (_,l) -> List.map of_lits l
+      | Stmt.Lemma l -> List.map of_lits l
 
   let update_trail f c =
     let sclause = SClause.update_trail f c.sclause in

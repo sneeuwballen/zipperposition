@@ -156,9 +156,9 @@ let app_encode_stmt stmt =
     | Statement.Data _ -> failwith "Not implemented: Data"
     | Statement.Lemma _ -> failwith "Not implemented: Lemma"
     | Statement.Goal lits -> failwith "Not implemented: Goal"
-    | Statement.NegatedGoal (skolems,clauses) -> 
+    | Statement.NegatedGoal (skolems,c) -> 
       let skolems = List.map (fun (id, ty) -> (id, app_encode_ty ty)) skolems in
-      Statement.neg_goal ~proof ~skolems (List.map app_encode_lits clauses)
+      Statement.neg_goal ~proof ~skolems (app_encode_lits c)
     | Statement.Assert lits -> Statement.assert_ ~proof (app_encode_lits lits)
     | Statement.TyDecl (id, ty) ->
       Statement.ty_decl ~proof:Proof.Step.trivial id (app_encode_ty ty)

@@ -1236,23 +1236,21 @@ let cnf_of_seq ~ctx ?(opts=[])  seq =
          | Stmt.Goal f ->
            (* intermediate statement to represent the negation step *)
            let not_f = F.not_ f in
-           let stmt = Stmt.neg_goal ~proof:(proof_neg stmt) ~skolems:[] [not_f] in
+           let stmt = Stmt.neg_goal ~proof:(proof_neg stmt) ~skolems:[] not_f in
            (* now take the CNF of negated goal *)
            let skolems, l = conv_form_sk not_f in
            let proof = proof_cnf stmt skolems in
            let skolems = CCList.map fst skolems in
-           CCVector.push res (Stmt.neg_goal ~attrs ~proof ~skolems l)
-         | Stmt.NegatedGoal (sk1,l) ->
-           let skolems, l =
-             CCList.fold_flat_map
-               (fun sk f ->
-                  let sk', clauses = conv_form_sk f in
-                  List.rev_append sk' sk, clauses)
-                [] l
-           in
+           List.iter
+             (fun c -> CCVector.push res (Stmt.neg_goal ~attrs ~proof ~skolems c))
+             l 
+         | Stmt.NegatedGoal (sk1,f) ->
+           let skolems, l = conv_form_sk f in
            let proof = proof_cnf stmt skolems in
            let skolems = sk1 @ List.map fst skolems in
-           CCVector.push res (Stmt.neg_goal ~attrs ~proof ~skolems l)
+           List.iter
+             (fun c -> CCVector.push res (Stmt.neg_goal ~attrs ~proof ~skolems c))
+             l 
     )
     v;
   (* return final vector of clauses *)
@@ -1306,10 +1304,10 @@ let convert seq =
       | Stmt.Goal c ->
         let c = clause_to_fo ~ctx:t_ctx c in
         Stmt.goal ~attrs ~proof c
-      | Stmt.NegatedGoal (sk,l) ->
+      | Stmt.NegatedGoal (sk,c) ->
         let skolems = List.map (fun (id,ty)->id, conv_ty ty) sk in
-        let l = List.map (clause_to_fo ~ctx:t_ctx) l in
-        Stmt.neg_goal ~attrs ~proof ~skolems l
+        let c = clause_to_fo ~ctx:t_ctx c in
+        Stmt.neg_goal ~attrs ~proof ~skolems c
       | Stmt.Lemma l ->
         let l = List.map (clause_to_fo ~ctx:t_ctx) l in
         Stmt.lemma ~attrs ~proof l
