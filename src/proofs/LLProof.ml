@@ -170,7 +170,7 @@ let pp_check_res out = function
 
 module Dot = struct
   (** Get a graph of the proof *)
-  let as_graph : (t, string * inst) CCGraph.t =
+  let as_graph ~display_trivial : (t, string * inst) CCGraph.t =
     CCGraph.make
       (fun p ->
          let descr = match step p with
@@ -187,6 +187,9 @@ module Dot = struct
          begin
            parents p
            |> Iter.of_list
+           |> Iter.filter (fun p' -> match step p'.p_proof with 
+              | Trivial -> display_trivial 
+              | _ -> true)
            |> Iter.map
              (fun p' -> (descr,inst p), p'.p_proof)
          end)
@@ -211,12 +214,12 @@ module Dot = struct
       | _ -> Some "grey"
     end
 
-  let pp_dot_seq ~name out seq =
+  let pp_dot_seq ~name ~display_trivial out seq =
     CCGraph.Dot.pp_seq
       ~tbl:(CCGraph.mk_table ~eq:equal ~hash:hash 64)
       ~eq:equal
       ~name
-      ~graph:as_graph
+      ~graph:(as_graph ~display_trivial)
       ~attrs_v:(fun p ->
         let top, b_color = match get_check_res p with
           | None -> "[no-check]", []
@@ -238,16 +241,16 @@ module Dot = struct
     Format.pp_print_newline out ();
     ()
 
-  let pp_dot ~name out proof = pp_dot_seq ~name out (Iter.singleton proof)
+  let pp_dot ~name ~display_trivial out proof = pp_dot_seq ~name ~display_trivial out (Iter.singleton proof)
 
-  let pp_dot_seq_file ?(name="llproof") filename seq =
+  let pp_dot_seq_file ?(name="llproof") ~display_trivial filename seq =
     (* print graph on file *)
     Util.debugf ~section 1 "print LLProof graph to@ `%s`" (fun k->k filename);
     CCIO.with_out filename
       (fun oc ->
          let out = Format.formatter_of_out_channel oc in
-         Format.fprintf out "%a@." (pp_dot_seq ~name) seq)
+         Format.fprintf out "%a@." (pp_dot_seq ~name ~display_trivial) seq)
 
-  let pp_dot_file ?name filename proof =
-    pp_dot_seq_file ?name filename (Iter.singleton proof)
+  let pp_dot_file ?name ~display_trivial filename proof =
+    pp_dot_seq_file ?name ~display_trivial filename (Iter.singleton proof)
 end

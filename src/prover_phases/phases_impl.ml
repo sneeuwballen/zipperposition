@@ -505,8 +505,9 @@ let check res =
       begin match params.Params.dot_llproof with
         | None -> ()
         | Some file ->
+        let display_trivial = params.Params.dot_llproof_trivial in
           Util.debugf ~section 2 "print LLProof into `%s`"(fun k->k file);
-          LLProof.Dot.pp_dot_file file p';
+          LLProof.Dot.pp_dot_file ~display_trivial file p';
       end;
       (* exit code *)
       if res = LLProof_check.R_fail then 15 else 0

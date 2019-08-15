@@ -19,6 +19,7 @@ type t = {
   select : string; (** name of the selection function *)
   dot_file : string option; (** file to print the final state in *)
   dot_llproof: string option; (** file to print llproof *)
+  dot_llproof_trivial: bool; (** display trivial nodes in llproof print *)
   dot_sat : bool; (** Print saturated set into DOT? *)
   dot_all_roots : bool;
   def_as_rewrite: bool;
@@ -45,6 +46,7 @@ let default : t = {
   dot_all_roots= false;
   dot_file = None;
   dot_llproof= None;
+  dot_llproof_trivial = false;
   unary_depth= 1;
   dot_sat= false;
   expand_def= false;
@@ -72,6 +74,7 @@ let parse_args () =
   and presaturate = ref default.presaturate
   and dot_file = ref default.dot_file
   and dot_llproof = ref default.dot_llproof
+  and dot_llproof_trivial = ref default.dot_llproof_trivial
   and dot_sat = ref default.dot_sat
   and dot_all_roots = ref default.dot_all_roots
   and expand_def = ref default.expand_def
@@ -103,6 +106,7 @@ let parse_args () =
       " pre-saturate (interreduction of) the initial clause set"
     ; "--dot", Arg.String (fun s -> dot_file := Some s) , " print final state to file in DOT"
     ; "--dot-llproof", Arg.String (fun s -> dot_llproof := Some s) , " print LLProof to file in DOT"
+    ; "--dot-llproof-trivial", Arg.Bool (fun b -> dot_llproof_trivial := b), " display trivial nodes in LLProof DOT file"
     ; "--dot-sat", Arg.Set dot_sat, " print saturated set into DOT"
     ; "--dot-all-roots", Arg.Set dot_all_roots, " print all empty clauses into DOT"
     ; "--color", Arg.Bool CCFormat.set_color_default, " enable/disable ANSI color codes"
@@ -132,7 +136,8 @@ let parse_args () =
     files = files; select = !select;
     stats= ! Options._stats; def_as_rewrite= !def_as_rewrite;
     presaturate = !presaturate; dot_all_roots= !dot_all_roots;
-    dot_file = !dot_file; dot_llproof= !dot_llproof;
+    dot_file = !dot_file; dot_llproof= !dot_llproof; 
+    dot_llproof_trivial = !dot_llproof_trivial;
     unary_depth= !unary_depth; dot_sat= !dot_sat;
     expand_def= !expand_def; check= !check; eta = !eta}
 

@@ -12,6 +12,7 @@ type t = {
   select : string; (** name of the selection function *)
   dot_file : string option; (** file to print the final state in *)
   dot_llproof: string option; (** file to print llproof *)
+  dot_llproof_trivial: bool; (** display trivial nodes in llproof print *)
   dot_sat : bool; (** Print saturated set into DOT? *)
   dot_all_roots : bool;
   def_as_rewrite: bool;

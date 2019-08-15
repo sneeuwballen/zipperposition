@@ -108,15 +108,15 @@ val pp_check_res : check_res CCFormat.printer
 module Tbl : CCHashtbl.S with type key = t
 
 module Dot : sig
-  val pp_dot : name:string -> t CCFormat.printer
+  val pp_dot : name:string -> display_trivial:bool -> t CCFormat.printer
   (** Pretty print the proof as a DOT graph *)
 
-  val pp_dot_file : ?name:string -> string -> t -> unit
+  val pp_dot_file : ?name:string -> display_trivial:bool -> string -> t -> unit
   (** print to dot into a file *)
 
-  val pp_dot_seq : name:string -> t Iter.t CCFormat.printer
+  val pp_dot_seq : name:string -> display_trivial:bool -> t Iter.t CCFormat.printer
   (** Print a set of proofs as a DOT graph, sharing common subproofs *)
 
-  val pp_dot_seq_file : ?name:string -> string -> t Iter.t -> unit
+  val pp_dot_seq_file : ?name:string -> display_trivial:bool -> string -> t Iter.t -> unit
   (** same as {!pp_dot_seq} but into a file *)
 end
