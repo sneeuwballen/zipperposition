@@ -149,13 +149,6 @@ and conv_step st p =
   let res = Proof.Result.to_form ~ctx:st.ctx (Proof.S.result p) in
   (* convert result *)
   let res = match Proof.Step.kind @@ Proof.S.step p with
-    (* TODO: introduce separate Proof constructors for cnf.conv and cnf.neg*)
-    | Proof.Conv ->
-      let parents = Proof.Step.parents (Proof.S.step p)
-        |> List.map (conv_parent st res [])
-        |> List.map (fun (p_proof, _) -> LLProof.p_of p_proof)
-      in
-      LLProof.inference ~intros:None ~tags:[] res "conv" parents
     | Proof.Esa (rule,tags) ->
       let parents = Proof.Step.parents (Proof.S.step p)
         |> List.map (conv_parent st res tags)
@@ -169,6 +162,21 @@ and conv_step st p =
       in
       LLProof.inference ~intros:None ~tags:[]
         res "cnf" (parents @ quantifier_axioms skolems res parents) 
+    | Proof.Conv ->
+      (* Parent and conclusion should be equal up to variable names and order of
+        quantifiers. We need to construct the correct instantiation to show this. *)
+      let parents = Proof.Step.parents (Proof.S.step p) in
+      assert (List.length parents = 1);
+      let p_proof, p_res = conv_parent st res [] (List.hd parents) in
+      let _, res'        = T.unfold_binder Binder.forall res in
+      let p_vars, p_res' = T.unfold_binder Binder.forall p_res in
+      let subst = 
+        CCList.map2 (fun t s -> t, T.var s)  
+          (T.Seq.free_vars p_res' |> Iter.to_list) 
+          (T.Seq.free_vars res' |> Iter.to_list)
+        |> Var.Subst.of_list in
+      let inst = p_vars |> List.map (fun v -> Var.Subst.find_exn subst v) in
+      LLProof.instantiate ~tags:[] res p_proof inst
     | Proof.Inference (rule,tags)
     | Proof.Simplification (rule,tags) ->
       let intro_subst = ref Var.Subst.empty in

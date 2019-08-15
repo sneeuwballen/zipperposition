@@ -1081,7 +1081,7 @@ let proof_neg stmt =
     [Stmt.as_proof_i stmt |> Proof.Parent.from]
 
 let proof_conv stmt =
-  Proof.Step.esa ~rule:rule_conv ~tags:[T_conv]
+  Proof.Step.conv
     [Proof.S.mk (Stmt.proof_step stmt) (Proof.Result.make Statement.res_tc_sc stmt) |> Proof.Parent.from]
 
 (* Transform the clauses into proper CNF; returns a list of clauses *)
