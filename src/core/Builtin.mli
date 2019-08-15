@@ -178,7 +178,6 @@ module Tag : sig
     | T_distinct (** distinct constants *)
     | T_ac of ID.t (** AC symbol *)
     | T_neg (** negate a conjecture *)
-    | T_cnf (** CNF transformation *)
     | T_conv (** Term conversion *)
 
   val compare : t -> t -> int
