@@ -577,8 +577,8 @@ module S = struct
     let step = Step.simp ~rule parents in
     mk_f step f
 
-  let mk_f_esa ~rule f parents =
-    let step = Step.esa ~rule parents in
+  let mk_f_esa ?(tags=[]) ~rule f parents =
+    let step = Step.esa ~tags ~rule parents in
     mk_f step f
 
   let mk_f_cnf ~skolems f parents =

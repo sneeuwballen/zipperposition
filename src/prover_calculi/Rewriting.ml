@@ -350,7 +350,8 @@ let rewrite_tst_stmt stmt =
   let mk_proof ~stmt_parents f_opt orig =
     CCOpt.map (fun (f', parent_list) -> 
        let rule = Proof.Rule.mk "definition expansion" in
-       f', Proof.S.mk_f_esa ~rule orig (parent_list @ stmt_parents)) f_opt in
+       let tags = [Builtin.Tag.T_defexp] in
+       f', Proof.S.mk_f_esa ~tags ~rule orig (parent_list @ stmt_parents)) f_opt in
   
   let stmt_parents = [Proof.Parent.from @@ Statement.as_proof_i stmt] in
   match Statement.view stmt with
@@ -364,7 +365,8 @@ let rewrite_tst_stmt stmt =
       let rule = Proof.Rule.mk "definition expansion" in
       let fs_parents = (List.map (fun f -> Proof.Parent.from (Proof.S.mk_f_esa ~rule f stmt_parents)) fs)
                         @ parents in
-      let proof = Proof.Step.simp ~rule fs_parents in
+      let tags = [Builtin.Tag.T_defexp] in
+      let proof = Proof.Step.esa ~tags ~rule fs_parents in
       Statement.lemma ~proof fs'
     | None -> stmt end
   | Goal g ->

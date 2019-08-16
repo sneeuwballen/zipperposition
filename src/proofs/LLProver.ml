@@ -90,7 +90,8 @@ let can_check : LLProof.tag list -> bool =
   let f = function
     | T_ho | T_ext -> true
     | T_lra | T_lia | T_ind | T_data
-    | T_distinct | T_ac _ | T_neg | T_conv -> false
+    | T_distinct | T_ac _ | T_neg 
+    | T_conv | T_defexp | T_avatar -> false
   in
   List.for_all f
 

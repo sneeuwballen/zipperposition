@@ -282,6 +282,8 @@ module Tag = struct
     | T_ac of ID.t (** AC symbols *)
     | T_neg (** negating a conjecture *)
     | T_conv (** Term conversion *)
+    | T_defexp (** Definition expansion *)
+    | T_avatar (** Avatar *)
 
   let compare = Pervasives.compare
 
@@ -296,6 +298,8 @@ module Tag = struct
     | T_ac id -> Fmt.fprintf out "(ac %a)" ID.pp_full id
     | T_neg -> Fmt.string out "neg"
     | T_conv -> Fmt.string out "conv"
+    | T_defexp -> Fmt.string out "definition_expansion"
+    | T_avatar -> Fmt.string out "avatar"
 end
 
 

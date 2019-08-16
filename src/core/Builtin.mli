@@ -179,6 +179,8 @@ module Tag : sig
     | T_ac of ID.t (** AC symbol *)
     | T_neg (** negate a conjecture *)
     | T_conv (** Term conversion *)
+    | T_defexp (** Definition expansion *)
+    | T_avatar (** Avatar *)
 
   val compare : t -> t -> int
   val pp : t CCFormat.printer

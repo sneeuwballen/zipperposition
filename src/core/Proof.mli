@@ -339,7 +339,7 @@ module S : sig
 
   val mk_f_simp : rule:rule -> form -> parent list -> t
 
-  val mk_f_esa : rule:rule -> form -> parent list -> t
+  val mk_f_esa : ?tags:tag list -> rule:rule -> form -> parent list -> t
 
   val mk_f_cnf : skolems:skolem list -> form -> parent list -> t
 

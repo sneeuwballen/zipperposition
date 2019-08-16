@@ -96,7 +96,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         (* do a simplification! *)
         Util.incr_stat stat_splits;
         let proof =
-          Proof.Step.esa ~rule:(Proof.Rule.mk "split")
+          Proof.Step.esa ~tags:[Builtin.Tag.T_avatar] ~rule:(Proof.Rule.mk "split")
             [Proof.Parent.from @@ C.proof c]
         in
         (* elements of the trail to keep *)
@@ -240,7 +240,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
           List.map (CCFun.compose Sat.get_proof_of_lit Proof.Parent.from) removed_trail
         in
         let proof =
-          Proof.Step.simp ~rule:(Proof.Rule.mk "simpl_trail")
+          Proof.Step.simp ~tags:[Builtin.Tag.T_avatar] ~rule:(Proof.Rule.mk "simpl_trail")
             (Proof.Parent.from (C.proof c) :: proof_removed) in
         let c' =
           C.create_a ~trail:new_trail ~penalty:(C.penalty c)(C.lits c) proof
@@ -333,7 +333,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     in
     (* positive clauses *)
     let proof_pos =
-      Proof.Step.esa ~rule:(Proof.Rule.mk "cut") [cut_proof_parent]
+      Proof.Step.esa ~tags:[Builtin.Tag.T_avatar] ~rule:(Proof.Rule.mk "cut") [cut_proof_parent]
     in
     let c_pos =
       List.map
@@ -372,7 +372,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       let g = cut_form c in
       (* proof step *)
       let proof =
-        Proof.Step.esa [cut_proof_parent c] ~rule:(Proof.Rule.mk "cut")
+        Proof.Step.esa [cut_proof_parent c] 
+          ~tags:[Builtin.Tag.T_avatar] ~rule:(Proof.Rule.mk "cut")
       in
       let vars = Cut_form.vars g |> T.VarSet.to_list in
       Util.debugf ~section 2
@@ -503,7 +504,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
           (fun c ->
              Proof.Parent.from @@ Proof.S.mk proof_st @@
              SClause.mk_proof_res @@ SClause.make ~trail:Trail.empty c)
-        |> Proof.Step.esa ~rule:(Proof.Rule.mk "lemma")
+        |> Proof.Step.esa ~tags:[Builtin.Tag.T_avatar] ~rule:(Proof.Rule.mk "lemma")
       in
       let cut = introduce_cut ~reason:Fmt.(return "in-input") f proof in
       let all_clauses = cut_res_clauses cut |> Iter.to_rev_list in
