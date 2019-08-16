@@ -92,7 +92,7 @@ let quantifier_axioms skolems res parents =
     assert (T.equal (T.ty_exn t) (T.prop));
     let t1 = match kind with
       | `Instance -> T.Form.forall v t 
-      | `Choice -> T.Form.exists v t 
+      | `Choice -> T.Form.exists v t (* TODO: Make sure that each skolem is only used once for choice. *)
     in
     let t2 = T.Subst.eval ~rename_binders:false (Var.Subst.singleton v (make_skolem v)) t in
     let t = T.Form.imply t1 t2 in
