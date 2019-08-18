@@ -208,6 +208,10 @@ let is_const t = match T.view t with
   | T.Const _ -> true
   | _ -> false
 
+let is_appbuiltin t = match T.view t with
+  | T.AppBuiltin _ -> true
+  | _ -> false
+
 let is_fun t = match T.view t with
   | T.Bind (Binder.Lambda, _, _) -> true
   | _ -> false
@@ -1142,7 +1146,7 @@ module Conv = struct
           let res = 
             ST.app_builtin ~ty:(aux_ty (ty t))
               b (List.map (aux_t env) l) in
-          begin match ST.view res with 
+          (* begin match ST.view res with 
           | ST.AppBuiltin(b', l') ->
             assert(Builtin.equal b' Builtin.Equiv || Builtin.equal b' Builtin.Eq ||
                    Builtin.equal b' Builtin.Xor || Builtin.equal b' Builtin.Neq ||
@@ -1150,7 +1154,7 @@ module Conv = struct
             assert(Builtin.equal b' Builtin.Equiv || Builtin.equal b' Builtin.Eq ||
                    Builtin.equal b' Builtin.Xor || Builtin.equal b' Builtin.Neq ||
                    List.length l = List.length l');
-          | _ -> assert false end;
+          | _ -> assert false end; *)
           res
         | Fun (ty_arg, body) ->
           let v = Var.makef ~ty:(aux_ty ty_arg) "v_%d" (CCRef.incr_then_get n) in

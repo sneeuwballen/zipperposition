@@ -127,6 +127,7 @@ val grounding : Type.t -> t
 (** [grounding ty] is a unique constant of type [ty] *)
 
 val is_var : t -> bool
+val is_appbuiltin : t -> bool
 val is_bvar : t -> bool
 val is_formula : t -> bool
 val is_app : t -> bool

@@ -6,11 +6,10 @@ module S = Subst
 
 let delay depth res =
   (* CCFormat.printf "depth: %d@." depth; *)
-  if depth > 3 then
-    OSeq.append 
-      (OSeq.take 50 (OSeq.repeat None))
-      res 
-  else res
+  OSeq.append 
+    (OSeq.take (depth*10) (OSeq.repeat None))
+    res 
+  (* res *)
 
 let elim_rule ~counter ~scope t u depth = 
   let eliminate_at_idx v k =  
@@ -47,11 +46,10 @@ let imit_rule ~counter ~scope t u depth =
     |> OSeq.map (fun x -> Some (U.subst x, depth+1)))
 
 let proj_rule ~counter ~scope s t depth =
-  delay depth
-    (OSeq.append
-      (JP_unif.project_onesided ~scope ~counter s)
-      (JP_unif.project_onesided ~scope ~counter t)
-    |> OSeq.map (fun x -> Some (U.subst x, depth)))
+  OSeq.append
+    (JP_unif.project_onesided ~scope ~counter s)
+    (JP_unif.project_onesided ~scope ~counter t)
+  |> OSeq.map (fun x -> Some (U.subst x, depth))
 
 let ident_rule ~counter ~scope t u depth = 
   delay depth
@@ -72,16 +70,16 @@ let head_classifier s =
 
 let oracle ~counter ~scope (s,_) (t,_) flag = 
   match head_classifier s, head_classifier t with 
-  | `Flex x, `Flex y when HVar.equal (fun _ _ -> true) x y ->
+  | `Flex x, `Flex y when HVar.equal Type.equal x y ->
     (* eliminate + iter *)
     OSeq.append (elim_rule ~counter ~scope s t flag)
                 (iter_rule ~counter ~scope s t flag)
   | `Flex x, `Flex y ->
     (* all rules  *)
     OSeq.append 
-      (elim_rule ~counter ~scope s t flag)
+      (proj_rule ~counter ~scope s t flag)
       (OSeq.append 
-        (proj_rule ~counter ~scope s t flag)
+        (elim_rule ~counter ~scope s t flag)
         (OSeq.append 
           (imit_rule ~counter ~scope s t flag)
           (OSeq.append 
@@ -92,9 +90,11 @@ let oracle ~counter ~scope (s,_) (t,_) flag =
     OSeq.append
       (proj_rule ~counter ~scope s t flag)
       (OSeq.append 
-            (imit_rule ~counter ~scope s t flag)
-            (iter_rule ~counter ~scope s t flag))
-  | _ -> assert false
+        (imit_rule ~counter ~scope s t flag)
+        (iter_rule ~counter ~scope s t flag))
+  | _ -> 
+    CCFormat.printf "Did not disassemble properly: [%a]\n[%a]@." T.pp s T.pp t;
+    assert false
 
 let unify_scoped =  
   let counter = ref 0 in

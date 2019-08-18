@@ -57,6 +57,14 @@ module Make (P : PARAMETERS) = struct
       if n1 < n2 then (do_exp_otf n1 pref2 t1,t2,pref2)
       else (t1,do_exp_otf n2 pref1 t2,pref1))
 
+  let different_rigid_heads s t =
+    not @@ T.is_var s && not @@ T.is_var t &&
+      match T.view s with
+      | T.DB _ -> not @@ T.is_bvar t
+      | T.Const _  -> not @@ T.is_const t
+      | T.AppBuiltin _ ->  not @@ T.is_appbuiltin t
+      | _ -> false
+
 
   let rec do_unif problem subst mono unifscope =
     let decompose args_l args_r rest flag =
@@ -93,6 +101,7 @@ module Make (P : PARAMETERS) = struct
         if Builtin.equal b1 b2 && List.length args1 = List.length args2 then (
           decompose_and_continue (args_lhs@args1) (args_rhs@args2) rest flag
         ) else OSeq.empty
+      | _ when different_rigid_heads hd_lhs hd_rhs -> OSeq.empty
       | _ -> 
         let args_unif = 
           if T.is_var hd_lhs && T.is_var hd_rhs && T.equal hd_lhs hd_rhs then
@@ -114,13 +123,13 @@ module Make (P : PARAMETERS) = struct
           | None ->
             let flagged_pb = P.pb_oracle (body_lhs, unifscope) (body_rhs, unifscope) flag unifscope in
             OSeq.interleave
-              args_unif
               (OSeq.flat_map (fun pb_flag_opt ->
                 match pb_flag_opt with
                 | Some (pb, flag') ->
                   let subst' = Subst.merge subst pb in
                   do_unif ((lhs,rhs,flag')::rest) subst' mono unifscope
                 | None -> OSeq.return None) flagged_pb)
+              args_unif
         with Unif.Fail -> OSeq.empty
   
   let unify_scoped t0s t1s =
