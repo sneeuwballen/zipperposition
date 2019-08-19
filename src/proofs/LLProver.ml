@@ -88,10 +88,10 @@ let solve_ (solver:t) : res =
 let can_check : LLProof.tag list -> bool =
   let open Builtin.Tag in
   let f = function
-    | T_ho | T_ext -> true
+    | T_ho | T_ext | T_defexp -> true
     | T_lra | T_lia | T_ind | T_data
     | T_distinct | T_ac _ | T_neg 
-    | T_conv | T_defexp | T_avatar -> false
+    | T_conv | T_avatar -> false
   in
   List.for_all f
 
@@ -152,6 +152,75 @@ module Th_bool = Sidekick_th_bool_static.Make(struct
         B_atom t
   end)
 
+(* lambdas *)
+module Th_lambda = struct
+
+  module SI = Solver.Solver_internal
+
+  type state = {
+    triggers: (SI.CC.N.t * SI.CC.N.t * T.t) T.Tbl.t;
+  }(* TODO: use record *)
+
+  let create tst : state =
+    { triggers=T.Tbl.create 128 }
+
+  let cc_on_new_term si (st:state) (cc:SI.CC.t) (node:SI.CC.N.t) (t:T.t) = 
+    Util.debugf 3 ~section "CC new term: %a" (fun k -> k T.pp t);
+    () (* TODO: search triggers *)
+  
+  let check_triggers st cc n =
+    let t = (SI.CC.N.term n) in
+    match LLTerm.view t with
+    | App (t1, t2) -> 
+      begin match T.Tbl.find_opt st.triggers t1 with 
+      (* TODO: trigger might not be exactly s1, but just in its congruence closure *)
+        | Some (n1,n2,s) -> 
+          let new_node = SI.CC.add_term cc (T.app s t2) in
+          SI.CC.merge cc new_node n (SI.CC.Expl.mk_merge n1 n2) (* TODO: repair expl *);
+          Util.debugf 3 ~section "@[Trigger triggered@ :t1 %a@ :t2 %a@ :new_node %a@ :n %a@]" 
+            (fun k -> k T.pp t1 T.pp t2 SI.CC.N.pp new_node SI.CC.N.pp n);
+        | None -> ()
+      end
+    | _ -> ()
+
+  let cc_on_merge si (st:state) (cc:SI.CC.t) ac (a:SI.CC.N.t) (b:SI.CC.N.t) expl = 
+    let add_trigger node lambda_node =
+      let term, lambda_term = (SI.CC.N.term node), (SI.CC.N.term lambda_node) in
+      (* Add trigger *)
+      Util.debugf 3 ~section "@[Add trigger@ :term %a@ :lambda_term %a@]" 
+        (fun k -> k T.pp term T.pp lambda_term);
+      T.Tbl.add st.triggers term (node, lambda_node, lambda_term);
+      (* Search existing CC for instances of this trigger *)
+      (SI.CC.all_classes cc) |> Iter.iter (fun n -> 
+        let rec aux n = 
+          SI.CC.N.iter_class n |> Iter.iter (fun n' -> 
+            check_triggers st cc n'
+          )
+        in
+        aux n
+      );
+    in
+    let s, t = (SI.CC.N.term a), (SI.CC.N.term b) in
+    match LLTerm.view s, LLTerm.view t with
+    | _, Bind {binder=Binder.Lambda; _} -> add_trigger a b
+    | Bind {binder=Binder.Lambda; _}, _ -> add_trigger b a
+    | _ -> ();
+    ()
+
+  let create_and_setup si =
+    Util.debug 3 ~section "Setting up theory of lambda expressions.";
+    let st = create (SI.tst si) in
+    SI.CC.on_new_term (SI.cc si) (cc_on_new_term si st);
+    SI.CC.on_merge (SI.cc si) (cc_on_merge si st);
+    st
+
+  let theory =
+    Solver.mk_theory
+      ~name:"th-lambda"
+      ~create_and_setup
+      ()
+end
+
 let prove (a:form list) (b:form) : _*_ =
   Util.debugf ~section 3
     "(@[@{<yellow>llprover.prove@}@ :hyps (@[<hv>%a@])@ :concl %a@])"
@@ -159,7 +228,7 @@ let prove (a:form list) (b:form) : _*_ =
   Util.incr_stat stat_solve;
   Util.enter_prof prof_check;
   (* prove [a ∧ -b ⇒ ⊥] *)
-  let theories = [Th_bool.theory] in
+  let theories = [Th_bool.theory; Th_lambda.theory] in
   let solver = Solver.create ~size:`Small ~store_proof:false ~theories () () in
   List.iter
     (fun t -> Solver.add_clause_l solver [Solver.mk_atom_t solver t])
