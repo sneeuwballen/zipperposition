@@ -157,39 +157,40 @@ module Th_lambda = struct
 
   module SI = Solver.Solver_internal
 
+  type trigger = {trigger_node: SI.CC.N.t; lambda_node: SI.CC.N.t}
+
   type state = {
-    triggers: (SI.CC.N.t * SI.CC.N.t * T.t) T.Tbl.t;
-  }(* TODO: use record *)
+    triggers: trigger T.Tbl.t
+  }
 
   let create tst : state =
     { triggers=T.Tbl.create 128 }
-
-  let cc_on_new_term si (st:state) (cc:SI.CC.t) (node:SI.CC.N.t) (t:T.t) = 
-    Util.debugf 3 ~section "CC new term: %a" (fun k -> k T.pp t);
-    () (* TODO: search triggers *)
   
   let check_triggers st cc n =
     let t = (SI.CC.N.term n) in
     match LLTerm.view t with
     | App (t1, t2) -> 
-      begin match T.Tbl.find_opt st.triggers t1 with 
-      (* TODO: trigger might not be exactly s1, but just in its congruence closure *)
-        | Some (n1,n2,s) -> 
-          let new_node = SI.CC.add_term cc (T.app s t2) in
-          SI.CC.merge cc new_node n (SI.CC.Expl.mk_merge n1 n2) (* TODO: repair expl *);
+      begin match T.Tbl.find_opt st.triggers t1 with
+        | Some {trigger_node; lambda_node} -> 
+          let new_node = SI.CC.add_term cc (T.app (SI.CC.N.term lambda_node) t2) in
+          SI.CC.merge cc new_node n (SI.CC.Expl.mk_merge trigger_node lambda_node) (* TODO: repair expl *);
           Util.debugf 3 ~section "@[Trigger triggered@ :t1 %a@ :t2 %a@ :new_node %a@ :n %a@]" 
             (fun k -> k T.pp t1 T.pp t2 SI.CC.N.pp new_node SI.CC.N.pp n);
         | None -> ()
       end
     | _ -> ()
+  
+  let cc_on_new_term _ (st:state) (cc:SI.CC.t) (node:SI.CC.N.t) (_:T.t) = 
+    check_triggers st cc node;
+    ()
 
   let cc_on_merge si (st:state) (cc:SI.CC.t) ac (a:SI.CC.N.t) (b:SI.CC.N.t) expl = 
-    let add_trigger node lambda_node =
-      let term, lambda_term = (SI.CC.N.term node), (SI.CC.N.term lambda_node) in
+    let add_trigger trigger_node lambda_node =
+      let term, lambda_term = (SI.CC.N.term trigger_node), (SI.CC.N.term lambda_node) in
       (* Add trigger *)
       Util.debugf 3 ~section "@[Add trigger@ :term %a@ :lambda_term %a@]" 
         (fun k -> k T.pp term T.pp lambda_term);
-      T.Tbl.add st.triggers term (node, lambda_node, lambda_term);
+      T.Tbl.add st.triggers term {trigger_node; lambda_node};
       (* Search existing CC for instances of this trigger *)
       (SI.CC.all_classes cc) |> Iter.iter (fun n -> 
         let rec aux n = 
