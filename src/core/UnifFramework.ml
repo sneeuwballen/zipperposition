@@ -90,48 +90,50 @@ module Make (P : PARAMETERS) = struct
         eta_expand_otf ~subst ~scope:unifscope pref_lhs pref_rhs body_lhs body_rhs in
       let (hd_lhs, args_lhs), (hd_rhs, args_rhs) = T.as_app body_lhs, T.as_app body_rhs in
 
-      match T.view hd_lhs, T.view hd_rhs with
-      | T.DB i, T.DB j ->
-        if i = j then decompose_and_continue args_lhs args_rhs rest flag
-        else OSeq.empty
-      | T.Const f, T.Const g ->
-        if ID.equal f g then decompose_and_continue args_lhs args_rhs rest flag
-        else OSeq.empty
-      | T.AppBuiltin(b1, args1), T.AppBuiltin(b2, args2) ->
-        let args_lhs = args_lhs @ args1 and args_rhs = args_rhs @ args2 in
-        if Builtin.equal b1 b2 && List.length args_lhs = List.length args_rhs then (
-          decompose_and_continue (args_lhs@args1) (args_rhs@args2) rest flag
-        ) else OSeq.empty
-      | _ when different_rigid_heads hd_lhs hd_rhs -> OSeq.empty
-      | _ -> 
-        let args_unif = 
-          if T.is_var hd_lhs && T.is_var hd_rhs && T.equal hd_lhs hd_rhs then
-            decompose_and_continue args_lhs args_rhs rest flag
-          else LL.empty in
-        try 
-          let mgu = CCList.find_map (fun alg ->  
-            try
-              Some (alg (body_lhs, unifscope) (body_rhs, unifscope) subst)
-            with 
-              | P.NotInFragment -> None
-              | P.NotUnifiable -> raise Unif.Fail
-          ) P.frag_algs in 
-          match mgu with 
-          | Some subst ->
-            (* We assume that the substitution was augmented so that it is mgu for
-                lhs and rhs *)
-            do_unif rest subst mono unifscope
-          | None ->
-            let flagged_pb = P.pb_oracle (body_lhs, unifscope) (body_rhs, unifscope) flag unifscope in
-            OSeq.interleave
-              (OSeq.flat_map (fun pb_flag_opt ->
-                match pb_flag_opt with
-                | Some (pb, flag') ->
-                  let subst' = Subst.merge subst pb in
-                  do_unif ((lhs,rhs,flag')::rest) subst' mono unifscope
-                | None -> OSeq.return None) flagged_pb)
-              args_unif
-        with Unif.Fail -> OSeq.empty
+      if T.equal body_lhs body_rhs then do_unif rest subst mono unifscope
+      else (
+        match T.view hd_lhs, T.view hd_rhs with
+        | T.DB i, T.DB j ->
+          if i = j then decompose_and_continue args_lhs args_rhs rest flag
+          else OSeq.empty
+        | T.Const f, T.Const g ->
+          if ID.equal f g then decompose_and_continue args_lhs args_rhs rest flag
+          else OSeq.empty
+        | T.AppBuiltin(b1, args1), T.AppBuiltin(b2, args2) ->
+          let args_lhs = args_lhs @ args1 and args_rhs = args_rhs @ args2 in
+          if Builtin.equal b1 b2 && List.length args_lhs = List.length args_rhs then (
+            decompose_and_continue (args_lhs@args1) (args_rhs@args2) rest flag
+          ) else OSeq.empty
+        | _ when different_rigid_heads hd_lhs hd_rhs -> OSeq.empty
+        | _ -> 
+          let args_unif = 
+            if T.is_var hd_lhs && T.is_var hd_rhs && T.equal hd_lhs hd_rhs then
+              decompose_and_continue args_lhs args_rhs rest flag
+            else LL.empty in
+          try 
+            let mgu = CCList.find_map (fun alg ->  
+              try
+                Some (alg (body_lhs, unifscope) (body_rhs, unifscope) subst)
+              with 
+                | P.NotInFragment -> None
+                | P.NotUnifiable -> raise Unif.Fail
+            ) P.frag_algs in 
+            match mgu with 
+            | Some subst ->
+              (* We assume that the substitution was augmented so that it is mgu for
+                  lhs and rhs *)
+              do_unif rest subst mono unifscope
+            | None ->
+              let flagged_pb = P.pb_oracle (body_lhs, unifscope) (body_rhs, unifscope) flag unifscope in
+              OSeq.interleave
+                (OSeq.flat_map (fun pb_flag_opt ->
+                  match pb_flag_opt with
+                  | Some (pb, flag') ->
+                    let subst' = Subst.merge subst pb in
+                    do_unif ((lhs,rhs,flag')::rest) subst' mono unifscope
+                  | None -> OSeq.return None) flagged_pb)
+                args_unif
+          with Unif.Fail -> OSeq.empty)
   
   let unify_scoped t0s t1s =
     let lhs,rhs,unifscope,subst = P.identify_scope t0s t1s in

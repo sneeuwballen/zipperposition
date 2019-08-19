@@ -2,6 +2,7 @@ module T = Term
 module US = Unif_subst
 module P = PatternUnif
 module H = HVar
+module Params = PragUnifParams
 
 
 type subst = US.t
@@ -26,14 +27,12 @@ module S = struct
   let pp = US.pp
 end
 
-let max_depth = ref 4
-let max_app_projections = ref 2
-let max_var_imitations = ref 1
-let max_identifications = ref 0
-let max_elims           = ref 0
+let continue_unification state =
+  state.depth <= !Params.max_depth
 
-let _cons_e = ref true
-let _imit_first = ref false
+let compose_sub s1 s2 =
+  US.merge s1 s2
+
 let solve_var = ref true
 
 (* apply a substitution and reduce to whnf *)
@@ -62,21 +61,6 @@ let rec nfapply_mono subst (t,sc) =
   else T.fun_l pref t'
 
 let normalize ~mono = if mono then nfapply_mono else nfapply
-
-let disable_conservative_elim () =
-  _cons_e := false
-
-let enable_imit_first () = 
-  _imit_first := true
-
-let enable_solve_var () = 
-  solve_var := true
-
-let compose_sub s1 s2 =
-  US.merge s1 s2
-
-let continue_unification state =
-  state.depth <= !max_depth
 
 (* Make new list of constraints, prefering the rigid-rigid pairs *)
 let build_constraints ~ban_id args1 args2 rest = 
@@ -158,7 +142,7 @@ let proj_imit_bindings ~state ~subst ~scope ~counter  s t =
     |> (fun l ->
         (* if we performed more than N projections that applied the
            bound variable we back off *)
-        if state.num_app_projections <= !max_app_projections then l
+        if state.num_app_projections <= !Params.max_app_projections then l
         else
           List.filter (fun (_, ty) ->
             (List.length args_s <= 1) ||  
@@ -198,7 +182,7 @@ let proj_imit_bindings ~state ~subst ~scope ~counter  s t =
          [(imitate_one ~scope ~counter s t,-1)]
        else [] in
   let first, second = 
-    if !_imit_first then imit_binding, proj_bindings
+    if !Params._imit_first then imit_binding, proj_bindings
     else proj_bindings, imit_binding in 
   first @ second
 
@@ -244,7 +228,7 @@ let rec unify ~state ~scope ~counter ~subst = function
                   Constraints on which iteration rule has not been applied
                   have the ban_id value of false.                    
                   *)
-                  if !_imit_first then (
+                  if !Params._imit_first then (
                     OSeq.append
                       (flex_proj_imit  ~state ~subst ~counter ~scope body_s' body_t' rest)
                       (identify ~state ~subst ~counter ~scope body_s' body_t' rest))
@@ -286,7 +270,7 @@ and identify ~state ~subst ~counter ~scope s t rest =
   let state = {state with 
                   num_identifications = state.num_identifications + 1;
                   depth               = state.depth + 1} in
-  if state.num_identifications <= !max_identifications then ( 
+  if state.num_identifications <= !Params.max_identifications then ( 
     let id_subs = OSeq.nth 0 (JP_unif.identify ~scope ~counter s t []) in
     let subst = compose_sub subst id_subs in
     unify ~state ~scope ~counter ~subst ((s, t, true)::rest)
@@ -306,7 +290,7 @@ and flex_rigid ~state ~subst ~counter ~scope ~ban_id s t rest =
           depth               = state.depth + 1;
           num_app_projections = state.num_app_projections + 
                                 if n_args > 0 then 1 else 0;} in
-    if state.num_app_projections <= !max_app_projections then (
+    if state.num_app_projections <= !Params.max_app_projections then (
       unify ~state ~scope  ~counter ~subst ((s, t,ban_id) :: rest)
     ) else OSeq.empty
   )
@@ -320,12 +304,12 @@ and flex_same ~subst ~state ~counter ~scope hd_s args_s args_t rest all =
     let all_vars = CCList.range 0 ((List.length args_s) -1 ) in
     let all_args_unif = unify ~state ~subst ~counter ~scope new_cstrs in
     let first_unif = OSeq.take 1 all_args_unif in
-    if !_cons_e && not (OSeq.is_empty first_unif)  then (
+    if !Params._cons_e && not (OSeq.is_empty first_unif)  then (
       first_unif
     ) 
     else (
       let state = {state with depth = state.depth + 1} in
-      if state.num_elims < !max_elims then (
+      if state.num_elims < !Params.max_elims then (
         assert(List.length all_vars != 0);
         OSeq.append
           all_args_unif
@@ -373,8 +357,8 @@ and flex_proj_imit ~subst ~state ~counter ~scope s t rest =
           num_var_imitations  = state.num_var_imitations + imit_dif;
           depth               = state.depth + 1
       } in
-      if proj_dif = 0 || state.num_app_projections <= !max_app_projections && 
-         imit_dif = 0 || state.num_var_imitations <= !max_var_imitations then (
+      if proj_dif = 0 || state.num_app_projections <= !Params.max_app_projections && 
+         imit_dif = 0 || state.num_var_imitations <= !Params.max_var_imitations then (
         unify ~scope ~state ~counter ~subst ((s, t, true) :: rest)
       ) 
       else OSeq.empty
