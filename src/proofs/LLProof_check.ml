@@ -152,6 +152,7 @@ let check_step_ (p:proof): check_step_res =
 
 let check_step p = Util.with_prof prof_check check_step_ p
 
+(* TODO: check steps before goal backwards *)
 let check
     ?(before_check=fun _ -> ())
     ?(on_check=fun _ _ -> ())
