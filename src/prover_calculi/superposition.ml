@@ -2957,9 +2957,10 @@ let () =
     , Arg.Set_int _trigger_bool_inst
     , " instantiate predicate variables with boolean terms already in the proof state. Argument is the maximal proof depth of predicate variable";
       "--ho-unif-level",
-      Arg.Symbol (["full-framework";"full"; "pragmatic"], (fun str ->
+      Arg.Symbol (["full-framework";"full"; "pragmatic-framework"; "pragmatic"], (fun str ->
         _unif_alg := if (String.equal "full" str) then JP_unif.unify_scoped
                      else if (String.equal "full-framework" str) then JPFull.unify_scoped
+                     else if (String.equal "pragmatic-framework" str) then PUnif.unify_scoped
                      else PragHOUnif.unify_scoped)),
       "set the level of HO unification"
       ; "--max-inferences"
