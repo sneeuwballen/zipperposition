@@ -62,7 +62,7 @@ let [@inline] handle_quants ~subst ~scope s =
 let imitate_one ~scope ~counter  s t =
   try
     OSeq.nth 0 (JP_unif.imitate_onesided ~scope ~counter s t)
-  with Not_found ->  raise Not_found
+  with Not_found ->  invalid_arg "no_imits"
 
 (*Create all possible projection and imitation bindings. *)
 let proj_imit_lr ~counter ~scope s t flag =
@@ -101,8 +101,10 @@ let proj_imit_lr ~counter ~scope s t flag =
             Some (Subst.FO.bind' Subst.empty (hd_s, scope) (pr_bind, scope), flag'))
           else None) in
       let imit_binding =
-        let flag' = if Term.is_app_var t then inc_op flag ImitFlex else flag in
-        [U.subst @@ imitate_one ~scope ~counter s t, flag'] in
+        try 
+          let flag' = if Term.is_app_var t then inc_op flag ImitFlex else flag in
+          [U.subst @@ imitate_one ~scope ~counter s t, flag']
+        with Invalid_argument s when String.equal s "no_imits" -> [] in
     let first, second = 
       if !Params._imit_first then imit_binding, proj_bindings
       else proj_bindings, imit_binding in 
