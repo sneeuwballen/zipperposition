@@ -98,7 +98,8 @@ module Make (P : PARAMETERS) = struct
         if ID.equal f g then decompose_and_continue args_lhs args_rhs rest flag
         else OSeq.empty
       | T.AppBuiltin(b1, args1), T.AppBuiltin(b2, args2) ->
-        if Builtin.equal b1 b2 && List.length args1 = List.length args2 then (
+        let args_lhs = args_lhs @ args1 and args_rhs = args_rhs @ args2 in
+        if Builtin.equal b1 b2 && List.length args_lhs = List.length args_rhs then (
           decompose_and_continue (args_lhs@args1) (args_rhs@args2) rest flag
         ) else OSeq.empty
       | _ when different_rigid_heads hd_lhs hd_rhs -> OSeq.empty

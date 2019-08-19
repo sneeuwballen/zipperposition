@@ -77,14 +77,12 @@ let oracle ~counter ~scope (s,_) (t,_) flag =
   | `Flex x, `Flex y ->
     (* all rules  *)
     OSeq.append 
-      (proj_rule ~counter ~scope s t flag)
-      (OSeq.append 
-        (elim_rule ~counter ~scope s t flag)
+      (imit_rule ~counter ~scope s t flag)
         (OSeq.append 
-          (imit_rule ~counter ~scope s t flag)
+          (proj_rule ~counter ~scope s t flag)
           (OSeq.append 
             (ident_rule ~counter ~scope s t flag)
-            (iter_rule ~counter ~scope s t flag))))
+            (iter_rule ~counter ~scope s t flag)))
   | `Flex _, `Rigid
   | `Rigid, `Flex _ ->
     OSeq.append
