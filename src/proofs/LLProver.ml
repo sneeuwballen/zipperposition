@@ -173,7 +173,7 @@ module Th_lambda = struct
       begin match T.Tbl.find_opt st.triggers t1 with
         | Some {trigger_node; lambda_node} -> 
           let new_node = SI.CC.add_term cc (T.app (SI.CC.N.term lambda_node) t2) in
-          SI.CC.merge cc new_node n (SI.CC.Expl.mk_merge trigger_node lambda_node) (* TODO: repair expl *);
+          SI.CC.merge cc new_node n (SI.CC.Expl.mk_merge trigger_node lambda_node);
           Util.debugf 3 ~section "@[Trigger triggered@ :t1 %a@ :t2 %a@ :new_node %a@ :n %a@]" 
             (fun k -> k T.pp t1 T.pp t2 SI.CC.N.pp new_node SI.CC.N.pp n);
         | None -> ()
