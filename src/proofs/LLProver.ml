@@ -171,11 +171,15 @@ module Th_lambda = struct
     match LLTerm.view t with
     | App (t1, t2) -> 
       begin match T.Tbl.find_opt st.triggers t1 with
-        | Some {trigger_node; lambda_node} -> 
+        | Some {trigger_node; lambda_node} 
+            when SI.CC.N.equal (SI.CC.find cc trigger_node) (SI.CC.find cc lambda_node) -> 
           let new_node = SI.CC.add_term cc (T.app (SI.CC.N.term lambda_node) t2) in
           SI.CC.merge cc new_node n (SI.CC.Expl.mk_merge trigger_node lambda_node);
           Util.debugf 3 ~section "@[Trigger triggered@ :t1 %a@ :t2 %a@ :new_node %a@ :n %a@]" 
             (fun k -> k T.pp t1 T.pp t2 SI.CC.N.pp new_node SI.CC.N.pp n);
+        | Some {trigger_node; lambda_node} -> 
+          (* TODO: use a callback to remove outdated triggers ? *)
+          T.Tbl.remove st.triggers t1
         | None -> ()
       end
     | _ -> ()
@@ -229,6 +233,7 @@ let prove (a:form list) (b:form) : _*_ =
   Util.incr_stat stat_solve;
   Util.enter_prof prof_check;
   (* prove [a ∧ -b ⇒ ⊥] *)
+  (* Msat.Log.set_debug 100; *)
   let theories = [Th_bool.theory; Th_lambda.theory] in
   let solver = Solver.create ~size:`Small ~store_proof:false ~theories () () in
   List.iter
