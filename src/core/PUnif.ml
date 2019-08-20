@@ -13,20 +13,28 @@ type op =
   | Elim
 
 let op_masks =
-  [ProjApp, (63,0);
-   ImitFlex, (63 lsl 6, 6);
-   ImitRigid, (63 lsl 12, 12);
-   Ident, (63 lsl 18, 18);
-   Elim, (63 lsl 24, 24)]
+  [ProjApp, (63, 0, "proj");
+   ImitFlex, (63 lsl 6, 6, "imit_flex");
+   ImitRigid, (63 lsl 12, 12, "imit_rigid");
+   Ident, (63 lsl 18, 18, "ident");
+   Elim, (63 lsl 24, 24, "elim")]
 
 let get_op flag op =
-  let mask,_ = List.assoc op op_masks in
-  flag land mask
+  let mask,shift,name = List.assoc op op_masks in
+  (flag land mask) lsr shift
 
 let inc_op flag op =
-  let mask, shift = List.assoc op op_masks in
+  let old = get_op flag op in
+  let mask, shift, _ = List.assoc op op_masks in
   let op_val = (((flag land mask) lsr shift) + 1) lsl shift in
-  flag lor op_val
+  let res = (flag land (lnot mask)) lor op_val in
+  assert(old + 1 = (get_op res op));
+  res
+
+let pp_flag out flag =
+  List.iter (fun (op, (_,_,name)) ->
+     CCFormat.fprintf out "|%s:%d" name (get_op flag op);
+  ) op_masks
 
 (* Create substitution: v |-> λ u1 ... um. u_i (H1 u1 ... um) ... (Hn u1 ... um)
    where type of u_i is τ1 -> ... τn -> τ where τ is atomic and H_i have correct
@@ -102,7 +110,7 @@ let proj_imit_lr ~counter ~scope s t flag =
           else None) in
       let imit_binding =
         try 
-          let flag' = if Term.is_app_var t then inc_op flag ImitFlex else flag in
+          let flag' = if Term.is_app_var t then inc_op flag ImitFlex else inc_op flag ImitRigid in
           [U.subst @@ imitate_one ~scope ~counter s t, flag']
         with Invalid_argument s when String.equal s "no_imits" -> [] in
     let first, second = 
@@ -135,10 +143,6 @@ let elim_rule ~counter ~scope t u flag =
     else OSeq.empty in
   OSeq.append (eliminate_one t) (eliminate_one u)
   |> OSeq.map (fun x -> Some (x, inc_op flag Elim))
-
-let ident_rule ~counter ~scope t u depth = 
-  (JP_unif.identify ~scope ~counter t u []
-  |> OSeq.map (fun x -> Some (U.subst x, depth+1)))
 
 let renamer ~counter t0s t1s = 
   let lhs,rhs, unifscope, us = U.FO.rename_to_new_scope ~counter t0s t1s in
