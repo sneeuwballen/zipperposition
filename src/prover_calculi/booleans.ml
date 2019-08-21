@@ -283,7 +283,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     match idx with 
     | Some _ ->
       let f = Literals.Conv.to_tst (C.lits c) in
-      let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "cnf_otf") ~tags:[Proof.Tag.T_ho] [C.proof_parent c] in
+      let proof = Proof.Step.cnf [C.proof_parent c] in
       let trail = C.trail c and penalty = C.penalty c in
       let stmt = Statement.assert_ ~proof f in
       let cnf_vec = Cnf.convert @@ CCVector.to_seq @@ 
@@ -292,15 +292,17 @@ module Make(E : Env.S) : S with module Env = E = struct
         Statement.Seq.ty_decls cl
         |> Iter.iter (fun (id,ty) -> Ctx.declare id ty)) cnf_vec;
 
+      let proof = Proof.Step.conv
+            [Proof.S.mk (Statement.proof_step stmt) (Proof.Result.make Statement.res_tc_i stmt) |> Proof.Parent.from] in
       let clauses = CCVector.map (C.of_statement ~convert_defs:true) cnf_vec
                     |> CCVector.to_list 
                     |> CCList.flatten
                     |> List.map (fun c -> 
-                        C.create ~penalty  ~trail (CCArray.to_list (C.lits c)) proof) in
+                        C.create ~penalty ~trail (CCArray.to_list (C.lits c)) proof) in
       (* CCFormat.printf "cnf [%a].\n" TypedSTerm.pp f; *)
-      List.iteri (fun i new_c -> 
-        (* CCFormat.printf "%d: [%a].\n" i C.pp new_c; *)
-        assert((C.proof_depth c) <= C.proof_depth new_c);) clauses;
+      (* List.iteri (fun i new_c -> 
+        CCFormat.printf "%d: [%a].\n" i C.pp new_c;
+        assert((C.proof_depth c) <= C.proof_depth new_c);) clauses; *)
       Some clauses
     | None       -> 
       (* Format.printf "res:none.\n"; *)
