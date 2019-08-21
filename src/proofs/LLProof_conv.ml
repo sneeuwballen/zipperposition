@@ -192,7 +192,7 @@ and conv_step st p =
     | Proof.Trivial -> LLProof.trivial res
     | Proof.By_def id -> LLProof.by_def id res
     | Proof.Define (id,_) -> LLProof.define id res
-    | Proof.Intro (_,Proof.R_assert) -> LLProof.assert_ res
+    | Proof.Intro (_,Proof.R_assert) -> LLProof.assert_ (T.close_all ~ty:T.prop Binder.Forall res)
     | Proof.Intro (_,(Proof.R_goal|Proof.R_lemma)) -> LLProof.goal res
     | Proof.Intro (_,(Proof.R_def|Proof.R_decl)) ->
       LLProof.trivial res
