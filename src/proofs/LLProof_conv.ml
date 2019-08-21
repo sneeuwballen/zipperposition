@@ -89,7 +89,9 @@ let quantifier_axioms skolems res parents =
   in
   (* Create choice/inst axiom. *)
   let quantifier_axiom t kind v =
-    assert (T.equal (T.ty_exn t) (T.prop));
+    Util.debugf 10 ~section "@[Create quantifier axiom for@ :term %a@ :choice %b@ :v %a@]"  
+      (fun k -> k T.pp t (kind = `Instance) Var.pp v);
+    assert (T.Ty.is_prop (T.ty_exn t));
     let t1 = match kind with
       | `Instance -> T.Form.forall v t 
       | `Choice -> T.Form.exists v t (* TODO: Make sure that each skolem is only used once for choice. *)
