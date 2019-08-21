@@ -14,9 +14,6 @@ module type PARAMETERS = sig
 end
 
 module Make (P : PARAMETERS) = struct 
-  (* apply a substitution and reduce to whnf *)
-  let nfapply s u = Lambda.beta_red_head (S.FO.apply S.Renaming.none s u)
-
   let rec nfapply_mono subst (t,sc) =
     let pref, tt = T.open_fun t in
     let t' =  
@@ -37,6 +34,9 @@ module Make (P : PARAMETERS) = struct
       end in
     if T.equal tt t' then t
     else T.fun_l pref t'
+  
+  (* apply a substitution and reduce to whnf *)
+  let nfapply s u = Lambda.whnf (S.FO.apply S.Renaming.none s u)
 
   let normalize ~mono = if mono then nfapply_mono else nfapply
 

@@ -36,6 +36,13 @@ module Inner = struct
       (* the arguments in [l] might contain variables *)
       let l = List.rev_map (eval_in_env_ st.env) l in
       { st with head=f; args=List.rev_append l st.args; }
+    | T.AppBuiltin (b, l) ->
+      (* the arguments in [l] might contain variables *)
+      let arg_tys = List.rev_map T.ty_exn l in
+      let ret_ty = T.ty_exn st.head in
+      let ty = T.arrow arg_tys ret_ty in
+      let l = List.rev_map (eval_in_env_ st.env) l in
+      { st with head=T.app_builtin ~ty b []; args=List.rev_append l st.args; }
     | _ -> st
 
   let st_of_term ~env ~ty t = {head=t; args=[]; env; ty; } |> normalize
@@ -77,15 +84,23 @@ module Inner = struct
       | T.AppBuiltin _, _ | T.Bind _, _ -> st
     end
 
-  let whnf_term ?(env=DBEnv.empty) t = 
-    let is_reducible t =
-      T.is_lambda (fst @@ T.as_app t) in
+  let whnf_term_aux ?(env=DBEnv.empty) t = 
     match T.ty t with
-    | T.HasType ty when is_reducible t ->
+    | T.HasType ty->
       let st = st_of_term ~ty ~env t in
       let st = whnf_rec st in
       term_of_st st
     | _ -> t
+  
+  let rec whnf_term ?(env=DBEnv.empty) t =
+    let pref, tt = T.open_bind Binder.Lambda t in
+    assert(not (T.is_lambda tt));
+    let hd, args = T.as_app tt in
+    if T.is_lambda hd then (
+      let tt' = whnf_term_aux tt in
+      if T.equal tt' tt then t
+      else whnf_term (T.fun_l pref tt')
+    ) else t
 
   let rec snf_rec t =
     let t = whnf_term t in
@@ -215,13 +230,12 @@ module Inner = struct
     let t' = aux t in
     t'
 
-  let whnf t = match T.view t with
-    | T.App (f, _) when T.is_lambda f ->
-      Util.enter_prof prof_whnf;
-      let t' = whnf_term t in
-      Util.exit_prof prof_whnf;
-      t'
-    | _ -> t
+  let whnf t =
+    Util.enter_prof prof_whnf;
+    let t' = whnf_term t in
+    Util.exit_prof prof_whnf;
+    t'
+
 
   let beta_red_head t = 
     let pref, body = T.open_fun t in
