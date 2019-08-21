@@ -188,7 +188,7 @@ module Th_lambda = struct
     check_triggers st cc node;
     ()
 
-  let cc_on_merge si (st:state) (cc:SI.CC.t) ac (a:SI.CC.N.t) (b:SI.CC.N.t) expl = 
+  let cc_on_post_merge si (st:state) (cc:SI.CC.t) ac (a:SI.CC.N.t) (b:SI.CC.N.t) = 
     let add_trigger trigger_node lambda_node =
       let term, lambda_term = (SI.CC.N.term trigger_node), (SI.CC.N.term lambda_node) in
       (* Add trigger *)
@@ -216,7 +216,7 @@ module Th_lambda = struct
     Util.debug 3 ~section "Setting up theory of lambda expressions.";
     let st = create (SI.tst si) in
     SI.CC.on_new_term (SI.cc si) (cc_on_new_term si st);
-    SI.CC.on_merge (SI.cc si) (cc_on_merge si st);
+    SI.CC.on_post_merge (SI.cc si) (cc_on_post_merge si st);
     st
 
   let theory =
