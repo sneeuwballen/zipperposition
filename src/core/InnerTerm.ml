@@ -203,8 +203,9 @@ let rec app_builtin ~ty b l = match b, l with
     
     let l = if Builtin.is_quantifier b then 
           List.filter (fun t -> not @@ equal (ty_exn t) tType) l else l in
-    if Builtin.is_quantifier b  && CCList.length l != 1 then (
-      invalid_arg "wrong encoding of quantifiers.";
+    if Builtin.is_quantifier b  && CCList.length l > 1 then (
+      let err_msg = CCFormat.sprintf "wrong encoding of quants: %a %d" Builtin.pp b (List.length l) in
+      invalid_arg err_msg;
     );
     let my_t = make_ ~ty:(HasType ty) (AppBuiltin (b,l)) in
     H.hashcons my_t
