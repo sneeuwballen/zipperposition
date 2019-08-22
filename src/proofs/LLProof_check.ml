@@ -117,8 +117,8 @@ let check_step_ (p:proof): check_step_res =
             and does not occur in the original problem *)
          else CS_check R_ok
     | P.Negated_goal p' ->
-      (* [p'] should prove [not concl] *)
-      CS_check (prove [P.concl p'] (F.not_ concl))
+      (* [not p'] should prove [concl] *)
+      CS_check (prove [F.not_ (P.concl p')] concl)
     | P.Trivial -> CS_skip `Trivial (* axiom of the theory *)
     | P.Instantiate {tags;_} when not (LLProver.can_check tags) -> CS_skip `Tags
     | P.Instantiate {form=p';inst;_} ->

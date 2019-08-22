@@ -177,7 +177,6 @@ module Tag : sig
     | T_data (** datatypes *)
     | T_distinct (** distinct constants *)
     | T_ac of ID.t (** AC symbol *)
-    | T_neg (** negate a conjecture *)
     | T_conv (** Term conversion *)
     | T_defexp (** Definition expansion *)
     | T_avatar (** Avatar *)

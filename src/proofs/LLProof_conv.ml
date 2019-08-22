@@ -197,6 +197,10 @@ and conv_step st p =
     | Proof.Intro (_,(Proof.R_goal|Proof.R_lemma)) -> LLProof.goal res
     | Proof.Intro (_,(Proof.R_def|Proof.R_decl)) ->
       LLProof.trivial res
+    | Proof.Negate_goal -> 
+      let parents = Proof.Step.parents (Proof.S.step p) in
+      assert (List.length parents = 1);
+      LLProof.negated_goal res (fst (conv_parent st res [] (List.hd parents)))
   in
   Util.debugf ~section 4 "(@[llproof.conv.step.->@ :from %a@ :to %a@])"
     (fun k->k Proof.S.pp_notrec1 p LLProof.pp res);

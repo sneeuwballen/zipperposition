@@ -33,6 +33,7 @@ type kind =
   | Trivial (** trivial, or trivial within theories *)
   | Define of ID.t * source (** definition *)
   | By_def of ID.t (** following from the def of ID *)
+  | Negate_goal
 
 (** Source of leaves (from some input problem, or internal def) *)
 and source = private {
@@ -273,6 +274,8 @@ module Step : sig
   val esa : ?infos:infos -> ?tags:tag list -> rule:rule -> parent list -> t
 
   val cnf : ?infos:infos -> ?skolems:(skolem list) -> parent list -> t
+
+  val negate_goal : ?infos:infos -> parent list -> t
 
   val conv : ?infos:infos -> parent list -> t
 

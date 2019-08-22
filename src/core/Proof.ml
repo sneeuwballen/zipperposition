@@ -39,6 +39,7 @@ type kind =
   | Trivial (** trivial, or trivial within theories *)
   | Define of ID.t * source (** definition *)
   | By_def of ID.t (** following from the def of ID *)
+  | Negate_goal
 
 and source = {
   src_id: int;
@@ -245,6 +246,7 @@ module Kind = struct
     | Trivial -> CCFormat.string out "trivial"
     | By_def id -> Format.fprintf out "by_def(%a)" ID.pp id
     | Define (id,src) -> Format.fprintf out "define(@[%a@ %a@])" ID.pp id Src.pp src
+    | Negate_goal -> CCFormat.string out "negate_goal"
 
   let pp_tstp out (k,parents) =
     let pp_parents = Util.pp_list pp_parent_ in
@@ -265,7 +267,8 @@ module Kind = struct
       | Intro (_,R_lemma) -> Format.fprintf out "lemma"
       | Trivial -> assert(parents=[]); Format.fprintf out "trivial([status(thm)])"
       | By_def _ -> Format.fprintf out "by_def([status(thm)])"
-      | Define _ -> Format.fprintf out "define([status(thm)])"
+      | Define _ -> Format.fprintf out "define([status(thm)])" 
+      | Negate_goal -> Format.fprintf out "negate_goal" 
     end
 end
 
@@ -395,7 +398,7 @@ module Step = struct
 
   let src p = match p.kind with
     | Intro (src,_) | Define (_,src) -> Some src
-    | Trivial | By_def _ | Esa _ | Cnf _ | Conv | Inference _ | Simplification _
+    | Trivial | By_def _ | Esa _ | Cnf _ | Conv | Inference _ | Simplification _ | Negate_goal
       -> None
 
   let to_attrs p = match src p with
@@ -408,7 +411,8 @@ module Step = struct
     | By_def _
     | Define _
     | Cnf _ 
-    | Conv -> None
+    | Conv 
+    | Negate_goal -> None
     | Esa (rule, _)
     | Simplification (rule,_)
     | Inference (rule,_)
@@ -514,6 +518,9 @@ module Step = struct
   let cnf ?infos ?(skolems=[]) parents =
     step_ ?infos (Cnf skolems) parents
 
+  let negate_goal ?infos parents =
+    step_ ?infos Negate_goal parents
+
   let conv ?infos parents =
     step_ ?infos Conv parents
 
@@ -542,7 +549,8 @@ module Step = struct
     | Simplification _
     | Esa _
     | Cnf _
-    | Conv ->
+    | Conv 
+    | Negate_goal ->
       Format.fprintf out "@[<hv2>%a%a%a@]"
         Kind.pp (kind step) pp_parents (parents step) pp_infos step.infos
 end
@@ -767,6 +775,7 @@ module S = struct
            | Intro (src,R_decl) -> mk_status "decl" :: Src.to_attrs src
            | Trivial -> [mk_status "trivial"]
            | By_def _ | Define _ -> []
+           | Negate_goal -> [mk_status "negate_goal"]
          in
          let pp_infos = UntypedAST.pp_attrs_zf in
          let infos =

@@ -1077,7 +1077,7 @@ let proof_cnf stmt skolems =
     [Stmt.as_proof_i stmt |> Proof.Parent.from]
 
 let proof_neg stmt =
-  Proof.Step.esa ~rule:rule_neg ~tags:[T_neg]
+  Proof.Step.negate_goal
     [Stmt.as_proof_i stmt |> Proof.Parent.from]
 
 let proof_conv stmt =
