@@ -80,6 +80,8 @@ type 'a result_tc = {
   res_pp_in: Output_format.t -> 'a CCFormat.printer;
   res_to_form: ctx:Term.Conv.ctx -> 'a -> TypedSTerm.Form.t;
   res_to_form_subst: ctx:Term.Conv.ctx -> Subst.Projection.t -> 'a -> form * inst_subst;
+  res_to_open_form: ctx:Term.Conv.ctx -> 'a -> TypedSTerm.Form.t;
+  res_to_open_form_subst: ctx:Term.Conv.ctx -> Subst.Projection.t -> 'a -> form * inst_subst;
   res_name:('a -> string) option;
   res_flavor: 'a -> flavor;
 }
@@ -299,6 +301,14 @@ module Result = struct
     | None -> assert false
     | Some x -> r.res_to_form_subst ~ctx subst x
 
+  let to_open_form ?(ctx=Term.Conv.create()) (Res (r,x)) = match r.res_of_exn x with
+    | None -> assert false
+    | Some x -> r.res_to_open_form ~ctx x
+
+  let to_open_form_subst ?(ctx=Term.Conv.create()) subst (Res (r,x)) = match r.res_of_exn x with
+    | None -> assert false
+    | Some x -> r.res_to_open_form_subst ~ctx subst x
+
   let pp_in o out (Res (r,x)) = match r.res_of_exn x with
     | None -> assert false
     | Some x -> r.res_pp_in o out x
@@ -322,6 +332,8 @@ module Result = struct
       ~of_exn ~to_exn ~compare
       ~to_form
       ?(to_form_subst=fun ~ctx:_ _ _ -> assert false)
+      ?to_open_form
+      ?to_open_form_subst
       ~pp_in
       ?name
       ?(is_stmt=false)
@@ -337,6 +349,8 @@ module Result = struct
       res_pp_in=pp_in;
       res_to_form=to_form;
       res_to_form_subst=to_form_subst;
+      res_to_open_form=CCOpt.get_or ~default:to_form to_open_form;
+      res_to_open_form_subst=CCOpt.get_or ~default:to_form_subst to_open_form_subst;
       res_name=name;
       res_flavor=flavor;
     }

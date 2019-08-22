@@ -171,6 +171,8 @@ module Result : sig
     compare:('a -> 'a -> int) ->
     to_form:(ctx:Term.Conv.ctx -> 'a -> form) ->
     ?to_form_subst:(ctx:Term.Conv.ctx -> Subst.Projection.t -> 'a -> form * inst_subst) ->
+    ?to_open_form:(ctx:Term.Conv.ctx -> 'a -> form) ->
+    ?to_open_form_subst:(ctx:Term.Conv.ctx -> Subst.Projection.t -> 'a -> form * inst_subst) ->
     pp_in:(Output_format.t -> 'a CCFormat.printer) ->
     ?name:('a -> string) ->
     ?is_stmt:bool ->
@@ -183,8 +185,17 @@ module Result : sig
       @param is_stmt true only if ['a] is a toplevel statement (default false)
       @param name returns the name of the result. Typically, a name from
         the input file
-      @param to_form_subst apply substitution, then convert to form.
-      If not provided, will fail.
+      @param to_form convert to form, using explixit universal quantifiers 
+        when converting clauses.
+      @param to_form_subst apply substitution, then convert to form, 
+        using explixit universal quantifiers when converting clauses.
+        If not provided, will fail.
+      @param to_open_form convert to form, omitting the implicit universal 
+        quantifiers of clauses.
+        Defaults to [to_form].
+      @param to_open_form_subst apply substitution, then convert to form, 
+        omitting the implicit universal quantifiers of clauses.
+        Defaults to [to_form_subst].
   *)
 
   val make : 'a tc -> 'a -> t
@@ -198,10 +209,17 @@ module Result : sig
   val pp_in : Output_format.t -> t CCFormat.printer
   val pp : t CCFormat.printer
   val is_stmt : t -> bool
+
   val to_form : ?ctx:Term.Conv.ctx -> t -> form
 
   val to_form_subst : ?ctx:Term.Conv.ctx -> Subst.Projection.t -> t -> form * inst_subst
   (** instantiated form + bindings for vars *)
+
+  val to_open_form : ?ctx:Term.Conv.ctx -> t -> form
+  (** omitting the implicit universal quantifiers of clauses *)
+
+  val to_open_form_subst : ?ctx:Term.Conv.ctx -> Subst.Projection.t -> t -> form * inst_subst
+  (** instantiated form, omitting the implicit universal quantifiers of clauses + bindings for vars *)
 
   val flavor : t -> flavor
   val name : t -> string option

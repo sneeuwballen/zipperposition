@@ -33,7 +33,7 @@ let open_forall = T.unfold_binder Binder.Forall
     Some variables are typed using other variables, so we
     need to substitute eagerly *)
 let intro_list ~intro_subst f =
-  let vars, _ = T.unfold_binder Binder.forall f in
+  let vars, f = T.Form.close_forall_vars f in
   let l = List.map
     (fun v ->
       begin match Var.Subst.find !intro_subst v with
@@ -169,9 +169,9 @@ and conv_step st p =
         quantifiers. We need to construct the correct instantiation to show this. *)
       let parents = Proof.Step.parents (Proof.S.step p) in
       assert (List.length parents = 1);
-      let p_proof, p_res = conv_parent st res [] (List.hd parents) in
+      let p_proof, p_res_open = conv_parent st res [] (List.hd parents) in
       let _, res'        = T.unfold_binder Binder.forall res in
-      let p_vars, p_res' = T.unfold_binder Binder.forall p_res in
+      let p_vars, p_res' = T.unfold_binder Binder.forall (p_res_open |> T.Form.close_forall) in
       let subst = 
         CCList.map2 (fun t s -> t, T.var s)  
           (T.Seq.free_vars p_res' |> Iter.to_list) 
@@ -181,11 +181,12 @@ and conv_step st p =
       LLProof.instantiate ~tags:[] res p_proof inst
     | Proof.Inference (rule,tags)
     | Proof.Simplification (rule,tags) ->
+      let res_open = Proof.Result.to_open_form ~ctx:st.ctx (Proof.S.result p) in
       let intro_subst = ref Var.Subst.empty in
-      let intros = Some (intro_list ~intro_subst res) in
+      let intros = Some (intro_list ~intro_subst res_open) in
       let parents = Proof.Step.parents (Proof.S.step p)
         |> List.map (conv_parent st res tags)
-        |> List.map (fun (p_proof, p_res) -> p_proof, intro_list ~intro_subst p_res)
+        |> List.map (fun (p_proof, p_res_open) -> p_proof, intro_list ~intro_subst p_res_open)
         |> List.map (fun (p_proof, inst) -> LLProof.p_inst p_proof inst)
       in
       LLProof.inference ~intros ~tags res (Proof.Rule.name rule) parents
@@ -207,17 +208,17 @@ and conv_parent st step_res tags (parent:Proof.Parent.t) =
   Util.debugf ~section 5 "(@[llproof.conv_parent@ %a@])"
     (fun k->k Proof.pp_parent parent);
   (* build an instantiation step, if needed *)
-  let prev_proof, p_instantiated_res = match parent with
+  let prev_proof, p_instantiated_res_open = match parent with
     | Proof.P_of p ->
-      let p_res = Proof.Result.to_form ~ctx:st.ctx (Proof.S.result p) in
+      let p_res_open = Proof.Result.to_open_form ~ctx:st.ctx (Proof.S.result p) in 
       let p = conv_proof st p in
-      p, p_res
+      p, p_res_open
     | Proof.P_subst (p,subst) ->
       (* perform instantiation *)
       assert (not (Subst.Projection.is_empty subst));
       (* instantiated result of [p] *)
-      let p_instantiated_res, inst_subst =
-        Proof.Result.to_form_subst ~ctx:st.ctx subst (Proof.S.result p)
+      let p_instantiated_res_open, inst_subst =
+        Proof.Result.to_open_form_subst ~ctx:st.ctx subst (Proof.S.result p)
       in
       let p_res = Proof.Result.to_form ~ctx:st.ctx (Proof.S.result p) in
       (* convert [p] itself *)
@@ -234,14 +235,15 @@ and conv_parent st step_res tags (parent:Proof.Parent.t) =
                          in inst-subst {%a}@ :inst-res %a@ :res %a@ \
                          :parent %a"
                    Var.pp_fullc v (Var.Subst.pp T.pp) inst_subst
-                   T.pp p_instantiated_res T.pp step_res Proof.pp_parent parent
+                   T.pp p_instantiated_res_open T.pp step_res Proof.pp_parent parent
                    (Var.Subst.pp T.pp)
              end)
           vars_p
       in
-      LLProof.instantiate ~tags p_instantiated_res p inst, p_instantiated_res
+      let p_instantiated_res = T.Form.close_forall p_instantiated_res_open in
+      LLProof.instantiate ~tags p_instantiated_res p inst, p_instantiated_res_open
   in
-  prev_proof, p_instantiated_res
+  prev_proof, p_instantiated_res_open
 
 let conv (p:Proof.t) : LLProof.t =
   let st = {

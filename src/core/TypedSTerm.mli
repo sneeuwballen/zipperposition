@@ -214,7 +214,14 @@ module Form : sig
   val unfold_binder : Binder.t -> t -> t Var.t list * t
 
   val unfold_forall : t -> t Var.t list * t
+
+  val close_forall_vars : ?loc:location -> t -> t Var.t list * t 
+  (** Bind all free variables with forall. 
+    Returns the resulting term and the closed variables. *)
+
   val close_forall : ?loc:location -> t -> t
+  (** Bind all free variables with forall. 
+    Returns the resulting term. *)
 
   val box_opaque : t -> t
 end

@@ -878,14 +878,16 @@ module Form = struct
   let unfold_binder = unfold_binder
   let unfold_forall = unfold_binder Binder.Forall
 
-  let close_forall ?loc f =
+  let close_forall_vars ?loc f =
     (* quantification over types: outermost *)
     let tyvars, vars =
       List.partition
         (fun v -> Ty.returns_tType (Var.ty v))
         (free_vars f)
     in
-    forall_l ?loc tyvars (forall_l ?loc vars f)
+    tyvars @ vars, forall_l ?loc tyvars (forall_l ?loc vars f)
+
+  let close_forall ?loc f = snd (close_forall_vars ?loc f)
 end
 
 let _l_counter = ref 0

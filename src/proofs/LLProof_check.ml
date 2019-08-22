@@ -56,13 +56,8 @@ let () = Printexc.register_printer
 let instantiate (f:form) (inst:LLProof.inst) : form =
   let f = T.rename_all_vars f in
   let vars, body = T.unfold_binder Binder.Forall f in
-  if List.length vars <> List.length inst then (
-    errorf "mismatched arities in instantiate `%a`@ :with %a"
-      T.pp f LLProof.pp_inst inst
-  );
-  let subst =
-    List.fold_left2 Var.Subst.add Var.Subst.empty vars inst
-  in
+  let vars = CCList.take (List.length inst) vars in
+  let subst = List.fold_left2 Var.Subst.add Var.Subst.empty vars inst in
   let f' = T.Subst.eval subst body in
   Util.debugf ~section 5
     "(@[<hv>instantiate@ :inst %a@ :from %a@ :into %a@ :subst {%a}@])"
@@ -143,7 +138,7 @@ let check_step_ (p:proof): check_step_res =
         let all_premises =
           List.map concl_of_parent parents
         and concl = match intros with
-          | Some intros -> instantiate concl intros
+          | Some intros -> instantiate concl intros |> T.Form.close_forall
           | None -> concl
         in
         CS_check (prove all_premises concl)
