@@ -96,7 +96,7 @@ module Inner = struct
     let pref, tt = T.open_bind Binder.Lambda t in
     assert(not (T.is_lambda tt));
     let hd, args = T.as_app tt in
-    if T.is_lambda hd then (
+    if T.is_lambda hd && not (CCList.is_empty args) then (
       let tt' = whnf_term_aux tt in
       if T.equal tt' tt then t
       else whnf_term (T.fun_l pref tt')

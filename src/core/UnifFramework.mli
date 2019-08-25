@@ -9,7 +9,8 @@ module type PARAMETERS = sig
   val init_flag : flag_type
   val identify_scope : T.t Scoped.t -> T.t Scoped.t -> T.t * T.t * Scoped.scope * S.t
   val frag_algs : (T.t Scoped.t -> T.t Scoped.t -> S.t -> S.t) list
-  val pb_oracle : (T.t Scoped.t -> T.t Scoped.t ->  flag_type -> Scoped.scope -> (S.t * flag_type) option LL.t  )
+  val pb_oracle : (T.t Scoped.t -> T.t Scoped.t ->  flag_type -> Scoped.scope -> (S.t * flag_type) option LL.t)
+  val oracle_composer : 'a OSeq.t -> 'a OSeq.t -> 'a OSeq.t
 end
 
 module Make(X:PARAMETERS) : sig 

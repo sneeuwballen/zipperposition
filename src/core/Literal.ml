@@ -209,7 +209,7 @@ let ty_error_ a b =
   let msg =
     CCFormat.sprintf
       "@[<2>Literal: incompatible types in equational lit@ for `@[%a : %a@]`@ and `@[%a : %a@]`@]"
-      T.pp a Type.pp (T.ty a) T.pp b Type.pp (T.ty b)
+      T.TPTP.pp a Type.pp (T.ty a) T.TPTP.pp b Type.pp (T.ty b)
   in
   raise (Type.ApplyError msg)
 

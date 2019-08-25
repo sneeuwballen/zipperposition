@@ -202,7 +202,8 @@ let unify_scoped =
     let identify_scope = renamer ~counter
     let frag_algs = pattern_frag ~counter
     let pb_oracle s t (f:flag_type) scope = 
-      oracle ~counter ~scope s t f 
+      oracle ~counter ~scope s t f
+    let oracle_composer = OSeq.append
   end in
   
   let module PragUnif = UnifFramework.Make(PragUnifParams) in
