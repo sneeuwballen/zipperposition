@@ -161,7 +161,7 @@ let get_depth flag =
   List.fold_left (fun acc o -> get_op flag o + acc ) 0 ops
 
 let oracle ~counter ~scope (s,_) (t,_) flag =
-  CCFormat.printf "(@[%a@],@[%a@]):@[%a@]:%d@." T.pp s T.pp t pp_flag flag (get_depth flag);
+  (* CCFormat.printf "(@[%a@],@[%a@]):@[%a@]:%d@." T.pp s T.pp t pp_flag flag (get_depth flag); *)
   if get_depth flag < !Params.max_depth then (
     match head_classifier s, head_classifier t with 
     | `Flex x, `Flex y when HVar.equal Type.equal x y ->
