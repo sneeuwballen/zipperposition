@@ -84,11 +84,10 @@ let proj_imit_lr ~counter ~scope s t flag =
       |> (fun l ->
           (* if we performed more than N projections that applied the
             bound variable we back off *)
-          if get_op flag ProjApp <= !Params.max_app_projections then l
+          if get_op flag ProjApp <= !Params.max_app_projections (*||
+             List.length args_s <= 1*) then l
           else
-            List.filter (fun (_, ty) ->
-              (List.length args_s <= 1) ||  
-              List.length (Type.expected_args ty) = 0) l)
+            List.filter (fun (_, ty) -> List.length (Type.expected_args ty) = 0) l)
       (* If heads are different constants, do not project to those subterms *)
       |> CCList.filter_map (fun ((i, _) as p) -> 
           if i < List.length args_s then (
@@ -104,7 +103,7 @@ let proj_imit_lr ~counter ~scope s t flag =
             (* we project only to arguments of appropriate type *)
             let pr_bind = project_hs_one ~counter pref_tys i ty in
             let max_num_of_apps = 
-              if List.length args_s <= 1 then 0  else List.length @@ Type.expected_args ty in
+              List.length @@ Type.expected_args ty in
             let flag' = if max_num_of_apps > 0 then inc_op flag ProjApp else flag in
             Some (Subst.FO.bind' Subst.empty (hd_s, scope) (pr_bind, scope), flag'))
           else None) in
@@ -117,6 +116,7 @@ let proj_imit_lr ~counter ~scope s t flag =
       if !Params._imit_first then imit_binding, proj_bindings
       else proj_bindings, imit_binding in 
     OSeq.of_list @@ CCList.map (fun x -> Some x) @@ first @ second
+    (* OSeq.of_list @@ CCList.map (fun x -> Some x) proj_bindings *)
   with Invalid_argument s when String.equal s "as_var_exn" ->
     OSeq.empty
 
@@ -161,6 +161,7 @@ let get_depth flag =
   List.fold_left (fun acc o -> get_op flag o + acc ) 0 ops
 
 let oracle ~counter ~scope (s,_) (t,_) flag =
+  CCFormat.printf "(@[%a@],@[%a@]):@[%a@]:%d@." T.pp s T.pp t pp_flag flag (get_depth flag);
   if get_depth flag < !Params.max_depth then (
     match head_classifier s, head_classifier t with 
     | `Flex x, `Flex y when HVar.equal Type.equal x y ->
