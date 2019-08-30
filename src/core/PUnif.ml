@@ -105,11 +105,15 @@ let proj_imit_lr ~counter ~scope s t flag =
             let max_num_of_apps = 
               List.length @@ Type.expected_args ty in
             let flag' = if max_num_of_apps > 0 then inc_op flag ProjApp else flag in
+            (* let flag' = inc_op flag ProjApp in *)
             Some (Subst.FO.bind' Subst.empty (hd_s, scope) (pr_bind, scope), flag'))
           else None) in
       let imit_binding =
         try 
-          let flag' = if Term.is_app_var t then inc_op flag ImitFlex else inc_op flag ImitRigid in
+          let flag' = if Term.is_app_var t then inc_op flag ImitFlex 
+                      else if List.length (Type.expected_args (Term.ty t)) != 0
+                           then inc_op flag ImitRigid else flag in
+                      (* else inc_op flag ImitRigid in *)
           [U.subst @@ imitate_one ~scope ~counter s t, flag']
         with Invalid_argument s when String.equal s "no_imits" -> [] in
     let first, second = 
@@ -144,6 +148,16 @@ let elim_rule ~counter ~scope t u flag =
   OSeq.append (eliminate_one t) (eliminate_one u)
   |> OSeq.map (fun x -> Some (x, inc_op flag Elim))
 
+(* removes all arguments of an applied variable
+   v |-> λ u1 ... um. x
+ *)
+let elim_trivial ~scope ~counter v =  
+  let prefix_types, return_type = Type.open_fun (HVar.ty v) in
+  let matrix_head = T.var (H.fresh_cnt ~counter ~ty:return_type ()) in
+  let subst_value = T.fun_l prefix_types matrix_head in
+  let subst = Subst.FO.bind' Subst.empty (v, scope) (subst_value, scope) in
+  subst
+
 let renamer ~counter t0s t1s = 
   let lhs,rhs, unifscope, us = U.FO.rename_to_new_scope ~counter t0s t1s in
   lhs,rhs,unifscope,U.subst us
@@ -168,7 +182,7 @@ let oracle ~counter ~scope (s,_) (t,_) flag =
       let num_elims = get_op flag Elim in
       if num_elims < !Params.max_elims 
       then elim_rule ~counter ~scope s t flag 
-      else OSeq.empty
+      else OSeq.return (Some (elim_trivial ~counter ~scope x, flag))
   | `Flex x, `Flex y ->
       (* all rules  *)
       let var_imits =
@@ -201,7 +215,7 @@ let unify_scoped =
     type flag_type = int
     let init_flag = (0:flag_type)
     let identify_scope = renamer ~counter
-    let frag_algs = pattern_frag ~counter
+    let frag_algs = pattern_frag ~counter (*[]*)
     let pb_oracle s t (f:flag_type) scope = 
       oracle ~counter ~scope s t f
     let oracle_composer = OSeq.append
