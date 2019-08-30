@@ -111,9 +111,9 @@ let proj_imit_lr ~counter ~scope s t flag =
       let imit_binding =
         try 
           let flag' = if Term.is_app_var t then inc_op flag ImitFlex 
-                      else if List.length (Type.expected_args (Term.ty t)) != 0
-                           then inc_op flag ImitRigid else flag in
-                      (* else inc_op flag ImitRigid in *)
+                      (*else if List.length (Type.expected_args (Term.ty t)) != 0
+                           then inc_op flag ImitRigid else flag in*)
+                      else inc_op flag ImitRigid in
           [U.subst @@ imitate_one ~scope ~counter s t, flag']
         with Invalid_argument s when String.equal s "no_imits" -> [] in
     let first, second = 
