@@ -106,7 +106,7 @@ let unify_scoped =
     let init_flag = (0:flag_type)
     let identify_scope = renamer ~counter
     let frag_algs = pattern_frag ~counter
-    let pb_oracle s t (f:flag_type) scope = 
+    let pb_oracle s t (f:flag_type) _ scope = 
       oracle ~counter ~scope s t f
     let oracle_composer = OSeq.interleave
   end in

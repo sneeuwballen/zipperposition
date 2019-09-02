@@ -267,6 +267,10 @@ let rec unify ~scope ~counter ~subst = function
     if CCOpt.is_none ty_unif then
       raise NotUnifiable; *)
     
+    if not @@ Type.is_ground (T.ty s) || not @@ Type.is_ground (T.ty t) then (
+      raise NotInFragment
+    );
+
     if not (Type.equal (T.ty s) (T.ty t)) then (
       raise NotUnifiable
     );

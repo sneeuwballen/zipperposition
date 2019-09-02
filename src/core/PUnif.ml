@@ -4,6 +4,8 @@ module H = HVar
 module S = Subst
 module P = PatternUnif
 module Params = PragUnifParams
+module I = Int32 
+
 
 type op =
   | ProjApp
@@ -12,24 +14,41 @@ type op =
   | Ident
   | Elim
 
+let (<<<) = I.shift_left 
+let (>>>) = I.shift_right_logical  
+let (&&&) = I.logand
+let (|||) = I.logor
+let (~~~) = I.lognot
+
+let (i63) = I.of_int 63
+
 let op_masks =
-  [ProjApp, (63, 0, "proj");
-   ImitFlex, (63 lsl 6, 6, "imit_flex");
-   ImitRigid, (63 lsl 12, 12, "imit_rigid");
-   Ident, (63 lsl 18, 18, "ident");
-   Elim, (63 lsl 24, 24, "elim")]
+  [ProjApp, ( i63, (0), "proj");
+   ImitFlex, (i63 <<< 6, 6, "imit_flex");
+   ImitRigid, (i63 <<< 12, 12, "imit_rigid");
+   Ident, (i63 <<< 18, 18, "ident");
+   Elim, (i63 <<< 24, 24, "elim")]
 
 let get_op flag op =
   let mask,shift,name = List.assoc op op_masks in
-  (flag land mask) lsr shift
+  I.to_int ((flag &&& mask) >>> shift)
 
 let inc_op flag op =
   let old = get_op flag op in
   let mask, shift, _ = List.assoc op op_masks in
-  let op_val = (((flag land mask) lsr shift) + 1) lsl shift in
-  let res = (flag land (lnot mask)) lor op_val in
-  assert(old + 1 = (get_op res op));
+  let op_val = (I.succ ((flag &&& mask) >>> shift)) <<< shift in
+  let res = (flag &&& (~~~ mask)) ||| op_val in
+  assert( old + 1 = (get_op res op));
   res
+
+let is_ident_last flag = 
+  I.to_int ((I.one <<< 30) &&& flag) != 0
+
+let set_ident_last flag = 
+  (I.one <<< 30) ||| flag
+
+let clear_ident_last flag =
+  (~~~ (I.one <<< 30)) &&& flag
 
 let pp_flag out flag =
   List.iter (fun (op, (_,_,name)) ->
@@ -72,50 +91,58 @@ let imitate_one ~scope ~counter  s t =
     OSeq.nth 0 (JP_unif.imitate_onesided ~scope ~counter s t)
   with Not_found ->  invalid_arg "no_imits"
 
+let unif_types ~subst ~scope t s = 
+  try 
+    Some (Unif.FO.unify_syn ~subst (T.of_ty t, scope) (T.of_ty s, scope))
+  with Unif.Fail -> None
+
+let proj_lr ~counter ~scope ~subst s t flag = 
+  let hd_s, args_s = CCPair.map1 T.as_var_exn (T.as_app s) in
+  let hd_t,_ = T.as_app (snd (T.open_fun t)) in
+  let pref_tys, var_ret_ty = Type.open_fun (HVar.ty hd_s) in
+  pref_tys
+  |> List.mapi (fun i ty -> i, ty)
+  |> (fun l ->
+      (* if we performed more than N projections that applied the
+        bound variable we back off *)
+      if get_op flag ProjApp <= !Params.max_app_projections then l
+      else List.filter (fun (_, ty) -> List.length (Type.expected_args ty) = 0) l)
+  (* If heads are different constants, do not project to those subterms *)
+  |> CCList.filter_map (fun ((i, _) as p) -> 
+      if i < List.length args_s then (
+        let s_i = List.nth args_s i in
+        let s_i = T.head_term (snd (T.open_fun s_i)) in
+        if (T.is_const s_i && T.is_const hd_t && (not (T.equal s_i hd_t))) then None 
+        else Some p
+      ) else Some p
+  )
+  |> CCList.filter_map(fun (i, ty) ->
+      let _, arg_ret_ty = Type.open_fun ty in
+      match unif_types ~subst ~scope arg_ret_ty var_ret_ty with
+      | Some subst' ->
+        (* we project only to arguments of appropriate type *)
+        let pr_bind = project_hs_one ~counter pref_tys i ty in
+        let max_num_of_apps = 
+          List.length @@ Type.expected_args ty in
+        let flag' = if max_num_of_apps > 0 then inc_op flag ProjApp else flag in
+        (* let flag' = inc_op flag ProjApp in *)
+        Some (Subst.FO.bind' subst' (hd_s, scope) (pr_bind, scope), flag')
+      |None -> None)
+
 (*Create all possible projection and imitation bindings. *)
-let proj_imit_lr ~counter ~scope s t flag =
+let proj_imit_lr ~counter ~scope ~subst s t flag =
   try
-    let hd_s, args_s = CCPair.map1 T.as_var_exn (T.as_app s) in
-    let hd_t,_ = T.as_app (snd (T.open_fun t)) in
-    let pref_tys, var_ret_ty = Type.open_fun (HVar.ty hd_s) in
     let proj_bindings = 
-      pref_tys
-      |> List.mapi (fun i ty -> i, ty)
-      |> (fun l ->
-          (* if we performed more than N projections that applied the
-            bound variable we back off *)
-          if get_op flag ProjApp <= !Params.max_app_projections (*||
-             List.length args_s <= 1*) then l
-          else
-            List.filter (fun (_, ty) -> List.length (Type.expected_args ty) = 0) l)
-      (* If heads are different constants, do not project to those subterms *)
-      |> CCList.filter_map (fun ((i, _) as p) -> 
-          if i < List.length args_s then (
-            let s_i = List.nth args_s i in
-            let s_i = T.head_term (snd (T.open_fun s_i)) in
-            if (T.is_const s_i && T.is_const hd_t && (not (T.equal s_i hd_t))) then None 
-            else Some p
-          ) else Some p
-      )
-      |> CCList.filter_map (fun (i, ty) ->
-          let _, arg_ret_ty = Type.open_fun ty in
-          if Type.equal  arg_ret_ty var_ret_ty then (
-            (* we project only to arguments of appropriate type *)
-            let pr_bind = project_hs_one ~counter pref_tys i ty in
-            let max_num_of_apps = 
-              List.length @@ Type.expected_args ty in
-            let flag' = if max_num_of_apps > 0 then inc_op flag ProjApp else flag in
-            (* let flag' = inc_op flag ProjApp in *)
-            Some (Subst.FO.bind' Subst.empty (hd_s, scope) (pr_bind, scope), flag'))
-          else None) in
-      let imit_binding =
-        try 
-          let flag' = if Term.is_app_var t then inc_op flag ImitFlex 
-                      (*else if List.length (Type.expected_args (Term.ty t)) != 0
-                           then inc_op flag ImitRigid else flag in*)
-                      else inc_op flag ImitRigid in
-          [U.subst @@ imitate_one ~scope ~counter s t, flag']
-        with Invalid_argument s when String.equal s "no_imits" -> [] in
+      if is_ident_last flag then []
+      else proj_lr ~counter ~scope ~subst s t flag in
+    let imit_binding =
+      try 
+        let flag' = if Term.is_app_var t then inc_op flag ImitFlex 
+                    (*else if List.length (Type.expected_args (Term.ty t)) != 0
+                          then inc_op flag ImitRigid else flag in*)
+                    else inc_op flag ImitRigid in
+        [U.subst @@ imitate_one ~scope ~counter s t, flag']
+      with Invalid_argument s when String.equal s "no_imits" -> [] in
     let first, second = 
       if !Params._imit_first then imit_binding, proj_bindings
       else proj_bindings, imit_binding in 
@@ -174,33 +201,45 @@ let get_depth flag =
   let ops = [ProjApp; ImitFlex; ImitRigid; Ident; Elim] in
   List.fold_left (fun acc o -> get_op flag o + acc ) 0 ops
 
-let oracle ~counter ~scope (s,_) (t,_) flag =
-  (* CCFormat.printf "(@[%a@],@[%a@]):@[%a@]:%d@." T.pp s T.pp t pp_flag flag (get_depth flag); *)
+let oracle ~counter ~scope ~subst (s,_) (t,_) (flag:I.t) =
+  (* CCFormat.printf "subst:@[%a@]@." S.pp subst; *)
+  (* CCFormat.printf "(@[%a@],@[%a@]):@[%a@]:%d:%b@." T.pp s T.pp t pp_flag flag (get_depth flag) (is_ident_last flag); *)
   if get_depth flag < !Params.max_depth then (
     match head_classifier s, head_classifier t with 
     | `Flex x, `Flex y when HVar.equal Type.equal x y ->
-      let num_elims = get_op flag Elim in
-      if num_elims < !Params.max_elims 
-      then elim_rule ~counter ~scope s t flag 
-      else OSeq.return (Some (elim_trivial ~counter ~scope x, flag))
+      let res = 
+        let num_elims = get_op flag Elim in
+        if num_elims < !Params.max_elims 
+        then elim_rule ~counter ~scope s t flag 
+        else OSeq.return (Some (elim_trivial ~counter ~scope x, flag)) in
+      OSeq.map (CCOpt.map (fun (s,f) -> (s, clear_ident_last f))) res
   | `Flex x, `Flex y ->
       (* all rules  *)
       let var_imits =
         if get_op flag ImitFlex < !Params.max_var_imitations then (
           JP_unif.imitate ~scope ~counter s t []
-          |> OSeq.map (fun x -> Some (U.subst x, inc_op flag ImitFlex)))
+          |> OSeq.map (fun x -> Some (U.subst x, clear_ident_last @@ inc_op flag ImitFlex)))
         else OSeq.empty in
       let ident = 
         if get_op flag Ident < !Params.max_identifications then (
           JP_unif.identify ~scope ~counter s t []
-          |> OSeq.map (fun x -> Some (U.subst x, inc_op flag Ident)))
+          |> OSeq.map (fun x -> Some (U.subst x, set_ident_last @@ inc_op flag Ident)))
         else OSeq.empty in
-      OSeq.append ident var_imits
+      let var_projs = 
+        if not (is_ident_last flag) then
+          OSeq.interleave 
+            (proj_imit_lr ~scope ~counter ~subst s t (clear_ident_last flag))
+            (proj_imit_lr ~scope ~counter ~subst t s (clear_ident_last flag))
+        else OSeq.empty in
+      OSeq.interleave 
+        (OSeq.interleave var_projs var_imits)
+        ident 
     | `Flex _, `Rigid
     | `Rigid, `Flex _ ->
       OSeq.append
-        (proj_imit_lr ~counter ~scope s t flag)
-        (proj_imit_lr ~counter ~scope t s flag) 
+        (proj_imit_lr ~counter ~scope ~subst s t flag)
+        (proj_imit_lr ~counter ~scope ~subst t s flag) 
+      |> OSeq.map (CCOpt.map (fun (s, f) -> (s, clear_ident_last f) ))
     | _ -> 
       CCFormat.printf "Did not disassemble properly: [%a]\n[%a]@." T.pp s T.pp t;
       assert false)
@@ -212,12 +251,12 @@ let unify_scoped =
   let module PragUnifParams = struct
     exception NotInFragment = PatternUnif.NotInFragment
     exception NotUnifiable = PatternUnif.NotUnifiable
-    type flag_type = int
-    let init_flag = (0:flag_type)
+    type flag_type = int32
+    let init_flag = (Int32.zero:flag_type)
     let identify_scope = renamer ~counter
     let frag_algs = pattern_frag ~counter (*[]*)
-    let pb_oracle s t (f:flag_type) scope = 
-      oracle ~counter ~scope s t f
+    let pb_oracle s t (f:flag_type) subst scope = 
+      oracle ~counter ~scope ~subst s t f
     let oracle_composer = OSeq.append
   end in
   
