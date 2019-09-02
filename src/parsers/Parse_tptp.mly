@@ -230,6 +230,11 @@ unary_formula:
      let loc = L.mk_pos $startpos $endpos in
      o ?loc:(Some loc) f
     }
+  | EQUAL AT f1=unary_formula AT f2=unary_formula 
+    {
+      let loc = L.mk_pos $startpos $endpos in 
+      PT.eq ?loc:(Some loc) f1 f2
+    }
 
 binary_formula:
   | f=nonassoc_binary_formula { f }
