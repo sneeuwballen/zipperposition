@@ -95,6 +95,8 @@ module Make (P : PARAMETERS) = struct
         let body_lhs, body_rhs, _ = 
           eta_expand_otf ~subst ~scope:unifscope pref_lhs pref_rhs body_lhs body_rhs in
         let (hd_lhs, args_lhs), (hd_rhs, args_rhs) = T.as_app body_lhs, T.as_app body_rhs in
+
+        (* CCFormat.printf "solving:@[%a@]=?=@[%a@]@." T.pp lhs T.pp rhs; *)
       
         if T.equal body_lhs body_rhs then do_unif rest subst mono unifscope
         else (

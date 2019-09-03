@@ -105,7 +105,7 @@ let proj_lr ~counter ~scope ~subst s t flag =
   |> (fun l ->
       (* if we performed more than N projections that applied the
         bound variable we back off *)
-      if get_op flag ProjApp <= !Params.max_app_projections then l
+      if get_op flag ProjApp < !Params.max_app_projections then l
       else List.filter (fun (_, ty) -> List.length (Type.expected_args ty) = 0) l)
   (* If heads are different constants, do not project to those subterms *)
   |> CCList.filter_map (fun ((i, _) as p) -> 
@@ -136,12 +136,14 @@ let proj_imit_lr ~counter ~scope ~subst s t flag =
       if is_ident_last flag then []
       else proj_lr ~counter ~scope ~subst s t flag in
     let imit_binding =
-      try 
-        let flag' = if Term.is_app_var t then inc_op flag ImitFlex 
-                    (*else if List.length (Type.expected_args (Term.ty t)) != 0
-                          then inc_op flag ImitRigid else flag in*)
-                    else inc_op flag ImitRigid in
-        [U.subst @@ imitate_one ~scope ~counter s t, flag']
+      try
+        if not (Term.is_app_var t) || get_op flag ImitFlex < !Params.max_var_imitations  then (
+          let flag' = if Term.is_app_var t then inc_op flag ImitFlex 
+                      (*else if List.length (Type.expected_args (Term.ty t)) != 0
+                            then inc_op flag ImitRigid else flag in*)
+                      else inc_op flag ImitRigid in
+          [U.subst @@ imitate_one ~scope ~counter s t, flag'])
+        else []
       with Invalid_argument s when String.equal s "no_imits" -> [] in
     let first, second = 
       if !Params._imit_first then imit_binding, proj_bindings
@@ -203,7 +205,7 @@ let get_depth flag =
 
 let oracle ~counter ~scope ~subst (s,_) (t,_) (flag:I.t) =
   (* CCFormat.printf "subst:@[%a@]@." S.pp subst; *)
-  (* CCFormat.printf "(@[%a@],@[%a@]):@[%a@]:%d:%b@." T.pp s T.pp t pp_flag flag (get_depth flag) (is_ident_last flag); *)
+  (* CCFormat.printf "(@[%a@],@[%a@]):@[%a@]:%d:%b@." T.pp s T.pp t pp_flag flag (get_depth flag) (is_ident_last flag);  *)
   if get_depth flag < !Params.max_depth then (
     match head_classifier s, head_classifier t with 
     | `Flex x, `Flex y when HVar.equal Type.equal x y ->
@@ -227,19 +229,19 @@ let oracle ~counter ~scope ~subst (s,_) (t,_) (flag:I.t) =
         else OSeq.empty in
       let var_projs = 
         if not (is_ident_last flag) then
-          OSeq.interleave 
+          OSeq.append 
             (proj_imit_lr ~scope ~counter ~subst s t (clear_ident_last flag))
             (proj_imit_lr ~scope ~counter ~subst t s (clear_ident_last flag))
         else OSeq.empty in
-      OSeq.interleave 
-        (OSeq.interleave var_projs var_imits)
+      OSeq.append 
+        (OSeq.append var_projs var_imits)
         ident 
     | `Flex _, `Rigid
     | `Rigid, `Flex _ ->
       OSeq.append
         (proj_imit_lr ~counter ~scope ~subst s t flag)
         (proj_imit_lr ~counter ~scope ~subst t s flag) 
-      |> OSeq.map (CCOpt.map (fun (s, f) -> (s, clear_ident_last f) ))
+      |> OSeq.map (CCOpt.map (fun (s, f) -> (s, clear_ident_last f)))
     | _ -> 
       CCFormat.printf "Did not disassemble properly: [%a]\n[%a]@." T.pp s T.pp t;
       assert false)
