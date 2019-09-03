@@ -191,7 +191,7 @@ and conv_step st p =
       in
       LLProof.inference ~intros ~tags res (Proof.Rule.name rule) parents
     | Proof.Trivial -> LLProof.trivial res
-    | Proof.Define (id,_) -> LLProof.define id res
+    | Proof.Define (def,_) -> LLProof.define def res
     | Proof.Intro (_,Proof.R_assert) -> LLProof.assert_ (T.close_all ~ty:T.prop Binder.Forall res)
     | Proof.Intro (_,(Proof.R_goal|Proof.R_lemma)) -> LLProof.goal res
     | Proof.Intro (_,(Proof.R_def|Proof.R_decl)) ->

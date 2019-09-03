@@ -840,9 +840,9 @@ type options =
   | PostSkolem of (form -> form) (** must not introduce variables nor negations *)
 
 (* return new sources, without modifying anything *)
-let new_src ~ctx : Stmt.input_t list =
+let new_src ?(ignore_polarity=false) ~ctx : Stmt.input_t list =
   Skolem.new_definitions ~ctx
-  |> CCList.flat_map Skolem.def_as_stmt
+  |> CCList.flat_map (Skolem.def_as_stmt ~ignore_polarity)
 
 let rule_flatten = Proof.Rule.mk "cnf.flatten"
 let rule_rename = Proof.Rule.mk "cnf.tseitin"
@@ -910,7 +910,7 @@ let flatten ~ctx ~should_define seq : _ Iter.t =
        let n = Skolem.counter ctx in
        let proof() =
          if Skolem.counter ctx > n
-         then proof_preprocess stmt (new_src ~ctx) rule_flatten
+         then proof_preprocess stmt (new_src ~ignore_polarity:true ~ctx) rule_flatten
          else Stmt.proof_step stmt
        in
        let attrs = stmt.Stmt.attrs in
@@ -1013,7 +1013,7 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
          let old_counter = Skolem.counter ctx in
          let proof() =
            if Skolem.counter ctx > old_counter
-           then proof_preprocess stmt (new_src ~ctx) rule_rename
+           then proof_preprocess stmt (new_src ~ignore_polarity:true ~ctx) rule_rename
            else Stmt.proof_step stmt
          in
          let attrs = Stmt.attrs stmt in
@@ -1131,13 +1131,13 @@ let cnf_of_seq ~ctx ?(opts=[])  seq =
           (fun k->k (Util.pp_list ~sep:", " pp_clause) clauses);
         clauses
     in
-    let new_ids = Skolem.pop_new_skolem_symbols ~ctx in
+    let new_skolems = Skolem.pop_new_skolem_symbols ~ctx in
     List.iter
       (fun ((id,ty), _) ->
-         let proof = Proof.Step.define_internal id [] in
+         let proof = Proof.Step.define_internal id ty [] [] in
          CCVector.push res (Stmt.ty_decl ~proof id ty))
-      new_ids;
-    new_ids, clauses
+      new_skolems;
+    new_skolems, clauses
   in
   let conv_form f =
     snd (conv_form_sk f)

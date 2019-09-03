@@ -209,9 +209,19 @@ module Term = struct
     let vars r = T.vars (lhs r)
     let vars_l r = vars r |> T.VarSet.to_list
 
-    let make_ ?proof head args term_lhs term_rhs =
+    let conv_ ~ctx lhs rhs =
+      let module F = TypedSTerm.Form in
+      F.eq
+        (Term.Conv.to_simple_term ctx lhs)
+        (Term.Conv.to_simple_term ctx rhs)
+      |> F.close_forall
+
+    let make_ ?proof head ty args term_lhs term_rhs =
+      let ctx = T.Conv.create () in
+      let def_rules = [conv_ ~ctx term_lhs term_rhs] in
       let term_proof =
-        Proof.Step.define head (Proof.Src.internal[]) (List.map Proof.Parent.from (CCOpt.to_list proof))
+        Proof.Step.define_internal head (Type.Conv.to_simple_term ctx ty) def_rules
+          (List.map Proof.Parent.from (CCOpt.to_list proof))
       in
       { term_head=head; term_args=args; term_arity=List.length args;
         term_lhs; term_rhs; term_proof }
@@ -225,7 +235,7 @@ module Term = struct
           "Rule.make_const %a %a:@ invalid rule, RHS contains variables"
           ID.pp id T.pp rhs
       );
-      make_ ?proof id [] lhs rhs 
+      make_ ?proof id ty [] lhs rhs 
 
     (* [id args := rhs] *)
     let make ?proof id ty args rhs : t =
@@ -238,17 +248,9 @@ module Term = struct
           "Rule.make_const %a %a:@ invalid rule, RHS contains variables"
           ID.pp id T.pp rhs
       );
-      make_ ?proof id args lhs rhs 
+      make_ ?proof id ty args lhs rhs 
 
     let pp out r = pp_term_rule out r
-
-    let conv_ ~ctx lhs rhs =
-      let module F = TypedSTerm.Form in
-      F.eq
-        (Term.Conv.to_simple_term ctx lhs)
-        (Term.Conv.to_simple_term ctx rhs)
-      |> F.close_forall
-
 
     let to_form ~ctx r = conv_ ~ctx (lhs r) (rhs r)
 

@@ -31,7 +31,7 @@ type step =
   | Assert
   | Negated_goal of t
   | Trivial
-  | Define of ID.t
+  | Define of Proof.def
   | Instantiate of {
       form: t;
       inst: inst;
@@ -80,7 +80,7 @@ val goal : form -> t
 val negated_goal : form -> t -> t
 val assert_ : form -> t
 val trivial : form -> t
-val define : ID.t -> form -> t
+val define : Proof.def -> form -> t
 val instantiate : ?tags:tag list -> form -> t -> inst -> t
 val inference :
   intros:term list option ->

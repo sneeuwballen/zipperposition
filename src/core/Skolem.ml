@@ -39,7 +39,6 @@ type form_definition = {
   polarity : polarity;
   proof: Proof.step;
   (* source for this definition *)
-  as_stmt: Statement.input_t list lazy_t;
 }
 
 type term_definition = {
@@ -215,7 +214,7 @@ let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~parents form 
     (* not a skolem (but a defined term). Will be defined, not declared. *)
     let f = fresh_id ~start0:true ~ctx pattern in
     let proxy = T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t) in
-    let proof = Proof.Step.define_internal f parents in
+    let proof = Proof.Step.define_internal f ty [T.Form.eq proxy form] parents in
     (* register the new definition *)
     let def = {
       form;
@@ -225,7 +224,6 @@ let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~parents form 
       proxy;
       polarity;
       proof;
-      as_stmt=lazy (stmt_of_form rw_rules polarity proxy f ty form proof);
     } in
     ctx.sc_new_defs <- Def_form def :: ctx.sc_new_defs;
     Util.debugf ~section 5 "@[<2>define_form@ %a@ :proof %a@]"
@@ -244,13 +242,9 @@ let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~parents form 
       Util.debugf ~section 1 "@[Reusing definition %a. Old def: %a. New def: %a]"
         (fun k -> k T.pp def.proxy T.pp def.form T.pp form);
       let proxy = T.Subst.eval subst def.proxy in
-      let proof = Proof.Step.define_internal def.proxy_id parents in
-      let res = {
-        def with 
-          form; proxy; proof; polarity;
-          as_stmt = lazy (stmt_of_form rw_rules polarity proxy
-                           def.proxy_id def.proxy_ty form proof);
-      }  in
+      let proof = Proof.Step.define_internal def.proxy_id def.proxy_ty 
+        [T.Form.eq def.proxy def.form] parents in
+      let res = { def with form; proxy; proof; polarity; } in
       if def.polarity != polarity then (
         incr_counter ctx;
         ctx.sc_new_defs <- Def_form res :: ctx.sc_new_defs
@@ -325,7 +319,7 @@ let define_term ?(pattern="fun_") ~ctx ~parents rules : term_definition =
       rules
   in
   let td_as_def = Stmt.mk_def ~rewrite:true id ty rules in
-  let proof = Proof.Step.define_internal id parents in
+  let proof = Proof.Step.define_internal id ty [(* TODO *)] parents in
   let def = {
     td_id=id;
     td_ty=ty;
@@ -348,6 +342,8 @@ let pop_new_definitions ~ctx =
 
 let rule_def = Proof.Rule.mk "define"
 
-let def_as_stmt (d:definition): Stmt.input_t list = match d with
-  | Def_form d -> Lazy.force d.as_stmt
+let def_as_stmt ?(ignore_polarity=false) (d:definition): Stmt.input_t list = match d with
+  | Def_form d ->
+    let polarity = if ignore_polarity then `Both else d.polarity in
+    stmt_of_form d.rw_rules polarity d.proxy d.proxy_id d.proxy_ty d.form d.proof
   | Def_term d -> Lazy.force d.td_stmt

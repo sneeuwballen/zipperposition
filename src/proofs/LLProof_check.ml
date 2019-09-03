@@ -109,12 +109,13 @@ let check_step_ (p:proof): check_step_res =
     | P.Goal
     | P.Assert
       -> CS_check R_ok
-    | P.Define id
-      -> if ID.is_skolem id
-         then CS_skip `ESA
-         (* TODO: check whether the Skolem was only defined once
-            and does not occur in the original problem *)
-         else CS_check R_ok
+    | P.Define _
+      -> CS_skip `ESA
+         (* TODO: check whether 
+            - definition justifies the result formula
+            - the Skolem was only defined once
+              and does not occur in the original problem 
+              if defined internally *)
     | P.Negated_goal p' ->
       (* [not p'] should prove [concl] *)
       CS_check (prove [F.not_ (P.concl p')] concl)

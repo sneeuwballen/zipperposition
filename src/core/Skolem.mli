@@ -76,8 +76,6 @@ type form_definition = private {
      [proxy -> false if not form] (depending on polarity) *)
   polarity : polarity;
   proof: Proof.step;
-  (* source for this definition *)
-  as_stmt: Statement.input_t list lazy_t;
 }
 
 val pp_form_definition : form_definition CCFormat.printer
@@ -133,7 +131,7 @@ val pop_new_definitions : ctx:ctx -> definition list
     Will call {!remove_def} so there is no risk of re-using a definition
     with a new polarity. *)
 
-val def_as_stmt : definition -> Statement.input_t list
+val def_as_stmt : ?ignore_polarity:bool -> definition -> Statement.input_t list
 (** Project the definition into a list of statements *)
 
 (** {2 Attribute} *)

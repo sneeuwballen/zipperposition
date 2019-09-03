@@ -36,7 +36,7 @@ and step =
   | Assert
   | Negated_goal of t
   | Trivial
-  | Define of ID.t
+  | Define of Proof.def
   | Instantiate of {
       form: t;
       inst: inst;
@@ -70,7 +70,7 @@ let pp_step out (s:step): unit = match s with
   | Assert -> Fmt.string out "assert"
   | Negated_goal _ -> Fmt.string out "negated_goal"
   | Trivial -> Fmt.string out "trivial"
-  | Define id -> Fmt.fprintf out "(@[define@ %a@])" ID.pp id
+  | Define id -> Fmt.fprintf out "(@[define@ %a@])" Proof.pp_def id
   | Instantiate {inst;tags;_} ->
     Fmt.fprintf out "(@[instantiate %a%a@])" pp_inst inst pp_tags tags
   | Inference {name=n;tags;_} -> Fmt.fprintf out "(inf %s%a)" n pp_tags tags
@@ -148,7 +148,7 @@ let goal f = mk_ f Goal
 let negated_goal f p = mk_ f (Negated_goal p)
 let assert_ f = mk_ f Assert
 let trivial f = mk_ f Trivial
-let define id f = mk_ f (Define id)
+let define def f = mk_ f (Define def)
 
 let instantiate ?(tags=[]) f p inst =
   mk_ f (Instantiate {form=p;inst;tags})
@@ -175,7 +175,7 @@ module Dot = struct
            | Assert -> "assert"
            | Negated_goal _ -> "negated_goal"
            | Trivial -> "trivial"
-           | Define id -> Fmt.sprintf "define(%a)" ID.pp id
+           | Define id -> Fmt.sprintf "define(%a)" Proof.pp_def id
            | Instantiate _ -> "instantiate"
            | Inference {name;_} -> name
          in

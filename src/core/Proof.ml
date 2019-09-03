@@ -29,6 +29,12 @@ type infos = info list
 (** Skolem ID, type, variable it corresponds to in the parent, arguments of skolem *)
 type skolem = (ID.t * term) * (term Var.t * term list)
 
+type def = {
+  def_id: ID.t;
+  def_ty: term;
+  def_rules: form list;
+}
+
 type kind =
   | Intro of source * role
   | Inference of rule * tag list
@@ -37,7 +43,7 @@ type kind =
   | Conv (** Conversion of different term datatypes *)
   | Esa of rule * tag list
   | Trivial (** trivial, or trivial within theories *)
-  | Define of ID.t * source (** definition *)
+  | Define of def * source (** definition *)
   | Negate_goal
 
 and source = {
@@ -219,6 +225,8 @@ let pp_tag = Tag.pp
 let pp_tags out = function
   | [] -> ()
   | l -> Fmt.fprintf out "@ [@[%a@]]" (Util.pp_list ~sep:"," pp_tag) l
+let pp_def out {def_id; def_ty; def_rules} = 
+  Fmt.fprintf out "@[(%a;%a;%a)@]" ID.pp def_id TypedSTerm.pp def_ty (CCList.pp TypedSTerm.pp) def_rules
 
 module Kind = struct
   type t = kind
@@ -243,7 +251,7 @@ module Kind = struct
     | Conv ->
       Format.fprintf out "conv"
     | Trivial -> CCFormat.string out "trivial"
-    | Define (id,src) -> Format.fprintf out "define(@[%a@ %a@])" ID.pp id Src.pp src
+    | Define (def,src) -> Format.fprintf out "define(@[%a@ %a@])" pp_def def Src.pp src
     | Negate_goal -> CCFormat.string out "negate_goal"
 
   let pp_tstp out (k,parents) =
@@ -433,7 +441,7 @@ module Step = struct
     {id=get_id_(); parents=[]; kind=Intro(src,r); dist_to_goal; infos=[]}
   let define id src parents =
     {id=get_id_(); parents; kind=Define (id,src); dist_to_goal=None; infos=[]; }
-  let define_internal id parents = define id (Src.internal []) parents
+  let define_internal def_id def_ty def_rules parents = define {def_id; def_ty; def_rules} (Src.internal []) parents
   let lemma src =
     {id=get_id_(); parents=[]; kind=Intro(src,R_lemma); dist_to_goal=Some 0; infos=[]; }
 
@@ -535,9 +543,9 @@ module Step = struct
       Format.fprintf out "@[<hv2>%a@]%a" Kind.pp (kind step) pp_infos step.infos
     | Intro (_,R_lemma) -> Format.fprintf out "@[<2>lemma%a@]" pp_infos step.infos
     | Trivial -> Format.fprintf out "@[<2>trivial%a@]" pp_infos step.infos
-    | Define (id,src) ->
+    | Define (def,src) ->
       Format.fprintf out "@[<2>define %a@ %a%a%a@]"
-        ID.pp id Src.pp src pp_parents (parents step) pp_infos step.infos
+        pp_def def Src.pp src pp_parents (parents step) pp_infos step.infos
     | Inference _
     | Simplification _
     | Esa _

@@ -22,6 +22,12 @@ type attrs = UntypedAST.attrs
 (** Skolem ID, type, variable it corresponds to in the parent, arguments of skolem *)
 type skolem = (ID.t * term) * (term Var.t * term list)
 
+type def = {
+  def_id: ID.t;
+  def_ty: term;
+  def_rules: form list;
+}
+
 (** Classification of proof steps *)
 type kind =
   | Intro of source * role
@@ -31,7 +37,7 @@ type kind =
   | Conv (** Conversion of different term datatypes *)
   | Esa of rule * tag list
   | Trivial (** trivial, or trivial within theories *)
-  | Define of ID.t * source (** definition *)
+  | Define of def * source (** definition *)
   | Negate_goal
 
 (** Source of leaves (from some input problem, or internal def) *)
@@ -247,8 +253,8 @@ module Step : sig
 
   val trivial : t
 
-  val define : ID.t -> source -> parent list -> t
-  val define_internal : ID.t -> parent list -> t
+  val define : def -> source -> parent list -> t
+  val define_internal : ID.t -> term -> form list -> parent list -> t
 
   val lemma : source -> t
 
@@ -317,6 +323,7 @@ val pp_parent : Parent.t CCFormat.printer
 
 val pp_tag : tag CCFormat.printer
 val pp_tags : tag list CCFormat.printer
+val pp_def : def CCFormat.printer
 
 (** {2 Proof} *)
 
