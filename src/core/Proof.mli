@@ -32,7 +32,6 @@ type kind =
   | Esa of rule * tag list
   | Trivial (** trivial, or trivial within theories *)
   | Define of ID.t * source (** definition *)
-  | By_def of ID.t (** following from the def of ID *)
   | Negate_goal
 
 (** Source of leaves (from some input problem, or internal def) *)
@@ -248,8 +247,6 @@ module Step : sig
 
   val trivial : t
 
-  val by_def : ID.t -> t
-
   val define : ID.t -> source -> parent list -> t
   val define_internal : ID.t -> parent list -> t
 
@@ -282,7 +279,6 @@ module Step : sig
   val to_attrs : t -> UntypedAST.attrs
 
   val is_trivial : t -> bool
-  val is_by_def : t -> bool
 
   val is_assert : t -> bool
   (** Proof: the statement was asserted in some file *)
@@ -354,7 +350,6 @@ module S : sig
   val mk_f : step -> form -> t
 
   val mk_f_trivial : form -> t
-  val mk_f_by_def : ID.t -> form -> t
 
   val mk_f_inference : rule:rule -> form -> parent list -> t
 

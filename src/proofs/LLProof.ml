@@ -36,7 +36,6 @@ and step =
   | Assert
   | Negated_goal of t
   | Trivial
-  | By_def of ID.t
   | Define of ID.t
   | Instantiate of {
       form: t;
@@ -71,14 +70,13 @@ let pp_step out (s:step): unit = match s with
   | Assert -> Fmt.string out "assert"
   | Negated_goal _ -> Fmt.string out "negated_goal"
   | Trivial -> Fmt.string out "trivial"
-  | By_def id -> Fmt.fprintf out "(by_def :of %a)" ID.pp id
   | Define id -> Fmt.fprintf out "(@[define@ %a@])" ID.pp id
   | Instantiate {inst;tags;_} ->
     Fmt.fprintf out "(@[instantiate %a%a@])" pp_inst inst pp_tags tags
   | Inference {name=n;tags;_} -> Fmt.fprintf out "(inf %s%a)" n pp_tags tags
 
 let parents (p:t): parent list = match p.step with
-  | Goal | Assert | Trivial | By_def _ | Define _ -> []
+  | Goal | Assert | Trivial | Define _ -> []
   | Negated_goal p2 -> [p_of p2]
   | Instantiate {form=p2;_} -> [p_of p2]
   | Inference {parents=l;_} -> l
@@ -150,7 +148,6 @@ let goal f = mk_ f Goal
 let negated_goal f p = mk_ f (Negated_goal p)
 let assert_ f = mk_ f Assert
 let trivial f = mk_ f Trivial
-let by_def id f = mk_ f (By_def id)
 let define id f = mk_ f (Define id)
 
 let instantiate ?(tags=[]) f p inst =
@@ -178,7 +175,6 @@ module Dot = struct
            | Assert -> "assert"
            | Negated_goal _ -> "negated_goal"
            | Trivial -> "trivial"
-           | By_def id -> Fmt.sprintf "by_def(%a)" ID.pp id
            | Define id -> Fmt.sprintf "define(%a)" ID.pp id
            | Instantiate _ -> "instantiate"
            | Inference {name;_} -> name
@@ -210,7 +206,7 @@ module Dot = struct
       | Goal, _ -> Some "green"
       | Assert, _ -> Some "yellow"
       | Trivial, _ -> Some "gold"
-      | (By_def _ | Define _), _ -> Some "navajowhite"
+      | Define _, _ -> Some "navajowhite"
       | _ -> Some "grey"
     end
 

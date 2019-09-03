@@ -108,7 +108,6 @@ let check_step_ (p:proof): check_step_res =
   begin match P.step p with
     | P.Goal
     | P.Assert
-    | P.By_def _
       -> CS_check R_ok
     | P.Define id
       -> if ID.is_skolem id

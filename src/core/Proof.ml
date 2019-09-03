@@ -38,7 +38,6 @@ type kind =
   | Esa of rule * tag list
   | Trivial (** trivial, or trivial within theories *)
   | Define of ID.t * source (** definition *)
-  | By_def of ID.t (** following from the def of ID *)
   | Negate_goal
 
 and source = {
@@ -244,7 +243,6 @@ module Kind = struct
     | Conv ->
       Format.fprintf out "conv"
     | Trivial -> CCFormat.string out "trivial"
-    | By_def id -> Format.fprintf out "by_def(%a)" ID.pp id
     | Define (id,src) -> Format.fprintf out "define(@[%a@ %a@])" ID.pp id Src.pp src
     | Negate_goal -> CCFormat.string out "negate_goal"
 
@@ -266,7 +264,6 @@ module Kind = struct
       | Conv -> Format.fprintf out "conv"
       | Intro (_,R_lemma) -> Format.fprintf out "lemma"
       | Trivial -> assert(parents=[]); Format.fprintf out "trivial([status(thm)])"
-      | By_def _ -> Format.fprintf out "by_def([status(thm)])"
       | Define _ -> Format.fprintf out "define([status(thm)])" 
       | Negate_goal -> Format.fprintf out "negate_goal" 
     end
@@ -398,7 +395,7 @@ module Step = struct
 
   let src p = match p.kind with
     | Intro (src,_) | Define (_,src) -> Some src
-    | Trivial | By_def _ | Esa _ | Cnf _ | Conv | Inference _ | Simplification _ | Negate_goal
+    | Trivial | Esa _ | Cnf _ | Conv | Inference _ | Simplification _ | Negate_goal
       -> None
 
   let to_attrs p = match src p with
@@ -408,7 +405,6 @@ module Step = struct
   let rule p = match p.kind with
     | Intro _
     | Trivial
-    | By_def _
     | Define _
     | Cnf _ 
     | Conv 
@@ -422,7 +418,6 @@ module Step = struct
   let is_assert_like p = match p.kind with Intro (_,(R_assert|R_def|R_decl)) -> true | _ -> false
   let is_goal p = match p.kind with Intro (_,(R_goal|R_lemma)) -> true | _ -> false
   let is_trivial p = match p.kind with Trivial -> true | _ -> false
-  let is_by_def p = match p.kind with By_def _ -> true | _ -> false
 
   let distance_to_goal p = p.dist_to_goal
 
@@ -431,7 +426,6 @@ module Step = struct
     fun () -> CCRef.incr_then_get n
 
   let trivial = {id=get_id_(); parents=[]; kind=Trivial; dist_to_goal=None; infos=[]; }
-  let by_def id = {id=get_id_(); parents=[]; kind=By_def id; dist_to_goal=None; infos=[]; }
   let intro src r =
     let dist_to_goal = match r with
       | R_goal | R_lemma -> Some 0 | _ -> None
@@ -541,7 +535,6 @@ module Step = struct
       Format.fprintf out "@[<hv2>%a@]%a" Kind.pp (kind step) pp_infos step.infos
     | Intro (_,R_lemma) -> Format.fprintf out "@[<2>lemma%a@]" pp_infos step.infos
     | Trivial -> Format.fprintf out "@[<2>trivial%a@]" pp_infos step.infos
-    | By_def id -> Format.fprintf out "@[<2>by_def %a%a@]" ID.pp id pp_infos step.infos
     | Define (id,src) ->
       Format.fprintf out "@[<2>define %a@ %a%a%a@]"
         ID.pp id Src.pp src pp_parents (parents step) pp_infos step.infos
@@ -589,7 +582,6 @@ module S = struct
   let mk_f step res = mk step (Result.of_form res)
 
   let mk_f_trivial = mk_f Step.trivial
-  let mk_f_by_def id f = mk_f (Step.by_def id) f
 
   let mk_f_inference ~rule f parents =
     let step = Step.inference ~rule parents in
@@ -774,7 +766,7 @@ module S = struct
            | Intro (src,R_def) -> mk_status "def" :: Src.to_attrs src
            | Intro (src,R_decl) -> mk_status "decl" :: Src.to_attrs src
            | Trivial -> [mk_status "trivial"]
-           | By_def _ | Define _ -> []
+           | Define _ -> []
            | Negate_goal -> [mk_status "negate_goal"]
          in
          let pp_infos = UntypedAST.pp_attrs_zf in
@@ -818,7 +810,6 @@ module S = struct
         else if is_def p then `Color "navajowhite" :: shape :: attrs
         else if Step.is_goal @@ step p then `Color "green" :: shape :: attrs
         else if Step.is_trivial @@ step p then `Color "cyan" :: shape :: attrs
-        else if Step.is_by_def @@ step p then `Color "navajowhite" :: shape :: attrs
         else if Step.is_assert_like @@ step p then `Color "yellow" :: shape :: attrs
         else shape :: attrs
       )
