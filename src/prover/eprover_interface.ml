@@ -21,6 +21,7 @@ module type S = sig
 end
 
 let _timeout = ref 11
+let _e_auto = ref false
 
 let e_bin = ref (None : string option)
 
@@ -77,7 +78,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     match !e_bin with 
     | Some e_path ->
       let to_ = !_timeout in
-      let cmd = CCFormat.sprintf "timeout %d %s %s --cpu-limit=%d --auto-schedule -s -p" (to_+2) e_path prob_path to_ in
+      let cmd = 
+        CCFormat.sprintf "timeout %d %s %s --cpu-limit=%d %s -s -p" 
+          (to_+2) e_path prob_path to_ (if !_e_auto then "--auto" else "--auto-schedule") in
       CCFormat.printf "%% Running : %s.\n" cmd;
       let process_channel = Unix.open_process_in cmd in
       let _,status = Unix.wait () in
@@ -189,4 +192,5 @@ end
 let () =
    Options.add_opts
     [ "--tmp-dir", Arg.String (fun v -> _tmp_dir := v), " scratch directory for running E";
-      "--e-timeout", Arg.Set_int _timeout, "set E prover timeout." ]
+      "--e-timeout", Arg.Set_int _timeout, " set E prover timeout.";
+      "--e-auto", Arg.Bool (fun v -> _e_auto := v), " If set to on eprover will not run in autoschedule, but in auto mode"]

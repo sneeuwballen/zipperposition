@@ -143,7 +143,7 @@ let is_logical_op = function
     |_ -> false
 
 let is_logical_binop = function
-    |And|Or|Imply|Xor -> true
+    |And|Or|Imply|Xor|Equiv -> true
     |_->false
 
 let is_quantifier = function 

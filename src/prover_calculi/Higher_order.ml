@@ -1007,7 +1007,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     if T.DB.is_closed arg then Always arg else Varies
                   in
                   (* Find next identical argument *)
-                  let das = match CCList.find_idx ((=) arg) args' with
+                  let das = match CCList.find_idx ((Term.equal) arg) args' with
                     | Some (j, _) -> AlwaysSameAs (i + j + 1)
                     | None -> Unique
                   in
