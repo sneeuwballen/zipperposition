@@ -459,7 +459,7 @@ let bind ~ty binder ~ty_var body = match binder, view body with
     else t_reduced
   | _ -> bind_ binder ~ty ~ty_var body
 
-let app_ f x = match ty f, ty x with
+let app f x = match ty f, ty x with
   | Some {view=Arrow (a,b);_}, Some a' when equal a a' -> app_ f x ~ty:b
   | Some {view=Bind{binder=Binder.ForallTy;ty_var;body};_}, Some ty_x ->
     (* polymorphic type *)
@@ -475,18 +475,6 @@ let app_ f x = match ty f, ty x with
   | _ ->
     errorf "type error: cannot apply `@[<2>%a@ : %a@]`@ to `@[<2>%a@ : %a@]`"
       pp f (Fmt.opt pp) (ty f) pp x (Fmt.opt pp) (ty x)
-
-let app f x = match view f with
-  | Bind {binder=Binder.Lambda;ty_var;body} ->
-    (* β-reduction *)
-    begin match ty x with
-      | Some ty_x when equal ty_var ty_x ->
-        db_eval ~sub:x body
-      | Some ty_x ->
-        errorf "type error: cannot apply `%a`@ to `%a : %a`" pp f pp x pp ty_x
-      | None -> errorf "type error: cannot apply `%a`@ to `%a : none`" pp f pp x
-    end
-  | _ -> app_ f x
 
 let rec app_l f = function
   | [] -> f

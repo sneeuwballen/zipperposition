@@ -152,7 +152,10 @@ module Th_bool = Sidekick_th_bool_static.Make(struct
         B_atom t
   end)
 
-(* lambdas *)
+(* Theory for lambda-expressions. This theory has two functions:
+- For any non-β-reduced term, it adds (λx. t) s = t[s/x] to the congruence closure.
+- For any equality in the congruence closure of a lambda-term (λx. t) with some other term s,
+  it adds an equality t[u/x] = s u when a term of the form s u appears. *)
 module Th_lambda = struct
 
   module SI = Solver.Solver_internal
@@ -184,8 +187,34 @@ module Th_lambda = struct
       end
     | _ -> ()
   
+  let errorf msg = Util.errorf ~where:"llprover" msg
+
+  let beta_reduce st cc node =
+    match T.view (SI.CC.N.term node) with
+      | T.App (t, arg) ->
+        begin match T.view t with
+          | T.Bind {binder=Binder.Lambda;ty_var;body} ->
+            begin match LLTerm.ty arg with
+              | Some ty_arg when T.equal ty_var ty_arg ->
+                (* β-reduction *)
+                Util.debugf 3 ~section "@[beta-reduce@ :term %a@]" 
+                  (fun k -> k T.pp t);
+                let reduced_term = T.db_eval ~sub:arg body in
+                let reduced_node = SI.CC.add_term cc reduced_term in
+                let expl = SI.CC.Expl.mk_merge node node in
+                (* TODO: fix explanation *)
+                SI.CC.merge cc node reduced_node expl
+              | Some ty_x ->
+                errorf "type error: cannot apply `%a`@ to `%a : %a`" T.pp t T.pp arg T.pp ty_x
+              | None -> errorf "type error: cannot apply `%a`@ to `%a : none`" T.pp t T.pp arg
+            end
+          | _ -> ()
+        end
+      | _ -> ()
+  
   let cc_on_new_term _ (st:state) (cc:SI.CC.t) (node:SI.CC.N.t) (_:T.t) = 
     check_triggers st cc node;
+    beta_reduce st cc node;
     ()
 
   let cc_on_post_merge si (st:state) (cc:SI.CC.t) ac (a:SI.CC.N.t) (b:SI.CC.N.t) = 
