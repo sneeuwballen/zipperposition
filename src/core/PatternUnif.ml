@@ -336,7 +336,9 @@ and flex_same ~counter ~scope ~subst var args_s args_t =
   let bvars = 
     CCList.filter_map (fun x->x)
     (CCArray.mapi (fun i si ->
-      if si = CCArray.get bvar_t i then Some (snd si) else None) bvar_s
+      let i,s = si in
+      let bi,bv = CCArray.get bvar_t i in
+      if i=bi && T.equal s bv then Some s else None) bvar_s
      |> CCArray.to_list) in
   let v_ty = Type.arrow (List.map T.ty bvars) ret_ty in
   let matrix = Term.app (Term.var (H.fresh_cnt ~counter ~ty:v_ty ())) bvars in
