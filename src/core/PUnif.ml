@@ -217,25 +217,19 @@ let oracle ~counter ~scope ~subst (s,_) (t,_) (flag:I.t) =
       OSeq.map (CCOpt.map (fun (s,f) -> (s, clear_ident_last f))) res
   | `Flex x, `Flex y ->
       (* all rules  *)
-      let var_imits =
-        if get_op flag ImitFlex < !Params.max_var_imitations then (
-          JP_unif.imitate ~scope ~counter s t []
-          |> OSeq.map (fun x -> Some (U.subst x, clear_ident_last @@ inc_op flag ImitFlex)))
-        else OSeq.empty in
       let ident = 
         if get_op flag Ident < !Params.max_identifications then (
           JP_unif.identify ~scope ~counter s t []
           |> OSeq.map (fun x -> Some (U.subst x, set_ident_last @@ inc_op flag Ident)))
         else OSeq.empty in
-      let var_projs = 
-        if not (is_ident_last flag) then
+      let var_proj_imits = 
           OSeq.append 
-            (proj_imit_lr ~scope ~counter ~subst s t (clear_ident_last flag))
-            (proj_imit_lr ~scope ~counter ~subst t s (clear_ident_last flag))
-        else OSeq.empty in
-      OSeq.append 
-        (OSeq.append var_projs var_imits)
+            (proj_imit_lr ~scope ~counter ~subst s t flag)
+            (proj_imit_lr ~scope ~counter ~subst t s flag)
+          |> OSeq.map (CCOpt.map (fun (s,f) -> (s, clear_ident_last f))) in
+      OSeq.interleave 
         ident 
+        var_proj_imits
     | `Flex _, `Rigid
     | `Rigid, `Flex _ ->
       OSeq.append
