@@ -51,6 +51,7 @@ let _compose_subs = ref false
 let _var_solve = ref false
 let _neg_cong_fun = ref false
 let _unif_max_depth = ref 11
+let _check_fragment = ref `None
 
 type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
 
@@ -1247,10 +1248,25 @@ let extension =
     |> Flex_state.add k_enable_ho_unif (!enabled_ && !enable_unif_)
     |> Flex_state.add k_ho_prim_mode (if !enabled_ then !prim_mode_ else `None)
     |> Flex_state.add k_ho_prim_max_penalty !prim_max_penalty
+  and check_fragment vec state = (* check whether problem is in fragment *)
+    let aux test = 
+      vec
+      |> CCVector.to_seq
+      |> Iter.flat_map Statement.Seq.terms 
+      |> (fun trm -> 
+        try ignore(Iter.for_all test trm)
+        with Failure msg -> failwith ("CNF of this problem is not in the lambda-free fragment: " ^ msg))
+    in
+    begin match !_check_fragment with 
+      | `LambdaFree -> aux Term.in_lfho_fragment
+      | `PredicateFree -> aux Term.in_pfho_fragment
+      | `None -> ()
+    end;
+    state
   in
   { Extensions.default with
       Extensions.name = "ho";
-      post_cnf_actions=[check_ho];
+      post_cnf_actions=[check_ho; check_fragment];
       env_actions=[register];
   }
 
@@ -1313,6 +1329,7 @@ let () =
     _neg_cong_fun := false;
     enable_unif_ := false;
     _prune_arg_fun := `PruneMaxCover;
+    _check_fragment := `PredicateFree;
   );
   Params.add_to_mode "ho-pragmatic" (fun () ->
     enabled_ := true;
@@ -1365,6 +1382,7 @@ let () =
     prim_mode_ := `None;
     Unif._allow_pattern_unif := false;
     Unif._allow_partial_skolem_application := false;
+    _check_fragment := `LambdaFree;
   );
   Params.add_to_modes 
     [ "lambda-free-extensional"

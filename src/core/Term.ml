@@ -447,10 +447,10 @@ let is_ground t = T.is_ground t
 let rec in_pfho_fragment t =
    match view t with
     | Var _ -> if (not (type_ok (ty t))) then
-               (raise (Failure (CCFormat.sprintf "Variable has wrong type [%a]" T.pp t)))
+               (raise (Failure (CCFormat.sprintf "Variable has out-of-fragment type [%a]" T.pp t)))
                else true
     | Const sym -> if (List.for_all type_ok (Type.expected_args (ty t))) then true
-                 else (raise (Failure (CCFormat.sprintf "Constant has wrong type [%a] " ID.pp sym)))
+                 else (raise (Failure (CCFormat.sprintf "Constant has out-of-fragment type [%a] " ID.pp sym)))
     | AppBuiltin( _, l)
     | App (_, l) -> let hd = head_term t in
                     let hd_is_skolem = match as_const hd with
@@ -461,13 +461,13 @@ let rec in_pfho_fragment t =
                     if((not (is_var hd || hd_is_skolem) || type_ok (ty t)) && 
                       List.map ty l |> List.for_all type_ok
                     && List.for_all in_pfho_fragment l) then true
-                    else (raise (Failure (CCFormat.sprintf "Arugment of a term has wrong type [%a]" T.pp t)))
+                    else (raise (Failure (CCFormat.sprintf "Argument of a term has out-of-fragment type [%a]" T.pp t)))
     | Fun (var_t, body) -> if(type_ok (var_t) &&
                            type_ok (ty body) &&
                            in_pfho_fragment body) then true
-                           else (raise (Failure (CCFormat.sprintf "Lambda body has wrong type [%a]" T.pp t)))
+                           else (raise (Failure (CCFormat.sprintf "Lambda body has out-of-fragment type [%a]" T.pp t)))
     | DB _ -> if(type_ok (ty t)) then true
-              else (raise (Failure "Bound variable has wrong type"))
+              else (raise (Failure "Bound variable has out-of-fragment type"))
    and type_ok ty_ =
     not (Type.Seq.sub ty_ |> Iter.exists (fun t -> Type.equal t (Type.prop) || Type.equal t (Type.rat) || Type.equal t (Type.int)))
 
@@ -477,7 +477,7 @@ let in_lfho_fragment t =
       (fun subts ->
          if Iter.for_all (fun subt -> not (is_fun subt)) subts
          then true
-         else raise (Failure "has lambda"))
+         else raise (Failure "Contains a lambda-expression"))
 
 let rec is_fo_term t =
   match view t with
