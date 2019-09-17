@@ -656,82 +656,68 @@ end
 module EPO : ORD = struct
   let name = "epo"
 
-  let rec epo ~prec (s,ss) (t,tt) = CCCache.with_cache _cache (fun ((s,ss), (t,tt)) -> epo_behind_cache ~prec (s,ss) (t,tt)) ((s,ss),(t,tt))
+  let rec epo ~prec (t,tt) (s,ss) = CCCache.with_cache _cache (fun ((t,tt), (s,ss)) -> epo_behind_cache ~prec (t,tt) (s,ss)) ((t,tt),(s,ss))
   and _cache = 
-    let hash ((a,aa),(b,bb)) = Hash.combine5 42 (T.hash a) (T.hash b) (Hash.list T.hash aa) (Hash.list T.hash bb)in
+    let hash ((b,bb),(a,aa)) = Hash.combine5 42 (T.hash b) (T.hash a) (Hash.list T.hash bb) (Hash.list T.hash aa)in
     CCCache.replacing
-      ~eq:(fun ((a1,aa1),(b1,bb1)) ((a2,aa2),(b2,bb2)) -> 
-        T.equal a1 a2 && T.equal b1 b2 
-        && CCList.length aa1 = CCList.length aa2 && CCList.for_all2 T.equal aa1 aa2
-        && CCList.length bb1 = CCList.length bb2 && CCList.for_all2 T.equal bb1 bb2) 
+      ~eq:(fun ((b1,bb1),(a1,aa1)) ((b2,bb2),(a2,aa2)) -> 
+        T.equal b1 b2 && T.equal a1 a2 
+        && CCList.length bb1 = CCList.length bb2 && CCList.for_all2 T.equal bb1 bb2
+        && CCList.length aa1 = CCList.length aa2 && CCList.for_all2 T.equal aa1 aa2) 
       ~hash
       256
-  and epo_behind_cache ~prec (s,ss) (t,tt) = 
-    if T.equal s t && CCList.length ss = CCList.length tt && CCList.for_all2 T.equal ss tt then Eq else
-      begin match Head.term_to_head s, Head.term_to_head t with
-        | f, g ->
-          epo_composite ~prec (s,ss) (t,tt) (f, Head.term_to_args s @ ss)  (g, Head.term_to_args t @ tt)
+  and epo_behind_cache ~prec (t,tt) (s,ss) = 
+    if T.equal t s && CCList.length tt = CCList.length ss && CCList.for_all2 T.equal tt ss then Eq else
+      begin match Head.term_to_head t, Head.term_to_head s with
+        | g, f ->
+          epo_composite ~prec (t,tt) (s,ss) (g, Head.term_to_args t @ tt)  (f, Head.term_to_args s @ ss)
       end
-  and epo_composite ~prec (s,ss) (t,tt) (f,ff) (g,gg) =
-      begin match prec_compare prec f g  with
+  and epo_composite ~prec (t,tt) (s,ss) (g,gg) (f,ff) =
+      begin match prec_compare prec g f  with
+        | Gt -> epo_check_e2_e3 ~prec (t,tt) (s,ss) (g,gg) (f,ff)
+        | Lt -> Comparison.opp (epo_check_e2_e3 ~prec (s,ss) (t,tt) (f,ff) (g,gg))
         | Eq ->
-          let c = match prec_status prec f with
+          let c = match prec_status prec g with
             | Prec.Multiset -> assert false
-            | Prec.Lexicographic -> epo_lex ~prec ff gg
-            | Prec.LengthLexicographic ->  epo_llex ~prec ff gg
-            | Prec.LengthLexicographicRTL ->  epo_llex ~prec (List.rev ff) (List.rev gg)
+            | Prec.Lexicographic -> epo_lex ~prec gg ff
+            | Prec.LengthLexicographic ->  epo_llex ~prec gg ff
+            | Prec.LengthLexicographicRTL ->  epo_llex ~prec (List.rev gg) (List.rev ff)
           in
-          begin match f with
+          begin match g with
             | Head.V _ -> 
-              if c = Gt && some_gt_or_none (epo_chkchop ~prec (chop (f,ff)) (g,gg)) then Gt else
-              if c = Lt && some_gt_or_none (epo_chkchop ~prec (chop (g,gg)) (f,ff)) then Lt else
-              if some_lt_or_eq (epo_chkchop ~prec (t,tt) (f,ff)) then Gt else
-              if some_lt_or_eq (epo_chkchop ~prec (s,ss) (g,gg)) then Lt else
-              Incomparable
-
+              if c = Gt then epo_check_e4 ~prec (t,tt) (s,ss) (g,gg) (f,ff) else
+              if c = Lt then Comparison.opp (epo_check_e4 ~prec (s,ss) (t,tt) (f,ff) (g,gg)) else
+              epo_check_e1 ~prec (t,tt) (s,ss) (g,gg) (f,ff)
             | _ -> 
-              if c = Gt && some_gt_or_none (epo_chkchop ~prec (s,ss) (g,gg)) then Gt else
-              if c = Lt && some_gt_or_none (epo_chkchop ~prec (t,tt) (f,ff)) then Lt else
-              if some_lt_or_eq (epo_chkchop ~prec (t,tt) (f,ff)) then Gt else
-              if some_lt_or_eq (epo_chkchop ~prec (s,ss) (g,gg)) then Lt else
-              Incomparable
+              if c = Gt then epo_check_e2_e3 ~prec (t,tt) (s,ss) (g,gg) (f,ff) else
+              if c = Lt then Comparison.opp (epo_check_e2_e3 ~prec (s,ss) (t,tt) (f,ff) (g,gg)) else
+              epo_check_e1 ~prec (t,tt) (s,ss) (g,gg) (f,ff)
           end
-        | Gt -> 
-          let chk_s_g = epo_chkchop ~prec (s,ss) (g,gg) in
-          if some_gt_or_none chk_s_g then Gt else 
-          if some_lt_or_eq chk_s_g then Lt else
-          if some_lt_or_eq (epo_chkchop ~prec (t,tt) (f,ff)) then Gt else
-          Incomparable
-        | Lt -> 
-          let chk_t_f = epo_chkchop ~prec (t,tt) (f,ff) in
-          if some_gt_or_none chk_t_f then Lt else 
-          if some_lt_or_eq chk_t_f then Gt else
-          if some_lt_or_eq (epo_chkchop ~prec (s,ss) (g,gg)) then Lt else
-          Incomparable
-        | Incomparable -> 
-          if some_lt_or_eq (epo_chkchop ~prec (t,tt) (f,ff)) then Gt else
-          if some_lt_or_eq (epo_chkchop ~prec (s,ss) (g,gg)) then Lt else
-          Incomparable
+        | Incomparable -> epo_check_e1 ~prec (t,tt) (s,ss) (g,gg) (f,ff)
       end
+  and epo_check_e1 ~prec (t,tt) (s,ss) (g,gg) (f,ff) =
+    if gg != [] && (let c = epo ~prec (s,ss) (chop (g,gg)) in c = Lt || c = Eq) then Gt else
+    if ff != [] && (let c = epo ~prec (t,tt) (chop (f,ff)) in c = Lt || c = Eq) then Lt else
+    Incomparable
+  and epo_check_e2_e3 ~prec (t,tt) (s,ss) (g,gg) (f,ff) = 
+    if ff = [] || epo ~prec (t,tt) (chop (f,ff)) = Gt  then Gt else 
+    epo_check_e1 ~prec (t,tt) (s,ss) (g,gg) (f,ff)
+  and epo_check_e4 ~prec (t,tt) (s,ss) (g,gg) (f,ff) = 
+    if ff = [] || epo ~prec (chop (g,gg)) (chop (f,ff)) = Gt then Gt else 
+    epo_check_e1 ~prec (t,tt) (s,ss) (g,gg) (f,ff)
   and chop (f,ff) = (List.hd ff, List.tl ff)
-  and some_gt_or_none x = (x = Some Gt || x = None)
-  and some_lt_or_eq x = (x = Some Lt || x = Some Eq)
-  and epo_chkchop ~prec (t,tt) (f,ff) =
-    if List.length ff > 0
-    then Some (epo ~prec (t,tt) (chop (f,ff)))
-    else None
-  and epo_llex ~prec ff gg =
-    let m, n = (List.length ff), (List.length gg) in
+  and epo_llex ~prec gg ff =
+    let m, n = (List.length gg), (List.length ff) in
     if m < n then Lt else
       if m > n then Gt else
-        epo_lex ~prec ff gg
-  and epo_lex ~prec ff gg =
-    match ff, gg with
+        epo_lex ~prec gg ff
+  and epo_lex ~prec gg ff =
+    match gg, ff with
       | [], [] -> Eq
-      | (ff_hd :: ff_tl), (gg_hd :: gg_tl) -> 
-        let c = epo ~prec (ff_hd,[]) (gg_hd,[]) in
+      | (gg_hd :: gg_tl), (ff_hd :: ff_tl) -> 
+        let c = epo ~prec (gg_hd,[]) (ff_hd,[]) in
         if c = Eq 
-        then epo_lex ~prec ff_tl gg_tl
+        then epo_lex ~prec gg_tl ff_tl
         else c
       | (_ :: _), [] -> Gt
       | [], (_ :: _) -> Lt
