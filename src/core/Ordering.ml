@@ -14,6 +14,9 @@ let prof_rpo6 = Util.mk_profiler "compare_rpo6"
 let prof_kbo = Util.mk_profiler "compare_kbo"
 let prof_epo = Util.mk_profiler "compare_epo"
 
+let stat_calls = Util.mk_stat "compare_calls"
+let stat_incomparable = Util.mk_stat "compare_incomparable"
+
 module T = Term
 module TC = Term.Classic
 
@@ -40,7 +43,11 @@ type t = {
 
 type ordering = t
 
-let compare ord t1 t2 = ord.compare ord.prec t1 t2
+let compare ord t1 t2 = 
+  let c = ord.compare ord.prec t1 t2 in
+  if c = Incomparable then Util.incr_stat stat_incomparable;
+  Util.incr_stat stat_calls;
+  c
 
 let might_flip ord t1 t2 = ord.might_flip ord.prec t1 t2
 
