@@ -15,6 +15,7 @@ end
 exception NotSolid
 exception CoveringImpossible
 exception NotInFragment = PU.NotInFragment
+exception NotUnifiable = PU.NotUnifiable
 
 let solidify t =
   let rec aux t =
@@ -103,10 +104,7 @@ let cover_rigid_skeleton t solids =
     aux t
   with CoveringImpossible -> []
 
-let collect_flex_flex ~subst ~counter ~scope t args  =
-  let t' = S.FO.apply S.Renaming.none subst (t, scope) in
-  let t' = Lambda.eta_expand @@ Lambda.snf t' in
-
+let collect_flex_flex ~counter t args  =
   let rec aux ~bvar_tys t =
     match T.view t with
     | AppBuiltin (hd,args) ->
@@ -139,29 +137,20 @@ let collect_flex_flex ~subst ~counter ~scope t args  =
       let body', cons = aux ~bvar_tys body in
       T.fun_ ty body', cons
     | _ -> t, [] in
-
-  aux ~bvar_tys:[] t'
+  
+  aux ~bvar_tys:[] t
 
 let solve_flex_flex ~subst ~counter ~scope lhs rhs =
-  let norm_args args =
-    List.map (fun arg -> 
-      let ty = T.ty arg in
-      if Type.is_fun ty then (
-        let arg = Lambda.eta_reduce arg in
-        if Term.is_bvar arg then arg else raise NotInFragment
-      ) else (
-        let arg = S.FO.apply S.Renaming.none subst (arg, scope) in
-        let arg = Lambda.snf arg in
-        if Term.is_ground arg then arg else raise NotInFragment
-      )
-    ) args in
-
-  assert(Term.is_app_var lhs && T.is_app_var rhs);
+  let lhs = solidify @@ Subst.FO.apply Subst.Renaming.none subst (lhs,scope) in 
+  let rhs = solidify @@ Subst.FO.apply Subst.Renaming.none subst (rhs,scope) in
+  assert(Term.is_app_var lhs);
+  assert(T.is_app_var rhs);
   assert(Type.equal (Term.ty lhs) (Term.ty rhs));
-  let hd_l, args_l, n_l = T.as_var_exn @@ T.head_term lhs, 
-                          norm_args @@ T.args lhs, List.length @@ T.args lhs in
-  let hd_r, args_r, n_r = T.as_var_exn @@ T.head_term rhs, 
-                          norm_args @@ T.args rhs, List.length @@ T.args rhs in
+
+  let hd_l, args_l, n_l = 
+    T.as_var_exn @@ T.head_term lhs, T.args lhs, List.length @@ T.args lhs in
+  let hd_r, args_r, n_r = 
+    T.as_var_exn @@ T.head_term rhs, T.args rhs, List.length @@ T.args rhs in
   
   let covered_l =
     CCList.flatten (List.mapi (fun i arg -> 
@@ -188,21 +177,142 @@ let solve_flex_flex ~subst ~counter ~scope lhs rhs =
   let subs_r = T.fun_l (List.map T.ty args_r) (T.app fresh_var (List.map snd all_covers)) in
   let subst = Subst.FO.bind' subst (hd_l, scope) (subs_l,scope) in
   let subst = Subst.FO.bind' subst (hd_r, scope) (subs_r,scope) in
-  subst
+  US.of_subst subst
+
+let solve_flex_rigid ~subst ~counter ~scope flex rigid =
+  assert(T.is_app_var flex);
+  assert(not @@ T.is_app_var rigid);
+
+  let flex, rigid = solidify flex, solidify rigid in
+  let flex_args = T.args flex in
+  let rigid', flex_constraints = collect_flex_flex ~counter rigid flex_args in
+  let subst = List.fold_left (fun subst (lhs,rhs) -> 
+    US.subst (solve_flex_flex ~subst ~counter ~scope lhs rhs)
+  ) subst flex_constraints in
+
+  let rigid = Subst.FO.apply Subst.Renaming.none subst (rigid, scope) in
+  let rigid_covers = cover_rigid_skeleton rigid flex_args in
+  if CCList.is_empty rigid_covers then (
+    raise NotUnifiable
+  ) else (
+    let tys = List.map T.ty flex_args in
+    let head_var = T.as_var_exn @@ T.head_term flex in
+    List.map (fun rigid' ->
+      let closed_rigid = T.fun_l tys rigid' in
+      assert(T.DB.is_closed closed_rigid);
+      let subs_flex = Subst.FO.bind' subst (head_var,scope) (closed_rigid,scope) in
+      US.of_subst subs_flex
+    ) rigid_covers
+  )
 
 let var_conditions s t = 
   (T.is_linear s || T.is_linear t) &&
   T.VarSet.is_empty (T.VarSet.inter (T.vars s) (T.vars t))
 
-let unify ~scope ~counter ~subst list =
-  raise NotInFragment
-  
+let norm t = 
+  if Term.is_fun (T.head_term t)
+  then Lambda.whnf t else t
+
+let rec norm_deref subst (t,sc) =
+  let pref, tt = T.open_fun t in
+  let t' =  
+    begin match T.view tt with
+      | T.Var _ ->
+        let u, _ = US.FO.deref subst (tt,sc) in
+        if T.equal tt u then u
+        else norm_deref subst (u,sc)
+      | T.App (f0, l) ->
+        let f = norm_deref subst (f0, sc) in
+        let t =
+          if T.equal f0 f then tt else T.app f l in
+        let u = norm t in
+        if T.equal t u
+        then t
+        else norm_deref subst (u,sc)
+      | _ -> tt
+    end in
+  if T.equal tt t' then t
+  else T.fun_l pref t'
+
+let eta_expand_otf ~subst ~scope pref1 pref2 t1 t2 =
+  let do_exp_otf n types t = 
+    let remaining = CCList.drop n types in
+    assert(List.length remaining != 0);
+    let num_vars = List.length remaining in
+    let vars = List.mapi (fun i ty -> 
+      let ty = US_A.apply_ty subst (ty,scope) in
+      T.bvar ~ty (num_vars-1-i)) remaining in
+    let shifted = T.DB.shift num_vars t in
+    (* T.app_w_ty shifted vars ~ty:(S.apply_ty subst (T.ty shifted, scope)) in  *)
+    T.app shifted vars in
+  if List.length pref1 = List.length pref2 then (t1, t2, pref1)
+  else (
+    let n1, n2 = List.length pref1, List.length pref2 in 
+    if n1 < n2 then (
+      (do_exp_otf n1 pref2 t1,t2,pref2)
+    ) else (
+      assert(n1 > n2);
+      (t1,do_exp_otf n2 pref1 t2,pref1)
+    )
+  )
+
+let build_constraints args1 args2 rest =
+  let rf, other = 
+    CCList.combine args1 args2
+    |> CCList.partition (fun (s,t) -> T.is_const (T.head_term s) && T.is_const (T.head_term t)) in
+    rf @ rest @ other
+
+let rec unify ~scope ~counter ~subst constraints =
+  match constraints with
+  | [] -> [subst]
+  | (s,t) :: rest -> 
+    
+    if not (Type.equal (T.ty s) (T.ty t)) then (
+      raise NotUnifiable
+    );
+
+    let s', t' = norm_deref subst (s,scope), norm_deref subst (t,scope) in
+
+    if not (Term.equal s' t') then (
+      let pref_s, body_s = T.open_fun s' in
+      let pref_t, body_t = T.open_fun t' in 
+      let body_s', body_t', _ = eta_expand_otf ~subst ~scope pref_s pref_t body_s body_t in
+      let hd_s, args_s = T.as_app body_s' in
+      let hd_t, args_t = T.as_app body_t' in
+      (* let hd_s, hd_t = CCPair.map_same (fun t -> cast_var t subst scope) (hd_s, hd_t) in                                        *)
+      match T.view hd_s, T.view hd_t with 
+      | (T.Var _, T.Var _) ->
+        let body_s', body_t' = solidify body_s', solidify body_t' in
+        let subst = solve_flex_flex ~subst:(US.subst subst) ~scope ~counter body_s' body_t' in
+        unify ~scope ~counter ~subst rest
+      | (T.Var _, _) ->
+        let subst = solve_flex_rigid ~subst:(US.subst subst) ~counter ~scope  body_s' body_t' in
+        CCList.flat_map (fun subst -> unify ~scope ~counter ~subst rest) subst
+      | (_, T.Var _) ->
+        let subst = solve_flex_rigid ~subst:(US.subst subst) ~counter ~scope  body_t' body_s' in
+        CCList.flat_map (fun subst -> unify ~scope ~counter ~subst rest) subst
+      | T.AppBuiltin(hd_s, args_s'), T.AppBuiltin(hd_t, args_t') when
+          Builtin.equal hd_s hd_t &&
+          (* not (Builtin.equal Builtin.ForallConst hd_s) &&
+          not (Builtin.equal Builtin.ExistsConst hd_s) &&   *)
+          List.length args_s' + List.length args_s = 
+          List.length args_t' + List.length args_t ->
+          unify ~subst ~counter ~scope @@ build_constraints (args_s'@args_s)  (args_t'@args_t) rest
+      | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->
+        (* assert (List.length args_s = List.length args_t); *)
+        unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest
+      | _ -> raise NotUnifiable) 
+    else (
+      unify ~subst ~counter ~scope rest
+    )
+
+
 let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
   let res = 
     if US.is_empty subst then (
       let t0',t1',scope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
       if var_conditions t0' t1' then (
-        let t0' t1' = solidify t0', solidify t1' in
+        let t0',t1' = solidify t0', solidify t1' in
         unify ~scope ~counter ~subst [(t0', t1')])
       else raise NotInFragment
     )
@@ -216,6 +326,7 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
       )
     ) 
   in
-  res
+  if CCList.is_empty res then raise NotUnifiable
+  else res
 
 
