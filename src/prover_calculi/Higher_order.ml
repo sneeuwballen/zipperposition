@@ -1401,6 +1401,7 @@ let () =
       "--ho-max-app-projections", Arg.Set_int PragUnifParams.max_app_projections, " set maximal number of functional type projections";
       "--ho-max-var-imitations", Arg.Set_int PragUnifParams.max_var_imitations, " set maximal number of flex-flex imitations";
       "--ho-max-identifications", Arg.Set_int PragUnifParams.max_identifications, " set maximal number of flex-flex identifications";
+      "--ho-max-rigid-imitations", Arg.Set_int PragUnifParams.max_rigid_imitations, " set maximal number of rigid imitations";
       "--ho-max-elims", Arg.Set_int PragUnifParams.max_elims, " set maximal number of eliminations";
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->

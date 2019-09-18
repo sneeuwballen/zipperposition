@@ -1,6 +1,7 @@
 let max_depth = ref 4
 let max_app_projections = ref 2
 let max_var_imitations = ref 1
+let max_rigid_imitations = ref 3
 let max_identifications = ref 0
 let max_elims           = ref 0
 

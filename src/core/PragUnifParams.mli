@@ -1,6 +1,7 @@
 val max_depth : int ref
 val max_app_projections : int ref
 val max_var_imitations : int ref
+val max_rigid_imitations : int ref
 val max_identifications : int ref
 val max_elims           : int ref
 

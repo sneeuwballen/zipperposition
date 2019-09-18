@@ -137,7 +137,9 @@ let proj_imit_lr ~counter ~scope ~subst s t flag =
       else proj_lr ~counter ~scope ~subst s t flag in
     let imit_binding =
       try
-        if not (Term.is_app_var t) || get_op flag ImitFlex < !Params.max_var_imitations  then (
+        if (not (Term.is_app_var t) || get_op flag ImitFlex < !Params.max_var_imitations)
+           && (Term.is_app_var t || get_op flag ImitRigid < !Params.max_rigid_imitations) 
+           then (
           let flag' = if Term.is_app_var t then inc_op flag ImitFlex 
                       (*else if List.length (Type.expected_args (Term.ty t)) != 0
                             then inc_op flag ImitRigid else flag in*)
