@@ -9,7 +9,7 @@ module type PARAMETERS = sig
   type flag_type
   val init_flag : flag_type
   val identify_scope : T.t Scoped.t -> T.t Scoped.t -> T.t * T.t * Scoped.scope * S.t
-  val frag_algs : (T.t Scoped.t -> T.t Scoped.t -> S.t -> S.t) list
+  val frag_algs : (T.t Scoped.t -> T.t Scoped.t -> S.t -> S.t list) list
   val pb_oracle : (T.t Scoped.t -> T.t Scoped.t -> flag_type -> S.t -> Scoped.scope -> (S.t * flag_type) option LL.t)
   val oracle_composer : 'a OSeq.t -> 'a OSeq.t -> 'a OSeq.t
 end
@@ -127,10 +127,12 @@ module Make (P : PARAMETERS) = struct
                   | P.NotUnifiable -> raise Unif.Fail
               ) P.frag_algs in 
               match mgu with 
-              | Some subst ->
+              | Some substs ->
                 (* We assume that the substitution was augmented so that it is mgu for
                     lhs and rhs *)
-                do_unif rest subst mono unifscope
+                OSeq.flat_map (fun subst -> 
+                  do_unif rest subst mono unifscope) 
+                (OSeq.of_list substs)
               | None ->
                 let flagged_pb = P.pb_oracle (body_lhs, unifscope) (body_rhs, unifscope) flag subst unifscope in
                 P.oracle_composer

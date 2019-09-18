@@ -194,7 +194,7 @@ let renamer ~counter t0s t1s =
   lhs,rhs,unifscope,U.subst us
 
 let pattern_frag ~counter =
-  [(fun s t sub -> U.subst @@  PatternUnif.unify_scoped ~subst:(U.of_subst sub) ~counter s t)]
+  [(fun s t sub -> [U.subst @@  PatternUnif.unify_scoped ~subst:(U.of_subst sub) ~counter s t])]
 
 let head_classifier s =
   match T.view @@ T.head_term s with 
