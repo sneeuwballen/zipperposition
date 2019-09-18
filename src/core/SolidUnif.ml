@@ -1,8 +1,51 @@
 module T = Term
 module S = Subst
 module PU = PatternUnif
+module US = Unif_subst
 
+module US_A = struct
+
+  let apply s t = Subst.FO.apply Subst.Renaming.none (US.subst s) t
+
+  let apply_ty s ty = Subst.Ty.apply Subst.Renaming.none (US.subst s) ty
+  let pp = US.pp
+
+end
+
+exception NotSolid
 exception CoveringImpossible
+exception NotInFragment = PU.NotInFragment
+
+let solidify t =
+  let rec aux t =
+    match T.view t with
+    | AppBuiltin(hd, args) -> 
+      let args' = List.map aux args in
+      if T.same_l args args' then t 
+      else T.app_builtin ~ty:(T.ty t) hd args'
+    | App(hd, args) when not @@ T.is_var hd ->
+      let hd' = aux hd in
+      let args' = List.map aux args in
+      if T.equal hd hd' && T.same_l args args' then t
+      else T.app hd' args'
+    | App(hd, args) ->
+      assert (T.is_var hd);
+      let args' = List.map (fun arg -> 
+        if Type.is_fun (T.ty arg) then (
+          let arg = Lambda.eta_reduce arg in
+          if T.is_bvar arg then arg else raise NotInFragment
+        ) else (
+          let arg = Lambda.snf arg in
+          if T.is_ground arg then arg else raise NotInFragment
+        )
+      ) args in
+      if T.same_l args args' then t
+      else T.app hd args'
+    | Fun (ty, body) ->
+      let body' = aux body in
+      T.fun_ ty body'
+    | _ -> t in
+  aux t
 
 let rec all_combs = function 
   | [] -> []
@@ -27,14 +70,14 @@ let cover_rigid_skeleton t solids =
       CCList.filter_map (fun (s, s_db) -> 
         if T.equal s t then Some s_db else None) 
       sols_as_db in
-    let rest = 
+    let rest =
       try 
         match T.view t with
         | AppBuiltin (hd,args) ->
           if CCList.is_empty args then [T.app_builtin ~ty:(T.ty t) hd []]
           else (
             let args_combined = all_combs (List.map aux args) in
-            List.map (fun args -> T.app_builtin ~ty:(T.ty t) hd args) args_combined
+            List.map (T.app_builtin ~ty:(T.ty t) hd) args_combined
           )
         | App(hd,args) ->
           if Term.is_var hd then [t]
@@ -105,11 +148,11 @@ let solve_flex_flex ~subst ~counter ~scope lhs rhs =
       let ty = T.ty arg in
       if Type.is_fun ty then (
         let arg = Lambda.eta_reduce arg in
-        if Term.is_bvar arg then arg else raise PU.NotInFragment
+        if Term.is_bvar arg then arg else raise NotInFragment
       ) else (
         let arg = S.FO.apply S.Renaming.none subst (arg, scope) in
         let arg = Lambda.snf arg in
-        if Term.is_ground arg then arg else raise PU.NotInFragment
+        if Term.is_ground arg then arg else raise NotInFragment
       )
     ) args in
 
@@ -145,6 +188,34 @@ let solve_flex_flex ~subst ~counter ~scope lhs rhs =
   let subs_r = T.fun_l (List.map T.ty args_r) (T.app fresh_var (List.map snd all_covers)) in
   let subst = Subst.FO.bind' subst (hd_l, scope) (subs_l,scope) in
   let subst = Subst.FO.bind' subst (hd_r, scope) (subs_r,scope) in
-  subst 
+  subst
+
+let var_conditions s t = 
+  (T.is_linear s || T.is_linear t) &&
+  T.VarSet.is_empty (T.VarSet.inter (T.vars s) (T.vars t))
+
+let unify ~scope ~counter ~subst list =
+  raise NotInFragment
+  
+let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
+  let res = 
+    if US.is_empty subst then (
+      let t0',t1',scope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
+      if var_conditions t0' t1' then (
+        let t0' t1' = solidify t0', solidify t1' in
+        unify ~scope ~counter ~subst [(t0', t1')])
+      else raise NotInFragment
+    )
+    else (
+      if Scoped.scope t0_s != Scoped.scope t1_s then (
+        raise (Invalid_argument "scopes should be the same")
+      )
+      else (
+        let t0', t1' = US_A.apply subst t0_s, US_A.apply subst t1_s in
+        unify ~scope:(Scoped.scope t0_s) ~counter ~subst [(t0', t1')]
+      )
+    ) 
+  in
+  res
 
 

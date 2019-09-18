@@ -502,6 +502,31 @@ let ho_weight = T.ho_weight
 
 let is_ground t = T.is_ground t
 
+let of_term_unsafe t = t
+let of_term_unsafe_l l = l
+
+let of_ty t = (t : Type.t :> T.t)
+
+
+let is_linear t =
+  let var_set = VarTbl.create 8 in
+
+  let rec aux t =
+    match view t with
+    | AppBuiltin(hd, args) -> 
+      List.for_all aux args
+    | App(hd, args) ->
+      List.for_all aux (hd :: args)
+    | Fun(_, body) -> aux body
+    | Var v -> 
+      if VarTbl.mem var_set v then false
+      else (VarTbl.add var_set v (); true)
+    | _ -> true in
+
+  let res = aux t in
+  VarTbl.clear var_set;
+  res
+
 let rec in_pfho_fragment t =
    match view t with
     | Var _ -> if (not (type_ok (ty t))) then
@@ -606,10 +631,6 @@ let head t =
 
 let ty_vars t = Seq.ty_vars t |> Type.VarSet.of_seq
 
-let of_term_unsafe t = t
-let of_term_unsafe_l l = l
-
-let of_ty t = (t : Type.t :> T.t)
 
 (** {2 Subterms and positions} *)
 

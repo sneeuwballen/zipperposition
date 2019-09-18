@@ -205,6 +205,7 @@ end
 
 val var_occurs : var:var -> t -> bool (** [var_occurs ~var t] true iff [var] in t *)
 val is_ground : t -> bool (** is the term ground? (no free vars) *)
+val is_linear : t -> bool (** is the term linear? (no vars occuring multiple times) *)
 val monomorphic : t -> bool (** true if the term contains no type var *)
 val max_var : VarSet.t -> int (** find the maximum variable *)
 val min_var : VarSet.t -> int (** minimum variable *)
