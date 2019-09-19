@@ -208,6 +208,7 @@ let solve_flex_rigid ~subst ~counter ~scope flex rigid =
   assert(T.is_var (T.head_term flex));
   assert(not @@ T.is_app_var rigid);
 
+  let rigid = Subst.FO.apply Subst.Renaming.none subst (rigid, scope) in
   let flex, rigid = solidify flex, solidify rigid in
   let flex_args = T.args flex in
   let rigid', flex_constraints = collect_flex_flex ~counter rigid in
