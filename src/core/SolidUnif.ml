@@ -361,6 +361,18 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
       )
     ) 
   in
+
+  assert(List.for_all (fun sub -> 
+    let norm t = Lambda.eta_reduce @@ Lambda.snf t in
+    let lhs = norm @@ US_A.apply sub t0_s and rhs = norm @@ US_A.apply sub t1_s in
+    if T.equal lhs rhs then true
+    else (
+      CCFormat.printf "orig: @[%a@]=?=@[%a@]" (Scoped.pp T.pp) t0_s (Scoped.pp T.pp) t1_s ;
+      CCFormat.printf "sub: @[%a@]" US.pp sub ;
+      CCFormat.printf "res: @[%a@]=?=@[%a@]" T.pp lhs T.pp rhs ;
+      false
+    )) res);
+
   if CCList.is_empty res then raise NotUnifiable
   else res
 
