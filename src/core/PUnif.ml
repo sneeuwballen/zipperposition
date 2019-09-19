@@ -193,7 +193,7 @@ let renamer ~counter t0s t1s =
   let lhs,rhs, unifscope, us = U.FO.rename_to_new_scope ~counter t0s t1s in
   lhs,rhs,unifscope,U.subst us
 
-let deciders ~counter =
+let deciders ~counter () =
   let pattern = 
     if !PragUnifParams.pattern_decider then 
       [(fun s t sub -> [(U.subst @@ PatternUnif.unify_scoped ~subst:(U.of_subst sub) ~counter s t)])] 

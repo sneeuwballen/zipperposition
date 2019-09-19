@@ -8,5 +8,5 @@ let max_elims           = ref 0
 let _cons_e = ref true
 let _imit_first = ref false
 
-let pattern_decider = ref true
-let solid_decider = ref false
+let pattern_decider = ref false
+let solid_decider = ref true

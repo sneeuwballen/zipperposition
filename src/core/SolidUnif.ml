@@ -144,8 +144,6 @@ let collect_flex_flex ~counter t  =
 let solve_flex_flex_diff ~subst ~counter ~scope lhs rhs =
   let lhs = solidify @@ Subst.FO.apply Subst.Renaming.none subst (lhs,scope) in 
   let rhs = solidify @@ Subst.FO.apply Subst.Renaming.none subst (rhs,scope) in
-  assert(Term.is_app_var lhs);
-  assert(T.is_app_var rhs);
   assert(Type.equal (Term.ty lhs) (Term.ty rhs));
 
   let hd_l, args_l, n_l = 
@@ -207,7 +205,7 @@ let solve_flex_flex_same ~subst ~counter ~scope lhs rhs =
   US.of_subst subst
 
 let solve_flex_rigid ~subst ~counter ~scope flex rigid =
-  assert(T.is_app_var flex);
+  assert(T.is_var (T.head_term flex));
   assert(not @@ T.is_app_var rigid);
 
   let flex, rigid = solidify flex, solidify rigid in
