@@ -353,7 +353,11 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
       )
       else (
         let t0', t1' = US_A.apply subst t0_s, US_A.apply subst t1_s in
-        unify ~scope:(Scoped.scope t0_s) ~counter ~subst [(t0', t1')]
+        if var_conditions t0' t1' then (
+          let t0',t1' = solidify t0', solidify t1' in
+          unify ~scope:(Scoped.scope t0_s) ~counter ~subst [(t0', t1')]
+        )
+        else raise NotInFragment
       )
     ) 
   in
