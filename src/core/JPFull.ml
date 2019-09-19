@@ -77,7 +77,7 @@ let oracle ~counter ~scope (s,_) (t,_) flag =
       (proj_rule ~counter ~scope s t flag) *)
       (OSeq.append (elim_rule ~counter ~scope s t flag)
                    (iter_rule ~counter ~scope s t flag))
-  | `Flex x, `Flex y ->
+  | `Flex _, `Flex _ ->
     (* all rules  *)
     OSeq.append 
       (proj_rule ~counter ~scope s t flag)

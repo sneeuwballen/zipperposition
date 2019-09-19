@@ -513,7 +513,7 @@ let is_linear t =
 
   let rec aux t =
     match view t with
-    | AppBuiltin(hd, args) -> 
+    | AppBuiltin(_, args) -> 
       List.for_all aux args
     | App(hd, args) ->
       List.for_all aux (hd :: args)
@@ -564,7 +564,7 @@ let in_lfho_fragment t =
 let rec is_fo_term t =
   match view t with
   | Var _ -> not @@ Type.is_fun @@ ty t
-  | AppBuiltin (_,l) -> false
+  | AppBuiltin _ -> false
   | App (hd, l) -> let expected_args = List.length @@ Type.expected_args @@ ty hd in
                    let actual_args = List.length l in
                    expected_args = actual_args &&

@@ -12,7 +12,7 @@ module US_A = struct
 
 end
 
-exception NotSolid
+(* exception NotSolid *)
 exception CoveringImpossible
 exception NotInFragment = PU.NotInFragment
 exception NotUnifiable = PU.NotUnifiable
@@ -104,7 +104,7 @@ let cover_rigid_skeleton t solids =
     aux t
   with CoveringImpossible -> []
 
-let collect_flex_flex ~counter t args  =
+let collect_flex_flex ~counter t  =
   let rec aux ~bvar_tys t =
     match T.view t with
     | AppBuiltin (hd,args) ->
@@ -211,12 +211,12 @@ let solve_flex_rigid ~subst ~counter ~scope flex rigid =
 
   let flex, rigid = solidify flex, solidify rigid in
   let flex_args = T.args flex in
-  let rigid', flex_constraints = collect_flex_flex ~counter rigid flex_args in
+  let rigid', flex_constraints = collect_flex_flex ~counter rigid in
   let subst = List.fold_left (fun subst (lhs,rhs) -> 
     US.subst (solve_flex_flex_diff ~subst ~counter ~scope lhs rhs)
   ) subst flex_constraints in
 
-  let rigid = Subst.FO.apply Subst.Renaming.none subst (rigid, scope) in
+  let rigid = Subst.FO.apply Subst.Renaming.none subst (rigid', scope) in
   let rigid_covers = cover_rigid_skeleton rigid flex_args in
   if CCList.is_empty rigid_covers then (
     raise NotUnifiable

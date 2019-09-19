@@ -145,7 +145,7 @@ let rec open_bind b t = match view t with
 let[@inline] is_var t = match view t with | Var _ -> true | _ -> false
 
 let ho_weight_ t t_ty = 
-  let rec aux t t_ty = 
+  let rec aux t _ = 
     let init_w s_ty = match s_ty with 
     | NoType -> 0
     | HasType ty -> 
@@ -162,7 +162,7 @@ let ho_weight_ t t_ty =
       | App (f, l) ->
         if is_var f then 1
         else aux_l (aux (view f) (ty f)) l
-      | AppBuiltin (b, l) -> aux_l (1) l
+      | AppBuiltin (_, l) -> aux_l (1) l
   and aux_l acc = function
   | [] -> acc
   | x :: xs -> aux_l (acc + aux (view x) (ty x))  xs 

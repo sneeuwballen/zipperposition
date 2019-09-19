@@ -24,7 +24,7 @@ let unif_simple ?(subst=Subst.empty) ~scope t s =
     Some (US.of_subst type_unifier)
   with Unif.Fail -> None
 
-let cast_var v subst sc =
+let cast_var v _ _ =
   (* let ty = Term.ty v in
   if Type.is_ground ty then v
   else (
@@ -335,7 +335,7 @@ and flex_same ~counter ~scope ~subst var args_s args_t =
         cast_var t subst scope) args_s :> InnerTerm.t list)) in
   let bvars = 
     CCList.filter_map (fun x->x)
-    (CCArray.mapi (fun i si ->
+    (CCArray.mapi (fun _ si ->
       let i,s = si in
       let bi,bv = CCArray.get bvar_t i in
       if i=bi && T.equal s bv then Some s else None) bvar_s

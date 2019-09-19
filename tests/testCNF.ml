@@ -15,7 +15,7 @@ let check_cnf_gives_clauses =
   (* check that the CNf of a formula is in clausal form *)
   let prop f =
     let proof = Proof.Step.intro (Proof.Src.from_file "<none>") Proof.R_goal in
-    Cnf.cnf_of (Statement.assert_ ~proof f)
+    Cnf.cnf_of ~ctx:(Skolem.create ()) (Statement.assert_ ~proof f)
     |> CCVector.flat_map_list
       (fun st -> match Statement.view st with
         | Statement.Data _

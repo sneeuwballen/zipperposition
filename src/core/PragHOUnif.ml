@@ -395,7 +395,7 @@ and try_weaker_unif ~subst ~state ~counter ~scope ~s ~t ~rest ~continuation =
 (* If it is an applied variable that is applied to
    itself somewhere, then we need to consider lfho unifier *)
 let is_lfho_candidate t = 
-  let rec aux t = match T.view t with
+  let aux t = match T.view t with
   | App(hd, args) -> 
     T.is_var hd && (List.exists (T.subterm ~sub:hd) args) 
   | _ -> false

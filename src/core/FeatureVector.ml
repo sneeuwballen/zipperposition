@@ -53,7 +53,7 @@ module Make(C : Index.CLAUSE) = struct
       | T.Var _
       | T.Const _
       | T.DB _ -> depth
-      | T.Fun (_,u) -> assert false (* we just opened a function*)
+      | T.Fun _ -> assert false (* we just opened a function*)
       | T.AppBuiltin (_, l)
       | T.App (_, l) ->
         if CCList.is_empty l || T.is_var (T.head_term t)  then depth (* for logical operators*)

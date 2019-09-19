@@ -38,7 +38,7 @@ let expand_otf_ body =
 (* compute a feature for a given position *)
 let rec gfpf ?(depth=0) pos t =
   let depth_inc = List.length (Type.expected_args (Term.ty t)) in
-  let pref_vars, body =  T.open_fun t in
+  let _, body =  T.open_fun t in
   match pos with 
   | [] -> 
     let body = expand_otf_ body in

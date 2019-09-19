@@ -30,7 +30,7 @@ let op_masks =
    Elim, (i63 <<< 24, 24, "elim")]
 
 let get_op flag op =
-  let mask,shift,name = List.assoc op op_masks in
+  let mask,shift,_ = List.assoc op op_masks in
   I.to_int ((flag &&& mask) >>> shift)
 
 let inc_op flag op =
@@ -218,7 +218,7 @@ let oracle ~counter ~scope ~subst (s,_) (t,_) (flag:I.t) =
         then elim_rule ~counter ~scope s t flag 
         else OSeq.return (Some (elim_trivial ~counter ~scope x, flag)) in
       OSeq.map (CCOpt.map (fun (s,f) -> (s, clear_ident_last f))) res
-  | `Flex x, `Flex y ->
+  | `Flex _, `Flex _s ->
       (* all rules  *)
       let ident = 
         if get_op flag Ident < !Params.max_identifications then (

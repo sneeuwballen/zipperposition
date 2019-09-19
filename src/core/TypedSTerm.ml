@@ -1014,18 +1014,20 @@ let rec rectify_aux ?(pref="v_") ~cnt ~subst t =
       app_builtin ~ty:t_ty b fs, subst
     | _ -> t, subst
 and rec_aux_l ?(pref="v_") ~cnt ~subst args =
-      List.fold_right (fun arg (tmp,subst) -> 
-        let arg', subst' = rectify_aux ~subst ~cnt arg in
-        arg' :: tmp, subst'
-      ) args ([], subst)
+  ignore(pref);
+  List.fold_right (fun arg (tmp,subst) -> 
+    let arg', subst' = rectify_aux ~subst ~cnt arg in
+    arg' :: tmp, subst'
+  ) args ([], subst)
 and handle_var ~pref ?(rename=true) ~cnt ~subst v t_ty = 
-      if rename && Subst.mem subst v then (Subst.find_exn subst v, subst, v) else (
-        let id = CCRef.get_then_incr cnt in
-        let v' = Var.make ~ty:t_ty (ID.dummy_of_int id) in
-        let res = var v' in
-        let subst = Subst.add subst v res in
-        (res, subst, v')
-      )
+  ignore(pref);
+  if rename && Subst.mem subst v then (Subst.find_exn subst v, subst, v) else (
+    let id = CCRef.get_then_incr cnt in
+    let v' = Var.make ~ty:t_ty (ID.dummy_of_int id) in
+    let res = var v' in
+    let subst = Subst.add subst v res in
+    (res, subst, v')
+  )
 
 let rectify ?(cnt=ref 0) ?(subst=Subst.empty) t = 
   rectify_aux ~cnt ~subst t

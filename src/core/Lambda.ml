@@ -93,6 +93,7 @@ module Inner = struct
     | _ -> t
   
   let rec whnf_term ?(env=DBEnv.empty) t =
+    ignore(env);
     let pref, tt = T.open_bind Binder.Lambda t in
     assert(not (T.is_lambda tt));
     let hd, args = T.as_app tt in
@@ -316,7 +317,7 @@ let rec is_properly_encoded t = match T.view t with
     | _ -> false end in
     if not res then CCFormat.printf "Failed for %a.\n" T.pp t;
     res
-| AppBuiltin(hd,l) -> List.for_all is_properly_encoded l
+| AppBuiltin(_,l) -> List.for_all is_properly_encoded l
 | App (hd, l) -> List.for_all is_properly_encoded (hd::l)
 | Fun (_,u) -> is_properly_encoded u 
  
