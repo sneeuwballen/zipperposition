@@ -140,7 +140,7 @@ let collect_flex_flex ~counter t args  =
   
   aux ~bvar_tys:[] t
 
-let solve_flex_flex ~subst ~counter ~scope lhs rhs =
+let solve_flex_flex_diff ~subst ~counter ~scope lhs rhs =
   let lhs = solidify @@ Subst.FO.apply Subst.Renaming.none subst (lhs,scope) in 
   let rhs = solidify @@ Subst.FO.apply Subst.Renaming.none subst (rhs,scope) in
   assert(Term.is_app_var lhs);
@@ -151,6 +151,7 @@ let solve_flex_flex ~subst ~counter ~scope lhs rhs =
     T.as_var_exn @@ T.head_term lhs, T.args lhs, List.length @@ T.args lhs in
   let hd_r, args_r, n_r = 
     T.as_var_exn @@ T.head_term rhs, T.args rhs, List.length @@ T.args rhs in
+  assert(not @@ HVar.equal Type.equal hd_l hd_r);
   
   let covered_l =
     CCList.flatten (List.mapi (fun i arg -> 
@@ -179,6 +180,31 @@ let solve_flex_flex ~subst ~counter ~scope lhs rhs =
   let subst = Subst.FO.bind' subst (hd_r, scope) (subs_r,scope) in
   US.of_subst subst
 
+let solve_flex_flex_same ~subst ~counter ~scope lhs rhs =
+  let lhs = solidify @@ Subst.FO.apply Subst.Renaming.none subst (lhs,scope) in 
+  let rhs = solidify @@ Subst.FO.apply Subst.Renaming.none subst (rhs,scope) in
+  assert(Term.is_app_var lhs);
+  assert(T.is_app_var rhs);
+  assert(Type.equal (Term.ty lhs) (Term.ty rhs));
+
+  let hd_l, args_l, n_l = 
+    T.as_var_exn @@ T.head_term lhs, T.args lhs, List.length @@ T.args lhs in
+  let hd_r, args_r, n_r = 
+    T.as_var_exn @@ T.head_term rhs, T.args rhs, List.length @@ T.args rhs in
+  assert(HVar.equal Type.equal hd_l hd_r);
+  assert(n_l = n_r);
+  let same_args = 
+    List.combine args_l args_r
+    |> List.mapi (fun i (a,b) -> if T.equal a b then Some (T.bvar ~ty:(T.ty a) (n_l-i-1)) else None)
+    |> CCList.filter_map CCFun.id in
+
+
+  let fresh_var_ty = Type.arrow (List.map (fun t -> T.ty t) same_args) (T.ty lhs) in
+  let fresh_var = T.var (HVar.fresh_cnt ~counter ~ty:fresh_var_ty ()) in
+  let subs_val = T.fun_l (List.map T.ty args_l) (T.app fresh_var same_args) in
+  let subst = Subst.FO.bind' subst (hd_l,scope) (subs_val,scope) in
+  US.of_subst subst
+
 let solve_flex_rigid ~subst ~counter ~scope flex rigid =
   assert(T.is_app_var flex);
   assert(not @@ T.is_app_var rigid);
@@ -187,7 +213,7 @@ let solve_flex_rigid ~subst ~counter ~scope flex rigid =
   let flex_args = T.args flex in
   let rigid', flex_constraints = collect_flex_flex ~counter rigid flex_args in
   let subst = List.fold_left (fun subst (lhs,rhs) -> 
-    US.subst (solve_flex_flex ~subst ~counter ~scope lhs rhs)
+    US.subst (solve_flex_flex_diff ~subst ~counter ~scope lhs rhs)
   ) subst flex_constraints in
 
   let rigid = Subst.FO.apply Subst.Renaming.none subst (rigid, scope) in
@@ -282,9 +308,14 @@ let rec unify ~scope ~counter ~subst constraints =
       (* let hd_s, hd_t = CCPair.map_same (fun t -> cast_var t subst scope) (hd_s, hd_t) in                                        *)
       match T.view hd_s, T.view hd_t with 
       | (T.Var _, T.Var _) ->
-        let body_s', body_t' = solidify body_s', solidify body_t' in
-        let subst = solve_flex_flex ~subst:(US.subst subst) ~scope ~counter body_s' body_t' in
-        unify ~scope ~counter ~subst rest
+        if not (T.equal hd_s hd_t) then (
+          let subst = solve_flex_flex_diff ~subst:(US.subst subst) ~scope ~counter body_s' body_t' in
+          unify ~scope ~counter ~subst rest
+        ) else (
+          let subst = solve_flex_flex_same ~subst:(US.subst subst) ~scope ~counter body_s' body_t' in
+          unify ~scope ~counter ~subst rest
+        )
+
       | (T.Var _, _) ->
         let subst = solve_flex_rigid ~subst:(US.subst subst) ~counter ~scope  body_s' body_t' in
         CCList.flat_map (fun subst -> unify ~scope ~counter ~subst rest) subst
