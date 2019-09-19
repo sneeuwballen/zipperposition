@@ -7,3 +7,6 @@ val max_elims           : int ref
 
 val _cons_e : bool ref
 val _imit_first : bool ref
+
+val pattern_decider : bool ref
+val solid_decider : bool ref

@@ -1402,6 +1402,8 @@ let () =
       "--ho-max-var-imitations", Arg.Set_int PragUnifParams.max_var_imitations, " set maximal number of flex-flex imitations";
       "--ho-max-identifications", Arg.Set_int PragUnifParams.max_identifications, " set maximal number of flex-flex identifications";
       "--ho-max-rigid-imitations", Arg.Set_int PragUnifParams.max_rigid_imitations, " set maximal number of rigid imitations";
+      "--ho-pattern-decider", Arg.Bool (fun b -> PragUnifParams.pattern_decider := b), "turn pattern decider on or off";
+      "--ho-solid-decider", Arg.Bool (fun b -> PragUnifParams.solid_decider := b), "turn solid decider on or off";
       "--ho-max-elims", Arg.Set_int PragUnifParams.max_elims, " set maximal number of eliminations";
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->

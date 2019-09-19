@@ -61,12 +61,12 @@ let cover_rigid_skeleton t solids =
   assert(List.for_all T.is_ground solids);
   (* If the term is not of base type, then it must be a bound variable *)
   assert(List.for_all (fun t -> not @@ Type.is_fun @@ T.ty t || T.is_bvar t) solids);
-
   let n = List.length solids in
-  let sols_as_db = List.mapi (fun i t -> (t,T.bvar ~ty:(T.ty t) (n-i-1))) solids in
 
-  let rec aux t =
+  let rec aux ~depth s_args t  =
     (* All the ways in which we can represent term t using solids *)
+    let sols_as_db = List.mapi (fun i t -> 
+      (t,T.bvar ~ty:(T.ty t) (n-i-1+depth))) s_args in
     let db_hits = 
       CCList.filter_map (fun (s, s_db) -> 
         if T.equal s t then Some s_db else None) 
@@ -77,7 +77,7 @@ let cover_rigid_skeleton t solids =
         | AppBuiltin (hd,args) ->
           if CCList.is_empty args then [T.app_builtin ~ty:(T.ty t) hd []]
           else (
-            let args_combined = all_combs (List.map aux args) in
+            let args_combined = all_combs (List.map (aux ~depth s_args) args) in
             List.map (T.app_builtin ~ty:(T.ty t) hd) args_combined
           )
         | App(hd,args) ->
@@ -85,15 +85,16 @@ let cover_rigid_skeleton t solids =
           else (
             assert(not (CCList.is_empty args));
             let hd, args = T.head_term_mono t, CCList.drop_while T.is_type args in
-            let hd_args_combined = all_combs (aux hd :: (List.map aux args)) in
-            List.map (fun l -> T.app (List.hd l) (List.tl l)) hd_args_combined
-          )
+            let hd_args_combined = 
+              all_combs (aux ~depth s_args hd :: (List.map (aux ~depth s_args) args)) in
+            List.map (fun l -> T.app (List.hd l) (List.tl l)) hd_args_combined)
         | Fun _ -> 
           let ty_args, body = T.open_fun t in
-          let pref_len = List.length ty_args in
-          let res = aux (T.DB.unshift pref_len body) in
-          List.map (fun r -> T.fun_l ty_args (T.DB.shift pref_len r)) res
-        | DB i when i >= 0 -> []
+          let d_inc = List.length ty_args in
+          let s_args' = List.map (T.DB.shift d_inc) s_args in
+          let res = aux ~depth:(depth+d_inc) s_args' body in
+          List.map (T.fun_l ty_args) res
+        | DB i when i >= depth -> []
         | _ -> [t]
       with CoveringImpossible -> [] in
     if CCList.is_empty db_hits && CCList.is_empty rest 
@@ -101,7 +102,7 @@ let cover_rigid_skeleton t solids =
     else db_hits @ rest in
   
   try
-    aux t
+    aux ~depth:0 solids t 
   with CoveringImpossible -> []
 
 let collect_flex_flex ~counter t  =
@@ -329,6 +330,8 @@ let rec unify ~scope ~counter ~subst constraints =
           List.length args_s' + List.length args_s = 
           List.length args_t' + List.length args_t ->
           unify ~subst ~counter ~scope @@ build_constraints (args_s'@args_s)  (args_t'@args_t) rest
+      | T.Const f , T.Const g when ID.equal f g && List.length args_s = List.length args_t ->
+        unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest
       | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->
         (* assert (List.length args_s = List.length args_t); *)
         unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest
@@ -357,21 +360,24 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
           let t0',t1' = solidify t0', solidify t1' in
           unify ~scope:(Scoped.scope t0_s) ~counter ~subst [(t0', t1')]
         )
-        else raise NotInFragment
+        else (raise NotInFragment)
       )
     ) 
   in
 
-  assert(List.for_all (fun sub -> 
+  (* assert(List.for_all (fun sub -> 
     let norm t = Lambda.eta_reduce @@ Lambda.snf t in
+    let lhs_o = Lambda.eta_reduce @@ US_A.apply subst t0_s and rhs_o = Lambda.eta_reduce @@ US_A.apply subst t1_s in
     let lhs = norm @@ US_A.apply sub t0_s and rhs = norm @@ US_A.apply sub t1_s in
     if T.equal lhs rhs then true
     else (
-      CCFormat.printf "orig: @[%a@]=?=@[%a@]" (Scoped.pp T.pp) t0_s (Scoped.pp T.pp) t1_s ;
-      CCFormat.printf "sub: @[%a@]" US.pp sub ;
-      CCFormat.printf "res: @[%a@]=?=@[%a@]" T.pp lhs T.pp rhs ;
+      CCFormat.printf "orig: @[%a@]=?=@[%a@]@." (Scoped.pp T.pp) t0_s (Scoped.pp T.pp) t1_s ;
+      CCFormat.printf "orig_sub: @[%a@]@." US.pp subst;
+      CCFormat.printf "orig_app: @[%a@]=?=@[%a@]@." (T.pp) lhs_o (T.pp) rhs_o ;
+      CCFormat.printf "new_sub: @[%a@]@." US.pp sub ;
+      CCFormat.printf "res: @[%a@]=?=@[%a@]@." T.pp lhs T.pp rhs ;
       false
-    )) res);
+    )) res); *)
 
   if CCList.is_empty res then raise NotUnifiable
   else res

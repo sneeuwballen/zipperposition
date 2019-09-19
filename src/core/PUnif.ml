@@ -193,10 +193,17 @@ let renamer ~counter t0s t1s =
   let lhs,rhs, unifscope, us = U.FO.rename_to_new_scope ~counter t0s t1s in
   lhs,rhs,unifscope,U.subst us
 
-let pattern_frag ~counter =
-  [(fun s t sub -> [(U.subst @@ PatternUnif.unify_scoped ~subst:(U.of_subst sub) ~counter s t)]);
-   (fun s t sub -> (List.map U.subst @@ SolidUnif.unify_scoped ~subst:(U.of_subst sub) ~counter s t))]
-
+let deciders ~counter =
+  let pattern = 
+    if !PragUnifParams.pattern_decider then 
+      [(fun s t sub -> [(U.subst @@ PatternUnif.unify_scoped ~subst:(U.of_subst sub) ~counter s t)])] 
+    else [] in
+  let solid = 
+    if !PragUnifParams.solid_decider then 
+      [(fun s t sub -> (List.map U.subst @@ SolidUnif.unify_scoped ~subst:(U.of_subst sub) ~counter s t))] 
+    else [] in
+  pattern @ solid
+  
 let head_classifier s =
   match T.view @@ T.head_term s with 
   | T.Var x -> `Flex x
@@ -253,7 +260,7 @@ let unify_scoped =
     type flag_type = int32
     let init_flag = (Int32.zero:flag_type)
     let identify_scope = renamer ~counter
-    let frag_algs = pattern_frag ~counter (*[]*)
+    let frag_algs = deciders ~counter (*[]*)
     let pb_oracle s t (f:flag_type) subst scope = 
       oracle ~counter ~scope ~subst s t f
     let oracle_composer = OSeq.append
