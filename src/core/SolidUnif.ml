@@ -175,6 +175,7 @@ let solve_flex_flex_diff ~subst ~counter ~scope lhs rhs =
       T.as_var_exn @@ T.head_term lhs, T.args lhs, List.length @@ T.args lhs in
     let hd_r, args_r, n_r = 
       T.as_var_exn @@ T.head_term rhs, T.args rhs, List.length @@ T.args rhs in
+    assert(not @@ HVar.equal Type.equal hd_l hd_r);
     
     let covered_l =
       CCList.flatten (List.mapi (fun i arg -> 
@@ -369,7 +370,7 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
     ) 
   in
 
-  (* assert(List.for_all (fun sub -> 
+  assert(List.for_all (fun sub -> 
     let norm t = Lambda.eta_reduce @@ Lambda.snf t in
     let lhs_o = Lambda.eta_reduce @@ US_A.apply subst t0_s and rhs_o = Lambda.eta_reduce @@ US_A.apply subst t1_s in
     let lhs = norm @@ US_A.apply sub t0_s and rhs = norm @@ US_A.apply sub t1_s in
@@ -381,7 +382,7 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
       CCFormat.printf "new_sub: @[%a@]@." US.pp sub ;
       CCFormat.printf "res: @[%a@]=?=@[%a@]@." T.pp lhs T.pp rhs ;
       false
-    )) res); *)
+    )) res);
 
   if CCList.is_empty res then raise NotUnifiable
   else res
