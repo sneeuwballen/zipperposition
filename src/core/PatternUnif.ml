@@ -433,7 +433,8 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
         raise (Invalid_argument "scopes should be the same")
       )
       else (
-        let t0', t1' = S.apply subst t0_s, S.apply subst t1_s in
+        (* let t0', t1' = S.apply subst t0_s, S.apply subst t1_s in *)
+        let t0', t1' = fst t0_s, fst t1_s in
         (* CCFormat.printf "[PU: %a:%a =?= %a:%a].\n" tptp_pp t0' Type.pp (Term.ty t0') tptp_pp t1' Type.pp (Term.ty t1'); *)
         unify ~scope:(Scoped.scope t0_s) ~counter ~subst [(t0', t1')]
       )

@@ -17,6 +17,28 @@ exception CoveringImpossible
 exception NotInFragment = PU.NotInFragment
 exception NotUnifiable = PU.NotUnifiable
 
+let eta_expand_otf ~subst ~scope pref1 pref2 t1 t2 =
+  let do_exp_otf n types t = 
+    let remaining = CCList.drop n types in
+    assert(List.length remaining != 0);
+    let num_vars = List.length remaining in
+    let vars = List.mapi (fun i ty -> 
+      let ty = US_A.apply_ty subst (ty,scope) in
+      T.bvar ~ty (num_vars-1-i)) remaining in
+    let shifted = T.DB.shift num_vars t in
+    (* T.app_w_ty shifted vars ~ty:(S.apply_ty subst (T.ty shifted, scope)) in  *)
+    T.app shifted vars in
+  if List.length pref1 = List.length pref2 then (t1, t2, pref1)
+  else (
+    let n1, n2 = List.length pref1, List.length pref2 in 
+    if n1 < n2 then (
+      (do_exp_otf n1 pref2 t1,t2,pref2)
+    ) else (
+      assert(n1 > n2);
+      (t1,do_exp_otf n2 pref1 t2,pref1)
+    )
+  )
+
 let solidify t =
   let rec aux t =
     match T.view t with
@@ -142,49 +164,54 @@ let collect_flex_flex ~counter t  =
   aux ~bvar_tys:[] t
 
 let solve_flex_flex_diff ~subst ~counter ~scope lhs rhs =
-  let lhs = solidify @@ Subst.FO.apply Subst.Renaming.none subst (lhs,scope) in 
-  let rhs = solidify @@ Subst.FO.apply Subst.Renaming.none subst (rhs,scope) in
+  let lhs = solidify @@ Lambda.whnf @@ Subst.FO.apply Subst.Renaming.none subst (lhs,scope) in 
+  let rhs = solidify @@ Lambda.whnf @@ Subst.FO.apply Subst.Renaming.none subst (rhs,scope) in
   assert(Type.equal (Term.ty lhs) (Term.ty rhs));
+  let pref_lhs, lhs = T.open_fun lhs and  pref_rhs, rhs = T.open_fun rhs in
+  let lhs,rhs,_ = eta_expand_otf ~subst:(US.of_subst subst) ~scope pref_lhs pref_rhs lhs rhs in
 
-  let hd_l, args_l, n_l = 
-    T.as_var_exn @@ T.head_term lhs, T.args lhs, List.length @@ T.args lhs in
-  let hd_r, args_r, n_r = 
-    T.as_var_exn @@ T.head_term rhs, T.args rhs, List.length @@ T.args rhs in
-  assert(not @@ HVar.equal Type.equal hd_l hd_r);
-  
-  let covered_l =
-    CCList.flatten (List.mapi (fun i arg -> 
-      let arg_covers = cover_rigid_skeleton arg args_r in
-      let n = List.length arg_covers in
-        List.combine 
-          (CCList.replicate n (T.bvar (n_l-i-1) ~ty:(T.ty arg))) 
-          arg_covers) 
-    args_l) in
-  let covered_r = 
-    CCList.flatten (List.mapi (fun i arg -> 
-      let arg_covers = cover_rigid_skeleton arg args_l in
-      let n = List.length arg_covers in
-        List.combine 
-          arg_covers
-          (CCList.replicate n (T.bvar (n_r-i-1) ~ty:(T.ty arg))))
-    args_r) in
-  let all_covers = covered_l @ covered_r in
-  assert (List.for_all (fun (l_arg, r_arg) -> 
-            Type.equal (Term.ty l_arg) (Term.ty r_arg)) all_covers);
-  let fresh_var_ty = Type.arrow (List.map (fun (a_l, _) -> T.ty a_l ) all_covers) (T.ty lhs) in
-  let fresh_var = T.var (HVar.fresh_cnt ~counter ~ty:fresh_var_ty ()) in
-  let subs_l = T.fun_l (List.map T.ty args_l) (T.app fresh_var (List.map fst all_covers)) in
-  let subs_r = T.fun_l (List.map T.ty args_r) (T.app fresh_var (List.map snd all_covers)) in
-  let subst = Subst.FO.bind' subst (hd_l, scope) (subs_l,scope) in
-  let subst = Subst.FO.bind' subst (hd_r, scope) (subs_r,scope) in
-  US.of_subst subst
+  try 
+    let hd_l, args_l, n_l = 
+      T.as_var_exn @@ T.head_term lhs, T.args lhs, List.length @@ T.args lhs in
+    let hd_r, args_r, n_r = 
+      T.as_var_exn @@ T.head_term rhs, T.args rhs, List.length @@ T.args rhs in
+    
+    let covered_l =
+      CCList.flatten (List.mapi (fun i arg -> 
+        let arg_covers = cover_rigid_skeleton arg args_r in
+        let n = List.length arg_covers in
+          List.combine 
+            (CCList.replicate n (T.bvar (n_l-i-1) ~ty:(T.ty arg))) 
+            arg_covers) 
+      args_l) in
+    let covered_r = 
+      CCList.flatten (List.mapi (fun i arg -> 
+        let arg_covers = cover_rigid_skeleton arg args_l in
+        let n = List.length arg_covers in
+          List.combine 
+            arg_covers
+            (CCList.replicate n (T.bvar (n_r-i-1) ~ty:(T.ty arg))))
+      args_r) in
+    let all_covers = covered_l @ covered_r in
+    assert (List.for_all (fun (l_arg, r_arg) -> 
+              Type.equal (Term.ty l_arg) (Term.ty r_arg)) all_covers);
+    let fresh_var_ty = Type.arrow (List.map (fun (a_l, _) -> T.ty a_l ) all_covers) (T.ty lhs) in
+    let fresh_var = T.var (HVar.fresh_cnt ~counter ~ty:fresh_var_ty ()) in
+    let subs_l = T.fun_l (List.map T.ty args_l) (T.app fresh_var (List.map fst all_covers)) in
+    let subs_r = T.fun_l (List.map T.ty args_r) (T.app fresh_var (List.map snd all_covers)) in
+    let subst = Subst.FO.bind' subst (hd_l, scope) (subs_l,scope) in
+    let subst = Subst.FO.bind' subst (hd_r, scope) (subs_r,scope) in
+    US.of_subst subst
+  with Invalid_argument _ ->
+    let err_msg = CCFormat.sprintf "@[%a@]=?=@[%a@] solved wrongly@." T.pp lhs T.pp rhs in
+    invalid_arg err_msg
 
 let solve_flex_flex_same ~subst ~counter ~scope lhs rhs =
-  let lhs = solidify @@ Subst.FO.apply Subst.Renaming.none subst (lhs,scope) in 
-  let rhs = solidify @@ Subst.FO.apply Subst.Renaming.none subst (rhs,scope) in
-  assert(Term.is_app_var lhs);
-  assert(T.is_app_var rhs);
+  let lhs = solidify @@ Lambda.whnf @@ Subst.FO.apply Subst.Renaming.none subst (lhs,scope) in 
+  let rhs = solidify @@ Lambda.whnf @@ Subst.FO.apply Subst.Renaming.none subst (rhs,scope) in
   assert(Type.equal (Term.ty lhs) (Term.ty rhs));
+  let pref_lhs, lhs = T.open_fun lhs and  pref_rhs, rhs = T.open_fun rhs in
+  let lhs,rhs,_ = eta_expand_otf ~subst:(US.of_subst subst) ~scope pref_lhs pref_rhs lhs rhs in
 
   let hd_l, args_l, n_l = 
     T.as_var_exn @@ T.head_term lhs, T.args lhs, List.length @@ T.args lhs in
@@ -259,28 +286,6 @@ let rec norm_deref subst (t,sc) =
     end in
   if T.equal tt t' then t
   else T.fun_l pref t'
-
-let eta_expand_otf ~subst ~scope pref1 pref2 t1 t2 =
-  let do_exp_otf n types t = 
-    let remaining = CCList.drop n types in
-    assert(List.length remaining != 0);
-    let num_vars = List.length remaining in
-    let vars = List.mapi (fun i ty -> 
-      let ty = US_A.apply_ty subst (ty,scope) in
-      T.bvar ~ty (num_vars-1-i)) remaining in
-    let shifted = T.DB.shift num_vars t in
-    (* T.app_w_ty shifted vars ~ty:(S.apply_ty subst (T.ty shifted, scope)) in  *)
-    T.app shifted vars in
-  if List.length pref1 = List.length pref2 then (t1, t2, pref1)
-  else (
-    let n1, n2 = List.length pref1, List.length pref2 in 
-    if n1 < n2 then (
-      (do_exp_otf n1 pref2 t1,t2,pref2)
-    ) else (
-      assert(n1 > n2);
-      (t1,do_exp_otf n2 pref1 t2,pref1)
-    )
-  )
 
 let build_constraints args1 args2 rest =
   let rf, other = 
