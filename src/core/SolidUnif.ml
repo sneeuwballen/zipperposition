@@ -127,6 +127,17 @@ let cover_rigid_skeleton t solids =
   with CoveringImpossible -> []
 
 let collect_flex_flex ~counter ~flex_args t  =
+  let replace_var ~bvar_tys ~target = 
+    let bvars = 
+      List.mapi (fun i ty -> (i,ty)) bvar_tys
+      |> List.rev_map (fun (i,ty) -> T.bvar ~ty i) in
+    let n_bvars = List.length bvars in
+    let args' = (List.map (T.DB.shift n_bvars) flex_args) @ bvars in
+    let fresh_var_ty = Type.arrow (List.map T.ty args') (T.ty target) in
+    let fresh_var = HVar.fresh_cnt ~counter ~ty:fresh_var_ty () in
+    let replacement = T.app (T.var fresh_var) args' in
+    replacement, [replacement, target] in
+
   let rec aux ~bvar_tys t =
     match T.view t with
     | AppBuiltin (hd,args) ->
@@ -137,15 +148,7 @@ let collect_flex_flex ~counter ~flex_args t  =
       T.app_builtin ~ty:(T.ty t) hd args', cons  
     | App(hd,args) ->
       if Term.is_var hd then (
-        let bvars = 
-          List.mapi (fun i ty -> (i,ty)) bvar_tys
-          |> List.rev_map (fun (i,ty) -> T.bvar ~ty i) in
-        let n_bvars = List.length bvars in
-        let args' = (List.map (T.DB.shift n_bvars) flex_args) @ bvars in
-        let fresh_var_ty = Type.arrow (List.map T.ty args') (T.ty t) in
-        let fresh_var = HVar.fresh_cnt ~counter ~ty:fresh_var_ty () in
-        let replacement = T.app (T.var fresh_var) args' in
-        replacement, [replacement, t]  
+        replace_var ~bvar_tys ~target:t
       ) else (
         let hd', cons_hd = aux ~bvar_tys hd in
         let args', cons_args = List.fold_right (fun arg (acc_args, acc_cons) -> 
@@ -158,6 +161,8 @@ let collect_flex_flex ~counter ~flex_args t  =
       let bvar_tys = ty :: bvar_tys in
       let body', cons = aux ~bvar_tys body in
       T.fun_ ty body', cons
+    | Var _ ->
+      replace_var ~bvar_tys ~target:t
     | _ -> t, [] in
   
   aux ~bvar_tys:[] t
@@ -330,15 +335,12 @@ let rec unify ~scope ~counter ~subst constraints =
         CCList.flat_map (fun subst -> unify ~scope ~counter ~subst rest) subst
       | T.AppBuiltin(hd_s, args_s'), T.AppBuiltin(hd_t, args_t') when
           Builtin.equal hd_s hd_t &&
-          (* not (Builtin.equal Builtin.ForallConst hd_s) &&
-          not (Builtin.equal Builtin.ExistsConst hd_s) &&   *)
           List.length args_s' + List.length args_s = 
           List.length args_t' + List.length args_t ->
           unify ~subst ~counter ~scope @@ build_constraints (args_s'@args_s)  (args_t'@args_t) rest
       | T.Const f , T.Const g when ID.equal f g && List.length args_s = List.length args_t ->
         unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest
       | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->
-        (* assert (List.length args_s = List.length args_t); *)
         unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest
       | _ -> raise NotUnifiable) 
     else (
@@ -347,66 +349,41 @@ let rec unify ~scope ~counter ~subst constraints =
 
 
 let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
-  try 
-    let res = 
-      if US.is_empty subst then (
-        let t0',t1',scope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
-        if var_conditions t0' t1' then (
-          let t0',t1' = solidify t0', solidify t1' in
-          unify ~scope ~counter ~subst [(t0', t1')])
-        else raise NotInFragment
+  let res = 
+    if US.is_empty subst then (
+      let t0',t1',scope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
+      if var_conditions t0' t1' then (
+        let t0',t1' = solidify t0', solidify t1' in
+        unify ~scope ~counter ~subst [(t0', t1')])
+      else raise NotInFragment
+    )
+    else (
+      if Scoped.scope t0_s != Scoped.scope t1_s then (
+        raise (Invalid_argument "scopes should be the same")
       )
       else (
-        if Scoped.scope t0_s != Scoped.scope t1_s then (
-          raise (Invalid_argument "scopes should be the same")
+        let t0', t1' = US_A.apply subst t0_s, US_A.apply subst t1_s in
+        if var_conditions t0' t1' then (
+          let t0',t1' = solidify t0', solidify t1' in
+          unify ~scope:(Scoped.scope t0_s) ~counter ~subst [(t0', t1')]
         )
-        else (
-          let t0', t1' = US_A.apply subst t0_s, US_A.apply subst t1_s in
-          if var_conditions t0' t1' then (
-            let t0',t1' = solidify t0', solidify t1' in
-            unify ~scope:(Scoped.scope t0_s) ~counter ~subst [(t0', t1')]
-          )
-          else (raise NotInFragment)
-        )
-      ) 
-    in
+        else (raise NotInFragment)
+      )
+    ) 
+  in
 
-    assert(List.for_all (fun sub -> 
-      let norm t = Lambda.eta_reduce @@ Lambda.snf t in
-      let lhs_o = Lambda.eta_reduce @@ US_A.apply subst t0_s and rhs_o = Lambda.eta_reduce @@ US_A.apply subst t1_s in
-      let lhs = norm @@ US_A.apply sub t0_s and rhs = norm @@ US_A.apply sub t1_s in
-      if T.equal lhs rhs then true
-      else (
-        CCFormat.printf "orig: @[%a@]=?=@[%a@]@." (Scoped.pp T.pp) t0_s (Scoped.pp T.pp) t1_s ;
-        CCFormat.printf "orig_sub: @[%a@]@." US.pp subst;
-        CCFormat.printf "orig_app: @[%a@]=?=@[%a@]@." (T.pp) lhs_o (T.pp) rhs_o ;
-        CCFormat.printf "new_sub: @[%a@]@." US.pp sub ;
-        CCFormat.printf "res: @[%a@]=?=@[%a@]@." T.pp lhs T.pp rhs ;
-        false
-      )) res);
-
+  assert(List.for_all (fun sub -> 
     let norm t = Lambda.eta_reduce @@ Lambda.snf t in
-    let lhs = norm @@ US_A.apply subst t0_s and rhs = norm @@ US_A.apply subst t1_s in
-    (* CCFormat.printf "solutions: @[%a@]=?=@[%a@]@." T.pp lhs T.pp rhs;
-    CCFormat.printf "orig: @[%a@]@." US.pp subst;
-    
-    List.iter (fun sub ->
-      CCFormat.printf "sub:@[%a@]@." US.pp sub
-    ) res; *)
-
-    if CCList.is_empty res then raise NotUnifiable
-    else res
-  with 
-    | NotInFragment ->
-      (* let norm t = Lambda.eta_reduce @@ Lambda.whnf t in
-      let lhs = norm @@ US_A.apply subst t0_s and rhs = norm @@ US_A.apply subst t1_s in
-      CCFormat.printf "@[%a@]=?=@[%a@] is not in the solid fragment@." T.pp lhs T.pp rhs; *)
-      raise NotInFragment
-    | NotUnifiable ->
-      (* let norm t = solidify t in
-      let lhs = norm @@ US_A.apply subst t0_s and rhs = norm @@ US_A.apply subst t1_s in
-      CCFormat.printf "@[%a@]=?=@[%a@] is not unifiable@." T.pp lhs T.pp rhs;
-      CCFormat.printf "originally: @[%a@]=?=@[%a@]@.subs:@[%a@]@." (Scoped.pp T.pp) t0_s (Scoped.pp T.pp) t1_s  US.pp subst; *)
-      raise NotUnifiable
-
-
+    let lhs_o = Lambda.eta_reduce @@ US_A.apply subst t0_s and rhs_o = Lambda.eta_reduce @@ US_A.apply subst t1_s in
+    let lhs = norm @@ US_A.apply sub t0_s and rhs = norm @@ US_A.apply sub t1_s in
+    if T.equal lhs rhs then true
+    else (
+      CCFormat.printf "orig: @[%a@]=?=@[%a@]@." (Scoped.pp T.pp) t0_s (Scoped.pp T.pp) t1_s ;
+      CCFormat.printf "orig_sub: @[%a@]@." US.pp subst;
+      CCFormat.printf "orig_app: @[%a@]=?=@[%a@]@." (T.pp) lhs_o (T.pp) rhs_o ;
+      CCFormat.printf "new_sub: @[%a@]@." US.pp sub ;
+      CCFormat.printf "res: @[%a@]=?=@[%a@]@." T.pp lhs T.pp rhs ;
+      false
+    )) res);
+  if CCList.is_empty res then raise NotUnifiable
+  else res
