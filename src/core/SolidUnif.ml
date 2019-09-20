@@ -142,42 +142,46 @@ let collect_flex_flex ~counter t  =
   aux ~bvar_tys:[] t
 
 let solve_flex_flex_diff ~subst ~counter ~scope lhs rhs =
-  let lhs = solidify @@ Subst.FO.apply Subst.Renaming.none subst (lhs,scope) in 
-  let rhs = solidify @@ Subst.FO.apply Subst.Renaming.none subst (rhs,scope) in
+  let lhs = solidify @@ Lambda.whnf @@ Subst.FO.apply Subst.Renaming.none subst (lhs,scope) in 
+  let rhs = solidify @@ Lambda.whnf @@ Subst.FO.apply Subst.Renaming.none subst (rhs,scope) in
   assert(Type.equal (Term.ty lhs) (Term.ty rhs));
 
-  let hd_l, args_l, n_l = 
-    T.as_var_exn @@ T.head_term lhs, T.args lhs, List.length @@ T.args lhs in
-  let hd_r, args_r, n_r = 
-    T.as_var_exn @@ T.head_term rhs, T.args rhs, List.length @@ T.args rhs in
-  assert(not @@ HVar.equal Type.equal hd_l hd_r);
-  
-  let covered_l =
-    CCList.flatten (List.mapi (fun i arg -> 
-      let arg_covers = cover_rigid_skeleton arg args_r in
-      let n = List.length arg_covers in
-        List.combine 
-          (CCList.replicate n (T.bvar (n_l-i-1) ~ty:(T.ty arg))) 
-          arg_covers) 
-    args_l) in
-  let covered_r = 
-    CCList.flatten (List.mapi (fun i arg -> 
-      let arg_covers = cover_rigid_skeleton arg args_l in
-      let n = List.length arg_covers in
-        List.combine 
-          arg_covers
-          (CCList.replicate n (T.bvar (n_r-i-1) ~ty:(T.ty arg))))
-    args_r) in
-  let all_covers = covered_l @ covered_r in
-  assert (List.for_all (fun (l_arg, r_arg) -> 
-            Type.equal (Term.ty l_arg) (Term.ty r_arg)) all_covers);
-  let fresh_var_ty = Type.arrow (List.map (fun (a_l, _) -> T.ty a_l ) all_covers) (T.ty lhs) in
-  let fresh_var = T.var (HVar.fresh_cnt ~counter ~ty:fresh_var_ty ()) in
-  let subs_l = T.fun_l (List.map T.ty args_l) (T.app fresh_var (List.map fst all_covers)) in
-  let subs_r = T.fun_l (List.map T.ty args_r) (T.app fresh_var (List.map snd all_covers)) in
-  let subst = Subst.FO.bind' subst (hd_l, scope) (subs_l,scope) in
-  let subst = Subst.FO.bind' subst (hd_r, scope) (subs_r,scope) in
-  US.of_subst subst
+  try
+    let hd_l, args_l, n_l = 
+      T.as_var_exn @@ T.head_term lhs, T.args lhs, List.length @@ T.args lhs in
+    let hd_r, args_r, n_r = 
+      T.as_var_exn @@ T.head_term rhs, T.args rhs, List.length @@ T.args rhs in
+    assert(not @@ HVar.equal Type.equal hd_l hd_r);
+    
+    let covered_l =
+      CCList.flatten (List.mapi (fun i arg -> 
+        let arg_covers = cover_rigid_skeleton arg args_r in
+        let n = List.length arg_covers in
+          List.combine 
+            (CCList.replicate n (T.bvar (n_l-i-1) ~ty:(T.ty arg))) 
+            arg_covers) 
+      args_l) in
+    let covered_r = 
+      CCList.flatten (List.mapi (fun i arg -> 
+        let arg_covers = cover_rigid_skeleton arg args_l in
+        let n = List.length arg_covers in
+          List.combine 
+            arg_covers
+            (CCList.replicate n (T.bvar (n_r-i-1) ~ty:(T.ty arg))))
+      args_r) in
+    let all_covers = covered_l @ covered_r in
+    assert (List.for_all (fun (l_arg, r_arg) -> 
+              Type.equal (Term.ty l_arg) (Term.ty r_arg)) all_covers);
+    let fresh_var_ty = Type.arrow (List.map (fun (a_l, _) -> T.ty a_l ) all_covers) (T.ty lhs) in
+    let fresh_var = T.var (HVar.fresh_cnt ~counter ~ty:fresh_var_ty ()) in
+    let subs_l = T.fun_l (List.map T.ty args_l) (T.app fresh_var (List.map fst all_covers)) in
+    let subs_r = T.fun_l (List.map T.ty args_r) (T.app fresh_var (List.map snd all_covers)) in
+    let subst = Subst.FO.bind' subst (hd_l, scope) (subs_l,scope) in
+    let subst = Subst.FO.bind' subst (hd_r, scope) (subs_r,scope) in
+    US.of_subst subst
+  with Invalid_argument _ -> 
+    let msg = CCFormat.sprintf "error solving @[%a@]=@[%a@]" T.pp lhs T.pp rhs in
+    invalid_arg msg
 
 let solve_flex_flex_same ~subst ~counter ~scope lhs rhs =
   let lhs = solidify @@ Subst.FO.apply Subst.Renaming.none subst (lhs,scope) in 
@@ -364,7 +368,7 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
     ) 
   in
 
-  (* assert(List.for_all (fun sub -> 
+  assert(List.for_all (fun sub -> 
     let norm t = Lambda.eta_reduce @@ Lambda.snf t in
     let lhs_o = Lambda.eta_reduce @@ US_A.apply subst t0_s and rhs_o = Lambda.eta_reduce @@ US_A.apply subst t1_s in
     let lhs = norm @@ US_A.apply sub t0_s and rhs = norm @@ US_A.apply sub t1_s in
@@ -376,7 +380,7 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
       CCFormat.printf "new_sub: @[%a@]@." US.pp sub ;
       CCFormat.printf "res: @[%a@]=?=@[%a@]@." T.pp lhs T.pp rhs ;
       false
-    )) res); *)
+    )) res);
 
   if CCList.is_empty res then raise NotUnifiable
   else res
