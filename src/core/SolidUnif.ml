@@ -53,6 +53,10 @@ let solidify t =
       else T.app hd' args'
     | App(hd, args) ->
       assert (T.is_var hd);
+
+      if List.length args > !PragUnifParams.solidification_limit then
+        raise NotInFragment;
+
       let args' = List.map (fun arg -> 
         if Type.is_fun (T.ty arg) then (
           let arg = Lambda.eta_reduce arg in

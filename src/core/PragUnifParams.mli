@@ -10,3 +10,5 @@ val _imit_first : bool ref
 
 val pattern_decider : bool ref
 val solid_decider : bool ref
+
+val solidification_limit : int ref
