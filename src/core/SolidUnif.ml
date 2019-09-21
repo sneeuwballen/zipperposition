@@ -73,64 +73,70 @@ let solidify t =
     | _ -> t in
   aux t
 
-let rec all_combs = function 
-  | [] -> []
-  | x::xs ->
-      let rest_combs = all_combs xs in
-      if CCList.is_empty rest_combs then CCList.map (fun t->[t]) x 
-      else CCList.flat_map 
-            (fun i -> CCList.map (fun comb -> i::comb) rest_combs) 
-           x
+let rec all_combs (seq : T.t OSeq.t OSeq.t) : T.t OSeq.t OSeq.t = 
+  if OSeq.is_empty seq then OSeq.empty
+  else (
+    let x,xs = OSeq.nth 0 seq, OSeq.drop 1 seq in
+    let rest_combs = all_combs xs in
+    if OSeq.is_empty rest_combs then OSeq.map OSeq.return x
+    else (OSeq.flat_map (fun i -> OSeq.map (OSeq.cons i) rest_combs) x)
+  )
 
-let cover_rigid_skeleton t solids =
+let cover_rigid_skeleton t solids : (T.t OSeq.t) =
   assert(List.for_all T.is_ground solids);
   (* If the term is not of base type, then it must be a bound variable *)
   assert(List.for_all (fun t -> not @@ Type.is_fun @@ T.ty t || T.is_bvar t) solids);
   let n = List.length solids in
 
-  let rec aux ~depth s_args t  =
+  let rec aux ~depth s_args t : (T.t OSeq.t)  =
     (* All the ways in which we can represent term t using solids *)
     let sols_as_db = List.mapi (fun i t -> 
       (t,T.bvar ~ty:(T.ty t) (n-i-1+depth))) s_args in
     let db_hits = 
-      CCList.filter_map (fun (s, s_db) -> 
+      (CCList.filter_map (fun (s, s_db) -> 
         if T.equal s t then Some s_db else None) 
-      sols_as_db in
+      sols_as_db)
+      |> OSeq.of_list in
     let rest =
       try 
         match T.view t with
         | AppBuiltin (hd,args) ->
-          if CCList.is_empty args then [T.app_builtin ~ty:(T.ty t) hd []]
+          if CCList.is_empty args then OSeq.return (T.app_builtin ~ty:(T.ty t) hd [])
           else (
-            let args_combined = all_combs (List.map (aux ~depth s_args) args) in
-            List.map (T.app_builtin ~ty:(T.ty t) hd) args_combined
-          )
+            let args_combined = all_combs (OSeq.map (aux ~depth s_args) (OSeq.of_list args)) in
+            OSeq.map (fun args -> T.app_builtin ~ty:(T.ty t) hd (OSeq.to_list args)) args_combined)
         | App(hd,args) ->
-          if Term.is_var hd then [t]
+          if Term.is_var hd then OSeq.return t
           else (
             assert(not (CCList.is_empty args));
             let hd, args = T.head_term_mono t, CCList.drop_while T.is_type args in
+            let hd_covered = aux ~depth s_args hd in
+            let args_covered = OSeq.map (aux ~depth s_args) (OSeq.of_list args) in
             let hd_args_combined = 
-              all_combs (aux ~depth s_args hd :: (List.map (aux ~depth s_args) args)) in
-            List.map (fun l -> T.app (List.hd l) (List.tl l)) hd_args_combined)
+              all_combs (OSeq.cons hd_covered args_covered) in
+            OSeq.map (fun l -> 
+              let hd = OSeq.nth 0 l in
+              let args = OSeq.to_list (OSeq.drop 1 l) in
+              T.app hd args)
+            hd_args_combined)
         | Fun _ -> 
           let ty_args, body = T.open_fun t in
           let d_inc = List.length ty_args in
           let s_args' = List.map (T.DB.shift d_inc) s_args in
           let res = aux ~depth:(depth+d_inc) s_args' body in
-          List.map (T.fun_l ty_args) res
-        | DB i when i >= depth -> []
-        | _ -> [t]
-      with CoveringImpossible -> [] in
-    if CCList.is_empty db_hits && CCList.is_empty rest 
+          OSeq.map (fun t -> T.fun_l ty_args t) res
+        | DB i when i >= depth -> OSeq.empty
+        | _ -> OSeq.return t
+      with CoveringImpossible -> OSeq.empty in
+    if OSeq.is_empty db_hits && OSeq.is_empty rest 
     then raise CoveringImpossible
-    else db_hits @ rest in
+    else OSeq.interleave db_hits rest in
   
   try
-    aux ~depth:0 solids t 
-  with CoveringImpossible -> []
+    aux ~depth:0 solids t
+  with CoveringImpossible -> OSeq.empty
 
-let collect_flex_flex ~counter ~flex_args t  =
+let collect_flex_flex ~counter ~flex_args t =
   let replace_var ~bvar_tys ~target = 
     let bvars = 
       List.mapi (fun i ty -> (i,ty)) bvar_tys
@@ -187,7 +193,7 @@ let solve_flex_flex_diff ~subst ~counter ~scope lhs rhs =
     
     let covered_l =
       CCList.flatten (List.mapi (fun i arg -> 
-        let arg_covers = cover_rigid_skeleton arg args_r in
+        let arg_covers = OSeq.to_list @@ cover_rigid_skeleton arg args_r in
         let n = List.length arg_covers in
           List.combine 
             (CCList.replicate n (T.bvar (n_l-i-1) ~ty:(T.ty arg))) 
@@ -195,7 +201,7 @@ let solve_flex_flex_diff ~subst ~counter ~scope lhs rhs =
       args_l) in
     let covered_r = 
       CCList.flatten (List.mapi (fun i arg -> 
-        let arg_covers = cover_rigid_skeleton arg args_l in
+        let arg_covers = OSeq.to_list @@ cover_rigid_skeleton arg args_l in
         let n = List.length arg_covers in
           List.combine 
             arg_covers
@@ -255,12 +261,12 @@ let solve_flex_rigid ~subst ~counter ~scope flex rigid =
 
   let rigid = Subst.FO.apply Subst.Renaming.none subst (rigid', scope) in
   let rigid_covers = cover_rigid_skeleton rigid flex_args in
-  if CCList.is_empty rigid_covers then (
+  if OSeq.is_empty rigid_covers then (
     raise NotUnifiable
   ) else (
     let tys = List.map T.ty flex_args in
     let head_var = T.as_var_exn @@ T.head_term flex in
-    List.map (fun rigid' ->
+    OSeq.map (fun rigid' ->
       let closed_rigid = T.fun_l tys rigid' in
       assert(T.DB.is_closed closed_rigid);
       let subs_flex = Subst.FO.bind' subst (head_var,scope) (closed_rigid,scope) in
@@ -303,9 +309,9 @@ let build_constraints args1 args2 rest =
     |> CCList.partition (fun (s,t) -> T.is_const (T.head_term s) && T.is_const (T.head_term t)) in
     rf @ rest @ other
 
-let rec unify ~scope ~counter ~subst constraints =
+let rec unify ~scope ~counter ~subst constraints : US.t OSeq.t =
   match constraints with
-  | [] -> [subst]
+  | [] -> OSeq.return subst
   | (s,t) :: rest -> 
     
     if not (Type.equal (T.ty s) (T.ty t)) then (
@@ -313,7 +319,6 @@ let rec unify ~scope ~counter ~subst constraints =
     );
 
     let s', t' = norm_deref subst (s,scope), norm_deref subst (t,scope) in
-
     if not (Term.equal s' t') then (
       let pref_s, body_s = T.open_fun s' in
       let pref_t, body_t = T.open_fun t' in 
@@ -333,10 +338,10 @@ let rec unify ~scope ~counter ~subst constraints =
 
       | (T.Var _, _) ->
         let subst = solve_flex_rigid ~subst:(US.subst subst) ~counter ~scope  body_s' body_t' in
-        CCList.flat_map (fun subst -> unify ~scope ~counter ~subst rest) subst
+        OSeq.flat_map (fun subst -> unify ~scope ~counter ~subst rest) subst
       | (_, T.Var _) ->
         let subst = solve_flex_rigid ~subst:(US.subst subst) ~counter ~scope  body_t' body_s' in
-        CCList.flat_map (fun subst -> unify ~scope ~counter ~subst rest) subst
+        OSeq.flat_map (fun subst -> unify ~scope ~counter ~subst rest) subst
       | T.AppBuiltin(hd_s, args_s'), T.AppBuiltin(hd_t, args_t') when
           Builtin.equal hd_s hd_t &&
           List.length args_s' + List.length args_s = 
@@ -376,7 +381,7 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
     ) 
   in
 
-  assert(List.for_all (fun sub -> 
+  assert(OSeq.for_all (fun sub -> 
     let norm t = Lambda.eta_reduce @@ Lambda.snf t in
     let lhs_o = Lambda.eta_reduce @@ US_A.apply subst t0_s and rhs_o = Lambda.eta_reduce @@ US_A.apply subst t1_s in
     let lhs = norm @@ US_A.apply sub t0_s and rhs = norm @@ US_A.apply sub t1_s in
@@ -389,5 +394,6 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
       CCFormat.printf "res: @[%a@]=?=@[%a@]@." T.pp lhs T.pp rhs ;
       false
     )) res);
-  if CCList.is_empty res then raise NotUnifiable
-  else res
+  if OSeq.is_empty res then raise NotUnifiable
+  else (if !PragUnifParams.max_infs < 0 then OSeq.to_list res 
+        else OSeq.to_list @@ OSeq.take !PragUnifParams.max_infs res)
