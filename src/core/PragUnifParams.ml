@@ -13,4 +13,6 @@ let solid_decider = ref true
 
 let solidification_limit = ref 5
 
-let max_infs = ref (-1)
+let max_inferences = ref (-1)
+
+let max_unifs_solid_ff = ref (-1)
