@@ -12,3 +12,5 @@ val pattern_decider : bool ref
 val solid_decider : bool ref
 
 val solidification_limit : int ref
+
+val max_inferences : int ref

@@ -85,7 +85,7 @@ let _sup_with_pure_vars = ref true
 
 let _NO_LAMSUP = -1
 let _lambdasup = ref (-1)
-let _max_infs = ref (-1)
+let _max_infs = PragUnifParams.max_inferences
 let max_lits_ext_dec = ref 0
 let _ext_dec_lits = ref `OnlyMax
 let _unif_alg = ref JP_unif.unify_scoped

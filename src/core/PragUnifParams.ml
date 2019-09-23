@@ -12,3 +12,5 @@ let pattern_decider = ref false
 let solid_decider = ref true
 
 let solidification_limit = ref 5
+
+let max_inferences = ref (-1)
