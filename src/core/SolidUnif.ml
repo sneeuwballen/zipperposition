@@ -12,6 +12,13 @@ module US_A = struct
 
 end
 
+let prof_flex_same = Util.mk_profiler "su.flex_same"
+let prof_flex_diff = Util.mk_profiler "su.flex_diff"
+let prof_flex_rigid = Util.mk_profiler "su.flex_rigid"
+let prof_cover_rigid = Util.mk_profiler "su.cover_rigid"
+let prof_solidifier = Util.mk_profiler "su.solidifier"
+
+
 (* exception NotSolid *)
 exception CoveringImpossible
 exception NotInFragment = PU.NotInFragment
@@ -71,7 +78,11 @@ let solidify t =
       let body' = aux body in
       T.fun_ ty body'
     | _ -> t in
-  aux t
+  
+  Util.enter_prof prof_solidifier;
+  let res = aux t in
+  Util.exit_prof prof_solidifier;
+  res
 
 let rec all_combs (seq : T.t OSeq.t OSeq.t) : T.t OSeq.t OSeq.t = 
   if OSeq.is_empty seq then OSeq.empty
@@ -133,7 +144,10 @@ let cover_rigid_skeleton t solids : (T.t OSeq.t) =
     else OSeq.interleave db_hits rest in
   
   try
-    aux ~depth:0 solids t
+    Util.enter_prof prof_cover_rigid;
+    let res = aux ~depth:0 solids t in
+    Util.exit_prof prof_cover_rigid;
+    res
   with CoveringImpossible -> OSeq.empty
 
 let collect_flex_flex ~counter ~flex_args t =
@@ -181,19 +195,20 @@ let collect_flex_flex ~counter ~flex_args t =
   aux ~bvar_tys:[] t
 
 let solve_flex_flex_diff ~subst ~counter ~scope lhs rhs =
+  Util.enter_prof prof_flex_diff;
   let lhs = solidify @@ Lambda.whnf @@ Subst.FO.apply Subst.Renaming.none subst (lhs,scope) in 
   let rhs = solidify @@ Lambda.whnf @@ Subst.FO.apply Subst.Renaming.none subst (rhs,scope) in
   assert(Type.equal (Term.ty lhs) (Term.ty rhs));
   let pref_lhs, lhs = T.open_fun lhs and  pref_rhs, rhs = T.open_fun rhs in
   let lhs,rhs,_ = eta_expand_otf ~subst:(US.of_subst subst) ~scope pref_lhs pref_rhs lhs rhs in
 
-  try 
-    let hd_l, args_l, n_l = 
-      T.as_var_exn @@ T.head_term lhs, T.args lhs, List.length @@ T.args lhs in
-    let hd_r, args_r, n_r = 
-      T.as_var_exn @@ T.head_term rhs, T.args rhs, List.length @@ T.args rhs in
-    assert(not @@ HVar.equal Type.equal hd_l hd_r);
-    
+  let hd_l, args_l, n_l = 
+    T.as_var_exn @@ T.head_term lhs, T.args lhs, List.length @@ T.args lhs in
+  let hd_r, args_r, n_r = 
+    T.as_var_exn @@ T.head_term rhs, T.args rhs, List.length @@ T.args rhs in
+  assert(not @@ HVar.equal Type.equal hd_l hd_r);
+  
+  let res = 
     if CCList.is_empty args_l && CCList.is_empty args_r then (
       let res = Subst.FO.bind' subst (hd_l,scope) (rhs,scope) in
       US.of_subst res
@@ -224,12 +239,12 @@ let solve_flex_flex_diff ~subst ~counter ~scope lhs rhs =
       let subs_r = T.fun_l (List.map T.ty args_r) (T.app fresh_var (List.map snd all_covers)) in
       let subst = Subst.FO.bind' subst (hd_l, scope) (subs_l,scope) in
       let subst = Subst.FO.bind' subst (hd_r, scope) (subs_r,scope) in
-      US.of_subst subst)
-  with Invalid_argument _ ->
-    let err_msg = CCFormat.sprintf "@[%a@]=?=@[%a@] solved wrongly@." T.pp lhs T.pp rhs in
-    invalid_arg err_msg
+      US.of_subst subst) in
+  Util.exit_prof prof_flex_diff;
+  res
 
 let solve_flex_flex_same ~subst ~counter ~scope lhs rhs =
+  Util.enter_prof prof_flex_same;
   let lhs = solidify @@ Lambda.whnf @@ Subst.FO.apply Subst.Renaming.none subst (lhs,scope) in 
   let rhs = solidify @@ Lambda.whnf @@ Subst.FO.apply Subst.Renaming.none subst (rhs,scope) in
   assert(Type.equal (Term.ty lhs) (Term.ty rhs));
@@ -241,24 +256,29 @@ let solve_flex_flex_same ~subst ~counter ~scope lhs rhs =
   let hd_r, args_r, n_r = 
     T.as_var_exn @@ T.head_term rhs, T.args rhs, List.length @@ T.args rhs in
 
-  if CCList.is_empty args_l && CCList.is_empty args_r then (
-    US.of_subst subst
-  ) else (
-    assert(HVar.equal Type.equal hd_l hd_r);
-    assert(n_l = n_r);
-    let same_args = 
-      List.combine args_l args_r
-      |> List.mapi (fun i (a,b) -> if T.equal a b then Some (T.bvar ~ty:(T.ty a) (n_l-i-1)) else None)
-      |> CCList.filter_map CCFun.id in
+  let res = 
+    if CCList.is_empty args_l && CCList.is_empty args_r then (
+      US.of_subst subst
+    ) else (
+      assert(HVar.equal Type.equal hd_l hd_r);
+      assert(n_l = n_r);
+      let same_args = 
+        List.combine args_l args_r
+        |> List.mapi (fun i (a,b) -> if T.equal a b then Some (T.bvar ~ty:(T.ty a) (n_l-i-1)) else None)
+        |> CCList.filter_map CCFun.id in
 
 
-    let fresh_var_ty = Type.arrow (List.map (fun t -> T.ty t) same_args) (T.ty lhs) in
-    let fresh_var = T.var (HVar.fresh_cnt ~counter ~ty:fresh_var_ty ()) in
-    let subs_val = T.fun_l (List.map T.ty args_l) (T.app fresh_var same_args) in
-    let subst = Subst.FO.bind' subst (hd_l,scope) (subs_val,scope) in
-    US.of_subst subst)
+      let fresh_var_ty = Type.arrow (List.map (fun t -> T.ty t) same_args) (T.ty lhs) in
+      let fresh_var = T.var (HVar.fresh_cnt ~counter ~ty:fresh_var_ty ()) in
+      let subs_val = T.fun_l (List.map T.ty args_l) (T.app fresh_var same_args) in
+      let subst = Subst.FO.bind' subst (hd_l,scope) (subs_val,scope) in
+      US.of_subst subst) in
+  Util.exit_prof prof_flex_same;
+  res
+  
 
 let solve_flex_rigid ~subst ~counter ~scope flex rigid =
+  Util.enter_prof prof_flex_rigid;
   assert(T.is_var (T.head_term flex));
   assert(not @@ T.is_app_var rigid);
 
@@ -273,28 +293,31 @@ let solve_flex_rigid ~subst ~counter ~scope flex rigid =
 
   let rigid = Subst.FO.apply Subst.Renaming.none subst (rigid', scope) in
   let rigid_covers = cover_rigid_skeleton rigid flex_args in
-  if OSeq.is_empty rigid_covers then (
-    raise NotUnifiable
-  ) else (
-    let head_var = T.as_var_exn @@ T.head_term flex in
-    
-    if CCList.is_empty flex_args then (
-      (* avoid creating fresh vars *)
-      let rigid = OSeq.nth 0 rigid_covers in
-      assert (Term.DB.is_closed rigid);
-      assert (OSeq.length rigid_covers = 1);
-
-      let res = Subst.FO.bind' subst (head_var,scope) (rigid,scope) in
-      OSeq.return (US.of_subst res)
+  let res = 
+    if OSeq.is_empty rigid_covers then (
+      raise NotUnifiable
     ) else (
-      let tys = List.map T.ty flex_args in
-      OSeq.map (fun rigid' ->
-        let closed_rigid = T.fun_l tys rigid' in
-        assert(T.DB.is_closed closed_rigid);
-        let subs_flex = Subst.FO.bind' subst (head_var,scope) (closed_rigid,scope) in
-        US.of_subst subs_flex
-      ) rigid_covers)
-  )
+      let head_var = T.as_var_exn @@ T.head_term flex in
+      
+      if CCList.is_empty flex_args then (
+        (* avoid creating fresh vars *)
+        let rigid = OSeq.nth 0 rigid_covers in
+        assert (Term.DB.is_closed rigid);
+        assert (OSeq.length rigid_covers = 1);
+
+        let res = Subst.FO.bind' subst (head_var,scope) (rigid,scope) in
+        OSeq.return (US.of_subst res)
+      ) else (
+        let tys = List.map T.ty flex_args in
+        OSeq.map (fun rigid' ->
+          let closed_rigid = T.fun_l tys rigid' in
+          assert(T.DB.is_closed closed_rigid);
+          let subs_flex = Subst.FO.bind' subst (head_var,scope) (closed_rigid,scope) in
+          US.of_subst subs_flex
+        ) rigid_covers)
+    ) in
+  Util.exit_prof prof_flex_rigid;
+  res
 
 let var_conditions s t = 
   (T.is_linear s || T.is_linear t) &&
@@ -380,44 +403,56 @@ let rec unify ~scope ~counter ~subst constraints : US.t OSeq.t =
 
 
 let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
-  let res = 
-    if US.is_empty subst then (
-      let t0',t1',scope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
-      if var_conditions t0' t1' then (
-        let t0',t1' = solidify t0', solidify t1' in
-        unify ~scope ~counter ~subst [(t0', t1')])
-      else raise NotInFragment
-    )
-    else (
-      if Scoped.scope t0_s != Scoped.scope t1_s then (
-        raise (Invalid_argument "scopes should be the same")
-      )
-      else (
-        let t0', t1' = US_A.apply subst t0_s, US_A.apply subst t1_s in
+  try 
+    let res = 
+      if US.is_empty subst then (
+        let t0',t1',scope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
         if var_conditions t0' t1' then (
           let t0',t1' = solidify t0', solidify t1' in
-          unify ~scope:(Scoped.scope t0_s) ~counter ~subst [(t0', t1')]
-        )
-        else (raise NotInFragment)
+          unify ~scope ~counter ~subst [(t0', t1')])
+        else raise NotInFragment
       )
-    ) 
-  in
+      else (
+        if Scoped.scope t0_s != Scoped.scope t1_s then (
+          raise (Invalid_argument "scopes should be the same")
+        )
+        else (
+          let t0', t1' = US_A.apply subst t0_s, US_A.apply subst t1_s in
+          if var_conditions t0' t1' then (
+            let t0',t1' = solidify t0', solidify t1' in
+            unify ~scope:(Scoped.scope t0_s) ~counter ~subst [(t0', t1')]
+          )
+          else (raise NotInFragment)
+        )
+      ) 
+    in
 
-  assert(OSeq.for_all (fun sub -> 
-    let norm t = Lambda.eta_reduce @@ Lambda.snf t in
-    let lhs_o = norm @@ US_A.apply subst t0_s and rhs_o = norm @@ US_A.apply subst t1_s in
-    (* CCFormat.printf "l_o:@[%a@];r_0:@[%a@]@.sub:@[%a@]@." T.pp lhs_o T.pp rhs_o US.pp sub; *)
-    let lhs = norm @@ US_A.apply sub t0_s and rhs = norm @@ US_A.apply sub t1_s in
-    if T.equal lhs rhs then true
-    else (
-      CCFormat.printf "orig: @[%a@]=?=@[%a@]@." (Scoped.pp T.pp) t0_s (Scoped.pp T.pp) t1_s ;
-      CCFormat.printf "orig_sub: @[%a@]@." US.pp subst;
-      CCFormat.printf "orig_app: @[%a@]=?=@[%a@]@." (T.pp) lhs_o (T.pp) rhs_o ;
-      CCFormat.printf "new_sub: @[%a@]@." US.pp sub ;
-      CCFormat.printf "res: @[%a@]=?=@[%a@]@." T.pp lhs T.pp rhs ;
-      false
-    )) res);
-  (* CCFormat.printf "%d@." !PragUnifParams.max_infs; *)
-  if OSeq.is_empty res then raise NotUnifiable
-  else (if !PragUnifParams.max_infs < 0 then OSeq.to_list res 
-        else OSeq.to_list @@ OSeq.take (20*(!PragUnifParams.max_infs)) res)
+    let res = 
+      if OSeq.is_empty res then raise NotUnifiable
+      else (if !PragUnifParams.max_infs < 0 then OSeq.to_list res 
+            else OSeq.to_list @@ OSeq.take (!PragUnifParams.max_infs) res) in
+    assert(CCList.for_all (fun sub -> 
+      let norm t = Lambda.eta_reduce @@ Lambda.snf t in
+      let lhs_o = norm @@ US_A.apply subst t0_s and rhs_o = norm @@ US_A.apply subst t1_s in
+      (* CCFormat.printf "l_o:@[%a@];r_0:@[%a@]@.sub:@[%a@]@." T.pp lhs_o T.pp rhs_o US.pp sub; *)
+      let lhs = norm @@ US_A.apply sub t0_s and rhs = norm @@ US_A.apply sub t1_s in
+      if T.equal lhs rhs then true
+      else (
+        CCFormat.printf "orig: @[%a@]=?=@[%a@]@." (Scoped.pp T.pp) t0_s (Scoped.pp T.pp) t1_s ;
+        CCFormat.printf "orig_sub: @[%a@]@." US.pp subst;
+        CCFormat.printf "orig_app: @[%a@]=?=@[%a@]@." (T.pp) lhs_o (T.pp) rhs_o ;
+        CCFormat.printf "new_sub: @[%a@]@." US.pp sub ;
+        CCFormat.printf "res: @[%a@]=?=@[%a@]@." T.pp lhs T.pp rhs ;
+        false
+      )) res);
+      res    
+  with NotInFragment ->
+    (* let norm t = Lambda.eta_reduce @@ Lambda.snf t in
+    let lhs_o = norm @@ US_A.apply subst t0_s and rhs_o = norm @@ US_A.apply subst t1_s in *)
+    (* CCFormat.printf "@[%a@]=?=@[%a@]@ is not solid@." T.pp lhs_o T.pp rhs_o; *)
+    raise NotInFragment
+  | NotUnifiable ->
+    (* let norm t = Lambda.eta_reduce @@ Lambda.snf t in
+    let lhs_o = norm @@ US_A.apply subst t0_s and rhs_o = norm @@ US_A.apply subst t1_s in *)
+    (* CCFormat.printf "@[%a@]=?=@[%a@]@ is not unifiable@." T.pp lhs_o T.pp rhs_o; *)
+    raise NotUnifiable
