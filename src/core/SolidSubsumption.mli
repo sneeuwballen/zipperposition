@@ -1,1 +1,1 @@
-val subsumes : Literals.t Scoped.t -> Literals.t Scoped.t -> bool
+val subsumes : Literals.t -> Literals.t -> bool

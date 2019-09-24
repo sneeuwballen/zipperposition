@@ -2449,6 +2449,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let try_eq_subsumption = CCArray.exists Lit.is_eqn (C.lits c) in
     (* use feature vector indexing *)
     let c = if !_ground_subs_check > 0 then  C.ground_clause c else c in
+    let subsumes = 
+      if !_solid_subsumption then SolidSubsumption.subsumes else subsumes in
     let res =
       SubsumIdx.retrieve_subsuming_c !_idx_fv c
       |> Iter.exists
@@ -2475,6 +2477,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       C.is_unit_clause c && Lit.is_pos (C.lits c).(0)
     in
     (* use feature vector indexing *)
+    let subsumes = 
+      if !_solid_subsumption then SolidSubsumption.subsumes else subsumes in
     let res =
       SubsumIdx.retrieve_subsumed_c !_idx_fv c
       |> Iter.fold

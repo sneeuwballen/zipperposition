@@ -287,7 +287,7 @@ let check_subsumption_possibility subsumer target =
     CCArray.for_all (fun l -> CCArray.exists (is_more_specific l) target) subsumer)
 
 
-let subsumes (subsumer,_) (target,_) =
+let subsumes subsumer target =
   let n = Array.length subsumer in
   
   let rec aux ?(i=0) picklist subst subsumer target =
