@@ -76,12 +76,12 @@ let cover t solids : multiterm =
     (* All the ways in which we can represent term t using solids *)
     let sols_as_db = List.mapi (fun i t -> 
       (t,T.bvar ~ty:(T.ty t) (n-i-1+depth))) s_args in
-    let find_solids target = 
+    let matches_of_solids target = 
       (CCList.filter_map (fun (s, s_db) -> 
         if T.equal s target then Some s_db else None) 
       sols_as_db)
       |> TS.of_list in
-    let db_hits = find_solids t in
+    let db_hits = matches_of_solids t in
 
     match T.view t with
     | AppBuiltin (hd,args) ->
@@ -89,7 +89,7 @@ let cover t solids : multiterm =
     | App(hd,args) ->
       assert(not (CCList.is_empty args));
       assert(bvar_or_const hd);
-      let hds = TS.add hd @@ find_solids hd in
+      let hds = TS.add hd @@ matches_of_solids hd in
       let args = List.map (aux ~depth s_args) args in
       app hds args db_hits
     | Fun _ -> 
@@ -103,7 +103,6 @@ let cover t solids : multiterm =
       if TS.is_empty db_hits then raise SolidMatchFail
       else repl db_hits
     | _ -> repl (TS.add t db_hits) in
-  
   aux ~depth:0 solids t
 
 let term_intersection s t =
@@ -317,6 +316,3 @@ let subsumes (subsumer,_) (target,_) =
     let picklist = CCBV.create ~size:(Array.length target) false in
     aux picklist MS.empty subsumer target
   ) else false
-
-  
-
