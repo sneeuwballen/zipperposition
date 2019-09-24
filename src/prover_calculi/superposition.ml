@@ -92,6 +92,7 @@ let _unif_alg = ref JP_unif.unify_scoped
 let _unif_level = ref `Full
 let _ground_subs_check = ref 0
 let _sup_t_f = ref true
+let _solid_subsumption = ref false
 
 module Make(Env : Env.S) : S with module Env = Env = struct
   module Env = Env
@@ -2943,6 +2944,9 @@ let () =
     , " enable DupSup inferences";
     "--ground-before-subs"
     , Arg.Set_int _ground_subs_check
+    , " set the level of grounding before substitution. 0 - no grounding. 1 - only active. 2 - both.";
+    "--solid-substitution"
+    , Arg.Bool (fun v -> _solid_subsumption := v)
     , " set the level of grounding before substitution. 0 - no grounding. 1 - only active. 2 - both.";
     "--recognize-injectivity"
     , Arg.Bool (fun v -> _recognize_injectivity := v)
