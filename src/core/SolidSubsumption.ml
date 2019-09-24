@@ -1,6 +1,8 @@
 module TS = Term.Set
 module T  = Term
-module C  = Clause
+module VT = T.VarTbl
+module Ls = Literals
+module IntSet = Set.Make(CCInt)
 
 exception SolidMatchFail
 
@@ -131,5 +133,56 @@ let term_intersection s t =
     Util.debugf 3 "Incompatible constructors: %s" (fun k -> k s);
     raise SolidMatchFail
 
-  (* let normaize_clauses subsumer target =
-    let target' = Clause_intf. *)
+let normaize_clauses subsumer target =
+  let eta_exp_snf =
+     Ls.map (fun t -> Lambda.eta_expand @@ Lambda.snf @@ t) in
+  
+  let target' = 
+    Ls.ground_lits @@ eta_exp_snf target in
+  
+  let subsumer = eta_exp_snf subsumer in
+  let args_to_remove = VT.create 16 in
+
+  (* We populate app_var_map to contain indices of all arguments that
+     should be removed *)
+  Ls.Seq.terms subsumer
+  |> Iter.flat_map T.Seq.subterms
+  |> Iter.iter (fun s ->
+      if Term.is_app_var s then (
+        let hd,args = T.as_var_exn (T.head_term s), T.args s in
+        let res = ref (VT.get_or args_to_remove hd ~default:IntSet.empty) in
+        CCList.iteri (fun i arg -> 
+          let ty = T.ty arg in
+          if not @@ IntSet.mem i !res then (
+            if Type.is_fun ty then (
+              if not @@ T.is_bvar (Lambda.eta_reduce arg) then (
+                res := IntSet.add i !res;
+            )) else (
+              if not @@ T.is_ground arg then (
+                res := IntSet.add i !res;
+            )))
+        ) args;
+        VT.replace args_to_remove hd !res;
+    ));
+
+  let counter = ref 0 in
+  let arg_prune_subst = 
+    VT.to_seq args_to_remove
+    |> Iter.fold (fun subst (var, idxs) -> 
+      let arg_tys, ret_ty = Type.open_fun @@ HVar.ty var in
+      let n = List.length arg_tys in
+      let matrix_args = 
+        List.mapi (fun i ty -> 
+          if IntSet.mem i idxs then None else Some (T.bvar ty (n-i-1))) arg_tys
+        |> CCList.filter_map CCFun.id in
+      let fresh_var_ty = Type.arrow (List.map T.ty matrix_args) ret_ty in
+      let fresh_var = HVar.fresh_cnt ~counter ~ty:fresh_var_ty () in
+      let matrix = T.app (T.var fresh_var) matrix_args in
+      let subs_term = T.fun_l arg_tys matrix in
+      Subst.FO.bind' subst (var,0) (subs_term,0)
+    ) Subst.empty in
+  
+  let subsumer' = Ls.apply_subst Subst.Renaming.none arg_prune_subst (subsumer,0) in
+  subsumer', target'
+
+
