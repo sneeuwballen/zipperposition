@@ -373,15 +373,9 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
 
   let ground_clause c =
-    let counter = ref 0 in
-    let all_vars = T.VarSet.of_seq @@ Seq.vars c in
-    let gr_subst = T.VarSet.fold (fun v subst -> 
-      let ty = HVar.ty v in
-      Subst.FO.bind subst ((v :> InnerTerm.t HVar.t),0) (T.mk_tmp_cst ~counter ~ty,0)
-    ) all_vars Subst.empty in
-    let res = apply_subst (c,0) gr_subst in
-    assert(Iter.for_all T.is_ground @@ Seq.terms res);
-    res
+    let new_lits = CCArray.to_list @@ Lits.ground_lits (lits c) in
+    let proof_step = proof_step c in
+    create ~trail:(trail c) ~penalty:(penalty c) new_lits proof_step
 
   (** {2 Filter literals} *)
 

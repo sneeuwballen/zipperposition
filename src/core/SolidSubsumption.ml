@@ -1,5 +1,6 @@
 module TS = Term.Set
 module T  = Term
+module C  = Clause
 
 exception SolidMatchFail
 
@@ -129,3 +130,6 @@ let term_intersection s t =
   with Invalid_argument s ->
     Util.debugf 3 "Incompatible constructors: %s" (fun k -> k s);
     raise SolidMatchFail
+
+  (* let normaize_clauses subsumer target =
+    let target' = Clause_intf. *)

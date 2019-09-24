@@ -224,3 +224,5 @@ val unshielded_vars : ?filter:(Term.var -> bool) -> t -> Term.var list
 (** Set of variables occurring unshielded *)
 
 val vars_distinct : t -> bool
+
+val ground_lits : t -> t

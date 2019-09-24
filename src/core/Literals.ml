@@ -543,3 +543,14 @@ let vars_distinct lits =
   let dif_ids  = 
     List.sort_uniq CCOrd.int @@ List.map HVar.id dif_vars in
   List.length dif_ids = List.length dif_vars
+
+let ground_lits lits = 
+  let counter = ref 0 in
+  let all_vars = T.VarSet.of_seq @@ Seq.vars lits in
+  let gr_subst = T.VarSet.fold (fun v subst -> 
+    let ty = HVar.ty v in
+    Subst.FO.bind subst ((v :> InnerTerm.t HVar.t),0) (T.mk_tmp_cst ~counter ~ty,0)
+  ) all_vars Subst.empty in
+  let res = apply_subst Subst.Renaming.none gr_subst (lits,0)  in
+  assert(Iter.for_all T.is_ground @@ Seq.terms res);
+  res
