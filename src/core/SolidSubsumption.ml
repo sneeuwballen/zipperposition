@@ -10,6 +10,7 @@ module SU = SolidUnif
 module MS = Term.VarMap
 
 exception SolidMatchFail
+exception UnsupportedLiteralKind
 
 type multiterm =
   (* Application of Builtin constant to a list of multiterms.
@@ -256,23 +257,66 @@ let subsumption_cmp l1 l2 =
   if sign_res != 0 then sign_res
   else cmp_by_weight l1 l2
 
+let lit_matchers ~subst ~pattern ~target k =
+  begin match pattern with
+  | L.Equation(lhs,rhs,sign) ->
+    begin match target with
+    | L.Equation(lhs', rhs',sign') ->
+      if sign=sign' then (
+        try 
+          let subst = (solid_match ~subst ~pattern:lhs ~target:lhs') in
+          k (solid_match ~subst ~pattern:rhs ~target:rhs')
+        with SolidMatchFail -> ();
+        try 
+          let subst = (solid_match ~subst ~pattern:lhs ~target:rhs') in
+          k (solid_match ~subst ~pattern:rhs ~target:rhs')
+        with SolidMatchFail -> ()) 
+      | _ -> () end
+  | L.True -> begin match target with | L.True -> k subst | _ -> () end
+  | L.False -> begin match target with | L.False -> k subst | _ -> () end
+  | _ -> raise UnsupportedLiteralKind end
+
 let check_subsumption_possibility subsumer target =
   let is_more_specific pattern target =
-    true in
+    not @@ Iter.is_empty (lit_matchers ~subst:MS.empty ~pattern ~target) in
 
   let neg_s, neg_t = CCPair.map_same CCBV.cardinal (Ls.neg subsumer, Ls.neg target) in 
   let pos_s, pos_t = CCPair.map_same CCBV.cardinal (Ls.pos subsumer, Ls.pos target) in
   Ls.ho_weight subsumer <= Ls.ho_weight target && 
   neg_s <= neg_t && pos_s <= pos_t &&
-  ( not (neg_t >=3 || pos_t >= 3) ||
+  (not (neg_t >=3 || pos_t >= 3) ||
     CCArray.for_all (fun l -> CCArray.exists (is_more_specific l) target) subsumer)
 
 
 let subsumes (subsumer,_) (target,_) =
+  let n = Array.length subsumer in
+  
+  let rec aux ?(i=0) picklist subst subsumer target =
+    if i > n then true
+    else (
+      let lit = subsumer.(i) in
+      CCArray.exists (fun (j,lit') -> 
+        if CCBV.get picklist j || cmp_by_sign lit lit' != 0
+           || cmp_by_weight lit lit' > 0 then false
+        else (
+          Iter.exists (fun subst ->
+            CCBV.set picklist j;
+            let res = aux ~i:(i+1) picklist subst subsumer target in
+            CCBV.reset picklist j;
+            res) (lit_matchers ~subst ~pattern:lit ~target:lit')
+        )) (CCArray.mapi (fun i l -> (i,l)) target)
+    ) in
+
+
   let subsumer,target = normaize_clauses subsumer target in
 
   CCArray.sort subsumption_cmp subsumer;
   CCArray.sort subsumption_cmp target;
+
+  if check_subsumption_possibility subsumer target then (
+    let picklist = CCBV.create ~size:(Array.length target) false in
+    aux picklist MS.empty subsumer target
+  ) else false
 
   
 
