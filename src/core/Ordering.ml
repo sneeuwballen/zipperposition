@@ -669,8 +669,8 @@ module EPO : ORD = struct
     CCCache.replacing
       ~eq:(fun ((b1,bb1),(a1,aa1)) ((b2,bb2),(a2,aa2)) -> 
         T.equal b1 b2 && T.equal a1 a2 
-        && CCList.length bb1 = CCList.length bb2 && CCList.for_all2 T.equal bb1 bb2
-        && CCList.length aa1 = CCList.length aa2 && CCList.for_all2 T.equal aa1 aa2) 
+        && CCList.equal T.equal bb1 bb2
+        && CCList.equal T.equal aa1 aa2) 
       ~hash
       256
   and epo_behind_cache ~prec (t,tt) (s,ss) = 
