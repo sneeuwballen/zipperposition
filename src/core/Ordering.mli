@@ -61,6 +61,9 @@ val kbo : Precedence.t -> t
 val rpo6 : Precedence.t -> t
 (** Efficient implementation of RPO (recursive path ordering) *)
 
+val epo : Precedence.t -> t
+(** Embedding Path Order *)
+
 val none : t
 (** All terms are incomparable (equality still works).
     Not a simplification ordering. *)

@@ -73,7 +73,7 @@ let () =
      val a_poly : pi a. a -> a.
      val f_poly : pi a b. (a -> b) -> (a -> b) -> a.
      val sk : term -> term.
-   ");
+   ")
 
 let tyctx = T.Conv.create()
 
