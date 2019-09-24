@@ -2949,9 +2949,9 @@ let () =
     "--ground-before-subs"
     , Arg.Set_int _ground_subs_check
     , " set the level of grounding before substitution. 0 - no grounding. 1 - only active. 2 - both.";
-    "--solid-substitution"
+    "--solid-subsumption"
     , Arg.Bool (fun v -> _solid_subsumption := v)
-    , " set the level of grounding before substitution. 0 - no grounding. 1 - only active. 2 - both.";
+    , " set solid subsumption on or off";
     "--recognize-injectivity"
     , Arg.Bool (fun v -> _recognize_injectivity := v)
     , " recognize injectivity axiom and axiomatize corresponding inverse";

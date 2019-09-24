@@ -147,7 +147,7 @@ let refine_subst subst var t =
   )
 
 let solid_match ~subst ~pattern ~target =
-  assert(T.is_ground pattern);
+  assert(T.is_ground target);
 
   let rec aux subst l r =
     match T.view l with
@@ -211,8 +211,11 @@ let normaize_clauses subsumer target =
         ) args;
         VT.replace args_to_remove hd !res;
     ));
-
-  let counter = ref 0 in
+  let max_var = Ls.Seq.vars subsumer
+                |> Iter.max ~lt:(fun x y -> HVar.id x < HVar.id y)
+                |> CCOpt.map HVar.id
+                |> CCOpt.get_or ~default:0 in
+  let counter = ref (max_var +1) in
   let arg_prune_subst = 
     VT.to_seq args_to_remove
     |> Iter.fold (fun subst (var, idxs) -> 
@@ -291,7 +294,7 @@ let subsumes subsumer target =
   let n = Array.length subsumer in
   
   let rec aux ?(i=0) picklist subst subsumer target =
-    if i > n then true
+    if i >= n then true
     else (
       let lit = subsumer.(i) in
       CCArray.exists (fun (j,lit') -> 
