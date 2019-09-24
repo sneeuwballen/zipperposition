@@ -665,14 +665,14 @@ module EPO : ORD = struct
 
   let rec epo ~prec (t,tt) (s,ss) = CCCache.with_cache _cache (fun ((t,tt), (s,ss)) -> epo_behind_cache ~prec (t,tt) (s,ss)) ((t,tt),(s,ss))
   and _cache = 
-    let hash ((b,bb),(a,aa)) = Hash.combine5 42 (T.hash b) (T.hash a) (Hash.list T.hash bb) (Hash.list T.hash aa)in
+    let hash ((b,bb),(a,aa)) = Hash.combine4 (T.hash b) (T.hash a) (Hash.list T.hash bb) (Hash.list T.hash aa)in
     CCCache.replacing
       ~eq:(fun ((b1,bb1),(a1,aa1)) ((b2,bb2),(a2,aa2)) -> 
         T.equal b1 b2 && T.equal a1 a2 
         && CCList.equal T.equal bb1 bb2
         && CCList.equal T.equal aa1 aa2) 
       ~hash
-      256
+      512
   and epo_behind_cache ~prec (t,tt) (s,ss) = 
     if T.equal t s && CCList.length tt = CCList.length ss && CCList.for_all2 T.equal tt ss then Eq else
       begin match Head.term_to_head t, Head.term_to_head s with
