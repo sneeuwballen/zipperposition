@@ -62,6 +62,9 @@ let matches a1 a2 =
 let weight lits =
   Array.fold_left (fun w lit -> w + Lit.weight lit) 0 lits
 
+let ho_weight lits = 
+  Array.fold_left (fun w lit -> w + Lit.ho_weight lit) 0 lits
+
 let depth lits =
   Array.fold_left (fun d lit -> max d (Lit.depth lit)) 0 lits
 

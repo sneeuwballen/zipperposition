@@ -103,6 +103,9 @@ let hash lit =
 let weight lit =
   fold (fun acc t -> acc + T.size t) 0 lit
 
+let ho_weight =
+  fold (fun acc t -> acc + T.ho_weight t) 0 
+
 let heuristic_weight weight = function
   | Equation (l, r, true) 
       when Term.equal r Term.true_ || Term.equal r Term.false_ -> weight l
@@ -181,8 +184,8 @@ let is_typex_pred = function
   | _ -> false
 
 let is_propositional = function
-  | Equation(lhs,rhs,true) when T.is_true_or_false rhs ->
-    T.is_const lhs
+  | Equation(lhs,rhs,true) ->
+    T.is_true_or_false rhs
   | _ -> false
 
 let is_arith_eqn = _on_arith Int_lit.is_eqn

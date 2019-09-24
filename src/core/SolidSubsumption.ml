@@ -1,8 +1,13 @@
 module TS = Term.Set
 module T  = Term
 module VT = T.VarTbl
+module L = Literal
 module Ls = Literals
 module IntSet = Set.Make(CCInt)
+module SU = SolidUnif
+
+(* Meta subst *)
+module MS = Term.VarMap
 
 exception SolidMatchFail
 
@@ -59,7 +64,6 @@ let repl repls =
   if TS.for_all bvar_or_const repls then (
     Repl repls
   ) else invalid_arg "replacements must be bound vars or constants"
-
 
 let cover t solids : multiterm = 
   assert(List.for_all T.is_ground solids);
@@ -133,9 +137,52 @@ let term_intersection s t =
     Util.debugf 3 "Incompatible constructors: %s" (fun k -> k s);
     raise SolidMatchFail
 
+
+let refine_subst subst var t = 
+  if not @@ MS.mem var subst then (
+    MS.add var t subst
+  ) else (
+    let old = CCOpt.get_exn @@ MS.get var subst in
+    MS.add var (term_intersection old t) subst 
+  )
+
+let solid_match ~subst ~pattern ~target =
+  assert(T.is_ground pattern);
+
+  let rec aux subst l r =
+    match T.view l with
+    | AppBuiltin(b, args) ->
+      begin match T.view r with 
+      | AppBuiltin(b', args') 
+        when Builtin.equal b b' && List.length args = List.length args' ->
+        List.fold_left 
+          (fun subst (l',r') ->  aux subst l' r') 
+        subst (List.combine args args')
+      | _ -> raise SolidMatchFail end
+    | App(hd, args) when T.is_var hd -> 
+      refine_subst subst (T.as_var_exn hd) (cover r args)
+    | App(hd, args) -> 
+      assert(T.is_const hd || T.is_bvar hd);
+      begin match T.view r with 
+      | App(hd', args') when T.equal hd hd' ->
+        assert(List.length args = List.length args');
+        List.fold_left 
+          (fun subst (l',r') ->  aux subst l' r') 
+        subst (List.combine args args')
+      | _ -> raise SolidMatchFail end
+    | Fun(ty, body) ->
+      let prefix, body = T.open_fun l in
+      let prefix', body' = T.open_fun r in
+      assert(List.length prefix = List.length prefix');
+      aux subst body body'
+    | Var x -> refine_subst subst x (cover r [])
+    | _ -> if T.equal l r then subst else raise SolidMatchFail 
+  in
+  aux subst pattern target
+
 let normaize_clauses subsumer target =
-  let eta_exp_snf =
-     Ls.map (fun t -> Lambda.eta_expand @@ Lambda.snf @@ t) in
+  let eta_exp_snf ?(f=CCFun.id) =
+     Ls.map (fun t -> f @@ Lambda.eta_expand @@ Lambda.snf @@ t) in
   
   let target' = 
     Ls.ground_lits @@ eta_exp_snf target in
@@ -182,7 +229,50 @@ let normaize_clauses subsumer target =
       Subst.FO.bind' subst (var,0) (subs_term,0)
     ) Subst.empty in
   
-  let subsumer' = Ls.apply_subst Subst.Renaming.none arg_prune_subst (subsumer,0) in
+  let subsumer' =
+    Ls.apply_subst Subst.Renaming.none arg_prune_subst (subsumer,0)
+    |> eta_exp_snf ~f:(SU.solidify ~limit:false)  in
   subsumer', target'
 
+let cmp_by_sign l1 l2 =
+  let sign l = 
+    let res = 
+      match l with 
+      | L.Equation (l, r, sign) ->
+        if sign && T.is_true_or_false r then T.equal r T.true_ else sign
+      | L.Int o -> Int_lit.sign o
+      | L.False -> false
+      | _ -> true 
+    in
+    if res then 1 else 0 in
+
+  CCOrd.int (sign l1) (sign l2)
+
+let cmp_by_weight l1 l2 = 
+  CCOrd.int (L.ho_weight l1) (L.ho_weight l2)
+
+let subsumption_cmp l1 l2 =
+  let sign_res = cmp_by_sign l1 l2 in
+  if sign_res != 0 then sign_res
+  else cmp_by_weight l1 l2
+
+let check_subsumption_possibility subsumer target =
+  let is_more_specific pattern target =
+    true in
+
+  let neg_s, neg_t = CCPair.map_same CCBV.cardinal (Ls.neg subsumer, Ls.neg target) in 
+  let pos_s, pos_t = CCPair.map_same CCBV.cardinal (Ls.pos subsumer, Ls.pos target) in
+  Ls.ho_weight subsumer <= Ls.ho_weight target && 
+  neg_s <= neg_t && pos_s <= pos_t &&
+  ( not (neg_t >=3 || pos_t >= 3) ||
+    CCArray.for_all (fun l -> CCArray.exists (is_more_specific l) target) subsumer)
+
+
+let subsumes (subsumer,_) (target,_) =
+  let subsumer,target = normaize_clauses subsumer target in
+
+  CCArray.sort subsumption_cmp subsumer;
+  CCArray.sort subsumption_cmp target;
+
+  
 

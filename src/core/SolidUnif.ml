@@ -46,7 +46,7 @@ let eta_expand_otf ~subst ~scope pref1 pref2 t1 t2 =
     )
   )
 
-let solidify t =
+let solidify ?(limit=true) t =
   let rec aux t =
     match T.view t with
     | AppBuiltin(hd, args) -> 
@@ -61,7 +61,7 @@ let solidify t =
     | App(hd, args) ->
       assert (T.is_var hd);
 
-      if List.length args > !PragUnifParams.solidification_limit then
+      if limit && List.length args > !PragUnifParams.solidification_limit then
         raise NotInFragment;
 
       let args' = List.map (fun arg -> 
