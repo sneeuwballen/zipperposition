@@ -681,8 +681,8 @@ module EPO : ORD = struct
       end
   and epo_composite ~prec (t,tt) (s,ss) (g,gg) (f,ff) =
       begin match prec_compare prec g f  with
-        | Gt -> epo_check_e2_e3 ~prec (t,tt) (s,ss) (g,gg) (f,ff)
-        | Lt -> Comparison.opp (epo_check_e2_e3 ~prec (s,ss) (t,tt) (f,ff) (g,gg))
+        | Gt -> epo_check_e2_e3     ~prec (t,tt) (s,ss) (g,gg) (f,ff)
+        | Lt -> epo_check_e2_e3_inv ~prec (t,tt) (s,ss) (g,gg) (f,ff)
         | Eq ->
           let c = match prec_status prec g with
             | Prec.Multiset -> assert false
@@ -692,12 +692,12 @@ module EPO : ORD = struct
           in
           begin match g with
             | Head.V _ -> 
-              if c = Gt then epo_check_e4 ~prec (t,tt) (s,ss) (g,gg) (f,ff) else
-              if c = Lt then Comparison.opp (epo_check_e4 ~prec (s,ss) (t,tt) (f,ff) (g,gg)) else
+              if c = Gt then epo_check_e4     ~prec (t,tt) (s,ss) (g,gg) (f,ff) else
+              if c = Lt then epo_check_e4_inv ~prec (t,tt) (s,ss) (g,gg) (f,ff) else
               epo_check_e1 ~prec (t,tt) (s,ss) (g,gg) (f,ff)
             | _ -> 
-              if c = Gt then epo_check_e2_e3 ~prec (t,tt) (s,ss) (g,gg) (f,ff) else
-              if c = Lt then Comparison.opp (epo_check_e2_e3 ~prec (s,ss) (t,tt) (f,ff) (g,gg)) else
+              if c = Gt then epo_check_e2_e3     ~prec (t,tt) (s,ss) (g,gg) (f,ff) else
+              if c = Lt then epo_check_e2_e3_inv ~prec (t,tt) (s,ss) (g,gg) (f,ff) else
               epo_check_e1 ~prec (t,tt) (s,ss) (g,gg) (f,ff)
           end
         | Incomparable -> epo_check_e1 ~prec (t,tt) (s,ss) (g,gg) (f,ff)
@@ -709,8 +709,14 @@ module EPO : ORD = struct
   and epo_check_e2_e3 ~prec (t,tt) (s,ss) (g,gg) (f,ff) = 
     if ff = [] || epo ~prec (t,tt) (chop (f,ff)) = Gt  then Gt else 
     epo_check_e1 ~prec (t,tt) (s,ss) (g,gg) (f,ff)
+  and epo_check_e2_e3_inv ~prec (t,tt) (s,ss) (g,gg) (f,ff) = 
+    if gg = [] || epo ~prec (chop (g,gg)) (s, ss) = Lt then Lt else 
+    epo_check_e1 ~prec (t,tt) (s,ss) (g,gg) (f,ff)
   and epo_check_e4 ~prec (t,tt) (s,ss) (g,gg) (f,ff) = 
     if ff = [] || epo ~prec (chop (g,gg)) (chop (f,ff)) = Gt then Gt else 
+    epo_check_e1 ~prec (t,tt) (s,ss) (g,gg) (f,ff)
+  and epo_check_e4_inv ~prec (t,tt) (s,ss) (g,gg) (f,ff) = 
+    if gg = [] || epo ~prec (chop (g,gg)) (chop (f,ff)) = Lt then Lt else 
     epo_check_e1 ~prec (t,tt) (s,ss) (g,gg) (f,ff)
   and chop (f,ff) = (List.hd ff, List.tl ff)
   and epo_llex ~prec gg ff =
