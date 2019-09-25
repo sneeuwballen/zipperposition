@@ -66,6 +66,16 @@ let repl repls =
     Repl repls
   ) else invalid_arg "replacements must be bound vars or constants"
 
+let rec pp out = function 
+  | AppBuiltin(b,args,repls) ->
+    CCFormat.printf "[|@[%a@](@[%a@])|@[%a@]|]" Builtin.pp b (CCList.pp ~sep:" " pp) args (TS.pp ~sep:" " T.pp) repls;
+  | App(hds,args,repls) ->
+    CCFormat.printf "[|@[%a@](@[%a@])|@[%a@]|]" (TS.pp ~sep:"," ~start:"{" ~stop:"}" T.pp) hds (CCList.pp ~sep:" " pp) args (TS.pp ~sep:" " T.pp) repls;
+  | Fun(ty,repls) ->
+    CCFormat.printf "[|l@[%a@].@[%a@]|]" Type.pp ty pp repls;
+  | Repl repls ->
+    CCFormat.printf "{r:@[%a@]}" (TS.pp ~sep:" " T.pp) repls
+
 let cover t solids : multiterm = 
   assert(List.for_all T.is_ground solids);
   (* If the term is not of base type, then it must be a bound variable *)
@@ -118,7 +128,7 @@ let term_intersection s t =
     | App(s_hds,s_args,s_repls) ->
       let (t_hds,t_args,t_repls) = open_app t in
       let i_hds = TS.inter s_hds t_hds in
-      if TS.is_empty i_hds then (
+      if not @@ TS.is_empty i_hds then (
         let args = List.map (fun (s,t) -> aux s t) @@ 
                       List.combine s_args t_args in
         app i_hds args (TS.inter s_repls t_repls)
@@ -275,7 +285,7 @@ let lit_matchers ~subst ~pattern ~target k =
         with SolidMatchFail -> ();
         try 
           let subst = (solid_match ~subst ~pattern:lhs ~target:rhs') in
-          k (solid_match ~subst ~pattern:rhs ~target:rhs')
+          k (solid_match ~subst ~pattern:rhs ~target:lhs')
         with SolidMatchFail -> ()) 
       | _ -> () end
   | L.True -> begin match target with | L.True -> k subst | _ -> () end
@@ -297,10 +307,14 @@ let check_subsumption_possibility subsumer target =
 
 let subsumes subsumer target =
   let n = Array.length subsumer in
-  let subsumer_o, target_o = subsumer, target in
+  (* let subsumer_o, target_o = subsumer, target in *)
   
   let rec aux ?(i=0) picklist subst subsumer target =
-    if i >= n then true
+    if i >= n then ( 
+      (* CCFormat.printf "SUCESS:@.s:@[%a@];@.t:@[%a@]@.subst:@[%a@]@."
+        Ls.pp subsumer Ls.pp target (MS.pp HVar.pp pp) subst; *)
+      true
+    )
     else (
       let lit = subsumer.(i) in
       CCArray.exists (fun (j,lit') -> 
@@ -324,10 +338,10 @@ let subsumes subsumer target =
   if check_subsumption_possibility subsumer target then (
     let picklist = CCBV.create ~size:(Array.length target) false in
     let res = aux picklist MS.empty subsumer target in
-    CCFormat.printf 
+    (* CCFormat.printf 
       "subsumption[%s]:@.S_O:@[%a@]@.S_N:@[%a@]@.T_O:@[%a@]@.T_N:@[%a@]@.@." 
         (if res then "OK" else "FAIL")
         Ls.pp subsumer_o Ls.pp subsumer
-        Ls.pp target_o Ls.pp target;
+        Ls.pp target_o Ls.pp target; *)
     res
   ) else false
