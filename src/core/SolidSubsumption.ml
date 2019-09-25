@@ -129,7 +129,9 @@ let term_intersection s t =
         fun_ s_ty (aux s_bodys t_bodys)
       ) else raise SolidMatchFail
     | Repl(repls) ->
-      repl (TS.inter repls (open_repl t))
+      let res = TS.inter repls (open_repl t) in
+      if TS.is_empty res then raise SolidMatchFail
+      else repl res
   in
   try 
     aux s t
@@ -178,7 +180,9 @@ let solid_match ~subst ~pattern ~target =
     | Var x -> refine_subst subst x (cover r [])
     | _ -> if T.equal l r then subst else raise SolidMatchFail 
   in
-  aux subst pattern target
+  
+  if Type.equal (T.ty pattern) (T.ty target) then aux subst pattern target
+  else raise SolidMatchFail
 
 let normaize_clauses subsumer target =
   let eta_exp_snf ?(f=CCFun.id) =
@@ -292,6 +296,7 @@ let check_subsumption_possibility subsumer target =
 
 let subsumes subsumer target =
   let n = Array.length subsumer in
+  let subsumer_o, target_o = subsumer, target in
   
   let rec aux ?(i=0) picklist subst subsumer target =
     if i >= n then true
@@ -317,5 +322,11 @@ let subsumes subsumer target =
 
   if check_subsumption_possibility subsumer target then (
     let picklist = CCBV.create ~size:(Array.length target) false in
-    aux picklist MS.empty subsumer target
+    let res = aux picklist MS.empty subsumer target in
+    CCFormat.printf 
+      "subsumption[%s]:@.S_O:@[%a@]@.S_N:@[%a@]@.T_O:@[%a@]@.T_N:@[%a@]@.@." 
+        (if res then "OK" else "FAIL")
+        Ls.pp subsumer_o Ls.pp subsumer
+        Ls.pp target_o Ls.pp target;
+    res
   ) else false
