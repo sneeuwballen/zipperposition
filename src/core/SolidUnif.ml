@@ -46,7 +46,7 @@ let eta_expand_otf ~subst ~scope pref1 pref2 t1 t2 =
     )
   )
 
-let solidify ?(limit=true) t =
+let solidify ?(limit=true) ?(exception_on_error=true) t =
   let rec aux t =
     match T.view t with
     | AppBuiltin(hd, args) -> 
@@ -67,10 +67,10 @@ let solidify ?(limit=true) t =
       let args' = List.map (fun arg -> 
         if Type.is_fun (T.ty arg) then (
           let arg = Lambda.eta_reduce arg in
-          if T.is_bvar arg then arg else raise NotInFragment
+          if T.is_bvar arg || not exception_on_error then arg else raise NotInFragment
         ) else (
           let arg = Lambda.snf arg in
-          if T.is_ground arg then arg else raise NotInFragment
+          if T.is_ground arg || not exception_on_error then arg else raise NotInFragment
         )) args in
       if T.same_l args args' then t
       else T.app hd args'

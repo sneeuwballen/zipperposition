@@ -403,6 +403,7 @@ module FO = struct
   let update = (update :> t -> var Scoped.t -> term Scoped.t -> t)
   let of_list = (of_list :> ?init:t -> (var Scoped.t * term Scoped.t) list -> t)
 
+
   let bind' = (bind :> t -> Type.t HVar.t Scoped.t -> term Scoped.t -> t)
   let update' = (update :> t -> Type.t HVar.t Scoped.t -> term Scoped.t -> t)
   let of_list' = (of_list :> ?init:t -> (Type.t HVar.t Scoped.t * term Scoped.t) list -> t)

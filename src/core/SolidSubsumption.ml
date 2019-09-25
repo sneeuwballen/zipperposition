@@ -64,22 +64,32 @@ let open_repl = function
 let repl repls = 
   if TS.for_all bvar_or_const repls then (
     Repl repls
-  ) else invalid_arg "replacements must be bound vars or constants"
+  ) else (
+    let err_msg = CCFormat.sprintf "replacements must be ground: @[%a@]" (TS.pp T.pp) repls in
+    invalid_arg err_msg
+  )
+
+let rec of_term term =
+  match T.view term with
+  | AppBuiltin(b, args) ->
+    app_builtin b (List.map of_term args) TS.empty
+  | App(hd, args) ->
+    app (TS.singleton hd) (List.map of_term args) TS.empty
+  | Fun(ty,body) ->
+    fun_ ty (of_term body)
+  | _ -> repl (TS.singleton term)
 
 let rec pp out = function 
   | AppBuiltin(b,args,repls) ->
-    CCFormat.printf "[|@[%a@](@[%a@])|@[%a@]|]" Builtin.pp b (CCList.pp ~sep:" " pp) args (TS.pp ~sep:" " T.pp) repls;
+    CCFormat.printf "|@[%a@](@[%a@])|@[%a@]|" Builtin.pp b (CCList.pp ~sep:"," pp) args (TS.pp ~sep:" " T.pp) repls;
   | App(hds,args,repls) ->
-    CCFormat.printf "[|@[%a@](@[%a@])|@[%a@]|]" (TS.pp ~sep:"," ~start:"{" ~stop:"}" T.pp) hds (CCList.pp ~sep:" " pp) args (TS.pp ~sep:" " T.pp) repls;
+    CCFormat.printf "|@[%a@](@[%a@])|@[%a@]|" (TS.pp ~sep:"," ~start:"{" ~stop:"}" T.pp) hds (CCList.pp ~sep:"," pp) args (TS.pp ~sep:" " T.pp) repls;
   | Fun(ty,repls) ->
-    CCFormat.printf "[|l@[%a@].@[%a@]|]" Type.pp ty pp repls;
+    CCFormat.printf "|l@[%a@].@[%a@]|" Type.pp ty pp repls;
   | Repl repls ->
     CCFormat.printf "{r:@[%a@]}" (TS.pp ~sep:" " T.pp) repls
 
 let cover t solids : multiterm = 
-  assert(List.for_all T.is_ground solids);
-  (* If the term is not of base type, then it must be a bound variable *)
-  assert(List.for_all (fun t -> not @@ Type.is_fun @@ T.ty t || T.is_bvar t) solids);
   let n = List.length solids in
 
   let rec aux ~depth s_args t : multiterm  =
@@ -103,7 +113,6 @@ let cover t solids : multiterm =
       let args = List.map (aux ~depth s_args) args in
       app hds args db_hits
     | Fun _ -> 
-      assert(TS.is_empty db_hits);
       let ty_args, body = T.open_fun t in
       let d_inc = List.length ty_args in
       let s_args' = List.map (T.DB.shift d_inc) s_args in
@@ -150,13 +159,20 @@ let term_intersection s t =
     raise SolidMatchFail
 
 
-let refine_subst subst var t = 
+let refine_subst_w_term subst var t = 
   if not @@ MS.mem var subst then (
     MS.add var t subst
   ) else (
     let old = CCOpt.get_exn @@ MS.get var subst in
     MS.add var (term_intersection old t) subst 
   )
+
+let refine_subst_w_subst metasubst subst =
+  let res = ref metasubst in
+  Subst.FO.iter (fun (v,_) (t,_) ->  
+    res := refine_subst_w_term !res v (of_term t);
+  ) subst;
+  !res
 
 let solid_match ~subst ~pattern ~target =
   assert(T.is_ground target);
@@ -172,7 +188,7 @@ let solid_match ~subst ~pattern ~target =
         subst (List.combine args args')
       | _ -> raise SolidMatchFail end
     | App(hd, args) when T.is_var hd -> 
-      refine_subst subst (T.as_var_exn hd) (cover r args)
+      refine_subst_w_term subst (T.as_var_exn hd) (cover r args)
     | App(hd, args) -> 
       assert(T.is_const hd || T.is_bvar hd);
       begin match T.view r with 
@@ -187,7 +203,7 @@ let solid_match ~subst ~pattern ~target =
       let prefix', body' = T.open_fun r in
       assert(List.length prefix = List.length prefix');
       aux subst body body'
-    | Var x -> refine_subst subst x (cover r [])
+    | Var x -> refine_subst_w_term subst x (cover r [])
     | _ -> if T.equal l r then subst else raise SolidMatchFail 
   in
   
@@ -201,58 +217,12 @@ let normaize_clauses subsumer target =
   let target' = 
     Ls.ground_lits @@ eta_exp_snf target in
   
-  let subsumer = eta_exp_snf subsumer in
-  let args_to_remove = VT.create 16 in
-
+  let subsumer' = eta_exp_snf ~f:(SU.solidify ~limit:false ~exception_on_error:false) subsumer in
   (* We populate app_var_map to contain indices of all arguments that
      should be removed *)
-  Ls.Seq.terms subsumer
-  |> Iter.flat_map T.Seq.subterms
-  |> Iter.iter (fun s ->
-      if Term.is_app_var s then (
-        let hd,args = T.as_var_exn (T.head_term s), T.args s in
-        let res = ref (VT.get_or args_to_remove hd ~default:IntSet.empty) in
-        CCList.iteri (fun i arg -> 
-          let ty = T.ty arg in
-          if not @@ IntSet.mem i !res then (
-            if Type.is_fun ty then (
-              if not @@ T.is_bvar (Lambda.eta_reduce arg) then (
-                res := IntSet.add i !res;
-            )) else (
-              if not @@ T.is_ground arg then (
-                res := IntSet.add i !res;
-            )))
-        ) args;
-        VT.replace args_to_remove hd !res;
-    ));
-  let max_var = Ls.Seq.vars subsumer
-                |> Iter.max ~lt:(fun x y -> HVar.id x < HVar.id y)
-                |> CCOpt.map HVar.id
-                |> CCOpt.get_or ~default:0 in
-  let counter = ref (max_var +1) in
-  let arg_prune_subst = 
-    VT.to_seq args_to_remove
-    |> Iter.fold (fun subst (var, idxs) -> 
-      let arg_tys, ret_ty = Type.open_fun @@ HVar.ty var in
-      let n = List.length arg_tys in
-      let matrix_args = 
-        List.mapi (fun i ty -> 
-          if IntSet.mem i idxs then None else Some (T.bvar ty (n-i-1))) arg_tys
-        |> CCList.filter_map CCFun.id in
-      let fresh_var_ty = Type.arrow (List.map T.ty matrix_args) ret_ty in
-      let fresh_var = HVar.fresh_cnt ~counter ~ty:fresh_var_ty () in
-      let matrix = T.app (T.var fresh_var) matrix_args in
-      let subs_term = T.fun_l arg_tys matrix in
-      Subst.FO.bind' subst (var,0) (subs_term,0)
-    ) Subst.empty in
-  
-  let subsumer' =
-    Ls.apply_subst Subst.Renaming.none arg_prune_subst (subsumer,0)
-    |> eta_exp_snf ~f:(SU.solidify ~limit:false)  in
   subsumer', target'
 
-let cmp_by_sign l1 l2 =
-  let sign l = 
+let sign l = 
     let res = 
       match l with 
       | L.Equation (l, r, sign) ->
@@ -261,8 +231,9 @@ let cmp_by_sign l1 l2 =
       | L.False -> false
       | _ -> true 
     in
-    if res then 1 else 0 in
+    if res then 1 else -1
 
+let cmp_by_sign l1 l2 =
   CCOrd.int (sign l1) (sign l2)
 
 let cmp_by_weight l1 l2 = 
@@ -273,20 +244,47 @@ let subsumption_cmp l1 l2 =
   if sign_res != 0 then sign_res
   else cmp_by_weight l1 l2
 
-let lit_matchers ~subst ~pattern ~target k =
+let classic_match ~subst ~pattern ~target =
+  try
+    (* CCFormat.printf "classic: @[%a@] >=? @[%a@]@." T.pp pattern T.pp target; *)
+    Unif.FO.matching_same_scope ~subst ~pattern ~scope:0 target
+  with Unif.Fail -> raise SolidMatchFail
+
+let lit_matchers ~subst ~pattern ~target k  =
   begin match pattern with
   | L.Equation(lhs,rhs,sign) ->
     begin match target with
     | L.Equation(lhs', rhs',sign') ->
-      if sign=sign' then (
-        try 
-          let subst = (solid_match ~subst ~pattern:lhs ~target:lhs') in
-          k (solid_match ~subst ~pattern:rhs ~target:rhs')
-        with SolidMatchFail -> ();
-        try 
-          let subst = (solid_match ~subst ~pattern:lhs ~target:rhs') in
-          k (solid_match ~subst ~pattern:rhs ~target:lhs')
-        with SolidMatchFail -> ()) 
+      assert(T.is_ground lhs');
+      assert(T.is_ground rhs');
+      (* let res_list = ref [] in  *)
+      if sign=sign' then 
+        (
+          (try
+          (* CCFormat.printf "clr:@[%a@],@[%a@]@." T.pp lhs T.pp lhs'; *)
+            let c_subst = classic_match ~subst:Subst.empty ~pattern:lhs ~target:lhs' in
+            let c_subst = classic_match ~subst:c_subst ~pattern:rhs ~target:rhs' in
+            (* CCFormat.printf "clrOK:@[%a@]@." Subst.pp c_subst; *)
+            k (refine_subst_w_subst subst c_subst)
+          with SolidMatchFail -> (*CCFormat.printf "clr:false@.";*) ());
+          (try
+            (* CCFormat.printf "crl:@[%a@],@[%a@]@." T.pp lhs T.pp rhs'; *)
+            let c_subst = classic_match ~subst:Subst.empty ~pattern:lhs ~target:rhs' in
+            let c_subst = classic_match ~subst:c_subst ~pattern:rhs ~target:lhs' in
+            (* CCFormat.printf "crlOK:@[%a@]@." Subst.pp c_subst; *)
+            k (refine_subst_w_subst subst c_subst)
+          with SolidMatchFail -> (*CCFormat.printf "crl:false@.";*) ());
+          (try
+            (* CCFormat.printf "slr:@[%a@],@[%a@]@." T.pp lhs T.pp lhs'; *)
+            let subst1 = (solid_match ~subst ~pattern:lhs ~target:lhs') in
+            k (solid_match ~subst:subst1 ~pattern:rhs ~target:rhs')
+          with SolidMatchFail -> (*CCFormat.printf "slr:false@.";*) ());
+        (try 
+          (* CCFormat.printf "srl:@[%a@],@[%a@]@." T.pp lhs T.pp rhs'; *)
+          let subst2 = (solid_match ~subst ~pattern:lhs ~target:rhs') in
+          k (solid_match ~subst:subst2 ~pattern:rhs ~target:lhs')
+        with SolidMatchFail -> (*CCFormat.printf "srl:false@.";*) ());
+        );
       | _ -> () end
   | L.True -> begin match target with | L.True -> k subst | _ -> () end
   | L.False -> begin match target with | L.False -> k subst | _ -> () end
@@ -294,22 +292,21 @@ let lit_matchers ~subst ~pattern ~target k =
     raise UnsupportedLiteralKind end
 
 let check_subsumption_possibility subsumer target =
-  let is_more_specific pattern target =
+   let is_more_specific pattern target =
     not @@ Iter.is_empty (lit_matchers ~subst:MS.empty ~pattern ~target) in
 
-  let neg_s, neg_t = CCPair.map_same CCBV.cardinal (Ls.neg subsumer, Ls.neg target) in 
-  let pos_s, pos_t = CCPair.map_same CCBV.cardinal (Ls.pos subsumer, Ls.pos target) in
-  Ls.ho_weight subsumer <= Ls.ho_weight target && 
-  neg_s <= neg_t && pos_s <= pos_t &&
+  let neg_s, neg_t = CCPair.map_same (CCArray.fold (fun acc l -> if sign l = (-1) then acc + 1 else acc) 0) (subsumer, target) in 
+  let pos_s, pos_t = CCPair.map_same (CCArray.fold (fun acc l -> if sign l = 1 then acc + 1 else acc) 0) (subsumer, target) in
+  Ls.ho_weight subsumer <= Ls.ho_weight target &&
+  neg_s <= neg_t && pos_s <= pos_t && 
   (not (neg_t >=3 || pos_t >= 3) ||
     CCArray.for_all (fun l -> CCArray.exists (is_more_specific l) target) subsumer)
-
 
 let subsumes subsumer target =
   let n = Array.length subsumer in
   (* let subsumer_o, target_o = subsumer, target in *)
   
-  let rec aux ?(i=0) picklist subst subsumer target =
+  let rec aux ?(i=0) picklist subst subsumer target_i =
     if i >= n then ( 
       (* CCFormat.printf "SUCESS:@.s:@[%a@];@.t:@[%a@]@.subst:@[%a@]@."
         Ls.pp subsumer Ls.pp target (MS.pp HVar.pp pp) subst; *)
@@ -318,17 +315,27 @@ let subsumes subsumer target =
     else (
       let lit = subsumer.(i) in
       CCArray.exists (fun (j,lit') -> 
+        (* CCFormat.printf "(%d,%d,@[%a@],@[%a@]):@[%a@]=<=@[%a@]@."
+          i j CCBV.pp picklist (MS.pp HVar.pp pp) subst L.pp lit L.pp lit'; *)
+
         if CCBV.get picklist j || cmp_by_sign lit lit' != 0
            || cmp_by_weight lit lit' > 0 then false
         else (
-          Iter.exists (fun subst ->
-            CCBV.set picklist j;
-            let res = aux ~i:(i+1) picklist subst subsumer target in
-            CCBV.reset picklist j;
-            res) (lit_matchers ~subst ~pattern:lit ~target:lit')
-        )) (CCArray.mapi (fun i l -> (i,l)) target)
-    ) in
+          let matchers = lit_matchers ~subst ~pattern:lit ~target:lit' in
 
+          (* let n = CCList.length matchers in *)
+          (* CCList.iteri (fun i ms -> 
+            CCFormat.printf "matcher %d/%d: @[%a@]@." i n (MS.pp HVar.pp pp) ms;
+          ) matchers; *)
+
+          Iter.exists (fun subst' ->
+            CCBV.set picklist j;
+            let res = aux ~i:(i+1) picklist subst' subsumer target_i in
+            CCBV.reset picklist j;
+            (* CCFormat.printf "res:%b@." res; *)
+            res) matchers
+        )) target_i
+    ) in
 
   let subsumer,target = normaize_clauses subsumer target in
 
@@ -337,7 +344,8 @@ let subsumes subsumer target =
 
   if check_subsumption_possibility subsumer target then (
     let picklist = CCBV.create ~size:(Array.length target) false in
-    let res = aux picklist MS.empty subsumer target in
+    let target_i = CCArray.mapi (fun i l -> (i,l)) target in
+    let res = aux picklist MS.empty subsumer target_i in
     (* CCFormat.printf 
       "subsumption[%s]:@.S_O:@[%a@]@.S_N:@[%a@]@.T_O:@[%a@]@.T_N:@[%a@]@.@." 
         (if res then "OK" else "FAIL")
@@ -345,3 +353,4 @@ let subsumes subsumer target =
         Ls.pp target_o Ls.pp target; *)
     res
   ) else false
+
