@@ -280,7 +280,8 @@ let lit_matchers ~subst ~pattern ~target k =
       | _ -> () end
   | L.True -> begin match target with | L.True -> k subst | _ -> () end
   | L.False -> begin match target with | L.False -> k subst | _ -> () end
-  | _ -> raise UnsupportedLiteralKind end
+  | _ -> 
+    raise UnsupportedLiteralKind end
 
 let check_subsumption_possibility subsumer target =
   let is_more_specific pattern target =
