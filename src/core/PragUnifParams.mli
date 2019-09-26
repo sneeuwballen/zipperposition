@@ -16,3 +16,4 @@ val solidification_limit : int ref
 val max_inferences : int ref
 
 val max_unifs_solid_ff : int ref
+val use_weight_for_solid_subsumption : bool ref

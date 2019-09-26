@@ -16,3 +16,4 @@ let solidification_limit = ref 5
 let max_inferences = ref (-1)
 
 let max_unifs_solid_ff = ref (-1)
+let use_weight_for_solid_subsumption = ref true

@@ -2971,6 +2971,9 @@ let () =
     ("--sup-with-true-false")
     , Arg.Bool (fun v ->( _sup_t_f := v))
     , " enable/disable superposition, eq-res and eq-fact with true/false";
+    "--use-weight-for-solid-subsumption"
+    , Arg.Bool (fun v -> PragUnifParams.use_weight_for_solid_subsumption := v)
+    , " enable/disable superposition to and from pure variable equations";
     "--trigger-bool-inst"
     , Arg.Set_int _trigger_bool_inst
     , " instantiate predicate variables with boolean terms already in the proof state. Argument is the maximal proof depth of predicate variable";

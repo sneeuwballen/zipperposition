@@ -242,11 +242,11 @@ let cmp_by_weight l1 l2 =
 let subsumption_cmp l1 l2 =
   let sign_res = cmp_by_sign l1 l2 in
   if sign_res != 0 then sign_res
-  else cmp_by_weight l1 l2
+  else if !PragUnifParams.use_weight_for_solid_subsumption
+       then cmp_by_weight l1 l2 else 0
 
 let classic_match ~subst ~pattern ~target =
   try
-    (* CCFormat.printf "classic: @[%a@] >=? @[%a@]@." T.pp pattern T.pp target; *)
     Unif.FO.matching_same_scope ~subst ~pattern ~scope:0 target
   with Unif.Fail -> raise SolidMatchFail
 
@@ -261,29 +261,23 @@ let lit_matchers ~subst ~pattern ~target k  =
       if sign=sign' then 
         (
           (try
-          (* CCFormat.printf "clr:@[%a@],@[%a@]@." T.pp lhs T.pp lhs'; *)
             let c_subst = classic_match ~subst:Subst.empty ~pattern:lhs ~target:lhs' in
             let c_subst = classic_match ~subst:c_subst ~pattern:rhs ~target:rhs' in
-            (* CCFormat.printf "clrOK:@[%a@]@." Subst.pp c_subst; *)
             k (refine_subst_w_subst subst c_subst)
-          with SolidMatchFail -> (*CCFormat.printf "clr:false@.";*) ());
+          with SolidMatchFail -> ());
           (try
-            (* CCFormat.printf "crl:@[%a@],@[%a@]@." T.pp lhs T.pp rhs'; *)
             let c_subst = classic_match ~subst:Subst.empty ~pattern:lhs ~target:rhs' in
             let c_subst = classic_match ~subst:c_subst ~pattern:rhs ~target:lhs' in
-            (* CCFormat.printf "crlOK:@[%a@]@." Subst.pp c_subst; *)
             k (refine_subst_w_subst subst c_subst)
-          with SolidMatchFail -> (*CCFormat.printf "crl:false@.";*) ());
+          with SolidMatchFail -> ());
           (try
-            (* CCFormat.printf "slr:@[%a@],@[%a@]@." T.pp lhs T.pp lhs'; *)
             let subst1 = (solid_match ~subst ~pattern:lhs ~target:lhs') in
             k (solid_match ~subst:subst1 ~pattern:rhs ~target:rhs')
-          with SolidMatchFail -> (*CCFormat.printf "slr:false@.";*) ());
+          with SolidMatchFail -> ());
         (try 
-          (* CCFormat.printf "srl:@[%a@],@[%a@]@." T.pp lhs T.pp rhs'; *)
           let subst2 = (solid_match ~subst ~pattern:lhs ~target:rhs') in
           k (solid_match ~subst:subst2 ~pattern:rhs ~target:lhs')
-        with SolidMatchFail -> (*CCFormat.printf "srl:false@.";*) ());
+        with SolidMatchFail -> ());
         );
       | _ -> () end
   | L.True -> begin match target with | L.True -> k subst | _ -> () end
@@ -297,44 +291,35 @@ let check_subsumption_possibility subsumer target =
 
   let neg_s, neg_t = CCPair.map_same (CCArray.fold (fun acc l -> if sign l = (-1) then acc + 1 else acc) 0) (subsumer, target) in 
   let pos_s, pos_t = CCPair.map_same (CCArray.fold (fun acc l -> if sign l = 1 then acc + 1 else acc) 0) (subsumer, target) in
-  Ls.ho_weight subsumer <= Ls.ho_weight target &&
+  (not !PragUnifParams.use_weight_for_solid_subsumption ||
+    Ls.ho_weight subsumer <= Ls.ho_weight target) &&
   neg_s <= neg_t && pos_s <= pos_t && 
   (not (neg_t >=3 || pos_t >= 3) ||
     CCArray.for_all (fun l -> CCArray.exists (is_more_specific l) target) subsumer)
 
+exception PrematureTermination
 let subsumes subsumer target =
   let n = Array.length subsumer in
   (* let subsumer_o, target_o = subsumer, target in *)
   
   let rec aux ?(i=0) picklist subst subsumer target_i =
-    if i >= n then ( 
-      (* CCFormat.printf "SUCESS:@.s:@[%a@];@.t:@[%a@]@.subst:@[%a@]@."
-        Ls.pp subsumer Ls.pp target (MS.pp HVar.pp pp) subst; *)
-      true
-    )
+    if i >= n then true
     else (
       let lit = subsumer.(i) in
-      CCArray.exists (fun (j,lit') -> 
-        (* CCFormat.printf "(%d,%d,@[%a@],@[%a@]):@[%a@]=<=@[%a@]@."
-          i j CCBV.pp picklist (MS.pp HVar.pp pp) subst L.pp lit L.pp lit'; *)
-
-        if CCBV.get picklist j || cmp_by_sign lit lit' != 0
-           || cmp_by_weight lit lit' > 0 then false
-        else (
-          let matchers = lit_matchers ~subst ~pattern:lit ~target:lit' in
-
-          (* let n = CCList.length matchers in *)
-          (* CCList.iteri (fun i ms -> 
-            CCFormat.printf "matcher %d/%d: @[%a@]@." i n (MS.pp HVar.pp pp) ms;
-          ) matchers; *)
-
-          Iter.exists (fun subst' ->
-            CCBV.set picklist j;
-            let res = aux ~i:(i+1) picklist subst' subsumer target_i in
-            CCBV.reset picklist j;
-            (* CCFormat.printf "res:%b@." res; *)
-            res) matchers
-        )) target_i
+      try 
+        CCArray.exists (fun (j,lit') -> 
+          if CCBV.get picklist j || cmp_by_sign lit lit' < 0 then false 
+          else if cmp_by_sign lit lit' = 0 && 
+                  (not !PragUnifParams.use_weight_for_solid_subsumption || cmp_by_weight lit lit' <= 0) then (
+            let matchers = lit_matchers ~subst ~pattern:lit ~target:lit' in
+            Iter.exists (fun subst' ->
+              CCBV.set picklist j;
+              let res = aux ~i:(i+1) picklist subst' subsumer target_i in
+              CCBV.reset picklist j;
+              (* CCFormat.printf "res:%b@." res; *)
+              res) matchers
+          ) else raise PrematureTermination) target_i
+      with PrematureTermination -> false
     ) in
 
   let subsumer,target = normaize_clauses subsumer target in
