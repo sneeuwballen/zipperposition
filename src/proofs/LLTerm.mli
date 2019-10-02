@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Terms For Proofs} *)
@@ -103,6 +102,9 @@ val map_shallow : (t -> t) -> t -> t
 
 val db_eval : sub:t -> t -> t
 (** [db_eval ~sub t] replaces De Bruijn 0 in [t] by [sub] *)
+
+val db_closed : t -> bool
+(** [db_closed t] is [true] iff [t] doesn't have free DB indices *)
 
 val pp : t CCFormat.printer
 val pp_inner : t CCFormat.printer

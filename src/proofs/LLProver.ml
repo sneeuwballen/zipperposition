@@ -1,4 +1,3 @@
-
 (** {1 Low Level Prover} *)
 
 open Logtk
@@ -63,6 +62,9 @@ module Solver = Sidekick_msat_solver.Make(struct
         V.App_fun (Fun.Bind (binder,ty_var), Iter.return body)
       | Int_pred _ | Rat_pred _
       | T.Const _ | T.Var _ | T.Type | T.Arrow _ -> V.Opaque t
+
+    let is_valid_literal (t:T.t) : bool =
+      T.db_closed t
   end)
 
 (** main state *)
@@ -170,15 +172,16 @@ module Th_lambda = struct
     { triggers=T.Tbl.create 128 }
   
   let check_triggers st cc n =
-    let t = (SI.CC.N.term n) in
+    let t = SI.CC.N.term n in
     match LLTerm.view t with
     | App (t1, t2) -> 
-      begin match T.Tbl.find_opt st.triggers t1 with
+      begin match T.Tbl.get st.triggers t1 with
         | Some {trigger_node; lambda_node} 
             when SI.CC.N.equal (SI.CC.find cc trigger_node) (SI.CC.find cc lambda_node) -> 
           let new_node = SI.CC.add_term cc (T.app (SI.CC.N.term lambda_node) t2) in
           SI.CC.merge cc new_node n (SI.CC.Expl.mk_merge trigger_node lambda_node);
-          Util.debugf 3 ~section "@[Trigger triggered@ :t1 %a@ :t2 %a@ :new_node %a@ :n %a@]" 
+          Util.debugf 3 ~section
+            "(@[th-lambda.check-trigger@ :t1 %a@ :t2 %a@ :new_node %a@ :n %a@])" 
             (fun k -> k T.pp t1 T.pp t2 SI.CC.N.pp new_node SI.CC.N.pp n);
         | Some {trigger_node; lambda_node} -> 
           (* TODO: use a callback to remove outdated triggers ? *)
@@ -190,14 +193,15 @@ module Th_lambda = struct
   let errorf msg = Util.errorf ~where:"llprover" msg
 
   let beta_reduce st cc node =
-    match T.view (SI.CC.N.term node) with
-      | T.App (t, arg) ->
-        begin match T.view t with
+    let t = SI.CC.N.term node in
+    match T.view t with
+      | T.App (f, arg) ->
+        begin match T.view f with
           | T.Bind {binder=Binder.Lambda;ty_var;body} ->
             begin match LLTerm.ty arg with
               | Some ty_arg when T.equal ty_var ty_arg ->
                 (* β-reduction *)
-                Util.debugf 3 ~section "@[beta-reduce@ :term %a@]" 
+                Util.debugf 3 ~section "@[th-lambda.beta-reduce@ :term %a@]" 
                   (fun k -> k T.pp t);
                 let reduced_term = T.db_eval ~sub:arg body in
                 let reduced_node = SI.CC.add_term cc reduced_term in
@@ -219,13 +223,13 @@ module Th_lambda = struct
 
   let cc_on_post_merge si (st:state) (cc:SI.CC.t) ac (a:SI.CC.N.t) (b:SI.CC.N.t) = 
     let add_trigger trigger_node lambda_node =
-      let term, lambda_term = (SI.CC.N.term trigger_node), (SI.CC.N.term lambda_node) in
+      let term, lambda_term = SI.CC.N.term trigger_node, SI.CC.N.term lambda_node in
       (* Add trigger *)
-      Util.debugf 3 ~section "@[Add trigger@ :term %a@ :lambda_term %a@]" 
+      Util.debugf 3 ~section "(@[th-lambda.add-trigger@ :term %a@ :lambda_term %a@])" 
         (fun k -> k T.pp term T.pp lambda_term);
       T.Tbl.add st.triggers term {trigger_node; lambda_node};
       (* Search existing CC for instances of this trigger *)
-      (SI.CC.all_classes cc) |> Iter.iter (fun n -> 
+      SI.CC.all_classes cc |> Iter.iter (fun n -> 
         let rec aux n = 
           SI.CC.N.iter_class n |> Iter.iter (fun n' -> 
             check_triggers st cc n'
@@ -234,11 +238,12 @@ module Th_lambda = struct
         aux n
       );
     in
-    let s, t = (SI.CC.N.term a), (SI.CC.N.term b) in
-    match LLTerm.view s, LLTerm.view t with
-    | _, Bind {binder=Binder.Lambda; _} -> add_trigger a b
-    | Bind {binder=Binder.Lambda; _}, _ -> add_trigger b a
-    | _ -> ();
+    let s, t = SI.CC.N.term a, SI.CC.N.term b in
+    begin match LLTerm.view s, LLTerm.view t with
+      | _, Bind {binder=Binder.Lambda; _} -> add_trigger a b
+      | Bind {binder=Binder.Lambda; _}, _ -> add_trigger b a
+      | _ -> ()
+    end;
     ()
 
   let create_and_setup si =

@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Terms For Proofs} *)
@@ -160,6 +159,8 @@ module Make_linexp(N : NUM) = struct
       (Hash.seq (Hash.pair hash_t hash_n) @@ I_map.values e.coeffs)
   let map f e =
     I_map.fold (fun _ (t,n) acc -> add n (f t) acc) e.coeffs (const e.const)
+  let iter f e =
+    I_map.iter (fun _ (t,_) -> f t) e.coeffs
 
   let subterms e = I_map.values e.coeffs |> Iter.map fst
 
@@ -271,7 +272,7 @@ let rec pp_rec depth out (t:t) = match view t with
     Format.fprintf out "(@[<hv>%a@ %a@])"
       Builtin.pp b (Util.pp_list (pp_rec_inner depth)) l
   | Bind {ty_var;binder;body} ->
-    Fmt.fprintf out "@[%a (@[Y%d:%a@]).@ %a@]"
+    Fmt.fprintf out "(@[%a (@[Y%d:%a@]).@ %a@])"
       Binder.pp binder
       depth (pp_rec depth) ty_var
       (pp_rec @@ depth+1) body
@@ -403,6 +404,19 @@ let rat_pred l o =
     end |> of_bool
   ) else mk_ (Rat_pred (l,o)) (Some prop)
 
+let[@inline] iter ~f ~bind:f_bind b_acc t = match view t with
+  | Type | Const _ -> ()
+  | Var v -> f b_acc (HVar.ty v)
+  | App (hd,a) -> f b_acc hd; f b_acc a
+  | Arrow (a,b) -> f b_acc a; f b_acc b
+  | Bind b ->
+    let b_acc' = f_bind b_acc in
+    f b_acc' b.body
+  | AppBuiltin (_,l) -> List.iter (f b_acc) l
+  | Ite (a,b,c) -> f b_acc a; f b_acc b; f b_acc c
+  | Int_pred (l,o) -> Linexp_int.iter (f b_acc) l
+  | Rat_pred (l,o) -> Linexp_rat.iter (f b_acc) l
+
 let[@inline] map ~f ~bind:f_bind b_acc t = match view t with
   | Type -> t_type
   | Var v -> var (HVar.update_ty v ~f:(f b_acc))
@@ -430,6 +444,19 @@ let db_shift n (t:t) : t =
       map ~f:aux ~bind:succ k t
   in
   aux 0 t
+
+exception Closed_exit
+
+(* is [t] closed? *)
+let db_closed (t:t) : bool =
+  let rec aux k t = match view t with
+    | Var v ->
+      if HVar.id v >= k then raise_notrace Closed_exit
+    | _ ->
+      iter ~f:aux ~bind:succ k t
+  in
+  try aux 0 t; true
+  with Closed_exit -> false
 
 (* replace DB 0 by [sub] in [t] *)
 let db_eval ~(sub:t) (t:t) : t =
