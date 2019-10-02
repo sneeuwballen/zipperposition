@@ -45,6 +45,12 @@ let imit_rule ~counter ~scope t u depth =
     (JP_unif.imitate ~scope ~counter t u []
     |> OSeq.map (fun x -> Some (U.subst x, depth+1)))
 
+let hs_proj_flex_rigid ~counter ~scope ~flex u depth =
+  delay depth 
+    (PUnif.proj_hs ~counter ~scope ~flex u
+     |> OSeq.of_list
+     |> OSeq.map (fun x -> Some (x,depth)))
+
 let proj_rule ~counter ~scope s t depth =
   OSeq.append
     (JP_unif.project_onesided ~scope ~counter s)
@@ -89,17 +95,15 @@ let oracle ~counter ~scope (s,_) (t,_) flag =
     OSeq.append 
       (proj_rule ~counter ~scope s t flag)
         (OSeq.append 
-          (imit_rule ~counter ~scope s t flag)
-          (OSeq.append 
-            (ident_rule ~counter ~scope s t flag)
-            (iter_rule ~counter ~scope s t flag)))
+          (ident_rule ~counter ~scope s t flag)
+          (iter_rule ~counter ~scope s t flag))
   | `Flex _, `Rigid
   | `Rigid, `Flex _ ->
     OSeq.append
       (proj_rule ~counter ~scope s t flag)
       (OSeq.append 
         (imit_rule ~counter ~scope s t flag)
-        (iter_rule ~counter ~scope s t flag))
+        (hs_proj_flex_rigid ~counter ~scope ~flex:s t flag))
   | _ -> 
     CCFormat.printf "Did not disassemble properly: [%a]\n[%a]@." T.pp s T.pp t;
     assert false

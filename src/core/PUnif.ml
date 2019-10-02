@@ -129,16 +129,20 @@ let proj_lr ~counter ~scope ~subst s t flag =
         Some (Subst.FO.bind' subst' (hd_s, scope) (pr_bind, scope), flag')
       |None -> None)
 
+let proj_hs ~counter ~scope ~flex s =
+  CCList.map fst @@ proj_lr ~counter ~scope ~subst:Subst.empty flex s Int32.zero
+
 (*Create all possible projection and imitation bindings. *)
-let proj_imit_lr ~counter ~scope ~subst s t flag =
+let proj_imit_lr ?(disable_imit=false) ~counter ~scope ~subst s t flag =
   try
     let proj_bindings = 
       if is_ident_last flag then []
       else proj_lr ~counter ~scope ~subst s t flag in
     let imit_binding =
       try
-        if (not (Term.is_app_var t) || get_op flag ImitFlex < !Params.max_var_imitations)
-           && (Term.is_app_var t || get_op flag ImitRigid < !Params.max_rigid_imitations) 
+        if not disable_imit && (
+            (not (Term.is_app_var t) || get_op flag ImitFlex < !Params.max_var_imitations)
+            && (Term.is_app_var t || get_op flag ImitRigid < !Params.max_rigid_imitations))
            then (
           let flag' = if Term.is_app_var t then inc_op flag ImitFlex 
                       (*else if List.length (Type.expected_args (Term.ty t)) != 0
@@ -232,14 +236,14 @@ let oracle ~counter ~scope ~subst (s,_) (t,_) (flag:I.t) =
           JP_unif.identify ~scope ~counter s t []
           |> OSeq.map (fun x -> Some (U.subst x, set_ident_last @@ inc_op flag Ident)))
         else OSeq.empty in
-      let var_proj_imits = 
+      let proj_imits = 
           OSeq.append 
-            (proj_imit_lr ~scope ~counter ~subst s t flag)
-            (proj_imit_lr ~scope ~counter ~subst t s flag)
+            (proj_imit_lr ~disable_imit:true ~scope ~counter ~subst s t flag)
+            (proj_imit_lr ~disable_imit:true ~scope ~counter ~subst t s flag)
           |> OSeq.map (CCOpt.map (fun (s,f) -> (s, clear_ident_last f))) in
       OSeq.interleave 
         ident 
-        var_proj_imits
+        proj_imits
     | `Flex _, `Rigid
     | `Rigid, `Flex _ ->
       OSeq.append

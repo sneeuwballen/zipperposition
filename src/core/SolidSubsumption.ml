@@ -292,7 +292,7 @@ let check_subsumption_possibility subsumer target =
   let neg_s, neg_t = CCPair.map_same (CCArray.fold (fun acc l -> if sign l = (-1) then acc + 1 else acc) 0) (subsumer, target) in 
   let pos_s, pos_t = CCPair.map_same (CCArray.fold (fun acc l -> if sign l = 1 then acc + 1 else acc) 0) (subsumer, target) in
   (not !PragUnifParams.use_weight_for_solid_subsumption ||
-    Ls.ho_weight subsumer <= Ls.ho_weight target) &&
+    Ls.weight subsumer <= Ls.weight target) &&
   neg_s <= neg_t && pos_s <= pos_t && 
   (not (neg_t >=3 || pos_t >= 3) ||
     CCArray.for_all (fun l -> CCArray.exists (is_more_specific l) target) subsumer)
@@ -306,20 +306,17 @@ let subsumes subsumer target =
     if i >= n then true
     else (
       let lit = subsumer.(i) in
-      try 
-        CCArray.exists (fun (j,lit') -> 
-          if CCBV.get picklist j || cmp_by_sign lit lit' < 0 then false 
-          else if cmp_by_sign lit lit' = 0 && 
-                  (not !PragUnifParams.use_weight_for_solid_subsumption || cmp_by_weight lit lit' <= 0) then (
-            let matchers = lit_matchers ~subst ~pattern:lit ~target:lit' in
-            Iter.exists (fun subst' ->
-              CCBV.set picklist j;
-              let res = aux ~i:(i+1) picklist subst' subsumer target_i in
-              CCBV.reset picklist j;
-              (* CCFormat.printf "res:%b@." res; *)
-              res) matchers
-          ) else raise PrematureTermination) target_i
-      with PrematureTermination -> false
+      CCArray.exists (fun (j,lit') -> 
+        if CCBV.get picklist j || cmp_by_sign lit lit' != 0 ||
+            (!PragUnifParams.use_weight_for_solid_subsumption && cmp_by_weight lit lit' > 0) then false 
+        else (
+          let matchers = lit_matchers ~subst ~pattern:lit ~target:lit' in
+          Iter.exists (fun subst' ->
+            CCBV.set picklist j;
+            let res = aux ~i:(i+1) picklist subst' subsumer target_i in
+            CCBV.reset picklist j;
+            res) matchers
+        )) target_i
     ) in
 
   let subsumer,target = normaize_clauses subsumer target in

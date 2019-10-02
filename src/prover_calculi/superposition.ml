@@ -2980,7 +2980,12 @@ let () =
       "--ho-unif-level",
       Arg.Symbol (["full-framework";"full"; "pragmatic-framework"; "pragmatic"], (fun str ->
         _unif_alg := if (String.equal "full" str) then JP_unif.unify_scoped
-                     else if (String.equal "full-framework" str) then JPFull.unify_scoped
+                     else if (String.equal "full-framework" str) then 
+                      (
+                        let res = JPFull.unify_scoped in 
+                        PragUnifParams.all_params_to_max ();
+                        res
+                      )
                      else if (String.equal "pragmatic-framework" str) then PUnif.unify_scoped
                      else PragHOUnif.unify_scoped)),
       "set the level of HO unification"

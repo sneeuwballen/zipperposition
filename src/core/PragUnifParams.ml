@@ -17,3 +17,12 @@ let max_inferences = ref (-1)
 
 let max_unifs_solid_ff = ref (-1)
 let use_weight_for_solid_subsumption = ref true
+
+let all_params_to_max () = 
+  max_depth := max_int;
+  max_app_projections := max_int;
+  max_var_imitations := max_int;
+  max_rigid_imitations := max_int;
+  max_identifications := max_int;
+  max_elims           := max_int;
+  max_inferences := -1

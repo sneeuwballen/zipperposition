@@ -295,7 +295,7 @@ let solve_flex_flex_same ~subst ~counter ~scope lhs rhs =
   res
   
 
-let solve_flex_rigid ~subst ~counter ~scope flex rigid =
+let cover_flex_rigid ~subst ~counter ~scope flex rigid =
   Util.enter_prof prof_flex_rigid;
   assert(T.is_var (T.head_term flex));
   assert(not @@ T.is_app_var rigid);
@@ -377,6 +377,27 @@ let build_constraints args1 args2 rest =
     |> CCList.partition (fun (s,t) -> T.is_const (T.head_term s) && T.is_const (T.head_term t)) in
     rf @ rest @ other
 
+let project_flex_rigid ~subst ~counter ~scope flex rigid =
+  let flex_var, flex_args = T.as_var_exn @@ T.head_term flex,
+                            List.mapi (fun i a -> i,a) (T.args flex) in
+  let pref_tys, ret_ty = Type.open_fun @@ HVar.ty flex_var in
+  let n = List.length pref_tys in
+  let trailing_tys = CCList.drop (List.length flex_args) pref_tys in
+  let rigid_hd = T.head rigid in
+  match rigid_hd with 
+  | None -> []
+  | Some id -> 
+    CCList.filter_map ( fun (i, fa) ->
+      begin match T.head fa with 
+      | Some id' when ID.equal id id' && Type.equal (T.ty fa) ret_ty ->
+        let subs_term = T.fun_l pref_tys (T.bvar ret_ty (n-1-i)) in
+        let subst = Subst.FO.bind' subst (flex_var, scope) (subs_term, scope) in
+        let flex_arg = if CCList.is_empty trailing_tys then fa else T.fun_l trailing_tys fa in
+        assert(Type.equal (T.ty flex_arg) (T.ty rigid));
+        Some (subst, flex_arg, rigid)
+      | _ -> None end
+    ) flex_args
+
 let rec unify ~scope ~counter ~subst constraints =
   match constraints with
   | [] -> [subst]
@@ -403,13 +424,16 @@ let rec unify ~scope ~counter ~subst constraints =
           let subst = solve_flex_flex_same ~subst:(US.subst subst) ~scope ~counter body_s' body_t' in
           unify ~scope ~counter ~subst rest
         )
-
       | (T.Var _, _) ->
-        let subst = solve_flex_rigid ~subst:(US.subst subst) ~counter ~scope  body_s' body_t' in
-        CCList.flat_map (fun subst -> unify ~scope ~counter ~subst rest) subst
+        let projected = project_flex_rigid ~subst:(US.subst subst) ~scope ~counter body_s' body_t' in
+        let covered = cover_flex_rigid ~subst:(US.subst subst) ~counter ~scope  body_s' body_t' in
+        (CCList.flat_map (fun subst -> unify ~scope ~counter ~subst rest) covered) @
+        (CCList.flat_map (fun (subst,s,t) -> unify ~scope ~counter ~subst:(US.of_subst subst) ((s,t)::rest)) projected)
       | (_, T.Var _) ->
-        let subst = solve_flex_rigid ~subst:(US.subst subst) ~counter ~scope  body_t' body_s' in
-        CCList.flat_map (fun subst -> unify ~scope ~counter ~subst rest) subst
+        let projected = project_flex_rigid ~subst:(US.subst subst) ~scope ~counter body_t' body_s' in
+        let covered = cover_flex_rigid ~subst:(US.subst subst) ~counter ~scope  body_t' body_s' in
+        (CCList.flat_map (fun subst -> unify ~scope ~counter ~subst rest) covered) @ 
+        (CCList.flat_map (fun (subst,s,t) -> unify ~scope ~counter ~subst:(US.of_subst subst) ((s,t)::rest)) projected)
       | T.AppBuiltin(hd_s, args_s'), T.AppBuiltin(hd_t, args_t') when
           Builtin.equal hd_s hd_t &&
           List.length args_s' + List.length args_s = 
