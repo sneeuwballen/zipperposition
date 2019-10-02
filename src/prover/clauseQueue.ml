@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Priority Queue of clauses} *)
@@ -354,7 +353,7 @@ module Make(C : Clause_intf.S) = struct
       let crv_regex = Str.regexp "conjecture-relative-var(\\([0-9]+[.]?[0-9]*\\),\\([lsLS]\\),\\([tfTF]\\))" in
       try
         ignore(Str.search_forward crv_regex s 0);
-        let distinct_vars_mul = CCOpt.get_exn (Float.of_string_opt (Str.matched_group 1 s)) in
+        let distinct_vars_mul = CCFloat.of_string (Str.matched_group 1 s) in
         let parameters_magnitude = 
           Str.matched_group 2 s |> CCString.trim |> String.lowercase_ascii
           |> (fun s -> if CCString.prefix ~pre:"l" s then `Large else `Small) in
@@ -378,9 +377,9 @@ module Make(C : Clause_intf.S) = struct
         ignore(Str.search_forward or_lmax_regex s 0);
         let v_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 1 s)) in
         let f_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 2 s)) in
-        let pos_m = CCOpt.get_exn (Float.of_string_opt (Str.matched_group 3 s)) in
-        let unord_m = CCOpt.get_exn (Float.of_string_opt (Str.matched_group 4 s)) in
-        let max_l_mul = CCOpt.get_exn (Float.of_string_opt (Str.matched_group 5 s)) in
+        let pos_m = CCFloat.of_string (Str.matched_group 3 s) in
+        let unord_m = CCFloat.of_string (Str.matched_group 4 s) in
+        let max_l_mul = CCFloat.of_string (Str.matched_group 5 s) in
 
         orient_lmax_weight ~v_w ~f_w ~pos_m ~unord_m ~max_l_mul
       with Not_found | Invalid_argument _ -> 
@@ -404,9 +403,9 @@ module Make(C : Clause_intf.S) = struct
         let pf_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 2 s)) in
         let nv_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 2 s)) in
         let nf_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 2 s)) in
-        let pos_m = CCOpt.get_exn (Float.of_string_opt (Str.matched_group 3 s)) in
-        let max_t_m = CCOpt.get_exn (Float.of_string_opt (Str.matched_group 4 s)) in
-        let max_l_m = CCOpt.get_exn (Float.of_string_opt (Str.matched_group 5 s)) in
+        let pos_m = CCFloat.of_string (Str.matched_group 3 s) in
+        let max_t_m = CCFloat.of_string (Str.matched_group 4 s) in
+        let max_l_m = CCFloat.of_string (Str.matched_group 5 s) in
         pn_refined_weight ~pv_w ~pf_w ~nv_w ~nf_w ~pos_m ~max_t_m ~max_l_m
       with Not_found | Invalid_argument _ -> 
         invalid_arg @@
@@ -426,9 +425,9 @@ module Make(C : Clause_intf.S) = struct
         ignore(Str.search_forward or_lmax_regex s 0);
         let v = CCOpt.get_exn (CCInt.of_string (Str.matched_group 1 s)) in
         let f = CCOpt.get_exn (CCInt.of_string (Str.matched_group 2 s)) in
-        let pos_mul = CCOpt.get_exn (Float.of_string_opt (Str.matched_group 3 s)) in
-        let conj_mul = CCOpt.get_exn (Float.of_string_opt (Str.matched_group 4 s)) in
-        let dist_var_mul = CCOpt.get_exn (Float.of_string_opt (Str.matched_group 5 s)) in
+        let pos_mul = CCFloat.of_string (Str.matched_group 3 s) in
+        let conj_mul = CCFloat.of_string (Str.matched_group 4 s) in
+        let dist_var_mul = CCFloat.of_string (Str.matched_group 5 s) in
         conj_relative_cheap ~v ~f ~pos_mul ~conj_mul ~dist_var_mul
       with Not_found | Invalid_argument _ ->
         Util.invalid_argf

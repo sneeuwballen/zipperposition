@@ -1,4 +1,3 @@
-
 (** {1 Simple Resolution Prover} *)
 
 open Logtk
@@ -328,7 +327,7 @@ let process_file f =
           because resolution only works on clauses.
 
           This algorithm is already implemented in {!Logtk}. *)
-      let decls = Cnf.cnf_of_seq ?ctx:None (CCVector.to_seq st) in
+      let decls = Cnf.cnf_of_seq ~ctx:(Skolem.create()) (CCVector.to_seq st) in
       _signature :=
         CCVector.to_seq decls
         |> Cnf.type_declarations
