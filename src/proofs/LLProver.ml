@@ -155,108 +155,140 @@ module Th_bool = Sidekick_th_bool_static.Make(struct
   end)
 
 (* Theory for lambda-expressions. This theory has two functions:
-- For any non-β-reduced term, it adds (λx. t) s = t[s/x] to the congruence closure.
-- For any equality in the congruence closure of a lambda-term (λx. t) with some other term s,
-  it adds an equality t[u/x] = s u when a term of the form s u appears. *)
+   - For any non-β-reduced term, it adds (λx. t) s = t[s/x] to the congruence closure.
+   - For any equality in the congruence closure of a lambda-term (λx. t)
+      with some other term s, it adds an equality t[u/x] = s u when a term of the
+      form s u appears.
+*)
 module Th_lambda = struct
-
   module SI = Solver.Solver_internal
+  module CC = SI.CC
+  module N = SI.CC.N
+  module Expl = SI.CC.Expl
+  module N_tbl = Sidekick_util.Backtrackable_tbl.Make(N)
 
-  type trigger = {trigger_node: SI.CC.N.t; lambda_node: SI.CC.N.t}
+  (* a node [lm_node] decorated with a lambda-term *)
+  type lambda_node = {
+    lm_node: N.t;
+    lm_body: T.t;
+  }
 
   type state = {
-    triggers: trigger T.Tbl.t
+    lambdas: lambda_node list N_tbl.t; (* repr -> lambdas for the class *)
   }
 
   let create tst : state =
-    { triggers=T.Tbl.create 128 }
-  
-  let check_triggers st cc n =
-    let t = SI.CC.N.term n in
-    match LLTerm.view t with
-    | App (t1, t2) -> 
-      begin match T.Tbl.get st.triggers t1 with
-        | Some {trigger_node; lambda_node} 
-            when SI.CC.N.equal (SI.CC.find cc trigger_node) (SI.CC.find cc lambda_node) -> 
-          let new_node = SI.CC.add_term cc (T.app (SI.CC.N.term lambda_node) t2) in
-          SI.CC.merge cc new_node n (SI.CC.Expl.mk_merge trigger_node lambda_node);
-          Util.debugf 3 ~section
-            "(@[th-lambda.check-trigger@ :t1 %a@ :t2 %a@ :new_node %a@ :n %a@])" 
-            (fun k -> k T.pp t1 T.pp t2 SI.CC.N.pp new_node SI.CC.N.pp n);
-        | Some {trigger_node; lambda_node} -> 
-          (* TODO: use a callback to remove outdated triggers ? *)
-          T.Tbl.remove st.triggers t1
-        | None -> ()
-      end
-    | _ -> ()
+    { lambdas=N_tbl.create ~size:128 (); }
+
+  let push_level st = N_tbl.push_level st.lambdas
+  let pop_levels st n = N_tbl.pop_levels st.lambdas n
+
+  let get_lambdas st (n:N.t) : _ list =
+    N_tbl.get st.lambdas n |> CCOpt.get_or ~default:[]
   
   let errorf msg = Util.errorf ~where:"llprover" msg
 
-  let beta_reduce st cc node =
+  (* do static beta-reduction *)
+  let beta_reduce st cc node : unit =
     let t = SI.CC.N.term node in
     match T.view t with
-      | T.App (f, arg) ->
-        begin match T.view f with
-          | T.Bind {binder=Binder.Lambda;ty_var;body} ->
-            begin match LLTerm.ty arg with
-              | Some ty_arg when T.equal ty_var ty_arg ->
-                (* β-reduction *)
-                Util.debugf 3 ~section "@[th-lambda.beta-reduce@ :term %a@]" 
-                  (fun k -> k T.pp t);
-                let reduced_term = T.db_eval ~sub:arg body in
-                let reduced_node = SI.CC.add_term cc reduced_term in
-                let expl = SI.CC.Expl.mk_merge node node in
-                (* TODO: fix explanation *)
-                SI.CC.merge cc node reduced_node expl
-              | Some ty_x ->
-                errorf "type error: cannot apply `%a`@ to `%a : %a`" T.pp t T.pp arg T.pp ty_x
-              | None -> errorf "type error: cannot apply `%a`@ to `%a : none`" T.pp t T.pp arg
-            end
-          | _ -> ()
-        end
-      | _ -> ()
-  
-  let cc_on_new_term _ (st:state) (cc:SI.CC.t) (node:SI.CC.N.t) (_:T.t) = 
-    check_triggers st cc node;
-    beta_reduce st cc node;
+    | T.App (f, arg) ->
+      begin match T.view f with
+        | T.Bind {binder=Binder.Lambda;ty_var;body} ->
+          begin match LLTerm.ty arg with
+            | Some ty_arg when T.equal ty_var ty_arg ->
+              (* β-reduction *)
+              let reduced_term = T.db_eval ~sub:arg body in
+              Util.debugf 3 ~section "@[th-lambda.beta-reduce@ :term %a@ :into %a@]" 
+                (fun k -> k T.pp t T.pp reduced_term);
+              let reduced_node = SI.CC.add_term cc reduced_term in
+              let expl = SI.CC.Expl.mk_list [] in (* trivial *)
+              SI.CC.merge cc node reduced_node expl
+            | Some ty_x ->
+              errorf "type error: cannot apply `%a`@ to `%a : %a`" T.pp t T.pp arg T.pp ty_x
+            | None -> errorf "type error: cannot apply `%a`@ to `%a : none`" T.pp t T.pp arg
+          end
+        | _ -> ()
+      end
+    | _ -> ()
+
+(* when merging classes [a] and [b], look in each class.
+   If the class [a] contains [λx. t], look in all parents of [b]
+   for some [apply b' u] where [b=b'].
+   For each such parent of [b], do the merge
+   [a=λx. t && b=b' && expl ==> apply b' u = t[x\u]] *)
+  let cc_on_pre_merge si (st:state)
+      (cc:SI.CC.t) ac (a:N.t) (b:N.t) (expl_a_b:SI.CC.Expl.t) : unit =
+    let iter_lambdas a b =
+      match get_lambdas st a with
+      | [] -> () (* no lambdas *)
+      | lambdas ->
+        let app_parents =
+          N.iter_parents b
+          |> Iter.filter_map
+            (fun n_parent_b ->
+               let t_parent_b = N.term n_parent_b in
+               match T.view t_parent_b with
+               | App (f, arg) when N.equal (CC.find_t cc f) b ->
+                 Some (n_parent_b, f, arg)
+               | _ -> None)
+        in
+        let all_new_beta =
+          app_parents
+          |> Iter.flat_map
+            (fun (n_parent_b, f, arg) ->
+               Iter.of_list lambdas |> Iter.map (fun lm -> n_parent_b, f, arg, lm))
+        in
+        all_new_beta
+          (fun (n_parent_b, f, arg, lm) ->
+             let {lm_node; lm_body; } = lm in
+             (* [app f arg = body[x\arg]] because [f=b] and [b=a=λx. body] *)
+             let new_t = T.db_eval ~sub:arg lm_body in
+             Util.debugf 3 ~section
+               "(@[th-lambda.cc-beta-reduce@ :n1 %a@ :n2 %a@ \
+                :lambda-n1 %a@ :parent-n2 %a@ :new-t %a@])" 
+               (fun k -> k N.pp a N.pp b N.pp lm_node N.pp n_parent_b T.pp new_t);
+             let expl =
+               Expl.mk_list
+                 [expl_a_b; Expl.mk_merge lm_node a; Expl.mk_merge b (CC.add_term cc f)]
+             in
+             CC.merge_t cc (N.term n_parent_b) new_t expl;
+          );
+    in
+    iter_lambdas a b;
+    iter_lambdas b a;
+    let lms = get_lambdas st a @ get_lambdas st b in
+    if lms <> [] then (
+      N_tbl.add st.lambdas a lms; (* update with the merge *)
+    );
     ()
 
-  let cc_on_post_merge si (st:state) (cc:SI.CC.t) ac (a:SI.CC.N.t) (b:SI.CC.N.t) = 
-    let add_trigger trigger_node lambda_node =
-      let term, lambda_term = SI.CC.N.term trigger_node, SI.CC.N.term lambda_node in
-      (* Add trigger *)
-      Util.debugf 3 ~section "(@[th-lambda.add-trigger@ :term %a@ :lambda_term %a@])" 
-        (fun k -> k T.pp term T.pp lambda_term);
-      T.Tbl.add st.triggers term {trigger_node; lambda_node};
-      (* Search existing CC for instances of this trigger *)
-      SI.CC.all_classes cc |> Iter.iter (fun n -> 
-        let rec aux n = 
-          SI.CC.N.iter_class n |> Iter.iter (fun n' -> 
-            check_triggers st cc n'
-          )
-        in
-        aux n
-      );
-    in
-    let s, t = SI.CC.N.term a, SI.CC.N.term b in
-    begin match LLTerm.view s, LLTerm.view t with
-      | _, Bind {binder=Binder.Lambda; _} -> add_trigger a b
-      | Bind {binder=Binder.Lambda; _}, _ -> add_trigger b a
-      | _ -> ()
-    end;
+  (* if [t] is a lambda term, add its node to the set of lambdas *)
+  let add_lambda (st:state) (n:SI.CC.N.t) (t:T.t) : unit =
+    match T.view t with
+    | T.Bind {binder=Binder.Lambda; ty_var=_; body} ->
+      let lm = { lm_node=n; lm_body=body; } in
+      N_tbl.add st.lambdas n [lm];
+    | _ -> ()
+
+  let cc_on_new_term _ (st:state) (cc:SI.CC.t) (n:SI.CC.N.t) (t:T.t) = 
+    add_lambda st n t;
+    beta_reduce st cc n;
     ()
 
   let create_and_setup si =
     Util.debug 3 ~section "Setting up theory of lambda expressions.";
     let st = create (SI.tst si) in
     SI.CC.on_new_term (SI.cc si) (cc_on_new_term si st);
-    SI.CC.on_post_merge (SI.cc si) (cc_on_post_merge si st);
+    SI.CC.on_pre_merge (SI.cc si) (cc_on_pre_merge si st);
     st
 
   let theory =
     Solver.mk_theory
       ~name:"th-lambda"
       ~create_and_setup
+      ~push_level
+      ~pop_levels
       ()
 end
 
