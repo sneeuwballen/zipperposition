@@ -60,6 +60,9 @@ module Solver = Sidekick_msat_solver.Make(struct
             V.App_fun (Fun.Builtin b, Iter.of_list l)
         end
       | T.Ite (a,b,c) -> V.If (a,b,c)
+      | T.Bind {body;binder=Binder.Lambda as binder; ty_var} ->
+        (* do not enter bodies of lmabdas *)
+        V.App_fun (Fun.Bind (binder,ty_var), Iter.return (T.box_opaque body))
       | T.Bind {body;binder;ty_var} ->
         V.App_fun (Fun.Bind (binder,ty_var), Iter.return body)
       | Int_pred _ | Rat_pred _
