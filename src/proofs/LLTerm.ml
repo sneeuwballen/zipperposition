@@ -604,6 +604,7 @@ end
 let abs t = match Form.view t with
   | Form.Not u -> u, false
   | Form.Neq (a,b) -> Form.eq a b, false
+  | Form.False -> Form.true_, false
   | _ -> t, true
 
 let as_bool t =
