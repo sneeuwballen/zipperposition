@@ -8,8 +8,8 @@ let max_elims           = ref 0
 let _cons_e = ref true
 let _imit_first = ref false
 
-let pattern_decider = ref false
-let solid_decider = ref true
+let pattern_decider = ref true
+let solid_decider = ref false
 
 let solidification_limit = ref 5
 
@@ -19,10 +19,10 @@ let max_unifs_solid_ff = ref (-1)
 let use_weight_for_solid_subsumption = ref true
 
 let all_params_to_max () = 
-  max_depth := max_int;
-  max_app_projections := max_int;
-  max_var_imitations := max_int;
-  max_rigid_imitations := max_int;
-  max_identifications := max_int;
-  max_elims           := max_int;
+  max_depth := 1000;
+  max_app_projections := 1000;
+  max_var_imitations := 1000;
+  max_rigid_imitations := 1000;
+  max_identifications := 1000;
+  max_elims           := 1000;
   max_inferences := -1

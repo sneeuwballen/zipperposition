@@ -98,6 +98,7 @@ let unif_types ~subst ~scope t s =
 
 let proj_lr ~counter ~scope ~subst s t flag = 
   let hd_s, args_s = CCPair.map1 T.as_var_exn (T.as_app s) in
+  let argss_arr = CCArray.of_list args_s in
   let hd_t,_ = T.as_app (snd (T.open_fun t)) in
   let pref_tys, var_ret_ty = Type.open_fun (HVar.ty hd_s) in
   pref_tys
@@ -110,9 +111,10 @@ let proj_lr ~counter ~scope ~subst s t flag =
   (* If heads are different constants, do not project to those subterms *)
   |> CCList.filter_map (fun ((i, _) as p) -> 
       if i < List.length args_s then (
-        let s_i = List.nth args_s i in
-        let s_i = T.head_term (snd (T.open_fun s_i)) in
-        if (T.is_const s_i && T.is_const hd_t && (not (T.equal s_i hd_t))) then None 
+        let s_i = snd (T.open_fun argss_arr.(i)) in
+        let hd_si = T.head_term s_i in
+        if ((T.is_const hd_si && T.is_const hd_t && (not (T.equal hd_si hd_t))) 
+             || (T.is_bvar s_i && T.is_bvar t && (not (T.equal s_i t)))) then None 
         else Some p
       ) else Some p
   )
@@ -154,10 +156,10 @@ let proj_imit_lr ?(disable_imit=false) ~counter ~scope ~subst s t flag =
     let first, second = 
       if !Params._imit_first then imit_binding, proj_bindings
       else proj_bindings, imit_binding in 
-    OSeq.of_list @@ CCList.map (fun x -> Some x) @@ first @ second
+    CCList.map (fun x -> Some x) @@ first @ second
     (* OSeq.of_list @@ CCList.map (fun x -> Some x) proj_bindings *)
   with Invalid_argument s when String.equal s "as_var_exn" ->
-    OSeq.empty
+    []
 
 let elim_rule ~counter ~scope t u flag = 
   let eliminate_at_idx v k =  
@@ -176,12 +178,11 @@ let elim_rule ~counter ~scope t u flag =
   let eliminate_one t = 
     let hd, args = T.as_app t in
     if T.is_var hd && List.length args > 0 then (
-      let all_vars = CCList.range 0 ((List.length args)-1) in
-        OSeq.of_list all_vars
-        |> OSeq.map (eliminate_at_idx (T.as_var_exn hd)))
-    else OSeq.empty in
-  OSeq.append (eliminate_one t) (eliminate_one u)
-  |> OSeq.map (fun x -> Some (x, inc_op flag Elim))
+       CCList.range 0 ((List.length args)-1) 
+       |> List.map (eliminate_at_idx (T.as_var_exn hd)))
+    else [] in
+  List.append (eliminate_one t) (eliminate_one u)
+  |> List.map (fun x -> Some (x, inc_op flag Elim))
 
 (* removes all arguments of an applied variable
    v |-> λ u1 ... um. x
@@ -220,40 +221,43 @@ let get_depth flag =
 let oracle ~counter ~scope ~subst (s,_) (t,_) (flag:I.t) =
   (* CCFormat.printf "subst:@[%a@]@." S.pp subst; *)
   (* CCFormat.printf "(@[%a@],@[%a@]):@[%a@]:%d:%b@." T.pp s T.pp t pp_flag flag (get_depth flag) (is_ident_last flag);  *)
-  if get_depth flag < !Params.max_depth then (
-    match head_classifier s, head_classifier t with 
-    | `Flex x, `Flex y when HVar.equal Type.equal x y ->
-      let res = 
-        let num_elims = get_op flag Elim in
-        if num_elims < !Params.max_elims 
-        then elim_rule ~counter ~scope s t flag 
-        else OSeq.return (Some (elim_trivial ~counter ~scope x, flag)) in
-      OSeq.map (CCOpt.map (fun (s,f) -> (s, clear_ident_last f))) res
-  | `Flex _, `Flex _s ->
-      (* all rules  *)
-      let ident = 
-        if get_op flag Ident < !Params.max_identifications then (
-          JP_unif.identify ~scope ~counter s t []
-          |> OSeq.map (fun x -> Some (U.subst x, set_ident_last @@ inc_op flag Ident)))
-        else OSeq.empty in
-      let proj_imits = 
-          OSeq.append 
-            (proj_imit_lr ~disable_imit:true ~scope ~counter ~subst s t flag)
-            (proj_imit_lr ~disable_imit:true ~scope ~counter ~subst t s flag)
-          |> OSeq.map (CCOpt.map (fun (s,f) -> (s, clear_ident_last f))) in
-      OSeq.interleave 
-        ident 
-        proj_imits
-    | `Flex _, `Rigid
-    | `Rigid, `Flex _ ->
-      OSeq.append
-        (proj_imit_lr ~counter ~scope ~subst s t flag)
-        (proj_imit_lr ~counter ~scope ~subst t s flag) 
-      |> OSeq.map (CCOpt.map (fun (s, f) -> (s, clear_ident_last f)))
-    | _ -> 
-      CCFormat.printf "Did not disassemble properly: [%a]\n[%a]@." T.pp s T.pp t;
-      assert false)
-  else OSeq.empty
+  let res = 
+    if get_depth flag < !Params.max_depth then (
+      match head_classifier s, head_classifier t with
+      | `Flex x, `Flex y when HVar.equal Type.equal x y ->
+        let res = 
+          let num_elims = get_op flag Elim in
+          if num_elims < !Params.max_elims 
+          then elim_rule ~counter ~scope s t flag 
+          else [Some (elim_trivial ~counter ~scope x, flag)] in
+        List.map (CCOpt.map (fun (s,f) -> (s, clear_ident_last f))) res
+    | `Flex _, `Flex _s ->
+        (* all rules  *)
+        let ident = 
+          if get_op flag Ident < !Params.max_identifications then (
+            JP_unif.identify ~scope ~counter s t []
+            |> OSeq.map (fun x -> Some (U.subst x, set_ident_last @@ inc_op flag Ident)))
+            |> OSeq.to_list
+          else [] in
+        let proj_imits = 
+            List.append 
+              (proj_imit_lr ~disable_imit:true ~scope ~counter ~subst s t flag)
+              (proj_imit_lr ~disable_imit:true ~scope ~counter ~subst t s flag)
+            |> List.map (CCOpt.map (fun (s,f) -> (s, clear_ident_last f))) in
+        CCList.interleave 
+          ident 
+          proj_imits
+      | `Flex _, `Rigid
+      | `Rigid, `Flex _ ->
+        List.append
+          (proj_imit_lr ~counter ~scope ~subst s t flag)
+          (proj_imit_lr ~counter ~scope ~subst t s flag) 
+        |> List.map (CCOpt.map (fun (s, f) -> (s, clear_ident_last f)))
+      | _ -> 
+        CCFormat.printf "Did not disassemble properly: [%a]\n[%a]@." T.pp s T.pp t;
+        assert false)
+    else [] in
+  CCList.filter_map CCFun.id res, OSeq.empty
 
 let unify_scoped =  
   let counter = ref 0 in

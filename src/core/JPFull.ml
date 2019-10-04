@@ -3,12 +3,13 @@ module T = Term
 module H = HVar
 module S = Subst
 
+let skip = 10
 
 let delay depth res =
-  (* CCFormat.printf "depth: %d@." depth; *)
-  OSeq.append 
-    (OSeq.take (depth*10) (OSeq.repeat None))
-    res 
+  (* CCFormat.printf "depth:%d@." depth; *)
+    OSeq.append
+      (OSeq.take (10*depth) (OSeq.repeat None))
+      res
   (* res *)
 
 let elim_rule ~counter ~scope t u depth = 
@@ -36,20 +37,17 @@ let elim_rule ~counter ~scope t u depth =
   |> OSeq.map (fun x -> Some (x, depth))
 
 let iter_rule ~counter ~scope t u depth  =
-  delay depth
-    (JP_unif.iterate ~scope ~counter t u []
-    |> OSeq.map (CCOpt.map (fun s -> U.subst s, depth+1)))
+  JP_unif.iterate ~scope ~counter t u []
+  |> OSeq.map (CCOpt.map (fun s -> U.subst s, depth+1))
 
 let imit_rule ~counter ~scope t u depth =
-  delay depth
-    (JP_unif.imitate ~scope ~counter t u []
-    |> OSeq.map (fun x -> Some (U.subst x, depth+1)))
+  JP_unif.imitate ~scope ~counter t u []
+  |> OSeq.map (fun x -> Some (U.subst x, depth+1))
 
 let hs_proj_flex_rigid ~counter ~scope ~flex u depth =
-  delay depth 
-    (PUnif.proj_hs ~counter ~scope ~flex u
-     |> OSeq.of_list
-     |> OSeq.map (fun x -> Some (x,depth+1)))
+  PUnif.proj_hs ~counter ~scope ~flex u
+   |> OSeq.of_list
+   |> OSeq.map (fun x -> Some (x,depth+1))
 
 let proj_rule ~counter ~scope s t depth =
   OSeq.append
@@ -58,9 +56,8 @@ let proj_rule ~counter ~scope s t depth =
   |> OSeq.map (fun x -> Some (U.subst x, depth))
 
 let ident_rule ~counter ~scope t u depth = 
-  delay depth
-    (JP_unif.identify ~scope ~counter t u []
-    |> OSeq.map (fun x -> Some (U.subst x, depth+1)))
+  JP_unif.identify ~scope ~counter t u []
+  |> OSeq.map (fun x -> Some (U.subst x, depth+1))
 
 let renamer ~counter t0s t1s = 
   let lhs,rhs, unifscope, us = U.FO.rename_to_new_scope ~counter t0s t1s in
@@ -86,25 +83,25 @@ let oracle ~counter ~scope (s,_) (t,_) flag =
   match head_classifier s, head_classifier t with 
   | `Flex x, `Flex y when HVar.equal Type.equal x y ->
     (* eliminate + iter *)
-    (* OSeq.append 
-      (proj_rule ~counter ~scope s t flag) *)
-      (OSeq.append (elim_rule ~counter ~scope s t flag)
-                   (iter_rule ~counter ~scope s t flag))
+    CCList.filter_map CCFun.id (OSeq.to_list (elim_rule ~counter ~scope s t flag)),
+    delay (flag+1) @@ iter_rule ~counter ~scope s t flag
   | `Flex _, `Flex _ ->
     (* all rules  *)
-    OSeq.append 
-      (proj_rule ~counter ~scope s t flag)
-        (OSeq.append 
-          (ident_rule ~counter ~scope s t flag)
-          (iter_rule ~counter ~scope s t flag))
+
+      CCList.filter_map CCFun.id 
+        (List.append (OSeq.to_list (OSeq.append (proj_rule ~counter ~scope s t flag)
+                                                (imit_rule ~counter ~scope s t flag)  ))
+                     (OSeq.to_list (ident_rule ~counter ~scope s t flag))),
+      delay (flag+1) @@ iter_rule ~counter ~scope s t flag  
   | `Flex _, `Rigid
   | `Rigid, `Flex _ ->
-    (* OSeq.append
-      (proj_rule ~counter ~scope s t flag) *)
-      (OSeq.append 
-        (imit_rule ~counter ~scope s t flag)
-        (let flex, rigid = if Term.is_var (T.head_term s) then s,t else t,s in
-         hs_proj_flex_rigid ~counter ~scope ~flex rigid flag))
+    CCList.filter_map CCFun.id  @@
+      CCList.append 
+        (OSeq.to_list (imit_rule ~counter ~scope s t flag))
+        (OSeq.to_list (
+            let flex, rigid = if Term.is_var (T.head_term s) then s,t else t,s in
+            hs_proj_flex_rigid ~counter ~scope ~flex rigid flag)), 
+    OSeq.empty
   | _ -> 
     CCFormat.printf "Did not disassemble properly: [%a]\n[%a]@." T.pp s T.pp t;
     assert false
@@ -121,7 +118,7 @@ let unify_scoped =
     let frag_algs = deciders ~counter
     let pb_oracle s t (f:flag_type) _ scope = 
       oracle ~counter ~scope s t f
-    let oracle_composer = OSeq.interleave
+    let oracle_composer = OSeq.append
   end in
   
   let module JPFull = UnifFramework.Make(JPFullParams) in
