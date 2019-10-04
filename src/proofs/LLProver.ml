@@ -52,6 +52,8 @@ module Solver = Sidekick_msat_solver.Make(struct
       | T.AppBuiltin (Builtin.Box_opaque, _) -> V.Opaque t  (* simple equality *)
       | T.AppBuiltin (b,l) ->
         begin match F.view t with
+          | F.True -> V.Bool true
+          | F.False -> V.Bool false
           | F.Eq (a,b) -> V.Eq (a,b)
           | F.Not a -> V.Not a
           | _ ->
