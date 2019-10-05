@@ -299,7 +299,7 @@ module Th_lambda = struct
        add [lm=lm' => lm sko=lm' sko] for each pair of lambdas [lm, lm']
        with the same type. [sko] is unique to the pair [lm,lm'].
   *)
-  let final_check (st:state) (si:SI.t) (acts:SI.actions) (_trail:_) : unit =
+  let final_check (st:state) (si:SI.t) (acts:SI.actions) trail : unit =
     let mk_lit ?sign t = SI.mk_lit si acts t in
     let lambdas =
       T_tbl.to_iter st.lambdas_of_ty
@@ -316,7 +316,7 @@ module Th_lambda = struct
            let t1 = N.term lm1.lm_node in
            let t2 = N.term lm2.lm_node in
            assert (not (T.equal t1 t2));
-           let pair = sorted_pair t1 t2 in
+           let (t1,t2) as pair = sorted_pair t1 t2 in
            let sko =
              try T2_tbl.find st.ext_skolems pair
              with Not_found ->
@@ -342,10 +342,12 @@ module Th_lambda = struct
            ())
     end;
     CC.check (SI.cc si) acts;
-    Util.debugf 5 ~section "(@[th-lambda.final-check@ :classes (@[%a@])@])"
+    Util.debugf 5 ~section
+      "(@[th-lambda.final-check@ :classes (@[%a@])@ (@[<2>:trail@ %a@])@])"
       (fun k->k (Util.pp_seq (Fmt.Dump.list N.pp))
           (CC.all_classes (SI.cc si)
-           |> Iter.map (fun n-> N.iter_class n |> Iter.to_rev_list)));
+           |> Iter.map (fun n-> N.iter_class n |> Iter.to_rev_list))
+          (Util.pp_seq SI.Lit.pp) trail);
     ()
 
   (* if [t] is a lambda term, add its node to the set of lambdas_in_cls *)
