@@ -64,7 +64,8 @@ type t =
 type t_ = t
 
 let to_int_ = function
-  (* True < false for the completeness of (HO case) FOOL paramodulation: C[b] ⟹ b ∨ C[false]. The opposite way required b=false would simplify b≠true (aka ¬b) which doesn't rewrite. *)
+  (* [True < false] for the completeness of (HO case) FOOL paramodulation: [C[b] ⟹ b ∨ C[false]].
+     The opposite way required [b=false] would simplify [b≠true] (aka [¬b]) which doesn't rewrite. *)
   | True -> 0
   | False -> 1
   | Not -> 2
@@ -123,14 +124,14 @@ let to_int_ = function
 let compare a b = match a, b with
   | Int i, Int j -> Z.compare i j
   | Rat i, Rat j -> Q.compare i j
-  | _ -> to_int_ a - to_int_ b
+  | _ -> CCInt.compare (to_int_ a) (to_int_ b)
 
 let equal a b = compare a b = 0
 
 let hash s = match s with
   | Int i -> Hash.combine2 1 (Z.hash i)
   | Rat r -> Hash.combine2 2 (Hash.string (Q.to_string r))
-  | c -> Hash.combine2 3 (Hashtbl.hash c)
+  | c -> Hash.combine2 3 (CCInt.hash (to_int_ c))
 
 module Map = Iter.Map.Make(struct type t = t_ let compare = compare end)
 module Set = Iter.Set.Make(struct type t = t_ let compare = compare end)
