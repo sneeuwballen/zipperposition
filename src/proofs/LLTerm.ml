@@ -251,10 +251,13 @@ module H_cons = Hashcons.Make(struct
       t.id <- i
   end)
 
-let rec pp_rec depth out (t:t) = match view t with
+let rec pp_rec depth out (t:t) =
+  Fmt.fprintf out "%a@{<Black>/%d@}" (pp_rec_ depth) t t.id
+and pp_rec_ depth out (t:t) = match view t with
   | Type -> Fmt.string out "type"
   | Const id -> ID.pp_fullc out id
-  | App (f,a) -> Fmt.fprintf out "@[%a@ %a@]" (pp_rec depth) f (pp_rec_inner depth) a
+  | App (f,a) ->
+    Fmt.fprintf out "@[<1>%a@ %a@]" (pp_rec depth) f (pp_rec_inner depth) a
   | Arrow (a,b) ->
     Fmt.fprintf out "@[%a@ @<1>→ %a@]" (pp_rec_inner depth) a (pp_rec depth) b
   | Var v -> Format.fprintf out "Y%d" (depth-HVar.id v-1)
@@ -262,17 +265,22 @@ let rec pp_rec depth out (t:t) = match view t with
     Format.fprintf out "@<1>⟦@[%a@]@<1>⟧" (pp_rec depth) t
   | AppBuiltin (b, [a]) when Builtin.is_prefix b ->
     Format.fprintf out "@[<1>%a@ %a@]" Builtin.pp b (pp_rec_inner depth) a
-  | AppBuiltin (b, ([t1;t2] | [_;t1;t2])) when Builtin.fixity b = Builtin.Infix_binary ->
+  | AppBuiltin (b, [t0;t1;t2]) when Builtin.fixity b = Builtin.Infix_binary ->
+    Format.fprintf out "@[<1>%a %a_@[%a@]@ %a@]"
+      (pp_rec_inner depth) t1 Builtin.pp b
+      (pp_rec_inner depth) t0
+      (pp_rec_inner depth) t2
+  | AppBuiltin (b, [t1;t2]) when Builtin.fixity b = Builtin.Infix_binary ->
     Format.fprintf out "@[<1>%a %a@ %a@]"
       (pp_rec_inner depth) t1 Builtin.pp b (pp_rec_inner depth) t2
   | AppBuiltin (b, l) when Builtin.is_infix b && List.length l > 0 ->
-    Format.fprintf out "@[<hv>%a@]" (pp_infix_ depth b) l
+    Format.fprintf out "(@[<hv2>%a@])" (pp_infix_ depth b) l
   | AppBuiltin (b, []) -> Builtin.pp out b
   | AppBuiltin (b, l) ->
     Format.fprintf out "(@[<hv>%a@ %a@])"
       Builtin.pp b (Util.pp_list (pp_rec_inner depth)) l
   | Bind {ty_var;binder;body} ->
-    Fmt.fprintf out "(@[%a (@[Y%d:%a@]).@ %a@])"
+    Fmt.fprintf out "(@[<2>%a (@[Y%d:%a@]).@ @[%a@]@])"
       Binder.pp binder
       depth (pp_rec depth) ty_var
       (pp_rec @@ depth+1) body
@@ -287,9 +295,9 @@ let rec pp_rec depth out (t:t) = match view t with
     Fmt.fprintf out "(@[%a@ %a@])" (Linexp_rat.pp (pp_rec_inner depth)) l Rat_op.pp o
 and pp_rec_inner depth out t = match view t with
   | App _ | Bind _ | AppBuiltin (_,_::_) | Arrow _ | Ite _ ->
-    Fmt.fprintf out "(%a)@{<Black>/%d@}" (pp_rec depth) t t.id
+    Fmt.fprintf out "(%a)" (pp_rec depth) t
   | Type | Const _ | Var _ | AppBuiltin (_,[]) | Int_pred _ | Rat_pred _ ->
-    Fmt.fprintf out "%a@{<Black>/%d@}" (pp_rec depth) t t.id
+    pp_rec depth out t
 and pp_infix_ depth b out l = match l with
   | [] -> assert false
   | [t] -> pp_rec_inner depth out t
