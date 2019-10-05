@@ -358,11 +358,20 @@ let[@inline] arrow_ a b = mk_ (Arrow (a,b)) (Some t_type)
 
 let[@inline] bind_ ~ty binder ~ty_var body = mk_ (Bind {binder;ty_var;body}) (Some ty)
 
-let id_eta_ = ID.make "test_eta_" (* privat to {!as_eta_expansion} *)
+(* private to {!as_eta_expansion}, used to test invariance by eta-expansion *)
+let id_eta_ = ID.make "test_eta_"
 
-let[@inline] app_builtin ~ty b l =
+let[@inline] sorted_l2 x y = if compare x y <= 0 then [x;y] else [y;x]
+
+let app_builtin ~ty b l =
   let mk_ b l = mk_ (AppBuiltin(b,l)) (Some ty) in
   begin match b, l with
+    | (Builtin.Eq | Builtin.Neq), [_;x;y] ->
+      (* normalize wrt commutativity and remove ty arg *)
+      mk_ b (sorted_l2 x y)
+    | (Builtin.Eq | Builtin.Neq | Builtin.Xor | Builtin.Equiv), [x;y] ->
+      (* normalize wrt commutativity *)
+      mk_ b (sorted_l2 x y)
     | Builtin.Not, [f'] ->
       begin match view f' with
         | AppBuiltin (Builtin.Eq,l) -> mk_ Builtin.Neq l
@@ -531,8 +540,6 @@ let rec arrow_l l ret = match l with
   | a :: tail -> arrow a (arrow_l tail ret)
 
 let box_opaque t = app_builtin ~ty:(ty_exn t) Builtin.Box_opaque [t]
-
-let id_eta_ = ID.make "test_eta_" (* privat to {!as_eta_expansion} *)
 
 (* check if [body = t db0], with [db0 ∉ t].
    returns [Some (t shift -1)] if it's the case *)
