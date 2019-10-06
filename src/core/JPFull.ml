@@ -33,7 +33,7 @@ let elim_rule ~counter ~scope t u depth =
         OSeq.of_list all_vars
         |> OSeq.map (eliminate_at_idx (T.as_var_exn hd)))
     else OSeq.empty in
-  OSeq.append (eliminate_one t) (eliminate_one u)
+  eliminate_one t
   |> OSeq.map (fun x -> Some (x, depth))
 
 let iter_rule ~counter ~scope t u depth  =
@@ -87,20 +87,18 @@ let oracle ~counter ~scope (s,_) (t,_) flag =
     delay (flag+1) @@ iter_rule ~counter ~scope s t flag
   | `Flex _, `Flex _ ->
     (* all rules  *)
-
-      CCList.filter_map CCFun.id 
-        (List.append (OSeq.to_list (OSeq.append (proj_rule ~counter ~scope s t flag)
-                                                (imit_rule ~counter ~scope s t flag)  ))
-                     (OSeq.to_list (ident_rule ~counter ~scope s t flag))),
-      delay (flag+1) @@ iter_rule ~counter ~scope s t flag  
+    CCList.filter_map CCFun.id 
+      (List.append (OSeq.to_list (proj_rule ~counter ~scope s t flag))
+                   (OSeq.to_list (ident_rule ~counter ~scope s t flag))),
+    delay (flag+1) @@ iter_rule ~counter ~scope s t flag  
   | `Flex _, `Rigid
   | `Rigid, `Flex _ ->
     CCList.filter_map CCFun.id  @@
       CCList.append 
-        (OSeq.to_list (imit_rule ~counter ~scope s t flag))
         (OSeq.to_list (
             let flex, rigid = if Term.is_var (T.head_term s) then s,t else t,s in
-            hs_proj_flex_rigid ~counter ~scope ~flex rigid flag)), 
+            hs_proj_flex_rigid ~counter ~scope ~flex rigid flag))
+        (OSeq.to_list (imit_rule ~counter ~scope s t flag)), 
     OSeq.empty
   | _ -> 
     CCFormat.printf "Did not disassemble properly: [%a]\n[%a]@." T.pp s T.pp t;

@@ -181,7 +181,7 @@ let elim_rule ~counter ~scope t u flag =
        CCList.range 0 ((List.length args)-1) 
        |> List.map (eliminate_at_idx (T.as_var_exn hd)))
     else [] in
-  List.append (eliminate_one t) (eliminate_one u)
+  eliminate_one t
   |> List.map (fun x -> Some (x, inc_op flag Elim))
 
 (* removes all arguments of an applied variable
