@@ -69,7 +69,7 @@ module Make (P : PARAMETERS) = struct
 
   let tasks_taken = 100
 
-  (* rigid path check *)
+  (* rigid path check -- has to be rewritten!!! *)
   let rp_check s t =
     let rec rp_check_aux var rigid =
       match T.view rigid with 
@@ -77,11 +77,10 @@ module Make (P : PARAMETERS) = struct
         let args_hds = List.map T.head_term args in
         if List.exists (T.equal var) args_hds then false
         else List.for_all (rp_check_aux var) args
-      | T.App(hd, args) when not (T.is_var hd) ->
+      | T.App(hd, args) when not (T.is_var hd) && not (T.is_fun hd) ->
         let args_hds = List.map T.head_term args in
         if List.exists (T.equal var) args_hds then false
         else List.for_all (rp_check_aux var) args
-      | T.Fun(_, body) -> rp_check_aux var body
       | _ -> true in
 
     let hd_s = T.head_term s in
@@ -124,10 +123,7 @@ module Make (P : PARAMETERS) = struct
         
           if T.equal body_lhs body_rhs then (
             aux ~depth subst rest
-          ) else if not (rp_check body_lhs body_rhs) then (
-            OSeq.empty
-          )
-          else (
+          ) else (
             match T.view hd_lhs, T.view hd_rhs with
             | T.DB i, T.DB j ->
               if i = j then decompose_and_cont args_lhs args_rhs rest flag subst
@@ -154,9 +150,10 @@ module Make (P : PARAMETERS) = struct
                 | Some substs ->
                   (* We assume that the substitution was augmented so that it is mgu for
                       lhs and rhs *)
-                  OSeq.flat_map (fun sub ->
+                  OSeq.map (fun sub ->
                     aux ~depth sub rest
                   ) (OSeq.of_list substs)
+                  |> OSeq.merge
                 | None ->
                   let args_unif =
                     if T.is_var hd_lhs && T.is_var hd_rhs && T.equal hd_lhs hd_rhs then
@@ -165,18 +162,25 @@ module Make (P : PARAMETERS) = struct
                   
                   let finite_branch_oracle, infinite_branch_oracle = 
                     P.pb_oracle (body_lhs, unifscope) (body_rhs, unifscope) flag subst unifscope in
+                  
+                  let finite_branch_w_none = 
+                    let n = if depth > 2 then 2*depth else 0 in
+                    OSeq.append 
+                      (OSeq.take n (OSeq.repeat None))
+                      (OSeq.of_list @@ List.map (fun x -> Some x) finite_branch_oracle)
+                    in
                   let all_oracles =
-                    OSeq.append (OSeq.of_list @@ List.map (fun x -> Some x) finite_branch_oracle) infinite_branch_oracle in
+                    OSeq.append finite_branch_w_none infinite_branch_oracle in
                   
                   let oracle_unifs = OSeq.map (fun sub_flag_opt -> 
                     match sub_flag_opt with 
                     | None -> OSeq.return None
                     | Some (sub', flag') ->
                       let subst = Subst.merge subst sub' in
-                      aux ~depth subst ((lhs,rhs,flag')::rest)) all_oracles
+                      aux ~depth:(depth+1) subst ((lhs,rhs,flag')::rest)) all_oracles
                   |> OSeq.merge in
 
-                  OSeq.interleave oracle_unifs args_unif
+                  OSeq.interleave args_unif oracle_unifs
               with Unif.Fail -> OSeq.empty) in
     aux ~depth:0 subst problem
   

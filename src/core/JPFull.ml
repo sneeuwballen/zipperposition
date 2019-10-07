@@ -12,6 +12,10 @@ let delay depth res =
       res
   (* res *)
 
+let delay_l depth res =
+  let n = if depth > 5 then depth else 0 in 
+  CCList.append (CCList.replicate n None) res
+
 let elim_rule ~counter ~scope t u depth = 
   let eliminate_at_idx v k =  
     let prefix_types, return_type = Type.open_fun (HVar.ty v) in

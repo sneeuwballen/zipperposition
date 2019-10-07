@@ -114,7 +114,7 @@ let proj_lr ~counter ~scope ~subst s t flag =
         let s_i = snd (T.open_fun argss_arr.(i)) in
         let hd_si = T.head_term s_i in
         if ((T.is_const hd_si && T.is_const hd_t && (not (T.equal hd_si hd_t))) 
-             || (T.is_bvar s_i && T.is_bvar t && (not (T.equal s_i t)))) then None 
+             || (T.is_bvar argss_arr.(i) && T.is_bvar hd_t && (not (T.equal argss_arr.(i) hd_t)))) then None 
         else Some p
       ) else Some p
   )
@@ -129,7 +129,7 @@ let proj_lr ~counter ~scope ~subst s t flag =
         let flag' = if max_num_of_apps > 0 then inc_op flag ProjApp else flag in
         (* let flag' = inc_op flag ProjApp in *)
         Some (Subst.FO.bind' subst' (hd_s, scope) (pr_bind, scope), flag')
-      |None -> None)
+      | None -> None)
 
 let proj_hs ~counter ~scope ~flex s =
   CCList.map fst @@ proj_lr ~counter ~scope ~subst:Subst.empty flex s Int32.zero

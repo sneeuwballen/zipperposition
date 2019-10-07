@@ -982,8 +982,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let inf_res = infer_active_aux
       ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:!_unif_alg)
       ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
-        let all_substs = OSeq.to_list @@ OSeq.take max_unifs substs   in
-        let res = List.map (fun subst -> do_sup u_p with_pos (CCOpt.get_exn subst)) all_substs in
+        let all_substs = OSeq.to_list @@ OSeq.take max_unifs @@ OSeq.filter_map CCFun.id substs   in
+        let res = List.map (fun subst -> do_sup u_p with_pos subst) all_substs in
         Some res
       )
       clause
@@ -994,8 +994,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let inf_res = infer_passive_aux
       ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:!_unif_alg)
       ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
-        let all_substs = OSeq.to_list @@ OSeq.take max_unifs substs in
-        let res = List.map (fun subst -> do_sup u_p with_pos (CCOpt.get_exn subst)) all_substs in
+        let all_substs = OSeq.to_list @@ OSeq.take max_unifs @@ OSeq.filter_map CCFun.id substs   in
+        let res = List.map (fun subst -> do_sup u_p with_pos subst) all_substs in
         Some res   
       )
       clause
@@ -1308,8 +1308,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~unify:!_unif_alg
         ~iterate_substs:(fun substs do_eq_res ->
            (* Some (OSeq.map (CCOpt.flat_map do_eq_res) substs) *)
-           let all_substs = OSeq.to_list @@ OSeq.take max_unifs substs in
-           let res = List.map (fun subst -> do_eq_res (CCOpt.get_exn subst)) all_substs in
+           let all_substs = OSeq.to_list @@ OSeq.take max_unifs @@ OSeq.filter_map CCFun.id substs   in
+           let res = List.map (fun subst -> do_eq_res subst) all_substs in
            Some res)
         clause
     in
@@ -1540,8 +1540,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~unify:!_unif_alg
         ~iterate_substs:(fun substs do_eq_fact ->
            (* Some (OSeq.map (CCOpt.flat_map do_eq_fact) substs) *)
-           let all_substs = OSeq.to_list @@ OSeq.take max_unifs substs  in
-           let res = List.map (fun subst -> do_eq_fact (CCOpt.get_exn subst)) all_substs in
+           let all_substs = OSeq.to_list @@ OSeq.take max_unifs @@ OSeq.filter_map CCFun.id substs in
+           let res = List.map (fun subst -> do_eq_fact subst) all_substs in
            Some res)
         clause
     in
