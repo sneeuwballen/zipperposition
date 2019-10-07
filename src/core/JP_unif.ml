@@ -238,14 +238,14 @@ let iterate_one ~counter types_w prefix_types return_type i type_ul =
   subst_value
 
 
-let iterate ~scope ~counter u v l =
+let iterate ?(flex_same=false) ~scope ~counter u v l =
   (* The variable can be either above the disagreement pair (i.e., in l) 
      or it can be the head of either member of the disagreement pair *)
   let positions =
     l 
     |> CCList.map fst
     |> CCList.cons_maybe (T.as_var (T.head_term u))
-    |> CCList.cons_maybe (T.as_var (T.head_term v))
+    |> CCList.cons_maybe (if flex_same then None else T.as_var (T.head_term v))
     |> OSeq.of_list
     |> OSeq.flat_map
       (fun v ->
@@ -255,6 +255,9 @@ let iterate ~scope ~counter u v l =
             (fun i type_ul -> (v, prefix_types, return_type, i, type_ul))
         |> List.fast_sort (fun (_,_,_,_,x) (_,_,_,_,y) -> 
             List.length (Type.expected_args y) - List.length (Type.expected_args x))
+        |> (fun l -> 
+              if not flex_same then l
+              else List.filter (fun (_,_,_,_,ty) -> Type.is_fun ty) l)
         |> OSeq.of_list
       )
   in
@@ -378,7 +381,7 @@ let unify ~scope ~counter t0 s0 =
                add_some identify,"id"; 
                (if !_huet_style 
                then project_huet_style 
-               else iterate)
+               else iterate ~flex_same:false)
                ~scope ~counter,"proj_hs";]
               (* iterate must be last in this list because it is the only one with infinitely many child nodes *)
               |> OSeq.of_list  

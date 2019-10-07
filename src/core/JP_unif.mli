@@ -23,7 +23,7 @@ val identify : scope:Scoped.scope -> counter:int ref -> T.t -> T.t -> (T.var * i
 
 val eliminate : scope:Scoped.scope -> counter:int ref -> T.t -> T.t -> (Type.t HVar.t * int) list -> subst OSeq.t
 
-val iterate : scope:Scoped.scope -> counter:int ref -> T.t -> T.t -> (T.var * 'a) CCList.t -> Unif_subst.t option OSeq.t
+val iterate : ?flex_same:bool -> scope:Scoped.scope -> counter:int ref -> T.t -> T.t -> (T.var * 'a) CCList.t -> Unif_subst.t option OSeq.t
 
 (** Find disagreeing subterms. 
     This function also returns a list of variables occurring above the
