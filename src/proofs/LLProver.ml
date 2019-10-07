@@ -137,6 +137,7 @@ module Th_bool = Sidekick_th_bool_static.Make(struct
       | B_eq (a,b) -> F.eq a b
       | B_ite (a,b,c) -> T.ite a b c
       | B_atom t -> t
+      | B_opaque_bool t -> t
 
     let view_as_bool t =
       match F.view t with
