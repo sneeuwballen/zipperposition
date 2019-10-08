@@ -18,6 +18,13 @@ let max_inferences = ref (-1)
 let max_unifs_solid_ff = ref (-1)
 let use_weight_for_solid_subsumption = ref true
 
+type e_dir = 
+ | LowToHigh 
+ | HighToLow
+
+let elim_direction = ref HighToLow
+
+
 let all_params_to_max () = 
   max_depth := 1000;
   max_app_projections := 1000;

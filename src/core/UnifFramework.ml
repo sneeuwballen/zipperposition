@@ -164,7 +164,7 @@ module Make (P : PARAMETERS) = struct
                     P.pb_oracle (body_lhs, unifscope) (body_rhs, unifscope) flag subst unifscope in
                   
                   let finite_branch_w_none = 
-                    let n = if depth > 4 then 5*depth else 0 in
+                    let n = if depth > 4 then 5*depth else depth in
                     OSeq.append 
                       (OSeq.take n (OSeq.repeat None))
                       (OSeq.of_list @@ List.map (fun x -> Some x) finite_branch_oracle)

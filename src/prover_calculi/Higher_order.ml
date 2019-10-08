@@ -1393,7 +1393,9 @@ let () =
       "--ho-huet-style-unif", Arg.Set _huet_style, " enable Huet style projection";
       "--ho-conservative-elim", Arg.Bool (fun v -> _cons_elim := v), " Disables conservative elimination rule in pragmatic unification";
       "--ho-imitation-first",Arg.Bool (fun v -> PragUnifParams._imit_first:=v), " Use imitation rule before projection rule";
-      (* "--ho-solve-vars", Arg.Bool (fun v -> PragUnifParams.solve_var := v), " Enable solving variables."; *)
+      "--ho-elim-direction", Arg.Symbol (["high-to-low"; "low-to-high"], (fun s ->
+          if s = "high-to-low" then PragUnifParams.elim_direction := PragUnifParams.HighToLow
+          else (assert (s = "low-to-high"); PragUnifParams.elim_direction := PragUnifParams.LowToHigh))), " Enable solving variables.";
       "--ho-composition", Arg.Set _compose_subs, " Enable composition instead of merging substitutions";
       "--ho-disable-var-arg-removal", Arg.Clear _var_arg_remove, " disable removal of arguments of applied variables";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom";

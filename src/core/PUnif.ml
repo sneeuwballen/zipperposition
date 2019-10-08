@@ -4,7 +4,10 @@ module H = HVar
 module S = Subst
 module P = PatternUnif
 module Params = PragUnifParams
-module I = Int32 
+module I = Int32
+module IntSet = CCSet.Make(CCInt)
+
+let elim_vars = ref IntSet.empty
 
 
 type op =
@@ -134,6 +137,73 @@ let proj_lr ~counter ~scope ~subst s t flag =
 let proj_hs ~counter ~scope ~flex s =
   CCList.map fst @@ proj_lr ~counter ~scope ~subst:Subst.empty flex s Int32.zero
 
+let k_subset ~k l =
+  let rec aux i acc l = 
+    if i = 0 then OSeq.return acc
+    else if i > List.length l then OSeq.empty 
+    else (
+      match l with 
+      | x :: xs ->
+        OSeq.interleave (aux i acc xs) (aux (i-1) (x::acc) xs)
+      | [] -> assert(false)
+    ) in
+  
+  assert(k>=0);
+  aux k [] l
+
+let elim_subsets_rule  ?(max_elims=None) ~elim_vars ~counter ~scope t u (depth) =
+  let hd_t, args_t = T.head_term t, Array.of_list (T.args t) in
+  let hd_u, args_u = T.head_term u, Array.of_list (T.args u) in
+  assert(T.is_var hd_t);
+  assert(T.is_var hd_u);
+  assert(T.equal hd_t hd_u);
+
+  let hd_var = T.as_var_exn hd_t in
+  let var_id = !counter in
+  elim_vars := IntSet.add var_id !elim_vars;
+  incr counter;
+
+  let pref_tys, ret_ty = Type.open_fun (T.ty hd_t) in
+  let pref_len = List.length pref_tys in
+
+  let same_args, diff_args = 
+    List.mapi (fun i ty -> 
+      if i < Array.length args_t && i < Array.length args_u &&
+        T.equal args_t.(i) args_u.(i) 
+      then `Left (T.bvar ~ty (pref_len-i-1))
+      else `Right (T.bvar ~ty (pref_len-i-1))) pref_tys
+    |> CCList.partition_map CCFun.id in
+
+  let diff_args_num = List.length diff_args in
+  let end_ = match max_elims with 
+            | None -> 0 
+            | Some x -> assert(x>0); diff_args_num-x in
+  let start,end_,step =
+    match !PragUnifParams.elim_direction with
+    | HighToLow -> max (diff_args_num-1) 0, max end_ 0,-1
+    | LowToHigh -> max end_ 0,max (diff_args_num-1) 0,1
+  in
+  CCList.range_by start end_ ~step
+  |> OSeq.of_list
+  |> OSeq.flat_map (fun k ->
+    k_subset ~k diff_args
+    |> OSeq.map (fun diff_args_subset ->
+      assert(List.length diff_args_subset = k);
+      let all_args = diff_args_subset @ same_args in
+      assert(List.length all_args <= pref_len);
+      let arg_tys = List.map T.ty all_args in
+      let ty = Type.arrow arg_tys ret_ty in
+      let matrix = T.app (T.var (HVar.make ~ty var_id)) all_args in
+      let subs_term = T.fun_l pref_tys matrix in
+      assert(T.DB.is_closed subs_term);
+      (Subst.FO.bind' Subst.empty (hd_var, scope) (subs_term, scope),
+            (depth+(diff_args_num-k),false))))
+
+let subset_elimination ~max_elims ~counter ~scope t u =
+  elim_subsets_rule ~elim_vars ~max_elims ~counter ~scope t u 0
+  |> OSeq.map (fun sub_flag -> 
+      fst sub_flag, fst (snd sub_flag))
+
 (*Create all possible projection and imitation bindings. *)
 let proj_imit_lr ?(disable_imit=false) ~counter ~scope ~subst s t flag =
   try
@@ -227,8 +297,14 @@ let oracle ~counter ~scope ~subst (s,_) (t,_) (flag:I.t) =
       | `Flex x, `Flex y when HVar.equal Type.equal x y ->
         let res = 
           let num_elims = get_op flag Elim in
-          if num_elims < !Params.max_elims 
-          then elim_rule ~counter ~scope s t flag 
+          let remaining_elims = !Params.max_elims - num_elims in
+          if remaining_elims > 0 then (
+            subset_elimination ~max_elims:(Some remaining_elims) ~counter ~scope s t
+            |> OSeq.map (fun (sub, inc) ->
+                let flag' = CCList.fold_left (fun acc _ -> inc_op acc Elim) 
+                                             flag (CCList.replicate inc None) in
+                Some (sub, flag'))
+            |> OSeq.to_list)
           else [Some (elim_trivial ~counter ~scope x, flag)] in
         List.map (CCOpt.map (fun (s,f) -> (s, clear_ident_last f))) res
     | `Flex _, `Flex _s ->
@@ -257,7 +333,11 @@ let oracle ~counter ~scope ~subst (s,_) (t,_) (flag:I.t) =
         CCFormat.printf "Did not disassemble properly: [%a]\n[%a]@." T.pp s T.pp t;
         assert false)
     else [] in
-  CCList.filter_map CCFun.id res, OSeq.empty
+  let hd_t, hd_s = T.head_term s, T.head_term t in
+  if T.is_var hd_t && T.is_var hd_s && T.equal hd_s hd_t &&
+     IntSet.mem (HVar.id @@ T.as_var_exn hd_t) !elim_vars then (
+    [], OSeq.empty)
+  else (CCList.filter_map CCFun.id res, OSeq.empty)
 
 let unify_scoped =  
   let counter = ref 0 in
@@ -275,5 +355,6 @@ let unify_scoped =
   end in
   
   let module PragUnif = UnifFramework.Make(PragUnifParams) in
-  (fun x y -> 
+  (fun x y ->
+    elim_vars := IntSet.empty;
     OSeq.map (CCOpt.map Unif_subst.of_subst) (PragUnif.unify_scoped x y))

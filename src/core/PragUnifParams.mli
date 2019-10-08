@@ -5,6 +5,12 @@ val max_rigid_imitations : int ref
 val max_identifications : int ref
 val max_elims           : int ref
 
+type e_dir = 
+ | LowToHigh 
+ | HighToLow
+
+val elim_direction : e_dir ref
+
 val _cons_e : bool ref
 val _imit_first : bool ref
 
