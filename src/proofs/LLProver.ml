@@ -60,11 +60,9 @@ module Solver = Sidekick_msat_solver.Make(struct
             V.App_fun (Fun.Builtin b, Iter.of_list l)
         end
       | T.Ite (a,b,c) -> V.If (a,b,c)
-      | T.Bind {body;binder=Binder.Lambda as binder; ty_var} ->
-        (* do not enter bodies of lmabdas *)
-        V.App_fun (Fun.Bind (binder,ty_var), Iter.return (T.box_opaque body))
-      | T.Bind {body;binder;ty_var} ->
-        V.App_fun (Fun.Bind (binder,ty_var), Iter.return body)
+      | T.Bind _ ->
+        (* do not enter binders at all *)
+        V.Opaque t
       | Int_pred _ | Rat_pred _
       | T.Const _ | T.Var _ | T.Type | T.Arrow _ -> V.Opaque t
 
@@ -141,6 +139,7 @@ module Th_bool = Sidekick_th_bool_static.Make(struct
 
     let view_as_bool t =
       match F.view t with
+      | _ when not (T.db_closed t) -> B_opaque_bool t
       | F.True -> B_bool true
       | F.False -> B_bool false
       | F.And l -> B_and (Sidekick_util.IArray.of_list l)
@@ -156,7 +155,8 @@ module Th_bool = Sidekick_th_bool_static.Make(struct
           | Ite (a,b,c) -> B_ite (a,b,c)
           | _ -> B_atom t
         end
-      | F.Int_pred _ | F.Rat_pred _ | F.Forall _ | F.Exists _ ->
+      | F.Forall _ | F.Exists _ -> B_opaque_bool t
+      | F.Int_pred _ | F.Rat_pred _ ->
         B_atom t
   end)
 
@@ -344,7 +344,7 @@ module Th_lambda = struct
     end;
     CC.check (SI.cc si) acts;
     Util.debugf 5 ~section
-      "(@[th-lambda.final-check@ :classes (@[%a@])@ (@[<2>:trail@ %a@])@])"
+      "(@[th-lambda.final-check@ :classes (@[%a@])@ (@[<hv2>:trail@ %a@])@])"
       (fun k->k (Util.pp_seq (Fmt.Dump.list N.pp))
           (CC.all_classes (SI.cc si)
            |> Iter.map (fun n-> N.iter_class n |> Iter.to_rev_list))
