@@ -217,6 +217,7 @@ module Form : sig
   val close_forall : ?loc:location -> t -> t
 
   val box_opaque : t -> t
+  val is_var : view -> bool
 end
 
 (** {2 Utils} *)

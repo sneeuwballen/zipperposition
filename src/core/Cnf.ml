@@ -563,13 +563,13 @@ let skolemize ~ctx f =
     | F.Exists (var,f') ->
       (* replace [v] by a fresh skolem term *)
       let t = Skolem.skolem_form ~ctx subst var f in
-      Util.debugf 2 ~section "@[<2>bind `%a` to@ `@[%a@]`@ :subst {%a}@]"
+      Util.debugf 10 ~section "@[<2>bind `%a` to@ `@[%a@]`@ :subst {%a}@]"
         (fun k->k Var.pp_fullc var T.pp t T.Subst.pp subst);
       let subst = Var.Subst.add subst var t in
       skolemize subst f'
     | F.Forall (var,f') ->
       let var' = Var.copy var in
-      Util.debugf 5 ~section "@[<2>rename `%a` to@ `%a`@ :subst {%a}@]"
+      Util.debugf 10 ~section "@[<2>rename `%a` to@ `%a`@ :subst {%a}@]"
         (fun k->k Var.pp_fullc var Var.pp_fullc var' T.Subst.pp subst);
       let subst = Var.Subst.add subst var (T.var var') in
       skolemize subst f'
@@ -658,7 +658,9 @@ let estimate_num_clauses ~pos f =
   n
 
 (* atomic formula, or forall/exists/not an atomic formula (1 literal) *)
-let rec will_yield_lit f = match F.view f with
+let rec will_yield_lit f = 
+  let v = F.view f in
+  match v with
   | F.Not f'
   | F.Exists (_, f')
   | F.Forall (_, f') -> will_yield_lit f'
@@ -669,9 +671,9 @@ let rec will_yield_lit f = match F.view f with
   | F.False -> true
   | F.And _
   | F.Or _
-  | F.Imply _
-  | F.Equiv _
-  | F.Xor _ -> false
+  | F.Imply _ -> false 
+  | F.Equiv(a,b)
+  | F.Xor(a,b) -> F.is_var (F.view a) || F.is_var (F.view b) 
 
 (* introduce definitions for sub-formulas of [f], is needed. This might
    modify [ctx] by adding definitions to it, and it will {!NOT} introduce
@@ -693,7 +695,7 @@ let introduce_defs ~ctx ~is_pos stmt f =
         f
     in
     let p = def.Skolem.proxy in
-    Util.debugf ~section 4
+    Util.debugf ~section 2
       "@[<2>introduce@ def. @[%a@]@ for subformula `@[%a@]`@ with pol %a@]"
       (fun k->k T.pp p T.pp f Skolem.pp_polarity polarity);
     p
@@ -720,7 +722,7 @@ let introduce_defs ~ctx ~is_pos stmt f =
     let should_rename = E.geq_or_big c1 c2 in
     if not (will_yield_lit f) && should_rename then (
       let f' = rename_form ~polarity f in
-      Util.debugf ~section 5 "rename because pol=%a, a=%a, b=%a, c1=%a, c2=%a"
+      Util.debugf ~section 2 "rename because pol=%a, a=%a, b=%a, c1=%a, c2=%a"
         (fun k->k Skolem.pp_polarity polarity E.pp a E.pp b E.pp c1 E.pp c2);
       f'
     ) else f
@@ -945,7 +947,7 @@ let flatten ~ctx ~should_define seq : _ Iter.t =
            [Stmt.goal ~attrs ~proof:(proof ()) (F.and_ (flatten_axiom stmt f))]
          | Stmt.NegatedGoal _ -> assert false
        in
-       Util.debugf ~section 5 "@[<2>flatten `@[%a@]`@ into `@[%a@]`@]"
+       Util.debugf ~section 2 "@[<2>flatten `@[%a@]`@ into `@[%a@]`@]"
          (fun k->k pp_stmt stmt (Util.pp_list pp_stmt) new_sts);
        begin match pop_new_defs ~ctx with
          | [] -> new_sts
@@ -962,7 +964,7 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
   Util.enter_prof prof_simplify_rename;
   (* process a formula *)
   let process_form ~is_goal stmt f =
-    Util.debugf ~section 4 "@[<2>simplify and rename@ `@[%a@]`@]" (fun k->k T.pp f);
+    Util.debugf ~section 2 "@[<2>simplify and rename@ `@[%a@]`@]" (fun k->k T.pp f);
     (* preprocessing *)
     let f = List.fold_left (|>) f preprocess in
     (* introduce definitions? *)
@@ -1032,7 +1034,7 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
                       List.map (process_def stmt) d.Stmt.def_rules
                     in
                     let new_d = { d with Stmt.def_rules=rules } in
-                    Util.debugf ~section 5
+                    Util.debugf ~section 2
                       "(@[simplify-def@ `@[%a@]`@ :into `@[%a@]`@])"
                       (fun k->
                          let pp_st = Stmt.pp_def T.pp T.pp T.pp in
@@ -1110,7 +1112,7 @@ let cnf_of_seq ~ctx ?(opts=[])  seq =
   let res = CCVector.create () in
   (* convert formula into CNF, returning a list of clauses and a list of skolems *)
   let conv_form_sk f : (ID.t * type_) list * clause list =
-    Util.debugf ~section 4 "@[<2>reduce@ `@[%a@]`@ to CNF@]" (fun k->k T.pp f);
+    Util.debugf ~section 2 "@[<2>reduce@ `@[%a@]`@ to CNF@]" (fun k->k T.pp f);
     let clauses =
       try as_cnf f
       with NotCNF _ | SLiteral.NotALit _ ->
@@ -1127,7 +1129,7 @@ let cnf_of_seq ~ctx ?(opts=[])  seq =
         let f = List.fold_left (|>) f post_skolem in
         Util.debugf ~section 4 "@[<2>... skolemized:@ `@[%a@]`@]" (fun k->k T.pp f);
         let clauses = to_cnf f in
-        Util.debugf ~section 4 "@[<2>... CNF:@ `@[%a@]`@]"
+        Util.debugf ~section 2 "@[<2>... CNF:@ `@[%a@]`@]"
           (fun k->k (Util.pp_list ~sep:", " pp_clause) clauses);
         clauses
     in
@@ -1287,7 +1289,7 @@ let convert seq =
       Stmt.Def_form { vars;lhs;rhs;polarity;as_form}
   in
   let conv_statement st =
-    Util.debugf ~section 5
+    Util.debugf ~section 3
       "@[<2>@{<yellow>convert@}@ `@[%a@]`@]" (fun k->k pp_c_statement st);
     let attrs = Stmt.attrs st in
     let proof = Stmt.proof_step st in

@@ -886,6 +886,10 @@ module Form = struct
         (free_vars f)
     in
     forall_l ?loc tyvars (forall_l ?loc vars f)
+
+  let is_var = function 
+  | Atom x -> is_var x
+  | _ -> false
 end
 
 let _l_counter = ref 0
