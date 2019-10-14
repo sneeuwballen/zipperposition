@@ -307,7 +307,7 @@ let oracle ~counter ~scope ~subst (s,_) (t,_) (flag:I.t) =
             |> OSeq.to_list)
           else [Some (elim_trivial ~counter ~scope x, flag)] in
         List.map (CCOpt.map (fun (s,f) -> (s, clear_ident_last f))) res
-    | `Flex _, `Flex _s ->
+    | `Flex _, `Flex _ ->
         (* all rules  *)
         let ident = 
           if get_op flag Ident < !Params.max_identifications then (
