@@ -674,11 +674,11 @@ let rec will_yield_lit f =
   | F.Imply _ -> false 
   | F.Equiv(a,b)
   | F.Xor(a,b) -> 
-    let is_atom_or_tf f =
+    let is_tf f =
       match F.view f with
-      | F.Atom _ | F.True | F.False -> true
+      | F.True | F.False -> true
       | _ -> false in
-    is_atom_or_tf a && is_atom_or_tf b
+    is_tf a && is_tf b
     
 
 (* introduce definitions for sub-formulas of [f], is needed. This might
