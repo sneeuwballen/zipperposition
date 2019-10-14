@@ -1096,18 +1096,22 @@ module Conv = struct
         fun_ ty_arg body
       | PT.Bind(b, v, body) when Binder.equal b Binder.Forall 
                                  || Binder.equal b Binder.Exists ->
-        let b = if Binder.equal b Binder.Forall 
-                then Builtin.ForallConst else Builtin.ExistsConst in
-        let ty_arg = Type.Conv.of_simple_term_exn ctx (Var.ty v) in
-        let previous = PT.Var_tbl.find_opt tbl v in
-        PT.Var_tbl.replace tbl v (!depth,ty_arg);
-        incr depth;
-        let ty_b = Type.Conv.of_simple_term_exn ctx (PT.ty_exn body) in
-        let body = fun_ ty_arg (aux body) in
-        decr depth;
-        if CCOpt.is_some previous then PT.Var_tbl.replace tbl v (CCOpt.get_exn previous)
-        else PT.Var_tbl.remove tbl v;
-        app_builtin ~ty:ty_b b [body]
+        if TypedSTerm.Ty.is_tType (Var.ty v) then (
+          (* we are ignoring the types, since the conversion will take care of itself *)
+          aux body
+        ) else (
+          let b = if Binder.equal b Binder.Forall 
+                  then Builtin.ForallConst else Builtin.ExistsConst in
+          let ty_arg = Type.Conv.of_simple_term_exn ctx (Var.ty v) in
+          let previous = PT.Var_tbl.find_opt tbl v in
+          PT.Var_tbl.replace tbl v (!depth,ty_arg);
+          incr depth;
+          let ty_b = Type.Conv.of_simple_term_exn ctx (PT.ty_exn body) in
+          let body = fun_ ty_arg (aux body) in
+          decr depth;
+          if CCOpt.is_some previous then PT.Var_tbl.replace tbl v (CCOpt.get_exn previous)
+          else PT.Var_tbl.remove tbl v;
+          app_builtin ~ty:ty_b b [body])
       | PT.Meta _
       | PT.Record _
       | PT.Ite _
@@ -1173,15 +1177,6 @@ module Conv = struct
           let res = 
             ST.app_builtin ~ty:(aux_ty (ty t))
               b (List.map (aux_t env) l) in
-          (* begin match ST.view res with 
-          | ST.AppBuiltin(b', l') ->
-            assert(Builtin.equal b' Builtin.Equiv || Builtin.equal b' Builtin.Eq ||
-                   Builtin.equal b' Builtin.Xor || Builtin.equal b' Builtin.Neq ||
-                   Builtin.equal b b');
-            assert(Builtin.equal b' Builtin.Equiv || Builtin.equal b' Builtin.Eq ||
-                   Builtin.equal b' Builtin.Xor || Builtin.equal b' Builtin.Neq ||
-                   List.length l = List.length l');
-          | _ -> assert false end; *)
           res
         | Fun (ty_arg, body) ->
           let v = Var.makef ~ty:(aux_ty ty_arg) "v_%d" (CCRef.incr_then_get n) in
