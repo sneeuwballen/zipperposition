@@ -673,7 +673,13 @@ let rec will_yield_lit f =
   | F.Or _
   | F.Imply _ -> false 
   | F.Equiv(a,b)
-  | F.Xor(a,b) -> F.is_var (F.view a) || F.is_var (F.view b) 
+  | F.Xor(a,b) -> 
+    let is_atom_or_tf f =
+      match F.view f with
+      | F.Atom _ | F.True | F.False -> true
+      | _ -> false in
+    is_atom_or_tf a && is_atom_or_tf b
+    
 
 (* introduce definitions for sub-formulas of [f], is needed. This might
    modify [ctx] by adding definitions to it, and it will {!NOT} introduce
