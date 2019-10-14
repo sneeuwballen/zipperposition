@@ -37,38 +37,32 @@ let expand_otf_ body =
 
 (* compute a feature for a given position *)
 let rec gfpf ?(depth=0) pos t =
-  let depth_inc = List.length (Type.expected_args (Term.ty t)) in
+  let t_ty = Term.ty t in
+  let exp_args_num = List.length (Type.expected_args t_ty) in
   let _, body =  T.open_fun t in
   match pos with 
   | [] -> 
     let body = expand_otf_ body in
-    gfpf_root ~depth:(depth + depth_inc) body
+    gfpf_root ~depth:(depth + exp_args_num) body
   | i::is ->
       let hd, args = T.as_app body in
       let args = List.filter (fun x -> not @@ T.is_type x) args in
-      (* TODO: not ready for polymorphism *)
-      (* let args = List.filter (fun t -> not (Term.is_type t)) args in *)
-      let exp_args = Type.expected_args (Term.ty hd) in
-      if T.is_var hd then B
+      (*                 if we are sampling something of variable type, it might eta-expand *)
+      if T.is_var hd || (Type.is_var (snd (Type.open_fun (Term.ty body)))) then B
       else (
         let num_acutal_args = List.length args in
-        (* formulas can potentially support variable number of arguments *)
-        let num_exp_args = 
-          if T.is_formula body then num_acutal_args else List.length exp_args in
+        let extra_args,_ = Type.open_fun (T.ty body) in  (* arguments for eta-expansion *)
 
-        let idx = i-1 in (* zero-based i *)
         if num_acutal_args >= i then (
-          let arg = T.DB.shift (num_exp_args - num_acutal_args) (List.nth args idx) in
-          gfpf ~depth:(depth + depth_inc) is arg
+          let arg = T.DB.shift (List.length extra_args) (List.nth args (i-1)) in
+          gfpf ~depth:(depth + exp_args_num) is arg
         ) 
-        else if num_exp_args >= i then (
-          let arg = T.bvar (num_exp_args - i) ~ty:(List.nth exp_args idx) in
-          gfpf ~depth:(depth + depth_inc) is arg
-        ) else (
-          (* eta-expanding on the fly *)
-          let _, ret = Type.open_fun (Term.ty body) in
-          if (Type.is_var ret) then B else N
-        ) 
+        else if num_acutal_args + (List.length extra_args) >= i then (
+          let exp_arg_idx = i - num_acutal_args in
+          let db_ty = List.nth extra_args (exp_arg_idx-1) in
+          let arg = T.bvar (List.length extra_args - exp_arg_idx) ~ty:db_ty in
+          gfpf ~depth:(depth + exp_args_num) is arg) 
+        else N
       )
 and gfpf_root ~depth t =
   match T.view t with 

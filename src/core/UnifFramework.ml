@@ -37,8 +37,9 @@ module Make (P : PARAMETERS) = struct
     if T.equal tt t' then t
     else T.fun_l pref t'
   
-  (* apply a substitution and reduce to whnf *)
-  let nfapply s u = Lambda.whnf (S.FO.apply S.Renaming.none s u)
+  (* apply a substitution, possibly eta-expand because
+     a type substitution might introduce a need for expansion and reduce to whnf *)
+  let nfapply s u = Lambda.whnf @@ Lambda.eta_expand @@ S.FO.apply S.Renaming.none s u
 
   let normalize ~mono = if mono then nfapply_mono else nfapply
 
@@ -129,7 +130,8 @@ module Make (P : PARAMETERS) = struct
               if i = j then decompose_and_cont args_lhs args_rhs rest flag subst
               else OSeq.empty
             | T.Const f, T.Const g ->
-              if ID.equal f g then decompose_and_cont args_lhs args_rhs rest flag subst
+              if ID.equal f g && List.length args_lhs = List.length args_rhs 
+              then decompose_and_cont args_lhs args_rhs rest flag subst
               else OSeq.empty
             | T.AppBuiltin(b1, args1), T.AppBuiltin(b2, args2) ->
               let args_lhs = args_lhs @ args1 and args_rhs = args_rhs @ args2 in
