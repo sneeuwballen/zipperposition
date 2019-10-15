@@ -103,7 +103,7 @@ let proj_lr ~counter ~scope ~subst s t flag =
   let hd_s, args_s = CCPair.map1 T.as_var_exn (T.as_app s) in
   let argss_arr = CCArray.of_list args_s in
   let hd_t,_ = T.as_app (snd (T.open_fun t)) in
-  let pref_tys, var_ret_ty = Type.open_fun (HVar.ty hd_s) in
+  let pref_tys, hd_ret_ty = Type.open_fun (HVar.ty hd_s) in
   pref_tys
   |> List.mapi (fun i ty -> i, ty)
   |> (fun l ->
@@ -123,7 +123,7 @@ let proj_lr ~counter ~scope ~subst s t flag =
   )
   |> CCList.filter_map(fun (i, ty) ->
       let _, arg_ret_ty = Type.open_fun ty in
-      match unif_types ~subst ~scope arg_ret_ty var_ret_ty with
+      match unif_types ~subst ~scope arg_ret_ty hd_ret_ty with
       | Some subst' ->
         (* we project only to arguments of appropriate type *)
         let pr_bind = project_hs_one ~counter pref_tys i ty in
