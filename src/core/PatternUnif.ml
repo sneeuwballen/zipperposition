@@ -331,8 +331,10 @@ and flex_same ~counter ~scope ~subst var args_s args_t =
   let bvar_s, bvar_t = get_bvars args_s, get_bvars args_t in
   if CCOpt.is_none bvar_s || CCOpt.is_none bvar_t then
     raise NotInFragment;
+
   
   let bvar_s, bvar_t = CCOpt.get_exn bvar_s, CCOpt.get_exn bvar_t in
+  assert(CCArray.length bvar_s = CCArray.length bvar_t);
   let v = Term.as_var_exn var in
   let ret_ty = Type.apply_unsafe (Term.ty var) 
     ((List.map (fun t -> 
@@ -341,8 +343,10 @@ and flex_same ~counter ~scope ~subst var args_s args_t =
     CCList.filter_map (fun x->x)
     (CCArray.mapi (fun _ si ->
       let i,s = si in
-      let bi,bv = CCArray.get bvar_t i in
-      if i=bi && T.equal s bv then Some s else None) bvar_s
+      if i < CCArray.length bvar_t then (
+        let bi,bv = CCArray.get bvar_t i in
+        if i=bi && T.equal s bv then Some s else None)
+      else None) bvar_s
      |> CCArray.to_list) in
   let v_ty = Type.arrow (List.map T.ty bvars) ret_ty in
   let matrix = Term.app (Term.var (H.fresh_cnt ~counter ~ty:v_ty ())) bvars in
