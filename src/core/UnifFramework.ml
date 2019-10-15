@@ -178,8 +178,11 @@ module Make (P : PARAMETERS) = struct
                     match sub_flag_opt with 
                     | None -> OSeq.return None
                     | Some (sub', flag') ->
-                      let subst = Subst.merge subst sub' in
-                      aux ~depth:(depth+1) subst ((lhs,rhs,flag')::rest)) all_oracles
+                      try 
+                        let subst' = Subst.merge subst sub' in
+                        aux ~depth:(depth+1) subst' ((lhs,rhs,flag')::rest)
+                      with Subst.InconsistentBinding _ ->
+                       OSeq.return None) all_oracles
                   |> OSeq.merge in
 
                   OSeq.interleave args_unif oracle_unifs

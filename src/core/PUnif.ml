@@ -94,11 +94,6 @@ let imitate_one ~scope ~counter  s t =
     OSeq.nth 0 (JP_unif.imitate_onesided ~scope ~counter s t)
   with Not_found ->  invalid_arg "no_imits"
 
-let unif_types ~subst ~scope t s = 
-  try 
-    Some (Unif.FO.unify_syn ~subst (T.of_ty t, scope) (T.of_ty s, scope))
-  with Unif.Fail -> None
-
 let proj_lr ~counter ~scope ~subst s t flag = 
   let hd_s, args_s = CCPair.map1 T.as_var_exn (T.as_app s) in
   let argss_arr = CCArray.of_list args_s in
@@ -123,9 +118,11 @@ let proj_lr ~counter ~scope ~subst s t flag =
   )
   |> CCList.filter_map(fun (i, ty) ->
       let _, arg_ret_ty = Type.open_fun ty in
-      match unif_types ~subst ~scope arg_ret_ty var_ret_ty with
+      match PatternUnif.unif_simple ~subst ~scope 
+                  (T.of_ty arg_ret_ty) (T.of_ty var_ret_ty) with
       | Some subst' ->
         (* we project only to arguments of appropriate type *)
+        let subst' = Unif_subst.subst subst' in
         let pr_bind = project_hs_one ~counter pref_tys i ty in
         let max_num_of_apps = 
           List.length @@ Type.expected_args ty in

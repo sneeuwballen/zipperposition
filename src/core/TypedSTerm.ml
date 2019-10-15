@@ -857,15 +857,19 @@ module Form = struct
       in
       flatten_ k acc l'
 
-  let and_ ?loc = function
+  let and_ ?loc l  =
+    let flattened = flatten_ `And [] l in
+    match flattened with
     | [] -> true_
-    | [t] -> t
-    | l -> app_builtin ?loc ~ty:Ty.prop Builtin.And (flatten_ `And [] l)
+    | [t] -> t 
+    | _ ->  app_builtin ?loc ~ty:Ty.prop Builtin.And (flattened)
 
-  let or_ ?loc = function
+  let or_ ?loc l = 
+    let flattened = flatten_ `Or [] l in
+    match flattened with
     | [] -> false_
-    | [t] -> t
-    | l -> app_builtin ?loc ~ty:Ty.prop Builtin.Or (flatten_ `Or [] l)
+    | [t] -> t 
+    | _ ->  app_builtin ?loc ~ty:Ty.prop Builtin.Or (flattened)
 
   let not_ ?loc f = app_builtin ?loc ~ty:Ty.prop Builtin.Not [f]
 
