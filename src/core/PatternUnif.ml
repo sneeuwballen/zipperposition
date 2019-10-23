@@ -386,7 +386,7 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
       )
     ) 
   in
-  (* let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply res t0_s in 
+  let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply res t0_s in 
   let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply res t1_s in
-  assert ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r))); *)
+  assert ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r)));
   res
