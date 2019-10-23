@@ -17,8 +17,8 @@ exception DontKnow = PatternUnif.NotInFragment
 let norm_deref = PatternUnif.norm_deref
 
 (* If there is a nonunifiable rigid path raises NotUnifiable
-   If the variable occurs on a flex path or unifiable rigid path raises
-   NotInFragment Otherwise, returns true *)
+   If the variable occurs on a flex path or unifiable rigid path returns false
+   Otherwise, variable does not occur and it returns true *)
 let path_check ~subst ~scope var t =
   let pref, body = T.open_fun t in
   let no_prefix = CCList.is_empty pref in
@@ -34,7 +34,9 @@ let path_check ~subst ~scope var t =
         if under_var || not no_prefix then false
         else raise NotUnif)
       else aux_l ~under_var:true args
-    | T.App(hd,args) -> aux_l ~under_var args
+    | T.App(hd,args) -> 
+      assert(not (T.is_fun hd));
+      aux_l ~under_var args
     | T.AppBuiltin(b, args) -> aux_l ~under_var args
     | T.Var _ ->
       assert(not (US.FO.mem subst (T.as_var_exn t,scope)));
@@ -42,11 +44,9 @@ let path_check ~subst ~scope var t =
         (if under_var then false else raise NotUnif)
       else true
     | _ -> true 
-  and aux_l ~under_var = function 
-    | [] -> true
-    | x :: xs -> 
-      (* not short-circuting since we have to inspect all possible rigid paths *)
-      aux_l ~under_var xs && aux ~under_var x in
+  and aux_l ~under_var args = 
+    (* no short circuting since  *)
+    List.fold_left (fun res arg -> aux ~under_var arg && res) true args in
   
   aux ~under_var:false t
 

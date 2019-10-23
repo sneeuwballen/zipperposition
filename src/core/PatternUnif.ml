@@ -40,21 +40,16 @@ let eta_expand_otf ~subst ~scope pref1 pref2 t1 t2 =
     assert(List.length remaining != 0);
     let num_vars = List.length remaining in
     let vars = List.mapi (fun i ty -> 
-      let ty = S.apply_ty subst (ty,scope) in
+      let ty = Subst.Ty.apply Subst.Renaming.none (US.subst subst) (ty,scope) in
       T.bvar ~ty (num_vars-1-i)) remaining in
     let shifted = T.DB.shift num_vars t in
     T.app shifted vars in
-  
+
   if List.length pref1 = List.length pref2 then (t1, t2, pref1)
   else (
     let n1, n2 = List.length pref1, List.length pref2 in 
-    if n1 < n2 then (
-      (do_exp_otf n1 pref2 t1,t2,pref2)
-    ) else (
-      assert(n1 > n2);
-      (t1,do_exp_otf n2 pref1 t2,pref1)
-    )
-  )
+    if n1 < n2 then (do_exp_otf n1 pref2 t1,t2,pref2)
+    else (t1,do_exp_otf n2 pref1 t2,pref1))
 
 let cmp (i, _) (j, _) = compare i j
 

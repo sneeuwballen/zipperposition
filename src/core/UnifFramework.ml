@@ -121,7 +121,7 @@ module Make (P : PARAMETERS) = struct
               try 
                 let mgu = CCList.find_map (fun alg ->  
                   try
-                    Some (alg (body_lhs, unifscope) (body_rhs, unifscope) subst)
+                    Some (alg (lhs, unifscope) (rhs, unifscope) subst)
                   with 
                     | P.NotInFragment -> None
                     | P.NotUnifiable -> raise Unif.Fail

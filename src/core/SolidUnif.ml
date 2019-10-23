@@ -24,27 +24,22 @@ exception CoveringImpossible
 exception NotInFragment = PU.NotInFragment
 exception NotUnifiable = PU.NotUnifiable
 
-let eta_expand_otf ~subst ~scope pref1 pref2 t1 t2 =
-  let do_exp_otf n types t = 
-    let remaining = CCList.drop n types in
-    assert(List.length remaining != 0);
-    let num_vars = List.length remaining in
-    let vars = List.mapi (fun i ty -> 
-      let ty = US_A.apply_ty subst (ty,scope) in
-      T.bvar ~ty (num_vars-1-i)) remaining in
-    let shifted = T.DB.shift num_vars t in
-    (* T.app_w_ty shifted vars ~ty:(S.apply_ty subst (T.ty shifted, scope)) in  *)
-    T.app shifted vars in
-  if List.length pref1 = List.length pref2 then (t1, t2, pref1)
-  else (
-    let n1, n2 = List.length pref1, List.length pref2 in 
-    if n1 < n2 then (
-      (do_exp_otf n1 pref2 t1,t2,pref2)
-    ) else (
-      assert(n1 > n2);
-      (t1,do_exp_otf n2 pref1 t2,pref1)
-    )
-  )
+  let eta_expand_otf ~subst ~scope pref1 pref2 t1 t2 =
+    let do_exp_otf n types t = 
+      let remaining = CCList.drop n types in
+      assert(List.length remaining != 0);
+      let num_vars = List.length remaining in
+      let vars = List.mapi (fun i ty -> 
+        let ty = S.Ty.apply S.Renaming.none subst (ty,scope) in
+        T.bvar ~ty (num_vars-1-i)) remaining in
+      let shifted = T.DB.shift num_vars t in
+      T.app shifted vars in
+
+    if List.length pref1 = List.length pref2 then (t1, t2, pref1)
+    else (
+      let n1, n2 = List.length pref1, List.length pref2 in 
+      if n1 < n2 then (do_exp_otf n1 pref2 t1,t2,pref2)
+      else (t1,do_exp_otf n2 pref1 t2,pref1))
 
 let solidify ?(limit=true) ?(exception_on_error=true) t =
   let rec aux t =
@@ -215,7 +210,7 @@ let solve_flex_flex_diff ~subst ~counter ~scope lhs rhs =
   let rhs = solidify @@ Lambda.whnf @@ Subst.FO.apply Subst.Renaming.none subst (rhs,scope) in
   assert(Type.equal (Term.ty lhs) (Term.ty rhs));
   let pref_lhs, lhs = T.open_fun lhs and  pref_rhs, rhs = T.open_fun rhs in
-  let lhs,rhs,_ = eta_expand_otf ~subst:(US.of_subst subst) ~scope pref_lhs pref_rhs lhs rhs in
+  let lhs,rhs,_ = eta_expand_otf ~subst ~scope pref_lhs pref_rhs lhs rhs in
 
   let hd_l, args_l, n_l = 
     T.as_var_exn @@ T.head_term lhs, T.args lhs, List.length @@ T.args lhs in
@@ -267,7 +262,7 @@ let solve_flex_flex_same ~subst ~counter ~scope lhs rhs =
   let rhs = solidify @@ Lambda.whnf @@ Subst.FO.apply Subst.Renaming.none subst (rhs,scope) in
   assert(Type.equal (Term.ty lhs) (Term.ty rhs));
   let pref_lhs, lhs = T.open_fun lhs and  pref_rhs, rhs = T.open_fun rhs in
-  let lhs,rhs,_ = eta_expand_otf ~subst:(US.of_subst subst) ~scope pref_lhs pref_rhs lhs rhs in
+  let lhs,rhs,_ = eta_expand_otf ~subst ~scope pref_lhs pref_rhs lhs rhs in
 
   let hd_l, args_l, n_l = 
     T.as_var_exn @@ T.head_term lhs, T.args lhs, List.length @@ T.args lhs in
@@ -411,7 +406,7 @@ let rec unify ~scope ~counter ~subst constraints =
     if not (Term.equal s' t') then (
       let pref_s, body_s = T.open_fun s' in
       let pref_t, body_t = T.open_fun t' in 
-      let body_s', body_t', _ = eta_expand_otf ~subst ~scope pref_s pref_t body_s body_t in
+      let body_s', body_t', _ = eta_expand_otf ~subst:(US.subst subst) ~scope pref_s pref_t body_s body_t in
       let hd_s, args_s = T.as_app body_s' in
       let hd_t, args_t = T.as_app body_t' in
       (* let hd_s, hd_t = CCPair.map_same (fun t -> cast_var t subst scope) (hd_s, hd_t) in                                        *)
