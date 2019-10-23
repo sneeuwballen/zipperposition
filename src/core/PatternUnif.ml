@@ -225,9 +225,6 @@ let rec unify ~scope ~counter ~subst = function
   | (s,t) :: rest -> ( 
     (* let ty_unif = unif_simple ~subst:(US.subst subst) ~scope 
                   (T.of_ty (T.ty s)) (T.of_ty (T.ty t)) in *)
-(*  i
-    if CCOpt.is_none ty_unif then
-      raise NotUnifiable; *)
     
     if not @@ Type.is_ground (T.ty s) || not @@ Type.is_ground (T.ty t) then (
       raise NotInFragment

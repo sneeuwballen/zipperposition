@@ -801,6 +801,10 @@ module Form = struct
   let () = add_hook pp_hook
 
   let not_ t: t =
+    if (not (Type.is_prop (ty t))) then (
+      CCFormat.printf "t:@[%a@]@." T.pp t;
+      CCFormat.printf "ty:@[%a@]@." Type.pp (ty t);
+    );
     assert (Type.is_prop (ty t));
     match view t with
       | AppBuiltin (Builtin.Not, [u]) -> u
@@ -1120,6 +1124,7 @@ module Conv = struct
       | PT.Multiset _ 
       | _ -> raise (Type.Conv.Error t)
     in
+    (* CCFormat.printf "converting:@[%a@]@." TypedSTerm.pp t; *)
     aux t
 
   let of_simple_term ctx t =
