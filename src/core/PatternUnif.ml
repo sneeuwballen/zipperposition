@@ -120,6 +120,13 @@ let rec norm_deref subst (t,sc) =
   variables). The target term can be any term.  
    *)
 let rec build_term ?(depth=0) ~all_args ~subst ~scope ~counter var bvar_map t =
+  let rec args_same ls1 ls2  = 
+    match ls1, ls2 with
+    | ((Some x)::xs), (y::ys) ->
+      T.equal x y && args_same xs ys
+    | [], [] -> true
+    | _ -> false in
+
   let t = norm t in
   match T.view t with
   | T.Var _ ->
@@ -172,7 +179,10 @@ let rec build_term ?(depth=0) ~all_args ~subst ~scope ~counter var bvar_map t =
             let res_term = T.app new_hd (CCList.filter_map (fun x->x) new_args) in
             res_term, subst
           )
-          else (t,subst)
+          else (
+            if args_same new_args args then (t,subst)
+            else T.app hd (CCList.filter_map CCFun.id new_args), subst
+          )
         )
         else (
           let hd',_ =  US.FO.deref subst (hd, scope) in
@@ -388,5 +398,10 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
   in
   let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply res t0_s in 
   let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply res t1_s in
-  assert ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r)));
+  if not ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r))) then (
+    CCFormat.printf "orig:@[%a@]=?=@[%a@]@." (Scoped.pp T.pp) t0_s (Scoped.pp T.pp) t1_s;
+    CCFormat.printf "before:@[%a@]@." US.pp subst;
+    CCFormat.printf "after:@[%a@]@." US.pp res;
+    assert(false);
+  );
   res
