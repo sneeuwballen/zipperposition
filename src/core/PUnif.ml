@@ -8,6 +8,7 @@ module I = Int32
 module IntSet = CCSet.Make(CCInt)
 
 let elim_vars = ref IntSet.empty
+let ident_vars = ref IntSet.empty
 
 
 type op =
@@ -43,15 +44,6 @@ let inc_op flag op =
   let res = (flag &&& (~~~ mask)) ||| op_val in
   assert( old + 1 = (get_op res op));
   res
-
-let is_ident_last flag = 
-  I.to_int ((I.one <<< 30) &&& flag) != 0
-
-let set_ident_last flag = 
-  (I.one <<< 30) ||| flag
-
-let clear_ident_last flag =
-  (~~~ (I.one <<< 30)) &&& flag
 
 let pp_flag out flag =
   List.iter (fun (op, (_,_,name)) ->
@@ -197,18 +189,21 @@ let elim_subsets_rule  ?(max_elims=None) ~elim_vars ~counter ~scope t u (depth) 
       let subs_term = T.fun_l pref_tys matrix in
       assert(T.DB.is_closed subs_term);
       (Subst.FO.bind' Subst.empty (hd_var, scope) (subs_term, scope),
-            (depth+(diff_args_num-k),false))))
+            (depth+(diff_args_num-k)))))
 
 let subset_elimination ~max_elims ~counter ~scope t u =
   elim_subsets_rule ~elim_vars ~max_elims ~counter ~scope t u 0
   |> OSeq.map (fun sub_flag -> 
-      fst sub_flag, fst (snd sub_flag))
+      fst sub_flag, (snd sub_flag))
 
 (*Create all possible projection and imitation bindings. *)
 let proj_imit_lr ?(disable_imit=false) ~counter ~scope ~subst s t flag =
   try
     let proj_bindings = 
-      if is_ident_last flag then []
+      let is_ident_last = 
+        let hd_var_id = HVar.id (T.as_var_exn (T.head_term s)) in
+        IntSet.mem hd_var_id !ident_vars in
+      if is_ident_last then []
       else proj_lr ~counter ~scope ~subst s t flag in
     let imit_binding =
       try
@@ -289,8 +284,6 @@ let get_depth flag =
   List.fold_left (fun acc o -> get_op flag o + acc ) 0 ops
 
 let oracle ~counter ~scope ~subst (s,_) (t,_) (flag:I.t) =
-  (* CCFormat.printf "subst:@[%a@]@." S.pp subst; *)
-  (* CCFormat.printf "(@[%a@],@[%a@]):@[%a@]:%d:%b@." T.pp s T.pp t pp_flag flag (get_depth flag) (is_ident_last flag);  *)
   let res = 
     if get_depth flag < !Params.max_depth then (
       match head_classifier s, head_classifier t with
@@ -306,20 +299,28 @@ let oracle ~counter ~scope ~subst (s,_) (t,_) (flag:I.t) =
                 Some (sub, flag'))
             |> OSeq.to_list)
           else [Some (elim_trivial ~counter ~scope x, flag)] in
-        List.map (CCOpt.map (fun (s,f) -> (s, clear_ident_last f))) res
+        List.map (CCOpt.map (fun (s,f) -> (s, f))) res
     | `Flex _, `Flex _ ->
         (* all rules  *)
         let ident = 
           if get_op flag Ident < !Params.max_identifications then (
             JP_unif.identify ~scope ~counter s t []
-            |> OSeq.map (fun x -> Some (U.subst x, set_ident_last @@ inc_op flag Ident)))
+            |> OSeq.map (fun x -> 
+                      let subst = U.subst x  in
+                      (* variable introduced by identification *)
+                      let subs_t = T.of_term_unsafe @@ fst (snd (List.hd (Subst.to_list subst))) in
+                      let new_var, _ = T.as_app (snd (T.open_fun subs_t)) in
+                      let new_var_id = HVar.id (T.as_var_exn new_var) in
+                      (* remembering that we introduced this var in identification *)
+                      ident_vars := IntSet.add new_var_id !ident_vars;
+                Some (subst, inc_op flag Ident)))
             |> OSeq.to_list
           else [] in
         let proj_imits = 
             List.append 
               (proj_imit_lr ~disable_imit:true ~scope ~counter ~subst s t flag)
               (proj_imit_lr ~disable_imit:true ~scope ~counter ~subst t s flag)
-            |> List.map (CCOpt.map (fun (s,f) -> (s, clear_ident_last f))) in
+            |> List.map (CCOpt.map (fun (s,f) -> (s, f))) in
         CCList.interleave 
           ident 
           proj_imits
@@ -328,7 +329,7 @@ let oracle ~counter ~scope ~subst (s,_) (t,_) (flag:I.t) =
         List.append
           (proj_imit_lr ~counter ~scope ~subst s t flag)
           (proj_imit_lr ~counter ~scope ~subst t s flag) 
-        |> List.map (CCOpt.map (fun (s, f) -> (s, clear_ident_last f)))
+        |> List.map (CCOpt.map (fun (s, f) -> (s, f)))
       | _ -> 
         CCFormat.printf "Did not disassemble properly: [%a]\n[%a]@." T.pp s T.pp t;
         assert false)
@@ -357,4 +358,5 @@ let unify_scoped =
   let module PragUnif = UnifFramework.Make(PragUnifParams) in
   (fun x y ->
     elim_vars := IntSet.empty;
+    ident_vars := IntSet.empty;
     OSeq.map (CCOpt.map Unif_subst.of_subst) (PragUnif.unify_scoped x y))

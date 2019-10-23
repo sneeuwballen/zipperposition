@@ -24,17 +24,6 @@ let unif_simple ?(subst=Subst.empty) ~scope t s =
     Some (US.of_subst type_unifier)
   with Unif.Fail -> None
 
-let cast_var v _ _ =
-  (* let ty = Term.ty v in
-  if Type.is_ground ty then v
-  else (
-    match T.view v with
-    | T.Var x -> T.var (HVar.cast x ~ty:(S.apply_ty subst (ty, sc)))
-    | T.DB i  -> T.bvar ~ty:(S.apply_ty subst (ty, sc)) i
-    | _ -> v
-  )  *)
-  v
-
 (* Make new list of constraints, prefering the rigid-rigid pairs *)
 let build_constraints args1 args2 rest =
   let rf, other = 
@@ -54,12 +43,8 @@ let eta_expand_otf ~subst ~scope pref1 pref2 t1 t2 =
       let ty = S.apply_ty subst (ty,scope) in
       T.bvar ~ty (num_vars-1-i)) remaining in
     let shifted = T.DB.shift num_vars t in
-    (* T.app_w_ty shifted vars ~ty:(S.apply_ty subst (T.ty shifted, scope)) in  *)
     T.app shifted vars in
-
-  (* let pref1 = List.map (fun ty -> S.apply_ty subst (ty,scope)) pref1 in *)
-  (* let pref2 = List.map (fun ty -> S.apply_ty subst (ty,scope)) pref2 in *)
-
+  
   if List.length pref1 = List.length pref2 then (t1, t2, pref1)
   else (
     let n1, n2 = List.length pref1, List.length pref2 in 
@@ -140,86 +125,59 @@ let rec norm_deref subst (t,sc) =
   variables). The target term can be any term.  
    *)
 let rec build_term ?(depth=0) ~all_args ~subst ~scope ~counter var bvar_map t =
-  let args_same args new_args = 
-    List.for_all2 (fun s t -> 
-      try 
-        let t = CCOpt.get_exn t in
-        Term.equal s t
-      with Invalid_argument _ -> false
-    ) args new_args in
-
-
   let t = norm t in
   match T.view t with
   | T.Var _ ->
-    let t = cast_var t subst scope in 
     let t' = fst @@ US.FO.deref subst (t,scope) in
     if T.equal t' t then (
-      if T.equal var t then raise (Failure "occurs check")
-      else (cast_var t subst scope, subst)
+      if T.equal var t && all_args then raise (Failure "occurs check")
+      else (t, subst)
     ) 
     else build_term ~all_args ~subst ~scope ~counter ~depth var bvar_map t'  
   | T.Const _ -> (t, subst)
   | T.App (hd, args) ->
       if T.is_var hd then (
-        let old_hd = hd in
-        let hd = cast_var hd subst scope in
         if T.equal hd var && CCList.is_empty args then
             raise (Failure "Occurs check!");
         if T.equal hd var then
             raise NotInFragment;
-        (* If the variable is not yet bound, try to bind to target subterm.
+        (* If the variable is not yet bound, try to bind to
+           proper elimination of the arguments not present in all_args
            If it is bound then dereference and try again. *)
         if not (US.FO.mem subst (Term.as_var_exn hd, scope)) then (
-          let new_args, subst =
-          List.fold_right (fun arg (l, subst) -> (
-            try (
-              let arg', subst = build_term ~all_args ~depth ~subst ~scope ~counter 
-                                            var bvar_map arg in
-              Some arg' :: l, subst)
-            with  Failure _ ->  None :: l, subst)) 
-          args ([], subst) in
-          (* While dealing with arguments of variable, we might have bound it.
-             Think of F (F 0) for example. If we have bound it, then we need
-             to dereference and try again. If we have not then we prune
-             away the arguments that cound not be unified.*)
-          if not (US.FO.mem subst (Term.as_var_exn hd, scope)) then (
-            (* let pref_types = List.map (fun t-> S.apply_ty subst (Term.ty t, scope)) args in *)
-            let pref_types = List.map Term.ty args in
-            let n = List.length pref_types in
-            let ret_type = Type.apply_unsafe (Term.ty hd) 
-              ((List.mapi (fun i x -> match x with 
-                            | Some t -> t
-                            | None   -> cast_var (List.nth args i) subst scope) new_args) :> InnerTerm.t list) in
-            
-            if not all_args && List.exists (fun t_opt -> 
-                match t_opt with
-                | None -> false
-                | Some t -> Type.is_fun (T.ty t) && not (T.is_ground t)
-            ) new_args then 
-              raise NotInFragment;
+          if CCOpt.is_none (get_bvars args) then raise NotInFragment;
 
-            let matrix = 
-              CCList.filter_map (fun x->x) (List.mapi (fun i opt_arg -> 
-                (match opt_arg with
-                | Some arg -> Some (T.bvar ~ty:(Term.ty arg) (n-i-1))
-                | None -> None)) new_args) in
-            if List.length matrix != List.length new_args then (
-              let ty = Type.arrow (List.map Term.ty matrix) ret_type in
-              let new_hd = T.var @@ H.fresh_cnt ~counter ~ty () in
-              let hd_subs = T.fun_l pref_types (T.app new_hd matrix) in
-              let subst = US.FO.bind subst (T.as_var_exn hd, scope) (hd_subs, scope) in
-              let res_term = T.app new_hd (CCList.filter_map (fun x->x) new_args) in
-              res_term, subst)
-            else (
-              if T.equal hd old_hd && args_same args new_args then (t,subst)
-              else T.app hd (CCList.filter_map (fun x->x) new_args), subst)
+          let new_args, subst =
+            List.fold_right (fun arg (l, subst) -> (
+              try (
+                let arg', subst = build_term ~all_args ~depth ~subst ~scope ~counter 
+                                              var bvar_map arg in
+                Some arg' :: l, subst)
+              with  Failure _ ->  None :: l, subst)) 
+            args ([], subst) in
+          
+          let pref_types = List.map Term.ty args in
+          let n = List.length pref_types in
+          let ret_type = Type.apply_unsafe (Term.ty hd) 
+            ((List.mapi (fun i x -> match x with 
+                          | Some t -> t
+                          | None   -> List.nth args i) new_args) :> InnerTerm.t list) in
+
+          let matrix = 
+            CCList.filter_map CCFun.id (List.mapi (fun i opt_arg -> 
+              (match opt_arg with
+              | Some arg -> Some (T.bvar ~ty:(Term.ty arg) (n-i-1))
+              | None -> None)) new_args) in
+          if List.length matrix != List.length args then (
+            (* There are some arguments to remove *)
+            let ty = Type.arrow (List.map Term.ty matrix) ret_type in
+            let new_hd = T.var @@ H.fresh_cnt ~counter ~ty () in
+            let hd_subs = T.fun_l pref_types (T.app new_hd matrix) in
+            let subst = US.FO.bind subst (T.as_var_exn hd, scope) (hd_subs, scope) in
+            let res_term = T.app new_hd (CCList.filter_map (fun x->x) new_args) in
+            res_term, subst
           )
-          else (
-            let hd',_ =  US.FO.deref subst (hd, scope) in
-            let t' = T.app hd' args in
-            build_term ~all_args ~depth ~subst ~scope ~counter var bvar_map t' 
-          )
+          else (t,subst)
         )
         else (
           let hd',_ =  US.FO.deref subst (hd, scope) in
@@ -242,14 +200,13 @@ let rec build_term ?(depth=0) ~all_args ~subst ~scope ~counter var bvar_map t =
     if T.equal b' body (*&& Type.equal new_ty ty*) then t,subst
     else T.fun_ ty  b', subst
   | T.DB i -> 
-    if i < depth then cast_var t subst scope,subst
+    if i < depth then t,subst
     else (
       (* Check which argument of the applied variable a
          given bound variable correspodns to.  *)
       match CCArray.bsearch ~cmp (i-depth, Term.true_) bvar_map with
       | `At idx -> 
         let val_,bvar = CCArray.get bvar_map idx in
-        let bvar = cast_var bvar subst scope in
         assert(val_ = (i-depth));
         T.DB.shift depth bvar, subst
       | _ -> raise (Failure "Bound variable not argument to head")
@@ -262,6 +219,7 @@ let rec build_term ?(depth=0) ~all_args ~subst ~scope ~counter var bvar_map t =
     ) args ([], subst) in
     if List.for_all2 T.equal args new_args then t,subst
     else T.app_builtin ~ty:(Term.ty t) b new_args, subst
+
 let rec unify ~scope ~counter ~subst = function
   | [] -> subst
   | (s,t) :: rest -> ( 
@@ -337,8 +295,7 @@ and flex_same ~counter ~scope ~subst var args_s args_t =
   assert(CCArray.length bvar_s = CCArray.length bvar_t);
   let v = Term.as_var_exn var in
   let ret_ty = Type.apply_unsafe (Term.ty var) 
-    ((List.map (fun t -> 
-        cast_var t subst scope) args_s :> InnerTerm.t list)) in
+    (args_s :> InnerTerm.t list) in
   let bvars = 
     CCList.filter_map (fun x->x)
     (CCArray.mapi (fun _ si ->
@@ -369,28 +326,20 @@ and flex_diff ~pref_l ~counter ~scope ~subst var_s var_t args_s args_t =
   ) else (
       let bvar_s, bvar_t = get_bvars args_s, get_bvars args_t in
       if CCOpt.is_none bvar_s || CCOpt.is_none bvar_t then (
-        let s,t =
-          if CCOpt.is_some bvar_s then  (T.app var_s args_s, T.app var_t args_t)
-          else if CCOpt.is_some bvar_t then (T.app var_t args_t, T.app var_s args_s)
-          else raise NotInFragment in
-        flex_rigid ~pref_l ~subst ~counter ~scope  s t
+        raise NotInFragment
       ) else (
         let bvar_s, bvar_t = CCOpt.get_exn bvar_s, CCOpt.get_exn bvar_t in
         let new_bvars = 
-          CCArray.filter_map (fun x->x) (
-            CCArray.map (fun si -> 
+          CCArray.map (fun si -> 
               match CCArray.bsearch ~cmp (fst si, Term.true_) bvar_t  with
-              | `At idx -> Some (cast_var (snd si) subst scope, 
-                                cast_var (snd @@ CCArray.get bvar_t idx) subst scope)
+              | `At idx -> Some (snd si, snd @@ CCArray.get bvar_t idx)
               | _ -> None
             ) bvar_s
-          ) 
+          |> CCArray.filter_map CCFun.id
           |> CCArray.to_list in
         let arg_types = List.map (fun (b1, _) -> Term.ty b1) new_bvars in
         let ret_ty = 
-          Type.apply_unsafe (Term.ty var_s) 
-            (List.map (fun t -> 
-              cast_var t subst scope) args_s :> InnerTerm.t list) in
+          Type.apply_unsafe (Term.ty var_s) (args_s :> InnerTerm.t list) in
         let new_var_ty = Type.arrow arg_types ret_ty in
         let new_var = Term.var @@ H.fresh_cnt ~counter ~ty:new_var_ty () in
         let matrix_s = Term.app new_var (List.map fst new_bvars) in
@@ -402,8 +351,6 @@ and flex_diff ~pref_l ~counter ~scope ~subst var_s var_t args_s args_t =
         let subst = US.FO.bind subst (v_t, scope) (subs_t, scope) in
         subst)
   )
-
-    
 
 (* Flex-rigid pairs can be solved if variable is applied to a sequence
    of distinct bound variables. IMPORTANT: Such a requirement is NOT
@@ -423,15 +370,13 @@ and flex_rigid ~pref_l ~subst ~counter ~scope flex rigid =
   let all_args = List.length pref_l = Array.length bvars in
   try
     let matrix, subst = 
-      build_term ~all_args ~subst ~scope ~counter (cast_var hd subst scope) bvars rigid in
+      build_term ~all_args ~subst ~scope ~counter hd bvars rigid in
     let new_subs_val = T.fun_l (List.map Term.ty args) matrix in
     US.FO.bind subst (T.as_var_exn hd, scope) (new_subs_val, scope)
   with Failure _ -> raise NotUnifiable
  
   
 let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
-  (* let tptp_pp = T.pp_in Output_format.O_tptp in *)
-  (* let start = Util.total_time_s () in *)
   let res = 
     if US.is_empty subst then (
       let t0',t1',scope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
@@ -449,8 +394,6 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
       )
     ) 
   in
-  (* let finish = Util.total_time_s () in *)
-  (* CCFormat.printf "%g\n" (finish -. start); *)
   (* let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply res t0_s in 
   let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply res t1_s in
   assert ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r))); *)
