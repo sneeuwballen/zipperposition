@@ -10,6 +10,7 @@ let _imit_first = ref false
 
 let pattern_decider = ref true
 let solid_decider = ref false
+let fixpoint_decider = ref false
 
 let solidification_limit = ref 5
 
@@ -26,10 +27,12 @@ let elim_direction = ref HighToLow
 
 
 let all_params_to_max () = 
-  max_depth := 1000;
-  max_app_projections := 1000;
-  max_var_imitations := 1000;
-  max_rigid_imitations := 1000;
-  max_identifications := 1000;
-  max_elims           := 1000;
+  (* intmax does not work because we use high-level bit :(
+     10000 operations is effectively max. *)
+  max_depth := 10000;
+  max_app_projections := 10000;
+  max_var_imitations := 10000;
+  max_rigid_imitations := 10000;
+  max_identifications := 10000;
+  max_elims           := 10000;
   max_inferences := -1

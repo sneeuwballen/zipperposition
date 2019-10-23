@@ -65,7 +65,11 @@ let deciders ~counter () =
     if !PragUnifParams.solid_decider then 
       [(fun s t sub -> (List.map U.subst @@ SolidUnif.unify_scoped ~subst:(U.of_subst sub) ~counter s t))] 
     else [] in
-  pattern @ solid
+  let fixpoint = 
+    if !PragUnifParams.fixpoint_decider then 
+      [(fun s t sub -> [(U.subst @@ FixpointUnif.unify_scoped ~subst:(U.of_subst sub) ~counter s t)])] 
+    else [] in
+  fixpoint @ pattern @ solid
 
 let head_classifier s =
   match T.view @@ T.head_term s with 

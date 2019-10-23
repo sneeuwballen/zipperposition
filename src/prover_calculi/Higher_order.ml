@@ -1408,6 +1408,7 @@ let () =
       "--ho-max-unifs-solid-flex-flex", Arg.Set_int PragUnifParams.max_unifs_solid_ff, " set maximal number of found unifiers for solid flex-flex pairs. -1 stands for finding the MGU";
       "--ho-pattern-decider", Arg.Bool (fun b -> PragUnifParams.pattern_decider := b), "turn pattern decider on or off";
       "--ho-solid-decider", Arg.Bool (fun b -> PragUnifParams.solid_decider := b), "turn solid decider on or off";
+      "--ho-fixpoint-decider", Arg.Bool (fun b -> PragUnifParams.fixpoint_decider := b), "turn fixpoint decider on or off";
       "--ho-max-elims", Arg.Set_int PragUnifParams.max_elims, " set maximal number of eliminations";
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->

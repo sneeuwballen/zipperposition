@@ -70,28 +70,6 @@ module Make (P : PARAMETERS) = struct
 
   let tasks_taken = 100
 
-  (* rigid path check -- has to be rewritten!!! *)
-  let rp_check s t =
-    let rec rp_check_aux var rigid =
-      match T.view rigid with 
-      | T.AppBuiltin(hd, args) ->
-        let args_hds = List.map T.head_term args in
-        if List.exists (T.equal var) args_hds then false
-        else List.for_all (rp_check_aux var) args
-      | T.App(hd, args) when not (T.is_var hd) && not (T.is_fun hd) ->
-        let args_hds = List.map T.head_term args in
-        if List.exists (T.equal var) args_hds then false
-        else List.for_all (rp_check_aux var) args
-      | _ -> true in
-
-    let hd_s = T.head_term s in
-    let hd_t = T.head_term t in
-    if Term.is_var hd_s && not (T.is_var hd_t) then (
-      rp_check_aux hd_s t
-    ) else if Term.is_var hd_t && not (T.is_var hd_s) then (
-      rp_check_aux hd_t s
-    ) else true
-
   let do_unif problem subst mono unifscope =   
     let rec aux ~depth subst problem =
       let decompose args_l args_r rest flag =
