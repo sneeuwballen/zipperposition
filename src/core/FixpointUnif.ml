@@ -16,6 +16,9 @@ exception DontKnow = PatternUnif.NotInFragment
 
 let norm_deref = PatternUnif.norm_deref
 
+let apply_subst subst t =
+  Subst.FO.apply Subst.Renaming.none (US.subst subst) t
+
 (* If there is a nonunifiable rigid path raises NotUnifiable
    If the variable occurs on a flex path or unifiable rigid path returns false
    Otherwise, variable does not occur and it returns true *)
@@ -44,15 +47,18 @@ let path_check ~subst ~scope var t =
         (if under_var then false else raise NotUnif)
       else true
     | _ -> true 
-  and aux_l ~under_var args = 
-    (* no short circuting since  *)
-    List.fold_left (fun res arg -> aux ~under_var arg && res) true args in
+  and aux_l ~under_var args =
+    let non_short_circut_and = (fun a b -> a && b) in
+    CCList.fold_left (fun res arg -> 
+      non_short_circut_and (aux ~under_var arg) res) 
+    true args in
   
   aux ~under_var:false t
 
 let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
   let driver s t scope subst =
-    let s, t = Lambda.eta_reduce s, Lambda.eta_reduce t in
+    let s, t = Lambda.eta_reduce @@ norm_deref subst(s,scope),
+               Lambda.eta_reduce @@ norm_deref subst(t,scope) in
     if T.is_var s && T.is_var t then (
       if T.equal s t then subst
       else US.FO.bind subst (T.as_var_exn s, scope) (t, scope))
@@ -62,7 +68,11 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
       let var, rigid = if T.is_var s then s, t else t,s in
       if path_check ~subst ~scope var rigid then (
         if T.DB.is_closed rigid 
-        then US.FO.bind subst (T.as_var_exn var, scope) (rigid, scope)
+        then (
+          (* Important because it might be true that var appears in some
+             beta-pruned part of rigid *)
+          US.FO.bind subst (T.as_var_exn var, scope)
+            (Lambda.snf @@ apply_subst subst (rigid,scope), scope))
         else raise NotUnif
       )
       else raise DontKnow)

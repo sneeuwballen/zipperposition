@@ -70,6 +70,7 @@ let deciders ~counter () =
       [(fun s t sub -> [(U.subst @@ FixpointUnif.unify_scoped ~subst:(U.of_subst sub) ~counter s t)])] 
     else [] in
   fixpoint @ pattern @ solid
+  (* pattern @ fixpoint @ solid *)
 
 let head_classifier s =
   match T.view @@ T.head_term s with 

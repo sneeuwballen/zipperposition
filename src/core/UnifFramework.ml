@@ -178,8 +178,8 @@ module Make (P : PARAMETERS) = struct
         let r = Lambda.eta_reduce @@ Lambda.snf @@ S.FO.apply Subst.Renaming.none subst t1s in
         if not ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r))) then (
           CCFormat.printf "orig:@[%a@]=?=@[%a@]@." (Scoped.pp T.pp) t0s (Scoped.pp T.pp) t1s;
-          CCFormat.printf "new:@[%a@]=?=@[%a@]@." T.pp l T.pp r;
           CCFormat.printf "subst:@[%a@]@." Subst.pp subst;
+          CCFormat.printf "new:@[%a@]=?=@[%a@]@." T.pp l T.pp r;
           assert(false)
         ); subst) opt)
       (* res *)
