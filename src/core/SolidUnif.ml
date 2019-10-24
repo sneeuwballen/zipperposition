@@ -43,6 +43,10 @@ exception NotUnifiable = PU.NotUnifiable
 
 let solidify ?(limit=true) ?(exception_on_error=true) t =
   let rec aux t =
+    (* right now working only on monomorphic terms *)
+    if not (Type.is_ground (T.ty t)) then 
+      raise NotInFragment;
+    
     match T.view t with
     | AppBuiltin(hd, args) -> 
       let args' = List.map aux args in
