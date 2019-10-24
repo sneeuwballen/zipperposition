@@ -19,40 +19,58 @@ let norm_deref = PatternUnif.norm_deref
 let apply_subst subst t =
   Subst.FO.apply Subst.Renaming.none (US.subst subst) t
 
-(* If there is a nonunifiable rigid path raises NotUnifiable
-   If the variable occurs on a flex path or unifiable rigid path returns false
-   Otherwise, variable does not occur and it returns true *)
+(* If there is a nonunifiable rigid path raises NotUnif
+   If the variable occurs on a flex path or unifiable rigid path returns None
+   Otherwise, variable does not occur and it returns the term var needs to be bound to *)
 let path_check ~subst ~scope var t =
-  let pref, body = T.open_fun t in
+  let pref, _ = T.open_fun t in
   let no_prefix = CCList.is_empty pref in
 
   let rec aux ~under_var t =
     let t = norm_deref subst (t,scope) in
-    let _,t = T.open_fun t in
     match T.view t with
     | T.App(hd,args) when T.is_var hd ->
       assert(not (CCList.is_empty args));
       assert(not (US.FO.mem subst (T.as_var_exn hd,scope)));
       if T.equal hd var then (
-        if under_var || not no_prefix then false
+        if under_var || not no_prefix then None
         else raise NotUnif)
-      else aux_l ~under_var:true args
+      else (
+        CCOpt.map (fun args' -> 
+          if T.same_l args args' then t else T.app hd args') 
+        (aux_l ~under_var:true args))
     | T.App(hd,args) -> 
       assert(not (T.is_fun hd));
-      aux_l ~under_var args
-    | T.AppBuiltin(b, args) -> aux_l ~under_var args
+      CCOpt.map (fun args' -> 
+        if T.same_l args args' then t else T.app hd args') 
+      (aux_l ~under_var args)
+    | T.AppBuiltin(b, args) -> 
+      CCOpt.map (fun args' -> 
+        if T.same_l args args' then t 
+        else T.app_builtin ~ty:(T.ty t) b args') 
+      (aux_l ~under_var args)
     | T.Var _ ->
       assert(not (US.FO.mem subst (T.as_var_exn t,scope)));
       if T.equal var t then
-        (if under_var then false else raise NotUnif)
-      else true
-    | _ -> true 
+        (if under_var then None else raise NotUnif)
+      else Some t
+    | T.Fun _ ->
+      let pref_tys, body' = T.open_fun t in
+      begin match aux ~under_var body' with
+      | None -> None
+      | Some t' -> 
+        if T.equal t' t then Some t
+        else Some (T.fun_l pref_tys t') end
+    | _ -> Some t 
   and aux_l ~under_var args =
-    let non_short_circut_and = (fun a b -> a && b) in
-    CCList.fold_left (fun res arg -> 
-      non_short_circut_and (aux ~under_var arg) res) 
-    true args in
-  
+    match args with 
+    | [] -> Some []
+    | x :: xs ->
+      let xs' = aux_l ~under_var xs in
+      match aux ~under_var x with
+      | None -> ignore(xs'); None
+      | Some t -> CCOpt.map (fun ts -> t :: ts) xs' in
+
   aux ~under_var:false t
 
 let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
@@ -66,17 +84,12 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
       raise DontKnow) 
     else (
       let var, rigid = if T.is_var s then s, t else t,s in
-      if path_check ~subst ~scope var rigid then (
+      match path_check ~subst ~scope var rigid with 
+      | None -> raise DontKnow
+      | Some rigid ->
         if T.DB.is_closed rigid 
-        then (
-          (* Important because it might be true that var appears in some
-             beta-pruned part of rigid *)
-          US.FO.bind subst (T.as_var_exn var, scope)
-            (Lambda.snf @@ apply_subst subst (rigid,scope), scope))
-        else raise NotUnif
-      )
-      else raise DontKnow)
-  in
+        then (US.FO.bind subst (T.as_var_exn var, scope) (rigid, scope))
+        else raise NotUnif) in
 
   if US.is_empty subst then (
     let t0',t1',scope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
