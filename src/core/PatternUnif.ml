@@ -132,8 +132,8 @@ let rec build_term ?(depth=0) ~all_args ~subst ~scope ~counter var bvar_map t =
   | T.Var _ ->
     let t' = fst @@ US.FO.deref subst (t,scope) in
     if T.equal t' t then (
-      if T.equal var t && all_args then raise (Failure "occurs check")
-      else (t, subst)
+      if T.equal var t then raise (Failure "occurs check")
+      else (t', subst)
     ) 
     else build_term ~all_args ~subst ~scope ~counter ~depth var bvar_map t'  
   | T.Const _ -> (t, subst)

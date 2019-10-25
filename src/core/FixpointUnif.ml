@@ -16,9 +16,6 @@ exception DontKnow = PatternUnif.NotInFragment
 
 let norm_deref = PatternUnif.norm_deref
 
-let apply_subst subst t =
-  Subst.FO.apply Subst.Renaming.none (US.subst subst) t
-
 (* If there is a nonunifiable rigid path raises NotUnif
    If the variable occurs on a flex path or unifiable rigid path returns None
    Otherwise, variable does not occur and it returns the term var needs to be bound to *)

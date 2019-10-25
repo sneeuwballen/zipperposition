@@ -74,11 +74,14 @@ module Make (P : PARAMETERS) = struct
     let rec aux ~depth subst problem =
       let decompose args_l args_r rest flag =
         let flagged = List.map (fun (l,r) -> (l,r,flag)) @@ List.combine args_l args_r in
-        let rigid, non_rigid = List.partition (fun (s,t,_) ->
+        let rigid_rigid, non_rigid = List.partition (fun (s,t,_) ->
           T.is_const (T.head_term s) && T.is_const (T.head_term t)) flagged in
-        let pure_var, app_var = List.partition (fun (s,t,_) ->
-          T.is_var s && T.is_var t) non_rigid in
-      rigid @ pure_var @ rest @ app_var in
+        let flex_rigid, flex_flex = List.partition (fun (s,t,_) ->
+          let var_hds = 
+            (if Term.is_var (T.head_term s) then 1 else 0) +
+            (if Term.is_var (T.head_term t) then 1 else 0) in
+          var_hds = 1) non_rigid in
+      rigid_rigid @ flex_rigid @ rest @ flex_flex in
 
       let decompose_and_cont args_l args_r rest flag subst =
         let new_prob = decompose args_l args_r rest flag in
