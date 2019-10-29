@@ -747,7 +747,7 @@ let res_tc_i : input_t Proof.result_tc =
     ~is_stmt:true
     ~name
     ~to_form:(fun ~ctx:_ st ->
-      Seq.forms st |> Iter.to_list |> TypedSTerm.Form.and_)
+      Seq.forms st |> Iter.map TypedSTerm.Form.close_forall |> Iter.to_list |> TypedSTerm.Form.and_)
     ()
 
 let res_tc_c : clause_t Proof.result_tc =
