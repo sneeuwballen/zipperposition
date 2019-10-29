@@ -322,9 +322,7 @@ let oracle ~counter ~scope ~subst (s,_) (t,_) (flag:I.t) =
               (proj_imit_lr ~disable_imit:true ~scope ~counter ~subst s t flag)
               (proj_imit_lr ~disable_imit:true ~scope ~counter ~subst t s flag)
             |> List.map (CCOpt.map (fun (s,f) -> (s, f))) in
-        CCList.interleave 
-          ident 
-          proj_imits
+        CCList.append proj_imits ident
       | `Flex _, `Rigid
       | `Rigid, `Flex _ ->
         List.append

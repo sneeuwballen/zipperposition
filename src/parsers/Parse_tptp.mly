@@ -193,7 +193,7 @@ app_formula:
       let loc = L.mk_pos $startpos $endpos in
       PT.app ~loc f [t]
     }
-
+  
 unitary_formula:
   | f=quantified_formula { f }
   | f=unitary_atomic_formula { f }
@@ -235,7 +235,7 @@ unary_formula:
       let loc = L.mk_pos $startpos $endpos in 
       PT.eq ?loc:(Some loc) f1 f2
     }
-
+  
 binary_formula:
   | f=nonassoc_binary_formula { f }
   | f=assoc_binary_formula { f }
@@ -280,6 +280,7 @@ nonassoc_binary_formula:
 assoc_binary_formula:
   | f=and_formula { f }
   | f=or_formula { f }
+  | f=type_arg { f }
 
 assoc_binary_formula_aux(OP):
   | l=unary_formula
@@ -289,6 +290,15 @@ assoc_binary_formula_aux(OP):
 
 and_formula: l=assoc_binary_formula_aux(AND) { PT.and_ l }
 or_formula: l=assoc_binary_formula_aux(VLINE) { PT.or_ l }
+type_arg: l=assoc_binary_formula_aux(ARROW) {
+  let rec args_ret xs =
+    match xs with
+    | [] | [_] -> raise (Invalid_argument "at least one argument to type is necessary")
+    | [x;y] -> ([x],y)
+    | x :: xs -> let args,ret = args_ret xs in
+      x::args, ret in
+  let args,ret = args_ret l in
+  PT.fun_ty args ret  }
 
 %inline binary_connective:
   | EQUIV { PT.equiv }
@@ -297,7 +307,7 @@ or_formula: l=assoc_binary_formula_aux(VLINE) { PT.or_ l }
   | XOR { PT.xor }
   | NOTVLINE { fun ?loc x y -> PT.not_ ?loc (PT.or_ ?loc [x; y]) }
   | NOTAND { fun ?loc x y -> PT.not_ ?loc (PT.and_ ?loc [x; y]) }
-  | ARROW { fun ?loc x y -> PT.fun_ty ?loc [x] y }
+
 %inline quantifier:
   | FORALL { PT.forall }
   | EXISTS { PT.exists }
@@ -320,6 +330,7 @@ atomic_formula:
 %inline infix_connective:
   | EQUAL { PT.eq }
   | NOT_EQUAL { PT.neq }
+
 
 /* Terms */
 

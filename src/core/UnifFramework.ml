@@ -71,7 +71,7 @@ module Make (P : PARAMETERS) = struct
   let tasks_taken = 100
 
   let do_unif problem subst mono unifscope =   
-    let rec aux ~depth subst problem =
+    let rec aux ~steps subst problem =
       let decompose args_l args_r rest flag =
         let flagged = List.map (fun (l,r) -> (l,r,flag)) @@ List.combine args_l args_r in
         let rigid_rigid, non_rigid = List.partition (fun (s,t,_) ->
@@ -81,11 +81,11 @@ module Make (P : PARAMETERS) = struct
             (if Term.is_var (T.head_term s) then 1 else 0) +
             (if Term.is_var (T.head_term t) then 1 else 0) in
           var_hds = 1) non_rigid in
-      rigid_rigid @ flex_rigid @ rest @ flex_flex in
+      rigid_rigid @ rest @ flex_rigid @ flex_flex in
 
       let decompose_and_cont args_l args_r rest flag subst =
         let new_prob = decompose args_l args_r rest flag in
-        aux ~depth subst new_prob in
+        aux ~steps subst new_prob in
       
       match problem with 
       | [] -> OSeq.return (Some subst)
@@ -104,7 +104,7 @@ module Make (P : PARAMETERS) = struct
           let (hd_lhs, args_lhs), (hd_rhs, args_rhs) = T.as_app body_lhs, T.as_app body_rhs in
         
           if T.equal body_lhs body_rhs then (
-            aux ~depth subst rest
+            aux ~steps subst rest
           ) else (
             match T.view hd_lhs, T.view hd_rhs with
             | T.DB i, T.DB j ->
@@ -134,7 +134,7 @@ module Make (P : PARAMETERS) = struct
                   (* We assume that the substitution was augmented so that it is mgu for
                       lhs and rhs *)
                   OSeq.map (fun sub ->
-                    aux ~depth sub rest
+                    aux ~steps sub rest
                   ) (OSeq.of_list substs)
                   |> OSeq.merge
                 | None ->
@@ -147,9 +147,11 @@ module Make (P : PARAMETERS) = struct
                     P.pb_oracle (body_lhs, unifscope) (body_rhs, unifscope) flag subst unifscope in
                   
                   let finite_branch_w_none = 
-                    let n = if depth > 4 then 5*depth else depth in
-                    OSeq.append 
-                      (OSeq.take n (OSeq.repeat None))
+                    (* delaying this unification steps every once in a whilemake *)
+                    let delay = 
+                      if steps != 0 && steps mod 4 = 0 then steps*2 else 0 in 
+                    OSeq.append
+                      (OSeq.take (delay) (OSeq.repeat None))
                       (OSeq.of_list @@ List.map (fun x -> Some x) finite_branch_oracle)
                     in
                   let all_oracles =
@@ -161,14 +163,14 @@ module Make (P : PARAMETERS) = struct
                     | Some (sub', flag') ->
                       try 
                         let subst' = Subst.merge subst sub' in
-                        aux ~depth:(depth+1) subst' ((lhs,rhs,flag')::rest)
+                        aux ~steps:(steps+1) subst' ((lhs,rhs,flag')::rest)
                       with Subst.InconsistentBinding _ ->
                        OSeq.return None) all_oracles
                   |> OSeq.merge in
 
                   OSeq.interleave args_unif oracle_unifs
               with Unif.Fail -> OSeq.empty) in
-    aux ~depth:0 subst problem
+    aux ~steps:0 subst problem
   
   let unify_scoped t0s t1s =
     let lhs,rhs,unifscope,subst = P.identify_scope t0s t1s in
@@ -176,7 +178,7 @@ module Make (P : PARAMETERS) = struct
       Iter.is_empty @@ Iter.append (Term.Seq.ty_vars lhs) (Term.Seq.ty_vars rhs) in
     try
       do_unif [(lhs,rhs,P.init_flag)] subst mono unifscope
-      |> OSeq.map (fun opt -> CCOpt.map (fun subst -> 
+      (* |> OSeq.map (fun opt -> CCOpt.map (fun subst -> 
         let l = Lambda.eta_reduce @@ Lambda.snf @@ S.FO.apply Subst.Renaming.none subst t0s in 
         let r = Lambda.eta_reduce @@ Lambda.snf @@ S.FO.apply Subst.Renaming.none subst t1s in
         if not ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r))) then (
@@ -185,6 +187,6 @@ module Make (P : PARAMETERS) = struct
           CCFormat.printf "new:@[%a@]=?=@[%a@]@." T.pp l T.pp r;
           assert(false)
         ); subst) opt)
-      (* res *)
+      res *)
     with Unif.Fail -> OSeq.empty
 end

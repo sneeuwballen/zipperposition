@@ -87,11 +87,13 @@ let all_combs ~combs_limit l =
   let rec aux = function 
   | [] -> []
   | x::xs ->
-      let rest_combs = aux xs in
-      if CCList.is_empty rest_combs then CCList.map (fun t->[t]) x 
-      else CCList.flat_map 
-            (fun i -> CCList.map (fun comb -> i::comb) rest_combs) 
-           x in
+    let rest_combs = aux xs in
+    if CCList.is_empty rest_combs then CCList.map (fun t->[t]) x 
+    else CCList.flat_map 
+          (fun i -> CCList.map (fun comb -> i::comb) rest_combs) 
+          x
+    in
+  
   if CCList.for_all (fun l -> List.length l = 1 ) l then [CCList.flatten l]
   else (
     let rec limit_combinations max l = 
@@ -106,8 +108,7 @@ let all_combs ~combs_limit l =
               x :: limit_combinations max xs) in
     match combs_limit with
     | None -> aux l
-    | Some max -> aux (limit_combinations max l)
-  )
+    | Some max -> aux (limit_combinations max l))
 
 let cover_rigid_skeleton ?(covers_limit = None) t solids =
   assert(List.for_all T.is_ground solids);
@@ -175,8 +176,12 @@ let collect_flex_flex ~counter ~flex_args t =
       let args' = (List.map (T.DB.shift n_bvars) flex_args) @ bvars in
       let fresh_var_ty = Type.arrow (List.map T.ty args') (T.ty target) in
       let fresh_var = HVar.fresh_cnt ~counter ~ty:fresh_var_ty () in
-      let replacement = T.app (T.var fresh_var) args' in
-      replacement, [replacement, target]
+      let unif_w_target = T.app (T.var fresh_var) args' in
+      let num_f_args = List.length flex_args in
+      let flex_args_db =
+        List.mapi (fun i a -> T.bvar (T.ty a) (n_bvars+(num_f_args-1-i))) flex_args in
+      let replacement = T.app (T.var fresh_var) (flex_args_db @ bvars) in
+      replacement, [unif_w_target, target]
     ) in
 
   let rec aux ~bvar_tys t =
@@ -303,15 +308,14 @@ let cover_flex_rigid ~subst ~counter ~scope flex rigid =
   let rigid_orig = rigid in
   let flex, rigid = solidify flex, solidify rigid in
   let flex_args = T.args flex in
-  let rigid', flex_constraints = collect_flex_flex ~counter ~flex_args rigid in
+  let to_bind, flex_constraints = collect_flex_flex ~counter ~flex_args rigid in
 
   let subst = List.fold_left (fun subst (lhs,rhs) -> 
     US.subst (solve_flex_flex_diff ~subst ~counter ~scope lhs rhs)
   ) subst flex_constraints in
-
-  let rigid = Subst.FO.apply Subst.Renaming.none subst (rigid', scope) in
+  
   let covers_limit = Some (2 * !PragUnifParams.max_inferences) in
-  let rigid_covers = cover_rigid_skeleton ~covers_limit rigid flex_args in
+  let rigid_covers = cover_rigid_skeleton ~covers_limit to_bind flex_args in
   let res = 
     if CCList.is_empty rigid_covers then (
       raise NotUnifiable
@@ -331,8 +335,8 @@ let cover_flex_rigid ~subst ~counter ~scope flex rigid =
         [US.of_subst res]
       ) else (
         let tys = List.map T.ty flex_args in
-        List.map (fun rigid' ->
-          let closed_rigid = T.fun_l tys rigid' in
+        List.map (fun r ->
+          let closed_rigid = T.fun_l tys r in
           assert(T.DB.is_closed closed_rigid);
           let subs_flex = Subst.FO.bind' subst (head_var,scope) (closed_rigid,scope) in
           US.of_subst subs_flex
@@ -403,7 +407,7 @@ let rec unify ~scope ~counter ~subst constraints =
   | (s,t) :: rest -> 
     
     if not (Type.equal (T.ty s) (T.ty t)) then (
-      raise NotUnifiable
+      raise NotInFragment
     );
 
     let s', t' = norm_deref subst (s,scope), norm_deref subst (t,scope) in
