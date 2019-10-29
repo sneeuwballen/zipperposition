@@ -93,7 +93,8 @@ let solve_ (solver:t) : res =
 let can_check : LLProof.tag list -> bool =
   let open Builtin.Tag in
   let f = function
-    | T_ho | T_ext | T_defexp -> true
+    | T_ho | T_ext -> true
+    | T_defexp -> false (* TODO: need a notion of rewrite rule directly in sidekick *)
     | T_lra | T_lia | T_ind | T_data
     | T_distinct | T_ac _
     | T_conv | T_avatar -> false
@@ -142,6 +143,7 @@ module Th_bool = Sidekick_th_bool_static.Make(struct
       | _ when not (T.db_closed t) -> B_opaque_bool t
       | F.True -> B_bool true
       | F.False -> B_bool false
+      | _ when not (T.db_closed t) -> B_opaque_bool t
       | F.And l -> B_and (Sidekick_util.IArray.of_list l)
       | F.Or l -> B_or (Sidekick_util.IArray.of_list l)
       | F.Equiv (a,b) -> B_equiv (a,b)
@@ -158,6 +160,9 @@ module Th_bool = Sidekick_th_bool_static.Make(struct
       | F.Forall _ | F.Exists _ -> B_opaque_bool t
       | F.Int_pred _ | F.Rat_pred _ ->
         B_atom t
+
+    (* be sure to use Tseitin encoding on subterms *)
+    let check_congruence_classes = true
   end)
 
 (* Theory for lambda-expressions. This theory has two functions:
@@ -392,8 +397,12 @@ let prove (a:form list) (b:form) : _*_ =
     (fun k->k (Util.pp_list T.pp) a T.pp b);
   Util.incr_stat stat_solve;
   Util.enter_prof prof_check;
+  (* see if we enable debug in sidekick, but reduce verbosity *)
+  begin match Util.Section.get_debug section with
+    | Some n when n>5 -> Msat.Log.set_debug (n-5)
+    | _ -> ()
+  end;
   (* prove [a ∧ -b ⇒ ⊥] *)
-  (* Msat.Log.set_debug 100; *)
   let theories = [Th_bool.theory; Th_lambda.theory] in
   let solver = Solver.create ~size:`Small ~store_proof:false ~theories () () in
   List.iter
