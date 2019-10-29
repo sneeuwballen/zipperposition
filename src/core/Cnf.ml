@@ -848,10 +848,10 @@ let rule_flatten = Proof.Rule.mk "cnf.flatten"
 let rule_rename = Proof.Rule.mk "cnf.tseitin"
 
 (* proof for a preprocessing step *)
-let proof_preprocess stmt defs rule : Proof.Step.t =
+let proof_preprocess ?tags stmt defs rule : Proof.Step.t =
   let stmt = Stmt.as_proof_i stmt in
   let defs = List.map Stmt.as_proof_i defs in
-  Proof.Step.esa ~rule (List.map Proof.Parent.from (stmt::defs))
+  Proof.Step.esa ?tags ~rule (List.map Proof.Parent.from (stmt::defs))
 
 (* pop and return new statements *)
 let pop_new_defs ~ctx : (_,_,_) Stmt.t list =
@@ -909,9 +909,10 @@ let flatten ~ctx ~should_define seq : _ Iter.t =
     (fun stmt ->
        let n = Skolem.counter ctx in
        let proof() =
-         if Skolem.counter ctx > n
-         then proof_preprocess stmt (new_src ~ignore_polarity:true ~ctx) rule_flatten
-         else Stmt.proof_step stmt
+         if Skolem.counter ctx > n then (
+           proof_preprocess stmt ~tags:[Proof.Tag.T_defexp]
+             (new_src ~ignore_polarity:true ~ctx) rule_flatten
+         ) else Stmt.proof_step stmt
        in
        let attrs = stmt.Stmt.attrs in
        let new_sts = match stmt.Stmt.view with
@@ -1012,9 +1013,10 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
       (fun stmt ->
          let old_counter = Skolem.counter ctx in
          let proof() =
-           if Skolem.counter ctx > old_counter
-           then proof_preprocess stmt (new_src ~ignore_polarity:true ~ctx) rule_rename
-           else Stmt.proof_step stmt
+           if Skolem.counter ctx > old_counter then (
+             proof_preprocess ~tags:[Proof.Tag.T_defexp] stmt
+               (new_src ~ignore_polarity:true ~ctx) rule_rename
+           ) else Stmt.proof_step stmt
          in
          let attrs = Stmt.attrs stmt in
          let new_st = match stmt.Stmt.view with
