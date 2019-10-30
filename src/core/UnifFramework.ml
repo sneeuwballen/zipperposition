@@ -122,14 +122,16 @@ module Make (P : PARAMETERS) = struct
                     Some (alg (lhs, unifscope) (rhs, unifscope) subst)
                   with 
                     | P.NotInFragment -> None
-                    | P.NotUnifiable -> raise Unif.Fail
+                    | P.NotUnifiable -> 
+                    (* CCFormat.printf "f:@[%a@]=?=@[%a@]@." T.pp (nfapply subst (lhs,unifscope)) T.pp (nfapply subst (rhs,unifscope)); *)
+                    raise Unif.Fail
                 ) (P.frag_algs ()) in 
                 match mgu with 
                 | Some substs ->
                   (* We assume that the substitution was augmented so that it is mgu for
                       lhs and rhs *)
                   OSeq.map (fun sub ->
-                    aux ~steps sub rest
+                    aux ~steps:(steps+1) sub rest
                   ) (OSeq.of_list substs)
                   |> OSeq.merge
                 | None ->
@@ -143,7 +145,7 @@ module Make (P : PARAMETERS) = struct
                   
                   let finite_branch_w_none = 
                     (* delaying this unification steps every once in a whilemake *)
-                    let delay = if steps > 4 then 3*steps else 0 in 
+                    let delay = if steps > 3 then 5*steps else steps in 
                     OSeq.append
                       (OSeq.take (delay) (OSeq.repeat None))
                       (OSeq.of_list @@ List.map (fun x -> Some x) finite_branch_oracle)
