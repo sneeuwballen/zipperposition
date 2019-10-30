@@ -76,12 +76,7 @@ module Make (P : PARAMETERS) = struct
         let flagged = List.map (fun (l,r) -> (l,r,flag)) @@ List.combine args_l args_r in
         let rigid_rigid, non_rigid = List.partition (fun (s,t,_) ->
           T.is_const (T.head_term s) && T.is_const (T.head_term t)) flagged in
-        let flex_rigid, flex_flex = List.partition (fun (s,t,_) ->
-          let var_hds = 
-            (if Term.is_var (T.head_term s) then 1 else 0) +
-            (if Term.is_var (T.head_term t) then 1 else 0) in
-          var_hds = 1) non_rigid in
-      rigid_rigid @ rest @ flex_rigid @ flex_flex in
+      rigid_rigid @ rest  @ non_rigid in
 
       let decompose_and_cont args_l args_r rest flag subst =
         let new_prob = decompose args_l args_r rest flag in
@@ -148,8 +143,7 @@ module Make (P : PARAMETERS) = struct
                   
                   let finite_branch_w_none = 
                     (* delaying this unification steps every once in a whilemake *)
-                    let delay = 
-                      if steps != 0 && steps mod 4 = 0 then steps*2 else 0 in 
+                    let delay = if steps > 4 then 3*steps else 0 in 
                     OSeq.append
                       (OSeq.take (delay) (OSeq.repeat None))
                       (OSeq.of_list @@ List.map (fun x -> Some x) finite_branch_oracle)
