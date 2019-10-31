@@ -9,7 +9,7 @@ RUN eval `opam config env` && \
     git pull && \
     opam update && \
     opam depext -i zarith && \
-    opam install dune zarith containers iter msat menhir
+    opam install dune zarith containers iter msat menhir oseq
 # main build
 COPY --chown=opam:nogroup src *.opam Makefile dune-project ./
 RUN eval `opam config env` && \
