@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** Test unification *)
@@ -74,6 +73,7 @@ let () =
      val f_poly : pi a b. (a -> b) -> (a -> b) -> a.
      val sk : term -> term.
    ");
+  ()
 
 let tyctx = T.Conv.create()
 
@@ -830,26 +830,35 @@ let reg_matching1 = "regression matching", `Quick, fun () ->
     with Unif.Fail -> ();
   ) 
 
-
 (** Jensen-Pietrzykowski auxiliary functions tests *)
 let test_jp_unif_aux = "JP unification", `Quick, fun () ->
   Util.set_debug 1; Printexc.record_backtrace true;
 
   (** Find disagreement tests *)
+  
+  let test_disagree =
+    Alcotest.testable
+      Fmt.Dump.(option (pair (pair T.ZF.pp T.ZF.pp) (list @@ pair HVar.pp int)))
+      CCEqual.(option @@ pair (pair T.equal T.equal) (list (pair (HVar.equal Type.equal) int)))
+  in
 
-  OUnit.assert_equal 
+  Alcotest.check test_disagree "disagree1"
     (JP_unif.find_disagreement (pterm "g (g a)") (pterm "g (h a)")) 
     (Some ((pterm "g a", pterm "h a"), []));
 
-  OUnit.assert_equal 
+  Alcotest.check test_disagree "disagree2"
     (JP_unif.find_disagreement (pterm "g (g a)") (pterm "g (g b)")) 
     (Some ((pterm "a", pterm "b"), []));
   
-  OUnit.assert_equal 
+  Alcotest.check test_disagree "disagree3"
     (JP_unif.find_disagreement (pterm "f_ho2 (fun (x:term). x)") (pterm "f_ho2 (fun (x:term). a)")) 
     (Some ((T.bvar ~ty:(Type.Conv.of_simple_term_exn (Type.Conv.create ()) (psterm "term")) 0, pterm "a"), []));
 
   (** Rule tests *)
+
+  let test_rule =
+    Alcotest.testable Fmt.Dump.(list T.ZF.pp) CCEqual.(list T.equal)
+  in
 
   let scope = 0 in
 
@@ -859,7 +868,7 @@ let test_jp_unif_aux = "JP unification", `Quick, fun () ->
     |> OSeq.map (fun subst -> Lambda.snf (JP_unif.S.apply subst (term,scope)))
     |> OSeq.to_list in
   let expected = [pterm "a"; pterm "b"] in
-  OUnit.assert_equal expected result;
+  Alcotest.check test_rule "rule1" expected result;
 
   clear_scope ();
 
@@ -869,7 +878,7 @@ let test_jp_unif_aux = "JP unification", `Quick, fun () ->
     JP_unif.imitate ~scope ~counter:(ref 1000) term1 term2 []
     |> OSeq.map (fun subst -> Lambda.snf (JP_unif.S.apply subst (term1,scope)))
     |> OSeq.to_array in
-  OUnit.assert_equal 1 (Array.length results);
+  Alcotest.(check int) "len_results" 1 (Array.length results);
   check_variant (results.(0)) (pterm ~ty:"term" "f (X a b) (Y a b)");
 
   clear_scope ();
@@ -877,7 +886,7 @@ let test_jp_unif_aux = "JP unification", `Quick, fun () ->
   let term1 = pterm ~ty:"term" "X a b" in
   let term2 = pterm ~ty:"term" "Y c d" in
   let substs = JP_unif.identify ~scope ~counter:(ref 1000) term1 term2 [] in
-  OUnit.assert_equal 1 (OSeq.length substs);
+  Alcotest.(check int) "len_subst" 1 (OSeq.length substs);
   let subst = OSeq.nth 0 substs in
   let result1 = Lambda.snf (JP_unif.S.apply subst (term1,scope)) in
   let result2 = Lambda.snf (JP_unif.S.apply subst (term2,scope)) in
@@ -887,7 +896,6 @@ let test_jp_unif_aux = "JP unification", `Quick, fun () ->
   check_variant (result2) 
     (T.app (pterm ~ty:"term -> term -> term -> term -> term" "X1") 
       [pterm ~ty:"term" "Y c d"; pterm ~ty:"term" "Z c d"; pterm "c"; pterm "d"]);
-
   ()
 
 let suite_unif2 = [ reg_matching1; test_jp_unif_aux ]
