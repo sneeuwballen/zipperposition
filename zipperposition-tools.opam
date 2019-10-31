@@ -5,11 +5,11 @@ homepage: "https://github.com/sneeuwballen/zipperposition"
 version: "1.5.1"
 synopsis: "Support tools for Zipperposition"
 build: [
-  ["dune" "build" "-p" name]
-  ["dune" "build" "@doc" "-p" name] {with-doc}
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "build" "@doc" "-p" name "-j" jobs] {with-doc}
 ]
 depends: [
-  "dune" { build }
+  "dune" { >= "1.1" }
   "containers" { >= "1.0" }
   "iter" { >= "1.2" }
   "msat" { >= "0.8" < "0.9" }
