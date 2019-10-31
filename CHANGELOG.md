@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.5.1
+
+- compatibility with ocaml 4.08
+- move to sneeuwballen organization
+- migrate to dune
+- changes in HO
+- use msat.0.8
+- migrate to `iter` instead of `sequence`
+- make build a bit more robust wrt warn-error
+- add travis CI
+
+- perf improvements
+- perf: use profile=release
+- make floor (and co) a function from real to real
+- two bugfixes for polymorphic function types
+- fix(demo): update resolution demo so it builds again
+- fix(superposition): do not try to rewrite type arguments
+- chore: update opam files to 2.0
+- move to alcotest for tests
+- improve ho selection restrictions
+- perf: optimize `debugf` function (closes #21)
+- support more cases in THF parser
+- less selection restrictions for lfhol-calculi
+- cli option for fool
+- bugfix: KBO variable balance for applied variables
+- In TPTP, interpret untyped variables as $i, not as a fresh type variable
+- Don't rewrite heads in subsumption module
+- complete variables one-by-one in complete_eq_args (ArgCong)
+- dont rewrite heads in the presence of type variables or nonmonotonicity
+- loosen assertion in whnf_deref_rec
+- Use type arguments in orderings
+- missing supatvars flag should switch off hidden supatvars
+
 ## 1.5
 
 - be compatible with sequence >= 1.0
