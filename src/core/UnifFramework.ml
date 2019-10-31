@@ -73,10 +73,31 @@ module Make (P : PARAMETERS) = struct
   let do_unif problem subst mono unifscope =   
     let rec aux ~steps subst problem =
       let decompose args_l args_r rest flag =
-        let flagged = List.map (fun (l,r) -> (l,r,flag)) @@ List.combine args_l args_r in
+        (* let flagged = List.map (fun (l,r) -> (l,r,flag)) @@ List.combine args_l args_r in
         let rigid_rigid, non_rigid = List.partition (fun (s,t,_) ->
           T.is_const (T.head_term s) && T.is_const (T.head_term t)) flagged in
-      rigid_rigid @ rest  @ non_rigid in
+      rigid_rigid @ rest  @ non_rigid in *)
+
+      let rec classify lx ly =
+        match lx, ly with
+        | [], [] -> ([],[],[],[])
+        | x::xs, y::ys ->
+          let is_rigid t = T.is_const t || T.is_bvar t in 
+
+          let rr,fr,pure_var,ff = classify xs ys in
+          let hd_x, args_x = T.as_app x in
+          let hd_y, args_y = T.as_app y in
+          if is_rigid hd_x && is_rigid hd_y then ((x,y,flag)::rr,fr,pure_var,ff)
+          else (
+            if T.is_var hd_x && T.is_var hd_y then (
+              if CCList.is_empty args_x || CCList.is_empty args_y then (
+                (rr,fr,(x,y,flag)::pure_var,ff)
+              ) else (rr,fr,pure_var,(x,y,flag)::ff) 
+            ) else (rr,(x,y,flag)::fr,pure_var,ff)
+          )
+        | _ -> invalid_arg "arguments have to be of the same size" in
+      let rigid_rigid, flex_rigid, pure_vars, flex_flex = classify args_l args_r in
+      rigid_rigid @ pure_vars @ flex_rigid @ rest @ flex_flex in
 
       let decompose_and_cont args_l args_r rest flag subst =
         let new_prob = decompose args_l args_r rest flag in
@@ -122,16 +143,14 @@ module Make (P : PARAMETERS) = struct
                     Some (alg (lhs, unifscope) (rhs, unifscope) subst)
                   with 
                     | P.NotInFragment -> None
-                    | P.NotUnifiable -> 
-                    (* CCFormat.printf "f:@[%a@]=?=@[%a@]@." T.pp (nfapply subst (lhs,unifscope)) T.pp (nfapply subst (rhs,unifscope)); *)
-                    raise Unif.Fail
+                    | P.NotUnifiable -> raise Unif.Fail
                 ) (P.frag_algs ()) in 
                 match mgu with 
                 | Some substs ->
                   (* We assume that the substitution was augmented so that it is mgu for
                       lhs and rhs *)
                   OSeq.map (fun sub ->
-                    aux ~steps:(steps+1) sub rest
+                    aux ~steps sub rest
                   ) (OSeq.of_list substs)
                   |> OSeq.merge
                 | None ->
@@ -145,7 +164,7 @@ module Make (P : PARAMETERS) = struct
                   
                   let finite_branch_w_none = 
                     (* delaying this unification steps every once in a whilemake *)
-                    let delay = if steps > 3 then 5*steps else steps in 
+                    let delay = if steps > 3 then 3*steps else 0 in 
                     OSeq.append
                       (OSeq.take (delay) (OSeq.repeat None))
                       (OSeq.of_list @@ List.map (fun x -> Some x) finite_branch_oracle)
@@ -174,7 +193,7 @@ module Make (P : PARAMETERS) = struct
       Iter.is_empty @@ Iter.append (Term.Seq.ty_vars lhs) (Term.Seq.ty_vars rhs) in
     try
       do_unif [(lhs,rhs,P.init_flag)] subst mono unifscope
-      (* |> OSeq.map (fun opt -> CCOpt.map (fun subst -> 
+      |> OSeq.map (fun opt -> CCOpt.map (fun subst -> 
         let l = Lambda.eta_reduce @@ Lambda.snf @@ S.FO.apply Subst.Renaming.none subst t0s in 
         let r = Lambda.eta_reduce @@ Lambda.snf @@ S.FO.apply Subst.Renaming.none subst t1s in
         if not ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r))) then (
@@ -183,6 +202,5 @@ module Make (P : PARAMETERS) = struct
           CCFormat.printf "new:@[%a@]=?=@[%a@]@." T.pp l T.pp r;
           assert(false)
         ); subst) opt)
-      res *)
     with Unif.Fail -> OSeq.empty
 end

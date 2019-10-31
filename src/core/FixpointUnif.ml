@@ -49,7 +49,7 @@ let path_check ~subst ~scope var t =
     | T.Var _ ->
       assert(not (US.FO.mem subst (T.as_var_exn t,scope)));
       if T.equal var t then
-        (if under_var then None else raise NotUnif)
+        (if under_var || Type.is_fun (T.ty t) then None else raise NotUnif)
       else Some t
     | T.Fun _ ->
       let pref_tys, body' = T.open_fun t in

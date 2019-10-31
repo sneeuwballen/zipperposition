@@ -307,13 +307,13 @@ let oracle ~counter ~scope ~subst (s,_) (t,_) (flag:I.t) =
           if get_op flag Ident < !Params.max_identifications then (
             JP_unif.identify ~scope ~counter s t []
             |> OSeq.map (fun x -> 
-                      let subst = U.subst x  in
-                      (* variable introduced by identification *)
-                      let subs_t = T.of_term_unsafe @@ fst (snd (List.hd (Subst.to_list subst))) in
-                      let new_var, _ = T.as_app (snd (T.open_fun subs_t)) in
-                      let new_var_id = HVar.id (T.as_var_exn new_var) in
-                      (* remembering that we introduced this var in identification *)
-                      ident_vars := IntSet.add new_var_id !ident_vars;
+                let subst = U.subst x  in
+                (* variable introduced by identification *)
+                let subs_t = T.of_term_unsafe @@ fst (snd (List.hd (Subst.to_list subst))) in
+                let new_var, _ = T.as_app (snd (T.open_fun subs_t)) in
+                let new_var_id = HVar.id (T.as_var_exn new_var) in
+                (* remembering that we introduced this var in identification *)
+                ident_vars := IntSet.add new_var_id !ident_vars;
                 Some (subst, inc_op flag Ident)))
             |> OSeq.to_list
           else [] in
