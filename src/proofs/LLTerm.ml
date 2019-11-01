@@ -356,7 +356,8 @@ let ite a b c =
 let[@inline] app_ f x ~ty = mk_ (App (f,x)) (Some ty)
 let[@inline] arrow_ a b = mk_ (Arrow (a,b)) (Some t_type)
 
-let[@inline] bind_ ~ty binder ~ty_var body = mk_ (Bind {binder;ty_var;body}) (Some ty)
+let[@inline] bind_ ~ty binder ~ty_var body =
+  mk_ (Bind {binder;ty_var;body}) (Some ty)
 
 (* private to {!as_eta_expansion}, used to test invariance by eta-expansion *)
 let id_eta_ = ID.make "test_eta_"
@@ -703,13 +704,14 @@ module Conv = struct
     | T.Bind (Binder.Exists,var,body) ->
       of_term ctx (T.Form.not_ (T.bind ~ty:T.prop Binder.Forall var (T.Form.not_ body)))
     | T.Bind (b,var,body) ->
-      let ty = of_term ctx (T.ty_exn t) in
       let ty_var = of_term ctx (Var.ty var) in
       let ctx = {
         depth=ctx.depth+1;
         vars=Var.Subst.add ctx.vars var (ctx.depth,ty_var)
       } in
-      bind b ~ty_var ~ty (of_term ctx body)
+      let body = of_term ctx body in
+      let ty = arrow_ ty_var (ty_exn body) in
+      bind b ~ty_var ~ty body
     | T.AppBuiltin (Builtin.TType, []) -> t_type
     | T.AppBuiltin (Builtin.Arrow, ret::l) ->
       let ret = of_term ctx ret in
