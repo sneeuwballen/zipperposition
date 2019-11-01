@@ -17,36 +17,40 @@ let stat_solve = Util.mk_stat "llproof.prove"
 let prof_check = Util.mk_profiler "llproof.prove"
 
 module Solver = Sidekick_msat_solver.Make(struct
-    module Term = struct
-      include T
-      let ty = ty_exn
-      type state = unit
-      let bool () b = if b then Form.true_ else Form.false_
-      let abs () t = abs t
-      let map_shallow () = map_shallow
+    module T = struct
+      module Term = struct
+        include T
+        let ty = ty_exn
+        type state = unit
+        let bool () b = if b then Form.true_ else Form.false_
+        let abs () t = abs t
+        let map_shallow () = map_shallow
+      end
+      module Ty = struct
+        include T
+        let is_bool = equal bool
+      end
+      module Fun = struct
+        type t = Bind of Binder.t * Ty.t | Builtin of Builtin.t | Const of ID.t
+        let equal a b = match a, b with
+          | Bind (b1,ty1), Bind(b2,ty2) -> Binder.equal b1 b2 && Ty.equal ty1 ty2
+          | Builtin b1, Builtin b2 -> b1=b2
+          | Const id1, Const id2 -> ID.equal id1 id2
+          | (Bind _ | Builtin _ | Const _), _ -> false
+        let hash _ = 0 (* TODO *)
+        let pp out = function
+          | Bind (b,_) -> Fmt.fprintf out "(@[bind %a@])" Binder.pp b
+          | Builtin b -> Builtin.pp out b
+          | Const id -> ID.pp out id
+      end
     end
-    module Ty = struct
-      include T
-      let is_bool = equal bool
-    end
-    module Fun = struct
-      type t = Bind of Binder.t * Ty.t | Builtin of Builtin.t | Const of ID.t
-      let equal a b = match a, b with
-        | Bind (b1,ty1), Bind(b2,ty2) -> Binder.equal b1 b2 && Ty.equal ty1 ty2
-        | Builtin b1, Builtin b2 -> b1=b2
-        | Const id1, Const id2 -> ID.equal id1 id2
-        | (Bind _ | Builtin _ | Const _), _ -> false
-      let hash _ = 0 (* TODO *)
-      let pp out = function
-        | Bind (b,_) -> Fmt.fprintf out "(@[bind %a@])" Binder.pp b
-        | Builtin b -> Builtin.pp out b
-        | Const id -> ID.pp out id
-    end
-    module Proof = struct type t = unit let pp = Fmt.(const string "<proof>") let default=() end
+    module P = struct type t = unit let pp = Fmt.(const string "<proof>") let default=() end
 
     module V = Sidekick_core.CC_view
 
-    let cc_view (t:T.t) : _ V.t =
+    let cc_view (t:T.Term.t) : _ V.t =
+      let module Fun = T.Fun in
+      let module T = T.Term in
       match T.view t with
       | T.App (f, a) -> V.App_ho (f, Iter.return a)
       | T.AppBuiltin (Builtin.Box_opaque, _) -> V.Opaque t  (* simple equality *)
@@ -66,8 +70,8 @@ module Solver = Sidekick_msat_solver.Make(struct
       | Int_pred _ | Rat_pred _
       | T.Const _ | T.Var _ | T.Type | T.Arrow _ -> V.Opaque t
 
-    let is_valid_literal (t:T.t) : bool =
-      T.db_closed t
+    let is_valid_literal (t:T.Term.t) : bool =
+      T.Term.db_closed t
   end)
 
 (** main state *)
