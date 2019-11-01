@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Builtin Objects} *)
@@ -107,7 +106,6 @@ let to_int_ = function
   | Is_int -> 39
   | Is_rat -> 40
   | To_int -> 41
-  | To_rat -> 42
   | Less -> 43
   | Lesseq -> 44
   | Greater -> 45
@@ -124,6 +122,7 @@ let to_int_ = function
 let compare a b = match a, b with
   | Int i, Int j -> Z.compare i j
   | Rat i, Rat j -> Q.compare i j
+  | Pseudo_de_bruijn i, Pseudo_de_bruijn j -> CCInt.compare i j
   | _ -> CCInt.compare (to_int_ a) (to_int_ b)
 
 let equal a b = compare a b = 0
@@ -131,6 +130,7 @@ let equal a b = compare a b = 0
 let hash s = match s with
   | Int i -> Hash.combine2 1 (Z.hash i)
   | Rat r -> Hash.combine2 2 (Hash.string (Q.to_string r))
+  | Pseudo_de_bruijn i -> Hash.combine2 10 (CCInt.hash i)
   | c -> Hash.combine2 3 (CCInt.hash (to_int_ c))
 
 module Map = Iter.Map.Make(struct type t = t_ let compare = compare end)
