@@ -23,7 +23,7 @@ let path_check ~subst ~scope var t =
   let pref, _ = T.open_fun t in
   let no_prefix = CCList.is_empty pref in
 
-  let rec aux ~under_var t =
+  let rec aux ~depth ~under_var t =
     let t = norm_deref subst (t,scope) in
     match T.view t with
     | T.App(hd,args) when T.is_var hd ->
@@ -35,17 +35,17 @@ let path_check ~subst ~scope var t =
       else (
         CCOpt.map (fun args' -> 
           if T.same_l args args' then t else T.app hd args') 
-        (aux_l ~under_var:true args))
+        (aux_l ~depth ~under_var:true args))
     | T.App(hd,args) -> 
       assert(not (T.is_fun hd));
       CCOpt.map (fun args' -> 
         if T.same_l args args' then t else T.app hd args') 
-      (aux_l ~under_var args)
+      (aux_l ~depth ~under_var args)
     | T.AppBuiltin(b, args) -> 
       CCOpt.map (fun args' -> 
         if T.same_l args args' then t 
         else T.app_builtin ~ty:(T.ty t) b args') 
-      (aux_l ~under_var args)
+      (aux_l ~depth ~under_var args)
     | T.Var _ ->
       assert(not (US.FO.mem subst (T.as_var_exn t,scope)));
       if T.equal var t then
@@ -53,22 +53,25 @@ let path_check ~subst ~scope var t =
       else Some t
     | T.Fun _ ->
       let pref_tys, body' = T.open_fun t in
-      begin match aux ~under_var body' with
+      let depth_inc = List.length pref_tys in
+      begin match aux ~depth:(depth+depth_inc) ~under_var body' with
       | None -> None
       | Some t' -> 
         if T.equal t' t then Some t
         else Some (T.fun_l pref_tys t') end
+    | T.DB i when i >= depth -> 
+      if under_var then None else raise NotUnif
     | _ -> Some t 
-  and aux_l ~under_var args =
+  and aux_l ~depth ~under_var args =
     match args with 
     | [] -> Some []
     | x :: xs ->
-      let xs' = aux_l ~under_var xs in
-      match aux ~under_var x with
+      let xs' = aux_l ~depth ~under_var xs in
+      match aux ~depth ~under_var x with
       | None -> ignore(xs'); None
       | Some t -> CCOpt.map (fun ts -> t :: ts) xs' in
 
-  aux ~under_var:false t
+  aux ~depth:0 ~under_var:false t
 
 let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
   let driver s t scope subst =
@@ -84,9 +87,8 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
       match path_check ~subst ~scope var rigid with 
       | None -> raise DontKnow
       | Some rigid ->
-        if T.DB.is_closed rigid 
-        then (US.FO.bind subst (T.as_var_exn var, scope) (rigid, scope))
-        else raise NotUnif) in
+        assert (T.DB.is_closed rigid);
+        US.FO.bind subst (T.as_var_exn var, scope) (rigid, scope)) in
 
   if US.is_empty subst then (
     let t0',t1',scope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in

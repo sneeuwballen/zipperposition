@@ -4,16 +4,17 @@ module H = HVar
 module S = Subst
 module IntSet = PUnif.IntSet
 
-let skip = 10
-
 let elim_vars = ref IntSet.empty
 let ident_vars = ref IntSet.empty
 
+let skip depth = 
+  if depth > 2 then int_of_float @@ log10 (float_of_int depth) *. !PragUnifParams.skip_multiplier
+  else 0 
 
 let delay depth res =
-    OSeq.append
-      (OSeq.take (10*depth) (OSeq.repeat None))
-      res
+  OSeq.append
+    (OSeq.take (skip depth) (OSeq.repeat None))
+    res
 
 let iter_rule ?(flex_same=false) ~counter ~scope t u depth  =
   JP_unif.iterate ~flex_same ~scope ~counter t u []
@@ -24,13 +25,21 @@ let imit_rule ~counter ~scope t u depth =
   |> OSeq.map (fun x -> Some (U.subst x, depth+1))
 
 let hs_proj_flex_rigid ~counter ~scope ~flex u depth =
-  let flex_hd_id = HVar.id (T.as_var_exn (T.head_term flex)) in
+  let flex_var = T.as_var_exn (T.head_term flex) in
+  let flex_hd_id = HVar.id flex_var  in
   if IntSet.mem flex_hd_id !ident_vars then OSeq.empty
   else(
-    PUnif.proj_hs ~counter ~scope ~flex u
-      |> OSeq.of_list
-      |> OSeq.map (fun x -> Some (x,(depth+1))))
-
+    let projections = 
+      PUnif.proj_hs ~counter ~scope ~flex u in
+    let simp_projs, func_projs =
+      CCList.partition (fun sub -> 
+        let binding,_ = Subst.FO.deref sub (T.head_term flex,scope) in
+        let _,body = T.open_fun binding in
+        T.is_bvar body) projections in
+    let simp_projs = CCList.map (fun s -> Some (s,depth)) simp_projs in
+    let func_projs = CCList.map (fun s -> Some (s,depth+1)) func_projs in
+    OSeq.append (OSeq.of_list simp_projs) (delay depth (OSeq.of_list func_projs)))
+    
 let proj_rule ~counter ~scope s t depth =
   let maybe_project u =
     let flex_hd_id = HVar.id (T.as_var_exn (T.head_term u)) in
@@ -81,34 +90,31 @@ let oracle ~counter ~scope (s,_) (t,_) depth =
   let hd_t, hd_s = T.head_term s, T.head_term t in
   if T.is_var hd_t && T.is_var hd_s && T.equal hd_s hd_t &&
      IntSet.mem (HVar.id @@ T.as_var_exn hd_t) !elim_vars then (
-    [], OSeq.empty)
+    OSeq.empty)
   else (
     match head_classifier s, head_classifier t with 
     | `Flex x, `Flex y when HVar.equal Type.equal x y ->
       (* eliminate + iter *)
-      [],
-      OSeq.append 
+        OSeq.append
         (OSeq.map (fun x -> Some x) @@
-           PUnif.elim_subsets_rule ~max_elims:None ~elim_vars ~counter ~scope s t depth)
-        (delay (depth+1) @@ iter_rule ~flex_same:true ~counter ~scope s t depth)
+            PUnif.elim_subsets_rule ~max_elims:None ~elim_vars ~counter ~scope s t depth)
+        (delay depth @@ iter_rule ~flex_same:true ~counter ~scope s t depth)
     | `Flex _, `Flex _ ->
       (* all rules  *)
-      CCList.filter_map CCFun.id 
-        (List.append (OSeq.to_list (proj_rule ~counter ~scope s t depth))
-                     (OSeq.to_list (ident_rule ~counter ~scope s t depth))),
-      delay (depth+1) @@ iter_rule ~counter ~scope s t depth  
+      let proj_ident =
+        OSeq.append
+          (proj_rule ~counter ~scope s t depth)
+          (delay depth @@ (ident_rule ~counter ~scope s t depth)) in
+      OSeq.append proj_ident 
+        (delay depth @@ iter_rule ~counter ~scope s t depth)
     | `Flex _, `Rigid
     | `Rigid, `Flex _ ->
-      CCList.filter_map CCFun.id  @@
-        CCList.append 
-          (OSeq.to_list (
-              let flex, rigid = if Term.is_var (T.head_term s) then s,t else t,s in
-              hs_proj_flex_rigid ~counter ~scope ~flex rigid depth))
-          (OSeq.to_list (imit_rule ~counter ~scope s t depth)), 
-      OSeq.empty
+        OSeq.append
+         (let flex, rigid = if Term.is_var (T.head_term s) then s,t else t,s in
+          hs_proj_flex_rigid ~counter ~scope ~flex rigid depth)
+        (imit_rule ~counter ~scope s t depth)
     | _ -> 
-      assert false
-  )
+      assert false)
 
 let unify_scoped =  
   let counter = ref 0 in

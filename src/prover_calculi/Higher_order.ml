@@ -1403,6 +1403,7 @@ let () =
       "--ho-max-app-projections", Arg.Set_int PragUnifParams.max_app_projections, " set maximal number of functional type projections";
       "--ho-max-var-imitations", Arg.Set_int PragUnifParams.max_var_imitations, " set maximal number of flex-flex imitations";
       "--ho-max-identifications", Arg.Set_int PragUnifParams.max_identifications, " set maximal number of flex-flex identifications";
+      "--ho-skip-multiplier", Arg.Set_float PragUnifParams.skip_multiplier, " set maximal number of flex-flex identifications";
       "--ho-max-rigid-imitations", Arg.Set_int PragUnifParams.max_rigid_imitations, " set maximal number of rigid imitations";
       "--ho-max-solidification", Arg.Set_int PragUnifParams.solidification_limit, " set maximal number of rigid imitations";
       "--ho-max-unifs-solid-flex-flex", Arg.Set_int PragUnifParams.max_unifs_solid_ff, " set maximal number of found unifiers for solid flex-flex pairs. -1 stands for finding the MGU";

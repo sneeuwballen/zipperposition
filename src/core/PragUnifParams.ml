@@ -25,14 +25,15 @@ type e_dir =
 
 let elim_direction = ref HighToLow
 
+let skip_multiplier = ref 20.0
 
-let all_params_to_max () = 
+let all_paramst_to_def () = 
   (* intmax does not work because we use high-level bit :(
      10000 operations is effectively max. *)
-  max_depth := 10000;
-  max_app_projections := 10000;
-  max_var_imitations := 10000;
-  max_rigid_imitations := 10000;
-  max_identifications := 10000;
-  max_elims           := 10000;
+  max_depth := 1;
+  max_app_projections := 1;
+  max_var_imitations := 1;
+  max_rigid_imitations := 1;
+  max_identifications := 1;
+  max_elims           := 1;
   max_inferences := -1

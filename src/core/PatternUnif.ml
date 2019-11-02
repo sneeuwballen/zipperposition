@@ -142,8 +142,7 @@ let rec build_term ?(depth=0) ~all_args ~subst ~scope ~counter var bvar_map t =
   | T.Const _ -> (t, subst)
   | T.App (hd, args) ->
       if T.is_var hd then (
-        if T.equal hd var && CCList.is_empty args then
-            raise (Failure "Occurs check!");
+        assert(not @@ CCList.is_empty args);
         if T.equal hd var then
             raise NotInFragment;
         (* If the variable is not yet bound, try to bind to
@@ -399,12 +398,12 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
       )
     ) 
   in
-  let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply res t0_s in 
+  (* let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply res t0_s in 
   let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply res t1_s in
   if not ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r))) then (
     CCFormat.printf "orig:@[%a@]=?=@[%a@]@." (Scoped.pp T.pp) t0_s (Scoped.pp T.pp) t1_s;
     CCFormat.printf "before:@[%a@]@." US.pp subst;
     CCFormat.printf "after:@[%a@]@." US.pp res;
     assert(false);
-  );
+  ); *)
   res

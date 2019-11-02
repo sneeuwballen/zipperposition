@@ -2983,7 +2983,7 @@ let () =
                      else if (String.equal "full-framework" str) then 
                       (
                         let res = JPFull.unify_scoped in 
-                        PragUnifParams.all_params_to_max ();
+                        PragUnifParams.all_paramst_to_def ();
                         res
                       )
                      else if (String.equal "pragmatic-framework" str) then PUnif.unify_scoped

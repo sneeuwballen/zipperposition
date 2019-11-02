@@ -9,7 +9,7 @@ module type PARAMETERS = sig
   val init_flag : flag_type
   val identify_scope : T.t Scoped.t -> T.t Scoped.t -> T.t * T.t * Scoped.scope * S.t
   val frag_algs : unit -> (T.t Scoped.t -> T.t Scoped.t -> S.t -> S.t list) list
-  val pb_oracle : (T.t Scoped.t -> T.t Scoped.t -> flag_type -> S.t -> Scoped.scope -> (S.t * flag_type) list * (S.t * flag_type) option LL.t)
+  val pb_oracle : (T.t Scoped.t -> T.t Scoped.t -> flag_type -> S.t -> Scoped.scope -> (S.t * flag_type) option LL.t)
   val oracle_composer : 'a OSeq.t -> 'a OSeq.t -> 'a OSeq.t
 end
 
