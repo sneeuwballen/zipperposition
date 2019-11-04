@@ -120,7 +120,7 @@ module Make(Stm : Stream_intf.S) = struct
         (
           try
             dripped := Stm.drip s;
-            H.insert (w + (1) , s) reduced_hp
+            H.insert (w + Stm.penalty s , s) reduced_hp
           (* No matter if a clause or None is dripped the penalty is the same:
              TODO: should the penalty be higher when None is dripped? *)
           with
@@ -149,7 +149,7 @@ module Make(Stm : Stream_intf.S) = struct
         (
           try
             dripped := Stm.drip s;
-            H.insert (w + (1), s) reduced_hp
+            H.insert (w + Stm.penalty s, s) reduced_hp
           with
             | Stm.Empty_Stream ->
               assert (q.stm_nb > 0);
@@ -196,7 +196,7 @@ module Make(Stm : Stream_intf.S) = struct
         else
           (
             let res = Stm.drip_n s n q.guard in
-            q.hp <- H.insert (w + 1, s) red_hp;
+            q.hp <- H.insert (w + Stm.penalty s, s) red_hp;
             res
           )
       with
