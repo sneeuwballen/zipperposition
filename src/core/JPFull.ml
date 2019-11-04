@@ -9,7 +9,7 @@ let ident_vars = ref IntSet.empty
 
 let skip depth = 
   if depth > 2 then int_of_float @@ log10 (float_of_int depth) *. !PragUnifParams.skip_multiplier
-  else 0 
+  else 0
 
 let delay depth res =
   OSeq.append

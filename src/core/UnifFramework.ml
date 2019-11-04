@@ -148,6 +148,7 @@ module Make (P : PARAMETERS) = struct
             | _ -> 
               try
                 let mgu =
+                 if steps > 3 then None else
                  CCList.find_map (fun alg ->  
                   try
                     Some (alg (lhs, unifscope) (rhs, unifscope) subst)
@@ -159,7 +160,8 @@ module Make (P : PARAMETERS) = struct
                 | Some substs ->
                   (* We assume that the substitution was augmented so that it is mgu for
                       lhs and rhs *)
-                  OSeq.map (fun sub -> aux ~steps sub rest) (OSeq.of_list substs)
+                  CCList.map (fun sub -> aux ~steps sub rest) substs
+                  |> OSeq.of_list
                   |> OSeq.merge
                 | None ->
                   let args_unif =
@@ -181,8 +183,7 @@ module Make (P : PARAMETERS) = struct
                       with Subst.InconsistentBinding _ ->
                        OSeq.empty) all_oracles
                   |> OSeq.merge in
-                  
-                  OSeq.interleave args_unif oracle_unifs
+                  OSeq.interleave oracle_unifs args_unif
               with Unif.Fail -> OSeq.empty) in
     aux ~steps:0 subst problem
   
