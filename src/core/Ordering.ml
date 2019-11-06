@@ -674,10 +674,20 @@ module EPO : ORD = struct
       ~hash
       512
   and epo_behind_cache ~prec (t,tt) (s,ss) = 
-    if T.equal t s && CCList.length tt = CCList.length ss && CCList.for_all2 T.equal tt ss then Eq else
-      begin match Head.term_to_head t, Head.term_to_head s with
-        | g, f ->
-          epo_composite ~prec (t,tt) (s,ss) (g, Head.term_to_args t @ tt)  (f, Head.term_to_args s @ ss)
+    if T.equal t s && CCList.length tt = CCList.length ss && CCList.for_all2 T.equal tt ss 
+    then Eq 
+    else 
+      begin match (T.view t,tt), (T.view s,ss) with
+      | (T.Var _, []), (T.Var _, []) -> Incomparable
+      | _, (T.Var var, []) -> 
+          if T.var_occurs ~var t || CCList.exists (T.var_occurs ~var) tt then Gt else Incomparable
+      | (T.Var var, []), _ -> 
+          if T.var_occurs ~var s || CCList.exists (T.var_occurs ~var) ss then Lt else Incomparable
+      | _ ->
+        begin match Head.term_to_head t, Head.term_to_head s with
+          | g, f ->
+            epo_composite ~prec (t,tt) (s,ss) (g, Head.term_to_args t @ tt)  (f, Head.term_to_args s @ ss)
+        end
       end
   and epo_composite ~prec (t,tt) (s,ss) (g,gg) (f,ff) =
       begin match prec_compare prec g f  with
