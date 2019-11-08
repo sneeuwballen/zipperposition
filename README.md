@@ -157,7 +157,8 @@ $ make uninstall
 The native syntax, with file extension `.zf`, resembles a simple fragment of
 ML with explicit polymorphism. Many examples
 in `examples/` are written using this syntax.
-A vim [syntax coloring file](https://github.com/c-cube/vim-zf) is available.
+A vim syntax coloring file can be found in `utils/vim`
+(see [the readme](./utils/vim/README.md) for instructions on how to install it).
 
 
 <details>
