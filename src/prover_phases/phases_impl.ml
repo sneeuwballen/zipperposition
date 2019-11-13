@@ -58,6 +58,7 @@ let load_extensions =
   Extensions.register Fool.extension;
   Extensions.register Booleans.extension;
   Extensions.register Higher_order.extension;
+  Extensions.register App_encode.extension;
   let l = Extensions.extensions () in
   Phases.return_phase l
 
@@ -69,6 +70,10 @@ let do_extensions ~x ~field =
     ~f:(fun () e ->
       Phases.fold_l (field e) ~x:()
         ~f:(fun () f -> Phases.update ~f:(f x)))
+
+let apply_modifiers ~field o =
+  Extensions.extensions ()
+  |> CCList.fold_left (fun o e -> field e |> CCList.fold_left (fun o m -> m o) o) o
 
 let start_file file =
   Phases.start_phase Phases.Start_file >>= fun () ->
@@ -134,6 +139,7 @@ let cnf ~sk_ctx decls =
         else Iter.flat_map Statement.lift_lambdas)
     |> Cnf.cnf_of_seq ~ctx:sk_ctx
     |> CCVector.to_seq
+    |> apply_modifiers ~field:(fun e -> e.Extensions.post_cnf_modifiers)
     |> Cnf.convert
   in
   do_extensions ~field:(fun e -> e.Extensions.post_cnf_actions)

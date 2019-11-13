@@ -136,7 +136,6 @@ let imitate_onesided ~scope ~counter u v =
   (* assert (Type.equal ret1 ret2); *)
   if T.is_var head_u                                        (* u has a varaible head *)
     && not (T.is_bvar head_v) && not (T.is_fun head_v)      (* the head of v is not a bound variable or a lambda-expression *)
-    && not (T.var_occurs ~var:(T.as_var_exn head_u) head_v) (* the head of u does not occur in the mandatory args of v *)
   then
     (* create substitution: head_u |-> λ u1 ... um. head_v (x1 u1 ... um) ... (xn u1 ... um)) *)
     let bvars = prefix_types_u |> List.rev |> List.mapi (fun i ty -> T.bvar ~ty i) |> List.rev in

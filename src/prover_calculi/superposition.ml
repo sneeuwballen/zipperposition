@@ -516,14 +516,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let t' = if info.sup_kind != DupSup then 
                 S.FO.apply ~shift_vars renaming subst (info.t, sc_a)
                else dup_sup_apply_subst info.t sc_a sc_p subst renaming in
-      if(info.sup_kind = LambdaSup &&
-         T.Seq.subterms t'
-         |> Iter.exists (fun st ->
-              List.exists (fun arg -> not @@ T.DB.is_closed arg)
-              (T.get_mand_args st))) then (
-        Util.debugf ~section 3 "LambdaSup sneaks in bound variables under the skolem" (fun k->k);
-        raise @@ ExitSuperposition("LambdaSup sneaks in bound variables under the skolem");
-      );
+      Util.debugf ~section 1
+      "@[<2>sup, kind %s(%d)@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
+       (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
+      (fun k->k (kind_to_str info.sup_kind) (Term.Set.cardinal lambdasup_vars) C.pp info.active sc_a T.pp info.s T.pp info.t
+          T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
+          Position.pp info.passive_pos US.pp info.subst);
+      
       if(info.sup_kind = LambdaSup && 
          T.Set.exists (fun v -> 
             not @@ T.DB.is_closed @@  Subst.FO.apply renaming subst (v,sc_p)) 
@@ -573,14 +572,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let new_trail = C.trail_l [info.active; info.passive] in
       if Env.is_trivial_trail new_trail then raise (ExitSuperposition "trivial trail");
       let s' = S.FO.apply ~shift_vars renaming subst (info.s, sc_a) in
-      if(info.sup_kind = LambdaSup &&
-         T.Seq.subterms s'
-         |> Iter.exists (fun st ->
-              List.exists (fun arg -> not @@ T.DB.is_closed arg)
-              (T.get_mand_args st))) then (
-        Util.debugf ~section 3 "LambdaSup sneaks in bound variables under the skolem" (fun k->k);
-        raise @@ ExitSuperposition("LambdaSup sneaks in bound variables under the skolem");
-      );
       if (
         O.compare ord s' t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
@@ -1378,7 +1369,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let ext_eqfact_decompose_aux cl =
     let try_ext_eq_fact (s,t) (u,v) idx =
-    let (s_hd, s_args), (u_hd, u_args) = CCPair.map_same T.as_app_with_mandatory_args (s,u) in
+    let (s_hd, s_args), (u_hd, u_args) = CCPair.map_same T.as_app (s,u) in
     if not (T.equal s_hd u_hd) && Type.equal (T.ty s) (T.ty u) && 
       List.length s_args = List.length u_args &&
       List.for_all (fun (s, t) -> Term.equal s t) (CCList.combine s_args u_args) then (
@@ -1803,7 +1794,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let do_ext_dec from_c from_p from_t into_c into_p into_t = 
     let sc_f, sc_i = 0, 1 in
     let renaming = Subst.Renaming.create () in
-    let (hd_f, args_f), (hd_i,args_i) = Term.as_app_with_mandatory_args from_t, Term.as_app_with_mandatory_args into_t in
+    let (hd_f, args_f), (hd_i,args_i) = Term.as_app from_t, Term.as_app into_t in
     if Type.equal (Term.ty from_t) (Term.ty into_t) && List.length args_f = List.length args_i  &&
        not (C.id from_c = C.id into_c && Position.equal from_p into_p) then (
       (* Renaming variables apart *)
@@ -1904,7 +1895,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         |> Iter.to_list
         |> CCList.filter_map (fun (lhs,rhs,sign,pos) ->
             assert(sign = false);
-            let (l_hd, l_args), (r_hd, r_args) = CCPair.map_same T.as_app_with_mandatory_args (lhs,rhs) in
+            let (l_hd, l_args), (r_hd, r_args) = CCPair.map_same T.as_app (lhs,rhs) in
             if not (T.equal l_hd r_hd) && List.length l_args = List.length r_args &&
               List.for_all (fun (s, t) -> Type.equal (Term.ty s) (Term.ty t)) (CCList.combine l_args r_args) &&
               (List.for_all (fun (s, t) -> Term.equal s t) (CCList.combine l_args r_args)) then (

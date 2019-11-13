@@ -252,8 +252,8 @@ let apply ty0 args0 =
       aux ty args env
     | _ ->
       err_applyf_
-        "@[<2>Type.apply:@ expected quantified or function type,@ but got @[%a@]"
-        T.pp_zf ty
+        "@[<2>Type.apply:@ expected quantified or function type,@ but got @[%a@] @[(args: %a)@]"
+        T.pp_zf ty (CCList.pp T.pp) args
   and aux_l ty_ret exp_args args env = match exp_args, args with
     | [], [] -> T.DB.eval env ty_ret
     | _, [] ->

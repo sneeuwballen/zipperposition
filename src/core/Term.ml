@@ -256,38 +256,6 @@ let head_term_mono t = match view t with
     app_builtin ~ty b ty_args
   | _ -> t
 
-let get_mand_args t =
-  match view t with
-    | App (f,l) ->
-      let num_mand_args =
-        begin match as_const f with
-          | Some id -> ID.num_mandatory_args id
-          | None -> 0
-        end
-      in
-      let _, other_args = CCList.take_drop_while is_type l in
-      let mand_args, _ = CCList.take_drop num_mand_args other_args in
-      mand_args
-    | _ -> []
-
-
-let as_app_with_mandatory_args t =
-  match view t with
-    | App (f,l) ->
-      let num_mand_args =
-        begin match as_const f with
-          | Some id -> ID.num_mandatory_args id
-          | None -> 0
-        end
-      in
-      assert(num_mand_args = 0);
-      let ty_args, other_args = CCList.take_drop_while is_type l in
-      let head = app f (ty_args) in (* re-apply to type & mandatory args *)
-      head, other_args
-    | _ -> t, []
-
-let head_term_with_mandatory_args t = fst (as_app_with_mandatory_args t)
-
 let is_ho_var t = match view t with
   | Var v -> Type.needs_args (HVar.ty v)
   | _ -> false
@@ -504,7 +472,9 @@ let rec in_pfho_fragment t =
                     let hd_is_skolem = match as_const hd with
                                     | Some sym -> ID.is_skolem sym
                                     | None -> false in
-                    if((not (is_var hd || hd_is_skolem) || type_ok (ty t)) &&
+                    (* If the head is a variable or skolem, the return type must be ok. 
+                       But if the head is a constant, we want to allow predicate symbols. *)
+                    if((not (is_var hd || hd_is_skolem) || type_ok (ty t)) && 
                       List.map ty l |> List.for_all type_ok
                     && List.for_all in_pfho_fragment l) then true
                     else (raise (Failure (CCFormat.sprintf "Arugment of a term has wrong type [%a]" T.pp t)))
@@ -515,8 +485,7 @@ let rec in_pfho_fragment t =
     | DB _ -> if(type_ok (ty t)) then true
               else (raise (Failure "Bound variable has wrong type"))
    and type_ok ty_ =
-    not (Type.Seq.sub ty_ |> Iter.mem ~eq:Type.equal (Type.prop)) &&
-    not (Type.Seq.sub ty_ |> Iter.mem ~eq:Type.equal (Type.tType))
+    not (Type.Seq.sub ty_ |> Iter.exists (fun t -> Type.equal t (Type.prop) || Type.equal t (Type.rat) || Type.equal t (Type.int)))
 
 let in_lfho_fragment t =
    in_pfho_fragment t &&
@@ -567,7 +536,7 @@ let mk_fresh_skolem =
    let i = CCRef.incr_then_get n in
    (** fresh skolem **)
    let id = ID.makef "#fsk%d" i in
-   ID.set_payload id (ID.Attr_skolem (ID.K_normal, i));
+   ID.set_payload id (ID.Attr_skolem ID.K_normal);
    let ty_vars, vars =
       List.partition (fun v -> Type.is_tType (HVar.ty v)) vars
    in

@@ -84,8 +84,7 @@ let make_skolem ty : ID.t =
   incr n_;
   (* declare as a skolem *)
   let k = if Ind_ty.is_inductive_type ty then ID.K_ind else ID.K_normal in
-  let _, args, _ = Type.open_poly_fun ty in
-  ID.set_payload c (ID.Attr_skolem (k, List.length args));
+  ID.set_payload c (ID.Attr_skolem k);
   c
 
 (* declare new constant *)
@@ -111,7 +110,7 @@ let declare ~depth ~is_sub id ty =
   in
   ID.set_payload id (Payload_cst cst)
     ~can_erase:(function
-      | ID.Attr_skolem (ID.K_ind, _) ->
+      | ID.Attr_skolem ID.K_ind ->
         true (* special case: promotion from skolem to inductive const *)
       | _ -> false);
   (* return *)
