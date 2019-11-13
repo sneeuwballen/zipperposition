@@ -103,6 +103,9 @@ let hash lit =
 let weight lit =
   fold (fun acc t -> acc + T.size t) 0 lit
 
+let ho_weight =
+  fold (fun acc t -> acc + T.ho_weight t) 0 
+
 let heuristic_weight weight = function
   | Equation (l, r, true) 
       when Term.equal r Term.true_ || Term.equal r Term.false_ -> weight l
@@ -181,8 +184,8 @@ let is_typex_pred = function
   | _ -> false
 
 let is_propositional = function
-  | Equation(lhs,rhs,true) when T.is_true_or_false rhs ->
-    T.is_const lhs
+  | Equation(lhs,rhs,true) ->
+    T.is_true_or_false rhs
   | _ -> false
 
 let is_arith_eqn = _on_arith Int_lit.is_eqn
@@ -202,14 +205,14 @@ let is_rat_eq = _on_rat Rat_lit.is_eq
 let is_rat_less = _on_rat Rat_lit.is_less
 
 let is_essentially_prop = function 
-  | Equation (lhs, rhs, true) -> T.is_true_or_false rhs
+  | Equation (_, rhs, true) -> T.is_true_or_false rhs
   | _ -> false
 
 let ty_error_ a b =
   let msg =
     CCFormat.sprintf
       "@[<2>Literal: incompatible types in equational lit@ for `@[%a : %a@]`@ and `@[%a : %a@]`@]"
-      T.pp a Type.pp (T.ty a) T.pp b Type.pp (T.ty b)
+      T.TPTP.pp a Type.pp (T.ty a) T.TPTP.pp b Type.pp (T.ty b)
   in
   raise (Type.ApplyError msg)
 
@@ -808,11 +811,11 @@ module Comp = struct
   let max_terms ~ord lit =
     assert(no_prop_invariant lit);
     match lit with
-      | Equation (l, r, s) when is_essentially_prop lit ->
+      | Equation (l, r, _) when is_essentially_prop lit ->
         let l = Lambda.whnf l in
         if T.is_app_var l && T.equal T.true_ r then [l;r]
         else [l]
-      | Equation (l, r, s) -> 
+      | Equation (l, r, _) -> 
         _maxterms2 ~ord l r
       | Int a -> Int_lit.max_terms ~ord a
       | Rat a -> Rat_lit.max_terms ~ord a

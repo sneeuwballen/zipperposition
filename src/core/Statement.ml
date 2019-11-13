@@ -259,8 +259,12 @@ let decl_data_functions ity proof : unit =
 let get_formulas_from_defs st =
   let get_from_rule rule =
     match rule with
-    | Def_term {vars;id;ty;args;rhs;as_form} -> [as_form]
-    | Def_form {vars;lhs;rhs;polarity;as_form} -> as_form in
+    | Def_term {vars;id;ty;args;rhs;as_form} -> 
+      ignore(vars,id,ty,args,rhs);
+      [as_form]
+    | Def_form {vars;lhs;rhs;polarity;as_form} -> 
+      ignore(vars,lhs,polarity,rhs);
+      as_form in
 
 
   match view st with 
@@ -525,10 +529,10 @@ let lift_lambdas st =
   let get_tydecl_from_def ~proof def =
     let _, body = TST.unfold_binder Binder.Forall def in
     match TST.view body with
-    | TST.AppBuiltin(b, [lhs;rhs])
+    | TST.AppBuiltin(b, [lhs;_])
        when Builtin.equal b Builtin.Eq || Builtin.equal b Builtin.Equiv ->
       begin match TST.view lhs with
-      | TST.App(hd, args) when TST.is_const hd ->
+      | TST.App(hd, _) when TST.is_const hd ->
         let hd_id = TST.head_exn hd in
         let ty = TST.ty_exn hd in
         ty_decl ~proof hd_id ty 
@@ -552,9 +556,8 @@ let lift_lambdas st =
   let res = begin match view st with
   | Assert f -> 
     let f', new_defs =  TST.lift_lambdas f in
-
     (if CCList.is_empty new_defs then Iter.singleton st
-    else (assert_ (ll_proof_step st f new_defs) f') :: (CCList.flat_map assert_defs new_defs)
+    else (assert_ ~proof:(ll_proof_step st f new_defs) f') :: (CCList.flat_map assert_defs new_defs)
           |> Iter.of_list)
   | Lemma fs ->
     let fs', defs = List.fold_right (fun f (ffs, ddefs) -> 
@@ -572,7 +575,7 @@ let lift_lambdas st =
   | Goal f ->
     let f', new_defs =  TST.lift_lambdas f in
     if CCList.is_empty new_defs then Iter.singleton st
-    else ((goal (ll_proof_step st f new_defs) f') ::  (CCList.flat_map assert_defs new_defs)
+    else ((goal ~proof:(ll_proof_step st f new_defs) f') ::  (CCList.flat_map assert_defs new_defs)
           |> Iter.of_list)
   | NegatedGoal (skolems,fs) ->
     let fs', defs = List.fold_right (fun f (ffs, ddefs) -> 
@@ -786,7 +789,8 @@ let as_proof_c t = Proof.S.mk t.proof (Proof.Result.make res_tc_c t)
 
 (** {2 Scanning} *)
 
-let define_rw_rule ~proof r = 
+let define_rw_rule ~proof r =
+  ignore(proof);
   begin match r with
     | Rewrite.T_rule r ->
       let id = Rewrite.Term.Rule.head_id r in

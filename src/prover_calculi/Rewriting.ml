@@ -384,7 +384,11 @@ let rewrite_tst_stmt stmt =
 
 let unfold_def_before_cnf stmts =
   if !rewrite_before_cnf then (
-    CCVector.map rewrite_tst_stmt stmts
+    CCVector.map (fun stmt -> 
+      let res = rewrite_tst_stmt stmt in
+      (* CCFormat.printf "rewriting @[%a@] into @[%a@]@." Statement.pp_input stmt Statement.pp_input res; *)
+      res
+      ) stmts
   ) else stmts
 
 let post_tying stmts st =

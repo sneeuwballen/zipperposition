@@ -14,9 +14,6 @@ module type S = sig
 
   val setup : unit -> unit
   (** Register rules in the environment *)
-
-
-
   
 end
 

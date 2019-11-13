@@ -131,7 +131,7 @@ let max_goal ~strict ~ord lits =
 
 let ho_sel_driver lits f =
   let neg_max = CCArray.mapi (fun i l -> i,l)  lits
-                  |> CCArray.filter (fun (_,l) -> Lit.is_neg l) in
+                |> CCArray.filter (fun (_,l) -> Lit.is_neg l) in
     if CCArray.length neg_max = 0 then BV.empty ()
     else (
       CCArray.fast_sort (fun (i, _) (j, _) -> compare (f i) (f j)) neg_max;
@@ -183,7 +183,7 @@ let weight_based_sel_driver ?(blocker=(fun _ -> false)) ~ord lits f =
 let lit_sel_diff_w l =
   match l with
   | Lit.Equation(lhs,rhs,_) ->
-    let lhs_w,rhs_w = CCPair.map_same T.size (lhs,rhs) in
+    let lhs_w,rhs_w = CCPair.map_same T.ho_weight (lhs,rhs) in
     100*((max lhs_w rhs_w) - (min lhs_w rhs_w)) + lhs_w + rhs_w
   | _ -> 0
 
@@ -275,7 +275,7 @@ let e_sel4 ~ord lits =
     let freq_tbl = pred_freq ~ord lits in
     let hd_freq = get_pred_freq ~freq_tbl l in
     if Lit.is_ground l then (
-      (sign, 0, -(Term.weight lhs), hd_freq) 
+      (sign, 0, -(T.ho_weight lhs), hd_freq) 
     ) else if not @@ Lit.is_typex_pred l then (
       let max_term_weight = 
         Iter.of_list (Lit.Comp.max_terms ~ord l)
@@ -283,7 +283,7 @@ let e_sel4 ~ord lits =
         |> Iter.sum in
       (sign, 10, -max_term_weight, hd_freq)
     ) else if not @@ Lit.is_type_pred l then (
-      (sign, 20, -(Term.weight lhs), hd_freq)
+      (sign, 20, -(T.ho_weight lhs), hd_freq)
     ) else (sign, max_int, max_int, max_int) in
   let blocker = Lit.is_type_pred in
   weight_based_sel_driver ~ord ~blocker lits chooser 

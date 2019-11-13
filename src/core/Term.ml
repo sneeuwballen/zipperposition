@@ -208,6 +208,10 @@ let is_const t = match T.view t with
   | T.Const _ -> true
   | _ -> false
 
+let is_appbuiltin t = match T.view t with
+  | T.AppBuiltin _ -> true
+  | _ -> false
+
 let is_fun t = match T.view t with
   | T.Bind (Binder.Lambda, _, _) -> true
   | _ -> false
@@ -254,6 +258,12 @@ let head_term_mono t = match view t with
     let ty_args, args = CCList.partition is_type l in
     let ty = Type.arrow (List.map ty args) (ty t) in 
     app_builtin ~ty b ty_args
+  | AppBuiltin(b, l) ->
+    assert(Builtin.is_quantifier b);
+    assert(Type.is_prop @@ ty t);
+    assert(List.length l = 1);
+    let ty = Type.arrow [ty (List.hd l)] Type.prop in
+    app_builtin ~ty b []
   | _ -> t
 
 let is_ho_var t = match view t with
@@ -460,6 +470,31 @@ let ho_weight = T.ho_weight
 
 let is_ground t = T.is_ground t
 
+let of_term_unsafe t = t
+let of_term_unsafe_l l = l
+
+let of_ty t = (t : Type.t :> T.t)
+
+
+let is_linear t =
+  let var_set = VarTbl.create 8 in
+
+  let rec aux t =
+    match view t with
+    | AppBuiltin(_, args) -> 
+      List.for_all aux args
+    | App(hd, args) ->
+      List.for_all aux (hd :: args)
+    | Fun(_, body) -> aux body
+    | Var v -> 
+      if VarTbl.mem var_set v then false
+      else (VarTbl.add var_set v (); true)
+    | _ -> true in
+
+  let res = aux t in
+  VarTbl.clear var_set;
+  res
+
 let rec in_pfho_fragment t =
    match view t with
     | Var _ -> if (not (type_ok (ty t))) then
@@ -498,7 +533,7 @@ let in_lfho_fragment t =
 let rec is_fo_term t =
   match view t with
   | Var _ -> not @@ Type.is_fun @@ ty t
-  | AppBuiltin (_,l) -> false
+  | AppBuiltin _ -> false
   | App (hd, l) -> let expected_args = List.length @@ Type.expected_args @@ ty hd in
                    let actual_args = List.length l in
                    expected_args = actual_args &&
@@ -565,10 +600,6 @@ let head t =
 
 let ty_vars t = Seq.ty_vars t |> Type.VarSet.of_seq
 
-let of_term_unsafe t = t
-let of_term_unsafe_l l = l
-
-let of_ty t = (t : Type.t :> T.t)
 
 (** {2 Subterms and positions} *)
 
@@ -739,6 +770,10 @@ module Form = struct
   let () = add_hook pp_hook
 
   let not_ t: t =
+    if (not (Type.is_prop (ty t))) then (
+      CCFormat.printf "t:@[%a@]@." T.pp t;
+      CCFormat.printf "ty:@[%a@]@." Type.pp (ty t);
+    );
     assert (Type.is_prop (ty t));
     match view t with
       | AppBuiltin (Builtin.Not, [u]) -> u
@@ -1034,18 +1069,22 @@ module Conv = struct
         fun_ ty_arg body
       | PT.Bind(b, v, body) when Binder.equal b Binder.Forall 
                                  || Binder.equal b Binder.Exists ->
-        let b = if Binder.equal b Binder.Forall 
-                then Builtin.ForallConst else Builtin.ExistsConst in
-        let ty_arg = Type.Conv.of_simple_term_exn ctx (Var.ty v) in
-        let previous = PT.Var_tbl.find_opt tbl v in
-        PT.Var_tbl.replace tbl v (!depth,ty_arg);
-        incr depth;
-        let ty_b = Type.Conv.of_simple_term_exn ctx (PT.ty_exn body) in
-        let body = fun_ ty_arg (aux body) in
-        decr depth;
-        if CCOpt.is_some previous then PT.Var_tbl.replace tbl v (CCOpt.get_exn previous)
-        else PT.Var_tbl.remove tbl v;
-        app_builtin ~ty:ty_b b [body]
+        if TypedSTerm.Ty.is_tType (Var.ty v) then (
+          (* we are ignoring the types, since the conversion will take care of itself *)
+          aux body
+        ) else (
+          let b = if Binder.equal b Binder.Forall 
+                  then Builtin.ForallConst else Builtin.ExistsConst in
+          let ty_arg = Type.Conv.of_simple_term_exn ctx (Var.ty v) in
+          let previous = PT.Var_tbl.find_opt tbl v in
+          PT.Var_tbl.replace tbl v (!depth,ty_arg);
+          incr depth;
+          let ty_b = Type.Conv.of_simple_term_exn ctx (PT.ty_exn body) in
+          let body = fun_ ty_arg (aux body) in
+          decr depth;
+          if CCOpt.is_some previous then PT.Var_tbl.replace tbl v (CCOpt.get_exn previous)
+          else PT.Var_tbl.remove tbl v;
+          app_builtin ~ty:ty_b b [body])
       | PT.Meta _
       | PT.Record _
       | PT.Ite _
@@ -1054,6 +1093,7 @@ module Conv = struct
       | PT.Multiset _ 
       | _ -> raise (Type.Conv.Error t)
     in
+    (* CCFormat.printf "converting:@[%a@]@." TypedSTerm.pp t; *)
     aux t
 
   let of_simple_term ctx t =
@@ -1111,15 +1151,6 @@ module Conv = struct
           let res = 
             ST.app_builtin ~ty:(aux_ty (ty t))
               b (List.map (aux_t env) l) in
-          begin match ST.view res with 
-          | ST.AppBuiltin(b', l') ->
-            assert(Builtin.equal b' Builtin.Equiv || Builtin.equal b' Builtin.Eq ||
-                   Builtin.equal b' Builtin.Xor || Builtin.equal b' Builtin.Neq ||
-                   Builtin.equal b b');
-            assert(Builtin.equal b' Builtin.Equiv || Builtin.equal b' Builtin.Eq ||
-                   Builtin.equal b' Builtin.Xor || Builtin.equal b' Builtin.Neq ||
-                   List.length l = List.length l');
-          | _ -> assert false end;
           res
         | Fun (ty_arg, body) ->
           let v = Var.makef ~ty:(aux_ty ty_arg) "v_%d" (CCRef.incr_then_get n) in

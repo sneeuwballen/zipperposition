@@ -510,7 +510,7 @@ module TPTP_THF = struct
     | Let _ -> failwith "cannot print `let` in TPTP"
     | Match _ -> failwith "cannot print `match` in TPTP"
     | Record _ -> failwith "cannot print records in TPTP"
-    | List l -> failwith "cannot print lists in TPTP THF"
+    | List _ -> failwith "cannot print lists in TPTP THF"
     
   and pp_typed_var out (v,o) = match o with
     | None -> pp_var out v

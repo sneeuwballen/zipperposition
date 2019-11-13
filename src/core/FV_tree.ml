@@ -128,7 +128,7 @@ module Make(C: Index_intf.CLAUSE) = struct
            Iter.filter SLiteral.is_neg lits |> Iter.length |> mk_n)
 
     let weight_lit lit =
-      let rec t_weight t = 
+      (* let rec t_weight t = 
         let pref,t = T.open_fun t in
         match T.view t with
         | T.Const _ | T.Var _ | T.DB _ -> List.length pref + 1
@@ -136,9 +136,9 @@ module Make(C: Index_intf.CLAUSE) = struct
         | T.AppBuiltin(_,l)
         | T.App(_,l) ->
           if Term.is_app_var t then List.length pref + 1
-          else (List.fold_left (fun acc s -> acc + t_weight s) (List.length pref + 1) l) in
+          else (List.fold_left (fun acc s -> acc + t_weight s) (List.length pref + 1) l) in *)
 
-      SLiteral.to_seq lit |> Iter.map t_weight |> Iter.fold (+) 0
+      SLiteral.to_seq lit |> Iter.map T.ho_weight |> Iter.fold (+) 0
 
     let weight_ name filter =
       make name

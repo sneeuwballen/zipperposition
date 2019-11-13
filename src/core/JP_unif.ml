@@ -131,8 +131,8 @@ let project_huet_style ~scope ~counter u v l =
 let imitate_onesided ~scope ~counter u v = 
   let head_u = T.head_term_mono u in
   let head_v = T.head_term_mono v in
-  let prefix_types_u, ret1 = Type.open_fun (T.ty head_u) in
-  let prefix_types_v, ret2 = Type.open_fun (T.ty head_v) in
+  let prefix_types_u, _ = Type.open_fun (T.ty head_u) in
+  let prefix_types_v, _ = Type.open_fun (T.ty head_v) in
   (* assert (Type.equal ret1 ret2); *)
   if T.is_var head_u                                        (* u has a varaible head *)
     && not (T.is_bvar head_v) && not (T.is_fun head_v)      (* the head of v is not a bound variable or a lambda-expression *)
@@ -164,7 +164,7 @@ let identify ~scope ~counter u v (_ : (T.var * int) list) =
   let head_u = T.head_term_mono u in
   let head_v = T.head_term_mono v in
   let prefix_types_u, return_type = Type.open_fun (T.ty head_u) in
-  let prefix_types_v, return_type2 = Type.open_fun (T.ty head_v) in
+  let prefix_types_v, _ = Type.open_fun (T.ty head_v) in
   (* assert (Type.equal return_type return_type2); *)
   if T.is_var head_u && T.is_var head_v (* TODO: necessary when args_u or args_v is empty? *)
   then
@@ -237,14 +237,14 @@ let iterate_one ~counter types_w prefix_types return_type i type_ul =
   subst_value
 
 
-let iterate ~scope ~counter u v l =
+let iterate ?(flex_same=false) ~scope ~counter u v l =
   (* The variable can be either above the disagreement pair (i.e., in l) 
      or it can be the head of either member of the disagreement pair *)
   let positions =
     l 
     |> CCList.map fst
     |> CCList.cons_maybe (T.as_var (T.head_term u))
-    |> CCList.cons_maybe (T.as_var (T.head_term v))
+    |> CCList.cons_maybe (if flex_same then None else T.as_var (T.head_term v))
     |> OSeq.of_list
     |> OSeq.flat_map
       (fun v ->
@@ -254,6 +254,9 @@ let iterate ~scope ~counter u v l =
             (fun i type_ul -> (v, prefix_types, return_type, i, type_ul))
         |> List.fast_sort (fun (_,_,_,_,x) (_,_,_,_,y) -> 
             List.length (Type.expected_args y) - List.length (Type.expected_args x))
+        |> (fun l -> 
+              if not flex_same then l
+              else List.filter (fun (_,_,_,_,ty) -> Type.is_fun ty) l)
         |> OSeq.of_list
       )
   in
@@ -340,7 +343,7 @@ let find_disagreement s t =
           find_disagreement_l ~applied_var:(Some f) ss tt 
         | T.AppBuiltin (f, ss), T.AppBuiltin (g, tt) when Builtin.equal f g -> 
           find_disagreement_l ss tt 
-        | T.Var x, T.Var y when x = y -> OSeq.empty
+        | T.Var _, T.Var _ when T.equal s t -> OSeq.empty
         | T.DB i, T.DB j when i = j -> OSeq.empty
         | T.Const a, T.Const b when ID.equal a b -> OSeq.empty
         | T.Fun (ty_s, s'), T.Fun (ty_t, t') -> 
@@ -377,7 +380,7 @@ let unify ~scope ~counter t0 s0 =
                add_some identify,"id"; 
                (if !_huet_style 
                then project_huet_style 
-               else iterate)
+               else iterate ~flex_same:false)
                ~scope ~counter,"proj_hs";]
               (* iterate must be last in this list because it is the only one with infinitely many child nodes *)
               |> OSeq.of_list  

@@ -419,12 +419,13 @@ module Step = struct
     | Some x, Some y -> Some (min x y)
 
   let inferences_perfomed ?(count_cnf=false) p =
+    ignore(count_cnf);
     let rec aux p = match p.kind with 
-    | Simplification(r,_) -> (*List.fold_left (fun acc par -> 
+    | Simplification _ -> (*List.fold_left (fun acc par -> 
         acc + aux ((Parent.proof par).step)) 0 p.parents *)
         let parents = List.map (fun par -> aux ((Parent.proof par).step)) p.parents in
         CCOpt.get_or ~default:0 (Iter.max (Iter.of_list parents))
-    | Inference(r,_) -> (*List.fold_left (fun acc par -> 
+    | Inference _ -> (*List.fold_left (fun acc par -> 
         acc + aux ((Parent.proof par).step)) 0 p.parents + 1 *)
         let parents = List.map (fun par -> aux ((Parent.proof par).step)) p.parents in
         CCOpt.get_or ~default:0 (Iter.max (Iter.of_list parents)) + 1 

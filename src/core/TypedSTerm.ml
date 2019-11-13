@@ -857,15 +857,19 @@ module Form = struct
       in
       flatten_ k acc l'
 
-  let and_ ?loc = function
+  let and_ ?loc l  =
+    let flattened = flatten_ `And [] l in
+    match flattened with
     | [] -> true_
-    | [t] -> t
-    | l -> app_builtin ?loc ~ty:Ty.prop Builtin.And (flatten_ `And [] l)
+    | [t] -> t 
+    | _ ->  app_builtin ?loc ~ty:Ty.prop Builtin.And (flattened)
 
-  let or_ ?loc = function
+  let or_ ?loc l = 
+    let flattened = flatten_ `Or [] l in
+    match flattened with
     | [] -> false_
-    | [t] -> t
-    | l -> app_builtin ?loc ~ty:Ty.prop Builtin.Or (flatten_ `Or [] l)
+    | [t] -> t 
+    | _ ->  app_builtin ?loc ~ty:Ty.prop Builtin.Or (flattened)
 
   let not_ ?loc f = app_builtin ?loc ~ty:Ty.prop Builtin.Not [f]
 
@@ -886,6 +890,10 @@ module Form = struct
         (free_vars f)
     in
     forall_l ?loc tyvars (forall_l ?loc vars f)
+
+  let is_var = function 
+  | Atom x -> is_var x
+  | _ -> false
 end
 
 let _l_counter = ref 0
@@ -1014,18 +1022,20 @@ let rec rectify_aux ?(pref="v_") ~cnt ~subst t =
       app_builtin ~ty:t_ty b fs, subst
     | _ -> t, subst
 and rec_aux_l ?(pref="v_") ~cnt ~subst args =
-      List.fold_right (fun arg (tmp,subst) -> 
-        let arg', subst' = rectify_aux ~subst ~cnt arg in
-        arg' :: tmp, subst'
-      ) args ([], subst)
+  ignore(pref);
+  List.fold_right (fun arg (tmp,subst) -> 
+    let arg', subst' = rectify_aux ~subst ~cnt arg in
+    arg' :: tmp, subst'
+  ) args ([], subst)
 and handle_var ~pref ?(rename=true) ~cnt ~subst v t_ty = 
-      if rename && Subst.mem subst v then (Subst.find_exn subst v, subst, v) else (
-        let id = CCRef.get_then_incr cnt in
-        let v' = Var.make ~ty:t_ty (ID.dummy_of_int id) in
-        let res = var v' in
-        let subst = Subst.add subst v res in
-        (res, subst, v')
-      )
+  ignore(pref);
+  if rename && Subst.mem subst v then (Subst.find_exn subst v, subst, v) else (
+    let id = CCRef.get_then_incr cnt in
+    let v' = Var.make ~ty:t_ty (ID.dummy_of_int id) in
+    let res = var v' in
+    let subst = Subst.add subst v res in
+    (res, subst, v')
+  )
 
 let rectify ?(cnt=ref 0) ?(subst=Subst.empty) t = 
   rectify_aux ~cnt ~subst t

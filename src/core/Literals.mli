@@ -43,6 +43,7 @@ val matching :
 val matches : t -> t -> bool
 
 val weight : t -> int
+val ho_weight : t -> int
 val depth : t -> int
 val vars : t -> Type.t HVar.t list
 val is_ground : t -> bool       (** all the literals are ground? *)
@@ -224,3 +225,5 @@ val unshielded_vars : ?filter:(Term.var -> bool) -> t -> Term.var list
 (** Set of variables occurring unshielded *)
 
 val vars_distinct : t -> bool
+
+val ground_lits : t -> t

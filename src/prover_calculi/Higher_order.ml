@@ -875,7 +875,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* rule for β-reduction *)
   let beta_reduce t =
-    assert (T.DB.is_closed t);
+    (* assert (T.DB.is_closed t); *)
     let t' = Lambda.snf t in
     if (T.equal t t') then (
        Util.debugf ~section 50 "(@[beta_reduce `%a`@ failed `@])" (fun k->k T.pp t );
@@ -884,13 +884,13 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debugf ~section 50 "(@[beta_reduce `%a`@ :into `%a`@])"
         (fun k->k T.pp t T.pp t');
       Util.incr_stat stat_beta;
-      assert (T.DB.is_closed t');
+      (* assert (T.DB.is_closed t'); *)
       Some t'
    )
 
   (* rule for eta-expansion *)
   let eta_normalize t =
-    assert (T.DB.is_closed t);
+    (* assert (T.DB.is_closed t); *)
     let t' = Ctx.eta_normalize t in
     if (T.equal t t') then (
        Util.debugf ~section 50 "(@[eta_normalize `%a`@ failed `@])" (fun k->k T.pp t );
@@ -899,7 +899,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debugf ~section 50 "(@[eta_normalize `%a`@ :into `%a`@])"
         (fun k->k T.pp t T.pp t');
       Util.incr_stat stat_eta_normalize;
-      assert (T.DB.is_closed t');
+      (* assert (T.DB.is_closed t'); *)
       Some t'
     )
 
@@ -1244,16 +1244,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       if (!_huet_style) then
         JP_unif.set_huet_style ();
 
-      if (not !_cons_elim) then
-        PragHOUnif.disable_conservative_elim ();
-
-      if (!_imit_first) then
-        PragHOUnif.enable_imit_first ();
-
-      if (!_var_solve) then (
-        PragHOUnif.enable_solve_var ();
-      );
-
       if(!_neg_cong_fun) then (
         Env.add_unary_inf "neg_cong_fun" neg_cong_fun 
       );
@@ -1401,17 +1391,26 @@ let () =
       "--ho-def-unfold", Arg.Set def_unfold_enabled_, " enable ho definition unfolding";
       "--ho-choice-inst", Arg.Bool (fun v -> _instantiate_choice_ax := v), " enable ho definition unfolding";
       "--ho-huet-style-unif", Arg.Set _huet_style, " enable Huet style projection";
-      "--ho-no-conservative-elim", Arg.Clear _cons_elim, " Disables conservative elimination rule in pragmatic unification";
-      "--ho-imitation-first",Arg.Set _imit_first, " Use imitation rule before projection rule";
-      "--ho-solve-vars", Arg.Bool (fun v -> PragHOUnif.solve_var := v), " Enable solving variables.";
+      "--ho-conservative-elim", Arg.Bool (fun v -> _cons_elim := v), " Disables conservative elimination rule in pragmatic unification";
+      "--ho-imitation-first",Arg.Bool (fun v -> PragUnifParams._imit_first:=v), " Use imitation rule before projection rule";
+      "--ho-elim-direction", Arg.Symbol (["high-to-low"; "low-to-high"], (fun s ->
+          if s = "high-to-low" then PragUnifParams.elim_direction := PragUnifParams.HighToLow
+          else (assert (s = "low-to-high"); PragUnifParams.elim_direction := PragUnifParams.LowToHigh))), " Enable solving variables.";
       "--ho-composition", Arg.Set _compose_subs, " Enable composition instead of merging substitutions";
       "--ho-disable-var-arg-removal", Arg.Clear _var_arg_remove, " disable removal of arguments of applied variables";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom";
-      "--ho-unif-max-depth", Arg.Set_int PragHOUnif.max_depth, " set pragmatic unification max depth";
-      "--ho-max-app-projections", Arg.Set_int PragHOUnif.max_app_projections, " set maximal number of functional type projections";
-      "--ho-max-var-imitations", Arg.Set_int PragHOUnif.max_var_imitations, " set maximal number of flex-flex imitations";
-      "--ho-max-identifications", Arg.Set_int PragHOUnif.max_identifications, " set maximal number of flex-flex identifications";
-      "--ho-max-elims", Arg.Set_int PragHOUnif.max_elims, " set maximal number of eliminations";
+      "--ho-unif-max-depth", Arg.Set_int PragUnifParams.max_depth, " set pragmatic unification max depth";
+      "--ho-max-app-projections", Arg.Set_int PragUnifParams.max_app_projections, " set maximal number of functional type projections";
+      "--ho-max-var-imitations", Arg.Set_int PragUnifParams.max_var_imitations, " set maximal number of flex-flex imitations";
+      "--ho-max-identifications", Arg.Set_int PragUnifParams.max_identifications, " set maximal number of flex-flex identifications";
+      "--ho-skip-multiplier", Arg.Set_float PragUnifParams.skip_multiplier, " set maximal number of flex-flex identifications";
+      "--ho-max-rigid-imitations", Arg.Set_int PragUnifParams.max_rigid_imitations, " set maximal number of rigid imitations";
+      "--ho-max-solidification", Arg.Set_int PragUnifParams.solidification_limit, " set maximal number of rigid imitations";
+      "--ho-max-unifs-solid-flex-flex", Arg.Set_int PragUnifParams.max_unifs_solid_ff, " set maximal number of found unifiers for solid flex-flex pairs. -1 stands for finding the MGU";
+      "--ho-pattern-decider", Arg.Bool (fun b -> PragUnifParams.pattern_decider := b), "turn pattern decider on or off";
+      "--ho-solid-decider", Arg.Bool (fun b -> PragUnifParams.solid_decider := b), "turn solid decider on or off";
+      "--ho-fixpoint-decider", Arg.Bool (fun b -> PragUnifParams.fixpoint_decider := b), "turn fixpoint decider on or off";
+      "--ho-max-elims", Arg.Set_int PragUnifParams.max_elims, " set maximal number of eliminations";
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
     enabled_ := true;

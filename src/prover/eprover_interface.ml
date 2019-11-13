@@ -7,6 +7,8 @@ open Logtk
 
 let _tmp_dir = ref "/tmp"
 
+exception PolymorphismDetected
+
 module type S = sig
   module Env : Env.S
 
@@ -21,6 +23,7 @@ module type S = sig
 end
 
 let _timeout = ref 11
+let _e_auto = ref false
 
 let e_bin = ref (None : string option)
 
@@ -59,7 +62,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         output_symdecl ~out sym ty;
         acc
       ) else (
-        assert (not ((Type.Seq.sub ty) |> Iter.exists (Type.is_tType)));
+        if (((Type.Seq.sub ty) |> Iter.exists (Type.is_tType))) then
+          raise PolymorphismDetected;
         Iter.cons (sym, ty) acc
       )
     ) syms Iter.empty
@@ -77,7 +81,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     match !e_bin with 
     | Some e_path ->
       let to_ = !_timeout in
-      let cmd = CCFormat.sprintf "timeout %d %s %s --cpu-limit=%d --auto-schedule -s -p" (to_+2) e_path prob_path to_ in
+      let cmd = 
+        CCFormat.sprintf "timeout %d %s %s --cpu-limit=%d %s -s -p" 
+          (to_+2) e_path prob_path to_ (if !_e_auto then "--auto" else "--auto-schedule") in
       CCFormat.printf "%% Running : %s.\n" cmd;
       let process_channel = Unix.open_process_in cmd in
       let _,status = Unix.wait () in
@@ -156,31 +162,35 @@ module Make(E : Env.S) : S with module Env = E = struct
     let prob_name, prob_channel = Filename.open_temp_file ~temp_dir:!_tmp_dir "e_input" "" in
     let out = Format.formatter_of_out_channel prob_channel in
 
-    let active_set = take_from_set active_set in
-    let ignore_ids = IntSet.of_list (List.map C.id active_set) in
-    let passive_set =  take_from_set ~ignore_ids passive_set in
-    let already_defined = output_all ~out active_set in
-    Format.fprintf out "%% -- PASSIVE -- \n";
-    ignore(output_all  ~already_defined ~out passive_set);
-    close_out prob_channel;
-    let cl_set = active_set @ passive_set in
+    try 
+      let active_set = take_from_set active_set in
+      let ignore_ids = IntSet.of_list (List.map C.id active_set) in
+      let passive_set =  take_from_set ~ignore_ids passive_set in
+      let already_defined = output_all ~out active_set in
+      Format.fprintf out "%% -- PASSIVE -- \n";
+      ignore(output_all  ~already_defined ~out passive_set);
+      close_out prob_channel;
+      let cl_set = active_set @ passive_set in
 
-    let res = 
-      match run_e prob_name with
-      | Some ids ->
-        assert(not (CCList.is_empty ids));
-        
-        let clauses = List.map (fun id -> 
-          List.find (fun cl -> (C.id cl) = id) cl_set) ids in
-        let rule = Proof.Rule.mk "eprover" in
-        let proof = Proof.Step.inference  ~rule (List.map C.proof_parent clauses) in
-        let penalty = CCOpt.get_exn @@ Iter.max (Iter.map C.penalty (Iter.of_list clauses)) in
-        let trail = C.trail_l clauses in
-        Some (C.create ~penalty ~trail [] proof)
-      | _ -> None 
-    in
-    (* Sys.remove prob_name; *)
-    res
+      let res = 
+        match run_e prob_name with
+        | Some ids ->
+          assert(not (CCList.is_empty ids));
+          
+          let clauses = List.map (fun id -> 
+            List.find (fun cl -> (C.id cl) = id) cl_set) ids in
+          let rule = Proof.Rule.mk "eprover" in
+          let proof = Proof.Step.inference  ~rule (List.map C.proof_parent clauses) in
+          let penalty = CCOpt.get_exn @@ Iter.max (Iter.map C.penalty (Iter.of_list clauses)) in
+          let trail = C.trail_l clauses in
+          Some (C.create ~penalty ~trail [] proof)
+        | _ -> None 
+      in
+      (* Sys.remove prob_name; *)
+      res
+    with PolymorphismDetected -> 
+      CCFormat.printf "%% Running E stopped because polymorphism was detected @.";
+      None
     
   let setup () = 
     ()
@@ -189,4 +199,5 @@ end
 let () =
    Options.add_opts
     [ "--tmp-dir", Arg.String (fun v -> _tmp_dir := v), " scratch directory for running E";
-      "--e-timeout", Arg.Set_int _timeout, "set E prover timeout." ]
+      "--e-timeout", Arg.Set_int _timeout, " set E prover timeout.";
+      "--e-auto", Arg.Bool (fun v -> _e_auto := v), " If set to on eprover will not run in autoschedule, but in auto mode"]

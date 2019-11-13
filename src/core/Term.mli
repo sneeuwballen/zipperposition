@@ -127,6 +127,7 @@ val grounding : Type.t -> t
 (** [grounding ty] is a unique constant of type [ty] *)
 
 val is_var : t -> bool
+val is_appbuiltin : t -> bool
 val is_bvar : t -> bool
 val is_formula : t -> bool
 val is_app : t -> bool
@@ -196,6 +197,7 @@ end
 
 val var_occurs : var:var -> t -> bool (** [var_occurs ~var t] true iff [var] in t *)
 val is_ground : t -> bool (** is the term ground? (no free vars) *)
+val is_linear : t -> bool (** is the term linear? (no vars occuring multiple times) *)
 val monomorphic : t -> bool (** true if the term contains no type var *)
 val max_var : VarSet.t -> int (** find the maximum variable *)
 val min_var : VarSet.t -> int (** minimum variable *)

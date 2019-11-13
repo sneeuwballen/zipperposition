@@ -38,7 +38,7 @@ let view t = match T.view t with
   | T.App (f, l) ->
     begin match T.view f with
       | T.Const id -> App (id, l)
-      | _ -> assert false
+      | _ -> CCFormat.printf "wrong:@[%a@]@." T.pp t; assert false
     end
   | T.AppBuiltin (Builtin.Arrow, [_]) -> assert false
   | T.AppBuiltin (Builtin.Arrow, (ret :: l)) -> Fun (l, ret)

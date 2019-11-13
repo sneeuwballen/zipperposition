@@ -22,24 +22,6 @@ module S : sig
 
 end
 
-
-val max_app_projections : int ref
-val max_var_imitations  : int ref
-val max_identifications : int ref
-val max_elims           : int ref
-val max_depth           : int ref
-val solve_var           : bool ref
-
-(* Disable getting only the first solution for unifying arguments
-   after performing identification *)
-val disable_conservative_elim : unit -> unit
-(* Apply imitation and projection rules for flex-flex pairs *)
-val enable_imit_first : unit -> unit
-(* Solve pairs that have exactly one unifier directly using 
-   an extension of pattern unification algorithm. *)
-val enable_solve_var : unit -> unit
-
-
 val unify : state:unif_state ->
             scope:Scoped.scope ->
             counter:int ref ->

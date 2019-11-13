@@ -85,13 +85,14 @@ let _sup_with_pure_vars = ref true
 
 let _NO_LAMSUP = -1
 let _lambdasup = ref (-1)
-let _max_infs = ref (-1)
+let _max_infs = PragUnifParams.max_inferences
 let max_lits_ext_dec = ref 0
 let _ext_dec_lits = ref `OnlyMax
 let _unif_alg = ref JP_unif.unify_scoped
 let _unif_level = ref `Full
 let _ground_subs_check = ref 0
 let _sup_t_f = ref true
+let _solid_subsumption = ref false
 
 module Make(Env : Env.S) : S with module Env = Env = struct
   module Env = Env
@@ -767,7 +768,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let do_superposition info =
     let open SupInfo in
     assert (info.sup_kind=DupSup || Type.equal (T.ty info.s) (T.ty info.t));
-    assert (info.sup_kind=DupSup || 
+    assert (info.sup_kind=DupSup ||
             Unif.Ty.equal ~subst:(US.subst info.subst)
               (T.ty info.s, info.scope_active) (T.ty info.u_p, info.scope_passive));
     let renaming = Subst.Renaming.create () in
@@ -972,8 +973,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let inf_res = infer_active_aux
       ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:!_unif_alg)
       ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
-        let all_substs = OSeq.to_list @@ OSeq.take max_unifs substs   in
-        let res = List.map (fun subst -> do_sup u_p with_pos (CCOpt.get_exn subst)) all_substs in
+        let all_substs = OSeq.to_list @@ OSeq.take max_unifs @@ OSeq.filter_map CCFun.id substs   in
+        let res = List.map (fun subst -> do_sup u_p with_pos subst) all_substs in
         Some res
       )
       clause
@@ -984,8 +985,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let inf_res = infer_passive_aux
       ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:!_unif_alg)
       ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
-        let all_substs = OSeq.to_list @@ OSeq.take max_unifs substs in
-        let res = List.map (fun subst -> do_sup u_p with_pos (CCOpt.get_exn subst)) all_substs in
+        let all_substs = OSeq.to_list @@ OSeq.take max_unifs @@ OSeq.filter_map CCFun.id substs   in
+        let res = List.map (fun subst -> do_sup u_p with_pos subst) all_substs in
         Some res   
       )
       clause
@@ -1298,8 +1299,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~unify:!_unif_alg
         ~iterate_substs:(fun substs do_eq_res ->
            (* Some (OSeq.map (CCOpt.flat_map do_eq_res) substs) *)
-           let all_substs = OSeq.to_list @@ OSeq.take max_unifs substs in
-           let res = List.map (fun subst -> do_eq_res (CCOpt.get_exn subst)) all_substs in
+           let all_substs = OSeq.to_list @@ OSeq.take max_unifs @@ OSeq.filter_map CCFun.id substs   in
+           let res = List.map (fun subst -> do_eq_res subst) all_substs in
            Some res)
         clause
     in
@@ -1530,8 +1531,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~unify:!_unif_alg
         ~iterate_substs:(fun substs do_eq_fact ->
            (* Some (OSeq.map (CCOpt.flat_map do_eq_fact) substs) *)
-           let all_substs = OSeq.to_list @@ OSeq.take max_unifs substs  in
-           let res = List.map (fun subst -> do_eq_fact (CCOpt.get_exn subst)) all_substs in
+           let all_substs = OSeq.to_list @@ OSeq.take max_unifs @@ OSeq.filter_map CCFun.id substs in
+           let res = List.map (fun subst -> do_eq_fact subst) all_substs in
            Some res)
         clause
     in
@@ -2439,6 +2440,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let try_eq_subsumption = CCArray.exists Lit.is_eqn (C.lits c) in
     (* use feature vector indexing *)
     let c = if !_ground_subs_check > 0 then  C.ground_clause c else c in
+    let subsumes a b = 
+      if not !_solid_subsumption then subsumes a b else (
+        try 
+          SolidSubsumption.subsumes a b
+        with SolidSubsumption.UnsupportedLiteralKind -> 
+          subsumes a b
+      ) in
     let res =
       SubsumIdx.retrieve_subsuming_c !_idx_fv c
       |> Iter.exists
@@ -2465,6 +2473,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       C.is_unit_clause c && Lit.is_pos (C.lits c).(0)
     in
     (* use feature vector indexing *)
+    let subsumes a b = 
+      if not !_solid_subsumption then subsumes a b else (
+        try 
+          SolidSubsumption.subsumes a b
+        with SolidSubsumption.UnsupportedLiteralKind -> 
+          subsumes a b
+      ) in
     let res =
       SubsumIdx.retrieve_subsumed_c !_idx_fv c
       |> Iter.fold
@@ -2786,8 +2801,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Env.add_unary_inf "equality_resolution" (infer_equality_resolution_pragmatic_ho !_max_infs);
       );
 
-      
-
       if !_fluidsup then (
         Env.add_binary_inf "fluidsup_passive" infer_fluidsup_passive;
         Env.add_binary_inf "fluidsup_active" infer_fluidsup_active;
@@ -2937,6 +2950,9 @@ let () =
     "--ground-before-subs"
     , Arg.Set_int _ground_subs_check
     , " set the level of grounding before substitution. 0 - no grounding. 1 - only active. 2 - both.";
+    "--solid-subsumption"
+    , Arg.Bool (fun v -> _solid_subsumption := v)
+    , " set solid subsumption on or off";
     "--recognize-injectivity"
     , Arg.Bool (fun v -> _recognize_injectivity := v)
     , " recognize injectivity axiom and axiomatize corresponding inverse";
@@ -2946,12 +2962,22 @@ let () =
     ("--sup-with-true-false")
     , Arg.Bool (fun v ->( _sup_t_f := v))
     , " enable/disable superposition, eq-res and eq-fact with true/false";
+    "--use-weight-for-solid-subsumption"
+    , Arg.Bool (fun v -> PragUnifParams.use_weight_for_solid_subsumption := v)
+    , " enable/disable superposition to and from pure variable equations";
     "--trigger-bool-inst"
     , Arg.Set_int _trigger_bool_inst
     , " instantiate predicate variables with boolean terms already in the proof state. Argument is the maximal proof depth of predicate variable";
       "--ho-unif-level",
-      Arg.Symbol (["full"; "pragmatic"], (fun str ->
+      Arg.Symbol (["full-framework";"full"; "pragmatic-framework"; "pragmatic"], (fun str ->
         _unif_alg := if (String.equal "full" str) then JP_unif.unify_scoped
+                     else if (String.equal "full-framework" str) then 
+                      (
+                        let res = JPFull.unify_scoped in 
+                        PragUnifParams.all_paramst_to_def ();
+                        res
+                      )
+                     else if (String.equal "pragmatic-framework" str) then PUnif.unify_scoped
                      else PragHOUnif.unify_scoped)),
       "set the level of HO unification"
       ; "--max-inferences"
@@ -2985,11 +3011,11 @@ let () =
       _lambdasup := -1;
       _dupsup := false;
       _max_infs := 5;
-      PragHOUnif.max_depth := 3;
-      PragHOUnif.max_app_projections := 0;
-      PragHOUnif.max_var_imitations := 1;
-      PragHOUnif.max_identifications := 1;
-      PragHOUnif.max_elims := 1;
+      PragUnifParams.max_depth := 3;
+      PragUnifParams.max_app_projections := 0;
+      PragUnifParams.max_var_imitations := 1;
+      PragUnifParams.max_identifications := 1;
+      PragUnifParams.max_elims := 1;
       _fluidsup := false;
     );
     Params.add_to_mode "ho-competitive" (fun () ->
@@ -3006,11 +3032,11 @@ let () =
       _lambdasup := -1;
       _dupsup := false;
       _max_infs := 10;
-      PragHOUnif.max_depth := 6;
-      PragHOUnif.max_app_projections := 1;
-      PragHOUnif.max_var_imitations := 1;
-      PragHOUnif.max_identifications := 1;
-      PragHOUnif.max_elims := 1;
+      PragUnifParams.max_depth := 6;
+      PragUnifParams.max_app_projections := 1;
+      PragUnifParams.max_var_imitations := 1;
+      PragUnifParams.max_identifications := 1;
+      PragUnifParams.max_elims := 1;
       _fluidsup := false;
     );
     Params.add_to_mode "fo-complete-basic" (fun () ->
