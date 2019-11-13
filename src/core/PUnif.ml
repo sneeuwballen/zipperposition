@@ -225,7 +225,7 @@ let proj_imit_lr ?(disable_imit=false) ~counter ~scope ~subst s t flag =
   with Invalid_argument s when String.equal s "as_var_exn" ->
     OSeq.empty
 
-let elim_rule ~counter ~scope t u flag = 
+let elim_rule ~counter ~scope t _ flag = 
   let eliminate_at_idx v k =  
     let prefix_types, return_type = Type.open_fun (HVar.ty v) in
     let m = List.length prefix_types in

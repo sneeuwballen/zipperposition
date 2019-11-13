@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Perfect Discrimination Tree} *)
@@ -22,7 +21,6 @@ type character =
 type iterator = {
   cur_char : character;
   cur_term : T.t;
-  cur_weight : int;
   stack : T.t list list; (* skip: drop head, next: first of head *)
   stack_len: int;
 }
@@ -31,10 +29,6 @@ let[@inline] char_to_int_ = function
   | Symbol _ -> 0
   | Variable _ -> 2
   | Subterm _ -> 3
-
-let[@inline] char_weight_ = function 
-  | Symbol _ | Variable _ -> 1
-  | Subterm s -> T.ho_weight s 
 
 let compare_char c1 c2 =
   (* compare variables by index *)
@@ -71,37 +65,30 @@ let pp_char out = function
 (* parameter: maximum depth before we start using {!Subterm} *)
 let max_depth_ = ref 3
 
-let open_term ~stack ~weight ~len t =
-  assert(weight >= 0);
+let open_term ~stack ~len t =
   if len > !max_depth_ then (
     (* opaque. Do not enter the term. *)
     let cur_char = Subterm t in
-    {cur_char; cur_term=t; cur_weight=weight; stack=[]::stack; stack_len=len+1}
+    {cur_char; cur_term=t; stack=[]::stack; stack_len=len+1}
   ) else (
-    let cur_char, l = (term_to_char) t in
-    {cur_char; cur_term=t; cur_weight=weight; stack=l::stack; stack_len=len+1}
+    let cur_char, l = term_to_char t in
+    {cur_char; cur_term=t; stack=l::stack; stack_len=len+1}
   )
 
-let rec next_rec stack len weight = 
-  assert(weight >= 0);
-  match stack with
+let rec next_rec stack len = match stack with
   | [] -> None
-  | []::stack' -> next_rec stack' (len-1) weight
+  | []::stack' -> next_rec stack' (len-1)
   | (t::next')::stack' ->
-    Some (open_term ~stack:(next'::stack') ~len ~weight t)
+    Some (open_term ~stack:(next'::stack') ~len t)
 
 let skip iter = match iter.stack with
   | [] -> None
-  | _next::stack' ->
-    let w = iter.cur_weight-(T.ho_weight iter.cur_term) in
-    next_rec stack' (iter.stack_len-1) w
+  | _next::stack' -> next_rec stack' (iter.stack_len-1)
 
-let[@inline] next iter = 
-  let w = char_weight_ iter.cur_char in
-  next_rec iter.stack iter.stack_len (iter.cur_weight - w)
+let[@inline] next iter = next_rec iter.stack iter.stack_len
 
 (* Iterate on a term *)
-let[@inline] iterate term = Some (open_term ~stack:[] ~len:0 term ~weight:(T.ho_weight term))
+let[@inline] iterate term = Some (open_term ~stack:[] ~len:0 term)
 
 (* convert term to list of var/symbol *)
 let to_list t : _ list =
@@ -130,25 +117,12 @@ module Make(E : Index.EQUATION) = struct
 
   type trie = {
     map : trie CharMap.t; (** map atom -> trie *)
-    min_weight: int;
     leaf : (T.t * E.t * int) list; (** leaf with (term, value, priority) list *)
   } (* The discrimination tree *)
 
-  let empty_trie = {map=CharMap.empty; min_weight=0; leaf=[]}
+  let empty_trie = {map=CharMap.empty; leaf=[]}
 
   let is_empty n = n.leaf = [] && CharMap.is_empty n.map
-
-  let get_min_weight l =
-    Iter.of_list l
-    |> Iter.map (fun (t,_,_) -> T.ho_weight t)
-    |> Iter.min
-    |> CCOpt.get_or ~default:0 
-  
-  let min_weight_of_tries map =
-    CharMap.values map
-    |> Iter.map (fun trie -> trie.min_weight)
-    |> Iter.min
-    |> CCOpt.get_or ~default:0
 
   (** get/add/remove the leaf for the given flatterm. The
       continuation k takes the leaf, and returns a leaf option
@@ -163,26 +137,22 @@ module Make(E : Index.EQUATION) = struct
         | [] -> (* look at leaf *)
           begin match k trie.leaf with
             | new_leaf when trie.leaf == new_leaf -> root (* no change, return same tree *)
-            | new_leaf -> rebuild {trie with leaf=new_leaf; min_weight=get_min_weight new_leaf} (* replace by new leaf *)
+            | new_leaf -> rebuild {trie with leaf=new_leaf} (* replace by new leaf *)
           end
         | c::t' ->
           begin match CharMap.get c trie.map with
             | Some subtrie ->
               let rebuild' subtrie = match subtrie with
                 | _ when is_empty subtrie ->
-                  let map = CharMap.remove c trie.map in
-                  rebuild {trie with map; min_weight=min_weight_of_tries map}
-                | _ -> 
-                  let map = CharMap.add c subtrie trie.map in
-                  rebuild {trie with map; min_weight=min_weight_of_tries map}
+                  rebuild {trie with map=CharMap.remove c trie.map}
+                | _ -> rebuild {trie with map=CharMap.add c subtrie trie.map}
               in
               goto subtrie t' rebuild'
             | None ->
               let subtrie = empty_trie in
               let rebuild' subtrie = match subtrie with
                 | _ when is_empty subtrie -> root  (* same tree *)
-                | _ -> let map = CharMap.add c subtrie trie.map in
-                       rebuild {trie with map; min_weight=min_weight_of_tries map}
+                | _ -> rebuild {trie with map=CharMap.add c subtrie trie.map}
               in
               goto subtrie t' rebuild'
           end
@@ -239,48 +209,46 @@ module Make(E : Index.EQUATION) = struct
           let c1 = i.cur_char in
           CharMap.iter
             (fun c2 subtrie ->
-               if i.cur_weight >= subtrie.min_weight then
-                (match c2 with
-                  | Variable v2 ->
-                    (* deal with the variable branch in the trie *)
-                    begin match S.FO.get_var subst (Scoped.set dt (v2:>ST.t HVar.t)) with
-                      | None ->
-                        (* not bound: try to match types + bind, then continue *)
-                        begin
-                          try
-                            let subst =
-                              Unif.Ty.matching ~subst
-                                ~pattern:(Scoped.set dt (HVar.ty v2))
-                                (Scoped.set t (T.ty t_pos))
-                            in
-                            let subst =
-                              Unif.FO.bind ~check:false subst
-                                (Scoped.set dt v2) (Scoped.set t t_pos) in
-                            traverse subtrie (skip i) subst
-                          with Unif.Fail -> () (* incompatible binding, or occur check *)
-                        end
-                      | Some t' ->
-                        (* already bound, check consistency *)
-                        if Unif.FO.equal ~subst (Scoped.set t t_pos) t'
-                        then traverse subtrie (skip i) subst
-                    end
-                  | Subterm t2 ->
-                    (* fallback to matching *)
-                    begin
-                      try
-                        let subst =
-                          Unif.FO.matching
-                            ~subst ~pattern:(Scoped.set dt t2) (Scoped.set t t_pos)
-                        in
-                        traverse subtrie (skip i) subst
-                      with Unif.Fail -> ()
-                    end
-                  | _ when eq_char c2 c1 ->
-                    (* explore branch that has the same symbol, if any *)
-                    assert (not (T.is_var t_pos));
-                    traverse subtrie (next i) subst;
-                  | _ -> ())
-                else ())
+               match c2 with
+                 | Variable v2 ->
+                   (* deal with the variable branche in the trie *)
+                   begin match S.FO.get_var subst (Scoped.set dt (v2:>ST.t HVar.t)) with
+                     | None ->
+                       (* not bound: try to match types + bind, then continue *)
+                       begin
+                         try
+                           let subst =
+                             Unif.Ty.matching ~subst
+                               ~pattern:(Scoped.set dt (HVar.ty v2))
+                               (Scoped.set t (T.ty t_pos))
+                           in
+                           let subst =
+                             Unif.FO.bind ~check:false subst
+                               (Scoped.set dt v2) (Scoped.set t t_pos) in
+                           traverse subtrie (skip i) subst
+                         with Unif.Fail -> () (* incompatible binding, or occur check *)
+                       end
+                     | Some t' ->
+                       (* already bound, check consistency *)
+                       if Unif.FO.equal ~subst (Scoped.set t t_pos) t'
+                       then traverse subtrie (skip i) subst
+                   end
+                 | Subterm t2 ->
+                   (* fallback to matching *)
+                   begin
+                     try
+                       let subst =
+                         Unif.FO.matching
+                           ~subst ~pattern:(Scoped.set dt t2) (Scoped.set t t_pos)
+                       in
+                       traverse subtrie (skip i) subst
+                     with Unif.Fail -> ()
+                   end
+                 | _ when eq_char c2 c1 ->
+                   (* explore branch that has the same symbol, if any *)
+                   assert (not (T.is_var t_pos));
+                   traverse subtrie (next i) subst;
+                 | _ -> ())
             trie.map
     in
     traverse (fst dt) (iterate (fst t)) subst;

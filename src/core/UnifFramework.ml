@@ -97,7 +97,7 @@ module Make (P : PARAMETERS) = struct
         else (
           let rec decompose_rest = function 
           | [] -> ([],[],[])
-          | ((l,r,f) as x) :: xs ->
+          | ((l,r,_) as x) :: xs ->
             let num_vars = if T.is_var (T.head_term l) then 1 else 0 
                            + if T.is_var (T.head_term r) then 1 else 0 in
             let rr, fr, vars = decompose_rest xs in

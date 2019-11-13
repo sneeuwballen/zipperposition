@@ -647,7 +647,7 @@ let suite_pv_unif : unit Alcotest.test_case list =
   let (=?=) a b = Task.mk_unif a b in (* unif pair *)
   let (<?>) a b = Task.mk_unif ~negated:true a b in (* unif pair *)
   let (>->) a b = Task.set_with_ty b a in (* specify return type *)
-  let (>?->) a b = Action.set_with_ty b a in (* specify return type *)
+  (* let (>?->) a b = Action.set_with_ty b a in specify return type *)
   let (>>>) a b = Task.add_action b a in (* specify return type *)
   let mk_tests (pair) =
     let parsed_pair = ref None in
@@ -673,7 +673,7 @@ let suite_pv_unif : unit Alcotest.test_case list =
 
   CCList.flat_map mk_tests
     [ 
-      "X" =?= "Y a" >-> "term"
+      (* "X" =?= "Y a" >-> "term"
       |> Task.add_var_type "X" "term"
       |> Task.add_var_type "Y" "term -> term"
       >>> Action.eqs [
@@ -713,7 +713,7 @@ let suite_pv_unif : unit Alcotest.test_case list =
       >>> Action.eqs [
             "X", "(fun u. u)", Some "term -> term" ; 
             "Y", "g a", Some "term";
-         ];
+         ]; *)
 
       
       (* Iterate on head of disagreement pair *)
@@ -759,7 +759,7 @@ let suite_pv_unif : unit Alcotest.test_case list =
 
       (* More *)
 
-       "fun (x : term). x" <?> "fun (x : term). X"
+       (* "fun (x : term). x" <?> "fun (x : term). X"
       |> Task.add_var_type "X" "term";
 
       "X a" =?= "g a" 
@@ -776,7 +776,7 @@ let suite_pv_unif : unit Alcotest.test_case list =
       "X a b" =?= "f b Y"
       |> Task.add_var_type "X" "term -> term -> term"
       |> Task.add_var_type "Y" "term"
-      >>> Action.count 2;
+      >>> Action.count 2; *)
 
       (* "F b (g D)" =?= "f (g a) C"
       |> Task.add_var_type "F" "term -> term -> term"
@@ -836,11 +836,11 @@ let test_jp_unif_aux = "JP unification", `Quick, fun () ->
 
   (** Find disagreement tests *)
   
-  let test_disagree =
+  (* let test_disagree =
     Alcotest.testable
       Fmt.Dump.(option (pair (pair T.ZF.pp T.ZF.pp) (list @@ pair HVar.pp int)))
       CCEqual.(option @@ pair (pair T.equal T.equal) (list (pair (HVar.equal Type.equal) int)))
-  in
+  in *)
 
   OUnit.assert_equal 
     ~cmp:(CCOpt.equal (fun ((a,b),l) (((c,d),k)) -> 
@@ -862,9 +862,9 @@ let test_jp_unif_aux = "JP unification", `Quick, fun () ->
 
   (** Rule tests *)
 
-  let test_rule =
+  (* let test_rule =
     Alcotest.testable Fmt.Dump.(list T.ZF.pp) CCEqual.(list T.equal)
-  in
+  in *)
 
   let scope = 0 in
 

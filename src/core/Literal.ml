@@ -184,7 +184,7 @@ let is_typex_pred = function
   | _ -> false
 
 let is_propositional = function
-  | Equation(lhs,rhs,true) ->
+  | Equation(_,rhs,true) ->
     T.is_true_or_false rhs
   | _ -> false
 

@@ -81,13 +81,13 @@ let rec of_term term =
 
 let rec pp out = function 
   | AppBuiltin(b,args,repls) ->
-    CCFormat.printf "|@[%a@](@[%a@])|@[%a@]|" Builtin.pp b (CCList.pp ~sep:"," pp) args (TS.pp ~sep:" " T.pp) repls;
+    CCFormat.fprintf out "|@[%a@](@[%a@])|@[%a@]|" Builtin.pp b (CCList.pp ~sep:"," pp) args (TS.pp ~sep:" " T.pp) repls;
   | App(hds,args,repls) ->
-    CCFormat.printf "|@[%a@](@[%a@])|@[%a@]|" (TS.pp ~sep:"," ~start:"{" ~stop:"}" T.pp) hds (CCList.pp ~sep:"," pp) args (TS.pp ~sep:" " T.pp) repls;
+    CCFormat.fprintf out "|@[%a@](@[%a@])|@[%a@]|" (TS.pp ~sep:"," ~start:"{" ~stop:"}" T.pp) hds (CCList.pp ~sep:"," pp) args (TS.pp ~sep:" " T.pp) repls;
   | Fun(ty,repls) ->
-    CCFormat.printf "|l@[%a@].@[%a@]|" Type.pp ty pp repls;
+    CCFormat.fprintf out "|l@[%a@].@[%a@]|" Type.pp ty pp repls;
   | Repl repls ->
-    CCFormat.printf "{r:@[%a@]}" (TS.pp ~sep:" " T.pp) repls
+    CCFormat.fprintf out "{r:@[%a@]}" (TS.pp ~sep:" " T.pp) repls
 
 let cover t solids : multiterm = 
   let n = List.length solids in
@@ -198,7 +198,7 @@ let solid_match ~subst ~pattern ~target =
           (fun subst (l',r') ->  aux subst l' r') 
         subst (List.combine args args')
       | _ -> raise SolidMatchFail end
-    | Fun(ty, body) ->
+    | Fun _ ->
       let prefix, body = T.open_fun l in
       let prefix', body' = T.open_fun r in
       assert(List.length prefix = List.length prefix');
@@ -225,7 +225,7 @@ let normaize_clauses subsumer target =
 let sign l = 
     let res = 
       match l with 
-      | L.Equation (l, r, sign) ->
+      | L.Equation (_, r, sign) ->
         if sign && T.is_true_or_false r then T.equal r T.true_ else sign
       | L.Int o -> Int_lit.sign o
       | L.False -> false
@@ -297,7 +297,6 @@ let check_subsumption_possibility subsumer target =
   (not (neg_t >=3 || pos_t >= 3) ||
     CCArray.for_all (fun l -> CCArray.exists (is_more_specific l) target) subsumer)
 
-exception PrematureTermination
 let subsumes subsumer target =
   let n = Array.length subsumer in
   (* let subsumer_o, target_o = subsumer, target in *)

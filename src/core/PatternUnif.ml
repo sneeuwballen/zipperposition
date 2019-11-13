@@ -256,7 +256,7 @@ let rec unify ~scope ~counter ~subst = function
       | (T.Var _, T.Var _) ->
         let subst =
           (if T.equal hd_s hd_t then flex_same ~counter ~scope ~subst hd_s args_s args_t
-          else flex_diff ~pref_l ~counter ~scope ~subst hd_s hd_t args_s args_t) in
+          else flex_diff ~counter ~scope ~subst hd_s hd_t args_s args_t) in
         unify ~scope ~counter ~subst rest
       | (T.Var _, T.Const _) | (T.Var _, T.DB _) | (T.Var _, T.AppBuiltin _) ->
         let subst = flex_rigid ~pref_l ~subst ~counter ~scope  body_s' body_t' in
@@ -324,7 +324,7 @@ and flex_same ~counter ~scope ~subst var args_s args_t =
    
    For example, X 0 3 1 =?= Y 1 3 2 5 is solved by 
     {X -> λλλ. Z 1 0, Y -> λλλλ. Z 2 0 } *)
-and flex_diff ~pref_l ~counter ~scope ~subst var_s var_t args_s args_t =
+and flex_diff  ~counter ~scope ~subst var_s var_t args_s args_t =
   if CCList.is_empty args_s && CCList.is_empty args_t then (
     US.FO.bind subst (Term.as_var_exn var_s,scope) (var_t,scope)
   ) else (
