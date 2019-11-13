@@ -368,7 +368,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let unifiers = CCList.flat_map (fun literal -> 
       match literal with 
       | Literal.Equation(lhs, rhs, false) when Type.is_prop (Term.ty lhs) ->
-        PragHOUnif.unify_scoped (lhs,0) (rhs,0)
+        PUnif.unify_scoped (lhs,0) (rhs,0)
         |> OSeq.filter_map CCFun.id
         |> OSeq.to_list
       | _ -> []

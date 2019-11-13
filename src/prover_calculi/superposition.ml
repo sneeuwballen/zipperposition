@@ -2969,7 +2969,7 @@ let () =
     , Arg.Set_int _trigger_bool_inst
     , " instantiate predicate variables with boolean terms already in the proof state. Argument is the maximal proof depth of predicate variable";
       "--ho-unif-level",
-      Arg.Symbol (["full-framework";"full"; "pragmatic-framework"; "pragmatic"], (fun str ->
+      Arg.Symbol (["full-framework";"full"; "pragmatic-framework";], (fun str ->
         _unif_alg := if (String.equal "full" str) then JP_unif.unify_scoped
                      else if (String.equal "full-framework" str) then 
                       (
@@ -2978,7 +2978,7 @@ let () =
                         res
                       )
                      else if (String.equal "pragmatic-framework" str) then PUnif.unify_scoped
-                     else PragHOUnif.unify_scoped)),
+                     else invalid_arg "unknown argument")),
       "set the level of HO unification"
       ; "--max-inferences"
       , Arg.Int (fun p -> _max_infs := p)
@@ -2994,6 +2994,7 @@ let () =
       _complete_ho_unification := true;
       _ord_in_normal_form := true;
       _sup_at_var_headed := false;
+      _unif_alg := JPFull.unify_scoped;
       _lambdasup := -1;
       _dupsup := false;
     );
@@ -3005,7 +3006,7 @@ let () =
       _lambda_demod := false;
       _demod_in_var_args := false;
       _complete_ho_unification := true;
-      _unif_alg := PragHOUnif.unify_scoped;
+      _unif_alg := PUnif.unify_scoped;
       _ord_in_normal_form := true;
       _sup_at_var_headed := true;
       _lambdasup := -1;
@@ -3026,7 +3027,7 @@ let () =
       _lambda_demod := false;
       _demod_in_var_args := false;
       _complete_ho_unification := true;
-      _unif_alg := PragHOUnif.unify_scoped;
+      _unif_alg := PUnif.unify_scoped;
       _ord_in_normal_form := true;
       _sup_at_var_headed := true;
       _lambdasup := -1;
