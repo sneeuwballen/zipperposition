@@ -35,31 +35,30 @@ let prof_eq_res = Util.mk_profiler "ho.eq_res"
 let prof_eq_res_syn = Util.mk_profiler "ho.eq_res_syntactic"
 let prof_ho_unif = Util.mk_profiler "ho.unif"
 
-let _ext_pos = ref true
-let _ext_pos_all_lits = ref false
-let _ext_axiom = ref false
-let _choice_axiom = ref false
-let _elim_pred_var = ref true
-let _ext_neg_lit = ref false
-let _neg_ext = ref true
-let _neg_ext_as_simpl = ref false
-let _ext_axiom_penalty = ref 5
-let _var_arg_remove = ref true
-let _huet_style = ref false
-let _cons_elim = ref true
-let _imit_first = ref false
-let _compose_subs = ref false
-let _var_solve = ref false
-let _neg_cong_fun = ref false
-let _instantiate_choice_ax = ref false
-let _elim_leibniz_eq = ref (-1)
-let _unif_max_depth = ref 11
+let k_ext_pos = Flex_state.create_key ()
+let k_ext_pos_all_lits = Flex_state.create_key ()
+let k_ext_axiom = Flex_state.create_key ()
+let k_choice_axiom = Flex_state.create_key ()
+let k_elim_pred_var = Flex_state.create_key ()
+let k_ext_neg_lit = Flex_state.create_key ()
+let k_neg_ext = Flex_state.create_key ()
+let k_neg_ext_as_simpl = Flex_state.create_key ()
+let k_ext_axiom_penalty = Flex_state.create_key ()
+let k_var_arg_remove = Flex_state.create_key ()
+let k_huet_style = Flex_state.create_key ()
+let k_cons_elim = Flex_state.create_key ()
+let k_imit_first = Flex_state.create_key ()
+let k_compose_subs = Flex_state.create_key ()
+let k_var_solve = Flex_state.create_key ()
+let k_neg_cong_fun = Flex_state.create_key ()
+let k_instantiate_choice_ax = Flex_state.create_key ()
+let k_elim_leibniz_eq = Flex_state.create_key ()
+let k_unif_max_depth = Flex_state.create_key ()
+let k_prune_arg_fun = Flex_state.create_key ()
+let k_prim_enum_terms = Flex_state.create_key ()
 
 type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
 
-let _prune_arg_fun = ref `NoPrune
-
-let prim_enum_terms = ref Term.Set.empty
 
 module type S = sig
   module Env : Env.S
@@ -582,7 +581,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     end
 
   (* maximum penalty on clauses to perform Primitive Enum on *)
-  let max_penalty_prim_ = E.flex_get k_ho_prim_max_penalty
+  let max_penalty_prim_ = Env.flex_get k_ho_prim_max_penalty
 
   (* rule for primitive enumeration of predicates [P t1…tn]
      (using ¬ and ∧ and =) *)
@@ -613,11 +612,11 @@ module Make(E : Env.S) : S with module Env = E = struct
     let sc_c = 0 in
     let offset = C.Seq.vars c |> T.Seq.max_var |> succ in
     begin
-      let enum_prop = vars
+      vars
       |> T.VarSet.to_seq
       |> Iter.flat_map_l
-        (fun v -> HO_unif.enum_prop ~mode ~enum_cache:prim_enum_terms (v,sc_c) ~offset) in
-      enum_prop
+        (fun v -> HO_unif.enum_prop ~enum_cache:(Env.flex_get k_prim_enum_terms) 
+                                    ~mode ~offset (v,sc_c))
       |> Iter.map
         (fun (subst,penalty) ->
            let renaming = Subst.Renaming.create() in
@@ -762,7 +761,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     
   
   let elim_leibniz_equality c =
-    if C.proof_depth c < !_elim_leibniz_eq then (
+    if C.proof_depth c < Env.flex_get k_elim_leibniz_eq then (
       let ord = Env.ord () in
       let eligible = C.Eligible.always in
       let pos_pred_vars, neg_pred_vars, occurences = 
@@ -792,7 +791,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                                 arg (T.bvar ~ty:(T.ty arg) (n-i-1)) in
                   let subs_term = T.fun_l tyargs body in 
                   (let cached_t = Subst.FO.canonize_all_vars subs_term in
-                  prim_enum_terms := Term.Set.add cached_t !prim_enum_terms);
+                  E.flex_add k_prim_enum_terms 
+                    (ref (Term.Set.add cached_t !(Env.flex_get k_prim_enum_terms))));
                   let subst = Subst.FO.bind' (Subst.empty) (var_hd, 0) (subs_term, 0) in
                   let rule = Proof.Rule.mk ("elim_leibniz_eq_" ^ (if sign then "+" else "-")) in
                   let tags = [Proof.Tag.T_ho] in
@@ -927,7 +927,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     let x_diff = Term.app x [Term.app diff [T.of_ty alpha; T.of_ty beta; x; y]] in
     let y_diff = Term.app y [Term.app diff [T.of_ty alpha; T.of_ty beta; x; y]] in
     let lits = [Literal.mk_eq x y; Literal.mk_neq x_diff y_diff] in
-    Env.C.create ~penalty:!_ext_axiom_penalty ~trail:Trail.empty lits Proof.Step.trivial
+    Env.C.create ~penalty:(Env.flex_get k_ext_axiom_penalty) ~trail:Trail.empty 
+      lits Proof.Step.trivial
 
   let choice_clause =
     let choice_id = ID.make("zf_choice") in
@@ -1193,27 +1194,23 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debug ~section 1 "setup HO rules";
       Env.Ctx.lost_completeness();
       Env.add_unary_inf "ho_complete_eq" complete_eq_args;
-      if !_elim_pred_var then
+      if Env.flex_get k_elim_pred_var then
         Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
-      if !_ext_neg_lit then
+      if Env.flex_get k_ext_neg_lit then
         Env.add_lit_rule "ho_ext_neg_lit" ext_neg_lit;
 
-      if !_elim_leibniz_eq > 0 then (
+      if Env.flex_get k_elim_leibniz_eq > 0 then (
         Env.add_unary_inf "ho_elim_leibniz_eq" elim_leibniz_equality
       );
 
-      if !_instantiate_choice_ax then (
+      if Env.flex_get k_instantiate_choice_ax then (
         Env.add_redundant recognize_choice_ops;
         Env.add_unary_inf "inst_choice" insantiate_choice;
       );
 
-
-
-
-      if !_ext_pos then (
-        (* Env.add_unary_inf "ho_ext_pos" (ext_pos ~only_unit:(not !_ext_pos_non_unit)) *)
-        (* Env.add_unary_inf "ho_ext_pos_old" ext_pos_old; *)
-        Env.add_unary_inf "ho_ext_pos" (ext_pos_general ~all_lits:!_ext_pos_all_lits);
+      if Env.flex_get k_ext_pos then (
+        Env.add_unary_inf "ho_ext_pos" 
+          (ext_pos_general ~all_lits:(Env.flex_get k_ext_pos_all_lits));
       );
 
       (* removing unfolded clauses *)
@@ -1223,7 +1220,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                         | Some _ -> E.CR_drop
                         | None -> E.CR_skip ));
 
-      begin match !_prune_arg_fun with
+      begin match Env.flex_get k_prune_arg_fun with
       | `PruneMaxCover -> Env.add_unary_simplify (prune_arg ~all_covers:false);
       | `PruneAllCovers -> Env.add_unary_simplify (prune_arg ~all_covers:true);
       | `OldPrune -> Env.add_unary_simplify prune_arg_old;
@@ -1241,17 +1238,17 @@ module Make(E : Env.S) : S with module Env = E = struct
       Env.set_ho_normalization_rule ho_norm;
       Ordering.normalize := (fun t -> CCOpt.get_or ~default:t (ho_norm t));
 
-      if (!_huet_style) then
+      if (Env.flex_get k_huet_style) then
         JP_unif.set_huet_style ();
 
-      if(!_neg_cong_fun) then (
+      if(Env.flex_get k_neg_cong_fun) then (
         Env.add_unary_inf "neg_cong_fun" neg_cong_fun 
       );
 
-      if(!_neg_ext) then (
+      if(Env.flex_get k_neg_ext) then (
         Env.add_unary_inf "neg_ext" neg_ext 
       )
-      else if(!_neg_ext_as_simpl) then (
+      else if(Env.flex_get k_neg_ext_as_simpl) then (
         Env.add_unary_simplify neg_ext_simpl;
       );
 
@@ -1263,9 +1260,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         | mode ->
           Env.add_unary_inf "ho_prim_enum" (prim_enum ~mode);
       end;
-      if !_ext_axiom then
+      if Env.flex_get k_ext_axiom then
         Env.ProofState.PassiveSet.add (Iter.singleton extensionality_clause);
-      if !_choice_axiom then
+      if Env.flex_get k_choice_axiom then
         Env.ProofState.PassiveSet.add (Iter.singleton choice_clause);
     );
     ()
@@ -1315,15 +1312,57 @@ let st_contains_ho (st:(_,_,_) Statement.t): bool =
   in
   has_ho_sym () || has_ho_var () || has_ho_eq()
 
-let extension =
-  (* let env_action env =
-    let module E = (val env : Env.S) in
-    if E.flex_get k_enable_def_unfold then (
-      let clauses = E.
-    )  *)
+let _ext_pos = ref true
+let _ext_pos_all_lits = ref false
+let _ext_axiom = ref false
+let _choice_axiom = ref false
+let _elim_pred_var = ref true
+let _ext_neg_lit = ref false
+let _neg_ext = ref true
+let _neg_ext_as_simpl = ref false
+let _ext_axiom_penalty = ref 5
+let _var_arg_remove = ref true
+let _huet_style = ref false
+let _cons_elim = ref true
+let _imit_first = ref false
+let _compose_subs = ref false
+let _var_solve = ref false
+let _neg_cong_fun = ref false
+let _instantiate_choice_ax = ref false
+let _elim_leibniz_eq = ref (-1)
+let _unif_max_depth = ref 11
+let _prune_arg_fun = ref `NoPrune
+let prim_enum_terms = ref Term.Set.empty
 
+
+let extension =
   let register env =
     let module E = (val env : Env.S) in
+
+    E.flex_add k_ext_pos !_ext_pos;
+    E.flex_add k_ext_pos_all_lits !_ext_pos_all_lits;
+    E.flex_add k_ext_axiom !_ext_pos_all_lits;
+    E.flex_add k_choice_axiom !_choice_axiom;
+    E.flex_add k_elim_pred_var !_elim_pred_var;
+    E.flex_add k_ext_neg_lit !_ext_neg_lit;
+    E.flex_add k_neg_ext !_neg_ext;
+    E.flex_add k_neg_ext_as_simpl !_neg_ext_as_simpl;
+    E.flex_add k_ext_axiom_penalty !_ext_axiom_penalty;
+    E.flex_add k_var_arg_remove !_var_arg_remove;
+    E.flex_add k_huet_style !_huet_style;
+    E.flex_add k_cons_elim !_cons_elim;
+    E.flex_add k_imit_first !_imit_first;
+    E.flex_add k_compose_subs !_compose_subs;
+    E.flex_add k_var_solve !_var_solve;
+    E.flex_add k_neg_cong_fun !_neg_cong_fun;
+    E.flex_add k_instantiate_choice_ax !_instantiate_choice_ax;
+    E.flex_add k_elim_leibniz_eq !_elim_leibniz_eq;
+    E.flex_add k_unif_max_depth !_unif_max_depth;
+    E.flex_add k_prune_arg_fun !_prune_arg_fun;
+    E.flex_add k_prim_enum_terms prim_enum_terms;
+
+
+
     if E.flex_get k_some_ho || !force_enabled_ then (
       let module ET = Make(E) in
       ET.setup ()
