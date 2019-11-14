@@ -109,6 +109,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     end)
   module StmQ = StreamQueue.Make(Stm)
   module Bools = Booleans.Make(Env)
+  module SS = SolidSubsumption.Make(struct let st = Env.flex_state () end)
 
   (** {6 Stream queue} *)
 
@@ -2475,7 +2476,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let subsumes a b = 
       if not @@ Env.flex_get k_solid_subsumption then subsumes a b else (
         try 
-          SolidSubsumption.subsumes a b
+          SS.subsumes a b
         with SolidSubsumption.UnsupportedLiteralKind -> 
           subsumes a b
       ) in
@@ -2508,7 +2509,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let subsumes a b = 
       if not @@ Env.flex_get k_solid_subsumption then subsumes a b else (
         try 
-          SolidSubsumption.subsumes a b
+          SS.subsumes a b
         with SolidSubsumption.UnsupportedLiteralKind -> 
           subsumes a b
       ) in
@@ -2909,20 +2910,43 @@ let _recognize_injectivity = ref false
 let _sup_with_pure_vars = ref true
 
 let _lambdasup = ref (-1)
-let _max_infs = PragUnifParams.max_inferences
+let _max_infs = ref (-1)
 let max_lits_ext_dec = ref 0
 let _ext_dec_lits = ref `OnlyMax
-let _unif_alg = ref JP_unif.unify_scoped
+let _unif_alg = ref `NewJPFull
 let _unif_level = ref `Full
 let _ground_subs_check = ref 0
 let _sup_t_f = ref true
 let _solid_subsumption = ref false
 
+let _skip_multiplier = ref 30.0
+let _imit_first = ref false
+let _max_depth = ref 3
+let _max_rigid_imitations = ref 3
+let _max_app_projections = ref 1
+let _max_elims = ref 1
+let _max_identifications = ref 1
+let _pattern_decider = ref true
+let _fixpoint_decider = ref true
+let _solid_decider = ref false
+let _solidification_limit = ref 5
+let _max_unifs_solid_ff = ref 20
+let _use_weight_for_solid_subsumption = ref false
+
 let key = Flex_state.create_key ()
+
+let all_params_to_max () =
+  _max_depth := 32768;
+  _max_app_projections := 32768;
+  _max_rigid_imitations := 32768;
+  _max_identifications := 32768;
+  _max_elims           := 32768;
+  _max_infs := -1 
 
 let register ~sup =
   let module Sup = (val sup : S) in
   let module E = Sup.Env in
+
   E.update_flex_state (Flex_state.add key sup);
   E.flex_add k_trigger_bool_inst !_trigger_bool_inst;
   E.flex_add k_sup_at_vars !_sup_at_vars;
@@ -2938,8 +2962,7 @@ let register ~sup =
   E.flex_add k_lambda_demod !_lambda_demod;
   E.flex_add k_ext_dec_lits !_ext_dec_lits;
   E.flex_add k_max_lits_ext_dec !max_lits_ext_dec;
-  E.flex_add k_use_simultaneous_sup !_use_simultaneous_sup;
-  E.flex_add k_unif_alg !_unif_alg;
+  E.flex_add k_use_simultaneous_sup !_use_simultaneous_sup;  
   E.flex_add k_fluidsup_penalty !_fluidsup_penalty;
   E.flex_add k_ground_subs_check !_ground_subs_check;
   E.flex_add k_solid_subsumption !_solid_subsumption;
@@ -2952,9 +2975,31 @@ let register ~sup =
   E.flex_add k_max_infs !_max_infs;
   E.flex_add k_switch_stream_extraction !_switch_stream_extraction;
   E.flex_add k_dont_simplify !_dont_simplify;
-  E.flex_add k_use_semantic_tauto !_use_semantic_tauto 
+  E.flex_add k_use_semantic_tauto !_use_semantic_tauto;
 
+  E.flex_add PragUnifParams.k_skip_multiplier !_skip_multiplier;
+  E.flex_add PragUnifParams.k_imit_first !_imit_first;
+  E.flex_add PragUnifParams.k_max_depth !_max_depth;
+  E.flex_add PragUnifParams.k_max_rigid_imitations !_max_rigid_imitations;
+  E.flex_add PragUnifParams.k_max_app_projections !_max_app_projections;
+  E.flex_add PragUnifParams.k_max_elims !_max_elims;
+  E.flex_add PragUnifParams.k_max_identifications !_max_identifications;
+  E.flex_add PragUnifParams.k_pattern_decider !_pattern_decider;
+  E.flex_add PragUnifParams.k_fixpoint_decider !_fixpoint_decider;
+  E.flex_add PragUnifParams.k_solid_decider !_solid_decider;
+  E.flex_add PragUnifParams.k_solidification_limit !_solidification_limit;
+  E.flex_add PragUnifParams.k_max_unifs_solid_ff !_max_unifs_solid_ff;
+  E.flex_add PragUnifParams.k_use_weight_for_solid_subsumption !_use_weight_for_solid_subsumption;
   
+  let module JPF = JPFull.Make(struct let st = E.flex_state () end) in
+  let module JPP = PUnif.Make(struct let st = E.flex_state () end) in
+  begin match !_unif_alg with 
+  | `OldJP -> E.flex_add k_unif_alg JP_unif.unify_scoped
+  | `NewJPFull -> E.flex_add k_unif_alg JPF.unify_scoped
+  | `NewJPPragmatic -> E.flex_add k_unif_alg JPP.unify_scoped end
+    
+
+ 
 
 (* TODO: move DOT index printing into the extension *)
 
@@ -2972,114 +3017,66 @@ let extension =
 
 let () =
   Params.add_opts
-    [ "--semantic-tauto"
-    , Arg.Bool (fun v -> _use_semantic_tauto := v)
-    , " enable/disable semantic tautology check"
-    ; "--dot-sup-into"
-    , Arg.String (fun s -> _dot_sup_into := Some s)
-    , " print superposition-into index into file"
-    ; "--dot-sup-from"
-    , Arg.String (fun s -> _dot_sup_from := Some s)
-    , " print superposition-from index into file"
-    ; "--dot-demod"
-    , Arg.String (fun s -> _dot_simpl := Some s)
-    , " print forward rewriting index into file"
-    ; "--dot-demod-into"
-    , Arg.String (fun s -> _dot_demod_into := Some s)
-    , " print backward rewriting index into file"
-    ; "--simultaneous-sup"
-    , Arg.Bool (fun b -> _use_simultaneous_sup := b)
-    , " enable/disable simultaneous superposition"
-    ; "--dont-simplify"
-    , Arg.Set _dont_simplify
-    , " disable simplification rules"
-    ; "--sup-at-vars"
-    , Arg.Bool (fun v -> _sup_at_vars := v)
-    , " enable/disable superposition at variables under certain ordering conditions"
-    ; "--sup-at-var-headed"
-    , Arg.Bool (fun b -> _sup_at_var_headed := b)
-    , " enable/disable superposition at variable headed terms"
-    ; "--sup-in-var-args"
-    , Arg.Bool (fun b -> _sup_in_var_args := b)
-    , " enable/disable superposition in arguments of applied variables"
-    ; "--sup-under-lambdas"
-    , Arg.Bool (fun b -> _sup_under_lambdas := b)
-    , " enable/disable superposition in bodies of lambda-expressions"
-    ; "--lambda-demod"
-    , Arg.Bool (fun b -> _lambda_demod := b)
-    , " enable/disable demodulation in bodies of lambda-expressions"
-    ; "--demod-in-var-args"
-    , Arg.Bool (fun b -> _demod_in_var_args := b)
-    , " enable demodulation in arguments of variables"
-    ; "--complete-ho-unif"
-    , Arg.Bool (fun b -> _complete_ho_unification := b)
-    , " enable complete higher-order unification algorithm (Jensen-Pietrzykowski)"
-    ; "--switch-stream-extract"
-    , Arg.Bool (fun b -> _switch_stream_extraction := b)
-    , " in ho mode, switches heuristic of clause extraction from the stream queue"
-    ; "--ord-in-normal-form"
-    , Arg.Bool (fun v -> _ord_in_normal_form := v)
-    , " compare intermediate terms in calculus rules in beta-normal-eta-long form"
-    ; "--ext-decompose"
-    , Arg.Set_int max_lits_ext_dec
-    , " Sets the maximal number of literals clause can have for ExtDec inference."
-    ; "--ext-decompose-lits"
-    , Arg.Symbol (["all";"max"], (fun str -> 
+    [
+    "--semantic-tauto", Arg.Bool (fun v -> _use_semantic_tauto := v), " enable/disable semantic tautology check"; 
+    "--dot-sup-into", Arg.String (fun s -> _dot_sup_into := Some s), " print superposition-into index into file";
+    "--dot-sup-from", Arg.String (fun s -> _dot_sup_from := Some s), " print superposition-from index into file";
+    "--dot-demod", Arg.String (fun s -> _dot_simpl := Some s), " print forward rewriting index into file";
+    "--dot-demod-into", Arg.String (fun s -> _dot_demod_into := Some s), " print backward rewriting index into file"; 
+    "--simultaneous-sup", Arg.Bool (fun b -> _use_simultaneous_sup := b), " enable/disable simultaneous superposition";
+    "--dont-simplify", Arg.Set _dont_simplify, " disable simplification rules";
+    "--sup-at-vars", Arg.Bool (fun v -> _sup_at_vars := v), " enable/disable superposition at variables under certain ordering conditions";
+    "--sup-at-var-headed", Arg.Bool (fun b -> _sup_at_var_headed := b), " enable/disable superposition at variable headed terms";
+    "--sup-in-var-args", Arg.Bool (fun b -> _sup_in_var_args := b), " enable/disable superposition in arguments of applied variables";
+    "--sup-under-lambdas", Arg.Bool (fun b -> _sup_under_lambdas := b), " enable/disable superposition in bodies of lambda-expressions";
+    "--lambda-demod", Arg.Bool (fun b -> _lambda_demod := b), " enable/disable demodulation in bodies of lambda-expressions";
+    "--demod-in-var-args", Arg.Bool (fun b -> _demod_in_var_args := b), " enable demodulation in arguments of variables";
+    "--complete-ho-unif", Arg.Bool (fun b -> _complete_ho_unification := b), " enable complete higher-order unification algorithm (Jensen-Pietrzykowski)";
+    "--switch-stream-extract", Arg.Bool (fun b -> _switch_stream_extraction := b), " in ho mode, switches heuristic of clause extraction from the stream queue";
+    "--ord-in-normal-form", Arg.Bool (fun v -> _ord_in_normal_form := v), " compare intermediate terms in calculus rules in beta-normal-eta-long form";
+    "--ext-decompose", Arg.Set_int max_lits_ext_dec, " Sets the maximal number of literals clause can have for ExtDec inference.";
+    "--ext-decompose-lits", Arg.Symbol (["all";"max"], (fun str -> 
         _ext_dec_lits := if String.equal str "all" then `All else `OnlyMax))
-    , " Sets the maximal number of literals clause can have for ExtDec inference."
-    ; "--fluidsup-penalty"
-    , Arg.Int (fun p -> _fluidsup_penalty := p)
-    , " penalty for FluidSup inferences"
-    ; "--fluidsup"
-    , Arg.Bool (fun b -> _fluidsup :=b)
-    , " enable/disable FluidSup inferences (only effective when complete higher-order unification is enabled)"
-    ; "--lambdasup"
-    , Arg.Int (fun l -> 
-                  if l < 0 then 
-                    raise (Util.Error ("argument parsing", 
-                                       "lambdaSup argument should be non-negative"));
-              _lambdasup := l)
-    , " enable LambdaSup -- argument is the maximum number of skolems introduced in an inference";
-    "--dupsup"
-    , Arg.Bool (fun v -> _dupsup := v)
-    , " enable/disable DupSup inferences";
-    "--ground-before-subs"
-    , Arg.Set_int _ground_subs_check
-    , " set the level of grounding before substitution. 0 - no grounding. 1 - only active. 2 - both.";
-    "--solid-subsumption"
-    , Arg.Bool (fun v -> _solid_subsumption := v)
-    , " set solid subsumption on or off";
-    "--recognize-injectivity"
-    , Arg.Bool (fun v -> _recognize_injectivity := v)
-    , " recognize injectivity axiom and axiomatize corresponding inverse";
-    "--sup-with-pure-vars"
-    , Arg.Bool (fun v -> _sup_with_pure_vars := v)
-    , " enable/disable superposition to and from pure variable equations";
-    ("--sup-with-true-false")
-    , Arg.Bool (fun v ->( _sup_t_f := v))
-    , " enable/disable superposition, eq-res and eq-fact with true/false";
-    "--use-weight-for-solid-subsumption"
-    , Arg.Bool (fun v -> PragUnifParams.use_weight_for_solid_subsumption := v)
-    , " enable/disable superposition to and from pure variable equations";
-    "--trigger-bool-inst"
-    , Arg.Set_int _trigger_bool_inst
-    , " instantiate predicate variables with boolean terms already in the proof state. Argument is the maximal proof depth of predicate variable";
-      "--ho-unif-level",
+    , " Sets the maximal number of literals clause can have for ExtDec inference.";
+    "--fluidsup-penalty", Arg.Int (fun p -> _fluidsup_penalty := p), " penalty for FluidSup inferences";
+    "--fluidsup", Arg.Bool (fun b -> _fluidsup :=b), " enable/disable FluidSup inferences (only effective when complete higher-order unification is enabled)";
+    "--lambdasup", Arg.Int (fun l -> 
+        if l < 0 then 
+          raise (Util.Error ("argument parsing", 
+                              "lambdaSup argument should be non-negative"));
+          _lambdasup := l), 
+        " enable LambdaSup -- argument is the maximum number of skolems introduced in an inference";
+    "--dupsup", Arg.Bool (fun v -> _dupsup := v), " enable/disable DupSup inferences";
+    "--ground-before-subs", Arg.Set_int _ground_subs_check, " set the level of grounding before substitution. 0 - no grounding. 1 - only active. 2 - both.";
+    "--solid-subsumption", Arg.Bool (fun v -> _solid_subsumption := v), " set solid subsumption on or off";
+    "--recognize-injectivity", Arg.Bool (fun v -> _recognize_injectivity := v), " recognize injectivity axiom and axiomatize corresponding inverse";
+    "--sup-with-pure-vars" , Arg.Bool (fun v -> _sup_with_pure_vars := v), " enable/disable superposition to and from pure variable equations";
+    "--sup-with-true-false", Arg.Bool (fun v ->( _sup_t_f := v)), " enable/disable superposition, eq-res and eq-fact with true/false";
+    "--use-weight-for-solid-subsumption", Arg.Bool (fun v -> _use_weight_for_solid_subsumption := v), 
+        " enable/disable superposition to and from pure variable equations";
+    "--trigger-bool-inst", Arg.Set_int _trigger_bool_inst
+        , " instantiate predicate variables with boolean terms already in the proof state. Argument is the maximal proof depth of predicate variable";
+    "--ho-unif-level",
       Arg.Symbol (["full-framework";"full"; "pragmatic-framework";], (fun str ->
-        _unif_alg := if (String.equal "full" str) then JP_unif.unify_scoped
-                     else if (String.equal "full-framework" str) then 
-                      (
-                        let res = JPFull.unify_scoped in 
-                        PragUnifParams.all_paramst_to_def ();
-                        res
-                      )
-                     else if (String.equal "pragmatic-framework" str) then PUnif.unify_scoped
-                     else invalid_arg "unknown argument")),
-      "set the level of HO unification"
-      ; "--max-inferences"
-      , Arg.Int (fun p -> _max_infs := p)
-      , " set maximal number of inferences"
-    ];
+        _unif_alg := if (String.equal "full" str) then `OldJP
+                     else if (String.equal "full-framework" str) then (
+                        all_params_to_max ();
+                        `NewJPFull)
+                     else if (String.equal "pragmatic-framework" str) then `NewJPPragmatic
+                     else invalid_arg "unknown argument")), "set the level of HO unification";
+    "--ho-imitation-first",Arg.Bool (fun v -> _imit_first:=v), " Use imitation rule before projection rule";
+    "--ho-unif-max-depth", Arg.Set_int _max_depth, " set pragmatic unification max depth";
+    "--ho-max-app-projections", Arg.Set_int _max_app_projections, " set maximal number of functional type projections";
+    "--ho-max-elims", Arg.Set_int _max_elims, " set maximal number of eliminations";
+    "--ho-max-identifications", Arg.Set_int _max_identifications, " set maximal number of flex-flex identifications";
+    "--ho-skip-multiplier", Arg.Set_float _skip_multiplier, " set maximal number of flex-flex identifications";
+    "--ho-max-rigid-imitations", Arg.Set_int _max_rigid_imitations, " set maximal number of rigid imitations";
+    "--ho-max-solidification", Arg.Set_int _solidification_limit, " set maximal number of rigid imitations";
+    "--ho-max-unifs-solid-flex-flex", Arg.Set_int _max_unifs_solid_ff, " set maximal number of found unifiers for solid flex-flex pairs. -1 stands for finding the MGU";
+    "--ho-pattern-decider", Arg.Bool (fun b -> _pattern_decider := b), "turn pattern decider on or off";
+    "--ho-solid-decider", Arg.Bool (fun b -> _solid_decider := b), "turn solid decider on or off";
+    "--ho-fixpoint-decider", Arg.Bool (fun b -> _fixpoint_decider := b), "turn fixpoint decider on or off";
+    "--max-inferences", Arg.Int (fun p -> _max_infs := p), " set maximal number of inferences"];
     Params.add_to_mode "ho-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
       _sup_at_vars := true;
@@ -3090,7 +3087,7 @@ let () =
       _complete_ho_unification := true;
       _ord_in_normal_form := true;
       _sup_at_var_headed := false;
-      _unif_alg := JPFull.unify_scoped;
+      _unif_alg := `NewJPFull;
       _lambdasup := -1;
       _dupsup := false;
     );
@@ -3102,17 +3099,16 @@ let () =
       _lambda_demod := false;
       _demod_in_var_args := false;
       _complete_ho_unification := true;
-      _unif_alg := PUnif.unify_scoped;
+      _unif_alg := `NewJPPragmatic;
       _ord_in_normal_form := true;
       _sup_at_var_headed := true;
       _lambdasup := -1;
       _dupsup := false;
       _max_infs := 5;
-      PragUnifParams.max_depth := 3;
-      PragUnifParams.max_app_projections := 0;
-      PragUnifParams.max_var_imitations := 1;
-      PragUnifParams.max_identifications := 1;
-      PragUnifParams.max_elims := 1;
+      _max_depth := 3;
+      _max_app_projections := 0;
+      _max_identifications := 1;
+      _max_elims := 1;
       _fluidsup := false;
     );
     Params.add_to_mode "ho-competitive" (fun () ->
@@ -3123,17 +3119,16 @@ let () =
       _lambda_demod := false;
       _demod_in_var_args := false;
       _complete_ho_unification := true;
-      _unif_alg := PUnif.unify_scoped;
+      _unif_alg := `NewJPPragmatic;
       _ord_in_normal_form := true;
       _sup_at_var_headed := true;
       _lambdasup := -1;
       _dupsup := false;
       _max_infs := 10;
-      PragUnifParams.max_depth := 6;
-      PragUnifParams.max_app_projections := 1;
-      PragUnifParams.max_var_imitations := 1;
-      PragUnifParams.max_identifications := 1;
-      PragUnifParams.max_elims := 1;
+      _max_depth := 6;
+      _max_app_projections := 1;
+      _max_identifications := 1;
+      _max_elims := 1;
       _fluidsup := false;
     );
     Params.add_to_mode "fo-complete-basic" (fun () ->

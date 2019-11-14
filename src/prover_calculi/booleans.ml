@@ -40,6 +40,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module C = Env.C
   module Ctx = Env.Ctx
   module Fool = Fool.Make(Env)
+  module PUnif = PUnif.Make(struct let st = Env.flex_state () end)
 
   let (=~),(/~) = Literal.mk_eq, Literal.mk_neq
   let (@:) = T.app_builtin ~ty:Type.prop

@@ -2,6 +2,7 @@ module T = Term
 module S = Subst
 module PU = PatternUnif
 module US = Unif_subst
+module PUP = PragUnifParams
 
 module US_A = struct
 
@@ -18,11 +19,15 @@ let prof_flex_rigid = Util.mk_profiler "su.flex_rigid"
 let prof_cover_rigid = Util.mk_profiler "su.cover_rigid"
 let prof_solidifier = Util.mk_profiler "su.solidifier"
 
-
-(* exception NotSolid *)
-exception CoveringImpossible
 exception NotInFragment = PU.NotInFragment
 exception NotUnifiable = PU.NotUnifiable
+
+module Make (St : sig val st : Flex_state.t end) = struct
+
+  let get_op k = Flex_state.get_exn k St.st
+
+  (* exception NotSolid *)
+  exception CoveringImpossible
 
   let eta_expand_otf ~subst ~scope pref1 pref2 t1 t2 =
     let do_exp_otf n types t = 
@@ -60,7 +65,8 @@ let solidify ?(limit=true) ?(exception_on_error=true) t =
     | App(hd, args) ->
       assert (T.is_var hd);
 
-      if limit && List.length args > !PragUnifParams.solidification_limit then
+      let solid_limit = get_op PUP.k_solidification_limit in
+      if limit && List.length args > solid_limit then
         raise NotInFragment;
 
       let args' = List.map (fun arg -> 
@@ -228,7 +234,8 @@ let solve_flex_flex_diff ~subst ~counter ~scope lhs rhs =
   assert(not @@ HVar.equal Type.equal hd_l hd_r);
   
   let cover_rigid_skeleton =
-    cover_rigid_skeleton ~covers_limit:(Some !PragUnifParams.max_unifs_solid_ff) in
+    let limit = get_op PUP.k_max_unifs_solid_ff in
+    cover_rigid_skeleton ~covers_limit:(Some limit) in
 
   let res = 
     if CCList.is_empty args_l && CCList.is_empty args_r then (
@@ -314,7 +321,7 @@ let cover_flex_rigid ~subst ~counter ~scope flex rigid =
     US.subst (solve_flex_flex_diff ~subst ~counter ~scope lhs rhs)
   ) subst flex_constraints in
   
-  let covers_limit = Some (2 * !PragUnifParams.max_inferences) in
+  let covers_limit = Some (2 * get_op PUP.k_max_inferences) in
   let rigid_covers = cover_rigid_skeleton ~covers_limit to_bind flex_args in
   let res = 
     if CCList.is_empty rigid_covers then (
@@ -502,3 +509,4 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
     let lhs_o = norm @@ US_A.apply subst t0_s and rhs_o = norm @@ US_A.apply subst t1_s in *)
     (* CCFormat.printf "@[%a@]=?=@[%a@]@ is not unifiable@." T.pp lhs_o T.pp rhs_o; *)
     raise NotUnifiable
+end

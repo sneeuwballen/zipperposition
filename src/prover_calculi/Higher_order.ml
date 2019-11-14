@@ -133,11 +133,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           idx_ext_neg_lit_ := FV_ext_neg_lit.add !idx_ext_neg_lit_ (lit,l);
           l
       in
-      let new_lit =
-        Literal.mk_neq
-          (T.app f params)
-          (T.app g params)
-      in
+      let new_lit = Literal.mk_neq (T.app f params) (T.app g params) in
       Util.incr_stat stat_ext_neg_lit;
       Util.debugf ~section 4
         "(@[ho_ext_neg_lit@ :old `%a`@ :new `%a`@])"
@@ -1410,23 +1406,7 @@ let () =
       "--ho-elim-leibniz", Arg.Int (fun v -> _elim_leibniz_eq := v), " enable/disable treatment of Leibniz equality";
       "--ho-def-unfold", Arg.Bool (fun v -> def_unfold_enabled_ := v), " enable ho definition unfolding";
       "--ho-choice-inst", Arg.Bool (fun v -> _instantiate_choice_ax := v), " enable ho definition unfolding";
-      "--ho-imitation-first",Arg.Bool (fun v -> PragUnifParams._imit_first:=v), " Use imitation rule before projection rule";
-      "--ho-elim-direction", Arg.Symbol (["high-to-low"; "low-to-high"], (fun s ->
-          if s = "high-to-low" then PragUnifParams.elim_direction := PragUnifParams.HighToLow
-          else (assert (s = "low-to-high"); PragUnifParams.elim_direction := PragUnifParams.LowToHigh))), " Enable solving variables.";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom";
-      "--ho-unif-max-depth", Arg.Set_int PragUnifParams.max_depth, " set pragmatic unification max depth";
-      "--ho-max-app-projections", Arg.Set_int PragUnifParams.max_app_projections, " set maximal number of functional type projections";
-      "--ho-max-var-imitations", Arg.Set_int PragUnifParams.max_var_imitations, " set maximal number of flex-flex imitations";
-      "--ho-max-identifications", Arg.Set_int PragUnifParams.max_identifications, " set maximal number of flex-flex identifications";
-      "--ho-skip-multiplier", Arg.Set_float PragUnifParams.skip_multiplier, " set maximal number of flex-flex identifications";
-      "--ho-max-rigid-imitations", Arg.Set_int PragUnifParams.max_rigid_imitations, " set maximal number of rigid imitations";
-      "--ho-max-solidification", Arg.Set_int PragUnifParams.solidification_limit, " set maximal number of rigid imitations";
-      "--ho-max-unifs-solid-flex-flex", Arg.Set_int PragUnifParams.max_unifs_solid_ff, " set maximal number of found unifiers for solid flex-flex pairs. -1 stands for finding the MGU";
-      "--ho-pattern-decider", Arg.Bool (fun b -> PragUnifParams.pattern_decider := b), "turn pattern decider on or off";
-      "--ho-solid-decider", Arg.Bool (fun b -> PragUnifParams.solid_decider := b), "turn solid decider on or off";
-      "--ho-fixpoint-decider", Arg.Bool (fun b -> PragUnifParams.fixpoint_decider := b), "turn fixpoint decider on or off";
-      "--ho-max-elims", Arg.Set_int PragUnifParams.max_elims, " set maximal number of eliminations";
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
     enabled_ := true;

@@ -1,3 +1,5 @@
 exception UnsupportedLiteralKind
 
-val subsumes : Literals.t -> Literals.t -> bool
+module Make (S : sig val st : Flex_state.t end) : sig
+  val subsumes : Literals.t -> Literals.t -> bool
+end

@@ -1,29 +1,21 @@
-val max_depth : int ref
-val max_app_projections : int ref
-val max_var_imitations : int ref
-val max_rigid_imitations : int ref
-val max_identifications : int ref
-val max_elims           : int ref
+val k_max_depth : int Flex_state.key
+val k_max_app_projections : int Flex_state.key
+val k_max_var_imitations : int Flex_state.key
+val k_max_rigid_imitations : int Flex_state.key
+val k_max_identifications : int Flex_state.key
+val k_max_elims           : int Flex_state.key
 
-type e_dir = 
- | LowToHigh 
- | HighToLow
+val k_imit_first : bool Flex_state.key
 
-val elim_direction : e_dir ref
+val k_pattern_decider : bool Flex_state.key
+val k_solid_decider : bool Flex_state.key
+val k_fixpoint_decider : bool Flex_state.key
 
-val _cons_e : bool ref
-val _imit_first : bool ref
+val k_solidification_limit : int Flex_state.key
 
-val pattern_decider : bool ref
-val solid_decider : bool ref
-val fixpoint_decider : bool ref
+val k_max_inferences : int Flex_state.key
 
-val solidification_limit : int ref
+val k_max_unifs_solid_ff : int Flex_state.key
+val k_use_weight_for_solid_subsumption : bool Flex_state.key
 
-val max_inferences : int ref
-
-val max_unifs_solid_ff : int ref
-val use_weight_for_solid_subsumption : bool ref
-
-val all_paramst_to_def : unit -> unit
-val skip_multiplier : float ref
+val k_skip_multiplier : float Flex_state.key
