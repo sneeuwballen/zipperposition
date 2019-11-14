@@ -60,39 +60,39 @@ let prof_infer_fluidsup_passive = Util.mk_profiler "sup.infer_fluidsup_passive"
 let prof_infer_equality_resolution = Util.mk_profiler "sup.infer_equality_resolution"
 let prof_infer_equality_factoring = Util.mk_profiler "sup.infer_equality_factoring"
 
-let _use_semantic_tauto = ref true
-let _use_simultaneous_sup = ref true
-let _dot_sup_into = ref None
-let _dot_sup_from = ref None
-let _dot_simpl = ref None
-let _dont_simplify = ref false
-let _sup_at_vars = ref false
-let _sup_at_var_headed = ref true
-let _sup_in_var_args = ref true
-let _sup_under_lambdas = ref true
-let _lambda_demod = ref false
-let _demod_in_var_args = ref true
-let _dot_demod_into = ref None
-let _complete_ho_unification = ref false
-let _switch_stream_extraction = ref false
-let _ord_in_normal_form = ref false
-let _fluidsup_penalty = ref 0
-let _fluidsup = ref true
-let _dupsup = ref true
-let _trigger_bool_inst = ref (-1)
-let _recognize_injectivity = ref false
-let _sup_with_pure_vars = ref true
+let k_trigger_bool_inst = Flex_state.create_key ()
+let k_sup_at_vars = Flex_state.create_key ()
+let k_sup_in_var_args = Flex_state.create_key ()
+let k_sup_under_lambdas = Flex_state.create_key ()
+let k_sup_true_false = Flex_state.create_key ()
+let k_sup_at_var_headed = Flex_state.create_key ()
+let k_fluidsup = Flex_state.create_key ()
+let k_dupsup = Flex_state.create_key ()
+let k_lambdasup = Flex_state.create_key ()
+let k_sup_w_pure_vars = Flex_state.create_key ()
+let k_demod_in_var_args = Flex_state.create_key ()
+let k_lambda_demod = Flex_state.create_key ()
+let k_ext_dec_lits = Flex_state.create_key ()
+let k_max_lits_ext_dec = Flex_state.create_key ()
+let k_use_simultaneous_sup = Flex_state.create_key ()
+let k_unif_alg = Flex_state.create_key ()
+let k_fluidsup_penalty = Flex_state.create_key ()
+let k_ground_subs_check = Flex_state.create_key ()
+let k_solid_subsumption = Flex_state.create_key ()
+let k_dot_sup_into = Flex_state.create_key ()
+let k_dot_sup_from = Flex_state.create_key ()
+let k_dot_simpl = Flex_state.create_key ()
+let k_dot_demod_into = Flex_state.create_key ()
+let k_recognize_injectivity = Flex_state.create_key ()
+let k_complete_ho_unification = Flex_state.create_key ()
+let k_max_infs = Flex_state.create_key ()
+let k_switch_stream_extraction = Flex_state.create_key ()
+let k_dont_simplify = Flex_state.create_key ()
+let k_use_semantic_tauto = Flex_state.create_key ()
+
 
 let _NO_LAMSUP = -1
-let _lambdasup = ref (-1)
-let _max_infs = PragUnifParams.max_inferences
-let max_lits_ext_dec = ref 0
-let _ext_dec_lits = ref `OnlyMax
-let _unif_alg = ref JP_unif.unify_scoped
-let _unif_level = ref `Full
-let _ground_subs_check = ref 0
-let _sup_t_f = ref true
-let _solid_subsumption = ref false
+
 
 module Make(Env : Env.S) : S with module Env = Env = struct
   module Env = Env
@@ -174,7 +174,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     )
 
   let handle_pred_var_inst c =
-    if C.proof_depth c < !_trigger_bool_inst then (
+    if C.proof_depth c < Env.flex_get k_trigger_bool_inst then (
       if not (CCList.is_empty (pred_vars c)) then (
         _cls_w_pred_vars := C.ClauseSet.add c !_cls_w_pred_vars;
       );
@@ -190,7 +190,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     || T.is_fun t && not (T.is_ground t)                          
     (* Deep: A variable also occurring in a lambda-expression or in an argument of a variable in the same clause*)
     || match T.as_var t with
-      | Some v -> Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false ~which:`All ~ord ~subterms:true ~eligible:(fun _ _ -> true) (C.lits c)
+      | Some v -> 
+        Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false 
+                        ~ty_args:false ~which:`All ~ord ~subterms:true
+                        ~eligible:(fun _ _ -> true) (C.lits c)
         |> Iter.exists 
           (fun (t, _) -> 
             match T.view t with
@@ -205,18 +208,31 @@ module Make(Env : Env.S) : S with module Env = Env = struct
      from the active set *)
   let _update_active f c =
     (* index subterms that can be rewritten by superposition *)
+    let sup_at_vars = Env.flex_get k_sup_at_vars in
+    let sup_in_var_args = Env.flex_get k_sup_in_var_args in
+    let sup_under_lambdas = Env.flex_get k_sup_under_lambdas in
+    let sup_t_f = Env.flex_get k_sup_true_false in
+    let sup_at_var_headed = Env.flex_get k_sup_at_var_headed in
+    let fluidsup = Env.flex_get k_fluidsup in
+    let dupsup = Env.flex_get k_dupsup in
+    let lambdasup = Env.flex_get k_lambdasup in
+    let sup_with_pure_vars = Env.flex_get k_sup_w_pure_vars in
+    let demod_in_var_args = Env.flex_get k_demod_in_var_args in
+    let lambda_demod = Env.flex_get k_lambda_demod in
+
+
     _idx_sup_into :=
-      Lits.fold_terms ~vars:!_sup_at_vars ~var_args:!_sup_in_var_args ~fun_bodies:!_sup_under_lambdas ~ty_args:false ~ord ~which:`Max ~subterms:true
-        ~eligible:(C.Eligible.res c) (C.lits c)
+      Lits.fold_terms ~vars:sup_at_vars ~var_args:sup_in_var_args ~fun_bodies:sup_under_lambdas 
+                    ~ty_args:false ~ord ~which:`Max ~subterms:true  ~eligible:(C.Eligible.res c) (C.lits c)
       |> Iter.filter (fun (t, _) ->
             (* Util.debugf ~section 3 "@[ Filtering vars %a,1  @]" (fun k-> k T.pp t); *)
-            (!_sup_t_f || not (Term.is_true_or_false t)) &&
+            (sup_t_f || not (Term.is_true_or_false t)) &&
             (not (T.is_var t) || T.is_ho_var t))
       (* TODO: could exclude more variables from the index:
          they are not needed if they occur with the same args everywhere in the clause *)
       |> Iter.filter (fun (t, _) ->
          (* Util.debugf ~section 3 "@[ Filtering vars %a,2  @]" (fun k-> k T.pp t); *)
-         !_sup_at_var_headed || not (T.is_var (T.head_term t)))
+         sup_at_var_headed || not (T.is_var (T.head_term t)))
       |> Iter.fold
         (fun tree (t, pos) ->
            (* Util.debugf ~section 3 "@[ Adding %a to into index %B @]" (fun k-> k T.pp t !_sup_under_lambdas); *)
@@ -225,10 +241,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         !_idx_sup_into;
 
     (* index subterms that can be rewritten by FluidSup *)
-    if !_fluidsup then
+    if fluidsup then
       _idx_fluidsup_into :=
-        Lits.fold_terms ~vars:true ~var_args:false ~fun_bodies:false ~ty_args:false ~ord ~which:`Max ~subterms:true
-          ~eligible:(C.Eligible.res c) (C.lits c)
+        Lits.fold_terms ~vars:true ~var_args:false ~fun_bodies:false
+                        ~ty_args:false ~ord ~which:`Max ~subterms:true
+                        ~eligible:(C.Eligible.res c) (C.lits c)
         |> Iter.filter (fun (t, _) -> is_fluid_or_deep c t) 
         |> Iter.fold
           (fun tree (t, pos) ->
@@ -236,10 +253,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             f tree t with_pos)
           !_idx_fluidsup_into;
     
-    if !_dupsup then 
+    if dupsup then 
     _idx_dupsup_into :=
-      Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false ~ord ~which:`Max ~subterms:true
-        ~eligible:(C.Eligible.res c) (C.lits c)
+      Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false
+                      ~ty_args:false ~ord ~which:`Max ~subterms:true
+                      ~eligible:(C.Eligible.res c) (C.lits c)
       |> Iter.filter (fun (t, _) -> 
           T.is_var (T.head_term t) && not (CCList.is_empty @@ T.args t)
           && Type.is_ground (T.ty t)) (* Only applied variables *)
@@ -252,9 +270,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* index subterms that can be rewritten by LambdaSup --
        the ones that can rewrite those are actually the ones
        already indexed by _idx_sup_from*)
-    if !_lambdasup != _NO_LAMSUP then
+    if lambdasup != _NO_LAMSUP then
       _idx_lambdasup_into :=
-        Lits.fold_terms ~vars:!_sup_at_vars ~var_args:!_sup_in_var_args
+        Lits.fold_terms ~vars:sup_at_vars ~var_args:sup_in_var_args
                         ~fun_bodies:true ~ty_args:false ~ord
                         ~which:`Max ~subterms:true
                         ~eligible:(C.Eligible.res c) (C.lits c)
@@ -266,7 +284,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                     let hd = T.head_term body in
                     if (not (T.is_var body) || T.is_ho_var body) &&
                        (not (T.is_const hd) || not (ID.is_skolem (T.as_const_exn hd))) &&
-                       (!_sup_at_var_headed || not (T.is_var (T.head_term body))) then
+                       (sup_at_var_headed || not (T.is_var (T.head_term body))) then
                     ( (*CCFormat.printf "Adding %a to LS index.\n" T.pp body; *)
                     Some (body, new_pos)) else None))
         |> Iter.fold
@@ -280,8 +298,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Lits.fold_eqn ~ord ~both:true ~sign:true
         ~eligible:(C.Eligible.param c) (C.lits c)
       |> Iter.filter (fun (l,r,_,_) -> 
-          (!_sup_with_pure_vars || not (Term.is_var l) || not (Term.is_var r))
-          && (!_sup_t_f || not (Term.is_true_or_false l)))
+          (sup_with_pure_vars || not (Term.is_var l) || not (Term.is_var r))
+          && (sup_t_f || not (Term.is_true_or_false l)))
       |> Iter.filter((fun (l, _, _, _) -> not (T.equal l T.false_)))
       |> Iter.fold
         (fun tree (l, _, sign, pos) ->
@@ -292,7 +310,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* terms that can be demodulated: all subterms (but vars) *)
     _idx_back_demod :=
       (* TODO: allow demod under lambdas under certain conditions (DemodExt) *)
-      Lits.fold_terms ~vars:false ~var_args:(!_demod_in_var_args) ~fun_bodies:!_lambda_demod  
+      Lits.fold_terms ~vars:false ~var_args:(demod_in_var_args) ~fun_bodies:lambda_demod  
                       ~ty_args:false ~ord ~subterms:true ~which:`All
         ~eligible:C.Eligible.always (C.lits c)
       |> Iter.fold
@@ -336,9 +354,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       | None -> C.Tbl.create 8
       | Some res -> res in
     let all_pos =
-      try 
+      (try 
         (t,pos) :: (C.Tbl.find clause_map c)
-      with _ -> [(t,pos)] in
+      with _ -> 
+        [(t,pos)]) in
     C.Tbl.replace clause_map c all_pos;
     index := ID.Map.add key clause_map !index
 
@@ -353,9 +372,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     )
 
   let update_ext_dec_indices f c =
-    let which, eligible = if !_ext_dec_lits = `OnlyMax 
+    let which, eligible = if Env.flex_get k_ext_dec_lits = `OnlyMax 
                           then `Max, C.Eligible.res c else `All, C.Eligible.always in
-    if C.proof_depth c <= !max_lits_ext_dec then (
+    if C.proof_depth c <= Env.flex_get k_max_lits_ext_dec then (
       Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false 
         ~ord ~which ~subterms:true ~eligible (C.lits c)
       |> Iter.filter (fun (t, _) ->
@@ -367,7 +386,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun (t, pos) ->
           f _ext_dec_into_idx (c,pos,t));
       
-      let eligible = if !_ext_dec_lits = `OnlyMax then C.Eligible.param c 
+      let eligible = if Env.flex_get k_ext_dec_lits = `OnlyMax then C.Eligible.param c 
                      else C.Eligible.always in
       Lits.fold_eqn ~ord ~both:true ~sign:true ~eligible (C.lits c)
       |> Iter.iter
@@ -492,7 +511,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     assert (InnerTerm.DB.closed (info.s:>InnerTerm.t));
     assert (info.sup_kind == LambdaSup || InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
     assert (not(T.is_var info.u_p) || T.is_ho_var info.u_p || info.sup_kind = FluidSup);
-    assert (!_sup_at_var_headed || info.sup_kind = FluidSup || 
+    assert (Env.flex_get k_sup_at_var_headed || info.sup_kind = FluidSup || 
             info.sup_kind = DupSup || not (T.is_var (T.head_term info.u_p)));
     let active_idx = Lits.Pos.idx info.active_pos in
     let shift_vars = if info.sup_kind = LambdaSup then 0 else -1 in
@@ -561,7 +580,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         vars_bound_to_closed_terms vars_a sc_a;
         vars_bound_to_closed_terms vars_p sc_p;
 
-        if Util.Int_set.cardinal (Util.Int_set.of_list !dbs)  > !_lambdasup   then (
+        if Util.Int_set.cardinal (Util.Int_set.of_list !dbs)  > Env.flex_get k_lambdasup   then (
           Util.debugf ~section 3 "Too many skolems will be introduced for LambdaSup." (fun k->k);
           raise (ExitSuperposition "Too many skolems will be introduced for LambdaSup.");
         )
@@ -582,7 +601,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       ) then raise (ExitSuperposition "bad ordering conditions");
       (* Check for superposition at a variable *)
       if info.sup_kind != FluidSup then
-        if not !_sup_at_vars then
+        if not @@ Env.flex_get k_sup_at_vars then
           assert (not (T.is_var info.u_p))
         else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then (
           Util.debugf ~section 3 "superposition at variable" (fun k->k);
@@ -689,7 +708,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     assert (InnerTerm.DB.closed (info.s:>InnerTerm.t));
     assert (info.sup_kind == LambdaSup || InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
     assert (not(T.is_var info.u_p) || T.is_ho_var info.u_p || info.sup_kind = FluidSup);
-    assert (!_sup_at_var_headed || info.sup_kind = FluidSup || 
+    assert (Env.flex_get k_sup_at_var_headed || info.sup_kind = FluidSup || 
             info.sup_kind = DupSup || not (T.is_var (T.head_term info.u_p)));
     let active_idx = Lits.Pos.idx info.active_pos in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
@@ -723,7 +742,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       ) then raise (ExitSuperposition "bad ordering conditions");
       (* Check for superposition at a variable *)
       if info.sup_kind != FluidSup then
-        if not !_sup_at_vars then
+        if not @@ Env.flex_get k_sup_at_vars then
           assert (not (T.is_var info.u_p))
         else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then
           raise (ExitSuperposition "superposition at variable");
@@ -776,7 +795,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let s = Subst.FO.apply renaming (US.subst info.subst) (info.s, info.scope_active) in
     let u_p = Subst.FO.apply renaming (US.subst info.subst) (info.u_p, info.scope_passive) in
     assert(Term.equal (Lambda.eta_reduce @@ Lambda.snf @@ s) (Lambda.eta_reduce @@ Lambda.snf @@ u_p) || US.has_constr info.subst);
-    if !_use_simultaneous_sup && info.sup_kind != LambdaSup && info.sup_kind != DupSup
+    if Env.flex_get k_use_simultaneous_sup && info.sup_kind != LambdaSup && info.sup_kind != DupSup
     then do_simultaneous_superposition info
     else do_classic_superposition info
 
@@ -792,8 +811,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Lits.fold_eqn ~sign:true ~ord
         ~both:true ~eligible (C.lits clause)
       |> Iter.filter (fun (l,r,_,_) -> 
-          (!_sup_with_pure_vars || not (Term.is_var l) || not (Term.is_var r))
-          && (!_sup_t_f || not (Term.is_true_or_false l)))
+          (Env.flex_get k_sup_w_pure_vars || not (Term.is_var l) || not (Term.is_var r))
+          && (Env.flex_get k_sup_true_false || not (Term.is_true_or_false l)))
       |> Iter.flat_map
         (fun (s, t, _, s_pos) ->
           let do_sup u_p with_pos subst =
@@ -827,11 +846,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* do the inferences in which clause is passive (rewritten),
        so we consider both negative and positive literals *)
     let new_clauses =
-      Lits.fold_terms ~vars:!_sup_at_vars ~var_args:!_sup_in_var_args ~fun_bodies:!_sup_under_lambdas ~subterms:true ~ord
-        ~which:`Max ~eligible ~ty_args:false (C.lits clause)
+      Lits.fold_terms ~vars:(Env.flex_get k_sup_at_vars) 
+                      ~var_args:(Env.flex_get k_sup_in_var_args)
+                      ~fun_bodies:(Env.flex_get k_sup_under_lambdas) 
+                      ~subterms:true ~ord ~which:`Max ~eligible ~ty_args:false 
+        (C.lits clause)
       |> Iter.filter (fun (u_p, _) -> not (T.is_var u_p) || T.is_ho_var u_p)
       |> Iter.filter (fun (u_p, _) -> T.DB.is_closed u_p)
-      |> Iter.filter (fun (u_p, _) -> !_sup_at_var_headed || not (T.is_var (T.head_term u_p)))
+      |> Iter.filter (fun (u_p, _) -> 
+          Env.flex_get k_sup_at_var_headed || not (T.is_var (T.head_term u_p)))
       |> Iter.flat_map
         (fun (u_p, passive_pos) ->
           let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
@@ -904,7 +927,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* do the inferences in which clause is passive (rewritten),
        so we consider both negative and positive literals *)
     let new_clauses =
-      Lits.fold_terms ~vars:!_sup_at_vars ~var_args:!_sup_in_var_args
+      Lits.fold_terms ~vars:(Env.flex_get k_sup_at_vars) 
+                      ~var_args:(Env.flex_get k_sup_in_var_args)
                       ~fun_bodies:true ~subterms:true ~ord
                       ~which:`Max ~eligible ~ty_args:false (C.lits clause)
       |> Iter.filter_map (fun (u_p, p) ->
@@ -916,7 +940,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                 (* we check normal superposition conditions  *)
                 if (not (T.is_var body) || T.is_ho_var body) &&
                    (not (T.is_const hd) || not (ID.is_skolem (T.as_const_exn hd))) &&
-                   (!_sup_at_var_headed || not (T.is_var (T.head_term body))) then
+                   (Env.flex_get k_sup_at_var_headed || not (T.is_var (T.head_term body))) then
                   Some (body, new_pos)
                 else None) )
       |> Iter.flat_map
@@ -948,7 +972,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let infer_active_complete_ho clause =
     let inf_res = infer_active_aux
-      ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:!_unif_alg)
+      ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:(Env.flex_get k_unif_alg))
       ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
           let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) in
           (* /!\ may differ from the actual penalty (by -2) *)
@@ -960,7 +984,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let infer_passive_complete_ho clause =
     let inf_res = infer_passive_aux
-      ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:!_unif_alg)
+      ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:(Env.flex_get k_unif_alg))
       ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
           let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) in
           (* /!\ may differ from the actual penalty (by -2) *)
@@ -972,7 +996,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let infer_active_pragmatic_ho max_unifs clause =
     let inf_res = infer_active_aux
-      ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:!_unif_alg)
+      ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:(Env.flex_get k_unif_alg))
       ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
         let all_substs = OSeq.to_list @@ OSeq.take max_unifs @@ OSeq.filter_map CCFun.id substs   in
         let res = List.map (fun subst -> do_sup u_p with_pos subst) all_substs in
@@ -984,7 +1008,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let infer_passive_pragmatic_ho max_unifs clause =
     let inf_res = infer_passive_aux
-      ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:!_unif_alg)
+      ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:(Env.flex_get k_unif_alg))
       ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
         let all_substs = OSeq.to_list @@ OSeq.take max_unifs @@ OSeq.filter_map CCFun.id substs   in
         let res = List.map (fun subst -> do_sup u_p with_pos subst) all_substs in
@@ -1018,7 +1042,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               let var_h = T.var (HVar.fresh ~ty:(Type.arrow [T.ty s] (Type.var (HVar.fresh ~ty:Type.tType ()))) ()) in
               let hs = T.app var_h [s] in
               let ht = T.app var_h [t] in
-              let res = !_unif_alg (u_p,1) (hs,0) |> OSeq.map (
+              let res = Env.flex_get k_unif_alg (u_p,1) (hs,0) |> OSeq.map (
                   fun osubst ->
                     osubst |> CCOpt.flat_map (
                       fun subst ->
@@ -1033,7 +1057,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                     )
                 )
               in
-              let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) + !_fluidsup_penalty in
+              let penalty = 
+                max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause)
+                  + (Env.flex_get k_fluidsup_penalty) in
               (* /!\ may differ from the actual penalty (by -2) *)
               Iter.cons (penalty,res) acc
             )
@@ -1069,7 +1095,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                 let var_h = T.var (HVar.fresh ~ty:(Type.arrow [T.ty s] (Type.var (HVar.fresh ~ty:Type.tType ()))) ()) in
                 let hs = T.app var_h [s] in
                 let ht = T.app var_h [t] in
-                !_unif_alg (hs,1) (u_p,0)
+                Env.flex_get k_unif_alg (hs,1) (u_p,0)
                 |> OSeq.map
                   (fun osubst ->
                     osubst |> CCOpt.flat_map (fun subst ->
@@ -1082,7 +1108,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   )
                 | _ -> assert false
               in
-              let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) + !_fluidsup_penalty in
+              let penalty = 
+                max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) 
+                  + Env.flex_get k_fluidsup_penalty in
               (* /!\ may differ from the actual penalty (by -2) *)
               Iter.cons (penalty,res) acc
             )
@@ -1132,7 +1160,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                 let w_args = T.app term_w args_up in
                 let w_args = Subst.FO.apply Subst.Renaming.none (US.subst subst_y) (w_args,scope_passive) in
                 let z_args = T.app term_z (List.append args_up [t]) in
-                let res = !_unif_alg (s,scope_active) (w_args,scope_passive) |> OSeq.map (
+                let res = Env.flex_get k_unif_alg (s,scope_active) (w_args,scope_passive) |> OSeq.map (
                     fun osubst ->
                       osubst |> CCOpt.flat_map (
                         fun subst ->
@@ -1149,7 +1177,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                       )
                   )
                 in
-                let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) + !_fluidsup_penalty in
+                let penalty = 
+                  max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) 
+                    + Env.flex_get k_fluidsup_penalty in
                 (* /!\ may differ from the actual penalty (by -2) *)
                 Iter.cons (penalty,res) acc
             ))
@@ -1169,8 +1199,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* do the inferences in which clause is passive (rewritten),
       so we consider both negative and positive literals *)
     let new_clauses =
-      Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~subterms:true ~ord
-        ~which:`Max ~eligible ~ty_args:false (C.lits clause)
+      Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~subterms:true
+                      ~ord ~which:`Max ~eligible ~ty_args:false (C.lits clause)
       |> Iter.filter (fun (u_p, _) -> 
           (T.is_var (T.head_term u_p) && not (CCList.is_empty @@ T.args u_p)
           && Type.is_ground (T.ty u_p)))
@@ -1188,7 +1218,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                         acc
                     )
                     else (
-
                       let scope_passive, scope_active = 0, 1 in
                       let hd_up, args_up = T.as_app u_p in
                       let arg_types = List.map T.ty args_up in
@@ -1206,7 +1235,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                       let w_args = T.app term_w args_up in
                       let w_args = Subst.FO.apply Subst.Renaming.none (US.subst subst_y) (w_args,scope_passive) in
                       let z_args = T.app term_z (List.append args_up [t]) in
-                      let res = !_unif_alg (w_args,scope_passive) (s,scope_active) |> OSeq.map (
+                      let res = Env.flex_get k_unif_alg (w_args,scope_passive) (s,scope_active) |> OSeq.map (
                         fun osubst ->
                           osubst |> CCOpt.flat_map (
                             fun subst ->
@@ -1219,7 +1248,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                               do_superposition info
                       ))
                   in
-                  let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) + !_fluidsup_penalty in
+                  let penalty = 
+                    max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) 
+                      + Env.flex_get k_fluidsup_penalty in
                   (* /!\ may differ from the actual penalty (by -2) *)
                   Iter.cons (penalty,res) acc))
               | _ -> acc)
@@ -1242,8 +1273,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let eligible = C.Eligible.always in
     (* iterate on those literals *)
     let new_clauses =
-      Lits.fold_eqn ~sign:false ~ord
-        ~both:false ~eligible (C.lits clause)
+      Lits.fold_eqn ~sign:false ~ord ~both:false ~eligible (C.lits clause)
       |> Iter.filter_map
         (fun (l, r, _, l_pos) ->
           let do_eq_res us =
@@ -1287,7 +1317,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let infer_equality_resolution_complete_ho clause =
     let inf_res = infer_equality_resolution_aux
-        ~unify:!_unif_alg
+        ~unify:(Env.flex_get k_unif_alg)
         ~iterate_substs:(fun substs do_eq_res -> Some (OSeq.map (CCOpt.flat_map do_eq_res) substs))
         clause
     in
@@ -1297,7 +1327,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let infer_equality_resolution_pragmatic_ho max_unifs clause =
     let inf_res = infer_equality_resolution_aux
-        ~unify:!_unif_alg
+        ~unify:(Env.flex_get k_unif_alg)
         ~iterate_substs:(fun substs do_eq_res ->
            (* Some (OSeq.map (CCOpt.flat_map do_eq_res) substs) *)
            let all_substs = OSeq.to_list @@ OSeq.take max_unifs @@ OSeq.filter_map CCFun.id substs   in
@@ -1434,12 +1464,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     |> Iter.to_list
   
   let instantiate_with_triggers c =
-    if C.proof_depth c < !_trigger_bool_inst then ( 
+    if C.proof_depth c < Env.flex_get k_trigger_bool_inst then ( 
       pred_var_instantiation c !_trigger_bools)
     else []
   
   let trigger_insantiation c =
-    if C.proof_depth c < !_trigger_bool_inst then (
+    if C.proof_depth c < Env.flex_get k_trigger_bool_inst then (
       let triggers = Term.Set.of_seq @@ get_triggers c in
       let res = ref [] in
       C.ClauseSet.iter (fun old_c -> 
@@ -1450,7 +1480,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
 
   let ext_eqfact_decompose given =
-    if Proof.Step.inferences_perfomed (C.proof_step given) < !max_lits_ext_dec then  
+    if Proof.Step.inferences_perfomed (C.proof_step given)
+        < Env.flex_get k_max_lits_ext_dec then  
       Util.with_prof prof_ext_dec ext_eqfact_decompose_aux given
     else []
 
@@ -1487,14 +1518,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     (* try to do inferences with each positive literal *)
     let new_clauses =
-      Lits.fold_eqn ~sign:true ~ord
-        ~both:true ~eligible (C.lits clause)
+      Lits.fold_eqn ~sign:true ~ord ~both:true ~eligible (C.lits clause)
       |> Iter.flat_map
         (fun (s, t, _, s_pos) -> (* try with s=t *)
            let active_idx = Lits.Pos.idx s_pos in
            let is_var_pred = 
             T.is_var (T.head_term s) && Type.is_prop (T.ty s) && T.is_true_or_false t in
-           if not !_sup_t_f && T.is_true_or_false s then Iter.empty (* disable factoring from false*)
+           if not @@ Env.flex_get k_sup_true_false && T.is_true_or_false s 
+           then Iter.empty (* disable factoring from false*)
            else if T.equal t T.false_ && not is_var_pred then Iter.empty 
            else (
               let var_pred_status = (is_var_pred, t) in
@@ -1519,7 +1550,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let infer_equality_factoring_complete_ho clause =
     let inf_res = infer_equality_factoring_aux
-        ~unify:!_unif_alg
+        ~unify:(Env.flex_get k_unif_alg)
         ~iterate_substs:(fun substs do_eq_fact -> Some (OSeq.map (CCOpt.flat_map do_eq_fact) substs))
         clause
     in
@@ -1529,7 +1560,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
    let infer_equality_factoring_pragmatic_ho max_unifs clause =
     let inf_res = infer_equality_factoring_aux
-        ~unify:!_unif_alg
+        ~unify:(Env.flex_get k_unif_alg)
         ~iterate_substs:(fun substs do_eq_fact ->
            (* Some (OSeq.map (CCOpt.flat_map do_eq_fact) substs) *)
            let all_substs = OSeq.to_list @@ OSeq.take max_unifs @@ OSeq.filter_map CCFun.id substs in
@@ -1660,7 +1691,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | T.Const _ -> reduce_at_root ~restrict t k
         | T.App (hd, l) ->
           (* rewrite subterms in call by value. *)
-          let rewrite_args = !_demod_in_var_args || not (T.is_var hd) in
+          let rewrite_args = Env.flex_get k_demod_in_var_args || not (T.is_var hd) in
           if rewrite_args
           then
             normal_form_l l
@@ -1675,7 +1706,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           else reduce_at_root ~restrict t k
         | T.Fun (ty_arg, body) ->
           (* reduce under lambdas *)
-          if !_lambda_demod
+          if Env.flex_get k_lambda_demod
           then
             normal_form ~restrict:lazy_false body
               (fun body' ->
@@ -1856,9 +1887,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               |> Iter.map (fun (t,p) -> (c,t,p)))
 
   let ext_decompose_act given =
-    if C.length given <= !max_lits_ext_dec then (
+    if C.length given <= Env.flex_get k_max_lits_ext_dec then (
       let eligible = 
-        if !_ext_dec_lits = `OnlyMax then C.Eligible.param given else C.Eligible.always in
+        if Env.flex_get k_ext_dec_lits = `OnlyMax then C.Eligible.param given else C.Eligible.always in
       Lits.fold_eqn ~ord ~both:true ~sign:true ~eligible (C.lits given)
       |> Iter.flat_map (fun (l,_,sign,pos) ->
           let hd,args = T.as_app l in
@@ -1872,9 +1903,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     else []
 
   let ext_decompose_pas given =
-    if C.length given <= !max_lits_ext_dec then ( 
+    if C.length given <= Env.flex_get k_max_lits_ext_dec then ( 
       let which, eligible =
-        if !_ext_dec_lits = `OnlyMax then `Max, C.Eligible.res given 
+        if Env.flex_get k_ext_dec_lits = `OnlyMax then `Max, C.Eligible.res given 
         else `All, C.Eligible.always in
       Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false 
         ~ord ~which ~subterms:true ~eligible (C.lits given)
@@ -1891,7 +1922,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let ext_eqres_decompose_aux c =
     let eligible = C.Eligible.neg in
-    if C.proof_depth c < !max_lits_ext_dec then (
+    if C.proof_depth c < Env.flex_get k_max_lits_ext_dec then (
       let res = 
         Literals.fold_eqn (C.lits c) ~eligible ~ord ~both:false ~sign:false
         |> Iter.to_list
@@ -2440,9 +2471,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* if there is an equation in c, try equality subsumption *)
     let try_eq_subsumption = CCArray.exists Lit.is_eqn (C.lits c) in
     (* use feature vector indexing *)
-    let c = if !_ground_subs_check > 0 then  C.ground_clause c else c in
+    let c = if Env.flex_get k_ground_subs_check > 0 then  C.ground_clause c else c in
     let subsumes a b = 
-      if not !_solid_subsumption then subsumes a b else (
+      if not @@ Env.flex_get k_solid_subsumption then subsumes a b else (
         try 
           SolidSubsumption.subsumes a b
         with SolidSubsumption.UnsupportedLiteralKind -> 
@@ -2475,7 +2506,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     (* use feature vector indexing *)
     let subsumes a b = 
-      if not !_solid_subsumption then subsumes a b else (
+      if not @@ Env.flex_get k_solid_subsumption then subsumes a b else (
         try 
           SolidSubsumption.subsumes a b
         with SolidSubsumption.UnsupportedLiteralKind -> 
@@ -2487,7 +2518,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun res c' ->
            if C.trail_subsumes c c'
            then
-            let c' = if !_ground_subs_check > 1 then  C.ground_clause c' else c' in
+            let c' = if Env.flex_get k_ground_subs_check > 1 then  C.ground_clause c' else c' in
              let redundant =
                (try_eq_subsumption && eq_subsumes (C.lits c) (C.lits c'))
                || subsumes (C.lits c) (C.lits c')
@@ -2735,22 +2766,22 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (fun file ->
          Signal.once Signals.on_dot_output
            (fun () -> _print_idx ~f:(TermIndex.to_dot pp_leaf) file !_idx_sup_into))
-      !_dot_sup_into;
+      @@ Env.flex_get k_dot_sup_into;
     CCOpt.iter
       (fun file ->
          Signal.once Signals.on_dot_output
            (fun () -> _print_idx ~f:(TermIndex.to_dot pp_leaf) file !_idx_sup_from))
-      !_dot_sup_from;
+      @@ Env.flex_get k_dot_sup_from;
     CCOpt.iter
       (fun file ->
          Signal.once Signals.on_dot_output
            (fun () -> _print_idx ~f:UnitIdx.to_dot file !_idx_simpl))
-      !_dot_simpl;
+      @@ Env.flex_get k_dot_simpl;
     CCOpt.iter
       (fun file ->
          Signal.once Signals.on_dot_output
            (fun () -> _print_idx ~f:(TermIndex.to_dot pp_leaf) file !_idx_back_demod))
-      !_dot_demod_into;
+      @@ Env.flex_get k_dot_demod_into;
     ()
 
   let register () =
@@ -2771,57 +2802,60 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and backward_redundant = subsumed_in_active_set
     and is_trivial = is_tautology in
 
-    if not !_sup_with_pure_vars then (
+    if not @@ Env.flex_get k_sup_w_pure_vars then (
       Env.Ctx.lost_completeness ()
     );
 
-    if !_recognize_injectivity then (
+    if Env.flex_get k_recognize_injectivity then (
         Env.add_unary_inf "recognize injectivity" recognize_injectivity;
     );
 
-    if !max_lits_ext_dec != 0 then (
+    if Env.flex_get k_max_lits_ext_dec != 0 then (
         Env.add_binary_inf "ext_dec_act" ext_decompose_act;
         Env.add_binary_inf "ext_dec_pas" ext_decompose_pas;
         Env.add_unary_inf "ext_eqres_dec" ext_eqres_decompose;
         Env.add_unary_inf "ext_eqfact_dec" ext_eqfact_decompose;
     );
 
-    if !_complete_ho_unification
+    if Env.flex_get k_complete_ho_unification
     then (
-      if !_max_infs = -1 then (
+      if (Env.flex_get k_max_infs) = -1 then (
         Env.add_binary_inf "superposition_passive" infer_passive_complete_ho;
         Env.add_binary_inf "superposition_active" infer_active_complete_ho;
         Env.add_unary_inf "equality_factoring" infer_equality_factoring_complete_ho;
         Env.add_unary_inf "equality_resolution" infer_equality_resolution_complete_ho;
       )
       else (
-        assert(!_max_infs > 0);
-        Env.add_binary_inf "superposition_passive" (infer_passive_pragmatic_ho !_max_infs);
-        Env.add_binary_inf "superposition_active" (infer_active_pragmatic_ho !_max_infs);
-        Env.add_unary_inf "equality_factoring" (infer_equality_factoring_pragmatic_ho !_max_infs);
-        Env.add_unary_inf "equality_resolution" (infer_equality_resolution_pragmatic_ho !_max_infs);
+        assert((Env.flex_get k_max_infs) > 0);
+        Env.add_binary_inf "superposition_passive" (infer_passive_pragmatic_ho (Env.flex_get k_max_infs));
+        Env.add_binary_inf "superposition_active" (infer_active_pragmatic_ho (Env.flex_get k_max_infs));
+        Env.add_unary_inf "equality_factoring" (infer_equality_factoring_pragmatic_ho (Env.flex_get k_max_infs));
+        Env.add_unary_inf "equality_resolution" (infer_equality_resolution_pragmatic_ho (Env.flex_get k_max_infs));
       );
 
-      if !_fluidsup then (
+      if Env.flex_get k_fluidsup then (
         Env.add_binary_inf "fluidsup_passive" infer_fluidsup_passive;
         Env.add_binary_inf "fluidsup_active" infer_fluidsup_active;
         );
-      if !_dupsup then (
+      if Env.flex_get k_dupsup then (
         Env.add_binary_inf "dupsup_passive(into)" infer_dupsup_passive;
         Env.add_binary_inf "dupsup_active(from)" infer_dupsup_active;
       );
-      if !_lambdasup != -1 then (
+      if Env.flex_get k_lambdasup != -1 then (
         Env.add_binary_inf "lambdasup_active(from)" infer_lambdasup_from;
         Env.add_binary_inf "lambdasup_passive(into)" infer_lambdasup_into;
       );
-      if !_trigger_bool_inst > 0 then (
+      if Env.flex_get k_trigger_bool_inst > 0 then (
         Env.add_unary_inf "trigger_pred_var active" trigger_insantiation;
         Env.add_unary_inf "trigger_pred_var passive" instantiate_with_triggers;
       );
       
 
-      if (List.exists CCFun.id [!_fluidsup; !_dupsup; !_lambdasup != -1; !_max_infs = -1]) then (
-        if !_switch_stream_extraction then
+      if (List.exists CCFun.id [Env.flex_get k_fluidsup;
+                                Env.flex_get k_dupsup;
+                                Env.flex_get k_lambdasup != -1;
+                                Env.flex_get k_max_infs = -1]) then (
+        if Env.flex_get k_switch_stream_extraction then
           Env.add_generate "stream_queue_extraction" extract_from_stream_queue_fix_stm
         else
           Env.add_generate "stream_queue_extraction" extract_from_stream_queue;
@@ -2833,7 +2867,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Env.add_unary_inf "equality_factoring" infer_equality_factoring;
       Env.add_unary_inf "equality_resolution" infer_equality_resolution;
     );
-    if not (!_dont_simplify) then (
+    if not (Env.flex_get k_dont_simplify) then (
       Env.add_rw_simplify rw_simplify;
       Env.add_basic_simplify canonize_variables;
       Env.add_basic_simplify basic_simplify;
@@ -2842,7 +2876,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     );
     Env.add_redundant redundant;
     Env.add_backward_redundant backward_redundant;
-    if !_use_semantic_tauto
+    if Env.flex_get k_use_semantic_tauto
     then Env.add_is_trivial is_semantic_tautology;
     Env.add_is_trivial is_trivial;
     Env.add_lit_rule "distinct_symbol" handle_distinct_constants;
@@ -2851,12 +2885,76 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ()
 end
 
-let key = Flex_state.create_key()
+let _use_semantic_tauto = ref true
+let _use_simultaneous_sup = ref true
+let _dot_sup_into = ref None
+let _dot_sup_from = ref None
+let _dot_simpl = ref None
+let _dont_simplify = ref false
+let _sup_at_vars = ref false
+let _sup_at_var_headed = ref true
+let _sup_in_var_args = ref true
+let _sup_under_lambdas = ref true
+let _lambda_demod = ref false
+let _demod_in_var_args = ref true
+let _dot_demod_into = ref None
+let _complete_ho_unification = ref false
+let _switch_stream_extraction = ref false
+let _ord_in_normal_form = ref false
+let _fluidsup_penalty = ref 0
+let _fluidsup = ref true
+let _dupsup = ref true
+let _trigger_bool_inst = ref (-1)
+let _recognize_injectivity = ref false
+let _sup_with_pure_vars = ref true
+
+let _lambdasup = ref (-1)
+let _max_infs = PragUnifParams.max_inferences
+let max_lits_ext_dec = ref 0
+let _ext_dec_lits = ref `OnlyMax
+let _unif_alg = ref JP_unif.unify_scoped
+let _unif_level = ref `Full
+let _ground_subs_check = ref 0
+let _sup_t_f = ref true
+let _solid_subsumption = ref false
+
+let key = Flex_state.create_key ()
 
 let register ~sup =
   let module Sup = (val sup : S) in
   let module E = Sup.Env in
-  E.update_flex_state (Flex_state.add key sup)
+  E.update_flex_state (Flex_state.add key sup);
+  E.flex_add k_trigger_bool_inst !_trigger_bool_inst;
+  E.flex_add k_sup_at_vars !_sup_at_vars;
+  E.flex_add k_sup_in_var_args !_sup_in_var_args;
+  E.flex_add k_sup_under_lambdas !_sup_under_lambdas;
+  E.flex_add k_sup_true_false !_sup_t_f;
+  E.flex_add k_sup_at_var_headed !_sup_at_var_headed;
+  E.flex_add k_fluidsup !_fluidsup;
+  E.flex_add k_dupsup !_dupsup;
+  E.flex_add k_lambdasup !_lambdasup;
+  E.flex_add k_sup_w_pure_vars !_sup_with_pure_vars;
+  E.flex_add k_demod_in_var_args !_demod_in_var_args;
+  E.flex_add k_lambda_demod !_lambda_demod;
+  E.flex_add k_ext_dec_lits !_ext_dec_lits;
+  E.flex_add k_max_lits_ext_dec !max_lits_ext_dec;
+  E.flex_add k_use_simultaneous_sup !_use_simultaneous_sup;
+  E.flex_add k_unif_alg !_unif_alg;
+  E.flex_add k_fluidsup_penalty !_fluidsup_penalty;
+  E.flex_add k_ground_subs_check !_ground_subs_check;
+  E.flex_add k_solid_subsumption !_solid_subsumption;
+  E.flex_add k_dot_sup_into !_dot_sup_into;
+  E.flex_add k_dot_sup_from !_dot_sup_from;
+  E.flex_add k_dot_simpl !_dot_simpl;
+  E.flex_add k_dot_demod_into !_dot_demod_into;
+  E.flex_add k_recognize_injectivity !_recognize_injectivity;
+  E.flex_add k_complete_ho_unification !_complete_ho_unification;
+  E.flex_add k_max_infs !_max_infs;
+  E.flex_add k_switch_stream_extraction !_switch_stream_extraction;
+  E.flex_add k_dont_simplify !_dont_simplify;
+  E.flex_add k_use_semantic_tauto !_use_semantic_tauto 
+
+  
 
 (* TODO: move DOT index printing into the extension *)
 
@@ -2875,11 +2973,8 @@ let extension =
 let () =
   Params.add_opts
     [ "--semantic-tauto"
-    , Arg.Set _use_semantic_tauto
-    , " enable semantic tautology check"
-    ; "--no-semantic-tauto"
-    , Arg.Clear _use_semantic_tauto
-    , " disable semantic tautology check"
+    , Arg.Bool (fun v -> _use_semantic_tauto := v)
+    , " enable/disable semantic tautology check"
     ; "--dot-sup-into"
     , Arg.String (fun s -> _dot_sup_into := Some s)
     , " print superposition-into index into file"
@@ -2946,8 +3041,8 @@ let () =
               _lambdasup := l)
     , " enable LambdaSup -- argument is the maximum number of skolems introduced in an inference";
     "--dupsup"
-    , Arg.Set _dupsup
-    , " enable DupSup inferences";
+    , Arg.Bool (fun v -> _dupsup := v)
+    , " enable/disable DupSup inferences";
     "--ground-before-subs"
     , Arg.Set_int _ground_subs_check
     , " set the level of grounding before substitution. 0 - no grounding. 1 - only active. 2 - both.";
