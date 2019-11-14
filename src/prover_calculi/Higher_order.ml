@@ -44,12 +44,6 @@ let k_ext_neg_lit = Flex_state.create_key ()
 let k_neg_ext = Flex_state.create_key ()
 let k_neg_ext_as_simpl = Flex_state.create_key ()
 let k_ext_axiom_penalty = Flex_state.create_key ()
-let k_var_arg_remove = Flex_state.create_key ()
-let k_huet_style = Flex_state.create_key ()
-let k_cons_elim = Flex_state.create_key ()
-let k_imit_first = Flex_state.create_key ()
-let k_compose_subs = Flex_state.create_key ()
-let k_var_solve = Flex_state.create_key ()
 let k_neg_cong_fun = Flex_state.create_key ()
 let k_instantiate_choice_ax = Flex_state.create_key ()
 let k_elim_leibniz_eq = Flex_state.create_key ()
@@ -1238,9 +1232,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       Env.set_ho_normalization_rule ho_norm;
       Ordering.normalize := (fun t -> CCOpt.get_or ~default:t (ho_norm t));
 
-      if (Env.flex_get k_huet_style) then
-        JP_unif.set_huet_style ();
-
       if(Env.flex_get k_neg_cong_fun) then (
         Env.add_unary_inf "neg_cong_fun" neg_cong_fun 
       );
@@ -1321,7 +1312,6 @@ let _ext_neg_lit = ref false
 let _neg_ext = ref true
 let _neg_ext_as_simpl = ref false
 let _ext_axiom_penalty = ref 5
-let _var_arg_remove = ref true
 let _huet_style = ref false
 let _cons_elim = ref true
 let _imit_first = ref false
@@ -1348,12 +1338,6 @@ let extension =
     E.flex_add k_neg_ext !_neg_ext;
     E.flex_add k_neg_ext_as_simpl !_neg_ext_as_simpl;
     E.flex_add k_ext_axiom_penalty !_ext_axiom_penalty;
-    E.flex_add k_var_arg_remove !_var_arg_remove;
-    E.flex_add k_huet_style !_huet_style;
-    E.flex_add k_cons_elim !_cons_elim;
-    E.flex_add k_imit_first !_imit_first;
-    E.flex_add k_compose_subs !_compose_subs;
-    E.flex_add k_var_solve !_var_solve;
     E.flex_add k_neg_cong_fun !_neg_cong_fun;
     E.flex_add k_instantiate_choice_ax !_instantiate_choice_ax;
     E.flex_add k_elim_leibniz_eq !_elim_leibniz_eq;
@@ -1404,19 +1388,16 @@ let extension =
 
 let () =
   Options.add_opts
-    [ "--ho", Arg.Set enabled_, " enable HO reasoning";
-      "--force-ho", Arg.Bool  (fun b -> force_enabled_ := false), " enable/disable HO reasoning even if the problem is first-order";
-      "--no-ho", Arg.Clear enabled_, " disable HO reasoning";
+    [ "--ho", Arg.Bool (fun b -> enabled_ := b), " enable/disable HO reasoning";
+      "--force-ho", Arg.Bool  (fun b -> force_enabled_ := b), " enable/disable HO reasoning even if the problem is first-order";
       "--ho-unif", Arg.Bool (fun v -> enable_unif_ := v), " enable full HO unification";
-      "--ho-neg-cong-fun", Arg.Set _neg_cong_fun, "enable NegCongFun";
-      "--no-ho-unif", Arg.Clear enable_unif_, " disable full HO unification";
+      "--ho-neg-cong-fun", Arg.Bool (fun v -> _neg_cong_fun := v), "enable NegCongFun";
       "--ho-elim-pred-var", Arg.Bool (fun b -> _elim_pred_var := b), " disable predicate variable elimination";
       "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";
       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
-      "--ho-ext-axiom", Arg.Set _ext_axiom, " enable extensionality axiom";
+      "--ho-ext-axiom", Arg.Bool (fun v -> _ext_axiom := v), " enable/disable extensionality axiom";
       "--ho-choice-axiom", Arg.Bool (fun v -> _choice_axiom := v), " enable choice axiom";
-      "--no-ho-ext-axiom", Arg.Clear _ext_axiom, " disable extensionality axiom";
-      "--ho-no-ext-pos", Arg.Clear _ext_pos, " disable positive extensionality rule";
+      "--ho-ext-pos", Arg.Bool (fun v -> _ext_pos := v), " enable/disable positive extensionality rule";
       "--ho-neg-ext", Arg.Bool (fun v -> _neg_ext := v), " turn NegExt on or off";
       "--ho-neg-ext-simpl", Arg.Bool (fun v -> _neg_ext_as_simpl := v), " turn NegExt as simplification rule on or off";
       "--ho-ext-pos-all-lits", Arg.Bool (fun v -> _ext_pos_all_lits := v), " turn ExtPos on for all or only eligible literals";
@@ -1425,18 +1406,14 @@ let () =
           else if s = "max-covers" then _prune_arg_fun := `PruneMaxCover
           else if s = "old-prune" then _prune_arg_fun := `OldPrune 
           else _prune_arg_fun := `NoPrune)), " choose arg prune mode";
-      "--ho-no-ext-neg-lit", Arg.Clear _ext_neg_lit, " enable negative extensionality rule on literal level [?]";
+      "--ho-ext-neg-lit", Arg.Bool (fun  v -> _ext_neg_lit := v), " enable/disable negative extensionality rule on literal level [?]";
       "--ho-elim-leibniz", Arg.Int (fun v -> _elim_leibniz_eq := v), " enable/disable treatment of Leibniz equality";
-      "--ho-def-unfold", Arg.Set def_unfold_enabled_, " enable ho definition unfolding";
+      "--ho-def-unfold", Arg.Bool (fun v -> def_unfold_enabled_ := v), " enable ho definition unfolding";
       "--ho-choice-inst", Arg.Bool (fun v -> _instantiate_choice_ax := v), " enable ho definition unfolding";
-      "--ho-huet-style-unif", Arg.Set _huet_style, " enable Huet style projection";
-      "--ho-conservative-elim", Arg.Bool (fun v -> _cons_elim := v), " Disables conservative elimination rule in pragmatic unification";
       "--ho-imitation-first",Arg.Bool (fun v -> PragUnifParams._imit_first:=v), " Use imitation rule before projection rule";
       "--ho-elim-direction", Arg.Symbol (["high-to-low"; "low-to-high"], (fun s ->
           if s = "high-to-low" then PragUnifParams.elim_direction := PragUnifParams.HighToLow
           else (assert (s = "low-to-high"); PragUnifParams.elim_direction := PragUnifParams.LowToHigh))), " Enable solving variables.";
-      "--ho-composition", Arg.Set _compose_subs, " Enable composition instead of merging substitutions";
-      "--ho-disable-var-arg-removal", Arg.Clear _var_arg_remove, " disable removal of arguments of applied variables";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom";
       "--ho-unif-max-depth", Arg.Set_int PragUnifParams.max_depth, " set pragmatic unification max depth";
       "--ho-max-app-projections", Arg.Set_int PragUnifParams.max_app_projections, " set maximal number of functional type projections";
