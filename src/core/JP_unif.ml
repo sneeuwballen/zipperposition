@@ -8,8 +8,6 @@ module US = Unif_subst
 module H = HVar
 
 let prof_jp_unify = Util.mk_profiler "jp_unify"
-let _huet_style = ref false
-
 type subst = US.t
 
 module S = struct
@@ -62,68 +60,6 @@ let project_hs_one ~counter pref_types i type_ui =
   let matrix_hd = T.bvar ~ty:type_ui (n_args_free-i-1) in
   let matrix = T.app matrix_hd new_vars_applied in
   Lambda.eta_expand @@ T.fun_l pref_types matrix
-
-let project_huet_style ~scope ~counter u v l =
-  (* The variable can be either above the disagreement pair (i.e., in l) 
-     or it can be the head of either member of the disagreement pair *)
-  let positions =
-    l 
-    |> CCList.map fst
-    |> CCList.cons_maybe (T.as_var (T.head_term u))
-    |> CCList.cons_maybe (T.as_var (T.head_term v))
-    |> OSeq.of_list
-    |> OSeq.flat_map
-      (fun v ->
-        let prefix_types, return_type = Type.open_fun (HVar.ty v) in
-        prefix_types 
-        |> List.mapi
-          (fun i type_ul ->
-            if Type.is_var type_ul
-            then Some (v, prefix_types, i, return_type, type_ul)
-            else (
-              if (Type.is_fun type_ul) then (
-                let _, ret_type_arg = Type.open_fun type_ul in
-                if Type.equal return_type ret_type_arg || 
-                   Type.is_var ret_type_arg then
-                  (Some (v, prefix_types, i, return_type, type_ul))
-                else None)
-              else None)) 
-        |> CCList.filter_map (fun x -> x)
-        |> OSeq.of_list
-      )
-  in
-  positions
-  |> OSeq.map
-    (fun (v, prefix_types, i, var_ret_type, type_ul) -> 
-      if Type.is_fun type_ul 
-      (* then Some (US.FO.singleton (v, scope) (project_hs_one ~counter prefix_types i type_ul, scope)) *)
-      then (let _, arg_ret_type = Type.open_fun type_ul in
-            let ty_unif = unif_simple ~scope (T.of_ty arg_ret_type) (T.of_ty var_ret_type) in
-              match ty_unif with
-              None -> None
-              | Some unif -> 
-                let v' = HVar.cast ~ty:(S.apply_ty unif (HVar.ty v, scope)) v in
-                let prefix_types'=   prefix_types |> CCList.map (fun ty -> S.apply_ty unif (ty, scope)) in
-                let type_ul' = S.apply_ty unif (type_ul, scope) in
-                let projected =  project_hs_one ~counter prefix_types' i type_ul', scope in
-                (* Format.printf "Var %a -- proj binding %a\n" T.pp (Term.var v) T.pp (fst projected);  *)
-                Some (US.FO.bind unif (v', scope) projected))
-      else 
-        (* To get a complete polymorphic algorithm, we need to consider the case that a type variable could be instantiated as a function. *)
-        match Type.view type_ul with
-          | Type.Var alpha when not @@ Type.equal type_ul var_ret_type -> 
-            let beta = (H.fresh_cnt ~counter ~ty:Type.tType ()) in
-            let alpha' = (Type.arrow [Type.var beta] var_ret_type) in
-            let ty_subst = US.FO.singleton (alpha, scope) (Term.of_ty alpha', scope) in
-            let v' = HVar.cast ~ty:(S.apply_ty ty_subst (HVar.ty v, scope)) v in
-            let prefix_types' = prefix_types |> CCList.map (fun ty -> S.apply_ty ty_subst (ty, scope)) in
-            let projected = project_hs_one ~counter prefix_types' i alpha', scope in 
-            (* Format.printf "Var %a -- proj binding %a\n" T.pp (T.var v') T.pp (fst projected);  *)
-            Some (US.FO.bind ty_subst (v', scope) projected)
-          | _ -> None
-    )
-  (* Append some "None"s to delay the substitutions containing long w tuples *)
-  |> (fun seq -> OSeq.append seq (OSeq.take 10 (OSeq.repeat None)))
 
 
 (** {2 Imitation rule} *)
@@ -378,9 +314,7 @@ let unify ~scope ~counter t0 s0 =
                add_some eliminate,"elim";
                add_some imitate,"imit"; 
                add_some identify,"id"; 
-               (if !_huet_style 
-               then project_huet_style 
-               else iterate ~flex_same:false)
+               iterate ~flex_same:false
                ~scope ~counter,"proj_hs";]
               (* iterate must be last in this list because it is the only one with infinitely many child nodes *)
               |> OSeq.of_list  
@@ -464,9 +398,6 @@ let unify_scoped (t0, scope0) (t1, scope1) =
     ) ()
 
 let unify_scoped_nonterminating t s = OSeq.filter_map (fun x -> x) (unify_scoped t s)
-
-let set_huet_style () =
-  _huet_style := true
 
 (* TODO: operate on inner types like in `Unif`? Test for NO-TYPE terms? *)
 (* TODO: `dont care` unification, i.e. stopping at flex-flex pairs because exact result does not matter? *)

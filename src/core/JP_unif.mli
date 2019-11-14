@@ -11,8 +11,6 @@ module S : sig
 
 end
 
-val set_huet_style : unit -> unit
-
 val project_onesided : scope:Scoped.scope -> counter:int ref -> T.t -> subst OSeq.t
 
 val imitate_onesided : scope:Scoped.scope -> counter:int ref -> T.t -> T.t -> subst OSeq.t
