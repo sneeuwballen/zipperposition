@@ -3007,8 +3007,8 @@ let extension =
   let action env =
     let module E = (val env : Env.S) in
     let module Sup = Make(E) in
+    register ~sup:(module Sup : S);
     Sup.register();
-    register ~sup:(module Sup : S)
   in
   { Extensions.default with Extensions.
                          name="superposition";

@@ -134,7 +134,7 @@ let k_subset ~k l =
   assert(k>=0);
   aux k [] l
 
-let elim_subsets_rule  ?(max_elims=None) ~elim_vars ~counter ~scope t u (depth) =
+let elim_subsets_rule  ?(max_elims=None) ~elim_vars ~counter ~scope t u depth =
   let hd_t, args_t = T.head_term t, Array.of_list (T.args t) in
   let hd_u, args_u = T.head_term u, Array.of_list (T.args u) in
   assert(T.is_var hd_t);
@@ -162,7 +162,7 @@ let elim_subsets_rule  ?(max_elims=None) ~elim_vars ~counter ~scope t u (depth) 
             | None -> 0 
             | Some x -> assert(x>0); diff_args_num-x in
   let start,step = max (diff_args_num-1) 0, -1 in
-  CCList.range_by start end_ ~step
+  CCList.range_by start (max end_ 0) ~step
   |> OSeq.of_list
   |> OSeq.flat_map (fun k ->
     k_subset ~k diff_args
