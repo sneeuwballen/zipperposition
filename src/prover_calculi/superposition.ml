@@ -3006,16 +3006,16 @@ let () =
     , Arg.Bool (fun b -> _sup_under_lambdas := b)
     , " enable/disable superposition in bodies of lambda-expressions"
     ; "--lambda-demod"
-    , Arg.Set _lambda_demod
-    , " enable demodulation in bodies of lambda-expressions"
+    , Arg.Bool (fun b -> _lambda_demod := b)
+    , " enable/disable demodulation in bodies of lambda-expressions"
     ; "--demod-in-var-args"
-    , Arg.Set _demod_in_var_args
+    , Arg.Bool (fun b -> _demod_in_var_args := b)
     , " enable demodulation in arguments of variables"
     ; "--complete-ho-unif"
-    , Arg.Set _complete_ho_unification
+    , Arg.Bool (fun b -> _complete_ho_unification := b)
     , " enable complete higher-order unification algorithm (Jensen-Pietrzykowski)"
     ; "--switch-stream-extract"
-    , Arg.Set _switch_stream_extraction
+    , Arg.Bool (fun b -> _switch_stream_extraction := b)
     , " in ho mode, switches heuristic of clause extraction from the stream queue"
     ; "--ord-in-normal-form"
     , Arg.Bool (fun v -> _ord_in_normal_form := v)
