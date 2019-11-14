@@ -903,10 +903,11 @@ module DB = struct
     | Var _ ->  (subt, skolemized)
     | DB i ->
         if i >= depth then
-          (match IntMap.find_opt (i-depth) skolemized with
-          | (Some sk) -> (sk, skolemized)
-          | None ->
-             let new_sk = snd @@ mk_fresh_skolem [] (ty subt) in
+          (try
+            let sk = IntMap.find (i-depth) skolemized in
+            (sk, skolemized)
+          with _ -> 
+            let new_sk = snd @@ mk_fresh_skolem [] (ty subt) in
              let skolemized = IntMap.add (i-depth) new_sk skolemized in
              new_sk,skolemized)
           else subt, skolemized
@@ -1076,7 +1077,8 @@ module Conv = struct
           let b = if Binder.equal b Binder.Forall 
                   then Builtin.ForallConst else Builtin.ExistsConst in
           let ty_arg = Type.Conv.of_simple_term_exn ctx (Var.ty v) in
-          let previous = PT.Var_tbl.find_opt tbl v in
+          let previous = 
+            if PT.Var_tbl.mem tbl v then Some (PT.Var_tbl.find tbl v) else None in
           PT.Var_tbl.replace tbl v (!depth,ty_arg);
           incr depth;
           let ty_b = Type.Conv.of_simple_term_exn ctx (PT.ty_exn body) in

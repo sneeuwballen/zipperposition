@@ -232,9 +232,10 @@ type arg_coeff_fun = ID.t -> int list
 let depth_occ_driver ~flip stmt_d =
   let tbl = ID.Tbl.create 16 in
   Iter.iter (fun (sym,d) -> 
-    match ID.Tbl.find_opt tbl sym with
-    | Some l -> ID.Tbl.replace tbl sym (d :: l)
-    | None -> ID.Tbl.add tbl sym [d]
+    try 
+      let l = ID.Tbl.find tbl sym in
+      ID.Tbl.replace tbl sym (d :: l)
+    with _ -> ID.Tbl.add tbl sym [d]
   ) stmt_d;
 
   let rec sum = function 

@@ -335,9 +335,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let clause_map = match clause_map with 
       | None -> C.Tbl.create 8
       | Some res -> res in
-    let all_pos = match C.Tbl.find_opt clause_map c with 
-      | None -> [(t,pos)]
-      | Some res -> (t,pos) :: res in
+    let all_pos =
+      try 
+        (t,pos) :: (C.Tbl.find clause_map c)
+      with _ -> [(t,pos)] in
     C.Tbl.replace clause_map c all_pos;
     index := ID.Map.add key clause_map !index
 

@@ -1097,7 +1097,13 @@ and define_lambda_of ~bound ~free body =
   let closed  = fun_l (rec_free @ rec_bound) rec_body in
   let args = List.map (fun v -> var v) (free @ bound) in
 
-  match Tbl.find_opt _lam_ids closed with 
+  let def_opt = 
+    (* old versions of OCaml do not support Tbl.find_opt *)
+    if Tbl.mem _lam_ids closed 
+    then Some (Tbl.find _lam_ids closed)
+    else None in
+
+  match def_opt with 
   | Some (id,def) ->
     fst @@ apply_to_new_hd id free bound body args, def
   | None ->
