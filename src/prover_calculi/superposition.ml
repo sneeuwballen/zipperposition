@@ -2934,12 +2934,12 @@ let _use_weight_for_solid_subsumption = ref false
 
 let key = Flex_state.create_key ()
 
-let all_params_to_max () =
-  _max_depth := 32768;
-  _max_app_projections := 32768;
-  _max_rigid_imitations := 32768;
-  _max_identifications := 32768;
-  _max_elims           := 32768;
+let unif_params_to_def () =
+  _max_depth := 2;
+  _max_app_projections := 1;
+  _max_rigid_imitations := 1;
+  _max_identifications := 1;
+  _max_elims           := 1;
   _max_infs := -1 
 
 let register ~sup =
@@ -3060,7 +3060,7 @@ let () =
       Arg.Symbol (["full-framework";"full"; "pragmatic-framework";], (fun str ->
         _unif_alg := if (String.equal "full" str) then `OldJP
                      else if (String.equal "full-framework" str) then (
-                        all_params_to_max ();
+                        unif_params_to_def ();
                         `NewJPFull)
                      else if (String.equal "pragmatic-framework" str) then `NewJPPragmatic
                      else invalid_arg "unknown argument")), "set the level of HO unification";
@@ -3119,7 +3119,7 @@ let () =
       _lambda_demod := false;
       _demod_in_var_args := false;
       _complete_ho_unification := true;
-      _unif_alg := `NewJPPragmatic;
+      _unif_alg := `NewJPFull;
       _ord_in_normal_form := true;
       _sup_at_var_headed := true;
       _lambdasup := -1;

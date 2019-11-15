@@ -38,9 +38,13 @@ let path_check ~subst ~scope var t =
         (aux_l ~depth ~under_var:true args))
     | T.App(hd,args) -> 
       assert(not (T.is_fun hd));
-      CCOpt.map (fun args' -> 
-        if T.same_l args args' then t else T.app hd args') 
-      (aux_l ~depth ~under_var args)
+      begin match aux ~depth ~under_var hd with
+      | None -> None
+      | Some hd' -> 
+        CCOpt.map (fun args' -> 
+          if T.same_l args args' && T.equal hd hd' then t 
+          else T.app hd' args') 
+        (aux_l ~depth ~under_var args) end
     | T.AppBuiltin(b, args) -> 
       CCOpt.map (fun args' -> 
         if T.same_l args args' then t 
