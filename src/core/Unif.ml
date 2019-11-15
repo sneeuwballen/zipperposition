@@ -500,8 +500,8 @@ module Inner = struct
         not (T.is_var f && US.mem subst (T.as_var_exn f,sc_t))
       | _ -> true
     in
-    assert (not (T.is_a_type t1 && Type.is_forall (Type.of_term_unsafe t1)));
-    assert (not (T.is_a_type t2 && Type.is_forall (Type.of_term_unsafe t2)));
+    (* assert (not (T.is_a_type t1 && Type.is_forall (Type.of_term_unsafe t1)));
+    assert (not (T.is_a_type t2 && Type.is_forall (Type.of_term_unsafe t2))); *)
     begin match view1, view2 with
       | _ when sc1=sc2 && T.equal t1 t2 ->
         subst (* the terms are equal under any substitution *)

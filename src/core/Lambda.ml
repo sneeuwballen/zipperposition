@@ -130,43 +130,43 @@ module Inner = struct
       | T.NoType -> t
       | T.HasType ty ->
         let n, ty_args, ty_ret = T.open_poly_fun ty in
-        assert (n=0);
-        (* first, WHNF *)
-        let t = whnf_term t in
-        (* see how many arguments are missing, and what type *)
-        let args, body = T.open_bind Binder.Lambda t in
-        let n_args = List.length ty_args in
-        let n_missing = n_args - List.length args in
-        if n_missing>0 then (
-          Util.debugf 50 "(@[eta_expand_rec `%a`,@ missing %d args@ in %a@])"
-            (fun k->k T.pp t n_missing (CCFormat.Dump.list T.pp) ty_args);
-          (* missing args: suffix of length [n_missing] *)
-          let missing_args = CCList.drop (n_args-n_missing) ty_args in
-          (* shift body to accommodate for new binders *)
-          let body = T.DB.shift n_missing body in
-          (* build the fully-abstracted term *)
-          let dbvars =
-            List.mapi (fun i ty_arg -> T.bvar (n_missing-i-1) ~ty:ty_arg) missing_args
-          in
-          T.fun_l ty_args (aux (T.app ~ty:ty_ret body dbvars))
-        ) else (
-          let ty = T.ty_exn body in
-          (* traverse body *)
-          let body = match T.view body with
-            | T.Const _ | T.Var _ | T.DB _ -> body
-            | T.App (f, l) ->
-              let l' = List.map aux l in
-              if T.same_l l l' then body else T.app ~ty f l'
-            | T.AppBuiltin (b, l) ->
-              let l' = List.map aux l in
-              if T.same_l l l' then body else T.app_builtin ~ty b l'
-            | T.Bind (b, varty, body') ->
-              assert (b <> Binder.Lambda);
-              let body_reduced = aux body' in
-              if body' = body_reduced then body else T.bind ~ty ~varty b body_reduced
-          in
-          T.fun_l ty_args body
-        )
+        if n!=0 then t (* polymorhpic eta expansion not implemented *)
+        else
+          (* first, WHNF *)
+          let t = whnf_term t in
+          (* see how many arguments are missing, and what type *)
+          let args, body = T.open_bind Binder.Lambda t in
+          let n_args = List.length ty_args in
+          let n_missing = n_args - List.length args in
+          if n_missing>0 then (
+            Util.debugf 50 "(@[eta_expand_rec `%a`,@ missing %d args@ in %a@])"
+              (fun k->k T.pp t n_missing (CCFormat.Dump.list T.pp) ty_args);
+            (* missing args: suffix of length [n_missing] *)
+            let missing_args = CCList.drop (n_args-n_missing) ty_args in
+            (* shift body to accommodate for new binders *)
+            let body = T.DB.shift n_missing body in
+            (* build the fully-abstracted term *)
+            let dbvars =
+              List.mapi (fun i ty_arg -> T.bvar (n_missing-i-1) ~ty:ty_arg) missing_args
+            in
+            T.fun_l ty_args (aux (T.app ~ty:ty_ret body dbvars))
+          ) else (
+            let ty = T.ty_exn body in
+            (* traverse body *)
+            let body = match T.view body with
+              | T.Const _ | T.Var _ | T.DB _ -> body
+              | T.App (f, l) ->
+                let l' = List.map aux l in
+                if T.same_l l l' then body else T.app ~ty f l'
+              | T.AppBuiltin (b, l) ->
+                let l' = List.map aux l in
+                if T.same_l l l' then body else T.app_builtin ~ty b l'
+              | T.Bind (b, varty, body') ->
+                assert (b <> Binder.Lambda);
+                let body_reduced = aux body' in
+                if body' = body_reduced then body else T.bind ~ty ~varty b body_reduced
+            in
+            T.fun_l ty_args body)
     in
     aux t
 
