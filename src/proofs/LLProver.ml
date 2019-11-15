@@ -14,7 +14,8 @@ type res =
   | R_fail
 
 let section = LLProof.section
-let stat_solve = Util.mk_stat "llprover.prove"
+let stat_solve = Util.mk_stat "llproof.prove"
+let prof_check = Util.mk_profiler "llproof.prove"
 
 (** Congruence Closure *)
 module CC = Congruence.Make(struct
@@ -258,7 +259,7 @@ module Rule : sig
   type t
 
   val apply : t list -> F.t -> F.t list list
-  (** Return a disjunctive list of conjuctions *)
+  (** Return a disjunctive list of conjunctions *)
 
   val all : t list
 end = struct
@@ -362,6 +363,7 @@ let prove (a:form list) (b:form) =
     "(@[@{<yellow>llprover.prove@}@ :hyps (@[<hv>%a@])@ :concl %a@])"
     (fun k->k (Util.pp_list T.pp) a T.pp b);
   Util.incr_stat stat_solve;
+  Util.enter_prof prof_check;
   (* prove [a ∧ -b ⇒ ⊥] *)
   let b_init = Branch.add (Branch.root()) (F.not_ b :: a) in
   let tab = {
@@ -369,7 +371,9 @@ let prove (a:form list) (b:form) =
     closed_branches=[];
     saturated=None;
   } in
-  solve_ tab, tab
+  let res = solve_ tab in
+  Util.exit_prof prof_check;
+  res, tab
 
 let pp_stats out (s:final_state) =
   let n_open = List.length s.open_branches in

@@ -15,5 +15,3 @@
   (libraries containers zarith msat logtk logtk.proofs logtk.parsers str)
   (flags :standard -w -32-50)
 )
-
-

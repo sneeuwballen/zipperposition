@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Implementation of Phases}
@@ -54,7 +53,7 @@ val main_cli :
 val main :
   ?setup_gc:bool ->
   ?params:Params.t ->
-  string -> (** file *)
+  string -> (* file *)
   (Phases.errcode, [`Init], [`Exit]) Phases.t
 (** Main to use from a library *)
 

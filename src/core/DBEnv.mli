@@ -53,7 +53,7 @@ val pop_many : 'a t -> int -> 'a t
 
 val size : 'a t -> int
 (** Number of scopes (number of times {!push} or {!push_none} were
-    called to produce the given environement) *)
+    called to produce the given environment) *)
 
 val find : 'a t -> int -> 'a option
 (** Find to which value the given De Bruijn index is bound to, or

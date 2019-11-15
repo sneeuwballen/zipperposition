@@ -6,7 +6,7 @@
   at providing basic types and algorithms (terms, unification, orderings,
   indexing, etc.) that can be factored out of several applications.
 
-[![build status](https://api.travis-ci.org/c-cube/zipperposition.svg?branch=master)](https://travis-ci.org/c-cube/zipperposition)
+[![build status](https://api.travis-ci.org/sneeuwballen/zipperposition.svg?branch=master)](https://travis-ci.org/sneeuwballen/zipperposition)
 
 ## Short summary
 
@@ -28,8 +28,8 @@ Zipperposition is written in the functional and imperative language
 functional data structure) and "superposition" (the calculus used by the
 prover), although the current implementation is written in quite an imperative style.
 Superposition-based theorem proving is an active field of research, so
-there is a lot of literature about it; for this implementation my main references
-are:
+there is a lot of literature about it; for this implementation the main references
+for the base calculus are:
 
 * the chapter _paramodulation-based theorem proving_ of the _handbook of automated reasoning_,
 * the paper _E: a brainiac theorem prover_ that describes the [E prover](http://eprover.org) by S.Schulz,
@@ -69,7 +69,7 @@ If you want to try the development (unstable) version, which has more
 dependencies (in particular `dune` for the build), try:
 
 ```
-$ opam pin -k git https://github.com/c-cube/zipperposition.git#master
+$ opam pin -k git https://github.com/sneeuwballen/zipperposition.git#master
 ```
 
 NOTE: do *not* install `logtk`. It now ships with zipperposition itself.
@@ -79,7 +79,7 @@ NOTE: if installation fails, you might want to try to `opam update` and
 ### Manually
 
 If you really need to, you can download a release on the
-following [github page for releases](https://github.com/c-cube/zipperposition/releases).
+following [github page for releases](https://github.com/sneeuwballen/zipperposition/releases).
 
 Look in the file `opam` to see which dependencies you need to install.
 They include `menhir`, `zarith`, `containers`,
@@ -114,7 +114,7 @@ Try `rm _build -rf` to try to build from scratch.
 
 ## Documentation
 
-See [this page](http://c-cube.github.io/zipperposition/).
+See [this page](http://sneeuwballen.github.io/zipperposition/).
 
 There are some examples of how to use the libraries in `src/tools/`
 and `src/demo/`.
@@ -546,7 +546,7 @@ $ opam install dune zarith containers sequence msat menhir
 Clone Zipperposition and compile it:
 
 ```
-$ git clone https://github.com/c-cube/zipperposition.git --branch dev
+$ git clone https://github.com/sneeuwballen/zipperposition.git --branch dev
 $ cd zipperposition
 $ make
 ```
@@ -610,7 +610,7 @@ Now we use dune, it should simplify the process compared to oasis.
 
 - `git push origin <version>` (`origin` being the name of the github remote)
 
-- `opam publish prepare zipperposition.1.4 https://github.com/c-cube/zipperposition/archive/1.4.tar.gz`
+- `opam publish prepare zipperposition.1.4 https://github.com/sneeuwballen/zipperposition/archive/1.4.tar.gz`
   (using the actual version number).
   This might require to `opam install opam-publish` first, it's a handy opam plugin
   for managing releases.

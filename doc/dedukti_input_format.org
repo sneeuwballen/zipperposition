@@ -16,7 +16,7 @@ More precisely, this document describes Zenon Modulo Dedukti parser.
 The format describes problems in a polymorphic logic.  As usual in
 type theory and thougeven if Zenon is classical prover, booleans are
 distinguished from propositions; booleans are a datatype with two
-constructors (true and false) wheras propositions are built from
+constructors (true and false) whereas propositions are built from
 logical connectives and quantifiers.
 
 This overview is structured as follows: we first describe the minimal
@@ -154,7 +154,7 @@ The following types are also built-in but come for now without operation:
 
 ** Recursion
 
-Recursive definitions are written as rewrite systems. To avoid the definition to trivially diverge, the polymorphic function =dk_builtins.call_by_value : __var_a : cc.uT -> __var_b : cc.uT -> (cc.eT __var_a -> cc.eT __var_b) -> cc.eT __var_a -> cc.eT __var_b= is used to freeze the computation until its last argument looks like a value (starts with a constructor).  The ATP does not need to interpret this function because it will recieve the necessary axiom.
+Recursive definitions are written as rewrite systems. To avoid the definition to trivially diverge, the polymorphic function =dk_builtins.call_by_value : __var_a : cc.uT -> __var_b : cc.uT -> (cc.eT __var_a -> cc.eT __var_b) -> cc.eT __var_a -> cc.eT __var_b= is used to freeze the computation until its last argument looks like a value (starts with a constructor).  The ATP does not need to interpret this function because it will receive the necessary axiom.
 
 * File structure
 

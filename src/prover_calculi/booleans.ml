@@ -40,7 +40,6 @@ module Make(E : Env.S) : S with module Env = E = struct
   module C = Env.C
   module Ctx = Env.Ctx
   module Fool = Fool.Make(Env)
-  module PUnif = PUnif.Make(struct let st = Env.flex_state () end)
 
   let (=~),(/~) = Literal.mk_eq, Literal.mk_neq
   let (@:) = T.app_builtin ~ty:Type.prop
@@ -366,6 +365,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) []
 
   let solve_bool_formulas cl =
+    let module PUnif = PUnif.Make(struct let st = Env.flex_state () end) in
     let unifiers = CCList.flat_map (fun literal -> 
       match literal with 
       | Literal.Equation(lhs, rhs, false) when Type.is_prop (Term.ty lhs) ->

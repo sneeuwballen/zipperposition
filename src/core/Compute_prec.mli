@@ -30,7 +30,7 @@ val set_weight_rule : Precedence.weight_fun parametrized -> t -> t
 (** Choose the way weights are computed *)
 
 val add_status : (ID.t * Precedence.symbol_status) list -> t -> t
-(** Specify explicitely the status of some symbols *)
+(** Specify explicitly the status of some symbols *)
 
 val mk_precedence :
   db_w:int -> lmb_w:int -> t ->

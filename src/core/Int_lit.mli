@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Arithmetic Integer Literal} *)
@@ -58,13 +57,16 @@ val negate : t -> t
 
 val sign : t -> bool
 val polarity : t -> bool  (** Used for the literal ordering *)
+
 val is_pos : t -> bool
 val is_neg : t -> bool
 
 val is_eq : t -> bool
 val is_neq : t -> bool
-val is_eqn : t -> bool   (* = or != *)
+val is_eqn : t -> bool   (** = or != *)
+
 val is_ineq : t -> bool   (** < or <= *)
+
 val is_less : t -> bool
 val is_lesseq : t -> bool
 val is_divides : t -> bool
@@ -176,7 +178,7 @@ module Focus : sig
 
   val is_strictly_max : ord:Ordering.t -> t -> bool
   (** Is the focused term maximal in the literal, ie is it greater
-      than all the othe terms? *)
+      than all the other terms? *)
 
   val map_lit :
     f_m:(Z.t Monome.t -> Z.t Monome.t) ->

@@ -290,7 +290,7 @@ module Term = struct
 
      use De Bruijn  indices for rewrite rules, with RuleSet.t being a
      decision tree (similar to pattern-matching compilation) on head symbols
-     + equality contraints for non-linear rules.
+     + equality constraints for non-linear rules.
 
      Use the Term.DB case extensively... *)
 

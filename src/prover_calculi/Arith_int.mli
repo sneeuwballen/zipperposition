@@ -70,7 +70,7 @@ module type S = sig
 
   val canc_divisibility : Env.unary_inf_rule
   (** Infer divisibility constraints from integer equations,
-      for instace   C or  2a=b ---->  C or 2 | b    if a is maximal *)
+      for instance   C or  2a=b ---->  C or 2 | b    if a is maximal *)
 
   (** {3 Other} *)
 

@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Some helpers} *)
@@ -43,12 +42,13 @@ module Section : sig
   (** [make ?parent ?inheriting name] makes a new section with the given name.
       It has a parent (default [root]), used to give it a name. It can
       also have a list of sections it inherits from.
-      Unless specificed explicitely otherwise (using
+      Unless specified explicitly otherwise (using
       {!set_debug}, the level of the section will be the max level of its
       parent and its inherited sections. *)
 end
 
 val set_debug : int -> unit (** Set debug level of [Section.root] *)
+
 val get_debug : unit -> int (** Current debug level for [Section.root] *)
 
 val break_on_debug : bool ref
@@ -124,10 +124,15 @@ end
 (** {2 profiling facilities} *)
 
 type profiler
+
 val enable_profiling : bool ref (** Enable/disable profiling *)
+
 val mk_profiler : string -> profiler (** Create a named profiler *)
+
 val enter_prof : profiler -> unit (** Enter the profiler *)
+
 val exit_prof : profiler -> unit (** Exit the profiler *)
+
 val with_prof : profiler -> ('a -> 'b) -> 'a -> 'b
 
 (** {2 Runtime statistics} *)
@@ -135,8 +140,11 @@ val with_prof : profiler -> ('a -> 'b) -> 'a -> 'b
 type stat
 
 val mk_stat : string -> stat
+
 val print_global_stats : comment:string -> unit -> unit (** comment prefix *)
+
 val incr_stat : stat -> unit
+
 val add_stat : stat -> int -> unit
 
 (** {2 Flags as integers} *)
@@ -176,6 +184,7 @@ val tstp_needs_escaping: string -> bool
 (** Is this name a proper TSTP identifier, or does it need ' ' around it? *)
 
 val pp_str_tstp : string CCFormat.printer (** possibly escaping *)
+
 val pp_var_tstp : string CCFormat.printer
 
 val ord_option : 'a CCOrd.t -> 'a option CCOrd.t

@@ -1327,7 +1327,7 @@ let extension =
 
     E.flex_add k_ext_pos !_ext_pos;
     E.flex_add k_ext_pos_all_lits !_ext_pos_all_lits;
-    E.flex_add k_ext_axiom !_ext_pos_all_lits;
+    E.flex_add k_ext_axiom !_ext_axiom;
     E.flex_add k_choice_axiom !_choice_axiom;
     E.flex_add k_elim_pred_var !_elim_pred_var;
     E.flex_add k_ext_neg_lit !_ext_neg_lit;

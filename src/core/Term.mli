@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Terms} *)
@@ -189,24 +188,36 @@ module Seq : sig
   val subterms_depth : ?filter_term:(t -> bool) -> t -> (t * int) Iter.t  (* subterms with their depth *)
   val symbols : ?include_types:bool -> ?filter_term:(t -> bool) -> t -> ID.t Iter.t
   val max_var : var Iter.t -> int (** max var *)
+
   val min_var : var Iter.t -> int (** min var *)
+
   val ty_vars : t -> var Iter.t
   val typed_symbols : t -> (ID.t * Type.t) Iter.t
   val add_set : Set.t -> t Iter.t -> Set.t
 end
 
 val var_occurs : var:var -> t -> bool (** [var_occurs ~var t] true iff [var] in t *)
+
 val is_ground : t -> bool (** is the term ground? (no free vars) *)
 val is_linear : t -> bool (** is the term linear? (no vars occuring multiple times) *)
 val monomorphic : t -> bool (** true if the term contains no type var *)
+
 val max_var : VarSet.t -> int (** find the maximum variable *)
+
 val min_var : VarSet.t -> int (** minimum variable *)
+
 val add_vars : unit VarTbl.t -> t -> unit (** add variables of the term to the set *)
+
 val vars : t -> VarSet.t (** compute variables of the terms *)
+
 val vars_prefix_order : t -> var list (** variables in prefix traversal order *)
+
 val depth : t -> int (** depth of the term *)
+
 val head : t -> ID.t option (** head ID.t *)
+
 val head_exn : t -> ID.t (** head ID.t (or Invalid_argument) *)
+
 val size : t -> int (** Size (number of nodes) *)
 
 val simplify_bools : t -> t
@@ -423,9 +434,13 @@ val pp_in : Output_format.t -> t CCFormat.printer
 
 module Conv : sig
   type ctx = Type.Conv.ctx
+
   val create : unit -> ctx
+
   val of_simple_term : ctx -> TypedSTerm.t -> t option
+
   val of_simple_term_exn : ctx -> TypedSTerm.t -> t (** @raise Type.Conv.Error on failure *)
+
   val to_simple_term :
     ?allow_free_db:bool ->
     ?env:TypedSTerm.t Var.t DBEnv.t ->

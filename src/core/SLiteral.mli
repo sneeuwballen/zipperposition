@@ -1,5 +1,3 @@
-
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Simple Literal} *)
@@ -22,6 +20,7 @@ type +'t t =
 type 'a lit = 'a t
 
 val of_form : form -> term t (** @raise NotALit if the form is not a literal *)
+
 val to_form : term t -> form
 
 val map : f:('a -> 'b) -> 'a t -> 'b t

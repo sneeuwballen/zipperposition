@@ -5,7 +5,7 @@
   (public_name logtk.arbitrary)
   (synopsis "random generators for logtk")
   (optional)
-  (libraries containers logtk qcheck)
+  (libraries containers logtk qcheck-core)
   )
 
 
