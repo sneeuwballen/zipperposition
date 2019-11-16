@@ -916,8 +916,7 @@ let rec pp_depth ?(hooks=[]) depth out t =
       Format.fprintf out "@[%a@ → %a@]"
         (Util.pp_list ~sep:" → " (_pp_surrounded depth)) args
         (_pp_surrounded depth) ret
-    | AppBuiltin(b, [x;body]) when Builtin.equal b Builtin.ExistsConst ||
-                                   Builtin.equal b Builtin.ForallConst ->
+    | AppBuiltin((Builtin.ExistsConst | Builtin.ForallConst) as b, [x;body]) ->
       Format.fprintf out "%a %a. %a" Builtin.pp b (_pp depth) x (_pp depth) body;
     | AppBuiltin (b, ([_;a] | [a])) when Builtin.is_prefix b ->
       Format.fprintf out "@[<1>%a %a@]" Builtin.pp b (_pp depth) a
