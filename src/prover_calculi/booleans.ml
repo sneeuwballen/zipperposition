@@ -85,8 +85,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> List.map as_clause |> Iter.of_list
 
   let bool_cases(c: C.t) : C.t list =
-    let term_as_true = Hashtbl.create 8 in
-    let term_as_false = Hashtbl.create 4 in
+    let term_as_true = Term.Tbl.create 8 in
+    let term_as_false = Term.Tbl.create 4 in
     let cased_term_selection = Env.flex_get k_cased_term_selection in
     let rec find_bools top t =
       let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && (not top ||
@@ -98,7 +98,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           Builtin.equal b Builtin.ForallConst || Builtin.equal b Builtin.ExistsConst
         | _ -> false in
       (* Add only propositions. *)
-      let add = if can_be_cased then Hashtbl.add term_as_true else fun _ _ -> () in
+      let add = if can_be_cased then Term.Tbl.add term_as_true else fun _ _ -> () in
       let yes = if can_be_cased then yes else fun _ -> yes T.true_ in
       (* Stop recursion in combination of certain settings. *)
       let inner f x = 
@@ -118,7 +118,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               begin match ps with 
                 | [x;y] when (cased_term_selection != Minimal || Type.is_prop(T.ty x)) ->
                   if f = Builtin.Neq || f = Builtin.Xor then(
-                    if can_be_cased then Hashtbl.add term_as_false t (x =~ y);
+                    if can_be_cased then Term.Tbl.add term_as_false t (x =~ y);
                     add t (x /~ y))
                   else add t (x =~ y)
                 | _ -> () end
@@ -135,12 +135,12 @@ module Make(E : Env.S) : S with module Env = E = struct
         (b_lit :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:polarity)))
       proof :: clauses
     in
-    Hashtbl.fold(case T.false_) term_as_true [] @
-    Hashtbl.fold(case T.true_) term_as_false []
+    Term.Tbl.fold(case T.false_) term_as_true [] @
+    Term.Tbl.fold(case T.true_) term_as_false []
 
 
   let bool_case_simp(c: C.t) : C.t list option =
-    let term_to_equations = Hashtbl.create 8 in
+    let term_to_equations = Term.Tbl.create 8 in
     let cased_term_selection = Env.flex_get k_cased_term_selection in
     let rec find_bools top t =
       let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && (not top ||
@@ -151,7 +151,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           Builtin.equal b Builtin.ForallConst || Builtin.equal b Builtin.ExistsConst
         | _ -> false in
       (* Add only propositions. *)
-      let add t x y = if can_be_cased then Hashtbl.add term_to_equations t (x=~y, x/~y) in
+      let add t x y = if can_be_cased then Term.Tbl.add term_to_equations t (x=~y, x/~y) in
       (* Stop recursion in combination of certain settings. *)
       let inner f x = 
         if is_quant || (can_be_cased && cased_term_selection = Large) 
@@ -172,7 +172,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                 | [x;y] when (cased_term_selection != Minimal || Type.is_prop(T.ty x)) ->
                   add t x y;
                   if (f = Builtin.Neq || f = Builtin.Xor) && can_be_cased then
-                    Hashtbl.replace term_to_equations t (Hashtbl.find term_to_equations t |> CCPair.swap)
+                    Term.Tbl.replace term_to_equations t (Term.Tbl.find term_to_equations t |> CCPair.swap)
                 | _ -> ())
             | Builtin.And | Builtin.Or | Builtin.Imply | Builtin.Not ->
               if cased_term_selection != Minimal then add t t T.true_ else()
@@ -183,7 +183,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Literals.Seq.terms(C.lits c) 
         |> Iter.iter(find_bools true));
       let res = 
-        Hashtbl.fold(fun b (b_true, b_false) clauses ->
+        Term.Tbl.fold(fun b (b_true, b_false) clauses ->
           if cased_term_selection != Minimal ||
             Term.Seq.subterms b |> 
             Iter.for_all (fun st -> T.equal b st || 
