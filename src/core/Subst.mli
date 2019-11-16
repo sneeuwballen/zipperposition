@@ -192,7 +192,7 @@ module FO : sig
   val iter : (Type.t HVar.t Scoped.t -> term Scoped.t -> unit) -> t -> unit
   val filter : (Type.t HVar.t Scoped.t -> term Scoped.t -> bool) -> t -> t
   val compose:  scope:int -> t -> t -> t
-  (* (* Takes a substitution that might map a variable x to a term *)
+  (** Takes a substitution that might map a variable x to a term
      that containts loosely bound variables. It fixes the substitution
      so that all such variables are remaped to a fresh skolem *)
   val unleak_variables : t -> t * (Term.t list)
