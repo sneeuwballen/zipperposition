@@ -532,14 +532,15 @@ let in_lfho_fragment t =
 
 let rec is_fo_term t =
   match view t with
-  | Var _ -> not @@ Type.is_fun @@ ty t
-  | AppBuiltin _ -> false
-  | App (hd, l) -> let expected_args = List.length @@ Type.expected_args @@ ty hd in
-                   let actual_args = List.length l in
-                   expected_args = actual_args &&
-                   T.is_const hd && List.for_all is_fo_term l
-  | Const _ -> true
-  | _ -> false
+    | Var _ -> not @@ Type.is_fun @@ ty t
+    | AppBuiltin _ -> false
+    | App (hd, l) -> 
+      let expected_args = List.length @@ Type.expected_args @@ ty hd in
+      let actual_args = List.length l in
+      expected_args = actual_args && T.is_const hd 
+        && List.for_all is_fo_term l
+    | Const _ -> true
+    | _ -> false
 
 let is_true_or_false t = match view t with
   | AppBuiltin(b, []) -> 
