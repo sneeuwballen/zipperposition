@@ -73,32 +73,16 @@ module Make(E : Env.S) : S with module Env = E = struct
   let as_clause c = Env.C.create ~penalty:1 ~trail:Trail.empty c Proof.Step.trivial
 
   let create_clauses () = 
-    (*let alpha_var = HVar.make ~ty:Type.tType 0 in
-    let alpha = Type.var alpha_var in
-    let b = T.var (HVar.make ~ty:Type.prop 1) in
-    let p = T.var (HVar.make ~ty:(Type.arrow [alpha] Type.prop) 1) in
-    let x = T.var (HVar.make ~ty:alpha 1) in
-    let y = T.var (HVar.make ~ty:alpha 2) in*)
     let a = T.var (HVar.make ~ty:Type.prop 0) in
-    [
-    [Builtin.And @:[T.true_; a] =~ a];
-	  [Builtin.And @:[T.false_; a] =~ T.false_];
-	  [Builtin.Or @:[T.true_; a] =~ T.true_];
-	  [Builtin.Or @:[T.false_; a] =~ a];
-	  [Builtin.Imply @:[T.true_; a] =~ a];
-	  [Builtin.Imply @:[T.false_; a] =~ T.true_];
-	  [Builtin.Not @:[T.true_] =~ T.false_];
-	  [Builtin.Not @:[T.false_] =~ T.true_];
-	  (*
-	  imp_true1 a b; imp_true2 a b; imp_false a b; 
-      and_ a b;
-      all_true p; all_false p;
-	  eq_true x y; eq_false x y; 
-      (*not; exists alpha;*)
-      or_ a b;
-      (*and_false a; and_true a;*)
-	  *)
-    ] |> List.map as_clause |> Iter.of_list
+    [ [Builtin.And @:[T.true_; a] =~ a];
+      [Builtin.And @:[T.false_; a] =~ T.false_];
+      [Builtin.Or @:[T.true_; a] =~ T.true_];
+      [Builtin.Or @:[T.false_; a] =~ a];
+      [Builtin.Imply @:[T.true_; a] =~ a];
+      [Builtin.Imply @:[T.false_; a] =~ T.true_];
+      [Builtin.Not @:[T.true_] =~ T.false_];
+      [Builtin.Not @:[T.false_] =~ T.true_]; ] 
+    |> List.map as_clause |> Iter.of_list
 
   let bool_cases(c: C.t) : C.t list =
   let term_as_true = Hashtbl.create 8 in
