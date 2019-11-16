@@ -17,6 +17,10 @@
     or ill-typed terms by manipulating this carelessly.
 *)
 
+(* ho_weight presents the syntactic weight of eta-expanded
+   term in which lambda prefixes are not counted in the weight.
+   all other symbols (including bound and free variables)
+   take weight of 1  *)
 type t = private {
   term : view;
   ty : type_result;
