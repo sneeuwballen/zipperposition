@@ -549,7 +549,8 @@ module Make(C : Clause_intf.S) = struct
   end
 
   module H = CCHeap.Make(struct
-      (* heap ordered by [weight, real age(id)] *)
+      (* heap ordered by [priority, weight].
+         the lower the better. *)
       type t = (int * int * C.t)
       let leq (i10, i11, c1) (i20, i21, c2) =
         if i10 < i20 then true
