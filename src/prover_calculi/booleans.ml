@@ -13,16 +13,16 @@ type reasoning_kind    =
   BoolReasoningDisabled | BoolCasesInference | BoolCasesSimplification | BoolCasesKeepParent
   | BoolCasesEagerFar | BoolCasesEagerNear
 
-let _bool_reasoning = ref BoolReasoningDisabled
-let cased_term_selection = ref Large
-let quant_rename = ref false
-let interpret_bool_funs = ref false
-let cnf_non_simpl = ref false
-let _norm_bools = ref false 
-let _solve_formulas = ref false
-
 let section = Util.Section.make ~parent:Const.section "booleans"
 
+
+let k_bool_reasoning = Flex_state.create_key ()
+let k_cased_term_selection = Flex_state.create_key ()
+let k_quant_rename = Flex_state.create_key ()
+let k_interpret_bool_funs = Flex_state.create_key ()
+let k_cnf_non_simpl = Flex_state.create_key ()
+let k_norm_bools = Flex_state.create_key () 
+let k_solve_formulas = Flex_state.create_key ()
 
 module type S = sig
   module Env : Env.S
@@ -85,61 +85,63 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> List.map as_clause |> Iter.of_list
 
   let bool_cases(c: C.t) : C.t list =
-  let term_as_true = Hashtbl.create 8 in
-  let term_as_false = Hashtbl.create 4 in
-  let rec find_bools top t =
-    let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && (not top ||
-        (* It is useful to case top level equality like 𝘵𝘦𝘳𝘮𝘴 because these are simplified into 𝘭𝘪𝘵𝘦𝘳𝘢𝘭𝘴. *)
-        match T.view t with AppBuiltin((Eq|Neq|Equiv|Xor),_) -> true | _ -> false) in
-    let is_quant = match T.view t with 
-      | AppBuiltin(b,_) -> 
-        Builtin.equal b Builtin.ForallConst || Builtin.equal b Builtin.ExistsConst
-      | _ -> false in
-    (* Add only propositions. *)
-    let add = if can_be_cased then Hashtbl.add term_as_true else fun _ _ -> () in
-    let yes = if can_be_cased then yes else fun _ -> yes T.true_ in
-    (* Stop recursion in combination of certain settings. *)
-    let inner f x = 
-      if is_quant || can_be_cased && !cased_term_selection = Large 
-      then () 
-      else List.iter(f false) x in
-    match T.view t with
-      | DB _ | Var _ -> ()
-      | Const _ -> add t (yes t)
-      | Fun(_,b) -> find_bools false b
-      | App(f,ps) -> add t (yes t); inner find_bools (f::ps)
-      | AppBuiltin(f,ps) ->
-        inner find_bools ps;
-        match f with
-          | Builtin.True | Builtin.False -> ()
-          | Builtin.Eq | Builtin.Neq | Builtin.Equiv | Builtin.Xor ->
-            (match ps with 
-              | [x;y] when (!cased_term_selection != Minimal || Type.is_prop(T.ty x)) ->
-                if f = Builtin.Neq || f = Builtin.Xor then(
-                  if can_be_cased then Hashtbl.add term_as_false t (x =~ y);
-                  add t (x /~ y)
-                )else
-                  add t (x =~ y)
-              | _ -> ())
-          | Builtin.And | Builtin.Or | Builtin.Imply | Builtin.Not ->
-            if !cased_term_selection != Minimal then add t (yes t) else()
-          | _ -> add t (yes t)
-  in
-  Literals.Seq.terms(C.lits c) |> Iter.iter(find_bools true);
-  let case polarity b b_lit clauses =
-    let proof = Proof.Step.inference[C.proof_parent c]
-      ~rule:(Proof.Rule.mk"bool_cases") ~tags:[Proof.Tag.T_ho]
+    let term_as_true = Hashtbl.create 8 in
+    let term_as_false = Hashtbl.create 4 in
+    let cased_term_selection = Env.flex_get k_cased_term_selection in
+    let rec find_bools top t =
+      let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && (not top ||
+          (* It is useful to case top level equality like 𝘵𝘦𝘳𝘮𝘴 
+            because these are simplified into 𝘭𝘪𝘵𝘦𝘳𝘢𝘭𝘴. *)
+          match T.view t with AppBuiltin((Eq|Neq|Equiv|Xor),_) -> true | _ -> false) in
+      let is_quant = match T.view t with 
+        | AppBuiltin(b,_) -> 
+          Builtin.equal b Builtin.ForallConst || Builtin.equal b Builtin.ExistsConst
+        | _ -> false in
+      (* Add only propositions. *)
+      let add = if can_be_cased then Hashtbl.add term_as_true else fun _ _ -> () in
+      let yes = if can_be_cased then yes else fun _ -> yes T.true_ in
+      (* Stop recursion in combination of certain settings. *)
+      let inner f x = 
+        if is_quant || can_be_cased && cased_term_selection = Large 
+        then () 
+        else List.iter(f false) x in
+      match T.view t with
+        | DB _ | Var _ -> ()
+        | Const _ -> add t (yes t)
+        | Fun(_,b) -> find_bools false b
+        | App(f,ps) -> add t (yes t); inner find_bools (f::ps)
+        | AppBuiltin(f,ps) ->
+          inner find_bools ps;
+          match f with
+            | Builtin.True | Builtin.False -> ()
+            | Builtin.Eq | Builtin.Neq | Builtin.Equiv | Builtin.Xor ->
+              begin match ps with 
+                | [x;y] when (cased_term_selection != Minimal || Type.is_prop(T.ty x)) ->
+                  if f = Builtin.Neq || f = Builtin.Xor then(
+                    if can_be_cased then Hashtbl.add term_as_false t (x =~ y);
+                    add t (x /~ y))
+                  else add t (x =~ y)
+                | _ -> () end
+            | Builtin.And | Builtin.Or | Builtin.Imply | Builtin.Not ->
+              if cased_term_selection != Minimal then add t (yes t) else()
+            | _ -> add t (yes t) 
     in
-    C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-      (b_lit :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:polarity)))
-    proof :: clauses
-  in
-  Hashtbl.fold(case T.false_) term_as_true [] @
-  Hashtbl.fold(case T.true_) term_as_false []
+    Literals.Seq.terms(C.lits c) |> Iter.iter(find_bools true);
+    let case polarity b b_lit clauses =
+      let proof = Proof.Step.inference[C.proof_parent c]
+        ~rule:(Proof.Rule.mk"bool_cases") ~tags:[Proof.Tag.T_ho]
+      in
+      C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+        (b_lit :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:polarity)))
+      proof :: clauses
+    in
+    Hashtbl.fold(case T.false_) term_as_true [] @
+    Hashtbl.fold(case T.true_) term_as_false []
 
 
   let bool_case_simp(c: C.t) : C.t list option =
     let term_to_equations = Hashtbl.create 8 in
+    let cased_term_selection = Env.flex_get k_cased_term_selection in
     let rec find_bools top t =
       let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && (not top ||
         (* It is useful to case top level equality like 𝘵𝘦𝘳𝘮𝘴 because these are simplified into 𝘭𝘪𝘵𝘦𝘳𝘢𝘭𝘴. *)
@@ -152,7 +154,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let add t x y = if can_be_cased then Hashtbl.add term_to_equations t (x=~y, x/~y) in
       (* Stop recursion in combination of certain settings. *)
       let inner f x = 
-        if is_quant || (can_be_cased && !cased_term_selection = Large) 
+        if is_quant || (can_be_cased && cased_term_selection = Large) 
         then () 
         else List.iter(f false) x in
       match T.view t with
@@ -167,13 +169,13 @@ module Make(E : Env.S) : S with module Env = E = struct
             | Builtin.Eq | Builtin.Neq | Builtin.Equiv | Builtin.Xor ->
               (match ps with 
                 | [_;x;y]
-                | [x;y] when (!cased_term_selection != Minimal || Type.is_prop(T.ty x)) ->
+                | [x;y] when (cased_term_selection != Minimal || Type.is_prop(T.ty x)) ->
                   add t x y;
                   if (f = Builtin.Neq || f = Builtin.Xor) && can_be_cased then
                     Hashtbl.replace term_to_equations t (Hashtbl.find term_to_equations t |> CCPair.swap)
                 | _ -> ())
             | Builtin.And | Builtin.Or | Builtin.Imply | Builtin.Not ->
-              if !cased_term_selection != Minimal then add t t T.true_ else()
+              if cased_term_selection != Minimal then add t t T.true_ else()
             | _ -> add t t T.true_
       in
       if not @@ Iter.exists T.is_formula (C.Seq.terms c) then (
@@ -182,7 +184,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         |> Iter.iter(find_bools true));
       let res = 
         Hashtbl.fold(fun b (b_true, b_false) clauses ->
-          if !cased_term_selection != Minimal ||
+          if cased_term_selection != Minimal ||
             Term.Seq.subterms b |> 
             Iter.for_all (fun st -> T.equal b st || 
                                     not (Type.is_prop (T.ty st))) then (
@@ -281,17 +283,13 @@ module Make(E : Env.S) : S with module Env = E = struct
                     |> CCList.flatten
                     |> List.map (fun c -> 
                         C.create ~penalty  ~trail (CCArray.to_list (C.lits c)) proof) in
-      (* CCFormat.printf "cnf [%a].\n" TypedSTerm.pp f; *)
       List.iteri (fun i new_c -> 
-        (* CCFormat.printf "%d: [%a].\n" i C.pp new_c; *)
         assert((C.proof_depth c) <= C.proof_depth new_c);) clauses;
       Some clauses
-    | None       -> 
-      (* Format.printf "res:none.\n"; *)
-      None
+    | None -> None
 
   let cnf_infer cl = 
-    CCOpt.get_or ~default:[] (cnf_otf cl )
+    CCOpt.get_or ~default:[] (cnf_otf cl)
 
   let interpret_boolean_functions c =
     (* Collects boolean functions only at top level, 
@@ -364,40 +362,35 @@ module Make(E : Env.S) : S with module Env = E = struct
                 C.apply_subst (cl,0) subst) unifiers)
 
   let setup () =
-  (* if !_bool_reasoning then(
-    Env.ProofState.ActiveSet.add (create_clauses () );
-    Env.add_unary_inf "bool_cases" bool_cases;
-    Env.add_basic_simplify simpl_bool_subterms;
-  ) *)
-  match !_bool_reasoning with 
-  | BoolReasoningDisabled -> ()
-  | _ -> 
-    (* Env.ProofState.PassiveSet.add (create_clauses ()); *)
-    Env.add_basic_simplify simpl_bool_subterms;
-    Env.add_basic_simplify normalize_equalities;
-    if !_norm_bools then (
-      Env.add_basic_simplify normalize_bool_terms
-    );
-    Env.add_multi_simpl_rule Fool.rw_bool_lits;
-    if !cnf_non_simpl then (
-      Env.add_unary_inf "cnf otf inf" cnf_infer;
-    ) else  Env.add_multi_simpl_rule cnf_otf;
-    if !_solve_formulas then (
-      Env.add_multi_simpl_rule solve_bool_formulas
-    );
-    if (!interpret_bool_funs) then (
-      Env.add_unary_inf "interpret boolean functions" interpret_boolean_functions;
-    );
+    match Env.flex_get k_bool_reasoning with 
+    | BoolReasoningDisabled -> ()
+    | _ -> 
+      (* Env.ProofState.PassiveSet.add (create_clauses ()); *)
+      Env.add_basic_simplify simpl_bool_subterms;
+      Env.add_basic_simplify normalize_equalities;
+      if Env.flex_get k_norm_bools then (
+        Env.add_basic_simplify normalize_bool_terms
+      );
+      Env.add_multi_simpl_rule Fool.rw_bool_lits;
+      if Env.flex_get k_cnf_non_simpl then (
+        Env.add_unary_inf "cnf otf inf" cnf_infer;
+      ) else  Env.add_multi_simpl_rule cnf_otf;
+      if Env.flex_get k_solve_formulas then (
+        Env.add_multi_simpl_rule solve_bool_formulas
+      );
+      if (Env.flex_get k_interpret_bool_funs) then (
+        Env.add_unary_inf "interpret boolean functions" interpret_boolean_functions;
+      );
 
-    if !_bool_reasoning = BoolCasesInference then (
-      Env.add_unary_inf "bool_cases" bool_cases;
-    )
-    else if !_bool_reasoning = BoolCasesSimplification then (
-      Env.set_single_step_multi_simpl_rule bool_case_simp;
-    ) else if !_bool_reasoning = BoolCasesKeepParent then (
-      let keep_parent c  = CCOpt.get_or ~default:[] (bool_case_simp c) in
-      Env.add_unary_inf "bool_cases_keep_parent" keep_parent;
-    )
+      if Env.flex_get k_bool_reasoning = BoolCasesInference then (
+        Env.add_unary_inf "bool_cases" bool_cases;
+      )
+      else if Env.flex_get k_bool_reasoning = BoolCasesSimplification then (
+        Env.set_single_step_multi_simpl_rule bool_case_simp;
+      ) else if Env.flex_get k_bool_reasoning = BoolCasesKeepParent then (
+        let keep_parent c  = CCOpt.get_or ~default:[] (bool_case_simp c) in
+        Env.add_unary_inf "bool_cases_keep_parent" keep_parent;
+      )
 end
 
 
@@ -594,22 +587,43 @@ let post_eager_cases =
       ) res
     )) [c] c)
 
+let _bool_reasoning = ref BoolReasoningDisabled
+let _quant_rename = ref false
 
+
+(* These two options run before CNF, 
+   so (for now it is impossible to move them to Env
+   since it is not even made at the moment) *)
 let preprocess_booleans stmts = (match !_bool_reasoning with
   | BoolCasesEagerFar -> eager_cases_far
   | BoolCasesEagerNear -> eager_cases_near
   | _ -> id
-  ) (if !quant_rename then name_quantifiers stmts else stmts)
+  ) (if !_quant_rename then name_quantifiers stmts else stmts)
 
 let preprocess_cnf_booleans stmts = match !_bool_reasoning with
   | BoolCasesEagerFar | BoolCasesEagerNear -> post_eager_cases stmts
   | _ -> stmts
 
 
+let _cased_term_selection = ref Large
+let _interpret_bool_funs = ref false
+let _cnf_non_simpl = ref false
+let _norm_bools = ref false 
+let _solve_formulas = ref false
+
+
 let extension =
   let register env =
     let module E = (val env : Env.S) in
     let module ET = Make(E) in
+    E.flex_add k_bool_reasoning !_bool_reasoning;
+    E.flex_add k_cased_term_selection !_cased_term_selection;
+    E.flex_add k_quant_rename !_quant_rename;
+    E.flex_add k_interpret_bool_funs !_interpret_bool_funs;
+    E.flex_add k_cnf_non_simpl !_cnf_non_simpl;
+    E.flex_add k_norm_bools !_norm_bools;
+    E.flex_add k_solve_formulas !_solve_formulas;
+
     ET.setup ()
   in
   { Extensions.default with
@@ -631,18 +645,18 @@ let () =
                     | _ -> assert false), 
       " enable/disable boolean axioms";
       "--bool-subterm-selection", 
-      Arg.Symbol(["A"; "M"; "L"], (fun opt -> cased_term_selection := 
+      Arg.Symbol(["A"; "M"; "L"], (fun opt -> _cased_term_selection := 
         match opt with "A"->Any | "M"->Minimal | "L"->Large
         | _ -> assert false)), 
       " select boolean subterm selection criterion: A for any, M for minimal and L for large";
       "--quantifier-renaming"
-      , Arg.Bool (fun v -> quant_rename := v)
+      , Arg.Bool (fun v -> _quant_rename := v)
       , " turn the quantifier renaming on or off";
       "--disable-simplifying-cnf",
-      Arg.Set cnf_non_simpl,
+      Arg.Set _cnf_non_simpl,
       "implement cnf on-the-fly as an inference rule";
       "--interpret-bool-funs"
-      , Arg.Bool (fun v -> interpret_bool_funs := v)
+      , Arg.Bool (fun v -> _interpret_bool_funs := v)
       , " turn interpretation of boolean functions as forall or negation of forall on or off";
       "--normalize-bool-terms", Arg.Bool((fun v -> _norm_bools := v)),
       " normalize boolean subterms using their weight.";

@@ -454,7 +454,7 @@ let process_file ?(prelude=Iter.empty) file =
      Hence naming quantifiers inside terms is done directly here. 
      Without this Type.Conv.Error occures so the naming is done unconditionally. *)
   let quant_transformer = 
-    if !Booleans.quant_rename then Booleans.preprocess_booleans 
+    if !Booleans._quant_rename then Booleans.preprocess_booleans 
     else CCFun.id in
   let transformed = Rewriting.unfold_def_before_cnf (quant_transformer decls) in
   let sk_ctx = Skolem.create () in 
