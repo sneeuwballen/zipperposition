@@ -17,9 +17,7 @@ end
 
 module H = Hashtbl.Make(VarInt)
 module M = CCMap.Make(VarInt)
-module IntMap = Map.Make(struct type t = int
-                                let compare : int -> int -> int = Pervasives.compare
-                         end)
+module IntMap = Map.Make(CCInt)
 
 
 (** {2 Renaming} *)

@@ -403,7 +403,7 @@ module Term = struct
           (fun tail' ->
              reduce t (fun t' -> k (t' :: tail')))
     in
-     reduce t0 (fun t->  t, !set)
+    reduce t0 (fun t -> t, !set)
 
   let normalize_term ?(max_steps=1000) (t:term): term * Rule_inst_set.t =
     Util.with_prof prof_term_rw (normalize_term_ max_steps) t
