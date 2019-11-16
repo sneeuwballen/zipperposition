@@ -547,12 +547,3 @@ let register name ord =
   if Hashtbl.mem tbl_ name
   then invalid_arg ("ordering name already used: " ^ name)
   else Hashtbl.add tbl_ name ord
-
-
-let () =
-  (* [ "--db-weight"
-  , Arg.Set_int _db_weight
-  , " set KBO weight of DeBrujin indices"
-  ; "--db-weight"
-  , Arg.Set_int _lam_weight
-  , " set KBO weight of lambda symbols"]; *) ();
