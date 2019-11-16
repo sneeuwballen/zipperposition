@@ -1,3 +1,8 @@
+(* This file is free software, part of Zipperposition. See file "license" for more details. *)
+
+(** {1 Pattern unification algorithm implementation} *)
+
+
 module T = Term
 module US = Unif_subst
 module H = HVar
