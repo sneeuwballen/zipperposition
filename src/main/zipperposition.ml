@@ -14,7 +14,7 @@ let section = Libzipperposition.Const.section
 let phases = Phases_impl.main_cli ~setup_gc:true ()
 
 let () =
-  Printexc.record_backtrace true;
+  (* Printexc.record_backtrace true; *)
   begin match Phases.run phases with
     | CCResult.Error msg ->
       print_endline msg;
