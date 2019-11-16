@@ -87,33 +87,33 @@ module Make(E : Env.S) : S with module Env = E = struct
   let bool_cases(c: C.t) : C.t list =
   let term_as_true = Hashtbl.create 8 in
   let term_as_false = Hashtbl.create 4 in
-	let rec find_bools top t =
-		let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && (not top ||
+  let rec find_bools top t =
+    let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && (not top ||
         (* It is useful to case top level equality like 𝘵𝘦𝘳𝘮𝘴 because these are simplified into 𝘭𝘪𝘵𝘦𝘳𝘢𝘭𝘴. *)
         match T.view t with AppBuiltin((Eq|Neq|Equiv|Xor),_) -> true | _ -> false) in
     let is_quant = match T.view t with 
       | AppBuiltin(b,_) -> 
         Builtin.equal b Builtin.ForallConst || Builtin.equal b Builtin.ExistsConst
       | _ -> false in
-		(* Add only propositions. *)
-		let add = if can_be_cased then Hashtbl.add term_as_true else fun _ _ -> () in
-		let yes = if can_be_cased then yes else fun _ -> yes T.true_ in
-		(* Stop recursion in combination of certain settings. *)
-		let inner f x = 
+    (* Add only propositions. *)
+    let add = if can_be_cased then Hashtbl.add term_as_true else fun _ _ -> () in
+    let yes = if can_be_cased then yes else fun _ -> yes T.true_ in
+    (* Stop recursion in combination of certain settings. *)
+    let inner f x = 
       if is_quant || can_be_cased && !cased_term_selection = Large 
       then () 
       else List.iter(f false) x in
-		match T.view t with
-			| DB _ | Var _ -> ()
-			| Const _ -> add t (yes t)
-			| Fun(_,b) -> find_bools false b
-			| App(f,ps) -> add t (yes t); inner find_bools (f::ps)
-			| AppBuiltin(f,ps) ->
-				inner find_bools ps;
-				match f with
-					| Builtin.True | Builtin.False -> ()
-					| Builtin.Eq | Builtin.Neq | Builtin.Equiv | Builtin.Xor ->
-						(match ps with 
+    match T.view t with
+      | DB _ | Var _ -> ()
+      | Const _ -> add t (yes t)
+      | Fun(_,b) -> find_bools false b
+      | App(f,ps) -> add t (yes t); inner find_bools (f::ps)
+      | AppBuiltin(f,ps) ->
+        inner find_bools ps;
+        match f with
+          | Builtin.True | Builtin.False -> ()
+          | Builtin.Eq | Builtin.Neq | Builtin.Equiv | Builtin.Xor ->
+            (match ps with 
               | [x;y] when (!cased_term_selection != Minimal || Type.is_prop(T.ty x)) ->
                 if f = Builtin.Neq || f = Builtin.Xor then(
                   if can_be_cased then Hashtbl.add term_as_false t (x =~ y);
@@ -121,21 +121,21 @@ module Make(E : Env.S) : S with module Env = E = struct
                 )else
                   add t (x =~ y)
               | _ -> ())
-					| Builtin.And | Builtin.Or | Builtin.Imply | Builtin.Not ->
-						if !cased_term_selection != Minimal then add t (yes t) else()
-					| _ -> add t (yes t)
-	in
-	Literals.Seq.terms(C.lits c) |> Iter.iter(find_bools true);
-	let case polarity b b_lit clauses =
-		let proof = Proof.Step.inference[C.proof_parent c]
-			~rule:(Proof.Rule.mk"bool_cases") ~tags:[Proof.Tag.T_ho]
-		in
-		C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-			(b_lit :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:polarity)))
-		proof :: clauses
-	in
-	Hashtbl.fold(case T.false_) term_as_true [] @
-	Hashtbl.fold(case T.true_) term_as_false []
+          | Builtin.And | Builtin.Or | Builtin.Imply | Builtin.Not ->
+            if !cased_term_selection != Minimal then add t (yes t) else()
+          | _ -> add t (yes t)
+  in
+  Literals.Seq.terms(C.lits c) |> Iter.iter(find_bools true);
+  let case polarity b b_lit clauses =
+    let proof = Proof.Step.inference[C.proof_parent c]
+      ~rule:(Proof.Rule.mk"bool_cases") ~tags:[Proof.Tag.T_ho]
+    in
+    C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+      (b_lit :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:polarity)))
+    proof :: clauses
+  in
+  Hashtbl.fold(case T.false_) term_as_true [] @
+  Hashtbl.fold(case T.true_) term_as_false []
 
 
   let bool_case_simp(c: C.t) : C.t list option =
@@ -364,11 +364,11 @@ module Make(E : Env.S) : S with module Env = E = struct
                 C.apply_subst (cl,0) subst) unifiers)
 
   let setup () =
-	(* if !_bool_reasoning then(
-		Env.ProofState.ActiveSet.add (create_clauses () );
-		Env.add_unary_inf "bool_cases" bool_cases;
+  (* if !_bool_reasoning then(
+    Env.ProofState.ActiveSet.add (create_clauses () );
+    Env.add_unary_inf "bool_cases" bool_cases;
     Env.add_basic_simplify simpl_bool_subterms;
-	) *)
+  ) *)
   match !_bool_reasoning with 
   | BoolReasoningDisabled -> ()
   | _ -> 
