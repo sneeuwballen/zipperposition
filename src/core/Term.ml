@@ -567,21 +567,21 @@ let depth t = Seq.subterms_depth t |> Iter.map snd |> Iter.fold max 0
    @param ty_ret the return type *)
 let mk_fresh_skolem =
    let n = ref 0 in
-   fun vars ty_ret ->
-   let i = CCRef.incr_then_get n in
-   (** fresh skolem **)
-   let id = ID.makef "#fsk%d" i in
-   ID.set_payload id (ID.Attr_skolem ID.K_normal);
-   let ty_vars, vars =
-      List.partition (fun v -> Type.is_tType (HVar.ty v)) vars
-   in
-   let ty =
-      Type.forall_fvars ty_vars
-         (Type.arrow (List.map HVar.ty vars) ty_ret)
-   in
-   ((id,ty), app_full (const id ~ty)
-      (List.map Type.var ty_vars)
-      (List.map var vars) )
+    fun vars ty_ret ->
+      let i = CCRef.incr_then_get n in
+      (** fresh skolem **)
+      let id = ID.makef "#fsk%d" i in
+      ID.set_payload id (ID.Attr_skolem ID.K_normal);
+      let ty_vars, vars =
+          List.partition (fun v -> Type.is_tType (HVar.ty v)) vars
+      in
+      let ty =
+          Type.forall_fvars ty_vars
+            (Type.arrow (List.map HVar.ty vars) ty_ret)
+      in
+      ((id,ty), app_full (const id ~ty)
+          (List.map Type.var ty_vars)
+          (List.map var vars) )
 
 let mk_tmp_cst ~counter ~ty =
   let idx = CCRef.get_then_incr counter in
