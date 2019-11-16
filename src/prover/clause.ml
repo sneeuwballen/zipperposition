@@ -357,7 +357,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     ) else None
 
   let proof_depth c =
-    Proof.Step.inferences_perfomed (proof_step c)
+    Proof.Step.inferences_performed (proof_step c)
 
   module Seq = struct
     let lits c = Iter.of_array c.sclause.lits

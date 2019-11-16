@@ -418,18 +418,16 @@ module Step = struct
     | None, (Some _ as res) -> res
     | Some x, Some y -> Some (min x y)
 
-  let inferences_perfomed ?(count_cnf=false) p =
-    ignore(count_cnf);
-    let rec aux p = match p.kind with 
-    | Simplification _ -> (*List.fold_left (fun acc par -> 
-        acc + aux ((Parent.proof par).step)) 0 p.parents *)
+  let inferences_performed p =
+    let rec aux p = 
+      match p.kind with 
+      | Simplification _ -> 
         let parents = List.map (fun par -> aux ((Parent.proof par).step)) p.parents in
         CCOpt.get_or ~default:0 (Iter.max (Iter.of_list parents))
-    | Inference _ -> (*List.fold_left (fun acc par -> 
-        acc + aux ((Parent.proof par).step)) 0 p.parents + 1 *)
+      | Inference _ -> 
         let parents = List.map (fun par -> aux ((Parent.proof par).step)) p.parents in
         CCOpt.get_or ~default:0 (Iter.max (Iter.of_list parents)) + 1 
-    | _ -> 0 in
+      | _ -> 0 in
   aux p
 
   let rec has_ho_step p = match p.kind with

@@ -1480,7 +1480,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
 
   let ext_eqfact_decompose given =
-    if Proof.Step.inferences_perfomed (C.proof_step given)
+    if Proof.Step.inferences_performed (C.proof_step given)
         < Env.flex_get k_max_lits_ext_dec then  
       Util.with_prof prof_ext_dec ext_eqfact_decompose_aux given
     else []

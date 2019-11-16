@@ -42,7 +42,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let output_cl ~out clause =
     let lits_converted = Literals.Conv.to_tst (C.lits clause) in
-    Format.fprintf out "%% %d:\n" (Proof.Step.inferences_perfomed (C.proof_step clause));
+    Format.fprintf out "%% %d:\n" (Proof.Step.inferences_performed (C.proof_step clause));
     Format.fprintf out "@[thf(zip_cl_%d,axiom,@[%a@]).@]@\n" (C.id clause) TypedSTerm.TPTP_THF.pp lits_converted
 
   let output_symdecl ~out sym ty =

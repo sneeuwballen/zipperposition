@@ -239,7 +239,7 @@ module Step : sig
   val goal : source -> t
   val goal' : ?loc:Loc.t -> file:string -> name:string -> unit -> t
 
-  val inferences_perfomed : ?count_cnf:bool -> t -> int
+  val inferences_performed : t -> int
 
   val has_ho_step : t -> bool
 
