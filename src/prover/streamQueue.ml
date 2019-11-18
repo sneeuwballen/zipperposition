@@ -196,7 +196,7 @@ module Make(Stm : Stream_intf.S) = struct
         else
           (
             let res = Stm.drip_n s n q.guard in
-            q.hp <- H.insert (w + Stm.penalty s, s) red_hp;
+            q.hp <- H.insert (w +  n * Stm.penalty s, s) red_hp;
             res
           )
       with

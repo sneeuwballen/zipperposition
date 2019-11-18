@@ -25,7 +25,7 @@ type e_dir =
 
 let elim_direction = ref HighToLow
 
-let skip_multiplier = ref 20.0
+let skip_multiplier = ref 35.0
 
 let all_paramst_to_def () = 
   (* intmax does not work because we use high-level bit :(

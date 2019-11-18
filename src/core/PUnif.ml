@@ -55,8 +55,8 @@ let pp_flag out flag =
   ) op_masks
 
 let skip depth = 
-  if depth > 2 then int_of_float @@ log10 (float_of_int depth) *. !PragUnifParams.skip_multiplier
-  else 0 
+  if depth > 1 then int_of_float @@ log10 (float_of_int depth) *. !PragUnifParams.skip_multiplier
+  else 0
 
 let delay depth res =
   OSeq.append
