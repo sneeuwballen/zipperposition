@@ -88,6 +88,8 @@ let k_max_infs = Flex_state.create_key ()
 let k_switch_stream_extraction = Flex_state.create_key ()
 let k_dont_simplify = Flex_state.create_key ()
 let k_use_semantic_tauto = Flex_state.create_key ()
+let k_restrict_fluidsup = Flex_state.create_key ()
+
 
 
 let _NO_LAMSUP = -1
@@ -181,6 +183,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       _trigger_bools := Term.Set.add_seq !_trigger_bools (get_triggers c);
     );
     Signal.ContinueListening
+
+  let fluidsup_applicable cl =
+    not (Env.flex_get k_restrict_fluidsup) ||
+    Array.length (C.lits cl) <= 2 ||  (C.proof_depth cl) == 0
 
   (* Syntactic overapproximation of fluid or deep terms *)
   let is_fluid_or_deep c t = 
@@ -1031,41 +1037,43 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       we try to rewrite conditionally other clauses using
       non-minimal sides of every positive literal *)
     let new_clauses =
-      Lits.fold_eqn ~sign:true ~ord ~both:true ~eligible (C.lits clause)
-      |> Iter.flat_map
-        (fun (s, t, _, s_pos) ->
-          I.fold !_idx_fluidsup_into
-            (fun acc u_p with_pos ->
-              assert (is_fluid_or_deep with_pos.C.WithPos.clause u_p);
-              assert (T.DB.is_closed u_p);
-              (* Create prefix variable H and use H s = H t for superposition *)
-              let var_h = T.var (HVar.fresh ~ty:(Type.arrow [T.ty s] (Type.var (HVar.fresh ~ty:Type.tType ()))) ()) in
-              let hs = T.app var_h [s] in
-              let ht = T.app var_h [t] in
-              let res = Env.flex_get k_unif_alg (u_p,1) (hs,0) |> OSeq.map (
-                  fun osubst ->
-                    osubst |> CCOpt.flat_map (
-                      fun subst ->
-                        let passive = with_pos.C.WithPos.clause in
-                        let passive_pos = with_pos.C.WithPos.pos in
-                        let passive_lit, _ = Lits.Pos.lit_at (C.lits passive) passive_pos in
-                        let info = SupInfo.({
-                            s=hs; t=ht; active=clause; active_pos=s_pos; scope_active=0;
-                            u_p; passive; passive_lit; passive_pos; scope_passive=1; subst; sup_kind=FluidSup
-                          }) in
-                        do_superposition info
-                    )
-                )
-              in
-              let penalty = 
-                max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause)
-                  + (Env.flex_get k_fluidsup_penalty) in
-              (* /!\ may differ from the actual penalty (by -2) *)
-              Iter.cons (penalty,res) acc
-            )
-          Iter.empty
-        )
-      |> Iter.to_rev_list
+      if fluidsup_applicable clause then
+        Lits.fold_eqn ~sign:true ~ord ~both:true ~eligible (C.lits clause)
+        |> Iter.flat_map
+          (fun (s, t, _, s_pos) ->
+            I.fold !_idx_fluidsup_into
+              (fun acc u_p with_pos ->
+                assert (is_fluid_or_deep with_pos.C.WithPos.clause u_p);
+                assert (T.DB.is_closed u_p);
+                (* Create prefix variable H and use H s = H t for superposition *)
+                let var_h = T.var (HVar.fresh ~ty:(Type.arrow [T.ty s] (Type.var (HVar.fresh ~ty:Type.tType ()))) ()) in
+                let hs = T.app var_h [s] in
+                let ht = T.app var_h [t] in
+                let res = Env.flex_get k_unif_alg (u_p,1) (hs,0) |> OSeq.map (
+                    fun osubst ->
+                      osubst |> CCOpt.flat_map (
+                        fun subst ->
+                          let passive = with_pos.C.WithPos.clause in
+                          let passive_pos = with_pos.C.WithPos.pos in
+                          let passive_lit, _ = Lits.Pos.lit_at (C.lits passive) passive_pos in
+                          let info = SupInfo.({
+                              s=hs; t=ht; active=clause; active_pos=s_pos; scope_active=0;
+                              u_p; passive; passive_lit; passive_pos; scope_passive=1; subst; sup_kind=FluidSup
+                            }) in
+                          do_superposition info
+                      )
+                  )
+                in
+                let penalty = 
+                  max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause)
+                    + (Env.flex_get k_fluidsup_penalty) in
+                (* /!\ may differ from the actual penalty (by -2) *)
+                Iter.cons (penalty,res) acc
+              )
+            Iter.empty
+          )
+        |> Iter.to_rev_list
+      else []
     in
     let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) new_clauses in
       StmQ.add_lst _stmq.q stm_res;
@@ -1079,44 +1087,46 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* do the inferences in which clause is passive (rewritten),
       so we consider both negative and positive literals *)
     let new_clauses =
-      Lits.fold_terms ~vars:true ~var_args:false ~fun_bodies:false ~subterms:true ~ord
-        ~which:`Max ~eligible ~ty_args:false (C.lits clause)
-      |> Iter.filter (fun (u_p, _) -> is_fluid_or_deep clause u_p)
-      |> Iter.flat_map
-        (fun (u_p, passive_pos) ->
-          let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
-          I.fold !_idx_sup_from
-            (fun acc _ with_pos ->
-              let active = with_pos.C.WithPos.clause in
-              let s_pos = with_pos.C.WithPos.pos in
-              let res = match Lits.View.get_eqn (C.lits active) s_pos with
-                | Some (s, t, true) ->
-                (* Create prefix variable H and use H s = H t for superposition *)
-                let var_h = T.var (HVar.fresh ~ty:(Type.arrow [T.ty s] (Type.var (HVar.fresh ~ty:Type.tType ()))) ()) in
-                let hs = T.app var_h [s] in
-                let ht = T.app var_h [t] in
-                Env.flex_get k_unif_alg (hs,1) (u_p,0)
-                |> OSeq.map
-                  (fun osubst ->
-                    osubst |> CCOpt.flat_map (fun subst ->
-                      let info = SupInfo.({
-                          s = hs; t = ht; active; active_pos=s_pos; scope_active=1; subst;
-                          u_p; passive=clause; passive_lit; passive_pos; scope_passive=0; sup_kind=FluidSup
-                        }) in
-                      do_superposition info
+      if fluidsup_applicable clause then
+        Lits.fold_terms ~vars:true ~var_args:false ~fun_bodies:false ~subterms:true ~ord
+          ~which:`Max ~eligible ~ty_args:false (C.lits clause)
+        |> Iter.filter (fun (u_p, _) -> is_fluid_or_deep clause u_p)
+        |> Iter.flat_map
+          (fun (u_p, passive_pos) ->
+            let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
+            I.fold !_idx_sup_from
+              (fun acc _ with_pos ->
+                let active = with_pos.C.WithPos.clause in
+                let s_pos = with_pos.C.WithPos.pos in
+                let res = match Lits.View.get_eqn (C.lits active) s_pos with
+                  | Some (s, t, true) ->
+                  (* Create prefix variable H and use H s = H t for superposition *)
+                  let var_h = T.var (HVar.fresh ~ty:(Type.arrow [T.ty s] (Type.var (HVar.fresh ~ty:Type.tType ()))) ()) in
+                  let hs = T.app var_h [s] in
+                  let ht = T.app var_h [t] in
+                  Env.flex_get k_unif_alg (hs,1) (u_p,0)
+                  |> OSeq.map
+                    (fun osubst ->
+                      osubst |> CCOpt.flat_map (fun subst ->
+                        let info = SupInfo.({
+                            s = hs; t = ht; active; active_pos=s_pos; scope_active=1; subst;
+                            u_p; passive=clause; passive_lit; passive_pos; scope_passive=0; sup_kind=FluidSup
+                          }) in
+                        do_superposition info
+                      )
                     )
-                  )
-                | _ -> assert false
-              in
-              let penalty = 
-                max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) 
-                  + Env.flex_get k_fluidsup_penalty in
-              (* /!\ may differ from the actual penalty (by -2) *)
-              Iter.cons (penalty,res) acc
-            )
-            Iter.empty
-        )
-      |> Iter.to_rev_list
+                  | _ -> assert false
+                in
+                let penalty = 
+                  max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) 
+                    + Env.flex_get k_fluidsup_penalty in
+                (* /!\ may differ from the actual penalty (by -2) *)
+                Iter.cons (penalty,res) acc
+              )
+              Iter.empty
+          )
+        |> Iter.to_rev_list
+      else []
     in
     let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) new_clauses in
       StmQ.add_lst _stmq.q stm_res;
@@ -2907,6 +2917,7 @@ let _dupsup = ref true
 let _trigger_bool_inst = ref (-1)
 let _recognize_injectivity = ref false
 let _sup_with_pure_vars = ref true
+let _restrict_fluidsup = ref false
 
 let _lambdasup = ref (-1)
 let _max_infs = ref (-1)
@@ -2957,6 +2968,7 @@ let register ~sup =
   E.flex_add k_dupsup !_dupsup;
   E.flex_add k_lambdasup !_lambdasup;
   E.flex_add k_sup_w_pure_vars !_sup_with_pure_vars;
+  E.flex_add k_restrict_fluidsup !_restrict_fluidsup;
   E.flex_add k_demod_in_var_args !_demod_in_var_args;
   E.flex_add k_lambda_demod !_lambda_demod;
   E.flex_add k_ext_dec_lits !_ext_dec_lits;
@@ -3051,6 +3063,7 @@ let () =
     "--solid-subsumption", Arg.Bool (fun v -> _solid_subsumption := v), " set solid subsumption on or off";
     "--recognize-injectivity", Arg.Bool (fun v -> _recognize_injectivity := v), " recognize injectivity axiom and axiomatize corresponding inverse";
     "--sup-with-pure-vars" , Arg.Bool (fun v -> _sup_with_pure_vars := v), " enable/disable superposition to and from pure variable equations";
+    "--restrict-fluidsup" , Arg.Bool (fun v -> _restrict_fluidsup := v), " enable/disable restriction of fluidSup to up to two literal or inital clauses";
     "--sup-with-true-false", Arg.Bool (fun v ->( _sup_t_f := v)), " enable/disable superposition, eq-res and eq-fact with true/false";
     "--use-weight-for-solid-subsumption", Arg.Bool (fun v -> _use_weight_for_solid_subsumption := v), 
         " enable/disable superposition to and from pure variable equations";
