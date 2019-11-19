@@ -195,7 +195,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
   let get_option k = Flex_state.get_exn k St.st 
 
   let skip depth = 
-    if depth > 2 then int_of_float @@ log10 (float_of_int depth) *. get_option PUP.k_skip_multiplier
+    if depth > 1 then int_of_float @@ log10 (float_of_int depth) *. get_option PUP.k_skip_multiplier
     else 0 
 
   let delay depth res =

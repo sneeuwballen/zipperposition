@@ -14,7 +14,7 @@ module Make (S : sig val st: Flex_state.t end) = struct
   let get_op k = Flex_state.get_exn k S.st
 
   let skip depth = 
-    if depth > 2 then
+    if depth > 1 then
       int_of_float ((log10 (float_of_int depth)) *. get_op PUP.k_skip_multiplier)
     else 0
 

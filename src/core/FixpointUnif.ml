@@ -89,7 +89,8 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
     else (
       let var, rigid = if T.is_var s then s, t else t,s in
       match path_check ~subst ~scope var rigid with 
-      | None -> raise DontKnow
+      | None -> 
+        raise DontKnow
       | Some rigid ->
         assert (T.DB.is_closed rigid);
         US.FO.bind subst (T.as_var_exn var, scope) (rigid, scope)) in
