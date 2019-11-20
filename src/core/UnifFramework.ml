@@ -148,7 +148,7 @@ module Make (P : PARAMETERS) = struct
             | _ -> 
               try
                 let mgu =
-                 if steps > 3 then None else
+                 (* if steps > 3 then None else *)
                  CCList.find_map (fun alg ->  
                   try
                     Some (alg (lhs, unifscope) (rhs, unifscope) subst)
