@@ -19,8 +19,3 @@ let k_use_weight_for_solid_subsumption = Flex_state.create_key ()
 
 
 let k_skip_multiplier = Flex_state.create_key ()
-
-(* let all_paramst_to_def () = 
-  (* intmax does not work because we use high-level bit :(
-     10000 operations is effectively max. *)
-  *)
