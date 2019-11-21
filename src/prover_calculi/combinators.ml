@@ -203,6 +203,15 @@ let opt4 t =
 
 let curry_optimizations = [opt1;opt2;opt3;opt4]
 
+let optimizer ~opts t =
+  let rec aux = function 
+  | f :: fs ->
+    begin match f t with 
+    | Some t' -> t'
+    | None -> aux fs end
+  | [] -> t in
+  aux opts
+
 (* Assumes beta-reduced, eta-short term *)
 let abf t =
   let rec abstract ~bvar ~depth t =
