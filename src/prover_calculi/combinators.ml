@@ -203,7 +203,7 @@ let opt4 t =
 
 let curry_optimizations = [opt1;opt2;opt3;opt4]
 
-let optimizer ~opts t =
+let optimize ~opts t =
   let rec aux = function 
   | f :: fs ->
     begin match f t with 
@@ -214,18 +214,47 @@ let optimizer ~opts t =
 
 (* Assumes beta-reduced, eta-short term *)
 let abf t =
-  let rec abstract ~bvar ~depth t =
-    invalid_arg "not implemented" in
+  let rec abstract ~bvar_ty t =
+    match T.view t with 
+    | T.DB 0 -> mk_i ~alpha:bvar_ty ~args:[]
+    | T.DB i -> 
+      let ty = T.ty t in
+      mk_k ~alpha:bvar_ty ~beta:(Term.of_ty ty) ~args:[T.bvar ~ty (i-1)]
+    | T.Const _ | T.Var _ ->
+      let beta = Term.of_ty @@ T.ty t in
+      mk_k ~alpha:bvar_ty ~beta ~args:[t]
+    | T.AppBuiltin _ | T.App _ -> 
+      let hd_mono, args = T.as_app_mono t in
+      assert(not @@ T.is_fun hd_mono);
+      let hd_conv = 
+        if T.is_app hd_mono || T.is_appbuiltin hd_mono then (
+          let beta = Term.of_ty @@ T.ty t in
+          mk_k ~alpha:bvar_ty ~beta ~args:[t]
+        ) else abstract ~bvar_ty hd_mono in
+      let _, raw_res = List.fold_left (fun (l_ty, l_conv) r -> 
+        let r_conv = abstract ~bvar_ty r in
+        let ret_ty = Ty.apply l_ty [T.ty r] in
+        let raw_res = 
+          mk_s ~alpha:bvar_ty ~beta:(Term.of_ty @@ T.ty r) 
+               ~gamma:(Term.of_ty ret_ty) ~args:[l_conv;r_conv] in
+        ret_ty, optimize ~opts:curry_optimizations raw_res
+      ) (T.ty hd_mono, hd_conv) args in
+      optimize ~opts:curry_optimizations raw_res
+    | T.Fun _ -> 
+      invalid_arg "all lambdas should be abstracted away!" in
 
-  let rec aux ~depth t =
+
+  let rec aux t =
     match T.view t with 
     | T.AppBuiltin _ | T.App _ ->
       let hd_mono, args = T.as_app_mono t in
-      let args' = List.map (aux ~depth) args in
+      let args' = List.map aux args in
+      
+      assert (not (T.is_fun hd_mono));
       if T.same_l args args' then t
       else T.app hd_mono args' (* flattens AppBuiltin if necessary *)
     | T.Fun(ty, body) ->
-      let body' = aux ~depth:(depth+1) in
-      abstract ~depth:(depth+1) ~bvar:(T.bvar ~ty 0) body'
+      let body' = aux body in
+      abstract ~bvar_ty:(Term.of_ty ty) body'
     | _ ->  t in
-  aux ~depth:0 t
+  aux t
