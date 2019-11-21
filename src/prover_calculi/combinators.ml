@@ -1,10 +1,15 @@
 open Logtk
 
+module T = Term
+module Ty = Type
+
+type conv_rule = T.t -> T.t
+
 (* see mk_s *)
 let ty_s =
-  let db_alpha = Type.bvar 2 in
-  let db_beta = Type.bvar 1 in
-  let db_gamma = Type.bvar 0 in
+  let db_alpha = Ty.bvar 2 in
+  let db_beta = Ty.bvar 1 in
+  let db_gamma = Ty.bvar 0 in
   
   let open Type in
   let prefix ty = forall @@ forall @@ forall ty in
@@ -15,9 +20,9 @@ let ty_s =
 
 (* see mk_c *)
 let ty_c =
-  let db_alpha = Type.bvar 2 in
-  let db_beta = Type.bvar 1 in
-  let db_gamma = Type.bvar 0 in
+  let db_alpha = Ty.bvar 2 in
+  let db_beta = Ty.bvar 1 in
+  let db_gamma = Ty.bvar 0 in
   
   let open Type in
   let prefix ty = forall @@ forall @@ forall ty in
@@ -28,9 +33,9 @@ let ty_c =
 
 (* see mk_b *)
 let ty_b =
-  let db_alpha = Type.bvar 2 in
-  let db_beta = Type.bvar 1 in
-  let db_gamma = Type.bvar 0 in
+  let db_alpha = Ty.bvar 2 in
+  let db_beta = Ty.bvar 1 in
+  let db_gamma = Ty.bvar 0 in
   
   let open Type in
   let prefix ty = forall @@ forall @@ forall ty in
@@ -41,54 +46,114 @@ let ty_b =
 
 (* see mk_k *)
 let ty_k =
-  let db_alpha = Type.bvar 1 in
-  let db_beta = Type.bvar 0 in  
+  let db_alpha = Ty.bvar 1 in
+  let db_beta = Ty.bvar 0 in  
 
   let open Type in
   forall @@ forall ([db_alpha; db_beta] ==> db_alpha)
 
 (* see mk_i *)
 let ty_i =
-  let db_alpha = Type.bvar 0 in  
+  let db_alpha = Ty.bvar 0 in  
 
   let open Type in
   forall ([db_alpha] ==> db_alpha)
 
 
-let mk_comb comb_head ty ty_args =
-  Term.app_builtin ~ty comb_head ty_args
+let [@inline] mk_comb comb_head ty ty_args args =
+  (* optmization: if args is empty, the whole 
+     ty_args will be traversed *)
+  if CCList.is_empty args then (
+    T.app_builtin ~ty comb_head ty_args
+  ) else T.app_builtin ~ty comb_head (ty_args @ args)
 
 (* make S combinator with the type:
    Παβγ. (α→β→γ) → (α→β) → α → γ *)
-let mk_s ~alpha ~beta ~gamma =
-  let ty = Type.apply ty_s [alpha;beta;gamma] in
-  let ty_args = List.map Term.of_ty [alpha;beta;gamma] in
-  mk_comb Builtin.SComb ty ty_args
+let mk_s ?(args=[]) ~alpha ~beta ~gamma =
+  let ty = Ty.apply ty_s [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t);
+                          Type.of_term_unsafe (beta : Term.t :> InnerTerm.t);
+                          Type.of_term_unsafe (gamma : Term.t :> InnerTerm.t);] in
+  mk_comb Builtin.SComb ty [alpha;beta;gamma] args
 
 (* make C combinator with the type:
    Παβγ. (α→β→γ) → β → α → γ *)
-let mk_c ~alpha ~beta ~gamma =
-  let ty = Type.apply ty_c [alpha;beta;gamma] in
-  let ty_args = List.map Term.of_ty [alpha;beta;gamma] in
-  mk_comb Builtin.CComb ty ty_args
+let mk_c ?(args=[]) ~alpha ~beta ~gamma =
+  let ty = Ty.apply ty_c [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t);
+                          Type.of_term_unsafe (beta : Term.t :> InnerTerm.t);
+                          Type.of_term_unsafe (gamma : Term.t :> InnerTerm.t);] in
+  mk_comb Builtin.CComb ty [alpha;beta;gamma] args
 
 (* make B combinator with the type:
    Παβγ. (α→β) → (γ→α) → γ → β *)
-let mk_b ~alpha ~beta ~gamma =
-  let ty = Type.apply ty_b [alpha;beta;gamma] in
-  let ty_args = List.map Term.of_ty [alpha;beta;gamma] in
-  mk_comb Builtin.BComb ty ty_args
+let mk_b ?(args=[]) ~alpha ~beta ~gamma =
+  let ty = Ty.apply ty_b [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t);
+                          Type.of_term_unsafe (beta : Term.t :> InnerTerm.t);
+                          Type.of_term_unsafe (gamma : Term.t :> InnerTerm.t);]  in
+  mk_comb Builtin.BComb ty [alpha;beta;gamma] args
 
 (* make K combinator with the type:
    Παβ. α → β → α *)
-let mk_k ~alpha ~beta =
-  let ty = Type.apply ty_k [alpha;beta] in
-  let ty_args = List.map Term.of_ty [alpha;beta] in
-  mk_comb Builtin.KComb ty ty_args
+let mk_k ?(args=[]) ~alpha ~beta =
+  let ty = Ty.apply ty_k [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t);
+                          Type.of_term_unsafe (beta : Term.t :> InnerTerm.t)] in
+  mk_comb Builtin.KComb ty [alpha;beta] args
 
 (* make I combinator with the type:
    Πα. α → α *)
-let mk_i ~alpha =
-  let ty = Type.apply ty_i [alpha] in
-  let ty_args = [Term.of_ty alpha] in
-  mk_comb Builtin.IComb ty ty_args
+let mk_i ?(args=[]) ~alpha =
+  let ty = Ty.apply ty_i [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t)] in
+  mk_comb Builtin.IComb ty [alpha] args
+
+(* {2 Helper functions} *)
+
+let [@inline] hd_is_comb hd =
+  match hd with
+  | Builtin.SComb | Builtin.CComb | Builtin.BComb 
+  | Builtin.KComb | Builtin.IComb -> true
+  | _ -> false
+
+let [@inline] term_is_comb t =
+  match T.view t with
+  | T.AppBuiltin(hd, _) when hd_is_comb hd -> true
+  | _ -> false
+
+let [@inline] term_has_comb ~comb t =
+  match T.view t with
+  | T.AppBuiltin(hd, _) when Builtin.equal comb hd -> true
+  | _ -> false
+
+(* Returns the cobminator head, type arguments and real arguments 
+   of a combinator *)
+let [@inline] unpack_comb t =
+  match T.view t with 
+  | T.AppBuiltin(hd, args) when hd_is_comb hd ->
+    let ty_args, real_args = List.partition Term.is_type args in
+    (hd, ty_args, real_args)
+  | _ -> invalid_arg "argument is not a combinator"
+
+(* {3 Narrowing and optimization functions} *)
+
+(* Rules for optimizing the abf algorithm, as laid out in the paper 
+   Martin W. Bunder -- Some Improvements to Turner's Algorithm for 
+   Bracket Abstraction \url{https://ro.uow.edu.au/eispapers/1962/}
+
+  They are numbered as they are numbered in the paper.
+  Some of the rules are applicable only for SKBCI combinators,
+  but due to the abf algorithm design it is easy to extend it.
+*)
+
+(* [1]. S (K X) (K Y) -> K (X Y) *)
+let opt1 t = 
+  let c_kind,ty_args,args = unpack_comb t in
+  if Builtin.equal Builtin.SComb c_kind then (
+    match args,ty_args with 
+    | [u;v],[alpha;_;beta] ->
+      begin match unpack_comb u, unpack_comb v with
+      | (Builtin.KComb,_,[x]), (Builtin.KComb,_,[y]) ->
+        let xy = Term.app x [y] in
+        mk_k ~args:[xy] ~alpha ~beta 
+      | _ -> t end
+    | _ -> t
+  ) else t
+
+(* [2]. S (K X) I -> X *)
