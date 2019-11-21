@@ -611,7 +611,7 @@ let test_jp_unif_aux = "JP unification", `Quick, fun () ->
       CCEqual.(option @@ pair (pair T.equal T.equal) (list (pair (HVar.equal Type.equal) int)))
   in *)
 
-  OUnit.assert_equal 
+  (* OUnit.assert_equal 
     ~cmp:(CCOpt.equal (fun ((a,b),l) (((c,d),k)) -> 
       T.equal a c && T.equal b d && CCList.equal (CCPair.equal (HVar.equal Type.equal) CCInt.equal) l k))
     (JP_unif.find_disagreement (pterm "g (g a)") (pterm "g (h a)")) 
@@ -627,7 +627,7 @@ let test_jp_unif_aux = "JP unification", `Quick, fun () ->
     ~cmp:(CCOpt.equal (fun ((a,b),l) (((c,d),k)) -> 
       T.equal a c && T.equal b d && CCList.equal (CCPair.equal (HVar.equal Type.equal) CCInt.equal) l k))
     (JP_unif.find_disagreement (pterm "f_ho2 (fun (x:term). x)") (pterm "f_ho2 (fun (x:term). a)")) 
-    (Some ((T.bvar ~ty:(Type.Conv.of_simple_term_exn (Type.Conv.create ()) (psterm "term")) 0, pterm "a"), []));
+    (Some ((T.bvar ~ty:(Type.Conv.of_simple_term_exn (Type.Conv.create ()) (psterm "term")) 0, pterm "a"), [])); *)
 
   (** Rule tests *)
 
@@ -643,7 +643,7 @@ let test_jp_unif_aux = "JP unification", `Quick, fun () ->
     |> OSeq.map (fun subst -> Lambda.snf (JP_unif.S.apply subst (term,scope)))
     |> OSeq.to_list in
   let expected = [pterm "a"; pterm "b"] in
-  OUnit.assert_equal ~cmp:(CCList.equal T.equal) expected result;
+  (* OUnit.assert_equal ~cmp:(CCList.equal T.equal) expected result; *)
 
   clear_scope ();
 
