@@ -3,7 +3,7 @@ open Logtk
 module T = Term
 module Ty = Type
 
-type conv_rule = T.t -> T.t
+type conv_rule = T.t -> T.t option
 
 (* see mk_s *)
 let ty_s =
@@ -131,6 +131,11 @@ let [@inline] unpack_comb t =
     (hd, ty_args, real_args)
   | _ -> invalid_arg "argument is not a combinator"
 
+(* Given type arguments of S, calculate correct type arguments 
+   for B *)
+let s2b_tyargs ~alpha ~beta ~gamma =
+  (beta, gamma, alpha)
+
 (* {3 Narrowing and optimization functions} *)
 
 (* Rules for optimizing the abf algorithm, as laid out in the paper 
@@ -151,9 +156,67 @@ let opt1 t =
       begin match unpack_comb u, unpack_comb v with
       | (Builtin.KComb,_,[x]), (Builtin.KComb,_,[y]) ->
         let xy = Term.app x [y] in
-        mk_k ~args:[xy] ~alpha ~beta 
-      | _ -> t end
-    | _ -> t
-  ) else t
+        Some (mk_k ~args:[xy] ~alpha ~beta )
+      | _ -> None end
+    | _ -> None
+  ) else None
 
 (* [2]. S (K X) I -> X *)
+let opt2 t = 
+  let c_kind,_,args = unpack_comb t in
+  if Builtin.equal Builtin.SComb c_kind then (
+    match args with 
+    | [u;v] ->
+      begin match unpack_comb u, unpack_comb v with 
+      | (Builtin.KComb, _, [x]), (Builtin.IComb, _, []) ->
+        Some x
+      | _ -> None end
+    | _ -> None
+  ) else None
+
+(* [3]. S (K X) Y -> B X Y *)
+let opt3 t = 
+  let c_kind,ty_args,args = unpack_comb t in
+  if Builtin.equal Builtin.SComb c_kind then (
+    match args,ty_args with 
+    | [u;y], [alpha;beta;gamma] ->
+      begin match unpack_comb u with 
+      | (Builtin.KComb, _, [x])->
+        let alpha,beta,gamma = s2b_tyargs ~alpha ~beta ~gamma in
+        Some (mk_b ~args:[x;y] ~alpha ~beta ~gamma)
+      | _ -> None end
+    | _ -> None
+  ) else None
+
+(* [4]. S X (K Y) -> C X Y *)
+let opt4 t = 
+  let c_kind,ty_args,args = unpack_comb t in
+  if Builtin.equal Builtin.SComb c_kind then (
+    match args,ty_args with 
+    | [x;u], [alpha;beta;gamma] ->
+      begin match unpack_comb u with 
+      | (Builtin.KComb, _, [y])->
+        Some (mk_c ~args:[x;y] ~alpha ~beta ~gamma)
+      | _ -> None end
+    | _ -> None
+  ) else None
+
+let curry_optimizations = [opt1;opt2;opt3;opt4]
+
+(* Assumes beta-reduced, eta-short term *)
+let abf t =
+  let rec abstract ~bvar ~depth t =
+    invalid_arg "not implemented" in
+
+  let rec aux ~depth t =
+    match T.view t with 
+    | T.AppBuiltin _ | T.App _ ->
+      let hd_mono, args = T.as_app_mono t in
+      let args' = List.map (aux ~depth) args in
+      if T.same_l args args' then t
+      else T.app hd_mono args' (* flattens AppBuiltin if necessary *)
+    | T.Fun(ty, body) ->
+      let body' = aux ~depth:(depth+1) in
+      abstract ~depth:(depth+1) ~bvar:(T.bvar ~ty 0) body'
+    | _ ->  t in
+  aux ~depth:0 t

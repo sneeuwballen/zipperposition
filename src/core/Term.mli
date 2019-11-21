@@ -153,6 +153,11 @@ val as_app : t -> t * t list
 (** [as_app t] decomposes [t] into a head (non-application) and arguments,
     such as [(let f,l = as_app t in app f l) = t] *)
 
+val as_app_mono : t -> t * t list
+(** [as_app t] decomposes [t] into a head (possibly applied to type arguments) 
+    and arguments, such as [(let f,l = as_app t in app f l) = t] *)
+
+
 val as_fun : t -> Type.t list * t
 (** Open functions *)
 
