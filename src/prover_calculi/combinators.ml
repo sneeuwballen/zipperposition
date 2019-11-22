@@ -231,7 +231,73 @@ module Make(E : Env.S) : S with module Env = E = struct
       ) else None
     with IsNotCombinator -> None
 
+  (* Definition of S:
+      S X Y Z t1 ... tn -> X Z (Y Z) t1 ... tn *)
+  let narrowS t =
+    try
+      let c_kind,_,args = unpack_comb t in
+      if Builtin.equal Builtin.SComb c_kind then (
+        match args with 
+        | x :: y :: z :: rest ->
+          Some (T.app x (z :: (T.app y [z]) ::rest))
+        | _ -> None
+      ) else None
+    with IsNotCombinator -> None
+  
+  (* Definition of B:
+      B X Y Z t1 ... tn -> X (Y Z) t1 ... tn *)
+  let narrowB t =
+    try
+      let c_kind,_,args = unpack_comb t in
+      if Builtin.equal Builtin.BComb c_kind then (
+        match args with 
+        | x :: y :: z :: rest ->
+          Some (T.app x ((T.app y [z]) ::rest))
+        | _ -> None
+      ) else None
+    with IsNotCombinator -> None
+  
+  (* Definition of C:
+      C X Y Z t1 ... tn -> X Z Y t1 ... tn *)
+  let narrowC t =
+    try
+      let c_kind,_,args = unpack_comb t in
+      if Builtin.equal Builtin.CComb c_kind then (
+        match args with 
+        | x :: y :: z :: rest ->
+          Some (T.app x ((T.app z [y]) ::rest))
+        | _ -> None
+      ) else None
+    with IsNotCombinator -> None
+  
+  (* Definition of K:
+      K X Y t1 ... tn -> X t1 ... tn *)
+  let narrowK t =
+    try
+      let c_kind,_,args = unpack_comb t in
+      if Builtin.equal Builtin.KComb c_kind then (
+        match args with 
+        | x :: y :: rest ->
+          Some (T.app x rest)
+        | _ -> None
+      ) else None
+    with IsNotCombinator -> None
+  
+  (* Definition of I:
+      I X t1 ... tn -> X t1 ... tn *)
+  let narrowI t =
+    try
+      let c_kind,_,args = unpack_comb t in
+      if Builtin.equal Builtin.IComb c_kind then (
+        match args with 
+        | x :: rest ->
+          Some (T.app x rest)
+        | _ -> None
+      ) else None
+    with IsNotCombinator -> None
+
   let curry_optimizations = [opt1;opt2;opt3;opt4]
+  let narrow_rules = [narrowS; narrowB; narrowC; narrowK; narrowI]
 
   let optimize ~opts t =
     let rec aux = function 
@@ -290,20 +356,17 @@ module Make(E : Env.S) : S with module Env = E = struct
       | _ ->  t in
     aux t
 
+
   exception E_i of Statement.clause_t
-
-
   let pp_in pp_f pp_t pp_ty = function
     | Output_format.O_zf -> Statement.ZF.pp pp_f pp_t pp_ty
     | Output_format.O_tptp -> Statement.TPTP.pp pp_f pp_t pp_ty
     | Output_format.O_normal -> Statement.pp pp_f pp_t pp_ty
     | Output_format.O_none -> CCFormat.silent
-
   let pp_clause_in o =
     let pp_term = T.pp_in o in
     let pp_type = Type.pp_in o in
     pp_in (Util.pp_list ~sep:" ∨ " (SLiteral.pp_in o pp_term)) pp_term pp_type o
-
 
   let result_tc =
     Proof.Result.make_tc
