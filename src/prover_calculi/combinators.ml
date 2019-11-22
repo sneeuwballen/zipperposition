@@ -17,9 +17,7 @@ module type S = sig
   module C : module type of Env.C
 
   (** {6 Registration} *)
-
   val setup : unit -> unit
-  (** Register rules in the environment *)
 end
 
 
@@ -57,7 +55,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let open Type in
     let prefix ty = forall @@ forall @@ forall ty in
     prefix
-      ([[db_alpha] ==> db_beta; [db_beta] ==> db_alpha; db_gamma] 
+      ([[db_alpha] ==> db_beta; [db_gamma] ==> db_alpha; db_gamma] 
       ==> db_beta)
 
   (* see mk_k *)
@@ -570,7 +568,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if E.flex_get k_enable_combinators then (
         E.add_clause_conversion enocde_stmt;
         E.add_unary_simplify comb_narrow;
-        E.add_unary_inf "narrow applied variable" narrow_app_vars;
+        (* E.add_unary_inf "narrow applied variable" narrow_app_vars; *)
       )
 
 end
