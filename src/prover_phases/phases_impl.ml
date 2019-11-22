@@ -58,6 +58,8 @@ let load_extensions =
   Extensions.register Fool.extension;
   Extensions.register Booleans.extension;
   Extensions.register Higher_order.extension;
+  Extensions.register Combinators.extension;
+
   Extensions.register App_encode.extension;
   let l = Extensions.extensions () in
   Phases.return_phase l

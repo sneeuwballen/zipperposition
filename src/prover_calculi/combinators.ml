@@ -5,6 +5,7 @@ module T = Term
 module Ty = Type
 
 type conv_rule = T.t -> T.t option
+exception IsNotCombinator
 
 let k_enable_combinators = Flex_state.create_key ()
 
@@ -71,7 +72,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let db_beta = Ty.bvar 0 in  
 
     let open Type in
-    forall @@ forall ([db_alpha; db_beta] ==> db_alpha)
+    forall @@ forall ([db_beta; db_alpha] ==> db_beta)
 
   (* see mk_i *)
   let ty_i =
@@ -86,7 +87,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       ty_args will be traversed *)
     if CCList.is_empty args then (
       T.app_builtin ~ty comb_head ty_args
-    ) else T.app_builtin ~ty comb_head (ty_args @ args)
+    ) else T.app (T.app_builtin ~ty comb_head ty_args) args
 
   (* make S combinator with the type:
     Παβγ. (α→β→γ) → (α→β) → α → γ *)
@@ -113,7 +114,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     mk_comb Builtin.BComb ty [alpha;beta;gamma] args
 
   (* make K combinator with the type:
-    Παβ. α → β → α *)
+    Παβ. β → α → β *)
   let mk_k ?(args=[]) ~alpha ~beta =
     let ty = Ty.apply ty_k [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t);
                             Type.of_term_unsafe (beta : Term.t :> InnerTerm.t)] in
@@ -150,7 +151,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     | T.AppBuiltin(hd, args) when hd_is_comb hd ->
       let ty_args, real_args = List.partition Term.is_type args in
       (hd, ty_args, real_args)
-    | _ -> invalid_arg "argument is not a combinator"
+    | _ -> raise IsNotCombinator
 
   (* Given type arguments of S, calculate correct type arguments 
     for B *)
@@ -169,58 +170,66 @@ module Make(E : Env.S) : S with module Env = E = struct
   *)
 
   (* [1]. S (K X) (K Y) -> K (X Y) *)
-  let opt1 t = 
-    let c_kind,ty_args,args = unpack_comb t in
-    if Builtin.equal Builtin.SComb c_kind then (
-      match args,ty_args with 
-      | [u;v],[alpha;_;beta] ->
-        begin match unpack_comb u, unpack_comb v with
-        | (Builtin.KComb,_,[x]), (Builtin.KComb,_,[y]) ->
-          let xy = Term.app x [y] in
-          Some (mk_k ~args:[xy] ~alpha ~beta )
-        | _ -> None end
-      | _ -> None
-    ) else None
+  let opt1 t =
+    try 
+      let c_kind,ty_args,args = unpack_comb t in
+      if Builtin.equal Builtin.SComb c_kind then (
+        match args,ty_args with 
+        | [u;v],[alpha;_;beta] ->
+          begin match unpack_comb u, unpack_comb v with
+          | (Builtin.KComb,_,[x]), (Builtin.KComb,_,[y]) ->
+            let xy = Term.app x [y] in
+            Some (mk_k ~args:[xy] ~alpha ~beta )
+          | _ -> None end
+        | _ -> None
+      ) else None
+    with IsNotCombinator -> None
 
   (* [2]. S (K X) I -> X *)
-  let opt2 t = 
-    let c_kind,_,args = unpack_comb t in
-    if Builtin.equal Builtin.SComb c_kind then (
-      match args with 
-      | [u;v] ->
-        begin match unpack_comb u, unpack_comb v with 
-        | (Builtin.KComb, _, [x]), (Builtin.IComb, _, []) ->
-          Some x
-        | _ -> None end
-      | _ -> None
-    ) else None
+  let opt2 t =
+    try
+      let c_kind,_,args = unpack_comb t in
+      if Builtin.equal Builtin.SComb c_kind then (
+        match args with 
+        | [u;v] ->
+          begin match unpack_comb u, unpack_comb v with 
+          | (Builtin.KComb, _, [x]), (Builtin.IComb, _, []) ->
+            Some x
+          | _ -> None end
+        | _ -> None
+      ) else None
+    with IsNotCombinator -> None
 
   (* [3]. S (K X) Y -> B X Y *)
-  let opt3 t = 
-    let c_kind,ty_args,args = unpack_comb t in
-    if Builtin.equal Builtin.SComb c_kind then (
-      match args,ty_args with 
-      | [u;y], [alpha;beta;gamma] ->
-        begin match unpack_comb u with 
-        | (Builtin.KComb, _, [x])->
-          let alpha,beta,gamma = s2b_tyargs ~alpha ~beta ~gamma in
-          Some (mk_b ~args:[x;y] ~alpha ~beta ~gamma)
-        | _ -> None end
-      | _ -> None
-    ) else None
+  let opt3 t =
+    try 
+      let c_kind,ty_args,args = unpack_comb t in
+      if Builtin.equal Builtin.SComb c_kind then (
+        match args,ty_args with 
+        | [u;y], [alpha;beta;gamma] ->
+          begin match unpack_comb u with 
+          | (Builtin.KComb, _, [x])->
+            let alpha,beta,gamma = s2b_tyargs ~alpha ~beta ~gamma in
+            Some (mk_b ~args:[x;y] ~alpha ~beta ~gamma)
+          | _ -> None end
+        | _ -> None
+      ) else None
+    with IsNotCombinator -> None
 
   (* [4]. S X (K Y) -> C X Y *)
-  let opt4 t = 
-    let c_kind,ty_args,args = unpack_comb t in
-    if Builtin.equal Builtin.SComb c_kind then (
-      match args,ty_args with 
-      | [x;u], [alpha;beta;gamma] ->
-        begin match unpack_comb u with 
-        | (Builtin.KComb, _, [y])->
-          Some (mk_c ~args:[x;y] ~alpha ~beta ~gamma)
-        | _ -> None end
-      | _ -> None
-    ) else None
+  let opt4 t =
+    try
+      let c_kind,ty_args,args = unpack_comb t in
+      if Builtin.equal Builtin.SComb c_kind then (
+        match args,ty_args with 
+        | [x;u], [alpha;beta;gamma] ->
+          begin match unpack_comb u with 
+          | (Builtin.KComb, _, [y])->
+            Some (mk_c ~args:[x;y] ~alpha ~beta ~gamma)
+          | _ -> None end
+        | _ -> None
+      ) else None
+    with IsNotCombinator -> None
 
   let curry_optimizations = [opt1;opt2;opt3;opt4]
 
@@ -228,7 +237,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     let rec aux = function 
     | f :: fs ->
       begin match f t with 
-      | Some t' -> t'
+      | Some t' -> 
+        assert (Type.equal (T.ty t) (T.ty t'));
+        t'
       | None -> aux fs end
     | [] -> t in
     aux opts
@@ -247,15 +258,15 @@ module Make(E : Env.S) : S with module Env = E = struct
       | T.AppBuiltin _ | T.App _ -> 
         let hd_mono, args = T.as_app_mono t in
         assert(not @@ T.is_fun hd_mono);
-        let hd_conv = 
+        let hd_conv =
           if T.is_app hd_mono || T.is_appbuiltin hd_mono then (
-            let beta = Term.of_ty @@ T.ty t in
-            mk_k ~alpha:bvar_ty ~beta ~args:[t]
+            let beta = Term.of_ty @@ T.ty hd_mono in
+            mk_k ~alpha:bvar_ty ~beta ~args:[hd_mono]
           ) else abstract ~bvar_ty hd_mono in
-        let _, raw_res = List.fold_left (fun (l_ty, l_conv) r -> 
+        let _, raw_res = List.fold_left (fun (l_ty, l_conv) r ->
           let r_conv = abstract ~bvar_ty r in
-          let ret_ty = Ty.apply l_ty [T.ty r] in
-          let raw_res = 
+          let ret_ty = Ty.apply_unsafe l_ty [(r :> InnerTerm.t)] in
+          let raw_res =
             mk_s ~alpha:bvar_ty ~beta:(Term.of_ty @@ T.ty r) 
                 ~gamma:(Term.of_ty ret_ty) ~args:[l_conv;r_conv] in
           ret_ty, optimize ~opts raw_res
@@ -263,7 +274,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         optimize ~opts raw_res
       | T.Fun _ -> 
         invalid_arg "all lambdas should be abstracted away!" in
-
 
     let rec aux t =
       match T.view t with 
