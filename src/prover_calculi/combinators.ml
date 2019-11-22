@@ -32,47 +32,37 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* see mk_s *)
   let ty_s =
-    let db_alpha = Ty.bvar 2 in
-    let db_beta = Ty.bvar 1 in
-    let db_gamma = Ty.bvar 0 in
+    let db_alpha = Ty.bvar 2 and db_beta = Ty.bvar 1 and db_gamma = Ty.bvar 0 in
     
     let open Type in
     let prefix ty = forall @@ forall @@ forall ty in
-      prefix
-        ([[db_alpha; db_beta] ==> db_gamma;
-          [db_alpha] ==> db_beta;
-          db_alpha] ==> db_gamma)
+    prefix
+      ([[db_alpha; db_beta] ==> db_gamma; [db_alpha] ==> db_beta; db_alpha]
+        ==> db_gamma)
 
   (* see mk_c *)
   let ty_c =
-    let db_alpha = Ty.bvar 2 in
-    let db_beta = Ty.bvar 1 in
-    let db_gamma = Ty.bvar 0 in
+    let db_alpha = Ty.bvar 2 and db_beta = Ty.bvar 1 and db_gamma = Ty.bvar 0 in
     
     let open Type in
     let prefix ty = forall @@ forall @@ forall ty in
-      prefix
-        ([[db_alpha; db_beta] ==> db_gamma;
-          db_beta;
-          db_alpha] ==> db_gamma)
+    prefix
+      ([[db_alpha; db_beta] ==> db_gamma; db_beta; db_alpha] 
+        ==> db_gamma)
 
   (* see mk_b *)
   let ty_b =
-    let db_alpha = Ty.bvar 2 in
-    let db_beta = Ty.bvar 1 in
-    let db_gamma = Ty.bvar 0 in
+    let db_alpha = Ty.bvar 2 and db_beta = Ty.bvar 1 and db_gamma = Ty.bvar 0 in
     
     let open Type in
     let prefix ty = forall @@ forall @@ forall ty in
-      prefix
-        ([[db_alpha] ==> db_beta;
-          [db_beta] ==> db_alpha;
-          db_gamma] ==> db_beta)
+    prefix
+      ([[db_alpha] ==> db_beta; [db_beta] ==> db_alpha; db_gamma] 
+      ==> db_beta)
 
   (* see mk_k *)
   let ty_k =
-    let db_alpha = Ty.bvar 1 in
-    let db_beta = Ty.bvar 0 in  
+    let db_alpha = Ty.bvar 1 and db_beta = Ty.bvar 0 in  
 
     let open Type in
     forall @@ forall ([db_beta; db_alpha] ==> db_beta)
