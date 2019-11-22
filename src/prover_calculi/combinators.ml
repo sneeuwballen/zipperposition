@@ -234,7 +234,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     aux opts
 
   (* Assumes beta-reduced, eta-short term *)
-  let abf t =
+  let abf ~opts t =
     let rec abstract ~bvar_ty t =
       match T.view t with 
       | T.DB 0 -> mk_i ~alpha:bvar_ty ~args:[]
@@ -258,9 +258,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           let raw_res = 
             mk_s ~alpha:bvar_ty ~beta:(Term.of_ty @@ T.ty r) 
                 ~gamma:(Term.of_ty ret_ty) ~args:[l_conv;r_conv] in
-          ret_ty, optimize ~opts:curry_optimizations raw_res
+          ret_ty, optimize ~opts raw_res
         ) (T.ty hd_mono, hd_conv) args in
-        optimize ~opts:curry_optimizations raw_res
+        optimize ~opts raw_res
       | T.Fun _ -> 
         invalid_arg "all lambdas should be abstracted away!" in
 
@@ -280,11 +280,83 @@ module Make(E : Env.S) : S with module Env = E = struct
       | _ ->  t in
     aux t
 
-    let setup () = ()
+  exception E_i of Statement.clause_t
+
+
+  let pp_in pp_f pp_t pp_ty = function
+    | Output_format.O_zf -> Statement.ZF.pp pp_f pp_t pp_ty
+    | Output_format.O_tptp -> Statement.TPTP.pp pp_f pp_t pp_ty
+    | Output_format.O_normal -> Statement.pp pp_f pp_t pp_ty
+    | Output_format.O_none -> CCFormat.silent
+
+  let pp_clause_in o =
+    let pp_term = T.pp_in o in
+    let pp_type = Type.pp_in o in
+    pp_in (Util.pp_list ~sep:" ∨ " (SLiteral.pp_in o pp_term)) pp_term pp_type o
+
+
+  let result_tc =
+    Proof.Result.make_tc
+      ~of_exn:(function E_i c -> Some c | _ -> None)
+      ~to_exn:(fun i -> E_i i)
+      ~compare:compare
+      ~pp_in:pp_clause_in
+      ~is_stmt:true
+      ~name:Statement.name
+      ~to_form:(fun ~ctx st ->
+        let conv_c c =
+          CCList.to_seq c 
+          |> Iter.flat_map (fun l -> SLiteral.to_seq l)
+          |> Iter.map (fun t -> Term.Conv.to_simple_term ctx t)
+          |> Iter.to_list
+          |> TypedSTerm.Form.or_ in
+        Statement.Seq.forms st
+        |> Iter.map conv_c
+        |> Iter.to_list
+        |> TypedSTerm.Form.and_)
+      ()
+
+
+    let encode_lit ~opts l =
+      SLiteral.map (abf ~opts) l
+    
+    let rec encode_clause ~opts = function 
+      | [] -> []
+      | l :: ls -> 
+        encode_lit ~opts l :: encode_clause ~opts ls
+
+    let enocde_stmt st =
+      let opts = curry_optimizations in
+      let rule = Proof.Rule.mk "lambdas_to_combs" in
+      let as_proof = 
+        Proof.S.mk (Statement.proof_step st) (Proof.Result.make result_tc st) in
+      let proof = 
+        Proof.Step.esa ~rule [Proof.Parent.from as_proof] in
+
+      match Statement.view st with
+      | Statement.Def _ | Statement.Rewrite _ | Statement.Data _ 
+      | Statement.Lemma _ | Statement.TyDecl _ -> E.cr_skip
+      | Statement.Goal lits | Statement.Assert lits ->
+        let lits' = encode_clause ~opts lits in
+        E.cr_return @@ [E.C.of_forms ~trail:Trail.empty lits' proof]
+      | Statement.NegatedGoal (skolems,clauses) -> 
+        let clauses' = 
+          List.map (fun c -> 
+            E.C.of_forms ~trail:Trail.empty (encode_clause ~opts c) proof) 
+          clauses in
+        E.cr_add clauses'
+        (* E.cr_return @@ 
+          Statement.neg_goal ~proof ~skolems (List.map (encode_clause ~opts) clauses) *)
+    
+    let setup () =
+      if E.flex_get k_enable_combinators then (
+        E.add_clause_conversion enocde_stmt;
+      )
 
 end
 
 let _enable_combinators = ref false
+
 
 let extension =
   let lam2combs seq = seq in
