@@ -310,6 +310,36 @@ module Make(E : Env.S) : S with module Env = E = struct
     | [] -> t in
     aux rules
 
+  let narrow t =
+    let steps = ref 0 in
+    let rec do_narrow t =
+      match T.view t with 
+      | T.Const _ | T.Var _ | T.DB _-> t
+      | T.AppBuiltin(hd, args) -> 
+        let args' = List.map do_narrow args in
+        let t =
+          if T.same_l args args' then t
+          else T.app_builtin ~ty:(T.ty t) hd args' in
+        narrow_head t
+      | T.App(hd, args) ->
+        let hd' = do_narrow hd and args' = List.map do_narrow args in
+        let t = 
+          if T.equal hd hd' && T.same_l args args' then t
+          else T.app hd' args' in
+        narrow_head t
+      | T.Fun _ ->
+        let tys, body = T.open_fun t in
+        let body' = do_narrow body in
+        if T.equal body body' then t
+        else T.fun_l tys body'
+    and narrow_head t =
+      let t' = apply_rw_rules ~rules:narrow_rules t in
+      if T.equal t t' then t
+      else (incr steps; do_narrow t') in
+    do_narrow t, !steps
+
+      
+
   (* Assumes beta-reduced, eta-short term *)
   let abf ~rules t =
     let rec abstract ~bvar_ty t =
@@ -423,7 +453,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     
     let comb_narrow c =
       let rules = narrow_rules in
-      let new_lits = Literals.map (apply_rw_rules ~rules) (C.lits c) in
+      let new_lits = Literals.map (fun t -> fst @@ narrow t) (C.lits c) in
       if Literals.equal (C.lits c) new_lits then (
         SimplM.return_same c
       ) else (
@@ -433,6 +463,84 @@ module Make(E : Env.S) : S with module Env = E = struct
                     (Array.to_list new_lits) proof in
         SimplM.return_new new_
       )
+
+    let tyvarA = HVar.fresh ~ty:Ty.tType ()
+    let tyvarB = HVar.fresh ~ty:Ty.tType ()
+    let tyvarC = HVar.fresh ~ty:Ty.tType ()
+
+    let type_of_vars ?(args=[]) ~ret =
+      let open Ty in
+      if CCList.is_empty args then Ty.var ret
+      else List.map Ty.var args ==> Ty.var ret
+
+    (* Create the arguments of type appropriate to be applied to the combinator *)
+    let s_arg1 =
+      T.var @@ HVar.fresh ~ty:(type_of_vars ~args:[tyvarA;tyvarB] ~ret:tyvarC) ()
+    let s_arg2 =
+      T.var @@ HVar.fresh ~ty:(type_of_vars ~args:[tyvarA] ~ret:tyvarB) ()
+
+    let b_arg1 =
+      T.var @@ HVar.fresh ~ty:(type_of_vars ~args:[tyvarA] ~ret:tyvarB) ()
+    let b_arg2 =
+      T.var @@ HVar.fresh ~ty:(type_of_vars ~args:[tyvarC] ~ret:tyvarA) ()
+
+    let c_arg1 =
+      T.var @@ HVar.fresh ~ty:(type_of_vars ~args:[tyvarA;tyvarB] ~ret:tyvarC) ()
+    let c_arg2 =
+      T.var @@ HVar.fresh ~ty:(type_of_vars ~args:[] ~ret:tyvarB) ()
+
+    let k_arg1 =
+      T.var @@ HVar.fresh ~ty:(type_of_vars ~args:[] ~ret:tyvarB) ()
+
+    (* Partially applies a combinator with arguments
+        arguments:
+          comb: original combinator with penalty for instantianting clause with it
+          args: arguments with corresponding pentalties *)
+    let partially_apply ~comb args =
+      let orig_comb, penalty = comb in
+      let rec aux acc = function 
+        | [] -> []
+        | (a,p) :: aas ->
+          let acc = T.app acc [a] in
+          (a,p) :: aux acc aas in
+      (orig_comb,penalty) :: aux orig_comb args
+
+    let alpha = T.var tyvarA 
+    let beta = T.var tyvarB
+    let gamma = T.var tyvarC
+
+    let partially_applied_s =
+      partially_apply ~comb:(mk_s ~alpha ~beta ~gamma ~args:[], 1)
+        [s_arg1, 2; s_arg2, 3]
+
+    let partially_applied_b =
+      partially_apply ~comb:(mk_b ~alpha ~beta ~gamma ~args:[], 1)
+        [b_arg1, 2; b_arg2, 3]
+
+    let partially_applied_c =
+      partially_apply ~comb:(mk_c ~alpha ~beta ~gamma ~args:[], 1)
+        [c_arg1, 2; c_arg2, 3]
+    
+    let partially_applied_k =
+      partially_apply ~comb:(mk_k ~alpha ~beta ~args:[], 1)
+        [k_arg1, 2]
+    
+    let partially_applied_i =
+      [mk_i ~alpha ~args:[], 1]
+
+    let partially_applied_combs =
+      partially_applied_s @ partially_applied_b @ partially_applied_c @ 
+      partially_applied_k @ partially_applied_i
+
+    let instantiate_var_w_comb ~var =
+      CCList.filter_map (fun (comb, penalty) ->
+        try 
+          Some (Unif.FO.unify_syn (comb, 1) (var, 2), penalty)
+        with Unif.Fail -> None
+      ) partially_applied_combs
+
+    (* let narrow_app_vars clause =
+       *)
     
     let setup () =
       if E.flex_get k_enable_combinators then (
@@ -443,7 +551,6 @@ module Make(E : Env.S) : S with module Env = E = struct
 end
 
 let _enable_combinators = ref false
-
 
 let extension =
   let lam2combs seq = seq in
