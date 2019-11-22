@@ -3,6 +3,9 @@ open Libzipperposition
 
 module T = Term
 module Ty = Type
+module Lits = Literals
+module Lit = Literal
+
 
 type conv_rule = T.t -> T.t option
 exception IsNotCombinator
@@ -338,8 +341,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       else (incr steps; do_narrow t') in
     do_narrow t, !steps
 
-      
-
   (* Assumes beta-reduced, eta-short term *)
   let abf ~rules t =
     let rec abstract ~bvar_ty t =
@@ -452,7 +453,6 @@ module Make(E : Env.S) : S with module Env = E = struct
           Statement.neg_goal ~proof ~skolems (List.map (encode_clause ~opts) clauses) *)
     
     let comb_narrow c =
-      let rules = narrow_rules in
       let new_lits = Literals.map (fun t -> fst @@ narrow t) (C.lits c) in
       if Literals.equal (C.lits c) new_lits then (
         SimplM.return_same c
@@ -535,17 +535,52 @@ module Make(E : Env.S) : S with module Env = E = struct
     let instantiate_var_w_comb ~var =
       CCList.filter_map (fun (comb, penalty) ->
         try 
-          Some (Unif.FO.unify_syn (comb, 1) (var, 2), penalty)
+          Some (Unif.FO.unify_syn (comb, 0) (var, 1), penalty)
         with Unif.Fail -> None
       ) partially_applied_combs
 
-    (* let narrow_app_vars clause =
-       *)
+
+    let narrow_app_vars clause =
+      let rule = Proof.Rule.mk "narrow applied variable" in
+      let tags = [Proof.Tag.T_ho] in
+
+      let ord = Env.ord () in 
+      let eligible = C.Eligible.(res clause) in
+      let lits = C.lits clause in
+      (* do the inferences in which clause is passive (rewritten),
+        so we consider both negative and positive literals *)
+      Lits.fold_terms ~vars:(false) ~var_args:(true) ~fun_bodies:(false) 
+                      ~subterms:true ~ord ~which:`Max ~eligible ~ty_args:false
+      lits
+      (* Variable has at least one arugment *)
+      |> Iter.filter (fun (u_p, _) -> T.is_app_var u_p)
+      |> Iter.flat_map_l (fun (u, u_pos) -> 
+        (* variable names as in Ahmed's paper (unpublished) *)
+        let var = T.head_term u in
+        assert(T.is_var var);
+        CCList.filter_map (fun (subst, comb_penalty) -> 
+          let renaming = Subst.Renaming.create () in
+          let lit_idx, lit_pos = Lits.Pos.cut u_pos in
+          let lit = Lit.apply_subst_no_simp renaming subst (lits.(lit_idx), 1) in
+          if not (Lit.Pos.is_max_term ~ord lit lit_pos) ||
+             not (CCBV.get (C.eligible_res (clause, 1) subst) lit_idx) then (
+            None)
+          else (
+            let lits' = CCArray.to_list @@ Lits.apply_subst renaming subst (lits, 1) in
+            let proof = 
+              Proof.Step.inference ~rule ~tags
+                [C.proof_parent_subst renaming (clause,1) subst] in
+            let penalty = comb_penalty + C.penalty clause in
+            let new_clause = C.create ~trail:(C.trail clause) ~penalty lits' proof in
+            Some new_clause
+          )) (instantiate_var_w_comb ~var))
+        |> Iter.to_list
     
     let setup () =
       if E.flex_get k_enable_combinators then (
         E.add_clause_conversion enocde_stmt;
         E.add_unary_simplify comb_narrow;
+        E.add_unary_inf "narrow applied variable" narrow_app_vars;
       )
 
 end
