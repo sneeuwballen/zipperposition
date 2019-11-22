@@ -299,7 +299,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let curry_optimizations = [opt1;opt2;opt3;opt4]
   let narrow_rules = [narrowS; narrowB; narrowC; narrowK; narrowI]
 
-  let optimize ~opts t =
+  let apply_rw_rules ~rules t =
     let rec aux = function 
     | f :: fs ->
       begin match f t with 
@@ -308,10 +308,10 @@ module Make(E : Env.S) : S with module Env = E = struct
         t'
       | None -> aux fs end
     | [] -> t in
-    aux opts
+    aux rules
 
   (* Assumes beta-reduced, eta-short term *)
-  let abf ~opts t =
+  let abf ~rules t =
     let rec abstract ~bvar_ty t =
       match T.view t with 
       | T.DB 0 -> mk_i ~alpha:bvar_ty ~args:[]
@@ -335,9 +335,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           let raw_res =
             mk_s ~alpha:bvar_ty ~beta:(Term.of_ty @@ T.ty r) 
                 ~gamma:(Term.of_ty ret_ty) ~args:[l_conv;r_conv] in
-          ret_ty, optimize ~opts raw_res
+          ret_ty, apply_rw_rules ~rules raw_res
         ) (T.ty hd_mono, hd_conv) args in
-        optimize ~opts raw_res
+        apply_rw_rules ~rules raw_res
       | T.Fun _ -> 
         invalid_arg "all lambdas should be abstracted away!" in
 
@@ -390,16 +390,16 @@ module Make(E : Env.S) : S with module Env = E = struct
       ()
 
 
-    let encode_lit ~opts l =
-      SLiteral.map (abf ~opts) l
+    let encode_lit ~rules l =
+      SLiteral.map (abf ~rules) l
     
-    let rec encode_clause ~opts = function 
+    let rec encode_clause ~rules = function 
       | [] -> []
       | l :: ls -> 
-        encode_lit ~opts l :: encode_clause ~opts ls
+        encode_lit ~rules l :: encode_clause ~rules ls
 
     let enocde_stmt st =
-      let opts = curry_optimizations in
+      let rules = curry_optimizations in
       let rule = Proof.Rule.mk "lambdas_to_combs" in
       let as_proof = 
         Proof.S.mk (Statement.proof_step st) (Proof.Result.make result_tc st) in
@@ -410,20 +410,34 @@ module Make(E : Env.S) : S with module Env = E = struct
       | Statement.Def _ | Statement.Rewrite _ | Statement.Data _ 
       | Statement.Lemma _ | Statement.TyDecl _ -> E.cr_skip
       | Statement.Goal lits | Statement.Assert lits ->
-        let lits' = encode_clause ~opts lits in
+        let lits' = encode_clause ~rules lits in
         E.cr_return @@ [E.C.of_forms ~trail:Trail.empty lits' proof]
       | Statement.NegatedGoal (skolems,clauses) -> 
         let clauses' = 
           List.map (fun c -> 
-            E.C.of_forms ~trail:Trail.empty (encode_clause ~opts c) proof) 
+            E.C.of_forms ~trail:Trail.empty (encode_clause ~rules c) proof) 
           clauses in
         E.cr_add clauses'
         (* E.cr_return @@ 
           Statement.neg_goal ~proof ~skolems (List.map (encode_clause ~opts) clauses) *)
     
+    let comb_narrow c =
+      let rules = narrow_rules in
+      let new_lits = Literals.map (apply_rw_rules ~rules) (C.lits c) in
+      if Literals.equal (C.lits c) new_lits then (
+        SimplM.return_same c
+      ) else (
+        let proof = Proof.Step.simp [C.proof_parent c] 
+                      ~rule:(Proof.Rule.mk "narrow combinators") in
+        let new_ = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
+                    (Array.to_list new_lits) proof in
+        SimplM.return_new new_
+      )
+    
     let setup () =
       if E.flex_get k_enable_combinators then (
         E.add_clause_conversion enocde_stmt;
+        E.add_unary_simplify comb_narrow;
       )
 
 end
