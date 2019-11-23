@@ -490,7 +490,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         | [] -> []
         | (a,p) :: aas ->
           let acc = T.app acc [a] in
-          (a,p) :: aux acc aas in
+          (acc,p) :: aux acc aas in
       (orig_comb,penalty) :: aux orig_comb args
 
     let alpha = T.var tyvarA 
@@ -522,7 +522,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let instantiate_var_w_comb ~var =
       CCList.filter_map (fun (comb, penalty) ->
-        try 
+        try
           Some (Unif.FO.unify_syn (comb, 0) (var, 1), penalty)
         with Unif.Fail -> None
       ) partially_applied_combs
@@ -546,7 +546,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         (* variable names as in Ahmed's paper (unpublished) *)
         let var = T.head_term u in
         assert(T.is_var var);
-        CCList.filter_map (fun (subst, comb_penalty) -> 
+        CCList.filter_map (fun (subst, comb_penalty) ->
           let renaming = Subst.Renaming.create () in
           let lit_idx, lit_pos = Lits.Pos.cut u_pos in
           let lit = Lit.apply_subst_no_simp renaming subst (lits.(lit_idx), 1) in
@@ -560,6 +560,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                 [C.proof_parent_subst renaming (clause,1) subst] in
             let penalty = comb_penalty + C.penalty clause in
             let new_clause = C.create ~trail:(C.trail clause) ~penalty lits' proof in
+            (* CCFormat.printf "success: @[%a@]@." Subst.pp subst; *)
+            (* CCFormat.printf "res: @[%a@]@." C.pp new_clause; *)
             Some new_clause
           )) (instantiate_var_w_comb ~var))
         |> Iter.to_list
@@ -568,7 +570,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if E.flex_get k_enable_combinators then (
         E.add_clause_conversion enocde_stmt;
         E.add_unary_simplify comb_narrow;
-        (* E.add_unary_inf "narrow applied variable" narrow_app_vars; *)
+        E.add_unary_inf "narrow applied variable" narrow_app_vars;
       )
 
 end
