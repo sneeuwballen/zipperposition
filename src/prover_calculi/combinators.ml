@@ -256,7 +256,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if Builtin.equal Builtin.CComb c_kind then (
         match args with 
         | x :: y :: z :: rest ->
-          Some (T.app x ((T.app z [y]) ::rest))
+          Some (T.app x (z :: y ::rest))
         | _ -> None
       ) else None
     with IsNotCombinator -> None
