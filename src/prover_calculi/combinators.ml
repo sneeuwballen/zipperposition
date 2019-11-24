@@ -559,7 +559,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         |> Iter.exists (fun t ->
            T.Seq.subterms ~include_builtin:true ~ignore_head:false t 
            |> Iter.exists T.is_fun) in
-      if has_lams c then SimplM.return_same c
+      if not @@ has_lams c then SimplM.return_same c
       else (
         let proof = Proof.Step.simp [C.proof_parent c] 
                       ~rule:(Proof.Rule.mk "convert lambdas otf") in
