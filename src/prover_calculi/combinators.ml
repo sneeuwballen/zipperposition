@@ -568,12 +568,16 @@ module Make(E : Env.S) : S with module Env = E = struct
                     (Array.to_list lits') proof in
         SimplM.return_new new_
       )
+
+    let convert_and_narrow c =
+      let open SimplM.Infix in
+      lams2combs_otf c 
+      >>= comb_narrow
     
     let setup () =
       if E.flex_get k_enable_combinators then (
         E.add_clause_conversion enocde_stmt;
-        E.add_basic_simplify lams2combs_otf;
-        E.add_basic_simplify comb_narrow;
+        E.add_basic_simplify convert_and_narrow;
         E.add_unary_inf "narrow applied variable" narrow_app_vars;
       )
 
@@ -600,4 +604,7 @@ let extension =
 let () =
   Options.add_opts
     [ "--combinator-based-reasoning", Arg.Bool (fun v -> _enable_combinators := v), "enable / disable combinator based reasoning"];
-  Extensions.register extension
+  Params.add_to_mode "ho-comb-complete" (fun () ->
+    _enable_combinators := true;
+  );
+  Extensions.register extension;

@@ -3144,6 +3144,20 @@ let () =
       _max_elims := 1;
       _fluidsup := false;
     );
+    Params.add_to_mode "ho-comb-complete" (fun () ->
+      _use_simultaneous_sup := true;
+      _sup_at_vars := false;
+      _sup_in_var_args := true;
+      _sup_under_lambdas := false;
+      _lambda_demod := false;
+      _demod_in_var_args := false;
+      _complete_ho_unification := false;
+      _ord_in_normal_form := false;
+      _sup_at_var_headed := true;
+      _lambdasup := -1;
+      _dupsup := false;
+      _fluidsup := false;
+    );
     Params.add_to_mode "fo-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
     )

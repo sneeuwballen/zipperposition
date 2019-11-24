@@ -1456,6 +1456,22 @@ let () =
     enable_unif_ := false;
     _prune_arg_fun := `PruneMaxCover;
   );
+  Params.add_to_mode "ho-comb-complete" (fun () ->
+    enabled_ := true;
+    def_unfold_enabled_ := false;
+    force_enabled_ := true;
+    _ext_axiom := false;
+    _ext_neg_lit := false;
+    _neg_ext := true;
+    _neg_ext_as_simpl := false;
+    _ext_pos := true;
+    _ext_pos_all_lits := true;
+    prim_mode_ := `None;
+    _elim_pred_var := true;
+    _neg_cong_fun := false;
+    enable_unif_ := false;
+    _prune_arg_fun := `PruneMaxCover;  
+  );
   Params.add_to_mode "fo-complete-basic" (fun () ->
     enabled_ := false;
   );
