@@ -216,6 +216,18 @@ let is_fun t = match T.view t with
   | T.Bind (Binder.Lambda, _, _) -> true
   | _ -> false
 
+
+let [@inline] hd_is_comb hd =
+  match hd with
+  | Builtin.SComb | Builtin.CComb | Builtin.BComb 
+  | Builtin.KComb | Builtin.IComb -> true
+  | _ -> false
+
+let [@inline] is_comb t =
+  match view t with
+  | AppBuiltin(hd, _) when hd_is_comb hd -> true
+  | _ -> false
+
 let is_app t = match T.view t with
   | T.Const _
   | T.App _ -> true

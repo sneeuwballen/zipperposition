@@ -140,6 +140,9 @@ val in_lfho_fragment : t -> bool
 val is_fo_term : t -> bool
 val is_true_or_false : t -> bool
 
+val hd_is_comb: Builtin.t -> bool
+val is_comb : t -> bool
+
 val mk_fresh_skolem : var list -> Type.t -> (ID.t*Type.t) * t
 
 val as_const : t -> ID.t option

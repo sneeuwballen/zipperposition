@@ -1,4 +1,5 @@
 open Libzipperposition
+open Logtk
 
 module type S = sig
   module Env : Env.S

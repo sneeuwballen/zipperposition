@@ -165,12 +165,14 @@ module KBO : ORD = struct
     mutable pos_counter : int;
     mutable neg_counter : int;
     mutable balance : CCInt.t Term.Tbl.t;
+    mutable comb2var : T.t Term.Tbl.t
   }
 
   (** create a balance for the two terms *)
   let mk_balance t1 t2 =
     let numvars = Iter.length (T.Seq.vars t1) + Iter.length (T.Seq.vars t2) in
-    { offset = 0; pos_counter = 0; neg_counter = 0; balance = Term.Tbl.create numvars; }
+    { offset = 0; pos_counter = 0; neg_counter = 0; balance = Term.Tbl.create numvars;
+      comb2var = Term.Tbl.create 16 }
 
   (** add a positive variable *)
   let add_pos_var balance var =
@@ -200,6 +202,21 @@ module KBO : ORD = struct
     | Head.V _ -> weight_var_headed
     | Head.DB _ -> Prec.db_weight prec
     | Head.LAM ->  Prec.lam_weight prec
+
+  (* Type-1 combinator is a combinator that is not ground
+     (see Ahmed's combinator KBO paper) *)
+  let ty1comb_to_var t balance =
+    if T.is_comb t then (
+      match T.Tbl.find_opt balance.comb2var t with
+      | Some t' -> t'
+      | None ->
+        if T.is_ground t then t
+        else (
+          let fresh_var = T.var (HVar.fresh ~ty:(T.ty t) ()) in
+          T.Tbl.add balance.comb2var t fresh_var;
+          fresh_var
+        ))
+    else t
 
   (** Higher-order KBO *)
   let rec kbo ~prec t1 t2 =
@@ -249,10 +266,10 @@ module KBO : ORD = struct
     and balance_weight_var (wb:W.t) t s ~pos : W.t * bool =
       if pos then (
         add_pos_var balance t;
-        W.(wb + weight_var_headed), CCOpt.is_some s && ( Term.equal (CCOpt.get_exn s) t)
+        W.(wb + weight_var_headed), CCOpt.is_some s && (Term.equal (CCOpt.get_exn s) t)
       ) else (
         add_neg_var balance t;
-        W.(wb - weight_var_headed), CCOpt.is_some s && ( Term.equal (CCOpt.get_exn s) t)
+        W.(wb - weight_var_headed), CCOpt.is_some s && (Term.equal (CCOpt.get_exn s) t)
       )
     (** list version of the previous one, threaded with the check result *)
     and balance_weight_rec wb terms s ~pos res = match terms with
@@ -303,6 +320,7 @@ module KBO : ORD = struct
       if T.equal t1 t2
       then (wb, Eq) (* do not update weight or var balance *)
       else
+        let t1 = ty1comb_to_var t1 balance and t2 = ty1comb_to_var t2 balance in
         match Head.term_to_head t1, Head.term_to_head t2 with
           | Head.V _, Head.V _ ->
             add_pos_var balance t1;

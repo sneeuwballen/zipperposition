@@ -20,129 +20,116 @@ module type S = sig
   val setup : unit -> unit
 end
 
+(* Helper function for defining combinators *)
+(* see mk_s *)
+let ty_s =
+  let db_alpha = Ty.bvar 2 and db_beta = Ty.bvar 1 and db_gamma = Ty.bvar 0 in
+  
+  let open Type in
+  let prefix ty = forall @@ forall @@ forall ty in
+  prefix
+    ([[db_alpha; db_beta] ==> db_gamma; [db_alpha] ==> db_beta; db_alpha]
+      ==> db_gamma)
+
+(* see mk_c *)
+let ty_c =
+  let db_alpha = Ty.bvar 2 and db_beta = Ty.bvar 1 and db_gamma = Ty.bvar 0 in
+  
+  let open Type in
+  let prefix ty = forall @@ forall @@ forall ty in
+  prefix
+    ([[db_alpha; db_beta] ==> db_gamma; db_beta; db_alpha] 
+      ==> db_gamma)
+
+(* see mk_b *)
+let ty_b =
+  let db_alpha = Ty.bvar 2 and db_beta = Ty.bvar 1 and db_gamma = Ty.bvar 0 in
+  
+  let open Type in
+  let prefix ty = forall @@ forall @@ forall ty in
+  prefix
+    ([[db_alpha] ==> db_beta; [db_gamma] ==> db_alpha; db_gamma] 
+    ==> db_beta)
+
+(* see mk_k *)
+let ty_k =
+  let db_alpha = Ty.bvar 1 and db_beta = Ty.bvar 0 in  
+
+  let open Type in
+  forall @@ forall ([db_beta; db_alpha] ==> db_beta)
+
+(* see mk_i *)
+let ty_i =
+  let db_alpha = Ty.bvar 0 in  
+
+  let open Type in
+  forall ([db_alpha] ==> db_alpha)
+
+
+let [@inline] mk_comb comb_head ty ty_args args =
+  (* optmization: if args is empty, the whole 
+    ty_args will be traversed *)
+  if CCList.is_empty args then (
+    T.app_builtin ~ty comb_head ty_args
+  ) else T.app (T.app_builtin ~ty comb_head ty_args) args
+
+(* make S combinator with the type:
+  Παβγ. (α→β→γ) → (α→β) → α → γ *)
+let mk_s ?(args=[]) ~alpha ~beta ~gamma =
+  let ty = Ty.apply ty_s [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t);
+                          Type.of_term_unsafe (beta : Term.t :> InnerTerm.t);
+                          Type.of_term_unsafe (gamma : Term.t :> InnerTerm.t);] in
+  mk_comb Builtin.SComb ty [alpha;beta;gamma] args
+
+(* make C combinator with the type:
+  Παβγ. (α→β→γ) → β → α → γ *)
+let mk_c ?(args=[]) ~alpha ~beta ~gamma =
+  let ty = Ty.apply ty_c [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t);
+                          Type.of_term_unsafe (beta : Term.t :> InnerTerm.t);
+                          Type.of_term_unsafe (gamma : Term.t :> InnerTerm.t);] in
+  mk_comb Builtin.CComb ty [alpha;beta;gamma] args
+
+(* make B combinator with the type:
+  Παβγ. (α→β) → (γ→α) → γ → β *)
+let mk_b ?(args=[]) ~alpha ~beta ~gamma =
+  let ty = Ty.apply ty_b [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t);
+                          Type.of_term_unsafe (beta : Term.t :> InnerTerm.t);
+                          Type.of_term_unsafe (gamma : Term.t :> InnerTerm.t);]  in
+  mk_comb Builtin.BComb ty [alpha;beta;gamma] args
+
+(* make K combinator with the type:
+  Παβ. β → α → β *)
+let mk_k ?(args=[]) ~alpha ~beta =
+  let ty = Ty.apply ty_k [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t);
+                          Type.of_term_unsafe (beta : Term.t :> InnerTerm.t)] in
+  mk_comb Builtin.KComb ty [alpha;beta] args
+
+(* make I combinator with the type:
+  Πα. α → α *)
+let mk_i ?(args=[]) ~alpha =
+  let ty = Ty.apply ty_i [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t)] in
+  mk_comb Builtin.IComb ty [alpha] args
+
+(* {2 Helper functions} *)
+let [@inline] term_has_comb ~comb t =
+  match T.view t with
+  | T.AppBuiltin(hd, _) when Builtin.equal comb hd -> true
+  | _ -> false
+
+(* Returns the cobminator head, type arguments and real arguments 
+  of a combinator *)
+let [@inline] unpack_comb t =
+  match T.view t with 
+  | T.AppBuiltin(hd, args) when T.hd_is_comb hd ->
+    let ty_args, real_args = List.partition Term.is_type args in
+    (hd, ty_args, real_args)
+  | _ -> raise IsNotCombinator
 
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
   module C = Env.C
   module Ctx = Env.Ctx
   module Fool = Fool.Make(Env)
-
-
-  (* see mk_s *)
-  let ty_s =
-    let db_alpha = Ty.bvar 2 and db_beta = Ty.bvar 1 and db_gamma = Ty.bvar 0 in
-    
-    let open Type in
-    let prefix ty = forall @@ forall @@ forall ty in
-    prefix
-      ([[db_alpha; db_beta] ==> db_gamma; [db_alpha] ==> db_beta; db_alpha]
-        ==> db_gamma)
-
-  (* see mk_c *)
-  let ty_c =
-    let db_alpha = Ty.bvar 2 and db_beta = Ty.bvar 1 and db_gamma = Ty.bvar 0 in
-    
-    let open Type in
-    let prefix ty = forall @@ forall @@ forall ty in
-    prefix
-      ([[db_alpha; db_beta] ==> db_gamma; db_beta; db_alpha] 
-        ==> db_gamma)
-
-  (* see mk_b *)
-  let ty_b =
-    let db_alpha = Ty.bvar 2 and db_beta = Ty.bvar 1 and db_gamma = Ty.bvar 0 in
-    
-    let open Type in
-    let prefix ty = forall @@ forall @@ forall ty in
-    prefix
-      ([[db_alpha] ==> db_beta; [db_gamma] ==> db_alpha; db_gamma] 
-      ==> db_beta)
-
-  (* see mk_k *)
-  let ty_k =
-    let db_alpha = Ty.bvar 1 and db_beta = Ty.bvar 0 in  
-
-    let open Type in
-    forall @@ forall ([db_beta; db_alpha] ==> db_beta)
-
-  (* see mk_i *)
-  let ty_i =
-    let db_alpha = Ty.bvar 0 in  
-
-    let open Type in
-    forall ([db_alpha] ==> db_alpha)
-
-
-  let [@inline] mk_comb comb_head ty ty_args args =
-    (* optmization: if args is empty, the whole 
-      ty_args will be traversed *)
-    if CCList.is_empty args then (
-      T.app_builtin ~ty comb_head ty_args
-    ) else T.app (T.app_builtin ~ty comb_head ty_args) args
-
-  (* make S combinator with the type:
-    Παβγ. (α→β→γ) → (α→β) → α → γ *)
-  let mk_s ?(args=[]) ~alpha ~beta ~gamma =
-    let ty = Ty.apply ty_s [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t);
-                            Type.of_term_unsafe (beta : Term.t :> InnerTerm.t);
-                            Type.of_term_unsafe (gamma : Term.t :> InnerTerm.t);] in
-    mk_comb Builtin.SComb ty [alpha;beta;gamma] args
-
-  (* make C combinator with the type:
-    Παβγ. (α→β→γ) → β → α → γ *)
-  let mk_c ?(args=[]) ~alpha ~beta ~gamma =
-    let ty = Ty.apply ty_c [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t);
-                            Type.of_term_unsafe (beta : Term.t :> InnerTerm.t);
-                            Type.of_term_unsafe (gamma : Term.t :> InnerTerm.t);] in
-    mk_comb Builtin.CComb ty [alpha;beta;gamma] args
-
-  (* make B combinator with the type:
-    Παβγ. (α→β) → (γ→α) → γ → β *)
-  let mk_b ?(args=[]) ~alpha ~beta ~gamma =
-    let ty = Ty.apply ty_b [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t);
-                            Type.of_term_unsafe (beta : Term.t :> InnerTerm.t);
-                            Type.of_term_unsafe (gamma : Term.t :> InnerTerm.t);]  in
-    mk_comb Builtin.BComb ty [alpha;beta;gamma] args
-
-  (* make K combinator with the type:
-    Παβ. β → α → β *)
-  let mk_k ?(args=[]) ~alpha ~beta =
-    let ty = Ty.apply ty_k [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t);
-                            Type.of_term_unsafe (beta : Term.t :> InnerTerm.t)] in
-    mk_comb Builtin.KComb ty [alpha;beta] args
-
-  (* make I combinator with the type:
-    Πα. α → α *)
-  let mk_i ?(args=[]) ~alpha =
-    let ty = Ty.apply ty_i [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t)] in
-    mk_comb Builtin.IComb ty [alpha] args
-
-  (* {2 Helper functions} *)
-
-  let [@inline] hd_is_comb hd =
-    match hd with
-    | Builtin.SComb | Builtin.CComb | Builtin.BComb 
-    | Builtin.KComb | Builtin.IComb -> true
-    | _ -> false
-
-  let [@inline] term_is_comb t =
-    match T.view t with
-    | T.AppBuiltin(hd, _) when hd_is_comb hd -> true
-    | _ -> false
-
-  let [@inline] term_has_comb ~comb t =
-    match T.view t with
-    | T.AppBuiltin(hd, _) when Builtin.equal comb hd -> true
-    | _ -> false
-
-  (* Returns the cobminator head, type arguments and real arguments 
-    of a combinator *)
-  let [@inline] unpack_comb t =
-    match T.view t with 
-    | T.AppBuiltin(hd, args) when hd_is_comb hd ->
-      let ty_args, real_args = List.partition Term.is_type args in
-      (hd, ty_args, real_args)
-    | _ -> raise IsNotCombinator
 
   (* Given type arguments of S, calculate correct type arguments 
     for B *)
