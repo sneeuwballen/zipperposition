@@ -360,7 +360,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let body' = aux body in
         abstract ~bvar_ty:(Term.of_ty ty) body'
       | _ ->  t in
-    aux t
+    aux (Lambda.eta_reduce @@ Lambda.snf @@ t)
 
 
   exception E_i of Statement.clause_t
@@ -552,11 +552,28 @@ module Make(E : Env.S) : S with module Env = E = struct
             Some new_clause
           )) (instantiate_var_w_comb ~var))
         |> Iter.to_list
+
+    let lams2combs_otf c =
+      let has_lams c = 
+        C.Seq.terms c
+        |> Iter.exists (fun t ->
+           T.Seq.subterms ~include_builtin:true ~ignore_head:false t 
+           |> Iter.exists T.is_fun) in
+      if has_lams c then SimplM.return_same c
+      else (
+        let proof = Proof.Step.simp [C.proof_parent c] 
+                      ~rule:(Proof.Rule.mk "convert lambdas otf") in
+        let lits' = Literals.map (abf ~rules:curry_optimizations) (C.lits c) in
+        let new_ = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
+                    (Array.to_list lits') proof in
+        SimplM.return_new new_
+      )
     
     let setup () =
       if E.flex_get k_enable_combinators then (
         E.add_clause_conversion enocde_stmt;
-        E.add_unary_simplify comb_narrow;
+        E.add_basic_simplify lams2combs_otf;
+        E.add_basic_simplify comb_narrow;
         E.add_unary_inf "narrow applied variable" narrow_app_vars;
       )
 
