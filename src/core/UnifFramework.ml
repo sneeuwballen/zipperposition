@@ -148,19 +148,22 @@ module Make (P : PARAMETERS) = struct
             | _ -> 
               try
                 let mgu =
-                 (* if steps > 3 then None else *)
+                 if steps > 3 then None else
                  CCList.find_map (fun alg ->  
                   try
                     Some (alg (lhs, unifscope) (rhs, unifscope) subst)
                   with 
-                    | P.NotInFragment -> None
-                    | P.NotUnifiable -> raise Unif.Fail
+                    | P.NotInFragment -> 
+                      None
+                    | P.NotUnifiable -> 
+                      raise Unif.Fail
                 ) (P.frag_algs ()) in 
                 match mgu with 
                 | Some substs ->
                   (* We assume that the substitution was augmented so that it is mgu for
                       lhs and rhs *)
-                  CCList.map (fun sub -> aux ~steps sub rest) substs
+                  CCList.map (fun sub -> 
+                    aux ~steps sub rest) substs
                   |> OSeq.of_list
                   |> OSeq.merge
                 | None ->

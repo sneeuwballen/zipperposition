@@ -6,6 +6,8 @@
 
 open Logtk
 
+val k_enable_combinators : bool Logtk.Flex_state.key
+
 val check_timeout : float option -> bool
 (** check whether we still have some time w.r.t timeout *)
 

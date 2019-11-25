@@ -810,6 +810,7 @@ module Make(X : sig
       (fun k->k
           (Util.pp_seq ~sep:" " C.pp) (CCVector.to_seq c_set)
           (Util.pp_seq ~sep:" " C.pp) (CCVector.to_seq c_sos));
+    Util.debugf ~section 1 "end@." CCFun.id;
     let c_set = CCVector.freeze c_set in
     let c_sos = CCVector.freeze c_sos in
     { Clause.c_set; c_sos; }

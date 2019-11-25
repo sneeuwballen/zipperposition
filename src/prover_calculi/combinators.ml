@@ -10,7 +10,7 @@ module Lit = Literal
 type conv_rule = T.t -> T.t option
 exception IsNotCombinator
 
-let k_enable_combinators = Flex_state.create_key ()
+let k_enable_combinators = Saturate.k_enable_combinators
 
 module type S = sig
   module Env : Env.S
@@ -395,6 +395,8 @@ let abf ~rules t =
     | _ ->  t in
   let reduced = Lambda.eta_reduce @@ Lambda.snf @@ t in
   let res = aux reduced in
+  (* CCFormat.printf "abf(@[%a@])=" T.pp reduced;
+  CCFormat.printf "@.   @[%a@]@." T.pp res; *)
   res
 
 
@@ -445,6 +447,19 @@ module Make(E : Env.S) : S with module Env = E = struct
   module Ctx = Env.Ctx
   module Fool = Fool.Make(Env)
 
+    let has_lams_aux = 
+      Iter.exists (fun t ->
+        T.Seq.subterms ~include_builtin:true ~ignore_head:false t 
+        |> Iter.exists T.is_fun)
+
+    let has_lams_c c = 
+      has_lams_aux @@ C.Seq.terms c
+    
+    let has_lams_lits lits =
+      CCList.to_seq lits 
+      |> Iter.flat_map (SLiteral.to_seq)
+      |> has_lams_aux
+
     let enocde_stmt st =
       let rules = curry_optimizations in
       let rule = Proof.Rule.mk "lambdas_to_combs" in
@@ -452,9 +467,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         Proof.S.mk (Statement.proof_step st) (Proof.Result.make result_tc st) in
       let proof = 
         Proof.Step.esa ~rule [Proof.Parent.from as_proof] in
-      let clause_eq = function 
+      let rec clause_eq = function 
         | [], [] -> true 
-        | l1 :: l1s, l2 :: l2s -> SLiteral.equal T.equal l1 l2 
+        | l1 :: l1s, l2 :: l2s -> SLiteral.equal T.equal l1 l2 && clause_eq (l1s, l2s) 
         | _, _ -> false in
         
 
@@ -463,8 +478,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       | Statement.Lemma _ | Statement.TyDecl _ -> E.cr_skip
       | Statement.Goal lits | Statement.Assert lits ->
         let lits' = encode_clause ~rules lits in
-        if clause_eq (lits,lits') then E.cr_skip 
-        else E.cr_return @@ [E.C.of_forms ~trail:Trail.empty lits' proof]
+        if clause_eq (lits,lits') then  E.cr_skip
+        else (
+          let res = E.C.of_forms ~trail:Trail.empty lits' proof in
+          (* assert (not @@ has_lams_c res); *)
+          E.cr_return @@ [res])
       | Statement.NegatedGoal (skolems,clauses) -> 
         let encoded = ref false in
         let clauses' = 
@@ -473,7 +491,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             if not @@ clause_eq (c,c') 
             then encoded := true;
 
-            E.C.of_forms ~trail:Trail.empty c' proof) 
+            let res = E.C.of_forms ~trail:Trail.empty c' proof in
+            (* assert(not @@ has_lams_c res); *)
+            res) 
           clauses in
         if !encoded then E.cr_return clauses'
         else E.cr_skip
@@ -598,19 +618,12 @@ module Make(E : Env.S) : S with module Env = E = struct
                 [C.proof_parent_subst renaming (clause,1) subst] in
             let penalty = comb_penalty + C.penalty clause in
             let new_clause = C.create ~trail:(C.trail clause) ~penalty lits' proof in
-            (* CCFormat.printf "success: @[%a@]@." Subst.pp subst; *)
-            (* CCFormat.printf "res: @[%a@]@." C.pp new_clause; *)
             Some new_clause
           )) (instantiate_var_w_comb ~var))
         |> Iter.to_list
 
     let lams2combs_otf c =
-      let has_lams c = 
-        C.Seq.terms c
-        |> Iter.exists (fun t ->
-           T.Seq.subterms ~include_builtin:true ~ignore_head:false t 
-           |> Iter.exists T.is_fun) in
-      if not @@ has_lams c then SimplM.return_same c
+      if not @@ has_lams_c c then SimplM.return_same c
       else (
         let proof = Proof.Step.simp [C.proof_parent c] 
                       ~rule:(Proof.Rule.mk "lams2combs on-the-fly") in

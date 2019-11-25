@@ -233,7 +233,7 @@ let app ~ty f l = match f.term, l with
         let prop = builtin ~ty:tType Builtin.Prop in
 
         let args,_ = open_fun ty in
-        if List.length args >= 2 then (
+        if List.length args > 0 then (
           ty
         ) else if Builtin.is_logical_binop f1 then (
           if List.length flattened >= 2 then prop
@@ -926,15 +926,12 @@ let rec pp_depth ?(hooks=[]) depth out t =
     | AppBuiltin((Builtin.ExistsConst | Builtin.ForallConst) as b, [x;body]) ->
       Format.fprintf out "%a %a. %a" Builtin.pp b (_pp depth) x (_pp depth) body;
     | AppBuiltin((Builtin.Eq | Builtin.Neq) as b,  x :: rest) ->
-      let l = 
+      let sep, l = 
         if is_a_type x then (
-          CCFormat.printf "(%a::%a) " Builtin.pp b (_pp depth) x;
-          rest
+          CCFormat.sprintf "(%a::%a) " Builtin.pp b (_pp depth) x,rest
         ) else (
-          CCFormat.printf "%a " Builtin.pp b;
-          x :: rest
+          CCFormat.sprintf "%a " Builtin.pp b, x :: rest
         ) in
-      let sep = CCFormat.sprintf " %s " (Builtin.TPTP.to_string b) in
       Format.fprintf out " @[%a@]" (Util.pp_list ~sep (_pp depth)) l
     | AppBuiltin (b, ([_;a] | [a])) when Builtin.is_prefix b ->
       Format.fprintf out "@[<1>%a %a@]" Builtin.pp b (_pp depth) a

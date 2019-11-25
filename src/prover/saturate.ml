@@ -18,6 +18,9 @@ let stat_steps = Util.mk_stat "saturate.steps"
 
 let section = Util.Section.make ~parent:Const.section "saturate"
 
+let k_enable_combinators = Flex_state.create_key ()
+
+
 let check_timeout = function
   | None -> false
   | Some timeout -> Util.total_time_s () > timeout
@@ -84,7 +87,8 @@ module Make(E : Env.S) = struct
     if !_check_types then Env.C.check_types c;
     assert (Env.C.Seq.terms c |> Iter.for_all Term.DB.is_closed);
     assert (Env.C.lits c |> Literals.vars_distinct);
-    if not (Env.C.Seq.terms c 
+    if Env.flex_get k_enable_combinators &&
+       not (Env.C.Seq.terms c 
             |> Iter.flat_map (fun t -> Term.Seq.subterms ~include_builtin:true ~ignore_head:false t)
             |> Iter.for_all (fun t -> not @@ Term.is_fun t)) then (
       CCFormat.printf "ENCODED WRONGLY: %a:%d.\n" Env.C.pp_tstp c (Env.C.proof_depth c);
