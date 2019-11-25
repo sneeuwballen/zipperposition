@@ -266,32 +266,20 @@ let head_term_mono t = match view t with
   | App (f,l) ->
     let l1 = CCList.take_while is_type l in
     app f l1 (* re-apply to type parameters *)
-  | AppBuiltin(b, l) when not (Builtin.is_quantifier b) ->
+  | AppBuiltin(b, l) ->
     let ty_args, args = CCList.partition is_type l in
     let ty = Type.arrow (List.map ty args) (ty t) in 
     app_builtin ~ty b ty_args
-  | AppBuiltin(b, l) ->
-    assert(Builtin.is_quantifier b);
-    assert(Type.is_prop @@ ty t);
-    assert(List.length l = 1);
-    let ty = Type.arrow [ty (List.hd l)] Type.prop in
-    app_builtin ~ty b []
   | _ -> t
 
 let as_app_mono t = match view t with
   | App (f,l) ->
     let l1,l2 = CCList.partition is_type l in
     app f l1, l2 (* re-apply to type parameters *)
-  | AppBuiltin(b, l) when not (Builtin.is_quantifier b) ->
+  | AppBuiltin(b, l) ->
     let ty_args, args = CCList.partition is_type l in
     let ty = Type.arrow (List.map ty args) (ty t) in 
     app_builtin ~ty b ty_args, args
-  | AppBuiltin(b, l) ->
-    assert(Builtin.is_quantifier b);
-    assert(Type.is_prop @@ ty t);
-    assert(List.length l = 1);
-    let ty = Type.arrow [ty (List.hd l)] Type.prop in
-    app_builtin ~ty b [], []
   | _ -> t, []
 
 

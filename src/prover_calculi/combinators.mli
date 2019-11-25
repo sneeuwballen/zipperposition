@@ -13,4 +13,5 @@ end
 
 module Make(E : Env.S) : S with module Env = E
 
+val k_enable_combinators : bool Logtk.Flex_state.key
 val extension : Extensions.t

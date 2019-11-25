@@ -339,7 +339,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           let r_conv = abstract ~bvar_ty r in
           let ret_ty = Ty.apply_unsafe l_ty [(r :> InnerTerm.t)] in
           let raw_res =
-            mk_s ~alpha:bvar_ty ~beta:(Term.of_ty @@ T.ty r) 
+            mk_s ~alpha:bvar_ty ~beta:(Term.of_ty @@ T.ty r)
                 ~gamma:(Term.of_ty ret_ty) ~args:[l_conv;r_conv] in
           ret_ty, apply_rw_rules ~rules raw_res
         ) (T.ty hd_mono, hd_conv) args in
@@ -360,7 +360,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         let body' = aux body in
         abstract ~bvar_ty:(Term.of_ty ty) body'
       | _ ->  t in
-    aux (Lambda.eta_reduce @@ Lambda.snf @@ t)
+    let reduced = Lambda.eta_reduce @@ Lambda.snf @@ t in
+    let res = aux reduced in
+    res
 
 
   exception E_i of Statement.clause_t
@@ -423,9 +425,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           List.map (fun c -> 
             E.C.of_forms ~trail:Trail.empty (encode_clause ~rules c) proof) 
           clauses in
-        E.cr_add clauses'
-        (* E.cr_return @@ 
-          Statement.neg_goal ~proof ~skolems (List.map (encode_clause ~opts) clauses) *)
+        E.cr_return clauses'
     
     let comb_narrow c =
       let new_lits = Literals.map (fun t -> fst @@ narrow t) (C.lits c) in
@@ -562,7 +562,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if not @@ has_lams c then SimplM.return_same c
       else (
         let proof = Proof.Step.simp [C.proof_parent c] 
-                      ~rule:(Proof.Rule.mk "convert lambdas otf") in
+                      ~rule:(Proof.Rule.mk "lams2combs on-the-fly") in
         let lits' = Literals.map (abf ~rules:curry_optimizations) (C.lits c) in
         let new_ = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
                     (Array.to_list lits') proof in
