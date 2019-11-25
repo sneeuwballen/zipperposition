@@ -330,6 +330,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       | T.AppBuiltin _ | T.App _ -> 
         let hd_mono, args = T.as_app_mono t in
         assert(not @@ T.is_fun hd_mono);
+        CCFormat.printf "hd_m:@[%a@]; ty:@[%a@]@." T.pp hd_mono Ty.pp (T.ty hd_mono);
         let hd_conv =
           if T.is_app hd_mono || T.is_appbuiltin hd_mono then (
             let beta = Term.of_ty @@ T.ty hd_mono in
@@ -344,7 +345,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           ret_ty, apply_rw_rules ~rules raw_res
         ) (T.ty hd_mono, hd_conv) args in
         apply_rw_rules ~rules raw_res
-      | T.Fun _ -> 
+      | T.Fun _ ->
         invalid_arg "all lambdas should be abstracted away!" in
 
     let rec aux t =
@@ -361,7 +362,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         abstract ~bvar_ty:(Term.of_ty ty) body'
       | _ ->  t in
     let reduced = Lambda.eta_reduce @@ Lambda.snf @@ t in
+    CCFormat.printf "abf(@[%a@])=" T.pp reduced;
     let res = aux reduced in
+    CCFormat.printf "@.    @[%a@]@." T.pp res;
     res
 
 
@@ -413,19 +416,31 @@ module Make(E : Env.S) : S with module Env = E = struct
         Proof.S.mk (Statement.proof_step st) (Proof.Result.make result_tc st) in
       let proof = 
         Proof.Step.esa ~rule [Proof.Parent.from as_proof] in
+      let clause_eq = function 
+        | [], [] -> true 
+        | l1 :: l1s, l2 :: l2s -> SLiteral.equal T.equal l1 l2 
+        | _, _ -> false in
+        
 
       match Statement.view st with
       | Statement.Def _ | Statement.Rewrite _ | Statement.Data _ 
       | Statement.Lemma _ | Statement.TyDecl _ -> E.cr_skip
       | Statement.Goal lits | Statement.Assert lits ->
         let lits' = encode_clause ~rules lits in
-        E.cr_return @@ [E.C.of_forms ~trail:Trail.empty lits' proof]
+        if clause_eq (lits,lits') then E.cr_skip 
+        else E.cr_return @@ [E.C.of_forms ~trail:Trail.empty lits' proof]
       | Statement.NegatedGoal (skolems,clauses) -> 
+        let encoded = ref false in
         let clauses' = 
-          List.map (fun c -> 
-            E.C.of_forms ~trail:Trail.empty (encode_clause ~rules c) proof) 
+          List.map (fun c ->
+            let c' = encode_clause ~rules c in
+            if not @@ clause_eq (c,c') 
+            then encoded := true;
+
+            E.C.of_forms ~trail:Trail.empty c' proof) 
           clauses in
-        E.cr_return clauses'
+        if !encoded then E.cr_return clauses'
+        else E.cr_skip
     
     let comb_narrow c =
       let new_lits = Literals.map (fun t -> fst @@ narrow t) (C.lits c) in

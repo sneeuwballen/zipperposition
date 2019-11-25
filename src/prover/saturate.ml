@@ -136,13 +136,13 @@ module Make(E : Env.S) = struct
             Unsat proof
           | c :: l', _ ->
             (* put clauses of [l'] back in passive set *)
-            assert(List.for_all (fun c -> 
+            (* assert(List.for_all (fun c -> 
               let is_prop_encoded = 
                 Env.C.Seq.terms c |> Iter.for_all  Lambda.is_properly_encoded in
               if not is_prop_encoded then (
                 CCFormat.printf "IMPROPERLY ENCODED: %a" Env.C.pp c;
               );
-              is_prop_encoded) (c::l'));
+              is_prop_encoded) (c::l')); *)
             Env.add_passive (Iter.of_list l');
             (* process the clause [c] *)
             let new_clauses = CCVector.create () in

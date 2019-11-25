@@ -249,6 +249,10 @@ let fixity = function
 let is_prefix o = fixity o = Prefix
 let is_infix o = match fixity o with Infix_nary | Infix_binary -> true | Prefix -> false
 
+let is_combinator = function 
+  | BComb | CComb | IComb | KComb | SComb -> true
+  | _ -> false
+
 let ty = function
   | Int _ -> `Int
   | Rat _ -> `Rat

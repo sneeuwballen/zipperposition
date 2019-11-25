@@ -217,11 +217,7 @@ let is_fun t = match T.view t with
   | _ -> false
 
 
-let [@inline] hd_is_comb hd =
-  match hd with
-  | Builtin.SComb | Builtin.CComb | Builtin.BComb 
-  | Builtin.KComb | Builtin.IComb -> true
-  | _ -> false
+let hd_is_comb = Builtin.is_combinator
 
 let [@inline] is_comb t =
   match view t with
@@ -449,7 +445,6 @@ module Seq = struct
          | T.Const s -> Some (s, ty t)
          | _ -> None)
 end
-
 
 let has_ho_subterm t =
   Seq.subterms ~include_builtin:true ~ignore_head:true t
@@ -993,7 +988,12 @@ module TPTP = struct
         Format.fprintf out "(@[%a@])"
           (Util.pp_list ~sep:(Builtin.TPTP.to_string b) pp_rec) l
       | AppBuiltin (b,l) ->
-        Format.fprintf out "(@[<hov2>%a@ %a@])" Builtin.TPTP.pp b (Util.pp_list pp_rec) l
+        let l = 
+          if Builtin.is_combinator b 
+          then List.filter (fun t -> not @@ is_type t) l 
+          else l in
+        if CCList.is_empty l then Format.fprintf out "@[%a@]" Builtin.pp b 
+        else Format.fprintf out "(@[<hov2>%a@ %a@])" Builtin.TPTP.pp b (Util.pp_list pp_rec) l
       | Const s -> ID.pp_tstp out s
       | App (f, l) ->
         Format.fprintf out "@[<hov2>%a(@,%a)@]" pp_rec f

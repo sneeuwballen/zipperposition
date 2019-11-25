@@ -189,6 +189,10 @@ let tType =
   let my_t = make_ ~ty:NoType (AppBuiltin(Builtin.TType, [])) in
   H.hashcons my_t
 
+let open_fun ty = match view ty with
+  | AppBuiltin (Builtin.Arrow, ret :: args) -> args, ret
+  | _ -> [], ty
+
 let rec app_builtin ~ty b l = match b, l with
   | Builtin.Arrow, [] -> assert false
   | Builtin.Arrow, [ret] -> ret
@@ -201,7 +205,6 @@ let rec app_builtin ~ty b l = match b, l with
   | Builtin.Not, [{term=AppBuiltin(Builtin.False,[]); _}] ->
     app_builtin ~ty Builtin.True []
   | _ ->
-    
     let l = if Builtin.is_quantifier b then 
           List.filter (fun t -> not @@ equal (ty_exn t) tType) l else l in
     if Builtin.is_quantifier b  && CCList.length l > 1 then (
@@ -222,17 +225,22 @@ let app ~ty f l = match f.term, l with
   | AppBuiltin (f1, l1), _ ->
     (* flatten *)
     let flattened = l1 @ l in
-    let ty = if Builtin.is_logical_op f1 then (
-      let prop = builtin ~ty:tType Builtin.Prop in
-      if Builtin.is_logical_binop f1 then (
-        if List.length flattened >= 2 then prop
-        else (if List.length flattened = 1 then arrow [prop] prop
-              else arrow [prop;prop] prop)
-      ) else (
-        if List.length flattened = 1 then prop
-        else arrow [prop] prop
-      ))
-     else ty in
+    let ty = 
+      if Builtin.is_logical_op f1 then (
+        let prop = builtin ~ty:tType Builtin.Prop in
+
+        let args,_ = open_fun ty in
+        if List.length args >= 2 then (
+          ty
+        ) else if Builtin.is_logical_binop f1 then (
+          if List.length flattened >= 2 then prop
+          else (if List.length flattened = 1 then arrow [prop] prop
+                else arrow [prop;prop] prop)
+        ) else (
+          if List.length flattened = 1 then prop
+          else arrow [prop] prop
+        ))
+      else ty in
     let my_t = make_ ~ty:(HasType ty) (AppBuiltin (f1,flattened)) in
     H.hashcons my_t
   | _ ->
@@ -768,10 +776,6 @@ let open_bind_fresh2 ?(eq_ty=equal) b t1 t2 =
   in
   aux DBEnv.empty [] t1 t2
 
-let open_fun ty = match view ty with
-  | AppBuiltin (Builtin.Arrow, ret :: args) -> args, ret
-  | _ -> [], ty
-
 let rec open_poly_fun ty = match view ty with
   | Bind (Binder.ForallTy, _, ty') ->
     let i, args, ret = open_poly_fun ty' in
@@ -925,7 +929,12 @@ let rec pp_depth ?(hooks=[]) depth out t =
       Format.fprintf out "(@[%a@])" (Util.pp_list ~sep (_pp depth)) l
     | AppBuiltin (b, []) -> Builtin.pp out b
     | AppBuiltin (b, l) ->
-      Format.fprintf out "@[%a(%a)@]" Builtin.pp b (Util.pp_list (_pp depth)) l
+      let l = 
+        if Builtin.is_combinator b 
+        then List.filter (fun t -> not (is_tType @@ ty_exn t)) l
+        else l in
+      if CCList.is_empty l then Format.fprintf out "@[%a@]" Builtin.pp b
+      else Format.fprintf out "@[%a(%a)@]" Builtin.pp b (Util.pp_list (_pp depth)) l
     | App (f, l) ->
       (* remove type arguments unless required,
          or unless we are already printing a type *)
