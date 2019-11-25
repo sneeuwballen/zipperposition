@@ -22,6 +22,8 @@ let prof_matching = Util.mk_profiler "matching"
 
 let fail () = raise Fail
 
+let disable_pattern_unif = ref false
+
 (** {2 Signatures} *)
 
 module type S = Unif_intf.S
@@ -754,12 +756,13 @@ module Inner = struct
           "(@[unif_ho.flex_rigid, trying@ `@[:f1 %a :l1 %a@]`@ :t2 `%a`@ :subst %a@ :bvars %a@])@."
           (Scoped.pp T.pp) (f1,scope) (CCFormat.Dump.list T.pp) l1
           (Scoped.pp T.pp) (t2,scope) US.pp subst B_vars.pp bvars; *)
-        if distinct_bvar_l ~bvars:bvars.B_vars.left l1 
+        let patterns = not !disable_pattern_unif in
+        if patterns && distinct_bvar_l ~bvars:bvars.B_vars.left l1 
           && CCList.subset ~eq:(=) (T.DB.unbound t2) (List.map T.as_bvar_exn l1) 
         then (
           (* flex/rigid pattern unif *)
           flex_rigid ~op ~bvars:bvars.B_vars.left subst f1 l1 t2 ~scope
-        ) else if distinct_ground_l l1 then (
+        ) else if patterns && distinct_ground_l l1 then (
           (* [v t = t2] becomes [v = λx. t2[x/t]] *)
           let t2 = lift_terms l1 t2 in
           unif_rec ~op ~root ~bvars subst (f1,scope) (t2,scope)
@@ -777,13 +780,14 @@ module Inner = struct
           "(@[unif_ho.flex_rigid@ `@[:f2 %a :l2 %a@]`@ :t1 `%a`@ :subst %a@ :bvars %a@])@."
           (Scoped.pp T.pp) (f2,scope) (CCFormat.Dump.list T.pp) l2
           (Scoped.pp T.pp) (t1,scope) US.pp subst B_vars.pp bvars;*)
-        if distinct_bvar_l ~bvars:bvars.B_vars.right l2 
+        let patterns = not !disable_pattern_unif in
+        if patterns && distinct_bvar_l ~bvars:bvars.B_vars.right l2 
           && CCList.subset ~eq:(=) (T.DB.unbound t1) (List.map T.as_bvar_exn l2) 
           && op=O_unify 
         then (
           (* flex/rigid pattern unif *)
           flex_rigid ~op ~bvars:bvars.B_vars.right subst f2 l2 t1 ~scope
-        ) else if distinct_ground_l l2 && op=O_unify then (
+        ) else if patterns &&  distinct_ground_l l2 && op=O_unify then (
           (* [t1 = v t] becomes [v = λx. t1[x/t]] *)
           let t1 = lift_terms l2 t1 in
           unif_rec ~op ~root ~bvars subst (t1,scope) (f2,scope)
@@ -1104,12 +1108,6 @@ module FO = struct
       if(not (Term.DB.is_closed ta) || not (Term.DB.is_closed tb)) then (
          let sk_a, sk_a_subs = Term.DB.skolemize_loosely_bound ta in
          let sk_b, sk_b_subs = Term.DB.skolemize_loosely_bound tb in
-         (* Format.printf "Skolemized %a into %a.\n" Term.pp ta Term.pp sk_a;
-            Format.printf "Skolemized %a into %a.\n" Term.pp tb Term.pp sk_b;
-            Format.printf "Map a:\n";
-            Term.IntMap.iter (fun i t -> Format.printf "[%d:%a]\n" i Term.pp t) sk_a_subs;
-            Format.printf "Map b:\n";
-         Term.IntMap.iter (fun i t -> Format.printf "[%d:%a]\n" i Term.pp t) sk_b_subs; *)
          let res = (unify_full :> ?subst:unif_subst -> term Scoped.t -> term Scoped.t -> unif_subst)
                   ~subst (Scoped.make sk_a sca) (Scoped.make sk_b scb) in
          let sk_a_rev = Term.IntMap.fold (fun k v acc -> Term.Map.add v k acc) sk_a_subs Term.Map.empty in
@@ -1119,9 +1117,6 @@ module FO = struct
          let subst = Unif_subst.subst res in 
          let mapped = Subst.FO.map (fun t -> Term.DB.unskolemize sk_rev_union t) subst in
          let res' = Unif_subst.make mapped (Unif_subst.constr_l res) in
-
-         (* Format.printf "Res: @[%a@]\n" Unif_subst.pp res'; *)
-
          res'  
       )
       else (
@@ -1137,12 +1132,6 @@ module FO = struct
       if(not (Term.DB.is_closed ta) || not (Term.DB.is_closed tb)) then (
         let sk_a, sk_a_subs = Term.DB.skolemize_loosely_bound ta in
         let sk_b, sk_b_subs = Term.DB.skolemize_loosely_bound tb in
-        (* Format.printf "Skolemized %a into %a.\n" Term.pp ta Term.pp sk_a;
-        Format.printf "Skolemized %a into %a.\n" Term.pp tb Term.pp sk_b;
-        Format.printf "Map a:\n";
-        Term.IntMap.iter (fun i t -> Format.printf "[%d:%a]\n" i Term.pp t) sk_a_subs;
-        Format.printf "Map b:\n";
-        Term.IntMap.iter (fun i t -> Format.printf "[%d:%a]\n" i Term.pp t) sk_b_subs; *)
         let res = (unify_syn :> ?subst:subst -> term Scoped.t -> term Scoped.t -> subst)
                   ~subst (Scoped.make sk_a sca) (Scoped.make sk_b scb) in
         let sk_a_rev = Term.IntMap.fold (fun k v -> Term.Map.add v k) sk_a_subs Term.Map.empty in
@@ -1150,9 +1139,6 @@ module FO = struct
         let sk_rev_union = Term.Map.union (fun _ _ _ -> raise (Invalid_argument "keys must be unique "))
                           sk_a_rev sk_b_rev in
         let res = Subst.FO.map (Term.DB.unskolemize sk_rev_union) res in
-
-        (* Format.printf "Res: %@[%a@]\n" Subst.pp res; *)
-
         res
       )
       else (

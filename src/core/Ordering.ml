@@ -512,6 +512,16 @@ let rpo6 prec =
   in
   { cache_compare; compare; name=RPO6.name; prec; might_flip; cache_might_flip}
 
+let compose f ord =
+  {ord with 
+    compare = 
+      fun prec a b ->
+        let f_res = f a b in
+        if Comparison.equal Comparison.Eq f_res then (
+          ord.compare prec a b
+        ) else f_res
+      }
+
 let dummy_cache_ = CCCache.dummy
 
 let none =

@@ -59,6 +59,11 @@ val kbo : Precedence.t -> t
 val rpo6 : Precedence.t -> t
 (** Efficient implementation of RPO (recursive path ordering) *)
 
+val compose : (term -> term -> Comparison.t) -> t -> t
+(** Takes a function that is going to be run before the chosen order and the order.
+    If the first argument returns Comparison.Eq, then the order determined by second arg.
+    Otherwise, the result of the first argument is returned. *) 
+
 val none : t
 (** All terms are incomparable (equality still works).
     Not a simplification ordering. *)
