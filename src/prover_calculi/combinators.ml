@@ -330,7 +330,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       | T.AppBuiltin _ | T.App _ -> 
         let hd_mono, args = T.as_app_mono t in
         assert(not @@ T.is_fun hd_mono);
-        CCFormat.printf "hd_m:@[%a@]; ty:@[%a@]@." T.pp hd_mono Ty.pp (T.ty hd_mono);
         let hd_conv =
           if T.is_app hd_mono || T.is_appbuiltin hd_mono then (
             let beta = Term.of_ty @@ T.ty hd_mono in
@@ -362,9 +361,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         abstract ~bvar_ty:(Term.of_ty ty) body'
       | _ ->  t in
     let reduced = Lambda.eta_reduce @@ Lambda.snf @@ t in
-    CCFormat.printf "abf(@[%a@])=" T.pp reduced;
     let res = aux reduced in
-    CCFormat.printf "@.    @[%a@]@." T.pp res;
     res
 
 

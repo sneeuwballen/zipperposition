@@ -272,6 +272,18 @@ let as_app_mono t = match view t with
   | App (f,l) ->
     let l1,l2 = CCList.partition is_type l in
     app f l1, l2 (* re-apply to type parameters *)
+  | AppBuiltin((Builtin.Eq | Builtin.Neq) as b, (x :: rest as l)) ->
+    let l = if is_type x then rest else l in
+    begin match l with
+    | y :: _ ->
+      let eq_ty = Type.arrow [ty y; ty y] Type.prop in
+      app_builtin ~ty:eq_ty b [], l
+    | [] ->
+      assert(is_type x);
+      let eq_ty = 
+        Type.arrow [Type.of_term_unsafe (x:>InnerTerm.t); 
+                    Type.of_term_unsafe (x:>InnerTerm.t)] Type.prop in
+      app_builtin ~ty:eq_ty b [], [] end
   | AppBuiltin(b, l) ->
     let ty_args, args = CCList.partition is_type l in
     let ty = Type.arrow (List.map ty args) (ty t) in 

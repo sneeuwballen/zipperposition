@@ -211,10 +211,13 @@ let rec app_builtin ~ty b l = match b, l with
       let err_msg = CCFormat.sprintf "wrong encoding of quants: %a %d" Builtin.pp b (List.length l) in
       invalid_arg err_msg;
     );
+    assert(not (Builtin.is_quantifier b && CCList.is_empty l) ||
+           List.length @@ fst @@ open_fun ty =1);
     let my_t = make_ ~ty:(HasType ty) (AppBuiltin (b,l)) in
     H.hashcons my_t
 
-let arrow l r = app_builtin ~ty:tType Builtin.arrow (r :: l)
+let arrow l r =
+  app_builtin ~ty:tType Builtin.arrow (r :: l)
 
 let app ~ty f l = match f.term, l with
   | _, [] -> f
@@ -225,7 +228,7 @@ let app ~ty f l = match f.term, l with
   | AppBuiltin (f1, l1), _ ->
     (* flatten *)
     let flattened = l1 @ l in
-    let ty = 
+    let ty =
       if Builtin.is_logical_op f1 then (
         let prop = builtin ~ty:tType Builtin.Prop in
 
@@ -922,6 +925,17 @@ let rec pp_depth ?(hooks=[]) depth out t =
         (_pp_surrounded depth) ret
     | AppBuiltin((Builtin.ExistsConst | Builtin.ForallConst) as b, [x;body]) ->
       Format.fprintf out "%a %a. %a" Builtin.pp b (_pp depth) x (_pp depth) body;
+    | AppBuiltin((Builtin.Eq | Builtin.Neq) as b,  x :: rest) ->
+      let l = 
+        if is_a_type x then (
+          CCFormat.printf "(%a::%a) " Builtin.pp b (_pp depth) x;
+          rest
+        ) else (
+          CCFormat.printf "%a " Builtin.pp b;
+          x :: rest
+        ) in
+      let sep = CCFormat.sprintf " %s " (Builtin.TPTP.to_string b) in
+      Format.fprintf out " @[%a@]" (Util.pp_list ~sep (_pp depth)) l
     | AppBuiltin (b, ([_;a] | [a])) when Builtin.is_prefix b ->
       Format.fprintf out "@[<1>%a %a@]" Builtin.pp b (_pp depth) a
     | AppBuiltin (b, l) when Builtin.is_infix b && List.length l >= 2 ->
