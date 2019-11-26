@@ -2626,31 +2626,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.exit_prof prof_clc;
     res
 
-  let inject_destruct lit =
-    let rec destruct l r = (try
-        let l_hd, l_args = T.as_app l in
-        let r_hd, r_args = T.as_app r in
-        let s_sym, t_sym = T.as_const_exn l_hd, T.as_const_exn r_hd in
-        if s_sym = t_sym && List.length l_args = List.length r_args then (
-          let idxs = CCList.range 0 (List.length l_args - 1) in
-          let zipped_args = List.combine l_args r_args in
-          let zipped_idx = List.combine idxs zipped_args in
-          let diffs = CCList.filter_map (fun (i, (s_i, t_i)) ->
-               if not (T.equal s_i t_i) then Some (i, s_i, t_i)
-               else None) zipped_idx in
-          if CCList.length diffs = 1 then (
-            let (i, s_i, t_i) = CCList.hd diffs in
-            if (Env.Ctx.is_injective_for_arg s_sym i)
-            then Some(Literal.mk_neq s_i t_i,[],[])
-            else destruct s_i t_i
-          ) else None
-        ) else None
-      with Invalid_argument _ -> None) in
-    match Literal.View.as_eqn lit with
-    | Some (l, r, false) ->
-       destruct l r
-    | _ -> None
-
   (* ----------------------------------------------------------------------
    * contraction (condensation)
    * ---------------------------------------------------------------------- *)
@@ -2890,7 +2865,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     then Env.add_is_trivial is_semantic_tautology;
     Env.add_is_trivial is_trivial;
     Env.add_lit_rule "distinct_symbol" handle_distinct_constants;
-    (* Env.add_lit_rule "inject_destruct" inject_destruct; *)
     setup_dot_printers ();
     ()
 end
