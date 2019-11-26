@@ -219,60 +219,62 @@ let to_string = CCFormat.to_string pp
 
 let apply_aux ~sv subst ~f_rename t sc =
   let rec aux t sc_t depth =
-    match T.ty t with
-      | T.NoType ->
-        assert(T.equal T.tType t);
-        t
-      | T.HasType ty ->
-        let ty' = aux ty sc_t depth in
-        let res =
-          begin match T.view t with
-            | T.Const id ->
-              (* regular constant *)
-              if T.equal ty ty'
-              then t
-              else T.const ~ty:ty' id
-            | T.DB i ->
-              if T.equal ty ty'
-              then t
-              else T.bvar ~ty:ty' i
-            | T.Var v ->
-              (* the most interesting cases!
-                 switch depending on whether [t] is bound by [subst] or not *)
-              begin match find_exn subst (v,sc_t) with
-                | (t',sc') ->
-                  (* NOTE: if [t'] is not closed, we assume that it
-                     is always replaced in a context where variables
-                     are properly bound. Typically, that means only
-                     in rewriting. *)
-                  (* also apply [subst] to [t'] *)
-                  let shifted = if sv != -1 then T.DB.shift depth t' else t' in
-                  aux shifted sc' depth
-                | exception Not_found ->
-                  (* rename the variable using [f_rename] *)
-                  let v' = f_rename (v,sc_t) ty' in
-                  T.var v'
-              end
-            | T.Bind (s, varty, sub_t) ->
-              let varty' = aux varty sc_t (depth+1) in
-              let sub_t' = aux sub_t sc_t (depth+1) in
-              let res = T.bind ~varty:varty' ~ty:ty' s sub_t' in
-              (* Util.debugf 1 ("Before body: %a, after body: %a") *)
-              (* (fun k -> k T.pp t T.pp res); res *)
-              res
-            | T.App (hd, l) ->
-              let hd' = aux hd sc_t depth in
-              let l' = aux_list l sc_t depth in
-              if T.equal ty ty' && T.equal hd hd' && T.same_l l l'
-              then t
-              else T.app ~ty:ty' hd' l'
-            | T.AppBuiltin (s, l) ->
-              let l' = aux_list l sc_t depth in
-              if T.equal ty ty' && T.same_l l l'
-              then t
-              else T.app_builtin ~ty:ty' s l'
-          end in
-        res
+    if T.is_ground t then t
+    else (
+      match T.ty t with
+        | T.NoType ->
+          assert(T.equal T.tType t);
+          t
+        | T.HasType ty ->
+          let ty' = aux ty sc_t depth in
+          let res =
+            begin match T.view t with
+              | T.Const id ->
+                (* regular constant *)
+                if T.equal ty ty'
+                then t
+                else T.const ~ty:ty' id
+              | T.DB i ->
+                if T.equal ty ty'
+                then t
+                else T.bvar ~ty:ty' i
+              | T.Var v ->
+                (* the most interesting cases!
+                  switch depending on whether [t] is bound by [subst] or not *)
+                begin match find_exn subst (v,sc_t) with
+                  | (t',sc') ->
+                    (* NOTE: if [t'] is not closed, we assume that it
+                      is always replaced in a context where variables
+                      are properly bound. Typically, that means only
+                      in rewriting. *)
+                    (* also apply [subst] to [t'] *)
+                    let shifted = if sv != -1 then T.DB.shift depth t' else t' in
+                    aux shifted sc' depth
+                  | exception Not_found ->
+                    (* rename the variable using [f_rename] *)
+                    let v' = f_rename (v,sc_t) ty' in
+                    T.var v'
+                end
+              | T.Bind (s, varty, sub_t) ->
+                let varty' = aux varty sc_t (depth+1) in
+                let sub_t' = aux sub_t sc_t (depth+1) in
+                let res = T.bind ~varty:varty' ~ty:ty' s sub_t' in
+                (* Util.debugf 1 ("Before body: %a, after body: %a") *)
+                (* (fun k -> k T.pp t T.pp res); res *)
+                res
+              | T.App (hd, l) ->
+                let hd' = aux hd sc_t depth in
+                let l' = aux_list l sc_t depth in
+                if T.equal ty ty' && T.equal hd hd' && T.same_l l l'
+                then t
+                else T.app ~ty:ty' hd' l'
+              | T.AppBuiltin (s, l) ->
+                let l' = aux_list l sc_t depth in
+                if T.equal ty ty' && T.same_l l l'
+                then t
+                else T.app_builtin ~ty:ty' s l'
+            end in
+          res)
   and aux_list l sc depth = match l with
     | [] -> []
     | [t1] -> [aux t1 sc depth]

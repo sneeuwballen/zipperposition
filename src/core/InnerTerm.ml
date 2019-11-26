@@ -3,11 +3,70 @@
 
 (** {1 Inner Terms} *)
 
+module I = Int32
+
+let zero = I.zero
+
+let (<<<) = I.shift_left
+let (>>>) = I.shift_right_logical
+let (&&&) = I.logand
+let (|||) = I.logor
+let (~~~) = I.lognot
+
+(* flags for propetries
+   flag is set if for any subterm the corresponding property holds *)
+let f_has_freevars = I.one 
+let f_is_beta_reducible = f_has_freevars <<< 1
+let f_is_eta_reducible = f_is_beta_reducible <<< 1
+
+(* From 16th bit onwards, we will keep the maximum 
+   De Bruijn variable seen so far. *)
+
+(* If DB has more than 16 bits (very unlikely),
+   then we set a bit that forces to recompute the property *)
+let f_db_overflowed = f_is_eta_reducible <<< 1
+let f_db_mask = (~~~ zero) <<< 16
+let max_db = I.to_int (f_db_mask >>> 16)
+
+let set_property props prop_flag =
+  props ||| prop_flag
+
+let unset_property props prop_flag =
+  props &&& (~~~ prop_flag)
+
+let get_property props prop_flag = 
+  not @@ I.equal zero (props &&& prop_flag)
+
+let dec_max_db props =
+  let max_db_val = I.to_int ((props &&& f_db_mask) >>> 16) in
+  let cleared = props &&& (~~~ f_db_mask) in
+  let max_db_val = (I.of_int @@ max_db_val - 1) <<< 16 in
+  cleared ||| max_db_val
+
+let update_max_db props new_db =
+  if new_db > max_db then (
+    set_property props f_db_overflowed 
+  ) else (
+    let max_db_val = 
+      max (I.to_int ((props &&& f_db_mask) >>> 16)) new_db in
+    (props &&& (~~~ f_db_mask)) ||| ((I.of_int max_db_val) <<< 16))
+
+let get_max_db props =
+  I.to_int ((props &&& f_db_mask) >>> 16)
+
+(* Properties that should be set if they are set for ANY of the subterms *)
+let any_props = f_is_beta_reducible ||| f_is_eta_reducible ||| f_has_freevars
+(* Properties that should be set if they are set for ALL of the subterms *)
+let all_props = zero (* currently no props like that -- is_closed computed
+                        by looking at the value of max_db *)
+
+
 type t = {
   term : view;
   ty : type_result;
   mutable id : int;
   mutable payload: exn;
+  props: I.t;
   ho_weight : int lazy_t;
 }
 
@@ -25,6 +84,11 @@ and type_result =
   | HasType of t
 
 type term = t
+
+let any_props_for_ts =
+  List.fold_left (fun acc t -> 
+    (any_props &&& t.props) ||| acc
+  ) zero
 
 let[@inline] view t = t.term
 let[@inline] ty t = t.ty
@@ -47,6 +111,10 @@ let same_l l1 l2 = match l1, l2 with
   | [t1], [t2] -> equal t1 t2
   | [t1;u1], [t2;u2] -> equal t1 t2 && equal u1 u2
   | _ -> same_l_rec l1 l2
+
+let [@inline] ty_is_fun ty = match view ty with
+  | AppBuiltin (Builtin.Arrow, ret :: args) -> List.length args != 0
+  | _ -> false
 
 let same_l_gen l1 l2 =
   List.length l1 == List.length l2 && same_l l1 l2
@@ -143,6 +211,7 @@ let rec open_bind b t = match view t with
   | _ -> [], t
 
 let[@inline] is_var t = match view t with | Var _ -> true | _ -> false
+let[@inline] is_lam t = match view t with | Bind(Binder.Lambda,_,_) -> true | _ -> false
 
 let ho_weight_ t t_ty = 
   let rec aux t t_ty = 
@@ -172,21 +241,24 @@ let ho_weight_ t t_ty =
 
 let[@inline] ho_weight t = Lazy.force t.ho_weight
 
-let make_ ~ty term =
+let make_ ~props ~ty term  =
   { term; ty; id = ~-1; payload=No_payload;
-    ho_weight = lazy (ho_weight_ term ty) }
+    props; ho_weight = lazy (ho_weight_ term ty) }
 
 let const ~ty s =
-  let my_t = make_ ~ty:(HasType ty) (Const s) in
+  let props = 
+    if ty_is_fun ty then set_property f_is_eta_reducible zero else zero in
+  let my_t = make_ ~props ~ty:(HasType ty) (Const s) in
   H.hashcons my_t
 
-
 let builtin ~ty b =
-  let my_t = make_ ~ty:(HasType ty) (AppBuiltin (b,[])) in
+  let props = 
+    if ty_is_fun ty then set_property f_is_eta_reducible zero else zero in
+  let my_t = make_ ~props ~ty:(HasType ty) (AppBuiltin (b,[])) in
   H.hashcons my_t
 
 let tType =
-  let my_t = make_ ~ty:NoType (AppBuiltin(Builtin.TType, [])) in
+  let my_t = make_ ~props:zero ~ty:NoType (AppBuiltin(Builtin.TType, [])) in
   H.hashcons my_t
 
 let rec app_builtin ~ty b l = match b, l with
@@ -201,14 +273,16 @@ let rec app_builtin ~ty b l = match b, l with
   | Builtin.Not, [{term=AppBuiltin(Builtin.False,[]); _}] ->
     app_builtin ~ty Builtin.True []
   | _ ->
-    
     let l = if Builtin.is_quantifier b then 
           List.filter (fun t -> not @@ equal (ty_exn t) tType) l else l in
     if Builtin.is_quantifier b  && CCList.length l > 1 then (
       let err_msg = CCFormat.sprintf "wrong encoding of quants: %a %d" Builtin.pp b (List.length l) in
       invalid_arg err_msg;
     );
-    let my_t = make_ ~ty:(HasType ty) (AppBuiltin (b,l)) in
+    let props = any_props_for_ts l in
+    let props = 
+      if ty_is_fun ty then set_property f_is_eta_reducible props else props in
+    let my_t = make_ ~props ~ty:(HasType ty) (AppBuiltin (b,l)) in
     H.hashcons my_t
 
 let arrow l r = app_builtin ~ty:tType Builtin.arrow (r :: l)
@@ -217,7 +291,14 @@ let app ~ty f l = match f.term, l with
   | _, [] -> f
   | App (f1, l1), _::_ ->
     (* flatten *)
-    let my_t = make_ ~ty:(HasType ty) (App (f1,l1 @ l)) in
+    let flattened = l1 @ l in
+    let props = 
+      unset_property f_is_eta_reducible (any_props_for_ts (f1 :: flattened)) in
+    let props = 
+      if ty_is_fun ty then set_property f_is_eta_reducible props else props in
+    let props =
+      if is_lam f then set_property f_is_beta_reducible props else props in
+    let my_t = make_ ~props ~ty:(HasType ty) (App (f1,flattened)) in
     H.hashcons my_t
   | AppBuiltin (f1, l1), _ ->
     (* flatten *)
@@ -233,21 +314,34 @@ let app ~ty f l = match f.term, l with
         else arrow [prop] prop
       ))
      else ty in
-    let my_t = make_ ~ty:(HasType ty) (AppBuiltin (f1,flattened)) in
+    let props = any_props_for_ts flattened in
+    let props = 
+      if ty_is_fun ty then set_property f_is_eta_reducible props else props in
+    let my_t = make_ ~props ~ty:(HasType ty) (AppBuiltin (f1,flattened)) in
     H.hashcons my_t
   | _ ->
-    let my_t = make_ ~ty:(HasType ty) (App (f,l)) in
+    let props = 
+      unset_property f_is_eta_reducible (any_props_for_ts (f :: l)) in
+    let props = 
+      if ty_is_fun ty then set_property f_is_eta_reducible props else props in
+    let props =
+      if is_lam f then set_property f_is_beta_reducible props else props in
+    let my_t = make_ ~props ~ty:(HasType ty) (App (f,l)) in
     H.hashcons my_t
 
-let var v = H.hashcons (make_ ~ty:(HasType (HVar.ty v)) (Var v))
+let var v = 
+  let props = set_property f_has_freevars zero in
+  H.hashcons (make_ ~props ~ty:(HasType (HVar.ty v)) (Var v))
 
 let bvar ~ty i =
   if i<0 then raise (IllFormedTerm "bvar");
-  H.hashcons (make_ ~ty:(HasType ty) (DB i))
+  let max_db = i+1 in
+  let props = update_max_db zero max_db in
+  H.hashcons (make_ ~props ~ty:(HasType ty) (DB i))
 
 let bind ~ty ~varty s t' =
-  H.hashcons (make_ ~ty:(HasType ty) (Bind (s, varty, t')))
-
+  let props = dec_max_db t'.props in
+  H.hashcons (make_ ~props ~ty:(HasType ty) (Bind (s, varty, t')))
 
 let cast ~ty old = match old.term with
   | Var v -> var (HVar.cast v ~ty)
@@ -264,6 +358,9 @@ let[@inline] is_app t = match view t with | App _ -> true | _ -> false
 let[@inline] is_tType t = match view t with AppBuiltin (Builtin.TType, _) -> true | _ -> false
 
 let[@inline] is_lambda t = match view t with Bind (Binder.Lambda, _, _) -> true | _ -> false
+
+let[@inline] is_eta_reducible t = get_property f_is_eta_reducible t.props
+let[@inline] is_beta_reducible t = get_property f_is_beta_reducible t.props
 
 (** {3 Payload} *)
 
@@ -343,9 +440,17 @@ module DB = struct
   let[@inline] _id x = x
 
   let closed t =
-    _to_seq ~depth:0 t
-    |> Iter.map (fun (bvar,depth) -> bvar < depth)
-    |> Iter.for_all _id
+    let db_calc t = 
+      _to_seq ~depth:0 t
+      |> Iter.map (fun (bvar,depth) -> bvar < depth)
+      |> Iter.for_all _id in
+    if get_property f_db_overflowed t.props then (
+      db_calc t 
+    ) else (
+      let res = (get_max_db t.props) - 1 == 0 in
+      assert(res == db_calc t);
+      res
+    )
 
   (* check whether t contains the De Bruijn symbol n *)
   let contains t n =
@@ -784,7 +889,10 @@ let rec expected_ty_vars ty = match view ty with
   | Bind (Binder.ForallTy, _, ty') -> 1 + expected_ty_vars ty'
   | _ -> 0
 
-let is_ground t = Iter.is_empty (Seq.vars t)
+let is_ground t = 
+  assert (Iter.is_empty (Seq.vars t) == 
+    not (get_property f_has_freevars t.props));
+  not @@ get_property f_has_freevars t.props
 
 (** {3 Misc} *)
 
