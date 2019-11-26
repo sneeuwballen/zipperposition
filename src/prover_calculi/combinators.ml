@@ -18,6 +18,7 @@ module type S = sig
 
   (** {6 Registration} *)
   val setup : unit -> unit
+  val maybe_conv_lams : Env.C.t -> Env.C.t
 end
 
 (* Helper function for defining combinators *)
@@ -632,6 +633,11 @@ module Make(E : Env.S) : S with module Env = E = struct
                     (Array.to_list lits') proof in
         SimplM.return_new new_
       )
+
+    let maybe_conv_lams c =
+      if E.flex_get k_enable_combinators then (
+        SimplM.get (lams2combs_otf c)
+      ) else c
 
     let convert_and_narrow c =
       let open SimplM.Infix in

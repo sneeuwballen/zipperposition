@@ -75,6 +75,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
   module C = Env.C
   module Ctx = Env.Ctx
+  module Combs = Combinators.Make(E)
 
 
   (* index for ext-neg, to ensure α-equivalent negative equations have the same skolems *)
@@ -741,7 +742,10 @@ module Make(E : Env.S) : S with module Env = E = struct
                 insantiate_choice ~inst_vars:false 
                                   ~choice_ops:(ref (Term.Set.singleton sym)) 
                                   pas_cl
-                )) in
+                ))
+            |> Iter.map Combs.maybe_conv_lams
+          in
+          
           Env.add_passive new_cls;
           C.mark_redundant c;
           true
