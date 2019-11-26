@@ -441,6 +441,11 @@ module TPTP = struct
     | "$lesseq" -> Lesseq
     | "$greater" -> Greater
     | "$greatereq" -> Greatereq
+    | "$B" -> BComb
+    | "$S" -> SComb
+    | "$C" -> CComb
+    | "$K" -> KComb
+    | "$I" -> IComb
     | _ -> raise NotABuiltin
 
   let fixity = function

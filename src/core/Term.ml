@@ -1005,7 +1005,7 @@ module TPTP = struct
           then List.filter (fun t -> not @@ is_type t) l 
           else l in
         if CCList.is_empty l then Format.fprintf out "@[%a@]" Builtin.pp b 
-        else Format.fprintf out "(@[<hov2>%a@ %a@])" Builtin.TPTP.pp b (Util.pp_list pp_rec) l
+        else Format.fprintf out "(@[%a(%a)@])" Builtin.TPTP.pp b (Util.pp_list pp_rec) l
       | Const s -> ID.pp_tstp out s
       | App (f, l) ->
         Format.fprintf out "@[<hov2>%a(@,%a)@]" pp_rec f
