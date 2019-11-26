@@ -470,8 +470,8 @@ let ho_weight = T.ho_weight
 
 let is_ground t = T.is_ground t
 
-let is_eta_reducible t = T.is_eta_reducible t
 let is_beta_reducible t = T.is_beta_reducible t
+let has_lambda t = T.has_lambda t
 
 let of_term_unsafe t = t
 let of_term_unsafe_l l = l

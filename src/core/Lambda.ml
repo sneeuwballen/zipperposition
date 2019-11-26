@@ -205,7 +205,7 @@ module Inner = struct
         ) else 0, t
       ) in
     let rec aux t =
-      if T.is_eta_reducible t then (      
+      if T.has_lambda t then (      
         match T.ty t with
         | T.NoType -> t
         | T.HasType ty ->

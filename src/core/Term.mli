@@ -202,8 +202,8 @@ val is_ground : t -> bool (** is the term ground? (no free vars) *)
 val is_linear : t -> bool (** is the term linear? (no vars occuring multiple times) *)
 val monomorphic : t -> bool (** true if the term contains no type var *)
 
-val is_eta_reducible : t -> bool
 val is_beta_reducible : t -> bool
+val has_lambda : t -> bool
 
 val max_var : VarSet.t -> int (** find the maximum variable *)
 
