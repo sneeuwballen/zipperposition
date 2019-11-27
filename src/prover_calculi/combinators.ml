@@ -121,7 +121,7 @@ let [@inline] term_has_comb ~comb t =
   of a combinator *)
 let [@inline] unpack_comb t =
   match T.view t with 
-  | T.AppBuiltin(hd, args) when T.hd_is_comb hd ->
+  | T.AppBuiltin(hd, args) when Builtin.is_combinator hd ->
     let ty_args, real_args = List.partition Term.is_type args in
     (hd, ty_args, real_args)
   | _ -> raise IsNotCombinator
@@ -322,18 +322,20 @@ let max_weak_reduction_length t =
     | T.App (hd, l) ->
       aux_l (hd :: l)
     | T.AppBuiltin(b, l) when Builtin.is_combinator b ->
-      let c_kind, _, args =  unpack_comb t in
-      begin match c_kind with 
-      | Builtin.IComb ->
-        if CCList.is_empty args then 0
-        else 1 + narrow_one t
-      | Builtin.KComb ->
-        if CCList.length args < 2 then aux_l args
-        else 1 + (aux (List.nth args 1)) + narrow_one t
-      | Builtin.SComb | Builtin.CComb | Builtin.BComb -> 
-        if CCList.length args < 3 then aux_l args
-        else 1 + narrow_one t  
-      | _ -> invalid_arg "only combinators are supported" end
+      if T.is_ground t then (
+        let c_kind, _, args =  unpack_comb t in
+        begin match c_kind with 
+        | Builtin.IComb ->
+          if CCList.is_empty args then 0
+          else 1 + narrow_one t
+        | Builtin.KComb ->
+          if CCList.length args < 2 then aux_l args
+          else 1 + (aux (List.nth args 1)) + narrow_one t
+        | Builtin.SComb | Builtin.CComb | Builtin.BComb -> 
+          if CCList.length args < 3 then aux_l args
+          else 1 + narrow_one t  
+        | _ -> invalid_arg "only combinators are supported" end)
+      else 0
     | T.AppBuiltin(_, l) ->
       aux_l l
   and aux_l = function 
