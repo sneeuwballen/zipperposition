@@ -288,26 +288,24 @@ let narrow t =
     match T.view t with 
     | T.Const _ | T.Var _ | T.DB _-> t
     | T.AppBuiltin(hd, args) -> 
-      let args' = List.map do_narrow args in
-      let t =
+      let t' = apply_rw_rules ~rules:narrow_rules t in
+      if T.equal t t' then (
+        (* If no rule is applicable, then this is either not 
+           a combinator or a paritally applied combinator *)
+        let args' = List.map do_narrow args in
         if T.same_l args args' then t
-        else T.app_builtin ~ty:(T.ty t) hd args' in
-      narrow_head t
+        else T.app_builtin hd args' ~ty:(T.ty t)
+      ) else (incr steps; do_narrow t')
     | T.App(hd, args) ->
       let hd' = do_narrow hd and args' = List.map do_narrow args in
-      let t = 
-        if T.equal hd hd' && T.same_l args args' then t
-        else T.app hd' args' in
-      narrow_head t
+      if T.equal hd hd' && T.same_l args args' then t
+      else T.app hd' args'
     | T.Fun _ ->
       let tys, body = T.open_fun t in
       let body' = do_narrow body in
       if T.equal body body' then t
-      else T.fun_l tys body'
-  and narrow_head t =
-    let t' = apply_rw_rules ~rules:narrow_rules t in
-    if T.equal t t' then t
-    else (incr steps; do_narrow t') in
+      else T.fun_l tys body' 
+    in
   do_narrow t, !steps
 
 let max_weak_reduction_length t =
