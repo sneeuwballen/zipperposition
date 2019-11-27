@@ -317,8 +317,8 @@ let max_weak_reduction_length t =
       invalid_arg err_msg
     | T.Const _ | T.Var _ ->
       0
-    | T.App (hd, l) ->
-      aux_l (hd :: l)
+    | T.App (hd, l)->
+      if T.is_var hd then 0 else aux_l (hd :: l)
     | T.AppBuiltin(b, l) when Builtin.is_combinator b ->
       if T.is_ground t then (
         let c_kind, _, args =  unpack_comb t in
@@ -401,47 +401,6 @@ let abf ~rules t =
   res
 
 
-exception E_i of Statement.clause_t
-let pp_in pp_f pp_t pp_ty = function
-  | Output_format.O_zf -> Statement.ZF.pp pp_f pp_t pp_ty
-  | Output_format.O_tptp -> Statement.TPTP.pp pp_f pp_t pp_ty
-  | Output_format.O_normal -> Statement.pp pp_f pp_t pp_ty
-  | Output_format.O_none -> CCFormat.silent
-let pp_clause_in o =
-  let pp_term = T.pp_in o in
-  let pp_type = Type.pp_in o in
-  pp_in (Util.pp_list ~sep:" ∨ " (SLiteral.pp_in o pp_term)) pp_term pp_type o
-
-let result_tc =
-  Proof.Result.make_tc
-    ~of_exn:(function E_i c -> Some c | _ -> None)
-    ~to_exn:(fun i -> E_i i)
-    ~compare:compare
-    ~pp_in:pp_clause_in
-    ~is_stmt:true
-    ~name:Statement.name
-    ~to_form:(fun ~ctx st ->
-      let conv_c c =
-        CCList.to_seq c 
-        |> Iter.flat_map (fun l -> SLiteral.to_seq l)
-        |> Iter.map (fun t -> Term.Conv.to_simple_term ctx t)
-        |> Iter.to_list
-        |> TypedSTerm.Form.or_ in
-      Statement.Seq.forms st
-      |> Iter.map conv_c
-      |> Iter.to_list
-      |> TypedSTerm.Form.and_)
-    ()
-
-
-let encode_lit ~rules l =
-  SLiteral.map (abf ~rules) l
-
-let rec encode_clause ~rules = function 
-  | [] -> []
-  | l :: ls -> 
-    encode_lit ~rules l :: encode_clause ~rules ls
-
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
   module C = Env.C
@@ -462,42 +421,16 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> has_lams_aux
 
     let enocde_stmt st =
-      let rules = curry_optimizations in
-      let rule = Proof.Rule.mk "lambdas_to_combs" in
-      let as_proof = 
-        Proof.S.mk (Statement.proof_step st) (Proof.Result.make result_tc st) in
-      let proof = 
-        Proof.Step.esa ~rule [Proof.Parent.from as_proof] in
-      let rec clause_eq = function 
-        | [], [] -> true 
-        | l1 :: l1s, l2 :: l2s -> SLiteral.equal T.equal l1 l2 && clause_eq (l1s, l2s) 
-        | _, _ -> false in
-        
-
-      match Statement.view st with
-      | Statement.Def _ | Statement.Rewrite _ | Statement.Data _ 
-      | Statement.Lemma _ | Statement.TyDecl _ -> E.cr_skip
-      | Statement.Goal lits | Statement.Assert lits ->
-        let lits' = encode_clause ~rules lits in
-        if clause_eq (lits,lits') then  E.cr_skip
-        else (
-          let res = E.C.of_forms ~trail:Trail.empty lits' proof in
-          (* assert (not @@ has_lams_c res); *)
-          E.cr_return @@ [res])
-      | Statement.NegatedGoal (skolems,clauses) -> 
-        let encoded = ref false in
-        let clauses' = 
-          List.map (fun c ->
-            let c' = encode_clause ~rules c in
-            if not @@ clause_eq (c,c') 
-            then encoded := true;
-
-            let res = E.C.of_forms ~trail:Trail.empty c' proof in
-            (* assert(not @@ has_lams_c res); *)
-            res) 
-          clauses in
-        if !encoded then E.cr_return clauses'
-        else E.cr_skip
+      let rule = Proof.Rule.mk "lams2combs" in
+      E.cr_return @@ List.map (fun c -> 
+        if has_lams_c c then (
+          let proof = Proof.Step.simp [C.proof_parent c] ~rule in
+          let lits' = Literals.map (abf ~rules:curry_optimizations) (C.lits c) in
+          C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
+          (Array.to_list lits') proof
+        ) else c
+      )(E.C.of_statement st)
+      
     
     let comb_narrow c =
       let new_lits = Literals.map (fun t -> fst @@ narrow t) (C.lits c) in
