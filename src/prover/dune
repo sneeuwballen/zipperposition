@@ -1,12 +1,11 @@
-
 (rule
-  (targets const.ml)
-  (action
-    (with-stdout-to %{targets}
-      (progn
-        (echo "let version = \"${version:libzipperposition}\"\n")
-        (echo "let section = Logtk.Util.Section.make \"zip\"\n"))))
-  )
+ (targets const.ml)
+ (action
+  (with-stdout-to
+   %{targets}
+   (progn
+    (echo "let version = \"%{version:libzipperposition}\"\n")
+    (echo "let section = Logtk.Util.Section.make \"zip\"\n")))))
 
 (library
   (name libzipperposition)
