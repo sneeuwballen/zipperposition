@@ -21,11 +21,16 @@
    term in which lambda prefixes are not counted in the weight.
    all other symbols (including bound and free variables)
    take weight of 1  *)
+module I = Int32
+
+
+
 type t = private {
   term : view;
   ty : type_result;
   mutable id : int;
   mutable payload: exn;
+  props: I.t;
   ho_weight : int lazy_t;
 }
 (** Abstract type of term *)
@@ -107,6 +112,9 @@ val is_tType : t -> bool
 val is_lambda : t -> bool
 
 val hashcons_stats : unit -> int*int*int*int*int*int
+
+val is_beta_reducible : t -> bool
+val has_lambda : t -> bool
 
 (** {3 Payload} *)
 

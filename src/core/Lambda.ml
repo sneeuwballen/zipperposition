@@ -104,26 +104,28 @@ module Inner = struct
     ) else t
 
   let rec snf_rec t =
-    let t = whnf_term t in
-    match T.ty t with
-      | T.NoType -> t
-      | T.HasType ty ->
-        begin match T.view t with
-          | T.App (f, l) ->
-            let f' = snf_rec f in
-            if not (T.equal f f') then snf_rec (T.app ~ty f' l)
-            else (
+    if T.is_beta_reducible t then (
+      let t = whnf_term t in
+      match T.ty t with
+        | T.NoType -> t
+        | T.HasType ty ->
+          begin match T.view t with
+            | T.App (f, l) ->
+              let f' = snf_rec f in
+              if not (T.equal f f') then snf_rec (T.app ~ty f' l)
+              else (
+                let l' = List.map snf_rec l in
+                if T.equal f f' && T.same_l l l' then t else T.app ~ty f' l'
+              )
+            | T.AppBuiltin (b, l) ->
               let l' = List.map snf_rec l in
-              if T.equal f f' && T.same_l l l' then t else T.app ~ty f' l'
-            )
-          | T.AppBuiltin (b, l) ->
-            let l' = List.map snf_rec l in
-            if T.same_l l l' then t else T.app_builtin ~ty b l'
-          | T.Var _ | T.Const _ | T.DB _ -> t
-          | T.Bind (b, varty, body) ->
-            let body' = snf_rec body in
-            if T.equal body body' then t else T.bind b ~ty ~varty body'
-        end
+              if T.same_l l l' then t else T.app_builtin ~ty b l'
+            | T.Var _ | T.Const _ | T.DB _ -> t
+            | T.Bind (b, varty, body) ->
+              let body' = snf_rec body in
+              if T.equal body body' then t else T.bind b ~ty ~varty body'
+          end) 
+    else t
 
   let eta_expand_rec t =
     let rec aux t = match T.ty t with
@@ -202,31 +204,34 @@ module Inner = struct
           m, T.DB.unshift m (T.app ~ty:(ty :> T.t) hd args)
         ) else 0, t
       ) in
-    let rec aux t =  match T.ty t with
-      | T.NoType -> t
-      | T.HasType ty ->
-        begin match T.view t with
-          | T.Var _ | T.DB _ | T.Const _ -> t
-          | T.Bind(Binder.Lambda,_,_) ->
-            let pref, body = T.open_bind Binder.Lambda t in
-            let body' = if full then aux body else body in
-            let n, reduced = q_reduce ~pref_len:(List.length pref) body' in
-            assert(Type.equal (Type.of_term_unsafe @@ T.ty_exn body) (Type.of_term_unsafe @@ T.ty_exn body'));
-            if n = 0 && T.equal body body' then t
-            else (
-              T.fun_l (CCList.take (List.length pref - n) pref) reduced
-            )
-          | T.Bind(_,_,_) -> t
-          | T.App (_,[]) -> assert false
-          | T.App (f, l) ->
-            let f' = aux f in
-            let l' = List.map aux l in
-            if T.equal f f' && T.same_l l l'
-            then t
-            else T.app ~ty (aux f) (List.map aux l)
-          | T.AppBuiltin (b,l) ->
-            T.app_builtin ~ty b (List.map aux l)
-        end
+    let rec aux t =
+      if T.has_lambda t then (      
+        match T.ty t with
+        | T.NoType -> t
+        | T.HasType ty ->
+          begin match T.view t with
+            | T.Var _ | T.DB _ | T.Const _ -> t
+            | T.Bind(Binder.Lambda,_,_) ->
+              let pref, body = T.open_bind Binder.Lambda t in
+              let body' = if full then aux body else body in
+              let n, reduced = q_reduce ~pref_len:(List.length pref) body' in
+              assert(Type.equal (Type.of_term_unsafe @@ T.ty_exn body) (Type.of_term_unsafe @@ T.ty_exn body'));
+              if n = 0 && T.equal body body' then t
+              else (
+                T.fun_l (CCList.take (List.length pref - n) pref) reduced
+              )
+            | T.Bind(_,_,_) -> t
+            | T.App (_,[]) -> assert false
+            | T.App (f, l) ->
+              let f' = aux f in
+              let l' = List.map aux l in
+              if T.equal f f' && T.same_l l l'
+              then t
+              else T.app ~ty (aux f) (List.map aux l)
+            | T.AppBuiltin (b,l) ->
+              T.app_builtin ~ty b (List.map aux l)
+          end)
+      else t
     in
     let t' = aux t in
     t'

@@ -86,11 +86,7 @@ module Make(E : Env.S) = struct
   let[@inline] check_clause_ c = 
     if !_check_types then Env.C.check_types c;
     assert (Env.C.Seq.terms c |> Iter.for_all Term.DB.is_closed);
-    if not (Env.C.lits c |> Literals.vars_distinct) then (
-      CCFormat.printf "diff vars: %a:%d.\n" Env.C.pp_tstp c (Env.C.proof_depth c);
-      CCFormat.printf "proof : %a.\n" Proof.S.pp_tstp (Env.C.proof c);
-      assert(false);
-    );
+    assert (Env.C.lits c |> Literals.vars_distinct);
     if Env.flex_get k_enable_combinators &&
        not (Env.C.Seq.terms c 
             |> Iter.flat_map (fun t -> Term.Seq.subterms ~include_builtin:true ~ignore_head:false t)

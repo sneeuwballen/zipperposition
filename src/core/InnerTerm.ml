@@ -3,11 +3,76 @@
 
 (** {1 Inner Terms} *)
 
+module I = Int32
+
+let zero = I.zero
+
+let (<<<) = I.shift_left
+let (>>>) = I.shift_right_logical
+let (&&&) = I.logand
+let (|||) = I.logor
+let (~~~) = I.lognot
+
+(* flags for propetries
+   flag is set if for any subterm the corresponding property holds *)
+let f_has_freevars = I.one 
+let f_is_beta_reducible = f_has_freevars <<< 1
+
+(* From 16th bit onwards, we will keep the maximum 
+   De Bruijn variable seen so far. *)
+
+(* If DB has more than 16 bits (very unlikely),
+   then we set a bit that forces to recompute the property *)
+let f_db_overflowed = f_is_beta_reducible <<< 1
+let f_db_mask = (~~~ zero) <<< 16
+let max_db = I.to_int (f_db_mask >>> 16)
+
+let f_has_lams = f_db_overflowed <<< 1
+
+let set_property props prop_flag =
+  props ||| prop_flag
+
+let unset_property props prop_flag =
+  props &&& (~~~ prop_flag)
+
+let get_property props prop_flag = 
+  not @@ I.equal zero (props &&& prop_flag)
+
+let dec_max_db props =
+  let max_db_val = I.to_int ((props &&& f_db_mask) >>> 16) in
+  let cleared = props &&& (~~~ f_db_mask) in
+  let max_db_val = (I.of_int @@ max (max_db_val - 1) 0) <<< 16 in
+  cleared ||| max_db_val
+
+let update_max_db props new_db =
+  if new_db > max_db then (
+    set_property props f_db_overflowed 
+  ) else (
+    let max_db_val = 
+      max (I.to_int ((props &&& f_db_mask) >>> 16)) new_db in
+    (props &&& (~~~ f_db_mask)) ||| ((I.of_int max_db_val) <<< 16))
+
+let get_max_db props =
+  I.to_int ((props &&& f_db_mask) >>> 16)
+
+(* Properties that should be set if they are set for ANY of the subterms *)
+let any_props = f_is_beta_reducible ||| f_has_freevars ||| f_has_lams
+(* Properties that should be set if they are set for ALL of the subterms *)
+let all_props = zero (* currently no props like that -- is_closed computed
+                        by looking at the value of max_db *)
+
+let debug_props out props =
+  CCFormat.fprintf out "db:%d" (get_max_db props);
+  CCFormat.fprintf out " h_fv:%b" (get_property props f_has_freevars);
+  CCFormat.fprintf out " h_l:%b" (get_property props f_has_lams);
+  CCFormat.fprintf out " beta_r:%b@." (get_property props f_is_beta_reducible);
+
 type t = {
   term : view;
   ty : type_result;
   mutable id : int;
   mutable payload: exn;
+  props: I.t;
   ho_weight : int lazy_t;
 }
 
@@ -25,6 +90,12 @@ and type_result =
   | HasType of t
 
 type term = t
+
+let any_props_for_ts =
+  List.fold_left (fun acc t -> 
+    let new_props = (any_props &&& t.props) ||| acc in
+    update_max_db new_props (get_max_db t.props)
+  ) zero
 
 let[@inline] view t = t.term
 let[@inline] ty t = t.ty
@@ -47,6 +118,10 @@ let same_l l1 l2 = match l1, l2 with
   | [t1], [t2] -> equal t1 t2
   | [t1;u1], [t2;u2] -> equal t1 t2 && equal u1 u2
   | _ -> same_l_rec l1 l2
+
+let [@inline] ty_is_fun ty = match view ty with
+  | AppBuiltin (Builtin.Arrow, ret :: args) -> List.length args != 0
+  | _ -> false
 
 let same_l_gen l1 l2 =
   List.length l1 == List.length l2 && same_l l1 l2
@@ -143,6 +218,7 @@ let rec open_bind b t = match view t with
   | _ -> [], t
 
 let[@inline] is_var t = match view t with | Var _ -> true | _ -> false
+let[@inline] is_lam t = match view t with | Bind(Binder.Lambda,_,_) -> true | _ -> false
 
 let ho_weight_ t t_ty = 
   let rec aux t t_ty = 
@@ -172,21 +248,20 @@ let ho_weight_ t t_ty =
 
 let[@inline] ho_weight t = Lazy.force t.ho_weight
 
-let make_ ~ty term =
+let make_ ~props ~ty term  =
   { term; ty; id = ~-1; payload=No_payload;
-    ho_weight = lazy (ho_weight_ term ty) }
+    props; ho_weight = lazy (ho_weight_ term ty) }
 
 let const ~ty s =
-  let my_t = make_ ~ty:(HasType ty) (Const s) in
+  let my_t = make_ ~props:zero ~ty:(HasType ty) (Const s) in
   H.hashcons my_t
 
-
 let builtin ~ty b =
-  let my_t = make_ ~ty:(HasType ty) (AppBuiltin (b,[])) in
+  let my_t = make_ ~props:zero ~ty:(HasType ty) (AppBuiltin (b,[])) in
   H.hashcons my_t
 
 let tType =
-  let my_t = make_ ~ty:NoType (AppBuiltin(Builtin.TType, [])) in
+  let my_t = make_ ~props:zero ~ty:NoType (AppBuiltin(Builtin.TType, [])) in
   H.hashcons my_t
 
 let open_fun ty = match view ty with
@@ -213,7 +288,8 @@ let rec app_builtin ~ty b l = match b, l with
     );
     assert(not (Builtin.is_quantifier b && CCList.is_empty l) ||
            List.length @@ fst @@ open_fun ty =1);
-    let my_t = make_ ~ty:(HasType ty) (AppBuiltin (b,l)) in
+    let props = any_props_for_ts (ty :: l) in
+    let my_t = make_ ~props ~ty:(HasType ty) (AppBuiltin (b,l)) in
     H.hashcons my_t
 
 let arrow l r =
@@ -223,7 +299,11 @@ let app ~ty f l = match f.term, l with
   | _, [] -> f
   | App (f1, l1), _::_ ->
     (* flatten *)
-    let my_t = make_ ~ty:(HasType ty) (App (f1,l1 @ l)) in
+    let flattened = l1 @ l in
+    let props = (any_props_for_ts (ty :: f1 :: flattened)) in
+    let props =
+      if is_lam f then set_property props f_is_beta_reducible else props in
+    let my_t = make_ ~props ~ty:(HasType ty) (App (f1,flattened)) in
     H.hashcons my_t
   | AppBuiltin (f1, l1), _ ->
     (* flatten *)
@@ -244,21 +324,31 @@ let app ~ty f l = match f.term, l with
           else arrow [prop] prop
         ))
       else ty in
-    let my_t = make_ ~ty:(HasType ty) (AppBuiltin (f1,flattened)) in
+    let props = any_props_for_ts (ty :: flattened) in
+    let my_t = make_ ~props ~ty:(HasType ty) (AppBuiltin (f1,flattened)) in
     H.hashcons my_t
   | _ ->
-    let my_t = make_ ~ty:(HasType ty) (App (f,l)) in
+    let props = any_props_for_ts (ty :: f :: l) in
+    let props =
+      if is_lam f then set_property props f_is_beta_reducible else props in
+    let my_t = make_ ~props ~ty:(HasType ty) (App (f,l)) in
     H.hashcons my_t
 
-let var v = H.hashcons (make_ ~ty:(HasType (HVar.ty v)) (Var v))
+let var v = 
+  let props = set_property zero f_has_freevars in
+  H.hashcons (make_ ~props ~ty:(HasType (HVar.ty v)) (Var v))
 
 let bvar ~ty i =
   if i<0 then raise (IllFormedTerm "bvar");
-  H.hashcons (make_ ~ty:(HasType ty) (DB i))
+  let max_db = i+1 in
+  let props = update_max_db zero max_db in
+  H.hashcons (make_ ~props ~ty:(HasType ty) (DB i))
 
 let bind ~ty ~varty s t' =
-  H.hashcons (make_ ~ty:(HasType ty) (Bind (s, varty, t')))
-
+  let props = set_property t'.props f_has_lams in
+  let props = 
+    if Binder.equal Binder.Lambda s then dec_max_db props else props in
+  H.hashcons (make_ ~props ~ty:(HasType ty) (Bind (s, varty, t')))
 
 let cast ~ty old = match old.term with
   | Var v -> var (HVar.cast v ~ty)
@@ -275,6 +365,7 @@ let[@inline] is_app t = match view t with | App _ -> true | _ -> false
 let[@inline] is_tType t = match view t with AppBuiltin (Builtin.TType, _) -> true | _ -> false
 
 let[@inline] is_lambda t = match view t with Bind (Binder.Lambda, _, _) -> true | _ -> false
+
 
 (** {3 Payload} *)
 
@@ -326,6 +417,13 @@ let rec debugf out t = match view t with
     Format.fprintf out "(@[<1>%a@ %a@ %a@])"
       Binder.pp b debugf varty debugf t'
 
+let[@inline] has_lambda t =
+  get_property t.props f_has_lams
+
+let[@inline] is_beta_reducible t =
+  let res = get_property t.props f_is_beta_reducible in
+  assert(not res || has_lambda t);
+  res
 
 (** {3 De Bruijn} *)
 
@@ -354,9 +452,20 @@ module DB = struct
   let[@inline] _id x = x
 
   let closed t =
-    _to_seq ~depth:0 t
-    |> Iter.map (fun (bvar,depth) -> bvar < depth)
-    |> Iter.for_all _id
+    let db_calc t = 
+      _to_seq ~depth:0 t
+      |> Iter.map (fun (bvar,depth) -> bvar < depth)
+      |> Iter.for_all _id in
+    if get_property t.props f_db_overflowed then (
+      db_calc t 
+    ) else (
+      let res = (get_max_db t.props) = 0 in
+      (* if(res != db_calc t) then (
+        CCFormat.printf "t:@[%a@];max_db:%d@." debugf t (get_max_db t.props);
+        assert(false);
+      ); *)
+      res
+    )
 
   (* check whether t contains the De Bruijn symbol n *)
   let contains t n =
@@ -791,7 +900,13 @@ let rec expected_ty_vars ty = match view ty with
   | Bind (Binder.ForallTy, _, ty') -> 1 + expected_ty_vars ty'
   | _ -> 0
 
-let is_ground t = Iter.is_empty (Seq.vars t)
+let is_ground t = 
+  (* if (Iter.is_empty (Seq.vars t) != 
+    not (get_property t.props f_has_freevars )) then (
+    CCFormat.printf "ground_error: @[%a@]@." debugf t;
+    CCFormat.printf "flags: @[%a@]@." debug_props t.props;
+  ); *)
+  not @@ get_property t.props f_has_freevars 
 
 (** {3 Misc} *)
 
@@ -873,7 +988,7 @@ let needs_args (t:t): bool = match view t with
   | Bind (Binder.ForallTy, _, _) -> true
   | _ -> false
 
-let show_type_arguments = ref false
+let show_type_arguments = ref true
 
 let rec open_bind2 b t1 t2 = match view t1, view t2 with
   | Bind (b1', ty1, t1'), Bind (b2', ty2, t2') when b=b1' && b=b2' ->
@@ -941,7 +1056,7 @@ let rec pp_depth ?(hooks=[]) depth out t =
     | AppBuiltin (b, []) -> Builtin.pp out b
     | AppBuiltin (b, l) ->
       let l = 
-        if Builtin.is_combinator b 
+        if Builtin.is_combinator b && not !show_type_arguments
         then List.filter (fun t -> not (is_tType @@ ty_exn t)) l
         else l in
       if CCList.is_empty l then Format.fprintf out "@[%a@]" Builtin.pp b
