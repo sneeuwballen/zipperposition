@@ -431,7 +431,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         ) else c
       )(E.C.of_statement st)
       
-    
     let comb_narrow c =
       let new_lits = Literals.map (fun t -> fst @@ narrow t) (C.lits c) in
       if Literals.equal (C.lits c) new_lits then (
@@ -564,8 +563,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let lits' = Literals.map (abf ~rules:curry_optimizations) (C.lits c) in
         let new_ = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
                     (Array.to_list lits') proof in
-        SimplM.return_new new_
-      )
+        SimplM.return_new new_)
 
     let maybe_conv_lams c =
       if E.flex_get k_enable_combinators then (

@@ -219,7 +219,7 @@ let to_string = CCFormat.to_string pp
 
 let apply_aux ~sv subst ~f_rename t sc =
   let rec aux t sc_t depth =
-    if T.is_ground t  then t
+    if T.is_ground t then t
     else (
       match T.ty t with
         | T.NoType ->

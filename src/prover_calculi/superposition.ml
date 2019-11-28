@@ -808,7 +808,18 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let renaming = Subst.Renaming.create () in
     let s = Subst.FO.apply renaming (US.subst info.subst) (info.s, info.scope_active) in
     let u_p = Subst.FO.apply renaming (US.subst info.subst) (info.u_p, info.scope_passive) in
-    assert(Term.equal (Lambda.eta_reduce @@ Lambda.snf @@ s) (Lambda.eta_reduce @@ Lambda.snf @@ u_p) || US.has_constr info.subst);
+    if not (Term.equal (Lambda.eta_reduce @@ Lambda.snf @@ s) (Lambda.eta_reduce @@ Lambda.snf @@ u_p) || US.has_constr info.subst) then (
+      CCFormat.printf "info_s:@[%a@]@." T.pp info.s;
+      CCFormat.printf "s:@[%a@]@." T.pp s;
+      CCFormat.printf "|s|:@[%a@]@." T.pp (Lambda.eta_reduce @@ Lambda.snf s);
+
+      CCFormat.printf "info_t:@[%a@]@." T.pp info.u_p;
+      CCFormat.printf "t:@[%a@]@." T.pp u_p;
+      CCFormat.printf "|t|:@[%a@]@." T.pp (Lambda.eta_reduce @@ Lambda.snf u_p);
+
+      CCFormat.printf "subst:@[%a@]@." US.pp info.subst;
+      assert(false);
+    );
     if Env.flex_get k_use_simultaneous_sup && info.sup_kind != LambdaSup && info.sup_kind != DupSup
     then do_simultaneous_superposition info
     else do_classic_superposition info
