@@ -12,22 +12,31 @@ module H = Helpers
 let (==>) = QCheck.(==>)
 let t_test = (module T : Alcotest.TESTABLE with type t = T.t)
 let ty_test = (module Type : Alcotest.TESTABLE with type t = Type.t)
-
 (* unit tests *)
 
 let f_ = ID.make "f"
 let g_ = ID.make "g"
 let h_ = ID.make "h"
+let k_ = ID.make "k"
+let l_ = ID.make "l"
+
 
 let ty = Type.term
-let f x y = T.app (T.const ~ty:Type.([ty;ty] ==> ty) f_) [x; y]
+let f_fun = (T.const ~ty:Type.([ty;ty] ==> ty) f_)
+let f x y = T.app f_fun [x; y]
 let g_fun = T.const ~ty:Type.([ty] ==> ty) g_
 let g x = T.app g_fun [x]
 let h x y z = T.app (T.const ~ty:Type.([ty;ty;ty] ==> ty) h_) [x;y;z]
+let h_fun = T.const ~ty:Type.([ty;ty;ty] ==> ty) h_
+let k_fun = (T.const ~ty:Type.([[ty;ty] ==> ty] ==> ty) k_)
+let k x = T.app k_fun [x]
+let l_fun = (T.const ~ty:Type.([[ty;ty] ==> ty;ty] ==> ty) l_)
+let l x = T.app l_fun [x]
 let a = T.const ~ty (ID.make "a")
 let b = T.const ~ty (ID.make "b")
 let x = T.var_of_int ~ty 0
 let y = T.var_of_int ~ty 1
+let fun_var x y = T.app (T.var_of_int ~ty:Type.([ty;ty] ==> ty) 2) [x; y]
 
 let test_db_shift = "db shift", `Quick, fun () ->
   let t = T.fun_ ty (f (T.bvar ~ty 0) (g (T.bvar ~ty 1))) in
@@ -36,12 +45,30 @@ let test_db_shift = "db shift", `Quick, fun () ->
   Alcotest.(check t_test) "db_shift" t1 t';
   ()
 
+let test_app_var = "is_appvar", `Quick, fun () -> 
+  let app_var = fun_var a b in
+  let not_app_var = x in
+  Alcotest.(check bool) "is_appvar" (T.is_app_var app_var) true;
+  Alcotest.(check bool) "is_nappvar" (T.is_app_var not_app_var) false;
+  ()
+
 let test_db_unshift = "db unshift", `Quick, fun () ->
   let t = T.fun_ ty (f (T.bvar ~ty 0) (g (T.bvar ~ty 2))) in
   let t' = T.of_term_unsafe (InnerTerm.DB.unshift 1 (t:T.t:>InnerTerm.t)) in
   let t1 = T.fun_ ty (f (T.bvar ~ty 0) (g (T.bvar ~ty 1))) in
   Alcotest.(check t_test) "db_unshift" t1 t';
   ()
+
+let test_covers = "cover_correct", `Quick, fun () ->
+  let t = T.fun_ ty (h y b (h x b x)) in
+  let coverings = T.cover_with_terms t [Some b;Some y;Some a;Some y] in
+  let max_cover = T.max_cover t [Some b; Some (h x b x)] in
+  let str = CCFormat.sprintf "%a.\n" (CCList.pp T.pp) coverings in
+  Alcotest.(check int) str (List.length coverings) 12;
+  let str = CCFormat.sprintf "%a.\n" T.pp max_cover in
+  Alcotest.(check t_test) str max_cover (T.fun_ ty (h y (T.bvar ~ty 2) (T.bvar ~ty 1)));
+  ()
+
 
 let test_whnf1 = "whnf1", `Quick, fun () ->
   (* eta expansion of [g] *)
@@ -76,6 +103,22 @@ let test_whnf2 = "whnf2", `Quick, fun () ->
   Alcotest.(check t_test) "whnf2" t1 t';
   ()
 
+let test_whnf2 = "patterns", `Quick, fun () ->
+  let t1 = f (g a) (g b) in 
+  let t2 = T.fun_ ty (f (T.bvar ~ty 0) (g (T.bvar ~ty 1))) in
+  let t3 = T.fun_ ty (f (fun_var (T.bvar ~ty 0) (T.bvar ~ty 1)) (g (T.bvar ~ty 1))) in 
+  let t4 = T.fun_ ty (f (fun_var (T.bvar ~ty 0) (T.bvar ~ty 0)) (g (T.bvar ~ty 1))) in 
+  let t5 = T.fun_ ty (f (fun_var (T.bvar ~ty 0) (g (T.bvar ~ty 1))) (g (T.bvar ~ty 1))) in
+
+
+  Alcotest.(check bool) "pattern1" (Lambda.is_lambda_pattern t1) true;
+  Alcotest.(check bool) "pattern2" (Lambda.is_lambda_pattern t2) true;
+  Alcotest.(check bool) "pattern3" (Lambda.is_lambda_pattern t3) true;
+  Alcotest.(check bool) "pattern3" (Lambda.is_lambda_pattern t4) false;
+  Alcotest.(check bool) "pattern3" (Lambda.is_lambda_pattern t5) false;
+
+  ()
+
 let test_polymorphic_app = "poly app", `Quick, fun () ->
   (* Π α. α *)
   let polyty = Type.forall_fvars [HVar.make ~ty:Type.tType 0] (Type.var_of_int 0) in
@@ -87,12 +130,57 @@ let test_polymorphic_app = "poly app", `Quick, fun () ->
   Alcotest.(check ty_test) "polyapp" (Term.ty result) ty;
   ()
 
+let test_eta_reduce = "eta reduce", `Quick, fun () ->
+  (* (λx. (λy. f x y)) -> f *)
+  let t1 = T.fun_of_fvars [HVar.make ~ty 0; HVar.make ~ty 1] (T.app f_fun [T.var_of_int ~ty 0; T.var_of_int ~ty 1]) in
+  let t2 = f_fun in
+  Alcotest.(check t_test) "eta reduce" (Lambda.eta_reduce t1) t2;
+  (* (λx. (λy. g y) x) -> g *)
+  let t1 = T.fun_of_fvars [HVar.make ~ty 0] (T.app (T.fun_of_fvars [HVar.make ~ty 1] (g (T.var_of_int ~ty 1))) [T.var_of_int ~ty 0]) in
+  let t2 = g_fun in
+  Alcotest.(check t_test) "eta reduce" (Lambda.eta_reduce t1) t2;
+  Alcotest.(check t_test) "eta reduce" (Lambda.eta_reduce t1) t2;
+  (* (λx y. f y x) -> does not reduce *)
+  let t1 = T.fun_of_fvars [HVar.make ~ty 0; HVar.make ~ty 1] (f (T.var_of_int ~ty 1) (T.var_of_int ~ty 0)) in
+  let t2 = t1 in
+  Alcotest.(check t_test) "eta reduce" (Lambda.eta_reduce t1) t2;
+  (* (λx y. h (g x) x y) -> (λx. h (g x) x) *)
+  let t1 = T.fun_of_fvars [HVar.make ~ty 0; HVar.make ~ty 1] (h (g (T.var_of_int ~ty 0)) (T.var_of_int ~ty 0) (T.var_of_int ~ty 1)) in
+  let t2 = T.fun_of_fvars [HVar.make ~ty 0] (T.app h_fun [g (T.var_of_int ~ty 0); (T.var_of_int ~ty 0)]) in
+  Alcotest.(check t_test) "eta reduce" (Lambda.eta_reduce t1) t2;
+
+  let subterm =  T.fun_of_fvars [HVar.make ~ty 0; HVar.make ~ty 1] (T.app f_fun [T.var_of_int ~ty 0; T.var_of_int ~ty 1]) in
+  let unreduced = k subterm in 
+  let reduced = k f_fun in
+  Alcotest.(check t_test) "eta reduce" (Lambda.eta_reduce unreduced) reduced
+
+let test_eta_expand = "eta expand", `Quick, fun () ->
+  (* f -> (λx. (λy. f x y)) *)
+  let t1 = T.fun_of_fvars [HVar.make ~ty 0; HVar.make ~ty 1] (T.app f_fun [T.var_of_int ~ty 0; T.var_of_int ~ty 1]) in
+  let t2 = f_fun in
+  Alcotest.(check t_test) "eta expand" (Lambda.eta_expand t2) t1;
+
+  let subterm =  T.fun_of_fvars [HVar.make ~ty 0; HVar.make ~ty 1] (T.app f_fun [T.var_of_int ~ty 0; T.var_of_int ~ty 1]) in
+  let unreduced = k subterm in 
+  let reduced = k f_fun in
+  Alcotest.(check t_test) "eta expand" (Lambda.eta_expand reduced) unreduced;
+
+  let subterm =  T.fun_of_fvars [HVar.make ~ty 0; HVar.make ~ty 1] (T.app f_fun [T.var_of_int ~ty 0; T.var_of_int ~ty 1]) in
+  let expanded = T.fun_of_fvars [HVar.make ~ty 0] (T.app l_fun [subterm; T.var_of_int ~ty 0]) in 
+  let unexpanded = l f_fun in
+  Alcotest.(check t_test) "eta expand"  expanded (Lambda.eta_expand unexpanded)
+
+
 let suite : unit Alcotest.test_case list =
   [ test_db_shift;
     test_db_unshift;
+    test_app_var;
     test_whnf1;
     test_whnf2;
     test_polymorphic_app;
+    test_eta_reduce;
+    test_eta_expand;
+    test_covers;
   ]
 
 (** Properties *)

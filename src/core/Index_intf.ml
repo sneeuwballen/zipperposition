@@ -17,8 +17,13 @@ module type LEAF = sig
   val size : t -> int
 
   val fold_unify :
-    ?subst:Unif_subst.t -> t Scoped.t -> term Scoped.t ->
+    t Scoped.t -> term Scoped.t ->
     (term * elt * Unif_subst.t) Iter.t
+
+  val fold_unify_complete :
+    unif_alg : (Term.t Scoped.t -> Term.t Scoped.t -> Unif_subst.t option OSeq.t) ->
+    t Scoped.t -> term Scoped.t ->
+    (term * elt * Unif_subst.t option OSeq.t) Iter.t
 
   val fold_match :
     ?subst:subst ->
@@ -59,9 +64,17 @@ module type TERM_IDX = sig
 
   val fold : t -> ('a -> term -> elt -> 'a) -> 'a -> 'a
 
-  val retrieve_unifiables : ?subst:Unif_subst.t ->
+  (** Retrieves a decidable fragment of unifiables. Only one unifier per subterm. *)
+  val retrieve_unifiables :
     t Scoped.t -> term Scoped.t ->
     (term * elt * Unif_subst.t) Iter.t
+
+  (** Retrieves all unifiables. The set of unifiers is potentially infinite.
+      Because HO unification is undecidable, the sequence is intersperced with `None`s to ensure termination for each element of the sequence. *)
+  val retrieve_unifiables_complete :
+    ?unif_alg:(Term.t Scoped.t -> Term.t Scoped.t -> Unif_subst.t option OSeq.t)->
+    t Scoped.t -> term Scoped.t ->
+    (term * elt * Unif_subst.t option OSeq.t) Iter.t
 
   val retrieve_generalizations : ?subst:subst ->
     t Scoped.t -> term Scoped.t ->

@@ -38,7 +38,7 @@ let view t = match T.view t with
   | T.App (f, l) ->
     begin match T.view f with
       | T.Const id -> App (id, l)
-      | _ -> assert false
+      | _ -> CCFormat.printf "wrong:@[%a@]@." T.pp t; assert false
     end
   | T.AppBuiltin (Builtin.Arrow, [_]) -> assert false
   | T.AppBuiltin (Builtin.Arrow, (ret :: l)) -> Fun (l, ret)
@@ -63,6 +63,10 @@ let[@inline] is_const ty = match T.view ty with T.Const _ -> true | _ -> false
 let[@inline] is_fun ty = match T.view ty with | T.AppBuiltin(Builtin.Arrow, _) -> true | _ -> false
 let[@inline] is_forall ty = match T.view ty with T.Bind (Binder.ForallTy, _, _) -> true | _ -> false
 let[@inline] is_prop ty = match T.view ty with T.AppBuiltin (Builtin.Prop, []) -> true | _ -> false
+
+let as_var_exn ty = match view ty with 
+  | Var v -> v 
+  | _ -> invalid_arg "as_var_exn"
 
 let tType = T.tType
 let prop = T.builtin ~ty:tType Builtin.Prop
@@ -162,7 +166,7 @@ let vars t = vars_set VarSet.empty t |> VarSet.elements
 
 let close_forall ty =
   let vars = vars ty in
-  T.bind_vars ~ty:prop Binder.Forall vars ty
+  T.bind_vars ~ty:tType Binder.ForallTy vars ty
 
 type arity_result =
   | Arity of int * int
@@ -176,7 +180,8 @@ let arity ty =
       Arity (n_forall, List.length l)
     | Forall ty' ->
       traverse (n_forall+1) ty'
-    | Var _ | Builtin _ -> NoArity
+    | Var _ -> NoArity
+    | Builtin _ -> Arity (n_forall, 0)
     | DB _
     | App _ -> Arity (n_forall, 0)
   in traverse 0 ty
@@ -247,8 +252,8 @@ let apply ty0 args0 =
       aux ty args env
     | _ ->
       err_applyf_
-        "@[<2>Type.apply:@ expected quantified or function type,@ but got @[%a@]"
-        T.pp_zf ty
+        "@[<2>Type.apply:@ expected quantified or function type,@ but got @[%a@] @[(args: %a)@]"
+        T.pp_zf ty (CCList.pp T.pp) args
   and aux_l ty_ret exp_args args env = match exp_args, args with
     | [], [] -> T.DB.eval env ty_ret
     | _, [] ->
@@ -325,6 +330,34 @@ module TPTP = struct
   let pp out t = pp_tstp_rec 0 out t
 
   let pp_depth ?hooks:_ depth out t = pp_tstp_rec depth out t
+
+  let rec pp_ho_depth depth out t = match view t with
+    | Builtin Prop -> CCFormat.string out "$o"
+    | Builtin TType -> CCFormat.string out "$tType"
+    | Builtin Term -> CCFormat.string out "$i"
+    | Builtin Int -> CCFormat.string out "$int"
+    | Builtin Rat -> CCFormat.string out "$rat"
+    | Var v -> Format.fprintf out "X%d" (HVar.id v)
+    | DB i -> Format.fprintf out "Tb%d" (depth-i-1)
+    | App (p, []) -> ID.pp_tstp out p
+    | App (p, args) ->
+      Format.fprintf out "@[<2>%a(%a)@]" ID.pp_tstp p
+        (Util.pp_list (pp_ho_depth depth)) args
+    | Fun (args, ret) ->
+      Format.fprintf out "%a > %a" (pp_l depth) args (pp_inner depth) ret
+    | Forall ty' ->
+      Format.fprintf out "!>[Tb%d:$tType]: %a" depth (pp_inner (depth+1)) ty'
+  and pp_inner depth out t = match view t with
+    | Fun _ -> Format.fprintf out "(@[%a@])" (pp_ho_depth depth) t
+    | _ -> pp_ho_depth depth out t
+  and pp_l depth out l = match l with
+    | [] -> assert false
+    | [ty] -> pp_inner depth out ty
+    | _ ->
+      Format.fprintf out "@[%a@]"
+        (Util.pp_list ~sep:" > " (pp_inner depth)) l
+
+  let pp_ho out t = pp_ho_depth 0 out t
 
   let pp_typed_var out v = match view (HVar.ty v) with
     | Builtin Term -> HVar.pp out v (* implicit *)
@@ -432,9 +465,29 @@ module Conv = struct
     mutable vars: (PT.t, t HVar.t) Var.Subst.t;
     mutable n: int;  (* counter for free vars *)
     mutable hvars: PT.t Var.t VarMap.t;
+    mutable bvars_to_db: int VarMap.t ;
   }
 
-  let create () = { vars=Var.Subst.empty; n=0; hvars=VarMap.empty; }
+  let create () = { vars=Var.Subst.empty; n=0; hvars=VarMap.empty;
+                    bvars_to_db=VarMap.empty }
+
+  let enter_bvar ctx v =
+    let ret_handle = VarMap.find_opt v ctx.bvars_to_db in
+    let new_map = VarMap.map (fun x-> x+1) ctx.bvars_to_db in
+    ctx.bvars_to_db <- VarMap.add v 0 new_map;
+
+    ret_handle
+
+  let exit_bvar ~handle ctx v =
+    let new_map = VarMap.map (fun x-> x-1) ctx.bvars_to_db in
+    if CCOpt.is_some handle then (
+      ctx.bvars_to_db <- VarMap.add v (CCOpt.get_exn handle) new_map
+    )
+    else ctx.bvars_to_db <- new_map
+
+  let find_bvar ctx v =
+    VarMap.find_opt v ctx.bvars_to_db
+
 
   let copy t = {t with vars=t.vars; }
 

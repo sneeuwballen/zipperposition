@@ -92,6 +92,12 @@ module Ctx : sig
   val declare : ?loc:loc -> t -> ID.t -> type_ -> unit
   (** Declare the type of a symbol, possibly shadowing a previous version  *)
 
+  val with_var : t -> type_ Var.t -> f:(unit -> 'a) -> 'a
+  (** Execute a function f with an additional declared variable *)
+
+  val with_vars : t -> type_ Var.t list -> f:(unit -> 'a) -> 'a
+  (** Execute a function f with additional declared variables *)
+
   val pop_new_types : t -> (ID.t * type_) list
   (** Obtain the list of symbols whose type has been inferred recently,
       and reset it. *)

@@ -4,6 +4,8 @@
 open Logtk
 
 module type S = sig
+  val sk_ctx : unit -> Skolem.ctx
+
   val ord : unit -> Ordering.t
   (** current ordering on terms *)
 
@@ -26,6 +28,9 @@ module type S = sig
 
   val select : Selection.t
 
+  val eta_normalize : Term.t -> Term.t
+  (** eta_normalize a term (expand or reduce or neutral, depending on cli options) *)
+
   val lost_completeness : unit -> unit
   (** To be called when completeness is not preserved *)
 
@@ -47,6 +52,9 @@ module type S = sig
 
   val on_new_symbol : (ID.t * Type.t) Signal.t
   val on_signature_update : Signature.t Signal.t
+
+  val set_injective_for_arg : ID.t -> int -> unit
+  val is_injective_for_arg : ID.t -> int -> bool
 
   (** {2 Literals} *)
 

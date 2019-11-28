@@ -67,9 +67,9 @@ module Make(E : Env.S) = struct
       let lits = C.lits c in
       (* number of distinct term variables *)
       let n_vars =
-        Literals.vars lits
+        (Literals.vars lits
         |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))
-        |> List.length
+        |> List.length)
       in
       if n_vars > !max_vars then (
         Ctx.lost_completeness();
@@ -102,5 +102,20 @@ let () =
     [ "--depth-limit", Arg.Int enable_depth_limit, " set maximal term depth";
       "--max-vars", Arg.Set_int max_vars, " maximum number of variables per clause";
       "--no-max-vars", Arg.Set no_max_vars, " disable maximum number of variables per clause";
+      "--enable-max-vars", Arg.Clear no_max_vars, "enable maximum number of variables per clause";
     ];
+  Params.add_to_mode "ho-complete-basic" (fun () ->
+    no_max_vars := true
+  );
+  Params.add_to_mode "ho-pragmatic" (fun () ->
+    no_max_vars := false;
+    max_vars    := 10;
+  );
+  Params.add_to_mode "ho-competitive" (fun () ->
+    no_max_vars := false;
+    max_vars    := 10;
+  );
+  Params.add_to_mode "fo-complete-basic" (fun () ->
+    no_max_vars := true
+  );
   ()

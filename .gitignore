@@ -40,3 +40,6 @@ benchs
 *.exe
 *.install
 .merlin
+zipperposition.exe
+diffs
+out

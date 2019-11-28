@@ -105,6 +105,7 @@ type t = proof
 
 module Tag = Builtin.Tag
 
+
 module Rule = struct
   type t = rule
   let pp out r = Format.fprintf out "'%s'" r
@@ -416,6 +417,26 @@ module Step = struct
     | (Some _ as res), None
     | None, (Some _ as res) -> res
     | Some x, Some y -> Some (min x y)
+
+  let inferences_performed p =
+    let rec aux p = 
+      match p.kind with 
+      | Simplification _ -> 
+        let parents = List.map (fun par -> aux ((Parent.proof par).step)) p.parents in
+        CCOpt.get_or ~default:0 (Iter.max (Iter.of_list parents))
+      | Inference _ -> 
+        let parents = List.map (fun par -> aux ((Parent.proof par).step)) p.parents in
+        CCOpt.get_or ~default:0 (Iter.max (Iter.of_list parents)) + 1 
+      | _ -> 0 in
+  aux p
+
+  let rec has_ho_step p = match p.kind with
+  | Simplification(_,tags)
+  | Inference(_,tags) -> 
+      List.mem Tag.T_ho tags ||
+      List.exists has_ho_step (List.map (fun par -> (Parent.proof par).step) p.parents)
+  | _ -> false
+
 
   let step_ ?(infos=[]) kind parents =
     (* distance to goal (0 if a goal itself) *)

@@ -55,6 +55,10 @@ module Make(X : sig
       [(c, `Same)] means the clause has not been simplified;
       [(c, `New)] means the clause has been simplified at least once *)
 
+   
+  type term_norm_rule = Term.t -> Term.t option
+  (** Normalization rule on terms *)
+
   type active_simplify_rule = simplify_rule
   type rw_simplify_rule = simplify_rule
 
@@ -90,6 +94,7 @@ module Make(X : sig
 
   type 'a conversion_result =
     | CR_skip (** rule didn't fire *)
+    | CR_drop (** remove the clause from proof state *)
     | CR_add of 'a (** add this to the result *)
     | CR_return of 'a (** shortcut the remaining rules, return this *)
 
@@ -100,6 +105,7 @@ module Make(X : sig
   let _binary_rules : (string * binary_inf_rule) list ref = ref []
   let _unary_rules : (string * unary_inf_rule) list ref = ref []
   let _rewrite_rules : (string * term_rewrite_rule) list ref = ref []
+  let _norm_rule : term_norm_rule ref = ref (fun _ -> None)
   let _lit_rules : (string * lit_rewrite_rule) list ref = ref []
   let _basic_simplify : simplify_rule list ref = ref []
   let _unary_simplify : simplify_rule list ref = ref []
@@ -112,6 +118,7 @@ module Make(X : sig
   let _is_trivial : is_trivial_rule list ref = ref []
   let _empty_clauses = ref C.ClauseSet.empty
   let _multi_simpl_rule : multi_simpl_rule list ref = ref []
+  let _ss_multi_simpl_rule : multi_simpl_rule ref = ref (fun _ -> None)
   let _generate_rules : (string * generate_rule) list ref = ref []
   let _clause_conversion_rules : clause_conversion_rule list ref = ref []
   let _step_init = ref []
@@ -194,13 +201,23 @@ module Make(X : sig
     _is_trivial := r :: !_is_trivial
 
   let add_rewrite_rule name rule =
+    Util.debugf ~section 1 "[ Adding rule %s to env ]" (fun k-> k name);
     _rewrite_rules := (name, rule) :: !_rewrite_rules
+
+  let set_ho_normalization_rule rule =
+    _norm_rule := rule
+
+  let get_ho_normalization_rule () =
+    !_norm_rule
 
   let add_lit_rule name rule =
     _lit_rules := (name, rule) :: !_lit_rules
 
   let add_multi_simpl_rule rule =
     _multi_simpl_rule := rule :: !_multi_simpl_rule
+
+  let set_single_step_multi_simpl_rule rule =
+    _ss_multi_simpl_rule := rule
 
   let cr_skip = CR_skip
   let cr_add x = CR_add x
@@ -275,7 +292,7 @@ module Make(X : sig
     let clauses =
       List.fold_left
         (fun acc (name,g) ->
-           Util.debugf ~section 3 "apply generating rule %s" (fun k->k name);
+           Util.debugf ~section 3 "apply generating rule %s (full: %b)" (fun k->k name full);
            List.rev_append (g ~full ()) acc)
         []
         !_generate_rules
@@ -325,13 +342,15 @@ module Make(X : sig
             | Some (t',proof) ->
               applied_rules := StrSet.add name !applied_rules;
               proofs := List.rev_append proof !proofs;
+              let new_t = match !_norm_rule t' with 
+                                       | None -> t'
+                                       | Some tt -> tt in
               Util.debugf ~section 5
                 "@[<2>rewrite `@[%a@]`@ into `@[%a@]`@ :proof (@[%a@])@]"
-                (fun k->k T.pp t T.pp t' (Util.pp_list Proof.pp_parent) proof);
-              reduce_term !_rewrite_rules t'  (* re-apply all rules *)
+                (fun k->k T.pp t T.pp new_t (Util.pp_list Proof.pp_parent) proof);
+              reduce_term !_rewrite_rules new_t  (* re-apply all rules *)
           end
-    in
-    (* reduce every literal *)
+    in 
     let lits' =
       Array.map
         (fun lit -> Lit.map (reduce_term !_rewrite_rules) lit)
@@ -350,6 +369,32 @@ module Make(X : sig
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
       assert (not (C.equal c c'));
       Util.debugf ~section 3 "@[term rewritten clause `@[%a@]`@ into `@[%a@]`"
+        (fun k->k C.pp c C.pp c');
+      SimplM.return_new c'
+    )
+
+   let ho_normalize c =
+    let did_reduce = ref false in
+    let lits' =
+      Array.map
+        (fun lit -> Lit.map (fun t -> match !_norm_rule t with 
+                                       | None -> t
+                                       | Some t' -> did_reduce := true; t' ) lit)
+        (C.lits c)
+    in
+    if not !did_reduce
+    then SimplM.return_same c (* no simplification *)
+    else (
+      C.mark_redundant c;
+      (* FIXME: put the rules as parameters *)
+      let rule = Proof.Rule.mk "lambda-normalize" in
+      let proof =
+        Proof.Step.simp ~rule
+          ([C.proof_parent c])
+      in
+      let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
+      assert (not (C.equal c c'));
+      Util.debugf ~section 3 "@[lambda rewritten clause `@[%a@]`@ into `@[%a@]`"
         (fun k->k C.pp c C.pp c');
       SimplM.return_new c'
     )
@@ -425,6 +470,7 @@ module Make(X : sig
       ~f:(fun c ->
         basic_simplify c >>= fun c ->
         (* first, rewrite terms *)
+        ho_normalize c >>= fun c ->
         rewrite c >>= fun c ->
         (* rewrite literals (if needed) *)
         begin match !_lit_rules with
@@ -474,6 +520,7 @@ module Make(X : sig
           let old_c = c in
           basic_simplify c >>=
           (* simplify with unit clauses, then all active clauses *)
+          ho_normalize >>=
           rewrite >>=
           rw_simplify >>=
           unary_simplify >>=
@@ -545,6 +592,7 @@ module Make(X : sig
           let old_c = c in
           basic_simplify c >>=
           (* simplify with unit clauses, then all active clauses *)
+          ho_normalize >>=
           rewrite >>=
           rw_simplify >>=
           unary_simplify >|= fun c ->
@@ -612,7 +660,7 @@ module Make(X : sig
   (** Simplify the clause w.r.t to the active set *)
   let forward_simplify c =
     let open SimplM.Infix in
-    rewrite c >>= rw_simplify >>= unary_simplify
+    ho_normalize c >>= rewrite >>= rw_simplify >>= unary_simplify
 
   (** generate all clauses from inferences *)
   let generate given =
@@ -687,7 +735,15 @@ module Make(X : sig
     let did_simplify = ref false in
     let set = ref C.ClauseSet.empty in
     let q = Queue.create () in
-    Queue.push c q;
+    let c, st = simplify c in
+    if st=`New then did_simplify := true;
+    let single_step_simplified = !_ss_multi_simpl_rule c in
+    begin
+      match single_step_simplified with
+      | None -> Queue.push c q;
+      | Some l -> did_simplify := true;
+                  List.iter (fun res -> Queue.push res q) l
+    end;
     while not (Queue.is_empty q) do
       let c = Queue.pop q in
       let c, st = simplify c in
@@ -735,6 +791,7 @@ module Make(X : sig
       | r :: rules' ->
         begin match r st with
           | CR_skip -> conv_clause_ rules' st
+          | CR_drop -> []
           | CR_return l -> l
           | CR_add l -> List.rev_append l (conv_clause_ rules' st)
         end

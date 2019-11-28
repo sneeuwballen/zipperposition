@@ -15,6 +15,8 @@ let stat_disjointness = Util.mk_stat "ind_ty.disjointness_steps"
 let stat_injectivity = Util.mk_stat "ind_ty.injectivity_steps"
 let stat_exhaustiveness = Util.mk_stat "ind_ty.exhaustiveness_steps"
 
+let enabled_ = ref true
+
 (** {1 Deal with Inductive Types} *)
 module Make(Env : Env_intf.S) = struct
   module C = Env.C
@@ -340,14 +342,15 @@ module Make(Env : Env_intf.S) = struct
     end
 
   let setup() =
-    Util.debug ~section 2 "setup inductive types calculus";
-    Env.add_is_trivial acyclicity_trivial;
-    Env.add_unary_simplify acyclicity_simplify;
-    Env.add_multi_simpl_rule injectivity_destruct_pos;
-    Env.add_lit_rule "ind_types.disjointness" disjointness;
-    Env.add_unary_inf "ind_types.acyclicity" acyclicity_inf;
-    Env.add_unary_inf "ind_types.exhaustiveness" exhaustiveness;
-    ()
+    if !enabled_ then (
+      Util.debug ~section 2 "setup inductive types calculus";
+      Env.add_is_trivial acyclicity_trivial;
+      Env.add_unary_simplify acyclicity_simplify;
+      Env.add_multi_simpl_rule injectivity_destruct_pos;
+      Env.add_lit_rule "ind_types.disjointness" disjointness;
+      Env.add_unary_inf "ind_types.acyclicity" acyclicity_inf;
+      Env.add_unary_inf "ind_types.exhaustiveness" exhaustiveness
+    )
 end
 
 let env_act (module E : Env_intf.S) =
@@ -360,3 +363,17 @@ let extension =
       name="ind_types";
       env_actions=[env_act]
   }
+
+let () =
+  Params.add_to_mode "ho-complete-basic" (fun () ->
+    enabled_ := false
+  );
+  Params.add_to_mode "ho-pragmatic" (fun () ->
+    enabled_ := false
+  );
+  Params.add_to_mode "ho-competitive" (fun () ->
+    enabled_ := false
+  );
+  Params.add_to_mode "fo-complete-basic" (fun () ->
+    enabled_ := false
+  );

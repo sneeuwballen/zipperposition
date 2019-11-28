@@ -249,7 +249,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           [C.proof_parent_subst renaming (info.active,s_a) subst;
            C.proof_parent_subst renaming (info.passive,s_p) subst] in
       let trail = C.trail_l [info.active;info.passive] in
-      let penalty = C.penalty info.active + C.penalty info.passive in
+      let penalty = max (C.penalty info.active) (C.penalty info.passive) in
       let new_c = C.create ~penalty ~trail all_lits proof in
       Util.debugf ~section 5 "@[<2>... gives@ @[%a@]@]" (fun k->k C.pp new_c);
       Util.incr_stat stat_rat_sup;
@@ -694,8 +694,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           let trail = C.trail_l [info.left; info.right] in
           (* penalty for some chaining *)
           let penalty =
-            C.penalty info.left
-            + C.penalty info.right
+            max (C.penalty info.left) (C.penalty info.right)
             + 3 (* nested chainings are dangerous *)
             + (if MF.term mf_1 |> T.is_var then 10 else 0)
             + (if MF.term mf_2 |> T.is_var then 10 else 0)
@@ -1189,8 +1188,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         Monome.Rat.of_term l >>= fun m1 ->
         Monome.Rat.of_term r >|= fun m2 ->
         i, [Lit.mk_rat_less m1 m2; Lit.mk_rat_less m2 m1]
-      | Lit.Prop (f,sign) ->
-        begin match T.view f, sign with
+      | Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
+        begin match T.view lhs, T.equal rhs T.true_ with
           | T.AppBuiltin (Builtin.Less, [_; l; r]), false when type_ok l ->
             Monome.Rat.of_term l >>= fun m1 ->
             Monome.Rat.of_term r >|= fun m2 ->

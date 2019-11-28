@@ -28,11 +28,11 @@ val create :
     @param prop_prefix used to name sub-formulas during CNF
     @param on_id function called whenever a Skolem symbol is created *)
 
-val fresh_skolem : ctx:ctx -> ty:type_ -> vars_count:int -> ID.t
+val fresh_skolem : ctx:ctx -> ty:type_ -> ID.t
 (** Just obtain a fresh skolem symbol. It is also declared
     in the inner signature. *)
 
-val fresh_skolem_prefix : ctx:ctx -> ty:type_ -> vars_count:int -> string -> ID.t
+val fresh_skolem_prefix : ctx:ctx -> ty:type_ -> string -> ID.t
 (** Fresh symbol with a different name *)
 
 val pop_new_skolem_symbols : ctx:ctx -> (ID.t * type_) list

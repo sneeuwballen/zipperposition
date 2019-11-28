@@ -239,6 +239,10 @@ module Step : sig
   val goal : source -> t
   val goal' : ?loc:Loc.t -> file:string -> name:string -> unit -> t
 
+  val inferences_performed : t -> int
+
+  val has_ho_step : t -> bool
+
   val inference : ?infos:infos -> ?tags:tag list -> rule:rule -> parent list -> t
 
   val simp : ?infos:infos -> ?tags:tag list -> rule:rule -> parent list -> t

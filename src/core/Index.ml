@@ -52,13 +52,20 @@ module MakeLeaf(X : Set.OrderedType) : LEAF with type elt = X.t = struct
   let size leaf =
     T.Map.fold (fun _ set acc -> S.cardinal set + acc) leaf 0
 
-  let fold_unify ?(subst=Unif_subst.empty) (leaf,sc_l) t k =
+  let fold_unify (leaf,sc_l) t k =
     T.Map.iter
       (fun t' set ->
          try
-           let subst = Unif.FO.unify_full ~subst (t',sc_l) t in
+           let subst = Unif.FO.unify_full (t',sc_l) t in
            S.iter (fun data -> k (t', data, subst)) set
          with Unif.Fail -> ())
+      leaf
+
+  let fold_unify_complete ~unif_alg (leaf,sc_l) t k =
+    T.Map.iter
+      (fun t' set ->
+        let substs = unif_alg (t',sc_l) t in
+        S.iter (fun data -> k (t', data, substs)) set)
       leaf
 
   let fold_match ?(subst=Subst.empty) (leaf,sc_l) t k =

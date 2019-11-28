@@ -113,7 +113,7 @@ val are_variant : t -> t -> bool
 val is_trivial : t -> bool
 val is_absurd : t -> bool
 
-val fold_terms : ?pos:Position.t -> ?vars:bool -> ?ty_args:bool ->
+val fold_terms : ?pos:Position.t -> ?vars:bool -> ?var_args:bool -> ?fun_bodies:bool -> ?ty_args:bool ->
   which:[<`Max|`All] ->
   ord:Ordering.t -> subterms:bool ->
   t -> (term * Position.t) Iter.t

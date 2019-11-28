@@ -20,31 +20,36 @@ let prof_narrowing_term = Util.mk_profiler "narrow.term"
 let prof_narrowing_lit = Util.mk_profiler "narrow.lit"
 let prof_ctx_narrowing = Util.mk_profiler "narrow.ctx_narrow"
 
+let max_steps = 500
+let rewrite_before_cnf = ref false
+
+
 module Key = struct
   let has_rw = Flex_state.create_key()
   let ctx_narrow = Flex_state.create_key()
 end
+
+let simpl_term t =
+  let t', rules = RW.Term.normalize_term ~max_steps t in
+  if T.equal t t' then (
+    assert (RW.Term.Rule_inst_set.is_empty rules);
+    None
+  ) else (
+    let proof =
+      RW.Rule.set_as_proof_parents rules
+    in
+
+    Util.debugf ~section 2
+      "@[<2>@{<green> simpl rewrite@} `@[%a@]`@ :into `@[%a@]`@ :using %a@]"
+      (fun k->k T.pp t T.pp t' RW.Term.Rule_inst_set.pp rules);
+    Some (t',proof)
+  )
 
 module Make(E : Env_intf.S) = struct
   module Env = E
   module C = E.C
 
   (* simplification rule *)
-  let simpl_term t =
-    let t', rules = RW.Term.normalize_term t in
-    if T.equal t t' then (
-      assert (RW.Term.Rule_inst_set.is_empty rules);
-      None
-    ) else (
-      Util.debugf ~section 2
-        "@[<2>@{<green>rewrite@} `@[%a@]`@ :into `@[%a@]`@ :using %a@]"
-        (fun k->k T.pp t T.pp t' RW.Term.Rule_inst_set.pp rules);
-      let proof =
-        RW.Rule.set_as_proof_parents rules
-      in
-      Some (t',proof)
-    )
-
   (* perform term narrowing in [c] *)
   let narrow_term_passive_ c: C.t list =
     let eligible = C.Eligible.(res c) in
@@ -302,18 +307,101 @@ end
 let ctx_narrow_ = ref true
 
 let post_cnf stmts st =
-  CCVector.iter Statement.scan_stmt_for_defined_cst stmts;
+  CCVector.iter Statement.scan_stmt_for_defined_cst 
+    (if not !rewrite_before_cnf then stmts
+    else (
+      CCVector.filter (fun st -> match Statement.view st with
+        | Statement.Rewrite _ -> false
+        | _ -> false) stmts));
   (* check if there are rewrite rules *)
   let has_rw =
     CCVector.to_seq stmts
     |> Iter.exists
       (fun st -> match Statement.view st with
-         | Statement.Rewrite _
-         | Statement.Def _ -> true
-         | _ -> false)
-  in
+          | Statement.Rewrite _
+          | Statement.Def _ -> true
+          | _ -> false)  in
   st
   |> Flex_state.add Key.has_rw has_rw
+
+(* let post_typing stmts state = 
+   *)
+
+let rewrite_tst_stmt stmt = 
+    let aux f =
+      let ctx = Type.Conv.create () in
+      let t = Term.Conv.of_simple_term_exn ctx f in
+      let snf = Lambda.snf in
+      CCOpt.map (fun (t',p) ->  (Term.Conv.to_simple_term ctx (snf t'), p)) (simpl_term t) in
+
+    let aux_l fs =
+      let ts = List.map aux fs in
+      if List.for_all CCOpt.is_none ts then None
+      else (
+        let proof = ref [] in
+        let combined = CCList.combine fs ts in
+        let res = 
+          List.map (fun (f,res) -> 
+            let f', p_list = CCOpt.get_or ~default:(f,[]) res in
+            proof := p_list @ !proof;
+            f') combined in
+        Some (res, !proof)) in
+
+  let mk_proof ~stmt_parents f_opt orig =
+    CCOpt.map (fun (f', parent_list) -> 
+       let rule = Proof.Rule.mk "definition expansion" in
+       f', Proof.S.mk_f_simp ~rule orig (parent_list @ stmt_parents)) f_opt in
+  
+  let stmt_parents = [Proof.Parent.from @@ Statement.as_proof_i stmt] in
+  match Statement.view stmt with
+  | Assert f -> 
+    (match mk_proof ~stmt_parents (aux f) f with
+    | Some (f', proof) -> Statement.assert_ ~proof:(Proof.S.step proof) f'
+    | None -> stmt)
+  | Lemma fs -> 
+    begin match aux_l fs with 
+    | Some (fs', parents) ->
+      let rule = Proof.Rule.mk "definition expansion" in
+      let fs_parents = (List.map (fun f -> Proof.Parent.from (Proof.S.mk_f_esa ~rule f stmt_parents)) fs)
+                        @ parents in
+      let proof = Proof.Step.simp ~rule fs_parents in
+      Statement.lemma ~proof fs'
+    | None -> stmt end
+  | Goal g ->
+    (match mk_proof ~stmt_parents (aux g) g with
+    | Some (g', proof) -> Statement.goal ~proof:(Proof.S.step proof) g'
+    | None -> stmt)
+  | NegatedGoal (skolems, ngs) -> 
+    begin match aux_l ngs with 
+    | Some (ng', parents) ->
+      let rule = Proof.Rule.mk "definition expansion" in
+      let ng_parents = (List.map (fun f -> Proof.Parent.from (Proof.S.mk_f_esa ~rule f stmt_parents)) ngs)
+                        @ parents in
+      let proof = Proof.Step.simp ~rule ng_parents in
+      Statement.neg_goal ~skolems ~proof ng'
+    | None -> stmt end
+  | _ -> stmt
+
+let unfold_def_before_cnf stmts =
+  if !rewrite_before_cnf then (
+    CCVector.map (fun stmt -> 
+      let res = rewrite_tst_stmt stmt in
+      (* CCFormat.printf "rewriting @[%a@] into @[%a@]@." Statement.pp_input stmt Statement.pp_input res; *)
+      res
+      ) stmts
+  ) else stmts
+
+let post_tying stmts st =
+  if !rewrite_before_cnf then (
+    CCVector.iter Statement.scan_tst_rewrite stmts;
+    let has_rw =
+      CCVector.to_seq stmts
+      |> Iter.exists
+        (fun st -> match Statement.view st with
+            | Statement.Rewrite _ -> true
+            | _ -> false)  in
+    Flex_state.add Key.has_rw has_rw st
+  ) else st
 
 (* add a term simplification that normalizes terms w.r.t the set of rules *)
 let normalize_simpl (module E : Env_intf.S) =
@@ -326,6 +414,7 @@ let extension =
   let open Extensions in
   { default with
       name = "rewriting";
+      post_typing_actions=[post_tying];
       post_cnf_actions=[post_cnf];
       env_actions=[normalize_simpl];
   }
@@ -333,4 +422,5 @@ let extension =
 let () = Options.add_opts
     [ "--rw-ctx-narrow", Arg.Set ctx_narrow_, " enable contextual narrowing";
       "--no-rw-ctx-narrow", Arg.Clear ctx_narrow_, " disable contextual narrowing";
+      "--rewrite-before-cnf", Arg.Bool (fun v -> rewrite_before_cnf := v), " enable/disable rewriting before CNF"
     ]

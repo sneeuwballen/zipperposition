@@ -30,10 +30,6 @@ val might_flip : t -> term -> term -> bool
     of tθ vs sθ cannot change when appending arguments. This function is allowed
     to overapproximate, i.e. we get no information if it returns true. *)
 
-val monotonic : t -> bool
-(** Is the ordering fully monotonic? Is it in particular compatible with arguments,
-    i.e., t > s ==> t a > s a *)
-
 val precedence : t -> Precedence.t
 (** Current precedence *)
 
@@ -48,6 +44,8 @@ val name : t -> string
 
 val clear_cache : t -> unit
 
+val normalize : (Lambda.term -> Lambda.term) ref
+
 include Interfaces.PRINT with type t := t
 
 (** {2 Ordering implementations}
@@ -56,13 +54,10 @@ include Interfaces.PRINT with type t := t
     with the subterm property, and monotonic), some other are not. *)
 
 val kbo : Precedence.t -> t
-(** Knuth-Bendix simplification ordering (Blanchette's lambda-free higher-order version) *)
-
-val lfhokbo_arg_coeff : Precedence.t -> t
-(** Blanchette's lambda-free higher-order KPO with argument coefficients *)
+(** Knuth-Bendix simplification ordering *)
 
 val rpo6 : Precedence.t -> t
-(** Efficient implementation of RPO (recursive path ordering) (Blanchette's lambda-free higher-order version)  *)
+(** Efficient implementation of RPO (recursive path ordering) *)
 
 val none : t
 (** All terms are incomparable (equality still works).
@@ -70,6 +65,8 @@ val none : t
 
 val subterm : t
 (** Subterm ordering. Not a simplification ordering. *)
+
+val map : (term -> term) -> t -> t
 
 (** {2 Global table of Orders} *)
 

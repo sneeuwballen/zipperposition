@@ -40,6 +40,8 @@ val id : t -> int
 val name : t -> string
 val payload : t -> exn list
 
+val dummy_of_int : int -> t
+
 val payload_find: f:(exn -> 'a option) -> t -> 'a option
 
 val payload_pred: f:(exn -> bool) -> t -> bool
@@ -84,7 +86,7 @@ exception Attr_parameter of int
 
 type skolem_kind = K_normal | K_ind (* inductive *)
 
-exception Attr_skolem of skolem_kind * int
+exception Attr_skolem of skolem_kind
 
 exception Attr_distinct
 
@@ -101,9 +103,6 @@ val is_skolem : t -> bool
 (** [is_skolem id] returns [true] iff [id] is a Skolem symbol *)
 
 val as_skolem : t -> skolem_kind option
-
-val num_mandatory_args : t -> int
-(** number of mandatory arguments of a skolem constant or 0 otherwise *)
 
 val is_distinct_object : t -> bool
 (** whether the identifier is a distinct object (as defined in TPTP syntax) *)

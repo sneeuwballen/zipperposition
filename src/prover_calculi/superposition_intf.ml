@@ -8,6 +8,8 @@ module type S = sig
   module Env : Env.S
   module C : module type of Env.C with type t = Env.C.t
   module PS : module type of Env.ProofState with type C.t = Env.C.t
+  module Stm : Stream.S with module C = Env.C
+  module StmQ : StreamQueue.S with module Stm = Stm
 
   (** {6 Term Indices} *)
 
@@ -31,6 +33,17 @@ module type S = sig
   val infer_equality_resolution: Env.unary_inf_rule
 
   val infer_equality_factoring: Env.unary_inf_rule
+
+  (** {6 Extraction of clauses from the queue (HO feature)} *)
+
+  val extract_from_stream_queue: Env.generate_rule
+  (** Extracts at most as many clauses from the stream queue as there are
+  streams in the queue. If called with [~full=true] extracts only one clause
+  but may loop forever. *)
+
+  val extract_from_stream_queue_fix_stm: Env.generate_rule
+  (** Same as [extract_from_stream_queue] with a different extraction heuristic
+  If possible, all clauses are taken from the first stream *)
 
   (** {6 Simplifications rules} *)
 

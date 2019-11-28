@@ -194,12 +194,12 @@ module Ctx = struct
     match !r, k with
       | None, `BindDefault ->
         let ty = ctx.default in
-        Util.debugf ~section 5 "@[<2>specialize type meta_var %a to@ @[%a@]@]"
+        Util.debugf ~section 50 "@[<2>specialize type meta_var %a to@ @[%a@]@]"
           (fun k->k Var.pp v T.pp ty);
         r := Some ty
       | None, `Generalize ->
         let v' = Var.copy v in
-        Util.debugf ~section 5 "@[<2>generalize type meta_var %a@]"
+        Util.debugf ~section 50 "@[<2>generalize type meta_var %a@]"
           (fun k->k Var.pp v);
         r := Some (T.var v')
       | None, `NoBind -> assert false
@@ -222,7 +222,7 @@ module Ctx = struct
         begin match ctx.on_shadow with
           | `Ignore ->
             (* ignore decl, but ensure the two types are the same *)
-            Util.debugf ~section 5 "ignore duplicate declaration of `%a`"
+            Util.debugf ~section 50 "ignore duplicate declaration of `%a`"
               (fun k->k ID.pp s);
             T.unify ?loc ty_old ty;
             false
@@ -232,7 +232,7 @@ module Ctx = struct
         end
     in
     if doit then (
-      Util.debugf ~section 3 "@{<yellow>declare@} %a:@ @[%a@]"
+      Util.debugf ~section 30 "@{<yellow>declare@} %a:@ @[%a@]"
         (fun k->k ID.pp s T.pp ty);
       Hashtbl.add ctx.env name (`ID (s,ty))
     )
@@ -497,7 +497,7 @@ let rec infer_rec ?loc ctx t =
           let l = add_implicit_params ctx (Var.ty v) l in
           (* infer types for arguments *)
           let l = List.map (infer_rec ?loc ctx) l in
-          Util.debugf ~section 5 "@[<2>apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]"
+          Util.debugf ~section 50 "@[<2>apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]"
             (fun k->k Var.pp v T.pp (Var.ty v) (Util.pp_list T.pp) l
                 (Util.pp_list T.pp) (List.map T.ty_exn l));
           let ty = apply_unify ctx ?loc ~allow_open:true (Var.ty v) l in
@@ -510,7 +510,7 @@ let rec infer_rec ?loc ctx t =
       (* higher order application *)
       let f = infer_rec ?loc ctx f in
       let l = List.map (infer_rec ?loc ctx) l in
-      Util.debugf ~section 5 "@[<2>apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]"
+      Util.debugf ~section 50 "@[<2>apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]"
         (fun k->k T.pp f T.pp (T.ty_exn f) (Util.pp_list T.pp) l
             (Util.pp_list T.pp) (List.map T.ty_exn l));
       let ty = apply_unify ctx ?loc ~allow_open:true (T.ty_exn f) l in
@@ -612,9 +612,13 @@ let rec infer_rec ?loc ctx t =
       then error_ ?loc "(in)equation @[%a@] ?= @[%a@] between types is forbidden" T.pp a T.pp b;
       begin match conn with
         | Builtin.Eq ->
-          if T.Ty.is_prop (T.ty_exn a) then T.Form.equiv a b else T.Form.eq a b
+          if T.Ty.is_prop (T.ty_exn a) && (CCOpt.is_none (T.head a) || CCOpt.is_none (T.head b))
+          then T.Form.equiv a b 
+          else T.Form.eq a b
         | Builtin.Neq ->
-          if T.Ty.is_prop (T.ty_exn a) then T.Form.xor a b else T.Form.neq a b
+          if T.Ty.is_prop (T.ty_exn a) && (CCOpt.is_none (T.head a) || CCOpt.is_none (T.head b))
+          then T.Form.xor a b 
+          else T.Form.neq a b
         | _ -> assert false
       end
     | PT.Bind(((Binder.Forall | Binder.Exists) as binder), vars, f') ->
@@ -665,7 +669,7 @@ let rec infer_rec ?loc ctx t =
           let l =
             if i>0 && List.length l = j
             then (
-              Util.debugf ~section 5
+              Util.debugf ~section 50
                 "@[<2>add %d implicit type arguments to@ `@[<1>%a@ (%a)@]`@]"
                 (fun k->k i Builtin.pp b (Util.pp_list T.pp) l);
               let metas = Ctx.fresh_ty_meta_vars ~dest:`Generalize ctx i in
@@ -677,7 +681,7 @@ let rec infer_rec ?loc ctx t =
           T.app_builtin ?loc ~ty b l
       end
   in
-  Util.debugf ~section 5 "@[<hv>typing of `@[%a@]`@ yields @[<2>`@[%a@]`@ : `@[%a@]`@]@]"
+  Util.debugf ~section 50 "@[<hv>typing of `@[%a@]`@ yields @[<2>`@[%a@]`@ : `@[%a@]`@]@]"
     (fun k->k PT.pp t T.pp t' T.pp (T.ty_exn t'));
   t'
 
@@ -685,7 +689,7 @@ and infer_app ?loc ctx id ty_id l =
   let l = add_implicit_params ctx ty_id l in
   (* infer types for arguments *)
   let l = List.map (infer_rec ?loc ctx) l in
-  Util.debugf ~section 5 "@[<2>apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]"
+  Util.debugf ~section 50 "@[<2>apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]"
     (fun k->k ID.pp id T.pp ty_id (Util.pp_list T.pp) l
         (Util.pp_list T.pp) (List.map T.ty_exn l));
   let ty = apply_unify ctx ?loc ~allow_open:true ty_id l in
@@ -788,7 +792,7 @@ and infer_prop_ ?loc ctx t =
 
 let infer_exn ctx t =
   Util.enter_prof prof_infer;
-  Util.debugf ~section 5 "@[<2>infer type of@ `@[%a@]`@]" (fun k->k PT.pp t);
+  Util.debugf ~section 50 "@[<2>infer type of@ `@[%a@]`@]" (fun k->k PT.pp t);
   try
     let t = infer_rec ctx t in
     Util.exit_prof prof_infer;
@@ -1003,7 +1007,7 @@ let read_attrs ~file attrs =
   Proof.Src.from_file ?name file, attrs
 
 let infer_statement_exn ?(file="<no file>") ctx st =
-  Util.debugf ~section 3 "@[<2>infer types for @{<yellow>statement@}@ `@[%a@]`@]"
+  Util.debugf ~section 30 "@[<2>infer types for @{<yellow>statement@}@ `@[%a@]`@]"
     (fun k->k A.pp_statement st);
   (* auxiliary statements *)
   let src, attrs = read_attrs ~file st.A.attrs in

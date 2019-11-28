@@ -8,7 +8,7 @@
     global parameters, and return a parameter type for other options.
 *)
 
-val stats : bool ref
+val _stats : bool ref
 (** Enable printing of statistics? *)
 
 type input_format =

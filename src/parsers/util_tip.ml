@@ -58,7 +58,6 @@ let rec conv_ty ty = match ty with
     T.app (T.var s) (List.map conv_ty args)
 
 let app ?loc x y = T.app ?loc x [y]
-let app_l = T.app
 
 let conv_tyvar v = T.V v, Some T.tType
 let conv_var (v,ty) = T.V v, Some (conv_ty ty)

@@ -21,6 +21,7 @@ type t = {
   presaturate : bool; (** initial interreduction of proof state? *)
   unary_depth : int; (** Maximum successive levels of unary inferences *)
   check: bool; (** check proof *)
+  eta: [`Reduce | `Expand | `None]; (** eta conversion *)
 }
 
 val parse_args : unit -> t
@@ -29,6 +30,8 @@ val default : t
 
 val add_opt : (string * Arg.spec * string) -> unit
 val add_opts : (string * Arg.spec * string) list -> unit
+
+val add_to_mode : string -> (unit -> unit) -> unit
 
 val key : t Flex_state.key
 

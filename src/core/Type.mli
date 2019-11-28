@@ -54,6 +54,8 @@ val is_fun : t -> bool
 val is_forall : t -> bool
 val is_prop : t -> bool
 
+val as_var_exn : t -> t HVar.t
+
 val hash_mod_alpha : t -> int
 (** Hash invariant w.r.t variable renaming *)
 
@@ -191,7 +193,7 @@ val depth : t -> int
 
 val open_poly_fun : t -> int * t list * t
 (** [open_poly_fun ty] "unrolls" polymorphic function arrows from the left, so that
-    [open_fun (forall a b. f a -> (g b -> (c -> d)))] returns [2; [f a;g b;c], d].
+    [open_poly_fun (forall a b. f a -> (g b -> (c -> d)))] returns [2; [f a;g b;c], d].
     @return the return type, the number of type variables,
       and the list of all its arguments *)
 
@@ -246,6 +248,7 @@ module TPTP : sig
   include Interfaces.PRINT_DE_BRUIJN with type term := t and type t := t
   include Interfaces.PRINT with type t := t
   val pp_typed_var : t HVar.t CCFormat.printer
+  val pp_ho : CCFormat.t -> t -> unit
 
   (** {2 Basic types} *)
 
@@ -274,6 +277,11 @@ module Conv : sig
   val create : unit -> ctx
   val copy : ctx -> ctx
   val clear : ctx -> unit
+
+  val enter_bvar : ctx -> VarMap.key -> int option
+  val exit_bvar  : handle:int CCOpt.t -> ctx -> VarMap.key -> unit
+  val find_bvar  : ctx -> VarMap.key -> int option
+
 
   val of_simple_term : ctx -> TypedSTerm.t -> t option
   (** convert a simple typed term into a type. The term is assumed to be

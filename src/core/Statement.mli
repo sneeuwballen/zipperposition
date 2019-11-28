@@ -123,7 +123,7 @@ val goal : ?attrs:attrs -> proof:proof -> 'f -> ('f, _, _) t
 val neg_goal :
   ?attrs:attrs -> proof:proof -> skolems:'ty skolem list -> 'f list -> ('f, _, 'ty) t
 
-val signature : ?init:Signature.t -> (_, _, Type.t) t Iter.t -> Signature.t
+val signature : ?init:Signature.t -> ?conj_syms: ID.t Iter.t -> (_, _, Type.t) t Iter.t -> Signature.t
 (** Compute signature when the types are using {!Type} *)
 
 val conv_attrs : UntypedAST.attrs -> attrs
@@ -165,6 +165,8 @@ val declare_defined_cst : ID.t -> level:int -> definition -> unit
 val scan_stmt_for_defined_cst : clause_t -> unit
 (** Try and declare defined constants in the given statement *)
 
+val scan_tst_rewrite : input_t -> unit
+
 (** {2 Inductive Types} *)
 
 val scan_stmt_for_ind_ty : clause_t -> unit
@@ -175,7 +177,13 @@ val scan_stmt_for_ind_ty : clause_t -> unit
 val scan_simple_stmt_for_ind_ty : input_t -> unit
 (** Same as {!scan_stmt} but on earlier statements *)
 
+val get_rw_rule:  ?weight_incr:int -> clause_t -> (ID.Set.elt * Rewrite.rule) option
+
+val get_formulas_from_defs: ('a, _, _) t -> 'a CCList.t
+
 (** {2 Iterators} *)
+
+val lift_lambdas: input_t -> input_t Iter.t
 
 module Seq : sig
   val to_seq : ('f,'t,'ty) t ->

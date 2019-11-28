@@ -17,11 +17,21 @@
     or ill-typed terms by manipulating this carelessly.
 *)
 
+(* ho_weight presents the syntactic weight of eta-expanded
+   term in which lambda prefixes are not counted in the weight.
+   all other symbols (including bound and free variables)
+   take weight of 1  *)
+module I = Int32
+
+
+
 type t = private {
   term : view;
   ty : type_result;
   mutable id : int;
   mutable payload: exn;
+  props: I.t;
+  ho_weight : int lazy_t;
 }
 (** Abstract type of term *)
 
@@ -57,6 +67,13 @@ val hash_mod_alpha : t -> int
 
 val same_l : t list -> t list -> bool
 (** Physical equality on lists of terms, roughly the same as {!List.forall2 (==)} *)
+
+val same_l_gen : t list -> t list -> bool
+(** Physical equality on lists of terms, roughly the same as {!List.forall2 (==),
+    tolerates different lengths} *)
+
+
+val ho_weight : t -> int
 
 (** {3 Constructors}
 
@@ -96,6 +113,9 @@ val is_lambda : t -> bool
 
 val hashcons_stats : unit -> int*int*int*int*int*int
 
+val is_beta_reducible : t -> bool
+val has_lambda : t -> bool
+
 (** {3 Payload} *)
 
 exception No_payload
@@ -131,6 +151,9 @@ module DB : sig
 
   val contains : t -> int -> bool
   (** Does t contains the De Bruijn variable of index n? *)
+
+  val unbound : t -> int list
+  (** Return a list of all unbound DB indices in a term *)
 
   val shift : ?depth:int -> int -> t -> t
   (** shift the non-captured De Bruijn indexes in the term by n *)
@@ -213,7 +236,7 @@ val open_fun : t -> t list * t
 
 val open_poly_fun : t -> int * t list * t
 (** [open_poly_fun ty] "unrolls" polymorphic function arrows from the left, so that
-    [open_fun (forall a b. f a -> (g b -> (c -> d)))] returns [2; [f a;g b;c], d].
+    [open_poly_fun (forall a b. f a -> (g b -> (c -> d)))] returns [2; [f a;g b;c], d].
     @return the return type, the number of type variables,
       and the list of all its arguments *)
 
@@ -242,7 +265,7 @@ val open_fun : t -> t list * t
 
 val open_poly_fun : t -> int * t list * t
 (** [open_poly_fun ty] "unrolls" polymorphic function arrows from the left, so that
-    [open_fun (forall a b. f a -> (g b -> (c -> d)))] returns [2; [f a;g b;c], d].
+    [open_poly_fun (forall a b. f a -> (g b -> (c -> d)))] returns [2; [f a;g b;c], d].
     @return the return type, the number of type variables,
       and the list of all its arguments *)
 
@@ -283,6 +306,9 @@ val as_app : t -> t * t list
 
 val as_var : t -> t HVar.t option
 val as_var_exn : t -> t HVar.t
+
+val as_const : t -> ID.t option
+val as_const_exn : t -> ID.t
 
 val as_bvar_exn : t -> int
 val is_bvar_i : int -> t -> bool

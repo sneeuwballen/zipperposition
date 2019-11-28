@@ -11,13 +11,13 @@ module S = Subst
 let prof_traverse = Util.mk_profiler "fingerprint.traverse"
 
 (* a feature.
-   A = variable
-   B = below variable
-   NonFO = Builtin/nonFO (non-syntactically unifiable)
-   N = invalid position
-   S = symbol
+   A    = variable
+   B    = below variable
+   DB i = De-Bruijn index i 
+   N    = invalid position
+   S c  = symbol c
 *)
-type feature = A | B | NonFO | N | S of ID.t
+type feature = A | B | DB of int | N | S of ID.t | Ignore
 
 (* a fingerprint function, it computes several features of a term *)
 type fingerprint_fun = T.t -> feature list
@@ -27,32 +27,78 @@ type fingerprint_fun = T.t -> feature list
 (* TODO: more efficient implem of traversal, only following branches that
    are useful instead of folding and filtering *)
 
-(* compute a feature for a given position *)
-let rec gfpf pos t = match pos, T.Classic.view t with
-  | [], T.Classic.Var _ -> A
-  | [], T.Classic.DB _ -> B
-  | [], _
-    when not (Unif.Ty.type_is_unifiable @@ T.ty t) ||
-         Type.is_fun (T.ty t) -> NonFO
-  | [], T.Classic.App (s, _) -> S s
-  | i::pos', T.Classic.App (_, l) ->
-    begin try gfpf pos' (List.nth l i)  (* recurse in subterm *)
-      with Failure _ -> N  (* not a position in t *)
-    end
-  | _::_, T.Classic.DB _ -> N
-  | _::_, T.Classic.Var _ -> B  (* under variable *)
-  | _, T.Classic.AppBuiltin _
-  | _, T.Classic.NonFO -> NonFO (* don't filter! *)
+let expand_otf_ body = 
+  let extra_args = Type.expected_args (Term.ty body) in
+  if CCList.is_empty extra_args then body else (
+    let n = List.length extra_args in
+    T.app (T.DB.shift n body) 
+          (List.mapi (fun i ty -> T.bvar ~ty (n-1-i)) extra_args)
+  )
 
-(* TODO more efficient way to compute a vector of features: if the fingerprint
+(* compute a feature for a given position *)
+let rec gfpf ?(depth=0) pos t =
+  let t_ty = Term.ty t in
+  let exp_args_num = List.length (Type.expected_args t_ty) in
+  let _, body =  T.open_fun t in
+  match pos with 
+  | [] -> 
+    let body = expand_otf_ body in
+    gfpf_root ~depth:(depth + exp_args_num) body
+  | i::is ->
+      let hd, args = T.as_app body in
+      let args = List.filter (fun x -> not @@ T.is_type x) args in
+      (*                 if we are sampling something of variable type, it might eta-expand *)
+      if T.is_var hd || (Type.is_var (snd (Type.open_fun (Term.ty body)))) then B
+      else (
+        let num_acutal_args = List.length args in
+        let extra_args,_ = Type.open_fun (T.ty body) in  (* arguments for eta-expansion *)
+
+        if num_acutal_args >= i then (
+          let arg = T.DB.shift (List.length extra_args) (List.nth args (i-1)) in
+          gfpf ~depth:(depth + exp_args_num) is arg
+        ) 
+        else if num_acutal_args + (List.length extra_args) >= i then (
+          let exp_arg_idx = i - num_acutal_args in
+          let db_ty = List.nth extra_args (exp_arg_idx-1) in
+          let arg = T.bvar (List.length extra_args - exp_arg_idx) ~ty:db_ty in
+          gfpf ~depth:(depth + exp_args_num) is arg) 
+        else N
+      )
+and gfpf_root ~depth t =
+  match T.view t with 
+  | T.AppBuiltin(_, _) -> Ignore
+  (* if we are sampling under a function, it can happen that there are
+     loosely bound variables that can be unified inside LambdaSup. *)
+  | T.DB i -> if (i < depth) then DB i else Ignore 
+  | T.Var _ -> A
+  | T.Const c -> S c
+  | T.App (hd,_) -> (match T.view hd with
+                         T.Var _ -> A
+                         | T.Const s -> S s
+                         | T.DB i    -> if (i < depth) then DB i else Ignore
+                         | T.AppBuiltin(_,_) -> Ignore
+                         | _ -> assert false)
+  | T.Fun (_, _) -> assert false
+
+(* TODO more efficient way to compute a vector of s: if the fingerprint
    is in BFS, compute features during only one traversal of the term? *)
+
+let pp_feature out = function 
+  | A -> CCFormat.fprintf out "A"
+  | B -> CCFormat.fprintf out "B" 
+  | DB i -> CCFormat.fprintf out "DB %d" i 
+  | N -> CCFormat.fprintf out "N" 
+  | S id -> CCFormat.fprintf out "S %a" ID.pp id
+  | Ignore -> CCFormat.fprintf out "I"
 
 (** compute a feature vector for some positions *)
 let fp positions =
   (* list of fingerprint feature functions *)
-  let fpfs = List.map (fun pos -> gfpf pos) positions in
+  let fpfs = List.map gfpf positions in
   fun t ->
     List.map (fun fpf -> fpf t) fpfs
+    (* Format.printf "@[Fingerprinting:@ @[%a@]=@[%a@].@]\n" T.pp t (CCList.pp pp_feature) res; *)
+
 
 (** {2 Fingerprint functions} *)
 
@@ -75,40 +121,59 @@ let feat_to_int_ = function
   | B -> 1
   | S _ -> 2
   | N -> 3
-  | NonFO -> 4
+  | DB _ -> 4
+  | Ignore -> 5
 
 let cmp_feature f1 f2 = match f1, f2 with
   | A, A
   | B, B
   | N, N
-  | NonFO, NonFO
+  | Ignore, Ignore
     -> 0
   | S s1, S s2 -> ID.compare s1 s2
+  | DB i, DB j -> compare i j
   | _ -> feat_to_int_ f1 - feat_to_int_ f2
 
 (** check whether two features are compatible for unification. *)
 let compatible_features_unif f1 f2 =
-  match f1, f2 with
-    | S s1, S s2 -> ID.equal s1 s2
-    | NonFO, _ | _, NonFO
-    | B, _ | _, B -> true
-    | A, N | N, A -> false
-    | A, _ | _, A -> true
-    | N, S _ | S _, N -> false
-    | N, N -> true
+  match f1 with
+  | S s1 -> (match f2 with
+             | S s2 -> ID.equal s1 s2 
+             | A | B | Ignore -> true
+             | N | DB _ -> false)
+  | Ignore -> true
+  | B    -> true
+  | A    -> (match f2 with
+             | N  -> false
+             | DB _ | Ignore | S _ | A | B  -> true)
+  | DB i -> (match f2 with 
+             | DB j -> i = j
+             | B | A | Ignore -> true
+             | S _ | N -> false)
+  | N ->    (match f2 with 
+             | N | B | Ignore -> true
+             | A | DB _ | S _ -> false)
 
 (** check whether two features are compatible for matching. *)
 let compatible_features_match f1 f2 =
-  match f1, f2 with
-    | S s1, S s2 -> ID.equal s1 s2
-    | NonFO, _ | _, NonFO
-    | B, _ -> true
-    | N, N -> true
-    | N, _ -> false
-    | _, N -> false
-    | A, B -> false
-    | A, _ -> true
-    | S _, _ -> false
+  match f1 with
+  | S s1 -> (match f2 with
+             | S s2 -> ID.equal s1 s2
+             | Ignore -> true 
+             | _ -> false)
+  | Ignore 
+  | B    -> true
+  | A    -> (match f2 with
+             | A | DB _ | S _ | Ignore -> true
+             | _ -> false)
+  | DB i -> (match f2 with 
+             | DB j -> i = j
+             | Ignore -> true
+             | _ -> false)
+  | N ->    (match f2 with 
+             | N | Ignore -> true
+             | _ -> false)
+
 
 (** Map whose keys are features *)
 module FeatureMap = Map.Make(struct
@@ -273,11 +338,16 @@ module Make(X : Set.OrderedType) = struct
       Util.exit_prof prof_traverse;
       raise e
 
-  let retrieve_unifiables ?(subst=Unif_subst.empty) (idx,sc_idx) t k =
+  let retrieve_unifiables_aux fold_unify (idx,sc_idx) t k =
     let features = idx.fp (fst t) in
     let compatible = compatible_features_unif in
     traverse ~compatible idx features
-      (fun leaf -> Leaf.fold_unify ~subst (leaf,sc_idx) t k)
+      (fun leaf -> fold_unify (leaf,sc_idx) t k)
+
+  let retrieve_unifiables = retrieve_unifiables_aux Leaf.fold_unify
+  
+  let retrieve_unifiables_complete ?(unif_alg=JP_unif.unify_scoped) = 
+    retrieve_unifiables_aux (Leaf.fold_unify_complete ~unif_alg)
 
   let retrieve_generalizations ?(subst=S.empty) (idx,sc_idx) t k =
     let features = idx.fp (fst t) in

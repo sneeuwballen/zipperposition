@@ -144,7 +144,7 @@ val of_list : ?init:t -> (var Scoped.t * term Scoped.t) list -> t
 
 (** {2 Applying a substitution} *)
 
-val apply : Renaming.t -> t -> term Scoped.t -> term
+val apply : ?shift_vars:int -> Renaming.t -> t -> term Scoped.t -> term
 (** Apply the substitution to the given term.
     This function assumes that all terms in the substitution are closed,
     and it will not perform De Bruijn indices shifting. For instance,
@@ -165,7 +165,7 @@ module type SPECIALIZED = sig
 
   val deref : t -> term Scoped.t -> term Scoped.t
 
-  val apply : Renaming.t -> t -> term Scoped.t -> term
+  val apply : ?shift_vars:int -> Renaming.t -> t -> term Scoped.t -> term
   (** Apply the substitution to the given term/type.
       @param renaming used to desambiguate free variables from distinct scopes *)
 
@@ -186,10 +186,19 @@ module Ty : SPECIALIZED with type term = Type.t
 module FO : sig
   include SPECIALIZED with type term = Term.t
   val bind' : t -> Type.t HVar.t Scoped.t -> term Scoped.t -> t
-  val apply_l : Renaming.t -> t -> term list Scoped.t -> term list
+  val apply_l : ?shift_vars:int -> Renaming.t -> t -> term list Scoped.t -> term list
   val of_list' : ?init:t -> (Type.t HVar.t Scoped.t * term Scoped.t) list -> t
   val map : (term -> term) -> t -> t
+  val iter : (Type.t HVar.t Scoped.t -> term Scoped.t -> unit) -> t -> unit
   val filter : (Type.t HVar.t Scoped.t -> term Scoped.t -> bool) -> t -> t
+  val compose:  scope:int -> t -> t -> t
+  (** Takes a substitution that might map a variable x to a term
+     that containts loosely bound variables. It fixes the substitution
+     so that all such variables are remaped to a fresh skolem *)
+  val unleak_variables : t -> t * (Term.t list)
+  val subset_is_renaming : subset:(term Scoped.t list) -> res_scope:int -> t -> bool
+  val canonize_neg_vars : var_set:(InnerTerm.VarSet.t) -> t
+  val canonize_all_vars : term -> term
 end
 
 (** {2 Projections for proofs} *)

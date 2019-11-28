@@ -5,6 +5,7 @@
 
 module T = TypedSTerm
 module F = T.Form
+module US = Unif_subst
 
 type form = TypedSTerm.t
 type term = TypedSTerm.t
@@ -133,6 +134,7 @@ let pp ppt out = function
   | Atom (t, false) -> fpf out "@[<2>¬@ @[%a@]@]" ppt t
   | Eq (t1,t2) -> fpf out "@[%a@ =@ %a@]" ppt t1 ppt t2
   | Neq (t1,t2) -> fpf out "@[%a@ ≠@ %a@]" ppt t1 ppt t2
+
 
 let to_string ppt = CCFormat.to_string (pp ppt)
 

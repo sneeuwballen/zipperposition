@@ -50,10 +50,20 @@ val update : t -> var Scoped.t -> term Scoped.t -> t
 
 val mem : t -> var Scoped.t -> bool
 
+val merge : t -> t -> t
+val compose : scope:Scoped.scope -> t -> t -> t
+
+
+
 module FO : sig
   val bind : t -> Type.t HVar.t Scoped.t -> Term.t Scoped.t -> t
   val mem : t -> Type.t HVar.t Scoped.t -> bool
   val deref : t -> Term.t Scoped.t -> Term.t Scoped.t
+  val singleton : Type.t HVar.t Scoped.t -> Term.t Scoped.t -> t
+  val rename_to_new_scope : counter:int ref -> 
+                            Term.t Scoped.t -> 
+                            Term.t Scoped.t ->
+                            Term.t * Term.t * Scoped.scope * t
 end
 
 include Interfaces.HASH with type t := t

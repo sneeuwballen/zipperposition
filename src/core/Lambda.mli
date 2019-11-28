@@ -8,6 +8,8 @@ type term = Term.t
 val whnf : term -> term
 (** Beta-reduce the term into its weak head normal form *)
 
+val beta_red_head : term -> term
+
 val whnf_list : term -> term list -> term
 (** Apply a lambda to a list of arguments.
     The type of the lambda must be a generalization of a function
@@ -23,9 +25,14 @@ val eta_expand : term -> term
 (** Traverse the term, eta-expanding all sub-terms.
     A term [t : a -> b] becomes [fun (x:a). t x] *)
 
-val eta_reduce : term -> term
+val eta_reduce : ?full:bool -> term -> term
 (** Traverse the term, eta-reducing all sub-terms.
-    A term [fun x. t x] where [x ∉ vars(t)] becomes [t] *)
+    A term [fun x. t x] where [x ∉ vars(t)] becomes [t].
+    If full is false, it eta-reduces only at the top level (default: true) *)
+
+val is_lambda_pattern : term -> bool
+
+val is_properly_encoded : term -> bool
 
 (** Low level interface *)
 module Inner : sig
@@ -36,4 +43,8 @@ module Inner : sig
   val snf : term -> term
 
   val eta_expand : term -> term
+
+  val eta_reduce : ?full:bool -> term -> term
+  
+  val beta_red_head : term -> term
 end

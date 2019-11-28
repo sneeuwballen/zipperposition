@@ -73,7 +73,7 @@ let create
     sc_counter=0;
     sc_new_defs = [];
     sc_gensym = Hashtbl.create 16;
-    sc_new_ids = [];
+    sc_new_ids = []; 
     sc_on_new = on_new;
   } in
   ctx
@@ -86,13 +86,13 @@ let fresh_id ?(start0=false) ~ctx prefix =
   let name = if n=0 && not start0 then prefix else prefix ^ string_of_int n in
   ID.make name
 
-let fresh_skolem_prefix ~ctx ~ty ~vars_count prefix =
+let fresh_skolem_prefix ~ctx ~ty prefix =
   incr_counter ctx;
   let s = fresh_id ~ctx prefix in
   let kind =
     if Ind_ty.is_inductive_simple_type ty then ID.K_ind else ID.K_normal
   in
-  ID.set_payload s (ID.Attr_skolem (kind, vars_count));
+  ID.set_payload s (ID.Attr_skolem kind);
   ctx.sc_new_ids <- (s,ty) :: ctx.sc_new_ids;
   ctx.sc_on_new s ty;
   Util.debugf ~section 3 "@[<2>new skolem symbol `%a`@ with type `@[%a@]`@]"
@@ -136,8 +136,7 @@ let skolem_form ~ctx subst var form =
   let ty_var = T.Subst.eval subst (Var.ty var) in
   let ty = ty_forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) ty_var) in
   let prefix = "sk_" ^ Var.to_string var in
-  let vars_count = List.length vars in
-  let f = fresh_skolem_prefix ~ctx ~ty ~vars_count prefix in
+  let f = fresh_skolem_prefix ~ctx ~ty prefix in
   let skolem_t = T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t) in
   T.Subst.eval subst skolem_t
 
@@ -191,32 +190,74 @@ let stmt_of_form rw_rules polarity proxy proxy_id proxy_ty form proof =
     ]
   )
 
+let find_def_in_ctx ~ctx form =
+  CCList.find_map (fun def ->
+    match def with
+    | Def_form def when not def.rw_rules -> 
+      let def_form = def.form in
+      let df_vars, f_vars = 
+        CCPair.map_same (fun x -> Var.Set.of_seq (T.Seq.vars x)) (def_form,form) in
+      if not (Var.Set.intersection_empty df_vars f_vars) then None 
+      else CCOpt.map (fun subst -> def,subst) (TypedSTerm.try_alpha_renaming def_form form)
+    | _ -> None) 
+  ctx.sc_new_defs
+
 let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~parents form =
-  incr_counter ctx;
-  let tyvars, vars = collect_vars Var.Subst.empty form in
-  let vars_t = List.map (fun v->T.var v) vars in
-  let tyvars_t = List.map (fun v->T.Ty.var v) tyvars in
-  (* similar to {!skolem_form}, but always return [prop] *)
-  let ty = ty_forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) T.Ty.prop) in
-  (* not a skolem (but a defined term). Will be defined, not declared. *)
-  let f = fresh_id ~start0:true ~ctx pattern in
-  let proxy = T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t) in
-  let proof = Proof.Step.define_internal f parents in
-  (* register the new definition *)
-  let def = {
-    form;
-    proxy_id=f;
-    proxy_ty=ty;
-    rw_rules;
-    proxy;
-    polarity;
-    proof;
-    as_stmt=lazy (stmt_of_form rw_rules polarity proxy f ty form proof);
-  } in
-  ctx.sc_new_defs <- Def_form def :: ctx.sc_new_defs;
-  Util.debugf ~section 5 "@[<2>define_form@ %a@ :proof %a@]"
-    (fun k->k pp_form_definition def Proof.Step.pp proof);
-  def
+  let create_new ~ctx ~rw_rules ~polarity ~parents ~form = 
+    incr_counter ctx;
+    let tyvars, vars = collect_vars Var.Subst.empty form in
+    let vars_t = List.map (fun v->T.var v) vars in
+    let tyvars_t = List.map (fun v->T.Ty.var v) tyvars in
+    (* similar to {!skolem_form}, but always return [prop] *)
+    let ty = ty_forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) T.Ty.prop) in
+    (* not a skolem (but a defined term). Will be defined, not declared. *)
+    let f = fresh_id ~start0:true ~ctx pattern in
+    let proxy = T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t) in
+    let proof = Proof.Step.define_internal f parents in
+    (* register the new definition *)
+    let def = {
+      form;
+      proxy_id=f;
+      proxy_ty=ty;
+      rw_rules;
+      proxy;
+      polarity;
+      proof;
+      as_stmt=lazy (stmt_of_form rw_rules polarity proxy f ty form proof);
+    } in
+    ctx.sc_new_defs <- Def_form def :: ctx.sc_new_defs;
+    Util.debugf ~section 5 "@[<2>define_form@ %a@ :proof %a@]"
+      (fun k->k pp_form_definition def Proof.Step.pp proof);
+    def in
+  let res = 
+  if not rw_rules then (
+    (* Format.printf "defining:@ @[%a@]\n" T.pp form; *)
+
+    match find_def_in_ctx ~ctx form with
+    | Some (def, subst) ->
+      (* def.form is alpha renaming *)
+      assert (T.equal form (T.Subst.eval ~rename_binders:false subst def.form));
+      (* nothing is bound in form *)
+      assert(T.equal form (T.Subst.eval ~rename_binders:false subst form));
+      Util.debugf ~section 1 "@[Reusing definition %a. Old def: %a. New def: %a]"
+        (fun k -> k T.pp def.proxy T.pp def.form T.pp form);
+      let proxy = T.Subst.eval subst def.proxy in
+      let proof = Proof.Step.define_internal def.proxy_id parents in
+      let res = {
+        def with 
+          form; proxy; proof; polarity;
+          as_stmt = lazy (stmt_of_form rw_rules polarity proxy
+                           def.proxy_id def.proxy_ty form proof);
+      }  in
+      if def.polarity != polarity then (
+        incr_counter ctx;
+        ctx.sc_new_defs <- Def_form res :: ctx.sc_new_defs
+      );
+      res
+    | None -> create_new ~ctx ~rw_rules ~polarity ~parents ~form
+  ) else (create_new ~ctx ~rw_rules ~polarity ~parents ~form)
+  in
+  res
 
 let pp_rules =
   Fmt.(Util.pp_list Dump.(pair (list T.pp_inner |> hovbox) T.pp) |> hovbox)

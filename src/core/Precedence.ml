@@ -10,6 +10,9 @@ type symbol_status =
 
 let section = Util.Section.(make "precedence")
 
+let db_w_def = 1
+let lmb_w_def = 1
+
 (** {2 Weight of Symbols} *)
 module Weight = struct
   type t = {
@@ -132,6 +135,8 @@ type t = {
   (* weight function *)
   mutable arg_coeff: ID.t -> int list;
   (* argument coefficients *)
+  db_w : int;
+  lmb_w : int;
   constr : [`total] Constr.t;
   (* constraint used to build and update the precedence *)
 }
@@ -144,6 +149,11 @@ let equal p1 p2 =
 
 let snapshot p = p.snapshot
 
+(* Precedence weight for E-like selection functions *)
+let sel_prec_weight p s1 =
+  let lazy tbl = p.tbl in
+  ID.Tbl.get_or ~default:100 tbl s1
+
 let compare_by_tbl p s1 s2 =
   let lazy tbl = p.tbl in
   let i1 = ID.Tbl.get_or ~default:~-1 tbl s1 in
@@ -151,8 +161,7 @@ let compare_by_tbl p s1 s2 =
   let c = CCInt.compare i1 i2 in
   if c = 0
   then (
-    (* Format.printf "%a (%d) and %a (%d)@." ID.pp_full s1 i1 ID.pp_full s2 i2; *)
-    assert (ID.equal s1 s2);
+    assert (i1=(-1) && i2=(-1) || ID.equal s1 s2);
     c
   )
   else c
@@ -170,6 +179,9 @@ let mem p s =
 let status p s = ID.Tbl.get_or ~default:LengthLexicographic p.status s
 
 let weight p s = p.weight s
+
+let db_weight p = Weight.int p.db_w
+let lam_weight p = Weight.int p.lmb_w
 
 let arg_coeff p s i = try List.nth (p.arg_coeff s) i with _ -> 1
 
@@ -217,11 +229,114 @@ let mk_tbl_ l =
 type weight_fun = ID.t -> Weight.t
 type arg_coeff_fun = ID.t -> int list
 
+let depth_occ_driver ~flip stmt_d =
+  let tbl = ID.Tbl.create 16 in
+  Iter.iter (fun (sym,d) -> 
+    try 
+      let l = ID.Tbl.find tbl sym in
+      ID.Tbl.replace tbl sym (d :: l)
+    with _ -> ID.Tbl.add tbl sym [d]
+  ) stmt_d;
+
+  let rec sum = function 
+  | [] -> 0
+  | x :: xs -> x + (sum xs) in
+
+  let sorted = 
+    ID.Tbl.to_list tbl 
+    |> List.map (fun (id, depths) -> 
+        let d_sum = sum depths and n = List.length depths in
+        (d_sum / n, n, id))
+    |> List.sort (fun (avg1, n1, id1) (avg2, n2, id2) -> 
+      let open CCOrd in
+      if flip then compare avg2 avg1 <?> (compare, n2, n1) <?> (ID.compare, id2, id1)
+      else compare avg1 avg2 <?> (compare, n1, n2) <?> (ID.compare, id1, id2)
+    ) in
+
+  ID.Tbl.clear tbl;
+  let tbl = ID.Tbl.create 16 in
+  List.iteri (fun i (_,_,sym) -> ID.Tbl.add tbl sym (Weight.int (i + 5))) sorted;
+  let default = Weight.int 10 in
+  fun sym -> (ID.Tbl.get_or ~default tbl sym)
+
+let inv_depth_occurence =  depth_occ_driver ~flip:false
+let depth_occurence =  depth_occ_driver ~flip:true
+
+
 (* weight of f = arity of f + 4 *)
-let weight_modarity ~arity a = Weight.int (arity a + 4)
+let weight_modarity ~signature a = 
+  let arity =  try snd @@ Signature.arity signature a with _ -> 10 in
+  Weight.int (arity + 4)
+
+let weight_invarity ~signature = 
+  let max_arity = 
+    Signature.Seq.symbols signature
+    |> Iter.map (fun sym -> snd @@ Signature.arity signature sym)
+    |> Iter.max |> CCOpt.get_or ~default:max_int in
+  
+  (fun a ->
+    let arity =  try snd @@ Signature.arity signature a with _ -> 0 in
+    Weight.int (max_arity - arity + 3))
+
 
 (* constant weight *)
 let weight_constant _ = Weight.int 4
+
+let weight_invfreq (symbs : ID.t Iter.t) : ID.t -> Weight.t =
+  let tbl = ID.Tbl.create 16 in
+  Iter.iter (ID.Tbl.incr tbl) symbs;
+  let max_freq = List.fold_left (max) 0 (ID.Tbl.values_list tbl) in
+  fun sym ->Weight.int (max_freq - (ID.Tbl.get_or ~default:1 tbl sym) + 5) 
+
+let weight_freq (symbs : ID.t Iter.t) : ID.t -> Weight.t =
+  let tbl = ID.Tbl.create 16 in
+  Iter.iter (ID.Tbl.incr tbl) symbs;
+  fun sym ->Weight.int ((ID.Tbl.get_or ~default:10 tbl sym) + 5) 
+
+let weight_invfreqrank (symbs : ID.t Iter.t) : ID.t -> Weight.t =
+  let tbl = ID.Tbl.create 16 in
+  Iter.iter (ID.Tbl.incr tbl) symbs;
+  let sorted = 
+    Iter.sort ~cmp:(fun s1 s2 -> 
+      CCInt.compare (ID.Tbl.get_or tbl ~default:0 s1) 
+                    (ID.Tbl.get_or tbl ~default:0 s2)) symbs in
+  ID.Tbl.clear tbl;
+  let tbl = ID.Tbl.create 16 in
+  Iter.iteri (fun i (sym:ID.t) -> ID.Tbl.add tbl sym (i+1)) sorted;
+  (fun sym -> Weight.int (ID.Tbl.get_or ~default:10 tbl sym))
+
+
+let weight_freqrank (symbs : ID.t Iter.t) : ID.t -> Weight.t =
+  let tbl = ID.Tbl.create 16 in
+  Iter.iter (ID.Tbl.incr tbl) symbs;
+  let sorted = 
+    Iter.sort ~cmp:(fun s1 s2 -> 
+      CCInt.compare (ID.Tbl.get_or tbl ~default:0 s2) 
+                    (ID.Tbl.get_or tbl ~default:0 s1)) symbs in
+  ID.Tbl.clear tbl;
+  Iter.iteri (fun i sym -> ID.Tbl.add tbl sym (i+1)) sorted;
+  (fun sym -> Weight.int (ID.Tbl.get_or ~default:10 tbl sym))
+
+
+let weight_fun_of_string ~signature s = 
+  let syms_only sym_depth = 
+    Iter.map fst sym_depth in
+  let with_syms f sym_depth = f (syms_only sym_depth) in
+  let ignore_arg f _ = f in 
+
+  let wf_map = 
+    ["invfreq", with_syms weight_invfreq; 
+    "freq", with_syms weight_freq; 
+    "invfreqrank", with_syms weight_invfreqrank;
+    "freqrank", with_syms weight_freqrank;
+    "modarity", ignore_arg @@ weight_modarity ~signature;
+    "invarity", ignore_arg @@ weight_invarity ~signature;
+    "invdocc", inv_depth_occurence;
+    "docc", depth_occurence;
+    "const", ignore_arg weight_constant] in
+  try
+    List.assoc s wf_map
+  with Not_found -> invalid_arg "KBO weight function not found"
 
 (* default argument coefficients *)
 let arg_coeff_default _ = []
@@ -242,7 +357,9 @@ let check_inv_ p =
   in
   sorted_ p.snapshot
 
-let create ?(weight=weight_constant) ?(arg_coeff=arg_coeff_default) c l =
+let create ?(weight=weight_constant) ?(arg_coeff=arg_coeff_default)
+           ?(db_w=db_w_def) ?(lmb_w=lmb_w_def)
+           c l =
   let l = CCList.sort_uniq ~cmp:c l in
   let tbl = lazy (mk_tbl_ l) in
   let res = {
@@ -250,6 +367,8 @@ let create ?(weight=weight_constant) ?(arg_coeff=arg_coeff_default) c l =
     tbl;
     weight;
     arg_coeff;
+    db_w;
+    lmb_w;
     status=ID.Tbl.create 16;
     constr=c;
   } in

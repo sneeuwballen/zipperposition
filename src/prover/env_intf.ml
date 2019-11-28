@@ -50,6 +50,9 @@ module type S = sig
   type term_rewrite_rule = Term.t -> (Term.t * Proof.parent list) option
   (** Rewrite rule on terms *)
 
+  type term_norm_rule = Term.t -> Term.t option
+  (** Normalization rule on terms *)
+
   type lit_rewrite_rule = Literal.t -> (Literal.t * Proof.parent list * Proof.tag list) option
   (** Rewrite rule on literals *)
 
@@ -59,6 +62,7 @@ module type S = sig
 
   type 'a conversion_result =
     | CR_skip (** rule didn't fire *)
+    | CR_drop (** drop the clause from the proof state *)
     | CR_add of 'a (** add this to the result *)
     | CR_return of 'a (** shortcut the remaining rules, return this *)
 
@@ -122,6 +126,10 @@ module type S = sig
   val add_multi_simpl_rule : multi_simpl_rule -> unit
   (** Add a multi-clause simplification rule *)
 
+  val set_single_step_multi_simpl_rule : multi_simpl_rule -> unit
+  (** Add a multi-clause simplification rule, that is going to be applied
+      only once, not in a fixed-point manner *)
+
   val add_is_trivial_trail : is_trivial_trail_rule -> unit
   (** Add tautology detection rule *)
 
@@ -130,6 +138,11 @@ module type S = sig
 
   val add_rewrite_rule : string -> term_rewrite_rule -> unit
   (** Add a term rewrite rule *)
+
+  val set_ho_normalization_rule : term_norm_rule -> unit
+  (** Add a ho norm rule *)
+
+  val get_ho_normalization_rule : unit -> term_norm_rule
 
   val add_lit_rule : string -> lit_rewrite_rule -> unit
   (** Add a literal rewrite rule *)

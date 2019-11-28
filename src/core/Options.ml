@@ -8,7 +8,7 @@
     global parameters, and return a parameter type for other options.
 *)
 
-let stats = ref false
+let _stats = ref false
 
 type input_format =
   | I_tptp
@@ -87,7 +87,7 @@ let make () =
     ; "--no-color", switch_opt false CCFormat.set_color_default, " disable colors"
     ; "-nc", switch_opt false CCFormat.set_color_default, " alias to --no-color"
     ; "--mem-limit", Arg.Int Util.set_memory_limit, " memory limit (in MB)"
-    ; "--stats", Arg.Set stats, " gather and print statistics"
+    ; "--stats", Arg.Set _stats, " gather and print statistics"
     ; "--input", Arg.String set_in, " set input format (zf or tptp)"
     ; "-i", Arg.String set_in, " alias for --input"
     ; "--output" , Arg.String set_out , " choose printing format (zf, tptp, default, none)"

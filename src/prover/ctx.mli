@@ -16,6 +16,8 @@ module type PARAMETERS = sig
   val signature : Signature.t
   val ord : Ordering.t
   val select : Selection.t
+  val eta : [`Reduce | `Expand | `None]
+  val sk_ctx : Skolem.ctx
 end
 
 (** {2 Create a new context} *)

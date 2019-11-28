@@ -3,6 +3,15 @@
 
 (** {1 Statement} *)
 
+module OptionSet = Set.Make(
+   struct
+      let compare x y = Pervasives.compare x y
+      type t = int option
+   end)
+
+module IdMap = ID.Map
+module US = Unif_subst
+module TST = TypedSTerm
 
 (** A datatype declaration *)
 type 'ty data = {
@@ -187,6 +196,28 @@ let conv_rule ~proof (r:_ def_rule) : Rewrite.rule = match r with
     let rhs = List.map (List.map Literal.Conv.of_form) rhs in
     Rewrite.Rule.make_lit lhs rhs ~proof
 
+let conv_rule_i ~proof (r:_ def_rule) = match r with
+  | Def_term {id;ty;args;rhs;_} ->
+    let ctx = Type.Conv.create () in
+    let ty = Type.Conv.of_simple_term_exn ctx ty in
+    let args = List.map (Term.Conv.of_simple_term_exn ctx) args in
+    let rhs = Lambda.snf (Term.Conv.of_simple_term_exn ctx rhs) in
+    let rule = Rewrite.Term.Rule.make id ty args rhs ~proof in
+    Rewrite.T_rule rule
+  | Def_form {lhs;rhs;_} ->
+    let ctx = Type.Conv.create () in
+    match lhs with 
+    | SLiteral.Atom(lhs, true) -> 
+      let lhs = Term.Conv.of_simple_term_exn ctx lhs in
+      let hd, args = Term.as_app lhs in
+      let ty = Term.ty hd in
+      if List.length rhs = 1 then (
+        let rhs = Term.Conv.of_simple_term_exn ctx (List.hd rhs) in
+        let rule = Rewrite.Term.Rule.make (Term.as_const_exn hd) ty args rhs ~proof in
+        Rewrite.T_rule rule
+      ) else invalid_arg "rhs must be a singleton list."
+    | _ -> invalid_arg "only positive polarity is supported."
+
 (* convert rules *)
 let conv_rules (l:_ def_rule list) proof : definition =
   assert (l <> []);
@@ -224,6 +255,25 @@ let decl_data_functions ity proof : unit =
          Rewrite.Defined_cst.declare_cstor ~proof cstor
        );)
     ity.Ind_ty.ty_constructors
+
+let get_formulas_from_defs st =
+  let get_from_rule rule =
+    match rule with
+    | Def_term {vars;id;ty;args;rhs;as_form} -> 
+      ignore(vars,id,ty,args,rhs);
+      [as_form]
+    | Def_form {vars;lhs;rhs;polarity;as_form} -> 
+      ignore(vars,lhs,polarity,rhs);
+      as_form in
+
+
+  match view st with 
+  | Def defs -> CCList.flat_map (fun d -> CCList.flat_map get_from_rule d.def_rules) defs
+  | Rewrite def_rule  -> get_from_rule def_rule
+  | _ -> []
+
+
+
 
 (** {2 Iterators} *)
 
@@ -339,10 +389,13 @@ module Seq = struct
         | `Ty ty -> Type.Seq.symbols ty)
 end
 
-let signature ?(init=Signature.empty) seq =
-  seq
-  |> Iter.flat_map Seq.ty_decls
-  |> Iter.fold (fun sigma (id,ty) -> Signature.declare sigma id ty) init
+let signature ?(init=Signature.empty) ?(conj_syms=Iter.empty) seq =
+  let signtr =
+   seq
+    |> Iter.flat_map Seq.ty_decls
+    |> Iter.fold (fun sigma (id,ty) -> Signature.declare sigma id ty) init in
+   conj_syms
+   |> Iter.fold (fun sigma symb -> Signature.set_sym_in_conj symb sigma) signtr
 
 let conv_attrs =
   let module A = UntypedAST in
@@ -471,6 +524,76 @@ let name (st:(_,_,_)t) : string =
       st.name <- Some s;
       s
   end
+
+let lift_lambdas st = 
+  let get_tydecl_from_def ~proof def =
+    let _, body = TST.unfold_binder Binder.Forall def in
+    match TST.view body with
+    | TST.AppBuiltin(b, [lhs;_])
+       when Builtin.equal b Builtin.Eq || Builtin.equal b Builtin.Equiv ->
+      begin match TST.view lhs with
+      | TST.App(hd, _) when TST.is_const hd ->
+        let hd_id = TST.head_exn hd in
+        let ty = TST.ty_exn hd in
+        ty_decl ~proof hd_id ty 
+      | _ -> invalid_arg "wrong encoding of def" end
+    | _ -> invalid_arg "wrong encoding of def" in
+
+  let ll_proof_step st f new_defs =
+    let rule = Proof.Rule.mk "lift_lambdas" in
+    let parents  = Proof.Step.parents (proof_step st) @ 
+                   CCList.flat_map (fun d -> Proof.Step.parents @@ Proof.S.step @@ Proof.S.mk_f_trivial d) new_defs in
+    (* Proof.Step.simp ~tags ~rule (Proof.Step.parents (proof_step st))  *)
+    let step = Proof.S.mk_f_simp ~rule f parents in
+    Proof.S.step step in
+
+  let assert_defs def = 
+    let step = Proof.Step.intro (Proof.Src.internal []) Proof.R_assert in
+    let proof = Proof.S.step (Proof.S.mk_f step def) in
+    [get_tydecl_from_def ~proof def; assert_ ~proof def] in
+
+  let stmt_parents = Proof.Step.parents (proof_step st) in
+  let res = begin match view st with
+  | Assert f -> 
+    let f', new_defs =  TST.lift_lambdas f in
+    (if CCList.is_empty new_defs then Iter.singleton st
+    else (assert_ ~proof:(ll_proof_step st f new_defs) f') :: (CCList.flat_map assert_defs new_defs)
+          |> Iter.of_list)
+  | Lemma fs ->
+    let fs', defs = List.fold_right (fun f (ffs, ddefs) -> 
+      let f', new_defs = TST.lift_lambdas f in
+      f' :: ffs, new_defs @ ddefs
+    ) fs ([], []) in
+    if CCList.is_empty defs then Iter.singleton st
+    else (
+      let rule = Proof.Rule.mk "lift_lambdas" in
+      let fs_parents = (List.map (fun f ->
+         Proof.Parent.from (Proof.S.mk_f_esa ~rule f stmt_parents)) fs) in
+      let proof = Proof.Step.simp ~rule fs_parents in
+      (lemma ~proof fs') :: (CCList.flat_map assert_defs defs)
+      |> Iter.of_list)
+  | Goal f ->
+    let f', new_defs =  TST.lift_lambdas f in
+    if CCList.is_empty new_defs then Iter.singleton st
+    else ((goal ~proof:(ll_proof_step st f new_defs) f') ::  (CCList.flat_map assert_defs new_defs)
+          |> Iter.of_list)
+  | NegatedGoal (skolems,fs) ->
+    let fs', defs = List.fold_right (fun f (ffs, ddefs) -> 
+      let f', new_defs = TST.lift_lambdas f in
+      f' :: ffs, new_defs @ ddefs
+    ) fs ([], []) in
+    if CCList.is_empty defs then Iter.singleton st
+    else (
+      let rule = Proof.Rule.mk "lift_lambdas" in
+      let fs_parents = (List.map (fun f -> 
+        Proof.Parent.from (Proof.S.mk_f_esa ~rule f stmt_parents)) fs) in
+      let proof = Proof.Step.simp ~rule fs_parents in
+      (neg_goal ~proof ~skolems fs' :: (CCList.flat_map assert_defs defs))
+      |> Iter.of_list)
+  | _ -> Iter.singleton st end in
+  Util.debugf 1 "Lambda lifted:@ @[%a@]\n" (fun k -> k pp_input st);
+  Util.debugf 1 "into @ @[%a@]\n" (fun k -> k (CCList.pp pp_input) (Iter.to_list res));
+  res
 
 module ZF = struct
   module UA = UntypedAST.A
@@ -666,6 +789,22 @@ let as_proof_c t = Proof.S.mk t.proof (Proof.Result.make res_tc_c t)
 
 (** {2 Scanning} *)
 
+let define_rw_rule ~proof r =
+  ignore(proof);
+  begin match r with
+    | Rewrite.T_rule r ->
+      let id = Rewrite.Term.Rule.head_id r in
+      Rewrite.Defined_cst.declare_or_add id (Rewrite.T_rule r)
+    | Rewrite.L_rule lr ->
+      begin match Rewrite.Lit.Rule.head_id lr with
+        | Some id ->
+          Rewrite.Defined_cst.declare_or_add id r
+        | None ->
+          assert (Rewrite.Lit.Rule.is_equational lr);
+          Rewrite.Defined_cst.add_eq_rule lr
+      end
+  end
+
 let scan_stmt_for_defined_cst (st:(clause,Term.t,Type.t) t): unit = match view st with
   | Def [] -> assert false
   | Def l ->
@@ -700,22 +839,15 @@ let scan_stmt_for_defined_cst (st:(clause,Term.t,Type.t) t): unit = match view s
          let _ = Rewrite.Defined_cst.declare ~level id def in
          ())
       ids_and_levels
-  | Rewrite d ->
+  | Rewrite d  ->
     let proof = as_proof_c st in
-    let r = conv_rule ~proof d in
-    begin match r with
-      | Rewrite.T_rule r ->
-        let id = Rewrite.Term.Rule.head_id r in
-        Rewrite.Defined_cst.declare_or_add id (Rewrite.T_rule r)
-      | Rewrite.L_rule lr ->
-        begin match Rewrite.Lit.Rule.head_id lr with
-          | Some id ->
-            Rewrite.Defined_cst.declare_or_add id r
-          | None ->
-            assert (Rewrite.Lit.Rule.is_equational lr);
-            Rewrite.Defined_cst.add_eq_rule lr
-        end
-    end
+    define_rw_rule ~proof (conv_rule ~proof d)
+  | _ -> ()
+
+let scan_tst_rewrite (st:(TypedSTerm.t,TypedSTerm.t,TypedSTerm.t) t): unit = match view st with
+  | Rewrite d  ->
+    let proof = as_proof_i st in
+    define_rw_rule ~proof (conv_rule_i ~proof d)
   | _ -> ()
 
 let scan_stmt_for_ind_ty st = match view st with
@@ -760,3 +892,79 @@ let scan_simple_stmt_for_ind_ty st = match view st with
          ())
       l
   | _ -> ()
+
+(** TODO: Ask Simon how to hide this in the fun *)
+let def_sym = ref IdMap.empty;;
+
+let get_rw_rule ?weight_incr:(w_i=1000000) c  =
+  let distinct_free_vars l =
+    l |> List.map (fun t -> Term.as_var t |>
+                    (fun v -> match v with
+                               | Some x -> Some (HVar.id x)
+                               | None -> None) )
+    |> OptionSet.of_list
+    |> (fun set -> not (OptionSet.mem None set) && OptionSet.cardinal set = List.length l) in
+
+  let make_rw sym vars rhs =
+    let ty_vars = List.filter (fun v -> Type.is_tType (Term.ty v)) vars in
+    let vars = List.filter (fun v -> not (Type.is_tType (Term.ty v))) vars in
+    let n_new = List.length vars in
+    let var_db_map =
+      CCList.foldi (fun acc i v -> Term.Map.add v (n_new-i-1) acc) Term.Map.empty vars in
+    let vars_to_db = Term.DB.map_vars_shift var_db_map rhs in
+    let abs_rhs =  (Term.fun_l ((CCList.map Term.ty vars)) vars_to_db) in
+    assert(Term.DB.is_closed abs_rhs);
+    let r = Rewrite.Term.Rule.make ~proof:(as_proof_c c) sym (Type.close_forall (Term.ty abs_rhs)) ty_vars abs_rhs in
+    let rule = Rewrite.T_rule r in
+    Util.debugf 5 "Defined %a with %a" (fun k -> k ID.pp sym Rewrite.Term.Rule.pp r);
+    rule in
+
+  let build_from_head sym vars rhs =
+    let rhs = Lambda.eta_reduce @@ Lambda.snf (fst (Rewrite.Term.normalize_term rhs)) in
+    let vars_lhs = Term.VarSet.of_seq (Iter.fold (fun acc v -> 
+        Iter.append acc (Term.Seq.vars v)) 
+      Iter.empty (Iter.of_list vars)) in
+    if not (Term.symbols rhs |> ID.Set.mem sym) &&
+        Term.VarSet.cardinal
+          (Term.VarSet.diff (Term.vars rhs) vars_lhs) = 0 then
+      (* Here I skipped proof object creation *)
+      let res_rw =  Some (sym, make_rw sym vars rhs) in
+      (def_sym := IdMap.add sym (rhs, res_rw) !def_sym;
+       res_rw)
+    else None in
+
+  let conv_terms_rw t1 t2 =
+    let reduced = Lambda.eta_reduce t1 in
+    let t2' = Lambda.snf (fst (Rewrite.Term.normalize_term t2)) in
+    let hd, l = Term.as_app reduced in
+    if (Term.is_const hd && distinct_free_vars l && Type.is_fun (Term.ty hd)) then (
+      let sym = (Term.as_const_exn hd) in
+      (match IdMap.find_opt sym !def_sym with
+      | Some (rhs, rw_rule) ->  (
+          let rhs = Lambda.eta_reduce rhs in
+          if  not (Unif.FO.are_variant rhs t2') then (
+          None)
+          else rw_rule )
+      | _ -> build_from_head sym l t2)
+    ) 
+    else None in
+      
+   let all_lits =  Seq.lits c in
+   if Iter.length all_lits = 1 then
+      match Iter.head_exn all_lits with
+      | SLiteral.Eq (t1,t2) when not (List.mem t1 [Term.true_; Term.false_]) &&
+                                 not (List.mem t2 [Term.true_; Term.false_]) ->
+         assert(Type.equal (Term.ty t1) (Term.ty t2));
+         let ty = Term.ty t1 in
+         let fresh_vars = List.map (fun ty -> Term.var (HVar.fresh ~ty ())) (Type.expected_args ty) in
+         let t1, t2 = Lambda.snf @@ Term.app t1 fresh_vars, Lambda.snf @@ Term.app t2 fresh_vars in
+         if (Term.weight t2 - Term.weight t1 <= w_i) then (
+            match conv_terms_rw t1 t2 with
+            | Some rhs -> Some rhs
+            | None -> if Term.weight t1 - Term.weight t2 <= w_i then
+                      conv_terms_rw t2 t1 else None)
+         else (if Term.weight t1 - Term.weight t2 <= w_i then
+               conv_terms_rw t2 t1 else None)
+      | _ -> None
+   else None
+

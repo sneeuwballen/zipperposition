@@ -67,6 +67,8 @@ let make op m1 m2 =
 let mk_eq = make Equal
 let mk_less = make Less
 
+let make_no_simp op m1 m2 = {op; left=m1; right=m2}
+
 let pp out m =
   Format.fprintf out "%a %s %a"
     M.pp m.left
@@ -324,11 +326,11 @@ let is_absurd lit = match lit.op with
     M.is_const m && M.sign m <> 0
   | Less -> M.dominates ~strict:false lit.left lit.right
 
-let fold_terms ?(pos=P.stop) ?(vars=false) ?ty_args ~which ~ord ~subterms lit k =
+let fold_terms ?(pos=P.stop) ?(vars=false) ?(var_args=true) ?(fun_bodies=true) ?ty_args ~which ~ord ~subterms lit k =
   (* function to call at terms *)
   let at_term ~pos t k =
     if subterms
-    then T.all_positions ?ty_args ~vars ~pos t k
+    then T.all_positions ?ty_args ~var_args ~fun_bodies ~vars ~pos t k
     else (* don't do anything if [t] is a var and [vars=false] *)
     if vars || not (T.is_var t) then k (t,pos)
   and fold_monome = match which with

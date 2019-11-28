@@ -221,7 +221,7 @@ end = struct
       (* add goal's clauses to the local saturation set *)
       List.iter
         (fun lits ->
-           let c = C.create_a ~trail:Trail.empty ~penalty:0 lits Proof.Step.trivial in
+           let c = C.create_a ~trail:Trail.empty ~penalty:1 lits Proof.Step.trivial in
            let c, _ = E.unary_simplify c in
            if E.is_trivial c then ()
            else if C.is_empty c then raise (Yield_false c)
@@ -588,7 +588,7 @@ module Make
                            BoolLit.neg cut_blit;
                          ] |> Trail.of_list
                        in
-                       C.create_a lits proof ~trail ~penalty:0))
+                       C.create_a lits proof ~trail ~penalty:1))
              |> Iter.to_list
            in
            (* clauses [CNF[¬goal[case]) <- b_lit(case), ¬cut.blit] with
@@ -618,7 +618,7 @@ module Make
                         b_lit_case;
                       ] |> Trail.of_list
                     in
-                    C.create_a lits proof ~trail ~penalty:0)
+                    C.create_a lits proof ~trail ~penalty:1)
              end
            in
            (* all new clauses *)
@@ -741,8 +741,6 @@ module Make
 
   (* variable appears only naked, i.e. directly under [=] *)
   let var_always_naked (f:Cut_form.t)(x:T.var): bool =
-    let check_t t = T.is_var t || not (T.var_occurs ~var:x t) in
-    begin
       Cut_form.cs f
       |> Iter.of_list
       |> Iter.flat_map Iter.of_array
@@ -751,11 +749,9 @@ module Make
           | Literal.Equation (l,r,_) ->
             let check_t t = T.is_var t || not (T.var_occurs ~var:x t) in
             check_t l && check_t r
-          | Literal.Prop (t,_) -> check_t t
           | Literal.Int _ | Literal.Rat _ -> false
           | Literal.True | Literal.False -> true)
-    end
-
+ 
   let active_subterms_form (f:Cut_form.t): T.t Iter.t =
     Cut_form.cs f
     |> Iter.of_list
@@ -1386,4 +1382,16 @@ let () =
     ; "--ind-gen-term", Arg.Set gen_term, " generalize on terms"
     ; "--no-ind-gen-var", Arg.Clear gen_var, " do not generalize on variables"
     ; "--no-ind-gen-term", Arg.Clear gen_term, " do not generalize on terms"
-    ]
+    ];
+  Params.add_to_mode "ho-complete-basic" (fun () ->
+    enabled_ := false
+  );
+  Params.add_to_mode "ho-pragmatic" (fun () ->
+    enabled_ := false
+  );
+  Params.add_to_mode "ho-competitive" (fun () ->
+    enabled_ := false
+  );
+  Params.add_to_mode "fo-complete-basic" (fun () ->
+    enabled_ := false
+  );

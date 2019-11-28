@@ -20,7 +20,7 @@ let[@inline] cast v ~ty = {v with ty; }
 let[@inline] update_ty v ~f = {v with ty=f v.ty; }
 
 let[@inline] compare cmp a b =
-  let c = Pervasives.compare a.id b.id  in
+  let c = CCOrd.int a.id b.id  in
   if c<>0 then c else cmp a.ty b.ty
 let[@inline] equal eq a b = a.id = b.id && eq a.ty b.ty
 let[@inline] hash a = Hash.int a.id
@@ -41,5 +41,10 @@ let[@inline] fresh ~ty () =
   let v = make_unsafe ~ty !fresh_ in
   decr fresh_;
   v
+
+let fresh_cnt ~counter ~ty () = 
+  let var = make ~ty !counter in 
+  incr counter; 
+  var
 
 let[@inline] is_fresh v = id v < 0

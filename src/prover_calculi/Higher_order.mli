@@ -2,7 +2,10 @@
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 HO} *)
+open Logtk
 open Libzipperposition
+
+val prim_enum_terms : Term.Set.t ref
 
 module type S = sig
   module Env : Env.S
@@ -12,6 +15,8 @@ module type S = sig
 
   val setup : unit -> unit
   (** Register rules in the environment *)
+
+  
 end
 
 module Make(E : Env.S) : S with module Env = E

@@ -140,6 +140,10 @@ module TPTP : sig
   include Interfaces.PRINT with type t := t
 end
 
+module TPTP_THF : sig
+  include Interfaces.PRINT with type t := t
+end
+
 module ZF : sig
   include Interfaces.PRINT with type t := t
   val pp_inner : t CCFormat.printer

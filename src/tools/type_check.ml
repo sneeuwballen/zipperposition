@@ -41,8 +41,9 @@ let check file =
   if !dump then  (
     Format.printf "# file `%s`@." file;
   ) else (
-    print_line ();
-    Format.printf "checking file `%s`...@." file;
+    (* print_line ();
+    Format.printf "checking file `%s`...@." file; *)
+    ()
   );
   let input = Parsing_utils.input_of_file file in
   Parsing_utils.parse_file input file
@@ -52,27 +53,16 @@ let check file =
     ~on_shadow:(Input_format.on_shadow input)
     ~implicit_ty_args:(Input_format.implicit_ty_args input)
     ?ctx:None
-  >|= fun decls ->
-  let sigma =
-    CCVector.to_seq decls
-    |> Iter.flat_map Statement.Seq.ty_decls
-    |> ID.Map.of_seq
-  in
-  if not !dump then (
-    Format.printf "@[<hv2>signature:@ @[<v>%a@]@]@."
-      (ID.Map.pp ~sep:"" ~arrow:" : " ID.pp T.pp) sigma;
-  );
-  (* print formulas *)
-  if !dump then (
-    CCFormat.set_color_default false;
-    Format.printf "@[<v>%a@]@." (CCVector.pp ~sep:"" pp_stmt) decls;
-  ) else if !cat_input then (
-    Format.printf "@[<v2>statements:@ %a@]@."
-      (CCVector.pp ~sep:"" pp_stmt)
-      decls;
-  );
-  ()
-
+  >>= (fun decls -> decls
+    |> CCVector.to_seq
+    |> Cnf.cnf_of_seq ~ctx:(Skolem.create ())
+    |> CCVector.to_seq
+    |> Cnf.convert
+    |> CCResult.return) >>= (fun stmts -> CCVector.to_seq stmts |> Iter.flat_map Statement.Seq.terms |>
+                            (fun trm -> try ignore(Iter.for_all Term.in_lfho_fragment trm); ""
+                                        with Failure msg -> msg) |>
+                            fun x -> if (x = "") then CCResult.return ()
+                                     else CCResult.fail ("FAIL: " ^ x))
 let main () =
   CCFormat.set_color_default true;
   let files = ref [] in
@@ -88,8 +78,8 @@ let main () =
   match res with
     | Err.Ok () ->
       if not !dump then (
-        print_line ();
-        Format.printf "@{<Green>success!@}@."
+        (* print_line (); *)
+        print_endline "OK."
       )
     | Err.Error msg ->
       print_endline msg

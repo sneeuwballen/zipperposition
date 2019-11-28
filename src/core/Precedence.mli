@@ -108,6 +108,11 @@ val status : t -> ID.t -> symbol_status
 val weight : t -> ID.t -> Weight.t
 (** Weight of a symbol (for KBO). *)
 
+val sel_prec_weight : t -> ID.t -> int
+
+val db_weight : t -> Weight.t
+val lam_weight : t -> Weight.t
+
 val arg_coeff : t -> ID.t -> int -> int
 (** Nth argument coefficient of a symbol (for KBO with argument coefficients). *)
 
@@ -131,9 +136,15 @@ include Interfaces.PRINT with type t := t
 type weight_fun = ID.t -> Weight.t
 type arg_coeff_fun = ID.t -> int list
 
-val weight_modarity : arity:(ID.t -> int) -> weight_fun
+val weight_modarity : signature:Signature.t -> weight_fun
 
 val weight_constant : weight_fun
+val weight_invfreq : ID.t Iter.t -> weight_fun
+val weight_freq : ID.t Iter.t -> weight_fun
+val weight_invfreqrank : ID.t Iter.t -> weight_fun
+val weight_freqrank : ID.t Iter.t -> weight_fun
+
+val weight_fun_of_string : signature:Signature.t -> string -> (ID.t * int) Iter.t -> weight_fun
 
 val set_weight : t -> weight_fun -> unit
 (** Change the weight function of the precedence
@@ -141,7 +152,7 @@ val set_weight : t -> weight_fun -> unit
 
 (** {2 Creation of a precedence from constraints} *)
 
-val create : ?weight:weight_fun -> ?arg_coeff:arg_coeff_fun -> [`total] Constr.t -> ID.t list -> t
+val create : ?weight:weight_fun -> ?arg_coeff:arg_coeff_fun -> ?db_w:int -> ?lmb_w:int -> [`total] Constr.t -> ID.t list -> t
 (** make a precedence from the given constraints. Constraints near
     the head of the list are {b more important} than constraints close
     to the tail. Only the very first constraint is assured to be totally

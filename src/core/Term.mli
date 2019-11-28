@@ -57,9 +57,11 @@ include Interfaces.ORD with type t := t
 
 val ty : t -> Type.t                (** Obtain the type of a term.. *)
 
+module IntMap : Map.S with type key = int
 module Set : CCSet.S with type elt = t
 module Map : CCMap.S with type key = t
 module Tbl : CCHashtbl.S with type key = t
+
 
 val hash_mod_alpha : t -> int
 (** Hash invariant w.r.t variable renaming *)
@@ -69,6 +71,7 @@ val same_l : t list -> t list -> bool
     equal, [false] otherwise.
     Precondition: both lists have the same length
     @raise Assert_failure if lists have not the same length *)
+val same_l_gen : t list -> t list -> bool
 
 (** {2 Constructors} *)
 
@@ -96,6 +99,10 @@ val app : t -> t list -> t
 (** Apply a term to a list of terms
     @raise Type.ApplyError if types do not match. *)
 
+val app_w_ty : ty:Type.t -> t -> t list -> t
+(** Apply a term to a list of terms
+    @raise Type.ApplyError if types do not match. *)
+
 val app_full : t -> Type.t list -> t list -> t
 (** Apply the term to types, then to terms *)
 
@@ -119,16 +126,28 @@ val grounding : Type.t -> t
 (** [grounding ty] is a unique constant of type [ty] *)
 
 val is_var : t -> bool
+val is_appbuiltin : t -> bool
 val is_bvar : t -> bool
+val is_formula : t -> bool
 val is_app : t -> bool
 val is_const : t -> bool
 val is_fun : t -> bool
+val is_app_var : t -> bool
 val is_type : t -> bool (** Does it have type [tType]? *)
+
+val in_pfho_fragment : t -> bool
+val in_lfho_fragment : t -> bool
+val is_fo_term : t -> bool
+val is_true_or_false : t -> bool
+
+val mk_fresh_skolem : var list -> Type.t -> (ID.t*Type.t) * t
 
 val as_const : t -> ID.t option
 val as_const_exn : t -> ID.t
 val as_var : t -> var option
 val as_var_exn : t -> var
+
+val as_bvar_exn : t -> int
 
 val as_app : t -> t * t list
 (** [as_app t] decomposes [t] into a head (non-application) and arguments,
@@ -155,6 +174,8 @@ val of_term_unsafe_l : InnerTerm.t list -> t list
 val of_ty : Type.t -> t
 (** Upcast from type *)
 
+val mk_tmp_cst : counter:int ref -> ty:Type.t -> t
+
 module VarSet : CCSet.S with type elt = var
 module VarMap : CCMap.S with type key = var
 module VarTbl : CCHashtbl.S with type key = var
@@ -163,10 +184,9 @@ module VarTbl : CCHashtbl.S with type key = var
 
 module Seq : sig
   val vars : t -> var Iter.t
-  val subterms : t -> t Iter.t
-  val subterms_depth : t -> (t * int) Iter.t  (** subterms with their depth *)
-
-  val symbols : t -> ID.t Iter.t
+  val subterms : ?include_builtin:bool -> ?ignore_head:bool -> t -> t Iter.t
+  val subterms_depth : ?filter_term:(t -> bool) -> t -> (t * int) Iter.t  (* subterms with their depth *)
+  val symbols : ?include_types:bool -> ?filter_term:(t -> bool) -> t -> ID.t Iter.t
   val max_var : var Iter.t -> int (** max var *)
 
   val min_var : var Iter.t -> int (** min var *)
@@ -179,8 +199,11 @@ end
 val var_occurs : var:var -> t -> bool (** [var_occurs ~var t] true iff [var] in t *)
 
 val is_ground : t -> bool (** is the term ground? (no free vars) *)
-
+val is_linear : t -> bool (** is the term linear? (no vars occuring multiple times) *)
 val monomorphic : t -> bool (** true if the term contains no type var *)
+
+val is_beta_reducible : t -> bool
+val has_lambda : t -> bool
 
 val max_var : VarSet.t -> int (** find the maximum variable *)
 
@@ -200,12 +223,25 @@ val head_exn : t -> ID.t (** head ID.t (or Invalid_argument) *)
 
 val size : t -> int (** Size (number of nodes) *)
 
+val simplify_bools : t -> t
+(* Sort the arguments to logical operators using their weights
+   in an attempt to make more terms unifiable. *)
+val normalize_bools : t -> t
+
+(* all the ways in which term can be covered (built) using the arguments given *)
+val cover_with_terms : ?depth:int -> ?recurse:bool -> t -> t option list -> t list
+
+(* cover the term in a maximal way looked top-down *)
+val max_cover : t -> t option list -> t
+
 val weight : ?var:int -> ?sym:(ID.t -> int) -> t -> int
 (** Compute the weight of a term, given a weight for variables
     and one for ID.ts.
     @param var unique weight for every variable (default 1)
     @param sym function from ID.ts to their weight (default [const 1])
     @since 0.5.3 *)
+  
+val ho_weight : t -> int 
 
 val ty_vars : t -> Type.VarSet.t
 (** Set of free type variables *)
@@ -259,11 +295,13 @@ val contains_symbol : ID.t -> t -> bool
 (** High level fold-like combinators *)
 
 val all_positions :
-  ?vars:bool -> ?ty_args:bool -> ?pos:Position.t ->
+  ?vars:bool -> ?ty_args:bool -> ?var_args:bool -> ?fun_bodies:bool -> ?pos:Position.t ->
   t -> t Position.With.t Iter.t
 (** Iterate on all sub-terms with their position.
     @param vars specifies whether variables are folded on (default false).
     @param ty_args specifies whether type arguments are folded on (default true).
+    @param var_args specifies whether arguments of applied variables are folded on (default true).
+    @param fun_bodies specifies whether bodies of lambda-expressions are folded on (default true).
     @param pos the initial position (default empty) *)
 
 (** {2 Some AC-utils} *)
@@ -328,6 +366,8 @@ module Form : sig
   val or_ : t -> t -> t
   val and_l : t list -> t
   val or_l : t list -> t
+  val forall : t -> t
+  val exists : t -> t
 end
 
 (** {2 Arith} *)
@@ -363,12 +403,20 @@ module Arith : sig
   (** hook to print arithmetic expressions *)
 end
 
+
+val close_quantifier : Builtin.t -> Type.t list -> t -> t
+val has_ho_subterm : t -> bool
+
 (** {2 De Bruijn} *)
 module DB : sig
   val is_closed : t -> bool
   val shift : ?depth:int -> int -> t -> t
   val unshift : ?depth:int -> int -> t -> t
   val eval : t DBEnv.t -> t -> t
+  val unbound : t -> int list
+  val skolemize_loosely_bound : ?already_sk:t IntMap.t -> t -> t * t IntMap.t
+  val unskolemize : int Map.t -> Map.key -> t
+  val map_vars_shift : ?depth:int -> int Map.t -> t -> t
 end
 
 (** {2 TPTP} *)

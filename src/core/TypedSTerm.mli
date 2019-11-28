@@ -217,6 +217,7 @@ module Form : sig
   val close_forall : ?loc:location -> t -> t
 
   val box_opaque : t -> t
+  val is_var : view -> bool
 end
 
 (** {2 Utils} *)
@@ -258,6 +259,10 @@ val free_vars_set : t -> t Var.Set.t
 
 val close_all : ty:t -> Binder.t -> t -> t
 (** Bind all free vars with the symbol *)
+
+val close_with_vars : t list -> t -> t
+
+val lift_lambdas : t -> (t * (t list))
 
 (** Generic non-recursive map *)
 val map :
@@ -304,11 +309,11 @@ module Subst : sig
   val find_exn : t -> term Var.t -> term
   (** @raise Not_found if the variable is not present *)
 
-  val rename_var : t -> term Var.t -> t * term Var.t
+  val rename_var : rename_binders:bool -> t -> term Var.t -> t * term Var.t
 
   val merge : t -> t -> t
 
-  val eval : t -> term -> term
+  val eval : ?rename_binders:bool -> t -> term -> term
 
   val eval_nonrec : t -> term -> term
   (** Evaluate under substitution, but consider the substitution as
@@ -376,6 +381,8 @@ val app_infer :
 (** [app_infer f l] computes the type [ty] of [f l], and return [app ~ty f l]
     @raise UnifyFailure if types do not correspond *)
 
+val try_alpha_renaming : t -> t -> Subst.t option
+
 (** {2 Conversion} *)
 
 val erase : t -> STerm.t
@@ -383,6 +390,10 @@ val erase : t -> STerm.t
 (** {2 TPTP} *)
 
 module TPTP : sig
+  include Interfaces.PRINT with type t := t
+end
+
+module TPTP_THF : sig
   include Interfaces.PRINT with type t := t
 end
 

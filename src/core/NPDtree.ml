@@ -343,13 +343,13 @@ module MakeTerm(X : Set.OrderedType) = struct
     in
     skip trie 1 k
 
-  let retrieve_unifiables ?(subst=Unif_subst.empty) dt t k =
+  let retrieve_unifiables_aux fold_unify dt t k =
     Util.enter_prof prof_npdtree_term_unify;
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie iter = match iter with
       | None ->
         Util.exit_prof prof_npdtree_term_unify;
-        Leaf.fold_unify ~subst (Scoped.set dt trie.leaf) t k;
+        fold_unify (Scoped.set dt trie.leaf) t k;
         Util.enter_prof prof_npdtree_term_unify;
       | Some i ->
         match view_head i.cur_term with
@@ -376,6 +376,10 @@ module MakeTerm(X : Set.OrderedType) = struct
     with e ->
       Util.exit_prof prof_npdtree_term_unify;
       raise e
+  
+  let retrieve_unifiables = retrieve_unifiables_aux Leaf.fold_unify 
+
+  let retrieve_unifiables_complete ?(unif_alg=JP_unif.unify_scoped) = retrieve_unifiables_aux (Leaf.fold_unify_complete ~unif_alg) 
 
   let retrieve_generalizations ?(subst=S.empty) dt t k =
     Util.enter_prof prof_npdtree_term_generalizations;

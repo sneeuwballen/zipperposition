@@ -23,6 +23,8 @@ module type S = sig
   (** {6 Registration} *)
 
   val setup : unit -> unit
+  val rw_bool_lits : Env.multi_simpl_rule
+
   (** Register rules in the environment *)
 end
 
@@ -97,9 +99,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> Iter.of_array_i
     |> Iter.filter_map
       (fun (idx,lit) -> match lit with
-         | Literal.Prop (t, sign) ->
-           begin match T.as_var t with
+         | Literal.Equation (lhs, rhs, true) when  (T.equal rhs T.true_) || (T.equal rhs T.false_) ->
+           begin match T.as_var lhs with
              | Some v -> 
+               let sign = T.equal rhs T.true_ in
                (* found var, replace it with [not sign] *)
                let t = if sign then T.false_ else T.true_ in
                let subst =
@@ -140,7 +143,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
     (* how to build a new clause *)
     let mk_c lits =
-      let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "fool_simp")
+      let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "cnf_fool")
           [Proof.Parent.from @@ C.proof c]
       in
       C.create lits proof
@@ -157,9 +160,11 @@ module Make(E : Env.S) : S with module Env = E = struct
            let c_pos = Literal.mk_true a :: Literal.mk_true b :: lits |> mk_c in
            let c_neg = Literal.mk_false a :: Literal.mk_false b :: lits |> mk_c in
            Some [c_pos; c_neg]
-         | Literal.Prop (t, sign) ->
+         | Literal.Equation (lhs, rhs, true) 
+            when  (T.equal rhs T.true_) || (T.equal rhs T.false_) ->
            (* see if there is some CNF to do here *)
-           begin match T.view t, sign with
+           let sign = T.equal rhs T.true_ in
+           begin match T.view lhs, sign with
              | T.AppBuiltin (Builtin.And, l), true
              | T.AppBuiltin (Builtin.Or, l), false ->
                let lits = CCArray.except_idx (C.lits c) i in
@@ -177,6 +182,14 @@ module Make(E : Env.S) : S with module Env = E = struct
                Some [mk_c (lit::lits)]
              | _ -> None
            end
+          | Literal.Equation (a, b, true)
+           when Type.is_prop (T.ty a) &&
+                not (is_bool_val a) &&
+                not (is_bool_val b) ->
+           let lits = CCArray.except_idx (C.lits c) i in
+           let c_a_imp_b = Literal.mk_false a :: Literal.mk_true b :: lits |> mk_c in
+           let c_b_imp_a = Literal.mk_false b :: Literal.mk_true a :: lits |> mk_c in
+           Some [c_a_imp_b; c_b_imp_a]
          | _ -> None)
 
   let setup () =
@@ -201,5 +214,17 @@ let extension =
 
 let () =
   Options.add_opts
-    [ "--no-fool", Arg.Clear enabled_, " disable fool (first-class booleans)"  ];
+    [ "--fool", Arg.Bool (fun v -> enabled_ := v), " enable/disable fool (first-class booleans)"  ];
+  Params.add_to_mode "ho-complete-basic" (fun () ->
+    enabled_ := false
+  );
+  Params.add_to_mode "ho-pragmatic" (fun () ->
+    enabled_ := false
+  );
+  Params.add_to_mode "ho-competitive" (fun () ->
+    enabled_ := false
+  );
+  Params.add_to_mode "fo-complete-basic" (fun () ->
+    enabled_ := false
+  );
   Extensions.register extension

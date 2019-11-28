@@ -28,6 +28,7 @@ type t = {
   presaturate : bool; (** initial interreduction of proof state? *)
   unary_depth : int; (** Maximum successive levels of unary inferences *)
   check: bool; (** check proof *)
+  eta: [`Reduce | `Expand | `None]; (** eta conversion *)
 }
 
 let default : t = {
@@ -39,7 +40,7 @@ let default : t = {
   prelude= CCVector.create() |> CCVector.freeze;
   files = CCVector.create() |> CCVector.freeze;
   select = "default";
-  stats= !Options.stats;
+  stats= !Options._stats;
   def_as_rewrite= true;
   presaturate = false;
   dot_all_roots= false;
@@ -50,9 +51,18 @@ let default : t = {
   dot_sat= false;
   expand_def= false;
   check= false;
+  eta = `Reduce;
 }
 
 let select = ref default.select
+
+let _modes = Hashtbl.create 10
+let mode_spec () =
+  Arg.Symbol 
+    (List.sort_uniq String.compare (CCHashtbl.keys_list _modes), 
+    fun s -> List.iter (fun f -> f ()) (Hashtbl.find_all _modes s))
+let add_to_mode mode f = 
+  Hashtbl.add _modes mode f
 
 (** parse_args returns parameters *)
 let parse_args () =
@@ -73,12 +83,19 @@ let parse_args () =
   and prelude = CCVector.create()
   and files = CCVector.create ()
   and check = ref default.check
+  and eta = ref `Reduce
+  in
+  let eta_opt =
+    let set_ n = eta := n in
+    let l = [ "reduce", `Reduce; "expand", `Expand; "none", `None] in
+    Arg.Symbol (List.map fst l, fun s -> set_ (List.assoc s l))
   in
   (* special handlers *)
   let add_file s = CCVector.push files s in
   (* options list *)
   let options = (
-    [ "--ord", Arg.Set_string ord, " choose ordering (rpo,kbo)"
+    [ "--mode", mode_spec (), " mode"
+    ; "--ord", Arg.Set_string ord, " choose ordering (rpo,kbo)"
     ; "--version", Arg.Set version, " print version"
     ; "--steps", Arg.Set_int steps,
       " maximal number of steps of given clause loop (no limit if negative)"
@@ -100,6 +117,7 @@ let parse_args () =
     ; "--check", Arg.Set check, " check proof"
     ; "--prelude", Arg.String (CCVector.push prelude), " parse prelude file"
     ; "--no-check", Arg.Clear check, " do not check proof"
+    ; "--ho-eta", eta_opt, " eta-expansion/reduction"
     ] @ Options.make ()
   ) |> List.sort (fun (s1,_,_)(s2,_,_) -> String.compare s1 s2)
                 |> Arg.align
@@ -116,12 +134,12 @@ let parse_args () =
   { ord= !ord; seed = !seed; steps = !steps;
     version= !version; timeout = !timeout; prelude= prelude;
     files = files; select = !select;
-    stats= ! Options.stats; def_as_rewrite= !def_as_rewrite;
+    stats= ! Options._stats; def_as_rewrite= !def_as_rewrite;
     presaturate = !presaturate; dot_all_roots= !dot_all_roots;
     dot_file = !dot_file; dot_llproof= !dot_llproof;
     dot_check= !dot_check;
     unary_depth= !unary_depth; dot_sat= !dot_sat;
-    expand_def= !expand_def; check= !check; }
+    expand_def= !expand_def; check= !check; eta = !eta}
 
 let add_opt = Options.add_opt
 let add_opts = Options.add_opts

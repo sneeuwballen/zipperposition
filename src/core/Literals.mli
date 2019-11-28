@@ -43,6 +43,7 @@ val matching :
 val matches : t -> t -> bool
 
 val weight : t -> int
+val ho_weight : t -> int
 val depth : t -> int
 val vars : t -> Type.t HVar.t list
 val is_ground : t -> bool       (** all the literals are ground? *)
@@ -124,6 +125,8 @@ module Conv : sig
     ?hooks:Literal.Conv.hook_to list ->
     t ->
     TypedSTerm.Form.t
+
+  val to_tst : t -> TypedSTerm.t
 end
 
 module View : sig
@@ -183,14 +186,14 @@ val fold_rat_terms : eligible:(int -> Literal.t -> bool) ->
 (** Fold on terms under arithmetic literals, with the focus on
     the current term *)
 
-val fold_terms : ?vars:bool -> ?ty_args:bool -> which:[<`Max|`All] ->
+val fold_terms : ?vars:bool -> ?var_args:bool -> ?fun_bodies:bool -> ?ty_args:bool -> which:[<`Max|`All] ->
   ord:Ordering.t -> subterms:bool ->
   eligible:(int -> Literal.t -> bool) ->
   t -> term Position.With.t Iter.t
 (** See {!Literal.fold_terms}, which is the same but for the
     [eligible] argument *)
 
-val symbols : ?init:ID.Set.t -> t -> ID.Set.t
+val symbols : ?init:ID.Set.t -> ?include_types:bool -> t -> ID.Set.t
 
 (** {2 IO} *)
 
@@ -220,3 +223,7 @@ val is_shielded : Term.var -> t -> bool
 
 val unshielded_vars : ?filter:(Term.var -> bool) -> t -> Term.var list
 (** Set of variables occurring unshielded *)
+
+val vars_distinct : t -> bool
+
+val ground_lits : t -> t

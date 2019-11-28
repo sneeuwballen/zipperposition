@@ -68,7 +68,7 @@ let _add_custom_weights weights arg_coeff=
         | Failure _ | Not_found -> failwith "Syntax error in custom weights"
     ) (weights, arg_coeff) input_list
 
-let mk_precedence t seq =
+let mk_precedence ~db_w ~lmb_w t seq =
   Util.enter_prof prof_mk_prec;
   (* set of symbols *)
   let symbols =
@@ -89,7 +89,7 @@ let mk_precedence t seq =
   let constr = Precedence.Constr.compose_sort constrs in
   let constr = Precedence.Constr.compose constr t.last_constr in
   let constr = (if !_alpha_precedence then Precedence.Constr.alpha else constr) in
-  let p = Precedence.create ~weight ~arg_coeff constr symbols in
+  let p = Precedence.create ~weight ~arg_coeff ~db_w ~lmb_w constr symbols in
   (* multiset status *)
   List.iter
     (fun (s,status) -> Precedence.declare_status p s status)
