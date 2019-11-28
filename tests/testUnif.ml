@@ -605,35 +605,34 @@ let test_jp_unif_aux = "JP unification", `Quick, fun () ->
 
   (** Find disagreement tests *)
   
-  (* let test_disagree =
+  let test_disagree =
     Alcotest.testable
       Fmt.Dump.(option (pair (pair T.ZF.pp T.ZF.pp) (list @@ pair HVar.pp int)))
       CCEqual.(option @@ pair (pair T.equal T.equal) (list (pair (HVar.equal Type.equal) int)))
-  in *)
+  in
 
-  OUnit.assert_equal 
-    ~cmp:(CCOpt.equal (fun ((a,b),l) (((c,d),k)) -> 
-      T.equal a c && T.equal b d && CCList.equal (CCPair.equal (HVar.equal Type.equal) CCInt.equal) l k))
+  Alcotest.check test_disagree
+    "jpunif1"
     (JP_unif.find_disagreement (pterm "g (g a)") (pterm "g (h a)")) 
     (Some ((pterm "g a", pterm "h a"), []));
 
-  OUnit.assert_equal 
-    ~cmp:(CCOpt.equal (fun ((a,b),l) (((c,d),k)) -> 
-      T.equal a c && T.equal b d && CCList.equal (CCPair.equal (HVar.equal Type.equal) CCInt.equal) l k))
+  Alcotest.check test_disagree
+    "jpunif2"
     (JP_unif.find_disagreement (pterm "g (g a)") (pterm "g (g b)")) 
     (Some ((pterm "a", pterm "b"), []));
   
-  OUnit.assert_equal 
-    ~cmp:(CCOpt.equal (fun ((a,b),l) (((c,d),k)) -> 
-      T.equal a c && T.equal b d && CCList.equal (CCPair.equal (HVar.equal Type.equal) CCInt.equal) l k))
-    (JP_unif.find_disagreement (pterm "f_ho2 (fun (x:term). x)") (pterm "f_ho2 (fun (x:term). a)")) 
-    (Some ((T.bvar ~ty:(Type.Conv.of_simple_term_exn (Type.Conv.create ()) (psterm "term")) 0, pterm "a"), []));
+  Alcotest.check test_disagree
+    "jpunif3"
+    (JP_unif.find_disagreement (pterm "f_ho2 (fun (x:term). x)")
+       (pterm "f_ho2 (fun (x:term). a)")) 
+    (Some ((T.bvar ~ty:(Type.Conv.of_simple_term_exn (Type.Conv.create ()) (psterm "term")) 0,
+            pterm "a"), []));
 
   (** Rule tests *)
 
-  (* let test_rule =
+  let test_rule =
     Alcotest.testable Fmt.Dump.(list T.ZF.pp) CCEqual.(list T.equal)
-  in *)
+  in
 
   let scope = 0 in
 
@@ -643,7 +642,7 @@ let test_jp_unif_aux = "JP unification", `Quick, fun () ->
     |> OSeq.map (fun subst -> Lambda.snf (JP_unif.S.apply subst (term,scope)))
     |> OSeq.to_list in
   let expected = [pterm "a"; pterm "b"] in
-  OUnit.assert_equal ~cmp:(CCList.equal T.equal) expected result;
+  Alcotest.check test_rule "jp-unif-rule" expected result;
 
   clear_scope ();
 
