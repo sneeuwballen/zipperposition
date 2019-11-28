@@ -1557,16 +1557,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            then Iter.empty (* disable factoring from false*)
            else if T.equal t T.false_ && not is_var_pred then Iter.empty 
            else (
-              let var_pred_status = (is_var_pred, t) in
-              find_unifiable_lits ~var_pred_status active_idx s s_pos)
-           |> Iter.filter_map
-             (fun (u,v,substs) ->
-                iterate_substs substs
-                  (fun subst ->
-                     let info = EqFactInfo.({
-                         clause; s; t; u; v; active_idx; subst; scope=0;
-                       }) in
-                     do_eq_factoring info)))
+             let var_pred_status = (is_var_pred, t) in
+             find_unifiable_lits ~var_pred_status active_idx s s_pos)
+             |> Iter.filter_map
+               (fun (u,v,substs) ->
+                  iterate_substs substs
+                    (fun subst ->
+                       let info = EqFactInfo.({
+                           clause; s; t; u; v; active_idx; subst; scope=0;
+                         }) in
+                      do_eq_factoring info)))
       |> Iter.to_rev_list
     in
     Util.exit_prof prof_infer_equality_factoring;

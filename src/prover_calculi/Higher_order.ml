@@ -1474,7 +1474,7 @@ let () =
     _elim_pred_var := true;
     _neg_cong_fun := false;
     enable_unif_ := false;
-    _prune_arg_fun := `PruneMaxCover;  
+    _prune_arg_fun := `NoPrune;  
   );
   Params.add_to_mode "fo-complete-basic" (fun () ->
     enabled_ := false;
