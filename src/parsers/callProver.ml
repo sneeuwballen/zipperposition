@@ -50,8 +50,8 @@ module Prover = struct
 
   let p_Eproof =
     { p_E with
-        name = "Eproof";
-        command = "eproof_ram --cpu-limit=${timeout} -tAuto -xAuto -l0 --tstp-in --tstp-out";
+      name = "Eproof";
+      command = "eproof_ram --cpu-limit=${timeout} -tAuto -xAuto -l0 --tstp-in --tstp-out";
     }
 
   let p_SPASS = {
@@ -137,8 +137,8 @@ let decls_of_string ~source str =
 let proof_of_decls decls =
   let res = Trace_tstp.of_decls decls in
   match res with
-    | Err.Error _ -> None
-    | Err.Ok proof -> Some proof
+  | Err.Error _ -> None
+  | Err.Ok proof -> Some proof
 
 let call_proof ?timeout ?args ~prover decls =
   Err.(
@@ -191,15 +191,15 @@ module Eprover = struct
       (* read its output *)
       let decls, proof =
         match decls_of_string ~source:"E" output with
-          | Err.Error _ -> None, None
-          | Err.Ok s ->
-            (* try to parse proof, if it's a theorem *)
-            let proof =
-              if answer = Theorem
-              then proof_of_decls s
-              else None
-            in
-            Some s, proof
+        | Err.Error _ -> None, None
+        | Err.Ok s ->
+          (* try to parse proof, if it's a theorem *)
+          let proof =
+            if answer = Theorem
+            then proof_of_decls s
+            else None
+          in
+          Some s, proof
       in
       Err.return { answer; output; decls; proof }
     )

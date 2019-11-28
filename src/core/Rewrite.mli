@@ -110,7 +110,7 @@ module Lit : sig
   val normalize_clause :
     Literals.t ->
     (Literals.t list * rule * Subst.t * Scoped.scope *
-       Subst.Renaming.t * Proof.tag list) option
+     Subst.Renaming.t * Proof.tag list) option
   (** normalize literals of the clause w.r.t. rules, or return [None]
       if no rule applies. The input clause lives in scope 0. *)
 

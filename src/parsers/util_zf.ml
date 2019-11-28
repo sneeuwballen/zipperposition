@@ -74,6 +74,6 @@ let parse_file ?cache ?recursive file : parser_res =
       |> Iter.of_list
       |> CCResult.return
     with
-      | Sys_error e ->
-        CCResult.fail (Util.err_spf "sys_error when parsing `%s`:@ %s" file e)
-      | e -> CCResult.of_exn e
+    | Sys_error e ->
+      CCResult.fail (Util.err_spf "sys_error when parsing `%s`:@ %s" file e)
+    | e -> CCResult.of_exn e

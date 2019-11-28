@@ -44,7 +44,7 @@ let hash lits = Hash.array Lit.hash lits
 let variant ?(subst=S.empty) (a1,sc1) (a2,sc2) =
   Unif.unif_array_com ~size:`Same (subst,[]) (a1,sc1) (a2,sc2)
     ~op:(fun (subst,t1) x y k ->
-      Lit.variant ~subst x y (fun (s,t2) -> k (s,t1@t2)))
+        Lit.variant ~subst x y (fun (s,t2) -> k (s,t1@t2)))
   |> Iter.filter (fun (s,_) -> Subst.is_renaming s)
 
 let are_variant a1 a2 =
@@ -53,8 +53,8 @@ let are_variant a1 a2 =
 let matching ?(subst=S.empty) ~pattern:(a1,sc1) (a2,sc2) =
   Unif.unif_array_com ~size:`Same (subst,[]) (a1,sc1) (a2,sc2)
     ~op:(fun (subst,t1) x y k ->
-      Lit.matching ~subst ~pattern:x y
-        (fun (s,t2) -> k (s,t1@t2)))
+        Lit.matching ~subst ~pattern:x y
+          (fun (s,t2) -> k (s,t1@t2)))
 
 let matches a1 a2 =
   not (Iter.is_empty (matching ~pattern:(Scoped.make a1 0) (Scoped.make a2 1)))
@@ -259,13 +259,13 @@ module Conv = struct
     Array.map (fun t -> Lit.Conv.lit_to_tst ~ctx (Lit.Conv.to_form t)) lits 
     |> Array.to_list
     |> (fun or_args ->
-          let ty = TypedSTerm.Ty.prop in
-          let clause_vars = T.VarSet.of_seq (Seq.vars lits) in
-          let vars = clause_vars
-                     |> T.VarSet.to_list 
-                     |> CCList.map (fun v -> T.Conv.to_simple_term ctx (T.var v))  in
-          let disjuncts =  TypedSTerm.app_builtin ~ty Builtin.or_ or_args in
-          TypedSTerm.close_with_vars vars disjuncts
+        let ty = TypedSTerm.Ty.prop in
+        let clause_vars = T.VarSet.of_seq (Seq.vars lits) in
+        let vars = clause_vars
+                   |> T.VarSet.to_list 
+                   |> CCList.map (fun v -> T.Conv.to_simple_term ctx (T.var v))  in
+        let disjuncts =  TypedSTerm.app_builtin ~ty Builtin.or_ or_args in
+        TypedSTerm.close_with_vars vars disjuncts
       )
 
   let to_s_form ?allow_free_db ?(ctx=T.Conv.create()) ?hooks lits =
@@ -375,10 +375,10 @@ let fold_arith_terms ~eligible ~which ~ord lits k =
        (* do we use the given term? *)
        let do_term =
          match which with
-           | `All -> (fun _ -> true)
-           | `Max ->
-             let max_terms = Int_lit.max_terms ~ord a_lit in
-             fun t -> CCList.mem ~eq:T.equal t max_terms
+         | `All -> (fun _ -> true)
+         | `Max ->
+           let max_terms = Int_lit.max_terms ~ord a_lit in
+           fun t -> CCList.mem ~eq:T.equal t max_terms
        in
        Int_lit.Focus.fold_terms ~pos a_lit
          (fun (foc_lit, pos) ->
@@ -408,10 +408,10 @@ let fold_rat_terms ~eligible ~which ~ord lits k =
        (* do we use the given term? *)
        let do_term =
          match which with
-           | `All -> (fun _ -> true)
-           | `Max ->
-             let max_terms = Rat_lit.max_terms ~ord a_lit in
-             fun t -> CCList.mem ~eq:T.equal t max_terms
+         | `All -> (fun _ -> true)
+         | `Max ->
+           let max_terms = Rat_lit.max_terms ~ord a_lit in
+           fun t -> CCList.mem ~eq:T.equal t max_terms
        in
        Rat_lit.Focus.fold_terms ~pos a_lit
          (fun (foc_lit, pos) ->
@@ -491,12 +491,12 @@ let to_string a = CCFormat.to_string pp a
 let is_RR_horn_clause lits =
   let bv = pos lits in
   match BV.to_list bv with
-    | [i] ->
-      (* single positive lit, check variables restrictions, ie all vars
-          occur in the head *)
-      let hd_vars = Lit.vars lits.(i) in
-      List.length hd_vars = List.length (vars lits)
-    | _ -> false
+  | [i] ->
+    (* single positive lit, check variables restrictions, ie all vars
+        occur in the head *)
+    let hd_vars = Lit.vars lits.(i) in
+    List.length hd_vars = List.length (vars lits)
+  | _ -> false
 
 (** Recognizes Horn clauses (at most one positive literal) *)
 let is_horn lits =
@@ -505,9 +505,9 @@ let is_horn lits =
 
 let is_pos_eq lits =
   match lits with
-    | [| Lit.Equation (l,r,true) |] -> Some (l,r)
-    | [| Lit.True |] -> Some (T.true_, T.true_)
-    | _ -> None
+  | [| Lit.Equation (l,r,true) |] -> Some (l,r)
+  | [| Lit.True |] -> Some (T.true_, T.true_)
+  | _ -> None
 
 (** {2 Shielded Variables} *)
 
@@ -551,9 +551,9 @@ let ground_lits lits =
   let counter = ref 0 in
   let all_vars = T.VarSet.of_seq @@ Seq.vars lits in
   let gr_subst = T.VarSet.fold (fun v subst -> 
-    let ty = HVar.ty v in
-    Subst.FO.bind subst ((v :> InnerTerm.t HVar.t),0) (T.mk_tmp_cst ~counter ~ty,0)
-  ) all_vars Subst.empty in
+      let ty = HVar.ty v in
+      Subst.FO.bind subst ((v :> InnerTerm.t HVar.t),0) (T.mk_tmp_cst ~counter ~ty,0)
+    ) all_vars Subst.empty in
   let res = apply_subst Subst.Renaming.none gr_subst (lits,0)  in
   assert(Iter.for_all T.is_ground @@ Seq.terms res);
   res

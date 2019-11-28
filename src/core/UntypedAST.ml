@@ -116,36 +116,36 @@ let pp_statement out st =
   let attrs = st.attrs in
   let fpf = Format.fprintf in
   match st.stmt with
-    | Include s ->
-      fpf out "@[<2>include \"%s\"@]@." (String.escaped s)
-    | Decl (id,ty) ->
-      fpf out "@[<2>val%a %s :@ @[%a@]@]." pp_attrs attrs id T.pp ty
-    | Def l ->
-      let pp_def out {def_id=id;def_ty;def_rules} =
-        fpf out "@[<2>@[%s :@ %a@]@ := @[%a@]"
-          id T.pp def_ty (Util.pp_list ~sep:" and " T.pp) def_rules
-      in
-      fpf out "@[<2>def%a %a@]."
-        pp_attrs attrs (Util.pp_list ~sep:"" pp_def) l
-    | Rewrite t ->
-      fpf out "@[<2>rewrite%a @[%a@]@]." pp_attrs attrs T.pp t
-    | Data l ->
-      let pp_arg out (_,ty) = T.pp out ty in
-      let pp_cstor out (id,args) =
-        fpf out "@[<2>| @[%s@ %a@]@]" id (Util.pp_list ~sep:" " pp_arg) args in
-      let pp_data out d =
-        fpf out "@[%s %a@] :=@ @[<v>%a@]"
-          d.data_name
-          (Util.pp_list ~sep:" " CCFormat.string) d.data_vars
-          (Util.pp_list ~sep:"" pp_cstor) d.data_cstors
-      in
-      fpf out "@[<v>data%a@ %a@]." pp_attrs attrs (Util.pp_list ~sep:" and " pp_data) l
-    | Assert f ->
-      fpf out "@[<2>assert%a@ @[%a@]@]." pp_attrs attrs T.pp f
-    | Lemma f ->
-      fpf out "@[<2>lemma%a@ @[%a@]@]." pp_attrs attrs T.pp f
-    | Goal f ->
-      fpf out "@[<2>goal%a@ @[%a@]@]." pp_attrs attrs T.pp f
+  | Include s ->
+    fpf out "@[<2>include \"%s\"@]@." (String.escaped s)
+  | Decl (id,ty) ->
+    fpf out "@[<2>val%a %s :@ @[%a@]@]." pp_attrs attrs id T.pp ty
+  | Def l ->
+    let pp_def out {def_id=id;def_ty;def_rules} =
+      fpf out "@[<2>@[%s :@ %a@]@ := @[%a@]"
+        id T.pp def_ty (Util.pp_list ~sep:" and " T.pp) def_rules
+    in
+    fpf out "@[<2>def%a %a@]."
+      pp_attrs attrs (Util.pp_list ~sep:"" pp_def) l
+  | Rewrite t ->
+    fpf out "@[<2>rewrite%a @[%a@]@]." pp_attrs attrs T.pp t
+  | Data l ->
+    let pp_arg out (_,ty) = T.pp out ty in
+    let pp_cstor out (id,args) =
+      fpf out "@[<2>| @[%s@ %a@]@]" id (Util.pp_list ~sep:" " pp_arg) args in
+    let pp_data out d =
+      fpf out "@[%s %a@] :=@ @[<v>%a@]"
+        d.data_name
+        (Util.pp_list ~sep:" " CCFormat.string) d.data_vars
+        (Util.pp_list ~sep:"" pp_cstor) d.data_cstors
+    in
+    fpf out "@[<v>data%a@ %a@]." pp_attrs attrs (Util.pp_list ~sep:" and " pp_data) l
+  | Assert f ->
+    fpf out "@[<2>assert%a@ @[%a@]@]." pp_attrs attrs T.pp f
+  | Lemma f ->
+    fpf out "@[<2>lemma%a@ @[%a@]@]." pp_attrs attrs T.pp f
+  | Goal f ->
+    fpf out "@[<2>goal%a@ @[%a@]@]." pp_attrs attrs T.pp f
 
 (** {2 Errors} *)
 

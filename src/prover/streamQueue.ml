@@ -45,8 +45,8 @@ module Make(Stm : Stream_intf.S) = struct
     name: string;
   }
 
-(** generic stream queue based on some ordering on streams, given
-      by a weight function *)
+  (** generic stream queue based on some ordering on streams, given
+        by a weight function *)
   let make ~guard ~ratio ~weight name =
     if ratio < 0 then invalid_arg "StreamQueue.make: ratio must be greater or equal to 0";
     {
@@ -124,16 +124,16 @@ module Make(Stm : Stream_intf.S) = struct
           (* No matter if a clause or None is dripped the penalty is the same:
              TODO: should the penalty be higher when None is dripped? *)
           with
-            | Stm.Empty_Stream ->
-              assert (q.stm_nb > 0); (* TODO: stronger but more costly assert using H.size ?*)
-              q.stm_nb <- q.stm_nb - 1;
-              reduced_hp
+          | Stm.Empty_Stream ->
+            assert (q.stm_nb > 0); (* TODO: stronger but more costly assert using H.size ?*)
+            q.stm_nb <- q.stm_nb - 1;
+            reduced_hp
         ) in
       q.hp <- new_hp;
       match !dripped with
-        | None -> _take_first (guard-1) q
-        | Some _ ->
-          !dripped
+      | None -> _take_first (guard-1) q
+      | Some _ ->
+        !dripped
     )
 
   let take_first q =
@@ -151,17 +151,17 @@ module Make(Stm : Stream_intf.S) = struct
             dripped := Stm.drip s;
             H.insert (w + Stm.penalty s, s) reduced_hp
           with
-            | Stm.Empty_Stream ->
-              assert (q.stm_nb > 0);
-              q.stm_nb <- q.stm_nb - 1;
-              reduced_hp
+          | Stm.Empty_Stream ->
+            assert (q.stm_nb > 0);
+            q.stm_nb <- q.stm_nb - 1;
+            reduced_hp
         ) in
       q.hp <- new_hp;
       match !dripped with
-        | None -> take_first_anyway q
-        | Some _ ->
-          q.time_before_fair <- q.ratio; (* TODO: is this still necessary here? *)
-          !dripped
+      | None -> take_first_anyway q
+      | Some _ ->
+        q.time_before_fair <- q.ratio; (* TODO: is this still necessary here? *)
+        !dripped
     )
 
   let rec _take_nb q nb prev_res =
@@ -170,7 +170,7 @@ module Make(Stm : Stream_intf.S) = struct
       try
         _take_nb q (nb-1) ((take_first q)::prev_res)
       with
-        | Not_found -> prev_res
+      | Not_found -> prev_res
 
   let take_stm_nb q =
     if q.time_before_fair = 0 then (
@@ -200,8 +200,8 @@ module Make(Stm : Stream_intf.S) = struct
             res
           )
       with
-        | Stm.Drip_n_Unfinished (res', n') ->
-          _take_stm_nb_fix_stm q n' (res'@res)
+      | Stm.Drip_n_Unfinished (res', n') ->
+        _take_stm_nb_fix_stm q n' (res'@res)
 
   let take_stm_nb_fix_stm q =
     if q.time_before_fair = 0 then (

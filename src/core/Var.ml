@@ -45,9 +45,9 @@ module Set = struct
   let diff a b =
     ID.Map.merge_safe a b
       ~f:(fun _ pair -> match pair with
-        | `Left x -> Some x
-        | `Right _ -> None
-        | `Both _ -> None)
+          | `Left x -> Some x
+          | `Right _ -> None
+          | `Both _ -> None)
   let cardinal t = ID.Map.cardinal t
   let intersection_empty s t =  
     ID.Set.is_empty @@ 
@@ -86,6 +86,6 @@ module Subst = struct
   let merge a b =
     ID.Map.merge_safe a b
       ~f:(fun _ v -> match v with
-        | `Both (_,x) -> Some x (* favor right one *)
-        | `Left x | `Right x -> Some x)
+          | `Both (_,x) -> Some x (* favor right one *)
+          | `Left x | `Right x -> Some x)
 end

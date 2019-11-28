@@ -49,12 +49,12 @@ let cardinal = ID.Map.cardinal
 let arity signature s =
   let ty = find_exn signature s in
   match Type.arity ty with
-    | Type.NoArity ->
-      failwith (CCFormat.sprintf "symbol %a has ill-formed type %a" ID.pp s Type.TPTP.pp ty)
-    | Type.Arity (a,b) -> a, b
+  | Type.NoArity ->
+    failwith (CCFormat.sprintf "symbol %a has ill-formed type %a" ID.pp s Type.TPTP.pp ty)
+  | Type.Arity (a,b) -> a, b
 
 let is_ground signature =
-   ID.Map.for_all (fun _ (ty, _) -> Type.is_ground ty) signature
+  ID.Map.for_all (fun _ (ty, _) -> Type.is_ground ty) signature
 
 let merge s1 s2 =
   ID.Map.merge
@@ -85,11 +85,11 @@ let well_founded s =
     s
 
 let sym_in_conj s signature =
-   snd (ID.Map.get_or s signature ~default:(Type.int, false))
+  snd (ID.Map.get_or s signature ~default:(Type.int, false))
 
 let set_sym_in_conj s signature =
-   let t = find_exn signature s in
-   ID.Map.add s (t, true) signature
+  let t = find_exn signature s in
+  ID.Map.add s (t, true) signature
 
 module Seq = struct
   let symbols s =
@@ -113,7 +113,7 @@ let iter s f =
   ID.Map.iter f s
 
 let fold s acc f =
-   ID.Map.fold (fun s (ty,c) acc -> f acc s (ty,c)) s acc
+  ID.Map.fold (fun s (ty,c) acc -> f acc s (ty,c)) s acc
 
 let is_bool signature s =
   let rec is_bool ty = match Type.view ty with

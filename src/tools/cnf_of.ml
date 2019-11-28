@@ -83,8 +83,8 @@ let process file =
         (CCVector.pp ~sep:"" Statement.pp_input) st;
     let opts =
       (if !flag_distribute_exists then [Cnf.DistributeExists] else []) @
-        (if !flag_disable_renaming then [Cnf.DisableRenaming] else []) @
-        []
+      (if !flag_disable_renaming then [Cnf.DisableRenaming] else []) @
+      []
     in
     let decls = Cnf.cnf_of_seq ~opts ~ctx:(Skolem.create()) (CCVector.to_seq st) in
     let sigma = Cnf.type_declarations (CCVector.to_seq decls) in
@@ -97,10 +97,10 @@ let process file =
     print_res decls;
     ()
   in match res with
-    | CCResult.Ok () -> ()
-    | CCResult.Error msg ->
-      print_endline msg;
-      exit 1
+  | CCResult.Ok () -> ()
+  | CCResult.Error msg ->
+    print_endline msg;
+    exit 1
 
 let main () =
   CCFormat.set_color_default true;

@@ -121,8 +121,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     &&
     (
       match lit with
-        | Lit.Equation (l, r, true) -> has_ac_ids_ l r && A.equal l r
-        | _ -> false
+      | Lit.Equation (l, r, true) -> has_ac_ids_ l r && A.equal l r
+      | _ -> false
     )
 
   let is_trivial c =
@@ -161,7 +161,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         let tags = List.map (fun id -> Builtin.Tag.T_ac id) symbols in
         let premises =
           C.proof_parent c ::
-            List.map (fun id -> (ID.Tbl.find tbl id).proof) symbols
+          List.map (fun id -> (ID.Tbl.find tbl id).proof) symbols
         in
         let proof =
           Proof.Step.simp premises

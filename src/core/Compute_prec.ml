@@ -65,7 +65,7 @@ let _add_custom_weights weights arg_coeff=
            if ID.name constant = name then List.tl values
            else arg_coeff constant)
       with
-        | Failure _ | Not_found -> failwith "Syntax error in custom weights"
+      | Failure _ | Not_found -> failwith "Syntax error in custom weights"
     ) (weights, arg_coeff) input_list
 
 let mk_precedence ~db_w ~lmb_w t seq =
@@ -80,7 +80,7 @@ let mk_precedence ~db_w ~lmb_w t seq =
   (* constraints *)
   let constrs =
     t.constrs @
-      List.map (fun (p,rule) -> p, rule seq) t.constr_rules
+    List.map (fun (p,rule) -> p, rule seq) t.constr_rules
   in
   Util.debugf ~section 2 "@[<2>%d precedence constraint(s)@]"
     (fun k->k(List.length constrs));

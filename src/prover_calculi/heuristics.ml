@@ -47,18 +47,18 @@ module Make(E : Env.S) = struct
 
   let is_too_deep c =
     match !depth_limit_ with
-      | None -> false
-      | Some d ->
-        let lits = C.lits c in
-        let depth = max (_depth_types lits) (Literals.depth lits) in
-        if depth > d
-        then (
-          Ctx.lost_completeness();
-          Util.incr_stat stat_depth_limit;
-          Util.debugf ~section 5 "@[<2>clause dismissed (too deep at %d):@ @[%a@]@]"
-            (fun k->k depth C.pp c);
-          true
-        ) else false
+    | None -> false
+    | Some d ->
+      let lits = C.lits c in
+      let depth = max (_depth_types lits) (Literals.depth lits) in
+      if depth > d
+      then (
+        Ctx.lost_completeness();
+        Util.incr_stat stat_depth_limit;
+        Util.debugf ~section 5 "@[<2>clause dismissed (too deep at %d):@ @[%a@]@]"
+          (fun k->k depth C.pp c);
+        true
+      ) else false
 
   let has_too_many_vars c =
     if !no_max_vars
@@ -68,8 +68,8 @@ module Make(E : Env.S) = struct
       (* number of distinct term variables *)
       let n_vars =
         (Literals.vars lits
-        |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))
-        |> List.length)
+         |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))
+         |> List.length)
       in
       if n_vars > !max_vars then (
         Ctx.lost_completeness();
@@ -105,17 +105,17 @@ let () =
       "--enable-max-vars", Arg.Clear no_max_vars, "enable maximum number of variables per clause";
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
-    no_max_vars := true
-  );
+      no_max_vars := true
+    );
   Params.add_to_mode "ho-pragmatic" (fun () ->
-    no_max_vars := false;
-    max_vars    := 10;
-  );
+      no_max_vars := false;
+      max_vars    := 10;
+    );
   Params.add_to_mode "ho-competitive" (fun () ->
-    no_max_vars := false;
-    max_vars    := 10;
-  );
+      no_max_vars := false;
+      max_vars    := 10;
+    );
   Params.add_to_mode "fo-complete-basic" (fun () ->
-    no_max_vars := true
-  );
+      no_max_vars := true
+    );
   ()

@@ -62,8 +62,8 @@ let on_new_cst = Signal.create()
 let id_as_cst id =
   ID.payload_find id
     ~f:(function
-      | Payload_cst c -> Some c
-      | _ -> None)
+        | Payload_cst c -> Some c
+        | _ -> None)
 
 let id_as_cst_exn id = match id_as_cst id with
   | None -> raise (NotAnInductiveConstant id)
@@ -110,9 +110,9 @@ let declare ~depth ~is_sub id ty =
   in
   ID.set_payload id (Payload_cst cst)
     ~can_erase:(function
-      | ID.Attr_skolem ID.K_ind ->
-        true (* special case: promotion from skolem to inductive const *)
-      | _ -> false);
+        | ID.Attr_skolem ID.K_ind ->
+          true (* special case: promotion from skolem to inductive const *)
+        | _ -> false);
   (* return *)
   Signal.send on_new_cst cst;
   cst

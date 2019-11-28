@@ -41,10 +41,10 @@ let subterm ~sub t =
   let rec check t =
     T.equal sub t ||
     match T.view t with
-      | T.Var _ | T.DB _ | T.Const _ -> false
-      | T.App (f, l) -> check f || List.exists check l
-      | T.Bind (_, _, t') -> check t'
-      | T.AppBuiltin (_,l) -> List.exists check l
+    | T.Var _ | T.DB _ | T.Const _ -> false
+    | T.App (f, l) -> check f || List.exists check l
+    | T.Bind (_, _, t') -> check t'
+    | T.AppBuiltin (_,l) -> List.exists check l
   in
   check t
 
@@ -286,43 +286,43 @@ let is_ho_at_root t = is_ho_var t || is_ho_app t
 let rec all_combs = function 
   | [] -> []
   | x::xs ->
-      let rest_combs = all_combs xs in
-      if CCList.is_empty rest_combs then CCList.map (fun t->[t]) x 
-      else CCList.flat_map 
-            (fun i -> CCList.map (fun comb -> i::comb) rest_combs) 
-           x
+    let rest_combs = all_combs xs in
+    if CCList.is_empty rest_combs then CCList.map (fun t->[t]) x 
+    else CCList.flat_map 
+        (fun i -> CCList.map (fun comb -> i::comb) rest_combs) 
+        x
 
 let rec cover_with_terms ?(depth=0) ?(recurse=true) t ts =
   let n = List.length ts in
   let db = CCList.mapi (fun i x -> 
-              if CCOpt.is_some x then (i, CCOpt.get_exn x) else (-1, false_)) 
-           ts
+      if CCOpt.is_some x then (i, CCOpt.get_exn x) else (-1, false_)) 
+      ts
            |> CCList.filter_map (fun (i,x) ->
-                if i!=(-1) && equal x t then 
-                (assert (Type.equal (ty x) (ty t));
-                Some (bvar ~ty:(ty t) (n-1-i+depth))) 
-                else None) in
+               if i!=(-1) && equal x t then 
+                 (assert (Type.equal (ty x) (ty t));
+                  Some (bvar ~ty:(ty t) (n-1-i+depth))) 
+               else None) in
   let rest =
     if recurse then 
       begin match view t with 
         | AppBuiltin (hd,args) ->
-            if CCList.is_empty args then [app_builtin ~ty:(ty t) hd []]
-            else (
-              let args' = List.map (fun a -> cover_with_terms ~depth a ts) args in
-              let args_combined = all_combs args' in
-              List.map (fun args -> app_builtin ~ty:(ty t) hd args) args_combined
-            )
-        | App (_,args) ->
-            assert(not (CCList.is_empty args));
-            let hd, args = head_term_mono t, CCList.drop_while is_type args in
-            let hd' = cover_with_terms ~recurse:false hd ts in
+          if CCList.is_empty args then [app_builtin ~ty:(ty t) hd []]
+          else (
             let args' = List.map (fun a -> cover_with_terms ~depth a ts) args in
-            let args_combined = all_combs (hd'::args') in
-            List.map (fun l ->  app (List.hd l) (List.tl l)) args_combined
+            let args_combined = all_combs args' in
+            List.map (fun args -> app_builtin ~ty:(ty t) hd args) args_combined
+          )
+        | App (_,args) ->
+          assert(not (CCList.is_empty args));
+          let hd, args = head_term_mono t, CCList.drop_while is_type args in
+          let hd' = cover_with_terms ~recurse:false hd ts in
+          let args' = List.map (fun a -> cover_with_terms ~depth a ts) args in
+          let args_combined = all_combs (hd'::args') in
+          List.map (fun l ->  app (List.hd l) (List.tl l)) args_combined
         | Fun (ty_var, body) -> 
-            let bodies = cover_with_terms ~depth:(depth+1) body ts in
-            assert(not (CCList.is_empty bodies));
-            List.map (fun b -> fun_ ty_var b) bodies
+          let bodies = cover_with_terms ~depth:(depth+1) body ts in
+          assert(not (CCList.is_empty bodies));
+          List.map (fun b -> fun_ ty_var b) bodies
         | _ -> [t]
       end
     else [t] in
@@ -338,16 +338,16 @@ let max_cover t ts =
     | Some idx -> bvar ~ty:(ty t) (List.length ts - 1 - idx + depth)
     | None -> 
       begin match view t with
-      | AppBuiltin (hd,args) -> 
-        let args' = List.map (fun arg -> aux depth arg) args in
-        app_builtin ~ty:(ty t) hd args'
-      | App (hd,args) -> 
-        let args' = List.map (fun arg -> aux depth arg) args in
-        app (aux depth hd) args'
-      | Fun (ty_var, body) -> 
-        let body' = aux (depth+1) body in
-        fun_ ty_var body'
-      | DB _ | Var _  | Const _ -> t
+        | AppBuiltin (hd,args) -> 
+          let args' = List.map (fun arg -> aux depth arg) args in
+          app_builtin ~ty:(ty t) hd args'
+        | App (hd,args) -> 
+          let args' = List.map (fun arg -> aux depth arg) args in
+          app (aux depth hd) args'
+        | Fun (ty_var, body) -> 
+          let body' = aux (depth+1) body in
+          fun_ ty_var body'
+        | DB _ | Var _  | Const _ -> t
       end
   in
   aux 0 t
@@ -373,12 +373,12 @@ module Seq = struct
     let rec aux t =
       k t;
       match view t with
-        | AppBuiltin (_, l) -> if include_builtin then List.iter aux l;
-        | Const _
-        | Var _
-        | DB _ -> ()
-        | Fun (_, u) -> aux u
-        | App (f, l) -> if not ignore_head then aux f; List.iter aux l
+      | AppBuiltin (_, l) -> if include_builtin then List.iter aux l;
+      | Const _
+      | Var _
+      | DB _ -> ()
+      | Fun (_, u) -> aux u
+      | App (f, l) -> if not ignore_head then aux f; List.iter aux l
     in
     aux t
 
@@ -387,14 +387,14 @@ module Seq = struct
       if filter_term t then  (
         k (t, depth);
         match view t with
-          | Const _
-          | DB _
-          | Var _ -> ()
-          | Fun (_,u) -> recurse (depth+1) u
-          | AppBuiltin (_, l) -> List.iter (recurse (depth+1)) l
-          | App (_, l) ->
-            let depth' = depth + 1 in
-            List.iter (recurse depth') l)
+        | Const _
+        | DB _
+        | Var _ -> ()
+        | Fun (_,u) -> recurse (depth+1) u
+        | AppBuiltin (_, l) -> List.iter (recurse (depth+1)) l
+        | App (_, l) ->
+          let depth' = depth + 1 in
+          List.iter (recurse depth') l)
     in
     recurse 0 t
 
@@ -402,17 +402,17 @@ module Seq = struct
     if include_types then (
       Type.Seq.symbols (ty t) k
     );
-    
+
     let rec aux t = 
-    if filter_term t then (
-      match view t with
+      if filter_term t then (
+        match view t with
         | AppBuiltin (_,l) -> List.iter aux l
         | Const s -> k s
         | Var _
         | DB _ -> ()
         | Fun (ty,u) -> if (include_types) then Type.Seq.symbols ty k; aux u
         | App (f, l) -> aux f; List.iter aux l
-    ) in
+      ) in
     aux t
 
   let max_var = Type.Seq.max_var
@@ -442,8 +442,8 @@ let has_ho_subterm t =
 
 let close_quantifier b ty_args body =
   CCList.fold_right (fun ty acc -> 
-    app_builtin ~ty:Type.prop b [fun_ ty acc])
-  ty_args body
+      app_builtin ~ty:Type.prop b [fun_ ty acc])
+    ty_args body
 
 let var_occurs ~var t =
   Iter.exists (HVar.equal Type.equal var) (Seq.vars t)
@@ -499,51 +499,51 @@ let is_linear t =
   res
 
 let rec in_pfho_fragment t =
-   match view t with
-    | Var _ -> if (not (type_ok (ty t))) then
-               (raise (Failure (CCFormat.sprintf "Variable has wrong type [%a]" T.pp t)))
-               else true
-    | Const sym -> if (List.for_all type_ok (Type.expected_args (ty t))) then true
-                 else (raise (Failure (CCFormat.sprintf "Constant has wrong type [%a] " ID.pp sym)))
-    | AppBuiltin( _, l)
-    | App (_, l) -> let hd = head_term t in
-                    let hd_is_skolem = match as_const hd with
-                                    | Some sym -> ID.is_skolem sym
-                                    | None -> false in
-                    (* If the head is a variable or skolem, the return type must be ok. 
-                       But if the head is a constant, we want to allow predicate symbols. *)
-                    if((not (is_var hd || hd_is_skolem) || type_ok (ty t)) && 
-                      List.map ty l |> List.for_all type_ok
-                    && List.for_all in_pfho_fragment l) then true
-                    else (raise (Failure (CCFormat.sprintf "Arugment of a term has wrong type [%a]" T.pp t)))
-    | Fun (var_t, body) -> if(type_ok (var_t) &&
-                           type_ok (ty body) &&
-                           in_pfho_fragment body) then true
-                           else (raise (Failure (CCFormat.sprintf "Lambda body has wrong type [%a]" T.pp t)))
-    | DB _ -> if(type_ok (ty t)) then true
-              else (raise (Failure "Bound variable has wrong type"))
-   and type_ok ty_ =
-    not (Type.Seq.sub ty_ |> Iter.exists (fun t -> Type.equal t (Type.prop) || Type.equal t (Type.rat) || Type.equal t (Type.int)))
+  match view t with
+  | Var _ -> if (not (type_ok (ty t))) then
+      (raise (Failure (CCFormat.sprintf "Variable has wrong type [%a]" T.pp t)))
+    else true
+  | Const sym -> if (List.for_all type_ok (Type.expected_args (ty t))) then true
+    else (raise (Failure (CCFormat.sprintf "Constant has wrong type [%a] " ID.pp sym)))
+  | AppBuiltin( _, l)
+  | App (_, l) -> let hd = head_term t in
+    let hd_is_skolem = match as_const hd with
+      | Some sym -> ID.is_skolem sym
+      | None -> false in
+    (* If the head is a variable or skolem, the return type must be ok. 
+       But if the head is a constant, we want to allow predicate symbols. *)
+    if((not (is_var hd || hd_is_skolem) || type_ok (ty t)) && 
+       List.map ty l |> List.for_all type_ok
+       && List.for_all in_pfho_fragment l) then true
+    else (raise (Failure (CCFormat.sprintf "Arugment of a term has wrong type [%a]" T.pp t)))
+  | Fun (var_t, body) -> if(type_ok (var_t) &&
+                            type_ok (ty body) &&
+                            in_pfho_fragment body) then true
+    else (raise (Failure (CCFormat.sprintf "Lambda body has wrong type [%a]" T.pp t)))
+  | DB _ -> if(type_ok (ty t)) then true
+    else (raise (Failure "Bound variable has wrong type"))
+and type_ok ty_ =
+  not (Type.Seq.sub ty_ |> Iter.exists (fun t -> Type.equal t (Type.prop) || Type.equal t (Type.rat) || Type.equal t (Type.int)))
 
 let in_lfho_fragment t =
-   in_pfho_fragment t &&
-      (Seq.subterms t) |>
-      (fun subts ->
-         if Iter.for_all (fun subt -> not (is_fun subt)) subts
-         then true
-         else raise (Failure "has lambda"))
+  in_pfho_fragment t &&
+  (Seq.subterms t) |>
+  (fun subts ->
+     if Iter.for_all (fun subt -> not (is_fun subt)) subts
+     then true
+     else raise (Failure "has lambda"))
 
 let rec is_fo_term t =
   match view t with
-    | Var _ -> not @@ Type.is_fun @@ ty t
-    | AppBuiltin _ -> false
-    | App (hd, l) -> 
-      let expected_args = List.length @@ Type.expected_args @@ ty hd in
-      let actual_args = List.length l in
-      expected_args = actual_args && T.is_const hd 
-        && List.for_all is_fo_term l
-    | Const _ -> true
-    | _ -> false
+  | Var _ -> not @@ Type.is_fun @@ ty t
+  | AppBuiltin _ -> false
+  | App (hd, l) -> 
+    let expected_args = List.length @@ Type.expected_args @@ ty hd in
+    let actual_args = List.length l in
+    expected_args = actual_args && T.is_const hd 
+    && List.for_all is_fo_term l
+  | Const _ -> true
+  | _ -> false
 
 let is_true_or_false t = match view t with
   | AppBuiltin(b, []) -> 
@@ -570,22 +570,22 @@ let depth t = Seq.subterms_depth t |> Iter.map snd |> Iter.fold max 0
 (* @param vars the free variables the parameter must depend upon
    @param ty_ret the return type *)
 let mk_fresh_skolem =
-   let n = ref 0 in
-    fun vars ty_ret ->
-      let i = CCRef.incr_then_get n in
-      (** fresh skolem **)
-      let id = ID.makef "#fsk%d" i in
-      ID.set_payload id (ID.Attr_skolem ID.K_normal);
-      let ty_vars, vars =
-          List.partition (fun v -> Type.is_tType (HVar.ty v)) vars
-      in
-      let ty =
-          Type.forall_fvars ty_vars
-            (Type.arrow (List.map HVar.ty vars) ty_ret)
-      in
-      ((id,ty), app_full (const id ~ty)
-          (List.map Type.var ty_vars)
-          (List.map var vars) )
+  let n = ref 0 in
+  fun vars ty_ret ->
+    let i = CCRef.incr_then_get n in
+    (** fresh skolem **)
+    let id = ID.makef "#fsk%d" i in
+    ID.set_payload id (ID.Attr_skolem ID.K_normal);
+    let ty_vars, vars =
+      List.partition (fun v -> Type.is_tType (HVar.ty v)) vars
+    in
+    let ty =
+      Type.forall_fvars ty_vars
+        (Type.arrow (List.map HVar.ty vars) ty_ret)
+    in
+    ((id,ty), app_full (const id ~ty)
+       (List.map Type.var ty_vars)
+       (List.map var vars) )
 
 let mk_tmp_cst ~counter ~ty =
   let idx = CCRef.get_then_incr counter in
@@ -647,17 +647,17 @@ let all_positions ?(vars=false) ?(ty_args=true) ?(var_args=true) ?(fun_bodies=tr
       f (PW.make t (PB.to_pos pb))
     | AppBuiltin (_, args)
     | App (_, args) ->
-        if ty_args || not (Type.is_tType (ty t)) then (
-          f (PW.make t (PB.to_pos pb));
-        );
-        let len = List.length args in
-        let invi i = len - 1 - i in
-        List.iteri
-          (fun i t' ->
-              (* if [t'] is a type parameter and [not ty_args], ignore *)
-              if ty_args || not (Type.is_tType (ty t'))
-              then aux (PB.arg (invi i) pb) t')
-          args
+      if ty_args || not (Type.is_tType (ty t)) then (
+        f (PW.make t (PB.to_pos pb));
+      );
+      let len = List.length args in
+      let invi i = len - 1 - i in
+      List.iteri
+        (fun i t' ->
+           (* if [t'] is a type parameter and [not ty_args], ignore *)
+           if ty_args || not (Type.is_tType (ty t'))
+           then aux (PB.arg (invi i) pb) t')
+        args
   in
   aux (PB.of_pos pos) t
 
@@ -767,9 +767,9 @@ let to_string = CCFormat.to_string pp
 module Form = struct
   let pp_hook _depth pp_rec out t =
     match Classic.view t with
-      | Classic.AppBuiltin (Builtin.Not, [a]) ->
-        Format.fprintf out "(@[<1>¬@ %a@])" pp_rec a; true
-      | _ -> false  (* default *)
+    | Classic.AppBuiltin (Builtin.Not, [a]) ->
+      Format.fprintf out "(@[<1>¬@ %a@])" pp_rec a; true
+    | _ -> false  (* default *)
 
   let () = add_hook pp_hook
 
@@ -780,8 +780,8 @@ module Form = struct
     );
     assert (Type.is_prop (ty t));
     match view t with
-      | AppBuiltin (Builtin.Not, [u]) -> u
-      | _ -> app_builtin ~ty:Type.prop Builtin.not_ [t]
+    | AppBuiltin (Builtin.Not, [u]) -> u
+    | _ -> app_builtin ~ty:Type.prop Builtin.not_ [t]
 
   let eq a b =
     assert (Type.equal (ty a)(ty b));
@@ -811,7 +811,7 @@ module Form = struct
   let forall t =
     assert(Type.is_fun (ty t) && Type.returns_prop (ty t));
     app_builtin ~ty:Type.prop Builtin.ForallConst [t]
-  
+
   let exists t =
     assert(Type.is_fun (ty t) && Type.returns_prop (ty t));
     app_builtin ~ty:Type.prop Builtin.ExistsConst [t]
@@ -861,33 +861,33 @@ module Arith = struct
       | _ -> pp_rec buf t
     in
     match view t with
-      | Var v when Type.equal (ty t) Type.int ->
-        Format.fprintf out "I%d" (HVar.id v); true
-      | Var v when Type.equal (ty t) Type.rat ->
-        Format.fprintf out "Q%d" (HVar.id v); true
-      | AppBuiltin (Builtin.Less, [_; a; b]) ->
-        Format.fprintf out "%a < %a" pp_surrounded a pp_surrounded b; true
-      | AppBuiltin (Builtin.Lesseq, [_;a; b]) ->
-        Format.fprintf out "%a ≤ %a" pp_surrounded a pp_surrounded b; true
-      | AppBuiltin (Builtin.Greater, [_;a; b]) ->
-        Format.fprintf out "%a > %a" pp_surrounded a pp_surrounded b; true
-      | AppBuiltin (Builtin.Greatereq, [_;a; b]) ->
-        Format.fprintf out "%a ≥ %a" pp_surrounded a pp_surrounded b; true
-      | AppBuiltin (Builtin.Sum, [_;a; b]) ->
-        Format.fprintf out "%a + %a" pp_surrounded a pp_surrounded b; true
-      | AppBuiltin (Builtin.Difference, [_;a; b]) ->
-        Format.fprintf out "%a - %a" pp_surrounded a pp_surrounded b; true
-      | AppBuiltin (Builtin.Product, [_;a; b]) ->
-        Format.fprintf out "%a × %a" pp_surrounded a pp_surrounded b; true
-      | AppBuiltin (Builtin.Quotient, [_;a; b]) ->
-        Format.fprintf out "%a / %a" pp_surrounded a pp_surrounded b; true
-      | AppBuiltin (Builtin.Quotient_e, [_;a; b]) ->
-        Format.fprintf out "%a // %a" pp_surrounded a pp_surrounded b; true
-      | AppBuiltin (Builtin.Uminus, [_;a]) ->
-        Format.fprintf out "-%a" pp_surrounded a; true;
-      | AppBuiltin (Builtin.Remainder_e, [_;a;b]) ->
-        Format.fprintf out "%a mod %a" pp_surrounded a pp_surrounded b; true;
-      | _ -> false  (* default *)
+    | Var v when Type.equal (ty t) Type.int ->
+      Format.fprintf out "I%d" (HVar.id v); true
+    | Var v when Type.equal (ty t) Type.rat ->
+      Format.fprintf out "Q%d" (HVar.id v); true
+    | AppBuiltin (Builtin.Less, [_; a; b]) ->
+      Format.fprintf out "%a < %a" pp_surrounded a pp_surrounded b; true
+    | AppBuiltin (Builtin.Lesseq, [_;a; b]) ->
+      Format.fprintf out "%a ≤ %a" pp_surrounded a pp_surrounded b; true
+    | AppBuiltin (Builtin.Greater, [_;a; b]) ->
+      Format.fprintf out "%a > %a" pp_surrounded a pp_surrounded b; true
+    | AppBuiltin (Builtin.Greatereq, [_;a; b]) ->
+      Format.fprintf out "%a ≥ %a" pp_surrounded a pp_surrounded b; true
+    | AppBuiltin (Builtin.Sum, [_;a; b]) ->
+      Format.fprintf out "%a + %a" pp_surrounded a pp_surrounded b; true
+    | AppBuiltin (Builtin.Difference, [_;a; b]) ->
+      Format.fprintf out "%a - %a" pp_surrounded a pp_surrounded b; true
+    | AppBuiltin (Builtin.Product, [_;a; b]) ->
+      Format.fprintf out "%a × %a" pp_surrounded a pp_surrounded b; true
+    | AppBuiltin (Builtin.Quotient, [_;a; b]) ->
+      Format.fprintf out "%a / %a" pp_surrounded a pp_surrounded b; true
+    | AppBuiltin (Builtin.Quotient_e, [_;a; b]) ->
+      Format.fprintf out "%a // %a" pp_surrounded a pp_surrounded b; true
+    | AppBuiltin (Builtin.Uminus, [_;a]) ->
+      Format.fprintf out "-%a" pp_surrounded a; true;
+    | AppBuiltin (Builtin.Remainder_e, [_;a;b]) ->
+      Format.fprintf out "%a mod %a" pp_surrounded a pp_surrounded b; true;
+    | _ -> false  (* default *)
 
   let () = add_hook pp_hook
 end
@@ -901,61 +901,61 @@ module DB = struct
   let unshift = T.DB.unshift
   let unbound = T.DB.unbound
   let skolemize_loosely_bound ?(already_sk=IntMap.empty) t =
-  let rec aux skolemized depth subt =
-    match view subt with
-    | Const _
-    | Var _ ->  (subt, skolemized)
-    | DB i ->
+    let rec aux skolemized depth subt =
+      match view subt with
+      | Const _
+      | Var _ ->  (subt, skolemized)
+      | DB i ->
         if i >= depth then
           (try
-            let sk = IntMap.find (i-depth) skolemized in
-            (sk, skolemized)
-          with _ -> 
-            let new_sk = snd @@ mk_fresh_skolem [] (ty subt) in
+             let sk = IntMap.find (i-depth) skolemized in
+             (sk, skolemized)
+           with _ -> 
+             let new_sk = snd @@ mk_fresh_skolem [] (ty subt) in
              let skolemized = IntMap.add (i-depth) new_sk skolemized in
              new_sk,skolemized)
-          else subt, skolemized
-    | Fun (v_ty,body) -> let b', s' = aux skolemized (depth+1) body in
-                         fun_ v_ty b', s'
-    | App (f, l) ->
-       let hd', s' = aux skolemized depth f in
-       let args, s'' = sk_args l s' depth  in
-       app hd' args, s''
-    | AppBuiltin (hd,l) -> let args, s' = sk_args l skolemized depth in
-                           app_builtin ~ty:(ty subt) hd args, s'
-  and sk_args l subst depth =
+        else subt, skolemized
+      | Fun (v_ty,body) -> let b', s' = aux skolemized (depth+1) body in
+        fun_ v_ty b', s'
+      | App (f, l) ->
+        let hd', s' = aux skolemized depth f in
+        let args, s'' = sk_args l s' depth  in
+        app hd' args, s''
+      | AppBuiltin (hd,l) -> let args, s' = sk_args l skolemized depth in
+        app_builtin ~ty:(ty subt) hd args, s'
+    and sk_args l subst depth =
       List.fold_right (fun arg (acc, s) ->
-        let arg', s_new = aux s depth arg in
-        arg'::acc, s_new)
-      l ([], subst)
-  in
+          let arg', s_new = aux s depth arg in
+          arg'::acc, s_new)
+        l ([], subst)
+    in
     aux already_sk 0 t
 
   let unskolemize sk_to_vars t =
     let rec aux depth subt =
       match Map.find_opt subt sk_to_vars  with
         Some i -> bvar ~ty:(ty subt) (depth+i)
-        | None ->
-          (match view subt with
-          | Const _  | Var _  | DB _ -> subt
-          | Fun (v_ty,body) -> fun_ v_ty (aux (depth+1) body)
-          | App (f, l) -> let f' = aux depth f in
-                          app f' (List.map (aux depth) l)
-          | AppBuiltin (hd,l) -> app_builtin ~ty:(ty subt) hd (List.map (aux depth) l))
-   in aux 0 t
+      | None ->
+        (match view subt with
+         | Const _  | Var _  | DB _ -> subt
+         | Fun (v_ty,body) -> fun_ v_ty (aux (depth+1) body)
+         | App (f, l) -> let f' = aux depth f in
+           app f' (List.map (aux depth) l)
+         | AppBuiltin (hd,l) -> app_builtin ~ty:(ty subt) hd (List.map (aux depth) l))
+    in aux 0 t
 
   let rec map_vars_shift ?(depth=0) var_map t =
-   match view t with
-   | Const _  | DB _ -> t
-   | Var _ -> (match Map.find_opt t var_map with
-              | Some i -> bvar ~ty:(ty t) (i + depth)
-              | None -> t)
-   | Fun (v_ty,body) -> let depth = depth+1 in
-                        fun_ v_ty (map_vars_shift ~depth var_map body)
-   | App (f, l) -> let f' = map_vars_shift ~depth var_map f in
-                   app f' (List.map (map_vars_shift ~depth var_map) l)
-   | AppBuiltin (hd,l) -> app_builtin ~ty:(ty t) hd
-                          (List.map (map_vars_shift ~depth var_map) l)
+    match view t with
+    | Const _  | DB _ -> t
+    | Var _ -> (match Map.find_opt t var_map with
+        | Some i -> bvar ~ty:(ty t) (i + depth)
+        | None -> t)
+    | Fun (v_ty,body) -> let depth = depth+1 in
+      fun_ v_ty (map_vars_shift ~depth var_map body)
+    | App (f, l) -> let f' = map_vars_shift ~depth var_map f in
+      app f' (List.map (map_vars_shift ~depth var_map) l)
+    | AppBuiltin (hd,l) -> app_builtin ~ty:(ty t) hd
+                             (List.map (map_vars_shift ~depth var_map) l)
 end
 
 let debugf = pp
@@ -1073,13 +1073,13 @@ module Conv = struct
         PT.Var_tbl.remove tbl v;
         fun_ ty_arg body
       | PT.Bind(b, v, body) when Binder.equal b Binder.Forall 
-                                 || Binder.equal b Binder.Exists ->
+                              || Binder.equal b Binder.Exists ->
         if TypedSTerm.Ty.is_tType (Var.ty v) then (
           (* we are ignoring the types, since the conversion will take care of itself *)
           aux body
         ) else (
           let b = if Binder.equal b Binder.Forall 
-                  then Builtin.ForallConst else Builtin.ExistsConst in
+            then Builtin.ForallConst else Builtin.ExistsConst in
           let ty_arg = Type.Conv.of_simple_term_exn ctx (Var.ty v) in
           let previous = 
             if PT.Var_tbl.mem tbl v then Some (PT.Var_tbl.find tbl v) else None in
@@ -1113,55 +1113,55 @@ module Conv = struct
     let orig_term = t in
     let rec aux_t env t =
       match view t with
-        | Var i -> ST.var (aux_var i)
-        | DB i ->
-          begin match DBEnv.find env i with
-            | Some v -> ST.var v
-            | None when allow_free_db ->
-              (* encode DB index *)
-              ST.builtin ~ty:(aux_ty @@ ty t) (Builtin.Pseudo_de_bruijn i)
-            | None ->
-              Util.errorf ~where:"Term" "cannot find `Y%d`@ @[:in [%a]@]" i (DBEnv.pp Var.pp) env
-          end
-        | Const id -> ST.const ~ty:(aux_ty (ty t)) id
-        | App (f,l) ->
-          ST.app ~ty:(aux_ty (ty t))
-            (aux_t env f) (List.map (aux_t env) l)
-        | AppBuiltin (b,[body]) when Builtin.equal b Builtin.ForallConst ||
-                                     Builtin.equal b Builtin.ExistsConst ->
-          let b = if Builtin.equal b Builtin.ForallConst 
-                  then Binder.Forall else Binder.Exists in
-          let ty_args, fun_body = open_fun body in 
+      | Var i -> ST.var (aux_var i)
+      | DB i ->
+        begin match DBEnv.find env i with
+          | Some v -> ST.var v
+          | None when allow_free_db ->
+            (* encode DB index *)
+            ST.builtin ~ty:(aux_ty @@ ty t) (Builtin.Pseudo_de_bruijn i)
+          | None ->
+            Util.errorf ~where:"Term" "cannot find `Y%d`@ @[:in [%a]@]" i (DBEnv.pp Var.pp) env
+        end
+      | Const id -> ST.const ~ty:(aux_ty (ty t)) id
+      | App (f,l) ->
+        ST.app ~ty:(aux_ty (ty t))
+          (aux_t env f) (List.map (aux_t env) l)
+      | AppBuiltin (b,[body]) when Builtin.equal b Builtin.ForallConst ||
+                                   Builtin.equal b Builtin.ExistsConst ->
+        let b = if Builtin.equal b Builtin.ForallConst 
+          then Binder.Forall else Binder.Exists in
+        let ty_args, fun_body = open_fun body in 
 
-          if is_true_or_false fun_body then (
-            if T.equal fun_body true_ then ST.app_builtin ~ty:(aux_ty Type.prop) Builtin.True []
-            else ST.app_builtin ~ty:(aux_ty Type.prop) Builtin.False []
-          ) else if not (Type.returns_prop (ty fun_body)) then (
-            let err_msg = CCFormat.sprintf "quantifier wrongly encoded: %a(%a)" T.pp t T.pp orig_term in
-            Util.error ~where:"Term" err_msg;
-          ) else (
-            let fresh_vars = List.map (fun ty -> 
+        if is_true_or_false fun_body then (
+          if T.equal fun_body true_ then ST.app_builtin ~ty:(aux_ty Type.prop) Builtin.True []
+          else ST.app_builtin ~ty:(aux_ty Type.prop) Builtin.False []
+        ) else if not (Type.returns_prop (ty fun_body)) then (
+          let err_msg = CCFormat.sprintf "quantifier wrongly encoded: %a(%a)" T.pp t T.pp orig_term in
+          Util.error ~where:"Term" err_msg;
+        ) else (
+          let fresh_vars = List.map (fun ty -> 
               incr max_var;
               var_of_int ~ty !max_var) ty_args in
-            let replacement = DBEnv.push_l_rev DBEnv.empty fresh_vars in
-            let body  = DB.eval replacement fun_body in
-            let remaining_vars = List.map (fun ty ->
+          let replacement = DBEnv.push_l_rev DBEnv.empty fresh_vars in
+          let body  = DB.eval replacement fun_body in
+          let remaining_vars = List.map (fun ty ->
               incr max_var;
               var_of_int ~ty !max_var) (Type.expected_args (ty fun_body)) in
-            let body = app body remaining_vars in
-            let vars_converted = List.map convert_var (fresh_vars @ remaining_vars) in
-            List.fold_right (fun v acc ->
+          let body = app body remaining_vars in
+          let vars_converted = List.map convert_var (fresh_vars @ remaining_vars) in
+          List.fold_right (fun v acc ->
               ST.bind ~ty:(aux_ty Type.prop) b v acc) (vars_converted) (aux_t env body) 
-          )
-        | AppBuiltin (b,l) ->
-          let res = 
-            ST.app_builtin ~ty:(aux_ty (ty t))
-              b (List.map (aux_t env) l) in
-          res
-        | Fun (ty_arg, body) ->
-          let v = Var.makef ~ty:(aux_ty ty_arg) "v_%d" (CCRef.incr_then_get n) in
-          let body = aux_t (DBEnv.push env v) body in
-          ST.bind Binder.Lambda ~ty:(aux_ty (ty t)) v body
+        )
+      | AppBuiltin (b,l) ->
+        let res = 
+          ST.app_builtin ~ty:(aux_ty (ty t))
+            b (List.map (aux_t env) l) in
+        res
+      | Fun (ty_arg, body) ->
+        let v = Var.makef ~ty:(aux_ty ty_arg) "v_%d" (CCRef.incr_then_get n) in
+        let body = aux_t (DBEnv.push env v) body in
+        ST.bind Binder.Lambda ~ty:(aux_ty (ty t)) v body
     and aux_var v =
       Type.Conv.var_to_simple_var ~prefix:"X" ctx v
     and aux_ty ty =
@@ -1182,10 +1182,10 @@ let rebuild_rec t =
       | Var v -> var (HVar.cast ~ty v)
       | DB i ->
         assert (if i >= 0 && i < List.length env then true
-          else (Format.printf "%d not in %a@." i (CCFormat.Dump.list Type.pp) env; false));
+                else (Format.printf "%d not in %a@." i (CCFormat.Dump.list Type.pp) env; false));
         assert (if Type.equal ty (List.nth env i) then true
-          else (Format.printf "@[%a@ has type %a@ but bound with type %a@]@."
-              pp t Type.pp ty Type.pp (List.nth env i); false));
+                else (Format.printf "@[%a@ has type %a@ but bound with type %a@]@."
+                        pp t Type.pp ty Type.pp (List.nth env i); false));
         bvar ~ty i
       | Const id -> const ~ty id
       | App (f, l) -> app (aux env f) (List.map (aux env) l)
@@ -1203,12 +1203,12 @@ let rebuild_rec t =
 let compl_in_l l =
   let pos, neg = 
     CCList.partition_map (fun t -> 
-      match view t with 
+        match view t with 
         | AppBuiltin(Builtin.Not, [s]) -> `Right s
         | _ -> `Left t) l
     |> CCPair.map_same Set.of_list in
   not (Set.is_empty (Set.inter pos neg))
-  
+
 
 let simplify_bools t =
   let simplify_and_or t b l =
@@ -1226,10 +1226,10 @@ let simplify_bools t =
           else (if List.length l' = 1 then List.hd l'
                 else app_builtin ~ty:(Type.prop) b l')
         )) 
-      in
-    res 
     in
- 
+    res 
+  in
+
   let rec aux t =
     match view t with 
     | DB _ | Const _ | Var _ -> t
@@ -1244,25 +1244,25 @@ let simplify_bools t =
     | AppBuiltin(Builtin.And, l) when List.length l > 1 ->
       let l' = List.map aux l in
       let t = if same_l l l' then t 
-              else app_builtin ~ty:(Type.prop) Builtin.And l' in
+        else app_builtin ~ty:(Type.prop) Builtin.And l' in
       simplify_and_or t Builtin.And l'
     | AppBuiltin(Builtin.Or, l) when List.length l > 1 ->
       let l' = List.map aux l in
       let t = if same_l l l' then t 
-              else app_builtin ~ty:(Type.prop) Builtin.Or l' in
+        else app_builtin ~ty:(Type.prop) Builtin.Or l' in
       simplify_and_or t Builtin.Or l'
     | AppBuiltin(Builtin.Not, [s]) ->
       if equal s true_ then false_
       else 
-        if equal s false_ then true_
-        else (
-          match view s with 
-          | AppBuiltin(Builtin.Not, [s']) -> aux s'
-          | _ ->  
-            let s' = aux s in
-            if equal s s' then t else
+      if equal s false_ then true_
+      else (
+        match view s with 
+        | AppBuiltin(Builtin.Not, [s']) -> aux s'
+        | _ ->  
+          let s' = aux s in
+          if equal s s' then t else
             app_builtin ~ty:(Type.prop) Builtin.Not [s'] 
-        )
+      )
     | AppBuiltin(Builtin.Imply, [p;c]) ->
       if T.equal p true_ then aux c
       else if T.equal p false_ then true_
@@ -1271,14 +1271,14 @@ let simplify_bools t =
         if equal p p' && equal c c' then t 
         else app_builtin ~ty:(ty t) Builtin.Imply [p';c'])
     | AppBuiltin(hd, [a;b]) 
-        when hd = Builtin.Eq || hd = Builtin.Equiv ->
+      when hd = Builtin.Eq || hd = Builtin.Equiv ->
       if equal a b then true_ else (
         let a',b' = aux a, aux b in
         if equal a a' && equal b b' then t 
         else app_builtin ~ty:(ty t) hd [a';b']
       )
     | AppBuiltin(hd, [a;b])
-        when hd = Builtin.Neq || hd = Builtin.Xor ->
+      when hd = Builtin.Neq || hd = Builtin.Xor ->
       if equal a b then false_ else (
         let a',b' = aux a, aux b in
         if equal a a' && equal b b' then t 
@@ -1292,37 +1292,37 @@ let simplify_bools t =
 
 let rec normalize_bools t =
   match view t with 
-    | DB _ | Const _ | Var _ -> t
-    | Fun(ty, body) ->
-      let body' = normalize_bools body in
-      if equal body body' then t
-      else fun_ ty body'
-    | App(hd, args) ->
-      let hd' = normalize_bools hd and  args' = List.map normalize_bools args in
-      if equal hd hd' && same_l args args' then t
-      else app hd' args'
-    | AppBuiltin((Builtin.And|Builtin.Or) as b, l) -> 
-      let l' = List.map normalize_bools l in
-      let sorted = 
-        List.combine l' (List.map T.size l')
-        |> List.fast_sort (fun x y -> CCInt.compare (snd x) (snd y))
-        |> List.map fst in
-      if same_l l l' && same_l l' sorted then t
-      else app_builtin ~ty:Type.prop b sorted
-    | AppBuiltin((Builtin.Eq|Builtin.Neq|Builtin.Xor|Builtin.Equiv) as b, ([_;x;y] as l) )
-    | AppBuiltin((Builtin.Eq|Builtin.Neq|Builtin.Xor|Builtin.Equiv) as b, ([x;y] as l)) -> 
-        let rec swap_last_two l = match l with
-          | [] | [_] -> l
-          | [x;y] -> [y;x]
-          | x :: xs -> x :: swap_last_two xs in
-        let x', y' = normalize_bools x, normalize_bools y in
-        let l = if List.length l = 3 then List.hd l :: x' :: [y'] else x' :: [y'] in
-        if T.size x' > T.size y' then (
-          app_builtin ~ty:Type.prop b (swap_last_two l)
-        ) else if T.equal x x' && T.equal y y' then t 
-        else app_builtin ~ty:Type.prop b l
-    | AppBuiltin(hd, l) -> 
-      let l' = List.map normalize_bools l in
-      if same_l l' l then t
-      else app_builtin ~ty:(ty t) hd l'
+  | DB _ | Const _ | Var _ -> t
+  | Fun(ty, body) ->
+    let body' = normalize_bools body in
+    if equal body body' then t
+    else fun_ ty body'
+  | App(hd, args) ->
+    let hd' = normalize_bools hd and  args' = List.map normalize_bools args in
+    if equal hd hd' && same_l args args' then t
+    else app hd' args'
+  | AppBuiltin((Builtin.And|Builtin.Or) as b, l) -> 
+    let l' = List.map normalize_bools l in
+    let sorted = 
+      List.combine l' (List.map T.size l')
+      |> List.fast_sort (fun x y -> CCInt.compare (snd x) (snd y))
+      |> List.map fst in
+    if same_l l l' && same_l l' sorted then t
+    else app_builtin ~ty:Type.prop b sorted
+  | AppBuiltin((Builtin.Eq|Builtin.Neq|Builtin.Xor|Builtin.Equiv) as b, ([_;x;y] as l) )
+  | AppBuiltin((Builtin.Eq|Builtin.Neq|Builtin.Xor|Builtin.Equiv) as b, ([x;y] as l)) -> 
+    let rec swap_last_two l = match l with
+      | [] | [_] -> l
+      | [x;y] -> [y;x]
+      | x :: xs -> x :: swap_last_two xs in
+    let x', y' = normalize_bools x, normalize_bools y in
+    let l = if List.length l = 3 then List.hd l :: x' :: [y'] else x' :: [y'] in
+    if T.size x' > T.size y' then (
+      app_builtin ~ty:Type.prop b (swap_last_two l)
+    ) else if T.equal x x' && T.equal y y' then t 
+    else app_builtin ~ty:Type.prop b l
+  | AppBuiltin(hd, l) -> 
+    let l' = List.map normalize_bools l in
+    if same_l l' l then t
+    else app_builtin ~ty:(ty t) hd l'
 

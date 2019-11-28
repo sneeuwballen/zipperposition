@@ -123,11 +123,11 @@ let debugf_real ~section msg k =
   else Format.fprintf debug_fmt_ "@{<Black>@[<4>%.3f[%s]@}@ "
       now section.Section.full_name;
   k (Format.kfprintf
-      (fun fmt ->
-         Format.fprintf fmt "@]@.";
-         if !break_on_debug then wait_user_input();
-      )
-      debug_fmt_ msg)
+       (fun fmt ->
+          Format.fprintf fmt "@]@.";
+          if !break_on_debug then wait_user_input();
+       )
+       debug_fmt_ msg)
 
 let[@inline] debugf ?(section=Section.root) l msg k =
   if l <= Section.cur_level section then (
@@ -393,12 +393,12 @@ let map_product ~f l =
       [] a
   in
   match l with
-    | [] -> []
-    | l1 :: tail ->
-      List.fold_left
-        (fun acc x -> product (f x) acc)
-        (f l1)
-        tail
+  | [] -> []
+  | l1 :: tail ->
+    List.fold_left
+      (fun acc x -> product (f x) acc)
+      (f l1)
+      tail
 
 let seq_map_l ~f l =
   let rec aux l yield = match l with

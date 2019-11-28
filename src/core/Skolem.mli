@@ -113,7 +113,7 @@ val define_term :
 (** [define_term l] introduces a new function symbol [f] that is
     defined by:
     - for each [args, rhs] in [l], [f args = rhs]
-    @param pattern used to name the new function in an informative way
+      @param pattern used to name the new function in an informative way
 *)
 
 type definition =

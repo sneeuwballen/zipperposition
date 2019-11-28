@@ -10,10 +10,10 @@ let prof_eta_reduce = Util.mk_profiler "term.eta_reduce"
 
 
 module OptionSet = Set.Make(
-   struct 
-      let compare x y = Pervasives.compare x y
-      type t = int option
-   end)
+  struct 
+    let compare x y = Pervasives.compare x y
+    type t = int option
+  end)
 
 
 module Inner = struct
@@ -91,7 +91,7 @@ module Inner = struct
       let st = whnf_rec st in
       term_of_st st
     | _ -> t
-  
+
   let rec whnf_term ?(env=DBEnv.empty) t =
     ignore(env);
     let pref, tt = T.open_bind Binder.Lambda t in
@@ -107,24 +107,24 @@ module Inner = struct
     if T.is_beta_reducible t then (
       let t = whnf_term t in
       match T.ty t with
-        | T.NoType -> t
-        | T.HasType ty ->
-          begin match T.view t with
-            | T.App (f, l) ->
-              let f' = snf_rec f in
-              if not (T.equal f f') then snf_rec (T.app ~ty f' l)
-              else (
-                let l' = List.map snf_rec l in
-                if T.equal f f' && T.same_l l l' then t else T.app ~ty f' l'
-              )
-            | T.AppBuiltin (b, l) ->
+      | T.NoType -> t
+      | T.HasType ty ->
+        begin match T.view t with
+          | T.App (f, l) ->
+            let f' = snf_rec f in
+            if not (T.equal f f') then snf_rec (T.app ~ty f' l)
+            else (
               let l' = List.map snf_rec l in
-              if T.same_l l l' then t else T.app_builtin ~ty b l'
-            | T.Var _ | T.Const _ | T.DB _ -> t
-            | T.Bind (b, varty, body) ->
-              let body' = snf_rec body in
-              if T.equal body body' then t else T.bind b ~ty ~varty body'
-          end) 
+              if T.equal f f' && T.same_l l l' then t else T.app ~ty f' l'
+            )
+          | T.AppBuiltin (b, l) ->
+            let l' = List.map snf_rec l in
+            if T.same_l l l' then t else T.app_builtin ~ty b l'
+          | T.Var _ | T.Const _ | T.DB _ -> t
+          | T.Bind (b, varty, body) ->
+            let body' = snf_rec body in
+            if T.equal body body' then t else T.bind b ~ty ~varty body'
+        end) 
     else t
 
   let eta_expand_rec t =
@@ -179,25 +179,25 @@ module Inner = struct
       let n = List.length args in
       let _, r_bvars = 
         List.fold_right (fun arg (idx, vars) -> 
-          if idx = -1 then (idx, vars)
-          else (
-            if idx < pref_len && T.is_bvar_i idx arg then 
-              (idx+1, arg :: vars)
-            else (-1, vars)
-          )
-        ) args (0, []) in
+            if idx = -1 then (idx, vars)
+            else (
+              if idx < pref_len && T.is_bvar_i idx arg then 
+                (idx+1, arg :: vars)
+              else (-1, vars)
+            )
+          ) args (0, []) in
       let redundant = List.length r_bvars in
       if redundant = 0 then 0, t
       else (
         let non_redundant = hd :: CCList.take (n-redundant) args in
         let _, m = List.fold_right (fun arg (idx, m) ->
-          if idx = -1 then (idx, m)
-          else (
-            if not @@ List.exists (fun tt -> 
-                T.DB.contains tt (T.as_bvar_exn arg)) non_redundant then
-              (idx+1, m+1) 
-            else (-1, m))
-        ) r_bvars (0, 0) in
+            if idx = -1 then (idx, m)
+            else (
+              if not @@ List.exists (fun tt -> 
+                  T.DB.contains tt (T.as_bvar_exn arg)) non_redundant then
+                (idx+1, m+1) 
+              else (-1, m))
+          ) r_bvars (0, 0) in
         if m > 0 then (
           let args = CCList.take (n-m) args in 
           let ty = Type.apply_unsafe (Type.of_term_unsafe @@ T.ty_exn hd) args in
@@ -304,25 +304,25 @@ let rec is_lambda_pattern t = match T.view (whnf t) with
   | T.AppBuiltin (_, ts) -> List.for_all is_lambda_pattern ts
   | T.DB _ | T.Var _ | T.Const _ -> true
   | T.App (hd, args) -> if T.is_var hd 
-                        then all_distinct_bound args 
-                      else List.for_all is_lambda_pattern args 
+    then all_distinct_bound args 
+    else List.for_all is_lambda_pattern args 
   | T.Fun (_, body) -> is_lambda_pattern body
-  and all_distinct_bound args =
-    List.map (fun arg -> match T.view (eta_reduce arg) with T.DB i -> Some i | _ -> None) args
-    |> OptionSet.of_list
-    |> (fun set -> not (OptionSet.mem None set) && OptionSet.cardinal set = List.length args)
+and all_distinct_bound args =
+  List.map (fun arg -> match T.view (eta_reduce arg) with T.DB i -> Some i | _ -> None) args
+  |> OptionSet.of_list
+  |> (fun set -> not (OptionSet.mem None set) && OptionSet.cardinal set = List.length args)
 
 let rec is_properly_encoded t = match T.view t with
-| Var _ | DB _ | Const _ -> true
-| AppBuiltin (hd,l) when Builtin.equal hd Builtin.ForallConst 
-                         || Builtin.equal hd Builtin.ExistsConst ->
+  | Var _ | DB _ | Const _ -> true
+  | AppBuiltin (hd,l) when Builtin.equal hd Builtin.ForallConst 
+                        || Builtin.equal hd Builtin.ExistsConst ->
     let res = begin match l with
-    | [body] -> let ty = Term.ty body in
-      Type.is_fun ty && Type.returns_prop ty
-    | _ -> false end in
+      | [body] -> let ty = Term.ty body in
+        Type.is_fun ty && Type.returns_prop ty
+      | _ -> false end in
     if not res then CCFormat.printf "Failed for %a.\n" T.pp t;
     res
-| AppBuiltin(_,l) -> List.for_all is_properly_encoded l
-| App (hd, l) -> List.for_all is_properly_encoded (hd::l)
-| Fun (_,u) -> is_properly_encoded u 
- 
+  | AppBuiltin(_,l) -> List.for_all is_properly_encoded l
+  | App (hd, l) -> List.for_all is_properly_encoded (hd::l)
+  | Fun (_,u) -> is_properly_encoded u 
+

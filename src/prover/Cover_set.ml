@@ -174,8 +174,8 @@ let make_coverset_ ~cover_set_depth ~depth (ty:Type.t)(ity:Ind_ty.t) : t =
     ) else mk_skolem ty
   in
   (* list of generators of:
-      - member of the coverset (one of the t such that cst=t)
-      - set of sub-constants of this term *)
+     - member of the coverset (one of the t such that cst=t)
+     - set of sub-constants of this term *)
   let rec make (cs_depth:int)(subst:Subst.t) : T.t mm =
     Util.debugf ~section:Ind_ty.section 5
       "(@[make_cover_set@ :ty %a@ :depth %d@ :subst %a@])"

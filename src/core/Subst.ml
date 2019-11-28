@@ -71,19 +71,19 @@ let[@inline] mem subst v = M.mem v subst
 
 let[@unroll 2] rec deref subst ((t,sc_t) as term) =
   match T.view t with
-    | T.Var v ->
-      begin match find subst (v,sc_t) with
-        | Some t' -> deref subst t'
-        | None -> term
-      end
-    | _ -> term
+  | T.Var v ->
+    begin match find subst (v,sc_t) with
+      | Some t' -> deref subst t'
+      | None -> term
+    end
+  | _ -> term
 
 (** Recursively lookup a variable in the substitution, until we get a value
     that is not a variable or that is not bound *)
 let get_var subst v =
   match find subst v with
-    | None -> None
-    | Some t -> Some (deref subst t)
+  | None -> None
+  | Some t -> Some (deref subst t)
 
 exception InconsistentBinding of var Scoped.t * term Scoped.t * term Scoped.t
 
@@ -165,19 +165,19 @@ let normalize subst : t =
     else (
       let ty = aux sc (T.ty_exn t) in
       match T.view t with
-        | T.Var v ->
-          (* follow binding if it stays in the same domain *)
-          begin match find subst (v,sc) with
-            | Some (u, sc') when sc=sc' -> aux sc u
-            | _ -> T.var (HVar.cast ~ty v)
-          end
-        | T.DB i -> T.bvar ~ty i
-        | T.Const id -> T.const ~ty id
-        | T.App (f, l) -> T.app ~ty (aux sc f) (List.map (aux sc) l)
-        | T.AppBuiltin (b, l) -> T.app_builtin b ~ty (List.map (aux sc) l)
-        | T.Bind (b,varty,body) ->
-          let varty = aux sc varty in
-          T.bind b ~ty ~varty (aux sc body)
+      | T.Var v ->
+        (* follow binding if it stays in the same domain *)
+        begin match find subst (v,sc) with
+          | Some (u, sc') when sc=sc' -> aux sc u
+          | _ -> T.var (HVar.cast ~ty v)
+        end
+      | T.DB i -> T.bvar ~ty i
+      | T.Const id -> T.const ~ty id
+      | T.App (f, l) -> T.app ~ty (aux sc f) (List.map (aux sc) l)
+      | T.AppBuiltin (b, l) -> T.app_builtin b ~ty (List.map (aux sc) l)
+      | T.Bind (b,varty,body) ->
+        let varty = aux sc varty in
+        T.bind b ~ty ~varty (aux sc body)
     )
   in
   M.map (fun (t,sc) -> aux sc t, sc) subst
@@ -222,59 +222,59 @@ let apply_aux ~sv subst ~f_rename t sc =
     if T.is_ground t then t
     else (
       match T.ty t with
-        | T.NoType ->
-          assert(T.equal T.tType t);
-          t
-        | T.HasType ty ->
-          let ty' = aux ty sc_t depth in
-          let res =
-            begin match T.view t with
-              | T.Const id ->
-                (* regular constant *)
-                if T.equal ty ty'
-                then t
-                else T.const ~ty:ty' id
-              | T.DB i ->
-                if T.equal ty ty'
-                then t
-                else T.bvar ~ty:ty' i
-              | T.Var v ->
-                (* the most interesting cases!
-                  switch depending on whether [t] is bound by [subst] or not *)
-                begin match find_exn subst (v,sc_t) with
-                  | (t',sc') ->
-                    (* NOTE: if [t'] is not closed, we assume that it
-                      is always replaced in a context where variables
-                      are properly bound. Typically, that means only
-                      in rewriting. *)
-                    (* also apply [subst] to [t'] *)
-                    let shifted = if sv != -1 then T.DB.shift depth t' else t' in
-                    aux shifted sc' depth
-                  | exception Not_found ->
-                    (* rename the variable using [f_rename] *)
-                    let v' = f_rename (v,sc_t) ty' in
-                    T.var v'
-                end
-              | T.Bind (s, varty, sub_t) ->
-                let varty' = aux varty sc_t (depth+1) in
-                let sub_t' = aux sub_t sc_t (depth+1) in
-                let res = T.bind ~varty:varty' ~ty:ty' s sub_t' in
-                (* Util.debugf 1 ("Before body: %a, after body: %a") *)
-                (* (fun k -> k T.pp t T.pp res); res *)
-                res
-              | T.App (hd, l) ->
-                let hd' = aux hd sc_t depth in
-                let l' = aux_list l sc_t depth in
-                if T.equal ty ty' && T.equal hd hd' && T.same_l l l'
-                then t
-                else T.app ~ty:ty' hd' l'
-              | T.AppBuiltin (s, l) ->
-                let l' = aux_list l sc_t depth in
-                if T.equal ty ty' && T.same_l l l'
-                then t
-                else T.app_builtin ~ty:ty' s l'
-            end in
-          res)
+      | T.NoType ->
+        assert(T.equal T.tType t);
+        t
+      | T.HasType ty ->
+        let ty' = aux ty sc_t depth in
+        let res =
+          begin match T.view t with
+            | T.Const id ->
+              (* regular constant *)
+              if T.equal ty ty'
+              then t
+              else T.const ~ty:ty' id
+            | T.DB i ->
+              if T.equal ty ty'
+              then t
+              else T.bvar ~ty:ty' i
+            | T.Var v ->
+              (* the most interesting cases!
+                 switch depending on whether [t] is bound by [subst] or not *)
+              begin match find_exn subst (v,sc_t) with
+                | (t',sc') ->
+                  (* NOTE: if [t'] is not closed, we assume that it
+                     is always replaced in a context where variables
+                     are properly bound. Typically, that means only
+                     in rewriting. *)
+                  (* also apply [subst] to [t'] *)
+                  let shifted = if sv != -1 then T.DB.shift depth t' else t' in
+                  aux shifted sc' depth
+                | exception Not_found ->
+                  (* rename the variable using [f_rename] *)
+                  let v' = f_rename (v,sc_t) ty' in
+                  T.var v'
+              end
+            | T.Bind (s, varty, sub_t) ->
+              let varty' = aux varty sc_t (depth+1) in
+              let sub_t' = aux sub_t sc_t (depth+1) in
+              let res = T.bind ~varty:varty' ~ty:ty' s sub_t' in
+              (* Util.debugf 1 ("Before body: %a, after body: %a") *)
+              (* (fun k -> k T.pp t T.pp res); res *)
+              res
+            | T.App (hd, l) ->
+              let hd' = aux hd sc_t depth in
+              let l' = aux_list l sc_t depth in
+              if T.equal ty ty' && T.equal hd hd' && T.same_l l l'
+              then t
+              else T.app ~ty:ty' hd' l'
+            | T.AppBuiltin (s, l) ->
+              let l' = aux_list l sc_t depth in
+              if T.equal ty ty' && T.same_l l l'
+              then t
+              else T.app_builtin ~ty:ty' s l'
+          end in
+        res)
   and aux_list l sc depth = match l with
     | [] -> []
     | [t1] -> [aux t1 sc depth]
@@ -371,29 +371,29 @@ module FO = struct
     (* Format.printf "Composing: @[ %a = %a @]\n" pp s1 pp s2; *)
     let subs_l1 = to_list s1 in
     let subs_as_map =
-    (List.map (fun ((v,sc_v), (t,sc_t)) ->
-      ((v,sc_v), (( (Lambda.snf (apply Renaming.none s2 (Term.of_term_unsafe t,sc_t))) : term :> T.t), scope)))
-    subs_l1) @ (to_list s2) in
+      (List.map (fun ((v,sc_v), (t,sc_t)) ->
+           ((v,sc_v), (( (Lambda.snf (apply Renaming.none s2 (Term.of_term_unsafe t,sc_t))) : term :> T.t), scope)))
+          subs_l1) @ (to_list s2) in
     (of_list subs_as_map)
 
 
   let canonize_neg_vars ~var_set = 
     let max_id   = T.VarSet.max_elt_opt var_set in
-      match max_id with 
-      | Some id ->
-        let max_id = ref (CCInt.max (HVar.id id) (-1)) in
-        T.VarSet.fold (fun v subst -> 
+    match max_id with 
+    | Some id ->
+      let max_id = ref (CCInt.max (HVar.id id) (-1)) in
+      T.VarSet.fold (fun v subst -> 
           let v_id = HVar.id v in
-            if v_id < 0 then (
-              match get_var subst ((v :> InnerTerm.t HVar.t),0) with
-              | Some _ -> subst 
-              | None -> (
+          if v_id < 0 then (
+            match get_var subst ((v :> InnerTerm.t HVar.t),0) with
+            | Some _ -> subst 
+            | None -> (
                 incr max_id;
                 let renamed_var = T.var (HVar.make ~ty:(HVar.ty v) !max_id) in
                 bind subst ((v :> InnerTerm.t HVar.t), 0) (renamed_var, 0)))
-            else subst) 
-          var_set empty 
-      | None -> empty
+          else subst) 
+        var_set empty 
+    | None -> empty
 
   let canonize_all_vars t =
     apply (Renaming.create()) empty (t,0)
@@ -423,42 +423,42 @@ module FO = struct
 
   let iter f s =
     iter (fun (v, sc_v) (t,sc_t) ->
-      let v = HVar.update_ty ~f:Type.of_term_unsafe v in
-      let t = Term.of_term_unsafe t in
-      f (v, sc_v) (t, sc_t)
-    ) s
+        let v = HVar.update_ty ~f:Type.of_term_unsafe v in
+        let t = Term.of_term_unsafe t in
+        f (v, sc_v) (t, sc_t)
+      ) s
 
   let unleak_variables subs =
-   let subs_l = to_list subs in
-   let unleaked_l, new_sk = List.fold_right
-    (fun ((v,sc_v), (t,sc_t)) (l, sk_map) ->
-      let t = Term.of_term_unsafe t in
-      Util.debugf 1 " unleaking in unleak_vars : %a" (fun k -> k Term.pp t);
-      let t', sk_map = Term.DB.skolemize_loosely_bound ~already_sk:sk_map t in
-      let v' = (HVar.update_ty ~f:Type.of_term_unsafe v,sc_v) in
-          (v', (t',sc_t))::l, sk_map) subs_l ([],Term.IntMap.empty) in
-   of_list' unleaked_l, List.map snd (Term.IntMap.bindings new_sk)
+    let subs_l = to_list subs in
+    let unleaked_l, new_sk = List.fold_right
+        (fun ((v,sc_v), (t,sc_t)) (l, sk_map) ->
+           let t = Term.of_term_unsafe t in
+           Util.debugf 1 " unleaking in unleak_vars : %a" (fun k -> k Term.pp t);
+           let t', sk_map = Term.DB.skolemize_loosely_bound ~already_sk:sk_map t in
+           let v' = (HVar.update_ty ~f:Type.of_term_unsafe v,sc_v) in
+           (v', (t',sc_t))::l, sk_map) subs_l ([],Term.IntMap.empty) in
+    of_list' unleaked_l, List.map snd (Term.IntMap.bindings new_sk)
 
   let subset_is_renaming ~subset ~res_scope subst =
     try 
       let subset = List.filter (fun v ->
-        let der_t, der_sc = deref subst v in
-        if der_sc != snd v then (
-          der_sc = res_scope
-        ) else (
-          der_sc = res_scope && not (Term.equal (fst v) der_t)
-        )
-      ) subset in
+          let der_t, der_sc = deref subst v in
+          if der_sc != snd v then (
+            der_sc = res_scope
+          ) else (
+            der_sc = res_scope && not (Term.equal (fst v) der_t)
+          )
+        ) subset in
       let derefed_vars = CCList.map (fun v ->
-        let derefed = deref subst v in
-        if not (Term.is_var (fst derefed)) then (
-          raise (invalid_arg "found a non-variable")
-        ) else derefed
-      ) subset 
-      |> CCList.sort_uniq ~cmp:(Scoped.compare Term.compare) in
+          let derefed = deref subst v in
+          if not (Term.is_var (fst derefed)) then (
+            raise (invalid_arg "found a non-variable")
+          ) else derefed
+        ) subset 
+                         |> CCList.sort_uniq ~cmp:(Scoped.compare Term.compare) in
       List.length derefed_vars = List.length subset
     with Invalid_argument _ -> false
- 
+
 
 
 end
