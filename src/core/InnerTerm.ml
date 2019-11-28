@@ -304,7 +304,7 @@ let app ~ty f l = match f.term, l with
     let flattened = l1 @ l in
     let props = add_ty_vars (any_props_for_ts (f1 :: flattened)) ty.props in
     let props =
-      if is_lam f then set_property props f_is_beta_reducible else props in
+      if is_lam f1 then set_property props f_is_beta_reducible else props in
     let my_t = make_ ~props ~ty:(HasType ty) (App (f1,flattened)) in
     H.hashcons my_t
   | AppBuiltin (f1, l1), _ ->
