@@ -489,27 +489,28 @@ module Make(E : Env.S) : S with module Env = E = struct
     let gamma = T.var tyvarC
 
     let partially_applied_s =
-      partially_apply ~comb:(mk_s ~alpha ~beta ~gamma ~args:[], 1)
-        [s_arg1, 2; s_arg2, 3]
+      partially_apply ~comb:(mk_s ~alpha ~beta ~gamma ~args:[], 0)
+        [s_arg1, 0; s_arg2, 15]
 
     let partially_applied_b =
-      partially_apply ~comb:(mk_b ~alpha ~beta ~gamma ~args:[], 1)
-        [b_arg1, 2; b_arg2, 3]
+      partially_apply ~comb:(mk_b ~alpha ~beta ~gamma ~args:[], 0)
+        [b_arg1, 0; b_arg2, 5]
 
     let partially_applied_c =
-      partially_apply ~comb:(mk_c ~alpha ~beta ~gamma ~args:[], 1)
-        [c_arg1, 2; c_arg2, 3]
+      partially_apply ~comb:(mk_c ~alpha ~beta ~gamma ~args:[], 0)
+        [c_arg1, 0; c_arg2, 10]
     
     let partially_applied_k =
-      partially_apply ~comb:(mk_k ~alpha ~beta ~args:[], 1)
-        [k_arg1, 2]
+      partially_apply ~comb:(mk_k ~alpha ~beta ~args:[], 0)
+        [k_arg1, 1]
     
     let partially_applied_i =
-      [mk_i ~alpha ~args:[], 1]
+      [mk_i ~alpha ~args:[], 0]
 
     let partially_applied_combs =
       partially_applied_s @ partially_applied_b @ partially_applied_c @ 
       partially_applied_k @ partially_applied_i
+
 
     let instantiate_var_w_comb ~var =
       CCList.filter_map (fun (comb, penalty) ->

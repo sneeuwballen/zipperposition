@@ -128,6 +128,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       | AppBuiltin(b, [body]) when Builtin.is_quantifier b && Type.is_fun (Term.ty body) -> 
         let _, fun_body = Term.open_fun body in
         can_be_translated fun_body
+      | AppBuiltin(b, _) when Builtin.is_combinator b -> false
       | AppBuiltin(b, l) -> (not (Builtin.is_logical_binop b) || List.length l >= 2) && 
                             (b != Builtin.Not || List.length l = 1) &&
                             List.for_all can_be_translated l

@@ -450,7 +450,8 @@ module Make(C : Clause_intf.S) = struct
     try
       let splitted = CCString.split ~by:"(" s in
       let name = List.hd splitted in
-      List.assoc name parsers s
+      let w = List.assoc name parsers s in
+      penalize w
     with Not_found | Failure _ -> 
       invalid_arg (CCFormat.sprintf "unknown weight function %s" s)
     
