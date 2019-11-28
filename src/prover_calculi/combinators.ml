@@ -11,6 +11,9 @@ type conv_rule = T.t -> T.t option
 exception IsNotCombinator
 
 let k_enable_combinators = Saturate.k_enable_combinators
+let k_s_penalty = Flex_state.create_key ()
+let k_b_penalty = Flex_state.create_key ()
+let k_c_penalty = Flex_state.create_key ()
 
 module type S = sig
   module Env : Env.S
@@ -490,15 +493,15 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let partially_applied_s =
       partially_apply ~comb:(mk_s ~alpha ~beta ~gamma ~args:[], 0)
-        [s_arg1, 0; s_arg2, 15]
+        [s_arg1, 0; s_arg2, E.flex_get k_s_penalty]
 
     let partially_applied_b =
       partially_apply ~comb:(mk_b ~alpha ~beta ~gamma ~args:[], 0)
-        [b_arg1, 0; b_arg2, 5]
+        [b_arg1, 0; b_arg2, E.flex_get k_b_penalty]
 
     let partially_applied_c =
       partially_apply ~comb:(mk_c ~alpha ~beta ~gamma ~args:[], 0)
-        [c_arg1, 0; c_arg2, 10]
+        [c_arg1, 0; c_arg2, E.flex_get k_c_penalty]
     
     let partially_applied_k =
       partially_apply ~comb:(mk_k ~alpha ~beta ~args:[], 0)
@@ -588,6 +591,10 @@ module Make(E : Env.S) : S with module Env = E = struct
 end
 
 let _enable_combinators = ref false
+let _s_penalty = ref 15
+let _b_penalty = ref 5
+let _c_penalty = ref 10
+
 
 let extension =
   let lam2combs seq = seq in
@@ -596,6 +603,9 @@ let extension =
     let module E = (val env : Env.S) in
     let module ET = Make(E) in
     E.flex_add k_enable_combinators !_enable_combinators;
+    E.flex_add k_s_penalty !_s_penalty;
+    E.flex_add k_c_penalty !_c_penalty;
+    E.flex_add k_b_penalty !_b_penalty;
 
     ET.setup ()
   in
@@ -607,7 +617,10 @@ let extension =
 
 let () =
   Options.add_opts
-    [ "--combinator-based-reasoning", Arg.Bool (fun v -> _enable_combinators := v), "enable / disable combinator based reasoning"];
+    [ "--combinator-based-reasoning", Arg.Bool (fun v -> _enable_combinators := v), "enable / disable combinator based reasoning";
+     "--comb-s-penalty", Arg.Set_int _s_penalty, "penalty for narrowing with $S X Y";
+     "--comb-c-penalty", Arg.Set_int _c_penalty, "penalty for narrowing with $C X Y";
+     "--comb-b-penalty", Arg.Set_int _b_penalty, "penalty for narrowing with $B X Y"];
   Params.add_to_mode "ho-comb-complete" (fun () ->
     _enable_combinators := true;
   );
