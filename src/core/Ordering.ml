@@ -206,17 +206,14 @@ module KBO : ORD = struct
   (* Type-1 combinator is a combinator that is not ground
      (see Ahmed's combinator KBO paper) *)
   let ty1comb_to_var t balance =
-    if T.is_comb t then (
+    if T.is_comb t && not (T.is_ground t) then (
       match T.Tbl.find_opt balance.comb2var t with
       | Some t' -> t'
       | None ->
-        if T.is_ground t then t
-        else (
           let fresh_var = T.var (HVar.fresh ~ty:(T.ty t) ()) in
           T.Tbl.add balance.comb2var t fresh_var;
           fresh_var
-        ))
-    else t
+    ) else t
 
   (** Higher-order KBO *)
   let rec kbo ~prec t1 t2 =
