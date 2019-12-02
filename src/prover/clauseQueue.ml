@@ -268,7 +268,7 @@ module Make(C : Clause_intf.S) = struct
                     1.0 /. divider
                   ) else 1.0 in
                 let val_ = int_of_float (goal_dist_penalty *. dist_var_penalty *. res) in
-                (Util.debugf  10 "cl: %a, w:%d\n" (fun k -> k C.pp c val_);
+                (Util.debugf  20 "cl: %a, w:%d\n" (fun k -> k C.pp c val_);
                 val_))
 
 

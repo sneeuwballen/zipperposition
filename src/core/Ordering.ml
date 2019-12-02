@@ -226,6 +226,7 @@ module KBO : ORD = struct
         @return weight balance, was `s` found?
     *)
     let rec balance_weight (wb:W.t) t s ~pos : W.t * bool =
+      let t = ty1comb_to_var t balance in
       match T.view t with
         | T.Var _ ->
           balance_weight_var wb t s ~pos
@@ -516,9 +517,13 @@ let compose f ord =
   {ord with 
     compare = 
       fun prec a b ->
+        (* CCFormat.printf "kbo: @[%a@]<?>@[%a@]@." T.pp a T.pp b; *)
         let f_res = f a b in
+        (* CCFormat.printf "f_res: @[%a@]@." Comparison.pp f_res; *)
         if Comparison.equal Comparison.Eq f_res then (
-          ord.compare prec a b
+          let res = ord.compare prec a b in
+          (* CCFormat.printf "res: @[%a@]@." Comparison.pp res; *)
+          res
         ) else f_res
       }
 

@@ -666,7 +666,7 @@ module Inner = struct
     (* first, normalize and un-app both terms *)
     let subst, t1 = whnf_deref subst (t1_0,scope) in
     let subst, t2 = whnf_deref subst (t2_0,scope) in
-    Util.debugf ~section 20
+    Util.debugf ~section 50
       "(@[unif_ho@ :t1 `%a`@ :t1_nf `%a`@ :t2 `%a`@ :t2_nf `%a`@ \
        :sc %d :subst %a@ :op %a@ :bvars %a@])@."
       (fun k -> k T.pp t1_0 T.pp t1 T.pp t2_0 T.pp t2 scope US.pp subst pp_op op B_vars.pp bvars);

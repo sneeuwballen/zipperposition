@@ -7,6 +7,8 @@ module Lits = Literals
 module Lit = Literal
 
 
+let section = Util.Section.make ~parent:Const.section "combs"
+
 type conv_rule = T.t -> T.t option
 exception IsNotCombinator
 
@@ -513,8 +515,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       [mk_i ~alpha ~args:[], 1]
 
     let partially_applied_combs =
-      partially_applied_s @ partially_applied_b @ partially_applied_c @ 
-      partially_applied_k @ partially_applied_i
+      (* partially_applied_s @ partially_applied_b @ partially_applied_c @ 
+      partially_applied_k @ partially_applied_i *)
+      (* partially_applied_b @ partially_applied_s @ partially_applied_i *)
+      [List.nth (partially_applied_b) 2; List.nth (partially_applied_s) 2] @ partially_applied_i
 
 
     let instantiate_var_w_comb ~var =
@@ -546,9 +550,13 @@ module Make(E : Env.S) : S with module Env = E = struct
         CCList.filter_map (fun (subst, comb_penalty) ->
           let renaming = Subst.Renaming.create () in
           let lit_idx, lit_pos = Lits.Pos.cut u_pos in
+
+          Util.debugf ~section 2 "narrow vars:@[%a@]:@[%d@]" (fun k -> k C.pp clause lit_idx);
+
           let lit = Lit.apply_subst_no_simp renaming subst (lits.(lit_idx), 1) in
           if not (Lit.Pos.is_max_term ~ord lit lit_pos) ||
              not (CCBV.get (C.eligible_res (clause, 1) subst) lit_idx) then (
+            Util.debugf ~section 2 "ordering restriction fail: @[%a@]@." (fun k -> k Subst.pp subst);
             None)
           else (
             let t_depth = Position.size (Literal.Pos.term_pos (lits.(lit_idx)) lit_pos) in
@@ -558,6 +566,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                 [C.proof_parent_subst renaming (clause,1) subst] in
             let penalty = (max 1 t_depth) * (comb_penalty + C.penalty clause) in
             let new_clause = C.create ~trail:(C.trail clause) ~penalty lits' proof in
+            Util.debugf ~section 2 "success: @[%a@]@." (fun k -> k C.pp new_clause);
             Some new_clause
           )) (instantiate_var_w_comb ~var))
         |> Iter.to_list
