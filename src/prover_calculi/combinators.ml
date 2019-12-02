@@ -496,29 +496,29 @@ module Make(E : Env.S) : S with module Env = E = struct
     let gamma = T.var tyvarC
 
     let partially_applied_s =
-      partially_apply ~comb:(mk_s ~alpha ~beta ~gamma ~args:[], 1)
+      partially_apply ~comb:(mk_s ~alpha ~beta ~gamma ~args:[], 0)
         [s_arg1, 1; s_arg2, Env.flex_get k_s_penalty]
 
     let partially_applied_b =
-      partially_apply ~comb:(mk_b ~alpha ~beta ~gamma ~args:[], 1)
+      partially_apply ~comb:(mk_b ~alpha ~beta ~gamma ~args:[], 0)
         [b_arg1, 1; b_arg2, Env.flex_get k_b_penalty]
 
     let partially_applied_c =
-      partially_apply ~comb:(mk_c ~alpha ~beta ~gamma ~args:[], 1)
+      partially_apply ~comb:(mk_c ~alpha ~beta ~gamma ~args:[], 0)
         [c_arg1, 1; c_arg2, Env.flex_get k_c_penalty]
     
     let partially_applied_k =
-      partially_apply ~comb:(mk_k ~alpha ~beta ~args:[], 1)
+      partially_apply ~comb:(mk_k ~alpha ~beta ~args:[], 0)
         [k_arg1, Env.flex_get k_k_penalty]
     
     let partially_applied_i =
-      [mk_i ~alpha ~args:[], 1]
+      [mk_i ~alpha ~args:[], 0]
 
     let partially_applied_combs =
-      (* partially_applied_s @ partially_applied_b @ partially_applied_c @ 
-      partially_applied_k @ partially_applied_i *)
+      partially_applied_s @ partially_applied_b @ partially_applied_c @ 
+      partially_applied_k @ partially_applied_i
       (* partially_applied_b @ partially_applied_s @ partially_applied_i *)
-      [List.nth (partially_applied_b) 2; List.nth (partially_applied_s) 2] @ partially_applied_i
+      
 
 
     let instantiate_var_w_comb ~var =
@@ -564,9 +564,11 @@ module Make(E : Env.S) : S with module Env = E = struct
             let proof = 
               Proof.Step.inference ~rule ~tags
                 [C.proof_parent_subst renaming (clause,1) subst] in
-            let penalty = (max 1 t_depth) * (comb_penalty + C.penalty clause) in
+            let penalty = (max t_depth 1) *  comb_penalty + C.penalty clause in
             let new_clause = C.create ~trail:(C.trail clause) ~penalty lits' proof in
+
             Util.debugf ~section 2 "success: @[%a@]@." (fun k -> k C.pp new_clause);
+
             Some new_clause
           )) (instantiate_var_w_comb ~var))
         |> Iter.to_list
