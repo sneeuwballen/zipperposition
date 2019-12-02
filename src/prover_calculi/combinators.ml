@@ -275,6 +275,116 @@ let narrowI t =
     ) else None
   with IsNotCombinator -> None
 
+(* 7. S (K X) = B X *)
+let opt5 t =
+  try 
+    let c_kind,ty_args,args = unpack_comb t in
+    if Builtin.equal Builtin.SComb c_kind then (
+      match args, ty_args with 
+      | [kx], [alpha;beta;gamma] ->
+        begin match unpack_comb kx with 
+        | (Builtin.KComb, _, [x])->
+          let alpha,beta,gamma = s2b_tyargs ~alpha ~beta ~gamma in
+          Some (mk_b ~args:[x] ~alpha ~beta ~gamma)
+        | _ -> None end
+      | _ -> None
+    ) else None
+  with IsNotCombinator -> None
+
+(* Optimizations from Bunder's paper *)
+(* 6. B X (K Y) = K (X Y) *)
+let opt6 t =
+  try 
+    let c_kind,ty_args,args = unpack_comb t in
+    if Builtin.equal Builtin.BComb c_kind then (
+      match args with 
+      | [x;ky] ->
+        begin match unpack_comb ky with 
+        | (Builtin.KComb, [alpha;_], [y])->
+          let xy = T.app x [y] in
+          Some (mk_k ~args:[xy] ~alpha ~beta:(Term.of_ty @@ T.ty xy))
+        | _ -> None end
+      | _ -> None
+    ) else None
+  with IsNotCombinator -> None
+
+(* 7. B X I = X *)
+let opt7 t =
+  try 
+    let c_kind,ty_args,args = unpack_comb t in
+    if Builtin.equal Builtin.BComb c_kind then (
+      match args with 
+      | [x;i] ->
+        begin match unpack_comb i with 
+        | (Builtin.IComb, _, [])->
+          Some x
+        | _ -> None end
+      | _ -> None
+    ) else None
+  with IsNotCombinator -> None
+
+(* 8. C (K X) Y = K (X Y) *)
+let opt8 t =
+  try 
+    let c_kind,ty_args,args = unpack_comb t in
+    if Builtin.equal Builtin.CComb c_kind then (
+      match args with 
+      | [kx;y] ->
+        begin match unpack_comb kx with 
+        | (Builtin.KComb, [alpha;_], [x])->
+          let xy = T.app x [y] in
+          Some (mk_k ~args:[xy] ~alpha ~beta:(Term.of_ty @@ T.ty xy))
+        | _ -> None end
+      | _ -> None
+    ) else None
+  with IsNotCombinator -> None
+
+(* 9. B I = I
+let opt9 t =
+  try 
+    let c_kind,ty_args,args = unpack_comb t in
+    if Builtin.equal Builtin.BComb c_kind then (
+      match args with 
+      | [i] ->
+        begin match unpack_comb i with 
+        | (Builtin.IComb, _, []) -> Some i
+        | _ -> None end
+      | _ -> None
+    ) else None
+  with IsNotCombinator -> None *)
+
+(* 10. S K X = I *)
+let opt10 t =
+  try 
+    let c_kind,ty_args,args = unpack_comb t in
+    if Builtin.equal Builtin.SComb c_kind then (
+      match args with 
+      | [k;x] ->
+        begin match unpack_comb k with 
+        | (Builtin.KComb, [_;beta], []) -> Some (mk_i ~args:[] ~alpha:beta)
+        | _ -> None end
+      | _ -> None
+    ) else None
+  with IsNotCombinator -> None
+
+(* 11. S (B K X) Y = X *)
+let opt11 t =
+  try 
+    let c_kind,ty_args,args = unpack_comb t in
+    if Builtin.equal Builtin.SComb c_kind then (
+      match args with 
+      | [bkx;y] ->
+        begin match unpack_comb bkx with 
+        | (Builtin.BComb, _, [k;x]) ->
+          begin match unpack_comb k with 
+          | (Builtin.KComb, _, []) -> Some x
+          | _ -> None end
+        | _ -> None end
+      | _ -> None
+    ) else None
+  with IsNotCombinator -> None
+
+let binder_optimizations = [opt5;opt6;opt7;opt8;opt10;opt11]
 let curry_optimizations = [opt1;opt2;opt3;opt4]
 let narrow_rules = [narrowS; narrowB; narrowC; narrowK; narrowI]
 
@@ -283,7 +393,11 @@ let apply_rw_rules ~rules t =
   | f :: fs ->
     begin match f t with 
     | Some t' -> 
-      assert (Type.equal (T.ty t) (T.ty t'));
+      if not (Type.equal (T.ty t) (T.ty t')) then (
+        CCFormat.printf "t:@[%a@]::@[%a@]@." T.pp t Ty.pp (T.ty t);
+        CCFormat.printf "t':@[%a@]::@[%a@]@." T.pp t' Ty.pp (T.ty t');
+        assert false;
+      );
       t'
     | None -> aux fs end
   | [] -> t in
@@ -291,11 +405,12 @@ let apply_rw_rules ~rules t =
 
 let narrow t =
   let steps = ref 0 in
+  let rules = narrow_rules @ binder_optimizations in
   let rec do_narrow t =
     match T.view t with 
     | T.Const _ | T.Var _ | T.DB _-> t
     | T.AppBuiltin(hd, args) -> 
-      let t' = apply_rw_rules ~rules:narrow_rules t in
+      let t' = apply_rw_rules ~rules t in
       if T.equal t t' then (
         (* If no rule is applicable, then this is either not 
            a combinator or a paritally applied combinator *)
@@ -429,10 +544,11 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let enocde_stmt st =
       let rule = Proof.Rule.mk "lams2combs" in
+      let rules = curry_optimizations @ binder_optimizations in
       E.cr_return @@ List.map (fun c -> 
         if has_lams_c c then (
           let proof = Proof.Step.simp [C.proof_parent c] ~rule in
-          let lits' = Literals.map (abf ~rules:curry_optimizations) (C.lits c) in
+          let lits' = Literals.map (abf ~rules) (C.lits c) in
           C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
           (Array.to_list lits') proof
         ) else c
@@ -576,9 +692,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     let lams2combs_otf c =
       if not @@ has_lams_c c then SimplM.return_same c
       else (
+        let rules = curry_optimizations @ binder_optimizations in
         let proof = Proof.Step.simp [C.proof_parent c] 
                       ~rule:(Proof.Rule.mk "lams2combs on-the-fly") in
-        let lits' = Literals.map (abf ~rules:curry_optimizations) (C.lits c) in
+        let lits' = Literals.map (abf ~rules) (C.lits c) in
         let new_ = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
                     (Array.to_list lits') proof in
         SimplM.return_new new_)
