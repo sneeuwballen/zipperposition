@@ -3139,7 +3139,7 @@ let () =
       _fluidsup := false;
     );
     Params.add_to_mode "ho-comb-complete" (fun () ->
-      _use_simultaneous_sup := true;
+      _use_simultaneous_sup := false;
       _sup_at_vars := false;
       _sup_in_var_args := true;
       _sup_under_lambdas := false;

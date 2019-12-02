@@ -14,6 +14,8 @@ let k_enable_combinators = Saturate.k_enable_combinators
 let k_s_penalty = Flex_state.create_key ()
 let k_b_penalty = Flex_state.create_key ()
 let k_c_penalty = Flex_state.create_key ()
+let k_k_penalty = Flex_state.create_key ()
+
 
 module type S = sig
   module Env : Env.S
@@ -492,23 +494,23 @@ module Make(E : Env.S) : S with module Env = E = struct
     let gamma = T.var tyvarC
 
     let partially_applied_s =
-      partially_apply ~comb:(mk_s ~alpha ~beta ~gamma ~args:[], 0)
-        [s_arg1, 0; s_arg2, Env.flex_get k_s_penalty]
+      partially_apply ~comb:(mk_s ~alpha ~beta ~gamma ~args:[], 1)
+        [s_arg1, 1; s_arg2, Env.flex_get k_s_penalty]
 
     let partially_applied_b =
-      partially_apply ~comb:(mk_b ~alpha ~beta ~gamma ~args:[], 0)
-        [b_arg1, 0; b_arg2, Env.flex_get k_b_penalty]
+      partially_apply ~comb:(mk_b ~alpha ~beta ~gamma ~args:[], 1)
+        [b_arg1, 1; b_arg2, Env.flex_get k_b_penalty]
 
     let partially_applied_c =
-      partially_apply ~comb:(mk_c ~alpha ~beta ~gamma ~args:[], 0)
-        [c_arg1, 0; c_arg2, Env.flex_get k_c_penalty]
+      partially_apply ~comb:(mk_c ~alpha ~beta ~gamma ~args:[], 1)
+        [c_arg1, 1; c_arg2, Env.flex_get k_c_penalty]
     
     let partially_applied_k =
-      partially_apply ~comb:(mk_k ~alpha ~beta ~args:[], 0)
-        [k_arg1, 1]
+      partially_apply ~comb:(mk_k ~alpha ~beta ~args:[], 1)
+        [k_arg1, Env.flex_get k_k_penalty]
     
     let partially_applied_i =
-      [mk_i ~alpha ~args:[], 0]
+      [mk_i ~alpha ~args:[], 1]
 
     let partially_applied_combs =
       partially_applied_s @ partially_applied_b @ partially_applied_c @ 
@@ -549,11 +551,12 @@ module Make(E : Env.S) : S with module Env = E = struct
              not (CCBV.get (C.eligible_res (clause, 1) subst) lit_idx) then (
             None)
           else (
+            let t_depth = Position.size (Literal.Pos.term_pos (lits.(lit_idx)) lit_pos) in
             let lits' = CCArray.to_list @@ Lits.apply_subst renaming subst (lits, 1) in
             let proof = 
               Proof.Step.inference ~rule ~tags
                 [C.proof_parent_subst renaming (clause,1) subst] in
-            let penalty = comb_penalty + C.penalty clause in
+            let penalty = (max 1 t_depth) * (comb_penalty + C.penalty clause) in
             let new_clause = C.create ~trail:(C.trail clause) ~penalty lits' proof in
             Some new_clause
           )) (instantiate_var_w_comb ~var))
@@ -591,9 +594,10 @@ module Make(E : Env.S) : S with module Env = E = struct
 end
 
 let _enable_combinators = ref false
-let _s_penalty = ref 15
-let _b_penalty = ref 5
-let _c_penalty = ref 10
+let _s_penalty = ref 6
+let _b_penalty = ref 2
+let _c_penalty = ref 3
+let _k_penalty = ref 2
 
 
 let extension =
@@ -605,6 +609,8 @@ let extension =
     E.flex_add k_s_penalty !_s_penalty;
     E.flex_add k_c_penalty !_c_penalty;
     E.flex_add k_b_penalty !_b_penalty;
+    E.flex_add k_k_penalty !_k_penalty;
+
 
     let module ET = Make(E) in
     ET.setup ()
@@ -620,7 +626,8 @@ let () =
     [ "--combinator-based-reasoning", Arg.Bool (fun v -> _enable_combinators := v), "enable / disable combinator based reasoning";
      "--comb-s-penalty", Arg.Set_int _s_penalty, "penalty for narrowing with $S X Y";
      "--comb-c-penalty", Arg.Set_int _c_penalty, "penalty for narrowing with $C X Y";
-     "--comb-b-penalty", Arg.Set_int _b_penalty, "penalty for narrowing with $B X Y"];
+     "--comb-b-penalty", Arg.Set_int _b_penalty, "penalty for narrowing with $B X Y";
+     "--comb-k-penalty", Arg.Set_int _k_penalty, "penalty for narrowing with $K X"];
   Params.add_to_mode "ho-comb-complete" (fun () ->
     _enable_combinators := true;
   );
