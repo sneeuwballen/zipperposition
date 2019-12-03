@@ -275,7 +275,7 @@ let narrowI t =
     ) else None
   with IsNotCombinator -> None
 
-(* 7. S (K X) = B X *)
+(* 5. S (K X) = B X *)
 let opt5 t =
   try 
     let c_kind,ty_args,args = unpack_comb t in
@@ -339,19 +339,20 @@ let opt8 t =
     ) else None
   with IsNotCombinator -> None
 
-(* 9. B I = I
+(* 9. B I = I *)
 let opt9 t =
   try 
     let c_kind,ty_args,args = unpack_comb t in
     if Builtin.equal Builtin.BComb c_kind then (
       match args with 
       | [i] ->
+        let alpha = Term.of_ty @@ List.hd @@ Type.expected_args @@ T.ty t in
         begin match unpack_comb i with 
-        | (Builtin.IComb, _, []) -> Some i
+        | (Builtin.IComb, _, []) -> Some (mk_i ~args:[] ~alpha)
         | _ -> None end
       | _ -> None
     ) else None
-  with IsNotCombinator -> None *)
+  with IsNotCombinator -> None
 
 (* 10. S K X = I *)
 let opt10 t =
@@ -384,7 +385,26 @@ let opt11 t =
     ) else None
   with IsNotCombinator -> None
 
-let binder_optimizations = [opt5;opt6;opt7;opt8;opt10;opt11]
+(* 12. S (B K X) = K X *)
+let opt12 t =
+  try 
+    let c_kind,ty_args,args = unpack_comb t in
+    if Builtin.equal Builtin.SComb c_kind then (
+      match args, ty_args with 
+      | [bkx], [alpha;_;_] ->
+        begin match unpack_comb bkx with
+        | (Builtin.BComb, _, [k;x]) ->
+          begin match unpack_comb k with
+          | (Builtin.KComb, _, []) ->
+            let beta = T.of_ty @@ T.ty x in
+            Some (mk_k ~args:[x] ~alpha ~beta)
+          | _ -> None end
+        | _ -> None end
+      | _ -> None
+    ) else None
+  with IsNotCombinator -> None
+
+let binder_optimizations = [opt5;opt6;opt7;opt8;opt9;opt10;opt11;opt12]
 let curry_optimizations = [opt1;opt2;opt3;opt4]
 let narrow_rules = [narrowS; narrowB; narrowC; narrowK; narrowI]
 
