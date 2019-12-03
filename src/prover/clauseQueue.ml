@@ -518,7 +518,46 @@ module Make(C : Clause_intf.S) = struct
       if C.is_ground c then 1 else 0
 
     let defer_sos c = 
-       if C.proof_depth c = 0 || CCOpt.is_some (C.distance_to_goal c) then 1 else 0
+      if C.proof_depth c = 0 || CCOpt.is_some (C.distance_to_goal c) then 1 else 0
+
+    let prefer_top_level_app_var c =
+      let lits = C.lits c in
+      if Array.length lits > 1 then max_int
+      else if Array.length lits = 0 then min_int
+      else (
+        let no_app_vars = 
+            Lit.Seq.terms lits.(0)
+            |> Iter.filter Term.is_app_var
+            |> Iter.length in
+        if no_app_vars = 0 then max_int else no_app_vars)
+    
+    let defer_top_level_app c =
+      - (prefer_top_level_app_var c)
+
+    let prefer_shallow_app_var c =
+      let app_var_depth t =
+        let rec aux depth t = 
+          match Term.view t with 
+          | Term.DB _ | Term.Const _ | Term.Var _ -> 0
+          | Term.Fun(_,body) -> aux (depth+1) body
+          | Term.App(hd, args) when Term.is_var hd ->
+            max depth (aux_l (depth+1) args)
+          | Term.App(hd, args) -> aux_l (depth+1) (hd :: args)
+          | Term.AppBuiltin(_, args) -> aux_l (depth+1) args
+        and aux_l depth = function
+          | [] -> min_int
+          | t :: ts -> max (aux depth t) (aux_l depth ts) 
+        in
+      aux 0 t 
+      in 
+      
+      C.Seq.terms c
+      |> Iter.map app_var_depth
+      |> Iter.max
+      |> CCOpt.get_or ~default:min_int
+    
+    let prefer_deep_app_var c =
+      - (prefer_shallow_app_var c)
 
     let parsers = 
       ["const", (fun _ -> const_prio);
@@ -537,7 +576,11 @@ module Make(C : Clause_intf.S) = struct
       "prefer-ground", (fun _ -> prefer_ground);
       "defer-ground", (fun _ -> defer_ground);
       "defer-fo", (fun _ -> defer_fo);
-      "prefer-fo", (fun _ -> prefer_fo);]
+      "prefer-fo", (fun _ -> prefer_fo);
+      "prefer-top-level-appvars", (fun _ -> prefer_top_level_app_var);
+      "defer-top-level-appvars", (fun _ -> prefer_top_level_app_var);
+      "prefer-shallow-appvars", (fun _ -> prefer_shallow_app_var);
+      "prefer-deep-appvars", (fun _ -> prefer_deep_app_var)]
 
     let of_string s = 
       try 

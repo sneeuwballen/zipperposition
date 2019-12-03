@@ -696,6 +696,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             None)
           else (
             let t_depth = Position.size (Literal.Pos.term_pos (lits.(lit_idx)) lit_pos) in
+            let t_depth = (if t_depth = 0 then 0 else 3 * t_depth) in
             let lits' = CCArray.to_list @@ Lits.apply_subst renaming subst (lits, 1) in
             let proof = 
               Proof.Step.inference ~rule ~tags
