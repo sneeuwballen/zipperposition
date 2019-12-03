@@ -58,6 +58,18 @@ let pp out ord =
 
 let to_string ord = CCFormat.to_string pp ord
 
+(* Type-1 combinator is a combinator that is not ground
+    (see Ahmed's combinator KBO paper) *)
+let ty1comb_to_var t balance =
+  if T.is_comb t && not (T.is_ground t) then (
+    match T.Tbl.find_opt balance t with
+    | Some t' -> t'
+    | None ->
+        let fresh_var = T.var (HVar.fresh ~ty:(T.ty t) ()) in
+        T.Tbl.add balance t fresh_var;
+        fresh_var
+  ) else t
+
 (** Common internal interface for orderings *)
 
 module type ORD = sig
@@ -203,18 +215,6 @@ module KBO : ORD = struct
     | Head.DB _ -> Prec.db_weight prec
     | Head.LAM ->  Prec.lam_weight prec
 
-  (* Type-1 combinator is a combinator that is not ground
-     (see Ahmed's combinator KBO paper) *)
-  let ty1comb_to_var t balance =
-    if T.is_comb t && not (T.is_ground t) then (
-      match T.Tbl.find_opt balance.comb2var t with
-      | Some t' -> t'
-      | None ->
-          let fresh_var = T.var (HVar.fresh ~ty:(T.ty t) ()) in
-          T.Tbl.add balance.comb2var t fresh_var;
-          fresh_var
-    ) else t
-
   (** Higher-order KBO *)
   let rec kbo ~prec t1 t2 =
     let balance = mk_balance t1 t2 in
@@ -223,7 +223,7 @@ module KBO : ORD = struct
         @return weight balance, was `s` found?
     *)
     let rec balance_weight (wb:W.t) t s ~pos : W.t * bool =
-      let t = ty1comb_to_var t balance in
+      let t = ty1comb_to_var t balance.comb2var in
       match T.view t with
         | T.Var _ ->
           balance_weight_var wb t s ~pos
@@ -318,7 +318,8 @@ module KBO : ORD = struct
       if T.equal t1 t2
       then (wb, Eq) (* do not update weight or var balance *)
       else
-        let t1 = ty1comb_to_var t1 balance and t2 = ty1comb_to_var t2 balance in
+        let t1 = ty1comb_to_var t1 balance.comb2var in 
+        let t2 = ty1comb_to_var t2 balance.comb2var in
         match Head.term_to_head t1, Head.term_to_head t2 with
           | Head.V _, Head.V _ ->
             add_pos_var balance t1;

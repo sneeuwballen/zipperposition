@@ -13,6 +13,7 @@ exception Fail
 (** Raised when a unification/matching attempt fails *)
 
 val disable_pattern_unif : bool ref
+val app_var_constraints : bool ref
 
 val occurs_check : depth:int -> subst ->
   InnerTerm.t HVar.t Scoped.t -> InnerTerm.t Scoped.t -> bool

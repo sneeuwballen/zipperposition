@@ -17,6 +17,8 @@ let k_s_penalty = Flex_state.create_key ()
 let k_b_penalty = Flex_state.create_key ()
 let k_c_penalty = Flex_state.create_key ()
 let k_k_penalty = Flex_state.create_key ()
+let k_deep_app_var_penalty = Flex_state.create_key ()
+
 
 
 module type S = sig
@@ -451,47 +453,131 @@ let narrow t =
     in
   do_narrow t, !steps
 
-let max_weak_reduction_length t =
+type state = {
+  mutable pos_counter : int;
+  mutable neg_counter : int;
+  mutable balance : CCInt.t Term.Tbl.t;
+  mutable var_map : T.t Term.Tbl.t
+}
+
+let comb_map_args t new_args =
+  let hd, args = T.as_app_mono t in
+  assert(List.length args = List.length new_args);
+  T.app hd new_args
+
+(** add a positive variable *)
+let add_pos_var state var =
+  let n = Term.Tbl.get_or state.balance var ~default:0 in
+  if n = 0  then state.pos_counter <- state.pos_counter + 1
+  else (
+    if n = -1 then state.neg_counter <- state.neg_counter - 1
+  );
+  Term.Tbl.add state.balance var (n + 1)
+
+(** add a negative variable *)
+let add_neg_var state var =
+  let n = Term.Tbl.get_or state.balance var ~default:0 in
+  if n = 0 then state.neg_counter <- state.neg_counter + 1
+  else (
+    if n = 1 then state.pos_counter <- state.pos_counter - 1
+  );
+  Term.Tbl.add state.balance var (n - 1)
+
+let max_weak_reduction_length var_handler ~state t =
   let rec aux t  = 
-    match T.view t with 
+    match T.view t with
     | T.DB _ | T.Fun _ ->
       let err_msg = 
         CCFormat.sprintf "lambdas should be removed:@[%a@]@." T.pp t in
       invalid_arg err_msg
-    | T.Const _ | T.Var _ ->
-      0
+    | T.Const _ -> 0, t 
+    | T.Var _ ->
+      var_handler state t;
+      0, t
     | T.App (hd, l)->
-      if T.is_var hd then 0 else aux_l (hd :: l)
+      if T.is_var hd then (
+        match T.Tbl.get state.var_map t with 
+        | Some t' ->
+          var_handler state t';
+          0, t'
+        | None ->
+          let fresh_var = T.var (HVar.fresh ~ty:(T.ty t) ()) in
+          T.Tbl.add state.var_map t fresh_var;
+          var_handler state fresh_var;
+          0, fresh_var)
+      else (
+        let steps_hd, hd' = aux hd in
+        let steps_args, l' = aux_l l in
+        if T.equal hd hd' && T.same_l l' l then (
+          assert(steps_hd = 0 && steps_args = 0);
+          0, t)
+        else steps_hd + steps_args, T.app hd' l')
     | T.AppBuiltin(b, l) when Builtin.is_combinator b ->
       if T.is_ground t then (
-        let c_kind, _, args =  unpack_comb t in
+        let c_kind, ty_args, args =  unpack_comb t in
         begin match c_kind with 
         | Builtin.IComb ->
-          if CCList.is_empty args then 0
-          else 1 + narrow_one t
+          if CCList.is_empty args then 0, t
+          else (
+            let steps, t' = aux (narrow_one t) in
+            steps+1, t')
         | Builtin.KComb ->
-          if CCList.length args < 2 then aux_l args
-          else 1 + (aux (List.nth args 1)) + narrow_one t
+          if CCList.length args < 2 then (
+            let steps, args' = aux_l args in
+            if T.same_l args args' then (
+              assert(steps = 0);
+              0, t
+            ) else steps, comb_map_args t args')
+          else (
+            let steps_inc = 1 + fst (aux (List.nth args 1)) in
+            let steps_rest, t' = aux (narrow_one t) in
+            steps_rest + steps_inc, t')
         | Builtin.SComb | Builtin.CComb | Builtin.BComb -> 
-          if CCList.length args < 3 then aux_l args
-          else 1 + narrow_one t  
+          if CCList.length args < 3 then (
+            let steps, args' = aux_l args in
+            if T.same_l args args' then (
+              assert(steps = 0);
+              0, t
+            ) else steps, comb_map_args t args')
+          else (
+            let steps_rest, t' = aux (narrow_one t) in
+            steps_rest + 1, t')  
         | _ -> invalid_arg "only combinators are supported" end)
-      else 0
-    | T.AppBuiltin(_, l) ->
-      aux_l l
+      else (
+        let fresh_var = Ordering.ty1comb_to_var t state.var_map in
+        var_handler state fresh_var;
+        0, fresh_var)
+    | T.AppBuiltin(b, l) ->
+      let steps, l' = aux_l l in
+      if T.same_l l l' then (
+        assert (steps = 0);
+        0, t) 
+      else (steps, T.app_builtin ~ty:(T.ty t) b l')
   and aux_l = function 
-    | [] -> 0
-    | t :: ts -> aux t + aux_l ts
+    | [] -> 0, []
+    | t :: ts -> 
+      let steps, t' = aux t in
+      let steps_rest , t_rest = aux_l ts in
+      steps+steps_rest, t' :: t_rest
   and narrow_one t = 
     let t' = apply_rw_rules ~rules:narrow_rules t in
     assert (not @@ T.equal t' t);
-    aux t' in
+    t'; in
   aux t
 
-let cmp_by_max_weak_r_len t1 t2 = 
-  let t1_len = max_weak_reduction_length t1 in
-  let t2_len = max_weak_reduction_length t2 in
-  Comparison.of_total (t1_len-t2_len)
+let cmp_by_max_weak_r_len t1 t2 =
+  let numvars = Iter.length (T.Seq.vars t1) + Iter.length (T.Seq.vars t2) in
+  let state = 
+    { pos_counter = 0; neg_counter = 0;
+      balance = Term.Tbl.create numvars;
+      var_map = Term.Tbl.create 16 } in
+  let t1_len,_ = max_weak_reduction_length add_pos_var ~state t1 in
+  let t2_len,_ = max_weak_reduction_length add_neg_var ~state t2 in
+  if t1_len > t2_len then (
+    if state.neg_counter > 0 then Comparison.Incomparable else Comparison.Gt
+  ) else if t1_len < t2_len then (
+    if state.pos_counter > 0 then Comparison.Incomparable else Comparison.Lt
+  ) else Comparison.Eq
 
 (* Assumes beta-reduced, eta-short term *)
 let abf ~rules t =
@@ -697,12 +783,14 @@ module Make(E : Env.S) : S with module Env = E = struct
             None)
           else (
             let t_depth = Position.size (Literal.Pos.term_pos (lits.(lit_idx)) lit_pos) in
-            let t_depth = (if t_depth = 0 then 0 else 3 * t_depth) in
+            let depth_mul = 
+              if not @@ Env.flex_get k_deep_app_var_penalty then 1
+              else max t_depth 1 in
             let lits' = CCArray.to_list @@ Lits.apply_subst renaming subst (lits, 1) in
             let proof = 
               Proof.Step.inference ~rule ~tags
                 [C.proof_parent_subst renaming (clause,1) subst] in
-            let penalty = (max t_depth 1) *  comb_penalty + C.penalty clause in
+            let penalty = depth_mul * comb_penalty + C.penalty clause in
             let new_clause = C.create ~trail:(C.trail clause) ~penalty lits' proof in
 
             Util.debugf ~section 2 "success: @[%a@]@." (fun k -> k C.pp new_clause);
@@ -748,6 +836,8 @@ let _s_penalty = ref 6
 let _b_penalty = ref 2
 let _c_penalty = ref 3
 let _k_penalty = ref 2
+let _app_var_constraints = ref false
+let _deep_app_var_penalty = ref false
 
 
 let extension =
@@ -760,6 +850,8 @@ let extension =
     E.flex_add k_c_penalty !_c_penalty;
     E.flex_add k_b_penalty !_b_penalty;
     E.flex_add k_k_penalty !_k_penalty;
+    E.flex_add k_deep_app_var_penalty !_deep_app_var_penalty;
+    Unif.app_var_constraints := !_app_var_constraints;
 
 
     let module ET = Make(E) in
@@ -774,6 +866,8 @@ let extension =
 let () =
   Options.add_opts
     [ "--combinator-based-reasoning", Arg.Bool (fun v -> _enable_combinators := v), "enable / disable combinator based reasoning";
+     "--app-var-constraints", Arg.Bool (fun v -> _app_var_constraints := v), "enable / disable delaying app var clashes as constraints";
+     "--penalize-deep-appvars", Arg.Bool (fun v -> _deep_app_var_penalty := v), "enable / disable penalizing narrow app var inferences with deep variables";
      "--comb-s-penalty", Arg.Set_int _s_penalty, "penalty for narrowing with $S X Y";
      "--comb-c-penalty", Arg.Set_int _c_penalty, "penalty for narrowing with $C X Y";
      "--comb-b-penalty", Arg.Set_int _b_penalty, "penalty for narrowing with $B X Y";

@@ -1688,7 +1688,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                  (fun k->k T.pp t 0 T.pp l cur_sc T.pp r cur_sc S.pp subst);
 
                let t' = Lambda.eta_reduce @@ Lambda.snf t in
-               let l' = Lambda.eta_reduce @@ Lambda.snf @@  Subst.FO.apply Subst.Renaming.none subst (l,cur_sc) in
+               let l' = Lambda.eta_reduce @@ Lambda.snf @@  Subst.FO.apply Subst.Renaming.none subst (l,cur_sc) in               
                (* sanity checks *)
                assert (Type.equal (T.ty l) (T.ty r));
                assert (T.equal l' t');
@@ -1704,11 +1704,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | Some (rhs,subst,cur_sc) ->
           (* reduce [rhs] in current scope [cur_sc] *)
           assert (cur_sc < st.demod_sc);
+          let rhs = Subst.FO.apply Subst.Renaming.none subst (rhs,cur_sc) in
           Util.debugf ~section 3
             "@[<2>demod:@ rewrite `@[%a@]`@ into `@[%a@]`@ using %a[%d]@]"
             (fun k->k T.pp t T.pp rhs Subst.pp subst cur_sc);
           (* NOTE: we retraverse the term several times, but this is simpler *)
-          let rhs = Subst.FO.apply Subst.Renaming.none subst (rhs,cur_sc) in
           normal_form ~restrict rhs k (* done one rewriting step, continue *)
       end
     (* rewrite innermost-leftmost of [subst(t,scope)]. The initial scope is

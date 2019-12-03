@@ -23,6 +23,8 @@ let prof_matching = Util.mk_profiler "matching"
 let fail () = raise Fail
 
 let disable_pattern_unif = ref false
+(* Cannot make it a key atm!!! -- unif used in non Environment mode *)
+let app_var_constraints = ref false
 
 (** {2 Signatures} *)
 
@@ -673,8 +675,9 @@ module Inner = struct
     let f1, l1 = T.as_app t1 in
     let f2, l2 = T.as_app t2 in
     let delay() = 
-      Util.debug ~section 5 "delaying\n"; 
-      delay ~bvars subst t1 scope t2 scope in
+      Util.debug ~section 5 "delaying\n";
+      delay ~bvars subst t1 scope t2 scope 
+    in
     (* case where heads are the same *)
     let same_rigid_head() =
       if List.length l1 = List.length l2
@@ -773,7 +776,12 @@ module Inner = struct
              does take type arguments. This avoids errors with the debug output. *)
           assert (T.expected_ty_vars (HVar.ty v1) = 0);
           if T.expected_ty_vars (T.ty_exn (List.hd l2)) != 0 then fail();
-          unif_list ~op ~bvars subst l1 scope l2 scope
+          if not (!app_var_constraints) || op != O_unify
+          then unif_list ~op ~bvars subst l1 scope l2 scope
+          else (
+            try
+              unif_list ~op ~bvars subst l1 scope l2 scope
+            with Fail -> delay ~tags:[Builtin.Tag.T_ho] ())
         ) else fail()
       | T.Const _, T.Var v2 ->
         (*Format.printf
@@ -798,7 +806,12 @@ module Inner = struct
              does take type arguments. This avoids errors with the debug output. *)
           assert (T.expected_ty_vars (HVar.ty v2) = 0);
           if T.expected_ty_vars (T.ty_exn (List.hd l1)) != 0 then fail();
-          unif_list ~op ~bvars subst l1 scope l2 scope
+          if not !app_var_constraints || op != O_unify 
+          then unif_list ~op ~bvars subst l1 scope l2 scope
+          else (
+            try
+              unif_list ~op ~bvars subst l1 scope l2 scope
+            with Fail -> delay ~tags:[Builtin.Tag.T_ho] ())
         ) else fail()
       | T.Var v1, T.Var v2
         when op=O_unify &&
@@ -932,7 +945,10 @@ module Inner = struct
 
   let unify_full ?(subst=US.empty) a b : unif_subst =
     Util.with_prof prof_unify
-      (fun () -> unif_rec ~root:true ~op:O_unify ~bvars:B_vars.empty subst a b) ()
+      (fun () -> 
+        let res = unif_rec ~root:true ~op:O_unify ~bvars:B_vars.empty subst a b in
+        res
+        ) ()
 
   let unify_syn ?(subst=Subst.empty) a b : Subst.t =
     let subst = US.of_subst subst in
