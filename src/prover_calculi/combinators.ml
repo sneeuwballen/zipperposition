@@ -390,12 +390,13 @@ let opt12 t =
   try 
     let c_kind,ty_args,args = unpack_comb t in
     if Builtin.equal Builtin.SComb c_kind then (
-      match args, ty_args with 
-      | [bkx], [alpha;_;_] ->
+      match args with 
+      | [bkx] ->
         begin match unpack_comb bkx with
         | (Builtin.BComb, _, [k;x]) ->
           begin match unpack_comb k with
           | (Builtin.KComb, _, []) ->
+            let alpha = Term.of_ty @@ List.hd @@ Type.expected_args @@ T.ty t in
             let beta = T.of_ty @@ T.ty x in
             Some (mk_k ~args:[x] ~alpha ~beta)
           | _ -> None end
