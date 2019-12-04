@@ -341,7 +341,7 @@ let opt8 t =
     ) else None
   with IsNotCombinator -> None
 
-(* 9. B I = I *)
+(* 9. B I (x) = I (x) *)
 let opt9 t =
   try 
     let c_kind,ty_args,args = unpack_comb t in
@@ -351,6 +351,10 @@ let opt9 t =
         let alpha = Term.of_ty @@ List.hd @@ Type.expected_args @@ T.ty t in
         begin match unpack_comb i with 
         | (Builtin.IComb, _, []) -> Some (mk_i ~args:[] ~alpha)
+        | _ -> None end
+      | [i; x] ->
+        begin match unpack_comb i with 
+        | (Builtin.IComb, _, []) -> Some x
         | _ -> None end
       | _ -> None
     ) else None
@@ -427,7 +431,7 @@ let apply_rw_rules ~rules t =
   aux rules
 
 let narrow t =
-  let rules = narrow_rules @ binder_optimizations in
+  let rules = narrow_rules @ curry_optimizations @ binder_optimizations in
   let rec do_narrow t =
     match T.view t with 
     | T.Const _ | T.Var _ | T.DB _-> t

@@ -1270,6 +1270,22 @@ let simplify_bools t =
       let hd' = aux hd and  args' = List.map aux args in
       if equal hd hd' && same_l args args' then t
       else app hd' args'
+    | AppBuiltin(Builtin.And, [x]) when is_true_or_false x ->
+      let prop = of_ty Type.prop in
+      if equal x true_ then (
+        T.fun_ prop (T.bvar ~ty:prop 0)
+      ) else (
+        assert (equal x false_);
+        T.fun_ prop false_
+      )
+    | AppBuiltin(Builtin.Or, [x]) when is_true_or_false x ->
+      let prop = of_ty Type.prop in
+      if equal x true_ then (
+        T.fun_ prop (true_)
+      ) else (
+        assert (equal x false_);
+        T.fun_ prop (T.bvar ~ty:prop 0)
+      )
     | AppBuiltin(Builtin.And, l) when List.length l > 1 ->
       let l' = List.map aux l in
       let t = if same_l l l' then t 
