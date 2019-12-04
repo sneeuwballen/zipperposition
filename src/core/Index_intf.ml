@@ -17,7 +17,7 @@ module type LEAF = sig
   val size : t -> int
 
   val fold_unify :
-    t Scoped.t -> term Scoped.t ->
+    ?ext_dec:bool -> t Scoped.t -> term Scoped.t ->
     (term * elt * Unif_subst.t) Iter.t
 
   val fold_unify_complete :
@@ -66,7 +66,7 @@ module type TERM_IDX = sig
 
   (** Retrieves a decidable fragment of unifiables. Only one unifier per subterm. *)
   val retrieve_unifiables :
-    t Scoped.t -> term Scoped.t ->
+    ?ext_dec:bool -> t Scoped.t -> term Scoped.t ->
     (term * elt * Unif_subst.t) Iter.t
 
   (** Retrieves all unifiables. The set of unifiers is potentially infinite.

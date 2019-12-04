@@ -505,6 +505,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let t' = S.FO.apply renaming subst (List.hd t', sc_a) in
     T.app in_passive [t']
 
+  let eligible_for_ext_dec ~p_depth =
+    let max_lits = Env.flex_get k_max_lits_ext_dec in
+    Env.flex_get Saturate.k_enable_combinators &&
+    max_lits >= 0 &&
+    p_depth < max_lits
 
   (* Helper that does one or zero superposition inference, with all
      the given parameters. Clauses have a scope. *)
@@ -898,8 +903,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     new_clauses
 
   let infer_active clause =
+    let ext_dec = eligible_for_ext_dec (C.proof_depth clause) in
     infer_active_aux
-      ~retrieve_from_index:I.retrieve_unifiables
+      ~retrieve_from_index:(I.retrieve_unifiables ~ext_dec)
       ~process_retrieved:(fun do_sup (u_p, with_pos, subst) -> do_sup u_p with_pos subst)
       clause
 
@@ -933,8 +939,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     |> Iter.to_rev_list
 
   let infer_passive clause =
+    let ext_dec = eligible_for_ext_dec (C.proof_depth clause) in
     infer_passive_aux
-      ~retrieve_from_index:I.retrieve_unifiables
+      ~retrieve_from_index:(I.retrieve_unifiables ~ext_dec)
       ~process_retrieved:(fun do_sup (u_p, with_pos, subst) -> do_sup u_p with_pos subst)
       clause
 
@@ -1331,10 +1338,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.exit_prof prof_infer_equality_resolution;
     new_clauses
 
-  let infer_equality_resolution =
+  let infer_equality_resolution c =
     infer_equality_resolution_aux
-      ~unify:(fun l r -> try Some (Unif.FO.unify_full l r) with Unif.Fail -> None)
-      ~iterate_substs:(fun substs do_eq_res -> CCOpt.flat_map do_eq_res substs)
+      ~unify:(fun l r -> 
+        let ext_dec = eligible_for_ext_dec ~p_depth:(C.proof_depth c) in
+        try Some (Unif.FO.unify_full ~ext_dec l r) 
+        with Unif.Fail -> None)
+      ~iterate_substs:(fun substs do_eq_res -> CCOpt.flat_map do_eq_res substs) c
 
   let infer_equality_resolution_complete_ho clause =
     let inf_res = infer_equality_resolution_aux
@@ -1499,7 +1509,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       !res)
     else []
 
-
   let ext_eqfact_decompose given =
     if Proof.Step.inferences_performed (C.proof_step given)
         < Env.flex_get k_max_lits_ext_dec then  
@@ -1564,10 +1573,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.exit_prof prof_infer_equality_factoring;
     new_clauses
 
-  let infer_equality_factoring =
+  let infer_equality_factoring c =
     infer_equality_factoring_aux
-      ~unify:(fun s t -> try Some (Unif.FO.unify_full s t) with Unif.Fail -> None)
-      ~iterate_substs:(fun subst do_eq_fact -> CCOpt.flat_map do_eq_fact subst)
+      ~unify:(fun s t ->
+        let ext_dec = eligible_for_ext_dec ~p_depth:0 in
+        try Some (Unif.FO.unify_full ~ext_dec s t) 
+        with Unif.Fail -> 
+      None)
+      ~iterate_substs:(fun subst do_eq_fact -> CCOpt.flat_map do_eq_fact subst) c
 
   let infer_equality_factoring_complete_ho clause =
     let inf_res = infer_equality_factoring_aux
@@ -2807,7 +2820,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Env.add_unary_inf "recognize injectivity" recognize_injectivity;
     );
 
-    if Env.flex_get k_max_lits_ext_dec != 0 then (
+    if Env.flex_get k_max_lits_ext_dec != 0 &&
+       not (Env.flex_get Saturate.k_enable_combinators) then (
         Env.add_binary_inf "ext_dec_act" ext_decompose_act;
         Env.add_binary_inf "ext_dec_pas" ext_decompose_pas;
         Env.add_unary_inf "ext_eqres_dec" ext_eqres_decompose;

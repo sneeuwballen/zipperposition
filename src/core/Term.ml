@@ -1270,7 +1270,8 @@ let simplify_bools t =
       let hd' = aux hd and  args' = List.map aux args in
       if equal hd hd' && same_l args args' then t
       else app hd' args'
-    | AppBuiltin(Builtin.And, [x]) when is_true_or_false x ->
+    | AppBuiltin(Builtin.And, [x]) 
+        when is_true_or_false x && List.length (Type.expected_args (ty t)) = 1 ->
       let prop = of_ty Type.prop in
       if equal x true_ then (
         T.fun_ prop (T.bvar ~ty:prop 0)
@@ -1278,7 +1279,8 @@ let simplify_bools t =
         assert (equal x false_);
         T.fun_ prop false_
       )
-    | AppBuiltin(Builtin.Or, [x]) when is_true_or_false x ->
+    | AppBuiltin(Builtin.Or, [x]) 
+        when is_true_or_false x && List.length (Type.expected_args (ty t)) = 1 ->
       let prop = of_ty Type.prop in
       if equal x true_ then (
         T.fun_ prop (true_)
@@ -1315,14 +1317,14 @@ let simplify_bools t =
         let p',c' = aux p, aux c in
         if equal p p' && equal c c' then t 
         else app_builtin ~ty:(ty t) Builtin.Imply [p';c'])
-    | AppBuiltin(hd, [a;b]) 
+    | AppBuiltin(hd, ([a;b]|[_;a;b])) 
         when hd = Builtin.Eq || hd = Builtin.Equiv ->
       if equal a b then true_ else (
         let a',b' = aux a, aux b in
         if equal a a' && equal b b' then t 
         else app_builtin ~ty:(ty t) hd [a';b']
       )
-    | AppBuiltin(hd, [a;b])
+    | AppBuiltin(hd, ([a;b]|[_;a;b]))
         when hd = Builtin.Neq || hd = Builtin.Xor ->
       if equal a b then false_ else (
         let a',b' = aux a, aux b in

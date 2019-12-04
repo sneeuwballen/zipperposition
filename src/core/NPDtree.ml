@@ -377,7 +377,7 @@ module MakeTerm(X : Set.OrderedType) = struct
       Util.exit_prof prof_npdtree_term_unify;
       raise e
   
-  let retrieve_unifiables = retrieve_unifiables_aux Leaf.fold_unify 
+  let retrieve_unifiables ?(ext_dec=false) = retrieve_unifiables_aux (Leaf.fold_unify ~ext_dec)
 
   let retrieve_unifiables_complete ?(unif_alg=JP_unif.unify_scoped) = retrieve_unifiables_aux (Leaf.fold_unify_complete ~unif_alg) 
 

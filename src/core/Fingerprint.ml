@@ -344,7 +344,7 @@ module Make(X : Set.OrderedType) = struct
     traverse ~compatible idx features
       (fun leaf -> fold_unify (leaf,sc_idx) t k)
 
-  let retrieve_unifiables = retrieve_unifiables_aux Leaf.fold_unify
+  let retrieve_unifiables ?(ext_dec=false) = retrieve_unifiables_aux (Leaf.fold_unify ~ext_dec)
   
   let retrieve_unifiables_complete ?(unif_alg=JP_unif.unify_scoped) = 
     retrieve_unifiables_aux (Leaf.fold_unify_complete ~unif_alg)

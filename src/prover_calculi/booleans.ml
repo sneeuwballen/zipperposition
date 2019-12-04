@@ -349,7 +349,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let solve_bool_formulas cl =
     let module PUnif = PUnif.Make(struct let st = Env.flex_state () end) in
     let unifiers = CCList.flat_map (fun literal -> 
-      match literal with 
+      match literal with
       | Literal.Equation(lhs, rhs, false) when Type.is_prop (Term.ty lhs) ->
         PUnif.unify_scoped (lhs,0) (rhs,0)
         |> OSeq.filter_map CCFun.id

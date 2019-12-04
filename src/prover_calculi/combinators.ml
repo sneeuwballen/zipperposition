@@ -411,7 +411,7 @@ let opt12 t =
     ) else None
   with IsNotCombinator -> None
 
-let binder_optimizations = [opt5;opt6;opt7;opt8;opt9;opt10;opt11;opt12]
+let bunder_optimizations = [opt5;opt6;opt7;opt8;opt9;opt10;opt11;opt12]
 let curry_optimizations = [opt1;opt2;opt3;opt4]
 let narrow_rules = [narrowS; narrowB; narrowC; narrowK; narrowI]
 
@@ -431,7 +431,7 @@ let apply_rw_rules ~rules t =
   aux rules
 
 let narrow t =
-  let rules = narrow_rules @ curry_optimizations @ binder_optimizations in
+  let rules = narrow_rules @ curry_optimizations @ bunder_optimizations in
   let rec do_narrow t =
     match T.view t with 
     | T.Const _ | T.Var _ | T.DB _-> t
@@ -634,7 +634,7 @@ let abf ~rules t =
 
 let comb_normalize t =
   let changed = ref false in
-  let rules = curry_optimizations @ binder_optimizations in
+  let rules = curry_optimizations @ bunder_optimizations in
   let t =
     if T.has_lambda t then (
       changed := true;
@@ -665,7 +665,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let enocde_stmt st =
       let rule = Proof.Rule.mk "lams2combs" in
-      let rules = curry_optimizations @ binder_optimizations in
+      let rules = curry_optimizations @ bunder_optimizations in
       E.cr_return @@ List.map (fun c -> 
         if has_lams_c c then (
           let proof = Proof.Step.simp [C.proof_parent c] ~rule in
@@ -816,7 +816,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let lams2combs_otf c =
       if not @@ has_lams_c c then SimplM.return_same c
       else (
-        let rules = curry_optimizations @ binder_optimizations in
+        let rules = curry_optimizations @ bunder_optimizations in
         let proof = Proof.Step.simp [C.proof_parent c] 
                       ~rule:(Proof.Rule.mk "lams2combs on-the-fly") in
         let lits' = Literals.map (abf ~rules) (C.lits c) in
@@ -859,8 +859,6 @@ let extension =
     E.flex_add k_b_penalty !_b_penalty;
     E.flex_add k_k_penalty !_k_penalty;
     E.flex_add k_deep_app_var_penalty !_deep_app_var_penalty;
-    Unif.app_var_constraints := !_app_var_constraints;
-
 
     let module ET = Make(E) in
     ET.setup ()
