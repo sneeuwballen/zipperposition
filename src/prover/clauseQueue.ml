@@ -208,7 +208,6 @@ module Make(C : Clause_intf.S) = struct
          | Term.Var _ -> v
          | Term.DB _ -> w
          | Term.App (f, l) ->
-            let v = if Term.is_var f then 2*v else v in
             calc_tweight f sg v w c_mul +
               List.fold_left (fun acc t -> acc + calc_tweight t sg v w c_mul) 0 l
          | Term.Const id -> (int_of_float ((if Signature.sym_in_conj id sg then c_mul else 1.0)*.float_of_int w))
@@ -559,6 +558,14 @@ module Make(C : Clause_intf.S) = struct
     let prefer_deep_app_var c =
       - (prefer_shallow_app_var c)
 
+    let prefer_neg_unit c =
+      match C.lits c with 
+      | [| Literal.Equation(_,_,false) |] -> 0
+      | _ -> 1
+    
+    let defer_neg_unit c =
+      - (prefer_neg_unit c)
+
     let parsers = 
       ["const", (fun _ -> const_prio);
       "prefer-ho-steps", (fun _ -> prefer_ho_steps);
@@ -580,7 +587,9 @@ module Make(C : Clause_intf.S) = struct
       "prefer-top-level-appvars", (fun _ -> prefer_top_level_app_var);
       "defer-top-level-appvars", (fun _ -> prefer_top_level_app_var);
       "prefer-shallow-appvars", (fun _ -> prefer_shallow_app_var);
-      "prefer-deep-appvars", (fun _ -> prefer_deep_app_var)]
+      "prefer-deep-appvars", (fun _ -> prefer_deep_app_var);
+      "prefer-neg-unit", (fun _ -> prefer_neg_unit);
+      "defer-neg-unit", (fun _ -> defer_neg_unit)]
 
     let of_string s = 
       try 

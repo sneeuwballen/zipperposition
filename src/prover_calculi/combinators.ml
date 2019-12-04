@@ -427,7 +427,6 @@ let apply_rw_rules ~rules t =
   aux rules
 
 let narrow t =
-  let steps = ref 0 in
   let rules = narrow_rules @ binder_optimizations in
   let rec do_narrow t =
     match T.view t with 
@@ -440,7 +439,7 @@ let narrow t =
         let args' = List.map do_narrow args in
         if T.same_l args args' then t
         else T.app_builtin hd args' ~ty:(T.ty t)
-      ) else (incr steps; do_narrow t')
+      ) else (do_narrow t')
     | T.App(hd, args) ->
       let hd' = do_narrow hd and args' = List.map do_narrow args in
       if T.equal hd hd' && T.same_l args args' then t
@@ -451,7 +450,7 @@ let narrow t =
       if T.equal body body' then t
       else T.fun_l tys body' 
     in
-  do_narrow t, !steps
+  do_narrow t
 
 type state = {
   mutable pos_counter : int;
@@ -567,7 +566,7 @@ let max_weak_reduction_length var_handler ~state t =
 
 let cmp_by_max_weak_r_len t1 t2 =
   let numvars = Iter.length (T.Seq.vars t1) + Iter.length (T.Seq.vars t2) in
-  let state = 
+  let state =
     { pos_counter = 0; neg_counter = 0;
       balance = Term.Tbl.create numvars;
       var_map = Term.Tbl.create 16 } in
@@ -629,6 +628,17 @@ let abf ~rules t =
   CCFormat.printf "@.   @[%a@]@." T.pp res; *)
   res
 
+let comb_normalize t =
+  let changed = ref false in
+  let rules = curry_optimizations @ binder_optimizations in
+  let t =
+    if T.has_lambda t then (
+      changed := true;
+      abf ~rules t
+    ) else t in
+  let t' = narrow t in
+  if not (T.equal t t') then changed := true;
+  if !changed then Some t' else None
 
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
@@ -662,7 +672,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       )(E.C.of_statement st)
       
     let comb_narrow c =
-      let new_lits = Literals.map (fun t -> fst @@ narrow t) (C.lits c) in
+      let new_lits = Literals.map narrow (C.lits c) in
       if Literals.equal (C.lits c) new_lits then (
         SimplM.return_same c
       ) else (
@@ -814,16 +824,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       if E.flex_get k_enable_combinators then (
         SimplM.get (lams2combs_otf c)
       ) else c
-
-    let convert_and_narrow c =
-      let open SimplM.Infix in
-      lams2combs_otf c 
-      >>= comb_narrow
     
     let setup () =
       if E.flex_get k_enable_combinators then (
         E.add_clause_conversion enocde_stmt;
-        E.add_basic_simplify convert_and_narrow;
         E.add_unary_inf "narrow applied variable" narrow_app_vars;
         E.Ctx.set_ord (Ordering.compose cmp_by_max_weak_r_len (E.Ctx.ord ()));
         Unif.disable_pattern_unif := true;

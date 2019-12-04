@@ -139,7 +139,7 @@ module type S = sig
   val add_rewrite_rule : string -> term_rewrite_rule -> unit
   (** Add a term rewrite rule *)
 
-  val set_ho_normalization_rule : term_norm_rule -> unit
+  val set_ho_normalization_rule : string -> term_norm_rule -> unit
   (** Add a ho norm rule *)
 
   val get_ho_normalization_rule : unit -> term_norm_rule

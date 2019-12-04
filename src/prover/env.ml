@@ -106,6 +106,7 @@ module Make(X : sig
   let _unary_rules : (string * unary_inf_rule) list ref = ref []
   let _rewrite_rules : (string * term_rewrite_rule) list ref = ref []
   let _norm_rule : term_norm_rule ref = ref (fun _ -> None)
+  let _norm_name : string ref = ref "lambda normalize"
   let _lit_rules : (string * lit_rewrite_rule) list ref = ref []
   let _basic_simplify : simplify_rule list ref = ref []
   let _unary_simplify : simplify_rule list ref = ref []
@@ -204,7 +205,8 @@ module Make(X : sig
     Util.debugf ~section 1 "[ Adding rule %s to env ]" (fun k-> k name);
     _rewrite_rules := (name, rule) :: !_rewrite_rules
 
-  let set_ho_normalization_rule rule =
+  let set_ho_normalization_rule name rule =
+    _norm_name := name;
     _norm_rule := rule
 
   let get_ho_normalization_rule () =
@@ -387,7 +389,7 @@ module Make(X : sig
     else (
       C.mark_redundant c;
       (* FIXME: put the rules as parameters *)
-      let rule = Proof.Rule.mk "lambda-normalize" in
+      let rule = Proof.Rule.mk !_norm_name in
       let proof =
         Proof.Step.simp ~rule
           ([C.proof_parent c])

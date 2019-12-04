@@ -273,6 +273,10 @@ let open_fun ty = match view ty with
   | AppBuiltin (Builtin.Arrow, ret :: args) -> args, ret
   | _ -> [], ty
 
+let[@inline] is_a_type t = match ty t with
+  | HasType ty -> equal ty tType
+  | NoType -> assert false
+
 let rec app_builtin ~ty b l = match b, l with
   | Builtin.Arrow, [] -> assert false
   | Builtin.Arrow, [ret] -> ret
@@ -943,10 +947,6 @@ let type_non_unifiable_tags (ty:t): _ list = match view ty with
   | _ -> []
 
 let type_is_prop t = match view t with AppBuiltin (Builtin.Prop, _) -> true | _ -> false
-
-let[@inline] is_a_type t = match ty t with
-  | HasType ty -> equal ty tType
-  | NoType -> assert false
 
 let [@inline] get_type t = match ty t with
   | HasType ty -> ty

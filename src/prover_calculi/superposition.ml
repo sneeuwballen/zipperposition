@@ -658,14 +658,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                 Term.replace ~old:sk ~by:sk_v acc)
               sk_with_vars t ) lit) new_lits in
       
-      if List.exists (fun lit -> 
-          Lit.Seq.terms lit 
-          |> Iter.exists (fun t ->
-                not (Lambda.is_properly_encoded t))) 
-             new_lits then (
-        raise (ExitSuperposition "improperly formed quantified expressions.");
-      );
-
       let subst_has_lams = 
         Subst.codomain subst
         |> Iter.exists (fun (t,_) -> 

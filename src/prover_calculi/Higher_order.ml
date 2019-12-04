@@ -1221,16 +1221,19 @@ module Make(E : Env.S) : S with module Env = E = struct
       | `NoPrune -> ();
       end;
 
-      let ho_norm = (fun t -> t |> beta_reduce |> (
-                        fun opt -> match opt with
-                                    None -> eta_normalize t
-                                    | Some t' ->
-                                       match eta_normalize t' with
-                                          None -> Some t'
-                                          | Some tt -> Some tt))
-      in
-      Env.set_ho_normalization_rule ho_norm;
-      Ordering.normalize := (fun t -> CCOpt.get_or ~default:t (ho_norm t));
+      if Env.flex_get Saturate.k_enable_combinators then (
+        Env.set_ho_normalization_rule "comb-normalize" Combinators.comb_normalize;
+      ) else (
+        let ho_norm = (fun t -> t |> beta_reduce |> (
+                          fun opt -> match opt with
+                                      None -> eta_normalize t
+                                      | Some t' ->
+                                        match eta_normalize t' with
+                                            None -> Some t'
+                                            | Some tt -> Some tt))
+        in
+        Env.set_ho_normalization_rule "lambda-normalize" ho_norm;
+        Ordering.normalize := (fun t -> CCOpt.get_or ~default:t (ho_norm t)));
 
       if(Env.flex_get k_neg_cong_fun) then (
         Env.add_unary_inf "neg_cong_fun" neg_cong_fun 
