@@ -21,6 +21,9 @@ can be found on [Matryoshka's website](http://matryoshka.gforge.inria.fr/).
 
 ## API Documentation
 
+- [latest](1.6)
+
+- [1.6](1.6)
 - [1.5](1.5)
 - [1.3](1.3)
 - [1.2](1.2)
