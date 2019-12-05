@@ -60,7 +60,7 @@ end
 *)
 
 (*$Q
-  Q.int (fun n -> Array.length (Arr.make c n '_') = n)
+    Q.int (fun n -> Array.length (Arr.make c n '_') = n)
 *)
 
 (*$T
