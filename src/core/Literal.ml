@@ -24,39 +24,39 @@ type lit = t
 
 let equal l1 l2 =
   match l1, l2 with
-    | Equation (l1,r1,sign1), Equation (l2,r2,sign2) ->
-      sign1 = sign2 && l1 == l2 && r1 == r2
-    | True, True
-    | False, False -> true
-    | Int o1, Int o2 -> Int_lit.equal o1 o2
-    | Rat o1, Rat o2 -> Rat_lit.equal o1 o2
-    | Equation _, _
-    | True, _
-    | False, _
-    | Int _, _
-    | Rat _, _
-      -> false
+  | Equation (l1,r1,sign1), Equation (l2,r2,sign2) ->
+    sign1 = sign2 && l1 == l2 && r1 == r2
+  | True, True
+  | False, False -> true
+  | Int o1, Int o2 -> Int_lit.equal o1 o2
+  | Rat o1, Rat o2 -> Rat_lit.equal o1 o2
+  | Equation _, _
+  | True, _
+  | False, _
+  | Int _, _
+  | Rat _, _
+    -> false
 
 let equal_com l1 l2 =
   match l1, l2 with
-    | Equation (l1,r1,sign1), Equation (l2,r2,sign2) ->
-      sign1 = sign2 &&
-      ((T.equal l1 l2 && T.equal r1 r2) ||
-       (T.equal l1 r2 && T.equal r1 l2))
-    | True, True
-    | False, False -> true
-    | Int o1, Int o2 -> Int_lit.equal_com o1 o2
-    | _ -> equal l1 l2  (* regular comparison *)
+  | Equation (l1,r1,sign1), Equation (l2,r2,sign2) ->
+    sign1 = sign2 &&
+    ((T.equal l1 l2 && T.equal r1 r2) ||
+     (T.equal l1 r2 && T.equal r1 l2))
+  | True, True
+  | False, False -> true
+  | Int o1, Int o2 -> Int_lit.equal_com o1 o2
+  | _ -> equal l1 l2  (* regular comparison *)
 
 let no_prop_invariant = 
   let diff_f_t t = not (T.equal t T.true_) && not (T.equal t T.false_) in
   function 
   | Equation (lhs,rhs,sign) -> 
-      let res = diff_f_t lhs && (diff_f_t rhs || sign = true) in
-      if not res then (
-          CCFormat.printf "NO PROP INVARIANT BROKEN: %a,%a,%b.\n" T.pp lhs T.pp rhs sign;
-      );
-      res
+    let res = diff_f_t lhs && (diff_f_t rhs || sign = true) in
+    if not res then (
+      CCFormat.printf "NO PROP INVARIANT BROKEN: %a,%a,%b.\n" T.pp lhs T.pp rhs sign;
+    );
+    res
   | _ -> true
 
 
@@ -70,17 +70,17 @@ let compare l1 l2 =
     | Rat _ -> 6
   in
   match l1, l2 with
-    | Equation (l1,r1,sign1), Equation (l2,r2,sign2) ->
-      let c = T.compare l1 l2 in
+  | Equation (l1,r1,sign1), Equation (l2,r2,sign2) ->
+    let c = T.compare l1 l2 in
+    if c <> 0 then c else
+      let c = T.compare r1 r2 in
       if c <> 0 then c else
-        let c = T.compare r1 r2 in
-        if c <> 0 then c else
-          Pervasives.compare sign1 sign2
-    | True, True
-    | False, False -> 0
-    | Int o1, Int o2 -> Int_lit.compare o1 o2
-    | Rat o1, Rat o2 -> Rat_lit.compare o1 o2
-    | _, _ -> __to_int l1 - __to_int l2
+        Pervasives.compare sign1 sign2
+  | True, True
+  | False, False -> 0
+  | Int o1, Int o2 -> Int_lit.compare o1 o2
+  | Rat o1, Rat o2 -> Rat_lit.compare o1 o2
+  | _, _ -> __to_int l1 - __to_int l2
 
 let fold f acc lit = match lit with
   | Equation (l, r, _) -> f (f acc l) r
@@ -93,12 +93,12 @@ let for_all f lit = fold (fun b t -> b && f t) true lit
 
 let hash lit =
   match lit with
-    | Int o -> Int_lit.hash o
-    | Rat o -> Rat_lit.hash o
-    | Equation (l, r, sign) ->
-      Hash.combine4 30 (Hash.bool sign) (T.hash l) (T.hash r)
-    | True -> 40
-    | False -> 50
+  | Int o -> Int_lit.hash o
+  | Rat o -> Rat_lit.hash o
+  | Equation (l, r, sign) ->
+    Hash.combine4 30 (Hash.bool sign) (T.hash l) (T.hash r)
+  | True -> 40
+  | False -> 50
 
 let weight lit =
   fold (fun acc t -> acc + T.size t) 0 lit
@@ -108,7 +108,7 @@ let ho_weight =
 
 let heuristic_weight weight = function
   | Equation (l, r, true) 
-      when Term.equal r Term.true_ || Term.equal r Term.false_ -> weight l
+    when Term.equal r Term.true_ || Term.equal r Term.false_ -> weight l
   | Equation (l, r, _) -> weight l + weight r
   | True
   | False -> 0
@@ -133,7 +133,7 @@ let is_pos = function
     if sign && T.is_true_or_false r && T.is_const hd_l then (
       T.equal r T.true_ 
     ) else sign
-    (* sign *)
+  (* sign *)
   | Int o -> Int_lit.sign o
   | False -> false
   | _ -> true
@@ -153,8 +153,8 @@ let is_eq lit = is_eqn lit && is_pos lit
 let is_neq lit = is_eqn lit && is_neg lit
 
 let is_app_var_eq = function
-   | Equation (l,r,_) -> T.is_app_var l && T.is_app_var r
-   | _ -> false
+  | Equation (l,r,_) -> T.is_app_var l && T.is_app_var r
+  | _ -> false
 
 let is_prop = function
   | True | False -> true
@@ -171,16 +171,16 @@ let _on_arith p lit = match lit with
 let is_type_pred = function
   | Equation(lhs,rhs,true) when T.is_true_or_false rhs ->
     begin match Term.view lhs with
-    | App(f, [x]) -> T.is_var x && T.is_const f
-    | _ -> false end
+      | App(f, [x]) -> T.is_var x && T.is_const f
+      | _ -> false end
   | _ -> false
 
 let is_typex_pred = function
   | Equation(lhs,rhs,true) when T.is_true_or_false rhs ->
     begin match Term.view lhs with
-    | App(f, xs) when not (CCList.is_empty xs) -> 
+      | App(f, xs) when not (CCList.is_empty xs) -> 
         T.is_const f && List.for_all T.is_var xs
-    | _ -> false end
+      | _ -> false end
   | _ -> false
 
 let is_propositional = function
@@ -225,23 +225,23 @@ let rec mk_lit a b sign =
   if not (Type.equal (T.ty a) (T.ty b)) then ty_error_ a b;
   (* Maybe the sign will flip, so we have to beta reduce. *)
   match T.view a, T.view b with
-    | T.AppBuiltin (Builtin.True, []), T.AppBuiltin (Builtin.False, []) -> if sign then False else True
-    | T.AppBuiltin (Builtin.False, []), T.AppBuiltin (Builtin.True, []) -> if sign then False else True
-    | T.AppBuiltin (Builtin.True, []), T.AppBuiltin (Builtin.True, []) -> if sign then True else False
-    | T.AppBuiltin (Builtin.False, []), T.AppBuiltin (Builtin.False, []) -> if sign then True else False
-    | T.AppBuiltin (Builtin.True, []), _ -> Equation (b, (if sign then T.true_ else T.false_), true)
-    | _, T.AppBuiltin (Builtin.True, []) -> Equation (a, (if sign then T.true_ else T.false_), true)
-    | T.AppBuiltin (Builtin.False, []), _ -> Equation (b, (if not sign then T.true_ else T.false_), true)
-    | _, T.AppBuiltin (Builtin.False, []) -> Equation (a, (if not sign then T.true_ else T.false_), true)
-    (* | T.AppBuiltin (Builtin.Not, [a']), _ when Term.is_true_or_false b -> mk_lit a' b (not sign) *)
-    (* | _, T.AppBuiltin (Builtin.Not, [b']) -> mk_lit a b' (not sign) *)
-   
-    | _ when has_num_ty a ->
-      begin match mk_num_eq a b sign with
-        | None -> Equation (a,b,sign)
-        | Some lit -> lit
-      end
-    | _ -> Equation (a, b, sign)
+  | T.AppBuiltin (Builtin.True, []), T.AppBuiltin (Builtin.False, []) -> if sign then False else True
+  | T.AppBuiltin (Builtin.False, []), T.AppBuiltin (Builtin.True, []) -> if sign then False else True
+  | T.AppBuiltin (Builtin.True, []), T.AppBuiltin (Builtin.True, []) -> if sign then True else False
+  | T.AppBuiltin (Builtin.False, []), T.AppBuiltin (Builtin.False, []) -> if sign then True else False
+  | T.AppBuiltin (Builtin.True, []), _ -> Equation (b, (if sign then T.true_ else T.false_), true)
+  | _, T.AppBuiltin (Builtin.True, []) -> Equation (a, (if sign then T.true_ else T.false_), true)
+  | T.AppBuiltin (Builtin.False, []), _ -> Equation (b, (if not sign then T.true_ else T.false_), true)
+  | _, T.AppBuiltin (Builtin.False, []) -> Equation (a, (if not sign then T.true_ else T.false_), true)
+  (* | T.AppBuiltin (Builtin.Not, [a']), _ when Term.is_true_or_false b -> mk_lit a' b (not sign) *)
+  (* | _, T.AppBuiltin (Builtin.Not, [b']) -> mk_lit a b' (not sign) *)
+
+  | _ when has_num_ty a ->
+    begin match mk_num_eq a b sign with
+      | None -> Equation (a,b,sign)
+      | Some lit -> lit
+    end
+  | _ -> Equation (a, b, sign)
 
 and mk_num_eq t u sign =
   let open CCOpt in
@@ -397,23 +397,23 @@ let unif4 op ~subst x1 y1 sc1 x2 y2 sc2 k =
 let unif_lits op ~subst (lit1,sc1) (lit2,sc2) k =
   let open UnifOp in
   match lit1, lit2 with
-    | True, True
-    | False, False -> k (subst,[])
-    | Equation (l1, r1, sign1), Equation (l2, r2, sign2) when sign1 = sign2 ->
-      unif4 op.term ~subst l1 r1 sc1 l2 r2 sc2 (fun s -> k (s,[]))
-    | Int o1, Int o2 ->
-      Int_lit.generic_unif op.monomes ~subst (o1,sc1) (o2,sc2)
-        (fun s -> k(s,[Builtin.Tag.T_lia]))
-    | Rat o1, Rat o2 ->
-      Rat_lit.generic_unif op.monomes ~subst (o1,sc1) (o2,sc2)
-        (fun s -> k(s,[Builtin.Tag.T_lra]))
-    | _, _ -> ()
+  | True, True
+  | False, False -> k (subst,[])
+  | Equation (l1, r1, sign1), Equation (l2, r2, sign2) when sign1 = sign2 ->
+    unif4 op.term ~subst l1 r1 sc1 l2 r2 sc2 (fun s -> k (s,[]))
+  | Int o1, Int o2 ->
+    Int_lit.generic_unif op.monomes ~subst (o1,sc1) (o2,sc2)
+      (fun s -> k(s,[Builtin.Tag.T_lia]))
+  | Rat o1, Rat o2 ->
+    Rat_lit.generic_unif op.monomes ~subst (o1,sc1) (o2,sc2)
+      (fun s -> k(s,[Builtin.Tag.T_lra]))
+  | _, _ -> ()
 
 let variant ?(subst=S.empty) lit1 lit2 k =
   let op = UnifOp.({
       term=(fun ~subst t1 t2 k ->
-        try k (Unif.FO.variant ~subst t1 t2)
-        with Unif.Fail -> ());
+          try k (Unif.FO.variant ~subst t1 t2)
+          with Unif.Fail -> ());
       monomes=(fun ~subst m1 m2 k -> Monome.variant ~subst m1 m2 k)
     })
   in
@@ -426,8 +426,8 @@ let are_variant lit1 lit2 =
 let matching ?(subst=Subst.empty) ~pattern:lit1 lit2 k =
   let op = UnifOp.({
       term=(fun ~subst t1 t2 k ->
-        try k (Unif.FO.matching_adapt_scope ~subst ~pattern:t1 t2)
-        with Unif.Fail -> ());
+          try k (Unif.FO.matching_adapt_scope ~subst ~pattern:t1 t2)
+          with Unif.Fail -> ());
       monomes=(fun ~subst m1 m2 k -> Monome.matching ~subst m1 m2 k)
     })
   in
@@ -441,14 +441,14 @@ let _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 k =
     equate_root ~subst l2 r2 k;
     (* decompose *)
     match T.view l2, T.view r2 with
-      | _ when T.equal l2 r2 -> k subst
-      | T.App (f, ss), T.App (g, ts) when List.length ss = List.length ts ->
-        (* Don't rewrite heads because it can cause incompletness, e.g. by
-           subsuming ho_complete_eq inferences. *)
-        if T.equal f g
-        then equate_lists ~subst ss ts k
-        else ()
-      | _ -> ()
+    | _ when T.equal l2 r2 -> k subst
+    | T.App (f, ss), T.App (g, ts) when List.length ss = List.length ts ->
+      (* Don't rewrite heads because it can cause incompletness, e.g. by
+         subsuming ho_complete_eq inferences. *)
+      if T.equal f g
+      then equate_lists ~subst ss ts k
+      else ()
+    | _ -> ()
   and equate_lists ~subst l2s r2s k = match l2s, r2s with
     | [], [] -> k subst
     | [], _
@@ -486,19 +486,19 @@ let _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 k =
 
 let subsumes ?(subst=Subst.empty) (lit1,sc1) (lit2,sc2) k =
   match lit1, lit2 with
-    | Int o1, Int o2 ->
-      (* use the more specific subsumption mechanism *)
-      Int_lit.subsumes ~subst (o1,sc1) (o2,sc2)
-        (fun s -> k(s,[Builtin.Tag.T_lia]))
-    | Equation (l1, r1, true), Equation (l2, r2, true) ->
-      _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 (fun s -> k(s,[]))
-    | _ -> matching ~subst ~pattern:(lit1,sc1) (lit2,sc2) k
+  | Int o1, Int o2 ->
+    (* use the more specific subsumption mechanism *)
+    Int_lit.subsumes ~subst (o1,sc1) (o2,sc2)
+      (fun s -> k(s,[Builtin.Tag.T_lia]))
+  | Equation (l1, r1, true), Equation (l2, r2, true) ->
+    _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 (fun s -> k(s,[]))
+  | _ -> matching ~subst ~pattern:(lit1,sc1) (lit2,sc2) k
 
 let unify ?(subst=US.empty) lit1 lit2 k =
   let op = UnifOp.({
       term=(fun ~subst t1 t2 k ->
-        try k (Unif.FO.unify_full ~subst t1 t2)
-        with Unif.Fail -> ());
+          try k (Unif.FO.unify_full ~subst t1 t2)
+          with Unif.Fail -> ());
       monomes=(fun ~subst m1 m2 k -> Monome.unify ~subst m1 m2 k)
     })
   in
@@ -518,14 +518,14 @@ let map f lit = map_ f lit
 
 let apply_subst_ ~f_term ~f_arith_lit ~f_rat subst (lit,sc) =
   match lit with
-    | Equation (l,r,sign) ->
-      let new_l = f_term subst (l,sc)
-      and new_r = f_term subst (r,sc) in
-      mk_lit new_l new_r sign
-    | Int o -> Int (f_arith_lit subst (o,sc))
-    | Rat o -> Rat (f_rat subst (o,sc))
-    | True
-    | False -> lit
+  | Equation (l,r,sign) ->
+    let new_l = f_term subst (l,sc)
+    and new_r = f_term subst (r,sc) in
+    mk_lit new_l new_r sign
+  | Int o -> Int (f_arith_lit subst (o,sc))
+  | Rat o -> Rat (f_rat subst (o,sc))
+  | True
+  | False -> lit
 
 let apply_subst renaming subst (lit,sc) =
   apply_subst_ subst (lit,sc)
@@ -535,12 +535,12 @@ let apply_subst renaming subst (lit,sc) =
 
 let apply_subst_no_simp renaming subst (lit,sc) =
   match lit with
-    | Int o -> Int (Int_lit.apply_subst_no_simp renaming subst (o,sc))
-    | Rat o -> Rat (Rat_lit.apply_subst_no_simp renaming subst (o,sc))
-    | Equation (l,r,sign) ->
-      mk_lit (S.FO.apply renaming subst (l,sc)) (S.FO.apply renaming subst (r,sc)) sign
-    | True
-    | False -> lit
+  | Int o -> Int (Int_lit.apply_subst_no_simp renaming subst (o,sc))
+  | Rat o -> Rat (Rat_lit.apply_subst_no_simp renaming subst (o,sc))
+  | Equation (l,r,sign) ->
+    mk_lit (S.FO.apply renaming subst (l,sc)) (S.FO.apply renaming subst (r,sc)) sign
+  | True
+  | False -> lit
 
 let apply_subst_list renaming subst (lits,sc) =
   List.map
@@ -729,18 +729,18 @@ let of_unif_subst renaming (s:Unif_subst.t) : t list =
 let normalize_eq lit = 
   match lit with
   | Equation(lhs, rhs, true) 
-      when T.equal rhs T.false_ || T.equal rhs T.true_ ->
-        begin match T.view lhs with 
-        | T.AppBuiltin(Builtin.Eq, [_;l;r]) (* first arg can be type variable *)
-        | T.AppBuiltin(Builtin.Eq, [l;r]) ->
-          let eq_cons = if T.equal rhs T.true_ then mk_eq else mk_neq in
-          Some (eq_cons l r) 
-        | T.AppBuiltin(Builtin.Neq, [_;l;r])
-        | T.AppBuiltin(Builtin.Neq, [l;r]) ->
-          let eq_cons = if T.equal rhs T.true_ then mk_neq else mk_eq in
-          Some (eq_cons l r)
-        | _ -> None
-        end
+    when T.equal rhs T.false_ || T.equal rhs T.true_ ->
+    begin match T.view lhs with 
+      | T.AppBuiltin(Builtin.Eq, [_;l;r]) (* first arg can be type variable *)
+      | T.AppBuiltin(Builtin.Eq, [l;r]) ->
+        let eq_cons = if T.equal rhs T.true_ then mk_eq else mk_neq in
+        Some (eq_cons l r) 
+      | T.AppBuiltin(Builtin.Neq, [_;l;r])
+      | T.AppBuiltin(Builtin.Neq, [l;r]) ->
+        let eq_cons = if T.equal rhs T.true_ then mk_neq else mk_eq in
+        Some (eq_cons l r)
+      | _ -> None
+    end
   | _ -> None
 
 (** {2 IO} *)
@@ -749,42 +749,42 @@ let pp_debug ?(hooks=[]) out lit =
   (* assert(no_prop_invariant lit); *)
   if List.for_all (fun h -> not (h out lit)) hooks
   then (begin match lit with
-    | Equation (p, t, true) when T.equal t T.true_ -> Format.fprintf out "@[%a@]" T.pp p
-    | Equation (p, t, true) when T.equal t T.false_ -> Format.fprintf out "¬@[%a@]" T.pp p
-    | True -> CCFormat.string out "Τ"
-    | False -> CCFormat.string out "⊥"
-    | Equation (l, r, true) ->
-      Format.fprintf out "@[<1>%a@ = %a@]" T.pp l T.pp r
-    | Equation (l, r, false) ->
-      Format.fprintf out "@[<1>%a@ ≠ %a@]" T.pp l T.pp r
-    | Int o -> CCFormat.within "(" ")" Int_lit.pp out o
-    | Rat o -> CCFormat.within "(" ")" Rat_lit.pp out o
-  end)
+      | Equation (p, t, true) when T.equal t T.true_ -> Format.fprintf out "@[%a@]" T.pp p
+      | Equation (p, t, true) when T.equal t T.false_ -> Format.fprintf out "¬@[%a@]" T.pp p
+      | True -> CCFormat.string out "Τ"
+      | False -> CCFormat.string out "⊥"
+      | Equation (l, r, true) ->
+        Format.fprintf out "@[<1>%a@ = %a@]" T.pp l T.pp r
+      | Equation (l, r, false) ->
+        Format.fprintf out "@[<1>%a@ ≠ %a@]" T.pp l T.pp r
+      | Int o -> CCFormat.within "(" ")" Int_lit.pp out o
+      | Rat o -> CCFormat.within "(" ")" Rat_lit.pp out o
+    end)
 let pp_tstp out lit =
   match lit with
-    | Equation (p, t, true) when T.equal t T.true_  -> T.TPTP.pp out p
-    | Equation (p, t, true) when T.equal t T.false_ -> Format.fprintf out "~ %a" T.TPTP.pp p
-    | True -> CCFormat.string out "$true"
-    | False -> CCFormat.string out "$false"
-    | Equation (l, r, true) ->
-      Format.fprintf out "@[<1>%a@ = %a@]" T.TPTP.pp l T.TPTP.pp r
-    | Equation (l, r, false) ->
-      Format.fprintf out "@[<1>%a@ != %a@]" T.TPTP.pp l T.TPTP.pp r
-    | Int o -> Int_lit.pp_tstp out o
-    | Rat o -> Rat_lit.pp_tstp out o
+  | Equation (p, t, true) when T.equal t T.true_  -> T.TPTP.pp out p
+  | Equation (p, t, true) when T.equal t T.false_ -> Format.fprintf out "~ %a" T.TPTP.pp p
+  | True -> CCFormat.string out "$true"
+  | False -> CCFormat.string out "$false"
+  | Equation (l, r, true) ->
+    Format.fprintf out "@[<1>%a@ = %a@]" T.TPTP.pp l T.TPTP.pp r
+  | Equation (l, r, false) ->
+    Format.fprintf out "@[<1>%a@ != %a@]" T.TPTP.pp l T.TPTP.pp r
+  | Int o -> Int_lit.pp_tstp out o
+  | Rat o -> Rat_lit.pp_tstp out o
 
 let pp_zf out lit =
   match lit with
-    | Equation (p, t, true) when T.equal t T.true_ -> T.ZF.pp out p
-    | Equation (p, t, true) when T.equal t T.false_ -> Format.fprintf out "~ %a" T.ZF.pp p
-    | True -> CCFormat.string out "true"
-    | False -> CCFormat.string out "false"
-    | Equation (l, r, true) ->
-      Format.fprintf out "@[<1>%a@ = %a@]" T.ZF.pp l T.ZF.pp r
-    | Equation (l, r, false) ->
-      Format.fprintf out "@[<1>%a@ != %a@]" T.ZF.pp l T.ZF.pp r
-    | Int o -> Int_lit.pp_zf out o
-    | Rat o -> Rat_lit.pp_zf out o
+  | Equation (p, t, true) when T.equal t T.true_ -> T.ZF.pp out p
+  | Equation (p, t, true) when T.equal t T.false_ -> Format.fprintf out "~ %a" T.ZF.pp p
+  | True -> CCFormat.string out "true"
+  | False -> CCFormat.string out "false"
+  | Equation (l, r, true) ->
+    Format.fprintf out "@[<1>%a@ = %a@]" T.ZF.pp l T.ZF.pp r
+  | Equation (l, r, false) ->
+    Format.fprintf out "@[<1>%a@ != %a@]" T.ZF.pp l T.ZF.pp r
+  | Int o -> Int_lit.pp_zf out o
+  | Rat o -> Rat_lit.pp_zf out o
 
 type print_hook = CCFormat.t -> t -> bool
 let __hooks = ref []
@@ -801,26 +801,26 @@ module Comp = struct
 
   let _maxterms2 ~ord l r =
     match O.compare ord l r with
-      | C.Gt -> [l]
-      | C.Lt -> [r]
-      | C.Eq -> [l]
-      | C.Incomparable -> 
-        [l; r]
+    | C.Gt -> [l]
+    | C.Lt -> [r]
+    | C.Eq -> [l]
+    | C.Incomparable -> 
+      [l; r]
 
   (* maximal terms of the literal *)
   let max_terms ~ord lit =
     assert(no_prop_invariant lit);
     match lit with
-      | Equation (l, r, _) when is_essentially_prop lit ->
-        let l = Lambda.whnf l in
-        if T.is_app_var l && T.equal T.true_ r then [l;r]
-        else [l]
-      | Equation (l, r, _) -> 
-        _maxterms2 ~ord l r
-      | Int a -> Int_lit.max_terms ~ord a
-      | Rat a -> Rat_lit.max_terms ~ord a
-      | True
-      | False -> []
+    | Equation (l, r, _) when is_essentially_prop lit ->
+      let l = Lambda.whnf l in
+      if T.is_app_var l && T.equal T.true_ r then [l;r]
+      else [l]
+    | Equation (l, r, _) -> 
+      _maxterms2 ~ord l r
+    | Int a -> Int_lit.max_terms ~ord a
+    | Rat a -> Rat_lit.max_terms ~ord a
+    | True
+    | False -> []
 
   (* general comparison is a bit complicated.
      - First we compare literals l1 and l2
@@ -841,25 +841,25 @@ module Comp = struct
     let t1 = max_terms ~ord l1 and t2 = max_terms ~ord l2 in
     let f = Ordering.compare ord in
     match _some_term_dominates f t1 t2, _some_term_dominates f t2 t1 with
-      | false, false ->
-        let t1' = CCList.fold_right T.Set.add t1 T.Set.empty
-        and t2' = CCList.fold_right T.Set.add t2 T.Set.empty in
-        if T.Set.equal t1' t2'
-        then C.Eq (* next criterion *)
-        else C.Incomparable
-      | true, true -> assert false
-      | true, false -> C.Gt
-      | false, true -> C.Lt
+    | false, false ->
+      let t1' = CCList.fold_right T.Set.add t1 T.Set.empty
+      and t2' = CCList.fold_right T.Set.add t2 T.Set.empty in
+      if T.Set.equal t1' t2'
+      then C.Eq (* next criterion *)
+      else C.Incomparable
+    | true, true -> assert false
+    | true, false -> C.Gt
+    | false, true -> C.Lt
 
   (* negative literals dominate *)
   let _cmp_by_polarity l1 l2 =
     let p1 = polarity l1 in
     let p2 = polarity l2 in
     match p1, p2 with
-      | true, true
-      | false, false -> Comparison.Eq
-      | true, false -> Comparison.Lt
-      | false, true -> Comparison.Gt
+    | true, true
+    | false, false -> Comparison.Eq
+    | true, false -> Comparison.Lt
+    | false, true -> Comparison.Gt
 
   let _cmp_by_kind l1 l2 =
     let open Int_lit in
@@ -884,43 +884,43 @@ module Comp = struct
 
   let _cmp_specific ~ord l1 l2 =
     match l1, l2 with
-      | True, True
-      | True, False
-      | True, Equation _
-      | False, False
-      | False, True
-      | False, Equation _
-      | Equation _, Equation _
-      | Equation _, True
-      | Equation _, False ->
-        _cmp_by_term_multiset ~ord l1 l2
-      | Int (AL.Binary(op1, x1, y1)), Int (AL.Binary(op2, x2, y2)) ->
-        assert (op1 = op2);
-        let module MI = Monome.Int in
-        let left = Multisets.MMT.doubleton (MI.to_multiset x1) (MI.to_multiset y1) in
-        let right = Multisets.MMT.doubleton (MI.to_multiset x2) (MI.to_multiset y2) in
-        Multisets.MMT.compare_partial
-          (Multisets.MT.compare_partial (Ordering.compare ord))
-          left right
-      | Int(AL.Divides d1), Int(AL.Divides d2) ->
-        assert (d1.AL.sign=d2.AL.sign);
-        let c = Z.compare d1.AL.num d2.AL.num in
-        if c <> 0 then C.of_total c  (* live in totally distinct Z/nZ *)
-        else
-        if is_ground l1 && is_ground l2
-        then
-          C.Incomparable
-          (* TODO: Bezout-normalize, then actually compare Monomes. *)
-        else C.Incomparable
-      | Rat {Rat_lit.op=o1;left=l1;right=r1}, Rat {Rat_lit.op=o2;left=l2;right=r2} ->
-        assert (o1=o2);
-        let module M = Monome.Rat in
-        let m1 = Multisets.MT.union (M.to_multiset l1) (M.to_multiset r1) in
-        let m2 = Multisets.MT.union (M.to_multiset l2) (M.to_multiset r2) in
-        Multisets.MT.compare_partial (Ordering.compare ord) m1 m2
-      | _, _ ->
-        Util.debugf 5 "(@[bad_compare %a %a@])" (fun k->k pp l1 pp l2);
-        assert false
+    | True, True
+    | True, False
+    | True, Equation _
+    | False, False
+    | False, True
+    | False, Equation _
+    | Equation _, Equation _
+    | Equation _, True
+    | Equation _, False ->
+      _cmp_by_term_multiset ~ord l1 l2
+    | Int (AL.Binary(op1, x1, y1)), Int (AL.Binary(op2, x2, y2)) ->
+      assert (op1 = op2);
+      let module MI = Monome.Int in
+      let left = Multisets.MMT.doubleton (MI.to_multiset x1) (MI.to_multiset y1) in
+      let right = Multisets.MMT.doubleton (MI.to_multiset x2) (MI.to_multiset y2) in
+      Multisets.MMT.compare_partial
+        (Multisets.MT.compare_partial (Ordering.compare ord))
+        left right
+    | Int(AL.Divides d1), Int(AL.Divides d2) ->
+      assert (d1.AL.sign=d2.AL.sign);
+      let c = Z.compare d1.AL.num d2.AL.num in
+      if c <> 0 then C.of_total c  (* live in totally distinct Z/nZ *)
+      else
+      if is_ground l1 && is_ground l2
+      then
+        C.Incomparable
+        (* TODO: Bezout-normalize, then actually compare Monomes. *)
+      else C.Incomparable
+    | Rat {Rat_lit.op=o1;left=l1;right=r1}, Rat {Rat_lit.op=o2;left=l2;right=r2} ->
+      assert (o1=o2);
+      let module M = Monome.Rat in
+      let m1 = Multisets.MT.union (M.to_multiset l1) (M.to_multiset r1) in
+      let m2 = Multisets.MT.union (M.to_multiset l2) (M.to_multiset r2) in
+      Multisets.MT.compare_partial (Ordering.compare ord) m1 m2
+    | _, _ ->
+      Util.debugf 5 "(@[bad_compare %a %a@])" (fun k->k pp l1 pp l2);
+      assert false
 
   let compare ~ord l1 l2 =
     let f = Comparison.(
@@ -949,30 +949,30 @@ module Pos = struct
   let split lit pos =
     let module AL = Int_lit in
     match lit, pos with
-      | True, P.Stop ->
-        {lit_pos=P.stop; term_pos=P.stop; term=T.true_; }
-      | False, P.Stop ->
-        {lit_pos=P.stop; term_pos=P.stop; term=T.false_; }
-      | Equation (l,_,_), P.Left pos' ->
-        {lit_pos=P.(left stop); term_pos=pos'; term=l; }
-      | Equation (_,r,_), P.Right pos' ->
-        {lit_pos=P.(right stop); term_pos=pos'; term=r; }
-      | Int(AL.Divides d), P.Arg (i, pos') ->
-        let term = try snd(Monome.nth d.AL.monome i) with _ -> _fail_lit lit pos in
-        {lit_pos=P.(arg i stop); term_pos= pos'; term; }
-      | Int(AL.Binary (_, m1, _)), P.Left (P.Arg (i, pos')) ->
-        let term = try snd(Monome.nth m1 i) with _ -> _fail_lit lit pos in
-        {lit_pos=P.(left @@ arg i stop); term_pos=pos'; term; }
-      | Int(AL.Binary(_, _, m2)), P.Right (P.Arg (i, pos')) ->
-        let term = try snd(Monome.nth m2 i) with _ -> _fail_lit lit pos in
-        {lit_pos=P.(right @@ arg i stop); term_pos=pos'; term; }
-      | Rat ({Rat_lit.left; _}: Rat_lit.t), P.Left (P.Arg (i, pos')) ->
-        let term = try snd(Monome.nth left i) with _ -> _fail_lit lit pos in
-        {lit_pos=P.(left @@ arg i stop); term_pos=pos'; term; }
-      | Rat ({Rat_lit.right; _}: Rat_lit.t), P.Right (P.Arg (i, pos')) ->
-        let term = try snd(Monome.nth right i) with _ -> _fail_lit lit pos in
-        {lit_pos=P.(right @@ arg i stop); term_pos=pos'; term; }
-      | _ -> _fail_lit lit pos
+    | True, P.Stop ->
+      {lit_pos=P.stop; term_pos=P.stop; term=T.true_; }
+    | False, P.Stop ->
+      {lit_pos=P.stop; term_pos=P.stop; term=T.false_; }
+    | Equation (l,_,_), P.Left pos' ->
+      {lit_pos=P.(left stop); term_pos=pos'; term=l; }
+    | Equation (_,r,_), P.Right pos' ->
+      {lit_pos=P.(right stop); term_pos=pos'; term=r; }
+    | Int(AL.Divides d), P.Arg (i, pos') ->
+      let term = try snd(Monome.nth d.AL.monome i) with _ -> _fail_lit lit pos in
+      {lit_pos=P.(arg i stop); term_pos= pos'; term; }
+    | Int(AL.Binary (_, m1, _)), P.Left (P.Arg (i, pos')) ->
+      let term = try snd(Monome.nth m1 i) with _ -> _fail_lit lit pos in
+      {lit_pos=P.(left @@ arg i stop); term_pos=pos'; term; }
+    | Int(AL.Binary(_, _, m2)), P.Right (P.Arg (i, pos')) ->
+      let term = try snd(Monome.nth m2 i) with _ -> _fail_lit lit pos in
+      {lit_pos=P.(right @@ arg i stop); term_pos=pos'; term; }
+    | Rat ({Rat_lit.left; _}: Rat_lit.t), P.Left (P.Arg (i, pos')) ->
+      let term = try snd(Monome.nth left i) with _ -> _fail_lit lit pos in
+      {lit_pos=P.(left @@ arg i stop); term_pos=pos'; term; }
+    | Rat ({Rat_lit.right; _}: Rat_lit.t), P.Right (P.Arg (i, pos')) ->
+      let term = try snd(Monome.nth right i) with _ -> _fail_lit lit pos in
+      {lit_pos=P.(right @@ arg i stop); term_pos=pos'; term; }
+    | _ -> _fail_lit lit pos
 
   let cut lit pos =
     let s = split lit pos in
@@ -985,35 +985,35 @@ module Pos = struct
   let replace lit ~at ~by =
     let module AL = Int_lit in
     match lit, at with
-      | Equation (l, r, sign), P.Left pos' ->
-        let cons = if sign then mk_eq else mk_neq in
-        cons (T.Pos.replace l pos' ~by) r
-      | Equation (l, r, sign), P.Right pos' ->
-        let cons = if sign then mk_eq else mk_neq in
-        cons l (T.Pos.replace r pos' ~by)
-      | True, _
-      | False, _ -> lit  (* flexible, lit can be the result of a simplification *)
-      | Int (AL.Binary (op, m1, m2)), P.Left (P.Arg(i,pos')) ->
-        let _, t = Monome.nth m1 i in
-        let m1' = Monome.set_term m1 i (T.Pos.replace t pos' ~by) in
-        Int (AL.make_no_simp op m1' m2)
-      | Int (AL.Binary(op, m1, m2)), P.Right (P.Arg(i,pos')) ->
-        let _, t = Monome.nth m2 i in
-        let m2' = Monome.set_term m2 i (T.Pos.replace t pos' ~by) in
-        Int (AL.make_no_simp op m1 m2')
-      | Int (AL.Divides d), P.Arg (i, pos') ->
-        let _, t = Monome.nth d.AL.monome i in
-        let m' = Monome.set_term d.AL.monome i (T.Pos.replace t pos' ~by) in
-        Int (AL.mk_divides ~sign:d.AL.sign ~power:d.AL.power d.AL.num m')
-      | Rat {Rat_lit.op; left; right}, P.Left (P.Arg(i,pos')) ->
-        let _, t = Monome.nth left i in
-        let left' = Monome.set_term left i (T.Pos.replace t pos' ~by) in
-        Rat (Rat_lit.make_no_simp op left' right)
-      | Rat {Rat_lit.op; left; right}, P.Right (P.Arg(i,pos')) ->
-        let _, t = Monome.nth right i in
-        let right' = Monome.set_term right i (T.Pos.replace t pos' ~by) in
-        Rat (Rat_lit.make_no_simp op left right')
-      | _ -> _fail_lit lit at
+    | Equation (l, r, sign), P.Left pos' ->
+      let cons = if sign then mk_eq else mk_neq in
+      cons (T.Pos.replace l pos' ~by) r
+    | Equation (l, r, sign), P.Right pos' ->
+      let cons = if sign then mk_eq else mk_neq in
+      cons l (T.Pos.replace r pos' ~by)
+    | True, _
+    | False, _ -> lit  (* flexible, lit can be the result of a simplification *)
+    | Int (AL.Binary (op, m1, m2)), P.Left (P.Arg(i,pos')) ->
+      let _, t = Monome.nth m1 i in
+      let m1' = Monome.set_term m1 i (T.Pos.replace t pos' ~by) in
+      Int (AL.make_no_simp op m1' m2)
+    | Int (AL.Binary(op, m1, m2)), P.Right (P.Arg(i,pos')) ->
+      let _, t = Monome.nth m2 i in
+      let m2' = Monome.set_term m2 i (T.Pos.replace t pos' ~by) in
+      Int (AL.make_no_simp op m1 m2')
+    | Int (AL.Divides d), P.Arg (i, pos') ->
+      let _, t = Monome.nth d.AL.monome i in
+      let m' = Monome.set_term d.AL.monome i (T.Pos.replace t pos' ~by) in
+      Int (AL.mk_divides ~sign:d.AL.sign ~power:d.AL.power d.AL.num m')
+    | Rat {Rat_lit.op; left; right}, P.Left (P.Arg(i,pos')) ->
+      let _, t = Monome.nth left i in
+      let left' = Monome.set_term left i (T.Pos.replace t pos' ~by) in
+      Rat (Rat_lit.make_no_simp op left' right)
+    | Rat {Rat_lit.op; left; right}, P.Right (P.Arg(i,pos')) ->
+      let _, t = Monome.nth right i in
+      let right' = Monome.set_term right i (T.Pos.replace t pos' ~by) in
+      Rat (Rat_lit.make_no_simp op left right')
+    | _ -> _fail_lit lit at
 
   let root_term lit pos =
     at lit (fst (cut lit pos))
@@ -1023,29 +1023,29 @@ module Pos = struct
   let is_max_term ~ord lit pos =
     let module AL = Int_lit in
     match lit, pos with
-      | Equation (l, r, _), P.Left _ ->
-        Ordering.compare ord l r <> Comparison.Lt
-      | Equation (l, r, _), P.Right _ ->
-        Ordering.compare ord r l <> Comparison.Lt
-      | Int (AL.Binary(_, _m1, _m2)), _ ->
-        (* [t] dominates all atomic terms? *)
-        let t = root_term lit pos in
-        Iter.for_all
-          (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
-          (Seq.terms lit)
-      | Int (AL.Divides d), _ ->
-        let t = root_term lit pos in
-        Iter.for_all
-          (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
-          (Monome.Seq.terms d.AL.monome)
-      | Rat _, _ ->
-        let t = root_term lit pos in
-        Iter.for_all
-          (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
-          (Seq.terms lit)
-      | True, _
-      | False, _ -> true  (* why not. *)
-      | Equation _, _ -> _fail_lit lit pos
+    | Equation (l, r, _), P.Left _ ->
+      Ordering.compare ord l r <> Comparison.Lt
+    | Equation (l, r, _), P.Right _ ->
+      Ordering.compare ord r l <> Comparison.Lt
+    | Int (AL.Binary(_, _m1, _m2)), _ ->
+      (* [t] dominates all atomic terms? *)
+      let t = root_term lit pos in
+      Iter.for_all
+        (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
+        (Seq.terms lit)
+    | Int (AL.Divides d), _ ->
+      let t = root_term lit pos in
+      Iter.for_all
+        (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
+        (Monome.Seq.terms d.AL.monome)
+    | Rat _, _ ->
+      let t = root_term lit pos in
+      Iter.for_all
+        (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
+        (Seq.terms lit)
+    | True, _
+    | False, _ -> true  (* why not. *)
+    | Equation _, _ -> _fail_lit lit pos
 end
 
 let replace lit ~old ~by = map (T.replace ~old ~by) lit
@@ -1058,20 +1058,20 @@ module Conv = struct
     | [] -> None
     | h::hooks' ->
       match h x with
-        | None -> try_hooks x hooks'
-        | (Some _) as res -> res
+      | None -> try_hooks x hooks'
+      | (Some _) as res -> res
 
   let of_form ?(hooks=[]) f =
     match try_hooks f hooks with
-      | Some lit -> lit
-      | None ->
-        begin match f with
-          | SLiteral.True -> True
-          | SLiteral.False -> False
-          | SLiteral.Atom (t,b) -> mk_prop t b
-          | SLiteral.Eq (l,r) -> mk_eq l r
-          | SLiteral.Neq (l,r) -> mk_neq l r
-        end
+    | Some lit -> lit
+    | None ->
+      begin match f with
+        | SLiteral.True -> True
+        | SLiteral.False -> False
+        | SLiteral.Atom (t,b) -> mk_prop t b
+        | SLiteral.Eq (l,r) -> mk_eq l r
+        | SLiteral.Neq (l,r) -> mk_neq l r
+      end
 
   let to_form ?(hooks=[]) lit =
     begin match try_hooks lit hooks with
@@ -1136,13 +1136,13 @@ module View = struct
 
   let get_eqn lit position =
     match lit, position with
-      | Equation (l,r,sign), P.Left _ -> Some (l, r, sign)
-      | Equation (l,r,sign), P.Right _ -> Some (r, l, sign)
-      | True, _
-      | False, _
-      | Int _, _
-      | Rat _, _ -> None
-      | _ -> invalid_arg "get_eqn: wrong literal or position"
+    | Equation (l,r,sign), P.Left _ -> Some (l, r, sign)
+    | Equation (l,r,sign), P.Right _ -> Some (r, l, sign)
+    | True, _
+    | False, _
+    | Int _, _
+    | Rat _, _ -> None
+    | _ -> invalid_arg "get_eqn: wrong literal or position"
 
   let get_arith = function
     | Int o -> Some o
@@ -1170,36 +1170,36 @@ let _as_var = fun t -> T.as_var_exn (Lambda.eta_reduce t)
 let as_inj_def lit =
   match View.as_eqn lit with
   | Some (l, r, false) ->
-     (try  
-      let hd_l, hd_r = T.head_exn l, T.head_exn r in
-      let vars_l, vars_r = List.map _as_var (T.args l), List.map _as_var (T.args r) in
-      let args_l, args_r = VS.of_list vars_l, VS.of_list vars_r in
-      
-      (* We are looking for literal f X1 ... Xn ~= f Y1 ... Yn 
-         where all X_i, Y_i are different pairwise, but form each
-         other also. *)
-      if hd_l = hd_r && 
-         VS.cardinal args_l = List.length (T.args l) &&
-         VS.cardinal args_r = List.length (T.args r) &&
-         VS.cardinal args_l = VS.cardinal args_r &&
-         VS.inter args_l args_r = VS.empty then
-      Some( hd_l, List.combine vars_l vars_r )
-      else None
+    (try  
+       let hd_l, hd_r = T.head_exn l, T.head_exn r in
+       let vars_l, vars_r = List.map _as_var (T.args l), List.map _as_var (T.args r) in
+       let args_l, args_r = VS.of_list vars_l, VS.of_list vars_r in
+
+       (* We are looking for literal f X1 ... Xn ~= f Y1 ... Yn 
+          where all X_i, Y_i are different pairwise, but form each
+          other also. *)
+       if hd_l = hd_r && 
+          VS.cardinal args_l = List.length (T.args l) &&
+          VS.cardinal args_r = List.length (T.args r) &&
+          VS.cardinal args_l = VS.cardinal args_r &&
+          VS.inter args_l args_r = VS.empty then
+         Some( hd_l, List.combine vars_l vars_r )
+       else None
      with Invalid_argument _ -> None)
   | _ -> None
 
 let is_pure_var lit =
   match lit with 
   | Equation(l,r,_) -> 
-      begin 
-        try
-          ignore(_as_var l, _as_var r);
-          true
-        with Invalid_argument _ -> false
-      end
+    begin 
+      try
+        ignore(_as_var l, _as_var r);
+        true
+      with Invalid_argument _ -> false
+    end
   | _ -> false
 
 let as_pos_pure_var lit =
-   match View.as_eqn lit with 
-   | Some (l, r, true) when is_pure_var lit && is_pos lit -> Some(_as_var l,_as_var r)
-   | _ -> None
+  match View.as_eqn lit with 
+  | Some (l, r, true) when is_pure_var lit && is_pos lit -> Some(_as_var l,_as_var r)
+  | _ -> None

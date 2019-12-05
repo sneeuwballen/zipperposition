@@ -13,8 +13,8 @@ let cons a b = Lazy.from_val (Cons (a, b))
 
 let of_fun f =
   let rec aux i = lazy (match f i with
-    | None -> Nil
-    | Some x -> Cons (x, aux (i+1)))
+      | None -> Nil
+      | Some x -> Cons (x, aux (i+1)))
   in
   aux 0
 
@@ -22,8 +22,8 @@ let rec take n l =
   if n=0 then nil
   else lazy (
     match l with
-      | lazy Nil -> Nil
-      | lazy (Cons (x,tl)) -> Cons (x, take (n-1) tl)
+    | lazy Nil -> Nil
+    | lazy (Cons (x,tl)) -> Cons (x, take (n-1) tl)
   )
 
 let rec to_list = function

@@ -109,7 +109,7 @@ let subst1 (v:var) (t:term) (f:t): t =
 let variant_ ~subst (f1,sc1)(f2,sc2): _ Iter.t =
   Unif.unif_list_com ~size:`Same subst
     ~op:(fun subst c1 c2 k ->
-      Literals.variant ~subst c1 c2 (fun (subst,_tags) -> k subst))
+        Literals.variant ~subst c1 c2 (fun (subst,_tags) -> k subst))
     (f1.cs,sc1)(f2.cs,sc2)
 
 let are_variant f1 f2: bool =

@@ -126,15 +126,15 @@ let rec compare t1 t2 =
     | Var s1, Var s2 -> Var.compare s1 s2
     | Const s1, Const s2 -> ID.compare s1 s2
     | App (s1,l1), App (s2, l2) ->
-        compare s1 s2
-        <?> (CCOrd.list compare, l1, l2)
+      compare s1 s2
+      <?> (CCOrd.list compare, l1, l2)
     | Bind (s1, v1, t1), Bind (s2, v2, t2) ->
-        Binder.compare s1 s2
-        <?> (Var.compare, v1, v2)
-        <?> (compare, t1, t2)
+      Binder.compare s1 s2
+      <?> (Var.compare, v1, v2)
+      <?> (compare, t1, t2)
     | AppBuiltin (b1,l1), AppBuiltin (b2,l2) ->
-        Builtin.compare b1 b2
-        <?> (CCOrd.list compare, l1, l2)
+      Builtin.compare b1 b2
+      <?> (CCOrd.list compare, l1, l2)
     | Multiset l1, Multiset l2 ->
       let l1 = List.sort compare l1 and l2 = List.sort compare l2 in
       CCOrd.list compare l1 l2
@@ -148,13 +148,13 @@ let rec compare t1 t2 =
       CCList.compare compare [a1;b1;c1] [a2;b2;c2]
     | Let (l1,t1), Let (l2,t2) ->
       CCOrd.( compare t1 t2
-        <?> (list (pair Var.compare compare), l1, l2))
+              <?> (list (pair Var.compare compare), l1, l2))
     | Match (u1,l1), Match (u2,l2) ->
       let cmp_branch (c1,vars1,rhs1) (c2,vars2,rhs2) =
         CCOrd.(ID.compare c1.cstor_id c2.cstor_id
-          <?> (list compare, c1.cstor_args, c2.cstor_args)
-          <?> (list Var.compare, vars1,vars2)
-          <?> (compare,rhs1,rhs2))
+               <?> (list compare, c1.cstor_args, c2.cstor_args)
+               <?> (list Var.compare, vars1,vars2)
+               <?> (compare,rhs1,rhs2))
       in
       CCOrd.( compare u1 u2 <?> (list cmp_branch,l1,l2))
     | Var _, _
@@ -264,8 +264,8 @@ and pp_infix_ b out l = match l with
 and pp_var_ty out v =
   let ty = Var.ty v in
   match view ty with
-    | AppBuiltin (Builtin.Term, []) -> ()
-    | _ -> Format.fprintf out ":%a" pp_inner ty
+  | AppBuiltin (Builtin.Term, []) -> ()
+  | _ -> Format.fprintf out ":%a" pp_inner ty
 
 let pp_with_ty out t = Format.fprintf out "(@[%a@,:%a@])" pp t pp (ty_exn t)
 
@@ -301,11 +301,11 @@ let app_builtin ?loc ~ty b (l:t list) =
         | _ -> mk_ b l
       end
     | Builtin.Arrow, ret1 :: args1 -> 
-        begin match view ret1 with 
-          | AppBuiltin (Builtin.Arrow, ret2 :: args2) -> 
-            mk_ Builtin.Arrow (ret2 :: args1 @ args2)
-          | _ -> mk_ b l
-        end
+      begin match view ret1 with 
+        | AppBuiltin (Builtin.Arrow, ret2 :: args2) -> 
+          mk_ Builtin.Arrow (ret2 :: args1 @ args2)
+        | _ -> mk_ b l
+      end
     | _ -> mk_ b l
   end
 
@@ -356,25 +356,25 @@ let record ?loc ~ty l ~rest =
 
 let record_flatten ?loc ~ty l ~rest =
   match CCOpt.map deref rest with
-    | None
-    | Some {term=(Var _ | Meta _); _} ->
-      let l = List.sort cmp_field l in
-      make_ ?loc ~ty (Record (l, rest))
-    | Some {term=Record (l', rest'); _} ->
-      let l = List.sort cmp_field (l@l') in
-      check_no_dup_ [] l;
-      make_ ?loc ~ty (Record(l, rest'))
-    | Some t' ->
-      ill_formedf "ill-formed record row: @[%a@]" pp t'
+  | None
+  | Some {term=(Var _ | Meta _); _} ->
+    let l = List.sort cmp_field l in
+    make_ ?loc ~ty (Record (l, rest))
+  | Some {term=Record (l', rest'); _} ->
+    let l = List.sort cmp_field (l@l') in
+    check_no_dup_ [] l;
+    make_ ?loc ~ty (Record(l, rest'))
+  | Some t' ->
+    ill_formedf "ill-formed record row: @[%a@]" pp t'
 
 let at_loc ?loc t = {t with loc; }
 let with_ty ~ty t = {t with ty=Some ty; }
 let map_ty t ~f =
   {t with
-     hash= ~-1;
-     ty=match t.ty with
-       | None -> None
-       | Some x -> Some (f x)
+   hash= ~-1;
+   ty=match t.ty with
+     | None -> None
+     | Some x -> Some (f x)
   }
 
 let of_string ?loc ~ty s = const ?loc ~ty (ID.make s)
@@ -404,21 +404,21 @@ module Seq = struct
       k t;
       CCOpt.iter iter t.ty;
       match (deref t).term with
-        | Meta _
-        | Var _
-        | Const _ -> ()
-        | App (f, l) -> iter f; List.iter iter l
-        | Bind (_, v, t') -> iter (Var.ty v); iter t'
-        | Record (l, rest) ->
-          CCOpt.iter iter rest;
-          List.iter (fun (_,t) -> iter t) l
-        | Ite (a,b,c) -> iter a; iter b; iter c
-        | Let (l,u) -> iter u; List.iter (fun (_,t) -> iter t) l
-        | Match (u,l) ->
-          iter u;
-          List.iter (fun (_,_,t) -> iter t) l
-        | AppBuiltin (_,l)
-        | Multiset l -> List.iter iter l
+      | Meta _
+      | Var _
+      | Const _ -> ()
+      | App (f, l) -> iter f; List.iter iter l
+      | Bind (_, v, t') -> iter (Var.ty v); iter t'
+      | Record (l, rest) ->
+        CCOpt.iter iter rest;
+        List.iter (fun (_,t) -> iter t) l
+      | Ite (a,b,c) -> iter a; iter b; iter c
+      | Let (l,u) -> iter u; List.iter (fun (_,t) -> iter t) l
+      | Match (u,l) ->
+        iter u;
+        List.iter (fun (_,_,t) -> iter t) l
+      | AppBuiltin (_,l)
+      | Multiset l -> List.iter iter l
     in iter t
 
   let vars t =
@@ -442,33 +442,33 @@ module Seq = struct
       k (t,set);
       CCOpt.iter (iter set) t.ty;
       match view t with
-        | Meta _
-        | Var _
-        | Const _ -> ()
-        | App (f, l) -> iter set f; List.iter (iter set) l
-        | Ite (a,b,c) -> iter set a; iter set b; iter set c
-        | Let (l,u) ->
-          let set' =
-            List.fold_left
-              (fun bound' (v,u) -> iter set u; Var.Set.add bound' v)
-              set l
-          in
-          iter set' u
-        | Match (u,l) ->
-          iter set u;
-          List.iter
-            (fun (_,vars,t) ->
-               let set = List.fold_left Var.Set.add set vars in
-               iter set t)
-            l
-        | Bind (_, v, t') ->
-          let set' = Var.Set.add set v in
-          iter set (Var.ty v); iter set' t'
-        | Record (l, rest) ->
-          CCOpt.iter (iter set) rest;
-          List.iter (fun (_,t) -> iter set t) l
-        | AppBuiltin (_,l)
-        | Multiset l -> List.iter (iter set) l
+      | Meta _
+      | Var _
+      | Const _ -> ()
+      | App (f, l) -> iter set f; List.iter (iter set) l
+      | Ite (a,b,c) -> iter set a; iter set b; iter set c
+      | Let (l,u) ->
+        let set' =
+          List.fold_left
+            (fun bound' (v,u) -> iter set u; Var.Set.add bound' v)
+            set l
+        in
+        iter set' u
+      | Match (u,l) ->
+        iter set u;
+        List.iter
+          (fun (_,vars,t) ->
+             let set = List.fold_left Var.Set.add set vars in
+             iter set t)
+          l
+      | Bind (_, v, t') ->
+        let set' = Var.Set.add set v in
+        iter set (Var.ty v); iter set' t'
+      | Record (l, rest) ->
+        CCOpt.iter (iter set) rest;
+        List.iter (fun (_,t) -> iter set t) l
+      | AppBuiltin (_,l)
+      | Multiset l -> List.iter (iter set) l
     in
     iter Var.Set.empty t
 
@@ -484,25 +484,25 @@ let rec is_ground t =
   CCOpt.map_or is_ground ~default:true t.ty
   &&
   match t.term with
-    | Var _ -> false
-    | Const _ -> true
-    | App (f, l) -> is_ground f && List.for_all is_ground l
-    | AppBuiltin (_,l) -> List.for_all is_ground l
-    | Ite (a,b,c) -> is_ground a && is_ground b && is_ground c
-    | Let (l,u) ->
-      is_ground u
-      &&
-      List.for_all (fun (_,t) -> is_ground t) l
-    | Match (u,l) ->
-      is_ground u &&
-      List.for_all (fun (_,_,t) -> is_ground t) l
-    | Bind (_, v, t') -> is_ground (Var.ty v) && is_ground t'
-    | Record (l, rest) ->
-      CCOpt.map_or is_ground ~default:true rest
-      &&
-      List.for_all (fun (_,t') -> is_ground t') l
-    | Multiset l -> List.for_all is_ground l
-    | Meta _ -> false
+  | Var _ -> false
+  | Const _ -> true
+  | App (f, l) -> is_ground f && List.for_all is_ground l
+  | AppBuiltin (_,l) -> List.for_all is_ground l
+  | Ite (a,b,c) -> is_ground a && is_ground b && is_ground c
+  | Let (l,u) ->
+    is_ground u
+    &&
+    List.for_all (fun (_,t) -> is_ground t) l
+  | Match (u,l) ->
+    is_ground u &&
+    List.for_all (fun (_,_,t) -> is_ground t) l
+  | Bind (_, v, t') -> is_ground (Var.ty v) && is_ground t'
+  | Record (l, rest) ->
+    CCOpt.map_or is_ground ~default:true rest
+    &&
+    List.for_all (fun (_,t') -> is_ground t') l
+  | Multiset l -> List.for_all is_ground l
+  | Meta _ -> false
 
 let var_occurs ~var t =
   Seq.vars t
@@ -533,7 +533,7 @@ let close_with_vars vars t =
   let vars = List.map (fun v -> match view v with
       | Var v -> v
       | _ -> invalid_arg "has to be a variable" ) 
-    vars in
+      vars in
   bind_list Binder.Forall vars t ~ty:prop
 
 let unfold_fun = unfold_binder Binder.Lambda
@@ -892,8 +892,8 @@ module Form = struct
     forall_l ?loc tyvars (forall_l ?loc vars f)
 
   let is_var = function 
-  | Atom x -> is_var x
-  | _ -> false
+    | Atom x -> is_var x
+    | _ -> false
 end
 
 let _l_counter = ref 0
@@ -959,19 +959,19 @@ module Subst = struct
     subst, v'
   and eval_var ~rename_binders ~recursive ~t subst v =
     begin match Var.Subst.find subst v with
-        | None ->
-          var ?loc:t.loc (Var.update_ty v ~f:(eval_ ~recursive ~rename_binders subst))
-        | Some t' ->
-          if not (t != t') then (
-            Format.printf "faulty subst:@ %a.\n" pp subst;
-            assert(false);
-          );
-          if recursive then (eval_ ~recursive ~rename_binders subst t') else (t')
+      | None ->
+        var ?loc:t.loc (Var.update_ty v ~f:(eval_ ~recursive ~rename_binders subst))
+      | Some t' ->
+        if not (t != t') then (
+          Format.printf "faulty subst:@ %a.\n" pp subst;
+          assert(false);
+        );
+        if recursive then (eval_ ~recursive ~rename_binders subst t') else (t')
     end
   and eval_binders ~rename_binders ~recursive ~t subst v =
     subst, match view (eval_var ~recursive ~rename_binders ~t subst v) with
-           | Var v' -> v'
-           | _ -> invalid_arg "binder must be evaluated to a variable"
+    | Var v' -> v'
+    | _ -> invalid_arg "binder must be evaluated to a variable"
 
   let eval ?(rename_binders=true) subst t = if is_empty subst then t else eval_ ~rename_binders ~recursive:true subst t
 
@@ -1002,31 +1002,31 @@ and bind_rename_var subst v =
 let rename_all_vars t = rename Subst.empty t
 
 let rec rectify_aux ?(pref="v_") ~cnt ~subst t =
-    let t_ty = ty_exn t in
-    match view t with
-    | Const _ -> (t, subst)
-    | Var v -> 
-      let (t,subst,_) = handle_var ~pref ~cnt ~subst v t_ty in (t,subst)
-    | App (hd, fs) -> 
-      let ts, subst = rec_aux_l ~cnt ~subst (hd :: fs) in
-      let hd = List.hd ts and args = List.tl ts in
-      app ~ty:t_ty hd args, subst
-    | Bind(b, v_old, body) ->  
-      let old = Subst.find subst v_old in
-      let (_,subst,v) = handle_var ~rename:false ~pref ~cnt ~subst v_old t_ty in
-      let (body, subst) = rectify_aux ~cnt ~subst body in
-      bind ~ty:t_ty b v body, (if CCOpt.is_none old then Subst.remove subst v_old
-                               else Subst.add subst v_old (CCOpt.get_exn old))
-    | AppBuiltin(b, fs) ->
-      let fs, subst = rec_aux_l ~cnt ~subst fs in
-      app_builtin ~ty:t_ty b fs, subst
-    | _ -> t, subst
+  let t_ty = ty_exn t in
+  match view t with
+  | Const _ -> (t, subst)
+  | Var v -> 
+    let (t,subst,_) = handle_var ~pref ~cnt ~subst v t_ty in (t,subst)
+  | App (hd, fs) -> 
+    let ts, subst = rec_aux_l ~cnt ~subst (hd :: fs) in
+    let hd = List.hd ts and args = List.tl ts in
+    app ~ty:t_ty hd args, subst
+  | Bind(b, v_old, body) ->  
+    let old = Subst.find subst v_old in
+    let (_,subst,v) = handle_var ~rename:false ~pref ~cnt ~subst v_old t_ty in
+    let (body, subst) = rectify_aux ~cnt ~subst body in
+    bind ~ty:t_ty b v body, (if CCOpt.is_none old then Subst.remove subst v_old
+                             else Subst.add subst v_old (CCOpt.get_exn old))
+  | AppBuiltin(b, fs) ->
+    let fs, subst = rec_aux_l ~cnt ~subst fs in
+    app_builtin ~ty:t_ty b fs, subst
+  | _ -> t, subst
 and rec_aux_l ?(pref="v_") ~cnt ~subst args =
   ignore(pref);
   List.fold_right (fun arg (tmp,subst) -> 
-    let arg', subst' = rectify_aux ~subst ~cnt arg in
-    arg' :: tmp, subst'
-  ) args ([], subst)
+      let arg', subst' = rectify_aux ~subst ~cnt arg in
+      arg' :: tmp, subst'
+    ) args ([], subst)
 and handle_var ~pref ?(rename=true) ~cnt ~subst v t_ty = 
   ignore(pref);
   if rename && Subst.mem subst v then (Subst.find_exn subst v, subst, v) else (
@@ -1053,8 +1053,8 @@ let rec lift_lambdas  f =
     let hd', hd_def = aux hd in
     let fs', all_defs = 
       List.fold_right (fun f (args, defs) -> 
-        let f', new_defs = aux f in
-        (f'::args, new_defs @ defs)) fs ([],hd_def) in
+          let f', new_defs = aux f in
+          (f'::args, new_defs @ defs)) fs ([],hd_def) in
     if not (CCList.is_empty all_defs) then (
       app ~ty hd' fs', all_defs
     ) else f, []
@@ -1077,8 +1077,8 @@ let rec lift_lambdas  f =
   | AppBuiltin(b, fs) ->
     let fs', all_defs = 
       List.fold_right (fun f (args, defs) -> 
-        let f', new_defs = aux f in
-        (f'::args, new_defs @ defs)) fs ([],[]) in
+          let f', new_defs = aux f in
+          (f'::args, new_defs @ defs)) fs ([],[]) in
     if not (CCList.is_empty all_defs) then (
       app_builtin ~ty b fs', all_defs
     ) else f, []
@@ -1090,9 +1090,9 @@ and define_lambda_of ~bound ~free body =
   let rec_body, recitifier = rectify ~cnt ~subst:rectifier body in
 
   let eval_vars vs  = List.map (fun v -> 
-    match view (Subst.eval recitifier v) with 
-    | Var v -> v
-    | _ -> invalid_arg "substitution is not a rectifier")  vs in
+      match view (Subst.eval recitifier v) with 
+      | Var v -> v
+      | _ -> invalid_arg "substitution is not a rectifier")  vs in
   let rec_bound = eval_vars rec_bound and rec_free = eval_vars rec_free in
   let closed  = fun_l (rec_free @ rec_bound) rec_body in
   let args = List.map (fun v -> var v) (free @ bound) in
@@ -1113,15 +1113,15 @@ and define_lambda_of ~bound ~free body =
     let (_, def) as res = apply_to_new_hd new_id free bound body args in
     Tbl.add _lam_ids closed (new_id,def);
     res
-  and apply_to_new_hd new_id free bound body args =
-    let body_ty = ty_exn body in
-    let ll_sym_ty = Ty.mk_fun_ (List.map ty_exn args) body_ty in
-    let lam_const = const ~ty:ll_sym_ty new_id in
-    let replacement_ty =  Ty.mk_fun_ (List.map Var.ty free) body_ty in
-    let replacement = app ~ty:replacement_ty lam_const (List.map (fun v -> var v) free) in
-    let new_pred = app ~ty:body_ty lam_const args in
-    let def_form = Form.forall_l (free @ bound) (Form.eq_or_equiv new_pred body) in
-    replacement,def_form
+and apply_to_new_hd new_id free bound body args =
+  let body_ty = ty_exn body in
+  let ll_sym_ty = Ty.mk_fun_ (List.map ty_exn args) body_ty in
+  let lam_const = const ~ty:ll_sym_ty new_id in
+  let replacement_ty =  Ty.mk_fun_ (List.map Var.ty free) body_ty in
+  let replacement = app ~ty:replacement_ty lam_const (List.map (fun v -> var v) free) in
+  let new_pred = app ~ty:body_ty lam_const args in
+  let def_form = Form.forall_l (free @ bound) (Form.eq_or_equiv new_pred body) in
+  replacement,def_form
 
 
 (* apply and reduce *)
@@ -1165,8 +1165,8 @@ module UStack = struct
     let rec unwind l size i =
       if size>i then
         match l with
-          | [] -> assert false
-          | r :: l' -> r := None; unwind l' (size-1) i
+        | [] -> assert false
+        | r :: l' -> r := None; unwind l' (size-1) i
       else l
     in
     if i<t.size then (
@@ -1217,38 +1217,38 @@ let occur_check_ ~allow_open ~subst v t =
     v == t ||
     CCOpt.map_or (check bound) ~default:false t.ty ||
     match view t with
-      | Meta _ -> equal v t
-      | Var v' ->
-        begin match Subst.find subst v' with
-          | None -> not allow_open && not (Var.Set.mem bound v')
-          | Some t' -> check bound t'
-        end
-      | Ite (a,b,c) -> check bound a || check bound b || check bound c
-      | Let (l,u) ->
-        List.exists (fun (_,t) -> check bound t) l
-        ||
-        let bound = List.fold_left (fun set (v,_) -> Var.Set.add set v) bound l in
-        check bound u
-      | Match (u, l) ->
-        check bound u
-        ||
-        List.exists
-          (fun (_, vars, rhs) ->
-             let bound =
-               if allow_open then bound else List.fold_left Var.Set.add bound vars
-             in
-             check bound rhs)
-          l
-      | Const _ -> false
-      | App (f, l) -> check bound f || List.exists (check bound) l
-      | Bind (_, v, t) ->
-        check bound v.Var.ty
-        || check (if allow_open then bound else Var.Set.add bound v) t
-      | AppBuiltin (_,l)
-      | Multiset l -> List.exists (check bound) l
-      | Record (l, rest) ->
-        CCOpt.map_or (check bound) ~default:false rest ||
-        List.exists (fun (_,t) -> check bound t) l
+    | Meta _ -> equal v t
+    | Var v' ->
+      begin match Subst.find subst v' with
+        | None -> not allow_open && not (Var.Set.mem bound v')
+        | Some t' -> check bound t'
+      end
+    | Ite (a,b,c) -> check bound a || check bound b || check bound c
+    | Let (l,u) ->
+      List.exists (fun (_,t) -> check bound t) l
+      ||
+      let bound = List.fold_left (fun set (v,_) -> Var.Set.add set v) bound l in
+      check bound u
+    | Match (u, l) ->
+      check bound u
+      ||
+      List.exists
+        (fun (_, vars, rhs) ->
+           let bound =
+             if allow_open then bound else List.fold_left Var.Set.add bound vars
+           in
+           check bound rhs)
+        l
+    | Const _ -> false
+    | App (f, l) -> check bound f || List.exists (check bound) l
+    | Bind (_, v, t) ->
+      check bound v.Var.ty
+      || check (if allow_open then bound else Var.Set.add bound v) t
+    | AppBuiltin (_,l)
+    | Multiset l -> List.exists (check bound) l
+    | Record (l, rest) ->
+      CCOpt.map_or (check bound) ~default:false rest ||
+      List.exists (fun (_,t) -> check bound t) l
   in
   check Var.Set.empty t
 
@@ -1541,24 +1541,24 @@ let try_alpha_renaming f1 f2 =
       match view f1, view f2 with
       | Var v, Var v' ->
         begin match Subst.find subst v with 
-        | Some t -> begin match view t with
-            | Var v'' when Var.equal v' v'' -> aux subst rest
-            | _ -> raise (UnifyFailure ("double binding",[],None)) end
-        | None -> if not (Var.equal v v') then aux (Subst.add subst v f2) rest 
-                  else aux subst rest end
+          | Some t -> begin match view t with
+              | Var v'' when Var.equal v' v'' -> aux subst rest
+              | _ -> raise (UnifyFailure ("double binding",[],None)) end
+          | None -> if not (Var.equal v v') then aux (Subst.add subst v f2) rest 
+            else aux subst rest end
       | Const x, Const y when ID.equal x y -> aux subst rest
       | App(hd_x, xs), App (hd_y, ys) when List.length xs = List.length ys ->
         (* head might be a lambda or a const, delegate solving it to
-          the same algorithm *)
+           the same algorithm *)
         let args = List.combine (hd_x :: xs) (hd_y :: ys) in
         aux subst (args @ rest)
       | AppBuiltin(hd_x, xs), AppBuiltin(hd_y, ys) 
-          when Builtin.equal hd_x hd_y && List.length xs = List.length ys ->
+        when Builtin.equal hd_x hd_y && List.length xs = List.length ys ->
         aux subst ((List.combine xs ys) @ rest)
       | Bind(b, v, body), Bind(b', v', body') when Binder.equal b b' ->
         assert(CCOpt.is_none (Subst.find subst v));
         let subst = if not (Var.equal v v') then Subst.add subst v (var v') 
-                    else subst in
+          else subst in
         aux subst ((body, body') ::  rest)
       | _ -> raise (UnifyFailure ("unknown constructors",[],None)) 
   in
@@ -1569,7 +1569,7 @@ let try_alpha_renaming f1 f2 =
   with UnifyFailure (msg, _, _) ->
     Util.debugf 1 "Alpha renaming failed: %s@." (fun k -> k msg);
     None
-      
+
 
 (** {2 Conversion} *)
 

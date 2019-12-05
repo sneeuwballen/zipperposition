@@ -114,13 +114,13 @@ let fail msg _ = E.Error msg
 
 let bind x ~f st =
   match x st with
-    | E.Ok (st, x) -> f x st
-    | E.Error msg -> E.Error msg  (*  cut evaluation *)
+  | E.Ok (st, x) -> f x st
+  | E.Error msg -> E.Error msg  (*  cut evaluation *)
 
 let bind_err e ~f st =
   match e with
-    | E.Ok x -> f x st
-    | E.Error msg -> fail msg st (*  cut evaluation *)
+  | E.Ok x -> f x st
+  | E.Error msg -> fail msg st (*  cut evaluation *)
 
 let map x ~f st = match x st with
   | E.Error msg -> E.Error msg
@@ -174,8 +174,8 @@ let get st = E.Ok (st, st)
 
 let get_key k st =
   match Flex_state.get k st with
-    | None -> E.Error "key not found"
-    | Some v -> E.Ok (st, v)
+  | None -> E.Error "key not found"
+  | Some v -> E.Ok (st, v)
 
 let set new_st _st = E.Ok (new_st, ())
 

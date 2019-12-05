@@ -384,9 +384,9 @@ end
 (* data flow for induction:
 
    1) Introduce lemmas
-     - some lemmas come directly from the input, and are directly
+   - some lemmas come directly from the input, and are directly
        asserted in Avatar
-     - some other lemmas are "guessed" from regular clauses that
+   - some other lemmas are "guessed" from regular clauses that
        contain inductive skolems. From these clauses (where we do not know
        what to do with these skolems in general), a lemma is
        built by negating the clauses and replacing the skolems by fresh
@@ -394,9 +394,9 @@ end
 
        The goals obtained from this second source (given clauses)
        are pre-processed:
-       - they are tested (see {!Test_prop}) to avoid trying to prove
+   - they are tested (see {!Test_prop}) to avoid trying to prove
          trivially false lemmas
-       - they might be generalized using a collection of heuristics.
+   - they might be generalized using a collection of heuristics.
          Each generalization is also tested.
 
        Then, the surviving goals are added to Avatar using [A.introduce_cut].
@@ -440,9 +440,9 @@ module Make
 
   let is_ind_conjecture_ c =
     match C.distance_to_goal c with
-      | Some (0 | 1) -> true
-      | Some _
-      | None -> false
+    | Some (0 | 1) -> true
+    | Some _
+    | None -> false
 
   let has_pos_lit_ c = CCArray.exists Literal.is_pos (C.lits c)
 
@@ -549,9 +549,9 @@ module Make
     let clauses =
       Util.map_product c_sets
         ~f:(fun (v,set) ->
-          Cover_set.cases ~which:`All set
-          |> Iter.to_list
-          |> List.map (fun case -> [v,case]))
+            Cover_set.cases ~which:`All set
+            |> Iter.to_list
+            |> List.map (fun case -> [v,case]))
       |> CCList.flat_map
         (fun (cases:(T.var * Cover_set.case) list) ->
            assert (cases<>[]);
@@ -563,14 +563,14 @@ module Make
            let pos_clauses =
              Util.seq_map_l cases
                ~f:(fun (v,case) ->
-                 Cover_set.Case.sub_constants case
-                 |> CCList.filter_map
-                   (fun sub_cst ->
-                      (* only keep sub-constants that have the same type as [v] *)
-                      if Type.equal (Ind_cst.ty sub_cst) (HVar.ty v) then (
-                        let t = Ind_cst.to_term sub_cst in
-                        Some (v,t)
-                      ) else None))
+                   Cover_set.Case.sub_constants case
+                   |> CCList.filter_map
+                     (fun sub_cst ->
+                        (* only keep sub-constants that have the same type as [v] *)
+                        if Type.equal (Ind_cst.ty sub_cst) (HVar.ty v) then (
+                          let t = Ind_cst.to_term sub_cst in
+                          Some (v,t)
+                        ) else None))
              |> Iter.flat_map_l
                (fun v_and_t_list ->
                   let subst =
@@ -608,8 +608,8 @@ module Make
                |> Cut_form.cs
                |> Util.map_product
                  ~f:(fun lits ->
-                   let lits = Array.map (fun l -> [Literal.negate l]) lits in
-                   Array.to_list lits)
+                     let lits = Array.map (fun l -> [Literal.negate l]) lits in
+                     Array.to_list lits)
                |> CCList.map
                  (fun l ->
                     let lits = Array.of_list l in
@@ -741,17 +741,17 @@ module Make
 
   (* variable appears only naked, i.e. directly under [=] *)
   let var_always_naked (f:Cut_form.t)(x:T.var): bool =
-      Cut_form.cs f
-      |> Iter.of_list
-      |> Iter.flat_map Iter.of_array
-      |> Iter.for_all
-        (function
-          | Literal.Equation (l,r,_) ->
-            let check_t t = T.is_var t || not (T.var_occurs ~var:x t) in
-            check_t l && check_t r
-          | Literal.Int _ | Literal.Rat _ -> false
-          | Literal.True | Literal.False -> true)
- 
+    Cut_form.cs f
+    |> Iter.of_list
+    |> Iter.flat_map Iter.of_array
+    |> Iter.for_all
+      (function
+        | Literal.Equation (l,r,_) ->
+          let check_t t = T.is_var t || not (T.var_occurs ~var:x t) in
+          check_t l && check_t r
+        | Literal.Int _ | Literal.Rat _ -> false
+        | Literal.True | Literal.False -> true)
+
   let active_subterms_form (f:Cut_form.t): T.t Iter.t =
     Cut_form.cs f
     |> Iter.of_list
@@ -970,17 +970,17 @@ module Make
              |> Iter.filter_map
                (fun ((i1,t1),(i2,t2)) ->
                   match T.as_var t1, T.as_var t2 with
-                    | Some x, Some y
-                      when
-                        i1 < i2 &&
-                        IArray.get pos i1 = Defined_pos.P_active &&
-                        IArray.get pos i2 = Defined_pos.P_active &&
-                        not (eq_var x y) &&
-                        CCList.mem ~eq:eq_var x vars &&
-                        CCList.mem ~eq:eq_var y vars
-                      ->
-                      Some (x,y)
-                    | _ -> None)
+                  | Some x, Some y
+                    when
+                      i1 < i2 &&
+                      IArray.get pos i1 = Defined_pos.P_active &&
+                      IArray.get pos i2 = Defined_pos.P_active &&
+                      not (eq_var x y) &&
+                      CCList.mem ~eq:eq_var x vars &&
+                      CCList.mem ~eq:eq_var y vars
+                    ->
+                    Some (x,y)
+                  | _ -> None)
              |> Iter.iter
                (fun (x,y) ->
                   assert (not (eq_var x y));
@@ -1108,19 +1108,19 @@ module Make
         cs
         |> Util.map_product
           ~f:(fun lits ->
-            let lits_l = Array.to_list lits in
-            (* separate the guard (constraints) from other literals *)
-            let guard, other_lits =
-              List.partition Literal.is_constraint lits_l
-            in
-            let replace_lits =
-              List.map (Literal.map (fun t -> T.replace_m t pairs))
-            in
-            let guard = replace_lits guard in
-            let other_lits = replace_lits other_lits in
-            List.map
-              (fun other_lit -> Literal.negate other_lit :: guard)
-              other_lits)
+              let lits_l = Array.to_list lits in
+              (* separate the guard (constraints) from other literals *)
+              let guard, other_lits =
+                List.partition Literal.is_constraint lits_l
+              in
+              let replace_lits =
+                List.map (Literal.map (fun t -> T.replace_m t pairs))
+              in
+              let guard = replace_lits guard in
+              let other_lits = replace_lits other_lits in
+              List.map
+                (fun other_lit -> Literal.negate other_lit :: guard)
+                other_lits)
         |> List.map Array.of_list
         |> Goal.of_form
       end
@@ -1184,8 +1184,8 @@ module Make
              let cut =
                A.introduce_cut ~penalty ~depth (Goal.form goal) proof
                  ~reason:Fmt.(fun out () -> fprintf out
-                       "(@[prove_ind@ :clauses (@[%a@])@ :on (@[%a@])@])"
-                       (Util.pp_list C.pp) clauses pp_csts generalize_on)
+                                 "(@[prove_ind@ :clauses (@[%a@])@ :on (@[%a@])@])"
+                                 (Util.pp_list C.pp) clauses pp_csts generalize_on)
              in
              A.add_lemma cut
            ))
@@ -1362,9 +1362,9 @@ let env_action (module E : Env.S) =
 let extension =
   Extensions.(
     {default with
-       name="induction_simple";
-       post_typing_actions=[post_typing_hook];
-       env_actions=[env_action];
+     name="induction_simple";
+     post_typing_actions=[post_typing_hook];
+     env_actions=[env_action];
     })
 
 let () =
@@ -1384,14 +1384,14 @@ let () =
     ; "--no-ind-gen-term", Arg.Clear gen_term, " do not generalize on terms"
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
-    enabled_ := false
-  );
+      enabled_ := false
+    );
   Params.add_to_mode "ho-pragmatic" (fun () ->
-    enabled_ := false
-  );
+      enabled_ := false
+    );
   Params.add_to_mode "ho-competitive" (fun () ->
-    enabled_ := false
-  );
+      enabled_ := false
+    );
   Params.add_to_mode "fo-complete-basic" (fun () ->
-    enabled_ := false
-  );
+      enabled_ := false
+    );

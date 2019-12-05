@@ -170,7 +170,7 @@ let esa f name ps = mk_ f (Esa (name,ps))
 
 let inference ~intros ~local_intros ~tags f name ps : t =
   mk_ f (Inference
-      {name;intros;local_intros;parents=ps;tags})
+           {name;intros;local_intros;parents=ps;tags})
 
 let get_check_res t = t.checked
 let set_check_res t r = t.checked <- Some r
@@ -231,21 +231,21 @@ module Dot = struct
       ~name
       ~graph:as_graph
       ~attrs_v:(fun p ->
-        let top, b_color = match get_check_res p with
-          | None -> "[no-check]", []
-          | Some R_ok -> "[check ✔]", [`Color "green"; `Other ("penwidth", "6")]
-          | Some R_fail -> "[check ×]", [`Color "red"; `Other ("penwidth", "8")]
-          | Some R_skip -> "[check ø]", [`Color "yellow"]
-        in
-        let label = _to_str_escape "@[<v>%s@,@[<2>%a@]@]@." top T.pp (concl p) in
-        let attrs = [`Label label; `Style "filled"] in
-        let shape = `Shape "box" in
-        let color = match color p with None -> [] | Some c -> [`Other ("fillcolor", c)] in
-        shape :: color @ b_color @ attrs
-      )
+          let top, b_color = match get_check_res p with
+            | None -> "[no-check]", []
+            | Some R_ok -> "[check ✔]", [`Color "green"; `Other ("penwidth", "6")]
+            | Some R_fail -> "[check ×]", [`Color "red"; `Other ("penwidth", "8")]
+            | Some R_skip -> "[check ø]", [`Color "yellow"]
+          in
+          let label = _to_str_escape "@[<v>%s@,@[<2>%a@]@]@." top T.pp (concl p) in
+          let attrs = [`Label label; `Style "filled"] in
+          let shape = `Shape "box" in
+          let color = match color p with None -> [] | Some c -> [`Other ("fillcolor", c)] in
+          shape :: color @ b_color @ attrs
+        )
       ~attrs_e:(fun (r,inst) ->
-        let label = _to_str_escape "@[<v>%s%a@]@." r pp_inst_some inst in
-        [`Label label; `Other ("dir", "back")])
+          let label = _to_str_escape "@[<v>%s%a@]@." r pp_inst_some inst in
+          [`Label label; `Other ("dir", "back")])
       out
       seq;
     Format.pp_print_newline out ();

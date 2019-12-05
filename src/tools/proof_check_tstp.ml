@@ -59,8 +59,8 @@ module CheckedTrace = struct
     let l = get ~checked step in
     StepTbl.replace checked.steps step (res :: l);
     match res with
-      | Failed _ -> checked.failures <- (step, res) :: checked.failures
-      | _ -> ()
+    | Failed _ -> checked.failures <- (step, res) :: checked.failures
+    | _ -> ()
 end
 
 (* can we avoid checking this proof step? *)
@@ -71,8 +71,8 @@ let _do_not_check proof = match proof with
   | TT.InferForm (_, lazy step) ->
     step.TT.esa ||
     match step.TT.parents with
-      | [| a |] when TT.is_axiom a -> true  (* axiom *)
-      | _ -> false
+    | [| a |] when TT.is_axiom a -> true  (* axiom *)
+    | _ -> false
 
 let slit_to_form = function
   | SLiteral.Atom (t, true) -> t
@@ -121,24 +121,24 @@ let check_step ~timeout ~prover step =
   (* input to feed to the prover *)
   let obligation = mk_proof_obligation step in
   match obligation with
-    | None -> E.return Unchecked  (* nothing to check, no obligation! *)
-    | Some decls ->
-      E.(
-        CallProver.call ~timeout ~prover decls
-        >>= fun res ->
-        let p_name = CallProver.name prover in
-        (* interpret result of the subprover *)
-        let res = match res with
-          | CallProver.Unsat -> Succeeded p_name
-          | CallProver.Error e ->
-            Util.debugf 1 "error trying to check %a: %s" (fun k->k TT.pp1 step e);
-            Failed p_name
-          | CallProver.Unknown
-          | CallProver.Sat -> Failed p_name
-        in
-        Util.debugf 1 "step %a: %a" (fun k->k A.pp_name (TT.get_id step) pp_res res);
-        E.return res
-      )
+  | None -> E.return Unchecked  (* nothing to check, no obligation! *)
+  | Some decls ->
+    E.(
+      CallProver.call ~timeout ~prover decls
+      >>= fun res ->
+      let p_name = CallProver.name prover in
+      (* interpret result of the subprover *)
+      let res = match res with
+        | CallProver.Unsat -> Succeeded p_name
+        | CallProver.Error e ->
+          Util.debugf 1 "error trying to check %a: %s" (fun k->k TT.pp1 step e);
+          Failed p_name
+        | CallProver.Unknown
+        | CallProver.Sat -> Failed p_name
+      in
+      Util.debugf 1 "step %a: %a" (fun k->k A.pp_name (TT.get_id step) pp_res res);
+      E.return res
+    )
 
 (* print progress in proof checking *)
 let pp_progress num total =
@@ -162,10 +162,10 @@ let check_all ~progress ~provers ~timeout ~checked =
            (fun prover ->
               (* check step with prover *)
               match  check_step ~timeout ~prover step with
-                | E.Ok res ->
-                  CheckedTrace.add ~checked step res
-                | E.Error msg ->
-                  failwith msg)
+              | E.Ok res ->
+                CheckedTrace.add ~checked step res
+              | E.Error msg ->
+                failwith msg)
            provers);
     (* clean line of progress *)
     if progress then Printf.printf "                                      \n";
@@ -280,7 +280,7 @@ let () =
   CCFormat.set_color_default true;
   parse_args ();
   match main !file with
-    | E.Ok () -> ()
-    | E.Error msg ->
-      print_endline msg;
-      exit 1
+  | E.Ok () -> ()
+  | E.Error msg ->
+    print_endline msg;
+    exit 1

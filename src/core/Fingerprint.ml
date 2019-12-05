@@ -32,7 +32,7 @@ let expand_otf_ body =
   if CCList.is_empty extra_args then body else (
     let n = List.length extra_args in
     T.app (T.DB.shift n body) 
-          (List.mapi (fun i ty -> T.bvar ~ty (n-1-i)) extra_args)
+      (List.mapi (fun i ty -> T.bvar ~ty (n-1-i)) extra_args)
   )
 
 (* compute a feature for a given position *)
@@ -45,25 +45,25 @@ let rec gfpf ?(depth=0) pos t =
     let body = expand_otf_ body in
     gfpf_root ~depth:(depth + exp_args_num) body
   | i::is ->
-      let hd, args = T.as_app body in
-      let args = List.filter (fun x -> not @@ T.is_type x) args in
-      (*                 if we are sampling something of variable type, it might eta-expand *)
-      if T.is_var hd || (Type.is_var (snd (Type.open_fun (Term.ty body)))) then B
-      else (
-        let num_acutal_args = List.length args in
-        let extra_args,_ = Type.open_fun (T.ty body) in  (* arguments for eta-expansion *)
+    let hd, args = T.as_app body in
+    let args = List.filter (fun x -> not @@ T.is_type x) args in
+    (*                 if we are sampling something of variable type, it might eta-expand *)
+    if T.is_var hd || (Type.is_var (snd (Type.open_fun (Term.ty body)))) then B
+    else (
+      let num_acutal_args = List.length args in
+      let extra_args,_ = Type.open_fun (T.ty body) in  (* arguments for eta-expansion *)
 
-        if num_acutal_args >= i then (
-          let arg = T.DB.shift (List.length extra_args) (List.nth args (i-1)) in
-          gfpf ~depth:(depth + exp_args_num) is arg
-        ) 
-        else if num_acutal_args + (List.length extra_args) >= i then (
-          let exp_arg_idx = i - num_acutal_args in
-          let db_ty = List.nth extra_args (exp_arg_idx-1) in
-          let arg = T.bvar (List.length extra_args - exp_arg_idx) ~ty:db_ty in
-          gfpf ~depth:(depth + exp_args_num) is arg) 
-        else N
-      )
+      if num_acutal_args >= i then (
+        let arg = T.DB.shift (List.length extra_args) (List.nth args (i-1)) in
+        gfpf ~depth:(depth + exp_args_num) is arg
+      ) 
+      else if num_acutal_args + (List.length extra_args) >= i then (
+        let exp_arg_idx = i - num_acutal_args in
+        let db_ty = List.nth extra_args (exp_arg_idx-1) in
+        let arg = T.bvar (List.length extra_args - exp_arg_idx) ~ty:db_ty in
+        gfpf ~depth:(depth + exp_args_num) is arg) 
+      else N
+    )
 and gfpf_root ~depth t =
   match T.view t with 
   | T.AppBuiltin(_, _) -> Ignore
@@ -73,11 +73,11 @@ and gfpf_root ~depth t =
   | T.Var _ -> A
   | T.Const c -> S c
   | T.App (hd,_) -> (match T.view hd with
-                         T.Var _ -> A
-                         | T.Const s -> S s
-                         | T.DB i    -> if (i < depth) then DB i else Ignore
-                         | T.AppBuiltin(_,_) -> Ignore
-                         | _ -> assert false)
+        T.Var _ -> A
+      | T.Const s -> S s
+      | T.DB i    -> if (i < depth) then DB i else Ignore
+      | T.AppBuiltin(_,_) -> Ignore
+      | _ -> assert false)
   | T.Fun (_, _) -> assert false
 
 (* TODO more efficient way to compute a vector of s: if the fingerprint
@@ -97,7 +97,7 @@ let fp positions =
   let fpfs = List.map gfpf positions in
   fun t ->
     List.map (fun fpf -> fpf t) fpfs
-    (* Format.printf "@[Fingerprinting:@ @[%a@]=@[%a@].@]\n" T.pp t (CCList.pp pp_feature) res; *)
+(* Format.printf "@[Fingerprinting:@ @[%a@]=@[%a@].@]\n" T.pp t (CCList.pp pp_feature) res; *)
 
 
 (** {2 Fingerprint functions} *)
@@ -138,41 +138,41 @@ let cmp_feature f1 f2 = match f1, f2 with
 let compatible_features_unif f1 f2 =
   match f1 with
   | S s1 -> (match f2 with
-             | S s2 -> ID.equal s1 s2 
-             | A | B | Ignore -> true
-             | N | DB _ -> false)
+      | S s2 -> ID.equal s1 s2 
+      | A | B | Ignore -> true
+      | N | DB _ -> false)
   | Ignore -> true
   | B    -> true
   | A    -> (match f2 with
-             | N  -> false
-             | DB _ | Ignore | S _ | A | B  -> true)
+      | N  -> false
+      | DB _ | Ignore | S _ | A | B  -> true)
   | DB i -> (match f2 with 
-             | DB j -> i = j
-             | B | A | Ignore -> true
-             | S _ | N -> false)
+      | DB j -> i = j
+      | B | A | Ignore -> true
+      | S _ | N -> false)
   | N ->    (match f2 with 
-             | N | B | Ignore -> true
-             | A | DB _ | S _ -> false)
+      | N | B | Ignore -> true
+      | A | DB _ | S _ -> false)
 
 (** check whether two features are compatible for matching. *)
 let compatible_features_match f1 f2 =
   match f1 with
   | S s1 -> (match f2 with
-             | S s2 -> ID.equal s1 s2
-             | Ignore -> true 
-             | _ -> false)
+      | S s2 -> ID.equal s1 s2
+      | Ignore -> true 
+      | _ -> false)
   | Ignore 
   | B    -> true
   | A    -> (match f2 with
-             | A | DB _ | S _ | Ignore -> true
-             | _ -> false)
+      | A | DB _ | S _ | Ignore -> true
+      | _ -> false)
   | DB i -> (match f2 with 
-             | DB j -> i = j
-             | Ignore -> true
-             | _ -> false)
+      | DB j -> i = j
+      | Ignore -> true
+      | _ -> false)
   | N ->    (match f2 with 
-             | N | Ignore -> true
-             | _ -> false)
+      | N | Ignore -> true
+      | _ -> false)
 
 
 (** Map whose keys are features *)
@@ -215,9 +215,9 @@ module Make(X : Set.OrderedType) = struct
   let is_empty idx =
     let rec is_empty trie =
       match trie with
-        | Empty -> true
-        | Leaf l -> Leaf.is_empty l
-        | Node map -> FeatureMap.for_all (fun _ trie' -> is_empty trie') map
+      | Empty -> true
+      | Leaf l -> Leaf.is_empty l
+      | Node map -> FeatureMap.for_all (fun _ trie' -> is_empty trie') map
     in is_empty idx.trie
 
   (** add t -> data to the trie *)
@@ -225,27 +225,27 @@ module Make(X : Set.OrderedType) = struct
     (* recursive insertion *)
     let rec recurse trie features =
       match trie, features with
-        | Empty, [] ->
-          let leaf = Leaf.empty in
-          let leaf = Leaf.add leaf t data in
-          Leaf leaf (* creation of new leaf *)
-        | Empty, f::features' ->
-          let subtrie = recurse Empty features' in
-          let map = FeatureMap.add f subtrie FeatureMap.empty in
-          Node map  (* index new subtrie by feature *)
-        | Node map, f::features' ->
-          let subtrie =
-            try FeatureMap.find f map
-            with Not_found -> Empty in
-          (* insert in subtrie *)
-          let subtrie = recurse subtrie features' in
-          let map = FeatureMap.add f subtrie map in
-          Node map  (* point to new subtrie *)
-        | Leaf leaf, [] ->
-          let leaf = Leaf.add leaf t data in
-          Leaf leaf (* addition to set *)
-        | Node _, [] | Leaf _, _::_ ->
-          failwith "different feature length in fingerprint trie"
+      | Empty, [] ->
+        let leaf = Leaf.empty in
+        let leaf = Leaf.add leaf t data in
+        Leaf leaf (* creation of new leaf *)
+      | Empty, f::features' ->
+        let subtrie = recurse Empty features' in
+        let map = FeatureMap.add f subtrie FeatureMap.empty in
+        Node map  (* index new subtrie by feature *)
+      | Node map, f::features' ->
+        let subtrie =
+          try FeatureMap.find f map
+          with Not_found -> Empty in
+        (* insert in subtrie *)
+        let subtrie = recurse subtrie features' in
+        let map = FeatureMap.add f subtrie map in
+        Node map  (* point to new subtrie *)
+      | Leaf leaf, [] ->
+        let leaf = Leaf.add leaf t data in
+        Leaf leaf (* addition to set *)
+      | Node _, [] | Leaf _, _::_ ->
+        failwith "different feature length in fingerprint trie"
     in
     let features = idx.fp t in  (* features of term *)
     { idx with trie = recurse idx.trie features; }
@@ -259,30 +259,30 @@ module Make(X : Set.OrderedType) = struct
     (* recursive deletion *)
     let rec recurse trie features =
       match trie, features with
-        | Empty, [] | Empty, _::_ ->
-          Empty (* keep it empty *)
-        | Node map, f::features' ->
-          let map =
-            (* delete from subtrie, if there is a subtrie *)
-            try
-              let subtrie = FeatureMap.find f map in
-              let subtrie = recurse subtrie features' in
-              if subtrie = Empty
-              then FeatureMap.remove f map
-              else FeatureMap.add f subtrie map
-            with Not_found -> map
-          in
-          (* if the map is empty, use Empty *)
-          if FeatureMap.is_empty map
-          then Empty
-          else Node map
-        | Leaf leaf, [] ->
-          let leaf = Leaf.remove leaf t data in
-          if Leaf.is_empty leaf
-          then Empty
-          else Leaf leaf
-        | Node _, [] | Leaf _, _::_ ->
-          failwith "different feature length in fingerprint trie"
+      | Empty, [] | Empty, _::_ ->
+        Empty (* keep it empty *)
+      | Node map, f::features' ->
+        let map =
+          (* delete from subtrie, if there is a subtrie *)
+          try
+            let subtrie = FeatureMap.find f map in
+            let subtrie = recurse subtrie features' in
+            if subtrie = Empty
+            then FeatureMap.remove f map
+            else FeatureMap.add f subtrie map
+          with Not_found -> map
+        in
+        (* if the map is empty, use Empty *)
+        if FeatureMap.is_empty map
+        then Empty
+        else Node map
+      | Leaf leaf, [] ->
+        let leaf = Leaf.remove leaf t data in
+        if Leaf.is_empty leaf
+        then Empty
+        else Leaf leaf
+      | Node _, [] | Leaf _, _::_ ->
+        failwith "different feature length in fingerprint trie"
     in
     let features = idx.fp t in  (* features of term *)
     { idx with trie = recurse idx.trie features; }
@@ -319,17 +319,17 @@ module Make(X : Set.OrderedType) = struct
     (* fold on the trie *)
     let rec recurse trie features =
       match trie, features with
-        | Empty, _ -> ()
-        | Leaf leaf, [] ->
-          k leaf  (* give the leaf to [k] *)
-        | Node map, f::features' ->
-          (* fold on any subtrie that is compatible with current feature *)
-          FeatureMap.iter
-            (fun f' subtrie ->
-               if compatible f f' then recurse subtrie features')
-            map
-        | Node _, [] | Leaf _, _::_ ->
-          failwith "different feature length in fingerprint trie"
+      | Empty, _ -> ()
+      | Leaf leaf, [] ->
+        k leaf  (* give the leaf to [k] *)
+      | Node map, f::features' ->
+        (* fold on any subtrie that is compatible with current feature *)
+        FeatureMap.iter
+          (fun f' subtrie ->
+             if compatible f f' then recurse subtrie features')
+          map
+      | Node _, [] | Leaf _, _::_ ->
+        failwith "different feature length in fingerprint trie"
     in
     try
       recurse idx.trie features;
@@ -345,7 +345,7 @@ module Make(X : Set.OrderedType) = struct
       (fun leaf -> fold_unify (leaf,sc_idx) t k)
 
   let retrieve_unifiables = retrieve_unifiables_aux Leaf.fold_unify
-  
+
   let retrieve_unifiables_complete ?(unif_alg=JP_unif.unify_scoped) = 
     retrieve_unifiables_aux (Leaf.fold_unify_complete ~unif_alg)
 

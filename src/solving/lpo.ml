@@ -66,35 +66,35 @@ module Constraint = struct
   (* simplify the constraints *)
   let rec simplify t =
     match t with
-      | EQ (a, b) when ID.equal a b -> true_
-      | LE (a, b) when ID.equal a b -> true_
-      | LT (a, b) when ID.equal a b -> false_
-      | Not (Not t) -> simplify t
-      | Not True -> true_
-      | Not False -> true_
-      | Not (And l) -> simplify (or_ (List.map not_ l))
-      | Not (Or l) -> simplify (and_ (List.map not_ l))
-      | And [] -> true_
-      | Or [] -> true_
-      | And [x] -> simplify x
-      | Or [x] -> simplify x
-      | And l ->
-        let l' = List.fold_left flatten_and [] l in
-        begin match l' with
-          | [] -> true_
-          | _ when List.mem false_ l' -> false_
-          | [x] -> x
-          | _ -> and_ l'
-        end
-      | Or l ->
-        let l' = List.fold_left flatten_or [] l in
-        begin match l' with
-          | [] -> false_
-          | _ when List.mem true_ l' -> true_
-          | [x] -> x
-          | _ -> or_ l'
-        end
-      | _ -> t
+    | EQ (a, b) when ID.equal a b -> true_
+    | LE (a, b) when ID.equal a b -> true_
+    | LT (a, b) when ID.equal a b -> false_
+    | Not (Not t) -> simplify t
+    | Not True -> true_
+    | Not False -> true_
+    | Not (And l) -> simplify (or_ (List.map not_ l))
+    | Not (Or l) -> simplify (and_ (List.map not_ l))
+    | And [] -> true_
+    | Or [] -> true_
+    | And [x] -> simplify x
+    | Or [x] -> simplify x
+    | And l ->
+      let l' = List.fold_left flatten_and [] l in
+      begin match l' with
+        | [] -> true_
+        | _ when List.mem false_ l' -> false_
+        | [x] -> x
+        | _ -> and_ l'
+      end
+    | Or l ->
+      let l' = List.fold_left flatten_or [] l in
+      begin match l' with
+        | [] -> false_
+        | _ when List.mem true_ l' -> true_
+        | [x] -> x
+        | _ -> or_ l'
+      end
+    | _ -> t
   and flatten_or acc t = match simplify t with
     | False -> acc
     | Or l -> List.fold_left flatten_or acc l
@@ -296,23 +296,23 @@ module MakeSolver(X : sig end) = struct
     let rec next () =
       Util.debug ~section 5 "check satisfiability";
       match Solver.solve solver with
-        | Solver.Sat sat ->
-          Util.debug ~section 5 "next solution exists, try to extract it...";
-          let solution = get_solution sat ~n symbols in
-          Util.debugf ~section 5 "... solution is %a" (fun k->k Solution.pp solution);
-          (* obtain another solution: negate current one and continue *)
-          let tl = lazy (negate ~n solution) in
-          LazyList.Cons (solution, tl)
-        | Solver.Unsat _ ->
-          Util.debug ~section 5 "no solution";
-          LazyList.Nil
+      | Solver.Sat sat ->
+        Util.debug ~section 5 "next solution exists, try to extract it...";
+        let solution = get_solution sat ~n symbols in
+        Util.debugf ~section 5 "... solution is %a" (fun k->k Solution.pp solution);
+        (* obtain another solution: negate current one and continue *)
+        let tl = lazy (negate ~n solution) in
+        LazyList.Cons (solution, tl)
+      | Solver.Unsat _ ->
+        Util.debug ~section 5 "no solution";
+        LazyList.Nil
     and negate ~n:_ solution =
       (* negate current solution to get the next one... if any *)
       let c = Solution.neg_to_constraint solution in
       encode_constr c;
       match Solver.solve solver with
-        | Solver.Sat _ -> next()
-        | Solver.Unsat _ -> LazyList.Nil
+      | Solver.Sat _ -> next()
+      | Solver.Unsat _ -> LazyList.Nil
     in
     lazy (next())
 end
@@ -345,13 +345,13 @@ and lexico_order ~eq ~orient_lpo l1 l2 =
   let c = List.fold_left2
       (fun constr a b ->
          match constr with
-           | Some _ -> constr
-           | None when eq a b -> None
-           | None -> Some (orient_lpo a b))
+         | Some _ -> constr
+         | None when eq a b -> None
+         | None -> Some (orient_lpo a b))
       None l1 l2
   in match c with
-    | None -> C.false_   (* they are equal *)
-    | Some c -> c
+  | None -> C.false_   (* they are equal *)
+  | Some c -> c
 
 module FO = struct
   module T = Term
@@ -361,44 +361,44 @@ module FO = struct
   (* constraint for a > b *)
   let rec orient_lpo a b =
     match TC.view a, TC.view b with
-      | (TC.Var _ | TC.DB _), _ ->
-        C.false_  (* a variable cannot be > *)
-      | _, _ when T.subterm ~sub:b a ->
-        C.true_  (* trivial subterm property --> ok! *)
-      | TC.App (f, ((_::_) as l)), TC.App (g, l')
-        when List.length l = List.length l' ->
-        (* three cases: either some element of [l] is > [r],
-            or precedence of first symbol applies,
-            or lexicographic case applies (with non empty lists) *)
-        C.or_
-          [ C.and_
-              [ C.eq f g
-              ; lexico_order ~eq:T.equal ~orient_lpo l l' ]
-          (* f=g, lexicographic order of subterms *)
-          ; C.and_
-              [ C.gt f g
-              ; all_bigger ~orient_lpo a l'
-              ]  (* f>g and a > all subterms of b *)
-          ; any_bigger ~orient_lpo l b  (* some subterm of a is > b *)
-          ]
-      | TC.App (f, l), TC.App (g, l') ->
-        (* two cases: either some element of [l] is > [r],
-            or precedence of first symbol applies *)
-        C.or_
-          [ C.and_
-              [ C.gt f g
-              ; all_bigger ~orient_lpo a l'
-              ]  (* f>g and a > all subterms of b *)
-          ; any_bigger ~orient_lpo l b  (* some subterm of a is > b *)
-          ]
-      | TC.App (_, l), _ ->
-        (* only the subterm property can apply *)
-        any_bigger ~orient_lpo l b
-      | TC.AppBuiltin _, _
-      | _, TC.AppBuiltin _
-      | TC.NonFO, _ ->
-        (* no clue... *)
-        C.false_
+    | (TC.Var _ | TC.DB _), _ ->
+      C.false_  (* a variable cannot be > *)
+    | _, _ when T.subterm ~sub:b a ->
+      C.true_  (* trivial subterm property --> ok! *)
+    | TC.App (f, ((_::_) as l)), TC.App (g, l')
+      when List.length l = List.length l' ->
+      (* three cases: either some element of [l] is > [r],
+          or precedence of first symbol applies,
+          or lexicographic case applies (with non empty lists) *)
+      C.or_
+        [ C.and_
+            [ C.eq f g
+            ; lexico_order ~eq:T.equal ~orient_lpo l l' ]
+        (* f=g, lexicographic order of subterms *)
+        ; C.and_
+            [ C.gt f g
+            ; all_bigger ~orient_lpo a l'
+            ]  (* f>g and a > all subterms of b *)
+        ; any_bigger ~orient_lpo l b  (* some subterm of a is > b *)
+        ]
+    | TC.App (f, l), TC.App (g, l') ->
+      (* two cases: either some element of [l] is > [r],
+          or precedence of first symbol applies *)
+      C.or_
+        [ C.and_
+            [ C.gt f g
+            ; all_bigger ~orient_lpo a l'
+            ]  (* f>g and a > all subterms of b *)
+        ; any_bigger ~orient_lpo l b  (* some subterm of a is > b *)
+        ]
+    | TC.App (_, l), _ ->
+      (* only the subterm property can apply *)
+      any_bigger ~orient_lpo l b
+    | TC.AppBuiltin _, _
+    | _, TC.AppBuiltin _
+    | TC.NonFO, _ ->
+      (* no clue... *)
+      C.false_
 
   let orient_lpo_list l =
     List.map
@@ -417,45 +417,45 @@ module TypedSTerm = struct
   (* constraint for a > b *)
   let rec orient_lpo a b =
     match T.view a, T.view b with
-      | T.Var _ , _ ->
-        C.false_  (* a variable cannot be > *)
-      | _ when T.equal a b -> C.false_
-      | _ when T.is_subterm ~strict:true b ~of_:a ->
-        C.true_  (* trivial subterm property --> ok! *)
-      | T.App (f, l), T.App (g, l') ->
-        begin match T.view f, T.view g with
-          | T.Const f, T.Const g when List.length l = List.length l' ->
-            (* three cases: either some element of [l] is > [r],
-                or precedence of first symbol applies,
-                or lexicographic case applies (with non empty lists) *)
-            C.or_
-              [ C.and_
-                  [ C.eq f g
-                  ; lexico_order ~eq:T.equal ~orient_lpo l l' ]  (* f=g, lexicographic order of subterms *)
-              ; C.and_
-                  [ C.gt f g
-                  ; all_bigger ~orient_lpo a l'
-                  ]  (* f>g and a > all subterms of b *)
-              ; any_bigger ~orient_lpo l b  (* some subterm of a is > b *)
-              ]
-          | T.Const f, T.Const g ->
-            (* two cases: either some element of [l] is > [r],
-                or precedence of first symbol applies *)
-            C.or_
-              [ C.and_
-                  [ C.gt f g
-                  ; all_bigger ~orient_lpo a l'
-                  ]  (* f>g and a > all subterms of b *)
-              ; any_bigger ~orient_lpo l b  (* some subterm of a is > b *)
-              ]
-          | _ -> C.false_ (* no clue *)
-        end
-      | T.App (f, l), _ when T.is_const f ->
-        (* only the subterm property can apply *)
-        any_bigger ~orient_lpo l b
-      | _ ->
-        (* no clue... *)
-        C.false_
+    | T.Var _ , _ ->
+      C.false_  (* a variable cannot be > *)
+    | _ when T.equal a b -> C.false_
+    | _ when T.is_subterm ~strict:true b ~of_:a ->
+      C.true_  (* trivial subterm property --> ok! *)
+    | T.App (f, l), T.App (g, l') ->
+      begin match T.view f, T.view g with
+        | T.Const f, T.Const g when List.length l = List.length l' ->
+          (* three cases: either some element of [l] is > [r],
+              or precedence of first symbol applies,
+              or lexicographic case applies (with non empty lists) *)
+          C.or_
+            [ C.and_
+                [ C.eq f g
+                ; lexico_order ~eq:T.equal ~orient_lpo l l' ]  (* f=g, lexicographic order of subterms *)
+            ; C.and_
+                [ C.gt f g
+                ; all_bigger ~orient_lpo a l'
+                ]  (* f>g and a > all subterms of b *)
+            ; any_bigger ~orient_lpo l b  (* some subterm of a is > b *)
+            ]
+        | T.Const f, T.Const g ->
+          (* two cases: either some element of [l] is > [r],
+              or precedence of first symbol applies *)
+          C.or_
+            [ C.and_
+                [ C.gt f g
+                ; all_bigger ~orient_lpo a l'
+                ]  (* f>g and a > all subterms of b *)
+            ; any_bigger ~orient_lpo l b  (* some subterm of a is > b *)
+            ]
+        | _ -> C.false_ (* no clue *)
+      end
+    | T.App (f, l), _ when T.is_const f ->
+      (* only the subterm property can apply *)
+      any_bigger ~orient_lpo l b
+    | _ ->
+      (* no clue... *)
+      C.false_
 
   let orient_lpo_list l =
     List.map

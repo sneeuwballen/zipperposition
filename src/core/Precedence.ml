@@ -81,10 +81,10 @@ module Constr = struct
       let is_max1 = ID.Set.mem s1 set in
       let is_max2 = ID.Set.mem s2 set in
       match is_max1, is_max2 with
-        | true, true
-        | false, false -> 0
-        | true, false -> 1
-        | false, true -> -1
+      | true, true
+      | false, false -> 0
+      | true, false -> 1
+      | false, true -> -1
 
   let min l =
     let set = ID.Set.of_list l in
@@ -92,10 +92,10 @@ module Constr = struct
       let is_min1 = ID.Set.mem s1 set in
       let is_min2 = ID.Set.mem s2 set in
       match is_min1, is_min2 with
-        | true, true
-        | false, false -> 0
-        | true, false -> -1
-        | false, true -> 1
+      | true, true
+      | false, false -> 0
+      | true, false -> -1
+      | false, true -> 1
 
   (* regular string ordering *)
   let alpha a b =
@@ -232,15 +232,15 @@ type arg_coeff_fun = ID.t -> int list
 let depth_occ_driver ~flip stmt_d =
   let tbl = ID.Tbl.create 16 in
   Iter.iter (fun (sym,d) -> 
-    try 
-      let l = ID.Tbl.find tbl sym in
-      ID.Tbl.replace tbl sym (d :: l)
-    with _ -> ID.Tbl.add tbl sym [d]
-  ) stmt_d;
+      try 
+        let l = ID.Tbl.find tbl sym in
+        ID.Tbl.replace tbl sym (d :: l)
+      with _ -> ID.Tbl.add tbl sym [d]
+    ) stmt_d;
 
   let rec sum = function 
-  | [] -> 0
-  | x :: xs -> x + (sum xs) in
+    | [] -> 0
+    | x :: xs -> x + (sum xs) in
 
   let sorted = 
     ID.Tbl.to_list tbl 
@@ -248,10 +248,10 @@ let depth_occ_driver ~flip stmt_d =
         let d_sum = sum depths and n = List.length depths in
         (d_sum / n, n, id))
     |> List.sort (fun (avg1, n1, id1) (avg2, n2, id2) -> 
-      let open CCOrd in
-      if flip then compare avg2 avg1 <?> (compare, n2, n1) <?> (ID.compare, id2, id1)
-      else compare avg1 avg2 <?> (compare, n1, n2) <?> (ID.compare, id1, id2)
-    ) in
+        let open CCOrd in
+        if flip then compare avg2 avg1 <?> (compare, n2, n1) <?> (ID.compare, id2, id1)
+        else compare avg1 avg2 <?> (compare, n1, n2) <?> (ID.compare, id1, id2)
+      ) in
 
   ID.Tbl.clear tbl;
   let tbl = ID.Tbl.create 16 in
@@ -273,10 +273,10 @@ let weight_invarity ~signature =
     Signature.Seq.symbols signature
     |> Iter.map (fun sym -> snd @@ Signature.arity signature sym)
     |> Iter.max |> CCOpt.get_or ~default:max_int in
-  
+
   (fun a ->
-    let arity =  try snd @@ Signature.arity signature a with _ -> 0 in
-    Weight.int (max_arity - arity + 3))
+     let arity =  try snd @@ Signature.arity signature a with _ -> 0 in
+     Weight.int (max_arity - arity + 3))
 
 
 (* constant weight *)
@@ -298,8 +298,8 @@ let weight_invfreqrank (symbs : ID.t Iter.t) : ID.t -> Weight.t =
   Iter.iter (ID.Tbl.incr tbl) symbs;
   let sorted = 
     Iter.sort ~cmp:(fun s1 s2 -> 
-      CCInt.compare (ID.Tbl.get_or tbl ~default:0 s1) 
-                    (ID.Tbl.get_or tbl ~default:0 s2)) symbs in
+        CCInt.compare (ID.Tbl.get_or tbl ~default:0 s1) 
+          (ID.Tbl.get_or tbl ~default:0 s2)) symbs in
   ID.Tbl.clear tbl;
   let tbl = ID.Tbl.create 16 in
   Iter.iteri (fun i (sym:ID.t) -> ID.Tbl.add tbl sym (i+1)) sorted;
@@ -311,8 +311,8 @@ let weight_freqrank (symbs : ID.t Iter.t) : ID.t -> Weight.t =
   Iter.iter (ID.Tbl.incr tbl) symbs;
   let sorted = 
     Iter.sort ~cmp:(fun s1 s2 -> 
-      CCInt.compare (ID.Tbl.get_or tbl ~default:0 s2) 
-                    (ID.Tbl.get_or tbl ~default:0 s1)) symbs in
+        CCInt.compare (ID.Tbl.get_or tbl ~default:0 s2) 
+          (ID.Tbl.get_or tbl ~default:0 s1)) symbs in
   ID.Tbl.clear tbl;
   Iter.iteri (fun i sym -> ID.Tbl.add tbl sym (i+1)) sorted;
   (fun sym -> Weight.int (ID.Tbl.get_or ~default:10 tbl sym))
@@ -326,14 +326,14 @@ let weight_fun_of_string ~signature s =
 
   let wf_map = 
     ["invfreq", with_syms weight_invfreq; 
-    "freq", with_syms weight_freq; 
-    "invfreqrank", with_syms weight_invfreqrank;
-    "freqrank", with_syms weight_freqrank;
-    "modarity", ignore_arg @@ weight_modarity ~signature;
-    "invarity", ignore_arg @@ weight_invarity ~signature;
-    "invdocc", inv_depth_occurence;
-    "docc", depth_occurence;
-    "const", ignore_arg weight_constant] in
+     "freq", with_syms weight_freq; 
+     "invfreqrank", with_syms weight_invfreqrank;
+     "freqrank", with_syms weight_freqrank;
+     "modarity", ignore_arg @@ weight_modarity ~signature;
+     "invarity", ignore_arg @@ weight_invarity ~signature;
+     "invdocc", inv_depth_occurence;
+     "docc", depth_occurence;
+     "const", ignore_arg weight_constant] in
   try
     List.assoc s wf_map
   with Not_found -> invalid_arg "KBO weight function not found"
@@ -358,8 +358,8 @@ let check_inv_ p =
   sorted_ p.snapshot
 
 let create ?(weight=weight_constant) ?(arg_coeff=arg_coeff_default)
-           ?(db_w=db_w_def) ?(lmb_w=lmb_w_def)
-           c l =
+    ?(db_w=db_w_def) ?(lmb_w=lmb_w_def)
+    c l =
   let l = CCList.sort_uniq ~cmp:c l in
   let tbl = lazy (mk_tbl_ l) in
   let res = {

@@ -93,9 +93,9 @@ type term = t
 
 let any_props_for_ts =
   List.fold_left (fun acc t -> 
-    let new_props = (any_props &&& t.props) ||| acc in
-    update_max_db new_props (get_max_db t.props)
-  ) zero
+      let new_props = (any_props &&& t.props) ||| acc in
+      update_max_db new_props (get_max_db t.props)
+    ) zero
 
 let add_ty_vars props ty_props =
   if get_property ty_props f_has_freevars then (
@@ -185,16 +185,16 @@ let rec _eq_record_list l1 l2 = match l1, l2 with
 let _eq_norec t1 t2 =
   _eq_ty t1 t2 &&
   match t1.term, t2.term with
-    | Var i, Var j -> HVar.equal equal i j
-    | DB i, DB j -> i = j
-    | Const s1, Const s2 -> ID.equal s1 s2
-    | Bind (b1, varty1, t1'), Bind (b2, varty2, t2') ->
-      Binder.equal b1 b2 && equal varty1 varty2 && equal t1' t2'
-    | App (f1, l1), App (f2, l2) ->
-      equal f1 f2 && _eq_norec_list l1 l2
-    | AppBuiltin (b1, l1), AppBuiltin (b2, l2) ->
-      Builtin.equal b1 b2 && _eq_norec_list l1 l2
-    | _ -> false
+  | Var i, Var j -> HVar.equal equal i j
+  | DB i, DB j -> i = j
+  | Const s1, Const s2 -> ID.equal s1 s2
+  | Bind (b1, varty1, t1'), Bind (b2, varty2, t2') ->
+    Binder.equal b1 b2 && equal varty1 varty2 && equal t1' t2'
+  | App (f1, l1), App (f2, l2) ->
+    equal f1 f2 && _eq_norec_list l1 l2
+  | AppBuiltin (b1, l1), AppBuiltin (b2, l2) ->
+    Builtin.equal b1 b2 && _eq_norec_list l1 l2
+  | _ -> false
 
 (** {3 Constructors} *)
 
@@ -233,11 +233,11 @@ let ho_weight_ t t_ty =
   let rec aux t t_ty = 
     let init_w s_ty = 
       match s_ty with 
-        | NoType -> 0
-        | HasType ty -> 
-          begin match view ty with 
-            | AppBuiltin (Builtin.Arrow, l) -> List.length l - 1
-            | _ -> 0 end in
+      | NoType -> 0
+      | HasType ty -> 
+        begin match view ty with 
+          | AppBuiltin (Builtin.Arrow, l) -> List.length l - 1
+          | _ -> 0 end in
     begin match t with 
       | Var _  | DB _  | Const _ -> init_w t_ty +  1
       | Bind (Binder.Lambda, _, t') ->
@@ -250,8 +250,8 @@ let ho_weight_ t t_ty =
         else init_w t_ty + aux_l (aux (view f) (ty f)) l
       | AppBuiltin (_, l) -> aux_l (init_w t_ty + 1) l end
   and aux_l acc = function
-  | [] -> acc
-  | x :: xs -> aux_l (acc + aux (view x) (ty x))  xs 
+    | [] -> acc
+    | x :: xs -> aux_l (acc + aux (view x) (ty x))  xs 
   in
   aux t t_ty  
 
@@ -262,8 +262,8 @@ let make_ ~props ~ty term  =
     props; ho_weight = lazy (ho_weight_ term ty) }
 
 let const ~ty s =
-let my_t = make_ ~props:(add_ty_vars zero ty.props) ~ty:(HasType ty) (Const s) in 
-H.hashcons my_t
+  let my_t = make_ ~props:(add_ty_vars zero ty.props) ~ty:(HasType ty) (Const s) in 
+  H.hashcons my_t
 
 let builtin ~ty b =
   let my_t = make_ ~props:(add_ty_vars zero ty.props) ~ty:(HasType ty) (AppBuiltin (b,[])) in
@@ -286,7 +286,7 @@ let rec app_builtin ~ty b l = match b, l with
     app_builtin ~ty Builtin.True []
   | _ ->
     let l = if Builtin.is_quantifier b then 
-          List.filter (fun t -> not @@ equal (ty_exn t) tType) l else l in
+        List.filter (fun t -> not @@ equal (ty_exn t) tType) l else l in
     if Builtin.is_quantifier b  && CCList.length l > 1 then (
       let err_msg = CCFormat.sprintf "wrong encoding of quants: %a %d" Builtin.pp b (List.length l) in
       invalid_arg err_msg;
@@ -350,12 +350,12 @@ let bind ~ty ~varty s t' =
   let props = add_ty_vars (add_ty_vars t'.props ty.props) varty.props in
   let props = 
     if Binder.equal Binder.Lambda s || Binder.equal Binder.ForallTy s 
-      then dec_max_db props 
-      else props in
+    then dec_max_db props 
+    else props in
   let props = 
     if Binder.equal Binder.Lambda s
-      then set_property props f_has_lams
-      else props in
+    then set_property props f_has_lams
+    else props in
   H.hashcons (make_ ~props ~ty:(HasType ty) (Bind (s, varty, t')))
 
 let cast ~ty old = match old.term with
@@ -445,17 +445,17 @@ module DB = struct
       | HasType ty -> _to_seq ~depth ty k
     end;
     match view t with
-      | DB v -> k (v,depth)
-      | Var _
-      | Const _ -> ()
-      | Bind (_, varty, t') ->
-        _to_seq ~depth varty k;
-        _to_seq ~depth:(depth+1) t' k
-      | AppBuiltin (_, l) ->
-        List.iter (fun t -> _to_seq ~depth t k) l
-      | App (f, l) ->
-        _to_seq ~depth f k;
-        List.iter (fun t -> _to_seq ~depth t k) l
+    | DB v -> k (v,depth)
+    | Var _
+    | Const _ -> ()
+    | Bind (_, varty, t') ->
+      _to_seq ~depth varty k;
+      _to_seq ~depth:(depth+1) t' k
+    | AppBuiltin (_, l) ->
+      List.iter (fun t -> _to_seq ~depth t k) l
+    | App (f, l) ->
+      _to_seq ~depth f k;
+      List.iter (fun t -> _to_seq ~depth t k) l
 
   let[@inline] _id x = x
 
@@ -469,9 +469,9 @@ module DB = struct
     ) else (
       let res = (get_max_db t.props) = 0 in
       (* if(res != db_calc t) then (
-        CCFormat.printf "t:@[%a@];max_db:%d@." debugf t (get_max_db t.props);
-        assert(false);
-      ); *)
+         CCFormat.printf "t:@[%a@];max_db:%d@." debugf t (get_max_db t.props);
+         assert(false);
+         ); *)
       res
     )
 
@@ -498,18 +498,18 @@ module DB = struct
       | HasType ty ->
         let ty = recurse ~depth acc ty in
         match view t with
-          | Var v -> var (HVar.cast ~ty v)
-          | DB i -> bvar ~ty (on_bvar ~depth acc i)
-          | Const s -> const ~ty s
-          | Bind (s, varty, t') ->
-            let acc' = on_binder ~ty ~depth acc s varty in
-            let varty' = recurse ~depth acc varty in
-            let t' = recurse ~depth:(depth+1) acc' t' in
-            bind ~ty ~varty:varty' s t'
-          | App (f, l) ->
-            app ~ty (recurse ~depth acc f) (List.map (recurse ~depth acc) l)
-          | AppBuiltin (s,l) ->
-            app_builtin ~ty s (List.map (recurse ~depth acc) l)
+        | Var v -> var (HVar.cast ~ty v)
+        | DB i -> bvar ~ty (on_bvar ~depth acc i)
+        | Const s -> const ~ty s
+        | Bind (s, varty, t') ->
+          let acc' = on_binder ~ty ~depth acc s varty in
+          let varty' = recurse ~depth acc varty in
+          let t' = recurse ~depth:(depth+1) acc' t' in
+          bind ~ty ~varty:varty' s t'
+        | App (f, l) ->
+          app ~ty (recurse ~depth acc f) (List.map (recurse ~depth acc) l)
+        | AppBuiltin (s,l) ->
+          app_builtin ~ty s (List.map (recurse ~depth acc) l)
     in
     recurse ~depth acc t
 
@@ -546,35 +546,35 @@ module DB = struct
   (* recurse and replace elements of l. *)
   let rec _replace depth ~to_replace t =
     match t.ty with
-      | NoType ->
-        assert (t == tType);
-        t
-      | HasType ty ->
-        let ty = _replace depth ty ~to_replace in
-        match view t with
-          | _ when CCList.exists (equal t) to_replace ->
-            begin match CCList.find_idx (equal t) to_replace with
-              | None -> assert false
-              | Some (i, t') ->
-                assert (equal t t');
-                bvar ~ty (depth+List.length to_replace-i-1) (* replace *)
-            end
-          | Var v -> var (HVar.cast ~ty v)
-          | DB i ->
-            if i<depth
-            then bvar ~ty i
-            else bvar ~ty (i + List.length to_replace) (* shift *)
-          | Const s -> const ~ty s
-          | Bind (s, varty, t') ->
-            let varty' = _replace depth ~to_replace varty in
-            let t' = _replace (depth+1) t' ~to_replace in
-            bind ~ty ~varty:varty' s t'
-          | App (f, l) ->
-            app ~ty
-              (_replace depth ~to_replace f)
-              (List.map (_replace depth ~to_replace) l)
-          | AppBuiltin (s,l) ->
-            app_builtin ~ty s (List.map (_replace depth ~to_replace) l)
+    | NoType ->
+      assert (t == tType);
+      t
+    | HasType ty ->
+      let ty = _replace depth ty ~to_replace in
+      match view t with
+      | _ when CCList.exists (equal t) to_replace ->
+        begin match CCList.find_idx (equal t) to_replace with
+          | None -> assert false
+          | Some (i, t') ->
+            assert (equal t t');
+            bvar ~ty (depth+List.length to_replace-i-1) (* replace *)
+        end
+      | Var v -> var (HVar.cast ~ty v)
+      | DB i ->
+        if i<depth
+        then bvar ~ty i
+        else bvar ~ty (i + List.length to_replace) (* shift *)
+      | Const s -> const ~ty s
+      | Bind (s, varty, t') ->
+        let varty' = _replace depth ~to_replace varty in
+        let t' = _replace (depth+1) t' ~to_replace in
+        bind ~ty ~varty:varty' s t'
+      | App (f, l) ->
+        app ~ty
+          (_replace depth ~to_replace f)
+          (List.map (_replace depth ~to_replace) l)
+      | AppBuiltin (s,l) ->
+        app_builtin ~ty s (List.map (_replace depth ~to_replace) l)
 
   let replace_l t ~l = _replace 0 t ~to_replace:l
 
@@ -592,34 +592,34 @@ module DB = struct
       | HasType ty ->
         let ty = _eval env ty in
         match view t with
-          | Var v -> var (HVar.cast ~ty v)
-          | DB i ->
-            begin match DBEnv.find env i with
-              | None ->
-                if i >= DBEnv.size env
-                then bvar ~ty (i - DBEnv.size env0) (* unshift *)
-                else bvar ~ty i
-              | Some t' ->
-                (* type might not be exactly equal, e.g. might be equal
-                   up to unifier *)
-                (*assert (equal (ty_exn t') ty);*)
-                (* [t'] is defined in scope 0, but there are [i-1] binders
-                   between the scope where its open variables live, and
-                   the current scope.
-                   Therefore we must lift by [i-1].
-                   The depth is the number of binders between the original [env0]
-                   and current [env]. *)
-                shift (DBEnv.size env - DBEnv.size env0) t'
-            end
-          | Const s -> const ~ty s
-          | Bind (s, varty, t') ->
-            let varty' = _eval env varty in
-            let t' = _eval (DBEnv.push_none env) t' in
-            bind ~ty ~varty:varty' s t'
-          | App (f, l) ->
-            app ~ty (_eval env f) (List.map (_eval env) l)
-          | AppBuiltin (s,l) ->
-            app_builtin ~ty s (List.map (_eval env) l)
+        | Var v -> var (HVar.cast ~ty v)
+        | DB i ->
+          begin match DBEnv.find env i with
+            | None ->
+              if i >= DBEnv.size env
+              then bvar ~ty (i - DBEnv.size env0) (* unshift *)
+              else bvar ~ty i
+            | Some t' ->
+              (* type might not be exactly equal, e.g. might be equal
+                 up to unifier *)
+              (*assert (equal (ty_exn t') ty);*)
+              (* [t'] is defined in scope 0, but there are [i-1] binders
+                 between the scope where its open variables live, and
+                 the current scope.
+                 Therefore we must lift by [i-1].
+                 The depth is the number of binders between the original [env0]
+                 and current [env]. *)
+              shift (DBEnv.size env - DBEnv.size env0) t'
+          end
+        | Const s -> const ~ty s
+        | Bind (s, varty, t') ->
+          let varty' = _eval env varty in
+          let t' = _eval (DBEnv.push_none env) t' in
+          bind ~ty ~varty:varty' s t'
+        | App (f, l) ->
+          app ~ty (_eval env f) (List.map (_eval env) l)
+        | AppBuiltin (s,l) ->
+          app_builtin ~ty s (List.map (_eval env) l)
     in
     _eval env0 t
 
@@ -629,12 +629,12 @@ module DB = struct
   let apply_subst subst t =
     let rec aux depth t =
       match t.ty with
-        | NoType ->
-          assert (t == tType);
-          t
-        | HasType ty ->
-          let ty = aux depth ty in
-          aux' depth ty t
+      | NoType ->
+        assert (t == tType);
+        t
+      | HasType ty ->
+        let ty = aux depth ty in
+        aux' depth ty t
     and aux' depth ty t = match view t with
       | Var v ->
         begin
@@ -687,12 +687,12 @@ module Seq = struct
     let rec subterms t =
       k t;
       match view t with
-        | Var _
-        | DB _
-        | Const _ -> ()
-        | Bind (_, varty, t') -> subterms varty; subterms t'
-        | AppBuiltin (_, l) -> List.iter subterms l
-        | App(f, l) -> subterms f; List.iter subterms l
+      | Var _
+      | DB _
+      | Const _ -> ()
+      | Bind (_, varty, t') -> subterms varty; subterms t'
+      | AppBuiltin (_, l) -> List.iter subterms l
+      | App(f, l) -> subterms f; List.iter subterms l
     in
     subterms t
 
@@ -700,14 +700,14 @@ module Seq = struct
     let rec recurse depth t =
       k (t, depth);
       match view t with
-        | App (_,l) ->
-          let depth' = depth + 1 in
-          List.iter (fun t' -> recurse depth' t') l
-        | AppBuiltin (_,l) -> List.iter (recurse (depth+1)) l
-        | Bind (_, varty, t') -> recurse depth varty; recurse (depth+1) t'
-        | Const _
-        | DB _
-        | Var _ -> ()
+      | App (_,l) ->
+        let depth' = depth + 1 in
+        List.iter (fun t' -> recurse depth' t') l
+      | AppBuiltin (_,l) -> List.iter (recurse (depth+1)) l
+      | Bind (_, varty, t') -> recurse depth varty; recurse (depth+1) t'
+      | Const _
+      | DB _
+      | Var _ -> ()
     in
     recurse 0 t
 
@@ -729,10 +729,10 @@ module Seq = struct
         | HasType ty -> k ty
       end;
       match view t with
-        | Var _ | DB _ | Const _ -> ()
-        | App (head, l) -> types head; List.iter types l
-        | AppBuiltin (_,l) -> List.iter types l
-        | Bind (_, _, t') -> types t'
+      | Var _ | DB _ | Const _ -> ()
+      | App (head, l) -> types head; List.iter types l
+      | AppBuiltin (_,l) -> List.iter types l
+      | Bind (_, _, t') -> types t'
     in types t
 
   let max_var seq =
@@ -956,13 +956,13 @@ let [@inline] get_type t = match ty t with
 let[@inline] as_app t = match view t with
   | App (f,l) -> 
     begin match view f with 
-    | AppBuiltin(b, l') -> app_builtin b ~ty:(ty_exn t) (l'@l), []
-    | _ -> f, l 
+      | AppBuiltin(b, l') -> app_builtin b ~ty:(ty_exn t) (l'@l), []
+      | _ -> f, l 
     end
   | AppBuiltin(b, l ) when Builtin.is_logical_op b && not (Builtin.is_quantifier b) ->
     let prop = builtin ~ty:tType Builtin.Prop in
     let args = if (Builtin.is_logical_binop b) then [prop;prop]
-               else [prop] in
+      else [prop] in
     app_builtin b ~ty:(arrow args prop) [], l 
   | _ -> t, []
 

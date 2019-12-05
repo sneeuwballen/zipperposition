@@ -193,10 +193,10 @@ let check
           upd_stats
             (fun s ->
                {s with
-                  n_skip = s.n_skip+1;
-                  n_skip_esa=if r=`ESA then s.n_skip_esa+1 else s.n_skip_esa;
-                  n_skip_tags=if r=`Tags then s.n_skip_tags+1 else s.n_skip_tags;
-                  n_skip_trivial=if r=`Trivial then s.n_skip_trivial+1 else s.n_skip_trivial;
+                n_skip = s.n_skip+1;
+                n_skip_esa=if r=`ESA then s.n_skip_esa+1 else s.n_skip_esa;
+                n_skip_tags=if r=`Tags then s.n_skip_tags+1 else s.n_skip_tags;
+                n_skip_trivial=if r=`Trivial then s.n_skip_trivial+1 else s.n_skip_trivial;
                })
       end;
       (* now check premises *)

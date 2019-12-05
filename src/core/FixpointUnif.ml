@@ -34,22 +34,22 @@ let path_check ~subst ~scope var t =
         else raise NotUnif)
       else (
         CCOpt.map (fun args' -> 
-          if T.same_l args args' then t else T.app hd args') 
-        (aux_l ~depth ~under_var:true args))
+            if T.same_l args args' then t else T.app hd args') 
+          (aux_l ~depth ~under_var:true args))
     | T.App(hd,args) -> 
       assert(not (T.is_fun hd));
       begin match aux ~depth ~under_var hd with
-      | None -> None
-      | Some hd' -> 
-        CCOpt.map (fun args' -> 
-          if T.same_l args args' && T.equal hd hd' then t 
-          else T.app hd' args') 
-        (aux_l ~depth ~under_var args) end
+        | None -> None
+        | Some hd' -> 
+          CCOpt.map (fun args' -> 
+              if T.same_l args args' && T.equal hd hd' then t 
+              else T.app hd' args') 
+            (aux_l ~depth ~under_var args) end
     | T.AppBuiltin(b, args) -> 
       CCOpt.map (fun args' -> 
-        if T.same_l args args' then t 
-        else T.app_builtin ~ty:(T.ty t) b args') 
-      (aux_l ~depth ~under_var args)
+          if T.same_l args args' then t 
+          else T.app_builtin ~ty:(T.ty t) b args') 
+        (aux_l ~depth ~under_var args)
     | T.Var _ ->
       assert(not (US.FO.mem subst (T.as_var_exn t,scope)));
       if T.equal var t then
@@ -59,10 +59,10 @@ let path_check ~subst ~scope var t =
       let pref_tys, body' = T.open_fun t in
       let depth_inc = List.length pref_tys in
       begin match aux ~depth:(depth+depth_inc) ~under_var body' with
-      | None -> None
-      | Some t' -> 
-        if T.equal t' t then Some t
-        else Some (T.fun_l pref_tys t') end
+        | None -> None
+        | Some t' -> 
+          if T.equal t' t then Some t
+          else Some (T.fun_l pref_tys t') end
     | T.DB i when i >= depth -> 
       if under_var then None else raise NotUnif
     | _ -> Some t 
@@ -104,4 +104,4 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
     else (
       let t0', t1' = fst t0_s, fst t1_s in
       driver t0' t1' (Scoped.scope t0_s) subst
-  )) 
+    )) 

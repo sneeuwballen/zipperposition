@@ -38,17 +38,17 @@ module Make(Payload : PAYLOAD)
   (* factory for literals *)
   let make =
     fun payload ->
-      let id = fresh_id () in
-      let rec pos = {
-        id;
+    let id = fresh_id () in
+    let rec pos = {
+      id;
+      payload;
+      neg;
+    } and neg = {
+        id= -id;
         payload;
-        neg;
-      } and neg = {
-          id= -id;
-          payload;
-          neg=pos;
-        } in
-      pos
+        neg=pos;
+      } in
+    pos
 
   let hash i = Hash.int i.id
   let equal i j = i.id = j.id

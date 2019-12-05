@@ -151,23 +151,23 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let of_statement ?(convert_defs=false) st =
     let of_lits lits =
       (* convert literals *)
-    let lits = List.map Ctx.Lit.of_form lits in
+      let lits = List.map Ctx.Lit.of_form lits in
       let proof = Stmt.proof_step st in
       let c = create ~trail:Trail.empty ~penalty:1 lits proof in
       c
     in
     match Stmt.view st with
-      | Stmt.Data _
-      | Stmt.TyDecl _ -> []
-      | Stmt.Def _
-      | Stmt.Rewrite _ -> 
-        if not convert_defs then [] (*dealt with by rewriting *)
-        (* dealt with  *)
-        else List.map of_lits (Stmt.get_formulas_from_defs st)
-      | Stmt.Assert lits -> [of_lits lits]
-      | Stmt.Goal lits -> [of_lits lits]
-      | Stmt.Lemma l
-      | Stmt.NegatedGoal (_,l) -> List.map of_lits l
+    | Stmt.Data _
+    | Stmt.TyDecl _ -> []
+    | Stmt.Def _
+    | Stmt.Rewrite _ -> 
+      if not convert_defs then [] (*dealt with by rewriting *)
+      (* dealt with  *)
+      else List.map of_lits (Stmt.get_formulas_from_defs st)
+    | Stmt.Assert lits -> [of_lits lits]
+    | Stmt.Goal lits -> [of_lits lits]
+    | Stmt.Lemma l
+    | Stmt.NegatedGoal (_,l) -> List.map of_lits l
 
   let update_trail f c =
     let sclause = SClause.update_trail f c.sclause in
@@ -207,7 +207,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       let lits' = _apply_subst_no_simpl subst (lits c,sc) in
       Lits.maxlits ~ord lits')
     else BV.of_list @@ Lazy.force c.max_lits
-  
+
   (** Check whether the literal is maximal *)
   let is_maxlit (c,sc) subst ~idx =
     if not @@ Subst.is_empty subst then (
@@ -215,7 +215,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       let lits' = _apply_subst_no_simpl subst (lits c,sc) in
       Lits.is_max ~ord lits' idx
     ) else (BV.get (BV.of_list @@ Lazy.force c.max_lits) idx)
-    
+
 
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for resolution. *)
@@ -267,9 +267,9 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let lit_arr = lits c in
     let changed = ref false in
     let new_lits = Literals.map (fun t -> 
-      let reduced = Lambda.eta_reduce (Lambda.snf t) in
-      if not (Term.equal t reduced) then changed := true;
-      reduced) lit_arr in
+        let reduced = Lambda.eta_reduce (Lambda.snf t) in
+        if not (Term.equal t reduced) then changed := true;
+        reduced) lit_arr in
     if !changed then (
       let penalty = penalty c and trail = trail c and proof = proof_step c in
       Some (create ~penalty ~trail (CCArray.to_list new_lits) proof)
@@ -316,14 +316,14 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let is_oriented_rule c =
     let ord = Ctx.ord () in
     match c.sclause.lits with
-      | [| Lit.Equation (l, r, true) |] ->
-        begin match Ordering.compare ord l r with
-          | Comparison.Gt
-          | Comparison.Lt -> true
-          | Comparison.Eq
-          | Comparison.Incomparable -> false
-        end
-      | _ -> false
+    | [| Lit.Equation (l, r, true) |] ->
+      begin match Ordering.compare ord l r with
+        | Comparison.Gt
+        | Comparison.Lt -> true
+        | Comparison.Eq
+        | Comparison.Incomparable -> false
+      end
+    | _ -> false
 
   let symbols ?(init=ID.Set.empty) ?(include_types=false) seq =
     Iter.fold
@@ -340,19 +340,19 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       let inj_defs = CCArray.filter_map Lit.as_inj_def (lits c) in
       if (CCArray.length inj_defs) != 1 then None
       else (
-         let sym, var_pairs = CCArray.get inj_defs 0 in
-         let l = CCArray.filter_map Lit.as_pos_pure_var (lits c) |> CCArray.to_list in
-         if List.length l != 1 then None
-         else (
-           let (x, y) = List.hd l in
-           let v_eq = HVar.equal Type.equal in
-           let rec args_same n = function 
+        let sym, var_pairs = CCArray.get inj_defs 0 in
+        let l = CCArray.filter_map Lit.as_pos_pure_var (lits c) |> CCArray.to_list in
+        if List.length l != 1 then None
+        else (
+          let (x, y) = List.hd l in
+          let v_eq = HVar.equal Type.equal in
+          let rec args_same n = function 
             | [] -> None
             | (x', y') :: xs -> if (v_eq x x' && v_eq y y') || 
                                    (v_eq x y' && v_eq y x') then Some (sym, n)
-                                else args_same (n+1) xs in
-           args_same 0 var_pairs
-         )
+              else args_same (n+1) xs in
+          args_same 0 var_pairs
+        )
       )
     ) else None
 
@@ -404,8 +404,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let pos _ lit = Lit.is_pos lit
 
     let pos_eq _ lit = match lit with
-    | Lit.Equation(l,r,s) -> s
-    | _ -> false
+      | Lit.Equation(l,r,s) -> s
+      | _ -> false
 
     let neg _ lit = Lit.is_neg lit
 

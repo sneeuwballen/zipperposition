@@ -68,8 +68,8 @@ module FV_components = FV_tree.Make(struct
     type t = Lits.t * payload * lit
     let compare (l1,i1,j1)(l2,i2,j2) =
       CCOrd.(Lits.compare l1 l2
-        <?> (compare_payload, i1, i2)
-        <?> (Lit.compare, j1, j2))
+             <?> (compare_payload, i1, i2)
+             <?> (Lit.compare, j1, j2))
     let to_lits (l,_,_) = Lits.to_form l |> Iter.of_list
     let labels _ = Util.Int_set.empty
   end)
@@ -189,10 +189,10 @@ let inject_case p =
 
 let must_be_kept lit =
   match Lit.payload (Lit.abs lit) with
-    | Fresh
-    | Clause_component _ -> false
-    | Lemma _
-    | Case _ -> true
+  | Fresh
+  | Clause_component _ -> false
+  | Lemma _
+  | Case _ -> true
 
 let is_lemma lit = match Lit.payload (Lit.abs lit) with
   | Lemma _ -> true

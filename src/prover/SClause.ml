@@ -163,10 +163,10 @@ let proof_tc =
     ~to_exn:(fun c -> E_proof c)
     ~compare:compare
     ~flavor:(fun c ->
-      if Literals.is_absurd (lits c)
-      then if Trail.is_empty (trail c) then `Proof_of_false
-        else `Absurd_lits
-      else `Vanilla)
+        if Literals.is_absurd (lits c)
+        then if Trail.is_empty (trail c) then `Proof_of_false
+          else `Absurd_lits
+        else `Vanilla)
     ~to_form:(fun ~ctx c -> to_s_form ~allow_free_db:true ~ctx c)
     ~to_form_subst:to_s_form_subst
     ~pp_in

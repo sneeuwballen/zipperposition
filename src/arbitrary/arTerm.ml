@@ -24,17 +24,17 @@ module PT = struct
   and shrink_sub t =
     let open QA.Iter in
     match PT.view t with
-      | PT.App (f, l) ->
-        append
-          (shrink f >|= fun f' -> PT.app ~ty:(PT.ty_exn t) f' l)
-          (Iter.(0 -- (List.length l-1)) >>= fun i ->
-           let sub = List.nth l i in
-           shrink_sub sub >|= fun sub' ->
-           let l' = CCList.set_at_idx i sub' l in
-           PT.app ~ty:(PT.ty_exn t) f l')
-      | PT.Bind (b, v, bod) ->
-        shrink bod >|= PT.bind ~ty:(PT.ty_exn t) b v
-      | _ -> empty
+    | PT.App (f, l) ->
+      append
+        (shrink f >|= fun f' -> PT.app ~ty:(PT.ty_exn t) f' l)
+        (Iter.(0 -- (List.length l-1)) >>= fun i ->
+         let sub = List.nth l i in
+         shrink_sub sub >|= fun sub' ->
+         let l' = CCList.set_at_idx i sub' l in
+         PT.app ~ty:(PT.ty_exn t) f l')
+    | PT.Bind (b, v, bod) ->
+      shrink bod >|= PT.bind ~ty:(PT.ty_exn t) b v
+    | _ -> empty
 
   let mk_ gen =
     QA.make ~print:TypedSTerm.to_string ~shrink gen
@@ -171,17 +171,17 @@ let rec shrink t =
 and shrink_sub t =
   let open QA.Iter in
   match T.view t with
-    | T.App (f, l) ->
-      append
-        (shrink f >|= fun f' -> T.app f' l)
-        (Iter.(0 -- (List.length l-1)) >>= fun i ->
-         let sub = List.nth l i in
-         shrink_sub sub >|= fun sub' ->
-         let l' = CCList.set_at_idx i sub' l in
-         T.app f l')
-    | T.Fun (ty_arg, bod) ->
-      shrink bod >|= T.fun_ ty_arg
-    | _ -> empty
+  | T.App (f, l) ->
+    append
+      (shrink f >|= fun f' -> T.app f' l)
+      (Iter.(0 -- (List.length l-1)) >>= fun i ->
+       let sub = List.nth l i in
+       shrink_sub sub >|= fun sub' ->
+       let l' = CCList.set_at_idx i sub' l in
+       T.app f l')
+  | T.Fun (ty_arg, bod) ->
+    shrink bod >|= T.fun_ ty_arg
+  | _ -> empty
 
 let mk_ gen = QA.make ~print:T.to_string ~shrink gen
 
@@ -209,15 +209,15 @@ let pos t =
   let rec recurse t pb st =
     let stop = return (PB.to_pos pb) in
     match T.view t with
-      | T.App (_, [])
-      | T.Const _
-      | T.Var _
-      | T.DB _ -> PB.to_pos pb
-      | T.AppBuiltin (_, l)
-      | T.App (_, l) ->
-        let len = List.length l in
-        oneof (stop :: List.mapi (fun i t' -> recurse t' (PB.arg (len - 1 - i) pb)) l) st
-      | T.Fun (_,bod) ->
-        oneof [stop; recurse bod (PB.body pb)] st
+    | T.App (_, [])
+    | T.Const _
+    | T.Var _
+    | T.DB _ -> PB.to_pos pb
+    | T.AppBuiltin (_, l)
+    | T.App (_, l) ->
+      let len = List.length l in
+      oneof (stop :: List.mapi (fun i t' -> recurse t' (PB.arg (len - 1 - i) pb)) l) st
+    | T.Fun (_,bod) ->
+      oneof [stop; recurse bod (PB.body pb)] st
   in
   recurse t PB.empty

@@ -37,8 +37,8 @@ let z : Z.t num = {
   abs = Z.abs;
   cmp = Z.compare;
   raise_to_lcm = (fun a b ->
-    let gcd = Z.gcd a b in
-    Z.divexact b gcd, Z.divexact a gcd);
+      let gcd = Z.gcd a b in
+      Z.divexact b gcd, Z.divexact a gcd);
   hash = Z.hash;
   zero = Z.zero;
   one = Z.one;
@@ -60,10 +60,10 @@ let q : Q.t num = {
   abs = Q.abs;
   cmp = Q.compare;
   raise_to_lcm = (fun a b ->
-    assert (Q.sign a <> 0);
-    assert (Q.sign b <> 0);
-    let gcd = Q.max a b in
-    Q.div b gcd, Q.div a gcd);
+      assert (Q.sign a <> 0);
+      assert (Q.sign b <> 0);
+      let gcd = Q.max a b in
+      Q.div b gcd, Q.div a gcd);
   hash = (fun q-> CCHash.string (Q.to_string q));
   zero = Q.zero;
   one = Q.one;
@@ -118,13 +118,13 @@ let rec _merge ~num op l1 l2 = match l1, l2 with
   | [], l -> l
   | (s1, t1)::l1', (s2, t2)::l2' ->
     match T.compare t1 t2 with
-      | 0 ->
-        let s' = op s1 s2 in
-        if num.cmp num.zero s' = 0
-        then _merge ~num op l1' l2'  (* t disappears *)
-        else (s', t1) :: _merge ~num op l1' l2'
-      | n when n < 0 -> (s1, t1) :: _merge ~num op l1' l2
-      | _ -> (s2, t2) :: _merge ~num op l1 l2'
+    | 0 ->
+      let s' = op s1 s2 in
+      if num.cmp num.zero s' = 0
+      then _merge ~num op l1' l2'  (* t disappears *)
+      else (s', t1) :: _merge ~num op l1' l2'
+    | n when n < 0 -> (s1, t1) :: _merge ~num op l1' l2
+    | _ -> (s2, t2) :: _merge ~num op l1 l2'
 
 (* map [f] on all symbols of [e] *)
 let _fmap f e =
@@ -166,8 +166,8 @@ let find_exn e t = match find e t with
 
 let mem e t =
   match find e t with
-    | None -> false
-    | Some _ -> true
+  | None -> false
+  | Some _ -> true
 
 let add e s t =
   assert (Type.equal (T.ty t) e.num.ty);
@@ -205,7 +205,7 @@ let add_const e s =
 
 let remove e t =
   { e with
-      terms = List.filter (fun (_, t') -> not (T.equal t t')) e.terms; }
+    terms = List.filter (fun (_, t') -> not (T.equal t t')) e.terms; }
 
 let remove_const e =
   { e with const = e.num.zero; }
@@ -271,10 +271,10 @@ let comparison m1 m2 =
       depends on the model/instance *)
   let m = difference m1 m2 in
   match is_const m, m.num.sign m.const with
-    | false, _ -> Comparison.Incomparable
-    | true, 0 -> Comparison.Eq
-    | true, n when n < 0 -> Comparison.Lt
-    | true, _ -> Comparison.Gt
+  | false, _ -> Comparison.Incomparable
+  | true, 0 -> Comparison.Eq
+  | true, n when n < 0 -> Comparison.Lt
+  | true, _ -> Comparison.Gt
 
 let dominates ~strict m1 m2 = match comparison m1 m2 with
   | Comparison.Eq -> not strict
@@ -306,7 +306,7 @@ let apply_subst renaming subst (m,sc) =
 
 let apply_subst_no_simp renaming subst (m,sc) = {
   m with
-    terms=List.map (fun (c,t) -> c, Subst.FO.apply renaming subst (t,sc)) m.terms;
+  terms=List.map (fun (c,t) -> c, Subst.FO.apply renaming subst (t,sc)) m.terms;
 }
 
 let is_ground m =
@@ -339,14 +339,14 @@ let pp_ ~mult ~add ~pp_t out e =
     else Format.fprintf out "%s %s %a" (e.num.to_string s) mult pp_t t
   in
   match e.terms with
-    | [] -> CCFormat.string out (e.num.to_string e.const)
-    | _::_ when e.num.sign e.const = 0 ->
-      Util.pp_list ~sep:add pp_pair out e.terms
-    | _::_ ->
-      Format.fprintf out "%a%s%s"
-        (Util.pp_list ~sep:add pp_pair) e.terms
-        add
-        (e.num.to_string e.const)
+  | [] -> CCFormat.string out (e.num.to_string e.const)
+  | _::_ when e.num.sign e.const = 0 ->
+    Util.pp_list ~sep:add pp_pair out e.terms
+  | _::_ ->
+    Format.fprintf out "%a%s%s"
+      (Util.pp_list ~sep:add pp_pair) e.terms
+      add
+      (e.num.to_string e.const)
 
 let pp out e = pp_ ~mult:"×" ~add:" + " ~pp_t:T.pp out e
 let pp_zf out e = pp_ ~mult:" * " ~add:" + " ~pp_t:T.ZF.pp out e
@@ -365,10 +365,10 @@ let pp_tstp out e =
       Format.fprintf buf "$sum(%a, %a)" pp_pair (s,t) pp_list l'
   in
   match e.terms with
-    | [] -> CCFormat.string out (e.num.to_string e.const)
-    | _::_ when e.num.sign e.const = 0 -> pp_list out e.terms
-    | _::_ ->
-      Format.fprintf out "$sum(%s, %a)" (e.num.to_string e.const) pp_list e.terms
+  | [] -> CCFormat.string out (e.num.to_string e.const)
+  | _::_ when e.num.sign e.const = 0 -> pp_list out e.terms
+  | _::_ ->
+    Format.fprintf out "$sum(%s, %a)" (e.num.to_string e.const) pp_list e.terms
 
 let _fail_idx m i =
   invalid_arg (CCFormat.sprintf "invalid index %d in %a" i pp m)
@@ -408,10 +408,10 @@ module Focus = struct
   (* TODO: optimize *)
   let focus_term m term =
     match find m term with
-      | None -> None
-      | Some coeff ->
-        let rest = remove m term in
-        Some {coeff; rest; term; }
+    | None -> None
+    | Some coeff ->
+      let rest = remove m term in
+      Some {coeff; rest; term; }
 
   let focus_term_exn m t = match focus_term m t with
     | None -> failwith "focus_term_exn"
@@ -498,30 +498,30 @@ module Focus = struct
   (* unification between terms of the same monome *)
   let rec _iter_self ~num ~subst c t l rest const scope k =
     match l with
-      | [] ->
-        let mf' = { coeff=c; term=t; rest=of_list ~num const rest;} in
-        if num.sign c <> 0 then k (mf', subst)
-      | (c', t') :: l' ->
-        if Unif.FO.equal ~subst:(US.subst subst)
-            (Scoped.make t scope) (Scoped.make t' scope)
-        then (
-          (* we do not have a choice, [t = t'] is true *)
-          _iter_self ~num ~subst (num.add c c') t l' rest const scope k
-        ) else (
-          begin
-            try
-              (* maybe we can merge [t] and [t'] *)
-              let subst' = Unif.FO.unify_full ~subst
-                  (Scoped.make t scope) (Scoped.make t' scope)
-              in
-              (* move back [rest] into the main list, some terms might be equal
-                 to [t] now *)
-              _iter_self ~num ~subst:subst' (num.add c c') t (l'@ rest) [] const scope k
-            with Unif.Fail -> ()
-          end;
-          (* we can also choose not to unify [t] and [t']. *)
-          _iter_self ~num ~subst c t l' ((c',t')::rest) const scope k
-        )
+    | [] ->
+      let mf' = { coeff=c; term=t; rest=of_list ~num const rest;} in
+      if num.sign c <> 0 then k (mf', subst)
+    | (c', t') :: l' ->
+      if Unif.FO.equal ~subst:(US.subst subst)
+          (Scoped.make t scope) (Scoped.make t' scope)
+      then (
+        (* we do not have a choice, [t = t'] is true *)
+        _iter_self ~num ~subst (num.add c c') t l' rest const scope k
+      ) else (
+        begin
+          try
+            (* maybe we can merge [t] and [t'] *)
+            let subst' = Unif.FO.unify_full ~subst
+                (Scoped.make t scope) (Scoped.make t' scope)
+            in
+            (* move back [rest] into the main list, some terms might be equal
+               to [t] now *)
+            _iter_self ~num ~subst:subst' (num.add c c') t (l'@ rest) [] const scope k
+          with Unif.Fail -> ()
+        end;
+        (* we can also choose not to unify [t] and [t']. *)
+        _iter_self ~num ~subst c t l' ((c',t')::rest) const scope k
+      )
 
   let unify_self ?(subst=US.empty) (mf,sc) k =
     let num = mf.rest.num in
@@ -660,13 +660,13 @@ let unify ?(subst=Unif_subst.empty) (m1,sc1)(m2,sc2) k =
         try
           let subst = Unif.FO.unify_full ~subst (t1,sc1) (t2,sc2) in
           match m1.num.cmp c1 c2 with
-            | 0 -> start subst l1' (rest2 @ l2')  (* t1 removed *)
-            | n when n<0 ->
-              (* t1 removed *)
-              start subst l1' ((m1.num.sub c2 c1, t2) :: l2' @ rest2)
-            | _ ->
-              (* t2 removed *)
-              start subst ((m1.num.sub c1 c2, t1) :: l1') (l2' @ rest2)
+          | 0 -> start subst l1' (rest2 @ l2')  (* t1 removed *)
+          | n when n<0 ->
+            (* t1 removed *)
+            start subst l1' ((m1.num.sub c2 c1, t2) :: l2' @ rest2)
+          | _ ->
+            (* t2 removed *)
+            start subst ((m1.num.sub c1 c2, t1) :: l1') (l2' @ rest2)
         with Unif.Fail -> ()
       end;
       traverse_lists subst (c1,t1) l1' ((c2,t2)::rest2) l2'
@@ -1024,10 +1024,10 @@ module Int = struct
         (* let's build a linear combination of the variables that are going to
             be provided. for this, we build smaller linear combinations
            {[x1 = lcm(1,2)/l1 k1
-                 ...
-                   xi = -lcm(i-1,i)/li k(i-1) + lcm(i,i+1)/li ki
-                   ...
-                     xn = -lcm(n-1,n)/ln k(n-1)
+                    ...
+                                xi = -lcm(i-1,i)/li k(i-1) + lcm(i,i+1)/li ki
+                                                               ...
+                                                                             xn = -lcm(n-1,n)/ln k(n-1)
            ]}
             where lcm(i,j) = lcm(li, lj).
             This linear combination is of dimension n-1, and is always solution

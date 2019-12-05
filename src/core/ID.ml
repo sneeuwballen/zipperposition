@@ -27,8 +27,8 @@ let payload t = t.payload
 
 (* for temporary purposes *)
 let dummy_of_int id =
- let name = "DUMMY_" ^ (CCInt.to_string id) in
- {id; name; payload=[]}
+  let name = "DUMMY_" ^ (CCInt.to_string id) in
+  {id; name; payload=[]}
 
 let set_payload ?(can_erase=fun _->false) t e =
   let rec aux = function
@@ -43,16 +43,16 @@ let payload_find ~f:p t =
     | [] -> None
     | e1 :: tail ->
       match p e1, tail with
+      | Some _ as res, _ -> res
+      | None, [] -> None
+      | None, e2 :: tail2 ->
+        match p e2, tail2 with
         | Some _ as res, _ -> res
         | None, [] -> None
-        | None, e2 :: tail2 ->
-          match p e2, tail2 with
-            | Some _ as res, _ -> res
-            | None, [] -> None
-            | None, e3 :: tail3 ->
-              match p e3 with
-                | Some _ as res -> res
-                | None -> CCList.find_map p tail3
+        | None, e3 :: tail3 ->
+          match p e3 with
+          | Some _ as res -> res
+          | None -> CCList.find_map p tail3
   end
 
 let payload_pred ~f:p t =
@@ -127,19 +127,19 @@ let is_parameter id = as_parameter id |> CCOpt.is_some
 let is_skolem id =
   payload_pred id
     ~f:(function
-      | Attr_skolem _ -> true
-      | _ -> false)
+        | Attr_skolem _ -> true
+        | _ -> false)
 
 let as_skolem id =
   payload_find id
     ~f:(function
-      | Attr_skolem a -> Some a
-      | _ -> None)
+        | Attr_skolem a -> Some a
+        | _ -> None)
 
 (* Note: If you want to reinsert mandatory arguments: They were here. (let num_mandatory_args _ =) *)
 
 let is_distinct_object id =
   payload_pred id
     ~f:(function
-      | Attr_distinct -> true
-      | _ -> false)
+        | Attr_distinct -> true
+        | _ -> false)

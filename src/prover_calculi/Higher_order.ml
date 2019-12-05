@@ -105,8 +105,8 @@ module Make(E : Env.S) : S with module Env = E = struct
          end)
 
   let rec declare_skolems = function
-  | [] -> ()
-  | (sym,id) :: rest -> Ctx.declare sym id; declare_skolems rest
+    | [] -> ()
+    | (sym,id) :: rest -> Ctx.declare sym id; declare_skolems rest
 
   (* negative extensionality rule:
      [f != g] where [f : a -> b] becomes [f k != g k] for a fresh parameter [k] *)
@@ -125,9 +125,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           let vars = Literal.vars lit in
           let skolems = ref [] in
           let l = List.map (fun ty -> 
-            let sk, res =  T.mk_fresh_skolem vars ty in
-            skolems := sk :: !skolems;
-            res) ty_args in
+              let sk, res =  T.mk_fresh_skolem vars ty in
+              skolems := sk :: !skolems;
+              res) ty_args in
           (* save list *)
           declare_skolems !skolems;
           idx_ext_neg_lit_ := FV_ext_neg_lit.add !idx_ext_neg_lit_ (lit,l);
@@ -149,57 +149,57 @@ module Make(E : Env.S) : S with module Env = E = struct
     if not only_unit || C.lits c |> CCArray.length = 1 then 
       C.lits c
       |> CCArray.mapi (fun i l ->
-        let l = Literal.map (fun t -> Lambda.eta_reduce ~full:true t) l in
-        match l with 
-        | Literal.Equation (t1,t2,true) 
+          let l = Literal.map (fun t -> Lambda.eta_reduce ~full:true t) l in
+          match l with 
+          | Literal.Equation (t1,t2,true) 
             when is_eligible i l ->
-          let f1, l1 = T.as_app t1 in
-          let f2, l2 = T.as_app t2 in
-          begin match List.rev l1, List.rev l2 with
-            | last1 :: l1, last2 :: l2 ->
-              begin match T.view last1, T.view last2 with
-                | T.Var x, T.Var y
-                  when HVar.equal Type.equal x y &&
-                      not (Type.is_tType (HVar.ty x)) &&
-                        Iter.of_list
-                          [Iter.doubleton f1 f2;
+            let f1, l1 = T.as_app t1 in
+            let f2, l2 = T.as_app t2 in
+            begin match List.rev l1, List.rev l2 with
+              | last1 :: l1, last2 :: l2 ->
+                begin match T.view last1, T.view last2 with
+                  | T.Var x, T.Var y
+                    when HVar.equal Type.equal x y &&
+                         not (Type.is_tType (HVar.ty x)) &&
+                         Iter.of_list
+                           [Iter.doubleton f1 f2;
                             Iter.of_list l1;
                             Iter.of_list l2]
-                        |> Iter.flatten
-                        |> Iter.flat_map T.Seq.vars
-                        |> Iter.for_all
-                          (fun v' -> not (HVar.equal Type.equal v' x)) ->
-                  (* it works! *)
-                  let new_lit =
-                    Literal.mk_eq
-                      (T.app f1 (List.rev l1))
-                      (T.app f2 (List.rev l2))
-                  in
-                  let new_lits = C.lits c |> CCArray.to_list |>
-                                List.mapi (fun j l -> if i = j then new_lit else l) in
-                  let proof =
-                    Proof.Step.inference [C.proof_parent c]
-                      ~rule:(Proof.Rule.mk "ho_ext_pos")
-                      ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext]
-                  in
-                  let new_c =
-                    C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
-                  in
-                  Format.printf "@[EP: @[%a@] => @[%a@]@].\n" C.pp c C.pp new_c;
-                  Format.force_newline ();
-                  Util.incr_stat stat_ext_pos;
-                  Util.debugf ~section 4
-                    "(@[ext_pos@ :clause %a@ :yields %a@])"
-                    (fun k->k C.pp c C.pp new_c);
-                  Some new_c
-                | _,_ -> None
-              end
-            | _ -> None
-        end
-      | _ -> None)
-    |> CCArray.filter_map (fun x -> x)
-    |> CCArray.to_list
-  else []
+                         |> Iter.flatten
+                         |> Iter.flat_map T.Seq.vars
+                         |> Iter.for_all
+                           (fun v' -> not (HVar.equal Type.equal v' x)) ->
+                    (* it works! *)
+                    let new_lit =
+                      Literal.mk_eq
+                        (T.app f1 (List.rev l1))
+                        (T.app f2 (List.rev l2))
+                    in
+                    let new_lits = C.lits c |> CCArray.to_list |>
+                                   List.mapi (fun j l -> if i = j then new_lit else l) in
+                    let proof =
+                      Proof.Step.inference [C.proof_parent c]
+                        ~rule:(Proof.Rule.mk "ho_ext_pos")
+                        ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext]
+                    in
+                    let new_c =
+                      C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
+                    in
+                    Format.printf "@[EP: @[%a@] => @[%a@]@].\n" C.pp c C.pp new_c;
+                    Format.force_newline ();
+                    Util.incr_stat stat_ext_pos;
+                    Util.debugf ~section 4
+                      "(@[ext_pos@ :clause %a@ :yields %a@])"
+                      (fun k->k C.pp c C.pp new_c);
+                    Some new_c
+                  | _,_ -> None
+                end
+              | _ -> None
+            end
+          | _ -> None)
+      |> CCArray.filter_map (fun x -> x)
+      |> CCArray.to_list
+    else []
 
   let ext_pos_general ?(all_lits = false) (c:C.t) : C.t list =
     let eligible = if all_lits then C.Eligible.always else C.Eligible.param c in
@@ -213,22 +213,22 @@ module Make(E : Env.S) : S with module Env = E = struct
         | last_t :: tl_rev_t, last_s :: tl_rev_s ->
           if T.equal last_t last_s && not (T.is_type last_t) then
             match T.as_var last_t with
-              | Some v ->
-                if not (T.var_occurs ~var:v f)
-                && not (T.var_occurs ~var:v g)
-                && not (List.exists (T.var_occurs ~var:v) tl_rev_t)
-                && not (List.exists (T.var_occurs ~var:v) tl_rev_s)
-                && not (List.exists (Literal.var_occurs v) other_lits)
-                then (
-                  let butlast = (fun l -> CCList.take (List.length l - 1) l) in
-                  let t' = T.app f (butlast tt) in
-                  let s' = T.app g (butlast ss) in
-                  Literal.mk_eq t' s'
-                  :: ext_pos_lit t' s' other_lits
-                )
-                else
-                  []
-              | None -> []
+            | Some v ->
+              if not (T.var_occurs ~var:v f)
+              && not (T.var_occurs ~var:v g)
+              && not (List.exists (T.var_occurs ~var:v) tl_rev_t)
+              && not (List.exists (T.var_occurs ~var:v) tl_rev_s)
+              && not (List.exists (Literal.var_occurs v) other_lits)
+              then (
+                let butlast = (fun l -> CCList.take (List.length l - 1) l) in
+                let t' = T.app f (butlast tt) in
+                let s' = T.app g (butlast ss) in
+                Literal.mk_eq t' s'
+                :: ext_pos_lit t' s' other_lits
+              )
+              else
+                []
+            | None -> []
           else []
         | _ -> []
       end
@@ -240,8 +240,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Iter.filter (fun (idx,lit) -> eligible idx lit)
       |> Iter.flat_map_l
         (fun (lit_idx,lit) ->
-        let lit = Literal.map (fun t -> Lambda.eta_reduce t) lit in
-        match lit with
+           let lit = Literal.map (fun t -> Lambda.eta_reduce t) lit in
+           match lit with
            | Literal.Equation (t, s, true) ->
              ext_pos_lit t s (CCArray.except_idx (C.lits c) lit_idx)
              |> Iter.of_list
@@ -285,18 +285,18 @@ module Make(E : Env.S) : S with module Env = E = struct
       CCList.(1 -- List.length vars)
       |> List.map
         (fun prefix_len ->
-          let vars_prefix = CCList.take prefix_len vars in
-          let new_lit = Literal.mk_eq (T.app t vars_prefix) (T.app u vars_prefix) in
-          let new_lits = new_lit :: CCArray.except_idx lits lit_idx in
-          let proof =
-            Proof.Step.inference [C.proof_parent c]
-              ~rule:(Proof.Rule.mk "ho_complete_eq")
-              ~tags:[Proof.Tag.T_ho]
-          in
-          let new_c =
-            C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
-          in
-          new_c)
+           let vars_prefix = CCList.take prefix_len vars in
+           let new_lit = Literal.mk_eq (T.app t vars_prefix) (T.app u vars_prefix) in
+           let new_lits = new_lit :: CCArray.except_idx lits lit_idx in
+           let proof =
+             Proof.Step.inference [C.proof_parent c]
+               ~rule:(Proof.Rule.mk "ho_complete_eq")
+               ~tags:[Proof.Tag.T_ho]
+           in
+           let new_c =
+             C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
+           in
+           new_c)
     in
     let new_c =
       C.lits c
@@ -310,7 +310,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              (* A polymorphic variable might be functional on the ground level *)
              let var = Type.as_var_exn (T.ty t) in
              let funty = T.of_ty (Type.arrow [Type.var (HVar.fresh ~ty:Type.tType ())]
-                                             (Type.var (HVar.fresh ~ty:Type.tType ()))) in
+                                    (Type.var (HVar.fresh ~ty:Type.tType ()))) in
              let subst = Unif_subst.FO.singleton (var,0) (funty,0) in
              let renaming, subst = Subst.Renaming.none, Unif_subst.subst subst in
              let lits' = Lits.apply_subst renaming subst (C.lits c, 0) in
@@ -361,34 +361,34 @@ module Make(E : Env.S) : S with module Env = E = struct
           assert(List.for_all (fun (s,t) -> Type.equal (T.ty s) (T.ty t)) subterms);
           if not (CCList.is_empty subterms) &&
              List.exists (fun (l,_) -> 
-                Type.is_fun (T.ty l) || Type.is_prop (T.ty l)) subterms then
-             let subterms_lit = CCList.map (fun (l,r) ->
-               let free_vars = T.VarSet.union (T.vars l) (T.vars r) |> T.VarSet.to_list in 
-               let arg_types = Type.expected_args @@ T.ty l in
-               if CCList.is_empty arg_types then Literal.mk_neq l r
-               else (
-                 let skolem_decls = ref [] in
-                 let skolems = List.map (fun ty -> 
-                  let sk, res =  T.mk_fresh_skolem free_vars ty in
-                  skolem_decls := sk :: !skolem_decls;
-                  res) arg_types in
-                 declare_skolems !skolem_decls;
-                 Literal.mk_neq (T.app l skolems) (T.app r skolems)
-               )
+                 Type.is_fun (T.ty l) || Type.is_prop (T.ty l)) subterms then
+            let subterms_lit = CCList.map (fun (l,r) ->
+                let free_vars = T.VarSet.union (T.vars l) (T.vars r) |> T.VarSet.to_list in 
+                let arg_types = Type.expected_args @@ T.ty l in
+                if CCList.is_empty arg_types then Literal.mk_neq l r
+                else (
+                  let skolem_decls = ref [] in
+                  let skolems = List.map (fun ty -> 
+                      let sk, res =  T.mk_fresh_skolem free_vars ty in
+                      skolem_decls := sk :: !skolem_decls;
+                      res) arg_types in
+                  declare_skolems !skolem_decls;
+                  Literal.mk_neq (T.app l skolems) (T.app r skolems)
+                )
               ) subterms in
-             let new_lits = CCList.flat_map (fun (j,x) -> 
-              if i!=j then [x]
-              else subterms_lit) 
-              (C.lits c |> Array.mapi (fun j x -> (j,x)) |> Array.to_list) in
-             let proof =
+            let new_lits = CCList.flat_map (fun (j,x) -> 
+                if i!=j then [x]
+                else subterms_lit) 
+                (C.lits c |> Array.mapi (fun j x -> (j,x)) |> Array.to_list) in
+            let proof =
               Proof.Step.inference [C.proof_parent c] 
                 ~rule:(Proof.Rule.mk "neg_cong_fun") 
                 ~tags:[Proof.Tag.T_ho]
-              in
-             let new_c =
-               C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
-             Util.incr_stat stat_neg_cong_fun;
-             Some new_c
+            in
+            let new_c =
+              C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
+            Util.incr_stat stat_neg_cong_fun;
+            Some new_c
           else None
         | _ -> None)
     |> CCArray.filter_map (fun x -> x)
@@ -400,7 +400,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> CCArray.mapi (fun i l -> 
         match l with 
         | Literal.Equation (lhs,rhs,false) 
-            when is_eligible i l && Type.is_fun @@ T.ty lhs ->
+          when is_eligible i l && Type.is_fun @@ T.ty lhs ->
           let arg_types = Type.expected_args @@ T.ty lhs in
           let free_vars = Literal.vars l in
           let skolem_decls = ref [] in
@@ -408,9 +408,9 @@ module Make(E : Env.S) : S with module Env = E = struct
               if i!=j then x
               else (
                 let skolems = List.map (fun ty -> 
-                  let sk, res =  T.mk_fresh_skolem free_vars ty in
-                  skolem_decls := sk :: !skolem_decls;
-                  res) arg_types in
+                    let sk, res =  T.mk_fresh_skolem free_vars ty in
+                    skolem_decls := sk :: !skolem_decls;
+                    res) arg_types in
                 Literal.mk_neq (T.app lhs skolems) (T.app rhs skolems))
             ) (C.lits c |> Array.mapi (fun j x -> (j,x)) |> Array.to_list) in
           declare_skolems !skolem_decls;
@@ -421,9 +421,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           in
           let new_c =
             C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
-           Util.debugf 1 ~section "NegExt: @[%a@] => @[%a@].\n" (fun k -> k C.pp c C.pp new_c);
-           Util.incr_stat stat_neg_ext;
-           Some new_c
+          Util.debugf 1 ~section "NegExt: @[%a@] => @[%a@].\n" (fun k -> k C.pp c C.pp new_c);
+          Util.incr_stat stat_neg_ext;
+          Some new_c
         | _ -> None)
     |> CCArray.filter_map (fun x -> x)
     |> CCArray.to_list
@@ -436,14 +436,14 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> CCArray.mapi (fun i l -> 
           match l with 
           | Literal.Equation (lhs,rhs,false) 
-              when is_eligible i l && Type.is_fun @@ T.ty lhs ->
+            when is_eligible i l && Type.is_fun @@ T.ty lhs ->
             let arg_types = Type.expected_args @@ T.ty lhs in
             let free_vars = Literal.vars l |> T.VarSet.of_list |> T.VarSet.to_list in
             let skolem_decls = ref [] in
             let skolems = List.map (fun ty -> 
-              let sk, res =  T.mk_fresh_skolem free_vars ty in
-              skolem_decls := sk :: !skolem_decls;
-              res) arg_types in
+                let sk, res =  T.mk_fresh_skolem free_vars ty in
+                skolem_decls := sk :: !skolem_decls;
+                res) arg_types in
             applied_neg_ext := true;
             declare_skolems !skolem_decls;
             Literal.mk_neq (T.app lhs skolems) (T.app rhs skolems)
@@ -606,7 +606,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> T.VarSet.to_seq
       |> Iter.flat_map_l
         (fun v -> HO_unif.enum_prop ~enum_cache:(Env.flex_get k_prim_enum_terms) 
-                                    ~mode ~offset (v,sc_c))
+            ~mode ~offset (v,sc_c))
       |> Iter.map
         (fun (subst,penalty) ->
            let renaming = Subst.Renaming.create() in
@@ -694,8 +694,8 @@ module Make(E : Env.S) : S with module Env = E = struct
             |> Term.Set.to_list
             |> (fun l -> if CCList.is_empty l then [new_choice_op hd_ty] else l) in
           CCList.flat_map (fun hd -> 
-            [choice_inst_of_hd hd arg; choice_inst_of_hd hd (neg_trigger arg)]) 
-          choice_ops
+              [choice_inst_of_hd hd arg; choice_inst_of_hd hd (neg_trigger arg)]) 
+            choice_ops
         ) else if Term.Set.mem hd !choice_ops then (
           [choice_inst_of_hd hd arg; choice_inst_of_hd hd (neg_trigger arg)]
         ) else []
@@ -707,23 +707,23 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> Iter.flat_map_l build_choice_inst
     |> Iter.to_list
 
-   let recognize_choice_ops c =
+  let recognize_choice_ops c =
     let extract_not_p_x l = match l with
-    | Literal.Equation(lhs,rhs,true) when T.equal T.false_ rhs && T.is_app_var lhs ->
-      begin match T.view lhs with
-      | T.App(hd, [var]) when T.is_var var -> Some hd
-      | _ -> None end
-    | _ -> None in
-    
+      | Literal.Equation(lhs,rhs,true) when T.equal T.false_ rhs && T.is_app_var lhs ->
+        begin match T.view lhs with
+          | T.App(hd, [var]) when T.is_var var -> Some hd
+          | _ -> None end
+      | _ -> None in
+
     let extract_p_choice_p p l = match l with 
-    | Literal.Equation(lhs,rhs,true) when T.equal T.true_ rhs && T.is_app_var lhs ->
-      begin match T.view lhs with
-      | T.App(hd, [ch_p]) when T.equal hd p ->
-        begin match T.view ch_p with 
-        | T.App(sym, [var]) when T.is_const sym && T.equal var p -> Some sym
-        | _ -> None end
-      | _ -> None end
-    | _ -> None in
+      | Literal.Equation(lhs,rhs,true) when T.equal T.true_ rhs && T.is_app_var lhs ->
+        begin match T.view lhs with
+          | T.App(hd, [ch_p]) when T.equal hd p ->
+            begin match T.view ch_p with 
+              | T.App(sym, [var]) when T.is_const sym && T.equal var p -> Some sym
+              | _ -> None end
+          | _ -> None end
+      | _ -> None in
 
     if C.length c == 2 then (
       let px = CCArray.find_map extract_not_p_x (C.lits c) in
@@ -731,25 +731,25 @@ module Make(E : Env.S) : S with module Env = E = struct
       | Some p ->
         let p_ch_p = CCArray.find_map (extract_p_choice_p p) (C.lits c) in
         begin match p_ch_p with
-        | Some sym ->
-          choice_ops := Term.Set.add sym !choice_ops;
-          let new_cls = 
-            Env.get_active ()
-            |> Iter.flat_map_l (fun pas_cl -> 
-                if C.id pas_cl = C.id c then []
-                else (
-                insantiate_choice ~inst_vars:false 
-                                  ~choice_ops:(ref (Term.Set.singleton sym)) 
-                                  pas_cl
-                )) in
-          Env.add_passive new_cls;
-          C.mark_redundant c;
-          true
-        | None -> false end
+          | Some sym ->
+            choice_ops := Term.Set.add sym !choice_ops;
+            let new_cls = 
+              Env.get_active ()
+              |> Iter.flat_map_l (fun pas_cl -> 
+                  if C.id pas_cl = C.id c then []
+                  else (
+                    insantiate_choice ~inst_vars:false 
+                      ~choice_ops:(ref (Term.Set.singleton sym)) 
+                      pas_cl
+                  )) in
+            Env.add_passive new_cls;
+            C.mark_redundant c;
+            true
+          | None -> false end
       | None -> false
     ) else false
-    
-  
+
+
   let elim_leibniz_equality c =
     if C.proof_depth c < Env.flex_get k_elim_leibniz_eq then (
       let ord = Env.ord () in
@@ -757,46 +757,46 @@ module Make(E : Env.S) : S with module Env = E = struct
       let pos_pred_vars, neg_pred_vars, occurences = 
         Lits.fold_eqn ~both:false ~ord ~eligible (C.lits c)
         |> Iter.fold (fun (pos_vs,neg_vs,occ) (lhs,rhs,sign,_) -> 
-          if Type.is_prop (Term.ty lhs) && Term.is_app_var lhs && sign
-              && Term.is_true_or_false rhs then (
-            let var_hd = Term.as_var_exn (Term.head_term lhs) in
-            if Term.equal T.true_ rhs then (Term.VarSet.add var_hd pos_vs, neg_vs, Term.Map.add lhs true occ)
-            else (pos_vs, Term.VarSet.add var_hd neg_vs, Term.Map.add lhs false occ)
-          ) else (pos_vs, neg_vs, occ)
-        ) (Term.VarSet.empty,Term.VarSet.empty,Term.Map.empty) in
+            if Type.is_prop (Term.ty lhs) && Term.is_app_var lhs && sign
+               && Term.is_true_or_false rhs then (
+              let var_hd = Term.as_var_exn (Term.head_term lhs) in
+              if Term.equal T.true_ rhs then (Term.VarSet.add var_hd pos_vs, neg_vs, Term.Map.add lhs true occ)
+              else (pos_vs, Term.VarSet.add var_hd neg_vs, Term.Map.add lhs false occ)
+            ) else (pos_vs, neg_vs, occ)
+          ) (Term.VarSet.empty,Term.VarSet.empty,Term.Map.empty) in
       let pos_neg_vars = Term.VarSet.inter pos_pred_vars neg_pred_vars in
       let res = 
         if Term.VarSet.is_empty pos_neg_vars then []
         else (
           CCList.flat_map (fun (t,sign) -> 
-            let hd, args = T.as_app t in
-            let var_hd = T.as_var_exn hd in
-            if Term.VarSet.mem (Term.as_var_exn hd) pos_neg_vars then (
-              let tyargs, _ = Type.open_fun (Term.ty hd) in
-              let n = List.length tyargs in
-              CCList.filter_map (fun (i,arg) ->
-                if T.var_occurs ~var:var_hd arg then None 
-                else (
-                  let body = (if sign then T.Form.neq else T.Form.eq) 
-                                arg (T.bvar ~ty:(T.ty arg) (n-i-1)) in
-                  let subs_term = T.fun_l tyargs body in 
-                  (let cached_t = Subst.FO.canonize_all_vars subs_term in
-                  E.flex_add k_prim_enum_terms 
-                    (ref (Term.Set.add cached_t !(Env.flex_get k_prim_enum_terms))));
-                  let subst = Subst.FO.bind' (Subst.empty) (var_hd, 0) (subs_term, 0) in
-                  let rule = Proof.Rule.mk ("elim_leibniz_eq_" ^ (if sign then "+" else "-")) in
-                  let tags = [Proof.Tag.T_ho] in
-                  let proof = Some (Proof.Step.inference ~rule ~tags [C.proof_parent c]) in
-                  Some (C.apply_subst ~proof (c,0) subst))
-              ) (CCList.mapi (fun i arg -> (i, arg)) args)
-            ) else [] 
-          ) (Term.Map.to_list occurences)) in
+              let hd, args = T.as_app t in
+              let var_hd = T.as_var_exn hd in
+              if Term.VarSet.mem (Term.as_var_exn hd) pos_neg_vars then (
+                let tyargs, _ = Type.open_fun (Term.ty hd) in
+                let n = List.length tyargs in
+                CCList.filter_map (fun (i,arg) ->
+                    if T.var_occurs ~var:var_hd arg then None 
+                    else (
+                      let body = (if sign then T.Form.neq else T.Form.eq) 
+                          arg (T.bvar ~ty:(T.ty arg) (n-i-1)) in
+                      let subs_term = T.fun_l tyargs body in 
+                      (let cached_t = Subst.FO.canonize_all_vars subs_term in
+                       E.flex_add k_prim_enum_terms 
+                         (ref (Term.Set.add cached_t !(Env.flex_get k_prim_enum_terms))));
+                      let subst = Subst.FO.bind' (Subst.empty) (var_hd, 0) (subs_term, 0) in
+                      let rule = Proof.Rule.mk ("elim_leibniz_eq_" ^ (if sign then "+" else "-")) in
+                      let tags = [Proof.Tag.T_ho] in
+                      let proof = Some (Proof.Step.inference ~rule ~tags [C.proof_parent c]) in
+                      Some (C.apply_subst ~proof (c,0) subst))
+                  ) (CCList.mapi (fun i arg -> (i, arg)) args)
+              ) else [] 
+            ) (Term.Map.to_list occurences)) in
       (* CCFormat.printf "Elim Leibniz eq:@ @[%a@].\n" C.pp c;
-      CCFormat.printf "Pos/neg vars:@ @[%a@].\n" (Term.VarSet.pp HVar.pp) pos_neg_vars;
-      CCFormat.printf "Res:@ @[%a@].\n" (CCList.pp C.pp) res); *)
+         CCFormat.printf "Pos/neg vars:@ @[%a@].\n" (Term.VarSet.pp HVar.pp) pos_neg_vars;
+         CCFormat.printf "Res:@ @[%a@].\n" (CCList.pp C.pp) res); *)
       res
     ) else []
-    
+
 
   let pp_pairs_ out =
     let open CCFormat in
@@ -868,23 +868,23 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* assert (T.DB.is_closed t); *)
     let t' = Lambda.snf t in
     if (T.equal t t') then (
-       Util.debugf ~section 50 "(@[beta_reduce `%a`@ failed `@])" (fun k->k T.pp t );
-       None)
+      Util.debugf ~section 50 "(@[beta_reduce `%a`@ failed `@])" (fun k->k T.pp t );
+      None)
     else (
       Util.debugf ~section 50 "(@[beta_reduce `%a`@ :into `%a`@])"
         (fun k->k T.pp t T.pp t');
       Util.incr_stat stat_beta;
       (* assert (T.DB.is_closed t'); *)
       Some t'
-   )
+    )
 
   (* rule for eta-expansion *)
   let eta_normalize t =
     (* assert (T.DB.is_closed t); *)
     let t' = Ctx.eta_normalize t in
     if (T.equal t t') then (
-       Util.debugf ~section 50 "(@[eta_normalize `%a`@ failed `@])" (fun k->k T.pp t );
-       None)
+      Util.debugf ~section 50 "(@[eta_normalize `%a`@ failed `@])" (fun k->k T.pp t );
+      None)
     else (
       Util.debugf ~section 50 "(@[eta_normalize `%a`@ :into `%a`@])"
         (fun k->k T.pp t T.pp t');
@@ -945,70 +945,70 @@ module Make(E : Env.S) : S with module Env = E = struct
     | Unique              (* This argument is not always the same as some other argument across occurences *)
 
   (** Removal of fixed/duplicate arguments of variables.
-    - If within a clause, there exists a variable F that's always applied
-      to at least i arguments and the ith argument is always the same DB-free term,
-      we can systematically remove the argument (and repair F's type).
-    - If within a clause, there exist a variable F, and indices i < j
-      such that all occurrences of F are applied to at least j arguments and the
-      ith argument is syntactically same as the jth argument, we can
-      systematically remove the ith argument (and repair F's type accordingly).
+      - If within a clause, there exists a variable F that's always applied
+        to at least i arguments and the ith argument is always the same DB-free term,
+        we can systematically remove the argument (and repair F's type).
+      - If within a clause, there exist a variable F, and indices i < j
+        such that all occurrences of F are applied to at least j arguments and the
+        ith argument is syntactically same as the jth argument, we can
+        systematically remove the ith argument (and repair F's type accordingly).
   *)
   let prune_arg_old c =
     let status : (fixed_arg_status * dupl_arg_status) list VTbl.t = VTbl.create 8 in
     C.lits c
     |> Literals.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord:Ordering.none 
-                           ~subterms:true  ~eligible:(fun _ _ -> true)
+      ~subterms:true  ~eligible:(fun _ _ -> true)
     |> Iter.iter
       (fun (t,_) ->
-        let head, args = T.as_app t in
-        match T.as_var head with
-          | Some var ->
-            begin match VTbl.get status var with
-            | Some var_status ->
-              (* We have seen this var before *)
-              let update_fas fas arg =
-                match fas with
-                  | Always u -> if T.equal u arg then Always u else Varies
-                  | Varies -> Varies
-              in
-              let rec update_das das arg =
-                match das with
-                | AlwaysSameAs j ->
-                  begin
-                    try
-                      if T.equal (List.nth args j) arg
-                      then AlwaysSameAs j
-                      else update_das (snd (List.nth var_status j)) (List.nth args j)
-                    with Failure _ -> Unique
-                  end
-                | Unique -> Unique
-              in
-              (* Shorten the lists to have equal lengths. Arguments positions are only interesting if they appear behind every occurrence of a var.*)
-              let minlen = min (List.length var_status) (List.length args) in
-              let args = CCList.take minlen args in
-              let var_status = CCList.take minlen var_status in
-              VTbl.replace status var (CCList.map (fun ((fas, das), arg) -> update_fas fas arg, update_das das arg) (List.combine var_status args))
-            | None ->
-              (* First time to encounter this var *)
-              let rec create_var_status ?(i=0) args : (fixed_arg_status * dupl_arg_status) list =
-                match args with
-                | [] -> []
-                | arg :: args' ->
-                  let fas =
-                    if T.DB.is_closed arg then Always arg else Varies
-                  in
-                  (* Find next identical argument *)
-                  let das = match CCList.find_idx ((Term.equal) arg) args' with
-                    | Some (j, _) -> AlwaysSameAs (i + j + 1)
-                    | None -> Unique
-                  in
-                  (fas, das) :: create_var_status ~i:(i+1) args'
-              in
-              VTbl.add status var (create_var_status args)
-            end
-          | None -> ()
-          ;
-        ()
+         let head, args = T.as_app t in
+         match T.as_var head with
+         | Some var ->
+           begin match VTbl.get status var with
+             | Some var_status ->
+               (* We have seen this var before *)
+               let update_fas fas arg =
+                 match fas with
+                 | Always u -> if T.equal u arg then Always u else Varies
+                 | Varies -> Varies
+               in
+               let rec update_das das arg =
+                 match das with
+                 | AlwaysSameAs j ->
+                   begin
+                     try
+                       if T.equal (List.nth args j) arg
+                       then AlwaysSameAs j
+                       else update_das (snd (List.nth var_status j)) (List.nth args j)
+                     with Failure _ -> Unique
+                   end
+                 | Unique -> Unique
+               in
+               (* Shorten the lists to have equal lengths. Arguments positions are only interesting if they appear behind every occurrence of a var.*)
+               let minlen = min (List.length var_status) (List.length args) in
+               let args = CCList.take minlen args in
+               let var_status = CCList.take minlen var_status in
+               VTbl.replace status var (CCList.map (fun ((fas, das), arg) -> update_fas fas arg, update_das das arg) (List.combine var_status args))
+             | None ->
+               (* First time to encounter this var *)
+               let rec create_var_status ?(i=0) args : (fixed_arg_status * dupl_arg_status) list =
+                 match args with
+                 | [] -> []
+                 | arg :: args' ->
+                   let fas =
+                     if T.DB.is_closed arg then Always arg else Varies
+                   in
+                   (* Find next identical argument *)
+                   let das = match CCList.find_idx ((Term.equal) arg) args' with
+                     | Some (j, _) -> AlwaysSameAs (i + j + 1)
+                     | None -> Unique
+                   in
+                   (fas, das) :: create_var_status ~i:(i+1) args'
+               in
+               VTbl.add status var (create_var_status args)
+           end
+         | None -> ()
+           ;
+           ()
       );
     let subst =
       VTbl.to_list status
@@ -1017,10 +1017,10 @@ module Make(E : Env.S) : S with module Env = E = struct
           assert (not (Type.is_tType (HVar.ty var)));
           let ty_args, ty_return = Type.open_fun (HVar.ty var) in
           let keep = var_status |> CCList.map
-            (fun (fas, das) ->
-                (* Keep argument if this is true: *)
-                fas == Varies && das == Unique
-            )
+                       (fun (fas, das) ->
+                          (* Keep argument if this is true: *)
+                          fas == Varies && das == Unique
+                       )
           in
           if CCList.for_all ((=) true) keep
           then None
@@ -1029,9 +1029,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             let keep = CCList.(append keep (replicate (length ty_args - length keep) true)) in
             (* Create substitution: *)
             let ty_args' = ty_args
-              |> CCList.combine keep
-              |> CCList.filter fst
-              |> CCList.map snd
+                           |> CCList.combine keep
+                           |> CCList.filter fst
+                           |> CCList.map snd
             in
             let var' = HVar.cast var ~ty:(Type.arrow ty_args' ty_return) in
             let bvars =
@@ -1053,43 +1053,43 @@ module Make(E : Env.S) : S with module Env = E = struct
       let renaming = Subst.Renaming.none in
       let new_lits = Lits.apply_subst renaming subst (C.lits c, 0) in
       let proof =
-          Proof.Step.simp
-            ~rule:(Proof.Rule.mk "prune_arg")
-            ~tags:[Proof.Tag.T_ho]
-            [C.proof_parent_subst renaming (c,0) subst] in
+        Proof.Step.simp
+          ~rule:(Proof.Rule.mk "prune_arg")
+          ~tags:[Proof.Tag.T_ho]
+          [C.proof_parent_subst renaming (c,0) subst] in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
       Util.debugf ~section 3
-          "@[<>@[%a@]@ @[<2>prune_arg into@ @[%a@]@]@ with @[%a@]@]"
-          (fun k->k C.pp c C.pp c' Subst.pp subst);
+        "@[<>@[%a@]@ @[<2>prune_arg into@ @[%a@]@]@ with @[%a@]@]"
+        (fun k->k C.pp c C.pp c' Subst.pp subst);
       SimplM.return_new c'
     )
-    (* TODO: Simplified flag like in first-order? Profiler?*)
+  (* TODO: Simplified flag like in first-order? Profiler?*)
 
   let prune_arg ~all_covers c =
     let get_covers ?(current_sets=[]) head args = 
       let ty_args, _ = Type.open_fun (T.ty head) in
       let missing = CCList.replicate (List.length ty_args - List.length args) None in 
       let args_opt = List.mapi (fun i a_i ->
-            assert(Term.DB.is_closed a_i);
-            assert(CCList.is_empty current_sets ||
-                   List.length current_sets = (List.length args + List.length missing));
-            if CCList.is_empty current_sets ||
-               not (Term.Set.is_empty (List.nth current_sets i)) then 
-              (Some (List.mapi (fun j a_j -> 
-                if i = j then None else Some a_j) args))
-            else None (* ignoring onself *))
-        args @ missing in
+          assert(Term.DB.is_closed a_i);
+          assert(CCList.is_empty current_sets ||
+                 List.length current_sets = (List.length args + List.length missing));
+          if CCList.is_empty current_sets ||
+             not (Term.Set.is_empty (List.nth current_sets i)) then 
+            (Some (List.mapi (fun j a_j -> 
+                 if i = j then None else Some a_j) args))
+          else None (* ignoring onself *))
+          args @ missing in
       let res = List.mapi (fun i arg_opt ->
-        if i < List.length args then (
-          let t = List.nth args i in 
-          begin match arg_opt with 
-          | Some arg_l ->
-            let res_l = if all_covers then T.cover_with_terms t arg_l 
-                        else [t; T.max_cover t arg_l] in
-            T.Set.of_list res_l 
-          | None -> Term.Set.empty 
-          end)
-        else Term.Set.empty) args_opt in
+          if i < List.length args then (
+            let t = List.nth args i in 
+            begin match arg_opt with 
+              | Some arg_l ->
+                let res_l = if all_covers then T.cover_with_terms t arg_l 
+                  else [t; T.max_cover t arg_l] in
+                T.Set.of_list res_l 
+              | None -> Term.Set.empty 
+            end)
+          else Term.Set.empty) args_opt in
       res
     in
 
@@ -1098,30 +1098,30 @@ module Make(E : Env.S) : S with module Env = E = struct
     C.lits c
     |> Literals.map (fun t -> Lambda.eta_expand t) (* to make sure that DB indices are everywhere the same *)
     |> Literals.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord:Ordering.none 
-                           ~subterms:true  ~eligible:(fun _ _ -> true)
+      ~subterms:true  ~eligible:(fun _ _ -> true)
     |> Iter.iter
       (fun (t,_) ->
-        let head, _ = T.as_app t in
-        match T.as_var head with
-          | Some var when T.VarSet.mem var free_vars ->
-            begin match VTbl.get status var with
-            | Some (current_sets, created_sk) ->
-              let t, new_sk = T.DB.skolemize_loosely_bound t in
-              let new_skolems = T.IntMap.bindings new_sk 
+         let head, _ = T.as_app t in
+         match T.as_var head with
+         | Some var when T.VarSet.mem var free_vars ->
+           begin match VTbl.get status var with
+             | Some (current_sets, created_sk) ->
+               let t, new_sk = T.DB.skolemize_loosely_bound t in
+               let new_skolems = T.IntMap.bindings new_sk 
+                                 |> List.map snd |> Term.Set.of_list in
+               let covers = get_covers ~current_sets head (T.args t) in
+               assert(List.length current_sets = List.length covers);
+               let paired = CCList.combine current_sets covers in
+               let res = List.map (fun (o,n) -> Term.Set.inter o n) paired in
+               VTbl.replace status var (res, Term.Set.union created_sk new_skolems);
+             | None ->
+               let t', created_sk = T.DB.skolemize_loosely_bound t in
+               let created_sk = T.IntMap.bindings created_sk
                                 |> List.map snd |> Term.Set.of_list in
-              let covers = get_covers ~current_sets head (T.args t) in
-              assert(List.length current_sets = List.length covers);
-              let paired = CCList.combine current_sets covers in
-              let res = List.map (fun (o,n) -> Term.Set.inter o n) paired in
-              VTbl.replace status var (res, Term.Set.union created_sk new_skolems);
-            | None ->
-              let t', created_sk = T.DB.skolemize_loosely_bound t in
-              let created_sk = T.IntMap.bindings created_sk
-                                |> List.map snd |> Term.Set.of_list in
-              VTbl.add status var (get_covers head (T.args t'), created_sk);
-            end
-          | _ -> ();
-        ()
+               VTbl.add status var (get_covers head (T.args t'), created_sk);
+           end
+         | _ -> ();
+           ()
       );
 
     let subst =
@@ -1130,16 +1130,16 @@ module Make(E : Env.S) : S with module Env = E = struct
           let removed = ref IntSet.empty in
           let n = List.length args in 
           let keep = List.mapi (fun i arg_set -> 
-            let arg_l = Term.Set.to_list arg_set in
-            let arg_l = List.filter (fun t -> 
-              List.for_all (fun idx -> 
-                not @@ IntSet.mem idx !removed) (T.DB.unbound t) &&
-              T.Seq.subterms t
-              |> Iter.for_all (fun subt -> not @@ Term.Set.mem subt skolems)) 
-              arg_l in
-            let res = CCList.is_empty arg_l in
-            if not res then removed := IntSet.add (n-i-1) !removed;
-            res) args in
+              let arg_l = Term.Set.to_list arg_set in
+              let arg_l = List.filter (fun t -> 
+                  List.for_all (fun idx -> 
+                      not @@ IntSet.mem idx !removed) (T.DB.unbound t) &&
+                  T.Seq.subterms t
+                  |> Iter.for_all (fun subt -> not @@ Term.Set.mem subt skolems)) 
+                  arg_l in
+              let res = CCList.is_empty arg_l in
+              if not res then removed := IntSet.add (n-i-1) !removed;
+              res) args in
           if CCList.for_all ((=) true) keep then None
           else (
             let ty_args, ty_return = Type.open_fun (HVar.ty var) in
@@ -1164,18 +1164,18 @@ module Make(E : Env.S) : S with module Env = E = struct
       let renaming = Subst.Renaming.none in
       let new_lits = Lits.apply_subst renaming subst (C.lits c, 0) in
       let proof =
-          Proof.Step.simp
-            ~rule:(Proof.Rule.mk "prune_arg_fun")
-            ~tags:[Proof.Tag.T_ho]
-            [C.proof_parent_subst renaming (c,0) subst] in
+        Proof.Step.simp
+          ~rule:(Proof.Rule.mk "prune_arg_fun")
+          ~tags:[Proof.Tag.T_ho]
+          [C.proof_parent_subst renaming (c,0) subst] in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
 
       Util.debugf ~section 3
-          "@[<>@[%a@]@ @[<2>prune_arg_fun into@ @[%a@]@]@ with @[%a@]@]"
-          (fun k->k C.pp c C.pp c' Subst.pp subst);
+        "@[<>@[%a@]@ @[<2>prune_arg_fun into@ @[%a@]@]@ with @[%a@]@]"
+        (fun k->k C.pp c C.pp c' Subst.pp subst);
       SimplM.return_new c'
     )
-    (* TODO: Simplified flag like in first-order? Profiler?*)
+  (* TODO: Simplified flag like in first-order? Profiler?*)
 
   let setup () =
     if not (Env.flex_get k_enabled) then (
@@ -1205,25 +1205,25 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       (* removing unfolded clauses *)
       if Env.flex_get k_enable_def_unfold then (
-         Env.add_clause_conversion (
-            fun c ->  match Statement.get_rw_rule c with
-                        | Some _ -> E.CR_drop
-                        | None -> E.CR_skip ));
+        Env.add_clause_conversion (
+          fun c ->  match Statement.get_rw_rule c with
+            | Some _ -> E.CR_drop
+            | None -> E.CR_skip ));
 
       begin match Env.flex_get k_prune_arg_fun with
-      | `PruneMaxCover -> Env.add_unary_simplify (prune_arg ~all_covers:false);
-      | `PruneAllCovers -> Env.add_unary_simplify (prune_arg ~all_covers:true);
-      | `OldPrune -> Env.add_unary_simplify prune_arg_old;
-      | `NoPrune -> ();
+        | `PruneMaxCover -> Env.add_unary_simplify (prune_arg ~all_covers:false);
+        | `PruneAllCovers -> Env.add_unary_simplify (prune_arg ~all_covers:true);
+        | `OldPrune -> Env.add_unary_simplify prune_arg_old;
+        | `NoPrune -> ();
       end;
 
       let ho_norm = (fun t -> t |> beta_reduce |> (
-                        fun opt -> match opt with
-                                    None -> eta_normalize t
-                                    | Some t' ->
-                                       match eta_normalize t' with
-                                          None -> Some t'
-                                          | Some tt -> Some tt))
+          fun opt -> match opt with
+              None -> eta_normalize t
+            | Some t' ->
+              match eta_normalize t' with
+                None -> Some t'
+              | Some tt -> Some tt))
       in
       Env.set_ho_normalization_rule ho_norm;
       Ordering.normalize := (fun t -> CCOpt.get_or ~default:t (ho_norm t));
@@ -1358,13 +1358,13 @@ let extension =
     );
 
     if !def_unfold_enabled_ then (
-       (* let new_vec = *)
-       CCVector.iter (fun c -> match Statement.get_rw_rule c with
-                                  Some (sym, r) -> Util.debugf ~section 1
-                                          "@[<2> Adding constant def rule: `@[%a@]`@]"
-                                          (fun k->k Rewrite.Rule.pp r);
-                                  Rewrite.Defined_cst.declare_or_add sym  r;
-                                | _ -> ()) vec (*vec in*)
+      (* let new_vec = *)
+      CCVector.iter (fun c -> match Statement.get_rw_rule c with
+            Some (sym, r) -> Util.debugf ~section 1
+                               "@[<2> Adding constant def rule: `@[%a@]`@]"
+                               (fun k->k Rewrite.Rule.pp r);
+            Rewrite.Defined_cst.declare_or_add sym  r;
+          | _ -> ()) vec (*vec in*)
     );
 
     state
@@ -1376,9 +1376,9 @@ let extension =
     |> Flex_state.add k_ho_prim_max_penalty !prim_max_penalty
   in
   { Extensions.default with
-      Extensions.name = "ho";
-      post_cnf_actions=[check_ho];
-      env_actions=[register];
+    Extensions.name = "ho";
+    post_cnf_actions=[check_ho];
+    env_actions=[register];
   }
 
 
@@ -1409,54 +1409,54 @@ let () =
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom";
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
-    enabled_ := true;
-    def_unfold_enabled_ := false;
-    force_enabled_ := true;
-    _ext_axiom := true;
-    _ext_neg_lit := false;
-    _neg_ext := false;
-    _neg_ext_as_simpl := false;
-    _ext_pos := true;
-    _ext_pos_all_lits := false;
-    prim_mode_ := `None;
-    _elim_pred_var := false;
-    _neg_cong_fun := false;
-    enable_unif_ := false;
-    _prune_arg_fun := `PruneMaxCover;
-  );
+      enabled_ := true;
+      def_unfold_enabled_ := false;
+      force_enabled_ := true;
+      _ext_axiom := true;
+      _ext_neg_lit := false;
+      _neg_ext := false;
+      _neg_ext_as_simpl := false;
+      _ext_pos := true;
+      _ext_pos_all_lits := false;
+      prim_mode_ := `None;
+      _elim_pred_var := false;
+      _neg_cong_fun := false;
+      enable_unif_ := false;
+      _prune_arg_fun := `PruneMaxCover;
+    );
   Params.add_to_mode "ho-pragmatic" (fun () ->
-    enabled_ := true;
-    def_unfold_enabled_ := false;
-    force_enabled_ := true;
-    _ext_axiom := false;
-    _ext_neg_lit := false;
-    _neg_ext := true;
-    _neg_ext_as_simpl := false;
-    _ext_pos := true;
-    _ext_pos_all_lits := true;
-    prim_mode_ := `None;
-    _elim_pred_var := true;
-    _neg_cong_fun := false;
-    enable_unif_ := false;
-    _prune_arg_fun := `PruneMaxCover;
-  );
+      enabled_ := true;
+      def_unfold_enabled_ := false;
+      force_enabled_ := true;
+      _ext_axiom := false;
+      _ext_neg_lit := false;
+      _neg_ext := true;
+      _neg_ext_as_simpl := false;
+      _ext_pos := true;
+      _ext_pos_all_lits := true;
+      prim_mode_ := `None;
+      _elim_pred_var := true;
+      _neg_cong_fun := false;
+      enable_unif_ := false;
+      _prune_arg_fun := `PruneMaxCover;
+    );
   Params.add_to_mode "ho-competitive" (fun () ->
-    enabled_ := true;
-    def_unfold_enabled_ := true;
-    force_enabled_ := true;
-    _ext_axiom := false;
-    _ext_neg_lit := false;
-    _neg_ext := true;
-    _neg_ext_as_simpl := false;
-    _ext_pos := true;
-    _ext_pos_all_lits := true;
-    prim_mode_ := `None;
-    _elim_pred_var := true;
-    _neg_cong_fun := false;
-    enable_unif_ := false;
-    _prune_arg_fun := `PruneMaxCover;
-  );
+      enabled_ := true;
+      def_unfold_enabled_ := true;
+      force_enabled_ := true;
+      _ext_axiom := false;
+      _ext_neg_lit := false;
+      _neg_ext := true;
+      _neg_ext_as_simpl := false;
+      _ext_pos := true;
+      _ext_pos_all_lits := true;
+      prim_mode_ := `None;
+      _elim_pred_var := true;
+      _neg_cong_fun := false;
+      enable_unif_ := false;
+      _prune_arg_fun := `PruneMaxCover;
+    );
   Params.add_to_mode "fo-complete-basic" (fun () ->
-    enabled_ := false;
-  );
+      enabled_ := false;
+    );
   Extensions.register extension;

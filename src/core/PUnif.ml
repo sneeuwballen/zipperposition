@@ -55,8 +55,8 @@ let inc_op flag op =
 
 let pp_flag out flag =
   List.iter (fun (op, (_,_,name)) ->
-     CCFormat.fprintf out "|%s:%d" name (get_op flag op);
-  ) op_masks
+      CCFormat.fprintf out "|%s:%d" name (get_op flag op);
+    ) op_masks
 
 (* Create substitution: v |-> λ u1 ... um. u_i (H1 u1 ... um) ... (Hn u1 ... um)
    where type of u_i is τ1 -> ... τn -> τ where τ is atomic and H_i have correct
@@ -68,9 +68,9 @@ let project_hs_one ~counter pref_types i type_ui =
     List.mapi (fun i ty -> T.bvar ~ty (n_args_free-i-1)) pref_types in
   let new_vars = 
     List.map (fun ty ->
-      let new_ty =  (Type.arrow pref_types ty) in
-      T.var (H.fresh_cnt ~counter ~ty:new_ty ()))
-    pref_types_ui  in
+        let new_ty =  (Type.arrow pref_types ty) in
+        T.var (H.fresh_cnt ~counter ~ty:new_ty ()))
+      pref_types_ui  in
   let new_vars_applied = List.map (fun nv -> T.app nv pref_args) new_vars in
   let matrix_hd = T.bvar ~ty:type_ui (n_args_free-i-1) in
   let matrix = T.app matrix_hd new_vars_applied in
@@ -93,7 +93,7 @@ let proj_lr ~counter ~scope ~subst s t flag max_app_projs =
   |> List.mapi (fun i ty -> i, ty)
   |> (fun l ->
       (* if we performed more than N projections that applied the
-        bound variable we back off *)
+         bound variable we back off *)
       if get_op flag ProjApp < max_app_projs then l
       else List.filter (fun (_, ty) -> List.length (Type.expected_args ty) = 0) l)
   (* If heads are different constants, do not project to those subterms *)
@@ -102,14 +102,14 @@ let proj_lr ~counter ~scope ~subst s t flag max_app_projs =
         let s_i = snd (T.open_fun argss_arr.(i)) in
         let hd_si = T.head_term s_i in
         if ((T.is_const hd_si && T.is_const hd_t && (not (T.equal hd_si hd_t))) 
-             || (T.is_bvar argss_arr.(i) && T.is_bvar hd_t && (not (T.equal argss_arr.(i) hd_t)))) then None 
+            || (T.is_bvar argss_arr.(i) && T.is_bvar hd_t && (not (T.equal argss_arr.(i) hd_t)))) then None 
         else Some p
       ) else Some p
-  )
+    )
   |> CCList.filter_map(fun (i, ty) ->
       let _, arg_ret_ty = Type.open_fun ty in
       match PatternUnif.unif_simple ~subst ~scope 
-                  (T.of_ty arg_ret_ty) (T.of_ty hd_ret_ty) with
+              (T.of_ty arg_ret_ty) (T.of_ty hd_ret_ty) with
       | Some subst' ->
         (* we project only to arguments of appropriate type *)
         let subst' = Unif_subst.subst subst' in
@@ -134,7 +134,7 @@ let k_subset ~k l =
         OSeq.interleave (aux i acc xs) (aux (i-1) (x::acc) xs)
       | [] -> assert(false)
     ) in
-  
+
   assert(k>=0);
   aux k [] l
 
@@ -155,32 +155,32 @@ let elim_subsets_rule  ?(max_elims=None) ~elim_vars ~counter ~scope t u depth =
 
   let same_args, diff_args = 
     List.mapi (fun i ty -> 
-      if i < Array.length args_t && i < Array.length args_u &&
-        T.equal args_t.(i) args_u.(i) 
-      then `Left (T.bvar ~ty (pref_len-i-1))
-      else `Right (T.bvar ~ty (pref_len-i-1))) pref_tys
+        if i < Array.length args_t && i < Array.length args_u &&
+           T.equal args_t.(i) args_u.(i) 
+        then `Left (T.bvar ~ty (pref_len-i-1))
+        else `Right (T.bvar ~ty (pref_len-i-1))) pref_tys
     |> CCList.partition_map CCFun.id in
 
   let diff_args_num = List.length diff_args in
   let end_ = match max_elims with 
-            | None -> 0 
-            | Some x -> assert(x>0); diff_args_num-x in
+    | None -> 0 
+    | Some x -> assert(x>0); diff_args_num-x in
   let start,step = max (diff_args_num-1) 0, -1 in
   CCList.range_by start (max end_ 0) ~step
   |> OSeq.of_list
   |> OSeq.flat_map (fun k ->
-    k_subset ~k diff_args
-    |> OSeq.map (fun diff_args_subset ->
-      assert(List.length diff_args_subset = k);
-      let all_args = diff_args_subset @ same_args in
-      assert(List.length all_args <= pref_len);
-      let arg_tys = List.map T.ty all_args in
-      let ty = Type.arrow arg_tys ret_ty in
-      let matrix = T.app (T.var (HVar.make ~ty var_id)) all_args in
-      let subs_term = T.fun_l pref_tys matrix in
-      assert(T.DB.is_closed subs_term);
-      (Subst.FO.bind' Subst.empty (hd_var, scope) (subs_term, scope),
-            (depth+(diff_args_num-k)))))
+      k_subset ~k diff_args
+      |> OSeq.map (fun diff_args_subset ->
+          assert(List.length diff_args_subset = k);
+          let all_args = diff_args_subset @ same_args in
+          assert(List.length all_args <= pref_len);
+          let arg_tys = List.map T.ty all_args in
+          let ty = Type.arrow arg_tys ret_ty in
+          let matrix = T.app (T.var (HVar.make ~ty var_id)) all_args in
+          let subs_term = T.fun_l pref_tys matrix in
+          assert(T.DB.is_closed subs_term);
+          (Subst.FO.bind' Subst.empty (hd_var, scope) (subs_term, scope),
+           (depth+(diff_args_num-k)))))
 
 let subset_elimination ~max_elims ~counter ~scope t u =
   elim_subsets_rule ~elim_vars ~max_elims ~counter ~scope t u 0
@@ -220,7 +220,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
       let imit_binding =
         try
           if not disable_imit && not (Term.is_var (T.head_term t)) &&
-            get_op flag ImitRigid < get_option PUP.k_max_rigid_imitations then (
+             get_op flag ImitRigid < get_option PUP.k_max_rigid_imitations then (
             let flag' = inc_op flag ImitRigid in
             [Some (U.subst @@ imitate_one ~scope ~counter s t, flag')])
           else []
@@ -245,7 +245,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
       let subst_value = T.fun_l prefix_types matrix in
       let subst = S.FO.bind' Subst.empty (v, scope) (subst_value, scope) in
       subst in 
-    
+
     let eliminate_one t = 
       let hd, args = T.as_app t in
       if T.is_var hd && List.length args > 0 then (
@@ -256,7 +256,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
     |> List.map (fun x -> Some (x, inc_op flag Elim))
 
   (* removes all arguments of an applied variable
-    v |-> λ u1 ... um. x
+     v |-> λ u1 ... um. x
   *)
   let elim_trivial ~scope ~counter v =  
     let prefix_types, return_type = Type.open_fun (HVar.ty v) in
@@ -283,7 +283,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
         [(fun s t sub -> [(U.subst @@ FixpointUnif.unify_scoped ~subst:(U.of_subst sub) ~counter s t)])] 
       else [] in
     fixpoint @ pattern @ solid
-    
+
   let head_classifier s =
     match T.view @@ T.head_term s with 
     | T.Var x -> `Flex x
@@ -299,12 +299,12 @@ module Make (St : sig val st : Flex_state.t end) = struct
           let remaining_elims = get_option PUP.k_max_elims - num_elims in
           if remaining_elims > 0 then (
             (subset_elimination ~max_elims:(Some remaining_elims) ~counter ~scope s t
-            |> OSeq.map (fun (sub, inc) ->
-                let flag' = CCList.fold_left (fun acc _ -> inc_op acc Elim) 
-                              flag (CCList.replicate inc None) in
-                Some (sub, flag'))))
+             |> OSeq.map (fun (sub, inc) ->
+                 let flag' = CCList.fold_left (fun acc _ -> inc_op acc Elim) 
+                     flag (CCList.replicate inc None) in
+                 Some (sub, flag'))))
           else OSeq.return (Some (elim_trivial ~counter ~scope x, flag))
-      | `Flex _, `Flex _ ->
+        | `Flex _, `Flex _ ->
           (* all rules  *)
           let ident = 
             if get_op flag Ident < get_option PUP.k_max_identifications then (
@@ -326,16 +326,16 @@ module Make (St : sig val st : Flex_state.t end) = struct
           delay depth @@ OSeq.append projs ident
         | `Flex _, `Rigid
         | `Rigid, `Flex _ ->
-            OSeq.append
-              (proj_imit_lr ~counter ~scope ~subst s t flag)
-              (proj_imit_lr ~counter ~scope ~subst t s flag)
+          OSeq.append
+            (proj_imit_lr ~counter ~scope ~subst s t flag)
+            (proj_imit_lr ~counter ~scope ~subst t s flag)
         | _ -> 
           CCFormat.printf "Did not disassemble properly: [%a]\n[%a]@." T.pp s T.pp t;
           assert false)
       else OSeq.empty in
     let hd_t, hd_s = T.head_term s, T.head_term t in
     if T.is_var hd_t && T.is_var hd_s && T.equal hd_s hd_t &&
-      IntSet.mem (HVar.id @@ T.as_var_exn hd_t) !elim_vars then (
+       IntSet.mem (HVar.id @@ T.as_var_exn hd_t) !elim_vars then (
       OSeq.empty)
     else res
 
@@ -353,10 +353,10 @@ module Make (St : sig val st : Flex_state.t end) = struct
         oracle ~counter ~scope ~subst s t f
       let oracle_composer = OSeq.append
     end in
-    
+
     let module PragUnif = UnifFramework.Make(PragUnifParams) in
     (fun x y ->
-      elim_vars := IntSet.empty;
-      ident_vars := IntSet.empty;
-      OSeq.map (CCOpt.map Unif_subst.of_subst) (PragUnif.unify_scoped x y))
+       elim_vars := IntSet.empty;
+       ident_vars := IntSet.empty;
+       OSeq.map (CCOpt.map Unif_subst.of_subst) (PragUnif.unify_scoped x y))
 end

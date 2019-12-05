@@ -292,9 +292,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       with Not_found -> None
     in
     match Type.view ty with
-      | Type.Builtin b -> find_aux (B b) []
-      | Type.App (id, l) -> find_aux (I id) l
-      | _ -> None
+    | Type.Builtin b -> find_aux (B b) []
+    | Type.App (id, l) -> find_aux (I id) l
+    | _ -> None
 
   (* TODO: maybe relax the restriction that is must not be naked, but only
      up to a given depth (if CLI arg?) *)
@@ -315,37 +315,37 @@ module Make(E : Env.S) : S with module Env = E = struct
     CCList.find_map
       (fun v ->
          match find_ty_ s_decl (T.ty v) s_c with
-           | None -> None
-           | Some (decl, subst) ->
-             (* we found an enum type declaration for [v], replace it
-                with each case for the enum type *)
-             Util.incr_stat stat_simplify;
-             let subst = Unif_subst.of_subst subst in
-             let l =
-               List.map
-                 (fun case ->
-                    (* replace [v] with [case] now *)
-                    let subst = Unif.FO.unify_full ~subst (v,s_c) (case,s_decl) in
-                    let renaming = Subst.Renaming.create () in
-                    let c_guard = Literals.of_unif_subst renaming subst
-                    and subst = Unif_subst.subst subst in
-                    let lits' = Lits.apply_subst renaming subst (C.lits c,s_c) in
-                    let proof =
-                      Proof.Step.inference [Proof.Parent.from @@ C.proof c]
-                        ~rule:(Proof.Rule.mk"enum_type_case_switch")
-                    in
-                    let trail = C.trail c and penalty = C.penalty c in
-                    let c' =
-                      C.create_a ~trail ~penalty
-                        (CCArray.append c_guard lits') proof
-                    in
-                    Util.debugf ~section 3
-                      "@[<2>deduce @[%a@]@ from @[%a@]@ @[(enum_type switch on %a)@]@]"
-                      (fun k->k C.pp c' C.pp c Type.pp decl.decl_ty);
-                    c')
-                 decl.decl_cases
-             in
-             Some l)
+         | None -> None
+         | Some (decl, subst) ->
+           (* we found an enum type declaration for [v], replace it
+              with each case for the enum type *)
+           Util.incr_stat stat_simplify;
+           let subst = Unif_subst.of_subst subst in
+           let l =
+             List.map
+               (fun case ->
+                  (* replace [v] with [case] now *)
+                  let subst = Unif.FO.unify_full ~subst (v,s_c) (case,s_decl) in
+                  let renaming = Subst.Renaming.create () in
+                  let c_guard = Literals.of_unif_subst renaming subst
+                  and subst = Unif_subst.subst subst in
+                  let lits' = Lits.apply_subst renaming subst (C.lits c,s_c) in
+                  let proof =
+                    Proof.Step.inference [Proof.Parent.from @@ C.proof c]
+                      ~rule:(Proof.Rule.mk"enum_type_case_switch")
+                  in
+                  let trail = C.trail c and penalty = C.penalty c in
+                  let c' =
+                    C.create_a ~trail ~penalty
+                      (CCArray.append c_guard lits') proof
+                  in
+                  Util.debugf ~section 3
+                    "@[<2>deduce @[%a@]@ from @[%a@]@ @[(enum_type switch on %a)@]@]"
+                    (fun k->k C.pp c' C.pp c Type.pp decl.decl_ty);
+                  c')
+               decl.decl_cases
+           in
+           Some l)
       vars
 
   let instantiate_vars c = Util.with_prof prof_instantiate instantiate_vars_ c
@@ -421,14 +421,14 @@ module Make(E : Env.S) : S with module Env = E = struct
   let check_decl_ ~ty s decl =
     let _, ty_ret = Type.open_fun ty in
     match Type.view ty_ret, decl.decl_ty_id with
-      | Type.Builtin b, B b' when b=b' ->
-        instantiate_axiom ~ty_s:ty s [] decl
-      | Type.App (c, args), I i
-        when ID.equal c i
-          && not (is_projector_ s ~of_:i)
-          && List.length args = List.length decl.decl_ty_vars->
-        instantiate_axiom ~ty_s:ty s args decl
-      | _ -> None
+    | Type.Builtin b, B b' when b=b' ->
+      instantiate_axiom ~ty_s:ty s [] decl
+    | Type.App (c, args), I i
+      when ID.equal c i
+        && not (is_projector_ s ~of_:i)
+        && List.length args = List.length decl.decl_ty_vars->
+      instantiate_axiom ~ty_s:ty s args decl
+    | _ -> None
 
   (* add axioms for new symbol [s] with type [ty], if needed *)
   let _on_new_symbol s ~ty =
@@ -441,9 +441,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     let clauses =
       let _, ty_ret = Type.open_fun ty in
       match Type.view ty_ret with
-        | Type.Builtin b -> aux (B b)
-        | Type.App (id, _) -> aux (I id)
-        | _ -> []
+      | Type.Builtin b -> aux (B b)
+      | Type.App (id, _) -> aux (I id)
+      | _ -> []
     in
     (* set of support *)
     PS.ActiveSet.add (Iter.of_list clauses)
@@ -453,8 +453,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       Signature.fold (Ctx.signature ()) []
         (fun acc s (ty,_) ->
            match check_decl_ s ~ty decl with
-             | None -> acc
-             | Some c -> c::acc)
+           | None -> acc
+           | Some c -> c::acc)
     in
     PS.PassiveSet.add (Iter.of_list clauses)
 
@@ -466,14 +466,14 @@ module Make(E : Env.S) : S with module Env = E = struct
   let _detect_and_declare c =
     Util.debugf ~section 5 "@[<2>examine clause@ `@[%a@]`@]" (fun k->k C.pp c);
     match detect_declaration c with
-      | None -> ()
-      | Some (var,cases) ->
-        let ty_id = CCOpt.get_exn (as_simple_ty (HVar.ty var)) in
-        let is_new = declare_ ~ty_id ~ty_vars:[] ~var ~proof:(`Clause (C.proof c)) cases in
-        (* clause becomes redundant if it's a new declaration *)
-        match is_new with
-          | New _ -> C.set_flag flag_enumeration_clause c true
-          | AlreadyDeclared _ -> ()
+    | None -> ()
+    | Some (var,cases) ->
+      let ty_id = CCOpt.get_exn (as_simple_ty (HVar.ty var)) in
+      let is_new = declare_ ~ty_id ~ty_vars:[] ~var ~proof:(`Clause (C.proof c)) cases in
+      (* clause becomes redundant if it's a new declaration *)
+      match is_new with
+      | New _ -> C.set_flag flag_enumeration_clause c true
+      | AlreadyDeclared _ -> ()
 
   (* introduce projectors for each constructor's argument, in order to
      declare the inductive type as an EnumType. *)
@@ -512,19 +512,19 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* detect whether the input statement contains some EnumType declaration *)
   let _detect_stmt stmt =
     match Stmt.view stmt with
-      | Stmt.Assert c ->
-        let proof = Stmt.proof_step stmt in
-        let c = C.of_forms ~trail:Trail.empty c proof in
-        _detect_and_declare c
-      | Stmt.Data l ->
-        let proof = Stmt.as_proof_c stmt in
-        List.iter (_declare_inductive ~proof) l
-      | Stmt.TyDecl _
-      | Stmt.Def _
-      | Stmt.Rewrite _
-      | Stmt.Lemma _
-      | Stmt.NegatedGoal _
-      | Stmt.Goal _ -> ()
+    | Stmt.Assert c ->
+      let proof = Stmt.proof_step stmt in
+      let c = C.of_forms ~trail:Trail.empty c proof in
+      _detect_and_declare c
+    | Stmt.Data l ->
+      let proof = Stmt.as_proof_c stmt in
+      List.iter (_declare_inductive ~proof) l
+    | Stmt.TyDecl _
+    | Stmt.Def _
+    | Stmt.Rewrite _
+    | Stmt.Lemma _
+    | Stmt.NegatedGoal _
+    | Stmt.Goal _ -> ()
 
   let setup () =
     if !_enable then (

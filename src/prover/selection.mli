@@ -65,9 +65,9 @@ val e_sel8 : ord:Ordering.t -> t
 val ho_sel  : ord:Ordering.t -> t
 (** Selection function that tries to take 
     into account the number of nested applied variables.
-    
+
     The assumption is that they are hard for unification.
-     *)
+*)
 
 val from_string : ord:Ordering.t -> string -> t
 (** selection function from string (may fail) *)

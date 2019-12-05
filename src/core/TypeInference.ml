@@ -44,11 +44,11 @@ let () =
 let error_ ?loc msg =
   CCFormat.ksprintf msg
     ~f:(fun msg ->
-      let msg = match loc with
-        | None -> msg
-        | Some l -> Util.err_spf "@[<hv>%s@ at %a@]" msg Loc.pp l
-      in
-      raise (Error msg))
+        let msg = match loc with
+          | None -> msg
+          | Some l -> Util.err_spf "@[<hv>%s@ at %a@]" msg Loc.pp l
+        in
+        raise (Error msg))
 
 (* unify within the context's substitution. Wraps {!Unif.Ty.unification}
    by returning a nicer exception in case of failure *)
@@ -166,7 +166,7 @@ module Ctx = struct
 
   let copy t =
     { t with
-        env = Hashtbl.copy t.env;
+      env = Hashtbl.copy t.env;
     }
 
   (* enter new scope for the variables with those names *)
@@ -192,18 +192,18 @@ module Ctx = struct
   (* only specialize/generalize variable if it's not bound *)
   let bind_meta ctx (v, r, k) =
     match !r, k with
-      | None, `BindDefault ->
-        let ty = ctx.default in
-        Util.debugf ~section 50 "@[<2>specialize type meta_var %a to@ @[%a@]@]"
-          (fun k->k Var.pp v T.pp ty);
-        r := Some ty
-      | None, `Generalize ->
-        let v' = Var.copy v in
-        Util.debugf ~section 50 "@[<2>generalize type meta_var %a@]"
-          (fun k->k Var.pp v);
-        r := Some (T.var v')
-      | None, `NoBind -> assert false
-      | Some _, _ -> ()
+    | None, `BindDefault ->
+      let ty = ctx.default in
+      Util.debugf ~section 50 "@[<2>specialize type meta_var %a to@ @[%a@]@]"
+        (fun k->k Var.pp v T.pp ty);
+      r := Some ty
+    | None, `Generalize ->
+      let v' = Var.copy v in
+      Util.debugf ~section 50 "@[<2>generalize type meta_var %a@]"
+        (fun k->k Var.pp v);
+      r := Some (T.var v')
+    | None, `NoBind -> assert false
+    | Some _, _ -> ()
 
   let exit_scope ctx =
     List.iter (fun v -> Hashtbl.remove ctx.env (Var.name v)) ctx.local_vars;
@@ -309,21 +309,21 @@ module Ctx = struct
       v'
     in
     match v with
-      | PT.Wildcard -> `Var (mk_fresh "_")
-      | PT.V v ->
-        try Hashtbl.find ctx.env v
-        with Not_found ->
-          begin match ctx.on_undef with
-            | `Fail -> error_ ?loc "unknown variable %s@,%a" v pp_names (find_close_names ctx v)
-            | `Guess -> ()
-            | `Warn ->
-              Util.warnf
-                "@[<2>create implicit variable %s@,%a%a@]"
-                v pp_names (find_close_names ctx v) Loc.pp_opt loc;
-          end;
-          let v' = mk_fresh v in
-          Hashtbl.add ctx.env v (`Var v');
-          `Var v'
+    | PT.Wildcard -> `Var (mk_fresh "_")
+    | PT.V v ->
+      try Hashtbl.find ctx.env v
+      with Not_found ->
+        begin match ctx.on_undef with
+          | `Fail -> error_ ?loc "unknown variable %s@,%a" v pp_names (find_close_names ctx v)
+          | `Guess -> ()
+          | `Warn ->
+            Util.warnf
+              "@[<2>create implicit variable %s@,%a%a@]"
+              v pp_names (find_close_names ctx v) Loc.pp_opt loc;
+        end;
+        let v' = mk_fresh v in
+        Hashtbl.add ctx.env v (`Var v');
+        `Var v'
 
   let pop_new_types ctx =
     let l = ctx.new_types in
@@ -361,8 +361,8 @@ let with_typed_vars_ ?loc ~infer_ty ctx vars ~f =
 let with_typed_var_ ?loc ~infer_ty ctx v ~f =
   with_typed_vars_ ?loc ~infer_ty ctx [v]
     ~f:(function
-      | [v] -> f v
-      | _ -> assert false)
+        | [v] -> f v
+        | _ -> assert false)
 
 let apply_unify ~allow_open ?loc ctx ty l =
   T.apply_unify ty l
@@ -415,10 +415,10 @@ let rec infer_ty_ ?loc ctx ty =
     | PT.Bind (Binder.ForallTy, vars, body) ->
       with_typed_vars_ ?loc ~infer_ty:infer_ty_ ctx vars
         ~f:(fun vars' ->
-          (* be sure those are type variables *)
-          List.iter (fun v -> unify T.tType (Var.ty v)) vars';
-          let body' = aux body in
-          T.Ty.forall_l vars' body')
+            (* be sure those are type variables *)
+            List.iter (fun v -> unify T.tType (Var.ty v)) vars';
+            let body' = aux body in
+            T.Ty.forall_l vars' body')
     | PT.AppBuiltin (Builtin.Wildcard,[]) ->
       Ctx.fresh_ty_meta_var ctx ~dest:`Generalize () |> T.meta
     | _ ->
@@ -530,8 +530,8 @@ let rec infer_rec ?loc ctx t =
           with_typed_var_ ctx ?loc ~infer_ty:(fun ?loc:_ _ ty -> ty)
             (v, Some (T.ty_exn t))
             ~f:(fun v ->
-              let body = aux tail in
-              T.let_ ?loc [v, t] body)
+                let body = aux tail in
+                T.let_ ?loc [v, t] body)
       in
       aux l
     | PT.Match (u, l) ->
@@ -624,22 +624,22 @@ let rec infer_rec ?loc ctx t =
     | PT.Bind(((Binder.Forall | Binder.Exists) as binder), vars, f') ->
       with_non_inferred_typed_vars ?loc ctx vars
         ~f:(fun vars' ->
-          let f' = infer_prop_ ctx f' in
-          match binder with
+            let f' = infer_prop_ ctx f' in
+            match binder with
             | Binder.Forall -> T.Form.forall_l vars' f'
             | Binder.Exists -> T.Form.exists_l vars' f'
             | _ -> assert false)
     | PT.Bind(Binder.Lambda, vars, t') ->
       with_non_inferred_typed_vars ?loc ctx vars
         ~f:(fun vars' ->
-          let t' = infer_rec ?loc ctx t' in
-          let ty = T.Ty.fun_ ?loc (List.map Var.ty vars') (T.ty_exn t') in
-          T.bind_list ?loc ~ty Binder.Lambda vars' t')
+            let t' = infer_rec ?loc ctx t' in
+            let ty = T.Ty.fun_ ?loc (List.map Var.ty vars') (T.ty_exn t') in
+            T.bind_list ?loc ~ty Binder.Lambda vars' t')
     | PT.Bind (Binder.ForallTy, vars, t') ->
       with_non_inferred_typed_vars ?loc ctx vars
         ~f:(fun vars' ->
-          let t' = infer_rec ?loc ctx t' in
-          T.Ty.forall_l ?loc vars' t')
+            let t' = infer_rec ?loc ctx t' in
+            T.Ty.forall_l ?loc vars' t')
     | PT.AppBuiltin (Builtin.Int _ as b, []) -> T.builtin ~ty:T.Ty.int b
     | PT.AppBuiltin (Builtin.Rat _ as b, []) -> T.builtin ~ty:T.Ty.rat b
     | PT.AppBuiltin (Builtin.Real _ as b, []) -> T.builtin ~ty:T.Ty.real b
@@ -754,13 +754,13 @@ and infer_match ?loc ctx ~ty_matched t data (l:PT.match_branch list)
              with_typed_vars_ ?loc ~infer_ty:(fun ?loc:_ _ ty -> ty) ctx
                (List.map2 (fun v ty_arg -> v, Some ty_arg) vars ty_s_args)
                ~f:(fun vars ->
-                 (* now we have everything in scope, we can convert [rhs] *)
-                 let rhs = infer_rec ?loc ctx rhs in
-                 check_ty (T.ty_exn rhs);
-                 let cstor =
-                   { T.cstor_id=c_id; cstor_ty=c_ty; cstor_args=ty_params; }
-                 in
-                 [cstor, vars, rhs])
+                   (* now we have everything in scope, we can convert [rhs] *)
+                   let rhs = infer_rec ?loc ctx rhs in
+                   check_ty (T.ty_exn rhs);
+                   let cstor =
+                     { T.cstor_id=c_id; cstor_ty=c_ty; cstor_args=ty_params; }
+                   in
+                   [cstor, vars, rhs])
          end)
       l
   in
@@ -1055,45 +1055,45 @@ let infer_statement_exn ?(file="<no file>") ctx st =
              with_non_inferred_typed_vars ?loc ctx
                (List.map (fun v->PT.V v, Some PT.tType) d.A.data_vars)
                ~f:(fun ty_vars ->
-                 (* return type of every constructor: [data_ty ty_vars] *)
-                 let ty_ret =
-                   T.Ty.app data_ty (List.map (T.Ty.var ?loc:None) ty_vars)
-                 in
-                 (* infer type of constructors *)
-                 let cstors =
-                   List.map
-                     (fun (name, args) ->
-                        let c_id = ID.make name in
-                        (* type of c: forall ty_vars. ty_args -> ty_ret *)
-                        let args =
-                          List.mapi
-                            (fun i (p,ty) ->
-                               let ty = infer_ty_exn ctx ty in
-                               (* type of projector *)
-                               let p_ty =
-                                 T.Ty.forall_l ty_vars (T.Ty.fun_ [ty_ret] ty)
-                               and p_id = match p with
-                                 | Some p -> ID.make p
-                                 | None ->
-                                   (* create projector *)
-                                   ID.makef "proj_%a_%d" ID.pp c_id i
-                               in
-                               Ctx.declare ?loc ctx p_id p_ty;
-                               ty, (p_id, p_ty))
-                            args
-                        in
-                        let ty_args = List.map fst args in
-                        let ty_c =
-                          T.Ty.forall_l ty_vars (T.Ty.fun_ ty_args ty_ret)
-                        in
-                        Ctx.declare ?loc ctx c_id ty_c;
-                        (* TODO: check absence of other type variables in ty_c *)
-                        c_id, ty_c, args)
-                     d.A.data_cstors
-                 in
-                 ID.Tbl.add ctx.Ctx.datatypes data_ty cstors;
-                 Stmt.mk_data data_ty ty_of_data_ty ~args:ty_vars cstors
-               ))
+                   (* return type of every constructor: [data_ty ty_vars] *)
+                   let ty_ret =
+                     T.Ty.app data_ty (List.map (T.Ty.var ?loc:None) ty_vars)
+                   in
+                   (* infer type of constructors *)
+                   let cstors =
+                     List.map
+                       (fun (name, args) ->
+                          let c_id = ID.make name in
+                          (* type of c: forall ty_vars. ty_args -> ty_ret *)
+                          let args =
+                            List.mapi
+                              (fun i (p,ty) ->
+                                 let ty = infer_ty_exn ctx ty in
+                                 (* type of projector *)
+                                 let p_ty =
+                                   T.Ty.forall_l ty_vars (T.Ty.fun_ [ty_ret] ty)
+                                 and p_id = match p with
+                                   | Some p -> ID.make p
+                                   | None ->
+                                     (* create projector *)
+                                     ID.makef "proj_%a_%d" ID.pp c_id i
+                                 in
+                                 Ctx.declare ?loc ctx p_id p_ty;
+                                 ty, (p_id, p_ty))
+                              args
+                          in
+                          let ty_args = List.map fst args in
+                          let ty_c =
+                            T.Ty.forall_l ty_vars (T.Ty.fun_ ty_args ty_ret)
+                          in
+                          Ctx.declare ?loc ctx c_id ty_c;
+                          (* TODO: check absence of other type variables in ty_c *)
+                          c_id, ty_c, args)
+                       d.A.data_cstors
+                   in
+                   ID.Tbl.add ctx.Ctx.datatypes data_ty cstors;
+                   Stmt.mk_data data_ty ty_of_data_ty ~args:ty_vars cstors
+                 ))
           l
           data_types
       in

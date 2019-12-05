@@ -11,22 +11,22 @@ module T = TypedSTerm
 (** encode a term *)
 let rec detect_term t  =
   match T.view t with
-    | T.App (f, args) -> T.is_var(f) || CCList.exists detect_term args
-    | T.AppBuiltin (_, args) -> CCList.exists detect_term args
-    | T.Bind (_, _, t) -> detect_term t
-    | _ -> false
+  | T.App (f, args) -> T.is_var(f) || CCList.exists detect_term args
+  | T.AppBuiltin (_, args) -> CCList.exists detect_term args
+  | T.Bind (_, _, t) -> detect_term t
+  | _ -> false
 
 (** encode a statement *)
 let detect_stmt stmt =
   match Statement.view stmt with
-    | Statement.Def _ -> failwith "Not implemented"
-    | Statement.Rewrite _ -> failwith "Not implemented"
-    | Statement.Data _ -> failwith "Not implemented"
-    | Statement.Lemma _ -> failwith "Not implemented"
-    | Statement.Goal f -> detect_term f
-    | Statement.NegatedGoal (_,_) -> failwith "Not implemented"
-    | Statement.Assert f -> detect_term f
-    | Statement.TyDecl (_, _) -> false
+  | Statement.Def _ -> failwith "Not implemented"
+  | Statement.Rewrite _ -> failwith "Not implemented"
+  | Statement.Data _ -> failwith "Not implemented"
+  | Statement.Lemma _ -> failwith "Not implemented"
+  | Statement.Goal f -> detect_term f
+  | Statement.NegatedGoal (_,_) -> failwith "Not implemented"
+  | Statement.Assert f -> detect_term f
+  | Statement.TyDecl (_, _) -> false
 
 let process file =
   let input = Input_format.I_tptp in

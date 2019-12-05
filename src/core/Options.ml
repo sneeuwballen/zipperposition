@@ -19,11 +19,11 @@ type input_format =
 
 let input_format_of_string s =
   match s |> String.trim |> CCString.lowercase_ascii with
-    | "tptp" | "tstp" -> I_tptp
-    | "zf" -> I_zf
-    | "tip" -> I_tip
-    | "dk" -> I_dk
-    | s -> failwith ("unknown input format " ^ s)
+  | "tptp" | "tstp" -> I_tptp
+  | "zf" -> I_zf
+  | "tip" -> I_tip
+  | "dk" -> I_dk
+  | s -> failwith ("unknown input format " ^ s)
 
 type print_format = Output_format.t =
   | O_none
@@ -33,12 +33,12 @@ type print_format = Output_format.t =
 
 let print_format_of_string s =
   match s |> String.trim |> CCString.lowercase_ascii with
-    | "none" -> O_none
-    | "tptp" | "tstp" -> O_tptp
-    | "default" | "normal" -> O_normal
-    | "dk"
-    | "zf" -> O_zf
-    | _ -> failwith ("unknown print format " ^ s)
+  | "none" -> O_none
+  | "tptp" | "tstp" -> O_tptp
+  | "default" | "normal" -> O_normal
+  | "dk"
+  | "zf" -> O_zf
+  | _ -> failwith ("unknown print format " ^ s)
 
 let input = ref I_guess
 let output = ref O_normal

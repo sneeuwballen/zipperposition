@@ -132,8 +132,8 @@ exception Payload_def of def
 let def id =
   ID.payload_find id
     ~f:(function
-      | Payload_def d -> Some d
-      | _ -> None)
+        | Payload_def d -> Some d
+        | _ -> None)
 
 let def_exn id = match def id with
   | Some d -> d
@@ -623,9 +623,9 @@ let rebuild_rec ?(env=[]) (t:t) : t =
         | Var v -> var (HVar.cast ~ty v)
         | DB i ->
           assert (if i >= 0 && i < List.length env then true
-            else (Format.printf "%d not in %a@." i (CCFormat.Dump.list pp) env; false));
+                  else (Format.printf "%d not in %a@." i (CCFormat.Dump.list pp) env; false));
           assert (if equal ty (List.nth env i) then true
-            else (Format.printf "%a:%a or %a@." pp t pp ty pp (List.nth env i); false));
+                  else (Format.printf "%a:%a or %a@." pp t pp ty pp (List.nth env i); false));
           bvar i
         | App (f, l) -> app f (List.map (aux env) l)
         | Fun (args, ret) -> arrow (List.map (aux env) args) (aux env ret)

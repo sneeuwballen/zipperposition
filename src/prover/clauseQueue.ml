@@ -37,34 +37,34 @@ let profile_of_string s =
   try
     match CCString.chop_prefix ~pre:"conjecture-relative-var" s with
     | Some suffix -> 
-        let err_msg = "conjecutre-relative-var(ratio:int,var_mul:float,par:[L,S],goal_penalty:[true,false])" in
-        let args = List.map (fun s -> 
-                    String.trim (CCString.replace ~sub:")" ~by:"" 
-                                  (CCString.replace ~sub:"(" ~by:"" s))) 
-                  (CCString.split ~by:"," suffix) in
-        if List.length args != 4 then (invalid_arg err_msg)
-        else (
-          let ratio = CCInt.of_string (List.nth args 0) in
-          let var_mul =
-            try float_of_string (List.nth args 1)
-            with _ -> invalid_arg err_msg
-          in
-          let par_mag = List.nth args 2 in
-          let goal_pen = List.nth args 3 in
-          if CCOpt.is_none ratio then (
-            invalid_arg err_msg;
-          ) else (
-            cr_var_ratio := CCOpt.get_exn ratio;
-            cr_var_mul := var_mul;
-            parameters_magnitude := if CCString.equal par_mag "l" then `Large
-                                    else if CCString.equal par_mag "s" then `Small
-                                    else invalid_arg err_msg;
-            goal_penalty         := if CCString.prefix ~pre:"t" goal_pen then true
-                                    else if CCString.prefix ~pre:"f" goal_pen then false
-                                    else invalid_arg err_msg;
-            ClauseQueue_intf.P_conj_rel_var
-          )
+      let err_msg = "conjecutre-relative-var(ratio:int,var_mul:float,par:[L,S],goal_penalty:[true,false])" in
+      let args = List.map (fun s -> 
+          String.trim (CCString.replace ~sub:")" ~by:"" 
+                         (CCString.replace ~sub:"(" ~by:"" s))) 
+          (CCString.split ~by:"," suffix) in
+      if List.length args != 4 then (invalid_arg err_msg)
+      else (
+        let ratio = CCInt.of_string (List.nth args 0) in
+        let var_mul =
+          try float_of_string (List.nth args 1)
+          with _ -> invalid_arg err_msg
+        in
+        let par_mag = List.nth args 2 in
+        let goal_pen = List.nth args 3 in
+        if CCOpt.is_none ratio then (
+          invalid_arg err_msg;
+        ) else (
+          cr_var_ratio := CCOpt.get_exn ratio;
+          cr_var_mul := var_mul;
+          parameters_magnitude := if CCString.equal par_mag "l" then `Large
+            else if CCString.equal par_mag "s" then `Small
+            else invalid_arg err_msg;
+          goal_penalty         := if CCString.prefix ~pre:"t" goal_pen then true
+            else if CCString.prefix ~pre:"f" goal_pen then false
+            else invalid_arg err_msg;
+          ClauseQueue_intf.P_conj_rel_var
         )
+      )
     | None ->  List.assoc s profiles_
   with Not_found -> invalid_arg ("unknown queue profile: " ^ s)
 
@@ -110,13 +110,13 @@ module Make(C : Clause_intf.S) = struct
       let app_var_num c = 
         float_of_int @@ 
         Iter.fold (fun acc t -> 
-          acc + (if Term.is_app_var t then 1 else 0 )) 0 (all_terms c) in
-      
+            acc + (if Term.is_app_var t then 1 else 0 )) 0 (all_terms c) in
+
       let formulas_num c =
         float_of_int @@
         Iter.fold (fun acc t -> 
-          acc + (if Term.is_formula t then 1 else 0 )) 0 (C.Seq.terms c) in
-      
+            acc + (if Term.is_formula t then 1 else 0 )) 0 (C.Seq.terms c) in
+
       let p_depth c = float_of_int (C.proof_depth c) in
 
       let t_depth c = C.Seq.terms c 
@@ -129,8 +129,8 @@ module Make(C : Clause_intf.S) = struct
 
       let res = 
         int_of_float (weight c *. (1.25 ** (app_var_num c *. (1.35 ** p_depth c)))
-                               *. (0.85 ** formulas_num c)
-                               *. 1.05 ** t_depth c) in
+                      *. (0.85 ** formulas_num c)
+                      *. 1.05 ** t_depth c) in
       Util.debugf 5 "[C_W:]@ @[%a@]@ :@ %d(%g, %g, %g).\n"
         (fun k -> k C.pp c res (app_var_num c) (formulas_num c) (p_depth c));
       res
@@ -139,61 +139,61 @@ module Make(C : Clause_intf.S) = struct
       let max_lits = C.maxlits (c,0) Subst.empty in
       let signature = C.Ctx.signature () in
       CCArray.foldi (fun acc i l -> 
-        let max_terms = 
-          if CCBV.get max_lits i then Literal.Comp.max_terms ~ord:(C.Ctx.ord ()) l else [] in
-        let lit_weight = 
-          Literal.Seq.terms l
-          |> Iter.map (fun t -> 
-            let var,f_nc,f_c = if List.mem t max_terms then (2,6,3) else (1,2,1) in
-            let sym id_ = if Signature.sym_in_conj id_ signature then f_c else f_nc in
-            Term.weight ~var ~sym t * (if Term.is_app_var t then 2 else 1)
-          ) |> Iter.sum in
-        let multiplier = (if Literal.is_typex_pred l then 1.2 else 1.0) *.
-                         (if Literal.is_type_pred l then 1.8 else 1.0) *.
-                         (if Literal.is_ground l then 0.5 else 1.0) in
-        int_of_float (multiplier *. (float_of_int lit_weight)) + acc
-      ) 0 (C.lits c)
+          let max_terms = 
+            if CCBV.get max_lits i then Literal.Comp.max_terms ~ord:(C.Ctx.ord ()) l else [] in
+          let lit_weight = 
+            Literal.Seq.terms l
+            |> Iter.map (fun t -> 
+                let var,f_nc,f_c = if List.mem t max_terms then (2,6,3) else (1,2,1) in
+                let sym id_ = if Signature.sym_in_conj id_ signature then f_c else f_nc in
+                Term.weight ~var ~sym t * (if Term.is_app_var t then 2 else 1)
+              ) |> Iter.sum in
+          let multiplier = (if Literal.is_typex_pred l then 1.2 else 1.0) *.
+                           (if Literal.is_type_pred l then 1.8 else 1.0) *.
+                           (if Literal.is_ground l then 0.5 else 1.0) in
+          int_of_float (multiplier *. (float_of_int lit_weight)) + acc
+        ) 0 (C.lits c)
 
     let orient_lmax_weight ~v_w ~f_w ~pos_m ~unord_m ~max_l_mul c =
       let max_lits = C.maxlits (c,0) Subst.empty in
       let ord = C.Ctx.ord () in
       let res = CCArray.foldi (fun sum i lit -> 
-        let term_w = (fun t -> float_of_int (Term.weight ~var:v_w ~sym:(fun _ -> f_w) t)) in
-        let w = 
-          match lit with 
-          | Lit.Equation(l,r,_) ->
-            let t_w = max (term_w l) (term_w r) in
-            let t_w = if Lit.is_pos lit then pos_m *. t_w else t_w in
-            let t_w = if CCBV.get max_lits i then max_l_mul *. t_w else t_w in
-            let ordered = Ordering.compare ord l r != Comparison.Incomparable in
-            t_w *. (if not ordered then unord_m else 1.0)
-          | _ -> 1.0 in
-        sum +. w
-      ) 0.0 (C.lits c) in
+          let term_w = (fun t -> float_of_int (Term.weight ~var:v_w ~sym:(fun _ -> f_w) t)) in
+          let w = 
+            match lit with 
+            | Lit.Equation(l,r,_) ->
+              let t_w = max (term_w l) (term_w r) in
+              let t_w = if Lit.is_pos lit then pos_m *. t_w else t_w in
+              let t_w = if CCBV.get max_lits i then max_l_mul *. t_w else t_w in
+              let ordered = Ordering.compare ord l r != Comparison.Incomparable in
+              t_w *. (if not ordered then unord_m else 1.0)
+            | _ -> 1.0 in
+          sum +. w
+        ) 0.0 (C.lits c) in
       int_of_float res
 
     let pn_refined_weight ~pv_w ~pf_w ~nv_w ~nf_w ~max_t_m ~max_l_m ~pos_m c =
       let max_lits = C.maxlits (c,0) Subst.empty in
       let ord = C.Ctx.ord () in
       let res = CCArray.foldi (fun sum i lit -> 
-        let pterm_w = (fun t -> float_of_int (Term.weight ~var:pv_w ~sym:(fun _ -> pf_w) t)) in
-        let nterm_w = (fun t -> float_of_int (Term.weight ~var:nv_w ~sym:(fun _ -> nf_w) t)) in
-        let w = 
-          match lit with 
-          | Lit.Equation(l,r,_) ->
-            let term_w = if Lit.is_pos lit then pterm_w else nterm_w in
-            let ord_side = Ordering.compare ord l r in
-            let l_mul = if ord_side = Comparison.Gt || ord_side = Comparison.Incomparable 
-                        then max_t_m else 1.0 in
-            let r_mul = if ord_side = Comparison.Lt || ord_side = Comparison.Incomparable 
-                        then max_t_m else 1.0 in
-            let t_w = l_mul *. (term_w l) +. r_mul *. (term_w r) in
-            let t_w = if Lit.is_pos lit then pos_m *. t_w else t_w in
-            let t_w = if CCBV.get max_lits i then max_l_m *. t_w else t_w in
-            t_w 
-          | _ -> 1.0 in
-        sum +. w
-      ) 0.0 (C.lits c) in
+          let pterm_w = (fun t -> float_of_int (Term.weight ~var:pv_w ~sym:(fun _ -> pf_w) t)) in
+          let nterm_w = (fun t -> float_of_int (Term.weight ~var:nv_w ~sym:(fun _ -> nf_w) t)) in
+          let w = 
+            match lit with 
+            | Lit.Equation(l,r,_) ->
+              let term_w = if Lit.is_pos lit then pterm_w else nterm_w in
+              let ord_side = Ordering.compare ord l r in
+              let l_mul = if ord_side = Comparison.Gt || ord_side = Comparison.Incomparable 
+                then max_t_m else 1.0 in
+              let r_mul = if ord_side = Comparison.Lt || ord_side = Comparison.Incomparable 
+                then max_t_m else 1.0 in
+              let t_w = l_mul *. (term_w l) +. r_mul *. (term_w r) in
+              let t_w = if Lit.is_pos lit then pos_m *. t_w else t_w in
+              let t_w = if CCBV.get max_lits i then max_l_m *. t_w else t_w in
+              t_w 
+            | _ -> 1.0 in
+          sum +. w
+        ) 0.0 (C.lits c) in
       int_of_float res
 
     let ho_weight_initial c =
@@ -202,24 +202,24 @@ module Make(C : Clause_intf.S) = struct
 
     let rec calc_tweight t sg v w c_mul =
       match Term.view t with 
-         Term.AppBuiltin (_,l) -> 
-            w + List.fold_left (fun acc t -> acc + 
-                                    calc_tweight t sg v w c_mul) 0 l
-         | Term.Var _ -> v
-         | Term.DB _ -> w
-         | Term.App (f, l) ->
-            let v = if Term.is_var f then 2*v else v in
-            calc_tweight f sg v w c_mul +
-              List.fold_left (fun acc t -> acc + calc_tweight t sg v w c_mul) 0 l
-         | Term.Const id -> (int_of_float ((if Signature.sym_in_conj id sg then c_mul else 1.0)*.float_of_int w))
-         | Term.Fun (_, t) -> calc_tweight t sg v w c_mul
+        Term.AppBuiltin (_,l) -> 
+        w + List.fold_left (fun acc t -> acc + 
+                                         calc_tweight t sg v w c_mul) 0 l
+      | Term.Var _ -> v
+      | Term.DB _ -> w
+      | Term.App (f, l) ->
+        let v = if Term.is_var f then 2*v else v in
+        calc_tweight f sg v w c_mul +
+        List.fold_left (fun acc t -> acc + calc_tweight t sg v w c_mul) 0 l
+      | Term.Const id -> (int_of_float ((if Signature.sym_in_conj id sg then c_mul else 1.0)*.float_of_int w))
+      | Term.Fun (_, t) -> calc_tweight t sg v w c_mul
 
-     let calc_lweight l sg v w c_mul =
+    let calc_lweight l sg v w c_mul =
       assert (Literal.no_prop_invariant l);
       match l with 
       (* Special treatment of propositions *)
       | Lit.Equation (lhs,rhs,true) when Term.equal rhs Term.true_ 
-                                          || Term.equal rhs Term.false_ ->
+                                      || Term.equal rhs Term.false_ ->
         calc_tweight lhs sg v w c_mul, Term.equal rhs Term.true_
       | Lit.Equation (lhs,rhs,sign) -> (calc_tweight lhs sg v w c_mul + 
                                         calc_tweight rhs sg v w c_mul, sign)
@@ -230,8 +230,8 @@ module Make(C : Clause_intf.S) = struct
       let res = 
         Array.mapi (fun i xx -> i,xx) (C.lits c)
         |> (Array.fold_left (fun acc (i,l) -> acc +. 
-              let l_w, l_s = (calc_lweight l sgn v f conj_mul) in 
-                ( if l_s then pos_mul else 1.0 )*. float_of_int l_w ) 0.0) in
+                                              let l_w, l_s = (calc_lweight l sgn v f conj_mul) in 
+                                              ( if l_s then pos_mul else 1.0 )*. float_of_int l_w ) 0.0) in
       let dist_vars =  List.length (Literals.vars (C.lits c)) in
       int_of_float (dist_var_mul ** (float_of_int dist_vars) *. res)
 
@@ -244,32 +244,32 @@ module Make(C : Clause_intf.S) = struct
         |`Small -> (2.0,1.5,2,3)
       in
       let conj_mul = 0.5 in
-        Array.mapi (fun i xx -> i,xx) (C.lits c)
-        |> 
-        (Array.fold_left (fun acc (i,l) -> acc +. 
-                          let l_w, l_s = (calc_lweight l sgn v f conj_mul) in 
-                            ( if l_s then pos_mul else 1.0 )*.
-                            ( if CCBV.get max_lits i then max_mul else 1.0)*. 
-                            float_of_int l_w ) 0.0) 
-        |> (fun res -> 
-              if distinct_vars_mul < 0.0 then int_of_float res
-              else
-                let dist_vars = 
-                 Literals.vars (C.lits c)
-                 |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))  in
-                let n_vars = List.length dist_vars + 1  in
-                let dist_var_penalty = distinct_vars_mul ** (float_of_int n_vars) in
-                let goal_dist_penalty = 
-                  if goal_penalty then (
-                    let divider = 
-                      match C.distance_to_goal c with
-                      | Some d -> 1.5 ** (1.0 /. (1.0 +. (float_of_int @@ d)))
-                      | None -> 1.0 in
-                    1.0 /. divider
-                  ) else 1.0 in
-                let val_ = int_of_float (goal_dist_penalty *. dist_var_penalty *. res) in
-                (Util.debugf  10 "cl: %a, w:%d\n" (fun k -> k C.pp c val_);
-                val_))
+      Array.mapi (fun i xx -> i,xx) (C.lits c)
+      |> 
+      (Array.fold_left (fun acc (i,l) -> acc +. 
+                                         let l_w, l_s = (calc_lweight l sgn v f conj_mul) in 
+                                         ( if l_s then pos_mul else 1.0 )*.
+                                         ( if CCBV.get max_lits i then max_mul else 1.0)*. 
+                                         float_of_int l_w ) 0.0) 
+      |> (fun res -> 
+          if distinct_vars_mul < 0.0 then int_of_float res
+          else
+            let dist_vars = 
+              Literals.vars (C.lits c)
+              |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))  in
+            let n_vars = List.length dist_vars + 1  in
+            let dist_var_penalty = distinct_vars_mul ** (float_of_int n_vars) in
+            let goal_dist_penalty = 
+              if goal_penalty then (
+                let divider = 
+                  match C.distance_to_goal c with
+                  | Some d -> 1.5 ** (1.0 /. (1.0 +. (float_of_int @@ d)))
+                  | None -> 1.0 in
+                1.0 /. divider
+              ) else 1.0 in
+            let val_ = int_of_float (goal_dist_penalty *. dist_var_penalty *. res) in
+            (Util.debugf  10 "cl: %a, w:%d\n" (fun k -> k C.pp c val_);
+             val_))
 
 
     let penalty = C.penalty
@@ -339,7 +339,7 @@ module Make(C : Clause_intf.S) = struct
       penalize (
         combine
           [default, 4; favor_small_num_vars, 1;
-          favor_all_neg, 1 ]
+           favor_all_neg, 1 ]
       )
 
     let default_fun =
@@ -369,10 +369,10 @@ module Make(C : Clause_intf.S) = struct
       let or_lmax_regex = 
         Str.regexp 
           ("orient-lmax(\\([0-9]+[.]?[0-9]*\\)," 
-            ^ "\\([0-9]+[.]?[0-9]*\\),"
-            ^ "\\([0-9]+[.]?[0-9]*\\),"
-            ^ "\\([0-9]+[.]?[0-9]*\\),"
-            ^ "\\([0-9]+[.]?[0-9]*\\))") in
+           ^ "\\([0-9]+[.]?[0-9]*\\),"
+           ^ "\\([0-9]+[.]?[0-9]*\\),"
+           ^ "\\([0-9]+[.]?[0-9]*\\),"
+           ^ "\\([0-9]+[.]?[0-9]*\\))") in
       try
         ignore(Str.search_forward or_lmax_regex s 0);
         let v_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 1 s)) in
@@ -384,19 +384,19 @@ module Make(C : Clause_intf.S) = struct
         orient_lmax_weight ~v_w ~f_w ~pos_m ~unord_m ~max_l_mul
       with Not_found | Invalid_argument _ -> 
         invalid_arg @@
-          "expected orient-lmax(var_weight:int,fun_weight:int" ^
-          "pos_lit_mult:float, unorderable_lit_mul:float, max_lit_mul:float)"
-    
+        "expected orient-lmax(var_weight:int,fun_weight:int" ^
+        "pos_lit_mult:float, unorderable_lit_mul:float, max_lit_mul:float)"
+
     let parse_pnrefine s = 
       let or_lmax_regex = 
         Str.regexp 
           ("pnrefined(\\([0-9]+[.]?[0-9]*\\)," 
-            ^ "\\([0-9]+[.]?[0-9]*\\),"
-            ^ "\\([0-9]+[.]?[0-9]*\\),"
-            ^ "\\([0-9]+[.]?[0-9]*\\),"
-            ^ "\\([0-9]+[.]?[0-9]*\\),"
-            ^ "\\([0-9]+[.]?[0-9]*\\),"
-            ^ "\\([0-9]+[.]?[0-9]*\\))") in
+           ^ "\\([0-9]+[.]?[0-9]*\\),"
+           ^ "\\([0-9]+[.]?[0-9]*\\),"
+           ^ "\\([0-9]+[.]?[0-9]*\\),"
+           ^ "\\([0-9]+[.]?[0-9]*\\),"
+           ^ "\\([0-9]+[.]?[0-9]*\\),"
+           ^ "\\([0-9]+[.]?[0-9]*\\))") in
       try
         ignore(Str.search_forward or_lmax_regex s 0);
         let pv_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 1 s)) in
@@ -409,18 +409,18 @@ module Make(C : Clause_intf.S) = struct
         pn_refined_weight ~pv_w ~pf_w ~nv_w ~nf_w ~pos_m ~max_t_m ~max_l_m
       with Not_found | Invalid_argument _ -> 
         invalid_arg @@
-          "expected pnrefined(+var_weight:int,+fun_weight:int" ^
-          "-var_weight:int,-fun_weight:int" ^
-          "pos_lit_mult:float, max_t_mult:float, max_lit_mul:float)"
+        "expected pnrefined(+var_weight:int,+fun_weight:int" ^
+        "-var_weight:int,-fun_weight:int" ^
+        "pos_lit_mult:float, max_t_mult:float, max_lit_mul:float)"
 
     let parse_conj_relative_cheap s = 
       let or_lmax_regex = 
         Str.regexp 
           ("conjecture-relative-cheap(\\([0-9]+\\)," 
-            ^ "\\([0-9]+\\),"
-            ^ "\\([0-9]+[.]?[0-9]*\\),"
-            ^ "\\([0-9]+[.]?[0-9]*\\),"
-            ^ "\\([0-9]+[.]?[0-9]*\\))") in
+           ^ "\\([0-9]+\\),"
+           ^ "\\([0-9]+[.]?[0-9]*\\),"
+           ^ "\\([0-9]+[.]?[0-9]*\\),"
+           ^ "\\([0-9]+[.]?[0-9]*\\))") in
       try
         ignore(Str.search_forward or_lmax_regex s 0);
         let v = CCOpt.get_exn (CCInt.of_string (Str.matched_group 1 s)) in
@@ -432,28 +432,28 @@ module Make(C : Clause_intf.S) = struct
       with Not_found | Invalid_argument _ ->
         Util.invalid_argf
           "expected conjecture-relative-cheap(v:int,f:int,pos_mul:float,conj_mul:float,dist_var_mul:float\n\
-          got: %s" s
+           got: %s" s
 
     let parsers = 
       ["fifo", (fun _ c -> C.id c);
        "default", (fun _ -> default_fun);
        "explore",  (fun _ -> explore_fun);
        "conjecture-relative", (fun _ -> conj_relative ~distinct_vars_mul:1.0 
-                                                     ~parameters_magnitude:`Large 
-                                                     ~goal_penalty:false );
+                                  ~parameters_magnitude:`Large 
+                                  ~goal_penalty:false );
        "conjecture-relative-var", parse_crv;
        "conjecture-relative-cheap", parse_conj_relative_cheap;
        "pnrefined", parse_pnrefine;
        "orient-lmax", parse_orient_lmax]
 
     let of_string s =
-    try
-      let splitted = CCString.split ~by:"(" s in
-      let name = List.hd splitted in
-      List.assoc name parsers s
-    with Not_found | Failure _ -> 
-      invalid_arg (CCFormat.sprintf "unknown weight function %s" s)
-    
+      try
+        let splitted = CCString.split ~by:"(" s in
+        let name = List.hd splitted in
+        List.assoc name parsers s
+      with Not_found | Failure _ -> 
+        invalid_arg (CCFormat.sprintf "unknown weight function %s" s)
+
   end
 
   module PriorityFun = struct
@@ -472,7 +472,7 @@ module Make(C : Clause_intf.S) = struct
     let prefer_unit_ground_non_goals c = 
       if Iter.exists Literal.is_pos (C.Seq.lits c) &&
          C.is_unit_clause c && C.is_ground c then 0 else 1
-    
+
     let prefer_goals c = 
       - (prefer_non_goals c)
 
@@ -482,14 +482,14 @@ module Make(C : Clause_intf.S) = struct
     let prefer_lambdas c = 
       if (C.Seq.terms c |> Iter.exists (fun t -> Iter.exists Term.is_fun (Term.Seq.subterms t)))
       then 0 else 1
-    
+
     let defer_lambdas c =
       - (prefer_lambdas c)
 
     let prefer_formulas c =
       if (C.Seq.terms c |> Iter.exists (fun t -> Iter.exists Term.is_formula (Term.Seq.subterms t)))
-        then 0 else 1
-    
+      then 0 else 1
+
     let prefer_easy_ho c =
       let has_lam_eq c =
         C.Seq.lits c
@@ -500,7 +500,7 @@ module Make(C : Clause_intf.S) = struct
       if has_lam_eq c || prefer_formulas c = 1 then 0 
       else if prefer_lambdas c = 1 then 1
       else 2
-    
+
     let defer_formulas c =
       - (prefer_formulas c)
 
@@ -517,26 +517,26 @@ module Make(C : Clause_intf.S) = struct
       if C.is_ground c then 1 else 0
 
     let defer_sos c = 
-       if C.proof_depth c = 0 || CCOpt.is_some (C.distance_to_goal c) then 1 else 0
+      if C.proof_depth c = 0 || CCOpt.is_some (C.distance_to_goal c) then 1 else 0
 
     let parsers = 
       ["const", (fun _ -> const_prio);
-      "prefer-ho-steps", (fun _ -> prefer_ho_steps);
-      "prefer-sos", (fun _ -> prefer_sos);
-      "defer-sos", (fun _ -> defer_sos);
-      "prefer-goals", (fun _ -> prefer_goals);
-      "prefer-non-goals", (fun _ -> prefer_non_goals);
-      "prefer-unit-ground-non-goals", (fun _ -> prefer_unit_ground_non_goals);            
-      "prefer-processed", (fun _ -> prefer_processed);
-      "prefer-lambdas", (fun _ -> prefer_lambdas);
-      "defer-lambdas", (fun _ -> defer_lambdas);
-      "prefer-formulas", (fun _ -> prefer_formulas);
-      "defer-formulas", (fun _ -> defer_formulas);
-      "prefer-easy-ho", (fun _ -> prefer_easy_ho);
-      "prefer-ground", (fun _ -> prefer_ground);
-      "defer-ground", (fun _ -> defer_ground);
-      "defer-fo", (fun _ -> defer_fo);
-      "prefer-fo", (fun _ -> prefer_fo);]
+       "prefer-ho-steps", (fun _ -> prefer_ho_steps);
+       "prefer-sos", (fun _ -> prefer_sos);
+       "defer-sos", (fun _ -> defer_sos);
+       "prefer-goals", (fun _ -> prefer_goals);
+       "prefer-non-goals", (fun _ -> prefer_non_goals);
+       "prefer-unit-ground-non-goals", (fun _ -> prefer_unit_ground_non_goals);            
+       "prefer-processed", (fun _ -> prefer_processed);
+       "prefer-lambdas", (fun _ -> prefer_lambdas);
+       "defer-lambdas", (fun _ -> defer_lambdas);
+       "prefer-formulas", (fun _ -> prefer_formulas);
+       "defer-formulas", (fun _ -> defer_formulas);
+       "prefer-easy-ho", (fun _ -> prefer_easy_ho);
+       "prefer-ground", (fun _ -> prefer_ground);
+       "defer-ground", (fun _ -> defer_ground);
+       "defer-fo", (fun _ -> defer_fo);
+       "prefer-fo", (fun _ -> prefer_fo);]
 
     let of_string s = 
       try 
@@ -544,7 +544,7 @@ module Make(C : Clause_intf.S) = struct
       with Not_found -> 
         let err_msg = 
           CCFormat.sprintf "unknown priortity: %s.\noptions:@ %a"
-          s (CCList.pp ~start:"{" ~stop:"}" CCString.pp) (List.map fst parsers) in
+            s (CCList.pp ~start:"{" ~stop:"}" CCString.pp) (List.map fst parsers) in
         invalid_arg err_msg
   end
 
@@ -596,8 +596,8 @@ module Make(C : Clause_intf.S) = struct
         C.Tbl.add q.tbl c ();
         let weights = Array.map (fun f -> f c) q.weight_funs in
         let heaps = Array.mapi (fun i (prio,weight) ->  
-          let heap = Array.get q.heaps i in
-          H.insert (prio,weight,c) heap) weights in
+            let heap = Array.get q.heaps i in
+            H.insert (prio,weight,c) heap) weights in
         q.heaps <- heaps)
 
   let add_seq q hcs = Iter.iter (add q) hcs
@@ -609,7 +609,7 @@ module Make(C : Clause_intf.S) = struct
         q.current_step <- q.current_step + 1;
       ) else ( 
         (* we have to choose the next heap *)
-        
+
         if (q.current_heap_idx + 1 = Array.length (q.heaps)) then (
           (* cycled through all the heaps, starting over  *)
           q.current_heap_idx <- 0;
@@ -677,7 +677,7 @@ module Make(C : Clause_intf.S) = struct
     let weight =
       penalize ( 
         combine [default, 4; favor_small_num_vars, 2;
-                favor_goal, 1; favor_all_neg, 1; ]
+                 favor_goal, 1; favor_all_neg, 1; ]
       ) in
     (* make ~ratio:6 ~weight name *)
     let weight_fun = const_prioritize_fun weight in
@@ -707,7 +707,7 @@ module Make(C : Clause_intf.S) = struct
     let weight =
       penalize (
         combine [favor_pos_unit, 1; favor_ground, 2;
-                favor_small_num_vars, 10; ]
+                 favor_small_num_vars, 10; ]
       )
     in
     (* make ~ratio:6 ~weight "ground" *)
@@ -732,8 +732,8 @@ module Make(C : Clause_intf.S) = struct
     (* make ~ratio:!cr_var_ratio ~weight:(WeightFun.conj_relative ~distinct_vars_mul:!cr_var_mul)
          "conj_relative_var" *)
     let weight_fun = const_prioritize_fun 
-      (WeightFun.conj_relative ~distinct_vars_mul:!cr_var_mul 
-                                ~parameters_magnitude:!parameters_magnitude ~goal_penalty:!goal_penalty) in
+        (WeightFun.conj_relative ~distinct_vars_mul:!cr_var_mul 
+           ~parameters_magnitude:!parameters_magnitude ~goal_penalty:!goal_penalty) in
     ignore(add_to_mixed_eval ~ratio:!cr_var_ratio ~weight_fun);
     add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf
 
@@ -759,23 +759,23 @@ module Make(C : Clause_intf.S) = struct
     let open ClauseQueue_intf in
     if CCList.is_empty !funs_to_parse then (
       match p with
-        | P_default -> default ()
-        | P_bfs -> bfs ()
-        | P_almost_bfs -> almost_bfs ()
-        | P_explore -> explore ()
-        | P_ground -> ground ()
-        | P_goal -> goal_oriented ()
-        | P_conj_rel ->  conj_relative_mk ()
-        | P_conj_rel_var -> conj_var_relative_mk ()
-        | P_ho_weight -> ho_weight ()
-        | P_ho_weight_init -> ho_weight_init ()
-        | P_avoid_expensive -> avoid_expensive_mk ())
+      | P_default -> default ()
+      | P_bfs -> bfs ()
+      | P_almost_bfs -> almost_bfs ()
+      | P_explore -> explore ()
+      | P_ground -> ground ()
+      | P_goal -> goal_oriented ()
+      | P_conj_rel ->  conj_relative_mk ()
+      | P_conj_rel_var -> conj_var_relative_mk ()
+      | P_ho_weight -> ho_weight ()
+      | P_ho_weight_init -> ho_weight_init ()
+      | P_avoid_expensive -> avoid_expensive_mk ())
     else (
       List.fold_left (fun _ (ratio, prio, weight) -> 
-        let prio_fun = PriorityFun.of_string prio in
-        let weight_fun = WeightFun.of_string weight in
-        add_to_mixed_eval ~ratio ~weight_fun:(fun c -> prio_fun c, weight_fun c)
-      ) (Mixed mixed_eval) !funs_to_parse
+          let prio_fun = PriorityFun.of_string prio in
+          let weight_fun = WeightFun.of_string weight in
+          add_to_mixed_eval ~ratio ~weight_fun:(fun c -> prio_fun c, weight_fun c)
+        ) (Mixed mixed_eval) !funs_to_parse
     )
 
   let pp out q = CCFormat.fprintf out "queue %s" (name q)
@@ -812,20 +812,20 @@ let () =
       _profile := P_conj_rel_var;
       cr_var_ratio := 8;
       cr_var_mul   := 1.05;
-  );
+    );
   Params.add_to_mode "ho-competitive" (fun () ->
       _profile := P_conj_rel_var;
       cr_var_ratio := 8;
       cr_var_mul   := 1.05;
-  );
+    );
   Params.add_to_mode "ho-complete-basic" (fun () ->
       _profile := P_conj_rel_var;
       cr_var_ratio := 8;
       cr_var_mul   := 1.05;
-  );
+    );
   Params.add_to_mode "fo-complete-basic" (fun () ->
       _profile := P_conj_rel_var;
       cr_var_ratio := 8;
       cr_var_mul   := 1.05;
-  );
+    );
 

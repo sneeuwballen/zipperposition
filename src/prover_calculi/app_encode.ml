@@ -87,21 +87,21 @@ let rec app_encode_term toplevel t  =
         (fun term arg ->
            Util.debugf 5 "Encoding application of %a to %a" (fun k -> k T.pp_with_ty term T.pp arg);
            match T.view (T.ty_exn term) with
-             | T.App (f, types) ->
-               assert (T.equal f function_type);
-               assert (List.length types == 2);
-               assert (not (is_type arg));
-               let arg' = app_encode_term false arg in
-               T.app
-                 ~ty:(List.nth types 1)
-                 const_ae_app
-                 [CCOpt.get_exn (T.ty arg'); List.nth types 1; term; arg']
-             | T.Bind (Binder.ForallTy, var, t) ->
-               assert (is_type arg);
-               let arg' = app_encode_ty arg in
-               let t' = T.Subst.eval (Var.Subst.singleton var arg') t in
-               T.app ~ty:t' term [arg']
-             | _ -> failwith "Expected quantified or function type"
+           | T.App (f, types) ->
+             assert (T.equal f function_type);
+             assert (List.length types == 2);
+             assert (not (is_type arg));
+             let arg' = app_encode_term false arg in
+             T.app
+               ~ty:(List.nth types 1)
+               const_ae_app
+               [CCOpt.get_exn (T.ty arg'); List.nth types 1; term; arg']
+           | T.Bind (Binder.ForallTy, var, t) ->
+             assert (is_type arg);
+             let arg' = app_encode_ty arg in
+             let t' = T.Subst.eval (Var.Subst.singleton var arg') t in
+             T.app ~ty:t' term [arg']
+           | _ -> failwith "Expected quantified or function type"
         )
         (app_encode_term false f)
         args
@@ -149,33 +149,33 @@ let result_tc =
     ~is_stmt:true
     ~name:Statement.name
     ~to_form:(fun ~ctx st ->
-      let conv_c (c:(T.t SLiteral.t) list) : _ =
-        c 
-        |> List.map SLiteral.to_form
-        |> T.Form.or_
-      in
-      Statement.Seq.forms st
-      |> Iter.map conv_c
-      |> Iter.to_list
-      |> T.Form.and_)
+        let conv_c (c:(T.t SLiteral.t) list) : _ =
+          c 
+          |> List.map SLiteral.to_form
+          |> T.Form.or_
+        in
+        Statement.Seq.forms st
+        |> Iter.map conv_c
+        |> Iter.to_list
+        |> T.Form.and_)
     ()
 
 (** encode a statement *)
 let app_encode_stmt stmt =
   let as_proof = Proof.S.mk (Statement.proof_step stmt) (Proof.Result.make result_tc stmt) in
   let proof = Proof.Step.esa ~rule:(Proof.Rule.mk "app_encode") [as_proof |> Proof.Parent.from] in
-   match Statement.view stmt with
-    | Statement.Def _ -> failwith "Not implemented: Def"
-    | Statement.Rewrite _ -> failwith "Not implemented: Rewrite"
-    | Statement.Data _ -> failwith "Not implemented: Data"
-    | Statement.Lemma _ -> failwith "Not implemented: Lemma"
-    | Statement.Goal lits -> failwith "Not implemented: Goal"
-    | Statement.NegatedGoal (skolems,clauses) -> 
-      let skolems = List.map (fun (id, ty) -> (id, app_encode_ty ty)) skolems in
-      Statement.neg_goal ~proof ~skolems (List.map app_encode_lits clauses)
-    | Statement.Assert lits -> Statement.assert_ ~proof (app_encode_lits lits)
-    | Statement.TyDecl (id, ty) ->
-      Statement.ty_decl ~proof:Proof.Step.trivial id (app_encode_ty ty)
+  match Statement.view stmt with
+  | Statement.Def _ -> failwith "Not implemented: Def"
+  | Statement.Rewrite _ -> failwith "Not implemented: Rewrite"
+  | Statement.Data _ -> failwith "Not implemented: Data"
+  | Statement.Lemma _ -> failwith "Not implemented: Lemma"
+  | Statement.Goal lits -> failwith "Not implemented: Goal"
+  | Statement.NegatedGoal (skolems,clauses) -> 
+    let skolems = List.map (fun (id, ty) -> (id, app_encode_ty ty)) skolems in
+    Statement.neg_goal ~proof ~skolems (List.map app_encode_lits clauses)
+  | Statement.Assert lits -> Statement.assert_ ~proof (app_encode_lits lits)
+  | Statement.TyDecl (id, ty) ->
+    Statement.ty_decl ~proof:Proof.Step.trivial id (app_encode_ty ty)
 
 (* TODO: fix, add diff (+ ty_decl) *)
 let extensionality_axiom =

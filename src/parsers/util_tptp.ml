@@ -77,28 +77,28 @@ let parse_lexbuf ?names buf =
       decls;
     Err.return (Iter.of_queue q)
   with
-    | Error msg | Sys_error msg ->
-      Err.fail msg
-    | e ->
-      Err.fail (Printexc.to_string e)
+  | Error msg | Sys_error msg ->
+    Err.fail msg
+  | e ->
+    Err.fail (Printexc.to_string e)
 
 (* find file *)
 let _find_and_open filename dir =
   match filename with
-    | "stdin" -> stdin
-    | _ ->
-      match find_file filename dir with
-        | Some filename ->
-          begin try open_in filename
-            with Sys_error msg ->
-              errorf "error when opening file `%s`: %s" filename msg
-          end
-        | None -> errorf "could not find file `%s`" filename
+  | "stdin" -> stdin
+  | _ ->
+    match find_file filename dir with
+    | Some filename ->
+      begin try open_in filename
+        with Sys_error msg ->
+          errorf "error when opening file `%s`: %s" filename msg
+      end
+    | None -> errorf "could not find file `%s`" filename
 
 let parse_file ?cache ~recursive f =
   let parse_cache =
     lazy (if recursive then CCOpt.get_lazy create_parse_cache cache
-      else assert false)
+          else assert false)
   in
   let dir = Filename.dirname f in
   let result_decls = Queue.create () in
@@ -148,9 +148,9 @@ let parse_file ?cache ~recursive f =
     parse_this_file ?names:None f;
     Err.return (Iter.of_queue result_decls)
   with
-    | Error msg | Sys_error msg ->
-      Err.fail (Util.err_spf "in parse_tptp: %s" msg)
-    | e -> Err.fail (Printexc.to_string e)
+  | Error msg | Sys_error msg ->
+    Err.fail (Util.err_spf "in parse_tptp: %s" msg)
+  | e -> Err.fail (Printexc.to_string e)
 
 let fpf = Format.fprintf
 
@@ -219,27 +219,27 @@ let to_ast st =
     let name = A.string_of_name name in
     let attrs = [UA.attr_name name] in
     match role with
-      | A.R_question
-      | A.R_conjecture -> UA.goal ~attrs f
-      | A.R_negated_conjecture -> UA.goal ~attrs (PT.not_ f)
-      | A.R_lemma -> UA.lemma ~attrs f
-      | A.R_definition
-        when !enable_def_as_rewrite &&
-             looks_like_def f ->
-        (* conversion into def *)
-        Util.debugf ~section 3 "(@[tptp.def_as_rewrite@ %a@])"
-          (fun k->k PT.pp f);
-        Util.incr_stat stat_def_as_rw;
-        UA.rewrite ~attrs f
-      | A.R_definition
-      | A.R_axiom
-      | A.R_hypothesis
-      | A.R_assumption
-      | A.R_theorem
-      | A.R_plain
-      | A.R_finite _
-      | A.R_type
-      | A.R_unknown  -> UA.assert_ ~attrs f
+    | A.R_question
+    | A.R_conjecture -> UA.goal ~attrs f
+    | A.R_negated_conjecture -> UA.goal ~attrs (PT.not_ f)
+    | A.R_lemma -> UA.lemma ~attrs f
+    | A.R_definition
+      when !enable_def_as_rewrite &&
+           looks_like_def f ->
+      (* conversion into def *)
+      Util.debugf ~section 3 "(@[tptp.def_as_rewrite@ %a@])"
+        (fun k->k PT.pp f);
+      Util.incr_stat stat_def_as_rw;
+      UA.rewrite ~attrs f
+    | A.R_definition
+    | A.R_axiom
+    | A.R_hypothesis
+    | A.R_assumption
+    | A.R_theorem
+    | A.R_plain
+    | A.R_finite _
+    | A.R_type
+    | A.R_unknown  -> UA.assert_ ~attrs f
   and conv_decl name s ty info =
     let name = A.string_of_name name in
     let attr_name = UA.attr_name name in
@@ -278,17 +278,17 @@ let of_ast st =
     | Some s -> A.NameString s
   in
   match st.UA.stmt with
-    | UA.Include s -> A.Include s
-    | UA.Decl (s,ty) ->
-      let name = name_sym_ s in
-      (* XXX we should look if [ty] returns tType or not *)
-      A.TypeDecl (name, s, ty, [])
-    | UA.Def _ -> error "cannot convert `def` statement into TPTP"
-    | UA.Rewrite _ -> error "cannot convert `rewrite` statement into TPTP"
-    | UA.Data _ -> error "cannot convert `data` statement into TPTP"
-    | UA.Goal f -> A.TFF (name, A.R_conjecture, f, [])
-    | UA.Assert f -> A.TFF (name, A.R_axiom, f, [])
-    | UA.Lemma f -> A.TFF (name, A.R_lemma, f, [])
+  | UA.Include s -> A.Include s
+  | UA.Decl (s,ty) ->
+    let name = name_sym_ s in
+    (* XXX we should look if [ty] returns tType or not *)
+    A.TypeDecl (name, s, ty, [])
+  | UA.Def _ -> error "cannot convert `def` statement into TPTP"
+  | UA.Rewrite _ -> error "cannot convert `rewrite` statement into TPTP"
+  | UA.Data _ -> error "cannot convert `data` statement into TPTP"
+  | UA.Goal f -> A.TFF (name, A.R_conjecture, f, [])
+  | UA.Assert f -> A.TFF (name, A.R_axiom, f, [])
+  | UA.Lemma f -> A.TFF (name, A.R_lemma, f, [])
 
 let () =
   Options.add_opts

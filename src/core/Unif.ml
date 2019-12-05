@@ -37,22 +37,22 @@ let occurs_check ~depth subst (v,sc_v) t =
       (* check type and subterms *)
       check ~depth (ty, sc_t) ||
       match T.view t with
-        | T.Var v' ->
-          (HVar.equal T.equal v v' && sc_v = sc_t)
-          ||
-          begin match Subst.find subst (v',sc_t) with
-            | None -> false
-            | Some t' -> check ~depth t'
-          end
-        | T.DB i -> i>=depth (* not closed! *)
-        | T.Const _ -> false
-        | T.Bind (_, varty, t') ->
-          check ~depth (varty,sc_t) ||
-          check ~depth:(depth+1) (t',sc_t)
-        | T.AppBuiltin (_, l) -> check_l ~depth l sc_t
-        | T.App (hd, l) ->
-          check ~depth (hd,sc_t) ||
-          check_l ~depth l sc_t
+      | T.Var v' ->
+        (HVar.equal T.equal v v' && sc_v = sc_t)
+        ||
+        begin match Subst.find subst (v',sc_t) with
+          | None -> false
+          | Some t' -> check ~depth t'
+        end
+      | T.DB i -> i>=depth (* not closed! *)
+      | T.Const _ -> false
+      | T.Bind (_, varty, t') ->
+        check ~depth (varty,sc_t) ||
+        check ~depth:(depth+1) (t',sc_t)
+      | T.AppBuiltin (_, l) -> check_l ~depth l sc_t
+      | T.App (hd, l) ->
+        check ~depth (hd,sc_t) ||
+        check_l ~depth l sc_t
   and check_l ~depth l sc = match l with
     | [] -> false
     | [t] -> check ~depth (t,sc)
@@ -330,7 +330,7 @@ module Inner = struct
   (* distinct ground terms *)
   let distinct_ground_l l : bool =
     List.for_all (fun t -> T.is_ground t (*&& CCList.is_empty @@ T.DB.unbound t*)) l 
-      && distinct_term_l l
+    && distinct_term_l l
 
   (* given [l], a list of distinct (ground) terms, and [rhs],
      replace [l] by distinct fresh variables indices in [rhs],
@@ -416,7 +416,7 @@ module Inner = struct
      [λall_vars. H (l1 ∩ l2)] *)
   let restrict_fun2
     : unif_subst -> ty_ret:T.t -> bvars:B_vars.t -> scope:Scoped.scope ->
-    _ -> _ -> unif_subst
+      _ -> _ -> unif_subst
     = fun subst ~ty_ret ~bvars ~scope (v1,l1) (v2,l2) ->
       assert (not (HVar.equal T.equal v1 v2)); (* non-trivial *)
       assert (not (US.mem subst (v1,scope)));
@@ -483,9 +483,9 @@ module Inner = struct
       | _, T.NoType -> fail()
       | T.HasType ty1, T.HasType ty2 ->
         (* unify types, then terms *)
-      (* Util.debugf ~section 5 "(@[unif_start@ :t1 `%a`@ :t2 `%a`@ :op %a@ :subst @[%a@]@ :bvars %a@])@."
-      (fun k -> k (Scoped.pp T.pp) (t1,sc1) (Scoped.pp T.pp) (t2,sc2)
-                pp_op op US.pp subst B_vars.pp bvars); *)
+        (* Util.debugf ~section 5 "(@[unif_start@ :t1 `%a`@ :t2 `%a`@ :op %a@ :subst @[%a@]@ :bvars %a@])@."
+           (fun k -> k (Scoped.pp T.pp) (t1,sc1) (Scoped.pp T.pp) (t2,sc2)
+                  pp_op op US.pp subst B_vars.pp bvars); *)
         let subst = unif_rec ~op ~root:true ~bvars subst (ty1,sc1) (ty2,sc2) in
         unif_term ~op ~root ~bvars subst t1 sc1 t2 sc2
     end
@@ -501,7 +501,7 @@ module Inner = struct
       | _ -> true
     in
     (* assert (not (T.is_a_type t1 && Type.is_forall (Type.of_term_unsafe t1)));
-    assert (not (T.is_a_type t2 && Type.is_forall (Type.of_term_unsafe t2))); *)
+       assert (not (T.is_a_type t2 && Type.is_forall (Type.of_term_unsafe t2))); *)
     begin match view1, view2 with
       | _ when sc1=sc2 && T.equal t1 t2 ->
         subst (* the terms are equal under any substitution *)
@@ -596,16 +596,16 @@ module Inner = struct
         let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
         delay ~tags () (* push pair as a constraint, because of typing. *)
       | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when 
-        Builtin.equal s1 s2 ->
+          Builtin.equal s1 s2 ->
         (* && not (Builtin.equal Builtin.ForallConst s1) && 
-        not (Builtin.equal Builtin.ExistsConst s1) -> *)
+           not (Builtin.equal Builtin.ExistsConst s1) -> *)
         (* try to unify/match builtins pairwise *)
         unif_list ~op ~bvars subst l1 sc1 l2 sc2
       | _, _ -> raise Fail
     end
 
   and unif_vars ~op subst t1 sc1 t2 sc2 : unif_subst =
-   (* Util.debugf ~section 4 "var_binidng: %a =?= %a" (fun k-> k T.pp t1 T.pp t2); *)
+    (* Util.debugf ~section 4 "var_binidng: %a =?= %a" (fun k-> k T.pp t1 T.pp t2); *)
     let t1,t2 = CCPair.map_same (fun t -> ((Lambda.eta_reduce t) :> InnerTerm.t)) (Term.of_term_unsafe t1,Term.of_term_unsafe t2) in
     begin match T.view t1, T.view t2, op with
       | T.Var v1, T.Var v2, O_equal ->
@@ -694,8 +694,8 @@ module Inner = struct
         in
         unif_rec ~op ~root:false
           ~bvars:(B_vars.make
-              (DBEnv.push_l_rev bvars.B_vars.left new_vars1)
-              (DBEnv.push_l_rev bvars.B_vars.right new_vars2))
+                    (DBEnv.push_l_rev bvars.B_vars.left new_vars1)
+                    (DBEnv.push_l_rev bvars.B_vars.right new_vars2))
           subst (f1,scope) (f2,scope)
       | T.Bind (Binder.Lambda, _, _), _ ->
         (* [λx. t = u] becomes [t = u x] *)
@@ -704,8 +704,8 @@ module Inner = struct
         let n = List.length new_vars in
         unif_rec ~op ~root
           ~bvars:(B_vars.make
-              (DBEnv.push_l_rev bvars.B_vars.left new_vars)
-              (DBEnv.push_l_rev bvars.B_vars.right new_vars))
+                    (DBEnv.push_l_rev bvars.B_vars.left new_vars)
+                    (DBEnv.push_l_rev bvars.B_vars.right new_vars))
           subst
           (f1,scope)
           (T.app ~ty:(T.ty_exn f1)
@@ -718,8 +718,8 @@ module Inner = struct
         let n = List.length new_vars in
         unif_rec ~op ~root
           ~bvars:(B_vars.make
-              (DBEnv.push_l_rev bvars.B_vars.left new_vars)
-              (DBEnv.push_l_rev bvars.B_vars.right new_vars))
+                    (DBEnv.push_l_rev bvars.B_vars.left new_vars)
+                    (DBEnv.push_l_rev bvars.B_vars.right new_vars))
           subst
           (T.app ~ty:(T.ty_exn f2)
              (T.DB.shift n t1)
@@ -751,11 +751,11 @@ module Inner = struct
           | O_variant _ | O_equal -> fail()
         end;
         (* Format.printf
-          "(@[unif_ho.flex_rigid, trying@ `@[:f1 %a :l1 %a@]`@ :t2 `%a`@ :subst %a@ :bvars %a@])@."
-          (Scoped.pp T.pp) (f1,scope) (CCFormat.Dump.list T.pp) l1
-          (Scoped.pp T.pp) (t2,scope) US.pp subst B_vars.pp bvars; *)
+           "(@[unif_ho.flex_rigid, trying@ `@[:f1 %a :l1 %a@]`@ :t2 `%a`@ :subst %a@ :bvars %a@])@."
+           (Scoped.pp T.pp) (f1,scope) (CCFormat.Dump.list T.pp) l1
+           (Scoped.pp T.pp) (t2,scope) US.pp subst B_vars.pp bvars; *)
         if distinct_bvar_l ~bvars:bvars.B_vars.left l1 
-          && CCList.subset ~eq:(=) (T.DB.unbound t2) (List.map T.as_bvar_exn l1) 
+        && CCList.subset ~eq:(=) (T.DB.unbound t2) (List.map T.as_bvar_exn l1) 
         then (
           (* flex/rigid pattern unif *)
           flex_rigid ~op ~bvars:bvars.B_vars.left subst f1 l1 t2 ~scope
@@ -778,8 +778,8 @@ module Inner = struct
           (Scoped.pp T.pp) (f2,scope) (CCFormat.Dump.list T.pp) l2
           (Scoped.pp T.pp) (t1,scope) US.pp subst B_vars.pp bvars;*)
         if distinct_bvar_l ~bvars:bvars.B_vars.right l2 
-          && CCList.subset ~eq:(=) (T.DB.unbound t1) (List.map T.as_bvar_exn l2) 
-          && op=O_unify 
+        && CCList.subset ~eq:(=) (T.DB.unbound t1) (List.map T.as_bvar_exn l2) 
+        && op=O_unify 
         then (
           (* flex/rigid pattern unif *)
           flex_rigid ~op ~bvars:bvars.B_vars.right subst f2 l2 t1 ~scope
@@ -1098,68 +1098,68 @@ module FO = struct
 
   let unify_full ?(subst=US.empty) =
     fun sc1 sc2 -> 
-      let ta, sca = sc1 in 
-      let tb, scb = sc2 in
+    let ta, sca = sc1 in 
+    let tb, scb = sc2 in
 
-      if(not (Term.DB.is_closed ta) || not (Term.DB.is_closed tb)) then (
-         let sk_a, sk_a_subs = Term.DB.skolemize_loosely_bound ta in
-         let sk_b, sk_b_subs = Term.DB.skolemize_loosely_bound tb in
-         (* Format.printf "Skolemized %a into %a.\n" Term.pp ta Term.pp sk_a;
-            Format.printf "Skolemized %a into %a.\n" Term.pp tb Term.pp sk_b;
-            Format.printf "Map a:\n";
-            Term.IntMap.iter (fun i t -> Format.printf "[%d:%a]\n" i Term.pp t) sk_a_subs;
-            Format.printf "Map b:\n";
+    if(not (Term.DB.is_closed ta) || not (Term.DB.is_closed tb)) then (
+      let sk_a, sk_a_subs = Term.DB.skolemize_loosely_bound ta in
+      let sk_b, sk_b_subs = Term.DB.skolemize_loosely_bound tb in
+      (* Format.printf "Skolemized %a into %a.\n" Term.pp ta Term.pp sk_a;
+         Format.printf "Skolemized %a into %a.\n" Term.pp tb Term.pp sk_b;
+         Format.printf "Map a:\n";
+         Term.IntMap.iter (fun i t -> Format.printf "[%d:%a]\n" i Term.pp t) sk_a_subs;
+         Format.printf "Map b:\n";
          Term.IntMap.iter (fun i t -> Format.printf "[%d:%a]\n" i Term.pp t) sk_b_subs; *)
-         let res = (unify_full :> ?subst:unif_subst -> term Scoped.t -> term Scoped.t -> unif_subst)
-                  ~subst (Scoped.make sk_a sca) (Scoped.make sk_b scb) in
-         let sk_a_rev = Term.IntMap.fold (fun k v acc -> Term.Map.add v k acc) sk_a_subs Term.Map.empty in
-         let sk_b_rev = Term.IntMap.fold (fun k v acc -> Term.Map.add v k acc) sk_b_subs Term.Map.empty in
-         let sk_rev_union = Term.Map.union (fun _ _ _ -> raise (Invalid_argument "keys must be unique "))
-                           sk_a_rev sk_b_rev in
-         let subst = Unif_subst.subst res in 
-         let mapped = Subst.FO.map (fun t -> Term.DB.unskolemize sk_rev_union t) subst in
-         let res' = Unif_subst.make mapped (Unif_subst.constr_l res) in
+      let res = (unify_full :> ?subst:unif_subst -> term Scoped.t -> term Scoped.t -> unif_subst)
+          ~subst (Scoped.make sk_a sca) (Scoped.make sk_b scb) in
+      let sk_a_rev = Term.IntMap.fold (fun k v acc -> Term.Map.add v k acc) sk_a_subs Term.Map.empty in
+      let sk_b_rev = Term.IntMap.fold (fun k v acc -> Term.Map.add v k acc) sk_b_subs Term.Map.empty in
+      let sk_rev_union = Term.Map.union (fun _ _ _ -> raise (Invalid_argument "keys must be unique "))
+          sk_a_rev sk_b_rev in
+      let subst = Unif_subst.subst res in 
+      let mapped = Subst.FO.map (fun t -> Term.DB.unskolemize sk_rev_union t) subst in
+      let res' = Unif_subst.make mapped (Unif_subst.constr_l res) in
 
-         (* Format.printf "Res: @[%a@]\n" Unif_subst.pp res'; *)
+      (* Format.printf "Res: @[%a@]\n" Unif_subst.pp res'; *)
 
-         res'  
-      )
-      else (
-         (unify_full :> ?subst:unif_subst -> term Scoped.t -> term Scoped.t -> unif_subst)
-         ~subst sc1 sc2
-      )
-      
+      res'  
+    )
+    else (
+      (unify_full :> ?subst:unif_subst -> term Scoped.t -> term Scoped.t -> unif_subst)
+        ~subst sc1 sc2
+    )
+
 
   let unify_syn ?(subst=Subst.empty) =
     fun sc1 sc2 -> 
-      let ta, sca = sc1 in 
-      let tb, scb = sc2 in  
-      if(not (Term.DB.is_closed ta) || not (Term.DB.is_closed tb)) then (
-        let sk_a, sk_a_subs = Term.DB.skolemize_loosely_bound ta in
-        let sk_b, sk_b_subs = Term.DB.skolemize_loosely_bound tb in
-        (* Format.printf "Skolemized %a into %a.\n" Term.pp ta Term.pp sk_a;
-        Format.printf "Skolemized %a into %a.\n" Term.pp tb Term.pp sk_b;
-        Format.printf "Map a:\n";
-        Term.IntMap.iter (fun i t -> Format.printf "[%d:%a]\n" i Term.pp t) sk_a_subs;
-        Format.printf "Map b:\n";
-        Term.IntMap.iter (fun i t -> Format.printf "[%d:%a]\n" i Term.pp t) sk_b_subs; *)
-        let res = (unify_syn :> ?subst:subst -> term Scoped.t -> term Scoped.t -> subst)
-                  ~subst (Scoped.make sk_a sca) (Scoped.make sk_b scb) in
-        let sk_a_rev = Term.IntMap.fold (fun k v -> Term.Map.add v k) sk_a_subs Term.Map.empty in
-        let sk_b_rev = Term.IntMap.fold (fun k v -> Term.Map.add v k) sk_b_subs Term.Map.empty in
-        let sk_rev_union = Term.Map.union (fun _ _ _ -> raise (Invalid_argument "keys must be unique "))
-                          sk_a_rev sk_b_rev in
-        let res = Subst.FO.map (Term.DB.unskolemize sk_rev_union) res in
+    let ta, sca = sc1 in 
+    let tb, scb = sc2 in  
+    if(not (Term.DB.is_closed ta) || not (Term.DB.is_closed tb)) then (
+      let sk_a, sk_a_subs = Term.DB.skolemize_loosely_bound ta in
+      let sk_b, sk_b_subs = Term.DB.skolemize_loosely_bound tb in
+      (* Format.printf "Skolemized %a into %a.\n" Term.pp ta Term.pp sk_a;
+         Format.printf "Skolemized %a into %a.\n" Term.pp tb Term.pp sk_b;
+         Format.printf "Map a:\n";
+         Term.IntMap.iter (fun i t -> Format.printf "[%d:%a]\n" i Term.pp t) sk_a_subs;
+         Format.printf "Map b:\n";
+         Term.IntMap.iter (fun i t -> Format.printf "[%d:%a]\n" i Term.pp t) sk_b_subs; *)
+      let res = (unify_syn :> ?subst:subst -> term Scoped.t -> term Scoped.t -> subst)
+          ~subst (Scoped.make sk_a sca) (Scoped.make sk_b scb) in
+      let sk_a_rev = Term.IntMap.fold (fun k v -> Term.Map.add v k) sk_a_subs Term.Map.empty in
+      let sk_b_rev = Term.IntMap.fold (fun k v -> Term.Map.add v k) sk_b_subs Term.Map.empty in
+      let sk_rev_union = Term.Map.union (fun _ _ _ -> raise (Invalid_argument "keys must be unique "))
+          sk_a_rev sk_b_rev in
+      let res = Subst.FO.map (Term.DB.unskolemize sk_rev_union) res in
 
-        (* Format.printf "Res: %@[%a@]\n" Subst.pp res; *)
+      (* Format.printf "Res: %@[%a@]\n" Subst.pp res; *)
 
-        res
-      )
-      else (
-        (unify_syn :> ?subst:subst -> term Scoped.t -> term Scoped.t -> subst)
+      res
+    )
+    else (
+      (unify_syn :> ?subst:subst -> term Scoped.t -> term Scoped.t -> subst)
         ~subst sc1 sc2
-      )
-     
+    )
+
 
   let matching =
     (matching :> ?subst:subst ->
