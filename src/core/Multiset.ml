@@ -44,11 +44,11 @@ module Make(E : Map.OrderedType) = struct
   let _merge f m1 m2 =
     M.merge_safe m1 m2
       ~f:(fun _ v -> match v with
-        | `Left n
-        | `Right n -> Some n
-        | `Both (n1,n2) ->
-          let n = f n1 n2 in
-          if Z.equal n Z.zero then None else Some n)
+          | `Left n
+          | `Right n -> Some n
+          | `Both (n1,n2) ->
+            let n = f n1 n2 in
+            if Z.equal n Z.zero then None else Some n)
 
   let union = _merge Z.max
 
@@ -139,11 +139,11 @@ module Make(E : Map.OrderedType) = struct
     let diff m1 m2 =
       M.merge_safe m1 m2
         ~f:(fun _ v -> match v with
-          | `Left n -> Some n
-          | `Right _ -> None
-          | `Both (n1,n2) ->
-            let n = Z.(n1-n2) in
-            if Z.sign n <= 0 then None else Some n)
+            | `Left n -> Some n
+            | `Right _ -> None
+            | `Both (n1,n2) ->
+              let n = Z.(n1-n2) in
+              if Z.sign n <= 0 then None else Some n)
     in
     diff m1 m2, diff m2 m1
 

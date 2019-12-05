@@ -126,12 +126,12 @@ module Make_linexp(N : NUM) = struct
   let merge_ f a b : t = {
     const=f a.const b.const;
     coeffs=I_map.merge_safe a.coeffs b.coeffs
-      ~f:(fun _ o -> match o with
-        | `Left n | `Right n -> Some n
-        | `Both ((t,a),(t2,b)) ->
-          assert (t==t2);
-          let c = f a b in
-          if N.equal N.zero c then None else Some (t,c))
+        ~f:(fun _ o -> match o with
+            | `Left n | `Right n -> Some n
+            | `Both ((t,a),(t2,b)) ->
+              assert (t==t2);
+              let c = f a b in
+              if N.equal N.zero c then None else Some (t,c))
   }
 
   let (+) = merge_ N.(+)
@@ -681,11 +681,11 @@ module Conv = struct
       | _ -> assert false
     in
     match l with
-      | [_; a; b] | [a;b] ->
-        let a = conv_int_linexp ctx a in
-        let b = conv_int_linexp ctx b in
-        int_pred Linexp_int.(a - b) op
-      | _ -> conv_builtin ctx ~ty b l
+    | [_; a; b] | [a;b] ->
+      let a = conv_int_linexp ctx a in
+      let b = conv_int_linexp ctx b in
+      int_pred Linexp_int.(a - b) op
+    | _ -> conv_builtin ctx ~ty b l
 
   and conv_rat_pred ctx ~ty b l : term =
     let module O = Rat_op in
@@ -699,11 +699,11 @@ module Conv = struct
       | _ -> assert false
     in
     match l with
-      | [_; a; b] | [a;b] ->
-        let a = conv_rat_linexp ctx a in
-        let b = conv_rat_linexp ctx b in
-        rat_pred Linexp_rat.(a - b) op
-      | _ -> conv_builtin ctx ~ty b l
+    | [_; a; b] | [a;b] ->
+      let a = conv_rat_linexp ctx a in
+      let b = conv_rat_linexp ctx b in
+      rat_pred Linexp_rat.(a - b) op
+    | _ -> conv_builtin ctx ~ty b l
 
   and conv_int_linexp ctx t : Linexp_int.t = match T.view t with
     | T.AppBuiltin (Builtin.Int z, []) -> Linexp_int.const z

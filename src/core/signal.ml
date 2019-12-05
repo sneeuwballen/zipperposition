@@ -80,7 +80,7 @@ let map signal f =
   let r = Weak.create 1 in
   Weak.set r 0 (Some signal');
   on signal (fun x ->
-    match Weak.get r 0 with
+      match Weak.get r 0 with
       | None -> StopListening
       | Some signal' -> send signal' (f x); ContinueListening);
   signal'.alive <- Keep signal;
@@ -92,7 +92,7 @@ let filter signal p =
   let r = Weak.create 1 in
   Weak.set r 0 (Some signal');
   on signal (fun x ->
-    match Weak.get r 0 with
+      match Weak.get r 0 with
       | None -> StopListening
       | Some signal' -> (if p x then send signal' x); ContinueListening);
   signal'.alive <- Keep signal;

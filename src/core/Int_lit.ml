@@ -110,40 +110,40 @@ let make op m1 m2 =
     make_no_simp op m1 m2
   in
   match op with
-    | Equal
-    | Different ->
-      (* divide by gcd *)
-      let m = M.Int.normalize_wrt_zero m in
-      _make_split op m
-    | Less ->
-      (* should be removed *)
-      _make_split op m
-    | Lesseq ->
-      let c = M.const m in
-      let m' = M.remove_const m in
-      begin match Monome.Int.factorize m' with
-        | Some (m'', g) when Z.gt g Z.one ->
-          if Z.sign c > 0
-          then
-            (* a constant occurs in m1, so m1' + k ≤ m2. In this
-               case we check whether m2 - m1' can be factored by some d,
-               and we replace k with ceil (k/d).
-               Example: 3 ≤ 2a  ----> 3/2 ≤ a ---> 2 ≤ a  *)
-            let c' = Z.cdiv c g in
-            _make_split op (M.add_const m'' c')
-          else if Z.equal c Z.zero
-          then
-            (* no constant, just divide by gcd *)
-            _make_split op m''
-          else
-            (* m1 ≤ k + m2'. If g is the gcd of m1 and m2' then
-                we replace k with floor(k/g) *)
-            let c' = Z.neg (Z.fdiv (Z.abs c) g) in
-            _make_split op (M.add_const m'' c')
-        | _ ->
-          (* no gcd other than 1 *)
-          _make_split op m
-      end
+  | Equal
+  | Different ->
+    (* divide by gcd *)
+    let m = M.Int.normalize_wrt_zero m in
+    _make_split op m
+  | Less ->
+    (* should be removed *)
+    _make_split op m
+  | Lesseq ->
+    let c = M.const m in
+    let m' = M.remove_const m in
+    begin match Monome.Int.factorize m' with
+      | Some (m'', g) when Z.gt g Z.one ->
+        if Z.sign c > 0
+        then
+          (* a constant occurs in m1, so m1' + k ≤ m2. In this
+             case we check whether m2 - m1' can be factored by some d,
+             and we replace k with ceil (k/d).
+             Example: 3 ≤ 2a  ----> 3/2 ≤ a ---> 2 ≤ a  *)
+          let c' = Z.cdiv c g in
+          _make_split op (M.add_const m'' c')
+        else if Z.equal c Z.zero
+        then
+          (* no constant, just divide by gcd *)
+          _make_split op m''
+        else
+          (* m1 ≤ k + m2'. If g is the gcd of m1 and m2' then
+              we replace k with floor(k/g) *)
+          let c' = Z.neg (Z.fdiv (Z.abs c) g) in
+          _make_split op (M.add_const m'' c')
+      | _ ->
+        (* no gcd other than 1 *)
+        _make_split op m
+    end
 
 let mk_eq = make Equal
 let mk_neq = make Different
@@ -200,22 +200,22 @@ module U = struct
       end
     with Not_found ->
     match Z.probab_prime n 7 with
-      | 0 -> false
-      | 2 -> (_add_prime n; true)
-      | 1 ->
-        _is_prime n
-      | _ -> assert false
+    | 0 -> false
+    | 2 -> (_add_prime n; true)
+    | 1 ->
+      _is_prime n
+    | _ -> assert false
 
   let rec _merge l1 l2 = match l1, l2 with
     | [], _ -> l2
     | _, [] -> l1
     | p1::l1', p2::l2' ->
       match Z.compare p1.prime p2.prime with
-        | 0 ->
-          {prime=p1.prime; power=p1.power+p2.power} :: _merge l1' l2'
-        | n when n < 0 ->
-          p1 :: _merge l1' l2
-        | _ -> p2 :: _merge l1 l2'
+      | 0 ->
+        {prime=p1.prime; power=p1.power+p2.power} :: _merge l1' l2'
+      | n when n < 0 ->
+        p1 :: _merge l1' l2
+      | _ -> p2 :: _merge l1 l2'
 
   let rec _decompose n =
     try
@@ -245,9 +245,9 @@ end
 let _normalize_n n power =
   let divisors = U.prime_decomposition (Z.pow n power) in
   match divisors with
-    | [] -> assert false
-    | [d] -> d.U.prime, d.U.power
-    | _::_::_ -> n, power
+  | [] -> assert false
+  | [d] -> d.U.prime, d.U.power
+  | _::_::_ -> n, power
 
 (* normalize coefficients of [m] in Z/n^power Z *)
 let _normalize_in_div n ~power m =
@@ -357,19 +357,19 @@ let unif4 op ~subst x1 y1 sc1 x2 y2 sc2 k =
 
 let generic_unif m_unif ~subst (lit1,sc1) (lit2,sc2) k =
   match lit1, lit2 with
-    | Binary (((Equal | Different) as op1), x1, y1),
-      Binary (((Equal | Different) as op2), x2, y2) when op1 = op2 ->
-      (* try both ways *)
-      unif4 m_unif ~subst x1 y1 sc1 x2 y2 sc2 k
-    | Binary (op1, x1, y1), Binary (op2, x2, y2) ->
-      if op1 = op2
-      then m_unif ~subst (x1,sc1) (x2,sc2)
-          (fun subst -> m_unif ~subst (y1,sc1) (y2,sc2) k)
-    | Divides d1, Divides d2 ->
-      if Z.equal d1.num d2.num && d1.power = d2.power && d1.sign = d2.sign
-      then m_unif ~subst (d1.monome,sc1) (d2.monome,sc2) k
-    | Binary _, Divides _
-    | Divides _, Binary _ -> ()
+  | Binary (((Equal | Different) as op1), x1, y1),
+    Binary (((Equal | Different) as op2), x2, y2) when op1 = op2 ->
+    (* try both ways *)
+    unif4 m_unif ~subst x1 y1 sc1 x2 y2 sc2 k
+  | Binary (op1, x1, y1), Binary (op2, x2, y2) ->
+    if op1 = op2
+    then m_unif ~subst (x1,sc1) (x2,sc2)
+        (fun subst -> m_unif ~subst (y1,sc1) (y2,sc2) k)
+  | Divides d1, Divides d2 ->
+    if Z.equal d1.num d2.num && d1.power = d2.power && d1.sign = d2.sign
+    then m_unif ~subst (d1.monome,sc1) (d2.monome,sc2) k
+  | Binary _, Divides _
+  | Divides _, Binary _ -> ()
 
 let unify ?(subst=Unif_subst.empty) lit1 lit2 =
   generic_unif (fun ~subst -> M.unify ~subst) ~subst lit1 lit2
@@ -444,41 +444,41 @@ module Subsumption = struct
        [c1] is the accumulated coefficient for terms of [l1] so far. *)
     let rec init_with_coeff ~subst c1 l1 rest1 t2 c2 rest2 =
       match l1 with
-        | [] when Z.(equal c1 zero) ->
-          () (* no match with [t2]: no term matches [t2] *)
-        | [] ->
-          (* ok, we did match some terms with [t2]. Scale coefficients if
-              possible, possibly changing their sign, otherwise fail  *)
-          assert Z.(gt c1 zero);
-          assert Z.(gt c2 zero);
-          if scale2
-          then
-            (* can scale both, so we take the [gcd], and multiply
-               the first monome with [c2/gcd] and the second with [c1/gcd] *)
-            let g = Z.(gcd c1 c2) in
-            check_other_terms ~subst
-              ~scale1:(Z.divexact c2 g)
-              ~scale2:(Z.divexact c1 g)
-              rest1 rest2
-          else
-            (* can only scale [c1], so it only works if [c1] divides [c2] *)
-          if Z.(equal (c2 mod c1) zero)
-          then
-            check_other_terms ~subst
-              ~scale1:(Z.divexact c2 c1)
-              ~scale2:Z.one
-              rest1 rest2
-          else ()
-        | (c1',t1) :: l1' ->
-          (* choose [t1], if possible, and then extend the substitution for t2 *)
-          begin try
-              let subst = Unif.FO.matching_adapt_scope ~protect ~subst
-                  ~pattern:(Scoped.make t1 sc1) (Scoped.make t2 sc2) in
-              init_with_coeff ~subst Z.(c1 + c1') l1' rest1 t2 c2 rest2
-            with Unif.Fail -> ()
-          end;
-          (* disregard [t1] *)
-          init_with_coeff ~subst c1 l1' ((c1',t1)::rest1) t2 c2 rest2
+      | [] when Z.(equal c1 zero) ->
+        () (* no match with [t2]: no term matches [t2] *)
+      | [] ->
+        (* ok, we did match some terms with [t2]. Scale coefficients if
+            possible, possibly changing their sign, otherwise fail  *)
+        assert Z.(gt c1 zero);
+        assert Z.(gt c2 zero);
+        if scale2
+        then
+          (* can scale both, so we take the [gcd], and multiply
+             the first monome with [c2/gcd] and the second with [c1/gcd] *)
+          let g = Z.(gcd c1 c2) in
+          check_other_terms ~subst
+            ~scale1:(Z.divexact c2 g)
+            ~scale2:(Z.divexact c1 g)
+            rest1 rest2
+        else
+          (* can only scale [c1], so it only works if [c1] divides [c2] *)
+        if Z.(equal (c2 mod c1) zero)
+        then
+          check_other_terms ~subst
+            ~scale1:(Z.divexact c2 c1)
+            ~scale2:Z.one
+            rest1 rest2
+        else ()
+      | (c1',t1) :: l1' ->
+        (* choose [t1], if possible, and then extend the substitution for t2 *)
+        begin try
+            let subst = Unif.FO.matching_adapt_scope ~protect ~subst
+                ~pattern:(Scoped.make t1 sc1) (Scoped.make t2 sc2) in
+            init_with_coeff ~subst Z.(c1 + c1') l1' rest1 t2 c2 rest2
+          with Unif.Fail -> ()
+        end;
+        (* disregard [t1] *)
+        init_with_coeff ~subst c1 l1' ((c1',t1)::rest1) t2 c2 rest2
     and
       (* match other terms with the given scaling coeff *)
       check_other_terms ~subst ~scale1 ~scale2 l1 l2 =
@@ -491,14 +491,14 @@ module Subsumption = struct
            k (subst, scale1, scale2))
     in
     match M.coeffs m2 with
-      | [] ->
-        begin match M.coeffs m1 with
-          | [] -> k (subst,Z.one,Z.one)
-          | _::_ -> ()  (* fail *)
-        end
-      | (c2,t2)::l2 ->
-        (* start with matching terms of [m1] with [t2] *)
-        init_with_coeff ~subst Z.zero (M.coeffs m1) [] t2 c2 l2
+    | [] ->
+      begin match M.coeffs m1 with
+        | [] -> k (subst,Z.one,Z.one)
+        | _::_ -> ()  (* fail *)
+      end
+    | (c2,t2)::l2 ->
+      (* start with matching terms of [m1] with [t2] *)
+      init_with_coeff ~subst Z.zero (M.coeffs m1) [] t2 c2 l2
 
   (* match l1 with l2, and r1 with r2, with the same scaling coefficient *)
   let matching2 ~subst l1 r1 sc1 ~scale2 l2 r2 sc2 k =
@@ -517,120 +517,120 @@ module Subsumption = struct
 
   let check ~subst lit1 sc1 lit2 sc2 k =
     match lit1, lit2 with
-      | Binary (Equal, l1, r1), Binary (Equal, l2, r2)
-      | Binary (Different, l1, r1), Binary (Different, l2, r2) ->
-        (* careful with equality, don't scale right literal because
-           it might involve divisibility issues *)
-        matching2 ~subst l1 r1 sc1 ~scale2:false l2 r2 sc2
-          (fun (subst, c1, c2) ->
-             if Z.(equal
+    | Binary (Equal, l1, r1), Binary (Equal, l2, r2)
+    | Binary (Different, l1, r1), Binary (Different, l2, r2) ->
+      (* careful with equality, don't scale right literal because
+         it might involve divisibility issues *)
+      matching2 ~subst l1 r1 sc1 ~scale2:false l2 r2 sc2
+        (fun (subst, c1, c2) ->
+           if Z.(equal
                    (c1 * (M.const r1 - M.const l1))
                    (c2 * (M.const r2 - M.const l2)))
-             then k subst);
-        matching2 ~subst l1 r1 sc1 ~scale2:false r2 l2 sc2
-          (fun (subst, c1, c2) ->
-             if Z.(equal
+           then k subst);
+      matching2 ~subst l1 r1 sc1 ~scale2:false r2 l2 sc2
+        (fun (subst, c1, c2) ->
+           if Z.(equal
                    (c1 * (M.const r1 - M.const l1))
                    (c2 * (M.const l2 - M.const r2)))
-             then k subst)
-      | Binary (Equal, l1, r1), Binary (Lesseq, l2, r2) ->
-        (* l1=r1  can subsume l2≤r2 if
-           r1.const-l1.const = subst(l1-r1) = l2-r2 ≤ r2.const - l2.const
-           with r1.const-l1.const ≤ r2.const - l2.const (tighter bound) *)
-        matching2 ~subst l1 r1 sc1 ~scale2:true l2 r2 sc2
-          (fun (subst, c1, c2) ->
-             if Z.(leq
+           then k subst)
+    | Binary (Equal, l1, r1), Binary (Lesseq, l2, r2) ->
+      (* l1=r1  can subsume l2≤r2 if
+         r1.const-l1.const = subst(l1-r1) = l2-r2 ≤ r2.const - l2.const
+         with r1.const-l1.const ≤ r2.const - l2.const (tighter bound) *)
+      matching2 ~subst l1 r1 sc1 ~scale2:true l2 r2 sc2
+        (fun (subst, c1, c2) ->
+           if Z.(leq
                    (c1 * (M.const r1 - M.const l1))
                    (c2 * (M.const r2 - M.const l2)))
-             then k subst)
-      | Binary (Lesseq, l1, r1), Binary (Different, l2, r2) ->
-        (* l1≤r1 can subsume l2 != r2 if
-           l1-r1 ≤ r1.const-l1.const and l2-r2 = r2.const-l2.const
-           with subst(l1-r1) = l2-r2 and r1.const-l1.const < r2.const-l2.const
-           (same with r2-l2 and l2.const-r2.const of course)*)
-        matching2 ~subst l1 r1 sc1 ~scale2:true l2 r2 sc2
-          (fun (subst, c1, c2) ->
-             if Z.(lt
+           then k subst)
+    | Binary (Lesseq, l1, r1), Binary (Different, l2, r2) ->
+      (* l1≤r1 can subsume l2 != r2 if
+         l1-r1 ≤ r1.const-l1.const and l2-r2 = r2.const-l2.const
+         with subst(l1-r1) = l2-r2 and r1.const-l1.const < r2.const-l2.const
+         (same with r2-l2 and l2.const-r2.const of course)*)
+      matching2 ~subst l1 r1 sc1 ~scale2:true l2 r2 sc2
+        (fun (subst, c1, c2) ->
+           if Z.(lt
                    (c1 * (M.const r1 - M.const l1))
                    (c2 * (M.const r2 - M.const l2)))
-             then k subst);
-        matching2 ~subst l1 r1 sc1 ~scale2:true r2 l2 sc2
-          (fun (subst, c1, c2) ->
-             if Z.(lt
+           then k subst);
+      matching2 ~subst l1 r1 sc1 ~scale2:true r2 l2 sc2
+        (fun (subst, c1, c2) ->
+           if Z.(lt
                    (c1 * (M.const r1 - M.const l1))
                    (c2 * (M.const l2 - M.const r2)))
-             then k subst);
-        (* l1≤r1 can also subsume l2!=r2 if
-           r1-l1 ≥ l1.const-r1.const with
-           subst(r1-l1)=l2-r2  and l1.const-r1.const > r2.const-l2.const *)
-        matching2 ~subst r1 l1 sc1 ~scale2:true r2 l2 sc2
-          (fun (subst, c1, c2) ->
-             if Z.(gt
+           then k subst);
+      (* l1≤r1 can also subsume l2!=r2 if
+         r1-l1 ≥ l1.const-r1.const with
+         subst(r1-l1)=l2-r2  and l1.const-r1.const > r2.const-l2.const *)
+      matching2 ~subst r1 l1 sc1 ~scale2:true r2 l2 sc2
+        (fun (subst, c1, c2) ->
+           if Z.(gt
                    (c1 * (M.const l1 - M.const r1))
                    (c2 * (M.const l2 - M.const r2)))
-             then k subst);
-        matching2 ~subst r1 l1 sc1 ~scale2:true l2 r2 sc2
-          (fun (subst, c1, c2) ->
-             if Z.(gt
+           then k subst);
+      matching2 ~subst r1 l1 sc1 ~scale2:true l2 r2 sc2
+        (fun (subst, c1, c2) ->
+           if Z.(gt
                    (c1 * (M.const l1 - M.const r1))
                    (c2 * (M.const r2 - M.const l2)))
-             then k subst);
-      | Binary (Lesseq, l1, r1), Binary (Lesseq, l2, r2) ->
-        (* if subst(r1 - l1) = r2-l2 - k where k≥0, then l1≤r1 => l2+k≤r2 => l2≤r2
-            so l1≤r1 subsumes l2≤r2. *)
-        matching2 ~subst l1 r1 sc1 ~scale2:true l2 r2 sc2
-          (fun (subst, c1, c2) ->
-             (* we removed all terms but the constants,
-                 l1-r1 = l2-r2. Now lit1= l1-r1 < r1.const-l1.const,
-                 so if r1.const-l1.const < r2.const - l2.const then lit1 => lit2 *)
-             if Z.(leq
+           then k subst);
+    | Binary (Lesseq, l1, r1), Binary (Lesseq, l2, r2) ->
+      (* if subst(r1 - l1) = r2-l2 - k where k≥0, then l1≤r1 => l2+k≤r2 => l2≤r2
+          so l1≤r1 subsumes l2≤r2. *)
+      matching2 ~subst l1 r1 sc1 ~scale2:true l2 r2 sc2
+        (fun (subst, c1, c2) ->
+           (* we removed all terms but the constants,
+               l1-r1 = l2-r2. Now lit1= l1-r1 < r1.const-l1.const,
+               so if r1.const-l1.const < r2.const - l2.const then lit1 => lit2 *)
+           if Z.(leq
                    (c1 * (M.const r1 - M.const l1))
                    (c2 * (M.const r2 - M.const l2)))
-             then k subst);
-        (* XXX: bad, because  2a = b will subsume 2|b but cannot participate
-           in some inferences 2|b will, e.g. in
-           2|b   2|b+1
-           -----------
-              false
-           so, it removes any chance of completeness
-           | Binary (Equal, l1, r1), Divides d when d.sign ->
-            let m1 = _normalize_in_div d.num ~power:d.power (M.difference l1 r1) in
-            let protect = M.Seq.vars d.monome in
-            matching ~protect ~subst m1 sc1 ~scale2:false d.monome sc2
-              (fun (subst, c1, c2) ->
-                (* l1-r1 = d.monome + something.num^power *)
-                if Z.(equal
-                  ((c1 * M.const m1) mod (d.num ** d.power))
-                  (c2 * M.const d.monome)) then k subst)
-        *)
-      | Divides d1, Divides d2 when d1.sign = d2.sign
-                                 && Z.equal d1.num d2.num &&
-                                 ((d1.sign && d1.power >= d2.power)
-                                  || not d1.sign && d1.power = d2.power) ->
-        (* n^{k+k'} | m1  can subsume n^k | m2
-           (with k' = d1.power - d2.power) if
-            c1.m1 = c2.m2 + something.n^k
-           for "not divides" relation we require the same power and no scaling
-           on lhs. *)
-        let protect = M.Seq.vars d2.monome in
-        matching ~protect ~subst d1.monome sc1 ~scale2:false d2.monome sc2
-          (fun (subst, c1, c2) ->
-             if Z.(equal
+           then k subst);
+      (* XXX: bad, because  2a = b will subsume 2|b but cannot participate
+         in some inferences 2|b will, e.g. in
+         2|b   2|b+1
+         -----------
+            false
+         so, it removes any chance of completeness
+         | Binary (Equal, l1, r1), Divides d when d.sign ->
+          let m1 = _normalize_in_div d.num ~power:d.power (M.difference l1 r1) in
+          let protect = M.Seq.vars d.monome in
+          matching ~protect ~subst m1 sc1 ~scale2:false d.monome sc2
+            (fun (subst, c1, c2) ->
+              (* l1-r1 = d.monome + something.num^power *)
+              if Z.(equal
+                ((c1 * M.const m1) mod (d.num ** d.power))
+                (c2 * M.const d.monome)) then k subst)
+      *)
+    | Divides d1, Divides d2 when d1.sign = d2.sign
+                               && Z.equal d1.num d2.num &&
+                               ((d1.sign && d1.power >= d2.power)
+                                || not d1.sign && d1.power = d2.power) ->
+      (* n^{k+k'} | m1  can subsume n^k | m2
+         (with k' = d1.power - d2.power) if
+          c1.m1 = c2.m2 + something.n^k
+         for "not divides" relation we require the same power and no scaling
+         on lhs. *)
+      let protect = M.Seq.vars d2.monome in
+      matching ~protect ~subst d1.monome sc1 ~scale2:false d2.monome sc2
+        (fun (subst, c1, c2) ->
+           if Z.(equal
                    ((c1 * M.const d1.monome) mod (d2.num ** d2.power))
                    (c2 * M.const d2.monome))
-             && (d1.sign || Z.equal c1 Z.one) then k subst)
-      | Divides d1, Divides d2 when d1.sign && not d2.sign
-                                    && Z.equal d1.num d2.num && d1.power >= d2.power ->
-        (* n^{k+k'} | m1 can subsume not(n^k | m2) if
-           c1.m1 = c2.m2 + k with k not divisible by n^k *)
-        let protect = M.Seq.vars d2.monome in
-        matching ~protect ~subst d1.monome sc1 ~scale2:false d2.monome sc2
-          (fun (subst, c1, c2) ->
-             if Z.(gt
+           && (d1.sign || Z.equal c1 Z.one) then k subst)
+    | Divides d1, Divides d2 when d1.sign && not d2.sign
+                                  && Z.equal d1.num d2.num && d1.power >= d2.power ->
+      (* n^{k+k'} | m1 can subsume not(n^k | m2) if
+         c1.m1 = c2.m2 + k with k not divisible by n^k *)
+      let protect = M.Seq.vars d2.monome in
+      matching ~protect ~subst d1.monome sc1 ~scale2:false d2.monome sc2
+        (fun (subst, c1, c2) ->
+           if Z.(gt
                    ((c1 * M.const d1.monome - c2 * M.const d2.monome) mod (d2.num ** d2.power))
                    zero)
-             then k subst)
-      | _ -> () (* fail *)
+           then k subst)
+    | _ -> () (* fail *)
 end
 
 let subsumes ?(subst=Subst.empty) (lit1,sc1) (lit2, sc2) k =
@@ -715,24 +715,24 @@ let fold_terms ?(pos=P.stop) ?(vars=false) ?(var_args=true) ?(fun_bodies=true) ?
     | `Max -> M.fold_max ~ord
   in
   match lit with
-    | Binary (_op, m1, m2) ->
-      fold_monome
-        (fun () i _ t -> at_term ~pos:P.(append pos (left (arg i stop))) t k)
-        () m1;
-      fold_monome
-        (fun () i _ t -> at_term ~pos:P.(append pos (right (arg i stop))) t k)
-        () m2
-    | Divides d ->
-      fold_monome
-        (fun () i _ t -> at_term ~pos:P.(append pos (arg i stop)) t k)
-        () d.monome
+  | Binary (_op, m1, m2) ->
+    fold_monome
+      (fun () i _ t -> at_term ~pos:P.(append pos (left (arg i stop))) t k)
+      () m1;
+    fold_monome
+      (fun () i _ t -> at_term ~pos:P.(append pos (right (arg i stop))) t k)
+      () m2
+  | Divides d ->
+    fold_monome
+      (fun () i _ t -> at_term ~pos:P.(append pos (arg i stop)) t k)
+      () d.monome
 
 let _to_coeffs lit =
   match lit with
-    | Binary (_, m1, m2) ->
-      Iter.append (M.Seq.coeffs_swap m1) (M.Seq.coeffs_swap m2)
-    | Divides d ->
-      M.Seq.coeffs_swap d.monome
+  | Binary (_, m1, m2) ->
+    Iter.append (M.Seq.coeffs_swap m1) (M.Seq.coeffs_swap m2)
+  | Divides d ->
+    M.Seq.coeffs_swap d.monome
 
 let to_multiset lit =
   _to_coeffs lit
@@ -795,17 +795,17 @@ module Focus = struct
 
   let get lit pos =
     match lit, pos with
-      | Binary (op, m1, m2), P.Left (P.Arg (i, _)) ->
-        Some (Left (op, M.Focus.get m1 i, m2))
-      | Binary (op, m1, m2), P.Right (P.Arg (i, _)) ->
-        Some (Right (op, m1, M.Focus.get m2 i))
-      | Divides d, P.Arg (i, _) ->
-        let d' = {
-          sign=d.sign; power=d.power; num=d.num;
-          monome=M.Focus.get d.monome i;
-        } in
-        Some (Div d')
-      | _ -> None
+    | Binary (op, m1, m2), P.Left (P.Arg (i, _)) ->
+      Some (Left (op, M.Focus.get m1 i, m2))
+    | Binary (op, m1, m2), P.Right (P.Arg (i, _)) ->
+      Some (Right (op, m1, M.Focus.get m2 i))
+    | Divides d, P.Arg (i, _) ->
+      let d' = {
+        sign=d.sign; power=d.power; num=d.num;
+        monome=M.Focus.get d.monome i;
+      } in
+      Some (Div d')
+    | _ -> None
 
   let get_exn lit pos = match get lit pos with
     | None ->
@@ -816,22 +816,22 @@ module Focus = struct
 
   let focus_term lit t =
     match lit with
-      | Binary (op, m1, m2) ->
-        begin match M.Focus.focus_term m1 t with
-          | Some mf1 ->
-            assert (not (M.mem m2 t));
-            Some (Left (op, mf1, m2))
-          | None ->
-            match M.Focus.focus_term m2 t with
-              | None -> None
-              | Some mf2 -> Some (Right (op, m1, mf2))
-        end
-      | Divides d ->
-        begin match M.Focus.focus_term d.monome t with
+    | Binary (op, m1, m2) ->
+      begin match M.Focus.focus_term m1 t with
+        | Some mf1 ->
+          assert (not (M.mem m2 t));
+          Some (Left (op, mf1, m2))
+        | None ->
+          match M.Focus.focus_term m2 t with
           | None -> None
-          | Some mf ->
-            Some (Div {d with monome=mf; })
-        end
+          | Some mf2 -> Some (Right (op, m1, mf2))
+      end
+    | Divides d ->
+      begin match M.Focus.focus_term d.monome t with
+        | None -> None
+        | Some mf ->
+          Some (Div {d with monome=mf; })
+      end
 
   let focus_term_exn lit t = match focus_term lit t with
     | None -> failwith "ALF.focus_term_exn"
@@ -855,21 +855,21 @@ module Focus = struct
 
   let opposite_monome_exn l =
     match opposite_monome l with
-      | None -> invalid_arg "ALF.opposite_monome_exn"
-      | Some m -> m
+    | None -> invalid_arg "ALF.opposite_monome_exn"
+    | Some m -> m
 
   let term lit = MF.term (focused_monome lit)
 
   let fold_terms ?(pos=P.stop) lit k =
     match lit with
-      | Binary (op, m1, m2) ->
-        MF.fold_m ~pos:P.(append pos (left stop)) m1 ()
-          (fun () mf pos -> k (Left (op, mf, m2), pos));
-        MF.fold_m ~pos:P.(append pos (right stop)) m2 ()
-          (fun () mf pos -> k (Right (op, m1, mf), pos))
-      | Divides d ->
-        MF.fold_m ~pos d.monome ()
-          (fun () mf pos -> k (Div {d with monome=mf}, pos))
+    | Binary (op, m1, m2) ->
+      MF.fold_m ~pos:P.(append pos (left stop)) m1 ()
+        (fun () mf pos -> k (Left (op, mf, m2), pos));
+      MF.fold_m ~pos:P.(append pos (right stop)) m2 ()
+        (fun () mf pos -> k (Right (op, m1, mf), pos))
+    | Divides d ->
+      MF.fold_m ~pos d.monome ()
+        (fun () mf pos -> k (Div {d with monome=mf}, pos))
 
   (* is the focused term maximal in the arithmetic literal? *)
   let is_max ~ord = function
@@ -978,16 +978,16 @@ module Focus = struct
       | Lesseq -> "≤"
     in
     match lit with
-      | Left (op, mf, m) ->
-        Format.fprintf out "@[%a %s@ %a@]" MF.pp mf (op2str op) M.pp m
-      | Right (op, m, mf) ->
-        Format.fprintf out "@[%a %s@ %a@]" M.pp m (op2str op) MF.pp mf
-      | Div d when d.sign ->
-        let nk = Z.pow d.num d.power in
-        Format.fprintf out "@[%s div %a@]" (Z.to_string nk) MF.pp d.monome
-      | Div d ->
-        let nk = Z.pow d.num d.power in
-        Format.fprintf out "¬(@[%s div %a@])" (Z.to_string nk) MF.pp d.monome
+    | Left (op, mf, m) ->
+      Format.fprintf out "@[%a %s@ %a@]" MF.pp mf (op2str op) M.pp m
+    | Right (op, m, mf) ->
+      Format.fprintf out "@[%a %s@ %a@]" M.pp m (op2str op) MF.pp mf
+    | Div d when d.sign ->
+      let nk = Z.pow d.num d.power in
+      Format.fprintf out "@[%s div %a@]" (Z.to_string nk) MF.pp d.monome
+    | Div d ->
+      let nk = Z.pow d.num d.power in
+      Format.fprintf out "¬(@[%s div %a@])" (Z.to_string nk) MF.pp d.monome
 
   let to_string = CCFormat.to_string pp
 end

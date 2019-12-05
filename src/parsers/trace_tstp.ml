@@ -179,12 +179,12 @@ let depth proof =
     if StepTbl.mem explored proof then () else begin
       StepTbl.add explored proof ();
       match p with
-        | Axiom _ -> depth := max d !depth
-        | Theory _ -> ()
-        | InferForm(_, lazy step)
-        | InferClause (_, lazy step) ->
-          (* explore parents *)
-          Array.iter (fun p -> Queue.push (p, d+1) q) step.parents
+      | Axiom _ -> depth := max d !depth
+      | Theory _ -> ()
+      | InferForm(_, lazy step)
+      | InferClause (_, lazy step) ->
+        (* explore parents *)
+        Array.iter (fun p -> Queue.push (p, d+1) q) step.parents
     end
   done;
   !depth
@@ -288,13 +288,13 @@ let of_decls decls =
     end
     decls;
   match !root with
-    | None -> Err.fail "could not find the root of the TSTP proof"
-    | Some p ->
-      try
-        (* force proofs to trigger errors here *)
-        traverse p force;
-        Err.return p
-      with Failure msg -> Err.fail msg
+  | None -> Err.fail "could not find the root of the TSTP proof"
+  | Some p ->
+    try
+      (* force proofs to trigger errors here *)
+      traverse p force;
+      Err.return p
+    with Failure msg -> Err.fail msg
 
 let parse ?(recursive=true) filename =
   Err.(
@@ -328,35 +328,35 @@ let pp_tstp out proof =
   traverse proof
     (fun p ->
        match p with
-         | Axiom _ -> ()
-         | Theory s -> CCFormat.fprintf out "theory(%s)" s
-         | InferClause(c, lazy ({rule="axiom";_} as step)) when is_axiom step.parents.(0)->
-           let id = get_id p in
-           let f,n = _extract_axiom step.parents.(0) in
-           Format.fprintf out "cnf(%a, axiom, (%a), file('%s', %s)).\n"
-             A.pp_name id _pp_clause c f n
-         | InferForm(f, lazy ({rule="axiom"; _} as step)) when is_axiom step.parents.(0)->
-           let id = get_id p in
-           let file,n = _extract_axiom step.parents.(0) in
-           Format.fprintf out "tff(%a, axiom, %a, file('%s', %s)).\n"
-             A.pp_name id T.pp f file n
-         | InferForm(f, lazy step) ->
-           let id = get_id p in
-           let ids = Array.map _print_parent step.parents in
-           let status = if step.esa then "esa" else "thm" in
-           let kind = if _form_is_fof f then "fof" else "tff" in
-           Format.fprintf out
-             "%s(%a, plain, %a, inference('%s', [status(%s)], [%a])).\n"
-             kind A.pp_name id T.pp (T.close_all Binder.Forall f) step.rule status
-             (CCFormat.array CCFormat.string) ids
-         | InferClause(c, lazy step) ->
-           let id = get_id p in
-           let ids = Array.map _print_parent step.parents in
-           let status = if step.esa then "esa" else "thm" in
-           Format.fprintf out
-             "cnf(%a, plain, %a, inference('%s', [status(%s)], [%a])).\n"
-             A.pp_name id _pp_clause c step.rule status
-             (CCFormat.array CCFormat.string) ids
+       | Axiom _ -> ()
+       | Theory s -> CCFormat.fprintf out "theory(%s)" s
+       | InferClause(c, lazy ({rule="axiom";_} as step)) when is_axiom step.parents.(0)->
+         let id = get_id p in
+         let f,n = _extract_axiom step.parents.(0) in
+         Format.fprintf out "cnf(%a, axiom, (%a), file('%s', %s)).\n"
+           A.pp_name id _pp_clause c f n
+       | InferForm(f, lazy ({rule="axiom"; _} as step)) when is_axiom step.parents.(0)->
+         let id = get_id p in
+         let file,n = _extract_axiom step.parents.(0) in
+         Format.fprintf out "tff(%a, axiom, %a, file('%s', %s)).\n"
+           A.pp_name id T.pp f file n
+       | InferForm(f, lazy step) ->
+         let id = get_id p in
+         let ids = Array.map _print_parent step.parents in
+         let status = if step.esa then "esa" else "thm" in
+         let kind = if _form_is_fof f then "fof" else "tff" in
+         Format.fprintf out
+           "%s(%a, plain, %a, inference('%s', [status(%s)], [%a])).\n"
+           kind A.pp_name id T.pp (T.close_all Binder.Forall f) step.rule status
+           (CCFormat.array CCFormat.string) ids
+       | InferClause(c, lazy step) ->
+         let id = get_id p in
+         let ids = Array.map _print_parent step.parents in
+         let status = if step.esa then "esa" else "thm" in
+         Format.fprintf out
+           "cnf(%a, plain, %a, inference('%s', [status(%s)], [%a])).\n"
+           A.pp_name id _pp_clause c step.rule status
+           (CCFormat.array CCFormat.string) ids
     )
 
 let pp0 out proof = match proof with

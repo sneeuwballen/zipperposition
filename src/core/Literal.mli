@@ -235,8 +235,8 @@ module Pos : sig
       - [lit_pos]: the literal-prefix of the position
       - [term_pos]: the suffix that describes a subterm position
       - [term]: the term root, just under the literal itself.
-      given this, applying T.Pos.at to the subterm position and
-      the root term we obtain the sub-term itself. *)
+        given this, applying T.Pos.at to the subterm position and
+        the root term we obtain the sub-term itself. *)
 
   val split : t -> Position.t -> split
   (** @raise Invalid_argument if the position is incorrect *)

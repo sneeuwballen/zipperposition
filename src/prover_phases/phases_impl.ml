@@ -68,8 +68,8 @@ let do_extensions ~x ~field =
   Extensions.extensions ()
   |> Phases.fold_l ~x:()
     ~f:(fun () e ->
-      Phases.fold_l (field e) ~x:()
-        ~f:(fun () f -> Phases.update ~f:(f x)))
+        Phases.fold_l (field e) ~x:()
+          ~f:(fun () f -> Phases.update ~f:(f x)))
 
 let apply_modifiers ~field o =
   Extensions.extensions ()
@@ -160,13 +160,13 @@ let compute_prec ~signature stmts =
     (* add constraint about inductive constructors, etc. *)
     |> Compute_prec.add_constr 10 Classify_cst.prec_constr
     |> Compute_prec.set_weight_rule (
-       fun stmts -> 
+      fun stmts -> 
         let sym_depth = 
           stmts 
           |> Iter.flat_map Statement.Seq.terms 
           |> Iter.flat_map (fun t -> Term.Seq.subterms_depth t
                                      |> Iter.filter_map (fun (st,d) -> 
-                                        CCOpt.map (fun id -> (id,d)) (Term.head st)))  in
+                                         CCOpt.map (fun id -> (id,d)) (Term.head st)))  in
         Precedence.weight_fun_of_string ~signature !_kbo_wf sym_depth)
     (* |> Compute_prec.set_weight_rule (fun _ -> Classify_cst.weight_fun) *)
 
@@ -431,14 +431,14 @@ let parse_cli =
   Phases.return_phase (files, params)
 
 let syms_in_conj decls =
-   let open Iter in
-    decls 
-    |> CCVector.to_seq
-    |> flat_map (fun st -> 
-        let pr = Statement.proof_step st in
-        if CCOpt.is_some (Proof.Step.distance_to_goal pr) then (
-          Statement.Seq.symbols st
-        ) else empty)
+  let open Iter in
+  decls 
+  |> CCVector.to_seq
+  |> flat_map (fun st -> 
+      let pr = Statement.proof_step st in
+      if CCOpt.is_some (Proof.Step.distance_to_goal pr) then (
+        Statement.Seq.symbols st
+      ) else empty)
 
 (* Process the given file (try to solve it) *)
 let process_file ?(prelude=Iter.empty) file =
@@ -579,30 +579,30 @@ let () =
   let open Libzipperposition in
   Params.add_opts [
     "--de-bruijn-weight"
-    , Arg.Set_int _db_w
-    , " Set weight of de Bruijn index for KBO";
+  , Arg.Set_int _db_w
+  , " Set weight of de Bruijn index for KBO";
     "--lift-lambdas"
-    , Arg.Bool (fun v -> _lift_lambdas := v)
-    , " Turn lambda lifting on or off.";
+  , Arg.Bool (fun v -> _lift_lambdas := v)
+  , " Turn lambda lifting on or off.";
     "--lambda-weight"
-    , Arg.Set_int _lmb_w
-    , " Set weight of lambda symbol for KBO";
+  , Arg.Set_int _lmb_w
+  , " Set weight of lambda symbol for KBO";
     "--kbo-weight-fun"
-    , Arg.Set_string _kbo_wf
-    , " Set the function for symbol weight calculation.";
+  , Arg.Set_string _kbo_wf
+  , " Set the function for symbol weight calculation.";
   ];
 
-   Params.add_to_mode "ho-pragmatic" (fun () ->
+  Params.add_to_mode "ho-pragmatic" (fun () ->
       _lmb_w := 20;
       _db_w  := 10;
-   );
-   
-   Params.add_to_mode "ho-complete-basic" (fun () ->
-      _lmb_w := 20;
-      _db_w  := 10;
-   );
+    );
 
-   Params.add_to_mode "ho-competitive" (fun () ->
+  Params.add_to_mode "ho-complete-basic" (fun () ->
       _lmb_w := 20;
       _db_w  := 10;
-   );
+    );
+
+  Params.add_to_mode "ho-competitive" (fun () ->
+      _lmb_w := 20;
+      _db_w  := 10;
+    );

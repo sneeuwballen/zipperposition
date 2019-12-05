@@ -161,7 +161,7 @@ module Make(E : Env.S) : S with module Env = E = struct
            let c_neg = Literal.mk_false a :: Literal.mk_false b :: lits |> mk_c in
            Some [c_pos; c_neg]
          | Literal.Equation (lhs, rhs, true) 
-            when  (T.equal rhs T.true_) || (T.equal rhs T.false_) ->
+           when  (T.equal rhs T.true_) || (T.equal rhs T.false_) ->
            (* see if there is some CNF to do here *)
            let sign = T.equal rhs T.true_ in
            begin match T.view lhs, sign with
@@ -182,7 +182,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                Some [mk_c (lit::lits)]
              | _ -> None
            end
-          | Literal.Equation (a, b, true)
+         | Literal.Equation (a, b, true)
            when Type.is_prop (T.ty a) &&
                 not (is_bool_val a) &&
                 not (is_bool_val b) ->
@@ -216,15 +216,15 @@ let () =
   Options.add_opts
     [ "--fool", Arg.Bool (fun v -> enabled_ := v), " enable/disable fool (first-class booleans)"  ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
-    enabled_ := false
-  );
+      enabled_ := false
+    );
   Params.add_to_mode "ho-pragmatic" (fun () ->
-    enabled_ := false
-  );
+      enabled_ := false
+    );
   Params.add_to_mode "ho-competitive" (fun () ->
-    enabled_ := false
-  );
+      enabled_ := false
+    );
   Params.add_to_mode "fo-complete-basic" (fun () ->
-    enabled_ := false
-  );
+      enabled_ := false
+    );
   Extensions.register extension

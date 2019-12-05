@@ -176,11 +176,11 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun (left,right) (t,pos) ->
            let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
            match pos with
-             | Position.Arg (_, Position.Left _) ->
-               f left t with_pos, right
-             | Position.Arg (_, Position.Right _) ->
-               left, f right t with_pos
-             | _ -> assert false)
+           | Position.Arg (_, Position.Left _) ->
+             f left t with_pos, right
+           | Position.Arg (_, Position.Right _) ->
+             left, f right t with_pos
+           | _ -> assert false)
         (!_idx_ineq_left, !_idx_ineq_right)
     in
     _idx_ineq_left := left;
@@ -409,20 +409,20 @@ module Make(E : Env.S) : S with module Env = E = struct
                 let active_lit = Lits.View.get_arith_exn (C.lits active) active_pos in
                 (* must have an equation as active lit *)
                 match ALF.op active_lit with
-                  | `Binary AL.Equal when not (T.is_var t) && not (T.is_var t') ->
-                    Util.debugf ~section 5 "@[<4>  possible match:@ @[%a@]@ in @[%a@]@]"
-                      (fun k->k ALF.pp passive_lit C.pp c);
-                    (* unify literals further *)
-                    ALF.unify ~subst (active_lit,sc_a) (passive_lit,sc_p)
-                    |> Iter.fold
-                      (fun acc (active_lit, passive_lit, subst) ->
-                         let info = SupInfo.({
-                             active; active_pos; active_lit; active_scope=sc_a;
-                             passive=c; passive_pos; passive_lit; passive_scope=sc_p; subst;
-                           }) in
-                         _do_canc info acc
-                      ) acc
-                  | _ -> acc)
+                | `Binary AL.Equal when not (T.is_var t) && not (T.is_var t') ->
+                  Util.debugf ~section 5 "@[<4>  possible match:@ @[%a@]@ in @[%a@]@]"
+                    (fun k->k ALF.pp passive_lit C.pp c);
+                  (* unify literals further *)
+                  ALF.unify ~subst (active_lit,sc_a) (passive_lit,sc_p)
+                  |> Iter.fold
+                    (fun acc (active_lit, passive_lit, subst) ->
+                       let info = SupInfo.({
+                           active; active_pos; active_lit; active_scope=sc_a;
+                           passive=c; passive_pos; passive_lit; passive_scope=sc_p; subst;
+                         }) in
+                       _do_canc info acc
+                    ) acc
+                | _ -> acc)
              acc)
         []
     in
@@ -439,7 +439,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let active_lit' = ALF.apply_subst renaming subst (active_lit,s_a) in
     (* restrictions:
        - the rewriting term must be bigger than other terms
-        (in other words, the inference is strictly decreasing)
+         (in other words, the inference is strictly decreasing)
        - all variables of active clause must be bound by subst
        - must not rewrite itself (c != c')
        - trail(active) must subsume trail(passive) *)
@@ -450,7 +450,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     && ( (C.lits c |> Array.length) > 1
          || not(Lit.equal (C.lits c).(i) (C.lits c').(0))
          || not(ALF.is_max ~ord passive_lit && C.is_maxlit (c,0) S.empty ~idx:i)
-    )
+       )
     && (C.trail_subsumes c' c)
     then (
       (* we know all variables of [active_lit] are bound, no need
@@ -458,24 +458,24 @@ module Make(E : Env.S) : S with module Env = E = struct
       let active_lit = ALF.apply_subst Subst.Renaming.none subst (active_lit,s_a) in
       let active_lit, passive_lit = ALF.scale active_lit passive_lit in
       match active_lit, passive_lit with
-        | ALF.Left (AL.Equal, mf1, m1), _
-        | ALF.Right (AL.Equal, m1, mf1), _ ->
+      | ALF.Left (AL.Equal, mf1, m1), _
+      | ALF.Right (AL.Equal, m1, mf1), _ ->
+        let new_lit = ALF.replace passive_lit
+            (M.difference m1 (MF.rest mf1)) in
+        raise (SimplifyInto (new_lit, c',subst))
+      | ALF.Div d1, ALF.Div d2 when d1.AL.sign ->
+        let n1 = Z.pow d1.AL.num d1.AL.power and n2 = Z.pow d2.AL.num d2.AL.power in
+        let gcd = Z.gcd (MF.coeff d1.AL.monome) (MF.coeff d2.AL.monome) in
+        (* simplification: we only do the rewriting if both
+           literals have exactly the same num and power...
+           TODO: generalize *)
+        if Z.equal n1 n2
+        && Z.lt gcd Z.(pow d2.AL.num d2.AL.power)
+        then
           let new_lit = ALF.replace passive_lit
-              (M.difference m1 (MF.rest mf1)) in
+              (M.uminus (MF.rest d1.AL.monome)) in
           raise (SimplifyInto (new_lit, c',subst))
-        | ALF.Div d1, ALF.Div d2 when d1.AL.sign ->
-          let n1 = Z.pow d1.AL.num d1.AL.power and n2 = Z.pow d2.AL.num d2.AL.power in
-          let gcd = Z.gcd (MF.coeff d1.AL.monome) (MF.coeff d2.AL.monome) in
-          (* simplification: we only do the rewriting if both
-             literals have exactly the same num and power...
-             TODO: generalize *)
-          if Z.equal n1 n2
-          && Z.lt gcd Z.(pow d2.AL.num d2.AL.power)
-          then
-            let new_lit = ALF.replace passive_lit
-                (M.uminus (MF.rest d1.AL.monome)) in
-            raise (SimplifyInto (new_lit, c',subst))
-        | _ -> ()
+      | _ -> ()
     ) else ()
 
   (* reduce an arithmetic literal to its current normal form *)
@@ -540,10 +540,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> Iter.iter
       (fun (lit,i) ->
          match lit with
-           | Lit.Int a_lit ->
-             _demod_lit_nf ~add_lit ~add_premise ~i c a_lit
-           | _ ->
-             add_lit lit (* keep non-arith literals *)
+         | Lit.Int a_lit ->
+           _demod_lit_nf ~add_lit ~add_premise ~i c a_lit
+         | _ ->
+           add_lit lit (* keep non-arith literals *)
       );
     (* build result clause (if it was simplified) *)
     let res =
@@ -553,9 +553,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           Proof.Step.inference ~tags:[Proof.Tag.T_lia]
             ~rule:(Proof.Rule.mk "canc_demod")
             (C.proof_parent c ::
-               List.rev_map
-                 (fun (c,subst) -> C.proof_parent_subst Subst.Renaming.none (c,1) subst)
-                 !clauses)
+             List.rev_map
+               (fun (c,subst) -> C.proof_parent_subst Subst.Renaming.none (c,1) subst)
+               !clauses)
         in
         let trail = C.trail c in
         let new_c = C.create ~penalty:(C.penalty c) ~trail (List.rev !lits) proof in
@@ -621,76 +621,76 @@ module Make(E : Env.S) : S with module Env = E = struct
            let idx = Lits.Pos.idx pos in
            (* cancellation depends on what the literal looks like *)
            match a_lit with
-             | AL.Binary (op, m1, m2) ->
-               Util.debugf ~section 5 "@[<2>try cancellation@ in @[%a@]@]" (fun k->k AL.pp a_lit);
-               (* try to unify terms in [m1] and [m2] *)
-               MF.unify_mm (m1,0) (m2,0)
-               |> Iter.fold
-                 (fun acc (mf1, mf2, us) ->
-                    let renaming = Subst.Renaming.create () in
-                    let subst = US.subst us in
-                    let mf1' = MF.apply_subst renaming subst (mf1,0) in
-                    let mf2' = MF.apply_subst renaming subst (mf2,0) in
-                    let is_max_lit = C.is_maxlit (c,0) subst ~idx in
-                    Util.debugf ~section 5
-                      "@[<4>... candidate:@ @[%a@] (max lit ? %B)@ :mf1 %a@ :mf2 %a@]"
-                      (fun k->k S.pp subst is_max_lit MF.pp mf1' MF.pp mf2');
-                    if is_max_lit && MF.is_max ~ord mf1' && MF.is_max ~ord mf2'
-                    then (
-                      (* do the inference *)
-                      let lits' = CCArray.except_idx (C.lits c) idx in
-                      let lits' = Lit.apply_subst_list renaming subst (lits',0) in
-                      let new_lit = Lit.mk_arith_op op (MF.rest mf1') (MF.rest mf2') in
-                      let c_guard = Literal.of_unif_subst renaming us in
-                      let all_lits = new_lit :: c_guard @ lits' in
-                      let proof =
-                        Proof.Step.inference ~tags:[Proof.Tag.T_lia]
-                          ~rule:(Proof.Rule.mk "cancellation")
-                          [C.proof_parent_subst renaming (c,0) subst] in
-                      let trail = C.trail c in
-                      let penalty = C.penalty c in
-                      let new_c = C.create ~trail ~penalty all_lits proof in
-                      Util.debugf ~section 3
-                        "@[<2>cancellation@ of @[%a@]@ (with %a)@ into @[%a@]@]"
-                        (fun k->k C.pp c Subst.pp subst C.pp new_c);
-                      Util.incr_stat stat_arith_cancellation;
-                      new_c :: acc
-                    ) else
-                      acc
-                 ) acc
-             | AL.Divides d ->
-               Util.debugf ~section 5 "@[try cancellation@ in @[%a@]@]" (fun k->k AL.pp a_lit);
-               MF.unify_self_monome (d.AL.monome,0)
-               |> Iter.fold
-                 (fun acc (mf, us) ->
-                    let renaming = Subst.Renaming.create () in
-                    let subst = US.subst us in
-                    let mf' = MF.apply_subst renaming subst (mf,0) in
-                    if C.is_maxlit (c,0) subst ~idx
-                    && MF.is_max ~ord mf
-                    then (
-                      let lits' = CCArray.except_idx (C.lits c) idx in
-                      let lits' = Lit.apply_subst_list renaming subst (lits',0) in
-                      let new_lit =
-                        Lit.mk_divides
-                          ~sign:d.AL.sign d.AL.num ~power:d.AL.power (MF.to_monome mf')
-                      in
-                      let c_guard = Literal.of_unif_subst renaming us in
-                      let all_lits = new_lit :: c_guard @ lits' in
-                      let proof =
-                        Proof.Step.inference ~tags:[Proof.Tag.T_lia]
-                          ~rule:(Proof.Rule.mk "cancellation")
-                          [C.proof_parent_subst renaming (c,0) subst] in
-                      let trail = C.trail c
-                      and penalty = C.penalty c in
-                      let new_c = C.create ~trail ~penalty all_lits proof in
-                      Util.debugf ~section 3
-                        "@[<2>cancellation@ of @[%a@]@ (with %a)@ into @[%a@]@]"
-                        (fun k->k C.pp c Subst.pp subst C.pp new_c);
-                      Util.incr_stat stat_arith_cancellation;
-                      new_c :: acc
-                    ) else acc)
-                 acc)
+           | AL.Binary (op, m1, m2) ->
+             Util.debugf ~section 5 "@[<2>try cancellation@ in @[%a@]@]" (fun k->k AL.pp a_lit);
+             (* try to unify terms in [m1] and [m2] *)
+             MF.unify_mm (m1,0) (m2,0)
+             |> Iter.fold
+               (fun acc (mf1, mf2, us) ->
+                  let renaming = Subst.Renaming.create () in
+                  let subst = US.subst us in
+                  let mf1' = MF.apply_subst renaming subst (mf1,0) in
+                  let mf2' = MF.apply_subst renaming subst (mf2,0) in
+                  let is_max_lit = C.is_maxlit (c,0) subst ~idx in
+                  Util.debugf ~section 5
+                    "@[<4>... candidate:@ @[%a@] (max lit ? %B)@ :mf1 %a@ :mf2 %a@]"
+                    (fun k->k S.pp subst is_max_lit MF.pp mf1' MF.pp mf2');
+                  if is_max_lit && MF.is_max ~ord mf1' && MF.is_max ~ord mf2'
+                  then (
+                    (* do the inference *)
+                    let lits' = CCArray.except_idx (C.lits c) idx in
+                    let lits' = Lit.apply_subst_list renaming subst (lits',0) in
+                    let new_lit = Lit.mk_arith_op op (MF.rest mf1') (MF.rest mf2') in
+                    let c_guard = Literal.of_unif_subst renaming us in
+                    let all_lits = new_lit :: c_guard @ lits' in
+                    let proof =
+                      Proof.Step.inference ~tags:[Proof.Tag.T_lia]
+                        ~rule:(Proof.Rule.mk "cancellation")
+                        [C.proof_parent_subst renaming (c,0) subst] in
+                    let trail = C.trail c in
+                    let penalty = C.penalty c in
+                    let new_c = C.create ~trail ~penalty all_lits proof in
+                    Util.debugf ~section 3
+                      "@[<2>cancellation@ of @[%a@]@ (with %a)@ into @[%a@]@]"
+                      (fun k->k C.pp c Subst.pp subst C.pp new_c);
+                    Util.incr_stat stat_arith_cancellation;
+                    new_c :: acc
+                  ) else
+                    acc
+               ) acc
+           | AL.Divides d ->
+             Util.debugf ~section 5 "@[try cancellation@ in @[%a@]@]" (fun k->k AL.pp a_lit);
+             MF.unify_self_monome (d.AL.monome,0)
+             |> Iter.fold
+               (fun acc (mf, us) ->
+                  let renaming = Subst.Renaming.create () in
+                  let subst = US.subst us in
+                  let mf' = MF.apply_subst renaming subst (mf,0) in
+                  if C.is_maxlit (c,0) subst ~idx
+                  && MF.is_max ~ord mf
+                  then (
+                    let lits' = CCArray.except_idx (C.lits c) idx in
+                    let lits' = Lit.apply_subst_list renaming subst (lits',0) in
+                    let new_lit =
+                      Lit.mk_divides
+                        ~sign:d.AL.sign d.AL.num ~power:d.AL.power (MF.to_monome mf')
+                    in
+                    let c_guard = Literal.of_unif_subst renaming us in
+                    let all_lits = new_lit :: c_guard @ lits' in
+                    let proof =
+                      Proof.Step.inference ~tags:[Proof.Tag.T_lia]
+                        ~rule:(Proof.Rule.mk "cancellation")
+                        [C.proof_parent_subst renaming (c,0) subst] in
+                    let trail = C.trail c
+                    and penalty = C.penalty c in
+                    let new_c = C.create ~trail ~penalty all_lits proof in
+                    Util.debugf ~section 3
+                      "@[<2>cancellation@ of @[%a@]@ (with %a)@ into @[%a@]@]"
+                      (fun k->k C.pp c Subst.pp subst C.pp new_c);
+                    Util.incr_stat stat_arith_cancellation;
+                    new_c :: acc
+                  ) else acc)
+               acc)
         []
     in
     Util.exit_prof prof_arith_cancellation;
@@ -824,72 +824,72 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* scale literals *)
       let lit_l, lit_r = ALF.scale lit_l lit_r in
       match lit_l, lit_r with
-        | ALF.Left (AL.Lesseq, mf_1, m1), ALF.Right (AL.Lesseq, m2, mf_2) ->
-          (* m2 ≤ mf_2 and mf_1 ≤ m1, with mf_1 and mf_2 sharing the same
-             focused term. We deduce m2 + mf_1 ≤ m1 + mf_2 and cancel the
-             term out (after scaling) *)
-          assert (Z.equal (MF.coeff mf_1) (MF.coeff mf_2));
-          let new_lit = Lit.mk_arith_lesseq
-              (M.sum m2 (MF.rest mf_1))
-              (M.sum m1 (MF.rest mf_2))
+      | ALF.Left (AL.Lesseq, mf_1, m1), ALF.Right (AL.Lesseq, m2, mf_2) ->
+        (* m2 ≤ mf_2 and mf_1 ≤ m1, with mf_1 and mf_2 sharing the same
+           focused term. We deduce m2 + mf_1 ≤ m1 + mf_2 and cancel the
+           term out (after scaling) *)
+        assert (Z.equal (MF.coeff mf_1) (MF.coeff mf_2));
+        let new_lit = Lit.mk_arith_lesseq
+            (M.sum m2 (MF.rest mf_1))
+            (M.sum m1 (MF.rest mf_2))
+        in
+        let lits_l = CCArray.except_idx (C.lits info.left) idx_l in
+        let lits_l = Lit.apply_subst_list renaming subst (lits_l,s_l) in
+        let lits_r = CCArray.except_idx (C.lits info.right) idx_r in
+        let lits_r = Lit.apply_subst_list renaming subst (lits_r,s_r) in
+        let c_guard = Literal.of_unif_subst renaming us in
+        let all_lits = new_lit :: c_guard @ lits_l @ lits_r in
+        let proof =
+          Proof.Step.inference ~tags:[Proof.Tag.T_lia]
+            ~rule:(Proof.Rule.mk "canc_ineq_chaining")
+            [C.proof_parent_subst renaming (info.left,s_l) subst;
+             C.proof_parent_subst renaming (info.right,s_r) subst] in
+        let trail = C.trail_l [info.left; info.right] in
+        (* penalty for some chaining *)
+        let penalty =
+          max (C.penalty info.left) (C.penalty info.right)
+          + 3 (* nested chainings are dangerous *)
+          + (if MF.term mf_1 |> T.is_var then 10 else 0)
+          + (if MF.term mf_2 |> T.is_var then 10 else 0)
+        in
+        let new_c = C.create ~penalty ~trail all_lits proof in
+        Util.debugf ~section 5 "@[<2>ineq chaining@ of @[%a@]@ and @[%a@]@ gives @[%a@]@]"
+          (fun k->k C.pp info.left C.pp info.right C.pp new_c);
+        Util.incr_stat stat_arith_ineq_chaining;
+        let acc = new_c :: acc in
+
+        (* now, maybe we can also perform case switch! We can if
+           mf_1 - m1 = k + (m2 - mf_2). In this case necessarily
+           Or_{i=0...k} mf_2 = m2 + i *)
+        let diff = M.difference
+            (M.sum m1 (MF.rest mf_2))
+            (M.sum m2 (MF.rest mf_1)) in
+        if M.is_const diff && Z.leq (M.const diff) Z.(of_int !case_switch_limit)
+        then (
+          (* re-use lits_l and lits_r, but build an enumeration *)
+          let new_lits =
+            List.map
+              (fun i ->
+                 (* mf_2 = m2 + i *)
+                 Lit.mk_arith_eq (MF.to_monome mf_2) (M.add_const m2 i))
+              (_range Z.zero (M.const diff))
           in
-          let lits_l = CCArray.except_idx (C.lits info.left) idx_l in
-          let lits_l = Lit.apply_subst_list renaming subst (lits_l,s_l) in
-          let lits_r = CCArray.except_idx (C.lits info.right) idx_r in
-          let lits_r = Lit.apply_subst_list renaming subst (lits_r,s_r) in
-          let c_guard = Literal.of_unif_subst renaming us in
-          let all_lits = new_lit :: c_guard @ lits_l @ lits_r in
+          let all_lits = CCList.flatten [new_lits; c_guard; lits_l; lits_r] in
           let proof =
             Proof.Step.inference ~tags:[Proof.Tag.T_lia]
-              ~rule:(Proof.Rule.mk "canc_ineq_chaining")
+              ~rule:(Proof.Rule.mk "canc_case_switch")
               [C.proof_parent_subst renaming (info.left,s_l) subst;
                C.proof_parent_subst renaming (info.right,s_r) subst] in
           let trail = C.trail_l [info.left; info.right] in
-          (* penalty for some chaining *)
-          let penalty =
-            max (C.penalty info.left) (C.penalty info.right)
-            + 3 (* nested chainings are dangerous *)
-            + (if MF.term mf_1 |> T.is_var then 10 else 0)
-            + (if MF.term mf_2 |> T.is_var then 10 else 0)
-          in
-          let new_c = C.create ~penalty ~trail all_lits proof in
-          Util.debugf ~section 5 "@[<2>ineq chaining@ of @[%a@]@ and @[%a@]@ gives @[%a@]@]"
+          (* small penalty for case switch *)
+          let penalty = max (C.penalty info.left) (C.penalty info.right) + 3 in
+          let new_c = C.create ~trail ~penalty all_lits proof in
+          Util.debugf ~section 5 "@[<2>case switch@ of @[%a@]@ and @[%a@]@ gives @[%a@]@]"
             (fun k->k C.pp info.left C.pp info.right C.pp new_c);
-          Util.incr_stat stat_arith_ineq_chaining;
-          let acc = new_c :: acc in
-
-          (* now, maybe we can also perform case switch! We can if
-             mf_1 - m1 = k + (m2 - mf_2). In this case necessarily
-             Or_{i=0...k} mf_2 = m2 + i *)
-          let diff = M.difference
-              (M.sum m1 (MF.rest mf_2))
-              (M.sum m2 (MF.rest mf_1)) in
-          if M.is_const diff && Z.leq (M.const diff) Z.(of_int !case_switch_limit)
-          then (
-            (* re-use lits_l and lits_r, but build an enumeration *)
-            let new_lits =
-              List.map
-                (fun i ->
-                   (* mf_2 = m2 + i *)
-                   Lit.mk_arith_eq (MF.to_monome mf_2) (M.add_const m2 i))
-                (_range Z.zero (M.const diff))
-            in
-            let all_lits = CCList.flatten [new_lits; c_guard; lits_l; lits_r] in
-            let proof =
-              Proof.Step.inference ~tags:[Proof.Tag.T_lia]
-                ~rule:(Proof.Rule.mk "canc_case_switch")
-                [C.proof_parent_subst renaming (info.left,s_l) subst;
-                 C.proof_parent_subst renaming (info.right,s_r) subst] in
-            let trail = C.trail_l [info.left; info.right] in
-            (* small penalty for case switch *)
-            let penalty = max (C.penalty info.left) (C.penalty info.right) + 3 in
-            let new_c = C.create ~trail ~penalty all_lits proof in
-            Util.debugf ~section 5 "@[<2>case switch@ of @[%a@]@ and @[%a@]@ gives @[%a@]@]"
-              (fun k->k C.pp info.left C.pp info.right C.pp new_c);
-            Util.incr_stat stat_arith_case_switch;
-            new_c :: acc
-          ) else acc
-        | _ -> assert false
+          Util.incr_stat stat_arith_case_switch;
+          new_c :: acc
+        ) else acc
+      | _ -> assert false
     ) else
       acc
 
@@ -903,50 +903,50 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Iter.fold
         (fun acc (t,lit,pos) ->
            match lit with
-             | _ when T.is_var t -> acc (* ignore variables *)
-             | ALF.Left (AL.Lesseq, mf_l, _) ->
-               (* find a right-chaining literal in some other clause *)
-               PS.TermIndex.retrieve_unifiables (!_idx_ineq_right,sc_r) (t,sc_l)
-               |> Iter.fold
-                 (fun acc (_t',with_pos,subst) ->
-                    let right = with_pos.C.WithPos.clause in
-                    let right_pos = with_pos.C.WithPos.pos in
-                    let lit_r = Lits.View.get_arith_exn (C.lits right) right_pos in
-                    match lit_r with
-                      | ALF.Right (AL.Lesseq, _, mf_r) ->
-                        MF.unify_ff ~subst (mf_l,sc_l) (mf_r,sc_r)
-                        |> Iter.fold
-                          (fun acc (_, _, subst) ->
-                             let info = ChainingInfo.({
-                                 left=c; left_scope=sc_l; left_lit=lit; left_pos=pos;
-                                 right; right_scope=sc_r; right_lit=lit_r; right_pos; subst;
-                               })
-                             in _do_chaining info acc)
-                          acc
-                      | _ -> acc)
-                 acc
-             | ALF.Right (AL.Lesseq, _, mf_r) ->
-               (* find a right-chaining literal in some other clause *)
-               PS.TermIndex.retrieve_unifiables (!_idx_ineq_left,sc_l) (t,sc_r)
-               |> Iter.fold
-                 (fun acc (_t',with_pos,subst) ->
-                    let left = with_pos.C.WithPos.clause in
-                    let left_pos = with_pos.C.WithPos.pos in
-                    let lit_l = Lits.View.get_arith_exn (C.lits left) left_pos in
-                    match lit_l with
-                      | ALF.Left (AL.Lesseq, mf_l, _) ->
-                        MF.unify_ff ~subst (mf_l,sc_l) (mf_r,sc_r)
-                        |> Iter.fold
-                          (fun acc (_, _, subst) ->
-                             let info = ChainingInfo.({
-                                 left; left_scope=sc_l; left_lit=lit_l; left_pos; subst;
-                                 right=c; right_scope=sc_r; right_lit=lit; right_pos=pos;
-                               })
-                             in _do_chaining info acc)
-                          acc
-                      | _ -> acc)
-                 acc
-             | _ -> assert false)
+           | _ when T.is_var t -> acc (* ignore variables *)
+           | ALF.Left (AL.Lesseq, mf_l, _) ->
+             (* find a right-chaining literal in some other clause *)
+             PS.TermIndex.retrieve_unifiables (!_idx_ineq_right,sc_r) (t,sc_l)
+             |> Iter.fold
+               (fun acc (_t',with_pos,subst) ->
+                  let right = with_pos.C.WithPos.clause in
+                  let right_pos = with_pos.C.WithPos.pos in
+                  let lit_r = Lits.View.get_arith_exn (C.lits right) right_pos in
+                  match lit_r with
+                  | ALF.Right (AL.Lesseq, _, mf_r) ->
+                    MF.unify_ff ~subst (mf_l,sc_l) (mf_r,sc_r)
+                    |> Iter.fold
+                      (fun acc (_, _, subst) ->
+                         let info = ChainingInfo.({
+                             left=c; left_scope=sc_l; left_lit=lit; left_pos=pos;
+                             right; right_scope=sc_r; right_lit=lit_r; right_pos; subst;
+                           })
+                         in _do_chaining info acc)
+                      acc
+                  | _ -> acc)
+               acc
+           | ALF.Right (AL.Lesseq, _, mf_r) ->
+             (* find a right-chaining literal in some other clause *)
+             PS.TermIndex.retrieve_unifiables (!_idx_ineq_left,sc_l) (t,sc_r)
+             |> Iter.fold
+               (fun acc (_t',with_pos,subst) ->
+                  let left = with_pos.C.WithPos.clause in
+                  let left_pos = with_pos.C.WithPos.pos in
+                  let lit_l = Lits.View.get_arith_exn (C.lits left) left_pos in
+                  match lit_l with
+                  | ALF.Left (AL.Lesseq, mf_l, _) ->
+                    MF.unify_ff ~subst (mf_l,sc_l) (mf_r,sc_r)
+                    |> Iter.fold
+                      (fun acc (_, _, subst) ->
+                         let info = ChainingInfo.({
+                             left; left_scope=sc_l; left_lit=lit_l; left_pos; subst;
+                             right=c; right_scope=sc_r; right_lit=lit; right_pos=pos;
+                           })
+                         in _do_chaining info acc)
+                      acc
+                  | _ -> acc)
+               acc
+           | _ -> assert false)
         []
     in
     Util.exit_prof prof_arith_ineq_chaining;
@@ -966,50 +966,50 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* same coefficient for the focused term *)
       let lit1, lit2 = ALF.scale lit1 lit2 in
       match lit1, lit2 with
-        | ALF.Left (AL.Lesseq, mf1, m1), ALF.Left (AL.Lesseq, mf2, m2)
-        | ALF.Right (AL.Lesseq, m1, mf1), ALF.Right (AL.Lesseq, m2, mf2) ->
-          (* mf1 ≤ m1  or  mf2 ≤ m2  (symmetry with > if needed)
-             so we deduce that if  m1-mf1.rest ≤ m2 - mf2.rest
-             then the first literal implies the second, so we only
-             keep the second one *)
-          assert (Z.equal (MF.coeff mf1) (MF.coeff mf2));
-          if (C.is_maxlit (c,0) subst ~idx:i || C.is_maxlit (c,0) subst ~idx:j)
-          && (ALF.is_max ~ord lit1 || ALF.is_max ~ord lit2)
-          then (
-            let left = match lit1 with ALF.Left _ -> true | _ -> false in
-            (* remove lit1, add the guard *)
-            let other_lits = CCArray.except_idx (C.lits c) i in
-            let other_lits = Lit.apply_subst_list renaming subst (other_lits,0) in
-            (* build new literal *)
-            let new_lit =
-              if left
-              then
-                Lit.mk_arith_lesseq
-                  (M.difference m1 (MF.rest mf1))
-                  (M.difference m2 (MF.rest mf2))
-              else
-                Lit.mk_arith_lesseq
-                  (M.difference m2 (MF.rest mf2))
-                  (M.difference m1 (MF.rest mf1))
-            in
-            (* negate the literal to obtain a guard *)
-            let new_lit = Lit.negate new_lit in
-            let c_guard = Literal.of_unif_subst renaming us in
-            let lits = new_lit :: c_guard @ other_lits in
-            (* build clauses *)
-            let proof =
-              Proof.Step.inference ~tags:[Proof.Tag.T_lia]
-                ~rule:(Proof.Rule.mk "canc_ineq_factoring")
-                [C.proof_parent_subst renaming (c,0) subst] in
-            let trail = C.trail c
-            and penalty = C.penalty c in
-            let new_c = C.create ~trail ~penalty lits proof in
-            Util.debugf ~section 5 "@[<2>ineq factoring@ of @[%a@]@ gives @[%a@]@"
-              (fun k->k C.pp c C.pp new_c);
-            Util.incr_stat stat_arith_ineq_factoring;
-            acc := new_c :: !acc
-          )
-        | _ -> ()
+      | ALF.Left (AL.Lesseq, mf1, m1), ALF.Left (AL.Lesseq, mf2, m2)
+      | ALF.Right (AL.Lesseq, m1, mf1), ALF.Right (AL.Lesseq, m2, mf2) ->
+        (* mf1 ≤ m1  or  mf2 ≤ m2  (symmetry with > if needed)
+           so we deduce that if  m1-mf1.rest ≤ m2 - mf2.rest
+           then the first literal implies the second, so we only
+           keep the second one *)
+        assert (Z.equal (MF.coeff mf1) (MF.coeff mf2));
+        if (C.is_maxlit (c,0) subst ~idx:i || C.is_maxlit (c,0) subst ~idx:j)
+        && (ALF.is_max ~ord lit1 || ALF.is_max ~ord lit2)
+        then (
+          let left = match lit1 with ALF.Left _ -> true | _ -> false in
+          (* remove lit1, add the guard *)
+          let other_lits = CCArray.except_idx (C.lits c) i in
+          let other_lits = Lit.apply_subst_list renaming subst (other_lits,0) in
+          (* build new literal *)
+          let new_lit =
+            if left
+            then
+              Lit.mk_arith_lesseq
+                (M.difference m1 (MF.rest mf1))
+                (M.difference m2 (MF.rest mf2))
+            else
+              Lit.mk_arith_lesseq
+                (M.difference m2 (MF.rest mf2))
+                (M.difference m1 (MF.rest mf1))
+          in
+          (* negate the literal to obtain a guard *)
+          let new_lit = Lit.negate new_lit in
+          let c_guard = Literal.of_unif_subst renaming us in
+          let lits = new_lit :: c_guard @ other_lits in
+          (* build clauses *)
+          let proof =
+            Proof.Step.inference ~tags:[Proof.Tag.T_lia]
+              ~rule:(Proof.Rule.mk "canc_ineq_factoring")
+              [C.proof_parent_subst renaming (c,0) subst] in
+          let trail = C.trail c
+          and penalty = C.penalty c in
+          let new_c = C.create ~trail ~penalty lits proof in
+          Util.debugf ~section 5 "@[<2>ineq factoring@ of @[%a@]@ gives @[%a@]@"
+            (fun k->k C.pp c C.pp new_c);
+          Util.incr_stat stat_arith_ineq_factoring;
+          acc := new_c :: !acc
+        )
+      | _ -> ()
     in
     (* traverse the clause to find matching pairs *)
     let eligible = C.Eligible.(max c ** filter Lit.is_arith_lesseq) in
@@ -1023,24 +1023,24 @@ module Make(E : Env.S) : S with module Env = E = struct
            (fun (lit2,pos2) ->
               let j = Lits.Pos.idx pos2 in
               match lit1, lit2 with
-                | _ when i=j -> ()  (* need distinct lits *)
-                | AL.Binary (AL.Lesseq, l1, r1), AL.Binary (AL.Lesseq, l2, r2) ->
-                  (* see whether we have   l1 < a.x + mf1  and  l2 < a.x + mf2 *)
-                  MF.unify_mm (r1,0) (r2,0)
-                    (fun (mf1,mf2,subst) ->
-                       let lit1 = ALF.mk_right AL.Lesseq l1 mf1 in
-                       let lit2 = ALF.mk_right AL.Lesseq l2 mf2 in
-                       _do_factoring ~subst lit1 lit2 i j
-                    );
-                  (* see whether we have   a.x + mf1 < r1 and a.x + mf2 < r2  *)
-                  MF.unify_mm (l1,0) (l2,0)
-                    (fun (mf1,mf2,subst) ->
-                       let lit1 = ALF.mk_left AL.Lesseq mf1 r1 in
-                       let lit2 = ALF.mk_left AL.Lesseq mf2 r2 in
-                       _do_factoring ~subst lit1 lit2 i j
-                    );
-                  ()
-                | _ -> assert false
+              | _ when i=j -> ()  (* need distinct lits *)
+              | AL.Binary (AL.Lesseq, l1, r1), AL.Binary (AL.Lesseq, l2, r2) ->
+                (* see whether we have   l1 < a.x + mf1  and  l2 < a.x + mf2 *)
+                MF.unify_mm (r1,0) (r2,0)
+                  (fun (mf1,mf2,subst) ->
+                     let lit1 = ALF.mk_right AL.Lesseq l1 mf1 in
+                     let lit2 = ALF.mk_right AL.Lesseq l2 mf2 in
+                     _do_factoring ~subst lit1 lit2 i j
+                  );
+                (* see whether we have   a.x + mf1 < r1 and a.x + mf2 < r2  *)
+                MF.unify_mm (l1,0) (l2,0)
+                  (fun (mf1,mf2,subst) ->
+                     let lit1 = ALF.mk_left AL.Lesseq mf1 r1 in
+                     let lit2 = ALF.mk_left AL.Lesseq mf2 r2 in
+                     _do_factoring ~subst lit1 lit2 i j
+                  );
+                ()
+              | _ -> assert false
            )
       );
     Util.exit_prof prof_arith_ineq_factoring;
@@ -1088,54 +1088,54 @@ module Make(E : Env.S) : S with module Env = E = struct
                 let active_clause = with_pos.C.WithPos.clause in
                 let active_pos = with_pos.C.WithPos.pos in
                 match Lits.View.get_arith (C.lits active_clause) active_pos with
-                  | None -> assert false
-                  | Some (ALF.Left (AL.Lesseq, _, _) as alit') when is_left ->
-                    let alit' = ALF.apply_subst Subst.Renaming.none subst (alit',1) in
-                    if C.trail_subsumes active_clause c
-                    && ALF.is_strictly_max ~ord alit'
-                    then (
-                      (* scale *)
-                      let plit, _alit' = ALF.scale plit alit' in
-                      let mf1', m2' =
-                        match Lits.View.get_arith (C.lits active_clause) active_pos with
-                          | Some (ALF.Left (_, mf1', m2')) -> mf1', m2'
-                          | _ -> assert false
-                      in
-                      let mf1' = MF.apply_subst Subst.Renaming.none subst (mf1',1) in
-                      let m2' = M.apply_subst Subst.Renaming.none subst (m2',1) in
-                      (* from t+mf1 ≤ m2  and t+mf1' ≤ m2', we deduce
-                         that if m2'-mf1' ≤ m2-mf1  then [lit] is redundant.
-                         That is, the sufficient literal is
-                         mf1 + m2' ≤ m2 + mf1'  (we replace [t] with [m2'-mf1']) *)
-                      let new_plit =
-                        ALF.replace plit (M.difference m2' (MF.rest mf1')) in
-                      (* transitive closure *)
-                      let trace = active_clause::trace in
-                      _ineq_find_sufficient ~ord ~trace c new_plit k
-                    )
-                  | Some (ALF.Right (AL.Lesseq, _, _) as alit') when not is_left ->
-                    (* symmetric case *)
-                    let alit' = ALF.apply_subst Subst.Renaming.none subst (alit',1) in
-                    if C.trail_subsumes active_clause c
-                    && ALF.is_strictly_max ~ord alit'
-                    then (
-                      (* scale *)
-                      let plit, _alit' = ALF.scale plit alit' in
-                      let m1', mf2' =
-                        match Lits.View.get_arith (C.lits active_clause) active_pos with
-                          | Some (ALF.Right (_, m1', mf2')) -> m1', mf2'
-                          | _ -> assert false
-                      in
-                      let mf2' = MF.apply_subst Subst.Renaming.none subst (mf2',1) in
-                      let m1' = M.apply_subst Subst.Renaming.none subst (m1',1) in
-                      let new_plit =
-                        ALF.replace plit (M.difference m1' (MF.rest mf2')) in
-                      (* transitive closure *)
-                      let trace = active_clause::trace in
-                      _ineq_find_sufficient ~ord ~trace c new_plit k
-                    )
-                  | Some _ ->
-                    ()   (* cannot make a sufficient literal *)
+                | None -> assert false
+                | Some (ALF.Left (AL.Lesseq, _, _) as alit') when is_left ->
+                  let alit' = ALF.apply_subst Subst.Renaming.none subst (alit',1) in
+                  if C.trail_subsumes active_clause c
+                  && ALF.is_strictly_max ~ord alit'
+                  then (
+                    (* scale *)
+                    let plit, _alit' = ALF.scale plit alit' in
+                    let mf1', m2' =
+                      match Lits.View.get_arith (C.lits active_clause) active_pos with
+                      | Some (ALF.Left (_, mf1', m2')) -> mf1', m2'
+                      | _ -> assert false
+                    in
+                    let mf1' = MF.apply_subst Subst.Renaming.none subst (mf1',1) in
+                    let m2' = M.apply_subst Subst.Renaming.none subst (m2',1) in
+                    (* from t+mf1 ≤ m2  and t+mf1' ≤ m2', we deduce
+                       that if m2'-mf1' ≤ m2-mf1  then [lit] is redundant.
+                       That is, the sufficient literal is
+                       mf1 + m2' ≤ m2 + mf1'  (we replace [t] with [m2'-mf1']) *)
+                    let new_plit =
+                      ALF.replace plit (M.difference m2' (MF.rest mf1')) in
+                    (* transitive closure *)
+                    let trace = active_clause::trace in
+                    _ineq_find_sufficient ~ord ~trace c new_plit k
+                  )
+                | Some (ALF.Right (AL.Lesseq, _, _) as alit') when not is_left ->
+                  (* symmetric case *)
+                  let alit' = ALF.apply_subst Subst.Renaming.none subst (alit',1) in
+                  if C.trail_subsumes active_clause c
+                  && ALF.is_strictly_max ~ord alit'
+                  then (
+                    (* scale *)
+                    let plit, _alit' = ALF.scale plit alit' in
+                    let m1', mf2' =
+                      match Lits.View.get_arith (C.lits active_clause) active_pos with
+                      | Some (ALF.Right (_, m1', mf2')) -> m1', mf2'
+                      | _ -> assert false
+                    in
+                    let mf2' = MF.apply_subst Subst.Renaming.none subst (mf2',1) in
+                    let m1' = M.apply_subst Subst.Renaming.none subst (m1',1) in
+                    let new_plit =
+                      ALF.replace plit (M.difference m1' (MF.rest mf2')) in
+                    (* transitive closure *)
+                    let trace = active_clause::trace in
+                    _ineq_find_sufficient ~ord ~trace c new_plit k
+                  )
+                | Some _ ->
+                  ()   (* cannot make a sufficient literal *)
              )
         )
     | _ -> ()
@@ -1143,22 +1143,22 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* is a literal redundant w.r.t the current set of unit clauses *)
   let _ineq_is_redundant_by_unit c lit =
     match lit with
-      | _ when Lit.is_trivial lit || Lit.is_absurd lit ->
-        None  (* something more efficient will take care of it *)
-      | Lit.Int (AL.Binary (AL.Lesseq, _m1, _m2) as alit) ->
-        let ord = Ctx.ord () in
-        let traces =
-          _ineq_find_sufficient ~ord ~trace:[] c alit
-          |> Iter.head  (* one is enough *)
-        in
-        begin match traces with
-          | Some (trace, _lit') ->
-            assert (AL.is_trivial _lit');
-            let trace = CCList.uniq ~eq:C.equal trace in
-            Some trace
-          | None -> None
-        end
-      | _ -> None
+    | _ when Lit.is_trivial lit || Lit.is_absurd lit ->
+      None  (* something more efficient will take care of it *)
+    | Lit.Int (AL.Binary (AL.Lesseq, _m1, _m2) as alit) ->
+      let ord = Ctx.ord () in
+      let traces =
+        _ineq_find_sufficient ~ord ~trace:[] c alit
+        |> Iter.head  (* one is enough *)
+      in
+      begin match traces with
+        | Some (trace, _lit') ->
+          assert (AL.is_trivial _lit');
+          let trace = CCList.uniq ~eq:C.equal trace in
+          Some trace
+        | None -> None
+      end
+    | _ -> None
 
   let is_redundant_by_ineq c =
     Util.enter_prof prof_arith_trivial_ineq;
@@ -1215,54 +1215,54 @@ module Make(E : Env.S) : S with module Env = E = struct
                 let active_clause = with_pos.C.WithPos.clause in
                 let active_pos = with_pos.C.WithPos.pos in
                 match Lits.View.get_arith (C.lits active_clause) active_pos with
-                  | None -> assert false
-                  | Some (ALF.Left (AL.Lesseq, _, _) as alit') when not is_left ->
-                    let alit' = ALF.apply_subst Subst.Renaming.none subst (alit',1) in
-                    if C.trail_subsumes active_clause c
-                    && ALF.is_strictly_max ~ord alit'
-                    then (
-                      (* scale *)
-                      let plit, _alit' = ALF.scale plit alit' in
-                      let mf1', m2' =
-                        match Lits.View.get_arith (C.lits active_clause) active_pos with
-                          | Some (ALF.Left (_, mf1', m2')) -> mf1', m2'
-                          | _ -> assert false
-                      in
-                      let mf1' = MF.apply_subst Subst.Renaming.none subst (mf1',1) in
-                      let m2' = M.apply_subst Subst.Renaming.none subst (m2',1) in
-                      (* from m1 ≤ t+mf2  and t+mf1' ≤ m2', we deduce
-                         m1 + mf1' ≤ mf2 + m2'. If this literal is absurd
-                         then so is [m1 ≤ t+mf2].
-                         We replace [t] with [m2'-mf1'] *)
-                      let new_plit =
-                        ALF.replace plit (M.difference m2' (MF.rest mf1')) in
-                      (* transitive closure *)
-                      let trace = active_clause::trace in
-                      ineq_find_necessary_ ~ord ~trace c new_plit k
-                    )
-                  | Some (ALF.Right (AL.Lesseq, _, _) as alit') when is_left ->
-                    (* symmetric case *)
-                    let alit' = ALF.apply_subst Subst.Renaming.none subst (alit',1) in
-                    if C.trail_subsumes active_clause c
-                    && ALF.is_strictly_max ~ord alit'
-                    then (
-                      (* scale *)
-                      let plit, _alit' = ALF.scale plit alit' in
-                      let m1', mf2' =
-                        match Lits.View.get_arith (C.lits active_clause) active_pos with
-                          | Some (ALF.Right (_, m1', mf2')) -> m1', mf2'
-                          | _ -> assert false
-                      in
-                      let mf2' = MF.apply_subst Subst.Renaming.none subst (mf2',1) in
-                      let m1' = M.apply_subst Subst.Renaming.none subst (m1',1) in
-                      let new_plit =
-                        ALF.replace plit (M.difference m1' (MF.rest mf2')) in
-                      (* transitive closure *)
-                      let trace = active_clause::trace in
-                      ineq_find_necessary_ ~ord ~trace c new_plit k
-                    )
-                  | Some _ ->
-                    ()   (* cannot make a sufficient literal *)
+                | None -> assert false
+                | Some (ALF.Left (AL.Lesseq, _, _) as alit') when not is_left ->
+                  let alit' = ALF.apply_subst Subst.Renaming.none subst (alit',1) in
+                  if C.trail_subsumes active_clause c
+                  && ALF.is_strictly_max ~ord alit'
+                  then (
+                    (* scale *)
+                    let plit, _alit' = ALF.scale plit alit' in
+                    let mf1', m2' =
+                      match Lits.View.get_arith (C.lits active_clause) active_pos with
+                      | Some (ALF.Left (_, mf1', m2')) -> mf1', m2'
+                      | _ -> assert false
+                    in
+                    let mf1' = MF.apply_subst Subst.Renaming.none subst (mf1',1) in
+                    let m2' = M.apply_subst Subst.Renaming.none subst (m2',1) in
+                    (* from m1 ≤ t+mf2  and t+mf1' ≤ m2', we deduce
+                       m1 + mf1' ≤ mf2 + m2'. If this literal is absurd
+                       then so is [m1 ≤ t+mf2].
+                       We replace [t] with [m2'-mf1'] *)
+                    let new_plit =
+                      ALF.replace plit (M.difference m2' (MF.rest mf1')) in
+                    (* transitive closure *)
+                    let trace = active_clause::trace in
+                    ineq_find_necessary_ ~ord ~trace c new_plit k
+                  )
+                | Some (ALF.Right (AL.Lesseq, _, _) as alit') when is_left ->
+                  (* symmetric case *)
+                  let alit' = ALF.apply_subst Subst.Renaming.none subst (alit',1) in
+                  if C.trail_subsumes active_clause c
+                  && ALF.is_strictly_max ~ord alit'
+                  then (
+                    (* scale *)
+                    let plit, _alit' = ALF.scale plit alit' in
+                    let m1', mf2' =
+                      match Lits.View.get_arith (C.lits active_clause) active_pos with
+                      | Some (ALF.Right (_, m1', mf2')) -> m1', mf2'
+                      | _ -> assert false
+                    in
+                    let mf2' = MF.apply_subst Subst.Renaming.none subst (mf2',1) in
+                    let m1' = M.apply_subst Subst.Renaming.none subst (m1',1) in
+                    let new_plit =
+                      ALF.replace plit (M.difference m1' (MF.rest mf2')) in
+                    (* transitive closure *)
+                    let trace = active_clause::trace in
+                    ineq_find_necessary_ ~ord ~trace c new_plit k
+                  )
+                | Some _ ->
+                  ()   (* cannot make a sufficient literal *)
              )
         )
     | _ -> ()
@@ -1270,22 +1270,22 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* is a literal absurd w.r.t the current set of unit clauses *)
   let _ineq_is_absurd_by_unit c lit =
     match lit with
-      | _ when Lit.is_trivial lit || Lit.is_absurd lit ->
-        None  (* something more efficient will take care of it *)
-      | Lit.Int (AL.Binary (AL.Lesseq, _m1, _m2) as alit) ->
-        let ord = Ctx.ord () in
-        let traces =
-          ineq_find_necessary_ ~ord ~trace:[] c alit
-          |> Iter.head  (* one is enough *)
-        in
-        begin match traces with
-          | Some (trace, _lit') ->
-            assert (AL.is_absurd _lit');
-            let trace = CCList.uniq ~eq:C.equal trace in
-            Some trace
-          | None -> None
-        end
-      | _ -> None
+    | _ when Lit.is_trivial lit || Lit.is_absurd lit ->
+      None  (* something more efficient will take care of it *)
+    | Lit.Int (AL.Binary (AL.Lesseq, _m1, _m2) as alit) ->
+      let ord = Ctx.ord () in
+      let traces =
+        ineq_find_necessary_ ~ord ~trace:[] c alit
+        |> Iter.head  (* one is enough *)
+      in
+      begin match traces with
+        | Some (trace, _lit') ->
+          assert (AL.is_absurd _lit');
+          let trace = CCList.uniq ~eq:C.equal trace in
+          Some trace
+        | None -> None
+      end
+    | _ -> None
 
   (* demodulate using inequalities *)
   let demod_ineq c : C.t SimplM.t =
@@ -1380,35 +1380,35 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Iter.fold
         (fun acc (t,lit1,pos1) ->
            match lit1 with
-             | ALF.Div d1 when AL.Util.is_prime d1.AL.num ->
-               (* inferences only possible when lit1 is a power-of-prime *)
-               let n = d1.AL.num in
-               PS.TermIndex.retrieve_unifiables (!_idx_div,sc2) (t,sc1)
-               |> Iter.fold
-                 (fun acc (_t',with_pos,subst) ->
-                    (* [subst t = subst t'], see whether they belong to the same group *)
-                    let c2 = with_pos.C.WithPos.clause in
-                    let pos2 = with_pos.C.WithPos.pos in
-                    let lit2 = Lits.View.get_arith_exn (C.lits c2) pos2 in
-                    match lit2 with
-                      | ALF.Div d2 when (d1.AL.sign || d2.AL.sign) && Z.equal n d2.AL.num ->
-                        (* inference seems possible (at least one lit is positive).
-                           start with scaling the literals to the same power *)
-                        let sign = d1.AL.sign && d2.AL.sign in
-                        let power = max d1.AL.power d2.AL.power in
-                        let lit1 = ALF.scale_power lit1 power
-                        and lit2 = ALF.scale_power lit2 power in
-                        let mf1 = ALF.focused_monome lit1
-                        and mf2 = ALF.focused_monome lit2 in
-                        (* unify mf1 and mf2 as possible *)
-                        MF.unify_ff ~subst (mf1,sc1) (mf2,sc2)
-                        |> Iter.fold
-                          (fun acc (_, _, subst) ->
-                             _do_chaining ~sign n power c lit1 pos1 c2 lit2 pos2 subst acc)
-                          acc
-                      | _ -> acc)
-                 acc
-             | _ -> acc)
+           | ALF.Div d1 when AL.Util.is_prime d1.AL.num ->
+             (* inferences only possible when lit1 is a power-of-prime *)
+             let n = d1.AL.num in
+             PS.TermIndex.retrieve_unifiables (!_idx_div,sc2) (t,sc1)
+             |> Iter.fold
+               (fun acc (_t',with_pos,subst) ->
+                  (* [subst t = subst t'], see whether they belong to the same group *)
+                  let c2 = with_pos.C.WithPos.clause in
+                  let pos2 = with_pos.C.WithPos.pos in
+                  let lit2 = Lits.View.get_arith_exn (C.lits c2) pos2 in
+                  match lit2 with
+                  | ALF.Div d2 when (d1.AL.sign || d2.AL.sign) && Z.equal n d2.AL.num ->
+                    (* inference seems possible (at least one lit is positive).
+                       start with scaling the literals to the same power *)
+                    let sign = d1.AL.sign && d2.AL.sign in
+                    let power = max d1.AL.power d2.AL.power in
+                    let lit1 = ALF.scale_power lit1 power
+                    and lit2 = ALF.scale_power lit2 power in
+                    let mf1 = ALF.focused_monome lit1
+                    and mf2 = ALF.focused_monome lit2 in
+                    (* unify mf1 and mf2 as possible *)
+                    MF.unify_ff ~subst (mf1,sc1) (mf2,sc2)
+                    |> Iter.fold
+                      (fun acc (_, _, subst) ->
+                         _do_chaining ~sign n power c lit1 pos1 c2 lit2 pos2 subst acc)
+                      acc
+                  | _ -> acc)
+               acc
+           | _ -> acc)
         []
     in
     Util.exit_prof prof_arith_div_chaining;
@@ -1514,46 +1514,46 @@ module Make(E : Env.S) : S with module Env = E = struct
         );
       None
     with
-      | ReplaceLitByLitsInSameClause (i, lits) ->
-        (* replace lit number [i] with [lits] *)
-        let lits' = CCArray.except_idx (C.lits c) i in
-        let all_lits = List.rev_append lits lits' in
-        let proof =
-          Proof.Step.inference ~tags:[Proof.Tag.T_lia]
-            ~rule:(Proof.Rule.mk "div_prime_decomposition")
-            [C.proof_parent c] in
-        let new_c =
-          C.create ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof
-        in
-        Util.debugf ~section 5
-          "@[<2>prime_decomposition- of@ @[%a@]@ into @[%a@]@]"
-          (fun k->k C.pp c C.pp new_c);
-        Some [new_c]
-      | ReplaceLitByLitsInManyClauses (i, lits) ->
-        let clauses = List.map
-            (fun lit ->
-               let all_lits = Array.copy (C.lits c) in
-               all_lits.(i) <- lit;
-               let proof =
-                 Proof.Step.inference ~tags:[Proof.Tag.T_lia]
-                   [C.proof_parent c]
-                   ~rule:(Proof.Rule.mk "div_prime_decomposition")  in
-               let new_c =
-                 C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof
-               in
-               new_c)
-            lits
-        in
-        Util.debugf ~section 5
-          "@[<2>prime_decomposition+@ of @[%a@]@ into set {@[%a@]}@]"
-          (fun k->k C.pp c (Util.pp_list C.pp) clauses);
-        Some clauses
+    | ReplaceLitByLitsInSameClause (i, lits) ->
+      (* replace lit number [i] with [lits] *)
+      let lits' = CCArray.except_idx (C.lits c) i in
+      let all_lits = List.rev_append lits lits' in
+      let proof =
+        Proof.Step.inference ~tags:[Proof.Tag.T_lia]
+          ~rule:(Proof.Rule.mk "div_prime_decomposition")
+          [C.proof_parent c] in
+      let new_c =
+        C.create ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof
+      in
+      Util.debugf ~section 5
+        "@[<2>prime_decomposition- of@ @[%a@]@ into @[%a@]@]"
+        (fun k->k C.pp c C.pp new_c);
+      Some [new_c]
+    | ReplaceLitByLitsInManyClauses (i, lits) ->
+      let clauses = List.map
+          (fun lit ->
+             let all_lits = Array.copy (C.lits c) in
+             all_lits.(i) <- lit;
+             let proof =
+               Proof.Step.inference ~tags:[Proof.Tag.T_lia]
+                 [C.proof_parent c]
+                 ~rule:(Proof.Rule.mk "div_prime_decomposition")  in
+             let new_c =
+               C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof
+             in
+             new_c)
+          lits
+      in
+      Util.debugf ~section 5
+        "@[<2>prime_decomposition+@ of @[%a@]@ into set {@[%a@]}@]"
+        (fun k->k C.pp c (Util.pp_list C.pp) clauses);
+      Some clauses
 
   let canc_divisibility c =
     Util.enter_prof prof_arith_divisibility;
     (* inference on 1/ positive eq  2/ positive divisibility *)
     let eligible = C.Eligible.(max c **
-          (filter Lit.is_arith_eq ++ (pos ** filter Lit.is_arith_divides))) in
+                               (filter Lit.is_arith_eq ++ (pos ** filter Lit.is_arith_divides))) in
     let ord = Ctx.ord () in
     let res =
       Lits.fold_arith_terms ~eligible ~which:`Max ~ord (C.lits c)
@@ -1627,41 +1627,41 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* regular literal ----> arith literal, sometimes *)
   let canc_lit_of_lit lit =
     match lit with
-      | Lit.Equation (l, r, sign) when Type.equal Type.int (T.ty l) ->
-        begin match T.view l, T.view r with
-          | T.AppBuiltin (Builtin.Remainder_e, [l'; r']), opp
-          | opp, T.AppBuiltin (Builtin.Remainder_e, [l'; r']) ->
-            begin match Monome.Int.of_term l', T.view r', opp with
-              | Some m,
-                T.AppBuiltin (Builtin.Int n,[]),
-                T.AppBuiltin (Builtin.Int opp', [])
-                when Z.sign opp' >= 0 && Z.compare opp' n < 0 ->
-                (* remainder(l1, n) = opp ----> n | l1-opp,
-                   assuming 0<=opp<n *)
-                let m = M.add_const m Z.(rem (~- opp') n) in
-                let lit = Lit.mk_divides ~sign n ~power:1 m in
-                Some (lit,[],[Proof.Tag.T_lia])
-              | Some _,
-                T.AppBuiltin (Builtin.Int n,[]),
-                T.AppBuiltin (Builtin.Int opp', [])
-                when Z.sign opp' < 0 || Z.compare opp' n >= 0 ->
-                (* remainder(l1, n) = opp --> false
-                   assuming opp ∉ [0.. n-1] *)
-                let lit = if sign then Lit.mk_absurd else Lit.mk_tauto in
-                Some (lit,[],[Proof.Tag.T_lia])
-              | _ -> None
-            end
-          | _ ->
-            begin match Monome.Int.of_term l, Monome.Int.of_term r with
-              | Some m1, Some m2 ->
-                if sign
-                then Some (Lit.mk_arith_eq m1 m2,[],[Proof.Tag.T_lia])
-                else Some (Lit.mk_arith_neq m1 m2,[],[Proof.Tag.T_lia])
-              | _, None
-              | None, _-> None
-            end
-        end
-      | _ -> None
+    | Lit.Equation (l, r, sign) when Type.equal Type.int (T.ty l) ->
+      begin match T.view l, T.view r with
+        | T.AppBuiltin (Builtin.Remainder_e, [l'; r']), opp
+        | opp, T.AppBuiltin (Builtin.Remainder_e, [l'; r']) ->
+          begin match Monome.Int.of_term l', T.view r', opp with
+            | Some m,
+              T.AppBuiltin (Builtin.Int n,[]),
+              T.AppBuiltin (Builtin.Int opp', [])
+              when Z.sign opp' >= 0 && Z.compare opp' n < 0 ->
+              (* remainder(l1, n) = opp ----> n | l1-opp,
+                 assuming 0<=opp<n *)
+              let m = M.add_const m Z.(rem (~- opp') n) in
+              let lit = Lit.mk_divides ~sign n ~power:1 m in
+              Some (lit,[],[Proof.Tag.T_lia])
+            | Some _,
+              T.AppBuiltin (Builtin.Int n,[]),
+              T.AppBuiltin (Builtin.Int opp', [])
+              when Z.sign opp' < 0 || Z.compare opp' n >= 0 ->
+              (* remainder(l1, n) = opp --> false
+                 assuming opp ∉ [0.. n-1] *)
+              let lit = if sign then Lit.mk_absurd else Lit.mk_tauto in
+              Some (lit,[],[Proof.Tag.T_lia])
+            | _ -> None
+          end
+        | _ ->
+          begin match Monome.Int.of_term l, Monome.Int.of_term r with
+            | Some m1, Some m2 ->
+              if sign
+              then Some (Lit.mk_arith_eq m1 m2,[],[Proof.Tag.T_lia])
+              else Some (Lit.mk_arith_neq m1 m2,[],[Proof.Tag.T_lia])
+            | _, None
+            | None, _-> None
+          end
+      end
+    | _ -> None
 
   (** {3 Others} *)
 
@@ -1688,22 +1688,22 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun acc (lit,_) ->
            (* negate the literal and make a constraint out of it *)
            match lit with
-             | AL.Binary (AL.Lesseq, m1, m2) ->
-               (* m1 ≤ m2 ----> m1-m2 > 0 ---> m1-m2 ≥ 1 *)
-               let m, c = to_rat (M.difference m1 m2) in
-               (Simp.GreaterEq, m, Q.add (Q.neg c) Q.one) :: acc
-             | AL.Binary (AL.Different, m1, m2) ->
-               (* m1 != m2  -----> (m1-m2) = 0 *)
-               let m, c = to_rat (M.difference m1 m2) in
-               (Simp.Eq, m, Q.neg c) :: acc
-             | _ -> acc)
+           | AL.Binary (AL.Lesseq, m1, m2) ->
+             (* m1 ≤ m2 ----> m1-m2 > 0 ---> m1-m2 ≥ 1 *)
+             let m, c = to_rat (M.difference m1 m2) in
+             (Simp.GreaterEq, m, Q.add (Q.neg c) Q.one) :: acc
+           | AL.Binary (AL.Different, m1, m2) ->
+             (* m1 != m2  -----> (m1-m2) = 0 *)
+             let m, c = to_rat (M.difference m1 m2) in
+             (Simp.Eq, m, Q.neg c) :: acc
+           | _ -> acc)
         []
     in
     let simplex = Simp.add_constraints Simp.empty constraints in
     Util.exit_prof prof_arith_semantic_tautology;
     match Simp.ksolve simplex with
-      | Simp.Unsatisfiable _ -> true (* negation unsatisfiable *)
-      | Simp.Solution _ -> false
+    | Simp.Unsatisfiable _ -> true (* negation unsatisfiable *)
+    | Simp.Solution _ -> false
 
   (* cache the result because it's a bit expensive *)
   let is_tautology c =
@@ -1736,31 +1736,31 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* check whether [m] is only one variable with coeff 1 *)
     let is_unary_var m =
       match M.coeffs m with
-        | [c, t] ->
-          begin match T.view t with
-            | T.Var v when Z.(equal c one) && Z.(equal (M.const m) zero) ->
-              Some v
-            | _ -> None
-          end
-        | _ -> None
+      | [c, t] ->
+        begin match T.view t with
+          | T.Var v when Z.(equal c one) && Z.(equal (M.const m) zero) ->
+            Some v
+          | _ -> None
+        end
+      | _ -> None
     in
     try
       Lits.fold_arith ~eligible:C.Eligible.(filter Lit.is_arith_neq) (C.lits c)
       |> Iter.iter
         (fun (lit,pos) ->
            match lit with
-             | AL.Binary (AL.Different, m1, m2) ->
-               begin match is_unary_var m1, is_unary_var m2 with
-                 | Some v1, Some v2 ->
-                   let subst =
-                     S.FO.bind S.empty
-                       ((v1:Type.t HVar.t :> InnerTerm.t HVar.t),0)
-                       (T.var v2,0) in
-                   let i = Lits.Pos.idx pos in
-                   raise (VarElim (i, subst))
-                 | _ -> ()
-               end
-             | _ -> ()
+           | AL.Binary (AL.Different, m1, m2) ->
+             begin match is_unary_var m1, is_unary_var m2 with
+               | Some v1, Some v2 ->
+                 let subst =
+                   S.FO.bind S.empty
+                     ((v1:Type.t HVar.t :> InnerTerm.t HVar.t),0)
+                     (T.var v2,0) in
+                 let i = Lits.Pos.idx pos in
+                 raise (VarElim (i, subst))
+               | _ -> ()
+             end
+           | _ -> ()
         );
       SimplM.return_same c (* could not simplify *)
     with VarElim (i, subst) ->
@@ -1797,36 +1797,36 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Iter.iter
         (fun (lit,i) ->
            match lit with
-             | Lit.Int (AL.Binary (AL.Different, m1, m2))
-               when not (is_singleton_unshielded_var (C.lits c) m1) &&
-                    not (is_singleton_unshielded_var (C.lits c) m2) ->
-               (* translate [m1 ≠ m2] into [m1 < m2 ∨ m1 > m2],
-                  do not do it on a variable that is going to be eliminated. *)
-               assert (eligible i lit);
-               (*Format.printf
-                 "@[<2>lit @[%a [%d]@]@ in @[%a@]@ :is-max %B@ :max_lits %a@]@."
-                 Lit.pp lit i C.pp c (Lits.is_max ~ord (C.lits c) i)
-                 CCBV.print (Lits.maxlits ~ord @@ C.lits c);*)
-               (* FIXME: find why this sometimes fails
-                  assert (Lits.is_max ~ord (C.lits c) i); *)
-               let lits = CCArray.except_idx (C.lits c) i in
-               let new_lits =
-                 [ Lit.mk_arith_lesseq (M.succ m1) m2
-                 ; Lit.mk_arith_lesseq (M.succ m2) m1
-                 ]
-               in
-               let proof =
-                 Proof.Step.inference [C.proof_parent c] ~tags:[Proof.Tag.T_lia]
-                   ~rule:(Proof.Rule.mk "arith_diff_to_lesseq") in
-               let c' =
-                 C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-                   (new_lits @ lits) proof
-               in
-               Util.debugf ~section 5 "@[<2>diff2less:@ @[%a@]@ into @[%a@]@]"
-                 (fun k->k C.pp c C.pp c');
-               raise (DiffToLesseq c')
-             | Lit.Int (AL.Binary (AL.Different, _, _)) -> ()
-             | _ -> assert false
+           | Lit.Int (AL.Binary (AL.Different, m1, m2))
+             when not (is_singleton_unshielded_var (C.lits c) m1) &&
+                  not (is_singleton_unshielded_var (C.lits c) m2) ->
+             (* translate [m1 ≠ m2] into [m1 < m2 ∨ m1 > m2],
+                do not do it on a variable that is going to be eliminated. *)
+             assert (eligible i lit);
+             (*Format.printf
+               "@[<2>lit @[%a [%d]@]@ in @[%a@]@ :is-max %B@ :max_lits %a@]@."
+               Lit.pp lit i C.pp c (Lits.is_max ~ord (C.lits c) i)
+               CCBV.print (Lits.maxlits ~ord @@ C.lits c);*)
+             (* FIXME: find why this sometimes fails
+                assert (Lits.is_max ~ord (C.lits c) i); *)
+             let lits = CCArray.except_idx (C.lits c) i in
+             let new_lits =
+               [ Lit.mk_arith_lesseq (M.succ m1) m2
+               ; Lit.mk_arith_lesseq (M.succ m2) m1
+               ]
+             in
+             let proof =
+               Proof.Step.inference [C.proof_parent c] ~tags:[Proof.Tag.T_lia]
+                 ~rule:(Proof.Rule.mk "arith_diff_to_lesseq") in
+             let c' =
+               C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+                 (new_lits @ lits) proof
+             in
+             Util.debugf ~section 5 "@[<2>diff2less:@ @[%a@]@ into @[%a@]@]"
+               (fun k->k C.pp c C.pp c');
+             raise (DiffToLesseq c')
+           | Lit.Int (AL.Binary (AL.Different, _, _)) -> ()
+           | _ -> assert false
         );
       SimplM.return_same c
     with DiffToLesseq c ->
@@ -1836,8 +1836,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   let canc_diff_imply_lesseq c =
     let c, st = canc_diff_to_lesseq c in
     match st with
-      | `New -> [c]
-      | `Same -> []
+    | `New -> [c]
+    | `Same -> []
 
   (** {6 Variable Elimination Procedure} *)
 
@@ -1877,12 +1877,12 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let map f c =
       {c with
-         a_lit = List.map f c.a_lit;
-         b_lit = List.map f c.b_lit;
-         c_lit = List.map f c.c_lit;
-         d_lit = List.map f c.d_lit;
-         e_lit = List.map f c.e_lit;
-         f_lit = List.map f c.f_lit;
+       a_lit = List.map f c.a_lit;
+       b_lit = List.map f c.b_lit;
+       c_lit = List.map f c.c_lit;
+       d_lit = List.map f c.d_lit;
+       e_lit = List.map f c.e_lit;
+       f_lit = List.map f c.f_lit;
       }
 
     (* map literals to 'a option, and return a list of 'a *)
@@ -2001,52 +2001,52 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* evaluate when the variable is equal to x *)
     let eval_at c x =
       Lit.mk_divides ~power:1 c.lcm x ::
-        map_lits
-          (function
-            | ALF.Left (op, mf, m) ->
-              Lit.mk_arith_op op (M.sum (MF.rest mf) x) m
-            | ALF.Right (op, m, mf) ->
-              Lit.mk_arith_op op m (M.sum (MF.rest mf) x)
-            | ALF.Div d ->
-              Lit.mk_divides ~sign:d.AL.sign d.AL.num
-                ~power:d.AL.power (M.sum (MF.rest d.AL.monome) x)
-          ) c
+      map_lits
+        (function
+          | ALF.Left (op, mf, m) ->
+            Lit.mk_arith_op op (M.sum (MF.rest mf) x) m
+          | ALF.Right (op, m, mf) ->
+            Lit.mk_arith_op op m (M.sum (MF.rest mf) x)
+          | ALF.Div d ->
+            Lit.mk_divides ~sign:d.AL.sign d.AL.num
+              ~power:d.AL.power (M.sum (MF.rest d.AL.monome) x)
+        ) c
 
     (* evaluate when the variable is equal to x, but as small as needed.
         Many literals will become true or false *)
     let eval_minus_infty c x =
       Lit.mk_divides ~power:1 c.lcm x ::
-        map_lits
-          (function
-            | ALF.Left (AL.Different, _, _)
-            | ALF.Right (AL.Different, _, _)
-            | ALF.Left (AL.Lesseq, _, _) -> Lit.mk_tauto
-            | ALF.Left (AL.Equal, _, _)
-            | ALF.Right (AL.Equal, _, _)
-            | ALF.Right (AL.Lesseq, _, _) -> Lit.mk_absurd
-            | ALF.Div d ->
-              Lit.mk_divides ~sign:d.AL.sign d.AL.num
-                ~power:d.AL.power (M.sum (MF.rest d.AL.monome) x)
-            | ALF.Left (AL.Less, _, _) | ALF.Right (AL.Less, _, _) -> assert false
-          ) c
+      map_lits
+        (function
+          | ALF.Left (AL.Different, _, _)
+          | ALF.Right (AL.Different, _, _)
+          | ALF.Left (AL.Lesseq, _, _) -> Lit.mk_tauto
+          | ALF.Left (AL.Equal, _, _)
+          | ALF.Right (AL.Equal, _, _)
+          | ALF.Right (AL.Lesseq, _, _) -> Lit.mk_absurd
+          | ALF.Div d ->
+            Lit.mk_divides ~sign:d.AL.sign d.AL.num
+              ~power:d.AL.power (M.sum (MF.rest d.AL.monome) x)
+          | ALF.Left (AL.Less, _, _) | ALF.Right (AL.Less, _, _) -> assert false
+        ) c
 
     (* evaluate when the variable is equal to x, but as big as needed.
         Many literals will become true or false *)
     let eval_plus_infty c x =
       Lit.mk_divides ~power:1 c.lcm x ::
-        map_lits
-          (function
-            | ALF.Left (AL.Different, _, _)
-            | ALF.Right (AL.Different, _, _)
-            | ALF.Right (AL.Lesseq, _, _) -> Lit.mk_tauto
-            | ALF.Left (AL.Equal, _, _)
-            | ALF.Right (AL.Equal, _, _)
-            | ALF.Left (AL.Lesseq, _, _) -> Lit.mk_absurd
-            | ALF.Div d ->
-              Lit.mk_divides ~sign:d.AL.sign d.AL.num
-                ~power:d.AL.power (M.sum (MF.rest d.AL.monome) x)
-            | ALF.Left (AL.Less, _, _) | ALF.Right (AL.Less, _, _) -> assert false
-          ) c
+      map_lits
+        (function
+          | ALF.Left (AL.Different, _, _)
+          | ALF.Right (AL.Different, _, _)
+          | ALF.Right (AL.Lesseq, _, _) -> Lit.mk_tauto
+          | ALF.Left (AL.Equal, _, _)
+          | ALF.Right (AL.Equal, _, _)
+          | ALF.Left (AL.Lesseq, _, _) -> Lit.mk_absurd
+          | ALF.Div d ->
+            Lit.mk_divides ~sign:d.AL.sign d.AL.num
+              ~power:d.AL.power (M.sum (MF.rest d.AL.monome) x)
+          | ALF.Left (AL.Less, _, _) | ALF.Right (AL.Less, _, _) -> assert false
+        ) c
   end
 
   let _negate_lits = List.map Lit.negate
@@ -2055,86 +2055,86 @@ module Make(E : Env.S) : S with module Env = E = struct
     let module NVE = NakedVarElim in
     let nvars = naked_vars (C.lits c) in
     match nvars with
-      | [] -> None
-      | x::_ ->
-        (* eliminate v *)
-        Util.debugf ~section 3
-          "@[<2>eliminate naked variable %a@ from @[%a@]@]" (fun k->k HVar.pp x C.pp c);
-        (* split C into C' (not containing v) and 6 kinds of literals *)
-        let view = NVE.of_lits (C.lits c) x in
-        let delta, view = NVE.scale view in
-        if not (Z.fits_int delta) then None
-        else begin
-          let delta = Z.to_int delta in
-          let a_set = NVE.a_set view
-          and b_set = NVE.b_set view in
-          (* prepare to build clauses *)
-          let acc = ref [] in
-          let add_clause ~by ~which lits =
-            let infos = UntypedAST.A.([
-                app "var_elim"
-                  [quoted (Z.to_string view.NVE.lcm);
-                   quoted (HVar.to_string_tstp x);
-                   quoted (CCFormat.to_string M.pp by);
-                   quoted which]
-              ])
-            in
-            (* TODO: use substitution (for ∞ cases just take sth high enough) *)
-            let rule = Proof.Rule.mkf "var_elim(%a)" T.pp_var x in
-            let proof = Proof.Step.inference ~tags:[Proof.Tag.T_lia] ~infos ~rule
-                [C.proof_parent c] in
-            let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
-            Util.debugf ~section 5
-              "@[<2>elimination of %s×%a@ by %a (which:%s)@ in @[%a@]:@ gives @[%a@]@]"
-              (fun k->k (Z.to_string view.NVE.lcm)
-                  HVar.pp x M.pp by which C.pp c C.pp new_c);
-            acc := new_c :: !acc
+    | [] -> None
+    | x::_ ->
+      (* eliminate v *)
+      Util.debugf ~section 3
+        "@[<2>eliminate naked variable %a@ from @[%a@]@]" (fun k->k HVar.pp x C.pp c);
+      (* split C into C' (not containing v) and 6 kinds of literals *)
+      let view = NVE.of_lits (C.lits c) x in
+      let delta, view = NVE.scale view in
+      if not (Z.fits_int delta) then None
+      else begin
+        let delta = Z.to_int delta in
+        let a_set = NVE.a_set view
+        and b_set = NVE.b_set view in
+        (* prepare to build clauses *)
+        let acc = ref [] in
+        let add_clause ~by ~which lits =
+          let infos = UntypedAST.A.([
+              app "var_elim"
+                [quoted (Z.to_string view.NVE.lcm);
+                 quoted (HVar.to_string_tstp x);
+                 quoted (CCFormat.to_string M.pp by);
+                 quoted which]
+            ])
           in
-          (* choose which form to use *)
-          if List.length a_set > List.length b_set
-          then begin
-            (* use B *)
-            Util.debug ~section 5 "use the B elimination algorithm";
-            (* first, the -infty part *)
-            for i = 1 to delta do
-              let x' = M.Int.const (Z.of_int i) in
-              let lits = view.NVE.rest @
-                  _negate_lits (NVE.eval_minus_infty view x') in
-              add_clause ~by:x' ~which:"-∝" lits
-            done;
-            (* then the enumeration *)
-            for i = 1 to delta do
-              List.iter
-                (fun x' ->
-                   (* evaluate at x'+i *)
-                   let x'' = M.add_const x' Z.(of_int i) in
-                   let lits = view.NVE.rest @ _negate_lits (NVE.eval_at view x'') in
-                   add_clause ~by:x'' ~which:"middle" lits
-                ) b_set
-            done;
-          end else begin
-            (* use A *)
-            Util.debug ~section 5 "use the A elimination algorithm";
-            (* first, the +infty part *)
-            for i = 1 to delta do
-              let x' = M.Int.const Z.(neg (of_int i)) in
-              let lits = view.NVE.rest @
-                  _negate_lits (NVE.eval_plus_infty view x') in
-              add_clause ~by:x' ~which:"+∝" lits
-            done;
-            (* then the enumeration *)
-            for i = 1 to delta do
-              List.iter
-                (fun x' ->
-                   (* evaluate at x'-i *)
-                   let x'' = M.add_const x' Z.(neg (of_int i)) in
-                   let lits = view.NVE.rest @ _negate_lits (NVE.eval_at view x'') in
-                   add_clause ~by:x'' ~which:"middle" lits
-                ) a_set
-            done;
-          end;
-          Some !acc
-        end
+          (* TODO: use substitution (for ∞ cases just take sth high enough) *)
+          let rule = Proof.Rule.mkf "var_elim(%a)" T.pp_var x in
+          let proof = Proof.Step.inference ~tags:[Proof.Tag.T_lia] ~infos ~rule
+              [C.proof_parent c] in
+          let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
+          Util.debugf ~section 5
+            "@[<2>elimination of %s×%a@ by %a (which:%s)@ in @[%a@]:@ gives @[%a@]@]"
+            (fun k->k (Z.to_string view.NVE.lcm)
+                HVar.pp x M.pp by which C.pp c C.pp new_c);
+          acc := new_c :: !acc
+        in
+        (* choose which form to use *)
+        if List.length a_set > List.length b_set
+        then begin
+          (* use B *)
+          Util.debug ~section 5 "use the B elimination algorithm";
+          (* first, the -infty part *)
+          for i = 1 to delta do
+            let x' = M.Int.const (Z.of_int i) in
+            let lits = view.NVE.rest @
+                       _negate_lits (NVE.eval_minus_infty view x') in
+            add_clause ~by:x' ~which:"-∝" lits
+          done;
+          (* then the enumeration *)
+          for i = 1 to delta do
+            List.iter
+              (fun x' ->
+                 (* evaluate at x'+i *)
+                 let x'' = M.add_const x' Z.(of_int i) in
+                 let lits = view.NVE.rest @ _negate_lits (NVE.eval_at view x'') in
+                 add_clause ~by:x'' ~which:"middle" lits
+              ) b_set
+          done;
+        end else begin
+          (* use A *)
+          Util.debug ~section 5 "use the A elimination algorithm";
+          (* first, the +infty part *)
+          for i = 1 to delta do
+            let x' = M.Int.const Z.(neg (of_int i)) in
+            let lits = view.NVE.rest @
+                       _negate_lits (NVE.eval_plus_infty view x') in
+            add_clause ~by:x' ~which:"+∝" lits
+          done;
+          (* then the enumeration *)
+          for i = 1 to delta do
+            List.iter
+              (fun x' ->
+                 (* evaluate at x'-i *)
+                 let x'' = M.add_const x' Z.(neg (of_int i)) in
+                 let lits = view.NVE.rest @ _negate_lits (NVE.eval_at view x'') in
+                 add_clause ~by:x'' ~which:"middle" lits
+              ) a_set
+          done;
+        end;
+        Some !acc
+      end
 
   (** {2 Setup} *)
 

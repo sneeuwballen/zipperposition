@@ -4,9 +4,9 @@
 
     This module is used for two things that overlap:
     - inferring the types of symbols that have not been declared (e.g. in
-    "fof" or "cnf" TPTP statements) so as to enrich a {!Signature}
+      "fof" or "cnf" TPTP statements) so as to enrich a {!Signature}
     - converting {i untyped} terms or formulas into {i typed} formulas, by inferring
-    the exact type of each subterm (and possibly inferring type parameters).
+      the exact type of each subterm (and possibly inferring type parameters).
 
     In this context, {b generalizing} type variables means that if some ID.t
     whose type was unknown and its type still contains variables after the

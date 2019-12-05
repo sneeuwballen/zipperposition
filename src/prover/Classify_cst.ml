@@ -78,30 +78,30 @@ let prec_constr_ a b =
   let c_a = classify a in
   let c_b = classify b in
   match c_a, c_b with
-    | Ty _, Ty _
-    | Cstor _, Cstor _
-    | Projector _, Projector _
-    | Skolem, Skolem
-    | Other, Other -> 0
-    | Parameter i, Parameter j -> CCOrd.int i j (* by mere index *)
-    | Inductive_cst c1, Inductive_cst c2 ->
-      (* Inductive_cst cases should be compared by "sub-case" order (i.e. `x
-         sub-cst-of y` means `x < y`); this is a stable ordering. *)
-      if dominates_ c1 c2 then 1
-      else if dominates_ c2 c1 then -1
-      else 0
-    | DefinedCst (l1,_), DefinedCst (l2,_) ->
-      (* bigger level means defined later *)
-      CCInt.compare l1 l2
-    | Ty _, _
-    | Cstor _, _
-    | Inductive_cst _, _
-    | Parameter _, _
-    | Projector _, _
-    | DefinedCst _, _
-    | Skolem, _
-    | Other, _
-      -> CCInt.compare (to_int_ c_a) (to_int_ c_b)
+  | Ty _, Ty _
+  | Cstor _, Cstor _
+  | Projector _, Projector _
+  | Skolem, Skolem
+  | Other, Other -> 0
+  | Parameter i, Parameter j -> CCOrd.int i j (* by mere index *)
+  | Inductive_cst c1, Inductive_cst c2 ->
+    (* Inductive_cst cases should be compared by "sub-case" order (i.e. `x
+       sub-cst-of y` means `x < y`); this is a stable ordering. *)
+    if dominates_ c1 c2 then 1
+    else if dominates_ c2 c1 then -1
+    else 0
+  | DefinedCst (l1,_), DefinedCst (l2,_) ->
+    (* bigger level means defined later *)
+    CCInt.compare l1 l2
+  | Ty _, _
+  | Cstor _, _
+  | Inductive_cst _, _
+  | Parameter _, _
+  | Projector _, _
+  | DefinedCst _, _
+  | Skolem, _
+  | Other, _
+    -> CCInt.compare (to_int_ c_a) (to_int_ c_b)
 
 let prec_constr = Precedence.Constr.make prec_constr_
 

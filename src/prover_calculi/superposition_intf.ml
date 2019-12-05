@@ -38,12 +38,12 @@ module type S = sig
 
   val extract_from_stream_queue: Env.generate_rule
   (** Extracts at most as many clauses from the stream queue as there are
-  streams in the queue. If called with [~full=true] extracts only one clause
-  but may loop forever. *)
+      streams in the queue. If called with [~full=true] extracts only one clause
+      but may loop forever. *)
 
   val extract_from_stream_queue_fix_stm: Env.generate_rule
   (** Same as [extract_from_stream_queue] with a different extraction heuristic
-  If possible, all clauses are taken from the first stream *)
+      If possible, all clauses are taken from the first stream *)
 
   (** {6 Simplifications rules} *)
 

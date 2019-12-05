@@ -264,14 +264,14 @@ module Subsumption = struct
         matching2 ~subst l1 r1 sc1 l2 r2 sc2
           (fun (subst, c1, c2) ->
              if Q.(equal
-                   (c1 * (M.const r1 - M.const l1))
-                   (c2 * (M.const r2 - M.const l2)))
+                     (c1 * (M.const r1 - M.const l1))
+                     (c2 * (M.const r2 - M.const l2)))
              then k subst);
         matching2 ~subst l1 r1 sc1 r2 l2 sc2
           (fun (subst, c1, c2) ->
              if Q.(equal
-                   (c1 * (M.const r1 - M.const l1))
-                   (c2 * (M.const l2 - M.const r2)))
+                     (c1 * (M.const r1 - M.const l1))
+                     (c2 * (M.const l2 - M.const r2)))
              then k subst)
       | Equal, Less ->
         (* l1=r1  can subsume l2<r2 if
@@ -280,8 +280,8 @@ module Subsumption = struct
         matching2 ~subst l1 r1 sc1 l2 r2 sc2
           (fun (subst, c1, c2) ->
              if Q.(lt
-                   (c1 * (M.const r1 - M.const l1))
-                   (c2 * (M.const r2 - M.const l2)))
+                     (c1 * (M.const r1 - M.const l1))
+                     (c2 * (M.const r2 - M.const l2)))
              then k subst)
       | Less, Less ->
         (* if subst(r1 - l1) = r2-l2 - k where k≥0, then l1<r1 => l2+k<r2 => l2<r2
@@ -292,8 +292,8 @@ module Subsumption = struct
                  l1-r1 = l2-r2. Now lit1= l1-r1 < r1.const-l1.const,
                  so if r1.const-l1.const < r2.const - l2.const then lit1 => lit2 *)
              if Q.(leq
-                   (c1 * (M.const r1 - M.const l1))
-                   (c2 * (M.const r2 - M.const l2)))
+                     (c1 * (M.const r1 - M.const l1))
+                     (c2 * (M.const r2 - M.const l2)))
              then k subst);
       | _ -> () (* fail *)
     end
@@ -312,8 +312,8 @@ let apply_subst renaming subst (lit,scope) =
 
 let apply_subst_no_simp renaming subst (lit,sc) =
   {lit with
-     left=M.apply_subst_no_simp renaming subst (lit.left, sc);
-     right=M.apply_subst_no_simp renaming subst (lit.right, sc);
+   left=M.apply_subst_no_simp renaming subst (lit.left, sc);
+   right=M.apply_subst_no_simp renaming subst (lit.right, sc);
   }
 
 let is_trivial lit = match lit.op with
@@ -418,8 +418,8 @@ module Focus = struct
         Some (Left (lit.op, mf1, lit.right))
       | None ->
         match M.Focus.focus_term lit.right t with
-          | None -> None
-          | Some mf2 -> Some (Right (lit.op, lit.left, mf2))
+        | None -> None
+        | Some mf2 -> Some (Right (lit.op, lit.left, mf2))
     end
 
   let focus_term_exn lit t = match focus_term lit t with

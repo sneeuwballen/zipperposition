@@ -45,6 +45,6 @@ module Inner : sig
   val eta_expand : term -> term
 
   val eta_reduce : ?full:bool -> term -> term
-  
+
   val beta_red_head : term -> term
 end

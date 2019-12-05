@@ -42,7 +42,7 @@ let check file =
     Format.printf "# file `%s`@." file;
   ) else (
     (* print_line ();
-    Format.printf "checking file `%s`...@." file; *)
+       Format.printf "checking file `%s`...@." file; *)
     ()
   );
   let input = Parsing_utils.input_of_file file in
@@ -54,15 +54,15 @@ let check file =
     ~implicit_ty_args:(Input_format.implicit_ty_args input)
     ?ctx:None
   >>= (fun decls -> decls
-    |> CCVector.to_seq
-    |> Cnf.cnf_of_seq ~ctx:(Skolem.create ())
-    |> CCVector.to_seq
-    |> Cnf.convert
-    |> CCResult.return) >>= (fun stmts -> CCVector.to_seq stmts |> Iter.flat_map Statement.Seq.terms |>
-                            (fun trm -> try ignore(Iter.for_all Term.in_lfho_fragment trm); ""
-                                        with Failure msg -> msg) |>
-                            fun x -> if (x = "") then CCResult.return ()
-                                     else CCResult.fail ("FAIL: " ^ x))
+                    |> CCVector.to_seq
+                    |> Cnf.cnf_of_seq ~ctx:(Skolem.create ())
+                    |> CCVector.to_seq
+                    |> Cnf.convert
+                    |> CCResult.return) >>= (fun stmts -> CCVector.to_seq stmts |> Iter.flat_map Statement.Seq.terms |>
+                                                          (fun trm -> try ignore(Iter.for_all Term.in_lfho_fragment trm); ""
+                                                            with Failure msg -> msg) |>
+                                                          fun x -> if (x = "") then CCResult.return ()
+                                                          else CCResult.fail ("FAIL: " ^ x))
 let main () =
   CCFormat.set_color_default true;
   let files = ref [] in
@@ -76,13 +76,13 @@ let main () =
       () !files;
   in
   match res with
-    | Err.Ok () ->
-      if not !dump then (
-        (* print_line (); *)
-        print_endline "OK."
-      )
-    | Err.Error msg ->
-      print_endline msg
+  | Err.Ok () ->
+    if not !dump then (
+      (* print_line (); *)
+      print_endline "OK."
+    )
+  | Err.Error msg ->
+    print_endline msg
 
 let _ =
   main ()

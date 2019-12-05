@@ -399,8 +399,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
           |> Cut_form.cs
           |> Util.map_product
             ~f:(fun lits ->
-              let lits = Array.map (fun l -> [Literal.negate l]) lits in
-              Array.to_list lits)
+                let lits = Array.map (fun l -> [Literal.negate l]) lits in
+                Array.to_list lits)
           |> CCList.map
             (fun l ->
                let lits = Array.of_list l in
@@ -594,14 +594,14 @@ let () =
     ; "--no-avatar-backward-simp-trail", Arg.Clear back_simplify_trail_, " do not backward-simplify boolean trails in Avatar"
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
-    enabled_ := false
-  );
+      enabled_ := false
+    );
   Params.add_to_mode "ho-pragmatic" (fun () ->
-    enabled_ := false
-  );
+      enabled_ := false
+    );
   Params.add_to_mode "ho-competitive" (fun () ->
-    enabled_ := false
-  );
+      enabled_ := false
+    );
   Params.add_to_mode "fo-complete-basic" (fun () ->
-    enabled_ := false
-  );
+      enabled_ := false
+    );

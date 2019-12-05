@@ -153,9 +153,9 @@ module Make(Var: OrderedType) = struct
       t
     else
       { t with
-          tab = List.map (fun l -> Q.zero :: l) t.tab;
-          nbasic = x :: t.nbasic;
-          assign = M.add x Q.zero t.assign;
+        tab = List.map (fun l -> Q.zero :: l) t.tab;
+        nbasic = x :: t.nbasic;
+        assign = M.add x Q.zero t.assign;
       }
 
   let add_vars t l = List.fold_left add_var t l
@@ -167,8 +167,8 @@ module Make(Var: OrderedType) = struct
     let l_eq = List.map (fun (c, x) -> List.map Q.(fun y -> c * y) (find_expr_total t x)) eq in
     let t_eq = List.fold_left (List.map2 Q.(+)) (empty_expr (List.length t.nbasic)) l_eq in
     { t with
-        tab = t_eq :: t.tab;
-        basic = s :: t.basic;
+      tab = t_eq :: t.tab;
+      basic = s :: t.basic;
     }
 
   let add_bound_aux t (x, low, upp) =
@@ -243,9 +243,9 @@ module Make(Var: OrderedType) = struct
         (fun b z -> if Var.compare y z = 0 then Q.inv a else Q.neg Q.(div b a))
         (find_expr_basic t x) t.nbasic in
     List.map2 (fun z e ->
-      if Var.compare x z = 0 then l else
-        let k, l' = find_and_replace y e t.nbasic in
-        List.map2 Q.(+) l' (List.map Q.(fun n -> k * n) l)) t.basic t.tab
+        if Var.compare x z = 0 then l else
+          let k, l' = find_and_replace y e t.nbasic in
+          List.map2 Q.(+) l' (List.map Q.(fun n -> k * n) l)) t.basic t.tab
 
   let subst x y l = List.map (fun z -> if Var.compare x z = 0 then y else z) l
 
@@ -274,10 +274,10 @@ module Make(Var: OrderedType) = struct
       solve_aux f t;
       Solution (get_full_assign t)
     with
-      | Unsat x ->
-        Unsatisfiable (x, List.combine (find_expr_basic t x) t.nbasic)
-      | AbsurdBounds x ->
-        Unsatisfiable (x, [])
+    | Unsat x ->
+      Unsatisfiable (x, List.combine (find_expr_basic t x) t.nbasic)
+    | AbsurdBounds x ->
+      Unsatisfiable (x, [])
 
   (* TODO: is there a better way to do this ? *)
   let is_z v = Z.equal (Q.den v) Z.one
@@ -421,17 +421,17 @@ module Make(Var: OrderedType) = struct
             Queue.push (t.bounds, (x, Q.minus_inf, Q.of_bigint v'), under) to_do;
           end
         with
-          | Unsat x ->
-            res := Some (Explanation (x, List.combine (find_expr_basic t x) t.nbasic))
-          | AbsurdBounds x ->
-            res := Some (Explanation(x, []))
+        | Unsat x ->
+          res := Some (Explanation (x, List.combine (find_expr_basic t x) t.nbasic))
+        | AbsurdBounds x ->
+          res := Some (Explanation(x, []))
       done;
       raise (UnExpected "")
     with
-      | Queue.Empty ->
-        Unsatisfiable final
-      | SolutionFound sol ->
-        Solution sol
+    | Queue.Empty ->
+      Unsatisfiable final
+    | SolutionFound sol ->
+      Solution sol
 
   let nsolve t int_vars =
     let init_bounds = t.bounds in
@@ -551,25 +551,25 @@ module MakeHelp(Var : OrderedType) = struct
          (* obtain one coefficient and variable that have bounds *)
          let var, coeff, simpl =
            match m with
-             | [c,v] -> v, c, simpl
-             | _ ->
-               let v = fresh_var () in
-               let simpl = add_eq simpl (v, m) in
-               v, Q.one, simpl
+           | [c,v] -> v, c, simpl
+           | _ ->
+             let v = fresh_var () in
+             let simpl = add_eq simpl (v, m) in
+             v, Q.one, simpl
          in
          (* add bounds for the selected variable *)
          assert(Q.sign coeff <> 0);
          let const' = Q.div const coeff in
          match op with
-           | Eq -> add_bounds simpl (var,const',const')
-           | LessEq ->
-             (* beware the multiplication by a negative number *)
-             if Q.sign coeff < 0
-             then add_bounds simpl (var,const',Q.inf)
-             else add_bounds simpl (var,Q.minus_inf,const')
-           | GreaterEq ->
-             if Q.sign coeff < 0
-             then add_bounds simpl (var,Q.minus_inf,const')
-             else add_bounds simpl (var,const',Q.inf)
+         | Eq -> add_bounds simpl (var,const',const')
+         | LessEq ->
+           (* beware the multiplication by a negative number *)
+           if Q.sign coeff < 0
+           then add_bounds simpl (var,const',Q.inf)
+           else add_bounds simpl (var,Q.minus_inf,const')
+         | GreaterEq ->
+           if Q.sign coeff < 0
+           then add_bounds simpl (var,Q.minus_inf,const')
+           else add_bounds simpl (var,const',Q.inf)
       ) simpl l
 end

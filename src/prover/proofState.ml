@@ -103,11 +103,11 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
 
     let remove seq =
       seq (fun c ->
-        if C.ClauseSet.mem c !clauses_
-        then (
-          clauses_ := C.ClauseSet.remove c !clauses_;
-          Signal.send on_remove_clause c
-        ));
+          if C.ClauseSet.mem c !clauses_
+          then (
+            clauses_ := C.ClauseSet.remove c !clauses_;
+            Signal.send on_remove_clause c
+          ));
       ()
   end
 

@@ -59,9 +59,9 @@ let () =
   in
   let res = process file in
   match res with
-    | CCResult.Ok () -> ()
-    | CCResult.Error msg ->
-      print_endline msg;
-      exit 1
+  | CCResult.Ok () -> ()
+  | CCResult.Error msg ->
+    print_endline msg;
+    exit 1
 
 

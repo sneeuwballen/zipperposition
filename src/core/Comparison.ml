@@ -51,8 +51,8 @@ let (++) = lexico
 
 let (@>>) f g x y =
   match f x y with
-    | Eq -> g x y
-    | res -> res
+  | Eq -> g x y
+  | res -> res
 
 type ('a,'b) combination = {
   call : 'a -> 'a -> 'b;
@@ -66,9 +66,9 @@ let last f = {
 
 let (>>>) f g = {
   call = (fun x y -> match f x y with
-    | Incomparable -> g.call
-    | res -> g.ignore res
-  );
+      | Incomparable -> g.call
+      | res -> g.ignore res
+    );
   ignore = (fun res _ _ -> g.ignore res);
 }
 
@@ -79,8 +79,8 @@ let dominates f l1 l2 =
     | [] -> false
     | x::l1' ->
       match f x y with
-        | Gt -> true
-        | _ -> find_x l1' y
+      | Gt -> true
+      | _ -> find_x l1' y
   and check_all l2 = match l2 with
     | [] -> true
     | y :: l2' -> find_x l1 y && check_all l2'

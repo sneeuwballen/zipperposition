@@ -60,7 +60,7 @@ let _modes = Hashtbl.create 10
 let mode_spec () =
   Arg.Symbol 
     (List.sort_uniq String.compare (CCHashtbl.keys_list _modes), 
-    fun s -> List.iter (fun f -> f ()) (Hashtbl.find_all _modes s))
+     fun s -> List.iter (fun f -> f ()) (Hashtbl.find_all _modes s))
 let add_to_mode mode f = 
   Hashtbl.add _modes mode f
 
@@ -120,7 +120,7 @@ let parse_args () =
     ; "--ho-eta", eta_opt, " eta-expansion/reduction"
     ] @ Options.make ()
   ) |> List.sort (fun (s1,_,_)(s2,_,_) -> String.compare s1 s2)
-                |> Arg.align
+    |> Arg.align
   in
   Arg.parse options add_file "solve problems in files";
   if CCVector.is_empty files then (

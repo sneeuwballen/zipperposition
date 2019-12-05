@@ -50,15 +50,15 @@ end = struct
   let compare f1 f2 : int =
     let to_int = function N _ -> 0 | S _ -> 1 | M _ -> 2 | L _ -> 3 in
     match f1, f2 with
-      | N i1, N i2 -> CCInt.compare i1 i2
-      | S s1, S s2 -> ID.Set.compare s1 s2
-      | M m1, M m2 -> ID.Map.compare CCInt.compare m1 m2
-      | L m1, L m2 -> Util.Int_set.compare m1 m2
-      | N _, _
-      | S _, _
-      | M _, _
-      | L _, _
-        -> CCInt.compare (to_int f1)(to_int f2)
+    | N i1, N i2 -> CCInt.compare i1 i2
+    | S s1, S s2 -> ID.Set.compare s1 s2
+    | M m1, M m2 -> ID.Map.compare CCInt.compare m1 m2
+    | L m1, L m2 -> Util.Int_set.compare m1 m2
+    | N _, _
+    | S _, _
+    | M _, _
+    | L _, _
+      -> CCInt.compare (to_int f1)(to_int f2)
 
   let equal f1 f2 = compare f1 f2 = 0
 
@@ -182,10 +182,10 @@ module Make(C: Index_intf.CLAUSE) = struct
     let symbols_depth_ filter lits : (ID.t * int) Iter.t =
       (* ignores app vars and does not count opening the functions *)
       let subterms_depth t k =
-      let rec recurse depth t =
-        if not (T.is_app_var t) then  (
-          k (t, depth);
-          match T.view t with
+        let rec recurse depth t =
+          if not (T.is_app_var t) then  (
+            k (t, depth);
+            match T.view t with
             | Const _
             | DB _
             | Var _ -> ()
@@ -195,9 +195,9 @@ module Make(C: Index_intf.CLAUSE) = struct
             | App (hd, l) ->
               recurse depth hd;
               List.iter (recurse (depth+1)) l)
-      in
-      recurse 0 t in
-    
+        in
+        recurse 0 t in
+
       lits
       |> Iter.filter filter
       |> Iter.flat_map SLiteral.to_seq
@@ -371,19 +371,19 @@ module Make(C: Index_intf.CLAUSE) = struct
   let retrieve_subsuming idx lits labels f: unit =
     retrieve_ idx lits labels f
       ~check:(fun ~feat_query ~feat_tree ->
-        Feature.leq feat_tree feat_query)
+          Feature.leq feat_tree feat_query)
 
   (* clauses that are subsumed (potentially) by the given clause *)
   let retrieve_subsumed idx lits labels f: unit =
     retrieve_ idx lits labels f
       ~check:(fun ~feat_query ~feat_tree ->
-        Feature.leq feat_query feat_tree)
+          Feature.leq feat_query feat_tree)
 
   (* clauses that are potentially alpha-equivalent to the given clause*)
   let retrieve_alpha_equiv idx lits labels f: unit =
     retrieve_ idx lits labels f
       ~check:(fun ~feat_query ~feat_tree ->
-        Feature.equal feat_query feat_tree)
+          Feature.equal feat_query feat_tree)
 
   let retrieve_subsuming_c idx c f =
     retrieve_subsuming idx (C.to_lits c) (C.labels c) f

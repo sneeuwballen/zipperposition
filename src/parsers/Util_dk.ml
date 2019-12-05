@@ -36,6 +36,6 @@ let parse_file file : parser_res =
            parse_lexbuf_ lexbuf)
       |> E.return
     with
-      | Sys_error e ->
-        E.fail (Util.err_spf "sys_error when parsing `%s`:@ %s" file e)
-      | e -> E.of_exn e
+    | Sys_error e ->
+      E.fail (Util.err_spf "sys_error when parsing `%s`:@ %s" file e)
+    | e -> E.of_exn e

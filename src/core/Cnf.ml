@@ -99,14 +99,14 @@ module Flatten = struct
     : type a b. a t -> (a -> b t) -> b t
     = fun seq f subst yield ->
       seq subst (fun (subst,x) ->
-        f x subst (fun (subst',y) ->
-          yield (T.Subst.merge subst subst',y)))
+          f x subst (fun (subst',y) ->
+              yield (T.Subst.merge subst subst',y)))
 
   let (>|=)
     : type a b. a t -> (a -> b) -> b t
     = fun seq f subst yield ->
       seq subst (fun (subst,x) ->
-        yield (subst,f x))
+          yield (subst,f x))
 
   let (<*>)
     : ('a -> 'b) t -> 'a t -> 'b t
@@ -258,7 +258,7 @@ module Flatten = struct
             begin
               (add_subst (Var.Subst.singleton x F.true_) >>= fun () -> aux pos vars b)
               <+>
-                (add_subst (Var.Subst.singleton x F.false_) >>= fun () -> aux pos vars c)
+              (add_subst (Var.Subst.singleton x F.false_) >>= fun () -> aux pos vars c)
             end
           | _ ->
             (* give a name to [if a b c] *)
@@ -363,8 +363,8 @@ module Flatten = struct
             ]
         in aux_maybe_define ~should_define pos f
       | T.AppBuiltin (Builtin.Eq, [a;b]) 
-          when  (T.is_fun a || T.is_fun b)
-                &&  not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a)))  (* false *) ->
+        when  (T.is_fun a || T.is_fun b)
+           &&  not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a)))  (* false *) ->
         (* turn [f = λx. t] into [∀x. f x=t] *)
         let vars_forall, a, b = complete_eq a b in
         let t' = F.forall_l vars_forall (F.eq_or_equiv a b) in
@@ -374,10 +374,10 @@ module Flatten = struct
         aux pos vars t'
       | T.AppBuiltin (Builtin.Eq, [a;b]) ->
         (F.eq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
-        (* >|= aux_maybe_define ~should_define pos *)
+      (* >|= aux_maybe_define ~should_define pos *)
       | T.AppBuiltin (Builtin.Neq, [a;b]) 
         when  (T.is_fun a || T.is_fun b) 
-              &&  not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a)))   (*false*) ->
+           &&  not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a)))   (*false*) ->
         (* turn [f ≠ λx. t] into [∃x. f x≠t] *)
         let vars_exist, a, b = complete_eq a b in
         let t' = F.exists_l vars_exist (F.neq_or_xor a b) in
@@ -387,16 +387,16 @@ module Flatten = struct
         aux pos vars t'
       | T.AppBuiltin (Builtin.Neq, [a;b]) ->
         (F.neq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
-        (* >|= aux_maybe_define pos *)
+      (* >|= aux_maybe_define pos *)
       | T.AppBuiltin (Builtin.Imply, [a;b]) ->
         (F.imply <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
-        (* >|= aux_maybe_define pos *)
+      (* >|= aux_maybe_define pos *)
       | T.AppBuiltin (Builtin.Equiv, [a;b]) ->
         (F.equiv <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
-        (* >|= aux_maybe_define pos *)
+      (* >|= aux_maybe_define pos *)
       | T.AppBuiltin (Builtin.Xor, [a;b]) ->
         (F.xor <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
-        (* >|= aux_maybe_define pos *)
+      (* >|= aux_maybe_define pos *)
       | T.AppBuiltin (Builtin.And, l) ->
         if pos = Pos_inner && CCList.length l <= 1 then return t
         else (F.and_ <$> map_m (aux Pos_toplevel vars) l) (*>|= aux_maybe_define pos*)
@@ -427,16 +427,16 @@ module Flatten = struct
       assert (T.Ty.is_prop (T.ty_exn f));
       if (not should_define) then f
       else 
-      begin match pos with
-        | Pos_toplevel -> f
-        | Pos_inner ->
-          let def =
-            Skolem.define_form f ~ctx ~rw_rules:true ~polarity:`Both
-              ~parents:[Stmt.as_proof_i stmt |> Proof.Parent.from]
-              ~pattern:(mk_pat "form")
-          in
-          def.Skolem.proxy
-      end
+        begin match pos with
+          | Pos_toplevel -> f
+          | Pos_inner ->
+            let def =
+              Skolem.define_form f ~ctx ~rw_rules:true ~polarity:`Both
+                ~parents:[Stmt.as_proof_i stmt |> Proof.Parent.from]
+                ~pattern:(mk_pat "form")
+            in
+            def.Skolem.proxy
+        end
     in
     Util.debugf ~section 5 "@[<2>flatten_rec@ `@[%a@]`@ vars: (@[%a@])@]"
       (fun k->k T.pp t (Util.pp_list Var.pp_fullc) vars);
@@ -503,48 +503,48 @@ let miniscope ?(distribute_exists=false) f =
 let rec nnf f =
   Util.debugf ~section 5 "@[<2>nnf of@ `@[%a@]`@]" (fun k->k T.pp f);
   match F.view f with
-    | F.Atom _
-    | F.Neq _
-    | F.Eq _
-    | F.True
-    | F.False -> f
-    | F.Not f' ->
-      begin match F.view f' with
-        | F.Not f'' -> nnf f''
-        | F.Neq (a,b) -> F.eq a b
-        | F.Eq (a,b) -> F.neq a b
-        | F.And l ->
-          F.or_ (List.map (fun f -> nnf (F.not_ f)) l)
-        | F.Or l ->
-          F.and_ (List.map (fun f -> nnf (F.not_ f)) l)
-        | F.Xor (a,b) ->
-          nnf (F.equiv a b)
-        | F.Equiv (a,b) ->
-          nnf (F.xor a b)
-        | F.Imply (a,b) -> (* not (a=>b)  is a and not b *)
-          nnf (F.and_ [a; F.not_ b])
-        | F.Forall (var, f'') ->
-          F.exists var (nnf (F.not_ f''))
-        | F.Exists (var, f'') ->
-          F.forall var (nnf (F.not_ f''))
-        | F.True -> F.false_
-        | F.False -> F.true_
-        | F.Atom _ -> f
-      end
-    | F.And l -> F.and_ (List.map nnf l)
-    | F.Or l -> F.or_ (List.map nnf l)
-    | F.Imply (f1, f2) ->
-      nnf (F.or_ [ (F.not_ f1); f2 ])
-    | F.Equiv(f1,f2) ->
-      (* equivalence with positive polarity *)
-      nnf (F.and_
-          [ F.imply f1 f2; F.imply f2 f1 ])
-    | F.Xor (f1,f2) ->
-      (* equivalence with negative polarity *)
-      nnf (F.and_
-          [ F.or_ [f1; f2]; F.or_ [F.not_ f1; F.not_ f2] ])
-    | F.Forall (var,f') -> F.forall var (nnf f')
-    | F.Exists (var,f') -> F.exists var (nnf f')
+  | F.Atom _
+  | F.Neq _
+  | F.Eq _
+  | F.True
+  | F.False -> f
+  | F.Not f' ->
+    begin match F.view f' with
+      | F.Not f'' -> nnf f''
+      | F.Neq (a,b) -> F.eq a b
+      | F.Eq (a,b) -> F.neq a b
+      | F.And l ->
+        F.or_ (List.map (fun f -> nnf (F.not_ f)) l)
+      | F.Or l ->
+        F.and_ (List.map (fun f -> nnf (F.not_ f)) l)
+      | F.Xor (a,b) ->
+        nnf (F.equiv a b)
+      | F.Equiv (a,b) ->
+        nnf (F.xor a b)
+      | F.Imply (a,b) -> (* not (a=>b)  is a and not b *)
+        nnf (F.and_ [a; F.not_ b])
+      | F.Forall (var, f'') ->
+        F.exists var (nnf (F.not_ f''))
+      | F.Exists (var, f'') ->
+        F.forall var (nnf (F.not_ f''))
+      | F.True -> F.false_
+      | F.False -> F.true_
+      | F.Atom _ -> f
+    end
+  | F.And l -> F.and_ (List.map nnf l)
+  | F.Or l -> F.or_ (List.map nnf l)
+  | F.Imply (f1, f2) ->
+    nnf (F.or_ [ (F.not_ f1); f2 ])
+  | F.Equiv(f1,f2) ->
+    (* equivalence with positive polarity *)
+    nnf (F.and_
+           [ F.imply f1 f2; F.imply f2 f1 ])
+  | F.Xor (f1,f2) ->
+    (* equivalence with negative polarity *)
+    nnf (F.and_
+           [ F.or_ [f1; f2]; F.or_ [F.not_ f1; F.not_ f2] ])
+  | F.Forall (var,f') -> F.forall var (nnf f')
+  | F.Exists (var,f') -> F.exists var (nnf f')
 
 let skolemize ~ctx f =
   Util.enter_prof prof_skolemize;
@@ -679,7 +679,7 @@ let rec will_yield_lit f =
       | F.True | F.False -> true
       | _ -> false in
     is_tf a && is_tf b
-    
+
 
 (* introduce definitions for sub-formulas of [f], is needed. This might
    modify [ctx] by adding definitions to it, and it will {!NOT} introduce
@@ -1202,54 +1202,54 @@ let cnf_of_seq ~ctx ?(opts=[])  seq =
        let proof = Stmt.proof_step stmt in
        let attrs = Stmt.attrs stmt in
        match stmt.Stmt.view with
-         | Stmt.Assert f ->
-           let proof = proof_cnf stmt in
-           List.iter
-             (fun c -> CCVector.push res (Stmt.assert_ ~attrs ~proof c))
-             (conv_form f)
-         | Stmt.Def l ->
-           let l =
-             List.map
-               (fun d ->
-                  let rules =
-                    d.Stmt.def_rules |> CCList.flat_map conv_def
-                  in
-                  { d with Stmt.def_rules = rules })
-               l
-           in
-           CCVector.push res (Stmt.def ~attrs ~proof l);
-         | Stmt.Rewrite d ->
-           let st_l =
-             conv_def d
-             |> List.map (Stmt.rewrite ~attrs ~proof)
-           in
-           CCVector.append_list res st_l;
-         | Stmt.Data l ->
-           CCVector.push res (Stmt.data ~attrs ~proof l)
-         | Stmt.TyDecl (id,ty) ->
-           CCVector.push res (Stmt.ty_decl ~attrs ~proof id ty)
-         | Stmt.Lemma l ->
-           let proof = proof_cnf stmt in
-           let l = CCList.flat_map conv_form l in
-           CCVector.push res (Stmt.lemma ~attrs ~proof l)
-         | Stmt.Goal f ->
-           (* intermediate statement to represent the negation step *)
-           let not_f = F.not_ f in
-           let stmt = Stmt.neg_goal ~proof:(proof_neg stmt) ~skolems:[] [not_f] in
-           (* now take the CNF of negated goal *)
-           let skolems, l = conv_form_sk not_f in
-           let proof = proof_cnf stmt in
-           CCVector.push res (Stmt.neg_goal ~attrs ~proof ~skolems l)
-         | Stmt.NegatedGoal (sk1,l) ->
-           let proof = proof_cnf stmt in
-           let skolems, l =
-             CCList.fold_flat_map
-               (fun sk f ->
-                  let sk', clauses = conv_form_sk f in
-                  List.rev_append sk' sk, clauses)
-               sk1 l
-           in
-           CCVector.push res (Stmt.neg_goal ~attrs ~proof ~skolems l)
+       | Stmt.Assert f ->
+         let proof = proof_cnf stmt in
+         List.iter
+           (fun c -> CCVector.push res (Stmt.assert_ ~attrs ~proof c))
+           (conv_form f)
+       | Stmt.Def l ->
+         let l =
+           List.map
+             (fun d ->
+                let rules =
+                  d.Stmt.def_rules |> CCList.flat_map conv_def
+                in
+                { d with Stmt.def_rules = rules })
+             l
+         in
+         CCVector.push res (Stmt.def ~attrs ~proof l);
+       | Stmt.Rewrite d ->
+         let st_l =
+           conv_def d
+           |> List.map (Stmt.rewrite ~attrs ~proof)
+         in
+         CCVector.append_list res st_l;
+       | Stmt.Data l ->
+         CCVector.push res (Stmt.data ~attrs ~proof l)
+       | Stmt.TyDecl (id,ty) ->
+         CCVector.push res (Stmt.ty_decl ~attrs ~proof id ty)
+       | Stmt.Lemma l ->
+         let proof = proof_cnf stmt in
+         let l = CCList.flat_map conv_form l in
+         CCVector.push res (Stmt.lemma ~attrs ~proof l)
+       | Stmt.Goal f ->
+         (* intermediate statement to represent the negation step *)
+         let not_f = F.not_ f in
+         let stmt = Stmt.neg_goal ~proof:(proof_neg stmt) ~skolems:[] [not_f] in
+         (* now take the CNF of negated goal *)
+         let skolems, l = conv_form_sk not_f in
+         let proof = proof_cnf stmt in
+         CCVector.push res (Stmt.neg_goal ~attrs ~proof ~skolems l)
+       | Stmt.NegatedGoal (sk1,l) ->
+         let proof = proof_cnf stmt in
+         let skolems, l =
+           CCList.fold_flat_map
+             (fun sk f ->
+                let sk', clauses = conv_form_sk f in
+                List.rev_append sk' sk, clauses)
+             sk1 l
+         in
+         CCVector.push res (Stmt.neg_goal ~attrs ~proof ~skolems l)
     )
     v;
   (* return final vector of clauses *)
