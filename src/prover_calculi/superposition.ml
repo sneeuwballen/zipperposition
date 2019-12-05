@@ -2828,6 +2828,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Env.add_unary_inf "ext_eqfact_dec" ext_eqfact_decompose;
     );
 
+    if Env.flex_get k_max_lits_ext_dec != 0 &&
+       Env.flex_get Saturate.k_enable_combinators then (
+      Fingerprint.ext_dec := true;
+    );
+
     if Env.flex_get k_complete_ho_unification
     then (
       if (Env.flex_get k_max_infs) = -1 then (

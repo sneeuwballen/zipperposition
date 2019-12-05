@@ -10,6 +10,8 @@ module S = Subst
 
 let prof_traverse = Util.mk_profiler "fingerprint.traverse"
 
+let ext_dec = ref false
+
 (* a feature.
    A    = variable
    B    = below variable
@@ -55,13 +57,15 @@ let rec gfpf ?(depth=0) pos t =
 
         if num_acutal_args >= i then (
           let arg = T.DB.shift (List.length extra_args) (List.nth args (i-1)) in
-          gfpf ~depth:(depth + exp_args_num) is arg
+          if !ext_dec && (Type.is_fun (T.ty arg) || Type.is_prop (T.ty arg)) then B 
+          else gfpf ~depth:(depth + exp_args_num) is arg
         ) 
         else if num_acutal_args + (List.length extra_args) >= i then (
           let exp_arg_idx = i - num_acutal_args in
           let db_ty = List.nth extra_args (exp_arg_idx-1) in
           let arg = T.bvar (List.length extra_args - exp_arg_idx) ~ty:db_ty in
-          gfpf ~depth:(depth + exp_args_num) is arg) 
+          if !ext_dec && (Type.is_fun (T.ty arg) || Type.is_prop (T.ty arg)) then B 
+          else gfpf ~depth:(depth + exp_args_num) is arg) 
         else N
       )
 and gfpf_root ~depth t =

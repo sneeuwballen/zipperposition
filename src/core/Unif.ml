@@ -488,7 +488,7 @@ module Inner = struct
       (fun k -> k (Scoped.pp T.pp) (t1,sc1) (Scoped.pp T.pp) (t2,sc2)
                 pp_op op US.pp subst B_vars.pp bvars); *)
         let subst = unif_rec ~ext_dec ~op ~root:true ~bvars subst (ty1,sc1) (ty2,sc2) in
-        try 
+        try
           unif_term ~ext_dec ~op ~root ~bvars subst t1 sc1 t2 sc2
         with Fail ->
           let ty = Type.of_term_unsafe ty1 in
@@ -602,6 +602,12 @@ module Inner = struct
       | _ when op=O_unify && not root && has_non_unifiable_type_or_is_prop t1 ->
         let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
         delay ~tags () (* push pair as a constraint, because of typing. *)
+      | T.AppBuiltin (s1, l1), T.AppBuiltin(s2,l2)
+        when Builtin.is_combinator s1 && Builtin.is_combinator s2
+              && Builtin.equal s1 s2 && ext_dec && op=O_unify ->
+        begin try
+          unif_list ~ext_dec:false ~op ~bvars subst l1 sc1 l2 sc2 
+        with Fail -> delay ~tags:[] () end
       | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when 
         Builtin.equal s1 s2 ->
         (* && not (Builtin.equal Builtin.ForallConst s1) && 
@@ -693,7 +699,8 @@ module Inner = struct
       ) else fail()
     in
     begin match T.view f1, T.view f2 with
-      | _ when T.equal f1 f2 -> same_rigid_head()
+      | _ when T.equal f1 f2 ->
+        same_rigid_head()
       | T.Bind (Binder.Lambda, _, _),
         T.Bind (Binder.Lambda, _, _) ->
         assert (l1=[] && l2=[]);

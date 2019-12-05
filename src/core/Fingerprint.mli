@@ -17,6 +17,8 @@ type fingerprint_fun
     fingerprints can then be compared for potential unifiability/matching.
 *)
 
+val ext_dec : bool ref
+
 val fp3d : fingerprint_fun
 val fp3w : fingerprint_fun
 val fp4d : fingerprint_fun
