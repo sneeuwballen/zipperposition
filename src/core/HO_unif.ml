@@ -149,13 +149,13 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
           enum_cache := Term.Set.add cached_t !enum_cache;
           let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
           (subst, penalty) )ts ) 
-      [ l_not, 10;
-        l_and, 10;
-        l_or, 10;
-        l_eq,  10;
-        l_false, 5;
-        l_true, 5;
-        l_simpl_op, 10;
+      [ l_not, 5;
+        l_and, 7;
+        l_or, 7;
+        l_eq,  7;
+        l_false, 0;
+        l_true, 0;
+        l_simpl_op, 2;
         l_quants, 10;
       ]
   )

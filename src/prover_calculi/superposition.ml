@@ -680,8 +680,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           [C.proof_parent_subst renaming (info.active,sc_a) subst';
            C.proof_parent_subst renaming (info.passive,sc_p) subst']
       and penalty =
-        max (C.penalty info.active) (C.penalty info.passive)
+        let pen_a = C.penalty info.active in
+        let pen_b = C.penalty info.passive in
+        (if pen_a == 1 && pen_b == 1 then 1 else pen_a + pen_b)
         + (if T.is_var s' then 2 else 0) (* superposition from var = bad *)
+        + (if US.has_constr info.subst then 1 else 0)
       in
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
       (* Format.printf "LS: %a\n" C.pp new_clause;  *)
@@ -784,8 +787,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           [C.proof_parent_subst renaming (info.active,sc_a) subst;
             C.proof_parent_subst renaming (info.passive,sc_p) subst]
       and penalty =
-        max (C.penalty info.active) (C.penalty info.passive)
+        let pen_a = C.penalty info.active in
+        let pen_b = C.penalty info.passive in
+        (if pen_a == 1 && pen_b == 1 then 1 else pen_a + pen_b + 1)
         + (if T.is_var s' then 2 else 0) (* superposition from var = bad *)
+        + (if US.has_constr info.subst then 1 else 0)
       in
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
       Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
@@ -1321,7 +1327,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   |> Iter.exists (fun (t,_) -> 
                       Iter.exists T.is_fun (T.Seq.subterms (T.of_term_unsafe t))) in
                 let tags = (if subst_has_lams then [Proof.Tag.T_ho] else []) @ Unif_subst.tags us in
-              let trail = C.trail clause and penalty = C.penalty clause in
+              let trail = C.trail clause in
+              let penalty = if C.penalty clause = 1 then 1 else C.penalty clause + 1 in
               let proof = Proof.Step.inference ~rule ~tags
                   [C.proof_parent_subst renaming (clause,0) subst] in
               let new_clause = C.create ~trail ~penalty (c_guard@new_lits) proof in
@@ -1419,9 +1426,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           (S.FO.apply renaming subst (v, info.scope))
       in
       let new_lits = lit' :: c_guard @ new_lits in
+      let penalty = if C.penalty info.clause = 1 then 1 else C.penalty info.clause + 1 in
       let new_clause =
-        C.create ~trail:(C.trail info.clause) ~penalty:(C.penalty info.clause)
-          new_lits proof
+        C.create ~trail:(C.trail info.clause) ~penalty new_lits proof
       in
       Util.debugf ~section 3 "@[<hv2>equality factoring on@ @[%a@]@ yields @[%a@]@]"
         (fun k->k C.pp info.clause C.pp new_clause);
