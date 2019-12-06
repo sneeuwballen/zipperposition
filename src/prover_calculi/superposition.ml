@@ -657,16 +657,17 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             Term.Map.fold 
               (fun sk sk_v acc -> 
                 (* For polymorphism -- will apply type substitution.  *)
-                let scope = if i < (List.length c_guard + List.length lits_a) 
+                let scope = if i < (List.length c_guard + List.length lits_a)
                             then sc_a else sc_p in
                 let sk = S.FO.apply renaming subst (sk, scope) in
                 Term.replace ~old:sk ~by:sk_v acc)
               sk_with_vars t ) lit) new_lits in
       
-      let subst_has_lams = 
+      let subst_is_ho = 
         Subst.codomain subst
         |> Iter.exists (fun (t,_) -> 
-            Iter.exists T.is_fun (T.Seq.subterms (T.of_term_unsafe t))) in
+            Iter.exists (fun t -> T.is_fun t || T.is_comb t) 
+              (T.Seq.subterms (T.of_term_unsafe t))) in
 
       let rule =
         let r = kind_to_str info.sup_kind in
@@ -674,7 +675,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Proof.Rule.mk (r ^ sign)
       in
       CCList.iter (fun (sym,ty) -> Ctx.declare sym ty) !skolem_decls;
-      let tags = (if subst_has_lams then [Proof.Tag.T_ho] else []) @ Unif_subst.tags us in
+      let tags = (if subst_is_ho then [Proof.Tag.T_ho] else []) @ Unif_subst.tags us in
       let proof =
         Proof.Step.inference ~rule ~tags
           [C.proof_parent_subst renaming (info.active,sc_a) subst';
@@ -774,11 +775,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         let sign = if Lit.is_pos passive_lit' then "+" else "-" in
         Proof.Rule.mk ("s_" ^ r ^ sign)
       in
-      let subst_has_lams = 
+      let subst_is_ho = 
         Subst.codomain subst
         |> Iter.exists (fun (t,_) -> 
-            Iter.exists T.is_fun (T.Seq.subterms (T.of_term_unsafe t))) in
-      let tags = (if subst_has_lams then [Proof.Tag.T_ho] else []) @ Unif_subst.tags us in
+            Iter.exists (fun t -> T.is_fun t || T.is_comb t) 
+              (T.Seq.subterms (T.of_term_unsafe t))) in
+      let tags = (if subst_is_ho then [Proof.Tag.T_ho] else []) @ Unif_subst.tags us in
       let proof =
         Proof.Step.inference ~rule ~tags
           [C.proof_parent_subst renaming (info.active,sc_a) subst;
@@ -1316,11 +1318,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               let new_lits = CCArray.except_idx (C.lits clause) pos in
               let new_lits = Lit.apply_subst_list renaming subst (new_lits,0) in
               let c_guard = Literal.of_unif_subst renaming us in
-              let subst_has_lams = 
+              let subst_is_ho = 
                   Subst.codomain subst
                   |> Iter.exists (fun (t,_) -> 
-                      Iter.exists T.is_fun (T.Seq.subterms (T.of_term_unsafe t))) in
-                let tags = (if subst_has_lams then [Proof.Tag.T_ho] else []) @ Unif_subst.tags us in
+                      Iter.exists (fun t -> T.is_fun t || T.is_comb t) 
+                        (T.Seq.subterms (T.of_term_unsafe t))) in
+              let tags = (if subst_is_ho then [Proof.Tag.T_ho] else []) @ Unif_subst.tags us in
               let trail = C.trail clause and penalty = C.penalty clause in
               let proof = Proof.Step.inference ~rule ~tags
                   [C.proof_parent_subst renaming (clause,0) subst] in
@@ -1399,11 +1402,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
        &&
        C.is_eligible_param (info.clause,info.scope) subst ~idx:info.active_idx
     then (
-      let subst_has_lams = 
+      let subst_is_ho = 
         Subst.codomain subst
         |> Iter.exists (fun (t,_) -> 
-            Iter.exists T.is_fun (T.Seq.subterms (T.of_term_unsafe t))) in
-      let tags = (if subst_has_lams then [Proof.Tag.T_ho] else []) @ Unif_subst.tags us in
+            Iter.exists (fun t -> T.is_fun t || T.is_comb t) 
+              (T.Seq.subterms (T.of_term_unsafe t))) in
+      let tags = (if subst_is_ho then [Proof.Tag.T_ho] else []) @ Unif_subst.tags us in
       Util.incr_stat stat_equality_factoring_call;
       let proof =
         Proof.Step.inference
