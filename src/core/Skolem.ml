@@ -62,6 +62,7 @@ type ctx = {
   mutable sc_gensym: (string,int) Hashtbl.t; (* prefix -> count *)
   mutable sc_new_defs : definition list; (* "new" definitions *)
   mutable sc_new_ids: (ID.t * type_) list; (* "new" symbols *)
+  mutable skolem_defs: SLiteral.term SLiteral.t list list;
   sc_on_new : ID.t -> type_ -> unit;
 }
 
@@ -74,6 +75,7 @@ let create
     sc_new_defs = [];
     sc_gensym = Hashtbl.create 16;
     sc_new_ids = []; 
+    skolem_defs = [];
     sc_on_new = on_new;
   } in
   ctx

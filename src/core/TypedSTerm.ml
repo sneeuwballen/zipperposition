@@ -775,6 +775,20 @@ let sort_ty_vars_first : t Var.t list -> t Var.t list =
          | _ -> 0
        end)
 
+let mk_choice_no_args ~ty =
+  app_builtin ~ty Builtin.ChoiceConst []
+
+let mk_choice ~arg =
+  let _, args, ret = Ty.unfold (ty_exn arg) in
+  assert (Ty.is_prop ret);
+  assert (List.length args = 1);
+  let arg_ty = List.hd args in
+
+  let ty = 
+    let open Ty in
+    [[arg_ty] ==> prop] ==> arg_ty in
+  app_builtin ~ty Builtin.ChoiceConst [arg]
+
 module Form = struct
   type t = term
   type view =

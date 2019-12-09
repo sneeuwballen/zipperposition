@@ -982,6 +982,21 @@ module DB = struct
                           (List.map (map_vars_shift ~depth var_map) l)
 end
 
+let mk_choice ~arg_ty ~args =
+  let choice_ty =
+    let open Type in 
+    let alpha = bvar 0 in
+    forall ([[alpha] ==> prop] ==> alpha) in
+  let choice_hd = 
+    app_builtin ~ty:choice_ty Builtin.ChoiceConst [] in
+  app choice_hd ([arg_ty] @ args)
+
+let mk_choice_of_arg ~arg = 
+  let args, ret = Type.open_fun (ty arg) in
+  assert(Type.is_prop ret);
+  assert(List.length args = 1);
+  mk_choice ~arg_ty:(of_ty @@ List.hd args) ~args:[arg]
+
 let debugf = pp
 
 (** {2 TPTP} *)
@@ -1089,6 +1104,16 @@ module Conv = struct
         let f = aux f in
         let l = List.map aux l in
         app f l
+      | PT.AppBuiltin (Builtin.ChoiceConst, l) ->
+        (* fresh type variable *)
+        if CCList.is_empty l then (
+          let ty = Type.Conv.of_simple_term_exn ctx (PT.ty_exn t) in
+          let arg_ty = of_ty @@ List.hd (fst (Type.open_fun ty)) in
+          mk_choice ~arg_ty ~args:[]
+        ) else (
+          assert(List.length l = 1);
+          mk_choice_of_arg ~arg:(aux @@ List.hd l)
+        )
       | PT.AppBuiltin (b, l) ->
         let ty = Type.Conv.of_simple_term_exn ctx (PT.ty_exn t) in
         let l = List.map aux l in
@@ -1182,6 +1207,15 @@ module Conv = struct
             List.fold_right (fun v acc ->
               ST.bind ~ty:(aux_ty Type.prop) b v acc) (vars_converted) (aux_t env body) 
           )
+        | AppBuiltin (Builtin.ChoiceConst, l) ->
+          begin match l with 
+          | [ty_arg] ->
+            ST.app_builtin ~ty:(aux_ty @@ ty (head_term_mono t)) Builtin.ChoiceConst []
+          | [ty_arg;arg] ->
+            let ty = aux_ty @@ ty (head_term_mono t) in
+            ST.app_builtin ~ty Builtin.ChoiceConst [aux_t env arg]
+          | _ -> invalid_arg "choice can maximally have one term argument"
+          end
         | AppBuiltin (b,l) ->
           let res = 
             ST.app_builtin ~ty:(aux_ty (ty t))
@@ -1372,4 +1406,3 @@ let rec normalize_bools t =
       let l' = List.map normalize_bools l in
       if same_l l' l then t
       else app_builtin ~ty:(ty t) hd l'
-

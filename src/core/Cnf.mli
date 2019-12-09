@@ -62,6 +62,8 @@ type options =
   (** disables formula renaming. Can re-introduce the worst-case
       exponential behavior of CNF. *)
 
+  | AddSkolemDefinitions (** define skolems in terms of choice operator *)
+
   | InitialProcessing of (form -> form)
   (** any processing, at the beginning, before CNF starts  *)
 

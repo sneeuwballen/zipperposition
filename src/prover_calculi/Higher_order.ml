@@ -635,15 +635,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     else []*)
     prim_enum_ ~mode c
 
-  let mk_choice ~arg_ty ~args =
-    let choice_ty =
-      let open Type in 
-      let alpha = bvar 0 in
-      forall ([[alpha] ==> prop] ==> alpha) in
-    let choice_hd = 
-      T.app_builtin ~ty:choice_ty Builtin.ChoiceConst [] in
-    T.app choice_hd ([arg_ty] @ args)
-
   let choice_ops = ref Term.Set.empty
   let new_choice_counter = ref 0
 
@@ -690,7 +681,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       assert(List.length arg_arg_ty = 1);
       assert(Type.equal (List.hd arg_arg_ty) ret_ty);
       assert(Type.is_prop arg_ret_ty);
-      mk_choice ~args:[] ~arg_ty:(Term.of_ty ret_ty) in
+      T.mk_choice ~args:[] ~arg_ty:(Term.of_ty ret_ty) in
 
     let build_choice_inst t =
       match T.view t with
@@ -940,7 +931,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let p = Term.var (HVar.make ~ty:alpha_to_prop 1) in
     let x = Term.var (HVar.make ~ty:alpha 2) in
     let px = Term.app p [x] in (* p x *)
-    let choice = mk_choice ~arg_ty:(Term.of_ty alpha) ~args:[p]  in
+    let choice = T.mk_choice ~arg_ty:(Term.of_ty alpha) ~args:[p]  in
     let p_choice = Term.app p [Term.app choice [p]] (* p (choice p) *) in
     (* ~ (p x) | p (choice p) *)
     let lits = [Literal.mk_prop px false; Literal.mk_prop p_choice true] in

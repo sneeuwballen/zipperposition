@@ -125,6 +125,10 @@ val open_fun_offset : offset:int -> t -> var list * t * int
 val grounding : Type.t -> t
 (** [grounding ty] is a unique constant of type [ty] *)
 
+val mk_choice : arg_ty:t -> args:t list -> t
+val mk_choice_of_arg : arg:t -> t
+
+
 val is_var : t -> bool
 val is_appbuiltin : t -> bool
 val is_bvar : t -> bool

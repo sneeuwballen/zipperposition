@@ -565,6 +565,7 @@ let skolemize ~ctx f =
       let t = Skolem.skolem_form ~ctx subst var f in
       Util.debugf 10 ~section "@[<2>bind `%a` to@ `@[%a@]`@ :subst {%a}@]"
         (fun k->k Var.pp_fullc var T.pp t T.Subst.pp subst);
+      
       let subst = Var.Subst.add subst var t in
       skolemize subst f'
     | F.Forall (var,f') ->
@@ -847,6 +848,7 @@ let to_cnf f =
 type options =
   | DistributeExists
   | DisableRenaming
+  | AddSkolemDefinitions (** define skolems in terms of choice operator *)
   | InitialProcessing of (form -> form) (** any processing, at the beginning *)
   | PostNNF of (form -> form)  (** any processing that keeps negation at leaves *)
   | PostSkolem of (form -> form) (** must not introduce variables nor negations *)
