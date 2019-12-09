@@ -549,31 +549,51 @@ let rec nnf f =
 let skolemize ~ctx f =
   Util.enter_prof prof_skolemize;
   let rec skolemize subst f = match F.view f with
-    | F.And l -> F.and_ (List.map (skolemize subst) l)
-    | F.Or l -> F.or_ (List.map (skolemize subst) l)
-    | F.Not f' -> F.not_ (skolemize subst f')
+    | F.And l -> 
+      let l', defs = skolemize_l subst l in
+      F.and_ l', defs
+    | F.Or l -> 
+      let l', defs = skolemize_l subst l in
+      F.or_ l', defs
+    | F.Not f' -> 
+      let f'', defs = skolemize subst f' in
+      F.not_ f'', defs
     | F.Xor _
     | F.Imply _
     | F.Equiv _ -> error_ "can only skolemize a NNF formula"
     | F.Atom _
     | F.Eq _
-    | F.Neq _ -> T.Subst.eval subst f
+    | F.Neq _ -> T.Subst.eval subst f, []
     | F.True
-    | F.False -> f
+    | F.False -> f, []
     | F.Exists (var,f') ->
+      (* enocode ∃x. F x as ∃(\x. F x) *)
+      let lambda_f' = T.fun_l [var] (T.Subst.eval subst f') in
+
       (* replace [v] by a fresh skolem term *)
       let t = Skolem.skolem_form ~ctx subst var f in
       Util.debugf 10 ~section "@[<2>bind `%a` to@ `@[%a@]`@ :subst {%a}@]"
         (fun k->k Var.pp_fullc var T.pp t T.Subst.pp subst);
-      
+
+      (* clause representing the definition of the skolem symbol
+         using the choice operator *)
+      let skolem_def = [SLiteral.eq t (T.mk_choice ~arg:lambda_f')] in
+
       let subst = Var.Subst.add subst var t in
-      skolemize subst f'
+      let f'',defs = skolemize subst f' in
+      f'', skolem_def :: defs
     | F.Forall (var,f') ->
       let var' = Var.copy var in
       Util.debugf 10 ~section "@[<2>rename `%a` to@ `%a`@ :subst {%a}@]"
         (fun k->k Var.pp_fullc var Var.pp_fullc var' T.Subst.pp subst);
       let subst = Var.Subst.add subst var (T.var var') in
       skolemize subst f'
+  and skolemize_l subst fs = match fs with 
+  | [] -> [], []
+  | f :: ffs -> 
+    let f', defs = skolemize subst f in
+    let f's, defss = skolemize_l subst ffs in
+    f' :: f's, defs @ defss
   in
   let res = skolemize f in
   Util.exit_prof prof_skolemize;
@@ -1098,6 +1118,7 @@ let proof_neg stmt =
 let cnf_of_seq ~ctx ?(opts=[])  seq =
   (* read options *)
   let disable_renaming = List.mem DisableRenaming opts in
+  let add_skolem_defs = List.mem AddSkolemDefinitions opts in
   let preprocess =
     CCList.filter_map
       (function InitialProcessing f -> Some f | _ -> None)
@@ -1132,14 +1153,14 @@ let cnf_of_seq ~ctx ?(opts=[])  seq =
         let f = miniscope ~distribute_exists f in
         Util.debugf ~section 4 "@[<2>... miniscoped:@ `@[%a@]`@]" (fun k->k T.pp f);
         (* adjust the variable counter to [f] before skolemizing *)
-        let f = skolemize ~ctx Var.Subst.empty f in
+        let f, defs = skolemize ~ctx Var.Subst.empty f in
         (* processing post-skolemization *)
         let f = List.fold_left (|>) f post_skolem in
         Util.debugf ~section 4 "@[<2>... skolemized:@ `@[%a@]`@]" (fun k->k T.pp f);
         let clauses = to_cnf f in
         Util.debugf ~section 2 "@[<2>... CNF:@ `@[%a@]`@]"
           (fun k->k (Util.pp_list ~sep:", " pp_clause) clauses);
-        clauses
+        (if add_skolem_defs then defs  else []) @ clauses
     in
     let new_ids = Skolem.pop_new_skolem_symbols ~ctx in
     List.iter

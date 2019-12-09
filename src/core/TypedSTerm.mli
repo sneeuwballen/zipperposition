@@ -100,6 +100,8 @@ val fresh_var : ?loc:location -> ty:t -> unit -> t
 val box_opaque : t -> t
 (** Put a box around this *)
 
+val mk_choice : arg:t -> t
+
 (** {2 Specific Views} *)
 
 module Ty : sig
