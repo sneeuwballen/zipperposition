@@ -635,6 +635,15 @@ module Make(E : Env.S) : S with module Env = E = struct
     else []*)
     prim_enum_ ~mode c
 
+  let mk_choice ~arg_ty ~args =
+    let choice_ty =
+      let open Type in 
+      let alpha = bvar 0 in
+      forall ([[alpha] ==> prop] ==> alpha) in
+    let choice_hd = 
+      T.app_builtin ~ty:choice_ty Builtin.ChoiceConst [] in
+    T.app choice_hd ([arg_ty] @ args)
+
   let choice_ops = ref Term.Set.empty
   let new_choice_counter = ref 0
 
@@ -651,6 +660,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Type.is_fun ty && List.length (Type.expected_args ty) = 1 &&
         Type.equal (Term.ty t) (List.hd (Type.expected_args ty)) &&
         Type.returns_prop ty && T.DB.is_closed t
+      | T.AppBuiltin(Builtin.ChoiceConst, [ty_arg;arg]) -> true
       | _ -> false in
 
     let neg_trigger t =
@@ -660,7 +670,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       let res = T.fun_ arg_ty applied_to_0 in
       assert(T.DB.is_closed res);
       res in
-
 
     let choice_inst_of_hd hd arg =
       let arg_ty = Term.ty arg in
@@ -674,17 +683,14 @@ module Make(E : Env.S) : S with module Env = E = struct
       let proof = Proof.Step.inference ~rule:(Proof.Rule.mk ("inst_choice" ^ arg_str)) [] in
       C.create ~penalty:1 ~trail:Trail.empty new_lits proof in
 
-
     let new_choice_op ty =
-      let choice_ty_name = "#_choice_" ^ 
-                           CCInt.to_string (CCRef.get_then_incr new_choice_counter) in
-      let new_ch_id = ID.make choice_ty_name in
-      let new_ch_const = T.const new_ch_id ~ty in
-      Ctx.add_signature (Signature.declare (C.Ctx.signature ()) new_ch_id ty);
-      Util.debugf 1 "new choice for type %a: %a(%a).\n" 
-        (fun k -> k Type.pp ty T.pp new_ch_const Type.pp (T.ty new_ch_const));
-      choice_ops := Term.Set.add new_ch_const !choice_ops;
-      new_ch_const in
+      let arg_ty, ret_ty = Type.open_fun ty in
+      let arg_arg_ty , arg_ret_ty = Type.open_fun ty in
+      assert(List.length arg_ty = 1);
+      assert(List.length arg_arg_ty = 1);
+      assert(Type.equal (List.hd arg_arg_ty) ret_ty);
+      assert(Type.is_prop arg_ret_ty);
+      mk_choice ~args:[] ~arg_ty:(Term.of_ty ret_ty) in
 
     let build_choice_inst t =
       match T.view t with
@@ -701,6 +707,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         ) else if Term.Set.mem hd !choice_ops then (
           [choice_inst_of_hd hd arg; choice_inst_of_hd hd (neg_trigger arg)]
         ) else []
+      | T.AppBuiltin(Builtin.ChoiceConst, [_;arg]) ->
+        let hd_mono = T.head_term_mono t in
+        [choice_inst_of_hd hd_mono arg; choice_inst_of_hd hd_mono (neg_trigger arg)]
       | _ -> assert (false) in
 
     C.Seq.terms c 
@@ -740,10 +749,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             |> Iter.flat_map_l (fun pas_cl -> 
                 if C.id pas_cl = C.id c then []
                 else (
-                insantiate_choice ~inst_vars:false 
-                                  ~choice_ops:(ref (Term.Set.singleton sym)) 
-                                  pas_cl
-                ))
+                  insantiate_choice ~inst_vars:false 
+                                    ~choice_ops:(ref (Term.Set.singleton sym)) 
+                                    pas_cl))
             |> Iter.map Combs.maybe_conv_lams
           in
           
@@ -926,19 +934,17 @@ module Make(E : Env.S) : S with module Env = E = struct
       lits Proof.Step.trivial
 
   let choice_clause =
-    let choice_id = ID.make("zf_choice") in
     let alpha_var = HVar.make ~ty:Type.tType 0 in
     let alpha = Type.var alpha_var in
     let alpha_to_prop = Type.arrow [alpha] Type.prop in
-    let choice_type = Type.arrow [alpha_to_prop] alpha in
-    let choice = Term.const ~ty:choice_type choice_id in
     let p = Term.var (HVar.make ~ty:alpha_to_prop 1) in
     let x = Term.var (HVar.make ~ty:alpha 2) in
     let px = Term.app p [x] in (* p x *)
+    let choice = mk_choice ~arg_ty:(Term.of_ty alpha) ~args:[p]  in
     let p_choice = Term.app p [Term.app choice [p]] (* p (choice p) *) in
     (* ~ (p x) | p (choice p) *)
     let lits = [Literal.mk_prop px false; Literal.mk_prop p_choice true] in
-    Env.C.create ~penalty:1 ~trail:Trail.empty lits Proof.Step.trivial
+    Env.C.create ~penalty:5 ~trail:Trail.empty lits Proof.Step.trivial
 
 
   type fixed_arg_status =
