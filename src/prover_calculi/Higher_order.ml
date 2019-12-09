@@ -931,8 +931,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     let p = Term.var (HVar.make ~ty:alpha_to_prop 1) in
     let x = Term.var (HVar.make ~ty:alpha 2) in
     let px = Term.app p [x] in (* p x *)
-    let choice = T.mk_choice ~arg_ty:(Term.of_ty alpha) ~args:[p]  in
-    let p_choice = Term.app p [Term.app choice [p]] (* p (choice p) *) in
+    let choice_p = T.mk_choice ~arg_ty:(Term.of_ty alpha) ~args:[p]  in
+    let p_choice = Term.app p [choice_p] (* p (choice p) *) in
     (* ~ (p x) | p (choice p) *)
     let lits = [Literal.mk_prop px false; Literal.mk_prop p_choice true] in
     Env.C.create ~penalty:5 ~trail:Trail.empty lits Proof.Step.trivial
