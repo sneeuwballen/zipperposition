@@ -826,10 +826,18 @@ module Form = struct
   let true_ = builtin ~ty:Ty.prop Builtin.True
   let false_ = builtin ~ty:Ty.prop Builtin.False
   let atom t = t
-  let eq ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Eq [a;b]
-  let neq ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Neq [a;b]
-  let equiv ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Equiv [a;b]
-  let xor ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Xor [a;b]
+  let eq ?loc a b = 
+    let a,b = if a.hash > b.hash then b,a else a,b in
+    app_builtin ?loc ~ty:Ty.prop Builtin.Eq [a;b]
+  let neq ?loc a b =
+    let a,b = if a.hash > b.hash then b,a else a,b in
+    app_builtin ?loc ~ty:Ty.prop Builtin.Neq [a;b]
+  let equiv ?loc a b = 
+    let a,b = if a.hash > b.hash then b,a else a,b in
+    app_builtin ?loc ~ty:Ty.prop Builtin.Equiv [a;b]
+  let xor ?loc a b =
+    let a,b = if a.hash > b.hash then b,a else a,b in
+    app_builtin ?loc ~ty:Ty.prop Builtin.Xor [a;b]
   let ite = ite
   let imply ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Imply [a;b]
 
@@ -859,6 +867,7 @@ module Form = struct
 
   let and_ ?loc l  =
     let flattened = flatten_ `And [] l in
+    let flattened = List.fast_sort (fun s t -> CCInt.compare (s.hash) (t.hash)) flattened in
     match flattened with
     | [] -> true_
     | [t] -> t 
@@ -866,6 +875,7 @@ module Form = struct
 
   let or_ ?loc l = 
     let flattened = flatten_ `Or [] l in
+    let flattened = List.fast_sort (fun s t -> CCInt.compare (s.hash) (t.hash)) flattened in
     match flattened with
     | [] -> false_
     | [t] -> t 
