@@ -64,6 +64,7 @@ type t =
   | IComb
   | KComb
   | SComb
+  | ChoiceConst
 
 
 type t_ = t
@@ -127,6 +128,7 @@ let to_int_ = function
   | IComb -> 82
   | KComb -> 83
   | SComb -> 84
+  | ChoiceConst -> 90
   | Pseudo_de_bruijn _ -> 100
 
 let compare a b = match a, b with
@@ -226,6 +228,7 @@ let to_string s = match s with
   | IComb -> "I"
   | KComb -> "K"
   | SComb -> "S"
+  | ChoiceConst -> "·ε"
   | Pseudo_de_bruijn i -> Printf.sprintf "db_%d" i
 
 let pp out s = Format.pp_print_string out (to_string s)
@@ -399,6 +402,7 @@ module TPTP = struct
     | KComb -> "$K"
     | SComb -> "$S"
     | Box_opaque -> "$$box"
+    | ChoiceConst -> "$$choose"
     | Pseudo_de_bruijn i -> Printf.sprintf "$$db_%d" i
 
   let pp out b = CCFormat.string out (to_string b)
@@ -446,6 +450,7 @@ module TPTP = struct
     | "$C" -> CComb
     | "$K" -> KComb
     | "$I" -> IComb
+    | "$choose" -> ChoiceConst
     | _ -> raise NotABuiltin
 
   let fixity = function
@@ -744,6 +749,7 @@ module ZF = struct
     | KComb -> "K"
     | SComb -> "S"
     | Box_opaque -> "<box>"
+    | ChoiceConst -> "$choose"
     | Pseudo_de_bruijn i -> Printf.sprintf "<db %d>" i
 
   let pp out b = CCFormat.string out (to_string b)

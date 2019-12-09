@@ -69,6 +69,7 @@ type t =
   | IComb
   | KComb
   | SComb
+  | ChoiceConst (* Choice operator *)
 
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
