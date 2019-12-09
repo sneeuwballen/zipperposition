@@ -963,6 +963,12 @@ let[@inline] as_app t = match view t with
     let args = if (Builtin.is_logical_binop b) then [prop;prop]
                else [prop] in
     app_builtin b ~ty:(arrow args prop) [], l 
+  | AppBuiltin(Builtin.ChoiceConst, x :: xs) ->
+    assert(is_a_type x);
+    (* let ty = ([[x_ty] ==> prop] ==> x_ty) in *)
+    let prop = builtin ~ty:tType Builtin.Prop in
+    let ty = arrow [arrow [x] prop] x in
+    app_builtin ~ty Builtin.ChoiceConst [x], xs
   | _ -> t, []
 
 let[@inline] as_var t = match view t with Var v -> Some v | _ -> None

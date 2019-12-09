@@ -676,10 +676,10 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let new_choice_op ty =
       let arg_ty, ret_ty = Type.open_fun ty in
-      let arg_arg_ty , arg_ret_ty = Type.open_fun ty in
+      let arg_arg_ty , arg_ret_ty = Type.open_fun (List.hd arg_ty) in
       assert(List.length arg_ty = 1);
       assert(List.length arg_arg_ty = 1);
-      assert(Type.equal (List.hd arg_arg_ty) ret_ty);
+      assert (Type.equal (List.hd arg_arg_ty) ret_ty);
       assert(Type.is_prop arg_ret_ty);
       T.mk_choice ~args:[] ~arg_ty:(Term.of_ty ret_ty) in
 
@@ -1067,6 +1067,21 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
     (* TODO: Simplified flag like in first-order? Profiler?*)
 
+  let penalize_choice c =
+    let has_choice c = 
+      C.Seq.terms c 
+      |> Iter.exists (fun t -> 
+          T.Seq.subterms ~include_builtin:true t 
+          |> Iter.exists (fun t ->
+            match T.view t with 
+            | T.App (hd, _) -> Term.Set.mem hd !choice_ops
+            | T.AppBuiltin(hd, _) -> Builtin.equal hd Builtin.ChoiceConst
+            | _ -> false )) in
+    if C.penalty c = 1 && has_choice c then (
+      let penalized = C.create ~penalty:5 ~trail:(C.trail c) (Array.to_list (C.lits c)) (C.proof_step c) in
+      SimplM.return_new penalized
+    ) else SimplM.return_same c
+
   let prune_arg ~all_covers c =
     let get_covers ?(current_sets=[]) head args = 
       let ty_args, _ = Type.open_fun (T.ty head) in
@@ -1185,6 +1200,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) else (
       Util.debug ~section 1 "setup HO rules";
       Env.Ctx.lost_completeness();
+      Env.add_basic_simplify penalize_choice;
       Env.add_unary_inf "ho_complete_eq" complete_eq_args;
       if Env.flex_get k_elim_pred_var then
         Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
@@ -1447,7 +1463,7 @@ let () =
   );
   Params.add_to_mode "ho-competitive" (fun () ->
     enabled_ := true;
-    def_unfold_enabled_ := true;
+    def_unfold_enabled_ := false;
     force_enabled_ := true;
     _ext_axiom := false;
     _ext_neg_lit := false;

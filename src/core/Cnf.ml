@@ -572,12 +572,15 @@ let skolemize ~ctx f =
 
       (* replace [v] by a fresh skolem term *)
       let t = Skolem.skolem_form ~ctx subst var f in
-      Util.debugf 10 ~section "@[<2>bind `%a` to@ `@[%a@]`@ :subst {%a}@]"
+      Util.debugf 5 ~section "@[<2>bind `%a` to@ `@[%a@]`@ :subst {%a}@]"
         (fun k->k Var.pp_fullc var T.pp t T.Subst.pp subst);
 
       (* clause representing the definition of the skolem symbol
          using the choice operator *)
       let skolem_def = [SLiteral.eq t (T.mk_choice ~arg:lambda_f')] in
+
+      Util.debugf 5 ~section "@[sk_def([%a]): %a@]"
+        (fun k->k T.pp f (CCList.pp (SLiteral.pp T.pp)) skolem_def );
 
       let subst = Var.Subst.add subst var t in
       let f'',defs = skolemize subst f' in

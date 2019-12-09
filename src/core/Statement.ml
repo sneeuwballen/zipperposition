@@ -948,12 +948,20 @@ let get_rw_rule ?weight_incr:(w_i=1000000) c  =
       | _ -> build_from_head sym l t2)
     ) 
     else None in
+
+   let has_choice t =
+    Term.Seq.subterms ~include_builtin:true  t
+    |> Iter.exists (fun t -> 
+        match Term.view t with 
+        | Term.AppBuiltin(Builtin.ChoiceConst, []) -> true
+        | _ -> false) in
       
    let all_lits =  Seq.lits c in
    if Iter.length all_lits = 1 then
       match Iter.head_exn all_lits with
       | SLiteral.Eq (t1,t2) when not (List.mem t1 [Term.true_; Term.false_]) &&
-                                 not (List.mem t2 [Term.true_; Term.false_]) ->
+                                 not (List.mem t2 [Term.true_; Term.false_]) &&
+                                 not (has_choice t1) && not (has_choice t2) ->
          assert(Type.equal (Term.ty t1) (Term.ty t2));
          let ty = Term.ty t1 in
          let fresh_vars = List.map (fun ty -> Term.var (HVar.fresh ~ty ())) (Type.expected_args ty) in

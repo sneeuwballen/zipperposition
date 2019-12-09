@@ -1105,15 +1105,14 @@ module Conv = struct
         let l = List.map aux l in
         app f l
       | PT.AppBuiltin (Builtin.ChoiceConst, l) ->
-        (* fresh type variable *)
-        if CCList.is_empty l then (
+        begin match l with 
+        | [] -> 
           let ty = Type.Conv.of_simple_term_exn ctx (PT.ty_exn t) in
           let arg_ty = of_ty @@ List.hd (fst (Type.open_fun ty)) in
           mk_choice ~arg_ty ~args:[]
-        ) else (
-          assert(List.length l = 1);
-          mk_choice_of_arg ~arg:(aux @@ List.hd l)
-        )
+        | arg :: args -> 
+          app (mk_choice_of_arg ~arg:(aux arg)) (List.map aux args)
+        end
       | PT.AppBuiltin (b, l) ->
         let ty = Type.Conv.of_simple_term_exn ctx (PT.ty_exn t) in
         let l = List.map aux l in
@@ -1211,10 +1210,10 @@ module Conv = struct
           begin match l with 
           | [ty_arg] ->
             ST.app_builtin ~ty:(aux_ty @@ ty (head_term_mono t)) Builtin.ChoiceConst []
-          | [ty_arg;arg] ->
+          | ty_arg :: (arg :: rest as l) ->
             let ty = aux_ty @@ ty (head_term_mono t) in
-            ST.app_builtin ~ty Builtin.ChoiceConst [aux_t env arg]
-          | _ -> invalid_arg "choice can maximally have one term argument"
+            ST.app_builtin ~ty Builtin.ChoiceConst (List.map (aux_t env) l) 
+          | _ -> invalid_arg "choice can must have at least one argument"
           end
         | AppBuiltin (b,l) ->
           let res = 
