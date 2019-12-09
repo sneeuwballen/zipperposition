@@ -116,7 +116,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
   let try_e active_set passive_set =
-    let max_others = 16 in
+    let max_others = 64 in
 
     let rec can_be_translated t =
       let can_translate_ty ty =
@@ -129,7 +129,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         let _, fun_body = Term.open_fun body in
         can_be_translated fun_body
       | AppBuiltin(b, _) when Builtin.is_combinator b -> false
-      | AppBuiltin(b, l) -> (not (Builtin.is_logical_binop b) || List.length l >= 2) && 
+      | AppBuiltin(b, l) -> (not (Builtin.is_logical_binop b) || List.length l >= 2) &&
+                            (not (Builtin.equal b Builtin.Eq) || List.length l >= 2) &&
+                            (not (Builtin.equal b Builtin.Neq) || List.length l >= 2) &&
                             (b != Builtin.Not || List.length l = 1) &&
                             List.for_all can_be_translated l
       | DB _ -> false
@@ -155,8 +157,11 @@ module Make(E : Env.S) : S with module Env = E = struct
         let has_ho_step = Proof.Step.has_ho_step (C.proof_step c) in
         has_ho_step && proof_d  > 0 && clause_no_lams c)
       |> Iter.sort ~cmp:(fun c1 c2 ->
-          let pd1 = C.proof_depth c1 and pd2 = C.proof_depth c2 in
-          CCInt.compare pd1 pd2)
+          let penalty =  C.penalty (*C.proof_depth*) in
+          let p1 = penalty c1 and p2 = penalty c2 in
+          let open CCOrd in
+          (CCInt.compare p1 p2) <?>
+          (CCInt.compare, (C.weight c1), (C.weight c2)))
       |> Iter.take max_others)
     |> Iter.to_list in
 

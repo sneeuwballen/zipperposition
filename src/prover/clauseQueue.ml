@@ -480,7 +480,10 @@ module Make(C : Clause_intf.S) = struct
       if C.is_backward_simplified c then 0 else 1
 
     let prefer_lambdas c = 
-      if (C.Seq.terms c |> Iter.exists (fun t -> Iter.exists Term.is_fun (Term.Seq.subterms t)))
+      if (C.Seq.terms c 
+          |> Iter.exists (fun t -> 
+              Iter.exists (fun t -> Term.is_fun t || Term.is_comb t) 
+                (Term.Seq.subterms t)))
       then 0 else 1
     
     let defer_lambdas c =
