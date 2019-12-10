@@ -196,7 +196,7 @@ module Make (P : PARAMETERS) = struct
       Iter.is_empty @@ Iter.append (Term.Seq.ty_vars lhs) (Term.Seq.ty_vars rhs) in
     try
       do_unif [(lhs,rhs,P.init_flag)] subst mono unifscope
-      (* |> OSeq.map (fun opt -> CCOpt.map (fun subst -> 
+      |> OSeq.map (fun opt -> CCOpt.map (fun subst -> 
         let l = Lambda.eta_reduce @@ Lambda.snf @@ S.FO.apply Subst.Renaming.none subst t0s in 
         let r = Lambda.eta_reduce @@ Lambda.snf @@ S.FO.apply Subst.Renaming.none subst t1s in
         if not ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r))) then (
@@ -204,6 +204,6 @@ module Make (P : PARAMETERS) = struct
           CCFormat.printf "subst:@[%a@]@." Subst.pp subst;
           CCFormat.printf "new:@[%a@]=?=@[%a@]@." T.pp l T.pp r;
           assert(false)
-        ); subst) opt) *)
+        ); subst) opt)
     with Unif.Fail -> OSeq.empty
 end
