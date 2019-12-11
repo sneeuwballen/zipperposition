@@ -645,14 +645,15 @@ module Make(E : Env.S) : S with module Env = E = struct
                   |> CCOpt.get_or ~default: 0 in
 
     let is_choice_subterm t = 
-      match T.view t with
-      | T.App(hd, [arg]) when T.is_var hd || Term.Set.mem hd !choice_ops ->
-        let ty = T.ty arg in
-        Type.is_fun ty && List.length (Type.expected_args ty) = 1 &&
-        Type.equal (Term.ty t) (List.hd (Type.expected_args ty)) &&
-        Type.returns_prop ty && T.DB.is_closed t
-      | T.AppBuiltin(Builtin.ChoiceConst, [ty_arg;arg]) -> true
-      | _ -> false in
+      T.DB.is_closed t &&
+        match T.view t with
+        | T.App(hd, [arg]) when T.is_var hd || Term.Set.mem hd !choice_ops ->
+          let ty = T.ty arg in
+          Type.is_fun ty && List.length (Type.expected_args ty) = 1 &&
+          Type.equal (Term.ty t) (List.hd (Type.expected_args ty)) &&
+          Type.returns_prop ty && T.DB.is_closed t
+        | T.AppBuiltin(Builtin.ChoiceConst, _ :: _ :: _) -> true
+        | _ -> false in
 
     let neg_trigger t =
       assert(T.DB.is_closed t);
@@ -677,13 +678,12 @@ module Make(E : Env.S) : S with module Env = E = struct
       res in
 
     let new_choice_op ty =
-      let arg_ty, ret_ty = Type.open_fun ty in
+      let arg_ty, _ = Type.open_fun ty in
+      assert(not @@ CCList.is_empty arg_ty);
       let arg_arg_ty , arg_ret_ty = Type.open_fun (List.hd arg_ty) in
-      assert(List.length arg_ty = 1);
-      assert(List.length arg_arg_ty = 1);
-      assert (Type.equal (List.hd arg_arg_ty) ret_ty);
       assert(Type.is_prop arg_ret_ty);
-      T.mk_choice ~args:[] ~arg_ty:(Term.of_ty ret_ty) in
+      assert(List.length arg_arg_ty = 1);
+      T.mk_choice ~args:[] ~arg_ty:(Term.of_ty (List.hd arg_arg_ty)) in
 
     let build_choice_inst t =
       match T.view t with
@@ -700,7 +700,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         ) else if Term.Set.mem hd !choice_ops then (
           [choice_inst_of_hd hd arg; choice_inst_of_hd hd (neg_trigger arg)]
         ) else []
-      | T.AppBuiltin(Builtin.ChoiceConst, [_;arg]) ->
+      | T.AppBuiltin(Builtin.ChoiceConst, _::arg::_) ->
         let hd_mono = T.head_term_mono t in
         [choice_inst_of_hd hd_mono arg; choice_inst_of_hd hd_mono (neg_trigger arg)]
       | _ -> assert (false) in
