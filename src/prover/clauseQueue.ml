@@ -490,7 +490,9 @@ module Make(C : Clause_intf.S) = struct
       - (prefer_lambdas c)
 
     let prefer_formulas c =
-      if (C.Seq.terms c |> Iter.exists (fun t -> Iter.exists Term.is_formula (Term.Seq.subterms t)))
+      if (C.Seq.terms c 
+          |> Iter.exists (fun t -> 
+              Iter.exists Term.is_formula (Term.Seq.subterms t)))
         then 0 else 1
     
     let prefer_easy_ho c =

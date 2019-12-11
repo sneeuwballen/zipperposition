@@ -671,8 +671,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       let new_lits = [Literal.mk_prop choice_x false;
                       Literal.mk_prop choice_arg true] in
       let arg_str = CCFormat.sprintf "%a" T.TPTP.pp arg in
-      let proof = Proof.Step.inference ~rule:(Proof.Rule.mk ("inst_choice" ^ arg_str)) [] in
-      C.create ~penalty:1 ~trail:Trail.empty new_lits proof in
+      let proof = Proof.Step.inference ~rule:(Proof.Rule.mk ("inst_choice(" ^ arg_str ^ ")")) [] in
+      let res = C.create ~penalty:2 ~trail:Trail.empty new_lits proof in
+      C.set_flag SClause.flag_is_choice_inst res  true;
+      res in
 
     let new_choice_op ty =
       let arg_ty, ret_ty = Type.open_fun ty in
@@ -1077,8 +1079,8 @@ module Make(E : Env.S) : S with module Env = E = struct
             | T.App (hd, _) -> Term.Set.mem hd !choice_ops
             | T.AppBuiltin(hd, _) -> Builtin.equal hd Builtin.ChoiceConst
             | _ -> false )) in
-    if C.penalty c = 1 && has_choice c then (
-      let penalized = C.create ~penalty:5 ~trail:(C.trail c) (Array.to_list (C.lits c)) (C.proof_step c) in
+    if C.penalty c = 1 && not @@ C.get_flag SClause.flag_is_choice_inst c && has_choice c then (
+      let penalized = C.create ~penalty:6 ~trail:(C.trail c) (Array.to_list (C.lits c)) (C.proof_step c) in
       SimplM.return_new penalized
     ) else SimplM.return_same c
 

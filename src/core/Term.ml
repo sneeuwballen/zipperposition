@@ -193,7 +193,7 @@ let is_formula t = match T.view t with
     List.mem hd [Builtin.And; Builtin.Or; Builtin.Not; 
                  Builtin.Imply; Builtin.Equiv; 
                  Builtin.Xor; Builtin.ForallConst;
-                 Builtin.ExistsConst]
+                 Builtin.ExistsConst; Builtin.ChoiceConst]
   | _ -> false
 
 let is_var t = match T.view t with
@@ -484,9 +484,10 @@ let weight ?(var=1) ?(sym=fun _ -> 1) t =
   let rec weight t = match view t with
     | Var _
     | DB _ -> var
-    | AppBuiltin (_,l)
-    | App (_, l) -> List.fold_left (fun s t' -> s + weight t') 1 l
-    | Fun (_, u) -> 1 + weight u
+    | AppBuiltin (_,l) ->
+      List.fold_left (fun s t' -> s + weight t') 1 l
+    | App (hd, l) -> List.fold_left (fun s t' -> s + weight t') (weight hd) l
+    | Fun (_, u) -> weight u
     | Const s -> sym s
   in weight t
 

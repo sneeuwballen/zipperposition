@@ -44,6 +44,9 @@ val flag_redundant : flag (** clause has been shown to be redundant *)
 
 val flag_backward_simplified : flag (** clause has been backward simplified *)
 
+val flag_is_choice_inst : flag (** clause has been backward simplified *)
+
+
 val set_flag : flag -> t -> bool -> unit (** set boolean flag *)
 
 val get_flag : flag -> t -> bool (** get value of boolean flag *)
