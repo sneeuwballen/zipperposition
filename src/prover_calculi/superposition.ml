@@ -1673,6 +1673,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     mutable demod_sc: Scoped.scope; (* current scope *)
   }
 
+  let var_types_same s t =
+    let vars_s = T.VarSet.of_seq @@ T.Seq.vars s in
+    let vars_t = T.VarSet.of_seq @@ T.Seq.vars t in
+    T.VarSet.subset vars_t vars_s 
+
   (** Compute normal form of term w.r.t active set. Clauses used to
       rewrite are added to the clauses hashset.
       restrict is an option for restricting demodulation in positive maximal terms *)
@@ -1720,7 +1725,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | Some (rhs,subst,cur_sc) ->
           (* reduce [rhs] in current scope [cur_sc] *)
           assert (cur_sc < st.demod_sc);
-          let rhs = Subst.FO.apply Subst.Renaming.none subst (rhs,cur_sc) in
+          let rhs = Lambda.snf @@ Subst.FO.apply Subst.Renaming.none subst (rhs,cur_sc) in
           Util.debugf ~section 3
             "@[<2>demod:@ rewrite `@[%a@]`@ into `@[%a@]`@ using %a[%d]@]"
             (fun k->k T.pp t T.pp rhs Subst.pp subst cur_sc);
@@ -1850,7 +1855,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         |> CCList.map (fun v -> (HVar.id v))
         |> (fun vars -> assert (CCList.length (CCList.uniq ~eq:CCInt.equal vars) == CCList.length vars)); *)
       (* return simplified clause *)
-      assert(C.lits new_c |> Literals.vars_distinct);
+      if not (C.lits new_c |> Literals.vars_distinct) then (
+        CCFormat.printf "c:@[%a@]@." C.pp new_c;
+        CCFormat.printf "p:@[%a@]@." Proof.S.pp_tstp (C.proof new_c);
+        assert false;
+      );
       SimplM.return_new new_c
     )
 

@@ -630,10 +630,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     end
 
   let prim_enum ~(mode) c =
-    (*if C.proof_depth c < max_penalty_prim_ 
+    if C.proof_depth c < max_penalty_prim_ 
     then prim_enum_ ~mode c
-    else []*)
-    prim_enum_ ~mode c
+    else []
+    (* prim_enum_ ~mode c *)
 
   let choice_ops = ref Term.Set.empty
   let new_choice_counter = ref 0
@@ -673,7 +673,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                       Literal.mk_prop choice_arg true] in
       let arg_str = CCFormat.sprintf "%a" T.TPTP.pp arg in
       let proof = Proof.Step.inference ~rule:(Proof.Rule.mk ("inst_choice(" ^ arg_str ^ ")")) [] in
-      let res = C.create ~penalty:2 ~trail:Trail.empty new_lits proof in
+      let penalty = if C.proof_depth c = 0 then 1 else 2*(C.penalty c) in
+      let res = C.create ~penalty ~trail:Trail.empty new_lits proof in
       C.set_flag SClause.flag_is_choice_inst res  true;
       res in
 

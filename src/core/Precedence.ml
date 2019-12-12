@@ -336,7 +336,11 @@ let weight_fun_of_string ~signature s =
     "const", ignore_arg weight_constant] in
   try
     List.assoc s wf_map
-  with Not_found -> invalid_arg "KBO weight function not found"
+  with Not_found -> 
+    let options = List.fold_left (fun acc (opt, _) -> 
+      acc ^ " " ^ opt
+    ) "" wf_map in
+    invalid_arg @@ "KBO weight function not found@.Options: " ^ options
 
 (* default argument coefficients *)
 let arg_coeff_default _ = []

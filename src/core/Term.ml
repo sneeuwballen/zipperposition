@@ -193,7 +193,7 @@ let is_formula t = match T.view t with
     List.mem hd [Builtin.And; Builtin.Or; Builtin.Not; 
                  Builtin.Imply; Builtin.Equiv; 
                  Builtin.Xor; Builtin.ForallConst;
-                 Builtin.ExistsConst; Builtin.ChoiceConst]
+                 Builtin.ExistsConst]
   | _ -> false
 
 let is_var t = match T.view t with
@@ -1406,3 +1406,12 @@ let rec normalize_bools t =
       let l' = List.map normalize_bools l in
       if same_l l' l then t
       else app_builtin ~ty:(ty t) hd l'
+
+let vars_have_different_ids t =
+  let dif_vars = 
+    Seq.vars t
+    |> VarSet.of_seq
+    |> VarSet.to_list in
+  let dif_ids  = 
+    List.sort_uniq CCOrd.int @@ List.map HVar.id dif_vars in
+  List.length dif_ids = List.length dif_vars

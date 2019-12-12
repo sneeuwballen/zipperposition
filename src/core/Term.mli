@@ -208,6 +208,7 @@ module Seq : sig
 end
 
 val var_occurs : var:var -> t -> bool (** [var_occurs ~var t] true iff [var] in t *)
+val vars_have_different_ids: t-> bool (** no variable has the same id but different type *)
 
 val is_ground : t -> bool (** is the term ground? (no free vars) *)
 val is_linear : t -> bool (** is the term linear? (no vars occuring multiple times) *)

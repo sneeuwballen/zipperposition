@@ -348,8 +348,8 @@ module Make(X : sig
                                        | None -> t'
                                        | Some tt -> tt in
               Util.debugf ~section 5
-                "@[<2>rewrite `@[%a@]`@ into `@[%a@]`@ :proof (@[%a@])@]"
-                (fun k->k T.pp t T.pp new_t (Util.pp_list Proof.pp_parent) proof);
+                "@[<2>rewrite(%s) `@[%a@]`@ into `@[%a@]`@ :proof (@[%a@])@]"
+                (fun k->k name T.pp t T.pp new_t (Util.pp_list Proof.pp_parent) proof);
               reduce_term !_rewrite_rules new_t  (* re-apply all rules *)
           end
     in 
