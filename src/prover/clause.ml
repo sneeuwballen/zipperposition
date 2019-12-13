@@ -125,6 +125,20 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     | Literal.False -> true
     | _ -> false
 
+  let is_skolem_def lits = 
+    match lits with 
+    | [| Literal.Equation(lhs,rhs,true) |] ->
+      let hd, args = T.as_app lhs in
+      if T.is_const hd then (
+        let hd_id = T.as_const_exn hd in
+        if ID.is_skolem hd_id && List.for_all T.is_var args then (
+          begin match T.view rhs with 
+          | T.AppBuiltin(Builtin.ChoiceConst, _) -> true
+          | _ -> false end
+        ) else false
+      ) else false 
+    | _ -> false
+
   let create_a ~penalty ~trail lits proof =
     (* remove spurious "false" literals automatically *)
     let lits =
@@ -133,7 +147,9 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       else lits
     in
     let selected = lazy (Ctx.select lits) in
-    create_inner ~penalty ~selected (SClause.make ~trail lits) proof
+    let sclause = SClause.make ~trail lits in
+    if is_skolem_def lits then SClause.set_flag SClause.flag_is_skolem_def sclause true;
+    create_inner ~penalty ~selected sclause proof
 
   let create ~penalty ~trail lits proof =
     (* let lits = List.fast_sort (fun l1 l2 -> -CCInt.compare (Lit.hash l1) (Lit.hash l2)) lits in *)
@@ -482,10 +498,11 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
           (Iter.of_array_i lits)
       )
     in
-    Format.fprintf out "@[%a@[<2>%a%a@]@]/id:%d/depth:%d"
+    Format.fprintf out "@[%a@[<2>%a%a@]@]/id:%d/depth:%d/sk_def:%b"
       SClause.pp_vars c.sclause pp_lits c.sclause.lits
       SClause.pp_trail c.sclause.trail c.sclause.id
-      (proof_depth c);
+      (proof_depth c)
+      (get_flag SClause.flag_is_skolem_def c);
     ()
 
   let pp_tstp out c = SClause.pp_tstp out c.sclause

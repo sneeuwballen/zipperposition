@@ -1194,7 +1194,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           "@[<>@[%a@]@ @[<2>prune_arg_fun into@ @[%a@]@]@ with @[%a@]@]"
           (fun k->k C.pp c C.pp c' Subst.pp subst);
       SimplM.return_new c'
-    )
+    ) 
     (* TODO: Simplified flag like in first-order? Profiler?*)
 
   let setup () =
@@ -1230,7 +1230,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             fun c ->  match Statement.get_rw_rule c with
                         | Some _ -> E.CR_drop
                         | None -> E.CR_skip ));
-
+      
       begin match Env.flex_get k_prune_arg_fun with
       | `PruneMaxCover -> Env.add_unary_simplify (prune_arg ~all_covers:false);
       | `PruneAllCovers -> Env.add_unary_simplify (prune_arg ~all_covers:true);

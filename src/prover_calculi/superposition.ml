@@ -234,6 +234,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             (* Util.debugf ~section 3 "@[ Filtering vars %a,1  @]" (fun k-> k T.pp t); *)
             (sup_t_f || not (Term.is_true_or_false t)) &&
             (not (T.is_var t) || T.is_ho_var t))
+      |> Iter.filter (fun (t, _) ->
+         let hd, args = T.as_app t in
+         not (C.get_flag SClause.flag_is_skolem_def c) ||
+         not (Term.is_const hd && ID.is_skolem (Term.as_const_exn hd) &&
+                 CCList.for_all T.is_var args))
       (* TODO: could exclude more variables from the index:
          they are not needed if they occur with the same args everywhere in the clause *)
       |> Iter.filter (fun (t, _) ->
@@ -306,6 +311,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       |> Iter.filter (fun (l,r,_,_) -> 
           (sup_with_pure_vars || not (Term.is_var l) || not (Term.is_var r))
           && (sup_t_f || not (Term.is_true_or_false l)))
+      |> Iter.filter (fun (l,r,_,_) ->
+          if C.get_flag SClause.flag_is_skolem_def c then (
+            let hd, args = T.as_app l in
+            not (Term.is_const hd && ID.is_skolem (Term.as_const_exn hd) &&
+                 CCList.for_all T.is_var args)
+          ) else true)
       |> Iter.filter((fun (l, _, _, _) -> not (T.equal l T.false_)))
       |> Iter.fold
         (fun tree (l, _, sign, pos) ->
@@ -316,14 +327,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* terms that can be demodulated: all subterms (but vars) *)
     _idx_back_demod :=
       (* TODO: allow demod under lambdas under certain conditions (DemodExt) *)
-      Lits.fold_terms ~vars:false ~var_args:(demod_in_var_args) ~fun_bodies:lambda_demod  
-                      ~ty_args:false ~ord ~subterms:true ~which:`All
-        ~eligible:C.Eligible.always (C.lits c)
-      |> Iter.fold
-        (fun tree (t, pos) ->
-           let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
-           f tree t with_pos)
-        !_idx_back_demod;
+        Lits.fold_terms ~vars:false ~var_args:(demod_in_var_args) ~fun_bodies:lambda_demod  
+                        ~ty_args:false ~ord ~subterms:true ~which:`All
+          ~eligible:C.Eligible.always (C.lits c)
+        |> Iter.fold
+          (fun tree (t, pos) ->
+              let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
+              f tree t with_pos)
+          !_idx_back_demod;
     Signal.ContinueListening
 
   (* update simpl. index using the clause [c] just added or removed to
@@ -331,24 +342,31 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let _update_simpl f c =
     assert (CCArray.for_all Lit.no_prop_invariant (C.lits c));
     let idx = !_idx_simpl in
-    let idx' = match C.lits c with
-      | [| Lit.Equation (l,r,true) |] ->
-        begin match Ordering.compare ord l r with
-          | Comparison.Gt ->
-            f idx (l,r,true,c)
-          | Comparison.Lt ->
-            assert(not (T.is_true_or_false r));
-            f idx (r,l,true,c)
-          | Comparison.Incomparable ->
-            assert(T.is_var (T.head_term l) || not (T.is_true_or_false l));
-            let idx = f idx (l,r,true,c) in
-            f idx (r,l,true,c)
-          | Comparison.Eq -> idx  (* no modif *)
-        end
-      | [| Lit.Equation (l,r,false) |] ->
-         assert(not (T.equal r T.true_ || T.equal r T.false_));
-        f idx (l,r,false,c)
-      | _ -> idx
+    let idx' = 
+        match C.lits c with
+        | [| Lit.Equation (l,r,true) |] 
+            when C.get_flag SClause.flag_is_skolem_def c ->
+          let hd, args = T.as_app l in
+          assert(T.is_const hd && ID.is_skolem (T.as_const_exn hd) &&
+                 List.for_all T.is_var args);
+          f idx (r,l,true,c)
+        | [| Lit.Equation (l,r,true) |] ->
+          begin match Ordering.compare ord l r with
+            | Comparison.Gt ->
+              f idx (l,r,true,c)
+            | Comparison.Lt ->
+              assert(not (T.is_true_or_false r));
+              f idx (r,l,true,c)
+            | Comparison.Incomparable ->
+              assert(T.is_var (T.head_term l) || not (T.is_true_or_false l));
+              let idx = f idx (l,r,true,c) in
+              f idx (r,l,true,c)
+            | Comparison.Eq -> idx  (* no modif *)
+          end
+        | [| Lit.Equation (l,r,false) |] ->
+          assert(not (T.equal r T.true_ || T.equal r T.false_));
+          f idx (l,r,false,c)
+        | _ -> idx
     in
     _idx_simpl := idx';
     Signal.ContinueListening
@@ -843,6 +861,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       |> Iter.filter (fun (l,r,_,_) -> 
           (Env.flex_get k_sup_w_pure_vars || not (Term.is_var l) || not (Term.is_var r))
           && (Env.flex_get k_sup_true_false || not (Term.is_true_or_false l)))
+      |> Iter.filter (fun (l,r,_,_) ->
+          if C.get_flag SClause.flag_is_skolem_def clause then (
+            let hd, args = T.as_app l in
+            not (Term.is_const hd && ID.is_skolem (Term.as_const_exn hd) &&
+                 CCList.for_all T.is_var args)
+          ) else true)
       |> Iter.flat_map
         (fun (s, t, _, s_pos) ->
           let do_sup u_p with_pos subst =
@@ -883,6 +907,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (C.lits clause)
       |> Iter.filter (fun (u_p, _) -> not (T.is_var u_p) || T.is_ho_var u_p)
       |> Iter.filter (fun (u_p, _) -> T.DB.is_closed u_p)
+      |> Iter.filter (fun (u_p, _) -> 
+         let hd, args = T.as_app u_p in
+         not (C.get_flag SClause.flag_is_skolem_def clause) ||
+         not (Term.is_const hd && ID.is_skolem (Term.as_const_exn hd) &&
+                 CCList.for_all T.is_var args))
       |> Iter.filter (fun (u_p, _) -> 
           Env.flex_get k_sup_at_var_headed || not (T.is_var (T.head_term u_p)))
       |> Iter.flat_map
@@ -2026,6 +2055,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         set
     in
     let set' = match C.lits given with
+      | [|Lit.Equation (l,r,true) |] when C.get_flag SClause.flag_is_skolem_def given ->
+        recurse ~oriented:false set r l 
       | [|Lit.Equation (l,r,true) |] ->
         begin match Ordering.compare ord l r with
           | Comp.Gt -> recurse ~oriented:true set l r
@@ -2775,31 +2806,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | _ -> assert false
       with Invalid_argument _ -> []
     ) else []
-
-   
-  let recognize_skolem_defs st =
-    let is_skolem_def c = 
-      match C.lits c with 
-      | [| Literal.Equation(lhs,rhs,true) |] ->
-        let hd, args = T.as_app lhs in
-        if T.is_const hd then (
-          let hd_id = T.as_const_exn hd in
-          if ID.is_skolem hd_id && List.for_all T.is_var args then (
-            begin match T.view rhs with 
-            | T.AppBuiltin(Builtin.ChoiceConst, _) -> true
-            | _ -> false end
-          ) else false
-        ) else false 
-      | _ -> false
-    in
-
-    Env.cr_return @@ List.map (fun c -> 
-      if is_skolem_def c then (
-        let lits = CCArray.to_list (C.lits c) in
-        let res = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits (C.proof_step c) in
-        C.set_flag SClause.flag_is_skolem_def res true;
-        res
-      ) else c) (C.of_statement st)
 
   (** {2 Registration} *)
 
