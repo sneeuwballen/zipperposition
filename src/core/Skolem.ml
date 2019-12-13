@@ -233,7 +233,7 @@ let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~parents form 
     def in
   let res = 
   if not rw_rules then (
-    (* Format.printf "defining:@ @[%a@]\n" T.pp form; *)
+    Format.printf "defining:@ @[%a@]@." T.pp form;
 
     match find_def_in_ctx ~ctx form with
     | Some (def, subst) ->
@@ -241,8 +241,8 @@ let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~parents form 
       assert (T.equal form (T.Subst.eval ~rename_binders:false subst def.form));
       (* nothing is bound in form *)
       assert(T.equal form (T.Subst.eval ~rename_binders:false subst form));
-      Util.debugf ~section 1 "@[Reusing definition %a. Old def: %a. New def: %a]"
-        (fun k -> k T.pp def.proxy T.pp def.form T.pp form);
+      CCFormat.printf "@[Reusing definition %a. Old def: %a. New def: %a]@."
+        T.pp def.proxy T.pp def.form T.pp form;
       let proxy = T.Subst.eval subst def.proxy in
       let proof = Proof.Step.define_internal def.proxy_id parents in
       let res = {

@@ -781,7 +781,7 @@ let mk_choice_no_args ~ty =
 let mk_choice ~arg =
   let _, args, ret = Ty.unfold (ty_exn arg) in
   assert (Ty.is_prop ret);
-  assert (List.length args = 1);
+  assert(List.length args = 1);
   let arg_ty = List.hd args in
 
   let ty = 
@@ -1561,8 +1561,8 @@ let app_infer ?st ?subst f l =
 let try_alpha_renaming f1 f2 = 
   let rec aux subst = function 
     | [] -> subst
-    | (f1,f2) :: rest -> 
-      match view f1, view f2 with
+    | (f1,f2) :: rest when CCOpt.equal equal (ty f1) (ty f2) -> 
+      begin match view f1, view f2 with
       | Var v, Var v' ->
         begin match Subst.find subst v with 
         | Some t -> begin match view t with
@@ -1584,7 +1584,8 @@ let try_alpha_renaming f1 f2 =
         let subst = if not (Var.equal v v') then Subst.add subst v (var v') 
                     else subst in
         aux subst ((body, body') ::  rest)
-      | _ -> raise (UnifyFailure ("unknown constructors",[],None)) 
+      | _ -> raise (UnifyFailure ("unknown constructors",[],None)) end 
+    | _ -> raise (UnifyFailure ("types are not equal", [], None))
   in
   try
     if not @@ Iter.is_empty 

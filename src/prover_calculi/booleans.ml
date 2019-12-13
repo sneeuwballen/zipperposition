@@ -269,6 +269,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     match idx with 
     | Some _ ->
+      CCFormat.printf "cnf_otf:@[%a@]@." C.pp c;
       let f = Literals.Conv.to_tst (C.lits c) in
       let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "cnf_otf") ~tags:[Proof.Tag.T_ho] [C.proof_parent c] in
       let trail = C.trail c and penalty = C.penalty c in

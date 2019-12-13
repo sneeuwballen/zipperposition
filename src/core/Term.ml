@@ -1211,9 +1211,9 @@ module Conv = struct
           begin match l with 
           | [ty_arg] ->
             ST.app_builtin ~ty:(aux_ty @@ ty (head_term_mono t)) Builtin.ChoiceConst []
-          | ty_arg :: (arg :: rest as l) ->
-            let ty = aux_ty @@ ty (head_term_mono t) in
-            ST.app_builtin ~ty Builtin.ChoiceConst (List.map (aux_t env) l) 
+          | ty_arg :: (arg :: rest) ->
+            let ty = aux_ty @@ ty t in
+            ST.app_builtin ~ty Builtin.ChoiceConst (List.map (aux_t env) (arg::rest))
           | _ -> invalid_arg "choice can must have at least one argument"
           end
         | AppBuiltin (b,l) ->
