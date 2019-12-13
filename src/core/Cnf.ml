@@ -1302,7 +1302,7 @@ let type_declarations seq =
   |> ID.Map.of_seq
 
 let convert seq =
-  let module A = UntypedAST in
+  (* let module A = UntypedAST in *)
   (* used for conversion *)
   let t_ctx = Term.Conv.create() in
   let ty_ctx = Type.Conv.create() in
