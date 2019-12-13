@@ -781,7 +781,7 @@ let mk_choice_no_args ~ty =
 let mk_choice ~arg =
   let _, args, ret = Ty.unfold (ty_exn arg) in
   assert (Ty.is_prop ret);
-  assert (List.length args = 1);
+  assert(List.length args = 1);
   let arg_ty = List.hd args in
 
   let ty = 

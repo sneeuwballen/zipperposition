@@ -17,6 +17,8 @@ let cr_var_mul   = ref 1.1
 let parameters_magnitude = ref `Large
 let goal_penalty = ref false
 
+let section = Util.Section.make ~parent:Const.section "cq"
+
 let profiles_ =
   let open ClauseQueue_intf in
   [ "default", P_default
@@ -131,8 +133,6 @@ module Make(C : Clause_intf.S) = struct
         int_of_float (weight c *. (1.25 ** (app_var_num c *. (1.35 ** p_depth c)))
                                *. (0.85 ** formulas_num c)
                                *. 1.05 ** t_depth c) in
-      Util.debugf 5 "[C_W:]@ @[%a@]@ :@ %d(%g, %g, %g).\n"
-        (fun k -> k C.pp c res (app_var_num c) (formulas_num c) (p_depth c));
       res
 
     let avoid_expensive c =
@@ -266,9 +266,7 @@ module Make(C : Clause_intf.S) = struct
                       | None -> 1.0 in
                     1.0 /. divider
                   ) else 1.0 in
-                let val_ = int_of_float (goal_dist_penalty *. dist_var_penalty *. res) in
-                (Util.debugf  20 "cl: %a, w:%d\n" (fun k -> k C.pp c val_);
-                val_))
+                int_of_float (goal_dist_penalty *. dist_var_penalty *. res))
 
 
     let penalty = C.penalty
@@ -450,7 +448,11 @@ module Make(C : Clause_intf.S) = struct
       let splitted = CCString.split ~by:"(" s in
       let name = List.hd splitted in
       let w = List.assoc name parsers s in
-      penalize w
+      penalize (fun c -> 
+        let res = w c in
+        Util.debugf ~section 1 "clause_weight_@[%s@]([%a@]):%d." (fun k -> k name C.pp c res);
+        res
+      )
     with Not_found | Failure _ -> 
       invalid_arg (CCFormat.sprintf "unknown weight function %s" s)
     

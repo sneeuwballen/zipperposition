@@ -569,6 +569,7 @@ let skolemize ~ctx f =
     | F.Exists (var,f') ->
       (* enocode ∃x. F x as ∃(\x. F x) *)
       let lambda_f' = T.fun_l [var] (T.Subst.eval subst f') in
+      assert (T.Ty.is_prop (T.ty_exn f'));
 
       (* replace [v] by a fresh skolem term *)
       let t = Skolem.skolem_form ~ctx subst var f in
