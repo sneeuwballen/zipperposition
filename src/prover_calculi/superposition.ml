@@ -1855,11 +1855,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         |> CCList.map (fun v -> (HVar.id v))
         |> (fun vars -> assert (CCList.length (CCList.uniq ~eq:CCInt.equal vars) == CCList.length vars)); *)
       (* return simplified clause *)
-      if not (C.lits new_c |> Literals.vars_distinct) then (
-        CCFormat.printf "c:@[%a@]@." C.pp new_c;
-        CCFormat.printf "p:@[%a@]@." Proof.S.pp_tstp (C.proof new_c);
-        assert false;
-      );
+      assert (C.lits new_c |> Literals.vars_distinct);
       SimplM.return_new new_c
     )
 
@@ -2779,6 +2775,31 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | _ -> assert false
       with Invalid_argument _ -> []
     ) else []
+
+   
+  let recognize_skolem_defs st =
+    let is_skolem_def c = 
+      match C.lits c with 
+      | [| Literal.Equation(lhs,rhs,true) |] ->
+        let hd, args = T.as_app lhs in
+        if T.is_const hd then (
+          let hd_id = T.as_const_exn hd in
+          if ID.is_skolem hd_id && List.for_all T.is_var args then (
+            begin match T.view rhs with 
+            | T.AppBuiltin(Builtin.ChoiceConst, _) -> true
+            | _ -> false end
+          ) else false
+        ) else false 
+      | _ -> false
+    in
+
+    Env.cr_return @@ List.map (fun c -> 
+      if is_skolem_def c then (
+        let lits = CCArray.to_list (C.lits c) in
+        let res = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits (C.proof_step c) in
+        C.set_flag SClause.flag_is_skolem_def res true;
+        res
+      ) else c) (C.of_statement st)
 
   (** {2 Registration} *)
 

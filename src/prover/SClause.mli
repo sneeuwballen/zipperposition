@@ -46,6 +46,7 @@ val flag_backward_simplified : flag (** clause has been backward simplified *)
 
 val flag_is_choice_inst : flag (** clause has been backward simplified *)
 
+val flag_is_skolem_def : flag (** clause is a definition of skolem in terms of choice*) 
 
 val set_flag : flag -> t -> bool -> unit (** set boolean flag *)
 

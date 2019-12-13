@@ -1202,7 +1202,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debug ~section 1 "HO rules disabled";
     ) else (
       Util.debug ~section 1 "setup HO rules";
-      Env.Ctx.lost_completeness();
+      Env.Ctx.lost_completeness ();
       Env.add_basic_simplify penalize_choice;
       Env.add_unary_inf "ho_complete_eq" complete_eq_args;
       if Env.flex_get k_elim_pred_var then
@@ -1364,8 +1364,6 @@ let extension =
     E.flex_add k_unif_max_depth !_unif_max_depth;
     E.flex_add k_prune_arg_fun !_prune_arg_fun;
     E.flex_add k_prim_enum_terms prim_enum_terms;
-
-
 
     if E.flex_get k_some_ho || !force_enabled_ then (
       let module ET = Make(E) in
