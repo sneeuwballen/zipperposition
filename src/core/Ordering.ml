@@ -127,6 +127,10 @@ end
 
 (* compare the two heads (ID or builtin or variable) using the precedence *)
 let prec_compare prec a b = match a,b with
+  (* make sure choice is the largest symbol *)
+  | Head.B Builtin.ChoiceConst, Head.B Builtin.ChoiceConst -> Eq
+  | Head.B Builtin.ChoiceConst, _-> Gt
+  | _, Head.B Builtin.ChoiceConst -> Lt
   | Head.I a, Head.I b ->
     begin match Prec.compare prec a b with
       | 0 -> Eq
@@ -209,6 +213,7 @@ module KBO : ORD = struct
   let weight_var_headed = W.one
 
   let weight prec = function
+    | Head.B Builtin.ChoiceConst -> W.int 50 (* make choice very heavy *)
     | Head.B _ -> W.one
     | Head.I s -> Prec.weight prec s
     | Head.V _ -> weight_var_headed

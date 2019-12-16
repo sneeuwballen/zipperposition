@@ -55,6 +55,7 @@ let flag_persistent = new_flag ()
 let flag_redundant = new_flag ()
 let flag_backward_simplified = new_flag()
 let flag_is_choice_inst = new_flag ()
+let flag_is_skolem_def = new_flag ()
 
 let set_flag flag c truth =
   if truth

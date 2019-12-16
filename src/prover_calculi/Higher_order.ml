@@ -706,11 +706,13 @@ module Make(E : Env.S) : S with module Env = E = struct
         [choice_inst_of_hd hd_mono arg; choice_inst_of_hd hd_mono (neg_trigger arg)]
       | _ -> assert (false) in
 
-    C.Seq.terms c 
-    |> Iter.flat_map Term.Seq.subterms
-    |> Iter.filter is_choice_subterm
-    |> Iter.flat_map_l build_choice_inst
-    |> Iter.to_list
+    if C.get_flag SClause.flag_is_skolem_def c then []
+    else (
+      C.Seq.terms c 
+      |> Iter.flat_map Term.Seq.subterms
+      |> Iter.filter is_choice_subterm
+      |> Iter.flat_map_l build_choice_inst
+      |> Iter.to_list)
 
    let recognize_choice_ops c =
     let extract_not_p_x l = match l with
@@ -1194,7 +1196,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           "@[<>@[%a@]@ @[<2>prune_arg_fun into@ @[%a@]@]@ with @[%a@]@]"
           (fun k->k C.pp c C.pp c' Subst.pp subst);
       SimplM.return_new c'
-    )
+    ) 
     (* TODO: Simplified flag like in first-order? Profiler?*)
 
   let setup () =
@@ -1202,7 +1204,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debug ~section 1 "HO rules disabled";
     ) else (
       Util.debug ~section 1 "setup HO rules";
-      Env.Ctx.lost_completeness();
+      Env.Ctx.lost_completeness ();
       Env.add_basic_simplify penalize_choice;
       Env.add_unary_inf "ho_complete_eq" complete_eq_args;
       if Env.flex_get k_elim_pred_var then
@@ -1230,7 +1232,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             fun c ->  match Statement.get_rw_rule c with
                         | Some _ -> E.CR_drop
                         | None -> E.CR_skip ));
-
+      
       begin match Env.flex_get k_prune_arg_fun with
       | `PruneMaxCover -> Env.add_unary_simplify (prune_arg ~all_covers:false);
       | `PruneAllCovers -> Env.add_unary_simplify (prune_arg ~all_covers:true);
@@ -1364,8 +1366,6 @@ let extension =
     E.flex_add k_unif_max_depth !_unif_max_depth;
     E.flex_add k_prune_arg_fun !_prune_arg_fun;
     E.flex_add k_prim_enum_terms prim_enum_terms;
-
-
 
     if E.flex_get k_some_ho || !force_enabled_ then (
       let module ET = Make(E) in

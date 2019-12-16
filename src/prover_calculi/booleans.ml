@@ -183,28 +183,27 @@ module Make(E : Env.S) : S with module Env = E = struct
         (* first clausify, then get bool subterms *)
         Literals.Seq.terms(C.lits c) 
         |> Iter.iter(find_bools true));
-      let res = 
-        Term.Tbl.fold(fun b (b_true, b_false) clauses ->
-          if cased_term_selection != Minimal ||
-            Term.Seq.subterms b |> 
-            Iter.for_all (fun st -> T.equal b st || 
-                                    not (Type.is_prop (T.ty st))) then (
-            let proof = Proof.Step.simp[C.proof_parent c]
-              ~rule:(Proof.Rule.mk"bool_case_simp") ~tags:[Proof.Tag.T_ho]
-            in
-            C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-              (b_true :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:T.false_)))
-            proof ::
-            C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-              (b_false :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:T.true_)))
-            proof ::
-            clauses)
-          else clauses) term_to_equations [] in
-      if CCList.is_empty res then None
+      if C.get_flag SClause.flag_is_skolem_def c then None
       else (
-        (* CCFormat.printf "bool case simp: %a.\n" C.pp c; *)
-        (* CCList.iteri (fun i nc -> CCFormat.printf "@[%d: @[%a@]@].\n" i C.pp nc) res; *)
-        Some res)
+        let res = 
+          Term.Tbl.fold(fun b (b_true, b_false) clauses ->
+            if cased_term_selection != Minimal ||
+              Term.Seq.subterms b |> 
+              Iter.for_all (fun st -> T.equal b st || 
+                                      not (Type.is_prop (T.ty st))) then (
+              let proof = Proof.Step.simp[C.proof_parent c]
+                ~rule:(Proof.Rule.mk"bool_case_simp") ~tags:[Proof.Tag.T_ho]
+              in
+              C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+                (b_true :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:T.false_)))
+              proof ::
+              C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+                (b_false :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:T.true_)))
+              proof ::
+              clauses)
+            else clauses) term_to_equations [] in
+        if CCList.is_empty res then None
+        else (Some res))
 
   let simpl_bool_subterms c =
     let new_lits = Literals.map T.simplify_bools (C.lits c) in
@@ -245,16 +244,18 @@ module Make(E : Env.S) : S with module Env = E = struct
       SimplM.return_same c 
     )
   
-  let cnf_otf c : C.t list option =   
-    let idx = CCArray.find_idx (fun l -> 
-      let eq = Literal.View.as_eqn l in
-      match eq with 
-      | Some (l,r,sign) -> 
-          Type.is_prop (T.ty l) && 
-            ((not (T.equal r T.true_) && not (T.equal r T.false_))
-              || T.is_formula l || T.is_formula r)
-      | None            -> false 
-    ) (C.lits c) in
+  let cnf_otf c : C.t list option =       
+    let idx =
+      if C.get_flag SClause.flag_is_skolem_def c then None 
+      else(
+        CCArray.find_idx (fun l -> 
+        let eq = Literal.View.as_eqn l in
+        match eq with 
+        | Some (l,r,sign) -> 
+            Type.is_prop (T.ty l) && 
+              ((not (T.equal r T.true_) && not (T.equal r T.false_))
+                || T.is_formula l || T.is_formula r)
+        | None-> false) (C.lits c)) in
 
     let renaming_weight = 40 in
     let max_formula_weight = 
