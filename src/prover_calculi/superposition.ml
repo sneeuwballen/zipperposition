@@ -89,9 +89,6 @@ let k_switch_stream_extraction = Flex_state.create_key ()
 let k_dont_simplify = Flex_state.create_key ()
 let k_use_semantic_tauto = Flex_state.create_key ()
 let k_restrict_fluidsup = Flex_state.create_key ()
-
-
-
 let _NO_LAMSUP = -1
 
 
@@ -108,15 +105,17 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       module Ctx = Ctx
       module C = C
     end)
-  module StmQ = StreamQueue.Make(Stm)
+  module StmQ = StreamQueue.Make(struct 
+    module Stm = Stm
+    module Env = Env end)
   module Bools = Booleans.Make(Env)
   module SS = SolidSubsumption.Make(struct let st = Env.flex_state () end)
 
   (** {6 Stream queue} *)
+  let k_stmq = Flex_state.create_key ()
 
-  type queue = {q : StmQ.t;}
 
-  let _stmq = {q = StmQ.default();}
+  let _stmq () = Env.flex_get k_stmq
 
   (** {6 Index Management} *)
 
@@ -986,7 +985,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         clause
     in
     let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) inf_res in
-    StmQ.add_lst _stmq.q stm_res; []
+    StmQ.add_lst (_stmq()) stm_res; []
 
   let infer_passive_complete_ho clause =
     let inf_res = infer_passive_aux
@@ -998,7 +997,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         clause
     in
     let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) inf_res in
-    StmQ.add_lst _stmq.q stm_res; []
+    StmQ.add_lst (_stmq()) stm_res; []
 
   let infer_active_pragmatic_ho max_unifs clause =
     let inf_res = infer_active_aux
@@ -1076,7 +1075,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       else []
     in
     let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) new_clauses in
-    StmQ.add_lst _stmq.q stm_res;
+    StmQ.add_lst (_stmq()) stm_res;
     Util.exit_prof prof_infer_fluidsup_active;
     []
 
@@ -1129,7 +1128,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       else []
     in
     let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) new_clauses in
-    StmQ.add_lst _stmq.q stm_res;
+    StmQ.add_lst (_stmq()) stm_res;
     Util.exit_prof prof_infer_fluidsup_passive;
     []
 
@@ -1198,7 +1197,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       |> Iter.to_rev_list
     in
     let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) new_clauses in
-    StmQ.add_lst _stmq.q stm_res;
+    StmQ.add_lst (_stmq()) stm_res;
     Util.exit_prof prof_infer_fluidsup_active;
     []
 
@@ -1269,7 +1268,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       |> Iter.to_rev_list
     in
     let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) new_clauses in
-    StmQ.add_lst _stmq.q stm_res;
+    StmQ.add_lst (_stmq()) stm_res;
     Util.exit_prof prof_infer_fluidsup_passive;
     []
 
@@ -1333,7 +1332,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     let penalty = C.penalty clause in
     let stm_res = List.map (Stm.make ~penalty:penalty) inf_res in
-    StmQ.add_lst _stmq.q stm_res; []
+    StmQ.add_lst (_stmq()) stm_res; []
 
   let infer_equality_resolution_pragmatic_ho max_unifs clause =
     let inf_res = infer_equality_resolution_aux
@@ -1566,7 +1565,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     let penalty = C.penalty clause in
     let stm_res = List.map (Stm.make ~penalty:penalty) inf_res in
-    StmQ.add_lst _stmq.q stm_res; []
+    StmQ.add_lst (_stmq()) stm_res; []
 
   let infer_equality_factoring_pragmatic_ho max_unifs clause =
     let inf_res = infer_equality_factoring_aux
@@ -1587,9 +1586,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let extract_from_stream_queue ~full () =
     let cl =
       if full then
-        [StmQ.take_first_anyway _stmq.q]
+        [StmQ.take_first_anyway (_stmq())]
       else
-        StmQ.take_stm_nb _stmq.q
+        StmQ.take_stm_nb (_stmq())
     in
     let opt_res = CCOpt.sequence_l (List.filter CCOpt.is_some cl)
     in
@@ -1600,9 +1599,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let extract_from_stream_queue_fix_stm ~full () =
     let cl =
       if full then
-        [StmQ.take_first_anyway _stmq.q]
+        [StmQ.take_first_anyway (_stmq())]
       else
-        StmQ.take_stm_nb_fix_stm _stmq.q
+        StmQ.take_stm_nb_fix_stm (_stmq())
     in
     let opt_res = CCOpt.sequence_l (List.filter CCOpt.is_some cl)
     in
@@ -2787,6 +2786,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and backward_redundant = subsumed_in_active_set
     and is_trivial = is_tautology in
 
+    Env.flex_add k_stmq (StmQ.default ());
+
     if not @@ Env.flex_get k_sup_w_pure_vars then (
       Env.Ctx.lost_completeness ()
     );
@@ -2917,6 +2918,9 @@ let _solidification_limit = ref 5
 let _max_unifs_solid_ff = ref 20
 let _use_weight_for_solid_subsumption = ref false
 
+let _guard = ref 100
+let _ratio = ref 6
+
 let key = Flex_state.create_key ()
 
 let unif_params_to_def () =
@@ -2976,6 +2980,9 @@ let register ~sup =
   E.flex_add PragUnifParams.k_solidification_limit !_solidification_limit;
   E.flex_add PragUnifParams.k_max_unifs_solid_ff !_max_unifs_solid_ff;
   E.flex_add PragUnifParams.k_use_weight_for_solid_subsumption !_use_weight_for_solid_subsumption;
+
+  E.flex_add StreamQueue.k_guard !_guard;
+  E.flex_add StreamQueue.k_ratio !_ratio;
 
   let module JPF = JPFull.Make(struct let st = E.flex_state () end) in
   let module JPP = PUnif.Make(struct let st = E.flex_state () end) in
@@ -3063,7 +3070,11 @@ let () =
       "--ho-pattern-decider", Arg.Bool (fun b -> _pattern_decider := b), "turn pattern decider on or off";
       "--ho-solid-decider", Arg.Bool (fun b -> _solid_decider := b), "turn solid decider on or off";
       "--ho-fixpoint-decider", Arg.Bool (fun b -> _fixpoint_decider := b), "turn fixpoint decider on or off";
-      "--max-inferences", Arg.Int (fun p -> _max_infs := p), " set maximal number of inferences"];
+      "--max-inferences", Arg.Int (fun p -> _max_infs := p), " set maximal number of inferences";
+      "--stream-queue-guard", Arg.Set_int _guard, "set value of guard for streamQueue";
+      "--stream-queue-ratio", Arg.Set_int _ratio, "set value of ratio for streamQueue"
+      ];
+
   Params.add_to_mode "ho-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
       _sup_at_vars := true;
@@ -3119,5 +3130,4 @@ let () =
       _fluidsup := false;
     );
   Params.add_to_mode "fo-complete-basic" (fun () ->
-      _use_simultaneous_sup := false;
-    )
+      _use_simultaneous_sup := false;)

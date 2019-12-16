@@ -3,6 +3,8 @@
 
 (** {1 A priority queue of streams} *)
 
+open Logtk
+
 module type S = sig
   module Stm : Stream_intf.S
 

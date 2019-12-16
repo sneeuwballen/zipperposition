@@ -3,10 +3,20 @@
 
 (** {1 A priority queue of streams} *)
 
+open Logtk
 module type S = StreamQueue_intf.S
 
-module Make(Stm : Stream_intf.S) = struct
-  module Stm = Stm
+module type ARG = sig
+  module Stm : Stream.S
+  module Env : Env.S
+end
+
+let k_guard = Flex_state.create_key ()
+let k_ratio = Flex_state.create_key ()
+
+module Make(A : ARG) = struct
+  module Stm = A.Stm
+  module E = A.Env
 
   (** {6 Weight functions} *)
   module WeightFun = struct
@@ -219,9 +229,8 @@ module Make(Stm : Stream_intf.S) = struct
 
   let default () : t =
     let open WeightFun in
-    let weight = penalty
-    in
-    make ~guard:100 ~ratio:6 ~weight "default"
+    let weight = penalty in
+    make ~guard:(E.flex_get k_guard)  ~ratio:(E.flex_get k_ratio) ~weight "default"
 
   let pp out q = CCFormat.fprintf out "queue %s" (name q)
   let to_string = CCFormat.to_string pp
