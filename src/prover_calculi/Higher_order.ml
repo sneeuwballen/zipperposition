@@ -1442,7 +1442,7 @@ let () =
     );
   Params.add_to_mode "ho-competitive" (fun () ->
       enabled_ := true;
-      def_unfold_enabled_ := true;
+      def_unfold_enabled_ := false;
       force_enabled_ := true;
       _ext_axiom := false;
       _ext_neg_lit := false;
