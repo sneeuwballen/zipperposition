@@ -10,6 +10,7 @@ module P = PatternUnif
 module Params = PragUnifParams
 module I = Int32
 module IntSet = CCSet.Make(CCInt)
+module PUP = PragUnifParams
 
 let elim_vars = ref IntSet.empty
 let ident_vars = ref IntSet.empty
@@ -198,10 +199,19 @@ module Make (St : sig val st : Flex_state.t end) = struct
     if depth > 1 then int_of_float @@ log10 (float_of_int depth) *. get_option PUP.k_skip_multiplier
     else 0 
 
+  let log100 x = (log10 x) /. 2.0
+
+  let max_skipped = ref 0 
+  let skip depth = 
+    if depth > max !max_skipped 1 then (
+      max_skipped := depth;
+      int_of_float ((log100 (float_of_int depth)) *. get_option PUP.k_skip_multiplier)
+    )else (if depth = 0 then 0 else 3)
+  
   let delay depth res =
     OSeq.append
       (OSeq.take (skip depth) (OSeq.repeat None))
-      res
+    res
 
   (*Create all possible projection and imitation bindings. *)
   let proj_imit_lr ?(disable_imit=false) ~counter ~scope ~subst s t flag =
@@ -359,5 +369,6 @@ module Make (St : sig val st : Flex_state.t end) = struct
     (fun x y ->
        elim_vars := IntSet.empty;
        ident_vars := IntSet.empty;
+       max_skipped := 0;
        OSeq.map (CCOpt.map Unif_subst.of_subst) (PragUnif.unify_scoped x y))
 end
