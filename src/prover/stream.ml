@@ -19,12 +19,13 @@ module Make(A:ARG) = struct
 
   type t = {
     id : int; (** unique ID of the stream *)
-    penalty: int; (** heuristic penalty *)
+    mutable penalty: int; (** heuristic penalty, increased by every drip *)
+    mutable nones : int; (** how many failed attemts to retrieve unifier were there  *)
     mutable stm : C.t option OSeq.t; (** the stream itself *)
   }
 
   exception Empty_Stream
-  exception Drip_n_Unfinished of C.t option list * int
+  exception Drip_n_Unfinished of C.t option list * int * int
 
   let id_count_ = ref 0
 
@@ -34,7 +35,7 @@ module Make(A:ARG) = struct
     Util.incr_stat stat_stream_create;
     let id = !id_count_ in
     incr id_count_;
-    { id; penalty = p; stm = s; }
+    { id; penalty = p; nones=0; stm = s; }
 
   let equal s1 s2 = s1.id = s2.id
   let compare s1 s2 = Pervasives.compare s1.id s2.id
@@ -49,50 +50,60 @@ module Make(A:ARG) = struct
 
   let penalty s = s.penalty
 
+  let clause_penalty s = function 
+    | None ->
+      s.nones <- s.nones +1;
+      4
+    | Some c -> max (C.penalty c) (C.proof_depth c )
+  
   let drip s =
     match s.stm () with
     | OSeq.Nil -> raise Empty_Stream
     | OSeq.Cons (hd,tl) ->
       s.stm <- tl;
+      s.penalty <-  s.penalty + (clause_penalty s hd);
       hd
   (* let dripped = OSeq.nth 0 s.stm in
      s.stm <- OSeq.drop 1 s.stm;
      dripped *)
 
-  let rec _drip_n st n guard =
-    if guard = 0 then (st,[])
-    else
-      match n with
-      | 0 -> (st,[])
-      | _ ->
-        match st () with
-        | OSeq.Nil -> raise (Drip_n_Unfinished([],n))
-        | OSeq.Cons (hd,tl) ->
-          match hd with
-          | None -> (
-              try
-                let (s',tl_res) = _drip_n tl n (guard - 1) in
-                (s',tl_res)
-              with
-              | Drip_n_Unfinished (partial_res,n') -> raise (Drip_n_Unfinished((hd::partial_res),n'))
-            )
-          | _ -> (
-              try
-                let (s',tl_res) = _drip_n tl (n-1) (guard - 1) in
-                (s',(hd::tl_res))
-              with
-              | Drip_n_Unfinished (partial_res,n') -> raise (Drip_n_Unfinished((hd::partial_res),n'))
-            )
-
   let drip_n s n guard =
+    let rec _drip_n st n guard =
+      if guard = 0 then (st,0,[])
+      else
+        match n with
+        | 0 -> (st,0,[])
+        | _ ->
+          match st () with
+          | OSeq.Nil -> raise (Drip_n_Unfinished([],0,n))
+          | OSeq.Cons (hd,tl) ->
+            let p = clause_penalty s hd in
+            match hd with
+            | None -> (
+                try
+                  let (s',p_tl,tl_res) = _drip_n tl n (guard - 1) in
+                  (s',p+p_tl,tl_res)
+                with
+                | Drip_n_Unfinished (partial_res,p_partial,n') -> raise (Drip_n_Unfinished((hd::partial_res),p+p_partial,n'))
+              )
+            | _ -> (
+                try
+                  let (s',p_tl,tl_res) = _drip_n tl (n-1) (guard - 1) in
+                  (s',p+p_tl,(hd::tl_res))
+                with
+                | Drip_n_Unfinished (partial_res,p_partial,n') -> raise (Drip_n_Unfinished((hd::partial_res),p+p_partial,n')))
+    in
+
     try
-      let (s',cl) = _drip_n s.stm n guard in
+      let (s',p_add,cl) = _drip_n s.stm n guard in
+      s.penalty <- s.penalty + p_add;
       s.stm <- s';
       cl
     with
-    | Drip_n_Unfinished (res,n') ->
+    | Drip_n_Unfinished (res,p_add,n') ->
       s.stm <- OSeq.empty;
-      raise (Drip_n_Unfinished (res,n'))
+      s.penalty <- s.penalty + p_add;
+      raise (Drip_n_Unfinished (res,p_add,n'))
 
   let pp out s =
     Format.fprintf out "stream %i" s.id;

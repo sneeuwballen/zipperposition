@@ -346,6 +346,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
       exception NotInFragment = PatternUnif.NotInFragment
       exception NotUnifiable = PatternUnif.NotUnifiable
       type flag_type = int32
+      let flex_state = St.st
       let init_flag = (Int32.zero:flag_type)
       let identify_scope = renamer ~counter
       let frag_algs = deciders ~counter (*[]*)

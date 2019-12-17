@@ -82,44 +82,6 @@ module Make(A : ARG) = struct
 
   let add_lst q sl = List.iter (add q) sl
 
-  (* let rec _take_first_when_available guard q =
-   *   if H.is_empty q.hp then None (\* TODO: replace with cheaper test q.stm_nb = 0 ? *\)
-   *   else (
-   *     if guard = 0 then raise Not_found;
-   *     if q.time_before_drip = 0
-   *     then (
-   *       let dripped = ref None in
-   *       let reduced_hp, (w, s) = H.take_exn q.hp in
-   *       let new_hp =
-   *        (
-   *           try
-   *             dripped := Stm.drip s;
-   *             H.insert (w + (1), s) reduced_hp
-   *           (\* No matter if a clause or None is dripped the penalty is the same:
-   *              TODO: should the penalty be higher when None is dripped? *\)
-   *           with
-   *             | Stm.Empty_Stream ->
-   *               assert (q.stm_nb > 0);
-   *               q.stm_nb <- q.stm_nb - 1;
-   *               reduced_hp
-   *         ) in
-   *       q.hp <- new_hp;
-   *       match !dripped with
-   *         | None -> _take_first_when_available (guard-1) q
-   *         | Some _ ->
-   *           q.time_before_drip <- q.ratio;
-   *           !dripped
-   *     ) else (
-   *       assert (q.time_before_drip > 0);
-   *       q.time_before_drip <- q.time_before_drip - 1;
-   *       None
-   *     )
-   *   )
-   * 
-   * let take_first_when_available q =
-   *   assert (q.guard >= 0);
-   *   _take_first_when_available q.guard q *)
-
   let rec _take_first guard q =
     if H.is_empty q.hp then None (* TODO: replace with cheaper test q.stm_nb = 0 ? *)
     else (
@@ -130,7 +92,7 @@ module Make(A : ARG) = struct
         (
           try
             dripped := Stm.drip s;
-            H.insert (w + Stm.penalty s , s) reduced_hp
+            H.insert (q.weight s , s) reduced_hp
           (* No matter if a clause or None is dripped the penalty is the same:
              TODO: should the penalty be higher when None is dripped? *)
           with
@@ -159,7 +121,7 @@ module Make(A : ARG) = struct
         (
           try
             dripped := Stm.drip s;
-            H.insert (w + Stm.penalty s, s) reduced_hp
+            H.insert (q.weight s, s) reduced_hp
           with
           | Stm.Empty_Stream ->
             assert (q.stm_nb > 0);
@@ -170,7 +132,7 @@ module Make(A : ARG) = struct
       match !dripped with
       | None -> take_first_anyway q
       | Some _ ->
-        q.time_before_fair <- q.ratio; (* TODO: is this still necessary here? *)
+        (* q.time_before_fair <- q.ratio; TODO: is this still necessary here? *)
         !dripped
     )
 
@@ -206,18 +168,16 @@ module Make(A : ARG) = struct
         else
           (
             let res = Stm.drip_n s n q.guard in
-            q.hp <- H.insert (w +  n * Stm.penalty s, s) red_hp;
+            q.hp <- H.insert (q.weight s, s) red_hp;
             res
           )
       with
-      | Stm.Drip_n_Unfinished (res', n') ->
+      | Stm.Drip_n_Unfinished (res', _, n') ->
         _take_stm_nb_fix_stm q n' (res'@res)
 
   let take_stm_nb_fix_stm q =
     if q.time_before_fair = 0 then (
       q.time_before_fair <- q.ratio;
-      (* TODO: the heap is fully traversed two times, can both operations be done with one traversal? *)
-      q.hp <- H.filter (fun (_,s) -> not (Stm.is_empty s)) q.hp;
       H.fold (fun res (_,s) -> Stm.drip s :: res) [] q.hp
     ) else (
       q.time_before_fair <- q.time_before_fair - 1;

@@ -13,15 +13,19 @@ module Make (S : sig val st: Flex_state.t end) = struct
 
   let get_op k = Flex_state.get_exn k S.st
 
+  let log100 x = (log10 x) /. 2.0
+
+  let max_skipped = ref 0 
   let skip depth = 
-    if depth > 1 then
-      int_of_float ((log10 (float_of_int depth)) *. get_op PUP.k_skip_multiplier)
-    else 0
+    if depth > max !max_skipped 1 then (
+      max_skipped := depth;
+      int_of_float ((log100 (float_of_int depth)) *. get_op PUP.k_skip_multiplier)
+    )else (if depth = 0 then 0 else 5)
 
   let delay depth res =
     OSeq.append
       (OSeq.take (skip depth) (OSeq.repeat None))
-      res
+    res
 
   let iter_rule ?(flex_same=false) ~counter ~scope t u depth  =
     JP_unif.iterate ~flex_same ~scope ~counter t u []
@@ -104,6 +108,7 @@ module Make (S : sig val st: Flex_state.t end) = struct
       match head_classifier s, head_classifier t with 
       | `Flex x, `Flex y when HVar.equal Type.equal x y ->
         (* eliminate + iter *)
+        delay depth @@
         OSeq.append
           (OSeq.map (fun x -> Some x) @@
            PUnif.elim_subsets_rule ~max_elims:None ~elim_vars ~counter ~scope s t depth)
@@ -121,7 +126,7 @@ module Make (S : sig val st: Flex_state.t end) = struct
         OSeq.append
           (let flex, rigid = if Term.is_var (T.head_term s) then s,t else t,s in
            hs_proj_flex_rigid ~counter ~scope ~flex rigid depth)
-          (imit_rule ~counter ~scope s t depth)
+          (delay depth @@ imit_rule ~counter ~scope s t depth)
       | _ -> 
         assert false)
 
@@ -132,6 +137,7 @@ module Make (S : sig val st: Flex_state.t end) = struct
       exception NotInFragment = PatternUnif.NotInFragment
       exception NotUnifiable = PatternUnif.NotUnifiable
       type flag_type = int
+      let flex_state = S.st 
       let init_flag = (0:flag_type)
       let identify_scope = renamer ~counter
       let frag_algs = deciders ~counter
@@ -144,5 +150,6 @@ module Make (S : sig val st: Flex_state.t end) = struct
     (fun x y ->
        elim_vars := IntSet.empty;
        ident_vars := IntSet.empty;
+       max_skipped := 0;
        OSeq.map (CCOpt.map Unif_subst.of_subst) (JPFull.unify_scoped x y))
 end
