@@ -242,7 +242,7 @@ let iterate ?(flex_same=false) ~scope ~counter u v l =
 (* Apply a substitution and reduce to normal form. Comparison form is actually slightly different, but eta_expand also works. *)
 let nfapply s u = S.apply s u |> Lambda.snf |> Lambda.eta_expand
 
-let find_disagreement s t = 
+let find_disagreement s t =
   (* TODO: preferably one that is not below a variable (to get preunification if possible) *)
   let rec find_disagreement_l ?(applied_var = None) ?(argindex=0) ss tt = 
     match ss, tt with
@@ -277,14 +277,18 @@ let find_disagreement s t =
         find_disagreement_l ss tt 
       | T.App (f, ss), T.App (g, tt) when T.equal f g && T.is_var f -> 
         find_disagreement_l ~applied_var:(Some f) ss tt 
-      | T.AppBuiltin (f, ss), T.AppBuiltin (g, tt) when Builtin.equal f g -> 
+      | T.AppBuiltin (f, ss), T.AppBuiltin (g, tt) when Builtin.equal f g && List.length ss = List.length tt ->
+        (* ss and tt do not have to be of the same size -- AND/OR are n-ary operators *)
         find_disagreement_l ss tt 
       | T.Var _, T.Var _ when T.equal s t -> OSeq.empty
       | T.DB i, T.DB j when i = j -> OSeq.empty
       | T.Const a, T.Const b when ID.equal a b -> OSeq.empty
       | T.Fun (ty_s, s'), T.Fun (ty_t, t') -> 
-        assert (Type.equal ty_s ty_t); 
-        find_disagreement_aux s' t'
+        (* type can be different for quantifiers -- 
+           e.g. forall x:nat alpha == !! \x:nat. alpha
+                forall x:real beta == !! \x:real. beta *)
+        if not (Type.equal ty_s ty_t) then (OSeq.return ((s,t), []))
+        else find_disagreement_aux s' t'
       | _ -> OSeq.return ((s, t),[])
     )
   in

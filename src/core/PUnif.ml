@@ -199,13 +199,11 @@ module Make (St : sig val st : Flex_state.t end) = struct
     if depth > 1 then int_of_float @@ log10 (float_of_int depth) *. get_option PUP.k_skip_multiplier
     else 0 
 
-  let log100 x = (log10 x) /. 2.0
-
   let max_skipped = ref 0 
   let skip depth = 
-    if depth > max !max_skipped 1 then (
+    if depth > !max_skipped then (
       max_skipped := depth;
-      int_of_float ((log100 (float_of_int depth)) *. get_option PUP.k_skip_multiplier)
+      int_of_float ((log10 (float_of_int depth)) *. get_option PUP.k_skip_multiplier)
     )else (if depth = 0 then 0 else 3)
   
   let delay depth res =
@@ -275,6 +273,17 @@ module Make (St : sig val st : Flex_state.t end) = struct
     let subst = Subst.FO.bind' Subst.empty (v, scope) (subst_value, scope) in
     subst
 
+  let flex_flex_diff_trivial ~scope ~counter x y  =  
+    let prefix_types_x, return_type_x = Type.open_fun (HVar.ty x) in
+    let prefix_types_y, return_type_y = Type.open_fun (HVar.ty y) in
+    assert(Type.equal return_type_x return_type_y);
+    let matrix_head = T.var (H.fresh_cnt ~counter ~ty:return_type_x ()) in
+    let subst_value_x = T.fun_l prefix_types_x matrix_head in
+    let subst_value_y = T.fun_l prefix_types_y matrix_head in
+    let subst = Subst.FO.bind' Subst.empty (x, scope) (subst_value_x, scope) in
+    let subst = Subst.FO.bind' subst (y, scope) (subst_value_y, scope) in
+    subst
+
   let renamer ~counter t0s t1s = 
     let lhs,rhs, unifscope, us = U.FO.rename_to_new_scope ~counter t0s t1s in
     lhs,rhs,unifscope,U.subst us
@@ -314,7 +323,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
                      flag (CCList.replicate inc None) in
                  Some (sub, flag'))))
           else OSeq.return (Some (elim_trivial ~counter ~scope x, flag))
-        | `Flex _, `Flex _ ->
+        | `Flex x, `Flex y ->
           (* all rules  *)
           let ident = 
             if get_op flag Ident < get_option PUP.k_max_identifications then (
@@ -333,7 +342,9 @@ module Make (St : sig val st : Flex_state.t end) = struct
             OSeq.append
               (proj_imit_lr ~disable_imit:true ~scope ~counter ~subst s t flag)
               (proj_imit_lr ~disable_imit:true ~scope ~counter ~subst t s flag) in
-          delay depth @@ OSeq.append projs ident
+          delay depth @@ 
+            OSeq.append (OSeq.append projs ident) 
+                        (OSeq.return (Some (flex_flex_diff_trivial ~scope ~counter x y, flag)))
         | `Flex _, `Rigid
         | `Rigid, `Flex _ ->
           OSeq.append
