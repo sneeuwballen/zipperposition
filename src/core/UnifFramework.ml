@@ -3,12 +3,14 @@ module LL = OSeq
 module T = Term
 module U = Unif
 module Q = CCDeque
+module PUP = PragUnifParams
 
 module type PARAMETERS = sig
   exception NotInFragment
   exception NotUnifiable
   type flag_type
   val init_flag : flag_type
+  val flex_state : Flex_state.t
   val identify_scope : T.t Scoped.t -> T.t Scoped.t -> T.t * T.t * Scoped.scope * S.t
   val frag_algs : unit -> (T.t Scoped.t -> T.t Scoped.t -> S.t -> S.t list) list
   val pb_oracle : (T.t Scoped.t -> T.t Scoped.t -> flag_type -> S.t -> Scoped.scope -> (S.t * flag_type) option LL.t)
