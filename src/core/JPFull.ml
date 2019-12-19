@@ -13,14 +13,12 @@ module Make (S : sig val st: Flex_state.t end) = struct
 
   let get_op k = Flex_state.get_exn k S.st
 
-  let log100 x = (log10 x) /. 2.0
-
   let max_skipped = ref 0 
   let skip depth = 
-    if depth > max !max_skipped 1 then (
+    if depth > !max_skipped then (
       max_skipped := depth;
-      int_of_float ((log100 (float_of_int depth)) *. get_op PUP.k_skip_multiplier)
-    )else (if depth = 0 then 0 else 5)
+      int_of_float ((log10 (float_of_int depth)) *. get_op PUP.k_skip_multiplier)
+    )else (if depth = 0 then 0 else 2)
 
   let delay depth res =
     OSeq.append

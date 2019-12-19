@@ -242,7 +242,7 @@ let iterate ?(flex_same=false) ~scope ~counter u v l =
 (* Apply a substitution and reduce to normal form. Comparison form is actually slightly different, but eta_expand also works. *)
 let nfapply s u = S.apply s u |> Lambda.snf |> Lambda.eta_expand
 
-let find_disagreement s t = 
+let find_disagreement s t =
   (* TODO: preferably one that is not below a variable (to get preunification if possible) *)
   let rec find_disagreement_l ?(applied_var = None) ?(argindex=0) ss tt = 
     match ss, tt with
@@ -277,14 +277,18 @@ let find_disagreement s t =
         find_disagreement_l ss tt 
       | T.App (f, ss), T.App (g, tt) when T.equal f g && T.is_var f -> 
         find_disagreement_l ~applied_var:(Some f) ss tt 
-      | T.AppBuiltin (f, ss), T.AppBuiltin (g, tt) when Builtin.equal f g -> 
+      | T.AppBuiltin (f, ss), T.AppBuiltin (g, tt) when Builtin.equal f g && List.length ss = List.length tt ->
+        (* ss and tt do not have to be of the same size -- AND/OR are n-ary operators *)
         find_disagreement_l ss tt 
       | T.Var _, T.Var _ when T.equal s t -> OSeq.empty
       | T.DB i, T.DB j when i = j -> OSeq.empty
       | T.Const a, T.Const b when ID.equal a b -> OSeq.empty
       | T.Fun (ty_s, s'), T.Fun (ty_t, t') -> 
-        assert (Type.equal ty_s ty_t); 
-        find_disagreement_aux s' t'
+        (* type can be different for quantifiers -- 
+           e.g. forall x:nat alpha == !! \x:nat. alpha
+                forall x:real beta == !! \x:real. beta *)
+        if not (Type.equal ty_s ty_t) then (OSeq.return ((s,t), []))
+        else find_disagreement_aux s' t'
       | _ -> OSeq.return ((s, t),[])
     )
   in
@@ -340,8 +344,8 @@ let unify ~scope ~counter t0 s0 =
              let t_subst = nfapply subst (t, scope) in
              let s_subst = nfapply subst (s, scope) in
              Util.debugf 1 "@[sigma(s): %a @] \n  @[sigma(t): %a @]" (fun k-> k T.pp s_subst T.pp t_subst);
-             let unifiers = if Lambda.is_lambda_pattern t_subst && 
-                               Lambda.is_lambda_pattern s_subst then
+             let unifiers = if Term.is_fo_term t_subst && 
+                               Term.is_fo_term s_subst then
                  OSeq.return (unif_simple ~scope t_subst s_subst)  else
                  unify_terms t_subst s_subst ~rules:(rules @ [rulename]) in
              unifiers 
@@ -362,8 +366,8 @@ let unify ~scope ~counter t0 s0 =
     let t' = nfapply type_unifier (t0, scope) in
     let s' = nfapply type_unifier (s0, scope) in
     (* ... then terms. *)
-    let term_unifiers = if Lambda.is_lambda_pattern t' && Lambda.is_lambda_pattern s' then
-        (Util.debugf 1 "Doing pattern unif %a = %a" (fun k -> k T.pp t0 T.pp s0);
+    let term_unifiers = if Term.is_fo_term t' && Term.is_fo_term s' then
+        (Util.debugf 1 "Doing first-order unif %a = %a" (fun k -> k T.pp t0 T.pp s0);
          OSeq.return (unif_simple ~scope t' s'))
       else  (Util.debugf 1 "Doing JP unif %a = %a" (fun k -> k T.pp t0 T.pp s0); 
              unify_terms t' s' ~rules:[]) in
