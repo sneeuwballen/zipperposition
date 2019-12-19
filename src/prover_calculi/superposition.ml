@@ -19,7 +19,7 @@ let section = Util.Section.make ~parent:Const.section "sup"
 let flag_simplified = SClause.new_flag()
 
 module type S = Superposition_intf.S
-
+                
 (* statistics *)
 let stat_basic_simplify_calls = Util.mk_stat "sup.basic_simplify calls"
 let stat_basic_simplify = Util.mk_stat "sup.basic_simplify"
