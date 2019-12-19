@@ -53,7 +53,7 @@ module Make(A:ARG) = struct
   let clause_penalty s = function 
     | None ->
       s.nones <- s.nones +1;
-      max (s.nones - 10) 3 (* at the beginning penalize a little bit, but later penalize more *)
+      max (s.nones - 10) 2 (* at the beginning penalize a little bit, but later penalize more *)
     | Some c -> max (C.penalty c) (C.proof_depth c )
   
   let drip s =

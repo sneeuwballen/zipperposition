@@ -342,9 +342,11 @@ module Make (St : sig val st : Flex_state.t end) = struct
             OSeq.append
               (proj_imit_lr ~disable_imit:true ~scope ~counter ~subst s t flag)
               (proj_imit_lr ~disable_imit:true ~scope ~counter ~subst t s flag) in
-          delay depth @@ 
-            OSeq.append (OSeq.append projs ident) 
-                        (OSeq.return (Some (flex_flex_diff_trivial ~scope ~counter x y, flag)))
+          let projs_ident =
+            if OSeq.is_empty projs && OSeq.is_empty ident then OSeq.empty
+            else OSeq.append projs (delay depth ident) in
+          if not (OSeq.is_empty projs_ident) then projs_ident
+          else OSeq.return (Some (flex_flex_diff_trivial ~scope ~counter x y, flag))
         | `Flex _, `Rigid
         | `Rigid, `Flex _ ->
           OSeq.append
