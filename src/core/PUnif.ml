@@ -204,7 +204,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
     if depth > !max_skipped then (
       max_skipped := depth;
       int_of_float ((log10 (float_of_int depth)) *. get_option PUP.k_skip_multiplier)
-    )else (if depth = 0 then 0 else 3)
+    ) else 1
   
   let delay depth res =
     OSeq.append
@@ -234,9 +234,12 @@ module Make (St : sig val st : Flex_state.t end) = struct
           else []
         with Invalid_argument s when String.equal s "no_imits" -> [] in
       (* OSeq.of_list (simp_proj @ imit_binding @ func_proj) *)
-      OSeq.append 
+      (* OSeq.append 
         (OSeq.of_list simp_proj)
-        (delay (get_depth flag) @@ OSeq.append (OSeq.of_list imit_binding) (OSeq.of_list func_proj))
+        (delay (get_depth flag) @@ OSeq.append (OSeq.of_list imit_binding) (OSeq.of_list func_proj)) *)
+        OSeq.append 
+          (OSeq.append (OSeq.of_list imit_binding) (OSeq.of_list simp_proj))
+          (delay (get_depth flag) (OSeq.of_list func_proj))
     with Invalid_argument s when String.equal s "as_var_exn" ->
       OSeq.empty
 

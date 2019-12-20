@@ -504,11 +504,14 @@ module Make(C : Clause_intf.S) = struct
     let defer_formulas c =
       - (prefer_formulas c)
 
-    let prefer_fo c = 
-      if Iter.for_all Term.is_fo_term (C.Seq.terms c) then 0 else 1
+    let prefer_fo c =
+      let all_terms = Iter.filter (fun t-> not (Term.is_true_or_false t)) (C.Seq.terms c) in
+      let num_terms = float_of_int (Iter.length all_terms) in
+      let num_fo_terms = float_of_int (Iter.filter_count Term.is_true_or_false all_terms) in
+      int_of_float @@  (1.0 -. (num_fo_terms /. num_terms)) *. 100.0
 
     let defer_fo c = 
-      if Iter.for_all Term.is_fo_term (C.Seq.terms c) then 0 else 1
+      - (prefer_fo c)
 
     let prefer_ground c =
       if C.is_ground c then 0 else 1

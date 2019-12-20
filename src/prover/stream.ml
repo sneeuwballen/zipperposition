@@ -20,7 +20,7 @@ module Make(A:ARG) = struct
   type t = {
     id : int; (** unique ID of the stream *)
     mutable penalty: int; (** heuristic penalty, increased by every drip *)
-    mutable nones : int; (** how many failed attemts to retrieve unifier were there  *)
+    mutable hits : int; (** how many attemts to retrieve unifier were there  *)
     mutable stm : C.t option OSeq.t; (** the stream itself *)
   }
 
@@ -35,7 +35,7 @@ module Make(A:ARG) = struct
     Util.incr_stat stat_stream_create;
     let id = !id_count_ in
     incr id_count_;
-    { id; penalty = p; nones=0; stm = s; }
+    { id; penalty = p; hits=0; stm = s; }
 
   let equal s1 s2 = s1.id = s2.id
   let compare s1 s2 = Pervasives.compare s1.id s2.id
@@ -52,13 +52,17 @@ module Make(A:ARG) = struct
 
   let clause_penalty s = function 
     | None ->
-      s.nones <- s.nones +1;
-      max (s.nones - 10) 2 (* at the beginning penalize a little bit, but later penalize more *)
-    | Some c -> max (C.penalty c) (C.proof_depth c )
+      s.hits <- s.hits +1;
+      10
+    | Some c ->
+      s.hits <- s.hits +1;
+      C.penalty c + s.hits-1
   
   let drip s =
     match s.stm () with
-    | OSeq.Nil -> raise Empty_Stream
+    | OSeq.Nil -> 
+      s.penalty <- 0;
+      raise Empty_Stream
     | OSeq.Cons (hd,tl) ->
       s.stm <- tl;
       s.penalty <-  s.penalty + (clause_penalty s hd);

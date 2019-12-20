@@ -979,9 +979,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let inf_res = infer_active_aux
         ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:(Env.flex_get k_unif_alg))
         ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
-            let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) in
+            (* let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) in *)
             (* /!\ may differ from the actual penalty (by -2) *)
-            Some (penalty, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
+            Some (0, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
         clause
     in
     let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) inf_res in
@@ -991,9 +991,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let inf_res = infer_passive_aux
         ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:(Env.flex_get k_unif_alg))
         ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
-            let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) in
+            (* let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) in *)
             (* /!\ may differ from the actual penalty (by -2) *)
-            Some (penalty, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
+            Some (0, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
         clause
     in
     let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) inf_res in
@@ -1330,8 +1330,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~iterate_substs:(fun substs do_eq_res -> Some (OSeq.map (CCOpt.flat_map do_eq_res) substs))
         clause
     in
-    let penalty = C.penalty clause in
-    let stm_res = List.map (Stm.make ~penalty:penalty) inf_res in
+    let stm_res = List.map (Stm.make ~penalty:0) inf_res in
     StmQ.add_lst (_stmq()) stm_res; []
 
   let infer_equality_resolution_pragmatic_ho max_unifs clause =
@@ -1563,8 +1562,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~iterate_substs:(fun substs do_eq_fact -> Some (OSeq.map (CCOpt.flat_map do_eq_fact) substs))
         clause
     in
-    let penalty = C.penalty clause in
-    let stm_res = List.map (Stm.make ~penalty:penalty) inf_res in
+    let stm_res = List.map (Stm.make ~penalty:0) inf_res in
     StmQ.add_lst (_stmq()) stm_res; []
 
   let infer_equality_factoring_pragmatic_ho max_unifs clause =
@@ -2904,7 +2902,7 @@ let _ground_subs_check = ref 0
 let _sup_t_f = ref true
 let _solid_subsumption = ref false
 
-let _skip_multiplier = ref 25.0
+let _skip_multiplier = ref 10.0
 let _imit_first = ref false
 let _max_depth = ref 3
 let _max_rigid_imitations = ref 3
@@ -2918,8 +2916,8 @@ let _solidification_limit = ref 5
 let _max_unifs_solid_ff = ref 20
 let _use_weight_for_solid_subsumption = ref false
 
-let _guard = ref 100
-let _ratio = ref 200
+let _guard = ref 20
+let _ratio = ref 100
 
 let key = Flex_state.create_key ()
 

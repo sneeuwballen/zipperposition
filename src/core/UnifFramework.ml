@@ -72,6 +72,33 @@ module Make (P : PARAMETERS) = struct
 
   let tasks_taken = 100
 
+  (* Given a sequence of sequences (i.e., a generator) A
+       take one element from the A[0],
+       then one element from A[0] and A[1]
+       then one element from A[0],A[1] and A[2], etc.. *)
+  let take_fair gens =
+    (* Take one element from A[0],A[1],...,A[k-1] *)
+    let rec take_first_k k gens =
+      if k = 0 then (OSeq.empty, gens)
+      else (match gens () with 
+      | OSeq.Nil -> (OSeq.empty, OSeq.empty)
+      | OSeq.Cons(x,xs) ->
+        begin match x () with 
+        | OSeq.Nil ->
+          take_first_k (k-1) xs
+        | OSeq.Cons(y, ys) ->
+          let taken, new_gens = take_first_k (k-1) xs in
+          (OSeq.cons y taken, OSeq.cons ys new_gens) end) in
+    
+    (* Take one element from A[0],A[1],...A[i-1]
+       and then take one element from A[0],A[1],...,A[i]   *)
+    let rec aux i gens =
+      let taken, new_gens = take_first_k i gens in
+      if OSeq.is_empty new_gens then taken
+      else (function () -> OSeq.append taken (aux (i+1) new_gens) ()) 
+    in
+    aux 1 gens
+
   let do_unif problem subst mono unifscope =   
     let rec aux ~steps subst problem =
       let decompose args_l args_r rest flag =
@@ -94,7 +121,7 @@ module Make (P : PARAMETERS) = struct
             )
           | _ -> invalid_arg "arguments have to be of the same size" in
         let rigid_rigid, flex_rigid, pure_vars, flex_flex = classify args_l args_r in
-        if List.length rest > 30 then (
+        if List.length rest > 10 then (
           rigid_rigid @ rest @ flex_rigid @ pure_vars @ flex_flex)
         else (
           let rec decompose_rest = function 
@@ -174,7 +201,8 @@ module Make (P : PARAMETERS) = struct
                   let all_oracles = 
                     P.pb_oracle (body_lhs, unifscope) (body_rhs, unifscope) flag subst unifscope in
 
-                  let oracle_unifs = OSeq.map (fun sub_flag_opt -> 
+                  let oracle_unifs = 
+                    OSeq.map (fun sub_flag_opt -> 
                       match sub_flag_opt with 
                       | None -> 
                         OSeq.return None
@@ -184,7 +212,7 @@ module Make (P : PARAMETERS) = struct
                           aux ~steps:(steps+1) subst' ((lhs,rhs,flag') :: rest)
                         with Subst.InconsistentBinding _ ->
                           OSeq.empty) all_oracles
-                                     |> OSeq.merge in
+                    |> take_fair in
                   OSeq.interleave oracle_unifs args_unif
               with Unif.Fail -> OSeq.empty) in
     aux ~steps:0 subst problem

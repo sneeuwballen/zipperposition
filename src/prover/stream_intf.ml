@@ -7,7 +7,7 @@ module type S = sig
   type t = private {
     id : int; (** unique ID of the stream *)
     mutable penalty: int; (** heuristic penalty *)
-    mutable nones: int; (** how many failed attemts to retrieve unifier were there  *)
+    mutable hits: int; (** how many attemts to retrieve unifier were there  *)
     mutable stm : C.t option OSeq.t; (** the stream itself *)
   }
 

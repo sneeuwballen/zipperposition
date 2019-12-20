@@ -15,10 +15,10 @@ module Make (S : sig val st: Flex_state.t end) = struct
 
   let max_skipped = ref 0 
   let skip depth = 
-    if depth > !max_skipped then (
+    if depth > max !max_skipped 1 then (
       max_skipped := depth;
       int_of_float ((log10 (float_of_int depth)) *. get_op PUP.k_skip_multiplier)
-    )else (if depth = 0 then 0 else 2)
+    )else (if depth !=0 then 5 else 0)
 
   let delay depth res =
     OSeq.append
@@ -122,9 +122,9 @@ module Make (S : sig val st: Flex_state.t end) = struct
       | `Flex _, `Rigid
       | `Rigid, `Flex _ ->
         OSeq.append
+          (delay depth @@ imit_rule ~counter ~scope s t depth)
           (let flex, rigid = if Term.is_var (T.head_term s) then s,t else t,s in
            hs_proj_flex_rigid ~counter ~scope ~flex rigid depth)
-          (delay depth @@ imit_rule ~counter ~scope s t depth)
       | _ -> 
         assert false)
 
